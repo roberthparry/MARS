@@ -3,8 +3,10 @@
 
 #include <stddef.h>
 #include <stdarg.h>
+#include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <wchar.h>
 
 /**
  * @file ustring.h
@@ -20,7 +22,7 @@
  * ## Text model
  *
  * @c string_t stores ordinary text that can be read or typed by a user. The
- * simple character functions (string_count(), string_at(),
+ * simple character functions (string_length(), string_at(),
  * string_substring(), string_each(), string_reverse()) treat combined text,
  * accents and emoji sequences as single characters. Low-level byte and UTF-8
  * details are handled inside the implementation.
@@ -55,7 +57,7 @@ typedef size_t string_pos_t;
 /**
  * @brief Stack value for one user-visible text rune.
  *
- * A rune may contain more than one storage byte and may be more complex than
+ * A rune may contain more than one encoded unit and may be more complex than
  * a C @c char. Treat this as a lightweight value returned by string_at().
  * It remains valid while the source string is alive and unmodified.
  */
@@ -96,6 +98,21 @@ string_t *string_new(void);
  * @return      Newly allocated string, or @c NULL on allocation failure.
  */
 string_t *string_new_with(const char *init);
+
+/**
+ * @brief Create a new string from a null-terminated wide C string.
+ *
+ * This is a convenience boundary for callers that already have @c L"..."
+ * text. The wide text is converted into the string module's ordinary internal
+ * representation, after which callers can forget about @c wchar_t.
+ *
+ * Invalid scalar values or unpaired UTF-16 surrogates are replaced with
+ * U+FFFD.
+ *
+ * @param init  Null-terminated wide C string to copy. Must not be @c NULL.
+ * @return      Newly allocated string, or @c NULL on allocation failure.
+ */
+string_t *string_new_wide(const wchar_t *init);
 
 /**
  * @brief Deep-copy a string.
@@ -145,17 +162,6 @@ const char *string_c_str(const string_t *s);
  * @param s  String to query. Must not be @c NULL.
  * @return   Number of user-visible characters.
  */
-size_t string_count(const string_t *s);
-
-/**
- * @brief Return the storage length in bytes.
- *
- * Most callers should use string_count() for text. This low-level function is
- * useful when interoperating with byte-oriented APIs or allocating storage.
- *
- * @param s  String to query. Must not be @c NULL.
- * @return   Number of storage bytes, excluding the null terminator.
- */
 size_t string_length(const string_t *s);
 
 /* =========================================================================
@@ -165,8 +171,8 @@ size_t string_length(const string_t *s);
 /**
  * @brief Clear the string to empty, preserving allocated capacity.
  *
- * After this call string_count() and string_length() return 0 and string_c_str() returns an
- * empty string. No reallocation is performed.
+ * After this call string_length() returns 0 and string_c_str() returns an empty
+ * string. No reallocation is performed.
  *
  * @param s  String to clear. Must not be @c NULL.
  */
@@ -216,7 +222,7 @@ int string_append_char(string_t *s, char c);
 /**
  * @brief Insert text at a character index.
  *
- * Inserting at string_count() is equivalent to appending. Values beyond the
+ * Inserting at string_length() is equivalent to appending. Values beyond the
  * end are clamped to the end.
  *
  * @param s    Destination string. Must not be @c NULL.
@@ -229,7 +235,7 @@ int string_insert(string_t *s, size_t pos, const char *text);
 /**
  * @brief Insert another string at a character index.
  *
- * Inserting at string_count() is equivalent to appending. Values beyond the
+ * Inserting at string_length() is equivalent to appending. Values beyond the
  * end are clamped to the end.
  *
  * @param s    Destination string. Must not be @c NULL.
@@ -254,28 +260,29 @@ string_t *string_substring(const string_t *s, size_t start, size_t count);
  *
  * @param s      Source string. Must not be @c NULL.
  * @param index  Zero-based character index.
- * @return       Rune value, or an empty rune for out-of-range @p index.
+ * @return       Rune value, or a none rune for out-of-range @p index.
  */
 rune_t string_at(const string_t *s, size_t index);
 
 /**
- * @brief Test whether a rune value is empty.
+ * @brief Test whether a rune value represents no character.
  *
- * Empty values are returned for out-of-range access.
+ * A none rune is returned for out-of-range access, failed ASCII construction,
+ * and end-of-input cursor reads.
  *
  * @param rune  Rune value to inspect.
- * @return    @c true if empty, @c false otherwise.
+ * @return      @c true if @p rune represents no character.
  */
-bool rune_is_empty(rune_t rune);
+bool rune_is_none(rune_t rune);
 
 /**
  * @brief Create a stack rune from one ASCII character.
  *
  * This does not allocate and does not borrow from a string. Non-ASCII input
- * returns an empty rune; use string_at() or a string cursor for general text.
+ * returns a none rune; use string_at() or a string cursor for general text.
  *
  * @param c  ASCII character to wrap.
- * @return   Stack rune representing @p c, or an empty rune for non-ASCII.
+ * @return   Stack rune representing @p c, or a none rune for non-ASCII.
  */
 rune_t rune_from_ascii(char c);
 
@@ -284,10 +291,10 @@ rune_t rune_from_ascii(char c);
  *
  * This is useful for recognising typed mathematical symbols such as
  * @c √, @c π, superscripts, and other non-ASCII input without exposing string
- * storage. Empty runes return 0.
+ * storage. None runes return 0.
  *
  * @param rune  Rune to inspect.
- * @return      Numeric rune value, or 0 for an empty rune.
+ * @return      Numeric rune value, or 0 for a none rune.
  */
 uint32_t rune_value(rune_t rune);
 
@@ -388,8 +395,8 @@ int string_each(const string_t *s, string_each_fn fn, void *user);
  * and unmodified.
  *
  * @param s    Source string. Must not be @c NULL.
- * @param pos  Starting storage offset.
- * @param len  Maximum storage length to borrow.
+ * @param pos  Starting string position.
+ * @param len  Maximum encoded length to borrow.
  * @return     Borrowed view, or an empty view for invalid input.
  */
 string_view_t string_view(const string_t *s, size_t pos, size_t len);
@@ -413,8 +420,8 @@ string_view_t string_view_empty(void);
  * @brief Borrow a sub-view from an existing view.
  *
  * @param view  Source view.
- * @param pos   Starting storage offset inside @p view.
- * @param len   Maximum storage length to borrow.
+ * @param pos   Starting position inside @p view.
+ * @param len   Maximum encoded length to borrow.
  * @return      Borrowed sub-view, or an empty view for invalid input.
  */
 string_view_t string_view_slice(string_view_t view, size_t pos, size_t len);
@@ -428,10 +435,10 @@ string_view_t string_view_slice(string_view_t view, size_t pos, size_t len);
 string_t *string_from_view(const string_view_t *v);
 
 /**
- * @brief Return the storage length of a borrowed view.
+ * @brief Return the encoded length of a borrowed view.
  *
  * @param view  View to inspect.
- * @return      Number of storage bytes in the view.
+ * @return      Encoded length of the view.
  */
 size_t string_view_length(string_view_t view);
 
@@ -453,32 +460,34 @@ int string_view_is_empty(string_view_t view);
 int string_view_equals_view(string_view_t a, string_view_t b);
 
 /**
- * @brief Inspect one storage unit in a borrowed view.
+ * @brief Peek at a view position as one ASCII rune.
  *
- * This is an interoperability helper for code that must hash or compare
- * legacy ASCII/UTF-8 spellings without exposing the view's backing pointer.
- * Most ordinary text code should prefer cursors and runes.
+ * This is a parsing helper for ordinary syntax characters such as @c +,
+ * @c (, or @c _. It returns false for non-ASCII runes.
  *
  * @param view  View to inspect.
- * @param pos   Storage offset inside @p view.
- * @param out   Optional output storage unit.
- * @return      @c true when @p pos is valid, @c false otherwise.
+ * @param pos   Position inside @p view.
+ * @param out   Optional output character.
+ * @return      @c true when @p pos contains one ASCII rune.
  */
-bool string_view_peek_storage(string_view_t view, size_t pos, unsigned char *out);
+bool string_view_peek_ascii(string_view_t view, string_pos_t pos, unsigned char *out);
 
 /**
- * @brief Decode the codepoint that begins at a view storage offset.
+ * @brief Peek at the rune value beginning at a view position.
  *
- * @param view       View to inspect.
- * @param pos        Storage offset inside @p view.
- * @param out        Optional decoded Unicode codepoint.
- * @param width_out  Optional number of storage units consumed.
- * @return           @c true when a codepoint was decoded, @c false otherwise.
+ * This is useful for mathematical parsers that need to recognise symbols such
+ * as @c π, @c √, and superscripts without exposing string storage.
+ *
+ * @param view          View to inspect.
+ * @param pos           Position inside @p view.
+ * @param out           Optional rune value.
+ * @param next_pos_out  Optional position immediately after the rune value.
+ * @return              @c true when a rune value was read, @c false otherwise.
  */
-bool string_view_peek_codepoint(string_view_t view,
-                                size_t pos,
-                                uint32_t *out,
-                                size_t *width_out);
+bool string_view_peek_rune_value(string_view_t view,
+                                 string_pos_t pos,
+                                 uint32_t *out,
+                                 string_pos_t *next_pos_out);
 
 /**
  * @brief Trim whitespace from both ends of a borrowed view.
@@ -609,7 +618,7 @@ int string_cursor_seek(string_cursor_t *cursor, string_pos_t pos);
  * @brief Peek at the current user-visible rune without advancing.
  *
  * @param cursor  Cursor to inspect. Must not be @c NULL.
- * @return        Current rune, or an empty rune at end.
+ * @return        Current rune, or a none rune at end.
  */
 rune_t string_cursor_peek(const string_cursor_t *cursor);
 
@@ -664,21 +673,22 @@ bool string_cursor_peek_ascii_at(const string_cursor_t *cursor,
                                  unsigned char *out);
 
 /**
- * @brief Advance over a known storage span.
+ * @brief Advance over a known matched span.
  *
- * Use this after matching a literal or borrowed view span when the cursor
- * needs to move by that exact matched length.
+ * Use this after matching a literal or borrowed view when the cursor needs to
+ * move by that exact matched length.
  *
  * @param cursor  Cursor to move.
- * @param length  Storage length to skip.
+ * @param span    Position span to skip, usually computed from two cursor
+ *                positions or a matched view.
  * @return        @c true on success, @c false if the span is invalid.
  */
-bool string_cursor_skip(string_cursor_t *cursor, size_t length);
+bool string_cursor_skip(string_cursor_t *cursor, string_pos_t span);
 
 /**
  * @brief Skip whitespace runes at the cursor.
  *
- * Handles ordinary ASCII whitespace and common Unicode space codepoints.
+ * Handles ordinary typed whitespace, including common Unicode spaces.
  *
  * @param cursor  Cursor to move.
  */
@@ -687,28 +697,41 @@ void string_cursor_skip_spaces(string_cursor_t *cursor);
 /**
  * @brief Copy text between two cursor positions into a new string.
  *
- * @param cursor  Cursor whose source text owns the positions.
  * @param start   Start position.
  * @param end     End position.
+ * @param cursor  Cursor whose source text owns the positions.
  * @return        New string, or @c NULL on invalid positions/allocation failure.
  */
-string_t *string_cursor_slice(const string_cursor_t *cursor,
-                              string_pos_t start,
-                              string_pos_t end);
+string_t *string_cursor_slice_between(string_pos_t start,
+                                      string_pos_t end,
+                                      const string_cursor_t *cursor);
+
+/**
+ * @brief Copy text from a saved position to the cursor's current position.
+ *
+ * This is the usual parser helper after saving a start position and advancing
+ * over a token.
+ *
+ * @param start   Saved start position.
+ * @param cursor  Cursor whose source text owns the position.
+ * @return        New string, or @c NULL on invalid positions/allocation failure.
+ */
+string_t *string_cursor_extract(string_pos_t start,
+                                const string_cursor_t *cursor);
 
 /**
  * @brief Append text between two cursor positions to an existing string.
  *
  * @param out     Destination string.
- * @param cursor  Cursor whose source text owns the positions.
  * @param start   Start position.
  * @param end     End position.
+ * @param cursor  Cursor whose source text owns the positions.
  * @return        0 on success, non-zero on error.
  */
-int string_cursor_append_slice(string_t *out,
-                               const string_cursor_t *cursor,
-                               string_pos_t start,
-                               string_pos_t end);
+int string_cursor_append_slice_between(string_t *out,
+                                       string_pos_t start,
+                                       string_pos_t end,
+                                       const string_cursor_t *cursor);
 
 /**
  * @brief Borrow a view between two cursor positions.
@@ -716,41 +739,33 @@ int string_cursor_append_slice(string_t *out,
  * The returned view remains valid while the cursor and its source remain alive
  * and unmodified.
  *
- * @param cursor  Cursor whose source text owns the positions.
  * @param start   Start position.
  * @param end     End position.
+ * @param cursor  Cursor whose source text owns the positions.
  * @return        Borrowed view, or an empty view for invalid positions.
  */
-string_view_t string_cursor_view(const string_cursor_t *cursor,
-                                 string_pos_t start,
-                                 string_pos_t end);
+string_view_t string_cursor_view_between(string_pos_t start,
+                                         string_pos_t end,
+                                         const string_cursor_t *cursor);
 
 /**
- * @brief Copy text from a position up to the cursor's current position.
+ * @brief Borrow a view from a saved position to the cursor's current position.
  *
- * @param cursor  Cursor whose source text owns the position.
- * @param start   Start position.
- * @return        New string, or @c NULL on invalid position/allocation failure.
- */
-string_t *string_cursor_slice_since(const string_cursor_t *cursor,
-                                    string_pos_t start);
-
-/**
- * @brief Borrow a view from a position to the cursor's current position.
+ * This is the borrowed-view counterpart to string_cursor_extract().
  *
+ * @param start   Saved start position.
  * @param cursor  Cursor whose source text owns the position.
- * @param start   Start position.
  * @return        Borrowed view, or an empty view for invalid positions.
  */
-string_view_t string_cursor_view_since(const string_cursor_t *cursor,
-                                       string_pos_t start);
+string_view_t string_cursor_view_extract(string_pos_t start,
+                                         const string_cursor_t *cursor);
 
 /**
  * @brief Peek at a rune at a saved cursor position without moving the cursor.
  *
  * @param cursor  Cursor whose source text owns the position.
  * @param pos     Position to inspect.
- * @return        Rune at @p pos, or an empty rune for invalid/end positions.
+ * @return        Rune at @p pos, or a none rune for invalid/end positions.
  */
 rune_t string_cursor_peek_at(const string_cursor_t *cursor,
                              string_pos_t pos);
@@ -854,12 +869,26 @@ string_t *string_sprintf(const char *fmt, ...);
  */
 int string_printf(const char *fmt, ...);
 
+/**
+ * @brief Print formatted text to a file stream.
+ *
+ * Uses the same conversion extensions as string_append_format():
+ * @c %S for `const string_t *`, @c %W for `string_view_t`, and @c %R for
+ * `rune_t`.
+ *
+ * @param stream  Destination stream. Must not be @c NULL.
+ * @param fmt     printf-style format string. Must not be @c NULL.
+ * @param ...     Format arguments.
+ * @return        Number of bytes printed, or negative on error.
+ */
+int string_fprintf(FILE *stream, const char *fmt, ...);
+
 /* =========================================================================
    Search and comparison
    ========================================================================= */
 
 /**
- * @brief Signed result type for byte-offset search functions.
+ * @brief Signed result type for encoded-position search functions.
  *
  * Used instead of @c ssize_t to avoid a POSIX dependency.
  */
@@ -868,32 +897,32 @@ typedef long string_offset_t;
 /**
  * @brief Find the first occurrence of a UTF-8 substring.
  *
- * Searches @p s for the first occurrence of @p needle using a
- * bytewise comparison.
+ * Searches @p s for the first occurrence of @p needle using the string's
+ * canonical encoded representation.
  *
  * @param s       String to search. Must not be @c NULL.
  * @param needle  Null-terminated UTF-8 substring to find. Must not be @c NULL.
- * @return        Byte offset of the first match, or -1 if not found.
+ * @return        Encoded position of the first match, or -1 if not found.
  */
 string_offset_t string_find(const string_t *s, const char *needle);
 
 /**
  * @brief Find the first occurrence of a string.
  *
- * Searches @p s for the first occurrence of @p needle using a
- * bytewise comparison.
+ * Searches @p s for the first occurrence of @p needle using the string's
+ * canonical encoded representation.
  *
  * @param s       String to search. Must not be @c NULL.
  * @param needle  String to find. Must not be @c NULL.
- * @return        Byte offset of the first match, or -1 if not found.
+ * @return        Encoded position of the first match, or -1 if not found.
  */
 string_offset_t string_find_string(const string_t *s, const string_t *needle);
 
 /**
- * @brief Lexicographically compare two strings by UTF-8 byte value.
+ * @brief Lexicographically compare two strings by canonical encoded value.
  *
- * The comparison is bytewise (not locale-aware or Unicode collation order).
- * Strings are stored in the class's canonical form before comparison.
+ * The comparison is not locale-aware or Unicode collation order. Strings are
+ * stored in the class's canonical form before comparison.
  *
  * @param a  First string. Must not be @c NULL.
  * @param b  Second string. Must not be @c NULL.
@@ -938,15 +967,15 @@ bool string_ends_with(const string_t *s, const char *suffix);
 bool string_ends_with_string(const string_t *s, const string_t *suffix);
 
 /**
- * @brief Extract a substring by storage byte range.
+ * @brief Extract a substring by encoded range.
  *
  * Prefer string_substring() for ordinary text. This low-level function is for
- * byte-oriented code; @p pos and @p pos + @p len should lie on valid character
- * boundaries to avoid splitting encoded text.
+ * boundary code; @p pos and @p pos + @p len should lie on valid character
+ * boundaries.
  *
  * @param s    Source string. Must not be @c NULL.
- * @param pos  Starting byte offset.
- * @param len  Number of bytes to extract.
+ * @param pos  Starting encoded position.
+ * @param len  Encoded span to extract.
  * @return     Newly allocated substring, or @c NULL on error.
  */
 string_t *string_substr(const string_t *s, size_t pos, size_t len);
@@ -1089,7 +1118,7 @@ void string_to_lower(string_t *s);
    ========================================================================= */
 
 /**
- * @brief Compute a hash of the UTF-8 byte contents.
+ * @brief Compute a hash of the encoded contents.
  *
  * The hash is consistent within a single process run but is not guaranteed
  * to be stable across library versions or platforms. Suitable for use in
@@ -1108,8 +1137,8 @@ unsigned long string_hash(const string_t *s);
  * @brief Fixed-capacity string buffer backed by caller-supplied storage.
  *
  * Useful for formatting short strings on the stack without heap allocation.
- * Appends that would exceed @c cap are silently truncated at a valid UTF-8
- * codepoint boundary.
+ * Appends that would exceed @c cap are silently truncated at a valid
+ * character boundary.
  *
  * ### Example
  * @code
@@ -1141,7 +1170,7 @@ void string_buffer_init(string_buffer_t *b, char *storage, size_t capacity);
  * @brief Append a null-terminated string to a fixed-capacity buffer.
  *
  * If the text does not fit, as much as possible is appended up to a valid
- * UTF-8 codepoint boundary and the buffer is NUL-terminated.
+ * character boundary and the buffer is NUL-terminated.
  *
  * @param b     Destination buffer. Must not be @c NULL.
  * @param text  Null-terminated text to append. Must not be @c NULL.
@@ -1153,7 +1182,7 @@ int string_buffer_append(string_buffer_t *b, const char *text);
  * @brief Append a string to a fixed-capacity buffer.
  *
  * If the text does not fit, as much as possible is appended up to a valid
- * UTF-8 codepoint boundary and the buffer is NUL-terminated.
+ * character boundary and the buffer is NUL-terminated.
  *
  * @param b     Destination buffer. Must not be @c NULL.
  * @param text  String to append. Must not be @c NULL.

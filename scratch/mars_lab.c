@@ -20,6 +20,15 @@ static char *xstrdup_local(const char *text)
     return copy;
 }
 
+static char *expr_text_dup(const expr_t *expr, style_t style)
+{
+    string_t *text = expr_to_text(expr, style);
+    char *copy = text ? xstrdup_local(string_c_str(text)) : NULL;
+
+    string_free(text);
+    return copy;
+}
+
 static void trim_fraction_tail(char *text)
 {
     char *dot = strchr(text, '.');
@@ -447,10 +456,10 @@ static int run_goal_seek(int argc, char **argv)
         goto cleanup;
     }
 
-    expr_text = expr_to_string(result.expr, style_EXPRESSION);
-    unbound_text = expr_to_string(result.expr, style_UNBOUND);
-    func_text = expr_to_string(result.expr, style_FUNCTION);
-    tex_text = expr_to_string(result.expr, style_TEX);
+    expr_text = expr_text_dup(result.expr, style_EXPRESSION);
+    unbound_text = expr_text_dup(result.expr, style_UNBOUND);
+    func_text = expr_text_dup(result.expr, style_FUNCTION);
+    tex_text = expr_text_dup(result.expr, style_TEX);
 
     printf("input       %s\n", input);
     printf("expression  %s\n", expr_text ? expr_text : "(null)");
@@ -513,10 +522,10 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    expr_text = expr_to_string(expr, style_EXPRESSION);
-    unbound_text = expr_to_string(expr, style_UNBOUND);
-    func_text = expr_to_string(expr, style_FUNCTION);
-    tex_text = expr_to_string(expr, style_TEX);
+    expr_text = expr_text_dup(expr, style_EXPRESSION);
+    unbound_text = expr_text_dup(expr, style_UNBOUND);
+    func_text = expr_text_dup(expr, style_FUNCTION);
+    tex_text = expr_text_dup(expr, style_TEX);
 
     printf("input       %s\n", input);
     printf("expression  %s\n", expr_text ? expr_text : "(null)");
@@ -536,8 +545,8 @@ int main(int argc, char **argv)
             rc = 1;
             goto cleanup;
         }
-        deriv_text = expr_to_string(deriv, style_EXPRESSION);
-        deriv_tex_text = expr_to_string(deriv, style_TEX);
+        deriv_text = expr_text_dup(deriv, style_EXPRESSION);
+        deriv_tex_text = expr_text_dup(deriv, style_TEX);
         printf("derivative  d/d%s = %s\n",
                wrt_name,
                deriv_text ? deriv_text : "(null)");

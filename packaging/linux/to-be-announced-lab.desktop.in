@@ -1,9 +1,9 @@
 [Desktop Entry]
 Type=Application
-Name=Ophelia Lab
+Name=To-Be-Announced Lab
 Comment=Explore MARS mathematics in a magical Wonderland lab
-Exec=@OPHELIA_LAUNCHER@
+Exec=@TO_BE_ANNOUNCED_LAUNCHER@
 Terminal=false
 Categories=Development;Science;Math;
 StartupNotify=false
-Icon=ophelia-lab
+Icon=to-be-announced-lab

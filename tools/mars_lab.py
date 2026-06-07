@@ -84,13 +84,13 @@ LAB_MANIFEST_THEME = "#0b4f8a"
 LAB_BODY_CLASS = ""
 LAB_THEME_OVERRIDES = ""
 
-if LAB_THEME == "ophelia":
+if LAB_THEME == "to-be-announced":
     LAB_THEME_COLOR = "#f7a8d9"
     LAB_MANIFEST_BACKGROUND = "#fff5fb"
     LAB_MANIFEST_THEME = "#f7a8d9"
-    LAB_BODY_CLASS = "theme-ophelia"
+    LAB_BODY_CLASS = "theme-to-be-announced"
     LAB_THEME_OVERRIDES = r"""
-    body.theme-ophelia {
+    body.theme-to-be-announced {
       color: #31143d;
       font-family: "Georgia", "Iowan Old Style", "Palatino Linotype", serif;
       background:
@@ -100,7 +100,7 @@ if LAB_THEME == "ophelia":
         linear-gradient(160deg, #fff7fd 0%, #ffe6f5 26%, #f6e6ff 52%, #dbf6ff 74%, #fff4cf 100%);
     }
 
-    body.theme-ophelia::before {
+    body.theme-to-be-announced::before {
       opacity: 1;
       background:
         radial-gradient(circle at 14% 16%, rgba(255, 255, 255, 0.96) 0 3.5rem, transparent 6rem),
@@ -114,7 +114,7 @@ if LAB_THEME == "ophelia":
       mask: none;
     }
 
-    body.theme-ophelia::after {
+    body.theme-to-be-announced::after {
       height: 14rem;
       opacity: 0.94;
       background:
@@ -123,11 +123,11 @@ if LAB_THEME == "ophelia":
         linear-gradient(0deg, rgba(255, 224, 244, 0.82), rgba(255, 255, 255, 0.12) 54%, transparent 90%);
     }
 
-    body.theme-ophelia .celtic-backdrop {
+    body.theme-to-be-announced .celtic-backdrop {
       overflow: visible;
     }
 
-    body.theme-ophelia .aurora {
+    body.theme-to-be-announced .aurora {
       top: 0.4rem;
       height: 16rem;
       opacity: 0.94;
@@ -142,13 +142,13 @@ if LAB_THEME == "ophelia":
       transform: skewY(-4deg);
     }
 
-    body.theme-ophelia .standing-stones {
+    body.theme-to-be-announced .standing-stones {
       bottom: 1.4rem;
       height: 13rem;
       opacity: 0.92;
     }
 
-    body.theme-ophelia .stone {
+    body.theme-to-be-announced .stone {
       width: clamp(3.6rem, 5vw, 4.8rem);
       height: clamp(7.2rem, 14vw, 11rem);
       border-radius: 58% 42% 48% 52% / 14% 14% 8% 8%;
@@ -160,17 +160,17 @@ if LAB_THEME == "ophelia":
         inset 0.55rem 0.35rem 1rem rgba(255, 255, 255, 0.72);
     }
 
-    body.theme-ophelia .stone:nth-child(2),
-    body.theme-ophelia .stone:nth-child(5) {
+    body.theme-to-be-announced .stone:nth-child(2),
+    body.theme-to-be-announced .stone:nth-child(5) {
       height: 12.2rem;
     }
 
-    body.theme-ophelia .stone:nth-child(1)::before,
-    body.theme-ophelia .stone:nth-child(2)::before,
-    body.theme-ophelia .stone:nth-child(3)::before,
-    body.theme-ophelia .stone:nth-child(4)::before,
-    body.theme-ophelia .stone:nth-child(5)::before,
-    body.theme-ophelia .stone:nth-child(6)::before {
+    body.theme-to-be-announced .stone:nth-child(1)::before,
+    body.theme-to-be-announced .stone:nth-child(2)::before,
+    body.theme-to-be-announced .stone:nth-child(3)::before,
+    body.theme-to-be-announced .stone:nth-child(4)::before,
+    body.theme-to-be-announced .stone:nth-child(5)::before,
+    body.theme-to-be-announced .stone:nth-child(6)::before {
       content: "";
       position: absolute;
       inset: 18% 22%;
@@ -184,7 +184,7 @@ if LAB_THEME == "ophelia":
       opacity: 0.96;
     }
 
-    body.theme-ophelia .chariot-wheel {
+    body.theme-to-be-announced .chariot-wheel {
       right: 5vw;
       bottom: 2rem;
       width: 8rem;
@@ -218,55 +218,55 @@ if LAB_THEME == "ophelia":
         inset 0 0 1rem rgba(255,255,255,0.6);
     }
 
-    body.theme-ophelia h1 {
+    body.theme-to-be-announced h1 {
       color: #8a2b74;
       text-shadow:
         0 0 1.2rem rgba(255, 198, 231, 0.92),
         0 0 2rem rgba(199, 236, 255, 0.52);
     }
 
-    body.theme-ophelia .subtitle,
-    body.theme-ophelia .status,
-    body.theme-ophelia .precision-label,
-    body.theme-ophelia label,
-    body.theme-ophelia .help-card,
-    body.theme-ophelia .mobile-panel {
+    body.theme-to-be-announced .subtitle,
+    body.theme-to-be-announced .status,
+    body.theme-to-be-announced .precision-label,
+    body.theme-to-be-announced label,
+    body.theme-to-be-announced .help-card,
+    body.theme-to-be-announced .mobile-panel {
       color: #5d2b67;
     }
 
-    body.theme-ophelia .status {
+    body.theme-to-be-announced .status {
       background: rgba(255,255,255,0.64);
       border-color: rgba(247, 168, 217, 0.56);
       box-shadow: 0 0.5rem 1.2rem rgba(191, 132, 188, 0.16);
     }
 
-    body.theme-ophelia .lab-topbar,
-    body.theme-ophelia #workspacePanel,
-    body.theme-ophelia #resultPanel,
-    body.theme-ophelia .help-card,
-    body.theme-ophelia .mobile-panel,
-    body.theme-ophelia .mode-panel,
-    body.theme-ophelia .value-card,
-    body.theme-ophelia .rendered,
-    body.theme-ophelia .raw-block,
-    body.theme-ophelia textarea,
-    body.theme-ophelia select {
+    body.theme-to-be-announced .lab-topbar,
+    body.theme-to-be-announced #workspacePanel,
+    body.theme-to-be-announced #resultPanel,
+    body.theme-to-be-announced .help-card,
+    body.theme-to-be-announced .mobile-panel,
+    body.theme-to-be-announced .mode-panel,
+    body.theme-to-be-announced .value-card,
+    body.theme-to-be-announced .rendered,
+    body.theme-to-be-announced .raw-block,
+    body.theme-to-be-announced textarea,
+    body.theme-to-be-announced select {
       background: linear-gradient(180deg, rgba(255,255,255,0.82), rgba(255,247,253,0.66));
       border-color: rgba(230, 167, 216, 0.44);
       box-shadow: 0 0.9rem 2rem rgba(179, 129, 179, 0.12);
       color: #421c4f;
     }
 
-    body.theme-ophelia textarea,
-    body.theme-ophelia select,
-    body.theme-ophelia .raw-block,
-    body.theme-ophelia code {
+    body.theme-to-be-announced textarea,
+    body.theme-to-be-announced select,
+    body.theme-to-be-announced .raw-block,
+    body.theme-to-be-announced code {
       color: #51245e;
     }
 
-    body.theme-ophelia .mode-tab,
-    body.theme-ophelia .card-action,
-    body.theme-ophelia button {
+    body.theme-to-be-announced .mode-tab,
+    body.theme-to-be-announced .card-action,
+    body.theme-to-be-announced button {
       background:
         linear-gradient(180deg, rgba(255,255,255,0.92), rgba(255,226,246,0.92));
       border-color: rgba(234, 154, 214, 0.62);
@@ -274,22 +274,22 @@ if LAB_THEME == "ophelia":
       box-shadow: 0 0.4rem 1rem rgba(198, 144, 194, 0.16);
     }
 
-    body.theme-ophelia .mode-tab.active,
-    body.theme-ophelia .card-action:hover,
-    body.theme-ophelia button:hover {
+    body.theme-to-be-announced .mode-tab.active,
+    body.theme-to-be-announced .card-action:hover,
+    body.theme-to-be-announced button:hover {
       background:
         linear-gradient(180deg, rgba(255, 238, 248, 0.98), rgba(213, 244, 255, 0.96));
       color: #5b2081;
       transform: translateY(-1px);
     }
 
-    body.theme-ophelia .mode-tab.active {
+    body.theme-to-be-announced .mode-tab.active {
       box-shadow:
         0 0 0 1px rgba(255,255,255,0.84),
         0 0.7rem 1.5rem rgba(171, 214, 255, 0.26);
     }
 
-    body.theme-ophelia .rendered {
+    body.theme-to-be-announced .rendered {
       background:
         radial-gradient(circle at top right, rgba(255,255,255,0.8), transparent 8rem),
         linear-gradient(180deg, rgba(255,255,255,0.92), rgba(255,245,252,0.82));

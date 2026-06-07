@@ -1,12 +1,14 @@
 #include "timeseries_internal.h"
+#include "ustring.h"
 
 static ts_arima_meta_t *ts_arima_meta_head = NULL;
 
 int ts_appendf(ts_string_builder_t *sb, const char *fmt, ...)
 {
     va_list ap;
-    va_list ap_copy;
-    int needed;
+    string_t *piece;
+    const char *piece_text;
+    size_t piece_len;
     size_t required;
     char *grown;
 
@@ -14,15 +16,14 @@ int ts_appendf(ts_string_builder_t *sb, const char *fmt, ...)
         return -1;
 
     va_start(ap, fmt);
-    va_copy(ap_copy, ap);
-    needed = vsnprintf(NULL, 0u, fmt, ap_copy);
-    va_end(ap_copy);
-    if (needed < 0) {
-        va_end(ap);
+    piece = string_vsprintf(fmt, ap);
+    va_end(ap);
+    if (!piece)
         return -1;
-    }
 
-    required = sb->len + (size_t)needed + 1u;
+    piece_text = string_c_str(piece);
+    piece_len = strlen(piece_text);
+    required = sb->len + piece_len + 1u;
     if (required > sb->cap) {
         size_t new_cap = sb->cap ? sb->cap : 256u;
 
@@ -30,16 +31,16 @@ int ts_appendf(ts_string_builder_t *sb, const char *fmt, ...)
             new_cap *= 2u;
         grown = realloc(sb->buf, new_cap);
         if (!grown) {
-            va_end(ap);
+            string_free(piece);
             return -1;
         }
         sb->buf = grown;
         sb->cap = new_cap;
     }
 
-    vsnprintf(sb->buf + sb->len, sb->cap - sb->len, fmt, ap);
-    va_end(ap);
-    sb->len += (size_t)needed;
+    memcpy(sb->buf + sb->len, piece_text, piece_len + 1u);
+    sb->len += piece_len;
+    string_free(piece);
     return 0;
 }
 

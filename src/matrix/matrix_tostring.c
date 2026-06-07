@@ -438,6 +438,7 @@ static void mt_emit_cells_tex(mat_buf_t *out,
 
 static int mt_split_expr_repr(const expr_t *dv, char **expr_out, char **bindings_out)
 {
+    string_t *tmp_text;
     char *tmp;
     char *body;
     char *sep;
@@ -452,7 +453,11 @@ static int mt_split_expr_repr(const expr_t *dv, char **expr_out, char **bindings
         return (*expr_out && *bindings_out) ? 0 : -1;
     }
 
-    tmp = expr_to_string(dv, style_EXPRESSION);
+    tmp_text = expr_to_text(dv, style_EXPRESSION);
+    if (!tmp_text)
+        return -1;
+    tmp = strdup(string_c_str(tmp_text));
+    string_free(tmp_text);
     if (!tmp)
         return -1;
 

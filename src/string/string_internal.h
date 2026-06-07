@@ -1,6 +1,10 @@
 #ifndef STRING_INTERNAL_H
 #define STRING_INTERNAL_H
 
+#ifndef MARS_STRING_INTERNAL_ACCESS
+#error "string_internal.h is private to the string module; include ustring.h instead."
+#endif
+
 /**
  * @file string_internal.h
  * @brief Internal representation and helpers for the string_t type.
@@ -88,6 +92,7 @@ size_t string_grapheme_count(const string_t *s);
 void string_grapheme_reverse(string_t *s);
 string_t *string_grapheme_substr(const string_t *s, size_t gpos, size_t glen);
 string_t *string_grapheme_at(const string_t *s, size_t index);
+bool rune_is_empty(rune_t rune);
 
 typedef enum {
     STRING_NORM_NFC,
@@ -99,6 +104,7 @@ typedef enum {
 
 int string_normalise(string_t *s, string_norm_form_t form);
 int string_normalise_storage(string_t *s);
+size_t string_encoded_len(const string_t *s);
 size_t string_character_byte_offset(const string_t *s, size_t index);
 
 #endif

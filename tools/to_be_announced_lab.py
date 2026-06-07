@@ -24,13 +24,13 @@ import mars_lab as shared
 
 
 ROOT = shared.ROOT
-LAB_APP_NAME = os.environ.get("MARS_LAB_APP_NAME", "Ophelia Lab").strip() or "Ophelia Lab"
-STATE_FILE = ROOT / os.environ.get("MARS_LAB_STATE_FILE", ".ophelia_lab_state.json")
-DEFAULT_BIN = ROOT / os.environ.get("MARS_LAB_BINARY", "build/release/scratch/ophelia_lab")
-DEFAULT_SCRATCH_TARGET = os.environ.get("MARS_LAB_SCRATCH_TARGET", "scratch/ophelia_lab").strip() or "scratch/ophelia_lab"
-LAB_ICON_FILE = ROOT / "packaging" / "linux" / "ophelia-lab.svg"
-UPLOAD_DIR = ROOT / ".ophelia_uploads"
-APP_BASE_PATH = "/" + os.environ.get("MARS_LAB_PUBLIC_PATH", "/ophelia").strip().strip("/")
+LAB_APP_NAME = os.environ.get("MARS_LAB_APP_NAME", "To-Be-Announced Lab").strip() or "To-Be-Announced Lab"
+STATE_FILE = ROOT / os.environ.get("MARS_LAB_STATE_FILE", ".to_be_announced_lab_state.json")
+DEFAULT_BIN = ROOT / os.environ.get("MARS_LAB_BINARY", "build/release/scratch/to-be-announced_lab")
+DEFAULT_SCRATCH_TARGET = os.environ.get("MARS_LAB_SCRATCH_TARGET", "scratch/to-be-announced_lab").strip() or "scratch/to-be-announced_lab"
+LAB_ICON_FILE = ROOT / "packaging" / "linux" / "to-be-announced-lab.svg"
+UPLOAD_DIR = ROOT / ".to_be_announced_uploads"
+APP_BASE_PATH = "/" + os.environ.get("MARS_LAB_PUBLIC_PATH", "/to-be-announced").strip().strip("/")
 
 if APP_BASE_PATH == "/":
     APP_BASE_PATH = ""
@@ -75,7 +75,7 @@ LATEST_FORECAST_CSV = ""
 
 WEB_MANIFEST = {
     "name": LAB_APP_NAME,
-    "short_name": "Ophelia",
+    "short_name": "TBA",
     "description": "Forecasting lab for MARS time-series work.",
     "start_url": f"{APP_BASE_PATH}/" if APP_BASE_PATH else "/",
     "scope": f"{APP_BASE_PATH}/" if APP_BASE_PATH else "/",
@@ -94,7 +94,7 @@ INDEX_HTML = """<!doctype html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Ophelia Lab</title>
+  <title>To-Be-Announced Lab</title>
   <meta name="theme-color" content="#071913">
   <meta name="description" content="Forecasting and time-series workbench for MARS.">
   <link rel="manifest" href="__BASE_PATH__/manifest.webmanifest">
@@ -1692,7 +1692,7 @@ INDEX_HTML = """<!doctype html>
       font-size: 0.95rem;
     }
 
-    /* MARS theme layer: keep Ophelia's layout, use the MARS visual system. */
+    /* MARS theme layer: keep the lab's layout, use the MARS visual system. */
     .hero h1,
     .panel-head h2,
     .help-card h3,
@@ -2015,7 +2015,7 @@ INDEX_HTML = """<!doctype html>
     <section class="hero">
       <div class="hero-top">
         <div class="hero-copy">
-          <h1>Ophelia Lab</h1>
+          <h1>To-Be-Announced Lab</h1>
           <p>Forecast from real dated series, pair it with exogenous drivers, and export the results without dropping back into the expression playground. This lab is for regression, ARIMA, ARIMAX, SARIMA, and SARIMAX workflows.</p>
         </div>
         <div class="header-side">
@@ -2049,11 +2049,11 @@ INDEX_HTML = """<!doctype html>
         <div class="panel-head">
           <div>
             <h2>Forecast Setup</h2>
-            <p>Point this at your dated CSVs, choose the model family, and let Ophelia return a summary plus a downloadable forecast table.</p>
+            <p>Point this at your dated CSVs, choose the model family, and let the lab return a summary plus a downloadable forecast table.</p>
           </div>
         </div>
         <div class="panel-body">
-          <form id="forecast-form" novalidate action="__BASE_PATH__/forecast-form" method="post" target="forecast-transport" onsubmit="return window.__opheliaPrepareForecastSubmit ? window.__opheliaPrepareForecastSubmit() : true;">
+          <form id="forecast-form" novalidate action="__BASE_PATH__/forecast-form" method="post" target="forecast-transport" onsubmit="return window.__to_be_announcedPrepareForecastSubmit ? window.__to_be_announcedPrepareForecastSubmit() : true;">
             <input type="hidden" name="target_display_name" value="__TARGET_DISPLAY_NAME__">
             <input type="hidden" name="xreg_display_name" value="__XREG_DISPLAY_NAME__">
             <div class="grid-2">
@@ -2068,7 +2068,7 @@ INDEX_HTML = """<!doctype html>
                   </div>
                 </div>
                 <div id="target-meta" class="detected-meta">__TARGET_META_HTML__</div>
-                <span class="field-hint">Upload the file from your machine. Ophelia will save it locally for this lab and read the header row for you.</span>
+                <span class="field-hint">Upload the file from your machine. The lab will save it locally for this lab and read the header row for you.</span>
               </div>
               <div class="target-right-stack">
                 <label class="compact-field">Target value column
@@ -2099,7 +2099,7 @@ INDEX_HTML = """<!doctype html>
                       <div id="outlier-list" class="multi-select-list outlier-list">__OUTLIER_PICKER_HTML__</div>
                     </div>
                   </div>
-                  <span class="field-hint">Tick any flagged points you want Ophelia to treat specially. Excluding points keeps the dates and interpolates only for fitting.</span>
+                  <span class="field-hint">Tick any flagged points you want the lab to treat specially. Excluding points keeps the dates and interpolates only for fitting.</span>
                 </div>
               </div>
             </div>
@@ -2109,13 +2109,13 @@ INDEX_HTML = """<!doctype html>
                 <select name="target_date_column">
                   __TARGET_DATE_OPTIONS__
                 </select>
-                <span class="field-hint">Choose the target date column from the likely candidates Ophelia found in the uploaded file.</span>
+                <span class="field-hint">Choose the target date column from the likely candidates the lab found in the uploaded file.</span>
               </label>
               <label>Forecast until
                 <select name="forecast_end_date">
                   __FORECAST_END_OPTIONS__
                 </select>
-                <span class="field-hint">Choose the last month, quarter, year, or day you want the forecast to reach. Ophelia lists only valid period ends, defaults to the furthest possible one, and remembers the choice when you come back.</span>
+                <span class="field-hint">Choose the last month, quarter, year, or day you want the forecast to reach. The lab lists only valid period ends, defaults to the furthest possible one, and remembers the choice when you come back.</span>
               </label>
             </div>
 
@@ -2154,7 +2154,7 @@ INDEX_HTML = """<!doctype html>
                 <select name="xreg_date_column">
                   __XREG_DATE_OPTIONS__
                 </select>
-                <span class="field-hint">Choose the exogenous date column from the likely candidates Ophelia found in the supporting file.</span>
+                <span class="field-hint">Choose the exogenous date column from the likely candidates the lab found in the supporting file.</span>
               </label>
               <label>Model
                 <input type="hidden" name="models" value="__MODELS__">
@@ -2170,7 +2170,7 @@ INDEX_HTML = """<!doctype html>
               <div class="field-block"><span class="field-title">Detected frequency</span>
                 <input id="detected-frequency-readout" value="__DETECTED_FREQUENCY_LABEL__" readonly>
                 <input type="hidden" name="frequency" value="__FREQUENCY__">
-                <span class="field-hint">Ophelia detects this from the target dates and uses it for the forecast cadence.</span>
+                <span class="field-hint">The lab detects this from the target dates and uses it for the forecast cadence.</span>
               </div>
               <label><span class="field-title">Reporting year</span>
                 <select name="year_type">
@@ -2285,7 +2285,7 @@ INDEX_HTML = """<!doctype html>
               <li>Start with your current file choices and press <code>Use suggested settings</code> if you want a sensible first setup.</li>
               <li>Use <code>Target CSV</code> for the numbers you want to predict, such as monthly demand, caseload, or activity.</li>
               <li>Use <code>Exogenous CSV</code> for outside drivers that may help explain changes, such as population.</li>
-              <li>Tick one or more model families. If you choose several, Ophelia compares them side by side.</li>
+              <li>Tick one or more model families. If you choose several, the lab compares them side by side.</li>
               <li>Use <code>Chart</code> after a run to open a full-width plot of actuals and each selected model's forecast line.</li>
               <li>The app returns a summary, a forecast table, and downloads you can open in Excel.</li>
             </ul>
@@ -2296,7 +2296,7 @@ INDEX_HTML = """<!doctype html>
               <li><code>Target CSV</code>: the file holding the historic figures you want to forecast.</li>
               <li><code>Target value column</code>: the exact column name containing the values to predict.</li>
               <li><code>Target date column</code>: the date column for the target file. Leave this blank if the first column contains the dates.</li>
-              <li><code>Forecast until</code>: the last date you want the forecast to cover. Ophelia works out the number of future periods for you.</li>
+              <li><code>Forecast until</code>: the last date you want the forecast to cover. The lab works out the number of future periods for you.</li>
               <li><code>Exogenous CSV</code>: a second file with related information that may help the forecast.</li>
               <li><code>Exogenous columns</code>: tick one or more supporting columns from the scrollable list.</li>
               <li><code>Exogenous date column</code>: the date column in the exogenous file, usually <code>DATE</code>.</li>
@@ -2328,9 +2328,9 @@ INDEX_HTML = """<!doctype html>
               <li><code>Yearly repeating pattern (P)</code>: the seasonal version of <code>p</code>. For monthly data, this looks back roughly one year at a time.</li>
               <li><code>Seasonal trend removal (D)</code>: the seasonal version of <code>d</code>. Use this if the same months behave similarly year after year.</li>
               <li><code>Seasonal error adjustment (Q)</code>: the seasonal version of <code>q</code>. Start at <code>0</code> unless you have a reason to add it.</li>
-              <li><code>Season length</code>: the repeating pattern to use for <code>SARIMA</code>, <code>SARIMAX</code>, and potentially <code>Auto-ARIMA</code>. Choose labels such as <code>None</code>, <code>Quarterly</code>, <code>Every 4 months</code>, <code>Half-yearly</code>, or <code>Yearly</code>; Ophelia converts the choice to the model's numeric setting.</li>
+              <li><code>Season length</code>: the repeating pattern to use for <code>SARIMA</code>, <code>SARIMAX</code>, and potentially <code>Auto-ARIMA</code>. Choose labels such as <code>None</code>, <code>Quarterly</code>, <code>Every 4 months</code>, <code>Half-yearly</code>, or <code>Yearly</code>; the lab converts the choice to the model's numeric setting.</li>
             </ul>
-            <p>Ophelia can suggest a sensible first set of these settings for you from the detected frequency and chosen model. Use <code>Use suggested settings</code> if you want a good practical starting point.</p>
+            <p>The lab can suggest a sensible first set of these settings for you from the detected frequency and chosen model. Use <code>Use suggested settings</code> if you want a good practical starting point.</p>
             <p>Good practical starting points for monthly council data are often:</p>
             <ul>
               <li><code>ARIMA</code>: <code>p=1, d=1, q=0</code></li>
@@ -2342,8 +2342,8 @@ INDEX_HTML = """<!doctype html>
             <h3>How Driver Checks Work</h3>
             <p>Driver evidence is model-specific. A population column can look very strong in plain regression but weaker in <code>SARIMAX</code> if the target's own history, trend removal, or seasonal pattern already explains much of the movement.</p>
             <ul>
-              <li>For <code>Regression</code>, Ophelia checks drivers against the target levels directly.</li>
-              <li>For <code>ARIMAX</code>, <code>SARIMAX</code>, and <code>Auto-ARIMA</code> runs that use differencing, Ophelia checks the drivers on the same transformed scale as the target, so changes are compared with changes.</li>
+              <li>For <code>Regression</code>, the lab checks drivers against the target levels directly.</li>
+              <li>For <code>ARIMAX</code>, <code>SARIMAX</code>, and <code>Auto-ARIMA</code> runs that use differencing, the lab checks the drivers on the same transformed scale as the target, so changes are compared with changes.</li>
               <li>The table headed <code>How the drivers look in this model</code> is therefore about that run only. It is not a permanent verdict on whether a column is good or bad.</li>
               <li>If a driver looks weak in a seasonal model but strong in regression, compare the forecast table and try a simpler model or fewer seasonal terms before throwing the driver away.</li>
             </ul>
@@ -2429,7 +2429,7 @@ INDEX_HTML = """<!doctype html>
             <ul>
               <li><code>Download summary.txt</code> gives you the readable model summary.</li>
               <li><code>Download forecast.csv</code> gives you <code>date</code>, <code>actual</code>, and the forecast columns. With one model, it includes <code>mean</code>, <code>stderr</code>, <code>lower</code>, and <code>upper</code>. With several models, it gives each model's <code>mean</code> and <code>stderr</code> side by side.</li>
-              <li>The QR/mobile card in the header points to this same lab, including the separate <code>/ophelia/</code> path.</li>
+              <li>The QR/mobile card in the header points to this same lab, including the separate <code>/to-be-announced/</code> path.</li>
             </ul>
           </div>
         </div>
@@ -2443,13 +2443,13 @@ INDEX_HTML = """<!doctype html>
   <script>
     window.addEventListener('message', (event) => {
       const data = event && event.data;
-      if (!data || data.kind !== 'ophelia-forecast-result') return;
-      if (typeof window.__opheliaApplyForecastResult === 'function') {
-        window.__opheliaApplyForecastResult(data);
+      if (!data || data.kind !== 'to-be-announced-forecast-result') return;
+      if (typeof window.__to_be_announcedApplyForecastResult === 'function') {
+        window.__to_be_announcedApplyForecastResult(data);
       }
     });
 
-    window.__opheliaRunForecast = async function () {
+    window.__to_be_announcedRunForecast = async function () {
       const basePath = "__BASE_PATH__";
       const form = document.getElementById('forecast-form');
       const status = document.getElementById('status');
@@ -2499,8 +2499,8 @@ INDEX_HTML = """<!doctype html>
         if (!response.ok || !data.ok) {
           throw new Error(data.error || 'Forecast failed');
         }
-        if (typeof window.__opheliaApplyForecastResult === 'function') {
-          window.__opheliaApplyForecastResult(data);
+        if (typeof window.__to_be_announcedApplyForecastResult === 'function') {
+          window.__to_be_announcedApplyForecastResult(data);
         }
         return true;
       } catch (error) {
@@ -2584,8 +2584,8 @@ INDEX_HTML = """<!doctype html>
     const targetMetaCache = Object.assign({}, initialTargetMetaMap || {});
     let latestSummary = '';
     let latestForecastCsv = '';
-    window.__opheliaLatestSummary = '';
-    window.__opheliaLatestForecastCsv = '';
+    window.__to_be_announcedLatestSummary = '';
+    window.__to_be_announcedLatestForecastCsv = '';
     let saveTimer = null;
     let initialHydrating = true;
     let currentOutliers = __INITIAL_OUTLIERS_JSON__;
@@ -3738,7 +3738,7 @@ INDEX_HTML = """<!doctype html>
       return `<div class="${classes.join(' ')}">${content}</div>`;
     }
 
-    window.__opheliaRenderSummary = renderSummaryText;
+    window.__to_be_announcedRenderSummary = renderSummaryText;
 
     function renderForecastTable(csvText) {
       const source = String(csvText || '').trim();
@@ -4464,8 +4464,8 @@ INDEX_HTML = """<!doctype html>
       }
       latestSummary = data.summary_text || '';
       latestForecastCsv = data.forecast_csv || '';
-      window.__opheliaLatestSummary = latestSummary;
-      window.__opheliaLatestForecastCsv = latestForecastCsv;
+      window.__to_be_announcedLatestSummary = latestSummary;
+      window.__to_be_announcedLatestForecastCsv = latestForecastCsv;
       if (data.multi) {
         renderMultiForecastChart(data.results || [], data.forecast_end_label || data.forecast_end_date || '');
         if (metricModel) metricModel.textContent = `${(data.results || []).length} models`;
@@ -4504,7 +4504,7 @@ INDEX_HTML = """<!doctype html>
       setStatus('Forecast complete.', 'ok');
     }
 
-    window.__opheliaApplyForecastResult = applyForecastResult;
+    window.__to_be_announcedApplyForecastResult = applyForecastResult;
 
     function downloadText(filename, content, type) {
       const blob = new Blob([content], { type });
@@ -4555,8 +4555,8 @@ INDEX_HTML = """<!doctype html>
       return true;
     }
 
-    window.__opheliaPrepareForecastSubmit = prepareForecastSubmit;
-    window.__opheliaUiRunForecast = runForecast;
+    window.__to_be_announcedPrepareForecastSubmit = prepareForecastSubmit;
+    window.__to_be_announcedUiRunForecast = runForecast;
 
     async function refreshMobileDetails() {
       mobileStatus.textContent = 'Refreshing phone access…';
@@ -5614,7 +5614,7 @@ def analyse_xreg_collinearity(path_text: object,
         return {
             "level": "mediocre",
             "title": "Driver overlap check",
-            "message": "Ophelia could not check driver overlap confidently because too few fully usable rows remained once all selected drivers were lined up.",
+            "message": "The lab could not check driver overlap confidently because too few fully usable rows remained once all selected drivers were lined up.",
             "detail": "Try fewer drivers or check for missing values.",
             "action": "Proceed with caution and prefer a simpler driver set.",
         }
@@ -6713,11 +6713,11 @@ def render_summary_html(text: object,
     return "".join(blocks) or '<div class="summary-line note-line">No summary returned.</div>'
 
 
-def ophelia_tailscale_target(port: int) -> str:
+def to_be_announced_tailscale_target(port: int) -> str:
     return f"http://127.0.0.1:{port}"
 
 
-def ophelia_tailscale_status() -> dict[str, object]:
+def to_be_announced_tailscale_status() -> dict[str, object]:
     try:
         completed = subprocess.run(
             ["tailscale", "funnel", "status", "--json"],
@@ -6737,10 +6737,10 @@ def ophelia_tailscale_status() -> dict[str, object]:
         return {}
 
 
-def ophelia_tailscale_funnel_enabled() -> bool:
+def to_be_announced_tailscale_funnel_enabled() -> bool:
     if not APP_BASE_PATH:
         return shared.tailscale_funnel_enabled()
-    status = ophelia_tailscale_status()
+    status = to_be_announced_tailscale_status()
     web = status.get("Web", {}) if isinstance(status, dict) else {}
     allowed = status.get("AllowFunnel", {}) if isinstance(status, dict) else {}
     for host_key, config in web.items():
@@ -6750,11 +6750,11 @@ def ophelia_tailscale_funnel_enabled() -> bool:
     return False
 
 
-def ophelia_set_tailscale_funnel_enabled(port: int, enabled: bool) -> bool:
+def to_be_announced_set_tailscale_funnel_enabled(port: int, enabled: bool) -> bool:
     if not shared.tailscale_https_host():
         return False
     path_flag = f"--set-path={APP_BASE_PATH or '/'}"
-    target = ophelia_tailscale_target(port)
+    target = to_be_announced_tailscale_target(port)
     try:
         if enabled:
             completed = subprocess.run(
@@ -6785,7 +6785,7 @@ def ophelia_set_tailscale_funnel_enabled(port: int, enabled: bool) -> bool:
         return False
 
 
-def ophelia_ensure_tailscale_serve(bind_host: str, port: int) -> None:
+def to_be_announced_ensure_tailscale_serve(bind_host: str, port: int) -> None:
     if os.environ.get("MARS_LAB_TAILSCALE_SERVE", "1").strip() in ("0", "false", "False", "no", "NO"):
         return
     bind_host = bind_host.strip()
@@ -6793,12 +6793,12 @@ def ophelia_ensure_tailscale_serve(bind_host: str, port: int) -> None:
         return
     if not shared.tailscale_https_host():
         return
-    # Privacy first: Ophelia is private tailnet-only. It should not publish
+    # Privacy first: The lab is private tailnet-only. It should not publish
     # itself to the public internet or expose a LAN URL on startup.
-    ophelia_set_tailscale_funnel_enabled(port, False)
+    to_be_announced_set_tailscale_funnel_enabled(port, False)
 
 
-def ophelia_browser_access_url(bind_host: str, port: int) -> str:
+def to_be_announced_browser_access_url(bind_host: str, port: int) -> str:
     bind_host = bind_host.strip()
     bind_address = shared._ip_address_from_text(bind_host)
     bind_is_tailscale = bool(bind_address and bind_address in shared.ipaddress.ip_network("100.64.0.0/10"))
@@ -6813,9 +6813,9 @@ def ophelia_browser_access_url(bind_host: str, port: int) -> str:
     return f"http://{browser_host}:{port}{app_url('/')}"
 
 
-def ophelia_mobile_access_details(bind_host: str, port: int, host_header: str = "",
+def to_be_announced_mobile_access_details(bind_host: str, port: int, host_header: str = "",
                                   control_allowed: bool = False) -> dict[str, object]:
-    funnel = ophelia_tailscale_funnel_enabled()
+    funnel = to_be_announced_tailscale_funnel_enabled()
     tailscale_ip = shared.tailscale_ipv4()
     tailscale_host = shared.tailscale_https_host() if tailscale_ip else ""
     tailscale_url = shared.tailscale_access_url(bind_host, port, app_url('/'))
@@ -7063,7 +7063,7 @@ def run_forecast(binary: Path, payload: dict[str, object]) -> dict[str, object]:
         suggested_forecast_end(target_meta, xreg_meta, year_type, payload.get("forecast_end_date", ""))
     )
     if not target_end:
-        raise RuntimeError("Ophelia could not detect the end date of the target series.")
+        raise RuntimeError("The lab could not detect the end date of the target series.")
     if not requested_end:
         raise RuntimeError("Choose the last date you want the forecast to cover.")
     normalized_end = period_end_for_date(requested_end, detected_frequency, year_type)
@@ -7090,7 +7090,7 @@ def run_forecast(binary: Path, payload: dict[str, object]) -> dict[str, object]:
                 )
     computed_horizon = periods_between(target_end, normalized_end, detected_frequency, year_type)
     if computed_horizon <= 0:
-        raise RuntimeError("Ophelia could not work out a positive forecast length from the chosen end date.")
+        raise RuntimeError("The lab could not work out a positive forecast length from the chosen end date.")
     command = [
         str(binary),
         "--target", target_path,
@@ -7122,7 +7122,7 @@ def run_forecast(binary: Path, payload: dict[str, object]) -> dict[str, object]:
     )
     raw = completed.stdout.strip() or completed.stderr.strip()
     if not raw:
-        raise RuntimeError("Ophelia forecast runner returned no output.")
+        raise RuntimeError("The lab forecast runner returned no output.")
     try:
         data = json.loads(raw)
     except json.JSONDecodeError as exc:
@@ -7250,14 +7250,14 @@ def run_forecasts(binary: Path, payload: dict[str, object]) -> dict[str, object]
     return combined
 
 
-class OpheliaLabHandler(http.server.BaseHTTPRequestHandler):
+class ToBeAnnouncedLabHandler(http.server.BaseHTTPRequestHandler):
     binary: Path = DEFAULT_BIN
     server_host: str = "127.0.0.1"
     server_port: int = 0
 
     def log_message(self, fmt: str, *args: object) -> None:
         try:
-            print(f"ophelia_lab: {fmt % args}", file=os.sys.stderr)
+            print(f"to_be_announced_lab: {fmt % args}", file=os.sys.stderr)
         except OSError:
             pass
 
@@ -7304,8 +7304,8 @@ class OpheliaLabHandler(http.server.BaseHTTPRequestHandler):
             "const doc=window.parent && window.parent.document;"
             "if(doc){"
             "let applied=false;"
-            "if(window.parent && typeof window.parent.__opheliaApplyForecastResult==='function'){"
-            "try{window.parent.__opheliaApplyForecastResult(data);applied=true;}catch(_err){applied=false;}"
+            "if(window.parent && typeof window.parent.__to_be_announcedApplyForecastResult==='function'){"
+            "try{window.parent.__to_be_announcedApplyForecastResult(data);applied=true;}catch(_err){applied=false;}"
             "}"
             "if(!applied){"
             "const status=doc.getElementById('status');"
@@ -7320,7 +7320,7 @@ class OpheliaLabHandler(http.server.BaseHTTPRequestHandler):
             "const downloadSummary=doc.getElementById('download-summary');"
             "const downloadForecast=doc.getElementById('download-forecast');"
             "const driversUsedNote=doc.getElementById('drivers-used-note');"
-            "if(window.parent){window.parent.latestSummary=data.summary_text||'';window.parent.latestForecastCsv=data.forecast_csv||'';window.parent.__opheliaLatestSummary=data.summary_text||'';window.parent.__opheliaLatestForecastCsv=data.forecast_csv||'';}"
+            "if(window.parent){window.parent.latestSummary=data.summary_text||'';window.parent.latestForecastCsv=data.forecast_csv||'';window.parent.__to_be_announcedLatestSummary=data.summary_text||'';window.parent.__to_be_announcedLatestForecastCsv=data.forecast_csv||'';}"
             "if(button) button.disabled=false;"
             "if(!data.ok){if(status){status.textContent=data.error||'Forecast failed.';status.className='status error';}}"
             "else {"
@@ -7392,7 +7392,7 @@ class OpheliaLabHandler(http.server.BaseHTTPRequestHandler):
                 str(self.client_address[0]),
                 shared._control_token_from_query(self.path),
             )
-            details = ophelia_mobile_access_details(
+            details = to_be_announced_mobile_access_details(
                 self.server_host,
                 self.server_port,
                 self.headers.get("Host", ""),
@@ -7405,13 +7405,13 @@ class OpheliaLabHandler(http.server.BaseHTTPRequestHandler):
             if not LATEST_SUMMARY_TEXT:
                 self.send_error(404, "No summary is available yet.")
                 return
-            self.send_download_text("ophelia-summary.txt", LATEST_SUMMARY_TEXT, "text/plain; charset=utf-8")
+            self.send_download_text("to-be-announced-summary.txt", LATEST_SUMMARY_TEXT, "text/plain; charset=utf-8")
             return
         if path == "/download-forecast":
             if not LATEST_FORECAST_CSV:
                 self.send_error(404, "No forecast is available yet.")
                 return
-            self.send_download_text("ophelia-forecast.csv", LATEST_FORECAST_CSV, "text/csv; charset=utf-8")
+            self.send_download_text("to-be-announced-forecast.csv", LATEST_FORECAST_CSV, "text/csv; charset=utf-8")
             return
         if path == "/favicon.svg":
             self.send_file(LAB_ICON_FILE, "image/svg+xml")
@@ -7437,7 +7437,7 @@ class OpheliaLabHandler(http.server.BaseHTTPRequestHandler):
             str(self.client_address[0]),
             shared._control_token_from_query(self.path),
         )
-        details = ophelia_mobile_access_details(
+        details = to_be_announced_mobile_access_details(
             self.server_host,
             self.server_port,
             self.headers.get("Host", ""),
@@ -7538,7 +7538,7 @@ class OpheliaLabHandler(http.server.BaseHTTPRequestHandler):
             return
 
         if path == "/funnel-toggle":
-            self.send_json(410, {"ok": False, "error": "Public access switching is disabled in Ophelia Lab."})
+            self.send_json(410, {"ok": False, "error": "Public access switching is disabled in To-Be-Announced Lab."})
             return
 
         if path != "/forecast":
@@ -7564,7 +7564,7 @@ class OpheliaLabHandler(http.server.BaseHTTPRequestHandler):
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Launch the local Ophelia Lab forecasting app.")
+    parser = argparse.ArgumentParser(description="Launch the local To-Be-Announced Lab forecasting app.")
     parser.add_argument("--host", default="::", help="host to bind")
     parser.add_argument("--port", type=int, default=0, help="port to bind, or 0 for auto")
     parser.add_argument("--no-browser", action="store_true", help="do not open the browser automatically")
@@ -7575,26 +7575,26 @@ def main() -> int:
     binary = args.binary if args.binary.is_absolute() else ROOT / args.binary
     shared.ensure_scratch_binary(binary, DEFAULT_SCRATCH_TARGET)
 
-    OpheliaLabHandler.binary = binary
+    ToBeAnnouncedLabHandler.binary = binary
     port = args.port or shared.find_free_port(args.host)
-    OpheliaLabHandler.server_host = args.host
-    OpheliaLabHandler.server_port = port
+    ToBeAnnouncedLabHandler.server_host = args.host
+    ToBeAnnouncedLabHandler.server_port = port
 
     try:
-        server = shared.create_threading_http_server(args.host, port, OpheliaLabHandler)
+        server = shared.create_threading_http_server(args.host, port, ToBeAnnouncedLabHandler)
     except OSError as exc:
         if exc.errno == errno.EADDRINUSE:
-            ophelia_ensure_tailscale_serve(args.host, port)
-            url = ophelia_browser_access_url(args.host, port)
+            to_be_announced_ensure_tailscale_serve(args.host, port)
+            url = to_be_announced_browser_access_url(args.host, port)
             print(f"{LAB_APP_NAME} already running at {url}")
             if not args.no_browser:
                 shared.open_lab_url(shared._control_url(url), args.browser)
             return 0
         raise
 
-    ophelia_ensure_tailscale_serve(args.host, port)
-    url = ophelia_browser_access_url(args.host, port)
-    mobile_url = str(ophelia_mobile_access_details(args.host, port).get("url", ""))
+    to_be_announced_ensure_tailscale_serve(args.host, port)
+    url = to_be_announced_browser_access_url(args.host, port)
+    mobile_url = str(to_be_announced_mobile_access_details(args.host, port).get("url", ""))
     print(f"{LAB_APP_NAME} running at {url}")
     if mobile_url:
         print(f"Mobile access: {mobile_url}")

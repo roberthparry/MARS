@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <math.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "qcomplex.h"
@@ -10,8 +11,8 @@
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 static int qcomplex_validity_equal(const void *actual, const void *expected, void *ctx);
 static int qfloat_validity_equal(const void *actual, const void *expected, void *ctx);
-static void qcomplex_validity_format(const void *value, char *buf, size_t buf_size, void *ctx);
-static void qfloat_validity_format(const void *value, char *buf, size_t buf_size, void *ctx);
+static int qcomplex_validity_format(const void *value, string_t *out, void *ctx);
+static int qfloat_validity_format(const void *value, string_t *out, void *ctx);
 static bool test_qcomplex_suite_setup(void);
 static bool test_assert_qcomplex_close_tol(const char *label,
                                            qcomplex_t actual,
@@ -80,16 +81,58 @@ static int qfloat_validity_equal(const void *actual, const void *expected, void 
     return qf_eq(*got, *want) || qf_to_double(qf_abs(qf_sub(*got, *want))) < tol;
 }
 
-static void qcomplex_validity_format(const void *value, char *buf, size_t buf_size, void *ctx)
+static int qcomplex_validity_format(const void *value, string_t *out, void *ctx)
 {
+    int needed;
+    char *text;
+
     (void)ctx;
-    qc_to_string(*(const qcomplex_t *)value, buf, buf_size);
+    if (!out)
+        return -1;
+
+    needed = qc_sprintf(NULL, 0u, "%z", *(const qcomplex_t *)value);
+    if (needed < 0)
+        return string_append_cstr(out, "<qcomplex format failed>");
+
+    text = malloc((size_t)needed + 1u);
+    if (!text)
+        return -1;
+
+    if (qc_sprintf(text, (size_t)needed + 1u, "%z", *(const qcomplex_t *)value) < 0 ||
+        string_append_cstr(out, text) != 0) {
+        free(text);
+        return -1;
+    }
+
+    free(text);
+    return 0;
 }
 
-static void qfloat_validity_format(const void *value, char *buf, size_t buf_size, void *ctx)
+static int qfloat_validity_format(const void *value, string_t *out, void *ctx)
 {
+    int needed;
+    char *text;
+
     (void)ctx;
-    qf_to_string(*(const qfloat_t *)value, buf, buf_size);
+    if (!out)
+        return -1;
+
+    needed = qf_sprintf(NULL, 0u, "%q", *(const qfloat_t *)value);
+    if (needed < 0)
+        return string_append_cstr(out, "<qfloat format failed>");
+
+    text = malloc((size_t)needed + 1u);
+    if (!text)
+        return -1;
+
+    if (qf_sprintf(text, (size_t)needed + 1u, "%q", *(const qfloat_t *)value) < 0 ||
+        string_append_cstr(out, text) != 0) {
+        free(text);
+        return -1;
+    }
+
+    free(text);
+    return 0;
 }
 
 static bool test_qcomplex_suite_setup(void)

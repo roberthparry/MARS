@@ -6,16 +6,17 @@ comparison, cloning, and destruction rules.
 ## Capabilities
 
 - generic keys and values (any fixed-size type)
-- shallow or deep ownership via optional `clone_fn` and `destroy_fn` callbacks
+- shallow byte copies or deep stored copies via optional `clone_fn` and
+  `destroy_fn` callbacks
 - insert, replace, remove, and one-off lookup
 - stable opaque entry handles for efficient repeated access and in-place update
 - unsorted iteration via index or `dictionary_foreach()`
 - lazy sorted views by key or by value
 - full-dictionary clone
 
-## Ownership Models
+## Copying And Cleanup
 
-### Shallow Ownership
+### Plain Byte Copies
 
 Store borrowed string pointers. The dictionary owns only its internal storage;
 it does not duplicate or free the pointed-to strings.
@@ -65,10 +66,10 @@ Expected output:
 Value for 'alpha': one
 ```
 
-### Deep Ownership
+### Deep Stored Copies
 
-Deep-copy keys and values into the dictionary so it owns the storage and
-releases it on destruction or removal.
+Deep-copy keys and values into dictionary-owned storage, then release those
+stored copies on destruction or removal.
 
 ```c
 #include <stdio.h>

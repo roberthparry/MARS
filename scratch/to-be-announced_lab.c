@@ -9,15 +9,16 @@
 #include "matrix.h"
 #include "number.h"
 #include "timeseries.h"
+#include "ustring.h"
 
 typedef enum {
-    OPHELIA_MODEL_REGRESSION = 0,
-    OPHELIA_MODEL_ARIMA,
-    OPHELIA_MODEL_ARIMAX,
-    OPHELIA_MODEL_SARIMA,
-    OPHELIA_MODEL_SARIMAX,
-    OPHELIA_MODEL_AUTO_ARIMA
-} ophelia_model_t;
+    TO_BE_ANNOUNCED_MODEL_REGRESSION = 0,
+    TO_BE_ANNOUNCED_MODEL_ARIMA,
+    TO_BE_ANNOUNCED_MODEL_ARIMAX,
+    TO_BE_ANNOUNCED_MODEL_SARIMA,
+    TO_BE_ANNOUNCED_MODEL_SARIMAX,
+    TO_BE_ANNOUNCED_MODEL_AUTO_ARIMA
+} to_be_announced_model_t;
 
 typedef struct {
     const char *target_path;
@@ -29,14 +30,14 @@ typedef struct {
     size_t xreg_column_count;
     ts_frequency_t frequency;
     ts_year_type_t year_type;
-    ophelia_model_t model;
+    to_be_announced_model_t model;
     ts_arima_spec_t spec;
     ts_information_criterion_t criterion;
     size_t horizon;
     double level;
-} ophelia_config_t;
+} to_be_announced_config_t;
 
-static void ophelia_print_json_string(const char *text)
+static void to_be_announced_print_json_string(const char *text)
 {
     const unsigned char *p = (const unsigned char *)(text ? text : "");
 
@@ -62,33 +63,34 @@ static void ophelia_print_json_string(const char *text)
     putchar('"');
 }
 
-static int ophelia_fail(const char *message)
+static int to_be_announced_fail(const char *message)
 {
     fputs("{\"ok\":false,\"error\":", stdout);
-    ophelia_print_json_string(message ? message : "Unknown error");
+    to_be_announced_print_json_string(message ? message : "Unknown error");
     fputs("}\n", stdout);
     return EXIT_FAILURE;
 }
 
-static int ophelia_appendf(char **buf, size_t *len, size_t *cap, const char *fmt, ...)
+static int to_be_announced_appendf(char **buf, size_t *len, size_t *cap, const char *fmt, ...)
 {
     va_list ap;
-    va_list ap_copy;
-    int needed;
+    string_t *piece;
+    const char *piece_text;
+    size_t piece_len;
     size_t required;
     char *grown;
 
     if (!buf || !len || !cap || !fmt)
         return -1;
     va_start(ap, fmt);
-    va_copy(ap_copy, ap);
-    needed = vsnprintf(NULL, 0u, fmt, ap_copy);
-    va_end(ap_copy);
-    if (needed < 0) {
-        va_end(ap);
+    piece = string_vsprintf(fmt, ap);
+    va_end(ap);
+    if (!piece)
         return -1;
-    }
-    required = *len + (size_t)needed + 1u;
+
+    piece_text = string_c_str(piece);
+    piece_len = strlen(piece_text);
+    required = *len + piece_len + 1u;
     if (required > *cap) {
         size_t new_cap = *cap ? *cap : 256u;
 
@@ -96,19 +98,19 @@ static int ophelia_appendf(char **buf, size_t *len, size_t *cap, const char *fmt
             new_cap *= 2u;
         grown = realloc(*buf, new_cap);
         if (!grown) {
-            va_end(ap);
+            string_free(piece);
             return -1;
         }
         *buf = grown;
         *cap = new_cap;
     }
-    vsnprintf(*buf + *len, *cap - *len, fmt, ap);
-    va_end(ap);
-    *len += (size_t)needed;
+    memcpy(*buf + *len, piece_text, piece_len + 1u);
+    *len += piece_len;
+    string_free(piece);
     return 0;
 }
 
-static char *ophelia_series_date_text(const timeseries_t *series, size_t index)
+static char *to_be_announced_series_date_text(const timeseries_t *series, size_t index)
 {
     datetime_t *dt;
     char *text;
@@ -127,7 +129,7 @@ static char *ophelia_series_date_text(const timeseries_t *series, size_t index)
     return text;
 }
 
-static char *ophelia_series_value_text(const timeseries_t *series, size_t index)
+static char *to_be_announced_series_value_text(const timeseries_t *series, size_t index)
 {
     number_t value = NUM_ZERO;
     char buf[64];
@@ -147,7 +149,7 @@ static char *ophelia_series_value_text(const timeseries_t *series, size_t index)
     return text;
 }
 
-static int ophelia_append_combined_csv_row(char **buf, size_t *len, size_t *cap,
+static int to_be_announced_append_combined_csv_row(char **buf, size_t *len, size_t *cap,
                                            const char *date_text,
                                            const char *actual_text,
                                            const char *mean_text,
@@ -155,7 +157,7 @@ static int ophelia_append_combined_csv_row(char **buf, size_t *len, size_t *cap,
                                            const char *lower_text,
                                            const char *upper_text)
 {
-    return ophelia_appendf(buf, len, cap, "%s,%s,%s,%s,%s,%s\n",
+    return to_be_announced_appendf(buf, len, cap, "%s,%s,%s,%s,%s,%s\n",
                            date_text ? date_text : "",
                            actual_text ? actual_text : "",
                            mean_text ? mean_text : "",
@@ -164,7 +166,7 @@ static int ophelia_append_combined_csv_row(char **buf, size_t *len, size_t *cap,
                            upper_text ? upper_text : "");
 }
 
-static int ophelia_append_combined_text_row(char **buf, size_t *len, size_t *cap,
+static int to_be_announced_append_combined_text_row(char **buf, size_t *len, size_t *cap,
                                             const char *date_text,
                                             const char *actual_text,
                                             const char *mean_text,
@@ -172,7 +174,7 @@ static int ophelia_append_combined_text_row(char **buf, size_t *len, size_t *cap
                                             const char *lower_text,
                                             const char *upper_text)
 {
-    return ophelia_appendf(
+    return to_be_announced_appendf(
         buf, len, cap,
         "%s: actual %s, mean %s%s%s%s%s%s%s\n",
         date_text ? date_text : "",
@@ -187,7 +189,7 @@ static int ophelia_append_combined_text_row(char **buf, size_t *len, size_t *cap
     );
 }
 
-static int ophelia_build_results_outputs(const timeseries_t *actual,
+static int to_be_announced_build_results_outputs(const timeseries_t *actual,
                                          const timeseries_t *fitted,
                                          const ts_forecast_t *forecast,
                                          char **csv_out,
@@ -199,17 +201,17 @@ static int ophelia_build_results_outputs(const timeseries_t *actual,
 
     if (!csv_out || !text_out)
         return -1;
-    if (ophelia_appendf(&csv, &csv_len, &csv_cap, "date,actual,mean,stderr,lower,upper\n") != 0)
+    if (to_be_announced_appendf(&csv, &csv_len, &csv_cap, "date,actual,mean,stderr,lower,upper\n") != 0)
         goto fail;
     for (i = 0u; actual && fitted && i < ts_length(actual) && i < ts_length(fitted); ++i) {
-        char *date_text = ophelia_series_date_text(actual, i);
-        char *actual_text = ophelia_series_value_text(actual, i);
-        char *mean_text = ophelia_series_value_text(fitted, i);
+        char *date_text = to_be_announced_series_date_text(actual, i);
+        char *actual_text = to_be_announced_series_value_text(actual, i);
+        char *mean_text = to_be_announced_series_value_text(fitted, i);
 
-        if (ophelia_append_combined_csv_row(&csv, &csv_len, &csv_cap,
+        if (to_be_announced_append_combined_csv_row(&csv, &csv_len, &csv_cap,
                                             date_text, actual_text, mean_text,
                                             NULL, NULL, NULL) != 0 ||
-            ophelia_append_combined_text_row(&text, &text_len, &text_cap,
+            to_be_announced_append_combined_text_row(&text, &text_len, &text_cap,
                                              date_text, actual_text, mean_text,
                                              NULL, NULL, NULL) != 0) {
             free(date_text); free(actual_text); free(mean_text);
@@ -218,16 +220,16 @@ static int ophelia_build_results_outputs(const timeseries_t *actual,
         free(date_text); free(actual_text); free(mean_text);
     }
     for (i = 0u; forecast && forecast->mean && i < ts_length(forecast->mean); ++i) {
-        char *date_text = ophelia_series_date_text(forecast->mean, i);
-        char *mean_text = ophelia_series_value_text(forecast->mean, i);
-        char *stderr_text = forecast->stderr ? ophelia_series_value_text(forecast->stderr, i) : NULL;
-        char *lower_text = forecast->lower ? ophelia_series_value_text(forecast->lower, i) : NULL;
-        char *upper_text = forecast->upper ? ophelia_series_value_text(forecast->upper, i) : NULL;
+        char *date_text = to_be_announced_series_date_text(forecast->mean, i);
+        char *mean_text = to_be_announced_series_value_text(forecast->mean, i);
+        char *stderr_text = forecast->stderr ? to_be_announced_series_value_text(forecast->stderr, i) : NULL;
+        char *lower_text = forecast->lower ? to_be_announced_series_value_text(forecast->lower, i) : NULL;
+        char *upper_text = forecast->upper ? to_be_announced_series_value_text(forecast->upper, i) : NULL;
 
-        if (ophelia_append_combined_csv_row(&csv, &csv_len, &csv_cap,
+        if (to_be_announced_append_combined_csv_row(&csv, &csv_len, &csv_cap,
                                             date_text, NULL, mean_text,
                                             stderr_text, lower_text, upper_text) != 0 ||
-            ophelia_append_combined_text_row(&text, &text_len, &text_cap,
+            to_be_announced_append_combined_text_row(&text, &text_len, &text_cap,
                                              date_text, NULL, mean_text,
                                              stderr_text, lower_text, upper_text) != 0) {
             free(date_text); free(mean_text); free(stderr_text); free(lower_text); free(upper_text);
@@ -245,7 +247,7 @@ fail:
     return -1;
 }
 
-static void ophelia_free_string_list(char **items, size_t count)
+static void to_be_announced_free_string_list(char **items, size_t count)
 {
     size_t i;
 
@@ -256,7 +258,7 @@ static void ophelia_free_string_list(char **items, size_t count)
     free(items);
 }
 
-static char **ophelia_split_columns(const char *text, size_t *count_out)
+static char **to_be_announced_split_columns(const char *text, size_t *count_out)
 {
     char *copy;
     char *tok;
@@ -292,7 +294,7 @@ static char **ophelia_split_columns(const char *text, size_t *count_out)
                 char **new_items = realloc(items, new_cap * sizeof(*new_items));
 
                 if (!new_items) {
-                    ophelia_free_string_list(items, count);
+                    to_be_announced_free_string_list(items, count);
                     free(copy);
                     return NULL;
                 }
@@ -301,7 +303,7 @@ static char **ophelia_split_columns(const char *text, size_t *count_out)
             }
             item = strdup(start);
             if (!item) {
-                ophelia_free_string_list(items, count);
+                to_be_announced_free_string_list(items, count);
                 free(copy);
                 return NULL;
             }
@@ -319,20 +321,20 @@ static char **ophelia_split_columns(const char *text, size_t *count_out)
     return items;
 }
 
-static const char *ophelia_model_name(ophelia_model_t model)
+static const char *to_be_announced_model_name(to_be_announced_model_t model)
 {
     switch (model) {
-    case OPHELIA_MODEL_REGRESSION: return "Regression";
-    case OPHELIA_MODEL_ARIMA: return "ARIMA";
-    case OPHELIA_MODEL_ARIMAX: return "ARIMAX";
-    case OPHELIA_MODEL_SARIMA: return "SARIMA";
-    case OPHELIA_MODEL_SARIMAX: return "SARIMAX";
-    case OPHELIA_MODEL_AUTO_ARIMA: return "Auto-ARIMA";
+    case TO_BE_ANNOUNCED_MODEL_REGRESSION: return "Regression";
+    case TO_BE_ANNOUNCED_MODEL_ARIMA: return "ARIMA";
+    case TO_BE_ANNOUNCED_MODEL_ARIMAX: return "ARIMAX";
+    case TO_BE_ANNOUNCED_MODEL_SARIMA: return "SARIMA";
+    case TO_BE_ANNOUNCED_MODEL_SARIMAX: return "SARIMAX";
+    case TO_BE_ANNOUNCED_MODEL_AUTO_ARIMA: return "Auto-ARIMA";
     default: return "Forecast";
     }
 }
 
-static int ophelia_parse_frequency(const char *text, ts_frequency_t *out)
+static int to_be_announced_parse_frequency(const char *text, ts_frequency_t *out)
 {
     if (!text || !out)
         return -1;
@@ -349,7 +351,7 @@ static int ophelia_parse_frequency(const char *text, ts_frequency_t *out)
     return 0;
 }
 
-static int ophelia_parse_year_type(const char *text, ts_year_type_t *out)
+static int to_be_announced_parse_year_type(const char *text, ts_year_type_t *out)
 {
     if (!text || !out)
         return -1;
@@ -362,28 +364,28 @@ static int ophelia_parse_year_type(const char *text, ts_year_type_t *out)
     return 0;
 }
 
-static int ophelia_parse_model(const char *text, ophelia_model_t *out)
+static int to_be_announced_parse_model(const char *text, to_be_announced_model_t *out)
 {
     if (!text || !out)
         return -1;
     if (strcmp(text, "regression") == 0)
-        *out = OPHELIA_MODEL_REGRESSION;
+        *out = TO_BE_ANNOUNCED_MODEL_REGRESSION;
     else if (strcmp(text, "arima") == 0)
-        *out = OPHELIA_MODEL_ARIMA;
+        *out = TO_BE_ANNOUNCED_MODEL_ARIMA;
     else if (strcmp(text, "arimax") == 0)
-        *out = OPHELIA_MODEL_ARIMAX;
+        *out = TO_BE_ANNOUNCED_MODEL_ARIMAX;
     else if (strcmp(text, "sarima") == 0)
-        *out = OPHELIA_MODEL_SARIMA;
+        *out = TO_BE_ANNOUNCED_MODEL_SARIMA;
     else if (strcmp(text, "sarimax") == 0)
-        *out = OPHELIA_MODEL_SARIMAX;
+        *out = TO_BE_ANNOUNCED_MODEL_SARIMAX;
     else if (strcmp(text, "auto-arima") == 0 || strcmp(text, "auto_arima") == 0)
-        *out = OPHELIA_MODEL_AUTO_ARIMA;
+        *out = TO_BE_ANNOUNCED_MODEL_AUTO_ARIMA;
     else
         return -1;
     return 0;
 }
 
-static int ophelia_parse_criterion(const char *text, ts_information_criterion_t *out)
+static int to_be_announced_parse_criterion(const char *text, ts_information_criterion_t *out)
 {
     if (!text || !out)
         return -1;
@@ -398,7 +400,7 @@ static int ophelia_parse_criterion(const char *text, ts_information_criterion_t 
     return 0;
 }
 
-static void ophelia_advance_datetime(datetime_t *dt, ts_frequency_t frequency)
+static void to_be_announced_advance_datetime(datetime_t *dt, ts_frequency_t frequency)
 {
     int preserve_month_end;
 
@@ -431,7 +433,7 @@ static void ophelia_advance_datetime(datetime_t *dt, ts_frequency_t frequency)
     }
 }
 
-static int ophelia_load_x_columns(const ophelia_config_t *cfg,
+static int to_be_announced_load_x_columns(const to_be_announced_config_t *cfg,
                                   const timeseries_t *y,
                                   timeseries_t **aligned_y_out,
                                   matrix_t **fit_x_out,
@@ -508,7 +510,7 @@ static int ophelia_load_x_columns(const ophelia_config_t *cfg,
 
         if (!future_start)
             goto fail;
-        ophelia_advance_datetime(future_start, cfg->frequency);
+        to_be_announced_advance_datetime(future_start, cfg->frequency);
         for (i = 0u; i < cfg->xreg_column_count; ++i) {
             datetime_t *x_end = ts_end_datetime(raw[i]);
             timeseries_t *window;
@@ -571,7 +573,7 @@ fail:
     return -1;
 }
 
-static void ophelia_print_success(const ophelia_config_t *cfg,
+static void to_be_announced_print_success(const to_be_announced_config_t *cfg,
                                   const char *forecast_csv,
                                   const char *forecast_text,
                                   size_t fit_rows,
@@ -581,21 +583,21 @@ static void ophelia_print_success(const ophelia_config_t *cfg,
                                   const char *summary_text)
 {
     fputs("{\"ok\":true,\"model\":", stdout);
-    ophelia_print_json_string(ophelia_model_name(cfg->model));
+    to_be_announced_print_json_string(to_be_announced_model_name(cfg->model));
     printf(",\"fit_rows\":%zu,\"horizon\":%zu,\"stationary\":%s,\"invertible\":%s,",
            fit_rows, effective_horizon,
            stationary ? "true" : "false",
            invertible ? "true" : "false");
     fputs("\"summary_text\":", stdout);
-    ophelia_print_json_string(summary_text ? summary_text : "");
+    to_be_announced_print_json_string(summary_text ? summary_text : "");
     fputs(",\"forecast_csv\":", stdout);
-    ophelia_print_json_string(forecast_csv ? forecast_csv : "");
+    to_be_announced_print_json_string(forecast_csv ? forecast_csv : "");
     fputs(",\"forecast_text\":", stdout);
-    ophelia_print_json_string(forecast_text ? forecast_text : "");
+    to_be_announced_print_json_string(forecast_text ? forecast_text : "");
     fputs("}\n", stdout);
 }
 
-static int ophelia_run(const ophelia_config_t *cfg)
+static int to_be_announced_run(const to_be_announced_config_t *cfg)
 {
     timeseries_t *y = NULL;
     timeseries_t *fit_y = NULL;
@@ -609,7 +611,7 @@ static int ophelia_run(const ophelia_config_t *cfg)
     size_t effective_horizon = 0u;
 
     if (!cfg || !cfg->target_path || !cfg->target_value_column)
-        return ophelia_fail("Target dataset and value column are required.");
+        return to_be_announced_fail("Target dataset and value column are required.");
 
     y = ts_from_csv(cfg->target_path,
                     cfg->target_date_column ? cfg->target_date_column : "",
@@ -618,18 +620,18 @@ static int ophelia_run(const ophelia_config_t *cfg)
                     cfg->year_type,
                     TS_MISSING_DROP);
     if (!y)
-        return ophelia_fail("Could not load the target time series.");
-    if (ophelia_load_x_columns(cfg, y, &fit_y, &fit_x, &future_x) != 0) {
+        return to_be_announced_fail("Could not load the target time series.");
+    if (to_be_announced_load_x_columns(cfg, y, &fit_y, &fit_x, &future_x) != 0) {
         ts_free(y);
-        return ophelia_fail("Could not align the exogenous data with the target series.");
+        return to_be_announced_fail("Could not align the exogenous data with the target series.");
     }
-    if ((cfg->model == OPHELIA_MODEL_REGRESSION ||
-         cfg->model == OPHELIA_MODEL_ARIMAX ||
-         cfg->model == OPHELIA_MODEL_SARIMAX) &&
+    if ((cfg->model == TO_BE_ANNOUNCED_MODEL_REGRESSION ||
+         cfg->model == TO_BE_ANNOUNCED_MODEL_ARIMAX ||
+         cfg->model == TO_BE_ANNOUNCED_MODEL_SARIMAX) &&
         !fit_x) {
         ts_free(y);
         ts_free(fit_y);
-        return ophelia_fail("This model needs at least one exogenous regressor column.");
+        return to_be_announced_fail("This model needs at least one exogenous regressor column.");
     }
     level = num_create_from_double(cfg->level);
     effective_horizon = cfg->horizon;
@@ -640,7 +642,7 @@ static int ophelia_run(const ophelia_config_t *cfg)
             effective_horizon = future_rows;
     }
 
-    if (cfg->model == OPHELIA_MODEL_REGRESSION) {
+    if (cfg->model == TO_BE_ANNOUNCED_MODEL_REGRESSION) {
         ts_regression_result_t fit = {0};
 
         if (ts_regression_fit(fit_y, fit_x, NULL, &fit) != 0) {
@@ -649,7 +651,7 @@ static int ophelia_run(const ophelia_config_t *cfg)
             ts_free(fit_y);
             mat_free(fit_x);
             mat_free(future_x);
-            return ophelia_fail("Regression fitting failed.");
+            return to_be_announced_fail("Regression fitting failed.");
         }
         if (effective_horizon > 0u && future_x &&
             ts_regression_forecast(&fit, future_x, fit_y, cfg->frequency, cfg->year_type,
@@ -660,10 +662,10 @@ static int ophelia_run(const ophelia_config_t *cfg)
             ts_free(fit_y);
             mat_free(fit_x);
             mat_free(future_x);
-            return ophelia_fail("Regression forecasting failed.");
+            return to_be_announced_fail("Regression forecasting failed.");
         }
         summary_text = ts_regression_summary_to_string(&fit);
-        if (ophelia_build_results_outputs(fit_y, fit.fitted, &forecast,
+        if (to_be_announced_build_results_outputs(fit_y, fit.fitted, &forecast,
                                           &forecast_csv, &forecast_text) != 0) {
             ts_regression_result_clear(&fit);
             ts_forecast_clear(&forecast);
@@ -673,7 +675,7 @@ static int ophelia_run(const ophelia_config_t *cfg)
             mat_free(fit_x);
             mat_free(future_x);
             free(summary_text);
-            return ophelia_fail("Regression output formatting failed.");
+            return to_be_announced_fail("Regression output formatting failed.");
         }
         if (!summary_text || !forecast_csv || !forecast_text) {
             ts_regression_result_clear(&fit);
@@ -686,19 +688,19 @@ static int ophelia_run(const ophelia_config_t *cfg)
             free(summary_text);
             free(forecast_csv);
             free(forecast_text);
-            return ophelia_fail("Regression output formatting failed.");
+            return to_be_announced_fail("Regression output formatting failed.");
         }
-        ophelia_print_success(cfg, forecast_csv, forecast_text,
+        to_be_announced_print_success(cfg, forecast_csv, forecast_text,
                               ts_length(fit_y), effective_horizon, true, true, summary_text);
         ts_regression_result_clear(&fit);
     } else {
         ts_arima_spec_t spec = cfg->spec;
         ts_arima_result_t fit = {0};
-        bool uses_xreg = (cfg->model == OPHELIA_MODEL_ARIMAX ||
-                          cfg->model == OPHELIA_MODEL_SARIMAX ||
-                          cfg->model == OPHELIA_MODEL_AUTO_ARIMA);
-        bool seasonal = (cfg->model == OPHELIA_MODEL_SARIMA ||
-                         cfg->model == OPHELIA_MODEL_SARIMAX);
+        bool uses_xreg = (cfg->model == TO_BE_ANNOUNCED_MODEL_ARIMAX ||
+                          cfg->model == TO_BE_ANNOUNCED_MODEL_SARIMAX ||
+                          cfg->model == TO_BE_ANNOUNCED_MODEL_AUTO_ARIMA);
+        bool seasonal = (cfg->model == TO_BE_ANNOUNCED_MODEL_SARIMA ||
+                         cfg->model == TO_BE_ANNOUNCED_MODEL_SARIMAX);
 
         if (!seasonal) {
             spec.P = 0u;
@@ -706,7 +708,7 @@ static int ophelia_run(const ophelia_config_t *cfg)
             spec.Q = 0u;
             spec.season_period = 0u;
         }
-        if (cfg->model == OPHELIA_MODEL_AUTO_ARIMA) {
+        if (cfg->model == TO_BE_ANNOUNCED_MODEL_AUTO_ARIMA) {
             ts_arima_spec_t best_spec = {0};
 
             if (ts_auto_arima(fit_y, uses_xreg ? fit_x : NULL,
@@ -719,7 +721,7 @@ static int ophelia_run(const ophelia_config_t *cfg)
                 ts_free(fit_y);
                 mat_free(fit_x);
                 mat_free(future_x);
-                return ophelia_fail("Auto-ARIMA search failed.");
+                return to_be_announced_fail("Auto-ARIMA search failed.");
             }
         } else if (ts_arima_fit(fit_y, uses_xreg ? fit_x : NULL, &spec, NULL, &fit) != 0) {
             num_destroy(&level);
@@ -727,7 +729,7 @@ static int ophelia_run(const ophelia_config_t *cfg)
             ts_free(fit_y);
             mat_free(fit_x);
             mat_free(future_x);
-            return ophelia_fail("ARIMA-family fitting failed.");
+            return to_be_announced_fail("ARIMA-family fitting failed.");
         }
         if (effective_horizon > 0u &&
             ts_arima_forecast(&fit, fit_y, uses_xreg ? future_x : NULL,
@@ -738,10 +740,10 @@ static int ophelia_run(const ophelia_config_t *cfg)
             ts_free(fit_y);
             mat_free(fit_x);
             mat_free(future_x);
-            return ophelia_fail("ARIMA-family forecasting failed.");
+            return to_be_announced_fail("ARIMA-family forecasting failed.");
         }
         summary_text = ts_arima_summary_to_string(&fit);
-        if (ophelia_build_results_outputs(fit_y, fit.fitted, &forecast,
+        if (to_be_announced_build_results_outputs(fit_y, fit.fitted, &forecast,
                                           &forecast_csv, &forecast_text) != 0) {
             ts_arima_result_clear(&fit);
             ts_forecast_clear(&forecast);
@@ -751,7 +753,7 @@ static int ophelia_run(const ophelia_config_t *cfg)
             mat_free(fit_x);
             mat_free(future_x);
             free(summary_text);
-            return ophelia_fail("ARIMA-family output formatting failed.");
+            return to_be_announced_fail("ARIMA-family output formatting failed.");
         }
         if (!summary_text || !forecast_csv || !forecast_text) {
             ts_arima_result_clear(&fit);
@@ -764,9 +766,9 @@ static int ophelia_run(const ophelia_config_t *cfg)
             free(summary_text);
             free(forecast_csv);
             free(forecast_text);
-            return ophelia_fail("ARIMA-family output formatting failed.");
+            return to_be_announced_fail("ARIMA-family output formatting failed.");
         }
-        ophelia_print_success(cfg, forecast_csv, forecast_text,
+        to_be_announced_print_success(cfg, forecast_csv, forecast_text,
                               ts_length(fit_y), effective_horizon,
                               ts_arima_is_stationary(&fit),
                               ts_arima_is_invertible(&fit),
@@ -786,7 +788,7 @@ static int ophelia_run(const ophelia_config_t *cfg)
     return EXIT_SUCCESS;
 }
 
-static void ophelia_config_init(ophelia_config_t *cfg)
+static void to_be_announced_config_init(to_be_announced_config_t *cfg)
 {
     if (!cfg)
         return;
@@ -798,7 +800,7 @@ static void ophelia_config_init(ophelia_config_t *cfg)
     cfg->xreg_date_column = "DATE";
     cfg->frequency = TS_FREQ_MONTHLY;
     cfg->year_type = TS_YEAR_FISCAL_UK_APR;
-    cfg->model = OPHELIA_MODEL_SARIMAX;
+    cfg->model = TO_BE_ANNOUNCED_MODEL_SARIMAX;
     cfg->spec.p = 1u;
     cfg->spec.d = 1u;
     cfg->spec.q = 0u;
@@ -814,7 +816,7 @@ static void ophelia_config_init(ophelia_config_t *cfg)
     cfg->level = 0.95;
 }
 
-static int ophelia_parse_args(ophelia_config_t *cfg, int argc, char **argv)
+static int to_be_announced_parse_args(to_be_announced_config_t *cfg, int argc, char **argv)
 {
     int i;
 
@@ -825,7 +827,7 @@ static int ophelia_parse_args(ophelia_config_t *cfg, int argc, char **argv)
         const char *value;
 
         if (strcmp(arg, "--help") == 0) {
-            puts("Usage: ophelia_lab [options]");
+            puts("Usage: to-be-announced_lab [options]");
             puts("  --target PATH");
             puts("  --target-date-column NAME");
             puts("  --target-value-column NAME");
@@ -855,18 +857,18 @@ static int ophelia_parse_args(ophelia_config_t *cfg, int argc, char **argv)
         else if (strcmp(arg, "--xreg-date-column") == 0)
             cfg->xreg_date_column = value;
         else if (strcmp(arg, "--xreg-cols") == 0) {
-            ophelia_free_string_list(cfg->xreg_columns, cfg->xreg_column_count);
-            cfg->xreg_columns = ophelia_split_columns(value, &cfg->xreg_column_count);
+            to_be_announced_free_string_list(cfg->xreg_columns, cfg->xreg_column_count);
+            cfg->xreg_columns = to_be_announced_split_columns(value, &cfg->xreg_column_count);
             if (value[0] && !cfg->xreg_columns)
                 return -1;
         } else if (strcmp(arg, "--model") == 0) {
-            if (ophelia_parse_model(value, &cfg->model) != 0)
+            if (to_be_announced_parse_model(value, &cfg->model) != 0)
                 return -1;
         } else if (strcmp(arg, "--frequency") == 0) {
-            if (ophelia_parse_frequency(value, &cfg->frequency) != 0)
+            if (to_be_announced_parse_frequency(value, &cfg->frequency) != 0)
                 return -1;
         } else if (strcmp(arg, "--year-type") == 0) {
-            if (ophelia_parse_year_type(value, &cfg->year_type) != 0)
+            if (to_be_announced_parse_year_type(value, &cfg->year_type) != 0)
                 return -1;
         } else if (strcmp(arg, "--horizon") == 0)
             cfg->horizon = (size_t)strtoul(value, NULL, 10);
@@ -885,7 +887,7 @@ static int ophelia_parse_args(ophelia_config_t *cfg, int argc, char **argv)
         else if (strcmp(arg, "--season-period") == 0)
             cfg->spec.season_period = (size_t)strtoul(value, NULL, 10);
         else if (strcmp(arg, "--criterion") == 0) {
-            if (ophelia_parse_criterion(value, &cfg->criterion) != 0)
+            if (to_be_announced_parse_criterion(value, &cfg->criterion) != 0)
                 return -1;
         } else if (strcmp(arg, "--level") == 0)
             cfg->level = strtod(value, NULL);
@@ -897,21 +899,21 @@ static int ophelia_parse_args(ophelia_config_t *cfg, int argc, char **argv)
 
 int main(int argc, char **argv)
 {
-    ophelia_config_t cfg;
+    to_be_announced_config_t cfg;
     int parse_rc;
     int rc;
 
-    ophelia_config_init(&cfg);
-    parse_rc = ophelia_parse_args(&cfg, argc, argv);
+    to_be_announced_config_init(&cfg);
+    parse_rc = to_be_announced_parse_args(&cfg, argc, argv);
     if (parse_rc == 1) {
-        ophelia_free_string_list(cfg.xreg_columns, cfg.xreg_column_count);
+        to_be_announced_free_string_list(cfg.xreg_columns, cfg.xreg_column_count);
         return EXIT_SUCCESS;
     }
     if (parse_rc != 0) {
-        ophelia_free_string_list(cfg.xreg_columns, cfg.xreg_column_count);
-        return ophelia_fail("Invalid arguments. Run with --help for usage.");
+        to_be_announced_free_string_list(cfg.xreg_columns, cfg.xreg_column_count);
+        return to_be_announced_fail("Invalid arguments. Run with --help for usage.");
     }
-    rc = ophelia_run(&cfg);
-    ophelia_free_string_list(cfg.xreg_columns, cfg.xreg_column_count);
+    rc = to_be_announced_run(&cfg);
+    to_be_announced_free_string_list(cfg.xreg_columns, cfg.xreg_column_count);
     return rc;
 }

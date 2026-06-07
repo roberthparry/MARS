@@ -1921,8 +1921,9 @@ static void num_replace_value(void *slot, number_t value)
  void expr_print_wrap(const void *v, char *buf, size_t n)
 {
     expr_t *dv = *(expr_t *const *)v;
-    char *tmp;
+    string_t *tmp_text;
     char *inner;
+    char *tmp;
     char *sep;
     size_t len;
 
@@ -1931,7 +1932,13 @@ static void num_replace_value(void *slot, number_t value)
         return;
     }
 
-    tmp = expr_to_string(dv, style_EXPRESSION);
+    tmp_text = expr_to_text(dv, style_EXPRESSION);
+    if (!tmp_text) {
+        snprintf(buf, n, "<expr>");
+        return;
+    }
+    tmp = strdup(string_c_str(tmp_text));
+    string_free(tmp_text);
     if (!tmp) {
         snprintf(buf, n, "<expr>");
         return;

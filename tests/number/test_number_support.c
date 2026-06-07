@@ -12,25 +12,26 @@ static int number_validity_equal(const void *actual,
     return num_eq(*(const number_t *)actual, *(const number_t *)expected);
 }
 
-static void number_validity_format(const void *value,
-                                   char *buf,
-                                   size_t buf_size,
-                                   void *ctx)
+static int number_validity_format(const void *value,
+                                  string_t *out,
+                                  void *ctx)
 {
     char *text;
 
     (void)ctx;
-    if (!buf || buf_size == 0u)
-        return;
+    if (!out)
+        return -1;
 
     text = num_to_string(*(const number_t *)value);
-    if (!text) {
-        snprintf(buf, buf_size, "<num_to_string failed>");
-        return;
-    }
+    if (!text)
+        return string_append_cstr(out, "<num_to_string failed>");
 
-    snprintf(buf, buf_size, "%s", text);
+    if (string_append_cstr(out, text) != 0) {
+        free(text);
+        return -1;
+    }
     free(text);
+    return 0;
 }
 
 const test_validity_contract_t *number_validity_contract_exact(void)

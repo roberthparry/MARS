@@ -71,8 +71,8 @@ typedef struct _set_t set_t;
  *   A pointer to a newly allocated set, or NULL on allocation failure.
  *
  * Semantics:
- *   - The set takes ownership of the hash, cmp, clone, and destroy callbacks
- *     for its lifetime (it does not free them, but assumes they remain valid).
+ *   - The set stores the callback pointers for its lifetime; callers must keep
+ *     those functions available, and the set never frees them.
  *   - Elements are stored by value, inline in an internal arena.
  *   - If clone is NULL, elements are copied with memcpy.
  *   - If destroy is NULL, elements are not individually destroyed.

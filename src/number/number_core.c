@@ -118,6 +118,271 @@ _Static_assert(sizeof(number_private_t) <= sizeof(number_t),
 _Static_assert(_Alignof(number_private_t) <= _Alignof(number_t),
     "number_t public storage alignment is too small for internal representation");
 
+typedef struct {
+    const char *name;
+    const number_t *value;
+    bool canonical;
+} number_constant_name_t;
+
+enum {
+    NUMBER_CONSTANT_NAME_COUNT = 128,
+    NUMBER_CONSTANT_HASH_VERTEX_COUNT = 149,
+    NUMBER_CONSTANT_HASH_SEED0 = 105264080u,
+    NUMBER_CONSTANT_HASH_SEED1 = 343043389u,
+    NUMBER_CONSTANT_HASH_SEED2 = 755892437u
+};
+
+static const unsigned char number_constant_hash_g[NUMBER_CONSTANT_HASH_VERTEX_COUNT] = {
+      9,  35,  81,  30,  34,  22,  81,  37,  70, 105,   0,  32, 116,   0,  12,  20,
+     63,  86,   0,  97,  46,  74,  99,   0,  67,  37,  44,  52,   0,  48,  33,  34,
+     11,  48,  56,   1, 123, 120,  45,  67,   1,   0, 101,   0,   2, 125, 102,   0,
+     94,  72,   8,  23,   0,  34, 111,  29,  24,  48,   0,  11,   0,  48,   0,  67,
+      0,  89,  88,  16,   0,  18,  60,  95, 103,   6,  34,  31,  56,  62,  68,  95,
+     84,   2, 126,   0,  21,  39,   0, 113, 118,  12,  74, 102,  87,   0,  16, 123,
+     92,  63,   4,  61,  29,   4,  76,  66,  78,  38, 127,  80, 111,   0,  64,  74,
+    108, 124,  66, 106,  71,  19, 112,  90,  27,  81,   0,  23,   0,  83,  13,  19,
+     98,   2,  46,  31,  69,  94, 109,  94,  97, 100,  81,  14,   6,  18,  66, 110,
+    110,  53,  78,   0, 106
+};
+
+static const number_constant_name_t number_constant_names[NUMBER_CONSTANT_NAME_COUNT] = {
+    [  0] = { "1/e", &NUM_INV_E, true },
+    [  1] = { "1/ln(2)", &NUM_INVLN2, true },
+    [  2] = { "2*pi", &NUM_2PI, false },
+    [  3] = { "log(sqrt(2@pi))", &NUM_LOG_SQRT_2PI, false },
+    [  4] = { "-pi/2", &NUM_NEG_PI_2, false },
+    [  5] = { "π²", &NUM_PI_SQUARED, true },
+    [  6] = { "ln(2*pi)", &NUM_LN_2PI, false },
+    [  7] = { "(2pi)^3", &NUM_2PI_CUBED, false },
+    [  8] = { "sqrt(@pi)", &NUM_SQRT_PI, false },
+    [  9] = { "-π/2", &NUM_NEG_PI_2, true },
+    [ 10] = { "∞", &NUM_INF, true },
+    [ 11] = { "1/sqrt(pi)", &NUM_SQRT1ONPI, false },
+    [ 12] = { "10", &NUM_TEN, true },
+    [ 13] = { "2/sqrt(pi)", &NUM_2_SQRTPI, false },
+    [ 14] = { "π/2", &NUM_PI_2, true },
+    [ 15] = { "π/3", &NUM_PI_3, true },
+    [ 16] = { "π/6", &NUM_PI_6, true },
+    [ 17] = { "π/4", &NUM_PI_4, true },
+    [ 18] = { "pi", &NUM_PI, false },
+    [ 19] = { "1/√(2π)", &NUM_INV_SQRT_2PI, true },
+    [ 20] = { "sqrt(2)/2", &NUM_SQRT2_OVER_TWO, false },
+    [ 21] = { "pi^2", &NUM_PI_SQUARED, false },
+    [ 22] = { "2/@pi", &NUM_2_PI, false },
+    [ 23] = { "0", &NUM_ZERO, true },
+    [ 24] = { "1", &NUM_ONE, true },
+    [ 25] = { "2", &NUM_TWO, true },
+    [ 26] = { "sqrt2/2", &NUM_SQRT2_OVER_TWO, false },
+    [ 27] = { "√2", &NUM_SQRT2, true },
+    [ 28] = { "√3", &NUM_SQRT3, true },
+    [ 29] = { "log(sqrt(2*pi))", &NUM_LOG_SQRT_2PI, false },
+    [ 30] = { "-1", &NUM_NEG_ONE, true },
+    [ 31] = { "-@pi/2", &NUM_NEG_PI_2, false },
+    [ 32] = { "ln10", &NUM_LN10, false },
+    [ 33] = { "sqrt_pi_over_two", &NUM_SQRT_PI_OVER_TWO, false },
+    [ 34] = { "@pi^2", &NUM_PI_SQUARED, false },
+    [ 35] = { "sqrt(@pi/2)", &NUM_SQRT_PI_OVER_TWO, false },
+    [ 36] = { "3π/4", &NUM_3PI_4, true },
+    [ 37] = { "i", &NUM_I, true },
+    [ 38] = { "1/ln2", &NUM_INVLN2, false },
+    [ 39] = { "3*pi/4", &NUM_3PI_4, false },
+    [ 40] = { "e", &NUM_E, true },
+    [ 41] = { "-i", &NUM_NEG_I, true },
+    [ 42] = { "sqrt(2@pi)", &NUM_SQRT_2PI, false },
+    [ 43] = { "√π", &NUM_SQRT_PI, true },
+    [ 44] = { "-2/√π", &NUM_NEG_TWO_OVER_SQRT_PI, true },
+    [ 45] = { "-2/sqrt(@pi)", &NUM_NEG_TWO_OVER_SQRT_PI, false },
+    [ 46] = { "1/sqrt(@pi)", &NUM_SQRT1ONPI, false },
+    [ 47] = { "2π", &NUM_2PI, true },
+    [ 48] = { "inf", &NUM_INF, false },
+    [ 49] = { "(2@pi)^3", &NUM_2PI_CUBED, false },
+    [ 50] = { "(2*pi)^3", &NUM_2PI_CUBED, false },
+    [ 51] = { "1/sqrt_pi", &NUM_SQRT1ONPI, false },
+    [ 52] = { "phi", &NUM_PHI, false },
+    [ 53] = { "sqrt(3)/2", &NUM_SQRT3_OVER_TWO, false },
+    [ 54] = { "NaN", &NUM_NAN, true },
+    [ 55] = { "@pi/6", &NUM_PI_6, false },
+    [ 56] = { "@pi/4", &NUM_PI_4, false },
+    [ 57] = { "-1/e", &NUM_NEG_INV_E, true },
+    [ 58] = { "@pi/2", &NUM_PI_2, false },
+    [ 59] = { "@pi/3", &NUM_PI_3, false },
+    [ 60] = { "√(2π)", &NUM_SQRT_2PI, true },
+    [ 61] = { "log(√(2π))", &NUM_LOG_SQRT_2PI, true },
+    [ 62] = { "nan", &NUM_NAN, false },
+    [ 63] = { "1/sqrt(2*pi)", &NUM_INV_SQRT_2PI, false },
+    [ 64] = { "2pi", &NUM_2PI, false },
+    [ 65] = { "sqrt3/2", &NUM_SQRT3_OVER_TWO, false },
+    [ 66] = { "3/2", &NUM_ONE_AND_HALF, true },
+    [ 67] = { "ln(2π)", &NUM_LN_2PI, true },
+    [ 68] = { "sqrt_pi", &NUM_SQRT_PI, false },
+    [ 69] = { "2/pi", &NUM_2_PI, false },
+    [ 70] = { "-infinity", &NUM_NINF, false },
+    [ 71] = { "gamma", &NUM_EULER_MASCHERONI, false },
+    [ 72] = { "1/sqrt(2@pi)", &NUM_INV_SQRT_2PI, false },
+    [ 73] = { "√3/2", &NUM_SQRT3_OVER_TWO, true },
+    [ 74] = { "-2/sqrt(pi)", &NUM_NEG_TWO_OVER_SQRT_PI, false },
+    [ 75] = { "√2/2", &NUM_SQRT2_OVER_TWO, true },
+    [ 76] = { "2/sqrt(@pi)", &NUM_2_SQRTPI, false },
+    [ 77] = { "(2π)³", &NUM_2PI_CUBED, true },
+    [ 78] = { "2/π", &NUM_2_PI, true },
+    [ 79] = { "@phi", &NUM_PHI, false },
+    [ 80] = { "ln2", &NUM_LN2, false },
+    [ 81] = { "2/sqrt_pi", &NUM_2_SQRTPI, false },
+    [ 82] = { "ln(2pi)", &NUM_LN_2PI, false },
+    [ 83] = { "-2/sqrt_pi", &NUM_NEG_TWO_OVER_SQRT_PI, false },
+    [ 84] = { "ln(2)", &NUM_LN2, true },
+    [ 85] = { "3@pi/4", &NUM_3PI_4, false },
+    [ 86] = { "@pi", &NUM_PI, false },
+    [ 87] = { "√(π/2)", &NUM_SQRT_PI_OVER_TWO, true },
+    [ 88] = { "sqrt(2pi)", &NUM_SQRT_2PI, false },
+    [ 89] = { "-∞", &NUM_NINF, true },
+    [ 90] = { "@gamma", &NUM_EULER_MASCHERONI, false },
+    [ 91] = { "sqrt(1/2)", &NUM_SQRT_HALF, false },
+    [ 92] = { "1/√π", &NUM_SQRT1ONPI, true },
+    [ 93] = { "ln(2@pi)", &NUM_LN_2PI, false },
+    [ 94] = { "1/10", &NUM_ONE_TENTH, true },
+    [ 95] = { "log(sqrt_2pi)", &NUM_LOG_SQRT_2PI, false },
+    [ 96] = { "3pi/4", &NUM_3PI_4, false },
+    [ 97] = { "invln2", &NUM_INVLN2, false },
+    [ 98] = { "sqrt_2pi", &NUM_SQRT_2PI, false },
+    [ 99] = { "sqrt(2*pi)", &NUM_SQRT_2PI, false },
+    [100] = { "sqrt(pi/2)", &NUM_SQRT_PI_OVER_TWO, false },
+    [101] = { "2@pi", &NUM_2PI, false },
+    [102] = { "sqrt(2)", &NUM_SQRT2, false },
+    [103] = { "sqrt(pi)", &NUM_SQRT_PI, false },
+    [104] = { "2/√π", &NUM_2_SQRTPI, true },
+    [105] = { "infinity", &NUM_INF, false },
+    [106] = { "ln(10)", &NUM_LN10, true },
+    [107] = { "1/sqrt_2pi", &NUM_INV_SQRT_2PI, false },
+    [108] = { "sqrt(3)", &NUM_SQRT3, false },
+    [109] = { "log(sqrt(2pi))", &NUM_LOG_SQRT_2PI, false },
+    [110] = { "1/3", &NUM_ONE_THIRD, true },
+    [111] = { "1/2", &NUM_HALF, true },
+    [112] = { "1/4", &NUM_QUARTER, true },
+    [113] = { "1/6", &NUM_ONE_SIXTH, true },
+    [114] = { "1/8", &NUM_ONE_EIGHTH, true },
+    [115] = { "sqrt2", &NUM_SQRT2, false },
+    [116] = { "sqrt3", &NUM_SQRT3, false },
+    [117] = { "pi/4", &NUM_PI_4, false },
+    [118] = { "pi/6", &NUM_PI_6, false },
+    [119] = { "pi/2", &NUM_PI_2, false },
+    [120] = { "pi/3", &NUM_PI_3, false },
+    [121] = { "sqrt_half", &NUM_SQRT_HALF, false },
+    [122] = { "1/sqrt(2pi)", &NUM_INV_SQRT_2PI, false },
+    [123] = { "φ", &NUM_PHI, true },
+    [124] = { "π", &NUM_PI, true },
+    [125] = { "-inf", &NUM_NINF, false },
+    [126] = { "γ", &NUM_EULER_MASCHERONI, true },
+    [127] = { "√(1/2)", &NUM_SQRT_HALF, true },
+};
+
+_Static_assert(NUMBER_CONSTANT_NAME_COUNT ==
+               sizeof(number_constant_names) / sizeof(number_constant_names[0]),
+    "number constant name count mismatch");
+_Static_assert(NUMBER_CONSTANT_HASH_VERTEX_COUNT ==
+               sizeof(number_constant_hash_g) / sizeof(number_constant_hash_g[0]),
+    "number constant hash vertex count mismatch");
+
+static size_t number_constant_name_count(void)
+{
+    return NUMBER_CONSTANT_NAME_COUNT;
+}
+
+static uint32_t number_constant_hash_bytes(const char *text, size_t len, uint32_t seed)
+{
+    uint32_t hash = seed;
+
+    for (size_t i = 0u; i < len; ++i)
+        hash = (hash * 65599u) ^ (unsigned char)text[i];
+
+    hash ^= (uint32_t)(len * 0x9e3779b9u);
+    hash ^= hash >> 16;
+    hash *= 0x85ebca6bu;
+    hash ^= hash >> 13;
+    return hash;
+}
+
+static size_t number_constant_hash_index(const char *text, size_t len)
+{
+    size_t vertex0;
+    size_t vertex1;
+    size_t vertex2;
+
+    vertex0 = number_constant_hash_bytes(text, len, NUMBER_CONSTANT_HASH_SEED0) %
+              NUMBER_CONSTANT_HASH_VERTEX_COUNT;
+    vertex1 = number_constant_hash_bytes(text, len, NUMBER_CONSTANT_HASH_SEED1) %
+              NUMBER_CONSTANT_HASH_VERTEX_COUNT;
+    vertex2 = number_constant_hash_bytes(text, len, NUMBER_CONSTANT_HASH_SEED2) %
+              NUMBER_CONSTANT_HASH_VERTEX_COUNT;
+
+    return ((size_t)number_constant_hash_g[vertex0] +
+            (size_t)number_constant_hash_g[vertex1] +
+            (size_t)number_constant_hash_g[vertex2]) %
+           NUMBER_CONSTANT_NAME_COUNT;
+}
+
+static void number_trim_name(const char *text, const char **start_out, size_t *len_out)
+{
+    const char *start = text;
+    const char *end;
+
+    if (!text) {
+        *start_out = NULL;
+        *len_out = 0u;
+        return;
+    }
+
+    while (*start && isspace((unsigned char)*start))
+        ++start;
+    end = start + strlen(start);
+    while (end > start && isspace((unsigned char)end[-1]))
+        --end;
+
+    *start_out = start;
+    *len_out = (size_t)(end - start);
+}
+
+bool num_constant_value(const char *text, number_t *out)
+{
+    const number_constant_name_t *entry;
+    const char *start;
+    size_t len;
+    size_t index;
+
+    if (!out)
+        return false;
+
+    number_trim_name(text, &start, &len);
+    if (!start || len == 0u)
+        return false;
+
+    index = number_constant_hash_index(start, len);
+    entry = &number_constant_names[index];
+
+    if (strlen(entry->name) == len && memcmp(start, entry->name, len) == 0) {
+        *out = num_clone(*entry->value);
+        return true;
+    }
+
+    return false;
+}
+
+const char *num_constant_name(number_t value)
+{
+    if (num_is_nan(value))
+        return "NaN";
+    if (!number_value_is_immortal(&value))
+        return NULL;
+
+    for (size_t i = 0u; i < number_constant_name_count(); ++i) {
+        if (number_constant_names[i].canonical &&
+            num_eq(value, *number_constant_names[i].value))
+            return number_constant_names[i].name;
+    }
+
+    return NULL;
+}
+
 static number_t *number_alloc(number_kind_t kind)
 {
     number_t *number;
@@ -2078,9 +2343,12 @@ number_t num_create_from_qcomplex(qcomplex_t value)
 number_t num_create_from_string(const char *text)
 {
     const char *trimmed = number_skip_ws(text);
+    number_t constant;
 
     if (!trimmed || *trimmed == '\0')
         return number_invalid();
+    if (num_constant_value(trimmed, &constant))
+        return constant;
     if (number_has_char_ci(trimmed, 'i'))
         return number_take(number_wrap_complex(
             number_complex_create_from_string(trimmed, number_default_precision_bits)));

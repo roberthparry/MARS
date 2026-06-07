@@ -697,9 +697,9 @@ static void expr_release(expr_t *dv)
     expr_release(b);
 }
 
-void expr_free(expr_t *dv)
+void expr_free(expr_t *expr)
 {
-    expr_release(dv);
+    expr_release(expr);
 }
 
 expr_t *expr_alloc(const expr_ops_t *ops)

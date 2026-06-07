@@ -17,6 +17,7 @@ This directory contains the longer module documentation for MARS.
 - [`expr_t`](expression.md) — differentiable expression DAGs and symbolic helper APIs
 - [`datetime_t`](datetime.md) — civil and astronomical date/time utilities
 - [`timeseries_t`](timeseries.md) — datetime-indexed forecasting and time-series analysis
+- [`json_t`](json.md) — opaque JSON value tree with string-backed parsing and `number_t` fidelity
 - [`dictionary_t`](dictionary.md) — generic key/value storage
 - [`set_t`](set.md) — generic set storage
 - [`array_t`](array.md) — generic array storage
@@ -26,9 +27,9 @@ This directory contains the longer module documentation for MARS.
 
 ## Guides
 
-- [`dictionary_t` ownership models](dictionary.md#ownership-models)
-- [`set_t` ownership models](set.md#ownership-models)
-- [`array_t` ownership models](array.md#ownership-models)
+- [`dictionary_t` copying and cleanup](dictionary.md#copying-and-cleanup)
+- [`set_t` copying and cleanup](set.md#copying-and-cleanup)
+- [`array_t` copying and cleanup](array.md#copying-and-cleanup)
 
 ## Acknowledgements
 

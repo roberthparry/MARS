@@ -6,6 +6,29 @@
 #include "matrix.h"
 #include "number.h"
 
+static char *dup_string(const char *text)
+{
+    size_t n;
+    char *copy;
+
+    if (!text)
+        text = "";
+    n = strlen(text);
+    copy = malloc(n + 1u);
+    if (copy)
+        memcpy(copy, text, n + 1u);
+    return copy;
+}
+
+static char *expr_text_dup(const expr_t *expr, style_t style)
+{
+    string_t *text = expr_to_text(expr, style);
+    char *copy = text ? dup_string(string_c_str(text)) : NULL;
+
+    string_free(text);
+    return copy;
+}
+
 static const char *matrix_type_name(const matrix_t *matrix)
 {
     return mat_typeof(matrix) == MAT_TYPE_EXPR ? "expr" : "number";
@@ -14,7 +37,7 @@ static const char *matrix_type_name(const matrix_t *matrix)
 static void print_expr_values(const char *label, expr_t **values, size_t count)
 {
     for (size_t i = 0; i < count; ++i) {
-        char *text = values[i] ? expr_to_string(values[i], style_EXPRESSION) : NULL;
+        char *text = values[i] ? expr_text_dup(values[i], style_EXPRESSION) : NULL;
 
         printf("%-12s λ%zu = %s\n", label, i + 1u, text ? text : "(null)");
         free(text);
@@ -67,7 +90,7 @@ static char *expr_to_unbound_tex(expr_t *expr)
 {
     const char *prefix = "\\left\\{ ";
     const char *middle = " \\;\\middle|\\; ";
-    char *tex = expr ? expr_to_string(expr, style_TEX) : NULL;
+    char *tex = expr ? expr_text_dup(expr, style_TEX) : NULL;
     char *mid;
     size_t prefix_len;
     size_t body_len;
@@ -118,7 +141,7 @@ static void print_expr_eigenvector_column(const char *prefix,
         char *text;
 
         mat_get(eigenvectors, row, column, &entry);
-        text = entry ? expr_to_string((expr_t *)entry, style_UNBOUND) : NULL;
+        text = entry ? expr_text_dup((expr_t *)entry, style_UNBOUND) : NULL;
         printf("%s%s", row ? "; " : "", text ? text : "(null)");
         free(text);
     }
@@ -195,7 +218,7 @@ static void print_eigendecomposition_expr_fields(expr_t **eigenvalues,
     printf("cols        %zu\n", mat_get_col_count(eigenvectors));
     printf("result      eigenvalues\n");
     for (size_t i = 0; i < count; ++i) {
-        char *text = eigenvalues[i] ? expr_to_string(eigenvalues[i], style_UNBOUND) : NULL;
+        char *text = eigenvalues[i] ? expr_text_dup(eigenvalues[i], style_UNBOUND) : NULL;
 
         printf("result      λ%zu = %s\n", i + 1u, text ? text : "(null)");
         free(text);
@@ -209,7 +232,7 @@ static void print_eigendecomposition_expr_fields(expr_t **eigenvalues,
 
     printf("pretty      eigenvalues\n");
     for (size_t i = 0; i < count; ++i) {
-        char *text = eigenvalues[i] ? expr_to_string(eigenvalues[i], style_UNBOUND) : NULL;
+        char *text = eigenvalues[i] ? expr_text_dup(eigenvalues[i], style_UNBOUND) : NULL;
 
         printf("  λ%zu = %s\n", i + 1u, text ? text : "(null)");
         free(text);
@@ -304,8 +327,8 @@ static void print_eigendecomposition_number_fields(number_t *eigenvalues,
 
 static void print_expr_field(const char *label, expr_t *expr)
 {
-    char *text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
-    char *tex = expr ? expr_to_string(expr, style_TEX) : NULL;
+    char *text = expr ? expr_text_dup(expr, style_EXPRESSION) : NULL;
+    char *tex = expr ? expr_text_dup(expr, style_TEX) : NULL;
 
     printf("%-12s %s\n", label, text ? text : "(null)");
     printf("tex         %s\n", tex ? tex : "(null)");

@@ -5,19 +5,21 @@
 #include <stddef.h>
 
 #include "test_config.h"
+#include "ustring.h"
 
-typedef void (*test_fn)(void);
-typedef bool (*test_suite_setup_fn)(void);
-typedef bool (*test_fixture_setup_fn)(void);
-typedef bool (*test_fixture_teardown_fn)(void);
-typedef void (*test_post_summary_fn)(void);
-typedef int (*test_validity_equal_fn)(const void *actual,
-                                      const void *expected,
-                                      void *ctx);
-typedef void (*test_validity_format_fn)(const void *value,
-                                        char *buf,
-                                        size_t buf_size,
-                                        void *ctx);
+typedef void    (*test_fn)                  (void);
+
+typedef bool    (*test_suite_setup_fn)      (void);
+
+typedef bool    (*test_fixture_setup_fn)    (void);
+
+typedef bool    (*test_fixture_teardown_fn) (void);
+
+typedef void    (*test_post_summary_fn)     (void);
+
+typedef int     (*test_validity_equal_fn)   (const void *actual, const void *expected, void *ctx);
+
+typedef int     (*test_validity_format_fn)  (const void *value, string_t *out, void *ctx);
 
 typedef struct {
     const char *name;
@@ -95,104 +97,120 @@ extern test_post_summary_fn test_post_summary_hook;
 #define C_GREY    "\x1b[90m"
 #define C_MAGENTA "\x1b[95m"
 
-void test_section(const char *title);
+/** Print a labelled section heading in test output. */
+void test_section                   (const char *title);
 
-void test_run_case(const char *file,
-                   int line,
-                   const char *name,
-                   const char *tags,
-                   test_fn fn);
+/** Run one top-level test case if enabled by the active test config. */
+void test_run_case                  (const char *file, int line, const char *name, const char *tags,
+                                     test_fn fn);
 
-void test_run_subtest(const char *file,
-                      int line,
-                      const char *name,
-                      const char *tags,
-                      test_fn fn);
+/** Run one nested test case under the currently active group path. */
+void test_run_subtest               (const char *file, int line, const char *name, const char *tags,
+                                     test_fn fn);
 
-void test_run_in_group(const char *file,
-                       int line,
-                       const char *name,
-                       const char *parent,
-                       const char *tags,
-                       test_fn fn);
+/** Run one test case beneath an explicit parent group. */
+void test_run_in_group              (const char *file, int line, const char *name, const char *parent, const char *tags,
+                                     test_fn fn);
 
-void test_run_output_case(const char *file,
-                          int line,
-                          const char *tags,
-                          const char *name,
-                          test_fn fn);
+/** Run an output/demo case, counted separately from correctness cases. */
+void test_run_output_case           (const char *file, int line, const char *tags, const char *name,
+                                     test_fn fn);
 
-int test_exit_code(void);
+/** Return the process exit code implied by the recorded test results. */
+int  test_exit_code                 (void);
 
-bool test_assert_true(bool expr,
-                      const char *file,
-                      int line,
-                      const char *detail);
+/** Record a failure unless @p expr is true. */
+bool test_assert_true               (bool expr, const char *file, int line, const char *detail);
 
-bool test_assert_false(bool expr,
-                       const char *file,
-                       int line,
-                       const char *detail);
+/** Record a failure unless @p expr is false. */
+bool test_assert_false              (bool expr, const char *file, int line, const char *detail);
 
-bool test_assert_int_eq(int actual,
-                        int expected,
-                        const char *file,
-                        int line);
+/** Record a failure unless two int values are equal. */
+bool test_assert_int_eq             (int actual, int expected, const char *file, int line);
 
-bool test_assert_long_eq(long actual,
-                         long expected,
-                         const char *file,
-                         int line);
+/** Record a failure unless two long values are equal. */
+bool test_assert_long_eq            (long actual, long expected, const char *file, int line);
 
-bool test_assert_double_eq(double actual,
-                           double expected,
-                           double eps,
-                           const char *file,
-                           int line);
+/** Record a failure unless two double values differ by no more than @p eps. */
+bool test_assert_double_eq          (double actual, double expected, double eps, const char *file, int line);
 
-bool test_assert_not_null(const void *ptr,
-                          const char *file,
-                          int line);
+/** Record a failure unless @p ptr is non-null. */
+bool test_assert_not_null           (const void *ptr, const char *file, int line);
 
-bool test_assert_null(const void *ptr,
-                      const char *file,
-                      int line);
+/** Record a failure unless @p ptr is null. */
+bool test_assert_null               (const void *ptr, const char *file, int line);
 
-bool test_assert_validity(const test_validity_contract_t *contract,
-                          const void *actual,
-                          const void *expected,
-                          const char *file,
-                          int line);
-void test_register_validity_checker(const char *name,
-                                    const test_validity_contract_t *contract);
+/** Record a failure unless @p actual and @p expected satisfy @p contract. */
+bool test_assert_validity           (const test_validity_contract_t *contract, const void *actual, const void *expected, const char *file, int line);
+
+/** Record a validity failure using a checker registered by name. */
+bool test_assert_validity_named     (const char *name, const void *actual, const void *expected, const char *file, int line);
+
+/** Record a failure unless two C-string boundary values are equal. */
+bool test_assert_cstr_eq            (const char *actual, const char *expected, const char *file, int line);
+
+/** Register a named semantic validity checker for later assertions. */
+void test_register_validity_checker (const char *name, const test_validity_contract_t *contract);
+
+/** Find a previously registered semantic validity checker. */
 const test_validity_contract_t *test_find_validity_checker(const char *name);
-bool test_require_validity_checker(const char *name,
-                                   const char *file,
-                                   int line);
 
-void test_set_failure_detailf(const char *fmt, ...);
-void test_clear_failure_detail(void);
-void test_mark_failure(const char *file, int line, const char *detail);
-void test_mark_skip(const char *file, int line, const char *detail);
-const char *test_case_temp_dir(void);
-const char *test_case_temp_path(const char *leafname);
-bool test_case_setenv(const char *name, const char *value);
-bool test_case_unsetenv(const char *name);
-int test_case_begin_stdout_capture(const char *leafname, const char **path_out);
-bool test_case_end_stdout_capture(int saved_stdout);
-int test_case_begin_stderr_capture(const char *leafname, const char **path_out);
-bool test_case_end_stderr_capture(int saved_stderr);
+/** Require that a named validity checker exists before a suite runs. */
+bool test_require_validity_checker  (const char *name, const char *file, int line);
 
+/** Query whether a case is enabled by the active test config. */
+bool test_harness_config_is_enabled (const char *file, const char *func, const char *parent);
+
+/** Query whether a case has an explicit key in the active test config. */
+bool test_harness_config_has_key    (const char *file, const char *func, const char *parent);
+
+/** Store formatted failure detail for the current case. */
+void test_set_failure_detailf       (const char *fmt, ...);
+
+/** Clear any recorded failure or skip detail for the current case. */
+void test_clear_failure_detail      (void);
+
+/** Mark the current case as failed at @p file:@p line. */
+void test_mark_failure              (const char *file, int line, const char *detail);
+
+/** Mark the current case as explicitly failed at @p file:@p line. */
+void test_fail                      (const char *file, int line);
+
+/** Mark the current case as skipped at @p file:@p line. */
+void test_mark_skip                 (const char *file, int line, const char *detail);
+
+/** Mark the current case as skipped and return false for assertion-style macros. */
+bool test_request_skip              (const char *file, int line, const char *detail);
+
+/** Return the temporary directory allocated for the current case. */
+const char *test_case_temp_dir      (void);
+
+/** Return a temporary file path beneath the current case directory. */
+const char *test_case_temp_path     (const char *leafname);
+
+/** Redirect stdout to a temporary capture file for the current case. */
+int test_case_begin_stdout_capture  (const char *leafname, const char **path_out);
+
+/** Restore stdout after a capture started by test_case_begin_stdout_capture(). */
+bool test_case_end_stdout_capture   (int saved_stdout);
+
+/** Redirect stderr to a temporary capture file for the current case. */
+int test_case_begin_stderr_capture  (const char *leafname, const char **path_out);
+
+/** Restore stderr after a capture started by test_case_begin_stderr_capture(). */
+bool test_case_end_stderr_capture   (int saved_stderr);
+
+/** Run the registered test suite. */
 int tests_main(void);
 
 #define TEST_SECTION(title) \
     test_section((title))
 
 #define TEST_ENABLED(parent) \
-    test_enabled(__FILE__, __func__, (parent))
+    test_harness_config_is_enabled(__FILE__, __func__, (parent))
 
 #define TEST_CONFIG_HAS_KEY(parent) \
-    test_config_has_key(__FILE__, __func__, (parent))
+    test_harness_config_has_key(__FILE__, __func__, (parent))
 
 #define TEST_RUN_CASE(fn, tags) \
     test_run_case(__FILE__, __LINE__, #fn, (tags), (fn))
@@ -212,47 +230,32 @@ int tests_main(void);
 #define TEST_EXIT_CODE() \
     test_exit_code()
 
-#define TEST_ASSERT_TRUE(expr, detail) \
+#define TEST_HARNESS_RETURN_UNLESS(ok_expr) \
     do { \
-        if (!test_assert_true((expr), __FILE__, __LINE__, (detail))) \
+        if (!(ok_expr)) \
             return; \
     } while (0)
+
+#define TEST_ASSERT_TRUE(expr, detail) \
+    TEST_HARNESS_RETURN_UNLESS(test_assert_true((expr), __FILE__, __LINE__, (detail)))
 
 #define TEST_ASSERT_FALSE(expr, detail) \
-    do { \
-        if (!test_assert_false((expr), __FILE__, __LINE__, (detail))) \
-            return; \
-    } while (0)
+    TEST_HARNESS_RETURN_UNLESS(test_assert_false((expr), __FILE__, __LINE__, (detail)))
 
 #define TEST_ASSERT_INT_EQ(actual, expected) \
-    do { \
-        if (!test_assert_int_eq((actual), (expected), __FILE__, __LINE__)) \
-            return; \
-    } while (0)
+    TEST_HARNESS_RETURN_UNLESS(test_assert_int_eq((actual), (expected), __FILE__, __LINE__))
 
 #define TEST_ASSERT_LONG_EQ(actual, expected) \
-    do { \
-        if (!test_assert_long_eq((actual), (expected), __FILE__, __LINE__)) \
-            return; \
-    } while (0)
+    TEST_HARNESS_RETURN_UNLESS(test_assert_long_eq((actual), (expected), __FILE__, __LINE__))
 
 #define TEST_ASSERT_DOUBLE_EQ(actual, expected, eps) \
-    do { \
-        if (!test_assert_double_eq((actual), (expected), (eps), __FILE__, __LINE__)) \
-            return; \
-    } while (0)
+    TEST_HARNESS_RETURN_UNLESS(test_assert_double_eq((actual), (expected), (eps), __FILE__, __LINE__))
 
 #define TEST_ASSERT_NOT_NULL(ptr) \
-    do { \
-        if (!test_assert_not_null((ptr), __FILE__, __LINE__)) \
-            return; \
-    } while (0)
+    TEST_HARNESS_RETURN_UNLESS(test_assert_not_null((ptr), __FILE__, __LINE__))
 
 #define TEST_ASSERT_NULL(ptr) \
-    do { \
-        if (!test_assert_null((ptr), __FILE__, __LINE__)) \
-            return; \
-    } while (0)
+    TEST_HARNESS_RETURN_UNLESS(test_assert_null((ptr), __FILE__, __LINE__))
 
 #define TEST_VALIDITY_CONTRACT(name, equal_fn, format_fn, ctx_ptr) \
     ((test_validity_contract_t){ (name), (equal_fn), (format_fn), (ctx_ptr) })
@@ -267,54 +270,22 @@ int tests_main(void);
     test_validity_contract_cstr()
 
 #define TEST_ASSERT_VALID(contract_ptr, actual_ptr, expected_ptr) \
-    do { \
-        if (!test_assert_validity((contract_ptr), \
-                                  (actual_ptr), \
-                                  (expected_ptr), \
-                                  __FILE__, \
-                                  __LINE__)) \
-            return; \
-    } while (0)
+    TEST_HARNESS_RETURN_UNLESS(test_assert_validity((contract_ptr), (actual_ptr), (expected_ptr), __FILE__, __LINE__))
 
 #define TEST_ASSERT_VALID_NAMED(name, actual_ptr, expected_ptr) \
-    do { \
-        const test_validity_contract_t *test_contract__ = \
-            test_find_validity_checker((name)); \
-        if (!test_contract__) { \
-            test_mark_failure(__FILE__, __LINE__, "missing named validity checker: " name); \
-            return; \
-        } \
-        if (!test_assert_validity(test_contract__, \
-                                  (actual_ptr), \
-                                  (expected_ptr), \
-                                  __FILE__, \
-                                  __LINE__)) \
-            return; \
-    } while (0)
+    TEST_HARNESS_RETURN_UNLESS(test_assert_validity_named((name), (actual_ptr), (expected_ptr), __FILE__, __LINE__))
 
 #define TEST_ASSERT_STR_EQ(actual_cstr, expected_cstr) \
-    do { \
-        const char *test_actual_cstr__ = (actual_cstr); \
-        const char *test_expected_cstr__ = (expected_cstr); \
-        if (!test_assert_validity(TEST_VALID_CSTR(), \
-                                  &test_actual_cstr__, \
-                                  &test_expected_cstr__, \
-                                  __FILE__, \
-                                  __LINE__)) \
-            return; \
-    } while (0)
+    TEST_HARNESS_RETURN_UNLESS(test_assert_cstr_eq((actual_cstr), (expected_cstr), __FILE__, __LINE__))
 
 #define TEST_FAIL() \
-    test_mark_failure(__FILE__, __LINE__, "explicit test failure")
+    test_fail(__FILE__, __LINE__)
 
 #define TEST_FAIL_AT(file, line) \
-    test_mark_failure((file), (line), "explicit test failure")
+    test_fail((file), (line))
 
 #define TEST_SKIP(reason) \
-    do { \
-        test_mark_skip(__FILE__, __LINE__, (reason)); \
-        return; \
-    } while (0)
+    TEST_HARNESS_RETURN_UNLESS(test_request_skip(__FILE__, __LINE__, (reason)))
 
 #define TEST_REQUIRE_VALIDITY_CHECKER(name) \
     test_require_validity_checker((name), __FILE__, __LINE__)

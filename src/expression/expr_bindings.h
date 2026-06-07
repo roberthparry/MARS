@@ -4,11 +4,10 @@
 #include <stddef.h>
 
 #include "expr_internal.h"
+#include "ustring.h"
 
-expr_binding_expr_t *expr_binding_expr_parse_region(const char *start,
-                                                const char *end,
-                                                char *errmsg,
-                                                size_t errmsg_n);
+expr_binding_expr_t *expr_binding_expr_parse_view(string_view_t text,
+                                                  string_t *errmsg);
 expr_t *expr_binding_expr_eval_expr(const expr_binding_expr_t *expr);
 bool expr_binding_expr_number_value(const expr_binding_expr_t *expr, number_t *out);
 bool expr_binding_expr_struct_eq(const expr_binding_expr_t *left,

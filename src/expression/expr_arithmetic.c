@@ -980,40 +980,40 @@ expr_t *expr_neg(const expr_t *dv)
     return expr_new_unary_internal(&ops_neg, dv);
 }
 
-expr_t *expr_add(const expr_t *dv1, const expr_t *dv2)
+expr_t *expr_add(const expr_t *expr1, const expr_t *expr2)
 {
-    if (!dv1 || !dv2)
+    if (!expr1 || !expr2)
         return NULL;
-    expr_retain(dv1);
-    expr_retain(dv2);
-    return expr_new_binary_internal(&ops_add, dv1, dv2);
+    expr_retain(expr1);
+    expr_retain(expr2);
+    return expr_new_binary_internal(&ops_add, expr1, expr2);
 }
 
-expr_t *expr_sub(const expr_t *dv1, const expr_t *dv2)
+expr_t *expr_sub(const expr_t *expr1, const expr_t *expr2)
 {
-    if (!dv1 || !dv2)
+    if (!expr1 || !expr2)
         return NULL;
-    expr_retain(dv1);
-    expr_retain(dv2);
-    return expr_new_binary_internal(&ops_sub, dv1, dv2);
+    expr_retain(expr1);
+    expr_retain(expr2);
+    return expr_new_binary_internal(&ops_sub, expr1, expr2);
 }
 
-expr_t *expr_mul(const expr_t *dv1, const expr_t *dv2)
+expr_t *expr_mul(const expr_t *expr1, const expr_t *expr2)
 {
-    if (!dv1 || !dv2)
+    if (!expr1 || !expr2)
         return NULL;
-    expr_retain(dv1);
-    expr_retain(dv2);
-    return expr_new_binary_internal(&ops_mul, dv1, dv2);
+    expr_retain(expr1);
+    expr_retain(expr2);
+    return expr_new_binary_internal(&ops_mul, expr1, expr2);
 }
 
-expr_t *expr_div(const expr_t *dv1, const expr_t *dv2)
+expr_t *expr_div(const expr_t *expr1, const expr_t *expr2)
 {
-    if (!dv1 || !dv2)
+    if (!expr1 || !expr2)
         return NULL;
-    expr_retain(dv1);
-    expr_retain(dv2);
-    return expr_new_binary_internal(&ops_div, dv1, dv2);
+    expr_retain(expr1);
+    expr_retain(expr2);
+    return expr_new_binary_internal(&ops_div, expr1, expr2);
 }
 
 expr_t *expr_pow_xp(const expr_t *a, const expr_t *b)

@@ -207,6 +207,15 @@ static char *dup_string(const char *text)
     return copy;
 }
 
+static char *expr_text_dup(const expr_t *expr, style_t style)
+{
+    string_t *text = expr_to_text(expr, style);
+    char *copy = text ? dup_string(string_c_str(text)) : NULL;
+
+    string_free(text);
+    return copy;
+}
+
 static int is_ascii_digit(char ch)
 {
     return ch >= '0' && ch <= '9';
@@ -272,7 +281,7 @@ static char *bound_tex_input(const char *raw_input, const expr_t *expr)
         free(body);
         free(bindings);
     }
-    return expr ? expr_to_string(expr, style_TEX) : dup_string(raw_input);
+    return expr ? expr_text_dup(expr, style_TEX) : dup_string(raw_input);
 }
 
 static char *expr_tex_body(const expr_t *expr)
@@ -288,7 +297,7 @@ static char *expr_tex_body(const expr_t *expr)
     }
     free(body);
     free(bindings);
-    return expr_to_string(expr, style_TEX);
+    return expr_text_dup(expr, style_TEX);
 }
 
 static char *combine_equation_tex(const char *lhs, const char *rhs)
@@ -674,9 +683,9 @@ int main(int argc, char **argv)
         if (hi_inputs[i])
             hi_display_inputs[i] = dup_string(hi_inputs[i]);
         if (!lo_display_inputs[i] && lo_expr[i])
-            lo_display_inputs[i] = expr_to_string(lo_expr[i], style_UNBOUND);
+            lo_display_inputs[i] = expr_text_dup(lo_expr[i], style_UNBOUND);
         if (!hi_display_inputs[i] && hi_expr[i])
-            hi_display_inputs[i] = expr_to_string(hi_expr[i], style_UNBOUND);
+            hi_display_inputs[i] = expr_text_dup(hi_expr[i], style_UNBOUND);
         if (lo_expr[i]) {
             lo_tex_inputs[i] = bound_tex_input(lo_inputs[i], lo_expr[i]);
         }
@@ -699,7 +708,7 @@ int main(int argc, char **argv)
     if (has_max_intervals)
         intg_set_interval_count_max(ig, max_intervals);
 
-    expr_text = expr_to_string(expr, style_UNBOUND);
+    expr_text = expr_text_dup(expr, style_UNBOUND);
     if (expr_text) {
         display_input = wrap_expression(expr_text);
         display_expr = expr_from_string(display_input ? display_input : expr_text, NULL);
@@ -709,11 +718,11 @@ int main(int argc, char **argv)
     symbolic_result = symbolic_integral(expr, ndim, vars, bound_kinds, lo_expr, hi_expr,
                                         &first_antiderivative);
     if (first_antiderivative) {
-        antiderivative_text = expr_to_string(first_antiderivative, style_UNBOUND);
+        antiderivative_text = expr_text_dup(first_antiderivative, style_UNBOUND);
         antiderivative_tex = expr_tex_body(first_antiderivative);
     }
     if (symbolic_result) {
-        symbolic_text = expr_to_string(symbolic_result, style_UNBOUND);
+        symbolic_text = expr_text_dup(symbolic_result, style_UNBOUND);
         symbolic_tex = expr_tex_body(symbolic_result);
         symbolic_num = expr_eval(symbolic_result);
         if (!num_is_nan(symbolic_num) && num_is_finite(symbolic_num) && num_is_real(symbolic_num))

@@ -1,12 +1,12 @@
 {
-  "expression": "{ cdf(x) - cdf(-x) | x = 1.95996398454005423552459443052055152795555007786954839847695264636163527414489 }",
+  "expression": "{ (x+a)^n | x = ? }",
   "matrix": "(1, 2; 3, 4)",
   "lab_mode": "integrator",
   "matrix_operation": "inverse",
   "matrix_operand": "",
-  "integrator_expression": "exp(-2x^2-5x-3)",
-  "integrator_bounds": "x = -inf .. inf",
-  "integrator_interval_cap": 20000,
+  "integrator_expression": "x^n",
+  "integrator_bounds": "x",
+  "integrator_interval_cap": 5000,
   "precision_bits": {
     "expression": 256,
     "matrix": 256,

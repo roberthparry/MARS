@@ -10,14 +10,15 @@
 #include "expr_binding_simplify.h"
 #include "expr_bindings.h"
 #include "expr_fromstring.h"
+#include "expr_parse_text.h"
 #include "expr_tostring.h"
 #include "internal/number_internal.h"
+#include "ustring.h"
 
 typedef struct {
-    const char *p;
-    const char *end;
-    int         error;
-    char        errmsg[256];
+    string_cursor_t     *cursor;
+    int                  error;
+    string_t            *errmsg;
 } binding_parser_t;
 
 typedef enum {
@@ -1358,82 +1359,58 @@ static void binding_set_error(binding_parser_t *p, const char *msg)
 {
     if (!p->error) {
         p->error = 1;
-        snprintf(p->errmsg, sizeof(p->errmsg), "%s", msg);
+        if (p->errmsg)
+            string_append_cstr(p->errmsg, msg ? msg : "");
     }
+}
+
+static size_t binding_pos(const binding_parser_t *p)
+{
+    return string_cursor_position(p->cursor);
+}
+
+static int binding_at_end(const binding_parser_t *p)
+{
+    return string_cursor_done(p->cursor);
+}
+
+static int binding_peek_ascii(const binding_parser_t *p, unsigned char *out)
+{
+    return string_cursor_peek_ascii(p->cursor, out);
+}
+
+static int binding_peek_value(const binding_parser_t *p,
+                              uint32_t *out,
+                              size_t *width_out)
+{
+    return expr_parse_cursor_peek_value(p ? p->cursor : NULL,
+                                        out,
+                                        width_out);
+}
+
+static int binding_skip(binding_parser_t *p, size_t count)
+{
+    return string_cursor_skip(p->cursor, count);
+}
+
+static int binding_consume_char(binding_parser_t *p, unsigned char ch)
+{
+    return expr_parse_cursor_consume_char(p->cursor, (char)ch);
+}
+
+static int binding_set_pos(binding_parser_t *p, size_t pos)
+{
+    return string_cursor_seek(p->cursor, pos) == 0;
 }
 
 static void binding_skip_spaces(binding_parser_t *p)
 {
-    while (p->p < p->end && isspace((unsigned char)*p->p))
-        p->p++;
+    string_cursor_skip_spaces(p->cursor);
 }
 
-static int scan_utf8_codepoint(const char *p, const char *end, unsigned int *out)
+static size_t scan_unicode_fraction_len_view(string_view_t view, size_t pos)
 {
-    int len;
-
-    if (p >= end)
-        return 0;
-    len = fs_utf8_decode(p, out);
-    if (len <= 0 || p + len > end)
-        return 0;
-    return len;
-}
-
-static int is_superscript_digit_codepoint(unsigned int c)
-{
-    return c == 0x00B2 || c == 0x00B3 || c == 0x00B9 || c == 0x2070 ||
-           (c >= 0x2074 && c <= 0x2079);
-}
-
-static int is_subscript_digit_codepoint(unsigned int c)
-{
-    return c >= 0x2080 && c <= 0x2089;
-}
-
-static int is_fraction_glyph_codepoint(unsigned int c)
-{
-    return c == 0x00BC || c == 0x00BD || c == 0x00BE ||
-           (c >= 0x2150 && c <= 0x215E);
-}
-
-static size_t scan_unicode_fraction_len(const char *s, const char *end)
-{
-    const char *p = s;
-    unsigned int c;
-    int len;
-    int digits = 0;
-
-    len = scan_utf8_codepoint(p, end, &c);
-    if (len <= 0)
-        return 0u;
-
-    if (is_fraction_glyph_codepoint(c))
-        return (size_t)len;
-
-    while ((len = scan_utf8_codepoint(p, end, &c)) > 0 &&
-           is_superscript_digit_codepoint(c)) {
-        p += len;
-        ++digits;
-    }
-    if (digits == 0)
-        return 0u;
-
-    len = scan_utf8_codepoint(p, end, &c);
-    if (len <= 0 || c != 0x2044)
-        return 0u;
-    p += len;
-
-    digits = 0;
-    while ((len = scan_utf8_codepoint(p, end, &c)) > 0 &&
-           is_subscript_digit_codepoint(c)) {
-        p += len;
-        ++digits;
-    }
-    if (digits == 0)
-        return 0u;
-
-    return (size_t)(p - s);
+    return expr_parse_scan_unicode_fraction_len(view, pos);
 }
 
 typedef struct {
@@ -1560,158 +1537,128 @@ static const binding_func_entry_t s_extra_binding_funcs[] = {
     BINDING_FUNC_ENTRY("arcoth",        false, &ops_acoth),
 };
 
-static unsigned binding_func_bucket_hash(const char *kw, size_t klen)
+static unsigned binding_func_bucket_hash(string_view_t kw)
 {
-    const unsigned char *s = (const unsigned char *)kw;
-    unsigned h = (unsigned)klen + s[0] + s[klen - 1u];
+    size_t len = string_view_length(kw);
+    unsigned char first = 0u;
+    unsigned char last = 0u;
+    unsigned h;
 
-    for (size_t i = 1u; i + 1u < klen; ++i)
-        h += (unsigned)(i + 1u) * s[i];
+    if (!expr_parse_view_peek_ascii(kw, 0u, &first) ||
+        !expr_parse_view_peek_ascii(kw, len - 1u, &last))
+        return 0u;
+
+    h = (unsigned)len + first + last;
+
+    for (size_t i = 1u; i + 1u < len; ++i) {
+        unsigned char b = 0u;
+        if (expr_parse_view_peek_ascii(kw, i, &b))
+            h += (unsigned)(i + 1u) * b;
+    }
 
     return h % BINDING_FUNC_TABLE_SIZE;
 }
 
-static unsigned binding_func_slot_hash(const char *kw, size_t klen)
+static unsigned binding_func_slot_hash(string_view_t kw)
 {
-    const unsigned char *s = (const unsigned char *)kw;
-    unsigned h = s[0] + s[klen - 1u];
+    size_t len = string_view_length(kw);
+    unsigned char first = 0u;
+    unsigned char last = 0u;
+    unsigned h;
 
-    for (size_t i = 0u; i < klen; ++i)
-        h += (unsigned)(i + 3u) * s[i];
+    if (!expr_parse_view_peek_ascii(kw, 0u, &first) ||
+        !expr_parse_view_peek_ascii(kw, len - 1u, &last))
+        return 0u;
+
+    h = first + last;
+
+    for (size_t i = 0u; i < len; ++i) {
+        unsigned char b = 0u;
+        if (expr_parse_view_peek_ascii(kw, i, &b))
+            h += (unsigned)(i + 3u) * b;
+    }
 
     return h % BINDING_FUNC_TABLE_SIZE;
 }
 
-static const binding_func_entry_t *binding_func_lookup(const char *kw, size_t klen)
+static bool binding_func_entry_matches(const binding_func_entry_t *entry,
+                                       string_view_t kw)
+{
+    return string_view_equals_literal(kw, entry->kw);
+}
+
+static const binding_func_entry_t *binding_func_lookup(string_view_t kw)
 {
     const binding_func_entry_t *entry;
     unsigned bucket;
     unsigned slot;
 
-    if (klen == 0u)
+    if (string_view_is_empty(kw))
         return NULL;
 
-    bucket = binding_func_bucket_hash(kw, klen);
-    slot = (binding_func_slot_hash(kw, klen) +
+    bucket = binding_func_bucket_hash(kw);
+    slot = (binding_func_slot_hash(kw) +
             s_binding_func_displacements[bucket]) % BINDING_FUNC_TABLE_SIZE;
     entry = &s_binding_funcs[slot];
 
-    if (entry->klen == klen && memcmp(entry->kw, kw, klen) == 0)
+    if (binding_func_entry_matches(entry, kw))
         return entry;
 
     for (size_t i = 0u; i < BINDING_FUNC_TABLE_SIZE; ++i) {
         entry = &s_binding_funcs[i];
-        if (entry->klen == klen && memcmp(entry->kw, kw, klen) == 0)
+        if (binding_func_entry_matches(entry, kw))
             return entry;
     }
 
     for (size_t i = 0u; i < sizeof(s_extra_binding_funcs) / sizeof(s_extra_binding_funcs[0]); ++i) {
         entry = &s_extra_binding_funcs[i];
-        if (entry->klen == klen && memcmp(entry->kw, kw, klen) == 0)
+        if (binding_func_entry_matches(entry, kw))
             return entry;
     }
 
     return NULL;
 }
 
-static int binding_region_eq_ci(const char *s, const char *end, const char *lit)
+static size_t scan_special_number_len_view(string_view_t view, size_t pos)
 {
-    const char *p = s;
-
-    while (*lit) {
-        if (p >= end ||
-            tolower((unsigned char)*p) != tolower((unsigned char)*lit))
-            return 0;
-        p++;
-        lit++;
-    }
-
-    return 1;
+    return expr_parse_scan_special_number_len(view, pos, true, false);
 }
 
-static size_t scan_special_number_len(const char *s, const char *end)
+static size_t scan_number_atom_len_view(string_view_t view, size_t pos)
 {
-    if (s < end && (unsigned char)s[0] == 0xE2 &&
-        (size_t)(end - s) >= 3u &&
-        (unsigned char)s[1] == 0x88 &&
-        (unsigned char)s[2] == 0x9E)
-        return 3u;
-    if (binding_region_eq_ci(s, end, "infinity"))
-        return 8u;
-    if (binding_region_eq_ci(s, end, "nan") ||
-        binding_region_eq_ci(s, end, "inf"))
-        return 3u;
-    return 0u;
+    return expr_parse_scan_number_atom_len(view, pos, true);
 }
 
-static size_t scan_number_atom_len(const char *s, const char *end)
+static int parse_number_view(string_view_t text, number_t *out)
 {
-    size_t len = scan_decimal_len(s, end);
-    const char *p;
-    size_t tail;
-
-    if (len == 0u) {
-        len = scan_special_number_len(s, end);
-        if (len > 0u)
-            return len;
-
-        len = scan_unicode_fraction_len(s, end);
-        if (len == 0u)
-            return 0u;
-        p = s + len;
-        if (p < end && (*p == 'i' || *p == 'I'))
-            p++;
-        return (size_t)(p - s);
-    }
-
-    p = s + len;
-    if (p < end && *p == '/') {
-        tail = scan_decimal_len(p + 1, end);
-        if (tail == 0u)
-            return len;
-        p += 1 + tail;
-    }
-
-    if (p < end && (*p == 'i' || *p == 'I'))
-        p++;
-
-    return (size_t)(p - s);
-}
-
-static int parse_number_region(const char *start, const char *end, number_t *out)
-{
-    char *buf;
     size_t len;
     size_t atom_len;
     char *roundtrip;
+    string_t *literal;
+    uint32_t value = 0u;
 
-    while (start < end && isspace((unsigned char)*start))
-        start++;
-    while (end > start && isspace((unsigned char)end[-1]))
-        end--;
+    text = string_view_trim(text);
 
-    if (start >= end)
+    if (string_view_is_empty(text))
         return 0;
 
-    len = (size_t)(end - start);
-    atom_len = scan_number_atom_len(start, end);
+    len = string_view_length(text);
+    atom_len = scan_number_atom_len_view(text, 0u);
     if (atom_len != len)
         return 0;
 
-    if (len == 3u &&
-        (unsigned char)start[0] == 0xE2 &&
-        (unsigned char)start[1] == 0x88 &&
-        (unsigned char)start[2] == 0x9E) {
+    if (expr_parse_view_peek_value(text, 0u, &value, NULL) &&
+        value == 0x221Eu) {
         *out = num_clone(NUM_INF);
         return 1;
     }
 
-    buf = (char *)fs_xmalloc(len + 1u);
-    memcpy(buf, start, len);
-    buf[len] = '\0';
+    literal = string_from_view(&text);
+    if (!literal)
+        return 0;
 
-    *out = num_create_from_string(buf);
-    free(buf);
+    *out = num_create_from_string(string_c_str(literal));
+    string_free(literal);
 
     roundtrip = num_to_string(*out);
     if (!roundtrip) {
@@ -1723,35 +1670,54 @@ static int parse_number_region(const char *start, const char *end, number_t *out
     return 1;
 }
 
+static string_view_t binding_text(const binding_parser_t *p)
+{
+    return string_cursor_view_between(0u,
+                                      string_cursor_end_position(p->cursor),
+                                      p->cursor);
+}
+
+static string_t *binding_read_any_name_cursor(string_cursor_t *cursor)
+{
+    return expr_parse_read_name(cursor, true);
+}
+
 static int binding_can_start_atom(const binding_parser_t *p)
 {
-    if (p->p >= p->end)
+    unsigned char c = 0u;
+    uint32_t cp = 0u;
+    size_t len = 0u;
+    string_view_t text;
+
+    if (binding_at_end(p))
         return 0;
 
-    if (*p->p == '(' || *p->p == '+' || *p->p == '-' || *p->p == '|')
+    text = binding_text(p);
+    if (scan_unicode_fraction_len_view(text, binding_pos(p)) > 0u)
         return 1;
-    if (isdigit((unsigned char)*p->p) || *p->p == '.')
-        return 1;
-    if (scan_unicode_fraction_len(p->p, p->end) > 0u)
+
+    if (binding_peek_value(p, &cp, &len) &&
+        (cp == 0x221A || cp == 0x230A || cp == 0x2308))
         return 1;
 
     {
-        unsigned int cp;
-        int len = scan_utf8_codepoint(p->p, p->end, &cp);
-
-        if (len > 0 && (cp == 0x221A || cp == 0x230A || cp == 0x2308))
-            return 1;
-    }
-
-    {
-        const char *q = p->p;
-        char *name = read_any_name(&q);
+        string_cursor_t *cursor = string_cursor_clone(p->cursor);
+        string_t *name = cursor ? binding_read_any_name_cursor(cursor) : NULL;
 
         if (name) {
-            free(name);
+            string_free(name);
+            string_cursor_free(cursor);
             return 1;
         }
+        string_cursor_free(cursor);
     }
+
+    if (!binding_peek_ascii(p, &c))
+        return 0;
+    if (c == '(' || c == '+' || c == '-' || c == '|')
+        return 1;
+    if (isdigit(c) || c == '.')
+        return 1;
 
     return 0;
 }
@@ -1759,9 +1725,10 @@ static int binding_can_start_atom(const binding_parser_t *p)
 /* True if we're at the middle dot · (U+00B7, UTF-8: 0xC2 0xB7). */
 static int binding_at_middle_dot(const binding_parser_t *p)
 {
-    return p->p + 1 < p->end &&
-           (unsigned char)p->p[0] == 0xC2 &&
-           (unsigned char)p->p[1] == 0xB7;
+    uint32_t cp = 0u;
+
+    return expr_parse_cursor_peek_value_at(p->cursor, binding_pos(p), &cp, NULL) &&
+           cp == 0x00B7u;
 }
 
 static int binding_const_id_from_name(const char *name,
@@ -1789,11 +1756,10 @@ static expr_binding_expr_t *parse_binding_signed_operand(binding_parser_t *p);
 static int parse_binding_required_char(binding_parser_t *p, char expected, const char *errmsg)
 {
     binding_skip_spaces(p);
-    if (p->p >= p->end || *p->p != expected) {
+    if (!binding_consume_char(p, (unsigned char)expected)) {
         binding_set_error(p, errmsg);
         return 0;
     }
-    p->p++;
     return 1;
 }
 
@@ -1838,30 +1804,35 @@ static int parse_binding_two_args(binding_parser_t *p,
 }
 
 static const binding_func_entry_t *parse_binding_function_head(binding_parser_t *p,
-                                                               const char **paren_out)
+                                                               size_t *paren_pos_out)
 {
-    const char *id = p->p;
-    const char *id_end = id;
+    string_cursor_t *scan = string_cursor_clone(p->cursor);
+    size_t id_start = binding_pos(p);
+    size_t id_end = id_start;
+    unsigned char b;
 
-    while (id_end < p->end &&
-           (isalpha((unsigned char)*id_end) ||
-            isdigit((unsigned char)*id_end) ||
-            *id_end == '_' ||
-            *id_end == '-'))
-        id_end++;
+    if (!scan) {
+        *paren_pos_out = 0u;
+        return NULL;
+    }
 
-    if (id_end > id) {
+    while (string_cursor_peek_ascii(scan, &b) &&
+           (isalpha(b) || isdigit(b) || b == '_' || b == '-')) {
+        string_cursor_skip(scan, 1u);
+        id_end = string_cursor_position(scan);
+    }
+
+    if (id_end > id_start) {
+        string_view_t id = string_cursor_view_between(id_start, id_end, p->cursor);
         const binding_func_entry_t *entry =
-            binding_func_lookup(id, (size_t)(id_end - id));
+            binding_func_lookup(id);
 
         if (entry) {
-            const char *q = id_end;
-
-            binding_parser_t tmp = *p;
-            tmp.p = q;
-            binding_skip_spaces(&tmp);
-            if (tmp.p < tmp.end && *tmp.p == '(') {
-                *paren_out = tmp.p;
+            string_cursor_seek(scan, id_end);
+            string_cursor_skip_spaces(scan);
+            if (string_cursor_peek_ascii(scan, &b) && b == '(') {
+                *paren_pos_out = string_cursor_position(scan);
+                string_cursor_free(scan);
                 return entry;
             }
         }
@@ -1872,133 +1843,150 @@ static const binding_func_entry_t *parse_binding_function_head(binding_parser_t 
 
         for (size_t i = 0u; i < sizeof(unicode_aliases) / sizeof(unicode_aliases[0]); ++i) {
             size_t len = strlen(unicode_aliases[i]);
+            string_view_t alias_span;
+            const binding_func_entry_t *entry;
 
-            if ((size_t)(p->end - p->p) < len ||
-                memcmp(p->p, unicode_aliases[i], len) != 0)
+            if (!string_cursor_match_at(p->cursor,
+                                                     binding_pos(p),
+                                                     unicode_aliases[i]))
                 continue;
 
-            const binding_func_entry_t *entry = binding_func_lookup(unicode_aliases[i], len);
-            binding_parser_t tmp = *p;
+            alias_span = string_cursor_view_between(binding_pos(p),
+                                                    binding_pos(p) + len,
+                                                    p->cursor);
 
-            tmp.p += len;
-            binding_skip_spaces(&tmp);
-            if (entry && tmp.p < tmp.end && *tmp.p == '(') {
-                *paren_out = tmp.p;
+            entry = binding_func_lookup(alias_span);
+            string_cursor_seek(scan, binding_pos(p));
+
+            string_cursor_skip(scan, len);
+            string_cursor_skip_spaces(scan);
+            if (entry && string_cursor_peek_ascii(scan, &b) && b == '(') {
+                *paren_pos_out = string_cursor_position(scan);
+                string_cursor_free(scan);
                 return entry;
             }
         }
     }
 
-    *paren_out = NULL;
+    *paren_pos_out = 0u;
+    string_cursor_free(scan);
     return NULL;
 }
 
 static expr_binding_expr_t *parse_binding_atom(binding_parser_t *p)
 {
     NUM_SCOPE(scope);
+    unsigned char c;
     binding_skip_spaces(p);
-    if (p->error || p->p >= p->end) {
+    if (p->error || binding_at_end(p)) {
         binding_set_error(p, "expected binding expression");
         return NULL;
     }
 
-    if (*p->p == '(') {
+    if (binding_peek_ascii(p, &c) && c == '(') {
         expr_binding_expr_t *inner;
 
-        p->p++;
+        binding_skip(p, 1u);
         inner = parse_binding_addexpr(p);
         binding_skip_spaces(p);
         if (!inner)
             return NULL;
-        if (p->p >= p->end || *p->p != ')') {
+        if (!binding_consume_char(p, ')')) {
             expr_binding_expr_free(inner);
             binding_set_error(p, "expected ')'");
             return NULL;
         }
-        p->p++;
         return inner;
     }
 
-    if (*p->p == '|') {
+    if (binding_peek_ascii(p, &c) && c == '|') {
         expr_binding_expr_t *inner;
 
-        p->p++;
+        binding_skip(p, 1u);
         inner = parse_binding_enclosed_expr(p, '|', "expected '|'");
         return inner ? expr_binding_expr_new_unary_op(&ops_abs, inner) : NULL;
     }
 
-    if (*p->p == '?') {
-        p->p++;
+    if (binding_peek_ascii(p, &c) && c == '?') {
+        binding_skip(p, 1u);
         return expr_binding_expr_new_number_text("NAN");
     }
 
     {
-        unsigned int cp = 0;
-        int cp_len = scan_utf8_codepoint(p->p, p->end, &cp);
+        uint32_t cp = 0;
+        size_t cp_len = 0u;
 
-        if (cp_len > 0 && cp == 0x221A) {
+        if (binding_peek_value(p, &cp, &cp_len) && cp == 0x221A) {
             expr_binding_expr_t *arg;
 
-            p->p += cp_len;
+            binding_skip(p, cp_len);
             if (!parse_binding_required_char(p, '(', "expected '(' after √"))
                 return NULL;
             arg = parse_binding_enclosed_expr(p, ')', "expected ')' after √ argument");
             return arg ? expr_binding_expr_new_unary_op(&ops_sqrt, arg) : NULL;
         }
 
-        if (cp_len > 0 && (cp == 0x230A || cp == 0x2308)) {
+        if (binding_peek_value(p, &cp, &cp_len) &&
+            (cp == 0x230A || cp == 0x2308)) {
             const expr_ops_t *ops = (cp == 0x230A) ? &ops_floor : &ops_ceil;
-            unsigned int close_cp = 0;
-            const unsigned int closing = (cp == 0x230A) ? 0x230B : 0x2309;
+            uint32_t close_cp = 0;
+            const uint32_t closing = (cp == 0x230A) ? 0x230B : 0x2309;
             const char *errmsg = (cp == 0x230A) ? "expected '⌋'" : "expected '⌉'";
             expr_binding_expr_t *inner;
-            int close_len;
+            size_t close_len = 0u;
 
-            p->p += cp_len;
+            binding_skip(p, cp_len);
             inner = parse_binding_addexpr(p);
             if (!inner)
                 return NULL;
             binding_skip_spaces(p);
-            close_len = scan_utf8_codepoint(p->p, p->end, &close_cp);
-            if (close_len <= 0 || close_cp != closing) {
+            if (!binding_peek_value(p, &close_cp, &close_len) ||
+                close_cp != closing) {
                 expr_binding_expr_free(inner);
                 binding_set_error(p, errmsg);
                 return NULL;
             }
-            p->p += close_len;
+            binding_skip(p, close_len);
             return expr_binding_expr_new_unary_op(ops, inner);
         }
     }
 
-    if (isdigit((unsigned char)*p->p) || *p->p == '.' ||
-        scan_special_number_len(p->p, p->end) > 0u ||
-        scan_unicode_fraction_len(p->p, p->end) > 0u) {
-        size_t len = scan_number_atom_len(p->p, p->end);
-        char *text;
+    if ((binding_peek_ascii(p, &c) && (isdigit(c) || c == '.')) ||
+        scan_special_number_len_view(binding_text(p), binding_pos(p)) > 0u ||
+        scan_unicode_fraction_len_view(binding_text(p), binding_pos(p)) > 0u) {
+        size_t pos = binding_pos(p);
+        size_t len = scan_number_atom_len_view(binding_text(p), pos);
+        string_view_t literal_view;
+        string_t *text;
         number_t value;
 
-        if (len == 0u || !parse_number_region(p->p, p->p + len, &value)) {
+        literal_view = string_cursor_view_between(pos, pos + len, p->cursor);
+        if (len == 0u ||
+            !parse_number_view(literal_view, &value)) {
             binding_set_error(p, "expected numeric literal");
             return NULL;
         }
         num_destroy(&value);
-        text = (char *)fs_xmalloc(len + 1u);
-        memcpy(text, p->p, len);
-        text[len] = '\0';
-        p->p += len;
+        text = string_from_view(&literal_view);
+        if (!text) {
+            binding_set_error(p, "could not preserve numeric literal");
+            return NULL;
+        }
+        binding_skip(p, len);
         {
-            expr_binding_expr_t *expr = expr_binding_expr_new_number_text(text);
-            free(text);
+            expr_binding_expr_t *expr =
+                expr_binding_expr_new_number_text(string_c_str(text));
+            string_free(text);
             return expr;
         }
     }
 
     {
-        const char *paren = NULL;
-        const binding_func_entry_t *func = parse_binding_function_head(p, &paren);
+        size_t paren_pos = 0u;
+        const binding_func_entry_t *func = parse_binding_function_head(p, &paren_pos);
 
-        if (func && paren) {
-            p->p = paren + 1;
+        if (func) {
+            binding_set_pos(p, paren_pos + 1u);
             if (func->is_binary) {
                 expr_binding_expr_t *a = NULL;
                 expr_binding_expr_t *b = NULL;
@@ -2021,19 +2009,19 @@ static expr_binding_expr_t *parse_binding_atom(binding_parser_t *p)
     }
 
     {
-        char *name = read_any_name(&p->p);
+        string_t *name = binding_read_any_name_cursor(p->cursor);
         expr_binding_const_id_t const_id;
 
         if (!name) {
             binding_set_error(p, "expected arithmetic constant");
             return NULL;
         }
-        if (!binding_const_id_from_name(name, &const_id)) {
-            free(name);
+        if (!binding_const_id_from_name(string_c_str(name), &const_id)) {
+            string_free(name);
             binding_set_error(p, "binding expressions only allow numeric constants");
             return NULL;
         }
-        free(name);
+        string_free(name);
         return expr_binding_expr_new_const(const_id);
     }
 }
@@ -2053,16 +2041,17 @@ static expr_binding_expr_t *parse_binding_power(binding_parser_t *p)
         expr_binding_expr_t *exponent;
         expr_binding_expr_t *result;
         long exponent_long;
+        unsigned char c;
 
         binding_skip_spaces(p);
-        if (p->p >= p->end || *p->p != '^')
+        if (!binding_peek_ascii(p, &c) || c != '^')
             return base;
 
-        p->p++;
+        binding_skip(p, 1u);
         binding_skip_spaces(p);
 
-        if (p->p < p->end && *p->p == '(') {
-            p->p++;
+        if (binding_peek_ascii(p, &c) && c == '(') {
+            binding_skip(p, 1u);
             exponent = parse_binding_enclosed_expr(p, ')',
                                                    "expected ')' after exponent");
         } else {
@@ -2090,15 +2079,17 @@ static expr_binding_expr_t *parse_binding_power(binding_parser_t *p)
 
 static expr_binding_expr_t *parse_binding_signed(binding_parser_t *p)
 {
+    unsigned char c;
+
     binding_skip_spaces(p);
-    if (p->p < p->end && *p->p == '+') {
-        p->p++;
+    if (binding_peek_ascii(p, &c) && c == '+') {
+        binding_skip(p, 1u);
         return parse_binding_signed(p);
     }
-    if (p->p < p->end && *p->p == '-') {
+    if (binding_peek_ascii(p, &c) && c == '-') {
         expr_binding_expr_t *inner;
 
-        p->p++;
+        binding_skip(p, 1u);
         inner = parse_binding_signed(p);
         if (!inner)
             return NULL;
@@ -2110,15 +2101,17 @@ static expr_binding_expr_t *parse_binding_signed(binding_parser_t *p)
 
 static expr_binding_expr_t *parse_binding_signed_operand(binding_parser_t *p)
 {
+    unsigned char c;
+
     binding_skip_spaces(p);
-    if (p->p < p->end && *p->p == '+') {
-        p->p++;
+    if (binding_peek_ascii(p, &c) && c == '+') {
+        binding_skip(p, 1u);
         return parse_binding_signed_operand(p);
     }
-    if (p->p < p->end && *p->p == '-') {
+    if (binding_peek_ascii(p, &c) && c == '-') {
         expr_binding_expr_t *inner;
 
-        p->p++;
+        binding_skip(p, 1u);
         inner = parse_binding_signed_operand(p);
         if (!inner)
             return NULL;
@@ -2138,26 +2131,29 @@ static expr_binding_expr_t *parse_binding_mulexpr(binding_parser_t *p)
 
     for (;;) {
         char op = '\0';
-        const char *peek;
+        unsigned char c = 0u;
         expr_binding_expr_t *rhs;
 
         binding_skip_spaces(p);
-        if (p->p >= p->end)
+        if (binding_at_end(p))
             break;
 
-        peek = p->p;
-        if (*peek == '+' || *peek == '-')
-            break;
         if (binding_at_middle_dot(p)) {
             op = '*';
-            p->p += 2;
-        } else if (*peek == '*' || *peek == '/') {
-            op = *peek;
-            p->p++;
-        } else if (binding_can_start_atom(p)) {
-            op = '*';
+            binding_skip(p, 2u);
         } else {
-            break;
+            if (binding_peek_ascii(p, &c)) {
+                if (c == '+' || c == '-')
+                    break;
+                if (c == '*' || c == '/') {
+                    op = (char)c;
+                    binding_skip(p, 1u);
+                }
+            }
+            if (!op && binding_can_start_atom(p))
+                op = '*';
+            if (!op)
+                break;
         }
 
         rhs = parse_binding_signed(p);
@@ -2191,13 +2187,15 @@ static expr_binding_expr_t *parse_binding_addexpr(binding_parser_t *p)
 
     for (;;) {
         char op;
+        unsigned char c;
         expr_binding_expr_t *rhs;
 
         binding_skip_spaces(p);
-        if (p->p >= p->end || (*p->p != '+' && *p->p != '-'))
+        if (!binding_peek_ascii(p, &c) || (c != '+' && c != '-'))
             break;
 
-        op = *p->p++;
+        op = (char)c;
+        binding_skip(p, 1u);
         rhs = parse_binding_mulexpr(p);
         if (!rhs) {
             expr_binding_expr_free(lhs);
@@ -2212,41 +2210,48 @@ static expr_binding_expr_t *parse_binding_addexpr(binding_parser_t *p)
     return lhs;
 }
 
-expr_binding_expr_t *expr_binding_expr_parse_region(const char *start,
-                                                const char *end,
-                                                char *errmsg,
-                                                size_t errmsg_n)
+expr_binding_expr_t *expr_binding_expr_parse_view(string_view_t text,
+                                                  string_t *errmsg)
 {
     binding_parser_t ps;
     expr_binding_expr_t *result;
 
-    if (errmsg && errmsg_n > 0u)
-        errmsg[0] = '\0';
+    if (errmsg)
+        string_clear(errmsg);
 
-    if (!start || !end || end < start)
+    if (string_view_is_empty(text))
         return NULL;
 
-    while (start < end && isspace((unsigned char)*start))
-        start++;
-    while (end > start && isspace((unsigned char)end[-1]))
-        end--;
+    text = string_view_trim(text);
+    if (string_view_is_empty(text))
+        return NULL;
 
-    ps.p = start;
-    ps.end = end;
+    ps.cursor = string_cursor_new_view(text);
+    if (!ps.cursor)
+        return NULL;
     ps.error = 0;
-    ps.errmsg[0] = '\0';
+    ps.errmsg = string_new();
+    if (!ps.errmsg) {
+        string_cursor_free(ps.cursor);
+        return NULL;
+    }
 
     result = parse_binding_addexpr(&ps);
     binding_skip_spaces(&ps);
-    if (result && !ps.error && ps.p == end)
+    if (result && !ps.error && binding_at_end(&ps)) {
+        string_free(ps.errmsg);
+        string_cursor_free(ps.cursor);
         return result;
+    }
 
     if (result)
         expr_binding_expr_free(result);
     if (!ps.error)
         binding_set_error(&ps, "trailing input");
-    if (errmsg && errmsg_n > 0u)
-        snprintf(errmsg, errmsg_n, "%s", ps.errmsg);
+    if (errmsg)
+        string_append_string(errmsg, ps.errmsg);
+    string_free(ps.errmsg);
+    string_cursor_free(ps.cursor);
     return NULL;
 }
 

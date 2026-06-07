@@ -1,6 +1,6 @@
 /* expr_fromstring.c - construct a expr_t from an expression-style string
  *
- * Accepts strings in the format produced by expr_to_string(f, style_EXPRESSION):
+ * Accepts strings in the format produced by expr_to_text(f, style_EXPRESSION):
  *
  *   { expr }
  *   { expr | x₀ = val, ...; [name] = val, ... }
@@ -46,77 +46,164 @@
 #include "expr_bindings.h"
 #include "expr_internal.h"
 #include "expr_fromstring.h"
+#include "expr_parse_text.h"
 #include "expression.h"
+#include "ustring.h"
 
 /* ------------------------------------------------------------------ */
 /* Parser state                                                         */
 /* ------------------------------------------------------------------ */
 
 typedef struct {
-    const char *p;        /* current scan position */
-    const char *end;      /* one past last character of the expression region */
-    symtab_t   *syms;
-    int         error;
-    char        errmsg[256];
-} parser_t;
+    string_cursor_t    *cursor;
+    symtab_t            *syms;
+    int                  error;
+    string_t            *errmsg;
+} expr_parse_state_t;
 
-static size_t scan_unicode_fraction_len(const char *s, const char *end);
-static size_t scan_special_number_literal_len(const char *s, const char *end);
-
-static void set_error(parser_t *p, const char *msg)
+static void set_error(expr_parse_state_t *p, const char *msg)
 {
     if (!p->error) {
         p->error = 1;
-        snprintf(p->errmsg, sizeof(p->errmsg), "%s", msg);
+        if (p->errmsg)
+            string_append_cstr(p->errmsg, msg ? msg : "");
     }
 }
 
-/* True if we're at the middle dot · (U+00B7, UTF-8: 0xC2 0xB7). */
-static int at_middle_dot(const parser_t *p)
+static int expr_parse_state_init(expr_parse_state_t *p,
+                                 string_view_t text,
+                                 symtab_t *syms)
 {
-    return p->p + 1 < p->end &&
-           (unsigned char)p->p[0] == 0xC2 &&
-           (unsigned char)p->p[1] == 0xB7;
+    if (!p)
+        return -1;
+
+    p->cursor = string_cursor_new_view(text);
+    if (!p->cursor)
+        return -1;
+    p->syms = syms;
+    p->error = 0;
+    p->errmsg = string_new();
+
+    if (!p->errmsg) {
+        string_cursor_free(p->cursor);
+        p->cursor = NULL;
+        return -1;
+    }
+    return 0;
 }
 
-/* True if the current position can start a new multiplication factor.
- * Spaces are NOT skipped — they only appear before binary '+'/'-'. */
-static int can_start_factor(const parser_t *p)
+static void expr_parse_state_dispose(expr_parse_state_t *p)
 {
-    if (p->p >= p->end) return 0;
-    unsigned char c = (unsigned char)*p->p;
-    if (c == ')' || c == '}' || c == ',' || c == ';' || c == '|') return 0;
-    if (c == ' ') return 0;
-    if (c == '[' || c == '(' || c == '@') return 1;
-    if (at_middle_dot(p)) return 1;
-    if (scan_unicode_fraction_len(p->p, p->end) > 0u) return 1;
-    if (scan_special_number_literal_len(p->p, p->end) > 0u) return 1;
-    unsigned int uc;
-    int len = fs_utf8_decode(p->p, &uc);
-    if (len > 0 && (fs_is_letter(uc) || uc == 0x230A || uc == 0x2308))
-        return 1;
-    if (isdigit(c) || c == '.') return 1;
-    return 0;
+    if (!p)
+        return;
+
+    string_cursor_free(p->cursor);
+    p->cursor = NULL;
+    string_free(p->errmsg);
+    p->errmsg = NULL;
+}
+
+static size_t expr_parse_pos(const expr_parse_state_t *p)
+{
+    return string_cursor_position(p->cursor);
+}
+
+static int expr_parse_at_end(const expr_parse_state_t *p)
+{
+    return string_cursor_done(p->cursor);
+}
+
+static int expr_parse_peek_ascii(const expr_parse_state_t *p, unsigned char *out)
+{
+    return string_cursor_peek_ascii(p->cursor, out);
+}
+
+static int expr_parse_peek_value(const expr_parse_state_t *p,
+                                 uint32_t *out,
+                                 size_t *width_out)
+{
+    return expr_parse_cursor_peek_value(p ? p->cursor : NULL,
+                                        out,
+                                        width_out);
+}
+
+static int expr_parse_skip(expr_parse_state_t *p, size_t count)
+{
+    return string_cursor_skip(p->cursor, count);
+}
+
+static int expr_parse_set_pos(expr_parse_state_t *p, size_t pos)
+{
+    return string_cursor_seek(p->cursor, pos) == 0;
+}
+
+static int expr_parse_consume_char(expr_parse_state_t *p, unsigned char ch)
+{
+    return expr_parse_cursor_consume_char(p->cursor, (char)ch);
+}
+
+static void expr_parse_skip_spaces(expr_parse_state_t *p)
+{
+    string_cursor_skip_spaces(p->cursor);
+}
+
+static string_view_t expr_parse_text(const expr_parse_state_t *p)
+{
+    return string_cursor_view_between(0u,
+                                      string_cursor_end_position(p->cursor),
+                                      p->cursor);
 }
 
 /* ------------------------------------------------------------------ */
 /* Forward declarations                                                 */
 /* ------------------------------------------------------------------ */
 
-static expr_t *parse_addexpr(parser_t *p);
-static expr_t *parse_signed_power(parser_t *p);
-static expr_t *parse_signed_power_operand(parser_t *p);
-static const char *scan_function_power_marker(const char *pos, const char *end);
-static expr_t *parse_expression_region(const char *start,
-                                       const char *end,
-                                       symtab_t *syms,
-                                       const char *context_label,
-                                       int report_errors);
+static expr_t *parse_addexpr(expr_parse_state_t *p);
+static expr_t *parse_signed_power(expr_parse_state_t *p);
+static expr_t *parse_signed_power_operand(expr_parse_state_t *p);
+static size_t scan_unicode_fraction_len_view(string_view_t view, size_t pos);
+static size_t scan_special_number_literal_len_view(string_view_t view, size_t pos);
+static size_t scan_number_atom_len_view(string_view_t view, size_t pos);
+static expr_t *parse_expression_view(string_view_t text,
+                                     symtab_t *syms,
+                                     const char *context_label,
+                                     int report_errors);
 static void symtab_discard_storage(symtab_t *t);
 
-/* ------------------------------------------------------------------ */
-/* Function dispatch                                                    */
-/* ------------------------------------------------------------------ */
+/* True if we're at the middle dot · (U+00B7, UTF-8: 0xC2 0xB7). */
+static int at_middle_dot(const expr_parse_state_t *p)
+{
+    uint32_t cp = 0u;
+
+    return expr_parse_cursor_peek_value_at(p->cursor, expr_parse_pos(p),
+                                    &cp, NULL) &&
+           cp == 0x00B7u;
+}
+
+/* True if the current position can start a new multiplication factor.
+ * Spaces are NOT skipped — they only appear before binary '+'/'-'. */
+static int can_start_factor(const expr_parse_state_t *p)
+{
+    size_t pos = expr_parse_pos(p);
+    string_view_t text = expr_parse_text(p);
+    unsigned char c = 0u;
+    uint32_t uc = 0u;
+    size_t len = 0u;
+
+    if (at_middle_dot(p)) return 1;
+    if (scan_unicode_fraction_len_view(text, pos) > 0u) return 1;
+    if (scan_special_number_literal_len_view(text, pos) > 0u) return 1;
+    if (expr_parse_peek_value(p, &uc, &len) &&
+        (fs_is_letter(uc) || uc == 0x230A || uc == 0x2308))
+        return 1;
+    if (!expr_parse_peek_ascii(p, &c))
+        return 0;
+    if (c == ')' || c == '}' || c == ',' || c == ';' || c == '|') return 0;
+    if (c == ' ') return 0;
+    if (c == '[' || c == '(' || c == '@') return 1;
+    if (isdigit(c) || c == '.') return 1;
+    return 0;
+}
 
 typedef expr_t *(*unary_fn)(const expr_t *);
 typedef expr_t *(*binary_fn)(const expr_t *, const expr_t *);
@@ -272,275 +359,73 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
     [106] = FUNC_ENTRY("W₋₁",           false, &ops_lambert_wm1,   expr_lambert_wm1,   NULL),
 };
 
-static unsigned func_bucket_hash(const char *kw, size_t klen)
+static unsigned func_bucket_hash(string_view_t kw)
 {
-    const unsigned char *s = (const unsigned char *)kw;
+    size_t len = string_view_length(kw);
+    unsigned char first = 0u;
+    unsigned char last = 0u;
 
-    return ((unsigned)klen + 5u * s[0] + 3u * s[klen - 1u]) % FUNC_TABLE_SIZE;
+    if (!expr_parse_view_peek_ascii(kw, 0u, &first) ||
+        !expr_parse_view_peek_ascii(kw, len - 1u, &last))
+        return 0u;
+
+    return ((unsigned)len + 5u * first + 3u * last) % FUNC_TABLE_SIZE;
 }
 
-static unsigned func_slot_hash(const char *kw, size_t klen)
+static unsigned func_slot_hash(string_view_t kw)
 {
-    const unsigned char *s = (const unsigned char *)kw;
+    size_t len = string_view_length(kw);
     unsigned h = 2166136261u;
 
-    for (size_t i = 0; i < klen; i++)
-        h = (h ^ s[i]) * 16777619u;
+    for (size_t i = 0; i < len; i++) {
+        unsigned char b = 0u;
+
+        if (expr_parse_view_peek_ascii(kw, i, &b))
+            h = (h ^ b) * 16777619u;
+    }
 
     return h % FUNC_TABLE_SIZE;
 }
 
-static const func_entry_t *lookup_func(const char *kw, size_t klen)
+static bool func_entry_matches(const func_entry_t *entry, string_view_t kw)
+{
+    return string_view_equals_literal(kw, entry->kw);
+}
+
+static const func_entry_t *lookup_func(string_view_t kw)
 {
     const func_entry_t *entry;
     unsigned bucket;
     unsigned slot;
 
-    if (klen == 0u)
+    if (string_view_is_empty(kw))
         return NULL;
 
-    bucket = func_bucket_hash(kw, klen);
-    slot = (func_slot_hash(kw, klen) + s_func_displacements[bucket]) % FUNC_TABLE_SIZE;
+    bucket = func_bucket_hash(kw);
+    slot = (func_slot_hash(kw) + s_func_displacements[bucket]) % FUNC_TABLE_SIZE;
     entry = &s_funcs[slot];
 
-    if (entry->klen == klen && memcmp(kw, entry->kw, klen) == 0)
+    if (func_entry_matches(entry, kw))
         return entry;
 
     return NULL;
-}
-
-/* Return 1 if the byte sequence at p looks like a superscript codepoint. */
-static int is_superscript_byte(const char *p)
-{
-    unsigned int c;
-    int len = fs_utf8_decode(p, &c);
-    if (len <= 0) return 0;
-    return c == 0x00B2 || c == 0x00B3 || c == 0x00B9 || c == 0x2070 ||
-           (c >= 0x2074 && c <= 0x2079);
-}
-
-static int scan_utf8_codepoint(const char *p, const char *end, unsigned int *out)
-{
-    int len;
-
-    if (p >= end)
-        return 0;
-    len = fs_utf8_decode(p, out);
-    if (len <= 0 || p + len > end)
-        return 0;
-    return len;
-}
-
-static int is_superscript_digit_codepoint(unsigned int c)
-{
-    return c == 0x00B2 || c == 0x00B3 || c == 0x00B9 || c == 0x2070 ||
-           (c >= 0x2074 && c <= 0x2079);
-}
-
-static int superscript_digit_value(unsigned int c)
-{
-    if (c == 0x00B9)
-        return 1;
-    if (c == 0x00B2)
-        return 2;
-    if (c == 0x00B3)
-        return 3;
-    if (c == 0x2070)
-        return 0;
-    if (c >= 0x2074 && c <= 0x2079)
-        return (int)(c - 0x2070);
-    return -1;
-}
-
-static int is_subscript_digit_codepoint(unsigned int c)
-{
-    return c >= 0x2080 && c <= 0x2089;
-}
-
-static int is_fraction_glyph_codepoint(unsigned int c)
-{
-    return c == 0x00BC || c == 0x00BD || c == 0x00BE ||
-           (c >= 0x2150 && c <= 0x215E);
-}
-
-static size_t scan_unicode_fraction_len(const char *s, const char *end)
-{
-    const char *p = s;
-    unsigned int c;
-    int len;
-    int digits = 0;
-
-    len = scan_utf8_codepoint(p, end, &c);
-    if (len <= 0)
-        return 0u;
-
-    if (is_fraction_glyph_codepoint(c))
-        return (size_t)len;
-
-    while ((len = scan_utf8_codepoint(p, end, &c)) > 0 &&
-           is_superscript_digit_codepoint(c)) {
-        p += len;
-        ++digits;
-    }
-    if (digits == 0)
-        return 0u;
-
-    len = scan_utf8_codepoint(p, end, &c);
-    if (len <= 0 || c != 0x2044)
-        return 0u;
-    p += len;
-
-    digits = 0;
-    while ((len = scan_utf8_codepoint(p, end, &c)) > 0 &&
-           is_subscript_digit_codepoint(c)) {
-        p += len;
-        ++digits;
-    }
-    if (digits == 0)
-        return 0u;
-
-    return (size_t)(p - s);
-}
-
-/* Check whether the text at pos starts with keyword kw (length klen) and is
- * immediately followed by '(' optionally preceded by a power marker.
- * Accepted power markers: Unicode superscripts (sin²) or ASCII ^N (sin^2).
- * Returns the position of the opening '(', or NULL if the pattern doesn't match. */
-static const char *func_call_start(const char *pos, const char *end,
-                                   const char *kw, size_t klen)
-{
-    const char *after;
-
-    if (pos + klen > end)
-        return NULL;
-    if (strncmp(pos, kw, klen) != 0) return NULL;
-    after = scan_function_power_marker(pos + klen, end);
-    if (!after)
-        return NULL;
-    return (after < end && *after == '(') ? after : NULL;
-}
-
-static const func_entry_t *lookup_fixed_func_call(const char *pos,
-                                                  const char *end,
-                                                  const char **paren_out)
-{
-    const char *id = pos;
-    const char *id_end = id;
-    size_t id_len;
-
-    if (paren_out)
-        *paren_out = NULL;
-
-    while (id_end < end &&
-           (isalpha((unsigned char)*id_end) ||
-            isdigit((unsigned char)*id_end) ||
-            *id_end == '_'))
-        id_end++;
-    id_len = (size_t)(id_end - id);
-
-    if (id_len > 0u) {
-        const func_entry_t *entry = lookup_func(id, id_len);
-
-        if (entry) {
-            const char *paren = func_call_start(pos, end, entry->kw, entry->klen);
-
-            if (paren) {
-                if (paren_out)
-                    *paren_out = paren;
-                return entry;
-            }
-        }
-    }
-
-    for (size_t i = 0u; i < FUNC_TABLE_SIZE; ++i) {
-        const func_entry_t *entry = &s_funcs[i];
-        const char *paren;
-
-        if (!entry->kw)
-            continue;
-        paren = func_call_start(pos, end, entry->kw, entry->klen);
-        if (!paren)
-            continue;
-
-        if (paren_out)
-            *paren_out = paren;
-        return entry;
-    }
-
-    return NULL;
-}
-
-static int scan_polygamma_symbol_call(const char *pos, const char *end,
-                                      unsigned int *order_out,
-                                      const char **paren_out)
-{
-    const char *p = pos;
-    unsigned int c;
-    unsigned long order = 0ul;
-    int len;
-    int digits = 0;
-
-    if (order_out)
-        *order_out = 0u;
-    if (paren_out)
-        *paren_out = NULL;
-
-    len = scan_utf8_codepoint(p, end, &c);
-    if (len <= 0 || c != 0x03C8)
-        return 0;
-    p += len;
-
-    len = scan_utf8_codepoint(p, end, &c);
-    if (len <= 0 || c != 0x207D)
-        return 0;
-    p += len;
-
-    while ((len = scan_utf8_codepoint(p, end, &c)) > 0 &&
-           is_superscript_digit_codepoint(c)) {
-        int digit = superscript_digit_value(c);
-
-        if (digit < 0)
-            return 0;
-        if (order > (ULONG_MAX - (unsigned long)digit) / 10ul)
-            return 0;
-        order = order * 10ul + (unsigned long)digit;
-        p += len;
-        ++digits;
-    }
-    if (digits == 0 || order > UINT_MAX)
-        return 0;
-
-    len = scan_utf8_codepoint(p, end, &c);
-    if (len <= 0 || c != 0x207E)
-        return 0;
-    p += len;
-
-    if (p >= end || *p != '(')
-        return 0;
-
-    if (order_out)
-        *order_out = (unsigned int)order;
-    if (paren_out)
-        *paren_out = p;
-    return 1;
 }
 
 /* ------------------------------------------------------------------ */
 /* Binary function argument parser helper                               */
 /* ------------------------------------------------------------------ */
 
-static int parse_two_args(parser_t *p, expr_t **a_out, expr_t **b_out)
+static int parse_two_args(expr_parse_state_t *p, expr_t **a_out, expr_t **b_out)
 {
     expr_t *a = parse_addexpr(p);
     if (!a) return 0;
 
-    if (p->p >= p->end || *p->p != ',') {
+    if (!expr_parse_consume_char(p, ',')) {
         expr_free(a);
         set_error(p, "expected ',' in binary function");
         return 0;
     }
-    p->p++;
-    skip_spaces(&p->p, p->end);
+    expr_parse_skip_spaces(p);
 
     expr_t *b = parse_addexpr(p);
     if (!b) { expr_free(a); return 0; }
@@ -550,7 +435,7 @@ static int parse_two_args(parser_t *p, expr_t **a_out, expr_t **b_out)
     return 1;
 }
 
-static int parse_three_args(parser_t *p,
+static int parse_three_args(expr_parse_state_t *p,
                             expr_t **a_out,
                             expr_t **b_out,
                             expr_t **c_out)
@@ -561,27 +446,25 @@ static int parse_three_args(parser_t *p,
 
     if (!a)
         return 0;
-    if (p->p >= p->end || *p->p != ',') {
+    if (!expr_parse_consume_char(p, ',')) {
         expr_free(a);
         set_error(p, "expected ',' in ternary function");
         return 0;
     }
-    p->p++;
-    skip_spaces(&p->p, p->end);
+    expr_parse_skip_spaces(p);
 
     b = parse_addexpr(p);
     if (!b) {
         expr_free(a);
         return 0;
     }
-    if (p->p >= p->end || *p->p != ',') {
+    if (!expr_parse_consume_char(p, ',')) {
         expr_free(b);
         expr_free(a);
         set_error(p, "expected ',' in ternary function");
         return 0;
     }
-    p->p++;
-    skip_spaces(&p->p, p->end);
+    expr_parse_skip_spaces(p);
 
     c = parse_addexpr(p);
     if (!c) {
@@ -596,98 +479,46 @@ static int parse_three_args(parser_t *p,
     return 1;
 }
 
-static size_t scan_number_atom_len(const char *s, const char *end)
+static size_t scan_unicode_fraction_len_view(string_view_t view, size_t pos)
 {
-    size_t len = scan_decimal_len(s, end);
-    const char *p;
-    size_t tail;
-
-    if (len == 0) {
-        len = scan_unicode_fraction_len(s, end);
-        if (len == 0)
-            return 0;
-        p = s + len;
-        if (p < end && (*p == 'i' || *p == 'I'))
-            p++;
-        return (size_t)(p - s);
-    }
-
-    p = s + len;
-    if (p < end && *p == '/') {
-        tail = scan_decimal_len(p + 1, end);
-        if (tail == 0)
-            return len;
-        p += 1 + tail;
-    }
-
-    if (p < end && (*p == 'i' || *p == 'I'))
-        p++;
-
-    return (size_t)(p - s);
+    return expr_parse_scan_unicode_fraction_len(view, pos);
 }
 
-static int ascii_region_eq_ci(const char *s, const char *end, const char *kw)
+static size_t scan_special_number_literal_len_view(string_view_t view, size_t pos)
 {
-    size_t len = strlen(kw);
-
-    if ((size_t)(end - s) < len)
-        return 0;
-    for (size_t i = 0u; i < len; ++i) {
-        if (tolower((unsigned char)s[i]) != tolower((unsigned char)kw[i]))
-            return 0;
-    }
-    return 1;
+    return expr_parse_scan_special_number_len(view, pos, false, true);
 }
 
-static int special_number_literal_boundary(const char *p, const char *end)
+static size_t scan_number_atom_len_view(string_view_t view, size_t pos)
 {
-    if (p >= end)
-        return 1;
-    return !isalnum((unsigned char)*p) && *p != '_';
+    return expr_parse_scan_number_atom_len(view, pos, false);
 }
 
-static size_t scan_special_number_literal_len(const char *s, const char *end)
+static int parse_number_view(string_view_t text, number_t *out)
 {
-    static const char *const specials[] = { "infinity", "nan", "inf" };
-
-    for (size_t i = 0u; i < sizeof(specials) / sizeof(specials[0]); ++i) {
-        size_t len = strlen(specials[i]);
-
-        if (ascii_region_eq_ci(s, end, specials[i]) &&
-            special_number_literal_boundary(s + len, end))
-            return len;
-    }
-    return 0u;
-}
-
-static int parse_number_region(const char *start, const char *end, number_t *out)
-{
-    char *buf;
     size_t len;
     size_t atom_len;
     char *roundtrip;
+    string_t *literal;
 
-    while (start < end && isspace((unsigned char)*start))
-        start++;
-    while (end > start && isspace((unsigned char)end[-1]))
-        end--;
+    text = string_view_trim(text);
 
-    if (start >= end)
+    if (string_view_is_empty(text))
         return 0;
 
-    len = (size_t)(end - start);
-    atom_len = scan_number_atom_len(start, end);
+    len = string_view_length(text);
+    atom_len = scan_number_atom_len_view(text, 0u);
     if (atom_len == 0u)
-        atom_len = scan_special_number_literal_len(start, end);
+        atom_len = scan_special_number_literal_len_view(text, 0u);
     if (atom_len != len)
         return 0;
 
-    buf = (char *)fs_xmalloc(len + 1);
-    memcpy(buf, start, len);
-    buf[len] = '\0';
+    literal = string_from_view(&text);
+    if (!literal)
+        return 0;
 
-    *out = num_create_from_string(buf);
-    free(buf);
+    *out = num_create_from_string(string_c_str(literal));
+    string_free(literal);
 
     roundtrip = num_to_string(*out);
     if (!roundtrip) {
@@ -699,114 +530,294 @@ static int parse_number_region(const char *start, const char *end, number_t *out
     return 1;
 }
 
-static const char *scan_binding_value_end(const char *p, const char *end)
+static string_t *read_any_name_cursor(string_cursor_t *cursor)
 {
-    int depth = 0;
-
-    while (p < end) {
-        if (*p == '(' || *p == '[') {
-            depth++;
-            p++;
-            continue;
-        }
-        if ((*p == ')' || *p == ']') && depth > 0) {
-            depth--;
-            p++;
-            continue;
-        }
-        if (depth == 0 && (*p == ',' || *p == ';'))
-            break;
-
-        {
-            unsigned int c;
-            int len = fs_utf8_decode(p, &c);
-            p += (len > 0) ? len : 1;
-        }
-    }
-
-    return p;
+    return expr_parse_read_name(cursor, false);
 }
 
-static int read_optional_display_exponent(const char **p_in)
+static string_view_t scan_binding_value(string_cursor_t *cursor)
 {
-    const char *p = *p_in;
-    int exponent = read_superscript(&p);
+    size_t start_pos = string_cursor_position(cursor);
+    int depth = 0;
+    unsigned char c;
 
-    if (exponent < 0 && p[0] == '^' && isdigit((unsigned char)p[1])) {
-        p++;
-        exponent = 0;
-        while (isdigit((unsigned char)*p))
-            exponent = exponent * 10 + (*p++ - '0');
+    while (!string_cursor_done(cursor)) {
+        if (string_cursor_peek_ascii(cursor, &c)) {
+            if (c == '(' || c == '[') {
+                depth++;
+                string_cursor_skip(cursor, 1u);
+                continue;
+            }
+            if ((c == ')' || c == ']') && depth > 0) {
+                depth--;
+                string_cursor_skip(cursor, 1u);
+                continue;
+            }
+            if (depth == 0 && (c == ',' || c == ';'))
+                break;
+            string_cursor_skip(cursor, 1u);
+            continue;
+        }
+
+        if (string_cursor_next(cursor) != 0)
+            break;
     }
 
-    *p_in = p;
+    return string_cursor_view_extract(start_pos, cursor);
+}
+
+static int read_superscript_cursor(string_cursor_t *cursor)
+{
+    return expr_parse_read_superscript_int(cursor);
+}
+
+static int read_optional_display_exponent(expr_parse_state_t *p)
+{
+    string_cursor_t *scan = string_cursor_clone(p->cursor);
+    int exponent;
+    unsigned char c;
+
+    if (!scan)
+        return -1;
+
+    exponent = read_superscript_cursor(scan);
+    if (exponent >= 0) {
+        string_cursor_seek(p->cursor, string_cursor_position(scan));
+        string_cursor_free(scan);
+        return exponent;
+    }
+
+    if (expr_parse_cursor_consume_char(scan, '^') &&
+        string_cursor_peek_ascii(scan, &c) && isdigit(c)) {
+        exponent = 0;
+        while (string_cursor_peek_ascii(scan, &c) && isdigit(c)) {
+            exponent = exponent * 10 + (int)(c - '0');
+            string_cursor_skip(scan, 1u);
+        }
+        string_cursor_seek(p->cursor, string_cursor_position(scan));
+    }
+
+    string_cursor_free(scan);
     return exponent;
 }
 
-static const char *scan_function_power_marker(const char *pos, const char *end)
+static size_t scan_function_power_marker_pos_view(string_view_t text,
+                                                  size_t pos)
 {
-    const char *after = pos;
-    unsigned int c = 0;
-    int len = 0;
+    size_t after = pos;
+    uint32_t c = 0;
+    size_t len = 0u;
+    unsigned char b0;
+    unsigned char b1;
+    unsigned char b2;
 
-    while (after < end && is_superscript_byte(after)) {
-        len = fs_utf8_decode(after, &c);
+    while (expr_parse_view_peek_value(text, after, &c, &len) &&
+           expr_parse_is_superscript_digit(c))
         after += len;
+
+    if (expr_parse_view_peek_value(text, after, &c, &len) && c == 0x207B) {
+        uint32_t next = 0;
+        size_t next_len = 0u;
+
+        if (expr_parse_view_peek_value(text, after + len, &next, &next_len) &&
+            next == 0x00B9)
+            return after + len + next_len;
     }
 
-    len = fs_utf8_decode(after, &c);
-    if (len > 0 && c == 0x207B) {
-        const char *scan = after + len;
-        unsigned int next = 0;
-        int next_len = fs_utf8_decode(scan, &next);
-
-        if (next_len > 0 && next == 0x00B9)
-            return scan + next_len;
-    }
-
-    if (after + 1 < end && *after == '^' &&
-        isdigit((unsigned char)after[1])) {
+    if (expr_parse_view_peek_ascii(text, after, &b0) &&
+        expr_parse_view_peek_ascii(text, after + 1u, &b1) &&
+        b0 == '^' && isdigit(b1)) {
         after++;
-        while (after < end && isdigit((unsigned char)*after))
+        while (expr_parse_view_peek_ascii(text, after, &b0) && isdigit(b0))
             after++;
         return after;
     }
 
-    if (after + 2 < end && after[0] == '^' &&
-        after[1] == '-' && after[2] == '1')
-        return after + 3;
+    if (expr_parse_view_peek_ascii(text, after, &b0) &&
+        expr_parse_view_peek_ascii(text, after + 1u, &b1) &&
+        expr_parse_view_peek_ascii(text, after + 2u, &b2) &&
+        b0 == '^' && b1 == '-' && b2 == '1')
+        return after + 3u;
 
-    if (after < end && *after == '^') {
-        const char *scan = after + 1;
-        char *name = read_any_name(&scan);
+    if (expr_parse_view_peek_ascii(text, after, &b0) && b0 == '^') {
+        string_cursor_t *cursor = string_cursor_new_view(text);
+        string_t *name;
+        size_t end_pos;
 
-        if (!name)
-            return NULL;
-        free(name);
-        return scan;
+        if (!cursor)
+            return SIZE_MAX;
+        if (string_cursor_seek(cursor, after + 1u) != 0) {
+            string_cursor_free(cursor);
+            return SIZE_MAX;
+        }
+        name = read_any_name_cursor(cursor);
+        if (!name) {
+            string_cursor_free(cursor);
+            return SIZE_MAX;
+        }
+        string_free(name);
+        end_pos = string_cursor_position(cursor);
+        string_cursor_free(cursor);
+        return end_pos;
     }
 
     return after;
 }
 
-static bool function_power_marker_is_inverse(const char *start, const char *end)
+static int func_call_start_view(string_view_t text,
+                                size_t pos,
+                                const char *kw,
+                                size_t klen,
+                                size_t *paren_pos_out)
 {
-    unsigned int c = 0;
-    int len = 0;
+    size_t after;
+    unsigned char c;
 
-    if (!start || !end || start >= end)
+    if (!string_view_equals_literal(string_view_slice(text, pos, klen), kw))
+        return 0;
+
+    after = scan_function_power_marker_pos_view(text, pos + klen);
+    if (after == SIZE_MAX)
+        return 0;
+    if (!expr_parse_view_peek_ascii(text, after, &c) || c != '(')
+        return 0;
+
+    if (paren_pos_out)
+        *paren_pos_out = after;
+    return 1;
+}
+
+static size_t scan_ascii_identifier_len_view(string_view_t text, size_t pos)
+{
+    size_t end = pos;
+    unsigned char c;
+
+    while (expr_parse_view_peek_ascii(text, end, &c) &&
+           (isalpha(c) || isdigit(c) || c == '_'))
+        end++;
+
+    return end - pos;
+}
+
+static const func_entry_t *lookup_fixed_func_call_view(string_view_t text,
+                                                       size_t pos,
+                                                       size_t *paren_pos_out)
+{
+    size_t id_len = scan_ascii_identifier_len_view(text, pos);
+
+    if (paren_pos_out)
+        *paren_pos_out = SIZE_MAX;
+
+    if (id_len > 0u) {
+        const func_entry_t *entry =
+            lookup_func(string_view_slice(text, pos, id_len));
+
+        if (entry) {
+            size_t paren_pos = SIZE_MAX;
+
+            if (func_call_start_view(text, pos, entry->kw, entry->klen, &paren_pos)) {
+                if (paren_pos_out)
+                    *paren_pos_out = paren_pos;
+                return entry;
+            }
+        }
+    }
+
+    for (size_t i = 0u; i < FUNC_TABLE_SIZE; ++i) {
+        const func_entry_t *entry = &s_funcs[i];
+        size_t paren_pos = SIZE_MAX;
+
+        if (!entry->kw)
+            continue;
+        if (!func_call_start_view(text, pos, entry->kw, entry->klen, &paren_pos))
+            continue;
+
+        if (paren_pos_out)
+            *paren_pos_out = paren_pos;
+        return entry;
+    }
+
+    return NULL;
+}
+
+static int scan_polygamma_symbol_call_view(string_view_t text,
+                                           size_t pos,
+                                           unsigned int *order_out,
+                                           size_t *paren_pos_out)
+{
+    size_t p = pos;
+    uint32_t c = 0;
+    size_t len = 0u;
+    unsigned long order = 0ul;
+    int digits = 0;
+    unsigned char b = 0u;
+
+    if (order_out)
+        *order_out = 0u;
+    if (paren_pos_out)
+        *paren_pos_out = SIZE_MAX;
+
+    if (!expr_parse_view_peek_value(text, p, &c, &len) || c != 0x03C8)
+        return 0;
+    p += len;
+
+    if (!expr_parse_view_peek_value(text, p, &c, &len) || c != 0x207D)
+        return 0;
+    p += len;
+
+    while (expr_parse_view_peek_value(text, p, &c, &len) &&
+           expr_parse_is_superscript_digit(c)) {
+        int digit = expr_parse_superscript_digit_value(c);
+
+        if (digit < 0)
+            return 0;
+        if (order > (ULONG_MAX - (unsigned long)digit) / 10ul)
+            return 0;
+        order = order * 10ul + (unsigned long)digit;
+        p += len;
+        ++digits;
+    }
+    if (digits == 0 || order > UINT_MAX)
+        return 0;
+
+    if (!expr_parse_view_peek_value(text, p, &c, &len) || c != 0x207E)
+        return 0;
+    p += len;
+
+    if (!expr_parse_view_peek_ascii(text, p, &b) || b != '(')
+        return 0;
+
+    if (order_out)
+        *order_out = (unsigned int)order;
+    if (paren_pos_out)
+        *paren_pos_out = p;
+    return 1;
+}
+
+static bool function_power_marker_is_inverse(string_view_t marker)
+{
+    uint32_t c = 0;
+    size_t len = 0u;
+    uint32_t one = 0;
+    size_t one_len = 0u;
+    unsigned char b0;
+    unsigned char b1;
+    unsigned char b2;
+
+    if (string_view_is_empty(marker))
         return false;
-    if ((size_t)(end - start) == 3u &&
-        start[0] == '^' && start[1] == '-' && start[2] == '1')
+    if (string_view_length(marker) == 3u &&
+        expr_parse_view_peek_ascii(marker, 0u, &b0) &&
+        expr_parse_view_peek_ascii(marker, 1u, &b1) &&
+        expr_parse_view_peek_ascii(marker, 2u, &b2) &&
+        b0 == '^' && b1 == '-' && b2 == '1')
         return true;
 
-    len = fs_utf8_decode(start, &c);
+    if (!expr_parse_view_peek_value(marker, 0u, &c, &len))
+        return false;
     if (len > 0 && c == 0x207B) {
-        const char *next = start + len;
-        unsigned int one = 0;
-        int one_len = fs_utf8_decode(next, &one);
-
-        if (one_len > 0 && one == 0x00B9 && next + one_len == end)
+        if (expr_parse_view_peek_value(marker, len, &one, &one_len) &&
+            one == 0x00B9 && len + one_len == string_view_length(marker))
             return true;
     }
 
@@ -837,13 +848,12 @@ static bool function_supports_inverse_power_notation(const func_entry_t *fe)
     return inverse_power_supported[fe->ops->kind];
 }
 
-static int parse_required_char(parser_t *p, char expected, const char *errmsg)
+static int parse_required_char(expr_parse_state_t *p, char expected, const char *errmsg)
 {
-    if (p->p >= p->end || *p->p != expected) {
+    if (!expr_parse_consume_char(p, (unsigned char)expected)) {
         set_error(p, errmsg);
         return 0;
     }
-    p->p++;
     return 1;
 }
 
@@ -1036,16 +1046,18 @@ static expr_t *apply_factorial_postfix(expr_t *value)
     return apply_unary_preserving_constexpr(&ops_gamma, incremented, expr_gamma);
 }
 
-static expr_t *parse_enclosed_addexpr(parser_t *p, char closing, const char *errmsg)
+static expr_t *parse_enclosed_addexpr(expr_parse_state_t *p,
+                                      char closing,
+                                      const char *errmsg)
 {
     expr_t *inner;
 
-    skip_spaces(&p->p, p->end);
+    expr_parse_skip_spaces(p);
     inner = parse_addexpr(p);
 
     if (!inner)
         return NULL;
-    skip_spaces(&p->p, p->end);
+    expr_parse_skip_spaces(p);
     if (!parse_required_char(p, closing, errmsg)) {
         expr_free(inner);
         return NULL;
@@ -1057,26 +1069,29 @@ static expr_t *parse_enclosed_addexpr(parser_t *p, char closing, const char *err
 /* Atom parser                                                          */
 /* ------------------------------------------------------------------ */
 
-static expr_t *parse_atom(parser_t *p)
+static expr_t *parse_atom(expr_parse_state_t *p)
 {
     NUM_SCOPE(scope);
-    unsigned int cp = 0;
-    int cp_len = fs_utf8_decode(p->p, &cp);
+    size_t pos = expr_parse_pos(p);
+    string_view_t text = expr_parse_text(p);
+    uint32_t cp = 0;
+    size_t cp_len = 0u;
+    unsigned char b = 0u;
 
-    if (p->error || p->p >= p->end) {
+    if (p->error || expr_parse_at_end(p)) {
         set_error(p, "unexpected end of expression");
         return NULL;
     }
+    expr_parse_peek_ascii(p, &b);
+    expr_parse_peek_value(p, &cp, &cp_len);
 
     /* Parenthesised sub-expression */
-    if (*p->p == '(') {
-        p->p++;
+    if (expr_parse_consume_char(p, '(')) {
         return parse_enclosed_addexpr(p, ')', "expected ')'");
     }
 
     /* Absolute-value bars: |expr| */
-    if (*p->p == '|') {
-        p->p++;
+    if (expr_parse_consume_char(p, '|')) {
         expr_t *inner = parse_enclosed_addexpr(p, '|', "expected '|'");
         if (!inner)
             return NULL;
@@ -1085,26 +1100,26 @@ static expr_t *parse_atom(parser_t *p)
 
     /* Mathematical floor/ceiling brackets: ⌊expr⌋ and ⌈expr⌉ */
     if (cp_len > 0 && (cp == 0x230A || cp == 0x2308)) {
-        const unsigned int closing = (cp == 0x230A) ? 0x230B : 0x2309;
+        const uint32_t closing = (cp == 0x230A) ? 0x230B : 0x2309;
         const char *errmsg = (cp == 0x230A) ? "expected '⌋'" : "expected '⌉'";
         expr_t *inner;
         expr_t *result;
-        unsigned int close_cp = 0;
-        int close_len;
+        uint32_t close_cp = 0;
+        size_t close_len = 0u;
 
-        p->p += cp_len;
+        expr_parse_skip(p, cp_len);
         inner = parse_addexpr(p);
         if (!inner)
             return NULL;
-        skip_spaces(&p->p, p->end);
+        expr_parse_skip_spaces(p);
 
-        close_len = fs_utf8_decode(p->p, &close_cp);
-        if (close_len <= 0 || close_cp != closing) {
+        if (!expr_parse_peek_value(p, &close_cp, &close_len) ||
+            close_cp != closing) {
             expr_free(inner);
             set_error(p, errmsg);
             return NULL;
         }
-        p->p += close_len;
+        expr_parse_skip(p, close_len);
 
         result = (cp == 0x230A)
             ? apply_unary_preserving_constexpr(&ops_floor, inner, expr_floor)
@@ -1113,46 +1128,66 @@ static expr_t *parse_atom(parser_t *p)
     }
 
     /* Numeric atom (integer/decimal/rational, optionally with trailing i) */
-    if (isdigit((unsigned char)*p->p) || *p->p == '.' ||
-        scan_unicode_fraction_len(p->p, p->end) > 0u ||
-        scan_special_number_literal_len(p->p, p->end) > 0u) {
-        size_t len = scan_number_atom_len(p->p, p->end);
-        size_t special_len = scan_special_number_literal_len(p->p, p->end);
-        const char *start = p->p;
+    if (isdigit(b) || b == '.' ||
+        scan_unicode_fraction_len_view(text, pos) > 0u ||
+        scan_special_number_literal_len_view(text, pos) > 0u) {
+        size_t len = scan_number_atom_len_view(text, pos);
+        size_t special_len = scan_special_number_literal_len_view(text, pos);
+        string_view_t literal_view;
         number_t value;
         expr_t *node;
-        char *text;
+        char *literal_text;
 
         if (len == 0u)
             len = special_len;
-        if (len == 0 || !parse_number_region(p->p, p->p + len, &value)) {
+        literal_view = string_view_slice(text, pos, len);
+        if (len == 0 ||
+            !parse_number_view(literal_view, &value)) {
             set_error(p, "expected numeric literal");
             return NULL;
         }
-        p->p += len;
+        expr_parse_skip(p, len);
         node = expr_new_const(value);
-        if (special_len > 0u && ascii_region_eq_ci(start, start + special_len, "nan")) {
-            text = (char *)fs_xmalloc(4u);
-            memcpy(text, "NAN", 4u);
+        if (special_len > 0u &&
+            expr_parse_view_starts_with_text(string_view_slice(text, pos, special_len),
+                                       "nan",
+                                       true)) {
+            literal_text = (char *)fs_xmalloc(4u);
+            memcpy(literal_text, "NAN", 4u);
         } else if (num_is_exact(value)) {
-            text = num_to_string(value);
-            if (!text) {
-                text = (char *)fs_xmalloc(4u);
-                memcpy(text, "NAN", 4u);
+            literal_text = num_to_string(value);
+            if (!literal_text) {
+                literal_text = (char *)fs_xmalloc(4u);
+                memcpy(literal_text, "NAN", 4u);
             }
         } else {
-            text = (char *)fs_xmalloc(len + 1u);
-            memcpy(text, start, len);
-            text[len] = '\0';
+            string_t *literal = string_from_view(&literal_view);
+
+            if (!literal) {
+                expr_free(node);
+                num_destroy(&value);
+                set_error(p, "could not preserve numeric literal");
+                return NULL;
+            }
+            literal_text = strdup(string_c_str(literal));
+            string_free(literal);
+            if (!literal_text) {
+                expr_free(node);
+                num_destroy(&value);
+                set_error(p, "out of memory");
+                return NULL;
+            }
         }
-        node->binding_expr = expr_binding_expr_new_number_text(text);
-        free(text);
+        node->binding_expr = expr_binding_expr_new_number_text(literal_text);
+        free(literal_text);
         return node;
     }
 
     if (cp_len > 0 && cp == 0x221A) {
-        p->p += cp_len;
-        int sup = read_optional_display_exponent(&p->p);
+        int sup;
+
+        expr_parse_skip(p, cp_len);
+        sup = read_optional_display_exponent(p);
 
         if (!parse_required_char(p, '(', "expected '(' after √"))
             return NULL;
@@ -1166,27 +1201,41 @@ static expr_t *parse_atom(parser_t *p)
     }
 
     {
-        const char *paren = NULL;
-        const func_entry_t *fe = lookup_fixed_func_call(p->p, p->end, &paren);
+        size_t paren_pos = SIZE_MAX;
+        const func_entry_t *fe =
+            lookup_fixed_func_call_view(text, pos, &paren_pos);
 
-        if (fe) {
-            const char *after_kw = p->p + fe->klen;
-            const char *symbolic_exp_start = NULL;
-            const char *symbolic_exp_end = NULL;
+        if (fe && paren_pos != SIZE_MAX) {
+            size_t after_kw_pos = pos + fe->klen;
+            expr_parse_state_t marker = *p;
+            string_view_t symbolic_exp_text = string_view_empty();
             bool inverse_power = false;
-            int sup = read_optional_display_exponent(&after_kw);
+            int sup;
             expr_t *symbolic_exponent = NULL;
+            unsigned char marker_byte = 0u;
 
-            if (sup < 0 && after_kw < paren) {
-                if (function_power_marker_is_inverse(after_kw, paren)) {
+            expr_parse_set_pos(&marker, after_kw_pos);
+            sup = read_optional_display_exponent(&marker);
+            after_kw_pos = expr_parse_pos(&marker);
+
+            if (sup < 0 && after_kw_pos < paren_pos) {
+                if (function_power_marker_is_inverse(
+                        string_view_slice(text,
+                                          after_kw_pos,
+                                          paren_pos - after_kw_pos))) {
                     inverse_power = true;
-                } else if (*after_kw == '^') {
-                    symbolic_exp_start = after_kw + 1;
-                    symbolic_exp_end = paren;
+                } else if (expr_parse_view_peek_ascii(text,
+                                                      after_kw_pos,
+                                                      &marker_byte) &&
+                           marker_byte == '^') {
+                    symbolic_exp_text = string_view_slice(
+                        text,
+                        after_kw_pos + 1u,
+                        paren_pos - after_kw_pos - 1u);
                 }
             }
 
-            p->p = paren + 1; /* skip past '(' */
+            expr_parse_set_pos(p, paren_pos + 1u);
             if (fe->arity == 2u) {
                 expr_t *a = NULL;
                 expr_t *b = NULL;
@@ -1207,10 +1256,10 @@ static expr_t *parse_atom(parser_t *p)
                     expr_free(a);
                     expr_free(b);
                 }
-                if (symbolic_exp_start) {
-                    symbolic_exponent = parse_expression_region(
-                        symbolic_exp_start, symbolic_exp_end, p->syms,
-                        "expr_from_string", 1);
+                if (!string_view_is_empty(symbolic_exp_text)) {
+                    symbolic_exponent = parse_expression_view(symbolic_exp_text,
+                                                              p->syms,
+                                                              "expr_from_string", 1);
                     if (!symbolic_exponent) {
                         expr_free(result);
                         return NULL;
@@ -1242,10 +1291,10 @@ static expr_t *parse_atom(parser_t *p)
                 expr_free(a);
                 expr_free(b);
                 expr_free(c);
-                if (symbolic_exp_start) {
-                    symbolic_exponent = parse_expression_region(
-                        symbolic_exp_start, symbolic_exp_end, p->syms,
-                        "expr_from_string", 1);
+                if (!string_view_is_empty(symbolic_exp_text)) {
+                    symbolic_exponent = parse_expression_view(symbolic_exp_text,
+                                                              p->syms,
+                                                              "expr_from_string", 1);
                     if (!symbolic_exponent) {
                         expr_free(result);
                         return NULL;
@@ -1283,10 +1332,10 @@ static expr_t *parse_atom(parser_t *p)
                 } else {
                     result = apply_unary_preserving_constexpr(fe->ops, arg, fe->ufn);
                 }
-                if (symbolic_exp_start) {
-                    symbolic_exponent = parse_expression_region(
-                        symbolic_exp_start, symbolic_exp_end, p->syms,
-                        "expr_from_string", 1);
+                if (!string_view_is_empty(symbolic_exp_text)) {
+                    symbolic_exponent = parse_expression_view(symbolic_exp_text,
+                                                              p->syms,
+                                                              "expr_from_string", 1);
                     if (!symbolic_exponent) {
                         expr_free(result);
                         return NULL;
@@ -1305,13 +1354,13 @@ static expr_t *parse_atom(parser_t *p)
 
     {
         unsigned int order = 0u;
-        const char *paren = NULL;
+        size_t paren_pos = SIZE_MAX;
 
-        if (scan_polygamma_symbol_call(p->p, p->end, &order, &paren)) {
+        if (scan_polygamma_symbol_call_view(text, pos, &order, &paren_pos)) {
             expr_t *arg;
             expr_t *result;
 
-            p->p = paren + 1;
+            expr_parse_set_pos(p, paren_pos + 1u);
             arg = parse_enclosed_addexpr(
                 p, ')', "expected ')' after polygamma argument");
             if (!arg)
@@ -1323,15 +1372,16 @@ static expr_t *parse_atom(parser_t *p)
     }
 
     /* Simple name (single Unicode letter + subscript digits) or [bracketed name] */
-    char *name = read_any_name(&p->p);
+    string_t *name = read_any_name_cursor(p->cursor);
     if (!name) {
         set_error(p, "expected expression");
         return NULL;
     }
 
-    expr_t *sym = symtab_lookup(p->syms, name);
+    expr_t *sym = symtab_lookup(p->syms, string_c_str(name));
     if (!sym) {
-        char *normalised = expr_normalise_name(expr_default_constant_canonical_name(name));
+        char *normalised =
+            expr_normalise_name(expr_default_constant_canonical_name(string_c_str(name)));
 
         if (normalised) {
             sym = symtab_lookup(p->syms, normalised);
@@ -1339,14 +1389,18 @@ static expr_t *parse_atom(parser_t *p)
         }
     }
     if (!sym) {
-        char msg[256];
-        snprintf(msg, sizeof(msg), "unknown symbol '%.200s'", name);
-        set_error(p, msg);
-        free(name);
+        if (!p->error) {
+            p->error = 1;
+            if (p->errmsg)
+                string_append_format(p->errmsg,
+                                     "unknown symbol '%.200s'",
+                                     string_c_str(name));
+        }
+        string_free(name);
         return NULL;
     }
     expr_retain(sym); /* give caller an owning reference */
-    free(name);
+    string_free(name);
     return sym;
 }
 
@@ -1354,13 +1408,12 @@ static expr_t *parse_atom(parser_t *p)
 /* Power parser                                                         */
 /* ------------------------------------------------------------------ */
 
-static expr_t *parse_power_operand(parser_t *p)
+static expr_t *parse_power_operand(expr_parse_state_t *p)
 {
     expr_t *base = parse_atom(p);
     if (!base) return NULL;
 
-    while (p->p < p->end && *p->p == '!') {
-        p->p++;
+    while (expr_parse_consume_char(p, '!')) {
         base = apply_factorial_postfix(base);
         if (!base)
             return NULL;
@@ -1369,7 +1422,7 @@ static expr_t *parse_power_operand(parser_t *p)
     return base;
 }
 
-static expr_t *parse_power(parser_t *p)
+static expr_t *parse_power(expr_parse_state_t *p)
 {
     NUM_SCOPE(scope);
     if (p->error) return NULL;
@@ -1381,7 +1434,7 @@ static expr_t *parse_power(parser_t *p)
         expr_t *result = NULL;
 
         /* Unicode superscript exponent: x² */
-        int sup = read_superscript(&p->p);
+        int sup = read_superscript_cursor(p->cursor);
         if (sup >= 0) {
             base = apply_integer_power_if_present(base, sup);
             if (!base)
@@ -1392,16 +1445,14 @@ static expr_t *parse_power(parser_t *p)
         /* Caret exponent: chained powers are left-associative in expr syntax:
          * a^x^2 means (a^x)^2. Use explicit parentheses for powers inside
          * the exponent: a^(x^2). */
-        if (p->p >= p->end || *p->p != '^')
+        if (!expr_parse_consume_char(p, '^'))
             break;
 
         expr_t *exponent = NULL;
 
-        p->p++;
-        skip_spaces(&p->p, p->end);
+        expr_parse_skip_spaces(p);
 
-        if (p->p < p->end && *p->p == '(') {
-            p->p++;
+        if (expr_parse_consume_char(p, '(')) {
             exponent = parse_enclosed_addexpr(p, ')', "expected ')' after exponent");
         } else {
             exponent = parse_signed_power_operand(p);
@@ -1432,18 +1483,22 @@ static expr_t *parse_power(parser_t *p)
 /* Signed factor (unary minus)                                         */
 /* ------------------------------------------------------------------ */
 
-static expr_t *parse_signed_power(parser_t *p)
+static expr_t *parse_signed_power(expr_parse_state_t *p)
 {
     int negate = 0;
     expr_t *inner;
 
     if (p->error) return NULL;
 
-    while (p->p < p->end && (*p->p == '-' || *p->p == '+')) {
-        if (*p->p == '-')
+    for (;;) {
+        unsigned char c = 0u;
+
+        if (!expr_parse_peek_ascii(p, &c) || (c != '-' && c != '+'))
+            break;
+        if (c == '-')
             negate = !negate;
-        p->p++;
-        skip_spaces(&p->p, p->end);
+        expr_parse_skip(p, 1u);
+        expr_parse_skip_spaces(p);
     }
 
     inner = parse_power(p);
@@ -1451,18 +1506,22 @@ static expr_t *parse_signed_power(parser_t *p)
     return negate ? apply_unary_preserving_constexpr(&ops_neg, inner, expr_neg) : inner;
 }
 
-static expr_t *parse_signed_power_operand(parser_t *p)
+static expr_t *parse_signed_power_operand(expr_parse_state_t *p)
 {
     int negate = 0;
     expr_t *inner;
 
     if (p->error) return NULL;
 
-    while (p->p < p->end && (*p->p == '-' || *p->p == '+')) {
-        if (*p->p == '-')
+    for (;;) {
+        unsigned char c = 0u;
+
+        if (!expr_parse_peek_ascii(p, &c) || (c != '-' && c != '+'))
+            break;
+        if (c == '-')
             negate = !negate;
-        p->p++;
-        skip_spaces(&p->p, p->end);
+        expr_parse_skip(p, 1u);
+        expr_parse_skip_spaces(p);
     }
 
     inner = parse_power_operand(p);
@@ -1474,18 +1533,18 @@ static expr_t *parse_signed_power_operand(parser_t *p)
 /* Multiplication / division (implicit, '*', '·', '/')                 */
 /* ------------------------------------------------------------------ */
 
-static expr_t *parse_mulexpr(parser_t *p)
+static expr_t *parse_mulexpr(expr_parse_state_t *p)
 {
     if (p->error) return NULL;
     expr_t *lhs = parse_signed_power(p);
     if (!lhs) return NULL;
 
     for (;;) {
-        if (p->p >= p->end) break;
+        if (expr_parse_at_end(p)) break;
 
         /* Explicit middle dot '·' */
         if (at_middle_dot(p)) {
-            p->p += 2;
+            expr_parse_skip(p, 2u);
             expr_t *rhs = parse_signed_power(p);
             if (!rhs) { expr_free(lhs); return NULL; }
             lhs = apply_binary_preserving_constexpr(&ops_mul, lhs, rhs, expr_mul);
@@ -1494,16 +1553,22 @@ static expr_t *parse_mulexpr(parser_t *p)
 
         /* Explicit '*' or '/' accepted with or without surrounding spaces,
          * e.g. "x*y", "x * y", "x/y", and "x / y". Peek past spaces before
-         * committing — if neither operator is present we fall through without
-         * advancing p->p. */
+         * committing so a failed probe leaves the cursor untouched. */
         {
-            const char *peek = p->p;
-            while (peek < p->end && *peek == ' ') peek++;
-            if (peek < p->end && (*peek == '*' || *peek == '/')) {
-                char op = *peek;
+            string_cursor_t *scan = string_cursor_clone(p->cursor);
+            unsigned char op = 0u;
 
-                p->p = peek + 1; /* consume optional leading spaces and operator */
-                skip_spaces(&p->p, p->end); /* trailing spaces */
+            if (!scan) {
+                expr_free(lhs);
+                return NULL;
+            }
+            string_cursor_skip_spaces(scan);
+            if (string_cursor_peek_ascii(scan, &op) &&
+                (op == '*' || op == '/')) {
+                string_cursor_seek(p->cursor, string_cursor_position(scan));
+                string_cursor_free(scan);
+                expr_parse_skip(p, 1u);
+                expr_parse_skip_spaces(p);
                 expr_t *rhs = parse_signed_power(p);
                 if (!rhs) { expr_free(lhs); return NULL; }
                 lhs = (op == '*')
@@ -1511,6 +1576,7 @@ static expr_t *parse_mulexpr(parser_t *p)
                     : apply_binary_preserving_constexpr(&ops_div, lhs, rhs, expr_div);
                 continue;
             }
+            string_cursor_free(scan);
         }
 
         /* Implicit multiplication: next position can start a factor */
@@ -1530,23 +1596,28 @@ static expr_t *parse_mulexpr(parser_t *p)
 /* Addition / subtraction                                              */
 /* ------------------------------------------------------------------ */
 
-static expr_t *parse_addexpr(parser_t *p)
+static expr_t *parse_addexpr(expr_parse_state_t *p)
 {
     if (p->error) return NULL;
     expr_t *lhs = parse_mulexpr(p);
     if (!lhs) return NULL;
 
     for (;;) {
-        const char *peek = p->p;
+        string_cursor_t *scan = string_cursor_clone(p->cursor);
+        unsigned char op = 0u;
 
-        while (peek < p->end && *peek == ' ')
-            peek++;
+        if (!scan) {
+            expr_free(lhs);
+            return NULL;
+        }
+        string_cursor_skip_spaces(scan);
 
-        if (peek < p->end && (*peek == '+' || *peek == '-')) {
-            char op = *peek;
-
-            p->p = peek + 1;
-            skip_spaces(&p->p, p->end);
+        if (string_cursor_peek_ascii(scan, &op) &&
+            (op == '+' || op == '-')) {
+            string_cursor_seek(p->cursor, string_cursor_position(scan));
+            string_cursor_free(scan);
+            expr_parse_skip(p, 1u);
+            expr_parse_skip_spaces(p);
             expr_t *rhs = parse_mulexpr(p);
             if (!rhs) { expr_free(lhs); return NULL; }
             lhs = (op == '+')
@@ -1555,6 +1626,7 @@ static expr_t *parse_addexpr(parser_t *p)
             continue;
         }
 
+        string_cursor_free(scan);
         break;
     }
     return lhs;
@@ -1564,111 +1636,139 @@ static expr_t *parse_addexpr(parser_t *p)
 /* Binding section parser                                               */
 /* ------------------------------------------------------------------ */
 
-static void binding_parse_error(char *errmsg,
-                                size_t errmsg_n,
+static void binding_parse_error(string_t *errmsg,
                                 const char *name,
-                                const char *value_start,
-                                const char *value_end)
+                                string_view_t value)
 {
     const size_t max_value = 160u;
     size_t value_len;
-    int value_width;
     const char *suffix;
+    string_t *display;
 
-    if (!errmsg || errmsg_n == 0u)
+    if (!errmsg)
         return;
 
-    while (value_start < value_end && isspace((unsigned char)*value_start))
-        value_start++;
-    while (value_end > value_start && isspace((unsigned char)value_end[-1]))
-        value_end--;
+    string_clear(errmsg);
+    value = string_view_trim(value);
 
-    value_len = (size_t)(value_end - value_start);
+    value_len = string_view_length(value);
     suffix = value_len > max_value ? "..." : "";
     if (value_len > max_value)
-        value_len = max_value;
-    value_width = value_len > (size_t)INT_MAX ? INT_MAX : (int)value_len;
+        value = string_view_slice(value, 0u, max_value);
 
-    snprintf(errmsg, errmsg_n,
-             "incorrect syntax for %.80s: %.*s%s",
-             name ? name : "",
-             value_width,
-             value_start,
-             suffix);
+    display = string_from_view(&value);
+
+    string_append_format(errmsg,
+                         "incorrect syntax for %.80s: %s%s",
+                         name ? name : "",
+                         display ? string_c_str(display) : "",
+                         suffix);
+    string_free(display);
 }
 
 /* Parse comma/semicolon-separated "name = value" pairs from [s, end).
  * is_var: 1 → create expr_new_named_var(); 0 → create expr_new_named_const().
  * On success returns 0; on failure writes to errmsg and returns -1. */
-static int parse_bindings(const char *s, const char *end,
-                           int is_var, symtab_t *syms,
-                           char *errmsg, size_t errmsg_n)
+static int parse_bindings(string_view_t text,
+                          int is_var, symtab_t *syms,
+                          string_t *errmsg)
 {
     NUM_SCOPE(scope);
-    const char *p = s;
-    while (p < end) {
+    string_cursor_t *cursor;
+
+    if (string_view_is_empty(text))
+        return 0;
+
+    cursor = string_cursor_new_view(text);
+    if (!cursor) {
+        if (errmsg) {
+            string_clear(errmsg);
+            string_append_cstr(errmsg, "out of memory");
+        }
+        return -1;
+    }
+
+    while (!string_cursor_done(cursor)) {
         /* Skip whitespace and separators between entries. */
-        while (p < end && (isspace((unsigned char)*p) || *p == ',' || *p == ';')) p++;
-        if (p >= end) break;
+        for (;;) {
+            string_cursor_skip_spaces(cursor);
+            if (expr_parse_cursor_consume_char(cursor, ',') ||
+                expr_parse_cursor_consume_char(cursor, ';'))
+                continue;
+            break;
+        }
+        if (string_cursor_done(cursor))
+            break;
 
-        char *name = read_any_name(&p);
+        string_t *name = read_any_name_cursor(cursor);
         if (!name) {
-            snprintf(errmsg, errmsg_n, "expected name in binding section");
+            if (errmsg) {
+                string_clear(errmsg);
+                string_append_cstr(errmsg, "expected name in binding section");
+            }
+            string_cursor_free(cursor);
             return -1;
         }
 
-        skip_spaces(&p, end);
-        if (p >= end || *p != '=') {
-            free(name);
-            snprintf(errmsg, errmsg_n, "expected '=' after name in binding");
+        string_cursor_skip_spaces(cursor);
+        if (!expr_parse_cursor_consume_char(cursor, '=')) {
+            string_free(name);
+            if (errmsg) {
+                string_clear(errmsg);
+                string_append_cstr(errmsg, "expected '=' after name in binding");
+            }
+            string_cursor_free(cursor);
             return -1;
         }
-        p++; /* skip '=' */
-        skip_spaces(&p, end);
+        string_cursor_skip_spaces(cursor);
 
-        const char *value_end = scan_binding_value_end(p, end);
-        const char *value_start = p;
+        string_view_t value = scan_binding_value(cursor);
         expr_binding_expr_t *binding_expr;
         number_t val;
         expr_t *node;
 
-        binding_expr = expr_binding_expr_parse_region(p, value_end, errmsg, errmsg_n);
+        binding_expr = expr_binding_expr_parse_view(value, errmsg);
         if (!binding_expr) {
-            binding_parse_error(errmsg, errmsg_n, name, value_start, value_end);
-            free(name);
+            binding_parse_error(errmsg, string_c_str(name), value);
+            string_free(name);
+            string_cursor_free(cursor);
             return -1;
         }
         binding_expr = expr_binding_expr_simplify(binding_expr);
         val = expr_binding_expr_eval(binding_expr);
-        p = value_end;
 
         node = is_var
-            ? expr_new_named_var(val, name)
-            : expr_new_named_const(val, name);
+            ? expr_new_named_var(val, string_c_str(name))
+            : expr_new_named_const(val, string_c_str(name));
         num_destroy(&val);
         node->binding_expr = binding_expr;
 
         /* expr_new_named_* calls expr_normalise_name, which may transform the name
          * (e.g. "@pi" → "π").  Use the normalised form as the lookup key so it
          * matches what the expression text will contain after its own read_any_name. */
-        const char *key = (node->name && *node->name) ? node->name : name;
+        const char *key = (node->name && *node->name)
+            ? node->name
+            : string_c_str(name);
 
         /* Detect name clashes — same name used twice, or once as a variable
          * and once as a named constant. */
         if (symtab_has(syms, key)) {
-            /* Copy key before freeing node/name — key may alias node->name or name */
-            char key_copy[210];
-            strncpy(key_copy, key, sizeof(key_copy) - 1);
-            key_copy[sizeof(key_copy) - 1] = '\0';
+            if (errmsg) {
+                string_clear(errmsg);
+                string_append_format(errmsg,
+                                     "duplicate name '%.200s' in binding section",
+                                     key);
+            }
             expr_free(node);
-            free(name);
-            snprintf(errmsg, errmsg_n, "duplicate name '%.200s' in binding section", key_copy);
+            string_free(name);
+            string_cursor_free(cursor);
             return -1;
         }
 
-        symtab_add(syms, key, node); /* symtab takes ownership of node */
-        free(name);
+        symtab_add(syms, key, node);
+        string_free(name);
     }
+    string_cursor_free(cursor);
     return 0;
 }
 
@@ -1676,27 +1776,44 @@ static int parse_bindings(const char *s, const char *end,
 /* Pure-constant format: { name = val }                                 */
 /* ------------------------------------------------------------------ */
 
-static expr_t *parse_pure_const(const char *s, const char *end,
-                                 char *errmsg, size_t errmsg_n)
+static expr_t *parse_pure_const(string_view_t text,
+                                string_t *errmsg)
 {
     NUM_SCOPE(scope);
-    const char *p = s;
-    skip_spaces(&p, end);
+    string_cursor_t *cursor;
 
-    char *name = read_any_name(&p);
+    if (string_view_is_empty(text))
+        return NULL;
 
-    skip_spaces(&p, end);
-    if (p >= end || *p != '=') {
-        free(name);
-        snprintf(errmsg, errmsg_n, "expected '=' in constant format");
+    cursor = string_cursor_new_view(text);
+    if (!cursor)
+        return NULL;
+
+    string_cursor_skip_spaces(cursor);
+
+    string_t *name = read_any_name_cursor(cursor);
+
+    string_cursor_skip_spaces(cursor);
+    if (!expr_parse_cursor_consume_char(cursor, '=')) {
+        string_free(name);
+        string_cursor_free(cursor);
+        if (errmsg) {
+            string_clear(errmsg);
+            string_append_cstr(errmsg, "expected '=' in constant format");
+        }
         return NULL;
     }
-    p++;
-    skip_spaces(&p, end);
+    string_cursor_skip_spaces(cursor);
 
-    expr_binding_expr_t *binding_expr = expr_binding_expr_parse_region(p, end, errmsg, errmsg_n);
+    expr_binding_expr_t *binding_expr =
+        expr_binding_expr_parse_view(
+            string_cursor_view_between(string_cursor_position(cursor),
+                                       string_cursor_end_position(cursor),
+                                       cursor),
+            errmsg);
     if (!binding_expr) {
-        free(name);
+        string_free(name);
+        string_cursor_free(cursor);
         return NULL;
     }
     binding_expr = expr_binding_expr_simplify(binding_expr);
@@ -1704,104 +1821,121 @@ static expr_t *parse_pure_const(const char *s, const char *end,
 
     if (!name) {
         expr_binding_expr_free(binding_expr);
-        snprintf(errmsg, errmsg_n, "constant name is required in pure-constant format");
+        string_cursor_free(cursor);
+        if (errmsg) {
+            string_clear(errmsg);
+            string_append_cstr(errmsg, "constant name is required in pure-constant format");
+        }
         return NULL;
     }
-    expr_t *result = expr_new_named_const(val, name);
+    expr_t *result = expr_new_named_const(val, string_c_str(name));
     num_destroy(&val);
     result->binding_expr = binding_expr;
-    free(name);
+    string_free(name);
+    string_cursor_free(cursor);
     return result;
 }
 
-static int has_top_level_equals(const char *start, const char *end)
+static int has_top_level_equals(string_view_t text)
 {
     int depth = 0;
-    const char *p = start;
+    string_cursor_t *cursor;
+    unsigned char c;
 
-    while (p < end) {
-        if (*p == '(' || *p == '[') {
-            depth++;
-            p++;
+    if (string_view_is_empty(text))
+        return 0;
+
+    cursor = string_cursor_new_view(text);
+    if (!cursor)
+        return 0;
+
+    while (!string_cursor_done(cursor)) {
+        if (string_cursor_peek_ascii(cursor, &c)) {
+            if (c == '(' || c == '[') {
+                depth++;
+                string_cursor_skip(cursor, 1u);
+                continue;
+            }
+            if (c == ')' || c == ']') {
+                depth--;
+                string_cursor_skip(cursor, 1u);
+                continue;
+            }
+            if (depth == 0 && c == '=') {
+                string_cursor_free(cursor);
+                return 1;
+            }
+            string_cursor_skip(cursor, 1u);
             continue;
         }
-        if (*p == ')' || *p == ']') {
-            depth--;
-            p++;
-            continue;
-        }
-        if (depth == 0 && *p == '=')
-            return 1;
 
-        {
-            unsigned int c;
-            int len = fs_utf8_decode(p, &c);
-            p += (len > 0) ? len : 1;
-        }
+        if (string_cursor_next(cursor) != 0)
+            break;
     }
 
+    string_cursor_free(cursor);
     return 0;
 }
 
-static int collect_implicit_symbols(const char *start, const char *end,
+static int collect_implicit_symbols(string_view_t text,
                                     symtab_t *syms)
 {
     NUM_SCOPE(scope);
-    const char *p = start;
+    string_cursor_t *cursor;
 
-    while (p < end) {
-        const char *id = p;
-        const char *id_end = id;
-        size_t special_len = scan_special_number_literal_len(p, end);
+    if (string_view_is_empty(text))
+        return 0;
+
+    cursor = string_cursor_new_view(text);
+    if (!cursor)
+        return -1;
+
+    while (!string_cursor_done(cursor)) {
+        size_t pos = string_cursor_position(cursor);
+        size_t special_len = scan_special_number_literal_len_view(text, pos);
 
         if (special_len > 0u) {
-            p += special_len;
+            string_cursor_skip(cursor, special_len);
             continue;
         }
 
-        while (id_end < end &&
-               (isalpha((unsigned char)*id_end) ||
-                isdigit((unsigned char)*id_end) ||
-                *id_end == '_'))
-            id_end++;
+        {
+            size_t paren_pos = SIZE_MAX;
+            const func_entry_t *fe =
+                lookup_fixed_func_call_view(text, pos, &paren_pos);
 
-        if (id_end > id || (unsigned char)*p >= 0x80) {
-            const char *paren = NULL;
-            const func_entry_t *fe = lookup_fixed_func_call(p, end, &paren);
-
-            if (fe && paren) {
-                p += fe->klen;
+            if (fe && paren_pos != SIZE_MAX) {
+                string_cursor_skip(cursor, fe->klen);
                 continue;
             }
         }
 
-        char *name = read_any_name(&p);
+        string_t *name = read_any_name_cursor(cursor);
         expr_t *node;
         int is_const;
         number_t value;
-        const char *canonical_name = name;
+        const char *canonical_name;
         char *key = NULL;
 
         if (!name) {
-            unsigned int c;
-            int len = fs_utf8_decode(p, &c);
-            p += (len > 0) ? len : 1;
+            if (string_cursor_next(cursor) != 0)
+                string_cursor_skip(cursor, 1u);
             continue;
         }
 
-        is_const = expr_is_default_constant_name(name);
-        if (expr_get_default_constant_num(name, &value)) {
-            char bind_err[128];
-
-            canonical_name = expr_default_constant_canonical_name(name);
+        canonical_name = string_c_str(name);
+        is_const = expr_is_default_constant_name(canonical_name);
+        if (expr_get_default_constant_num(canonical_name, &value)) {
+            canonical_name = expr_default_constant_canonical_name(canonical_name);
             node = expr_new_named_const(value, canonical_name);
             node->binding_expr =
-                expr_binding_expr_parse_region(name, name + strlen(name),
-                                             bind_err, sizeof(bind_err));
+                expr_binding_expr_parse_view(
+                    string_view_all(name),
+                    NULL);
         } else {
             node = is_const
-                ? expr_new_named_const(NUM_NAN, name)
-                : expr_new_named_var(NUM_NAN, name);
+                ? expr_new_named_const(NUM_NAN, string_c_str(name))
+                : expr_new_named_var(NUM_NAN, string_c_str(name));
         }
 
         key = expr_normalise_name(canonical_name);
@@ -1809,22 +1943,24 @@ static int collect_implicit_symbols(const char *start, const char *end,
             key = strdup(canonical_name);
         if (!key) {
             expr_free(node);
-            free(name);
+            string_free(name);
+            string_cursor_free(cursor);
             return -1;
         }
 
         if (symtab_has(syms, key)) {
             free(key);
             expr_free(node);
-            free(name);
+            string_free(name);
             continue;
         }
 
         symtab_add(syms, key, node);
         free(key);
-        free(name);
+        string_free(name);
     }
 
+    string_cursor_free(cursor);
     return 0;
 }
 
@@ -1833,35 +1969,30 @@ static void symtab_discard_storage(symtab_t *t)
     symtab_free(t);
 }
 
-static expr_t *parse_expression_region(const char *start,
-                                       const char *end,
-                                       symtab_t *syms,
-                                       const char *context_label,
-                                       int report_errors)
+static expr_t *parse_expression_view(string_view_t text,
+                                     symtab_t *syms,
+                                     const char *context_label,
+                                     int report_errors)
 {
-    parser_t ps;
+    expr_parse_state_t ps;
     expr_t *result;
+    expr_t *out = NULL;
 
-    if (!start || !end || end < start)
+    text = string_view_trim(text);
+    if (string_view_is_empty(text))
         return NULL;
 
-    while (start < end && isspace((unsigned char)*start))
-        start++;
-    while (end > start && isspace((unsigned char)end[-1]))
-        end--;
-
-    ps.p = start;
-    ps.end = end;
-    ps.syms = syms;
-    ps.error = 0;
-    ps.errmsg[0] = '\0';
+    if (expr_parse_state_init(&ps, text, syms) != 0)
+        return NULL;
 
     result = parse_addexpr(&ps);
     if (result && !ps.error) {
-        while (ps.p < end && isspace((unsigned char)*ps.p))
-            ps.p++;
-        if (ps.p == end)
-            return result;
+        expr_parse_skip_spaces(&ps);
+        if (expr_parse_at_end(&ps)) {
+            out = result;
+            result = NULL;
+            goto done;
+        }
         expr_free(result);
         result = NULL;
         set_error(&ps, "trailing input");
@@ -1872,8 +2003,11 @@ static expr_t *parse_expression_region(const char *start,
 
     (void)context_label;
     if (ps.error && report_errors)
-        fprintf(stderr, "parse error: %s\n", ps.errmsg);
-    return NULL;
+        fprintf(stderr, "parse error: %s\n", string_c_str(ps.errmsg));
+
+done:
+    expr_parse_state_dispose(&ps);
+    return out;
 }
 
 /* ------------------------------------------------------------------ */
@@ -1895,97 +2029,189 @@ static expr_t *simplify_parsed_result(expr_t *result)
     return simplified;
 }
 
-static expr_t *expr_from_string_impl(const char *s,
-                                     expr_bindings_t **bindings_out)
+static string_view_t view_rtrim_ascii(string_view_t text)
+{
+    size_t len = string_view_length(text);
+    unsigned char c;
+
+    while (len > 0u &&
+           expr_parse_view_peek_ascii(text, len - 1u, &c) &&
+           isspace(c))
+        len--;
+
+    return string_view_slice(text, 0u, len);
+}
+
+static void print_syntax_error_view(string_view_t text)
+{
+    string_view_t body = string_view_trim(text);
+    size_t len = string_view_length(body);
+    string_t *display;
+
+    if (len > 0u) {
+        unsigned char c;
+        if (expr_parse_view_peek_ascii(body, len - 1u, &c) && c == '}')
+            body = view_rtrim_ascii(string_view_slice(body, 0u, len - 1u));
+    }
+
+    display = string_from_view(&body);
+    fprintf(stderr, "syntax error: %s\n",
+            display ? string_c_str(display) : "");
+    string_free(display);
+}
+
+static size_t find_binding_semicolon(string_view_t text)
+{
+    string_cursor_t *cursor = string_cursor_new_view(text);
+    unsigned char c;
+
+    if (!cursor)
+        return SIZE_MAX;
+
+    while (!string_cursor_done(cursor)) {
+        if (string_cursor_peek_ascii(cursor, &c)) {
+            if (c == ';') {
+                size_t pos = string_cursor_position(cursor);
+                string_cursor_free(cursor);
+                return pos;
+            }
+            string_cursor_skip(cursor, 1u);
+            continue;
+        }
+
+        if (string_cursor_next(cursor) != 0)
+            break;
+    }
+
+    string_cursor_free(cursor);
+    return SIZE_MAX;
+}
+
+static expr_t *expr_from_string_view_impl(string_view_t source,
+                                          expr_bindings_t **bindings_out)
 {
     expr_bindings_t *bindings = NULL;
+    string_view_t text;
+    string_cursor_t *cursor;
+    string_cursor_t *scan_cursor;
+    size_t body_start;
+    size_t pipe_pos = SIZE_MAX;
+    size_t close_pos = SIZE_MAX;
+    int depth = 0;
+    unsigned char c;
 
     if (bindings_out)
         *bindings_out = NULL;
-    if (!s) return NULL;
+    if (string_view_is_empty(source))
+        return NULL;
 
-    while (isspace((unsigned char)*s)) s++;
-    if (*s != '{') {
+    text = string_view_trim(source);
+    cursor = string_cursor_new_view(text);
+    if (!cursor)
+        return NULL;
+    string_cursor_skip_spaces(cursor);
+
+    if (!expr_parse_cursor_consume_char(cursor, '{')) {
         fprintf(stderr, "expected '{'\n");
+        string_cursor_free(cursor);
         return NULL;
     }
-    s++;
-    while (isspace((unsigned char)*s)) s++;
+
+    string_cursor_skip_spaces(cursor);
+    body_start = string_cursor_position(cursor);
 
     /* Scan for '|' and '}', tracking bracket/paren depth so we don't mistake
      * a '|' or '}' inside a bracketed name or parenthesised expression. */
-    const char *pipe_pos  = NULL;
-    const char *close_pos = NULL;
-    int depth = 0;
-    const char *scan = s;
-    while (*scan) {
-        if (pipe_pos && *scan == '}') {
-            close_pos = scan;
+    scan_cursor = string_cursor_clone(cursor);
+    if (!scan_cursor) {
+        string_cursor_free(cursor);
+        return NULL;
+    }
+    while (!string_cursor_done(scan_cursor)) {
+        if (string_cursor_peek_ascii(scan_cursor, &c)) {
+            if (pipe_pos != SIZE_MAX && c == '}') {
+                close_pos = string_cursor_position(scan_cursor);
+                break;
+            }
+            if (c == '(' || c == '[') {
+                depth++;
+                string_cursor_skip(scan_cursor, 1u);
+                continue;
+            }
+            if (c == ')' || c == ']') {
+                depth--;
+                string_cursor_skip(scan_cursor, 1u);
+                continue;
+            }
+            if (depth == 0) {
+                if (c == '|') {
+                    pipe_pos = string_cursor_position(scan_cursor);
+                    string_cursor_skip(scan_cursor, 1u);
+                    continue;
+                }
+                if (c == '}') {
+                    close_pos = string_cursor_position(scan_cursor);
+                    break;
+                }
+            }
+            string_cursor_skip(scan_cursor, 1u);
+            continue;
+        }
+
+        if (string_cursor_next(scan_cursor) != 0)
             break;
-        }
-        if (*scan == '(' || *scan == '[') { depth++; scan++; continue; }
-        if (*scan == ')' || *scan == ']') { depth--; scan++; continue; }
-        if (depth == 0) {
-            if (*scan == '|') { pipe_pos = scan; scan++; continue; }
-            if (*scan == '}') { close_pos = scan; break; }
-        }
-        unsigned int uc;
-        int len = fs_utf8_decode(scan, &uc);
-        scan += (len > 0) ? len : 1;
     }
 
-    if (!close_pos) {
+    if (close_pos == SIZE_MAX) {
         if (depth != 0) {
-            const char *body_start = s;
-            const char *body_end = scan;
-
-            while (body_start < body_end && isspace((unsigned char)*body_start))
-                body_start++;
-            while (body_end > body_start && isspace((unsigned char)body_end[-1]))
-                body_end--;
-            if (body_end > body_start && body_end[-1] == '}') {
-                body_end--;
-                while (body_end > body_start && isspace((unsigned char)body_end[-1]))
-                    body_end--;
-            }
-            fprintf(stderr, "syntax error: %.*s\n",
-                    (int)(body_end - body_start),
-                    body_start);
+            print_syntax_error_view(
+                string_cursor_view_between(body_start,
+                                           string_cursor_position(scan_cursor),
+                                           scan_cursor));
+            string_cursor_free(scan_cursor);
+            string_cursor_free(cursor);
             return NULL;
         }
         fprintf(stderr, "expected '}'\n");
+        string_cursor_free(scan_cursor);
+        string_cursor_free(cursor);
         return NULL;
     }
+    string_cursor_free(scan_cursor);
+    string_cursor_free(cursor);
 
-    char errmsg[256] = { 0 };
+    string_t *errmsg = string_new();
+    if (!errmsg)
+        return NULL;
 
-    if (pipe_pos && !has_top_level_equals(pipe_pos + 1, close_pos))
-        pipe_pos = NULL;
+    if (pipe_pos != SIZE_MAX &&
+        !has_top_level_equals(
+            string_view_slice(text, pipe_pos + 1u, close_pos - pipe_pos - 1u)))
+        pipe_pos = SIZE_MAX;
 
     /* ---- No bindings: either { expr } or legacy { name = val } ---- */
-    if (!pipe_pos) {
-        const char *content_end = close_pos;
+    if (pipe_pos == SIZE_MAX) {
+        string_view_t content = view_rtrim_ascii(
+            string_view_slice(text, body_start, close_pos - body_start));
         int content_has_top_level_equals;
         symtab_t syms;
-        while (content_end > s && isspace((unsigned char)content_end[-1]))
-            content_end--;
-        content_has_top_level_equals = has_top_level_equals(s, content_end);
 
-        expr_t *result = parse_expression_region(s, content_end, NULL,
-                                                 "expr_from_string", 0);
+        content_has_top_level_equals = has_top_level_equals(content);
+
+        expr_t *result = parse_expression_view(content, NULL, "expr_from_string", 0);
 
         if (result) {
             if (bindings_out)
                 *bindings_out = single_binding_from_node(result);
+            string_free(errmsg);
             return result;
         }
 
         if (!content_has_top_level_equals) {
             symtab_init(&syms);
-            if (collect_implicit_symbols(s, content_end, &syms) == 0 &&
-                syms.count > 0) {
-                result = parse_expression_region(s, content_end, &syms,
-                                                 "expr_from_string", 1);
+            if (collect_implicit_symbols(content, &syms) == 0 && syms.count > 0) {
+                result = parse_expression_view(content,
+                                               &syms, "expr_from_string", 1);
             }
             if (result && bindings_out)
                 bindings = symtab_build_bindings(&syms);
@@ -1996,64 +2222,67 @@ static expr_t *expr_from_string_impl(const char *s,
             if (result) {
                 if (bindings_out)
                     *bindings_out = bindings;
+                string_free(errmsg);
                 return result;
             }
 
+            string_free(errmsg);
             return NULL;
         }
 
-        errmsg[0] = '\0';
-        result = parse_pure_const(s, content_end, errmsg, sizeof(errmsg));
+        string_clear(errmsg);
+        result = parse_pure_const(content, errmsg);
         if (!result)
-            fprintf(stderr, "%s\n", errmsg);
+            fprintf(stderr, "%s\n", string_c_str(errmsg));
         else {
             if (bindings_out)
                 *bindings_out = single_binding_from_node(result);
         }
+        string_free(errmsg);
         return result;
     }
 
     /* ---- Expression with bindings: { expr | vars; consts } ---- */
-    const char *expr_end   = pipe_pos;
-    const char *bind_start = pipe_pos + 1;
-    const char *bind_end   = close_pos;
-
-    /* Trim trailing whitespace from expression region */
-    while (expr_end > s && isspace((unsigned char)expr_end[-1]))
-        expr_end--;
-
-    /* Split binding section at ';' to separate vars from named consts */
-    const char *semi_pos = NULL;
-    for (const char *bp = bind_start; bp < bind_end; bp++) {
-        if (*bp == ';') { semi_pos = bp; break; }
-    }
+    string_view_t expr_view = view_rtrim_ascii(
+        string_view_slice(text, body_start, pipe_pos - body_start));
+    string_view_t bind_view =
+        string_view_slice(text, pipe_pos + 1u, close_pos - pipe_pos - 1u);
+    size_t semi_pos = find_binding_semicolon(bind_view);
 
     symtab_t syms;
     symtab_init(&syms);
 
-    const char *vars_end = semi_pos ? semi_pos : bind_end;
-    if (parse_bindings(bind_start, vars_end, 1, &syms, errmsg, sizeof(errmsg)) < 0) {
+    string_view_t var_bindings = semi_pos != SIZE_MAX
+        ? string_view_slice(bind_view, 0u, semi_pos)
+        : bind_view;
+
+    if (parse_bindings(var_bindings, 1, &syms, errmsg) < 0) {
         symtab_free(&syms);
-        fprintf(stderr, "%s\n", errmsg);
+        fprintf(stderr, "%s\n", string_c_str(errmsg));
+        string_free(errmsg);
         return NULL;
     }
-    if (semi_pos) {
-        if (parse_bindings(semi_pos + 1, bind_end, 0, &syms,
-                           errmsg, sizeof(errmsg)) < 0) {
+    if (semi_pos != SIZE_MAX) {
+        if (parse_bindings(
+                string_view_slice(bind_view,
+                                  semi_pos + 1u,
+                                  string_view_length(bind_view) - semi_pos - 1u),
+                0, &syms, errmsg) < 0) {
             symtab_free(&syms);
-            fprintf(stderr, "%s\n", errmsg);
+            fprintf(stderr, "%s\n", string_c_str(errmsg));
+            string_free(errmsg);
             return NULL;
         }
     }
 
-    if (collect_implicit_symbols(s, expr_end, &syms) < 0) {
+    if (collect_implicit_symbols(expr_view, &syms) < 0) {
         symtab_free(&syms);
         fprintf(stderr, "out of memory\n");
+        string_free(errmsg);
         return NULL;
     }
 
-    expr_t *result = parse_expression_region(s, expr_end, &syms,
-                                             "expr_from_string", 1);
+    expr_t *result = parse_expression_view(expr_view, &syms, "expr_from_string", 1);
     if (result && bindings_out) {
         bindings = symtab_build_bindings(&syms);
     }
@@ -2065,12 +2294,38 @@ static expr_t *expr_from_string_impl(const char *s,
     }
     if (result && bindings_out)
         *bindings_out = bindings;
+    string_free(errmsg);
     return result;
+}
+
+expr_t *expr_from_text(const string_t *text, expr_bindings_t **bnd_out)
+{
+    if (!text) {
+        if (bnd_out)
+            *bnd_out = NULL;
+        return NULL;
+    }
+
+    return expr_from_string_view_impl(string_view_all(text), bnd_out);
 }
 
 expr_t *expr_from_string(const char *s, expr_bindings_t **bnd_out)
 {
-    return expr_from_string_impl(s, bnd_out);
+    string_t *text;
+    expr_t *result;
+
+    if (bnd_out)
+        *bnd_out = NULL;
+    if (!s)
+        return NULL;
+
+    text = string_new_with(s);
+    if (!text)
+        return NULL;
+
+    result = expr_from_text(text, bnd_out);
+    string_free(text);
+    return result;
 }
 
 static expr_binding_entry_t *bnd_find_entry(expr_bindings_t *bnd,
@@ -2114,6 +2369,7 @@ expr_t *expr_from_expression_string(const char *expr,
                                     expr_t *const *symbols,
                                     size_t nsymbols)
 {
+    string_t *text;
     symtab_t syms;
     expr_t *result;
 
@@ -2130,12 +2386,17 @@ expr_t *expr_from_expression_string(const char *expr,
         return NULL;
     }
 
+    text = string_new_with(expr);
+    if (!text)
+        return NULL;
+
     symtab_init(&syms);
     for (size_t i = 0; i < nsymbols; ++i) {
         if (!names[i] || !symbols[i]) {
             fprintf(stderr,
                     "expr_from_expression_string: null symbol entry\n");
             symtab_free(&syms);
+            string_free(text);
             return NULL;
         }
         if (symtab_has(&syms, names[i])) {
@@ -2143,18 +2404,21 @@ expr_t *expr_from_expression_string(const char *expr,
                     "expr_from_expression_string: duplicate symbol '%s'\n",
                     names[i]);
             symtab_free(&syms);
+            string_free(text);
             return NULL;
         }
         if (symtab_add_borrowed(&syms, names[i], symbols[i]) != 0) {
             symtab_free(&syms);
+            string_free(text);
             return NULL;
         }
     }
 
-    result = parse_expression_region(expr, expr + strlen(expr),
-                                     nsymbols ? &syms : NULL,
-                                     "expr_from_expression_string", 1);
+    result = parse_expression_view(string_view_all(text),
+                                   nsymbols ? &syms : NULL,
+                                   "expr_from_expression_string", 1);
     symtab_free(&syms);
+    string_free(text);
     result = simplify_parsed_result(result);
     return result;
 }

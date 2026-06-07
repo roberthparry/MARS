@@ -3,7 +3,7 @@
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 
 static int qfloat_validity_equal(const void *actual, const void *expected, void *ctx);
-static void qfloat_validity_format(const void *value, char *buf, size_t buf_size, void *ctx);
+static int qfloat_validity_format(const void *value, string_t *out, void *ctx);
 static bool test_qfloat_suite_setup(void);
 
 static const double qfloat_validity_rel_tol = 1e-28;
@@ -67,10 +67,31 @@ static int qfloat_validity_equal(const void *actual, const void *expected, void 
     return qf_eq(*a, *b) || qf_close(*a, *b, rel) || qf_close_rel(*a, *b, rel);
 }
 
-static void qfloat_validity_format(const void *value, char *buf, size_t buf_size, void *ctx)
+static int qfloat_validity_format(const void *value, string_t *out, void *ctx)
 {
+    int needed;
+    char *text;
+
     (void)ctx;
-    qf_to_string(*(const qfloat_t *)value, buf, buf_size);
+    if (!out)
+        return -1;
+
+    needed = qf_sprintf(NULL, 0u, "%q", *(const qfloat_t *)value);
+    if (needed < 0)
+        return string_append_cstr(out, "<qfloat format failed>");
+
+    text = malloc((size_t)needed + 1u);
+    if (!text)
+        return -1;
+
+    if (qf_sprintf(text, (size_t)needed + 1u, "%q", *(const qfloat_t *)value) < 0 ||
+        string_append_cstr(out, text) != 0) {
+        free(text);
+        return -1;
+    }
+
+    free(text);
+    return 0;
 }
 
 static bool test_qfloat_suite_setup(void)

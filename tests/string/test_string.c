@@ -96,6 +96,25 @@ static void test_string_replace(void)
     string_free(s);
 }
 
+static void test_string_new_wide(void)
+{
+    string_t *s = string_new_wide(L"hello \u03C0 \U0001F642");
+    wchar_t invalid_wide[] = { (wchar_t)0xD800u, L'\0' };
+    string_t *replacement = string_new_wide(invalid_wide);
+
+    ASSERT_NOT_NULL(s);
+    ASSERT_STREQ(string_c_str(s), "hello π 🙂");
+    ASSERT_EQ(string_length(s), 9);
+
+    ASSERT_NOT_NULL(replacement);
+    ASSERT_STREQ(string_c_str(replacement), "�");
+    ASSERT_EQ(string_length(replacement), 1);
+    ASSERT_NULL(string_new_wide(NULL));
+
+    string_free(replacement);
+    string_free(s);
+}
+
 static string_t *test_string_vsprintf_helper(const char *fmt, ...)
 {
     string_t *out;
@@ -185,6 +204,39 @@ static void test_to_upper_and_to_lower(void)
     string_free(s);
 }
 
+static void test_embedded_nul_is_real_string_content(void)
+{
+    string_t *s = string_new_with("ab");
+    string_t *prefix = string_new_with("ab");
+    string_t *clone;
+    string_t *formatted;
+    rune_t nul;
+
+    ASSERT_EQ(string_append_char(s, '\0'), 0);
+    ASSERT_EQ(string_append_cstr(s, "cd"), 0);
+
+    nul = string_at(s, 2u);
+    ASSERT_FALSE(rune_is_none(nul));
+    ASSERT_EQ(rune_value(nul), 0u);
+    ASSERT_EQ(rune_value(string_at(s, 3u)), 'c');
+    ASSERT_EQ((long)string_length(s), 5L);
+
+    clone = string_clone(s);
+    ASSERT_NOT_NULL(clone);
+    ASSERT_EQ(string_compare(s, clone), 0);
+    ASSERT_TRUE(string_compare(s, prefix) > 0);
+    ASSERT_EQ(rune_value(string_at(clone, 3u)), 'c');
+
+    formatted = string_sprintf("%S", s);
+    ASSERT_NOT_NULL(formatted);
+    ASSERT_EQ(string_compare(s, formatted), 0);
+
+    string_free(formatted);
+    string_free(clone);
+    string_free(prefix);
+    string_free(s);
+}
+
 typedef struct {
     string_builder_t *out;
     size_t count;
@@ -209,9 +261,9 @@ static void test_text_character_api(void)
     string_builder_t *collected = string_builder_new();
     each_char_state_t state = { collected, 0u };
 
-    ASSERT_EQ((long)string_count(s), 8L);
-    ASSERT_FALSE(rune_is_empty(family));
-    ASSERT_TRUE(rune_is_empty(missing));
+    ASSERT_EQ((long)string_length(s), 8L);
+    ASSERT_FALSE(rune_is_none(family));
+    ASSERT_TRUE(rune_is_none(missing));
     ASSERT_STREQ(string_c_str(family_copy), "👨‍👩‍👧‍👦");
     ASSERT_STREQ(string_c_str(word), "café");
 
@@ -263,13 +315,22 @@ static void test_string_view(void)
 static void test_string_cursor_view_rune_values(void)
 {
     string_t *s = string_new_with("Aπ🙂");
-    string_view_t view = string_view(s, 0, string_length(s));
+    string_view_t view = string_view_all(s);
     string_cursor_t *cursor = string_cursor_new_view(view);
+    unsigned char ascii;
+    uint32_t value;
     string_pos_t start;
     string_pos_t end;
+    string_pos_t next;
     rune_t rune;
 
     ASSERT_TRUE(cursor != NULL);
+    ASSERT_TRUE(string_view_peek_ascii(view, 0u, &ascii));
+    ASSERT_EQ(ascii, 'A');
+    ASSERT_FALSE(string_view_peek_ascii(view, 1u, &ascii));
+    ASSERT_TRUE(string_view_peek_rune_value(view, 1u, &value, &next));
+    ASSERT_EQ(value, 0x03C0u);
+    ASSERT_EQ(next, 3u);
 
     start = string_cursor_position(cursor);
     rune = string_cursor_peek(cursor);
@@ -310,13 +371,13 @@ static void test_string_cursor_parsing_api(void)
 
     start = string_cursor_position(cursor);
     rune = string_cursor_peek(cursor);
-    ASSERT_FALSE(rune_is_empty(rune));
+    ASSERT_FALSE(rune_is_none(rune));
     rune_text = rune_to_string(rune);
     ASSERT_NOT_NULL(rune_text);
     ASSERT_STREQ(string_c_str(rune_text), "α");
     ASSERT_EQ(string_cursor_next(cursor), 0);
 
-    name = string_cursor_slice_since(cursor, start);
+    name = string_cursor_extract(start, cursor);
     ASSERT_NOT_NULL(name);
     ASSERT_STREQ(string_c_str(name), "α");
 
@@ -329,6 +390,133 @@ static void test_string_cursor_parsing_api(void)
     string_free(name);
     string_cursor_free(cursor);
     string_free(s);
+}
+
+static bool test_parser_identifier_rune(rune_t rune)
+{
+    return rune_is_alpha_numeric(rune) || rune_is_equal(rune, '_');
+}
+
+typedef enum {
+    TEST_TOKEN_ID,
+    TEST_TOKEN_NUMBER,
+    TEST_TOKEN_OPERATOR
+} test_parser_token_kind_t;
+
+static void test_parser_append_token(string_t *out,
+                                     test_parser_token_kind_t kind,
+                                     const string_t *text)
+{
+    if (string_length(out) > 0u)
+        string_append_cstr(out, " ");
+
+    switch (kind) {
+        case TEST_TOKEN_ID:
+            string_append_cstr(out, "id[");
+            break;
+        case TEST_TOKEN_NUMBER:
+            string_append_cstr(out, "number[");
+            break;
+        case TEST_TOKEN_OPERATOR:
+            string_append_cstr(out, "op[");
+            break;
+    }
+
+    string_append_format(out, "%S]", text);
+}
+
+static bool test_parser_read_identifier(string_cursor_t *cursor, string_t *out)
+{
+    string_pos_t start = string_cursor_position(cursor);
+    rune_t rune = string_cursor_peek(cursor);
+    string_t *token;
+
+    if (!test_parser_identifier_rune(rune) || rune_is_digit(rune))
+        return false;
+
+    do {
+        string_cursor_next(cursor);
+        rune = string_cursor_peek(cursor);
+    } while (!rune_is_none(rune) && test_parser_identifier_rune(rune));
+
+    token = string_cursor_extract(start, cursor);
+    if (!token)
+        return false;
+    test_parser_append_token(out, TEST_TOKEN_ID, token);
+    string_free(token);
+    return true;
+}
+
+static bool test_parser_read_number(string_cursor_t *cursor, string_t *out)
+{
+    string_pos_t start = string_cursor_position(cursor);
+    rune_t rune = string_cursor_peek(cursor);
+    string_t *token;
+
+    if (!rune_is_digit(rune))
+        return false;
+
+    do {
+        string_cursor_next(cursor);
+        rune = string_cursor_peek(cursor);
+    } while (!rune_is_none(rune) &&
+             (rune_is_digit(rune) || rune_is_equal(rune, '/')));
+
+    token = string_cursor_extract(start, cursor);
+    if (!token)
+        return false;
+    test_parser_append_token(out, TEST_TOKEN_NUMBER, token);
+    string_free(token);
+    return true;
+}
+
+static void test_parser_read_operator(string_cursor_t *cursor, string_t *out)
+{
+    string_t *token = rune_to_string(string_cursor_peek(cursor));
+
+    ASSERT_NOT_NULL(token);
+    test_parser_append_token(out, TEST_TOKEN_OPERATOR, token);
+    string_free(token);
+    string_cursor_next(cursor);
+}
+
+static string_t *test_parser_tokenise(const string_t *source)
+{
+    string_cursor_t *cursor = string_cursor_new(source);
+    string_t *out = string_new();
+
+    if (!cursor || !out) {
+        string_cursor_free(cursor);
+        string_free(out);
+        return NULL;
+    }
+
+    while (!string_cursor_done(cursor)) {
+        string_cursor_skip_spaces(cursor);
+        if (string_cursor_done(cursor))
+            break;
+        if (test_parser_read_identifier(cursor, out))
+            continue;
+        if (test_parser_read_number(cursor, out))
+            continue;
+        test_parser_read_operator(cursor, out);
+    }
+
+    string_cursor_free(cursor);
+    return out;
+}
+
+static void test_string_cursor_parser_example(void)
+{
+    string_t *source = string_new_with("cdf(α_1) + 355/113");
+    string_t *tokens = test_parser_tokenise(source);
+
+    ASSERT_NOT_NULL(tokens);
+    ASSERT_STREQ(string_c_str(tokens),
+                 "id[cdf] op[(] id[α_1] op[)] op[+] number[355/113]");
+
+    string_free(tokens);
+    string_free(source);
 }
 
 static void test_string_object_first_api(void)
@@ -426,7 +614,7 @@ static void test_utf8_stuff(void)
 {
     string_t *s = string_new_with("Héllo 🌍");
 
-    ASSERT_EQ((long)string_count(s), 7L);
+    ASSERT_EQ((long)string_length(s), 7L);
 
     string_reverse(s);
     string_to_upper(s);
@@ -438,7 +626,7 @@ static void test_character_count_and_reverse(void)
 {
     string_t *s = string_new_with("👩‍👩‍👧‍👦 café 🇬🇧");
 
-    ASSERT_TRUE(string_count(s) > 0);
+    ASSERT_TRUE(string_length(s) > 0);
 
     string_reverse(s);
 
@@ -449,7 +637,7 @@ static void test_character_reverse_and_substring(void)
 {
     string_t *s = string_new_with("👩‍👩‍👧‍👦 café 🇬🇧");
 
-    size_t g = string_count(s);
+    size_t g = string_length(s);
     ASSERT_TRUE(g > 0);
 
     string_reverse(s);
@@ -552,7 +740,7 @@ static void test_readme_example_Basic_UTF_8_Manipulation(void) {
     /* Insert at character index */
     string_insert(s, 1, "🙂");
 
-    printf("%s\n", string_c_str(s));
+    string_printf("%S\n", s);
 
     string_free(s);
 
@@ -567,9 +755,9 @@ static int print_character(rune_t rune, size_t index, void *user)
 static void test_readme_example_Character_Iteration(void) {
     string_t *s = string_new_with("👨‍👩‍👧‍👦 family");
 
-    size_t count = string_count(s);
+    size_t count = string_length(s);
 
-    printf("Characters: %zu\n", count);
+    string_printf("Characters: %zu\n", count);
 
     string_each(s, print_character, NULL);
 
@@ -584,14 +772,23 @@ static void test_readme_example_Using_the_Builder_API(void) {
 
     string_t *out = b;
 
-    printf("%s\n", string_c_str(out));
+    string_printf("%S\n", out);
 
     string_free(out);
 
 }
 
+static void test_readme_example_Escaping_Wide_C_Strings(void) {
+    string_t *s = string_new_wide(L"hello \u03C0");
+
+    string_printf("%S\n", s);
+
+    string_free(s);
+}
+
 static void example_readme_examples(void) {
     test_readme_example_Basic_UTF_8_Manipulation();
+    test_readme_example_Escaping_Wide_C_Strings();
     test_readme_example_Character_Iteration();
     test_readme_example_Using_the_Builder_API();
 }
@@ -604,15 +801,18 @@ int tests_main(void)
     TEST_RUN_CASE(test_split_edge_cases, NULL);
     TEST_RUN_CASE(test_join_empty_fields, NULL);
     TEST_RUN_CASE(test_string_replace, NULL);
+    TEST_RUN_CASE(test_string_new_wide, NULL);
 
     TEST_SECTION("Builder And Views");
     TEST_RUN_CASE(test_append_format, NULL);
     TEST_RUN_CASE(test_starts_with_ends_with, NULL);
     TEST_RUN_CASE(test_to_upper_and_to_lower, NULL);
+    TEST_RUN_CASE(test_embedded_nul_is_real_string_content, NULL);
     TEST_RUN_CASE(test_text_character_api, NULL);
     TEST_RUN_CASE(test_string_view, NULL);
     TEST_RUN_CASE(test_string_cursor_view_rune_values, NULL);
     TEST_RUN_CASE(test_string_cursor_parsing_api, NULL);
+    TEST_RUN_CASE(test_string_cursor_parser_example, NULL);
     TEST_RUN_CASE(test_string_object_first_api, NULL);
     TEST_RUN_CASE(test_string_builder, NULL);
     TEST_RUN_CASE(test_utf8_stuff, NULL);

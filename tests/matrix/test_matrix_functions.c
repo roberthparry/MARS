@@ -3109,29 +3109,29 @@ static int matrix_validity_equal(const void *actual,
     return 1;
 }
 
-static void matrix_validity_format(const void *value,
-                                   char *buf,
-                                   size_t buf_size,
-                                   void *ctx)
+static int matrix_validity_format(const void *value,
+                                  string_t *out,
+                                  void *ctx)
 {
     const matrix_t *matrix = value;
+    char *text;
     (void)ctx;
 
-    if (!buf || buf_size == 0)
-        return;
-    if (!matrix) {
-        snprintf(buf, buf_size, "<null>");
-        return;
-    }
+    if (!out)
+        return -1;
+    if (!matrix)
+        return string_append_cstr(out, "<null>");
 
-    char *text = mat_to_string(matrix, MAT_STRING_LAYOUT_PRETTY);
-    if (!text) {
-        snprintf(buf, buf_size, "<format-error>");
-        return;
-    }
+    text = mat_to_string(matrix, MAT_STRING_LAYOUT_PRETTY);
+    if (!text)
+        return string_append_cstr(out, "<format-error>");
 
-    snprintf(buf, buf_size, "%s", text);
+    if (string_append_cstr(out, text) != 0) {
+        free(text);
+        return -1;
+    }
     free(text);
+    return 0;
 }
 
 static matrix_validity_ctx_t matrix_double_default_ctx = {1e-12, 0};

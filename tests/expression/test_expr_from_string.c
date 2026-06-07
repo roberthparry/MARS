@@ -214,6 +214,29 @@ static void test_from_string_functions(void)
         0.0, __LINE__);
 }
 
+static void test_from_text_api(void)
+{
+    string_t *text = string_new_with("{ cdf(x) - cdf(-x) | x = 1 }");
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr;
+    number_t value;
+
+    ASSERT_NOT_NULL(text);
+    expr = expr_from_text(text, &bindings);
+    ASSERT_NOT_NULL(expr);
+    ASSERT_NOT_NULL(bindings);
+
+    value = expr_eval(expr);
+    ASSERT_FALSE(num_is_nan(value));
+
+    num_destroy(&value);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+    string_free(text);
+}
+
+/* ---- string_t-based parser entry point ---- */
+
 /* ---- Special functions (the 18 new ops) ---- */
 
 static void test_from_string_special_functions(void)
@@ -1964,6 +1987,7 @@ void test_expr_t_from_string(void)
     TEST_RUN_SUBTEST(test_from_string_pure_const, NULL);
     TEST_RUN_SUBTEST(test_from_string_arithmetic, NULL);
     TEST_RUN_SUBTEST(test_from_string_functions, NULL);
+    TEST_RUN_SUBTEST(test_from_text_api, NULL);
     TEST_RUN_SUBTEST(test_from_string_special_functions, NULL);
     TEST_RUN_SUBTEST(test_from_string_exact_value_functions, NULL);
     TEST_RUN_SUBTEST(test_from_string_named_consts, NULL);

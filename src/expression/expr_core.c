@@ -275,10 +275,10 @@ expr_t *expr_new_pow_const_internal(const expr_t *a, number_t exponent)
     return dv;
 }
 
-int expr_cmp(const expr_t *dv1, const expr_t *dv2) {
+int expr_cmp(const expr_t *expr1, const expr_t *expr2) {
     NUM_SCOPE(scope);
-    number_t a = expr_eval_num_internal(dv1);
-    number_t b = expr_eval_num_internal(dv2);
+    number_t a = expr_eval_num_internal(expr1);
+    number_t b = expr_eval_num_internal(expr2);
     number_t a_real = num_real_part(a);
     number_t b_real = num_real_part(b);
     int cmp = num_cmp(a_real, b_real);

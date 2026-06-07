@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "test_number.h"
 
@@ -158,5 +160,56 @@ void run_number_constant_tests(void)
         num_destroy(&i_half);
         num_destroy(&i_value);
         num_destroy(&neg_i);
+    }
+
+    {
+        number_t parsed_pi = num_create_from_string("@pi");
+        number_t parsed_gamma = num_create_from_string("@gamma");
+        number_t parsed_phi = num_create_from_string("@phi");
+        number_t parsed_sqrt2 = num_create_from_string("sqrt2");
+        number_t parsed_inf = num_create_from_string("inf");
+        number_t parsed_bad_sqrt2 = num_create_from_string("@sqrt2");
+        number_t parsed_bad_inf = num_create_from_string("@inf");
+        number_t named = NUM_NAN;
+        char *bad_sqrt2_text;
+        char *bad_inf_text;
+
+        ASSERT_TRUE(strcmp(num_constant_name(NUM_PI), "π") == 0);
+        ASSERT_TRUE(strcmp(num_constant_name(NUM_EULER_MASCHERONI), "γ") == 0);
+        ASSERT_TRUE(strcmp(num_constant_name(NUM_SQRT2), "√2") == 0);
+        ASSERT_TRUE(strcmp(num_constant_name(NUM_I), "i") == 0);
+
+        ASSERT_TRUE(num_constant_value("@pi", &named));
+        ASSERT_NUMBER_EQ(named, NUM_PI);
+        num_destroy(&named);
+        ASSERT_TRUE(num_constant_value("gamma", &named));
+        ASSERT_NUMBER_EQ(named, NUM_EULER_MASCHERONI);
+        num_destroy(&named);
+        ASSERT_TRUE(num_constant_value("sqrt2", &named));
+        ASSERT_NUMBER_EQ(named, NUM_SQRT2);
+        num_destroy(&named);
+        ASSERT_TRUE(!num_constant_value("@sqrt2", &named));
+        ASSERT_TRUE(!num_constant_value("@inf", &named));
+
+        ASSERT_NUMBER_EQ(parsed_pi, NUM_PI);
+        ASSERT_NUMBER_EQ(parsed_gamma, NUM_EULER_MASCHERONI);
+        ASSERT_NUMBER_EQ(parsed_phi, NUM_PHI);
+        ASSERT_NUMBER_EQ(parsed_sqrt2, NUM_SQRT2);
+        ASSERT_NUMBER_EQ(parsed_inf, NUM_INF);
+
+        bad_sqrt2_text = num_to_string(parsed_bad_sqrt2);
+        bad_inf_text = num_to_string(parsed_bad_inf);
+        ASSERT_TRUE(bad_sqrt2_text == NULL);
+        ASSERT_TRUE(bad_inf_text == NULL);
+
+        free(bad_sqrt2_text);
+        free(bad_inf_text);
+        num_destroy(&parsed_pi);
+        num_destroy(&parsed_gamma);
+        num_destroy(&parsed_phi);
+        num_destroy(&parsed_sqrt2);
+        num_destroy(&parsed_inf);
+        num_destroy(&parsed_bad_sqrt2);
+        num_destroy(&parsed_bad_inf);
     }
 }

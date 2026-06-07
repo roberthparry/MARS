@@ -241,6 +241,35 @@ number_t num_create_from_qcomplex  (qcomplex_t value);
  */
 number_t num_create_from_string(const char *text);
 
+/**
+ * @brief Return the canonical text spelling for a recognised shared constant.
+ *
+ * The returned pointer is process-lifetime static storage owned by the
+ * library. It is intended for serialisation layers that need a compact,
+ * stable spelling for named constants. Mathematical spellings such as `π`
+ * are preferred.
+ *
+ * @param value  Number to inspect.
+ * @return       Canonical spelling, or @c NULL if @p value is not a
+ *               recognised shared constant.
+ */
+const char *num_constant_name(number_t value);
+
+/**
+ * @brief Parse a recognised shared constant spelling.
+ *
+ * Accepts canonical mathematical spellings such as `π`, `γ`, `√2`, and
+ * typeable Greek aliases such as `@pi`, `@gamma`, and `@phi`. The `@` prefix
+ * is reserved for Greek aliases; non-Greek constants use ordinary names such
+ * as `e`, `i`, `inf`, `ln2`, and `sqrt2`.
+ *
+ * @param text  Constant spelling to parse.
+ * @param out   Receives a live `number_t` on success. Must not be @c NULL.
+ * @return      @c true on success, @c false when @p text is not a recognised
+ *              constant spelling.
+ */
+bool num_constant_value(const char *text, number_t *out);
+
 /** @name Shared constants
  * Process-lifetime immutable `number_t` values.
  *

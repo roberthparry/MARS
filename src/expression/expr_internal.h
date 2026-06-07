@@ -176,7 +176,7 @@ typedef struct expr_ops {
     /** Differentiability class used by UI and solver front-ends. */
     expr_diff_kind_t diff_kind;
 
-    /** Human-readable operator name used in debug output and expr_to_string(). */
+    /** Human-readable operator name used in debug output and expr_to_text(). */
     const char  *name;
 
     /** TeX presentation name for renderers that emit native TeX. */

@@ -34,9 +34,9 @@ MARS_LAB_LAUNCHER ?= $(MARS_LAB_BINDIR)/mars-lab
 MARS_LAB_DESKTOP ?= $(MARS_LAB_APPDIR)/mars-lab.desktop
 MARS_LAB_ICON ?= $(MARS_LAB_ICONDIR)/mars-lab.svg
 MARS_LAB_ICON_CONCEPTS := $(wildcard packaging/linux/icon-concepts/*.svg)
-OPHELIA_LAB_LAUNCHER ?= $(MARS_LAB_BINDIR)/ophelia-lab
-OPHELIA_LAB_DESKTOP ?= $(MARS_LAB_APPDIR)/ophelia-lab.desktop
-OPHELIA_LAB_ICON ?= $(MARS_LAB_ICONDIR)/ophelia-lab.svg
+TO_BE_ANNOUNCED_LAB_LAUNCHER ?= $(MARS_LAB_BINDIR)/to-be-announced-lab
+TO_BE_ANNOUNCED_LAB_DESKTOP ?= $(MARS_LAB_APPDIR)/to-be-announced-lab.desktop
+TO_BE_ANNOUNCED_LAB_ICON ?= $(MARS_LAB_ICONDIR)/to-be-announced-lab.svg
 
 INCLUDES := -I. -Iinclude -Isrc -Itests -Itests/include
 
@@ -98,7 +98,7 @@ TEST_BINS  := $(patsubst tests/%.c,$(TEST_BUILD_DIR)/%,$(TEST_SRCS))
 # ------------------------------------------------------------
 # Default target
 # ------------------------------------------------------------
-.PHONY: all clean test memtest debug release check-deps check-lab-deps install uninstall mars-lab ophelia-lab install-mars-lab uninstall-mars-lab help
+.PHONY: all clean test memtest debug release check-deps check-lab-deps install uninstall mars-lab to-be-announced-lab install-mars-lab uninstall-mars-lab help
 
 all: $(STATIC_LIB) $(SHARED_LIB) $(TEST_BINS) $(BENCH_BINS) $(SCRATCH_BINS)
 
@@ -306,13 +306,13 @@ $(foreach bin,$(SCRATCH_BINS),$(eval $(call SCRATCH_ALIAS_RULES,$(notdir $(bin))
 .PHONY: scratch
 scratch: $(SCRATCH_BINS)
 
-.PHONY: mars-lab ophelia-lab install-mars-lab uninstall-mars-lab install-ophelia-lab uninstall-ophelia-lab
+.PHONY: mars-lab to-be-announced-lab install-mars-lab uninstall-mars-lab install-to-be-announced-lab uninstall-to-be-announced-lab
 mars-lab: check-lab-deps $(BUILD_DIR)/scratch/mars_lab
 	@tools/mars-lab
 
-.PHONY: ophelia-lab
-ophelia-lab: $(BUILD_DIR)/scratch/ophelia_lab
-	@tools/ophelia-lab
+.PHONY: to-be-announced-lab
+to-be-announced-lab: $(BUILD_DIR)/scratch/to-be-announced_lab
+	@tools/to-be-announced-lab
 
 install-mars-lab: check-lab-deps tools/mars-lab packaging/linux/mars-lab.desktop.in packaging/linux/mars-lab.svg $(MARS_LAB_ICON_CONCEPTS)
 	$(INSTALL) -d "$(MARS_LAB_BINDIR)" "$(MARS_LAB_APPDIR)" "$(MARS_LAB_ICONDIR)"
@@ -351,37 +351,37 @@ install-mars-lab: check-lab-deps tools/mars-lab packaging/linux/mars-lab.desktop
 	@echo "Installed MARS Lab desktop launcher:"
 	@echo "  $(MARS_LAB_DESKTOP)"
 
-install-ophelia-lab: tools/ophelia-lab packaging/linux/ophelia-lab.desktop.in packaging/linux/ophelia-lab.svg
+install-to-be-announced-lab: tools/to-be-announced-lab packaging/linux/to-be-announced-lab.desktop.in packaging/linux/to-be-announced-lab.svg
 	$(INSTALL) -d "$(MARS_LAB_BINDIR)" "$(MARS_LAB_APPDIR)" "$(MARS_LAB_ICONDIR)"
 	@printf '%s\n' \
 		'#!/bin/sh' \
 		'export MARS_ROOT="$(CURDIR)"' \
-		'log_dir="$${XDG_STATE_HOME:-$$HOME/.local/state}/ophelia-lab"' \
+		'log_dir="$${XDG_STATE_HOME:-$$HOME/.local/state}/to-be-announced-lab"' \
 		'mkdir -p "$$log_dir"' \
 		'printf "[%s] launch %s\n" "$$(date "+%Y-%m-%d %H:%M:%S")" "$$0 $$*" >> "$$log_dir/launcher.log" 2>&1' \
 		'open_browser=1' \
 		'for arg in "$$@"; do [ "$$arg" = "--no-browser" ] && open_browser=0; done' \
-		'unit="ophelia-lab-$$(date +%s%N)"' \
-		'systemd-run --user --collect --unit="$$unit" --setenv=MARS_ROOT="$(CURDIR)" "$(CURDIR)/tools/ophelia-lab" --host :: --port 8766 --no-browser "$$@" >> "$$log_dir/launcher.log" 2>&1' \
+		'unit="to-be-announced-lab-$$(date +%s%N)"' \
+		'systemd-run --user --collect --unit="$$unit" --setenv=MARS_ROOT="$(CURDIR)" "$(CURDIR)/tools/to-be-announced-lab" --host :: --port 8766 --no-browser "$$@" >> "$$log_dir/launcher.log" 2>&1' \
 		'status=$$?' \
 		'printf "[%s] systemd-run exit %s unit %s\n" "$$(date "+%Y-%m-%d %H:%M:%S")" "$$status" "$$unit" >> "$$log_dir/launcher.log" 2>&1' \
 		'if [ "$$status" -eq 0 ] && [ "$$open_browser" -eq 1 ]; then' \
 		'  sleep 0.8' \
-		'  lab_url="$$(cd "$(CURDIR)" && python3 -c "import sys; sys.path.insert(0, \"tools\"); import ophelia_lab as o; print(o.ophelia_browser_access_url(\"::\", 8766))" 2>/dev/null || true)"' \
-		'  if [ -z "$$lab_url" ]; then lab_host="$$(hostname -s 2>/dev/null | tr "[:upper:]" "[:lower:]")"; [ -n "$$lab_host" ] || lab_host="lenovo"; lab_url="http://$$lab_host.local:8766/ophelia/"; fi' \
+		'  lab_url="$$(cd "$(CURDIR)" && python3 -c "import sys; sys.path.insert(0, \"tools\"); import to_be_announced_lab as t; print(t.to_be_announced_browser_access_url(\"::\", 8766))" 2>/dev/null || true)"' \
+		'  if [ -z "$$lab_url" ]; then lab_host="$$(hostname -s 2>/dev/null | tr "[:upper:]" "[:lower:]")"; [ -n "$$lab_host" ] || lab_host="lenovo"; lab_url="http://$$lab_host.local:8766/to-be-announced/"; fi' \
 		'  if command -v xdg-open >/dev/null 2>&1; then xdg-open "$$lab_url" >/dev/null 2>&1 & elif command -v gio >/dev/null 2>&1; then gio open "$$lab_url" >/dev/null 2>&1 & fi' \
 		'fi' \
 		'exit "$$status"' \
-		> "$(OPHELIA_LAB_LAUNCHER)"
-	chmod 755 "$(OPHELIA_LAB_LAUNCHER)"
-	$(INSTALL) -m 644 packaging/linux/ophelia-lab.svg "$(OPHELIA_LAB_ICON)"
-	@sed -e 's|@OPHELIA_LAUNCHER@|$(OPHELIA_LAB_LAUNCHER)|g' packaging/linux/ophelia-lab.desktop.in > "$(OPHELIA_LAB_DESKTOP)"
-	chmod 755 "$(OPHELIA_LAB_DESKTOP)"
+		> "$(TO_BE_ANNOUNCED_LAB_LAUNCHER)"
+	chmod 755 "$(TO_BE_ANNOUNCED_LAB_LAUNCHER)"
+	$(INSTALL) -m 644 packaging/linux/to-be-announced-lab.svg "$(TO_BE_ANNOUNCED_LAB_ICON)"
+	@sed -e 's|@TO_BE_ANNOUNCED_LAUNCHER@|$(TO_BE_ANNOUNCED_LAB_LAUNCHER)|g' packaging/linux/to-be-announced-lab.desktop.in > "$(TO_BE_ANNOUNCED_LAB_DESKTOP)"
+	chmod 755 "$(TO_BE_ANNOUNCED_LAB_DESKTOP)"
 	@if command -v update-desktop-database >/dev/null 2>&1; then update-desktop-database "$(MARS_LAB_APPDIR)" >/dev/null 2>&1 || true; fi
 	@if command -v gtk-update-icon-cache >/dev/null 2>&1; then gtk-update-icon-cache "$(MARS_LAB_INSTALL_PREFIX)/share/icons/hicolor" >/dev/null 2>&1 || true; fi
 	@if command -v kbuildsycoca6 >/dev/null 2>&1; then kbuildsycoca6 >/dev/null 2>&1 || true; elif command -v kbuildsycoca5 >/dev/null 2>&1; then kbuildsycoca5 >/dev/null 2>&1 || true; fi
-	@echo "Installed Ophelia Lab desktop launcher:"
-	@echo "  $(OPHELIA_LAB_DESKTOP)"
+	@echo "Installed To-Be-Announced Lab desktop launcher:"
+	@echo "  $(TO_BE_ANNOUNCED_LAB_DESKTOP)"
 
 uninstall-mars-lab:
 	rm -f "$(MARS_LAB_LAUNCHER)" "$(MARS_LAB_DESKTOP)" "$(MARS_LAB_ICON)" "$(MARS_LAB_ICONDIR)"/mars-lab-*.svg
@@ -390,8 +390,8 @@ uninstall-mars-lab:
 	@if command -v gtk-update-icon-cache >/dev/null 2>&1; then gtk-update-icon-cache "$(MARS_LAB_INSTALL_PREFIX)/share/icons/hicolor" >/dev/null 2>&1 || true; fi
 	@if command -v kbuildsycoca6 >/dev/null 2>&1; then kbuildsycoca6 >/dev/null 2>&1 || true; elif command -v kbuildsycoca5 >/dev/null 2>&1; then kbuildsycoca5 >/dev/null 2>&1 || true; fi
 
-uninstall-ophelia-lab:
-	rm -f "$(OPHELIA_LAB_LAUNCHER)" "$(OPHELIA_LAB_DESKTOP)" "$(OPHELIA_LAB_ICON)"
+uninstall-to-be-announced-lab:
+	rm -f "$(TO_BE_ANNOUNCED_LAB_LAUNCHER)" "$(TO_BE_ANNOUNCED_LAB_DESKTOP)" "$(TO_BE_ANNOUNCED_LAB_ICON)"
 	@if command -v update-desktop-database >/dev/null 2>&1; then update-desktop-database "$(MARS_LAB_APPDIR)" >/dev/null 2>&1 || true; fi
 	@if command -v gtk-update-icon-cache >/dev/null 2>&1; then gtk-update-icon-cache "$(MARS_LAB_INSTALL_PREFIX)/share/icons/hicolor" >/dev/null 2>&1 || true; fi
 	@if command -v kbuildsycoca6 >/dev/null 2>&1; then kbuildsycoca6 >/dev/null 2>&1 || true; elif command -v kbuildsycoca5 >/dev/null 2>&1; then kbuildsycoca5 >/dev/null 2>&1 || true; fi
@@ -421,15 +421,15 @@ help:
 	@echo "  make bench_<name>           Build and run a benchmark (e.g. make bench_integrator)"
 	@echo "  make scratch                Build all scratch binaries"
 	@echo "  make mars_lab               Build and run scratch/mars_lab.c"
-	@echo "  make ophelia_lab            Build and run scratch/ophelia_lab.c"
+	@echo "  make to-be-announced_lab              Build and run scratch/to-be-announced_lab.c"
 	@echo "  make scratch/mars_lab       Build scratch/mars_lab.c"
-	@echo "  make scratch/ophelia_lab    Build scratch/ophelia_lab.c"
+	@echo "  make scratch/to-be-announced_lab      Build scratch/to-be-announced_lab.c"
 	@echo "  make mars-lab               Launch the local MARS Lab"
-	@echo "  make ophelia-lab            Launch the local Ophelia Lab"
+	@echo "  make to-be-announced-lab              Launch the local To-Be-Announced Lab"
 	@echo "  make install-mars-lab       Install a user desktop launcher for MARS Lab"
 	@echo "  make uninstall-mars-lab     Remove the user desktop launcher for MARS Lab"
-	@echo "  make install-ophelia-lab    Install a user desktop launcher for Ophelia Lab"
-	@echo "  make uninstall-ophelia-lab  Remove the user desktop launcher for Ophelia Lab"
+	@echo "  make install-to-be-announced-lab      Install a user desktop launcher for To-Be-Announced Lab"
+	@echo "  make uninstall-to-be-announced-lab    Remove the user desktop launcher for To-Be-Announced Lab"
 	@echo "  make check-deps             Check required external development libraries"
 	@echo "  make check-lab-deps         Check development libraries and MARS Lab TeX tools"
 	@echo "  make install                Install libraries and headers under PREFIX (default /usr/local)"

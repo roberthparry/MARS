@@ -1,7 +1,7 @@
 # `set_t`
 
 `set_t` is a generic hash set with dense element storage and caller-defined
-ownership rules.
+copy/cleanup rules for the stored element slots.
 
 ## Capabilities
 
@@ -9,11 +9,12 @@ ownership rules.
 - unsorted iteration over a dense arena
 - lazy sorted traversal via `set_get_sorted()`
 - clone, union, intersection, and difference
-- shallow or deep ownership via optional `clone_fn` and `destroy_fn` callbacks
+- shallow byte copies or deep stored copies via optional `clone_fn` and
+  `destroy_fn` callbacks
 
-## Ownership Models
+## Copying And Cleanup
 
-### Shallow Ownership
+### Plain Byte Copies
 
 Store borrowed pointers. The set owns only its internal storage; it does not
 duplicate or free the pointed-to strings.
@@ -70,10 +71,10 @@ Duplicate 'hello' was not added
 'hello' was removed
 ```
 
-### Deep Ownership
+### Deep Stored Copies
 
-Deep-copy inserted strings so the set owns the elements and releases them on
-destruction.
+Deep-copy inserted strings into set-owned storage, then release those stored
+copies on destruction.
 
 ```c
 #include <stdio.h>
