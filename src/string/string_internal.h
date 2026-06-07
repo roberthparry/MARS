@@ -14,6 +14,7 @@
 #include <stdint.h>
 
 #include "ustring.h"
+#include "string_view.h"
 
 /**
  * @brief Full internal definition of a dynamic UTF-8 string.
@@ -32,6 +33,14 @@ struct _string_t {
     char  *data;
     size_t len;
     size_t cap;
+    char  *scratch;
+    size_t scratch_cap;
+};
+
+struct _string_cursor_t {
+    const string_t *source;
+    string_t       *owned_source;
+    size_t          pos;
 };
 
 /**
@@ -52,5 +61,44 @@ int string_reserve(string_t *s, size_t needed);
  * character) so the caller can advance past the bad byte and continue.
  */
 uint32_t utf8_decode(const char *s, size_t len, size_t *adv);
+
+typedef enum {
+    GB_Other,
+    GB_CR,
+    GB_LF,
+    GB_Control,
+    GB_Extend,
+    GB_ZWJ,
+    GB_Regional_Indicator,
+    GB_Extended_Pictographic,
+    GB_SpacingMark
+} grapheme_class_t;
+
+size_t utf8_next(const char *s, size_t len, size_t i);
+size_t string_utf8_prev(const char *s, size_t len, size_t i);
+size_t string_utf8_length(const string_t *s);
+void string_utf8_reverse(string_t *s);
+void string_utf8_to_upper(string_t *s);
+void string_utf8_to_lower(string_t *s);
+
+grapheme_class_t string_grapheme_class(uint32_t cp);
+size_t string_grapheme_next(const char *s, size_t len, size_t i);
+size_t string_grapheme_prev(const char *s, size_t len, size_t i);
+size_t string_grapheme_count(const string_t *s);
+void string_grapheme_reverse(string_t *s);
+string_t *string_grapheme_substr(const string_t *s, size_t gpos, size_t glen);
+string_t *string_grapheme_at(const string_t *s, size_t index);
+
+typedef enum {
+    STRING_NORM_NFC,
+    STRING_NORM_NFD,
+    STRING_NORM_NFKC,
+    STRING_NORM_NFKD,
+    STRING_NORM_COUNT
+} string_norm_form_t;
+
+int string_normalise(string_t *s, string_norm_form_t form);
+int string_normalise_storage(string_t *s);
+size_t string_character_byte_offset(const string_t *s, size_t index);
 
 #endif

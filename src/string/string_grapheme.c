@@ -19,6 +19,10 @@
  * The range tables embed the Unicode 15.0 data.
  */
 
+#ifdef HAVE_UNISTRING
+#include <unictype.h>
+#endif
+
 #include "string_internal.h"
 
 #define ARRAY_COUNT(a) (sizeof(a) / sizeof((a)[0]))
@@ -294,6 +298,27 @@ size_t string_grapheme_count(const string_t *s)
     return count;
 }
 
+size_t string_count(const string_t *s)
+{
+    return string_grapheme_count(s);
+}
+
+size_t string_character_byte_offset(const string_t *s, size_t index)
+{
+    size_t i = 0u;
+    size_t g = 0u;
+
+    if (!s)
+        return 0u;
+
+    while (i < s->len && g < index) {
+        i = string_grapheme_next(s->data, s->len, i);
+        g++;
+    }
+
+    return i;
+}
+
 /* Grapheme-safe reverse */
 
 void string_grapheme_reverse(string_t *s)
@@ -367,9 +392,256 @@ string_t *string_grapheme_substr(const string_t *s, size_t gpos, size_t glen)
     return out;
 }
 
+string_t *string_substring(const string_t *s, size_t start, size_t count)
+{
+    return string_grapheme_substr(s, start, count);
+}
+
 /* Convenience: single grapheme by index */
 
 string_t *string_grapheme_at(const string_t *s, size_t index)
 {
     return string_grapheme_substr(s, index, 1);
+}
+
+static rune_t rune_empty(void)
+{
+    rune_t rune = { { 0u, 0u, 0u } };
+
+    return rune;
+}
+
+static rune_t rune_from_range(const string_t *s, size_t offset, size_t length)
+{
+    rune_t rune = { { (uintptr_t)s, (uintptr_t)offset, (uintptr_t)length } };
+
+    return rune;
+}
+
+static bool rune_is_inline_ascii(rune_t rune)
+{
+    return rune._opaque[0] == 0u &&
+           rune._opaque[2] == 1u &&
+           rune._opaque[1] > 0u &&
+           rune._opaque[1] <= 0x7fu;
+}
+
+static unsigned char rune_inline_ascii(rune_t rune)
+{
+    return (unsigned char)rune._opaque[1];
+}
+
+static const string_t *rune_owner(rune_t rune)
+{
+    return (const string_t *)rune._opaque[0];
+}
+
+static size_t rune_offset(rune_t rune)
+{
+    return (size_t)rune._opaque[1];
+}
+
+static size_t rune_length(rune_t rune)
+{
+    return (size_t)rune._opaque[2];
+}
+
+static const char *rune_data(rune_t rune)
+{
+    const string_t *owner = rune_owner(rune);
+
+    return (owner && rune_length(rune) > 0u)
+        ? owner->data + rune_offset(rune)
+        : NULL;
+}
+
+rune_t string_at(const string_t *s, size_t index)
+{
+    size_t i = 0u;
+    size_t g = 0u;
+
+    if (!s)
+        return rune_empty();
+
+    while (i < s->len && g < index) {
+        i = string_grapheme_next(s->data, s->len, i);
+        g++;
+    }
+
+    if (i >= s->len)
+        return rune_empty();
+
+    size_t start = i;
+    size_t end = string_grapheme_next(s->data, s->len, i);
+
+    return rune_from_range(s, start, end - start);
+}
+
+bool rune_is_empty(rune_t rune)
+{
+    return !rune_is_inline_ascii(rune) && !rune_data(rune);
+}
+
+rune_t rune_from_ascii(char c)
+{
+    unsigned char uc = (unsigned char)c;
+
+    if (uc == 0u || uc > 0x7fu)
+        return rune_empty();
+
+    return (rune_t){ { 0u, (uintptr_t)uc, 1u } };
+}
+
+uint32_t rune_value(rune_t rune)
+{
+    const char *data;
+    size_t adv = 0u;
+
+    if (rune_is_inline_ascii(rune))
+        return (uint32_t)rune_inline_ascii(rune);
+
+    data = rune_data(rune);
+    if (!data)
+        return 0u;
+
+    return utf8_decode(data, rune_length(rune), &adv);
+}
+
+bool rune_to_ascii(rune_t rune, char *out)
+{
+    const char *data;
+    unsigned char c;
+
+    if (rune_is_inline_ascii(rune)) {
+        c = rune_inline_ascii(rune);
+    } else {
+        data = rune_data(rune);
+        if (!data || rune_length(rune) != 1u)
+            return false;
+        c = (unsigned char)data[0];
+        if (c > 0x7fu)
+            return false;
+    }
+
+    if (out)
+        *out = (char)c;
+    return true;
+}
+
+bool rune_is_equal(const rune_t rune, char ch)
+{
+    char got;
+
+    return rune_to_ascii(rune, &got) && got == ch;
+}
+
+#ifndef HAVE_UNISTRING
+static bool rune_value_is_common_digit(uint32_t cp)
+{
+    return (cp >= '0' && cp <= '9') ||
+           (cp >= 0x0660u && cp <= 0x0669u) ||
+           (cp >= 0x06f0u && cp <= 0x06f9u) ||
+           (cp >= 0xff10u && cp <= 0xff19u);
+}
+
+static bool rune_value_is_common_alpha(uint32_t cp)
+{
+    return (cp >= 'A' && cp <= 'Z') ||
+           (cp >= 'a' && cp <= 'z') ||
+           (cp >= 0x00c0u && cp <= 0x02afu) ||
+           (cp >= 0x0370u && cp <= 0x03ffu) ||
+           (cp >= 0x0400u && cp <= 0x052fu) ||
+           (cp >= 0x1d00u && cp <= 0x1d7fu);
+}
+#endif
+
+bool rune_is_digit(rune_t rune)
+{
+    uint32_t cp = rune_value(rune);
+
+    if (cp == 0u)
+        return false;
+#ifdef HAVE_UNISTRING
+    return uc_is_property_decimal_digit((ucs4_t)cp);
+#else
+    return rune_value_is_common_digit(cp);
+#endif
+}
+
+bool rune_is_alpha_numeric(rune_t rune)
+{
+    uint32_t cp = rune_value(rune);
+
+    if (cp == 0u)
+        return false;
+#ifdef HAVE_UNISTRING
+    return uc_is_property_alphabetic((ucs4_t)cp) ||
+           uc_is_property_decimal_digit((ucs4_t)cp);
+#else
+    return rune_value_is_common_alpha(cp) ||
+           rune_value_is_common_digit(cp);
+#endif
+}
+
+string_t *rune_to_string(rune_t rune)
+{
+    string_t *out;
+
+    if (rune_is_empty(rune))
+        return NULL;
+
+    out = string_new();
+    if (!out)
+        return NULL;
+
+    if (rune_is_inline_ascii(rune)) {
+        if (string_append_char(out, (char)rune_inline_ascii(rune)) != 0) {
+            string_free(out);
+            return NULL;
+        }
+        return out;
+    }
+
+    if (string_reserve(out, rune_length(rune) + 1u) != 0) {
+        string_free(out);
+        return NULL;
+    }
+
+    memcpy(out->data, rune_data(rune), rune_length(rune));
+    out->len = rune_length(rune);
+    out->data[out->len] = '\0';
+    return out;
+}
+
+int string_append_rune(string_t *s, rune_t rune)
+{
+    const char *data = rune_data(rune);
+
+    if (rune_is_inline_ascii(rune))
+        return string_append_char(s, (char)rune_inline_ascii(rune));
+
+    return data ? string_append_view(s, string_view_from_chars(data, rune_length(rune))) : -1;
+}
+
+int string_each(const string_t *s, string_each_fn fn, void *user)
+{
+    size_t count;
+
+    if (!s || !fn)
+        return -1;
+
+    count = string_grapheme_count(s);
+    for (size_t i = 0; i < count; i++) {
+        rune_t rune = string_at(s, i);
+        int r;
+
+        if (rune_is_empty(rune))
+            return -1;
+
+        r = fn(rune, i, user);
+        if (r != 0)
+            return r;
+    }
+
+    return 0;
 }
