@@ -39,7 +39,7 @@ typedef struct number_vtable_t {
     void (*destroy_scope_payload)(void *payload);
     number_t *(*clone)(const number_t *number);
     number_t *(*const_prec)(const number_t *number, size_t precision_bits);
-    char *(*to_string)(const number_t *number);
+    string_t *(*to_text)(const number_t *number);
     bool (*is_immortal)(const number_t *number);
     bool (*immortal_id)(const number_t *number, number_const_id_t *id_out);
     bool (*is_real)(const number_t *number);
@@ -53,7 +53,9 @@ typedef struct number_vtable_t {
     int (*cmp_same)(const number_t *a, const number_t *b);
     number_t (*const_like)(const number_t *like, number_const_id_t id);
     number_t (*imag_const_like)(const number_t *like, number_const_id_t id);
-    char *(*format_inexact)(const number_t *number, bool scientific, int precision);
+    string_t *(*format_inexact_text)(const number_t *number,
+                                     bool scientific,
+                                     int precision);
     int (*set_precision)(number_t *number, size_t precision_bits);
     size_t (*get_precision)(const number_t *number);
     size_t (*get_effective_precision)(const number_t *number);
@@ -229,8 +231,6 @@ complex_t *number_complex_create(number_t real, number_t imag);
 complex_t *number_complex_clone(const complex_t *value);
 complex_t *number_complex_create_from_qcomplex(qcomplex_t value,
                                                size_t precision_bits);
-complex_t *number_complex_create_from_string(const char *text,
-                                             size_t precision_bits);
 const number_t *number_complex_real_ref(const complex_t *value);
 const number_t *number_complex_imag_ref(const complex_t *value);
 number_const_id_t number_complex_const_id(const complex_t *value);
@@ -337,6 +337,7 @@ number_t num_as_inexact_real_prec(number_t number, size_t precision_bits);
 number_t number_take(number_t *boxed_number);
 number_t *number_box_value(number_t value);
 char *number_strdup(const char *text);
+char *number_cstring_from_text(string_t *text);
 void number_box_free(number_t *number);
 void number_assign(number_t *dst, number_t value);
 void number_scope_register_value(const number_t *number);
@@ -348,12 +349,13 @@ void num_scope_resume_cleanup(num_scope_t **scope);
 #define NUM_SCOPE_SUSPEND(name) \
     __attribute__((cleanup(num_scope_resume_cleanup))) num_scope_t *(name) = number_scope_suspend()
 
-char *number_format_double(const number_t *number, bool scientific, int precision);
-char *number_format_cdouble(const number_t *number, bool scientific, int precision);
-char *number_format_qfloat(const number_t *number, bool scientific, int precision);
-char *number_format_qcomplex(const number_t *number, bool scientific, int precision);
-char *number_format_mpfr(const number_t *number, bool scientific, int precision);
-char *number_format_complex(const number_t *number, bool scientific, int precision);
+string_t *number_format_double_text(const number_t *number, bool scientific, int precision);
+string_t *number_format_cdouble_text(const number_t *number, bool scientific, int precision);
+string_t *number_format_qfloat_text(const number_t *number, bool scientific, int precision);
+string_t *number_format_qcomplex_text(const number_t *number, bool scientific, int precision);
+string_t *number_format_mpfr_text(const number_t *number, bool scientific, int precision);
+string_t *number_format_complex_text(const number_t *number, bool scientific, int precision);
+char *number_to_cstring(const number_t *number);
 number_t *number_wrap_double(double value);
 number_t *number_wrap_cdouble(double _Complex value);
 number_t *number_wrap_qfloat(qfloat_t value);
@@ -366,12 +368,12 @@ number_mpz_t *number_mpz_from_const_id(number_const_id_t id);
 number_mpz_t *number_mpz_new(void);
 number_mpz_t *number_mpz_from_long(long value);
 number_mpz_t *number_mpz_from_mpz(mpz_srcptr value);
-number_mpz_t *number_mpz_from_string(const char *text);
+number_mpz_t *number_mpz_from_text(const string_t *text);
 number_mpz_t *number_mpz_clone(const number_mpz_t *value);
 void number_mpz_free(number_mpz_t *value);
 int number_mpz_ensure(const number_mpz_t *value);
 mpz_srcptr number_mpz_value(const number_mpz_t *value);
-char *number_mpz_to_string(const number_mpz_t *value);
+string_t *number_mpz_to_text(const number_mpz_t *value);
 bool number_mpz_get_long(const number_mpz_t *value, long *out);
 size_t number_mpz_bit_length(const number_mpz_t *value);
 int number_mpz_cmp(const number_mpz_t *a, const number_mpz_t *b);
@@ -381,12 +383,12 @@ number_mpq_t *number_mpq_from_const_id(number_const_id_t id);
 number_mpq_t *number_mpq_new(void);
 number_mpq_t *number_mpq_from_frac_long(long numerator, long denominator);
 number_mpq_t *number_mpq_from_mpq(mpq_srcptr value);
-number_mpq_t *number_mpq_from_string(const char *text);
+number_mpq_t *number_mpq_from_text(const string_t *text);
 number_mpq_t *number_mpq_clone(const number_mpq_t *value);
 void number_mpq_free(number_mpq_t *value);
 int number_mpq_ensure(const number_mpq_t *value);
 mpq_srcptr number_mpq_value(const number_mpq_t *value);
-char *number_mpq_to_string(const number_mpq_t *value);
+string_t *number_mpq_to_text(const number_mpq_t *value);
 bool number_mpq_get_small_fraction(const number_mpq_t *value,
                                    long *numerator,
                                    long *denominator);
@@ -401,7 +403,7 @@ number_mpfr_t *number_mpfr_from_const_id(number_const_id_t id,
 number_mpfr_t *number_mpfr_from_double(double value, size_t precision_bits);
 number_mpfr_t *number_mpfr_from_qfloat(qfloat_t value, size_t precision_bits);
 number_mpfr_t *number_mpfr_from_mpfr(mpfr_srcptr value, size_t precision_bits);
-number_mpfr_t *number_mpfr_from_string(const char *text, size_t precision_bits);
+number_mpfr_t *number_mpfr_from_text(const string_t *text, size_t precision_bits);
 number_mpfr_t *number_mpfr_clone(const number_mpfr_t *value);
 void number_mpfr_free(number_mpfr_t *value);
 int number_mpfr_ensure(const number_mpfr_t *value, size_t precision_bits);

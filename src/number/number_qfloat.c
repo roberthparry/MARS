@@ -2,6 +2,7 @@
 
 #include "number.h"
 #include "number_internal.h"
+#include "ustring.h"
 
 bool number_is_zero_qfloat(const number_t *number)
 {
@@ -82,24 +83,11 @@ int number_sign_qfloat(const number_t *number)
     return number && qf_lt(number_impl_const(number)->value.qf, QF_ZERO) ? -1 : 1;
 }
 
-char *number_to_string_qfloat(const number_t *number)
+string_t *number_to_text_qfloat(const number_t *number)
 {
-    int needed;
-    char *out;
-
     if (!number)
         return NULL;
-    needed = qf_sprintf(NULL, 0u, "%q", number_impl_const(number)->value.qf);
-    if (needed < 0)
-        return NULL;
-    out = malloc((size_t)needed + 1u);
-    if (!out)
-        return NULL;
-    if (qf_sprintf(out, (size_t)needed + 1u, "%q", number_impl_const(number)->value.qf) < 0) {
-        free(out);
-        return NULL;
-    }
-    return out;
+    return qf_sprintf_text("%q", number_impl_const(number)->value.qf);
 }
 
 number_t *number_clone_qfloat(const number_t *number)

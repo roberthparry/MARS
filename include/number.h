@@ -8,6 +8,8 @@
 #include "qcomplex.h"
 #include "qfloat.h"
 
+typedef struct _string_t string_t;
+
 /**
  * @file number.h
  * @brief Generic numeric value cluster with by-value public handles.
@@ -40,8 +42,8 @@
  * - passing `number_t` by value performs a shallow copy only
  * - shallow copies may alias the same heap-backed payload internally
  * - use `num_clone()` when an independent live copy is required
- * - `char *` strings returned by `num_to_string()` must be released with
- *   `free()`
+ * - `string_t *` strings returned by `num_to_string()` must be released with
+ *   `string_free()`
  *
  * For immortal-backed values such as `NUM_PI`, `NUM_E`, and `NUM_HALF`,
  * `num_destroy(&value)` is safe and may be a no-op.
@@ -242,6 +244,18 @@ number_t num_create_from_qcomplex  (qcomplex_t value);
 number_t num_create_from_string(const char *text);
 
 /**
+ * @brief Parse a number from a string object.
+ *
+ * This is the string_t-based counterpart to num_create_from_string(). It
+ * accepts the same literal forms while avoiding C-string parsing once callers
+ * already hold text as a string_t. The input is borrowed and is not modified.
+ *
+ * @param text  Number literal to parse. Must not be @c NULL.
+ * @return      Live parsed value, or an invalid number on parse failure.
+ */
+number_t num_create_from_text(const string_t *text);
+
+/**
  * @brief Return the canonical text spelling for a recognised shared constant.
  *
  * The returned pointer is process-lifetime static storage owned by the
@@ -256,12 +270,25 @@ number_t num_create_from_string(const char *text);
 const char *num_constant_name(number_t value);
 
 /**
- * @brief Parse a recognised shared constant spelling.
+ * @brief Parse a recognised shared constant spelling from a string object.
  *
  * Accepts canonical mathematical spellings such as `π`, `γ`, `√2`, and
  * typeable Greek aliases such as `@pi`, `@gamma`, and `@phi`. The `@` prefix
  * is reserved for Greek aliases; non-Greek constants use ordinary names such
  * as `e`, `i`, `inf`, `ln2`, and `sqrt2`.
+ *
+ * @param text  Constant spelling to parse.
+ * @param out   Receives a live `number_t` on success. Must not be @c NULL.
+ * @return      @c true on success, @c false when @p text is not a recognised
+ *              constant spelling.
+ */
+bool num_constant_value_text(const string_t *text, number_t *out);
+
+/**
+ * @brief Convenience wrapper for parsing a recognised shared constant.
+ *
+ * This accepts a C string for user convenience, then delegates to the
+ * string_t-based parser.
  *
  * @param text  Constant spelling to parse.
  * @param out   Receives a live `number_t` on success. Must not be @c NULL.
@@ -513,11 +540,20 @@ int num_set_qcomplex  (number_t *number, qcomplex_t value);
 int num_set_from_string(number_t *number, const char *text);
 
 /**
- * @brief Formats a numeric value as a newly allocated string.
+ * @brief Replaces a number by parsing text from a string object.
  *
- * Returns a newly allocated string that must be released with `free()`.
+ * This is the string_t-based counterpart to num_set_from_string().
+ *
+ * Returns `0` on success and `-1` on invalid input or parse failure.
  */
-char    *num_to_string (const number_t number);
+int num_set_from_text(number_t *number, const string_t *text);
+
+/**
+ * @brief Formats a numeric value as a newly allocated string object.
+ *
+ * Returns a newly allocated string that must be released with `string_free()`.
+ */
+string_t *num_to_string(const number_t number);
 /** @brief Returns the numeric value converted to `double`. */
 double   num_to_double (const number_t number);
 /** @brief Returns the numeric value converted to `qfloat_t`. */
@@ -539,7 +575,11 @@ qfloat_t num_to_qfloat (const number_t number);
  * @{
  */
 
- /** @brief `%n` / `%N` formatting helpers. `number_t` arguments are passed by value. */
+/** @brief `%n` / `%N` formatting helper returning a newly allocated string. */
+string_t *num_vsprintf_text(const char *fmt, va_list ap);
+/** @brief `%n` / `%N` formatting helper returning a newly allocated string. */
+string_t *num_sprintf_text(const char *fmt, ...);
+/** @brief `%n` / `%N` formatting helpers. `number_t` arguments are passed by value. */
 int num_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap);  /**< caller-provided buffer, `va_list` form */
 int num_sprintf (char *out, size_t out_size, const char *fmt, ...);         /**< caller-provided buffer, variadic form */
 int num_printf  (const char *fmt, ...);                                     /**< prints to standard output */

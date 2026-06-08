@@ -5,6 +5,7 @@
 
 #include "number.h"
 #include "test_harness.h"
+#include "ustring.h"
 
 const test_validity_contract_t *number_validity_contract_exact(void);
 

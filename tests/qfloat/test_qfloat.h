@@ -12,6 +12,7 @@
 #include "test_harness.h"
 
 void print_q(const char *label, qfloat_t x);
+void test_qf_to_buffer(qfloat_t x, char *out, size_t out_size);
 int approx_equal(qfloat_t a, double b, double tol);
 int qf_close(qfloat_t a, qfloat_t b, double rel);
 int qf_close_rel(qfloat_t a, qfloat_t b, double rel);

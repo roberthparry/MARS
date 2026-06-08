@@ -39,12 +39,14 @@ static void test_parse_object_array_and_escapes(void)
                        "\"name\":\"mars\","
                        "\"array\":[true,false,null,123,-4.5e+6],"
                        "\"emoji\":\"\\uD83D\\uDE42\","
+                       "\"nul\":\"\\u0000\","
                        "\"quote\":\"\\\"\\\\\\/\\b\\f\\n\\r\\t\""
                        "}");
-    json_t *json = json_from_string(text);
+    json_t *json = json_from_text(text);
     const json_t *name;
     const json_t *array;
     const json_t *emoji;
+    const json_t *nul;
     const json_t *number;
     bool b = false;
 
@@ -84,6 +86,13 @@ static void test_parse_object_array_and_escapes(void)
     TEST_ASSERT_NOT_NULL(emoji);
     TEST_ASSERT_STR_EQ(string_c_str(json_string_value(emoji)), "🙂");
 
+    nul = object_get_literal(json, "nul");
+    TEST_ASSERT_NOT_NULL(nul);
+    TEST_ASSERT_TRUE(string_length(json_string_value(nul)) == 1u,
+                     "escaped NUL is stored as real string content");
+    TEST_ASSERT_TRUE(rune_value(string_at(json_string_value(nul), 0u)) == 0u,
+                     "escaped NUL round-trips as a zero-valued rune");
+
     json_free(json);
     string_free(text);
 }
@@ -94,9 +103,9 @@ static void test_rejects_non_json_number_forms(void)
     string_t *missing_fraction = s("{\"bad\":1.}");
     string_t *missing_exponent = s("{\"bad\":1e}");
 
-    TEST_ASSERT_NULL(json_from_string(leading_zero));
-    TEST_ASSERT_NULL(json_from_string(missing_fraction));
-    TEST_ASSERT_NULL(json_from_string(missing_exponent));
+    TEST_ASSERT_NULL(json_from_text(leading_zero));
+    TEST_ASSERT_NULL(json_from_text(missing_fraction));
+    TEST_ASSERT_NULL(json_from_text(missing_exponent));
 
     string_free(missing_exponent);
     string_free(missing_fraction);
@@ -107,7 +116,7 @@ static void test_number_t_extension_round_trip(void)
 {
     number_t rational = num_create_from_frac(2, 3);
     number_t complex_value = num_create_from_string("3+4i");
-    char *complex_text = num_to_string(complex_value);
+    string_t *complex_text = num_to_string(complex_value);
     json_t *array = json_new_array();
     json_t *rational_json = json_new_number_value(rational);
     json_t *complex_json = json_new_number_value(complex_value);
@@ -116,7 +125,7 @@ static void test_number_t_extension_round_trip(void)
     json_t *round_trip;
 
     TEST_ASSERT_NOT_NULL(complex_text);
-    free(complex_text);
+    string_free(complex_text);
 
     TEST_ASSERT_NOT_NULL(array);
     TEST_ASSERT_NOT_NULL(rational_json);
@@ -135,7 +144,7 @@ static void test_number_t_extension_round_trip(void)
     TEST_ASSERT_TRUE(string_find_string(serialised, rational_spelling) >= 0,
                      "rational spelling is preserved");
 
-    round_trip = json_from_string(serialised);
+    round_trip = json_from_text(serialised);
     TEST_ASSERT_NOT_NULL(round_trip);
     TEST_ASSERT_TRUE(json_type(json_array_get(round_trip, 0)) == JSON_NUMBER,
                      "rational round-trips as a JSON number");
@@ -172,14 +181,14 @@ static void test_number_t_constants_use_math_spelling(void)
     TEST_ASSERT_TRUE(string_find(serialised, "NUM_PI") < 0,
                      "pi does not leak the C identifier");
 
-    round_trip = json_from_string(serialised);
+    round_trip = json_from_text(serialised);
     TEST_ASSERT_NOT_NULL(round_trip);
     TEST_ASSERT_TRUE(json_type(round_trip) == JSON_NUMBER,
                      "pi extension parses as a JSON number");
     TEST_ASSERT_TRUE(json_number_equals(round_trip, NUM_PI),
                      "pi number_t value round-trips");
 
-    fallback = json_from_string(fallback_text);
+    fallback = json_from_text(fallback_text);
     TEST_ASSERT_NOT_NULL(fallback);
     TEST_ASSERT_TRUE(json_number_equals(fallback, NUM_PI),
                      "@pi fallback parses as pi");
@@ -224,7 +233,7 @@ static void test_serialise_round_trip(void)
 
     serialised = json_to_string_pretty(object, 2);
     TEST_ASSERT_NOT_NULL(serialised);
-    round_trip = json_from_string(serialised);
+    round_trip = json_from_text(serialised);
     TEST_ASSERT_NOT_NULL(round_trip);
     TEST_ASSERT_TRUE(json_type(object_get_literal(round_trip, "items")) == JSON_ARRAY,
                      "round-tripped array exists");

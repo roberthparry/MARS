@@ -63,7 +63,7 @@ static void test_qf_to_string(void)
     for (int i = 0; i < N; i++) {
 
         char buf[256];
-        qf_to_string(tests[i].x, buf, sizeof(buf));
+        test_qf_to_buffer(tests[i].x, buf, sizeof(buf));
         qfloat_t x = qf_from_string(buf);
         bool ok = (strcmp(buf, tests[i].expected) == 0 ||
                    qfloat_string_value_matches(x, tests[i].x, 1e-30) ||
@@ -167,7 +167,7 @@ static void test_from_string_basic() {
     qfloat_t x = qf_from_string(s);
 
     char buf[256];
-    qf_to_string(x, buf, sizeof(buf));
+    test_qf_to_buffer(x, buf, sizeof(buf));
 
     if (strncmp(buf, "3.14159265358979323846264338327", 30) == 0) {
         printf(C_GREEN "  OK: parse basic\n" C_RESET);
@@ -188,7 +188,7 @@ static void test_from_string_scientific() {
     qfloat_t x = qf_from_string(s);
 
     char buf[256];
-    qf_to_string(x, buf, sizeof(buf));
+    test_qf_to_buffer(x, buf, sizeof(buf));
 
     if (strncmp(buf, "1.23456789012345678901234567890", 30) == 0) {
         printf(C_GREEN "  OK: parse scientific\n" C_RESET);
@@ -220,7 +220,7 @@ static void test_round_trip(void)
 
         char trimmed[256];
         memset(trimmed, 0, sizeof(trimmed));
-        qf_to_string(x, trimmed, sizeof(trimmed));
+        test_qf_to_buffer(x, trimmed, sizeof(trimmed));
 
         qfloat_t y = qf_from_string(trimmed);
 

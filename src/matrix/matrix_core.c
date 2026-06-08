@@ -8,6 +8,7 @@
 #include "qcomplex.h"
 #include "matrix.h"
 #include "internal/expr_internal.h"
+#include "ustring.h"
 
 /* ============================================================
    Internal matrix construction helpers (forward declarations)
@@ -1782,36 +1783,19 @@ static void num_replace_value(void *slot, number_t value)
     return num_cmp(*(const number_t *)a, *(const number_t *)b);
 }
 
- void num_print_wrap(const void *v, char *buf, size_t n)
-{
-    char *text = num_to_string(*(const number_t *)v);
-
-    if (!text) {
-        snprintf(buf, n, "<num>");
-        return;
-    }
-
-    snprintf(buf, n, "%s", text);
-    free(text);
-}
-
- int num_format_scalar(const void *v, int scientific, char *buf, size_t n)
+string_t *num_format_scalar_text(const void *v, int scientific)
 {
     number_t value = *(const number_t *)v;
     char fmt[32];
     size_t significant_digits = num_get_prec_digits(value);
     size_t precision;
-    int written;
 
-    if (num_is_exact(value) || significant_digits == 0u) {
-        written = num_sprintf(buf, n, scientific ? "%N" : "%n", value);
-        return written < 0 ? -1 : 0;
-    }
+    if (num_is_exact(value) || significant_digits == 0u)
+        return num_sprintf_text(scientific ? "%N" : "%n", value);
 
     precision = significant_digits > 0u ? significant_digits - 1u : 0u;
     snprintf(fmt, sizeof(fmt), "%%.%zu%c", precision, scientific ? 'N' : 'n');
-    written = num_sprintf(buf, n, fmt, value);
-    return written < 0 ? -1 : 0;
+    return num_sprintf_text(fmt, value);
 }
 
  void num_conj_elem(void *o, const void *a)
@@ -1916,48 +1900,6 @@ static void num_replace_value(void *slot, number_t value)
     if (!rhs)
         return 1;
     return expr_cmp(lhs, rhs);
-}
-
- void expr_print_wrap(const void *v, char *buf, size_t n)
-{
-    expr_t *dv = *(expr_t *const *)v;
-    string_t *tmp_text;
-    char *inner;
-    char *tmp;
-    char *sep;
-    size_t len;
-
-    if (!dv) {
-        snprintf(buf, n, "NULL");
-        return;
-    }
-
-    tmp_text = expr_to_text(dv, style_EXPRESSION);
-    if (!tmp_text) {
-        snprintf(buf, n, "<expr>");
-        return;
-    }
-    tmp = strdup(string_c_str(tmp_text));
-    string_free(tmp_text);
-    if (!tmp) {
-        snprintf(buf, n, "<expr>");
-        return;
-    }
-
-    /* Matrix entries read better without repeating the full binding block for
-     * every cell, so prefer the compact expression body when available. */
-    inner = tmp;
-    len = strlen(tmp);
-    if (len >= 4 && tmp[0] == '{' && tmp[1] == ' ' && tmp[len - 2] == ' ' && tmp[len - 1] == '}') {
-        inner = tmp + 2;
-        tmp[len - 2] = '\0';
-        sep = strstr(inner, " | ");
-        if (sep)
-            *sep = '\0';
-    }
-
-    snprintf(buf, n, "%s", inner);
-    free(tmp);
 }
 
  void expr_conj_elem(void *o, const void *a)

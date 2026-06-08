@@ -31,79 +31,85 @@ char *expr_tostring_xstrdup(const char *s)
 
 void sbuf_init(sbuf_t *b)
 {
-    b->cap = 128;
-    b->len = 0;
-    b->data = (char *)expr_tostring_xmalloc(b->cap);
-    b->data[0] = '\0';
+    b->text = string_new();
+    if (!b->text) {
+        fprintf(stderr, "expr_to_string: out of memory\n");
+        abort();
+    }
 }
 
 void sbuf_free(sbuf_t *b)
 {
-    free(b->data);
-    b->data = NULL;
-    b->len = 0;
-    b->cap = 0;
+    if (!b)
+        return;
+    string_free(b->text);
+    b->text = NULL;
 }
 
 void sbuf_reserve(sbuf_t *b, size_t extra)
 {
-    size_t ncap;
-    char *ndata;
-
-    if (b->len + extra + 1 <= b->cap)
-        return;
-
-    ncap = b->cap * 2;
-    while (ncap < b->len + extra + 1)
-        ncap *= 2;
-
-    ndata = (char *)expr_tostring_xmalloc(ncap);
-    memcpy(ndata, b->data, b->len + 1);
-    free(b->data);
-    b->data = ndata;
-    b->cap = ncap;
+    (void)b;
+    (void)extra;
 }
 
 void sbuf_putc(sbuf_t *b, char c)
 {
-    sbuf_reserve(b, 1);
-    b->data[b->len++] = c;
-    b->data[b->len] = '\0';
+    if (!b || !b->text)
+        return;
+    if (string_append_char(b->text, c) != 0) {
+        fprintf(stderr, "expr_to_string: out of memory\n");
+        abort();
+    }
 }
 
 void sbuf_puts(sbuf_t *b, const char *s)
 {
-    size_t n;
-
-    if (!s)
+    if (!b || !b->text || !s)
         return;
 
-    n = strlen(s);
-    sbuf_reserve(b, n);
-    memcpy(b->data + b->len, s, n);
-    b->len += n;
-    b->data[b->len] = '\0';
+    if (string_append_cstr(b->text, s) != 0) {
+        fprintf(stderr, "expr_to_string: out of memory\n");
+        abort();
+    }
 }
 
-int expr_tostring_utf8_decode(const char *s, unsigned int *out)
+void sbuf_put_string(sbuf_t *b, const string_t *s)
 {
-    const unsigned char *p = (const unsigned char *)s;
+    if (!b || !b->text || !s)
+        return;
 
-    if (p[0] < 0x80) {
-        *out = p[0];
-        return 1;
+    if (string_append_string(b->text, s) != 0) {
+        fprintf(stderr, "expr_to_string: out of memory\n");
+        abort();
     }
-    if ((p[0] & 0xE0) == 0xC0) {
-        *out = ((p[0] & 0x1F) << 6) | (p[1] & 0x3F);
-        return 2;
-    }
-    if ((p[0] & 0xF0) == 0xE0) {
-        *out = ((p[0] & 0x0F) << 12) |
-               ((p[1] & 0x3F) << 6) |
-               (p[2] & 0x3F);
-        return 3;
-    }
-    return -1;
+}
+
+const char *sbuf_c_str(const sbuf_t *b)
+{
+    return (b && b->text) ? string_c_str(b->text) : "";
+}
+
+size_t sbuf_len(const sbuf_t *b)
+{
+    return (b && b->text) ? string_view_length(string_view_all(b->text)) : 0u;
+}
+
+string_t *sbuf_to_string(const sbuf_t *b)
+{
+    return (b && b->text) ? string_clone(b->text) : string_new();
+}
+
+char *sbuf_to_c_string(const sbuf_t *b)
+{
+    return expr_tostring_xstrdup(sbuf_c_str(b));
+}
+
+char *sbuf_take_c_string(sbuf_t *b)
+{
+    char *out = sbuf_to_c_string(b);
+
+    sbuf_free(b);
+    return out;
 }
 
 int expr_tostring_is_negative_const(const expr_t *f)
@@ -131,29 +137,40 @@ int expr_tostring_is_unicode_letter(unsigned int c)
 
 int expr_tostring_is_simple_name(const char *name)
 {
-    const char *p;
+    string_t *text;
+    string_cursor_t *cursor;
     unsigned int c;
-    int len;
+    int ok = 0;
 
     if (!name || !*name)
         return 0;
 
-    len = expr_tostring_utf8_decode(name, &c);
-    if (len <= 0 || !expr_tostring_is_unicode_letter(c))
-        return 0;
+    text = string_new_with(name);
+    cursor = text ? string_cursor_new(text) : NULL;
+    if (!cursor)
+        goto done;
 
-    if (name[len] == '\0')
-        return 1;
+    c = rune_value(string_cursor_peek(cursor));
+    if (!expr_tostring_is_unicode_letter(c))
+        goto done;
 
-    p = name + len;
-    while (*p) {
-        unsigned int sc;
-        int sl = expr_tostring_utf8_decode(p, &sc);
-        if (sl <= 0 || sc < 0x2080 || sc > 0x2089)
-            return 0;
-        p += sl;
+    if (string_cursor_next(cursor) != 0)
+        goto done;
+
+    while (!string_cursor_done(cursor)) {
+        unsigned int sc = rune_value(string_cursor_peek(cursor));
+
+        if (sc < 0x2080 || sc > 0x2089)
+            goto done;
+        if (string_cursor_next(cursor) != 0)
+            goto done;
     }
-    return 1;
+    ok = 1;
+
+done:
+    string_cursor_free(cursor);
+    string_free(text);
+    return ok;
 }
 
 void emit_name(sbuf_t *b, const char *name)
@@ -174,30 +191,42 @@ void emit_name(sbuf_t *b, const char *name)
 
 int expr_tostring_is_safe_func_name(const char *name)
 {
-    const char *p;
+    string_t *text;
+    string_cursor_t *cursor;
     unsigned int c;
-    int len;
+    int ok = 0;
 
     if (!name || !*name)
         return 0;
 
-    len = expr_tostring_utf8_decode(name, &c);
-    if (len <= 0 || !expr_tostring_is_unicode_letter(c))
-        return 0;
+    text = string_new_with(name);
+    cursor = text ? string_cursor_new(text) : NULL;
+    if (!cursor)
+        goto done;
 
-    p = name + len;
-    while (*p) {
-        unsigned int sc;
-        int sl = expr_tostring_utf8_decode(p, &sc);
-        if (sl <= 0)
-            return 0;
+    c = rune_value(string_cursor_peek(cursor));
+    if (!expr_tostring_is_unicode_letter(c))
+        goto done;
+
+    if (string_cursor_next(cursor) != 0)
+        goto done;
+
+    while (!string_cursor_done(cursor)) {
+        unsigned int sc = rune_value(string_cursor_peek(cursor));
+
         if (!expr_tostring_is_unicode_letter(sc) &&
             !(sc >= '0' && sc <= '9') &&
             !(sc >= 0x2080 && sc <= 0x2089))
-            return 0;
-        p += sl;
+            goto done;
+        if (string_cursor_next(cursor) != 0)
+            goto done;
     }
-    return 1;
+    ok = 1;
+
+done:
+    string_cursor_free(cursor);
+    string_free(text);
+    return ok;
 }
 
 void emit_name_func(sbuf_t *b, const char *name)
@@ -376,27 +405,6 @@ static char expr_tostring_subscript_ascii(unsigned int c)
     return expr_tostring_subscript_ascii_table[idx];
 }
 
-static int expr_tostring_utf8_encode(unsigned int cp, char out[5])
-{
-    if (cp < 0x80) {
-        out[0] = (char)cp;
-        out[1] = '\0';
-        return 1;
-    }
-    if (cp < 0x800) {
-        out[0] = (char)(0xC0 | (cp >> 6));
-        out[1] = (char)(0x80 | (cp & 0x3F));
-        out[2] = '\0';
-        return 2;
-    }
-
-    out[0] = (char)(0xE0 | (cp >> 12));
-    out[1] = (char)(0x80 | ((cp >> 6) & 0x3F));
-    out[2] = (char)(0x80 | (cp & 0x3F));
-    out[3] = '\0';
-    return 3;
-}
-
 static const char *expr_tostring_greek_tex(unsigned int cp)
 {
     return expr_tostring_tex_lookup(expr_tostring_greek_tex_table,
@@ -423,14 +431,14 @@ static int expr_tostring_is_ascii_letter(char c)
     return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
 }
 
-static const char *expr_tostring_collect_superscript(const char *p, sbuf_t *tmp)
+static void expr_tostring_collect_superscript(string_cursor_t *cursor,
+                                              sbuf_t *tmp)
 {
-    while (*p) {
-        unsigned int cp;
-        int len = expr_tostring_utf8_decode(p, &cp);
+    while (!string_cursor_done(cursor)) {
+        unsigned int cp = rune_value(string_cursor_peek(cursor));
         char mapped;
 
-        if (len <= 0 || !expr_tostring_is_superscript_cp(cp))
+        if (!expr_tostring_is_superscript_cp(cp))
             break;
 
         mapped = expr_tostring_superscript_ascii(cp);
@@ -438,20 +446,19 @@ static const char *expr_tostring_collect_superscript(const char *p, sbuf_t *tmp)
             break;
 
         sbuf_putc(tmp, mapped);
-        p += len;
+        if (string_cursor_next(cursor) != 0)
+            break;
     }
-
-    return p;
 }
 
-static const char *expr_tostring_collect_subscript(const char *p, sbuf_t *tmp)
+static void expr_tostring_collect_subscript(string_cursor_t *cursor,
+                                            sbuf_t *tmp)
 {
-    while (*p) {
-        unsigned int cp;
-        int len = expr_tostring_utf8_decode(p, &cp);
+    while (!string_cursor_done(cursor)) {
+        unsigned int cp = rune_value(string_cursor_peek(cursor));
         char mapped;
 
-        if (len <= 0 || !expr_tostring_is_subscript_cp(cp))
+        if (!expr_tostring_is_subscript_cp(cp))
             break;
 
         mapped = expr_tostring_subscript_ascii(cp);
@@ -459,104 +466,108 @@ static const char *expr_tostring_collect_subscript(const char *p, sbuf_t *tmp)
             break;
 
         sbuf_putc(tmp, mapped);
-        p += len;
+        if (string_cursor_next(cursor) != 0)
+            break;
     }
-
-    return p;
 }
 
 char *expr_tostring_texify(const char *text)
 {
     sbuf_t out;
-    const char *p = text ? text : "";
+    string_t *source;
+    string_cursor_t *cursor;
 
     sbuf_init(&out);
 
-    while (*p) {
-        unsigned int cp;
-        int len = expr_tostring_utf8_decode(p, &cp);
-        const char *mapped;
-        const char *next;
-        char utf8_buf[5];
-        sbuf_t seq;
+    source = string_new_with(text ? text : "");
+    cursor = source ? string_cursor_new(source) : NULL;
+    if (!cursor) {
+        string_free(source);
+        return sbuf_take_c_string(&out);
+    }
 
-        if (len <= 0) {
-            sbuf_putc(&out, *p++);
-            continue;
-        }
+    while (!string_cursor_done(cursor)) {
+        rune_t rune = string_cursor_peek(cursor);
+        unsigned int cp = rune_value(rune);
+        const char *mapped;
+        sbuf_t seq;
 
         mapped = expr_tostring_vulgar_fraction_tex(cp);
         if (mapped) {
             sbuf_puts(&out, mapped);
-            p += len;
+            string_cursor_next(cursor);
             continue;
         }
 
         if (expr_tostring_is_superscript_cp(cp)) {
             sbuf_t num;
             sbuf_t den;
-            unsigned int slash_cp;
-            int slash_len;
 
             sbuf_init(&num);
-            next = expr_tostring_collect_superscript(p, &num);
-            slash_len = expr_tostring_utf8_decode(next, &slash_cp);
-            if (slash_len > 0 && slash_cp == 0x2044) {
+            expr_tostring_collect_superscript(cursor, &num);
+            if (rune_value(string_cursor_peek(cursor)) == 0x2044) {
+                string_cursor_next(cursor);
                 sbuf_init(&den);
-                next = expr_tostring_collect_subscript(next + slash_len, &den);
-                if (den.len > 0) {
+                expr_tostring_collect_subscript(cursor, &den);
+                if (sbuf_len(&den) > 0u) {
                     sbuf_puts(&out, "\\frac{");
-                    sbuf_puts(&out, num.data);
+                    sbuf_puts(&out, sbuf_c_str(&num));
                     sbuf_puts(&out, "}{");
-                    sbuf_puts(&out, den.data);
+                    sbuf_puts(&out, sbuf_c_str(&den));
                     sbuf_putc(&out, '}');
                     sbuf_free(&num);
                     sbuf_free(&den);
-                    p = next;
                     continue;
                 }
                 sbuf_free(&den);
             }
 
             sbuf_puts(&out, "^{");
-            sbuf_puts(&out, num.data);
+            sbuf_puts(&out, sbuf_c_str(&num));
             sbuf_putc(&out, '}');
             sbuf_free(&num);
-            p = next;
             continue;
         }
 
         if (expr_tostring_is_subscript_cp(cp)) {
             sbuf_init(&seq);
-            next = expr_tostring_collect_subscript(p, &seq);
+            expr_tostring_collect_subscript(cursor, &seq);
             sbuf_puts(&out, "_{");
-            sbuf_puts(&out, seq.data);
+            sbuf_puts(&out, sbuf_c_str(&seq));
             sbuf_putc(&out, '}');
             sbuf_free(&seq);
-            p = next;
             continue;
         }
 
         mapped = expr_tostring_greek_tex(cp);
         if (mapped) {
+            unsigned char next_ascii;
+
             sbuf_puts(&out, mapped);
-            if (expr_tostring_is_ascii_letter(p[len]))
+            string_cursor_next(cursor);
+            if (string_cursor_peek_ascii(cursor, &next_ascii) &&
+                expr_tostring_is_ascii_letter((char)next_ascii))
                 sbuf_puts(&out, "{}");
-            p += len;
             continue;
         }
 
         mapped = expr_tostring_symbol_tex(cp);
         if (mapped) {
             sbuf_puts(&out, mapped);
-            p += len;
+            string_cursor_next(cursor);
             continue;
         }
 
-        expr_tostring_utf8_encode(cp, utf8_buf);
-        sbuf_puts(&out, utf8_buf);
-        p += len;
+        {
+            string_t *rune_text = rune_to_string(rune);
+
+            sbuf_puts(&out, string_c_str(rune_text));
+            string_free(rune_text);
+        }
+        string_cursor_next(cursor);
     }
 
-    return out.data;
+    string_cursor_free(cursor);
+    string_free(source);
+    return sbuf_take_c_string(&out);
 }

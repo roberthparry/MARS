@@ -30,7 +30,7 @@ int main(void) {
     string_t *name_key = s("name");
     string_t *enabled_key = s("enabled");
     string_t *items_key = s("items");
-    json_t *root = json_from_string(text);
+    json_t *root = json_from_text(text);
     const json_t *name = json_object_get(root, name_key);
     const json_t *enabled_json = json_object_get(root, enabled_key);
     const json_t *items = json_object_get(root, items_key);
@@ -230,7 +230,7 @@ All declarations are in `include/json.h`.
 
 ### Parsing and Serialisation
 
-- `json_t *json_from_string(const string_t *text)` — parse JSON text
+- `json_t *json_from_text(const string_t *text)` — parse JSON text
 - `json_t *json_from_file(const string_t *path)` — load and parse a JSON file
 - `string_t *json_to_string(const json_t *json)` — serialise compact JSON
 - `string_t *json_to_string_pretty(const json_t *json, int indent_size)` — serialise pretty JSON

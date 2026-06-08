@@ -150,14 +150,14 @@ static int number_display_is_truncated(number_t z)
 {
     size_t display_digits = 16u;
     size_t prec_digits = num_get_prec_digits(z);
-    char *full = num_to_string(z);
+    string_t *full = num_to_string(z);
     int truncated = 0;
 
     if (prec_digits > display_digits)
         truncated = 1;
-    if (full && strlen(full) > 24u)
+    if (full && string_view_length(string_view_all(full)) > 24u)
         truncated = 1;
-    free(full);
+    string_free(full);
     return truncated;
 }
 
@@ -383,18 +383,19 @@ void print_mp_real(const char *label, qfloat_t x)
 static size_t visible_string_width(const char *s)
 {
     size_t width = 0;
+    size_t pos = 0u;
 
-    while (s && *s) {
-        if (s[0] == '\033' && s[1] == '[') {
-            s += 2;
-            while (*s && *s != 'm')
-                s++;
-            if (*s == 'm')
-                s++;
+    while (s && s[pos] != '\0') {
+        if (s[pos] == '\033' && s[pos + 1u] == '[') {
+            pos += 2u;
+            while (s[pos] != '\0' && s[pos] != 'm')
+                pos++;
+            if (s[pos] == 'm')
+                pos++;
             continue;
         }
         width++;
-        s++;
+        pos++;
     }
 
     return width;
@@ -402,17 +403,19 @@ static size_t visible_string_width(const char *s)
 
 static char *dup_trimmed_token(const char *start, size_t len)
 {
-    while (len > 0 && (*start == ' ' || *start == '\t')) {
-        start++;
-        len--;
-    }
-    while (len > 0 && (start[len - 1] == ' ' || start[len - 1] == '\t'))
-        len--;
+    size_t offset = 0u;
+    size_t end = len;
 
-    char *out = malloc(len + 1);
+    while (offset < end && (start[offset] == ' ' || start[offset] == '\t'))
+        offset++;
+    while (end > offset && (start[end - 1u] == ' ' || start[end - 1u] == '\t'))
+        end--;
+
+    len = end - offset;
+    char *out = malloc(len + 1u);
     if (!out)
         return NULL;
-    memcpy(out, start, len);
+    memcpy(out, &start[offset], len);
     out[len] = '\0';
     return out;
 }
@@ -462,25 +465,29 @@ static void collect_bindings(char ***var_bindings,
                              size_t *capconst_bindings,
                              const char *binding_text)
 {
-    const char *p = binding_text;
+    size_t pos = 0u;
+    size_t len = binding_text ? strlen(binding_text) : 0u;
     int in_constants = 0;
 
-    while (p && *p) {
-        while (*p == ' ' || *p == '\t' || *p == ',')
-            p++;
-        if (*p == ';') {
+    while (pos < len) {
+        while (pos < len &&
+               (binding_text[pos] == ' ' ||
+                binding_text[pos] == '\t' ||
+                binding_text[pos] == ','))
+            pos++;
+        if (pos < len && binding_text[pos] == ';') {
             in_constants = 1;
-            p++;
+            pos++;
             continue;
         }
-        if (!*p)
+        if (pos >= len)
             break;
 
-        const char *start = p;
-        while (*p && *p != ',' && *p != ';')
-            p++;
+        size_t start = pos;
+        while (pos < len && binding_text[pos] != ',' && binding_text[pos] != ';')
+            pos++;
 
-        char *token = dup_trimmed_token(start, (size_t)(p - start));
+        char *token = dup_trimmed_token(&binding_text[start], pos - start);
         if (in_constants)
             append_binding(const_bindings, nconst_bindings, capconst_bindings, token);
         else
@@ -553,10 +560,20 @@ static int split_binding_token(const char *binding, char **name_out, char **valu
         return -1;
     }
 
-    while (*name == ' ' || *name == '\t')
-        memmove(name, name + 1, strlen(name));
-    while (*value == ' ' || *value == '\t')
-        memmove(value, value + 1, strlen(value));
+    {
+        size_t start = 0u;
+
+        while (name[start] == ' ' || name[start] == '\t')
+            start++;
+        if (start > 0u)
+            memmove(name, &name[start], strlen(&name[start]) + 1u);
+
+        start = 0u;
+        while (value[start] == ' ' || value[start] == '\t')
+            start++;
+        if (start > 0u)
+            memmove(value, &value[start], strlen(&value[start]) + 1u);
+    }
 
     for (size_t len = strlen(name); len > 0; --len) {
         if (name[len - 1] == ' ' || name[len - 1] == '\t')

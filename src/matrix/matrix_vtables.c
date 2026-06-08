@@ -166,8 +166,7 @@ const struct elem_vtable number_elem = {
     .zero            = &NUM_ZERO,
     .one             = &NUM_ONE,
     .cmp             = number_cmp_wrap,
-    .print           = num_print_wrap,
-    .format_scalar   = num_format_scalar,
+    .format_scalar_text = num_format_scalar_text,
     .fun             = &number_fun
 };
 
@@ -224,7 +223,6 @@ const struct elem_vtable expr_elem = {
     .zero            = &EXPR_ZERO,
     .one             = &EXPR_ONE,
     .cmp             = expr_cmp_wrap,
-    .print           = expr_print_wrap,
-    .format_scalar   = NULL,
+    .format_scalar_text = NULL,
     .fun             = &expr_fun
 };

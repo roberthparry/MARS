@@ -210,14 +210,16 @@ All declarations are in `include/qcomplex.h`.
 
 | Function | Description |
 |---|---|
-| `void qc_to_string(qcomplex_t z, char *out, size_t out_size);` | Writes a human-readable representation of `z` into `out`. |
+| `string_t *qc_to_string(qcomplex_t z);` | Returns a newly allocated human-readable representation of `z`; release it with `string_free()`. |
 | `qcomplex_t qc_from_string(const char *s);` | Parses a complex number from a string (e.g. `"3+4i"`, `"2e-5-1.2e3i"`, `"5i"`, `"7"`). |
 
 ### Printf-style Formatting
 
 | Function | Description |
 |---|---|
-| `int qc_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap);` | Internal printf-style formatter with full `qcomplex_t` and `qfloat_t` support. |
+| `string_t *qc_vsprintf_text(const char *fmt, va_list ap);` | String-owning formatter with full `qcomplex_t` and `qfloat_t` support. |
+| `string_t *qc_sprintf_text(const char *fmt, ...);` | String-owning formatter with full `qcomplex_t` and `qfloat_t` support. |
+| `int qc_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap);` | Compatibility formatter for caller-supplied C buffers. |
 | `int qc_sprintf(char *out, size_t out_size, const char *fmt, ...);` | Printf-style formatter with full `qcomplex_t` and `qfloat_t` support. |
 | `int qc_printf(const char *fmt, ...);` | Printf to stdout with full `qcomplex_t` and `qfloat_t` support. |
 

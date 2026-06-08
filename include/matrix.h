@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdarg.h>
 
 #include "expression.h"
 
@@ -219,10 +220,21 @@ matrix_t *mat_create_expr(size_t rows, size_t cols, expr_t *const *data);
  * If any required symbol remains unbound (for example bare variables such as
  * `x`, or partially bound wrapped input), this function returns NULL.
  *
+ * This is a convenience wrapper around mat_from_text(...), so internally the
+ * parser works with the string module rather than C-string pointer arithmetic.
+ *
  * For symbolic parsing where callers need mutable bindings or symbolic output,
- * use mat_from_string_expr(...).
+ * use mat_from_string_expr(...) or mat_from_text_expr(...).
  */
 matrix_t *mat_from_string(const char *s);
+
+/**
+ * @brief Parse a matrix from a string object and return a numeric matrix when fully resolvable.
+ *
+ * This is the string_t-based counterpart to mat_from_string(). The input is
+ * borrowed and is not modified.
+ */
+matrix_t *mat_from_text(const string_t *text);
 
 /**
  * @brief Parse a numeric or symbolic matrix from a string.
@@ -247,15 +259,27 @@ matrix_t *mat_from_string(const char *s);
  * as `π₁`, but remain ordinary symbolic variables rather than built-in
  * constants.
  *
+ * This is a convenience wrapper around mat_from_text_expr(...), so internally
+ * the parser works with the string module rather than C-string pointer
+ * arithmetic.
+ *
  * If @p bnd_out is non-NULL and the parsed matrix is symbolic, the function
  * also returns an opaque bindings object that can be queried with
- * mat_bindings_get() and later released with mat_bindings_free(). If bindings
- * are not needed, pass NULL.
+ * mat_bindings_get_text() or mat_bindings_get(), then later released with
+ * mat_bindings_free(). If bindings are not needed, pass NULL.
  */
 matrix_t *mat_from_string_expr(const char *s, mat_bindings_t **bnd_out);
 
 /**
- * @brief Look up a parsed matrix binding by name.
+ * @brief Parse a numeric or symbolic matrix from a string object.
+ *
+ * This is the string_t-based counterpart to mat_from_string_expr(). The input
+ * is borrowed and is not modified.
+ */
+matrix_t *mat_from_text_expr(const string_t *text, mat_bindings_t **bnd_out);
+
+/**
+ * @brief Look up a parsed matrix binding by string object name.
  *
  * The lookup accepts the same normalised names as the parser. Bracketed names
  * may be queried either as `[radius]` or `radius`. Greek-style aliases are
@@ -265,6 +289,16 @@ matrix_t *mat_from_string_expr(const char *s, mat_bindings_t **bnd_out);
  *
  * The returned @ref expr_t pointer is borrowed from the parsed matrix and
  * remains valid only while that matrix remains alive.
+ *
+ * @return Borrowed symbolic leaf on success, or NULL if not found.
+ */
+expr_t *mat_bindings_get_text(mat_bindings_t *bnd, const string_t *name);
+
+/**
+ * @brief Convenience wrapper for looking up a parsed matrix binding by name.
+ *
+ * This accepts a C string for user convenience, then delegates to
+ * mat_bindings_get_text().
  *
  * @return Borrowed symbolic leaf on success, or NULL if not found.
  */
@@ -1237,7 +1271,38 @@ matrix_t *mat_pow(const matrix_t *A, const number_t *s);
    Debugging / I/O
    ------------------------------------------------------------------------- */
 
+/**
+ * @brief Convert a matrix to newly allocated text.
+ *
+ * This is the preferred string-owning formatter. The caller owns the returned
+ * string and must release it with string_free().
+ */
+string_t *mat_to_text(const matrix_t *A, mat_string_style_t style);
+
+/**
+ * @brief Convert a matrix to a newly allocated C string.
+ *
+ * Compatibility wrapper around mat_to_text(). The caller owns the returned
+ * buffer and must release it with free().
+ */
 char *mat_to_string(const matrix_t *A, mat_string_style_t style);
+
+/**
+ * @brief Format matrix-aware text into a new string_t from a va_list.
+ *
+ * Supports ordinary string formatting plus matrix conversions:
+ * `%m` inline pretty, `%M` inline scientific, `%ml` layout pretty, and
+ * `%ML` layout scientific.
+ */
+string_t *mat_vsprintf_text(const char *fmt, va_list ap);
+
+/**
+ * @brief Format matrix-aware text into a new string_t.
+ *
+ * The caller owns the returned string and must release it with string_free().
+ */
+string_t *mat_sprintf_text(const char *fmt, ...);
+
 int mat_sprintf(char *out, size_t out_size, const char *fmt, ...);
 int mat_printf(const char *fmt, ...);
 void mat_print(const matrix_t *A);

@@ -1,4 +1,3 @@
-#include <errno.h>
 #include <complex.h>
 #include <limits.h>
 #include <math.h>
@@ -6,6 +5,7 @@
 
 #include "number.h"
 #include "number_internal.h"
+#include "ustring.h"
 
 enum {
     NUMBER_LAMBERT_W_HALLEY_STEPS = 12,
@@ -51,6 +51,71 @@ static void __attribute__((destructor)) number_shutdown(void)
     }
     number_constants_shutdown();
     mpfr_free_cache();
+}
+
+static bool number_cursor_peek_ascii_digit(const string_cursor_t *cursor,
+                                           unsigned char *out)
+{
+    unsigned char ch = 0u;
+
+    if (!string_cursor_peek_ascii(cursor, &ch) || ch < '0' || ch > '9')
+        return false;
+    if (out)
+        *out = ch;
+    return true;
+}
+
+static bool number_text_to_int(const string_t *text, int *out)
+{
+    string_cursor_t *cursor;
+    unsigned long value = 0u;
+    unsigned long limit = (unsigned long)INT_MAX;
+    unsigned char ch = 0u;
+    bool negative = false;
+    bool have_digit = false;
+    bool ok = false;
+
+    if (!text || !out)
+        return false;
+
+    cursor = string_cursor_new(text);
+    if (!cursor)
+        return false;
+
+    if (string_cursor_peek_ascii(cursor, &ch) && (ch == '+' || ch == '-')) {
+        negative = (ch == '-');
+        limit = negative ? (unsigned long)INT_MAX + 1ul
+                         : (unsigned long)INT_MAX;
+        if (string_cursor_next(cursor) != 0)
+            goto done;
+    }
+
+    while (number_cursor_peek_ascii_digit(cursor, &ch)) {
+        unsigned long digit = (unsigned long)(ch - '0');
+
+        have_digit = true;
+        if (value > (limit - digit) / 10ul)
+            goto done;
+        value = value * 10ul + digit;
+        if (string_cursor_next(cursor) != 0)
+            goto done;
+    }
+
+    if (!have_digit || !string_cursor_done(cursor))
+        goto done;
+
+    if (negative) {
+        *out = value == (unsigned long)INT_MAX + 1ul
+            ? INT_MIN
+            : -(int)value;
+    } else {
+        *out = (int)value;
+    }
+    ok = true;
+
+done:
+    string_cursor_free(cursor);
+    return ok;
 }
 
 static int number_bernoulli_even_ensure(size_t index)
@@ -1394,9 +1459,7 @@ static number_t number_log_imag_multiple(const number_t *number,
 
 static int number_try_get_exact_int(const number_t number, int *out)
 {
-    char *text;
-    char *end;
-    long parsed;
+    string_t *text;
     uint64_t mantissa;
     long exponent2;
     int sign;
@@ -1423,16 +1486,11 @@ static int number_try_get_exact_int(const number_t number, int *out)
     text = num_to_string(number);
     if (!text)
         return 0;
-    errno = 0;
-    parsed = strtol(text, &end, 10);
-    if (errno != 0 || !end || *end != '\0' ||
-        parsed < (long)INT_MIN || parsed > (long)INT_MAX)
-    {
-        free(text);
+    if (!number_text_to_int(text, out)) {
+        string_free(text);
         return 0;
     }
-    free(text);
-    *out = (int)parsed;
+    string_free(text);
     return 1;
 }
 

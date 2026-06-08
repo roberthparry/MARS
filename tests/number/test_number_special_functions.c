@@ -13,15 +13,16 @@ static void assert_number_close_text(const char *label,
     number_t diff = num_sub(got, expected);
     number_t error = num_abs(diff);
     number_t tolerance = num_create_from_string(tolerance_text);
-    char *error_text = num_to_string(error);
+    string_t *error_text = num_to_string(error);
 
     printf(C_WHITE C_BOLD "%s" C_RESET "\n", label ? label : "<unspecified>");
     printf("    expected = %s\n", expected_text);
     printf("    tolerance = %s\n", tolerance_text);
-    printf("    error    = %s\n\n", error_text ? error_text : "(num_to_string failed)");
+    printf("    error    = %s\n\n",
+           error_text ? string_c_str(error_text) : "(num_to_string failed)");
     ASSERT_TRUE(num_lt(error, tolerance));
 
-    free(error_text);
+    string_free(error_text);
     num_destroy(&tolerance);
     num_destroy(&error);
     num_destroy(&diff);
@@ -36,17 +37,19 @@ static void assert_number_close_number(const char *label,
     number_t diff = num_sub(got, expected);
     number_t error = num_abs(diff);
     number_t tolerance = num_create_from_string(tolerance_text);
-    char *expected_text = num_to_string(expected);
-    char *error_text = num_to_string(error);
+    string_t *expected_text = num_to_string(expected);
+    string_t *error_text = num_to_string(error);
 
     printf(C_WHITE C_BOLD "%s" C_RESET "\n", label ? label : "<unspecified>");
-    printf("    expected = %s\n", expected_text ? expected_text : "(num_to_string failed)");
+    printf("    expected = %s\n",
+           expected_text ? string_c_str(expected_text) : "(num_to_string failed)");
     printf("    tolerance = %s\n", tolerance_text);
-    printf("    error    = %s\n\n", error_text ? error_text : "(num_to_string failed)");
+    printf("    error    = %s\n\n",
+           error_text ? string_c_str(error_text) : "(num_to_string failed)");
     ASSERT_TRUE(num_lt(error, tolerance));
 
-    free(error_text);
-    free(expected_text);
+    string_free(error_text);
+    string_free(expected_text);
     num_destroy(&tolerance);
     num_destroy(&error);
     num_destroy(&diff);
@@ -206,7 +209,7 @@ void run_number_special_function_tests(void)
         number_t residual;
         number_t residual_mag;
         number_t tolerance;
-        char *residual_text;
+        string_t *residual_text;
         bool within_tolerance;
 
         ASSERT_EQ_INT(num_set_default_prec_digits(201u), 0);
@@ -224,10 +227,10 @@ void run_number_special_function_tests(void)
                C_RESET "\n");
         printf("    tolerance = 1e-193\n");
         printf("    residual  = %s\n\n",
-               residual_text ? residual_text : "(num_to_string failed)");
+               residual_text ? string_c_str(residual_text) : "(num_to_string failed)");
         within_tolerance = num_lt(residual_mag, tolerance);
 
-        free(residual_text);
+        string_free(residual_text);
         num_destroy(&tolerance);
         num_destroy(&residual_mag);
         num_destroy(&residual);
@@ -258,7 +261,7 @@ void run_number_special_function_tests(void)
         number_t residual;
         number_t residual_mag;
         number_t tolerance;
-        char *residual_text;
+        string_t *residual_text;
         bool within_tolerance;
 
         ASSERT_EQ_INT(num_set_default_prec_bits(640u), 0);
@@ -285,10 +288,10 @@ void run_number_special_function_tests(void)
                C_RESET "\n");
         printf("    tolerance = 1e-180\n");
         printf("    residual  = %s\n\n",
-               residual_text ? residual_text : "(num_to_string failed)");
+               residual_text ? string_c_str(residual_text) : "(num_to_string failed)");
         within_tolerance = num_lt(residual_mag, tolerance);
 
-        free(residual_text);
+        string_free(residual_text);
         num_destroy(&tolerance);
         num_destroy(&residual_mag);
         num_destroy(&residual);

@@ -1,4 +1,3 @@
-#include <ctype.h>
 #include <errno.h>
 #include <limits.h>
 #include <stdbool.h>
@@ -477,158 +476,228 @@ expr_binding_expr_t *expr_binding_expr_clone(const expr_binding_expr_t *expr)
     return (ops && ops->clone) ? ops->clone(expr) : NULL;
 }
 
-static int binding_number_text_is_exact_decimal(const char *text)
+static bool binding_cursor_peek_ascii_digit(const string_cursor_t *cursor,
+                                            char *out)
 {
-    const char *p = text;
-    int have_decimal_marker = 0;
-    int have_digit = 0;
-    int exp_digits = 0;
+    char ch = '\0';
 
-    if (!p)
-        return 0;
+    if (!rune_to_ascii(string_cursor_peek(cursor), &ch) ||
+        ch < '0' || ch > '9')
+        return false;
 
-    if (*p == '+' || *p == '-')
-        p++;
-
-    while (isdigit((unsigned char)*p)) {
-        have_digit = 1;
-        p++;
-    }
-
-    if (*p == '.') {
-        have_decimal_marker = 1;
-        p++;
-        while (isdigit((unsigned char)*p)) {
-            have_digit = 1;
-            p++;
-        }
-    }
-
-    if (*p == 'e' || *p == 'E') {
-        have_decimal_marker = 1;
-        p++;
-        if (*p == '+' || *p == '-')
-            p++;
-        while (isdigit((unsigned char)*p)) {
-            exp_digits++;
-            p++;
-        }
-        if (exp_digits == 0)
-            return 0;
-    }
-
-    return have_digit && have_decimal_marker && *p == '\0';
+    if (out)
+        *out = ch;
+    return true;
 }
 
-static number_t binding_number_from_exact_decimal(const char *text)
+static bool binding_ascii_is_digit(unsigned char ch)
 {
-    const char *p = text;
-    char *digits;
-    char *literal;
-    number_t value;
+    return ch >= '0' && ch <= '9';
+}
+
+static bool binding_ascii_is_alpha(unsigned char ch)
+{
+    return (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z');
+}
+
+static bool binding_ascii_is_function_name_char(unsigned char ch)
+{
+    return binding_ascii_is_alpha(ch) ||
+           binding_ascii_is_digit(ch) ||
+           ch == '_' ||
+           ch == '-';
+}
+
+static bool binding_cursor_consume_ascii(string_cursor_t *cursor, char ch)
+{
+    if (!rune_is_equal(string_cursor_peek(cursor), ch))
+        return false;
+    return string_cursor_next(cursor) == 0;
+}
+
+static bool binding_number_string_is_exact_decimal(const string_t *text)
+{
+    string_cursor_t *cursor;
+    bool have_decimal_marker = false;
+    bool have_digit = false;
+    int exp_digits = 0;
+
+    if (!text)
+        return false;
+
+    cursor = string_cursor_new(text);
+    if (!cursor)
+        return false;
+
+    if (rune_is_equal(string_cursor_peek(cursor), '+') ||
+        rune_is_equal(string_cursor_peek(cursor), '-'))
+        (void)string_cursor_next(cursor);
+
+    while (binding_cursor_peek_ascii_digit(cursor, NULL)) {
+        have_digit = true;
+        (void)string_cursor_next(cursor);
+    }
+
+    if (binding_cursor_consume_ascii(cursor, '.')) {
+        have_decimal_marker = true;
+        while (binding_cursor_peek_ascii_digit(cursor, NULL)) {
+            have_digit = true;
+            (void)string_cursor_next(cursor);
+        }
+    }
+
+    if (rune_is_equal(string_cursor_peek(cursor), 'e') ||
+        rune_is_equal(string_cursor_peek(cursor), 'E')) {
+        have_decimal_marker = true;
+        (void)string_cursor_next(cursor);
+        if (rune_is_equal(string_cursor_peek(cursor), '+') ||
+            rune_is_equal(string_cursor_peek(cursor), '-'))
+            (void)string_cursor_next(cursor);
+        while (binding_cursor_peek_ascii_digit(cursor, NULL)) {
+            exp_digits++;
+            (void)string_cursor_next(cursor);
+        }
+        if (exp_digits == 0) {
+            string_cursor_free(cursor);
+            return false;
+        }
+    }
+
+    have_digit = have_digit && have_decimal_marker &&
+                 string_cursor_done(cursor);
+    string_cursor_free(cursor);
+    return have_digit;
+}
+
+static number_t binding_number_from_exact_decimal_string(const string_t *text)
+{
+    string_cursor_t *cursor;
+    string_t *digits;
+    string_t *literal;
+    number_t value = NUM_NAN;
     size_t digit_count = 0u;
-    size_t digit_cap = strlen(text) + 1u;
     long frac_digits = 0;
     long exponent = 0;
-    int negative = 0;
-    int seen_nonzero = 0;
+    bool negative = false;
+    bool seen_nonzero = false;
+    char digit;
 
-    digits = (char *)fs_xmalloc(digit_cap);
+    if (!text)
+        return num_clone(NUM_NAN);
 
-    if (*p == '+' || *p == '-') {
-        negative = (*p == '-');
-        p++;
+    cursor = string_cursor_new(text);
+    digits = string_new();
+    if (!cursor || !digits) {
+        string_cursor_free(cursor);
+        string_free(digits);
+        return num_clone(NUM_NAN);
     }
 
-    while (isdigit((unsigned char)*p)) {
-        if (*p != '0' || seen_nonzero) {
-            seen_nonzero = 1;
-            digits[digit_count++] = *p;
+    if (rune_is_equal(string_cursor_peek(cursor), '+') ||
+        rune_is_equal(string_cursor_peek(cursor), '-')) {
+        negative = rune_is_equal(string_cursor_peek(cursor), '-');
+        (void)string_cursor_next(cursor);
+    }
+
+    while (binding_cursor_peek_ascii_digit(cursor, &digit)) {
+        if (digit != '0' || seen_nonzero) {
+            seen_nonzero = true;
+            string_append_char(digits, digit);
+            digit_count++;
         }
-        p++;
+        (void)string_cursor_next(cursor);
     }
 
-    if (*p == '.') {
-        p++;
-        while (isdigit((unsigned char)*p)) {
+    if (binding_cursor_consume_ascii(cursor, '.')) {
+        while (binding_cursor_peek_ascii_digit(cursor, &digit)) {
             frac_digits++;
-            if (*p != '0' || seen_nonzero) {
-                seen_nonzero = 1;
-                digits[digit_count++] = *p;
+            if (digit != '0' || seen_nonzero) {
+                seen_nonzero = true;
+                string_append_char(digits, digit);
+                digit_count++;
             }
-            p++;
+            (void)string_cursor_next(cursor);
         }
     }
 
-    if (*p == 'e' || *p == 'E') {
-        int exp_negative = 0;
+    if (rune_is_equal(string_cursor_peek(cursor), 'e') ||
+        rune_is_equal(string_cursor_peek(cursor), 'E')) {
+        bool exp_negative = false;
 
-        p++;
-        if (*p == '+' || *p == '-') {
-            exp_negative = (*p == '-');
-            p++;
+        (void)string_cursor_next(cursor);
+        if (rune_is_equal(string_cursor_peek(cursor), '+') ||
+            rune_is_equal(string_cursor_peek(cursor), '-')) {
+            exp_negative = rune_is_equal(string_cursor_peek(cursor), '-');
+            (void)string_cursor_next(cursor);
         }
-        while (isdigit((unsigned char)*p)) {
-            exponent = exponent * 10 + (*p - '0');
-            p++;
+        while (binding_cursor_peek_ascii_digit(cursor, &digit)) {
+            exponent = exponent * 10 + (digit - '0');
+            (void)string_cursor_next(cursor);
         }
         if (exp_negative)
             exponent = -exponent;
     }
 
     if (digit_count == 0u) {
-        free(digits);
-        return num_create_from_string("0");
+        string_cursor_free(cursor);
+        string_free(digits);
+        return num_clone(NUM_ZERO);
     }
-    digits[digit_count] = '\0';
 
     frac_digits -= exponent;
-    if (frac_digits <= 0) {
-        size_t zeros = (size_t)-frac_digits;
-        size_t len = (negative ? 1u : 0u) + digit_count + zeros;
-        literal = (char *)fs_xmalloc(len + 1u);
-        p = literal;
-        if (negative)
-            *literal++ = '-';
-        memcpy(literal, digits, digit_count);
-        literal += digit_count;
-        memset(literal, '0', zeros);
-        literal += zeros;
-        *literal = '\0';
-        literal = (char *)p;
-    } else {
-        size_t denom_len = (size_t)frac_digits + 1u;
-        size_t len = (negative ? 1u : 0u) + digit_count + 1u + denom_len;
-        literal = (char *)fs_xmalloc(len + 1u);
-        p = literal;
-        if (negative)
-            *literal++ = '-';
-        memcpy(literal, digits, digit_count);
-        literal += digit_count;
-        *literal++ = '/';
-        *literal++ = '1';
-        memset(literal, '0', (size_t)frac_digits);
-        literal += frac_digits;
-        *literal = '\0';
-        literal = (char *)p;
+    literal = string_new();
+    if (!literal) {
+        string_cursor_free(cursor);
+        string_free(digits);
+        return num_clone(NUM_NAN);
     }
 
-    value = num_create_from_string(literal);
-    free(literal);
-    free(digits);
+    if (negative)
+        string_append_char(literal, '-');
+    string_append_string(literal, digits);
+
+    if (frac_digits <= 0) {
+        size_t zeros = (size_t)-frac_digits;
+
+        while (zeros-- > 0u)
+            string_append_char(literal, '0');
+    } else {
+        string_append_char(literal, '/');
+        string_append_char(literal, '1');
+        while (frac_digits-- > 0)
+            string_append_char(literal, '0');
+    }
+
+    value = num_create_from_text(literal);
+    string_free(literal);
+    string_free(digits);
+    string_cursor_free(cursor);
     return value;
+}
+
+static number_t binding_number_from_string(const string_t *text)
+{
+    if (text && string_view_equals_literal(string_view_all(text), "∞"))
+        return num_clone(NUM_INF);
+    if (text && string_view_equals_literal(string_view_all(text), "-∞"))
+        return num_clone(NUM_NINF);
+    if (binding_number_string_is_exact_decimal(text))
+        return binding_number_from_exact_decimal_string(text);
+
+    return num_create_from_text(text);
 }
 
 number_t binding_number_from_text(const char *text)
 {
-    if (text && strcmp(text, "∞") == 0)
-        return num_clone(NUM_INF);
-    if (text && strcmp(text, "-∞") == 0)
-        return num_clone(NUM_NINF);
-    if (binding_number_text_is_exact_decimal(text))
-        return binding_number_from_exact_decimal(text);
+    string_t *string = text ? string_new_with(text) : NULL;
+    number_t value;
 
-    return num_create_from_string(text);
+    if (!string)
+        return num_clone(NUM_NAN);
+
+    value = binding_number_from_string(string);
+    string_free(string);
+    return value;
 }
 
 expr_t *expr_binding_expr_eval_expr(const expr_binding_expr_t *expr)
@@ -899,46 +968,89 @@ bool expr_binding_expr_exact_complex(const expr_binding_expr_t *expr,
     return ops && ops->exact_complex ? ops->exact_complex(expr, out) : false;
 }
 
-static bool binding_number_text_exact_complex(const char *text,
-                                              binding_exact_complex_t *out)
+static bool binding_string_is_single_ascii(const string_t *text, char ch)
 {
-    size_t len;
-    char *coeff_text = NULL;
+    return text && string_length(text) == 1u &&
+           rune_is_equal(string_at(text, 0u), ch);
+}
+
+static bool binding_number_string_exact_complex(const string_t *text,
+                                                binding_exact_complex_t *out)
+{
+    string_cursor_t *cursor;
+    string_pos_t last_pos = 0u;
+    rune_t last;
+    string_t *coeff_text = NULL;
     number_t value;
+    bool have_rune = false;
 
     if (!text || !out)
         return false;
 
-    len = strlen(text);
-    if (len > 0u && (text[len - 1u] == 'i' || text[len - 1u] == 'I')) {
-        if (len == 1u) {
+    cursor = string_cursor_new(text);
+    if (!cursor)
+        return false;
+
+    while (!string_cursor_done(cursor)) {
+        last_pos = string_cursor_position(cursor);
+        last = string_cursor_peek(cursor);
+        have_rune = true;
+        if (string_cursor_next(cursor) != 0)
+            break;
+    }
+
+    if (have_rune &&
+        (rune_is_equal(last, 'i') || rune_is_equal(last, 'I'))) {
+        if (last_pos == 0u) {
             value = num_clone(NUM_ONE);
         } else {
-            coeff_text = expr_tostring_xstrdup(text);
-            coeff_text[len - 1u] = '\0';
-            if (strcmp(coeff_text, "+") == 0)
+            coeff_text = string_cursor_slice_between(0u, last_pos, cursor);
+            if (!coeff_text) {
+                string_cursor_free(cursor);
+                return false;
+            }
+
+            if (binding_string_is_single_ascii(coeff_text, '+'))
                 value = num_clone(NUM_ONE);
-            else if (strcmp(coeff_text, "-") == 0)
+            else if (binding_string_is_single_ascii(coeff_text, '-'))
                 value = num_clone(NUM_NEG_ONE);
             else
-                value = binding_number_from_text(coeff_text);
-            free(coeff_text);
+                value = binding_number_from_string(coeff_text);
+            string_free(coeff_text);
         }
         if (!num_is_exact(value) || !num_is_real(value)) {
             num_destroy(&value);
+            string_cursor_free(cursor);
             return false;
         }
         binding_exact_complex_set(out, num_clone(NUM_ZERO), value);
+        string_cursor_free(cursor);
         return true;
     }
 
-    value = binding_number_from_text(text);
+    value = binding_number_from_string(text);
     if (!num_is_exact(value) || !num_is_real(value)) {
         num_destroy(&value);
+        string_cursor_free(cursor);
         return false;
     }
     binding_exact_complex_set(out, value, num_clone(NUM_ZERO));
+    string_cursor_free(cursor);
     return true;
+}
+
+static bool binding_number_text_exact_complex(const char *text,
+                                              binding_exact_complex_t *out)
+{
+    string_t *string = text ? string_new_with(text) : NULL;
+    bool ok;
+
+    if (!string)
+        return false;
+
+    ok = binding_number_string_exact_complex(string, out);
+    string_free(string);
+    return ok;
 }
 
 static bool binding_exact_complex_number(const expr_binding_expr_t *expr,
@@ -1633,7 +1745,7 @@ static int parse_number_view(string_view_t text, number_t *out)
 {
     size_t len;
     size_t atom_len;
-    char *roundtrip;
+    string_t *roundtrip;
     string_t *literal;
     uint32_t value = 0u;
 
@@ -1657,7 +1769,7 @@ static int parse_number_view(string_view_t text, number_t *out)
     if (!literal)
         return 0;
 
-    *out = num_create_from_string(string_c_str(literal));
+    *out = num_create_from_text(literal);
     string_free(literal);
 
     roundtrip = num_to_string(*out);
@@ -1666,7 +1778,7 @@ static int parse_number_view(string_view_t text, number_t *out)
         return 0;
     }
 
-    free(roundtrip);
+    string_free(roundtrip);
     return 1;
 }
 
@@ -1716,7 +1828,7 @@ static int binding_can_start_atom(const binding_parser_t *p)
         return 0;
     if (c == '(' || c == '+' || c == '-' || c == '|')
         return 1;
-    if (isdigit(c) || c == '.')
+    if (binding_ascii_is_digit(c) || c == '.')
         return 1;
 
     return 0;
@@ -1817,7 +1929,7 @@ static const binding_func_entry_t *parse_binding_function_head(binding_parser_t 
     }
 
     while (string_cursor_peek_ascii(scan, &b) &&
-           (isalpha(b) || isdigit(b) || b == '_' || b == '-')) {
+           binding_ascii_is_function_name_char(b)) {
         string_cursor_skip(scan, 1u);
         id_end = string_cursor_position(scan);
     }
@@ -1839,16 +1951,22 @@ static const binding_func_entry_t *parse_binding_function_head(binding_parser_t 
     }
 
     {
-        static const char *const unicode_aliases[] = { "W₀", "W₋₁" };
+        static const struct {
+            const char *text;
+            size_t      len;
+        } unicode_aliases[] = {
+            { "W₀",  sizeof("W₀")  - 1u },
+            { "W₋₁", sizeof("W₋₁") - 1u }
+        };
 
         for (size_t i = 0u; i < sizeof(unicode_aliases) / sizeof(unicode_aliases[0]); ++i) {
-            size_t len = strlen(unicode_aliases[i]);
+            size_t len = unicode_aliases[i].len;
             string_view_t alias_span;
             const binding_func_entry_t *entry;
 
             if (!string_cursor_match_at(p->cursor,
                                                      binding_pos(p),
-                                                     unicode_aliases[i]))
+                                                     unicode_aliases[i].text))
                 continue;
 
             alias_span = string_cursor_view_between(binding_pos(p),
@@ -1951,7 +2069,7 @@ static expr_binding_expr_t *parse_binding_atom(binding_parser_t *p)
         }
     }
 
-    if ((binding_peek_ascii(p, &c) && (isdigit(c) || c == '.')) ||
+    if ((binding_peek_ascii(p, &c) && (binding_ascii_is_digit(c) || c == '.')) ||
         scan_special_number_len_view(binding_text(p), binding_pos(p)) > 0u ||
         scan_unicode_fraction_len_view(binding_text(p), binding_pos(p)) > 0u) {
         size_t pos = binding_pos(p);
@@ -2328,146 +2446,246 @@ static void emit_binding_superscript_int(sbuf_t *b, long n)
         sbuf_puts(b, s_binding_sup_digits[tmp[len] - '0']);
 }
 
-static bool binding_text_is_simple_rational(const char *text,
-                                            bool *negative_out,
-                                            const char **numer_start_out,
-                                            size_t *numer_len_out,
-                                            const char **denom_start_out,
-                                            size_t *denom_len_out)
+typedef struct {
+    bool      negative;
+    string_t *numer;
+    string_t *denom;
+} binding_simple_rational_t;
+
+static void binding_simple_rational_clear(binding_simple_rational_t *rational)
 {
-    const char *s;
-    const char *slash;
+    if (!rational)
+        return;
+    string_free(rational->numer);
+    string_free(rational->denom);
+    rational->negative = false;
+    rational->numer = NULL;
+    rational->denom = NULL;
+}
 
-    if (!text || !*text)
+static bool binding_string_is_simple_rational(const string_t *text,
+                                              binding_simple_rational_t *out)
+{
+    string_cursor_t *cursor;
+    string_pos_t numer_start;
+    string_pos_t slash_pos;
+    string_pos_t denom_start;
+    size_t numer_digits = 0u;
+    size_t denom_digits = 0u;
+    bool ok = false;
+
+    if (!text || !out)
         return false;
 
-    s = text;
-    *negative_out = false;
-    if (*s == '+' || *s == '-') {
-        *negative_out = (*s == '-');
-        s++;
+    out->negative = false;
+    out->numer = NULL;
+    out->denom = NULL;
+
+    cursor = string_cursor_new(text);
+    if (!cursor)
+        return false;
+
+    if (rune_is_equal(string_cursor_peek(cursor), '+') ||
+        rune_is_equal(string_cursor_peek(cursor), '-')) {
+        out->negative = rune_is_equal(string_cursor_peek(cursor), '-');
+        (void)string_cursor_next(cursor);
     }
-    if (!isdigit((unsigned char)*s))
+
+    numer_start = string_cursor_position(cursor);
+    while (binding_cursor_peek_ascii_digit(cursor, NULL)) {
+        numer_digits++;
+        (void)string_cursor_next(cursor);
+    }
+    if (numer_digits == 0u || !rune_is_equal(string_cursor_peek(cursor), '/'))
+        goto done;
+
+    slash_pos = string_cursor_position(cursor);
+    (void)string_cursor_next(cursor);
+    denom_start = string_cursor_position(cursor);
+
+    while (binding_cursor_peek_ascii_digit(cursor, NULL)) {
+        denom_digits++;
+        (void)string_cursor_next(cursor);
+    }
+    if (denom_digits == 0u || !string_cursor_done(cursor))
+        goto done;
+
+    out->numer = string_cursor_slice_between(numer_start, slash_pos, cursor);
+    out->denom = string_cursor_extract(denom_start, cursor);
+    ok = out->numer && out->denom;
+
+done:
+    string_cursor_free(cursor);
+    if (!ok)
+        binding_simple_rational_clear(out);
+    return ok;
+}
+
+static bool binding_text_is_simple_rational(const char *text,
+                                            binding_simple_rational_t *out)
+{
+    string_t *string = text ? string_new_with(text) : NULL;
+    bool ok;
+
+    if (!string)
         return false;
 
-    slash = strchr(s, '/');
-    if (!slash || strchr(slash + 1, '/'))
-        return false;
-    if (slash == s || slash[1] == '\0')
-        return false;
+    ok = binding_string_is_simple_rational(string, out);
+    string_free(string);
+    return ok;
+}
 
-    for (const char *p = s; p < slash; ++p)
-        if (!isdigit((unsigned char)*p))
-            return false;
-    for (const char *p = slash + 1; *p; ++p)
-        if (!isdigit((unsigned char)*p))
-            return false;
+static void emit_binding_digits(sbuf_t *b, const string_t *digits)
+{
+    string_cursor_t *cursor = string_cursor_new(digits);
 
-    *numer_start_out = s;
-    *numer_len_out = (size_t)(slash - s);
-    *denom_start_out = slash + 1;
-    *denom_len_out = strlen(slash + 1);
-    return true;
+    if (!cursor)
+        return;
+    while (!string_cursor_done(cursor)) {
+        char digit;
+
+        if (binding_cursor_peek_ascii_digit(cursor, &digit))
+            sbuf_putc(b, digit);
+        if (string_cursor_next(cursor) != 0)
+            break;
+    }
+    string_cursor_free(cursor);
 }
 
 static void emit_binding_unicode_digits(sbuf_t *b,
-                                        const char *digits,
-                                        size_t len,
+                                        const string_t *digits,
                                         const char *const table[10])
 {
-    for (size_t i = 0; i < len; ++i)
-        sbuf_puts(b, table[digits[i] - '0']);
+    string_cursor_t *cursor = string_cursor_new(digits);
+
+    if (!cursor)
+        return;
+    while (!string_cursor_done(cursor)) {
+        char digit;
+
+        if (binding_cursor_peek_ascii_digit(cursor, &digit))
+            sbuf_puts(b, table[digit - '0']);
+        if (string_cursor_next(cursor) != 0)
+            break;
+    }
+    string_cursor_free(cursor);
 }
 
-static void binding_trim_decimal_display_artifacts(char *text)
+static string_t *binding_decimal_display_text(const char *text)
 {
-    char *p;
+    string_t *source = string_new_with(text ? text : "");
+    string_t *out = NULL;
+    string_cursor_t *cursor = NULL;
 
-    if (!text)
-        return;
+    if (!source)
+        return NULL;
 
-    p = text;
-    while ((p = strchr(p, '.')) != NULL) {
-        char *frac = p + 1;
-        char *end = frac;
-        char *q;
-        char *zero_start = NULL;
+    out = string_new();
+    cursor = string_cursor_new(source);
+    if (!out || !cursor)
+        goto fail;
+
+    while (!string_cursor_done(cursor)) {
+        char digit;
+        string_pos_t frac_start;
+        string_pos_t keep_end;
+        string_pos_t last_nonzero_end;
+        string_pos_t zero_start = 0u;
+        string_pos_t long_zero_start = 0u;
+        size_t digit_count = 0u;
         size_t zero_run = 0u;
         bool seen_nonzero = false;
+        bool long_zero = false;
 
-        while (isdigit((unsigned char)*end))
-            ++end;
-        if (end == frac) {
-            ++p;
+        if (!rune_is_equal(string_cursor_peek(cursor), '.')) {
+            if (string_append_rune(out, string_cursor_peek(cursor)) != 0)
+                goto fail;
+            if (string_cursor_next(cursor) != 0)
+                goto fail;
             continue;
         }
 
-        for (q = frac; q < end; ++q) {
-            if (*q == '0') {
+        if (string_cursor_next(cursor) != 0)
+            goto fail;
+        frac_start = string_cursor_position(cursor);
+        last_nonzero_end = frac_start;
+
+        while (binding_cursor_peek_ascii_digit(cursor, &digit)) {
+            string_pos_t digit_start = string_cursor_position(cursor);
+
+            if (string_cursor_next(cursor) != 0)
+                goto fail;
+            digit_count++;
+
+            if (digit == '0') {
                 if (seen_nonzero) {
-                    if (!zero_start)
-                        zero_start = q;
-                    ++zero_run;
-                }
-                if (zero_start && zero_run >= 24u) {
-                    memmove(zero_start, end, strlen(end) + 1u);
-                    p = zero_start;
-                    break;
+                    if (zero_run == 0u)
+                        zero_start = digit_start;
+                    zero_run++;
+                    if (!long_zero && zero_run >= 24u) {
+                        long_zero = true;
+                        long_zero_start = zero_start;
+                    }
                 }
             } else {
                 seen_nonzero = true;
-                zero_start = NULL;
                 zero_run = 0u;
+                if (!long_zero)
+                    last_nonzero_end = string_cursor_position(cursor);
             }
         }
-        if (q != end)
-            continue;
 
-        while (end > frac && end[-1] == '0')
-            --end;
-        if (end == frac) {
-            memmove(p, q, strlen(q) + 1u);
+        if (digit_count == 0u) {
+            if (string_append_char(out, '.') != 0)
+                goto fail;
             continue;
         }
-        if (*end == '\0') {
-            *end = '\0';
-            p = end;
-        } else {
-            memmove(end, q, strlen(q) + 1u);
-            p = end;
+
+        keep_end = long_zero ? long_zero_start : last_nonzero_end;
+        if (keep_end > frac_start) {
+            if (string_append_char(out, '.') != 0)
+                goto fail;
+            if (string_cursor_append_slice_between(out, frac_start, keep_end, cursor) != 0)
+                goto fail;
         }
     }
+
+    string_cursor_free(cursor);
+    string_free(source);
+    return out;
+
+fail:
+    string_cursor_free(cursor);
+    string_free(out);
+    string_free(source);
+    return NULL;
 }
 
 static void emit_binding_number_text(const char *text, sbuf_t *b)
 {
-    char *clean;
-    bool negative;
-    const char *numer;
-    const char *denom;
-    size_t numer_len;
-    size_t denom_len;
+    string_t *clean;
+    binding_simple_rational_t rational = { false, NULL, NULL };
 
-    if (binding_text_is_simple_rational(text, &negative,
-                                        &numer, &numer_len,
-                                        &denom, &denom_len)) {
-        if (negative)
+    if (binding_text_is_simple_rational(text, &rational)) {
+        if (rational.negative)
             sbuf_putc(b, '-');
-        if (denom_len == 1u && denom[0] == '1') {
-            for (size_t i = 0u; i < numer_len; ++i)
-                sbuf_putc(b, numer[i]);
+        if (binding_string_is_single_ascii(rational.denom, '1')) {
+            emit_binding_digits(b, rational.numer);
+            binding_simple_rational_clear(&rational);
             return;
         }
-        emit_binding_unicode_digits(b, numer, numer_len, s_binding_sup_digits);
+        emit_binding_unicode_digits(b, rational.numer, s_binding_sup_digits);
         sbuf_puts(b, "⁄");
-        emit_binding_unicode_digits(b, denom, denom_len, s_binding_sub_digits);
+        emit_binding_unicode_digits(b, rational.denom, s_binding_sub_digits);
+        binding_simple_rational_clear(&rational);
         return;
     }
 
-    clean = expr_tostring_xstrdup(text ? text : "");
-    binding_trim_decimal_display_artifacts(clean);
-    sbuf_puts(b, clean);
-    free(clean);
+    clean = binding_decimal_display_text(text);
+    if (clean) {
+        sbuf_puts(b, string_c_str(clean));
+        string_free(clean);
+    }
 }
 
 static void emit_binding_expr(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
@@ -2870,13 +3088,9 @@ static void emit_binding_expr_powi(const expr_binding_expr_t *expr, sbuf_t *b, i
 
 static void emit_binding_tex_number(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec)
 {
-    char *clean;
+    string_t *clean;
     char *tex;
-    bool negative;
-    const char *numer;
-    const char *denom;
-    size_t numer_len;
-    size_t denom_len;
+    binding_simple_rational_t rational = { false, NULL, NULL };
 
     (void)parent_prec;
     if (expr->u.text && strcmp(expr->u.text, "∞") == 0) {
@@ -2887,25 +3101,21 @@ static void emit_binding_tex_number(const expr_binding_expr_t *expr, sbuf_t *b, 
         sbuf_puts(b, "-\\infty");
         return;
     }
-    if (binding_text_is_simple_rational(expr->u.text, &negative,
-                                        &numer, &numer_len,
-                                        &denom, &denom_len)) {
-        if (negative)
+    if (binding_text_is_simple_rational(expr->u.text, &rational)) {
+        if (rational.negative)
             sbuf_putc(b, '-');
         sbuf_puts(b, "\\frac{");
-        for (size_t i = 0u; i < numer_len; ++i)
-            sbuf_putc(b, numer[i]);
+        emit_binding_digits(b, rational.numer);
         sbuf_puts(b, "}{");
-        for (size_t i = 0u; i < denom_len; ++i)
-            sbuf_putc(b, denom[i]);
+        emit_binding_digits(b, rational.denom);
         sbuf_putc(b, '}');
+        binding_simple_rational_clear(&rational);
         return;
     }
 
-    clean = expr_tostring_xstrdup(expr->u.text ? expr->u.text : "");
-    binding_trim_decimal_display_artifacts(clean);
-    tex = expr_tostring_texify(clean);
-    free(clean);
+    clean = binding_decimal_display_text(expr->u.text);
+    tex = expr_tostring_texify(clean ? string_c_str(clean) : "");
+    string_free(clean);
     if (tex) {
         sbuf_puts(b, tex);
         free(tex);
@@ -3605,7 +3815,7 @@ char *expr_binding_expr_to_string(const expr_binding_expr_t *expr)
     sbuf_init(&b);
     emit_binding_expr(expr, &b, BIND_PREC_LOWEST);
     {
-        char *out = expr_tostring_xstrdup(b.data);
+        char *out = sbuf_to_c_string(&b);
         sbuf_free(&b);
         return out;
     }
@@ -3618,7 +3828,7 @@ char *expr_binding_expr_to_function_string(const expr_binding_expr_t *expr)
     sbuf_init(&b);
     emit_binding_func_expr(expr, &b, BIND_PREC_LOWEST);
     {
-        char *out = expr_tostring_xstrdup(b.data);
+        char *out = sbuf_to_c_string(&b);
         sbuf_free(&b);
         return out;
     }
@@ -3631,7 +3841,7 @@ char *expr_binding_expr_to_tex(const expr_binding_expr_t *expr)
     sbuf_init(&b);
     emit_binding_tex_expr(expr, &b, BIND_PREC_LOWEST);
     {
-        char *out = expr_tostring_xstrdup(b.data);
+        char *out = sbuf_to_c_string(&b);
         sbuf_free(&b);
         return out;
     }

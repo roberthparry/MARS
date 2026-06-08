@@ -62,7 +62,8 @@ static int int_cmp(const void *a, const void *b) {
 static size_t str_hash(const void *p) {
     const char *s = *(const char * const *)p;
     size_t h = 146527;
-    while (*s) h = (h * 33) ^ (unsigned char)*s++;
+    for (size_t i = 0u; s[i] != '\0'; ++i)
+        h = (h * 33) ^ (unsigned char)s[i];
     return h;
 }
 
@@ -96,7 +97,8 @@ static size_t deep_hash(const void *p) {
     const struct deep *d = p;
     size_t h = 146527;
     const char *s = d->name;
-    while (*s) h = (h * 33) ^ (unsigned char)*s++;
+    for (size_t i = 0u; s[i] != '\0'; ++i)
+        h = (h * 33) ^ (unsigned char)s[i];
     return h ^ (size_t)d->value;
 }
 

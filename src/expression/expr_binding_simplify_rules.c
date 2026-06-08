@@ -1,4 +1,3 @@
-#include <errno.h>
 #include <limits.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -8,13 +7,110 @@
 #include "expr_binding_simplify.h"
 #include "expr_tostring.h"
 #include "internal/number_internal.h"
+#include "ustring.h"
+
+static bool binding_simplify_cursor_peek_digit(const string_cursor_t *cursor,
+                                               unsigned int *digit_out)
+{
+    char ch;
+
+    if (!rune_to_ascii(string_cursor_peek(cursor), &ch) ||
+        ch < '0' || ch > '9')
+        return false;
+
+    if (digit_out)
+        *digit_out = (unsigned int)(ch - '0');
+    return true;
+}
+
+static bool binding_text_to_ulong(const string_t *text, unsigned long *out)
+{
+    string_cursor_t *cursor;
+    unsigned long parsed = 0ul;
+    size_t digits = 0u;
+    bool ok = false;
+
+    if (!text || !out)
+        return false;
+
+    cursor = string_cursor_new(text);
+    if (!cursor)
+        return false;
+
+    while (binding_simplify_cursor_peek_digit(cursor, NULL)) {
+        unsigned int digit;
+
+        (void)binding_simplify_cursor_peek_digit(cursor, &digit);
+        if (parsed > (ULONG_MAX - digit) / 10ul)
+            goto done;
+        parsed = parsed * 10ul + digit;
+        digits++;
+        (void)string_cursor_next(cursor);
+    }
+
+    ok = digits > 0u && string_cursor_done(cursor);
+    if (ok)
+        *out = parsed;
+
+done:
+    string_cursor_free(cursor);
+    return ok;
+}
+
+static bool binding_text_to_long(const string_t *text, long *out)
+{
+    string_cursor_t *cursor;
+    unsigned long parsed = 0ul;
+    unsigned long limit;
+    size_t digits = 0u;
+    bool negative = false;
+    bool ok = false;
+
+    if (!text || !out)
+        return false;
+
+    cursor = string_cursor_new(text);
+    if (!cursor)
+        return false;
+
+    if (rune_is_equal(string_cursor_peek(cursor), '+') ||
+        rune_is_equal(string_cursor_peek(cursor), '-')) {
+        negative = rune_is_equal(string_cursor_peek(cursor), '-');
+        (void)string_cursor_next(cursor);
+    }
+
+    limit = negative ? (unsigned long)LONG_MAX + 1ul : (unsigned long)LONG_MAX;
+    while (binding_simplify_cursor_peek_digit(cursor, NULL)) {
+        unsigned int digit;
+
+        (void)binding_simplify_cursor_peek_digit(cursor, &digit);
+        if (parsed > (limit - digit) / 10ul)
+            goto done;
+        parsed = parsed * 10ul + digit;
+        digits++;
+        (void)string_cursor_next(cursor);
+    }
+
+    ok = digits > 0u && string_cursor_done(cursor);
+    if (ok) {
+        if (negative && parsed == (unsigned long)LONG_MAX + 1ul)
+            *out = LONG_MIN;
+        else if (negative)
+            *out = -(long)parsed;
+        else
+            *out = (long)parsed;
+    }
+
+done:
+    string_cursor_free(cursor);
+    return ok;
+}
 
 static bool binding_expr_positive_ulong_value(const expr_binding_expr_t *expr,
                                               unsigned long *out)
 {
     number_t value;
-    char *text;
-    char *end = NULL;
+    string_t *text;
     unsigned long parsed;
     bool ok;
 
@@ -30,10 +126,8 @@ static bool binding_expr_positive_ulong_value(const expr_binding_expr_t *expr,
     if (!text)
         return false;
 
-    errno = 0;
-    parsed = strtoul(text, &end, 10);
-    ok = errno == 0 && end && *end == '\0' && parsed > 0ul;
-    free(text);
+    ok = binding_text_to_ulong(text, &parsed) && parsed > 0ul;
+    string_free(text);
     if (!ok)
         return false;
 
@@ -194,18 +288,14 @@ bool binding_number_text_to_long(const expr_binding_expr_t *expr, long *out)
     value = binding_number_from_text(expr->u.text);
     floor_value = num_floor(value);
     if (num_eq(value, floor_value)) {
-        char *text = num_to_string(value);
-        char *end = NULL;
+        string_t *text = num_to_string(value);
         long parsed = 0;
 
-        errno = 0;
-        if (text)
-            parsed = strtol(text, &end, 10);
-        if (text && errno == 0 && end && *end == '\0') {
+        if (text && binding_text_to_long(text, &parsed)) {
             *out = parsed;
             ok = true;
         }
-        free(text);
+        string_free(text);
     }
     num_destroy(&floor_value);
     num_destroy(&value);
@@ -421,83 +511,121 @@ expr_binding_expr_t *binding_expr_try_simplify_sqrt_square(expr_binding_expr_t *
 
 static expr_binding_expr_t *binding_expr_number_from_value(number_t value)
 {
-    char *text;
+    string_t *text;
     expr_binding_expr_t *expr;
 
     if (num_is_inf(value))
         return expr_binding_expr_new_number_text(num_get_sign(value) < 0 ? "-∞" : "∞");
 
     text = num_to_string(value);
-    expr = expr_binding_expr_new_number_text(text ? text : "NAN");
+    expr = expr_binding_expr_new_number_text(text ? string_c_str(text) : "NAN");
 
-    free(text);
+    string_free(text);
     return expr;
 }
 
-static bool binding_text_is_decimal_literal(const char *text)
+static bool binding_string_is_decimal_literal(const string_t *text)
 {
-    const char *p = text;
+    string_cursor_t *cursor;
     bool have_digit = false;
     bool have_decimal_marker = false;
     bool have_exp_digit = false;
 
-    if (!p || !*p)
+    if (!text || string_length(text) == 0u)
         return false;
 
-    if (*p == '+' || *p == '-')
-        p++;
+    cursor = string_cursor_new(text);
+    if (!cursor)
+        return false;
 
-    while (*p >= '0' && *p <= '9') {
+    if (rune_is_equal(string_cursor_peek(cursor), '+') ||
+        rune_is_equal(string_cursor_peek(cursor), '-'))
+        (void)string_cursor_next(cursor);
+
+    while (binding_simplify_cursor_peek_digit(cursor, NULL)) {
         have_digit = true;
-        p++;
+        (void)string_cursor_next(cursor);
     }
 
-    if (*p == '.') {
+    if (rune_is_equal(string_cursor_peek(cursor), '.')) {
         have_decimal_marker = true;
-        p++;
-        while (*p >= '0' && *p <= '9') {
+        (void)string_cursor_next(cursor);
+        while (binding_simplify_cursor_peek_digit(cursor, NULL)) {
             have_digit = true;
-            p++;
+            (void)string_cursor_next(cursor);
         }
     }
 
-    if (*p == 'e' || *p == 'E') {
+    if (rune_is_equal(string_cursor_peek(cursor), 'e') ||
+        rune_is_equal(string_cursor_peek(cursor), 'E')) {
         have_decimal_marker = true;
-        p++;
-        if (*p == '+' || *p == '-')
-            p++;
-        while (*p >= '0' && *p <= '9') {
+        (void)string_cursor_next(cursor);
+        if (rune_is_equal(string_cursor_peek(cursor), '+') ||
+            rune_is_equal(string_cursor_peek(cursor), '-'))
+            (void)string_cursor_next(cursor);
+        while (binding_simplify_cursor_peek_digit(cursor, NULL)) {
             have_exp_digit = true;
-            p++;
+            (void)string_cursor_next(cursor);
         }
-        if (!have_exp_digit)
+        if (!have_exp_digit) {
+            string_cursor_free(cursor);
             return false;
+        }
     }
 
-    return have_digit && have_decimal_marker && *p == '\0';
+    have_digit = have_digit && have_decimal_marker &&
+                 string_cursor_done(cursor);
+    string_cursor_free(cursor);
+    return have_digit;
 }
 
-static char *binding_negated_decimal_text(const char *text)
+static string_t *binding_negated_decimal_text(const char *text)
 {
-    char *out;
-    size_t len;
+    string_t *input = text ? string_new_with(text) : NULL;
+    string_cursor_t *cursor;
+    string_t *out;
+    string_pos_t start;
 
-    if (!binding_text_is_decimal_literal(text))
+    if (!input)
         return NULL;
-
-    if (text[0] == '-') {
-        return expr_tostring_xstrdup(text + 1u);
+    if (!binding_string_is_decimal_literal(input)) {
+        string_free(input);
+        return NULL;
     }
 
-    if (text[0] == '+')
-        text++;
+    cursor = string_cursor_new(input);
+    if (!cursor) {
+        string_free(input);
+        return NULL;
+    }
 
-    len = strlen(text);
-    out = (char *)malloc(len + 2u);
-    if (!out)
-        abort();
-    out[0] = '-';
-    memcpy(out + 1u, text, len + 1u);
+    if (rune_is_equal(string_cursor_peek(cursor), '-')) {
+        (void)string_cursor_next(cursor);
+        start = string_cursor_position(cursor);
+        out = string_cursor_slice_between(start,
+                                          string_cursor_end_position(cursor),
+                                          cursor);
+        string_cursor_free(cursor);
+        string_free(input);
+        return out;
+    }
+
+    if (rune_is_equal(string_cursor_peek(cursor), '+'))
+        (void)string_cursor_next(cursor);
+
+    start = string_cursor_position(cursor);
+    out = string_new_with("-");
+    if (out) {
+        if (string_cursor_append_slice_between(out,
+                                               start,
+                                               string_cursor_end_position(cursor),
+                                               cursor) != 0) {
+            string_free(out);
+            out = NULL;
+        }
+    }
+    string_cursor_free(cursor);
+    string_free(input);
     return out;
 }
 
@@ -506,7 +634,7 @@ expr_binding_expr_t *binding_expr_try_preserve_negated_decimal_owned(
 {
     expr_binding_expr_t *child;
     expr_binding_expr_t *folded;
-    char *text;
+    string_t *text;
 
     if (!expr || expr->kind != EXPR_BINDING_EXPR_NEG)
         return expr;
@@ -519,8 +647,8 @@ expr_binding_expr_t *binding_expr_try_preserve_negated_decimal_owned(
     if (!text)
         return expr;
 
-    folded = expr_binding_expr_new_number_text(text);
-    free(text);
+    folded = expr_binding_expr_new_number_text(string_c_str(text));
+    string_free(text);
     expr_binding_expr_free(expr);
     return folded;
 }
@@ -1269,11 +1397,11 @@ expr_binding_expr_t *binding_expr_try_simplify_trig_sum(expr_binding_expr_t *exp
 
 static expr_binding_expr_t *binding_expr_from_exact_real(number_t value)
 {
-    char *text = num_to_string(value);
+    string_t *text = num_to_string(value);
     expr_binding_expr_t *expr =
-        expr_binding_expr_new_number_text(text ? text : "NAN");
+        expr_binding_expr_new_number_text(text ? string_c_str(text) : "NAN");
 
-    free(text);
+    string_free(text);
     return expr;
 }
 

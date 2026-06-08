@@ -1,4 +1,5 @@
 #include "qfloat_internal.h"
+#include "ustring.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -58,62 +59,92 @@ static inline int qf_iszero(qfloat_t x)
     return (x.hi == 0.0 && x.lo == 0.0);
 }
 
+static bool qf_cursor_peek_digit(const string_cursor_t *cursor, int *digit_out)
+{
+    unsigned char ch = 0u;
+
+    if (!string_cursor_peek_ascii(cursor, &ch) || ch < '0' || ch > '9')
+        return false;
+
+    if (digit_out)
+        *digit_out = (int)(ch - '0');
+    return true;
+}
+
+static bool qf_cursor_consume_ascii(string_cursor_t *cursor, char expected)
+{
+    unsigned char ch = 0u;
+
+    if (!string_cursor_peek_ascii(cursor, &ch) || ch != (unsigned char)expected)
+        return false;
+
+    return string_cursor_next(cursor) == 0;
+}
+
 /* 32-digit decimal parser (no long double) */
-qfloat_t qf_from_string(const char *s)
+qfloat_t qf_from_text(const string_t *text)
 {
     qfloat_t result = QF_ZERO;
     qfloat_t ten    = QF_TEN;
+    string_cursor_t *cursor;
 
     int sign = 1;
     int exp10 = 0;
     int seen_dot = 0;
+    int digit = 0;
 
-    while (*s == ' ' || *s == '\t')
-        s++;
+    if (!text)
+        return QF_NAN;
 
-    if (*s == '-') {
+    cursor = string_cursor_new(text);
+    if (!cursor)
+        return QF_NAN;
+
+    string_cursor_skip_spaces(cursor);
+
+    if (qf_cursor_consume_ascii(cursor, '-')) {
         sign = -1;
-        s++;
-    } else if (*s == '+') {
-        s++;
+    } else {
+        (void)qf_cursor_consume_ascii(cursor, '+');
     }
 
-    while ((*s >= '0' && *s <= '9') || *s == '.') {
-        if (*s == '.') {
-            if (!seen_dot)
-                seen_dot = 1;
-            s++;
+    while (true) {
+        unsigned char ch = 0u;
+
+        if (qf_cursor_peek_digit(cursor, &digit)) {
+            result = qf_mul(result, ten);
+            result = qf_add(result, qf_from_double((double)digit));
+
+            if (seen_dot)
+                exp10--;
+
+            (void)string_cursor_next(cursor);
             continue;
         }
 
-        {
-            int digit = *s - '0';
-
-            result = qf_mul(result, ten);
-            result = qf_add(result, qf_from_double((double)digit));
+        if (string_cursor_peek_ascii(cursor, &ch) && ch == '.') {
+            if (!seen_dot)
+                seen_dot = 1;
+            (void)string_cursor_next(cursor);
+            continue;
         }
-
-        if (seen_dot)
-            exp10--;
-
-        s++;
+        break;
     }
 
-    if (*s == 'e' || *s == 'E') {
+    if (qf_cursor_consume_ascii(cursor, 'e') ||
+        qf_cursor_consume_ascii(cursor, 'E')) {
         int esign = 1;
         int e = 0;
 
-        s++;
-        if (*s == '-') {
+        if (qf_cursor_consume_ascii(cursor, '-')) {
             esign = -1;
-            s++;
-        } else if (*s == '+') {
-            s++;
+        } else {
+            (void)qf_cursor_consume_ascii(cursor, '+');
         }
 
-        while (*s >= '0' && *s <= '9') {
-            e = e * 10 + (*s - '0');
-            s++;
+        while (qf_cursor_peek_digit(cursor, &digit)) {
+            e = e * 10 + digit;
+            (void)string_cursor_next(cursor);
         }
         exp10 += esign * e;
     }
@@ -131,6 +162,20 @@ qfloat_t qf_from_string(const char *s)
         result.lo = -result.lo;
     }
 
+    string_cursor_free(cursor);
+    return result;
+}
+
+qfloat_t qf_from_string(const char *s)
+{
+    string_t *text = string_new_with(s ? s : "");
+    qfloat_t result;
+
+    if (!text)
+        return QF_NAN;
+
+    result = qf_from_text(text);
+    string_free(text);
     return result;
 }
 
@@ -170,80 +215,106 @@ int qf_decimal_exponent(qfloat_t x)
     return (int)e;
 }
 
-/* Extract ndigits decimal digits and return the (possibly adjusted) exp10 */
-int qf_to_decimal_digits(qfloat_t x, char *digits, int ndigits, int *out_exp10)
+/* Extract ndigits decimal digits and return the (possibly adjusted) exp10. */
+string_t *qf_decimal_digits_text(qfloat_t x, int ndigits, int *out_exp10)
 {
-    /* assume x > 0 and not zero; sign handled outside */
-
     int exp10 = qf_decimal_exponent(x);
     qfloat_t y  = qf_scale_pow10(x, -exp10);   /* y ≈ [1,10) */
-
     qfloat_t ten = QF_TEN;
+    string_t *digits;
+
+    if (ndigits < 0)
+        return NULL;
+
+    digits = string_new();
+    if (!digits)
+        return NULL;
 
     for (int i = 0; i < ndigits; i++) {
-
-        /* use full qfloat_t for the remainder, but digit from hi */
         int digit = qf_to_int(qf_floor(y));
         if (digit < 0) digit = 0;
         if (digit > 9) digit = 9;
 
-        digits[i] = (char)('0' + digit);
+        if (string_append_char(digits, (char)('0' + digit)) != 0) {
+            string_free(digits);
+            return NULL;
+        }
 
-        /* y = (y - digit) * 10, using qfloat_t subtraction */
         qfloat_t d = (qfloat_t){ (double)digit, 0.0 };
         y = qf_sub(y, d);
         y = qf_mul(y, ten);
     }
 
-    if (out_exp10) *out_exp10 = exp10;
-    return ndigits;
+    if (out_exp10)
+        *out_exp10 = exp10;
+    return digits;
 }
 
-void qf_to_string(qfloat_t x, char *out, size_t out_size)
+string_t *qf_to_text(qfloat_t x)
 {
-    if (out_size == 0) return;
+    string_t *out;
 
     /* Zero */
     if (x.hi == 0.0 && x.lo == 0.0) {
-        snprintf(out, out_size, "0");
-        return;
+        return string_new_with("0");
     }
 
     /* NaN */
     if (isnan(x.hi) || isnan(x.lo)) {
         if (signbit(x.hi))
-            snprintf(out, out_size, "-NAN");
-        else
-            snprintf(out, out_size, "NAN");
-        return;
+            return string_new_with("-NAN");
+        return string_new_with("NAN");
     }
 
     /* Inf */
     if (isinf(x.hi)) {
         if (signbit(x.hi))
-            snprintf(out, out_size, "-INF");
-        else
-            snprintf(out, out_size, "INF");
-        return;
+            return string_new_with("-INF");
+        return string_new_with("INF");
     }
 
     int sign = (x.hi < 0.0 || (x.hi == 0.0 && x.lo < 0.0));
     if (sign) { x.hi = -x.hi; x.lo = -x.lo; }
 
-    char digits[40];
+    string_t *digits;
     int exp10 = 0;
-    qf_to_decimal_digits(x, digits, 34, &exp10);
 
-    size_t pos = 0;
-    if (sign && pos < out_size - 1) out[pos++] = '-';
-    if (pos < out_size - 1) out[pos++] = digits[0];
-    if (pos < out_size - 1) out[pos++] = '.';
-    for (int i = 1; i < 34 && pos < out_size - 1; i++)
-        out[pos++] = digits[i];
+    digits = qf_decimal_digits_text(x, 34, &exp10);
+    if (!digits)
+        return NULL;
 
-    int n = snprintf(out + pos, out_size - pos, "e%+d", exp10);
-    if (n < 0) n = 0;
-    pos += n;
-    if (pos >= out_size) out[out_size - 1] = '\0';
-    else out[pos] = '\0';
+    out = string_new();
+    if (!out) {
+        string_free(digits);
+        return NULL;
+    }
+
+    if ((sign && string_append_char(out, '-') != 0) ||
+        string_append_rune(out, string_at(digits, 0u)) != 0 ||
+        string_append_char(out, '.') != 0) {
+        string_free(digits);
+        string_free(out);
+        return NULL;
+    }
+
+    for (int i = 1; i < 34; i++) {
+        if (string_append_rune(out, string_at(digits, (size_t)i)) != 0) {
+            string_free(digits);
+            string_free(out);
+            return NULL;
+        }
+    }
+
+    if (string_append_format(out, "e%+d", exp10) < 0) {
+        string_free(digits);
+        string_free(out);
+        return NULL;
+    }
+    string_free(digits);
+    return out;
+}
+
+string_t *qf_to_string(qfloat_t x)
+{
+    return qf_to_text(x);
 }

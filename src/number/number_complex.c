@@ -1,10 +1,10 @@
 #include "number.h"
 #include "number_internal.h"
+#include "ustring.h"
 
 #include <limits.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <string.h>
 
 bool number_eq_same_tol_complex(const number_t *a, const number_t *b);
 
@@ -171,14 +171,13 @@ bool number_get_mantissa_u64_complex(const number_t *number, uint64_t *out)
     return value && out && num_get_mantissa_u64(value->real, out);
 }
 
-char *number_to_string_complex(const number_t *number)
+string_t *number_to_text_complex(const number_t *number)
 {
     const complex_t *value = number_complex_value(number);
-    char *real = NULL;
-    char *imag = NULL;
-    char *out = NULL;
+    string_t *real = NULL;
+    string_t *imag = NULL;
+    string_t *formatted = NULL;
     bool imag_negative;
-    size_t len;
 
     if (!value)
         return NULL;
@@ -186,18 +185,15 @@ char *number_to_string_complex(const number_t *number)
         return num_to_string(value->real);
     if (num_is_zero(value->real)) {
         if (num_eq(value->imag, NUM_ONE))
-            return number_strdup("i");
+            return string_new_with("i");
         if (num_eq(value->imag, NUM_NEG_ONE))
-            return number_strdup("-i");
+            return string_new_with("-i");
         imag = num_to_string(value->imag);
         if (!imag)
             return NULL;
-        len = strlen(imag) + 2u;
-        out = malloc(len);
-        if (out)
-            snprintf(out, len, "%si", imag);
-        free(imag);
-        return out;
+        formatted = string_sprintf("%Si", imag);
+        string_free(imag);
+        return formatted;
     }
 
     real = num_to_string(value->real);
@@ -209,21 +205,19 @@ char *number_to_string_complex(const number_t *number)
     }
     if (!real || !imag)
         goto done;
-    if (strcmp(imag, "1") == 0) {
-        free(imag);
-        imag = number_strdup("");
-        if (!imag)
-            goto done;
-    }
-    len = strlen(real) + strlen(imag) + 6u;
-    out = malloc(len);
-    if (out)
-        snprintf(out, len, "%s %c %si", real, imag_negative ? '-' : '+', imag);
+
+    if (string_view_equals_literal(string_view_all(imag), "1"))
+        string_clear(imag);
+
+    formatted = string_sprintf("%S %c %Si",
+                               real,
+                               imag_negative ? '-' : '+',
+                               imag);
 
 done:
-    free(real);
-    free(imag);
-    return out;
+    string_free(real);
+    string_free(imag);
+    return formatted;
 }
 
 number_t *number_clone_complex(const number_t *number)

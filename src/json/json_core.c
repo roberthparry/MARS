@@ -182,19 +182,19 @@ done:
 bool json_number_value_from_spelling(const string_t *text, number_t *out)
 {
     number_t value;
-    char *round_trip;
+    string_t *round_trip;
 
     if (!text || !out)
         return false;
 
-    value = num_create_from_string(string_c_str(text));
+    value = num_create_from_text(text);
     round_trip = num_to_string(value);
     if (!round_trip) {
         num_destroy(&value);
         return false;
     }
 
-    free(round_trip);
+    string_free(round_trip);
     *out = value;
     return true;
 }
@@ -202,35 +202,11 @@ bool json_number_value_from_spelling(const string_t *text, number_t *out)
 string_t *json_number_spelling(number_t value)
 {
     const char *constant_name = num_constant_name(value);
-    char *text;
-    string_t *out;
 
     if (constant_name)
         return string_new_with(constant_name);
 
-    text = num_to_string(value);
-    if (!text)
-        return NULL;
-
-    out = string_new_with(text);
-    free(text);
-    return out;
-}
-
-static bool json_number_text_is_valid_value(const string_t *text)
-{
-    number_t value;
-    bool ok;
-
-    if (!text)
-        return false;
-
-    ok = json_number_value_from_spelling(text, &value);
-    if (!ok)
-        return false;
-
-    num_destroy(&value);
-    return true;
+    return num_to_string(value);
 }
 
 json_t *json_new_number(const string_t *number_text)
@@ -240,14 +216,15 @@ json_t *json_new_number(const string_t *number_text)
 
     if (!json_number_scan(number_text, true))
         return NULL;
-    if (!json_number_text_is_valid_value(number_text))
+    if (!json_number_value_from_spelling(number_text, &value))
         return NULL;
 
     json = json_alloc(JSON_NUMBER);
-    if (!json)
+    if (!json) {
+        num_destroy(&value);
         return NULL;
+    }
 
-    value = num_create_from_string(string_c_str(number_text));
     json->u.number.value = value;
     json->u.number.text = string_clone(number_text);
     if (!json->u.number.text) {

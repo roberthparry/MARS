@@ -80,8 +80,8 @@ int expr_to_tex_parts(const expr_t *dv, char **expr_out, char **bindings_out)
         }
     }
 
-    *expr_out = expr_tostring_texify(expr.data);
-    *bindings_out = expr_tostring_texify(bindings.data);
+    *expr_out = expr_tostring_texify(sbuf_c_str(&expr));
+    *bindings_out = expr_tostring_texify(sbuf_c_str(&bindings));
 
     sbuf_free(&expr);
     sbuf_free(&bindings);

@@ -10,6 +10,7 @@
 #include "number.h"
 #include "number_internal.h"
 #include "number_scope_alloc.h"
+#include "ustring.h"
 
 #include <complex.h>
 #undef complex
@@ -288,12 +289,58 @@ static size_t number_constant_name_count(void)
     return NUMBER_CONSTANT_NAME_COUNT;
 }
 
-static uint32_t number_constant_hash_bytes(const char *text, size_t len, uint32_t seed)
+static uint32_t number_constant_hash_feed_byte(uint32_t hash, unsigned char byte)
+{
+    return (hash * 65599u) ^ (uint32_t)byte;
+}
+
+static uint32_t number_constant_hash_feed_rune(uint32_t hash, uint32_t rune)
+{
+    if (rune <= 0x7fu)
+        return number_constant_hash_feed_byte(hash, (unsigned char)rune);
+    if (rune <= 0x7ffu) {
+        hash = number_constant_hash_feed_byte(hash,
+            (unsigned char)(0xc0u | (rune >> 6)));
+        return number_constant_hash_feed_byte(hash,
+            (unsigned char)(0x80u | (rune & 0x3fu)));
+    }
+    if (rune <= 0xffffu) {
+        hash = number_constant_hash_feed_byte(hash,
+            (unsigned char)(0xe0u | (rune >> 12)));
+        hash = number_constant_hash_feed_byte(hash,
+            (unsigned char)(0x80u | ((rune >> 6) & 0x3fu)));
+        return number_constant_hash_feed_byte(hash,
+            (unsigned char)(0x80u | (rune & 0x3fu)));
+    }
+
+    hash = number_constant_hash_feed_byte(hash,
+        (unsigned char)(0xf0u | (rune >> 18)));
+    hash = number_constant_hash_feed_byte(hash,
+        (unsigned char)(0x80u | ((rune >> 12) & 0x3fu)));
+    hash = number_constant_hash_feed_byte(hash,
+        (unsigned char)(0x80u | ((rune >> 6) & 0x3fu)));
+    return number_constant_hash_feed_byte(hash,
+        (unsigned char)(0x80u | (rune & 0x3fu)));
+}
+
+static uint32_t number_constant_hash_view(string_view_t view, uint32_t seed)
 {
     uint32_t hash = seed;
+    size_t len = string_view_length(view);
+    string_pos_t pos = 0u;
 
-    for (size_t i = 0u; i < len; ++i)
-        hash = (hash * 65599u) ^ (unsigned char)text[i];
+    while (pos < len) {
+        uint32_t rune = 0u;
+        string_pos_t next = 0u;
+
+        if (!string_view_peek_rune_value(view, pos, &rune, &next) ||
+            next <= pos) {
+            break;
+        }
+
+        hash = number_constant_hash_feed_rune(hash, rune);
+        pos = next;
+    }
 
     hash ^= (uint32_t)(len * 0x9e3779b9u);
     hash ^= hash >> 16;
@@ -302,17 +349,17 @@ static uint32_t number_constant_hash_bytes(const char *text, size_t len, uint32_
     return hash;
 }
 
-static size_t number_constant_hash_index(const char *text, size_t len)
+static size_t number_constant_hash_index(string_view_t view)
 {
     size_t vertex0;
     size_t vertex1;
     size_t vertex2;
 
-    vertex0 = number_constant_hash_bytes(text, len, NUMBER_CONSTANT_HASH_SEED0) %
+    vertex0 = number_constant_hash_view(view, NUMBER_CONSTANT_HASH_SEED0) %
               NUMBER_CONSTANT_HASH_VERTEX_COUNT;
-    vertex1 = number_constant_hash_bytes(text, len, NUMBER_CONSTANT_HASH_SEED1) %
+    vertex1 = number_constant_hash_view(view, NUMBER_CONSTANT_HASH_SEED1) %
               NUMBER_CONSTANT_HASH_VERTEX_COUNT;
-    vertex2 = number_constant_hash_bytes(text, len, NUMBER_CONSTANT_HASH_SEED2) %
+    vertex2 = number_constant_hash_view(view, NUMBER_CONSTANT_HASH_SEED2) %
               NUMBER_CONSTANT_HASH_VERTEX_COUNT;
 
     return ((size_t)number_constant_hash_g[vertex0] +
@@ -321,50 +368,51 @@ static size_t number_constant_hash_index(const char *text, size_t len)
            NUMBER_CONSTANT_NAME_COUNT;
 }
 
-static void number_trim_name(const char *text, const char **start_out, size_t *len_out)
-{
-    const char *start = text;
-    const char *end;
-
-    if (!text) {
-        *start_out = NULL;
-        *len_out = 0u;
-        return;
-    }
-
-    while (*start && isspace((unsigned char)*start))
-        ++start;
-    end = start + strlen(start);
-    while (end > start && isspace((unsigned char)end[-1]))
-        --end;
-
-    *start_out = start;
-    *len_out = (size_t)(end - start);
-}
-
-bool num_constant_value(const char *text, number_t *out)
+static bool number_constant_value_view(string_view_t view, number_t *out)
 {
     const number_constant_name_t *entry;
-    const char *start;
     size_t len;
     size_t index;
 
     if (!out)
         return false;
 
-    number_trim_name(text, &start, &len);
-    if (!start || len == 0u)
+    view = string_view_trim(view);
+    len = string_view_length(view);
+    if (len == 0u)
         return false;
 
-    index = number_constant_hash_index(start, len);
+    index = number_constant_hash_index(view);
     entry = &number_constant_names[index];
 
-    if (strlen(entry->name) == len && memcmp(start, entry->name, len) == 0) {
+    if (string_view_equals_literal(view, entry->name)) {
         *out = num_clone(*entry->value);
         return true;
     }
 
     return false;
+}
+
+bool num_constant_value_text(const string_t *text, number_t *out)
+{
+    return text ? number_constant_value_view(string_view_all(text), out) : false;
+}
+
+bool num_constant_value(const char *text, number_t *out)
+{
+    string_t *owned;
+    bool found;
+
+    if (!out)
+        return false;
+
+    owned = text ? string_new_with(text) : NULL;
+    if (!owned)
+        return false;
+
+    found = num_constant_value_text(owned, out);
+    string_free(owned);
+    return found;
 }
 
 const char *num_constant_name(number_t value)
@@ -927,54 +975,123 @@ number_t *number_box_value(number_t value)
     return boxed;
 }
 
-static const char *number_skip_ws(const char *text)
+static unsigned char number_ascii_lower(unsigned char ch)
 {
-    if (!text)
-        return NULL;
-    while (*text && isspace((unsigned char)*text))
-        text++;
-    return text;
+    return (ch >= 'A' && ch <= 'Z') ? (unsigned char)(ch - 'A' + 'a') : ch;
 }
 
-static bool number_has_char_ci(const char *text, char needle)
+static bool number_text_has_ascii(const string_t *text, char needle)
 {
-    unsigned char want;
+    string_cursor_t *cursor;
+    unsigned char ch;
 
     if (!text)
         return false;
-    want = (unsigned char)tolower((unsigned char)needle);
-    for (; *text; ++text) {
-        if ((unsigned char)tolower((unsigned char)*text) == want)
+
+    cursor = string_cursor_new(text);
+    if (!cursor)
+        return false;
+
+    while (!string_cursor_done(cursor)) {
+        if (string_cursor_peek_ascii(cursor, &ch) &&
+            ch == (unsigned char)needle) {
+            string_cursor_free(cursor);
             return true;
+        }
+        if (string_cursor_next(cursor) != 0)
+            break;
     }
+
+    string_cursor_free(cursor);
     return false;
 }
 
-static bool number_has_unicode_fraction_text(const char *text)
+static bool number_text_has_ascii_ci(const string_t *text, char needle)
 {
-    static const char *const glyphs[] = {
-        "½", "⅓", "⅔", "¼", "¾", "⅕", "⅖", "⅗", "⅘",
-        "⅙", "⅚", "⅐", "⅛", "⅜", "⅝", "⅞", "⅑", "⅒",
-    };
-    size_t i;
+    string_cursor_t *cursor;
+    unsigned char want = number_ascii_lower((unsigned char)needle);
+    unsigned char ch;
 
     if (!text)
         return false;
-    if (strstr(text, "⁄"))
-        return true;
 
-    for (i = 0u; i < sizeof(glyphs) / sizeof(glyphs[0]); ++i) {
-        if (strstr(text, glyphs[i]))
+    cursor = string_cursor_new(text);
+    if (!cursor)
+        return false;
+
+    while (!string_cursor_done(cursor)) {
+        if (string_cursor_peek_ascii(cursor, &ch) &&
+            number_ascii_lower(ch) == want) {
+            string_cursor_free(cursor);
             return true;
+        }
+        if (string_cursor_next(cursor) != 0)
+            break;
     }
 
+    string_cursor_free(cursor);
     return false;
 }
 
-static bool number_is_decimal_text(const char *text)
+static bool number_rune_is_fraction_marker(rune_t rune)
 {
-    return text && (strchr(text, '.') || strchr(text, 'e') || strchr(text, 'E') ||
-        number_has_char_ci(text, 'n') || number_has_char_ci(text, 'f'));
+    switch (rune_value(rune)) {
+        case 0x00BCu: /* ¼ */
+        case 0x00BDu: /* ½ */
+        case 0x00BEu: /* ¾ */
+        case 0x2044u: /* ⁄ */
+        case 0x2150u: /* ⅐ */
+        case 0x2151u: /* ⅑ */
+        case 0x2152u: /* ⅒ */
+        case 0x2153u: /* ⅓ */
+        case 0x2154u: /* ⅔ */
+        case 0x2155u: /* ⅕ */
+        case 0x2156u: /* ⅖ */
+        case 0x2157u: /* ⅗ */
+        case 0x2158u: /* ⅘ */
+        case 0x2159u: /* ⅙ */
+        case 0x215Au: /* ⅚ */
+        case 0x215Bu: /* ⅛ */
+        case 0x215Cu: /* ⅜ */
+        case 0x215Du: /* ⅝ */
+        case 0x215Eu: /* ⅞ */
+            return true;
+        default:
+            return false;
+    }
+}
+
+static bool number_text_has_unicode_fraction(const string_t *text)
+{
+    string_cursor_t *cursor;
+
+    if (!text)
+        return false;
+
+    cursor = string_cursor_new(text);
+    if (!cursor)
+        return false;
+
+    while (!string_cursor_done(cursor)) {
+        if (number_rune_is_fraction_marker(string_cursor_peek(cursor))) {
+            string_cursor_free(cursor);
+            return true;
+        }
+        if (string_cursor_next(cursor) != 0)
+            break;
+    }
+
+    string_cursor_free(cursor);
+    return false;
+}
+
+static bool number_text_is_decimal(const string_t *text)
+{
+    return text &&
+           (number_text_has_ascii(text, '.') ||
+            number_text_has_ascii_ci(text, 'e') ||
+            number_text_has_ascii_ci(text, 'n') ||
+            number_text_has_ascii_ci(text, 'f'));
 }
 
 static bool number_kind_is_complex_component(number_kind_t kind)
@@ -1260,133 +1377,293 @@ number_t *number_wrap_complex_mpc(mpc_srcptr source, size_t precision_bits)
     return boxed;
 }
 
-static char *number_complex_compact_literal(const char *text)
+static bool number_text_equals_literal(const string_t *text, const char *literal)
 {
-    size_t len = 0;
-    char *out;
-    char *dst;
+    return text && string_view_equals_literal(string_view_all(text), literal);
+}
+
+static string_t *number_complex_compact_text(const string_t *text)
+{
+    string_cursor_t *cursor;
+    string_t *out;
 
     if (!text)
         return NULL;
-    for (const char *p = text; *p; ++p) {
-        if (!isspace((unsigned char)*p))
-            ++len;
-    }
-    out = malloc(len + 1u);
-    if (!out)
+
+    cursor = string_cursor_new(text);
+    out = string_new();
+    if (!cursor || !out) {
+        string_cursor_free(cursor);
+        string_free(out);
         return NULL;
-    dst = out;
-    for (const char *p = text; *p; ++p) {
-        if (!isspace((unsigned char)*p))
-            *dst++ = *p;
     }
-    *dst = '\0';
+
+    while (!string_cursor_done(cursor)) {
+        string_pos_t before = string_cursor_position(cursor);
+        rune_t rune;
+
+        string_cursor_skip_spaces(cursor);
+        if (string_cursor_position(cursor) != before)
+            continue;
+
+        rune = string_cursor_peek(cursor);
+        if (rune_is_none(rune) ||
+            string_append_rune(out, rune) != 0 ||
+            string_cursor_next(cursor) != 0) {
+            string_cursor_free(cursor);
+            string_free(out);
+            return NULL;
+        }
+    }
+
+    string_cursor_free(cursor);
     return out;
 }
 
-static char *number_complex_strip_outer_parens(char *text)
+static bool number_text_last_ascii_pos(const string_t *text,
+                                       string_pos_t *pos_out,
+                                       unsigned char *ascii_out)
 {
+    string_cursor_t *cursor;
+    string_pos_t last_pos = 0u;
+    unsigned char last_ascii = 0u;
+    bool found = false;
+
+    if (!text)
+        return false;
+
+    cursor = string_cursor_new(text);
+    if (!cursor)
+        return false;
+
+    while (!string_cursor_done(cursor)) {
+        unsigned char ascii = 0u;
+
+        last_pos = string_cursor_position(cursor);
+        (void)string_cursor_peek_ascii(cursor, &ascii);
+        last_ascii = ascii;
+        found = true;
+
+        if (string_cursor_next(cursor) != 0)
+            break;
+    }
+
+    string_cursor_free(cursor);
+    if (!found)
+        return false;
+
+    if (pos_out)
+        *pos_out = last_pos;
+    if (ascii_out)
+        *ascii_out = last_ascii;
+    return true;
+}
+
+static string_t *number_complex_strip_outer_parens_text(const string_t *text)
+{
+    string_cursor_t *cursor;
+    string_t *inside;
+    string_t *out;
+    string_pos_t content_start;
+    string_pos_t last_pos;
+    unsigned char ascii = 0u;
+    unsigned char last_ascii = 0u;
     char sign = '\0';
-    size_t len;
 
     if (!text)
         return NULL;
-    if ((text[0] == '+' || text[0] == '-') && text[1] == '(') {
-        sign = text[0];
-        memmove(text, text + 1, strlen(text));
+
+    cursor = string_cursor_new(text);
+    if (!cursor)
+        return NULL;
+
+    if (string_cursor_peek_ascii(cursor, &ascii) &&
+        (ascii == '+' || ascii == '-')) {
+        sign = (char)ascii;
+        if (string_cursor_next(cursor) != 0) {
+            string_cursor_free(cursor);
+            return string_clone(text);
+        }
     }
-    len = strlen(text);
-    if (len >= 2u && text[0] == '(' && text[len - 1u] == ')') {
-        text[len - 1u] = '\0';
-        memmove(text, text + 1, len - 1u);
+
+    if (!string_cursor_peek_ascii(cursor, &ascii) || ascii != '(') {
+        string_cursor_free(cursor);
+        return string_clone(text);
     }
-    if (sign == '-') {
-        len = strlen(text);
-        memmove(text + 1, text, len + 1u);
-        text[0] = '-';
+
+    if (string_cursor_next(cursor) != 0) {
+        string_cursor_free(cursor);
+        return string_clone(text);
     }
-    return text;
+    content_start = string_cursor_position(cursor);
+
+    if (!number_text_last_ascii_pos(text, &last_pos, &last_ascii) ||
+        last_ascii != ')' ||
+        last_pos < content_start) {
+        string_cursor_free(cursor);
+        return string_clone(text);
+    }
+
+    inside = string_cursor_slice_between(content_start, last_pos, cursor);
+    string_cursor_free(cursor);
+    if (!inside)
+        return NULL;
+
+    if (sign != '-')
+        return inside;
+
+    out = string_new_with("-");
+    if (!out)
+        string_free(inside);
+    else if (string_append_string(out, inside) != 0) {
+        string_free(out);
+        out = NULL;
+    }
+
+    string_free(inside);
+    return out;
 }
 
-static bool number_complex_split_literal(const char *text,
-                                         char **real_out,
-                                         char **imag_out)
+static bool number_complex_split_text(const string_t *text,
+                                      string_t **real_out,
+                                      string_t **imag_out)
 {
-    char *compact;
-    const char *i_pos;
-    const char *split = NULL;
-    char *real;
-    char *imag;
+    string_t *compact;
+    string_t *real = NULL;
+    string_t *imag = NULL;
+    string_t *stripped = NULL;
+    string_cursor_t *cursor;
+    string_pos_t start;
+    string_pos_t end;
+    string_pos_t i_pos = 0u;
+    string_pos_t i_end = 0u;
+    string_pos_t split_pos = 0u;
+    unsigned char prev_ascii = 0u;
+    bool prev_was_ascii = false;
+    bool have_i = false;
+    bool have_split = false;
 
     if (!text || !real_out || !imag_out)
         return false;
+
     *real_out = NULL;
     *imag_out = NULL;
-    compact = number_complex_compact_literal(text);
+
+    compact = number_complex_compact_text(text);
     if (!compact)
         return false;
-    i_pos = strrchr(compact, 'i');
-    if (!i_pos || i_pos[1] != '\0')
-    {
-        free(compact);
+
+    cursor = string_cursor_new(compact);
+    if (!cursor) {
+        string_free(compact);
         return false;
     }
-    for (const char *p = i_pos; p > compact; --p) {
-        if ((*p == '+' || *p == '-') && p[-1] != 'e' && p[-1] != 'E') {
-            split = p;
-            break;
+
+    start = string_cursor_position(cursor);
+
+    while (!string_cursor_done(cursor)) {
+        string_pos_t pos = string_cursor_position(cursor);
+        unsigned char ascii = 0u;
+        bool is_ascii = string_cursor_peek_ascii(cursor, &ascii);
+
+        if (is_ascii && ascii == 'i') {
+            have_i = true;
+            i_pos = pos;
         }
+        else if (is_ascii &&
+                 (ascii == '+' || ascii == '-') &&
+                 pos != start &&
+                 !(prev_was_ascii &&
+                   (prev_ascii == 'e' || prev_ascii == 'E'))) {
+            have_split = true;
+            split_pos = pos;
+        }
+
+        if (string_cursor_next(cursor) != 0) {
+            string_cursor_free(cursor);
+            string_free(compact);
+            return false;
+        }
+
+        if (is_ascii && ascii == 'i')
+            i_end = string_cursor_position(cursor);
+
+        prev_ascii = ascii;
+        prev_was_ascii = is_ascii;
     }
-    if (split && split != compact) {
-        real = strndup(compact, (size_t)(split - compact));
-        imag = strndup(split, (size_t)(i_pos - split));
+
+    end = string_cursor_end_position(cursor);
+    if (!have_i || i_end != end) {
+        string_cursor_free(cursor);
+        string_free(compact);
+        return false;
+    }
+
+    if (have_split && split_pos != start) {
+        real = string_cursor_slice_between(start, split_pos, cursor);
+        imag = string_cursor_slice_between(split_pos, i_pos, cursor);
     }
     else {
-        real = strdup("0");
-        imag = strndup(compact, (size_t)(i_pos - compact));
+        real = string_new_with("0");
+        imag = string_cursor_slice_between(start, i_pos, cursor);
     }
-    free(compact);
+
+    string_cursor_free(cursor);
+    string_free(compact);
     if (!real || !imag) {
-        free(real);
-        free(imag);
+        string_free(real);
+        string_free(imag);
         return false;
     }
-    number_complex_strip_outer_parens(real);
-    number_complex_strip_outer_parens(imag);
-    if (strcmp(imag, "+") == 0 || strcmp(imag, "") == 0) {
-        free(imag);
-        imag = strdup("1");
+
+    stripped = number_complex_strip_outer_parens_text(real);
+    string_free(real);
+    real = stripped;
+    stripped = number_complex_strip_outer_parens_text(imag);
+    string_free(imag);
+    imag = stripped;
+    if (!real || !imag) {
+        string_free(real);
+        string_free(imag);
+        return false;
     }
-    else if (strcmp(imag, "-") == 0) {
-        free(imag);
-        imag = strdup("-1");
+
+    if (string_length(imag) == 0u || number_text_equals_literal(imag, "+")) {
+        string_free(imag);
+        imag = string_new_with("1");
     }
+    else if (number_text_equals_literal(imag, "-")) {
+        string_free(imag);
+        imag = string_new_with("-1");
+    }
+
     if (!imag) {
-        free(real);
+        string_free(real);
         return false;
     }
+
     *real_out = real;
     *imag_out = imag;
     return true;
 }
 
-complex_t *number_complex_create_from_string(const char *text,
-                                             size_t precision_bits)
+static complex_t *number_complex_create_from_text(const string_t *text,
+                                                  size_t precision_bits)
 {
-    char *real_text = NULL;
-    char *imag_text = NULL;
+    string_t *real_text = NULL;
+    string_t *imag_text = NULL;
     number_t real;
     number_t imag;
     number_t real_component;
     number_t imag_component;
     complex_t *out = NULL;
 
-    if (!number_complex_split_literal(text, &real_text, &imag_text))
+    if (!number_complex_split_text(text, &real_text, &imag_text))
         return NULL;
-    real = num_create_from_string(real_text);
-    imag = num_create_from_string(imag_text);
-    free(real_text);
-    free(imag_text);
+    real = num_create_from_text(real_text);
+    imag = num_create_from_text(imag_text);
+    string_free(real_text);
+    string_free(imag_text);
     real_component = number_complex_component_from_number(&real, precision_bits);
     imag_component = number_complex_component_from_number(&imag, precision_bits);
     num_destroy(&real);
@@ -1845,14 +2122,14 @@ int number_sign_mpq(const number_t *number)
     return number && number_mpq_is_negative(number_impl_const(number)->value.mpq) ? -1 : 1;
 }
 
-char *number_to_string_mpz(const number_t *number)
+string_t *number_to_text_mpz(const number_t *number)
 {
-    return number ? number_mpz_to_string(number_impl_const(number)->value.mpz) : NULL;
+    return number ? number_mpz_to_text(number_impl_const(number)->value.mpz) : NULL;
 }
 
-char *number_to_string_mpq(const number_t *number)
+string_t *number_to_text_mpq(const number_t *number)
 {
-    return number ? number_mpq_to_string(number_impl_const(number)->value.mpq) : NULL;
+    return number ? number_mpq_to_text(number_impl_const(number)->value.mpq) : NULL;
 }
 
 number_t *number_clone_mpz(const number_t *number)
@@ -2340,24 +2617,55 @@ number_t num_create_from_qcomplex(qcomplex_t value)
     return number_make_qcomplex(value);
 }
 
+number_t num_create_from_text(const string_t *text)
+{
+    string_view_t view;
+    string_t *trimmed;
+    number_t constant;
+    number_t out = number_invalid();
+
+    if (!text)
+        return number_invalid();
+
+    view = string_view_trim(string_view_all(text));
+    if (string_view_length(view) == 0u)
+        return number_invalid();
+
+    trimmed = string_from_view(&view);
+    if (!trimmed)
+        return number_invalid();
+
+    if (num_constant_value_text(trimmed, &constant))
+        out = constant;
+    else if (number_text_has_ascii_ci(trimmed, 'i'))
+        out = number_take(number_wrap_complex(
+            number_complex_create_from_text(trimmed, number_default_precision_bits)));
+    else if (number_text_has_ascii(trimmed, '/') ||
+             number_text_has_unicode_fraction(trimmed))
+        out = number_take(number_wrap_mpq(
+            number_mpq_from_text(trimmed)));
+    else if (number_text_is_decimal(trimmed))
+        out = number_take(number_wrap_mpfr(
+            number_mpfr_from_text(trimmed, number_default_precision_bits)));
+    else
+        out = number_take(number_wrap_mpz(
+            number_mpz_from_text(trimmed)));
+
+    string_free(trimmed);
+    return out;
+}
+
 number_t num_create_from_string(const char *text)
 {
-    const char *trimmed = number_skip_ws(text);
-    number_t constant;
+    string_t *owned = text ? string_new_with(text) : NULL;
+    number_t out;
 
-    if (!trimmed || *trimmed == '\0')
+    if (!owned)
         return number_invalid();
-    if (num_constant_value(trimmed, &constant))
-        return constant;
-    if (number_has_char_ci(trimmed, 'i'))
-        return number_take(number_wrap_complex(
-            number_complex_create_from_string(trimmed, number_default_precision_bits)));
-    if (strchr(trimmed, '/') || number_has_unicode_fraction_text(trimmed))
-        return number_take(number_wrap_mpq(number_mpq_from_string(trimmed)));
-    if (number_is_decimal_text(trimmed))
-        return number_take(number_wrap_mpfr(
-            number_mpfr_from_string(trimmed, number_default_precision_bits)));
-    return number_take(number_wrap_mpz(number_mpz_from_string(trimmed)));
+
+    out = num_create_from_text(owned);
+    string_free(owned);
+    return out;
 }
 
 number_t num_create_from_frac(long numerator, long denominator)
@@ -2706,11 +3014,18 @@ number_t num_as_complex_prec(number_t number, size_t precision_bits)
     return number_take(boxed);
 }
 
-char *num_to_string(const number_t number)
+char *number_to_cstring(const number_t *number)
+{
+    const number_vtable_t *vt = number ? number_vt(number) : NULL;
+
+    return vt && vt->to_text ? number_cstring_from_text(vt->to_text(number)) : NULL;
+}
+
+string_t *num_to_string(const number_t number)
 {
     const number_vtable_t *vt = number_vt(&number);
 
-    return vt && vt->to_string ? vt->to_string(&number) : NULL;
+    return vt && vt->to_text ? vt->to_text(&number) : NULL;
 }
 
 bool num_eq(const number_t a, const number_t b)
@@ -3547,6 +3862,14 @@ int num_set_from_string(number_t *number, const char *text)
     if (!number || !text)
         return -1;
     number_assign(number, num_create_from_string(text));
+    return number_is_valid_value(number) ? 0 : -1;
+}
+
+int num_set_from_text(number_t *number, const string_t *text)
+{
+    if (!number || !text)
+        return -1;
+    number_assign(number, num_create_from_text(text));
     return number_is_valid_value(number) ? 0 : -1;
 }
 

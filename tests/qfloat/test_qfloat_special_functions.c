@@ -448,8 +448,8 @@ static void test_qf_add_double(void) {
         qfloat_t x   = qf_from_string(tests[i].xs);
         qfloat_t got = qf_add_double(x, tests[i].y);
         qfloat_t exp = qf_from_string(tests[i].expected);
-        qf_to_string(got, buf, sizeof(buf));
-        qf_to_string(exp, buf_exp, sizeof(buf_exp));
+        test_qf_to_buffer(got, buf, sizeof(buf));
+        test_qf_to_buffer(exp, buf_exp, sizeof(buf_exp));
         if (qf_close_value(got, exp, 1e-30)) {
             printf("%s  OK: add_double(%s, %.17g)%s\n", C_GREEN, tests[i].xs, tests[i].y, C_RESET);
         } else {
@@ -479,8 +479,8 @@ static void test_qf_mul_double(void) {
         qfloat_t x   = qf_from_string(tests[i].xs);
         qfloat_t got = qf_mul_double(x, tests[i].y);
         qfloat_t exp = qf_from_string(tests[i].expected);
-        qf_to_string(got, buf, sizeof(buf));
-        qf_to_string(exp, buf_exp, sizeof(buf_exp));
+        test_qf_to_buffer(got, buf, sizeof(buf));
+        test_qf_to_buffer(exp, buf_exp, sizeof(buf_exp));
         if (qf_close_value(got, exp, 1e-30)) {
             printf("%s  OK: mul_double(%s, %.17g)%s\n", C_GREEN, tests[i].xs, tests[i].y, C_RESET);
         } else {
@@ -545,8 +545,8 @@ static void test_qf_floor(void) {
         qfloat_t x   = qf_from_string(tests[i].xs);
         qfloat_t got = qf_floor(x);
         qfloat_t exp = qf_from_string(tests[i].expected);
-        qf_to_string(got, buf, sizeof(buf));
-        qf_to_string(exp, buf_exp, sizeof(buf_exp));
+        test_qf_to_buffer(got, buf, sizeof(buf));
+        test_qf_to_buffer(exp, buf_exp, sizeof(buf_exp));
         if (qf_close(got, exp, 1e-30)) {
             printf("%s  OK: floor(%s) = %s%s\n", C_GREEN, tests[i].xs, buf, C_RESET);
         } else {
@@ -576,8 +576,8 @@ static void test_qf_ldexp(void) {
         qfloat_t x   = qf_from_string(tests[i].xs);
         qfloat_t got = qf_ldexp(x, tests[i].k);
         qfloat_t exp = qf_from_string(tests[i].expected);
-        qf_to_string(got, buf, sizeof(buf));
-        qf_to_string(exp, buf_exp, sizeof(buf_exp));
+        test_qf_to_buffer(got, buf, sizeof(buf));
+        test_qf_to_buffer(exp, buf_exp, sizeof(buf_exp));
         if (qf_close(got, exp, 1e-30)) {
             printf("%s  OK: ldexp(%s, %d) = %s%s\n", C_GREEN, tests[i].xs, tests[i].k, buf, C_RESET);
         } else {
@@ -608,8 +608,8 @@ static void test_qf_sqr(void) {
         qfloat_t got = qf_sqr(x);
         qfloat_t exp = qf_from_string(tests[i].expected);
         qfloat_t ref = qf_mul(x, x);
-        qf_to_string(got, buf, sizeof(buf));
-        qf_to_string(exp, buf_exp, sizeof(buf_exp));
+        test_qf_to_buffer(got, buf, sizeof(buf));
+        test_qf_to_buffer(exp, buf_exp, sizeof(buf_exp));
         if (qf_close(got, exp, 1e-30) && qf_close(got, ref, 1e-30)) {
             printf("%s  OK: sqr(%s) = %s%s\n", C_GREEN, tests[i].xs, buf, C_RESET);
         } else {
@@ -639,8 +639,8 @@ static void test_qf_mul_pow10(void) {
         qfloat_t x   = qf_from_string(tests[i].xs);
         qfloat_t got = qf_mul_pow10(x, tests[i].k);
         qfloat_t exp = qf_from_string(tests[i].expected);
-        qf_to_string(got, buf, sizeof(buf));
-        qf_to_string(exp, buf_exp, sizeof(buf_exp));
+        test_qf_to_buffer(got, buf, sizeof(buf));
+        test_qf_to_buffer(exp, buf_exp, sizeof(buf_exp));
         if (qf_close_value(got, exp, tests[i].tol)) {
             printf("%s  OK: mul_pow10(%s, %d) = %s%s\n", C_GREEN, tests[i].xs, tests[i].k, buf, C_RESET);
         } else {
@@ -777,8 +777,8 @@ void test_qf_trigamma(void) {
         qfloat_t x   = qf_from_string(tests[i].xs);
         qfloat_t got = qf_trigamma(x);
         qfloat_t exp = qf_from_string(tests[i].expected);
-        qf_to_string(got, buf, sizeof(buf));
-        qf_to_string(exp, buf_exp, sizeof(buf_exp));
+        test_qf_to_buffer(got, buf, sizeof(buf));
+        test_qf_to_buffer(exp, buf_exp, sizeof(buf_exp));
         if (qf_close_value(got, exp, tests[i].tol)) {
             printf("%s  OK: trigamma(%s)%s\n", C_GREEN, tests[i].xs, C_RESET);
             printf("    got      = %s\n", buf);
@@ -813,8 +813,8 @@ void test_qf_tetragamma(void) {
         qfloat_t x   = qf_from_string(tests[i].xs);
         qfloat_t got = qf_tetragamma(x);
         qfloat_t exp = qf_from_string(tests[i].expected);
-        qf_to_string(got, buf, sizeof(buf));
-        qf_to_string(exp, buf_exp, sizeof(buf_exp));
+        test_qf_to_buffer(got, buf, sizeof(buf));
+        test_qf_to_buffer(exp, buf_exp, sizeof(buf_exp));
         if (qf_close_value(got, exp, tests[i].tol)) {
             printf("%s  OK: tetragamma(%s)%s\n", C_GREEN, tests[i].xs, C_RESET);
             printf("    got      = %s\n", buf);

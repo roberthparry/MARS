@@ -4753,6 +4753,27 @@ static void test_mat_typeof(void)
     mat_free(E_n);
 }
 
+static char *matrix_functions_num_to_cstr(const number_t value)
+{
+    string_t *text = num_to_string(value);
+    string_view_t view;
+    size_t len;
+    char *out;
+
+    if (!text)
+        return NULL;
+
+    view = string_view_all(text);
+    len = string_view_length(view);
+    out = malloc(len + 1u);
+    if (out) {
+        memcpy(out, string_c_str(text), len);
+        out[len] = '\0';
+    }
+    string_free(text);
+    return out;
+}
+
 static char *format_matrix_number_at_own_precision(const number_t value)
 {
     char fmt[32];
@@ -4762,7 +4783,7 @@ static char *format_matrix_number_at_own_precision(const number_t value)
     size_t precision;
 
     if (num_is_exact(value) || significant_digits == 0u)
-        return num_to_string(value);
+        return matrix_functions_num_to_cstr(value);
 
     precision = significant_digits > 0u ? significant_digits - 1u : 0u;
     snprintf(fmt, sizeof(fmt), "%%.%zuN", precision);
@@ -4785,7 +4806,7 @@ static char *format_matrix_number_for_test_output(const number_t value)
 
     if (text)
         return text;
-    text = num_to_string(value);
+    text = matrix_functions_num_to_cstr(value);
     if (text)
         return text;
     return strdup("(unavailable)");
@@ -4797,7 +4818,7 @@ static char *format_matrix_error_for_test_output(const number_t value)
     char *out;
 
     if (needed < 0) {
-        out = num_to_string(value);
+        out = matrix_functions_num_to_cstr(value);
         if (out)
             return out;
         return strdup("(unavailable)");
@@ -4807,7 +4828,7 @@ static char *format_matrix_error_for_test_output(const number_t value)
         return NULL;
     if (num_sprintf(out, (size_t)needed + 1u, "%.6N", value) < 0) {
         free(out);
-        out = num_to_string(value);
+        out = matrix_functions_num_to_cstr(value);
         if (out)
             return out;
         return strdup("(unavailable)");

@@ -62,14 +62,6 @@ string_view_t string_view_from_chars(const char *data, size_t len)
     return string_view_make(data, len);
 }
 
-string_view_t string_view_from_region(const char *start, const char *end)
-{
-    if (!start || !end || end < start)
-        return string_view_from_chars(NULL, 0u);
-
-    return string_view_from_chars(start, (size_t)(end - start));
-}
-
 const char *string_view_data(string_view_t view)
 {
     return string_view_stored_data(&view);
@@ -645,17 +637,26 @@ static int views_grow(string_view_t **views, size_t *cap)
     return 0;
 }
 
-static const char *string_utils_find_bytes(const char *haystack, size_t haystack_len,
-                                           const char *needle, size_t needle_len)
+static bool string_utils_find_bytes_index(const char *haystack,
+                                          size_t haystack_len,
+                                          const char *needle,
+                                          size_t needle_len,
+                                          size_t start,
+                                          size_t *index_out)
 {
     if (!haystack || !needle || needle_len == 0u || needle_len > haystack_len)
-        return NULL;
+        return false;
+    if (start > haystack_len - needle_len)
+        return false;
 
-    for (size_t i = 0u; i <= haystack_len - needle_len; i++) {
-        if (memcmp(haystack + i, needle, needle_len) == 0)
-            return haystack + i;
+    for (size_t i = start; i <= haystack_len - needle_len; i++) {
+        if (memcmp(&haystack[i], needle, needle_len) == 0) {
+            if (index_out)
+                *index_out = i;
+            return true;
+        }
     }
-    return NULL;
+    return false;
 }
 
 string_view_t *string_split_view_by_view(const string_t *s,
@@ -664,8 +665,9 @@ string_view_t *string_split_view_by_view(const string_t *s,
 {
     const char *delim_data = string_view_data(delim);
     size_t delim_len = string_view_length(delim);
-    const char *start;
-    const char *end;
+    string_view_t source;
+    size_t start = 0u;
+    size_t match = 0u;
 
     size_t cap = 8;
     size_t count = 0;
@@ -678,19 +680,21 @@ string_view_t *string_split_view_by_view(const string_t *s,
         return NULL;
     }
 
-    start = s->data;
-    while ((end = string_utils_find_bytes(start,
-                                          (size_t)((s->data + s->len) - start),
-                                          delim_data,
-                                          delim_len)) != NULL) {
+    source = string_view_all(s);
+    while (string_utils_find_bytes_index(s->data,
+                                         s->len,
+                                         delim_data,
+                                         delim_len,
+                                         start,
+                                         &match)) {
         if (count == cap && views_grow(&views, &cap) != 0) return NULL;
-        views[count] = string_view_from_region(start, end);
+        views[count] = string_view_slice(source, start, match - start);
         count++;
-        start = end + delim_len;
+        start = match + delim_len;
     }
 
     if (count == cap && views_grow(&views, &cap) != 0) return NULL;
-    views[count] = string_view_from_region(start, s->data + s->len);
+    views[count] = string_view_slice(source, start, s->len - start);
     count++;
 
     *out_count = count;

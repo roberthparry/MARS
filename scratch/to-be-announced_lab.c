@@ -39,11 +39,13 @@ typedef struct {
 
 static void to_be_announced_print_json_string(const char *text)
 {
-    const unsigned char *p = (const unsigned char *)(text ? text : "");
+    const unsigned char *bytes = (const unsigned char *)(text ? text : "");
 
     putchar('"');
-    while (*p) {
-        switch (*p) {
+    for (size_t i = 0u; bytes[i] != '\0'; ++i) {
+        unsigned char ch = bytes[i];
+
+        switch (ch) {
         case '\\': fputs("\\\\", stdout); break;
         case '"': fputs("\\\"", stdout); break;
         case '\b': fputs("\\b", stdout); break;
@@ -52,13 +54,12 @@ static void to_be_announced_print_json_string(const char *text)
         case '\r': fputs("\\r", stdout); break;
         case '\t': fputs("\\t", stdout); break;
         default:
-            if (*p < 0x20u)
-                printf("\\u%04x", (unsigned int)*p);
+            if (ch < 0x20u)
+                printf("\\u%04x", (unsigned int)ch);
             else
-                putchar((int)*p);
+                putchar((int)ch);
             break;
         }
-        ++p;
     }
     putchar('"');
 }
@@ -69,6 +70,53 @@ static int to_be_announced_fail(const char *message)
     to_be_announced_print_json_string(message ? message : "Unknown error");
     fputs("}\n", stdout);
     return EXIT_FAILURE;
+}
+
+static int to_be_announced_parse_size(const char *text, size_t *out)
+{
+    size_t i = 0u;
+    size_t value = 0u;
+    int saw_digit = 0;
+
+    if (!text || !out)
+        return -1;
+    if (text[i] == '+')
+        i++;
+
+    for (; text[i] != '\0'; ++i) {
+        unsigned int digit;
+
+        if (text[i] < '0' || text[i] > '9')
+            return -1;
+        digit = (unsigned int)(text[i] - '0');
+        if (value > (((size_t)-1) - digit) / 10u)
+            return -1;
+        value = value * 10u + digit;
+        saw_digit = 1;
+    }
+
+    if (!saw_digit)
+        return -1;
+    *out = value;
+    return 0;
+}
+
+static int to_be_announced_parse_double(const char *text, double *out)
+{
+    number_t value;
+
+    if (!text || !out)
+        return -1;
+
+    value = num_create_from_string(text);
+    if (!num_is_real(value) || !num_is_finite(value)) {
+        num_destroy(&value);
+        return -1;
+    }
+
+    *out = num_to_double(value);
+    num_destroy(&value);
+    return 0;
 }
 
 static int to_be_announced_appendf(char **buf, size_t *len, size_t *cap, const char *fmt, ...)
@@ -143,7 +191,10 @@ static char *to_be_announced_series_value_text(const timeseries_t *series, size_
         snprintf(buf, sizeof(buf), "%.2f", d);
         text = strdup(buf);
     } else {
-        text = num_to_string(value);
+        string_t *value_text = num_to_string(value);
+
+        text = value_text ? strdup(string_c_str(value_text)) : NULL;
+        string_free(value_text);
     }
     num_destroy(&value);
     return text;
@@ -279,16 +330,21 @@ static char **to_be_announced_split_columns(const char *text, size_t *count_out)
     }
     tok = strtok_r(copy, ",", &save);
     while (tok) {
-        char *start = tok;
-        char *end;
+        size_t start = 0u;
+        size_t end = strlen(tok);
         char *item;
 
-        while (*start == ' ' || *start == '\t')
-            ++start;
-        end = start + strlen(start);
-        while (end > start && (end[-1] == ' ' || end[-1] == '\t' || end[-1] == '\r' || end[-1] == '\n'))
-            *--end = '\0';
-        if (*start) {
+        while (tok[start] == ' ' || tok[start] == '\t')
+            start++;
+        while (end > start &&
+               (tok[end - 1u] == ' ' ||
+                tok[end - 1u] == '\t' ||
+                tok[end - 1u] == '\r' ||
+                tok[end - 1u] == '\n')) {
+            end--;
+        }
+        tok[end] = '\0';
+        if (tok[start]) {
             if (count == cap) {
                 size_t new_cap = cap * 2u;
                 char **new_items = realloc(items, new_cap * sizeof(*new_items));
@@ -301,7 +357,7 @@ static char **to_be_announced_split_columns(const char *text, size_t *count_out)
                 items = new_items;
                 cap = new_cap;
             }
-            item = strdup(start);
+            item = strdup(&tok[start]);
             if (!item) {
                 to_be_announced_free_string_list(items, count);
                 free(copy);
@@ -870,28 +926,37 @@ static int to_be_announced_parse_args(to_be_announced_config_t *cfg, int argc, c
         } else if (strcmp(arg, "--year-type") == 0) {
             if (to_be_announced_parse_year_type(value, &cfg->year_type) != 0)
                 return -1;
-        } else if (strcmp(arg, "--horizon") == 0)
-            cfg->horizon = (size_t)strtoul(value, NULL, 10);
-        else if (strcmp(arg, "--p") == 0)
-            cfg->spec.p = (size_t)strtoul(value, NULL, 10);
-        else if (strcmp(arg, "--d") == 0)
-            cfg->spec.d = (size_t)strtoul(value, NULL, 10);
-        else if (strcmp(arg, "--q") == 0)
-            cfg->spec.q = (size_t)strtoul(value, NULL, 10);
-        else if (strcmp(arg, "--P") == 0)
-            cfg->spec.P = (size_t)strtoul(value, NULL, 10);
-        else if (strcmp(arg, "--D") == 0)
-            cfg->spec.D = (size_t)strtoul(value, NULL, 10);
-        else if (strcmp(arg, "--Q") == 0)
-            cfg->spec.Q = (size_t)strtoul(value, NULL, 10);
-        else if (strcmp(arg, "--season-period") == 0)
-            cfg->spec.season_period = (size_t)strtoul(value, NULL, 10);
-        else if (strcmp(arg, "--criterion") == 0) {
+        } else if (strcmp(arg, "--horizon") == 0) {
+            if (to_be_announced_parse_size(value, &cfg->horizon) != 0)
+                return -1;
+        } else if (strcmp(arg, "--p") == 0) {
+            if (to_be_announced_parse_size(value, &cfg->spec.p) != 0)
+                return -1;
+        } else if (strcmp(arg, "--d") == 0) {
+            if (to_be_announced_parse_size(value, &cfg->spec.d) != 0)
+                return -1;
+        } else if (strcmp(arg, "--q") == 0) {
+            if (to_be_announced_parse_size(value, &cfg->spec.q) != 0)
+                return -1;
+        } else if (strcmp(arg, "--P") == 0) {
+            if (to_be_announced_parse_size(value, &cfg->spec.P) != 0)
+                return -1;
+        } else if (strcmp(arg, "--D") == 0) {
+            if (to_be_announced_parse_size(value, &cfg->spec.D) != 0)
+                return -1;
+        } else if (strcmp(arg, "--Q") == 0) {
+            if (to_be_announced_parse_size(value, &cfg->spec.Q) != 0)
+                return -1;
+        } else if (strcmp(arg, "--season-period") == 0) {
+            if (to_be_announced_parse_size(value, &cfg->spec.season_period) != 0)
+                return -1;
+        } else if (strcmp(arg, "--criterion") == 0) {
             if (to_be_announced_parse_criterion(value, &cfg->criterion) != 0)
                 return -1;
-        } else if (strcmp(arg, "--level") == 0)
-            cfg->level = strtod(value, NULL);
-        else
+        } else if (strcmp(arg, "--level") == 0) {
+            if (to_be_announced_parse_double(value, &cfg->level) != 0)
+                return -1;
+        } else
             return -1;
     }
     return 0;

@@ -23,6 +23,7 @@
  * @brief the datetime type
  */
 typedef struct _datetime_t datetime_t;
+typedef struct _string_t string_t;
 
 /**
  * @brief the month type (1..12)
@@ -499,10 +500,18 @@ double datetime_duration(const datetime_t *dttm1, const datetime_t *dttm2, datet
  *        Fractions of seconds are currently not included.
  * @param dttm the datetime to convert to a formatted string.
  * @param format the format string to use for formatting the datetime. See the description above for the supported placeholders.
- * @return a newly allocated string containing the formatted datetime. The caller is responsible for freeing the returned string.
+ * @return a newly allocated C string containing the formatted datetime. The caller is responsible for freeing the returned string.
  *         If allocation fails or the datetime is not initialised, returns NULL.
  */
 char *datetime_format(const datetime_t *dttm, const char *format);
+
+/**
+ * @brief Format a datetime using a string object.
+ *
+ * This is the string_t-based counterpart to datetime_format(). The returned
+ * string must be released with string_free().
+ */
+string_t *datetime_format_text(const datetime_t *dttm, const string_t *format);
 
 /**
  * @brief calculate the sunrise or sunset time for a given date and location. The sunrise/sunset time is calculated using the
@@ -625,4 +634,3 @@ datetime_t *datetime_next_moon_phase(const datetime_t *dttm, moon_phase_t phase)
 datetime_t *datetime_next_weekday(const datetime_t *dttm, weekday_t weekday);
 
 #endif //_DATETIME_H
-

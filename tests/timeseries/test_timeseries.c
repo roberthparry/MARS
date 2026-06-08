@@ -68,13 +68,22 @@ fail:
 
 static void test_csv_load_and_slice(void)
 {
-    timeseries_t *y = ts_from_csv(TEST_TARGET_CSV,
-                                  "", "test1",
-                                  TS_FREQ_MONTHLY, TS_YEAR_FISCAL_UK_APR,
-                                  TS_MISSING_DROP);
+    string_t *path_text = string_new_with(TEST_TARGET_CSV);
+    string_t *date_column = string_new_with("");
+    string_t *value_column = string_new_with("test1");
+    timeseries_t *y = ts_from_csv_text(path_text,
+                                       date_column,
+                                       value_column,
+                                       TS_FREQ_MONTHLY,
+                                       TS_YEAR_FISCAL_UK_APR,
+                                       TS_MISSING_DROP);
     datetime_t *start = NULL;
     datetime_t *end = NULL;
     timeseries_t *head = NULL;
+
+    string_free(value_column);
+    string_free(date_column);
+    string_free(path_text);
 
     TEST_ASSERT_NOT_NULL(y);
     TEST_ASSERT_TRUE(ts_length(y) > 20u, "loaded monthly series");
@@ -230,7 +239,9 @@ static void test_output_and_write_file(void)
                                   "", "test1",
                                   TS_FREQ_MONTHLY, TS_YEAR_FISCAL_UK_APR,
                                   TS_MISSING_DROP);
-    char *text = NULL;
+    timeseries_t *head = NULL;
+    string_t *text = NULL;
+    string_t *file_text = NULL;
     const char *csv_path = test_case_temp_path("timeseries.csv");
     FILE *f = NULL;
     char buf[128] = {0};
@@ -238,44 +249,54 @@ static void test_output_and_write_file(void)
     const char *cols[] = { "test3" };
     matrix_t *x = NULL;
     ts_regression_result_t fit = {0};
-    char *summary = NULL;
+    string_t *summary = NULL;
 
     TEST_ASSERT_NOT_NULL(y);
-    text = ts_to_string(ts_head(y, 2u), TS_STRING_CSV);
+    head = ts_head(y, 2u);
+    TEST_ASSERT_NOT_NULL(head);
+    text = ts_to_text(head, TS_STRING_CSV);
     TEST_ASSERT_NOT_NULL(text);
-    TEST_ASSERT_TRUE(strstr(text, "date,value") != NULL, "csv header present");
-    free(text);
+    TEST_ASSERT_TRUE(string_find(text, "date,value") >= 0, "csv header present");
+    string_free(text);
+    text = NULL;
 
-    TEST_ASSERT_TRUE(ts_write_file(csv_path, ts_head(y, 2u), TS_STRING_CSV) == 0,
+    TEST_ASSERT_TRUE(ts_write_file(csv_path, head, TS_STRING_CSV) == 0,
                      "write csv file");
     f = fopen(csv_path, "r");
     TEST_ASSERT_NOT_NULL(f);
     used = fread(buf, 1u, sizeof(buf) - 1u, f);
     buf[used] = '\0';
     fclose(f);
-    TEST_ASSERT_TRUE(strstr(buf, "date,value") != NULL, "written csv header");
+    file_text = string_new_with(buf);
+    TEST_ASSERT_NOT_NULL(file_text);
+    TEST_ASSERT_TRUE(string_find(file_text, "date,value") >= 0, "written csv header");
+    string_free(file_text);
+    file_text = NULL;
 
     x = ts_matrix_from_csv(TEST_DRIVER_CSV,
                            "DATE", cols, 1u,
                            TS_FREQ_MONTHLY, TS_MISSING_DROP);
     TEST_ASSERT_NOT_NULL(x);
     TEST_ASSERT_TRUE(ts_regression_fit(y, x, NULL, &fit) == 0, "regression fit for summary");
-    summary = ts_regression_summary_to_string(&fit);
+    summary = ts_regression_summary_to_text(&fit);
     TEST_ASSERT_NOT_NULL(summary);
-    TEST_ASSERT_TRUE(strstr(summary, "Model comparison score (AIC):") != NULL,
+    TEST_ASSERT_TRUE(string_find(summary, "Model comparison score (AIC):") >= 0,
                      "summary uses plain-language labels");
-    TEST_ASSERT_TRUE(strstr(summary, "(comparison only; lower is better") != NULL,
+    TEST_ASSERT_TRUE(string_find(summary, "(comparison only; lower is better") >= 0,
                      "summary explains comparison-only metrics");
-    TEST_ASSERT_TRUE(strstr(summary, "Overall fit score (R2):") != NULL && strstr(summary, "(") != NULL,
+    TEST_ASSERT_TRUE(string_find(summary, "Overall fit score (R2):") >= 0 &&
+                     string_find(summary, "(") >= 0,
                      "summary includes inline ratings");
-    TEST_ASSERT_TRUE(strstr(summary, "Overall assessment: You've chosen") != NULL,
+    TEST_ASSERT_TRUE(string_find(summary, "Overall assessment: You've chosen") >= 0,
                      "summary includes a friendly overall assessment");
-    TEST_ASSERT_TRUE(strstr(summary, "improve") != NULL || strstr(summary, "better result") != NULL,
+    TEST_ASSERT_TRUE(string_find(summary, "improve") >= 0 ||
+                     string_find(summary, "better result") >= 0,
                      "summary assessment includes improvement guidance");
 
-    free(summary);
+    string_free(summary);
     ts_regression_result_clear(&fit);
     mat_free(x);
+    ts_free(head);
     ts_free(y);
 }
 
@@ -605,7 +626,7 @@ static void test_auto_arima_preserves_selected_model_and_scale(void)
     number_t level = num_create_from_double(0.95);
     number_t last_actual = NUM_ZERO;
     number_t first_forecast = NUM_ZERO;
-    char *summary = NULL;
+    string_t *summary = NULL;
     double last_value;
     double first_value;
 
@@ -618,11 +639,12 @@ static void test_auto_arima_preserves_selected_model_and_scale(void)
                                    TS_IC_AIC,
                                    NULL, &best_spec, &fit) == 0,
                      "auto arima fit with exogenous search");
-    summary = ts_arima_summary_to_string(&fit);
+    summary = ts_arima_summary_to_text(&fit);
     TEST_ASSERT_NOT_NULL(summary);
-    TEST_ASSERT_TRUE(strstr(summary, "Model: (") != NULL,
+    TEST_ASSERT_TRUE(string_find(summary, "Model: (") >= 0,
                      "auto arima summary keeps chosen model metadata");
-    TEST_ASSERT_TRUE(strstr(summary, "stderr =") != NULL && strstr(summary, "p =") != NULL,
+    TEST_ASSERT_TRUE(string_find(summary, "stderr =") >= 0 &&
+                     string_find(summary, "p =") >= 0,
                      "auto arima summary includes coefficient quality details for exogenous drivers");
 
     future_x = test_submatrix_rows_local(x, mat_get_row_count(x) - 12u, 12u);
@@ -637,7 +659,7 @@ static void test_auto_arima_preserves_selected_model_and_scale(void)
     TEST_ASSERT_TRUE(fabs(first_value - last_value) < 100.0,
                      "auto arima future forecast stays on the historical scale");
 
-    free(summary);
+    string_free(summary);
     num_destroy(&last_actual);
     num_destroy(&first_forecast);
     num_destroy(&level);

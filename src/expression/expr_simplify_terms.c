@@ -5,6 +5,7 @@
 
 #include "expr_bindings.h"
 #include "expr_internal.h"
+#include "ustring.h"
 
 extern expr_t *expr_simplify(const expr_t *dv);
 
@@ -28,31 +29,60 @@ static const expr_t *product_factor_base(const expr_t *dv)
     return dv;
 }
 
-static int is_unicode_subscript_byte(unsigned char c)
+static int product_factor_rune_is_digit_suffix(rune_t rune)
 {
-    return c == 0xE2u || c == 0x82u ||
-           (c >= 0x80u && c <= 0x89u);
+    uint32_t value = rune_value(rune);
+
+    return rune_is_digit(rune) || (value >= 0x2080u && value <= 0x2089u);
 }
 
 static int product_factor_is_primary_variable_name(const char *name)
 {
-    const unsigned char *p = (const unsigned char *)name;
+    string_t *text;
+    string_cursor_t *cursor;
+    char first;
+    int ok = 0;
 
-    if (!p || (*p != 'x' && *p != 'y' && *p != 'z'))
+    if (!name || !*name)
         return 0;
-    ++p;
-    if (!*p)
-        return 1;
-    if (*p == '_')
-        ++p;
-    while (*p) {
-        if ((*p >= '0' && *p <= '9') || is_unicode_subscript_byte(*p)) {
-            ++p;
-            continue;
-        }
-        return 0;
+
+    text = string_new_with(name);
+    cursor = text ? string_cursor_new(text) : NULL;
+    if (!cursor)
+        goto done;
+
+    if (!rune_to_ascii(string_cursor_peek(cursor), &first) ||
+        (first != 'x' && first != 'y' && first != 'z'))
+        goto done;
+
+    if (string_cursor_next(cursor) != 0)
+        goto done;
+    if (string_cursor_done(cursor)) {
+        ok = 1;
+        goto done;
     }
-    return 1;
+
+    if (rune_is_equal(string_cursor_peek(cursor), '_')) {
+        if (string_cursor_next(cursor) != 0)
+            goto done;
+        if (string_cursor_done(cursor)) {
+            ok = 1;
+            goto done;
+        }
+    }
+
+    while (!string_cursor_done(cursor)) {
+        if (!product_factor_rune_is_digit_suffix(string_cursor_peek(cursor)))
+            goto done;
+        if (string_cursor_next(cursor) != 0)
+            goto done;
+    }
+    ok = 1;
+
+done:
+    string_cursor_free(cursor);
+    string_free(text);
+    return ok;
 }
 
 static int product_factor_group(const expr_t *dv)
@@ -282,16 +312,17 @@ expr_t *expr_make_scaled(number_t coeff, expr_t *base)
             }
             num_destroy(&leading_coeff);
         }
-        char *coeff_text = num_to_string(coeff);
+        string_t *coeff_text = num_to_string(coeff);
         expr_binding_expr_t *coeff_expr =
-            expr_binding_expr_new_number_text(coeff_text ? coeff_text : "NAN");
+            expr_binding_expr_new_number_text(coeff_text
+                ? string_c_str(coeff_text) : "NAN");
         expr_binding_expr_t *expr =
             expr_binding_expr_new_mul(coeff_expr, expr_binding_expr_clone(base->binding_expr));
         number_t scaled = num_mul(coeff, base->c);
         expr_t *out = expr_new_const(scaled);
 
         expr = expr_binding_expr_simplify(expr);
-        free(coeff_text);
+        string_free(coeff_text);
         num_destroy(&scaled);
         expr_free(base);
         out->binding_expr = expr;

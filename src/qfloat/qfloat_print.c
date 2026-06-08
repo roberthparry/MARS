@@ -1,536 +1,903 @@
 #include "qfloat_internal.h"
+#include "ustring.h"
 
 #include <stdarg.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-/* Helper: apply width / padding to a preformatted string.
- * - s already contains any sign characters.
- * - sign_aware_zero controls whether '0' padding should come after the sign.
- */
-static void pad_string(char *out, size_t out_size,
-                       const char *s,
-                       int width,
-                       int flag_minus,
-                       int flag_zero,
-                       int sign_aware_zero)
+static int qf_append_repeated_char(string_t *out, char ch, int count)
 {
-    size_t len = strlen(s);
-    int pad = (width > (int)len) ? (width - (int)len) : 0;
-    if (pad < 0) pad = 0;
+    if (!out || count < 0)
+        return -1;
 
-    size_t pos = 0;
+    for (int i = 0; i < count; i++) {
+        if (string_append_char(out, ch) != 0)
+            return -1;
+    }
+
+    return 0;
+}
+
+static string_t *qf_pad_text(const string_t *text,
+                             int width,
+                             int flag_minus,
+                             int flag_zero,
+                             int sign_aware_zero)
+{
+    string_t *out;
+    size_t len;
+    int pad;
+
+    if (!text)
+        return NULL;
+
+    len = string_length(text);
+    pad = (width > (int)len) ? (width - (int)len) : 0;
+    if (pad < 0)
+        pad = 0;
+
+    out = string_new();
+    if (!out)
+        return NULL;
 
     if (flag_minus) {
-        /* left-justify: value, then spaces */
-        for (size_t i = 0; s[i] && pos + 1 < out_size; i++)
-            out[pos++] = s[i];
-        for (int i = 0; i < pad && pos + 1 < out_size; i++)
-            out[pos++] = ' ';
-    } else if (flag_zero) {
-        size_t i = 0;
-        if (sign_aware_zero &&
-            (s[0] == '+' || s[0] == '-' || s[0] == ' ')) {
-            /* keep sign, then zeros, then rest */
-            if (pos + 1 < out_size)
-                out[pos++] = s[i++];
-            for (int j = 0; j < pad && pos + 1 < out_size; j++)
-                out[pos++] = '0';
-        } else {
-            /* zeros first, then full string */
-            for (int j = 0; j < pad && pos + 1 < out_size; j++)
-                out[pos++] = '0';
+        if (string_append_string(out, text) != 0 ||
+            qf_append_repeated_char(out, ' ', pad) != 0) {
+            string_free(out);
+            return NULL;
         }
-        for (; s[i] && pos + 1 < out_size; i++)
-            out[pos++] = s[i];
-    } else {
-        /* right-justify: spaces, then value */
-        for (int i = 0; i < pad && pos + 1 < out_size; i++)
-            out[pos++] = ' ';
-        for (size_t i = 0; s[i] && pos + 1 < out_size; i++)
-            out[pos++] = s[i];
+        return out;
     }
 
-    out[pos] = '\0';
-}
+    if (flag_zero) {
+        rune_t first = string_at(text, 0);
 
-/* Inline helpers for safe output */
+        if (sign_aware_zero &&
+            (rune_is_equal(first, '+') ||
+             rune_is_equal(first, '-') ||
+             rune_is_equal(first, ' '))) {
+            string_t *rest = string_substring(text, 1, len > 0u ? len - 1u : 0u);
 
-static void qf_put_char(char c, char **dst, size_t *remaining, size_t *count)
-{
-    /* Count always increases */
-    (*count)++;
+            if (!rest ||
+                string_append_rune(out, first) != 0 ||
+                qf_append_repeated_char(out, '0', pad) != 0 ||
+                string_append_string(out, rest) != 0) {
+                string_free(rest);
+                string_free(out);
+                return NULL;
+            }
 
-    /* If no output buffer, only count */
-    if (*dst == NULL || *remaining == 0)
-        return;
+            string_free(rest);
+            return out;
+        }
 
-    /* Write only if space for at least 1 char + NUL */
-    if (*remaining > 1) {
-        **dst = c;
-        (*dst)++;
-        (*remaining)--;
+        if (qf_append_repeated_char(out, '0', pad) != 0 ||
+            string_append_string(out, text) != 0) {
+            string_free(out);
+            return NULL;
+        }
+        return out;
     }
-}
 
-static void qf_put_str(const char *s, char **dst, size_t *remaining, size_t *count)
-{
-    while (*s) {
-        qf_put_char(*s, dst, remaining, count);
-        s++;
+    if (qf_append_repeated_char(out, ' ', pad) != 0 ||
+        string_append_string(out, text) != 0) {
+        string_free(out);
+        return NULL;
     }
+
+    return out;
 }
 
-/* Helper: uppercase exponent for %Q */
-static inline void qf_uppercase_E(char *s) {
-    char *e = strchr(s, 'e');
-    if (e) *e = 'E';
-}
-
-static void qf_apply_sign_prefix(char *text, int flag_plus, int flag_space)
+static string_t *qf_text_with_sign_prefix(const string_t *text,
+                                          int flag_plus,
+                                          int flag_space)
 {
-    if (text[0] == '-')
-        return;
+    string_t *out;
+
+    if (!text)
+        return NULL;
+
+    if (rune_is_equal(string_at(text, 0), '-'))
+        return string_clone(text);
+
+    out = string_new();
+    if (!out)
+        return NULL;
 
     if (flag_plus) {
-        memmove(text + 1, text, strlen(text) + 1);
-        text[0] = '+';
+        if (string_append_char(out, '+') != 0)
+            goto fail;
     } else if (flag_space) {
-        memmove(text + 1, text, strlen(text) + 1);
-        text[0] = ' ';
+        if (string_append_char(out, ' ') != 0)
+            goto fail;
     }
+
+    if (string_append_string(out, text) != 0)
+        goto fail;
+
+    return out;
+
+fail:
+    string_free(out);
+    return NULL;
 }
 
-static void qf_round_digits_carry(char *digits,
-                                  int *nd,
-                                  size_t digits_cap,
-                                  int *fixed_dp,
-                                  int round_index)
+static string_t *qf_signed_padded_text(const string_t *text,
+                                       int flag_plus,
+                                       int flag_space,
+                                       int width,
+                                       int flag_minus,
+                                       int flag_zero,
+                                       int sign_aware_zero)
 {
-    int i = round_index - 1;
+    string_t *signed_text;
+    string_t *padded;
 
-    while (i >= 0 && digits[i] == '9') {
-        digits[i] = '0';
+    signed_text = qf_text_with_sign_prefix(text, flag_plus, flag_space);
+    if (!signed_text)
+        return NULL;
+
+    padded = qf_pad_text(signed_text,
+                         width,
+                         flag_minus,
+                         flag_zero,
+                         sign_aware_zero);
+    string_free(signed_text);
+    return padded;
+}
+
+static string_offset_t qf_exponent_marker_pos(const string_t *text)
+{
+    string_offset_t pos;
+
+    if (!text)
+        return -1;
+
+    pos = string_find(text, "e");
+    return pos >= 0 ? pos : string_find(text, "E");
+}
+
+static int qf_parse_exp10_text(const string_t *text,
+                               string_offset_t marker_pos,
+                               int *exp10_out)
+{
+    size_t len;
+    string_t *exp_text;
+
+    if (!text || marker_pos < 0 || !exp10_out)
+        return -1;
+
+    len = string_view_length(string_view_all(text));
+    if ((size_t)marker_pos + 1u > len)
+        return -1;
+
+    exp_text = string_substr(text,
+                             (size_t)marker_pos + 1u,
+                             len - (size_t)marker_pos - 1u);
+    if (!exp_text)
+        return -1;
+
+    *exp10_out = atoi(string_c_str(exp_text));
+    string_free(exp_text);
+    return 0;
+}
+
+static string_t *qf_trim_scientific_mantissa_text(const string_t *mantissa)
+{
+    size_t len;
+
+    if (!mantissa)
+        return NULL;
+
+    len = string_length(mantissa);
+    while (len > 0u && rune_is_equal(string_at(mantissa, len - 1u), '0'))
+        len--;
+    if (len > 0u && rune_is_equal(string_at(mantissa, len - 1u), '.'))
+        len--;
+    if (len == 0u)
+        return string_new_with("0");
+    return string_substring(mantissa, 0u, len);
+}
+
+static string_t *qf_normalised_scientific_text(const string_t *text,
+                                               string_offset_t marker_pos)
+{
+    string_t *mantissa = NULL;
+    string_t *trimmed = NULL;
+    string_t *exponent = NULL;
+    string_t *out = NULL;
+    size_t len;
+
+    if (!text)
+        return NULL;
+    if (marker_pos < 0)
+        return string_clone(text);
+
+    len = string_view_length(string_view_all(text));
+    mantissa = string_substr(text, 0u, (size_t)marker_pos);
+    exponent = string_substr(text, (size_t)marker_pos, len - (size_t)marker_pos);
+    if (!mantissa || !exponent)
+        goto done;
+
+    if (string_replace(exponent, "E", "e") != 0)
+        goto done;
+
+    trimmed = qf_trim_scientific_mantissa_text(mantissa);
+    if (trimmed)
+        out = string_sprintf("%S%S", trimmed, exponent);
+
+done:
+    string_free(mantissa);
+    string_free(trimmed);
+    string_free(exponent);
+    return out;
+}
+
+static string_t *qf_unsigned_mantissa_text(const string_t *mantissa,
+                                           int *negative_out)
+{
+    size_t len;
+
+    if (negative_out)
+        *negative_out = 0;
+    if (!mantissa)
+        return NULL;
+
+    len = string_length(mantissa);
+    if (len > 0u && rune_is_equal(string_at(mantissa, 0u), '-')) {
+        if (negative_out)
+            *negative_out = 1;
+        return string_substring(mantissa, 1u, len - 1u);
+    }
+
+    return string_clone(mantissa);
+}
+
+static int qf_digit_text_length(const string_t *digits)
+{
+    size_t len;
+
+    if (!digits)
+        return 0;
+    len = string_length(digits);
+    return len <= (size_t)INT_MAX ? (int)len : INT_MAX;
+}
+
+static char qf_digit_text_at(const string_t *digits, int index)
+{
+    size_t len;
+    char ch = '0';
+
+    if (!digits || index < 0)
+        return '0';
+    len = string_length(digits);
+    if ((size_t)index >= len)
+        return '0';
+    return rune_to_ascii(string_at(digits, (size_t)index), &ch) &&
+           ch >= '0' && ch <= '9'
+        ? ch
+        : '0';
+}
+
+static bool qf_digit_text_replace_at(string_t **digits_ptr,
+                                     int index,
+                                     char digit)
+{
+    string_t *digits;
+    string_t *prefix;
+    string_t *suffix;
+    string_t *next;
+    size_t len;
+    bool ok;
+
+    if (!digits_ptr || !*digits_ptr || index < 0 ||
+        digit < '0' || digit > '9')
+        return false;
+
+    digits = *digits_ptr;
+    len = string_length(digits);
+    if ((size_t)index >= len)
+        return false;
+
+    prefix = string_substring(digits, 0u, (size_t)index);
+    suffix = string_substring(digits,
+                              (size_t)index + 1u,
+                              len - (size_t)index - 1u);
+    next = string_new();
+    ok = prefix && suffix && next &&
+         string_append_string(next, prefix) == 0 &&
+         string_append_char(next, digit) == 0 &&
+         string_append_string(next, suffix) == 0;
+
+    string_free(prefix);
+    string_free(suffix);
+    if (!ok) {
+        string_free(next);
+        return false;
+    }
+
+    string_free(*digits_ptr);
+    *digits_ptr = next;
+    return true;
+}
+
+static bool qf_digit_text_prepend(string_t **digits_ptr, char digit)
+{
+    string_t *next;
+
+    if (!digits_ptr || !*digits_ptr || digit < '0' || digit > '9')
+        return false;
+
+    next = string_new();
+    if (!next)
+        return false;
+    if (string_append_char(next, digit) != 0 ||
+        string_append_string(next, *digits_ptr) != 0) {
+        string_free(next);
+        return false;
+    }
+
+    string_free(*digits_ptr);
+    *digits_ptr = next;
+    return true;
+}
+
+static bool qf_digit_text_truncate(string_t **digits_ptr, int keep_digits)
+{
+    string_t *next;
+    size_t len;
+
+    if (!digits_ptr || !*digits_ptr)
+        return false;
+    if (keep_digits < 0)
+        keep_digits = 0;
+
+    len = string_length(*digits_ptr);
+    if ((size_t)keep_digits >= len)
+        return true;
+
+    next = string_substring(*digits_ptr, 0u, (size_t)keep_digits);
+    if (!next)
+        return false;
+
+    string_free(*digits_ptr);
+    *digits_ptr = next;
+    return true;
+}
+
+static bool qf_digit_text_pad_zeros(string_t *digits, int target_len)
+{
+    if (!digits || target_len < 0)
+        return false;
+
+    while (qf_digit_text_length(digits) < target_len) {
+        if (string_append_char(digits, '0') != 0)
+            return false;
+    }
+    return true;
+}
+
+static bool qf_digit_text_round_carry(string_t **digits_ptr,
+                                      int *fixed_dp,
+                                      int round_index)
+{
+    int i;
+
+    if (!digits_ptr || !*digits_ptr || !fixed_dp)
+        return false;
+
+    i = round_index - 1;
+
+    while (i >= 0 && qf_digit_text_at(*digits_ptr, i) == '9') {
+        if (!qf_digit_text_replace_at(digits_ptr, i, '0'))
+            return false;
         i--;
     }
     if (i >= 0) {
-        digits[i]++;
-    } else if (*nd + 1 < (int)digits_cap) {
-        memmove(digits + 1, digits, (size_t)*nd + 1);
-        digits[0] = '1';
-        (*nd)++;
+        char digit = qf_digit_text_at(*digits_ptr, i);
+
+        return qf_digit_text_replace_at(digits_ptr, i, (char)(digit + 1));
+    } else {
+        if (!qf_digit_text_prepend(digits_ptr, '1'))
+            return false;
         (*fixed_dp)++;
     }
+
+    return true;
 }
-    
+
+static string_t *qf_finalise_fixed_q_text(string_t *text)
+{
+    size_t len;
+
+    if (!text)
+        return NULL;
+
+    len = string_length(text);
+    if (len >= 2u &&
+        rune_is_equal(string_at(text, 0u), '0') &&
+        rune_is_digit(string_at(text, 1u))) {
+        string_t *trimmed = string_substring(text, 1u, len - 1u);
+
+        string_free(text);
+        return trimmed;
+    }
+
+    if (len == 0u && string_append_char(text, '0') != 0) {
+        string_free(text);
+        return NULL;
+    }
+
+    return text;
+}
+
+typedef struct {
+    char conversion;
+    int flag_plus;
+    int flag_space;
+    int flag_minus;
+    int flag_zero;
+    int flag_hash;
+    int width;
+    int precision;
+} qf_format_options_t;
+
+static int qf_format_options_from_spec(qf_format_options_t *opts,
+                                       const string_format_spec_t *spec,
+                                       va_list ap)
+{
+    if (!opts || !spec || spec->length[0] != '\0')
+        return -1;
+
+    opts->conversion = spec->conversion;
+    opts->flag_plus = spec->flag_sign;
+    opts->flag_space = spec->flag_space;
+    opts->flag_minus = spec->flag_left;
+    opts->flag_zero = spec->flag_zero;
+    opts->flag_hash = spec->flag_alternate;
+    opts->width = spec->width_from_argument ? va_arg(ap, int) : spec->width;
+    opts->precision = spec->precision_from_argument
+        ? va_arg(ap, int)
+        : spec->precision;
+
+    if (opts->width < 0) {
+        opts->flag_minus = 1;
+        opts->width = -opts->width;
+    }
+    return 0;
+}
+
+static string_t *qf_format_q_value_text(qfloat_t x,
+                                        const qf_format_options_t *opts)
+{
+    string_t *sci_text = NULL;
+    string_t *mantissa = NULL;
+    string_t *unsigned_mantissa = NULL;
+    string_t *intpart = NULL;
+    string_t *fracpart = NULL;
+    string_t *digits_text = NULL;
+    string_t *out = NULL;
+    string_t *padded = NULL;
+    string_offset_t marker_pos;
+    int exp10 = 0;
+    int negative = 0;
+    int nd;
+    int fixed_dp;
+    string_offset_t dot_pos;
+
+    sci_text = qf_to_string(x);
+    if (!sci_text)
+        return NULL;
+
+    marker_pos = qf_exponent_marker_pos(sci_text);
+    if (marker_pos >= 0 &&
+        qf_parse_exp10_text(sci_text, marker_pos, &exp10) != 0)
+        goto done;
+
+    if (marker_pos < 0 || exp10 < -6 || exp10 > 32) {
+        string_t *core = qf_normalised_scientific_text(sci_text, marker_pos);
+
+        if (core)
+            padded = qf_signed_padded_text(core,
+                                           opts->flag_plus,
+                                           opts->flag_space,
+                                           opts->width,
+                                           opts->flag_minus,
+                                           opts->flag_zero,
+                                           0);
+        string_free(core);
+        goto done;
+    }
+
+    mantissa = string_substr(sci_text, 0u, (size_t)marker_pos);
+    unsigned_mantissa = qf_unsigned_mantissa_text(mantissa, &negative);
+    if (!mantissa || !unsigned_mantissa)
+        goto done;
+
+    dot_pos = string_find(unsigned_mantissa, ".");
+    if (dot_pos >= 0) {
+        size_t mantissa_len = string_view_length(string_view_all(unsigned_mantissa));
+
+        intpart = string_substr(unsigned_mantissa, 0u, (size_t)dot_pos);
+        fracpart = string_substr(unsigned_mantissa,
+                                 (size_t)dot_pos + 1u,
+                                 mantissa_len - (size_t)dot_pos - 1u);
+    } else {
+        intpart = string_clone(unsigned_mantissa);
+        fracpart = string_new();
+    }
+    if (!intpart || !fracpart)
+        goto done;
+
+    digits_text = string_sprintf("%S%S", intpart, fracpart);
+    if (!digits_text)
+        goto done;
+    fixed_dp = (int)string_length(intpart) + exp10;
+    nd = qf_digit_text_length(digits_text);
+
+    if (nd > 32) {
+        int trail = 0;
+        int tail_nonzero = 0;
+
+        for (int i = 31; i >= 0 && qf_digit_text_at(digits_text, i) == '0'; i--)
+            trail++;
+        for (int i = 32; i < nd; i++) {
+            if (qf_digit_text_at(digits_text, i) != '0') {
+                tail_nonzero = 1;
+                break;
+            }
+        }
+
+        if (trail >= 5 && tail_nonzero) {
+            if (qf_digit_text_at(digits_text, 32) >= '5' &&
+                !qf_digit_text_round_carry(&digits_text, &fixed_dp, 32))
+                goto done;
+            if (!qf_digit_text_truncate(&digits_text, 32))
+                goto done;
+            nd = qf_digit_text_length(digits_text);
+        }
+    }
+
+    if (opts->precision >= 0) {
+        int K = fixed_dp + opts->precision;
+
+        if (K + 1 > nd) {
+            int pad = K + 1 - nd;
+
+            if (nd + pad > 255)
+                pad = 255 - nd;
+            if (pad > 0 &&
+                !qf_digit_text_pad_zeros(digits_text, nd + pad))
+                goto done;
+            nd = qf_digit_text_length(digits_text);
+        }
+
+        if (K >= 0 && K < nd &&
+            qf_digit_text_at(digits_text, K) >= '5' &&
+            !qf_digit_text_round_carry(&digits_text, &fixed_dp, K))
+            goto done;
+
+        if (K < 0)
+            K = 0;
+        if (K < nd && !qf_digit_text_truncate(&digits_text, K))
+            goto done;
+        nd = qf_digit_text_length(digits_text);
+    }
+
+    out = string_new();
+    if (!out)
+        goto done;
+
+    if ((negative && string_append_char(out, '-') != 0) ||
+        (!negative && opts->flag_plus && string_append_char(out, '+') != 0) ||
+        (!negative && !opts->flag_plus && opts->flag_space &&
+         string_append_char(out, ' ') != 0))
+        goto done;
+
+    if (fixed_dp <= 0) {
+        if (string_append_char(out, '0') != 0)
+            goto done;
+    } else {
+        for (int i = 0; i < fixed_dp; i++) {
+            if (string_append_char(out,
+                                   qf_digit_text_at(digits_text, i)) != 0)
+                goto done;
+        }
+    }
+
+    {
+        int frac_digits = opts->precision < 0 ? nd - fixed_dp : opts->precision;
+
+        if (frac_digits < 0)
+            frac_digits = 0;
+
+        if (opts->precision < 0) {
+            int end = fixed_dp + frac_digits;
+
+            while (end > fixed_dp &&
+                   qf_digit_text_at(digits_text, end - 1) == '0')
+                end--;
+            frac_digits = end - fixed_dp;
+            if (frac_digits < 0)
+                frac_digits = 0;
+        }
+
+        if (frac_digits > 0 || opts->flag_hash) {
+            if (string_append_char(out, '.') != 0)
+                goto done;
+            for (int i = 0; i < frac_digits; i++) {
+                if (string_append_char(out,
+                                       qf_digit_text_at(digits_text,
+                                                        fixed_dp + i)) != 0)
+                    goto done;
+            }
+        }
+    }
+
+    out = qf_finalise_fixed_q_text(out);
+    if (!out)
+        goto done;
+
+    padded = qf_pad_text(out,
+                         opts->width,
+                         opts->flag_minus,
+                         opts->flag_zero,
+                         0);
+
+done:
+    string_free(sci_text);
+    string_free(mantissa);
+    string_free(unsigned_mantissa);
+    string_free(intpart);
+    string_free(fracpart);
+    string_free(digits_text);
+    string_free(out);
+    return padded;
+}
+static string_t *qf_format_Q_value_text(qfloat_t x,
+                                        const qf_format_options_t *opts)
+{
+    string_t *digits_text = NULL;
+    string_t *out = NULL;
+    int negative;
+    int exp10 = 0;
+    int precision;
+    int keep_digits;
+    int extracted_digits;
+
+    if (opts->precision < 0 ||
+        isnan(x.hi) || isnan(x.lo) || isinf(x.hi)) {
+        string_t *core_text;
+        string_t *upper_text;
+
+        core_text = qf_to_string(x);
+        if (!core_text)
+            return NULL;
+        if (string_replace(core_text, "e", "E") != 0) {
+            string_free(core_text);
+            return NULL;
+        }
+        upper_text = qf_signed_padded_text(core_text,
+                                           opts->flag_plus,
+                                           opts->flag_space,
+                                           opts->width,
+                                           opts->flag_minus,
+                                           opts->flag_zero,
+                                           0);
+        string_free(core_text);
+        return upper_text;
+    }
+
+    negative = (x.hi < 0.0 || (x.hi == 0.0 && x.lo < 0.0));
+    if (negative) {
+        x.hi = -x.hi;
+        x.lo = -x.lo;
+    }
+
+    precision = opts->precision;
+    keep_digits = precision + 1;
+    if (keep_digits < 1)
+        keep_digits = 1;
+
+    extracted_digits = keep_digits + 1;
+    if (extracted_digits < 34)
+        extracted_digits = 34;
+    if (extracted_digits > 127)
+        extracted_digits = 127;
+
+    digits_text = qf_decimal_digits_text(x, extracted_digits, &exp10);
+    if (!digits_text)
+        return NULL;
+
+    if (keep_digits < extracted_digits &&
+        qf_digit_text_at(digits_text, keep_digits) >= '5') {
+        int i = keep_digits - 1;
+
+        while (i >= 0 && qf_digit_text_at(digits_text, i) == '9') {
+            if (!qf_digit_text_replace_at(&digits_text, i, '0'))
+                goto fail;
+            i--;
+        }
+        if (i >= 0) {
+            char digit = qf_digit_text_at(digits_text, i);
+
+            if (!qf_digit_text_replace_at(&digits_text,
+                                          i,
+                                          (char)(digit + 1)))
+                goto fail;
+        } else {
+            if (!qf_digit_text_replace_at(&digits_text, 0, '1'))
+                goto fail;
+            for (i = 1; i < keep_digits; i++) {
+                if (!qf_digit_text_replace_at(&digits_text, i, '0'))
+                    goto fail;
+            }
+            exp10++;
+        }
+    }
+
+    if (negative)
+        out = string_new_with("-");
+    else if (opts->flag_plus)
+        out = string_new_with("+");
+    else if (opts->flag_space)
+        out = string_new_with(" ");
+    else
+        out = string_new();
+    if (!out)
+        goto fail;
+
+    if (string_append_char(out, qf_digit_text_at(digits_text, 0)) != 0)
+        goto fail;
+    if (precision > 0 || opts->flag_hash) {
+        if (string_append_char(out, '.') != 0)
+            goto fail;
+        for (int i = 0; i < precision; i++) {
+            int digit_index = i + 1;
+            if (string_append_char(out,
+                                   digit_index < extracted_digits
+                                       ? qf_digit_text_at(digits_text,
+                                                          digit_index)
+                                       : '0') != 0)
+                goto fail;
+        }
+    }
+    if (string_append_format(out, "E%+d", exp10) < 0)
+        goto fail;
+
+    {
+        string_t *padded = qf_pad_text(out,
+                                       opts->width,
+                                       opts->flag_minus,
+                                       opts->flag_zero,
+                                       0);
+        string_free(digits_text);
+        string_free(out);
+        return padded;
+    }
+
+fail:
+    string_free(digits_text);
+    string_free(out);
+    return NULL;
+}
+
+static string_t *qf_format_value_text(qfloat_t x,
+                                      const qf_format_options_t *opts)
+{
+    if (!opts)
+        return NULL;
+    return opts->conversion == 'Q'
+        ? qf_format_Q_value_text(x, opts)
+        : qf_format_q_value_text(x, opts);
+}
+
+static string_format_result_t qf_format_callback(string_t *out,
+                                                 const string_format_spec_t *spec,
+                                                 va_list ap,
+                                                 void *user)
+{
+    qf_format_options_t opts;
+    string_t *text;
+    qfloat_t value;
+
+    (void)user;
+
+    if (!out || !spec || !ap)
+        return STRING_FORMAT_ERROR;
+    if (spec->conversion != 'q' && spec->conversion != 'Q')
+        return STRING_FORMAT_UNHANDLED;
+
+    if (qf_format_options_from_spec(&opts, spec, ap) != 0)
+        return STRING_FORMAT_ERROR;
+
+    value = va_arg(ap, qfloat_t);
+    text = qf_format_value_text(value, &opts);
+    if (!text)
+        return STRING_FORMAT_ERROR;
+
+    if (string_append_string(out, text) != 0) {
+        string_free(text);
+        return STRING_FORMAT_ERROR;
+    }
+
+    string_free(text);
+    return STRING_FORMAT_HANDLED;
+}
+
+static int qf_copy_text_to_buffer(const string_t *text, char *out, size_t out_size)
+{
+    size_t len;
+
+    if (!text)
+        return -1;
+
+    len = string_view_length(string_view_all(text));
+    if (out && out_size > 0u) {
+        size_t copy_len = len < out_size - 1u ? len : out_size - 1u;
+
+        memcpy(out, string_c_str(text), copy_len);
+        out[copy_len] = '\0';
+    }
+
+    return len <= (size_t)INT_MAX ? (int)len : -1;
+}
+
+string_t *qf_vsprintf_text(const char *fmt, va_list ap)
+{
+    if (!fmt)
+        return NULL;
+
+    return string_vsprintf_with_callback(fmt, ap, qf_format_callback, NULL);
+}
+
 int qf_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap)
 {
-    const char *p = fmt;
-
-    va_list ap_local;
-    va_copy(ap_local, ap);
-
-    char *dst = out;
-    size_t remaining = out_size;
-    size_t count = 0;
-
-    if (!out || out_size == 0) {
-        dst = NULL;
-        remaining = 0;
-    }
-
-    while (*p) {
-
-        if (*p != '%') {
-            qf_put_char(*p++, &dst, &remaining, &count);
-            continue;
-        }
-
-        p++; /* skip '%' */
-
-        int flag_plus  = 0;
-        int flag_space = 0;
-        int flag_minus = 0;
-        int flag_zero  = 0;
-        int flag_hash  = 0;
-
-        while (1) {
-            if      (*p == '+') { flag_plus = 1; p++; }
-            else if (*p == ' ') { flag_space = 1; p++; }
-            else if (*p == '-') { flag_minus = 1; p++; }
-            else if (*p == '0') { flag_zero  = 1; p++; }
-            else if (*p == '#') { flag_hash  = 1; p++; }
-            else break;
-        }
-
-        int width = 0;
-        while (*p >= '0' && *p <= '9')
-            width = width * 10 + (*p++ - '0');
-
-        int precision = -1;
-        if (*p == '.') {
-            p++;
-            precision = 0;
-            while (*p >= '0' && *p <= '9')
-                precision = precision * 10 + (*p++ - '0');
-        }
-
-        /* ----------------------------------------------------
-           %Q — scientific (uppercase exponent)
-           ---------------------------------------------------- */
-        if (*p == 'Q') {
-            p++;
-
-            qfloat_t x   = va_arg(ap_local, qfloat_t);
-
-            char core[256];
-            qf_to_string(x, core, sizeof(core));
-            qf_uppercase_E(core);
-
-            char tmp[256];
-            strcpy(tmp, core);
-
-            qf_apply_sign_prefix(tmp, flag_plus, flag_space);
-
-            char padded[256];
-            pad_string(padded, sizeof(padded),
-                       tmp, width, flag_minus, flag_zero, 0);
-
-            qf_put_str(padded, &dst, &remaining, &count);
-            continue;
-        }
-
-        /* ----------------------------------------------------
-           %q — fixed-format with explicit precision and
-                 concise default, fallback to scientific
-           ---------------------------------------------------- */
-        else if (*p == 'q') {
-            p++;
-
-            qfloat_t x = va_arg(ap_local, qfloat_t);
-
-            /* Step 1: canonical scientific form */
-            char sci[128];
-            qf_to_string(x, sci, sizeof(sci));   /* mantissa + 'e' + exponent */
-
-            char *e = strchr(sci, 'e');
-            if (!e) e = strchr(sci, 'E');
-
-            int exp10 = 0;
-            if (e) {
-                exp10 = atoi(e + 1);
-                *e = '\0'; /* terminate mantissa */
-            }
-
-            /* Step 2: scientific fallback if exponent outside [-6, 32] */
-            if (!e || exp10 < -6 || exp10 > 32) {
-
-                char tmp[256];
-                qf_to_string(x, tmp, sizeof(tmp));
-
-                /* normalise to lowercase 'e' and trim mantissa only */
-                char *ep = strchr(tmp, 'e');
-                if (!ep) ep = strchr(tmp, 'E');
-
-                if (ep) {
-                    char mant[256];
-                    char expbuf[32];
-
-                    size_t mlen = (size_t)(ep - tmp);
-                    memcpy(mant, tmp, mlen);
-                    mant[mlen] = '\0';
-
-                    strcpy(expbuf, ep); /* includes 'e' and exponent */
-
-                    /* force lowercase 'e' */
-                    if (expbuf[0] == 'E')
-                        expbuf[0] = 'e';
-
-                    /* trim trailing zeros in mantissa */
-                    char *q = mant + strlen(mant) - 1;
-                    while (q > mant && *q == '0')
-                        *q-- = '\0';
-                    if (q > mant && *q == '.')
-                        *q = '\0';
-
-                    {
-                        size_t mlen = strlen(mant);
-                        size_t elen = strlen(expbuf);
-
-                        /* Clamp lengths to avoid overflow */
-                        if (mlen > sizeof(tmp) - 1)
-                            mlen = sizeof(tmp) - 1;
-
-                        if (elen > sizeof(tmp) - 1 - mlen)
-                            elen = sizeof(tmp) - 1 - mlen;
-
-                        memcpy(tmp, mant, mlen);
-                        memcpy(tmp + mlen, expbuf, elen);
-                        tmp[mlen + elen] = '\0';
-                    }
-                }
-
-                qf_apply_sign_prefix(tmp, flag_plus, flag_space);
-
-                char padded[256];
-                pad_string(padded, sizeof(padded),
-                           tmp, width, flag_minus, flag_zero, 0);
-
-                qf_put_str(padded, &dst, &remaining, &count);
-                continue;
-            }
-
-            /* Step 3: fixed-format reconstruction */
-
-            char mantissa[128];
-            strcpy(mantissa, sci);
-
-            int negative = 0;
-            char *mant = mantissa;
-
-            if (*mant == '-') {
-                negative = 1;
-                mant++;
-            }
-
-            char intpart[128], fracpart[128];
-            char *dot = strchr(mant, '.');
-
-            if (dot) {
-                size_t ilen = (size_t)(dot - mant);
-                memcpy(intpart, mant, ilen);
-                intpart[ilen] = '\0';
-                strcpy(fracpart, dot + 1);
-            } else {
-                strcpy(intpart, mant);
-                fracpart[0] = '\0';
-            }
-
-            char digits[256];
-            snprintf(digits, sizeof(digits), "%s%s", intpart, fracpart);
-            int nd = (int)strlen(digits);
-
-            int fixed_dp = (int)strlen(intpart) + exp10; /* decimal point position in digits[] */
-
-            /* Step 3a: suppress noise in digits 33-34.
-             * qfloat_t is reliable to ~32 significant digits.  Digits 33-34
-             * are real information only when the preceding digits are varied;
-             * when they follow a long run of zeros they are rounding noise.
-             * Heuristic: if the first 32 digits end in >=5 zeros AND the
-             * remaining digits are non-zero, treat them as noise and round
-             * to 32 sig figs.  Otherwise keep all 34. */
-            if (nd > 32) {
-                int trail = 0;
-                for (int i = 31; i >= 0 && digits[i] == '0'; i--)
-                    trail++;
-                int tail_nonzero = 0;
-                for (int i = 32; i < nd; i++)
-                    if (digits[i] != '0') { tail_nonzero = 1; break; }
-
-                if (trail >= 5 && tail_nonzero) {
-                    if (digits[32] >= '5')
-                        qf_round_digits_carry(digits, &nd, sizeof(digits), &fixed_dp, 32);
-                    nd = 32;
-                    digits[nd] = '\0';
-                }
-            }
-
-            /* Step 3b: rounding for explicit precision */
-            if (precision >= 0) {
-                int K = fixed_dp + precision; /* index of rounding digit */
-
-                if (K + 1 > nd) {
-                    int pad = K + 1 - nd;
-                    if (nd + pad >= (int)sizeof(digits))
-                        pad = (int)sizeof(digits) - 1 - nd;
-                    for (int i = 0; i < pad; i++)
-                        digits[nd + i] = '0';
-                    nd += pad;
-                    digits[nd] = '\0';
-                }
-
-                if (K >= 0 && K < nd && digits[K] >= '5') {
-                    qf_round_digits_carry(digits, &nd, sizeof(digits), &fixed_dp, K);
-                }
-
-                if (K < nd)
-                    nd = K;
-                digits[nd] = '\0';
-            }
-
-            char buf2[512];
-            char *bp = buf2;
-
-            /* sign */
-            if (negative) {
-                *bp++ = '-';
-            } else if (flag_plus) {
-                *bp++ = '+';
-            } else if (flag_space) {
-                *bp++ = ' ';
-            }
-
-            /* integer part */
-            if (fixed_dp <= 0) {
-                *bp++ = '0';
-            } else {
-                for (int i = 0; i < fixed_dp; i++) {
-                    int idx = i;
-                    if (idx >= 0 && idx < nd)
-                        *bp++ = digits[idx];
-                    else
-                        *bp++ = '0';
-                }
-            }
-
-            /* fractional part */
-            int frac_digits;
-            if (precision < 0) {
-                frac_digits = nd - fixed_dp;
-                if (frac_digits < 0) frac_digits = 0;
-            } else {
-                frac_digits = precision;
-            }
-
-            if (frac_digits > 0 || flag_hash) {
-                *bp++ = '.';
-
-                for (int i = 0; i < frac_digits; i++) {
-                    int idx = fixed_dp + i;
-                    if (idx >= 0 && idx < nd)
-                        *bp++ = digits[idx];
-                    else
-                        *bp++ = '0';
-                }
-
-                if (precision < 0) {
-                    /* trim trailing zeros, but keep '.' if flag_hash */
-                    char *q = bp - 1;
-                    while (q > buf2 && *q == '0') {
-                        *q-- = '\0';
-                        bp--;
-                    }
-                    if (!flag_hash && q > buf2 && *q == '.') {
-                        *q = '\0';
-                        bp--;
-                    }
-                } else {
-                    if (precision == 0 && !flag_hash) {
-                        /* remove '.' if no digits requested and no # */
-                        bp--;
-                    }
-                }
-            }
-
-            *bp = '\0';
-
-            /* Fix leading zero in integer part (e.g. "099" → "99") */
-            if (buf2[0] == '0' && buf2[1] >= '0' && buf2[1] <= '9') {
-                memmove(buf2, buf2 + 1, strlen(buf2));
-                bp--;  /* adjust write pointer */
-            }
-
-            if (buf2[0] == '\0')
-                strcpy(buf2, "0");
-
-            char padded[512];
-            pad_string(padded, sizeof(padded),
-                       buf2, width, flag_minus, flag_zero, 0);
-
-            qf_put_str(padded, &dst, &remaining, &count);
-            continue;
-        }
-
-        /* ----------------------------------------------------
-           Delegate to snprintf for everything else
-           ---------------------------------------------------- */
-        else {
-            char fmtbuf[32];
-            char tmp[256];
-
-            char *f = fmtbuf;
-            *f++ = '%';
-
-            if (flag_plus)  *f++ = '+';
-            if (flag_space) *f++ = ' ';
-            if (flag_minus) *f++ = '-';
-            if (flag_zero)  *f++ = '0';
-            if (flag_hash)  *f++ = '#';
-
-            if (width > 0)
-                f += sprintf(f, "%d", width);
-
-            if (precision >= 0) {
-                *f++ = '.';
-                f += sprintf(f, "%d", precision);
-            }
-
-            *f++ = *p;
-            *f   = '\0';
-
-            switch (*p) {
-                case 'd': {
-                    int v = va_arg(ap_local, int);
-                    snprintf(tmp, sizeof(tmp), fmtbuf, v);
-                } break;
-
-                case 's': {
-                    const char *v = va_arg(ap_local, const char *);
-                    snprintf(tmp, sizeof(tmp), fmtbuf, v);
-                } break;
-
-                default:
-                    snprintf(tmp, sizeof(tmp), "<?>");
-                    break;
-            }
-
-            p++;
-
-            qf_put_str(tmp, &dst, &remaining, &count);
-            continue;
-        }
-    }
-
-    if (dst && remaining > 0)
-        *dst = '\0';
-
-    va_end(ap_local);
-    return (int)count;
+    string_t *text = qf_vsprintf_text(fmt, ap);
+    int written = qf_copy_text_to_buffer(text, out, out_size);
+
+    string_free(text);
+    return written;
 }
 
 int qf_sprintf(char *out, size_t out_size, const char *fmt, ...)
 {
     va_list ap;
+    int n;
+
     va_start(ap, fmt);
-
-    int n = qf_vsprintf(out, out_size, fmt, ap);
-
+    n = qf_vsprintf(out, out_size, fmt, ap);
     va_end(ap);
     return n;
 }
 
-int qf_printf(const char *fmt, ...)
+string_t *qf_sprintf_text(const char *fmt, ...)
 {
     va_list ap;
-    va_start(ap, fmt);
+    string_t *out;
 
-    int needed = qf_vsprintf(NULL, 0, fmt, ap);
+    va_start(ap, fmt);
+    out = qf_vsprintf_text(fmt, ap);
+    va_end(ap);
+    return out;
+}
+
+int qf_printf(const char *fmt, ...)
+{
+    string_t *text;
+    int written;
+    va_list ap;
+
+    va_start(ap, fmt);
+    text = qf_vsprintf_text(fmt, ap);
     va_end(ap);
 
-    if (needed < 0)
-        return needed;
-
-    char *buf = malloc((size_t)needed + 1);
-    if (!buf)
+    if (!text)
         return -1;
 
-    va_start(ap, fmt);
-    qf_vsprintf(buf, (size_t)needed + 1, fmt, ap);
-    va_end(ap);
-
-    fwrite(buf, 1, needed, stdout);
-    free(buf);
-
-    return needed;
+    written = string_printf("%S", text);
+    string_free(text);
+    return written;
 }

@@ -101,7 +101,7 @@ static int expr_number_format(const void *value,
                               string_t *out,
                               void *ctx)
 {
-    char *text;
+    string_t *text;
 
     (void)ctx;
     if (!out)
@@ -109,11 +109,11 @@ static int expr_number_format(const void *value,
     text = num_to_string(*(const number_t *)value);
     if (!text)
         return string_append_cstr(out, "<num_to_string failed>");
-    if (string_append_cstr(out, text) != 0) {
-        free(text);
+    if (string_append_string(out, text) != 0) {
+        string_free(text);
         return -1;
     }
-    free(text);
+    string_free(text);
     return 0;
 }
 
@@ -184,10 +184,11 @@ void print_expr_of(const expr_t *f)
     free(s);
 }
 
-static char *format_num_at_own_precision(const number_t value)
+static string_t *format_num_at_own_precision(const number_t value)
 {
     char fmt[32];
     char *out;
+    string_t *text;
     size_t significant_digits = num_get_prec_digits(value);
     int needed;
     size_t precision;
@@ -207,17 +208,22 @@ static char *format_num_at_own_precision(const number_t value)
         free(out);
         return NULL;
     }
-    return out;
+    text = string_new_with(out);
+    free(out);
+    return text;
 }
 
 static void print_num_line(const char *label, const number_t value)
 {
-    char *text = format_num_at_own_precision(value);
+    string_t *text = format_num_at_own_precision(value);
 
     if (!text)
         text = num_to_string(value);
-    printf("%-8s = %s\n", label, text ? text : "(unavailable)");
-    free(text);
+    if (text)
+        string_printf("%-8s = %S\n", label, text);
+    else
+        string_printf("%-8s = (unavailable)\n", label);
+    string_free(text);
 }
 
 static expr_t *make_readme_f(expr_t *x)

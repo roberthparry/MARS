@@ -70,6 +70,14 @@ static void set_error(expr_parse_state_t *p, const char *msg)
     }
 }
 
+static string_t *expr_node_name_as_text(const expr_t *node,
+                                        const string_t *fallback)
+{
+    if (node && node->name && *node->name)
+        return string_new_with(node->name);
+    return fallback ? string_clone(fallback) : NULL;
+}
+
 static int expr_parse_state_init(expr_parse_state_t *p,
                                  string_view_t text,
                                  symtab_t *syms)
@@ -498,7 +506,7 @@ static int parse_number_view(string_view_t text, number_t *out)
 {
     size_t len;
     size_t atom_len;
-    char *roundtrip;
+    string_t *roundtrip;
     string_t *literal;
 
     text = string_view_trim(text);
@@ -517,7 +525,7 @@ static int parse_number_view(string_view_t text, number_t *out)
     if (!literal)
         return 0;
 
-    *out = num_create_from_string(string_c_str(literal));
+    *out = num_create_from_text(literal);
     string_free(literal);
 
     roundtrip = num_to_string(*out);
@@ -526,7 +534,7 @@ static int parse_number_view(string_view_t text, number_t *out)
         return 0;
     }
 
-    free(roundtrip);
+    string_free(roundtrip);
     return 1;
 }
 
@@ -882,11 +890,11 @@ static int node_has_preserved_constexpr(const expr_t *node)
 
 static expr_binding_expr_t *binding_expr_number_from_value_local(number_t value)
 {
-    char *text = num_to_string(value);
+    string_t *text = num_to_string(value);
     expr_binding_expr_t *expr =
-        expr_binding_expr_new_number_text(text ? text : "NAN");
+        expr_binding_expr_new_number_text(text ? string_c_str(text) : "NAN");
 
-    free(text);
+    string_free(text);
     return expr;
 }
 
@@ -997,15 +1005,16 @@ static expr_t *apply_binary_preserving_constexpr(const expr_ops_t *ops,
 static expr_t *apply_pow_const_preserving_constexpr(expr_t *base, const number_t *exponent)
 {
     if (node_has_preserved_constexpr(base)) {
-        char *text = num_to_string(*exponent);
-        expr_binding_expr_t *rhs = expr_binding_expr_new_number_text(text ? text : "NAN");
+        string_t *text = num_to_string(*exponent);
+        expr_binding_expr_t *rhs =
+            expr_binding_expr_new_number_text(text ? string_c_str(text) : "NAN");
         expr_binding_expr_t *expr =
             expr_binding_expr_new_binary_op(&ops_pow,
                                           expr_binding_expr_clone(base->binding_expr),
                                           rhs);
         expr_t *node;
 
-        free(text);
+        string_free(text);
         node = const_node_from_binding_expr(expr);
         expr_free(base);
         return node;
@@ -1155,7 +1164,10 @@ static expr_t *parse_atom(expr_parse_state_t *p)
             literal_text = (char *)fs_xmalloc(4u);
             memcpy(literal_text, "NAN", 4u);
         } else if (num_is_exact(value)) {
-            literal_text = num_to_string(value);
+            string_t *exact_text = num_to_string(value);
+
+            literal_text = exact_text ? strdup(string_c_str(exact_text)) : NULL;
+            string_free(exact_text);
             if (!literal_text) {
                 literal_text = (char *)fs_xmalloc(4u);
                 memcpy(literal_text, "NAN", 4u);
@@ -1378,23 +1390,23 @@ static expr_t *parse_atom(expr_parse_state_t *p)
         return NULL;
     }
 
-    expr_t *sym = symtab_lookup(p->syms, string_c_str(name));
+    expr_t *sym = symtab_lookup_text(p->syms, name);
     if (!sym) {
-        char *normalised =
-            expr_normalise_name(expr_default_constant_canonical_name(string_c_str(name)));
+        string_t *canonical = expr_default_constant_canonical_name_text(name);
+        string_t *normalised = expr_normalise_name_text(canonical);
 
-        if (normalised) {
-            sym = symtab_lookup(p->syms, normalised);
-            free(normalised);
-        }
+        if (normalised)
+            sym = symtab_lookup_text(p->syms, normalised);
+        string_free(normalised);
+        string_free(canonical);
     }
     if (!sym) {
         if (!p->error) {
             p->error = 1;
             if (p->errmsg)
                 string_append_format(p->errmsg,
-                                     "unknown symbol '%.200s'",
-                                     string_c_str(name));
+                                     "unknown symbol '%S'",
+                                     name);
         }
         string_free(name);
         return NULL;
@@ -1637,7 +1649,7 @@ static expr_t *parse_addexpr(expr_parse_state_t *p)
 /* ------------------------------------------------------------------ */
 
 static void binding_parse_error(string_t *errmsg,
-                                const char *name,
+                                const string_t *name,
                                 string_view_t value)
 {
     const size_t max_value = 160u;
@@ -1659,9 +1671,9 @@ static void binding_parse_error(string_t *errmsg,
     display = string_from_view(&value);
 
     string_append_format(errmsg,
-                         "incorrect syntax for %.80s: %s%s",
-                         name ? name : "",
-                         display ? string_c_str(display) : "",
+                         "incorrect syntax for %S: %S%s",
+                         name,
+                         display,
                          suffix);
     string_free(display);
 }
@@ -1729,7 +1741,7 @@ static int parse_bindings(string_view_t text,
 
         binding_expr = expr_binding_expr_parse_view(value, errmsg);
         if (!binding_expr) {
-            binding_parse_error(errmsg, string_c_str(name), value);
+            binding_parse_error(errmsg, name, value);
             string_free(name);
             string_cursor_free(cursor);
             return -1;
@@ -1738,34 +1750,40 @@ static int parse_bindings(string_view_t text,
         val = expr_binding_expr_eval(binding_expr);
 
         node = is_var
-            ? expr_new_named_var(val, string_c_str(name))
-            : expr_new_named_const(val, string_c_str(name));
+            ? expr_new_named_var_text(val, name)
+            : expr_new_named_const_text(val, name);
         num_destroy(&val);
+        if (!node) {
+            expr_binding_expr_free(binding_expr);
+            string_free(name);
+            string_cursor_free(cursor);
+            return -1;
+        }
         node->binding_expr = binding_expr;
 
         /* expr_new_named_* calls expr_normalise_name, which may transform the name
          * (e.g. "@pi" → "π").  Use the normalised form as the lookup key so it
          * matches what the expression text will contain after its own read_any_name. */
-        const char *key = (node->name && *node->name)
-            ? node->name
-            : string_c_str(name);
+        string_t *key = expr_node_name_as_text(node, name);
 
         /* Detect name clashes — same name used twice, or once as a variable
          * and once as a named constant. */
-        if (symtab_has(syms, key)) {
+        if (!key || symtab_has_text(syms, key)) {
             if (errmsg) {
                 string_clear(errmsg);
                 string_append_format(errmsg,
-                                     "duplicate name '%.200s' in binding section",
+                                     "duplicate name '%S' in binding section",
                                      key);
             }
             expr_free(node);
+            string_free(key);
             string_free(name);
             string_cursor_free(cursor);
             return -1;
         }
 
-        symtab_add(syms, key, node);
+        symtab_add_text(syms, key, node);
+        string_free(key);
         string_free(name);
     }
     string_cursor_free(cursor);
@@ -1828,7 +1846,7 @@ static expr_t *parse_pure_const(string_view_t text,
         }
         return NULL;
     }
-    expr_t *result = expr_new_named_const(val, string_c_str(name));
+    expr_t *result = expr_new_named_const_text(val, name);
     num_destroy(&val);
     result->binding_expr = binding_expr;
     string_free(name);
@@ -1914,8 +1932,8 @@ static int collect_implicit_symbols(string_view_t text,
         expr_t *node;
         int is_const;
         number_t value;
-        const char *canonical_name;
-        char *key = NULL;
+        string_t *canonical_text = NULL;
+        string_t *key = NULL;
 
         if (!name) {
             if (string_cursor_next(cursor) != 0)
@@ -1923,40 +1941,43 @@ static int collect_implicit_symbols(string_view_t text,
             continue;
         }
 
-        canonical_name = string_c_str(name);
-        is_const = expr_is_default_constant_name(canonical_name);
-        if (expr_get_default_constant_num(canonical_name, &value)) {
-            canonical_name = expr_default_constant_canonical_name(canonical_name);
-            node = expr_new_named_const(value, canonical_name);
+        is_const = expr_is_default_constant_name_text(name);
+        if (expr_get_default_constant_num_text(name, &value)) {
+            canonical_text = expr_default_constant_canonical_name_text(name);
+            node = expr_new_named_const_text(value, canonical_text);
             node->binding_expr =
                 expr_binding_expr_parse_view(
                     string_view_all(name),
                     NULL);
         } else {
             node = is_const
-                ? expr_new_named_const(NUM_NAN, string_c_str(name))
-                : expr_new_named_var(NUM_NAN, string_c_str(name));
+                ? expr_new_named_const_text(NUM_NAN, name)
+                : expr_new_named_var_text(NUM_NAN, name);
+            canonical_text = string_clone(name);
         }
 
-        key = expr_normalise_name(canonical_name);
+        key = expr_normalise_name_text(canonical_text);
         if (!key)
-            key = strdup(canonical_name);
+            key = string_clone(canonical_text);
         if (!key) {
+            string_free(canonical_text);
             expr_free(node);
             string_free(name);
             string_cursor_free(cursor);
             return -1;
         }
 
-        if (symtab_has(syms, key)) {
-            free(key);
+        if (symtab_has_text(syms, key)) {
+            string_free(key);
+            string_free(canonical_text);
             expr_free(node);
             string_free(name);
             continue;
         }
 
-        symtab_add(syms, key, node);
-        free(key);
+        symtab_add_text(syms, key, node);
+        string_free(key);
+        string_free(canonical_text);
         string_free(name);
     }
 
@@ -2328,29 +2349,46 @@ expr_t *expr_from_string(const char *s, expr_bindings_t **bnd_out)
     return result;
 }
 
-static expr_binding_entry_t *bnd_find_entry(expr_bindings_t *bnd,
-                                            const char *name)
+static expr_binding_entry_t *bnd_find_entry_text(expr_bindings_t *bnd,
+                                                 const string_t *name)
 {
-    char *norm;
+    string_t *norm;
     expr_binding_entry_t *entry = NULL;
 
     if (!bnd || !bnd->index || !name)
         return NULL;
 
-    norm = expr_normalise_binding_name(name);
+    norm = expr_normalise_binding_name_text(name);
     if (!norm)
         return NULL;
 
     dictionary_get(bnd->index, &norm, &entry);
-    free(norm);
+    string_free(norm);
     return entry;
+}
+
+expr_t *expr_bindings_get_text(expr_bindings_t *bnd, const string_t *name)
+{
+    expr_binding_entry_t *entry = bnd_find_entry_text(bnd, name);
+
+    return entry ? entry->expr : NULL;
 }
 
 expr_t *expr_bindings_get(expr_bindings_t *bnd, const char *name)
 {
-    expr_binding_entry_t *entry = bnd_find_entry(bnd, name);
+    string_t *text;
+    expr_t *expr;
 
-    return entry ? entry->expr : NULL;
+    if (!name)
+        return NULL;
+
+    text = string_new_with(name);
+    if (!text)
+        return NULL;
+
+    expr = expr_bindings_get_text(bnd, text);
+    string_free(text);
+    return expr;
 }
 
 void expr_bindings_free(expr_bindings_t *bnd)
@@ -2358,9 +2396,11 @@ void expr_bindings_free(expr_bindings_t *bnd)
     if (!bnd)
         return;
     for (size_t i = 0; i < bnd->count; ++i)
+        string_free(bnd->entries[i].name);
+    for (size_t i = 0; i < bnd->count; ++i)
         expr_free(bnd->entries[i].expr);
     dictionary_destroy(bnd->index);
-    free(bnd->storage);
+    free(bnd->entries);
     free(bnd);
 }
 
@@ -2370,6 +2410,54 @@ expr_t *expr_from_expression_string(const char *expr,
                                     size_t nsymbols)
 {
     string_t *text;
+    string_t **name_texts = NULL;
+    expr_t *result;
+
+    if (!expr)
+        return NULL;
+
+    text = string_new_with(expr);
+    if (!text)
+        return NULL;
+
+    if (nsymbols > 0u) {
+        name_texts = calloc(nsymbols, sizeof(*name_texts));
+        if (!name_texts) {
+            string_free(text);
+            return NULL;
+        }
+        for (size_t i = 0; i < nsymbols; ++i) {
+            if (!names || !names[i])
+                continue;
+            name_texts[i] = string_new_with(names[i]);
+            if (!name_texts[i]) {
+                for (size_t j = 0; j < i; ++j)
+                    string_free(name_texts[j]);
+                free(name_texts);
+                string_free(text);
+                return NULL;
+            }
+        }
+    }
+
+    result = expr_from_expression_text(text,
+                                       (const string_t *const *)name_texts,
+                                       symbols,
+                                       nsymbols);
+    if (name_texts) {
+        for (size_t i = 0; i < nsymbols; ++i)
+            string_free(name_texts[i]);
+        free(name_texts);
+    }
+    string_free(text);
+    return result;
+}
+
+expr_t *expr_from_expression_text(const string_t *expr,
+                                  const string_t *const *names,
+                                  expr_t *const *symbols,
+                                  size_t nsymbols)
+{
     symtab_t syms;
     expr_t *result;
 
@@ -2377,48 +2465,40 @@ expr_t *expr_from_expression_string(const char *expr,
         return NULL;
     if (nsymbols > 0 && (!names || !symbols)) {
         fprintf(stderr,
-                "expr_from_expression_string: symbol table is incomplete\n");
+                "expr_from_expression_text: symbol table is incomplete\n");
         return NULL;
     }
     if (nsymbols > (size_t)INT_MAX) {
         fprintf(stderr,
-                "expr_from_expression_string: too many symbols\n");
+                "expr_from_expression_text: too many symbols\n");
         return NULL;
     }
-
-    text = string_new_with(expr);
-    if (!text)
-        return NULL;
 
     symtab_init(&syms);
     for (size_t i = 0; i < nsymbols; ++i) {
         if (!names[i] || !symbols[i]) {
             fprintf(stderr,
-                    "expr_from_expression_string: null symbol entry\n");
+                    "expr_from_expression_text: null symbol entry\n");
             symtab_free(&syms);
-            string_free(text);
             return NULL;
         }
-        if (symtab_has(&syms, names[i])) {
-            fprintf(stderr,
-                    "expr_from_expression_string: duplicate symbol '%s'\n",
-                    names[i]);
+        if (symtab_has_text(&syms, names[i])) {
+            string_fprintf(stderr,
+                           "expr_from_expression_text: duplicate symbol '%S'\n",
+                           names[i]);
             symtab_free(&syms);
-            string_free(text);
             return NULL;
         }
-        if (symtab_add_borrowed(&syms, names[i], symbols[i]) != 0) {
+        if (symtab_add_borrowed_text(&syms, names[i], symbols[i]) != 0) {
             symtab_free(&syms);
-            string_free(text);
             return NULL;
         }
     }
 
-    result = parse_expression_view(string_view_all(text),
+    result = parse_expression_view(string_view_all(expr),
                                    nsymbols ? &syms : NULL,
-                                   "expr_from_expression_string", 1);
+                                   "expr_from_expression_text", 1);
     symtab_free(&syms);
-    string_free(text);
     result = simplify_parsed_result(result);
     return result;
 }

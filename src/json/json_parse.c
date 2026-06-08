@@ -55,39 +55,6 @@ static int json_hex_value(uint32_t value)
     return -1;
 }
 
-static bool json_append_scalar(string_t *out, uint32_t scalar)
-{
-    char bytes[4];
-    size_t len;
-
-    if (!out ||
-        scalar > 0x10FFFFu ||
-        (scalar >= 0xD800u && scalar <= 0xDFFFu))
-        return false;
-
-    if (scalar <= 0x7Fu) {
-        bytes[0] = (char)scalar;
-        len = 1u;
-    } else if (scalar <= 0x7FFu) {
-        bytes[0] = (char)(0xC0u | (scalar >> 6u));
-        bytes[1] = (char)(0x80u | (scalar & 0x3Fu));
-        len = 2u;
-    } else if (scalar <= 0xFFFFu) {
-        bytes[0] = (char)(0xE0u | (scalar >> 12u));
-        bytes[1] = (char)(0x80u | ((scalar >> 6u) & 0x3Fu));
-        bytes[2] = (char)(0x80u | (scalar & 0x3Fu));
-        len = 3u;
-    } else {
-        bytes[0] = (char)(0xF0u | (scalar >> 18u));
-        bytes[1] = (char)(0x80u | ((scalar >> 12u) & 0x3Fu));
-        bytes[2] = (char)(0x80u | ((scalar >> 6u) & 0x3Fu));
-        bytes[3] = (char)(0x80u | (scalar & 0x3Fu));
-        len = 4u;
-    }
-
-    return string_append_chars(out, bytes, len) == 0;
-}
-
 static bool json_parse_hex4(json_parser_t *parser, uint32_t *out)
 {
     uint32_t scalar = 0u;
@@ -110,6 +77,7 @@ static bool json_parse_hex4(json_parser_t *parser, uint32_t *out)
 static bool json_parse_unicode_escape(json_parser_t *parser, string_t *out)
 {
     uint32_t scalar;
+    rune_t rune;
 
     if (!json_parse_hex4(parser, &scalar))
         return false;
@@ -132,7 +100,8 @@ static bool json_parse_unicode_escape(json_parser_t *parser, string_t *out)
         return false;
     }
 
-    return json_append_scalar(out, scalar);
+    rune = rune_from_value(scalar);
+    return !rune_is_none(rune) && string_append_rune(out, rune) == 0;
 }
 
 static string_t *json_parse_string_text(json_parser_t *parser)
@@ -509,7 +478,7 @@ static json_t *json_parse_value(json_parser_t *parser)
     }
 }
 
-json_t *json_from_string(const string_t *text)
+json_t *json_from_text(const string_t *text)
 {
     json_parser_t parser;
     json_t *json;
@@ -573,7 +542,7 @@ json_t *json_from_file(const string_t *path)
     }
 
     fclose(file);
-    json = json_from_string(text);
+    json = json_from_text(text);
     string_free(text);
     return json;
 }

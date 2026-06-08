@@ -27,6 +27,8 @@
 #include "string_internal.h"
 
 #define ARRAY_COUNT(a) (sizeof(a) / sizeof((a)[0]))
+#define RUNE_INLINE_ASCII_TAG  1u
+#define RUNE_INLINE_SCALAR_TAG 2u
 
 /* Binary search over the sorted codepoint ranges array. Returns 1 if cp falls
    within any range, 0 otherwise. */
@@ -422,14 +424,62 @@ static rune_t rune_from_range(const string_t *s, size_t offset, size_t length)
 static bool rune_is_inline_ascii(rune_t rune)
 {
     return rune._opaque[0] == 0u &&
-           rune._opaque[2] == 1u &&
+           rune._opaque[2] == RUNE_INLINE_ASCII_TAG &&
            rune._opaque[1] > 0u &&
            rune._opaque[1] <= 0x7fu;
+}
+
+static bool rune_is_inline_scalar(rune_t rune)
+{
+    return rune._opaque[0] == 0u &&
+           rune._opaque[2] == RUNE_INLINE_SCALAR_TAG;
 }
 
 static unsigned char rune_inline_ascii(rune_t rune)
 {
     return (unsigned char)rune._opaque[1];
+}
+
+static uint32_t rune_inline_scalar(rune_t rune)
+{
+    return (uint32_t)rune._opaque[1];
+}
+
+static bool rune_value_is_valid_scalar(uint32_t value)
+{
+    return value <= 0x10FFFFu &&
+           (value < 0xD800u || value > 0xDFFFu);
+}
+
+static int string_append_scalar_value(string_t *s, uint32_t value)
+{
+    char bytes[4];
+    size_t count;
+
+    if (!s || !rune_value_is_valid_scalar(value))
+        return -1;
+
+    if (value <= 0x7Fu) {
+        bytes[0] = (char)value;
+        count = 1u;
+    } else if (value <= 0x7FFu) {
+        bytes[0] = (char)(0xC0u | (value >> 6u));
+        bytes[1] = (char)(0x80u | (value & 0x3Fu));
+        count = 2u;
+    } else if (value <= 0xFFFFu) {
+        bytes[0] = (char)(0xE0u | (value >> 12u));
+        bytes[1] = (char)(0x80u | ((value >> 6u) & 0x3Fu));
+        bytes[2] = (char)(0x80u | (value & 0x3Fu));
+        count = 3u;
+    } else {
+        bytes[0] = (char)(0xF0u | (value >> 18u));
+        bytes[1] = (char)(0x80u | ((value >> 12u) & 0x3Fu));
+        bytes[2] = (char)(0x80u | ((value >> 6u) & 0x3Fu));
+        bytes[3] = (char)(0x80u | (value & 0x3Fu));
+        count = 4u;
+    }
+
+    return string_append_chars(s, bytes, count);
 }
 
 static const string_t *rune_owner(rune_t rune)
@@ -480,7 +530,9 @@ rune_t string_at(const string_t *s, size_t index)
 
 bool rune_is_empty(rune_t rune)
 {
-    return !rune_is_inline_ascii(rune) && !rune_data(rune);
+    return !rune_is_inline_ascii(rune) &&
+           !rune_is_inline_scalar(rune) &&
+           !rune_data(rune);
 }
 
 bool rune_is_none(rune_t rune)
@@ -495,7 +547,17 @@ rune_t rune_from_ascii(char c)
     if (uc == 0u || uc > 0x7fu)
         return rune_empty();
 
-    return (rune_t){ { 0u, (uintptr_t)uc, 1u } };
+    return (rune_t){ { 0u, (uintptr_t)uc, RUNE_INLINE_ASCII_TAG } };
+}
+
+rune_t rune_from_value(uint32_t value)
+{
+    if (!rune_value_is_valid_scalar(value))
+        return rune_empty();
+    if (value > 0u && value <= 0x7fu)
+        return rune_from_ascii((char)value);
+
+    return (rune_t){ { 0u, (uintptr_t)value, RUNE_INLINE_SCALAR_TAG } };
 }
 
 uint32_t rune_value(rune_t rune)
@@ -505,6 +567,8 @@ uint32_t rune_value(rune_t rune)
 
     if (rune_is_inline_ascii(rune))
         return (uint32_t)rune_inline_ascii(rune);
+    if (rune_is_inline_scalar(rune))
+        return rune_inline_scalar(rune);
 
     data = rune_data(rune);
     if (!data)
@@ -520,6 +584,12 @@ bool rune_to_ascii(rune_t rune, char *out)
 
     if (rune_is_inline_ascii(rune)) {
         c = rune_inline_ascii(rune);
+    } else if (rune_is_inline_scalar(rune)) {
+        uint32_t value = rune_inline_scalar(rune);
+
+        if (value > 0x7fu)
+            return false;
+        c = (unsigned char)value;
     } else {
         data = rune_data(rune);
         if (!data || rune_length(rune) != 1u)
@@ -608,6 +678,14 @@ string_t *rune_to_string(rune_t rune)
         return out;
     }
 
+    if (rune_is_inline_scalar(rune)) {
+        if (string_append_scalar_value(out, rune_inline_scalar(rune)) != 0) {
+            string_free(out);
+            return NULL;
+        }
+        return out;
+    }
+
     if (string_reserve(out, rune_length(rune) + 1u) != 0) {
         string_free(out);
         return NULL;
@@ -625,6 +703,8 @@ int string_append_rune(string_t *s, rune_t rune)
 
     if (rune_is_inline_ascii(rune))
         return string_append_char(s, (char)rune_inline_ascii(rune));
+    if (rune_is_inline_scalar(rune))
+        return string_append_scalar_value(s, rune_inline_scalar(rune));
 
     return data ? string_append_view(s, string_view_from_chars(data, rune_length(rune))) : -1;
 }

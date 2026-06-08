@@ -18,7 +18,9 @@
  * borrowed; its refcount is not changed.
  */
 
-#include <errno.h>
+#include "ustring.h"
+
+#include <limits.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -30,6 +32,57 @@
 
 /* forward declaration — helpers below call expr_simplify recursively */
 expr_t *expr_simplify(const expr_t *dv);
+
+static int expr_simplify_text_to_long_local(const string_t *text, long *out)
+{
+    string_cursor_t *cursor;
+    bool negative = false;
+    bool saw_digit = false;
+    unsigned long value = 0u;
+    unsigned long limit;
+
+    if (!text || !out || string_length(text) == 0u)
+        return 0;
+
+    cursor = string_cursor_new(text);
+    if (!cursor)
+        return 0;
+
+    if (rune_is_equal(string_cursor_peek(cursor), '-')) {
+        negative = true;
+        (void)string_cursor_next(cursor);
+    }
+
+    limit = negative ? (unsigned long)LONG_MAX + 1u : (unsigned long)LONG_MAX;
+    while (!string_cursor_done(cursor)) {
+        rune_t rune = string_cursor_peek(cursor);
+        char ch = '\0';
+        unsigned int digit;
+
+        if (!rune_to_ascii(rune, &ch) || ch < '0' || ch > '9') {
+            string_cursor_free(cursor);
+            return 0;
+        }
+
+        digit = (unsigned int)(ch - '0');
+        if (value > (limit - digit) / 10u) {
+            string_cursor_free(cursor);
+            return 0;
+        }
+        value = value * 10u + digit;
+        saw_digit = true;
+        (void)string_cursor_next(cursor);
+    }
+
+    string_cursor_free(cursor);
+    if (!saw_digit)
+        return 0;
+
+    *out = negative && value == (unsigned long)LONG_MAX + 1u
+        ? LONG_MIN
+        : (negative ? -(long)value : (long)value);
+    return 1;
+}
 
 static void *expr_xrealloc(void *ptr, size_t size)
 {
@@ -1361,8 +1414,7 @@ static int binding_expr_integer_power_base_local(const expr_binding_expr_t *expr
 {
     number_t exponent_value;
     number_t exponent_floor;
-    char *exponent_text;
-    char *end = NULL;
+    string_t *exponent_text;
     long exponent_long = 0L;
     int ok = 0;
 
@@ -1383,11 +1435,8 @@ static int binding_expr_integer_power_base_local(const expr_binding_expr_t *expr
             goto done;
 
         exponent_text = num_to_string(exponent_value);
-        errno = 0;
-        if (exponent_text)
-            exponent_long = strtol(exponent_text, &end, 10);
-        ok = exponent_text && errno == 0 && end && *end == '\0';
-        free(exponent_text);
+        ok = expr_simplify_text_to_long_local(exponent_text, &exponent_long);
+        string_free(exponent_text);
         if (!ok)
             goto done;
 

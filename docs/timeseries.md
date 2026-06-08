@@ -62,8 +62,10 @@ The first concrete use case for this API is CSV-backed forecasting data.
 
 The header therefore includes helpers to:
 
-- load one dated numeric column as a `timeseries_t`
-- load several dated numeric columns as a `matrix_t` for exogenous regressors
+- load one dated numeric column as a `timeseries_t` with `ts_from_csv_text(...)`
+- load several dated numeric columns as a `matrix_t` with `ts_matrix_from_csv_text(...)`
+- use `ts_from_csv(...)` and `ts_matrix_from_csv(...)` as literal-friendly
+  wrappers when a caller already has ordinary C strings at the boundary
 
 This matches workflows where the target series and exogenous population series
 already exist as monthly CSV files, such as:
@@ -97,14 +99,18 @@ This is intended to support:
 
 The main entry points are:
 
-- `ts_to_string(...)`
-- `ts_forecast_to_string(...)`
-- `ts_regression_summary_to_string(...)`
-- `ts_arima_summary_to_string(...)`
+- `ts_to_text(...)`
+- `ts_forecast_to_text(...)`
+- `ts_regression_summary_to_text(...)`
+- `ts_arima_summary_to_text(...)`
 - `ts_write_file(...)`
 - `ts_forecast_write_file(...)`
 - `ts_regression_summary_write_file(...)`
 - `ts_arima_summary_write_file(...)`
+
+The older `*_to_string(...)` helpers remain as C-string convenience wrappers
+for interoperability boundaries. New code should prefer the `string_t`
+returning `*_to_text(...)` functions.
 
 `TS_STRING_CSV` is the machine-friendly export mode. The text styles are for
 human-readable output.

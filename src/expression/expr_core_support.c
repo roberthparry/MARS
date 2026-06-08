@@ -2,106 +2,95 @@
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
-#include <strings.h>
 
 #include "number.h"
-#include "dictionary.h"
 #include "expr_internal.h"
 #include "expression.h"
 
-static size_t expr_alias_hash(const void *key)
+typedef struct expr_default_constant_alias {
+    const char *key;
+    const char *value;
+} expr_default_constant_alias_t;
+
+enum {
+    EXPR_DEFAULT_ALIAS_HASH_SIZE = 13,
+    EXPR_DEFAULT_ALIAS_HASH_SEED = 864u,
+    EXPR_DEFAULT_ALIAS_HASH_MUL = 2654435761u
+};
+
+static const expr_default_constant_alias_t
+s_default_constant_aliases[EXPR_DEFAULT_ALIAS_HASH_SIZE] = {
+    [0]  = { "π",      "@pi"    },
+    [2]  = { "@gamma", "@gamma" },
+    [3]  = { "@phi",   "@phi"   },
+    [4]  = { "τ",      "@tau"   },
+    [5]  = { "pi",     "@pi"    },
+    [6]  = { "φ",      "@phi"   },
+    [7]  = { "@tau",   "@tau"   },
+    [8]  = { "@pi",    "@pi"    },
+    [9]  = { "i",      "i"      },
+    [10] = { "phi",    "@phi"   },
+    [11] = { "gamma",  "@gamma" },
+    [12] = { "γ",      "@gamma" },
+};
+
+static size_t expr_default_constant_alias_hash(const string_t *name)
 {
-    const unsigned char *s = (const unsigned char *)*(const char * const *)key;
-    size_t hash = 1469598103934665603ull;
+    string_cursor_t *cursor;
+    uint32_t hash = EXPR_DEFAULT_ALIAS_HASH_SEED;
 
-    while (*s) {
-        hash ^= (size_t)*s++;
-        hash *= 1099511628211ull;
-    }
-    return hash;
-}
+    if (!name)
+        return 0;
 
-static int expr_alias_cmp(const void *a, const void *b)
-{
-    const char *ka = *(const char * const *)a;
-    const char *kb = *(const char * const *)b;
+    cursor = string_cursor_new(name);
+    if (!cursor)
+        return 0;
 
-    return strcmp(ka, kb);
-}
-
-static dictionary_t *expr_default_constant_alias_table_storage = NULL;
-
-static void expr_destroy_default_constant_alias_table(void)
-{
-    dictionary_destroy(expr_default_constant_alias_table_storage);
-    expr_default_constant_alias_table_storage = NULL;
-}
-
-static dictionary_t *expr_default_constant_alias_table(void)
-{
-    static int cleanup_registered = 0;
-    static const struct {
-        const char *key;
-        const char *value;
-    } aliases[] = {
-        { "i",        "i"      },
-        { "pi",       "@pi"    },
-        { "@pi",      "@pi"    },
-        { "\xcf\x80", "@pi"    },
-        { "phi",      "@phi"   },
-        { "@phi",     "@phi"   },
-        { "\xcf\x86", "@phi"   },
-        { "gamma",    "@gamma" },
-        { "@gamma",   "@gamma" },
-        { "\xce\xb3", "@gamma" },
-        { "@tau",     "@tau"   },
-        { "\xcf\x84", "@tau"   },
-    };
-
-    if (expr_default_constant_alias_table_storage)
-        return expr_default_constant_alias_table_storage;
-
-    expr_default_constant_alias_table_storage = dictionary_create(sizeof(const char *),
-                                                                sizeof(const char *),
-                                                                expr_alias_hash,
-                                                                expr_alias_cmp,
-                                                                NULL,
-                                                                NULL,
-                                                                NULL,
-                                                                NULL,
-                                                                NULL);
-    if (!expr_default_constant_alias_table_storage)
-        abort();
-    if (!cleanup_registered) {
-        if (atexit(expr_destroy_default_constant_alias_table) != 0)
-            abort();
-        cleanup_registered = 1;
+    while (!string_cursor_done(cursor)) {
+        hash *= EXPR_DEFAULT_ALIAS_HASH_MUL;
+        hash ^= rune_value(string_cursor_peek(cursor));
+        string_cursor_next(cursor);
     }
 
-    for (size_t i = 0; i < sizeof(aliases) / sizeof(aliases[0]); ++i) {
-        const char *key = aliases[i].key;
-        const char *value = aliases[i].value;
-
-        if (!dictionary_set(expr_default_constant_alias_table_storage, &key, &value))
-            abort();
-    }
-
-    return expr_default_constant_alias_table_storage;
+    string_cursor_free(cursor);
+    return hash % EXPR_DEFAULT_ALIAS_HASH_SIZE;
 }
 
-static const char *expr_lookup_default_constant_alias(const char *name)
+static const char *expr_default_constant_alias_literal(const string_t *name)
 {
-    const char *mapped = NULL;
-    dictionary_t *table;
+    string_view_t view;
+    const expr_default_constant_alias_t *entry;
 
     if (!name)
         return NULL;
 
-    table = expr_default_constant_alias_table();
-    if (dictionary_get(table, &name, &mapped))
-        return mapped;
-    return name;
+    entry = &s_default_constant_aliases[
+        expr_default_constant_alias_hash(name)];
+    if (!entry->key)
+        return NULL;
+
+    view = string_view_all(name);
+    return string_view_equals_literal(view, entry->key) ? entry->value : NULL;
+}
+
+static const char *expr_lookup_default_constant_alias(const char *name)
+{
+    string_t *text;
+    const char *mapped;
+
+    if (!name)
+        return NULL;
+
+    text = string_new_with(name);
+    if (!text)
+        return name;
+
+    mapped = expr_default_constant_alias_literal(text);
+    string_free(text);
+
+    return mapped ? mapped : name;
 }
 
 void expr_store_const_num(expr_t *dv, number_t value)
@@ -369,286 +358,589 @@ static const greek_entry_t s_greek_names[GREEK_HT_SIZE] = {
     [29] = { "omega",   5, "ω", "Ω" }
 };
 
-static void append_subscript_digit(char *out, size_t *out_len, char digit)
+char *expr_take_string_as_c_string(string_t *text)
 {
-    int d = digit - '0';
+    const char *src;
+    char *out;
 
-    out[(*out_len)++] = (char)0xE2;
-    out[(*out_len)++] = (char)0x82;
-    out[(*out_len)++] = (char)(0x80 + d);
+    if (!text)
+        return NULL;
+
+    src = string_c_str(text);
+    out = strdup(src);
+    string_free(text);
+    if (!out)
+        abort();
+    return out;
 }
 
-static unsigned greek_ht_hash(const char *s, size_t n)
+static int expr_rune_ascii_alpha(rune_t rune, char *out)
 {
+    char ch;
+
+    if (!rune_to_ascii(rune, &ch))
+        return 0;
+    if (!isalpha((unsigned char)ch))
+        return 0;
+    if (out)
+        *out = ch;
+    return 1;
+}
+
+static int expr_append_subscript_digit_text(string_t *out, char digit)
+{
+    return string_append_rune(out,
+                              rune_from_value(0x2080u +
+                                              (uint32_t)(digit - '0')));
+}
+
+static int expr_string_equals_ascii_ci(const string_t *text,
+                                       const char *literal)
+{
+    string_t *literal_text;
+    string_view_t text_view;
+    string_view_t literal_view;
+    int equal;
+
+    if (!text || !literal)
+        return 0;
+
+    literal_text = string_new_with(literal);
+    if (!literal_text)
+        return 0;
+
+    text_view = string_view_all(text);
+    literal_view = string_view_all(literal_text);
+    equal = string_view_length(text_view) == string_view_length(literal_view) &&
+            string_view_starts_with(text_view, literal_text, true);
+    string_free(literal_text);
+    return equal;
+}
+
+static unsigned greek_ht_hash_text(const string_t *text)
+{
+    string_cursor_t *cursor;
     unsigned x = 113u;
 
-    for (size_t i = 0; i < n; ++i) {
+    if (!text)
+        return 0;
+
+    cursor = string_cursor_new(text);
+    if (!cursor)
+        return 0;
+
+    while (!string_cursor_done(cursor)) {
+        char ch;
+
+        if (!rune_to_ascii(string_cursor_peek(cursor), &ch)) {
+            string_cursor_free(cursor);
+            return 0;
+        }
         x *= 65599u;
-        x ^= (unsigned char)(s[i] | 32);
+        x ^= (unsigned char)tolower((unsigned char)ch);
+        string_cursor_next(cursor);
     }
 
+    string_cursor_free(cursor);
     x ^= (x >> 15);
     x *= 2654435761u;
 
     return x % GREEK_HT_SIZE;
 }
 
-static const greek_entry_t *lookup_greek_name(const char *kw, size_t klen)
+static const greek_entry_t *lookup_greek_name_text(const string_t *name)
 {
-    unsigned slot = greek_ht_hash(kw, klen);
-    const greek_entry_t *entry = &s_greek_names[slot];
-
-    if (!entry->ascii)
-        return NULL;
-    if (entry->klen == klen && strncasecmp(entry->ascii, kw, klen) == 0)
-        return entry;
-    return NULL;
-}
-
-char *expr_normalise_name(const char *name)
-{
-    const char *s;
-    const char *e;
-    size_t len;
-    char *t;
-    char *canon;
-    size_t out_len = 0;
+    const greek_entry_t *entry;
 
     if (!name)
         return NULL;
 
-    s = name;
-    while (*s && isspace((unsigned char)*s))
-        s++;
-    e = name + strlen(name);
-    while (e > s && isspace((unsigned char)e[-1]))
-        e--;
+    entry = &s_greek_names[greek_ht_hash_text(name)];
+    if (entry->ascii && expr_string_equals_ascii_ci(name, entry->ascii))
+        return entry;
 
-    len = (size_t)(e - s);
-    if (len == 0)
+    return NULL;
+}
+
+static int expr_string_all_ascii_upper(const string_t *text)
+{
+    string_cursor_t *cursor;
+    int upper = 1;
+
+    if (!text)
+        return 0;
+
+    cursor = string_cursor_new(text);
+    if (!cursor)
+        return 0;
+
+    while (!string_cursor_done(cursor)) {
+        char ch;
+
+        if (!rune_to_ascii(string_cursor_peek(cursor), &ch) ||
+            !isupper((unsigned char)ch)) {
+            upper = 0;
+            break;
+        }
+        string_cursor_next(cursor);
+    }
+
+    string_cursor_free(cursor);
+    return upper;
+}
+
+static string_t *expr_remove_at_runes_text(const string_t *text)
+{
+    string_t *out;
+    string_cursor_t *cursor;
+
+    out = string_new();
+    cursor = string_cursor_new(text);
+    if (!out || !cursor) {
+        string_free(out);
+        string_cursor_free(cursor);
+        return NULL;
+    }
+
+    while (!string_cursor_done(cursor)) {
+        rune_t rune = string_cursor_peek(cursor);
+
+        if (!rune_is_equal(rune, '@') &&
+            string_append_rune(out, rune) != 0) {
+            string_free(out);
+            string_cursor_free(cursor);
+            return NULL;
+        }
+        string_cursor_next(cursor);
+    }
+
+    string_cursor_free(cursor);
+    return out;
+}
+
+static string_t *expr_expand_leading_greek_alias_text(const string_t *text)
+{
+    string_t *out = NULL;
+    string_t *alias = NULL;
+    string_t *rest = NULL;
+    string_cursor_t *cursor;
+    string_pos_t alias_start;
+    string_pos_t rest_start;
+    const greek_entry_t *entry;
+
+    if (!text || !string_starts_with(text, "@"))
+        return string_clone(text);
+
+    cursor = string_cursor_new(text);
+    if (!cursor)
         return NULL;
 
-    t = malloc(len + 1);
-    memcpy(t, s, len);
-    t[len] = '\0';
+    string_cursor_next(cursor);
+    alias_start = string_cursor_position(cursor);
+    while (!string_cursor_done(cursor) &&
+           expr_rune_ascii_alpha(string_cursor_peek(cursor), NULL))
+        string_cursor_next(cursor);
 
-    if (t[0] == '@') {
-        const char *p = t + 1;
-        size_t alias_len = 0;
-        const greek_entry_t *entry;
+    alias = string_cursor_extract(alias_start, cursor);
+    rest_start = string_cursor_position(cursor);
+    while (!string_cursor_done(cursor))
+        string_cursor_next(cursor);
+    rest = string_cursor_extract(rest_start, cursor);
+    string_cursor_free(cursor);
 
-        while (p[alias_len] && isalpha((unsigned char)p[alias_len]))
-            alias_len++;
+    entry = alias ? lookup_greek_name_text(alias) : NULL;
+    if (entry) {
+        out = string_new_with(expr_string_all_ascii_upper(alias)
+                                  ? entry->upper
+                                  : entry->lower);
+        if (out && rest && string_append_string(out, rest) != 0) {
+            string_free(out);
+            out = NULL;
+        }
+    } else {
+        out = string_clone(text);
+    }
 
-        entry = alias_len ? lookup_greek_name(p, alias_len) : NULL;
-        if (entry) {
-            int upper = 1;
-            const char *g;
-            const char *rest = p + alias_len;
-            size_t gl;
-            size_t rl;
-            char *out;
+    string_free(rest);
+    string_free(alias);
+    return out;
+}
 
-            for (size_t k = 0; k < alias_len; ++k) {
-                if (!isupper((unsigned char)p[k]))
-                    upper = 0;
+static string_t *expr_subscript_underscore_digits_text(const string_t *text)
+{
+    string_t *out;
+    string_cursor_t *cursor;
+
+    out = string_new();
+    cursor = string_cursor_new(text);
+    if (!out || !cursor) {
+        string_free(out);
+        string_cursor_free(cursor);
+        return NULL;
+    }
+
+    while (!string_cursor_done(cursor)) {
+        rune_t rune = string_cursor_peek(cursor);
+
+        if (rune_is_equal(rune, '_')) {
+            string_cursor_next(cursor);
+            rune = string_cursor_peek(cursor);
+            if (rune_is_digit(rune)) {
+                while (!string_cursor_done(cursor)) {
+                    char digit;
+
+                    rune = string_cursor_peek(cursor);
+                    if (!rune_is_digit(rune) ||
+                        !rune_to_ascii(rune, &digit))
+                        break;
+                    if (expr_append_subscript_digit_text(out, digit) != 0) {
+                        string_free(out);
+                        string_cursor_free(cursor);
+                        return NULL;
+                    }
+                    string_cursor_next(cursor);
+                }
+                continue;
             }
 
-            g = upper ? entry->upper : entry->lower;
-            gl = strlen(g);
-            rl = strlen(rest);
-            out = malloc(gl + rl + 1);
-            memcpy(out, g, gl);
-            memcpy(out + gl, rest, rl);
-            out[gl + rl] = '\0';
-
-            free(t);
-            t = out;
-        }
-
-        size_t n = strlen(t);
-        char *clean = malloc(n + 1);
-        size_t w = 0;
-        for (size_t r = 0; r < n; ++r)
-            if (t[r] != '@')
-                clean[w++] = t[r];
-        clean[w] = '\0';
-
-        free(t);
-        t = clean;
-    }
-
-    len = strlen(t);
-    canon = malloc(len * 3 + 1);
-    if (!canon) {
-        free(t);
-        abort();
-    }
-
-    for (size_t r = 0; r < len; ) {
-        if (t[r] == '_' && r + 1 < len &&
-            isdigit((unsigned char)t[r + 1])) {
-            r++;
-            while (r < len && isdigit((unsigned char)t[r])) {
-                append_subscript_digit(canon, &out_len, t[r]);
-                r++;
+            if (string_append_rune(out, rune_from_ascii('_')) != 0) {
+                string_free(out);
+                string_cursor_free(cursor);
+                return NULL;
             }
             continue;
         }
 
-        canon[out_len++] = t[r++];
-    }
-    canon[out_len] = '\0';
-
-    size_t run_start = out_len;
-
-    while (run_start > 0 &&
-           isdigit((unsigned char)canon[run_start - 1])) {
-        run_start--;
-    }
-
-    if (run_start < out_len && run_start > 0) {
-        char *final = malloc(out_len * 3 + 1);
-        size_t final_len = 0;
-
-        if (!final) {
-            free(canon);
-            free(t);
-            abort();
+        if (string_append_rune(out, rune) != 0) {
+            string_free(out);
+            string_cursor_free(cursor);
+            return NULL;
         }
-
-        for (size_t i = 0; i < run_start; ++i)
-            final[final_len++] = canon[i];
-        for (size_t i = run_start; i < out_len; ++i)
-            append_subscript_digit(final, &final_len, canon[i]);
-        final[final_len] = '\0';
-
-        free(canon);
-        canon = final;
+        string_cursor_next(cursor);
     }
 
-    free(t);
-    return canon;
+    string_cursor_free(cursor);
+    return out;
 }
 
-char *expr_normalise_binding_name(const char *name)
+static string_t *expr_subscript_trailing_digits_text(const string_t *text)
 {
-    const char *s;
-    const char *e;
-    char *inner;
+    string_cursor_t *cursor;
+    string_pos_t run_start = 0;
+    int in_digit_run = 0;
+    int trailing_digits = 0;
+    string_t *out;
+
+    cursor = string_cursor_new(text);
+    if (!cursor)
+        return NULL;
+
+    while (!string_cursor_done(cursor)) {
+        string_pos_t pos = string_cursor_position(cursor);
+        rune_t rune = string_cursor_peek(cursor);
+
+        if (rune_is_digit(rune)) {
+            if (!in_digit_run) {
+                run_start = pos;
+                in_digit_run = 1;
+            }
+            trailing_digits = 1;
+        } else {
+            in_digit_run = 0;
+            trailing_digits = 0;
+        }
+        string_cursor_next(cursor);
+    }
+
+    if (!trailing_digits || run_start == 0) {
+        string_cursor_free(cursor);
+        return string_clone(text);
+    }
+
+    out = string_new();
+    if (!out || string_cursor_seek(cursor, 0) != 0) {
+        string_free(out);
+        string_cursor_free(cursor);
+        return NULL;
+    }
+
+    while (!string_cursor_done(cursor)) {
+        string_pos_t pos = string_cursor_position(cursor);
+        rune_t rune = string_cursor_peek(cursor);
+
+        if (pos >= run_start) {
+            char digit;
+
+            if (!rune_to_ascii(rune, &digit) ||
+                expr_append_subscript_digit_text(out, digit) != 0) {
+                string_free(out);
+                string_cursor_free(cursor);
+                return NULL;
+            }
+        } else if (string_append_rune(out, rune) != 0) {
+            string_free(out);
+            string_cursor_free(cursor);
+            return NULL;
+        }
+        string_cursor_next(cursor);
+    }
+
+    string_cursor_free(cursor);
+    return out;
+}
+
+char *expr_normalise_name(const char *name)
+{
+    string_t *text;
     char *out;
 
     if (!name)
         return NULL;
 
-    s = name;
-    while (*s && isspace((unsigned char)*s))
-        s++;
-    e = name + strlen(name);
-    while (e > s && isspace((unsigned char)e[-1]))
-        e--;
-    if (e == s)
+    text = string_new_with(name);
+    if (!text)
         return NULL;
 
-    if ((size_t)(e - s) >= 2 && s[0] == '[' && e[-1] == ']') {
-        inner = malloc((size_t)(e - s - 1));
-        if (!inner)
-            abort();
-        memcpy(inner, s + 1, (size_t)(e - s - 2));
-        inner[e - s - 2] = '\0';
-        return inner;
+    out = expr_take_string_as_c_string(expr_normalise_name_text(text));
+    string_free(text);
+    return out;
+}
+
+string_t *expr_normalise_name_text(const string_t *name)
+{
+    string_view_t trimmed_view;
+    string_t *trimmed = NULL;
+    string_t *expanded = NULL;
+    string_t *clean = NULL;
+    string_t *subscripted = NULL;
+    string_t *out = NULL;
+
+    if (!name)
+        return NULL;
+
+    trimmed_view = string_view_trim(string_view_all(name));
+    if (string_view_is_empty(trimmed_view))
+        return NULL;
+
+    trimmed = string_from_view(&trimmed_view);
+    expanded = expr_expand_leading_greek_alias_text(trimmed);
+    clean = expr_remove_at_runes_text(expanded);
+    subscripted = expr_subscript_underscore_digits_text(clean);
+    out = expr_subscript_trailing_digits_text(subscripted);
+
+    string_free(subscripted);
+    string_free(clean);
+    string_free(expanded);
+    string_free(trimmed);
+    return out;
+}
+
+char *expr_normalise_binding_name(const char *name)
+{
+    string_t *text;
+    char *out;
+
+    if (!name)
+        return NULL;
+
+    text = string_new_with(name);
+    if (!text)
+        return NULL;
+
+    out = expr_take_string_as_c_string(expr_normalise_binding_name_text(text));
+    string_free(text);
+    return out;
+}
+
+string_t *expr_normalise_binding_name_text(const string_t *name)
+{
+    string_view_t trimmed_view;
+    string_t *trimmed;
+    string_t *canon;
+    string_t *out;
+
+    if (!name)
+        return NULL;
+
+    trimmed_view = string_view_trim(string_view_all(name));
+    if (string_view_is_empty(trimmed_view))
+        return NULL;
+
+    trimmed = string_from_view(&trimmed_view);
+    if (!trimmed)
+        return NULL;
+
+    if (string_starts_with(trimmed, "[") &&
+        string_ends_with(trimmed, "]")) {
+        string_cursor_t *cursor = string_cursor_new(trimmed);
+        string_pos_t start;
+        string_pos_t end = 0;
+
+        if (!cursor) {
+            string_free(trimmed);
+            return NULL;
+        }
+
+        string_cursor_next(cursor);
+        start = string_cursor_position(cursor);
+        while (!string_cursor_done(cursor)) {
+            end = string_cursor_position(cursor);
+            string_cursor_next(cursor);
+        }
+
+        out = string_cursor_slice_between(start, end, cursor);
+        string_cursor_free(cursor);
+        string_free(trimmed);
+        return out;
     }
 
-    size_t n = (size_t)(e - s);
-    char *trimmed = malloc(n + 1);
-
-    if (!trimmed)
-        abort();
-    memcpy(trimmed, s, n);
-    trimmed[n] = '\0';
-    out = expr_normalise_name(expr_default_constant_canonical_name(trimmed));
-    free(trimmed);
-
+    canon = expr_default_constant_canonical_name_text(trimmed);
+    out = expr_normalise_name_text(canon);
+    string_free(canon);
+    string_free(trimmed);
     return out;
 }
 
 int expr_is_default_constant_name(const char *name)
 {
-    const char *p = name;
-    size_t len;
+    string_t *text;
+    int ok;
 
-    if (!name || !*name)
-        return 0;
-    if (*name != 'a' && *name != 'b' && *name != 'c' && *name != 'd' &&
-        *name != 'j' && *name != 'k' && *name != 'l' && *name != 'm' &&
-        *name != 'n')
+    if (!name)
         return 0;
 
-    p++;
-    len = strlen(p);
-    if (*p == '\0')
-        return 1;
-    if ((unsigned char)*p == 0xE2 && len >= 3) {
-        while (*p) {
-            int d;
+    text = string_new_with(name);
+    if (!text)
+        return 0;
 
-            d = (unsigned char)p[0] == 0xE2 &&
-                (unsigned char)p[1] == 0x82 &&
-                (unsigned char)p[2] >= 0x80 &&
-                (unsigned char)p[2] <= 0x89;
-            if (!d)
-                return 0;
-            p += 3;
+    ok = expr_is_default_constant_name_text(text);
+    string_free(text);
+    return ok;
+}
+
+int expr_is_default_constant_name_text(const string_t *name)
+{
+    string_cursor_t *cursor;
+    rune_t rune;
+    char ch;
+    int saw_digit = 0;
+    int ok = 0;
+
+    if (!name)
+        return 0;
+
+    cursor = string_cursor_new(name);
+    if (!cursor)
+        return 0;
+
+    rune = string_cursor_peek(cursor);
+    if (!rune_to_ascii(rune, &ch))
+        goto done;
+    if (ch != 'a' && ch != 'b' && ch != 'c' && ch != 'd' &&
+        ch != 'j' && ch != 'k' && ch != 'l' && ch != 'm' &&
+        ch != 'n')
+        goto done;
+
+    string_cursor_next(cursor);
+    if (string_cursor_done(cursor)) {
+        ok = 1;
+        goto done;
+    }
+
+    rune = string_cursor_peek(cursor);
+    if (rune_value(rune) >= 0x2080 && rune_value(rune) <= 0x2089) {
+        while (!string_cursor_done(cursor)) {
+            rune = string_cursor_peek(cursor);
+            if (rune_value(rune) < 0x2080 || rune_value(rune) > 0x2089)
+                goto done;
+            string_cursor_next(cursor);
         }
-        return 1;
+        ok = 1;
+        goto done;
     }
-    if (*p == '_' && p[1] >= '0' && p[1] <= '9') {
-        p += 2;
-        while (*p >= '0' && *p <= '9')
-            p++;
-        return *p == '\0';
+
+    if (!rune_is_equal(rune, '_'))
+        goto done;
+    string_cursor_next(cursor);
+
+    while (!string_cursor_done(cursor)) {
+        rune = string_cursor_peek(cursor);
+        if (!rune_is_digit(rune))
+            goto done;
+        saw_digit = 1;
+        string_cursor_next(cursor);
     }
-    return 0;
+
+    ok = saw_digit;
+
+done:
+    string_cursor_free(cursor);
+    return ok;
 }
 
 int expr_get_default_constant_num(const char *name, number_t *value_out)
 {
-    const char *canon = expr_lookup_default_constant_alias(name);
+    string_t *text;
+    int ok;
+
+    if (!name)
+        return 0;
+
+    text = string_new_with(name);
+    if (!text)
+        return 0;
+
+    ok = expr_get_default_constant_num_text(text, value_out);
+    string_free(text);
+    return ok;
+}
+
+int expr_get_default_constant_num_text(const string_t *name,
+                                       number_t *value_out)
+{
+    string_t *canon;
+    string_view_t view;
+    int ok = 1;
 
     if (!name || !value_out)
         return 0;
 
-    if (strcmp(canon, "e") == 0) {
+    canon = expr_default_constant_canonical_name_text(name);
+    if (!canon)
+        return 0;
+
+    view = string_view_all(canon);
+    if (string_view_equals_literal(view, "e"))
         *value_out = num_const(NUM_E);
-        return 1;
-    }
-
-    if (strcmp(canon, "i") == 0) {
+    else if (string_view_equals_literal(view, "i"))
         *value_out = num_const(NUM_I);
-        return 1;
-    }
-
-    if (strcmp(canon, "@pi") == 0) {
+    else if (string_view_equals_literal(view, "@pi"))
         *value_out = num_const(NUM_PI);
-        return 1;
-    }
-
-    if (strcmp(canon, "@phi") == 0) {
+    else if (string_view_equals_literal(view, "@phi"))
         *value_out = num_const(NUM_PHI);
-        return 1;
-    }
-
-    if (strcmp(canon, "@gamma") == 0) {
+    else if (string_view_equals_literal(view, "@gamma"))
         *value_out = num_const(NUM_EULER_MASCHERONI);
-        return 1;
-    }
+    else
+        ok = 0;
 
-    return 0;
+    string_free(canon);
+    return ok;
 }
 
 const char *expr_default_constant_canonical_name(const char *name)
 {
     return expr_lookup_default_constant_alias(name);
+}
+
+string_t *expr_default_constant_canonical_name_text(const string_t *name)
+{
+    const char *mapped;
+
+    if (!name)
+        return NULL;
+
+    mapped = expr_default_constant_alias_literal(name);
+    return mapped ? string_new_with(mapped) : string_clone(name);
 }
 
 /* ------------------------------------------------------------------------- */
@@ -773,12 +1065,30 @@ static expr_t *expr_attach_name(expr_t *dv, const char *name)
     return dv;
 }
 
+static expr_t *expr_attach_name_text(expr_t *dv, const string_t *name)
+{
+    dv->name = name
+        ? expr_take_string_as_c_string(expr_normalise_name_text(name))
+        : NULL;
+    return dv;
+}
+
 expr_t *expr_new_named_const(number_t x, const char *name)
 {
     return expr_attach_name(expr_new_const(x), name);
 }
 
+expr_t *expr_new_named_const_text(number_t x, const string_t *name)
+{
+    return expr_attach_name_text(expr_new_const(x), name);
+}
+
 expr_t *expr_new_named_var(number_t x, const char *name)
 {
     return expr_attach_name(expr_new_var(x), name);
+}
+
+expr_t *expr_new_named_var_text(number_t x, const string_t *name)
+{
+    return expr_attach_name_text(expr_new_var(x), name);
 }

@@ -485,6 +485,8 @@ expr_t *expr_alloc(const expr_ops_t *ops);
 expr_t *expr_make_const_num(number_t x);
 expr_t *expr_make_var_num(number_t x);
 int expr_get_default_constant_num(const char *name, number_t *value_out);
+int expr_get_default_constant_num_text(const string_t *name,
+                                       number_t *value_out);
 void expr_store_const_num(expr_t *dv, number_t value);
 void expr_store_value_num(expr_t *dv, number_t value);
 number_t expr_eval_num_internal(const expr_t *dv);

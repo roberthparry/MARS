@@ -1,7 +1,8 @@
 #include "number.h"
 #include "number_internal.h"
+#include "ustring.h"
 
-#include <ctype.h>
+#include <limits.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,23 +10,36 @@
 
 char *number_strdup(const char *text)
 {
+    string_t *wrapped;
     size_t len;
     char *copy;
 
     if (!text)
         return NULL;
-    len = strlen(text);
-    copy = malloc(len + 1u);
-    if (!copy)
+    wrapped = string_new_with(text);
+    if (!wrapped)
         return NULL;
-    memcpy(copy, text, len + 1u);
+    len = string_view_length(string_view_all(wrapped));
+    copy = malloc(len + 1u);
+    if (!copy) {
+        string_free(wrapped);
+        return NULL;
+    }
+    memcpy(copy, string_c_str(wrapped), len + 1u);
+    string_free(wrapped);
     return copy;
 }
 
-char *number_format_double(const number_t *number, bool scientific, int precision)
+char *number_cstring_from_text(string_t *text)
 {
-    int needed;
-    char *out;
+    char *out = text ? number_strdup(string_c_str(text)) : NULL;
+
+    string_free(text);
+    return out;
+}
+
+string_t *number_format_double_text(const number_t *number, bool scientific, int precision)
+{
     char fmt[32];
     double value;
 
@@ -36,20 +50,11 @@ char *number_format_double(const number_t *number, bool scientific, int precisio
         snprintf(fmt, sizeof(fmt), scientific ? "%%.%dE" : "%%.%dg", precision);
     else
         snprintf(fmt, sizeof(fmt), scientific ? "%%.16E" : "%%.17g");
-    needed = snprintf(NULL, 0, fmt, value);
-    if (needed < 0)
-        return NULL;
-    out = malloc((size_t)needed + 1u);
-    if (!out)
-        return NULL;
-    snprintf(out, (size_t)needed + 1u, fmt, value);
-    return out;
+    return string_sprintf(fmt, value);
 }
 
-char *number_format_qfloat(const number_t *number, bool scientific, int precision)
+string_t *number_format_qfloat_text(const number_t *number, bool scientific, int precision)
 {
-    int needed;
-    char *out;
     char fmt[32];
 
     if (!number)
@@ -58,20 +63,11 @@ char *number_format_qfloat(const number_t *number, bool scientific, int precisio
         snprintf(fmt, sizeof(fmt), scientific ? "%%.%dQ" : "%%.%dq", precision);
     else
         snprintf(fmt, sizeof(fmt), scientific ? "%%Q" : "%%q");
-    needed = qf_sprintf(NULL, 0u, fmt, number_impl_const(number)->value.qf);
-    if (needed < 0)
-        return NULL;
-    out = malloc((size_t)needed + 1u);
-    if (!out)
-        return NULL;
-    qf_sprintf(out, (size_t)needed + 1u, fmt, number_impl_const(number)->value.qf);
-    return out;
+    return qf_sprintf_text(fmt, number_impl_const(number)->value.qf);
 }
 
-char *number_format_qcomplex(const number_t *number, bool scientific, int precision)
+string_t *number_format_qcomplex_text(const number_t *number, bool scientific, int precision)
 {
-    int needed;
-    char *out;
     char fmt[32];
 
     if (!number)
@@ -80,22 +76,16 @@ char *number_format_qcomplex(const number_t *number, bool scientific, int precis
         snprintf(fmt, sizeof(fmt), scientific ? "%%.%dZ" : "%%.%dz", precision);
     else
         snprintf(fmt, sizeof(fmt), scientific ? "%%Z" : "%%z");
-    needed = qc_sprintf(NULL, 0u, fmt, number_impl_const(number)->value.qc);
-    if (needed < 0)
-        return NULL;
-    out = malloc((size_t)needed + 1u);
-    if (!out)
-        return NULL;
-    qc_sprintf(out, (size_t)needed + 1u, fmt, number_impl_const(number)->value.qc);
-    return out;
+    return qc_sprintf_text(fmt, number_impl_const(number)->value.qc);
 }
 
-char *number_format_mpfr(const number_t *number, bool scientific, int precision)
+string_t *number_format_mpfr_text(const number_t *number, bool scientific, int precision)
 {
     mpfr_srcptr value = number ? number_mpfr_value(number_impl_const(number)->value.mpfr) : NULL;
     int needed;
     char *out;
     char fmt[32];
+    string_t *text;
 
     if (!value)
         return NULL;
@@ -115,17 +105,22 @@ char *number_format_mpfr(const number_t *number, bool scientific, int precision)
         mpfr_snprintf(out, (size_t)needed + 1u, fmt, value);
     else
         mpfr_snprintf(out, (size_t)needed + 1u, fmt, (int)num_get_prec_digits(*number), value);
-    return out;
+    text = string_new_with(out);
+    free(out);
+    return text;
 }
 
-char *number_format_complex(const number_t *number, bool scientific, int precision)
+string_t *number_format_complex_text(const number_t *number, bool scientific, int precision)
 {
     const complex_t *value = number ? number_impl_const(number)->value.cx : NULL;
     size_t precision_bits = number ? num_get_prec_bits(*number) : 0u;
     mpc_t tmp;
-    char *real = NULL;
-    char *imag = NULL;
-    char *out = NULL;
+    mpfr_t imag_abs;
+    char *real_buffer = NULL;
+    char *imag_buffer = NULL;
+    string_t *real = NULL;
+    string_t *imag = NULL;
+    string_t *out = NULL;
     int real_needed;
     int imag_needed;
     int digits;
@@ -140,218 +135,196 @@ char *number_format_complex(const number_t *number, bool scientific, int precisi
         digits = (int)num_get_default_prec_digits();
     snprintf(fmt, sizeof(fmt), scientific ? "%%.%dRE" : "%%.%dRg", digits);
     mpc_init2(tmp, (mpfr_prec_t)precision_bits);
+    mpfr_init2(imag_abs, (mpfr_prec_t)precision_bits);
     if (number_complex_get_mpc(tmp, value, precision_bits) != 0) {
+        mpfr_clear(imag_abs);
         mpc_clear(tmp);
         return NULL;
     }
+    mpfr_abs(imag_abs, mpc_imagref(tmp), MPFR_RNDN);
     real_needed = mpfr_snprintf(NULL, 0u, fmt, mpc_realref(tmp));
-    imag_needed = mpfr_snprintf(NULL, 0u, fmt, mpc_imagref(tmp));
+    imag_needed = mpfr_snprintf(NULL, 0u, fmt, imag_abs);
     if (real_needed < 0 || imag_needed < 0)
         goto done;
-    real = malloc((size_t)real_needed + 1u);
-    imag = malloc((size_t)imag_needed + 1u);
+    real_buffer = malloc((size_t)real_needed + 1u);
+    imag_buffer = malloc((size_t)imag_needed + 1u);
+    if (!real_buffer || !imag_buffer)
+        goto done;
+    mpfr_snprintf(real_buffer, (size_t)real_needed + 1u, fmt, mpc_realref(tmp));
+    mpfr_snprintf(imag_buffer, (size_t)imag_needed + 1u, fmt, imag_abs);
+    real = string_new_with(real_buffer);
+    imag = string_new_with(imag_buffer);
     if (!real || !imag)
         goto done;
-    mpfr_snprintf(real, (size_t)real_needed + 1u, fmt, mpc_realref(tmp));
-    mpfr_snprintf(imag, (size_t)imag_needed + 1u, fmt, mpc_imagref(tmp));
     {
         int imag_sign = mpfr_sgn(mpc_imagref(tmp));
         bool real_zero = mpfr_zero_p(mpc_realref(tmp)) != 0;
         bool imag_is_unit = mpfr_cmpabs_ui(mpc_imagref(tmp), 1u) == 0;
         const char *sep = imag_sign < 0 ? " - " : " + ";
-        const char *imag_mag = imag[0] == '-' ? imag + 1 : imag;
-        const char *imag_coeff = imag_is_unit ? "" : imag_mag;
-        int needed;
 
         if (real_zero)
-            needed = snprintf(NULL, 0, "%s%si",
-                              imag_sign < 0 ? "-" : "", imag_coeff);
+            out = imag_is_unit
+                ? string_sprintf("%si", imag_sign < 0 ? "-" : "")
+                : string_sprintf("%s%Si", imag_sign < 0 ? "-" : "", imag);
         else
-            needed = snprintf(NULL, 0, "%s%s%si", real, sep, imag_coeff);
-        if (needed >= 0) {
-            out = malloc((size_t)needed + 1u);
-            if (out) {
-                if (real_zero)
-                    snprintf(out, (size_t)needed + 1u, "%s%si",
-                             imag_sign < 0 ? "-" : "", imag_coeff);
-                else
-                    snprintf(out, (size_t)needed + 1u, "%s%s%si",
-                             real, sep, imag_coeff);
-            }
-        }
+            out = imag_is_unit
+                ? string_sprintf("%S%si", real, sep)
+                : string_sprintf("%S%s%Si", real, sep, imag);
     }
 
 done:
-    free(real);
-    free(imag);
+    string_free(real);
+    string_free(imag);
+    free(real_buffer);
+    free(imag_buffer);
+    mpfr_clear(imag_abs);
     mpc_clear(tmp);
     return out;
 }
 
-static char *number_format_inexact(const number_t *number, bool scientific, int precision)
+static string_t *number_format_inexact_text(const number_t *number,
+                                            bool scientific,
+                                            int precision)
 {
     const number_vtable_t *vt = number ? number_vt(number) : NULL;
 
-    if (!number)
-        return NULL;
-    if (vt && vt->format_inexact)
-        return vt->format_inexact(number, scientific, precision);
+    if (vt && vt->format_inexact_text)
+        return vt->format_inexact_text(number, scientific, precision);
     return NULL;
+}
+
+static bool number_format_text_starts_with_ascii(const string_t *text, char ch)
+{
+    string_cursor_t *cursor;
+    bool found = false;
+    unsigned char ascii = 0u;
+
+    if (!text)
+        return false;
+
+    cursor = string_cursor_new(text);
+    if (!cursor)
+        return false;
+
+    found = string_cursor_peek_ascii(cursor, &ascii) &&
+            ascii == (unsigned char)ch;
+    string_cursor_free(cursor);
+    return found;
+}
+
+static string_t *number_format_value_text(number_t value,
+                                          char spec,
+                                          int precision)
+{
+    if (num_is_exact(value) && !number_vt(&value)->is_complex)
+        return num_to_string(value);
+    return number_format_inexact_text(&value, spec == 'N', precision);
+}
+
+static int number_format_append_padding(string_t *out, int count, char fill)
+{
+    while (count-- > 0) {
+        if (string_append_char(out, fill) != 0)
+            return -1;
+    }
+    return 0;
+}
+
+static string_format_result_t number_format_callback(string_t *out,
+                                                     const string_format_spec_t *spec,
+                                                     va_list ap,
+                                                     void *user)
+{
+    int width;
+    int precision;
+    bool left;
+    bool zero;
+    string_t *core = NULL;
+    size_t core_len;
+    int pad;
+    number_t value;
+
+    (void)user;
+
+    if (!out || !spec || !ap)
+        return STRING_FORMAT_ERROR;
+    if (spec->conversion != 'n' && spec->conversion != 'N')
+        return STRING_FORMAT_UNHANDLED;
+    if (spec->length[0] != '\0')
+        return STRING_FORMAT_ERROR;
+
+    width = spec->width_from_argument ? va_arg(ap, int) : spec->width;
+    precision = spec->precision_from_argument ? va_arg(ap, int) : spec->precision;
+    left = spec->flag_left;
+    zero = spec->flag_zero;
+    if (width < 0) {
+        left = true;
+        width = -width;
+    }
+    if (precision < 0)
+        precision = -1;
+
+    value = va_arg(ap, number_t);
+    core = number_format_value_text(value, spec->conversion, precision);
+    if (!core)
+        return STRING_FORMAT_ERROR;
+
+    if ((spec->flag_sign || spec->flag_space) &&
+        !number_format_text_starts_with_ascii(core, '-')) {
+        string_t *prefixed = string_sprintf("%c%S",
+                                            spec->flag_sign ? '+' : ' ',
+                                            core);
+
+        string_free(core);
+        core = prefixed;
+        if (!core)
+            return STRING_FORMAT_ERROR;
+    }
+
+    core_len = string_view_length(string_view_all(core));
+    pad = width > (int)core_len ? width - (int)core_len : 0;
+    if (!left && number_format_append_padding(out, pad, zero ? '0' : ' ') != 0)
+        goto fail;
+    if (string_append_string(out, core) != 0)
+        goto fail;
+    if (left && number_format_append_padding(out, pad, ' ') != 0)
+        goto fail;
+
+    string_free(core);
+    return STRING_FORMAT_HANDLED;
+
+fail:
+    string_free(core);
+    return STRING_FORMAT_ERROR;
+}
+
+string_t *num_vsprintf_text(const char *fmt, va_list ap)
+{
+    return string_vsprintf_with_callback(fmt,
+                                         ap,
+                                         number_format_callback,
+                                         NULL);
 }
 
 int num_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap)
 {
-    va_list ap_local;
-    const char *p = fmt;
-    size_t pos = 0u;
-    int total = 0;
+    string_t *text;
+    size_t len;
 
-    if (!fmt)
+    text = num_vsprintf_text(fmt, ap);
+    if (!text)
         return -1;
-    va_copy(ap_local, ap);
-    while (*p) {
-        char tmp[512];
-        int width = 0;
-        int precision = -1;
-        int left = 0, zero = 0, plus = 0, space = 0, alt = 0;
-        char spec;
-        char *core = NULL;
-        int core_len;
-        int pad;
 
-        if (*p != '%') {
-            if (out && pos + 1u < out_size)
-                out[pos] = *p;
-            pos += 1u;
-            total += 1;
-            ++p;
-            continue;
-        }
-        ++p;
-        if (*p == '%') {
-            if (out && pos + 1u < out_size)
-                out[pos] = '%';
-            pos += 1u;
-            total += 1;
-            ++p;
-            continue;
-        }
-        while (*p == '-' || *p == '0' || *p == '+' || *p == ' ' || *p == '#') {
-            left |= (*p == '-');
-            zero |= (*p == '0');
-            plus |= (*p == '+');
-            space |= (*p == ' ');
-            alt |= (*p == '#');
-            ++p;
-        }
-        while (isdigit((unsigned char)*p)) {
-            width = width * 10 + (*p - '0');
-            ++p;
-        }
-        if (*p == '.') {
-            precision = 0;
-            ++p;
-            while (isdigit((unsigned char)*p)) {
-                precision = precision * 10 + (*p - '0');
-                ++p;
-            }
-        }
-        while (*p == 'l' || *p == 'h' || *p == 'z' || *p == 't' || *p == 'j' || *p == 'L')
-            ++p;
-        spec = *p ? *p++ : '\0';
+    len = string_view_length(string_view_all(text));
+    if (out_size > 0u && out) {
+        size_t copy_len = len < out_size - 1u ? len : out_size - 1u;
 
-        if (spec == 'n' || spec == 'N') {
-            number_t value = va_arg(ap_local, number_t);
-            core = (num_is_exact(value) && !number_vt(&value)->is_complex)
-                ? num_to_string(value)
-                : number_format_inexact(&value, spec == 'N', precision);
-        } else if (spec == 'd' || spec == 'i') {
-            snprintf(tmp, sizeof(tmp), "%d", va_arg(ap_local, int));
-            core = number_strdup(tmp);
-        } else if (spec == 'u') {
-            snprintf(tmp, sizeof(tmp), "%u", va_arg(ap_local, unsigned int));
-            core = number_strdup(tmp);
-        } else if (spec == 'f' || spec == 'g' || spec == 'e' || spec == 'E') {
-            double value = va_arg(ap_local, double);
-            if (precision >= 0)
-                snprintf(tmp, sizeof(tmp), (spec == 'f') ? "%.*f" : (spec == 'g') ? "%.*g" : (spec == 'e') ? "%.*e" : "%.*E",
-                         precision, value);
-            else
-                snprintf(tmp, sizeof(tmp), (spec == 'f') ? "%f" : (spec == 'g') ? "%g" : (spec == 'e') ? "%e" : "%E",
-                         value);
-            core = number_strdup(tmp);
-        } else if (spec == 'c') {
-            tmp[0] = (char)va_arg(ap_local, int);
-            tmp[1] = '\0';
-            core = number_strdup(tmp);
-        } else if (spec == 's') {
-            const char *value = va_arg(ap_local, const char *);
-            core = number_strdup(value ? value : "(null)");
-        } else if (spec == 'p') {
-            snprintf(tmp, sizeof(tmp), "%p", va_arg(ap_local, void *));
-            core = number_strdup(tmp);
-        } else {
-            tmp[0] = '%';
-            tmp[1] = spec ? spec : '\0';
-            tmp[2] = '\0';
-            core = number_strdup(tmp);
-        }
-
-        if (!core) {
-            va_end(ap_local);
-            return -1;
-        }
-
-        if ((plus || space) && core[0] != '-' &&
-            (spec == 'n' || spec == 'N' || spec == 'f' || spec == 'g' || spec == 'e' || spec == 'E' || spec == 'd' || spec == 'i')) {
-            char *prefixed = malloc(strlen(core) + 2u);
-            if (!prefixed) {
-                free(core);
-                va_end(ap_local);
-                return -1;
-            }
-            prefixed[0] = plus ? '+' : ' ';
-            strcpy(prefixed + 1, core);
-            free(core);
-            core = prefixed;
-        }
-        core_len = (int)strlen(core);
-        pad = width > core_len ? width - core_len : 0;
-        if (!left) {
-            char fill = zero ? '0' : ' ';
-            while (pad-- > 0) {
-                if (out && pos + 1u < out_size)
-                    out[pos] = fill;
-                ++pos;
-                ++total;
-            }
-        }
-        for (int i = 0; i < core_len; ++i) {
-            if (out && pos + 1u < out_size)
-                out[pos] = core[i];
-            ++pos;
-            ++total;
-        }
-        if (left) {
-            pad = width > core_len ? width - core_len : 0;
-            while (pad-- > 0) {
-                if (out && pos + 1u < out_size)
-                    out[pos] = ' ';
-                ++pos;
-                ++total;
-            }
-        }
-        free(core);
-        (void)alt;
+        memcpy(out, string_c_str(text), copy_len);
+        out[copy_len] = '\0';
     }
-    if (out_size > 0u) {
-        if (out) {
-            size_t term = pos < out_size ? pos : out_size - 1u;
-            out[term] = '\0';
-        }
-    }
-    va_end(ap_local);
-    return total;
+
+    string_free(text);
+    return len <= (size_t)INT_MAX ? (int)len : -1;
 }
 
 int num_sprintf(char *out, size_t out_size, const char *fmt, ...)
@@ -365,26 +338,30 @@ int num_sprintf(char *out, size_t out_size, const char *fmt, ...)
     return n;
 }
 
-int num_printf(const char *fmt, ...)
+string_t *num_sprintf_text(const char *fmt, ...)
 {
-    int needed;
-    int written;
-    char *buf;
+    string_t *text;
     va_list ap;
 
     va_start(ap, fmt);
-    needed = num_vsprintf(NULL, 0u, fmt, ap);
+    text = num_vsprintf_text(fmt, ap);
     va_end(ap);
-    if (needed < 0)
-        return needed;
-    buf = malloc((size_t)needed + 1u);
-    if (!buf)
-        return -1;
+    return text;
+}
+
+int num_printf(const char *fmt, ...)
+{
+    int written;
+    string_t *text;
+    va_list ap;
+
     va_start(ap, fmt);
-    written = num_vsprintf(buf, (size_t)needed + 1u, fmt, ap);
+    text = num_vsprintf_text(fmt, ap);
     va_end(ap);
-    if (written >= 0)
-        fputs(buf, stdout);
-    free(buf);
+    if (!text)
+        return -1;
+
+    written = string_printf("%S", text);
+    string_free(text);
     return written;
 }

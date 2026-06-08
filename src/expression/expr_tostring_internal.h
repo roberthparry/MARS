@@ -53,8 +53,8 @@ void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec);
 void emit_func(const expr_t *f, sbuf_t *b, int parent_prec);
 void emit_tex_name(sbuf_t *b, const char *name);
 
-char *expr_to_string_expr(const expr_t *f);
-char *expr_to_string_unbound(const expr_t *f);
-char *expr_to_string_function(const expr_t *f);
+string_t *expr_to_text_expr(const expr_t *f);
+string_t *expr_to_text_unbound(const expr_t *f);
+string_t *expr_to_text_function(const expr_t *f);
 
 #endif

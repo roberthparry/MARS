@@ -3,6 +3,8 @@
 
 #include "expr_internal.h"
 
+int expr_number_to_polygamma_order(number_t value, unsigned int *order);
+
 number_t eval_sin(expr_t *dv);
 number_t eval_cos(expr_t *dv);
 number_t eval_tan(expr_t *dv);

@@ -22,7 +22,7 @@ static void test_add() {
     qfloat_t got = qf_add(a, b);
 
     char buf[64];
-    qf_to_string(got, buf, sizeof(buf));
+    test_qf_to_buffer(got, buf, sizeof(buf));
     char buf_exp[64] = "11.1111111011111102469135782469134";
     qfloat_t expected = qf_from_string(buf_exp);
 
@@ -42,7 +42,7 @@ static void test_mul() {
     qfloat_t b = qf_from_string(b_buf);
     qfloat_t r = qf_mul(a, b);
     char r_buf[64];
-    qf_to_string(r, r_buf, sizeof(r_buf));
+    test_qf_to_buffer(r, r_buf, sizeof(r_buf));
 
     char buf_exp[64] = "1.2412731971809253340758239961506";
     qfloat_t expected = qf_from_string(buf_exp);
@@ -69,7 +69,7 @@ static void test_div() {
     char buf[64];
     char buf_exp[64] = "0.1256789123456789012345678901234567";
     qfloat_t expected = qf_from_string(buf_exp);
-    qf_to_string(got, buf, sizeof(buf));
+    test_qf_to_buffer(got, buf, sizeof(buf));
 
     if (qf_close(got, expected, 1e-30)) {
         printf("%s  OK: %s = %s%s\n", C_GREEN, "1.2412731971809253340758239961506 / 9.8765431209876543171934981073984", "0.1256789123456789012345678901234567", C_RESET);
@@ -89,7 +89,7 @@ static void test_sqrt() {
     char buf[64];
     char buf_exp[64] = "0.707106781186547524400844362104849";
     qfloat_t expected = qf_from_string(buf_exp);
-    qf_to_string(got, buf, sizeof(buf));
+    test_qf_to_buffer(got, buf, sizeof(buf));
 
     if (qf_close(got, expected, 1e-30)) {
         printf(C_GREEN "  OK: sqrt\n" C_RESET);
@@ -109,7 +109,7 @@ static void test_exp_log() {
     qfloat_t got = qf_log(e);
 
     char buf_exp[64];
-    qf_to_string(expected, buf_exp, sizeof(buf_exp));
+    test_qf_to_buffer(expected, buf_exp, sizeof(buf_exp));
 
     TEST_ASSERT_QFLOAT_CLOSE(got, expected);
     printf(C_GREEN "  OK: exp/log\n" C_RESET);
@@ -169,8 +169,8 @@ static void test_qf_exp(void)
 
     for (int i = 0; i < N; ++i) {
         qfloat_t got = qf_exp(exp_tests[i].arg);
-        qf_to_string(got, buf, sizeof(buf));
-        qf_to_string(exp_tests[i].expected, buf_exp, sizeof(buf_exp));
+        test_qf_to_buffer(got, buf, sizeof(buf));
+        test_qf_to_buffer(exp_tests[i].expected, buf_exp, sizeof(buf_exp));
 
         if (qf_close_rel(got, exp_tests[i].expected, 1e-30)) {
             printf("%s  OK: %s = %s%s\n",
@@ -189,7 +189,7 @@ static void test_qf_exp(void)
     qfloat_t prod = qf_mul(ex, emx);
 
     qfloat_t one = qf_from_double(1.0);
-    qf_to_string(prod, buf, sizeof(buf));
+    test_qf_to_buffer(prod, buf, sizeof(buf));
 
     if (qf_close(prod, one, 1e-30)) {
         printf("%s  OK: exp(x)*exp(-x) = 1%s\n", C_GREEN, C_RESET);
@@ -233,8 +233,8 @@ static void test_qf_log(void)
 
     for (int i = 0; i < N; ++i) {
         qfloat_t got = qf_log(log_tests[i].arg);
-        qf_to_string(got, buf, sizeof(buf));
-        qf_to_string(log_tests[i].expected, buf_exp, sizeof(buf_exp));
+        test_qf_to_buffer(got, buf, sizeof(buf));
+        test_qf_to_buffer(log_tests[i].expected, buf_exp, sizeof(buf_exp));
 
         if (qf_close_value(got, log_tests[i].expected, 1e-30)) {
             printf("%s  OK: %s = %s%s\n",
@@ -253,8 +253,8 @@ static void test_qf_log(void)
     {
         qfloat_t got = qf_log10(qf_from_double(1000.0));
         qfloat_t expected = qf_from_double(3.0);
-        qf_to_string(got, buf, sizeof(buf));
-        qf_to_string(expected, buf_exp, sizeof(buf_exp));
+        test_qf_to_buffer(got, buf, sizeof(buf));
+        test_qf_to_buffer(expected, buf_exp, sizeof(buf_exp));
 
         if (qf_close_value(got, expected, 1e-30)) {
             printf("%s  OK: log10(1000) = %s%s\n", C_GREEN, buf, C_RESET);
@@ -271,7 +271,7 @@ static void test_qf_log(void)
     qfloat_t ex = qf_exp(x);
     qfloat_t lx = qf_log(ex);
 
-    qf_to_string(lx, buf, sizeof(buf));
+    test_qf_to_buffer(lx, buf, sizeof(buf));
         if (qf_close(lx, x, 1e-30)) {
         printf("%s  OK: log(exp(x)) = x%s\n", C_GREEN, C_RESET);
     } else {
@@ -283,7 +283,7 @@ static void test_qf_log(void)
     qfloat_t ly = qf_log(y);
     qfloat_t ey = qf_exp(ly);
 
-    qf_to_string(ey, buf, sizeof(buf));
+    test_qf_to_buffer(ey, buf, sizeof(buf));
     if (qf_close(ey, y, 1e-30)) {
         printf("%s  OK: exp(log(x)) = x%s\n", C_GREEN, C_RESET);
     } else {

@@ -1,63 +1,66 @@
 /* test_config_tree.c - hierarchical test configuration tree helpers */
 
-#include <string.h>
-
 #include "test_config_internal.h"
 
-static string_t *test_config_string_from_range(const char *start, size_t len)
+static bool test_config_ascii_is_alpha_or_underscore(char ch)
 {
-    string_t *s = string_new();
-
-    if (!s)
-        return NULL;
-    if (string_append_chars(s, start, len) != 0) {
-        string_free(s);
-        return NULL;
-    }
-    return s;
+    return (ch >= 'A' && ch <= 'Z') ||
+           (ch >= 'a' && ch <= 'z') ||
+           ch == '_';
 }
 
-const json_t *test_config_json_object_get_text(const json_t *object,
-                                               const char *name)
+static bool test_config_ascii_is_name_char(char ch)
 {
-    string_t *key;
-    const json_t *value;
-
-    key = string_new_with(name);
-    if (!key)
-        return NULL;
-    value = json_object_get(object, key);
-    string_free(key);
-    return value;
+    return test_config_ascii_is_alpha_or_underscore(ch) ||
+           (ch >= '0' && ch <= '9');
 }
 
-json_t *test_config_json_object_get_text_mutable(json_t *object,
-                                                 const char *name)
+static bool test_config_cursor_peek_ascii(const string_cursor_t *cursor,
+                                          char *out)
 {
-    string_t *key;
-    json_t *value;
+    unsigned char ch = 0u;
 
-    key = string_new_with(name);
-    if (!key)
-        return NULL;
-    value = json_object_get_mutable(object, key);
-    string_free(key);
-    return value;
+    if (!string_cursor_peek_ascii(cursor, &ch))
+        return false;
+    if (out)
+        *out = (char)ch;
+    return true;
 }
 
-void test_config_ensure_leaf(json_t *object, const char *name)
+static bool test_config_cursor_at_dot(const string_cursor_t *cursor)
+{
+    char ch = '\0';
+
+    return test_config_cursor_peek_ascii(cursor, &ch) && ch == '.';
+}
+
+static string_t *test_config_cursor_next_segment(string_cursor_t *cursor)
+{
+    string_pos_t start;
+
+    if (!cursor || string_cursor_done(cursor))
+        return NULL;
+
+    start = string_cursor_position(cursor);
+    while (!string_cursor_done(cursor) && !test_config_cursor_at_dot(cursor))
+        (void)string_cursor_next(cursor);
+
+    return string_cursor_extract(start, cursor);
+}
+
+void test_config_ensure_leaf(json_t *object, const string_t *name)
 {
     json_t *leaf;
 
-    if (!object || !name || test_config_json_object_get_text(object, name))
+    if (!object || !name || json_object_get(object, name))
         return;
 
     leaf = json_new_bool(true);
-    (void)test_config_json_object_set_literal(object, name, leaf);
+    (void)test_config_json_object_set_key(object, name, leaf);
     json_free(leaf);
 }
 
-static json_t *test_config_ensure_group(json_t *object, const char *name)
+static json_t *test_config_ensure_group(json_t *object, const string_t *name)
 {
     json_t *existing;
     bool enabled = true;
@@ -67,7 +70,7 @@ static json_t *test_config_ensure_group(json_t *object, const char *name)
     if (!object || !name)
         return NULL;
 
-    existing = test_config_json_object_get_text_mutable(object, name);
+    existing = json_object_get_mutable(object, name);
     if (existing && json_type(existing) == JSON_OBJECT)
         return existing;
 
@@ -85,7 +88,7 @@ static json_t *test_config_ensure_group(json_t *object, const char *name)
     }
 
     if (!test_config_json_object_set_literal(group, "enabled", enabled_value) ||
-        !test_config_json_object_set_literal(object, name, group)) {
+        !test_config_json_object_set_key(object, name, group)) {
         json_free(enabled_value);
         json_free(group);
         return NULL;
@@ -93,107 +96,140 @@ static json_t *test_config_ensure_group(json_t *object, const char *name)
 
     json_free(enabled_value);
     json_free(group);
-    return test_config_json_object_get_text_mutable(object, name);
+    return json_object_get_mutable(object, name);
 }
 
-json_t *test_config_ensure_group_path(json_t *object, const char *path)
+json_t *test_config_ensure_group_path(json_t *object, const string_t *path)
 {
-    const char *start = path;
+    string_cursor_t *cursor;
     json_t *current = object;
 
-    if (!object || !path || !*path)
+    if (!object || !path || string_length(path) == 0u)
         return NULL;
 
-    while (current && start && *start) {
-        const char *dot = strchr(start, '.');
-        size_t len = dot ? (size_t)(dot - start) : strlen(start);
-        string_t *segment = test_config_string_from_range(start, len);
+    cursor = string_cursor_new(path);
+    if (!cursor)
+        return NULL;
 
-        if (!segment)
+    while (current && !string_cursor_done(cursor)) {
+        string_t *segment = test_config_cursor_next_segment(cursor);
+
+        if (!segment || string_length(segment) == 0u) {
+            string_free(segment);
+            string_cursor_free(cursor);
             return NULL;
-        current = test_config_ensure_group(current, string_c_str(segment));
+        }
+
+        current = test_config_ensure_group(current, segment);
         string_free(segment);
-        start = dot ? dot + 1 : NULL;
+
+        if (test_config_cursor_at_dot(cursor))
+            (void)string_cursor_next(cursor);
     }
 
+    string_cursor_free(cursor);
     return current;
 }
 
 bool test_config_find_group_with_effective_enabled(json_t *object,
-                                                   const char *path,
+                                                   const string_t *path,
                                                    json_t **out_group,
                                                    bool *out_enabled)
 {
-    const char *start = path;
+    string_cursor_t *cursor;
     json_t *current = object;
     bool enabled = true;
 
-    if (!object || !path || !*path)
+    if (!object || !path || string_length(path) == 0u)
         return false;
 
-    while (current && start && *start) {
-        const char *dot = strchr(start, '.');
-        size_t len = dot ? (size_t)(dot - start) : strlen(start);
-        string_t *segment = test_config_string_from_range(start, len);
+    cursor = string_cursor_new(path);
+    if (!cursor)
+        return false;
+
+    while (current && !string_cursor_done(cursor)) {
+        string_t *segment = test_config_cursor_next_segment(cursor);
+        bool has_more;
         json_t *child;
 
-        if (!segment)
+        if (!segment || string_length(segment) == 0u) {
+            string_free(segment);
+            string_cursor_free(cursor);
             return false;
+        }
 
         child = json_object_get_mutable(current, segment);
         string_free(segment);
-        if (!child)
+        if (!child) {
+            string_cursor_free(cursor);
             return false;
+        }
 
         enabled = enabled && test_config_value_enabled(child, true);
-        if (!dot) {
-            if (json_type(child) != JSON_OBJECT)
+        has_more = test_config_cursor_at_dot(cursor);
+        if (!has_more) {
+            if (json_type(child) != JSON_OBJECT) {
+                string_cursor_free(cursor);
                 return false;
+            }
             if (out_group)
                 *out_group = child;
             if (out_enabled)
                 *out_enabled = enabled;
+            string_cursor_free(cursor);
             return true;
         }
 
-        if (json_type(child) != JSON_OBJECT)
+        if (json_type(child) != JSON_OBJECT) {
+            string_cursor_free(cursor);
             return false;
+        }
         current = child;
-        start = dot + 1;
+        (void)string_cursor_next(cursor);
     }
 
+    string_cursor_free(cursor);
     return false;
 }
 
-bool test_config_is_valid_group_name(const char *name)
+bool test_config_is_valid_group_name(const string_t *name)
 {
-    const unsigned char *p = (const unsigned char *)name;
+    string_cursor_t *cursor;
+    bool expecting_segment_start = true;
+    bool saw_segment = false;
 
-    if (!p || !*p)
+    if (!name || string_length(name) == 0u)
         return false;
 
-    while (*p) {
-        if (!((*p >= 'A' && *p <= 'Z') ||
-              (*p >= 'a' && *p <= 'z') ||
-              (*p == '_')))
+    cursor = string_cursor_new(name);
+    if (!cursor)
+        return false;
+
+    while (!string_cursor_done(cursor)) {
+        char ch = '\0';
+
+        if (!test_config_cursor_peek_ascii(cursor, &ch)) {
+            string_cursor_free(cursor);
             return false;
-
-        ++p;
-        while (*p && *p != '.') {
-            if (!((*p >= 'A' && *p <= 'Z') ||
-                  (*p >= 'a' && *p <= 'z') ||
-                  (*p >= '0' && *p <= '9') ||
-                  (*p == '_')))
-                return false;
-            ++p;
         }
 
-        if (*p == '.') {
-            ++p;
-            if (!*p)
+        if (expecting_segment_start) {
+            if (!test_config_ascii_is_alpha_or_underscore(ch)) {
+                string_cursor_free(cursor);
                 return false;
+            }
+            expecting_segment_start = false;
+            saw_segment = true;
+        } else if (ch == '.') {
+            expecting_segment_start = true;
+        } else if (!test_config_ascii_is_name_char(ch)) {
+            string_cursor_free(cursor);
+            return false;
         }
+
+        (void)string_cursor_next(cursor);
     }
 
-    return true;
+    string_cursor_free(cursor);
+    return saw_segment && !expecting_segment_start;
 }

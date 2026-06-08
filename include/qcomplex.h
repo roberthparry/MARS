@@ -2,8 +2,11 @@
 #define QCOMPLEX_H
 
 #include <stddef.h>
+#include <stdarg.h>
 
 #include "qfloat.h"
+
+typedef struct _string_t string_t;
 
 /**
  * @brief Double-double complex number (qfloat_t real and imaginary parts)
@@ -362,12 +365,22 @@ bool qc_isneginf(qcomplex_t z);                  /**< isneginf(z) */
 /** @} */
 
 /**
- * @brief Print qcomplex_t to string buffer.
- * @param z Complex number
- * @param out Output buffer
- * @param out_size Size of output buffer
+ * @brief Convert qcomplex_t to a newly allocated string.
+ * @param z Complex number.
+ * @return  Newly allocated string, or NULL on allocation failure.
  */
-void qc_to_string(qcomplex_t z, char *out, size_t out_size);
+string_t *qc_to_string(qcomplex_t z);
+
+/**
+ * @brief Convert qcomplex_t to a newly allocated string.
+ *
+ * Preferred spelling for string_t-returning APIs. qc_to_string() is retained
+ * as a convenience alias.
+ *
+ * @param z Complex number.
+ * @return  Newly allocated string, or NULL on allocation failure.
+ */
+string_t *qc_to_text(qcomplex_t z);
 
 /**
  * @brief Parse qcomplex_t from string.
@@ -375,6 +388,17 @@ void qc_to_string(qcomplex_t z, char *out, size_t out_size);
  * @return Parsed qcomplex_t (NaN if parsing fails)
  */
 qcomplex_t qc_from_string(const char *s);
+
+/**
+ * @brief Parse qcomplex_t from text.
+ *
+ * This is the string_t-based parser. qc_from_string() is the convenience
+ * wrapper for callers with ordinary C string literals.
+ *
+ * @param text Input text.
+ * @return Parsed qcomplex_t (NaN if parsing fails).
+ */
+qcomplex_t qc_from_text(const string_t *text);
 
 /**
  * @brief Internal printf-style formatter with full qcomplex_t and qfloat_t support.
@@ -406,6 +430,18 @@ qcomplex_t qc_from_string(const char *s);
 int qc_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap);
 
 /**
+ * @brief Format text into a new string_t with full qcomplex_t support.
+ *
+ * This is the string-owning counterpart to qc_vsprintf(). The caller owns the
+ * returned string and must release it with string_free().
+ *
+ * @param fmt  Format string.
+ * @param ap   Variadic argument list.
+ * @return     Newly allocated formatted string, or NULL on error.
+ */
+string_t *qc_vsprintf_text(const char *fmt, va_list ap);
+
+/**
  * @brief printf-style formatter with full qcomplex_t and qfloat_t support.
  *
  * Extends snprintf() with %z, %Z (qcomplex_t) and %q, %Q (qfloat_t).
@@ -418,6 +454,18 @@ int qc_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap);
  * @return Number of characters written (excluding null terminator).
  */
 int qc_sprintf(char *out, size_t out_size, const char *fmt, ...);
+
+/**
+ * @brief Format text into a new string_t with full qcomplex_t support.
+ *
+ * This is the string-owning counterpart to qc_sprintf(). The caller owns the
+ * returned string and must release it with string_free().
+ *
+ * @param fmt  Format string.
+ * @param ...  Additional arguments.
+ * @return     Newly allocated formatted string, or NULL on error.
+ */
+string_t *qc_sprintf_text(const char *fmt, ...);
 
 /**
  * @brief printf to stdout with full qcomplex_t and qfloat_t support.

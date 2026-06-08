@@ -242,6 +242,18 @@ void expr_set_name(expr_t *dv, const char *name)
     dv->simplify_epoch = 0;
 }
 
+void expr_set_name_text(expr_t *dv, const string_t *name)
+{
+    if (!dv) return;
+    if (dv->name) free(dv->name);
+    dv->name = name
+        ? expr_take_string_as_c_string(expr_normalise_name_text(name))
+        : NULL;
+    dv->epoch++;
+    dv->simplified = false;
+    dv->simplify_epoch = 0;
+}
+
 number_t expr_get_val(const expr_t *dv)
 {
     return expr_eval(dv);

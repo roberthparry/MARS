@@ -63,6 +63,14 @@ expr_t *expr_new_const(number_t x);
  */
 expr_t *expr_new_named_const(number_t x, const char *name);
 
+/**
+ * @brief Create a named constant node from string text.
+ *
+ * This is the string_t-based counterpart to expr_new_named_const(). The name
+ * is borrowed, normalised, and copied into the expression node.
+ */
+expr_t *expr_new_named_const_text(number_t x, const string_t *name);
+
 /* ------------------------------------------------------------------------- */
 /* Constructors — variables                                                  */
 /* ------------------------------------------------------------------------- */
@@ -84,6 +92,14 @@ expr_t *expr_new_var(number_t x);
  * Returns an owning handle; caller must call expr_free() exactly once.
  */
 expr_t *expr_new_named_var(number_t x, const char *name);
+
+/**
+ * @brief Create a named variable node from string text.
+ *
+ * This is the string_t-based counterpart to expr_new_named_var(). The name is
+ * borrowed, normalised, and copied into the expression node.
+ */
+expr_t *expr_new_named_var_text(number_t x, const string_t *name);
 
 /* ------------------------------------------------------------------------- */
 /* Mutators                                                                  */
@@ -109,6 +125,14 @@ void expr_set_val(expr_t *expr, number_t value);
  * @p name is copied. Passing NULL removes any existing name.
  */
 void expr_set_name(expr_t *expr, const char *name);
+
+/**
+ * @brief Set the display name from string text.
+ *
+ * This is the string_t-based counterpart to expr_set_name(). The name is
+ * borrowed, normalised, and copied into the expression node.
+ */
+void expr_set_name_text(expr_t *expr, const string_t *name);
 
 /* ------------------------------------------------------------------------- */
 /* Accessors                                                                 */
@@ -609,6 +633,15 @@ expr_t *expr_from_text(const string_t *text, expr_bindings_t **bnd_out);
 expr_t *expr_bindings_get(expr_bindings_t *bnd, const char *name);
 
 /**
+ * @brief Look up a parsed binding by string name.
+ *
+ * This is the string_t-based counterpart to expr_bindings_get(). The lookup
+ * name is borrowed and may be queried with the same aliases accepted by the
+ * raw-string convenience wrapper.
+ */
+expr_t *expr_bindings_get_text(expr_bindings_t *bnd, const string_t *name);
+
+/**
  * @brief Destroy an opaque bindings object returned by expr_from_string().
  */
 void expr_bindings_free(expr_bindings_t *bnd);
@@ -631,5 +664,16 @@ expr_t *expr_from_expression_string(const char *expr,
                                     const char *const *names,
                                     expr_t *const *symbols,
                                     size_t nsymbols);
+
+/**
+ * @brief Construct an expression from bare expression text using supplied symbols.
+ *
+ * This is the string_t-based counterpart to expr_from_expression_string(). The
+ * input text is borrowed and is not modified.
+ */
+expr_t *expr_from_expression_text(const string_t *expr,
+                                  const string_t *const *names,
+                                  expr_t *const *symbols,
+                                  size_t nsymbols);
 
 #endif /* EXPRESSION_H */

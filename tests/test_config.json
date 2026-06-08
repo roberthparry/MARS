@@ -573,6 +573,7 @@
   "tests/matrix/test_matrix_fromstring.c": {
     "test_mat_from_string_numeric_num_real": true,
     "test_mat_from_string_numeric_num_complex": true,
+    "test_mat_from_text_constructors": true,
     "test_mat_from_string_symbolic_numeric_fallback": true,
     "test_mat_from_string_symbolic_insufficient_bindings": true,
     "test_mat_from_string_symbolic_builtin_constants": true,
@@ -602,6 +603,7 @@
   },
   "tests/matrix/test_matrix_output.c": {
     "test_mat_sprintf_formats": true,
+    "test_mat_text_formatters": true,
     "test_mat_printf_smoke": true,
     "test_mat_sprintf_number_precision": true,
     "test_mat_sprintf_pretty_number_complex": true

@@ -4,17 +4,26 @@
 #include "expr_tostring.h"
 #include "expr_tostring_internal.h"
 
-char *expr_to_string_expr(const expr_t *f)
+static string_t *expr_text_from_owned_c_string(char *raw)
+{
+    string_t *text = raw ? string_new_with(raw) : NULL;
+
+    free(raw);
+    return text;
+}
+
+string_t *expr_to_text_expr(const expr_t *f)
 {
     sbuf_t b;
     autoname_table_t vnames;
     varlist_t vl;
     varlist_t cl;
     const expr_t *g = f;
-    char *out;
+    string_t *out;
 
     if (f && f->binding_expr && !expr_is_const(f))
-        return expr_binding_expr_to_string(f->binding_expr);
+        return expr_text_from_owned_c_string(
+            expr_binding_expr_to_string(f->binding_expr));
 
     autoname_init(&vnames);
     assign_unnamed_vars_dfs((expr_t *)f, &vnames);
@@ -72,7 +81,7 @@ char *expr_to_string_expr(const expr_t *f)
         sbuf_putc(&b, '}');
     }
 
-    out = expr_tostring_xstrdup(b.data);
+    out = sbuf_to_string(&b);
     sbuf_free(&b);
     free(vl.vars);
     free(cl.vars);
@@ -80,15 +89,16 @@ char *expr_to_string_expr(const expr_t *f)
     return out;
 }
 
-char *expr_to_string_unbound(const expr_t *f)
+string_t *expr_to_text_unbound(const expr_t *f)
 {
     sbuf_t b;
     autoname_table_t vnames;
     const expr_t *g = f;
-    char *out;
+    string_t *out;
 
     if (f && f->binding_expr && !expr_is_const(f))
-        return expr_binding_expr_to_string(f->binding_expr);
+        return expr_text_from_owned_c_string(
+            expr_binding_expr_to_string(f->binding_expr));
 
     autoname_init(&vnames);
     assign_unnamed_vars_dfs((expr_t *)f, &vnames);
@@ -96,7 +106,7 @@ char *expr_to_string_unbound(const expr_t *f)
     sbuf_init(&b);
     emit_expr(g, &b, PREC_LOWEST);
 
-    out = expr_tostring_xstrdup(b.data);
+    out = sbuf_to_string(&b);
     sbuf_free(&b);
     autoname_restore(&vnames);
     return out;

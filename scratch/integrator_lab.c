@@ -7,6 +7,7 @@
 #include "integrator.h"
 #include "internal/expr_internal.h"
 #include "number.h"
+#include "ustring.h"
 
 static char *wrap_expression(const char *raw_input)
 {
@@ -59,13 +60,72 @@ cleanup:
 
 static int text_is_ci_literal(const char *text, const char *literal)
 {
-    while (*text && *literal) {
-        if (tolower((unsigned char)*text) != tolower((unsigned char)*literal))
+    size_t i = 0u;
+
+    while (text[i] && literal[i]) {
+        if (tolower((unsigned char)text[i]) !=
+            tolower((unsigned char)literal[i]))
             return 0;
-        ++text;
-        ++literal;
+        i++;
     }
-    return *text == '\0' && *literal == '\0';
+    return text[i] == '\0' && literal[i] == '\0';
+}
+
+static int parse_size_text(const char *text, size_t *out)
+{
+    size_t i = 0u;
+    size_t value = 0u;
+    int saw_digit = 0;
+
+    if (!text || !out)
+        return 1;
+
+    while (isspace((unsigned char)text[i]))
+        i++;
+    if (text[i] == '+')
+        i++;
+
+    for (; text[i] != '\0'; ++i) {
+        unsigned int digit;
+
+        if (isspace((unsigned char)text[i]))
+            break;
+        if (!isdigit((unsigned char)text[i]))
+            return 1;
+
+        digit = (unsigned int)(text[i] - '0');
+        if (value > (((size_t)-1) - digit) / 10u)
+            return 1;
+        value = value * 10u + digit;
+        saw_digit = 1;
+    }
+
+    while (isspace((unsigned char)text[i]))
+        i++;
+    if (!saw_digit || text[i] != '\0')
+        return 1;
+
+    *out = value;
+    return 0;
+}
+
+static char *trim_ascii_in_place(char *text)
+{
+    size_t start = 0u;
+    size_t end;
+
+    if (!text)
+        return NULL;
+
+    end = strlen(text);
+    while (start < end && isspace((unsigned char)text[start]))
+        start++;
+    while (end > start && isspace((unsigned char)text[end - 1u]))
+        end--;
+    if (start > 0u)
+        memmove(text, &text[start], end - start);
+    text[end - start] = '\0';
+    return text;
 }
 
 static int parse_infinity_bound(const char *text, number_t *out)
@@ -73,8 +133,8 @@ static int parse_infinity_bound(const char *text, number_t *out)
     int sign = 1;
     size_t len;
     char *copy;
-    char *p;
-    char *end;
+    char *trimmed;
+    size_t pos = 0u;
     int ok;
 
     if (!text || !out)
@@ -86,22 +146,17 @@ static int parse_infinity_bound(const char *text, number_t *out)
         return 1;
     memcpy(copy, text, len + 1u);
 
-    p = copy;
-    while (isspace((unsigned char)*p))
-        ++p;
-    end = p + strlen(p);
-    while (end > p && isspace((unsigned char)end[-1]))
-        *--end = '\0';
+    trimmed = trim_ascii_in_place(copy);
 
-    if (*p == '+' || *p == '-') {
-        if (*p == '-')
+    if (trimmed[pos] == '+' || trimmed[pos] == '-') {
+        if (trimmed[pos] == '-')
             sign = -1;
-        ++p;
+        pos++;
     }
 
-    ok = text_is_ci_literal(p, "inf") ||
-         text_is_ci_literal(p, "infinity") ||
-         strcmp(p, "∞") == 0;
+    ok = text_is_ci_literal(&trimmed[pos], "inf") ||
+         text_is_ci_literal(&trimmed[pos], "infinity") ||
+         strcmp(&trimmed[pos], "∞") == 0;
     if (ok)
         *out = num_clone(sign < 0 ? NUM_NINF : NUM_INF);
 
@@ -183,7 +238,11 @@ static expr_t *binding_or_synthetic_var(expr_bindings_t *bindings,
 
 static char *number_text(number_t value)
 {
-    return num_to_string(value);
+    string_t *text = num_to_string(value);
+    char *copy = text ? strdup(string_c_str(text)) : NULL;
+
+    string_free(text);
+    return copy;
 }
 
 typedef enum {
@@ -223,47 +282,47 @@ static int is_ascii_digit(char ch)
 
 static int is_plain_decimal_bound(const char *text)
 {
-    const char *p = text;
+    size_t pos = 0u;
     int saw_digit = 0;
     int saw_dot = 0;
 
-    if (!p || !*p)
+    if (!text || !text[pos])
         return 0;
-    if (*p == '+' || *p == '-')
-        ++p;
+    if (text[pos] == '+' || text[pos] == '-')
+        pos++;
 
-    while (is_ascii_digit(*p)) {
+    while (is_ascii_digit(text[pos])) {
         saw_digit = 1;
-        ++p;
+        pos++;
     }
 
-    if (*p == '.') {
+    if (text[pos] == '.') {
         saw_dot = 1;
-        ++p;
-        while (is_ascii_digit(*p)) {
+        pos++;
+        while (is_ascii_digit(text[pos])) {
             saw_digit = 1;
-            ++p;
+            pos++;
         }
     }
 
     if (!saw_dot || !saw_digit)
         return 0;
 
-    if (*p == 'e' || *p == 'E') {
+    if (text[pos] == 'e' || text[pos] == 'E') {
         int saw_exponent_digit = 0;
 
-        ++p;
-        if (*p == '+' || *p == '-')
-            ++p;
-        while (is_ascii_digit(*p)) {
+        pos++;
+        if (text[pos] == '+' || text[pos] == '-')
+            pos++;
+        while (is_ascii_digit(text[pos])) {
             saw_exponent_digit = 1;
-            ++p;
+            pos++;
         }
         if (!saw_exponent_digit)
             return 0;
     }
 
-    return *p == '\0';
+    return text[pos] == '\0';
 }
 
 static char *bound_tex_input(const char *raw_input, const expr_t *expr)
@@ -547,19 +606,18 @@ int main(int argc, char **argv)
 
     while (argi < argc && strncmp(argv[argi], "--", 2u) == 0) {
         if (strcmp(argv[argi], "--max-intervals") == 0) {
-            char *end = NULL;
-            unsigned long parsed;
+            size_t parsed;
 
             if (argi + 1 >= argc) {
                 fprintf(stderr, "--max-intervals needs a value\n");
                 return 1;
             }
-            parsed = strtoul(argv[argi + 1], &end, 10);
-            if (!end || *end != '\0' || parsed == 0ul) {
+            if (parse_size_text(argv[argi + 1], &parsed) != 0 ||
+                parsed == 0u) {
                 fprintf(stderr, "Bad --max-intervals value\n");
                 return 1;
             }
-            max_intervals = (size_t)parsed;
+            max_intervals = parsed;
             has_max_intervals = 1;
             argi += 2;
             continue;
