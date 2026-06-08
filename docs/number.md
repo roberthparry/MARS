@@ -270,8 +270,8 @@ temporary churn.
 
 Return conventions:
 
-- `num_to_string(...)` returns a newly allocated string that must be released
-  with `free()`.
+- `num_to_string(...)` returns a newly allocated `string_t *` that must be
+  released with `string_free()`.
 - `num_sprintf(...)`, `num_vsprintf(...)`, and `num_printf(...)` follow the
   usual `snprintf` / `printf` return conventions.
 
@@ -423,8 +423,8 @@ Return conventions in this area:
 
 ```c
 #include <stdio.h>
-#include <stdlib.h>
 #include "number.h"
+#include "ustring.h"
 
 int main(void) {
     number_t a = num_create_from_string("2");
@@ -432,17 +432,17 @@ int main(void) {
     number_t c = num_create_from_string("5/6");
     number_t sum = num_add(a, c);
     number_t beta = num_beta(a, b);
-    char *sum_text = num_to_string(sum);
-    char *beta_text = num_to_string(beta);
+    string_t *sum_text = num_to_string(sum);
+    string_t *beta_text = num_to_string(beta);
 
     if (!sum_text || !beta_text)
         return 1;
 
-    printf("2 + 5/6 = %s\n", sum_text);
-    printf("beta(2, 3) = %s\n", beta_text);
+    printf("2 + 5/6 = %s\n", string_c_str(sum_text));
+    printf("beta(2, 3) = %s\n", string_c_str(beta_text));
 
-    free(sum_text);
-    free(beta_text);
+    string_free(sum_text);
+    string_free(beta_text);
     num_destroy(&a);
     num_destroy(&b);
     num_destroy(&c);
@@ -468,9 +468,10 @@ documented output stays tied to the public `number_t` API.
 number_t a = num_create_from_frac(2, 3);
 number_t b = num_create_from_string("5/4");
 number_t product = num_mul(a, b);
-char *text = num_to_string(product);
+string_t *text = num_to_string(product);
 
-printf("(2/3) * (5/4) = %s\n", text);
+printf("(2/3) * (5/4) = %s\n", string_c_str(text));
+string_free(text);
 ```
 
 ```text
@@ -483,9 +484,10 @@ printf("(2/3) * (5/4) = %s\n", text);
 number_t n = num_create_from_long(52);
 number_t k = num_create_from_long(5);
 number_t c = num_binomial(n, k);
-char *text = num_to_string(c);
+string_t *text = num_to_string(c);
 
-printf("C(52, 5) = %s\n", text);
+printf("C(52, 5) = %s\n", string_c_str(text));
+string_free(text);
 ```
 
 ```text

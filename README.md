@@ -136,21 +136,21 @@ lgamma(2.345) = 0.18173624337757203797862933229995978550118791690492470651875093
 
 ```c
 #include <stdio.h>
-#include <stdlib.h>
 #include "number.h"
+#include "ustring.h"
 
 int main(void) {
     number_t a = num_create_from_string("2");
     number_t b = num_create_from_string("5/6");
     number_t c = num_add(a, b);
-    char *text = num_to_string(c);
+    string_t *text = num_to_string(c);
 
     if (!text)
         return 1;
 
-    printf("2 + 5/6 = %s\n", text);
+    printf("2 + 5/6 = %s\n", string_c_str(text));
 
-    free(text);
+    string_free(text);
     num_destroy(&a);
     num_destroy(&b);
     num_destroy(&c);
