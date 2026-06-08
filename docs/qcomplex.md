@@ -210,7 +210,8 @@ All declarations are in `include/qcomplex.h`.
 
 | Function | Description |
 |---|---|
-| `string_t *qc_to_string(qcomplex_t z);` | Returns a newly allocated human-readable representation of `z`; release it with `string_free()`. |
+| `string_t *qc_to_text(qcomplex_t z);` | Returns a newly allocated human-readable representation of `z`; release it with `string_free()`. |
+| `string_t *qc_to_string(qcomplex_t z);` | Convenience alias for `qc_to_text(...)`. |
 | `qcomplex_t qc_from_string(const char *s);` | Parses a complex number from a string (e.g. `"3+4i"`, `"2e-5-1.2e3i"`, `"5i"`, `"7"`). |
 
 ### Printf-style Formatting
