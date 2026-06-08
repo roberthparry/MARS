@@ -1160,14 +1160,15 @@ static void check_parse_num(const char *label, const char *s,
         printf(C_BOLD "  expr   " C_RESET "%s\n", expr_text ? expr_text : "(null)");
         printf(C_BOLD "  value  " C_RESET "%s\n\n", expect_text);
     } else {
-        char *got_text = num_to_string(got);
+        string_t *got_text = num_to_string(got);
 
         printf(C_BOLD C_RED "FAIL" C_RESET " %s %s:%d:1\n", label, __FILE__, line);
         printf(C_BOLD "  input  " C_RESET "%s\n", s);
         printf(C_BOLD "  expr   " C_RESET "%s\n", expr_text ? expr_text : "(null)");
-        printf(C_BOLD "  got    " C_RESET "%s\n", got_text ? got_text : "(null)");
+        printf(C_BOLD "  got    " C_RESET "%s\n",
+               got_text ? string_c_str(got_text) : "(null)");
         printf(C_BOLD "  expect " C_RESET "%s\n\n", expect_text);
-        free(got_text);
+        string_free(got_text);
         TEST_FAIL();
     }
 
@@ -1775,14 +1776,15 @@ static void test_from_string_bindings_with_constant_expression_value(void)
             printf(C_BOLD C_GREEN "PASS" C_RESET
                    " derivative at symbolic pi/2 evaluates exactly to zero\n\n");
         } else {
-            char *got = num_to_string(expr_value);
+            string_t *got = num_to_string(expr_value);
 
             printf(C_BOLD C_RED "FAIL" C_RESET
                    " derivative at symbolic pi/2 evaluates exactly to zero %s:%d:1\n",
                    __FILE__, __LINE__);
-            printf(C_BOLD "  got    " C_RESET "%s\n", got ? got : "(null)");
+            printf(C_BOLD "  got    " C_RESET "%s\n",
+                   got ? string_c_str(got) : "(null)");
             printf(C_BOLD "  expect " C_RESET "0\n\n");
-            free(got);
+            string_free(got);
             TEST_FAIL();
         }
         num_destroy(&expr_value);

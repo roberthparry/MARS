@@ -8,7 +8,7 @@
 #include "expr_internal.h"
 
 typedef struct {
-    char   *name;
+    string_t *name;
     expr_t *node;
 } sym_t;
 
@@ -22,14 +22,14 @@ void *fs_xmalloc(size_t n);
 int fs_is_letter(unsigned int c);
 
 void symtab_init(symtab_t *t);
-int symtab_has(const symtab_t *t, const char *name);
-void symtab_add(symtab_t *t, const char *name, expr_t *node);
-expr_t *symtab_lookup(const symtab_t *t, const char *name);
+int symtab_has_text(const symtab_t *t, const string_t *name);
+void symtab_add_text(symtab_t *t, const string_t *name, expr_t *node);
+expr_t *symtab_lookup_text(const symtab_t *t, const string_t *name);
 void symtab_free(symtab_t *t);
-int symtab_add_borrowed(symtab_t *t, const char *name, expr_t *node);
+int symtab_add_borrowed_text(symtab_t *t, const string_t *name, expr_t *node);
 
 typedef struct {
-    const char *name;
+    string_t *name;
     expr_t *expr;
     bool is_constant;
 } expr_binding_entry_t;
@@ -38,7 +38,6 @@ struct expr_bindings_t {
     size_t count;
     expr_binding_entry_t *entries;
     dictionary_t *index;
-    void *storage;
 };
 
 expr_bindings_t *symtab_build_bindings(const symtab_t *t);

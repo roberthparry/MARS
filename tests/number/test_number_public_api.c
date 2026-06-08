@@ -145,14 +145,14 @@ void run_number_public_api_tests(void)
         number_t a = num_create_from_string("2");
         number_t b = num_create_from_string("5/6");
         number_t c = num_add(a, b);
-        char *text = num_to_string(c);
+        string_t *text = num_to_string(c);
 
         ASSERT_NOT_NULL(text);
         printf(C_WHITE C_BOLD "README example" C_RESET "\n");
-        printf("    2 + 5/6 = %s\n\n", text ? text : "(null)");
-        ASSERT_TRUE(text && strcmp(text, "¹⁷⁄₆") == 0);
+        printf("    2 + 5/6 = %s\n\n", text ? string_c_str(text) : "(null)");
+        ASSERT_TRUE(text && strcmp(string_c_str(text), "¹⁷⁄₆") == 0);
 
-        free(text);
+        string_free(text);
         num_destroy(&a);
         num_destroy(&b);
         num_destroy(&c);

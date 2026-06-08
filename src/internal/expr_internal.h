@@ -16,6 +16,8 @@
  */
 
 int expr_get_default_constant_num(const char *name, number_t *value_out);
+int expr_get_default_constant_num_text(const string_t *name,
+                                       number_t *value_out);
 
 void expr_retain(const expr_t *dv);
 
@@ -122,9 +124,14 @@ bool expr_match_affine_poly_deg4_times_unary_affine_kind(const expr_t *expr,
 /* ------------------------------------------------------------------------- */
 
 char *expr_normalise_name(const char *name);
+string_t *expr_normalise_name_text(const string_t *name);
+char *expr_take_string_as_c_string(string_t *text);
 char *expr_normalise_binding_name(const char *name);
+string_t *expr_normalise_binding_name_text(const string_t *name);
 int expr_is_default_constant_name(const char *name);
+int expr_is_default_constant_name_text(const string_t *name);
 const char *expr_default_constant_canonical_name(const char *name);
+string_t *expr_default_constant_canonical_name_text(const string_t *name);
 
 /* ------------------------------------------------------------------------- */
 /* Shared string rendering helpers                                           */

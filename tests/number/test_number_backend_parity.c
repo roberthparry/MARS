@@ -24,15 +24,16 @@ static void assert_number_close_text(const char *label,
     number_t expected = number_text(expected_text);
     number_t tolerance = number_text(tolerance_text);
     number_t error = num_abs(num_sub(got, expected));
-    char *error_text = num_to_string(error);
+    string_t *error_text = num_to_string(error);
 
     printf(C_WHITE C_BOLD "%s" C_RESET "\n", label ? label : "<unspecified>");
     printf("    expected = %s\n", expected_text);
     printf("    tol      = %s\n", tolerance_text);
-    printf("    error    = %s\n\n", error_text ? error_text : "<format-error>");
+    printf("    error    = %s\n\n",
+           error_text ? string_c_str(error_text) : "<format-error>");
     ASSERT_TRUE(num_le(error, tolerance));
 
-    free(error_text);
+    string_free(error_text);
     num_destroy(&error);
     num_destroy(&tolerance);
     num_destroy(&expected);

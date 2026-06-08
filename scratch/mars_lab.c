@@ -3,8 +3,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <limits.h>
 
 #include "expression.h"
+#include "ustring.h"
 
 static char *xstrdup_local(const char *text)
 {
@@ -29,25 +31,87 @@ static char *expr_text_dup(const expr_t *expr, style_t style)
     return copy;
 }
 
+static char *trim_ascii_in_place(char *text)
+{
+    size_t start = 0u;
+    size_t end;
+
+    if (!text)
+        return NULL;
+
+    end = strlen(text);
+    while (start < end && isspace((unsigned char)text[start]))
+        start++;
+    while (end > start && isspace((unsigned char)text[end - 1u]))
+        end--;
+    if (start > 0u)
+        memmove(text, &text[start], end - start);
+    text[end - start] = '\0';
+    return text;
+}
+
 static void trim_fraction_tail(char *text)
 {
-    char *dot = strchr(text, '.');
-    char *end;
+    size_t dot;
+    size_t end;
 
-    if (!dot)
+    if (!text)
+        return;
+    dot = strcspn(text, ".");
+    if (text[dot] != '.')
         return;
 
-    end = text + strlen(text);
-    while (end > dot + 1 && end[-1] == '0')
-        *--end = '\0';
-    if (end == dot + 1)
-        *dot = '\0';
+    end = strlen(text);
+    while (end > dot + 1u && text[end - 1u] == '0') {
+        end--;
+        text[end] = '\0';
+    }
+    if (end == dot + 1u)
+        text[dot] = '\0';
+}
+
+static int parse_long_suffix(const char *text, size_t start, long *out)
+{
+    size_t i = start;
+    unsigned long value = 0u;
+    unsigned long limit;
+    int negative = 0;
+    int saw_digit = 0;
+
+    if (!text || !out)
+        return 0;
+
+    if (text[i] == '-' || text[i] == '+') {
+        negative = text[i] == '-';
+        i++;
+    }
+
+    limit = negative ? (unsigned long)LONG_MAX + 1u : (unsigned long)LONG_MAX;
+    for (; text[i] != '\0'; ++i) {
+        unsigned int digit;
+
+        if (!isdigit((unsigned char)text[i]))
+            return 0;
+        digit = (unsigned int)(text[i] - '0');
+        if (value > (limit - digit) / 10u)
+            return 0;
+        value = value * 10u + digit;
+        saw_digit = 1;
+    }
+
+    if (!saw_digit)
+        return 0;
+
+    *out = negative && value == (unsigned long)LONG_MAX + 1u
+        ? LONG_MIN
+        : (negative ? -(long)value : (long)value);
+    return 1;
 }
 
 static char *format_scientific_as_general(char *scientific, int precision)
 {
-    char *e = strchr(scientific, 'E');
-    char *mantissa;
+    size_t exponent_pos;
+    size_t mantissa_pos = 0u;
     char *digits;
     char *out;
     char sign = '\0';
@@ -57,26 +121,27 @@ static char *format_scientific_as_general(char *scientific, int precision)
     size_t pos = 0u;
     long decimal_pos;
 
-    if (!e)
-        e = strchr(scientific, 'e');
-    if (!e) {
+    exponent_pos = strcspn(scientific, "Ee");
+    if (scientific[exponent_pos] == '\0') {
         trim_fraction_tail(scientific);
         return scientific;
     }
 
-    exponent = strtol(e + 1, NULL, 10);
-    *e = '\0';
-    mantissa = scientific;
-    if (*mantissa == '-' || *mantissa == '+')
-        sign = *mantissa++;
+    if (!parse_long_suffix(scientific, exponent_pos + 1u, &exponent))
+        return scientific;
+    scientific[exponent_pos] = '\0';
+    if (scientific[mantissa_pos] == '-' || scientific[mantissa_pos] == '+') {
+        sign = scientific[mantissa_pos];
+        mantissa_pos++;
+    }
 
-    digits = malloc(strlen(mantissa) + 1u);
+    digits = malloc(strlen(&scientific[mantissa_pos]) + 1u);
     if (!digits)
         return scientific;
 
-    for (char *p = mantissa; *p; ++p) {
-        if (isdigit((unsigned char)*p))
-            digits[digit_count++] = *p;
+    for (size_t i = mantissa_pos; scientific[i] != '\0'; ++i) {
+        if (isdigit((unsigned char)scientific[i]))
+            digits[digit_count++] = scientific[i];
     }
     digits[digit_count] = '\0';
 
@@ -84,8 +149,6 @@ static char *format_scientific_as_general(char *scientific, int precision)
         digits[--digit_count] = '\0';
 
     if (exponent < -4 || exponent >= precision) {
-        char *dot;
-
         if (digit_count > 1u) {
             memmove(digits + 2u, digits + 1u, digit_count);
             digits[1] = '.';
@@ -99,18 +162,23 @@ static char *format_scientific_as_general(char *scientific, int precision)
         snprintf(out, out_cap, "%s%sE%+ld", sign == '-' ? "-" : "", digits, exponent);
         free(digits);
         free(scientific);
-        dot = strchr(out, '.');
-        if (dot) {
-            char *exp_part = strchr(out, 'E');
-            char *tail = exp_part;
+        {
+            size_t dot_pos = strcspn(out, ".");
 
-            while (tail > dot + 1 && tail[-1] == '0') {
-                memmove(tail - 1, tail, strlen(tail) + 1u);
-                tail--;
-                exp_part--;
+            if (out[dot_pos] == '.') {
+                size_t tail_pos = strcspn(out, "E");
+
+                while (tail_pos > dot_pos + 1u && out[tail_pos - 1u] == '0') {
+                    memmove(&out[tail_pos - 1u],
+                            &out[tail_pos],
+                            strlen(&out[tail_pos]) + 1u);
+                    tail_pos--;
+                }
+                if (tail_pos == dot_pos + 1u)
+                    memmove(&out[dot_pos],
+                            &out[dot_pos + 1u],
+                            strlen(&out[dot_pos + 1u]) + 1u);
             }
-            if (tail == dot + 1)
-                memmove(dot, dot + 1, strlen(dot + 1) + 1u);
         }
         return out;
     }
@@ -131,18 +199,20 @@ static char *format_scientific_as_general(char *scientific, int precision)
         out[pos++] = '.';
         for (long i = 0; i < -decimal_pos; ++i)
             out[pos++] = '0';
-        memcpy(out + pos, digits, digit_count);
+        memcpy(&out[pos], digits, digit_count);
         pos += digit_count;
     } else if ((size_t)decimal_pos >= digit_count) {
-        memcpy(out + pos, digits, digit_count);
+        memcpy(&out[pos], digits, digit_count);
         pos += digit_count;
         for (size_t i = digit_count; i < (size_t)decimal_pos; ++i)
             out[pos++] = '0';
     } else {
-        memcpy(out + pos, digits, (size_t)decimal_pos);
+        memcpy(&out[pos], digits, (size_t)decimal_pos);
         pos += (size_t)decimal_pos;
         out[pos++] = '.';
-        memcpy(out + pos, digits + decimal_pos, digit_count - (size_t)decimal_pos);
+        memcpy(&out[pos],
+               &digits[decimal_pos],
+               digit_count - (size_t)decimal_pos);
         pos += digit_count - (size_t)decimal_pos;
     }
     out[pos] = '\0';
@@ -279,7 +349,10 @@ static void print_owned_number(const char *label, number_t value, int precision)
              ? format_real_number(num_clone(value), precision)
              : format_complex_number(value, precision);
     } else {
-        text = num_to_string(value);
+        string_t *number_text = num_to_string(value);
+
+        text = number_text ? xstrdup_local(string_c_str(number_text)) : NULL;
+        string_free(number_text);
     }
 
     printf("%-12s %s\n", label, text ? text : "(num_to_string failed)");
@@ -342,9 +415,9 @@ static int apply_goal_start(expr_bindings_t *bindings,
                             int precision)
 {
     char *copy;
-    char *eq;
     char *name;
     char *value_text;
+    size_t eq_pos;
     expr_t *binding;
     number_t value;
     int rc = 1;
@@ -356,23 +429,15 @@ static int apply_goal_start(expr_bindings_t *bindings,
     if (!copy)
         return 1;
 
-    eq = strchr(copy, '=');
-    if (!eq) {
+    eq_pos = strcspn(copy, "=");
+    if (copy[eq_pos] != '=') {
         fprintf(stderr, "Goal start must be name=value: %s\n", assignment);
         goto cleanup;
     }
 
-    *eq = '\0';
-    name = copy;
-    value_text = eq + 1;
-    while (isspace((unsigned char)*name))
-        name++;
-    while (isspace((unsigned char)*value_text))
-        value_text++;
-
-    eq--;
-    while (eq >= name && isspace((unsigned char)*eq))
-        *eq-- = '\0';
+    copy[eq_pos] = '\0';
+    name = trim_ascii_in_place(copy);
+    value_text = trim_ascii_in_place(&copy[eq_pos + 1u]);
 
     binding = expr_bindings_get(bindings, name);
     if (!binding) {

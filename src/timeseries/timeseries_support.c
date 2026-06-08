@@ -7,10 +7,7 @@ int ts_appendf(ts_string_builder_t *sb, const char *fmt, ...)
 {
     va_list ap;
     string_t *piece;
-    const char *piece_text;
-    size_t piece_len;
-    size_t required;
-    char *grown;
+    int rc;
 
     if (!sb || !fmt)
         return -1;
@@ -21,49 +18,48 @@ int ts_appendf(ts_string_builder_t *sb, const char *fmt, ...)
     if (!piece)
         return -1;
 
-    piece_text = string_c_str(piece);
-    piece_len = strlen(piece_text);
-    required = sb->len + piece_len + 1u;
-    if (required > sb->cap) {
-        size_t new_cap = sb->cap ? sb->cap : 256u;
+    rc = ts_append_text(sb, piece);
+    string_free(piece);
+    return rc;
+}
 
-        while (new_cap < required)
-            new_cap *= 2u;
-        grown = realloc(sb->buf, new_cap);
-        if (!grown) {
-            string_free(piece);
+int ts_append_text(ts_string_builder_t *sb, const string_t *text)
+{
+    if (!sb || !text)
+        return -1;
+
+    if (!sb->text) {
+        sb->text = string_new();
+        if (!sb->text)
             return -1;
-        }
-        sb->buf = grown;
-        sb->cap = new_cap;
     }
 
-    memcpy(sb->buf + sb->len, piece_text, piece_len + 1u);
-    sb->len += piece_len;
-    string_free(piece);
-    return 0;
+    return string_append_string(sb->text, text);
+}
+
+size_t ts_builder_encoded_length(const ts_string_builder_t *sb)
+{
+    return (sb && sb->text)
+        ? string_view_length(string_view_all(sb->text))
+        : 0u;
 }
 
 void ts_builder_free(ts_string_builder_t *sb)
 {
     if (!sb)
         return;
-    free(sb->buf);
-    sb->buf = NULL;
-    sb->len = 0u;
-    sb->cap = 0u;
+    string_free(sb->text);
+    sb->text = NULL;
 }
 
-char *ts_builder_detach(ts_string_builder_t *sb)
+string_t *ts_builder_detach_text(ts_string_builder_t *sb)
 {
-    char *out;
+    string_t *out;
 
     if (!sb)
         return NULL;
-    out = sb->buf;
-    sb->buf = NULL;
-    sb->len = 0u;
-    sb->cap = 0u;
+    out = sb->text;
+    sb->text = NULL;
     return out;
 }
 
@@ -166,15 +162,83 @@ int ts_infer_season_period(ts_frequency_t frequency)
     return ts_frequency_season_period_dispatch[idx];
 }
 
-int ts_parse_date(const char *text, datetime_t **out)
+static bool ts_date_cursor_parse_int(string_cursor_t *cursor, int *out)
 {
-    int day, month, year;
+    int value = 0;
+    bool saw_digit = false;
+
+    if (!cursor || !out)
+        return false;
+
+    while (!string_cursor_done(cursor)) {
+        rune_t rune = string_cursor_peek(cursor);
+        char ch = '\0';
+
+        if (!rune_to_ascii(rune, &ch) || ch < '0' || ch > '9')
+            break;
+        saw_digit = true;
+        value = value * 10 + (ch - '0');
+        (void)string_cursor_next(cursor);
+    }
+
+    if (!saw_digit)
+        return false;
+    *out = value;
+    return true;
+}
+
+static bool ts_date_cursor_consume_slash(string_cursor_t *cursor)
+{
+    rune_t rune;
+
+    if (!cursor)
+        return false;
+
+    rune = string_cursor_peek(cursor);
+    if (!rune_is_equal(rune, '/'))
+        return false;
+
+    (void)string_cursor_next(cursor);
+    return true;
+}
+
+int ts_parse_date_text(const string_t *text, datetime_t **out)
+{
+    string_t *trimmed;
+    string_cursor_t *cursor;
+    int day = 0;
+    int month = 0;
+    int year = 0;
     datetime_t *dt;
 
     if (!text || !out)
         return -1;
-    if (sscanf(text, "%d/%d/%d", &day, &month, &year) != 3)
+
+    trimmed = string_clone(text);
+    if (!trimmed)
         return -1;
+    string_trim(trimmed);
+
+    cursor = string_cursor_new(trimmed);
+    if (!cursor) {
+        string_free(trimmed);
+        return -1;
+    }
+
+    if (!ts_date_cursor_parse_int(cursor, &day) ||
+        !ts_date_cursor_consume_slash(cursor) ||
+        !ts_date_cursor_parse_int(cursor, &month) ||
+        !ts_date_cursor_consume_slash(cursor) ||
+        !ts_date_cursor_parse_int(cursor, &year) ||
+        !string_cursor_done(cursor)) {
+        string_cursor_free(cursor);
+        string_free(trimmed);
+        return -1;
+    }
+
+    string_cursor_free(cursor);
+    string_free(trimmed);
+
     dt = datetime_init_ymd(datetime_alloc(), (short)year, (month_t)month, (uint8_t)day);
     if (!dt)
         return -1;
@@ -318,42 +382,38 @@ datetime_t *ts_bucket_label(const datetime_t *dt, ts_frequency_t frequency,
 
 int ts_append_number_text(ts_string_builder_t *sb, number_t value)
 {
-    char *text = num_to_string(value);
+    string_t *text = num_to_string(value);
     int rc;
 
     if (!text)
         return -1;
-    rc = ts_appendf(sb, "%s", text);
-    free(text);
+    rc = ts_append_text(sb, text);
+    string_free(text);
     return rc;
 }
 
 int ts_append_number_fixed(ts_string_builder_t *sb, number_t value, int decimals)
 {
     double d;
-    char buf[64];
 
     if (!sb)
         return -1;
     d = num_to_double(value);
     if (!isfinite(d))
         return ts_append_number_text(sb, value);
-    snprintf(buf, sizeof(buf), "%.*f", decimals, d);
-    return ts_appendf(sb, "%s", buf);
+    return ts_appendf(sb, "%.*f", decimals, d);
 }
 
 int ts_append_number_sig(ts_string_builder_t *sb, number_t value, int sig_figs)
 {
     double d;
-    char buf[64];
 
     if (!sb)
         return -1;
     d = num_to_double(value);
     if (!isfinite(d))
         return ts_append_number_text(sb, value);
-    snprintf(buf, sizeof(buf), "%.*g", sig_figs, d);
-    return ts_appendf(sb, "%s", buf);
+    return ts_appendf(sb, "%.*g", sig_figs, d);
 }
 
 timeseries_t *ts_alloc_empty(size_t length)
@@ -535,16 +595,16 @@ matrix_t *ts_make_matrix_from_doubles(const double *values, size_t rows, size_t 
     return out;
 }
 
-int ts_write_text_file(const char *path, const char *text)
+int ts_write_text_file(const string_t *path, const string_t *text)
 {
     FILE *f;
 
     if (!path || !text)
         return -1;
-    f = fopen(path, "w");
+    f = fopen(string_c_str(path), "w");
     if (!f)
         return -1;
-    if (fputs(text, f) == EOF) {
+    if (fputs(string_c_str(text), f) == EOF) {
         fclose(f);
         return -1;
     }

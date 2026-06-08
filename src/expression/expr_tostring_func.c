@@ -63,7 +63,7 @@ static void emit_c_binding_assignment_line(sbuf_t *b,
     sbuf_puts(b, ";\n");
 }
 
-char *expr_to_string_function(const expr_t *f)
+string_t *expr_to_text_function(const expr_t *f)
 {
     sbuf_t b;
     autoname_table_t vnames;
@@ -71,7 +71,7 @@ char *expr_to_string_function(const expr_t *f)
     varlist_t cl;
     const expr_t *g = f;
     const char *fname = "expr";
-    char *out;
+    string_t *out;
 
     sbuf_init(&b);
 
@@ -89,7 +89,7 @@ char *expr_to_string_function(const expr_t *f)
             sbuf_puts(&b, "}");
             free(rhs);
 
-            out = expr_tostring_xstrdup(b.data);
+            out = sbuf_to_string(&b);
             sbuf_free(&b);
             return out;
         }
@@ -134,7 +134,7 @@ char *expr_to_string_function(const expr_t *f)
     sbuf_puts(&b, ");\n");
     sbuf_puts(&b, "}");
 
-    out = expr_tostring_xstrdup(b.data);
+    out = sbuf_to_string(&b);
     sbuf_free(&b);
     free(vl.vars);
     free(cl.vars);

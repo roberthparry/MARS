@@ -354,6 +354,8 @@ static void test_number_matrix_arithmetic(void)
     }
 }
 
+static char *matrix_core_num_to_cstr(const number_t value);
+
 static char *format_matrix_core_num_at_own_precision(const number_t value)
 {
     char fmt[32];
@@ -363,7 +365,7 @@ static char *format_matrix_core_num_at_own_precision(const number_t value)
     size_t precision;
 
     if (num_is_exact(value) || significant_digits == 0u)
-        return num_to_string(value);
+        return matrix_core_num_to_cstr(value);
 
     precision = significant_digits > 0u ? significant_digits - 1u : 0u;
     snprintf(fmt, sizeof(fmt), "%%.%zuN", precision);
@@ -380,19 +382,40 @@ static char *format_matrix_core_num_at_own_precision(const number_t value)
     return out;
 }
 
+static char *matrix_core_num_to_cstr(const number_t value)
+{
+    string_t *text = num_to_string(value);
+    string_view_t view;
+    size_t len;
+    char *out;
+
+    if (!text)
+        return NULL;
+
+    view = string_view_all(text);
+    len = string_view_length(view);
+    out = malloc(len + 1u);
+    if (out) {
+        memcpy(out, string_c_str(text), len);
+        out[len] = '\0';
+    }
+    string_free(text);
+    return out;
+}
+
 static char *format_matrix_core_num_error(const number_t value)
 {
     int needed = num_sprintf(NULL, 0u, "%.6N", value);
     char *out;
 
     if (needed < 0)
-        return num_to_string(value);
+        return matrix_core_num_to_cstr(value);
     out = malloc((size_t)needed + 1u);
     if (!out)
         return NULL;
     if (num_sprintf(out, (size_t)needed + 1u, "%.6N", value) < 0) {
         free(out);
-        return num_to_string(value);
+        return matrix_core_num_to_cstr(value);
     }
     return out;
 }

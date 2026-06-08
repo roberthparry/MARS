@@ -12,8 +12,37 @@
 #include "expr_tostring_internal.h"
 #include "expression.h"
 #include "internal/number_internal.h"
+#include "ustring.h"
 
-static void expr_trim_decimal_display_artifacts_local(char *text);
+static string_t *expr_trim_decimal_display_artifacts_text_local(
+    const string_t *text);
+
+static char *expr_take_text_object_as_c_string_local(string_t *text_obj)
+{
+    char *text = text_obj
+        ? expr_tostring_xstrdup(string_c_str(text_obj))
+        : NULL;
+
+    string_free(text_obj);
+    return text;
+}
+
+static char *expr_take_clean_decimal_text_object_as_c_string_local(
+    string_t *text_obj)
+{
+    string_t *cleaned;
+
+    if (!text_obj)
+        return NULL;
+
+    cleaned = expr_trim_decimal_display_artifacts_text_local(text_obj);
+    if (cleaned) {
+        string_free(text_obj);
+        text_obj = cleaned;
+    }
+
+    return expr_take_text_object_as_c_string_local(text_obj);
+}
 
 static bool expr_mpz_factor_out_ulong(mpz_t value, unsigned long factor, size_t *count)
 {
@@ -38,161 +67,252 @@ static void expr_mpz_mul_small_power(mpz_t value, unsigned long factor, size_t e
 
 static char *expr_decimal_from_scaled_integer(mpz_t scaled, size_t scale)
 {
-    char *digits = mpz_get_str(NULL, 10, scaled);
-    char *out;
-    const char *mag;
+    char *digits_raw = mpz_get_str(NULL, 10, scaled);
+    string_t *digits;
+    string_t *mag = NULL;
+    string_t *out = NULL;
     bool negative;
     size_t len;
-    size_t out_len;
-    size_t pos = 0u;
 
+    if (!digits_raw)
+        return NULL;
+
+    digits = string_new_with(digits_raw);
+    free(digits_raw);
     if (!digits)
         return NULL;
 
-    negative = digits[0] == '-';
-    mag = negative ? digits + 1 : digits;
-    len = strlen(mag);
+    len = string_length(digits);
+    negative = len > 0u && rune_is_equal(string_at(digits, 0u), '-');
+    mag = negative
+        ? string_substring(digits, 1u, len - 1u)
+        : string_clone(digits);
+    string_free(digits);
+    if (!mag)
+        return NULL;
+
+    len = string_length(mag);
+    out = string_new();
+    if (!out)
+        goto fail;
+
+    if (negative && string_append_char(out, '-') != 0)
+        goto fail;
 
     if (scale == 0u || len > scale) {
-        out_len = (negative ? 1u : 0u) + len + (scale ? 1u : 0u) + 1u;
-        out = expr_tostring_xmalloc(out_len);
-        if (negative)
-            out[pos++] = '-';
         if (scale == 0u) {
-            memcpy(out + pos, mag, len + 1u);
+            if (string_append_string(out, mag) != 0)
+                goto fail;
         } else {
             size_t int_len = len - scale;
+            string_t *intpart = string_substring(mag, 0u, int_len);
+            string_t *fracpart = string_substring(mag, int_len, scale);
 
-            memcpy(out + pos, mag, int_len);
-            pos += int_len;
-            out[pos++] = '.';
-            memcpy(out + pos, mag + int_len, scale + 1u);
+            if (!intpart || !fracpart ||
+                string_append_string(out, intpart) != 0 ||
+                string_append_char(out, '.') != 0 ||
+                string_append_string(out, fracpart) != 0) {
+                string_free(intpart);
+                string_free(fracpart);
+                goto fail;
+            }
+            string_free(intpart);
+            string_free(fracpart);
         }
     } else {
         size_t zero_count = scale - len;
 
-        out_len = (negative ? 1u : 0u) + 2u + zero_count + len + 1u;
-        out = expr_tostring_xmalloc(out_len);
-        if (negative)
-            out[pos++] = '-';
-        out[pos++] = '0';
-        out[pos++] = '.';
-        memset(out + pos, '0', zero_count);
-        pos += zero_count;
-        memcpy(out + pos, mag, len + 1u);
-    }
-
-    free(digits);
-    expr_trim_decimal_display_artifacts_local(out);
-    return out;
-}
-
-static int expr_unicode_digit_value_local(const char *text,
-                                        const char **next_out,
-                                        bool *subscript_out)
-{
-    static const char *const sup[] = {
-        "⁰", "¹", "²", "³", "⁴", "⁵", "⁶", "⁷", "⁸", "⁹"
-    };
-    static const char *const sub[] = {
-        "₀", "₁", "₂", "₃", "₄", "₅", "₆", "₇", "₈", "₉"
-    };
-
-    for (int i = 0; i < 10; ++i) {
-        size_t len = strlen(sup[i]);
-
-        if (strncmp(text, sup[i], len) == 0) {
-            *next_out = text + len;
-            *subscript_out = false;
-            return i;
-        }
-        len = strlen(sub[i]);
-        if (strncmp(text, sub[i], len) == 0) {
-            *next_out = text + len;
-            *subscript_out = true;
-            return i;
-        }
-    }
-
-    return -1;
-}
-
-static char *expr_ascii_rational_part_local(const char *start,
-                                          const char *end,
-                                          bool want_subscript)
-{
-    char *out;
-    size_t pos = 0u;
-
-    out = expr_tostring_xmalloc((size_t)(end - start) + 1u);
-    for (const char *p = start; p < end;) {
-        const char *next = p;
-        bool is_subscript = false;
-        int digit;
-
-        if (isdigit((unsigned char)*p)) {
-            if (want_subscript)
-                goto fail;
-            out[pos++] = *p++;
-            continue;
-        }
-
-        digit = expr_unicode_digit_value_local(p, &next, &is_subscript);
-        if (digit < 0 || is_subscript != want_subscript)
+        if (string_append_cstr(out, "0.") != 0)
             goto fail;
-        out[pos++] = (char)('0' + digit);
-        p = next;
+        for (size_t i = 0u; i < zero_count; ++i) {
+            if (string_append_char(out, '0') != 0)
+                goto fail;
+        }
+        if (string_append_string(out, mag) != 0)
+            goto fail;
     }
 
-    out[pos] = '\0';
-    return out;
+    string_free(mag);
+    return expr_take_clean_decimal_text_object_as_c_string_local(out);
 
 fail:
-    free(out);
+    string_free(out);
+    string_free(mag);
     return NULL;
 }
 
-static bool expr_split_rational_text_local(const char *text,
-                                         char **numer_out,
-                                         char **denom_out)
+static int expr_unicode_digit_value_local(rune_t rune, bool *subscript_out)
 {
-    const char *slash;
-    const char *numer_start;
-    bool negative = false;
-    char *numer;
+    uint32_t value = rune_value(rune);
 
-    if (!text)
-        return false;
+    if (value >= 0x2080u && value <= 0x2089u) {
+        *subscript_out = true;
+        return (int)(value - 0x2080u);
+    }
+    if (value == 0x2070u) {
+        *subscript_out = false;
+        return 0;
+    }
+    if (value == 0x00B9u) {
+        *subscript_out = false;
+        return 1;
+    }
+    if (value == 0x00B2u) {
+        *subscript_out = false;
+        return 2;
+    }
+    if (value == 0x00B3u) {
+        *subscript_out = false;
+        return 3;
+    }
+    if (value >= 0x2074u && value <= 0x2079u) {
+        *subscript_out = false;
+        return (int)(value - 0x2070u);
+    }
+    return -1;
+}
 
-    slash = strstr(text, "⁄");
-    if (!slash)
-        slash = strchr(text, '/');
-    if (!slash)
-        return false;
+static string_t *expr_ascii_rational_part_local(const string_t *text,
+                                                string_pos_t start,
+                                                string_pos_t end,
+                                                bool want_subscript)
+{
+    string_cursor_t *cursor;
+    string_t *out;
 
-    numer_start = text;
-    if (*numer_start == '-') {
-        negative = true;
-        ++numer_start;
+    if (!text || end < start)
+        return NULL;
+
+    cursor = string_cursor_new(text);
+    out = string_new();
+    if (!cursor || !out) {
+        string_cursor_free(cursor);
+        string_free(out);
+        return NULL;
     }
 
-    numer = expr_ascii_rational_part_local(numer_start, slash, false);
-    *denom_out = expr_ascii_rational_part_local(slash + (slash[0] == '/' ? 1u : strlen("⁄")),
-                                              text + strlen(text),
-                                              slash[0] != '/');
+    if (string_cursor_seek(cursor, start) != 0)
+        goto fail;
+
+    while (string_cursor_position(cursor) < end) {
+        string_pos_t before = string_cursor_position(cursor);
+        rune_t rune = string_cursor_peek(cursor);
+        unsigned char ascii = 0u;
+        bool is_subscript = false;
+        int digit;
+
+        if (string_cursor_peek_ascii(cursor, &ascii) &&
+            ascii >= '0' && ascii <= '9') {
+            if (want_subscript)
+                goto fail;
+            if (string_append_char(out, (char)ascii) != 0 ||
+                string_cursor_next(cursor) != 0 ||
+                string_cursor_position(cursor) > end)
+                goto fail;
+            continue;
+        }
+
+        digit = expr_unicode_digit_value_local(rune, &is_subscript);
+        if (digit < 0 || is_subscript != want_subscript)
+            goto fail;
+        if (string_append_char(out, (char)('0' + digit)) != 0 ||
+            string_cursor_next(cursor) != 0 ||
+            string_cursor_position(cursor) > end ||
+            string_cursor_position(cursor) == before)
+            goto fail;
+    }
+
+    string_cursor_free(cursor);
+    return out;
+
+fail:
+    string_cursor_free(cursor);
+    string_free(out);
+    return NULL;
+}
+
+static bool expr_split_rational_text_local(const string_t *text,
+                                           string_t **numer_out,
+                                           string_t **denom_out)
+{
+    string_cursor_t *cursor;
+    string_pos_t numer_start = 0u;
+    string_pos_t slash_pos = 0u;
+    string_pos_t slash_end = 0u;
+    string_pos_t end;
+    bool negative = false;
+    bool unicode_slash = false;
+    bool found_slash = false;
+    string_t *numer;
+
+    if (!text || !numer_out || !denom_out)
+        return false;
+
+    *numer_out = NULL;
+    *denom_out = NULL;
+    cursor = string_cursor_new(text);
+    if (!cursor)
+        return false;
+
+    if (rune_is_equal(string_cursor_peek(cursor), '-')) {
+        negative = true;
+        if (string_cursor_next(cursor) != 0) {
+            string_cursor_free(cursor);
+            return false;
+        }
+        numer_start = string_cursor_position(cursor);
+    }
+
+    while (!string_cursor_done(cursor)) {
+        rune_t rune = string_cursor_peek(cursor);
+
+        if (rune_is_equal(rune, '/') || rune_value(rune) == 0x2044u) {
+            slash_pos = string_cursor_position(cursor);
+            unicode_slash = rune_value(rune) == 0x2044u;
+            if (string_cursor_next(cursor) != 0) {
+                string_cursor_free(cursor);
+                return false;
+            }
+            slash_end = string_cursor_position(cursor);
+            found_slash = true;
+            break;
+        }
+        if (string_cursor_next(cursor) != 0) {
+            string_cursor_free(cursor);
+            return false;
+        }
+    }
+
+    end = string_cursor_end_position(cursor);
+    string_cursor_free(cursor);
+    if (!found_slash)
+        return false;
+
+    numer = expr_ascii_rational_part_local(text, numer_start, slash_pos, false);
+    *denom_out = expr_ascii_rational_part_local(text,
+                                                slash_end,
+                                                end,
+                                                unicode_slash);
     if (!numer || !*denom_out) {
-        free(numer);
-        free(*denom_out);
+        string_free(numer);
+        string_free(*denom_out);
         *denom_out = NULL;
         return false;
     }
 
     if (negative) {
-        size_t len = strlen(numer);
-        *numer_out = expr_tostring_xmalloc(len + 2u);
-        (*numer_out)[0] = '-';
-        memcpy(*numer_out + 1, numer, len + 1u);
-        free(numer);
+        *numer_out = string_new_with("-");
+        if (!*numer_out ||
+            string_append_string(*numer_out, numer) != 0) {
+            string_free(*numer_out);
+            *numer_out = NULL;
+        }
+        string_free(numer);
+        if (!*numer_out) {
+            string_free(*denom_out);
+            *denom_out = NULL;
+            return false;
+        }
     } else {
         *numer_out = numer;
     }
@@ -200,10 +320,10 @@ static bool expr_split_rational_text_local(const char *text,
     return true;
 }
 
-static char *expr_decimal_string_from_rational_text_local(const char *text)
+static char *expr_decimal_string_from_rational_text_local(const string_t *text)
 {
-    char *numer_text = NULL;
-    char *denom_text = NULL;
+    string_t *numer_text = NULL;
+    string_t *denom_text = NULL;
     mpz_t den;
     mpz_t scaled;
     bool mpz_ready = false;
@@ -218,8 +338,8 @@ static char *expr_decimal_string_from_rational_text_local(const char *text)
     mpz_init(den);
     mpz_init(scaled);
     mpz_ready = true;
-    if (mpz_set_str(den, denom_text, 10) != 0 ||
-        mpz_set_str(scaled, numer_text, 10) != 0 ||
+    if (mpz_set_str(den, string_c_str(denom_text), 10) != 0 ||
+        mpz_set_str(scaled, string_c_str(numer_text), 10) != 0 ||
         mpz_sgn(den) == 0)
         goto done;
     if (mpz_sgn(den) < 0) {
@@ -249,18 +369,18 @@ done:
         mpz_clear(scaled);
         mpz_clear(den);
     }
-    free(denom_text);
-    free(numer_text);
+    string_free(denom_text);
+    string_free(numer_text);
     return out;
 }
 
 char *expr_number_to_string_local(number_t value)
 {
     char *text;
+    string_t *text_obj;
     size_t bits;
     size_t digits;
     char fmt[32];
-    int needed;
 
     if (num_is_inf(value)) {
         if (num_get_sign(value) < 0) {
@@ -281,17 +401,17 @@ char *expr_number_to_string_local(number_t value)
 
     if ((!num_is_inexact_real_backend(value) && !num_is_complex_backend(value)) ||
         num_is_exact(value) || !num_is_finite(value)) {
-        text = num_to_string(value);
+        text_obj = num_to_string(value);
         if (num_is_exact(value)) {
-            char *decimal = expr_decimal_string_from_rational_text_local(text);
+            char *decimal = expr_decimal_string_from_rational_text_local(text_obj);
 
             if (decimal) {
-                free(text);
+                string_free(text_obj);
                 num_destroy(&value);
                 return decimal;
             }
         }
-        expr_trim_decimal_display_artifacts_local(text);
+        text = expr_take_clean_decimal_text_object_as_c_string_local(text_obj);
         num_destroy(&value);
         return text;
     }
@@ -303,85 +423,158 @@ char *expr_number_to_string_local(number_t value)
     if (digits == 0u)
         digits = num_get_default_prec_digits();
     if (digits == 0u || digits > (size_t)INT_MAX) {
-        text = num_to_string(value);
-        expr_trim_decimal_display_artifacts_local(text);
+        text = expr_take_clean_decimal_text_object_as_c_string_local(
+            num_to_string(value));
         num_destroy(&value);
         return text;
     }
 
     snprintf(fmt, sizeof(fmt), "%%.%dn", (int)digits);
-    needed = num_sprintf(NULL, 0u, fmt, value);
-    if (needed < 0) {
-        text = num_to_string(value);
-    } else {
-        text = malloc((size_t)needed + 1u);
-        if (text)
-            num_sprintf(text, (size_t)needed + 1u, fmt, value);
-    }
+    text_obj = num_sprintf_text(fmt, value);
+    text = expr_take_clean_decimal_text_object_as_c_string_local(
+        text_obj ? text_obj : num_to_string(value));
 
-    expr_trim_decimal_display_artifacts_local(text);
     num_destroy(&value);
     return text;
 }
 
-static void expr_trim_decimal_display_artifacts_local(char *text)
+static bool expr_append_decimal_text_slice_local(string_t *out,
+                                                 const string_cursor_t *cursor,
+                                                 string_pos_t start,
+                                                 string_pos_t end)
 {
-    char *p;
+    string_t *slice;
+    bool ok;
+
+    if (!out || !cursor || end < start)
+        return false;
+
+    slice = string_cursor_slice_between(start, end, cursor);
+    if (!slice)
+        return false;
+
+    ok = string_append_string(out, slice) == 0;
+    string_free(slice);
+    return ok;
+}
+
+static string_t *expr_trim_decimal_display_artifacts_text_local(
+    const string_t *text)
+{
+    string_cursor_t *cursor;
+    string_t *out;
+    string_pos_t segment_start = 0u;
 
     if (!text)
-        return;
+        return NULL;
 
-    p = text;
-    while ((p = strchr(p, '.')) != NULL) {
-        char *frac = p + 1;
-        char *end = frac;
-        char *q;
-        char *zero_start = NULL;
+    cursor = string_cursor_new(text);
+    out = string_new();
+    if (!cursor || !out) {
+        string_cursor_free(cursor);
+        string_free(out);
+        return NULL;
+    }
+
+    while (!string_cursor_done(cursor)) {
+        unsigned char ch;
+        string_pos_t dot_pos;
+        string_pos_t frac_end;
+        string_pos_t last_nonzero_end = 0u;
+        string_pos_t zero_start = 0u;
         size_t zero_run = 0u;
         bool seen_nonzero = false;
+        bool long_zero_run = false;
 
-        while (isdigit((unsigned char)*end))
-            ++end;
-        if (end == frac) {
-            ++p;
+        if (!string_cursor_peek_ascii(cursor, &ch) || ch != '.') {
+            if (string_cursor_next(cursor) != 0)
+                goto fail;
             continue;
         }
 
-        for (q = frac; q < end; ++q) {
-            if (*q == '0') {
+        dot_pos = string_cursor_position(cursor);
+        if (string_cursor_next(cursor) != 0)
+            goto fail;
+
+        if (!string_cursor_peek_ascii(cursor, &ch) || !isdigit(ch))
+            continue;
+
+        while (string_cursor_peek_ascii(cursor, &ch) && isdigit(ch)) {
+            string_pos_t digit_pos = string_cursor_position(cursor);
+
+            if (ch == '0') {
                 if (seen_nonzero) {
-                    if (!zero_start)
-                        zero_start = q;
+                    if (zero_run == 0u)
+                        zero_start = digit_pos;
                     ++zero_run;
-                }
-                if (zero_start && zero_run >= 24u) {
-                    memmove(zero_start, end, strlen(end) + 1u);
-                    p = zero_start;
-                    break;
                 }
             } else {
                 seen_nonzero = true;
-                zero_start = NULL;
+                last_nonzero_end = 0u;
+                zero_start = 0u;
                 zero_run = 0u;
             }
-        }
-        if (q != end)
-            continue;
 
-        while (end > frac && end[-1] == '0')
-            --end;
-        if (end == frac) {
-            memmove(p, q, strlen(q) + 1u);
+            if (string_cursor_next(cursor) != 0)
+                goto fail;
+
+            if (ch != '0')
+                last_nonzero_end = string_cursor_position(cursor);
+            if (zero_run >= 24u) {
+                long_zero_run = true;
+                while (string_cursor_peek_ascii(cursor, &ch) &&
+                       isdigit(ch)) {
+                    if (string_cursor_next(cursor) != 0)
+                        goto fail;
+                }
+                break;
+            }
+        }
+
+        frac_end = string_cursor_position(cursor);
+        if (long_zero_run) {
+            if (!expr_append_decimal_text_slice_local(out,
+                                                      cursor,
+                                                      segment_start,
+                                                      zero_start))
+                goto fail;
+            segment_start = frac_end;
             continue;
         }
-        if (*end == '\0') {
-            *end = '\0';
-            p = end;
-        } else {
-            memmove(end, q, strlen(q) + 1u);
-            p = end;
+
+        if (!seen_nonzero) {
+            if (!expr_append_decimal_text_slice_local(out,
+                                                      cursor,
+                                                      segment_start,
+                                                      dot_pos))
+                goto fail;
+            segment_start = frac_end;
+            continue;
+        }
+
+        if (last_nonzero_end < frac_end) {
+            if (!expr_append_decimal_text_slice_local(out,
+                                                      cursor,
+                                                      segment_start,
+                                                      last_nonzero_end))
+                goto fail;
+            segment_start = frac_end;
         }
     }
+
+    if (!expr_append_decimal_text_slice_local(out,
+                                              cursor,
+                                              segment_start,
+                                              string_cursor_end_position(cursor)))
+        goto fail;
+
+    string_cursor_free(cursor);
+    return out;
+
+fail:
+    string_cursor_free(cursor);
+    string_free(out);
+    return NULL;
 }
 
 char *expr_const_to_string_local(const expr_t *dv)
@@ -423,4 +616,3 @@ bool expr_is_immortal_default_const_local(const expr_t *dv)
     num_destroy(&builtin);
     return match || precise_match;
 }
-

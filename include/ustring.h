@@ -287,6 +287,18 @@ bool rune_is_none(rune_t rune);
 rune_t rune_from_ascii(char c);
 
 /**
+ * @brief Create a rune from a Unicode scalar value.
+ *
+ * This is the inverse of rune_value() for callers that have already decoded
+ * a character value, such as parsers handling escaped input. Invalid scalar
+ * values, including surrogate halves, return a none rune.
+ *
+ * @param value  Unicode scalar value to wrap.
+ * @return       Stack rune representing @p value, or a none rune if invalid.
+ */
+rune_t rune_from_value(uint32_t value);
+
+/**
  * @brief Return the numeric value represented by a rune.
  *
  * This is useful for recognising typed mathematical symbols such as
@@ -783,11 +795,10 @@ bool string_cursor_match_at(const string_cursor_t *cursor,
                             const char *literal);
 
 /**
- * @brief Trim ASCII whitespace from both ends of the string in place.
+ * @brief Trim whitespace from both ends of the string in place.
  *
- * Removes leading and trailing space, tab, newline, carriage return,
- * form feed, and vertical tab characters. Non-ASCII whitespace is not
- * removed.
+ * Removes ordinary typed whitespace, including common Unicode space
+ * characters, from the start and end of the string.
  *
  * @param s  String to modify. Must not be @c NULL.
  */
@@ -796,6 +807,55 @@ void string_trim(string_t *s);
 /* =========================================================================
    printf-style formatting
    ========================================================================= */
+
+/**
+ * @brief Parsed printf-style conversion details passed to formatter callbacks.
+ *
+ * The string module parses flags, width, precision, length modifiers, and the
+ * conversion rune once. Extension callbacks can then decide whether they own
+ * the conversion without re-parsing the format string.
+ */
+typedef struct {
+    char conversion;              /**< Conversion character, e.g. 'S' or 'q'. */
+    char trailing_modifier;       /**< Optional callback-owned trailing modifier. */
+    bool flag_left;               /**< '-' flag. */
+    bool flag_sign;               /**< '+' flag. */
+    bool flag_space;              /**< space flag. */
+    bool flag_alternate;          /**< '#' flag. */
+    bool flag_zero;               /**< '0' flag. */
+    int  width;                   /**< Literal width, or 0 when absent / from argument. */
+    int  precision;               /**< Literal precision, or -1 when absent / from argument. */
+    bool width_from_argument;     /**< Width was written as '*'. */
+    bool precision_from_argument; /**< Precision was written as '*'. */
+    char length[3];               /**< Length modifier: "", "h", "hh", "l", "ll", etc. */
+} string_format_spec_t;
+
+/**
+ * @brief Result returned by an extension formatter callback.
+ */
+typedef enum {
+    STRING_FORMAT_ERROR = -1,     /**< Formatting failed. */
+    STRING_FORMAT_UNHANDLED = 0,  /**< Callback does not own this conversion. */
+    STRING_FORMAT_HANDLED = 1,    /**< Callback handled and appended output. */
+    STRING_FORMAT_HANDLED_WITH_TRAILING_MODIFIER = 2
+                                  /**< Callback also consumed trailing modifier. */
+} string_format_result_t;
+
+/**
+ * @brief Extension callback used by string_append_vformat_with_callback().
+ *
+ * The callback receives the parsed conversion and the live argument list. If
+ * it returns STRING_FORMAT_HANDLED, it must consume exactly the arguments that
+ * belong to that conversion and append the formatted result to @p out. If it
+ * also consumes @c spec->trailing_modifier, it should return
+ * STRING_FORMAT_HANDLED_WITH_TRAILING_MODIFIER. If it returns
+ * STRING_FORMAT_UNHANDLED, it must not consume any arguments.
+ */
+typedef string_format_result_t (*string_format_callback_t)(
+    string_t *out,
+    const string_format_spec_t *spec,
+    va_list ap,
+    void *user);
 
 /**
  * @brief Append formatted text using a @c va_list.
@@ -809,6 +869,26 @@ void string_trim(string_t *s);
  * @return     Number of bytes appended, or negative on error.
  */
 int string_append_vformat(string_t *s, const char *fmt, va_list ap);
+
+/**
+ * @brief Append formatted text using an optional extension callback.
+ *
+ * The string module owns ordinary printf conversions plus @c %S, @c %W, and
+ * @c %R. When @p callback is not @c NULL, conversions not owned by the string
+ * module are offered to it before falling back to the standard formatter.
+ *
+ * @param s         Destination string. Must not be @c NULL.
+ * @param fmt       printf-style format string. Must not be @c NULL.
+ * @param ap        Argument list (consumed by this call).
+ * @param callback  Optional extension callback.
+ * @param user      Caller data passed through to @p callback.
+ * @return          Number of bytes appended, or negative on error.
+ */
+int string_append_vformat_with_callback(string_t *s,
+                                        const char *fmt,
+                                        va_list ap,
+                                        string_format_callback_t callback,
+                                        void *user);
 
 /**
  * @brief Append formatted text using a printf-style format string.
@@ -842,6 +922,20 @@ int string_append_format(string_t *s, const char *fmt, ...);
  * @return     Newly allocated formatted string, or @c NULL on error.
  */
 string_t *string_vsprintf(const char *fmt, va_list ap);
+
+/**
+ * @brief Create a new formatted string using an optional extension callback.
+ *
+ * @param fmt       printf-style format string. Must not be @c NULL.
+ * @param ap        Argument list (consumed by this call).
+ * @param callback  Optional extension callback.
+ * @param user      Caller data passed through to @p callback.
+ * @return          Newly allocated formatted string, or @c NULL on error.
+ */
+string_t *string_vsprintf_with_callback(const char *fmt,
+                                        va_list ap,
+                                        string_format_callback_t callback,
+                                        void *user);
 
 /**
  * @brief Create a new formatted string.

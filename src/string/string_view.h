@@ -8,7 +8,6 @@
 /* Raw byte bridges are for parsers that are still being migrated onto
    cursor operations. They do not expose string_t internals or view layout. */
 string_view_t string_view_from_chars(const char *data, size_t len);
-string_view_t string_view_from_region(const char *start, const char *end);
 const char *string_view_data(string_view_t view);
 const char *string_view_end(string_view_t view);
 

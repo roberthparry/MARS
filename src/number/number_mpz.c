@@ -1,6 +1,7 @@
 #include <stdlib.h>
 
 #include "number_internal.h"
+#include "ustring.h"
 
 typedef struct {
     number_const_id_t id;
@@ -80,18 +81,42 @@ number_mpz_t *number_mpz_from_long(long value)
     return out;
 }
 
-number_mpz_t *number_mpz_from_string(const char *text)
+number_mpz_t *number_mpz_from_text(const string_t *text)
 {
+    string_cursor_t *cursor;
+    string_t *digits;
     number_mpz_t *out;
-    const char *digits;
+    string_pos_t start;
+    int rc;
 
     if (!text)
         return NULL;
-    digits = text[0] == '+' ? text + 1 : text;
-    out = number_mpz_new();
-    if (!out)
+
+    cursor = string_cursor_new(text);
+    if (!cursor)
         return NULL;
-    if (mpz_set_str(out->value, digits, 10) != 0) {
+
+    if (string_cursor_consume(cursor, "+"))
+        start = string_cursor_position(cursor);
+    else
+        start = 0u;
+
+    digits = string_cursor_slice_between(start,
+                                         string_cursor_end_position(cursor),
+                                         cursor);
+    string_cursor_free(cursor);
+    if (!digits)
+        return NULL;
+
+    out = number_mpz_new();
+    if (!out) {
+        string_free(digits);
+        return NULL;
+    }
+
+    rc = mpz_set_str(out->value, string_c_str(digits), 10);
+    string_free(digits);
+    if (rc != 0) {
         number_mpz_free(out);
         return NULL;
     }
@@ -155,9 +180,19 @@ mpz_srcptr number_mpz_value(const number_mpz_t *value)
     return number_mpz_ensure(value) == 0 ? value->value : NULL;
 }
 
-char *number_mpz_to_string(const number_mpz_t *value)
+string_t *number_mpz_to_text(const number_mpz_t *value)
 {
-    return number_mpz_ensure(value) == 0 ? mpz_get_str(NULL, 10, value->value) : NULL;
+    char *text;
+    string_t *out;
+
+    if (number_mpz_ensure(value) != 0)
+        return NULL;
+    text = mpz_get_str(NULL, 10, value->value);
+    if (!text)
+        return NULL;
+    out = string_new_with(text);
+    free(text);
+    return out;
 }
 
 bool number_mpz_get_long(const number_mpz_t *value, long *out)

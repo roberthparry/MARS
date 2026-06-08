@@ -154,6 +154,27 @@ static void check_matrix_tostring_expr_double(const char *label,
     num_destroy(&got);
 }
 
+static char *matrix_tostring_num_to_cstr(const number_t value)
+{
+    string_t *text = num_to_string(value);
+    string_view_t view;
+    size_t len;
+    char *out;
+
+    if (!text)
+        return NULL;
+
+    view = string_view_all(text);
+    len = string_view_length(view);
+    out = malloc(len + 1u);
+    if (out) {
+        memcpy(out, string_c_str(text), len);
+        out[len] = '\0';
+    }
+    string_free(text);
+    return out;
+}
+
 static char *format_matrix_test_num_at_own_precision(const number_t value, int scientific)
 {
     char fmt[32];
@@ -163,7 +184,7 @@ static char *format_matrix_test_num_at_own_precision(const number_t value, int s
     size_t precision;
 
     if (num_is_exact(value) || significant_digits == 0u)
-        return num_to_string(value);
+        return matrix_tostring_num_to_cstr(value);
 
     precision = significant_digits > 0u ? significant_digits - 1u : 0u;
     snprintf(fmt, sizeof(fmt), "%%.%zu%c", precision, scientific ? 'N' : 'n');

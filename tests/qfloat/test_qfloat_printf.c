@@ -10,7 +10,7 @@ static void test_qd_sprintf_basic(void)
     qf_sprintf(buf, sizeof(buf), "%Q", x);
 
     char expected[256];
-    qf_to_string(x, expected, sizeof(expected));
+    test_qf_to_buffer(x, expected, sizeof(expected));
 
     /* %Q uses uppercase E */
     char *e = strchr(expected, 'e');
@@ -39,8 +39,8 @@ static void test_qd_sprintf_multiple(void)
     qf_sprintf(buf, sizeof(buf), "A=%Q B=%Q", a, b);
 
     char ea[64], eb[64];
-    qf_to_string(a, ea, sizeof(ea));
-    qf_to_string(b, eb, sizeof(eb));
+    test_qf_to_buffer(a, ea, sizeof(ea));
+    test_qf_to_buffer(b, eb, sizeof(eb));
 
     /* %Q uses uppercase E */
     char *e1 = strchr(ea, 'e');
@@ -130,7 +130,7 @@ static void test_qd_sprintf_edge_cases(void)
 
         /* For debugging, show the reparsed value */
         char reparsed[128];
-        qf_to_string(y, reparsed, sizeof(reparsed));
+        test_qf_to_buffer(y, reparsed, sizeof(reparsed));
         printf("  reparsed  = %s\n", reparsed);
         qfloat_t err = qf_abs(qf_sub(qf_div(x, y), (qfloat_t){1,0}));
         printf("  rel error = %.17g\n", err.hi);
@@ -352,7 +352,7 @@ static void test_qf_sprintf_q_concise(void)
 
         /* reparsed value */
         char reparsed[256];
-        qf_to_string(y, reparsed, sizeof(reparsed));
+        test_qf_to_buffer(y, reparsed, sizeof(reparsed));
         printf("  reparsed  = %s\n", reparsed);
 
         qfloat_t err = qf_abs(qf_sub(qf_div(x, y), (qfloat_t){1,0}));
@@ -381,7 +381,7 @@ static void test_qf_sprintf_null_safe_new(void)
 
     /* First, get the canonical %Q string via qf_to_string + 'E' */
     char core[128];
-    qf_to_string(x, core, sizeof(core));   /* produces ...e+0 */
+    test_qf_to_buffer(x, core, sizeof(core));   /* produces ...e+0 */
 
     char expected[160];
     strcpy(expected, "x=");
@@ -415,7 +415,7 @@ static void test_qf_sprintf_two_pass_new(void)
 
     /* Canonical expected string via qf_to_string + 'E' */
     char core[128];
-    qf_to_string(x, core, sizeof(core));
+    test_qf_to_buffer(x, core, sizeof(core));
 
     char expected[160];
     strcpy(expected, "x=");

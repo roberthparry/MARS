@@ -11,17 +11,17 @@ static void number_readme_rational_basic(void)
     number_t b = num_create_from_string("5/4");
     number_t product = num_mul(a, b);
     number_t expected = num_create_from_frac(5, 6);
-    char *text = num_to_string(product);
+    string_t *text = num_to_string(product);
 
     if (!text) {
         test_mark_failure(__FILE__, __LINE__,
                           "failed to format rational README example");
     } else {
-        printf("(2/3) * (5/4) = %s\n", text);
+        printf("(2/3) * (5/4) = %s\n", string_c_str(text));
         ASSERT_TRUE(num_eq(product, expected));
     }
 
-    free(text);
+    string_free(text);
     num_destroy(&a);
     num_destroy(&b);
     num_destroy(&product);
@@ -34,17 +34,17 @@ static void number_readme_binomial_cardinality(void)
     number_t k = num_create_from_long(5);
     number_t c = num_binomial(n, k);
     number_t expected = num_create_from_long(2598960);
-    char *text = num_to_string(c);
+    string_t *text = num_to_string(c);
 
     if (!text) {
         test_mark_failure(__FILE__, __LINE__,
                           "failed to format binomial README example");
     } else {
-        printf("C(52, 5) = %s\n", text);
+        printf("C(52, 5) = %s\n", string_c_str(text));
         ASSERT_TRUE(num_eq(c, expected));
     }
 
-    free(text);
+    string_free(text);
     num_destroy(&n);
     num_destroy(&k);
     num_destroy(&c);

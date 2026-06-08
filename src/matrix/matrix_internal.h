@@ -6,6 +6,7 @@
 
 #include "matrix.h"
 #include "internal/number_internal.h"
+#include "ustring.h"
 
 /* ============================================================
    Element kinds
@@ -101,8 +102,7 @@ struct elem_vtable {
     int (*cmp)(const void *a, const void *b);
 
     /* printing */
-    void (*print)(const void *val, char *buf, size_t buflen);
-    int (*format_scalar)(const void *val, int scientific, char *buf, size_t buflen);
+    string_t *(*format_scalar_text)(const void *val, int scientific);
 
     const struct elem_fun_vtable *fun;
 };

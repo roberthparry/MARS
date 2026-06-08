@@ -2,10 +2,11 @@
 
 #include <math.h>
 
-static char *format_number_at_own_precision(const number_t value)
+static string_t *format_number_at_own_precision(const number_t value)
 {
     char fmt[32];
     char *out;
+    string_t *text;
     size_t significant_digits = num_get_prec_digits(value);
     int needed;
     size_t precision;
@@ -25,14 +26,21 @@ static char *format_number_at_own_precision(const number_t value)
         free(out);
         return NULL;
     }
-    return out;
+    text = string_new_with(out);
+    free(out);
+    return text;
 }
 
-static char *format_number_for_test_output(const number_t value)
+static string_t *format_number_for_test_output(const number_t value)
 {
-    char *text = format_number_at_own_precision(value);
+    string_t *text = format_number_at_own_precision(value);
 
     return text ? text : num_to_string(value);
+}
+
+static const char *formatted_number_cstr(const string_t *text)
+{
+    return text ? string_c_str(text) : "(unavailable)";
 }
 
 static char *format_error_for_test_output(const number_t value)
@@ -125,8 +133,8 @@ static void print_precision_comparison(const char *label,
                                        const number_t got,
                                        const number_t expected)
 {
-    char *expected_text;
-    char *got_text;
+    string_t *expected_text;
+    string_t *got_text;
     char *error_text = NULL;
     int show_error = num_is_finite(got) && num_is_finite(expected);
     number_t error;
@@ -162,8 +170,8 @@ static void print_precision_comparison(const char *label,
     }
 
     printf("    %s\n", label);
-    printf("        expected = %s\n", expected_text);
-    printf("        got      = %s\n", got_text);
+    printf("        expected = %s\n", formatted_number_cstr(expected_text));
+    printf("        got      = %s\n", formatted_number_cstr(got_text));
     if (show_error)
         printf("        error    = %s\n", error_text);
     printf("        precision: %zu bits, %zu significant digits\n",
@@ -173,8 +181,8 @@ cleanup:
     free(error_text);
     if (error_live)
         num_destroy(&error);
-    free(got_text);
-    free(expected_text);
+    string_free(got_text);
+    string_free(expected_text);
 }
 
 typedef expr_t *(*expr_unary_builder_t)(const expr_t *dv);
@@ -265,15 +273,15 @@ static void assert_same_to_bits(const number_t got,
     ASSERT_EQ_INT(num_set_prec_bits(&got_cmp, compare_bits), 0);
     ASSERT_EQ_INT(num_set_prec_bits(&expected_cmp, compare_bits), 0);
     if (!num_eq(got_cmp, expected_cmp)) {
-        char *got_text = format_number_for_test_output(got);
-        char *expected_text = format_number_for_test_output(expected);
+        string_t *got_text = format_number_for_test_output(got);
+        string_t *expected_text = format_number_for_test_output(expected);
 
         printf(C_BOLD C_RED "FAIL" C_RESET " %s\n", label);
         printf("    compare precision = %zu bits\n", compare_bits);
-        printf("    expected          = %s\n", expected_text ? expected_text : "(unavailable)");
-        printf("    got               = %s\n", got_text ? got_text : "(unavailable)");
-        free(expected_text);
-        free(got_text);
+        printf("    expected          = %s\n", formatted_number_cstr(expected_text));
+        printf("    got               = %s\n", formatted_number_cstr(got_text));
+        string_free(expected_text);
+        string_free(got_text);
         TEST_FAIL();
     }
     num_destroy(&expected_cmp);
@@ -287,18 +295,18 @@ static void check_unary_eval_case(const unary_eval_case_t *tc)
     expr_t *expr = tc->expr_fn(x);
     number_t got = expr_eval(expr);
     number_t expected = tc->num_fn(input);
-    char *got_text;
-    char *expected_text;
+    string_t *got_text;
+    string_t *expected_text;
 
     if (!num_eq(got, expected)) {
         got_text = format_number_for_test_output(got);
         expected_text = format_number_for_test_output(expected);
         printf(C_BOLD C_RED "FAIL" C_RESET " numeric function sweep: %s\n", tc->name);
         printf("    input    = %s\n", tc->input);
-        printf("    expected = %s\n", expected_text ? expected_text : "(unavailable)");
-        printf("    got      = %s\n", got_text ? got_text : "(unavailable)");
-        free(expected_text);
-        free(got_text);
+        printf("    expected = %s\n", formatted_number_cstr(expected_text));
+        printf("    got      = %s\n", formatted_number_cstr(got_text));
+        string_free(expected_text);
+        string_free(got_text);
         TEST_FAIL();
     }
 
@@ -318,8 +326,8 @@ static void check_binary_eval_case(const binary_eval_case_t *tc)
     expr_t *expr = tc->expr_fn(a, b);
     number_t got = expr_eval(expr);
     number_t expected = tc->num_fn(lhs, rhs);
-    char *got_text;
-    char *expected_text;
+    string_t *got_text;
+    string_t *expected_text;
 
     if (!num_eq(got, expected)) {
         got_text = format_number_for_test_output(got);
@@ -327,10 +335,10 @@ static void check_binary_eval_case(const binary_eval_case_t *tc)
         printf(C_BOLD C_RED "FAIL" C_RESET " numeric function sweep: %s\n", tc->name);
         printf("    lhs      = %s\n", tc->lhs);
         printf("    rhs      = %s\n", tc->rhs);
-        printf("    expected = %s\n", expected_text ? expected_text : "(unavailable)");
-        printf("    got      = %s\n", got_text ? got_text : "(unavailable)");
-        free(expected_text);
-        free(got_text);
+        printf("    expected = %s\n", formatted_number_cstr(expected_text));
+        printf("    got      = %s\n", formatted_number_cstr(got_text));
+        string_free(expected_text);
+        string_free(got_text);
         TEST_FAIL();
     }
 
@@ -362,14 +370,14 @@ static void check_unary_derivative_case(const unary_eval_case_t *tc)
           (tc->deriv_tol_override
                ? number_close_with_tolerance_text(deriv_value, grad, tc->deriv_tol_override)
                : number_close_for_qfloat_precision(deriv_value, grad)))) {
-        char *got_text = format_number_for_test_output(deriv_value);
-        char *expected_text = format_number_for_test_output(grad);
+        string_t *got_text = format_number_for_test_output(deriv_value);
+        string_t *expected_text = format_number_for_test_output(grad);
 
         printf(C_BOLD C_RED "FAIL" C_RESET " %s\n", label);
-        printf("    expected = %s\n", expected_text ? expected_text : "(unavailable)");
-        printf("    got      = %s\n", got_text ? got_text : "(unavailable)");
-        free(expected_text);
-        free(got_text);
+        printf("    expected = %s\n", formatted_number_cstr(expected_text));
+        printf("    got      = %s\n", formatted_number_cstr(got_text));
+        string_free(expected_text);
+        string_free(got_text);
         TEST_FAIL();
     }
 
@@ -404,27 +412,27 @@ static void check_binary_derivative_case(const binary_eval_case_t *tc)
     snprintf(label, sizeof(label), "numeric derivative sweep d/dx: %s", tc->name);
     if (!(num_eq(got_dx, grads[0]) ||
           number_close_for_qfloat_precision(got_dx, grads[0]))) {
-        char *got_text = format_number_for_test_output(got_dx);
-        char *expected_text = format_number_for_test_output(grads[0]);
+        string_t *got_text = format_number_for_test_output(got_dx);
+        string_t *expected_text = format_number_for_test_output(grads[0]);
 
         printf(C_BOLD C_RED "FAIL" C_RESET " %s\n", label);
-        printf("    expected = %s\n", expected_text ? expected_text : "(unavailable)");
-        printf("    got      = %s\n", got_text ? got_text : "(unavailable)");
-        free(expected_text);
-        free(got_text);
+        printf("    expected = %s\n", formatted_number_cstr(expected_text));
+        printf("    got      = %s\n", formatted_number_cstr(got_text));
+        string_free(expected_text);
+        string_free(got_text);
         TEST_FAIL();
     }
     snprintf(label, sizeof(label), "numeric derivative sweep d/dy: %s", tc->name);
     if (!(num_eq(got_dy, grads[1]) ||
           number_close_for_qfloat_precision(got_dy, grads[1]))) {
-        char *got_text = format_number_for_test_output(got_dy);
-        char *expected_text = format_number_for_test_output(grads[1]);
+        string_t *got_text = format_number_for_test_output(got_dy);
+        string_t *expected_text = format_number_for_test_output(grads[1]);
 
         printf(C_BOLD C_RED "FAIL" C_RESET " %s\n", label);
-        printf("    expected = %s\n", expected_text ? expected_text : "(unavailable)");
-        printf("    got      = %s\n", got_text ? got_text : "(unavailable)");
-        free(expected_text);
-        free(got_text);
+        printf("    expected = %s\n", formatted_number_cstr(expected_text));
+        printf("    got      = %s\n", formatted_number_cstr(got_text));
+        string_free(expected_text);
+        string_free(got_text);
         TEST_FAIL();
     }
 
@@ -751,17 +759,17 @@ static void test_eval_expression_preserves_mpfr_precision(void)
     expect_root = num_sqrt(oracle_n);
 
     {
-        char *input_text = format_number_for_test_output(n);
+        string_t *input_text = format_number_for_test_output(n);
 
         ASSERT_NOT_NULL(input_text);
         printf(C_BOLD C_GREEN "PASS" C_RESET " high-precision mpfr expr evaluation\n");
-        printf("    input    = %s\n", input_text);
+        printf("    input    = %s\n", formatted_number_cstr(input_text));
         printf("    input precision: %zu bits, %zu significant digits\n",
                num_get_prec_bits(n), num_get_prec_digits(n));
         print_precision_comparison("x + 1", got_sum, expect_sum);
         print_precision_comparison("sqrt(x)", got_root, expect_root);
         printf("\n");
-        free(input_text);
+        string_free(input_text);
     }
 
     ASSERT_TRUE(num_eq(got_sum, check_sum));
@@ -811,17 +819,17 @@ static void test_eval_expression_preserves_complex_precision(void)
     expect_exp = num_exp(oracle_n);
 
     {
-        char *input_text = format_number_for_test_output(n);
+        string_t *input_text = format_number_for_test_output(n);
 
         ASSERT_NOT_NULL(input_text);
         printf(C_BOLD C_GREEN "PASS" C_RESET " high-precision complex expr evaluation\n");
-        printf("    input    = %s\n", input_text);
+        printf("    input    = %s\n", formatted_number_cstr(input_text));
         printf("    input precision: %zu bits, %zu significant digits\n",
                num_get_prec_bits(n), num_get_prec_digits(n));
         print_precision_comparison("z + 1", got_sum, expect_sum);
         print_precision_comparison("exp(z)", got_exp, expect_exp);
         printf("\n");
-        free(input_text);
+        string_free(input_text);
     }
 
     ASSERT_TRUE(num_eq(got_sum, check_sum));
@@ -2438,10 +2446,10 @@ static void test_lambert_inverse_branch_selection(void)
         productlog_simplified
             ? expr_to_string(productlog_simplified, style_EXPRESSION)
             : NULL;
-    char *w_branch_text = num_to_string(w_branch_value);
-    char *productlog_branch_text = num_to_string(productlog_branch_value);
-    char *w0_branch_text = num_to_string(w0_branch_value);
-    char *wm1_branch_text = num_to_string(wm1_branch_value);
+    string_t *w_branch_text = num_to_string(w_branch_value);
+    string_t *productlog_branch_text = num_to_string(productlog_branch_value);
+    string_t *w0_branch_text = num_to_string(w0_branch_value);
+    string_t *wm1_branch_text = num_to_string(wm1_branch_value);
     const char *expect_w0 = "{ W₀(x·exp(x)) | x = -2 }";
     const char *expect_wm1 = "-2";
     const char *expect_w = "-2";
@@ -2479,40 +2487,40 @@ static void test_lambert_inverse_branch_selection(void)
                        "productlog(x*exp(x)) chooses lower branch for x=-2",
                        productlog_text ? productlog_text : "(null)", expect_w);
 
-    if (str_eq(w_branch_text, expect_branch))
+    if (str_eq(formatted_number_cstr(w_branch_text), expect_branch))
         to_string_pass("W(-1/e) resolves branch point exactly",
-                       w_branch_text, expect_branch);
+                       formatted_number_cstr(w_branch_text), expect_branch);
     else
         to_string_fail(__FILE__, __LINE__, 1,
                        "W(-1/e) resolves branch point exactly",
-                       w_branch_text ? w_branch_text : "(null)",
+                       formatted_number_cstr(w_branch_text),
                        expect_branch);
 
-    if (str_eq(productlog_branch_text, expect_branch))
+    if (str_eq(formatted_number_cstr(productlog_branch_text), expect_branch))
         to_string_pass("productlog(-1/e) resolves branch point exactly",
-                       productlog_branch_text, expect_branch);
+                       formatted_number_cstr(productlog_branch_text), expect_branch);
     else
         to_string_fail(__FILE__, __LINE__, 1,
                        "productlog(-1/e) resolves branch point exactly",
-                       productlog_branch_text ? productlog_branch_text : "(null)",
+                       formatted_number_cstr(productlog_branch_text),
                        expect_branch);
 
-    if (str_eq(w0_branch_text, expect_branch))
+    if (str_eq(formatted_number_cstr(w0_branch_text), expect_branch))
         to_string_pass("W0(-1/e) resolves branch point exactly",
-                       w0_branch_text, expect_branch);
+                       formatted_number_cstr(w0_branch_text), expect_branch);
     else
         to_string_fail(__FILE__, __LINE__, 1,
                        "W0(-1/e) resolves branch point exactly",
-                       w0_branch_text ? w0_branch_text : "(null)",
+                       formatted_number_cstr(w0_branch_text),
                        expect_branch);
 
-    if (str_eq(wm1_branch_text, expect_branch))
+    if (str_eq(formatted_number_cstr(wm1_branch_text), expect_branch))
         to_string_pass("W-1(-1/e) resolves branch point exactly",
-                       wm1_branch_text, expect_branch);
+                       formatted_number_cstr(wm1_branch_text), expect_branch);
     else
         to_string_fail(__FILE__, __LINE__, 1,
                        "W-1(-1/e) resolves branch point exactly",
-                       wm1_branch_text ? wm1_branch_text : "(null)",
+                       formatted_number_cstr(wm1_branch_text),
                        expect_branch);
 
     ASSERT_TRUE(!num_is_real(w_outside_value));
@@ -2523,10 +2531,10 @@ static void test_lambert_inverse_branch_selection(void)
     num_destroy(&w_outside_check);
     num_destroy(&w_outside_exp);
     num_destroy(&w_outside_value);
-    free(wm1_branch_text);
-    free(w0_branch_text);
-    free(productlog_branch_text);
-    free(w_branch_text);
+    string_free(wm1_branch_text);
+    string_free(w0_branch_text);
+    string_free(productlog_branch_text);
+    string_free(w_branch_text);
     num_destroy(&wm1_branch_value);
     num_destroy(&w0_branch_value);
     num_destroy(&productlog_branch_value);
@@ -3499,10 +3507,11 @@ static void test_sqrt_negative_exact_evaluates_to_i(void)
         char *function_text = expr ? expr_to_string(expr, style_FUNCTION) : NULL;
         char *tex_text = expr ? expr_to_string(expr, style_TEX) : NULL;
         number_t value = expr ? expr_eval(expr) : num_clone(NUM_NAN);
-        char *value_text = num_to_string(value);
+        string_t *value_text = num_to_string(value);
 
         expect_sqrt_negative_text(cases[i].label, "value",
-                                  value_text, cases[i].value);
+                                  formatted_number_cstr(value_text),
+                                  cases[i].value);
         expect_sqrt_negative_text(cases[i].label, "expression",
                                   expr_text, cases[i].expression);
         expect_sqrt_negative_text(cases[i].label, "function",
@@ -3510,7 +3519,7 @@ static void test_sqrt_negative_exact_evaluates_to_i(void)
         expect_sqrt_negative_text(cases[i].label, "TeX",
                                   tex_text, cases[i].tex);
 
-        free(value_text);
+        string_free(value_text);
         num_destroy(&value);
         free(tex_text);
         free(function_text);

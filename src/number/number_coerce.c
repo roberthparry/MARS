@@ -1,5 +1,6 @@
 #include "number.h"
 #include "number_internal.h"
+#include "ustring.h"
 
 #include <complex.h>
 #include <stdlib.h>
@@ -16,16 +17,16 @@ static bool number_kind_is_mpfr_family(number_kind_t kind)
 
 static qfloat_t qfloat_from_mpz_value(const number_mpz_t *value)
 {
-    char *text;
+    string_t *text;
     qfloat_t out;
 
     if (!value)
         return QF_NAN;
-    text = number_mpz_to_string(value);
+    text = number_mpz_to_text(value);
     if (!text)
         return QF_NAN;
-    out = qf_from_string(text);
-    free(text);
+    out = qf_from_text(text);
+    string_free(text);
     return out;
 }
 
@@ -33,6 +34,8 @@ static qfloat_t qfloat_from_mpq_value(const number_mpq_t *value)
 {
     char *num_text = NULL;
     char *den_text = NULL;
+    string_t *num = NULL;
+    string_t *den = NULL;
     qfloat_t numerator;
     qfloat_t denominator;
     qfloat_t out = QF_NAN;
@@ -41,11 +44,15 @@ static qfloat_t qfloat_from_mpq_value(const number_mpq_t *value)
         return QF_NAN;
     num_text = mpz_get_str(NULL, 10, mpq_numref(value->value));
     den_text = mpz_get_str(NULL, 10, mpq_denref(value->value));
-    if (num_text && den_text) {
-        numerator = qf_from_string(num_text);
-        denominator = qf_from_string(den_text);
+    num = num_text ? string_new_with(num_text) : NULL;
+    den = den_text ? string_new_with(den_text) : NULL;
+    if (num && den) {
+        numerator = qf_from_text(num);
+        denominator = qf_from_text(den);
         out = qf_div(numerator, denominator);
     }
+    string_free(num);
+    string_free(den);
     free(num_text);
     free(den_text);
     return out;

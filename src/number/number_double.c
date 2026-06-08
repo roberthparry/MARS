@@ -1,5 +1,6 @@
 #include "number.h"
 #include "number_internal.h"
+#include "ustring.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -91,14 +92,11 @@ int number_sign_double(const number_t *number)
     return number && number_impl_const(number)->value.d < 0.0 ? -1 : 1;
 }
 
-char *number_to_string_double(const number_t *number)
+string_t *number_to_text_double(const number_t *number)
 {
-    char buf[64];
-
     if (!number)
         return NULL;
-    snprintf(buf, sizeof(buf), "%.17g", number_impl_const(number)->value.d);
-    return number_strdup(buf);
+    return string_sprintf("%.17g", number_impl_const(number)->value.d);
 }
 
 number_t *number_clone_double(const number_t *number)

@@ -30,7 +30,7 @@ static void test_qf_pow_int()
         qfloat_t expected = qf_from_string(cases[i].expected);
 
         /* THIS LINE WAS MISSING */
-        qf_to_string(r, buf, sizeof(buf));
+        test_qf_to_buffer(r, buf, sizeof(buf));
 
         TEST_ASSERT_QFLOAT_CLOSE(r, expected);
         printf("%s  OK: %s^%d = %s%s\n",
@@ -48,7 +48,7 @@ static void test_qf_pow()
     {
         qfloat_t r = qf_pow(qf_from_double(2.0), qf_from_double(3.0));
         qfloat_t expected = qf_from_double(8.0);
-        qf_to_string(r, buf, sizeof(buf));
+        test_qf_to_buffer(r, buf, sizeof(buf));
 
         TEST_ASSERT_QFLOAT_CLOSE(r, expected);
         printf("%s  OK: 2^3 = %s%s\n", C_GREEN, buf, C_RESET);
@@ -58,7 +58,7 @@ static void test_qf_pow()
     {
         qfloat_t r = qf_pow(qf_from_double(9.0), qf_from_double(0.5));
         qfloat_t expected = qf_from_double(3.0);
-        qf_to_string(r, buf, sizeof(buf));
+        test_qf_to_buffer(r, buf, sizeof(buf));
 
         TEST_ASSERT_QFLOAT_CLOSE(r, expected);
         printf("%s  OK: 9^0.5 = %s%s\n", C_GREEN, buf, C_RESET);
@@ -68,7 +68,7 @@ static void test_qf_pow()
     {
         qfloat_t r = qf_pow(qf_from_double(0.0), qf_from_double(5.0));
         qfloat_t expected = qf_from_double(0.0);
-        qf_to_string(r, buf, sizeof(buf));
+        test_qf_to_buffer(r, buf, sizeof(buf));
 
         TEST_ASSERT_QFLOAT_CLOSE(r, expected);
         printf("%s  OK: 0^5 = %s%s\n", C_GREEN, buf, C_RESET);
@@ -81,7 +81,7 @@ static void test_qf_pow()
         if (qf_isnan(r)) {
             printf("%s  OK: 0^-1 = NaN%s\n", C_GREEN, C_RESET);
         } else {
-            qf_to_string(r, buf, sizeof(buf));
+            test_qf_to_buffer(r, buf, sizeof(buf));
             printf("%s  FAIL: 0^-1%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = NaN\n");
@@ -93,7 +93,7 @@ static void test_qf_pow()
     {
         qfloat_t r = qf_pow(qf_from_double(-2.0), qf_from_double(3.0));
         qfloat_t expected = qf_from_double(-8.0);
-        qf_to_string(r, buf, sizeof(buf));
+        test_qf_to_buffer(r, buf, sizeof(buf));
 
         TEST_ASSERT_QFLOAT_CLOSE(r, expected);
         printf("%s  OK: (-2)^3 = %s%s\n", C_GREEN, buf, C_RESET);
@@ -106,7 +106,7 @@ static void test_qf_pow()
         if (qf_isnan(r)) {
             printf("%s  OK: (-2)^0.5 = NaN%s\n", C_GREEN, C_RESET);
         } else {
-            qf_to_string(r, buf, sizeof(buf));
+            test_qf_to_buffer(r, buf, sizeof(buf));
             printf("%s  FAIL: (-2)^0.5%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = NaN\n");
@@ -136,7 +136,7 @@ static void test_qf_pow10(void)
         qfloat_t r        = qf_pow10(cases[i].n);
         qfloat_t expected = qf_from_string(cases[i].expected);
 
-        qf_to_string(r, buf, sizeof(buf));
+        test_qf_to_buffer(r, buf, sizeof(buf));
 
         TEST_ASSERT_QFLOAT_CLOSE(r, expected);
         printf("%s  OK: 10^%d = %s%s\n",

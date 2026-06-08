@@ -116,6 +116,40 @@ static void test_mat_from_string_numeric_num_complex(void)
     mat_free(A);
 }
 
+static void test_mat_from_text_constructors(void)
+{
+    string_t *numeric_text = string_new_with("(1/3, 2; 3, 4)");
+    string_t *symbolic_text = string_new_with("{ (x, c1; c1*x, [radius]) | x = 2; c1 = 3; [radius] = 5 }");
+    matrix_t *numeric = mat_from_text(numeric_text);
+    mat_bindings_t *bindings = NULL;
+    matrix_t *symbolic = mat_from_text_expr(symbolic_text, &bindings);
+    number_t got = NUM_ZERO;
+    number_t expected = num_create_from_string("1/3");
+
+    check_bool("mat_from_text numeric non-null", numeric != NULL);
+    check_bool("mat_from_text numeric type", numeric && mat_typeof(numeric) == MAT_TYPE_NUMBER);
+    if (numeric) {
+        got = mat_get_num(numeric, 0, 0);
+        check_bool("mat_from_text numeric preserves rational", num_eq(got, expected));
+    }
+
+    check_bool("mat_from_text_expr symbolic non-null", symbolic != NULL);
+    check_bool("mat_from_text_expr symbolic type",
+               symbolic && mat_typeof(symbolic) == MAT_TYPE_EXPR);
+    check_bool("mat_from_text_expr x binding present",
+               bindings && mat_bindings_get(bindings, "x") != NULL);
+    check_bool("mat_from_text_expr bracketed binding present",
+               bindings && mat_bindings_get(bindings, "[radius]") != NULL);
+
+    num_destroy(&expected);
+    num_destroy(&got);
+    mat_bindings_free(bindings);
+    mat_free(symbolic);
+    mat_free(numeric);
+    string_free(symbolic_text);
+    string_free(numeric_text);
+}
+
 static void test_mat_from_string_symbolic_number_bindings(void)
 {
     mat_bindings_t *bindings = NULL;
@@ -725,6 +759,7 @@ void run_matrix_fromstring_tests(void)
 {
     TEST_RUN_CASE(test_mat_from_string_numeric_num_real, NULL);
     TEST_RUN_CASE(test_mat_from_string_numeric_num_complex, NULL);
+    TEST_RUN_CASE(test_mat_from_text_constructors, NULL);
     TEST_RUN_CASE(test_mat_from_string_symbolic_numeric_fallback, NULL);
     TEST_RUN_CASE(test_mat_from_string_symbolic_insufficient_bindings, NULL);
     TEST_RUN_CASE(test_mat_from_string_symbolic_builtin_constants, NULL);

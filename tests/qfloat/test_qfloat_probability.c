@@ -36,8 +36,8 @@ static void test_qf_lambert_w0(void) {
         qfloat_t got = qf_lambert_w0(x);
         qfloat_t exp = qf_from_string(tests[i].expected);
 
-        qf_to_string(got, buf, sizeof(buf));
-        qf_to_string(exp, buf_exp, sizeof(buf_exp));
+        test_qf_to_buffer(got, buf, sizeof(buf));
+        test_qf_to_buffer(exp, buf_exp, sizeof(buf_exp));
 
         TEST_ASSERT_QFLOAT_CLOSE(got, exp);
         printf("%s  OK: W0(%s)%s\n", C_GREEN, tests[i].xs, C_RESET);
@@ -78,8 +78,8 @@ static void test_qf_lambert_wm1(void) {
         qfloat_t got = qf_lambert_wm1(x);
         qfloat_t exp = qf_from_string(tests[i].expected);
 
-        qf_to_string(got, buf, sizeof(buf));
-        qf_to_string(exp, buf_exp, sizeof(buf_exp));
+        test_qf_to_buffer(got, buf, sizeof(buf));
+        test_qf_to_buffer(exp, buf_exp, sizeof(buf_exp));
 
         TEST_ASSERT_QFLOAT_CLOSE(got, exp);
         printf("%s  OK: Wm1(%s)%s\n", C_GREEN, tests[i].xs, C_RESET);

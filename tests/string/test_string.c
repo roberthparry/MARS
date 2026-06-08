@@ -115,6 +115,16 @@ static void test_string_new_wide(void)
     string_free(s);
 }
 
+static void test_string_trim_unicode_whitespace(void)
+{
+    string_t *s = string_new_with("　alpha ");
+
+    string_trim(s);
+    ASSERT_STREQ(string_c_str(s), "alpha");
+
+    string_free(s);
+}
+
 static string_t *test_string_vsprintf_helper(const char *fmt, ...)
 {
     string_t *out;
@@ -352,6 +362,32 @@ static void test_string_cursor_view_rune_values(void)
     ASSERT_TRUE(string_cursor_done(cursor));
 
     string_cursor_free(cursor);
+    string_free(s);
+}
+
+static void test_rune_from_value(void)
+{
+    string_t *s = string_new();
+    rune_t nul = rune_from_value(0u);
+    rune_t pi = rune_from_value(0x03C0u);
+    rune_t smile = rune_from_value(0x1F642u);
+    rune_t invalid = rune_from_value(0xD800u);
+
+    ASSERT_NOT_NULL(s);
+    ASSERT_FALSE(rune_is_none(nul));
+    ASSERT_EQ(rune_value(nul), 0u);
+    ASSERT_EQ(rune_value(pi), 0x03C0u);
+    ASSERT_EQ(rune_value(smile), 0x1F642u);
+    ASSERT_TRUE(rune_is_none(invalid));
+
+    ASSERT_EQ(string_append_rune(s, nul), 0);
+    ASSERT_EQ(string_append_rune(s, pi), 0);
+    ASSERT_EQ(string_append_rune(s, smile), 0);
+    ASSERT_EQ((long)string_length(s), 3L);
+    ASSERT_EQ(rune_value(string_at(s, 0u)), 0u);
+    ASSERT_EQ(rune_value(string_at(s, 1u)), 0x03C0u);
+    ASSERT_EQ(rune_value(string_at(s, 2u)), 0x1F642u);
+
     string_free(s);
 }
 
@@ -802,6 +838,7 @@ int tests_main(void)
     TEST_RUN_CASE(test_join_empty_fields, NULL);
     TEST_RUN_CASE(test_string_replace, NULL);
     TEST_RUN_CASE(test_string_new_wide, NULL);
+    TEST_RUN_CASE(test_string_trim_unicode_whitespace, NULL);
 
     TEST_SECTION("Builder And Views");
     TEST_RUN_CASE(test_append_format, NULL);
@@ -811,6 +848,7 @@ int tests_main(void)
     TEST_RUN_CASE(test_text_character_api, NULL);
     TEST_RUN_CASE(test_string_view, NULL);
     TEST_RUN_CASE(test_string_cursor_view_rune_values, NULL);
+    TEST_RUN_CASE(test_rune_from_value, NULL);
     TEST_RUN_CASE(test_string_cursor_parsing_api, NULL);
     TEST_RUN_CASE(test_string_cursor_parser_example, NULL);
     TEST_RUN_CASE(test_string_object_first_api, NULL);

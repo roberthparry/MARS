@@ -33,6 +33,8 @@
 #include <stddef.h>
 #include <stdarg.h>
 
+typedef struct _string_t string_t;
+
 /**
  * @struct qfloat_t
  * @brief Double-double precision floating-point number.
@@ -270,6 +272,17 @@ double qf_to_double(qfloat_t x);
 qfloat_t qf_from_string(const char *s);
 
 /**
+ * @brief Parse text into a qfloat_t.
+ *
+ * This is the string_t-based parser. qf_from_string() is the convenience
+ * wrapper for callers with ordinary C string literals.
+ *
+ * @param text Input text.
+ * @return Parsed qfloat_t value.
+ */
+qfloat_t qf_from_text(const string_t *text);
+
+/**
  * @brief Convert a qfloat_t to normalised scientific notation.
  *
  * Produces exactly 32 significant digits in the form:
@@ -278,11 +291,21 @@ qfloat_t qf_from_string(const char *s);
  *
  * where the mantissa is in [1,10).
  *
- * @param x   Input qfloat_t.
- * @param buf Output buffer.
- * @param n   Size of output buffer.
+ * @param x Input qfloat_t.
+ * @return  Newly allocated string, or NULL on allocation failure.
  */
-void qf_to_string(qfloat_t x, char *out, size_t out_size);
+string_t *qf_to_text(qfloat_t x);
+
+/**
+ * @brief Convert a qfloat_t to normalised scientific notation.
+ *
+ * Convenience alias for qf_to_text(). The caller owns the returned string and
+ * must release it with string_free().
+ *
+ * @param x Input qfloat_t.
+ * @return  Newly allocated string, or NULL on allocation failure.
+ */
+string_t *qf_to_string(qfloat_t x);
 
 /**
  * @brief Returns the absolute value of a qfloat_t (Windel's algorithm).
@@ -424,6 +447,18 @@ qfloat_t qf_mul_pow10(qfloat_t x, int k);
 int qf_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap);
 
 /**
+ * @brief Format text into a new string_t with full qfloat_t support.
+ *
+ * This is the string-owning counterpart to qf_vsprintf(). The caller owns the
+ * returned string and must release it with string_free().
+ *
+ * @param fmt  Format string.
+ * @param ap   Variadic argument list.
+ * @return     Newly allocated formatted string, or NULL on error.
+ */
+string_t *qf_vsprintf_text(const char *fmt, va_list ap);
+
+/**
  * @brief Print formatted text with full qfloat_t support.
  *
  * qf_sprintf extends snprintf() with two qfloat_t‑specific format specifiers:
@@ -446,6 +481,18 @@ int qf_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap);
  * @return Number of characters written (excluding null terminator).
  */
 int qf_sprintf(char *out, size_t out_size, const char *fmt, ...);
+
+/**
+ * @brief Format text into a new string_t with full qfloat_t support.
+ *
+ * This is the string-owning counterpart to qf_sprintf(). The caller owns the
+ * returned string and must release it with string_free().
+ *
+ * @param fmt  Format string.
+ * @param ...  Additional arguments.
+ * @return     Newly allocated formatted string, or NULL on error.
+ */
+string_t *qf_sprintf_text(const char *fmt, ...);
 
 /**
  * @brief Print formatted text with full qfloat_t support.

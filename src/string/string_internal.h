@@ -29,9 +29,12 @@
  *   • All bytes in data[0..len) are valid UTF-8 (enforced at mutation sites).
  *
  * Fields:
- *   data — heap-allocated byte buffer; NUL-terminated.
- *   len  — number of content bytes, not counting the NUL terminator.
- *   cap  — number of bytes allocated (always at least len + 1).
+ *   data        — heap-allocated byte buffer; NUL-terminated.
+ *   len         — number of content bytes, not counting the NUL terminator.
+ *   cap         — number of bytes allocated (always at least len + 1).
+ *   scratch     — optional transient buffer reserved for internal helpers
+ *                 that need short-lived materialised storage.
+ *   scratch_cap — number of bytes allocated for scratch.
  */
 struct _string_t {
     char  *data;
@@ -41,6 +44,19 @@ struct _string_t {
     size_t scratch_cap;
 };
 
+/**
+ * @brief Internal cursor over a string.
+ *
+ * The cursor normally borrows @c source and advances by encoded positions
+ * that are managed through the public cursor API. When constructed from a
+ * string view, @c owned_source holds the materialised view so cursor movement
+ * is still backed by a valid string object.
+ *
+ * Fields:
+ *   source       — borrowed string being traversed.
+ *   owned_source — optional owned backing string for view-derived cursors.
+ *   pos          — current encoded byte position within source.
+ */
 struct _string_cursor_t {
     const string_t *source;
     string_t       *owned_source;

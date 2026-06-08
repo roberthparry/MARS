@@ -54,8 +54,8 @@ static void test_qf_hypot(void)
         qfloat_t sum = qf_add(xx, yy);
         qfloat_t ref = qf_sqrt(sum);
 
-        qf_to_string(got, buf, sizeof(buf));
-        qf_to_string(ref, buf_ref, sizeof(buf_ref));
+        test_qf_to_buffer(got, buf, sizeof(buf));
+        test_qf_to_buffer(ref, buf_ref, sizeof(buf_ref));
 
         if (qf_close_rel(got, ref, 1e-31)) {
             printf("%s  OK: %s%s\n", C_GREEN, precise[i].label, C_RESET);
@@ -110,7 +110,7 @@ static void test_qf_hypot(void)
         double  href = hypot(xd, yd);
         double  err  = hq_d - href;
 
-        qf_to_string(hq, buf, sizeof(buf));
+        test_qf_to_buffer(hq, buf, sizeof(buf));
 
         if (fabs(err) <= 1e-15 * fabs(href)) {
             printf("%s  OK: %s%s\n", C_GREEN, extreme[i].label, C_RESET);
@@ -204,8 +204,8 @@ static void test_qf_gamma(void)
         qfloat_t got = qf_gamma(x);
         qfloat_t exp = qf_from_string(tests[i].expected);
 
-        qf_to_string(got, buf, sizeof(buf));
-        qf_to_string(exp, buf_exp, sizeof(buf_exp));
+        test_qf_to_buffer(got, buf, sizeof(buf));
+        test_qf_to_buffer(exp, buf_exp, sizeof(buf_exp));
 
         TEST_ASSERT_QFLOAT_CLOSE(got, exp);
         printf("%s  OK: gamma(%s)%s\n", C_GREEN, tests[i].xs, C_RESET);
@@ -224,7 +224,7 @@ static void test_qf_gamma(void)
         if (isnan(g.hi)) {
             printf("%s  OK: gamma(%s) is NaN%s\n", C_GREEN, poles[i], C_RESET);
         } else {
-            qf_to_string(g, buf, sizeof(buf));
+            test_qf_to_buffer(g, buf, sizeof(buf));
             printf("%s  FAIL: gamma(%s) should be NaN%s  [%s:%d]\n", C_RED, poles[i], C_RESET, __FILE__, __LINE__);
             printf("    got = %s\n", buf);
             TEST_FAIL();
@@ -243,7 +243,7 @@ static void test_qf_gamma(void)
             printf("%s  OK: gamma(%s) extreme -> NaN%s\n",
                    C_GREEN, extreme[i], C_RESET);
         } else {
-            qf_to_string(g, buf, sizeof(buf));
+            test_qf_to_buffer(g, buf, sizeof(buf));
             printf("%s  FAIL: gamma(%s) should be NaN%s  [%s:%d]\n", C_RED, extreme[i], C_RESET, __FILE__, __LINE__);
             printf("    got = %s\n", buf);
             TEST_FAIL();
@@ -309,8 +309,8 @@ static void test_qf_erf(void)
         qfloat_t got = qf_erf(x);
         qfloat_t exp = qf_from_string(tests[i].expected);
 
-        qf_to_string(got, buf, sizeof(buf));
-        qf_to_string(exp, buf_exp, sizeof(buf_exp));
+        test_qf_to_buffer(got, buf, sizeof(buf));
+        test_qf_to_buffer(exp, buf_exp, sizeof(buf_exp));
 
         TEST_ASSERT_QFLOAT_CLOSE(got, exp);
         printf("%s  OK: erf(%s)%s\n", C_GREEN, tests[i].xs, C_RESET);
@@ -374,8 +374,8 @@ static void test_qf_erfc(void)
         qfloat_t got = qf_erfc(x);
         qfloat_t exp = qf_from_string(tests[i].expected);
 
-        qf_to_string(got, buf, sizeof(buf));
-        qf_to_string(exp, buf_exp, sizeof(buf_exp));
+        test_qf_to_buffer(got, buf, sizeof(buf));
+        test_qf_to_buffer(exp, buf_exp, sizeof(buf_exp));
 
         TEST_ASSERT_QFLOAT_CLOSE(got, exp);
         printf("%s  OK: erfc(%s)%s\n", C_GREEN, tests[i].xs, C_RESET);
@@ -447,8 +447,8 @@ static void test_qf_erfinv(void) {
         else {
             qfloat_t exp = qf_from_string(tests[i].expected);
 
-            qf_to_string(got, buf, sizeof(buf));
-            qf_to_string(exp, buf_exp, sizeof(buf_exp));
+            test_qf_to_buffer(got, buf, sizeof(buf));
+            test_qf_to_buffer(exp, buf_exp, sizeof(buf_exp));
 
             TEST_ASSERT_QFLOAT_CLOSE_TOL(got, exp, tests[i].acceptable_error);
             printf("%s  OK: erfinv(%s)%s\n", C_GREEN, tests[i].xs, C_RESET);
@@ -535,8 +535,8 @@ static void test_qf_erfcinv(void) {
         /* Normal numeric case */
         qfloat_t exp = qf_from_string(tests[i].expected);
 
-        qf_to_string(got, buf, sizeof(buf));
-        qf_to_string(exp, buf_exp, sizeof(buf_exp));
+        test_qf_to_buffer(got, buf, sizeof(buf));
+        test_qf_to_buffer(exp, buf_exp, sizeof(buf_exp));
 
         TEST_ASSERT_QFLOAT_CLOSE_TOL(got, exp, tests[i].acceptable_error);
         printf("%s  OK: erfcinv(%s)%s\n", C_GREEN, tests[i].xs, C_RESET);
@@ -602,7 +602,7 @@ static void test_qf_lgamma(void) {
             } else {
                 printf(C_RED "  FAIL: lgamma(%s)  [%s:%d]\n" C_RESET, tests[i].xs, __FILE__, __LINE__);
                 printf("    expected = NAN\n");
-                qf_to_string(got, buf, sizeof(buf));
+                test_qf_to_buffer(got, buf, sizeof(buf));
                 printf("    got      = %s\n", buf);
                 TEST_FAIL();
             }
@@ -611,8 +611,8 @@ static void test_qf_lgamma(void) {
 
         qfloat_t exp = qf_from_string(tests[i].expected);
 
-        qf_to_string(got, buf, sizeof(buf));
-        qf_to_string(exp, buf_exp, sizeof(buf_exp));
+        test_qf_to_buffer(got, buf, sizeof(buf));
+        test_qf_to_buffer(exp, buf_exp, sizeof(buf_exp));
         
         if (qf_close_value(got, exp, tests[i].acceptable_error)) {
             printf(C_GREEN "  OK: lgamma(%s)\n" C_RESET, tests[i].xs);
@@ -682,7 +682,7 @@ static void test_qf_digamma(void) {
             } else {
                 printf(C_RED "  FAIL: digamma(%s)  [%s:%d]\n" C_RESET, tests[i].xs, __FILE__, __LINE__);
                 printf("    expected = NAN\n");
-                qf_to_string(got, buf, sizeof(buf));
+                test_qf_to_buffer(got, buf, sizeof(buf));
                 printf("    got      = %s\n", buf);
                 TEST_FAIL();
             }
@@ -691,8 +691,8 @@ static void test_qf_digamma(void) {
 
         qfloat_t exp = qf_from_string(tests[i].expected);
 
-        qf_to_string(got, buf, sizeof(buf));
-        qf_to_string(exp, buf_exp, sizeof(buf_exp));
+        test_qf_to_buffer(got, buf, sizeof(buf));
+        test_qf_to_buffer(exp, buf_exp, sizeof(buf_exp));
 
         if (qf_close_value(got, exp, tests[i].acceptable_error)) {
             printf(C_GREEN "  OK: digamma(%s)\n" C_RESET, tests[i].xs);
@@ -741,8 +741,8 @@ static void test_qf_gammainv(void) {
 
         qfloat_t exp = x;
 
-        qf_to_string(got, buf, sizeof(buf));
-        qf_to_string(exp, buf_exp, sizeof(buf_exp));
+        test_qf_to_buffer(got, buf, sizeof(buf));
+        test_qf_to_buffer(exp, buf_exp, sizeof(buf_exp));
 
         if (qf_close_value(got, exp, tests[i].acceptable_error)) {
             printf(C_GREEN "  OK: gammainv(gamma(%s))\n" C_RESET, tests[i].xs);

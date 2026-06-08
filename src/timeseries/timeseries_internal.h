@@ -38,20 +38,20 @@ typedef struct ts_arima_meta_t {
 } ts_arima_meta_t;
 
 typedef struct {
-    char *buf;
-    size_t len;
-    size_t cap;
+    string_t *text;
 } ts_string_builder_t;
 
 int ts_appendf(ts_string_builder_t *sb, const char *fmt, ...);
+int ts_append_text(ts_string_builder_t *sb, const string_t *text);
+size_t ts_builder_encoded_length(const ts_string_builder_t *sb);
 void ts_builder_free(ts_string_builder_t *sb);
-char *ts_builder_detach(ts_string_builder_t *sb);
+string_t *ts_builder_detach_text(ts_string_builder_t *sb);
 
 datetime_t *ts_datetime_clone(const datetime_t *dt);
 int ts_step_regular_datetime(datetime_t *dt, ts_frequency_t frequency);
 datetime_t *ts_advance_regular_datetime(datetime_t *dt, ts_frequency_t frequency);
 int ts_infer_season_period(ts_frequency_t frequency);
-int ts_parse_date(const char *text, datetime_t **out);
+int ts_parse_date_text(const string_t *text, datetime_t **out);
 bool ts_datetime_same_bucket(const datetime_t *a, const datetime_t *b,
                              ts_frequency_t frequency, ts_year_type_t year_type);
 datetime_t *ts_bucket_label(const datetime_t *dt, ts_frequency_t frequency,
@@ -78,7 +78,7 @@ matrix_t *ts_make_matrix_from_doubles(const double *values, size_t rows, size_t 
 matrix_t *ts_matrix_clone_local(const matrix_t *src);
 matrix_t *ts_submatrix_rows(const matrix_t *A, size_t start_row, size_t row_count);
 
-int ts_write_text_file(const char *path, const char *text);
+int ts_write_text_file(const string_t *path, const string_t *text);
 
 ts_arima_meta_t *ts_arima_meta_find(const ts_arima_result_t *owner);
 void ts_arima_meta_remove(const ts_arima_result_t *owner);

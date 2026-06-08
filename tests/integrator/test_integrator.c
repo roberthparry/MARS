@@ -11,6 +11,7 @@
 #include "integrator.h"
 #include "expression.h"
 #include "internal/number_internal.h"
+#include "ustring.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 static bool test_integrator_suite_setup(void);
@@ -83,21 +84,21 @@ static bool test_assert_integrator_number_close_tol(number_t actual,
     number_t diff = num_sub(actual, expected);
     number_t abs_diff = num_abs(diff);
     number_t tol = num_create_from_string(tol_text);
-    char *abs_text = NULL;
-    char *tol_display = NULL;
+    string_t *abs_text = NULL;
+    string_t *tol_display = NULL;
     bool ok = num_le(abs_diff, tol);
 
     if (!ok) {
         abs_text = num_to_string(abs_diff);
         tol_display = num_to_string(tol);
         test_set_failure_detailf("expected |actual - expected| <= tolerance, got %s > %s",
-                                 abs_text ? abs_text : "(null)",
-                                 tol_display ? tol_display : "(null)");
+                                 abs_text ? string_c_str(abs_text) : "(null)",
+                                 tol_display ? string_c_str(tol_display) : "(null)");
         test_mark_failure(file, line, "number tolerance check failed");
     }
 
-    free(tol_display);
-    free(abs_text);
+    string_free(tol_display);
+    string_free(abs_text);
     num_destroy(&tol);
     num_destroy(&abs_diff);
     num_destroy(&diff);
@@ -165,15 +166,15 @@ static int test_num_printf_compat(const char *fmt, ...)
     }
 
     va_start(ap, fmt);
-    while (*fmt) {
-        if (fmt[0] == '%' && fmt[1] == '%') {
+    for (size_t pos = 0u; fmt[pos] != '\0'; ) {
+        if (fmt[pos] == '%' && fmt[pos + 1u] == '%') {
             fputc('%', stdout);
             written += 1;
-            fmt += 2;
+            pos += 2u;
             continue;
         }
 
-        if (fmt[0] == '%' && fmt[1] == 'q') {
+        if (fmt[pos] == '%' && fmt[pos + 1u] == 'q') {
             number_t value = va_arg(ap, number_t);
             number_t display = test_number_for_display(value);
             int rc = num_printf("%N", display);
@@ -181,13 +182,13 @@ static int test_num_printf_compat(const char *fmt, ...)
             if (rc >= 0)
                 written += rc;
             num_destroy(&display);
-            fmt += 2;
+            pos += 2u;
             continue;
         }
 
-        fputc(*fmt, stdout);
+        fputc(fmt[pos], stdout);
         written += 1;
-        fmt += 1;
+        pos += 1u;
     }
     va_end(ap);
     return written;
@@ -261,6 +262,30 @@ static void test_clear_pending_integral_display(void)
     test_pending_expected_fmt = NULL;
 }
 
+static int test_parse_size_digits(const string_t *text, size_t *out)
+{
+    const char *digits = text ? string_c_str(text) : NULL;
+    size_t i = 0u;
+    size_t value = 0u;
+
+    if (!digits || !out || digits[0] == '\0')
+        return 0;
+
+    for (; digits[i] != '\0'; ++i) {
+        unsigned int digit;
+
+        if (digits[i] < '0' || digits[i] > '9')
+            return 0;
+        digit = (unsigned int)(digits[i] - '0');
+        if (value > (((size_t)-1) - digit) / 10u)
+            return 0;
+        value = value * 10u + digit;
+    }
+
+    *out = value;
+    return 1;
+}
+
 static size_t test_precision_expectation_digits(number_t result, number_t err, bool *exact_out)
 {
     number_t abs_err = num_new();
@@ -285,7 +310,7 @@ static size_t test_precision_expectation_digits(number_t result, number_t err, b
         number_t metric = num_new();
         number_t neg_log10 = num_new();
         number_t digits_num = num_new();
-        char *digits_text = NULL;
+        string_t *digits_text = NULL;
 
         abs_result = num_abs(result);
         scale = num_is_zero(abs_result) ? num_clone(NUM_ONE) : abs_result;
@@ -295,13 +320,12 @@ static size_t test_precision_expectation_digits(number_t result, number_t err, b
             neg_log10 = num_neg(num_log10(metric));
             digits_num = num_floor(neg_log10);
             digits_text = num_to_string(digits_num);
-            if (digits_text && digits_text[0] >= '0' && digits_text[0] <= '9')
-                digits = (size_t)strtoul(digits_text, NULL, 10);
+            (void)test_parse_size_digits(digits_text, &digits);
             if (digits > num_get_default_prec_digits())
                 digits = num_get_default_prec_digits();
         }
 
-        free(digits_text);
+        string_free(digits_text);
         num_destroy(&digits_num);
         num_destroy(&neg_log10);
         num_destroy(&metric);

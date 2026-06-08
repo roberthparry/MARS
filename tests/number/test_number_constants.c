@@ -171,8 +171,9 @@ void run_number_constant_tests(void)
         number_t parsed_bad_sqrt2 = num_create_from_string("@sqrt2");
         number_t parsed_bad_inf = num_create_from_string("@inf");
         number_t named = NUM_NAN;
-        char *bad_sqrt2_text;
-        char *bad_inf_text;
+        string_t *pi_text;
+        string_t *bad_sqrt2_text;
+        string_t *bad_inf_text;
 
         ASSERT_TRUE(strcmp(num_constant_name(NUM_PI), "π") == 0);
         ASSERT_TRUE(strcmp(num_constant_name(NUM_EULER_MASCHERONI), "γ") == 0);
@@ -191,6 +192,13 @@ void run_number_constant_tests(void)
         ASSERT_TRUE(!num_constant_value("@sqrt2", &named));
         ASSERT_TRUE(!num_constant_value("@inf", &named));
 
+        pi_text = string_new_with("π");
+        ASSERT_TRUE(pi_text != NULL);
+        ASSERT_TRUE(num_constant_value_text(pi_text, &named));
+        ASSERT_NUMBER_EQ(named, NUM_PI);
+        num_destroy(&named);
+        string_free(pi_text);
+
         ASSERT_NUMBER_EQ(parsed_pi, NUM_PI);
         ASSERT_NUMBER_EQ(parsed_gamma, NUM_EULER_MASCHERONI);
         ASSERT_NUMBER_EQ(parsed_phi, NUM_PHI);
@@ -202,8 +210,8 @@ void run_number_constant_tests(void)
         ASSERT_TRUE(bad_sqrt2_text == NULL);
         ASSERT_TRUE(bad_inf_text == NULL);
 
-        free(bad_sqrt2_text);
-        free(bad_inf_text);
+        string_free(bad_sqrt2_text);
+        string_free(bad_inf_text);
         num_destroy(&parsed_pi);
         num_destroy(&parsed_gamma);
         num_destroy(&parsed_phi);

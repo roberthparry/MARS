@@ -160,8 +160,10 @@ All declarations are in `include/qfloat.h`.
   Parse a decimal string (integer, fractional, optional sign, scientific
   notation). Uses exact decimal accumulation for full precision.
 
-- `void qf_to_string(qfloat_t x, char *out, size_t out_size)`  
-  Write normalised scientific notation with 32 significant digits into `out`.
+- `string_t *qf_to_string(qfloat_t x)`
+  Return a newly allocated string containing normalised scientific notation
+  with 32 significant digits. The caller owns the returned `string_t` and must
+  release it with `string_free()`.
 
 ### Comparison and Classification
 

@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdarg.h>
 
 #include "datetime.h"
 #include "matrix.h"
@@ -296,6 +297,10 @@ int ts_builder_append_double(ts_builder_t *builder,
                              const datetime_t *datetime,
                              double value);
 
+int ts_builder_append_date_text_double(ts_builder_t *builder,
+                                       const string_t *date_text,
+                                       double value);
+
 int ts_builder_append_date_string_double(ts_builder_t *builder,
                                          const char *date_text,
                                          double value);
@@ -315,6 +320,16 @@ void          ts_builder_destroy(ts_builder_t *builder);
  * Sample forecasting inputs this is expected to support forms such as
  * `31/05/2020`.
  */
+timeseries_t *ts_from_csv_text(const string_t *path,
+                               const string_t *date_column,
+                               const string_t *value_column,
+                               ts_frequency_t frequency,
+                               ts_year_type_t year_type,
+                               ts_missing_policy_t missing_policy);
+
+/**
+ * @brief Convenience wrapper for ts_from_csv_text().
+ */
 timeseries_t *ts_from_csv(const char *path,
                           const char *date_column,
                           const char *value_column,
@@ -329,6 +344,16 @@ timeseries_t *ts_from_csv(const char *path,
  * and is intended for exogenous regressors in regression and ARIMAX/SARIMAX
  * workflows.
  */
+matrix_t *ts_matrix_from_csv_text(const string_t *path,
+                                  const string_t *date_column,
+                                  const string_t *const *value_columns,
+                                  size_t value_column_count,
+                                  ts_frequency_t frequency,
+                                  ts_missing_policy_t missing_policy);
+
+/**
+ * @brief Convenience wrapper for ts_matrix_from_csv_text().
+ */
 matrix_t *ts_matrix_from_csv(const char *path,
                              const char *date_column,
                              const char *const *value_columns,
@@ -340,14 +365,20 @@ matrix_t *ts_matrix_from_csv(const char *path,
    Formatting / file output
    ------------------------------------------------------------------------- */
 
-char *ts_to_string(const timeseries_t *series, ts_string_style_t style);
+string_t *ts_to_text(const timeseries_t *series, ts_string_style_t style);
+char     *ts_to_string(const timeseries_t *series, ts_string_style_t style);
+string_t *ts_vsprintf_text(const char *fmt, va_list ap);
+string_t *ts_sprintf_text(const char *fmt, ...);
 int   ts_sprintf(char *out, size_t out_size, const char *fmt, ...);
 int   ts_printf(const char *fmt, ...);
 void  ts_print(const timeseries_t *series);
 
-char *ts_forecast_to_string(const ts_forecast_t *forecast, ts_string_style_t style);
-char *ts_regression_summary_to_string(const ts_regression_result_t *result);
-char *ts_arima_summary_to_string(const ts_arima_result_t *result);
+string_t *ts_forecast_to_text(const ts_forecast_t *forecast, ts_string_style_t style);
+char     *ts_forecast_to_string(const ts_forecast_t *forecast, ts_string_style_t style);
+string_t *ts_regression_summary_to_text(const ts_regression_result_t *result);
+char     *ts_regression_summary_to_string(const ts_regression_result_t *result);
+string_t *ts_arima_summary_to_text(const ts_arima_result_t *result);
+char     *ts_arima_summary_to_string(const ts_arima_result_t *result);
 
 /**
  * @brief Write a series to a text or CSV file.

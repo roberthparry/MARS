@@ -3,6 +3,7 @@
 #include <stdlib.h>
 
 #include "expr_maths.h"
+#include "ustring.h"
 
 static inline expr_t *expr_math_wrap_unary(const expr_ops_t *ops, const expr_t *a)
 {
@@ -817,11 +818,12 @@ static expr_t *expr_factor_product_from_number(number_t value)
         snprintf(name, sizeof(name), "a%zu", i);
         base = expr_new_named_const(factors->items[i].prime, name);
         {
-            char *prime_text = num_to_string(factors->items[i].prime);
+            string_t *prime_text = num_to_string(factors->items[i].prime);
 
             base->binding_expr =
-                expr_binding_expr_new_number_text(prime_text ? prime_text : "NAN");
-            free(prime_text);
+                expr_binding_expr_new_number_text(prime_text
+                    ? string_c_str(prime_text) : "NAN");
+            string_free(prime_text);
         }
         if (factors->items[i].exponent > 1u) {
             number_t exponent = num_create_from_long((long)factors->items[i].exponent);

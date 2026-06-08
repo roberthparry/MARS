@@ -1,28 +1,10 @@
 #include <stdarg.h>
+#include <limits.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 #include "matrix.h"
-
-static int mo_put_char(char **dst, size_t *remaining, size_t *count, char c)
-{
-    if (*dst && *remaining > 1) {
-        **dst = c;
-        (*dst)++;
-        (*remaining)--;
-        **dst = '\0';
-    }
-    (*count)++;
-    return 0;
-}
-
-static int mo_put_str(char **dst, size_t *remaining, size_t *count, const char *s)
-{
-    while (*s)
-        mo_put_char(dst, remaining, count, *s++);
-    return 0;
-}
+#include "ustring.h"
 
 static mat_string_style_t mo_matrix_style(int scientific, int layout)
 {
@@ -31,159 +13,137 @@ static mat_string_style_t mo_matrix_style(int scientific, int layout)
     return layout ? MAT_STRING_LAYOUT_PRETTY : MAT_STRING_INLINE_PRETTY;
 }
 
-static int mo_emit_matrix(char **dst,
-                          size_t *remaining,
-                          size_t *count,
-                          va_list *ap,
-                          const char **fmtp)
+static int mo_append_padding(string_t *out, int count)
 {
-    int scientific = (**fmtp == 'M');
-    int layout = 0;
-    const matrix_t *A;
-    char *s;
-
-    (*fmtp)++;
-    if (**fmtp == 'L' || **fmtp == 'l') {
-        layout = 1;
-        (*fmtp)++;
+    for (int i = 0; i < count; ++i) {
+        if (string_append_char(out, ' ') != 0)
+            return -1;
     }
-
-    A = va_arg(*ap, const matrix_t *);
-    s = mat_to_string(A, mo_matrix_style(scientific, layout));
-    if (!s)
-        return -1;
-
-    mo_put_str(dst, remaining, count, s);
-    free(s);
     return 0;
 }
 
-static int mo_format_scalar(char *tmp, size_t tmp_size, char spec, va_list *ap)
+static string_format_result_t mo_format_callback(string_t *out,
+                                                 const string_format_spec_t *spec,
+                                                 va_list ap,
+                                                 void *user)
 {
-    char fmtbuf[8];
+    bool scientific;
+    bool layout;
+    bool left;
+    int width;
+    const matrix_t *A;
+    string_t *text;
+    size_t text_len;
+    int pad;
+    string_format_result_t result = STRING_FORMAT_HANDLED;
 
-    snprintf(fmtbuf, sizeof(fmtbuf), "%%%c", spec);
+    (void)user;
 
-    switch (spec) {
-        case 'd':
-            return snprintf(tmp, tmp_size, fmtbuf, va_arg(*ap, int));
-        case 'u':
-            return snprintf(tmp, tmp_size, fmtbuf, va_arg(*ap, unsigned));
-        case 'g':
-        case 'f':
-        case 'e':
-        case 'E':
-            return snprintf(tmp, tmp_size, fmtbuf, va_arg(*ap, double));
-        case 'c':
-            return snprintf(tmp, tmp_size, fmtbuf, va_arg(*ap, int));
-        case 's': {
-            const char *v = va_arg(*ap, const char *);
-            return snprintf(tmp, tmp_size, fmtbuf, v ? v : "(null)");
+    if (!out || !spec || (spec->conversion != 'm' && spec->conversion != 'M'))
+        return STRING_FORMAT_UNHANDLED;
+
+    width = spec->width;
+    left = spec->flag_left;
+    if (spec->width_from_argument) {
+        width = va_arg(ap, int);
+        if (width < 0) {
+            left = true;
+            width = -width;
         }
-        case 'p':
-            return snprintf(tmp, tmp_size, fmtbuf, va_arg(*ap, void *));
-        default:
-            tmp[0] = '%';
-            tmp[1] = spec;
-            tmp[2] = '\0';
-            return 2;
     }
+    if (spec->precision_from_argument)
+        (void)va_arg(ap, int);
+
+    scientific = spec->conversion == 'M';
+    layout = spec->trailing_modifier == 'l' ||
+             spec->trailing_modifier == 'L';
+    if (layout)
+        result = STRING_FORMAT_HANDLED_WITH_TRAILING_MODIFIER;
+
+    A = va_arg(ap, const matrix_t *);
+    text = mat_to_text(A, mo_matrix_style(scientific, layout));
+    if (!text)
+        return STRING_FORMAT_ERROR;
+
+    text_len = string_length(text);
+    pad = width > (int)text_len ? width - (int)text_len : 0;
+
+    if (!left && mo_append_padding(out, pad) != 0)
+        goto fail;
+    if (string_append_string(out, text) != 0)
+        goto fail;
+    if (left && mo_append_padding(out, pad) != 0)
+        goto fail;
+
+    string_free(text);
+    return result;
+
+fail:
+    string_free(text);
+    return STRING_FORMAT_ERROR;
 }
 
-static int mo_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap)
+string_t *mat_vsprintf_text(const char *fmt, va_list ap)
 {
-    const char *p = fmt;
-    char *dst = out;
-    size_t remaining = out && out_size ? out_size : 0;
-    size_t count = 0;
-    va_list ap_local;
-
-    if (dst && remaining > 0)
-        *dst = '\0';
-
-    va_copy(ap_local, ap);
-    while (*p) {
-        if (*p != '%') {
-            mo_put_char(&dst, &remaining, &count, *p++);
-            continue;
-        }
-
-        p++;
-        if (*p == '%') {
-            mo_put_char(&dst, &remaining, &count, *p++);
-            continue;
-        }
-
-        if (*p == 'M' || *p == 'm') {
-            if (mo_emit_matrix(&dst, &remaining, &count, &ap_local, &p) != 0) {
-                va_end(ap_local);
-                return -1;
-            }
-            continue;
-        }
-
-        {
-            char spec = *p++;
-            char tmp[512];
-            int wrote = mo_format_scalar(tmp, sizeof(tmp), spec, &ap_local);
-
-            if (wrote < 0) {
-                va_end(ap_local);
-                return -1;
-            }
-            mo_put_str(&dst, &remaining, &count, tmp);
-        }
-    }
-
-    va_end(ap_local);
-    return (int)count;
+    return string_vsprintf_with_callback(fmt, ap, mo_format_callback, NULL);
 }
 
 int mat_sprintf(char *out, size_t out_size, const char *fmt, ...)
 {
     int n;
     va_list ap;
+    string_t *text;
+    size_t len;
 
     va_start(ap, fmt);
-    n = mo_vsprintf(out, out_size, fmt, ap);
+    text = mat_vsprintf_text(fmt, ap);
     va_end(ap);
+    if (!text)
+        return -1;
+
+    len = string_view_length(string_view_all(text));
+    if (out && out_size > 0u) {
+        size_t copy_len = len < out_size - 1u ? len : out_size - 1u;
+
+        memcpy(out, string_c_str(text), copy_len);
+        out[copy_len] = '\0';
+    }
+
+    n = len <= (size_t)INT_MAX ? (int)len : -1;
+    string_free(text);
     return n;
+}
+
+string_t *mat_sprintf_text(const char *fmt, ...)
+{
+    va_list ap;
+    string_t *text;
+
+    va_start(ap, fmt);
+    text = mat_vsprintf_text(fmt, ap);
+    va_end(ap);
+    return text;
 }
 
 int mat_printf(const char *fmt, ...)
 {
     va_list ap;
-    int needed;
-    char *buf;
+    int written;
+    string_t *text;
 
     va_start(ap, fmt);
-    needed = mo_vsprintf(NULL, 0, fmt, ap);
+    text = mat_vsprintf_text(fmt, ap);
     va_end(ap);
-    if (needed < 0)
-        return needed;
-
-    buf = malloc((size_t)needed + 1);
-    if (!buf)
+    if (!text)
         return -1;
 
-    va_start(ap, fmt);
-    mo_vsprintf(buf, (size_t)needed + 1, fmt, ap);
-    va_end(ap);
-
-    fputs(buf, stdout);
-    free(buf);
-    return needed;
+    written = string_printf("%S", text);
+    string_free(text);
+    return written;
 }
 
 void mat_print(const matrix_t *A)
 {
-    char *s = mat_to_string(A, MAT_STRING_LAYOUT_PRETTY);
-
-    if (!s) {
-        printf("(null)\n");
-        return;
-    }
-
-    printf("%s\n", s);
-    free(s);
+    if (mat_printf("%ml\n", A) < 0)
+        string_printf("(null)\n");
 }

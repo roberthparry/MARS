@@ -25,7 +25,6 @@
 #include <time.h>
 #include <stdio.h>
 #include <string.h>
-#include <ctype.h>
 
 #include "datetime.h"
 #include "ustring.h"
@@ -1077,16 +1076,85 @@ double datetime_duration(const datetime_t *dttm1, const datetime_t *dttm2, datet
 
 /* Internal utility functions for string handling */
 
-static void str_to_upper(char *s)
+static char datetime_ascii_upper(char ch)
 {
-    for (; *s; s++)
-        *s = (char)toupper((unsigned char)*s);
+   return (ch >= 'a' && ch <= 'z') ? (char)(ch - 'a' + 'A') : ch;
+}
+
+static int datetime_cursor_peek_ascii(const string_cursor_t *cursor, char *out)
+{
+   unsigned char ascii = 0u;
+
+   if (!cursor || string_cursor_done(cursor) ||
+       !string_cursor_peek_ascii(cursor, &ascii))
+      return 0;
+   if (out)
+      *out = (char)ascii;
+   return 1;
+}
+
+static int datetime_cursor_peek_matches(const string_cursor_t *cursor,
+                                        char lower,
+                                        char upper)
+{
+   char ch = '\0';
+
+   return datetime_cursor_peek_ascii(cursor, &ch) &&
+          (ch == lower || ch == upper);
+}
+
+static int datetime_cursor_advance(string_cursor_t *cursor)
+{
+   return string_cursor_next(cursor) == 0;
+}
+
+static size_t datetime_cursor_count_run(const string_cursor_t *cursor,
+                                        char lower,
+                                        char upper)
+{
+   string_cursor_t *scan = string_cursor_clone(cursor);
+   size_t count = 0u;
+
+   if (!scan)
+      return 0u;
+
+   while (datetime_cursor_peek_matches(scan, lower, upper)) {
+      count++;
+      if (!datetime_cursor_advance(scan))
+         break;
+   }
+
+   string_cursor_free(scan);
+   return count;
+}
+
+static int datetime_cursor_second_is(const string_cursor_t *cursor, char expected)
+{
+   string_cursor_t *scan = string_cursor_clone(cursor);
+   char ch = '\0';
+   int matches = 0;
+
+   if (!scan)
+      return 0;
+   if (datetime_cursor_advance(scan) &&
+       datetime_cursor_peek_ascii(scan, &ch) &&
+       ch == expected)
+      matches = 1;
+
+   string_cursor_free(scan);
+   return matches;
+}
+
+static void datetime_cursor_skip_run(string_cursor_t *cursor, size_t count)
+{
+   while (count-- > 0u && !string_cursor_done(cursor))
+      (void)datetime_cursor_advance(cursor);
 }
 
 static char *datetime_format_export(const string_t *text)
 {
    const char *raw = string_c_str(text);
-   size_t len = strlen(raw) + 1u;
+   size_t len = string_view_length(string_view_all(text)) + 1u;
    char *out = malloc(len);
 
    if (!out)
@@ -1105,6 +1173,54 @@ static void datetime_format_append_text(string_t *out,
       *failed = 1;
 }
 
+static void datetime_format_append_name(string_t *out,
+                                        int *failed,
+                                        const char *name,
+                                        size_t max_chars,
+                                        int title_case,
+                                        int upper_case)
+{
+   string_t *text;
+   string_cursor_t *cursor;
+   size_t written = 0u;
+
+   if (*failed)
+      return;
+
+   text = string_new_with(name);
+   cursor = text ? string_cursor_new(text) : NULL;
+   if (!text || !cursor) {
+      *failed = 1;
+      goto done;
+   }
+
+   while (!string_cursor_done(cursor) && written < max_chars) {
+      char ascii = '\0';
+      rune_t rune = string_cursor_peek(cursor);
+
+      if (rune_to_ascii(rune, &ascii) &&
+          (upper_case || (title_case && written == 0u))) {
+         if (string_append_char(out, datetime_ascii_upper(ascii)) != 0) {
+            *failed = 1;
+            goto done;
+         }
+      } else if (string_append_rune(out, rune) != 0) {
+         *failed = 1;
+         goto done;
+      }
+
+      written++;
+      if (!datetime_cursor_advance(cursor)) {
+         *failed = 1;
+         goto done;
+      }
+   }
+
+done:
+   string_cursor_free(cursor);
+   string_free(text);
+}
+
 static void datetime_format_append_char(string_t *out, int *failed, char ch)
 {
    if (*failed)
@@ -1113,165 +1229,175 @@ static void datetime_format_append_char(string_t *out, int *failed, char ch)
       *failed = 1;
 }
 
-char *datetime_format(const datetime_t *dttm, const char *format)
+static void datetime_format_append_format(string_t *out,
+                                          int *failed,
+                                          const char *format,
+                                          int value)
 {
-    static char* weekdayNames[] = { NULL,
+   if (*failed)
+      return;
+   if (string_append_format(out, format, value) < 0)
+      *failed = 1;
+}
+
+string_t *datetime_format_text(const datetime_t *dttm,
+                               const string_t *format)
+{
+    static const char* weekdayNames[] = { NULL,
         "sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday" };
-    static char* monthNames[] = { NULL,
+    static const char* monthNames[] = { NULL,
         "january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december" };
-
-    if (format == NULL) return NULL;
-    if (dttm->year == SHRT_MAX) {
-        if (datetime_year(dttm) == SHRT_MAX) {
-            return NULL;
-        }
-    }
-
-   string_t *formattedString = string_new();
-
-   if (!formattedString)
-      return NULL;
-
-   char  buffer[ 32 ];
-
-   const char *formatPtr = format;
+   string_t *formattedString;
+   string_cursor_t *cursor;
    int append_failed = 0;
 
-   while ( *formatPtr ) {
-      if ( *formatPtr == '%' ) {
-         formatPtr ++;
-         if ( *formatPtr == '\0' ) {
+   if (!dttm || !format)
+      return NULL;
+   if (dttm->year == SHRT_MAX && datetime_year(dttm) == SHRT_MAX)
+      return NULL;
+
+   formattedString = string_new();
+   cursor = formattedString ? string_cursor_new(format) : NULL;
+
+   if (!formattedString || !cursor) {
+      string_free(formattedString);
+      return NULL;
+   }
+
+   while (!string_cursor_done(cursor)) {
+      char marker = '\0';
+
+      if (!datetime_cursor_peek_ascii(cursor, &marker)) {
+         if (string_append_rune(formattedString, string_cursor_peek(cursor)) != 0)
+            append_failed = 1;
+         (void)datetime_cursor_advance(cursor);
+         continue;
+      }
+
+      if (marker == '%') {
+         (void)datetime_cursor_advance(cursor);
+         if (string_cursor_done(cursor)) {
             datetime_format_append_char(formattedString, &append_failed, '%');
             break;
          }
 
-         switch ( *formatPtr ) {
+         char token = '\0';
+         (void)datetime_cursor_peek_ascii(cursor, &token);
+         switch (token) {
             case '%':
                datetime_format_append_char(formattedString, &append_failed, '%');
-               formatPtr ++;
+               (void)datetime_cursor_advance(cursor);
                break;
 
             case 'd':
             case 'D':
-               switch ( strspn( formatPtr, "Dd" ) ) {
+            {
+               size_t run = datetime_cursor_count_run(cursor, 'd', 'D');
+               int all_caps = token == 'D' && datetime_cursor_second_is(cursor, 'D');
+               switch (run) {
                   case 1:
-                     sprintf(buffer, "%i", (int) dttm->day);
-                     datetime_format_append_text(formattedString, &append_failed, buffer);
-                     formatPtr ++;
+                     datetime_format_append_format(formattedString, &append_failed, "%i", (int)dttm->day);
+                     datetime_cursor_skip_run(cursor, 1u);
                      break;
                   case 2:
-                     sprintf(buffer, "%02i", (int) dttm->day);
-                     datetime_format_append_text(formattedString, &append_failed, buffer);
-                     formatPtr += 2;
+                     datetime_format_append_format(formattedString, &append_failed, "%02i", (int)dttm->day);
+                     datetime_cursor_skip_run(cursor, 2u);
                      break;
                   case 3:
-                     strncpy(buffer, weekdayNames[ datetime_weekday(dttm) ], 3);
-                     buffer[3] = '\0';
-                     if (*formatPtr == 'D') {
-                        if ( formatPtr[ 1 ] == 'D' )
-                           str_to_upper(buffer);
-                        else
-                           buffer[ 0 ] = (char)toupper((int) buffer[ 0 ]);
-                     }
-                     datetime_format_append_text(formattedString, &append_failed, buffer);
-                     formatPtr += 3;
+                     datetime_format_append_name(formattedString,
+                                                 &append_failed,
+                                                 weekdayNames[datetime_weekday(dttm)],
+                                                 3u,
+                                                 token == 'D' && !all_caps,
+                                                 all_caps);
+                     datetime_cursor_skip_run(cursor, 3u);
                      break;
                   case 4:
                   default:
-                     strcpy( buffer, weekdayNames[ datetime_weekday(dttm) ] );
-                     if (*formatPtr == 'D') {
-                        if (formatPtr[ 1 ] == 'D')
-                           str_to_upper(buffer);
-                        else
-                           buffer[ 0 ] = (char) toupper( (int) buffer[ 0 ] );
-                     }
-                     datetime_format_append_text(formattedString, &append_failed, buffer);
-                     formatPtr += 4;
+                     datetime_format_append_name(formattedString,
+                                                 &append_failed,
+                                                 weekdayNames[datetime_weekday(dttm)],
+                                                 SIZE_MAX,
+                                                 token == 'D' && !all_caps,
+                                                 all_caps);
+                     datetime_cursor_skip_run(cursor, 4u);
                      break;
                }
                break;
+            }
 
             case 'o':
             case 'O':
-               if ( 10 < dttm->day && dttm->day < 20 ) {
-                  strcpy(buffer, "th");
-               } else {
-                  switch (dttm->day % 10) {
-                     case 1:
-                        strcpy(buffer, "st");
-                        break;
-                     case 2:
-                        strcpy(buffer, "nd");
-                        break;
-                     case 3:
-                        strcpy(buffer, "rd");
-                        break;
-                     default:
-                        strcpy(buffer, "th");
-                        break;
-                  }
+            {
+               const char *suffix = "th";
 
+               if (!(10 < dttm->day && dttm->day < 20)) {
+                  switch (dttm->day % 10) {
+                     case 1: suffix = "st"; break;
+                     case 2: suffix = "nd"; break;
+                     case 3: suffix = "rd"; break;
+                     default: suffix = "th"; break;
+                  }
                }
-               if (*formatPtr == 'O')
-                  str_to_upper(buffer);
-               datetime_format_append_text(formattedString, &append_failed, buffer);
-               formatPtr ++;
+               datetime_format_append_name(formattedString,
+                                           &append_failed,
+                                           suffix,
+                                           SIZE_MAX,
+                                           0,
+                                           token == 'O');
+               (void)datetime_cursor_advance(cursor);
                break;
+            }
 
             case 'm':
             case 'M':
-               switch ( strspn(formatPtr, "Mm")) {
+            {
+               size_t run = datetime_cursor_count_run(cursor, 'm', 'M');
+               int all_caps = token == 'M' && datetime_cursor_second_is(cursor, 'M');
+               switch (run) {
                   case 1:
-                     sprintf(buffer, "%i", (int)dttm->month);
-                     datetime_format_append_text(formattedString, &append_failed, buffer);
-                     formatPtr ++;
+                     datetime_format_append_format(formattedString, &append_failed, "%i", (int)dttm->month);
+                     datetime_cursor_skip_run(cursor, 1u);
                      break;
                   case 2:
-                     sprintf( buffer, "%02i", (int) dttm->month );
-                     datetime_format_append_text(formattedString, &append_failed, buffer);
-                     formatPtr += 2;
+                     datetime_format_append_format(formattedString, &append_failed, "%02i", (int)dttm->month);
+                     datetime_cursor_skip_run(cursor, 2u);
                      break;
                   case 3:
-                     strncpy(buffer, monthNames[ dttm->month ], 3);
-                     buffer[3] = '\0';
-                     if (*formatPtr == 'M') {
-                        if (formatPtr[ 1 ] == 'M')
-                           str_to_upper(buffer);
-                        else
-                           buffer[ 0 ] = (char)toupper((int)buffer[ 0 ]);
-                     }
-                     datetime_format_append_text(formattedString, &append_failed, buffer);
-                     formatPtr += 3;
+                     datetime_format_append_name(formattedString,
+                                                 &append_failed,
+                                                 monthNames[dttm->month],
+                                                 3u,
+                                                 token == 'M' && !all_caps,
+                                                 all_caps);
+                     datetime_cursor_skip_run(cursor, 3u);
                      break;
                   case 4:
                   default:
-                     strcpy(buffer, monthNames[ dttm->month ] );
-                     if ( *formatPtr == 'M' ) {
-                        if ( formatPtr[ 1 ] == 'M' )
-                           str_to_upper( buffer );
-                        else
-                           buffer[ 0 ] = (char) toupper( (int) buffer[ 0 ] );
-                     }
-                     datetime_format_append_text(formattedString, &append_failed, buffer);
-                     formatPtr += 4;
+                     datetime_format_append_name(formattedString,
+                                                 &append_failed,
+                                                 monthNames[dttm->month],
+                                                 SIZE_MAX,
+                                                 token == 'M' && !all_caps,
+                                                 all_caps);
+                     datetime_cursor_skip_run(cursor, 4u);
                      break;
                }
                break;
+            }
 
             case 'y':
             case 'Y':
             {
-               int Y_count = (int) strspn( formatPtr, "Yy" );
-               if (Y_count < 4) {
+               size_t run = datetime_cursor_count_run(cursor, 'y', 'Y');
+               if (run < 4u) {
                   int year = dttm->year - 100 * (dttm->year / 100);
-                  sprintf(buffer, "%02i", year);
-                  datetime_format_append_text(formattedString, &append_failed, buffer);
-                  formatPtr += Y_count;
+                  datetime_format_append_format(formattedString, &append_failed, "%02i", year);
+                  datetime_cursor_skip_run(cursor, run);
                }
                else {
-                  sprintf(buffer, "%i", dttm->year);
-                  datetime_format_append_text(formattedString, &append_failed, buffer);
-                  formatPtr += 4;
+                  datetime_format_append_format(formattedString, &append_failed, "%i", dttm->year);
+                  datetime_cursor_skip_run(cursor, 4u);
                }
                break;
             }
@@ -1281,57 +1407,53 @@ char *datetime_format(const datetime_t *dttm, const char *format)
                break;
          }
       }
-      else if ( *formatPtr == '@' ) {
-         formatPtr ++;
-         if ( *formatPtr == '\0' ) {
+      else if (marker == '@') {
+         (void)datetime_cursor_advance(cursor);
+         if (string_cursor_done(cursor)) {
             datetime_format_append_char(formattedString, &append_failed, '%');
             break;
          }
 
-         switch (*formatPtr) {
+         char token = '\0';
+         (void)datetime_cursor_peek_ascii(cursor, &token);
+         switch (token) {
             case 'h':
             case 'H':
             {
                int hour = dttm->hour;
-               if (*formatPtr == 'h' && dttm->hour > 12) hour -= 12;
-               formatPtr ++;
-               if (toupper(*formatPtr) == 'H') {
-                  sprintf(buffer, "%02i", hour);
-                  datetime_format_append_text(formattedString, &append_failed, buffer);
-                  formatPtr ++;
+               if (token == 'h' && dttm->hour > 12) hour -= 12;
+               (void)datetime_cursor_advance(cursor);
+               if (datetime_cursor_peek_matches(cursor, 'h', 'H')) {
+                  datetime_format_append_format(formattedString, &append_failed, "%02i", hour);
+                  (void)datetime_cursor_advance(cursor);
                }
                else {
-                  sprintf( buffer, "%i", hour);
-                  datetime_format_append_text(formattedString, &append_failed, buffer);
+                  datetime_format_append_format(formattedString, &append_failed, "%i", hour);
                }
                break;
             }
 
             case 'M':
             case 'm':
-               formatPtr ++;
-               if (toupper(*formatPtr) == 'M') {
-                  sprintf(buffer, "%02i", (int)dttm->minute);
-                  datetime_format_append_text(formattedString, &append_failed, buffer);
-                  formatPtr ++;
+               (void)datetime_cursor_advance(cursor);
+               if (datetime_cursor_peek_matches(cursor, 'm', 'M')) {
+                  datetime_format_append_format(formattedString, &append_failed, "%02i", (int)dttm->minute);
+                  (void)datetime_cursor_advance(cursor);
                }
                else {
-                  sprintf(buffer, "%i", (int)dttm->minute);
-                  datetime_format_append_text(formattedString, &append_failed, buffer);
+                  datetime_format_append_format(formattedString, &append_failed, "%i", (int)dttm->minute);
                }
                break;
 
             case 'S':
             case 's':
-               formatPtr ++;
-               if (toupper(*formatPtr) == 'S') {
-                  sprintf( buffer, "%02i", (int)dttm->second);
-                  datetime_format_append_text(formattedString, &append_failed, buffer);
-                  formatPtr ++;
+               (void)datetime_cursor_advance(cursor);
+               if (datetime_cursor_peek_matches(cursor, 's', 'S')) {
+                  datetime_format_append_format(formattedString, &append_failed, "%02i", (int)dttm->second);
+                  (void)datetime_cursor_advance(cursor);
                }
                else {
-                  sprintf( buffer, "%i", (int)dttm->second);
-                  datetime_format_append_text(formattedString, &append_failed, buffer);
+                  datetime_format_append_format(formattedString, &append_failed, "%i", (int)dttm->second);
                }
                break;
 
@@ -1340,7 +1462,7 @@ char *datetime_format(const datetime_t *dttm, const char *format)
                   datetime_format_append_text(formattedString, &append_failed, "PM");
                else
                   datetime_format_append_text(formattedString, &append_failed, "AM");
-               formatPtr ++;
+               (void)datetime_cursor_advance(cursor);
                break;
 
             case 'p':
@@ -1348,12 +1470,12 @@ char *datetime_format(const datetime_t *dttm, const char *format)
                   datetime_format_append_text(formattedString, &append_failed, "pm");
                else
                   datetime_format_append_text(formattedString, &append_failed, "am");
-               formatPtr ++;
+               (void)datetime_cursor_advance(cursor);
                break;
 
             case '@':
                datetime_format_append_char(formattedString, &append_failed, '@');
-               formatPtr ++;
+               (void)datetime_cursor_advance(cursor);
                break;
 
             default:
@@ -1362,11 +1484,11 @@ char *datetime_format(const datetime_t *dttm, const char *format)
          }
       }
       else {
-         if ( *formatPtr == '^' )
-            formatPtr ++;
+         if (marker == '^')
+            (void)datetime_cursor_advance(cursor);
          else {
-            datetime_format_append_char(formattedString, &append_failed, *formatPtr);
-            formatPtr ++;
+            datetime_format_append_char(formattedString, &append_failed, marker);
+            (void)datetime_cursor_advance(cursor);
          }
       }
    }
@@ -1374,14 +1496,33 @@ char *datetime_format(const datetime_t *dttm, const char *format)
    if (append_failed)
       goto error;
 
-   char *result = datetime_format_export(formattedString);
-   string_free(formattedString);
-   return result;
+   string_cursor_free(cursor);
+   return formattedString;
 
 error:
+   string_cursor_free(cursor);
    string_free(formattedString);
    return NULL;
 
+}
+
+char *datetime_format(const datetime_t *dttm, const char *format)
+{
+   string_t *format_text;
+   string_t *formatted_text;
+   char *result;
+
+   if (format == NULL) return NULL;
+
+   format_text = string_new_with(format);
+   formatted_text = format_text ? datetime_format_text(dttm, format_text) : NULL;
+   string_free(format_text);
+   if (!formatted_text)
+      return NULL;
+
+   result = datetime_format_export(formatted_text);
+   string_free(formatted_text);
+   return result;
 }
 
 double datetime_sun_time(long julianDayNumber, double latitude, double longitude, bool isSunrise)

@@ -1,5 +1,6 @@
 #include "number.h"
 #include "number_internal.h"
+#include "ustring.h"
 
 #include <complex.h>
 #include <math.h>
@@ -22,40 +23,30 @@ static number_t number_cdouble_const(number_const_id_t id, double complex value)
     return out;
 }
 
-static char *number_format_cdouble_value(double value,
-                                         bool scientific,
-                                         int precision)
+static string_t *number_format_cdouble_value_text(double value,
+                                                  bool scientific,
+                                                  int precision)
 {
     char fmt[32];
-    char *out;
-    int needed;
 
     if (precision >= 0)
         snprintf(fmt, sizeof(fmt), scientific ? "%%.%dE" : "%%.%dg", precision);
     else
         snprintf(fmt, sizeof(fmt), scientific ? "%%.16E" : "%%.17g");
-    needed = snprintf(NULL, 0, fmt, value);
-    if (needed < 0)
-        return NULL;
-    out = malloc((size_t)needed + 1u);
-    if (!out)
-        return NULL;
-    snprintf(out, (size_t)needed + 1u, fmt, value);
-    return out;
+    return string_sprintf(fmt, value);
 }
 
-char *number_format_cdouble(const number_t *number,
-                                bool scientific,
-                                int precision)
+string_t *number_format_cdouble_text(const number_t *number,
+                                     bool scientific,
+                                     int precision)
 {
     double complex value;
     double real;
     double imag;
-    char *real_text = NULL;
-    char *imag_text = NULL;
-    char *out = NULL;
+    string_t *real_text = NULL;
+    string_t *imag_text = NULL;
+    string_t *out = NULL;
     const char *sign;
-    int needed;
 
     if (!number)
         return NULL;
@@ -63,51 +54,40 @@ char *number_format_cdouble(const number_t *number,
     real = creal(value);
     imag = cimag(value);
     if (imag == 0.0)
-        return number_format_cdouble_value(real, scientific, precision);
+        return number_format_cdouble_value_text(real, scientific, precision);
     if (real == 0.0) {
         if (imag == 1.0)
-            return number_strdup("i");
+            return string_new_with("i");
         if (imag == -1.0)
-            return number_strdup("-i");
-        imag_text = number_format_cdouble_value(imag, scientific, precision);
+            return string_new_with("-i");
+        imag_text = number_format_cdouble_value_text(imag, scientific, precision);
         if (!imag_text)
             return NULL;
-        needed = snprintf(NULL, 0, "%si", imag_text);
-        if (needed >= 0) {
-            out = malloc((size_t)needed + 1u);
-            if (out)
-                snprintf(out, (size_t)needed + 1u, "%si", imag_text);
-        }
-        free(imag_text);
+        out = string_sprintf("%Si", imag_text);
+        string_free(imag_text);
         return out;
     }
 
-    real_text = number_format_cdouble_value(real, scientific, precision);
-    imag_text = number_format_cdouble_value(fabs(imag), scientific, precision);
+    real_text = number_format_cdouble_value_text(real, scientific, precision);
+    imag_text = number_format_cdouble_value_text(fabs(imag), scientific, precision);
     if (!real_text || !imag_text)
         goto done;
     sign = imag < 0.0 ? "-" : "+";
     {
-        const char *imag_coeff = fabs(imag) == 1.0 ? "" : imag_text;
-
-        needed = snprintf(NULL, 0, "%s %s %si", real_text, sign, imag_coeff);
-        if (needed < 0)
-            goto done;
-        out = malloc((size_t)needed + 1u);
-        if (out)
-            snprintf(out, (size_t)needed + 1u, "%s %s %si",
-                     real_text, sign, imag_coeff);
+        out = fabs(imag) == 1.0
+            ? string_sprintf("%S %s i", real_text, sign)
+            : string_sprintf("%S %s %Si", real_text, sign, imag_text);
     }
 
 done:
-    free(real_text);
-    free(imag_text);
+    string_free(real_text);
+    string_free(imag_text);
     return out;
 }
 
-char *number_to_string_cdouble(const number_t *number)
+string_t *number_to_text_cdouble(const number_t *number)
 {
-    return number_format_cdouble(number, false, -1);
+    return number_format_cdouble_text(number, false, -1);
 }
 
 bool number_is_zero_cdouble(const number_t *number)

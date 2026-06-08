@@ -31,6 +31,40 @@ static void test_mat_sprintf_formats(void)
         num_destroy(&vals[i]);
 }
 
+static void test_mat_text_formatters(void)
+{
+    number_t vals[4];
+    matrix_t *A;
+    string_t *inline_text;
+    string_t *layout_text;
+
+    vals[0] = num_create_from_long(1);
+    vals[1] = num_create_from_long(2);
+    vals[2] = num_create_from_long(3);
+    vals[3] = num_create_from_long(4);
+    A = mat_create(2, 2, vals);
+
+    inline_text = mat_to_text(A, MAT_STRING_INLINE_PRETTY);
+    layout_text = mat_sprintf_text("A = %ml", A);
+
+    check_bool("mat_to_text returns string_t", inline_text != NULL);
+    check_bool("mat_to_text inline delimiters",
+               inline_text &&
+               string_starts_with(inline_text, "(") &&
+               string_find(inline_text, ";") >= 0);
+    check_bool("mat_sprintf_text returns string_t", layout_text != NULL);
+    check_bool("mat_sprintf_text layout has prefix and newline",
+               layout_text &&
+               string_starts_with(layout_text, "A = (") &&
+               string_find(layout_text, "\n") >= 0);
+
+    string_free(inline_text);
+    string_free(layout_text);
+    mat_free(A);
+    for (size_t i = 0; i < 4u; ++i)
+        num_destroy(&vals[i]);
+}
+
 static void test_mat_printf_smoke(void)
 {
     number_t vals[4];
@@ -74,7 +108,7 @@ static void test_mat_sprintf_number_precision(void)
     number_t vals[4];
     matrix_t *A;
     char buf[4096];
-    char *expected = NULL;
+    string_t *expected = NULL;
 
     vals[0] = num_create_from_string("1.25");
     check_bool("mat_sprintf number precision set",
@@ -88,9 +122,9 @@ static void test_mat_sprintf_number_precision(void)
     check_bool("mat_sprintf number returns non-negative",
                mat_sprintf(buf, sizeof(buf), "%m", A) >= 0);
     check_bool("mat_sprintf number preserves rational text",
-               expected && strstr(buf, expected) != NULL);
+               expected && strstr(buf, string_c_str(expected)) != NULL);
 
-    free(expected);
+    string_free(expected);
     mat_free(A);
     for (size_t i = 0; i < 4u; ++i)
         num_destroy(&vals[i]);
@@ -128,6 +162,7 @@ static void test_mat_sprintf_pretty_number_complex(void)
 void run_matrix_output_tests(void)
 {
     TEST_RUN_CASE(test_mat_sprintf_formats, NULL);
+    TEST_RUN_CASE(test_mat_text_formatters, NULL);
     TEST_RUN_CASE(test_mat_printf_smoke, NULL);
     TEST_RUN_CASE(test_mat_sprintf_number_precision, NULL);
     TEST_RUN_CASE(test_mat_sprintf_pretty_number_complex, NULL);

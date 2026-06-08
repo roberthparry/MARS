@@ -16,7 +16,7 @@ static int number_validity_format(const void *value,
                                   string_t *out,
                                   void *ctx)
 {
-    char *text;
+    string_t *text;
 
     (void)ctx;
     if (!out)
@@ -26,11 +26,11 @@ static int number_validity_format(const void *value,
     if (!text)
         return string_append_cstr(out, "<num_to_string failed>");
 
-    if (string_append_cstr(out, text) != 0) {
-        free(text);
+    if (string_append_string(out, text) != 0) {
+        string_free(text);
         return -1;
     }
-    free(text);
+    string_free(text);
     return 0;
 }
 
@@ -49,15 +49,15 @@ void assert_number_string(const char *label,
                           number_t number,
                           const char *expected_text)
 {
-    char *got;
+    string_t *got;
 
     got = num_to_string(number);
     ASSERT_NOT_NULL(got);
     printf(C_WHITE C_BOLD "%s" C_RESET "\n", label ? label : "<unspecified>");
     printf("    expected = %s\n", expected_text);
-    printf("    got      = %s\n\n", got);
-    ASSERT_TRUE(strcmp(got, expected_text) == 0);
-    free(got);
+    printf("    got      = %s\n\n", string_c_str(got));
+    ASSERT_TRUE(strcmp(string_c_str(got), expected_text) == 0);
+    string_free(got);
 }
 
 void assert_number_string_prefix(const char *label,

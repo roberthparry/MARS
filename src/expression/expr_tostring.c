@@ -47,7 +47,6 @@
  */
 
 #include <stdbool.h>
-#include <errno.h>
 #include <limits.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -61,6 +60,7 @@
 #include "expr_tostring_internal.h"
 #include "expression.h"
 #include "internal/number_internal.h"
+#include "ustring.h"
 
 /* ------------------------------------------------------------------------- */
 /* Growable string buffer                                                    */
@@ -68,7 +68,6 @@
 
 #define xmalloc expr_tostring_xmalloc
 #define xstrdup expr_tostring_xstrdup
-#define utf8_decode expr_tostring_utf8_decode
 
 /* ------------------------------------------------------------------------- */
 /* Precedence and superscripts                                               */
@@ -100,10 +99,60 @@ static void emit_superscript_int(sbuf_t *b, long n)
     }
 }
 
+static bool expr_tostring_text_to_long_local(const string_t *text, long *out)
+{
+    string_cursor_t *cursor;
+    bool negative = false;
+    bool saw_digit = false;
+    unsigned long value = 0u;
+    unsigned long limit;
+
+    if (!text || !out || string_length(text) == 0u)
+        return false;
+
+    cursor = string_cursor_new(text);
+    if (!cursor)
+        return false;
+
+    if (rune_is_equal(string_cursor_peek(cursor), '-')) {
+        negative = true;
+        (void)string_cursor_next(cursor);
+    }
+
+    limit = negative ? (unsigned long)LONG_MAX + 1u : (unsigned long)LONG_MAX;
+    while (!string_cursor_done(cursor)) {
+        rune_t rune = string_cursor_peek(cursor);
+        char ch = '\0';
+        unsigned int digit;
+
+        if (!rune_to_ascii(rune, &ch) || ch < '0' || ch > '9') {
+            string_cursor_free(cursor);
+            return false;
+        }
+
+        digit = (unsigned int)(ch - '0');
+        if (value > (limit - digit) / 10u) {
+            string_cursor_free(cursor);
+            return false;
+        }
+        value = value * 10u + digit;
+        saw_digit = true;
+        (void)string_cursor_next(cursor);
+    }
+
+    string_cursor_free(cursor);
+    if (!saw_digit)
+        return false;
+
+    *out = negative && value == (unsigned long)LONG_MAX + 1u
+        ? LONG_MIN
+        : (negative ? -(long)value : (long)value);
+    return true;
+}
+
 static bool expr_try_get_small_integer_exponent(number_t value, long *out)
 {
-    char *text;
-    char *end = NULL;
+    string_t *text;
     long parsed;
 
     if (!out || !num_is_real(value) || !num_is_integer(value))
@@ -112,19 +161,17 @@ static bool expr_try_get_small_integer_exponent(number_t value, long *out)
     text = num_to_string(value);
     if (!text)
         return false;
-    if (*text == '\0') {
-        free(text);
+    if (string_length(text) == 0u) {
+        string_free(text);
         return false;
     }
 
-    errno = 0;
-    parsed = strtol(text, &end, 10);
-    if (errno != 0 || !end || *end != '\0') {
-        free(text);
+    if (!expr_tostring_text_to_long_local(text, &parsed)) {
+        string_free(text);
         return false;
     }
 
-    free(text);
+    string_free(text);
     *out = parsed;
     return true;
 }
@@ -186,55 +233,105 @@ static bool emit_negative_const_binding_expr_abs(const expr_t *f,
                                                  sbuf_t *b,
                                                  bool tex)
 {
-    char *text;
-    const char *p;
-    const char *q;
-    size_t i;
+    char *raw;
+    string_t *text;
+    string_cursor_t *cursor;
+    string_pos_t rest_start;
+    string_pos_t digits_start;
+    string_pos_t digits_end;
+    string_t *slice;
+    unsigned char digit;
+    bool ok = false;
 
     if (!f || !f->binding_expr)
         return false;
 
-    text = tex
+    raw = tex
         ? expr_binding_expr_to_tex(f->binding_expr)
         : expr_binding_expr_to_string(f->binding_expr);
+    if (!raw)
+        return false;
+
+    text = string_new_with(raw);
+    free(raw);
     if (!text)
         return false;
 
-    p = text;
-    while (*p && isspace((unsigned char)*p))
-        ++p;
-    if (*p != '-') {
-        free(text);
+    cursor = string_cursor_new(text);
+    if (!cursor) {
+        string_free(text);
         return false;
     }
 
-    ++p;
-    while (*p && isspace((unsigned char)*p))
-        ++p;
-    q = p;
-    while (isdigit((unsigned char)*q))
-        ++q;
-    if (q > p) {
-        if (tex && strncmp(q, " \\cdot \\pi", 10u) == 0) {
-            for (i = 0u; p + i < q; ++i)
-                sbuf_putc(b, p[i]);
+    string_cursor_skip_spaces(cursor);
+    if (!rune_is_equal(string_cursor_peek(cursor), '-'))
+        goto done;
+
+    (void)string_cursor_next(cursor);
+    string_cursor_skip_spaces(cursor);
+
+    rest_start = string_cursor_position(cursor);
+    digits_start = rest_start;
+    while (string_cursor_peek_ascii(cursor, &digit) && isdigit(digit))
+        (void)string_cursor_next(cursor);
+    digits_end = string_cursor_position(cursor);
+
+    if (digits_end > digits_start) {
+        if (tex && string_cursor_consume(cursor, " \\cdot \\pi")) {
+            slice = string_cursor_slice_between(digits_start,
+                                                digits_end,
+                                                cursor);
+            if (slice) {
+                sbuf_puts(b, string_c_str(slice));
+                string_free(slice);
+            }
             sbuf_puts(b, "\\pi");
-            sbuf_puts(b, q + 10u);
-            free(text);
-            return true;
+            slice = string_cursor_slice_between(
+                string_cursor_position(cursor),
+                string_cursor_end_position(cursor),
+                cursor);
+            if (slice) {
+                sbuf_puts(b, string_c_str(slice));
+                string_free(slice);
+            }
+            ok = true;
+            goto done;
         }
-        if (!tex && strncmp(q, "·π", sizeof("·π") - 1u) == 0) {
-            for (i = 0u; p + i < q; ++i)
-                sbuf_putc(b, p[i]);
+        if (!tex && string_cursor_consume(cursor, "·π")) {
+            slice = string_cursor_slice_between(digits_start,
+                                                digits_end,
+                                                cursor);
+            if (slice) {
+                sbuf_puts(b, string_c_str(slice));
+                string_free(slice);
+            }
             sbuf_puts(b, "π");
-            sbuf_puts(b, q + sizeof("·π") - 1u);
-            free(text);
-            return true;
+            slice = string_cursor_slice_between(
+                string_cursor_position(cursor),
+                string_cursor_end_position(cursor),
+                cursor);
+            if (slice) {
+                sbuf_puts(b, string_c_str(slice));
+                string_free(slice);
+            }
+            ok = true;
+            goto done;
         }
     }
-    sbuf_puts(b, p);
-    free(text);
-    return true;
+
+    slice = string_cursor_slice_between(rest_start,
+                                        string_cursor_end_position(cursor),
+                                        cursor);
+    if (slice) {
+        sbuf_puts(b, string_c_str(slice));
+        string_free(slice);
+        ok = true;
+    }
+
+done:
+    string_cursor_free(cursor);
+    string_free(text);
+    return ok;
 }
 
 /* -------------------------------------------------------------
@@ -434,27 +531,82 @@ static int expr_tostring_is_named_const_pow_d(const expr_t *f)
            f->a->name && *f->a->name;
 }
 
+static int expr_tostring_rune_is_digit_suffix(rune_t rune)
+{
+    uint32_t value = rune_value(rune);
+
+    return rune_is_digit(rune) || (value >= 0x2080u && value <= 0x2089u);
+}
+
 static int expr_tostring_is_primary_variable_name(const char *name)
 {
-    const unsigned char *p = (const unsigned char *)name;
+    string_t *text;
+    string_cursor_t *cursor;
+    char first;
+    int ok = 0;
 
-    if (!p || (*p != 'x' && *p != 'y' && *p != 'z'))
+    if (!name || !*name)
         return 0;
-    ++p;
-    if (!*p)
-        return 1;
-    if (*p == '_')
-        ++p;
-    while (*p) {
-        if ((*p >= '0' && *p <= '9') ||
-            *p == 0xE2u || *p == 0x82u ||
-            (*p >= 0x80u && *p <= 0x89u)) {
-            ++p;
-            continue;
-        }
-        return 0;
+
+    text = string_new_with(name);
+    cursor = text ? string_cursor_new(text) : NULL;
+    if (!cursor)
+        goto done;
+
+    if (!rune_to_ascii(string_cursor_peek(cursor), &first) ||
+        (first != 'x' && first != 'y' && first != 'z'))
+        goto done;
+
+    if (string_cursor_next(cursor) != 0)
+        goto done;
+    if (string_cursor_done(cursor)) {
+        ok = 1;
+        goto done;
     }
-    return 1;
+
+    if (rune_is_equal(string_cursor_peek(cursor), '_')) {
+        if (string_cursor_next(cursor) != 0)
+            goto done;
+        if (string_cursor_done(cursor)) {
+            ok = 1;
+            goto done;
+        }
+    }
+
+    while (!string_cursor_done(cursor)) {
+        if (!expr_tostring_rune_is_digit_suffix(string_cursor_peek(cursor)))
+            goto done;
+        if (string_cursor_next(cursor) != 0)
+            goto done;
+    }
+    ok = 1;
+
+done:
+    string_cursor_free(cursor);
+    string_free(text);
+    return ok;
+}
+
+static int expr_tostring_name_starts_non_ascii(const char *name)
+{
+    string_t *text;
+    string_cursor_t *cursor;
+    int non_ascii = 0;
+
+    if (!name || !*name)
+        return 0;
+
+    text = string_new_with(name);
+    cursor = text ? string_cursor_new(text) : NULL;
+    if (!cursor)
+        goto done;
+
+    non_ascii = !rune_to_ascii(string_cursor_peek(cursor), NULL);
+
+done:
+    string_cursor_free(cursor);
+    string_free(text);
+    return non_ascii;
 }
 
 static int expr_tostring_is_coefficient_var(const expr_t *f)
@@ -488,8 +640,7 @@ static int factor_group(const expr_t *f)
         if (!f->name || !*f->name) return 0;
         if (f->binding_expr && !expr_is_immortal_default_const_local(f))
             return 3;
-        /* Greek letters are UTF-8 multi-byte; first byte >= 0x80 */
-        return ((unsigned char)f->name[0] >= 0x80) ? 1 : 2;
+        return expr_tostring_name_starts_non_ascii(f->name) ? 1 : 2;
     }
 
     if (expr_tostring_is_coefficient_var(f))
@@ -659,7 +810,8 @@ static int expr_renders_negative(const expr_t *f)
 
     sbuf_init(&b);
     emit_expr(f, &b, 0);
-    neg = (b.len > 0 && b.data[0] == '-');
+    neg = (sbuf_len(&b) > 0u &&
+           rune_is_equal(string_at(b.text, 0u), '-'));
     sbuf_free(&b);
     return neg;
 }
@@ -1538,10 +1690,17 @@ static void emit_func_abs(const expr_t *f, sbuf_t *b, int parent_prec)
 
     sbuf_init(&tmp);
     emit_func(f, &tmp, parent_prec);
-    if (tmp.len > 0 && tmp.data[0] == '-')
-        sbuf_puts(b, tmp.data + 1u);
-    else
-        sbuf_puts(b, tmp.data);
+    if (sbuf_len(&tmp) > 0u &&
+        rune_is_equal(string_at(tmp.text, 0u), '-')) {
+        string_t *tail = string_substr(tmp.text, 1u, sbuf_len(&tmp) - 1u);
+
+        if (tail) {
+            sbuf_put_string(b, tail);
+            string_free(tail);
+        }
+    } else {
+        sbuf_put_string(b, tmp.text);
+    }
     sbuf_free(&tmp);
 }
 
@@ -2489,66 +2648,81 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
 /* Public entry points                                                       */
 /* ------------------------------------------------------------------------- */
 
-static void strip_trailing_newline(char *s)
+static string_t *expr_to_tex_text(const expr_t *dv)
 {
-    size_t len = strlen(s);
-    while (len > 0 &&
-           (s[len - 1] == '\n' || s[len - 1] == '\r' ||
-            s[len - 1] == ' '  || s[len - 1] == '\t'))
-        s[--len] = '\0';
-}
-
-static char *expr_to_c_string(const expr_t *dv, style_t style)
-{
-    char *out;
     char *expr = NULL;
     char *bindings = NULL;
+    sbuf_t b;
+    string_t *out;
 
-    if (!dv) {
-        char *s = (char *)xmalloc(5);
-        strcpy(s, "NULL");
-        return s;
-    }
+    if (expr_to_tex_parts(dv, &expr, &bindings) != 0)
+        return expr_to_text_expr(dv);
 
-    if (style == style_TEX) {
-        sbuf_t b;
-
-        if (expr_to_tex_parts(dv, &expr, &bindings) != 0)
-            return expr_to_string_expr(dv);
-
-        sbuf_init(&b);
-        if (bindings && *bindings) {
-            sbuf_puts(&b, "\\left\\{ ");
-            sbuf_puts(&b, expr);
-            sbuf_puts(&b, " \\;\\middle|\\; ");
-            sbuf_puts(&b, bindings);
-            sbuf_puts(&b, " \\right\\}");
-        } else {
-            sbuf_puts(&b, expr);
-        }
-
-        free(expr);
-        free(bindings);
-        out = b.data;
-    } else if (style == style_FUNCTION) {
-        out = expr_to_string_function(dv);
-    } else if (style == style_UNBOUND) {
-        out = expr_to_string_unbound(dv);
+    sbuf_init(&b);
+    if (bindings && *bindings) {
+        sbuf_puts(&b, "\\left\\{ ");
+        sbuf_puts(&b, expr);
+        sbuf_puts(&b, " \\;\\middle|\\; ");
+        sbuf_puts(&b, bindings);
+        sbuf_puts(&b, " \\right\\}");
     } else {
-        out = expr_to_string_expr(dv);
+        sbuf_puts(&b, expr);
     }
 
-    strip_trailing_newline(out);
+    free(expr);
+    free(bindings);
+    out = sbuf_to_string(&b);
+    sbuf_free(&b);
     return out;
+}
+
+static bool expr_is_trailing_display_space(rune_t rune)
+{
+    return rune_is_equal(rune, '\n') ||
+           rune_is_equal(rune, '\r') ||
+           rune_is_equal(rune, ' ') ||
+           rune_is_equal(rune, '\t');
+}
+
+static string_t *expr_trim_trailing_display_space(string_t *text)
+{
+    size_t len;
+    string_t *trimmed;
+
+    if (!text)
+        return NULL;
+
+    len = string_length(text);
+    while (len > 0u &&
+           expr_is_trailing_display_space(string_at(text, len - 1u)))
+        len--;
+
+    if (len == string_length(text))
+        return text;
+
+    trimmed = string_substring(text, 0u, len);
+    string_free(text);
+    return trimmed;
 }
 
 string_t *expr_to_text(const expr_t *dv, style_t style)
 {
-    char *raw = expr_to_c_string(dv, style);
-    string_t *text = raw ? string_new_with(raw) : NULL;
+    string_t *text;
 
-    free(raw);
-    return text;
+    if (!dv)
+        return string_new_with("NULL");
+
+    if (style == style_TEX) {
+        text = expr_to_tex_text(dv);
+    } else if (style == style_FUNCTION) {
+        text = expr_to_text_function(dv);
+    } else if (style == style_UNBOUND) {
+        text = expr_to_text_unbound(dv);
+    } else {
+        text = expr_to_text_expr(dv);
+    }
+
+    return expr_trim_trailing_display_space(text);
 }
 
 void expr_print(const expr_t *dv)

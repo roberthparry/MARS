@@ -1,9 +1,6 @@
-#include <errno.h>
 #include <limits.h>
-#include <stddef.h>
-#include <stdlib.h>
 
-#include "expr_internal.h"
+#include "expr_maths.h"
 
 static inline void expr_reverse_unary(number_t value, number_t *a_bar, number_t *b_bar)
 {
@@ -478,25 +475,15 @@ void expr_reverse_polygamma(const expr_t *dv, const number_t *out_bar, number_t 
     number_t order_value = expr_eval_num_internal(dv->a);
     number_t next;
     number_t factor;
-    char *text;
-    char *end = NULL;
-    unsigned long order;
+    unsigned int order;
 
-    if (!num_is_real(order_value) || !num_is_integer(order_value) ||
-        num_get_sign(order_value) < 0 || !(text = num_to_string(order_value))) {
+    if (!expr_number_to_polygamma_order(order_value, &order) ||
+        order == UINT_MAX) {
         expr_reverse_binary(NUM_ZERO, NUM_ZERO, a_bar, b_bar);
         return;
     }
-    errno = 0;
-    order = strtoul(text, &end, 10);
-    if (errno != 0 || !end || *end != '\0' || order >= UINT_MAX) {
-        free(text);
-        expr_reverse_binary(NUM_ZERO, NUM_ZERO, a_bar, b_bar);
-        return;
-    }
-    free(text);
 
-    next = num_polygamma((unsigned int)order + 1u, expr_eval_num_internal(dv->b));
+    next = num_polygamma(order + 1u, expr_eval_num_internal(dv->b));
     factor = num_mul(*out_bar, next);
     expr_reverse_binary(NUM_ZERO, num_owned_clone_local(factor), a_bar, b_bar);
 }

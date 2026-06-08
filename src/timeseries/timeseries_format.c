@@ -1,6 +1,40 @@
 #include "timeseries_internal.h"
+#include "ustring.h"
 
-char *ts_to_string(const timeseries_t *series, ts_string_style_t style)
+static char *ts_cstring_from_text(string_t *text)
+{
+    char *out;
+    size_t len;
+
+    if (!text)
+        return NULL;
+
+    len = string_view_length(string_view_all(text));
+    out = malloc(len + 1u);
+    if (out)
+        memcpy(out, string_c_str(text), len + 1u);
+
+    string_free(text);
+    return out;
+}
+
+static string_t *ts_format_date_text(const datetime_t *date)
+{
+    string_t *format;
+    string_t *text = NULL;
+
+    if (!date)
+        return NULL;
+
+    format = string_new_with("%dd/%mm/%yyyy");
+    if (!format)
+        return NULL;
+    text = datetime_format_text(date, format);
+    string_free(format);
+    return text;
+}
+
+string_t *ts_to_text(const timeseries_t *series, ts_string_style_t style)
 {
     ts_string_builder_t sb = {0};
     size_t i;
@@ -10,12 +44,14 @@ char *ts_to_string(const timeseries_t *series, ts_string_style_t style)
     if (style == TS_STRING_CSV)
         ts_appendf(&sb, "date,value\n");
     for (i = 0u; i < series->length; ++i) {
-        char *date_text = NULL;
+        string_t *date_text = NULL;
 
         if (series->has_index && series->index[i])
-            date_text = datetime_format(series->index[i], "%dd/%mm/%yyyy");
+            date_text = ts_format_date_text(series->index[i]);
         if (style == TS_STRING_CSV) {
-            ts_appendf(&sb, "%s,", date_text ? date_text : "");
+            if (date_text)
+                ts_append_text(&sb, date_text);
+            ts_appendf(&sb, ",");
             if (series->missing[i])
                 ts_appendf(&sb, "\n");
             else {
@@ -23,7 +59,10 @@ char *ts_to_string(const timeseries_t *series, ts_string_style_t style)
                 ts_appendf(&sb, "\n");
             }
         } else if (style == TS_STRING_PRETTY) {
-            ts_appendf(&sb, "%s%s", date_text ? date_text : "", date_text ? " : " : "");
+            if (date_text) {
+                ts_append_text(&sb, date_text);
+                ts_appendf(&sb, " : ");
+            }
             if (series->missing[i])
                 ts_appendf(&sb, "(missing)\n");
             else {
@@ -33,135 +72,162 @@ char *ts_to_string(const timeseries_t *series, ts_string_style_t style)
         } else {
             if (i > 0u)
                 ts_appendf(&sb, "; ");
-            if (date_text)
-                ts_appendf(&sb, "%s=", date_text);
+            if (date_text) {
+                ts_append_text(&sb, date_text);
+                ts_appendf(&sb, "=");
+            }
             if (series->missing[i])
                 ts_appendf(&sb, "NA");
             else
                 ts_append_number_text(&sb, series->values[i]);
         }
-        free(date_text);
+        string_free(date_text);
     }
-    return ts_builder_detach(&sb);
+    return ts_builder_detach_text(&sb);
 }
 
-static int ts_vformat(char *out, size_t out_size, const char *fmt, va_list ap)
+char *ts_to_string(const timeseries_t *series, ts_string_style_t style)
 {
-    ts_string_builder_t sb = {0};
-    const char *p = fmt;
+    return ts_cstring_from_text(ts_to_text(series, style));
+}
 
-    while (p && *p) {
-        if (*p != '%') {
-            if (ts_appendf(&sb, "%c", *p) != 0) {
-                ts_builder_free(&sb);
-                return -1;
-            }
-            ++p;
-            continue;
-        }
-        ++p;
-        if (*p == '%') {
-            ts_appendf(&sb, "%%");
-            ++p;
-            continue;
-        }
-        if (*p == 't' || *p == 'T' || *p == 'C') {
-            timeseries_t *series = va_arg(ap, timeseries_t *);
-            char *text = ts_to_string(series,
-                                      *p == 'T' ? TS_STRING_PRETTY :
-                                      (*p == 'C' ? TS_STRING_CSV : TS_STRING_INLINE));
-
-            if (!text) {
-                ts_builder_free(&sb);
-                return -1;
-            }
-            ts_appendf(&sb, "%s", text);
-            free(text);
-            ++p;
-            continue;
-        }
-        if (*p == 's') {
-            const char *s = va_arg(ap, const char *);
-
-            ts_appendf(&sb, "%s", s ? s : "(null)");
-            ++p;
-            continue;
-        }
-        if (*p == 'd') {
-            int v = va_arg(ap, int);
-
-            ts_appendf(&sb, "%d", v);
-            ++p;
-            continue;
-        }
-        if (*p == 'z' && p[1] == 'u') {
-            size_t v = va_arg(ap, size_t);
-
-            ts_appendf(&sb, "%zu", v);
-            p += 2;
-            continue;
-        }
-        ts_appendf(&sb, "%%%c", *p);
-        ++p;
+static int ts_append_padding(string_t *out, int count)
+{
+    for (int i = 0; i < count; ++i) {
+        if (string_append_char(out, ' ') != 0)
+            return -1;
     }
-    if (!out || out_size == 0u) {
-        int n = (int)sb.len;
+    return 0;
+}
 
-        ts_builder_free(&sb);
-        return n;
+static string_format_result_t ts_format_callback(string_t *out,
+                                                 const string_format_spec_t *spec,
+                                                 va_list ap,
+                                                 void *user)
+{
+    timeseries_t *series;
+    string_t *text;
+    ts_string_style_t style;
+    bool left;
+    int width;
+    size_t text_len;
+    int pad;
+
+    (void)user;
+
+    if (!out || !spec)
+        return STRING_FORMAT_ERROR;
+    if (spec->conversion != 't' &&
+        spec->conversion != 'T' &&
+        spec->conversion != 'C')
+        return STRING_FORMAT_UNHANDLED;
+    if (spec->length[0] != '\0')
+        return STRING_FORMAT_ERROR;
+
+    width = spec->width_from_argument ? va_arg(ap, int) : spec->width;
+    if (spec->precision_from_argument)
+        (void)va_arg(ap, int);
+    left = spec->flag_left;
+    if (width < 0) {
+        left = true;
+        width = -width;
     }
-    snprintf(out, out_size, "%s", sb.buf ? sb.buf : "");
-    {
-        int n = (int)sb.len;
-        ts_builder_free(&sb);
-        return n;
-    }
+
+    style = spec->conversion == 'T'
+        ? TS_STRING_PRETTY
+        : (spec->conversion == 'C' ? TS_STRING_CSV : TS_STRING_INLINE);
+    series = va_arg(ap, timeseries_t *);
+    text = ts_to_text(series, style);
+    if (!text)
+        return STRING_FORMAT_ERROR;
+
+    text_len = string_length(text);
+    pad = width > (int)text_len ? width - (int)text_len : 0;
+    if (!left && ts_append_padding(out, pad) != 0)
+        goto fail;
+    if (string_append_string(out, text) != 0)
+        goto fail;
+    if (left && ts_append_padding(out, pad) != 0)
+        goto fail;
+
+    string_free(text);
+    return STRING_FORMAT_HANDLED;
+
+fail:
+    string_free(text);
+    return STRING_FORMAT_ERROR;
+}
+
+string_t *ts_vsprintf_text(const char *fmt, va_list ap)
+{
+    return string_vsprintf_with_callback(fmt, ap, ts_format_callback, NULL);
 }
 
 int ts_sprintf(char *out, size_t out_size, const char *fmt, ...)
 {
     int rc;
     va_list ap;
+    string_t *text;
+    size_t len;
 
     va_start(ap, fmt);
-    rc = ts_vformat(out, out_size, fmt, ap);
+    text = ts_vsprintf_text(fmt, ap);
     va_end(ap);
+    if (!text)
+        return -1;
+
+    len = string_view_length(string_view_all(text));
+    if (out && out_size > 0u) {
+        size_t copy_len = len < out_size - 1u ? len : out_size - 1u;
+
+        memcpy(out, string_c_str(text), copy_len);
+        out[copy_len] = '\0';
+    }
+
+    rc = len <= (size_t)INT_MAX ? (int)len : -1;
+    string_free(text);
     return rc;
+}
+
+string_t *ts_sprintf_text(const char *fmt, ...)
+{
+    va_list ap;
+    string_t *text;
+
+    va_start(ap, fmt);
+    text = ts_vsprintf_text(fmt, ap);
+    va_end(ap);
+    return text;
 }
 
 int ts_printf(const char *fmt, ...)
 {
     va_list ap;
-    char *text = NULL;
-    int n;
+    string_t *text;
+    int written;
 
     va_start(ap, fmt);
-    n = ts_vformat(NULL, 0u, fmt, ap);
+    text = ts_vsprintf_text(fmt, ap);
     va_end(ap);
-    if (n < 0)
-        return -1;
-    text = malloc((size_t)n + 1u);
     if (!text)
         return -1;
-    va_start(ap, fmt);
-    ts_vformat(text, (size_t)n + 1u, fmt, ap);
-    va_end(ap);
-    fputs(text, stdout);
-    free(text);
-    return n;
+
+    written = string_printf("%S", text);
+    string_free(text);
+    return written;
 }
 
 void ts_print(const timeseries_t *series)
 {
-    char *text = ts_to_string(series, TS_STRING_PRETTY);
+    string_t *text = ts_to_text(series, TS_STRING_PRETTY);
 
     if (!text)
         return;
-    fputs(text, stdout);
-    free(text);
+    string_printf("%S", text);
+    string_free(text);
 }
 
-char *ts_forecast_to_string(const ts_forecast_t *forecast, ts_string_style_t style)
+string_t *ts_forecast_to_text(const ts_forecast_t *forecast, ts_string_style_t style)
 {
     ts_string_builder_t sb = {0};
     size_t i;
@@ -172,19 +238,21 @@ char *ts_forecast_to_string(const ts_forecast_t *forecast, ts_string_style_t sty
         ts_appendf(&sb, "date,mean,stderr,lower,upper\n");
     for (i = 0u; i < ts_length(forecast->mean); ++i) {
         datetime_t *dt = ts_start_datetime(forecast->mean);
-        char *date_text;
+        string_t *date_text;
         number_t value, stderr_v, lower_v, upper_v;
 
         if (dt)
             datetime_dealloc(dt);
         date_text = (forecast->mean->has_index && forecast->mean->index[i])
-            ? datetime_format(forecast->mean->index[i], "%dd/%mm/%yyyy") : NULL;
+            ? ts_format_date_text(forecast->mean->index[i]) : NULL;
         value = mat_get_num(ts_to_column_matrix(forecast->mean), i, 0);
         stderr_v = forecast->stderr ? forecast->stderr->values[i] : num_clone(NUM_NAN);
         lower_v = forecast->lower ? forecast->lower->values[i] : num_clone(NUM_NAN);
         upper_v = forecast->upper ? forecast->upper->values[i] : num_clone(NUM_NAN);
         if (style == TS_STRING_CSV) {
-            ts_appendf(&sb, "%s,", date_text ? date_text : "");
+            if (date_text)
+                ts_append_text(&sb, date_text);
+            ts_appendf(&sb, ",");
             ts_append_number_fixed(&sb, value, 2);
             ts_appendf(&sb, ",");
             ts_append_number_fixed(&sb, stderr_v, 2);
@@ -194,7 +262,9 @@ char *ts_forecast_to_string(const ts_forecast_t *forecast, ts_string_style_t sty
             ts_append_number_fixed(&sb, upper_v, 2);
             ts_appendf(&sb, "\n");
         } else {
-            ts_appendf(&sb, "%s: best estimate ", date_text ? date_text : "");
+            if (date_text)
+                ts_append_text(&sb, date_text);
+            ts_appendf(&sb, ": best estimate ");
             ts_append_number_fixed(&sb, value, 2);
             ts_appendf(&sb, ", plausible lower end: ");
             ts_append_number_fixed(&sb, lower_v, 2);
@@ -202,13 +272,18 @@ char *ts_forecast_to_string(const ts_forecast_t *forecast, ts_string_style_t sty
             ts_append_number_fixed(&sb, upper_v, 2);
             ts_appendf(&sb, "\n");
         }
-        free(date_text);
+        string_free(date_text);
         num_destroy(&value);
         if (!forecast->stderr) num_destroy(&stderr_v);
         if (!forecast->lower) num_destroy(&lower_v);
         if (!forecast->upper) num_destroy(&upper_v);
     }
-    return ts_builder_detach(&sb);
+    return ts_builder_detach_text(&sb);
+}
+
+char *ts_forecast_to_string(const ts_forecast_t *forecast, ts_string_style_t style)
+{
+    return ts_cstring_from_text(ts_forecast_to_text(forecast, style));
 }
 
 static void ts_append_r2_rating(ts_string_builder_t *sb, number_t value)
@@ -308,100 +383,107 @@ static void ts_append_sigma2_rating(ts_string_builder_t *sb, number_t sigma2, do
         ts_appendf(sb, " (poor; good is usually much smaller relative to the scale of the series, and very good smaller still)");
 }
 
-static const char *ts_r2_band(number_t value)
+typedef enum {
+    TS_BAND_COMPARISON = 0,
+    TS_BAND_POOR = 1,
+    TS_BAND_OK = 2,
+    TS_BAND_GOOD = 3,
+    TS_BAND_VERY_GOOD = 4,
+    TS_BAND_EXCELLENT = 5,
+    TS_BAND_EXCEPTIONAL = 6
+} ts_rating_band_t;
+
+static const char *ts_band_label(ts_rating_band_t band)
+{
+    switch (band) {
+        case TS_BAND_EXCEPTIONAL: return "exceptional";
+        case TS_BAND_EXCELLENT: return "excellent";
+        case TS_BAND_VERY_GOOD: return "very good";
+        case TS_BAND_GOOD: return "good";
+        case TS_BAND_OK: return "ok";
+        case TS_BAND_POOR: return "poor";
+        case TS_BAND_COMPARISON:
+        default:
+            return "comparison";
+    }
+}
+
+static ts_rating_band_t ts_r2_band(number_t value)
 {
     double v = num_to_double(value);
 
     if (v > 0.95)
-        return "exceptional";
+        return TS_BAND_EXCEPTIONAL;
     if (v >= 0.90)
-        return "excellent";
+        return TS_BAND_EXCELLENT;
     if (v >= 0.80)
-        return "very good";
+        return TS_BAND_VERY_GOOD;
     if (v >= 0.65)
-        return "good";
+        return TS_BAND_GOOD;
     if (v >= 0.40)
-        return "ok";
-    return "poor";
+        return TS_BAND_OK;
+    return TS_BAND_POOR;
 }
 
-static const char *ts_relative_error_band(number_t value, double baseline)
+static ts_rating_band_t ts_relative_error_band(number_t value, double baseline)
 {
     double ratio;
 
     if (!isfinite(baseline) || baseline <= 0.0)
-        return "comparison";
+        return TS_BAND_COMPARISON;
     ratio = fabs(num_to_double(value)) / baseline;
     if (ratio < 0.05)
-        return "exceptional";
+        return TS_BAND_EXCEPTIONAL;
     if (ratio < 0.10)
-        return "excellent";
+        return TS_BAND_EXCELLENT;
     if (ratio < 0.15)
-        return "very good";
+        return TS_BAND_VERY_GOOD;
     if (ratio < 0.25)
-        return "good";
+        return TS_BAND_GOOD;
     if (ratio < 0.40)
-        return "ok";
-    return "poor";
+        return TS_BAND_OK;
+    return TS_BAND_POOR;
 }
 
-static const char *ts_sigma2_band(number_t sigma2, double baseline)
+static ts_rating_band_t ts_sigma2_band(number_t sigma2, double baseline)
 {
     double ratio;
 
     if (!isfinite(baseline) || baseline <= 0.0)
-        return "comparison";
+        return TS_BAND_COMPARISON;
     ratio = fabs(num_to_double(sigma2)) / baseline;
     if (ratio < 0.0025)
-        return "exceptional";
+        return TS_BAND_EXCEPTIONAL;
     if (ratio < 0.01)
-        return "excellent";
+        return TS_BAND_EXCELLENT;
     if (ratio < 0.0225)
-        return "very good";
+        return TS_BAND_VERY_GOOD;
     if (ratio < 0.0625)
-        return "good";
+        return TS_BAND_GOOD;
     if (ratio < 0.16)
-        return "ok";
-    return "poor";
-}
-
-static int ts_band_score(const char *band)
-{
-    if (!band)
-        return 0;
-    if (strcmp(band, "exceptional") == 0)
-        return 6;
-    if (strcmp(band, "excellent") == 0)
-        return 5;
-    if (strcmp(band, "very good") == 0)
-        return 4;
-    if (strcmp(band, "good") == 0)
-        return 3;
-    if (strcmp(band, "ok") == 0)
-        return 2;
-    if (strcmp(band, "poor") == 0)
-        return 1;
-    return 0;
+        return TS_BAND_OK;
+    return TS_BAND_POOR;
 }
 
 static void ts_append_overall_assessment(ts_string_builder_t *sb,
-                                         const char *band,
+                                         ts_rating_band_t band,
                                          bool comparison_only)
 {
-    if (!sb || !band)
+    const char *label = ts_band_label(band);
+
+    if (!sb)
         return;
     if (comparison_only) {
         ts_appendf(sb,
                    "Overall assessment: You've chosen a %s model so far. Proceed, but compare it with another candidate before deciding. To improve it in this app, run the forecast again with one simpler set of settings and one more seasonal set of settings, then keep the version with the lower comparison score on the same data.\n",
-                   band);
+                   label);
         return;
     }
-    if (strcmp(band, "exceptional") == 0 || strcmp(band, "excellent") == 0 ||
-        strcmp(band, "very good") == 0 || strcmp(band, "good") == 0) {
+    if (band >= TS_BAND_GOOD) {
         ts_appendf(sb,
                    "Overall assessment: You've chosen a %s model. Proceed. If you want to improve it further, try two extra runs in this app: first, make the model simpler by lowering one of p, q, P, or Q; second, if the data is monthly, try a seasonal version with season period 12 and P or D set to 1. Keep the version that gives lower error and still looks realistic.\n",
-                   band);
-    } else if (strcmp(band, "ok") == 0) {
+                   label);
+    } else if (band == TS_BAND_OK) {
         ts_appendf(sb,
                    "Overall assessment: You've chosen an ok model. Proceed with caution, and revisit it if the forecast looks unrealistic. To get a better result, first check that the target dates and exogenous dates line up properly. Then run it again with a seasonal model if the data is monthly, or try a different model type such as SARIMAX instead of regression alone. After that, compare the typical forecast error and keep the version that is lower and still believable.\n");
     } else {
@@ -410,21 +492,21 @@ static void ts_append_overall_assessment(ts_string_builder_t *sb,
     }
 }
 
-char *ts_regression_summary_to_string(const ts_regression_result_t *result)
+string_t *ts_regression_summary_to_text(const ts_regression_result_t *result)
 {
     ts_string_builder_t sb = {0};
     size_t i;
     double fitted_scale;
-    const char *fit_band;
-    const char *error_band;
-    const char *overall_band;
+    ts_rating_band_t fit_band;
+    ts_rating_band_t error_band;
+    ts_rating_band_t overall_band;
 
     if (!result || !result->coefficients)
         return NULL;
     fitted_scale = ts_mean_abs_series_value(result->fitted);
     fit_band = ts_r2_band(result->adj_r2);
     error_band = ts_relative_error_band(result->rmse, fitted_scale);
-    overall_band = ts_band_score(fit_band) < ts_band_score(error_band) ? fit_band : error_band;
+    overall_band = fit_band < error_band ? fit_band : error_band;
     ts_appendf(&sb, "Regression summary\n");
     ts_append_overall_assessment(&sb, overall_band, false);
     ts_appendf(&sb, "Overall fit score (R2): ");
@@ -463,17 +545,22 @@ char *ts_regression_summary_to_string(const ts_regression_result_t *result)
         num_destroy(&se);
         num_destroy(&p);
     }
-    return ts_builder_detach(&sb);
+    return ts_builder_detach_text(&sb);
 }
 
-char *ts_arima_summary_to_string(const ts_arima_result_t *result)
+char *ts_regression_summary_to_string(const ts_regression_result_t *result)
+{
+    return ts_cstring_from_text(ts_regression_summary_to_text(result));
+}
+
+string_t *ts_arima_summary_to_text(const ts_arima_result_t *result)
 {
     ts_string_builder_t sb = {0};
     ts_arima_meta_t *meta;
     size_t i;
     size_t offset = 0u;
     double fitted_scale;
-    const char *sigma_band;
+    ts_rating_band_t sigma_band;
 
     if (!result)
         return NULL;
@@ -481,7 +568,7 @@ char *ts_arima_summary_to_string(const ts_arima_result_t *result)
     fitted_scale = ts_mean_abs_series_value(result->fitted);
     sigma_band = ts_sigma2_band(result->summary.sigma2, fitted_scale * fitted_scale);
     ts_appendf(&sb, "ARIMA summary\n");
-    ts_append_overall_assessment(&sb, sigma_band, strcmp(sigma_band, "comparison") == 0);
+    ts_append_overall_assessment(&sb, sigma_band, sigma_band == TS_BAND_COMPARISON);
     if (meta) {
         ts_appendf(&sb, "Model: (%zu,%zu,%zu)x(%zu,%zu,%zu)[%zu]\n",
                    meta->spec.p, meta->spec.d, meta->spec.q,
@@ -606,36 +693,53 @@ char *ts_arima_summary_to_string(const ts_arima_result_t *result)
             display_index += 1u;
         }
     }
-    return ts_builder_detach(&sb);
+    return ts_builder_detach_text(&sb);
+}
+
+char *ts_arima_summary_to_string(const ts_arima_result_t *result)
+{
+    return ts_cstring_from_text(ts_arima_summary_to_text(result));
+}
+
+static int ts_write_owned_text_to_path(const char *path, string_t *text)
+{
+    string_t *path_text;
+    int rc = -1;
+
+    if (!path || !text) {
+        string_free(text);
+        return -1;
+    }
+
+    path_text = string_new_with(path);
+    if (path_text)
+        rc = ts_write_text_file(path_text, text);
+
+    string_free(path_text);
+    string_free(text);
+    return rc;
 }
 
 int ts_write_file(const char *path,
                   const timeseries_t *series,
                   ts_string_style_t style)
 {
-    char *text = ts_to_string(series, style);
-    int rc = text ? ts_write_text_file(path, text) : -1;
-
-    free(text);
-    return rc;
+    return ts_write_owned_text_to_path(path, ts_to_text(series, style));
 }
 
 int ts_forecast_write_file(const char *path,
                            const ts_forecast_t *forecast,
                            ts_string_style_t style)
 {
-    char *text = ts_forecast_to_string(forecast, style);
-    int rc = text ? ts_write_text_file(path, text) : -1;
-
-    free(text);
-    return rc;
+    return ts_write_owned_text_to_path(path,
+                                       ts_forecast_to_text(forecast, style));
 }
 
 int ts_regression_summary_write_file(const char *path,
                                      const ts_regression_result_t *result,
                                      ts_string_style_t style)
 {
-    char *text;
+    string_t *text;
 
     if (style == TS_STRING_CSV && result && result->coefficients) {
         ts_string_builder_t sb = {0};
@@ -662,24 +766,18 @@ int ts_regression_summary_write_file(const char *path,
             num_destroy(&t);
             num_destroy(&p);
         }
-        text = ts_builder_detach(&sb);
+        text = ts_builder_detach_text(&sb);
     } else {
-        text = ts_regression_summary_to_string(result);
+        text = ts_regression_summary_to_text(result);
     }
-    if (!text)
-        return -1;
-    {
-        int rc = ts_write_text_file(path, text);
-        free(text);
-        return rc;
-    }
+    return ts_write_owned_text_to_path(path, text);
 }
 
 int ts_arima_summary_write_file(const char *path,
                                 const ts_arima_result_t *result,
                                 ts_string_style_t style)
 {
-    char *text;
+    string_t *text;
 
     if (style == TS_STRING_CSV && result && result->ar_params) {
         ts_string_builder_t sb = {0};
@@ -694,15 +792,9 @@ int ts_arima_summary_write_file(const char *path,
             ts_appendf(&sb, "\n");
             num_destroy(&est);
         }
-        text = ts_builder_detach(&sb);
+        text = ts_builder_detach_text(&sb);
     } else {
-        text = ts_arima_summary_to_string(result);
+        text = ts_arima_summary_to_text(result);
     }
-    if (!text)
-        return -1;
-    {
-        int rc = ts_write_text_file(path, text);
-        free(text);
-        return rc;
-    }
+    return ts_write_owned_text_to_path(path, text);
 }

@@ -69,7 +69,7 @@ What currently works for `expr` matrices:
   - upper- and lower-triangular matrices
   - repeated-diagonal triangular cases such as Jordan blocks
 - symbolic pretty-printing with one shared binding footer for the whole matrix
-- `mat_to_string(...)`, `mat_printf(...)`, and `mat_sprintf(...)` for matrix-aware symbolic and numeric output
+- `mat_to_text(...)`, `mat_printf(...)`, and `mat_sprintf_text(...)` for matrix-aware symbolic and numeric output
 
 What is still intentionally unsupported for `expr` matrices:
 
@@ -128,8 +128,6 @@ forms `@DELTA` and `@OMEGA`, so you do not need to type Greek letters at the
 keyboard:
 
 ```c
-#include <stdio.h>
-#include <stdlib.h>
 #include "expression.h"
 #include "matrix.h"
 
@@ -143,25 +141,25 @@ int main(void)
     matrix_t *charpoly = mat_charpoly(H);
     expr_t *detH = NULL;
     expr_t *ddet_dDelta = mat_deriv_det(H, delta);
-    char *H_text;
-    char *p_text;
+    string_t *H_text;
+    string_t *p_text;
     string_t *det_text;
     string_t *ddet_text;
 
     mat_get(charpoly, 2, 0, &detH);
 
-    H_text = mat_to_string(H, MAT_STRING_LAYOUT_PRETTY);
-    p_text = mat_to_string(charpoly, MAT_STRING_INLINE_PRETTY);
+    H_text = mat_to_text(H, MAT_STRING_LAYOUT_PRETTY);
+    p_text = mat_to_text(charpoly, MAT_STRING_INLINE_PRETTY);
     det_text = expr_to_text(detH, style_EXPRESSION);
     ddet_text = expr_to_text(ddet_dDelta, style_EXPRESSION);
 
-    puts(H_text);
-    printf("characteristic polynomial coefficients = %s\n", p_text);
-    printf("det(H) = %s\n", string_c_str(det_text));
-    printf("d/dΔ det(H) = %s\n", string_c_str(ddet_text));
+    string_printf("%S\n", H_text);
+    string_printf("characteristic polynomial coefficients = %S\n", p_text);
+    string_printf("det(H) = %S\n", det_text);
+    string_printf("d/dΔ det(H) = %S\n", ddet_text);
 
-    free(H_text);
-    free(p_text);
+    string_free(H_text);
+    string_free(p_text);
     string_free(det_text);
     string_free(ddet_text);
     mat_bindings_free(bindings);
@@ -1020,7 +1018,10 @@ matrix_t *mat_deriv_block_inverse_by_name(const matrix_t *A, size_t split, mat_b
 matrix_t *mat_deriv_solve_by_name(const matrix_t *A, const matrix_t *B, mat_bindings_t *bindings, const char *name);
 matrix_t *mat_deriv_block_solve_by_name(const matrix_t *A, const matrix_t *B, size_t split, mat_bindings_t *bindings, const char *name);
 matrix_t *mat_jacobian_by_names(const matrix_t *A, mat_bindings_t *bindings, const char *const *names, size_t nnames);
+string_t *mat_to_text(const matrix_t *A, mat_string_style_t style);
 char *mat_to_string(const matrix_t *A, mat_string_style_t style);
+string_t *mat_vsprintf_text(const char *fmt, va_list ap);
+string_t *mat_sprintf_text(const char *fmt, ...);
 int mat_sprintf(char *out, size_t out_size, const char *fmt, ...);
 int mat_printf(const char *fmt, ...);
 ```
@@ -1099,7 +1100,7 @@ both resolve the same symbol.
 
 For compatibility, the older bracket-row forms such as `[[1 2][3 4]]` are still
 accepted on input, but the separator-based parenthesised form above is now the
-canonical matrix syntax and the format emitted by `mat_to_string(...)`.
+canonical matrix syntax and the format emitted by `mat_to_text(...)`.
 
 If `bnd_out` is non-NULL, `mat_from_string_expr(...)` returns an opaque bindings
 object for the names actually referenced by the matrix entries. Use
@@ -1131,15 +1132,19 @@ If you want to stay at the matrix layer, `mat_deriv_by_name(...)`,
 returned binding names without manually extracting the underlying `expr_t *`
 symbol first.
 
-`mat_to_string(...)` allocates a freshly formatted string which the caller owns
-and must release with `free(...)`.
+`mat_to_text(...)` allocates a freshly formatted `string_t` which the caller
+owns and must release with `string_free(...)`.
 
-For symbolic matrices, `mat_to_string(...)` omits the outer `{ ... | ... }`
+`mat_to_string(...)` is retained as a compatibility wrapper for C APIs that
+still require an owned `char *`; callers must release that buffer with
+`free(...)`.
+
+For symbolic matrices, `mat_to_text(...)` omits the outer `{ ... | ... }`
 wrapper when every discovered binding is still `NaN`. Once any binding has a
 concrete value, the shared matrix-wide binding footer is printed again.
 
-`mat_sprintf(...)` and `mat_printf(...)` understand matrix-specific format
-specifiers:
+`mat_sprintf_text(...)`, `mat_sprintf(...)`, and `mat_printf(...)` understand
+matrix-specific format specifiers:
 
 - `%M`  — inline scientific matrix
 - `%m`  — inline pretty matrix

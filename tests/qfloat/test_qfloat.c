@@ -17,9 +17,26 @@ TEST_SUITE_SETUP(test_qfloat_suite_setup);
 
 /* Helper to print qfloat_t */
 void print_q(const char *label, qfloat_t x) {
-    char buf[256];
-    qf_to_string(x, buf, sizeof(buf));
-    printf("%s = %s\n", label, buf);
+    string_t *text = qf_to_string(x);
+    printf("%s = %s\n", label, text ? string_c_str(text) : "<qfloat format failed>");
+    string_free(text);
+}
+
+void test_qf_to_buffer(qfloat_t x, char *out, size_t out_size)
+{
+    string_t *text;
+
+    if (!out || out_size == 0u)
+        return;
+
+    text = qf_to_string(x);
+    if (!text) {
+        out[0] = '\0';
+        return;
+    }
+
+    snprintf(out, out_size, "%s", string_c_str(text));
+    string_free(text);
 }
 
 /* Compare qfloat_t to double with tolerance */

@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "test_number.h"
+#include "ustring.h"
 
 void run_number_parse_tests(void)
 {
@@ -20,8 +21,10 @@ void run_number_parse_tests(void)
         number_t paren_imag = num_create_from_string("1e-23 + (2.3e12)i");
         number_t plain_imag = num_create_from_string("1e-23 + 2.3e12i");
         number_t direct = num_create_from_double(1.25);
+        string_t *text_number = string_new_with("  355/113  ");
+        number_t from_text = num_create_from_text(text_number);
         number_t set_value = num_new();
-        char *text;
+        string_t *text;
 
         assert_number_string("num_create_from_string(\"42\")", integer, "42");
         assert_number_string("num_create_from_string(\"5/6\")", fraction, "⅚");
@@ -33,10 +36,10 @@ void run_number_parse_tests(void)
         ASSERT_NOT_NULL(text);
         printf(C_WHITE C_BOLD "num_create_from_string(\"32.123\")" C_RESET "\n");
         printf("    selected = multiprecision real\n");
-        printf("    got      = %s\n\n", text ? text : "(null)");
+        printf("    got      = %s\n\n", text ? string_c_str(text) : "(null)");
         ASSERT_TRUE(num_is_real(decimal));
         ASSERT_TRUE(!num_is_exact(decimal));
-        free(text);
+        string_free(text);
 
         ASSERT_TRUE(!num_is_real(complex_value));
         assert_number_string("num_create_from_string(\"1 + i\")", unit_imag, "1 + i");
@@ -50,9 +53,12 @@ void run_number_parse_tests(void)
         ASSERT_NOT_NULL(text);
         printf(C_WHITE C_BOLD "num_create_from_double(1.25)" C_RESET "\n");
         printf("    expected = 1.25\n");
-        printf("    got      = %s\n\n", text ? text : "(null)");
-        ASSERT_TRUE(strcmp(text, "1.25") == 0);
-        free(text);
+        printf("    got      = %s\n\n", text ? string_c_str(text) : "(null)");
+        ASSERT_TRUE(strcmp(string_c_str(text), "1.25") == 0);
+        string_free(text);
+
+        assert_number_string("num_create_from_text(\"  355/113  \")",
+            from_text, "³⁵⁵⁄₁₁₃");
 
         num_destroy(&integer);
         num_destroy(&fraction);
@@ -65,6 +71,8 @@ void run_number_parse_tests(void)
         num_destroy(&paren_imag);
         num_destroy(&plain_imag);
         num_destroy(&direct);
+        num_destroy(&from_text);
         num_destroy(&set_value);
+        string_free(text_number);
     }
 }

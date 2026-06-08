@@ -3,6 +3,7 @@
 
 #include "number.h"
 #include "number_internal.h"
+#include "ustring.h"
 
 #include <stdio.h>
 
@@ -456,18 +457,16 @@ number_mpfr_t *number_mpfr_from_qfloat(qfloat_t value, size_t precision_bits)
     return out;
 }
 
-number_mpfr_t *number_mpfr_from_string(const char *text, size_t precision_bits)
+number_mpfr_t *number_mpfr_from_text(const string_t *text, size_t precision_bits)
 {
     number_mpfr_t *out;
-    char *end = NULL;
 
     if (!text)
         return NULL;
     out = number_mpfr_new_prec(precision_bits);
     if (!out)
         return NULL;
-    mpfr_strtofr(out->value, text, &end, 0, MPFR_RNDN);
-    if (end == text || (end && *end != '\0')) {
+    if (mpfr_set_str(out->value, string_c_str(text), 0, MPFR_RNDN) != 0) {
         number_mpfr_free(out);
         return NULL;
     }
@@ -712,20 +711,21 @@ int number_sign_mpfr(const number_t *number)
     return mpfr_sgn(value) < 0 ? -1 : 1;
 }
 
-char *number_to_string_mpfr(const number_t *number)
+string_t *number_to_text_mpfr(const number_t *number)
 {
     mpfr_srcptr value = number ? number_mpfr_value(number_impl_const(number)->value.mpfr) : NULL;
     int digits = number ? (int)num_get_prec_digits(*number) : 0;
     int needed;
     char *out;
     char fmt[32];
+    string_t *text;
 
     if (!value)
         return NULL;
     if (mpfr_nan_p(value))
-        return number_strdup("NAN");
+        return string_new_with("NAN");
     if (mpfr_inf_p(value))
-        return number_strdup(mpfr_sgn(value) < 0 ? "-inf" : "inf");
+        return string_new_with(mpfr_sgn(value) < 0 ? "-inf" : "inf");
     if (digits <= 0)
         digits = 17;
     snprintf(fmt, sizeof(fmt), "%%.%dRg", digits);
@@ -739,7 +739,9 @@ char *number_to_string_mpfr(const number_t *number)
         free(out);
         return NULL;
     }
-    return out;
+    text = string_new_with(out);
+    free(out);
+    return text;
 }
 
 number_t *number_clone_mpfr(const number_t *number)

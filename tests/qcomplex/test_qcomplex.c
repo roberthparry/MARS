@@ -47,9 +47,9 @@ TEST_SUITE_SETUP(test_qcomplex_suite_setup);
 
 static void print_qc(const char *label, qcomplex_t z)
 {
-    char buf[256];
-    qc_to_string(z, buf, sizeof(buf));
-    printf("    %s = %s\n", label, buf);
+    string_t *text = qc_to_string(z);
+    printf("    %s = %s\n", label, text ? string_c_str(text) : "<qcomplex format failed>");
+    string_free(text);
     fflush(stdout);
 }
 

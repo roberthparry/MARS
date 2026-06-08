@@ -1,10 +1,105 @@
-#include <errno.h>
 #include <limits.h>
 #include <stddef.h>
 #include <stdlib.h>
 
 #include "expr_bindings.h"
 #include "expr_maths.h"
+#include "ustring.h"
+
+static int expr_text_to_unsigned_long(const string_t *text, unsigned long *out)
+{
+    string_cursor_t *cursor;
+    bool saw_digit = false;
+    unsigned long value = 0u;
+
+    if (!text || !out || string_length(text) == 0u)
+        return 0;
+
+    cursor = string_cursor_new(text);
+    if (!cursor)
+        return 0;
+
+    if (rune_is_equal(string_cursor_peek(cursor), '+'))
+        (void)string_cursor_next(cursor);
+
+    while (!string_cursor_done(cursor)) {
+        rune_t rune = string_cursor_peek(cursor);
+        char ch = '\0';
+        unsigned int digit;
+
+        if (!rune_to_ascii(rune, &ch) || ch < '0' || ch > '9') {
+            string_cursor_free(cursor);
+            return 0;
+        }
+
+        digit = (unsigned int)(ch - '0');
+        if (value > (ULONG_MAX - digit) / 10u) {
+            string_cursor_free(cursor);
+            return 0;
+        }
+        value = value * 10u + digit;
+        saw_digit = true;
+        (void)string_cursor_next(cursor);
+    }
+
+    string_cursor_free(cursor);
+    if (!saw_digit)
+        return 0;
+
+    *out = value;
+    return 1;
+}
+
+static int expr_text_to_long(const string_t *text, long *out)
+{
+    string_cursor_t *cursor;
+    bool negative = false;
+    bool saw_digit = false;
+    unsigned long value = 0u;
+    unsigned long limit;
+
+    if (!text || !out || string_length(text) == 0u)
+        return 0;
+
+    cursor = string_cursor_new(text);
+    if (!cursor)
+        return 0;
+
+    if (rune_is_equal(string_cursor_peek(cursor), '-')) {
+        negative = true;
+        (void)string_cursor_next(cursor);
+    }
+
+    limit = negative ? (unsigned long)LONG_MAX + 1u : (unsigned long)LONG_MAX;
+    while (!string_cursor_done(cursor)) {
+        rune_t rune = string_cursor_peek(cursor);
+        char ch = '\0';
+        unsigned int digit;
+
+        if (!rune_to_ascii(rune, &ch) || ch < '0' || ch > '9') {
+            string_cursor_free(cursor);
+            return 0;
+        }
+
+        digit = (unsigned int)(ch - '0');
+        if (value > (limit - digit) / 10u) {
+            string_cursor_free(cursor);
+            return 0;
+        }
+        value = value * 10u + digit;
+        saw_digit = true;
+        (void)string_cursor_next(cursor);
+    }
+
+    string_cursor_free(cursor);
+    if (!saw_digit)
+        return 0;
+
+    *out = negative && value == (unsigned long)LONG_MAX + 1u
+        ? LONG_MIN
+        : (negative ? -(long)value : (long)value);
+    return 1;
+}
 
 static inline number_t expr_eval_unary_num(expr_t *dv, number_t (*fn)(const number_t))
 {
@@ -17,10 +112,9 @@ static inline number_t expr_eval_binary_num(
     return fn(expr_eval_num_internal(dv->a), expr_eval_num_internal(dv->b));
 }
 
-static int expr_number_to_polygamma_order(number_t value, unsigned int *order)
+int expr_number_to_polygamma_order(number_t value, unsigned int *order)
 {
-    char *text;
-    char *end = NULL;
+    string_t *text;
     unsigned long parsed;
 
     if (!order || !num_is_real(value) || !num_is_integer(value) ||
@@ -30,21 +124,18 @@ static int expr_number_to_polygamma_order(number_t value, unsigned int *order)
     text = num_to_string(value);
     if (!text)
         return 0;
-    errno = 0;
-    parsed = strtoul(text, &end, 10);
-    if (errno != 0 || !end || *end != '\0' || parsed > UINT_MAX) {
-        free(text);
+    if (!expr_text_to_unsigned_long(text, &parsed) || parsed > UINT_MAX) {
+        string_free(text);
         return 0;
     }
-    free(text);
+    string_free(text);
     *order = (unsigned int)parsed;
     return 1;
 }
 
 static int expr_number_to_unsigned_long(number_t value, unsigned long *out)
 {
-    char *text;
-    char *end = NULL;
+    string_t *text;
     unsigned long parsed;
 
     if (!out || !num_is_real(value) || !num_is_integer(value) ||
@@ -54,21 +145,18 @@ static int expr_number_to_unsigned_long(number_t value, unsigned long *out)
     text = num_to_string(value);
     if (!text)
         return 0;
-    errno = 0;
-    parsed = strtoul(text, &end, 10);
-    if (errno != 0 || !end || *end != '\0') {
-        free(text);
+    if (!expr_text_to_unsigned_long(text, &parsed)) {
+        string_free(text);
         return 0;
     }
-    free(text);
+    string_free(text);
     *out = parsed;
     return 1;
 }
 
 static int expr_number_to_long(number_t value, long *out)
 {
-    char *text;
-    char *end = NULL;
+    string_t *text;
     long parsed;
 
     if (!out || !num_is_real(value) || !num_is_integer(value))
@@ -77,13 +165,11 @@ static int expr_number_to_long(number_t value, long *out)
     text = num_to_string(value);
     if (!text)
         return 0;
-    errno = 0;
-    parsed = strtol(text, &end, 10);
-    if (errno != 0 || !end || *end != '\0') {
-        free(text);
+    if (!expr_text_to_long(text, &parsed)) {
+        string_free(text);
         return 0;
     }
-    free(text);
+    string_free(text);
     *out = parsed;
     return 1;
 }

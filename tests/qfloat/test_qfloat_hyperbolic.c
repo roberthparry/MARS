@@ -31,8 +31,8 @@ static void test_qf_sinh(void)
         qfloat_t expected = sinh_tests[i].expected;
         qfloat_t got = qf_sinh(x);
 
-        qf_to_string(got, buf, sizeof(buf));
-        qf_to_string(expected, buf_exp, sizeof(buf_exp));
+        test_qf_to_buffer(got, buf, sizeof(buf));
+        test_qf_to_buffer(expected, buf_exp, sizeof(buf_exp));
 
         if (qf_close(got, expected, 1e-30)) {
             printf("%s  OK: %s = %s%s\n",
@@ -74,8 +74,8 @@ static void test_qf_cosh(void)
         qfloat_t expected = cosh_tests[i].expected;
         qfloat_t got = qf_cosh(x);
 
-        qf_to_string(got, buf, sizeof(buf));
-        qf_to_string(expected, buf_exp, sizeof(buf_exp));
+        test_qf_to_buffer(got, buf, sizeof(buf));
+        test_qf_to_buffer(expected, buf_exp, sizeof(buf_exp));
 
         if (qf_close(got, expected, 1e-30)) {
             printf("%s  OK: %s = %s%s\n", C_GREEN, cosh_tests[i].name, buf, C_RESET);
@@ -122,8 +122,8 @@ static void test_qf_tanh(void)
         qfloat_t expected = tanh_tests[i].expected;
         qfloat_t got = qf_tanh(x);
 
-        qf_to_string(got, buf, sizeof(buf));
-        qf_to_string(expected, buf_exp, sizeof(buf_exp));
+        test_qf_to_buffer(got, buf, sizeof(buf));
+        test_qf_to_buffer(expected, buf_exp, sizeof(buf_exp));
 
         if (qf_close(got, expected, 1e-30)) {
             printf("%s  OK: %s = %s%s\n", C_GREEN, tanh_tests[i].name, buf, C_RESET);
@@ -181,8 +181,8 @@ static void test_qf_asinh(void)
         qfloat_t expected = asinh_tests[i].expected;
         qfloat_t got = qf_asinh(x);
 
-        qf_to_string(got, buf, sizeof(buf));
-        qf_to_string(expected, buf_exp, sizeof(buf_exp));
+        test_qf_to_buffer(got, buf, sizeof(buf));
+        test_qf_to_buffer(expected, buf_exp, sizeof(buf_exp));
 
         if (qf_close(got, expected, 1e-30)) {
             printf("%s  OK: %s = %s%s\n", C_GREEN, asinh_tests[i].name, buf, C_RESET);
@@ -221,8 +221,8 @@ static void test_qf_acosh(void)
         qfloat_t expected = acosh_tests[i].expected;
         qfloat_t got = qf_acosh(x);
 
-        qf_to_string(got, buf, sizeof(buf));
-        qf_to_string(expected, buf_exp, sizeof(buf_exp));
+        test_qf_to_buffer(got, buf, sizeof(buf));
+        test_qf_to_buffer(expected, buf_exp, sizeof(buf_exp));
 
         if (qf_close(got, expected, 1e-30)) {
             printf("%s  OK: %s = %s%s\n", C_GREEN, acosh_tests[i].name, buf, C_RESET);
@@ -238,7 +238,7 @@ static void test_qf_acosh(void)
     if (isnan(qf_to_double(r))) {
         printf("%s  OK: acosh(0.5) = NaN%s\n", C_GREEN, C_RESET);
     } else {
-        qf_to_string(r, buf, sizeof(buf));
+        test_qf_to_buffer(r, buf, sizeof(buf));
         printf("%s  FAIL: acosh(0.5) should be NaN%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
         printf("    got = %s\n", buf);
         TEST_FAIL();
@@ -284,8 +284,8 @@ static void test_qf_atanh(void)
         qfloat_t expected = atanh_tests[i].expected;
         qfloat_t got = qf_atanh(x);
 
-        qf_to_string(got, buf, sizeof(buf));
-        qf_to_string(expected, buf_exp, sizeof(buf_exp));
+        test_qf_to_buffer(got, buf, sizeof(buf));
+        test_qf_to_buffer(expected, buf_exp, sizeof(buf_exp));
 
         if (qf_close(got, expected, 1e-30)) {
             printf("%s  OK: %s = %s%s\n", C_GREEN, atanh_tests[i].name, buf, C_RESET);
@@ -301,7 +301,7 @@ static void test_qf_atanh(void)
     if (isnan(qf_to_double(r))) {
         printf("%s  OK: atanh(1) = NaN%s\n", C_GREEN, C_RESET);
     } else {
-        qf_to_string(r, buf, sizeof(buf));
+        test_qf_to_buffer(r, buf, sizeof(buf));
         printf("%s  FAIL: atanh(1) should be NaN%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
         printf("    got = %s\n", buf);
         TEST_FAIL();

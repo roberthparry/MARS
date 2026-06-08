@@ -2,6 +2,7 @@
 
 #include "number.h"
 #include "number_internal.h"
+#include "ustring.h"
 
 bool number_is_zero_qcomplex(const number_t *number)
 {
@@ -65,24 +66,11 @@ bool number_is_integer_qcomplex(const number_t *number)
               qc_real(number_impl_const(number)->value.qc));
 }
 
-char *number_to_string_qcomplex(const number_t *number)
+string_t *number_to_text_qcomplex(const number_t *number)
 {
-    int needed;
-    char *out;
-
     if (!number)
         return NULL;
-    needed = qc_sprintf(NULL, 0u, "%z", number_impl_const(number)->value.qc);
-    if (needed < 0)
-        return NULL;
-    out = malloc((size_t)needed + 1u);
-    if (!out)
-        return NULL;
-    if (qc_sprintf(out, (size_t)needed + 1u, "%z", number_impl_const(number)->value.qc) < 0) {
-        free(out);
-        return NULL;
-    }
-    return out;
+    return qc_sprintf_text("%z", number_impl_const(number)->value.qc);
 }
 
 number_t *number_clone_qcomplex(const number_t *number)

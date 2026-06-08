@@ -5,6 +5,7 @@
 #include "expression.h"
 #include "matrix.h"
 #include "number.h"
+#include "ustring.h"
 
 static char *dup_string(const char *text)
 {
@@ -29,6 +30,15 @@ static char *expr_text_dup(const expr_t *expr, style_t style)
     return copy;
 }
 
+static char *number_text_dup(number_t value)
+{
+    string_t *text = num_to_string(value);
+    char *copy = text ? dup_string(string_c_str(text)) : NULL;
+
+    string_free(text);
+    return copy;
+}
+
 static const char *matrix_type_name(const matrix_t *matrix)
 {
     return mat_typeof(matrix) == MAT_TYPE_EXPR ? "expr" : "number";
@@ -47,7 +57,7 @@ static void print_expr_values(const char *label, expr_t **values, size_t count)
 static void print_number_values(const char *label, number_t *values, size_t count)
 {
     for (size_t i = 0; i < count; ++i) {
-        char *text = num_to_string(values[i]);
+        char *text = number_text_dup(values[i]);
 
         printf("%-12s λ%zu = %s\n", label, i + 1u, text ? text : "(null)");
         free(text);
@@ -59,7 +69,7 @@ static void print_number_eigenvalues_tex(number_t *values, size_t count)
     printf("tex         \\begin{aligned}");
     printf("\\textbf{eigenvalues}\\quad&\\\\ ");
     for (size_t i = 0; i < count; ++i) {
-        char *text = num_to_string(values[i]);
+        char *text = number_text_dup(values[i]);
 
         printf("\\lambda_{%zu} &= \\text{%s}", i + 1u, text ? text : "null");
         printf(" \\\\ ");
@@ -178,7 +188,7 @@ static void print_number_eigenvector_column(const char *prefix,
         char *text = NULL;
 
         entry = mat_get_num(eigenvectors, row, column);
-        text = num_to_string(entry);
+        text = number_text_dup(entry);
         printf("%s%s", row ? "; " : "", text ? text : "(null)");
         free(text);
         num_destroy(&entry);
@@ -197,7 +207,7 @@ static void print_number_eigenvector_column_tex(const matrix_t *eigenvectors,
         char *text;
 
         entry = mat_get_num(eigenvectors, row, column);
-        text = num_to_string(entry);
+        text = number_text_dup(entry);
         printf("%s\\text{%s}", row ? ",\\; " : "", text ? text : "null");
         free(text);
         num_destroy(&entry);
@@ -278,7 +288,7 @@ static void print_eigendecomposition_number_fields(number_t *eigenvalues,
     printf("cols        %zu\n", mat_get_col_count(eigenvectors));
     printf("result      eigenvalues\n");
     for (size_t i = 0; i < count; ++i) {
-        char *text = num_to_string(eigenvalues[i]);
+        char *text = number_text_dup(eigenvalues[i]);
 
         printf("result      λ%zu = %s\n", i + 1u, text ? text : "(null)");
         free(text);
@@ -292,7 +302,7 @@ static void print_eigendecomposition_number_fields(number_t *eigenvalues,
 
     printf("pretty      eigenvalues\n");
     for (size_t i = 0; i < count; ++i) {
-        char *text = num_to_string(eigenvalues[i]);
+        char *text = number_text_dup(eigenvalues[i]);
 
         printf("  λ%zu = %s\n", i + 1u, text ? text : "(null)");
         free(text);
@@ -306,7 +316,7 @@ static void print_eigendecomposition_number_fields(number_t *eigenvalues,
     printf("tex         \\begin{aligned}");
     printf("\\textbf{eigenvalues}\\quad&\\\\ ");
     for (size_t i = 0; i < count; ++i) {
-        char *text = num_to_string(eigenvalues[i]);
+        char *text = number_text_dup(eigenvalues[i]);
 
         printf("\\lambda_{%zu} &= \\text{%s}", i + 1u, text ? text : "null");
         printf(" \\\\ ");
@@ -340,7 +350,7 @@ static void print_expr_field(const char *label, expr_t *expr)
 
 static void print_number_field(const char *label, number_t value)
 {
-    char *text = num_to_string(value);
+    char *text = number_text_dup(value);
 
     printf("%-12s %s\n", label, text ? text : "(null)");
 

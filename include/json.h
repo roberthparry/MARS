@@ -47,7 +47,7 @@ json_t *json_new_object(void);
 json_t *json_clone(const json_t *json);
 void json_free(json_t *json);
 
-json_t *json_from_string(const string_t *text);
+json_t *json_from_text(const string_t *text);
 json_t *json_from_file(const string_t *path);
 
 string_t *json_to_string(const json_t *json);

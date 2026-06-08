@@ -28,12 +28,12 @@ void run_number_multiprecision_tests(void)
         number_t clone_real;
         number_t log_real;
         number_t sqrt_complex;
-        char *qcomplex_pi_e_text;
-        char *set_real_text;
-        char *set_complex_text;
-        char *set_qfloat_real_text;
-        char *set_qfloat_complex_text;
-        char *set_qcomplex_text;
+        string_t *qcomplex_pi_e_text;
+        string_t *set_real_text;
+        string_t *set_complex_text;
+        string_t *set_qfloat_real_text;
+        string_t *set_qfloat_complex_text;
+        string_t *set_qcomplex_text;
 
         default_real = num_create_from_string("1.25");
         bits_real = num_const_prec(default_real, 512u);
@@ -87,9 +87,9 @@ void run_number_multiprecision_tests(void)
                                     qfloat_pi_prec,
                                     "3.1415926535897932384626433832795");
         ASSERT_NOT_NULL(qcomplex_pi_e_text);
-        ASSERT_TRUE(strstr(qcomplex_pi_e_text,
+        ASSERT_TRUE(strstr(string_c_str(qcomplex_pi_e_text),
                            "3.1415926535897932384626433832795") != NULL);
-        ASSERT_TRUE(strstr(qcomplex_pi_e_text,
+        ASSERT_TRUE(strstr(string_c_str(qcomplex_pi_e_text),
                            "2.7182818284590452353602874713526") != NULL);
 
         ASSERT_EQ_INT(num_set_prec_bits(&clone_real, 256u), 0);
@@ -99,25 +99,25 @@ void run_number_multiprecision_tests(void)
         ASSERT_EQ_INT((int)num_get_prec_bits(clone_real), 256);
         set_real_text = num_to_string(clone_real);
         ASSERT_NOT_NULL(set_real_text);
-        ASSERT_TRUE(strcmp(set_real_text, "2.5") == 0);
+        ASSERT_TRUE(strcmp(string_c_str(set_real_text), "2.5") == 0);
 
         ASSERT_EQ_INT(num_set_double(&bits_complex, 2.5), 0);
         ASSERT_EQ_INT((int)num_get_prec_bits(bits_complex), 384);
         set_complex_text = num_to_string(bits_complex);
         ASSERT_NOT_NULL(set_complex_text);
-        ASSERT_TRUE(strcmp(set_complex_text, "2.5") == 0);
+        ASSERT_TRUE(strcmp(string_c_str(set_complex_text), "2.5") == 0);
 
         ASSERT_EQ_INT(num_set_qfloat(&clone_real, qf_from_double(3.25)), 0);
         ASSERT_EQ_INT((int)num_get_prec_bits(clone_real), 256);
         set_qfloat_real_text = num_to_string(clone_real);
         ASSERT_NOT_NULL(set_qfloat_real_text);
-        ASSERT_TRUE(strcmp(set_qfloat_real_text, "3.25") == 0);
+        ASSERT_TRUE(strcmp(string_c_str(set_qfloat_real_text), "3.25") == 0);
 
         ASSERT_EQ_INT(num_set_qfloat(&bits_complex, qf_from_double(3.25)), 0);
         ASSERT_EQ_INT((int)num_get_prec_bits(bits_complex), 384);
         set_qfloat_complex_text = num_to_string(bits_complex);
         ASSERT_NOT_NULL(set_qfloat_complex_text);
-        ASSERT_TRUE(strcmp(set_qfloat_complex_text, "3.25") == 0);
+        ASSERT_TRUE(strcmp(string_c_str(set_qfloat_complex_text), "3.25") == 0);
 
         ASSERT_EQ_INT(num_set_qcomplex(
             &bits_complex,
@@ -125,7 +125,7 @@ void run_number_multiprecision_tests(void)
         ASSERT_EQ_INT((int)num_get_prec_bits(bits_complex), 384);
         set_qcomplex_text = num_to_string(bits_complex);
         ASSERT_NOT_NULL(set_qcomplex_text);
-        ASSERT_TRUE(strcmp(set_qcomplex_text, "1.5 + 0.25i") == 0);
+        ASSERT_TRUE(strcmp(string_c_str(set_qcomplex_text), "1.5 + 0.25i") == 0);
 
         num_destroy(&default_real);
         num_destroy(&bits_real);
@@ -146,12 +146,12 @@ void run_number_multiprecision_tests(void)
         num_destroy(&clone_real);
         num_destroy(&log_real);
         num_destroy(&sqrt_complex);
-        free(qcomplex_pi_e_text);
-        free(set_real_text);
-        free(set_complex_text);
-        free(set_qfloat_real_text);
-        free(set_qfloat_complex_text);
-        free(set_qcomplex_text);
+        string_free(qcomplex_pi_e_text);
+        string_free(set_real_text);
+        string_free(set_complex_text);
+        string_free(set_qfloat_real_text);
+        string_free(set_qfloat_complex_text);
+        string_free(set_qcomplex_text);
     }
 
     {

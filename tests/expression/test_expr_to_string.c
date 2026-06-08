@@ -174,22 +174,25 @@ static void print_multiline(const char *label, const char *s)
         return;
     }
 
-    const char *p = s;
+    size_t pos = 0u;
+    size_t len = strlen(s);
     int first = 1;
 
-    while (*p) {
+    while (pos < len) {
+        size_t line_len;
+
         if (!first) {
             /* indent continuation lines to same column */
             for (int i = 0; i < base_indent; i++)
                 fputc(' ', stderr);
         }
 
-        const char *nl = strchr(p, '\n');
-        if (nl) {
-            fwrite(p, 1, nl - p + 1, stderr);
-            p = nl + 1;
+        line_len = strcspn(&s[pos], "\n");
+        if (pos + line_len < len) {
+            fwrite(&s[pos], 1, line_len + 1u, stderr);
+            pos += line_len + 1u;
         } else {
-            fprintf(stderr, "%s\n", p);
+            fprintf(stderr, "%s\n", &s[pos]);
             break;
         }
 
@@ -321,33 +324,29 @@ static char *test_copy_range(const char *first, const char *last)
     return out;
 }
 
-static const char *test_skip_space(const char *p)
-{
-    while (*p == ' ' || *p == '\t')
-        ++p;
-    return p;
-}
-
 static char *test_trim_copy_range(const char *first, const char *last)
 {
-    while (first < last && (*first == ' ' || *first == '\t'))
-        ++first;
-    while (last > first && (last[-1] == ' ' || last[-1] == '\t'))
-        --last;
-    return test_copy_range(first, last);
+    size_t start = 0u;
+    size_t end = (size_t)(last - first);
+
+    while (start < end && (first[start] == ' ' || first[start] == '\t'))
+        start++;
+    while (end > start && (first[end - 1u] == ' ' || first[end - 1u] == '\t'))
+        end--;
+    return test_copy_range(&first[start], &first[end]);
 }
 
 static char *test_c_style_body_from_legacy(const char *body)
 {
     test_sbuf_t out = {0};
 
-    for (const char *p = body; *p; ++p) {
-        if (*p == '*' || *p == '/') {
-            if (!test_sbuf_puts(&out, *p == '*' ? " * " : " / ")) {
+    for (size_t pos = 0u; body[pos] != '\0'; ++pos) {
+        if (body[pos] == '*' || body[pos] == '/') {
+            if (!test_sbuf_puts(&out, body[pos] == '*' ? " * " : " / ")) {
                 free(out.buf);
                 return NULL;
             }
-        } else if (!test_sbuf_putc(&out, *p)) {
+        } else if (!test_sbuf_putc(&out, body[pos])) {
             free(out.buf);
             return NULL;
         }
@@ -398,22 +397,23 @@ static int test_emit_c_arg_list(test_sbuf_t *out,
                                 const test_legacy_binding_t *bindings,
                                 size_t nbindings)
 {
-    const char *p = args;
+    size_t len = args ? strlen(args) : 0u;
+    size_t pos = 0u;
     int first = 1;
 
     if (!args || !*args)
         return test_sbuf_puts(out, typed ? "void" : "");
 
-    while (*p) {
-        const char *start = p;
-        const char *end;
+    while (pos < len) {
+        size_t start = pos;
+        size_t end;
         char *name;
 
-        while (*p && *p != ',')
-            ++p;
-        end = p;
+        while (pos < len && args[pos] != ',')
+            pos++;
+        end = pos;
 
-        name = test_trim_copy_range(start, end);
+        name = test_trim_copy_range(&args[start], &args[end]);
         if (!name)
             return 0;
 
@@ -433,9 +433,10 @@ static int test_emit_c_arg_list(test_sbuf_t *out,
 
         free(name);
         first = 0;
-        if (*p == ',')
-            ++p;
-        p = test_skip_space(p);
+        if (pos < len && args[pos] == ',')
+            pos++;
+        while (pos < len && (args[pos] == ' ' || args[pos] == '\t'))
+            pos++;
     }
 
     return 1;
@@ -453,7 +454,7 @@ static char *test_legacy_function_expect_to_c(const char *legacy)
 
     memset(bindings, 0, sizeof(bindings));
 
-    while (line && *line) {
+    while (line && line[0] != '\0') {
         const char *eol = strchr(line, '\n');
         const char *end = eol ? eol : line + strlen(line);
 
