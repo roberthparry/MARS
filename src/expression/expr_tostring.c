@@ -477,6 +477,20 @@ static bool expr_is_const_neg_half_local(const expr_t *f)
     return f && expr_is_const(f) && number_is_neg_half_local(f->c);
 }
 
+static bool expr_const_half_can_render_as_sqrt_local(const expr_t *f)
+{
+    return expr_is_const_half_local(f) &&
+           (!f->name || !*f->name) &&
+           !f->binding_expr;
+}
+
+static bool expr_const_neg_half_can_render_as_sqrt_local(const expr_t *f)
+{
+    return expr_is_const_neg_half_local(f) &&
+           (!f->name || !*f->name) &&
+           !f->binding_expr;
+}
+
 static int is_atomic_for_mul(const expr_t *f);
 
 static void emit_expr_mul_separator_local(const expr_t *left,
@@ -2122,12 +2136,12 @@ void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec)
         int need = PREC_POW < parent_prec;
         int base_needs_parens = pow_base_needs_visible_parens(f->a);
 
-        if (expr_is_const_half_local(f->b)) {
+        if (expr_const_half_can_render_as_sqrt_local(f->b)) {
             emit_tex_sqrt_power(f->a, b, parent_prec, false);
             return;
         }
 
-        if (expr_is_const_neg_half_local(f->b)) {
+        if (expr_const_neg_half_can_render_as_sqrt_local(f->b)) {
             emit_tex_sqrt_power(f->a, b, parent_prec, true);
             return;
         }
@@ -2511,12 +2525,12 @@ void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
         int need = PREC_POW < parent_prec;
         int base_needs_parens = pow_base_needs_visible_parens(f->a);
 
-        if (expr_is_const_half_local(f->b)) {
+        if (expr_const_half_can_render_as_sqrt_local(f->b)) {
             emit_expr_sqrt_power(f->a, b, parent_prec, false);
             return;
         }
 
-        if (expr_is_const_neg_half_local(f->b)) {
+        if (expr_const_neg_half_can_render_as_sqrt_local(f->b)) {
             emit_expr_sqrt_power(f->a, b, parent_prec, true);
             return;
         }

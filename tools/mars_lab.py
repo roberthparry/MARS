@@ -264,6 +264,43 @@ if LAB_THEME == "to-be-announced":
       color: #51245e;
     }
 
+    body.theme-to-be-announced .mode-panel select {
+      color-scheme: light;
+    }
+
+    body.theme-to-be-announced .mode-panel select option {
+      color: #51245e;
+      background: #fff7fd;
+    }
+
+    body.theme-to-be-announced .mode-panel select option:checked {
+      color: #421c4f;
+      background: #ffd6f4;
+    }
+
+    body.theme-to-be-announced .select-shell .select-button,
+    body.theme-to-be-announced .select-shell .select-menu {
+      color: #51245e;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.92), rgba(255,247,253,0.78));
+      border-color: rgba(230, 167, 216, 0.48);
+      box-shadow: 0 0.9rem 2rem rgba(179, 129, 179, 0.12);
+    }
+
+    body.theme-to-be-announced .select-shell .select-option {
+      color: #51245e;
+    }
+
+    body.theme-to-be-announced .select-shell .select-option:hover,
+    body.theme-to-be-announced .select-shell .select-option:focus-visible {
+      background: rgba(247, 168, 217, 0.22);
+    }
+
+    body.theme-to-be-announced .select-shell .select-option.selected {
+      color: #421c4f;
+      background: #ffd6f4;
+    }
+
     body.theme-to-be-announced .mode-tab,
     body.theme-to-be-announced .card-action,
     body.theme-to-be-announced button {
@@ -724,20 +761,30 @@ INDEX_HTML = r"""<!doctype html>
       border-radius: 999px;
       outline: 0;
       padding: 0.65rem 0.9rem;
-      color: #f8fff8;
-      background: linear-gradient(180deg, rgba(16, 51, 38, 0.96), rgba(9, 28, 21, 0.96));
+      color: var(--code);
+      background-color: rgba(0, 0, 0, 0.14);
       font: 0.95rem/1.25 "Cascadia Code", "Fira Code", "DejaVu Sans Mono", monospace;
       appearance: none;
       -webkit-appearance: none;
+      color-scheme: dark;
       background-image:
         linear-gradient(45deg, transparent 50%, rgba(233, 244, 239, 0.88) 50%),
-        linear-gradient(135deg, rgba(233, 244, 239, 0.88) 50%, transparent 50%);
+        linear-gradient(135deg, rgba(233, 244, 239, 0.88) 50%, transparent 50%),
+        linear-gradient(180deg, rgba(16, 51, 38, 0.96), rgba(9, 28, 21, 0.96));
       background-position:
         calc(100% - 1.25rem) calc(50% - 0.12rem),
-        calc(100% - 0.9rem) calc(50% - 0.12rem);
-      background-size: 0.38rem 0.38rem, 0.38rem 0.38rem;
+        calc(100% - 0.9rem) calc(50% - 0.12rem),
+        0 0;
+      background-size: 0.38rem 0.38rem, 0.38rem 0.38rem, 100% 100%;
       background-repeat: no-repeat;
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.02),
+        0 0.55rem 1.2rem rgba(0, 0, 0, 0.14);
       padding-right: 2.4rem;
+    }
+
+    .mode-panel select:hover {
+      border-color: rgba(233, 244, 239, 0.42);
     }
 
     .mode-panel select:focus {
@@ -746,8 +793,122 @@ INDEX_HTML = r"""<!doctype html>
     }
 
     .mode-panel select option {
-      color: #081b14;
-      background: #f3f8f2;
+      color: var(--code);
+      background: #071913;
+    }
+
+    .mode-panel select option:checked {
+      color: #10190f;
+      background: #cfa052;
+    }
+
+    .select-shell {
+      position: relative;
+      width: 100%;
+    }
+
+    .select-shell > select.select-native-source {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .select-button {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      width: 100%;
+      border: 1px solid rgba(233, 244, 239, 0.28);
+      border-radius: 999px;
+      outline: 0;
+      padding: 0.65rem 0.9rem;
+      color: var(--code);
+      background:
+        linear-gradient(180deg, rgba(16, 51, 38, 0.96), rgba(9, 28, 21, 0.96));
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.02),
+        0 0.55rem 1.2rem rgba(0, 0, 0, 0.14);
+      font: 0.95rem/1.25 "Cascadia Code", "Fira Code", "DejaVu Sans Mono", monospace;
+      font-weight: 400;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .select-button::after {
+      content: "";
+      width: 0.48rem;
+      height: 0.48rem;
+      border-right: 2px solid rgba(233, 244, 239, 0.86);
+      border-bottom: 2px solid rgba(233, 244, 239, 0.86);
+      transform: rotate(45deg) translateY(-0.12rem);
+      flex: 0 0 auto;
+    }
+
+    .select-button:hover {
+      border-color: rgba(233, 244, 239, 0.42);
+    }
+
+    .select-button:focus-visible,
+    .select-shell.open .select-button {
+      border-color: color-mix(in srgb, var(--accent), var(--line) 25%);
+      box-shadow: 0 0 0 3px rgba(113, 198, 180, 0.18);
+    }
+
+    .select-menu {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: calc(100% + 0.4rem);
+      z-index: 40;
+      display: grid;
+      gap: 0.18rem;
+      max-height: min(19rem, 48vh);
+      overflow-y: auto;
+      padding: 0.35rem;
+      border: 1px solid rgba(233, 244, 239, 0.32);
+      border-radius: 18px;
+      color: var(--code);
+      background:
+        linear-gradient(180deg, rgba(16, 51, 38, 0.98), rgba(7, 25, 19, 0.98));
+      box-shadow:
+        0 1.2rem 2.4rem rgba(0, 0, 0, 0.32),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+      scrollbar-color: rgba(207, 160, 82, 0.74) rgba(7, 25, 19, 0.62);
+    }
+
+    .select-menu.hidden {
+      display: none;
+    }
+
+    .select-option {
+      width: 100%;
+      border: 0;
+      border-radius: 12px;
+      padding: 0.55rem 0.7rem;
+      color: var(--code);
+      background: transparent;
+      box-shadow: none;
+      font: 0.9rem/1.25 "Cascadia Code", "Fira Code", "DejaVu Sans Mono", monospace;
+      font-weight: 400;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .select-option:hover,
+    .select-option:focus-visible {
+      outline: 0;
+      color: #f8fff8;
+      background: rgba(113, 198, 180, 0.16);
+    }
+
+    .select-option.selected {
+      color: #10190f;
+      background: linear-gradient(135deg, rgba(233, 187, 90, 0.96), rgba(140, 216, 184, 0.94));
     }
 
     .mode-hint {
@@ -1656,7 +1817,7 @@ __THEME_OVERRIDES__
       </div>
       <textarea id="expr" spellcheck="false" aria-labelledby="leftPaneTitle">__INITIAL_EXPRESSION__</textarea>
       <div class="mode-panel hidden" id="matrixControls">
-        <label for="matrixOperation">Matrix operation</label>
+        <label id="matrixOperationLabel" for="matrixOperation">Matrix operation</label>
         <select id="matrixOperation">
           <option value="eval">Evaluate</option>
           <option value="inverse" selected>Inverse</option>
@@ -1904,6 +2065,7 @@ __THEME_OVERRIDES__
     const mobileUrl = document.getElementById('mobileUrl');
     const mobileQr = document.getElementById('mobileQr');
     const controlToken = __CONTROL_TOKEN__;
+    enhanceRoundedSelect(matrixOperation);
     const statusEl = document.getElementById('status');
     const rightPaneTitle = document.getElementById('rightPaneTitle');
     const resultPane = document.getElementById('resultPane');
@@ -2057,6 +2219,7 @@ __THEME_OVERRIDES__
     }
 
     function syncMatrixControls() {
+      syncRoundedSelect(matrixOperation);
       const needsOperand = currentMode() === 'matrix' && matrixOperation.value === 'solve';
       matrixOperand.classList.toggle('hidden', !needsOperand);
       matrixOperandLabel.classList.toggle('hidden', !needsOperand);
@@ -2149,6 +2312,151 @@ __THEME_OVERRIDES__
     function hideTargetEntry() {
       targetRow.classList.add('hidden');
       goalSeek.textContent = 'Goal seek';
+    }
+
+    function syncRoundedSelect(select) {
+      if (select && typeof select.__marsSyncRoundedSelect === 'function')
+        select.__marsSyncRoundedSelect();
+    }
+
+    function enhanceRoundedSelect(select) {
+      if (!select)
+        return null;
+
+      const label = document.querySelector(`label[for="${select.id}"]`);
+      const shell = document.createElement('div');
+      const button = document.createElement('button');
+      const menu = document.createElement('div');
+
+      shell.className = 'select-shell';
+      button.type = 'button';
+      button.className = 'select-button';
+      button.setAttribute('aria-haspopup', 'listbox');
+      button.setAttribute('aria-expanded', 'false');
+      if (label && label.id)
+        button.setAttribute('aria-labelledby', label.id);
+      else
+        button.setAttribute('aria-label', 'Select option');
+
+      menu.className = 'select-menu hidden';
+      menu.setAttribute('role', 'listbox');
+
+      select.classList.add('select-native-source');
+      select.tabIndex = -1;
+      select.setAttribute('aria-hidden', 'true');
+      select.parentNode.insertBefore(shell, select);
+      shell.appendChild(select);
+      shell.appendChild(button);
+      shell.appendChild(menu);
+
+      const optionButtons = Array.from(select.options).map((option) => {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'select-option';
+        item.setAttribute('role', 'option');
+        item.dataset.value = option.value;
+        item.textContent = option.textContent;
+        item.addEventListener('click', () => {
+          const changed = select.value !== option.value;
+          select.value = option.value;
+          sync();
+          close();
+          button.focus();
+          if (changed)
+            select.dispatchEvent(new Event('change', {bubbles: true}));
+        });
+        menu.appendChild(item);
+        return item;
+      });
+
+      function selectedOption() {
+        return select.selectedOptions[0] || select.options[select.selectedIndex] || select.options[0];
+      }
+
+      function sync() {
+        const selected = selectedOption();
+        button.textContent = selected ? selected.textContent : '';
+        optionButtons.forEach((item) => {
+          const selectedItem = item.dataset.value === select.value;
+          item.classList.toggle('selected', selectedItem);
+          item.setAttribute('aria-selected', selectedItem ? 'true' : 'false');
+        });
+      }
+
+      function close() {
+        shell.classList.remove('open');
+        button.setAttribute('aria-expanded', 'false');
+        menu.classList.add('hidden');
+      }
+
+      function open() {
+        sync();
+        shell.classList.add('open');
+        button.setAttribute('aria-expanded', 'true');
+        menu.classList.remove('hidden');
+      }
+
+      function focusSelectedOption() {
+        const selected = optionButtons.find((item) => item.dataset.value === select.value);
+        (selected || optionButtons[0] || button).focus();
+      }
+
+      function focusRelativeOption(step) {
+        if (!optionButtons.length)
+          return;
+        const currentIndex = optionButtons.indexOf(document.activeElement);
+        const selectedIndex = optionButtons.findIndex((item) => item.dataset.value === select.value);
+        const index = currentIndex >= 0 ? currentIndex : Math.max(0, selectedIndex);
+        const nextIndex = (index + step + optionButtons.length) % optionButtons.length;
+        optionButtons[nextIndex].focus();
+      }
+
+      button.addEventListener('click', () => {
+        if (shell.classList.contains('open'))
+          close();
+        else
+          open();
+      });
+
+      button.addEventListener('keydown', (event) => {
+        if (event.key === 'ArrowDown' || event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          open();
+          focusSelectedOption();
+        } else if (event.key === 'Escape') {
+          close();
+        }
+      });
+
+      menu.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          close();
+          button.focus();
+        } else if (event.key === 'ArrowDown') {
+          event.preventDefault();
+          focusRelativeOption(1);
+        } else if (event.key === 'ArrowUp') {
+          event.preventDefault();
+          focusRelativeOption(-1);
+        }
+      });
+
+      if (label)
+        label.addEventListener('click', (event) => {
+          event.preventDefault();
+          button.focus();
+        });
+
+      document.addEventListener('click', (event) => {
+        if (!shell.contains(event.target))
+          close();
+      });
+
+      select.addEventListener('change', sync);
+      select.__marsSyncRoundedSelect = sync;
+      sync();
+      return {sync, close};
     }
 
     function goalStartKeydown(event) {
@@ -5228,7 +5536,7 @@ def parse_keyed_output(
 def parse_mars_lab_output(output: str) -> dict[str, str]:
     patterns = {
         "input": r"^input\s+(.*)$",
-        "expression": r"^expression\s+(.*)$",
+        "expression": r"^expression\s{2,}(.*)$",
         "unbound": r"^unbound\s+(.*)$",
         "function": r"^function\s+(.*)$",
         "tex": r"^tex\s+(.*)$",

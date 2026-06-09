@@ -1,15 +1,15 @@
 {
-  "expression": "{ (x+a)^n | x = ? }",
+  "expression": "{ n·(n - 1)·(n - 2)·(n - 3)·(x + a)^(n - 4) | x = 3; n = ¹⁄₂, a = 2 }",
   "matrix": "(1, 2; 3, 4)",
-  "lab_mode": "integrator",
-  "matrix_operation": "inverse",
+  "lab_mode": "matrix",
+  "matrix_operation": "simplify",
   "matrix_operand": "",
-  "integrator_expression": "x^n",
+  "integrator_expression": "1/sqrt((a-bx))^5",
   "integrator_bounds": "x",
   "integrator_interval_cap": 5000,
   "precision_bits": {
     "expression": 256,
-    "matrix": 256,
+    "matrix": 53,
     "integrator": 512
   }
 }

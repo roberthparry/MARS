@@ -1056,6 +1056,7 @@
       "test_symbolic_negative_pi_quotient_stays_symbolic": true,
       "test_sqrt_quotient_combines_positive_real_denominator": true,
       "test_symbolic_power_derivative_uses_n_minus_one_form": true,
+      "test_named_half_exponent_round_trips_as_symbolic_power": true,
       "test_symbolic_function_power_matches_parenthesized_power": true,
       "test_inverse_power_function_notation_uses_supported_inverses_only": true,
       "test_nested_symbolic_pi_derivative_has_no_decimalized_coefficients": true,
