@@ -463,6 +463,20 @@ static bool expr_is_const_half_local(const expr_t *f)
     return f && expr_is_const(f) && num_eq(f->c, NUM_HALF);
 }
 
+static bool number_is_neg_half_local(number_t value)
+{
+    number_t neg_half = num_neg(NUM_HALF);
+    bool out = num_eq(value, neg_half);
+
+    num_destroy(&neg_half);
+    return out;
+}
+
+static bool expr_is_const_neg_half_local(const expr_t *f)
+{
+    return f && expr_is_const(f) && number_is_neg_half_local(f->c);
+}
+
 static int is_atomic_for_mul(const expr_t *f);
 
 static void emit_expr_mul_separator_local(const expr_t *left,
@@ -750,6 +764,68 @@ void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec);
 static void emit_tex_expr_abs(const expr_t *f, sbuf_t *b, int parent_prec);
 void emit_func(const expr_t *f, sbuf_t *b, int parent_prec);
 static void emit_func_abs(const expr_t *f, sbuf_t *b, int parent_prec);
+
+static void emit_tex_sqrt_power(const expr_t *base,
+                                sbuf_t *b,
+                                int parent_prec,
+                                bool reciprocal)
+{
+    if (reciprocal) {
+        int need = PREC_MUL < parent_prec;
+
+        if (need)
+            sbuf_puts(b, "\\left(");
+        sbuf_puts(b, "\\frac{1}{\\sqrt{");
+        emit_tex_expr(base, b, PREC_LOWEST);
+        sbuf_puts(b, "}}");
+        if (need)
+            sbuf_puts(b, "\\right)");
+        return;
+    }
+
+    {
+        int need = PREC_UNARY < parent_prec;
+
+        if (need)
+            sbuf_puts(b, "\\left(");
+        sbuf_puts(b, "\\sqrt{");
+        emit_tex_expr(base, b, PREC_LOWEST);
+        sbuf_putc(b, '}');
+        if (need)
+            sbuf_puts(b, "\\right)");
+    }
+}
+
+static void emit_expr_sqrt_power(const expr_t *base,
+                                 sbuf_t *b,
+                                 int parent_prec,
+                                 bool reciprocal)
+{
+    if (reciprocal) {
+        int need = PREC_MUL < parent_prec;
+
+        if (need)
+            sbuf_putc(b, '(');
+        sbuf_puts(b, "1/√(");
+        emit_expr(base, b, PREC_LOWEST);
+        sbuf_putc(b, ')');
+        if (need)
+            sbuf_putc(b, ')');
+        return;
+    }
+
+    {
+        int need = PREC_UNARY < parent_prec;
+
+        if (need)
+            sbuf_putc(b, '(');
+        sbuf_puts(b, "√(");
+        emit_expr(base, b, PREC_LOWEST);
+        sbuf_putc(b, ')');
+        if (need)
+            sbuf_putc(b, ')');
+    }
+}
 
 static bool match_atan_over_argument_denominator(const expr_t *expr,
                                                  const expr_t **atan_expr_out,
@@ -1786,6 +1862,16 @@ void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec)
         long ei = 0;
         int exponent_has_small_int = expr_try_get_small_integer_exponent(f->c, &ei);
 
+        if (num_eq(f->c, NUM_HALF)) {
+            emit_tex_sqrt_power(f->a, b, parent_prec, false);
+            return;
+        }
+
+        if (number_is_neg_half_local(f->c)) {
+            emit_tex_sqrt_power(f->a, b, parent_prec, true);
+            return;
+        }
+
         if (exponent_has_small_int && ei < 0) {
             int recip_need = PREC_MUL < parent_prec;
             long positive_exponent = -ei;
@@ -2036,6 +2122,16 @@ void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec)
         int need = PREC_POW < parent_prec;
         int base_needs_parens = pow_base_needs_visible_parens(f->a);
 
+        if (expr_is_const_half_local(f->b)) {
+            emit_tex_sqrt_power(f->a, b, parent_prec, false);
+            return;
+        }
+
+        if (expr_is_const_neg_half_local(f->b)) {
+            emit_tex_sqrt_power(f->a, b, parent_prec, true);
+            return;
+        }
+
         if (need)
             sbuf_puts(b, "\\left(");
         if (base_needs_parens)
@@ -2149,6 +2245,16 @@ void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
         int need = PREC_POW < parent_prec;
         long ei = 0;
         int exponent_has_small_int = expr_try_get_small_integer_exponent(f->c, &ei);
+
+        if (num_eq(f->c, NUM_HALF)) {
+            emit_expr_sqrt_power(f->a, b, parent_prec, false);
+            return;
+        }
+
+        if (number_is_neg_half_local(f->c)) {
+            emit_expr_sqrt_power(f->a, b, parent_prec, true);
+            return;
+        }
 
         if (exponent_has_small_int && ei < 0) {
             int recip_need = PREC_MUL < parent_prec;
@@ -2404,6 +2510,17 @@ void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
     if (expr_is_op(f, &ops_pow)) {
         int need = PREC_POW < parent_prec;
         int base_needs_parens = pow_base_needs_visible_parens(f->a);
+
+        if (expr_is_const_half_local(f->b)) {
+            emit_expr_sqrt_power(f->a, b, parent_prec, false);
+            return;
+        }
+
+        if (expr_is_const_neg_half_local(f->b)) {
+            emit_expr_sqrt_power(f->a, b, parent_prec, true);
+            return;
+        }
+
         if (need) sbuf_putc(b, '(');
 
         if (base_needs_parens) sbuf_putc(b, '(');
