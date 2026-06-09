@@ -230,19 +230,12 @@ typedef expr_t *(*ternary_fn)(const expr_t *, const expr_t *, const expr_t *);
 
 typedef struct {
     const char *kw;
-    size_t      klen;
     unsigned    arity;
     const expr_ops_t *ops;
     unary_fn    ufn;
     binary_fn   bfn;
     ternary_fn  tfn;
 } func_entry_t;
-
-#define FUNC_ENTRY(name, is_bin, op, unary, binary) \
-    { (name), sizeof(name) - 1u, (is_bin) ? 2u : 1u, (op), (unary), (binary), NULL }
-
-#define FUNC_TERNARY_ENTRY(name, ternary) \
-    { (name), sizeof(name) - 1u, 3u, NULL, NULL, NULL, (ternary) }
 
 static const unsigned char s_func_displacements[FUNC_TABLE_SIZE] = {
       0,   1,   0,   1,   1,   0,  11,   0,   0,   1,
@@ -259,112 +252,112 @@ static const unsigned char s_func_displacements[FUNC_TABLE_SIZE] = {
 };
 
 static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
-    [  0] = FUNC_ENTRY("SHR",           true,  &ops_shr,           NULL,             expr_shr),
-    [  1] = FUNC_ENTRY("hypot",         true,  &ops_hypot,         NULL,             expr_hypot),
-    [  2] = FUNC_ENTRY("tan",           false, &ops_tan,           expr_tan,           NULL),
-    [  3] = FUNC_ENTRY("asin",          false, &ops_asin,          expr_asin,          NULL),
-    [  4] = FUNC_ENTRY("beta",          true,  &ops_beta,          NULL,             expr_beta),
-    [  5] = FUNC_ENTRY("acos",          false, &ops_acos,          expr_acos,          NULL),
-    [  6] = FUNC_ENTRY("digamma",       false, &ops_digamma,       expr_digamma,       NULL),
-    [  7] = FUNC_ENTRY("csc",           false, &ops_cosec,         expr_cosec,         NULL),
-    [  8] = FUNC_ENTRY("SHL",           true,  &ops_shl,           NULL,             expr_shl),
-    [  9] = FUNC_ENTRY("lambert_w0",    false, &ops_lambert_w0,    expr_lambert_w0,    NULL),
-    [ 10] = FUNC_ENTRY("arccot",        false, &ops_acot,          expr_acot,          NULL),
-    [ 11] = FUNC_ENTRY("binomial",      true,  NULL,                NULL,             expr_binomial),
-    [ 12] = FUNC_ENTRY("trigamma",      false, &ops_trigamma,      expr_trigamma,      NULL),
-    [ 13] = FUNC_ENTRY("arsech",        false, &ops_asech,         expr_asech,         NULL),
-    [ 14] = FUNC_ENTRY("gammainv",      false, &ops_gammainv,      expr_gammainv,      NULL),
-    [ 15] = FUNC_ENTRY("abs",           false, &ops_abs,           expr_abs,           NULL),
-    [ 16] = FUNC_ENTRY("arcosech",      false, &ops_acosech,       expr_acosech,       NULL),
-    [ 17] = FUNC_ENTRY("arcoth",        false, &ops_acoth,         expr_acoth,         NULL),
-    [ 18] = FUNC_ENTRY("normal_pdf",    false, &ops_normal_pdf,    expr_normal_pdf,    NULL),
-    [ 19] = FUNC_ENTRY("sqrt",          false, &ops_sqrt,          expr_sqrt,          NULL),
-    [ 20] = FUNC_ENTRY("logbeta",       true,  &ops_logbeta,       NULL,             expr_logbeta),
-    [ 21] = FUNC_ENTRY("prev_prime",    false, &ops_prev_prime,    expr_prev_prime,    NULL),
-    [ 22] = FUNC_ENTRY("log10",         false, &ops_log10,         expr_log10,         NULL),
-    [ 23] = FUNC_ENTRY("asinh",         false, &ops_asinh,         expr_asinh,         NULL),
-    [ 24] = FUNC_ENTRY("sec",           false, &ops_sec,           expr_sec,           NULL),
-    [ 25] = FUNC_ENTRY("next_prime",    false, &ops_next_prime,    expr_next_prime,    NULL),
-    [ 26] = FUNC_ENTRY("cot",           false, &ops_cot,           expr_cot,           NULL),
-    [ 27] = FUNC_ENTRY("mod",           true,  &ops_mod,           NULL,             expr_mod),
-    [ 28] = FUNC_ENTRY("isqrt",         false, &ops_isqrt,         expr_isqrt,         NULL),
-    [ 29] = FUNC_ENTRY("Γ",             false, &ops_gamma,         expr_gamma,         NULL),
-    [ 30] = FUNC_ENTRY("gammainc_Q",    true,  &ops_gammainc_Q,    NULL,             expr_gammainc_Q),
-    [ 31] = FUNC_ENTRY("erfinv",        false, &ops_erfinv,        expr_erfinv,        NULL),
-    [ 32] = FUNC_ENTRY("arcsch",        false, &ops_acosech,       expr_acosech,       NULL),
-    [ 33] = FUNC_ENTRY("cosec",         false, &ops_cosec,         expr_cosec,         NULL),
-    [ 34] = FUNC_ENTRY("is_prime",      false, &ops_is_prime,      expr_is_prime,      NULL),
-    [ 35] = FUNC_ENTRY("atanh",         false, &ops_atanh,         expr_atanh,         NULL),
-    [ 36] = FUNC_ENTRY("acsch",         false, &ops_acosech,       expr_acosech,       NULL),
-    [ 37] = FUNC_ENTRY("coth",          false, &ops_coth,          expr_coth,          NULL),
-    [ 38] = FUNC_ENTRY("W-1",           false, &ops_lambert_wm1,   expr_lambert_wm1,   NULL),
-    [ 39] = FUNC_ENTRY("acosh",         false, &ops_acosh,         expr_acosh,         NULL),
-    [ 40] = FUNC_ENTRY("factorial",     false, &ops_factorial,     expr_factorial,     NULL),
-    [ 41] = FUNC_ENTRY("exp",           false, &ops_exp,           expr_exp,           NULL),
-    [ 42] = FUNC_ENTRY("asec",          false, &ops_asec,          expr_asec,          NULL),
-    [ 43] = FUNC_ENTRY("ψ⁽¹⁾",          false, &ops_trigamma,      expr_trigamma,      NULL),
-    [ 44] = FUNC_ENTRY("W_0",           false, &ops_lambert_w0,    expr_lambert_w0,    NULL),
-    [ 46] = FUNC_ENTRY("gamma",         false, &ops_gamma,         expr_gamma,         NULL),
-    [ 47] = FUNC_ENTRY("gammainc_P",    true,  &ops_gammainc_P,    NULL,             expr_gammainc_P),
-    [ 48] = FUNC_ENTRY("NOT",           false, &ops_bit_not,       expr_bit_not,       NULL),
-    [ 49] = FUNC_ENTRY("sech",          false, &ops_sech,          expr_sech,          NULL),
-    [ 50] = FUNC_ENTRY("atan2",         true,  &ops_atan2,         NULL,             expr_atan2),
-    [ 51] = FUNC_ENTRY("gammainc_lower", true, &ops_gammainc_lower, NULL,            expr_gammainc_lower),
-    [ 52] = FUNC_ENTRY("acosec",        false, &ops_acosec,        expr_acosec,        NULL),
-    [ 53] = FUNC_ENTRY("lambert_wm1",   false, &ops_lambert_wm1,   expr_lambert_wm1,   NULL),
-    [ 54] = FUNC_ENTRY("acsc",          false, &ops_acosec,        expr_acosec,        NULL),
-    [ 55] = FUNC_ENTRY("ln",            false, &ops_log,           expr_log,           NULL),
-    [ 56] = FUNC_ENTRY("acot",          false, &ops_acot,          expr_acot,          NULL),
-    [ 57] = FUNC_ENTRY("erfcinv",       false, &ops_erfcinv,       expr_erfcinv,       NULL),
-    [ 58] = FUNC_ENTRY("tanh",          false, &ops_tanh,          expr_tanh,          NULL),
-    [ 59] = FUNC_ENTRY("XOR",           true,  &ops_bit_xor,       NULL,             expr_bit_xor),
-    [ 60] = FUNC_ENTRY("normal_logpdf", false, &ops_normal_logpdf, expr_normal_logpdf, NULL),
-    [ 61] = FUNC_ENTRY("OR",            true,  &ops_bit_or,        NULL,             expr_bit_or),
-    [ 62] = FUNC_ENTRY("csch",          false, &ops_cosech,        expr_cosech,        NULL),
-    [ 63] = FUNC_ENTRY("arccsc",        false, &ops_acosec,        expr_acosec,        NULL),
-    [ 64] = FUNC_ENTRY("factors",       false, &ops_factors,       expr_factors,       NULL),
-    [ 65] = FUNC_ENTRY("normal_cdf",    false, &ops_normal_cdf,    expr_normal_cdf,    NULL),
-    [ 66] = FUNC_ENTRY("pow",           true,  &ops_pow,           NULL,             expr_pow_xp),
-    [ 67] = FUNC_ENTRY("cosech",        false, &ops_cosech,        expr_cosech,        NULL),
-    [ 68] = FUNC_ENTRY("ψ⁽⁰⁾",          false, &ops_digamma,       expr_digamma,       NULL),
-    [ 69] = FUNC_ENTRY("sin",           false, &ops_sin,           expr_sin,           NULL),
-    [ 70] = FUNC_ENTRY("Ei",            false, &ops_ei,            expr_ei,            NULL),
-    [ 71] = FUNC_ENTRY("arccosec",      false, &ops_acosec,        expr_acosec,        NULL),
-    [ 72] = FUNC_ENTRY("partition",     false, &ops_partition,     expr_partition,     NULL),
-    [ 73] = FUNC_ENTRY("W_-1",          false, &ops_lambert_wm1,   expr_lambert_wm1,   NULL),
-    [ 74] = FUNC_ENTRY("acosech",       false, &ops_acosech,       expr_acosech,       NULL),
-    [ 75] = FUNC_ENTRY("pdf",           false, &ops_pdf,           expr_pdf,           NULL),
-    [ 76] = FUNC_ENTRY("asech",         false, &ops_asech,         expr_asech,         NULL),
-    [ 77] = FUNC_ENTRY("polygamma",     true,  &ops_polygamma,     NULL,             expr_polygamma_xp),
-    [ 78] = FUNC_ENTRY("erf",           false, &ops_erf,           expr_erf,           NULL),
-    [ 79] = FUNC_ENTRY("productlog",    false, &ops_lambert_w,     expr_lambert_w,     NULL),
-    [ 80] = FUNC_ENTRY("erfc",          false, &ops_erfc,          expr_erfc,          NULL),
-    [ 81] = FUNC_ENTRY("gammainc_upper", true, &ops_gammainc_upper, NULL,            expr_gammainc_upper),
-    [ 82] = FUNC_ENTRY("lgamma",        false, &ops_lgamma,        expr_lgamma,        NULL),
-    [ 83] = FUNC_ENTRY("modinv",        true,  &ops_modinv,        NULL,             expr_modinv),
-    [ 84] = FUNC_ENTRY("sinh",          false, &ops_sinh,          expr_sinh,          NULL),
-    [ 85] = FUNC_ENTRY("W0",            false, &ops_lambert_w0,    expr_lambert_w0,    NULL),
-    [ 86] = FUNC_ENTRY("lg",            false, &ops_log10,         expr_log10,         NULL),
-    [ 87] = FUNC_ENTRY("cosh",          false, &ops_cosh,          expr_cosh,          NULL),
-    [ 88] = FUNC_ENTRY("log",           false, &ops_log10,         expr_log10,         NULL),
-    [ 89] = FUNC_ENTRY("AND",           true,  &ops_bit_and,       NULL,             expr_bit_and),
-    [ 90] = FUNC_ENTRY("E1",            false, &ops_e1,            expr_e1,            NULL),
-    [ 91] = FUNC_ENTRY("logpdf",        false, &ops_logpdf,        expr_logpdf,        NULL),
-    [ 92] = FUNC_ENTRY("gcd",           true,  &ops_gcd,           NULL,             expr_gcd),
-    [ 93] = FUNC_ENTRY("atan",          false, &ops_atan,          expr_atan,          NULL),
-    [ 94] = FUNC_TERNARY_ENTRY("logbeta_pdf", expr_logbeta_pdf),
-    [ 95] = FUNC_ENTRY("lcm",           true,  &ops_lcm,           NULL,             expr_lcm),
-    [ 96] = FUNC_ENTRY("W",             false, &ops_lambert_w,     expr_lambert_w,     NULL),
-    [ 97] = FUNC_TERNARY_ENTRY("beta_pdf",    expr_beta_pdf),
-    [ 98] = FUNC_ENTRY("floor",         false, &ops_floor,         expr_floor,         NULL),
-    [ 99] = FUNC_ENTRY("arcsec",        false, &ops_asec,          expr_asec,          NULL),
-    [100] = FUNC_ENTRY("fibonacci",     false, &ops_fibonacci,     expr_fibonacci,     NULL),
-    [101] = FUNC_ENTRY("ceil",          false, &ops_ceil,          expr_ceil,          NULL),
-    [102] = FUNC_ENTRY("cdf",           false, &ops_cdf,           expr_cdf,           NULL),
-    [103] = FUNC_ENTRY("W₀",            false, &ops_lambert_w0,    expr_lambert_w0,    NULL),
-    [104] = FUNC_ENTRY("cos",           false, &ops_cos,           expr_cos,           NULL),
-    [105] = FUNC_ENTRY("acoth",         false, &ops_acoth,         expr_acoth,         NULL),
-    [106] = FUNC_ENTRY("W₋₁",           false, &ops_lambert_wm1,   expr_lambert_wm1,   NULL),
+    [  0] = { .kw = "SHR", .arity = 2u, .ops = &ops_shr, .bfn = expr_shr },
+    [  1] = { .kw = "hypot", .arity = 2u, .ops = &ops_hypot, .bfn = expr_hypot },
+    [  2] = { .kw = "tan", .arity = 1u, .ops = &ops_tan, .ufn = expr_tan },
+    [  3] = { .kw = "asin", .arity = 1u, .ops = &ops_asin, .ufn = expr_asin },
+    [  4] = { .kw = "beta", .arity = 2u, .ops = &ops_beta, .bfn = expr_beta },
+    [  5] = { .kw = "acos", .arity = 1u, .ops = &ops_acos, .ufn = expr_acos },
+    [  6] = { .kw = "digamma", .arity = 1u, .ops = &ops_digamma, .ufn = expr_digamma },
+    [  7] = { .kw = "csc", .arity = 1u, .ops = &ops_cosec, .ufn = expr_cosec },
+    [  8] = { .kw = "SHL", .arity = 2u, .ops = &ops_shl, .bfn = expr_shl },
+    [  9] = { .kw = "lambert_w0", .arity = 1u, .ops = &ops_lambert_w0, .ufn = expr_lambert_w0 },
+    [ 10] = { .kw = "arccot", .arity = 1u, .ops = &ops_acot, .ufn = expr_acot },
+    [ 11] = { .kw = "binomial", .arity = 2u, .ops = NULL, .bfn = expr_binomial },
+    [ 12] = { .kw = "trigamma", .arity = 1u, .ops = &ops_trigamma, .ufn = expr_trigamma },
+    [ 13] = { .kw = "arsech", .arity = 1u, .ops = &ops_asech, .ufn = expr_asech },
+    [ 14] = { .kw = "gammainv", .arity = 1u, .ops = &ops_gammainv, .ufn = expr_gammainv },
+    [ 15] = { .kw = "abs", .arity = 1u, .ops = &ops_abs, .ufn = expr_abs },
+    [ 16] = { .kw = "arcosech", .arity = 1u, .ops = &ops_acosech, .ufn = expr_acosech },
+    [ 17] = { .kw = "arcoth", .arity = 1u, .ops = &ops_acoth, .ufn = expr_acoth },
+    [ 18] = { .kw = "normal_pdf", .arity = 1u, .ops = &ops_normal_pdf, .ufn = expr_normal_pdf },
+    [ 19] = { .kw = "sqrt", .arity = 1u, .ops = &ops_sqrt, .ufn = expr_sqrt },
+    [ 20] = { .kw = "logbeta", .arity = 2u, .ops = &ops_logbeta, .bfn = expr_logbeta },
+    [ 21] = { .kw = "prev_prime", .arity = 1u, .ops = &ops_prev_prime, .ufn = expr_prev_prime },
+    [ 22] = { .kw = "log10", .arity = 1u, .ops = &ops_log10, .ufn = expr_log10 },
+    [ 23] = { .kw = "asinh", .arity = 1u, .ops = &ops_asinh, .ufn = expr_asinh },
+    [ 24] = { .kw = "sec", .arity = 1u, .ops = &ops_sec, .ufn = expr_sec },
+    [ 25] = { .kw = "next_prime", .arity = 1u, .ops = &ops_next_prime, .ufn = expr_next_prime },
+    [ 26] = { .kw = "cot", .arity = 1u, .ops = &ops_cot, .ufn = expr_cot },
+    [ 27] = { .kw = "mod", .arity = 2u, .ops = &ops_mod, .bfn = expr_mod },
+    [ 28] = { .kw = "isqrt", .arity = 1u, .ops = &ops_isqrt, .ufn = expr_isqrt },
+    [ 29] = { .kw = "Γ", .arity = 1u, .ops = &ops_gamma, .ufn = expr_gamma },
+    [ 30] = { .kw = "gammainc_Q", .arity = 2u, .ops = &ops_gammainc_Q, .bfn = expr_gammainc_Q },
+    [ 31] = { .kw = "erfinv", .arity = 1u, .ops = &ops_erfinv, .ufn = expr_erfinv },
+    [ 32] = { .kw = "arcsch", .arity = 1u, .ops = &ops_acosech, .ufn = expr_acosech },
+    [ 33] = { .kw = "cosec", .arity = 1u, .ops = &ops_cosec, .ufn = expr_cosec },
+    [ 34] = { .kw = "is_prime", .arity = 1u, .ops = &ops_is_prime, .ufn = expr_is_prime },
+    [ 35] = { .kw = "atanh", .arity = 1u, .ops = &ops_atanh, .ufn = expr_atanh },
+    [ 36] = { .kw = "acsch", .arity = 1u, .ops = &ops_acosech, .ufn = expr_acosech },
+    [ 37] = { .kw = "coth", .arity = 1u, .ops = &ops_coth, .ufn = expr_coth },
+    [ 38] = { .kw = "W-1", .arity = 1u, .ops = &ops_lambert_wm1, .ufn = expr_lambert_wm1 },
+    [ 39] = { .kw = "acosh", .arity = 1u, .ops = &ops_acosh, .ufn = expr_acosh },
+    [ 40] = { .kw = "factorial", .arity = 1u, .ops = &ops_factorial, .ufn = expr_factorial },
+    [ 41] = { .kw = "exp", .arity = 1u, .ops = &ops_exp, .ufn = expr_exp },
+    [ 42] = { .kw = "asec", .arity = 1u, .ops = &ops_asec, .ufn = expr_asec },
+    [ 43] = { .kw = "ψ⁽¹⁾", .arity = 1u, .ops = &ops_trigamma, .ufn = expr_trigamma },
+    [ 44] = { .kw = "W_0", .arity = 1u, .ops = &ops_lambert_w0, .ufn = expr_lambert_w0 },
+    [ 46] = { .kw = "gamma", .arity = 1u, .ops = &ops_gamma, .ufn = expr_gamma },
+    [ 47] = { .kw = "gammainc_P", .arity = 2u, .ops = &ops_gammainc_P, .bfn = expr_gammainc_P },
+    [ 48] = { .kw = "NOT", .arity = 1u, .ops = &ops_bit_not, .ufn = expr_bit_not },
+    [ 49] = { .kw = "sech", .arity = 1u, .ops = &ops_sech, .ufn = expr_sech },
+    [ 50] = { .kw = "atan2", .arity = 2u, .ops = &ops_atan2, .bfn = expr_atan2 },
+    [ 51] = { .kw = "gammainc_lower", .arity = 2u, .ops = &ops_gammainc_lower, .bfn = expr_gammainc_lower },
+    [ 52] = { .kw = "acosec", .arity = 1u, .ops = &ops_acosec, .ufn = expr_acosec },
+    [ 53] = { .kw = "lambert_wm1", .arity = 1u, .ops = &ops_lambert_wm1, .ufn = expr_lambert_wm1 },
+    [ 54] = { .kw = "acsc", .arity = 1u, .ops = &ops_acosec, .ufn = expr_acosec },
+    [ 55] = { .kw = "ln", .arity = 1u, .ops = &ops_log, .ufn = expr_log },
+    [ 56] = { .kw = "acot", .arity = 1u, .ops = &ops_acot, .ufn = expr_acot },
+    [ 57] = { .kw = "erfcinv", .arity = 1u, .ops = &ops_erfcinv, .ufn = expr_erfcinv },
+    [ 58] = { .kw = "tanh", .arity = 1u, .ops = &ops_tanh, .ufn = expr_tanh },
+    [ 59] = { .kw = "XOR", .arity = 2u, .ops = &ops_bit_xor, .bfn = expr_bit_xor },
+    [ 60] = { .kw = "normal_logpdf", .arity = 1u, .ops = &ops_normal_logpdf, .ufn = expr_normal_logpdf },
+    [ 61] = { .kw = "OR", .arity = 2u, .ops = &ops_bit_or, .bfn = expr_bit_or },
+    [ 62] = { .kw = "csch", .arity = 1u, .ops = &ops_cosech, .ufn = expr_cosech },
+    [ 63] = { .kw = "arccsc", .arity = 1u, .ops = &ops_acosec, .ufn = expr_acosec },
+    [ 64] = { .kw = "factors", .arity = 1u, .ops = &ops_factors, .ufn = expr_factors },
+    [ 65] = { .kw = "normal_cdf", .arity = 1u, .ops = &ops_normal_cdf, .ufn = expr_normal_cdf },
+    [ 66] = { .kw = "pow", .arity = 2u, .ops = &ops_pow, .bfn = expr_pow_xp },
+    [ 67] = { .kw = "cosech", .arity = 1u, .ops = &ops_cosech, .ufn = expr_cosech },
+    [ 68] = { .kw = "ψ⁽⁰⁾", .arity = 1u, .ops = &ops_digamma, .ufn = expr_digamma },
+    [ 69] = { .kw = "sin", .arity = 1u, .ops = &ops_sin, .ufn = expr_sin },
+    [ 70] = { .kw = "Ei", .arity = 1u, .ops = &ops_ei, .ufn = expr_ei },
+    [ 71] = { .kw = "arccosec", .arity = 1u, .ops = &ops_acosec, .ufn = expr_acosec },
+    [ 72] = { .kw = "partition", .arity = 1u, .ops = &ops_partition, .ufn = expr_partition },
+    [ 73] = { .kw = "W_-1", .arity = 1u, .ops = &ops_lambert_wm1, .ufn = expr_lambert_wm1 },
+    [ 74] = { .kw = "acosech", .arity = 1u, .ops = &ops_acosech, .ufn = expr_acosech },
+    [ 75] = { .kw = "pdf", .arity = 1u, .ops = &ops_pdf, .ufn = expr_pdf },
+    [ 76] = { .kw = "asech", .arity = 1u, .ops = &ops_asech, .ufn = expr_asech },
+    [ 77] = { .kw = "polygamma", .arity = 2u, .ops = &ops_polygamma, .bfn = expr_polygamma_xp },
+    [ 78] = { .kw = "erf", .arity = 1u, .ops = &ops_erf, .ufn = expr_erf },
+    [ 79] = { .kw = "productlog", .arity = 1u, .ops = &ops_lambert_w, .ufn = expr_lambert_w },
+    [ 80] = { .kw = "erfc", .arity = 1u, .ops = &ops_erfc, .ufn = expr_erfc },
+    [ 81] = { .kw = "gammainc_upper", .arity = 2u, .ops = &ops_gammainc_upper, .bfn = expr_gammainc_upper },
+    [ 82] = { .kw = "lgamma", .arity = 1u, .ops = &ops_lgamma, .ufn = expr_lgamma },
+    [ 83] = { .kw = "modinv", .arity = 2u, .ops = &ops_modinv, .bfn = expr_modinv },
+    [ 84] = { .kw = "sinh", .arity = 1u, .ops = &ops_sinh, .ufn = expr_sinh },
+    [ 85] = { .kw = "W0", .arity = 1u, .ops = &ops_lambert_w0, .ufn = expr_lambert_w0 },
+    [ 86] = { .kw = "lg", .arity = 1u, .ops = &ops_log10, .ufn = expr_log10 },
+    [ 87] = { .kw = "cosh", .arity = 1u, .ops = &ops_cosh, .ufn = expr_cosh },
+    [ 88] = { .kw = "log", .arity = 1u, .ops = &ops_log10, .ufn = expr_log10 },
+    [ 89] = { .kw = "AND", .arity = 2u, .ops = &ops_bit_and, .bfn = expr_bit_and },
+    [ 90] = { .kw = "E1", .arity = 1u, .ops = &ops_e1, .ufn = expr_e1 },
+    [ 91] = { .kw = "logpdf", .arity = 1u, .ops = &ops_logpdf, .ufn = expr_logpdf },
+    [ 92] = { .kw = "gcd", .arity = 2u, .ops = &ops_gcd, .bfn = expr_gcd },
+    [ 93] = { .kw = "atan", .arity = 1u, .ops = &ops_atan, .ufn = expr_atan },
+    [ 94] = { .kw = "logbeta_pdf", .arity = 3u, .tfn = expr_logbeta_pdf },
+    [ 95] = { .kw = "lcm", .arity = 2u, .ops = &ops_lcm, .bfn = expr_lcm },
+    [ 96] = { .kw = "W", .arity = 1u, .ops = &ops_lambert_w, .ufn = expr_lambert_w },
+    [ 97] = { .kw = "beta_pdf", .arity = 3u, .tfn = expr_beta_pdf },
+    [ 98] = { .kw = "floor", .arity = 1u, .ops = &ops_floor, .ufn = expr_floor },
+    [ 99] = { .kw = "arcsec", .arity = 1u, .ops = &ops_asec, .ufn = expr_asec },
+    [100] = { .kw = "fibonacci", .arity = 1u, .ops = &ops_fibonacci, .ufn = expr_fibonacci },
+    [101] = { .kw = "ceil", .arity = 1u, .ops = &ops_ceil, .ufn = expr_ceil },
+    [102] = { .kw = "cdf", .arity = 1u, .ops = &ops_cdf, .ufn = expr_cdf },
+    [103] = { .kw = "W₀", .arity = 1u, .ops = &ops_lambert_w0, .ufn = expr_lambert_w0 },
+    [104] = { .kw = "cos", .arity = 1u, .ops = &ops_cos, .ufn = expr_cos },
+    [105] = { .kw = "acoth", .arity = 1u, .ops = &ops_acoth, .ufn = expr_acoth },
+    [106] = { .kw = "W₋₁", .arity = 1u, .ops = &ops_lambert_wm1, .ufn = expr_lambert_wm1 },
 };
 
 static unsigned func_bucket_hash(string_view_t kw)
@@ -398,6 +391,11 @@ static unsigned func_slot_hash(string_view_t kw)
 static bool func_entry_matches(const func_entry_t *entry, string_view_t kw)
 {
     return string_view_equals_literal(kw, entry->kw);
+}
+
+static size_t func_entry_kw_len(const func_entry_t *entry)
+{
+    return strlen(entry->kw);
 }
 
 static const func_entry_t *lookup_func(string_view_t kw)
@@ -674,14 +672,19 @@ static size_t scan_function_power_marker_pos_view(string_view_t text,
 
 static int func_call_start_view(string_view_t text,
                                 size_t pos,
-                                const char *kw,
-                                size_t klen,
+                                const func_entry_t *entry,
                                 size_t *paren_pos_out)
 {
+    size_t klen;
     size_t after;
     unsigned char c;
 
-    if (!string_view_equals_literal(string_view_slice(text, pos, klen), kw))
+    if (!entry || !entry->kw)
+        return 0;
+
+    klen = func_entry_kw_len(entry);
+
+    if (!string_view_equals_literal(string_view_slice(text, pos, klen), entry->kw))
         return 0;
 
     after = scan_function_power_marker_pos_view(text, pos + klen);
@@ -723,7 +726,7 @@ static const func_entry_t *lookup_fixed_func_call_view(string_view_t text,
         if (entry) {
             size_t paren_pos = SIZE_MAX;
 
-            if (func_call_start_view(text, pos, entry->kw, entry->klen, &paren_pos)) {
+            if (func_call_start_view(text, pos, entry, &paren_pos)) {
                 if (paren_pos_out)
                     *paren_pos_out = paren_pos;
                 return entry;
@@ -737,7 +740,7 @@ static const func_entry_t *lookup_fixed_func_call_view(string_view_t text,
 
         if (!entry->kw)
             continue;
-        if (!func_call_start_view(text, pos, entry->kw, entry->klen, &paren_pos))
+        if (!func_call_start_view(text, pos, entry, &paren_pos))
             continue;
 
         if (paren_pos_out)
@@ -1218,7 +1221,7 @@ static expr_t *parse_atom(expr_parse_state_t *p)
             lookup_fixed_func_call_view(text, pos, &paren_pos);
 
         if (fe && paren_pos != SIZE_MAX) {
-            size_t after_kw_pos = pos + fe->klen;
+            size_t after_kw_pos = pos + func_entry_kw_len(fe);
             expr_parse_state_t marker = *p;
             string_view_t symbolic_exp_text = string_view_empty();
             bool inverse_power = false;
@@ -1923,7 +1926,7 @@ static int collect_implicit_symbols(string_view_t text,
                 lookup_fixed_func_call_view(text, pos, &paren_pos);
 
             if (fe && paren_pos != SIZE_MAX) {
-                string_cursor_skip(cursor, fe->klen);
+                string_cursor_skip(cursor, func_entry_kw_len(fe));
                 continue;
             }
         }

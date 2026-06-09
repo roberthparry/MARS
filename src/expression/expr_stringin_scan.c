@@ -8,10 +8,12 @@
 
 typedef struct {
     const char *text;
-    size_t      len;
 } expr_parse_literal_t;
 
-#define EXPR_PARSE_LITERAL(text) { (text), sizeof(text) - 1u }
+static size_t expr_parse_literal_len(expr_parse_literal_t literal)
+{
+    return strlen(literal.text);
+}
 
 bool expr_parse_cursor_at_identifier_boundary(const string_cursor_t *cursor,
                                               string_pos_t pos)
@@ -198,9 +200,9 @@ size_t expr_parse_scan_special_number_len(string_view_t view,
                                           bool require_identifier_boundary)
 {
     static const expr_parse_literal_t specials[] = {
-        EXPR_PARSE_LITERAL("infinity"),
-        EXPR_PARSE_LITERAL("nan"),
-        EXPR_PARSE_LITERAL("inf")
+        { .text = "infinity" },
+        { .text = "nan" },
+        { .text = "inf" }
     };
     string_view_t remaining = string_view_slice(view, pos,
         string_view_length(view) > pos ? string_view_length(view) - pos : 0u);
@@ -213,12 +215,14 @@ size_t expr_parse_scan_special_number_len(string_view_t view,
         return value_len;
 
     for (size_t i = 0u; i < sizeof(specials) / sizeof(specials[0]); ++i) {
+        size_t special_len = expr_parse_literal_len(specials[i]);
+
         if (expr_parse_view_starts_with_text(remaining,
                                              specials[i].text,
                                              true) &&
             (!require_identifier_boundary ||
-             special_number_boundary(view, pos + specials[i].len)))
-            return specials[i].len;
+             special_number_boundary(view, pos + special_len)))
+            return special_len;
     }
 
     return 0u;
@@ -315,7 +319,7 @@ static string_t *cursor_read_literal_name(string_cursor_t *cursor,
     string_t *result = string_new_with(name.text);
 
     if (result)
-        string_cursor_skip(cursor, name.len);
+        string_cursor_skip(cursor, expr_parse_literal_len(name));
     return result;
 }
 
@@ -386,14 +390,14 @@ static bool cursor_alias_is_accepted(const string_cursor_t *cursor,
                                      string_pos_t alias_pos)
 {
     static const expr_parse_literal_t accepted[] = {
-        EXPR_PARSE_LITERAL("pi"),
-        EXPR_PARSE_LITERAL("phi"),
-        EXPR_PARSE_LITERAL("gamma"),
-        EXPR_PARSE_LITERAL("tau")
+        { .text = "pi" },
+        { .text = "phi" },
+        { .text = "gamma" },
+        { .text = "tau" }
     };
 
     for (size_t i = 0u; i < sizeof(accepted) / sizeof(accepted[0]); ++i) {
-        string_pos_t suffix_pos = alias_pos + accepted[i].len;
+        string_pos_t suffix_pos = alias_pos + expr_parse_literal_len(accepted[i]);
         unsigned char suffix = 0u;
         uint32_t suffix_value = 0;
         size_t suffix_len = 0u;
@@ -424,9 +428,9 @@ static string_t *read_simple_name(string_cursor_t *cursor,
                                   bool allow_plain_letters_after_first)
 {
     static const expr_parse_literal_t builtin_names[] = {
-        EXPR_PARSE_LITERAL("pi"),
-        EXPR_PARSE_LITERAL("phi"),
-        EXPR_PARSE_LITERAL("gamma")
+        { .text = "pi" },
+        { .text = "phi" },
+        { .text = "gamma" }
     };
     string_cursor_t *scan;
     string_t *out;
@@ -443,7 +447,8 @@ static string_t *read_simple_name(string_cursor_t *cursor,
         if (string_cursor_match_at(
                 scan, string_cursor_position(scan), builtin_names[i].text) &&
             expr_parse_cursor_at_identifier_boundary(
-                scan, string_cursor_position(scan) + builtin_names[i].len)) {
+                scan, string_cursor_position(scan) +
+                      expr_parse_literal_len(builtin_names[i]))) {
             string_cursor_free(scan);
             return cursor_read_literal_name(cursor, builtin_names[i]);
         }
@@ -610,11 +615,11 @@ string_t *expr_parse_read_name(string_cursor_t *cursor,
                                bool allow_plain_letters_after_first)
 {
     static const expr_parse_literal_t special_names[] = {
-        EXPR_PARSE_LITERAL("@pi"),
-        EXPR_PARSE_LITERAL("@phi"),
-        EXPR_PARSE_LITERAL("@gamma"),
-        EXPR_PARSE_LITERAL("@tau"),
-        EXPR_PARSE_LITERAL("pi")
+        { .text = "@pi" },
+        { .text = "@phi" },
+        { .text = "@gamma" },
+        { .text = "@tau" },
+        { .text = "pi" }
     };
     unsigned char b;
 
@@ -629,7 +634,8 @@ string_t *expr_parse_read_name(string_cursor_t *cursor,
                 cursor, string_cursor_position(cursor), special_names[i].text) &&
             expr_parse_cursor_at_identifier_boundary(
                 cursor,
-                string_cursor_position(cursor) + special_names[i].len))
+                string_cursor_position(cursor) +
+                expr_parse_literal_len(special_names[i])))
             return cursor_read_literal_name(cursor, special_names[i]);
     }
 
