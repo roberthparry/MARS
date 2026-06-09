@@ -1,10 +1,13 @@
 #ifndef EXPR_INTERNAL_H
 #define EXPR_INTERNAL_H
 
+#include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
-#include "qfloat.h"
+
 #include "expression.h"
 #include "internal/expr_internal.h"
+#include "qfloat.h"
 
 /**
  * @file expr_internal.h
@@ -27,15 +30,6 @@
 /* Operator vtable                                                           */
 /* ------------------------------------------------------------------------- */
 
-/**
- * @brief Virtual function table for a differentiable value operator.
- *
- * Each node carries a pointer to one of these tables. The vtable defines:
- *   • how to evaluate the node (eval)
- *   • how to construct its derivative node (deriv)
- *
- * Both functions must return *new* nodes with refcount = 1.
- */
 /**
  * @brief Arity classification for operator vtable entries.
  *
@@ -137,14 +131,12 @@ typedef enum {
     EXPR_KIND_COUNT
 } expr_op_kind_t;
 
-bool expr_match_unary_op(const expr_t *expr,
-                       expr_op_kind_t kind,
-                       const expr_t **arg_out);
+bool expr_match_unary_op(const expr_t *expr, expr_op_kind_t kind, const expr_t **arg_out);
 
 bool expr_match_binary_op(const expr_t *expr,
-                        expr_op_kind_t kind,
-                        const expr_t **left_out,
-                        const expr_t **right_out);
+                          expr_op_kind_t kind,
+                          const expr_t **left_out,
+                          const expr_t **right_out);
 
 typedef enum expr_diff_kind {
     EXPR_DIFF_SMOOTH = 0,
@@ -160,6 +152,15 @@ typedef expr_t *(*expr_integrate_fn)(const expr_t *expr, const expr_t *wrt);
 typedef void (*expr_reverse_fn)(const expr_t *dv, const number_t *out_bar,
                                 number_t *a_bar, number_t *b_bar);
 
+/**
+ * @brief Virtual function table for a differentiable value operator.
+ *
+ * Each node carries a pointer to one of these tables. The vtable defines:
+ *   • how to evaluate the node (eval)
+ *   • how to construct its derivative node (deriv)
+ *
+ * Both functions must return *new* nodes with refcount = 1.
+ */
 typedef struct expr_ops {
     /** Compute the primal value of the node. Returns an owning `number_t` by value. */
     number_t  (*eval)(expr_t *dv);
@@ -261,8 +262,8 @@ typedef struct expr_ops {
  * expr_create_deriv().
  */
 typedef struct expr_deriv_cache {
-    uint64_t              wrt_id; /* 0 = single-var sentinel; otherwise stable variable id */
-    expr_t              *dx;  /* the derivative expression (owned) */
+    uint64_t                 wrt_id; /* 0 = single-var sentinel; otherwise stable variable id */
+    expr_t                  *dx;     /* the derivative expression (owned) */
     struct expr_deriv_cache *next;
 } expr_deriv_cache_t;
 
@@ -360,7 +361,7 @@ struct _expr_t {
 
     expr_deriv_cache_t *dx_cache;
 
-    char              *name;
+    char                *name;
     expr_binding_expr_t *binding_expr;
 
     int     refcount;
@@ -490,21 +491,25 @@ extern const expr_ops_t ops_e1;
 /* Internal helpers                                                          */
 /* ------------------------------------------------------------------------- */
 
-expr_t *expr_alloc(const expr_ops_t *ops);
-expr_t *expr_make_const_num(number_t x);
-expr_t *expr_make_var_num(number_t x);
-int expr_get_default_constant_num(const char *name, number_t *value_out);
-int expr_get_default_constant_num_text(const string_t *name,
-                                       number_t *value_out);
-void expr_store_const_num(expr_t *dv, number_t value);
-void expr_store_value_num(expr_t *dv, number_t value);
-number_t expr_eval_num_internal(const expr_t *dv);
-expr_t *expr_get_dx_internal(const expr_t *dv);
-const expr_t *expr_current_wrt_internal(void);
-expr_t *expr_new_unary_internal(const expr_ops_t *ops, const expr_t *a);
-expr_t *expr_new_binary_internal(const expr_ops_t *ops, const expr_t *a, const expr_t *b);
-expr_t *expr_new_pow_const_internal(const expr_t *a, number_t exponent);
-expr_t *expr_polygamma_xp(const expr_t *order, const expr_t *arg);
+/* Core construction and evaluation helpers. */
+expr_t *       expr_alloc                        (const expr_ops_t *ops);
+expr_t *       expr_make_const_num               (number_t x);
+expr_t *       expr_make_var_num                 (number_t x);
+int            expr_get_default_constant_num     (const char *name, number_t *value_out);
+int            expr_get_default_constant_num_text(const string_t *name, number_t *value_out);
+void           expr_store_const_num              (expr_t *dv, number_t value);
+void           expr_store_value_num              (expr_t *dv, number_t value);
+number_t       expr_eval_num_internal            (const expr_t *dv);
+expr_t *       expr_get_dx_internal              (const expr_t *dv);
+const expr_t * expr_current_wrt_internal         (void);
+expr_t *       expr_new_unary_internal           (const expr_ops_t *ops, const expr_t *a);
+expr_t *       expr_new_binary_internal          (const expr_ops_t *ops,
+                                                  const expr_t *a,
+                                                  const expr_t *b);
+expr_t *       expr_new_pow_const_internal       (const expr_t *a, number_t exponent);
+expr_t *       expr_polygamma_xp                 (const expr_t *order, const expr_t *arg);
+
+/* Small structural predicates. */
 static inline int expr_const_is_zero(const expr_t *dv)
 {
     return dv && dv->ops == &ops_const && num_eq(dv->c, NUM_ZERO);
@@ -525,198 +530,484 @@ static inline int expr_is_op(const expr_t *dv, const expr_ops_t *ops)
     return dv && dv->ops == ops;
 }
 
-static inline int expr_is_const(const expr_t *dv) { return expr_is_op(dv, &ops_const); }
-static inline int expr_is_var(const expr_t *dv) { return expr_is_op(dv, &ops_var); }
-static inline int expr_is_neg(const expr_t *dv) { return expr_is_op(dv, &ops_neg); }
-static inline int expr_is_mul(const expr_t *dv) { return expr_is_op(dv, &ops_mul); }
-static inline int expr_is_div(const expr_t *dv) { return expr_is_op(dv, &ops_div); }
+static inline int expr_is_const(const expr_t *dv)
+{
+    return expr_is_op(dv, &ops_const);
+}
+
+static inline int expr_is_var(const expr_t *dv)
+{
+    return expr_is_op(dv, &ops_var);
+}
+
+static inline int expr_is_neg(const expr_t *dv)
+{
+    return expr_is_op(dv, &ops_neg);
+}
+
+static inline int expr_is_mul(const expr_t *dv)
+{
+    return expr_is_op(dv, &ops_mul);
+}
+
+static inline int expr_is_div(const expr_t *dv)
+{
+    return expr_is_op(dv, &ops_div);
+}
+
 static inline int expr_is_addsub(const expr_t *dv)
 {
     return expr_is_op(dv, &ops_add) || expr_is_op(dv, &ops_sub);
 }
-static inline int expr_is_exp_expr(const expr_t *dv) { return expr_is_op(dv, &ops_exp); }
-static inline int expr_is_sqrt_expr(const expr_t *dv) { return expr_is_op(dv, &ops_sqrt); }
-static inline int expr_is_pow_d_expr(const expr_t *dv) { return expr_is_op(dv, &ops_pow_d); }
+
+static inline int expr_is_exp_expr(const expr_t *dv)
+{
+    return expr_is_op(dv, &ops_exp);
+}
+
+static inline int expr_is_sqrt_expr(const expr_t *dv)
+{
+    return expr_is_op(dv, &ops_sqrt);
+}
+
+static inline int expr_is_pow_d_expr(const expr_t *dv)
+{
+    return expr_is_op(dv, &ops_pow_d);
+}
+
 static inline int expr_is_unnamed_const(const expr_t *dv)
 {
     return expr_is_const(dv) && (!dv->name || !*dv->name);
 }
 
-expr_t *expr_simplify_passthrough(const expr_t *dv, expr_t *a, expr_t *b);
-expr_t *expr_simplify_unary_operator(const expr_t *dv, expr_t *a, expr_t *b);
-expr_t *expr_simplify_binary_operator(const expr_t *dv, expr_t *a, expr_t *b);
-expr_t *expr_simplify_neg_operator(const expr_t *dv, expr_t *a, expr_t *b);
-expr_t *expr_simplify_add_sub_operator(const expr_t *dv, expr_t *a, expr_t *b);
-expr_t *expr_simplify_mul_operator(const expr_t *dv, expr_t *a, expr_t *b);
-expr_t *expr_simplify_div_operator(const expr_t *dv, expr_t *a, expr_t *b);
-expr_t *expr_simplify_pow_d_operator(const expr_t *dv, expr_t *a, expr_t *b);
-expr_t *expr_simplify_pow_operator(const expr_t *dv, expr_t *a, expr_t *b);
-expr_t *expr_simplify_hypot_operator(const expr_t *dv, expr_t *a, expr_t *b);
-bool expr_simplify_is_plain_real_const(const expr_t *dv);
-bool expr_simplify_try_get_plain_real_const(const expr_t *dv, number_t *out);
-bool expr_simplify_is_simplifiable_const(const expr_t *dv);
-bool expr_simplify_allows_const_identity_fold(const expr_t *dv);
-number_t expr_simplify_normalise_simple_rational_coeff(number_t coeff);
-expr_t *expr_simplify_positive_part_if_negative(expr_t *dv);
-expr_t *expr_simplify_try_log10_power_of_ten(expr_t *arg);
-expr_t *expr_simplify_try_floor_ceil_const(const expr_t *op, expr_t *arg);
-expr_t *expr_simplify_try_unary_const_fold(const expr_t *op, expr_t *arg);
-expr_t *expr_simplify_try_unary_const_value_fold(const expr_t *op, expr_t *arg);
-expr_t *expr_simplify_try_sqrt_scaled_square_const(expr_t *arg);
-expr_t *expr_simplify_try_sqrt_quotient(expr_t *num, expr_t *den);
-expr_t *expr_simplify_direct_inverse_pair(const expr_t *outer, expr_t *inner);
-expr_t *expr_simplify_direct_inverse_pair_from_raw(const expr_t *outer,
-                                                 const expr_t *raw_inner,
-                                                 expr_t *simplified_inner);
-bool expr_ops_is_lambert(const expr_ops_t *ops);
-bool expr_ops_is_floor_or_ceil(const expr_ops_t *ops);
-bool expr_ops_are_direct_inverse_pair(const expr_ops_t *outer,
-                                      const expr_ops_t *inner);
-const expr_ops_t *expr_ops_reciprocal_unary(const expr_ops_t *ops);
+/* Simplification helpers. */
+expr_t *           expr_simplify_passthrough                    (const expr_t *dv,
+                                                                 expr_t *a,
+                                                                 expr_t *b);
+expr_t *           expr_simplify_unary_operator                 (const expr_t *dv,
+                                                                 expr_t *a,
+                                                                 expr_t *b);
+expr_t *           expr_simplify_binary_operator                (const expr_t *dv,
+                                                                 expr_t *a,
+                                                                 expr_t *b);
+expr_t *           expr_simplify_neg_operator                   (const expr_t *dv,
+                                                                 expr_t *a,
+                                                                 expr_t *b);
+expr_t *           expr_simplify_add_sub_operator               (const expr_t *dv,
+                                                                 expr_t *a,
+                                                                 expr_t *b);
+expr_t *           expr_simplify_mul_operator                   (const expr_t *dv,
+                                                                 expr_t *a,
+                                                                 expr_t *b);
+expr_t *           expr_simplify_div_operator                   (const expr_t *dv,
+                                                                 expr_t *a,
+                                                                 expr_t *b);
+expr_t *           expr_simplify_pow_d_operator                 (const expr_t *dv,
+                                                                 expr_t *a,
+                                                                 expr_t *b);
+expr_t *           expr_simplify_pow_operator                   (const expr_t *dv,
+                                                                 expr_t *a,
+                                                                 expr_t *b);
+expr_t *           expr_simplify_hypot_operator                 (const expr_t *dv,
+                                                                 expr_t *a,
+                                                                 expr_t *b);
+bool               expr_simplify_is_plain_real_const            (const expr_t *dv);
+bool               expr_simplify_try_get_plain_real_const       (const expr_t *dv, number_t *out);
+bool               expr_simplify_is_simplifiable_const          (const expr_t *dv);
+bool               expr_simplify_allows_const_identity_fold     (const expr_t *dv);
+number_t           expr_simplify_normalise_simple_rational_coeff(number_t coeff);
+expr_t *           expr_simplify_positive_part_if_negative      (expr_t *dv);
+expr_t *           expr_simplify_try_log10_power_of_ten         (expr_t *arg);
+expr_t *           expr_simplify_try_floor_ceil_const           (const expr_t *op, expr_t *arg);
+expr_t *           expr_simplify_try_unary_const_fold           (const expr_t *op, expr_t *arg);
+expr_t *           expr_simplify_try_unary_const_value_fold     (const expr_t *op, expr_t *arg);
+expr_t *           expr_simplify_try_sqrt_scaled_square_const   (expr_t *arg);
+expr_t *           expr_simplify_try_sqrt_quotient              (expr_t *num, expr_t *den);
+expr_t *           expr_simplify_direct_inverse_pair            (const expr_t *outer,
+                                                                 expr_t *inner);
+expr_t *           expr_simplify_direct_inverse_pair_from_raw   (const expr_t *outer,
+                                                                 const expr_t *raw_inner,
+                                                                 expr_t *simplified_inner);
+bool               expr_ops_is_lambert                          (const expr_ops_t *ops);
+bool               expr_ops_is_floor_or_ceil                    (const expr_ops_t *ops);
+bool               expr_ops_are_direct_inverse_pair             (const expr_ops_t *outer,
+                                                                 const expr_ops_t *inner);
+const expr_ops_t * expr_ops_reciprocal_unary                    (const expr_ops_t *ops);
 
-expr_t *expr_integrate_dispatch_primitive(const expr_t *expr, const expr_t *wrt);
-bool expr_ops_has_inverse_unary_simplify_rule(const expr_ops_t *ops);
-bool expr_inverse_unary_candidate_value_ok(const expr_ops_t *ops,
-                                         number_t value);
-expr_t *expr_simplify_try_vtable_inverse_argument(const expr_t *outer,
-                                                const expr_t *arg);
-expr_t *expr_simplify_try_basic_sum(expr_t *a, expr_t *b);
-expr_t *expr_simplify_try_basic_product(expr_t *a, expr_t *b);
-expr_t *expr_simplify_try_trig_product(expr_t *a, expr_t *b);
-expr_t *expr_simplify_try_lambert_product(expr_t *a, expr_t *b);
-expr_t *expr_simplify_try_i_unit_product(expr_t *a, expr_t *b);
-expr_t *expr_simplify_try_imag_trig_bridge(const expr_t *op, expr_t *arg);
-expr_t *expr_try_trig_pythagorean_identity(const addend_t *terms, size_t n,
-                                         number_t c_const, number_t common_coeff);
+/* Integration and inverse-function simplification helpers. */
+expr_t * expr_integrate_dispatch_primitive        (const expr_t *expr, const expr_t *wrt);
+bool     expr_ops_has_inverse_unary_simplify_rule (const expr_ops_t *ops);
+bool     expr_inverse_unary_candidate_value_ok    (const expr_ops_t *ops, number_t value);
+expr_t * expr_simplify_try_vtable_inverse_argument(const expr_t *outer, const expr_t *arg);
+expr_t * expr_simplify_try_basic_sum              (expr_t *a, expr_t *b);
+expr_t * expr_simplify_try_basic_product          (expr_t *a, expr_t *b);
+expr_t * expr_simplify_try_trig_product           (expr_t *a, expr_t *b);
+expr_t * expr_simplify_try_lambert_product        (expr_t *a, expr_t *b);
+expr_t * expr_simplify_try_i_unit_product         (expr_t *a, expr_t *b);
+expr_t * expr_simplify_try_imag_trig_bridge       (const expr_t *op, expr_t *arg);
+expr_t * expr_try_trig_pythagorean_identity       (const addend_t *terms,
+                                                   size_t n,
+                                                   number_t c_const,
+                                                   number_t common_coeff);
 
-int expr_struct_eq(const expr_t *u, const expr_t *v);
-expr_t *expr_make_scaled(number_t coeff, expr_t *base);
-expr_t *expr_make_pow_like(expr_t *base, number_t exponent);
-void expr_collect_addends(expr_t *dv, number_t scale, number_t *c_const,
-                        addend_t **terms, size_t *n, size_t *cap);
-void expr_combine_common_denominator_addends(addend_t *terms, size_t n);
-void expr_sort_addends(addend_t *terms, size_t n);
-int expr_extract_common_addend_coeff(const addend_t *terms, size_t n,
-                                   number_t c_const, number_t *common_out);
-void expr_free_node_array(expr_t **nodes, size_t count);
-void expr_append_node(expr_t ***nodes, size_t *count, size_t *cap, expr_t *node);
-void expr_split_division_terms(number_t *c_acc, int *is_zero,
-                             expr_t **terms, size_t nterms,
-                             expr_t ***den_terms, size_t *nden_terms,
-                             size_t *den_cap);
-void expr_combine_like_powers(expr_t **terms, size_t nterms);
-void expr_cancel_common_powers(expr_t **terms, size_t nterms,
-                             expr_t **den_terms, size_t nden_terms);
-void expr_combine_exp_terms(expr_t **terms, size_t nterms);
-void expr_merge_sqrt_terms(expr_t **terms, size_t nterms);
-void expr_merge_sqrt_quotient_terms(expr_t **terms, size_t nterms,
-                                  expr_t **den_terms, size_t nden_terms);
-expr_t *expr_try_expand_shallow_product(number_t c_acc,
-                                      expr_t **terms, size_t nterms,
-                                      expr_t **den_terms, size_t nden_terms);
-expr_t *expr_rebuild_product_chain(number_t c_acc, expr_t **terms, size_t nterms);
-expr_t *expr_rebuild_division_chain(expr_t **den_terms, size_t nden_terms);
+/* Term collection and product rebuilding helpers. */
+int      expr_struct_eq                         (const expr_t *u, const expr_t *v);
+expr_t * expr_make_scaled                       (number_t coeff, expr_t *base);
+expr_t * expr_make_pow_like                     (expr_t *base, number_t exponent);
+void     expr_collect_addends                   (expr_t *dv,
+                                                 number_t scale,
+                                                 number_t *c_const,
+                                                 addend_t **terms,
+                                                 size_t *n,
+                                                 size_t *cap);
+void     expr_combine_common_denominator_addends(addend_t *terms, size_t n);
+void     expr_sort_addends                      (addend_t *terms, size_t n);
+int      expr_extract_common_addend_coeff       (const addend_t *terms,
+                                                 size_t n,
+                                                 number_t c_const,
+                                                 number_t *common_out);
+void     expr_free_node_array                   (expr_t **nodes, size_t count);
+void     expr_append_node                       (expr_t ***nodes,
+                                                 size_t *count,
+                                                 size_t *cap,
+                                                 expr_t *node);
+void     expr_split_division_terms              (number_t *c_acc,
+                                                 int *is_zero,
+                                                 expr_t **terms,
+                                                 size_t nterms,
+                                                 expr_t ***den_terms,
+                                                 size_t *nden_terms,
+                                                 size_t *den_cap);
+void     expr_combine_like_powers               (expr_t **terms, size_t nterms);
+void     expr_cancel_common_powers              (expr_t **terms,
+                                                 size_t nterms,
+                                                 expr_t **den_terms,
+                                                 size_t nden_terms);
+void     expr_combine_exp_terms                 (expr_t **terms, size_t nterms);
+void     expr_merge_sqrt_terms                  (expr_t **terms, size_t nterms);
+void     expr_merge_sqrt_quotient_terms         (expr_t **terms,
+                                                 size_t nterms,
+                                                 expr_t **den_terms,
+                                                 size_t nden_terms);
+expr_t * expr_try_expand_shallow_product        (number_t c_acc,
+                                                 expr_t **terms,
+                                                 size_t nterms,
+                                                 expr_t **den_terms,
+                                                 size_t nden_terms);
+expr_t * expr_rebuild_product_chain             (number_t c_acc, expr_t **terms, size_t nterms);
+expr_t * expr_rebuild_division_chain            (expr_t **den_terms, size_t nden_terms);
 
+/* Constant-fold hooks. */
 int expr_fold_zero_to_zero(const number_t *in, number_t *out);
-int expr_fold_cos_const(const number_t *in, number_t *out);
-int expr_fold_exp_const(const number_t *in, number_t *out);
-int expr_fold_log_const(const number_t *in, number_t *out);
-int expr_fold_sqrt_const(const number_t *in, number_t *out);
-int expr_fold_floor_const(const number_t *in, number_t *out);
-int expr_fold_erf_const(const number_t *in, number_t *out);
-int expr_fold_erfc_const(const number_t *in, number_t *out);
+int expr_fold_cos_const   (const number_t *in, number_t *out);
+int expr_fold_exp_const   (const number_t *in, number_t *out);
+int expr_fold_log_const   (const number_t *in, number_t *out);
+int expr_fold_sqrt_const  (const number_t *in, number_t *out);
+int expr_fold_floor_const (const number_t *in, number_t *out);
+int expr_fold_erf_const   (const number_t *in, number_t *out);
+int expr_fold_erfc_const  (const number_t *in, number_t *out);
 
-void expr_reverse_atom(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_add(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_sub(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_mul(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_div(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_pow(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_pow_d(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_atan2(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_neg(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_sin(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_cos(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_tan(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_sec(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_cosec(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_cot(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_sinh(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_cosh(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_tanh(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_sech(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_cosech(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_coth(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_asin(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_acos(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_atan(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_asec(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_acosec(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_acot(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_asinh(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_acosh(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_atanh(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_asech(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_acosech(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_acoth(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_exp(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_log(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_log10(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_sqrt(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_floor(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_ceil(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_abs(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_hypot(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_erf(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_erfc(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_erfinv(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_erfcinv(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_gamma(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_lgamma(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_digamma(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_trigamma(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_polygamma(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_gammainv(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_lambert_w(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_lambert_w0(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_lambert_wm1(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_normal_pdf(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_normal_cdf(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_normal_logpdf(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_ei(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_e1(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_beta(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_logbeta(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_gammainc_lower(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_gammainc_upper(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_gammainc_P(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_gammainc_Q(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_not_differentiable(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+/* Reverse-mode local adjoint hooks. */
+void expr_reverse_atom              (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_add               (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_sub               (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_mul               (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_div               (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_pow               (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_pow_d             (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_atan2             (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_neg               (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_sin               (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_cos               (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_tan               (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_sec               (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_cosec             (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_cot               (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_sinh              (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_cosh              (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_tanh              (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_sech              (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_cosech            (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_coth              (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_asin              (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_acos              (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_atan              (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_asec              (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_acosec            (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_acot              (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_asinh             (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_acosh             (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_atanh             (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_asech             (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_acosech           (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_acoth             (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_exp               (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_log               (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_log10             (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_sqrt              (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_floor             (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_ceil              (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_abs               (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_hypot             (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_erf               (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_erfc              (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_erfinv            (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_erfcinv           (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_gamma             (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_lgamma            (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_digamma           (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_trigamma          (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_polygamma         (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_gammainv          (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_lambert_w         (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_lambert_w0        (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_lambert_wm1       (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_normal_pdf        (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_normal_cdf        (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_normal_logpdf     (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_ei                (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_e1                (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_beta              (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_logbeta           (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_gammainc_lower    (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_gammainc_upper    (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_gammainc_P        (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_gammainc_Q        (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_not_differentiable(const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
 
 typedef struct binding_exact_complex {
     number_t real;
     number_t imag;
 } binding_exact_complex_t;
 
-expr_binding_expr_t *expr_binding_expr_new_number_text(const char *text);
-expr_binding_expr_t *expr_binding_expr_new_const(expr_binding_const_id_t const_id);
-expr_binding_expr_t *expr_binding_expr_new_neg(expr_binding_expr_t *child);
-expr_binding_expr_t *expr_binding_expr_new_add(expr_binding_expr_t *left, expr_binding_expr_t *right);
-expr_binding_expr_t *expr_binding_expr_new_sub(expr_binding_expr_t *left, expr_binding_expr_t *right);
-expr_binding_expr_t *expr_binding_expr_new_mul(expr_binding_expr_t *left, expr_binding_expr_t *right);
-expr_binding_expr_t *expr_binding_expr_new_div(expr_binding_expr_t *left, expr_binding_expr_t *right);
-expr_binding_expr_t *expr_binding_expr_new_powi(expr_binding_expr_t *base, long exponent);
-expr_binding_expr_t *expr_binding_expr_new_unary_op(const expr_ops_t *ops, expr_binding_expr_t *child);
-expr_binding_expr_t *expr_binding_expr_new_binary_op(const expr_ops_t *ops, expr_binding_expr_t *left, expr_binding_expr_t *right);
-expr_binding_expr_t *expr_binding_expr_clone(const expr_binding_expr_t *expr);
-void expr_binding_expr_free(expr_binding_expr_t *expr);
-number_t expr_binding_expr_eval(const expr_binding_expr_t *expr);
-bool expr_binding_expr_is_numeric_literal(const expr_binding_expr_t *expr);
-bool expr_binding_expr_exact_complex(const expr_binding_expr_t *expr,
-                                   binding_exact_complex_t *out);
-void expr_binding_exact_complex_clear(binding_exact_complex_t *value);
-bool expr_binding_expr_eval_if_precision_increased(expr_binding_expr_t *expr,
-                                                 number_t *value_out);
+/* Binding-expression constructors. */
+expr_binding_expr_t * expr_binding_expr_new_number_text(const char *text);
+expr_binding_expr_t * expr_binding_expr_new_const      (expr_binding_const_id_t const_id);
+expr_binding_expr_t * expr_binding_expr_new_neg        (expr_binding_expr_t *child);
+expr_binding_expr_t * expr_binding_expr_new_add        (expr_binding_expr_t *left,
+                                                        expr_binding_expr_t *right);
+expr_binding_expr_t * expr_binding_expr_new_sub        (expr_binding_expr_t *left,
+                                                        expr_binding_expr_t *right);
+expr_binding_expr_t * expr_binding_expr_new_mul        (expr_binding_expr_t *left,
+                                                        expr_binding_expr_t *right);
+expr_binding_expr_t * expr_binding_expr_new_div        (expr_binding_expr_t *left,
+                                                        expr_binding_expr_t *right);
+expr_binding_expr_t * expr_binding_expr_new_powi       (expr_binding_expr_t *base, long exponent);
+expr_binding_expr_t * expr_binding_expr_new_unary_op   (const expr_ops_t *ops,
+                                                        expr_binding_expr_t *child);
+expr_binding_expr_t * expr_binding_expr_new_binary_op  (const expr_ops_t *ops,
+                                                        expr_binding_expr_t *left,
+                                                        expr_binding_expr_t *right);
+
+/* Binding-expression lifecycle and evaluation. */
+expr_binding_expr_t * expr_binding_expr_clone             (const expr_binding_expr_t *expr);
+void                  expr_binding_expr_free              (expr_binding_expr_t *expr);
+number_t              expr_binding_expr_eval              (const expr_binding_expr_t *expr);
+bool                  expr_binding_expr_is_numeric_literal(const expr_binding_expr_t *expr);
+bool                  expr_binding_expr_exact_complex     (const expr_binding_expr_t *expr,
+                                                           binding_exact_complex_t *out);
+void                  expr_binding_exact_complex_clear    (binding_exact_complex_t *value);
+
+/* Precision-sensitive binding evaluation. */
+bool expr_binding_expr_eval_if_precision_increased(expr_binding_expr_t *expr, number_t *value_out);
 
 /**
  * @brief Simplify a differentiable value node using algebraic identities.
@@ -724,6 +1015,6 @@ bool expr_binding_expr_eval_if_precision_increased(expr_binding_expr_t *expr,
  * Returned node is owning (refcount = 1).
  * Input node is borrowed.
  */
-expr_t *expr_simplify(const expr_t *dv);
+expr_t * expr_simplify(const expr_t *dv);
 
 #endif /* EXPR_INTERNAL_H */

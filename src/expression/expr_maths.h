@@ -5,142 +5,168 @@
 
 int expr_number_to_polygamma_order(number_t value, unsigned int *order);
 
-number_t eval_sin(expr_t *dv);
-number_t eval_cos(expr_t *dv);
-number_t eval_tan(expr_t *dv);
-number_t eval_sec(expr_t *dv);
+/* Evaluation: trigonometric. */
+number_t eval_sin  (expr_t *dv);
+number_t eval_cos  (expr_t *dv);
+number_t eval_tan  (expr_t *dv);
+number_t eval_sec  (expr_t *dv);
 number_t eval_cosec(expr_t *dv);
-number_t eval_cot(expr_t *dv);
-number_t eval_sinh(expr_t *dv);
-number_t eval_cosh(expr_t *dv);
-number_t eval_tanh(expr_t *dv);
-number_t eval_sech(expr_t *dv);
+number_t eval_cot  (expr_t *dv);
+
+/* Evaluation: hyperbolic. */
+number_t eval_sinh  (expr_t *dv);
+number_t eval_cosh  (expr_t *dv);
+number_t eval_tanh  (expr_t *dv);
+number_t eval_sech  (expr_t *dv);
 number_t eval_cosech(expr_t *dv);
-number_t eval_coth(expr_t *dv);
-number_t eval_asin(expr_t *dv);
-number_t eval_acos(expr_t *dv);
-number_t eval_atan(expr_t *dv);
-number_t eval_asec(expr_t *dv);
-number_t eval_acosec(expr_t *dv);
-number_t eval_acot(expr_t *dv);
-number_t eval_asinh(expr_t *dv);
-number_t eval_acosh(expr_t *dv);
-number_t eval_atanh(expr_t *dv);
-number_t eval_asech(expr_t *dv);
+number_t eval_coth  (expr_t *dv);
+
+/* Evaluation: inverse trigonometric and inverse hyperbolic. */
+number_t eval_asin   (expr_t *dv);
+number_t eval_acos   (expr_t *dv);
+number_t eval_atan   (expr_t *dv);
+number_t eval_asec   (expr_t *dv);
+number_t eval_acosec (expr_t *dv);
+number_t eval_acot   (expr_t *dv);
+number_t eval_asinh  (expr_t *dv);
+number_t eval_acosh  (expr_t *dv);
+number_t eval_atanh  (expr_t *dv);
+number_t eval_asech  (expr_t *dv);
 number_t eval_acosech(expr_t *dv);
-number_t eval_acoth(expr_t *dv);
-number_t eval_exp(expr_t *dv);
-number_t eval_log(expr_t *dv);
+number_t eval_acoth  (expr_t *dv);
+
+/* Evaluation: elementary unary functions. */
+number_t eval_exp  (expr_t *dv);
+number_t eval_log  (expr_t *dv);
 number_t eval_log10(expr_t *dv);
-number_t eval_sqrt(expr_t *dv);
+number_t eval_sqrt (expr_t *dv);
 number_t eval_floor(expr_t *dv);
-number_t eval_ceil(expr_t *dv);
-number_t eval_abs(expr_t *dv);
-number_t eval_erf(expr_t *dv);
-number_t eval_erfc(expr_t *dv);
-number_t eval_lgamma(expr_t *dv);
-number_t eval_erfinv(expr_t *dv);
-number_t eval_erfcinv(expr_t *dv);
-number_t eval_gamma(expr_t *dv);
-number_t eval_digamma(expr_t *dv);
-number_t eval_trigamma(expr_t *dv);
-number_t eval_polygamma(expr_t *dv);
-number_t eval_gammainv(expr_t *dv);
-number_t eval_lambert_w(expr_t *dv);
-number_t eval_lambert_w0(expr_t *dv);
+number_t eval_ceil (expr_t *dv);
+number_t eval_abs  (expr_t *dv);
+
+/* Evaluation: special functions. */
+number_t eval_erf        (expr_t *dv);
+number_t eval_erfc       (expr_t *dv);
+number_t eval_lgamma     (expr_t *dv);
+number_t eval_erfinv     (expr_t *dv);
+number_t eval_erfcinv    (expr_t *dv);
+number_t eval_gamma      (expr_t *dv);
+number_t eval_digamma    (expr_t *dv);
+number_t eval_trigamma   (expr_t *dv);
+number_t eval_polygamma  (expr_t *dv);
+number_t eval_gammainv   (expr_t *dv);
+number_t eval_lambert_w  (expr_t *dv);
+number_t eval_lambert_w0 (expr_t *dv);
 number_t eval_lambert_wm1(expr_t *dv);
-number_t eval_normal_pdf(expr_t *dv);
-number_t eval_normal_cdf(expr_t *dv);
-number_t eval_normal_logpdf(expr_t *dv);
-number_t eval_ei(expr_t *dv);
-number_t eval_e1(expr_t *dv);
-number_t eval_hypot(expr_t *dv);
-number_t eval_beta(expr_t *dv);
-number_t eval_logbeta(expr_t *dv);
+
+/* Evaluation: distributions and multi-argument special functions. */
+number_t eval_normal_pdf    (expr_t *dv);
+number_t eval_normal_cdf    (expr_t *dv);
+number_t eval_normal_logpdf (expr_t *dv);
+number_t eval_ei            (expr_t *dv);
+number_t eval_e1            (expr_t *dv);
+number_t eval_hypot         (expr_t *dv);
+number_t eval_beta          (expr_t *dv);
+number_t eval_logbeta       (expr_t *dv);
 number_t eval_gammainc_lower(expr_t *dv);
 number_t eval_gammainc_upper(expr_t *dv);
-number_t eval_gammainc_P(expr_t *dv);
-number_t eval_gammainc_Q(expr_t *dv);
-number_t eval_factorial(expr_t *dv);
-number_t eval_fibonacci(expr_t *dv);
-number_t eval_partition(expr_t *dv);
-number_t eval_isqrt(expr_t *dv);
-number_t eval_gcd(expr_t *dv);
-number_t eval_lcm(expr_t *dv);
-number_t eval_mod(expr_t *dv);
-number_t eval_modinv(expr_t *dv);
-number_t eval_is_prime(expr_t *dv);
+number_t eval_gammainc_P    (expr_t *dv);
+number_t eval_gammainc_Q    (expr_t *dv);
+number_t eval_factorial     (expr_t *dv);
+
+/* Evaluation: integer and bitwise helpers. */
+number_t eval_fibonacci (expr_t *dv);
+number_t eval_partition (expr_t *dv);
+number_t eval_isqrt     (expr_t *dv);
+number_t eval_gcd       (expr_t *dv);
+number_t eval_lcm       (expr_t *dv);
+number_t eval_mod       (expr_t *dv);
+number_t eval_modinv    (expr_t *dv);
+number_t eval_is_prime  (expr_t *dv);
 number_t eval_next_prime(expr_t *dv);
 number_t eval_prev_prime(expr_t *dv);
-number_t eval_bit_and(expr_t *dv);
-number_t eval_bit_or(expr_t *dv);
-number_t eval_bit_xor(expr_t *dv);
-number_t eval_bit_not(expr_t *dv);
-number_t eval_shl(expr_t *dv);
-number_t eval_shr(expr_t *dv);
-number_t eval_factors(expr_t *dv);
-number_t eval_atan2(expr_t *dv);
+number_t eval_bit_and   (expr_t *dv);
+number_t eval_bit_or    (expr_t *dv);
+number_t eval_bit_xor   (expr_t *dv);
+number_t eval_bit_not   (expr_t *dv);
+number_t eval_shl       (expr_t *dv);
+number_t eval_shr       (expr_t *dv);
+number_t eval_factors   (expr_t *dv);
+number_t eval_atan2     (expr_t *dv);
 
-expr_t *deriv_sin(expr_t *dv);
-expr_t *deriv_cos(expr_t *dv);
-expr_t *deriv_tan(expr_t *dv);
-expr_t *deriv_sec(expr_t *dv);
-expr_t *deriv_cosec(expr_t *dv);
-expr_t *deriv_cot(expr_t *dv);
-expr_t *deriv_sinh(expr_t *dv);
-expr_t *deriv_cosh(expr_t *dv);
-expr_t *deriv_tanh(expr_t *dv);
-expr_t *deriv_sech(expr_t *dv);
-expr_t *deriv_cosech(expr_t *dv);
-expr_t *deriv_coth(expr_t *dv);
-expr_t *deriv_asin(expr_t *dv);
-expr_t *deriv_acos(expr_t *dv);
-expr_t *deriv_atan(expr_t *dv);
-expr_t *deriv_asec(expr_t *dv);
-expr_t *deriv_acosec(expr_t *dv);
-expr_t *deriv_acot(expr_t *dv);
-expr_t *deriv_asinh(expr_t *dv);
-expr_t *deriv_acosh(expr_t *dv);
-expr_t *deriv_atanh(expr_t *dv);
-expr_t *deriv_asech(expr_t *dv);
-expr_t *deriv_acosech(expr_t *dv);
-expr_t *deriv_acoth(expr_t *dv);
-expr_t *deriv_exp(expr_t *dv);
-expr_t *deriv_log(expr_t *dv);
-expr_t *deriv_log10(expr_t *dv);
-expr_t *deriv_sqrt(expr_t *dv);
-expr_t *deriv_floor(expr_t *dv);
-expr_t *deriv_ceil(expr_t *dv);
-expr_t *deriv_abs(expr_t *dv);
-expr_t *deriv_erf(expr_t *dv);
-expr_t *deriv_erfc(expr_t *dv);
-expr_t *deriv_lgamma(expr_t *dv);
-expr_t *deriv_erfinv(expr_t *dv);
-expr_t *deriv_erfcinv(expr_t *dv);
-expr_t *deriv_gamma(expr_t *dv);
-expr_t *deriv_digamma(expr_t *dv);
-expr_t *deriv_trigamma(expr_t *dv);
-expr_t *deriv_polygamma(expr_t *dv);
-expr_t *deriv_gammainv(expr_t *dv);
-expr_t *deriv_lambert_w(expr_t *dv);
-expr_t *deriv_lambert_w0(expr_t *dv);
-expr_t *deriv_lambert_wm1(expr_t *dv);
-expr_t *deriv_normal_pdf(expr_t *dv);
-expr_t *deriv_normal_cdf(expr_t *dv);
-expr_t *deriv_normal_logpdf(expr_t *dv);
-expr_t *deriv_pdf(expr_t *dv);
-expr_t *deriv_cdf(expr_t *dv);
-expr_t *deriv_logpdf(expr_t *dv);
-expr_t *deriv_ei(expr_t *dv);
-expr_t *deriv_e1(expr_t *dv);
-expr_t *deriv_hypot(expr_t *dv);
-expr_t *deriv_beta(expr_t *dv);
-expr_t *deriv_logbeta(expr_t *dv);
-expr_t *deriv_gammainc_lower(expr_t *dv);
-expr_t *deriv_gammainc_upper(expr_t *dv);
-expr_t *deriv_gammainc_P(expr_t *dv);
-expr_t *deriv_gammainc_Q(expr_t *dv);
-expr_t *deriv_not_differentiable(expr_t *dv);
-expr_t *deriv_atan2(expr_t *dv);
+/* Derivatives: trigonometric. */
+expr_t * deriv_sin  (expr_t *dv);
+expr_t * deriv_cos  (expr_t *dv);
+expr_t * deriv_tan  (expr_t *dv);
+expr_t * deriv_sec  (expr_t *dv);
+expr_t * deriv_cosec(expr_t *dv);
+expr_t * deriv_cot  (expr_t *dv);
 
-#endif
+/* Derivatives: hyperbolic. */
+expr_t * deriv_sinh  (expr_t *dv);
+expr_t * deriv_cosh  (expr_t *dv);
+expr_t * deriv_tanh  (expr_t *dv);
+expr_t * deriv_sech  (expr_t *dv);
+expr_t * deriv_cosech(expr_t *dv);
+expr_t * deriv_coth  (expr_t *dv);
+
+/* Derivatives: inverse trigonometric and inverse hyperbolic. */
+expr_t * deriv_asin   (expr_t *dv);
+expr_t * deriv_acos   (expr_t *dv);
+expr_t * deriv_atan   (expr_t *dv);
+expr_t * deriv_asec   (expr_t *dv);
+expr_t * deriv_acosec (expr_t *dv);
+expr_t * deriv_acot   (expr_t *dv);
+expr_t * deriv_asinh  (expr_t *dv);
+expr_t * deriv_acosh  (expr_t *dv);
+expr_t * deriv_atanh  (expr_t *dv);
+expr_t * deriv_asech  (expr_t *dv);
+expr_t * deriv_acosech(expr_t *dv);
+expr_t * deriv_acoth  (expr_t *dv);
+
+/* Derivatives: elementary unary functions. */
+expr_t * deriv_exp  (expr_t *dv);
+expr_t * deriv_log  (expr_t *dv);
+expr_t * deriv_log10(expr_t *dv);
+expr_t * deriv_sqrt (expr_t *dv);
+expr_t * deriv_floor(expr_t *dv);
+expr_t * deriv_ceil (expr_t *dv);
+expr_t * deriv_abs  (expr_t *dv);
+
+/* Derivatives: special functions. */
+expr_t * deriv_erf        (expr_t *dv);
+expr_t * deriv_erfc       (expr_t *dv);
+expr_t * deriv_lgamma     (expr_t *dv);
+expr_t * deriv_erfinv     (expr_t *dv);
+expr_t * deriv_erfcinv    (expr_t *dv);
+expr_t * deriv_gamma      (expr_t *dv);
+expr_t * deriv_digamma    (expr_t *dv);
+expr_t * deriv_trigamma   (expr_t *dv);
+expr_t * deriv_polygamma  (expr_t *dv);
+expr_t * deriv_gammainv   (expr_t *dv);
+expr_t * deriv_lambert_w  (expr_t *dv);
+expr_t * deriv_lambert_w0 (expr_t *dv);
+expr_t * deriv_lambert_wm1(expr_t *dv);
+
+/* Derivatives: distributions and multi-argument special functions. */
+expr_t * deriv_normal_pdf    (expr_t *dv);
+expr_t * deriv_normal_cdf    (expr_t *dv);
+expr_t * deriv_normal_logpdf (expr_t *dv);
+expr_t * deriv_pdf           (expr_t *dv);
+expr_t * deriv_cdf           (expr_t *dv);
+expr_t * deriv_logpdf        (expr_t *dv);
+expr_t * deriv_ei            (expr_t *dv);
+expr_t * deriv_e1            (expr_t *dv);
+expr_t * deriv_hypot         (expr_t *dv);
+expr_t * deriv_beta          (expr_t *dv);
+expr_t * deriv_logbeta       (expr_t *dv);
+expr_t * deriv_gammainc_lower(expr_t *dv);
+expr_t * deriv_gammainc_upper(expr_t *dv);
+expr_t * deriv_gammainc_P    (expr_t *dv);
+expr_t * deriv_gammainc_Q    (expr_t *dv);
+
+/* Derivatives: not-differentiable and special binary cases. */
+expr_t * deriv_not_differentiable(expr_t *dv);
+expr_t * deriv_atan2             (expr_t *dv);
+
+#endif /* EXPR_MATHS_H */
