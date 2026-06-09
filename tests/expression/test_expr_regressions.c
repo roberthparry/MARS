@@ -2182,6 +2182,46 @@ static void test_symbolic_power_derivative_uses_n_minus_one_form(void)
     expr_free(expr);
 }
 
+static void test_named_half_exponent_round_trips_as_symbolic_power(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_bindings_t *round_bindings = NULL;
+    expr_t *expr = expr_from_string("{ (x + a)^n | x = NAN; a = 2, n = 1/2 }",
+                                    &bindings);
+    char *expr_text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
+    expr_t *round = expr_text ? expr_from_string(expr_text, &round_bindings) : NULL;
+    expr_t *x = round_bindings ? expr_bindings_get(round_bindings, "x") : NULL;
+    expr_t *deriv = (round && x) ? expr_create_deriv(round, x) : NULL;
+    char *deriv_text = deriv ? expr_to_string(deriv, style_EXPRESSION) : NULL;
+    const char *expr_expect = "{ (x + a)^n | x = NAN; a = 2, n = ¹⁄₂ }";
+    const char *deriv_expect =
+        "{ n·(x + a)^(n - 1) | x = NAN; n = ¹⁄₂, a = 2 }";
+
+    if (str_eq(expr_text, expr_expect))
+        to_string_pass("named half exponent round-trips as symbolic power",
+                       expr_text, expr_expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "named half exponent round-trips as symbolic power",
+                       expr_text ? expr_text : "(null)", expr_expect);
+
+    if (str_eq(deriv_text, deriv_expect))
+        to_string_pass("named half exponent derivative keeps n",
+                       deriv_text, deriv_expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "named half exponent derivative keeps n",
+                       deriv_text ? deriv_text : "(null)", deriv_expect);
+
+    free(deriv_text);
+    expr_free(deriv);
+    expr_bindings_free(round_bindings);
+    expr_free(round);
+    free(expr_text);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+}
+
 static void test_symbolic_function_power_matches_parenthesized_power(void)
 {
     expr_bindings_t *bindings = NULL;
@@ -3624,6 +3664,7 @@ void test_runtime_regressions(void)
     TEST_RUN_SUBTEST(test_symbolic_negative_pi_quotient_stays_symbolic, NULL);
     TEST_RUN_SUBTEST(test_sqrt_quotient_combines_positive_real_denominator, NULL);
     TEST_RUN_SUBTEST(test_symbolic_power_derivative_uses_n_minus_one_form, NULL);
+    TEST_RUN_SUBTEST(test_named_half_exponent_round_trips_as_symbolic_power, NULL);
     TEST_RUN_SUBTEST(test_symbolic_function_power_matches_parenthesized_power, NULL);
     TEST_RUN_SUBTEST(test_inverse_power_function_notation_uses_supported_inverses_only, NULL);
     TEST_RUN_SUBTEST(test_nested_symbolic_pi_derivative_has_no_decimalized_coefficients, NULL);

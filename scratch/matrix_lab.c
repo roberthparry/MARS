@@ -39,9 +39,80 @@ static char *number_text_dup(number_t value)
     return copy;
 }
 
+static char *number_tex_dup(number_t value)
+{
+    expr_t *expr = expr_new_const(num_clone(value));
+    char *tex = expr ? expr_text_dup(expr, style_TEX) : NULL;
+
+    expr_free(expr);
+    return tex ? tex : number_text_dup(value);
+}
+
 static const char *matrix_type_name(const matrix_t *matrix)
 {
     return mat_typeof(matrix) == MAT_TYPE_EXPR ? "expr" : "number";
+}
+
+static void replace_same_length(char *text, const char *needle, const char *replacement)
+{
+    size_t needle_len;
+    size_t replacement_len;
+    char *pos;
+
+    if (!text || !needle || !replacement)
+        return;
+
+    needle_len = strlen(needle);
+    replacement_len = strlen(replacement);
+    if (needle_len == 0u || needle_len != replacement_len)
+        return;
+
+    pos = strstr(text, needle);
+    while (pos) {
+        memcpy(pos, replacement, replacement_len);
+        pos = strstr(pos + replacement_len, needle);
+    }
+}
+
+static char *concat3(const char *a, const char *b, const char *c)
+{
+    size_t na = a ? strlen(a) : 0u;
+    size_t nb = b ? strlen(b) : 0u;
+    size_t nc = c ? strlen(c) : 0u;
+    char *out = malloc(na + nb + nc + 1u);
+
+    if (!out)
+        return NULL;
+
+    memcpy(out, a ? a : "", na);
+    memcpy(out + na, b ? b : "", nb);
+    memcpy(out + na + nb, c ? c : "", nc);
+    out[na + nb + nc] = '\0';
+    return out;
+}
+
+static char *matrix_scalar_lhs_tex(const matrix_t *matrix, const char *operation)
+{
+    char *matrix_tex = mat_to_string(matrix, MAT_STRING_TEX);
+    char *lhs;
+
+    if (!matrix_tex)
+        return NULL;
+
+    if (strcmp(operation, "det") == 0) {
+        replace_same_length(matrix_tex, "{bmatrix}", "{vmatrix}");
+        return matrix_tex;
+    }
+
+    if (strcmp(operation, "trace") == 0)
+        lhs = concat3("\\operatorname{tr}\\!\\left(", matrix_tex, "\\right)");
+    else if (strcmp(operation, "rank") == 0)
+        lhs = concat3("\\operatorname{rank}\\!\\left(", matrix_tex, "\\right)");
+    else
+        lhs = dup_string(matrix_tex);
+
+    free(matrix_tex);
+    return lhs;
 }
 
 static void print_expr_values(const char *label, expr_t **values, size_t count)
@@ -335,25 +406,40 @@ static void print_eigendecomposition_number_fields(number_t *eigenvalues,
     free(inline_text);
 }
 
-static void print_expr_field(const char *label, expr_t *expr)
+static void print_expr_scalar_field(const matrix_t *matrix, const char *operation,
+                                    const char *label, expr_t *expr)
 {
     char *text = expr ? expr_text_dup(expr, style_EXPRESSION) : NULL;
     char *tex = expr ? expr_text_dup(expr, style_TEX) : NULL;
+    char *lhs_tex = matrix_scalar_lhs_tex(matrix, operation);
 
     printf("%-12s %s\n", label, text ? text : "(null)");
-    printf("tex         %s\n", tex ? tex : "(null)");
+    if (lhs_tex && tex)
+        printf("tex         %s = %s\n", lhs_tex, tex);
+    else
+        printf("tex         %s\n", tex ? tex : "(null)");
 
+    free(lhs_tex);
     free(tex);
     free(text);
     expr_free(expr);
 }
 
-static void print_number_field(const char *label, number_t value)
+static void print_number_scalar_field(const matrix_t *matrix, const char *operation,
+                                      const char *label, number_t value)
 {
     char *text = number_text_dup(value);
+    char *tex = number_tex_dup(value);
+    char *lhs_tex = matrix_scalar_lhs_tex(matrix, operation);
 
     printf("%-12s %s\n", label, text ? text : "(null)");
+    if (lhs_tex && tex)
+        printf("tex         %s = %s\n", lhs_tex, tex);
+    else if (tex)
+        printf("tex         %s\n", tex);
 
+    free(lhs_tex);
+    free(tex);
     free(text);
     num_destroy(&value);
 }
@@ -366,14 +452,14 @@ static int run_scalar_operation(const matrix_t *matrix, const char *operation)
 
             if (mat_trace_expr(matrix, &trace) != 0 || !trace)
                 return 1;
-            print_expr_field("value", trace);
+            print_expr_scalar_field(matrix, operation, "value", trace);
             return 0;
         } else {
             number_t trace = num_new();
 
             if (mat_trace(matrix, &trace) != 0)
                 return 1;
-            print_number_field("value", trace);
+            print_number_scalar_field(matrix, operation, "value", trace);
             return 0;
         }
     }
@@ -384,23 +470,28 @@ static int run_scalar_operation(const matrix_t *matrix, const char *operation)
 
             if (mat_det_expr(matrix, &det) != 0 || !det)
                 return 1;
-            print_expr_field("value", det);
+            print_expr_scalar_field(matrix, operation, "value", det);
             return 0;
         } else {
             number_t det = num_new();
 
             if (mat_det(matrix, &det) != 0)
                 return 1;
-            print_number_field("value", det);
+            print_number_scalar_field(matrix, operation, "value", det);
             return 0;
         }
     }
 
     if (strcmp(operation, "rank") == 0) {
         int rank = mat_rank(matrix);
+        char *lhs_tex = matrix_scalar_lhs_tex(matrix, operation);
 
         printf("value       %d\n", rank);
-        printf("tex         %d\n", rank);
+        if (lhs_tex)
+            printf("tex         %s = %d\n", lhs_tex, rank);
+        else
+            printf("tex         %d\n", rank);
+        free(lhs_tex);
         return 0;
     }
 
