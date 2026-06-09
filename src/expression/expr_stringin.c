@@ -1,4 +1,4 @@
-/* expr_fromstring.c - construct a expr_t from an expression-style string
+/* expr_stringin.c - construct a expr_t from an expression-style string
  *
  * Accepts strings in the format produced by expr_to_text(f, style_EXPRESSION):
  *
@@ -45,8 +45,8 @@
 #include "qfloat.h"
 #include "expr_bindings.h"
 #include "expr_internal.h"
-#include "expr_fromstring.h"
-#include "expr_parse_text.h"
+#include "expr_stringin_internal.h"
+#include "expr_stringin_scan.h"
 #include "expression.h"
 #include "ustring.h"
 

@@ -1,8 +1,8 @@
 #include <stdlib.h>
 
 #include "expr_bindings.h"
-#include "expr_tostring.h"
-#include "expr_tostring_internal.h"
+#include "expr_stringout.h"
+#include "expr_stringout_internal.h"
 
 static string_t *expr_text_from_owned_c_string(char *raw)
 {

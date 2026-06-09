@@ -636,7 +636,7 @@
     "test_expr_t_from_string": true,
     "test_expr_t_goal_seek": true,
     "test_partial_derivatives": true,
-    "test_expr_pattern_helpers": true,
+    "test_expr_tree_match_helpers": true,
     "test_symbolic_integration": true,
     "test_runtime_regressions": true,
     "test_reverse_mode": true
@@ -973,12 +973,12 @@
       "test_partial_to_string_sin_xy": true
     }
   },
-  "tests/expression/test_expr_pattern.c": {
-    "test_expr_pattern_helpers": {
+  "tests/expression/test_expr_tree_match.c": {
+    "test_expr_tree_match_helpers": {
       "enabled": true,
       "test_match_affine_families": true,
       "test_generic_unary_affine_matchers": true,
-      "test_pattern_rejections": true,
+      "test_tree_match_rejections": true,
       "test_scaled_expr_and_var_usage": true,
       "test_substitute_and_powd": true,
       "test_square_affine_matchers": true,
@@ -1140,11 +1140,13 @@
       "test_integrate_poly_times_affine_power": true,
       "test_integrate_poly_over_centered_quadratic": true,
       "test_integrate_symbolic_general_quadratic_denominator": true,
+      "test_integrate_symbolic_general_quadratic_roots": true,
       "test_integrate_log_quadratic": true,
       "test_integrate_negative_quadratic_exponential": true,
       "test_integrate_centered_quadratic_roots": true,
       "test_integrate_trig_power_products": true,
       "test_integrate_mixed_frequency_exp_unary": true,
+      "test_integrate_hyperbolic_table_tail": true,
       "test_integrate_frequency_product_families": true,
       "test_integrate_more_by_parts": true,
       "test_integrate_partial_fractions": true,

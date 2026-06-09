@@ -1,5 +1,5 @@
-#ifndef EXPR_FROMSTRING_H
-#define EXPR_FROMSTRING_H
+#ifndef EXPR_STRINGIN_INTERNAL_H
+#define EXPR_STRINGIN_INTERNAL_H
 
 #include <stddef.h>
 
@@ -43,4 +43,4 @@ struct expr_bindings_t {
 expr_bindings_t *symtab_build_bindings(const symtab_t *t);
 expr_bindings_t *single_binding_from_node(expr_t *node);
 
-#endif
+#endif /* EXPR_STRINGIN_INTERNAL_H */

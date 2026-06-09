@@ -137,6 +137,15 @@ typedef enum {
     EXPR_KIND_COUNT
 } expr_op_kind_t;
 
+bool expr_match_unary_op(const expr_t *expr,
+                       expr_op_kind_t kind,
+                       const expr_t **arg_out);
+
+bool expr_match_binary_op(const expr_t *expr,
+                        expr_op_kind_t kind,
+                        const expr_t **left_out,
+                        const expr_t **right_out);
+
 typedef enum expr_diff_kind {
     EXPR_DIFF_SMOOTH = 0,
     EXPR_DIFF_NONE

@@ -37,6 +37,11 @@ expr_t *expr_substitute(const expr_t *expr,
 
 bool expr_match_const_value(const expr_t *expr, number_t *value_out);
 
+bool expr_match_var_expr(const expr_t *expr,
+                       size_t nvars,
+                       expr_t *const *vars,
+                       size_t *index_out);
+
 bool expr_match_scaled_expr(const expr_t *expr,
                           number_t *scale_out,
                           const expr_t **base_out);
@@ -56,7 +61,7 @@ bool expr_collect_var_usage(const expr_t *expr,
                           bool *used_out);
 
 /* ------------------------------------------------------------------------- */
-/* Affine / polynomial pattern matchers                                      */
+/* Affine shape matchers                                                     */
 /* ------------------------------------------------------------------------- */
 
 typedef enum {

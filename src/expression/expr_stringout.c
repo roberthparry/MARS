@@ -1,4 +1,4 @@
-/* expr_tostring.c - symbolic/string conversion for expr_t
+/* expr_stringout.c - symbolic/string conversion for expr_t
  *
  * Produces human-readable string representations of a expr_t DAG via
  * expr_to_text(dv, style).  Four styles are supported:
@@ -38,8 +38,8 @@
  *   • Unicode superscripts and fraction glyphs for compact powers/coefficients
  *   • Shared low-level expression, TeX, and function-body emitters
  *
- * Style-specific wrappers live in expr_tostring_expr.c,
- * expr_tostring_tex.c, and expr_tostring_func.c.
+ * Style-specific wrappers live in expr_stringout_expr.c,
+ * expr_stringout_tex.c, and expr_stringout_func.c.
  *
  * Algebraic simplification is deliberately not part of ordinary rendering:
  * callers see the expression shape they built or parsed.  Owning derivative
@@ -56,8 +56,8 @@
 
 #include "expr_bindings.h"
 #include "expr_internal.h"
-#include "expr_tostring.h"
-#include "expr_tostring_internal.h"
+#include "expr_stringout.h"
+#include "expr_stringout_internal.h"
 #include "expression.h"
 #include "internal/number_internal.h"
 #include "ustring.h"

@@ -634,8 +634,8 @@ int tests_main(void)
     TEST_SECTION("Partial derivatives");
     TEST_RUN_CASE(test_partial_derivatives, NULL);
 
-    TEST_SECTION("expr_pattern helpers");
-    TEST_RUN_CASE(test_expr_pattern_helpers, NULL);
+    TEST_SECTION("expr_tree_match helpers");
+    TEST_RUN_CASE(test_expr_tree_match_helpers, NULL);
 
     TEST_SECTION("Symbolic integration");
     TEST_RUN_CASE(test_symbolic_integration, NULL);

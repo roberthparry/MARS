@@ -1,5 +1,20 @@
+#include <stdio.h>
+
 #include "test_expr.h"
 #include "internal/expr_internal.h"
+
+static void print_antiderivative_text(const char *label, const char *text)
+{
+    printf("ANTIDERIVATIVE: %s -> %s\n", label, text ? text : "(null)");
+}
+
+static void print_antiderivative_expr(const char *label, const expr_t *anti)
+{
+    char *text = anti ? expr_to_string(anti, style_UNBOUND) : NULL;
+
+    print_antiderivative_text(label, text);
+    free(text);
+}
 
 static void assert_antiderivative_matches(const char *label,
                                           const expr_t *expr,
@@ -12,6 +27,7 @@ static void assert_antiderivative_matches(const char *label,
 
     ASSERT_NOT_NULL(anti);
     ASSERT_NOT_NULL(deriv);
+    print_antiderivative_expr(label, anti);
 
     for (size_t i = 0; i < npoints; ++i) {
         char point_label[160];
@@ -58,6 +74,7 @@ static void assert_string_antiderivative_contains(const char *input,
     ASSERT_NOT_NULL(x);
     ASSERT_NOT_NULL(anti);
     ASSERT_NOT_NULL(text);
+    print_antiderivative_text(input, text);
     ASSERT_TRUE(strstr(text, expected) != NULL);
 
     free(text);
@@ -73,31 +90,294 @@ static void assert_string_antiderivative_matches_with_a(const char *input,
                                                         size_t npoints)
 {
     expr_bindings_t *bindings = NULL;
+    expr_bindings_t *anti_bindings = NULL;
+    expr_bindings_t *expected_bindings = NULL;
     expr_t *expr = expr_from_string(input, &bindings);
     expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
     expr_t *a = bindings ? expr_bindings_get(bindings, "a") : NULL;
     expr_t *simplified = expr ? expr_simplify(expr) : NULL;
     expr_t *anti = simplified ? expr_integrate(simplified, x) : NULL;
-    expr_t *deriv = anti ? expr_create_deriv(anti, x) : NULL;
+    char *anti_text = anti ? expr_to_string(anti, style_UNBOUND) : NULL;
+    char *expected_text = simplified ? expr_to_string(simplified, style_UNBOUND) : NULL;
+    size_t anti_input_len = anti_text ? strlen(anti_text) + 5u : 0u;
+    size_t expected_input_len = expected_text ? strlen(expected_text) + 5u : 0u;
+    char *anti_input = anti_text ? malloc(anti_input_len) : NULL;
+    char *expected_input = expected_text ? malloc(expected_input_len) : NULL;
+    expr_t *anti_eval = NULL;
+    expr_t *deriv_eval = NULL;
+    expr_t *expected_eval = NULL;
+    expr_t *anti_x = NULL;
+    expr_t *deriv_x = NULL;
+    expr_t *expected_x = NULL;
+    expr_t *anti_a = NULL;
+    expr_t *deriv_a = NULL;
+    expr_t *expected_a = NULL;
 
     ASSERT_NOT_NULL(simplified);
     ASSERT_NOT_NULL(x);
     ASSERT_NOT_NULL(a);
     ASSERT_NOT_NULL(anti);
-    ASSERT_NOT_NULL(deriv);
+    ASSERT_NOT_NULL(anti_text);
+    ASSERT_NOT_NULL(expected_text);
+    ASSERT_NOT_NULL(anti_input);
+    ASSERT_NOT_NULL(expected_input);
+    print_antiderivative_text(input, anti_text);
+
+    snprintf(anti_input, anti_input_len, "{ %s }", anti_text);
+    snprintf(expected_input, expected_input_len, "{ %s }", expected_text);
+
+    anti_eval = expr_from_string(anti_input, &anti_bindings);
+    expected_eval = expr_from_string(expected_input, &expected_bindings);
+    anti_x = anti_bindings ? expr_bindings_get(anti_bindings, "x") : NULL;
+    anti_a = anti_bindings ? expr_bindings_get(anti_bindings, "a") : NULL;
+    deriv_eval = anti_eval && anti_x ? expr_create_deriv(anti_eval, anti_x) : NULL;
+    deriv_x = anti_x;
+    deriv_a = anti_a;
+    expected_x = expected_bindings ? expr_bindings_get(expected_bindings, "x") : NULL;
+    expected_a = expected_bindings ? expr_bindings_get(expected_bindings, "a") : NULL;
+
+    ASSERT_NOT_NULL(anti_eval);
+    ASSERT_NOT_NULL(deriv_eval);
+    ASSERT_NOT_NULL(expected_eval);
+    ASSERT_NOT_NULL(anti_x);
+    ASSERT_NOT_NULL(anti_a);
+    ASSERT_NOT_NULL(deriv_x);
+    ASSERT_NOT_NULL(expected_x);
+    ASSERT_NOT_NULL(deriv_a);
+    ASSERT_NOT_NULL(expected_a);
 
     test_expr_set_val_d(a, a_value);
+    test_expr_set_val_d(deriv_a, a_value);
+    test_expr_set_val_d(expected_a, a_value);
     for (size_t i = 0; i < npoints; ++i) {
         char point_label[160];
 
         test_expr_set_val_d(x, points[i]);
+        test_expr_set_val_d(deriv_x, points[i]);
+        test_expr_set_val_d(expected_x, points[i]);
         snprintf(point_label, sizeof(point_label), "%s at x=%g, a=%g",
                  input, points[i], a_value);
         check_q_at(__FILE__, __LINE__, 1, point_label,
-                   expr_eval_qf(deriv), expr_eval_qf(simplified));
+                   expr_eval_qf(deriv_eval), expr_eval_qf(expected_eval));
     }
 
-    expr_free(deriv);
+    free(expected_input);
+    free(anti_input);
+    free(expected_text);
+    free(anti_text);
+    expr_free(expected_eval);
+    expr_bindings_free(expected_bindings);
+    expr_free(deriv_eval);
+    expr_free(anti_eval);
+    expr_bindings_free(anti_bindings);
+    expr_free(anti);
+    expr_free(simplified);
+    expr_free(expr);
+    expr_bindings_free(bindings);
+}
+
+static void assert_string_antiderivative_matches_with_ab(const char *input,
+                                                         double a_value,
+                                                         double b_value,
+                                                         const double *points,
+                                                         size_t npoints)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_bindings_t *anti_bindings = NULL;
+    expr_bindings_t *expected_bindings = NULL;
+    expr_t *expr = expr_from_string(input, &bindings);
+    expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    expr_t *a = bindings ? expr_bindings_get(bindings, "a") : NULL;
+    expr_t *b = bindings ? expr_bindings_get(bindings, "b") : NULL;
+    expr_t *simplified = expr ? expr_simplify(expr) : NULL;
+    expr_t *anti = simplified ? expr_integrate(simplified, x) : NULL;
+    char *anti_text = anti ? expr_to_string(anti, style_UNBOUND) : NULL;
+    char *expected_text = simplified ? expr_to_string(simplified, style_UNBOUND) : NULL;
+    size_t anti_input_len = anti_text ? strlen(anti_text) + 5u : 0u;
+    size_t expected_input_len = expected_text ? strlen(expected_text) + 5u : 0u;
+    char *anti_input = anti_text ? malloc(anti_input_len) : NULL;
+    char *expected_input = expected_text ? malloc(expected_input_len) : NULL;
+    expr_t *anti_eval = NULL;
+    expr_t *deriv_eval = NULL;
+    expr_t *expected_eval = NULL;
+    expr_t *anti_x = NULL;
+    expr_t *expected_x = NULL;
+    expr_t *anti_a = NULL;
+    expr_t *expected_a = NULL;
+    expr_t *anti_b = NULL;
+    expr_t *expected_b = NULL;
+
+    ASSERT_NOT_NULL(simplified);
+    ASSERT_NOT_NULL(x);
+    ASSERT_NOT_NULL(a);
+    ASSERT_NOT_NULL(b);
+    ASSERT_NOT_NULL(anti);
+    ASSERT_NOT_NULL(anti_text);
+    ASSERT_NOT_NULL(expected_text);
+    ASSERT_NOT_NULL(anti_input);
+    ASSERT_NOT_NULL(expected_input);
+    print_antiderivative_text(input, anti_text);
+
+    snprintf(anti_input, anti_input_len, "{ %s }", anti_text);
+    snprintf(expected_input, expected_input_len, "{ %s }", expected_text);
+
+    anti_eval = expr_from_string(anti_input, &anti_bindings);
+    expected_eval = expr_from_string(expected_input, &expected_bindings);
+    anti_x = anti_bindings ? expr_bindings_get(anti_bindings, "x") : NULL;
+    anti_a = anti_bindings ? expr_bindings_get(anti_bindings, "a") : NULL;
+    anti_b = anti_bindings ? expr_bindings_get(anti_bindings, "b") : NULL;
+    deriv_eval = anti_eval && anti_x ? expr_create_deriv(anti_eval, anti_x) : NULL;
+    expected_x = expected_bindings ? expr_bindings_get(expected_bindings, "x") : NULL;
+    expected_a = expected_bindings ? expr_bindings_get(expected_bindings, "a") : NULL;
+    expected_b = expected_bindings ? expr_bindings_get(expected_bindings, "b") : NULL;
+
+    ASSERT_NOT_NULL(anti_eval);
+    ASSERT_NOT_NULL(deriv_eval);
+    ASSERT_NOT_NULL(expected_eval);
+    ASSERT_NOT_NULL(anti_x);
+    ASSERT_NOT_NULL(expected_x);
+    ASSERT_NOT_NULL(anti_a);
+    ASSERT_NOT_NULL(expected_a);
+    ASSERT_NOT_NULL(anti_b);
+    ASSERT_NOT_NULL(expected_b);
+
+    test_expr_set_val_d(a, a_value);
+    test_expr_set_val_d(b, b_value);
+    test_expr_set_val_d(anti_a, a_value);
+    test_expr_set_val_d(expected_a, a_value);
+    test_expr_set_val_d(anti_b, b_value);
+    test_expr_set_val_d(expected_b, b_value);
+    for (size_t i = 0; i < npoints; ++i) {
+        char point_label[160];
+
+        test_expr_set_val_d(x, points[i]);
+        test_expr_set_val_d(anti_x, points[i]);
+        test_expr_set_val_d(expected_x, points[i]);
+        snprintf(point_label, sizeof(point_label), "%s at x=%g, a=%g, b=%g",
+                 input, points[i], a_value, b_value);
+        check_q_at(__FILE__, __LINE__, 1, point_label,
+                   expr_eval_qf(deriv_eval), expr_eval_qf(expected_eval));
+    }
+
+    free(expected_input);
+    free(anti_input);
+    free(expected_text);
+    free(anti_text);
+    expr_free(expected_eval);
+    expr_bindings_free(expected_bindings);
+    expr_free(deriv_eval);
+    expr_free(anti_eval);
+    expr_bindings_free(anti_bindings);
+    expr_free(anti);
+    expr_free(simplified);
+    expr_free(expr);
+    expr_bindings_free(bindings);
+}
+
+static void assert_string_antiderivative_matches_with_abc(const char *input,
+                                                          double a_value,
+                                                          double b_value,
+                                                          double c_value,
+                                                          const double *points,
+                                                          size_t npoints)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_bindings_t *anti_bindings = NULL;
+    expr_bindings_t *expected_bindings = NULL;
+    expr_t *expr = expr_from_string(input, &bindings);
+    expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    expr_t *a = bindings ? expr_bindings_get(bindings, "a") : NULL;
+    expr_t *b = bindings ? expr_bindings_get(bindings, "b") : NULL;
+    expr_t *c = bindings ? expr_bindings_get(bindings, "c") : NULL;
+    expr_t *simplified = expr ? expr_simplify(expr) : NULL;
+    expr_t *anti = simplified ? expr_integrate(simplified, x) : NULL;
+    char *anti_text = anti ? expr_to_string(anti, style_UNBOUND) : NULL;
+    char *expected_text = simplified ? expr_to_string(simplified, style_UNBOUND) : NULL;
+    size_t anti_input_len = anti_text ? strlen(anti_text) + 5u : 0u;
+    size_t expected_input_len = expected_text ? strlen(expected_text) + 5u : 0u;
+    char *anti_input = anti_text ? malloc(anti_input_len) : NULL;
+    char *expected_input = expected_text ? malloc(expected_input_len) : NULL;
+    expr_t *anti_eval = NULL;
+    expr_t *deriv_eval = NULL;
+    expr_t *expected_eval = NULL;
+    expr_t *anti_x = NULL;
+    expr_t *expected_x = NULL;
+    expr_t *anti_a = NULL;
+    expr_t *expected_a = NULL;
+    expr_t *anti_b = NULL;
+    expr_t *expected_b = NULL;
+    expr_t *anti_c = NULL;
+    expr_t *expected_c = NULL;
+
+    ASSERT_NOT_NULL(simplified);
+    ASSERT_NOT_NULL(x);
+    ASSERT_NOT_NULL(a);
+    ASSERT_NOT_NULL(b);
+    ASSERT_NOT_NULL(c);
+    ASSERT_NOT_NULL(anti);
+    ASSERT_NOT_NULL(anti_text);
+    ASSERT_NOT_NULL(expected_text);
+    ASSERT_NOT_NULL(anti_input);
+    ASSERT_NOT_NULL(expected_input);
+    print_antiderivative_text(input, anti_text);
+
+    snprintf(anti_input, anti_input_len, "{ %s }", anti_text);
+    snprintf(expected_input, expected_input_len, "{ %s }", expected_text);
+
+    anti_eval = expr_from_string(anti_input, &anti_bindings);
+    expected_eval = expr_from_string(expected_input, &expected_bindings);
+    anti_x = anti_bindings ? expr_bindings_get(anti_bindings, "x") : NULL;
+    anti_a = anti_bindings ? expr_bindings_get(anti_bindings, "a") : NULL;
+    anti_b = anti_bindings ? expr_bindings_get(anti_bindings, "b") : NULL;
+    anti_c = anti_bindings ? expr_bindings_get(anti_bindings, "c") : NULL;
+    deriv_eval = anti_eval && anti_x ? expr_create_deriv(anti_eval, anti_x) : NULL;
+    expected_x = expected_bindings ? expr_bindings_get(expected_bindings, "x") : NULL;
+    expected_a = expected_bindings ? expr_bindings_get(expected_bindings, "a") : NULL;
+    expected_b = expected_bindings ? expr_bindings_get(expected_bindings, "b") : NULL;
+    expected_c = expected_bindings ? expr_bindings_get(expected_bindings, "c") : NULL;
+
+    ASSERT_NOT_NULL(anti_eval);
+    ASSERT_NOT_NULL(deriv_eval);
+    ASSERT_NOT_NULL(expected_eval);
+    ASSERT_NOT_NULL(anti_x);
+    ASSERT_NOT_NULL(expected_x);
+    ASSERT_NOT_NULL(anti_a);
+    ASSERT_NOT_NULL(expected_a);
+    ASSERT_NOT_NULL(anti_b);
+    ASSERT_NOT_NULL(expected_b);
+    ASSERT_NOT_NULL(anti_c);
+    ASSERT_NOT_NULL(expected_c);
+
+    test_expr_set_val_d(a, a_value);
+    test_expr_set_val_d(b, b_value);
+    test_expr_set_val_d(c, c_value);
+    test_expr_set_val_d(anti_a, a_value);
+    test_expr_set_val_d(expected_a, a_value);
+    test_expr_set_val_d(anti_b, b_value);
+    test_expr_set_val_d(expected_b, b_value);
+    test_expr_set_val_d(anti_c, c_value);
+    test_expr_set_val_d(expected_c, c_value);
+    for (size_t i = 0; i < npoints; ++i) {
+        char point_label[192];
+
+        test_expr_set_val_d(x, points[i]);
+        test_expr_set_val_d(anti_x, points[i]);
+        test_expr_set_val_d(expected_x, points[i]);
+        snprintf(point_label, sizeof(point_label), "%s at x=%g, a=%g, b=%g, c=%g",
+                 input, points[i], a_value, b_value, c_value);
+        check_q_at(__FILE__, __LINE__, 1, point_label,
+                   expr_eval_qf(deriv_eval), expr_eval_qf(expected_eval));
+    }
+
+    free(expected_input);
+    free(anti_input);
+    free(expected_text);
+    free(anti_text);
+    expr_free(expected_eval);
+    expr_bindings_free(expected_bindings);
+    expr_free(deriv_eval);
+    expr_free(anti_eval);
+    expr_bindings_free(anti_bindings);
     expr_free(anti);
     expr_free(simplified);
     expr_free(expr);
@@ -910,6 +1190,7 @@ static void test_integrate_definite_symbolic_bounds(void)
     ASSERT_NOT_NULL(diff);
     ASSERT_NOT_NULL(simplified);
     ASSERT_NOT_NULL(text);
+    print_antiderivative_expr("{ x^2 }", anti);
     ASSERT_TRUE(strstr(text, "a") != NULL);
     ASSERT_TRUE(strstr(text, "b") != NULL);
 
@@ -957,6 +1238,7 @@ static void test_integrate_inverse_square_with_exact_bound(void)
     ASSERT_NOT_NULL(lower);
     ASSERT_NOT_NULL(diff);
     ASSERT_NOT_NULL(simplified);
+    print_antiderivative_expr("{ 1/x^2 }", anti);
     ASSERT_FALSE(num_is_nan(value));
     check_q_at(__FILE__, __LINE__, 1, "definite integral 1/x^2 from 1 to sqrt(3)",
                expr_eval_qf(simplified), qf_from_double(1.0 - 1.0 / sqrt(3.0)));
@@ -1001,6 +1283,7 @@ static void assert_symbolic_shifted_inverse_square(const char *input,
     ASSERT_NOT_NULL(diff);
     ASSERT_NOT_NULL(simplified);
     ASSERT_NOT_NULL(text);
+    print_antiderivative_expr(input, anti);
     ASSERT_TRUE(strstr(text, first_term) != NULL);
     ASSERT_TRUE(strstr(text, second_term) != NULL);
 
@@ -1049,6 +1332,7 @@ static void test_integrate_symbolic_power_exponent(void)
 
     ASSERT_NOT_NULL(anti);
     ASSERT_NOT_NULL(anti_text);
+    print_antiderivative_text("{ x^n }", anti_text);
     ASSERT_TRUE(strstr(anti_text, "x^(n + 1)/(n + 1)") != NULL);
     ASSERT_NOT_NULL(upper);
     ASSERT_NOT_NULL(lower);
@@ -1083,6 +1367,7 @@ static void test_integrate_symbolic_power_exponent(void)
 
     ASSERT_NOT_NULL(anti);
     ASSERT_NOT_NULL(anti_text);
+    print_antiderivative_text("{ (x+1)^n }", anti_text);
     ASSERT_TRUE(strstr(anti_text, "(x + 1)^(n + 1)/(n + 1)") != NULL);
 
     free(anti_text);
@@ -1100,6 +1385,7 @@ static void test_integrate_symbolic_power_exponent(void)
 
     ASSERT_NOT_NULL(anti);
     ASSERT_NOT_NULL(anti_text);
+    print_antiderivative_text("{ (a*x+b)^n }", anti_text);
     ASSERT_TRUE(strstr(anti_text, "(ax + b)^(n + 1)/(a·(n + 1))") != NULL);
 
     free(anti_text);
@@ -1117,6 +1403,7 @@ static void test_integrate_symbolic_power_exponent(void)
 
     ASSERT_NOT_NULL(anti);
     ASSERT_NOT_NULL(anti_text);
+    print_antiderivative_text("{ (b-a*x)^n }", anti_text);
     ASSERT_TRUE(strstr(anti_text, "-(b - ax)^(n + 1)/(a·(n + 1))") != NULL);
 
     free(anti_text);
@@ -1128,6 +1415,9 @@ static void test_integrate_symbolic_power_exponent(void)
 
 static void test_integrate_symbolic_shifted_sqrt(void)
 {
+    static const double quotient_minus_points[] = { 0.25, 1.0, 2.0, 3.5 };
+    static const double root_denom_minus_points[] = { 2.5, 3.0, 4.5, 7.0 };
+    static const double affine_root_points[] = { 0.5, 1.0, 1.75, 2.5 };
     expr_bindings_t *bindings = NULL;
     expr_t *integrand = expr_from_string("{ sqrt(x-a) }", &bindings);
     expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
@@ -1138,6 +1428,7 @@ static void test_integrate_symbolic_shifted_sqrt(void)
 
     ASSERT_NOT_NULL(anti);
     ASSERT_NOT_NULL(text);
+    print_antiderivative_text("{ sqrt(x-a) }", text);
     ASSERT_TRUE(strstr(text, "⅔·(x - a)^³⁄₂") != NULL);
 
     free(text);
@@ -1155,6 +1446,7 @@ static void test_integrate_symbolic_shifted_sqrt(void)
 
     ASSERT_NOT_NULL(anti);
     ASSERT_NOT_NULL(text);
+    print_antiderivative_text("{ sqrt(x+a) }", text);
     ASSERT_TRUE(strstr(text, "⅔·(x + a)^³⁄₂") != NULL);
 
     free(text);
@@ -1172,6 +1464,7 @@ static void test_integrate_symbolic_shifted_sqrt(void)
 
     ASSERT_NOT_NULL(anti);
     ASSERT_NOT_NULL(text);
+    print_antiderivative_text("{ sqrt(a+x) }", text);
     ASSERT_TRUE(strstr(text, "⅔·(x + a)^³⁄₂") != NULL);
 
     free(text);
@@ -1189,6 +1482,7 @@ static void test_integrate_symbolic_shifted_sqrt(void)
 
     ASSERT_NOT_NULL(anti);
     ASSERT_NOT_NULL(text);
+    print_antiderivative_text("{ sqrt(a-x) }", text);
     ASSERT_TRUE(strstr(text, "-⅔·(a - x)^³⁄₂") != NULL);
 
     free(text);
@@ -1206,6 +1500,7 @@ static void test_integrate_symbolic_shifted_sqrt(void)
 
     ASSERT_NOT_NULL(anti);
     ASSERT_NOT_NULL(text);
+    print_antiderivative_text("{ 1/sqrt(x-a) }", text);
     ASSERT_TRUE(strstr(text, "2·√(x - a)") != NULL);
 
     free(text);
@@ -1223,6 +1518,7 @@ static void test_integrate_symbolic_shifted_sqrt(void)
 
     ASSERT_NOT_NULL(anti);
     ASSERT_NOT_NULL(text);
+    print_antiderivative_text("{ 1/sqrt(x+a) }", text);
     ASSERT_TRUE(strstr(text, "2·√(x + a)") != NULL);
 
     free(text);
@@ -1240,6 +1536,7 @@ static void test_integrate_symbolic_shifted_sqrt(void)
 
     ASSERT_NOT_NULL(anti);
     ASSERT_NOT_NULL(text);
+    print_antiderivative_text("{ 1/sqrt(a+x) }", text);
     ASSERT_TRUE(strstr(text, "2·√(x + a)") != NULL);
 
     free(text);
@@ -1259,6 +1556,7 @@ static void test_integrate_symbolic_shifted_sqrt(void)
     ASSERT_NOT_NULL(anti);
     ASSERT_NOT_NULL(text);
     ASSERT_NOT_NULL(tex);
+    print_antiderivative_text("{ 1/sqrt(a-x) }", text);
     ASSERT_TRUE(strstr(text, "-2·√(a - x)") != NULL);
     ASSERT_TRUE(strstr(tex, "\\sqrt{a - x}") != NULL);
     ASSERT_TRUE(strstr(tex, "^{\\frac{1}{2}}") == NULL);
@@ -1270,6 +1568,24 @@ static void test_integrate_symbolic_shifted_sqrt(void)
     expr_free(integrand);
     expr_bindings_free(bindings);
 
+    assert_string_antiderivative_matches_with_a("{ sqrt(x/(a-x)) }", 5.0,
+                                                quotient_minus_points,
+                                                sizeof(quotient_minus_points) /
+                                                    sizeof(quotient_minus_points[0]));
+    assert_string_antiderivative_contains("{ sqrt(x/(a+x)) }", "atanh");
+    assert_string_antiderivative_contains("{ x/sqrt(x+a) }", "⅔·(x - 2a)·√(x + a)");
+    assert_string_antiderivative_matches_with_a("{ x/sqrt(x-a) }", 2.0,
+                                                root_denom_minus_points,
+                                                sizeof(root_denom_minus_points) /
+                                                    sizeof(root_denom_minus_points[0]));
+    assert_string_antiderivative_contains("{ x/sqrt(x-a) }", "⅔·(x + 2a)·√(x - a)");
+    assert_string_antiderivative_matches_with_ab("{ x/sqrt(a*x+b) }", 2.0, 3.0,
+                                                 affine_root_points,
+                                                 sizeof(affine_root_points) /
+                                                     sizeof(affine_root_points[0]));
+    assert_string_antiderivative_contains("{ x/sqrt(a*x+b) }",
+                                          "⅔·(ax - 2b)·√(ax + b)/a²");
+
     bindings = NULL;
     integrand = expr_from_string("{ sqrt(a-bx) }", &bindings);
     x = bindings ? expr_bindings_get(bindings, "x") : NULL;
@@ -1279,6 +1595,7 @@ static void test_integrate_symbolic_shifted_sqrt(void)
 
     ASSERT_NOT_NULL(anti);
     ASSERT_NOT_NULL(text);
+    print_antiderivative_text("{ sqrt(a-bx) }", text);
     ASSERT_TRUE(strstr(text, "-⅔·(a - bx)^³⁄₂/b") != NULL);
 
     free(text);
@@ -1298,6 +1615,7 @@ static void test_integrate_symbolic_shifted_sqrt(void)
     ASSERT_NOT_NULL(anti);
     ASSERT_NOT_NULL(text);
     ASSERT_NOT_NULL(tex);
+    print_antiderivative_text("{ 1/sqrt(a-bx) }", text);
     ASSERT_TRUE(strstr(text, "-2·√(a - bx)/b") != NULL);
     ASSERT_TRUE(strstr(tex, "\\sqrt{a - b x}") != NULL);
     ASSERT_TRUE(strstr(tex, "^{\\frac{1}{2}}") == NULL);
@@ -1332,6 +1650,7 @@ static void test_integrate_symbolic_shifted_sqrt(void)
     ASSERT_NOT_NULL(anti);
     ASSERT_NOT_NULL(text);
     ASSERT_NOT_NULL(tex);
+    print_antiderivative_text("{ 1/sqrt((a-bx)^3) }", text);
     ASSERT_TRUE(strstr(text, "2/(b·√(a - bx))") != NULL);
     ASSERT_TRUE(strstr(tex, "\\frac{2}{b \\cdot \\sqrt{a - b x}}") != NULL);
     ASSERT_TRUE(strstr(tex, "\\sqrt{a - b x}") != NULL);
@@ -1355,6 +1674,7 @@ static void test_integrate_symbolic_shifted_sqrt(void)
     ASSERT_NOT_NULL(anti);
     ASSERT_NOT_NULL(text);
     ASSERT_NOT_NULL(tex);
+    print_antiderivative_text("{ 1/sqrt((a-bx)^4) }", text);
     ASSERT_TRUE(strstr(text, "1/(b·(a - bx))") != NULL);
     ASSERT_TRUE(strstr(tex, "\\frac{1}{b \\cdot \\left(a - b x\\right)}") != NULL);
 
@@ -1376,6 +1696,7 @@ static void test_integrate_symbolic_shifted_sqrt(void)
     ASSERT_NOT_NULL(anti);
     ASSERT_NOT_NULL(text);
     ASSERT_NOT_NULL(tex);
+    print_antiderivative_text("{ 1/sqrt((a-bx)^5) }", text);
     ASSERT_TRUE(strstr(text, "2/(3b·(a - bx)^³⁄₂)") != NULL);
     ASSERT_TRUE(strstr(tex, "\\frac{2}{3 b \\cdot \\left(a - b x\\right)^{\\frac{3}{2}}}") != NULL);
     ASSERT_TRUE(strstr(tex, "\\frac{\\frac{2}{3}}") == NULL);
@@ -1416,6 +1737,15 @@ static void test_integrate_poly_times_affine_power(void)
     assert_string_antiderivative_matches("{ x*sqrt(2*x+3) }",
                                          positive_points,
                                          sizeof(positive_points) / sizeof(positive_points[0]));
+    assert_string_antiderivative_matches_with_ab("{ x*sqrt(a*x+b) }", 2.0, 3.0,
+                                                 positive_points,
+                                                 sizeof(positive_points) / sizeof(positive_points[0]));
+    assert_string_antiderivative_matches_with_ab("{ x^2/sqrt(a*x+b) }", 2.0, 3.0,
+                                                 positive_points,
+                                                 sizeof(positive_points) / sizeof(positive_points[0]));
+    assert_string_antiderivative_matches_with_ab("{ x^2*sqrt(a*x+b) }", 2.0, 3.0,
+                                                 positive_points,
+                                                 sizeof(positive_points) / sizeof(positive_points[0]));
 }
 
 static void test_integrate_poly_over_centered_quadratic(void)
@@ -1452,9 +1782,29 @@ static void test_integrate_symbolic_general_quadratic_denominator(void)
                                           "atan((2ax + b)/√(4ac - b²))");
 }
 
+static void test_integrate_symbolic_general_quadratic_roots(void)
+{
+    static const double points[] = { -1.2, -0.2, 0.5, 1.6 };
+
+    assert_string_antiderivative_matches_with_abc("{ sqrt(a*x^2+b*x+c) }",
+                                                  2.0, 3.0, 5.0,
+                                                  points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches_with_abc("{ 1/sqrt(a*x^2+b*x+c) }",
+                                                  2.0, 3.0, 5.0,
+                                                  points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches_with_abc("{ x/sqrt(a*x^2+b*x+c) }",
+                                                  2.0, 3.0, 5.0,
+                                                  points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches_with_abc("{ x*sqrt(a*x^2+b*x+c) }",
+                                                  2.0, 3.0, 5.0,
+                                                  points, sizeof(points) / sizeof(points[0]));
+}
+
 static void test_integrate_log_quadratic(void)
 {
     static const double points[] = { -1.5, -0.4, 0.6, 1.8 };
+    static const double positive_points[] = { 0.2, 0.7, 1.3, 2.1 };
+    static const double bounded_points[] = { 0.2, 0.7, 1.2, 2.0 };
 
     assert_string_antiderivative_matches("{ ln(x^2+1) }",
                                          points, sizeof(points) / sizeof(points[0]));
@@ -1462,11 +1812,32 @@ static void test_integrate_log_quadratic(void)
                                          points, sizeof(points) / sizeof(points[0]));
     assert_string_antiderivative_matches("{ ln(a*x^2+b*x+c) | a=2; b=3; c=5 }",
                                          points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches_with_ab("{ ln(a*x+b) }", 2.0, 3.0,
+                                                 positive_points,
+                                                 sizeof(positive_points) /
+                                                     sizeof(positive_points[0]));
+    assert_string_antiderivative_matches_with_a("{ ln(a*x)/x }", 2.0,
+                                                positive_points,
+                                                sizeof(positive_points) /
+                                                    sizeof(positive_points[0]));
+    assert_string_antiderivative_matches_with_ab("{ x*ln(a*x+b) }", 2.0, 3.0,
+                                                 positive_points,
+                                                 sizeof(positive_points) /
+                                                     sizeof(positive_points[0]));
+    assert_string_antiderivative_matches_with_abc("{ x*ln(a*x^2+b*x+c) }",
+                                                  2.0, 3.0, 5.0,
+                                                  points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches_with_ab("{ x*ln(a^2-b^2*x^2) }",
+                                                 3.0, 1.0,
+                                                 bounded_points,
+                                                 sizeof(bounded_points) /
+                                                     sizeof(bounded_points[0]));
 }
 
 static void test_integrate_negative_quadratic_exponential(void)
 {
     static const double points[] = { -1.5, -0.4, 0.6, 1.8 };
+    static const double positive_points[] = { 0.2, 0.7, 1.3, 2.1 };
 
     assert_string_antiderivative_matches("{ exp(-x^2) }",
                                          points, sizeof(points) / sizeof(points[0]));
@@ -1474,6 +1845,20 @@ static void test_integrate_negative_quadratic_exponential(void)
                                          points, sizeof(points) / sizeof(points[0]));
     assert_string_antiderivative_matches("{ exp(-3*(2*x+1)^2+5) }",
                                          points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches_with_a("{ exp(a*x) }", 2.0,
+                                                points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches_with_a("{ x*exp(a*x) }", 2.0,
+                                                points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches_with_a("{ x^2*exp(a*x) }", 2.0,
+                                                points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches_with_a("{ x^3*exp(a*x) }", 2.0,
+                                                points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches_with_a("{ sqrt(x)*exp(a*x) }", -2.0,
+                                                positive_points,
+                                                sizeof(positive_points) /
+                                                    sizeof(positive_points[0]));
+    assert_string_antiderivative_matches_with_a("{ exp(a*x^2) }", -2.0,
+                                                points, sizeof(points) / sizeof(points[0]));
 }
 
 static void test_integrate_centered_quadratic_roots(void)
@@ -1514,6 +1899,38 @@ static void test_integrate_centered_quadratic_roots(void)
                                          outer_points, sizeof(outer_points) / sizeof(outer_points[0]));
     assert_string_antiderivative_matches("{ x*sqrt(x^2-4) }",
                                          outer_points, sizeof(outer_points) / sizeof(outer_points[0]));
+    assert_string_antiderivative_matches_with_a("{ sqrt(x^2+a^2) }",
+                                                2.0, points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches_with_a("{ 1/sqrt(x^2+a^2) }",
+                                                2.0, points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches_with_a("{ x/sqrt(x^2+a^2) }",
+                                                2.0, points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches_with_a("{ x*sqrt(x^2+a^2) }",
+                                                2.0, points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches_with_a("{ sqrt(a^2-x^2) }",
+                                                2.0, bounded_points,
+                                                sizeof(bounded_points) / sizeof(bounded_points[0]));
+    assert_string_antiderivative_matches_with_a("{ 1/sqrt(a^2-x^2) }",
+                                                2.0, bounded_points,
+                                                sizeof(bounded_points) / sizeof(bounded_points[0]));
+    assert_string_antiderivative_matches_with_a("{ x/sqrt(a^2-x^2) }",
+                                                2.0, bounded_points,
+                                                sizeof(bounded_points) / sizeof(bounded_points[0]));
+    assert_string_antiderivative_matches_with_a("{ x*sqrt(a^2-x^2) }",
+                                                2.0, bounded_points,
+                                                sizeof(bounded_points) / sizeof(bounded_points[0]));
+    assert_string_antiderivative_matches_with_a("{ sqrt(x^2-a^2) }",
+                                                2.0, outer_points,
+                                                sizeof(outer_points) / sizeof(outer_points[0]));
+    assert_string_antiderivative_matches_with_a("{ 1/sqrt(x^2-a^2) }",
+                                                2.0, outer_points,
+                                                sizeof(outer_points) / sizeof(outer_points[0]));
+    assert_string_antiderivative_matches_with_a("{ x/sqrt(x^2-a^2) }",
+                                                2.0, outer_points,
+                                                sizeof(outer_points) / sizeof(outer_points[0]));
+    assert_string_antiderivative_matches_with_a("{ x*sqrt(x^2-a^2) }",
+                                                2.0, outer_points,
+                                                sizeof(outer_points) / sizeof(outer_points[0]));
 }
 
 static void test_integrate_trig_power_products(void)
@@ -1530,10 +1947,18 @@ static void test_integrate_trig_power_products(void)
                                          points, sizeof(points) / sizeof(points[0]));
     assert_string_antiderivative_matches("{ cosec(x)^3 }",
                                          points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ sin(x)^2*cos(x) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ sin(x)*cos(x)^2 }",
+                                         points, sizeof(points) / sizeof(points[0]));
     assert_string_antiderivative_matches("{ sec(x)^2*tan(x) }",
                                          points, sizeof(points) / sizeof(points[0]));
     assert_string_antiderivative_matches("{ cosec(x)^2*cot(x) }",
                                          points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches_with_a("{ sec(x)^a*tan(x) }", 4.0,
+                                                points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches_with_a("{ cosec(x)^a*cot(x) }", 4.0,
+                                                points, sizeof(points) / sizeof(points[0]));
     assert_string_antiderivative_matches("{ sec(x)*cosec(x) }",
                                          points, sizeof(points) / sizeof(points[0]));
     assert_string_antiderivative_matches("{ sin(x)^2*cos(x)^2 }",
@@ -1544,13 +1969,29 @@ static void test_integrate_mixed_frequency_exp_unary(void)
 {
     static const double points[] = { -0.6, -0.1, 0.4, 1.1 };
 
+    assert_string_antiderivative_matches_with_a("{ x*sin(a*x) }", 2.0,
+                                                points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches_with_a("{ x^2*sin(a*x) }", 2.0,
+                                                points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches_with_a("{ x*cos(a*x) }", 2.0,
+                                                points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches_with_a("{ x^2*cos(a*x) }", 2.0,
+                                                points, sizeof(points) / sizeof(points[0]));
     assert_string_antiderivative_matches("{ exp(3*x)*sin(2*x) }",
                                          points, sizeof(points) / sizeof(points[0]));
     assert_string_antiderivative_matches("{ exp(3*x)*cos(2*x) }",
                                          points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches_with_ab("{ exp(b*x)*sin(a*x) }", 2.0, 3.0,
+                                                 points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches_with_ab("{ exp(b*x)*cos(a*x) }", 2.0, 3.0,
+                                                 points, sizeof(points) / sizeof(points[0]));
     assert_string_antiderivative_matches("{ sin(2*x)*exp(3*x) }",
                                          points, sizeof(points) / sizeof(points[0]));
     assert_string_antiderivative_matches("{ cos(2*x)*exp(3*x) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ x*exp(x)*sin(x) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ x*exp(x)*cos(x) }",
                                          points, sizeof(points) / sizeof(points[0]));
     assert_string_antiderivative_matches("{ exp(2*x)*sinh(3*x) }",
                                          points, sizeof(points) / sizeof(points[0]));
@@ -1564,6 +2005,65 @@ static void test_integrate_mixed_frequency_exp_unary(void)
                                          points, sizeof(points) / sizeof(points[0]));
     assert_string_antiderivative_matches("{ cosh(3*x)*sinh(2*x) }",
                                          points, sizeof(points) / sizeof(points[0]));
+}
+
+static void test_integrate_hyperbolic_table_tail(void)
+{
+    static const double points[] = { -0.6, -0.1, 0.4, 1.1 };
+
+    assert_string_antiderivative_contains("{ cosh(x) }", "sinh(x)");
+    assert_string_antiderivative_matches("{ cosh(x) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_contains("{ exp(a*x)*cosh(b*x) }",
+                                          "exp(ax)·(a·cosh(bx) - b·sinh(bx))/(a² - b²)");
+    assert_string_antiderivative_matches_with_ab("{ exp(a*x)*cosh(b*x) }", 3.0, 2.0,
+                                                 points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_contains("{ sinh(x) }", "cosh(x)");
+    assert_string_antiderivative_matches("{ sinh(x) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_contains("{ exp(a*x)*sinh(b*x) }",
+                                          "exp(ax)·(a·sinh(bx) - b·cosh(bx))/(a² - b²)");
+    assert_string_antiderivative_matches_with_ab("{ exp(a*x)*sinh(b*x) }", 3.0, 2.0,
+                                                 points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_contains("{ exp(x)*tanh(x) }",
+                                          "exp(x) - 2·atan(exp(x))");
+    assert_string_antiderivative_matches("{ exp(x)*tanh(x) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_contains("{ tanh(a*x) }", "ln(cosh(ax))/a");
+    assert_string_antiderivative_matches_with_a("{ tanh(a*x) }", 2.0,
+                                                points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_contains("{ cos(a*x)*cosh(b*x) }",
+                                          "(a·sin(ax)·cosh(bx) + b·cos(ax)·sinh(bx))/(a² + b²)");
+    assert_string_antiderivative_matches_with_ab("{ cos(a*x)*cosh(b*x) }", 2.0, 3.0,
+                                                 points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_contains("{ cos(a*x)*sinh(b*x) }",
+                                          "(a·sin(ax)·sinh(bx) + b·cos(ax)·cosh(bx))/(a² + b²)");
+    assert_string_antiderivative_matches_with_ab("{ cos(a*x)*sinh(b*x) }", 2.0, 3.0,
+                                                 points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_contains("{ sin(a*x)*cosh(b*x) }",
+                                          "(b·sin(ax)·sinh(bx) - a·cos(ax)·cosh(bx))/(a² + b²)");
+    assert_string_antiderivative_matches_with_ab("{ sin(a*x)*cosh(b*x) }", 2.0, 3.0,
+                                                 points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_contains("{ sin(a*x)*sinh(b*x) }",
+                                          "(b·sin(ax)·cosh(bx) - a·cos(ax)·sinh(bx))/(a² + b²)");
+    assert_string_antiderivative_matches_with_ab("{ sin(a*x)*sinh(b*x) }", 2.0, 3.0,
+                                                 points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_contains("{ sinh(a*x)^2 }",
+                                          "¼·(sinh(2ax)/a - 2x)");
+    assert_string_antiderivative_matches_with_a("{ sinh(a*x)^2 }", 2.0,
+                                                points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_contains("{ sinh(a*x)*sinh(b*x) }",
+                                          "(b·cosh(bx)·sinh(ax) - a·cosh(ax)·sinh(bx))/(b² - a²)");
+    assert_string_antiderivative_matches_with_ab("{ sinh(a*x)*sinh(b*x) }", 2.0, 3.0,
+                                                 points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_contains("{ sinh(a*x)*cosh(b*x) }",
+                                          "(a·cosh(ax)·cosh(bx) - b·sinh(ax)·sinh(bx))/(a² - b²)");
+    assert_string_antiderivative_matches_with_ab("{ sinh(a*x)*cosh(b*x) }", 2.0, 3.0,
+                                                 points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_contains("{ sinh(a*x)*cosh(a*x) }",
+                                          "cosh(2ax)/(4a)");
+    assert_string_antiderivative_matches_with_a("{ sinh(a*x)*cosh(a*x) }", 2.0,
+                                                points, sizeof(points) / sizeof(points[0]));
 }
 
 static void test_integrate_frequency_product_families(void)
@@ -1727,11 +2227,13 @@ void test_symbolic_integration(void)
     TEST_RUN_SUBTEST(test_integrate_poly_times_affine_power, NULL);
     TEST_RUN_SUBTEST(test_integrate_poly_over_centered_quadratic, NULL);
     TEST_RUN_SUBTEST(test_integrate_symbolic_general_quadratic_denominator, NULL);
+    TEST_RUN_SUBTEST(test_integrate_symbolic_general_quadratic_roots, NULL);
     TEST_RUN_SUBTEST(test_integrate_log_quadratic, NULL);
     TEST_RUN_SUBTEST(test_integrate_negative_quadratic_exponential, NULL);
     TEST_RUN_SUBTEST(test_integrate_centered_quadratic_roots, NULL);
     TEST_RUN_SUBTEST(test_integrate_trig_power_products, NULL);
     TEST_RUN_SUBTEST(test_integrate_mixed_frequency_exp_unary, NULL);
+    TEST_RUN_SUBTEST(test_integrate_hyperbolic_table_tail, NULL);
     TEST_RUN_SUBTEST(test_integrate_frequency_product_families, NULL);
     TEST_RUN_SUBTEST(test_integrate_more_by_parts, NULL);
     TEST_RUN_SUBTEST(test_integrate_partial_fractions, NULL);

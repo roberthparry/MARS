@@ -2,7 +2,7 @@
 #include <stdlib.h>
 
 #include "qfloat.h"
-#include "expr_fromstring.h"
+#include "expr_stringin_internal.h"
 
 void *fs_xmalloc(size_t n)
 {

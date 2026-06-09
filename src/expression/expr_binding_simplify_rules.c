@@ -5,7 +5,7 @@
 #include <string.h>
 
 #include "expr_binding_simplify.h"
-#include "expr_tostring.h"
+#include "expr_stringout.h"
 #include "internal/number_internal.h"
 #include "ustring.h"
 

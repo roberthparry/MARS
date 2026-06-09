@@ -1,5 +1,335 @@
 #include "expr_integrate_internal.h"
 
+static bool is_wrt_square_power_primitives(const expr_t *expr, const expr_t *wrt)
+{
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+    number_t exponent = num_new();
+    bool ok = false;
+
+    if (!expr || !wrt)
+        goto cleanup;
+
+    if (expr->ops && expr->ops->kind == EXPR_KIND_POW_D &&
+        expr->a && is_wrt(expr->a, wrt)) {
+        ok = num_eq(expr->c, NUM_TWO);
+        goto cleanup;
+    }
+
+    if (expr->ops && expr->ops->kind == EXPR_KIND_POW &&
+        expr->a && expr->b && is_wrt(expr->a, wrt) &&
+        expr_match_const_value(expr->b, &exponent)) {
+        ok = num_eq(exponent, NUM_TWO);
+        goto cleanup;
+    }
+
+    if (expr_match_mul_expr(expr, &left, &right) &&
+        is_wrt(left, wrt) && is_wrt(right, wrt)) {
+        ok = true;
+        goto cleanup;
+    }
+
+cleanup:
+    num_destroy(&exponent);
+    return ok;
+}
+
+static expr_t *match_symbolic_wrt_factor_coeff_primitives(const expr_t *expr,
+                                                          const expr_t *wrt)
+{
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+
+    if (!expr || !wrt)
+        return NULL;
+
+    if (is_wrt(expr, wrt))
+        return expr_new_const(NUM_ONE);
+
+    if (expr_is_neg(expr))
+        return expr_integrate_negate_owned(
+            match_symbolic_wrt_factor_coeff_primitives(expr->a, wrt));
+
+    if (expr_match_mul_expr(expr, &left, &right)) {
+        expr_t *left_coeff = match_symbolic_wrt_factor_coeff_primitives(left, wrt);
+        expr_t *right_coeff = match_symbolic_wrt_factor_coeff_primitives(right, wrt);
+
+        if (left_coeff && !depends_on_wrt(right, wrt)) {
+            expr_t *right_clone = expr_integrate_retain_expr(right);
+            expr_t *product = right_clone ? expr_mul(left_coeff, right_clone) : NULL;
+
+            expr_free(right_clone);
+            expr_free(right_coeff);
+            expr_free(left_coeff);
+            return simplify_owned(product);
+        }
+
+        if (right_coeff && !depends_on_wrt(left, wrt)) {
+            expr_t *left_clone = expr_integrate_retain_expr(left);
+            expr_t *product = left_clone ? expr_mul(left_clone, right_coeff) : NULL;
+
+            expr_free(left_clone);
+            expr_free(right_coeff);
+            expr_free(left_coeff);
+            return simplify_owned(product);
+        }
+
+        expr_free(right_coeff);
+        expr_free(left_coeff);
+
+        if (is_wrt(left, wrt) && !depends_on_wrt(right, wrt))
+            return expr_integrate_retain_expr(right);
+        if (is_wrt(right, wrt) && !depends_on_wrt(left, wrt))
+            return expr_integrate_retain_expr(left);
+    }
+
+    if (expr_is_op(expr, &ops_div) && expr->a && expr->b &&
+        !depends_on_wrt(expr->b, wrt)) {
+        expr_t *numer_coeff = match_symbolic_wrt_factor_coeff_primitives(expr->a, wrt);
+        expr_t *denom = expr_integrate_retain_expr(expr->b);
+        expr_t *quotient = (numer_coeff && denom) ? expr_div(numer_coeff, denom) : NULL;
+
+        expr_free(denom);
+        expr_free(numer_coeff);
+        return simplify_owned(quotient);
+    }
+
+    return NULL;
+}
+
+static expr_t *match_symbolic_wrt_square_coeff_primitives(const expr_t *expr,
+                                                          const expr_t *wrt)
+{
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+
+    if (!expr || !wrt)
+        return NULL;
+
+    if (is_wrt_square_power_primitives(expr, wrt))
+        return expr_new_const(NUM_ONE);
+
+    if (expr_is_neg(expr))
+        return expr_integrate_negate_owned(
+            match_symbolic_wrt_square_coeff_primitives(expr->a, wrt));
+
+    if (expr_match_mul_expr(expr, &left, &right)) {
+        expr_t *left_coeff = match_symbolic_wrt_square_coeff_primitives(left, wrt);
+        expr_t *right_coeff = match_symbolic_wrt_square_coeff_primitives(right, wrt);
+        expr_t *left_linear = NULL;
+        expr_t *right_linear = NULL;
+
+        if (left_coeff && !depends_on_wrt(right, wrt)) {
+            expr_t *right_clone = expr_integrate_retain_expr(right);
+            expr_t *product = right_clone ? expr_mul(left_coeff, right_clone) : NULL;
+
+            expr_free(right_clone);
+            expr_free(right_coeff);
+            expr_free(left_coeff);
+            return simplify_owned(product);
+        }
+
+        if (right_coeff && !depends_on_wrt(left, wrt)) {
+            expr_t *left_clone = expr_integrate_retain_expr(left);
+            expr_t *product = left_clone ? expr_mul(left_clone, right_coeff) : NULL;
+
+            expr_free(left_clone);
+            expr_free(right_coeff);
+            expr_free(left_coeff);
+            return simplify_owned(product);
+        }
+
+        left_linear = match_symbolic_wrt_factor_coeff_primitives(left, wrt);
+        right_linear = match_symbolic_wrt_factor_coeff_primitives(right, wrt);
+        if (left_linear && right_linear) {
+            expr_t *product = expr_mul(left_linear, right_linear);
+
+            expr_free(right_linear);
+            expr_free(left_linear);
+            expr_free(right_coeff);
+            expr_free(left_coeff);
+            return simplify_owned(product);
+        }
+
+        expr_free(right_linear);
+        expr_free(left_linear);
+        expr_free(right_coeff);
+        expr_free(left_coeff);
+    }
+
+    if (expr_is_op(expr, &ops_div) && expr->a && expr->b &&
+        !depends_on_wrt(expr->b, wrt)) {
+        expr_t *numer_coeff = match_symbolic_wrt_square_coeff_primitives(expr->a, wrt);
+        expr_t *denom = expr_integrate_retain_expr(expr->b);
+        expr_t *quotient = (numer_coeff && denom) ? expr_div(numer_coeff, denom) : NULL;
+
+        expr_free(denom);
+        expr_free(numer_coeff);
+        return simplify_owned(quotient);
+    }
+
+    return NULL;
+}
+
+static expr_t *integrate_exp_symbolic_proportional_wrt(const expr_t *expr,
+                                                       const expr_t *wrt)
+{
+    expr_t *coeff = NULL;
+    expr_t *quotient = NULL;
+    expr_t *out = NULL;
+
+    if (!expr || !wrt || !expr->a || !expr_is_op(expr, &ops_exp))
+        return NULL;
+
+    coeff = match_symbolic_wrt_factor_coeff_primitives(expr->a, wrt);
+    if (!coeff || expr_const_is_zero(coeff))
+        goto cleanup;
+
+    quotient = expr_div(expr, coeff);
+    out = simplify_owned(quotient);
+    quotient = NULL;
+
+cleanup:
+    expr_free(quotient);
+    expr_free(coeff);
+    return out;
+}
+
+static expr_t *integrate_exp_symbolic_square_wrt(const expr_t *expr,
+                                                 const expr_t *wrt)
+{
+    expr_t *coeff = NULL;
+    expr_t *neg_coeff = NULL;
+    expr_t *sqrt_neg_coeff = NULL;
+    expr_t *arg = NULL;
+    expr_t *erf_arg = NULL;
+    expr_t *pi_const = NULL;
+    expr_t *sqrt_pi = NULL;
+    expr_t *numer = NULL;
+    expr_t *two = NULL;
+    expr_t *denom = NULL;
+    expr_t *quotient = NULL;
+    expr_t *out = NULL;
+
+    if (!expr || !wrt || !expr->a || !expr_is_op(expr, &ops_exp))
+        return NULL;
+
+    coeff = match_symbolic_wrt_square_coeff_primitives(expr->a, wrt);
+    if (!coeff || expr_const_is_zero(coeff))
+        goto cleanup;
+
+    neg_coeff = expr_neg(coeff);
+    sqrt_neg_coeff = neg_coeff ? expr_sqrt(neg_coeff) : NULL;
+    arg = (sqrt_neg_coeff && wrt) ? expr_mul(sqrt_neg_coeff, wrt) : NULL;
+    erf_arg = arg ? expr_erf(arg) : NULL;
+    pi_const = expr_new_named_const(NUM_PI, "@pi");
+    sqrt_pi = pi_const ? expr_sqrt(pi_const) : NULL;
+    numer = (sqrt_pi && erf_arg) ? expr_mul(sqrt_pi, erf_arg) : NULL;
+    two = expr_new_const(NUM_TWO);
+    denom = (two && sqrt_neg_coeff) ? expr_mul(two, sqrt_neg_coeff) : NULL;
+    quotient = (numer && denom) ? expr_div(numer, denom) : NULL;
+    out = simplify_owned(quotient);
+    quotient = NULL;
+
+cleanup:
+    expr_free(quotient);
+    expr_free(denom);
+    expr_free(two);
+    expr_free(numer);
+    expr_free(sqrt_pi);
+    expr_free(pi_const);
+    expr_free(erf_arg);
+    expr_free(arg);
+    expr_free(sqrt_neg_coeff);
+    expr_free(neg_coeff);
+    expr_free(coeff);
+    return out;
+}
+
+static expr_t *integrate_tanh_symbolic_proportional_wrt(const expr_t *expr,
+                                                        const expr_t *wrt)
+{
+    expr_t *coeff = NULL;
+    expr_t *cosh_arg = NULL;
+    expr_t *log_cosh = NULL;
+    expr_t *quotient = NULL;
+    expr_t *out = NULL;
+
+    if (!expr || !wrt || !expr->a || !expr_is_op(expr, &ops_tanh))
+        return NULL;
+
+    coeff = match_symbolic_wrt_factor_coeff_primitives(expr->a, wrt);
+    if (!coeff || expr_const_is_zero(coeff))
+        goto cleanup;
+
+    cosh_arg = expr_cosh(expr->a);
+    log_cosh = cosh_arg ? expr_log(cosh_arg) : NULL;
+    quotient = (log_cosh && coeff) ? expr_div(log_cosh, coeff) : NULL;
+    out = simplify_owned(quotient);
+    quotient = NULL;
+
+cleanup:
+    expr_free(quotient);
+    expr_free(log_cosh);
+    expr_free(cosh_arg);
+    expr_free(coeff);
+    return out;
+}
+
+static expr_t *integrate_sinh_symbolic_proportional_wrt(const expr_t *expr,
+                                                        const expr_t *wrt)
+{
+    expr_t *coeff = NULL;
+    expr_t *cosh_arg = NULL;
+    expr_t *quotient = NULL;
+    expr_t *out = NULL;
+
+    if (!expr || !wrt || !expr->a || !expr_is_op(expr, &ops_sinh))
+        return NULL;
+
+    coeff = match_symbolic_wrt_factor_coeff_primitives(expr->a, wrt);
+    if (!coeff || expr_const_is_zero(coeff))
+        goto cleanup;
+
+    cosh_arg = expr_cosh(expr->a);
+    quotient = (cosh_arg && coeff) ? expr_div(cosh_arg, coeff) : NULL;
+    out = simplify_owned(quotient);
+    quotient = NULL;
+
+cleanup:
+    expr_free(quotient);
+    expr_free(cosh_arg);
+    expr_free(coeff);
+    return out;
+}
+
+static expr_t *integrate_cosh_symbolic_proportional_wrt(const expr_t *expr,
+                                                        const expr_t *wrt)
+{
+    expr_t *coeff = NULL;
+    expr_t *sinh_arg = NULL;
+    expr_t *quotient = NULL;
+    expr_t *out = NULL;
+
+    if (!expr || !wrt || !expr->a || !expr_is_op(expr, &ops_cosh))
+        return NULL;
+
+    coeff = match_symbolic_wrt_factor_coeff_primitives(expr->a, wrt);
+    if (!coeff || expr_const_is_zero(coeff))
+        goto cleanup;
+
+    sinh_arg = expr_sinh(expr->a);
+    quotient = (sinh_arg && coeff) ? expr_div(sinh_arg, coeff) : NULL;
+    out = simplify_owned(quotient);
+    quotient = NULL;
+
+cleanup:
+    expr_free(quotient);
+    expr_free(sinh_arg);
+    expr_free(coeff);
+    return out;
+}
+
 expr_t *integrate_exp_rule(const expr_t *expr, const expr_t *wrt)
 {
     expr_t *out = integrate_affine_unary_kind(expr, wrt, EXPR_PATTERN_UNARY_EXP,
@@ -7,7 +337,13 @@ expr_t *integrate_exp_rule(const expr_t *expr, const expr_t *wrt)
 
     if (out)
         return out;
-    return integrate_exp_of_negative_quadratic(expr, wrt);
+    out = integrate_exp_of_negative_quadratic(expr, wrt);
+    if (out)
+        return out;
+    out = integrate_exp_symbolic_proportional_wrt(expr, wrt);
+    if (out)
+        return out;
+    return integrate_exp_symbolic_square_wrt(expr, wrt);
 }
 
 expr_t *integrate_sin_rule(const expr_t *expr, const expr_t *wrt)
@@ -158,14 +494,22 @@ expr_t *integrate_cot_rule(const expr_t *expr, const expr_t *wrt)
 
 expr_t *integrate_sinh_rule(const expr_t *expr, const expr_t *wrt)
 {
-    return integrate_affine_unary_kind(expr, wrt, EXPR_PATTERN_UNARY_SINH,
-                                      expr_cosh, NUM_ONE);
+    expr_t *out = integrate_affine_unary_kind(expr, wrt, EXPR_PATTERN_UNARY_SINH,
+                                             expr_cosh, NUM_ONE);
+
+    if (out)
+        return out;
+    return integrate_sinh_symbolic_proportional_wrt(expr, wrt);
 }
 
 expr_t *integrate_cosh_rule(const expr_t *expr, const expr_t *wrt)
 {
-    return integrate_affine_unary_kind(expr, wrt, EXPR_PATTERN_UNARY_COSH,
-                                      expr_sinh, NUM_ONE);
+    expr_t *out = integrate_affine_unary_kind(expr, wrt, EXPR_PATTERN_UNARY_COSH,
+                                             expr_sinh, NUM_ONE);
+
+    if (out)
+        return out;
+    return integrate_cosh_symbolic_proportional_wrt(expr, wrt);
 }
 
 expr_t *integrate_cosech_rule(const expr_t *expr, const expr_t *wrt)
@@ -216,7 +560,7 @@ expr_t *integrate_tanh_rule(const expr_t *expr, const expr_t *wrt)
         num_eq(coeffs[0], NUM_ZERO)) {
         num_destroy(&coeffs[0]);
         num_destroy(&constant);
-        return NULL;
+        return integrate_tanh_symbolic_proportional_wrt(expr, wrt);
     }
 
     cosh_arg = expr_cosh(expr->a);
@@ -258,196 +602,6 @@ expr_t *integrate_sech_rule(const expr_t *expr, const expr_t *wrt)
     return out;
 }
 
-expr_t *integrate_asec_rule(const expr_t *expr, const expr_t *wrt)
-{
-    number_t constant = num_new();
-    number_t coeff = num_new();
-    expr_t *u_asec_u;
-    expr_t *acosh_u;
-    expr_t *raw;
-
-    if (!match_affine_unary(expr, wrt, EXPR_PATTERN_UNARY_ASEC,
-                            &constant, &coeff)) {
-        num_destroy(&coeff);
-        num_destroy(&constant);
-        return NULL;
-    }
-
-    u_asec_u = expr_mul(expr->a, expr);
-    acosh_u = expr_acosh(expr->a);
-    raw = (u_asec_u && acosh_u) ? expr_sub(u_asec_u, acosh_u) : NULL;
-
-    expr_free(acosh_u);
-    expr_free(u_asec_u);
-    num_destroy(&constant);
-    return div_number_owned_consuming(raw, &coeff);
-}
-
-expr_t *integrate_acosec_rule(const expr_t *expr, const expr_t *wrt)
-{
-    number_t constant = num_new();
-    number_t coeff = num_new();
-    expr_t *u_acosec_u;
-    expr_t *acosh_u;
-    expr_t *raw;
-
-    if (!match_affine_unary(expr, wrt, EXPR_PATTERN_UNARY_ACOSEC,
-                            &constant, &coeff)) {
-        num_destroy(&coeff);
-        num_destroy(&constant);
-        return NULL;
-    }
-
-    u_acosec_u = expr_mul(expr->a, expr);
-    acosh_u = expr_acosh(expr->a);
-    raw = (u_acosec_u && acosh_u) ? expr_add(u_acosec_u, acosh_u) : NULL;
-
-    expr_free(acosh_u);
-    expr_free(u_acosec_u);
-    num_destroy(&constant);
-    return div_number_owned_consuming(raw, &coeff);
-}
-
-expr_t *integrate_acot_rule(const expr_t *expr, const expr_t *wrt)
-{
-    number_t constant = num_new();
-    number_t coeff = num_new();
-    expr_t *u_acot_u;
-    expr_t *u_sq;
-    expr_t *one_plus_u_sq;
-    expr_t *log_term;
-    expr_t *half_log_term;
-    expr_t *raw;
-
-    if (!match_affine_unary(expr, wrt, EXPR_PATTERN_UNARY_ACOT,
-                            &constant, &coeff)) {
-        num_destroy(&coeff);
-        num_destroy(&constant);
-        return NULL;
-    }
-
-    u_acot_u = expr_mul(expr->a, expr);
-    u_sq = expr_pow(expr->a, &NUM_TWO);
-    one_plus_u_sq = u_sq ? expr_add_num(u_sq, &NUM_ONE) : NULL;
-    log_term = one_plus_u_sq ? expr_log(one_plus_u_sq) : NULL;
-    half_log_term = log_term ? expr_mul_num(log_term, &NUM_HALF) : NULL;
-    raw = (u_acot_u && half_log_term) ? expr_add(u_acot_u, half_log_term) : NULL;
-
-    expr_free(half_log_term);
-    expr_free(log_term);
-    expr_free(one_plus_u_sq);
-    expr_free(u_sq);
-    expr_free(u_acot_u);
-    num_destroy(&constant);
-    return div_number_owned_consuming(raw, &coeff);
-}
-
-expr_t *integrate_asin_rule(const expr_t *expr, const expr_t *wrt)
-{
-    number_t constant = num_new();
-    number_t coeff = num_new();
-    expr_t *u_asin_u;
-    expr_t *u_sq;
-    expr_t *one_minus_u_sq;
-    expr_t *root;
-    expr_t *raw;
-
-    if (!match_affine_unary(expr, wrt, EXPR_PATTERN_UNARY_ASIN,
-                            &constant, &coeff)) {
-        num_destroy(&coeff);
-        num_destroy(&constant);
-        return NULL;
-    }
-
-    u_asin_u = expr_mul(expr->a, expr);
-    u_sq = expr_pow(expr->a, &NUM_TWO);
-    one_minus_u_sq = u_sq ? expr_sub_num(u_sq, &NUM_ONE) : NULL;
-    root = one_minus_u_sq ? expr_neg(one_minus_u_sq) : NULL;
-    if (root) {
-        expr_t *tmp = expr_sqrt(root);
-        expr_free(root);
-        root = tmp;
-    }
-    raw = (u_asin_u && root) ? expr_add(u_asin_u, root) : NULL;
-
-    expr_free(root);
-    expr_free(one_minus_u_sq);
-    expr_free(u_sq);
-    expr_free(u_asin_u);
-    num_destroy(&constant);
-    return div_number_owned_consuming(raw, &coeff);
-}
-
-expr_t *integrate_acos_rule(const expr_t *expr, const expr_t *wrt)
-{
-    number_t constant = num_new();
-    number_t coeff = num_new();
-    expr_t *u_acos_u;
-    expr_t *u_sq;
-    expr_t *one_minus_u_sq;
-    expr_t *root;
-    expr_t *raw;
-
-    if (!match_affine_unary(expr, wrt, EXPR_PATTERN_UNARY_ACOS,
-                            &constant, &coeff)) {
-        num_destroy(&coeff);
-        num_destroy(&constant);
-        return NULL;
-    }
-
-    u_acos_u = expr_mul(expr->a, expr);
-    u_sq = expr_pow(expr->a, &NUM_TWO);
-    one_minus_u_sq = u_sq ? expr_sub_num(u_sq, &NUM_ONE) : NULL;
-    root = one_minus_u_sq ? expr_neg(one_minus_u_sq) : NULL;
-    if (root) {
-        expr_t *tmp = expr_sqrt(root);
-        expr_free(root);
-        root = tmp;
-    }
-    raw = (u_acos_u && root) ? expr_sub(u_acos_u, root) : NULL;
-
-    expr_free(root);
-    expr_free(one_minus_u_sq);
-    expr_free(u_sq);
-    expr_free(u_acos_u);
-    num_destroy(&constant);
-    return div_number_owned_consuming(raw, &coeff);
-}
-
-expr_t *integrate_atan_rule(const expr_t *expr, const expr_t *wrt)
-{
-    number_t constant = num_new();
-    number_t coeff = num_new();
-    expr_t *u_atan_u;
-    expr_t *u_sq;
-    expr_t *one_plus_u_sq;
-    expr_t *log_term;
-    expr_t *half_log_term;
-    expr_t *raw;
-
-    if (!match_affine_unary(expr, wrt, EXPR_PATTERN_UNARY_ATAN,
-                            &constant, &coeff)) {
-        num_destroy(&coeff);
-        num_destroy(&constant);
-        return NULL;
-    }
-
-    u_atan_u = expr_mul(expr->a, expr);
-    u_sq = expr_pow(expr->a, &NUM_TWO);
-    one_plus_u_sq = u_sq ? expr_add_num(u_sq, &NUM_ONE) : NULL;
-    log_term = one_plus_u_sq ? expr_log(one_plus_u_sq) : NULL;
-    half_log_term = log_term ? expr_mul_num(log_term, &NUM_HALF) : NULL;
-    raw = (u_atan_u && half_log_term) ? expr_sub(u_atan_u, half_log_term) : NULL;
-
-    expr_free(half_log_term);
-    expr_free(log_term);
-    expr_free(one_plus_u_sq);
-    expr_free(u_sq);
-    expr_free(u_atan_u);
-    num_destroy(&constant);
-    return div_number_owned_consuming(raw, &coeff);
-}
-
 expr_t *integrate_coth_rule(const expr_t *expr, const expr_t *wrt)
 {
     expr_t *vars[1];
@@ -475,202 +629,6 @@ expr_t *integrate_coth_rule(const expr_t *expr, const expr_t *wrt)
     num_destroy(&coeffs[0]);
     num_destroy(&constant);
     return out;
-}
-
-expr_t *integrate_asinh_rule(const expr_t *expr, const expr_t *wrt)
-{
-    number_t constant = num_new();
-    number_t coeff = num_new();
-    expr_t *u_asinh_u;
-    expr_t *u_sq;
-    expr_t *one_plus_u_sq;
-    expr_t *root;
-    expr_t *raw;
-
-    if (!match_affine_unary(expr, wrt, EXPR_PATTERN_UNARY_ASINH,
-                            &constant, &coeff)) {
-        num_destroy(&coeff);
-        num_destroy(&constant);
-        return NULL;
-    }
-
-    u_asinh_u = expr_mul(expr->a, expr);
-    u_sq = expr_pow(expr->a, &NUM_TWO);
-    one_plus_u_sq = u_sq ? expr_add_num(u_sq, &NUM_ONE) : NULL;
-    root = one_plus_u_sq ? expr_sqrt(one_plus_u_sq) : NULL;
-    raw = (u_asinh_u && root) ? expr_sub(u_asinh_u, root) : NULL;
-
-    expr_free(root);
-    expr_free(one_plus_u_sq);
-    expr_free(u_sq);
-    expr_free(u_asinh_u);
-    num_destroy(&constant);
-    return div_number_owned_consuming(raw, &coeff);
-}
-
-expr_t *integrate_acosh_rule(const expr_t *expr, const expr_t *wrt)
-{
-    number_t constant = num_new();
-    number_t coeff = num_new();
-    expr_t *u_acosh_u;
-    expr_t *u_minus_one;
-    expr_t *u_plus_one;
-    expr_t *sqrt1;
-    expr_t *sqrt2;
-    expr_t *root_product;
-    expr_t *raw;
-
-    if (!match_affine_unary(expr, wrt, EXPR_PATTERN_UNARY_ACOSH,
-                            &constant, &coeff)) {
-        num_destroy(&coeff);
-        num_destroy(&constant);
-        return NULL;
-    }
-
-    u_acosh_u = expr_mul(expr->a, expr);
-    u_minus_one = expr_sub_num(expr->a, &NUM_ONE);
-    u_plus_one = expr_add_num(expr->a, &NUM_ONE);
-    sqrt1 = u_minus_one ? expr_sqrt(u_minus_one) : NULL;
-    sqrt2 = u_plus_one ? expr_sqrt(u_plus_one) : NULL;
-    root_product = (sqrt1 && sqrt2) ? expr_mul(sqrt1, sqrt2) : NULL;
-    raw = (u_acosh_u && root_product) ? expr_sub(u_acosh_u, root_product) : NULL;
-
-    expr_free(root_product);
-    expr_free(sqrt2);
-    expr_free(sqrt1);
-    expr_free(u_plus_one);
-    expr_free(u_minus_one);
-    expr_free(u_acosh_u);
-    num_destroy(&constant);
-    return div_number_owned_consuming(raw, &coeff);
-}
-
-expr_t *integrate_atanh_rule(const expr_t *expr, const expr_t *wrt)
-{
-    number_t constant = num_new();
-    number_t coeff = num_new();
-    expr_t *u_atanh_u;
-    expr_t *u_sq;
-    expr_t *one_minus_u_sq;
-    expr_t *log_term;
-    expr_t *half_log_term;
-    expr_t *raw;
-
-    if (!match_affine_unary(expr, wrt, EXPR_PATTERN_UNARY_ATANH,
-                            &constant, &coeff)) {
-        num_destroy(&coeff);
-        num_destroy(&constant);
-        return NULL;
-    }
-
-    u_atanh_u = expr_mul(expr->a, expr);
-    u_sq = expr_pow(expr->a, &NUM_TWO);
-    one_minus_u_sq = u_sq ? expr_sub_num(u_sq, &NUM_ONE) : NULL;
-    log_term = one_minus_u_sq ? expr_neg(one_minus_u_sq) : NULL;
-    if (log_term) {
-        expr_t *tmp = expr_log(log_term);
-        expr_free(log_term);
-        log_term = tmp;
-    }
-    half_log_term = log_term ? expr_mul_num(log_term, &NUM_HALF) : NULL;
-    raw = (u_atanh_u && half_log_term) ? expr_add(u_atanh_u, half_log_term) : NULL;
-
-    expr_free(half_log_term);
-    expr_free(log_term);
-    expr_free(one_minus_u_sq);
-    expr_free(u_sq);
-    expr_free(u_atanh_u);
-    num_destroy(&constant);
-    return div_number_owned_consuming(raw, &coeff);
-}
-
-expr_t *integrate_asech_rule(const expr_t *expr, const expr_t *wrt)
-{
-    number_t constant = num_new();
-    number_t coeff = num_new();
-    expr_t *u_asech_u;
-    expr_t *asin_u;
-    expr_t *raw;
-
-    if (!match_affine_unary(expr, wrt, EXPR_PATTERN_UNARY_ASECH,
-                            &constant, &coeff)) {
-        num_destroy(&coeff);
-        num_destroy(&constant);
-        return NULL;
-    }
-
-    u_asech_u = expr_mul(expr->a, expr);
-    asin_u = expr_asin(expr->a);
-    raw = (u_asech_u && asin_u) ? expr_add(u_asech_u, asin_u) : NULL;
-
-    expr_free(asin_u);
-    expr_free(u_asech_u);
-    num_destroy(&constant);
-    return div_number_owned_consuming(raw, &coeff);
-}
-
-expr_t *integrate_acosech_rule(const expr_t *expr, const expr_t *wrt)
-{
-    number_t constant = num_new();
-    number_t coeff = num_new();
-    expr_t *u_acosech_u;
-    expr_t *asinh_u;
-    expr_t *raw;
-
-    if (!match_affine_unary(expr, wrt, EXPR_PATTERN_UNARY_ACOSECH,
-                            &constant, &coeff)) {
-        num_destroy(&coeff);
-        num_destroy(&constant);
-        return NULL;
-    }
-
-    u_acosech_u = expr_mul(expr->a, expr);
-    asinh_u = expr_asinh(expr->a);
-    raw = (u_acosech_u && asinh_u) ? expr_add(u_acosech_u, asinh_u) : NULL;
-
-    expr_free(asinh_u);
-    expr_free(u_acosech_u);
-    num_destroy(&constant);
-    return div_number_owned_consuming(raw, &coeff);
-}
-
-expr_t *integrate_acoth_rule(const expr_t *expr, const expr_t *wrt)
-{
-    number_t constant = num_new();
-    number_t coeff = num_new();
-    expr_t *u_acoth_u;
-    expr_t *u_sq;
-    expr_t *one_minus_u_sq;
-    expr_t *log_term;
-    expr_t *half_log_term;
-    expr_t *raw;
-
-    if (!match_affine_unary(expr, wrt, EXPR_PATTERN_UNARY_ACOTH,
-                            &constant, &coeff)) {
-        num_destroy(&coeff);
-        num_destroy(&constant);
-        return NULL;
-    }
-
-    u_acoth_u = expr_mul(expr->a, expr);
-    u_sq = expr_pow(expr->a, &NUM_TWO);
-    one_minus_u_sq = u_sq ? expr_sub_num(u_sq, &NUM_ONE) : NULL;
-    log_term = one_minus_u_sq ? expr_neg(one_minus_u_sq) : NULL;
-    if (log_term) {
-        expr_t *tmp = expr_log(log_term);
-        expr_free(log_term);
-        log_term = tmp;
-    }
-    half_log_term = log_term ? expr_mul_num(log_term, &NUM_HALF) : NULL;
-    raw = (u_acoth_u && half_log_term) ? expr_add(u_acoth_u, half_log_term) : NULL;
-
-    expr_free(half_log_term);
-    expr_free(log_term);
-    expr_free(one_minus_u_sq);
-    expr_free(u_sq);
-    expr_free(u_acoth_u);
-    num_destroy(&constant);
-    return div_number_owned_consuming(raw, &coeff);
 }
 
 expr_t *integrate_erf_rule(const expr_t *expr, const expr_t *wrt)
