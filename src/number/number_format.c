@@ -306,12 +306,12 @@ string_t *num_vsprintf_text(const char *fmt, va_list ap)
                                          NULL);
 }
 
-int num_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap)
+static int number_format_write_and_free_text(char *out,
+                                             size_t out_size,
+                                             string_t *text)
 {
-    string_t *text;
     size_t len;
 
-    text = num_vsprintf_text(fmt, ap);
     if (!text)
         return -1;
 
@@ -325,6 +325,35 @@ int num_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap)
 
     string_free(text);
     return len <= (size_t)INT_MAX ? (int)len : -1;
+}
+
+static bool number_format_plain_number_spec(const char *fmt, char *spec_out)
+{
+    if (!fmt || fmt[0] != '%' || fmt[2] != '\0' ||
+        (fmt[1] != 'n' && fmt[1] != 'N'))
+        return false;
+
+    if (spec_out)
+        *spec_out = fmt[1];
+    return true;
+}
+
+int num_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap)
+{
+    string_t *text;
+    char spec;
+
+    if (number_format_plain_number_spec(fmt, &spec)) {
+        number_t value = va_arg(ap, number_t);
+
+        return number_format_write_and_free_text(
+            out,
+            out_size,
+            number_format_value_text(value, spec, -1));
+    }
+
+    text = num_vsprintf_text(fmt, ap);
+    return number_format_write_and_free_text(out, out_size, text);
 }
 
 int num_sprintf(char *out, size_t out_size, const char *fmt, ...)

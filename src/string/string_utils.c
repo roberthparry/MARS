@@ -303,7 +303,7 @@ string_cursor_t *string_cursor_new(const string_t *s)
     if (!s)
         return NULL;
 
-    cursor = calloc(1u, sizeof(*cursor));
+    cursor = malloc(sizeof(*cursor));
     if (!cursor)
         return NULL;
 
@@ -413,6 +413,11 @@ int string_cursor_next(string_cursor_t *cursor)
     if (string_cursor_done(cursor))
         return -1;
 
+    if ((unsigned char)cursor->source->data[cursor->pos] < 0x80u) {
+        ++cursor->pos;
+        return 0;
+    }
+
     next = string_grapheme_next(cursor->source->data,
                                 cursor->source->len,
                                 cursor->pos);
@@ -453,6 +458,14 @@ bool string_cursor_peek_ascii(const string_cursor_t *cursor, unsigned char *out)
 {
     char c = '\0';
 
+    if (!cursor || !cursor->source || cursor->pos >= cursor->source->len)
+        return false;
+    if ((unsigned char)cursor->source->data[cursor->pos] < 0x80u) {
+        if (out)
+            *out = (unsigned char)cursor->source->data[cursor->pos];
+        return true;
+    }
+
     if (!rune_to_ascii(string_cursor_peek(cursor), &c))
         return false;
     if (out)
@@ -465,6 +478,14 @@ bool string_cursor_peek_ascii_at(const string_cursor_t *cursor,
                                  unsigned char *out)
 {
     char c = '\0';
+
+    if (!cursor || !cursor->source || pos >= cursor->source->len)
+        return false;
+    if ((unsigned char)cursor->source->data[pos] < 0x80u) {
+        if (out)
+            *out = (unsigned char)cursor->source->data[pos];
+        return true;
+    }
 
     if (!rune_to_ascii(string_cursor_peek_at(cursor, pos), &c))
         return false;

@@ -747,6 +747,35 @@ static void test_text_empty_stays_stable(void)
     string_free(s);
 }
 
+static void test_text_numeric_fraction_glyphs_stay_stable(void)
+{
+    string_t *s = string_new_with("³⁵⁵⁄₁₁₃");
+
+    ASSERT_NOT_NULL(s);
+    ASSERT_STREQ(string_c_str(s), "³⁵⁵⁄₁₁₃");
+    ASSERT_EQ(string_append_cstr(s, " + 1"), 0);
+    ASSERT_STREQ(string_c_str(s), "³⁵⁵⁄₁₁₃ + 1");
+
+    string_free(s);
+}
+
+static void test_text_fast_append_still_allows_later_normalisation(void)
+{
+    string_t *s = string_new_with("caf");
+
+    ASSERT_NOT_NULL(s);
+    ASSERT_EQ(string_append_cstr(s, "e"), 0);
+    ASSERT_EQ(string_append_cstr(s, "́"), 0);
+
+#ifdef HAVE_UNISTRING
+    ASSERT_STREQ(string_c_str(s), "café");
+#else
+    ASSERT_STREQ(string_c_str(s), "café");
+#endif
+
+    string_free(s);
+}
+
 static void test_text_mutation_canonicalises_when_needed(void)
 {
     string_t *append = string_new_with("e");
@@ -863,6 +892,8 @@ int tests_main(void)
     TEST_RUN_CASE(test_text_construction_canonicalises_hangul, NULL);
     TEST_RUN_CASE(test_text_emoji_stays_stable, NULL);
     TEST_RUN_CASE(test_text_empty_stays_stable, NULL);
+    TEST_RUN_CASE(test_text_numeric_fraction_glyphs_stay_stable, NULL);
+    TEST_RUN_CASE(test_text_fast_append_still_allows_later_normalisation, NULL);
     TEST_RUN_CASE(test_text_mutation_canonicalises_when_needed, NULL);
 
     TEST_SECTION("README");
