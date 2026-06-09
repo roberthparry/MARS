@@ -1073,6 +1073,57 @@ static void test_integrate_symbolic_power_exponent(void)
     expr_free(simplified_integrand);
     expr_free(integrand);
     expr_bindings_free(bindings);
+
+    bindings = NULL;
+    integrand = expr_from_string("{ (x+1)^n }", &bindings);
+    x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    simplified_integrand = integrand ? expr_simplify(integrand) : NULL;
+    anti = simplified_integrand ? expr_integrate(simplified_integrand, x) : NULL;
+    anti_text = anti ? expr_to_string(anti, style_UNBOUND) : NULL;
+
+    ASSERT_NOT_NULL(anti);
+    ASSERT_NOT_NULL(anti_text);
+    ASSERT_TRUE(strstr(anti_text, "(x + 1)^(n + 1)/(n + 1)") != NULL);
+
+    free(anti_text);
+    expr_free(anti);
+    expr_free(simplified_integrand);
+    expr_free(integrand);
+    expr_bindings_free(bindings);
+
+    bindings = NULL;
+    integrand = expr_from_string("{ (a*x+b)^n }", &bindings);
+    x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    simplified_integrand = integrand ? expr_simplify(integrand) : NULL;
+    anti = simplified_integrand ? expr_integrate(simplified_integrand, x) : NULL;
+    anti_text = anti ? expr_to_string(anti, style_UNBOUND) : NULL;
+
+    ASSERT_NOT_NULL(anti);
+    ASSERT_NOT_NULL(anti_text);
+    ASSERT_TRUE(strstr(anti_text, "(ax + b)^(n + 1)/(a·(n + 1))") != NULL);
+
+    free(anti_text);
+    expr_free(anti);
+    expr_free(simplified_integrand);
+    expr_free(integrand);
+    expr_bindings_free(bindings);
+
+    bindings = NULL;
+    integrand = expr_from_string("{ (b-a*x)^n }", &bindings);
+    x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    simplified_integrand = integrand ? expr_simplify(integrand) : NULL;
+    anti = simplified_integrand ? expr_integrate(simplified_integrand, x) : NULL;
+    anti_text = anti ? expr_to_string(anti, style_UNBOUND) : NULL;
+
+    ASSERT_NOT_NULL(anti);
+    ASSERT_NOT_NULL(anti_text);
+    ASSERT_TRUE(strstr(anti_text, "-(b - ax)^(n + 1)/(a·(n + 1))") != NULL);
+
+    free(anti_text);
+    expr_free(anti);
+    expr_free(simplified_integrand);
+    expr_free(integrand);
+    expr_bindings_free(bindings);
 }
 
 static void test_integrate_symbolic_shifted_sqrt(void)
@@ -1083,6 +1134,7 @@ static void test_integrate_symbolic_shifted_sqrt(void)
     expr_t *simplified_integrand = integrand ? expr_simplify(integrand) : NULL;
     expr_t *anti = simplified_integrand ? expr_integrate(simplified_integrand, x) : NULL;
     char *text = anti ? expr_to_string(anti, style_UNBOUND) : NULL;
+    char *tex = NULL;
 
     ASSERT_NOT_NULL(anti);
     ASSERT_NOT_NULL(text);
@@ -1154,7 +1206,7 @@ static void test_integrate_symbolic_shifted_sqrt(void)
 
     ASSERT_NOT_NULL(anti);
     ASSERT_NOT_NULL(text);
-    ASSERT_TRUE(strstr(text, "2·(x - a)^½") != NULL);
+    ASSERT_TRUE(strstr(text, "2·√(x - a)") != NULL);
 
     free(text);
     expr_free(anti);
@@ -1171,7 +1223,7 @@ static void test_integrate_symbolic_shifted_sqrt(void)
 
     ASSERT_NOT_NULL(anti);
     ASSERT_NOT_NULL(text);
-    ASSERT_TRUE(strstr(text, "2·(x + a)^½") != NULL);
+    ASSERT_TRUE(strstr(text, "2·√(x + a)") != NULL);
 
     free(text);
     expr_free(anti);
@@ -1188,7 +1240,7 @@ static void test_integrate_symbolic_shifted_sqrt(void)
 
     ASSERT_NOT_NULL(anti);
     ASSERT_NOT_NULL(text);
-    ASSERT_TRUE(strstr(text, "2·(x + a)^½") != NULL);
+    ASSERT_TRUE(strstr(text, "2·√(x + a)") != NULL);
 
     free(text);
     expr_free(anti);
@@ -1202,11 +1254,133 @@ static void test_integrate_symbolic_shifted_sqrt(void)
     simplified_integrand = integrand ? expr_simplify(integrand) : NULL;
     anti = simplified_integrand ? expr_integrate(simplified_integrand, x) : NULL;
     text = anti ? expr_to_string(anti, style_UNBOUND) : NULL;
+    tex = anti ? expr_to_string(anti, style_TEX) : NULL;
 
     ASSERT_NOT_NULL(anti);
     ASSERT_NOT_NULL(text);
-    ASSERT_TRUE(strstr(text, "-2·(a - x)^½") != NULL);
+    ASSERT_NOT_NULL(tex);
+    ASSERT_TRUE(strstr(text, "-2·√(a - x)") != NULL);
+    ASSERT_TRUE(strstr(tex, "\\sqrt{a - x}") != NULL);
+    ASSERT_TRUE(strstr(tex, "^{\\frac{1}{2}}") == NULL);
 
+    free(tex);
+    free(text);
+    expr_free(anti);
+    expr_free(simplified_integrand);
+    expr_free(integrand);
+    expr_bindings_free(bindings);
+
+    bindings = NULL;
+    integrand = expr_from_string("{ sqrt(a-bx) }", &bindings);
+    x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    simplified_integrand = integrand ? expr_simplify(integrand) : NULL;
+    anti = simplified_integrand ? expr_integrate(simplified_integrand, x) : NULL;
+    text = anti ? expr_to_string(anti, style_UNBOUND) : NULL;
+
+    ASSERT_NOT_NULL(anti);
+    ASSERT_NOT_NULL(text);
+    ASSERT_TRUE(strstr(text, "-⅔·(a - bx)^³⁄₂/b") != NULL);
+
+    free(text);
+    expr_free(anti);
+    expr_free(simplified_integrand);
+    expr_free(integrand);
+    expr_bindings_free(bindings);
+
+    bindings = NULL;
+    integrand = expr_from_string("{ 1/sqrt(a-bx) }", &bindings);
+    x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    simplified_integrand = integrand ? expr_simplify(integrand) : NULL;
+    anti = simplified_integrand ? expr_integrate(simplified_integrand, x) : NULL;
+    text = anti ? expr_to_string(anti, style_UNBOUND) : NULL;
+    tex = anti ? expr_to_string(anti, style_TEX) : NULL;
+
+    ASSERT_NOT_NULL(anti);
+    ASSERT_NOT_NULL(text);
+    ASSERT_NOT_NULL(tex);
+    ASSERT_TRUE(strstr(text, "-2·√(a - bx)/b") != NULL);
+    ASSERT_TRUE(strstr(tex, "\\sqrt{a - b x}") != NULL);
+    ASSERT_TRUE(strstr(tex, "^{\\frac{1}{2}}") == NULL);
+
+    free(tex);
+    free(text);
+    expr_free(anti);
+    expr_free(simplified_integrand);
+    expr_free(integrand);
+    expr_bindings_free(bindings);
+
+    bindings = NULL;
+    integrand = expr_from_string("{ 1/sqrt((a-bx)^2) }", &bindings);
+    x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    simplified_integrand = integrand ? expr_simplify(integrand) : NULL;
+    anti = simplified_integrand ? expr_integrate(simplified_integrand, x) : NULL;
+
+    ASSERT_NULL(anti);
+
+    expr_free(simplified_integrand);
+    expr_free(integrand);
+    expr_bindings_free(bindings);
+
+    bindings = NULL;
+    integrand = expr_from_string("{ 1/sqrt((a-bx)^3) }", &bindings);
+    x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    simplified_integrand = integrand ? expr_simplify(integrand) : NULL;
+    anti = simplified_integrand ? expr_integrate(simplified_integrand, x) : NULL;
+    text = anti ? expr_to_string(anti, style_UNBOUND) : NULL;
+    tex = anti ? expr_to_string(anti, style_TEX) : NULL;
+
+    ASSERT_NOT_NULL(anti);
+    ASSERT_NOT_NULL(text);
+    ASSERT_NOT_NULL(tex);
+    ASSERT_TRUE(strstr(text, "2/(b·√(a - bx))") != NULL);
+    ASSERT_TRUE(strstr(tex, "\\frac{2}{b \\cdot \\sqrt{a - b x}}") != NULL);
+    ASSERT_TRUE(strstr(tex, "\\sqrt{a - b x}") != NULL);
+    ASSERT_TRUE(strstr(tex, "^{\\frac{1}{2}}") == NULL);
+
+    free(tex);
+    free(text);
+    expr_free(anti);
+    expr_free(simplified_integrand);
+    expr_free(integrand);
+    expr_bindings_free(bindings);
+
+    bindings = NULL;
+    integrand = expr_from_string("{ 1/sqrt((a-bx)^4) }", &bindings);
+    x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    simplified_integrand = integrand ? expr_simplify(integrand) : NULL;
+    anti = simplified_integrand ? expr_integrate(simplified_integrand, x) : NULL;
+    text = anti ? expr_to_string(anti, style_UNBOUND) : NULL;
+    tex = anti ? expr_to_string(anti, style_TEX) : NULL;
+
+    ASSERT_NOT_NULL(anti);
+    ASSERT_NOT_NULL(text);
+    ASSERT_NOT_NULL(tex);
+    ASSERT_TRUE(strstr(text, "1/(b·(a - bx))") != NULL);
+    ASSERT_TRUE(strstr(tex, "\\frac{1}{b \\cdot \\left(a - b x\\right)}") != NULL);
+
+    free(tex);
+    free(text);
+    expr_free(anti);
+    expr_free(simplified_integrand);
+    expr_free(integrand);
+    expr_bindings_free(bindings);
+
+    bindings = NULL;
+    integrand = expr_from_string("{ 1/sqrt((a-bx)^5) }", &bindings);
+    x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    simplified_integrand = integrand ? expr_simplify(integrand) : NULL;
+    anti = simplified_integrand ? expr_integrate(simplified_integrand, x) : NULL;
+    text = anti ? expr_to_string(anti, style_UNBOUND) : NULL;
+    tex = anti ? expr_to_string(anti, style_TEX) : NULL;
+
+    ASSERT_NOT_NULL(anti);
+    ASSERT_NOT_NULL(text);
+    ASSERT_NOT_NULL(tex);
+    ASSERT_TRUE(strstr(text, "2/(3b·(a - bx)^³⁄₂)") != NULL);
+    ASSERT_TRUE(strstr(tex, "\\frac{2}{3 b \\cdot \\left(a - b x\\right)^{\\frac{3}{2}}}") != NULL);
+    ASSERT_TRUE(strstr(tex, "\\frac{\\frac{2}{3}}") == NULL);
+
+    free(tex);
     free(text);
     expr_free(anti);
     expr_free(simplified_integrand);

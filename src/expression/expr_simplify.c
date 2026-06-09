@@ -1210,6 +1210,70 @@ int expr_fold_erfc_const(const number_t *in, number_t *out)
 static expr_t *expr_try_simplify_preserved_i_power_local(
     const expr_binding_expr_t *base_expr, number_t exponent);
 
+static bool expr_is_negative_real_power_local(const expr_t *dv)
+{
+    number_t exponent = num_new();
+    bool out = false;
+
+    if (expr_is_pow_d_expr(dv) && dv->a) {
+        num_destroy(&exponent);
+        exponent = num_clone(dv->c);
+    } else if (expr_is_op(dv, &ops_pow) && dv->a && dv->b &&
+               expr_simplify_is_plain_real_const(dv->b)) {
+        num_destroy(&exponent);
+        exponent = num_clone(dv->b->c);
+    } else {
+        num_destroy(&exponent);
+        return false;
+    }
+
+    out = num_is_real(exponent) && num_lt(exponent, NUM_ZERO);
+    num_destroy(&exponent);
+    return out;
+}
+
+static bool expr_collect_negative_power_as_reciprocal_local(
+    expr_t *dv, int in_denominator,
+    expr_t ***terms, size_t *nterms, size_t *term_cap,
+    expr_t ***den_terms, size_t *nden_terms, size_t *den_cap)
+{
+    const expr_t *base = NULL;
+    number_t exponent = num_new();
+    number_t positive_exponent;
+    expr_t *factor;
+
+    if (expr_is_pow_d_expr(dv) && dv->a) {
+        base = dv->a;
+        num_destroy(&exponent);
+        exponent = num_clone(dv->c);
+    } else if (expr_is_op(dv, &ops_pow) && dv->a && dv->b &&
+               expr_simplify_is_plain_real_const(dv->b)) {
+        base = dv->a;
+        num_destroy(&exponent);
+        exponent = num_clone(dv->b->c);
+    } else {
+        num_destroy(&exponent);
+        return false;
+    }
+
+    if (!num_is_real(exponent) || !num_lt(exponent, NUM_ZERO)) {
+        num_destroy(&exponent);
+        return false;
+    }
+
+    positive_exponent = num_neg(exponent);
+    num_destroy(&exponent);
+
+    expr_retain((expr_t *)base);
+    factor = expr_make_pow_like_owned_local((expr_t *)base, positive_exponent);
+    num_destroy(&positive_exponent);
+    if (in_denominator)
+        expr_append_node(terms, nterms, term_cap, factor);
+    else
+        expr_append_node(den_terms, nden_terms, den_cap, factor);
+    return true;
+}
+
 /* ========================================================================= */
 /* Multiplication flattening                                                  */
 /* ========================================================================= */
@@ -1602,6 +1666,13 @@ static void collect_quotient_flat(
         return;
     }
 
+    if (expr_collect_negative_power_as_reciprocal_local(
+            dv, in_denominator, terms, nterms, term_cap,
+            den_terms, nden_terms, den_cap)) {
+        num_scope_leave(&(scope));
+        return;
+    }
+
     if (in_denominator) {
         expr_retain(dv);
         expr_append_node(den_terms, nden_terms, den_cap, dv);
@@ -1611,6 +1682,48 @@ static void collect_quotient_flat(
     }
 
     num_scope_leave(&(scope));
+}
+
+static void expr_simplify_split_small_rational_quotient_coeff_local(
+    number_t *c_acc, size_t nterms,
+    expr_t ***den_terms, size_t *nden_terms, size_t *den_cap)
+{
+    long numerator;
+    long denominator;
+    bool should_split;
+    number_t numerator_value;
+    number_t denominator_value;
+    expr_t *denominator_node;
+
+    if (!c_acc || !den_terms || !nden_terms || !den_cap ||
+        *nden_terms == 0u) {
+        return;
+    }
+
+    should_split = nterms == 0u;
+    if (!should_split) {
+        number_t four = num_create_from_long(4L);
+        number_t quarter = num_div(NUM_ONE, four);
+
+        should_split = num_eq(*c_acc, quarter);
+        num_destroy(&quarter);
+        num_destroy(&four);
+    }
+
+    if (!should_split ||
+        !num_get_small_rational(*c_acc, &numerator, &denominator) ||
+        denominator <= 1L) {
+        return;
+    }
+
+    numerator_value = num_create_from_long(numerator);
+    denominator_value = num_create_from_long(denominator);
+    denominator_node = expr_new_const(denominator_value);
+
+    num_destroy(c_acc);
+    *c_acc = numerator_value;
+    expr_append_node(den_terms, nden_terms, den_cap, denominator_node);
+    num_destroy(&denominator_value);
 }
 
 static expr_t *expr_simplify_flat_quotient_local(expr_t *a, expr_t *b)
@@ -1689,21 +1802,8 @@ static expr_t *expr_simplify_flat_quotient_local(expr_t *a, expr_t *b)
     expr_merge_sqrt_terms(den_terms, nden_terms);
     expr_merge_sqrt_quotient_terms(terms, nterms, den_terms, nden_terms);
 
-    {
-        number_t four = num_create_from_long(4L);
-        number_t quarter = num_div(NUM_ONE, four);
-
-        if (num_eq(c_acc, quarter)) {
-            expr_t *four_node = expr_new_const(four);
-
-            num_destroy(&c_acc);
-            c_acc = num_clone(NUM_ONE);
-            expr_append_node(&den_terms, &nden_terms, &den_cap, four_node);
-        }
-
-        num_destroy(&quarter);
-        num_destroy(&four);
-    }
+    expr_simplify_split_small_rational_quotient_coeff_local(
+        &c_acc, nterms, &den_terms, &nden_terms, &den_cap);
 
     numerator = expr_rebuild_product_chain(c_acc, terms, nterms);
     num_destroy(&c_acc);
@@ -2497,7 +2597,9 @@ expr_t *expr_simplify_div_operator(const expr_t *dv, expr_t *a, expr_t *b)
 	div_fallback_2:
     if (!expr_is_addsub(a) &&
         (expr_is_op(a, &ops_mul) || expr_is_div(a) ||
-         expr_is_op(b, &ops_mul) || expr_is_div(b)))
+         expr_is_negative_real_power_local(a) ||
+         expr_is_op(b, &ops_mul) || expr_is_div(b) ||
+         expr_is_negative_real_power_local(b)))
         return expr_simplify_flat_quotient_local(a, b);
 
     if (expr_struct_eq(a, b)) {
