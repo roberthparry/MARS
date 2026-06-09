@@ -12,6 +12,7 @@ void run_number_formatting_tests(void)
         char buf[512];
         number_t dec = num_create_from_string("32.123");
         number_t rat = num_create_from_string("5/6");
+        number_t rat_general = num_create_from_string("355/113");
         number_t one = num_create_from_string("1");
         number_t two = num_create_from_string("2");
         number_t five = num_create_from_string("5");
@@ -42,6 +43,20 @@ void run_number_formatting_tests(void)
         printf("    got      = %s\n\n", buf);
         ASSERT_TRUE(strcmp(buf, "⅚") == 0);
 
+        written = num_sprintf(NULL, 0u, "%n", rat_general);
+        ASSERT_EQ_INT(written, (int)strlen("³⁵⁵⁄₁₁₃"));
+        written = num_sprintf(buf, sizeof(buf), "%n", rat_general);
+        ASSERT_EQ_INT(written, (int)strlen("³⁵⁵⁄₁₁₃"));
+        ASSERT_TRUE(strcmp(buf, "³⁵⁵⁄₁₁₃") == 0);
+
+        written = num_sprintf(buf, sizeof(buf), "%N", rat_general);
+        ASSERT_EQ_INT(written, (int)strlen("³⁵⁵⁄₁₁₃"));
+        ASSERT_TRUE(strcmp(buf, "³⁵⁵⁄₁₁₃") == 0);
+
+        written = num_sprintf(buf, sizeof(buf), "value=%n!", rat_general);
+        ASSERT_EQ_INT(written, (int)strlen("value=³⁵⁵⁄₁₁₃!"));
+        ASSERT_TRUE(strcmp(buf, "value=³⁵⁵⁄₁₁₃!") == 0);
+
         assert_number_string_prefix("num_beta(2, 2)", beta,
                                     "0.166666666666666666666666666666");
         assert_number_string_prefix("num_atan2(1, 1)", angle,
@@ -61,6 +76,7 @@ void run_number_formatting_tests(void)
 
         num_destroy(&dec);
         num_destroy(&rat);
+        num_destroy(&rat_general);
         num_destroy(&one);
         num_destroy(&two);
         num_destroy(&five);

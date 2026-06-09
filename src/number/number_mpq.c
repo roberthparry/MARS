@@ -101,36 +101,21 @@ static const char *number_mpq_fraction_glyph_lookup(mpz_srcptr numerator,
     return NULL;
 }
 
-static bool number_mpq_append_digit_table(string_t *out,
-                                          const string_t *digits,
-                                          const char *const table[])
+static bool number_mpq_append_digit_table_cstr(string_t *out,
+                                               const char *digits,
+                                               const char *const table[])
 {
-    string_cursor_t *cursor;
-    bool ok = true;
-
     if (!out || !digits || !table)
         return false;
 
-    cursor = string_cursor_new(digits);
-    if (!cursor)
-        return false;
+    for (size_t i = 0u; digits[i] != '\0'; ++i) {
+        unsigned char digit = (unsigned char)digits[i];
 
-    while (!string_cursor_done(cursor)) {
-        unsigned char digit;
-
-        if (!string_cursor_peek_ascii(cursor, &digit) ||
-            digit < '0' || digit > '9' ||
-            string_append_cstr(out, table[(unsigned int)(digit - '0')]) != 0) {
-            ok = false;
-            break;
-        }
-        if (string_cursor_next(cursor) != 0) {
-            ok = false;
-            break;
-        }
+        if (digit < '0' || digit > '9' ||
+            string_append_cstr(out, table[(unsigned int)(digit - '0')]) != 0)
+            return false;
     }
-    string_cursor_free(cursor);
-    return ok;
+    return true;
 }
 
 static string_t *number_mpq_decode_digit_sequence(string_cursor_t *cursor,
@@ -300,36 +285,36 @@ static string_t *number_mpq_format_stacked_fraction_text(bool negative,
                                                          mpz_srcptr denominator)
 {
     static const char fraction_slash[] = "⁄";
-    string_t *num_text;
-    string_t *den_text;
+    char *num_text;
+    char *den_text;
     string_t *text;
 
-    num_text = number_mpq_text_from_mpz(numerator);
+    num_text = mpz_get_str(NULL, 10, numerator);
     if (!num_text)
         return NULL;
-    den_text = number_mpq_text_from_mpz(denominator);
+    den_text = mpz_get_str(NULL, 10, denominator);
     if (!den_text) {
-        string_free(num_text);
+        free(num_text);
         return NULL;
     }
 
     text = string_new();
     if (!text) {
-        string_free(num_text);
-        string_free(den_text);
+        free(num_text);
+        free(den_text);
         return NULL;
     }
 
     if ((negative && string_append_char(text, '-') != 0) ||
-        !number_mpq_append_digit_table(text, num_text, number_mpq_superscript_digits) ||
+        !number_mpq_append_digit_table_cstr(text, num_text, number_mpq_superscript_digits) ||
         string_append_cstr(text, fraction_slash) != 0 ||
-        !number_mpq_append_digit_table(text, den_text, number_mpq_subscript_digits)) {
+        !number_mpq_append_digit_table_cstr(text, den_text, number_mpq_subscript_digits)) {
         string_free(text);
         text = NULL;
     }
 
-    string_free(num_text);
-    string_free(den_text);
+    free(num_text);
+    free(den_text);
     return text;
 }
 
