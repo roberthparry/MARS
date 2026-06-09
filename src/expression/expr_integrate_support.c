@@ -2,17 +2,6 @@
 
 #include "expr_integrate_internal.h"
 
-expr_t *simplify_owned(expr_t *expr)
-{
-    expr_t *simplified;
-
-    if (!expr)
-        return NULL;
-    simplified = expr_simplify(expr);
-    expr_free(expr);
-    return simplified;
-}
-
 bool depends_on_wrt(const expr_t *expr, const expr_t *wrt)
 {
     expr_t *vars[1];
@@ -279,6 +268,49 @@ bool match_affine_unary_data(const expr_t *expr,
     return ok;
 }
 
+bool match_affine_unary(const expr_t *expr,
+                        const expr_t *wrt,
+                        expr_pattern_unary_affine_kind_t kind,
+                        number_t *constant_out,
+                        number_t *coeff_out)
+{
+    return match_affine_unary_data(expr, wrt, kind, constant_out, coeff_out);
+}
+
+expr_t *integrate_affine_unary_kind(const expr_t *expr,
+                                    const expr_t *wrt,
+                                    expr_pattern_unary_affine_kind_t kind,
+                                    expr_apply_unary_fn antiderivative_fn,
+                                    number_t sign)
+{
+    expr_t *vars[1];
+    number_t constant = num_new();
+    number_t coeffs[1];
+    expr_t *anti;
+    expr_t *out;
+
+    vars[0] = (expr_t *)wrt;
+    coeffs[0] = num_new();
+    if (!expr_match_unary_affine_kind(expr, kind, 1u, vars, &constant, coeffs) ||
+        num_eq(coeffs[0], NUM_ZERO)) {
+        num_destroy(&coeffs[0]);
+        num_destroy(&constant);
+        return NULL;
+    }
+
+    anti = antiderivative_fn(expr->a);
+    if (num_eq(sign, NUM_NEG_ONE)) {
+        expr_t *negated = anti ? expr_neg(anti) : NULL;
+
+        expr_free(anti);
+        anti = negated;
+    }
+
+    out = div_number_owned_consuming(anti, &coeffs[0]);
+    num_destroy(&constant);
+    return out;
+}
+
 void exp_antiderivative_once_local(const number_t *src, size_t count, number_t *dst)
 {
     number_array_zero_local(dst, count);
@@ -364,61 +396,4 @@ void hyperbolic_antiderivative_once_local(const number_t *a_src,
         num_destroy(&term_a);
         num_destroy(&factor);
     }
-}
-
-expr_t *mul_number_owned(expr_t *expr, number_t factor)
-{
-    expr_t *scaled;
-
-    if (!expr)
-        return NULL;
-    scaled = expr_mul_num(expr, &factor);
-    expr_free(expr);
-    return simplify_owned(scaled);
-}
-
-expr_t *mul_number_owned_consuming(expr_t *expr, number_t *factor)
-{
-    expr_t *out;
-
-    if (!factor)
-        return NULL;
-    out = mul_number_owned(expr, *factor);
-    num_destroy(factor);
-    return out;
-}
-
-expr_t *div_number_owned(expr_t *expr, number_t denom)
-{
-    expr_t *scaled;
-
-    if (!expr)
-        return NULL;
-    if (num_eq(denom, NUM_ZERO)) {
-        expr_free(expr);
-        return NULL;
-    }
-    if (num_eq(denom, NUM_ONE))
-        return simplify_owned(expr);
-    if (num_eq(denom, NUM_NEG_ONE)) {
-        scaled = expr_neg(expr);
-        expr_free(expr);
-        return simplify_owned(scaled);
-    }
-    {
-        number_t reciprocal = num_div(NUM_ONE, denom);
-
-        return mul_number_owned_consuming(expr, &reciprocal);
-    }
-}
-
-expr_t *div_number_owned_consuming(expr_t *expr, number_t *denom)
-{
-    expr_t *out;
-
-    if (!denom)
-        return NULL;
-    out = div_number_owned(expr, *denom);
-    num_destroy(denom);
-    return out;
 }

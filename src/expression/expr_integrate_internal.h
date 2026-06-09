@@ -4,17 +4,48 @@
 #include "expr_internal.h"
 
 expr_t *simplify_owned(expr_t *expr);
+expr_t *expr_integrate_clone_expr(const expr_t *expr);
+expr_t *expr_integrate_retain_expr(const expr_t *expr);
+expr_t *expr_integrate_negate_owned(expr_t *expr);
+expr_t *expr_integrate_add_terms_owned(expr_t *left, expr_t *right);
 bool depends_on_wrt(const expr_t *expr, const expr_t *wrt);
 bool expr_equal_exact_local(const expr_t *a, const expr_t *b);
 bool is_wrt(const expr_t *expr, const expr_t *wrt);
+expr_t *expr_integrate_dispatch(const expr_t *expr, const expr_t *wrt);
+expr_t *expr_integrate_as_constant(const expr_t *expr, const expr_t *wrt);
 bool match_nonconstant_affine_linear_expr(const expr_t *expr,
                                           const expr_t *wrt,
                                           number_t *constant_out,
                                           number_t *coeff_out);
 void number_array_zero_local(number_t *values, size_t count);
 void number_array_clear_local(number_t *values, size_t count);
+bool expr_integrate_rewrite_poly_deg4_to_affine_basis(number_t *poly,
+                                                      number_t from_constant,
+                                                      number_t from_coeff,
+                                                      number_t to_constant,
+                                                      number_t to_coeff);
+expr_t *integrate_poly_times_affine_power(const expr_t *expr, const expr_t *wrt);
+expr_t *integrate_poly_times_unary_affine_kind(
+    const expr_t *expr,
+    const expr_t *wrt,
+    expr_pattern_unary_affine_kind_t kind);
+expr_t *integrate_poly_times_log_affine(const expr_t *expr, const expr_t *wrt);
+expr_t *integrate_poly_over_matching_affine(const expr_t *expr, const expr_t *wrt);
+expr_t *integrate_poly_over_centered_quadratic(const expr_t *expr, const expr_t *wrt);
+expr_t *integrate_power_of_wrt(const expr_t *base,
+                               number_t exponent,
+                               const expr_t *wrt);
+expr_t *integrate_constant_over_power_denominator(const expr_t *numerator,
+                                                  const expr_t *denominator,
+                                                  const expr_t *wrt);
 expr_t *div_number_owned(expr_t *expr, number_t denom);
 expr_t *div_number_owned_consuming(expr_t *expr, number_t *denom);
+expr_t *expr_integrate_div_number_owned_by_product(expr_t *expr,
+                                                   number_t left,
+                                                   number_t right);
+expr_t *expr_integrate_div_number_owned_by_long_product(expr_t *expr,
+                                                        long left,
+                                                        number_t right);
 expr_t *mul_number_owned(expr_t *expr, number_t factor);
 expr_t *mul_number_owned_consuming(expr_t *expr, number_t *factor);
 expr_t *build_affine_from_match(const expr_t *wrt,
@@ -42,6 +73,18 @@ bool match_affine_unary(const expr_t *expr,
                         expr_pattern_unary_affine_kind_t kind,
                         number_t *constant_out,
                         number_t *coeff_out);
+bool is_wrt_symbolic_affine_leaf(const expr_t *expr, const expr_t *wrt);
+bool is_negated_wrt_symbolic_affine_leaf(const expr_t *expr, const expr_t *wrt);
+expr_t *match_symbolic_wrt_factor_coeff(const expr_t *expr, const expr_t *wrt);
+bool match_symbolic_affine_constant_and_coeff(const expr_t *expr,
+                                              const expr_t *wrt,
+                                              expr_t **constant_term_out,
+                                              expr_t **coeff_out);
+bool match_symbolic_quadratic_coeffs(const expr_t *expr,
+                                     const expr_t *wrt,
+                                     expr_t **quad_out,
+                                     expr_t **linear_out,
+                                     expr_t **constant_out);
 expr_t *integrate_affine_unary_kind(const expr_t *expr,
                                     const expr_t *wrt,
                                     expr_pattern_unary_affine_kind_t kind,
@@ -51,6 +94,77 @@ expr_t *integrate_linear_poly_times_inverse_affine(
     const expr_t *expr,
     const expr_t *wrt,
     expr_pattern_unary_affine_kind_t kind);
+expr_t *integrate_sqrt_one_plus_minus_affine_square(const expr_t *quadratic,
+                                                     const expr_t *wrt);
+expr_t *integrate_centered_quadratic_root(const expr_t *quadratic,
+                                          const expr_t *wrt);
+expr_t *integrate_linear_poly_over_centered_quadratic_root(const expr_t *expr,
+                                                           const expr_t *wrt);
+expr_t *integrate_linear_poly_times_centered_quadratic_root(const expr_t *expr,
+                                                            const expr_t *wrt);
+expr_t *integrate_sqrt_wrt_over_symbolic_unit_affine(const expr_t *base,
+                                                     const expr_t *wrt);
+expr_t *integrate_wrt_over_symbolic_affine_root(const expr_t *expr,
+                                                const expr_t *wrt);
+expr_t *integrate_symbolic_monomial_times_affine_power(const expr_t *expr,
+                                                       const expr_t *wrt);
+expr_t *integrate_symbolic_square_family_root(const expr_t *quadratic,
+                                              const expr_t *wrt);
+expr_t *integrate_symbolic_square_family_inverse_root(const expr_t *expr,
+                                                      const expr_t *wrt);
+expr_t *integrate_symbolic_square_family_wrt_over_root(const expr_t *expr,
+                                                       const expr_t *wrt);
+expr_t *integrate_symbolic_square_family_times_root(const expr_t *expr,
+                                                    const expr_t *wrt);
+expr_t *integrate_symbolic_general_quadratic_root(const expr_t *quadratic,
+                                                  const expr_t *wrt);
+expr_t *integrate_symbolic_general_quadratic_linear_over_root(const expr_t *expr,
+                                                              const expr_t *wrt);
+expr_t *integrate_symbolic_general_quadratic_times_root(const expr_t *expr,
+                                                        const expr_t *wrt);
+expr_t *integrate_log_of_symbolic_affine(const expr_t *expr, const expr_t *wrt);
+expr_t *integrate_log_over_symbolic_proportional_affine(const expr_t *expr,
+                                                        const expr_t *wrt);
+expr_t *integrate_wrt_times_log_symbolic_affine(const expr_t *expr,
+                                                const expr_t *wrt);
+expr_t *integrate_wrt_times_log_symbolic_quadratic(const expr_t *expr,
+                                                   const expr_t *wrt);
+expr_t *integrate_log_over_proportional_affine(const expr_t *expr,
+                                               const expr_t *wrt);
+expr_t *integrate_symbolic_integer_power_times_exp(const expr_t *expr,
+                                                   const expr_t *wrt);
+expr_t *integrate_symbolic_power_times_exp_gamma(const expr_t *expr,
+                                                 const expr_t *wrt);
+expr_t *integrate_symbolic_integer_power_times_trig(const expr_t *expr,
+                                                    const expr_t *wrt);
+expr_t *expr_integrate_build_unsigned_expr_power(const expr_t *base,
+                                                 unsigned int exponent);
+bool expr_integrate_number_matches_uint_at_most(number_t value,
+                                                unsigned int max_value,
+                                                unsigned int *out);
+bool expr_integrate_match_wrt_power_factor_exponent(const expr_t *expr,
+                                                    const expr_t *wrt,
+                                                    expr_t **exponent_out);
+bool match_exp_proportional_wrt_coeff(const expr_t *expr,
+                                      const expr_t *wrt,
+                                      expr_t **coeff_out);
+bool match_trig_proportional_wrt_coeff(const expr_t *expr,
+                                       const expr_t *wrt,
+                                       bool *is_sin_out,
+                                       expr_t **coeff_out);
+expr_t *integrate_symbolic_exp_times_trig(const expr_t *expr,
+                                          const expr_t *wrt);
+expr_t *integrate_symbolic_exp_times_hyperbolic(const expr_t *expr,
+                                                const expr_t *wrt);
+expr_t *integrate_symbolic_hyperbolic_product(const expr_t *expr,
+                                              const expr_t *wrt);
+expr_t *integrate_symbolic_trig_times_hyperbolic(const expr_t *expr,
+                                                 const expr_t *wrt);
+expr_t *integrate_symbolic_squared_hyperbolic(const expr_t *expr,
+                                              const expr_t *wrt);
+expr_t *integrate_wrt_exp_times_trig_exact(const expr_t *expr,
+                                           const expr_t *wrt);
+expr_t *integrate_exp_tanh_exact(const expr_t *expr, const expr_t *wrt);
 expr_t *integrate_linear_poly_times_normal_logpdf_affine(const expr_t *expr,
                                                          const expr_t *wrt);
 expr_t *integrate_rational_partial_fractions(const expr_t *expr, const expr_t *wrt);
@@ -77,6 +191,18 @@ void hyperbolic_antiderivative_once_local(const number_t *a_src,
                                           number_t *b_dst);
 
 expr_t *integrate_exp_rule(const expr_t *expr, const expr_t *wrt);
+expr_t *integrate_constant_rule(const expr_t *expr, const expr_t *wrt);
+expr_t *integrate_var_rule(const expr_t *expr, const expr_t *wrt);
+expr_t *integrate_add_rule(const expr_t *expr, const expr_t *wrt);
+expr_t *integrate_sub_rule(const expr_t *expr, const expr_t *wrt);
+expr_t *integrate_neg_rule(const expr_t *expr, const expr_t *wrt);
+expr_t *integrate_mul_rule(const expr_t *expr, const expr_t *wrt);
+expr_t *integrate_div_rule(const expr_t *expr, const expr_t *wrt);
+expr_t *integrate_pow_rule(const expr_t *expr, const expr_t *wrt);
+expr_t *integrate_pow_d_rule(const expr_t *expr, const expr_t *wrt);
+expr_t *integrate_sqrt_rule(const expr_t *expr, const expr_t *wrt);
+expr_t *integrate_log_rule(const expr_t *expr, const expr_t *wrt);
+expr_t *integrate_log10_rule(const expr_t *expr, const expr_t *wrt);
 expr_t *integrate_sin_rule(const expr_t *expr, const expr_t *wrt);
 expr_t *integrate_cos_rule(const expr_t *expr, const expr_t *wrt);
 expr_t *integrate_tan_rule(const expr_t *expr, const expr_t *wrt);

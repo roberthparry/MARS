@@ -7,14 +7,6 @@ typedef struct {
     expr_t *coeff[3];
 } symbolic_poly2_t;
 
-static expr_t *retain_expr_local_quadratic(const expr_t *expr)
-{
-    if (!expr)
-        return NULL;
-    expr_retain(expr);
-    return (expr_t *)expr;
-}
-
 static void symbolic_poly2_clear(symbolic_poly2_t *poly)
 {
     if (!poly)
@@ -111,7 +103,7 @@ static bool symbolic_poly2_collect(const expr_t *expr, const expr_t *wrt, symbol
         goto cleanup;
 
     if (!depends_on_wrt(expr, wrt)) {
-        ok = symbolic_poly2_add_owned(poly, 0u, retain_expr_local_quadratic(expr));
+        ok = symbolic_poly2_add_owned(poly, 0u, expr_integrate_retain_expr(expr));
         goto cleanup;
     }
 
@@ -202,7 +194,7 @@ static expr_t *symbolic_poly2_coeff_or_zero(const symbolic_poly2_t *poly, size_t
 {
     if (!poly || degree >= 3u || !poly->coeff[degree])
         return expr_const_long_local(0L);
-    return retain_expr_local_quadratic(poly->coeff[degree]);
+    return expr_integrate_retain_expr(poly->coeff[degree]);
 }
 
 static bool symbolic_poly2_all_coeffs_numeric(const symbolic_poly2_t *poly)
@@ -600,7 +592,7 @@ expr_t *integrate_linear_over_symbolic_quadratic(const expr_t *expr, const expr_
     two_a = (two && a) ? expr_mul(two, a) : NULL;
     alpha = (m && two_a) ? expr_div(m, two_a) : NULL;
     alpha = simplify_owned(alpha);
-    alpha_for_log = retain_expr_local_quadratic(alpha);
+    alpha_for_log = expr_integrate_retain_expr(alpha);
     log_denom = expr_log(expr->b);
     log_part = (alpha_for_log && log_denom) ? expr_mul(alpha_for_log, log_denom) : NULL;
     alpha_b = (alpha && b) ? expr_mul(alpha, b) : NULL;
@@ -681,7 +673,7 @@ expr_t *integrate_log_of_symbolic_quadratic(const expr_t *expr, const expr_t *wr
     two_a = (two && a) ? expr_mul(two, a) : NULL;
     alpha = (b && two_a) ? expr_div(b, two_a) : NULL;
     alpha = simplify_owned(alpha);
-    alpha_for_log = retain_expr_local_quadratic(alpha);
+    alpha_for_log = expr_integrate_retain_expr(alpha);
     log_q_tail = expr_log(expr->a);
     log_part = (alpha_for_log && log_q_tail) ? expr_mul(alpha_for_log, log_q_tail) : NULL;
     alpha_b = (alpha && b) ? expr_mul(alpha, b) : NULL;

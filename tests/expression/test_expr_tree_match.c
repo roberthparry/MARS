@@ -192,7 +192,7 @@ static void test_generic_unary_affine_matchers(void)
     expr_free(x);
 }
 
-static void test_pattern_rejections(void)
+static void test_tree_match_rejections(void)
 {
     expr_t *x = test_expr_new_named_var_d(1.0, "x");
     expr_t *y = test_expr_new_named_var_d(2.0, "y");
@@ -996,11 +996,11 @@ static void test_generic_affine_poly_deg4_times_unary_matcher(void)
     expr_free(x);
 }
 
-void test_expr_pattern_helpers(void)
+void test_expr_tree_match_helpers(void)
 {
     TEST_RUN_SUBTEST(test_match_affine_families, NULL);
     TEST_RUN_SUBTEST(test_generic_unary_affine_matchers, NULL);
-    TEST_RUN_SUBTEST(test_pattern_rejections, NULL);
+    TEST_RUN_SUBTEST(test_tree_match_rejections, NULL);
     TEST_RUN_SUBTEST(test_scaled_expr_and_var_usage, NULL);
     TEST_RUN_SUBTEST(test_substitute_and_powd, NULL);
     TEST_RUN_SUBTEST(test_square_affine_matchers, NULL);

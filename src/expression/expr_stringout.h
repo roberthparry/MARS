@@ -1,5 +1,5 @@
-#ifndef EXPR_TOSTRING_H
-#define EXPR_TOSTRING_H
+#ifndef EXPR_STRINGOUT_H
+#define EXPR_STRINGOUT_H
 
 #include <stddef.h>
 
@@ -32,4 +32,4 @@ int expr_tostring_is_safe_func_name(const char *name);
 void emit_name(sbuf_t *b, const char *name);
 void emit_name_func(sbuf_t *b, const char *name);
 
-#endif
+#endif /* EXPR_STRINGOUT_H */

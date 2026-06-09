@@ -8,8 +8,8 @@
 
 #include "expr_bindings.h"
 #include "expr_internal.h"
-#include "expr_tostring.h"
-#include "expr_tostring_internal.h"
+#include "expr_stringout.h"
+#include "expr_stringout_internal.h"
 #include "expression.h"
 #include "internal/number_internal.h"
 #include "ustring.h"

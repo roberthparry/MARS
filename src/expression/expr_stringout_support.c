@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "expr_tostring.h"
+#include "expr_stringout.h"
 
 void *expr_tostring_xmalloc(size_t n)
 {

@@ -1,5 +1,5 @@
-#ifndef EXPR_PARSE_TEXT_H
-#define EXPR_PARSE_TEXT_H
+#ifndef EXPR_STRINGIN_SCAN_H
+#define EXPR_STRINGIN_SCAN_H
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -49,4 +49,4 @@ string_t *expr_parse_read_name(string_cursor_t *cursor,
                                bool allow_plain_letters_after_first);
 int expr_parse_read_superscript_int(string_cursor_t *cursor);
 
-#endif /* EXPR_PARSE_TEXT_H */
+#endif /* EXPR_STRINGIN_SCAN_H */

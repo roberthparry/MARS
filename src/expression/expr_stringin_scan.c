@@ -1,10 +1,10 @@
-#include "expr_parse_text.h"
+#include "expr_stringin_scan.h"
 
 #include <ctype.h>
 #include <limits.h>
 #include <string.h>
 
-#include "expr_fromstring.h"
+#include "expr_stringin_internal.h"
 
 typedef struct {
     const char *text;

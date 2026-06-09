@@ -1,5 +1,5 @@
-#ifndef EXPR_TOSTRING_INTERNAL_H
-#define EXPR_TOSTRING_INTERNAL_H
+#ifndef EXPR_STRINGOUT_INTERNAL_H
+#define EXPR_STRINGOUT_INTERNAL_H
 
 #include <stdbool.h>
 
@@ -57,4 +57,4 @@ string_t *expr_to_text_expr(const expr_t *f);
 string_t *expr_to_text_unbound(const expr_t *f);
 string_t *expr_to_text_function(const expr_t *f);
 
-#endif
+#endif /* EXPR_STRINGOUT_INTERNAL_H */

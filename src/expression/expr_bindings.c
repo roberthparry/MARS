@@ -8,9 +8,9 @@
 #include "expression.h"
 #include "expr_binding_simplify.h"
 #include "expr_bindings.h"
-#include "expr_fromstring.h"
-#include "expr_parse_text.h"
-#include "expr_tostring.h"
+#include "expr_stringin_internal.h"
+#include "expr_stringin_scan.h"
+#include "expr_stringout.h"
 #include "internal/number_internal.h"
 #include "ustring.h"
 

@@ -1,6 +1,6 @@
 #include <stdlib.h>
 
-#include "expr_fromstring.h"
+#include "expr_stringin_internal.h"
 #include "internal/expr_internal.h"
 #include "internal/number_internal.h"
 

@@ -1,8 +1,8 @@
 #include <stdlib.h>
 
 #include "expr_bindings.h"
-#include "expr_tostring.h"
-#include "expr_tostring_internal.h"
+#include "expr_stringout.h"
+#include "expr_stringout_internal.h"
 
 int expr_to_tex_parts(const expr_t *dv, char **expr_out, char **bindings_out)
 {
