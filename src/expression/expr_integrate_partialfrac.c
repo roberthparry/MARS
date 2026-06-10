@@ -1,4 +1,5 @@
 #include <stdbool.h>
+#include <math.h>
 #include <string.h>
 #include <stdlib.h>
 #include "expr_integrate_internal.h"
@@ -16,6 +17,57 @@ typedef struct {
     size_t capacity;
     size_t total_multiplicity;
 } partial_fraction_factorization_t;
+
+static void partial_fraction_array_zero(number_t *values, size_t count)
+{
+    for (size_t i = 0; i < count; ++i)
+        values[i] = num_clone(NUM_ZERO);
+}
+
+static number_t partial_fraction_normalize_small_rational(number_t value)
+{
+    double value_d;
+
+    if (!num_is_real(value) || !num_is_finite(value))
+        return num_clone(value);
+    {
+        long numerator;
+        long denominator;
+
+        if (num_get_small_rational(value, &numerator, &denominator))
+            return num_clone(value);
+    }
+
+    value_d = num_to_double(value);
+    if (!isfinite(value_d))
+        return num_clone(value);
+
+    for (long denominator = 1L; denominator <= 64L; ++denominator) {
+        long numerator = lround(value_d * (double)denominator);
+        number_t candidate;
+        number_t diff;
+        number_t abs_diff;
+        double err;
+        double scale;
+
+        if (numerator < -1024L || numerator > 1024L)
+            continue;
+
+        candidate = num_create_from_frac(numerator, denominator);
+        diff = num_sub(value, candidate);
+        abs_diff = num_abs(diff);
+        err = fabs(num_to_double(abs_diff));
+        scale = fmax(1.0, fabs(value_d));
+
+        num_destroy(&abs_diff);
+        num_destroy(&diff);
+        if (err <= scale * 1e-30)
+            return candidate;
+        num_destroy(&candidate);
+    }
+
+    return num_clone(value);
+}
 
 static void partial_fraction_factorization_init(partial_fraction_factorization_t *out)
 {
@@ -98,8 +150,8 @@ static bool poly_match_affine_basis_deg4(const expr_t *expr,
 
     vars[0] = (expr_t *)wrt;
     basis_coeffs[0] = num_new();
-    number_array_zero_local(affine_poly, 5);
-    number_array_zero_local(coeffs, 5);
+    partial_fraction_array_zero(affine_poly, 5);
+    partial_fraction_array_zero(coeffs, 5);
 
     if (!expr_match_affine_poly_deg4(expr, 1u, vars, affine_poly, &basis_constant, basis_coeffs))
         goto cleanup;
@@ -183,7 +235,7 @@ static bool poly_match_direct_deg4_rec(const expr_t *expr,
     bool rhs_ready = false;
     bool ok = false;
 
-    number_array_zero_local(coeffs, 5);
+    partial_fraction_array_zero(coeffs, 5);
 
     if (!expr) {
         ok = false;
@@ -294,7 +346,7 @@ static bool poly_match_direct_deg4_rec(const expr_t *expr,
         for (size_t iter = 0; iter < power; ++iter) {
             number_t next[5];
 
-            number_array_zero_local(next, 5);
+            partial_fraction_array_zero(next, 5);
             for (size_t i = 0; i < 5u; ++i) {
                 for (size_t j = 0; i + j < 5u; ++j) {
                     number_t term = num_mul(coeffs[i], lhs[j]);
@@ -331,7 +383,7 @@ static bool poly_match_direct_deg4_rec(const expr_t *expr,
         for (size_t iter = 0; iter < power; ++iter) {
             number_t next[5];
 
-            number_array_zero_local(next, 5);
+            partial_fraction_array_zero(next, 5);
             for (size_t i = 0; i < 5u; ++i) {
                 for (size_t j = 0; i + j < 5u; ++j) {
                     number_t term = num_mul(coeffs[i], lhs[j]);
@@ -370,21 +422,22 @@ static bool poly_match_direct_deg4(const expr_t *expr,
                                    number_t *coeffs,
                                    size_t *degree_out)
 {
-    bool affine_ok = poly_match_affine_basis_deg4(expr, wrt, coeffs, degree_out);
-    bool rec_ok = false;
-
-    if (affine_ok)
+    if (!poly_match_direct_deg4_rec(expr, wrt, coeffs)) {
+        if (!poly_match_affine_basis_deg4(expr, wrt, coeffs, degree_out))
+            return false;
         return true;
-    rec_ok = poly_match_direct_deg4_rec(expr, wrt, coeffs);
-    if (!rec_ok)
-        return false;
-    if (!poly_is_exact_real_local(coeffs, 4u)) {
-        number_array_clear_local(coeffs, 5);
-        return false;
     }
+
+    if (!poly_is_exact_real_local(coeffs, 4u))
+        goto fail;
+
     if (degree_out)
         *degree_out = poly_degree_local(coeffs, 5u);
     return true;
+
+fail:
+    number_array_clear_local(coeffs, 5);
+    return false;
 }
 
 static bool partial_fraction_append_shift(partial_fraction_factorization_t *out,
@@ -505,7 +558,7 @@ static bool partial_fraction_factor_poly_coeffs(const number_t *coeffs,
         number_t tail[5];
         bool ok;
 
-        number_array_zero_local(tail, 5);
+        partial_fraction_array_zero(tail, 5);
         for (size_t i = 0; i < degree; ++i) {
             num_destroy(&tail[i]);
             tail[i] = num_clone(coeffs[i + 1u]);
@@ -601,6 +654,12 @@ static bool partial_fraction_collect_linear_factors(const expr_t *expr,
         partial_fraction_factorization_clear(&base);
     }
 
+    if (poly_match_direct_deg4(expr, wrt, poly, &degree)) {
+        poly_ready = true;
+        ok = partial_fraction_factor_poly_coeffs(poly, degree, out);
+        goto cleanup;
+    }
+
     if (match_nonconstant_affine_linear_expr(expr, wrt, &constant, &coeff) &&
         num_is_real(constant) &&
         num_is_real(coeff) &&
@@ -611,11 +670,6 @@ static bool partial_fraction_collect_linear_factors(const expr_t *expr,
              partial_fraction_append_shift(out, shift, 1u);
         num_destroy(&shift);
         goto cleanup;
-    }
-
-    if (poly_match_direct_deg4(expr, wrt, poly, &degree)) {
-        poly_ready = true;
-        ok = partial_fraction_factor_poly_coeffs(poly, degree, out);
     }
 
 cleanup:
@@ -631,7 +685,7 @@ static void poly_mul_by_linear_in_place(number_t *coeffs, size_t *degree, number
 {
     number_t next[5];
 
-    number_array_zero_local(next, 5);
+    partial_fraction_array_zero(next, 5);
     for (size_t i = 0; i <= *degree; ++i) {
         number_t shifted = num_mul(coeffs[i], shift);
         number_t sum0 = num_add(next[i], shifted);
@@ -657,7 +711,7 @@ static bool build_normalized_denominator_poly(const partial_fraction_factorizati
 {
     size_t degree = 0u;
 
-    number_array_zero_local(coeffs, 5);
+    partial_fraction_array_zero(coeffs, 5);
     num_destroy(&coeffs[0]);
     coeffs[0] = num_clone(NUM_ONE);
 
@@ -681,7 +735,7 @@ static void build_partial_fraction_basis_poly(const partial_fraction_factorizati
 {
     size_t degree = 0u;
 
-    number_array_zero_local(coeffs, 5);
+    partial_fraction_array_zero(coeffs, 5);
     num_destroy(&coeffs[0]);
     coeffs[0] = num_clone(NUM_ONE);
 
@@ -707,9 +761,9 @@ static bool poly_divide_local(const number_t *numerator,
     if (den_degree == 0u || num_eq(denominator[den_degree], NUM_ZERO))
         return false;
 
-    number_array_zero_local(work, 5);
-    number_array_zero_local(quotient, 5);
-    number_array_zero_local(remainder, 5);
+    partial_fraction_array_zero(work, 5);
+    partial_fraction_array_zero(quotient, 5);
+    partial_fraction_array_zero(remainder, 5);
     poly_copy_local(work, numerator, 5u);
 
     while (num_degree >= den_degree && !num_eq(work[num_degree], NUM_ZERO)) {
@@ -800,7 +854,7 @@ static expr_t *build_polynomial_antiderivative(const expr_t *wrt, const number_t
     number_t anti[5];
     expr_t *out;
 
-    number_array_zero_local(anti, 5);
+    partial_fraction_array_zero(anti, 5);
     for (size_t i = 0; i < 4u; ++i) {
         number_t denom = num_create_from_long((long)(i + 1u));
         number_t next = num_div(coeffs[i], denom);
@@ -826,12 +880,15 @@ static expr_t *build_partial_fraction_antiderivative(const partial_fraction_fact
 
         for (size_t power = 1u; power <= factors->factors[i].multiplicity; ++power, ++index) {
             expr_t *term = NULL;
+            number_t coeff;
 
             if (num_eq(coeffs[index], NUM_ZERO))
                 continue;
+            coeff = partial_fraction_normalize_small_rational(coeffs[index]);
 
             u = expr_add_num(wrt, &factors->factors[i].shift);
             if (!u) {
+                num_destroy(&coeff);
                 expr_free(sum);
                 return NULL;
             }
@@ -839,11 +896,11 @@ static expr_t *build_partial_fraction_antiderivative(const partial_fraction_fact
             if (power == 1u) {
                 expr_t *log_u = expr_log(u);
 
-                term = log_u ? expr_mul_num(log_u, &coeffs[index]) : NULL;
+                term = log_u ? expr_mul_num(log_u, &coeff) : NULL;
                 expr_free(log_u);
             } else {
                 number_t exponent = num_create_from_long(1l - (long)power);
-                number_t scale = num_div(coeffs[index], exponent);
+                number_t scale = num_div(coeff, exponent);
                 expr_t *pow_u = expr_pow(u, &exponent);
 
                 term = pow_u ? expr_mul_num(pow_u, &scale) : NULL;
@@ -853,6 +910,7 @@ static expr_t *build_partial_fraction_antiderivative(const partial_fraction_fact
             }
 
             expr_free(u);
+            num_destroy(&coeff);
             if (!term) {
                 expr_free(sum);
                 return NULL;
@@ -898,10 +956,10 @@ expr_t *integrate_rational_partial_fractions(const expr_t *expr, const expr_t *w
         return NULL;
 
     partial_fraction_factorization_init(&factors);
-    number_array_zero_local(rhs, 4);
-    number_array_zero_local(solution, 4);
+    partial_fraction_array_zero(rhs, 4);
+    partial_fraction_array_zero(solution, 4);
     for (size_t row = 0; row < 4u; ++row)
-        number_array_zero_local(matrix_storage[row], 5);
+        partial_fraction_array_zero(matrix_storage[row], 5);
 
     {
         bool num_ok = poly_match_direct_deg4(expr->a, wrt, numerator, &num_degree);

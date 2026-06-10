@@ -84,6 +84,30 @@ static void assert_string_antiderivative_contains(const char *input,
     expr_bindings_free(bindings);
 }
 
+static void assert_string_antiderivative_not_contains(const char *input,
+                                                      const char *forbidden)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = expr_from_string(input, &bindings);
+    expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    expr_t *simplified = expr ? expr_simplify(expr) : NULL;
+    expr_t *anti = simplified ? expr_integrate(simplified, x) : NULL;
+    char *text = anti ? expr_to_string(anti, style_UNBOUND) : NULL;
+
+    ASSERT_NOT_NULL(simplified);
+    ASSERT_NOT_NULL(x);
+    ASSERT_NOT_NULL(anti);
+    ASSERT_NOT_NULL(text);
+    print_antiderivative_text(input, text);
+    ASSERT_TRUE(strstr(text, forbidden) == NULL);
+
+    free(text);
+    expr_free(anti);
+    expr_free(simplified);
+    expr_free(expr);
+    expr_bindings_free(bindings);
+}
+
 static void assert_string_antiderivative_matches_with_a(const char *input,
                                                         double a_value,
                                                         const double *points,
@@ -2174,6 +2198,12 @@ static void test_integrate_partial_fractions(void)
     assert_antiderivative_matches("integral derivative of 1/(x^2 - 1)",
                                   quadratic_recip, x, positive_points,
                                   sizeof(positive_points) / sizeof(positive_points[0]));
+    assert_string_antiderivative_matches("{ 1/((x+1)(x+2)(x+3)(x+4)) }",
+                                         positive_points,
+                                         sizeof(positive_points) / sizeof(positive_points[0]));
+    assert_string_antiderivative_contains("{ 1/((x+1)(x+2)(x+3)(x+4)) }", "⅙·(");
+    assert_string_antiderivative_not_contains("{ 1/((x+1)(x+2)(x+3)(x+4)) }",
+                                              "0.166666");
 
     expr_free(quadratic_recip);
     expr_free(x_sq_minus_one);

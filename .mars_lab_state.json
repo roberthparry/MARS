@@ -4,7 +4,7 @@
   "lab_mode": "expression",
   "matrix_operation": "solve",
   "matrix_operand": "(1;0)",
-  "integrator_expression": "n·(n - 1)·(n - 2)·(x + a)^(n - 3)",
+  "integrator_expression": "1/((x+1)(x+2)(x+3)(x+4))",
   "integrator_bounds": "x",
   "integrator_interval_cap": 5000,
   "precision_bits": {
