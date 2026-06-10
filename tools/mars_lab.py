@@ -41,13 +41,14 @@ LAB_DESCRIPTION = os.environ.get(
 ).strip() or "Explore MARS mathematics with rendered TeX."
 LAB_SUBTITLE = os.environ.get(
     "MARS_LAB_SUBTITLE",
-    "Switch between expression, matrix, and integrator experiments. Each mode runs through a local MARS scratch binary and shows the result on the right.",
-).strip() or "Switch between expression, matrix, and integrator experiments. Each mode runs through a local MARS scratch binary and shows the result on the right."
+    "Switch between expression, equation, matrix, and integrator experiments. Each mode runs through a local MARS scratch binary and shows the result on the right.",
+).strip() or "Switch between expression, equation, matrix, and integrator experiments. Each mode runs through a local MARS scratch binary and shows the result on the right."
 LAB_THEME = os.environ.get("MARS_LAB_THEME", "mars").strip().lower() or "mars"
 DEFAULT_SCRATCH_TARGET = os.environ.get("MARS_LAB_SCRATCH_TARGET", "scratch/mars_lab").strip() or "scratch/mars_lab"
 DEFAULT_BIN = ROOT / os.environ.get("MARS_LAB_BINARY", "build/release/scratch/mars_lab")
 DEFAULT_MATRIX_BIN = ROOT / "build" / "release" / "scratch" / "matrix_lab"
 DEFAULT_INTEGRATOR_BIN = ROOT / "build" / "release" / "scratch" / "integrator_lab"
+DEFAULT_EQUATION_BIN = ROOT / "build" / "release" / "scratch" / "equation_lab"
 STATE_FILE = ROOT / os.environ.get("MARS_LAB_STATE_FILE", ".mars_lab_state.json")
 LAB_ICON_FILE = ROOT / "packaging" / "linux" / "mars-lab.svg"
 LAB_FAVICON_FILE = LAB_ICON_FILE
@@ -55,6 +56,8 @@ LAB_TOUCH_ICON_FILE = ROOT / "packaging" / "linux" / "icon-concepts" / "wizard-p
 LAB_ICON_192_FILE = ROOT / "packaging" / "linux" / "icon-concepts" / "wizard-prism-192.png"
 LAB_ICON_512_FILE = ROOT / "packaging" / "linux" / "icon-concepts" / "wizard-prism-512.png"
 DEFAULT_EXPRESSION = "{e^(sin(x))|x=pi/2}"
+DEFAULT_EQUATION = "{ x^2 + y^2 = 5 | x = 1, y = 1 }"
+DEFAULT_EQUATION_VARIABLE = "x"
 DEFAULT_MATRIX = "(1, 2; 3, 4)"
 DEFAULT_MATRIX_OPERATION = "inverse"
 DEFAULT_INTEGRATOR_EXPRESSION = "{ exp(-x^2) | x = ? }"
@@ -1838,6 +1841,7 @@ __THEME_OVERRIDES__
     <div class="lab-topbar">
       <div class="lab-tabs" role="tablist" aria-label="__LAB_NAME__ mode selector">
         <button class="mode-tab active" id="modeTabExpression" type="button" role="tab" aria-selected="true" aria-controls="workspacePanel" data-mode="expression">Expression</button>
+        <button class="mode-tab" id="modeTabEquation" type="button" role="tab" aria-selected="false" aria-controls="workspacePanel" data-mode="equation">Equation</button>
         <button class="mode-tab" id="modeTabMatrix" type="button" role="tab" aria-selected="false" aria-controls="workspacePanel" data-mode="matrix">Matrix</button>
         <button class="mode-tab" id="modeTabIntegrator" type="button" role="tab" aria-selected="false" aria-controls="workspacePanel" data-mode="integrator">Integrator</button>
       </div>
@@ -1868,6 +1872,15 @@ __THEME_OVERRIDES__
         </select>
         <label class="hidden" for="matrixOperand" id="matrixOperandLabel">Right-hand side matrix</label>
         <textarea class="hidden secondary-editor" id="matrixOperand" spellcheck="false" placeholder="(1; 0)"></textarea>
+      </div>
+      <div class="mode-panel hidden" id="equationControls">
+        <div class="integrator-bound-grid">
+          <div class="integrator-bound-field integrator-var-field">
+            <label for="equationVariable">Solve for</label>
+            <input id="equationVariable" spellcheck="false" autocomplete="off" value="x">
+          </div>
+        </div>
+        <p class="mode-hint">Enter an equation such as <code>{ 2*x + 3 = 7 | x = ? }</code>. The lab first tries to isolate the chosen variable symbolically, then goal-seeks numeric values for all variable bindings if needed.</p>
       </div>
       <div class="mode-panel hidden" id="integratorControls">
         <div class="integrator-bound-grid">
@@ -2089,6 +2102,8 @@ __THEME_OVERRIDES__
     const matrixOperation = document.getElementById('matrixOperation');
     const matrixOperand = document.getElementById('matrixOperand');
     const matrixOperandLabel = document.getElementById('matrixOperandLabel');
+    const equationControls = document.getElementById('equationControls');
+    const equationVariable = document.getElementById('equationVariable');
     const integratorControls = document.getElementById('integratorControls');
     const integratorVariable = document.getElementById('integratorVariable');
     const integratorLowerBound = document.getElementById('integratorLowerBound');
@@ -2160,11 +2175,13 @@ __THEME_OVERRIDES__
     const MAX_PRECISION_BITS = 1048576;
     const MODE_DEFAULT_PRECISION_BITS = {
       expression: 256,
+      equation: 256,
       matrix: 256,
       integrator: DOUBLE_PRECISION_BITS
     };
     const modePrecisionBits = {
       expression: MODE_DEFAULT_PRECISION_BITS.expression,
+      equation: MODE_DEFAULT_PRECISION_BITS.equation,
       matrix: MODE_DEFAULT_PRECISION_BITS.matrix,
       integrator: MODE_DEFAULT_PRECISION_BITS.integrator
     };
@@ -2172,6 +2189,8 @@ __THEME_OVERRIDES__
     const COMPACT_BINDING_VALUE_LIMIT = 20;
     const COMPACT_BINDING_VALUE_KEEP = 16;
     const DEFAULT_EXPRESSION_TEXT = __DEFAULT_EXPRESSION__;
+    const DEFAULT_EQUATION_TEXT = __DEFAULT_EQUATION__;
+    const DEFAULT_EQUATION_VARIABLE_TEXT = __DEFAULT_EQUATION_VARIABLE__;
     const DEFAULT_MATRIX_TEXT = __DEFAULT_MATRIX__;
     const DEFAULT_INTEGRATOR_TEXT = __DEFAULT_INTEGRATOR__;
     const DEFAULT_INTEGRATOR_BOUNDS_TEXT = __DEFAULT_INTEGRATOR_BOUNDS__;
@@ -2180,6 +2199,7 @@ __THEME_OVERRIDES__
     let currentLabMode = 'expression';
     const modeEditorText = {
       expression: DEFAULT_EXPRESSION_TEXT,
+      equation: DEFAULT_EQUATION_TEXT,
       matrix: DEFAULT_MATRIX_TEXT,
       integrator: DEFAULT_INTEGRATOR_TEXT
     };
@@ -2220,7 +2240,9 @@ __THEME_OVERRIDES__
     }
 
     function setMode(mode, options = {}) {
-      const nextMode = mode === 'matrix' || mode === 'integrator' ? mode : 'expression';
+      const nextMode = mode === 'equation' || mode === 'matrix' || mode === 'integrator'
+        ? mode
+        : 'expression';
       const changed = nextMode !== currentLabMode;
       currentLabMode = nextMode;
       workingPrecisionBits = modePrecisionBits[currentLabMode] || workingPrecisionBits;
@@ -2234,6 +2256,10 @@ __THEME_OVERRIDES__
       const mode = currentMode();
       if (mode === 'expression')
         modeEditorText.expression = currentExpressionText() || expr.value.trim() || modeEditorText.expression;
+      else if (mode === 'equation') {
+        modeEditorText.equation = expr.value.trim() || modeEditorText.equation;
+        saveLastEquationState();
+      }
       else if (mode === 'matrix') {
         modeEditorText.matrix = expr.value.trim() || modeEditorText.matrix;
         saveLastMatrixState();
@@ -2246,6 +2272,9 @@ __THEME_OVERRIDES__
     function restoreModeEditor(mode) {
       if (mode === 'expression') {
         setExpressionEditor(modeEditorText.expression || DEFAULT_EXPRESSION_TEXT);
+      } else if (mode === 'equation') {
+        expr.value = modeEditorText.equation || DEFAULT_EQUATION_TEXT;
+        clearExpressionSource();
       } else if (mode === 'matrix') {
         expr.value = modeEditorText.matrix || DEFAULT_MATRIX_TEXT;
         clearExpressionSource();
@@ -2280,10 +2309,12 @@ __THEME_OVERRIDES__
     function syncModeUI() {
       const mode = currentMode();
       const expressionMode = mode === 'expression';
+      const equationMode = mode === 'equation';
       const matrixMode = mode === 'matrix';
       const integratorMode = mode === 'integrator';
 
       matrixControls.classList.toggle('hidden', !matrixMode);
+      equationControls.classList.toggle('hidden', !equationMode);
       integratorControls.classList.toggle('hidden', !integratorMode);
       targetRow.classList.toggle('hidden', !expressionMode || targetRow.classList.contains('hidden'));
       derivativeButtons.classList.toggle('hidden', !expressionMode);
@@ -2291,8 +2322,13 @@ __THEME_OVERRIDES__
 
       if (expressionMode) {
         leftPaneTitle.textContent = 'Expression';
-        subtitle.textContent = 'Switch between expression, matrix, and integrator experiments. Each mode runs through a local MARS scratch binary and shows the result on the right.';
+        subtitle.textContent = 'Switch between expression, equation, matrix, and integrator experiments. Each mode runs through a local MARS scratch binary and shows the result on the right.';
         setResultTitles('Rendered TeX', 'Expression', 'Function', 'Value');
+        setValueCardVisible(true);
+      } else if (equationMode) {
+        leftPaneTitle.textContent = 'Equation';
+        subtitle.textContent = 'Enter an equation on the left. The lab tries symbolic isolation first, then numeric solving for all variable bindings.';
+        setResultTitles('Rendered TeX', 'Equation', 'Solutions', 'Residual');
         setValueCardVisible(true);
       } else if (matrixMode) {
         leftPaneTitle.textContent = 'Matrix';
@@ -3132,7 +3168,7 @@ __THEME_OVERRIDES__
 
     function validLabMode(value) {
       const mode = String(value || '').trim();
-      return mode === 'matrix' || mode === 'integrator' ? mode : 'expression';
+      return mode === 'equation' || mode === 'matrix' || mode === 'integrator' ? mode : 'expression';
     }
 
     function applySavedState(data) {
@@ -3145,6 +3181,14 @@ __THEME_OVERRIDES__
       const savedMatrix = String(data.matrix || '').trim();
       if (savedMatrix && !savedMatrix.includes('...'))
         modeEditorText.matrix = savedMatrix;
+
+      const savedEquation = String(data.equation || '').trim();
+      if (savedEquation && !savedEquation.includes('...'))
+        modeEditorText.equation = savedEquation;
+
+      const savedEquationVariable = String(data.equation_variable || '').trim();
+      if (equationVariable)
+        equationVariable.value = savedEquationVariable || DEFAULT_EQUATION_VARIABLE_TEXT;
 
       const savedMatrixOperation = validMatrixOperation(data.matrix_operation);
       if (matrixOperation)
@@ -3205,6 +3249,12 @@ __THEME_OVERRIDES__
         const matrixOperandText = localStorage.getItem('mars.exprLab.lastMatrixOperand');
         if (matrixOperand && matrixOperandText !== null)
           matrixOperand.value = matrixOperandText;
+        const equationText = localStorage.getItem('mars.exprLab.lastEquation');
+        if (equationText && !equationText.includes('...'))
+          modeEditorText.equation = equationText;
+        const equationVariableText = localStorage.getItem('mars.exprLab.lastEquationVariable');
+        if (equationVariable && equationVariableText)
+          equationVariable.value = equationVariableText;
         const integratorExpression = localStorage.getItem('mars.exprLab.lastIntegratorExpression');
         if (integratorExpression && !integratorExpression.includes('...'))
           modeEditorText.integrator = integratorExpression;
@@ -3294,6 +3344,28 @@ __THEME_OVERRIDES__
       });
     }
 
+    function saveLastEquationState() {
+      const text = String(expr.value || '').trim();
+      const variable = String(equationVariable && equationVariable.value || DEFAULT_EQUATION_VARIABLE_TEXT).trim() ||
+        DEFAULT_EQUATION_VARIABLE_TEXT;
+      if (text)
+        modeEditorText.equation = text;
+
+      try {
+        if (text)
+          localStorage.setItem('mars.exprLab.lastEquation', text);
+        localStorage.setItem('mars.exprLab.lastEquationVariable', variable);
+      } catch (_) {
+        // The lab still works fine without persistence.
+      }
+
+      saveLabState({
+        equation: text,
+        equation_variable: variable,
+        precision_bits: modePrecisionBits
+      });
+    }
+
     function saveLastIntegratorState() {
       const text = String(expr.value || '').trim();
       const bounds = currentIntegratorBoundsText();
@@ -3341,6 +3413,8 @@ __THEME_OVERRIDES__
         if (input)
           input.disabled = isBusy;
       });
+      if (equationVariable)
+        equationVariable.disabled = isBusy;
       if (integratorIntervalCap)
         integratorIntervalCap.disabled = isBusy;
       copyButtons.forEach((button) => {
@@ -3548,6 +3622,21 @@ __THEME_OVERRIDES__
           matrix: expr.value.trim(),
           operation: matrixOperation.value,
           operand: matrixOperand.value.trim(),
+          precision: requestedValuePrecision()
+        })
+      });
+      const data = await response.json();
+      return {response, data};
+    }
+
+    async function fetchEquationEvaluation() {
+      saveLastEquationState();
+      const response = await fetch('/equation-eval', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          equation: expr.value.trim(),
+          variable: String(equationVariable && equationVariable.value || DEFAULT_EQUATION_VARIABLE_TEXT).trim(),
           precision: requestedValuePrecision()
         })
       });
@@ -4214,6 +4303,78 @@ __THEME_OVERRIDES__
       }
     }
 
+    async function evaluateEquation() {
+      const text = expr.value.trim();
+      if (!text)
+        return;
+      showResults();
+      setBusy(true);
+      setStatus('Solving equation...');
+      try {
+        const {response, data} = await fetchEquationEvaluation();
+        if (!response.ok || !data.ok) {
+          setRenderedError(data.error || 'Equation solving failed');
+          resetMoreDigitsButton(renderedMore, false);
+          clearResultDetails({keepBindings: true});
+          setStatus('Error');
+          return;
+        }
+
+        clearResultDetails({keepBindings: true});
+        clearRenderedError();
+        lastTex = data.tex || '';
+        rendered.dataset.displayTex = data.display_tex || data.tex || '';
+        rendered.dataset.fullTex = data.full_display_tex || data.tex || '';
+        rendered.dataset.displaySvg = data.svg || '';
+        rendered.dataset.fullSvg = '';
+        rendered.dataset.renderError = data.render_error || '';
+        setRenderedContent(data.svg || '', data.render_error || (data.tex || 'No rendered TeX available'));
+        resetMoreDigitsButton(
+          renderedMore,
+          !!data.full_display_tex &&
+            !!data.display_tex &&
+            data.full_display_tex !== data.display_tex &&
+            hasAbbreviatedValue(data.display_tex)
+        );
+        setExpandableText(
+          parsed,
+          parsedMore,
+          data.display_equation || data.equation || '',
+          data.full_display_equation || data.equation || ''
+        );
+        setExpandableText(
+          functionStyle,
+          functionMore,
+          data.solutions || data.status || '',
+          data.solutions || data.status || ''
+        );
+        {
+          const valueLines = [];
+          if (data.residual)
+            valueLines.push(`residual: ${data.residual}`);
+          if (data.value)
+            valueLines.push(`value: ${data.value}`);
+          if (data.status)
+            valueLines.push(`status: ${data.status}`);
+          value.textContent = valueLines.join('\n');
+        }
+        modeEditorText.equation = text;
+        saveLastEquationState();
+        currentVariables = [];
+        currentDifferentiable = false;
+        renderDerivativeButtons(currentVariables);
+        clearVariableValues();
+        setStatus('Ready');
+      } catch (err) {
+        setRenderedError(String(err));
+        resetMoreDigitsButton(renderedMore, false);
+        clearResultDetails({keepBindings: true});
+        setStatus('Error');
+      } finally {
+        setBusy(false);
+      }
+    }
+
     async function evaluateIntegrator() {
       const text = expr.value.trim();
       if (!text)
@@ -4299,6 +4460,10 @@ __THEME_OVERRIDES__
         evaluateMatrix();
         return;
       }
+      if (currentMode() === 'equation') {
+        evaluateEquation();
+        return;
+      }
       if (currentMode() === 'integrator') {
         evaluateIntegrator();
         return;
@@ -4377,6 +4542,8 @@ __THEME_OVERRIDES__
         clearGoalSeekRequest();
         hideTargetEntry();
         evaluateExpression();
+      } else if (currentMode() === 'equation') {
+        evaluateEquation();
       } else if (currentMode() === 'matrix') {
         evaluateMatrix();
       } else {
@@ -4466,6 +4633,8 @@ __THEME_OVERRIDES__
         event.preventDefault();
         if (currentMode() === 'expression')
           evaluateFromKeyboard();
+        else if (currentMode() === 'equation')
+          evaluateEquation();
         else if (currentMode() === 'matrix')
           evaluateMatrix();
         else
@@ -4504,6 +4673,8 @@ __THEME_OVERRIDES__
         matrixOperand.value = '';
         matrixOperation.value = 'inverse';
       }
+      if (currentMode() === 'equation' && equationVariable)
+        equationVariable.value = DEFAULT_EQUATION_VARIABLE_TEXT;
       if (currentMode() === 'integrator') {
         resetIntegratorBoundsToDefault();
         if (integratorIntervalCap)
@@ -4576,6 +4747,14 @@ __THEME_OVERRIDES__
           saveLastMatrixState();
       });
 
+    if (equationVariable)
+      equationVariable.addEventListener('change', () => {
+        equationVariable.value = String(equationVariable.value || DEFAULT_EQUATION_VARIABLE_TEXT).trim() ||
+          DEFAULT_EQUATION_VARIABLE_TEXT;
+        if (currentMode() === 'equation')
+          saveLastEquationState();
+      });
+
     if (integratorIntervalCap)
       integratorIntervalCap.addEventListener('change', () => {
         integratorIntervalCap.value = String(validIntegratorIntervalCap(integratorIntervalCap.value));
@@ -4617,6 +4796,8 @@ __THEME_OVERRIDES__
       try {
         if (currentMode() === 'expression')
           await evaluateExpression({skipHistoryUpdate: true, reuseLastInput: true});
+        else if (currentMode() === 'equation')
+          await evaluateEquation();
         else if (currentMode() === 'matrix')
           await evaluateMatrix();
         else
@@ -4633,6 +4814,8 @@ __THEME_OVERRIDES__
       try {
         if (currentMode() === 'expression')
           await evaluateExpression({skipHistoryUpdate: true, reuseLastInput: true});
+        else if (currentMode() === 'equation')
+          await evaluateEquation();
         else if (currentMode() === 'matrix')
           await evaluateMatrix();
         else
@@ -4746,6 +4929,8 @@ WEB_MANIFEST = {
 def default_state() -> dict[str, object]:
     return {
         "expression": DEFAULT_EXPRESSION,
+        "equation": DEFAULT_EQUATION,
+        "equation_variable": DEFAULT_EQUATION_VARIABLE,
         "matrix": DEFAULT_MATRIX,
         "lab_mode": "expression",
         "matrix_operation": DEFAULT_MATRIX_OPERATION,
@@ -4755,6 +4940,7 @@ def default_state() -> dict[str, object]:
         "integrator_interval_cap": DEFAULT_INTEGRATOR_INTERVAL_CAP,
         "precision_bits": {
             "expression": 256,
+            "equation": 256,
             "matrix": 256,
             "integrator": 17,
         },
@@ -4781,8 +4967,16 @@ def load_state_data() -> dict[str, object]:
         state["matrix"] = DEFAULT_MATRIX
 
     lab_mode = str(state.get("lab_mode", "")).strip()
-    if lab_mode not in {"expression", "matrix", "integrator"}:
+    if lab_mode not in {"expression", "equation", "matrix", "integrator"}:
         state["lab_mode"] = "expression"
+
+    equation = str(state.get("equation", "")).strip()
+    if "..." in equation:
+        state["equation"] = DEFAULT_EQUATION
+
+    equation_variable = str(state.get("equation_variable", "")).strip()
+    if not equation_variable:
+        state["equation_variable"] = DEFAULT_EQUATION_VARIABLE
 
     matrix_operation = str(state.get("matrix_operation", "")).strip()
     if matrix_operation not in {
@@ -5796,6 +5990,24 @@ def parse_integrator_lab_output(output: str) -> dict[str, str]:
     )
 
 
+def parse_equation_lab_output(output: str) -> dict[str, str]:
+    return parse_keyed_output(
+        output,
+        {
+            "input": r"^input\s+(.*)$",
+            "equation": r"^equation\s+(.*)$",
+            "unbound": r"^unbound\s+(.*)$",
+            "tex": r"^tex\s+(.*)$",
+            "residual": r"^residual\s+(.*)$",
+            "value": r"^value\s+(.*)$",
+            "status": r"^status\s+(.*)$",
+            "solutions_tex": r"^solutions_tex\s*(.*)$",
+            "solutions": r"^solutions\s+(.*)$",
+        },
+        {"solutions"},
+    )
+
+
 def _trim_decimal_tail(text: str) -> str:
     mantissa, sep, exponent = text.partition("E")
 
@@ -6156,6 +6368,31 @@ def run_integrator_lab_fields(
     return parse_integrator_lab_output(raw), raw, completed.returncode
 
 
+def run_equation_lab_fields(
+    binary: Path,
+    equation_text: str,
+    variable: str,
+    precision: int,
+) -> tuple[dict[str, str], str, int]:
+    command = [
+        str(binary),
+        equation_text,
+        str(max(17, precision)),
+        variable,
+    ]
+    completed = subprocess.run(
+        command,
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        timeout=10,
+    )
+    raw = completed.stdout
+    if completed.stderr:
+        raw = raw + ("\n" if raw else "") + completed.stderr
+    return parse_equation_lab_output(raw), raw, completed.returncode
+
+
 def _parse_decimal_bound(text: str) -> Decimal | None:
     try:
         return Decimal(str(text).strip())
@@ -6498,6 +6735,56 @@ def prepare_integrator_fields(fields: dict[str, str], precision: int) -> dict[st
     return payload
 
 
+def prepare_equation_fields(fields: dict[str, str], precision: int) -> dict[str, object]:
+    if fields.get("value"):
+        fields["value"] = format_number_text_for_precision(
+            str(fields["value"]), precision, zero_subprecision=True)
+
+    for key in ("equation", "unbound", "tex", "residual", "solutions", "solutions_tex"):
+        value = str(fields.get(key) or "")
+        if not value:
+            continue
+        fields[f"raw_{key}"] = value
+        fields[key] = precision_numeric_tokens(value, precision)
+
+    equation_text = str(fields.get("equation") or "").strip()
+    unbound_text = str(fields.get("unbound") or "").strip()
+    solutions_text = str(fields.get("solutions") or "").strip()
+    equation_tex = str(fields.get("tex") or "").strip()
+    solutions_tex = str(fields.get("solutions_tex") or "").strip()
+    render_tex = solutions_tex or equation_tex
+    display_tex = compact_display_text(render_tex)
+
+    svg = None
+    render_error = None
+    if display_tex and display_tex != "(null)":
+        svg, render_error = render_tex_to_svg(display_tex)
+
+    payload: dict[str, object] = {
+        "ok": True,
+        "mode": "equation",
+        "equation": equation_text,
+        "unbound": unbound_text,
+        "tex": "" if render_tex == "(null)" else render_tex,
+        "equation_tex": "" if equation_tex == "(null)" else equation_tex,
+        "solutions_tex": "" if solutions_tex == "(null)" else solutions_tex,
+        "residual": str(fields.get("residual") or "").strip(),
+        "value": str(fields.get("value") or "").strip(),
+        "status": str(fields.get("status") or "").strip(),
+        "solutions": solutions_text,
+        "full_display_equation": expression_for_display(equation_text or unbound_text),
+        "display_equation": compact_display_text(expression_for_display(equation_text or unbound_text)),
+        "full_display_tex": render_tex,
+        "display_tex": display_tex,
+        "binding_values": expression_variable_binding_values(equation_text or fields.get("input", ""), precision),
+    }
+    if svg:
+        payload["svg"] = svg
+    elif render_error:
+        payload["render_error"] = render_error
+    return payload
+
+
 def integrator_tex_for_display(tex: str) -> str:
     tex = str(tex or "").strip()
     if not tex:
@@ -6520,6 +6807,7 @@ def integrator_tex_for_display(tex: str) -> str:
 
 class MarsLabHandler(http.server.BaseHTTPRequestHandler):
     binary: Path = DEFAULT_BIN
+    equation_binary: Path = DEFAULT_EQUATION_BIN
     matrix_binary: Path = DEFAULT_MATRIX_BIN
     integrator_binary: Path = DEFAULT_INTEGRATOR_BIN
     server_host: str = "127.0.0.1"
@@ -6643,6 +6931,8 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
             .replace("__MOBILE_CARD_CLASS__", "")
             .replace("__MOBILE_TAILSCALE_CLASS__", "" if mobile_details.get("tailscale") else "hidden")
             .replace("__DEFAULT_EXPRESSION__", json.dumps(DEFAULT_EXPRESSION))
+            .replace("__DEFAULT_EQUATION__", json.dumps(DEFAULT_EQUATION))
+            .replace("__DEFAULT_EQUATION_VARIABLE__", json.dumps(DEFAULT_EQUATION_VARIABLE))
             .replace("__DEFAULT_MATRIX__", json.dumps(DEFAULT_MATRIX))
             .replace("__DEFAULT_INTEGRATOR__", json.dumps(DEFAULT_INTEGRATOR_EXPRESSION))
             .replace("__DEFAULT_INTEGRATOR_BOUNDS__", json.dumps(DEFAULT_INTEGRATOR_BOUNDS))
@@ -6686,8 +6976,16 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                     updates["matrix"] = matrix
 
                 lab_mode = str(payload.get("lab_mode", "")).strip()
-                if lab_mode in {"expression", "matrix", "integrator"}:
+                if lab_mode in {"expression", "equation", "matrix", "integrator"}:
                     updates["lab_mode"] = lab_mode
+
+                equation = str(payload.get("equation", "")).strip()
+                if equation and "..." not in equation:
+                    updates["equation"] = equation
+
+                equation_variable = str(payload.get("equation_variable", "")).strip()
+                if equation_variable:
+                    updates["equation_variable"] = equation_variable
 
                 matrix_operation = str(payload.get("matrix_operation", "")).strip()
                 if matrix_operation in {
@@ -6724,7 +7022,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                 if isinstance(payload.get("precision_bits"), dict):
                     saved_precision = load_state_data().get("precision_bits", {})
                     precision_bits = dict(saved_precision) if isinstance(saved_precision, dict) else {}
-                    for mode in ("expression", "matrix", "integrator"):
+                    for mode in ("expression", "equation", "matrix", "integrator"):
                         if mode in payload["precision_bits"]:
                             bits = int(payload["precision_bits"][mode])
                             precision_bits[mode] = max(17, min(MAX_VALUE_PRECISION_BITS, bits))
@@ -6733,6 +7031,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                     bits = int(payload["precision_bits"])
                     updates["precision_bits"] = {
                         "expression": max(17, min(MAX_VALUE_PRECISION_BITS, bits)),
+                        "equation": 256,
                         "matrix": 256,
                         "integrator": 17,
                     }
@@ -6762,6 +7061,46 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                     "ok": False,
                     "error": render_error or "Could not render TeX",
                 })
+            return
+
+        if path == "/equation-eval":
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                body = self.rfile.read(length)
+                payload = json.loads(body.decode("utf-8"))
+                equation_text = str(payload.get("equation", "")).strip()
+                variable = str(payload.get("variable", DEFAULT_EQUATION_VARIABLE)).strip() or DEFAULT_EQUATION_VARIABLE
+                precision = int(payload.get("precision", 96))
+            except Exception as exc:
+                self.send_json(400, {"ok": False, "error": f"Bad request: {exc}"})
+                return
+
+            if not equation_text:
+                self.send_json(400, {"ok": False, "error": "Equation input is empty"})
+                return
+
+            try:
+                precision = max(17, min(MAX_VALUE_PRECISION_DIGITS, precision))
+                ensure_scratch_binary(self.equation_binary, "scratch/equation_lab")
+                fields, raw, returncode = run_equation_lab_fields(
+                    self.equation_binary,
+                    equation_text,
+                    variable,
+                    precision,
+                )
+            except Exception as exc:
+                self.send_json(422, {"ok": False, "error": str(exc)})
+                return
+
+            if returncode != 0:
+                self.send_json(422, {"ok": False, "error": raw or "Equation solving failed"})
+                return
+
+            save_state_data({
+                "equation": equation_text,
+                "equation_variable": variable,
+            })
+            self.send_json(200, prepare_equation_fields(fields, precision))
             return
 
         if path == "/matrix-eval":
@@ -7080,12 +7419,15 @@ def main() -> int:
     parser.add_argument("--no-browser", action="store_true", help="do not open the browser automatically")
     parser.add_argument("--browser", default="", help="browser executable to open the lab URL")
     parser.add_argument("--binary", type=Path, default=DEFAULT_BIN, help="path to the scratch lab binary")
+    parser.add_argument("--equation-binary", type=Path, default=DEFAULT_EQUATION_BIN, help="path to the equation scratch binary")
     args = parser.parse_args()
 
     binary = args.binary if args.binary.is_absolute() else ROOT / args.binary
+    equation_binary = args.equation_binary if args.equation_binary.is_absolute() else ROOT / args.equation_binary
     ensure_mars_lab(binary)
 
     MarsLabHandler.binary = binary
+    MarsLabHandler.equation_binary = equation_binary
 
     port = args.port or find_free_port(args.host)
     MarsLabHandler.server_host = args.host
