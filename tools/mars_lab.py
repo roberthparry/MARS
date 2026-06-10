@@ -1185,6 +1185,15 @@ INDEX_HTML = r"""<!doctype html>
     }
 
     .card {
+      --result-zoom: 1;
+      --render-base-scale: 2;
+      --render-zoom: 2;
+      --result-base-font-rem: 0.92;
+      --result-font-size: 0.92rem;
+      --render-base-font-rem: 1.78;
+      --render-font-size: 1.78rem;
+      --render-base-margin-rem: 5;
+      --render-margin-bottom: 5rem;
       border: 2px solid rgba(233, 244, 239, 0.28);
       border-radius: 18px;
       background: rgba(8, 29, 22, 0.62);
@@ -1236,6 +1245,19 @@ INDEX_HTML = r"""<!doctype html>
       text-transform: uppercase;
       min-width: 4.25rem;
       transition: background 150ms ease, color 150ms ease, transform 150ms ease;
+    }
+
+    .zoom-action {
+      min-width: 2.25rem;
+      padding-inline: 0.48rem;
+    }
+
+    .zoom-reset {
+      min-width: 3.65rem;
+    }
+
+    .zoom-action:disabled {
+      opacity: 0.42;
     }
 
     .card-action.copied {
@@ -1349,12 +1371,13 @@ INDEX_HTML = r"""<!doctype html>
     pre {
       color: var(--code);
       white-space: pre-wrap;
-      font: 0.92rem/1.45 "Cascadia Code", "DejaVu Sans Mono", monospace;
+      font-family: "Cascadia Code", "DejaVu Sans Mono", monospace;
+      font-size: var(--result-font-size);
+      line-height: 1.45;
     }
 
     #value {
-      overflow-x: hidden;
-      overflow-y: visible;
+      overflow: auto;
       white-space: pre-wrap;
       overflow-wrap: anywhere;
       word-break: break-all;
@@ -1409,19 +1432,25 @@ INDEX_HTML = r"""<!doctype html>
       margin: 0;
       min-height: 12rem;
       padding: 2.1rem 1.6rem 3rem;
-      overflow-x: auto;
-      overflow-y: visible;
-      font-size: 1.78rem;
+      overflow: auto;
+      font-size: var(--render-font-size);
+    }
+
+    .rendered-zoom-frame {
+      position: relative;
+      display: inline-block;
+      min-width: max-content;
+      min-height: 1px;
     }
 
     .rendered svg {
       display: block;
-      max-width: 100%;
+      max-width: none;
       height: auto;
       overflow: visible;
-      transform: scale(2);
+      transform: scale(var(--render-zoom));
       transform-origin: left top;
-      margin-bottom: 5rem;
+      margin-bottom: var(--render-margin-bottom);
       filter: brightness(0) saturate(100%) invert(82%) sepia(39%) saturate(540%) hue-rotate(354deg) brightness(98%) contrast(92%) drop-shadow(0 0 0.65rem rgba(113, 198, 180, 0.28));
     }
 
@@ -1606,6 +1635,14 @@ INDEX_HTML = r"""<!doctype html>
 
       .card {
         border-radius: 15px;
+        --render-base-scale: 1.35;
+        --render-zoom: 1.35;
+        --result-base-font-rem: 0.82;
+        --result-font-size: 0.82rem;
+        --render-base-font-rem: 1.3;
+        --render-font-size: 1.3rem;
+        --render-base-margin-rem: 2.5;
+        --render-margin-bottom: 2.5rem;
       }
 
       .mobile-result-extra {
@@ -1636,12 +1673,11 @@ INDEX_HTML = r"""<!doctype html>
       .rendered {
         min-height: 8rem;
         padding: 1.35rem 1rem 2rem;
-        font-size: 1.3rem;
+        font-size: var(--render-font-size);
       }
 
       .rendered svg {
-        transform: scale(1.35);
-        margin-bottom: 2.5rem;
+        margin-bottom: var(--render-margin-bottom);
       }
 
       .mobile-panel {
@@ -1743,12 +1779,12 @@ INDEX_HTML = r"""<!doctype html>
       .rendered {
         min-height: 6.5rem;
         padding: 1rem 0.75rem 1.75rem;
-        font-size: 1.12rem;
+        font-size: var(--render-font-size);
       }
 
       .rendered svg {
-        transform: scale(1.12);
-        margin-bottom: 2rem;
+        transform: scale(var(--render-zoom));
+        margin-bottom: var(--render-margin-bottom);
       }
 
       .help-pane {
@@ -1887,6 +1923,9 @@ __THEME_OVERRIDES__
               <button class="card-action more-digits hidden" id="renderedMore">Show more digits</button>
             </span>
             <span class="card-actions top-card-actions">
+              <button class="card-action zoom-action" type="button" data-zoom-step="-1" title="Zoom out">−</button>
+              <button class="card-action zoom-action zoom-reset" type="button" data-zoom-reset title="Reset zoom">100%</button>
+              <button class="card-action zoom-action" type="button" data-zoom-step="1" title="Zoom in">+</button>
               <button class="card-action expand-card" data-expand-card>Expand</button>
               <button class="card-action copy-result" id="renderedCopy" data-copy-target="rendered">Copy</button>
             </span>
@@ -1900,6 +1939,9 @@ __THEME_OVERRIDES__
               <button class="card-action more-digits hidden" id="parsedMore">Show more digits</button>
             </span>
             <span class="card-actions top-card-actions">
+              <button class="card-action zoom-action" type="button" data-zoom-step="-1" title="Zoom out">−</button>
+              <button class="card-action zoom-action zoom-reset" type="button" data-zoom-reset title="Reset zoom">100%</button>
+              <button class="card-action zoom-action" type="button" data-zoom-step="1" title="Zoom in">+</button>
               <button class="card-action expand-card" data-expand-card>Expand</button>
               <button class="card-action copy-result" data-copy-target="expression">Copy</button>
             </span>
@@ -1913,6 +1955,9 @@ __THEME_OVERRIDES__
               <button class="card-action more-digits hidden" id="functionMore">Show more digits</button>
             </span>
             <span class="card-actions top-card-actions">
+              <button class="card-action zoom-action" type="button" data-zoom-step="-1" title="Zoom out">−</button>
+              <button class="card-action zoom-action zoom-reset" type="button" data-zoom-reset title="Reset zoom">100%</button>
+              <button class="card-action zoom-action" type="button" data-zoom-step="1" title="Zoom in">+</button>
               <button class="card-action expand-card" data-expand-card>Expand</button>
               <button class="card-action copy-result" data-copy-target="function">Copy</button>
             </span>
@@ -1923,6 +1968,9 @@ __THEME_OVERRIDES__
           <div class="card-title value-title">
             <span id="valueTitle">Value</span>
             <span class="card-actions value-card-actions">
+              <button class="card-action zoom-action" type="button" data-zoom-step="-1" title="Zoom out">−</button>
+              <button class="card-action zoom-action zoom-reset" type="button" data-zoom-reset title="Reset zoom">100%</button>
+              <button class="card-action zoom-action" type="button" data-zoom-step="1" title="Zoom in">+</button>
               <button class="card-action expand-card" data-expand-card>Expand</button>
               <button class="card-action copy-result" data-copy-target="value">Copy</button>
             </span>
@@ -2085,7 +2133,11 @@ __THEME_OVERRIDES__
     const valueTitle = document.getElementById('valueTitle');
     const copyButtons = Array.from(document.querySelectorAll('.copy-result'));
     const moreDigitButtons = Array.from(document.querySelectorAll('.more-digits'));
+    const resultCards = Array.from(document.querySelectorAll('.result-card'));
     const expandCardButtons = Array.from(document.querySelectorAll('[data-expand-card]'));
+    const zoomButtons = Array.from(document.querySelectorAll('[data-zoom-step], [data-zoom-reset]'));
+    const RESULT_ZOOM_LEVELS = [0.5, 0.67, 0.8, 1, 1.25, 1.5, 2, 3, 4, 6, 8];
+    const RESULT_ZOOM_DEFAULT_INDEX = 3;
     let lastTex = '';
     let lastDerivativeExpression = '';
     let currentVariables = [];
@@ -3624,6 +3676,116 @@ __THEME_OVERRIDES__
       return String(text || '').includes('...');
     }
 
+    function resultZoomIndex(card) {
+      const raw = Number(card && card.dataset.zoomIndex);
+      if (Number.isFinite(raw))
+        return Math.max(0, Math.min(RESULT_ZOOM_LEVELS.length - 1, Math.round(raw)));
+      return RESULT_ZOOM_DEFAULT_INDEX;
+    }
+
+    function svgLengthPixels(value) {
+      const match = String(value || '').trim().match(/^([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*(px|pt|pc|in|cm|mm)?$/i);
+      if (!match)
+        return 0;
+
+      const amount = Number.parseFloat(match[1]);
+      if (!Number.isFinite(amount))
+        return 0;
+
+      const unit = String(match[2] || 'px').toLowerCase();
+      if (unit === 'pt') return amount * 96 / 72;
+      if (unit === 'pc') return amount * 16;
+      if (unit === 'in') return amount * 96;
+      if (unit === 'cm') return amount * 96 / 2.54;
+      if (unit === 'mm') return amount * 96 / 25.4;
+      return amount;
+    }
+
+    function svgIntrinsicSize(svg) {
+      const attrWidth = svgLengthPixels(svg.getAttribute('width'));
+      const attrHeight = svgLengthPixels(svg.getAttribute('height'));
+      let viewWidth = 0;
+      let viewHeight = 0;
+      if (svg.viewBox && svg.viewBox.baseVal) {
+        viewWidth = svg.viewBox.baseVal.width;
+        viewHeight = svg.viewBox.baseVal.height;
+      }
+
+      const previousTransform = svg.style.transform;
+      svg.style.transform = 'none';
+      const rect = svg.getBoundingClientRect();
+      svg.style.transform = previousTransform;
+
+      return {
+        width: Math.max(1, attrWidth || rect.width || viewWidth || 1),
+        height: Math.max(1, attrHeight || rect.height || viewHeight || 1)
+      };
+    }
+
+    function updateRenderedZoomFrame(card, scale) {
+      const frame = card ? card.querySelector('.rendered-zoom-frame') : null;
+      const svg = frame ? frame.querySelector('svg') : null;
+      if (!frame || !svg)
+        return;
+
+      if (!svg.dataset.baseWidth || !svg.dataset.baseHeight) {
+        const intrinsic = svgIntrinsicSize(svg);
+        svg.dataset.baseWidth = String(intrinsic.width);
+        svg.dataset.baseHeight = String(intrinsic.height);
+      }
+
+      const width = Number(svg.dataset.baseWidth) || 1;
+      const height = Number(svg.dataset.baseHeight) || 1;
+      frame.style.width = `${width * scale}px`;
+      frame.style.height = `${height * scale}px`;
+      svg.style.width = `${width}px`;
+      svg.style.height = `${height}px`;
+      svg.style.transform = `scale(${scale})`;
+    }
+
+    function applyResultZoom(card) {
+      if (!card)
+        return;
+
+      const index = resultZoomIndex(card);
+      const zoom = RESULT_ZOOM_LEVELS[index];
+      const computed = getComputedStyle(card);
+      const renderBase = Number.parseFloat(computed.getPropertyValue('--render-base-scale')) || 2;
+      const textBase = Number.parseFloat(computed.getPropertyValue('--result-base-font-rem')) || 0.92;
+      const renderFontBase = Number.parseFloat(computed.getPropertyValue('--render-base-font-rem')) || 1.78;
+      const marginBase = Number.parseFloat(computed.getPropertyValue('--render-base-margin-rem')) || 5;
+      const renderScale = renderBase * zoom;
+
+      card.dataset.zoomIndex = String(index);
+      card.style.setProperty('--result-zoom', String(zoom));
+      card.style.setProperty('--result-font-size', `${textBase * zoom}rem`);
+      card.style.setProperty('--render-font-size', `${renderFontBase * zoom}rem`);
+      card.style.setProperty('--render-zoom', String(renderScale));
+      card.style.setProperty('--render-margin-bottom', `${marginBase * Math.max(1, zoom)}rem`);
+      updateRenderedZoomFrame(card, renderScale);
+      card.querySelectorAll('[data-zoom-reset]').forEach((button) => {
+        button.textContent = `${Math.round(zoom * 100)}%`;
+        button.setAttribute('aria-label', `Reset zoom from ${Math.round(zoom * 100)}%`);
+      });
+      card.querySelectorAll('[data-zoom-step="-1"]').forEach((button) => {
+        button.disabled = index <= 0;
+      });
+      card.querySelectorAll('[data-zoom-step="1"]').forEach((button) => {
+        button.disabled = index >= RESULT_ZOOM_LEVELS.length - 1;
+      });
+    }
+
+    function setResultZoom(card, index) {
+      if (!card)
+        return;
+      card.dataset.zoomIndex = String(Math.max(0, Math.min(RESULT_ZOOM_LEVELS.length - 1, index)));
+      applyResultZoom(card);
+    }
+
+    function stepResultZoom(card, direction) {
+      setResultZoom(card, resultZoomIndex(card) + (direction < 0 ? -1 : 1));
+    }
+
     function collapseResultCards() {
       resultPane.classList.remove('card-expanded');
       document.querySelectorAll('.result-card.expanded-card')
@@ -3651,12 +3813,18 @@ __THEME_OVERRIDES__
     }
 
     function setRenderedContent(svg, fallbackText = '') {
+      const card = rendered.closest('.result-card');
       rendered.replaceChildren();
       if (svg) {
-        rendered.innerHTML = svg;
+        const frame = document.createElement('div');
+        frame.className = 'rendered-zoom-frame';
+        frame.innerHTML = svg;
+        rendered.appendChild(frame);
       } else {
         rendered.textContent = fallbackText;
       }
+      if (card)
+        requestAnimationFrame(() => applyResultZoom(card));
     }
 
     function clearRenderedError() {
@@ -4500,6 +4668,35 @@ __THEME_OVERRIDES__
           setStatus(String(err));
         }
       });
+    });
+
+    zoomButtons.forEach((button) => {
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const card = button.closest('.result-card');
+        if (!card)
+          return;
+        if (button.hasAttribute('data-zoom-reset'))
+          setResultZoom(card, RESULT_ZOOM_DEFAULT_INDEX);
+        else
+          stepResultZoom(card, Number(button.dataset.zoomStep || 1));
+        setStatus(`Zoom ${Math.round(RESULT_ZOOM_LEVELS[resultZoomIndex(card)] * 100)}%`);
+      });
+    });
+
+    resultCards.forEach((card) => {
+      applyResultZoom(card);
+      card.addEventListener('wheel', (event) => {
+        if (!event.ctrlKey && !event.metaKey)
+          return;
+        event.preventDefault();
+        stepResultZoom(card, event.deltaY < 0 ? 1 : -1);
+      }, {passive: false});
+    });
+
+    window.addEventListener('resize', () => {
+      resultCards.forEach((card) => applyResultZoom(card));
     });
 
     expandCardButtons.forEach((button) => {
