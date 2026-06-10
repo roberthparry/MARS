@@ -1167,14 +1167,21 @@
       "test_equation_from_string_shares_symbols_across_sides": true,
       "test_equation_from_string_accepts_bare_equation": true,
       "test_equation_numeric_solves_all_variable_bindings": true,
+      "test_equation_numeric_rejects_unresolved_parameter_residual": true,
       "test_equation_to_text_round_trips_through_parser": true,
       "test_equation_detects_already_solved_form": true,
       "test_equation_rejects_rhs_containing_solve_variable": true,
       "test_equation_solves_simple_affine_equation": true,
+      "test_equation_solves_symbolic_affine_equation": true,
       "test_equation_solves_affine_variable_from_rhs": true,
+      "test_equation_solves_symbolic_quadratic_formula": true,
       "test_equation_solves_quadratic_two_roots": true,
       "test_equation_solves_quadratic_zero_product": true,
-      "test_equation_solves_quadratic_double_root_once": true
+      "test_equation_solves_quadratic_double_root_once": true,
+      "test_equation_solves_cubic_three_real_roots": true,
+      "test_equation_solves_cubic_complex_pair": true,
+      "test_equation_solves_cubic_repeated_root_once": true,
+      "test_equation_solves_symbolic_cubic_cardano": true
     },
     "test_equation_future_solver_cases": {
       "enabled": true,

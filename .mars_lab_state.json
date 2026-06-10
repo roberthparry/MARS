@@ -1,7 +1,9 @@
 {
   "expression": "{ n·(n - 1)·(n - 2)·(x + a)^(n - 3) | x = 3; n = ¹⁄₂, a = 2 }",
+  "equation": "{ ax³ + bx² + cx + d = 0 | x = ?; d = ?, a = ?, b = ?, c = ? }",
+  "equation_variable": "x",
   "matrix": "(1, 2; 3, 4)",
-  "lab_mode": "expression",
+  "lab_mode": "equation",
   "matrix_operation": "solve",
   "matrix_operand": "(1;0)",
   "integrator_expression": "1/((x+1)(x+2)(x+3)(x+4))",
@@ -10,6 +12,7 @@
   "precision_bits": {
     "expression": 256,
     "matrix": 53,
-    "integrator": 512
+    "integrator": 512,
+    "equation": 256
   }
 }
