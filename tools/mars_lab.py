@@ -2257,7 +2257,7 @@ __THEME_OVERRIDES__
       if (mode === 'expression')
         modeEditorText.expression = currentExpressionText() || expr.value.trim() || modeEditorText.expression;
       else if (mode === 'equation') {
-        modeEditorText.equation = expr.value.trim() || modeEditorText.equation;
+        modeEditorText.equation = currentExpressionText() || expr.value.trim() || modeEditorText.equation;
         saveLastEquationState();
       }
       else if (mode === 'matrix') {
@@ -2273,8 +2273,7 @@ __THEME_OVERRIDES__
       if (mode === 'expression') {
         setExpressionEditor(modeEditorText.expression || DEFAULT_EXPRESSION_TEXT);
       } else if (mode === 'equation') {
-        expr.value = modeEditorText.equation || DEFAULT_EQUATION_TEXT;
-        clearExpressionSource();
+        setExpressionEditor(modeEditorText.equation || DEFAULT_EQUATION_TEXT);
       } else if (mode === 'matrix') {
         expr.value = modeEditorText.matrix || DEFAULT_MATRIX_TEXT;
         clearExpressionSource();
@@ -3345,7 +3344,7 @@ __THEME_OVERRIDES__
     }
 
     function saveLastEquationState() {
-      const text = String(expr.value || '').trim();
+      const text = String(currentExpressionText() || expr.value || '').trim();
       const variable = String(equationVariable && equationVariable.value || DEFAULT_EQUATION_VARIABLE_TEXT).trim() ||
         DEFAULT_EQUATION_VARIABLE_TEXT;
       if (text)
@@ -3631,11 +3630,12 @@ __THEME_OVERRIDES__
 
     async function fetchEquationEvaluation() {
       saveLastEquationState();
+      const equationText = currentExpressionText() || expr.value.trim();
       const response = await fetch('/equation-eval', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
-          equation: expr.value.trim(),
+          equation: equationText,
           variable: String(equationVariable && equationVariable.value || DEFAULT_EQUATION_VARIABLE_TEXT).trim(),
           precision: requestedValuePrecision()
         })
@@ -4304,7 +4304,7 @@ __THEME_OVERRIDES__
     }
 
     async function evaluateEquation() {
-      const text = expr.value.trim();
+      const text = String(currentExpressionText() || expr.value || '').trim();
       if (!text)
         return;
       showResults();
@@ -4358,12 +4358,19 @@ __THEME_OVERRIDES__
             valueLines.push(`status: ${data.status}`);
           value.textContent = valueLines.join('\n');
         }
-        modeEditorText.equation = text;
+        if (data.equation)
+          setExpressionEditor(
+            data.equation,
+            data.binding_values || null,
+            data.unbound || null
+          );
+        else if (data.binding_values)
+          renderVariableValues(data.binding_values || []);
+        modeEditorText.equation = data.equation || text;
         saveLastEquationState();
         currentVariables = [];
         currentDifferentiable = false;
         renderDerivativeButtons(currentVariables);
-        clearVariableValues();
         setStatus('Ready');
       } catch (err) {
         setRenderedError(String(err));
@@ -4625,7 +4632,14 @@ __THEME_OVERRIDES__
 
     function evaluateFromKeyboard() {
       forwardHistory = [];
-      evaluateExpression();
+      if (currentMode() === 'equation')
+        evaluateEquation();
+      else if (currentMode() === 'matrix')
+        evaluateMatrix();
+      else if (currentMode() === 'integrator')
+        evaluateIntegrator();
+      else
+        evaluateExpression();
     }
 
     expr.addEventListener('keydown', (event) => {
@@ -4643,6 +4657,11 @@ __THEME_OVERRIDES__
     });
 
     expr.addEventListener('input', () => {
+      if (currentMode() === 'equation') {
+        refreshVariableValuesFromEditor();
+        updateHistoryButtons();
+        return;
+      }
       if (currentMode() !== 'expression') {
         updateHistoryButtons();
         return;
