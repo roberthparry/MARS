@@ -279,98 +279,122 @@ static const expr_integrate_mul_rule_t integrate_mul_special_product_rules[] = {
 
 static const expr_integrate_mul_rule_stage_t integrate_mul_rule_stages[] = {
     { .rules = integrate_mul_always_rules },
-    { .rules = integrate_mul_exp_power_rules,
-      .required_features = EXPR_INTEGRATE_MUL_FEATURE_EXP },
-    { .rules = integrate_mul_trig_power_rules,
-      .required_features = EXPR_INTEGRATE_MUL_FEATURE_TRIG },
-    { .rules = integrate_mul_exp_gamma_rules,
-      .required_features = EXPR_INTEGRATE_MUL_FEATURE_EXP },
-    { .rules = integrate_mul_exp_trig_rules,
-      .required_features = EXPR_INTEGRATE_MUL_FEATURE_EXP_TRIG },
-    { .rules = integrate_mul_exp_hyperbolic_rules,
-      .required_features = EXPR_INTEGRATE_MUL_FEATURE_EXP_HYPERBOLIC },
-    { .rules = integrate_mul_hyperbolic_product_rules,
-      .required_features = EXPR_INTEGRATE_MUL_FEATURE_HYPERBOLIC },
-    { .rules = integrate_mul_trig_hyperbolic_rules,
-      .required_features = EXPR_INTEGRATE_MUL_FEATURE_TRIG_HYPERBOLIC },
-    { .rules = integrate_mul_wrt_exp_trig_rules,
-      .required_features = EXPR_INTEGRATE_MUL_FEATURE_EXP_TRIG },
-    { .rules = integrate_mul_exp_tanh_rules,
-      .required_features = EXPR_INTEGRATE_MUL_FEATURE_EXP_HYPERBOLIC },
-    { .rules = integrate_mul_poly_exp_rules,
-      .required_features = EXPR_INTEGRATE_MUL_FEATURE_EXP },
-    { .rules = integrate_mul_poly_trig_rules,
-      .required_features = EXPR_INTEGRATE_MUL_FEATURE_TRIG },
-    { .rules = integrate_mul_poly_hyperbolic_rules,
-      .required_features = EXPR_INTEGRATE_MUL_FEATURE_HYPERBOLIC },
-    { .rules = integrate_mul_log_rules,
-      .required_features = EXPR_INTEGRATE_MUL_FEATURE_LOG },
-    { .rules = integrate_mul_by_parts_primary_rules,
-      .required_features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY },
-    { .rules = integrate_mul_normal_logpdf_rules,
-      .required_features = EXPR_INTEGRATE_MUL_FEATURE_NORMAL_LOGPDF },
-    { .rules = integrate_mul_by_parts_expint_rules,
-      .required_features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY },
-    { .rules = integrate_mul_special_product_rules,
-      .any_features = EXPR_INTEGRATE_MUL_FEATURE_SPECIAL_PRODUCT },
+    {
+        .rules             = integrate_mul_exp_power_rules,
+        .required_features = EXPR_INTEGRATE_MUL_FEATURE_EXP
+    },
+    {
+        .rules             = integrate_mul_trig_power_rules,
+        .required_features = EXPR_INTEGRATE_MUL_FEATURE_TRIG
+    },
+    {
+        .rules             = integrate_mul_exp_gamma_rules,
+        .required_features = EXPR_INTEGRATE_MUL_FEATURE_EXP
+    },
+    {
+        .rules             = integrate_mul_exp_trig_rules,
+        .required_features = EXPR_INTEGRATE_MUL_FEATURE_EXP_TRIG
+    },
+    {
+        .rules             = integrate_mul_exp_hyperbolic_rules,
+        .required_features = EXPR_INTEGRATE_MUL_FEATURE_EXP_HYPERBOLIC
+    },
+    {
+        .rules             = integrate_mul_hyperbolic_product_rules,
+        .required_features = EXPR_INTEGRATE_MUL_FEATURE_HYPERBOLIC
+    },
+    {
+        .rules             = integrate_mul_trig_hyperbolic_rules,
+        .required_features = EXPR_INTEGRATE_MUL_FEATURE_TRIG_HYPERBOLIC
+    },
+    {
+        .rules             = integrate_mul_wrt_exp_trig_rules,
+        .required_features = EXPR_INTEGRATE_MUL_FEATURE_EXP_TRIG
+    },
+    {
+        .rules             = integrate_mul_exp_tanh_rules,
+        .required_features = EXPR_INTEGRATE_MUL_FEATURE_EXP_HYPERBOLIC
+    },
+    {
+        .rules             = integrate_mul_poly_exp_rules,
+        .required_features = EXPR_INTEGRATE_MUL_FEATURE_EXP
+    },
+    {
+        .rules             = integrate_mul_poly_trig_rules,
+        .required_features = EXPR_INTEGRATE_MUL_FEATURE_TRIG
+    },
+    {
+        .rules             = integrate_mul_poly_hyperbolic_rules,
+        .required_features = EXPR_INTEGRATE_MUL_FEATURE_HYPERBOLIC
+    },
+    {
+        .rules             = integrate_mul_log_rules,
+        .required_features = EXPR_INTEGRATE_MUL_FEATURE_LOG
+    },
+    {
+        .rules             = integrate_mul_by_parts_primary_rules,
+        .required_features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY
+    },
+    {
+        .rules             = integrate_mul_normal_logpdf_rules,
+        .required_features = EXPR_INTEGRATE_MUL_FEATURE_NORMAL_LOGPDF
+    },
+    {
+        .rules             = integrate_mul_by_parts_expint_rules,
+        .required_features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY
+    },
+    {
+        .rules        = integrate_mul_special_product_rules,
+        .any_features = EXPR_INTEGRATE_MUL_FEATURE_SPECIAL_PRODUCT
+    },
     { .rules = NULL }
 };
 
 static const expr_integrate_mul_rule_feature_entry_t integrate_mul_rule_feature_table[] = {
-    { .kind = EXPR_KIND_SIN, .features = EXPR_INTEGRATE_MUL_FEATURE_TRIG },
-    { .kind = EXPR_KIND_COS, .features = EXPR_INTEGRATE_MUL_FEATURE_TRIG },
-    { .kind = EXPR_KIND_TAN, .features = EXPR_INTEGRATE_MUL_FEATURE_TRIG },
-    { .kind = EXPR_KIND_SEC, .features = EXPR_INTEGRATE_MUL_FEATURE_TRIG },
-    { .kind = EXPR_KIND_COSEC, .features = EXPR_INTEGRATE_MUL_FEATURE_TRIG },
-    { .kind = EXPR_KIND_COT, .features = EXPR_INTEGRATE_MUL_FEATURE_TRIG },
-    { .kind = EXPR_KIND_SINH, .features = EXPR_INTEGRATE_MUL_FEATURE_HYPERBOLIC },
-    { .kind = EXPR_KIND_COSH, .features = EXPR_INTEGRATE_MUL_FEATURE_HYPERBOLIC },
-    { .kind = EXPR_KIND_TANH, .features = EXPR_INTEGRATE_MUL_FEATURE_HYPERBOLIC },
-    { .kind = EXPR_KIND_SECH, .features = EXPR_INTEGRATE_MUL_FEATURE_HYPERBOLIC },
-    { .kind = EXPR_KIND_COSECH, .features = EXPR_INTEGRATE_MUL_FEATURE_HYPERBOLIC },
-    { .kind = EXPR_KIND_COTH, .features = EXPR_INTEGRATE_MUL_FEATURE_HYPERBOLIC },
-    { .kind = EXPR_KIND_ASIN, .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY },
-    { .kind = EXPR_KIND_ACOS, .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY },
-    { .kind = EXPR_KIND_ATAN, .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY },
-    { .kind = EXPR_KIND_ASEC, .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY },
-    { .kind = EXPR_KIND_ACOSEC, .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY },
-    { .kind = EXPR_KIND_ACOT, .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY },
-    { .kind = EXPR_KIND_ASINH, .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY },
-    { .kind = EXPR_KIND_ACOSH, .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY },
-    { .kind = EXPR_KIND_ATANH, .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY },
-    { .kind = EXPR_KIND_ASECH, .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY },
-    { .kind = EXPR_KIND_ACOSECH, .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY },
-    { .kind = EXPR_KIND_ACOTH, .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY },
-    { .kind = EXPR_KIND_EXP, .features = EXPR_INTEGRATE_MUL_FEATURE_EXP },
-    { .kind = EXPR_KIND_LOG, .features = EXPR_INTEGRATE_MUL_FEATURE_LOG },
-    { .kind = EXPR_KIND_LOG10, .features = EXPR_INTEGRATE_MUL_FEATURE_LOG },
-    { .kind = EXPR_KIND_ERF, .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY },
-    { .kind = EXPR_KIND_ERFC, .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY },
-    { .kind = EXPR_KIND_NORMAL_PDF,
-      .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY },
-    { .kind = EXPR_KIND_NORMAL_CDF,
-      .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY },
-    { .kind = EXPR_KIND_NORMAL_LOGPDF,
-      .features = EXPR_INTEGRATE_MUL_FEATURE_NORMAL_LOGPDF },
-    { .kind = EXPR_KIND_EI, .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY },
-    { .kind = EXPR_KIND_E1, .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY }
+    { .kind = EXPR_KIND_SIN,           .features = EXPR_INTEGRATE_MUL_FEATURE_TRIG },
+    { .kind = EXPR_KIND_COS,           .features = EXPR_INTEGRATE_MUL_FEATURE_TRIG },
+    { .kind = EXPR_KIND_TAN,           .features = EXPR_INTEGRATE_MUL_FEATURE_TRIG },
+    { .kind = EXPR_KIND_SEC,           .features = EXPR_INTEGRATE_MUL_FEATURE_TRIG },
+    { .kind = EXPR_KIND_COSEC,         .features = EXPR_INTEGRATE_MUL_FEATURE_TRIG },
+    { .kind = EXPR_KIND_COT,           .features = EXPR_INTEGRATE_MUL_FEATURE_TRIG },
+    { .kind = EXPR_KIND_SINH,          .features = EXPR_INTEGRATE_MUL_FEATURE_HYPERBOLIC },
+    { .kind = EXPR_KIND_COSH,          .features = EXPR_INTEGRATE_MUL_FEATURE_HYPERBOLIC },
+    { .kind = EXPR_KIND_TANH,          .features = EXPR_INTEGRATE_MUL_FEATURE_HYPERBOLIC },
+    { .kind = EXPR_KIND_SECH,          .features = EXPR_INTEGRATE_MUL_FEATURE_HYPERBOLIC },
+    { .kind = EXPR_KIND_COSECH,        .features = EXPR_INTEGRATE_MUL_FEATURE_HYPERBOLIC },
+    { .kind = EXPR_KIND_COTH,          .features = EXPR_INTEGRATE_MUL_FEATURE_HYPERBOLIC },
+    { .kind = EXPR_KIND_ASIN,          .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY },
+    { .kind = EXPR_KIND_ACOS,          .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY },
+    { .kind = EXPR_KIND_ATAN,          .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY },
+    { .kind = EXPR_KIND_ASEC,          .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY },
+    { .kind = EXPR_KIND_ACOSEC,        .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY },
+    { .kind = EXPR_KIND_ACOT,          .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY },
+    { .kind = EXPR_KIND_ASINH,         .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY },
+    { .kind = EXPR_KIND_ACOSH,         .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY },
+    { .kind = EXPR_KIND_ATANH,         .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY },
+    { .kind = EXPR_KIND_ASECH,         .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY },
+    { .kind = EXPR_KIND_ACOSECH,       .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY },
+    { .kind = EXPR_KIND_ACOTH,         .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY },
+    { .kind = EXPR_KIND_EXP,           .features = EXPR_INTEGRATE_MUL_FEATURE_EXP },
+    { .kind = EXPR_KIND_LOG,           .features = EXPR_INTEGRATE_MUL_FEATURE_LOG },
+    { .kind = EXPR_KIND_LOG10,         .features = EXPR_INTEGRATE_MUL_FEATURE_LOG },
+    { .kind = EXPR_KIND_ERF,           .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY },
+    { .kind = EXPR_KIND_ERFC,          .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY },
+    { .kind = EXPR_KIND_NORMAL_PDF,    .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY },
+    { .kind = EXPR_KIND_NORMAL_CDF,    .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY },
+    { .kind = EXPR_KIND_NORMAL_LOGPDF, .features = EXPR_INTEGRATE_MUL_FEATURE_NORMAL_LOGPDF },
+    { .kind = EXPR_KIND_EI,            .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY },
+    { .kind = EXPR_KIND_E1,            .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY }
 };
 
 static const expr_integrate_div_rule_feature_entry_t integrate_div_rule_feature_table[] = {
-    { .kind = EXPR_KIND_ADD,
-      .denominator_features = EXPR_INTEGRATE_DIV_FEATURE_DEN_ADD_SUB },
-    { .kind = EXPR_KIND_SUB,
-      .denominator_features = EXPR_INTEGRATE_DIV_FEATURE_DEN_ADD_SUB },
-    { .kind = EXPR_KIND_POW,
-      .denominator_features = EXPR_INTEGRATE_DIV_FEATURE_DEN_POWER },
-    { .kind = EXPR_KIND_POW_D,
-      .denominator_features = EXPR_INTEGRATE_DIV_FEATURE_DEN_POWER },
-    { .kind = EXPR_KIND_LOG,
-      .numerator_features = EXPR_INTEGRATE_DIV_FEATURE_NUM_LOG },
-    { .kind = EXPR_KIND_LOG10,
-      .numerator_features = EXPR_INTEGRATE_DIV_FEATURE_NUM_LOG },
-    { .kind = EXPR_KIND_SQRT,
-      .denominator_features = EXPR_INTEGRATE_DIV_FEATURE_DEN_SQRT }
+    { .kind = EXPR_KIND_ADD,   .denominator_features = EXPR_INTEGRATE_DIV_FEATURE_DEN_ADD_SUB },
+    { .kind = EXPR_KIND_SUB,   .denominator_features = EXPR_INTEGRATE_DIV_FEATURE_DEN_ADD_SUB },
+    { .kind = EXPR_KIND_POW,   .denominator_features = EXPR_INTEGRATE_DIV_FEATURE_DEN_POWER },
+    { .kind = EXPR_KIND_POW_D, .denominator_features = EXPR_INTEGRATE_DIV_FEATURE_DEN_POWER },
+    { .kind = EXPR_KIND_LOG,   .numerator_features   = EXPR_INTEGRATE_DIV_FEATURE_NUM_LOG },
+    { .kind = EXPR_KIND_LOG10, .numerator_features   = EXPR_INTEGRATE_DIV_FEATURE_NUM_LOG },
+    { .kind = EXPR_KIND_SQRT,  .denominator_features = EXPR_INTEGRATE_DIV_FEATURE_DEN_SQRT }
 };
 
 static const expr_integrate_binary_rule_fn integrate_div_initial_rules[] = {
@@ -446,26 +470,44 @@ static const expr_integrate_binary_rule_fn integrate_div_rational_rules[] = {
 
 static const expr_integrate_div_rule_stage_t integrate_div_rule_stages[] = {
     { .rules = integrate_div_initial_rules },
-    { .rules = integrate_div_constant_denominator_rules,
-      .required_features = EXPR_INTEGRATE_DIV_FEATURE_DEN_INDEPENDENT },
-    { .rules = integrate_div_wrt_denominator_rules,
-      .required_features = EXPR_INTEGRATE_DIV_FEATURE_NUM_INDEPENDENT |
-                           EXPR_INTEGRATE_DIV_FEATURE_DEN_WRT },
-    { .rules = integrate_div_power_denominator_rules,
-      .any_features = EXPR_INTEGRATE_DIV_FEATURE_DEN_POWER_OR_SQRT },
-    { .rules = integrate_div_log_over_rules,
-      .required_features = EXPR_INTEGRATE_DIV_FEATURE_NUM_LOG },
-    { .rules = integrate_div_square_sum_rules,
-      .required_features = EXPR_INTEGRATE_DIV_FEATURE_DEN_ADD_SUB },
-    { .rules = integrate_div_root_lead_rules,
-      .required_features = EXPR_INTEGRATE_DIV_FEATURE_DEN_SQRT },
-    { .rules = integrate_div_affine_power_rules,
-      .any_features = EXPR_INTEGRATE_DIV_FEATURE_DEN_POWER_OR_SQRT },
-    { .rules = integrate_div_root_family_rules,
-      .required_features = EXPR_INTEGRATE_DIV_FEATURE_DEN_SQRT },
-    { .rules = integrate_div_elementary_inverse_rules,
-      .required_features = EXPR_INTEGRATE_DIV_FEATURE_NUM_INDEPENDENT,
-      .any_features = EXPR_INTEGRATE_DIV_FEATURE_DEN_ADD_SUB_OR_SQRT },
+    {
+        .rules             = integrate_div_constant_denominator_rules,
+        .required_features = EXPR_INTEGRATE_DIV_FEATURE_DEN_INDEPENDENT
+    },
+    {
+        .rules             = integrate_div_wrt_denominator_rules,
+        .required_features = EXPR_INTEGRATE_DIV_FEATURE_NUM_INDEPENDENT |
+                             EXPR_INTEGRATE_DIV_FEATURE_DEN_WRT
+    },
+    {
+        .rules        = integrate_div_power_denominator_rules,
+        .any_features = EXPR_INTEGRATE_DIV_FEATURE_DEN_POWER_OR_SQRT
+    },
+    {
+        .rules             = integrate_div_log_over_rules,
+        .required_features = EXPR_INTEGRATE_DIV_FEATURE_NUM_LOG
+    },
+    {
+        .rules             = integrate_div_square_sum_rules,
+        .required_features = EXPR_INTEGRATE_DIV_FEATURE_DEN_ADD_SUB
+    },
+    {
+        .rules             = integrate_div_root_lead_rules,
+        .required_features = EXPR_INTEGRATE_DIV_FEATURE_DEN_SQRT
+    },
+    {
+        .rules        = integrate_div_affine_power_rules,
+        .any_features = EXPR_INTEGRATE_DIV_FEATURE_DEN_POWER_OR_SQRT
+    },
+    {
+        .rules             = integrate_div_root_family_rules,
+        .required_features = EXPR_INTEGRATE_DIV_FEATURE_DEN_SQRT
+    },
+    {
+        .rules             = integrate_div_elementary_inverse_rules,
+        .required_features = EXPR_INTEGRATE_DIV_FEATURE_NUM_INDEPENDENT,
+        .any_features      = EXPR_INTEGRATE_DIV_FEATURE_DEN_ADD_SUB_OR_SQRT
+    },
     { .rules = integrate_div_affine_quotient_rules },
     { .rules = integrate_div_rational_rules },
     { .rules = NULL }

@@ -223,16 +223,166 @@ static void emit_binding_tex_powi(const expr_binding_expr_t *expr, sbuf_t *b, in
 static void emit_binding_tex_unary_op(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
 static void emit_binding_tex_binary_op(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
 static const binding_expr_ops_t s_binding_expr_ops[BINDING_EXPR_KIND_COUNT] = {
-    [EXPR_BINDING_EXPR_NUMBER]    = { BIND_PREC_ATOM,  true,  binding_free_number,    binding_clone_number,    binding_eval_number,    binding_number_value_number, expr_binding_simplify_atom,      binding_struct_eq_number,    binding_numeric_literal_true,   binding_exact_complex_number, binding_explicit_mul_separator_false, emit_binding_expr_number,    emit_binding_func_number,    emit_binding_tex_number    },
-    [EXPR_BINDING_EXPR_CONST]     = { BIND_PREC_ATOM,  true,  binding_free_none,      binding_clone_const,     binding_eval_const,     binding_number_value_false,  expr_binding_simplify_atom,      binding_struct_eq_const,     binding_numeric_literal_const,  binding_exact_complex_const,  binding_explicit_mul_separator_false, emit_binding_expr_const,     emit_binding_func_const,     emit_binding_tex_const     },
-    [EXPR_BINDING_EXPR_NEG]       = { BIND_PREC_UNARY, false, binding_free_unary,     binding_clone_neg,       binding_eval_neg,       binding_number_value_neg,    expr_binding_simplify_neg,       binding_struct_eq_unary,     binding_numeric_literal_unary,  binding_exact_complex_unary,  binding_explicit_mul_separator_unary, emit_binding_expr_neg,       emit_binding_func_neg,       emit_binding_tex_neg       },
-    [EXPR_BINDING_EXPR_ADD]       = { BIND_PREC_ADD,   false, binding_free_binary,    binding_clone_add,       binding_eval_add,       binding_number_value_add,    expr_binding_simplify_addsub,    binding_struct_eq_binary,    binding_numeric_literal_binary, binding_exact_complex_addsub, binding_explicit_mul_separator_false, emit_binding_expr_add,       emit_binding_func_add,       emit_binding_tex_add       },
-    [EXPR_BINDING_EXPR_SUB]       = { BIND_PREC_ADD,   false, binding_free_binary,    binding_clone_sub,       binding_eval_sub,       binding_number_value_sub,    expr_binding_simplify_addsub,    binding_struct_eq_binary,    binding_numeric_literal_binary, binding_exact_complex_addsub, binding_explicit_mul_separator_false, emit_binding_expr_sub,       emit_binding_func_sub,       emit_binding_tex_sub       },
-    [EXPR_BINDING_EXPR_MUL]       = { BIND_PREC_MUL,   false, binding_free_binary,    binding_clone_mul,       binding_eval_mul,       binding_number_value_mul,    expr_binding_simplify_mul,       binding_struct_eq_binary,    binding_numeric_literal_binary, binding_exact_complex_mul,    binding_explicit_mul_separator_mul, emit_binding_expr_mul_node,  emit_binding_func_mul_node,  emit_binding_tex_mul_node  },
-    [EXPR_BINDING_EXPR_DIV]       = { BIND_PREC_MUL,   false, binding_free_binary,    binding_clone_div,       binding_eval_div,       binding_number_value_div,    expr_binding_simplify_div,       binding_struct_eq_binary,    binding_numeric_literal_binary, binding_exact_complex_div,    binding_explicit_mul_separator_true, emit_binding_expr_div,       emit_binding_func_div,       emit_binding_tex_div       },
-    [EXPR_BINDING_EXPR_POWI]      = { BIND_PREC_POW,   true,  binding_free_powi,      binding_clone_powi,      binding_eval_powi,      binding_number_value_powi,   expr_binding_simplify_powi,      binding_struct_eq_powi,      binding_numeric_literal_powi,   binding_exact_complex_powi,   binding_explicit_mul_separator_powi, emit_binding_expr_powi,      emit_binding_func_powi,      emit_binding_tex_powi      },
-    [EXPR_BINDING_EXPR_UNARY_OP]  = { BIND_PREC_UNARY, false, binding_free_unary_op,  binding_clone_unary_op,  binding_eval_unary_op,  binding_number_value_false,  expr_binding_simplify_unary_op,  binding_struct_eq_unary_op,  binding_numeric_literal_false,  NULL,                         binding_explicit_mul_separator_false, emit_binding_expr_unary_op,  emit_binding_func_unary_op,  emit_binding_tex_unary_op  },
-    [EXPR_BINDING_EXPR_BINARY_OP] = { BIND_PREC_POW,   false, binding_free_binary_op, binding_clone_binary_op, binding_eval_binary_op, binding_number_value_false,  expr_binding_simplify_binary_op, binding_struct_eq_binary_op, binding_numeric_literal_false,  NULL,                         binding_explicit_mul_separator_false, emit_binding_expr_binary_op, emit_binding_func_binary_op, emit_binding_tex_binary_op }
+    [EXPR_BINDING_EXPR_NUMBER] = {
+        .precedence              = BIND_PREC_ATOM,
+        .atomic                  = true,
+        .free_payload            = binding_free_number,
+        .clone                   = binding_clone_number,
+        .eval_expr               = binding_eval_number,
+        .number_value            = binding_number_value_number,
+        .simplify                = expr_binding_simplify_atom,
+        .struct_eq               = binding_struct_eq_number,
+        .numeric_literal         = binding_numeric_literal_true,
+        .exact_complex           = binding_exact_complex_number,
+        .explicit_mul_separator  = binding_explicit_mul_separator_false,
+        .emit_expr               = emit_binding_expr_number,
+        .emit_func               = emit_binding_func_number,
+        .emit_tex                = emit_binding_tex_number
+    },
+    [EXPR_BINDING_EXPR_CONST] = {
+        .precedence              = BIND_PREC_ATOM,
+        .atomic                  = true,
+        .free_payload            = binding_free_none,
+        .clone                   = binding_clone_const,
+        .eval_expr               = binding_eval_const,
+        .number_value            = binding_number_value_false,
+        .simplify                = expr_binding_simplify_atom,
+        .struct_eq               = binding_struct_eq_const,
+        .numeric_literal         = binding_numeric_literal_const,
+        .exact_complex           = binding_exact_complex_const,
+        .explicit_mul_separator  = binding_explicit_mul_separator_false,
+        .emit_expr               = emit_binding_expr_const,
+        .emit_func               = emit_binding_func_const,
+        .emit_tex                = emit_binding_tex_const
+    },
+    [EXPR_BINDING_EXPR_NEG] = {
+        .precedence              = BIND_PREC_UNARY,
+        .atomic                  = false,
+        .free_payload            = binding_free_unary,
+        .clone                   = binding_clone_neg,
+        .eval_expr               = binding_eval_neg,
+        .number_value            = binding_number_value_neg,
+        .simplify                = expr_binding_simplify_neg,
+        .struct_eq               = binding_struct_eq_unary,
+        .numeric_literal         = binding_numeric_literal_unary,
+        .exact_complex           = binding_exact_complex_unary,
+        .explicit_mul_separator  = binding_explicit_mul_separator_unary,
+        .emit_expr               = emit_binding_expr_neg,
+        .emit_func               = emit_binding_func_neg,
+        .emit_tex                = emit_binding_tex_neg
+    },
+    [EXPR_BINDING_EXPR_ADD] = {
+        .precedence              = BIND_PREC_ADD,
+        .atomic                  = false,
+        .free_payload            = binding_free_binary,
+        .clone                   = binding_clone_add,
+        .eval_expr               = binding_eval_add,
+        .number_value            = binding_number_value_add,
+        .simplify                = expr_binding_simplify_addsub,
+        .struct_eq               = binding_struct_eq_binary,
+        .numeric_literal         = binding_numeric_literal_binary,
+        .exact_complex           = binding_exact_complex_addsub,
+        .explicit_mul_separator  = binding_explicit_mul_separator_false,
+        .emit_expr               = emit_binding_expr_add,
+        .emit_func               = emit_binding_func_add,
+        .emit_tex                = emit_binding_tex_add
+    },
+    [EXPR_BINDING_EXPR_SUB] = {
+        .precedence              = BIND_PREC_ADD,
+        .atomic                  = false,
+        .free_payload            = binding_free_binary,
+        .clone                   = binding_clone_sub,
+        .eval_expr               = binding_eval_sub,
+        .number_value            = binding_number_value_sub,
+        .simplify                = expr_binding_simplify_addsub,
+        .struct_eq               = binding_struct_eq_binary,
+        .numeric_literal         = binding_numeric_literal_binary,
+        .exact_complex           = binding_exact_complex_addsub,
+        .explicit_mul_separator  = binding_explicit_mul_separator_false,
+        .emit_expr               = emit_binding_expr_sub,
+        .emit_func               = emit_binding_func_sub,
+        .emit_tex                = emit_binding_tex_sub
+    },
+    [EXPR_BINDING_EXPR_MUL] = {
+        .precedence              = BIND_PREC_MUL,
+        .atomic                  = false,
+        .free_payload            = binding_free_binary,
+        .clone                   = binding_clone_mul,
+        .eval_expr               = binding_eval_mul,
+        .number_value            = binding_number_value_mul,
+        .simplify                = expr_binding_simplify_mul,
+        .struct_eq               = binding_struct_eq_binary,
+        .numeric_literal         = binding_numeric_literal_binary,
+        .exact_complex           = binding_exact_complex_mul,
+        .explicit_mul_separator  = binding_explicit_mul_separator_mul,
+        .emit_expr               = emit_binding_expr_mul_node,
+        .emit_func               = emit_binding_func_mul_node,
+        .emit_tex                = emit_binding_tex_mul_node
+    },
+    [EXPR_BINDING_EXPR_DIV] = {
+        .precedence              = BIND_PREC_MUL,
+        .atomic                  = false,
+        .free_payload            = binding_free_binary,
+        .clone                   = binding_clone_div,
+        .eval_expr               = binding_eval_div,
+        .number_value            = binding_number_value_div,
+        .simplify                = expr_binding_simplify_div,
+        .struct_eq               = binding_struct_eq_binary,
+        .numeric_literal         = binding_numeric_literal_binary,
+        .exact_complex           = binding_exact_complex_div,
+        .explicit_mul_separator  = binding_explicit_mul_separator_true,
+        .emit_expr               = emit_binding_expr_div,
+        .emit_func               = emit_binding_func_div,
+        .emit_tex                = emit_binding_tex_div
+    },
+    [EXPR_BINDING_EXPR_POWI] = {
+        .precedence              = BIND_PREC_POW,
+        .atomic                  = true,
+        .free_payload            = binding_free_powi,
+        .clone                   = binding_clone_powi,
+        .eval_expr               = binding_eval_powi,
+        .number_value            = binding_number_value_powi,
+        .simplify                = expr_binding_simplify_powi,
+        .struct_eq               = binding_struct_eq_powi,
+        .numeric_literal         = binding_numeric_literal_powi,
+        .exact_complex           = binding_exact_complex_powi,
+        .explicit_mul_separator  = binding_explicit_mul_separator_powi,
+        .emit_expr               = emit_binding_expr_powi,
+        .emit_func               = emit_binding_func_powi,
+        .emit_tex                = emit_binding_tex_powi
+    },
+    [EXPR_BINDING_EXPR_UNARY_OP] = {
+        .precedence              = BIND_PREC_UNARY,
+        .atomic                  = false,
+        .free_payload            = binding_free_unary_op,
+        .clone                   = binding_clone_unary_op,
+        .eval_expr               = binding_eval_unary_op,
+        .number_value            = binding_number_value_false,
+        .simplify                = expr_binding_simplify_unary_op,
+        .struct_eq               = binding_struct_eq_unary_op,
+        .numeric_literal         = binding_numeric_literal_false,
+        .exact_complex           = NULL,
+        .explicit_mul_separator  = binding_explicit_mul_separator_false,
+        .emit_expr               = emit_binding_expr_unary_op,
+        .emit_func               = emit_binding_func_unary_op,
+        .emit_tex                = emit_binding_tex_unary_op
+    },
+    [EXPR_BINDING_EXPR_BINARY_OP] = {
+        .precedence              = BIND_PREC_POW,
+        .atomic                  = false,
+        .free_payload            = binding_free_binary_op,
+        .clone                   = binding_clone_binary_op,
+        .eval_expr               = binding_eval_binary_op,
+        .number_value            = binding_number_value_false,
+        .simplify                = expr_binding_simplify_binary_op,
+        .struct_eq               = binding_struct_eq_binary_op,
+        .numeric_literal         = binding_numeric_literal_false,
+        .exact_complex           = NULL,
+        .explicit_mul_separator  = binding_explicit_mul_separator_false,
+        .emit_expr               = emit_binding_expr_binary_op,
+        .emit_func               = emit_binding_func_binary_op,
+        .emit_tex                = emit_binding_tex_binary_op
+    }
 };
 
 static const binding_expr_ops_t *binding_expr_ops_for_kind(expr_binding_expr_kind_t kind)
@@ -1531,163 +1681,160 @@ typedef struct {
     const expr_ops_t *ops;
 } binding_func_entry_t;
 
-#define BINDING_FUNC_TABLE_SIZE 71u
+#define BINDING_FUNC_TABLE_SIZE 99u
 
 static const unsigned char s_binding_func_displacements[BINDING_FUNC_TABLE_SIZE] = {
-    0, 0, 0, 0, 0, 0, 1, 0, 2, 0,
-    0, 7, 1, 6, 0, 2, 0, 0, 12, 3,
-    0, 1, 1, 2, 6, 1, 0, 0, 2, 1,
-    0, 20, 17, 3, 32, 0, 0, 2, 1, 6,
-    37, 0, 0, 0, 2, 0, 0, 0, 0
+     0,  0,  1,  0,  0,  0,  0,  0,  8,  0,
+     0,  5,  3,  8,  0,  0,  0, 14,  0,  0,
+     1,  0,  1,  0,  3,  0,  0,  0,  0,  0,
+     0,  0,  0,  4,  0,  0,  5,  4,  0,  1,
+     0,  1,  0,  0,  0,  0,  1,  0,  1,  2,
+     0,  0,  0,  0,  0,  0,  3,  2,  0,  0,
+     9,  0,  0,  0,  3,  0,  1,  0,  0,  1,
+     1,  0,  1, 12,  0,  0,  2,  0, 14,  0,
+    16,  0,  0,  4,  9,  0, 12,  0, 25,  1,
+    25,  6, 17, 43, 16,  2,  0,  0,  6
 };
 
 static const binding_func_entry_t s_binding_funcs[BINDING_FUNC_TABLE_SIZE] = {
-    { .kw = "atan", .is_binary = false, .ops = &ops_atan },
-    { .kw = "lambert_wm1", .is_binary = false, .ops = &ops_lambert_wm1 },
-    { .kw = "erf", .is_binary = false, .ops = &ops_erf },
-    { .kw = "abs", .is_binary = false, .ops = &ops_abs },
-    { .kw = "sinh", .is_binary = false, .ops = &ops_sinh },
-    { .kw = "erfc", .is_binary = false, .ops = &ops_erfc },
-    { .kw = "W0", .is_binary = false, .ops = &ops_lambert_w0 },
-    { .kw = "erfcinv", .is_binary = false, .ops = &ops_erfcinv },
-    { .kw = "ln", .is_binary = false, .ops = &ops_log },
-    { .kw = "lambert_w0", .is_binary = false, .ops = &ops_lambert_w0 },
-    { .kw = "erfinv", .is_binary = false, .ops = &ops_erfinv },
-    { .kw = "cos", .is_binary = false, .ops = &ops_cos },
-    { .kw = "log10", .is_binary = false, .ops = &ops_log10 },
-    { .kw = "tan", .is_binary = false, .ops = &ops_tan },
-    { .kw = "digamma", .is_binary = false, .ops = &ops_digamma },
-    { .kw = "trigamma", .is_binary = false, .ops = &ops_trigamma },
-    { .kw = "normal_pdf", .is_binary = false, .ops = &ops_normal_pdf },
-    { .kw = "hypot", .is_binary = true, .ops = &ops_hypot },
-    { .kw = "Ei", .is_binary = false, .ops = &ops_ei },
-    { .kw = "W_0", .is_binary = false, .ops = &ops_lambert_w0 },
-    { .kw = "acosh", .is_binary = false, .ops = &ops_acosh },
-    { .kw = "sin", .is_binary = false, .ops = &ops_sin },
-    { .kw = "W₀", .is_binary = false, .ops = &ops_lambert_w0 },
-    { .kw = "ceil", .is_binary = false, .ops = &ops_ceil },
-    { .kw = "productlog", .is_binary = false, .ops = &ops_lambert_w },
-    { .kw = "asinh", .is_binary = false, .ops = &ops_asinh },
-    { .kw = "log", .is_binary = false, .ops = &ops_log10 },
-    { .kw = "gammainv", .is_binary = false, .ops = &ops_gammainv },
-    { .kw = "gammainc_lower", .is_binary = true, .ops = &ops_gammainc_lower },
-    { .kw = "gammainc_upper", .is_binary = true, .ops = &ops_gammainc_upper },
-    { .kw = "gammainc_P", .is_binary = true, .ops = &ops_gammainc_P },
-    { .kw = "gammainc_Q", .is_binary = true, .ops = &ops_gammainc_Q },
-    { .kw = "W_-1", .is_binary = false, .ops = &ops_lambert_wm1 },
-    { .kw = "tanh", .is_binary = false, .ops = &ops_tanh },
-    { .kw = "logbeta", .is_binary = true, .ops = &ops_logbeta },
-    { .kw = "gamma", .is_binary = false, .ops = &ops_gamma },
-    { .kw = "E1", .is_binary = false, .ops = &ops_e1 },
-    { .kw = "W₋₁", .is_binary = false, .ops = &ops_lambert_wm1 },
-    { .kw = "floor", .is_binary = false, .ops = &ops_floor },
-    { .kw = "normal_cdf", .is_binary = false, .ops = &ops_normal_cdf },
-    { .kw = "atanh", .is_binary = false, .ops = &ops_atanh },
-    { .kw = "asin", .is_binary = false, .ops = &ops_asin },
-    { .kw = "acos", .is_binary = false, .ops = &ops_acos },
-    { .kw = "exp", .is_binary = false, .ops = &ops_exp },
-    { .kw = "pow", .is_binary = true, .ops = &ops_pow },
-    { .kw = "W-1", .is_binary = false, .ops = &ops_lambert_wm1 },
-    { .kw = "cosh", .is_binary = false, .ops = &ops_cosh },
-    { .kw = "sqrt", .is_binary = false, .ops = &ops_sqrt },
-    { .kw = "lgamma", .is_binary = false, .ops = &ops_lgamma },
-    { .kw = "W", .is_binary = false, .ops = &ops_lambert_w },
-    { .kw = "beta", .is_binary = true, .ops = &ops_beta },
-    { .kw = "atan2", .is_binary = true, .ops = &ops_atan2 },
-    { .kw = "normal_logpdf", .is_binary = false, .ops = &ops_normal_logpdf },
-    { .kw = "factorial", .is_binary = false, .ops = &ops_factorial },
-    { .kw = "fibonacci", .is_binary = false, .ops = &ops_fibonacci },
-    { .kw = "partition", .is_binary = false, .ops = &ops_partition },
-    { .kw = "isqrt", .is_binary = false, .ops = &ops_isqrt },
-    { .kw = "gcd", .is_binary = true, .ops = &ops_gcd },
-    { .kw = "lcm", .is_binary = true, .ops = &ops_lcm },
-    { .kw = "mod", .is_binary = true, .ops = &ops_mod },
-    { .kw = "modinv", .is_binary = true, .ops = &ops_modinv },
-    { .kw = "is_prime", .is_binary = false, .ops = &ops_is_prime },
-    { .kw = "next_prime", .is_binary = false, .ops = &ops_next_prime },
-    { .kw = "prev_prime", .is_binary = false, .ops = &ops_prev_prime },
-    { .kw = "AND", .is_binary = true, .ops = &ops_bit_and },
-    { .kw = "OR", .is_binary = true, .ops = &ops_bit_or },
-    { .kw = "XOR", .is_binary = true, .ops = &ops_bit_xor },
-    { .kw = "NOT", .is_binary = false, .ops = &ops_bit_not },
-    { .kw = "SHL", .is_binary = true, .ops = &ops_shl },
-    { .kw = "SHR", .is_binary = true, .ops = &ops_shr },
-    { .kw = "factors", .is_binary = false, .ops = &ops_factors }
+    [ 0] = { .kw = "log10",          .is_binary = false, .ops = &ops_log10 },
+    [ 1] = { .kw = "factors",        .is_binary = false, .ops = &ops_factors },
+    [ 2] = { .kw = "acosh",          .is_binary = false, .ops = &ops_acosh },
+    [ 3] = { .kw = "acot",           .is_binary = false, .ops = &ops_acot },
+    [ 4] = { .kw = "E1",             .is_binary = false, .ops = &ops_e1 },
+    [ 5] = { .kw = "arcsec",         .is_binary = false, .ops = &ops_asec },
+    [ 6] = { .kw = "exp",            .is_binary = false, .ops = &ops_exp },
+    [ 7] = { .kw = "W_0",            .is_binary = false, .ops = &ops_lambert_w0 },
+    [ 8] = { .kw = "logbeta",        .is_binary = true,  .ops = &ops_logbeta },
+    [ 9] = { .kw = "lcm",            .is_binary = true,  .ops = &ops_lcm },
+    [10] = { .kw = "gamma",          .is_binary = false, .ops = &ops_gamma },
+    [11] = { .kw = "XOR",            .is_binary = true,  .ops = &ops_bit_xor },
+    [12] = { .kw = "modinv",         .is_binary = true,  .ops = &ops_modinv },
+    [13] = { .kw = "tan",            .is_binary = false, .ops = &ops_tan },
+    [14] = { .kw = "gammainc_lower", .is_binary = true,  .ops = &ops_gammainc_lower },
+    [15] = { .kw = "csch",           .is_binary = false, .ops = &ops_cosech },
+    [16] = { .kw = "logpdf",         .is_binary = false, .ops = &ops_logpdf },
+    [17] = { .kw = "partition",      .is_binary = false, .ops = &ops_partition },
+    [18] = { .kw = "W",              .is_binary = false, .ops = &ops_lambert_w },
+    [19] = { .kw = "normal_pdf",     .is_binary = false, .ops = &ops_normal_pdf },
+    [20] = { .kw = "acsch",          .is_binary = false, .ops = &ops_acosech },
+    [21] = { .kw = "W-1",            .is_binary = false, .ops = &ops_lambert_wm1 },
+    [22] = { .kw = "AND",            .is_binary = true,  .ops = &ops_bit_and },
+    [23] = { .kw = "cot",            .is_binary = false, .ops = &ops_cot },
+    [24] = { .kw = "sinh",           .is_binary = false, .ops = &ops_sinh },
+    [25] = { .kw = "asinh",          .is_binary = false, .ops = &ops_asinh },
+    [26] = { .kw = "coth",           .is_binary = false, .ops = &ops_coth },
+    [27] = { .kw = "floor",          .is_binary = false, .ops = &ops_floor },
+    [28] = { .kw = "arccsc",         .is_binary = false, .ops = &ops_acosec },
+    [29] = { .kw = "cosec",          .is_binary = false, .ops = &ops_cosec },
+    [30] = { .kw = "acos",           .is_binary = false, .ops = &ops_acos },
+    [31] = { .kw = "ln",             .is_binary = false, .ops = &ops_log },
+    [32] = { .kw = "isqrt",          .is_binary = false, .ops = &ops_isqrt },
+    [33] = { .kw = "sqrt",           .is_binary = false, .ops = &ops_sqrt },
+    [34] = { .kw = "lambert_w0",     .is_binary = false, .ops = &ops_lambert_w0 },
+    [35] = { .kw = "gcd",            .is_binary = true,  .ops = &ops_gcd },
+    [36] = { .kw = "pdf",            .is_binary = false, .ops = &ops_pdf },
+    [37] = { .kw = "atanh",          .is_binary = false, .ops = &ops_atanh },
+    [38] = { .kw = "csc",            .is_binary = false, .ops = &ops_cosec },
+    [39] = { .kw = "is_prime",       .is_binary = false, .ops = &ops_is_prime },
+    [40] = { .kw = "gammainc_Q",     .is_binary = true,  .ops = &ops_gammainc_Q },
+    [41] = { .kw = "acosec",         .is_binary = false, .ops = &ops_acosec },
+    [42] = { .kw = "erfc",           .is_binary = false, .ops = &ops_erfc },
+    [43] = { .kw = "abs",            .is_binary = false, .ops = &ops_abs },
+    [44] = { .kw = "arcsch",         .is_binary = false, .ops = &ops_acosech },
+    [45] = { .kw = "lgamma",         .is_binary = false, .ops = &ops_lgamma },
+    [46] = { .kw = "arccosec",       .is_binary = false, .ops = &ops_acosec },
+    [47] = { .kw = "SHR",            .is_binary = true,  .ops = &ops_shr },
+    [48] = { .kw = "atan2",          .is_binary = true,  .ops = &ops_atan2 },
+    [49] = { .kw = "sec",            .is_binary = false, .ops = &ops_sec },
+    [50] = { .kw = "beta",           .is_binary = true,  .ops = &ops_beta },
+    [51] = { .kw = "gammainc_upper", .is_binary = true,  .ops = &ops_gammainc_upper },
+    [52] = { .kw = "erfinv",         .is_binary = false, .ops = &ops_erfinv },
+    [53] = { .kw = "ceil",           .is_binary = false, .ops = &ops_ceil },
+    [54] = { .kw = "arcosech",       .is_binary = false, .ops = &ops_acosech },
+    [55] = { .kw = "fibonacci",      .is_binary = false, .ops = &ops_fibonacci },
+    [56] = { .kw = "asech",          .is_binary = false, .ops = &ops_asech },
+    [57] = { .kw = "NOT",            .is_binary = false, .ops = &ops_bit_not },
+    [58] = { .kw = "mod",            .is_binary = true,  .ops = &ops_mod },
+    [59] = { .kw = "W_-1",           .is_binary = false, .ops = &ops_lambert_wm1 },
+    [60] = { .kw = "cosech",         .is_binary = false, .ops = &ops_cosech },
+    [61] = { .kw = "hypot",          .is_binary = true,  .ops = &ops_hypot },
+    [62] = { .kw = "asec",           .is_binary = false, .ops = &ops_asec },
+    [63] = { .kw = "lambert_wm1",    .is_binary = false, .ops = &ops_lambert_wm1 },
+    [64] = { .kw = "OR",             .is_binary = true,  .ops = &ops_bit_or },
+    [65] = { .kw = "SHL",            .is_binary = true,  .ops = &ops_shl },
+    [66] = { .kw = "trigamma",       .is_binary = false, .ops = &ops_trigamma },
+    [67] = { .kw = "log",            .is_binary = false, .ops = &ops_log10 },
+    [68] = { .kw = "next_prime",     .is_binary = false, .ops = &ops_next_prime },
+    [69] = { .kw = "arsech",         .is_binary = false, .ops = &ops_asech },
+    [70] = { .kw = "W₋₁",            .is_binary = false, .ops = &ops_lambert_wm1 },
+    [71] = { .kw = "erf",            .is_binary = false, .ops = &ops_erf },
+    [72] = { .kw = "sech",           .is_binary = false, .ops = &ops_sech },
+    [73] = { .kw = "lg",             .is_binary = false, .ops = &ops_log10 },
+    [74] = { .kw = "W0",             .is_binary = false, .ops = &ops_lambert_w0 },
+    [75] = { .kw = "cosh",           .is_binary = false, .ops = &ops_cosh },
+    [76] = { .kw = "gammainv",       .is_binary = false, .ops = &ops_gammainv },
+    [77] = { .kw = "arcoth",         .is_binary = false, .ops = &ops_acoth },
+    [78] = { .kw = "productlog",     .is_binary = false, .ops = &ops_lambert_w },
+    [79] = { .kw = "prev_prime",     .is_binary = false, .ops = &ops_prev_prime },
+    [80] = { .kw = "tanh",           .is_binary = false, .ops = &ops_tanh },
+    [81] = { .kw = "digamma",        .is_binary = false, .ops = &ops_digamma },
+    [82] = { .kw = "cdf",            .is_binary = false, .ops = &ops_cdf },
+    [83] = { .kw = "atan",           .is_binary = false, .ops = &ops_atan },
+    [84] = { .kw = "factorial",      .is_binary = false, .ops = &ops_factorial },
+    [85] = { .kw = "asin",           .is_binary = false, .ops = &ops_asin },
+    [86] = { .kw = "sin",            .is_binary = false, .ops = &ops_sin },
+    [87] = { .kw = "pow",            .is_binary = true,  .ops = &ops_pow },
+    [88] = { .kw = "acoth",          .is_binary = false, .ops = &ops_acoth },
+    [89] = { .kw = "Ei",             .is_binary = false, .ops = &ops_ei },
+    [90] = { .kw = "gammainc_P",     .is_binary = true,  .ops = &ops_gammainc_P },
+    [91] = { .kw = "normal_logpdf",  .is_binary = false, .ops = &ops_normal_logpdf },
+    [92] = { .kw = "cos",            .is_binary = false, .ops = &ops_cos },
+    [93] = { .kw = "normal_cdf",     .is_binary = false, .ops = &ops_normal_cdf },
+    [94] = { .kw = "erfcinv",        .is_binary = false, .ops = &ops_erfcinv },
+    [95] = { .kw = "arccot",         .is_binary = false, .ops = &ops_acot },
+    [96] = { .kw = "acsc",           .is_binary = false, .ops = &ops_acosec },
+    [97] = { .kw = "acosech",        .is_binary = false, .ops = &ops_acosech },
+    [98] = { .kw = "W₀",             .is_binary = false, .ops = &ops_lambert_w0 },
 };
 
-static const binding_func_entry_t s_extra_binding_funcs[] = {
-    { .kw = "pdf", .is_binary = false, .ops = &ops_pdf },
-    { .kw = "cdf", .is_binary = false, .ops = &ops_cdf },
-    { .kw = "logpdf", .is_binary = false, .ops = &ops_logpdf },
-    { .kw = "sec", .is_binary = false, .ops = &ops_sec },
-    { .kw = "lg", .is_binary = false, .ops = &ops_log10 },
-    { .kw = "cosec", .is_binary = false, .ops = &ops_cosec },
-    { .kw = "csc", .is_binary = false, .ops = &ops_cosec },
-    { .kw = "cot", .is_binary = false, .ops = &ops_cot },
-    { .kw = "sech", .is_binary = false, .ops = &ops_sech },
-    { .kw = "cosech", .is_binary = false, .ops = &ops_cosech },
-    { .kw = "csch", .is_binary = false, .ops = &ops_cosech },
-    { .kw = "coth", .is_binary = false, .ops = &ops_coth },
-    { .kw = "asec", .is_binary = false, .ops = &ops_asec },
-    { .kw = "arcsec", .is_binary = false, .ops = &ops_asec },
-    { .kw = "acosec", .is_binary = false, .ops = &ops_acosec },
-    { .kw = "arccosec", .is_binary = false, .ops = &ops_acosec },
-    { .kw = "acsc", .is_binary = false, .ops = &ops_acosec },
-    { .kw = "arccsc", .is_binary = false, .ops = &ops_acosec },
-    { .kw = "acot", .is_binary = false, .ops = &ops_acot },
-    { .kw = "arccot", .is_binary = false, .ops = &ops_acot },
-    { .kw = "asech", .is_binary = false, .ops = &ops_asech },
-    { .kw = "arsech", .is_binary = false, .ops = &ops_asech },
-    { .kw = "acosech", .is_binary = false, .ops = &ops_acosech },
-    { .kw = "arcosech", .is_binary = false, .ops = &ops_acosech },
-    { .kw = "acsch", .is_binary = false, .ops = &ops_acosech },
-    { .kw = "arcsch", .is_binary = false, .ops = &ops_acosech },
-    { .kw = "acoth", .is_binary = false, .ops = &ops_acoth },
-    { .kw = "arcoth", .is_binary = false, .ops = &ops_acoth },
-};
-
-static unsigned binding_func_bucket_hash(string_view_t kw)
+static unsigned binding_func_hash_values(string_view_t kw, unsigned seed)
 {
     size_t len = string_view_length(kw);
-    unsigned char first = 0u;
-    unsigned char last = 0u;
-    unsigned h;
+    size_t pos = 0u;
+    unsigned h = seed ^ (unsigned)len;
+    unsigned index = 1u;
 
-    if (!expr_parse_view_peek_ascii(kw, 0u, &first) ||
-        !expr_parse_view_peek_ascii(kw, len - 1u, &last))
+    if (string_view_is_empty(kw))
         return 0u;
 
-    h = (unsigned)len + first + last;
+    while (pos < len) {
+        uint32_t value = 0u;
+        size_t width = 0u;
 
-    for (size_t i = 1u; i + 1u < len; ++i) {
-        unsigned char b = 0u;
-        if (expr_parse_view_peek_ascii(kw, i, &b))
-            h += (unsigned)(i + 1u) * b;
+        if (!expr_parse_view_peek_value(kw, pos, &value, &width) || width == 0u)
+            break;
+
+        h ^= (unsigned)value +
+             0x9e3779b9u +
+             index * 0x85ebca6bu;
+        h *= 16777619u;
+        h ^= h >> 13u;
+        pos += width;
+        ++index;
     }
 
     return h % BINDING_FUNC_TABLE_SIZE;
 }
 
+static unsigned binding_func_bucket_hash(string_view_t kw)
+{
+    return binding_func_hash_values(kw, 0x811c9dc5u);
+}
+
 static unsigned binding_func_slot_hash(string_view_t kw)
 {
-    size_t len = string_view_length(kw);
-    unsigned char first = 0u;
-    unsigned char last = 0u;
-    unsigned h;
-
-    if (!expr_parse_view_peek_ascii(kw, 0u, &first) ||
-        !expr_parse_view_peek_ascii(kw, len - 1u, &last))
-        return 0u;
-
-    h = first + last;
-
-    for (size_t i = 0u; i < len; ++i) {
-        unsigned char b = 0u;
-        if (expr_parse_view_peek_ascii(kw, i, &b))
-            h += (unsigned)(i + 3u) * b;
-    }
-
-    return h % BINDING_FUNC_TABLE_SIZE;
+    return binding_func_hash_values(kw, 0x85ebca6bu);
 }
 
 static bool binding_func_entry_matches(const binding_func_entry_t *entry,
@@ -1712,18 +1859,6 @@ static const binding_func_entry_t *binding_func_lookup(string_view_t kw)
 
     if (binding_func_entry_matches(entry, kw))
         return entry;
-
-    for (size_t i = 0u; i < BINDING_FUNC_TABLE_SIZE; ++i) {
-        entry = &s_binding_funcs[i];
-        if (binding_func_entry_matches(entry, kw))
-            return entry;
-    }
-
-    for (size_t i = 0u; i < sizeof(s_extra_binding_funcs) / sizeof(s_extra_binding_funcs[0]); ++i) {
-        entry = &s_extra_binding_funcs[i];
-        if (binding_func_entry_matches(entry, kw))
-            return entry;
-    }
 
     return NULL;
 }
