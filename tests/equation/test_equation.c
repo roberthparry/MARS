@@ -30,8 +30,7 @@ static int test_equation_create_numeric_solutions_call(
 
 #define ASSERT_NEW_RESULT(name) equation_solutions_t *(name) = NULL
 #define RESULT_COUNT(result_ptr) equation_solutions_count((result_ptr))
-#define RESULT_IS_VALID(result_ptr) equation_solutions_are_valid((result_ptr))
-#define RESULT_IS_SOLVED(result_ptr) equation_solutions_has_any((result_ptr))
+#define RESULT_IS_SOLVED(result_ptr) (equation_solutions_count((result_ptr)) > 0u)
 #define RESULT_SOLUTION(result_ptr, index) \
     equation_solutions_at((result_ptr), (index))
 #define equation_solve_result_free(ptr) equation_solutions_free((ptr))
@@ -195,7 +194,6 @@ static void test_equation_from_string_shares_symbols_across_sides(void)
 
     ASSERT_FALSE(equation_is_solved_for(equation, x));
     ASSERT_EQ_INT(equation_solve_for(equation, x, result), 0);
-    ASSERT_TRUE(RESULT_IS_VALID(result));
     ASSERT_FALSE(RESULT_IS_SOLVED(result));
     ASSERT_EQ_INT((int)RESULT_COUNT(result), 0);
 
@@ -217,7 +215,6 @@ static void test_equation_from_string_accepts_bare_equation(void)
     ASSERT_NOT_NULL(x);
 
     ASSERT_EQ_INT(equation_solve_for(equation, x, result), 0);
-    ASSERT_TRUE(RESULT_IS_VALID(result));
     ASSERT_TRUE(RESULT_IS_SOLVED(result));
     ASSERT_EQ_INT((int)RESULT_COUNT(result), 1);
     ASSERT_TRUE(test_equation_result_contains_long(result, 2L));
@@ -251,7 +248,6 @@ static void test_equation_numeric_solves_all_variable_bindings(void)
     ASSERT_NOT_NULL(y);
 
     ASSERT_EQ_INT(equation_solve_numeric(equation, bindings, &options, result), 0);
-    ASSERT_TRUE(RESULT_IS_VALID(result));
     ASSERT_TRUE(RESULT_IS_SOLVED(result));
     ASSERT_EQ_INT((int)RESULT_COUNT(result), 2);
     ASSERT_TRUE(test_equation_result_has_solution_for(result, x));
@@ -285,7 +281,6 @@ static void test_equation_numeric_rejects_unresolved_parameter_residual(void)
     ASSERT_NOT_NULL(x);
 
     ASSERT_EQ_INT(equation_solve_numeric(equation, bindings, &options, result), 0);
-    ASSERT_TRUE(RESULT_IS_VALID(result));
     ASSERT_FALSE(RESULT_IS_SOLVED(result));
     ASSERT_EQ_INT((int)RESULT_COUNT(result), 0);
 
@@ -325,7 +320,6 @@ static void test_equation_to_text_round_trips_through_parser(void)
     num_destroy(&x_value);
 
     ASSERT_EQ_INT(equation_solve_for(roundtrip, x, result), 0);
-    ASSERT_TRUE(RESULT_IS_VALID(result));
     ASSERT_TRUE(RESULT_IS_SOLVED(result));
     ASSERT_EQ_INT((int)RESULT_COUNT(result), 1);
     ASSERT_TRUE(test_equation_result_contains_long(result, 2L));
@@ -351,7 +345,6 @@ static void test_equation_detects_already_solved_form(void)
     ASSERT_TRUE(equation_is_solved_for(equation, x));
 
     ASSERT_EQ_INT(equation_solve_for(equation, x, result), 0);
-    ASSERT_TRUE(RESULT_IS_VALID(result));
     ASSERT_TRUE(RESULT_IS_SOLVED(result));
     ASSERT_EQ_INT((int)RESULT_COUNT(result), 1);
     ASSERT_TRUE(equation_is_solved_for(RESULT_SOLUTION(result, 0u), x));
@@ -373,7 +366,6 @@ static void test_equation_rejects_rhs_containing_solve_variable(void)
     ASSERT_NOT_NULL(equation);
     ASSERT_FALSE(equation_is_solved_for(equation, x));
     ASSERT_EQ_INT(equation_solve_for(equation, x, result), 0);
-    ASSERT_TRUE(RESULT_IS_VALID(result));
     ASSERT_FALSE(RESULT_IS_SOLVED(result));
     ASSERT_EQ_INT((int)RESULT_COUNT(result), 0);
 
@@ -401,7 +393,6 @@ static void test_equation_solves_simple_affine_equation(void)
     equation = equation_new(lhs, rhs);
     ASSERT_NOT_NULL(equation);
     ASSERT_EQ_INT(equation_solve_for(equation, x, result), 0);
-    ASSERT_TRUE(RESULT_IS_VALID(result));
     ASSERT_TRUE(RESULT_IS_SOLVED(result));
     ASSERT_EQ_INT((int)RESULT_COUNT(result), 1);
     ASSERT_TRUE(equation_is_solved_for(RESULT_SOLUTION(result, 0u), x));
@@ -429,7 +420,6 @@ static void test_equation_solves_symbolic_affine_equation(void)
     ASSERT_NOT_NULL(x);
 
     ASSERT_EQ_INT(equation_solve_for(equation, x, result), 0);
-    ASSERT_TRUE(RESULT_IS_VALID(result));
     ASSERT_TRUE(RESULT_IS_SOLVED(result));
     ASSERT_EQ_INT((int)RESULT_COUNT(result), 1);
     ASSERT_TRUE(equation_is_solved_for(RESULT_SOLUTION(result, 0u), x));
@@ -458,7 +448,6 @@ static void test_equation_solves_affine_variable_from_rhs(void)
     equation = equation_new(lhs, rhs);
     ASSERT_NOT_NULL(equation);
     ASSERT_EQ_INT(equation_solve_for(equation, x, result), 0);
-    ASSERT_TRUE(RESULT_IS_VALID(result));
     ASSERT_TRUE(RESULT_IS_SOLVED(result));
     ASSERT_EQ_INT((int)RESULT_COUNT(result), 1);
     ASSERT_TRUE(equation_is_solved_for(RESULT_SOLUTION(result, 0u), x));
@@ -486,7 +475,6 @@ static void test_equation_solves_symbolic_quadratic_formula(void)
     ASSERT_NOT_NULL(x);
 
     ASSERT_EQ_INT(equation_solve_for(equation, x, result), 0);
-    ASSERT_TRUE(RESULT_IS_VALID(result));
     ASSERT_TRUE(RESULT_IS_SOLVED(result));
     ASSERT_EQ_INT((int)RESULT_COUNT(result), 2);
     ASSERT_TRUE(equation_is_solved_for(RESULT_SOLUTION(result, 0u), x));
@@ -520,7 +508,6 @@ static void test_equation_solves_quadratic_two_roots(void)
     equation = equation_new(lhs, rhs);
     ASSERT_NOT_NULL(equation);
     ASSERT_EQ_INT(equation_solve_for(equation, x, result), 0);
-    ASSERT_TRUE(RESULT_IS_VALID(result));
     ASSERT_TRUE(RESULT_IS_SOLVED(result));
     ASSERT_EQ_INT((int)RESULT_COUNT(result), 2);
     ASSERT_TRUE(test_equation_result_contains_long(result, -2L));
@@ -550,7 +537,6 @@ static void test_equation_solves_quadratic_zero_product(void)
     equation = equation_new(lhs, rhs);
     ASSERT_NOT_NULL(equation);
     ASSERT_EQ_INT(equation_solve_for(equation, x, result), 0);
-    ASSERT_TRUE(RESULT_IS_VALID(result));
     ASSERT_TRUE(RESULT_IS_SOLVED(result));
     ASSERT_EQ_INT((int)RESULT_COUNT(result), 2);
     ASSERT_TRUE(test_equation_result_contains_long(result, -3L));
@@ -578,7 +564,6 @@ static void test_equation_solves_symbolic_zero_product_factors(void)
     ASSERT_NOT_NULL(x);
 
     ASSERT_EQ_INT(equation_solve_for(equation, x, result), 0);
-    ASSERT_TRUE(RESULT_IS_VALID(result));
     ASSERT_TRUE(RESULT_IS_SOLVED(result));
     ASSERT_EQ_INT((int)RESULT_COUNT(result), 3);
     ASSERT_TRUE(test_equation_result_has_rhs_string(result, "a"));
@@ -607,7 +592,6 @@ static void test_equation_solves_quadratic_double_root_once(void)
     equation = equation_new(lhs, rhs);
     ASSERT_NOT_NULL(equation);
     ASSERT_EQ_INT(equation_solve_for(equation, x, result), 0);
-    ASSERT_TRUE(RESULT_IS_VALID(result));
     ASSERT_TRUE(RESULT_IS_SOLVED(result));
     ASSERT_EQ_INT((int)RESULT_COUNT(result), 1);
     ASSERT_TRUE(test_equation_result_contains_long(result, 2L));
@@ -637,7 +621,6 @@ static void test_equation_solves_cubic_three_real_roots(void)
     equation = equation_new(lhs, rhs);
     ASSERT_NOT_NULL(equation);
     ASSERT_EQ_INT(equation_solve_for(equation, x, result), 0);
-    ASSERT_TRUE(RESULT_IS_VALID(result));
     ASSERT_TRUE(RESULT_IS_SOLVED(result));
     ASSERT_EQ_INT((int)RESULT_COUNT(result), 3);
     ASSERT_TRUE(test_equation_result_contains_long(result, 1L));
@@ -668,7 +651,6 @@ static void test_equation_solves_cubic_complex_pair(void)
     equation = equation_new(lhs, rhs);
     ASSERT_NOT_NULL(equation);
     ASSERT_EQ_INT(equation_solve_for(equation, x, result), 0);
-    ASSERT_TRUE(RESULT_IS_VALID(result));
     ASSERT_TRUE(RESULT_IS_SOLVED(result));
     ASSERT_EQ_INT((int)RESULT_COUNT(result), 3);
     ASSERT_TRUE(test_equation_result_contains_long(result, 1L));
@@ -697,7 +679,6 @@ static void test_equation_solves_cubic_repeated_root_once(void)
     equation = equation_new(lhs, rhs);
     ASSERT_NOT_NULL(equation);
     ASSERT_EQ_INT(equation_solve_for(equation, x, result), 0);
-    ASSERT_TRUE(RESULT_IS_VALID(result));
     ASSERT_TRUE(RESULT_IS_SOLVED(result));
     ASSERT_EQ_INT((int)RESULT_COUNT(result), 2);
     ASSERT_TRUE(test_equation_result_contains_long(result, -2L));
@@ -726,7 +707,6 @@ static void test_equation_solves_cubic_with_numeric_parameter_bindings(void)
     ASSERT_NOT_NULL(x);
 
     ASSERT_EQ_INT(equation_solve_for(equation, x, result), 0);
-    ASSERT_TRUE(RESULT_IS_VALID(result));
     ASSERT_TRUE(RESULT_IS_SOLVED(result));
     ASSERT_EQ_INT((int)RESULT_COUNT(result), 3);
     ASSERT_TRUE(test_equation_result_contains_long(result, 1L));
@@ -754,7 +734,6 @@ static void test_equation_solves_symbolic_cubic_cardano(void)
     ASSERT_NOT_NULL(x);
 
     ASSERT_EQ_INT(equation_solve_for(equation, x, result), 0);
-    ASSERT_TRUE(RESULT_IS_VALID(result));
     ASSERT_TRUE(RESULT_IS_SOLVED(result));
     ASSERT_EQ_INT((int)RESULT_COUNT(result), 3);
     ASSERT_TRUE(equation_is_solved_for(RESULT_SOLUTION(result, 0u), x));
@@ -791,7 +770,6 @@ static void test_equation_future_inverts_log(void)
     equation = equation_new(lhs, rhs);
     ASSERT_NOT_NULL(equation);
     ASSERT_EQ_INT(equation_solve_for(equation, x, result), 0);
-    ASSERT_TRUE(RESULT_IS_VALID(result));
     ASSERT_TRUE(RESULT_IS_SOLVED(result));
     ASSERT_EQ_INT((int)RESULT_COUNT(result), 1);
     ASSERT_TRUE(test_equation_rhs_string_equals(RESULT_SOLUTION(result, 0u), "exp(3)"));
@@ -820,7 +798,6 @@ static void test_equation_future_inverts_exp(void)
     equation = equation_new(lhs, rhs);
     ASSERT_NOT_NULL(equation);
     ASSERT_EQ_INT(equation_solve_for(equation, x, result), 0);
-    ASSERT_TRUE(RESULT_IS_VALID(result));
     ASSERT_TRUE(RESULT_IS_SOLVED(result));
     ASSERT_EQ_INT((int)RESULT_COUNT(result), 1);
     ASSERT_TRUE(test_equation_rhs_string_equals(RESULT_SOLUTION(result, 0u), "ln(5)"));

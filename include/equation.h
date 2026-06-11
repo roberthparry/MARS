@@ -78,16 +78,6 @@ equation_solutions_t *equation_create_numeric_solutions(
     const expr_goal_seek_options_t *options);
 
 /**
- * @brief Return true when @p result has been populated by a successful solve call.
- */
-bool equation_solutions_are_valid(const equation_solutions_t *solutions);
-
-/**
- * @brief Return true when @p result contains at least one solved form.
- */
-bool equation_solutions_has_any(const equation_solutions_t *solutions);
-
-/**
  * @brief Borrow the number of solutions currently stored in @p result.
  */
 size_t equation_solutions_count(const equation_solutions_t *solutions);
