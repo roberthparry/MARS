@@ -523,12 +523,12 @@ int main(int argc, char **argv)
     }
 
     solutions = solve_symbolically(equation, bindings, variable);
-    if (solutions && equation_solutions_has_any(solutions)) {
+    if (equation_solutions_count(solutions) > 0u) {
         status = "symbolic";
     } else {
         equation_solutions_free(solutions);
         solutions = solve_numerically(equation, bindings, precision);
-        if (solutions && equation_solutions_has_any(solutions))
+        if (equation_solutions_count(solutions) > 0u)
             status = "numeric";
         else if (!solutions)
             rc = 1;

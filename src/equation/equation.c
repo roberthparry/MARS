@@ -969,16 +969,6 @@ equation_solutions_t *equation_create_solutions_for(const equation_t *equation,
     return solutions;
 }
 
-bool equation_solutions_are_valid(const equation_solutions_t *solutions)
-{
-    return solutions && solutions->status != EQUATION_SOLVE_INVALID;
-}
-
-bool equation_solutions_has_any(const equation_solutions_t *solutions)
-{
-    return solutions && solutions->status == EQUATION_SOLVE_SOLVED;
-}
-
 size_t equation_solutions_count(const equation_solutions_t *solutions)
 {
     return solutions ? solutions->count : 0u;
