@@ -5,6 +5,7 @@
 #include <ctype.h>
 #include <limits.h>
 
+#include "expression/expr_internal.h"
 #include "expression.h"
 #include "ustring.h"
 
@@ -29,6 +30,176 @@ static char *expr_text_dup(const expr_t *expr, style_t style)
 
     string_free(text);
     return copy;
+}
+
+static char *expr_tex_body_dup(const expr_t *expr)
+{
+    char *body = NULL;
+    char *bindings = NULL;
+
+    if (!expr)
+        return NULL;
+    if (expr_to_tex_parts(expr, &body, &bindings) == 0) {
+        free(bindings);
+        return body;
+    }
+    free(body);
+    free(bindings);
+    return expr_text_dup(expr, style_TEX);
+}
+
+static expr_t *clone_expr_local(const expr_t *expr)
+{
+    number_t needle_value = num_new();
+    expr_t *needle = expr_new_named_var(needle_value, "__mars_display_clone__");
+    expr_t *replacement = expr_new_const(NUM_ZERO);
+    expr_t *copy = NULL;
+
+    num_destroy(&needle_value);
+    if (needle && replacement)
+        copy = expr_substitute(expr, needle, replacement);
+
+    expr_free(replacement);
+    expr_free(needle);
+    return copy;
+}
+
+static expr_t *expanded_display_expr(const expr_t *expr);
+
+static expr_t *expanded_display_product(const expr_t *left, const expr_t *right)
+{
+    expr_t *left_expr;
+    expr_t *right_expr;
+    expr_t *out;
+
+    if (!left || !right)
+        return NULL;
+
+    if (expr_is_addsub(left) && expr_is_addsub(right)) {
+        left_expr = expanded_display_expr(left);
+        right_expr = expanded_display_expr(right);
+        if (!left_expr || !right_expr) {
+            expr_free(left_expr);
+            expr_free(right_expr);
+            return NULL;
+        }
+
+        out = expr_mul(left_expr, right_expr);
+        expr_free(left_expr);
+        expr_free(right_expr);
+        return out;
+    }
+
+    if (expr_is_op(left, &ops_add)) {
+        expr_t *first = expanded_display_product(left->a, right);
+        expr_t *second = expanded_display_product(left->b, right);
+
+        if (!first || !second) {
+            expr_free(first);
+            expr_free(second);
+            return NULL;
+        }
+
+        out = expr_add(first, second);
+        expr_free(first);
+        expr_free(second);
+        return out;
+    }
+
+    if (expr_is_op(left, &ops_sub)) {
+        expr_t *first = expanded_display_product(left->a, right);
+        expr_t *second = expanded_display_product(left->b, right);
+
+        if (!first || !second) {
+            expr_free(first);
+            expr_free(second);
+            return NULL;
+        }
+
+        out = expr_sub(first, second);
+        expr_free(first);
+        expr_free(second);
+        return out;
+    }
+
+    if (expr_is_addsub(right))
+        return expanded_display_product(right, left);
+
+    left_expr = expanded_display_expr(left);
+    right_expr = expanded_display_expr(right);
+    if (!left_expr || !right_expr) {
+        expr_free(left_expr);
+        expr_free(right_expr);
+        return NULL;
+    }
+
+    out = expr_mul(left_expr, right_expr);
+    expr_free(left_expr);
+    expr_free(right_expr);
+    return out;
+}
+
+static expr_t *expanded_display_expr(const expr_t *expr)
+{
+    expr_t *left;
+    expr_t *right;
+    expr_t *out;
+
+    if (!expr)
+        return NULL;
+
+    if (expr_is_op(expr, &ops_add)) {
+        left = expanded_display_expr(expr->a);
+        right = expanded_display_expr(expr->b);
+        if (!left || !right) {
+            expr_free(left);
+            expr_free(right);
+            return NULL;
+        }
+        out = expr_add(left, right);
+        expr_free(left);
+        expr_free(right);
+        return out;
+    }
+
+    if (expr_is_op(expr, &ops_sub)) {
+        left = expanded_display_expr(expr->a);
+        right = expanded_display_expr(expr->b);
+        if (!left || !right) {
+            expr_free(left);
+            expr_free(right);
+            return NULL;
+        }
+        out = expr_sub(left, right);
+        expr_free(left);
+        expr_free(right);
+        return out;
+    }
+
+    if (expr_is_op(expr, &ops_mul))
+        return expanded_display_product(expr->a, expr->b);
+
+    return clone_expr_local(expr);
+}
+
+static expr_t *display_simplified_expr(const expr_t *expr)
+{
+    expr_t *expanded;
+    expr_t *simplified;
+
+    if (!expr)
+        return NULL;
+
+    expanded = expanded_display_expr(expr);
+    if (!expanded)
+        return expr_simplify(expr);
+
+    simplified = expr_simplify(expanded);
+    if (!simplified)
+        return expanded;
+
+    expr_free(expanded);
+    return simplified;
 }
 
 static char *trim_ascii_in_place(char *text)
@@ -561,7 +732,9 @@ int main(int argc, char **argv)
     char *wrapped_input = NULL;
     expr_bindings_t *bindings = NULL;
     expr_t *expr = NULL;
+    expr_t *display_expr = NULL;
     expr_t *deriv = NULL;
+    expr_t *display_deriv = NULL;
     expr_t *wrt = NULL;
     char *expr_text = NULL;
     char *unbound_text = NULL;
@@ -587,10 +760,14 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    display_expr = display_simplified_expr(expr);
+    if (!display_expr)
+        display_expr = expr;
+
     expr_text = expr_text_dup(expr, style_EXPRESSION);
-    unbound_text = expr_text_dup(expr, style_UNBOUND);
+    unbound_text = expr_text_dup(display_expr, style_UNBOUND);
     func_text = expr_text_dup(expr, style_FUNCTION);
-    tex_text = expr_text_dup(expr, style_TEX);
+    tex_text = expr_tex_body_dup(display_expr);
 
     printf("input       %s\n", input);
     printf("expression  %s\n", expr_text ? expr_text : "(null)");
@@ -610,8 +787,11 @@ int main(int argc, char **argv)
             rc = 1;
             goto cleanup;
         }
-        deriv_text = expr_text_dup(deriv, style_EXPRESSION);
-        deriv_tex_text = expr_text_dup(deriv, style_TEX);
+        display_deriv = expr_simplify(deriv);
+        if (!display_deriv)
+            display_deriv = deriv;
+        deriv_text = expr_text_dup(display_deriv, style_EXPRESSION);
+        deriv_tex_text = expr_text_dup(display_deriv, style_TEX);
         printf("derivative  d/d%s = %s\n",
                wrt_name,
                deriv_text ? deriv_text : "(null)");
@@ -629,6 +809,10 @@ cleanup:
     free(func_text);
     free(unbound_text);
     free(expr_text);
+    if (display_deriv && display_deriv != deriv)
+        expr_free(display_deriv);
+    if (display_expr && display_expr != expr)
+        expr_free(display_expr);
     expr_free(deriv);
     expr_free(expr);
     expr_bindings_free(bindings);

@@ -7,28 +7,7 @@
 #include "expression.h"
 
 typedef struct equation_t equation_t;
-
-/**
- * @brief Result status for equation_solve_for().
- */
-typedef enum equation_solve_status {
-    EQUATION_SOLVE_INVALID,
-    EQUATION_SOLVE_UNSOLVED,
-    EQUATION_SOLVE_SOLVED
-} equation_solve_status_t;
-
-/**
- * @brief Owning result returned by equation_solve_for().
- *
- * @p solutions is an owning array of owning equation handles. Each solution is
- * expected to be in isolated form, e.g. @c x = expression. Release the result
- * with equation_solve_result_clear().
- */
-typedef struct equation_solve_result {
-    equation_t **solutions;
-    size_t count;
-    equation_solve_status_t status;
-} equation_solve_result_t;
+typedef struct equation_solutions equation_solutions_t;
 
 /**
  * @brief Create an equation from a left- and right-hand expression.
@@ -65,15 +44,20 @@ expr_t *equation_residual(const equation_t *equation);
 bool equation_is_solved_for(const equation_t *equation, const expr_t *wrt);
 
 /**
- * @brief Try to isolate @p wrt on the left-hand side.
+ * @brief Release an owning solution set returned by equation creation helpers.
+ */
+void equation_solutions_free(equation_solutions_t *solutions);
+
+/**
+ * @brief Try to isolate @p wrt on the left-hand side and create solutions.
  *
  * This first solver slice handles already-isolated equations and non-constant
- * affine equations. Later symbolic solvers can append additional symbolic
- * solution equations to the same result shape.
+ * affine equations. The caller owns the returned solution set and must release
+ * it with equation_solutions_free().
  */
-int equation_solve_for(const equation_t *equation,
-                       const expr_t *wrt,
-                       equation_solve_result_t *result);
+equation_solutions_t *equation_create_solutions_for(
+    const equation_t *equation,
+    const expr_t *wrt);
 
 /**
  * @brief Numerically seek one point satisfying @p equation.
@@ -85,17 +69,35 @@ int equation_solve_for(const equation_t *equation,
  *
  * @p bindings should be the binding set that was produced while parsing this
  * equation, or another binding set whose variables are the same nodes used by
- * @p equation.
+ * @p equation. The caller owns the returned solution set and must release it
+ * with equation_solutions_free().
  */
-int equation_solve_numeric(const equation_t *equation,
-                           expr_bindings_t *bindings,
-                           const expr_goal_seek_options_t *options,
-                           equation_solve_result_t *result);
+equation_solutions_t *equation_create_numeric_solutions(
+    const equation_t *equation,
+    expr_bindings_t *bindings,
+    const expr_goal_seek_options_t *options);
 
 /**
- * @brief Release owning fields in an equation solve result.
+ * @brief Return true when @p result has been populated by a successful solve call.
  */
-void equation_solve_result_clear(equation_solve_result_t *result);
+bool equation_solutions_are_valid(const equation_solutions_t *solutions);
+
+/**
+ * @brief Return true when @p result contains at least one solved form.
+ */
+bool equation_solutions_has_any(const equation_solutions_t *solutions);
+
+/**
+ * @brief Borrow the number of solutions currently stored in @p result.
+ */
+size_t equation_solutions_count(const equation_solutions_t *solutions);
+
+/**
+ * @brief Borrow the solution at @p index, or NULL when out of range.
+ */
+const equation_t *equation_solutions_at(
+    const equation_solutions_t *solutions,
+    size_t index);
 
 /**
  * @brief Serialise @p equation to newly allocated text.

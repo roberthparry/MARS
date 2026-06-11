@@ -76,14 +76,14 @@ static int equation_append_distinct_root(const expr_t *wrt,
                                          number_t root,
                                          number_t *seen,
                                          size_t *seen_count,
-                                         equation_solve_result_t *result)
+                                         equation_solutions_t *solutions)
 {
     for (size_t i = 0u; i < *seen_count; ++i) {
         if (num_eq(root, seen[i]))
             return 0;
     }
 
-    if (equation_append_solution_value(wrt, root, result) != 0)
+    if (equation_append_solution_value(wrt, root, solutions) != 0)
         return -1;
 
     seen[*seen_count] = num_clone(root);
@@ -156,7 +156,7 @@ static int equation_append_cubic_zero_discriminant_roots(const expr_t *wrt,
                                                          number_t shift,
                                                          number_t *seen,
                                                          size_t *seen_count,
-                                                         equation_solve_result_t *result)
+                                                         equation_solutions_t *solutions)
 {
     number_t root;
     int rc = 0;
@@ -165,7 +165,7 @@ static int equation_append_cubic_zero_discriminant_roots(const expr_t *wrt,
         number_t zero_term = num_new();
 
         root = equation_cubic_shifted_root(zero_term, shift);
-        rc = equation_append_distinct_root(wrt, root, seen, seen_count, result);
+        rc = equation_append_distinct_root(wrt, root, seen, seen_count, solutions);
         num_destroy(&root);
         num_destroy(&zero_term);
         return rc;
@@ -179,13 +179,13 @@ static int equation_append_cubic_zero_discriminant_roots(const expr_t *wrt,
         number_t second_term = num_div(neg_three_q, two_p);
 
         root = equation_cubic_shifted_root(first_term, shift);
-        rc = equation_append_distinct_root(wrt, root, seen, seen_count, result);
+        rc = equation_append_distinct_root(wrt, root, seen, seen_count, solutions);
         num_destroy(&root);
 
         if (rc == 0) {
             root = equation_cubic_shifted_root(second_term, shift);
             rc = equation_append_distinct_root(wrt, root, seen, seen_count,
-                                               result);
+                                               solutions);
             num_destroy(&root);
         }
 
@@ -204,7 +204,7 @@ static int equation_append_cubic_trig_roots(const expr_t *wrt,
                                             number_t shift,
                                             number_t *seen,
                                             size_t *seen_count,
-                                            equation_solve_result_t *result)
+                                            equation_solutions_t *solutions)
 {
     number_t neg_p = num_neg(p);
     number_t neg_p_third = equation_div_long(neg_p, 3L);
@@ -230,7 +230,7 @@ static int equation_append_cubic_trig_roots(const expr_t *wrt,
         number_t term = num_mul(radius, cos_angle);
         number_t root = equation_cubic_shifted_root(term, shift);
 
-        rc = equation_append_distinct_root(wrt, root, seen, seen_count, result);
+        rc = equation_append_distinct_root(wrt, root, seen, seen_count, solutions);
 
         num_destroy(&root);
         num_destroy(&term);
@@ -264,7 +264,7 @@ static int equation_append_cubic_cardano_roots(const expr_t *wrt,
                                                number_t discriminant,
                                                number_t *seen,
                                                size_t *seen_count,
-                                               equation_solve_result_t *result)
+                                               equation_solutions_t *solutions)
 {
     number_t q_half = equation_div_long(q, 2L);
     number_t neg_q_half = num_neg(q_half);
@@ -283,14 +283,14 @@ static int equation_append_cubic_cardano_roots(const expr_t *wrt,
     (void)p;
 
     root = equation_cubic_sum_root(u, v, shift);
-    rc = equation_append_distinct_root(wrt, root, seen, seen_count, result);
+    rc = equation_append_distinct_root(wrt, root, seen, seen_count, solutions);
     num_destroy(&root);
 
     if (rc == 0) {
         omega_u = num_mul(omega, u);
         omega_v = num_mul(omega_conj, v);
         root = equation_cubic_sum_root(omega_u, omega_v, shift);
-        rc = equation_append_distinct_root(wrt, root, seen, seen_count, result);
+        rc = equation_append_distinct_root(wrt, root, seen, seen_count, solutions);
         num_destroy(&root);
         num_destroy(&omega_v);
         num_destroy(&omega_u);
@@ -300,7 +300,7 @@ static int equation_append_cubic_cardano_roots(const expr_t *wrt,
         omega_u = num_mul(omega_conj, u);
         omega_v = num_mul(omega, v);
         root = equation_cubic_sum_root(omega_u, omega_v, shift);
-        rc = equation_append_distinct_root(wrt, root, seen, seen_count, result);
+        rc = equation_append_distinct_root(wrt, root, seen, seen_count, solutions);
         num_destroy(&root);
         num_destroy(&omega_v);
         num_destroy(&omega_u);
@@ -551,7 +551,7 @@ static expr_t *equation_cubic_symbolic_root(const expr_t *u,
 
 static int equation_try_solve_symbolic_cubic(const expr_t *residual,
                                              const expr_t *wrt,
-                                             equation_solve_result_t *result)
+                                             equation_solutions_t *solutions)
 {
     expr_t *constant = NULL;
     expr_t *linear = NULL;
@@ -583,7 +583,7 @@ static int equation_try_solve_symbolic_cubic(const expr_t *residual,
         goto cleanup;
 
     root = equation_cubic_symbolic_root(u, v, shift, NULL, NULL);
-    if (!root || equation_append_solution_expr(wrt, root, result) != 0)
+    if (!root || equation_append_solution_expr(wrt, root, solutions) != 0)
         goto cleanup;
     expr_free(root);
     root = NULL;
@@ -591,16 +591,16 @@ static int equation_try_solve_symbolic_cubic(const expr_t *residual,
     omega = equation_cubic_omega_expr(false);
     omega_conj = equation_cubic_omega_expr(true);
     root = equation_cubic_symbolic_root(u, v, shift, omega, omega_conj);
-    if (!root || equation_append_solution_expr(wrt, root, result) != 0) {
-        equation_solve_result_clear(result);
+    if (!root || equation_append_solution_expr(wrt, root, solutions) != 0) {
+        equation_solutions_clear(solutions);
         goto cleanup;
     }
     expr_free(root);
     root = NULL;
 
     root = equation_cubic_symbolic_root(u, v, shift, omega_conj, omega);
-    if (!root || equation_append_solution_expr(wrt, root, result) != 0) {
-        equation_solve_result_clear(result);
+    if (!root || equation_append_solution_expr(wrt, root, solutions) != 0) {
+        equation_solutions_clear(solutions);
         goto cleanup;
     }
 
@@ -625,7 +625,7 @@ cleanup:
 
 int equation_try_solve_cubic(const equation_t *equation,
                              const expr_t *wrt,
-                             equation_solve_result_t *result)
+                             equation_solutions_t *solutions)
 {
     expr_t *residual = equation_residual(equation);
     number_t coeffs[4];
@@ -645,7 +645,7 @@ int equation_try_solve_cubic(const equation_t *equation,
     ok = equation_match_polynomial_expr(residual, wrt, 3u, coeffs) &&
          !num_is_zero(coeffs[3]);
     if (!ok) {
-        rc = equation_try_solve_symbolic_cubic(residual, wrt, result);
+        rc = equation_try_solve_symbolic_cubic(residual, wrt, solutions);
         goto cleanup;
     }
 
@@ -655,15 +655,15 @@ int equation_try_solve_cubic(const equation_t *equation,
 
     if (num_is_real(discriminant) && num_lt(discriminant, NUM_ZERO)) {
         rc = equation_append_cubic_trig_roots(wrt, p, q, shift, seen,
-                                              &seen_count, result);
+                                              &seen_count, solutions);
     } else if (num_is_zero(discriminant)) {
         rc = equation_append_cubic_zero_discriminant_roots(wrt, p, q, shift,
                                                            seen, &seen_count,
-                                                           result);
+                                                           solutions);
     } else {
         rc = equation_append_cubic_cardano_roots(wrt, p, q, shift,
                                                  discriminant, seen,
-                                                 &seen_count, result);
+                                                 &seen_count, solutions);
     }
 
 cleanup:
