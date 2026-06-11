@@ -110,6 +110,32 @@ static bool equation_collect_poly(const expr_t *expr,
                                   size_t max_degree,
                                   number_t *out);
 
+static bool equation_expr_numeric_parameter_value(const expr_t *expr,
+                                                  const expr_t *wrt,
+                                                  number_t *value_out)
+{
+    expr_t *vars[1];
+    bool used = false;
+    number_t value;
+
+    if (!expr || !wrt || !value_out)
+        return false;
+
+    vars[0] = (expr_t *)wrt;
+    if (!expr_collect_var_usage(expr, 1u, vars, &used) || used)
+        return false;
+
+    value = expr_eval(expr);
+    if (!num_is_finite(value)) {
+        num_destroy(&value);
+        return false;
+    }
+
+    num_destroy(value_out);
+    *value_out = value;
+    return true;
+}
+
 static bool equation_collect_scaled_poly(const expr_t *expr,
                                          const expr_t *wrt,
                                          size_t max_degree,
@@ -210,6 +236,14 @@ static bool equation_collect_poly(const expr_t *expr,
         goto cleanup_value;
 
     if (expr_match_const_value(expr, &value)) {
+        equation_poly_zero(out, count);
+        num_destroy(&out[0]);
+        out[0] = num_clone(value);
+        ok = true;
+        goto cleanup_value;
+    }
+
+    if (equation_expr_numeric_parameter_value(expr, wrt, &value)) {
         equation_poly_zero(out, count);
         num_destroy(&out[0]);
         out[0] = num_clone(value);

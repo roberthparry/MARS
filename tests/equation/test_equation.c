@@ -100,6 +100,22 @@ static bool test_equation_rhs_string_equals(const equation_t *equation,
     return ok;
 }
 
+static bool test_equation_result_has_rhs_string(const equation_solve_result_t *result,
+                                                const char *expected)
+{
+    for (size_t i = 0u; i < result->count; ++i) {
+        string_t *text = expr_to_text(equation_rhs(result->solutions[i]),
+                                      style_UNBOUND);
+        bool ok = text && strcmp(string_c_str(text), expected) == 0;
+
+        string_free(text);
+        if (ok)
+            return true;
+    }
+
+    return false;
+}
+
 static bool test_equation_rhs_text_contains(const equation_t *equation,
                                             style_t style,
                                             const char *expected)
@@ -502,6 +518,32 @@ static void test_equation_solves_quadratic_zero_product(void)
     expr_free(lhs);
 }
 
+static void test_equation_solves_symbolic_zero_product_factors(void)
+{
+    expr_bindings_t *bindings = NULL;
+    equation_t *equation = equation_from_string(
+        "{ (x-a)(x-b)(x-c) = 0 | x = NAN; a = NAN, b = NAN, c = NAN }",
+        &bindings);
+    expr_t *x;
+    equation_solve_result_t result;
+
+    ASSERT_NOT_NULL(equation);
+    ASSERT_NOT_NULL(bindings);
+    x = expr_bindings_get(bindings, "x");
+    ASSERT_NOT_NULL(x);
+
+    ASSERT_EQ_INT(equation_solve_for(equation, x, &result), 0);
+    ASSERT_EQ_INT(result.status, EQUATION_SOLVE_SOLVED);
+    ASSERT_EQ_INT((int)result.count, 3);
+    ASSERT_TRUE(test_equation_result_has_rhs_string(&result, "a"));
+    ASSERT_TRUE(test_equation_result_has_rhs_string(&result, "b"));
+    ASSERT_TRUE(test_equation_result_has_rhs_string(&result, "c"));
+
+    equation_solve_result_clear(&result);
+    expr_bindings_free(bindings);
+    equation_free(equation);
+}
+
 static void test_equation_solves_quadratic_double_root_once(void)
 {
     expr_bindings_t *bindings = NULL;
@@ -618,6 +660,33 @@ static void test_equation_solves_cubic_repeated_root_once(void)
     expr_free(lhs);
 }
 
+static void test_equation_solves_cubic_with_numeric_parameter_bindings(void)
+{
+    expr_bindings_t *bindings = NULL;
+    equation_t *equation = equation_from_string(
+        "{ a*x^3 + b*x^2 + c*x + d = 0 | x = NAN; "
+        "a = 1, b = -6, c = 11, d = -6 }",
+        &bindings);
+    expr_t *x;
+    equation_solve_result_t result;
+
+    ASSERT_NOT_NULL(equation);
+    ASSERT_NOT_NULL(bindings);
+    x = expr_bindings_get(bindings, "x");
+    ASSERT_NOT_NULL(x);
+
+    ASSERT_EQ_INT(equation_solve_for(equation, x, &result), 0);
+    ASSERT_EQ_INT(result.status, EQUATION_SOLVE_SOLVED);
+    ASSERT_EQ_INT((int)result.count, 3);
+    ASSERT_TRUE(test_equation_result_contains_long(&result, 1L));
+    ASSERT_TRUE(test_equation_result_contains_long(&result, 2L));
+    ASSERT_TRUE(test_equation_result_contains_long(&result, 3L));
+
+    equation_solve_result_clear(&result);
+    expr_bindings_free(bindings);
+    equation_free(equation);
+}
+
 static void test_equation_solves_symbolic_cubic_cardano(void)
 {
     expr_bindings_t *bindings = NULL;
@@ -724,10 +793,12 @@ static void test_equation_basics(void)
     TEST_RUN_SUBTEST(test_equation_solves_symbolic_quadratic_formula, NULL);
     TEST_RUN_SUBTEST(test_equation_solves_quadratic_two_roots, NULL);
     TEST_RUN_SUBTEST(test_equation_solves_quadratic_zero_product, NULL);
+    TEST_RUN_SUBTEST(test_equation_solves_symbolic_zero_product_factors, NULL);
     TEST_RUN_SUBTEST(test_equation_solves_quadratic_double_root_once, NULL);
     TEST_RUN_SUBTEST(test_equation_solves_cubic_three_real_roots, NULL);
     TEST_RUN_SUBTEST(test_equation_solves_cubic_complex_pair, NULL);
     TEST_RUN_SUBTEST(test_equation_solves_cubic_repeated_root_once, NULL);
+    TEST_RUN_SUBTEST(test_equation_solves_cubic_with_numeric_parameter_bindings, NULL);
     TEST_RUN_SUBTEST(test_equation_solves_symbolic_cubic_cardano, NULL);
 }
 

@@ -5,6 +5,7 @@
 #include "equation.h"
 #include "expression/expr_stringin_internal.h"
 #include "expression.h"
+#include "internal/expr_internal.h"
 #include "number.h"
 #include "ustring.h"
 
@@ -47,6 +48,22 @@ static char *number_text_dup(number_t value)
 
     string_free(text);
     return copy;
+}
+
+static char *expr_tex_body_dup(const expr_t *expr)
+{
+    char *body = NULL;
+    char *bindings = NULL;
+
+    if (!expr)
+        return NULL;
+    if (expr_to_tex_parts(expr, &body, &bindings) == 0) {
+        free(bindings);
+        return body;
+    }
+    free(body);
+    free(bindings);
+    return expr_text_dup(expr, style_TEX);
 }
 
 static const char *nth_variable_binding_name(expr_bindings_t *bindings,
@@ -126,7 +143,7 @@ static void print_solutions_tex(const equation_solve_result_t *result,
     printf("solutions_tex \\begin{aligned}");
     for (size_t i = 0u; i < result->count; ++i) {
         const char *name = solution_display_name(bindings, symbolic_variable, result, status, i);
-        char *rhs_tex = expr_text_dup(equation_rhs(result->solutions[i]), style_TEX);
+        char *rhs_tex = expr_tex_body_dup(equation_rhs(result->solutions[i]));
         char *tex = equation_text_dup(result->solutions[i], style_TEX);
 
         if (name && rhs_tex)

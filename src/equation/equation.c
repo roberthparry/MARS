@@ -1,11 +1,13 @@
 #include <stdbool.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "equation.h"
 #include "equation_internal.h"
 #include "expression/expr_stringin_internal.h"
 #include "expression.h"
 #include "internal/expr_internal.h"
+#include "ustring.h"
 
 struct equation_t {
     expr_t *lhs;
@@ -352,6 +354,113 @@ static expr_t *equation_symbolic_quadratic_root(const expr_t *linear,
     return root;
 }
 
+static bool equation_expr_simplifies_equal(const expr_t *left,
+                                           const expr_t *right)
+{
+    expr_t *diff = (left && right) ? expr_sub(left, right) : NULL;
+    expr_t *simplified = diff ? expr_simplify(diff) : NULL;
+    bool equal = simplified && expr_is_exact_zero(simplified);
+
+    expr_free(simplified);
+    expr_free(diff);
+    return equal;
+}
+
+static bool equation_expr_text_equal(const expr_t *left, const expr_t *right)
+{
+    string_t *left_text = left ? expr_to_text(left, style_EXPRESSION) : NULL;
+    string_t *right_text = right ? expr_to_text(right, style_EXPRESSION) : NULL;
+    bool equal = left_text && right_text &&
+                 strcmp(string_c_str(left_text),
+                        string_c_str(right_text)) == 0;
+
+    string_free(right_text);
+    string_free(left_text);
+    return equal;
+}
+
+static bool equation_expr_matches_expected(const expr_t *expr,
+                                           const expr_t *expected)
+{
+    return equation_expr_text_equal(expr, expected) ||
+           equation_expr_simplifies_equal(expr, expected);
+}
+
+static bool equation_expr_is_one(const expr_t *expr)
+{
+    number_t value = num_new();
+    bool ok = expr_match_const_value(expr, &value) && num_eq(value, NUM_ONE);
+
+    num_destroy(&value);
+    return ok;
+}
+
+static expr_t *equation_symbolic_negated_sum(const expr_t *left,
+                                             const expr_t *right)
+{
+    expr_t *neg_left = left ? expr_neg(left) : NULL;
+    expr_t *neg_right = right ? expr_neg(right) : NULL;
+    expr_t *sum = (neg_left && neg_right) ? expr_add(neg_left, neg_right) : NULL;
+    expr_t *out = equation_simplify_owned(sum);
+
+    expr_free(neg_right);
+    expr_free(neg_left);
+    return out;
+}
+
+static int equation_try_solve_symbolic_quadratic_product_roots(
+    const expr_t *constant,
+    const expr_t *linear,
+    const expr_t *quadratic,
+    const expr_t *wrt,
+    equation_solve_result_t *result)
+{
+    const expr_t *first = NULL;
+    const expr_t *second = NULL;
+    expr_t *expected_linear = NULL;
+    bool reversed = false;
+    int rc = 1;
+
+    if (!equation_expr_is_one(quadratic))
+        return 1;
+    if (!expr_match_mul_expr(constant, &first, &second))
+        return 1;
+    if (equation_expr_uses_wrt(first, wrt) ||
+        equation_expr_uses_wrt(second, wrt))
+        return 1;
+
+    expected_linear = equation_symbolic_negated_sum(first, second);
+    if (!expected_linear)
+        return -1;
+
+    if (!equation_expr_matches_expected(linear, expected_linear)) {
+        expr_free(expected_linear);
+        expected_linear = equation_symbolic_negated_sum(second, first);
+        if (!expected_linear)
+            return -1;
+        if (!equation_expr_matches_expected(linear, expected_linear))
+            goto cleanup;
+        reversed = true;
+    }
+
+    if (equation_append_solution_expr(wrt, reversed ? second : first, result) != 0)
+        goto error;
+    if (equation_append_solution_expr(wrt, reversed ? first : second, result) != 0)
+        goto error_clear;
+
+    rc = 0;
+    goto cleanup;
+
+error_clear:
+    equation_solve_result_clear(result);
+error:
+    rc = -1;
+
+cleanup:
+    expr_free(expected_linear);
+    return rc;
+}
+
 static int equation_try_solve_symbolic_quadratic(const expr_t *residual,
                                                  const expr_t *wrt,
                                                  equation_solve_result_t *result)
@@ -370,6 +479,11 @@ static int equation_try_solve_symbolic_quadratic(const expr_t *residual,
         rc = 1;
         goto cleanup;
     }
+
+    rc = equation_try_solve_symbolic_quadratic_product_roots(
+        constant, linear, quadratic, wrt, result);
+    if (rc <= 0)
+        goto cleanup;
 
     discriminant = equation_symbolic_quadratic_discriminant(constant, linear,
                                                             quadratic);
@@ -478,6 +592,102 @@ cleanup:
     num_destroy(&constant);
     expr_free(residual);
     return rc;
+}
+
+static int equation_try_solve_zero_product_factor(const expr_t *factor,
+                                                  const expr_t *wrt,
+                                                  const expr_t *zero,
+                                                  equation_solve_result_t *result,
+                                                  bool *saw_solved_factor)
+{
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+    equation_t *factor_equation = NULL;
+    equation_solve_result_t factor_result;
+    int rc = -1;
+
+    equation_solve_result_reset(&factor_result);
+
+    if (expr_match_mul_expr(factor, &left, &right)) {
+        rc = equation_try_solve_zero_product_factor(left, wrt, zero, result,
+                                                    saw_solved_factor);
+        if (rc != 0)
+            goto cleanup;
+        rc = equation_try_solve_zero_product_factor(right, wrt, zero, result,
+                                                    saw_solved_factor);
+        goto cleanup;
+    }
+
+    if (!equation_expr_uses_wrt(factor, wrt)) {
+        rc = expr_is_exact_zero(factor) ? 1 : 0;
+        goto cleanup;
+    }
+
+    factor_equation = equation_new(factor, zero);
+    if (!factor_equation)
+        goto cleanup;
+
+    if (equation_solve_for(factor_equation, wrt, &factor_result) != 0)
+        goto cleanup;
+    if (factor_result.status != EQUATION_SOLVE_SOLVED ||
+        factor_result.count == 0u) {
+        rc = 1;
+        goto cleanup;
+    }
+
+    for (size_t i = 0u; i < factor_result.count; ++i) {
+        if (equation_append_solution_expr(
+                wrt, equation_rhs(factor_result.solutions[i]), result) != 0)
+            goto cleanup;
+    }
+
+    *saw_solved_factor = true;
+    rc = 0;
+
+cleanup:
+    equation_solve_result_clear(&factor_result);
+    equation_free(factor_equation);
+    return rc;
+}
+
+static int equation_try_solve_zero_product(const equation_t *equation,
+                                           const expr_t *wrt,
+                                           equation_solve_result_t *result)
+{
+    const expr_t *product = NULL;
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+    expr_t *zero = NULL;
+    bool saw_solved_factor = false;
+    int rc;
+
+    if (!equation || !wrt || !result)
+        return -1;
+
+    if (expr_is_exact_zero(equation->rhs))
+        product = equation->lhs;
+    else if (expr_is_exact_zero(equation->lhs))
+        product = equation->rhs;
+    else
+        return 1;
+
+    if (!expr_match_mul_expr(product, &left, &right))
+        return 1;
+
+    zero = expr_new_const(NUM_ZERO);
+    if (!zero)
+        return -1;
+
+    rc = equation_try_solve_zero_product_factor(product, wrt, zero, result,
+                                                &saw_solved_factor);
+    expr_free(zero);
+
+    if (rc != 0 || !saw_solved_factor) {
+        equation_solve_result_clear(result);
+        return rc < 0 ? -1 : 1;
+    }
+
+    return 0;
 }
 
 static int equation_append_numeric_binding_solutions(expr_bindings_t *bindings,
@@ -653,6 +863,7 @@ int equation_solve_for(const equation_t *equation,
                        equation_solve_result_t *result)
 {
     int affine_rc;
+    int zero_product_rc;
     int quadratic_rc;
     int cubic_rc;
 
@@ -673,6 +884,12 @@ int equation_solve_for(const equation_t *equation,
     if (affine_rc == 0)
         return 0;
     if (affine_rc < 0)
+        return -1;
+
+    zero_product_rc = equation_try_solve_zero_product(equation, wrt, result);
+    if (zero_product_rc == 0)
+        return 0;
+    if (zero_product_rc < 0)
         return -1;
 
     quadratic_rc = equation_try_solve_quadratic(equation, wrt, result);
