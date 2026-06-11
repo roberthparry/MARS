@@ -2653,6 +2653,13 @@ __THEME_OVERRIDES__
         .filter(Boolean);
     }
 
+    function compareBindingNames(left, right) {
+      const leftName = String((left && left.name) || left || '');
+      const rightName = String((right && right.name) || right || '');
+      return leftName.localeCompare(rightName, undefined, {numeric: true, sensitivity: 'base'}) ||
+        leftName.localeCompare(rightName);
+    }
+
     function canGoalSeek() {
       return currentVariables.length > 0;
     }
@@ -2859,22 +2866,36 @@ __THEME_OVERRIDES__
       shortened = shortened || body !== parts.body;
 
       function compactAssignments(assignmentsText, kind) {
-        return splitTopLevel(assignmentsText, ',')
+        const rows = splitTopLevel(assignmentsText, ',')
           .map((part) => {
             const eq = indexOfTopLevel(part, '=');
-            if (eq < 0)
-              return part.trim();
+            if (eq < 0) {
+              const text = part.trim();
+              return text ? {name: text, text, bind: false} : null;
+            }
 
             const name = part.slice(0, eq).trim();
             const valueText = part.slice(eq + 1).trim();
             const compact = compactBindingValue(valueText);
-            if (name) {
-              bindingValues.push({name, value: valueText, display: compact.display, kind});
-            }
             shortened = shortened || compact.shortened;
-            return `${name} = ${compact.display}`;
+            return name
+              ? {name, value: valueText, display: compact.display, kind, text: `${name} = ${compact.display}`, bind: true}
+              : null;
           })
           .filter(Boolean);
+
+        if (kind === 'constant')
+          rows.sort(compareBindingNames);
+        rows.forEach((row) => {
+          if (row.bind && row.name)
+            bindingValues.push({
+              name: row.name,
+              value: row.value || '',
+              display: row.display || '',
+              kind
+            });
+        });
+        return rows.map((row) => row.text);
       }
 
       const variableAssignments = compactAssignments(parts.variables, 'variable');
@@ -2957,6 +2978,11 @@ __THEME_OVERRIDES__
       return (value === '?' || /^NAN$/i.test(value)) ? '' : value;
     }
 
+    function displayEquationValue(valueText) {
+      const value = String(valueText || '').trim();
+      return /^NAN$/i.test(value) ? 'unresolved' : value;
+    }
+
     function fullValueForBinding(binding) {
       const value = String(binding.value || binding.display || '').trim();
       return (value === '?' || /^NAN$/i.test(value)) ? '' : value;
@@ -2982,7 +3008,18 @@ __THEME_OVERRIDES__
         return;
       }
 
+      const variableBindings = [];
+      const constantBindings = [];
       bindings.forEach((binding) => {
+        const kind = binding.kind || 'variable';
+        if (kind === 'constant')
+          constantBindings.push(binding);
+        else
+          variableBindings.push(binding);
+      });
+      constantBindings.sort(compareBindingNames);
+
+      [...variableBindings, ...constantBindings].forEach((binding) => {
         const kind = binding.kind || 'variable';
         currentBindingKinds.set(binding.name, kind);
         const displayValue = displayValueForBinding(binding);
@@ -4353,7 +4390,7 @@ __THEME_OVERRIDES__
           if (data.residual)
             valueLines.push(`residual: ${data.residual}`);
           if (data.value)
-            valueLines.push(`value: ${data.value}`);
+            valueLines.push(`value: ${displayEquationValue(data.value)}`);
           if (data.status)
             valueLines.push(`status: ${data.status}`);
           value.textContent = valueLines.join('\n');
@@ -5846,6 +5883,11 @@ def compact_display_text(text: str) -> str:
     return compact_long_numeric_tokens(compact_binding_values_text(text))
 
 
+def normalize_multiline_display_text(text: str) -> str:
+    lines = str(text or "").splitlines()
+    return "\n".join(line.strip() for line in lines if line.strip())
+
+
 def compact_binding_values_text(text: str) -> str:
     if not text:
         return text
@@ -6210,6 +6252,52 @@ def parse_binding_assignments(bindings: str) -> list[tuple[str, str]]:
     return out
 
 
+def binding_name_sort_key(name: str) -> tuple[str, str]:
+    text = str(name or "").strip()
+    return text.casefold(), text
+
+
+def sorted_binding_assignments(assignments: list[tuple[str, str]]) -> list[tuple[str, str]]:
+    return sorted(assignments, key=lambda item: binding_name_sort_key(item[0]))
+
+
+def sorted_assignment_parts(parts: list[str]) -> list[str]:
+    def part_key(part: str) -> tuple[str, str]:
+        eq = index_top_level_text(part, "=")
+        name = part[:eq].strip() if eq >= 0 else part.strip()
+        return binding_name_sort_key(name)
+
+    return sorted(parts, key=part_key)
+
+
+def expression_with_sorted_constants(expression: str) -> str:
+    text = str(expression or "").strip()
+    if not text:
+        return text
+
+    body, var_text, const_text = parse_expression_body(text)
+    if not const_text:
+        return text
+
+    var_parts = [
+        part.strip()
+        for part in split_top_level_text(var_text, ",")
+        if part.strip()
+    ]
+    const_parts = sorted_assignment_parts([
+        part.strip()
+        for part in split_top_level_text(const_text, ",")
+        if part.strip()
+    ])
+
+    binding_text = ", ".join(var_parts)
+    if const_parts:
+        const_binding_text = ", ".join(const_parts)
+        binding_text = f"{binding_text}; {const_binding_text}" if binding_text else f"; {const_binding_text}"
+
+    return f"{{ {body} | {binding_text} }}"
+
+
 def restore_compact_binding_values(expression: str, source_expression: str) -> str:
     if "..." not in expression or not source_expression or "..." in source_expression:
         return expression
@@ -6249,7 +6337,7 @@ def restore_compact_binding_values(expression: str, source_expression: str) -> s
         return out
 
     var_parts = restore_assignments(var_text)
-    const_parts = restore_assignments(const_text)
+    const_parts = sorted_assignment_parts(restore_assignments(const_text))
     binding_text = ", ".join(var_parts)
     if const_parts:
         const_binding_text = ", ".join(const_parts)
@@ -6282,7 +6370,7 @@ def expression_with_binding_value(expression: str, target_name: str, value_text:
         return out
 
     var_parts = replace_assignments(var_text)
-    const_parts = replace_assignments(const_text)
+    const_parts = sorted_assignment_parts(replace_assignments(const_text))
     if not changed:
         return None
 
@@ -6552,7 +6640,7 @@ def expression_variable_binding_values(
             "kind": "variable",
         })
 
-    for name, value in parse_binding_assignments(const_text):
+    for name, value in sorted_binding_assignments(parse_binding_assignments(const_text)):
         display_value = value or "?"
         display = ""
         if display_value != "?" and display_value.upper() != "NAN":
@@ -6766,9 +6854,9 @@ def prepare_equation_fields(fields: dict[str, str], precision: int) -> dict[str,
         fields[f"raw_{key}"] = value
         fields[key] = precision_numeric_tokens(value, precision)
 
-    equation_text = str(fields.get("equation") or "").strip()
+    equation_text = expression_with_sorted_constants(str(fields.get("equation") or "").strip())
     unbound_text = str(fields.get("unbound") or "").strip()
-    solutions_text = str(fields.get("solutions") or "").strip()
+    solutions_text = normalize_multiline_display_text(fields.get("solutions") or "")
     equation_tex = str(fields.get("tex") or "").strip()
     solutions_tex = str(fields.get("solutions_tex") or "").strip()
     render_tex = solutions_tex or equation_tex

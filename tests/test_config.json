@@ -1177,10 +1177,12 @@
       "test_equation_solves_symbolic_quadratic_formula": true,
       "test_equation_solves_quadratic_two_roots": true,
       "test_equation_solves_quadratic_zero_product": true,
+      "test_equation_solves_symbolic_zero_product_factors": true,
       "test_equation_solves_quadratic_double_root_once": true,
       "test_equation_solves_cubic_three_real_roots": true,
       "test_equation_solves_cubic_complex_pair": true,
       "test_equation_solves_cubic_repeated_root_once": true,
+      "test_equation_solves_cubic_with_numeric_parameter_bindings": true,
       "test_equation_solves_symbolic_cubic_cardano": true
     },
     "test_equation_future_solver_cases": {
