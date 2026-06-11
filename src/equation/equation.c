@@ -14,13 +14,31 @@ struct equation_t {
     expr_t *rhs;
 };
 
-static void equation_solve_result_reset(equation_solve_result_t *result)
+static void equation_solutions_reset(equation_solutions_t *solutions)
 {
-    if (!result)
+    if (!solutions)
         return;
-    result->solutions = NULL;
-    result->count = 0u;
-    result->status = EQUATION_SOLVE_INVALID;
+    solutions->solutions = NULL;
+    solutions->count = 0u;
+    solutions->status = EQUATION_SOLVE_INVALID;
+}
+
+static equation_solutions_t *equation_solutions_new(void)
+{
+    equation_solutions_t *solutions = calloc(1u, sizeof(*solutions));
+
+    if (!solutions)
+        return NULL;
+    equation_solutions_reset(solutions);
+    return solutions;
+}
+
+void equation_solutions_free(equation_solutions_t *solutions)
+{
+    if (!solutions)
+        return;
+    equation_solutions_clear(solutions);
+    free(solutions);
 }
 
 equation_t *equation_new(const expr_t *lhs, const expr_t *rhs)
@@ -104,34 +122,48 @@ bool equation_is_solved_for(const equation_t *equation, const expr_t *wrt)
            !equation_expr_uses_wrt(equation->rhs, wrt);
 }
 
-static int equation_solve_result_append(equation_solve_result_t *result,
+static int equation_solutions_append(equation_solutions_t *solutions,
                                         equation_t *solution)
 {
     equation_t **items;
 
-    if (!result || !solution)
+    if (!solutions || !solution)
         return -1;
 
-    items = realloc(result->solutions,
-                    (result->count + 1u) * sizeof(*result->solutions));
+    for (size_t i = 0u; i < solutions->count; ++i) {
+        equation_t *existing = solutions->solutions[i];
+
+        if (!existing)
+            continue;
+        if (!expr_struct_eq(equation_lhs(existing), equation_lhs(solution)))
+            continue;
+        if (!expr_struct_eq(equation_rhs(existing), equation_rhs(solution)))
+            continue;
+
+        equation_free(solution);
+        return 0;
+    }
+
+    items = realloc(solutions->solutions,
+                    (solutions->count + 1u) * sizeof(*solutions->solutions));
     if (!items)
         return -1;
 
-    result->solutions = items;
-    result->solutions[result->count++] = solution;
-    result->status = EQUATION_SOLVE_SOLVED;
+    solutions->solutions = items;
+    solutions->solutions[solutions->count++] = solution;
+    solutions->status = EQUATION_SOLVE_SOLVED;
     return 0;
 }
 
 static int equation_append_existing_solution(const equation_t *equation,
-                                             equation_solve_result_t *result)
+                                             equation_solutions_t *solutions)
 {
     equation_t *solution = equation_new(equation->lhs, equation->rhs);
 
     if (!solution)
         return -1;
 
-    if (equation_solve_result_append(result, solution) != 0) {
+    if (equation_solutions_append(solutions, solution) != 0) {
         equation_free(solution);
         return -1;
     }
@@ -141,7 +173,7 @@ static int equation_append_existing_solution(const equation_t *equation,
 
 int equation_append_solution_value(const expr_t *wrt,
                                    number_t value,
-                                   equation_solve_result_t *result)
+                                   equation_solutions_t *solutions)
 {
     expr_t *rhs = expr_new_const(value);
     equation_t *solution = rhs ? equation_new(wrt, rhs) : NULL;
@@ -150,7 +182,7 @@ int equation_append_solution_value(const expr_t *wrt,
     if (!solution)
         goto cleanup;
 
-    if (equation_solve_result_append(result, solution) != 0)
+    if (equation_solutions_append(solutions, solution) != 0)
         goto cleanup;
 
     solution = NULL;
@@ -164,14 +196,14 @@ cleanup:
 
 int equation_append_solution_expr(const expr_t *wrt,
                                   const expr_t *rhs,
-                                  equation_solve_result_t *result)
+                                  equation_solutions_t *solutions)
 {
     equation_t *solution = equation_new(wrt, rhs);
 
     if (!solution)
         return -1;
 
-    if (equation_solve_result_append(result, solution) != 0) {
+    if (equation_solutions_append(solutions, solution) != 0) {
         equation_free(solution);
         return -1;
     }
@@ -183,11 +215,11 @@ static expr_t *equation_simplify_owned(expr_t *expr);
 
 static int equation_try_solve_symbolic_affine(const expr_t *residual,
                                               const expr_t *wrt,
-                                              equation_solve_result_t *result);
+                                              equation_solutions_t *solutions);
 
 static int equation_try_solve_affine(const equation_t *equation,
                                      const expr_t *wrt,
-                                     equation_solve_result_t *result)
+                                     equation_solutions_t *solutions)
 {
     expr_t *residual = equation_residual(equation);
     number_t constant = num_new();
@@ -202,13 +234,13 @@ static int equation_try_solve_affine(const equation_t *equation,
 
     ok = equation_match_affine_linear_expr(residual, wrt, true, &constant, &coeff);
     if (!ok) {
-        rc = equation_try_solve_symbolic_affine(residual, wrt, result);
+        rc = equation_try_solve_symbolic_affine(residual, wrt, solutions);
         goto cleanup;
     }
 
     neg_constant = num_neg(constant);
     solution_value = num_div(neg_constant, coeff);
-    if (equation_append_solution_value(wrt, solution_value, result) != 0) {
+    if (equation_append_solution_value(wrt, solution_value, solutions) != 0) {
         num_destroy(&solution_value);
         num_destroy(&neg_constant);
         goto cleanup;
@@ -276,7 +308,7 @@ static expr_t *equation_symbolic_linear_root(const expr_t *constant,
 
 static int equation_try_solve_symbolic_affine(const expr_t *residual,
                                               const expr_t *wrt,
-                                              equation_solve_result_t *result)
+                                              equation_solutions_t *solutions)
 {
     expr_t *constant = NULL;
     expr_t *linear = NULL;
@@ -293,7 +325,7 @@ static int equation_try_solve_symbolic_affine(const expr_t *residual,
     if (!root)
         goto cleanup;
 
-    if (equation_append_solution_expr(wrt, root, result) != 0)
+    if (equation_append_solution_expr(wrt, root, solutions) != 0)
         goto cleanup;
 
     rc = 0;
@@ -413,7 +445,7 @@ static int equation_try_solve_symbolic_quadratic_product_roots(
     const expr_t *linear,
     const expr_t *quadratic,
     const expr_t *wrt,
-    equation_solve_result_t *result)
+    equation_solutions_t *solutions)
 {
     const expr_t *first = NULL;
     const expr_t *second = NULL;
@@ -443,16 +475,16 @@ static int equation_try_solve_symbolic_quadratic_product_roots(
         reversed = true;
     }
 
-    if (equation_append_solution_expr(wrt, reversed ? second : first, result) != 0)
+    if (equation_append_solution_expr(wrt, reversed ? second : first, solutions) != 0)
         goto error;
-    if (equation_append_solution_expr(wrt, reversed ? first : second, result) != 0)
+    if (equation_append_solution_expr(wrt, reversed ? first : second, solutions) != 0)
         goto error_clear;
 
     rc = 0;
     goto cleanup;
 
 error_clear:
-    equation_solve_result_clear(result);
+    equation_solutions_clear(solutions);
 error:
     rc = -1;
 
@@ -463,7 +495,7 @@ cleanup:
 
 static int equation_try_solve_symbolic_quadratic(const expr_t *residual,
                                                  const expr_t *wrt,
-                                                 equation_solve_result_t *result)
+                                                 equation_solutions_t *solutions)
 {
     expr_t *constant = NULL;
     expr_t *linear = NULL;
@@ -481,7 +513,7 @@ static int equation_try_solve_symbolic_quadratic(const expr_t *residual,
     }
 
     rc = equation_try_solve_symbolic_quadratic_product_roots(
-        constant, linear, quadratic, wrt, result);
+        constant, linear, quadratic, wrt, solutions);
     if (rc <= 0)
         goto cleanup;
 
@@ -501,10 +533,10 @@ static int equation_try_solve_symbolic_quadratic(const expr_t *residual,
     if (!root_plus || !root_minus)
         goto cleanup;
 
-    if (equation_append_solution_expr(wrt, root_plus, result) != 0)
+    if (equation_append_solution_expr(wrt, root_plus, solutions) != 0)
         goto cleanup;
-    if (equation_append_solution_expr(wrt, root_minus, result) != 0) {
-        equation_solve_result_clear(result);
+    if (equation_append_solution_expr(wrt, root_minus, solutions) != 0) {
+        equation_solutions_clear(solutions);
         goto cleanup;
     }
 
@@ -523,7 +555,7 @@ cleanup:
 
 static int equation_try_solve_quadratic(const equation_t *equation,
                                         const expr_t *wrt,
-                                        equation_solve_result_t *result)
+                                        equation_solutions_t *solutions)
 {
     expr_t *residual = equation_residual(equation);
     number_t constant = num_new();
@@ -544,7 +576,7 @@ static int equation_try_solve_quadratic(const equation_t *equation,
     ok = equation_match_quadratic_expr(residual, wrt, &constant, &linear,
                                        &quadratic);
     if (!ok) {
-        rc = equation_try_solve_symbolic_quadratic(residual, wrt, result);
+        rc = equation_try_solve_symbolic_quadratic(residual, wrt, solutions);
         goto cleanup;
     }
 
@@ -554,7 +586,7 @@ static int equation_try_solve_quadratic(const equation_t *equation,
     denominator = num_mul_long(quadratic, 2L);
 
     root = equation_quadratic_root(neg_linear, sqrt_discriminant, denominator);
-    if (equation_append_solution_value(wrt, root, result) != 0) {
+    if (equation_append_solution_value(wrt, root, solutions) != 0) {
         num_destroy(&root);
         num_destroy(&denominator);
         num_destroy(&neg_linear);
@@ -569,7 +601,7 @@ static int equation_try_solve_quadratic(const equation_t *equation,
         root = equation_quadratic_root(neg_linear, neg_sqrt_discriminant,
                                        denominator);
         num_destroy(&neg_sqrt_discriminant);
-        if (equation_append_solution_value(wrt, root, result) != 0) {
+        if (equation_append_solution_value(wrt, root, solutions) != 0) {
             num_destroy(&root);
             num_destroy(&denominator);
             num_destroy(&neg_linear);
@@ -597,23 +629,23 @@ cleanup:
 static int equation_try_solve_zero_product_factor(const expr_t *factor,
                                                   const expr_t *wrt,
                                                   const expr_t *zero,
-                                                  equation_solve_result_t *result,
+                                                  equation_solutions_t *solutions,
                                                   bool *saw_solved_factor)
 {
     const expr_t *left = NULL;
     const expr_t *right = NULL;
     equation_t *factor_equation = NULL;
-    equation_solve_result_t factor_result;
+    equation_solutions_t factor_result;
     int rc = -1;
 
-    equation_solve_result_reset(&factor_result);
+    equation_solutions_reset(&factor_result);
 
     if (expr_match_mul_expr(factor, &left, &right)) {
-        rc = equation_try_solve_zero_product_factor(left, wrt, zero, result,
+        rc = equation_try_solve_zero_product_factor(left, wrt, zero, solutions,
                                                     saw_solved_factor);
         if (rc != 0)
             goto cleanup;
-        rc = equation_try_solve_zero_product_factor(right, wrt, zero, result,
+        rc = equation_try_solve_zero_product_factor(right, wrt, zero, solutions,
                                                     saw_solved_factor);
         goto cleanup;
     }
@@ -627,7 +659,7 @@ static int equation_try_solve_zero_product_factor(const expr_t *factor,
     if (!factor_equation)
         goto cleanup;
 
-    if (equation_solve_for(factor_equation, wrt, &factor_result) != 0)
+    if (equation_solve_for_into(factor_equation, wrt, &factor_result) != 0)
         goto cleanup;
     if (factor_result.status != EQUATION_SOLVE_SOLVED ||
         factor_result.count == 0u) {
@@ -637,7 +669,7 @@ static int equation_try_solve_zero_product_factor(const expr_t *factor,
 
     for (size_t i = 0u; i < factor_result.count; ++i) {
         if (equation_append_solution_expr(
-                wrt, equation_rhs(factor_result.solutions[i]), result) != 0)
+                wrt, equation_rhs(factor_result.solutions[i]), solutions) != 0)
             goto cleanup;
     }
 
@@ -645,14 +677,14 @@ static int equation_try_solve_zero_product_factor(const expr_t *factor,
     rc = 0;
 
 cleanup:
-    equation_solve_result_clear(&factor_result);
+    equation_solutions_clear(&factor_result);
     equation_free(factor_equation);
     return rc;
 }
 
 static int equation_try_solve_zero_product(const equation_t *equation,
                                            const expr_t *wrt,
-                                           equation_solve_result_t *result)
+                                           equation_solutions_t *solutions)
 {
     const expr_t *product = NULL;
     const expr_t *left = NULL;
@@ -661,7 +693,7 @@ static int equation_try_solve_zero_product(const equation_t *equation,
     bool saw_solved_factor = false;
     int rc;
 
-    if (!equation || !wrt || !result)
+    if (!equation || !wrt || !solutions)
         return -1;
 
     if (expr_is_exact_zero(equation->rhs))
@@ -678,12 +710,12 @@ static int equation_try_solve_zero_product(const equation_t *equation,
     if (!zero)
         return -1;
 
-    rc = equation_try_solve_zero_product_factor(product, wrt, zero, result,
+    rc = equation_try_solve_zero_product_factor(product, wrt, zero, solutions,
                                                 &saw_solved_factor);
     expr_free(zero);
 
     if (rc != 0 || !saw_solved_factor) {
-        equation_solve_result_clear(result);
+        equation_solutions_clear(solutions);
         return rc < 0 ? -1 : 1;
     }
 
@@ -691,9 +723,9 @@ static int equation_try_solve_zero_product(const equation_t *equation,
 }
 
 static int equation_append_numeric_binding_solutions(expr_bindings_t *bindings,
-                                                     equation_solve_result_t *result)
+                                                     equation_solutions_t *solutions)
 {
-    if (!bindings || !result)
+    if (!bindings || !solutions)
         return -1;
 
     for (size_t i = 0u; i < bindings->count; ++i) {
@@ -716,13 +748,13 @@ static int equation_append_numeric_binding_solutions(expr_bindings_t *bindings,
         if (!solution)
             return -1;
 
-        if (equation_solve_result_append(result, solution) != 0) {
+        if (equation_solutions_append(solutions, solution) != 0) {
             equation_free(solution);
             return -1;
         }
     }
 
-    return result->count > 0u ? 0 : 1;
+    return solutions->count > 0u ? 0 : 1;
 }
 
 static size_t equation_numeric_precision_digits(const expr_goal_seek_options_t *options)
@@ -805,10 +837,10 @@ static void equation_free_binding_value_snapshot(expr_bindings_t *bindings,
     free(values);
 }
 
-int equation_solve_numeric(const equation_t *equation,
-                           expr_bindings_t *bindings,
-                           const expr_goal_seek_options_t *options,
-                           equation_solve_result_t *result)
+int equation_solve_numeric_into(const equation_t *equation,
+                                expr_bindings_t *bindings,
+                                const expr_goal_seek_options_t *options,
+                                equation_solutions_t *solutions)
 {
     expr_t *residual = NULL;
     number_t target = num_create_from_long(0L);
@@ -816,14 +848,14 @@ int equation_solve_numeric(const equation_t *equation,
     expr_goal_seek_result_t goal_result;
     int rc = -1;
 
-    if (!result)
+    if (!solutions)
         return -1;
 
-    equation_solve_result_reset(result);
+    equation_solutions_reset(solutions);
     if (!equation || !bindings)
         goto cleanup_no_goal;
 
-    result->status = EQUATION_SOLVE_UNSOLVED;
+    solutions->status = EQUATION_SOLVE_UNSOLVED;
     residual = equation_residual(equation);
     if (!residual)
         goto cleanup_no_goal;
@@ -844,11 +876,11 @@ int equation_solve_numeric(const equation_t *equation,
         goto cleanup_no_goal;
     }
 
-    rc = equation_append_numeric_binding_solutions(bindings, result);
+    rc = equation_append_numeric_binding_solutions(bindings, solutions);
     if (rc < 0)
-        equation_solve_result_clear(result);
+        equation_solutions_clear(solutions);
     else if (rc > 0)
-        result->status = EQUATION_SOLVE_UNSOLVED;
+        solutions->status = EQUATION_SOLVE_UNSOLVED;
     expr_goal_seek_result_clear(&goal_result);
 
 cleanup_no_goal:
@@ -858,47 +890,47 @@ cleanup_no_goal:
     return rc < 0 ? -1 : 0;
 }
 
-int equation_solve_for(const equation_t *equation,
-                       const expr_t *wrt,
-                       equation_solve_result_t *result)
+int equation_solve_for_into(const equation_t *equation,
+                            const expr_t *wrt,
+                            equation_solutions_t *solutions)
 {
     int affine_rc;
     int zero_product_rc;
     int quadratic_rc;
     int cubic_rc;
 
-    if (!result)
+    if (!solutions)
         return -1;
 
-    equation_solve_result_reset(result);
+    equation_solutions_reset(solutions);
 
     if (!equation || !wrt)
         return -1;
 
-    result->status = EQUATION_SOLVE_UNSOLVED;
+    solutions->status = EQUATION_SOLVE_UNSOLVED;
 
     if (equation_is_solved_for(equation, wrt))
-        return equation_append_existing_solution(equation, result);
+        return equation_append_existing_solution(equation, solutions);
 
-    affine_rc = equation_try_solve_affine(equation, wrt, result);
+    affine_rc = equation_try_solve_affine(equation, wrt, solutions);
     if (affine_rc == 0)
         return 0;
     if (affine_rc < 0)
         return -1;
 
-    zero_product_rc = equation_try_solve_zero_product(equation, wrt, result);
+    zero_product_rc = equation_try_solve_zero_product(equation, wrt, solutions);
     if (zero_product_rc == 0)
         return 0;
     if (zero_product_rc < 0)
         return -1;
 
-    quadratic_rc = equation_try_solve_quadratic(equation, wrt, result);
+    quadratic_rc = equation_try_solve_quadratic(equation, wrt, solutions);
     if (quadratic_rc == 0)
         return 0;
     if (quadratic_rc < 0)
         return -1;
 
-    cubic_rc = equation_try_solve_cubic(equation, wrt, result);
+    cubic_rc = equation_try_solve_cubic(equation, wrt, solutions);
     if (cubic_rc == 0)
         return 0;
     if (cubic_rc < 0)
@@ -907,13 +939,67 @@ int equation_solve_for(const equation_t *equation,
     return 0;
 }
 
-void equation_solve_result_clear(equation_solve_result_t *result)
+equation_solutions_t *equation_create_numeric_solutions(
+    const equation_t *equation,
+    expr_bindings_t *bindings,
+    const expr_goal_seek_options_t *options)
 {
-    if (!result)
+    equation_solutions_t *solutions = equation_solutions_new();
+
+    if (!solutions)
+        return NULL;
+    if (equation_solve_numeric_into(equation, bindings, options, solutions) != 0) {
+        equation_solutions_free(solutions);
+        return NULL;
+    }
+    return solutions;
+}
+
+equation_solutions_t *equation_create_solutions_for(const equation_t *equation,
+                                                    const expr_t *wrt)
+{
+    equation_solutions_t *solutions = equation_solutions_new();
+
+    if (!solutions)
+        return NULL;
+    if (equation_solve_for_into(equation, wrt, solutions) != 0) {
+        equation_solutions_free(solutions);
+        return NULL;
+    }
+    return solutions;
+}
+
+bool equation_solutions_are_valid(const equation_solutions_t *solutions)
+{
+    return solutions && solutions->status != EQUATION_SOLVE_INVALID;
+}
+
+bool equation_solutions_has_any(const equation_solutions_t *solutions)
+{
+    return solutions && solutions->status == EQUATION_SOLVE_SOLVED;
+}
+
+size_t equation_solutions_count(const equation_solutions_t *solutions)
+{
+    return solutions ? solutions->count : 0u;
+}
+
+const equation_t *equation_solutions_at(
+    const equation_solutions_t *solutions,
+    size_t index)
+{
+    if (!solutions || index >= solutions->count)
+        return NULL;
+    return solutions->solutions[index];
+}
+
+void equation_solutions_clear(equation_solutions_t *solutions)
+{
+    if (!solutions)
         return;
 
-    for (size_t i = 0u; i < result->count; ++i)
-        equation_free(result->solutions[i]);
-    free(result->solutions);
-    equation_solve_result_reset(result);
+    for (size_t i = 0u; i < solutions->count; ++i)
+        equation_free(solutions->solutions[i]);
+    free(solutions->solutions);
+    equation_solutions_reset(solutions);
 }

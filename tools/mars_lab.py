@@ -2660,6 +2660,40 @@ __THEME_OVERRIDES__
         leftName.localeCompare(rightName);
     }
 
+    function sortedAssignmentParts(parts) {
+      return [...(parts || [])].sort((left, right) => {
+        const leftEq = indexOfTopLevel(left, '=');
+        const rightEq = indexOfTopLevel(right, '=');
+        const leftName = leftEq >= 0 ? left.slice(0, leftEq).trim() : String(left || '').trim();
+        const rightName = rightEq >= 0 ? right.slice(0, rightEq).trim() : String(right || '').trim();
+        return compareBindingNames(leftName, rightName);
+      });
+    }
+
+    function expressionWithSortedConstants(text) {
+      const normalized = expressionForEditor(text).trim();
+      const parts = bindingParts(normalized);
+      if (!parts || !parts.constants)
+        return normalized;
+
+      const variableAssignments = splitTopLevel(parts.variables, ',')
+        .map((part) => part.trim())
+        .filter(Boolean);
+      const constantAssignments = sortedAssignmentParts(
+        splitTopLevel(parts.constants, ',')
+          .map((part) => part.trim())
+          .filter(Boolean)
+      );
+
+      let bindingText = variableAssignments.join(', ');
+      if (constantAssignments.length) {
+        const constants = constantAssignments.join(', ');
+        bindingText = bindingText ? `${bindingText}; ${constants}` : `; ${constants}`;
+      }
+
+      return `{ ${parts.body} | ${bindingText} }`;
+    }
+
     function canGoalSeek() {
       return currentVariables.length > 0;
     }
@@ -3220,7 +3254,7 @@ __THEME_OVERRIDES__
 
       const savedEquation = String(data.equation || '').trim();
       if (savedEquation && !savedEquation.includes('...'))
-        modeEditorText.equation = savedEquation;
+        modeEditorText.equation = expressionWithSortedConstants(savedEquation);
 
       const savedEquationVariable = String(data.equation_variable || '').trim();
       if (equationVariable)
@@ -3287,7 +3321,7 @@ __THEME_OVERRIDES__
           matrixOperand.value = matrixOperandText;
         const equationText = localStorage.getItem('mars.exprLab.lastEquation');
         if (equationText && !equationText.includes('...'))
-          modeEditorText.equation = equationText;
+          modeEditorText.equation = expressionWithSortedConstants(equationText);
         const equationVariableText = localStorage.getItem('mars.exprLab.lastEquationVariable');
         if (equationVariable && equationVariableText)
           equationVariable.value = equationVariableText;
@@ -3381,7 +3415,7 @@ __THEME_OVERRIDES__
     }
 
     function saveLastEquationState() {
-      const text = String(currentExpressionText() || expr.value || '').trim();
+      const text = expressionWithSortedConstants(String(currentExpressionText() || expr.value || '').trim());
       const variable = String(equationVariable && equationVariable.value || DEFAULT_EQUATION_VARIABLE_TEXT).trim() ||
         DEFAULT_EQUATION_VARIABLE_TEXT;
       if (text)
@@ -4395,15 +4429,9 @@ __THEME_OVERRIDES__
             valueLines.push(`status: ${data.status}`);
           value.textContent = valueLines.join('\n');
         }
-        if (data.equation)
-          setExpressionEditor(
-            data.equation,
-            data.binding_values || null,
-            data.unbound || null
-          );
-        else if (data.binding_values)
+        if (data.binding_values)
           renderVariableValues(data.binding_values || []);
-        modeEditorText.equation = data.equation || text;
+        modeEditorText.equation = text;
         saveLastEquationState();
         currentVariables = [];
         currentDifferentiable = false;
@@ -5017,6 +5045,8 @@ def load_state_data() -> dict[str, object]:
     expression = str(state.get("expression", "")).strip()
     if "..." in expression:
         state["expression"] = DEFAULT_EXPRESSION
+    else:
+        state["expression"] = expression_with_sorted_constants(expression)
 
     matrix = str(state.get("matrix", "")).strip()
     if "..." in matrix:
@@ -5029,6 +5059,8 @@ def load_state_data() -> dict[str, object]:
     equation = str(state.get("equation", "")).strip()
     if "..." in equation:
         state["equation"] = DEFAULT_EQUATION
+    else:
+        state["equation"] = expression_with_sorted_constants(equation)
 
     equation_variable = str(state.get("equation_variable", "")).strip()
     if not equation_variable:
@@ -5074,7 +5106,16 @@ def load_state_expression() -> str:
 
 def save_state_data(updates: dict[str, object]) -> None:
     state = load_state_data()
-    state.update(updates)
+    normalized = dict(updates)
+    if "expression" in normalized:
+        normalized["expression"] = expression_with_sorted_constants(
+            str(normalized.get("expression") or "").strip()
+        )
+    if "equation" in normalized:
+        normalized["equation"] = expression_with_sorted_constants(
+            str(normalized.get("equation") or "").strip()
+        )
+    state.update(normalized)
     STATE_FILE.write_text(
         json.dumps(state, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
@@ -6879,8 +6920,8 @@ def prepare_equation_fields(fields: dict[str, str], precision: int) -> dict[str,
         "value": str(fields.get("value") or "").strip(),
         "status": str(fields.get("status") or "").strip(),
         "solutions": solutions_text,
-        "full_display_equation": expression_for_display(equation_text or unbound_text),
-        "display_equation": compact_display_text(expression_for_display(equation_text or unbound_text)),
+        "full_display_equation": expression_for_display(unbound_text or equation_text),
+        "display_equation": compact_display_text(expression_for_display(unbound_text or equation_text)),
         "full_display_tex": render_tex,
         "display_tex": display_tex,
         "binding_values": expression_variable_binding_values(equation_text or fields.get("input", ""), precision),
