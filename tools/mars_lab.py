@@ -1874,13 +1874,7 @@ __THEME_OVERRIDES__
         <textarea class="hidden secondary-editor" id="matrixOperand" spellcheck="false" placeholder="(1; 0)"></textarea>
       </div>
       <div class="mode-panel hidden" id="equationControls">
-        <div class="integrator-bound-grid">
-          <div class="integrator-bound-field integrator-var-field">
-            <label for="equationVariable">Solve for</label>
-            <input id="equationVariable" spellcheck="false" autocomplete="off" value="x">
-          </div>
-        </div>
-        <p class="mode-hint">Enter an equation such as <code>{ 2*x + 3 = 7 | x = ? }</code>. The lab first tries to isolate the chosen variable symbolically, then goal-seeks numeric values for all variable bindings if needed.</p>
+        <p class="mode-hint">Enter an equation such as <code>{ M = E - e*sin(E) | E = 1.5; M = 1.5, e = 0.0167 }</code>. Bindings after <code>|</code> decide which symbols are variables, which are constants, and which starting values numeric fallback should use.</p>
       </div>
       <div class="mode-panel hidden" id="integratorControls">
         <div class="integrator-bound-grid">
@@ -1910,7 +1904,6 @@ __THEME_OVERRIDES__
       <div class="target-row hidden" id="targetRow">
         <label for="goalTarget">Target</label>
         <input id="goalTarget" spellcheck="false" value="0">
-        <div class="goal-start-fields" id="goalStartFields"></div>
       </div>
       <div class="controls">
         <button id="run">Evaluate</button>
@@ -2018,9 +2011,9 @@ __THEME_OVERRIDES__
             <li>Constants are not changed by goal seek.</li>
             <li>If there is one variable, goal seek solves that variable directly.</li>
             <li>If there are several variables, goal seek moves them together by the smallest local step it can find.</li>
-            <li>Optional start boxes appear for each variable. Enter numeric constant expressions only, such as <code>3</code>, <code>pi/4</code>, <code>-2.5</code>, or <code>1e-6</code>.</li>
-            <li>Use a start point when the solver needs a hint about which crossing or branch to search near, for example target <code>27</code> with expression <code>x^x</code> and start <code>3</code>.</li>
-            <li>For several variables, fill the start box beside each variable you want to seed. Blank start boxes keep their current binding value, or use <code>1</code> for unknowns.</li>
+            <li>Current variable binding values become the starting point automatically.</li>
+            <li>Use the binding boxes in the main editor to seed a particular crossing or branch, for example target <code>27</code> with expression <code>{ x^x | x = 3 }</code>.</li>
+            <li>For several variables, set whichever variable bindings you want to seed. Blank or unknown bindings still fall back to the solver's defaults.</li>
             <li>It only reports success when <code>abs(value - target)</code> is within the current working precision.</li>
           </ul>
         </div>
@@ -2084,7 +2077,7 @@ __THEME_OVERRIDES__
             <li><code>Ctrl+Enter</code> evaluates the expression.</li>
             <li>Derivative buttons appear from the current variable bindings.</li>
             <li>Enter the goal-seek target in the left pane's <code>Target</code> field.</li>
-            <li>Use the per-variable start boxes when goal seek needs better initial guesses.</li>
+            <li>Use the binding boxes in the editor when goal seek needs better initial guesses.</li>
             <li><code>Goal seek</code> changes all variable bindings together to move the value towards that target.</li>
             <li>More/Less precision changes the displayed value precision without changing the expression.</li>
           </ul>
@@ -2103,7 +2096,7 @@ __THEME_OVERRIDES__
     const matrixOperand = document.getElementById('matrixOperand');
     const matrixOperandLabel = document.getElementById('matrixOperandLabel');
     const equationControls = document.getElementById('equationControls');
-    const equationVariable = document.getElementById('equationVariable');
+    const equationVariable = null;
     const integratorControls = document.getElementById('integratorControls');
     const integratorVariable = document.getElementById('integratorVariable');
     const integratorLowerBound = document.getElementById('integratorLowerBound');
@@ -2117,7 +2110,6 @@ __THEME_OVERRIDES__
     const clear = document.getElementById('clear');
     const targetRow = document.getElementById('targetRow');
     const goalTarget = document.getElementById('goalTarget');
-    const goalStartFields = document.getElementById('goalStartFields');
     const lessPrecision = document.getElementById('lessPrecision');
     const morePrecision = document.getElementById('morePrecision');
     const derivativeButtons = document.getElementById('derivativeButtons');
@@ -2327,7 +2319,7 @@ __THEME_OVERRIDES__
       } else if (equationMode) {
         leftPaneTitle.textContent = 'Equation';
         subtitle.textContent = 'Enter an equation on the left. The lab tries symbolic isolation first, then numeric solving for all variable bindings.';
-        setResultTitles('Rendered TeX', 'Equation', 'Solutions', 'Residual');
+        setResultTitles('Rendered TeX', 'Equation', 'Solutions', 'Error');
         setValueCardVisible(true);
       } else if (matrixMode) {
         leftPaneTitle.textContent = 'Matrix';
@@ -2387,8 +2379,6 @@ __THEME_OVERRIDES__
     }
 
     function showTargetEntry() {
-      const variables = currentVariables.slice();
-      renderGoalStartFields(variables);
       targetRow.classList.remove('hidden');
       goalSeek.textContent = 'Run goal seek';
       goalTarget.focus();
@@ -2544,52 +2534,6 @@ __THEME_OVERRIDES__
       select.__marsSyncRoundedSelect = sync;
       sync();
       return {sync, close};
-    }
-
-    function goalStartKeydown(event) {
-      if (event.key === 'Enter') {
-        event.preventDefault();
-        goalSeek.click();
-      } else if (event.key === 'Escape') {
-        event.preventDefault();
-        hideTargetEntry();
-        expr.focus();
-        setStatus('Ready');
-      }
-    }
-
-    function renderGoalStartFields(variables) {
-      goalStartFields.replaceChildren();
-      variables.forEach((name) => {
-        const id = `goalStart_${name.replace(/[^A-Za-z0-9_-]/g, '_')}`;
-        const label = document.createElement('label');
-        label.setAttribute('for', id);
-        label.textContent = `Start ${name}`;
-
-        const input = document.createElement('input');
-        input.id = id;
-        input.dataset.variable = name;
-        input.inputMode = 'decimal';
-        input.spellcheck = false;
-        input.placeholder = 'optional value';
-        input.addEventListener('keydown', goalStartKeydown);
-
-        goalStartFields.append(label, input);
-      });
-    }
-
-    function goalStartValues() {
-      const values = {};
-      for (const input of goalStartFields.querySelectorAll('input')) {
-        const text = input.value.trim();
-        if (!text)
-          continue;
-        if (START_FORBIDDEN_PATTERN.test(text)) {
-          throw new Error(`Start for ${input.dataset.variable} must be a numeric constant expression`);
-        }
-        values[input.dataset.variable] = text;
-      }
-      return values;
     }
 
     function splitTopLevel(text, separator) {
@@ -2786,6 +2730,8 @@ __THEME_OVERRIDES__
       if (!body)
         return '';
       if (bindingParts(body))
+        return body;
+      if (currentMode() === 'equation')
         return body;
 
       const full = expr.dataset.fullExpression || fullExpressionText;
@@ -3416,22 +3362,18 @@ __THEME_OVERRIDES__
 
     function saveLastEquationState() {
       const text = expressionWithSortedConstants(String(currentExpressionText() || expr.value || '').trim());
-      const variable = String(equationVariable && equationVariable.value || DEFAULT_EQUATION_VARIABLE_TEXT).trim() ||
-        DEFAULT_EQUATION_VARIABLE_TEXT;
       if (text)
         modeEditorText.equation = text;
 
       try {
         if (text)
           localStorage.setItem('mars.exprLab.lastEquation', text);
-        localStorage.setItem('mars.exprLab.lastEquationVariable', variable);
       } catch (_) {
         // The lab still works fine without persistence.
       }
 
       saveLabState({
         equation: text,
-        equation_variable: variable,
         precision_bits: modePrecisionBits
       });
     }
@@ -3471,9 +3413,6 @@ __THEME_OVERRIDES__
         ? 'Goal seek needs at least one variable binding'
         : '';
       goalTarget.disabled = isBusy;
-      Array.from(goalStartFields.querySelectorAll('input')).forEach((input) => {
-        input.disabled = isBusy;
-      });
       lessPrecision.disabled = isBusy || atMinimumPrecision();
       morePrecision.disabled = isBusy || atMaximumPrecision();
       morePrecision.title = !isBusy && atMaximumPrecision()
@@ -3707,7 +3646,6 @@ __THEME_OVERRIDES__
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
           equation: equationText,
-          variable: String(equationVariable && equationVariable.value || DEFAULT_EQUATION_VARIABLE_TEXT).trim(),
           precision: requestedValuePrecision()
         })
       });
@@ -4423,14 +4361,16 @@ __THEME_OVERRIDES__
           const valueLines = [];
           if (data.residual)
             valueLines.push(`residual: ${data.residual}`);
-          if (data.value)
-            valueLines.push(`value: ${displayEquationValue(data.value)}`);
+          if (data.error)
+            valueLines.push(`error: ${displayEquationValue(data.error)}`);
           if (data.status)
             valueLines.push(`status: ${data.status}`);
           value.textContent = valueLines.join('\n');
         }
-        if (data.binding_values)
-          renderVariableValues(data.binding_values || []);
+        if (Array.isArray(data.binding_values))
+          renderVariableValues(data.binding_values);
+        else
+          clearVariableValues();
         modeEditorText.equation = text;
         saveLastEquationState();
         currentVariables = [];
@@ -4543,7 +4483,7 @@ __THEME_OVERRIDES__
       evaluateExpression();
     }
 
-    async function runGoalSeek(sourceText, target, start, options = {}) {
+    async function runGoalSeek(sourceText, target, start = {}, options = {}) {
       const request = goalSeekExpressionAndStarts(sourceText, start);
       const response = await fetch('/goal_seek', {
         method: 'POST',
@@ -4723,6 +4663,12 @@ __THEME_OVERRIDES__
 
     expr.addEventListener('input', () => {
       if (currentMode() === 'equation') {
+        if (!bindingParts(expr.value)) {
+          fullExpressionText = expr.value.trim();
+          displayedExpressionText = expr.value.trim();
+          expr.dataset.fullExpression = fullExpressionText;
+          expr.dataset.displayExpression = displayedExpressionText;
+        }
         refreshVariableValuesFromEditor();
         updateHistoryButtons();
         return;
@@ -4791,8 +4737,7 @@ __THEME_OVERRIDES__
       setStatus('Goal seeking...');
       try {
         const target = goalTarget.value.trim() || '0';
-        const start = goalStartValues();
-        await runGoalSeek(text, target, start);
+        await runGoalSeek(text, target);
       } catch (err) {
         setRenderedError(String(err));
         resetMoreDigitsButton(renderedMore, false);
@@ -6058,7 +6003,7 @@ def parse_matrix_lab_output(output: str) -> dict[str, str]:
             "result": r"^result\s+(.*)$",
             "pretty": r"^pretty\s+(.*)$",
             "tex": r"^tex\s+(.*)$",
-            "value": r"^value\s+(.*)$",
+            "error": r"^error\s+(.*)$",
         },
         {"pretty"},
     )
@@ -6081,7 +6026,7 @@ def parse_integrator_lab_output(output: str) -> dict[str, str]:
             "antiderivative_tex": r"^antiderivative_tex\s*(.*)$",
             "antiderivative": r"^antiderivative\s+(.*)$",
             "symbolic": r"^symbolic\s+(.*)$",
-            "value": r"^value\s+(.*)$",
+            "error": r"^error\s+(.*)$",
             "error": r"^error\s+(.*)$",
             "work_units": r"^work_units\s+(.*)$",
             "work_cap": r"^work_cap\s+(.*)$",
@@ -6519,14 +6464,12 @@ def run_integrator_lab_fields(
 def run_equation_lab_fields(
     binary: Path,
     equation_text: str,
-    variable: str,
     precision: int,
 ) -> tuple[dict[str, str], str, int]:
     command = [
         str(binary),
         equation_text,
         str(max(17, precision)),
-        variable,
     ]
     completed = subprocess.run(
         command,
@@ -6713,7 +6656,7 @@ def goal_seek_expression(
 
     if start_values:
         if not isinstance(start_values, dict):
-            raise ValueError("Start values must be entered in the per-variable start boxes")
+            raise ValueError("Start values must be supplied as binding assignments")
         for name, value in start_values.items():
             name_text = str(name).strip()
             value_text = str(value).strip()
@@ -6830,9 +6773,9 @@ def prepare_matrix_fields(fields: dict[str, str]) -> dict[str, object]:
 
 
 def prepare_integrator_fields(fields: dict[str, str], precision: int) -> dict[str, object]:
-    if fields.get("value"):
-        fields["value"] = format_number_text_for_precision(
-            str(fields["value"]), precision, zero_subprecision=True)
+    if fields.get("error"):
+        fields["error"] = format_number_text_for_precision(
+            str(fields["error"]), precision, zero_subprecision=True)
     if fields.get("symbolic_value"):
         fields["symbolic_value"] = format_number_text_for_precision(
             str(fields["symbolic_value"]), precision, zero_subprecision=True)
@@ -6863,7 +6806,7 @@ def prepare_integrator_fields(fields: dict[str, str], precision: int) -> dict[st
         "symbolic": str(fields.get("symbolic") or "").strip(),
         "symbolic_tex": str(fields.get("symbolic_tex") or "").strip(),
         "symbolic_value": str(fields.get("symbolic_value") or "").strip(),
-        "value": str(fields.get("value") or "").strip(),
+        "error": str(fields.get("error") or "").strip(),
         "error": str(fields.get("error") or "").strip(),
         "intervals": str(fields.get("intervals") or "").strip(),
         "max_intervals": str(fields.get("max_intervals") or "").strip(),
@@ -6895,6 +6838,7 @@ def prepare_equation_fields(fields: dict[str, str], precision: int) -> dict[str,
         fields[f"raw_{key}"] = value
         fields[key] = precision_numeric_tokens(value, precision)
 
+    source_equation_text = str(fields.get("input") or "").strip()
     equation_text = expression_with_sorted_constants(str(fields.get("equation") or "").strip())
     unbound_text = str(fields.get("unbound") or "").strip()
     solutions_text = normalize_multiline_display_text(fields.get("solutions") or "")
@@ -6924,7 +6868,7 @@ def prepare_equation_fields(fields: dict[str, str], precision: int) -> dict[str,
         "display_equation": compact_display_text(expression_for_display(unbound_text or equation_text)),
         "full_display_tex": render_tex,
         "display_tex": display_tex,
-        "binding_values": expression_variable_binding_values(equation_text or fields.get("input", ""), precision),
+        "binding_values": expression_variable_binding_values(source_equation_text or equation_text, precision),
     }
     if svg:
         payload["svg"] = svg
@@ -7217,7 +7161,6 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                 body = self.rfile.read(length)
                 payload = json.loads(body.decode("utf-8"))
                 equation_text = str(payload.get("equation", "")).strip()
-                variable = str(payload.get("variable", DEFAULT_EQUATION_VARIABLE)).strip() or DEFAULT_EQUATION_VARIABLE
                 precision = int(payload.get("precision", 96))
             except Exception as exc:
                 self.send_json(400, {"ok": False, "error": f"Bad request: {exc}"})
@@ -7233,7 +7176,6 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                 fields, raw, returncode = run_equation_lab_fields(
                     self.equation_binary,
                     equation_text,
-                    variable,
                     precision,
                 )
             except Exception as exc:
@@ -7246,7 +7188,6 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
 
             save_state_data({
                 "equation": equation_text,
-                "equation_variable": variable,
             })
             self.send_json(200, prepare_equation_fields(fields, precision))
             return

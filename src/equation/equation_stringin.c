@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "equation.h"
+#include "equation_internal.h"
 #include "expression/expr_stringin_internal.h"
 
 typedef struct {
@@ -12,14 +13,14 @@ typedef struct {
     bool has_bindings;
 } equation_parse_parts_t;
 
-static bool equation_view_ascii_at(string_view_t view, size_t pos, char expected)
+static bool equ_view_ascii_at(string_view_t view, size_t pos, char expected)
 {
     unsigned char ch = 0u;
 
     return string_view_peek_ascii(view, pos, &ch) && ch == (unsigned char)expected;
 }
 
-static int equation_append_view(string_t *text, string_view_t view)
+static int equ_append_view(string_t *text, string_view_t view)
 {
     string_t *copy = string_from_view(&view);
     int rc;
@@ -31,7 +32,7 @@ static int equation_append_view(string_t *text, string_view_t view)
     return rc;
 }
 
-static bool equation_scan_depths(string_view_t view,
+static bool equ_scan_depths(string_view_t view,
                                  size_t pos,
                                  int *paren_depth,
                                  int *bracket_depth,
@@ -71,7 +72,7 @@ static bool equation_scan_depths(string_view_t view,
     return true;
 }
 
-static bool equation_find_top_level_char(string_view_t view,
+static bool equ_find_top_level_char(string_view_t view,
                                          char target,
                                          size_t *pos_out)
 {
@@ -84,32 +85,32 @@ static bool equation_find_top_level_char(string_view_t view,
         if (paren_depth == 0 &&
             bracket_depth == 0 &&
             brace_depth == 0 &&
-            equation_view_ascii_at(view, i, target)) {
+            equ_view_ascii_at(view, i, target)) {
             *pos_out = i;
             return true;
         }
 
-        equation_scan_depths(view, i, &paren_depth, &bracket_depth, &brace_depth);
+        equ_scan_depths(view, i, &paren_depth, &bracket_depth, &brace_depth);
     }
 
     return false;
 }
 
-static bool equation_strip_outer_braces(string_view_t *view)
+static bool equ_strip_outer_braces(string_view_t *view)
 {
     const size_t len = string_view_length(*view);
     int paren_depth = 0;
     int bracket_depth = 0;
     int brace_depth = 0;
 
-    if (len < 2u || !equation_view_ascii_at(*view, 0u, '{'))
+    if (len < 2u || !equ_view_ascii_at(*view, 0u, '{'))
         return true;
 
     for (size_t i = 0u; i < len; ++i) {
-        equation_scan_depths(*view, i, &paren_depth, &bracket_depth, &brace_depth);
+        equ_scan_depths(*view, i, &paren_depth, &bracket_depth, &brace_depth);
         if (brace_depth == 0) {
             if (i != len - 1u) {
-                fprintf(stderr, "equation_from_text: trailing text after equation wrapper\n");
+                fprintf(stderr, "equ_from_text: trailing text after equation wrapper\n");
                 return false;
             }
 
@@ -118,11 +119,11 @@ static bool equation_strip_outer_braces(string_view_t *view)
         }
     }
 
-    fprintf(stderr, "equation_from_text: missing closing equation wrapper\n");
+    fprintf(stderr, "equ_from_text: missing closing equation wrapper\n");
     return false;
 }
 
-static bool equation_parse_parts(const string_t *text, equation_parse_parts_t *parts)
+static bool equ_parse_parts(const string_t *text, equation_parse_parts_t *parts)
 {
     string_view_t view;
     size_t split_pos = 0u;
@@ -133,15 +134,15 @@ static bool equation_parse_parts(const string_t *text, equation_parse_parts_t *p
 
     view = string_view_trim(string_view_all(text));
     if (string_view_is_empty(view)) {
-        fprintf(stderr, "equation_from_text: empty equation\n");
+        fprintf(stderr, "equ_from_text: empty equation\n");
         return false;
     }
 
-    if (!equation_strip_outer_braces(&view))
+    if (!equ_strip_outer_braces(&view))
         return false;
 
     parts->bindings = string_view_empty();
-    parts->has_bindings = equation_find_top_level_char(view, '|', &split_pos);
+    parts->has_bindings = equ_find_top_level_char(view, '|', &split_pos);
     if (parts->has_bindings) {
         equation_view = string_view_trim(string_view_slice(view, 0u, split_pos));
         parts->bindings = string_view_trim(
@@ -152,8 +153,8 @@ static bool equation_parse_parts(const string_t *text, equation_parse_parts_t *p
         equation_view = view;
     }
 
-    if (!equation_find_top_level_char(equation_view, '=', &split_pos)) {
-        fprintf(stderr, "equation_from_text: expected top-level '='\n");
+    if (!equ_find_top_level_char(equation_view, '=', &split_pos)) {
+        fprintf(stderr, "equ_from_text: expected top-level '='\n");
         return false;
     }
 
@@ -164,23 +165,23 @@ static bool equation_parse_parts(const string_t *text, equation_parse_parts_t *p
                           string_view_length(equation_view) - split_pos - 1u));
 
     if (string_view_is_empty(parts->lhs) || string_view_is_empty(parts->rhs)) {
-        fprintf(stderr, "equation_from_text: equation side is empty\n");
+        fprintf(stderr, "equ_from_text: equation side is empty\n");
         return false;
     }
 
     return true;
 }
 
-static string_t *equation_make_binding_probe(const equation_parse_parts_t *parts)
+static string_t *equ_make_binding_probe(const equation_parse_parts_t *parts)
 {
     string_t *probe = string_new_with("{ (");
 
     if (!probe)
         return NULL;
 
-    if (equation_append_view(probe, parts->lhs) != 0 ||
+    if (equ_append_view(probe, parts->lhs) != 0 ||
         string_append_cstr(probe, ") + (") != 0 ||
-        equation_append_view(probe, parts->rhs) != 0 ||
+        equ_append_view(probe, parts->rhs) != 0 ||
         string_append_char(probe, ')') != 0) {
         string_free(probe);
         return NULL;
@@ -188,7 +189,7 @@ static string_t *equation_make_binding_probe(const equation_parse_parts_t *parts
 
     if (parts->has_bindings) {
         if (string_append_cstr(probe, " | ") != 0 ||
-            equation_append_view(probe, parts->bindings) != 0) {
+            equ_append_view(probe, parts->bindings) != 0) {
             string_free(probe);
             return NULL;
         }
@@ -202,7 +203,7 @@ static string_t *equation_make_binding_probe(const equation_parse_parts_t *parts
     return probe;
 }
 
-static int equation_build_symbol_arrays(expr_bindings_t *bindings,
+static int equ_build_symbol_arrays(expr_bindings_t *bindings,
                                         const string_t ***names_out,
                                         expr_t ***symbols_out,
                                         size_t *count_out)
@@ -237,7 +238,7 @@ static int equation_build_symbol_arrays(expr_bindings_t *bindings,
     return 0;
 }
 
-static expr_t *equation_parse_side(string_view_t side,
+static expr_t *equ_parse_side(string_view_t side,
                                    const string_t *const *names,
                                    expr_t *const *symbols,
                                    size_t symbol_count)
@@ -253,7 +254,7 @@ static expr_t *equation_parse_side(string_view_t side,
     return expr;
 }
 
-equation_t *equation_from_text(const string_t *text, expr_bindings_t **bnd_out)
+equation_t *equ_from_text(const string_t *text)
 {
     equation_parse_parts_t parts;
     string_t *probe = NULL;
@@ -266,13 +267,10 @@ equation_t *equation_from_text(const string_t *text, expr_bindings_t **bnd_out)
     expr_t *rhs = NULL;
     equation_t *equation = NULL;
 
-    if (bnd_out)
-        *bnd_out = NULL;
-
-    if (!equation_parse_parts(text, &parts))
+    if (!equ_parse_parts(text, &parts))
         return NULL;
 
-    probe = equation_make_binding_probe(&parts);
+    probe = equ_make_binding_probe(&parts);
     if (!probe)
         return NULL;
 
@@ -284,22 +282,18 @@ equation_t *equation_from_text(const string_t *text, expr_bindings_t **bnd_out)
     expr_free(probe_expr);
     probe_expr = NULL;
 
-    if (equation_build_symbol_arrays(bindings, &names, &symbols, &symbol_count) != 0)
+    if (equ_build_symbol_arrays(bindings, &names, &symbols, &symbol_count) != 0)
         goto cleanup;
 
-    lhs = equation_parse_side(parts.lhs, names, symbols, symbol_count);
-    rhs = equation_parse_side(parts.rhs, names, symbols, symbol_count);
+    lhs = equ_parse_side(parts.lhs, names, symbols, symbol_count);
+    rhs = equ_parse_side(parts.rhs, names, symbols, symbol_count);
     if (!lhs || !rhs)
         goto cleanup;
 
-    equation = equation_new(lhs, rhs);
+    equation = equ_new_with_owned_bindings(lhs, rhs, bindings);
     if (!equation)
         goto cleanup;
-
-    if (bnd_out) {
-        *bnd_out = bindings;
-        bindings = NULL;
-    }
+    bindings = NULL;
 
 cleanup:
     expr_free(rhs);
@@ -311,13 +305,11 @@ cleanup:
     return equation;
 }
 
-equation_t *equation_from_string(const char *s, expr_bindings_t **bnd_out)
+equation_t *equ_from_string(const char *s)
 {
     string_t *text;
     equation_t *equation;
 
-    if (bnd_out)
-        *bnd_out = NULL;
     if (!s)
         return NULL;
 
@@ -325,7 +317,7 @@ equation_t *equation_from_string(const char *s, expr_bindings_t **bnd_out)
     if (!text)
         return NULL;
 
-    equation = equation_from_text(text, bnd_out);
+    equation = equ_from_text(text);
     string_free(text);
     return equation;
 }

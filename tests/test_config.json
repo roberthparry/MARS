@@ -1183,7 +1183,8 @@
       "test_equation_solves_cubic_complex_pair": true,
       "test_equation_solves_cubic_repeated_root_once": true,
       "test_equation_solves_cubic_with_numeric_parameter_bindings": true,
-      "test_equation_solves_symbolic_cubic_cardano": true
+      "test_equation_solves_symbolic_cubic_cardano": true,
+      "test_equation_derives_kepler_solution_from_bindings": true
     },
     "test_equation_future_solver_cases": {
       "enabled": true,

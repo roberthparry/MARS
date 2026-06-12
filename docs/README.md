@@ -14,6 +14,7 @@ This directory contains the longer module documentation for MARS.
 - [`qfloat_t`](qfloat.md) — double-double arithmetic and special functions
 - [`qcomplex_t`](qcomplex.md) — double-double complex arithmetic and special functions
 - [`matrix_t`](matrix.md) — generic high-precision matrix with pluggable element types and storage kinds
+- [`equation_t`](equation.md) — parsed equations with symbolic isolation and numeric fallback
 - [`expr_t`](expression.md) — differentiable expression DAGs and symbolic helper APIs
 - [`datetime_t`](datetime.md) — civil and astronomical date/time utilities
 - [`timeseries_t`](timeseries.md) — datetime-indexed forecasting and time-series analysis

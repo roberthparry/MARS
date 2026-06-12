@@ -1,10 +1,112 @@
+#include <limits.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "equation.h"
 
-static string_t *equation_extract_binding_section(string_t *expr_text)
+bool expr_set_number_scientific_local(bool scientific);
+int expr_set_number_precision_local(int precision);
+
+static int equ_append_padding(string_t *out, int count)
+{
+    for (int i = 0; i < count; ++i) {
+        if (string_append_char(out, ' ') != 0)
+            return -1;
+    }
+    return 0;
+}
+
+static style_t equ_format_style(const string_format_spec_t *spec,
+                                string_format_result_t *result)
+{
+    if (!spec || !result)
+        return style_EXPRESSION;
+
+    switch (spec->trailing_modifier) {
+    case 'u':
+    case 'U':
+        *result = STRING_FORMAT_HANDLED_WITH_TRAILING_MODIFIER;
+        return style_UNBOUND;
+    case 't':
+    case 'T':
+        *result = STRING_FORMAT_HANDLED_WITH_TRAILING_MODIFIER;
+        return style_TEX;
+    default:
+        return style_EXPRESSION;
+    }
+}
+
+static string_format_result_t equ_format_callback(string_t *out,
+                                                  const string_format_spec_t *spec,
+                                                  va_list ap,
+                                                  void *user)
+{
+    bool left;
+    bool old_scientific;
+    bool scientific;
+    int width;
+    int old_precision;
+    int precision;
+    int pad;
+    size_t text_len;
+    const equation_t *equation;
+    string_t *text;
+    style_t style;
+    string_format_result_t result = STRING_FORMAT_HANDLED;
+
+    (void)user;
+
+    if (!out || !spec || (spec->conversion != 'n' && spec->conversion != 'N'))
+        return STRING_FORMAT_UNHANDLED;
+
+    width = spec->width;
+    left = spec->flag_left;
+    if (spec->width_from_argument) {
+        width = va_arg(ap, int);
+        if (width < 0) {
+            left = true;
+            width = -width;
+        }
+    }
+    precision = spec->precision;
+    if (spec->precision_from_argument) {
+        precision = va_arg(ap, int);
+        if (precision < 0)
+            precision = -1;
+    }
+
+    style = equ_format_style(spec, &result);
+    scientific = spec->conversion == 'N';
+    equation = va_arg(ap, const equation_t *);
+    old_scientific = expr_set_number_scientific_local(scientific);
+    old_precision = expr_set_number_precision_local(precision);
+    text = equ_to_text(equation, style);
+    expr_set_number_precision_local(old_precision);
+    expr_set_number_scientific_local(old_scientific);
+    if (!text)
+        return STRING_FORMAT_ERROR;
+
+    text_len = string_length(text);
+    pad = width > (int)text_len ? width - (int)text_len : 0;
+
+    if (!left && equ_append_padding(out, pad) != 0)
+        goto fail;
+    if (string_append_string(out, text) != 0)
+        goto fail;
+    if (left && equ_append_padding(out, pad) != 0)
+        goto fail;
+
+    string_free(text);
+    return result;
+
+fail:
+    string_free(text);
+    return STRING_FORMAT_ERROR;
+}
+
+static string_t *equ_extract_binding_section(string_t *expr_text)
 {
     const char *raw = expr_text ? string_c_str(expr_text) : NULL;
     const char *start;
@@ -41,13 +143,13 @@ static string_t *equation_extract_binding_section(string_t *expr_text)
     return out;
 }
 
-static string_t *equation_binding_section(const equation_t *equation)
+static string_t *equ_binding_section(const equation_t *equation)
 {
     expr_t *combined;
     string_t *combined_text;
     string_t *bindings;
 
-    combined = expr_add(equation_lhs(equation), equation_rhs(equation));
+    combined = expr_add(equ_lhs(equation), equ_rhs(equation));
     if (!combined)
         return NULL;
 
@@ -56,16 +158,16 @@ static string_t *equation_binding_section(const equation_t *equation)
     if (!combined_text)
         return NULL;
 
-    bindings = equation_extract_binding_section(combined_text);
+    bindings = equ_extract_binding_section(combined_text);
     string_free(combined_text);
     return bindings;
 }
 
-static string_t *equation_to_text_expression(const equation_t *equation)
+static string_t *equ_to_text_expression(const equation_t *equation)
 {
-    string_t *lhs = expr_to_text(equation_lhs(equation), style_UNBOUND);
-    string_t *rhs = expr_to_text(equation_rhs(equation), style_UNBOUND);
-    string_t *bindings = equation_binding_section(equation);
+    string_t *lhs = expr_to_text(equ_lhs(equation), style_UNBOUND);
+    string_t *rhs = expr_to_text(equ_rhs(equation), style_UNBOUND);
+    string_t *bindings = equ_binding_section(equation);
     string_t *out = NULL;
 
     if (!lhs || !rhs)
@@ -81,10 +183,10 @@ cleanup:
     return out;
 }
 
-static string_t *equation_to_text_unbound(const equation_t *equation)
+static string_t *equ_to_text_unbound(const equation_t *equation)
 {
-    string_t *lhs = expr_to_text(equation_lhs(equation), style_UNBOUND);
-    string_t *rhs = expr_to_text(equation_rhs(equation), style_UNBOUND);
+    string_t *lhs = expr_to_text(equ_lhs(equation), style_UNBOUND);
+    string_t *rhs = expr_to_text(equ_rhs(equation), style_UNBOUND);
     string_t *out = NULL;
 
     if (!lhs || !rhs)
@@ -98,10 +200,10 @@ cleanup:
     return out;
 }
 
-static string_t *equation_to_text_tex(const equation_t *equation)
+static string_t *equ_to_text_tex(const equation_t *equation)
 {
-    string_t *lhs = expr_to_text(equation_lhs(equation), style_TEX);
-    string_t *rhs = expr_to_text(equation_rhs(equation), style_TEX);
+    string_t *lhs = expr_to_text(equ_lhs(equation), style_TEX);
+    string_t *rhs = expr_to_text(equ_rhs(equation), style_TEX);
     string_t *out = NULL;
 
     if (!lhs || !rhs)
@@ -115,24 +217,80 @@ cleanup:
     return out;
 }
 
-string_t *equation_to_text(const equation_t *equation, style_t style)
+string_t *equ_to_text(const equation_t *equation, style_t style)
 {
     if (!equation)
         return string_new_with("NULL");
 
     if (style == style_TEX)
-        return equation_to_text_tex(equation);
+        return equ_to_text_tex(equation);
     if (style == style_UNBOUND)
-        return equation_to_text_unbound(equation);
+        return equ_to_text_unbound(equation);
 
-    return equation_to_text_expression(equation);
+    return equ_to_text_expression(equation);
 }
 
-void equation_print(const equation_t *equation)
+string_t *equ_vsprintf_text(const char *fmt, va_list ap)
 {
-    string_t *text = equation_to_text(equation, style_EXPRESSION);
+    return string_vsprintf_with_callback(fmt, ap, equ_format_callback, NULL);
+}
 
-    fputs(text ? string_c_str(text) : "NULL", stdout);
-    fputc('\n', stdout);
+string_t *equ_sprintf_text(const char *fmt, ...)
+{
+    va_list ap;
+    string_t *text;
+
+    va_start(ap, fmt);
+    text = equ_vsprintf_text(fmt, ap);
+    va_end(ap);
+    return text;
+}
+
+int equ_sprintf(char *out, size_t out_size, const char *fmt, ...)
+{
+    int n;
+    va_list ap;
+    string_t *text;
+    size_t len;
+
+    va_start(ap, fmt);
+    text = equ_vsprintf_text(fmt, ap);
+    va_end(ap);
+    if (!text)
+        return -1;
+
+    len = string_length(text);
+    if (out && out_size > 0u) {
+        size_t copy_len = len < out_size - 1u ? len : out_size - 1u;
+
+        memcpy(out, string_c_str(text), copy_len);
+        out[copy_len] = '\0';
+    }
+
+    n = len <= (size_t)INT_MAX ? (int)len : -1;
     string_free(text);
+    return n;
+}
+
+int equ_printf(const char *fmt, ...)
+{
+    va_list ap;
+    int written;
+    string_t *text;
+
+    va_start(ap, fmt);
+    text = equ_vsprintf_text(fmt, ap);
+    va_end(ap);
+    if (!text)
+        return -1;
+
+    written = string_printf("%S", text);
+    string_free(text);
+    return written;
+}
+
+void equ_print(const equation_t *equation)
+{
+    if (equ_printf("%n\n", equation) < 0)
+        string_printf("NULL\n");
 }

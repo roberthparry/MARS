@@ -13,7 +13,7 @@ typedef struct equation_symbolic_poly {
     expr_t *coeff[EQUATION_SYMBOLIC_POLY_COEFFS];
 } equation_symbolic_poly_t;
 
-static expr_t *equation_const_long_expr(long value)
+static expr_t *equ_const_long_expr(long value)
 {
     number_t number = num_create_from_long(value);
     expr_t *expr = expr_new_const(number);
@@ -22,7 +22,7 @@ static expr_t *equation_const_long_expr(long value)
     return expr;
 }
 
-static expr_t *equation_retain_expr(const expr_t *expr)
+static expr_t *equ_retain_expr(const expr_t *expr)
 {
     if (!expr)
         return NULL;
@@ -31,7 +31,7 @@ static expr_t *equation_retain_expr(const expr_t *expr)
     return (expr_t *)expr;
 }
 
-static expr_t *equation_simplify_expr_owned(expr_t *expr)
+static expr_t *equ_simplify_expr_owned(expr_t *expr)
 {
     expr_t *simplified;
 
@@ -43,7 +43,7 @@ static expr_t *equation_simplify_expr_owned(expr_t *expr)
     return simplified;
 }
 
-static void equation_symbolic_poly_clear(equation_symbolic_poly_t *poly)
+static void equ_symbolic_poly_clear(equation_symbolic_poly_t *poly)
 {
     if (!poly)
         return;
@@ -54,7 +54,7 @@ static void equation_symbolic_poly_clear(equation_symbolic_poly_t *poly)
     }
 }
 
-static bool equation_symbolic_coeff_is_zero(const expr_t *expr)
+static bool equ_symbolic_coeff_is_zero(const expr_t *expr)
 {
     number_t value = num_new();
     bool zero = false;
@@ -68,7 +68,7 @@ static bool equation_symbolic_coeff_is_zero(const expr_t *expr)
     return zero;
 }
 
-static bool equation_symbolic_add_owned(equation_symbolic_poly_t *poly,
+static bool equ_symbolic_add_owned(equation_symbolic_poly_t *poly,
                                         size_t degree,
                                         expr_t *term)
 {
@@ -82,40 +82,40 @@ static bool equation_symbolic_add_owned(equation_symbolic_poly_t *poly,
         return false;
 
     if (!poly->coeff[degree]) {
-        poly->coeff[degree] = equation_simplify_expr_owned(term);
+        poly->coeff[degree] = equ_simplify_expr_owned(term);
         return poly->coeff[degree] != NULL;
     }
 
     sum = expr_add(poly->coeff[degree], term);
     expr_free(term);
     expr_free(poly->coeff[degree]);
-    poly->coeff[degree] = equation_simplify_expr_owned(sum);
+    poly->coeff[degree] = equ_simplify_expr_owned(sum);
     return poly->coeff[degree] != NULL;
 }
 
-static bool equation_symbolic_add_const(equation_symbolic_poly_t *poly,
+static bool equ_symbolic_add_const(equation_symbolic_poly_t *poly,
                                         size_t degree,
                                         long value)
 {
-    return equation_symbolic_add_owned(poly, degree,
-                                       equation_const_long_expr(value));
+    return equ_symbolic_add_owned(poly, degree,
+                                       equ_const_long_expr(value));
 }
 
-static bool equation_symbolic_copy_into(equation_symbolic_poly_t *out,
+static bool equ_symbolic_copy_into(equation_symbolic_poly_t *out,
                                         const equation_symbolic_poly_t *in)
 {
     for (size_t i = 0u; i < EQUATION_SYMBOLIC_POLY_COEFFS; ++i) {
         if (!in->coeff[i])
             continue;
-        if (!equation_symbolic_add_owned(out, i,
-                                         equation_retain_expr(in->coeff[i])))
+        if (!equ_symbolic_add_owned(out, i,
+                                         equ_retain_expr(in->coeff[i])))
             return false;
     }
 
     return true;
 }
 
-static bool equation_expr_depends_on_wrt(const expr_t *expr, const expr_t *wrt)
+static bool equ_expr_depends_on_wrt(const expr_t *expr, const expr_t *wrt)
 {
     expr_t *vars[1];
     bool used = false;
@@ -127,7 +127,7 @@ static bool equation_expr_depends_on_wrt(const expr_t *expr, const expr_t *wrt)
     return expr_collect_var_usage(expr, 1u, vars, &used) && used;
 }
 
-static bool equation_expr_is_wrt(const expr_t *expr, const expr_t *wrt)
+static bool equ_expr_is_wrt(const expr_t *expr, const expr_t *wrt)
 {
     expr_t *vars[1];
     size_t index = 0u;
@@ -139,11 +139,11 @@ static bool equation_expr_is_wrt(const expr_t *expr, const expr_t *wrt)
     return expr_match_var_expr(expr, 1u, vars, &index) && index == 0u;
 }
 
-static bool equation_symbolic_poly_collect(const expr_t *expr,
+static bool equ_symbolic_poly_collect(const expr_t *expr,
                                            const expr_t *wrt,
                                            equation_symbolic_poly_t *poly);
 
-static bool equation_symbolic_poly_multiply(
+static bool equ_symbolic_poly_multiply(
     const equation_symbolic_poly_t *left,
     const equation_symbolic_poly_t *right,
     equation_symbolic_poly_t *out)
@@ -160,7 +160,7 @@ static bool equation_symbolic_poly_multiply(
                 return false;
 
             term = expr_mul(left->coeff[i], right->coeff[j]);
-            if (!equation_symbolic_add_owned(out, i + j, term))
+            if (!equ_symbolic_add_owned(out, i + j, term))
                 return false;
         }
     }
@@ -168,14 +168,14 @@ static bool equation_symbolic_poly_multiply(
     return true;
 }
 
-static bool equation_symbolic_poly_collect_neg(const expr_t *arg,
+static bool equ_symbolic_poly_collect_neg(const expr_t *arg,
                                                const expr_t *wrt,
                                                equation_symbolic_poly_t *poly)
 {
     equation_symbolic_poly_t inner = { 0 };
     bool ok = false;
 
-    if (!equation_symbolic_poly_collect(arg, wrt, &inner))
+    if (!equ_symbolic_poly_collect(arg, wrt, &inner))
         goto cleanup;
 
     for (size_t i = 0u; i < EQUATION_SYMBOLIC_POLY_COEFFS; ++i) {
@@ -184,17 +184,17 @@ static bool equation_symbolic_poly_collect_neg(const expr_t *arg,
         if (!inner.coeff[i])
             continue;
         negated = expr_neg(inner.coeff[i]);
-        if (!equation_symbolic_add_owned(poly, i, negated))
+        if (!equ_symbolic_add_owned(poly, i, negated))
             goto cleanup;
     }
     ok = true;
 
 cleanup:
-    equation_symbolic_poly_clear(&inner);
+    equ_symbolic_poly_clear(&inner);
     return ok;
 }
 
-static bool equation_symbolic_poly_collect_sub(const expr_t *left,
+static bool equ_symbolic_poly_collect_sub(const expr_t *left,
                                                const expr_t *right,
                                                const expr_t *wrt,
                                                equation_symbolic_poly_t *poly)
@@ -202,8 +202,8 @@ static bool equation_symbolic_poly_collect_sub(const expr_t *left,
     equation_symbolic_poly_t right_poly = { 0 };
     bool ok = false;
 
-    if (!equation_symbolic_poly_collect(left, wrt, poly) ||
-        !equation_symbolic_poly_collect(right, wrt, &right_poly))
+    if (!equ_symbolic_poly_collect(left, wrt, poly) ||
+        !equ_symbolic_poly_collect(right, wrt, &right_poly))
         goto cleanup;
 
     for (size_t i = 0u; i < EQUATION_SYMBOLIC_POLY_COEFFS; ++i) {
@@ -212,17 +212,17 @@ static bool equation_symbolic_poly_collect_sub(const expr_t *left,
         if (!right_poly.coeff[i])
             continue;
         negated = expr_neg(right_poly.coeff[i]);
-        if (!equation_symbolic_add_owned(poly, i, negated))
+        if (!equ_symbolic_add_owned(poly, i, negated))
             goto cleanup;
     }
     ok = true;
 
 cleanup:
-    equation_symbolic_poly_clear(&right_poly);
+    equ_symbolic_poly_clear(&right_poly);
     return ok;
 }
 
-static bool equation_symbolic_poly_collect_mul(const expr_t *left,
+static bool equ_symbolic_poly_collect_mul(const expr_t *left,
                                                const expr_t *right,
                                                const expr_t *wrt,
                                                equation_symbolic_poly_t *poly)
@@ -231,19 +231,19 @@ static bool equation_symbolic_poly_collect_mul(const expr_t *left,
     equation_symbolic_poly_t right_poly = { 0 };
     bool ok = false;
 
-    if (!equation_symbolic_poly_collect(left, wrt, &left_poly) ||
-        !equation_symbolic_poly_collect(right, wrt, &right_poly))
+    if (!equ_symbolic_poly_collect(left, wrt, &left_poly) ||
+        !equ_symbolic_poly_collect(right, wrt, &right_poly))
         goto cleanup;
 
-    ok = equation_symbolic_poly_multiply(&left_poly, &right_poly, poly);
+    ok = equ_symbolic_poly_multiply(&left_poly, &right_poly, poly);
 
 cleanup:
-    equation_symbolic_poly_clear(&right_poly);
-    equation_symbolic_poly_clear(&left_poly);
+    equ_symbolic_poly_clear(&right_poly);
+    equ_symbolic_poly_clear(&left_poly);
     return ok;
 }
 
-static long equation_symbolic_power_number_to_long(number_t value)
+static long equ_symbolic_power_number_to_long(number_t value)
 {
     if (!num_is_integer(value) || !num_is_real(value))
         return -1L;
@@ -260,7 +260,7 @@ static long equation_symbolic_power_number_to_long(number_t value)
     return -1L;
 }
 
-static long equation_symbolic_power_exponent(const expr_t *expr)
+static long equ_symbolic_power_exponent(const expr_t *expr)
 {
     number_t exponent = num_new();
     long out = -1L;
@@ -269,20 +269,20 @@ static long equation_symbolic_power_exponent(const expr_t *expr)
         goto cleanup;
 
     if (expr->ops && expr->ops->kind == EXPR_KIND_POW_D) {
-        out = equation_symbolic_power_number_to_long(expr->c);
+        out = equ_symbolic_power_number_to_long(expr->c);
         goto cleanup;
     }
 
     if (expr->ops && expr->ops->kind == EXPR_KIND_POW &&
         expr->b && expr_match_const_value(expr->b, &exponent))
-        out = equation_symbolic_power_number_to_long(exponent);
+        out = equ_symbolic_power_number_to_long(exponent);
 
 cleanup:
     num_destroy(&exponent);
     return out;
 }
 
-static bool equation_symbolic_poly_copy_power(const expr_t *base,
+static bool equ_symbolic_poly_copy_power(const expr_t *base,
                                               const expr_t *wrt,
                                               long exponent,
                                               equation_symbolic_poly_t *poly)
@@ -293,42 +293,42 @@ static bool equation_symbolic_poly_copy_power(const expr_t *base,
     bool ok = false;
 
     if (exponent == 0L)
-        return equation_symbolic_add_const(poly, 0u, 1L);
+        return equ_symbolic_add_const(poly, 0u, 1L);
     if (exponent == 1L)
-        return equation_symbolic_poly_collect(base, wrt, poly);
+        return equ_symbolic_poly_collect(base, wrt, poly);
 
-    if (!equation_symbolic_poly_collect(base, wrt, &base_poly) ||
-        !equation_symbolic_poly_multiply(&base_poly, &base_poly, &square_poly))
+    if (!equ_symbolic_poly_collect(base, wrt, &base_poly) ||
+        !equ_symbolic_poly_multiply(&base_poly, &base_poly, &square_poly))
         goto cleanup;
 
     if (exponent == 2L) {
-        ok = equation_symbolic_copy_into(poly, &square_poly);
+        ok = equ_symbolic_copy_into(poly, &square_poly);
         goto cleanup;
     }
 
-    if (!equation_symbolic_poly_multiply(&square_poly, &base_poly, &cube_poly))
+    if (!equ_symbolic_poly_multiply(&square_poly, &base_poly, &cube_poly))
         goto cleanup;
-    ok = equation_symbolic_copy_into(poly, &cube_poly);
+    ok = equ_symbolic_copy_into(poly, &cube_poly);
 
 cleanup:
-    equation_symbolic_poly_clear(&cube_poly);
-    equation_symbolic_poly_clear(&square_poly);
-    equation_symbolic_poly_clear(&base_poly);
+    equ_symbolic_poly_clear(&cube_poly);
+    equ_symbolic_poly_clear(&square_poly);
+    equ_symbolic_poly_clear(&base_poly);
     return ok;
 }
 
-static bool equation_symbolic_poly_collect_power(const expr_t *expr,
+static bool equ_symbolic_poly_collect_power(const expr_t *expr,
                                                  const expr_t *wrt,
                                                  equation_symbolic_poly_t *poly)
 {
-    long exponent = equation_symbolic_power_exponent(expr);
+    long exponent = equ_symbolic_power_exponent(expr);
 
     if (exponent < 0L)
         return false;
-    return equation_symbolic_poly_copy_power(expr->a, wrt, exponent, poly);
+    return equ_symbolic_poly_copy_power(expr->a, wrt, exponent, poly);
 }
 
-static bool equation_symbolic_poly_collect(const expr_t *expr,
+static bool equ_symbolic_poly_collect(const expr_t *expr,
                                            const expr_t *wrt,
                                            equation_symbolic_poly_t *poly)
 {
@@ -339,41 +339,41 @@ static bool equation_symbolic_poly_collect(const expr_t *expr,
     if (!expr || !wrt || !poly)
         return false;
 
-    if (!equation_expr_depends_on_wrt(expr, wrt))
-        return equation_symbolic_add_owned(poly, 0u, equation_retain_expr(expr));
+    if (!equ_expr_depends_on_wrt(expr, wrt))
+        return equ_symbolic_add_owned(poly, 0u, equ_retain_expr(expr));
 
-    if (equation_expr_is_wrt(expr, wrt))
-        return equation_symbolic_add_const(poly, 1u, 1L);
+    if (equ_expr_is_wrt(expr, wrt))
+        return equ_symbolic_add_const(poly, 1u, 1L);
 
     if (expr_match_unary_op(expr, EXPR_KIND_NEG, &left))
-        return equation_symbolic_poly_collect_neg(left, wrt, poly);
+        return equ_symbolic_poly_collect_neg(left, wrt, poly);
 
     if (expr_match_add_sub_expr(expr, &left, &right, &is_sub)) {
         if (is_sub)
-            return equation_symbolic_poly_collect_sub(left, right, wrt, poly);
-        return equation_symbolic_poly_collect(left, wrt, poly) &&
-               equation_symbolic_poly_collect(right, wrt, poly);
+            return equ_symbolic_poly_collect_sub(left, right, wrt, poly);
+        return equ_symbolic_poly_collect(left, wrt, poly) &&
+               equ_symbolic_poly_collect(right, wrt, poly);
     }
 
     if (expr_match_mul_expr(expr, &left, &right))
-        return equation_symbolic_poly_collect_mul(left, right, wrt, poly);
+        return equ_symbolic_poly_collect_mul(left, right, wrt, poly);
 
-    if (equation_symbolic_poly_collect_power(expr, wrt, poly))
+    if (equ_symbolic_poly_collect_power(expr, wrt, poly))
         return true;
 
     return false;
 }
 
-static expr_t *equation_symbolic_coeff_or_zero(equation_symbolic_poly_t *poly,
+static expr_t *equ_symbolic_coeff_or_zero(equation_symbolic_poly_t *poly,
                                                size_t degree)
 {
     if (!poly || degree >= EQUATION_SYMBOLIC_POLY_COEFFS || !poly->coeff[degree])
-        return equation_const_long_expr(0L);
+        return equ_const_long_expr(0L);
 
-    return equation_retain_expr(poly->coeff[degree]);
+    return equ_retain_expr(poly->coeff[degree]);
 }
 
-bool equation_match_symbolic_linear_expr(const expr_t *expr,
+bool equ_match_symbolic_linear_expr(const expr_t *expr,
                                          const expr_t *wrt,
                                          expr_t **constant_out,
                                          expr_t **linear_out)
@@ -384,23 +384,23 @@ bool equation_match_symbolic_linear_expr(const expr_t *expr,
     if (!expr || !wrt || !constant_out || !linear_out)
         return false;
 
-    ok = equation_symbolic_poly_collect(expr, wrt, &poly) &&
-         equation_symbolic_coeff_is_zero(poly.coeff[2]) &&
-         equation_symbolic_coeff_is_zero(poly.coeff[3]) &&
-         !equation_symbolic_coeff_is_zero(poly.coeff[1]);
+    ok = equ_symbolic_poly_collect(expr, wrt, &poly) &&
+         equ_symbolic_coeff_is_zero(poly.coeff[2]) &&
+         equ_symbolic_coeff_is_zero(poly.coeff[3]) &&
+         !equ_symbolic_coeff_is_zero(poly.coeff[1]);
     if (!ok)
         goto cleanup;
 
-    *constant_out = equation_symbolic_coeff_or_zero(&poly, 0u);
-    *linear_out = equation_symbolic_coeff_or_zero(&poly, 1u);
+    *constant_out = equ_symbolic_coeff_or_zero(&poly, 0u);
+    *linear_out = equ_symbolic_coeff_or_zero(&poly, 1u);
     ok = *constant_out && *linear_out;
 
 cleanup:
-    equation_symbolic_poly_clear(&poly);
+    equ_symbolic_poly_clear(&poly);
     return ok;
 }
 
-bool equation_match_symbolic_quadratic_expr(const expr_t *expr,
+bool equ_match_symbolic_quadratic_expr(const expr_t *expr,
                                             const expr_t *wrt,
                                             expr_t **constant_out,
                                             expr_t **linear_out,
@@ -412,23 +412,23 @@ bool equation_match_symbolic_quadratic_expr(const expr_t *expr,
     if (!expr || !wrt || !constant_out || !linear_out || !quadratic_out)
         return false;
 
-    ok = equation_symbolic_poly_collect(expr, wrt, &poly) &&
-         equation_symbolic_coeff_is_zero(poly.coeff[3]) &&
-         !equation_symbolic_coeff_is_zero(poly.coeff[2]);
+    ok = equ_symbolic_poly_collect(expr, wrt, &poly) &&
+         equ_symbolic_coeff_is_zero(poly.coeff[3]) &&
+         !equ_symbolic_coeff_is_zero(poly.coeff[2]);
     if (!ok)
         goto cleanup;
 
-    *constant_out = equation_symbolic_coeff_or_zero(&poly, 0u);
-    *linear_out = equation_symbolic_coeff_or_zero(&poly, 1u);
-    *quadratic_out = equation_symbolic_coeff_or_zero(&poly, 2u);
+    *constant_out = equ_symbolic_coeff_or_zero(&poly, 0u);
+    *linear_out = equ_symbolic_coeff_or_zero(&poly, 1u);
+    *quadratic_out = equ_symbolic_coeff_or_zero(&poly, 2u);
     ok = *constant_out && *linear_out && *quadratic_out;
 
 cleanup:
-    equation_symbolic_poly_clear(&poly);
+    equ_symbolic_poly_clear(&poly);
     return ok;
 }
 
-bool equation_match_symbolic_cubic_expr(const expr_t *expr,
+bool equ_match_symbolic_cubic_expr(const expr_t *expr,
                                         const expr_t *wrt,
                                         expr_t **constant_out,
                                         expr_t **linear_out,
@@ -442,18 +442,18 @@ bool equation_match_symbolic_cubic_expr(const expr_t *expr,
         !quadratic_out || !cubic_out)
         return false;
 
-    ok = equation_symbolic_poly_collect(expr, wrt, &poly) &&
-         !equation_symbolic_coeff_is_zero(poly.coeff[3]);
+    ok = equ_symbolic_poly_collect(expr, wrt, &poly) &&
+         !equ_symbolic_coeff_is_zero(poly.coeff[3]);
     if (!ok)
         goto cleanup;
 
-    *constant_out = equation_symbolic_coeff_or_zero(&poly, 0u);
-    *linear_out = equation_symbolic_coeff_or_zero(&poly, 1u);
-    *quadratic_out = equation_symbolic_coeff_or_zero(&poly, 2u);
-    *cubic_out = equation_symbolic_coeff_or_zero(&poly, 3u);
+    *constant_out = equ_symbolic_coeff_or_zero(&poly, 0u);
+    *linear_out = equ_symbolic_coeff_or_zero(&poly, 1u);
+    *quadratic_out = equ_symbolic_coeff_or_zero(&poly, 2u);
+    *cubic_out = equ_symbolic_coeff_or_zero(&poly, 3u);
     ok = *constant_out && *linear_out && *quadratic_out && *cubic_out;
 
 cleanup:
-    equation_symbolic_poly_clear(&poly);
+    equ_symbolic_poly_clear(&poly);
     return ok;
 }

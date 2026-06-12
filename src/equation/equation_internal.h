@@ -19,62 +19,68 @@ struct equation_solutions {
     equation_solve_status_t status;
 };
 
-bool equation_match_affine_linear_expr(const expr_t *expr,
+equation_t *equ_new_with_owned_bindings(const expr_t *lhs,
+                                             const expr_t *rhs,
+                                             expr_bindings_t *bindings);
+
+bool equ_match_affine_linear_expr(const expr_t *expr,
                                        const expr_t *wrt,
                                        bool require_nonzero_coeff,
                                        number_t *constant_out,
                                        number_t *coeff_out);
 
-bool equation_match_quadratic_expr(const expr_t *expr,
+bool equ_match_quadratic_expr(const expr_t *expr,
                                    const expr_t *wrt,
                                    number_t *constant_out,
                                    number_t *linear_out,
                                    number_t *quadratic_out);
 
-bool equation_match_symbolic_linear_expr(const expr_t *expr,
+bool equ_match_symbolic_linear_expr(const expr_t *expr,
                                          const expr_t *wrt,
                                          expr_t **constant_out,
                                          expr_t **linear_out);
 
-bool equation_match_symbolic_quadratic_expr(const expr_t *expr,
+bool equ_match_symbolic_quadratic_expr(const expr_t *expr,
                                             const expr_t *wrt,
                                             expr_t **constant_out,
                                             expr_t **linear_out,
                                             expr_t **quadratic_out);
 
-bool equation_match_symbolic_cubic_expr(const expr_t *expr,
+bool equ_match_symbolic_cubic_expr(const expr_t *expr,
                                         const expr_t *wrt,
                                         expr_t **constant_out,
                                         expr_t **linear_out,
                                         expr_t **quadratic_out,
                                         expr_t **cubic_out);
 
-bool equation_match_polynomial_expr(const expr_t *expr,
+bool equ_match_polynomial_expr(const expr_t *expr,
                                     const expr_t *wrt,
                                     size_t max_degree,
                                     number_t *coeffs_out);
 
-int equation_append_solution_value(const expr_t *wrt,
+int equ_append_solution_value(const expr_t *wrt,
                                    number_t value,
                                    equation_solutions_t *solutions);
 
-int equation_append_solution_expr(const expr_t *wrt,
+int equ_append_solution_expr(const expr_t *wrt,
                                   const expr_t *rhs,
                                   equation_solutions_t *solutions);
 
-int equation_try_solve_cubic(const equation_t *equation,
+int equ_try_solve_cubic(const equation_t *equation,
                              const expr_t *wrt,
                              equation_solutions_t *solutions);
 
-int equation_solve_for_into(const equation_t *equation,
+int equ_solve_for_into(const equation_t *equation,
                             const expr_t *wrt,
                             equation_solutions_t *solutions);
 
-int equation_solve_numeric_into(const equation_t *equation,
+int equ_solve_numeric_into(const equation_t *equation,
                                 expr_bindings_t *bindings,
                                 const expr_goal_seek_options_t *options,
                                 equation_solutions_t *solutions);
 
-void equation_solutions_clear(equation_solutions_t *solutions);
+expr_bindings_t *equ_bindings_borrow(const equation_t *equation);
+
+void equ_solutions_clear(equation_solutions_t *solutions);
 
 #endif
