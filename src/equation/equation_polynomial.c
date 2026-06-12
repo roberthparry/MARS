@@ -10,19 +10,19 @@ enum {
     EQUATION_POLY_MAX_PRODUCT_COEFFS = 2u * EQUATION_POLY_MAX_DEGREE + 1u
 };
 
-static void equation_poly_init(number_t *poly, size_t count)
+static void equ_poly_init(number_t *poly, size_t count)
 {
     for (size_t i = 0u; i < count; ++i)
         poly[i] = num_new();
 }
 
-static void equation_poly_destroy(number_t *poly, size_t count)
+static void equ_poly_destroy(number_t *poly, size_t count)
 {
     for (size_t i = 0u; i < count; ++i)
         num_destroy(&poly[i]);
 }
 
-static void equation_poly_zero(number_t *poly, size_t count)
+static void equ_poly_zero(number_t *poly, size_t count)
 {
     for (size_t i = 0u; i < count; ++i) {
         num_destroy(&poly[i]);
@@ -30,7 +30,7 @@ static void equation_poly_zero(number_t *poly, size_t count)
     }
 }
 
-static void equation_poly_copy(const number_t *src, number_t *dst, size_t count)
+static void equ_poly_copy(const number_t *src, number_t *dst, size_t count)
 {
     for (size_t i = 0u; i < count; ++i) {
         num_destroy(&dst[i]);
@@ -38,7 +38,7 @@ static void equation_poly_copy(const number_t *src, number_t *dst, size_t count)
     }
 }
 
-static bool equation_poly_scale(const number_t *src,
+static bool equ_poly_scale(const number_t *src,
                                 number_t scale,
                                 number_t *dst,
                                 size_t count)
@@ -55,7 +55,7 @@ static bool equation_poly_scale(const number_t *src,
     return true;
 }
 
-static bool equation_poly_add_sub(const number_t *left,
+static bool equ_poly_add_sub(const number_t *left,
                                   const number_t *right,
                                   bool subtract,
                                   number_t *out,
@@ -71,7 +71,7 @@ static bool equation_poly_add_sub(const number_t *left,
     return true;
 }
 
-static bool equation_poly_mul(const number_t *left,
+static bool equ_poly_mul(const number_t *left,
                               const number_t *right,
                               number_t *out,
                               size_t max_degree)
@@ -99,18 +99,18 @@ static bool equation_poly_mul(const number_t *left,
     for (size_t i = count; i < product_count; ++i)
         ok = ok && num_is_zero(tmp[i]);
     if (ok)
-        equation_poly_copy(tmp, out, count);
+        equ_poly_copy(tmp, out, count);
 
-    equation_poly_destroy(tmp, product_count);
+    equ_poly_destroy(tmp, product_count);
     return ok;
 }
 
-static bool equation_collect_poly(const expr_t *expr,
+static bool equ_collect_poly(const expr_t *expr,
                                   const expr_t *wrt,
                                   size_t max_degree,
                                   number_t *out);
 
-static bool equation_expr_numeric_parameter_value(const expr_t *expr,
+static bool equ_expr_numeric_parameter_value(const expr_t *expr,
                                                   const expr_t *wrt,
                                                   number_t *value_out)
 {
@@ -136,7 +136,7 @@ static bool equation_expr_numeric_parameter_value(const expr_t *expr,
     return true;
 }
 
-static bool equation_collect_scaled_poly(const expr_t *expr,
+static bool equ_collect_scaled_poly(const expr_t *expr,
                                          const expr_t *wrt,
                                          size_t max_degree,
                                          number_t *out)
@@ -150,17 +150,17 @@ static bool equation_collect_scaled_poly(const expr_t *expr,
     if (!expr_match_scaled_expr(expr, &scale, &base) || !base || base == expr)
         goto cleanup_scale;
 
-    equation_poly_init(base_poly, count);
-    ok = equation_collect_poly(base, wrt, max_degree, base_poly) &&
-         equation_poly_scale(base_poly, scale, out, count);
-    equation_poly_destroy(base_poly, count);
+    equ_poly_init(base_poly, count);
+    ok = equ_collect_poly(base, wrt, max_degree, base_poly) &&
+         equ_poly_scale(base_poly, scale, out, count);
+    equ_poly_destroy(base_poly, count);
 
 cleanup_scale:
     num_destroy(&scale);
     return ok;
 }
 
-static long equation_power_exponent(number_t exponent, size_t max_degree)
+static long equ_power_exponent(number_t exponent, size_t max_degree)
 {
     if (!num_is_integer(exponent) || !num_is_real(exponent))
         return -1L;
@@ -176,7 +176,7 @@ static long equation_power_exponent(number_t exponent, size_t max_degree)
     return -1L;
 }
 
-static bool equation_collect_power_poly(const expr_t *expr,
+static bool equ_collect_power_poly(const expr_t *expr,
                                         const expr_t *wrt,
                                         size_t max_degree,
                                         number_t *out)
@@ -190,33 +190,33 @@ static bool equation_collect_power_poly(const expr_t *expr,
     if (!expr || !expr->ops || expr->ops->kind != EXPR_KIND_POW_D)
         return false;
 
-    exponent = equation_power_exponent(expr->c, max_degree);
+    exponent = equ_power_exponent(expr->c, max_degree);
     if (exponent < 0L)
         return false;
 
     if (exponent == 0L) {
-        equation_poly_zero(out, count);
+        equ_poly_zero(out, count);
         num_destroy(&out[0]);
         out[0] = num_clone(NUM_ONE);
         return true;
     }
     if (exponent == 1L)
-        return equation_collect_poly(expr->a, wrt, max_degree, out);
+        return equ_collect_poly(expr->a, wrt, max_degree, out);
 
-    equation_poly_init(base_poly, count);
-    equation_poly_init(square_poly, count);
-    ok = equation_collect_poly(expr->a, wrt, max_degree, base_poly) &&
-         equation_poly_mul(base_poly, base_poly, square_poly, max_degree) &&
+    equ_poly_init(base_poly, count);
+    equ_poly_init(square_poly, count);
+    ok = equ_collect_poly(expr->a, wrt, max_degree, base_poly) &&
+         equ_poly_mul(base_poly, base_poly, square_poly, max_degree) &&
          (exponent == 2L ||
-          equation_poly_mul(square_poly, base_poly, out, max_degree));
+          equ_poly_mul(square_poly, base_poly, out, max_degree));
     if (ok && exponent == 2L)
-        equation_poly_copy(square_poly, out, count);
-    equation_poly_destroy(square_poly, count);
-    equation_poly_destroy(base_poly, count);
+        equ_poly_copy(square_poly, out, count);
+    equ_poly_destroy(square_poly, count);
+    equ_poly_destroy(base_poly, count);
     return ok;
 }
 
-static bool equation_collect_poly(const expr_t *expr,
+static bool equ_collect_poly(const expr_t *expr,
                                   const expr_t *wrt,
                                   size_t max_degree,
                                   number_t *out)
@@ -236,15 +236,15 @@ static bool equation_collect_poly(const expr_t *expr,
         goto cleanup_value;
 
     if (expr_match_const_value(expr, &value)) {
-        equation_poly_zero(out, count);
+        equ_poly_zero(out, count);
         num_destroy(&out[0]);
         out[0] = num_clone(value);
         ok = true;
         goto cleanup_value;
     }
 
-    if (equation_expr_numeric_parameter_value(expr, wrt, &value)) {
-        equation_poly_zero(out, count);
+    if (equ_expr_numeric_parameter_value(expr, wrt, &value)) {
+        equ_poly_zero(out, count);
         num_destroy(&out[0]);
         out[0] = num_clone(value);
         ok = true;
@@ -254,43 +254,43 @@ static bool equation_collect_poly(const expr_t *expr,
     vars[0] = (expr_t *)wrt;
     if (max_degree >= 1u &&
         expr_match_var_expr(expr, 1u, vars, &index) && index == 0u) {
-        equation_poly_zero(out, count);
+        equ_poly_zero(out, count);
         num_destroy(&out[1]);
         out[1] = num_clone(NUM_ONE);
         ok = true;
         goto cleanup_value;
     }
 
-    if (equation_collect_scaled_poly(expr, wrt, max_degree, out)) {
+    if (equ_collect_scaled_poly(expr, wrt, max_degree, out)) {
         ok = true;
         goto cleanup_value;
     }
 
-    if (equation_collect_power_poly(expr, wrt, max_degree, out)) {
+    if (equ_collect_power_poly(expr, wrt, max_degree, out)) {
         ok = true;
         goto cleanup_value;
     }
 
-    equation_poly_init(left_poly, count);
-    equation_poly_init(right_poly, count);
+    equ_poly_init(left_poly, count);
+    equ_poly_init(right_poly, count);
     if (expr_match_add_sub_expr(expr, &left, &right, &is_sub)) {
-        ok = equation_collect_poly(left, wrt, max_degree, left_poly) &&
-             equation_collect_poly(right, wrt, max_degree, right_poly) &&
-             equation_poly_add_sub(left_poly, right_poly, is_sub, out, count);
+        ok = equ_collect_poly(left, wrt, max_degree, left_poly) &&
+             equ_collect_poly(right, wrt, max_degree, right_poly) &&
+             equ_poly_add_sub(left_poly, right_poly, is_sub, out, count);
     } else if (expr_match_mul_expr(expr, &left, &right)) {
-        ok = equation_collect_poly(left, wrt, max_degree, left_poly) &&
-             equation_collect_poly(right, wrt, max_degree, right_poly) &&
-             equation_poly_mul(left_poly, right_poly, out, max_degree);
+        ok = equ_collect_poly(left, wrt, max_degree, left_poly) &&
+             equ_collect_poly(right, wrt, max_degree, right_poly) &&
+             equ_poly_mul(left_poly, right_poly, out, max_degree);
     }
-    equation_poly_destroy(right_poly, count);
-    equation_poly_destroy(left_poly, count);
+    equ_poly_destroy(right_poly, count);
+    equ_poly_destroy(left_poly, count);
 
 cleanup_value:
     num_destroy(&value);
     return ok;
 }
 
-bool equation_match_polynomial_expr(const expr_t *expr,
+bool equ_match_polynomial_expr(const expr_t *expr,
                                     const expr_t *wrt,
                                     size_t max_degree,
                                     number_t *coeffs_out)
@@ -302,10 +302,10 @@ bool equation_match_polynomial_expr(const expr_t *expr,
     if (!expr || !wrt || !coeffs_out || max_degree > EQUATION_POLY_MAX_DEGREE)
         return false;
 
-    equation_poly_init(coeffs, count);
-    ok = equation_collect_poly(expr, wrt, max_degree, coeffs);
+    equ_poly_init(coeffs, count);
+    ok = equ_collect_poly(expr, wrt, max_degree, coeffs);
     if (ok)
-        equation_poly_copy(coeffs, coeffs_out, count);
-    equation_poly_destroy(coeffs, count);
+        equ_poly_copy(coeffs, coeffs_out, count);
+    equ_poly_destroy(coeffs, count);
     return ok;
 }

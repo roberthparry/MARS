@@ -14,8 +14,27 @@
 #include "internal/number_internal.h"
 #include "ustring.h"
 
+static bool expr_number_scientific_local = false;
+static int expr_number_precision_local = -1;
+
 static string_t *expr_trim_decimal_display_artifacts_text_local(
     const string_t *text);
+
+bool expr_set_number_scientific_local(bool scientific)
+{
+    bool old = expr_number_scientific_local;
+
+    expr_number_scientific_local = scientific;
+    return old;
+}
+
+int expr_set_number_precision_local(int precision)
+{
+    int old = expr_number_precision_local;
+
+    expr_number_precision_local = precision;
+    return old;
+}
 
 static char *expr_take_text_object_as_c_string_local(string_t *text_obj)
 {
@@ -380,6 +399,8 @@ char *expr_number_to_string_local(number_t value)
     string_t *text_obj;
     size_t bits;
     size_t digits;
+    bool scientific = expr_number_scientific_local;
+    int precision_override = expr_number_precision_local;
     char fmt[32];
 
     if (num_is_inf(value)) {
@@ -399,8 +420,9 @@ char *expr_number_to_string_local(number_t value)
         return expr_tostring_xstrdup("-i");
     }
 
-    if ((!num_is_inexact_real_backend(value) && !num_is_complex_backend(value)) ||
-        num_is_exact(value) || !num_is_finite(value)) {
+    if (!scientific &&
+        ((!num_is_inexact_real_backend(value) && !num_is_complex_backend(value)) ||
+         num_is_exact(value) || !num_is_finite(value))) {
         text_obj = num_to_string(value);
         if (num_is_exact(value)) {
             char *decimal = expr_decimal_string_from_rational_text_local(text_obj);
@@ -416,20 +438,25 @@ char *expr_number_to_string_local(number_t value)
         return text;
     }
 
-    bits = num_get_prec_bits(value);
-    if (bits == 0u)
-        bits = num_get_effective_prec_bits(value);
-    digits = bits == 0u ? 0u : (size_t)((double)bits * 0.3010299956639812);
-    if (digits == 0u)
-        digits = num_get_default_prec_digits();
+    if (precision_override >= 0) {
+        digits = (size_t)precision_override;
+    } else {
+        bits = num_get_prec_bits(value);
+        if (bits == 0u)
+            bits = num_get_effective_prec_bits(value);
+        digits = bits == 0u ? 0u : (size_t)((double)bits * 0.3010299956639812);
+        if (digits == 0u)
+            digits = num_get_default_prec_digits();
+    }
+
     if (digits == 0u || digits > (size_t)INT_MAX) {
-        text = expr_take_clean_decimal_text_object_as_c_string_local(
-            num_to_string(value));
+        text_obj = scientific ? num_sprintf_text("%N", value) : num_to_string(value);
+        text = expr_take_clean_decimal_text_object_as_c_string_local(text_obj);
         num_destroy(&value);
         return text;
     }
 
-    snprintf(fmt, sizeof(fmt), "%%.%dn", (int)digits);
+    snprintf(fmt, sizeof(fmt), scientific ? "%%.%dN" : "%%.%dn", (int)digits);
     text_obj = num_sprintf_text(fmt, value);
     text = expr_take_clean_decimal_text_object_as_c_string_local(
         text_obj ? text_obj : num_to_string(value));

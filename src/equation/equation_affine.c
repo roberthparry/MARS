@@ -3,7 +3,7 @@
 #include "equation_internal.h"
 #include "internal/expr_internal.h"
 
-bool equation_match_affine_linear_expr(const expr_t *expr,
+bool equ_match_affine_linear_expr(const expr_t *expr,
                                        const expr_t *wrt,
                                        bool require_nonzero_coeff,
                                        number_t *constant_out,

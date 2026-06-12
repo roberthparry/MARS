@@ -1,6 +1,7 @@
 #ifndef EXPRESSION_H
 #define EXPRESSION_H
 
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include "number.h"
@@ -540,6 +541,41 @@ typedef enum {
  * released with string_free().
  */
 string_t *expr_to_text(const expr_t *expr, style_t style);
+
+/**
+ * @brief Format expression-aware text into a new string_t from a va_list.
+ *
+ * Supports ordinary string formatting plus expression conversions:
+ * `%n` expression style, `%nu` unbound style, `%nt` TeX style, and
+ * `%nf` function style.
+ *
+ * `%N` selects scientific numeric formatting for embedded number_t values
+ * while keeping the same expression style selection rules.
+ */
+string_t *expr_vsprintf_text(const char *fmt, va_list ap);
+
+/**
+ * @brief Format expression-aware text into a new string_t.
+ *
+ * The caller owns the returned string and must release it with string_free().
+ */
+string_t *expr_sprintf_text(const char *fmt, ...);
+
+/**
+ * @brief Format expression-aware text into a caller-provided buffer.
+ */
+int expr_sprintf(char *out, size_t out_size, const char *fmt, ...);
+
+/**
+ * @brief Print expression-aware formatted text to stdout.
+ *
+ * Supports `%n` expression style, `%nu` unbound style, `%nt` TeX style, and
+ * `%nf` function style.
+ *
+ * `%N` selects scientific numeric formatting for embedded number_t values
+ * while keeping the same expression style selection rules.
+ */
+int expr_printf(const char *fmt, ...);
 
 /**
  * @brief Print the expression-style string representation of @p expr to stdout.

@@ -23,9 +23,9 @@ static char *dup_string(const char *text)
     return copy;
 }
 
-static char *equation_text_dup(const equation_t *equation, style_t style)
+static char *equ_text_dup(const equation_t *equation, style_t style)
 {
-    string_t *text = equation_to_text(equation, style);
+    string_t *text = equ_to_text(equation, style);
     char *copy = text ? dup_string(string_c_str(text)) : NULL;
 
     string_free(text);
@@ -229,15 +229,15 @@ static equation_t *display_simplified_equation(const equation_t *equation)
     if (!equation)
         return NULL;
 
-    lhs = display_simplified_expr(equation_lhs(equation));
-    rhs = display_simplified_expr(equation_rhs(equation));
+    lhs = display_simplified_expr(equ_lhs(equation));
+    rhs = display_simplified_expr(equ_rhs(equation));
     if (!lhs || !rhs) {
         expr_free(lhs);
         expr_free(rhs);
         return NULL;
     }
 
-    out = equation_new(lhs, rhs);
+    out = equ_new(lhs, rhs);
     expr_free(rhs);
     expr_free(lhs);
     return out;
@@ -317,64 +317,43 @@ static equation_t *solution_with_bound_constants(const equation_t *solution,
     if (!solution)
         return NULL;
 
-    lhs = substitute_bound_constants(equation_lhs(solution), bindings);
-    rhs = substitute_bound_constants(equation_rhs(solution), bindings);
+    lhs = substitute_bound_constants(equ_lhs(solution), bindings);
+    rhs = substitute_bound_constants(equ_rhs(solution), bindings);
     if (!lhs || !rhs) {
         expr_free(lhs);
         expr_free(rhs);
         return NULL;
     }
 
-    out = equation_new(lhs, rhs);
+    out = equ_new(lhs, rhs);
     expr_free(rhs);
     expr_free(lhs);
     return out;
 }
 
-static const char *nth_variable_binding_name(expr_bindings_t *bindings,
-                                             size_t wanted_index)
+static const char *solution_binding_name(expr_bindings_t *bindings,
+                                         const equation_t *solution)
 {
-    size_t seen = 0u;
+    const expr_t *lhs = equ_lhs(solution);
 
-    if (!bindings)
+    if (!bindings || !lhs)
         return NULL;
 
     for (size_t i = 0u; i < bindings->count; ++i) {
         expr_binding_entry_t *entry = &bindings->entries[i];
 
-        if (entry->is_constant)
+        if (entry->is_constant || entry->expr != lhs || !entry->name)
             continue;
-        if (seen == wanted_index)
-            return string_c_str(entry->name);
-        ++seen;
+        return string_c_str(entry->name);
     }
 
     return NULL;
 }
 
-static const char *solution_display_name(expr_bindings_t *bindings,
-                                         const char *symbolic_variable,
-                                         const equation_solutions_t *solutions,
-                                         const char *status,
-                                         size_t index)
-{
-    const char *binding_name;
-
-    if (status && strcmp(status, "symbolic") == 0 &&
-        equation_solutions_count(solutions) > 0u &&
-        symbolic_variable && symbolic_variable[0])
-        return symbolic_variable;
-
-    binding_name = nth_variable_binding_name(bindings, index);
-    return binding_name && binding_name[0] ? binding_name : NULL;
-}
-
 static void print_solutions(const equation_solutions_t *solutions,
-                            expr_bindings_t *bindings,
-                            const char *symbolic_variable,
-                            const char *status)
+                            expr_bindings_t *bindings)
 {
-    size_t count = equation_solutions_count(solutions);
+    size_t count = equ_solutions_count(solutions);
 
     if (count == 0u) {
         printf("solutions   \n");
@@ -382,12 +361,12 @@ static void print_solutions(const equation_solutions_t *solutions,
     }
 
     for (size_t i = 0u; i < count; ++i) {
-        const char *name = solution_display_name(bindings, symbolic_variable, solutions, status, i);
-        const equation_t *solution = equation_solutions_at(solutions, i);
+        const equation_t *solution = equ_solutions_at(solutions, i);
+        const char *name = solution_binding_name(bindings, solution);
         equation_t *display = solution_with_bound_constants(solution, bindings);
         const equation_t *shown = display ? display : solution;
-        char *rhs_text = expr_text_dup(equation_rhs(shown), style_UNBOUND);
-        char *text = equation_text_dup(shown, style_UNBOUND);
+        char *rhs_text = expr_text_dup(equ_rhs(shown), style_UNBOUND);
+        char *text = equ_text_dup(shown, style_UNBOUND);
 
         if (name && rhs_text)
             printf("%s%s = %s\n", i == 0u ? "solutions   " : "            ",
@@ -395,18 +374,16 @@ static void print_solutions(const equation_solutions_t *solutions,
         else
             printf("%s%s\n", i == 0u ? "solutions   " : "            ",
                    text ? text : "(null)");
-        equation_free(display);
+        equ_free(display);
         free(text);
         free(rhs_text);
     }
 }
 
 static void print_solutions_tex(const equation_solutions_t *solutions,
-                                expr_bindings_t *bindings,
-                                const char *symbolic_variable,
-                                const char *status)
+                                expr_bindings_t *bindings)
 {
-    size_t count = equation_solutions_count(solutions);
+    size_t count = equ_solutions_count(solutions);
 
     if (count == 0u) {
         printf("solutions_tex \n");
@@ -415,18 +392,18 @@ static void print_solutions_tex(const equation_solutions_t *solutions,
 
     printf("solutions_tex \\begin{aligned}");
     for (size_t i = 0u; i < count; ++i) {
-        const char *name = solution_display_name(bindings, symbolic_variable, solutions, status, i);
-        const equation_t *solution = equation_solutions_at(solutions, i);
+        const equation_t *solution = equ_solutions_at(solutions, i);
+        const char *name = solution_binding_name(bindings, solution);
         equation_t *display = solution_with_bound_constants(solution, bindings);
         const equation_t *shown = display ? display : solution;
-        char *rhs_tex = expr_tex_body_dup(equation_rhs(shown));
-        char *tex = equation_text_dup(shown, style_TEX);
+        char *rhs_tex = expr_tex_body_dup(equ_rhs(shown));
+        char *tex = equ_text_dup(shown, style_TEX);
 
         if (name && rhs_tex)
             printf("%s%s &= %s", i == 0u ? " " : " \\\\ ", name, rhs_tex);
         else
             printf("%s%s", i == 0u ? " " : " \\\\ ", tex ? tex : "\\text{null}");
-        equation_free(display);
+        equ_free(display);
         free(tex);
         free(rhs_tex);
     }
@@ -437,17 +414,16 @@ static void print_equation_fields(const equation_t *equation,
                                   const equation_solutions_t *solutions,
                                   expr_bindings_t *bindings,
                                   const char *input,
-                                  const char *symbolic_variable,
                                   const char *status)
 {
-    expr_t *residual = equation_residual(equation);
+    expr_t *residual = equ_residual(equation);
     expr_t *display_residual = residual ? display_simplified_expr(residual) : NULL;
     equation_t *display_equation = display_simplified_equation(equation);
     const equation_t *shown_equation = display_equation ? display_equation : equation;
     number_t residual_value = residual ? expr_eval(residual) : num_new();
-    char *equation_text = equation_text_dup(equation, style_EXPRESSION);
-    char *unbound_text = equation_text_dup(shown_equation, style_UNBOUND);
-    char *tex = equation_text_dup(shown_equation, style_TEX);
+    char *equation_text = equ_text_dup(equation, style_EXPRESSION);
+    char *unbound_text = equ_text_dup(shown_equation, style_UNBOUND);
+    char *tex = equ_text_dup(shown_equation, style_TEX);
     char *residual_text = display_residual ? expr_text_dup(display_residual, style_UNBOUND) : NULL;
     char *residual_value_text = number_text_dup(residual_value);
 
@@ -456,58 +432,26 @@ static void print_equation_fields(const equation_t *equation,
     printf("unbound     %s\n", unbound_text ? unbound_text : "");
     printf("tex         %s\n", tex ? tex : "");
     printf("residual    %s\n", residual_text ? residual_text : "");
-    printf("value       %s\n", residual_value_text ? residual_value_text : "");
+    printf("error       %s\n", residual_value_text ? residual_value_text : "");
     printf("status      %s\n", status ? status : "unsolved");
-    print_solutions(solutions, bindings, symbolic_variable, status);
-    print_solutions_tex(solutions, bindings, symbolic_variable, status);
+    print_solutions(solutions, bindings);
+    print_solutions_tex(solutions, bindings);
 
     free(residual_value_text);
     free(residual_text);
     free(tex);
     free(unbound_text);
     free(equation_text);
-    equation_free(display_equation);
+    equ_free(display_equation);
     expr_free(display_residual);
     num_destroy(&residual_value);
     expr_free(residual);
-}
-
-static equation_solutions_t *solve_symbolically(equation_t *equation,
-                                                expr_bindings_t *bindings,
-                                                const char *variable)
-{
-    expr_t *wrt;
-
-    if (!variable || !variable[0] || !bindings)
-        return NULL;
-
-    wrt = expr_bindings_get(bindings, variable);
-    if (!wrt)
-        return NULL;
-
-    return equation_create_solutions_for(equation, wrt);
-}
-
-static equation_solutions_t *solve_numerically(equation_t *equation,
-                                               expr_bindings_t *bindings,
-                                               int precision)
-{
-    expr_goal_seek_options_t options = {
-        .precision_digits = precision > 0 ? (size_t)precision : 64u,
-        .max_iterations = precision > 0 ? (size_t)precision * 4u : 0u,
-        .allow_complex = true,
-        .simplify_result = false
-    };
-
-    return equation_create_numeric_solutions(equation, bindings, &options);
 }
 
 int main(int argc, char **argv)
 {
     const char *input = argc > 1 ? argv[1] : "{ 2*x + 3 = 7 | x = NAN }";
     int precision = argc > 2 ? atoi(argv[2]) : 64;
-    const char *variable = argc > 3 ? argv[3] : "x";
-    expr_bindings_t *bindings = NULL;
     equation_t *equation;
     equation_solutions_t *solutions = NULL;
     const char *status = "unsolved";
@@ -516,31 +460,24 @@ int main(int argc, char **argv)
     if (precision > 0)
         num_set_default_prec_digits((size_t)precision + 8u);
 
-    equation = equation_from_string(input, &bindings);
+    equation = equ_from_string(input);
     if (!equation) {
         fprintf(stderr, "could not parse equation\n");
         return 1;
     }
 
-    solutions = solve_symbolically(equation, bindings, variable);
-    if (equation_solutions_count(solutions) > 0u) {
-        status = "symbolic";
-    } else {
-        equation_solutions_free(solutions);
-        solutions = solve_numerically(equation, bindings, precision);
-        if (equation_solutions_count(solutions) > 0u)
-            status = "numeric";
-        else if (!solutions)
-            rc = 1;
-    }
+    solutions = equ_derive_solutions(equation);
+    if (!solutions)
+        rc = 1;
+    else if (equ_solutions_count(solutions) > 0u)
+        status = "solved";
 
     if (rc == 0)
-        print_equation_fields(equation, solutions, bindings, input, variable, status);
+        print_equation_fields(equation, solutions, equ_bindings(equation), input, status);
     else
         fprintf(stderr, "could not solve equation\n");
 
-    equation_solutions_free(solutions);
-    expr_bindings_free(bindings);
-    equation_free(equation);
+    equ_solutions_free(solutions);
+    equ_free(equation);
     return rc;
 }
