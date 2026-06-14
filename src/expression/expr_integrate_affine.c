@@ -428,6 +428,8 @@ cleanup:
 expr_t *integrate_sqrt_wrt_over_symbolic_unit_affine(const expr_t *base, const expr_t *wrt)
 {
     expr_t *constant = NULL;
+    expr_t *tmp_left = NULL;
+    expr_t *tmp_right = NULL;
     expr_t *denom = NULL;
     expr_t *quotient = NULL;
     expr_t *arg = NULL;
@@ -448,21 +450,42 @@ expr_t *integrate_sqrt_wrt_over_symbolic_unit_affine(const expr_t *base, const e
     } else if (expr_is_op(base, &ops_div) &&
                is_negated_wrt_symbolic_affine_leaf(base->a, wrt) &&
                match_symbolic_wrt_minus_constant(base->b, wrt, &constant)) {
-        denom = expr_sub(expr_integrate_clone_expr(constant), expr_integrate_clone_expr(wrt));
+        tmp_left = expr_integrate_clone_expr(constant);
+        tmp_right = expr_integrate_clone_expr(wrt);
+        denom = (tmp_left && tmp_right) ? expr_sub(tmp_left, tmp_right) : NULL;
+        expr_free(tmp_right);
+        expr_free(tmp_left);
+        tmp_right = NULL;
+        tmp_left = NULL;
         is_minus = true;
     } else if (expr_is_neg(base) &&
                expr_is_op(base->a, &ops_div) &&
                is_wrt_symbolic_affine_leaf(base->a->a, wrt) &&
                match_symbolic_wrt_minus_constant(base->a->b, wrt, &constant)) {
-        denom = expr_sub(expr_integrate_clone_expr(constant), expr_integrate_clone_expr(wrt));
+        tmp_left = expr_integrate_clone_expr(constant);
+        tmp_right = expr_integrate_clone_expr(wrt);
+        denom = (tmp_left && tmp_right) ? expr_sub(tmp_left, tmp_right) : NULL;
+        expr_free(tmp_right);
+        expr_free(tmp_left);
+        tmp_right = NULL;
+        tmp_left = NULL;
         is_minus = true;
     } else {
         goto cleanup;
     }
 
-    product = denom ? expr_mul(expr_integrate_clone_expr(wrt), denom) : NULL;
+    tmp_left = expr_integrate_clone_expr(wrt);
+    product = (tmp_left && denom) ? expr_mul(tmp_left, denom) : NULL;
+    expr_free(tmp_left);
+    tmp_left = NULL;
     root = product ? expr_sqrt(product) : NULL;
-    quotient = denom ? expr_div(expr_integrate_clone_expr(wrt), expr_integrate_clone_expr(denom)) : NULL;
+    tmp_left = expr_integrate_clone_expr(wrt);
+    tmp_right = expr_integrate_clone_expr(denom);
+    quotient = (tmp_left && tmp_right) ? expr_div(tmp_left, tmp_right) : NULL;
+    expr_free(tmp_right);
+    expr_free(tmp_left);
+    tmp_right = NULL;
+    tmp_left = NULL;
     arg = quotient ? expr_sqrt(quotient) : NULL;
 
     if (is_minus) {
@@ -477,6 +500,8 @@ expr_t *integrate_sqrt_wrt_over_symbolic_unit_affine(const expr_t *base, const e
     out = simplify_owned(out);
 
 cleanup:
+    expr_free(tmp_right);
+    expr_free(tmp_left);
     expr_free(root);
     expr_free(product);
     expr_free(scaled_inverse);
@@ -492,6 +517,8 @@ expr_t *integrate_wrt_over_symbolic_affine_root(const expr_t *expr, const expr_t
 {
     expr_t *constant_term = NULL;
     expr_t *coeff = NULL;
+    expr_t *tmp_left = NULL;
+    expr_t *tmp_right = NULL;
     expr_t *base = NULL;
     expr_t *root = NULL;
     expr_t *coeff_sq = NULL;
@@ -512,10 +539,22 @@ expr_t *integrate_wrt_over_symbolic_affine_root(const expr_t *expr, const expr_t
         goto cleanup;
 
     base = expr_integrate_clone_expr(expr->b->a);
-    root = expr_sqrt(expr_integrate_clone_expr(base));
-    coeff_sq = coeff ? expr_pow(expr_integrate_clone_expr(coeff), &NUM_TWO) : NULL;
+    tmp_left = expr_integrate_clone_expr(base);
+    root = tmp_left ? expr_sqrt(tmp_left) : NULL;
+    expr_free(tmp_left);
+    tmp_left = NULL;
+    tmp_left = expr_integrate_clone_expr(coeff);
+    coeff_sq = tmp_left ? expr_pow(tmp_left, &NUM_TWO) : NULL;
+    expr_free(tmp_left);
+    tmp_left = NULL;
     three_coeff_sq = (three && coeff_sq) ? expr_mul(three, coeff_sq) : NULL;
-    scaled_x = (coeff && wrt) ? expr_mul(expr_integrate_clone_expr(coeff), expr_integrate_clone_expr(wrt)) : NULL;
+    tmp_left = expr_integrate_clone_expr(coeff);
+    tmp_right = expr_integrate_clone_expr(wrt);
+    scaled_x = (tmp_left && tmp_right) ? expr_mul(tmp_left, tmp_right) : NULL;
+    expr_free(tmp_right);
+    expr_free(tmp_left);
+    tmp_right = NULL;
+    tmp_left = NULL;
     two_constant = constant_term ? expr_mul_num(constant_term, &NUM_TWO) : NULL;
     linear_factor = (scaled_x && two_constant) ? expr_sub(scaled_x, two_constant) : NULL;
     product = (linear_factor && root) ? expr_mul(linear_factor, root) : NULL;
@@ -524,6 +563,8 @@ expr_t *integrate_wrt_over_symbolic_affine_root(const expr_t *expr, const expr_t
     out = simplify_owned(out);
 
 cleanup:
+    expr_free(tmp_right);
+    expr_free(tmp_left);
     expr_free(scaled_product);
     expr_free(linear_factor);
     expr_free(two_constant);
@@ -559,6 +600,8 @@ expr_t *integrate_symbolic_monomial_times_affine_power(const expr_t *expr, const
     expr_t *const_sq = NULL;
     expr_t *numerator = NULL;
     expr_t *out = NULL;
+    expr_t *scale = NULL;
+    expr_t *tmp_left = NULL;
     number_t three = num_create_from_long(3);
     number_t exponent = num_new();
     number_t next1 = num_new();
@@ -598,73 +641,103 @@ expr_t *integrate_symbolic_monomial_times_affine_power(const expr_t *expr, const
         exponent = neg_exponent;
     }
 
+    num_destroy(&next1);
     next1 = num_add(exponent, NUM_ONE);
+    num_destroy(&next2);
     next2 = num_add(exponent, NUM_TWO);
-    if (degree == 2u)
+    if (degree == 2u) {
+        num_destroy(&next3);
         next3 = num_add(next2, NUM_ONE);
+    }
 
     if (num_eq(next1, NUM_ZERO) || num_eq(next2, NUM_ZERO) ||
         (degree == 2u && num_eq(next3, NUM_ZERO)))
         goto cleanup;
 
-    coeff_power = expr_pow(expr_integrate_clone_expr(coeff), degree == 1u ? &NUM_TWO : &three);
+    tmp_left = expr_integrate_clone_expr(coeff);
+    coeff_power = tmp_left ? expr_pow(tmp_left, degree == 1u ? &NUM_TWO : &three) : NULL;
+    expr_free(tmp_left);
+    tmp_left = NULL;
 
-    u_pow = expr_pow(expr_integrate_clone_expr(base), degree == 1u ? &next2 : &next3);
-    {
-        expr_t *scale = expr_new_const(degree == 1u ? next2 : next3);
-        denom = (coeff_power && scale) ? expr_mul(expr_integrate_clone_expr(coeff_power), scale) : NULL;
-    }
+    tmp_left = expr_integrate_clone_expr(base);
+    u_pow = tmp_left ? expr_pow(tmp_left, degree == 1u ? &next2 : &next3) : NULL;
+    expr_free(tmp_left);
+    tmp_left = NULL;
+    scale = expr_new_const(degree == 1u ? next2 : next3);
+    tmp_left = expr_integrate_clone_expr(coeff_power);
+    denom = (tmp_left && scale) ? expr_mul(tmp_left, scale) : NULL;
+    expr_free(tmp_left);
+    tmp_left = NULL;
     term1 = (u_pow && denom) ? expr_div(u_pow, denom) : NULL;
     expr_free(u_pow);
     expr_free(denom);
+    expr_free(scale);
     u_pow = NULL;
     denom = NULL;
+    scale = NULL;
 
-    scaled_const = constant ? expr_mul_num(expr_integrate_clone_expr(constant),
-                                           degree == 1u ? &NUM_ONE : &NUM_TWO)
-                            : NULL;
-    u_pow = expr_pow(expr_integrate_clone_expr(base), degree == 1u ? &next1 : &next2);
+    tmp_left = expr_integrate_clone_expr(constant);
+    scaled_const = tmp_left ? expr_mul_num(tmp_left, degree == 1u ? &NUM_ONE : &NUM_TWO) : NULL;
+    expr_free(tmp_left);
+    tmp_left = NULL;
+
+    tmp_left = expr_integrate_clone_expr(base);
+    u_pow = tmp_left ? expr_pow(tmp_left, degree == 1u ? &next1 : &next2) : NULL;
+    expr_free(tmp_left);
+    tmp_left = NULL;
     numerator = (scaled_const && u_pow) ? expr_mul(scaled_const, u_pow) : NULL;
-    {
-        expr_t *scale = expr_new_const(degree == 1u ? next1 : next2);
-        denom = (coeff_power && scale) ? expr_mul(expr_integrate_clone_expr(coeff_power), scale) : NULL;
-    }
+    scale = expr_new_const(degree == 1u ? next1 : next2);
+    tmp_left = expr_integrate_clone_expr(coeff_power);
+    denom = (tmp_left && scale) ? expr_mul(tmp_left, scale) : NULL;
+    expr_free(tmp_left);
+    tmp_left = NULL;
     term2 = (numerator && denom) ? expr_div(numerator, denom) : NULL;
     expr_free(numerator);
     expr_free(u_pow);
     expr_free(denom);
+    expr_free(scale);
     numerator = NULL;
     u_pow = NULL;
     denom = NULL;
+    scale = NULL;
     expr_free(scaled_const);
     scaled_const = NULL;
 
     if (degree == 1u) {
-        out = term1 ? expr_sub(term1, term2) : NULL;
+        out = term1 ? expr_integrate_add_terms_owned(term1, expr_integrate_negate_owned(term2)) : NULL;
         term1 = NULL;
         term2 = NULL;
     } else {
-        const_sq = constant ? expr_pow(expr_integrate_clone_expr(constant), &NUM_TWO) : NULL;
-        u_pow = expr_pow(expr_integrate_clone_expr(base), &next1);
+        tmp_left = expr_integrate_clone_expr(constant);
+        const_sq = tmp_left ? expr_pow(tmp_left, &NUM_TWO) : NULL;
+        expr_free(tmp_left);
+        tmp_left = NULL;
+
+        tmp_left = expr_integrate_clone_expr(base);
+        u_pow = tmp_left ? expr_pow(tmp_left, &next1) : NULL;
+        expr_free(tmp_left);
+        tmp_left = NULL;
         numerator = (const_sq && u_pow) ? expr_mul(const_sq, u_pow) : NULL;
-        {
-            expr_t *scale = expr_new_const(next1);
-            denom = (coeff_power && scale) ? expr_mul(expr_integrate_clone_expr(coeff_power), scale) : NULL;
-        }
+        scale = expr_new_const(next1);
+        tmp_left = expr_integrate_clone_expr(coeff_power);
+        denom = (tmp_left && scale) ? expr_mul(tmp_left, scale) : NULL;
+        expr_free(tmp_left);
+        tmp_left = NULL;
         term3 = (numerator && denom) ? expr_div(numerator, denom) : NULL;
         expr_free(numerator);
         expr_free(u_pow);
         expr_free(denom);
+        expr_free(scale);
         numerator = NULL;
         u_pow = NULL;
         denom = NULL;
+        scale = NULL;
 
-        out = term1 ? expr_sub(term1, term2) : NULL;
+        out = term1 ? expr_integrate_add_terms_owned(term1, expr_integrate_negate_owned(term2)) : NULL;
         term1 = NULL;
         term2 = NULL;
-        out = (out && term3) ? expr_add(out, term3) : (out ? out : term3);
-        if (out == term3)
-            term3 = NULL;
+        out = expr_integrate_add_terms_owned(out, term3);
+        term3 = NULL;
     }
 
     out = simplify_owned(out);
@@ -683,6 +756,8 @@ cleanup:
     expr_free(term1);
     expr_free(u_pow);
     expr_free(denom);
+    expr_free(scale);
+    expr_free(tmp_left);
     expr_free(coeff_power);
     expr_free(coeff);
     expr_free(constant);
@@ -868,6 +943,8 @@ static bool match_symbolic_square_family(const expr_t *expr,
 expr_t *integrate_symbolic_square_family_root(const expr_t *quadratic, const expr_t *wrt)
 {
     symbolic_square_family_kind_t kind;
+    expr_t *tmp_left = NULL;
+    expr_t *tmp_right = NULL;
     expr_t *param = NULL;
     expr_t *param_sq = NULL;
     expr_t *root = NULL;
@@ -881,11 +958,32 @@ expr_t *integrate_symbolic_square_family_root(const expr_t *quadratic, const exp
     if (!quadratic || !wrt || !match_symbolic_square_family(quadratic, wrt, &param, &kind))
         goto cleanup;
 
-    param_sq = expr_pow(expr_integrate_clone_expr(param), &NUM_TWO);
-    root = expr_sqrt(expr_integrate_clone_expr(quadratic));
-    x_root = root ? expr_mul(expr_integrate_clone_expr(wrt), expr_integrate_clone_expr(root)) : NULL;
+    tmp_left = expr_integrate_clone_expr(param);
+    param_sq = tmp_left ? expr_pow(tmp_left, &NUM_TWO) : NULL;
+    expr_free(tmp_left);
+    tmp_left = NULL;
+
+    tmp_left = expr_integrate_clone_expr(quadratic);
+    root = tmp_left ? expr_sqrt(tmp_left) : NULL;
+    expr_free(tmp_left);
+    tmp_left = NULL;
+
+    tmp_left = expr_integrate_clone_expr(wrt);
+    tmp_right = expr_integrate_clone_expr(root);
+    x_root = (tmp_left && tmp_right) ? expr_mul(tmp_left, tmp_right) : NULL;
+    expr_free(tmp_right);
+    expr_free(tmp_left);
+    tmp_right = NULL;
+    tmp_left = NULL;
     first = x_root ? mul_number_owned(x_root, NUM_HALF) : NULL;
-    arg = (param && wrt) ? expr_div(expr_integrate_clone_expr(wrt), expr_integrate_clone_expr(param)) : NULL;
+    x_root = NULL;
+    tmp_left = expr_integrate_clone_expr(wrt);
+    tmp_right = expr_integrate_clone_expr(param);
+    arg = (tmp_left && tmp_right) ? expr_div(tmp_left, tmp_right) : NULL;
+    expr_free(tmp_right);
+    expr_free(tmp_left);
+    tmp_right = NULL;
+    tmp_left = NULL;
 
     if (kind == SYMBOLIC_SQUARE_PLUS) {
         inverse = arg ? expr_asinh(arg) : NULL;
@@ -905,17 +1003,28 @@ expr_t *integrate_symbolic_square_family_root(const expr_t *quadratic, const exp
         expr_t *sum = NULL;
         expr_t *log_term = NULL;
 
-        sum = (wrt && root) ? expr_add(expr_integrate_clone_expr(wrt), expr_integrate_clone_expr(root)) : NULL;
+        tmp_left = expr_integrate_clone_expr(wrt);
+        tmp_right = expr_integrate_clone_expr(root);
+        sum = (tmp_left && tmp_right) ? expr_add(tmp_left, tmp_right) : NULL;
+        expr_free(tmp_right);
+        expr_free(tmp_left);
+        tmp_right = NULL;
+        tmp_left = NULL;
         log_term = sum ? expr_log(sum) : NULL;
         second = (param_sq && log_term) ? expr_mul(param_sq, log_term) : NULL;
         second = second ? mul_number_owned(second, NUM_HALF) : NULL;
-        out = first ? expr_sub(first, second) : NULL;
-        out = simplify_owned(out);
+        out = simplify_owned(first
+            ? expr_integrate_add_terms_owned(first, expr_integrate_negate_owned(second))
+            : NULL);
+        first = NULL;
+        second = NULL;
         expr_free(log_term);
         expr_free(sum);
     }
 
 cleanup:
+    expr_free(tmp_right);
+    expr_free(tmp_left);
     expr_free(second);
     expr_free(inverse);
     expr_free(arg);
@@ -930,15 +1039,16 @@ cleanup:
 expr_t *integrate_symbolic_square_family_inverse_root(const expr_t *expr, const expr_t *wrt)
 {
     symbolic_square_family_kind_t kind;
+    expr_t *tmp_left = NULL;
+    expr_t *tmp_right = NULL;
     expr_t *param = NULL;
     expr_t *quadratic = NULL;
     expr_t *arg = NULL;
     expr_t *root = NULL;
     expr_t *sum = NULL;
-    number_t one = num_new();
+    number_t one = num_clone(NUM_ONE);
     expr_t *out = NULL;
 
-    one = num_clone(NUM_ONE);
     if (!expr || !wrt || !expr->a || !expr->b ||
         !expr_match_const_value(expr->a, &one) || !num_eq(one, NUM_ONE) ||
         !expr->b->ops || expr->b->ops->kind != EXPR_KIND_SQRT || !expr->b->a ||
@@ -946,21 +1056,39 @@ expr_t *integrate_symbolic_square_family_inverse_root(const expr_t *expr, const 
         goto cleanup;
 
     quadratic = expr_integrate_clone_expr(expr->b->a);
-    arg = (param && wrt) ? expr_div(expr_integrate_clone_expr(wrt), expr_integrate_clone_expr(param)) : NULL;
+    tmp_left = expr_integrate_clone_expr(wrt);
+    tmp_right = expr_integrate_clone_expr(param);
+    arg = (tmp_left && tmp_right) ? expr_div(tmp_left, tmp_right) : NULL;
+    expr_free(tmp_right);
+    expr_free(tmp_left);
+    tmp_right = NULL;
+    tmp_left = NULL;
 
     if (kind == SYMBOLIC_SQUARE_PLUS) {
         out = arg ? expr_asinh(arg) : NULL;
     } else if (kind == SYMBOLIC_SQUARE_A2_MINUS_X2) {
         out = arg ? expr_asin(arg) : NULL;
     } else {
-        root = quadratic ? expr_sqrt(expr_integrate_clone_expr(quadratic)) : NULL;
-        sum = (wrt && root) ? expr_add(expr_integrate_clone_expr(wrt), expr_integrate_clone_expr(root)) : NULL;
+        tmp_left = expr_integrate_clone_expr(quadratic);
+        root = tmp_left ? expr_sqrt(tmp_left) : NULL;
+        expr_free(tmp_left);
+        tmp_left = NULL;
+
+        tmp_left = expr_integrate_clone_expr(wrt);
+        tmp_right = expr_integrate_clone_expr(root);
+        sum = (tmp_left && tmp_right) ? expr_add(tmp_left, tmp_right) : NULL;
+        expr_free(tmp_right);
+        expr_free(tmp_left);
+        tmp_right = NULL;
+        tmp_left = NULL;
         out = sum ? expr_log(sum) : NULL;
     }
 
     out = simplify_owned(out);
 
 cleanup:
+    expr_free(tmp_right);
+    expr_free(tmp_left);
     num_destroy(&one);
     expr_free(sum);
     expr_free(root);
@@ -974,6 +1102,7 @@ expr_t *integrate_symbolic_square_family_wrt_over_root(const expr_t *expr, const
 {
     symbolic_square_family_kind_t kind;
     expr_t *param = NULL;
+    expr_t *root_arg = NULL;
     expr_t *out = NULL;
 
     if (!expr || !wrt || !expr->a || !expr->b ||
@@ -982,12 +1111,16 @@ expr_t *integrate_symbolic_square_family_wrt_over_root(const expr_t *expr, const
         !match_symbolic_square_family(expr->b->a, wrt, &param, &kind))
         goto cleanup;
 
-    out = expr_sqrt(expr_integrate_clone_expr(expr->b->a));
+    root_arg = expr_integrate_clone_expr(expr->b->a);
+    out = root_arg ? expr_sqrt(root_arg) : NULL;
+    expr_free(root_arg);
+    root_arg = NULL;
     if (kind == SYMBOLIC_SQUARE_A2_MINUS_X2)
         out = expr_integrate_negate_owned(out);
     out = simplify_owned(out);
 
 cleanup:
+    expr_free(root_arg);
     expr_free(param);
     return out;
 }

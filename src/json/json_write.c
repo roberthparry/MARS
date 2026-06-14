@@ -44,24 +44,24 @@ static bool json_append_escaped_rune(string_t *out, rune_t rune)
 
     value = rune_value(rune);
     switch (value) {
-    case '"':
-        return string_append_cstr(out, "\\\"") == 0;
-    case '\\':
-        return string_append_cstr(out, "\\\\") == 0;
-    case '\b':
-        return string_append_cstr(out, "\\b") == 0;
-    case '\f':
-        return string_append_cstr(out, "\\f") == 0;
-    case '\n':
-        return string_append_cstr(out, "\\n") == 0;
-    case '\r':
-        return string_append_cstr(out, "\\r") == 0;
-    case '\t':
-        return string_append_cstr(out, "\\t") == 0;
-    default:
-        if (value < 0x20u)
-            return string_append_format(out, "\\u%04X", (unsigned int)value) >= 0;
-        return string_append_rune(out, rune) == 0;
+        case '"':
+            return string_append_cstr(out, "\\\"") == 0;
+        case '\\':
+            return string_append_cstr(out, "\\\\") == 0;
+        case '\b':
+            return string_append_cstr(out, "\\b") == 0;
+        case '\f':
+            return string_append_cstr(out, "\\f") == 0;
+        case '\n':
+            return string_append_cstr(out, "\\n") == 0;
+        case '\r':
+            return string_append_cstr(out, "\\r") == 0;
+        case '\t':
+            return string_append_cstr(out, "\\t") == 0;
+        default:
+            if (value == 0u || rune_is_control(rune))
+                return string_append_format(out, "\\u%04X", (unsigned int)value) >= 0;
+            return string_append_rune(out, rune) == 0;
     }
 }
 
@@ -212,10 +212,20 @@ static bool json_write_object(const json_t *json, string_t *out, int indent_size
         return string_append_char(out, '}') == 0;
 
     for (size_t i = 0u; i < count; ++i) {
-        const void *key_ptr = dictionary_get_key(json->u.object, i);
-        const void *value_ptr = dictionary_get_value(json->u.object, i);
+        dictionary_entry_t *entry = NULL;
+        const void *key_ptr;
+        const void *value_ptr;
         string_t *key;
 
+        if (!dictionary_get_entry_sorted(json->u.object,
+                                         i,
+                                         DICTIONARY_SORT_BY_KEY,
+                                         &entry) ||
+            !entry)
+            return false;
+
+        key_ptr = dictionary_entry_key(entry);
+        value_ptr = dictionary_entry_value(entry);
         if (!key_ptr || !value_ptr)
             return false;
         if (i > 0u && string_append_char(out, ',') != 0)

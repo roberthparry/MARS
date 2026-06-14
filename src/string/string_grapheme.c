@@ -620,6 +620,13 @@ static bool rune_value_is_common_digit(uint32_t cp)
            (cp >= 0xff10u && cp <= 0xff19u);
 }
 
+static bool rune_value_is_common_control(uint32_t cp)
+{
+    return cp <= 0x001fu ||
+           cp == 0x007fu ||
+           (cp >= 0x0080u && cp <= 0x009fu);
+}
+
 static bool rune_value_is_common_alpha(uint32_t cp)
 {
     return (cp >= 'A' && cp <= 'Z') ||
@@ -644,6 +651,19 @@ bool rune_is_digit(rune_t rune)
 #endif
 }
 
+bool rune_is_control(rune_t rune)
+{
+    uint32_t cp = rune_value(rune);
+
+    if (cp == 0u)
+        return false;
+#ifdef HAVE_UNISTRING
+    return uc_is_property_iso_control((ucs4_t)cp);
+#else
+    return rune_value_is_common_control(cp);
+#endif
+}
+
 bool rune_is_alpha_numeric(rune_t rune)
 {
     uint32_t cp = rune_value(rune);
@@ -657,6 +677,15 @@ bool rune_is_alpha_numeric(rune_t rune)
     return rune_value_is_common_alpha(cp) ||
            rune_value_is_common_digit(cp);
 #endif
+}
+
+bool rune_is_fraction(rune_t rune)
+{
+    uint32_t cp = rune_value(rune);
+
+    return (cp >= 0x00BCu && cp <= 0x00BEu) ||
+           cp == 0x2044u ||
+           (cp >= 0x2150u && cp <= 0x215Eu);
 }
 
 string_t *rune_to_string(rune_t rune)

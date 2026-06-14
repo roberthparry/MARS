@@ -163,6 +163,49 @@ static bool test_equation_result_has_rhs_text_containing(
     return false;
 }
 
+static void example_equation_simple_affine_solve(void)
+{
+    equation_t *equation = equ_from_string("{ 2*x + 3 = 7 | x = ? }");
+    equation_solutions_t *solutions = equ_derive_solutions(equation);
+    const equation_t *first = equ_solutions_at(solutions, 0u);
+
+    if (first)
+        equ_print(first);
+
+    equ_solutions_free(solutions);
+    equ_free(equation);
+}
+
+static void example_equation_kepler(void)
+{
+    size_t saved_digits = num_get_default_prec_digits();
+    equation_t *kepler;
+    equation_solutions_t *solutions;
+    const equation_t *first;
+
+    num_set_default_prec_digits(64u);
+
+    kepler = equ_from_string(
+        "{ M = E - e*sin(E) | E = 1.5; M = 1.5, e = 0.0167 }");
+    solutions = equ_derive_solutions(kepler);
+    first = equ_solutions_at(solutions, 0u);
+
+    if (first)
+        equ_print(first);
+
+    equ_solutions_free(solutions);
+    equ_free(kepler);
+    num_set_default_prec_digits(saved_digits);
+}
+
+static void example_equation_output_form(void)
+{
+    equation_t *equation = equ_from_string("{ 2*x + 3 = 7 | x = ? }");
+
+    equ_print(equation);
+    equ_free(equation);
+}
+
 static void test_equation_from_string_shares_symbols_across_sides(void)
 {
     equation_t *equation = equ_from_string("{ x = x + 1 | x = NAN }");
@@ -705,6 +748,90 @@ static void test_equation_future_inverts_exp(void)
     equ_free(equation);
 }
 
+static void test_equation_future_solves_sin_family(void)
+{
+    equation_t *equation = equ_from_string("{ sin(x) = 1 | x = NAN }");
+    expr_t *x;
+    ASSERT_NEW_RESULT(result);
+
+    ASSERT_NOT_NULL(equation);
+    x = equ_binding(equation, "x");
+    ASSERT_NOT_NULL(x);
+
+    ASSERT_EQ_INT(equ_solve_for(equation, x, result), 0);
+    ASSERT_TRUE(RESULT_IS_SOLVED(result));
+    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(
+        result, style_UNBOUND, "π/2"));
+    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(
+        result, style_UNBOUND, "4n + 1"));
+
+    equ_solve_result_free(result);
+    equ_free(equation);
+}
+
+static void test_equation_future_reduces_exp_sin_to_periodic_family(void)
+{
+    equation_t *equation = equ_from_string("{ exp(sin(x)) = e | x = NAN }");
+    expr_t *x;
+    ASSERT_NEW_RESULT(result);
+
+    ASSERT_NOT_NULL(equation);
+    x = equ_binding(equation, "x");
+    ASSERT_NOT_NULL(x);
+
+    ASSERT_EQ_INT(equ_solve_for(equation, x, result), 0);
+    ASSERT_TRUE(RESULT_IS_SOLVED(result));
+    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(
+        result, style_UNBOUND, "π/2"));
+    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(
+        result, style_UNBOUND, "4n + 1"));
+
+    equ_solve_result_free(result);
+    equ_free(equation);
+}
+
+static void test_equation_future_keeps_periodic_sin_family_symbolic(void)
+{
+    equation_t *equation = equ_from_string("{ sin(x) = sqrt(0.2) | x = NAN }");
+    expr_t *x;
+    ASSERT_NEW_RESULT(result);
+
+    ASSERT_NOT_NULL(equation);
+    x = equ_binding(equation, "x");
+    ASSERT_NOT_NULL(x);
+
+    ASSERT_EQ_INT(equ_solve_for(equation, x, result), 0);
+    ASSERT_TRUE(RESULT_IS_SOLVED(result));
+    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(
+        result, style_UNBOUND, "2π"));
+    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(
+        result, style_UNBOUND, "asin"));
+    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(
+        result, style_UNBOUND, "π·(2n + 1) - asin"));
+
+    equ_solve_result_free(result);
+    equ_free(equation);
+}
+
+static void test_equation_future_keeps_tan_sqrt_three_family_symbolic(void)
+{
+    equation_t *equation = equ_from_string("{ tan(x) = sqrt(3) | x = NAN }");
+    expr_t *x;
+    ASSERT_NEW_RESULT(result);
+
+    ASSERT_NOT_NULL(equation);
+    x = equ_binding(equation, "x");
+    ASSERT_NOT_NULL(x);
+
+    ASSERT_EQ_INT(equ_solve_for(equation, x, result), 0);
+    ASSERT_TRUE(RESULT_IS_SOLVED(result));
+    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(
+        result, style_UNBOUND, "1/3·π·(3n + 1)"));
+
+    equ_solve_result_free(result);
+    equ_free(equation);
+}
+
 static void test_equation_basics(void)
 {
     TEST_RUN_SUBTEST(test_equation_from_string_shares_symbols_across_sides, NULL);
@@ -734,15 +861,33 @@ static void test_equation_future_solver_cases(void)
 {
     TEST_RUN_SUBTEST(test_equation_future_inverts_log, "future,inverse");
     TEST_RUN_SUBTEST(test_equation_future_inverts_exp, "future,inverse");
+    TEST_RUN_SUBTEST(test_equation_future_solves_sin_family, "future,periodic");
+    TEST_RUN_SUBTEST(test_equation_future_reduces_exp_sin_to_periodic_family,
+                     "future,periodic");
+    TEST_RUN_SUBTEST(test_equation_future_keeps_periodic_sin_family_symbolic,
+                     "future,periodic");
+    TEST_RUN_SUBTEST(test_equation_future_keeps_tan_sqrt_three_family_symbolic,
+                     "future,periodic");
 }
 
 int tests_main(void)
 {
     TEST_SECTION("Equation Basics");
-    TEST_RUN_CASE(test_equation_basics, NULL);
+    TEST_RUN_IN_GROUP(test_equation_basics, tests, NULL);
 
     TEST_SECTION("Future Solver Cases");
-    TEST_RUN_CASE(test_equation_future_solver_cases, "future");
+    TEST_RUN_IN_GROUP(test_equation_future_solver_cases, tests, "future");
+
+    TEST_SECTION("README Output Examples");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_equation_simple_affine_solve,
+                                  readme_examples,
+                                  "equation,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_equation_kepler,
+                                  readme_examples,
+                                  "equation,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_equation_output_form,
+                                  readme_examples,
+                                  "equation,readme,output");
 
     return TEST_EXIT_CODE();
 }

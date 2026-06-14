@@ -192,26 +192,28 @@ static void test_readme_example_string_quantum(void)
 int tests_main(void)
 {
     TEST_SECTION("Core");
-    run_matrix_core_tests();
+    TEST_RUN_IN_GROUP(run_matrix_core_tests, tests, NULL);
 
     TEST_SECTION("Functions");
-    run_matrix_function_tests();
-    run_matrix_function_regression_tests();
+    TEST_RUN_IN_GROUP(run_matrix_function_tests, tests, NULL);
+    TEST_RUN_IN_GROUP(run_matrix_function_regression_tests, tests, NULL);
 
     TEST_SECTION("String Parsing");
-    run_matrix_fromstring_tests();
+    TEST_RUN_IN_GROUP(run_matrix_fromstring_tests, tests, NULL);
 
     TEST_SECTION("String Formatting");
-    run_matrix_tostring_tests();
+    TEST_RUN_IN_GROUP(run_matrix_tostring_tests, tests, NULL);
 
     TEST_SECTION("Output");
-    run_matrix_output_tests();
+    TEST_RUN_IN_GROUP(run_matrix_output_tests, tests, NULL);
 
     TEST_SECTION("README");
-    TEST_RUN_OUTPUT_TAGS(test_readme_example_hermitian_eigendecomposition,
-                         "matrix,readme,output");
-    TEST_RUN_OUTPUT_TAGS(test_readme_example_string_quantum,
-                         "matrix,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(test_readme_example_hermitian_eigendecomposition,
+                                  readme_examples,
+                                  "matrix,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(test_readme_example_string_quantum,
+                                  readme_examples,
+                                  "matrix,readme,output");
 
     clear_matrix_input_context();
     return TESTS_EXIT_CODE();

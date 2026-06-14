@@ -27,9 +27,8 @@ bool match_trig_proportional_wrt_coeff(const expr_t *expr,
     if (!expr_const_is_zero(constant) || expr_const_is_zero(coeff))
         goto cleanup;
 
-    *coeff_out = coeff;
-    coeff = NULL;
-    ok = true;
+    *coeff_out = expr_integrate_clone_expr(coeff);
+    ok = *coeff_out != NULL;
 
 cleanup:
     expr_free(coeff);
@@ -79,24 +78,39 @@ static bool match_power_trig_product(const expr_t *expr,
     return false;
 }
 
-static expr_t *build_symbolic_quadratic_power_trig_integral(bool integrand_is_sin,
-                                                            const expr_t *trig_expr,
-                                                            const expr_t *coeff,
-                                                            const expr_t *wrt)
+static expr_t *divide_expr_by_expr_power_owned(expr_t *numer,
+                                               const expr_t *base,
+                                               unsigned int power)
+{
+    expr_t *denom = NULL;
+    expr_t *out = NULL;
+
+    if (!numer || !base || power == 0u) {
+        expr_free(numer);
+        return NULL;
+    }
+
+    denom = expr_integrate_build_unsigned_expr_power(base, power);
+    out = denom ? expr_div(numer, denom) : NULL;
+    expr_free(denom);
+    expr_free(numer);
+    return out;
+}
+
+static expr_t *build_symbolic_quadratic_power_trig_integral(
+    bool integrand_is_sin,
+    const expr_t *trig_expr,
+    const expr_t *coeff,
+    const expr_t *wrt)
 {
     expr_t *sin_v = NULL;
     expr_t *cos_v = NULL;
     expr_t *x_sq = NULL;
-    expr_t *coeff_sq = NULL;
-    expr_t *coeff_cubed = NULL;
-    expr_t *a2x2 = NULL;
-    expr_t *two = NULL;
-    expr_t *bracket = NULL;
-    expr_t *lead_product = NULL;
     expr_t *term1 = NULL;
     expr_t *x_trig = NULL;
-    expr_t *two_x_trig = NULL;
     expr_t *term2 = NULL;
+    expr_t *tail_trig = NULL;
+    expr_t *term3 = NULL;
     expr_t *sum = NULL;
 
     if (!trig_expr || !trig_expr->a || !coeff || !wrt)
@@ -105,40 +119,88 @@ static expr_t *build_symbolic_quadratic_power_trig_integral(bool integrand_is_si
     sin_v = expr_sin(trig_expr->a);
     cos_v = expr_cos(trig_expr->a);
     x_sq = expr_integrate_build_unsigned_expr_power(wrt, 2u);
-    coeff_sq = expr_integrate_build_unsigned_expr_power(coeff, 2u);
-    coeff_cubed = expr_integrate_build_unsigned_expr_power(coeff, 3u);
-    a2x2 = (coeff_sq && x_sq) ? expr_mul(coeff_sq, x_sq) : NULL;
-    two = expr_new_const(NUM_TWO);
-    bracket = integrand_is_sin
-        ? ((two && a2x2) ? expr_sub(two, a2x2) : NULL)
-        : ((a2x2 && two) ? expr_sub(a2x2, two) : NULL);
-    lead_product = (bracket && (integrand_is_sin ? cos_v : sin_v))
-        ? expr_mul(bracket, integrand_is_sin ? cos_v : sin_v)
+    x_trig = (x_sq && (integrand_is_sin ? cos_v : sin_v))
+        ? expr_mul(x_sq, integrand_is_sin ? cos_v : sin_v)
         : NULL;
-    term1 = (lead_product && coeff_cubed) ? expr_div(lead_product, coeff_cubed) : NULL;
+    term1 = divide_expr_by_expr_power_owned(x_trig, coeff, 1u);
+    x_trig = NULL;
+    if (integrand_is_sin)
+        term1 = expr_integrate_negate_owned(term1);
 
     x_trig = (wrt && (integrand_is_sin ? sin_v : cos_v))
         ? expr_mul(wrt, integrand_is_sin ? sin_v : cos_v)
         : NULL;
-    two_x_trig = x_trig ? expr_mul_num(x_trig, &NUM_TWO) : NULL;
-    term2 = (two_x_trig && coeff_sq) ? expr_div(two_x_trig, coeff_sq) : NULL;
+    if (x_trig) {
+        term2 = expr_mul_num(x_trig, &NUM_TWO);
+        expr_free(x_trig);
+        x_trig = NULL;
+    }
+    term2 = divide_expr_by_expr_power_owned(term2, coeff, 2u);
+
+    tail_trig = integrand_is_sin ? expr_integrate_retain_expr(cos_v)
+                                 : expr_integrate_retain_expr(sin_v);
+    if (tail_trig) {
+        term3 = expr_mul_num(tail_trig, &NUM_TWO);
+        tail_trig = NULL;
+    }
+    term3 = divide_expr_by_expr_power_owned(term3, coeff, 3u);
+    if (!integrand_is_sin)
+        term3 = expr_integrate_negate_owned(term3);
+
     sum = expr_integrate_add_terms_owned(term1, term2);
     term1 = NULL;
     term2 = NULL;
+    sum = expr_integrate_add_terms_owned(sum, term3);
+    term3 = NULL;
 
+    expr_free(term3);
+    expr_free(tail_trig);
     expr_free(term2);
-    expr_free(two_x_trig);
     expr_free(x_trig);
     expr_free(term1);
-    expr_free(lead_product);
-    expr_free(bracket);
-    expr_free(two);
-    expr_free(a2x2);
-    expr_free(coeff_cubed);
-    expr_free(coeff_sq);
     expr_free(x_sq);
     expr_free(cos_v);
     expr_free(sin_v);
+    return simplify_owned(sum);
+}
+
+static expr_t *build_symbolic_linear_power_trig_integral(
+    bool integrand_is_sin,
+    const expr_t *trig_expr,
+    const expr_t *coeff,
+    const expr_t *wrt)
+{
+    expr_t *first_trig = NULL;
+    expr_t *x_trig = NULL;
+    expr_t *first = NULL;
+    expr_t *second_trig = NULL;
+    expr_t *second = NULL;
+    expr_t *sum = NULL;
+
+    if (!trig_expr || !trig_expr->a || !coeff || !wrt)
+        return NULL;
+
+    first_trig = integrand_is_sin ? expr_cos(trig_expr->a) : expr_sin(trig_expr->a);
+    x_trig = (wrt && first_trig) ? expr_mul(wrt, first_trig) : NULL;
+    first = divide_expr_by_expr_power_owned(x_trig, coeff, 1u);
+    x_trig = NULL;
+    if (integrand_is_sin)
+        first = expr_integrate_negate_owned(first);
+
+    second_trig = integrand_is_sin ? expr_sin(trig_expr->a) : expr_cos(trig_expr->a);
+    second = divide_expr_by_expr_power_owned(second_trig ? expr_integrate_retain_expr(second_trig) : NULL,
+                                             coeff,
+                                             2u);
+
+    sum = expr_integrate_add_terms_owned(first, second);
+    first = NULL;
+    second = NULL;
+
+    expr_free(second);
+    expr_free(second_trig);
+    expr_free(first);
+    expr_free(x_trig);
+    expr_free(first_trig);
     return simplify_owned(sum);
 }
 
@@ -151,6 +213,7 @@ static expr_t *build_symbolic_integer_power_trig_integral(unsigned int degree,
     expr_t *x_power = NULL;
     expr_t *trig_part = NULL;
     expr_t *product = NULL;
+    expr_t *tmp_coeff = NULL;
     expr_t *term1 = NULL;
     expr_t *inner = NULL;
     expr_t *scaled_inner = NULL;
@@ -159,6 +222,16 @@ static expr_t *build_symbolic_integer_power_trig_integral(unsigned int degree,
 
     if (!trig_expr || !trig_expr->a || !coeff || !wrt)
         return NULL;
+
+    if (degree == 1u) {
+        expr_t *linear = build_symbolic_linear_power_trig_integral(integrand_is_sin,
+                                                                   trig_expr,
+                                                                   coeff,
+                                                                   wrt);
+
+        if (linear)
+            return linear;
+    }
 
     if (degree == 2u) {
         expr_t *quadratic = build_symbolic_quadratic_power_trig_integral(integrand_is_sin,
@@ -173,7 +246,14 @@ static expr_t *build_symbolic_integer_power_trig_integral(unsigned int degree,
     x_power = expr_integrate_build_unsigned_expr_power(wrt, degree);
     trig_part = integrand_is_sin ? expr_cos(trig_expr->a) : expr_sin(trig_expr->a);
     product = (x_power && trig_part) ? expr_mul(x_power, trig_part) : NULL;
-    term1 = (product && coeff) ? expr_div(product, coeff) : NULL;
+    if (product && coeff->ops == &ops_const) {
+        term1 = div_number_owned(expr_integrate_retain_expr(product), coeff->c);
+    } else {
+        tmp_coeff = expr_integrate_clone_expr(coeff);
+        term1 = (product && tmp_coeff) ? expr_div(product, tmp_coeff) : NULL;
+        expr_free(tmp_coeff);
+        tmp_coeff = NULL;
+    }
     if (integrand_is_sin)
         term1 = expr_integrate_negate_owned(term1);
     term1 = simplify_owned(term1);
@@ -196,7 +276,14 @@ static expr_t *build_symbolic_integer_power_trig_integral(unsigned int degree,
         scaled_inner = expr_mul_num(inner, &scale);
         num_destroy(&scale);
     }
-    term2 = (scaled_inner && coeff) ? expr_div(scaled_inner, coeff) : NULL;
+    if (scaled_inner && coeff->ops == &ops_const) {
+        term2 = div_number_owned(expr_integrate_retain_expr(scaled_inner), coeff->c);
+    } else {
+        tmp_coeff = expr_integrate_clone_expr(coeff);
+        term2 = (scaled_inner && tmp_coeff) ? expr_div(scaled_inner, tmp_coeff) : NULL;
+        expr_free(tmp_coeff);
+        tmp_coeff = NULL;
+    }
     if (!integrand_is_sin)
         term2 = expr_integrate_negate_owned(term2);
     term2 = simplify_owned(term2);
@@ -204,6 +291,7 @@ static expr_t *build_symbolic_integer_power_trig_integral(unsigned int degree,
     term1 = NULL;
     term2 = NULL;
 
+    expr_free(tmp_coeff);
     expr_free(term2);
     expr_free(scaled_inner);
     expr_free(inner);

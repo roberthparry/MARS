@@ -234,6 +234,23 @@ static void example_set_strings(void) {
     set_destroy(s);
 }
 
+static void example_set_deep_strings(void) {
+    set_t *s = set_create(sizeof(char *), str_hash, str_cmp, str_clone, str_destroy);
+
+    const char *a = "hello";
+    const char *b = "world";
+
+    set_add(s, &a);
+    set_add(s, &b);
+
+    for (size_t i = 0; i < set_get_size(s); i++) {
+        const char *elem = *(const char **)set_get_sorted(s, i);
+        printf("[%zu] %s\n", i, elem);
+    }
+
+    set_destroy(s);
+}
+
 /* -------------------------------------------------------------
  * tests_main() — the harness entry point
  * ------------------------------------------------------------- */
@@ -241,22 +258,25 @@ static void example_set_strings(void) {
 int tests_main(void) {
 
     TEST_SECTION("Integer Tests");
-    TEST_RUN_CASE(test_ints, NULL);
+    TEST_RUN_IN_GROUP(test_ints, tests, NULL);
 
     TEST_SECTION("String Tests");
-    TEST_RUN_CASE(test_strings, NULL);
+    TEST_RUN_IN_GROUP(test_strings, tests, NULL);
 
     TEST_SECTION("Deep Struct Tests");
-    TEST_RUN_CASE(test_deep, NULL);
+    TEST_RUN_IN_GROUP(test_deep, tests, NULL);
 
     TEST_SECTION("Sorted Order Tests");
-    TEST_RUN_CASE(test_sorted, NULL);
+    TEST_RUN_IN_GROUP(test_sorted, tests, NULL);
 
     TEST_SECTION("Fuzz Tests");
-    TEST_RUN_CASE(test_fuzz, NULL);
+    TEST_RUN_IN_GROUP(test_fuzz, tests, NULL);
 
     printf(C_YELLOW "\nRunning README examples...\n" C_RESET);
-    TEST_RUN_OUTPUT_TAGS(example_set_strings, "set,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_set_strings, readme_examples,
+                                  "set,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_set_deep_strings, readme_examples,
+                                  "set,readme,output");
 
     return TESTS_EXIT_CODE();
 }

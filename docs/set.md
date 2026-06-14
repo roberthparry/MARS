@@ -124,6 +124,13 @@ int main(void) {
 }
 ```
 
+Expected output:
+
+```text
+[0] hello
+[1] world
+```
+
 ## Design Notes
 
 ### Storage Model

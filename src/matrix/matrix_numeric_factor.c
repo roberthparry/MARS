@@ -963,34 +963,34 @@ int mat_condition_number(const matrix_t *A, mat_norm_type_t type, number_t *out)
         }
 
         switch (type) {
-        case MAT_NORM_1:
-        case MAT_NORM_INF:
-        case MAT_NORM_2:
-            *out = mat_num_positive_ratio(sigma_max, sigma_min);
-            num_destroy(&sigma_max);
-            num_destroy(&sigma_min);
-            num_destroy(&sumsq);
-            num_destroy(&inv_sumsq);
-            return 0;
-        case MAT_NORM_FRO:
-        {
-            number_t root_sumsq = num_sqrt(sumsq);
-            number_t root_inv_sumsq = num_sqrt(inv_sumsq);
-            *out = num_mul(root_sumsq, root_inv_sumsq);
-            num_destroy(&root_sumsq);
-            num_destroy(&root_inv_sumsq);
-            num_destroy(&sigma_max);
-            num_destroy(&sigma_min);
-            num_destroy(&sumsq);
-            num_destroy(&inv_sumsq);
-            return 0;
-        }
-        default:
-            num_destroy(&sigma_max);
-            num_destroy(&sigma_min);
-            num_destroy(&sumsq);
-            num_destroy(&inv_sumsq);
-            break;
+            case MAT_NORM_1:
+            case MAT_NORM_INF:
+            case MAT_NORM_2:
+                *out = mat_num_positive_ratio(sigma_max, sigma_min);
+                num_destroy(&sigma_max);
+                num_destroy(&sigma_min);
+                num_destroy(&sumsq);
+                num_destroy(&inv_sumsq);
+                return 0;
+            case MAT_NORM_FRO:
+            {
+                number_t root_sumsq = num_sqrt(sumsq);
+                number_t root_inv_sumsq = num_sqrt(inv_sumsq);
+                *out = num_mul(root_sumsq, root_inv_sumsq);
+                num_destroy(&root_sumsq);
+                num_destroy(&root_inv_sumsq);
+                num_destroy(&sigma_max);
+                num_destroy(&sigma_min);
+                num_destroy(&sumsq);
+                num_destroy(&inv_sumsq);
+                return 0;
+            }
+            default:
+                num_destroy(&sigma_max);
+                num_destroy(&sigma_min);
+                num_destroy(&sumsq);
+                num_destroy(&inv_sumsq);
+                break;
         }
     }
 

@@ -103,6 +103,9 @@ In practice, the recommended pattern is:
    equality, and presentation or string rendering checks.
 6. Keep README/example/output cases on the output lane with
    `TEST_RUN_OUTPUT(...)` or `TEST_RUN_OUTPUT_TAGS(...)`.
+   When a suite has both ordinary correctness cases and README/demo cases,
+   prefer putting them beneath two explicit top-level groups:
+   `tests` and `readme_examples`.
 7. Remove old suite-local comparison engines once the harness-backed validity
    path is established. Remaining helpers should be thin wrappers for
    expected-value construction, labelling, or other domain-specific setup.
@@ -211,6 +214,28 @@ Setting `"enabled": false` on the group skips every test inside it regardless of
 
 Groups can be nested to any depth; a test is only run if every ancestor in its chain is enabled.
 
+For suites that expose both ordinary correctness cases and README/demo cases,
+the recommended top-level shape is:
+
+```json
+{
+  "tests/string/test_string.c": {
+    "tests": {
+      "enabled": true
+    },
+    "readme_examples": {
+      "enabled": true
+    }
+  }
+}
+```
+
+That gives three quick modes without recompilation:
+
+- run both: leave both groups enabled
+- run just correctness tests: set `"readme_examples": { "enabled": false }`
+- run just README examples: set `"tests": { "enabled": false }`
+
 ### Modes
 
 Test files declare one of two modes before including `test_harness.h`:
@@ -224,6 +249,6 @@ Test files declare one of two modes before including `test_harness.h`:
 For example, `tests/test_test_config/test_test_config.c` uses
 `tests/test_test_config/test_test_config.json` in local mode.
 
-Use `TEST_CONFIG_NONE` for foundational suites such as `string` and
-`dictionary`, where the test infrastructure itself depends on those modules
-being healthy.
+Use `TEST_CONFIG_NONE` only for suites that genuinely cannot participate in
+config I/O. The ordinary project suites, including `string` and `dictionary`,
+are expected to use the shared global config.

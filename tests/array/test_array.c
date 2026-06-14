@@ -669,45 +669,45 @@ void example_stack_deep(void) {
 
 int tests_main(void) {
     TEST_SECTION("Integer Array Tests");
-    TEST_RUN_CASE(test_ints, NULL);
+    TEST_RUN_IN_GROUP(test_ints, tests, NULL);
 
     TEST_SECTION("String Array Tests");
-    TEST_RUN_CASE(test_strings, NULL);
+    TEST_RUN_IN_GROUP(test_strings, tests, NULL);
 
     TEST_SECTION("Append Array Tests");
-    TEST_RUN_CASE(test_append_array, NULL);
+    TEST_RUN_IN_GROUP(test_append_array, tests, NULL);
 
     TEST_SECTION("Thread Safety Tests");
-    TEST_RUN_CASE(test_thread_safety_append, NULL);
+    TEST_RUN_IN_GROUP(test_thread_safety_append, tests, NULL);
 
     TEST_SECTION("Remove/Insert Tests");
-    TEST_RUN_CASE(test_remove_and_remove_elements, NULL);
-    TEST_RUN_CASE(test_insert_and_insert_carray, NULL);
-    TEST_RUN_CASE(test_insert_array, NULL);
+    TEST_RUN_IN_GROUP(test_remove_and_remove_elements, tests, NULL);
+    TEST_RUN_IN_GROUP(test_insert_and_insert_carray, tests, NULL);
+    TEST_RUN_IN_GROUP(test_insert_array, tests, NULL);
 
     TEST_SECTION("Swap/Rotate Tests");
-    TEST_RUN_CASE(test_swap_rotate, NULL);
+    TEST_RUN_IN_GROUP(test_swap_rotate, tests, NULL);
 
     TEST_SECTION("Slice/From Slice Tests");
-    TEST_RUN_CASE(test_slice_and_from_slice, NULL);
-    TEST_RUN_CASE(test_slice_view_ops, NULL);
+    TEST_RUN_IN_GROUP(test_slice_and_from_slice, tests, NULL);
+    TEST_RUN_IN_GROUP(test_slice_view_ops, tests, NULL);
 
     TEST_SECTION("Stack Tests");
-    TEST_RUN_CASE(test_stack_ints, NULL);
-    TEST_RUN_CASE(test_stack_strings, NULL);
+    TEST_RUN_IN_GROUP(test_stack_ints, tests, NULL);
+    TEST_RUN_IN_GROUP(test_stack_strings, tests, NULL);
 
     printf(C_YELLOW "\nRunning README examples...\n" C_RESET);
-    TEST_RUN_CASE(test_readme_examples, NULL);
-    TEST_RUN_CASE(test_readme_deep_struct, NULL);
+    TEST_RUN_IN_GROUP(test_readme_examples, readme_examples, "array,readme");
+    TEST_RUN_IN_GROUP(test_readme_deep_struct, readme_examples, "array,readme");
 
     TEST_SECTION("README Output Examples");
-    TEST_RUN_OUTPUT(example_array_primitive);
-    TEST_RUN_OUTPUT(example_array_deep_struct);
-    TEST_RUN_OUTPUT(example_slice_subrange);
-    TEST_RUN_OUTPUT(example_slice_sort);
-    TEST_RUN_OUTPUT(example_slice_materialise);
-    TEST_RUN_OUTPUT(example_stack_basic);
-    TEST_RUN_OUTPUT(example_stack_deep);
+    TEST_RUN_OUTPUT_IN_GROUP(example_array_primitive, readme_examples);
+    TEST_RUN_OUTPUT_IN_GROUP(example_array_deep_struct, readme_examples);
+    TEST_RUN_OUTPUT_IN_GROUP(example_slice_subrange, readme_examples);
+    TEST_RUN_OUTPUT_IN_GROUP(example_slice_sort, readme_examples);
+    TEST_RUN_OUTPUT_IN_GROUP(example_slice_materialise, readme_examples);
+    TEST_RUN_OUTPUT_IN_GROUP(example_stack_basic, readme_examples);
+    TEST_RUN_OUTPUT_IN_GROUP(example_stack_deep, readme_examples);
 
     return TESTS_EXIT_CODE();
 }

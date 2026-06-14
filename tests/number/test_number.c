@@ -17,43 +17,45 @@ static bool test_number_suite_setup(void)
 int tests_main(void)
 {
     TEST_SECTION("Parsing");
-    TEST_RUN_CASE(run_number_parse_tests, "number,parse");
+    TEST_RUN_IN_GROUP(run_number_parse_tests, tests, "number,parse");
 
     TEST_SECTION("Exact Backends");
-    TEST_RUN_CASE(run_number_exact_backend_tests, "number,exact");
+    TEST_RUN_IN_GROUP(run_number_exact_backend_tests, tests, "number,exact");
 
     TEST_SECTION("Fixed Precision");
-    TEST_RUN_CASE(run_number_fixed_precision_tests, "number,fixed-precision");
+    TEST_RUN_IN_GROUP(run_number_fixed_precision_tests, tests, "number,fixed-precision");
 
     TEST_SECTION("Multiprecision");
-    TEST_RUN_CASE(run_number_multiprecision_tests, "number,multiprecision");
+    TEST_RUN_IN_GROUP(run_number_multiprecision_tests, tests, "number,multiprecision");
 
     TEST_SECTION("Promotion");
-    TEST_RUN_CASE(run_number_promotion_tests, "number,promotion");
+    TEST_RUN_IN_GROUP(run_number_promotion_tests, tests, "number,promotion");
 
     TEST_SECTION("Constants");
-    TEST_RUN_CASE(run_number_constant_tests, "number,constants");
+    TEST_RUN_IN_GROUP(run_number_constant_tests, tests, "number,constants");
 
     TEST_SECTION("Formatting");
-    TEST_RUN_CASE(run_number_formatting_tests, "number,formatting");
+    TEST_RUN_IN_GROUP(run_number_formatting_tests, tests, "number,formatting");
 
     TEST_SECTION("Special Functions");
-    TEST_RUN_CASE(run_number_special_function_tests,
-                  "number,special-functions");
+    TEST_RUN_IN_GROUP(run_number_special_function_tests, tests,
+                      "number,special-functions");
 
     TEST_SECTION("Backend Parity");
-    TEST_RUN_CASE(run_number_backend_parity_tests, "number,backend-parity");
+    TEST_RUN_IN_GROUP(run_number_backend_parity_tests, tests, "number,backend-parity");
 
     TEST_SECTION("Public API");
-    TEST_RUN_CASE(run_number_public_api_tests, "number,public-api");
+    TEST_RUN_IN_GROUP(run_number_public_api_tests, tests, "number,public-api");
 
     /* README examples intentionally run last because they produce output. */
     TEST_SECTION("README Output Examples");
     printf(C_YELLOW "\nRunning number README-equivalent examples...\n" C_RESET);
-    TEST_RUN_OUTPUT_TAGS(run_number_readme_example_tests,
-                         "number,readme,output");
-    TEST_RUN_OUTPUT_TAGS(run_number_readme_mersenne_prime_search,
-                         "number,readme,mersenne,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(run_number_readme_example_tests,
+                                  readme_examples,
+                                  "number,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(run_number_readme_mersenne_prime_search,
+                                  readme_examples,
+                                  "number,readme,mersenne,output");
 
     return TEST_EXIT_CODE();
 }

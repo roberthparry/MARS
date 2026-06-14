@@ -25,16 +25,16 @@ static style_t equ_format_style(const string_format_spec_t *spec,
         return style_EXPRESSION;
 
     switch (spec->trailing_modifier) {
-    case 'u':
-    case 'U':
-        *result = STRING_FORMAT_HANDLED_WITH_TRAILING_MODIFIER;
-        return style_UNBOUND;
-    case 't':
-    case 'T':
-        *result = STRING_FORMAT_HANDLED_WITH_TRAILING_MODIFIER;
-        return style_TEX;
-    default:
-        return style_EXPRESSION;
+        case 'u':
+        case 'U':
+            *result = STRING_FORMAT_HANDLED_WITH_TRAILING_MODIFIER;
+            return style_UNBOUND;
+        case 't':
+        case 'T':
+            *result = STRING_FORMAT_HANDLED_WITH_TRAILING_MODIFIER;
+            return style_TEX;
+        default:
+            return style_EXPRESSION;
     }
 }
 

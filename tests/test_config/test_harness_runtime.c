@@ -1550,6 +1550,16 @@ void test_run_output_case(const char *file,
                           const char *name,
                           test_fn fn)
 {
+    test_run_output_in_group(file, line, name, NULL, tags, fn);
+}
+
+void test_run_output_in_group(const char *file,
+                              int line,
+                              const char *name,
+                              const char *parent,
+                              const char *tags,
+                              test_fn fn)
+{
     int failure_count_before;
     bool enabled;
     int had_config_key = 1;
@@ -1560,6 +1570,7 @@ void test_run_output_case(const char *file,
     struct timespec t1;
     string_t *file_text = NULL;
     string_t *name_text = NULL;
+    string_t *parent_text = NULL;
     string_t *tags_text = NULL;
     string_t *full_path_text = NULL;
     const string_t *print_file;
@@ -1570,20 +1581,24 @@ void test_run_output_case(const char *file,
 
     file_text = test_string_from_boundary(file);
     name_text = test_string_from_boundary(name ? name : "(unnamed-output)");
+    parent_text = parent ? test_string_from_boundary(parent) : NULL;
     tags_text = test_string_from_boundary(tags);
-    if (!file_text || !name_text || !tags_text) {
+    if (!file_text || !name_text || !tags_text || (parent && !parent_text)) {
         test_mark_failure(file, line, "out of memory while preparing output test strings");
         goto cleanup;
     }
 
-    full_path_text = string_clone(name_text);
+    if (parent_text && test_string_has_text(parent_text))
+        full_path_text = string_sprintf("%S.%S", parent_text, name_text);
+    else
+        full_path_text = string_clone(name_text);
     if (!full_path_text) {
         test_mark_failure(file, line, "out of memory while building output path");
         goto cleanup;
     }
 
-    had_config_key = test_config_has_key_for(file_text, name_text, NULL) ? 1 : 0;
-    enabled = test_config_is_enabled(file_text, name_text, NULL);
+    had_config_key = test_config_has_key_for(file_text, name_text, parent_text) ? 1 : 0;
+    enabled = test_config_is_enabled(file_text, name_text, parent_text);
     if (!had_config_key)
         test_note_missing_config_path(file_text, full_path_text);
 
@@ -1593,7 +1608,7 @@ void test_run_output_case(const char *file,
         g_test_output_skip_count++;
         string_printf(C_YELLOW "OUTPUT SKIP: %S" C_RESET, name_text);
         test_print_tags(tags_text);
-        test_record_case(file_text, line, name_text, NULL, full_path_text, tags_text,
+        test_record_case(file_text, line, name_text, parent_text, full_path_text, tags_text,
                          TEST_OUTCOME_SKIP, 0, 0, 1, 0, 0, 0, 0.0);
         string_printf("\n");
         goto cleanup;
@@ -1632,14 +1647,14 @@ void test_run_output_case(const char *file,
             string_printf(" " C_GREY "[%S]" C_RESET,
                           g_test_last_skip_detail);
         test_print_tags(tags_text);
-        test_record_case(file_text, line, name_text, NULL, full_path_text, tags_text,
+        test_record_case(file_text, line, name_text, parent_text, full_path_text, tags_text,
                          TEST_OUTCOME_SKIP, 1, 0, 1, 0, 0, 0, ms);
     } else if (g_test_failure_count == failure_count_before) {
         g_test_output_pass_count++;
         string_printf(C_BOLD C_CYAN "OUTPUT: "
                C_RESET "%S", name_text);
         test_print_tags(tags_text);
-        test_record_case(file_text, line, name_text, NULL, full_path_text, tags_text,
+        test_record_case(file_text, line, name_text, parent_text, full_path_text, tags_text,
                          TEST_OUTCOME_PASS, 1, 0, 1, 0, 0, 0, ms);
     } else {
         g_test_output_failure_count++;
@@ -1654,7 +1669,7 @@ void test_run_output_case(const char *file,
                    ? g_test_last_fail_line
                    : 0);
         test_print_tags(tags_text);
-        test_record_case(file_text, line, name_text, NULL, full_path_text, tags_text,
+        test_record_case(file_text, line, name_text, parent_text, full_path_text, tags_text,
                          TEST_OUTCOME_FAIL, 1, 0, 1, 0, 0, 0, ms);
     }
 
@@ -1663,6 +1678,7 @@ void test_run_output_case(const char *file,
 cleanup:
     string_free(full_path_text);
     string_free(tags_text);
+    string_free(parent_text);
     string_free(name_text);
     string_free(file_text);
 }

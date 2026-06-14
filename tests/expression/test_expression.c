@@ -1,7 +1,6 @@
 #include "test_expr.h"
 
 static bool test_expr_suite_setup(void);
-static void test_expr_post_summary(void);
 static int expr_number_exact_equal(const void *actual,
                                    const void *expected,
                                    void *ctx);
@@ -15,7 +14,6 @@ static number_t expr_error_magnitude(number_t got, number_t expected);
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 TEST_SUITE_SETUP(test_expr_suite_setup);
-TEST_POST_SUMMARY(test_expr_post_summary);
 
 #pragma GCC diagnostic ignored "-Wunused-function"
 
@@ -585,15 +583,9 @@ static int run_README_md_example(void)
     return 0;
 }
 
-static void test_expr_post_summary(void)
+static void example_readme_examples(void)
 {
-    printf(C_YELLOW "\nRunning README examples...\n" C_RESET);
-    if (run_README_md_example() != 0)
-        fprintf(stderr, C_BOLD C_RED
-                "README examples failed after summary output.\n"
-                C_RESET);
-    else
-        printf(C_YELLOW "\nREADME examples complete.\n" C_RESET);
+    TEST_ASSERT_TRUE(run_README_md_example() == 0, "README examples run");
 }
 
 /* ------------------------------------------------------------------------- */
@@ -604,47 +596,51 @@ int tests_main(void)
 {
     /* ---------------- Arithmetic ---------------- */
     TEST_SECTION("Arithmetic");
-    TEST_RUN_CASE(test_arithmetic, NULL);
+    TEST_RUN_IN_GROUP(test_arithmetic, tests, NULL);
 
     /* ---------------- _d variants ---------------- */
     TEST_SECTION("_d variants");
-    TEST_RUN_CASE(test_d_variants, NULL);
+    TEST_RUN_IN_GROUP(test_d_variants, tests, NULL);
 
     /* ---------------- Mathematical functions ----- */
     TEST_SECTION("Mathematical functions");
-    TEST_RUN_CASE(test_maths_functions, NULL);
+    TEST_RUN_IN_GROUP(test_maths_functions, tests, NULL);
 
     /* ---------------- First derivatives ---------- */
     TEST_SECTION("First derivatives");
-    TEST_RUN_CASE(test_first_derivatives, NULL);
+    TEST_RUN_IN_GROUP(test_first_derivatives, tests, NULL);
 
     /* ---------------- Second derivatives --------- */
     TEST_SECTION("Second derivatives");
-    TEST_RUN_CASE(test_second_derivatives, NULL);
+    TEST_RUN_IN_GROUP(test_second_derivatives, tests, NULL);
 
     TEST_SECTION("expr_t to_string Tests");
-    TEST_RUN_CASE(test_expr_t_to_string, NULL);
+    TEST_RUN_IN_GROUP(test_expr_t_to_string, tests, NULL);
 
     TEST_SECTION("expr_t from_string Tests");
-    TEST_RUN_CASE(test_expr_t_from_string, NULL);
+    TEST_RUN_IN_GROUP(test_expr_t_from_string, tests, NULL);
 
     TEST_SECTION("Goal seek");
-    TEST_RUN_CASE(test_expr_t_goal_seek, NULL);
+    TEST_RUN_IN_GROUP(test_expr_t_goal_seek, tests, NULL);
 
     TEST_SECTION("Partial derivatives");
-    TEST_RUN_CASE(test_partial_derivatives, NULL);
+    TEST_RUN_IN_GROUP(test_partial_derivatives, tests, NULL);
 
     TEST_SECTION("expr_tree_match helpers");
-    TEST_RUN_CASE(test_expr_tree_match_helpers, NULL);
+    TEST_RUN_IN_GROUP(test_expr_tree_match_helpers, tests, NULL);
 
     TEST_SECTION("Symbolic integration");
-    TEST_RUN_CASE(test_symbolic_integration, NULL);
+    TEST_RUN_IN_GROUP(test_symbolic_integration, tests, NULL);
 
     TEST_SECTION("Runtime regressions");
-    TEST_RUN_CASE(test_runtime_regressions, NULL);
+    TEST_RUN_IN_GROUP(test_runtime_regressions, tests, NULL);
 
     TEST_SECTION("Reverse mode");
-    TEST_RUN_CASE(test_reverse_mode, NULL);
+    TEST_RUN_IN_GROUP(test_reverse_mode, tests, NULL);
+
+    TEST_SECTION("README Output Examples");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_readme_examples, readme_examples,
+                                  "expression,readme,output");
 
     return TESTS_EXIT_CODE();
 }

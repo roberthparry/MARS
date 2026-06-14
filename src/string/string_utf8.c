@@ -108,9 +108,9 @@ uint32_t utf8_decode(const char *s, size_t len, size_t *adv)
 
     *adv = clen;
     switch (clen) {
-    case 2: return ((c & 0x1F) << 6)  |  (s[1] & 0x3F);
-    case 3: return ((c & 0x0F) << 12) | ((s[1] & 0x3F) << 6)  |  (s[2] & 0x3F);
-    case 4: return ((c & 0x07) << 18) | ((s[1] & 0x3F) << 12) | ((s[2] & 0x3F) << 6) | (s[3] & 0x3F);
-    default: return c;
+        case 2: return ((c & 0x1F) << 6)  |  (s[1] & 0x3F);
+        case 3: return ((c & 0x0F) << 12) | ((s[1] & 0x3F) << 6)  |  (s[2] & 0x3F);
+        case 4: return ((c & 0x07) << 18) | ((s[1] & 0x3F) << 12) | ((s[2] & 0x3F) << 6) | (s[3] & 0x3F);
+        default: return c;
     }
 }

@@ -395,41 +395,41 @@ void example_bitset_ops(void) {
 
 int tests_main(void) {
     TEST_SECTION("Lifecycle Tests");
-    TEST_RUN_CASE(test_create_and_destroy, NULL);
+    TEST_RUN_IN_GROUP(test_create_and_destroy, tests, NULL);
 
     TEST_SECTION("Single-Bit Tests");
-    TEST_RUN_CASE(test_set_and_test, NULL);
-    TEST_RUN_CASE(test_unset, NULL);
-    TEST_RUN_CASE(test_toggle, NULL);
-    TEST_RUN_CASE(test_clear, NULL);
+    TEST_RUN_IN_GROUP(test_set_and_test, tests, NULL);
+    TEST_RUN_IN_GROUP(test_unset, tests, NULL);
+    TEST_RUN_IN_GROUP(test_toggle, tests, NULL);
+    TEST_RUN_IN_GROUP(test_clear, tests, NULL);
 
     TEST_SECTION("Range Tests");
-    TEST_RUN_CASE(test_set_range, NULL);
-    TEST_RUN_CASE(test_unset_range, NULL);
+    TEST_RUN_IN_GROUP(test_set_range, tests, NULL);
+    TEST_RUN_IN_GROUP(test_unset_range, tests, NULL);
 
     TEST_SECTION("Query Tests");
-    TEST_RUN_CASE(test_popcount, NULL);
-    TEST_RUN_CASE(test_any_none, NULL);
-    TEST_RUN_CASE(test_next_set, NULL);
+    TEST_RUN_IN_GROUP(test_popcount, tests, NULL);
+    TEST_RUN_IN_GROUP(test_any_none, tests, NULL);
+    TEST_RUN_IN_GROUP(test_next_set, tests, NULL);
 
     TEST_SECTION("Clone Test");
-    TEST_RUN_CASE(test_clone, NULL);
+    TEST_RUN_IN_GROUP(test_clone, tests, NULL);
 
     TEST_SECTION("Bitwise Operation Tests");
-    TEST_RUN_CASE(test_bitwise_and, NULL);
-    TEST_RUN_CASE(test_bitwise_or, NULL);
-    TEST_RUN_CASE(test_bitwise_xor, NULL);
-    TEST_RUN_CASE(test_bitwise_not, NULL);
+    TEST_RUN_IN_GROUP(test_bitwise_and, tests, NULL);
+    TEST_RUN_IN_GROUP(test_bitwise_or, tests, NULL);
+    TEST_RUN_IN_GROUP(test_bitwise_xor, tests, NULL);
+    TEST_RUN_IN_GROUP(test_bitwise_not, tests, NULL);
 
     TEST_SECTION("Growth Test");
-    TEST_RUN_CASE(test_growth, NULL);
+    TEST_RUN_IN_GROUP(test_growth, tests, NULL);
 
     TEST_SECTION("Thread Safety Test");
-    TEST_RUN_CASE(test_thread_safety, NULL);
+    TEST_RUN_IN_GROUP(test_thread_safety, tests, NULL);
 
     TEST_SECTION("README Output Examples");
-    TEST_RUN_OUTPUT(example_bitset_basic);
-    TEST_RUN_OUTPUT(example_bitset_ops);
+    TEST_RUN_OUTPUT_IN_GROUP(example_bitset_basic, readme_examples);
+    TEST_RUN_OUTPUT_IN_GROUP(example_bitset_ops, readme_examples);
 
     return TESTS_EXIT_CODE();
 }

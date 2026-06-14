@@ -1033,34 +1033,6 @@ static bool number_text_has_ascii_ci(const string_t *text, char needle)
     return false;
 }
 
-static bool number_rune_is_fraction_marker(rune_t rune)
-{
-    switch (rune_value(rune)) {
-        case 0x00BCu: /* ¼ */
-        case 0x00BDu: /* ½ */
-        case 0x00BEu: /* ¾ */
-        case 0x2044u: /* ⁄ */
-        case 0x2150u: /* ⅐ */
-        case 0x2151u: /* ⅑ */
-        case 0x2152u: /* ⅒ */
-        case 0x2153u: /* ⅓ */
-        case 0x2154u: /* ⅔ */
-        case 0x2155u: /* ⅕ */
-        case 0x2156u: /* ⅖ */
-        case 0x2157u: /* ⅗ */
-        case 0x2158u: /* ⅘ */
-        case 0x2159u: /* ⅙ */
-        case 0x215Au: /* ⅚ */
-        case 0x215Bu: /* ⅛ */
-        case 0x215Cu: /* ⅜ */
-        case 0x215Du: /* ⅝ */
-        case 0x215Eu: /* ⅞ */
-            return true;
-        default:
-            return false;
-    }
-}
-
 static bool number_text_has_unicode_fraction(const string_t *text)
 {
     string_cursor_t *cursor;
@@ -1073,7 +1045,7 @@ static bool number_text_has_unicode_fraction(const string_t *text)
         return false;
 
     while (!string_cursor_done(cursor)) {
-        if (number_rune_is_fraction_marker(string_cursor_peek(cursor))) {
+        if (rune_is_fraction(string_cursor_peek(cursor))) {
             string_cursor_free(cursor);
             return true;
         }
@@ -1164,23 +1136,39 @@ static void number_complex_refresh_mpc_cache(complex_t *value)
 number_t number_complex_component_from_number(const number_t *value,
                                               size_t precision_bits)
 {
+    typedef enum {
+        NUMBER_COMPONENT_REJECT = 0,
+        NUMBER_COMPONENT_CLONE,
+        NUMBER_COMPONENT_INEXACT_REAL
+    } number_component_action_t;
+    static const unsigned char action_table[] = {
+        [NUMBER_INVALID] = NUMBER_COMPONENT_REJECT,
+        [NUMBER_DOUBLE] = NUMBER_COMPONENT_INEXACT_REAL,
+        [NUMBER_QFLOAT] = NUMBER_COMPONENT_INEXACT_REAL,
+        [NUMBER_QCOMPLEX] = NUMBER_COMPONENT_REJECT,
+        [NUMBER_MPZ] = NUMBER_COMPONENT_CLONE,
+        [NUMBER_MPQ] = NUMBER_COMPONENT_CLONE,
+        [NUMBER_MPFR] = NUMBER_COMPONENT_CLONE,
+        [NUMBER_CDOUBLE] = NUMBER_COMPONENT_REJECT,
+        [NUMBER_COMPLEX] = NUMBER_COMPONENT_REJECT
+    };
     number_t out = number_invalid();
+    number_kind_t kind;
+    number_component_action_t action;
 
     if (!value || !number_is_valid_value(value))
         return out;
-    switch (number_kind_value(value)) {
-    case NUMBER_MPZ:
-    case NUMBER_MPQ:
-    case NUMBER_MPFR:
+    kind = number_kind_value(value);
+    action = (kind >= 0 && (size_t)kind < sizeof(action_table))
+        ? (number_component_action_t)action_table[kind]
+        : NUMBER_COMPONENT_REJECT;
+    if (action == NUMBER_COMPONENT_CLONE)
         return num_clone(*value);
-    case NUMBER_DOUBLE:
-    case NUMBER_QFLOAT:
+    if (action == NUMBER_COMPONENT_INEXACT_REAL)
         return num_as_inexact_real_prec(
             *value,
             precision_bits ? precision_bits : number_default_precision_bits);
-    default:
-        return out;
-    }
+    return out;
 }
 
 static number_t number_complex_component_from_qfloat(qfloat_t value,

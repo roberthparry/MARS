@@ -2319,7 +2319,7 @@ __THEME_OVERRIDES__
       } else if (equationMode) {
         leftPaneTitle.textContent = 'Equation';
         subtitle.textContent = 'Enter an equation on the left. The lab tries symbolic isolation first, then numeric solving for all variable bindings.';
-        setResultTitles('Rendered TeX', 'Equation', 'Solutions', 'Error');
+        setResultTitles('Rendered TeX', 'Equation', 'Solutions', 'Details');
         setValueCardVisible(true);
       } else if (matrixMode) {
         leftPaneTitle.textContent = 'Matrix';
@@ -4194,9 +4194,11 @@ __THEME_OVERRIDES__
     }
 
     async function evaluateExpression(options = {}) {
+      const editorText = currentExpressionText();
+      const editorBodyText = String(expr.value || '').trim();
       const text = options.reuseLastInput && lastEvaluationInputText
         ? lastEvaluationInputText
-        : currentExpressionText();
+        : editorText;
       if (!text) return;
       showResults();
       setBusy(true);
@@ -4220,9 +4222,9 @@ __THEME_OVERRIDES__
         }
         if (data.expression && !data.partial_error)
           setExpressionEditor(
-            data.expression,
+            editorText || text,
             data.binding_values || null,
-            data.editor_expression || null
+            editorBodyText || null
           );
         else if (data.binding_values)
           renderVariableValues(data.binding_values || []);
@@ -4241,7 +4243,7 @@ __THEME_OVERRIDES__
         value.textContent = data.value || '';
         lastEvaluationInputText = data.partial_error ? text : (data.expression || text);
         if (!data.partial_error)
-          saveLastExpression(lastEvaluationInputText || fullExpressionText || expr.value.trim());
+          saveLastExpression(editorText || fullExpressionText || expr.value.trim());
         lastDerivativeExpression = derivativeExpressionFromLine(data.derivative);
         {
           const variableBindings = variableNamesFromBindings(data.binding_values || []);
@@ -4359,12 +4361,15 @@ __THEME_OVERRIDES__
         );
         {
           const valueLines = [];
-          if (data.residual)
-            valueLines.push(`residual: ${data.residual}`);
-          if (data.error)
-            valueLines.push(`error: ${displayEquationValue(data.error)}`);
+          const residualValue = displayEquationValue(data.error);
           if (data.status)
-            valueLines.push(`status: ${data.status}`);
+            valueLines.push(`solve status: ${data.status}`);
+          if (Number.isFinite(Number(data.solution_count)) && Number(data.solution_count) > 0)
+            valueLines.push(`solutions found: ${data.solution_count}`);
+          if (data.residual)
+            valueLines.push(`residual expression: ${data.residual}`);
+          if (data.error && residualValue !== 'unresolved')
+            valueLines.push(`residual value: ${residualValue}`);
           value.textContent = valueLines.join('\n');
         }
         if (Array.isArray(data.binding_values))
@@ -4823,8 +4828,18 @@ __THEME_OVERRIDES__
       savePrecisionState();
       setStatus('Precision changed');
       try {
-        if (currentMode() === 'expression')
-          await evaluateExpression({skipHistoryUpdate: true, reuseLastInput: true});
+        if (currentMode() === 'expression') {
+          const goalSeekSource = currentGoalSeekSource();
+          const goalSeekTarget = expr.dataset.goalSeekTarget || '';
+
+          if (goalSeekSource && goalSeekTarget) {
+            const solvedExpression = fullExpressionText || currentExpressionText();
+            const start = solvedStartValuesForGoalSeek(goalSeekSource, solvedExpression);
+            await runGoalSeek(goalSeekSource, goalSeekTarget, start, {skipHistoryUpdate: true});
+          } else {
+            await evaluateExpression({skipHistoryUpdate: true, reuseLastInput: true});
+          }
+        }
         else if (currentMode() === 'equation')
           await evaluateEquation();
         else if (currentMode() === 'matrix')
@@ -4841,8 +4856,18 @@ __THEME_OVERRIDES__
       savePrecisionState();
       setStatus('Precision changed');
       try {
-        if (currentMode() === 'expression')
-          await evaluateExpression({skipHistoryUpdate: true, reuseLastInput: true});
+        if (currentMode() === 'expression') {
+          const goalSeekSource = currentGoalSeekSource();
+          const goalSeekTarget = expr.dataset.goalSeekTarget || '';
+
+          if (goalSeekSource && goalSeekTarget) {
+            const solvedExpression = fullExpressionText || currentExpressionText();
+            const start = solvedStartValuesForGoalSeek(goalSeekSource, solvedExpression);
+            await runGoalSeek(goalSeekSource, goalSeekTarget, start, {skipHistoryUpdate: true});
+          } else {
+            await evaluateExpression({skipHistoryUpdate: true, reuseLastInput: true});
+          }
+        }
         else if (currentMode() === 'equation')
           await evaluateEquation();
         else if (currentMode() === 'matrix')
@@ -5833,6 +5858,16 @@ def compact_long_numeric_tokens(text: str) -> str:
         number_text = match.group(2)
         if len(number_text) <= COMPACT_BINDING_VALUE_LIMIT or "..." in number_text:
             return match.group(0)
+        scientific = re.match(r"^(.*?)([Ee][+-]?\d+)$", number_text)
+        if scientific:
+            mantissa = scientific.group(1)
+            exponent = scientific.group(2)
+            return (
+                match.group(1)
+                + mantissa[:COMPACT_BINDING_VALUE_KEEP]
+                + "..."
+                + exponent
+            )
         return match.group(1) + number_text[:COMPACT_BINDING_VALUE_KEEP] + "..."
 
     return re.sub(
@@ -5846,12 +5881,85 @@ def precision_numeric_tokens(text: str, precision: int) -> str:
     if not text:
         return text
 
+    text = decimalize_long_terminating_rational_tokens(text)
+
     def precision_match(match: re.Match[str]) -> str:
         return match.group(1) + format_number_text_for_precision(match.group(2), precision)
 
     return re.sub(
         r"(^|[^A-Za-z0-9_.])([+-]?(?:\d+\.\d+|\d{21,})(?:[Ee][+-]?\d+)?)",
         precision_match,
+        text,
+    )
+
+
+def _decimalize_long_terminating_rational_token(token: str) -> str:
+    token = str(token or "").strip()
+    if "/" not in token:
+        return token
+
+    sign = ""
+    if token.startswith(("+", "-")):
+        sign = token[0]
+        token = token[1:]
+
+    try:
+        numer_text, denom_text = token.split("/", 1)
+        numer = int(numer_text, 10)
+        denom = int(denom_text, 10)
+    except (TypeError, ValueError):
+        return (sign + token) if sign else token
+
+    if denom == 0:
+        return (sign + token) if sign else token
+
+    if denom < 0:
+        numer = -numer
+        denom = -denom
+
+    twos = 0
+    fives = 0
+    den_work = denom
+    while den_work % 2 == 0:
+        den_work //= 2
+        twos += 1
+    while den_work % 5 == 0:
+        den_work //= 5
+        fives += 1
+
+    scale = max(twos, fives)
+    if den_work != 1 or scale < 12:
+        return (sign + token) if sign else token
+
+    if twos < scale:
+        numer *= 5 ** (scale - twos)
+    if fives < scale:
+        numer *= 2 ** (scale - fives)
+
+    neg = numer < 0
+    digits = str(abs(numer))
+    if scale >= len(digits):
+        digits = "0" * (scale - len(digits) + 1) + digits
+
+    point = len(digits) - scale
+    decimal_text = digits[:point] + "." + digits[point:]
+    decimal_text = decimal_text.rstrip("0").rstrip(".")
+    if not decimal_text:
+        decimal_text = "0"
+    if neg:
+        decimal_text = "-" + decimal_text
+    if sign == "+" and not decimal_text.startswith(("+", "-")):
+        decimal_text = "+" + decimal_text
+    return decimal_text
+
+
+def decimalize_long_terminating_rational_tokens(text: str) -> str:
+    if not text:
+        return text
+
+    return re.sub(
+        r"(?<![A-Za-z0-9_.])([+-]?\d+/\d+)(?![A-Za-z0-9_.])",
+        lambda match: _decimalize_long_terminating_rational_token(match.group(1)),
         text,
     )
 
@@ -6704,7 +6812,7 @@ def prepare_evaluation_fields(
     precision_limit_result_fields(fields, precision)
     fields["editor_expression"] = editor_expression_from_fields(fields)
     if save_expression and fields.get("expression"):
-        save_state_expression(str(fields["editor_expression"]))
+        save_state_expression(expression_for_editor(expression))
 
     fields["full_display_expression"] = expression_for_display(fields.get("expression", ""))
     fields["full_display_tex"] = tex_for_display(fields.get("tex", ""))
@@ -6846,6 +6954,7 @@ def prepare_equation_fields(fields: dict[str, str], precision: int) -> dict[str,
     solutions_tex = str(fields.get("solutions_tex") or "").strip()
     render_tex = solutions_tex or equation_tex
     display_tex = compact_display_text(render_tex)
+    solution_lines = [line.strip() for line in solutions_text.splitlines() if line.strip()]
 
     svg = None
     render_error = None
@@ -6864,6 +6973,7 @@ def prepare_equation_fields(fields: dict[str, str], precision: int) -> dict[str,
         "value": str(fields.get("value") or "").strip(),
         "status": str(fields.get("status") or "").strip(),
         "solutions": solutions_text,
+        "solution_count": len(solution_lines),
         "full_display_equation": expression_for_display(unbound_text or equation_text),
         "display_equation": compact_display_text(expression_for_display(unbound_text or equation_text)),
         "full_display_tex": render_tex,

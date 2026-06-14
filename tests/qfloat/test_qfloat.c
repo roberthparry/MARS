@@ -180,25 +180,26 @@ int tests_main() {
 
     TEST_SECTION("Core and Elementary");
 
-    TEST_RUN_CASE(test_arithmetic, NULL);
-    TEST_RUN_CASE(test_arithmetic_extensions, NULL);
-    TEST_RUN_CASE(test_strings, NULL);
-    TEST_RUN_CASE(test_printf, NULL);
-    TEST_RUN_CASE(test_vsprintf, NULL);
-    TEST_RUN_CASE(test_power, NULL);
-    TEST_RUN_CASE(test_trigonometric, NULL);
-    TEST_RUN_CASE(test_hyperbolic, NULL);
-    TEST_RUN_CASE(test_hypotenus, NULL);
+    TEST_RUN_IN_GROUP(test_arithmetic, tests, NULL);
+    TEST_RUN_IN_GROUP(test_arithmetic_extensions, tests, NULL);
+    TEST_RUN_IN_GROUP(test_strings, tests, NULL);
+    TEST_RUN_IN_GROUP(test_printf, tests, NULL);
+    TEST_RUN_IN_GROUP(test_vsprintf, tests, NULL);
+    TEST_RUN_IN_GROUP(test_power, tests, NULL);
+    TEST_RUN_IN_GROUP(test_trigonometric, tests, NULL);
+    TEST_RUN_IN_GROUP(test_hyperbolic, tests, NULL);
+    TEST_RUN_IN_GROUP(test_hypotenus, tests, NULL);
 
     TEST_SECTION("Special Functions");
-    TEST_RUN_CASE(test_gamma_erf_erfc_erfinv_erfcinv_digamma, NULL);
-    TEST_RUN_CASE(test_lambert_w, NULL);
-    TEST_RUN_CASE(test_beta_logbeta_binomial_beta_pdf_logbeta_pdf_normal_pdf_cdf_logpdf, NULL);
-    TEST_RUN_CASE(test_gammainc_ei_e1, NULL);
-    TEST_RUN_CASE(test_difficult_qfloat_cases, NULL);
+    TEST_RUN_IN_GROUP(test_gamma_erf_erfc_erfinv_erfcinv_digamma, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lambert_w, tests, NULL);
+    TEST_RUN_IN_GROUP(test_beta_logbeta_binomial_beta_pdf_logbeta_pdf_normal_pdf_cdf_logpdf, tests, NULL);
+    TEST_RUN_IN_GROUP(test_gammainc_ei_e1, tests, NULL);
+    TEST_RUN_IN_GROUP(test_difficult_qfloat_cases, tests, NULL);
 
     printf(C_YELLOW "\nRunning README examples...\n" C_RESET);
-    TEST_RUN_OUTPUT_TAGS(test_readme_examples, "qfloat,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(test_readme_examples, readme_examples,
+                                  "qfloat,readme,output");
 
     printf("\n" C_YELLOW "Done.\n" C_RESET);
 
