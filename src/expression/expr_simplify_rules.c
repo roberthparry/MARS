@@ -103,6 +103,110 @@ expr_t *expr_simplify_try_floor_ceil_const(const expr_t *op, expr_t *arg)
     return out;
 }
 
+static expr_t *expr_new_pi_ratio_long(long numer, unsigned long denom)
+{
+    expr_t *base = NULL;
+    expr_t *coeff = NULL;
+    expr_t *scaled = NULL;
+    expr_t *divisor = NULL;
+    expr_t *quotient = NULL;
+    expr_t *negative = NULL;
+    expr_t *out = NULL;
+    bool is_negative = false;
+
+    if (denom == 0u)
+        return NULL;
+    if (numer == 0L)
+        return expr_new_const(NUM_ZERO);
+    if (numer < 0L) {
+        is_negative = true;
+        numer = -numer;
+    }
+
+    base = expr_new_named_const(NUM_PI, "@pi");
+    if (!base)
+        goto cleanup;
+
+    if (numer != 1L) {
+        number_t coeff_value = num_create_from_long(numer);
+
+        coeff = expr_new_const(coeff_value);
+        num_destroy(&coeff_value);
+        if (!coeff)
+            goto cleanup;
+        scaled = expr_mul(base, coeff);
+        if (!scaled)
+            goto cleanup;
+        expr_free(base);
+        expr_free(coeff);
+        base = expr_simplify(scaled);
+        scaled = NULL;
+        coeff = NULL;
+        if (!base)
+            goto cleanup;
+    }
+
+    if (denom != 1u) {
+        number_t denom_value = num_create_from_long((long)denom);
+
+        divisor = expr_new_const(denom_value);
+        num_destroy(&denom_value);
+        if (!divisor)
+            goto cleanup;
+        quotient = expr_div(base, divisor);
+        if (!quotient)
+            goto cleanup;
+        expr_free(base);
+        expr_free(divisor);
+        base = expr_simplify(quotient);
+        quotient = NULL;
+        divisor = NULL;
+        if (!base)
+            goto cleanup;
+    }
+
+    if (!is_negative) {
+        out = base;
+        base = NULL;
+        goto cleanup;
+    }
+
+    negative = expr_neg(base);
+    if (!negative)
+        goto cleanup;
+    out = expr_simplify(negative);
+    negative = NULL;
+
+cleanup:
+    expr_free(negative);
+    expr_free(quotient);
+    expr_free(divisor);
+    expr_free(scaled);
+    expr_free(coeff);
+    expr_free(base);
+    return out;
+}
+
+static expr_t *expr_simplify_try_unary_symbolic_inverse_fold(const expr_t *op,
+                                                             const number_t *value,
+                                                             expr_t *arg)
+{
+    long numer;
+    unsigned long denom;
+    expr_t *out;
+
+    if (!op || !value || !arg)
+        return NULL;
+    if (!expr_inverse_trig_exact_pi_ratio(op->ops, value, &numer, &denom))
+        return NULL;
+
+    out = expr_new_pi_ratio_long(numer, denom);
+    if (!out)
+        return NULL;
+    expr_free(arg);
+    return out;
+}
+
 expr_t *expr_simplify_try_unary_const_fold(const expr_t *op, expr_t *arg)
 {
     number_t folded;
@@ -117,6 +221,12 @@ expr_t *expr_simplify_try_unary_const_fold(const expr_t *op, expr_t *arg)
         !num_is_finite(folded)) {
         num_destroy(&folded);
         return NULL;
+    }
+
+    out = expr_simplify_try_unary_symbolic_inverse_fold(op, &arg->c, arg);
+    if (out) {
+        num_destroy(&folded);
+        return out;
     }
 
     out = expr_new_const(folded);
@@ -147,11 +257,14 @@ expr_t *expr_simplify_try_unary_const_value_fold(const expr_t *op, expr_t *arg)
 
     value = expr_eval(arg);
     folded = num_new();
-    if (!num_is_finite(value) &&
+    if (num_is_finite(value) &&
         op->ops->fold_const_unary(&value, &folded) &&
         num_is_finite(folded)) {
-        out = expr_new_const(folded);
-        expr_free(arg);
+        out = expr_simplify_try_unary_symbolic_inverse_fold(op, &value, arg);
+        if (!out) {
+            out = expr_new_const(folded);
+            expr_free(arg);
+        }
     }
 
     num_destroy(&folded);

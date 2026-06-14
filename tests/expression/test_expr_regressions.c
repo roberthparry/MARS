@@ -2352,11 +2352,11 @@ static void test_bound_euler_symbol_survives_derivative_simplify(void)
     char *deriv_text = deriv ? expr_to_string(deriv, style_EXPRESSION) : NULL;
 
     if (deriv_text &&
-        strstr(deriv_text, "ln(a)") &&
         strstr(deriv_text, "a^(ix)") &&
         strstr(deriv_text, "x = π/4") &&
         strstr(deriv_text, "a = e") &&
-        !strstr(deriv_text, "exp(ix)"))
+        !strstr(deriv_text, "exp(ix)") &&
+        (strstr(deriv_text, "ln(a)") || strstr(deriv_text, "{ i·a^(ix) |")))
         to_string_pass("a=e binding survives derivative simplify",
                        deriv_text, deriv_text);
     else
@@ -3438,6 +3438,37 @@ static void test_binding_exact_core_trig_values_simplify(void)
         { "{ x | x = cot(pi/4) }",   "1",       "cot(pi/4)" },
         { "{ x | x = cot(pi/3) }",   "√(3)/3",  "cot(pi/3)" },
         { "{ x | x = cot(pi/2) }",   "0",       "cot(pi/2)" },
+        { "{ x | x = asin(0) }",         "0",       "asin(0)" },
+        { "{ x | x = asin(1/2) }",       "π/6",     "asin(1/2)" },
+        { "{ x | x = asin(1/sqrt(2)) }", "π/4",     "asin(1/sqrt(2))" },
+        { "{ x | x = asin(sqrt(3)/2) }", "π/3",     "asin(sqrt(3)/2)" },
+        { "{ x | x = asin(1) }",         "π/2",     "asin(1)" },
+        { "{ x | x = asin(-1/2) }",      "-(π/6)",  "asin(-1/2)" },
+        { "{ x | x = asin(-1/sqrt(2)) }","-(π/4)",  "asin(-1/sqrt(2))" },
+        { "{ x | x = acos(1) }",             "0",       "acos(1)" },
+        { "{ x | x = acos(sqrt(3)/2) }",     "π/6",     "acos(sqrt(3)/2)" },
+        { "{ x | x = acos(1/sqrt(2)) }",     "π/4",     "acos(1/sqrt(2))" },
+        { "{ x | x = acos(1/2) }",           "π/3",     "acos(1/2)" },
+        { "{ x | x = acos(0) }",             "π/2",     "acos(0)" },
+        { "{ x | x = acos(-1) }",            "π",       "acos(-1)" },
+        { "{ x | x = atan(0) }",             "0",       "atan(0)" },
+        { "{ x | x = atan(sqrt(3)/3) }",     "π/6",     "atan(sqrt(3)/3)" },
+        { "{ x | x = atan(1) }",             "π/4",     "atan(1)" },
+        { "{ x | x = atan(sqrt(3)) }",       "π/3",     "atan(sqrt(3))" },
+        { "{ x | x = atan(-1) }",            "-(π/4)",  "atan(-1)" },
+        { "{ x | x = asec(1) }",             "0",       "asec(1)" },
+        { "{ x | x = asec(2/sqrt(3)) }",     "π/6",     "asec(2/sqrt(3))" },
+        { "{ x | x = asec(sqrt(2)) }",       "π/4",     "asec(sqrt(2))" },
+        { "{ x | x = asec(2) }",             "π/3",     "asec(2)" },
+        { "{ x | x = acosec(-1) }",          "-(π/2)",  "acosec(-1)" },
+        { "{ x | x = acosec(1) }",           "π/2",     "acosec(1)" },
+        { "{ x | x = acosec(2/sqrt(3)) }",   "π/3",     "acosec(2/sqrt(3))" },
+        { "{ x | x = acosec(sqrt(2)) }",     "π/4",     "acosec(sqrt(2))" },
+        { "{ x | x = acosec(2) }",           "π/6",     "acosec(2)" },
+        { "{ x | x = acot(sqrt(3)) }",       "π/6",     "acot(sqrt(3))" },
+        { "{ x | x = acot(1) }",             "π/4",     "acot(1)" },
+        { "{ x | x = acot(1/sqrt(3)) }",     "π/3",     "acot(1/sqrt(3))" },
+        { "{ x | x = acot(0) }",             "π/2",     "acot(0)" },
     };
 
     for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {

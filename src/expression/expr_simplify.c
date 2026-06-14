@@ -1145,6 +1145,313 @@ int expr_fold_cos_const(const number_t *in, number_t *out)
     return 1;
 }
 
+int expr_fold_asin_const(const number_t *in, number_t *out)
+{
+    number_t neg_half;
+    number_t neg_sqrt2_over_two;
+    number_t neg_sqrt3_over_two;
+
+    if (!in || !out)
+        return 0;
+    neg_half = num_neg(NUM_HALF);
+    neg_sqrt2_over_two = num_neg(NUM_SQRT2_OVER_TWO);
+    neg_sqrt3_over_two = num_neg(NUM_SQRT3_OVER_TWO);
+    if (num_eq(*in, NUM_NEG_ONE)) {
+        *out = NUM_NEG_PI_2;
+        goto matched;
+    }
+    if (num_eq(*in, neg_half)) {
+        *out = num_neg(NUM_PI_6);
+        goto matched;
+    }
+    if (num_eq(*in, neg_sqrt2_over_two)) {
+        *out = num_neg(NUM_PI_4);
+        goto matched;
+    }
+    if (num_eq(*in, neg_sqrt3_over_two)) {
+        *out = num_neg(NUM_PI_3);
+        goto matched;
+    }
+    if (num_eq(*in, NUM_ZERO)) {
+        *out = NUM_ZERO;
+        goto matched;
+    }
+    if (num_eq(*in, NUM_HALF)) {
+        *out = NUM_PI_6;
+        goto matched;
+    }
+    if (num_eq(*in, NUM_SQRT2_OVER_TWO)) {
+        *out = NUM_PI_4;
+        goto matched;
+    }
+    if (num_eq(*in, NUM_SQRT3_OVER_TWO)) {
+        *out = NUM_PI_3;
+        goto matched;
+    }
+    if (num_eq(*in, NUM_ONE)) {
+        *out = NUM_PI_2;
+        goto matched;
+    }
+    num_destroy(&neg_sqrt3_over_two);
+    num_destroy(&neg_sqrt2_over_two);
+    num_destroy(&neg_half);
+    return 0;
+
+matched:
+    num_destroy(&neg_sqrt3_over_two);
+    num_destroy(&neg_sqrt2_over_two);
+    num_destroy(&neg_half);
+    return 1;
+}
+
+int expr_inverse_trig_exact_pi_ratio(const expr_ops_t *ops,
+                                     const number_t *in,
+                                     long *numer_out,
+                                     unsigned long *denom_out)
+{
+    number_t three;
+    number_t neg_half;
+    number_t neg_sqrt2_over_two;
+    number_t neg_sqrt3_over_two;
+    number_t sqrt3_over_three;
+    number_t neg_sqrt3_over_three;
+    number_t two_sqrt3;
+    number_t two_sqrt3_over_three;
+    number_t neg_two_sqrt3_over_three;
+    number_t neg_sqrt3;
+    number_t neg_sqrt2;
+    number_t neg_two;
+    int matched = 0;
+    long numer = 0L;
+    unsigned long denom = 1u;
+
+    if (!in || !ops || !numer_out || !denom_out)
+        return 0;
+
+    three = num_create_from_long(3L);
+    neg_half = num_neg(NUM_HALF);
+    neg_sqrt2_over_two = num_neg(NUM_SQRT2_OVER_TWO);
+    neg_sqrt3_over_two = num_neg(NUM_SQRT3_OVER_TWO);
+    sqrt3_over_three = num_div(NUM_SQRT3, three);
+    neg_sqrt3_over_three = num_neg(sqrt3_over_three);
+    two_sqrt3 = num_mul(NUM_TWO, NUM_SQRT3);
+    two_sqrt3_over_three = num_div(two_sqrt3, three);
+    neg_two_sqrt3_over_three = num_neg(two_sqrt3_over_three);
+    neg_sqrt3 = num_neg(NUM_SQRT3);
+    neg_sqrt2 = num_neg(NUM_SQRT2);
+    neg_two = num_neg(NUM_TWO);
+
+    if (ops == &ops_asin) {
+        if (num_eq(*in, NUM_NEG_ONE)) {
+            numer = -1L; denom = 2u; matched = 1;
+        } else if (num_eq(*in, neg_half)) {
+            numer = -1L; denom = 6u; matched = 1;
+        } else if (num_eq(*in, neg_sqrt2_over_two)) {
+            numer = -1L; denom = 4u; matched = 1;
+        } else if (num_eq(*in, neg_sqrt3_over_two)) {
+            numer = -1L; denom = 3u; matched = 1;
+        } else if (num_eq(*in, NUM_ZERO)) {
+            numer = 0L; denom = 1u; matched = 1;
+        } else if (num_eq(*in, NUM_HALF)) {
+            numer = 1L; denom = 6u; matched = 1;
+        } else if (num_eq(*in, NUM_SQRT2_OVER_TWO)) {
+            numer = 1L; denom = 4u; matched = 1;
+        } else if (num_eq(*in, NUM_SQRT3_OVER_TWO)) {
+            numer = 1L; denom = 3u; matched = 1;
+        } else if (num_eq(*in, NUM_ONE)) {
+            numer = 1L; denom = 2u; matched = 1;
+        }
+    } else if (ops == &ops_acos) {
+        if (num_eq(*in, NUM_ONE)) {
+            numer = 0L; denom = 1u; matched = 1;
+        } else if (num_eq(*in, NUM_SQRT3_OVER_TWO)) {
+            numer = 1L; denom = 6u; matched = 1;
+        } else if (num_eq(*in, NUM_SQRT2_OVER_TWO)) {
+            numer = 1L; denom = 4u; matched = 1;
+        } else if (num_eq(*in, NUM_HALF)) {
+            numer = 1L; denom = 3u; matched = 1;
+        } else if (num_eq(*in, NUM_ZERO)) {
+            numer = 1L; denom = 2u; matched = 1;
+        } else if (num_eq(*in, neg_half)) {
+            numer = 2L; denom = 3u; matched = 1;
+        } else if (num_eq(*in, neg_sqrt2_over_two)) {
+            numer = 3L; denom = 4u; matched = 1;
+        } else if (num_eq(*in, neg_sqrt3_over_two)) {
+            numer = 5L; denom = 6u; matched = 1;
+        } else if (num_eq(*in, NUM_NEG_ONE)) {
+            numer = 1L; denom = 1u; matched = 1;
+        }
+    } else if (ops == &ops_atan) {
+        if (num_eq(*in, neg_sqrt3)) {
+            numer = -1L; denom = 3u; matched = 1;
+        } else if (num_eq(*in, NUM_NEG_ONE)) {
+            numer = -1L; denom = 4u; matched = 1;
+        } else if (num_eq(*in, neg_sqrt3_over_three)) {
+            numer = -1L; denom = 6u; matched = 1;
+        } else if (num_eq(*in, NUM_ZERO)) {
+            numer = 0L; denom = 1u; matched = 1;
+        } else if (num_eq(*in, sqrt3_over_three)) {
+            numer = 1L; denom = 6u; matched = 1;
+        } else if (num_eq(*in, NUM_ONE)) {
+            numer = 1L; denom = 4u; matched = 1;
+        } else if (num_eq(*in, NUM_SQRT3)) {
+            numer = 1L; denom = 3u; matched = 1;
+        }
+    } else if (ops == &ops_asec) {
+        if (num_eq(*in, NUM_ONE)) {
+            numer = 0L; denom = 1u; matched = 1;
+        } else if (num_eq(*in, two_sqrt3_over_three)) {
+            numer = 1L; denom = 6u; matched = 1;
+        } else if (num_eq(*in, NUM_SQRT2)) {
+            numer = 1L; denom = 4u; matched = 1;
+        } else if (num_eq(*in, NUM_TWO)) {
+            numer = 1L; denom = 3u; matched = 1;
+        } else if (num_is_inf(*in) && num_get_sign(*in) > 0) {
+            numer = 1L; denom = 2u; matched = 1;
+        } else if (num_eq(*in, NUM_NEG_ONE)) {
+            numer = 1L; denom = 1u; matched = 1;
+        } else if (num_eq(*in, neg_two_sqrt3_over_three)) {
+            numer = 5L; denom = 6u; matched = 1;
+        } else if (num_eq(*in, neg_sqrt2)) {
+            numer = 3L; denom = 4u; matched = 1;
+        } else if (num_eq(*in, neg_two)) {
+            numer = 2L; denom = 3u; matched = 1;
+        } else if (num_is_inf(*in) && num_get_sign(*in) < 0) {
+            numer = 1L; denom = 2u; matched = 1;
+        }
+    } else if (ops == &ops_acosec) {
+        if (num_eq(*in, NUM_NEG_ONE)) {
+            numer = -1L; denom = 2u; matched = 1;
+        } else if (num_eq(*in, neg_two_sqrt3_over_three)) {
+            numer = -1L; denom = 3u; matched = 1;
+        } else if (num_eq(*in, neg_sqrt2)) {
+            numer = -1L; denom = 4u; matched = 1;
+        } else if (num_eq(*in, neg_two)) {
+            numer = -1L; denom = 6u; matched = 1;
+        } else if (num_is_inf(*in) && num_get_sign(*in) < 0) {
+            numer = 0L; denom = 1u; matched = 1;
+        } else if (num_is_inf(*in) && num_get_sign(*in) > 0) {
+            numer = 0L; denom = 1u; matched = 1;
+        } else if (num_eq(*in, NUM_TWO)) {
+            numer = 1L; denom = 6u; matched = 1;
+        } else if (num_eq(*in, NUM_SQRT2)) {
+            numer = 1L; denom = 4u; matched = 1;
+        } else if (num_eq(*in, two_sqrt3_over_three)) {
+            numer = 1L; denom = 3u; matched = 1;
+        } else if (num_eq(*in, NUM_ONE)) {
+            numer = 1L; denom = 2u; matched = 1;
+        }
+    } else if (ops == &ops_acot) {
+        if (num_is_inf(*in) && num_get_sign(*in) > 0) {
+            numer = 0L; denom = 1u; matched = 1;
+        } else if (num_eq(*in, NUM_SQRT3)) {
+            numer = 1L; denom = 6u; matched = 1;
+        } else if (num_eq(*in, NUM_ONE)) {
+            numer = 1L; denom = 4u; matched = 1;
+        } else if (num_eq(*in, sqrt3_over_three)) {
+            numer = 1L; denom = 3u; matched = 1;
+        } else if (num_eq(*in, NUM_ZERO)) {
+            numer = 1L; denom = 2u; matched = 1;
+        } else if (num_eq(*in, neg_sqrt3_over_three)) {
+            numer = 2L; denom = 3u; matched = 1;
+        } else if (num_eq(*in, NUM_NEG_ONE)) {
+            numer = 3L; denom = 4u; matched = 1;
+        } else if (num_eq(*in, neg_sqrt3)) {
+            numer = 5L; denom = 6u; matched = 1;
+        } else if (num_is_inf(*in) && num_get_sign(*in) < 0) {
+            numer = 1L; denom = 1u; matched = 1;
+        }
+    }
+
+    num_destroy(&neg_two);
+    num_destroy(&neg_sqrt2);
+    num_destroy(&neg_sqrt3);
+    num_destroy(&neg_two_sqrt3_over_three);
+    num_destroy(&two_sqrt3_over_three);
+    num_destroy(&two_sqrt3);
+    num_destroy(&neg_sqrt3_over_three);
+    num_destroy(&sqrt3_over_three);
+    num_destroy(&neg_sqrt3_over_two);
+    num_destroy(&neg_sqrt2_over_two);
+    num_destroy(&neg_half);
+    num_destroy(&three);
+
+    if (!matched)
+        return 0;
+
+    *numer_out = numer;
+    *denom_out = denom;
+    return 1;
+}
+
+static int expr_fold_to_pi_ratio(long numer, unsigned long denom, number_t *out)
+{
+    number_t n;
+    number_t d;
+    number_t scaled;
+
+    if (!out || denom == 0u)
+        return 0;
+    if (numer == 0L) {
+        *out = NUM_ZERO;
+        return 1;
+    }
+
+    n = num_create_from_long(numer);
+    d = num_create_from_long((long)denom);
+    scaled = num_mul(NUM_PI, n);
+    *out = num_div(scaled, d);
+    num_destroy(&scaled);
+    num_destroy(&d);
+    num_destroy(&n);
+    return 1;
+}
+
+int expr_fold_acos_const(const number_t *in, number_t *out)
+{
+    long numer;
+    unsigned long denom;
+
+    return expr_inverse_trig_exact_pi_ratio(&ops_acos, in, &numer, &denom) &&
+           expr_fold_to_pi_ratio(numer, denom, out);
+}
+
+int expr_fold_atan_const(const number_t *in, number_t *out)
+{
+    long numer;
+    unsigned long denom;
+
+    return expr_inverse_trig_exact_pi_ratio(&ops_atan, in, &numer, &denom) &&
+           expr_fold_to_pi_ratio(numer, denom, out);
+}
+
+int expr_fold_asec_const(const number_t *in, number_t *out)
+{
+    long numer;
+    unsigned long denom;
+
+    return expr_inverse_trig_exact_pi_ratio(&ops_asec, in, &numer, &denom) &&
+           expr_fold_to_pi_ratio(numer, denom, out);
+}
+
+int expr_fold_acosec_const(const number_t *in, number_t *out)
+{
+    long numer;
+    unsigned long denom;
+
+    return expr_inverse_trig_exact_pi_ratio(&ops_acosec, in, &numer, &denom) &&
+           expr_fold_to_pi_ratio(numer, denom, out);
+}
+
+int expr_fold_acot_const(const number_t *in, number_t *out)
+{
+    long numer;
+    unsigned long denom;
+
+    return expr_inverse_trig_exact_pi_ratio(&ops_acot, in, &numer, &denom) &&
+           expr_fold_to_pi_ratio(numer, denom, out);
+}
+
 int expr_fold_exp_const(const number_t *in, number_t *out)
 {
     if (!in || !out || !num_eq(*in, NUM_ZERO))

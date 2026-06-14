@@ -163,6 +163,16 @@ static bool test_equation_result_has_rhs_text_containing(
     return false;
 }
 
+static bool test_equation_result_has_rhs_text_containing_either(
+    const equation_solve_result_t *result,
+    style_t style,
+    const char *left,
+    const char *right)
+{
+    return test_equation_result_has_rhs_text_containing(result, style, left) ||
+           test_equation_result_has_rhs_text_containing(result, style, right);
+}
+
 static void example_equation_simple_affine_solve(void)
 {
     equation_t *equation = equ_from_string("{ 2*x + 3 = 7 | x = ? }");
@@ -813,6 +823,73 @@ static void test_equation_future_keeps_periodic_sin_family_symbolic(void)
     equ_free(equation);
 }
 
+static void test_equation_future_simplifies_schoolbook_periodic_sin_families(void)
+{
+    equation_t *equation = equ_from_string("{ sin(x) = 1/sqrt(2) | x = NAN }");
+    expr_t *x;
+    ASSERT_NEW_RESULT(result);
+
+    ASSERT_NOT_NULL(equation);
+    x = equ_binding(equation, "x");
+    ASSERT_NOT_NULL(x);
+
+    ASSERT_EQ_INT(equ_solve_for(equation, x, result), 0);
+    ASSERT_TRUE(RESULT_IS_SOLVED(result));
+    ASSERT_TRUE(test_equation_result_has_rhs_text_containing_either(
+        result, style_UNBOUND, "π/4", "¼π"));
+    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(
+        result, style_UNBOUND, "π"));
+    ASSERT_FALSE(test_equation_result_has_rhs_text_containing(
+        result, style_UNBOUND, "asin"));
+
+    equ_solve_result_free(result);
+    equ_free(equation);
+}
+
+static void test_equation_future_simplifies_schoolbook_periodic_cos_families(void)
+{
+    equation_t *equation = equ_from_string("{ cos(x) = 1/2 | x = NAN }");
+    expr_t *x;
+    ASSERT_NEW_RESULT(result);
+
+    ASSERT_NOT_NULL(equation);
+    x = equ_binding(equation, "x");
+    ASSERT_NOT_NULL(x);
+
+    ASSERT_EQ_INT(equ_solve_for(equation, x, result), 0);
+    ASSERT_TRUE(RESULT_IS_SOLVED(result));
+    ASSERT_TRUE(test_equation_result_has_rhs_text_containing_either(
+        result, style_UNBOUND, "π/3", "⅓π"));
+    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(
+        result, style_UNBOUND, "π"));
+    ASSERT_FALSE(test_equation_result_has_rhs_text_containing(
+        result, style_UNBOUND, "acos"));
+
+    equ_solve_result_free(result);
+    equ_free(equation);
+}
+
+static void test_equation_future_simplifies_schoolbook_periodic_tan_families(void)
+{
+    equation_t *equation = equ_from_string("{ tan(x) = 1/sqrt(3) | x = NAN }");
+    expr_t *x;
+    ASSERT_NEW_RESULT(result);
+
+    ASSERT_NOT_NULL(equation);
+    x = equ_binding(equation, "x");
+    ASSERT_NOT_NULL(x);
+
+    ASSERT_EQ_INT(equ_solve_for(equation, x, result), 0);
+    ASSERT_TRUE(RESULT_IS_SOLVED(result));
+    ASSERT_TRUE(test_equation_result_has_rhs_text_containing_either(
+        result, style_UNBOUND, "π/6", "⅙π"));
+    ASSERT_FALSE(test_equation_result_has_rhs_text_containing(
+        result, style_UNBOUND, "atan"));
+
+    equ_solve_result_free(result);
+    equ_free(equation);
+}
+
 static void test_equation_future_keeps_tan_sqrt_three_family_symbolic(void)
 {
     equation_t *equation = equ_from_string("{ tan(x) = sqrt(3) | x = NAN }");
@@ -865,6 +942,12 @@ static void test_equation_future_solver_cases(void)
     TEST_RUN_SUBTEST(test_equation_future_reduces_exp_sin_to_periodic_family,
                      "future,periodic");
     TEST_RUN_SUBTEST(test_equation_future_keeps_periodic_sin_family_symbolic,
+                     "future,periodic");
+    TEST_RUN_SUBTEST(test_equation_future_simplifies_schoolbook_periodic_sin_families,
+                     "future,periodic");
+    TEST_RUN_SUBTEST(test_equation_future_simplifies_schoolbook_periodic_cos_families,
+                     "future,periodic");
+    TEST_RUN_SUBTEST(test_equation_future_simplifies_schoolbook_periodic_tan_families,
                      "future,periodic");
     TEST_RUN_SUBTEST(test_equation_future_keeps_tan_sqrt_three_family_symbolic,
                      "future,periodic");

@@ -700,6 +700,16 @@ expr_t * expr_rebuild_division_chain            (expr_t **den_terms, size_t nden
 /* Constant-fold hooks. */
 int expr_fold_zero_to_zero(const number_t *in, number_t *out);
 int expr_fold_cos_const   (const number_t *in, number_t *out);
+int expr_fold_asin_const  (const number_t *in, number_t *out);
+int expr_fold_acos_const  (const number_t *in, number_t *out);
+int expr_fold_atan_const  (const number_t *in, number_t *out);
+int expr_fold_asec_const  (const number_t *in, number_t *out);
+int expr_fold_acosec_const(const number_t *in, number_t *out);
+int expr_fold_acot_const  (const number_t *in, number_t *out);
+int expr_inverse_trig_exact_pi_ratio(const expr_ops_t *ops,
+                                     const number_t *in,
+                                     long *numer_out,
+                                     unsigned long *denom_out);
 int expr_fold_exp_const   (const number_t *in, number_t *out);
 int expr_fold_log_const   (const number_t *in, number_t *out);
 int expr_fold_sqrt_const  (const number_t *in, number_t *out);

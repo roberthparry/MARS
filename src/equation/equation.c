@@ -695,7 +695,7 @@ static int equ_try_solve_periodic_trig_kind(expr_op_kind_t kind,
                 rc = equ_append_solution_expr(wrt, exact_root, solutions);
                 break;
             }
-            base = expr_asin(target);
+            base = equ_simplify_owned(expr_asin(target));
             period = equ_symbolic_two_pi_expr();
             if (!base || !period)
                 goto cleanup;
@@ -721,7 +721,7 @@ static int equ_try_solve_periodic_trig_kind(expr_op_kind_t kind,
             break;
 
         case EXPR_KIND_COS:
-            base = expr_acos(target);
+            base = equ_simplify_owned(expr_acos(target));
             period = equ_symbolic_two_pi_expr();
             if (!base || !period)
                 goto cleanup;
@@ -765,7 +765,7 @@ static int equ_try_solve_periodic_trig_kind(expr_op_kind_t kind,
                 rc = equ_append_solution_expr(wrt, exact_root, solutions);
                 break;
             }
-            base = expr_atan(target);
+            base = equ_simplify_owned(expr_atan(target));
             period = equ_symbolic_pi_expr();
             if (!base || !period)
                 goto cleanup;
