@@ -106,6 +106,7 @@ static const binding_simplify_rule_t s_binding_unary_exact_rules[] = {
     { binding_expr_try_simplify_log_e },
     { binding_expr_try_simplify_log10_power },
     { binding_expr_try_simplify_imag_trig_bridge },
+    { binding_expr_try_simplify_asin_exact },
     { binding_expr_try_simplify_trig_exact }
 };
 

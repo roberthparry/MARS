@@ -2195,6 +2195,12 @@ __THEME_OVERRIDES__
       matrix: DEFAULT_MATRIX_TEXT,
       integrator: DEFAULT_INTEGRATOR_TEXT
     };
+    const modeResultState = {
+      expression: null,
+      equation: null,
+      matrix: null,
+      integrator: null
+    };
 
     function precisionDigitsForBits(bits) {
       if (bits <= DOUBLE_PRECISION_BITS)
@@ -2288,6 +2294,100 @@ __THEME_OVERRIDES__
       if (!visible && valueCard.classList.contains('expanded-card'))
         collapseResultCards();
       valueCard.classList.toggle('hidden', !visible);
+    }
+
+    function snapshotElementState(element) {
+      return {
+        className: element.className,
+        style: element.style.cssText,
+        innerHTML: element.innerHTML,
+        dataset: {...element.dataset}
+      };
+    }
+
+    function restoreElementState(element, state) {
+      element.className = state.className || '';
+      element.style.cssText = state.style || '';
+      element.innerHTML = state.innerHTML || '';
+      Object.keys(element.dataset).forEach((key) => {
+        delete element.dataset[key];
+      });
+      Object.entries(state.dataset || {}).forEach(([key, value]) => {
+        element.dataset[key] = value;
+      });
+    }
+
+    function snapshotButtonState(button) {
+      return {
+        className: button.className,
+        textContent: button.textContent,
+        disabled: !!button.disabled,
+        dataset: {...button.dataset}
+      };
+    }
+
+    function restoreButtonState(button, state) {
+      button.className = state.className || '';
+      button.textContent = state.textContent || '';
+      button.disabled = !!state.disabled;
+      Object.keys(button.dataset).forEach((key) => {
+        delete button.dataset[key];
+      });
+      Object.entries(state.dataset || {}).forEach(([key, value]) => {
+        button.dataset[key] = value;
+      });
+    }
+
+    function hasResultContent() {
+      return Boolean(
+        rendered.innerHTML.trim() ||
+        parsed.textContent.trim() ||
+        functionStyle.textContent.trim() ||
+        value.textContent.trim()
+      );
+    }
+
+    function saveCurrentModeResultState(mode = currentMode()) {
+      if (!hasResultContent()) {
+        modeResultState[mode] = null;
+        return;
+      }
+
+      modeResultState[mode] = {
+        rendered: snapshotElementState(rendered),
+        parsed: snapshotElementState(parsed),
+        functionStyle: snapshotElementState(functionStyle),
+        value: snapshotElementState(value),
+        renderedMore: snapshotButtonState(renderedMore),
+        parsedMore: snapshotButtonState(parsedMore),
+        functionMore: snapshotButtonState(functionMore),
+        lastTex,
+        lastDerivativeExpression,
+        currentVariables: [...currentVariables],
+        currentDifferentiable
+      };
+    }
+
+    function restoreModeResultState(mode = currentMode()) {
+      const state = modeResultState[mode];
+      if (!state) {
+        clearResultPane();
+        return;
+      }
+
+      collapseResultCards();
+      restoreElementState(rendered, state.rendered);
+      restoreElementState(parsed, state.parsed);
+      restoreElementState(functionStyle, state.functionStyle);
+      restoreElementState(value, state.value);
+      restoreButtonState(renderedMore, state.renderedMore);
+      restoreButtonState(parsedMore, state.parsedMore);
+      restoreButtonState(functionMore, state.functionMore);
+      lastTex = state.lastTex || '';
+      lastDerivativeExpression = state.lastDerivativeExpression || '';
+      currentVariables = Array.isArray(state.currentVariables) ? [...state.currentVariables] : [];
+      currentDifferentiable = state.currentDifferentiable !== false;
+      renderDerivativeButtons(currentVariables);
     }
 
     function syncMatrixControls() {
@@ -4719,6 +4819,7 @@ __THEME_OVERRIDES__
       clearExpressionSource();
       hideTargetEntry();
       clearResultPane();
+      saveCurrentModeResultState();
       updateHistoryButtons();
       setStatus('Ready');
       expr.focus();
@@ -4756,13 +4857,14 @@ __THEME_OVERRIDES__
     if (modeTabs.length) {
       modeTabs.forEach((tab) => tab.addEventListener('click', () => {
         captureCurrentModeEditor();
+        saveCurrentModeResultState();
         if (!setMode(tab.dataset.mode))
           return;
         saveLastLabMode(currentMode());
         hideTargetEntry();
-        clearResultPane();
         restoreModeEditor(currentMode());
         syncModeUI();
+        restoreModeResultState(currentMode());
         if (currentMode() === 'integrator' && !currentIntegratorBound().name)
           resetIntegratorBoundsToDefault();
         if (currentMode() === 'integrator') {
@@ -6134,6 +6236,7 @@ def parse_integrator_lab_output(output: str) -> dict[str, str]:
             "antiderivative_tex": r"^antiderivative_tex\s*(.*)$",
             "antiderivative": r"^antiderivative\s+(.*)$",
             "symbolic": r"^symbolic\s+(.*)$",
+            "value": r"^value\s*(.*)$",
             "error": r"^error\s+(.*)$",
             "error": r"^error\s+(.*)$",
             "work_units": r"^work_units\s+(.*)$",
@@ -6881,6 +6984,9 @@ def prepare_matrix_fields(fields: dict[str, str]) -> dict[str, object]:
 
 
 def prepare_integrator_fields(fields: dict[str, str], precision: int) -> dict[str, object]:
+    if fields.get("value"):
+        fields["value"] = format_number_text_for_precision(
+            str(fields["value"]), precision, zero_subprecision=True)
     if fields.get("error"):
         fields["error"] = format_number_text_for_precision(
             str(fields["error"]), precision, zero_subprecision=True)
@@ -6914,6 +7020,7 @@ def prepare_integrator_fields(fields: dict[str, str], precision: int) -> dict[st
         "symbolic": str(fields.get("symbolic") or "").strip(),
         "symbolic_tex": str(fields.get("symbolic_tex") or "").strip(),
         "symbolic_value": str(fields.get("symbolic_value") or "").strip(),
+        "value": str(fields.get("value") or fields.get("symbolic_value") or "").strip(),
         "error": str(fields.get("error") or "").strip(),
         "error": str(fields.get("error") or "").strip(),
         "intervals": str(fields.get("intervals") or "").strip(),

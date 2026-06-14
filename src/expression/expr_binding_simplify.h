@@ -70,6 +70,7 @@ expr_binding_expr_t * binding_expr_try_simplify_complex_floor_ceil(expr_binding_
 expr_binding_expr_t * binding_expr_try_simplify_e_power           (expr_binding_expr_t *expr);
 expr_binding_expr_t * binding_expr_try_simplify_log_e             (expr_binding_expr_t *expr);
 expr_binding_expr_t * binding_expr_try_simplify_log10_power       (expr_binding_expr_t *expr);
+expr_binding_expr_t * binding_expr_try_simplify_asin_exact        (expr_binding_expr_t *expr);
 expr_binding_expr_t * binding_expr_try_simplify_trig_exact        (expr_binding_expr_t *expr);
 expr_binding_expr_t * binding_expr_try_simplify_logbeta_integers  (expr_binding_expr_t *expr);
 

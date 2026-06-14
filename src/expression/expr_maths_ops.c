@@ -180,7 +180,7 @@ const expr_ops_t ops_asin = {
     .inverse_unary = expr_sin,
     .apply_unary = expr_asin, .apply_binary = NULL,
     .integrate = expr_integrate_dispatch_primitive,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
+    .simplify = expr_simplify_unary_operator, .fold_const_unary = expr_fold_asin_const
 };
 const expr_ops_t ops_acos = {
     .eval = eval_acos, .deriv = deriv_acos, .reverse = expr_reverse_acos,
@@ -189,7 +189,7 @@ const expr_ops_t ops_acos = {
     .inverse_unary = expr_cos,
     .apply_unary = expr_acos, .apply_binary = NULL,
     .integrate = expr_integrate_dispatch_primitive,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
+    .simplify = expr_simplify_unary_operator, .fold_const_unary = expr_fold_acos_const
 };
 const expr_ops_t ops_atan = {
     .eval = eval_atan, .deriv = deriv_atan, .reverse = expr_reverse_atan,
@@ -198,7 +198,7 @@ const expr_ops_t ops_atan = {
     .inverse_unary = expr_tan,
     .apply_unary = expr_atan, .apply_binary = NULL,
     .integrate = expr_integrate_dispatch_primitive,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
+    .simplify = expr_simplify_unary_operator, .fold_const_unary = expr_fold_atan_const
 };
 const expr_ops_t ops_asec = {
     .eval = eval_asec, .deriv = deriv_asec, .reverse = expr_reverse_asec,
@@ -207,7 +207,7 @@ const expr_ops_t ops_asec = {
     .inverse_unary = expr_sec,
     .apply_unary = expr_asec, .apply_binary = NULL,
     .integrate = expr_integrate_dispatch_primitive,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
+    .simplify = expr_simplify_unary_operator, .fold_const_unary = expr_fold_asec_const
 };
 const expr_ops_t ops_acosec = {
     .eval = eval_acosec, .deriv = deriv_acosec, .reverse = expr_reverse_acosec,
@@ -216,7 +216,7 @@ const expr_ops_t ops_acosec = {
     .inverse_unary = expr_cosec,
     .apply_unary = expr_acosec, .apply_binary = NULL,
     .integrate = expr_integrate_dispatch_primitive,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
+    .simplify = expr_simplify_unary_operator, .fold_const_unary = expr_fold_acosec_const
 };
 const expr_ops_t ops_acot = {
     .eval = eval_acot, .deriv = deriv_acot, .reverse = expr_reverse_acot,
@@ -225,7 +225,7 @@ const expr_ops_t ops_acot = {
     .inverse_unary = expr_cot,
     .apply_unary = expr_acot, .apply_binary = NULL,
     .integrate = expr_integrate_dispatch_primitive,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
+    .simplify = expr_simplify_unary_operator, .fold_const_unary = expr_fold_acot_const
 };
 const expr_ops_t ops_asinh = {
     .eval = eval_asinh, .deriv = deriv_asinh, .reverse = expr_reverse_asinh,
