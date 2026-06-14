@@ -258,9 +258,15 @@ int main(void) {
     string_buffer_init(&buf, storage, sizeof(storage));
     string_buffer_append(&buf, "Hello");
     string_buffer_append_char(&buf, '!');
-    string_printf("%s\n", string_buffer_c_str(&buf));   /* "Hello!" */
+    string_printf("%s\n", string_buffer_c_str(&buf));
     return 0;
 }
+```
+
+Expected output:
+
+```text
+Hello!
 ```
 
 ## Design Notes

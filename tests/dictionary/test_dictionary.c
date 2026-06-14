@@ -9,7 +9,7 @@
 #include "dictionary.h"
 #include "test_harness.h"
 
-TEST_SUITE_CONFIG(TEST_CONFIG_NONE);
+TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 
 /* -------------------------------------------------------------
  * Colour helpers
@@ -682,21 +682,23 @@ int tests_main(void) {
     printf(BLUE "Running dictionary tests...\n" RESET);
 
     TEST_SECTION("Core");
-    TEST_RUN_CASE(test_int_int, NULL);
-    TEST_RUN_CASE(test_str_int, NULL);
-    TEST_RUN_CASE(test_int_str, NULL);
-    TEST_RUN_CASE(test_deep_deep, NULL);
-    TEST_RUN_CASE(test_sorted, NULL);
-    TEST_RUN_CASE(test_entries, NULL);
-    TEST_RUN_CASE(test_foreach, NULL);
+    TEST_RUN_IN_GROUP(test_int_int, tests, NULL);
+    TEST_RUN_IN_GROUP(test_str_int, tests, NULL);
+    TEST_RUN_IN_GROUP(test_int_str, tests, NULL);
+    TEST_RUN_IN_GROUP(test_deep_deep, tests, NULL);
+    TEST_RUN_IN_GROUP(test_sorted, tests, NULL);
+    TEST_RUN_IN_GROUP(test_entries, tests, NULL);
+    TEST_RUN_IN_GROUP(test_foreach, tests, NULL);
 
     TEST_SECTION("Fuzz");
-    TEST_RUN_CASE(test_fuzz, NULL);
-    TEST_RUN_CASE(test_sorted_fuzz, NULL);
-    TEST_RUN_CASE(test_sort_by_value, NULL);
+    TEST_RUN_IN_GROUP(test_fuzz, tests, NULL);
+    TEST_RUN_IN_GROUP(test_sorted_fuzz, tests, NULL);
+    TEST_RUN_IN_GROUP(test_sort_by_value, tests, NULL);
 
     TEST_SECTION("README");
-    TEST_RUN_OUTPUT_TAGS(example_dictionary_readme_examples, "dictionary,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_dictionary_readme_examples,
+                                  readme_examples,
+                                  "dictionary,readme,output");
 
     printf(BLUE "Done.\n" RESET);
 

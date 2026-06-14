@@ -1917,6 +1917,44 @@ static void test_negative_decimal_function_argument_stays_decimal(void)
     expr_free(expr);
 }
 
+static void test_exact_decimal_literal_stays_decimal_in_expression_render(void)
+{
+    const char *input =
+        "{ exp(sin(1.57079632679489661923132169163975144209858471948544343596133822168661754865486"
+        " - 8.98275566258534851033990592436991679214844400177870060641283930271949038958935E-441i)) }";
+    expr_t *expr = expr_from_string(input, NULL);
+    char *text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
+    char *func = expr ? expr_to_string(expr, style_FUNCTION) : NULL;
+    int text_ok = text &&
+                  strstr(text, "1.5707963267948966") != NULL &&
+                  strstr(text, "/5000000000000000") == NULL;
+    int func_ok = func &&
+                  strstr(func, "1.5707963267948966") != NULL &&
+                  strstr(func, "/5000000000000000") == NULL;
+
+    if (text_ok)
+        to_string_pass("exact decimal literal expression render stays decimal",
+                       text, "contains original decimal literal");
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "exact decimal literal expression render stays decimal",
+                       text ? text : "(null)",
+                       "contains original decimal literal without giant fraction");
+
+    if (func_ok)
+        to_string_pass("exact decimal literal function render stays decimal",
+                       func, "contains original decimal literal");
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "exact decimal literal function render stays decimal",
+                       func ? func : "(null)",
+                       "contains original decimal literal without giant fraction");
+
+    free(func);
+    free(text);
+    expr_free(expr);
+}
+
 static void test_to_string_does_not_simplify_plain_expressions(void)
 {
     expr_t *x = test_expr_new_named_var_d(3.0, "x");
@@ -3388,6 +3426,18 @@ static void test_binding_exact_core_trig_values_simplify(void)
         { "{ x | x = tan(pi/2) }",   "∞",       "tan(pi/2)" },
         { "{ x | x = tan(-pi/2) }",  "-∞",      "tan(-pi/2)" },
         { "{ x | x = tan(pi) }",     "0",       "tan(pi)" },
+        { "{ x | x = sec(0) }",      "1",       "sec(0)" },
+        { "{ x | x = sec(pi/6) }",   "2·√(3)/3", "sec(pi/6)" },
+        { "{ x | x = sec(pi/4) }",   "√(2)",    "sec(pi/4)" },
+        { "{ x | x = sec(pi/3) }",   "2",       "sec(pi/3)" },
+        { "{ x | x = cosec(pi/6) }", "2",       "cosec(pi/6)" },
+        { "{ x | x = cosec(pi/4) }", "√(2)",    "cosec(pi/4)" },
+        { "{ x | x = cosec(pi/3) }", "2·√(3)/3", "cosec(pi/3)" },
+        { "{ x | x = cosec(pi/2) }", "1",       "cosec(pi/2)" },
+        { "{ x | x = cot(pi/6) }",   "√(3)",    "cot(pi/6)" },
+        { "{ x | x = cot(pi/4) }",   "1",       "cot(pi/4)" },
+        { "{ x | x = cot(pi/3) }",   "√(3)/3",  "cot(pi/3)" },
+        { "{ x | x = cot(pi/2) }",   "0",       "cot(pi/2)" },
     };
 
     for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
@@ -3645,6 +3695,7 @@ void test_runtime_regressions(void)
     TEST_RUN_SUBTEST(test_preserved_complex_function_addend_stays_ungrouped, NULL);
     TEST_RUN_SUBTEST(test_updated_decimal_binding_stays_decimal, NULL);
     TEST_RUN_SUBTEST(test_negative_decimal_function_argument_stays_decimal, NULL);
+    TEST_RUN_SUBTEST(test_exact_decimal_literal_stays_decimal_in_expression_render, NULL);
     TEST_RUN_SUBTEST(test_symbolic_negative_pi_derivative_stays_symbolic, NULL);
     TEST_RUN_SUBTEST(test_pow_derivative_preserves_literal_base_log, NULL);
     TEST_RUN_SUBTEST(test_symbolic_complex_power_derivative_keeps_base_log, NULL);

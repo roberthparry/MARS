@@ -7,6 +7,12 @@
 #define EXPR_GOAL_DEFAULT_DIGITS 64u
 #define EXPR_GOAL_DEFAULT_ITERATIONS 120u
 
+static void goal_set_var(expr_t *var, number_t value, size_t digits);
+static int goal_eval_residual(expr_t *expr,
+                              number_t target,
+                              number_t *value_out,
+                              number_t *residual_out);
+
 static size_t goal_iterations_for_digits(size_t digits)
 {
     size_t scaled = digits > 0u ? digits * 4u : EXPR_GOAL_DEFAULT_ITERATIONS;
@@ -97,14 +103,38 @@ static number_t goal_tolerance(number_t target,
 static bool goal_residual_close(number_t residual, number_t tolerance)
 {
     number_t mag = num_abs(residual);
-    bool ok = num_le(mag, tolerance);
+    bool ok = num_is_finite(mag) && num_le(mag, tolerance);
 
     num_destroy(&mag);
     return ok;
 }
 
+static number_t goal_component_tolerance(size_t digits)
+{
+    int exponent = 0;
+
+    if (digits > 1u)
+        exponent = -(int)(digits - 1u);
+
+    return num_pow10(exponent);
+}
+
+static number_t goal_cleanup_tolerance(number_t tolerance, size_t digits)
+{
+    number_t component_tolerance = goal_component_tolerance(digits);
+    number_t out;
+
+    if (num_gt(component_tolerance, tolerance))
+        out = num_clone(component_tolerance);
+    else
+        out = num_clone(tolerance);
+
+    num_destroy(&component_tolerance);
+    return out;
+}
+
 static number_t goal_clean_negligible_complex_parts(number_t value,
-                                                    number_t tolerance,
+                                                    number_t component_tolerance,
                                                     size_t digits)
 {
     number_t real;
@@ -127,9 +157,9 @@ static number_t goal_clean_negligible_complex_parts(number_t value,
     imag_mag = num_abs(imag);
     imag_unit_delta = num_sub(imag_mag, NUM_ONE);
     imag_unit_gap = num_abs(imag_unit_delta);
-    real_zero = num_le(real_mag, tolerance);
-    imag_zero = num_le(imag_mag, tolerance);
-    imag_unit = num_le(imag_unit_gap, tolerance);
+    real_zero = num_le(real_mag, component_tolerance);
+    imag_zero = num_le(imag_mag, component_tolerance);
+    imag_unit = num_le(imag_unit_gap, component_tolerance);
     num_destroy(&real_mag);
     num_destroy(&imag_mag);
     num_destroy(&imag_unit_delta);
@@ -155,6 +185,69 @@ static number_t goal_clean_negligible_complex_parts(number_t value,
     num_destroy(&imag);
     num_destroy(&real);
     return out;
+}
+
+static bool goal_candidate_residual_close(expr_t *expr,
+                                          expr_t *var,
+                                          number_t candidate,
+                                          number_t target,
+                                          number_t tolerance,
+                                          size_t digits)
+{
+    number_t value;
+    number_t residual;
+    bool ok = false;
+
+    goal_set_var(var, candidate, digits);
+    if (goal_eval_residual(expr, target, &value, &residual) == 0) {
+        ok = goal_residual_close(residual, tolerance);
+        num_destroy(&residual);
+        num_destroy(&value);
+    }
+    return ok;
+}
+
+static number_t goal_simplify_complex_solution(expr_t *expr,
+                                               expr_t *var,
+                                               number_t value,
+                                               number_t target,
+                                               number_t tolerance,
+                                               size_t digits)
+{
+    number_t component_tolerance = goal_cleanup_tolerance(tolerance, digits);
+    number_t clean = goal_clean_negligible_complex_parts(value,
+                                                         component_tolerance,
+                                                         digits);
+
+    num_destroy(&component_tolerance);
+    if (!num_is_real(clean)) {
+        number_t real = num_real_part(clean);
+        number_t imag = num_imag_part(clean);
+
+        if (!num_is_zero(imag) &&
+            goal_candidate_residual_close(expr, var, real, target, tolerance, digits)) {
+            num_destroy(&clean);
+            num_destroy(&imag);
+            return real;
+        }
+
+        if (!num_is_zero(real)) {
+            number_t imag_part = num_mul(NUM_I, imag);
+
+            if (goal_candidate_residual_close(expr, var, imag_part,
+                                              target, tolerance, digits)) {
+                num_destroy(&clean);
+                num_destroy(&real);
+                num_destroy(&imag);
+                return imag_part;
+            }
+            num_destroy(&imag_part);
+        }
+
+        num_destroy(&imag);
+        num_destroy(&real);
+    }
+    return clean;
 }
 
 static bool goal_residual_real(number_t residual)
@@ -599,8 +692,8 @@ loop_cleanup:
         rc = 0;
 
     if (rc == 0) {
-        number_t clean_x = goal_clean_negligible_complex_parts(best_x, tolerance, digits);
-
+        number_t clean_x = goal_simplify_complex_solution(expr, var, best_x,
+                                                          target, tolerance, digits);
         goal_set_var(var, clean_x, digits);
         num_destroy(&clean_x);
     } else {

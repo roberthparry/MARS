@@ -186,6 +186,36 @@ static void test_goal_seek_complex_lgamma_imaginary_axis(void)
     expr_free(expr);
 }
 
+static void test_goal_seek_tiny_complex_part_collapses_to_real(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = expr_from_string("{ exp(sin(x)) | x = NAN }", &bindings);
+    expr_t *x;
+    expr_goal_seek_options_t options = {
+        .precision_digits = 160u,
+        .allow_complex = true,
+        .simplify_result = false
+    };
+    expr_goal_seek_result_t result;
+    number_t x_value;
+
+    ASSERT_NOT_NULL(expr);
+    ASSERT_NOT_NULL(bindings);
+    ASSERT_EQ_INT(expr_goal_seek(expr, bindings, num_clone(NUM_E), &options, &result), 0);
+    ASSERT_TRUE(result.converged);
+    assert_residual_small(result.residual, "1.01e-150");
+
+    x = expr_bindings_get(bindings, "x");
+    ASSERT_NOT_NULL(x);
+    x_value = expr_eval(x);
+    ASSERT_TRUE(num_is_real(x_value));
+    num_destroy(&x_value);
+
+    expr_goal_seek_result_clear(&result);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+}
+
 static void test_goal_seek_real_multi_variable(void)
 {
     expr_bindings_t *bindings = NULL;
@@ -275,6 +305,7 @@ void test_expr_t_goal_seek(void)
     TEST_RUN_SUBTEST(test_goal_seek_complex_fallback_from_real_axis, NULL);
     TEST_RUN_SUBTEST(test_goal_seek_complex_uses_guard_precision, NULL);
     TEST_RUN_SUBTEST(test_goal_seek_complex_lgamma_imaginary_axis, NULL);
+    TEST_RUN_SUBTEST(test_goal_seek_tiny_complex_part_collapses_to_real, NULL);
     TEST_RUN_SUBTEST(test_goal_seek_real_multi_variable, NULL);
     TEST_RUN_SUBTEST(test_goal_seek_default_tolerance_uses_precision_digits, NULL);
     TEST_RUN_SUBTEST(test_goal_seek_default_iterations_scale_with_precision, NULL);

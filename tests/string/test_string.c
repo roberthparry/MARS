@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-TEST_SUITE_CONFIG(TEST_CONFIG_NONE);
+TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 
 /* ------------------------------------------------------------------------- */
 /* Tests                                                                     */
@@ -829,6 +829,24 @@ static void test_readme_example_Character_Iteration(void) {
     string_free(s);
 }
 
+static void test_readme_example_Unicode_Text_Just_Works(void) {
+    string_t *s = string_new_with("👨‍👩‍👧‍👦 café 🇬🇧");
+    rune_t first = string_at(s, 0);
+    string_t *first_text = rune_to_string(first);
+    string_t *word = string_substring(s, 2, 4);
+
+    string_printf("Characters: %zu\n", string_length(s));
+    string_printf("First: %S\n", first_text);
+    string_printf("Word: %S\n", word);
+
+    string_reverse(s);
+    string_printf("Reversed: %S\n", s);
+
+    string_free(first_text);
+    string_free(word);
+    string_free(s);
+}
+
 static void test_readme_example_Using_the_Builder_API(void) {
     string_builder_t *b = string_builder_new();
     string_builder_append(b, "Hello");
@@ -851,53 +869,77 @@ static void test_readme_example_Escaping_Wide_C_Strings(void) {
     string_free(s);
 }
 
+static void test_readme_example_Using_string_t_With_a_Parser(void) {
+    string_t *source = string_new_with("cdf(α_1) + 355/113");
+    string_t *tokens = test_parser_tokenise(source);
+
+    string_printf("%S\n", tokens);
+
+    string_free(tokens);
+    string_free(source);
+}
+
+static void test_readme_example_Fixed_Capacity_Buffer(void) {
+    char storage[64];
+    string_buffer_t buf;
+
+    string_buffer_init(&buf, storage, sizeof(storage));
+    string_buffer_append(&buf, "Hello");
+    string_buffer_append_char(&buf, '!');
+    string_printf("%s\n", string_buffer_c_str(&buf));
+}
+
 static void example_readme_examples(void) {
     test_readme_example_Basic_UTF_8_Manipulation();
+    test_readme_example_Unicode_Text_Just_Works();
     test_readme_example_Escaping_Wide_C_Strings();
     test_readme_example_Character_Iteration();
+    test_readme_example_Using_string_t_With_a_Parser();
+    test_readme_example_Fixed_Capacity_Buffer();
     test_readme_example_Using_the_Builder_API();
 }
 
 int tests_main(void)
 {
     TEST_SECTION("Core");
-    TEST_RUN_CASE(test_split_basic, NULL);
-    TEST_RUN_CASE(test_join_basic, NULL);
-    TEST_RUN_CASE(test_split_edge_cases, NULL);
-    TEST_RUN_CASE(test_join_empty_fields, NULL);
-    TEST_RUN_CASE(test_string_replace, NULL);
-    TEST_RUN_CASE(test_string_new_wide, NULL);
-    TEST_RUN_CASE(test_string_trim_unicode_whitespace, NULL);
+    TEST_RUN_IN_GROUP(test_split_basic, tests, NULL);
+    TEST_RUN_IN_GROUP(test_join_basic, tests, NULL);
+    TEST_RUN_IN_GROUP(test_split_edge_cases, tests, NULL);
+    TEST_RUN_IN_GROUP(test_join_empty_fields, tests, NULL);
+    TEST_RUN_IN_GROUP(test_string_replace, tests, NULL);
+    TEST_RUN_IN_GROUP(test_string_new_wide, tests, NULL);
+    TEST_RUN_IN_GROUP(test_string_trim_unicode_whitespace, tests, NULL);
 
     TEST_SECTION("Builder And Views");
-    TEST_RUN_CASE(test_append_format, NULL);
-    TEST_RUN_CASE(test_starts_with_ends_with, NULL);
-    TEST_RUN_CASE(test_to_upper_and_to_lower, NULL);
-    TEST_RUN_CASE(test_embedded_nul_is_real_string_content, NULL);
-    TEST_RUN_CASE(test_text_character_api, NULL);
-    TEST_RUN_CASE(test_string_view, NULL);
-    TEST_RUN_CASE(test_string_cursor_view_rune_values, NULL);
-    TEST_RUN_CASE(test_rune_from_value, NULL);
-    TEST_RUN_CASE(test_string_cursor_parsing_api, NULL);
-    TEST_RUN_CASE(test_string_cursor_parser_example, NULL);
-    TEST_RUN_CASE(test_string_object_first_api, NULL);
-    TEST_RUN_CASE(test_string_builder, NULL);
-    TEST_RUN_CASE(test_utf8_stuff, NULL);
-    TEST_RUN_CASE(test_character_count_and_reverse, NULL);
-    TEST_RUN_CASE(test_character_reverse_and_substring, NULL);
+    TEST_RUN_IN_GROUP(test_append_format, tests, NULL);
+    TEST_RUN_IN_GROUP(test_starts_with_ends_with, tests, NULL);
+    TEST_RUN_IN_GROUP(test_to_upper_and_to_lower, tests, NULL);
+    TEST_RUN_IN_GROUP(test_embedded_nul_is_real_string_content, tests, NULL);
+    TEST_RUN_IN_GROUP(test_text_character_api, tests, NULL);
+    TEST_RUN_IN_GROUP(test_string_view, tests, NULL);
+    TEST_RUN_IN_GROUP(test_string_cursor_view_rune_values, tests, NULL);
+    TEST_RUN_IN_GROUP(test_rune_from_value, tests, NULL);
+    TEST_RUN_IN_GROUP(test_string_cursor_parsing_api, tests, NULL);
+    TEST_RUN_IN_GROUP(test_string_cursor_parser_example, tests, NULL);
+    TEST_RUN_IN_GROUP(test_string_object_first_api, tests, NULL);
+    TEST_RUN_IN_GROUP(test_string_builder, tests, NULL);
+    TEST_RUN_IN_GROUP(test_utf8_stuff, tests, NULL);
+    TEST_RUN_IN_GROUP(test_character_count_and_reverse, tests, NULL);
+    TEST_RUN_IN_GROUP(test_character_reverse_and_substring, tests, NULL);
 
     TEST_SECTION("Text Intelligence");
-    TEST_RUN_CASE(test_text_ascii_stays_stable, NULL);
-    TEST_RUN_CASE(test_text_construction_canonicalises_combining_marks, NULL);
-    TEST_RUN_CASE(test_text_construction_canonicalises_hangul, NULL);
-    TEST_RUN_CASE(test_text_emoji_stays_stable, NULL);
-    TEST_RUN_CASE(test_text_empty_stays_stable, NULL);
-    TEST_RUN_CASE(test_text_numeric_fraction_glyphs_stay_stable, NULL);
-    TEST_RUN_CASE(test_text_fast_append_still_allows_later_normalisation, NULL);
-    TEST_RUN_CASE(test_text_mutation_canonicalises_when_needed, NULL);
+    TEST_RUN_IN_GROUP(test_text_ascii_stays_stable, tests, NULL);
+    TEST_RUN_IN_GROUP(test_text_construction_canonicalises_combining_marks, tests, NULL);
+    TEST_RUN_IN_GROUP(test_text_construction_canonicalises_hangul, tests, NULL);
+    TEST_RUN_IN_GROUP(test_text_emoji_stays_stable, tests, NULL);
+    TEST_RUN_IN_GROUP(test_text_empty_stays_stable, tests, NULL);
+    TEST_RUN_IN_GROUP(test_text_numeric_fraction_glyphs_stay_stable, tests, NULL);
+    TEST_RUN_IN_GROUP(test_text_fast_append_still_allows_later_normalisation, tests, NULL);
+    TEST_RUN_IN_GROUP(test_text_mutation_canonicalises_when_needed, tests, NULL);
 
     TEST_SECTION("README");
-    TEST_RUN_OUTPUT_TAGS(example_readme_examples, "string,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_readme_examples, readme_examples,
+                                  "string,readme,output");
 
     return TEST_EXIT_CODE();
 }

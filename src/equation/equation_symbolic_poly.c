@@ -59,8 +59,10 @@ static bool equ_symbolic_coeff_is_zero(const expr_t *expr)
     number_t value = num_new();
     bool zero = false;
 
-    if (!expr)
+    if (!expr) {
+        num_destroy(&value);
         return true;
+    }
 
     if (expr_match_const_value(expr, &value))
         zero = num_is_zero(value);

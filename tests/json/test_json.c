@@ -1,6 +1,7 @@
 #include <stdlib.h>
 
 #include "json.h"
+#include "number.h"
 #include "test_harness.h"
 #include "ustring.h"
 
@@ -279,17 +280,117 @@ static void test_file_round_trip(void)
     string_free(path);
 }
 
+static void example_json_parse_and_inspect(void)
+{
+    string_t *text = s("{\"name\":\"mars\",\"enabled\":true,\"items\":[1,2,3]}");
+    string_t *name_key = s("name");
+    string_t *enabled_key = s("enabled");
+    string_t *items_key = s("items");
+    json_t *root = json_from_text(text);
+    const json_t *name = json_object_get(root, name_key);
+    const json_t *enabled_json = json_object_get(root, enabled_key);
+    const json_t *items = json_object_get(root, items_key);
+    bool enabled = false;
+
+    json_bool_value(enabled_json, &enabled);
+
+    string_printf("name=%S\n", json_string_value(name));
+    string_printf("enabled=%s\n", enabled ? "true" : "false");
+    string_printf("items=%zu\n", json_array_size(items));
+
+    json_free(root);
+    string_free(items_key);
+    string_free(enabled_key);
+    string_free(name_key);
+    string_free(text);
+}
+
+static void example_json_build_and_serialise(void)
+{
+    json_t *items = json_new_array();
+    string_t *name = s("MARS");
+    string_t *two = s("2");
+    json_t *name_value = json_new_string(name);
+    json_t *true_value = json_new_bool(true);
+    json_t *two_value = json_new_number(two);
+    string_t *out;
+
+    json_array_append(items, name_value);
+    json_array_append(items, true_value);
+    json_array_append(items, two_value);
+
+    out = json_to_string_pretty(items, 2);
+    string_printf("%S", out);
+
+    string_free(out);
+    json_free(two_value);
+    json_free(true_value);
+    json_free(name_value);
+    string_free(two);
+    string_free(name);
+    json_free(items);
+}
+
+static void example_json_number_fidelity(void)
+{
+    number_t rational = num_create_from_frac(2, 3);
+    json_t *json = json_new_number_value(rational);
+    string_t *text = json_to_string(json);
+
+    string_printf("%S\n", text);
+
+    string_free(text);
+    json_free(json);
+    num_destroy(&rational);
+}
+
+static void example_json_file_round_trip(void)
+{
+    const char *path_text = test_case_temp_path("json-readme-settings.json");
+    string_t *path = s(path_text);
+    string_t *key = s("enabled");
+    json_t *root = json_new_object();
+    json_t *enabled = json_new_bool(true);
+    json_t *loaded;
+
+    json_object_set(root, key, enabled);
+    json_to_file_pretty(root, path, 2);
+
+    loaded = json_from_file(path);
+    string_printf("type=%d\n", (int)json_type(loaded));
+
+    json_free(loaded);
+    json_free(enabled);
+    json_free(root);
+    string_free(key);
+    string_free(path);
+}
+
 int tests_main(void)
 {
     TEST_SECTION("JSON Parsing");
-    TEST_RUN_CASE(test_parse_object_array_and_escapes, NULL);
-    TEST_RUN_CASE(test_rejects_non_json_number_forms, NULL);
-    TEST_RUN_CASE(test_number_t_extension_round_trip, NULL);
-    TEST_RUN_CASE(test_number_t_constants_use_math_spelling, NULL);
+    TEST_RUN_IN_GROUP(test_parse_object_array_and_escapes, tests, NULL);
+    TEST_RUN_IN_GROUP(test_rejects_non_json_number_forms, tests, NULL);
+    TEST_RUN_IN_GROUP(test_number_t_extension_round_trip, tests, NULL);
+    TEST_RUN_IN_GROUP(test_number_t_constants_use_math_spelling, tests, NULL);
 
     TEST_SECTION("JSON Serialisation");
-    TEST_RUN_CASE(test_serialise_round_trip, NULL);
-    TEST_RUN_CASE(test_file_round_trip, NULL);
+    TEST_RUN_IN_GROUP(test_serialise_round_trip, tests, NULL);
+    TEST_RUN_IN_GROUP(test_file_round_trip, tests, NULL);
+
+    TEST_SECTION("README Output Examples");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_json_parse_and_inspect,
+                                  readme_examples,
+                                  "json,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_json_build_and_serialise,
+                                  readme_examples,
+                                  "json,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_json_number_fidelity,
+                                  readme_examples,
+                                  "json,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_json_file_round_trip,
+                                  readme_examples,
+                                  "json,readme,output");
 
     return TEST_EXIT_CODE();
 }

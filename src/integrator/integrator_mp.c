@@ -76,11 +76,11 @@ static number_t mp_num_from_decimal(const char *text)
 static int mp_gk_pair_index(size_t kronrod_index)
 {
     switch (kronrod_index) {
-    case 1u: return 0;
-    case 3u: return 1;
-    case 5u: return 2;
-    case 7u: return 3;
-    default: return -1;
+        case 1u: return 0;
+        case 3u: return 1;
+        case 5u: return 2;
+        case 7u: return 3;
+        default: return -1;
     }
 }
 

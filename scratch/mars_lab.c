@@ -767,7 +767,7 @@ int main(int argc, char **argv)
     expr_text = expr_text_dup(expr, style_EXPRESSION);
     unbound_text = expr_text_dup(display_expr, style_UNBOUND);
     func_text = expr_text_dup(expr, style_FUNCTION);
-    tex_text = expr_tex_body_dup(display_expr);
+    tex_text = expr_tex_body_dup(expr);
 
     printf("input       %s\n", input);
     printf("expression  %s\n", expr_text ? expr_text : "(null)");

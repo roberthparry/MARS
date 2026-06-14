@@ -6,6 +6,7 @@
 
 #include "expr_binding_simplify.h"
 #include "expr_stringout.h"
+#include "expr_stringout_internal.h"
 #include "internal/number_internal.h"
 #include "ustring.h"
 
@@ -511,16 +512,16 @@ expr_binding_expr_t *binding_expr_try_simplify_sqrt_square(expr_binding_expr_t *
 
 static expr_binding_expr_t *binding_expr_number_from_value(number_t value)
 {
-    string_t *text;
+    char *text;
     expr_binding_expr_t *expr;
 
     if (num_is_inf(value))
         return expr_binding_expr_new_number_text(num_get_sign(value) < 0 ? "-∞" : "∞");
 
-    text = num_to_string(value);
-    expr = expr_binding_expr_new_number_text(text ? string_c_str(text) : "NAN");
+    text = expr_number_to_string_local(num_clone(value));
+    expr = expr_binding_expr_new_number_text(text ? text : "NAN");
 
-    string_free(text);
+    free(text);
     return expr;
 }
 
@@ -1669,13 +1670,15 @@ typedef expr_binding_expr_t *(*binding_trig_fold_fn)(
     const binding_trig_exact_rule_t *rule);
 
 struct binding_trig_exact_rule_t {
-    const expr_ops_t *ops;
-    long twelfths;
     binding_trig_fold_fn fold;
     const number_t *number_value;
     unsigned long radicand;
     unsigned long denominator;
+    unsigned long scale;
 };
+
+#define BINDING_TRIG_EXACT_TWELFTH_COUNT 24u
+#define BINDING_TRIG_EXACT_INDEX_MISSING (-1)
 
 static expr_binding_expr_t *binding_trig_fold_number(
     expr_binding_expr_t *expr,
@@ -1725,58 +1728,230 @@ static expr_binding_expr_t *binding_trig_fold_neg_sqrt_quotient(
         binding_expr_neg_sqrt_quotient_ulong(rule->radicand, rule->denominator));
 }
 
-static const binding_trig_exact_rule_t s_binding_trig_exact_rules[] = {
-    { &ops_sin, 0L,  binding_trig_fold_number,            &NUM_ZERO,    0ul, 0ul },
-    { &ops_sin, 12L, binding_trig_fold_number,            &NUM_ZERO,    0ul, 0ul },
-    { &ops_sin, 2L,  binding_trig_fold_number,            &NUM_HALF,    0ul, 0ul },
-    { &ops_sin, 10L, binding_trig_fold_number,            &NUM_HALF,    0ul, 0ul },
-    { &ops_sin, 3L,  binding_trig_fold_sqrt_quotient,     NULL,         2ul, 2ul },
-    { &ops_sin, 9L,  binding_trig_fold_sqrt_quotient,     NULL,         2ul, 2ul },
-    { &ops_sin, 4L,  binding_trig_fold_sqrt_quotient,     NULL,         3ul, 2ul },
-    { &ops_sin, 8L,  binding_trig_fold_sqrt_quotient,     NULL,         3ul, 2ul },
-    { &ops_sin, 6L,  binding_trig_fold_number,            &NUM_ONE,     0ul, 0ul },
-    { &ops_sin, 15L, binding_trig_fold_neg_sqrt_quotient, NULL,         2ul, 2ul },
-    { &ops_sin, 21L, binding_trig_fold_neg_sqrt_quotient, NULL,         2ul, 2ul },
-    { &ops_sin, 16L, binding_trig_fold_neg_sqrt_quotient, NULL,         3ul, 2ul },
-    { &ops_sin, 20L, binding_trig_fold_neg_sqrt_quotient, NULL,         3ul, 2ul },
-    { &ops_sin, 14L, binding_trig_fold_neg_number,        &NUM_HALF,    0ul, 0ul },
-    { &ops_sin, 22L, binding_trig_fold_neg_number,        &NUM_HALF,    0ul, 0ul },
-    { &ops_sin, 18L, binding_trig_fold_number,            &NUM_NEG_ONE, 0ul, 0ul },
+static expr_binding_expr_t *binding_expr_scaled_sqrt_quotient_ulong(
+    unsigned long scale,
+    unsigned long radicand,
+    unsigned long denom)
+{
+    expr_binding_expr_t *out = expr_binding_expr_new_mul(
+        binding_expr_new_ulong(scale),
+        binding_expr_sqrt_quotient_ulong(radicand, denom));
 
-    { &ops_cos, 0L,  binding_trig_fold_number,            &NUM_ONE,     0ul, 0ul },
-    { &ops_cos, 4L,  binding_trig_fold_number,            &NUM_HALF,    0ul, 0ul },
-    { &ops_cos, 20L, binding_trig_fold_number,            &NUM_HALF,    0ul, 0ul },
-    { &ops_cos, 2L,  binding_trig_fold_sqrt_quotient,     NULL,         3ul, 2ul },
-    { &ops_cos, 22L, binding_trig_fold_sqrt_quotient,     NULL,         3ul, 2ul },
-    { &ops_cos, 3L,  binding_trig_fold_sqrt_quotient,     NULL,         2ul, 2ul },
-    { &ops_cos, 21L, binding_trig_fold_sqrt_quotient,     NULL,         2ul, 2ul },
-    { &ops_cos, 6L,  binding_trig_fold_number,            &NUM_ZERO,    0ul, 0ul },
-    { &ops_cos, 18L, binding_trig_fold_number,            &NUM_ZERO,    0ul, 0ul },
-    { &ops_cos, 9L,  binding_trig_fold_neg_sqrt_quotient, NULL,         2ul, 2ul },
-    { &ops_cos, 15L, binding_trig_fold_neg_sqrt_quotient, NULL,         2ul, 2ul },
-    { &ops_cos, 10L, binding_trig_fold_neg_sqrt_quotient, NULL,         3ul, 2ul },
-    { &ops_cos, 14L, binding_trig_fold_neg_sqrt_quotient, NULL,         3ul, 2ul },
-    { &ops_cos, 8L,  binding_trig_fold_neg_number,        &NUM_HALF,    0ul, 0ul },
-    { &ops_cos, 16L, binding_trig_fold_neg_number,        &NUM_HALF,    0ul, 0ul },
-    { &ops_cos, 12L, binding_trig_fold_number,            &NUM_NEG_ONE, 0ul, 0ul },
+    return expr_binding_expr_simplify(out);
+}
 
-    { &ops_tan, 0L,  binding_trig_fold_number,            &NUM_ZERO,    0ul, 0ul },
-    { &ops_tan, 12L, binding_trig_fold_number,            &NUM_ZERO,    0ul, 0ul },
-    { &ops_tan, 3L,  binding_trig_fold_number,            &NUM_ONE,     0ul, 0ul },
-    { &ops_tan, 15L, binding_trig_fold_number,            &NUM_ONE,     0ul, 0ul },
-    { &ops_tan, 2L,  binding_trig_fold_sqrt_quotient,     NULL,         3ul, 3ul },
-    { &ops_tan, 14L, binding_trig_fold_sqrt_quotient,     NULL,         3ul, 3ul },
-    { &ops_tan, 4L,  binding_trig_fold_sqrt,              NULL,         3ul, 0ul },
-    { &ops_tan, 16L, binding_trig_fold_sqrt,              NULL,         3ul, 0ul },
-    { &ops_tan, 6L,  binding_trig_fold_number,            &NUM_INF,     0ul, 0ul },
-    { &ops_tan, 8L,  binding_trig_fold_neg_sqrt,          NULL,         3ul, 0ul },
-    { &ops_tan, 20L, binding_trig_fold_neg_sqrt,          NULL,         3ul, 0ul },
-    { &ops_tan, 10L, binding_trig_fold_neg_sqrt_quotient, NULL,         3ul, 3ul },
-    { &ops_tan, 22L, binding_trig_fold_neg_sqrt_quotient, NULL,         3ul, 3ul },
-    { &ops_tan, 9L,  binding_trig_fold_number,            &NUM_NEG_ONE, 0ul, 0ul },
-    { &ops_tan, 21L, binding_trig_fold_number,            &NUM_NEG_ONE, 0ul, 0ul },
-    { &ops_tan, 18L, binding_trig_fold_number,            &NUM_NINF,    0ul, 0ul }
+static expr_binding_expr_t *binding_expr_neg_scaled_sqrt_quotient_ulong(
+    unsigned long scale,
+    unsigned long radicand,
+    unsigned long denom)
+{
+    return expr_binding_expr_new_neg(
+        binding_expr_scaled_sqrt_quotient_ulong(scale, radicand, denom));
+}
+
+static expr_binding_expr_t *binding_trig_fold_scaled_sqrt_quotient(
+    expr_binding_expr_t *expr,
+    const binding_trig_exact_rule_t *rule)
+{
+    return binding_expr_fold_to_expr_owned(
+        expr,
+        binding_expr_scaled_sqrt_quotient_ulong(rule->scale,
+                                               rule->radicand,
+                                               rule->denominator));
+}
+
+static expr_binding_expr_t *binding_trig_fold_neg_scaled_sqrt_quotient(
+    expr_binding_expr_t *expr,
+    const binding_trig_exact_rule_t *rule)
+{
+    return binding_expr_fold_to_expr_owned(
+        expr,
+        binding_expr_neg_scaled_sqrt_quotient_ulong(rule->scale,
+                                                    rule->radicand,
+                                                    rule->denominator));
+}
+
+static const binding_trig_exact_rule_t s_binding_trig_exact_rules_sin[] = {
+    { binding_trig_fold_number,            &NUM_ZERO,    0ul, 0ul, 0ul },
+    { binding_trig_fold_number,            &NUM_HALF,    0ul, 0ul, 0ul },
+    { binding_trig_fold_sqrt_quotient,     NULL,         2ul, 2ul, 0ul },
+    { binding_trig_fold_sqrt_quotient,     NULL,         3ul, 2ul, 0ul },
+    { binding_trig_fold_number,            &NUM_ONE,     0ul, 0ul, 0ul },
+    { binding_trig_fold_sqrt_quotient,     NULL,         3ul, 2ul, 0ul },
+    { binding_trig_fold_sqrt_quotient,     NULL,         2ul, 2ul, 0ul },
+    { binding_trig_fold_number,            &NUM_HALF,    0ul, 0ul, 0ul },
+    { binding_trig_fold_number,            &NUM_ZERO,    0ul, 0ul, 0ul },
+    { binding_trig_fold_neg_number,        &NUM_HALF,    0ul, 0ul, 0ul },
+    { binding_trig_fold_neg_sqrt_quotient, NULL,         2ul, 2ul, 0ul },
+    { binding_trig_fold_neg_sqrt_quotient, NULL,         3ul, 2ul, 0ul },
+    { binding_trig_fold_number,            &NUM_NEG_ONE, 0ul, 0ul, 0ul },
+    { binding_trig_fold_neg_sqrt_quotient, NULL,         3ul, 2ul, 0ul },
+    { binding_trig_fold_neg_sqrt_quotient, NULL,         2ul, 2ul, 0ul },
+    { binding_trig_fold_neg_number,        &NUM_HALF,    0ul, 0ul, 0ul }
 };
+
+static const binding_trig_exact_rule_t s_binding_trig_exact_rules_cos[] = {
+    { binding_trig_fold_number,            &NUM_ONE,     0ul, 0ul, 0ul },
+    { binding_trig_fold_sqrt_quotient,     NULL,         3ul, 2ul, 0ul },
+    { binding_trig_fold_sqrt_quotient,     NULL,         2ul, 2ul, 0ul },
+    { binding_trig_fold_number,            &NUM_HALF,    0ul, 0ul, 0ul },
+    { binding_trig_fold_number,            &NUM_ZERO,    0ul, 0ul, 0ul },
+    { binding_trig_fold_neg_number,        &NUM_HALF,    0ul, 0ul, 0ul },
+    { binding_trig_fold_neg_sqrt_quotient, NULL,         2ul, 2ul, 0ul },
+    { binding_trig_fold_neg_sqrt_quotient, NULL,         3ul, 2ul, 0ul },
+    { binding_trig_fold_number,            &NUM_NEG_ONE, 0ul, 0ul, 0ul },
+    { binding_trig_fold_neg_sqrt_quotient, NULL,         3ul, 2ul, 0ul },
+    { binding_trig_fold_neg_sqrt_quotient, NULL,         2ul, 2ul, 0ul },
+    { binding_trig_fold_neg_number,        &NUM_HALF,    0ul, 0ul, 0ul },
+    { binding_trig_fold_number,            &NUM_ZERO,    0ul, 0ul, 0ul },
+    { binding_trig_fold_number,            &NUM_HALF,    0ul, 0ul, 0ul },
+    { binding_trig_fold_sqrt_quotient,     NULL,         2ul, 2ul, 0ul },
+    { binding_trig_fold_sqrt_quotient,     NULL,         3ul, 2ul, 0ul }
+};
+
+static const binding_trig_exact_rule_t s_binding_trig_exact_rules_tan[] = {
+    { binding_trig_fold_number,            &NUM_ZERO,    0ul, 0ul, 0ul },
+    { binding_trig_fold_sqrt_quotient,     NULL,         3ul, 3ul, 0ul },
+    { binding_trig_fold_number,            &NUM_ONE,     0ul, 0ul, 0ul },
+    { binding_trig_fold_sqrt,              NULL,         3ul, 0ul, 0ul },
+    { binding_trig_fold_number,            &NUM_INF,     0ul, 0ul, 0ul },
+    { binding_trig_fold_neg_sqrt,          NULL,         3ul, 0ul, 0ul },
+    { binding_trig_fold_number,            &NUM_NEG_ONE, 0ul, 0ul, 0ul },
+    { binding_trig_fold_neg_sqrt_quotient, NULL,         3ul, 3ul, 0ul },
+    { binding_trig_fold_number,            &NUM_ZERO,    0ul, 0ul, 0ul },
+    { binding_trig_fold_sqrt_quotient,     NULL,         3ul, 3ul, 0ul },
+    { binding_trig_fold_number,            &NUM_ONE,     0ul, 0ul, 0ul },
+    { binding_trig_fold_sqrt,              NULL,         3ul, 0ul, 0ul },
+    { binding_trig_fold_number,            &NUM_NINF,    0ul, 0ul, 0ul },
+    { binding_trig_fold_neg_sqrt,          NULL,         3ul, 0ul, 0ul },
+    { binding_trig_fold_number,            &NUM_NEG_ONE, 0ul, 0ul, 0ul },
+    { binding_trig_fold_neg_sqrt_quotient, NULL,         3ul, 3ul, 0ul }
+};
+
+static const binding_trig_exact_rule_t s_binding_trig_exact_rules_sec[] = {
+    { binding_trig_fold_number,                   &NUM_ONE,     0ul, 0ul, 0ul },
+    { binding_trig_fold_scaled_sqrt_quotient,     NULL,         3ul, 3ul, 2ul },
+    { binding_trig_fold_sqrt,                     NULL,         2ul, 0ul, 0ul },
+    { binding_trig_fold_number,                   &NUM_TWO,     0ul, 0ul, 0ul },
+    { binding_trig_fold_number,                   &NUM_INF,     0ul, 0ul, 0ul },
+    { binding_trig_fold_neg_number,               &NUM_TWO,     0ul, 0ul, 0ul },
+    { binding_trig_fold_neg_sqrt,                 NULL,         2ul, 0ul, 0ul },
+    { binding_trig_fold_neg_scaled_sqrt_quotient, NULL,         3ul, 3ul, 2ul },
+    { binding_trig_fold_number,                   &NUM_NEG_ONE, 0ul, 0ul, 0ul },
+    { binding_trig_fold_neg_scaled_sqrt_quotient, NULL,         3ul, 3ul, 2ul },
+    { binding_trig_fold_neg_sqrt,                 NULL,         2ul, 0ul, 0ul },
+    { binding_trig_fold_neg_number,               &NUM_TWO,     0ul, 0ul, 0ul },
+    { binding_trig_fold_number,                   &NUM_INF,     0ul, 0ul, 0ul },
+    { binding_trig_fold_number,                   &NUM_TWO,     0ul, 0ul, 0ul },
+    { binding_trig_fold_sqrt,                     NULL,         2ul, 0ul, 0ul },
+    { binding_trig_fold_scaled_sqrt_quotient,     NULL,         3ul, 3ul, 2ul }
+};
+
+static const binding_trig_exact_rule_t s_binding_trig_exact_rules_cosec[] = {
+    { binding_trig_fold_number,                   &NUM_INF,     0ul, 0ul, 0ul },
+    { binding_trig_fold_number,                   &NUM_TWO,     0ul, 0ul, 0ul },
+    { binding_trig_fold_sqrt,                     NULL,         2ul, 0ul, 0ul },
+    { binding_trig_fold_scaled_sqrt_quotient,     NULL,         3ul, 3ul, 2ul },
+    { binding_trig_fold_number,                   &NUM_ONE,     0ul, 0ul, 0ul },
+    { binding_trig_fold_scaled_sqrt_quotient,     NULL,         3ul, 3ul, 2ul },
+    { binding_trig_fold_sqrt,                     NULL,         2ul, 0ul, 0ul },
+    { binding_trig_fold_number,                   &NUM_TWO,     0ul, 0ul, 0ul },
+    { binding_trig_fold_number,                   &NUM_INF,     0ul, 0ul, 0ul },
+    { binding_trig_fold_neg_number,               &NUM_TWO,     0ul, 0ul, 0ul },
+    { binding_trig_fold_neg_sqrt,                 NULL,         2ul, 0ul, 0ul },
+    { binding_trig_fold_neg_scaled_sqrt_quotient, NULL,         3ul, 3ul, 2ul },
+    { binding_trig_fold_number,                   &NUM_NEG_ONE, 0ul, 0ul, 0ul },
+    { binding_trig_fold_neg_scaled_sqrt_quotient, NULL,         3ul, 3ul, 2ul },
+    { binding_trig_fold_neg_sqrt,                 NULL,         2ul, 0ul, 0ul },
+    { binding_trig_fold_neg_number,               &NUM_TWO,     0ul, 0ul, 0ul }
+};
+
+static const binding_trig_exact_rule_t s_binding_trig_exact_rules_cot[] = {
+    { binding_trig_fold_number,            &NUM_INF,     0ul, 0ul, 0ul },
+    { binding_trig_fold_sqrt,              NULL,         3ul, 0ul, 0ul },
+    { binding_trig_fold_number,            &NUM_ONE,     0ul, 0ul, 0ul },
+    { binding_trig_fold_sqrt_quotient,     NULL,         3ul, 3ul, 0ul },
+    { binding_trig_fold_number,            &NUM_ZERO,    0ul, 0ul, 0ul },
+    { binding_trig_fold_neg_sqrt_quotient, NULL,         3ul, 3ul, 0ul },
+    { binding_trig_fold_number,            &NUM_NEG_ONE, 0ul, 0ul, 0ul },
+    { binding_trig_fold_neg_sqrt,          NULL,         3ul, 0ul, 0ul },
+    { binding_trig_fold_number,            &NUM_INF,     0ul, 0ul, 0ul },
+    { binding_trig_fold_sqrt,              NULL,         3ul, 0ul, 0ul },
+    { binding_trig_fold_number,            &NUM_ONE,     0ul, 0ul, 0ul },
+    { binding_trig_fold_sqrt_quotient,     NULL,         3ul, 3ul, 0ul },
+    { binding_trig_fold_number,            &NUM_ZERO,    0ul, 0ul, 0ul },
+    { binding_trig_fold_neg_sqrt_quotient, NULL,         3ul, 3ul, 0ul },
+    { binding_trig_fold_number,            &NUM_NEG_ONE, 0ul, 0ul, 0ul },
+    { binding_trig_fold_neg_sqrt,          NULL,         3ul, 0ul, 0ul }
+};
+
+static const int8_t s_binding_trig_exact_index[BINDING_TRIG_EXACT_TWELFTH_COUNT] = {
+    [0]  = 0,
+    [1]  = BINDING_TRIG_EXACT_INDEX_MISSING,
+    [2]  = 1,
+    [3]  = 2,
+    [4]  = 3,
+    [5]  = BINDING_TRIG_EXACT_INDEX_MISSING,
+    [6]  = 4,
+    [7]  = BINDING_TRIG_EXACT_INDEX_MISSING,
+    [8]  = 5,
+    [9]  = 6,
+    [10] = 7,
+    [11] = BINDING_TRIG_EXACT_INDEX_MISSING,
+    [12] = 8,
+    [13] = BINDING_TRIG_EXACT_INDEX_MISSING,
+    [14] = 9,
+    [15] = 10,
+    [16] = 11,
+    [17] = BINDING_TRIG_EXACT_INDEX_MISSING,
+    [18] = 12,
+    [19] = BINDING_TRIG_EXACT_INDEX_MISSING,
+    [20] = 13,
+    [21] = 14,
+    [22] = 15,
+    [23] = BINDING_TRIG_EXACT_INDEX_MISSING
+};
+
+enum {
+    BINDING_TRIG_EXACT_RULE_KIND_MIN = (int)EXPR_KIND_SIN,
+    BINDING_TRIG_EXACT_RULE_KIND_MAX = (int)EXPR_KIND_COT,
+    BINDING_TRIG_EXACT_RULE_KIND_COUNT =
+        BINDING_TRIG_EXACT_RULE_KIND_MAX - BINDING_TRIG_EXACT_RULE_KIND_MIN + 1
+};
+
+static const binding_trig_exact_rule_t *const
+    s_binding_trig_exact_rule_tables[BINDING_TRIG_EXACT_RULE_KIND_COUNT] = {
+    [EXPR_KIND_SIN - BINDING_TRIG_EXACT_RULE_KIND_MIN] = s_binding_trig_exact_rules_sin,
+    [EXPR_KIND_COS - BINDING_TRIG_EXACT_RULE_KIND_MIN] = s_binding_trig_exact_rules_cos,
+    [EXPR_KIND_TAN - BINDING_TRIG_EXACT_RULE_KIND_MIN] = s_binding_trig_exact_rules_tan,
+    [EXPR_KIND_SEC - BINDING_TRIG_EXACT_RULE_KIND_MIN] = s_binding_trig_exact_rules_sec,
+    [EXPR_KIND_COSEC - BINDING_TRIG_EXACT_RULE_KIND_MIN] = s_binding_trig_exact_rules_cosec,
+    [EXPR_KIND_COT - BINDING_TRIG_EXACT_RULE_KIND_MIN] = s_binding_trig_exact_rules_cot
+};
+
+static const binding_trig_exact_rule_t *binding_trig_exact_rule_lookup(
+    const expr_ops_t *ops,
+    long twelfths)
+{
+    const binding_trig_exact_rule_t *rules;
+    int kind;
+    int8_t index;
+
+    kind = ops ? (int)ops->kind : -1;
+    if (!ops ||
+        twelfths < 0L || twelfths >= (long)BINDING_TRIG_EXACT_TWELFTH_COUNT ||
+        kind < BINDING_TRIG_EXACT_RULE_KIND_MIN ||
+        kind > BINDING_TRIG_EXACT_RULE_KIND_MAX)
+        return NULL;
+
+    rules = s_binding_trig_exact_rule_tables[
+        kind - BINDING_TRIG_EXACT_RULE_KIND_MIN];
+    if (!rules)
+        return NULL;
+
+    index = s_binding_trig_exact_index[twelfths];
+    return index >= 0 ? &rules[index] : NULL;
+}
 
 static expr_binding_expr_t *binding_expr_fold_trig_rule_owned(
     expr_binding_expr_t *expr,
@@ -1788,7 +1963,7 @@ static expr_binding_expr_t *binding_expr_fold_trig_rule_owned(
 expr_binding_expr_t *binding_expr_try_simplify_trig_exact(expr_binding_expr_t *expr)
 {
     long twelfths;
-    size_t i;
+    const binding_trig_exact_rule_t *rule;
 
     if (!expr || expr->kind != EXPR_BINDING_EXPR_UNARY_OP)
         return expr;
@@ -1798,13 +1973,9 @@ expr_binding_expr_t *binding_expr_try_simplify_trig_exact(expr_binding_expr_t *e
     else if (!binding_expr_pi_ratio_twelfths(expr->u.unary_op.child, &twelfths))
         return expr;
 
-    for (i = 0u; i < sizeof(s_binding_trig_exact_rules) /
-                        sizeof(s_binding_trig_exact_rules[0]); ++i) {
-        if (s_binding_trig_exact_rules[i].ops == expr->u.unary_op.ops &&
-            s_binding_trig_exact_rules[i].twelfths == twelfths)
-            return binding_expr_fold_trig_rule_owned(expr,
-                                                     &s_binding_trig_exact_rules[i]);
-    }
+    rule = binding_trig_exact_rule_lookup(expr->u.unary_op.ops, twelfths);
+    if (rule)
+        return binding_expr_fold_trig_rule_owned(expr, rule);
 
     return expr;
 }

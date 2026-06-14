@@ -1145,6 +1145,7 @@ static expr_t *parse_atom(expr_parse_state_t *p)
         scan_special_number_literal_len_view(text, pos) > 0u) {
         size_t len = scan_number_atom_len_view(text, pos);
         size_t special_len = scan_special_number_literal_len_view(text, pos);
+        size_t decimal_len = expr_parse_scan_decimal_len(text, pos);
         string_view_t literal_view;
         number_t value;
         expr_t *node;
@@ -1166,6 +1167,21 @@ static expr_t *parse_atom(expr_parse_state_t *p)
                                        true)) {
             literal_text = (char *)fs_xmalloc(4u);
             memcpy(literal_text, "NAN", 4u);
+        } else if (decimal_len > 0u &&
+                   (len == decimal_len ||
+                    (len == decimal_len + 1u &&
+                     expr_parse_view_peek_ascii(text, pos + decimal_len, &b) &&
+                     (b == 'i' || b == 'I')))) {
+            string_t *literal = string_from_view(&literal_view);
+
+            literal_text = literal ? strdup(string_c_str(literal)) : NULL;
+            string_free(literal);
+            if (!literal_text) {
+                expr_free(node);
+                num_destroy(&value);
+                set_error(p, "could not preserve numeric literal");
+                return NULL;
+            }
         } else if (num_is_exact(value)) {
             string_t *exact_text = num_to_string(value);
 

@@ -150,7 +150,7 @@ int main(void) {
 Expected output:
 
 ```json
-{"$mars.number":"2/3"}
+{"$mars.number":"⅔"}
 ```
 
 `@pi` and similar typeable aliases are accepted on input for convenience, but

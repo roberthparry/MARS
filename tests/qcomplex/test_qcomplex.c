@@ -1488,13 +1488,14 @@ static void test_from_string(void)
 
 int tests_main(void)
 {
-    TEST_RUN_CASE(test_arithmetic_group, NULL);
-    TEST_RUN_CASE(test_elementary_group, NULL);
-    TEST_RUN_CASE(test_trig_group, NULL);
-    TEST_RUN_CASE(test_special_group, NULL);
-    TEST_RUN_CASE(test_util_group, NULL);
-    TEST_RUN_CASE(test_from_string, NULL);
-    TEST_RUN_OUTPUT_TAGS(example_euler_identity, "qcomplex,readme,output");
+    TEST_RUN_IN_GROUP(test_arithmetic_group, tests, NULL);
+    TEST_RUN_IN_GROUP(test_elementary_group, tests, NULL);
+    TEST_RUN_IN_GROUP(test_trig_group, tests, NULL);
+    TEST_RUN_IN_GROUP(test_special_group, tests, NULL);
+    TEST_RUN_IN_GROUP(test_util_group, tests, NULL);
+    TEST_RUN_IN_GROUP(test_from_string, tests, NULL);
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_euler_identity, readme_examples,
+                                  "qcomplex,readme,output");
 
     return TESTS_EXIT_CODE();
 }

@@ -344,6 +344,17 @@ bool rune_is_equal(const rune_t rune, char ch);
 bool rune_is_digit(rune_t rune);
 
 /**
+ * @brief Test whether a rune is a Unicode control character.
+ *
+ * Uses Unicode character properties when available; otherwise recognises
+ * the standard C0, DEL, and C1 control ranges.
+ *
+ * @param rune  Rune value to inspect.
+ * @return      @c true when @p rune is a control character.
+ */
+bool rune_is_control(rune_t rune);
+
+/**
  * @brief Test whether a rune is alphabetic or a decimal digit.
  *
  * Uses Unicode character properties when available; otherwise recognises
@@ -354,6 +365,17 @@ bool rune_is_digit(rune_t rune);
  * @return      @c true when @p rune is alphabetic or a decimal digit.
  */
 bool rune_is_alpha_numeric(rune_t rune);
+
+/**
+ * @brief Test whether a rune is a recognised Unicode fraction marker.
+ *
+ * This recognises the standard vulgar fraction glyphs together with the
+ * Unicode fraction slash used in stacked fractions.
+ *
+ * @param rune  Rune value to inspect.
+ * @return      @c true when @p rune is a recognised fraction marker.
+ */
+bool rune_is_fraction(rune_t rune);
 
 /**
  * @brief Copy a rune into a new string.

@@ -1106,6 +1106,14 @@ static void binding_exact_complex_set(binding_exact_complex_t *out,
     out->imag = num_scope_detach(imag);
 }
 
+static void binding_num_destroy_detached(number_t *value)
+{
+    if (!value)
+        return;
+    *value = num_scope_detach(*value);
+    num_destroy(value);
+}
+
 bool expr_binding_expr_exact_complex(const expr_binding_expr_t *expr,
                                    binding_exact_complex_t *out)
 {
@@ -1169,7 +1177,7 @@ static bool binding_number_string_exact_complex(const string_t *text,
             string_free(coeff_text);
         }
         if (!num_is_exact(value) || !num_is_real(value)) {
-            num_destroy(&value);
+            binding_num_destroy_detached(&value);
             string_cursor_free(cursor);
             return false;
         }
@@ -1180,7 +1188,7 @@ static bool binding_number_string_exact_complex(const string_t *text,
 
     value = binding_number_from_string(text);
     if (!num_is_exact(value) || !num_is_real(value)) {
-        num_destroy(&value);
+        binding_num_destroy_detached(&value);
         string_cursor_free(cursor);
         return false;
     }

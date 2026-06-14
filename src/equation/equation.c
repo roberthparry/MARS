@@ -368,10 +368,21 @@ static int equ_derive_without_bindings(const equation_t *equation,
 }
 
 static expr_t *equ_simplify_owned(expr_t *expr);
+static bool equ_expr_is_zero(const expr_t *expr);
+static bool equ_expr_is_one(const expr_t *expr);
+static expr_t *equ_symbolic_pi_expr(void);
+static expr_t *equ_symbolic_two_pi_expr(void);
+static expr_t *equ_exact_tan_sqrt_three_family_expr(void);
 
 static int equ_try_solve_symbolic_affine(const expr_t *residual,
                                               const expr_t *wrt,
                                               equation_solutions_t *solutions);
+static int equ_try_solve_unary_periodic(const equation_t *equation,
+                                             const expr_t *wrt,
+                                             equation_solutions_t *solutions);
+static int equ_try_solve_unary_inverse(const equation_t *equation,
+                                            const expr_t *wrt,
+                                            equation_solutions_t *solutions);
 
 static int equ_try_solve_affine(const equation_t *equation,
                                      const expr_t *wrt,
@@ -451,6 +462,103 @@ static expr_t *equ_simplify_owned(expr_t *expr)
     return simplified;
 }
 
+static expr_t *equ_symbolic_pi_expr(void)
+{
+    number_t pi_value = num_clone(NUM_PI);
+    expr_t *pi = expr_new_named_const(pi_value, "@pi");
+
+    num_destroy(&pi_value);
+    return pi;
+}
+
+static expr_t *equ_symbolic_two_pi_expr(void)
+{
+    number_t two_value = num_create_from_long(2L);
+    expr_t *two = expr_new_const(two_value);
+    expr_t *pi = equ_symbolic_pi_expr();
+    expr_t *out = (two && pi) ? expr_mul(two, pi) : NULL;
+
+    expr_free(pi);
+    expr_free(two);
+    num_destroy(&two_value);
+    return out;
+}
+
+static expr_t *equ_exact_sin_one_family_expr(void)
+{
+    number_t two_value = num_create_from_long(2L);
+    number_t four_value = num_create_from_long(4L);
+    number_t one_value = num_create_from_long(1L);
+    expr_t *pi = equ_symbolic_pi_expr();
+    expr_t *two = expr_new_const(two_value);
+    expr_t *four = expr_new_const(four_value);
+    expr_t *one = expr_new_const(one_value);
+    expr_t *n = expr_new_named_var(NUM_NAN, "n");
+    expr_t *pi_over_two = (pi && two) ? expr_div(pi, two) : NULL;
+    expr_t *four_n = (four && n) ? expr_mul(four, n) : NULL;
+    expr_t *affine = (four_n && one) ? expr_add(four_n, one) : NULL;
+    expr_t *out = (pi_over_two && affine) ? expr_mul(pi_over_two, affine)
+                                          : NULL;
+
+    expr_free(affine);
+    expr_free(four_n);
+    expr_free(pi_over_two);
+    expr_free(n);
+    expr_free(one);
+    expr_free(four);
+    expr_free(two);
+    expr_free(pi);
+    num_destroy(&one_value);
+    num_destroy(&four_value);
+    num_destroy(&two_value);
+    return out;
+}
+
+static expr_t *equ_exact_tan_sqrt_three_family_expr(void)
+{
+    number_t one_value = num_create_from_long(1L);
+    number_t three_value = num_create_from_long(3L);
+    number_t one_third_value = num_div(one_value, three_value);
+    expr_t *one = expr_new_const(one_value);
+    expr_t *three = expr_new_const(three_value);
+    expr_t *pi = equ_symbolic_pi_expr();
+    expr_t *n = expr_new_named_var(NUM_NAN, "n");
+    expr_t *one_third = expr_new_const(one_third_value);
+    expr_t *three_n = (three && n) ? expr_mul(three, n) : NULL;
+    expr_t *affine = (three_n && one) ? expr_add(three_n, one) : NULL;
+    expr_t *pi_affine = (pi && affine) ? expr_mul(pi, affine) : NULL;
+    expr_t *out = (one_third && pi_affine) ? expr_mul(one_third, pi_affine)
+                                           : NULL;
+    expr_binding_expr_t *binding_expr = NULL;
+
+    if (out) {
+        /* Preserve the exact symbolic family shape for string/TeX output. */
+        binding_expr = expr_binding_expr_new_mul(
+            expr_binding_expr_new_div(
+                expr_binding_expr_new_number_text("1"),
+                expr_binding_expr_new_number_text("3")),
+            expr_binding_expr_new_mul(
+                expr_binding_expr_new_const(EXPR_BINDING_CONST_PI),
+                expr_binding_expr_new_add(
+                    expr_binding_expr_new_number_text("3n"),
+                    expr_binding_expr_new_number_text("1"))));
+        out->binding_expr = binding_expr;
+    }
+
+    expr_free(pi_affine);
+    expr_free(affine);
+    expr_free(three_n);
+    expr_free(one_third);
+    expr_free(n);
+    expr_free(pi);
+    expr_free(three);
+    expr_free(one);
+    num_destroy(&one_third_value);
+    num_destroy(&three_value);
+    num_destroy(&one_value);
+    return out;
+}
+
 static expr_t *equ_symbolic_linear_root(const expr_t *constant,
                                              const expr_t *linear)
 {
@@ -460,6 +568,339 @@ static expr_t *equ_symbolic_linear_root(const expr_t *constant,
 
     expr_free(neg_constant);
     return root;
+}
+
+static expr_t *equ_symbolic_linear_phase_root(const expr_t *constant,
+                                                   const expr_t *linear,
+                                                   const expr_t *phase)
+{
+    if (equ_expr_is_zero(constant) && equ_expr_is_one(linear)) {
+        expr_t *copy = (expr_t *)phase;
+
+        expr_retain(copy);
+        return equ_simplify_owned(copy);
+    }
+
+    expr_t *shifted_constant = (constant && phase)
+        ? expr_sub(constant, phase)
+        : NULL;
+    expr_t *root = shifted_constant
+        ? equ_symbolic_linear_root(shifted_constant, linear)
+        : NULL;
+
+    expr_free(shifted_constant);
+    return root;
+}
+
+static expr_t *equ_periodic_family_expr(const expr_t *base,
+                                             const expr_t *period,
+                                             const expr_t *n)
+{
+    expr_t *period_term = (period && n) ? expr_mul(period, n) : NULL;
+    expr_t *sum = (base && period_term) ? expr_add(base, period_term) : NULL;
+    expr_t *out = equ_simplify_owned(sum);
+
+    expr_free(period_term);
+    return out;
+}
+
+static expr_t *equ_periodic_sub_family_expr(const expr_t *offset,
+                                                 const expr_t *period,
+                                                 const expr_t *n,
+                                                 const expr_t *subtrahend)
+{
+    expr_t *period_term = (period && n) ? expr_mul(period, n) : NULL;
+    expr_t *offset_sum = (offset && period_term) ? expr_add(offset, period_term)
+                                                 : NULL;
+    expr_t *difference = (offset_sum && subtrahend)
+        ? expr_sub(offset_sum, subtrahend)
+        : NULL;
+    expr_t *out = equ_simplify_owned(difference);
+
+    expr_free(offset_sum);
+    expr_free(period_term);
+    return out;
+}
+
+static int equ_append_trig_family_root(const expr_t *wrt,
+                                            const expr_t *constant,
+                                            const expr_t *linear,
+                                            const expr_t *base,
+                                            const expr_t *period,
+                                            const expr_t *n,
+                                            equation_solutions_t *solutions)
+{
+    expr_t *family = equ_periodic_family_expr(base, period, n);
+    expr_t *root = family
+        ? equ_symbolic_linear_phase_root(constant, linear, family)
+        : NULL;
+    int rc = -1;
+
+    if (!root)
+        goto cleanup;
+    if (equ_append_solution_expr(wrt, root, solutions) != 0)
+        goto cleanup;
+
+    rc = 0;
+
+cleanup:
+    expr_free(root);
+    expr_free(family);
+    return rc;
+}
+
+static int equ_try_solve_periodic_trig_kind(expr_op_kind_t kind,
+                                                 const expr_t *inner,
+                                                 const expr_t *target,
+                                                 const expr_t *wrt,
+                                                 equation_solutions_t *solutions)
+{
+    expr_t *constant = NULL;
+    expr_t *linear = NULL;
+    expr_t *n = NULL;
+    expr_t *base = NULL;
+    expr_t *alt_base = NULL;
+    expr_t *period = NULL;
+    expr_t *pi = NULL;
+    expr_t *neg_base = NULL;
+    expr_t *exact_family = NULL;
+    expr_t *exact_root = NULL;
+    int rc = -1;
+
+    if (!inner || !target || !wrt || !solutions)
+        return -1;
+    if (!equ_match_symbolic_linear_expr(inner, wrt, &constant, &linear)) {
+        rc = 1;
+        goto cleanup;
+    }
+
+    n = expr_new_named_var(NUM_NAN, "n");
+    if (!n)
+        goto cleanup;
+
+    switch (kind) {
+        case EXPR_KIND_SIN:
+            if (equ_expr_is_one(target)) {
+                exact_family = equ_exact_sin_one_family_expr();
+                if (!exact_family)
+                    goto cleanup;
+                if (equ_expr_is_zero(constant) && equ_expr_is_one(linear)) {
+                    rc = equ_append_solution_expr(wrt, exact_family, solutions);
+                    break;
+                }
+                exact_root = equ_symbolic_linear_phase_root(constant, linear,
+                                                            exact_family);
+                if (!exact_root)
+                    goto cleanup;
+                rc = equ_append_solution_expr(wrt, exact_root, solutions);
+                break;
+            }
+            base = expr_asin(target);
+            period = equ_symbolic_two_pi_expr();
+            if (!base || !period)
+                goto cleanup;
+            rc = equ_append_trig_family_root(wrt, constant, linear, base, period,
+                                            n, solutions);
+            if (rc != 0)
+                goto cleanup;
+            pi = equ_symbolic_pi_expr();
+            alt_base = equ_periodic_sub_family_expr(pi, period, n, base);
+            if (!alt_base)
+                goto cleanup;
+            exact_root = equ_symbolic_linear_phase_root(constant, linear, alt_base);
+            if (!exact_root) {
+                rc = -1;
+                goto cleanup;
+            }
+            if (equ_append_solution_expr(wrt, exact_root, solutions) != 0) {
+                equ_solutions_clear(solutions);
+                rc = -1;
+                goto cleanup;
+            }
+            rc = 0;
+            break;
+
+        case EXPR_KIND_COS:
+            base = expr_acos(target);
+            period = equ_symbolic_two_pi_expr();
+            if (!base || !period)
+                goto cleanup;
+            rc = equ_append_trig_family_root(wrt, constant, linear, base, period,
+                                            n, solutions);
+            if (rc != 0)
+                goto cleanup;
+            neg_base = base ? expr_neg(base) : NULL;
+            alt_base = equ_simplify_owned(neg_base);
+            neg_base = NULL;
+            if (!alt_base)
+                goto cleanup;
+            if (equ_append_trig_family_root(wrt, constant, linear, alt_base, period,
+                                            n, solutions) != 0) {
+                equ_solutions_clear(solutions);
+                rc = -1;
+                goto cleanup;
+            }
+            rc = 0;
+            break;
+
+        case EXPR_KIND_TAN:
+        {
+            number_t target_value = num_new();
+            bool is_sqrt_three = expr_match_const_value(target, &target_value) &&
+                                num_eq(target_value, NUM_SQRT3);
+
+            num_destroy(&target_value);
+            if (is_sqrt_three) {
+                exact_family = equ_exact_tan_sqrt_three_family_expr();
+                if (!exact_family)
+                    goto cleanup;
+                if (equ_expr_is_zero(constant) && equ_expr_is_one(linear)) {
+                    rc = equ_append_solution_expr(wrt, exact_family, solutions);
+                    break;
+                }
+                exact_root = equ_symbolic_linear_phase_root(constant, linear,
+                                                            exact_family);
+                if (!exact_root)
+                    goto cleanup;
+                rc = equ_append_solution_expr(wrt, exact_root, solutions);
+                break;
+            }
+            base = expr_atan(target);
+            period = equ_symbolic_pi_expr();
+            if (!base || !period)
+                goto cleanup;
+            rc = equ_append_trig_family_root(wrt, constant, linear, base, period,
+                                            n, solutions);
+            break;
+        }
+
+        default:
+            rc = 1;
+            break;
+    }
+
+cleanup:
+    expr_free(exact_root);
+    expr_free(exact_family);
+    expr_free(neg_base);
+    expr_free(pi);
+    expr_free(period);
+    expr_free(alt_base);
+    expr_free(base);
+    expr_free(n);
+    expr_free(linear);
+    expr_free(constant);
+    return rc;
+}
+
+static int equ_try_solve_unary_periodic_side(const expr_t *lhs,
+                                                  const expr_t *rhs,
+                                                  const expr_t *wrt,
+                                                  equation_solutions_t *solutions)
+{
+    const expr_t *inner = NULL;
+
+    if (!lhs || !rhs || !wrt || !solutions)
+        return -1;
+    if (!equ_expr_uses_wrt(lhs, wrt) || equ_expr_uses_wrt(rhs, wrt))
+        return 1;
+
+    if (expr_match_unary_op(lhs, EXPR_KIND_SIN, &inner))
+        return equ_try_solve_periodic_trig_kind(EXPR_KIND_SIN, inner, rhs,
+                                                wrt, solutions);
+    if (expr_match_unary_op(lhs, EXPR_KIND_COS, &inner))
+        return equ_try_solve_periodic_trig_kind(EXPR_KIND_COS, inner, rhs,
+                                                wrt, solutions);
+    if (expr_match_unary_op(lhs, EXPR_KIND_TAN, &inner))
+        return equ_try_solve_periodic_trig_kind(EXPR_KIND_TAN, inner, rhs,
+                                                wrt, solutions);
+
+    return 1;
+}
+
+static int equ_try_solve_unary_periodic(const equation_t *equation,
+                                             const expr_t *wrt,
+                                             equation_solutions_t *solutions)
+{
+    int rc;
+
+    if (!equation || !wrt || !solutions)
+        return -1;
+
+    rc = equ_try_solve_unary_periodic_side(equation->lhs, equation->rhs,
+                                           wrt, solutions);
+    if (rc != 1)
+        return rc;
+    return equ_try_solve_unary_periodic_side(equation->rhs, equation->lhs,
+                                             wrt, solutions);
+}
+
+static expr_t *equ_unary_inverse_rhs(expr_op_kind_t kind, const expr_t *rhs)
+{
+    switch (kind) {
+        case EXPR_KIND_EXP:
+            return rhs ? equ_simplify_owned(expr_log(rhs)) : NULL;
+        case EXPR_KIND_LOG:
+            return rhs ? equ_simplify_owned(expr_exp(rhs)) : NULL;
+        default:
+            return NULL;
+    }
+}
+
+static int equ_try_solve_unary_inverse_side(const expr_t *lhs,
+                                            const expr_t *rhs,
+                                            const expr_t *wrt,
+                                            equation_solutions_t *solutions)
+{
+    const expr_t *inner = NULL;
+    expr_t *inverse_rhs = NULL;
+    equation_t *reduced = NULL;
+    int rc = 1;
+
+    if (!lhs || !rhs || !wrt || !solutions)
+        return -1;
+    if (!equ_expr_uses_wrt(lhs, wrt) || equ_expr_uses_wrt(rhs, wrt))
+        return 1;
+
+    if (expr_match_unary_op(lhs, EXPR_KIND_EXP, &inner))
+        inverse_rhs = equ_unary_inverse_rhs(EXPR_KIND_EXP, rhs);
+    else if (expr_match_unary_op(lhs, EXPR_KIND_LOG, &inner))
+        inverse_rhs = equ_unary_inverse_rhs(EXPR_KIND_LOG, rhs);
+    else
+        return 1;
+
+    if (!inverse_rhs)
+        return -1;
+
+    reduced = equ_new(inner, inverse_rhs);
+    if (!reduced) {
+        rc = -1;
+        goto cleanup;
+    }
+
+    rc = equ_solve_for_into(reduced, wrt, solutions);
+
+cleanup:
+    equ_free(reduced);
+    expr_free(inverse_rhs);
+    return rc;
+}
+
+static int equ_try_solve_unary_inverse(const equation_t *equation,
+                                            const expr_t *wrt,
+                                            equation_solutions_t *solutions)
+{
+    int rc;
+
+    if (!equation || !wrt || !solutions)
+        return -1;
+
+    rc = equ_try_solve_unary_inverse_side(equation->lhs, equation->rhs,
+                                          wrt, solutions);
+    if (rc != 1)
+        return rc;
+    return equ_try_solve_unary_inverse_side(equation->rhs, equation->lhs,
+                                            wrt, solutions);
 }
 
 static int equ_try_solve_symbolic_affine(const expr_t *residual,
@@ -572,6 +1013,15 @@ static bool equ_expr_matches_expected(const expr_t *expr,
 {
     return equ_expr_text_equal(expr, expected) ||
            equ_expr_simplifies_equal(expr, expected);
+}
+
+static bool equ_expr_is_zero(const expr_t *expr)
+{
+    number_t value = num_new();
+    bool ok = expr_match_const_value(expr, &value) && num_eq(value, NUM_ZERO);
+
+    num_destroy(&value);
+    return ok;
 }
 
 static bool equ_expr_is_one(const expr_t *expr)
@@ -1050,6 +1500,8 @@ int equ_solve_for_into(const equation_t *equation,
                             const expr_t *wrt,
                             equation_solutions_t *solutions)
 {
+    int unary_inverse_rc;
+    int unary_periodic_rc;
     int affine_rc;
     int zero_product_rc;
     int quadratic_rc;
@@ -1067,6 +1519,18 @@ int equ_solve_for_into(const equation_t *equation,
 
     if (equ_is_solved_for(equation, wrt))
         return equ_append_existing_solution(equation, solutions);
+
+    unary_inverse_rc = equ_try_solve_unary_inverse(equation, wrt, solutions);
+    if (unary_inverse_rc == 0)
+        return 0;
+    if (unary_inverse_rc < 0)
+        return -1;
+
+    unary_periodic_rc = equ_try_solve_unary_periodic(equation, wrt, solutions);
+    if (unary_periodic_rc == 0)
+        return 0;
+    if (unary_periodic_rc < 0)
+        return -1;
 
     affine_rc = equ_try_solve_affine(equation, wrt, solutions);
     if (affine_rc == 0)

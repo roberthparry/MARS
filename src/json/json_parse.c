@@ -146,38 +146,38 @@ static string_t *json_parse_string_text(json_parser_t *parser)
                 goto fail;
 
             switch (ascii) {
-            case '"':
-            case '\\':
-            case '/':
-                if (string_append_char(text, (char)ascii) != 0)
+                case '"':
+                case '\\':
+                case '/':
+                    if (string_append_char(text, (char)ascii) != 0)
+                        goto fail;
+                    break;
+                case 'b':
+                    if (string_append_char(text, '\b') != 0)
+                        goto fail;
+                    break;
+                case 'f':
+                    if (string_append_char(text, '\f') != 0)
+                        goto fail;
+                    break;
+                case 'n':
+                    if (string_append_char(text, '\n') != 0)
+                        goto fail;
+                    break;
+                case 'r':
+                    if (string_append_char(text, '\r') != 0)
+                        goto fail;
+                    break;
+                case 't':
+                    if (string_append_char(text, '\t') != 0)
+                        goto fail;
+                    break;
+                case 'u':
+                    if (!json_parse_unicode_escape(parser, text))
+                        goto fail;
+                    break;
+                default:
                     goto fail;
-                break;
-            case 'b':
-                if (string_append_char(text, '\b') != 0)
-                    goto fail;
-                break;
-            case 'f':
-                if (string_append_char(text, '\f') != 0)
-                    goto fail;
-                break;
-            case 'n':
-                if (string_append_char(text, '\n') != 0)
-                    goto fail;
-                break;
-            case 'r':
-                if (string_append_char(text, '\r') != 0)
-                    goto fail;
-                break;
-            case 't':
-                if (string_append_char(text, '\t') != 0)
-                    goto fail;
-                break;
-            case 'u':
-                if (!json_parse_unicode_escape(parser, text))
-                    goto fail;
-                break;
-            default:
-                goto fail;
             }
             continue;
         }
@@ -448,33 +448,24 @@ static json_t *json_parse_value(json_parser_t *parser)
     if (!string_cursor_peek_ascii(parser->cursor, &ch))
         return NULL;
 
-    switch (ch) {
-    case 'n':
-        return json_consume_literal(parser, "null") ? json_new_null() : NULL;
-    case 't':
-        return json_consume_literal(parser, "true") ? json_new_bool(true) : NULL;
-    case 'f':
-        return json_consume_literal(parser, "false") ? json_new_bool(false) : NULL;
-    case '"':
-        return json_parse_string_value(parser);
-    case '[':
-        return json_parse_array_value(parser);
-    case '{':
-        return json_parse_object_value(parser);
-    case '-':
-    case '0':
-    case '1':
-    case '2':
-    case '3':
-    case '4':
-    case '5':
-    case '6':
-    case '7':
-    case '8':
-    case '9':
+    if (ch == '-' || (ch >= '0' && ch <= '9'))
         return json_parse_number_value(parser);
-    default:
-        return NULL;
+
+    switch (ch) {
+        case 'n':
+            return json_consume_literal(parser, "null") ? json_new_null() : NULL;
+        case 't':
+            return json_consume_literal(parser, "true") ? json_new_bool(true) : NULL;
+        case 'f':
+            return json_consume_literal(parser, "false") ? json_new_bool(false) : NULL;
+        case '"':
+            return json_parse_string_value(parser);
+        case '[':
+            return json_parse_array_value(parser);
+        case '{':
+            return json_parse_object_value(parser);
+        default:
+            return NULL;
     }
 }
 

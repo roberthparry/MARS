@@ -247,15 +247,31 @@ static expr_t *substitute_bound_constants(const expr_t *expr,
                                           expr_bindings_t *bindings)
 {
     expr_t *current;
+    bool have_constant_bindings = false;
 
     if (!expr)
         return NULL;
 
-    current = expr_simplify((expr_t *)expr);
-    if (!current)
-        return NULL;
+    if (!bindings) {
+        current = (expr_t *)expr;
+        expr_retain(current);
+        return current;
+    }
 
-    if (!bindings)
+    for (size_t i = 0u; i < bindings->count; ++i) {
+        expr_binding_entry_t *entry = &bindings->entries[i];
+
+        if (!entry->is_constant)
+            continue;
+        if (!entry->name || string_length(entry->name) == 0u)
+            continue;
+        have_constant_bindings = true;
+        break;
+    }
+
+    current = (expr_t *)expr;
+    expr_retain(current);
+    if (!have_constant_bindings)
         return current;
 
     for (size_t i = 0u; i < bindings->count; ++i) {
@@ -298,8 +314,7 @@ static expr_t *substitute_bound_constants(const expr_t *expr,
             continue;
 
         expr_free(current);
-        current = expr_simplify(next);
-        expr_free(next);
+        current = next;
         if (!current)
             return NULL;
     }

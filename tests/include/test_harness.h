@@ -116,6 +116,10 @@ void test_run_in_group              (const char *file, int line, const char *nam
 void test_run_output_case           (const char *file, int line, const char *tags, const char *name,
                                      test_fn fn);
 
+/** Run an output/demo case beneath an explicit parent group. */
+void test_run_output_in_group       (const char *file, int line, const char *name, const char *parent,
+                                     const char *tags, test_fn fn);
+
 /** Return the process exit code implied by the recorded test results. */
 int  test_exit_code                 (void);
 
@@ -227,6 +231,12 @@ int tests_main(void);
 #define TEST_RUN_OUTPUT_TAGS(fn, tags) \
     test_run_output_case(__FILE__, __LINE__, (tags), #fn, (fn))
 
+#define TEST_RUN_OUTPUT_IN_GROUP(fn, parent) \
+    test_run_output_in_group(__FILE__, __LINE__, #fn, #parent, NULL, (fn))
+
+#define TEST_RUN_OUTPUT_IN_GROUP_TAGS(fn, parent, tags) \
+    test_run_output_in_group(__FILE__, __LINE__, #fn, #parent, (tags), (fn))
+
 #define TEST_EXIT_CODE() \
     test_exit_code()
 
@@ -317,6 +327,12 @@ int tests_main(void);
 
 #define RUN_OUTPUT_TAGS(fn, tags) \
     TEST_RUN_OUTPUT_TAGS(fn, tags)
+
+#define RUN_OUTPUT_IN_GROUP(fn, parent) \
+    TEST_RUN_OUTPUT_IN_GROUP(fn, parent)
+
+#define RUN_OUTPUT_IN_GROUP_TAGS(fn, parent, tags) \
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(fn, parent, tags)
 
 #define ASSERT_TRUE(expr) \
     TEST_ASSERT_TRUE((expr), #expr)

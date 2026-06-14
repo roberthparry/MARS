@@ -562,55 +562,56 @@ static void example_chinese_new_years(void) {
 int tests_main(void) {
 
     /* Basic Julian and date initialisation tests */
-    TEST_RUN_CASE(test_datetime_init_jd, NULL);
-    TEST_RUN_CASE(test_datetime_jdn_and_getJulianDay, NULL);
-    TEST_RUN_CASE(test_datetime_year_initialised, NULL);
-    TEST_RUN_CASE(test_datetime_init_now, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_init_jd, tests, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_jdn_and_getJulianDay, tests, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_year_initialised, tests, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_init_now, tests, NULL);
 
     /* GMT conversion tests */
-    TEST_RUN_CASE(test_datetime_to_gmt_basic, NULL);
-    TEST_RUN_CASE(test_datetime_to_gmt_null_pointer, NULL);
-    TEST_RUN_CASE(test_datetime_to_gmt_preserves_julian_values, NULL);
-    TEST_RUN_CASE(test_datetime_to_gmt_multiple_calls, NULL);
-    TEST_RUN_CASE(test_datetime_to_gmt_uninitialised, NULL);
-    TEST_RUN_CASE(test_datetime_to_gmt_with_julian_values, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_to_gmt_basic, tests, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_to_gmt_null_pointer, tests, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_to_gmt_preserves_julian_values, tests, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_to_gmt_multiple_calls, tests, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_to_gmt_uninitialised, tests, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_to_gmt_with_julian_values, tests, NULL);
 
     /* Easter Sunday tests */
-    TEST_RUN_CASE(test_datetime_init_easter_basic, NULL);
-    TEST_RUN_CASE(test_datetime_init_easter_known_dates, NULL);
-    TEST_RUN_CASE(test_datetime_init_easter_invalid_years, NULL);
-    TEST_RUN_CASE(test_datetime_init_easter_always_sunday, NULL);
-    TEST_RUN_CASE(test_datetime_init_easter_time_fields_zero, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_init_easter_basic, tests, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_init_easter_known_dates, tests, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_init_easter_invalid_years, tests, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_init_easter_always_sunday, tests, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_init_easter_time_fields_zero, tests, NULL);
 
     /* Basic allocation and initialisation tests */
-    TEST_RUN_CASE(test_datetime_alloc, NULL);
-    TEST_RUN_CASE(test_datetime_init_ymd, NULL);
-    TEST_RUN_CASE(test_datetime_init_ymdt, NULL);
-    TEST_RUN_CASE(test_datetime_init_copy, NULL);
-    TEST_RUN_CASE(test_datetime_init_jdn, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_alloc, tests, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_init_ymd, tests, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_init_ymdt, tests, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_init_copy, tests, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_init_jdn, tests, NULL);
 
     /* Chinese New Year tests */
-    TEST_RUN_CASE(test_datetime_init_chinese_new_year_basic, NULL);
-    TEST_RUN_CASE(test_datetime_init_chinese_new_year_known_dates, NULL);
-    TEST_RUN_CASE(test_datetime_init_chinese_new_year_invalid_years, NULL);
-    TEST_RUN_CASE(test_datetime_init_chinese_new_year_time_fields_zero, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_init_chinese_new_year_basic, tests, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_init_chinese_new_year_known_dates, tests, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_init_chinese_new_year_invalid_years, tests, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_init_chinese_new_year_time_fields_zero, tests, NULL);
 
     /* Timezone offset tests */
-    TEST_RUN_CASE(test_dttm_computeTimeZoneOffset_basic, NULL);
-    TEST_RUN_CASE(test_dttm_computeTimeZoneOffset_null_pointer, NULL);
-    TEST_RUN_CASE(test_dttm_computeTimeZoneOffset_uninitialised, NULL);
+    TEST_RUN_IN_GROUP(test_dttm_computeTimeZoneOffset_basic, tests, NULL);
+    TEST_RUN_IN_GROUP(test_dttm_computeTimeZoneOffset_null_pointer, tests, NULL);
+    TEST_RUN_IN_GROUP(test_dttm_computeTimeZoneOffset_uninitialised, tests, NULL);
 
     /* Julian consistency, getters, comparisons, days-in-month */
-    TEST_RUN_CASE(test_dttm_julian_roundtrip, NULL);
-    TEST_RUN_CASE(test_datetime_getters, NULL);
-    TEST_RUN_CASE(test_datetime_compare_equal, NULL);
-    TEST_RUN_CASE(test_datetime_compare_less, NULL);
-    TEST_RUN_CASE(test_datetime_compare_greater, NULL);
-    TEST_RUN_CASE(test_datetime_days_in_month, NULL);
-    TEST_RUN_CASE(test_datetime_format_uses_string_builder, NULL);
+    TEST_RUN_IN_GROUP(test_dttm_julian_roundtrip, tests, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_getters, tests, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_compare_equal, tests, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_compare_less, tests, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_compare_greater, tests, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_days_in_month, tests, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_format_uses_string_builder, tests, NULL);
 
     printf(C_YELLOW "\nRunning README examples...\n" C_RESET);
-    TEST_RUN_OUTPUT_TAGS(example_chinese_new_years, "datetime,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_chinese_new_years, readme_examples,
+                                  "datetime,readme,output");
 
     return TESTS_EXIT_CODE();
 }
