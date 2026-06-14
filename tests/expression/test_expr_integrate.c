@@ -60,6 +60,130 @@ static void assert_string_antiderivative_matches(const char *input,
     expr_bindings_free(bindings);
 }
 
+static void assert_iterated_derivatives_integrate_back(const char *input,
+                                                       const char * const expected_derivatives[4],
+                                                       const double *points,
+                                                       size_t npoints)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = expr_from_string(input, &bindings);
+    expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    expr_t *previous = expr ? expr_simplify(expr) : NULL;
+
+    ASSERT_NOT_NULL(previous);
+    ASSERT_NOT_NULL(x);
+
+    for (size_t order = 1u; order <= 4u; ++order) {
+        expr_t *raw_deriv = expr_create_deriv(previous, x);
+        expr_t *deriv = raw_deriv ? expr_simplify(raw_deriv) : NULL;
+        expr_t *anti = deriv ? expr_integrate(deriv, x) : NULL;
+        expr_t *anti_deriv = anti ? expr_create_deriv(anti, x) : NULL;
+        char label[160];
+        char *deriv_text = deriv ? expr_to_string(deriv, style_UNBOUND) : NULL;
+
+        snprintf(label, sizeof(label), "%s derivative %zu", input, order);
+        ASSERT_NOT_NULL(deriv);
+        ASSERT_NOT_NULL(deriv_text);
+        if (expected_derivatives && expected_derivatives[order - 1u]) {
+            if (str_eq(deriv_text, expected_derivatives[order - 1u]))
+                to_string_pass(label, deriv_text, expected_derivatives[order - 1u]);
+            else
+                to_string_fail(__FILE__, __LINE__, 1, label, deriv_text,
+                               expected_derivatives[order - 1u]);
+        }
+        ASSERT_NOT_NULL(anti);
+        ASSERT_NOT_NULL(anti_deriv);
+
+        for (size_t i = 0; i < npoints; ++i) {
+            char point_label[320];
+
+            test_expr_set_val_d(x, points[i]);
+            snprintf(point_label, sizeof(point_label),
+                     "%s differentiates back at x=%g", label, points[i]);
+            check_q_at(__FILE__, __LINE__, 1, point_label,
+                       expr_eval_qf(anti_deriv), expr_eval_qf(deriv));
+
+            snprintf(point_label, sizeof(point_label),
+                     "%s integrates to previous derivative at x=%g",
+                     label, points[i]);
+            check_q_at(__FILE__, __LINE__, 1, point_label,
+                       expr_eval_qf(anti), expr_eval_qf(previous));
+        }
+
+        expr_free(anti_deriv);
+        expr_free(anti);
+        expr_free(raw_deriv);
+        free(deriv_text);
+        expr_free(previous);
+        previous = deriv;
+    }
+
+    expr_free(previous);
+    expr_free(expr);
+    expr_bindings_free(bindings);
+}
+
+static void assert_nth_derivative_integrates_back(const char *input,
+                                                  size_t order,
+                                                  const double *points,
+                                                  size_t npoints)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = expr_from_string(input, &bindings);
+    expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    expr_t *previous = expr ? expr_simplify(expr) : NULL;
+    expr_t *deriv = NULL;
+    expr_t *anti = NULL;
+    expr_t *anti_deriv = NULL;
+
+    ASSERT_NOT_NULL(previous);
+    ASSERT_NOT_NULL(x);
+
+    for (size_t current = 1u; current <= order; ++current) {
+        expr_t *raw_deriv = expr_create_deriv(previous, x);
+
+        deriv = raw_deriv ? expr_simplify(raw_deriv) : NULL;
+        expr_free(raw_deriv);
+        ASSERT_NOT_NULL(deriv);
+
+        if (current < order) {
+            expr_free(previous);
+            previous = deriv;
+            deriv = NULL;
+        }
+    }
+
+    anti = deriv ? expr_integrate(deriv, x) : NULL;
+    anti_deriv = anti ? expr_create_deriv(anti, x) : NULL;
+
+    ASSERT_NOT_NULL(anti);
+    ASSERT_NOT_NULL(anti_deriv);
+
+    for (size_t i = 0; i < npoints; ++i) {
+        char point_label[320];
+
+        test_expr_set_val_d(x, points[i]);
+        snprintf(point_label, sizeof(point_label),
+                 "%s derivative %zu differentiates back at x=%g",
+                 input, order, points[i]);
+        check_q_at(__FILE__, __LINE__, 1, point_label,
+                   expr_eval_qf(anti_deriv), expr_eval_qf(deriv));
+
+        snprintf(point_label, sizeof(point_label),
+                 "%s derivative %zu integrates to previous derivative at x=%g",
+                 input, order, points[i]);
+        check_q_at(__FILE__, __LINE__, 1, point_label,
+                   expr_eval_qf(anti), expr_eval_qf(previous));
+    }
+
+    expr_free(anti_deriv);
+    expr_free(anti);
+    expr_free(deriv);
+    expr_free(previous);
+    expr_free(expr);
+    expr_bindings_free(bindings);
+}
+
 static void assert_string_antiderivative_contains(const char *input,
                                                   const char *expected)
 {
@@ -1883,6 +2007,8 @@ static void test_integrate_negative_quadratic_exponential(void)
                                                     sizeof(positive_points[0]));
     assert_string_antiderivative_matches_with_a("{ exp(a*x^2) }", -2.0,
                                                 points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ 4*exp(x^2+3)*(4*x^4+12*x^2+3) }",
+                                         points, sizeof(points) / sizeof(points[0]));
 }
 
 static void test_integrate_centered_quadratic_roots(void)
@@ -2029,6 +2155,215 @@ static void test_integrate_mixed_frequency_exp_unary(void)
                                          points, sizeof(points) / sizeof(points[0]));
     assert_string_antiderivative_matches("{ cosh(3*x)*sinh(2*x) }",
                                          points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ exp(sin(x))*(1 - sin(x) - sin(x)^2) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ exp(sin(2*x))*(1 - sin(2*x) - sin(2*x)^2) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ exp(cos(x))*(1 - cos(x) - cos(x)^2) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches(
+        "{ exp(sin(x))*(cos(x)*(cos(x)^2 - sin(x)) - sin(2*x) - cos(x)) }",
+        points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches(
+        "{ exp(sin(x))*(sin(x) - 2*cos(2*x) + cos(x)*(cos(x)*(cos(x)^2 - sin(x)) - sin(2*x) - cos(x)) + cos(x)*(-sin(2*x) - cos(x)) - sin(x)*(cos(x)^2 - sin(x))) }",
+        points, sizeof(points) / sizeof(points[0]));
+}
+
+static void test_integrate_iterated_exp_unary_derivatives(void)
+{
+    static const double points[] = { 0.45, 0.75, 1.05, 1.25 };
+    static const char * const exp_sin_derivatives[4] = {
+        "cos(x)·exp(sin(x))",
+        "exp(sin(x))·(cos²(x) - sin(x))",
+        "exp(sin(x))·(cos(x)·(cos²(x) - sin(x)) - sin(2x) - cos(x))",
+        "exp(sin(x))·(sin(x) - 2·cos(2x) + "
+        "cos(x)·(cos(x)·(cos²(x) - sin(x)) - sin(2x) - cos(x)) + "
+        "cos(x)·(-sin(2x) - cos(x)) - sin(x)·(cos²(x) - sin(x)))"
+    };
+    static const char * const exp_cos_derivatives[4] = {
+        "-sin(x)·exp(cos(x))",
+        "exp(cos(x))·(sin²(x) - cos(x))",
+        "exp(cos(x))·(sin(2x) + sin(x) - sin(x)·(sin²(x) - cos(x)))",
+        "exp(cos(x))·(2·cos(2x) + cos(x) - "
+        "sin(x)·(sin(2x) + sin(x) - sin(x)·(sin²(x) - cos(x))) - "
+        "cos(x)·(sin²(x) - cos(x)) - sin(x)·(sin(2x) + sin(x)))"
+    };
+    static const char * const exp_tan_derivatives[4] = {
+        "exp(tan(x))·(tan²(x) + 1)",
+        "exp(tan(x))·(tan²(x) + 1)·(tan(x)·(tan(x) + 2) + 1)",
+        "exp(tan(x))·(tan²(x) + 1)·"
+        "(2·(tan²(x) + 1)·(tan(x) + 1) + (tan(x)·(tan(x) + 2) + 1)²)",
+        "exp(tan(x))·(tan²(x) + 1)·"
+        "((tan(x)·(tan(x) + 2) + 1)·"
+        "(2·(tan²(x) + 1)·(tan(x) + 1) + "
+        "(tan(x)·(tan(x) + 2) + 1)²) + "
+        "2·(tan²(x) + 1)·(tan(x)·(3·tan(x) + 2) + "
+        "2·(tan(x) + 1)·(tan(x)·(tan(x) + 2) + 1) + 1))"
+    };
+    static const char * const exp_cot_derivatives[4] = {
+        "-cosec²(x)·exp(cot(x))",
+        "cosec²(x)·exp(cot(x))·(2·cot(x) + cosec²(x))",
+        "cosec²(x)·exp(cot(x))·"
+        "((-2·cot(x) - cosec²(x))·(2·cot(x) + cosec²(x)) - "
+        "2·cosec²(x)·(cot(x) + 1))",
+        "cosec²(x)·exp(cot(x))·"
+        "((-2·cot(x) - cosec²(x))·"
+        "((-2·cot(x) - cosec²(x))·(2·cot(x) + cosec²(x)) - "
+        "2·cosec²(x)·(cot(x) + 1)) + "
+        "2·cosec²(x)·(2·(cot(x) + 1)·(3·cot(x) + cosec²(x)) + "
+        "cosec²(x)))"
+    };
+    static const char * const exp_cosec_derivatives[4] = {
+        "-cosec(x)·cot(x)·exp(cosec(x))",
+        "cosec(x)·exp(cosec(x))·(cot²(x)·(cosec(x) + 1) + cosec²(x))",
+        "cosec(x)·cot(x)·exp(cosec(x))·"
+        "(cosec(x)·(-2·cosec(x)·(cosec(x) + 2) - cot²(x)) - "
+        "(cosec(x) + 1)·(cot²(x)·(cosec(x) + 1) + cosec²(x)))",
+        "cosec(x)·exp(cosec(x))·"
+        "((-cot²(x)·(cosec(x) + 1) - cosec²(x))·"
+        "(cosec(x)·(-2·cosec(x)·(cosec(x) + 2) - cot²(x)) - "
+        "(cosec(x) + 1)·(cot²(x)·(cosec(x) + 1) + cosec²(x))) + "
+        "cosec(x)·cot²(x)·(2·(cosec(x) + 1)·"
+        "(cosec(x)·(cosec(x) + 6) + cot²(x)) + cot²(x) + cosec²(x)))"
+    };
+    static const char * const exp_sec_derivatives[4] = {
+        "sec(x)·tan(x)·exp(sec(x))",
+        "sec(x)·exp(sec(x))·(tan²(x)·(sec(x) + 2) + 1)",
+        "sec(x)·tan(x)·exp(sec(x))·"
+        "((sec(x) + 1)·(tan²(x)·(sec(x) + 2) + 1) + "
+        "2·(tan²(x) + 1)·(sec(x) + 2) + tan²(x)·sec(x))",
+        "sec(x)·exp(sec(x))·"
+        "((tan²(x)·(sec(x) + 2) + 1)·"
+        "((sec(x) + 1)·(tan²(x)·(sec(x) + 2) + 1) + "
+        "2·(tan²(x) + 1)·(sec(x) + 2) + tan²(x)·sec(x)) + "
+        "tan²(x)·(sec(x)·(tan²(x)·(sec(x) + 2) + 1) + "
+        "(sec(x) + 1)·(2·(tan²(x) + 1)·(sec(x) + 2) + tan²(x)·sec(x)) + "
+        "2·(tan²(x) + 1)·(3·sec(x) + 4) + sec(x)·(3·tan²(x) + 2)))"
+    };
+    static const char * const exp_sinh_derivatives[4] = {
+        "cosh(x)·exp(sinh(x))",
+        "exp(sinh(x))·(sinh(x) + cosh²(x))",
+        "exp(sinh(x))·(cosh(x) + sinh(2x) + cosh(x)·(sinh(x) + cosh²(x)))",
+        "exp(sinh(x))·(sinh(x) + 2·cosh(2x) + "
+        "cosh(x)·(cosh(x) + sinh(2x) + cosh(x)·(sinh(x) + cosh²(x))) + "
+        "sinh(x)·(sinh(x) + cosh²(x)) + cosh(x)·(cosh(x) + sinh(2x)))"
+    };
+    static const char * const exp_cosh_derivatives[4] = {
+        "sinh(x)·exp(cosh(x))",
+        "exp(cosh(x))·(cosh(x) + sinh²(x))",
+        "exp(cosh(x))·(sinh(x) + sinh(2x) + sinh(x)·(cosh(x) + sinh²(x)))",
+        "exp(cosh(x))·(cosh(x) + 2·cosh(2x) + "
+        "sinh(x)·(sinh(x) + sinh(2x) + sinh(x)·(cosh(x) + sinh²(x))) + "
+        "cosh(x)·(cosh(x) + sinh²(x)) + sinh(x)·(sinh(x) + sinh(2x)))"
+    };
+    static const char * const exp_tanh_hyperbolic_derivatives[4] = {
+        "(1 - tanh²(x))·exp(tanh(x))",
+        "(1 - tanh²(x))·exp(tanh(x))·(1 - 2·tanh(x) - tanh²(x))",
+        "(1 - tanh²(x))·exp(tanh(x))·"
+        "(2·tanh(x)·(tanh(x)·(tanh(x) + 1) - 1) + "
+        "(1 - 2·tanh(x) - tanh²(x))² - 2)",
+        "(1 - tanh²(x))·exp(tanh(x))·"
+        "((1 - 2·tanh(x) - tanh²(x))·"
+        "(2·tanh(x)·(tanh(x)·(tanh(x) + 1) - 1) + "
+        "(1 - 2·tanh(x) - tanh²(x))² - 2) + "
+        "2·(1 - tanh²(x))·(tanh(x)·(3·tanh(x) + 2) - 1) + "
+        "4·(1 - 2·tanh(x) - tanh²(x))·"
+        "(tanh(x)·(tanh(x)·(tanh(x) + 1) - 1) - 1))"
+    };
+    static const char * const exp_sech_derivatives[4] = {
+        "-sech(x)·tanh(x)·exp(sech(x))",
+        "sech(x)·exp(sech(x))·(tanh²(x)·(sech(x) + 2) - 1)",
+        "sech(x)·tanh(x)·exp(sech(x))·"
+        "(2·(1 - tanh²(x))·(sech(x) + 2) - "
+        "(sech(x) + 1)·(tanh²(x)·(sech(x) + 2) - 1) - "
+        "tanh²(x)·sech(x))",
+        "sech(x)·exp(sech(x))·"
+        "((1 - tanh²(x)·(sech(x) + 1) - tanh²(x))·"
+        "(2·(1 - tanh²(x))·(sech(x) + 2) - "
+        "(sech(x) + 1)·(tanh²(x)·(sech(x) + 2) - 1) - "
+        "tanh²(x)·sech(x)) + "
+        "tanh²(x)·(2·(1 - tanh²(x))·(-3·sech(x) - 4) - "
+        "(sech(x) + 1)·(2·(1 - tanh²(x))·(sech(x) + 2) - "
+        "tanh²(x)·sech(x)) + sech(x)·(tanh²(x)·(sech(x) + 2) - 1) - "
+        "sech(x)·(2 - 3·tanh²(x))))"
+    };
+    static const char * const exp_cosech_hyperbolic_derivatives[4] = {
+        "-cosech(x)·coth(x)·exp(cosech(x))",
+        "cosech(x)·exp(cosech(x))·(coth²(x)·(cosech(x) + 1) + cosech²(x))",
+        "cosech(x)·coth(x)·exp(cosech(x))·"
+        "(cosech(x)·(-2·cosech(x)·(cosech(x) + 2) - coth²(x)) - "
+        "(cosech(x) + 1)·(coth²(x)·(cosech(x) + 1) + cosech²(x)))",
+        "cosech(x)·exp(cosech(x))·"
+        "((-coth²(x)·(cosech(x) + 1) - cosech²(x))·"
+        "(cosech(x)·(-2·cosech(x)·(cosech(x) + 2) - coth²(x)) - "
+        "(cosech(x) + 1)·(coth²(x)·(cosech(x) + 1) + cosech²(x))) + "
+        "cosech(x)·coth²(x)·(2·(cosech(x) + 1)·"
+        "(cosech(x)·(cosech(x) + 6) + coth²(x)) + coth²(x) + cosech²(x)))"
+    };
+    static const char * const exp_coth_hyperbolic_derivatives[4] = {
+        "-cosech²(x)·exp(coth(x))",
+        "cosech²(x)·exp(coth(x))·(2·coth(x) + cosech²(x))",
+        "cosech²(x)·exp(coth(x))·"
+        "((-2·coth(x) - cosech²(x))·(2·coth(x) + cosech²(x)) - "
+        "2·cosech²(x)·(coth(x) + 1))",
+        "cosech²(x)·exp(coth(x))·"
+        "((-2·coth(x) - cosech²(x))·"
+        "((-2·coth(x) - cosech²(x))·(2·coth(x) + cosech²(x)) - "
+        "2·cosech²(x)·(coth(x) + 1)) + "
+        "2·cosech²(x)·(2·(coth(x) + 1)·(3·coth(x) + cosech²(x)) + "
+        "cosech²(x)))"
+    };
+
+    assert_iterated_derivatives_integrate_back("{ exp(sin(x)) }",
+                                               exp_sin_derivatives,
+                                               points, sizeof(points) / sizeof(points[0]));
+    assert_iterated_derivatives_integrate_back("{ exp(cos(x)) }",
+                                               exp_cos_derivatives,
+                                               points, sizeof(points) / sizeof(points[0]));
+    assert_iterated_derivatives_integrate_back("{ exp(tan(x)) }",
+                                               exp_tan_derivatives,
+                                               points, sizeof(points) / sizeof(points[0]));
+    assert_iterated_derivatives_integrate_back("{ exp(cot(x)) }",
+                                               exp_cot_derivatives,
+                                               points, sizeof(points) / sizeof(points[0]));
+    assert_iterated_derivatives_integrate_back("{ exp(cosec(x)) }",
+                                               exp_cosec_derivatives,
+                                               points, sizeof(points) / sizeof(points[0]));
+    assert_iterated_derivatives_integrate_back("{ exp(sec(x)) }",
+                                               exp_sec_derivatives,
+                                               points, sizeof(points) / sizeof(points[0]));
+    assert_iterated_derivatives_integrate_back("{ exp(sinh(x)) }",
+                                               exp_sinh_derivatives,
+                                               points, sizeof(points) / sizeof(points[0]));
+    assert_iterated_derivatives_integrate_back("{ exp(cosh(x)) }",
+                                               exp_cosh_derivatives,
+                                               points, sizeof(points) / sizeof(points[0]));
+    assert_iterated_derivatives_integrate_back("{ exp(tanh(x)) }",
+                                               exp_tanh_hyperbolic_derivatives,
+                                               points, sizeof(points) / sizeof(points[0]));
+    assert_iterated_derivatives_integrate_back("{ exp(sech(x)) }",
+                                               exp_sech_derivatives,
+                                               points, sizeof(points) / sizeof(points[0]));
+    assert_iterated_derivatives_integrate_back("{ exp(cosech(x)) }",
+                                               exp_cosech_hyperbolic_derivatives,
+                                               points, sizeof(points) / sizeof(points[0]));
+    assert_iterated_derivatives_integrate_back("{ exp(coth(x)) }",
+                                               exp_coth_hyperbolic_derivatives,
+                                               points, sizeof(points) / sizeof(points[0]));
+    assert_nth_derivative_integrates_back("{ exp(cos(x)) }", 5u,
+                                          points, sizeof(points) / sizeof(points[0]));
+    assert_nth_derivative_integrates_back("{ exp(cos(x)) }", 6u,
+                                          points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_contains(
+        "{ -e^cos(x)*(-sin^2(x)*(sin^4(x) - 20*sin^2(x) + 16) + "
+        "15*cos^3(x) + (15 - 45*sin^2(x))*cos^2(x) + "
+        "(15*sin^4(x) - 75*sin^2(x) + 1)*cos(x)) }",
+        "sin(x)·exp(cos(x))·(cos(x)·(cos(x)·(cos(x)·(-cos(x) - 10) - 23) - 5) + 8)");
+    assert_string_antiderivative_matches(
+        "{ -e^cos(x)*(-sin^2(x)*(sin^4(x) - 20*sin^2(x) + 16) + "
+        "15*cos^3(x) + (15 - 45*sin^2(x))*cos^2(x) + "
+        "(15*sin^4(x) - 75*sin^2(x) + 1)*cos(x)) }",
+        points, sizeof(points) / sizeof(points[0]));
 }
 
 static void test_integrate_hyperbolic_table_tail(void)
@@ -2263,6 +2598,7 @@ void test_symbolic_integration(void)
     TEST_RUN_SUBTEST(test_integrate_centered_quadratic_roots, NULL);
     TEST_RUN_SUBTEST(test_integrate_trig_power_products, NULL);
     TEST_RUN_SUBTEST(test_integrate_mixed_frequency_exp_unary, NULL);
+    TEST_RUN_SUBTEST(test_integrate_iterated_exp_unary_derivatives, NULL);
     TEST_RUN_SUBTEST(test_integrate_hyperbolic_table_tail, NULL);
     TEST_RUN_SUBTEST(test_integrate_frequency_product_families, NULL);
     TEST_RUN_SUBTEST(test_integrate_more_by_parts, NULL);

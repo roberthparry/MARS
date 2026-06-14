@@ -17,15 +17,6 @@ static void symbolic_poly2_clear(symbolic_poly2_t *poly)
     }
 }
 
-static expr_t *expr_const_long_local(long value)
-{
-    number_t number = num_create_from_long(value);
-    expr_t *expr = expr_new_const(number);
-
-    num_destroy(&number);
-    return expr;
-}
-
 static bool symbolic_poly2_add_owned(symbolic_poly2_t *poly, size_t degree, expr_t *term)
 {
     expr_t *sum;
@@ -51,7 +42,7 @@ static bool symbolic_poly2_add_owned(symbolic_poly2_t *poly, size_t degree, expr
 
 static bool symbolic_poly2_add_const(symbolic_poly2_t *poly, size_t degree, long value)
 {
-    return symbolic_poly2_add_owned(poly, degree, expr_const_long_local(value));
+    return symbolic_poly2_add_owned(poly, degree, expr_const_long(value));
 }
 
 static bool symbolic_poly2_collect(const expr_t *expr, const expr_t *wrt, symbolic_poly2_t *poly);
@@ -103,7 +94,7 @@ static bool symbolic_poly2_collect(const expr_t *expr, const expr_t *wrt, symbol
         goto cleanup;
 
     if (!depends_on_wrt(expr, wrt)) {
-        ok = symbolic_poly2_add_owned(poly, 0u, expr_integrate_retain_expr(expr));
+        ok = symbolic_poly2_add_owned(poly, 0u, expr_retain_expr(expr));
         goto cleanup;
     }
 
@@ -193,8 +184,8 @@ cleanup:
 static expr_t *symbolic_poly2_coeff_or_zero(const symbolic_poly2_t *poly, size_t degree)
 {
     if (!poly || degree >= 3u || !poly->coeff[degree])
-        return expr_const_long_local(0L);
-    return expr_integrate_retain_expr(poly->coeff[degree]);
+        return expr_const_long(0L);
+    return expr_retain_expr(poly->coeff[degree]);
 }
 
 static bool symbolic_poly2_all_coeffs_numeric(const symbolic_poly2_t *poly)
@@ -331,8 +322,8 @@ static expr_t *symbolic_general_quadratic_inverse_integral(const expr_t *wrt,
                                                            const expr_t *c)
 {
     expr_t *numeric = symbolic_general_quadratic_inverse_integral_numeric(wrt, a, b, c);
-    expr_t *four = expr_const_long_local(4L);
-    expr_t *two = expr_const_long_local(2L);
+    expr_t *four = expr_const_long(4L);
+    expr_t *two = expr_const_long(2L);
     expr_t *ac = (a && c) ? expr_mul(a, c) : NULL;
     expr_t *four_ac = (four && ac) ? expr_mul(four, ac) : NULL;
     expr_t *b_sq = b ? expr_mul(b, b) : NULL;
@@ -506,7 +497,7 @@ expr_t *integrate_exp_of_negative_quadratic(const expr_t *expr, const expr_t *wr
     sqrt_pi = pi_const ? expr_sqrt(pi_const) : NULL;
     scale_factor = (exp_offset && sqrt_pi) ? expr_mul(exp_offset, sqrt_pi) : NULL;
     numer = (scale_factor && erf_arg) ? expr_mul(scale_factor, erf_arg) : NULL;
-    two_const = expr_const_long_local(2L);
+    two_const = expr_const_long(2L);
     basis_coeff_const = expr_new_const(basis_coeff);
     two_root_expr = (two_const && root_expr) ? expr_mul(two_const, root_expr) : NULL;
     denom_expr = (two_root_expr && basis_coeff_const)
@@ -588,11 +579,11 @@ expr_t *integrate_linear_over_symbolic_quadratic(const expr_t *expr, const expr_
     c = symbolic_poly2_coeff_or_zero(&denom, 0u);
     m = symbolic_poly2_coeff_or_zero(&numer, 1u);
     n = symbolic_poly2_coeff_or_zero(&numer, 0u);
-    two = expr_const_long_local(2L);
+    two = expr_const_long(2L);
     two_a = (two && a) ? expr_mul(two, a) : NULL;
     alpha = (m && two_a) ? expr_div(m, two_a) : NULL;
     alpha = simplify_owned(alpha);
-    alpha_for_log = expr_integrate_retain_expr(alpha);
+    alpha_for_log = expr_retain_expr(alpha);
     log_denom = expr_log(expr->b);
     log_part = (alpha_for_log && log_denom) ? expr_mul(alpha_for_log, log_denom) : NULL;
     alpha_b = (alpha && b) ? expr_mul(alpha, b) : NULL;
@@ -669,11 +660,11 @@ expr_t *integrate_log_of_symbolic_quadratic(const expr_t *expr, const expr_t *wr
     two_x = expr_mul_num(wrt, &NUM_TWO);
     base = (x_log_q && two_x) ? expr_sub(x_log_q, two_x) : NULL;
 
-    two = expr_const_long_local(2L);
+    two = expr_const_long(2L);
     two_a = (two && a) ? expr_mul(two, a) : NULL;
     alpha = (b && two_a) ? expr_div(b, two_a) : NULL;
     alpha = simplify_owned(alpha);
-    alpha_for_log = expr_integrate_retain_expr(alpha);
+    alpha_for_log = expr_retain_expr(alpha);
     log_q_tail = expr_log(expr->a);
     log_part = (alpha_for_log && log_q_tail) ? expr_mul(alpha_for_log, log_q_tail) : NULL;
     alpha_b = (alpha && b) ? expr_mul(alpha, b) : NULL;

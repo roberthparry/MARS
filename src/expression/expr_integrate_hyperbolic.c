@@ -311,8 +311,8 @@ expr_t *integrate_symbolic_hyperbolic_product(const expr_t *expr,
     } else {
         sinh_expr = first_is_sinh ? first_expr : second_expr;
         cosh_expr = first_is_sinh ? second_expr : first_expr;
-        sinh_coeff = expr_integrate_clone_expr(first_is_sinh ? first_coeff : second_coeff);
-        cosh_coeff = expr_integrate_clone_expr(first_is_sinh ? second_coeff : first_coeff);
+        sinh_coeff = expr_clone(first_is_sinh ? first_coeff : second_coeff);
+        cosh_coeff = expr_clone(first_is_sinh ? second_coeff : first_coeff);
         expr_free(sinh_first);
         expr_free(cosh_first);
         expr_free(sinh_second);

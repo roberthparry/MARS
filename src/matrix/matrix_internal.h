@@ -172,10 +172,8 @@ void elem_init_zero_value(const struct elem_vtable *elem, void *slot);
 void elem_copy_value(const struct elem_vtable *elem, void *dst, const void *src);
 void elem_destroy_value(const struct elem_vtable *elem, void *slot);
 void elem_simplify_value(const struct elem_vtable *elem, void *slot);
-expr_t *expr_sub_simplify(const expr_t *a, const expr_t *b);
 expr_t *expr_clone_for_storage(const expr_t *dv);
 matrix_t *mat_finalize_symbolic_result(matrix_t *A);
-expr_t *expr_simplify_owned(expr_t *dv);
 int mat_simplify_symbolic_inplace(matrix_t *A);
 
 /* ============================================================

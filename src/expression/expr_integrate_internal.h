@@ -8,10 +8,6 @@
 
 /* Shared ownership, simplification and dispatch helpers. */
 expr_t * simplify_owned                (expr_t *expr);
-expr_t * expr_integrate_clone_expr     (const expr_t *expr);
-expr_t * expr_integrate_retain_expr    (const expr_t *expr);
-expr_t * expr_integrate_negate_owned   (expr_t *expr);
-expr_t * expr_integrate_add_terms_owned(expr_t *left, expr_t *right);
 bool     depends_on_wrt                (const expr_t *expr, const expr_t *wrt);
 bool     expr_equal_exact_local        (const expr_t *a, const expr_t *b);
 bool     is_wrt                        (const expr_t *expr, const expr_t *wrt);
@@ -45,10 +41,10 @@ expr_t * integrate_constant_over_power_denominator       (const expr_t *numerato
                                                           const expr_t *wrt);
 expr_t * div_number_owned                                (expr_t *expr, number_t denom);
 expr_t * div_number_owned_consuming                      (expr_t *expr, number_t *denom);
-expr_t * expr_integrate_div_number_owned_by_product      (expr_t *expr,
+expr_t * div_number_owned_by_product                     (expr_t *expr,
                                                           number_t left,
                                                           number_t right);
-expr_t * expr_integrate_div_number_owned_by_long_product (expr_t *expr, long left, number_t right);
+expr_t * div_number_owned_by_long_product                (expr_t *expr, long left, number_t right);
 expr_t * mul_number_owned                                (expr_t *expr, number_t factor);
 expr_t * mul_number_owned_consuming                      (expr_t *expr, number_t *factor);
 
@@ -131,6 +127,7 @@ expr_t * integrate_log_over_symbolic_proportional_affine(const expr_t *expr, con
 expr_t * integrate_wrt_times_log_symbolic_affine        (const expr_t *expr, const expr_t *wrt);
 expr_t * integrate_wrt_times_log_symbolic_quadratic     (const expr_t *expr, const expr_t *wrt);
 expr_t * integrate_log_over_proportional_affine         (const expr_t *expr, const expr_t *wrt);
+expr_t * integrate_polynomial_times_polynomial_exp      (const expr_t *expr, const expr_t *wrt);
 expr_t * integrate_symbolic_integer_power_times_exp     (const expr_t *expr, const expr_t *wrt);
 expr_t * integrate_symbolic_power_times_exp_gamma       (const expr_t *expr, const expr_t *wrt);
 expr_t * integrate_symbolic_integer_power_times_trig    (const expr_t *expr, const expr_t *wrt);
@@ -153,6 +150,7 @@ expr_t * integrate_symbolic_exp_times_hyperbolic        (const expr_t *expr, con
 expr_t * integrate_symbolic_hyperbolic_product          (const expr_t *expr, const expr_t *wrt);
 expr_t * integrate_symbolic_trig_times_hyperbolic       (const expr_t *expr, const expr_t *wrt);
 expr_t * integrate_symbolic_squared_hyperbolic          (const expr_t *expr, const expr_t *wrt);
+expr_t * integrate_exact_substitution_product           (const expr_t *expr, const expr_t *wrt);
 
 /* Exact products and distribution-specific helpers. */
 expr_t * integrate_wrt_exp_times_trig_exact              (const expr_t *expr, const expr_t *wrt);

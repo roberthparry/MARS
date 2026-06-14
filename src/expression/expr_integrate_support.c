@@ -33,7 +33,9 @@ bool expr_equal_exact_local(const expr_t *a, const expr_t *b)
 
 bool is_wrt(const expr_t *expr, const expr_t *wrt)
 {
-    return expr && wrt && expr_is_var(expr) && expr == wrt;
+    return expr && wrt && expr_is_var(expr) && expr_is_var(wrt) &&
+           (expr == wrt ||
+            (expr->var_id != 0 && expr->var_id == wrt->var_id));
 }
 
 static bool match_affine_linear_expr(const expr_t *expr,

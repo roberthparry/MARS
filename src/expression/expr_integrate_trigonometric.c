@@ -27,7 +27,7 @@ bool match_trig_proportional_wrt_coeff(const expr_t *expr,
     if (!expr_const_is_zero(constant) || expr_const_is_zero(coeff))
         goto cleanup;
 
-    *coeff_out = expr_integrate_clone_expr(coeff);
+    *coeff_out = expr_clone(coeff);
     ok = *coeff_out != NULL;
 
 cleanup:
@@ -125,7 +125,7 @@ static expr_t *build_symbolic_quadratic_power_trig_integral(
     term1 = divide_expr_by_expr_power_owned(x_trig, coeff, 1u);
     x_trig = NULL;
     if (integrand_is_sin)
-        term1 = expr_integrate_negate_owned(term1);
+        term1 = expr_negate_owned(term1);
 
     x_trig = (wrt && (integrand_is_sin ? sin_v : cos_v))
         ? expr_mul(wrt, integrand_is_sin ? sin_v : cos_v)
@@ -137,20 +137,20 @@ static expr_t *build_symbolic_quadratic_power_trig_integral(
     }
     term2 = divide_expr_by_expr_power_owned(term2, coeff, 2u);
 
-    tail_trig = integrand_is_sin ? expr_integrate_retain_expr(cos_v)
-                                 : expr_integrate_retain_expr(sin_v);
+    tail_trig = integrand_is_sin ? expr_retain_expr(cos_v)
+                                 : expr_retain_expr(sin_v);
     if (tail_trig) {
         term3 = expr_mul_num(tail_trig, &NUM_TWO);
         tail_trig = NULL;
     }
     term3 = divide_expr_by_expr_power_owned(term3, coeff, 3u);
     if (!integrand_is_sin)
-        term3 = expr_integrate_negate_owned(term3);
+        term3 = expr_negate_owned(term3);
 
-    sum = expr_integrate_add_terms_owned(term1, term2);
+    sum = expr_add_owned(term1, term2);
     term1 = NULL;
     term2 = NULL;
-    sum = expr_integrate_add_terms_owned(sum, term3);
+    sum = expr_add_owned(sum, term3);
     term3 = NULL;
 
     expr_free(term3);
@@ -185,14 +185,14 @@ static expr_t *build_symbolic_linear_power_trig_integral(
     first = divide_expr_by_expr_power_owned(x_trig, coeff, 1u);
     x_trig = NULL;
     if (integrand_is_sin)
-        first = expr_integrate_negate_owned(first);
+        first = expr_negate_owned(first);
 
     second_trig = integrand_is_sin ? expr_sin(trig_expr->a) : expr_cos(trig_expr->a);
-    second = divide_expr_by_expr_power_owned(second_trig ? expr_integrate_retain_expr(second_trig) : NULL,
+    second = divide_expr_by_expr_power_owned(second_trig ? expr_retain_expr(second_trig) : NULL,
                                              coeff,
                                              2u);
 
-    sum = expr_integrate_add_terms_owned(first, second);
+    sum = expr_add_owned(first, second);
     first = NULL;
     second = NULL;
 
@@ -247,15 +247,15 @@ static expr_t *build_symbolic_integer_power_trig_integral(unsigned int degree,
     trig_part = integrand_is_sin ? expr_cos(trig_expr->a) : expr_sin(trig_expr->a);
     product = (x_power && trig_part) ? expr_mul(x_power, trig_part) : NULL;
     if (product && coeff->ops == &ops_const) {
-        term1 = div_number_owned(expr_integrate_retain_expr(product), coeff->c);
+        term1 = div_number_owned(expr_retain_expr(product), coeff->c);
     } else {
-        tmp_coeff = expr_integrate_clone_expr(coeff);
+        tmp_coeff = expr_clone(coeff);
         term1 = (product && tmp_coeff) ? expr_div(product, tmp_coeff) : NULL;
         expr_free(tmp_coeff);
         tmp_coeff = NULL;
     }
     if (integrand_is_sin)
-        term1 = expr_integrate_negate_owned(term1);
+        term1 = expr_negate_owned(term1);
     term1 = simplify_owned(term1);
 
     if (degree == 0u) {
@@ -277,17 +277,17 @@ static expr_t *build_symbolic_integer_power_trig_integral(unsigned int degree,
         num_destroy(&scale);
     }
     if (scaled_inner && coeff->ops == &ops_const) {
-        term2 = div_number_owned(expr_integrate_retain_expr(scaled_inner), coeff->c);
+        term2 = div_number_owned(expr_retain_expr(scaled_inner), coeff->c);
     } else {
-        tmp_coeff = expr_integrate_clone_expr(coeff);
+        tmp_coeff = expr_clone(coeff);
         term2 = (scaled_inner && tmp_coeff) ? expr_div(scaled_inner, tmp_coeff) : NULL;
         expr_free(tmp_coeff);
         tmp_coeff = NULL;
     }
     if (!integrand_is_sin)
-        term2 = expr_integrate_negate_owned(term2);
+        term2 = expr_negate_owned(term2);
     term2 = simplify_owned(term2);
-    sum = expr_integrate_add_terms_owned(term1, term2);
+    sum = expr_add_owned(term1, term2);
     term1 = NULL;
     term2 = NULL;
 

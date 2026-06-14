@@ -196,7 +196,7 @@ static expr_t *build_base_normal_pdf_term(const expr_t *u, expr_t *inverse_u, co
 {
     (void)u;
     (void)u_sq;
-    return inverse_u ? mul_number_owned(expr_integrate_retain_expr(inverse_u), poly_coeff) : NULL;
+    return inverse_u ? mul_number_owned(expr_retain_expr(inverse_u), poly_coeff) : NULL;
 }
 
 static expr_t *build_base_normal_cdf_term(const expr_t *u, expr_t *inverse_u, const expr_t *u_sq, number_t poly_coeff)
@@ -257,7 +257,7 @@ static expr_t *build_linear_half_shifted_inverse_term(const expr_t *u,
 {
     expr_t *shifted = u_sq ? expr_add_num(u_sq, &constant) : NULL;
     expr_t *inverse_part = (shifted && inverse_u) ? expr_mul(shifted, inverse_u) : NULL;
-    expr_t *term = combine_binary_owned(inverse_part, u ? expr_integrate_retain_expr(u) : NULL, add_u);
+    expr_t *term = combine_binary_owned(inverse_part, u ? expr_retain_expr(u) : NULL, add_u);
 
     expr_free(shifted);
     return scale_owned_by_ratio(term, poly_coeff, 2);
@@ -271,7 +271,7 @@ static expr_t *build_linear_half_root_inverse_term(const expr_t *u,
                                                    bool add_root,
                                                    bool subtract_one_from_u_sq)
 {
-    expr_t *leading = subtract_one_from_u_sq ? expr_sub_num(u_sq, &NUM_ONE) : expr_integrate_retain_expr(u_sq);
+    expr_t *leading = subtract_one_from_u_sq ? expr_sub_num(u_sq, &NUM_ONE) : expr_retain_expr(u_sq);
     expr_t *inverse_part = (leading && inverse_u) ? expr_mul(leading, inverse_u) : NULL;
     expr_t *term = combine_binary_owned(inverse_part, root, add_root);
 
@@ -377,7 +377,7 @@ static expr_t *build_linear_ei_term(const expr_t *u, expr_t *inverse_u, const ex
     expr_t *u_sq_inverse = (u_sq && inverse_u) ? expr_mul(u_sq, inverse_u) : NULL;
     expr_t *exp_u = u ? expr_exp(u) : NULL;
     expr_t *u_exp_u = (u && exp_u) ? expr_mul(u, exp_u) : NULL;
-    expr_t *correction = combine_binary_owned(u_exp_u, exp_u ? expr_integrate_retain_expr(exp_u) : NULL, false);
+    expr_t *correction = combine_binary_owned(u_exp_u, exp_u ? expr_retain_expr(exp_u) : NULL, false);
     expr_t *term = combine_binary_owned(u_sq_inverse, correction, false);
 
     expr_free(exp_u);

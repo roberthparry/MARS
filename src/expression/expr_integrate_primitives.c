@@ -47,7 +47,7 @@ static expr_t *match_symbolic_wrt_factor_coeff_primitives(const expr_t *expr,
         return expr_new_const(NUM_ONE);
 
     if (expr_is_neg(expr))
-        return expr_integrate_negate_owned(
+        return expr_negate_owned(
             match_symbolic_wrt_factor_coeff_primitives(expr->a, wrt));
 
     if (expr_match_mul_expr(expr, &left, &right)) {
@@ -55,7 +55,7 @@ static expr_t *match_symbolic_wrt_factor_coeff_primitives(const expr_t *expr,
         expr_t *right_coeff = match_symbolic_wrt_factor_coeff_primitives(right, wrt);
 
         if (left_coeff && !depends_on_wrt(right, wrt)) {
-            expr_t *right_clone = expr_integrate_retain_expr(right);
+            expr_t *right_clone = expr_retain_expr(right);
             expr_t *product = right_clone ? expr_mul(left_coeff, right_clone) : NULL;
 
             expr_free(right_clone);
@@ -65,7 +65,7 @@ static expr_t *match_symbolic_wrt_factor_coeff_primitives(const expr_t *expr,
         }
 
         if (right_coeff && !depends_on_wrt(left, wrt)) {
-            expr_t *left_clone = expr_integrate_retain_expr(left);
+            expr_t *left_clone = expr_retain_expr(left);
             expr_t *product = left_clone ? expr_mul(left_clone, right_coeff) : NULL;
 
             expr_free(left_clone);
@@ -78,15 +78,15 @@ static expr_t *match_symbolic_wrt_factor_coeff_primitives(const expr_t *expr,
         expr_free(left_coeff);
 
         if (is_wrt(left, wrt) && !depends_on_wrt(right, wrt))
-            return expr_integrate_retain_expr(right);
+            return expr_retain_expr(right);
         if (is_wrt(right, wrt) && !depends_on_wrt(left, wrt))
-            return expr_integrate_retain_expr(left);
+            return expr_retain_expr(left);
     }
 
     if (expr_is_op(expr, &ops_div) && expr->a && expr->b &&
         !depends_on_wrt(expr->b, wrt)) {
         expr_t *numer_coeff = match_symbolic_wrt_factor_coeff_primitives(expr->a, wrt);
-        expr_t *denom = expr_integrate_retain_expr(expr->b);
+        expr_t *denom = expr_retain_expr(expr->b);
         expr_t *quotient = (numer_coeff && denom) ? expr_div(numer_coeff, denom) : NULL;
 
         expr_free(denom);
@@ -110,7 +110,7 @@ static expr_t *match_symbolic_wrt_square_coeff_primitives(const expr_t *expr,
         return expr_new_const(NUM_ONE);
 
     if (expr_is_neg(expr))
-        return expr_integrate_negate_owned(
+        return expr_negate_owned(
             match_symbolic_wrt_square_coeff_primitives(expr->a, wrt));
 
     if (expr_match_mul_expr(expr, &left, &right)) {
@@ -120,7 +120,7 @@ static expr_t *match_symbolic_wrt_square_coeff_primitives(const expr_t *expr,
         expr_t *right_linear = NULL;
 
         if (left_coeff && !depends_on_wrt(right, wrt)) {
-            expr_t *right_clone = expr_integrate_retain_expr(right);
+            expr_t *right_clone = expr_retain_expr(right);
             expr_t *product = right_clone ? expr_mul(left_coeff, right_clone) : NULL;
 
             expr_free(right_clone);
@@ -130,7 +130,7 @@ static expr_t *match_symbolic_wrt_square_coeff_primitives(const expr_t *expr,
         }
 
         if (right_coeff && !depends_on_wrt(left, wrt)) {
-            expr_t *left_clone = expr_integrate_retain_expr(left);
+            expr_t *left_clone = expr_retain_expr(left);
             expr_t *product = left_clone ? expr_mul(left_clone, right_coeff) : NULL;
 
             expr_free(left_clone);
@@ -160,7 +160,7 @@ static expr_t *match_symbolic_wrt_square_coeff_primitives(const expr_t *expr,
     if (expr_is_op(expr, &ops_div) && expr->a && expr->b &&
         !depends_on_wrt(expr->b, wrt)) {
         expr_t *numer_coeff = match_symbolic_wrt_square_coeff_primitives(expr->a, wrt);
-        expr_t *denom = expr_integrate_retain_expr(expr->b);
+        expr_t *denom = expr_retain_expr(expr->b);
         expr_t *quotient = (numer_coeff && denom) ? expr_div(numer_coeff, denom) : NULL;
 
         expr_free(denom);

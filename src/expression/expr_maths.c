@@ -183,33 +183,6 @@ static expr_t *expr_chain_rule_with_factor(const expr_t *dv, expr_t *factor)
     return out;
 }
 
-static expr_t *expr_const_long_local(long value)
-{
-    NUM_SCOPE(scope);
-    number_t n = num_create_from_long(value);
-    expr_t *dv = expr_new_const(n);
-
-    return dv;
-}
-
-static expr_t *expr_pow_long_local(const expr_t *dv, long exponent)
-{
-    NUM_SCOPE(scope);
-    number_t n = num_create_from_long(exponent);
-    expr_t *out = expr_pow(dv, &n);
-
-    return out;
-}
-
-static expr_t *expr_add_long_local(const expr_t *dv, long value)
-{
-    NUM_SCOPE(scope);
-    number_t n = num_create_from_long(value);
-    expr_t *out = expr_add_num(dv, &n);
-
-    return out;
-}
-
 static expr_t *expr_const_num_local(number_t value)
 {
     NUM_SCOPE(scope);
@@ -476,7 +449,7 @@ expr_t *deriv_tan(expr_t *dv)
 {
     expr_t *da  = expr_get_dx_internal(dv->a);
     expr_t *t   = expr_tan(dv->a);
-    expr_t *t2  = expr_pow_long_local(t, 2);
+    expr_t *t2  = expr_pow_long(t, 2);
     expr_t *one = expr_new_const(NUM_ONE);
     expr_t *fac = expr_add(one, t2);
     expr_t *out = expr_mul(fac, da);
@@ -515,7 +488,7 @@ expr_t *deriv_cosec(expr_t *dv)
 expr_t *deriv_cot(expr_t *dv)
 {
     expr_t *cosec_a = expr_cosec(dv->a);
-    expr_t *square = expr_pow_long_local(cosec_a, 2);
+    expr_t *square = expr_pow_long(cosec_a, 2);
     expr_t *fac = expr_neg(square);
 
     expr_free(cosec_a);
@@ -537,7 +510,7 @@ expr_t *deriv_tanh(expr_t *dv)
 {
     expr_t *da  = expr_get_dx_internal(dv->a);
     expr_t *t   = expr_tanh(dv->a);
-    expr_t *t2  = expr_pow_long_local(t, 2);
+    expr_t *t2  = expr_pow_long(t, 2);
     expr_t *one = expr_new_const(NUM_ONE);
     expr_t *fac = expr_sub(one, t2);
     expr_t *out = expr_mul(fac, da);
@@ -578,7 +551,7 @@ expr_t *deriv_cosech(expr_t *dv)
 expr_t *deriv_coth(expr_t *dv)
 {
     expr_t *cosech_a = expr_cosech(dv->a);
-    expr_t *square = expr_pow_long_local(cosech_a, 2);
+    expr_t *square = expr_pow_long(cosech_a, 2);
     expr_t *fac = expr_neg(square);
 
     expr_free(cosech_a);
@@ -629,7 +602,7 @@ expr_t *deriv_log10(expr_t *dv)
 expr_t *deriv_sqrt(expr_t *dv)
 {
     expr_t *da   = expr_get_dx_internal(dv->a);
-    expr_t *two  = expr_const_long_local(2);
+    expr_t *two  = expr_const_long(2);
     expr_t *sqra = expr_sqrt(dv->a);
     expr_t *den  = expr_mul(two, sqra);
     expr_free(sqra);
@@ -661,7 +634,7 @@ expr_t *deriv_not_differentiable(expr_t *dv)
 expr_t *deriv_asin(expr_t *dv)
 {
     expr_t *da   = expr_get_dx_internal(dv->a);
-    expr_t *a2   = expr_pow_long_local(dv->a, 2);
+    expr_t *a2   = expr_pow_long(dv->a, 2);
     expr_t *one  = expr_new_const(NUM_ONE);
     expr_t *sub  = expr_sub(one, a2);
     expr_t *den  = expr_sqrt(sub);
@@ -677,7 +650,7 @@ expr_t *deriv_asin(expr_t *dv)
 expr_t *deriv_acos(expr_t *dv)
 {
     expr_t *da   = expr_get_dx_internal(dv->a);
-    expr_t *a2   = expr_pow_long_local(dv->a, 2);
+    expr_t *a2   = expr_pow_long(dv->a, 2);
     expr_t *one  = expr_new_const(NUM_ONE);
     expr_t *sub  = expr_sub(one, a2);
     expr_t *den  = expr_sqrt(sub);
@@ -695,7 +668,7 @@ expr_t *deriv_acos(expr_t *dv)
 expr_t *deriv_atan(expr_t *dv)
 {
     expr_t *da  = expr_get_dx_internal(dv->a);
-    expr_t *a2  = expr_pow_long_local(dv->a, 2);
+    expr_t *a2  = expr_pow_long(dv->a, 2);
     expr_t *one = expr_new_const(NUM_ONE);
     expr_t *den = expr_add(one, a2);
     expr_t *out = expr_div(da, den);
@@ -748,7 +721,7 @@ expr_t *deriv_atan2(expr_t *dv)
 expr_t *deriv_asinh(expr_t *dv)
 {
     expr_t *da   = expr_get_dx_internal(dv->a);
-    expr_t *a2   = expr_pow_long_local(dv->a, 2);
+    expr_t *a2   = expr_pow_long(dv->a, 2);
     expr_t *one  = expr_new_const(NUM_ONE);
     expr_t *sum  = expr_add(one, a2);
     expr_t *den  = expr_sqrt(sum);
@@ -784,7 +757,7 @@ expr_t *deriv_acosh(expr_t *dv)
 expr_t *deriv_atanh(expr_t *dv)
 {
     expr_t *da  = expr_get_dx_internal(dv->a);
-    expr_t *a2  = expr_pow_long_local(dv->a, 2);
+    expr_t *a2  = expr_pow_long(dv->a, 2);
     expr_t *one = expr_new_const(NUM_ONE);
     expr_t *den = expr_sub(one, a2);
     expr_t *out = expr_div(da, den);
@@ -826,7 +799,7 @@ expr_t *deriv_erf(expr_t *dv)
 {
     expr_t *da     = expr_get_dx_internal(dv->a);
     expr_t *c      = expr_const_num_local(NUM_2_SQRTPI);
-    expr_t *a2     = expr_pow_long_local(dv->a, 2);
+    expr_t *a2     = expr_pow_long(dv->a, 2);
     expr_t *neg_a2 = expr_neg(a2);
     expr_t *ea2    = expr_exp(neg_a2);
     expr_t *fac    = expr_mul(c, ea2);
@@ -844,7 +817,7 @@ expr_t *deriv_erfc(expr_t *dv)
 {
     expr_t *da     = expr_get_dx_internal(dv->a);
     expr_t *c      = expr_const_num_local(NUM_NEG_TWO_OVER_SQRT_PI);
-    expr_t *a2     = expr_pow_long_local(dv->a, 2);
+    expr_t *a2     = expr_pow_long(dv->a, 2);
     expr_t *neg_a2 = expr_neg(a2);
     expr_t *ea2    = expr_exp(neg_a2);
     expr_t *fac    = expr_mul(c, ea2);
@@ -887,7 +860,7 @@ expr_t *deriv_erfinv(expr_t *dv)
 {
     expr_t *da  = expr_get_dx_internal(dv->a);
     expr_t *w   = expr_erfinv(dv->a);
-    expr_t *w2  = expr_pow_long_local(w, 2);
+    expr_t *w2  = expr_pow_long(w, 2);
     expr_t *ew2 = expr_exp(w2);
     expr_t *c   = expr_const_ratio_local(NUM_SQRT_PI, NUM_TWO);
     expr_t *fac = expr_mul(c, ew2);
@@ -900,7 +873,7 @@ expr_t *deriv_erfcinv(expr_t *dv)
 {
     expr_t *da  = expr_get_dx_internal(dv->a);
     expr_t *w   = expr_erfcinv(dv->a);
-    expr_t *w2  = expr_pow_long_local(w, 2);
+    expr_t *w2  = expr_pow_long(w, 2);
     expr_t *ew2 = expr_exp(w2);
     expr_t *c   = expr_const_neg_ratio_local(NUM_SQRT_PI, NUM_TWO);
     expr_t *fac = expr_mul(c, ew2);
@@ -968,7 +941,7 @@ expr_t *deriv_lambert_w0(expr_t *dv)
 {
     expr_t *da  = expr_get_dx_internal(dv->a);
     expr_t *w   = expr_lambert_w0(dv->a);
-    expr_t *wp1 = expr_add_long_local(w, 1);
+    expr_t *wp1 = expr_add_long(w, 1);
     expr_t *den = expr_mul(dv->a, wp1);
     expr_t *fac = expr_div(w, den);
     expr_t *out = expr_mul(fac, da);
@@ -980,7 +953,7 @@ expr_t *deriv_lambert_w(expr_t *dv)
 {
     expr_t *da  = expr_get_dx_internal(dv->a);
     expr_t *w   = expr_lambert_w(dv->a);
-    expr_t *wp1 = expr_add_long_local(w, 1);
+    expr_t *wp1 = expr_add_long(w, 1);
     expr_t *den = expr_mul(dv->a, wp1);
     expr_t *fac = expr_div(w, den);
     expr_t *out = expr_mul(fac, da);
@@ -992,7 +965,7 @@ expr_t *deriv_lambert_wm1(expr_t *dv)
 {
     expr_t *da  = expr_get_dx_internal(dv->a);
     expr_t *w   = expr_lambert_wm1(dv->a);
-    expr_t *wp1 = expr_add_long_local(w, 1);
+    expr_t *wp1 = expr_add_long(w, 1);
     expr_t *den = expr_mul(dv->a, wp1);
     expr_t *fac = expr_div(w, den);
     expr_t *out = expr_mul(fac, da);

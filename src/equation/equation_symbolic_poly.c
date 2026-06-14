@@ -13,36 +13,6 @@ typedef struct equation_symbolic_poly {
     expr_t *coeff[EQUATION_SYMBOLIC_POLY_COEFFS];
 } equation_symbolic_poly_t;
 
-static expr_t *equ_const_long_expr(long value)
-{
-    number_t number = num_create_from_long(value);
-    expr_t *expr = expr_new_const(number);
-
-    num_destroy(&number);
-    return expr;
-}
-
-static expr_t *equ_retain_expr(const expr_t *expr)
-{
-    if (!expr)
-        return NULL;
-
-    expr_retain(expr);
-    return (expr_t *)expr;
-}
-
-static expr_t *equ_simplify_expr_owned(expr_t *expr)
-{
-    expr_t *simplified;
-
-    if (!expr)
-        return NULL;
-
-    simplified = expr_simplify(expr);
-    expr_free(expr);
-    return simplified;
-}
-
 static void equ_symbolic_poly_clear(equation_symbolic_poly_t *poly)
 {
     if (!poly)
@@ -84,14 +54,14 @@ static bool equ_symbolic_add_owned(equation_symbolic_poly_t *poly,
         return false;
 
     if (!poly->coeff[degree]) {
-        poly->coeff[degree] = equ_simplify_expr_owned(term);
+        poly->coeff[degree] = expr_simplify_owned(term);
         return poly->coeff[degree] != NULL;
     }
 
     sum = expr_add(poly->coeff[degree], term);
     expr_free(term);
     expr_free(poly->coeff[degree]);
-    poly->coeff[degree] = equ_simplify_expr_owned(sum);
+    poly->coeff[degree] = expr_simplify_owned(sum);
     return poly->coeff[degree] != NULL;
 }
 
@@ -100,7 +70,7 @@ static bool equ_symbolic_add_const(equation_symbolic_poly_t *poly,
                                         long value)
 {
     return equ_symbolic_add_owned(poly, degree,
-                                       equ_const_long_expr(value));
+                                       expr_const_long(value));
 }
 
 static bool equ_symbolic_copy_into(equation_symbolic_poly_t *out,
@@ -110,7 +80,7 @@ static bool equ_symbolic_copy_into(equation_symbolic_poly_t *out,
         if (!in->coeff[i])
             continue;
         if (!equ_symbolic_add_owned(out, i,
-                                         equ_retain_expr(in->coeff[i])))
+                                         expr_retain_expr(in->coeff[i])))
             return false;
     }
 
@@ -342,7 +312,7 @@ static bool equ_symbolic_poly_collect(const expr_t *expr,
         return false;
 
     if (!equ_expr_depends_on_wrt(expr, wrt))
-        return equ_symbolic_add_owned(poly, 0u, equ_retain_expr(expr));
+        return equ_symbolic_add_owned(poly, 0u, expr_retain_expr(expr));
 
     if (equ_expr_is_wrt(expr, wrt))
         return equ_symbolic_add_const(poly, 1u, 1L);
@@ -370,9 +340,9 @@ static expr_t *equ_symbolic_coeff_or_zero(equation_symbolic_poly_t *poly,
                                                size_t degree)
 {
     if (!poly || degree >= EQUATION_SYMBOLIC_POLY_COEFFS || !poly->coeff[degree])
-        return equ_const_long_expr(0L);
+        return expr_const_long(0L);
 
-    return equ_retain_expr(poly->coeff[degree]);
+    return expr_retain_expr(poly->coeff[degree]);
 }
 
 bool equ_match_symbolic_linear_expr(const expr_t *expr,

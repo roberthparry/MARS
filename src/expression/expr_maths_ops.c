@@ -703,6 +703,78 @@ const expr_ops_t ops_factors = {
     .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
 };
 
+expr_t *expr_apply_unary_kind(expr_op_kind_t kind, const expr_t *arg)
+{
+    static const expr_ops_t * const unary_ops_by_kind[EXPR_KIND_COUNT] = {
+        [EXPR_KIND_NEG] = &ops_neg,
+        [EXPR_KIND_SIN] = &ops_sin,
+        [EXPR_KIND_COS] = &ops_cos,
+        [EXPR_KIND_TAN] = &ops_tan,
+        [EXPR_KIND_SEC] = &ops_sec,
+        [EXPR_KIND_COSEC] = &ops_cosec,
+        [EXPR_KIND_COT] = &ops_cot,
+        [EXPR_KIND_SINH] = &ops_sinh,
+        [EXPR_KIND_COSH] = &ops_cosh,
+        [EXPR_KIND_TANH] = &ops_tanh,
+        [EXPR_KIND_SECH] = &ops_sech,
+        [EXPR_KIND_COSECH] = &ops_cosech,
+        [EXPR_KIND_COTH] = &ops_coth,
+        [EXPR_KIND_ASIN] = &ops_asin,
+        [EXPR_KIND_ACOS] = &ops_acos,
+        [EXPR_KIND_ATAN] = &ops_atan,
+        [EXPR_KIND_ASEC] = &ops_asec,
+        [EXPR_KIND_ACOSEC] = &ops_acosec,
+        [EXPR_KIND_ACOT] = &ops_acot,
+        [EXPR_KIND_ASINH] = &ops_asinh,
+        [EXPR_KIND_ACOSH] = &ops_acosh,
+        [EXPR_KIND_ATANH] = &ops_atanh,
+        [EXPR_KIND_ASECH] = &ops_asech,
+        [EXPR_KIND_ACOSECH] = &ops_acosech,
+        [EXPR_KIND_ACOTH] = &ops_acoth,
+        [EXPR_KIND_EXP] = &ops_exp,
+        [EXPR_KIND_LOG] = &ops_log,
+        [EXPR_KIND_LOG10] = &ops_log10,
+        [EXPR_KIND_SQRT] = &ops_sqrt,
+        [EXPR_KIND_FLOOR] = &ops_floor,
+        [EXPR_KIND_CEIL] = &ops_ceil,
+        [EXPR_KIND_ABS] = &ops_abs,
+        [EXPR_KIND_ERF] = &ops_erf,
+        [EXPR_KIND_ERFC] = &ops_erfc,
+        [EXPR_KIND_LGAMMA] = &ops_lgamma,
+        [EXPR_KIND_ERFINV] = &ops_erfinv,
+        [EXPR_KIND_ERFCINV] = &ops_erfcinv,
+        [EXPR_KIND_GAMMA] = &ops_gamma,
+        [EXPR_KIND_DIGAMMA] = &ops_digamma,
+        [EXPR_KIND_TRIGAMMA] = &ops_trigamma,
+        [EXPR_KIND_GAMMAINV] = &ops_gammainv,
+        [EXPR_KIND_LAMBERT_W] = &ops_lambert_w,
+        [EXPR_KIND_LAMBERT_W0] = &ops_lambert_w0,
+        [EXPR_KIND_LAMBERT_WM1] = &ops_lambert_wm1,
+        [EXPR_KIND_NORMAL_PDF] = &ops_normal_pdf,
+        [EXPR_KIND_NORMAL_CDF] = &ops_normal_cdf,
+        [EXPR_KIND_NORMAL_LOGPDF] = &ops_normal_logpdf,
+        [EXPR_KIND_EI] = &ops_ei,
+        [EXPR_KIND_E1] = &ops_e1,
+        [EXPR_KIND_FACTORIAL] = &ops_factorial,
+        [EXPR_KIND_FIBONACCI] = &ops_fibonacci,
+        [EXPR_KIND_PARTITION] = &ops_partition,
+        [EXPR_KIND_ISQRT] = &ops_isqrt,
+        [EXPR_KIND_IS_PRIME] = &ops_is_prime,
+        [EXPR_KIND_NEXT_PRIME] = &ops_next_prime,
+        [EXPR_KIND_PREV_PRIME] = &ops_prev_prime,
+        [EXPR_KIND_BIT_NOT] = &ops_bit_not,
+        [EXPR_KIND_FACTORS] = &ops_factors
+    };
+    const expr_ops_t *ops = NULL;
+
+    if ((unsigned)kind < (unsigned)EXPR_KIND_COUNT)
+        ops = unary_ops_by_kind[kind];
+    if (ops && ops->apply_unary)
+        return ops->apply_unary(arg);
+
+    return NULL;
+}
+
 expr_t *expr_sqrt(const expr_t *a) { return expr_math_wrap_unary(&ops_sqrt, a); }
 expr_t *expr_exp(const expr_t *a) { return expr_math_wrap_unary(&ops_exp, a); }
 expr_t *expr_log(const expr_t *a) { return expr_math_wrap_unary(&ops_log, a); }

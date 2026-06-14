@@ -367,7 +367,6 @@ static int equ_derive_without_bindings(const equation_t *equation,
     return 0;
 }
 
-static expr_t *equ_simplify_owned(expr_t *expr);
 static bool equ_expr_is_zero(const expr_t *expr);
 static bool equ_expr_is_one(const expr_t *expr);
 static expr_t *equ_symbolic_pi_expr(void);
@@ -448,18 +447,6 @@ static number_t equ_quadratic_root(number_t neg_linear,
 
     num_destroy(&numerator);
     return root;
-}
-
-static expr_t *equ_simplify_owned(expr_t *expr)
-{
-    expr_t *simplified;
-
-    if (!expr)
-        return NULL;
-
-    simplified = expr_simplify(expr);
-    expr_free(expr);
-    return simplified;
 }
 
 static expr_t *equ_symbolic_pi_expr(void)
@@ -564,7 +551,7 @@ static expr_t *equ_symbolic_linear_root(const expr_t *constant,
 {
     expr_t *neg_constant = expr_neg(constant);
     expr_t *quotient = neg_constant ? expr_div(neg_constant, linear) : NULL;
-    expr_t *root = equ_simplify_owned(quotient);
+    expr_t *root = expr_simplify_owned(quotient);
 
     expr_free(neg_constant);
     return root;
@@ -578,7 +565,7 @@ static expr_t *equ_symbolic_linear_phase_root(const expr_t *constant,
         expr_t *copy = (expr_t *)phase;
 
         expr_retain(copy);
-        return equ_simplify_owned(copy);
+        return expr_simplify_owned(copy);
     }
 
     expr_t *shifted_constant = (constant && phase)
@@ -598,7 +585,7 @@ static expr_t *equ_periodic_family_expr(const expr_t *base,
 {
     expr_t *period_term = (period && n) ? expr_mul(period, n) : NULL;
     expr_t *sum = (base && period_term) ? expr_add(base, period_term) : NULL;
-    expr_t *out = equ_simplify_owned(sum);
+    expr_t *out = expr_simplify_owned(sum);
 
     expr_free(period_term);
     return out;
@@ -615,7 +602,7 @@ static expr_t *equ_periodic_sub_family_expr(const expr_t *offset,
     expr_t *difference = (offset_sum && subtrahend)
         ? expr_sub(offset_sum, subtrahend)
         : NULL;
-    expr_t *out = equ_simplify_owned(difference);
+    expr_t *out = expr_simplify_owned(difference);
 
     expr_free(offset_sum);
     expr_free(period_term);
@@ -695,7 +682,7 @@ static int equ_try_solve_periodic_trig_kind(expr_op_kind_t kind,
                 rc = equ_append_solution_expr(wrt, exact_root, solutions);
                 break;
             }
-            base = equ_simplify_owned(expr_asin(target));
+            base = expr_simplify_owned(expr_asin(target));
             period = equ_symbolic_two_pi_expr();
             if (!base || !period)
                 goto cleanup;
@@ -721,7 +708,7 @@ static int equ_try_solve_periodic_trig_kind(expr_op_kind_t kind,
             break;
 
         case EXPR_KIND_COS:
-            base = equ_simplify_owned(expr_acos(target));
+            base = expr_simplify_owned(expr_acos(target));
             period = equ_symbolic_two_pi_expr();
             if (!base || !period)
                 goto cleanup;
@@ -730,7 +717,7 @@ static int equ_try_solve_periodic_trig_kind(expr_op_kind_t kind,
             if (rc != 0)
                 goto cleanup;
             neg_base = base ? expr_neg(base) : NULL;
-            alt_base = equ_simplify_owned(neg_base);
+            alt_base = expr_simplify_owned(neg_base);
             neg_base = NULL;
             if (!alt_base)
                 goto cleanup;
@@ -765,7 +752,7 @@ static int equ_try_solve_periodic_trig_kind(expr_op_kind_t kind,
                 rc = equ_append_solution_expr(wrt, exact_root, solutions);
                 break;
             }
-            base = equ_simplify_owned(expr_atan(target));
+            base = expr_simplify_owned(expr_atan(target));
             period = equ_symbolic_pi_expr();
             if (!base || !period)
                 goto cleanup;
@@ -839,9 +826,9 @@ static expr_t *equ_unary_inverse_rhs(expr_op_kind_t kind, const expr_t *rhs)
 {
     switch (kind) {
         case EXPR_KIND_EXP:
-            return rhs ? equ_simplify_owned(expr_log(rhs)) : NULL;
+            return rhs ? expr_simplify_owned(expr_log(rhs)) : NULL;
         case EXPR_KIND_LOG:
-            return rhs ? equ_simplify_owned(expr_exp(rhs)) : NULL;
+            return rhs ? expr_simplify_owned(expr_exp(rhs)) : NULL;
         default:
             return NULL;
     }
@@ -947,7 +934,7 @@ static expr_t *equ_symbolic_quadratic_discriminant(const expr_t *constant,
     expr_t *discriminant = (linear_sq && four_quad_constant)
         ? expr_sub(linear_sq, four_quad_constant)
         : NULL;
-    expr_t *out = equ_simplify_owned(discriminant);
+    expr_t *out = expr_simplify_owned(discriminant);
 
     expr_free(four_quad_constant);
     expr_free(quad_constant);
@@ -974,7 +961,7 @@ static expr_t *equ_symbolic_quadratic_root(const expr_t *linear,
     expr_t *quotient = (numerator && denominator)
         ? expr_div(numerator, denominator)
         : NULL;
-    expr_t *root = equ_simplify_owned(quotient);
+    expr_t *root = expr_simplify_owned(quotient);
 
     expr_free(denominator);
     expr_free(numerator);
@@ -1039,7 +1026,7 @@ static expr_t *equ_symbolic_negated_sum(const expr_t *left,
     expr_t *neg_left = left ? expr_neg(left) : NULL;
     expr_t *neg_right = right ? expr_neg(right) : NULL;
     expr_t *sum = (neg_left && neg_right) ? expr_add(neg_left, neg_right) : NULL;
-    expr_t *out = equ_simplify_owned(sum);
+    expr_t *out = expr_simplify_owned(sum);
 
     expr_free(neg_right);
     expr_free(neg_left);
@@ -1126,7 +1113,7 @@ static int equ_try_solve_symbolic_quadratic(const expr_t *residual,
     discriminant = equ_symbolic_quadratic_discriminant(constant, linear,
                                                             quadratic);
     sqrt_discriminant = discriminant ? expr_sqrt(discriminant) : NULL;
-    sqrt_discriminant = equ_simplify_owned(sqrt_discriminant);
+    sqrt_discriminant = expr_simplify_owned(sqrt_discriminant);
     root_plus = sqrt_discriminant
         ? equ_symbolic_quadratic_root(linear, quadratic,
                                            sqrt_discriminant, true)

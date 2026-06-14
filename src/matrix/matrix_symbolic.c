@@ -17,52 +17,6 @@ typedef struct {
     size_t rank;
 } expr_rref_info_t;
 
-expr_t *expr_simplify_owned(expr_t *dv)
-{
-    expr_t *simp;
-
-    if (!dv)
-        return NULL;
-
-    simp = expr_simplify(dv);
-    expr_free(dv);
-    return simp;
-}
-
-static expr_t *expr_div_simplify(const expr_t *num, const expr_t *den)
-{
-    expr_t *raw;
-
-    if (!num || !den) {
-        expr_free((expr_t *)num);
-        expr_free((expr_t *)den);
-        return NULL;
-    }
-
-    raw = expr_div(num, den);
-    expr_free((expr_t *)num);
-    expr_free((expr_t *)den);
-    if (!raw)
-        return NULL;
-
-    return expr_simplify_owned(raw);
-}
-
-static expr_t *expr_neg_simplify(expr_t *dv)
-{
-    expr_t *raw;
-
-    if (!dv)
-        return NULL;
-
-    raw = expr_neg(dv);
-    expr_free(dv);
-    if (!raw)
-        return NULL;
-
-    return expr_simplify_owned(raw);
-}
-
 int mat_simplify_symbolic_inplace(matrix_t *A)
 {
     expr_t *dv = NULL;
@@ -91,63 +45,6 @@ int mat_simplify_symbolic_inplace(matrix_t *A)
     return 0;
 }
 
-static expr_t *expr_mul_simplify(const expr_t *a, const expr_t *b)
-{
-    expr_t *raw;
-
-    if (!a || !b) {
-        expr_free((expr_t *)a);
-        expr_free((expr_t *)b);
-        return NULL;
-    }
-
-    raw = expr_mul(a, b);
-    expr_free((expr_t *)a);
-    expr_free((expr_t *)b);
-    if (!raw)
-        return NULL;
-
-    return expr_simplify_owned(raw);
-}
-
-static expr_t *expr_add_simplify(const expr_t *a, const expr_t *b)
-{
-    expr_t *raw;
-
-    if (!a || !b) {
-        expr_free((expr_t *)a);
-        expr_free((expr_t *)b);
-        return NULL;
-    }
-
-    raw = expr_add(a, b);
-    expr_free((expr_t *)a);
-    expr_free((expr_t *)b);
-    if (!raw)
-        return NULL;
-
-    return expr_simplify_owned(raw);
-}
-
-expr_t *expr_sub_simplify(const expr_t *a, const expr_t *b)
-{
-    expr_t *raw;
-
-    if (!a || !b) {
-        expr_free((expr_t *)a);
-        expr_free((expr_t *)b);
-        return NULL;
-    }
-
-    raw = expr_sub(a, b);
-    expr_free((expr_t *)a);
-    expr_free((expr_t *)b);
-    if (!raw)
-        return NULL;
-
-    return expr_simplify_owned(raw);
-}
-
 static expr_t *expr_det2_simplify(expr_t *a, expr_t *b, expr_t *c, expr_t *d)
 {
     expr_t *left = NULL, *right = NULL;
@@ -156,15 +53,15 @@ static expr_t *expr_det2_simplify(expr_t *a, expr_t *b, expr_t *c, expr_t *d)
         expr_retain(a);
     if (d)
         expr_retain(d);
-    left = expr_mul_simplify(a, d);
+    left = expr_mul_simplify_owned(a, d);
 
     if (b)
         expr_retain(b);
     if (c)
         expr_retain(c);
-    right = expr_mul_simplify(b, c);
+    right = expr_mul_simplify_owned(b, c);
 
-    return expr_sub_simplify(left, right);
+    return expr_sub_simplify_owned(left, right);
 }
 
 int mat_det_expr_exact(const matrix_t *A, expr_t **determinant);
@@ -189,7 +86,7 @@ static bool expr_exprs_equal_exact(const expr_t *a, const expr_t *b)
 
     expr_retain((expr_t *)a);
     expr_retain((expr_t *)b);
-    diff = expr_sub_simplify((expr_t *)a, (expr_t *)b);
+    diff = expr_sub_simplify_owned((expr_t *)a, (expr_t *)b);
     if (!diff)
         return false;
 
@@ -230,7 +127,7 @@ static int mat_eigenvalues_expr_symbolic(const matrix_t *A, expr_t **eigenvalues
             expr_retain(a);
         if (d)
             expr_retain(d);
-        sum = expr_add_simplify(a, d);
+        sum = expr_add_simplify_owned(a, d);
         a = d = NULL;
         if (!sum)
             goto fail_2x2;
@@ -241,13 +138,13 @@ static int mat_eigenvalues_expr_symbolic(const matrix_t *A, expr_t **eigenvalues
             expr_retain(a);
         if (d)
             expr_retain(d);
-        diff = expr_sub_simplify(a, d);
+        diff = expr_sub_simplify_owned(a, d);
         a = d = NULL;
         if (!diff)
             goto fail_2x2;
 
         expr_retain(diff);
-        diff2 = expr_mul_simplify(diff, diff);
+        diff2 = expr_mul_simplify_owned(diff, diff);
         diff = NULL;
         if (!diff2)
             goto fail_2x2;
@@ -256,20 +153,20 @@ static int mat_eigenvalues_expr_symbolic(const matrix_t *A, expr_t **eigenvalues
             expr_retain(b);
         if (c)
             expr_retain(c);
-        bc = expr_mul_simplify(b, c);
+        bc = expr_mul_simplify_owned(b, c);
         if (!bc)
             goto fail_2x2;
 
         {
             number_t four = num_create_from_long(4);
-            scaled_bc = expr_mul_simplify(expr_new_const(four), bc);
+            scaled_bc = expr_mul_simplify_owned(expr_new_const(four), bc);
             num_destroy(&four);
         }
         bc = NULL;
         if (!scaled_bc)
             goto fail_2x2;
 
-        disc = expr_add_simplify(diff2, scaled_bc);
+        disc = expr_add_simplify_owned(diff2, scaled_bc);
         diff2 = NULL;
         scaled_bc = NULL;
         if (!disc)
@@ -287,11 +184,11 @@ static int mat_eigenvalues_expr_symbolic(const matrix_t *A, expr_t **eigenvalues
 
         expr_retain(sum);
         expr_retain(root);
-        plus = expr_add_simplify(sum, root);
+        plus = expr_add_simplify_owned(sum, root);
         if (!plus)
             goto fail_2x2;
 
-        minus = expr_sub_simplify(sum, root);
+        minus = expr_sub_simplify_owned(sum, root);
         sum = NULL;
         root = NULL;
         if (!minus)
@@ -308,13 +205,13 @@ static int mat_eigenvalues_expr_symbolic(const matrix_t *A, expr_t **eigenvalues
             goto fail_2x2;
 
         expr_retain(half);
-        eigenvalues[0] = expr_mul_simplify(half, plus);
+        eigenvalues[0] = expr_mul_simplify_owned(half, plus);
         plus = NULL;
         if (!eigenvalues[0])
             goto fail_2x2;
 
         expr_retain(half);
-        eigenvalues[1] = expr_mul_simplify(half, minus);
+        eigenvalues[1] = expr_mul_simplify_owned(half, minus);
         minus = NULL;
         expr_free(half);
         half = NULL;
@@ -393,8 +290,8 @@ static matrix_t *mat_eigenvectors_expr_triangular(const matrix_t *A)
 
                     expr_retain(aij);
                     expr_retain(xjk);
-                    term = expr_mul_simplify(aij, xjk);
-                    sum = expr_add_simplify(sum, term);
+                    term = expr_mul_simplify_owned(aij, xjk);
+                    sum = expr_add_simplify_owned(sum, term);
                     if (!sum)
                         goto fail;
                 }
@@ -404,7 +301,7 @@ static matrix_t *mat_eigenvectors_expr_triangular(const matrix_t *A)
 
                     expr_retain(diag);
                     expr_retain(lambda);
-                    denom = expr_sub_simplify(diag, lambda);
+                    denom = expr_sub_simplify_owned(diag, lambda);
                 }
                 if (!denom) {
                     expr_free((expr_t *)sum);
@@ -421,14 +318,14 @@ static matrix_t *mat_eigenvectors_expr_triangular(const matrix_t *A)
                     goto fail;
                 }
 
-                x = expr_neg_simplify(sum);
+                x = expr_negate_owned(sum);
                 denom = expr_simplify_owned(denom);
                 if (!x) {
                     expr_free(denom);
                     goto fail;
                 }
 
-                x = expr_div_simplify(x, denom);
+                x = expr_div_simplify_owned(x, denom);
                 if (!x)
                     goto fail;
 
@@ -455,8 +352,8 @@ static matrix_t *mat_eigenvectors_expr_triangular(const matrix_t *A)
 
                     expr_retain(aij);
                     expr_retain(xjk);
-                    term = expr_mul_simplify(aij, xjk);
-                    sum = expr_add_simplify(sum, term);
+                    term = expr_mul_simplify_owned(aij, xjk);
+                    sum = expr_add_simplify_owned(sum, term);
                     if (!sum)
                         goto fail;
                 }
@@ -466,7 +363,7 @@ static matrix_t *mat_eigenvectors_expr_triangular(const matrix_t *A)
 
                     expr_retain(diag);
                     expr_retain(lambda);
-                    denom = expr_sub_simplify(diag, lambda);
+                    denom = expr_sub_simplify_owned(diag, lambda);
                 }
                 if (!denom) {
                     expr_free((expr_t *)sum);
@@ -483,14 +380,14 @@ static matrix_t *mat_eigenvectors_expr_triangular(const matrix_t *A)
                     goto fail;
                 }
 
-                x = expr_neg_simplify(sum);
+                x = expr_negate_owned(sum);
                 denom = expr_simplify_owned(denom);
                 if (!x) {
                     expr_free(denom);
                     goto fail;
                 }
 
-                x = expr_div_simplify(x, denom);
+                x = expr_div_simplify_owned(x, denom);
                 if (!x)
                     goto fail;
 
@@ -553,12 +450,12 @@ static matrix_t *mat_eigenvectors_expr_2x2(const matrix_t *A, expr_t **eigenvalu
 
         expr_retain(a);
         expr_retain(lambda);
-        p = expr_sub_simplify(a, lambda);
+        p = expr_sub_simplify_owned(a, lambda);
         q = expr_clone_for_storage(b);
         r = expr_clone_for_storage(c);
         expr_retain(d);
         expr_retain(lambda);
-        s = expr_sub_simplify(d, lambda);
+        s = expr_sub_simplify_owned(d, lambda);
         if (!p || !q || !r || !s) {
             expr_free(p);
             expr_free(q);
@@ -572,11 +469,11 @@ static matrix_t *mat_eigenvectors_expr_2x2(const matrix_t *A, expr_t **eigenvalu
             q = NULL;
             expr_retain(lambda);
             expr_retain(a);
-            v1 = expr_sub_simplify(lambda, a);
+            v1 = expr_sub_simplify_owned(lambda, a);
         } else if (!expr_is_exact_zero(r) || !expr_is_exact_zero(s)) {
             expr_retain(lambda);
             expr_retain(d);
-            v0 = expr_sub_simplify(lambda, d);
+            v0 = expr_sub_simplify_owned(lambda, d);
             v1 = r;
             r = NULL;
         } else if (k == 0) {
@@ -710,7 +607,7 @@ static matrix_t *mat_solve_expr_diagonal_exact(const matrix_t *A, const matrix_t
 
             expr_retain(rhs);
             expr_retain(diag);
-            out = expr_div_simplify(rhs, diag);
+            out = expr_div_simplify_owned(rhs, diag);
             if (!out)
                 goto fail;
             mat_set(X, i, j, &out);
@@ -741,7 +638,7 @@ static expr_t *expr_bareiss_update_simplify(const expr_t *left_a,
         expr_retain((expr_t *)left_a);
     if (left_b)
         expr_retain((expr_t *)left_b);
-    lhs = expr_mul_simplify((expr_t *)left_a, (expr_t *)left_b);
+    lhs = expr_mul_simplify_owned((expr_t *)left_a, (expr_t *)left_b);
     if (!lhs)
         return NULL;
 
@@ -749,13 +646,13 @@ static expr_t *expr_bareiss_update_simplify(const expr_t *left_a,
         expr_retain((expr_t *)right_a);
     if (right_b)
         expr_retain((expr_t *)right_b);
-    rhs = expr_mul_simplify((expr_t *)right_a, (expr_t *)right_b);
+    rhs = expr_mul_simplify_owned((expr_t *)right_a, (expr_t *)right_b);
     if (!rhs) {
         expr_free(lhs);
         return NULL;
     }
 
-    num = expr_sub_simplify(lhs, rhs);
+    num = expr_sub_simplify_owned(lhs, rhs);
     if (!num)
         return NULL;
 
@@ -764,7 +661,7 @@ static expr_t *expr_bareiss_update_simplify(const expr_t *left_a,
 
     if (divisor)
         expr_retain((expr_t *)divisor);
-    out = expr_div_simplify(num, (expr_t *)divisor);
+    out = expr_div_simplify_owned(num, (expr_t *)divisor);
     return out;
 }
 
@@ -896,20 +793,20 @@ static matrix_t *mat_forward_substitute_expr_exact(const matrix_t *L,
 
                 expr_retain(a);
                 expr_retain(x);
-                prod = expr_mul_simplify(a, x);
+                prod = expr_mul_simplify_owned(a, x);
                 if (!prod) {
                     expr_free((expr_t *)sum);
                     goto fail;
                 }
 
-                new_sum = expr_sub_simplify(sum, prod);
+                new_sum = expr_sub_simplify_owned(sum, prod);
                 if (!new_sum)
                     goto fail;
                 sum = new_sum;
             }
 
             expr_retain(diag);
-            out = expr_div_simplify(sum, diag);
+            out = expr_div_simplify_owned(sum, diag);
             if (!out)
                 goto fail;
             mat_set(X, i, j, &out);
@@ -956,20 +853,20 @@ static matrix_t *mat_backward_substitute_expr_exact(const matrix_t *U,
 
                 expr_retain(a);
                 expr_retain(x);
-                prod = expr_mul_simplify(a, x);
+                prod = expr_mul_simplify_owned(a, x);
                 if (!prod) {
                     expr_free((expr_t *)sum);
                     goto fail;
                 }
 
-                new_sum = expr_sub_simplify(sum, prod);
+                new_sum = expr_sub_simplify_owned(sum, prod);
                 if (!new_sum)
                     goto fail;
                 sum = new_sum;
             }
 
             expr_retain(diag);
-            out = expr_div_simplify(sum, diag);
+            out = expr_div_simplify_owned(sum, diag);
             if (!out)
                 goto fail;
             mat_set(X, ii, j, &out);
@@ -1033,20 +930,20 @@ static matrix_t *mat_solve_expr_dense_exact(const matrix_t *A, const matrix_t *B
 
                 expr_retain(uik);
                 expr_retain(xkj);
-                prod = expr_mul_simplify(uik, xkj);
+                prod = expr_mul_simplify_owned(uik, xkj);
                 if (!prod) {
                     expr_free((expr_t *)sum);
                     goto fail;
                 }
 
-                new_sum = expr_sub_simplify(sum, prod);
+                new_sum = expr_sub_simplify_owned(sum, prod);
                 if (!new_sum)
                     goto fail;
                 sum = new_sum;
             }
 
             expr_retain(diag);
-            out = expr_div_simplify(sum, diag);
+            out = expr_div_simplify_owned(sum, diag);
             if (!out)
                 goto fail;
             mat_set(X, ii, j, &out);
@@ -1103,13 +1000,13 @@ static matrix_t *mat_solve_expr_2x2_exact(const matrix_t *A, const matrix_t *B)
 
         expr_retain((expr_t *)d);
         expr_retain((expr_t *)r0);
-        x0_left = expr_mul_simplify(d, r0);
+        x0_left = expr_mul_simplify_owned(d, r0);
         expr_retain((expr_t *)b);
         expr_retain((expr_t *)r1);
-        x0_right = expr_mul_simplify(b, r1);
-        x0_num = expr_sub_simplify(x0_left, x0_right);
+        x0_right = expr_mul_simplify_owned(b, r1);
+        x0_num = expr_sub_simplify_owned(x0_left, x0_right);
         expr_retain(det);
-        x0 = expr_div_simplify(x0_num, det);
+        x0 = expr_div_simplify_owned(x0_num, det);
         if (!x0)
             goto fail;
         mat_set(X, 0, j, &x0);
@@ -1117,13 +1014,13 @@ static matrix_t *mat_solve_expr_2x2_exact(const matrix_t *A, const matrix_t *B)
 
         expr_retain((expr_t *)a);
         expr_retain((expr_t *)r1);
-        x1_left = expr_mul_simplify(a, r1);
+        x1_left = expr_mul_simplify_owned(a, r1);
         expr_retain((expr_t *)c);
         expr_retain((expr_t *)r0);
-        x1_right = expr_mul_simplify(c, r0);
-        x1_num = expr_sub_simplify(x1_left, x1_right);
+        x1_right = expr_mul_simplify_owned(c, r0);
+        x1_num = expr_sub_simplify_owned(x1_left, x1_right);
         expr_retain(det);
-        x1 = expr_div_simplify(x1_num, det);
+        x1 = expr_div_simplify_owned(x1_num, det);
         if (!x1)
             goto fail;
         mat_set(X, 1, j, &x1);
@@ -1182,7 +1079,7 @@ static matrix_t *mat_inverse_expr_upper_exact(const matrix_t *A)
             goto fail;
 
         expr_retain(uii);
-        xii = expr_div_simplify(expr_new_const(NUM_ONE), uii);
+        xii = expr_div_simplify_owned(expr_new_const(NUM_ONE), uii);
         if (!xii)
             goto fail;
         mat_set(I, ii, ii, &xii);
@@ -1223,7 +1120,7 @@ static matrix_t *mat_inverse_expr_upper_exact(const matrix_t *A)
             }
 
             expr_retain(uii);
-            xij = expr_div_simplify(expr_neg_simplify(sum), uii);
+            xij = expr_div_simplify_owned(expr_negate_owned(sum), uii);
             if (!xij)
                 goto fail;
             mat_set(I, ii, j, &xij);
@@ -1280,13 +1177,13 @@ static matrix_t *mat_inverse_expr_dense3_exact(const matrix_t *A)
         goto fail;
 
     cof[0][0] = expr_det2_simplify(m[1][1], m[1][2], m[2][1], m[2][2]);
-    cof[0][1] = expr_neg_simplify(expr_det2_simplify(m[1][0], m[1][2], m[2][0], m[2][2]));
+    cof[0][1] = expr_negate_owned(expr_det2_simplify(m[1][0], m[1][2], m[2][0], m[2][2]));
     cof[0][2] = expr_det2_simplify(m[1][0], m[1][1], m[2][0], m[2][1]);
-    cof[1][0] = expr_neg_simplify(expr_det2_simplify(m[0][1], m[0][2], m[2][1], m[2][2]));
+    cof[1][0] = expr_negate_owned(expr_det2_simplify(m[0][1], m[0][2], m[2][1], m[2][2]));
     cof[1][1] = expr_det2_simplify(m[0][0], m[0][2], m[2][0], m[2][2]);
-    cof[1][2] = expr_neg_simplify(expr_det2_simplify(m[0][0], m[0][1], m[2][0], m[2][1]));
+    cof[1][2] = expr_negate_owned(expr_det2_simplify(m[0][0], m[0][1], m[2][0], m[2][1]));
     cof[2][0] = expr_det2_simplify(m[0][1], m[0][2], m[1][1], m[1][2]);
-    cof[2][1] = expr_neg_simplify(expr_det2_simplify(m[0][0], m[0][2], m[1][0], m[1][2]));
+    cof[2][1] = expr_negate_owned(expr_det2_simplify(m[0][0], m[0][2], m[1][0], m[1][2]));
     cof[2][2] = expr_det2_simplify(m[0][0], m[0][1], m[1][0], m[1][1]);
 
     for (size_t i = 0; i < 3; ++i)
@@ -1304,7 +1201,7 @@ static matrix_t *mat_inverse_expr_dense3_exact(const matrix_t *A)
 
             expr_retain(cof[j][i]);
             expr_retain(det);
-            entry = expr_div_simplify(cof[j][i], det);
+            entry = expr_div_simplify_owned(cof[j][i], det);
             if (!entry)
                 goto fail;
             mat_set(I, i, j, &entry);
@@ -1858,7 +1755,7 @@ matrix_t *mat_charpoly_expr(const matrix_t *A)
 
             expr_retain(diag);
             expr_retain(coeff_prev);
-            new_diag = expr_add_simplify(diag, coeff_prev);
+            new_diag = expr_add_simplify_owned(diag, coeff_prev);
             if (!new_diag) {
                 mat_free(T);
                 goto fail;
@@ -1882,13 +1779,13 @@ matrix_t *mat_charpoly_expr(const matrix_t *A)
             den = expr_new_const(k_num);
             num_destroy(&k_num);
         }
-        quot = expr_div_simplify(trace_val, den);
+        quot = expr_div_simplify_owned(trace_val, den);
         if (!quot) {
             mat_free(Bnew);
             goto fail;
         }
 
-        coeff = expr_neg_simplify(quot);
+        coeff = expr_negate_owned(quot);
         if (!coeff) {
             mat_free(Bnew);
             goto fail;
@@ -1942,12 +1839,12 @@ static expr_t **expr_poly_multiply_linear(expr_t **coeffs, size_t degree, expr_t
 
         expr_retain(lambda);
         expr_retain(coeffs[k - 1]);
-        term = expr_mul_simplify(lambda, coeffs[k - 1]);
+        term = expr_mul_simplify_owned(lambda, coeffs[k - 1]);
         if (!term)
             goto fail;
 
         expr_retain(coeffs[k]);
-        next[k] = expr_sub_simplify(coeffs[k], term);
+        next[k] = expr_sub_simplify_owned(coeffs[k], term);
         if (!next[k])
             goto fail;
     }
@@ -1956,10 +1853,10 @@ static expr_t **expr_poly_multiply_linear(expr_t **coeffs, size_t degree, expr_t
 
     expr_retain(lambda);
     expr_retain(coeffs[degree]);
-    tail = expr_mul_simplify(lambda, coeffs[degree]);
+    tail = expr_mul_simplify_owned(lambda, coeffs[degree]);
     if (!tail)
         goto fail;
-    next[degree + 1] = expr_neg_simplify(tail);
+    next[degree + 1] = expr_negate_owned(tail);
     if (!next[degree + 1])
         goto fail;
 
@@ -2027,7 +1924,7 @@ static matrix_t *mat_shift_expr_exact(const matrix_t *A, const expr_t *lambda)
 
         expr_retain(diag);
         expr_retain(lambda);
-        new_diag = expr_sub_simplify(diag, lambda);
+        new_diag = expr_sub_simplify_owned(diag, lambda);
         if (!new_diag) {
             mat_free(Shifted);
             return NULL;
@@ -2166,7 +2063,7 @@ static int mat_expr_rref_exact(const matrix_t *A, expr_rref_info_t *out)
                 mat_get(R, row, j, &entry);
                 expr_retain(entry);
                 expr_retain(pivot);
-                new_entry = expr_div_simplify(entry, pivot);
+                new_entry = expr_div_simplify_owned(entry, pivot);
                 if (!new_entry) {
                     expr_free(pivot);
                     goto fail;
@@ -2199,12 +2096,12 @@ static int mat_expr_rref_exact(const matrix_t *A, expr_rref_info_t *out)
                 expr_retain(rij);
                 expr_retain(factor);
                 expr_retain(rrj);
-                term = expr_mul_simplify(factor, rrj);
+                term = expr_mul_simplify_owned(factor, rrj);
                 if (!term) {
                     expr_free(factor);
                     goto fail;
                 }
-                new_rij = expr_sub_simplify(rij, term);
+                new_rij = expr_sub_simplify_owned(rij, term);
                 if (!new_rij) {
                     expr_free(factor);
                     goto fail;
@@ -2484,7 +2381,7 @@ matrix_t *mat_adjugate_exact(const matrix_t *A)
 
                 entry = det;
                 if (((i + j) & 1u) != 0u) {
-                    entry = expr_neg_simplify(det);
+                    entry = expr_negate_owned(det);
                     det = NULL;
                     if (!entry) {
                         mat_free(Minor);
@@ -2559,7 +2456,7 @@ matrix_t *mat_nullspace_expr_exact(const matrix_t *A)
                 continue;
 
             expr_retain(entry);
-            coeff = expr_neg_simplify(entry);
+            coeff = expr_negate_owned(entry);
             if (!coeff)
                 goto fail;
             mat_set(N, pivot_col, basis_col, &coeff);
