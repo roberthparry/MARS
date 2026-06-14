@@ -170,7 +170,7 @@ int expr_struct_eq(const expr_t *u, const expr_t *v)
     if (expr_is_const(u))
         return const_struct_eq(u, v);
     if (expr_is_var(u))
-        return u == v;
+        return u->var_id != 0 && u->var_id == v->var_id;
     if (expr_is_mul(u))
         return mul_struct_eq(u, v);
     if (expr_is_neg(u))

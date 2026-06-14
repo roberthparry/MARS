@@ -11,7 +11,7 @@ static bool match_symbolic_affine_or_constant(const expr_t *expr,
         return false;
 
     if (!depends_on_wrt(expr, wrt)) {
-        *constant_out = expr_integrate_clone_expr(expr);
+        *constant_out = expr_clone(expr);
         *coeff_out = expr_new_const(NUM_ZERO);
         if (!*constant_out || !*coeff_out) {
             expr_free(*constant_out);
@@ -142,7 +142,7 @@ expr_t *integrate_symbolic_general_quadratic_root(const expr_t *quadratic,
     eight_a = expr_mul_num(quad_coeff, &eight);
     second = (delta_inverse && eight_a) ? expr_div(delta_inverse, eight_a) : NULL;
 
-    out = simplify_owned(expr_integrate_add_terms_owned(first, second));
+    out = simplify_owned(expr_add_owned(first, second));
     first = NULL;
     second = NULL;
 
@@ -216,7 +216,7 @@ expr_t *integrate_symbolic_general_quadratic_linear_over_root(const expr_t *expr
     if (wrt_over_root_integral && !expr_is_exact_zero(numer_linear))
         linear_part = expr_mul(numer_linear, wrt_over_root_integral);
 
-    out = simplify_owned(expr_integrate_add_terms_owned(constant_part, linear_part));
+    out = simplify_owned(expr_add_owned(constant_part, linear_part));
     constant_part = NULL;
     linear_part = NULL;
 

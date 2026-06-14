@@ -2259,10 +2259,10 @@ __THEME_OVERRIDES__
         saveLastEquationState();
       }
       else if (mode === 'matrix') {
-        modeEditorText.matrix = expr.value.trim() || modeEditorText.matrix;
+        modeEditorText.matrix = currentExpressionText() || expr.value.trim() || modeEditorText.matrix;
         saveLastMatrixState();
       } else {
-        modeEditorText.integrator = expr.value.trim() || modeEditorText.integrator;
+        modeEditorText.integrator = currentExpressionText() || expr.value.trim() || modeEditorText.integrator;
         saveLastIntegratorState();
       }
     }
@@ -2273,11 +2273,23 @@ __THEME_OVERRIDES__
       } else if (mode === 'equation') {
         setExpressionEditor(modeEditorText.equation || DEFAULT_EQUATION_TEXT);
       } else if (mode === 'matrix') {
-        expr.value = modeEditorText.matrix || DEFAULT_MATRIX_TEXT;
-        clearExpressionSource();
+        const text = modeEditorText.matrix || DEFAULT_MATRIX_TEXT;
+        if (bindingParts(text))
+          setExpressionEditor(text);
+        else {
+          expr.value = text;
+          clearExpressionSource();
+          clearVariableValues();
+        }
       } else {
-        expr.value = modeEditorText.integrator || DEFAULT_INTEGRATOR_TEXT;
-        clearExpressionSource();
+        const text = modeEditorText.integrator || DEFAULT_INTEGRATOR_TEXT;
+        if (bindingParts(text))
+          setExpressionEditor(text);
+        else {
+          expr.value = text;
+          clearExpressionSource();
+          clearVariableValues();
+        }
       }
     }
 
@@ -3029,6 +3041,74 @@ __THEME_OVERRIDES__
       return `{ ${parts.body} | ${bindingText} }`;
     }
 
+    function replaceBindingKindInExpression(sourceExpression, targetName, nextKind) {
+      const parts = bindingParts(sourceExpression);
+      if (!parts || !targetName)
+        return sourceExpression;
+
+      let movedAssignment = '';
+      function removeAssignment(assignmentsText, shouldRemove) {
+        return splitTopLevel(assignmentsText, ',')
+          .map((part) => part.trim())
+          .filter(Boolean)
+          .filter((part) => {
+            const eq = indexOfTopLevel(part, '=');
+            const name = eq >= 0 ? part.slice(0, eq).trim() : part.trim();
+            if (!shouldRemove || name !== targetName)
+              return true;
+            movedAssignment = part;
+            return false;
+          })
+          .join(', ');
+      }
+
+      const variables = removeAssignment(parts.variables, nextKind === 'constant');
+      const constants = removeAssignment(parts.constants, nextKind !== 'constant');
+      if (!movedAssignment)
+        return sourceExpression;
+
+      const nextVariables = nextKind === 'constant'
+        ? variables
+        : [variables, movedAssignment].filter(Boolean).join(', ');
+      const nextConstants = nextKind === 'constant'
+        ? sortedAssignmentParts(
+          [...splitTopLevel(constants, ','), movedAssignment]
+            .map((part) => part.trim())
+            .filter(Boolean)
+        ).join(', ')
+        : constants;
+      let bindingText = nextVariables;
+      if (nextConstants)
+        bindingText = bindingText ? `${bindingText}; ${nextConstants}` : `; ${nextConstants}`;
+      return `{ ${parts.body} | ${bindingText} }`;
+    }
+
+    function applyUpdatedBindingExpression(updated) {
+      if (currentMode() === 'expression' || currentMode() === 'equation') {
+        setExpressionEditor(updated);
+        return;
+      }
+
+      if (bindingParts(updated))
+        setExpressionEditor(updated);
+      else {
+        expr.value = expressionForEditor(updated).trim();
+        clearExpressionSource();
+        clearVariableValues();
+      }
+    }
+
+    function saveCurrentModeEditorState() {
+      if (currentMode() === 'expression')
+        saveLastExpression(currentExpressionText() || expr.value.trim());
+      else if (currentMode() === 'equation')
+        saveLastEquationState();
+      else if (currentMode() === 'matrix')
+        saveLastMatrixState();
+      else
+        saveLastIntegratorState();
+    }
+
     function normalisedBindingInputValue(input) {
       const text = String(input.value || '').trim();
       return text || '?';
@@ -3047,10 +3127,28 @@ __THEME_OVERRIDES__
       if (updated === current)
         return;
 
-      setExpressionEditor(updated);
+      applyUpdatedBindingExpression(updated);
       refreshVariableValuesFromEditor();
       updateHistoryButtons();
-      saveLastExpression(updated);
+      saveCurrentModeEditorState();
+    }
+
+    function toggleBindingKind(binding) {
+      const current = currentExpressionText();
+      const name = String(binding && binding.name || '').trim();
+      const currentKind = String(binding && binding.kind || 'variable').trim() || 'variable';
+      if (!current || !name)
+        return;
+
+      const nextKind = currentKind === 'constant' ? 'variable' : 'constant';
+      const updated = replaceBindingKindInExpression(current, name, nextKind);
+      if (updated === current)
+        return;
+
+      applyUpdatedBindingExpression(updated);
+      refreshVariableValuesFromEditor();
+      updateHistoryButtons();
+      saveCurrentModeEditorState();
     }
 
     function displayValueForBinding(binding) {
@@ -3162,7 +3260,16 @@ __THEME_OVERRIDES__
           }
         });
 
-        actions.appendChild(copy);
+        const toggle = document.createElement('button');
+        toggle.className = 'card-action variable-toggle';
+        toggle.type = 'button';
+        toggle.textContent = kind === 'constant' ? 'Variable' : 'Constant';
+        toggle.title = kind === 'constant'
+          ? `Treat ${binding.name} as a variable`
+          : `Treat ${binding.name} as a constant`;
+        toggle.addEventListener('click', () => toggleBindingKind(binding));
+
+        actions.append(toggle, copy);
         box.append(name, text, actions);
         variableValues.appendChild(box);
       });
@@ -3437,7 +3544,7 @@ __THEME_OVERRIDES__
     }
 
     function saveLastMatrixState() {
-      const text = String(expr.value || '').trim();
+      const text = String(currentExpressionText() || expr.value || '').trim();
       const operation = validMatrixOperation(matrixOperation && matrixOperation.value);
       const operand = String(matrixOperand && matrixOperand.value || '').trim();
       if (text)
@@ -3479,7 +3586,7 @@ __THEME_OVERRIDES__
     }
 
     function saveLastIntegratorState() {
-      const text = String(expr.value || '').trim();
+      const text = String(currentExpressionText() || expr.value || '').trim();
       const bounds = currentIntegratorBoundsText();
       const cap = requestedIntegratorIntervalCap();
       if (text)
@@ -3724,11 +3831,12 @@ __THEME_OVERRIDES__
 
     async function fetchMatrixEvaluation() {
       saveLastMatrixState();
+      const matrixText = currentExpressionText() || expr.value.trim();
       const response = await fetch('/matrix-eval', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
-          matrix: expr.value.trim(),
+          matrix: matrixText,
           operation: matrixOperation.value,
           operand: matrixOperand.value.trim(),
           precision: requestedValuePrecision()
@@ -3759,11 +3867,12 @@ __THEME_OVERRIDES__
         throw new Error('A one-sided bound should be entered as an upper bound. Leave lower blank and put the value in upper.');
       const bounds = [bound];
       saveLastIntegratorState();
+      const expressionText = currentExpressionText() || expr.value.trim();
       const response = await fetch('/integrator-eval', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
-          expression: expr.value.trim(),
+          expression: expressionText,
           bounds,
           precision: requestedValuePrecision(),
           max_intervals: requestedIntegratorIntervalCap()
@@ -4367,7 +4476,7 @@ __THEME_OVERRIDES__
     }
 
     async function evaluateMatrix() {
-      const text = expr.value.trim();
+      const text = currentExpressionText() || expr.value.trim();
       if (!text)
         return;
       showResults();
@@ -4397,12 +4506,15 @@ __THEME_OVERRIDES__
         setMatrixPrettyResult(data.result || '', data.pretty || '');
         value.textContent = '';
         setValueCardVisible(false);
+        if (Array.isArray(data.binding_values))
+          renderVariableValues(data.binding_values);
+        else
+          clearVariableValues();
         modeEditorText.matrix = text;
         saveLastMatrixState();
         currentVariables = [];
         currentDifferentiable = false;
         renderDerivativeButtons(currentVariables);
-        clearVariableValues();
         setStatus('Ready');
       } catch (err) {
         setRenderedError(String(err));
@@ -4453,15 +4565,31 @@ __THEME_OVERRIDES__
           data.display_equation || data.equation || '',
           data.full_display_equation || data.equation || ''
         );
-        setExpandableText(
-          functionStyle,
-          functionMore,
-          data.solutions || data.status || '',
-          data.solutions || data.status || ''
-        );
         {
           const valueLines = [];
           const residualValue = displayEquationValue(data.error);
+          const solutionLines = String(data.solutions || '')
+            .split('\n')
+            .map((line) => line.trim())
+            .filter(Boolean);
+          const numericSolutionLines = Array.isArray(data.numeric_solutions)
+            ? data.numeric_solutions.map((line) => String(line).trim()).filter(Boolean)
+            : [];
+          const combinedSolutionLines = [...solutionLines];
+          if (numericSolutionLines.length) {
+            if (combinedSolutionLines.length)
+              combinedSolutionLines.push('');
+            numericSolutionLines.forEach((line) => combinedSolutionLines.push(`numeric: ${line}`));
+          }
+          setExpandableText(
+            functionStyle,
+            functionMore,
+            combinedSolutionLines.join('\n') || data.status || '',
+            combinedSolutionLines.join('\n') || data.status || ''
+          );
+          if (solutionLines.length === 1)
+            valueLines.push(`solution: ${solutionLines[0]}`);
+          numericSolutionLines.forEach((line) => valueLines.push(`numeric: ${line}`));
           if (data.status)
             valueLines.push(`solve status: ${data.status}`);
           if (Number.isFinite(Number(data.solution_count)) && Number(data.solution_count) > 0)
@@ -4493,7 +4621,7 @@ __THEME_OVERRIDES__
     }
 
     async function evaluateIntegrator() {
-      const text = expr.value.trim();
+      const text = currentExpressionText() || expr.value.trim();
       if (!text)
         return;
       showResults();
@@ -4557,10 +4685,13 @@ __THEME_OVERRIDES__
         modeEditorText.integrator = text;
         applyIntegratorResultBound(data);
         saveLastIntegratorState();
+        if (Array.isArray(data.binding_values))
+          renderVariableValues(data.binding_values);
+        else
+          clearVariableValues();
         currentVariables = [];
         currentDifferentiable = false;
         renderDerivativeButtons(currentVariables);
-        clearVariableValues();
         setStatus('Ready');
       } catch (err) {
         setRenderedError(String(err));
@@ -4714,11 +4845,33 @@ __THEME_OVERRIDES__
           return;
         }
 
-        pushExpressionHistory(text);
-        setExpressionEditor(derivativeExpression);
-        await evaluateExpression();
+        clearResultDetails({keepBindings: true});
+        clearRenderedError();
+        setExpandableText(
+          parsed,
+          parsedMore,
+          data.derivative || `d/d${wrt} = ${derivativeExpression}`,
+          data.derivative || `d/d${wrt} = ${derivativeExpression}`
+        );
+        setExpandableText(
+          functionStyle,
+          functionMore,
+          derivativeExpression,
+          derivativeExpression
+        );
+        value.textContent = data.derivative_value
+          ? `d/d${wrt} value: ${data.derivative_value}`
+          : '';
+        lastDerivativeExpression = derivativeExpression;
+        {
+          const variableBindings = variableNamesFromBindings(data.binding_values || []);
+          currentVariables = variableBindings.length
+            ? variableBindings
+            : variablesFromExpression(data.expression || text);
+        }
+        currentDifferentiable = String(data.differentiable || 'yes').trim().toLowerCase() !== 'no';
+        renderDerivativeButtons(currentVariables);
         if (derivativeTex) {
-          clearRenderedError();
           lastTex = derivativeTex;
           rendered.dataset.displayTex = derivativeTex;
           rendered.dataset.fullTex = derivativeTex;
@@ -4730,7 +4883,11 @@ __THEME_OVERRIDES__
             data.derivative_render_error || derivativeTex
           );
           resetMoreDigitsButton(renderedMore, false);
+        } else {
+          setRenderedContent('', derivativeExpression);
+          resetMoreDigitsButton(renderedMore, false);
         }
+        setStatus('Ready');
       } catch (err) {
         setRenderedError(String(err));
         resetMoreDigitsButton(renderedMore, false);
@@ -4768,6 +4925,17 @@ __THEME_OVERRIDES__
 
     expr.addEventListener('input', () => {
       if (currentMode() === 'equation') {
+        if (!bindingParts(expr.value)) {
+          fullExpressionText = expr.value.trim();
+          displayedExpressionText = expr.value.trim();
+          expr.dataset.fullExpression = fullExpressionText;
+          expr.dataset.displayExpression = displayedExpressionText;
+        }
+        refreshVariableValuesFromEditor();
+        updateHistoryButtons();
+        return;
+      }
+      if (currentMode() === 'matrix' || currentMode() === 'integrator') {
         if (!bindingParts(expr.value)) {
           fullExpressionText = expr.value.trim();
           displayedExpressionText = expr.value.trim();
@@ -6495,6 +6663,143 @@ def expression_with_sorted_constants(expression: str) -> str:
     return f"{{ {body} | {binding_text} }}"
 
 
+def restore_source_constant_spellings(expression: str, source_expression: str) -> str:
+    text = str(expression or "").strip()
+    source_text = str(source_expression or "").strip()
+    if not text or not source_text:
+        return text
+
+    body, var_text, const_text = parse_expression_body(text)
+    _, _, source_const_text = parse_expression_body(source_text)
+    source_constants = {
+        name: value
+        for name, value in parse_binding_assignments(source_const_text)
+        if name and value and value != "?" and value.upper() != "NAN"
+    }
+    if not source_constants or not const_text:
+        return text
+
+    changed = False
+    const_parts: list[str] = []
+    for part in split_top_level_text(const_text, ","):
+        eq = index_top_level_text(part, "=")
+        if eq < 0:
+            stripped = part.strip()
+            if stripped:
+                const_parts.append(stripped)
+            continue
+        name = part[:eq].strip()
+        value = part[eq + 1:].strip()
+        source_value = source_constants.get(name)
+        if source_value and value != source_value:
+            const_parts.append(f"{name} = {source_value}")
+            changed = True
+        else:
+            stripped = part.strip()
+            if stripped:
+                const_parts.append(stripped)
+
+    if not changed:
+        return text
+
+    binding_text = var_text.strip()
+    if const_parts:
+        const_binding_text = ", ".join(sorted_assignment_parts(const_parts))
+        binding_text = f"{binding_text}; {const_binding_text}" if binding_text else f"; {const_binding_text}"
+    return f"{{ {body} | {binding_text} }}"
+
+
+_SUPERSCRIPT_DIGIT_MAP = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻", "0123456789+-")
+_SUBSCRIPT_DIGIT_MAP = str.maketrans("₀₁₂₃₄₅₆₇₈₉₊₋", "0123456789+-")
+
+
+def _plain_numeric_to_tex_literal(text: str) -> str:
+    source = str(text or "").strip()
+    match = re.fullmatch(r"([⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻]+)⁄([₀₁₂₃₄₅₆₇₈₉₊₋]+)", source)
+    if match:
+        numerator = match.group(1).translate(_SUPERSCRIPT_DIGIT_MAP)
+        denominator = match.group(2).translate(_SUBSCRIPT_DIGIT_MAP)
+        return rf"\frac{{{numerator}}}{{{denominator}}}"
+    return source
+
+
+def source_constant_replacements(
+    source_expression: str,
+    solved_expression: str,
+) -> list[tuple[str, str, str]]:
+    _, _, source_const_text = parse_expression_body(source_expression)
+    _, _, solved_const_text = parse_expression_body(solved_expression)
+    source_constants = {
+        name: value
+        for name, value in parse_binding_assignments(source_const_text)
+        if name and value and value != "?" and value.upper() != "NAN"
+    }
+    solved_constants = {
+        name: value
+        for name, value in parse_binding_assignments(solved_const_text)
+        if name and value and value != "?" and value.upper() != "NAN"
+    }
+    replacements: list[tuple[str, str, str]] = []
+    for name, source_value in source_constants.items():
+        solved_value = solved_constants.get(name)
+        if solved_value and solved_value != source_value:
+            replacements.append((solved_value, source_value, _plain_numeric_to_tex_literal(solved_value)))
+    return sorted(replacements, key=lambda item: len(item[0]), reverse=True)
+
+
+def replace_source_constant_spellings_in_text(
+    text: str,
+    source_expression: str,
+    solved_expression: str,
+) -> str:
+    rendered = str(text or "")
+    for exact_value, source_value, _ in source_constant_replacements(source_expression, solved_expression):
+        rendered = rendered.replace(exact_value, source_value)
+    return rendered
+
+
+def replace_source_constant_spellings_in_tex(
+    tex: str,
+    source_expression: str,
+    solved_expression: str,
+) -> str:
+    rendered = str(tex or "")
+    for exact_value, source_value, tex_literal in source_constant_replacements(source_expression, solved_expression):
+        if tex_literal and tex_literal != exact_value:
+            rendered = rendered.replace(tex_literal, source_value)
+        rendered = rendered.replace(exact_value, source_value)
+    return rendered
+
+
+def numeric_equation_solution_lines(
+    binary: Path,
+    solutions_text: str,
+    precision: int,
+) -> list[str]:
+    lines: list[str] = []
+    for line in normalize_multiline_display_text(solutions_text).splitlines():
+        lhs, sep, rhs = line.partition("=")
+        if not sep:
+            continue
+        name = lhs.strip()
+        expression = rhs.strip().replace("·", "*")
+        if not name or not expression:
+            continue
+        try:
+            fields, _, returncode = run_mars_lab_fields(binary, expression, precision)
+        except Exception:
+            continue
+        if returncode != 0:
+            continue
+        value = str(fields.get("value") or "").strip()
+        if not value:
+            continue
+        formatted = format_number_text_for_precision(value, precision, zero_subprecision=True)
+        if formatted and formatted != expression:
+            lines.append(f"{name} ≈ {formatted}")
+    return lines
+
+
 def restore_compact_binding_values(expression: str, source_expression: str) -> str:
     if "..." not in expression or not source_expression or "..." in source_expression:
         return expression
@@ -6945,7 +7250,7 @@ def prepare_evaluation_fields(
     return fields
 
 
-def prepare_matrix_fields(fields: dict[str, str]) -> dict[str, object]:
+def prepare_matrix_fields(fields: dict[str, str], precision: int) -> dict[str, object]:
     result_text = str(fields.get("result") or fields.get("value") or "").strip()
     pretty_text = str(fields.get("pretty") or "").strip()
     tex = str(fields.get("tex") or "").strip()
@@ -6953,6 +7258,7 @@ def prepare_matrix_fields(fields: dict[str, str]) -> dict[str, object]:
     kind = str(fields.get("kind") or "").strip()
     rows = str(fields.get("rows") or "").strip()
     cols = str(fields.get("cols") or "").strip()
+    input_text = str(fields.get("input") or "").strip()
 
     svg = None
     render_error = None
@@ -6975,6 +7281,7 @@ def prepare_matrix_fields(fields: dict[str, str]) -> dict[str, object]:
         "pretty": pretty_text,
         "tex": "" if tex == "(null)" else tex,
         "summary": " · ".join(summary_parts),
+        "binding_values": expression_variable_binding_values(input_text, precision),
     }
     if svg:
         payload["svg"] = svg
@@ -7033,6 +7340,7 @@ def prepare_integrator_fields(fields: dict[str, str], precision: int) -> dict[st
         "bound_var": str(fields.get("bound_var") or "").strip().splitlines()[0] if str(fields.get("bound_var") or "").strip() else "",
         "bound_lower": str(fields.get("bound_lower") or "").strip().splitlines()[0] if str(fields.get("bound_lower") or "").strip() else "",
         "bound_upper": str(fields.get("bound_upper") or "").strip().splitlines()[0] if str(fields.get("bound_upper") or "").strip() else "",
+        "binding_values": expression_variable_binding_values(str(fields.get("input") or "").strip(), precision),
     }
     if svg:
         payload["svg"] = svg
@@ -7046,6 +7354,8 @@ def prepare_equation_fields(fields: dict[str, str], precision: int) -> dict[str,
         fields["value"] = format_number_text_for_precision(
             str(fields["value"]), precision, zero_subprecision=True)
 
+    source_equation_text = str(fields.get("input") or "").strip()
+    solved_equation_text = str(fields.get("equation") or "").strip()
     for key in ("equation", "unbound", "tex", "residual", "solutions", "solutions_tex"):
         value = str(fields.get(key) or "")
         if not value:
@@ -7053,15 +7363,34 @@ def prepare_equation_fields(fields: dict[str, str], precision: int) -> dict[str,
         fields[f"raw_{key}"] = value
         fields[key] = precision_numeric_tokens(value, precision)
 
-    source_equation_text = str(fields.get("input") or "").strip()
-    equation_text = expression_with_sorted_constants(str(fields.get("equation") or "").strip())
+    equation_text = restore_source_constant_spellings(
+        expression_with_sorted_constants(str(fields.get("equation") or "").strip()),
+        source_equation_text,
+    )
     unbound_text = str(fields.get("unbound") or "").strip()
-    solutions_text = normalize_multiline_display_text(fields.get("solutions") or "")
-    equation_tex = str(fields.get("tex") or "").strip()
-    solutions_tex = str(fields.get("solutions_tex") or "").strip()
+    solutions_text = replace_source_constant_spellings_in_text(
+        normalize_multiline_display_text(fields.get("solutions") or ""),
+        source_equation_text,
+        solved_equation_text,
+    )
+    equation_tex = replace_source_constant_spellings_in_tex(
+        str(fields.get("tex") or "").strip(),
+        source_equation_text,
+        solved_equation_text,
+    )
+    solutions_tex = replace_source_constant_spellings_in_tex(
+        str(fields.get("solutions_tex") or "").strip(),
+        source_equation_text,
+        solved_equation_text,
+    )
     render_tex = solutions_tex or equation_tex
     display_tex = compact_display_text(render_tex)
     solution_lines = [line.strip() for line in solutions_text.splitlines() if line.strip()]
+    numeric_solution_lines = numeric_equation_solution_lines(
+        DEFAULT_BIN,
+        solutions_text,
+        precision,
+    )
 
     svg = None
     render_error = None
@@ -7081,6 +7410,7 @@ def prepare_equation_fields(fields: dict[str, str], precision: int) -> dict[str,
         "status": str(fields.get("status") or "").strip(),
         "solutions": solutions_text,
         "solution_count": len(solution_lines),
+        "numeric_solutions": numeric_solution_lines,
         "full_display_equation": expression_for_display(unbound_text or equation_text),
         "display_equation": compact_display_text(expression_for_display(unbound_text or equation_text)),
         "full_display_tex": render_tex,
@@ -7457,7 +7787,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                 "matrix_operation": operation,
                 "matrix_operand": operand,
             })
-            self.send_json(200, prepare_matrix_fields(fields))
+            self.send_json(200, prepare_matrix_fields(fields, precision))
             return
 
         if path == "/integrator-eval":
@@ -7595,7 +7925,9 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
             body = self.rfile.read(length)
             payload = json.loads(body.decode("utf-8"))
             expression = str(payload.get("expression", "")).strip()
-            wrt = str(payload.get("wrt", "")).strip() or "x"
+            requested_wrt = str(payload.get("wrt", "")).strip()
+            derivative_request = bool(requested_wrt)
+            wrt = requested_wrt or "x"
             precision = int(payload.get("precision", 96))
         except Exception as exc:
             self.send_json(400, {"ok": False, "error": f"Bad request: {exc}"})
@@ -7670,7 +8002,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
             fields,
             expression,
             precision,
-            save_expression=True,
+            save_expression=not derivative_request,
             wrt=wrt,
         )
 

@@ -157,6 +157,9 @@
         "test_equation_future_keeps_periodic_sin_family_symbolic": true,
         "test_equation_future_keeps_tan_sqrt_three_family_symbolic": true,
         "test_equation_future_reduces_exp_sin_to_periodic_family": true,
+        "test_equation_future_simplifies_schoolbook_periodic_cos_families": true,
+        "test_equation_future_simplifies_schoolbook_periodic_sin_families": true,
+        "test_equation_future_simplifies_schoolbook_periodic_tan_families": true,
         "test_equation_future_solves_sin_family": true
       }
     }
@@ -315,6 +318,7 @@
         "test_integrate_frequency_product_families": true,
         "test_integrate_hyperbolic_table_tail": true,
         "test_integrate_inverse_square_with_exact_bound": true,
+        "test_integrate_iterated_exp_unary_derivatives": true,
         "test_integrate_log_quadratic": true,
         "test_integrate_mixed_frequency_exp_unary": true,
         "test_integrate_more_by_parts": true,

@@ -278,7 +278,7 @@ static expr_t *build_linear_over_symbolic_quadratic_integral(const expr_t *quadr
         remainder_part = inverse_integral ? expr_mul(remainder, inverse_integral) : NULL;
     }
 
-    out = simplify_owned(expr_integrate_add_terms_owned(log_part, remainder_part));
+    out = simplify_owned(expr_add_owned(log_part, remainder_part));
     log_part = NULL;
     remainder_part = NULL;
 
@@ -350,15 +350,15 @@ expr_t *integrate_wrt_times_log_symbolic_affine(const expr_t *expr,
     scaled_log = (constant_sq_over_two_coeff_sq && log_u)
                      ? expr_mul(constant_sq_over_two_coeff_sq, log_u)
                      : NULL;
-    fourth = expr_integrate_negate_owned(scaled_log);
+    fourth = expr_negate_owned(scaled_log);
     scaled_log = NULL;
 
-    sum = expr_integrate_add_terms_owned(first, second);
+    sum = expr_add_owned(first, second);
     first = NULL;
     second = NULL;
-    sum = expr_integrate_add_terms_owned(sum, third);
+    sum = expr_add_owned(sum, third);
     third = NULL;
-    sum = expr_integrate_add_terms_owned(sum, fourth);
+    sum = expr_add_owned(sum, fourth);
     fourth = NULL;
     sum = simplify_owned(sum);
 
@@ -451,12 +451,12 @@ expr_t *integrate_wrt_times_log_symbolic_quadratic(const expr_t *expr,
     fourth = remainder_integral ? mul_number_owned(remainder_integral, neg_half) : NULL;
     remainder_integral = NULL;
 
-    sum = expr_integrate_add_terms_owned(first, second);
+    sum = expr_add_owned(first, second);
     first = NULL;
     second = NULL;
-    sum = expr_integrate_add_terms_owned(sum, third);
+    sum = expr_add_owned(sum, third);
     third = NULL;
-    sum = expr_integrate_add_terms_owned(sum, fourth);
+    sum = expr_add_owned(sum, fourth);
     fourth = NULL;
     sum = simplify_owned(sum);
 

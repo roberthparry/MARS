@@ -84,7 +84,7 @@ expr_t *integrate_sqrt_one_plus_minus_affine_square(const expr_t *quadratic,
         expr_t *root = expr_sqrt(quadratic);
         expr_t *u_root = (u && root) ? expr_mul(u, root) : NULL;
         expr_t *inverse = u ? (is_plus_square ? expr_asinh(u) : expr_asin(u)) : NULL;
-        expr_t *sum = expr_integrate_add_terms_owned(u_root, inverse);
+        expr_t *sum = expr_add_owned(u_root, inverse);
         expr_t *half = sum ? mul_number_owned(sum, NUM_HALF) : NULL;
 
         out = div_number_owned(half, coeff);
@@ -177,7 +177,7 @@ expr_t *integrate_centered_quadratic_root(const expr_t *quadratic, const expr_t 
         expr_t *inverse = arg ? expr_asinh(arg) : NULL;
         expr_t *second = inverse ? mul_number_owned(inverse, inverse_scale) : NULL;
 
-        out = simplify_owned(expr_integrate_add_terms_owned(first, second));
+        out = simplify_owned(expr_add_owned(first, second));
         expr_free(arg);
         expr_free(root);
         num_destroy(&inverse_scale);
@@ -199,7 +199,7 @@ expr_t *integrate_centered_quadratic_root(const expr_t *quadratic, const expr_t 
         expr_t *inverse = arg ? expr_asin(arg) : NULL;
         expr_t *second = inverse ? mul_number_owned(inverse, inverse_scale) : NULL;
 
-        out = simplify_owned(expr_integrate_add_terms_owned(first, second));
+        out = simplify_owned(expr_add_owned(first, second));
         expr_free(arg);
         expr_free(root);
         num_destroy(&inverse_scale);
@@ -223,7 +223,7 @@ expr_t *integrate_centered_quadratic_root(const expr_t *quadratic, const expr_t 
         expr_t *second = inverse ? mul_number_owned(inverse, inverse_scale) : NULL;
         expr_t *neg_second = second ? expr_neg(second) : NULL;
 
-        out = simplify_owned(expr_integrate_add_terms_owned(first, neg_second));
+        out = simplify_owned(expr_add_owned(first, neg_second));
         expr_free(second);
         expr_free(arg);
         expr_free(root);
@@ -272,7 +272,7 @@ expr_t *integrate_linear_poly_over_centered_quadratic_root(const expr_t *expr,
         root_part = div_number_owned(scaled, quad);
     }
 
-    out = simplify_owned(expr_integrate_add_terms_owned(inverse_part, root_part));
+    out = simplify_owned(expr_add_owned(inverse_part, root_part));
     inverse_part = NULL;
     root_part = NULL;
 
@@ -334,7 +334,7 @@ expr_t *integrate_linear_poly_times_centered_quadratic_root(const expr_t *expr,
         num_destroy(&three);
     }
 
-    out = simplify_owned(expr_integrate_add_terms_owned(root_part, linear_part));
+    out = simplify_owned(expr_add_owned(root_part, linear_part));
     root_part = NULL;
     linear_part = NULL;
 

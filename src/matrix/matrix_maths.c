@@ -171,113 +171,6 @@ static matrix_t *mat_fun_elementwise_same_type(const matrix_t *A,
     return R;
 }
 
-static expr_t *expr_simplify_owned_local(expr_t *dv)
-{
-    expr_t *simp;
-
-    if (!dv)
-        return NULL;
-
-    simp = expr_simplify(dv);
-    expr_free(dv);
-    return simp;
-}
-
-static expr_t *expr_const_zero_local(void)
-{
-    return expr_new_const(NUM_ZERO);
-}
-
-static expr_t *expr_const_one_local(void)
-{
-    return expr_new_const(NUM_ONE);
-}
-
-static expr_t *expr_const_long_local(long value)
-{
-    number_t n = num_create_from_long(value);
-    expr_t *dv = expr_new_const(n);
-
-    num_destroy(&n);
-    return dv;
-}
-
-static expr_t *expr_div_simplify_local(const expr_t *num, const expr_t *den)
-{
-    expr_t *raw;
-
-    if (!num || !den) {
-        expr_free((expr_t *)num);
-        expr_free((expr_t *)den);
-        return NULL;
-    }
-
-    raw = expr_div(num, den);
-    expr_free((expr_t *)num);
-    expr_free((expr_t *)den);
-    if (!raw)
-        return NULL;
-
-    return expr_simplify_owned_local(raw);
-}
-
-static expr_t *expr_mul_simplify_local(const expr_t *a, const expr_t *b)
-{
-    expr_t *raw;
-
-    if (!a || !b) {
-        expr_free((expr_t *)a);
-        expr_free((expr_t *)b);
-        return NULL;
-    }
-
-    raw = expr_mul(a, b);
-    expr_free((expr_t *)a);
-    expr_free((expr_t *)b);
-    if (!raw)
-        return NULL;
-
-    return expr_simplify_owned_local(raw);
-}
-
-static expr_t *expr_add_simplify_local(const expr_t *a, const expr_t *b)
-{
-    expr_t *raw;
-
-    if (!a || !b) {
-        expr_free((expr_t *)a);
-        expr_free((expr_t *)b);
-        return NULL;
-    }
-
-    raw = expr_add(a, b);
-    expr_free((expr_t *)a);
-    expr_free((expr_t *)b);
-    if (!raw)
-        return NULL;
-
-    return expr_simplify_owned_local(raw);
-}
-
-static expr_t *expr_sub_simplify_local(const expr_t *a, const expr_t *b)
-{
-    expr_t *raw;
-
-    if (!a || !b) {
-        expr_free((expr_t *)a);
-        expr_free((expr_t *)b);
-        return NULL;
-    }
-
-    raw = expr_sub(a, b);
-    expr_free((expr_t *)a);
-    expr_free((expr_t *)b);
-    if (!raw)
-        return NULL;
-
-    return expr_simplify_owned_local(raw);
-}
-
 static bool expr_is_zero_local(const expr_t *dv)
 {
     return !dv || expr_is_exact_zero(dv);
@@ -293,7 +186,7 @@ static expr_t *expr_fun_first_derivative_at_zero_local(
     if (!scalar_f)
         return NULL;
 
-    zero = expr_const_zero_local();
+    zero = expr_const_zero();
     if (!zero)
         return NULL;
 
@@ -321,7 +214,7 @@ static bool expr_equal_exact_local(const expr_t *a, const expr_t *b)
 
     expr_retain((expr_t *)a);
     expr_retain((expr_t *)b);
-    diff = expr_sub_simplify_local((expr_t *)a, (expr_t *)b);
+    diff = expr_sub_simplify_owned((expr_t *)a, (expr_t *)b);
     if (!diff)
         return false;
 
@@ -333,11 +226,11 @@ static bool expr_equal_exact_local(const expr_t *a, const expr_t *b)
 static expr_t *expr_mul_or_zero_owned_local(const expr_t *a, const expr_t *b)
 {
     if (expr_is_zero_local(a) || expr_is_zero_local(b))
-        return expr_const_zero_local();
+        return expr_const_zero();
 
     expr_retain((expr_t *)a);
     expr_retain((expr_t *)b);
-    return expr_mul_simplify_local((expr_t *)a, (expr_t *)b);
+    return expr_mul_simplify_owned((expr_t *)a, (expr_t *)b);
 }
 
 static bool mat_number_diagonal_equal_local(const matrix_t *A)
@@ -2026,20 +1919,20 @@ static matrix_t *mat_fun_expr_uniform_diag_offdiag(const matrix_t *A,
 
     expr_retain(diag ? diag : EXPR_ZERO);
     expr_retain(offdiag ? offdiag : EXPR_ZERO);
-    alpha = expr_sub_simplify_local(diag ? diag : EXPR_ZERO, offdiag ? offdiag : EXPR_ZERO);
+    alpha = expr_sub_simplify_owned(diag ? diag : EXPR_ZERO, offdiag ? offdiag : EXPR_ZERO);
     if (!alpha)
         goto fail;
 
     expr_retain(diag ? diag : EXPR_ZERO);
     expr_retain(offdiag ? offdiag : EXPR_ZERO);
     number_t n_minus_one = num_create_from_long((long)(n - 1));
-    expr_t *scaled_offdiag = expr_mul_simplify_local(
+    expr_t *scaled_offdiag = expr_mul_simplify_owned(
         expr_new_const(n_minus_one),
         offdiag ? offdiag : EXPR_ZERO);
     num_destroy(&n_minus_one);
     if (!scaled_offdiag)
         goto fail;
-    beta = expr_add_simplify_local(diag ? diag : EXPR_ZERO, scaled_offdiag);
+    beta = expr_add_simplify_owned(diag ? diag : EXPR_ZERO, scaled_offdiag);
     scaled_offdiag = NULL;
     if (!beta)
         goto fail;
@@ -2051,14 +1944,14 @@ static matrix_t *mat_fun_expr_uniform_diag_offdiag(const matrix_t *A,
 
     expr_retain(fb);
     expr_retain(fa);
-    delta = expr_sub_simplify_local(fb, fa);
+    delta = expr_sub_simplify_owned(fb, fa);
     if (!delta)
         goto fail;
     number_t n_num = num_create_from_long((long)n);
     expr_t *scaled_delta = expr_div_num(delta, &n_num);
     num_destroy(&n_num);
     expr_free(delta);
-    delta = expr_simplify_owned_local(scaled_delta);
+    delta = expr_simplify_owned(scaled_delta);
     if (!delta)
         goto fail;
 
@@ -2073,10 +1966,10 @@ static matrix_t *mat_fun_expr_uniform_diag_offdiag(const matrix_t *A,
             if (i == j) {
                 expr_retain(fa);
                 expr_retain(delta);
-                entry = expr_add_simplify_local(fa, delta);
+                entry = expr_add_simplify_owned(fa, delta);
             } else {
                 expr_retain(delta);
-                entry = expr_simplify_owned_local(delta);
+                entry = expr_simplify_owned(delta);
             }
 
             if (!entry)
@@ -2163,7 +2056,7 @@ static matrix_t *mat_fun_expr_scalar_plus_rank_one(const matrix_t *A,
         }
     }
 
-    v[q] = expr_const_one_local();
+    v[q] = expr_const_one();
     if (!v[q])
         goto fail;
 
@@ -2182,7 +2075,7 @@ static matrix_t *mat_fun_expr_scalar_plus_rank_one(const matrix_t *A,
 
         expr_retain(apj);
         expr_retain(apq);
-        v[j] = expr_div_simplify_local(apj, apq);
+        v[j] = expr_div_simplify_owned(apj, apq);
         if (!v[j])
             goto fail;
     }
@@ -2202,7 +2095,7 @@ static matrix_t *mat_fun_expr_scalar_plus_rank_one(const matrix_t *A,
 
         mat_get(A, i, i, &aii);
         expr_retain(aii ? aii : EXPR_ZERO);
-        cand = expr_sub_simplify_local(aii ? aii : EXPR_ZERO, diag_corr);
+        cand = expr_sub_simplify_owned(aii ? aii : EXPR_ZERO, diag_corr);
         if (!cand)
             goto fail;
 
@@ -2227,7 +2120,7 @@ static matrix_t *mat_fun_expr_scalar_plus_rank_one(const matrix_t *A,
     mat_get(A, p, p, &app);
     expr_retain(app ? app : EXPR_ZERO);
     expr_retain(alpha);
-    diag_p = expr_sub_simplify_local(app ? app : EXPR_ZERO, alpha);
+    diag_p = expr_sub_simplify_owned(app ? app : EXPR_ZERO, alpha);
     if (!diag_p)
         goto fail;
 
@@ -2236,7 +2129,7 @@ static matrix_t *mat_fun_expr_scalar_plus_rank_one(const matrix_t *A,
         goto fail;
     expr_retain(diag_p);
     expr_retain(apq);
-    v[p] = expr_div_simplify_local(diag_p, apq);
+    v[p] = expr_div_simplify_owned(diag_p, apq);
     expr_free(diag_p);
     if (!v[p])
         goto fail;
@@ -2244,7 +2137,7 @@ static matrix_t *mat_fun_expr_scalar_plus_rank_one(const matrix_t *A,
     mat_get(A, q, q, &aqq);
     expr_retain(aqq ? aqq : EXPR_ZERO);
     expr_retain(alpha);
-    diag_q = expr_sub_simplify_local(aqq ? aqq : EXPR_ZERO, alpha);
+    diag_q = expr_sub_simplify_owned(aqq ? aqq : EXPR_ZERO, alpha);
     if (!diag_q)
         goto fail;
     u[q] = diag_q;
@@ -2260,7 +2153,7 @@ static matrix_t *mat_fun_expr_scalar_plus_rank_one(const matrix_t *A,
                 if (!diag_corr)
                     goto fail;
                 expr_retain(alpha);
-                expected = expr_add_simplify_local(alpha, diag_corr);
+                expected = expr_add_simplify_owned(alpha, diag_corr);
             } else {
                 expected = expr_mul_or_zero_owned_local(u[i], v[j]);
             }
@@ -2275,7 +2168,7 @@ static matrix_t *mat_fun_expr_scalar_plus_rank_one(const matrix_t *A,
         }
     }
 
-    lambda = expr_const_zero_local();
+    lambda = expr_const_zero();
     if (!lambda)
         goto fail;
     for (size_t i = 0; i < n; ++i) {
@@ -2284,7 +2177,7 @@ static matrix_t *mat_fun_expr_scalar_plus_rank_one(const matrix_t *A,
 
         if (!term)
             goto fail;
-        next = expr_add_simplify_local(lambda, term);
+        next = expr_add_simplify_owned(lambda, term);
         if (!next)
             goto fail;
         lambda = next;
@@ -2299,7 +2192,7 @@ static matrix_t *mat_fun_expr_scalar_plus_rank_one(const matrix_t *A,
 
         expr_retain(alpha);
         expr_retain(lambda);
-        beta = expr_add_simplify_local(alpha, lambda);
+        beta = expr_add_simplify_owned(alpha, lambda);
         if (!beta)
             goto fail;
 
@@ -2311,11 +2204,11 @@ static matrix_t *mat_fun_expr_scalar_plus_rank_one(const matrix_t *A,
 
         expr_retain(f_beta);
         expr_retain(f_alpha);
-        num = expr_sub_simplify_local(f_beta, f_alpha);
+        num = expr_sub_simplify_owned(f_beta, f_alpha);
         if (!num)
             goto fail;
         expr_retain(lambda);
-        coeff = expr_div_simplify_local(num, lambda);
+        coeff = expr_div_simplify_owned(num, lambda);
         if (!coeff)
             goto fail;
     }
@@ -2335,7 +2228,7 @@ static matrix_t *mat_fun_expr_scalar_plus_rank_one(const matrix_t *A,
                 mat_get(A, i, i, &aij);
                 expr_retain(aij ? aij : EXPR_ZERO);
                 expr_retain(alpha);
-                diag_delta = expr_sub_simplify_local(aij ? aij : EXPR_ZERO, alpha);
+                diag_delta = expr_sub_simplify_owned(aij ? aij : EXPR_ZERO, alpha);
                 if (!diag_delta)
                     goto fail;
 
@@ -2347,21 +2240,21 @@ static matrix_t *mat_fun_expr_scalar_plus_rank_one(const matrix_t *A,
 
                     expr_retain(coeff);
                     expr_retain(diag_delta);
-                    scaled = expr_mul_simplify_local(coeff, diag_delta);
+                    scaled = expr_mul_simplify_owned(coeff, diag_delta);
                     expr_free(diag_delta);
                     if (!scaled)
                         goto fail;
                     expr_retain(f_alpha);
-                    entry = expr_add_simplify_local(f_alpha, scaled);
+                    entry = expr_add_simplify_owned(f_alpha, scaled);
                 }
             } else {
                 mat_get(A, i, j, &aij);
                 if (expr_is_zero_local(aij)) {
-                    entry = expr_const_zero_local();
+                    entry = expr_const_zero();
                 } else {
                     expr_retain(coeff);
                     expr_retain(aij);
-                    entry = expr_mul_simplify_local(coeff, aij);
+                    entry = expr_mul_simplify_owned(coeff, aij);
                 }
             }
 
@@ -2449,7 +2342,7 @@ static matrix_t *mat_fun_expr_cubic_linear_exact(const matrix_t *A,
             saw_nonzero = true;
             expr_retain(a3ij);
             expr_retain(aij);
-            expr_t *cand = expr_div_simplify_local(a3ij, aij);
+            expr_t *cand = expr_div_simplify_owned(a3ij, aij);
             if (!cand)
                 goto fail;
 
@@ -2468,7 +2361,7 @@ static matrix_t *mat_fun_expr_cubic_linear_exact(const matrix_t *A,
         goto fail;
 
     if (expr_is_exact_zero(s)) {
-        expr_t *zero = expr_const_zero_local();
+        expr_t *zero = expr_const_zero();
 
         if (!zero)
             goto fail;
@@ -2478,7 +2371,7 @@ static matrix_t *mat_fun_expr_cubic_linear_exact(const matrix_t *A,
         }
         expr_free(zero);
     } else {
-        expr_t *zero = expr_const_zero_local();
+        expr_t *zero = expr_const_zero();
         expr_t *neg_root = NULL;
         expr_t *two_root = NULL;
         expr_t *two_s = NULL;
@@ -2490,14 +2383,14 @@ static matrix_t *mat_fun_expr_cubic_linear_exact(const matrix_t *A,
             goto fail;
 
         root = expr_sqrt(s);
-        root = expr_simplify_owned_local(root);
+        root = expr_simplify_owned(root);
         if (!root) {
             expr_free(zero);
             goto fail;
         }
 
         expr_retain(root);
-        neg_root = expr_sub_simplify_local(expr_const_zero_local(), root);
+        neg_root = expr_sub_simplify_owned(expr_const_zero(), root);
         if (!neg_root) {
             expr_free(zero);
             goto fail;
@@ -2510,22 +2403,22 @@ static matrix_t *mat_fun_expr_cubic_linear_exact(const matrix_t *A,
         if (!f0 || !fp || !fm)
             goto fail;
 
-        c0 = expr_simplify_owned_local(f0);
+        c0 = expr_simplify_owned(f0);
         f0 = NULL;
         if (!c0)
             goto fail;
 
         expr_retain(fp);
         expr_retain(fm);
-        diff = expr_sub_simplify_local(fp, fm);
+        diff = expr_sub_simplify_owned(fp, fm);
         if (!diff)
             goto fail;
 
         expr_retain(root);
-        two_root = expr_mul_simplify_local(expr_const_long_local(2), root);
+        two_root = expr_mul_simplify_owned(expr_const_long(2), root);
         if (!two_root)
             goto fail;
-        c1 = expr_div_simplify_local(diff, two_root);
+        c1 = expr_div_simplify_owned(diff, two_root);
         diff = NULL;
         two_root = NULL;
         if (!c1)
@@ -2533,24 +2426,24 @@ static matrix_t *mat_fun_expr_cubic_linear_exact(const matrix_t *A,
 
         expr_retain(fp);
         expr_retain(fm);
-        sum = expr_add_simplify_local(fp, fm);
+        sum = expr_add_simplify_owned(fp, fm);
         if (!sum)
             goto fail;
 
         expr_retain(c0);
-        tmp = expr_mul_simplify_local(expr_const_long_local(2), c0);
+        tmp = expr_mul_simplify_owned(expr_const_long(2), c0);
         if (!tmp)
             goto fail;
-        sum = expr_sub_simplify_local(sum, tmp);
+        sum = expr_sub_simplify_owned(sum, tmp);
         tmp = NULL;
         if (!sum)
             goto fail;
 
         expr_retain(s);
-        two_s = expr_mul_simplify_local(expr_const_long_local(2), s);
+        two_s = expr_mul_simplify_owned(expr_const_long(2), s);
         if (!two_s)
             goto fail;
-        c2 = expr_div_simplify_local(sum, two_s);
+        c2 = expr_div_simplify_owned(sum, two_s);
         sum = NULL;
         two_s = NULL;
         if (!c2)
@@ -2576,17 +2469,17 @@ static matrix_t *mat_fun_expr_cubic_linear_exact(const matrix_t *A,
 
             expr_retain(c1);
             expr_retain(aij ? aij : EXPR_ZERO);
-            term1 = expr_mul_simplify_local(c1, aij ? aij : EXPR_ZERO);
+            term1 = expr_mul_simplify_owned(c1, aij ? aij : EXPR_ZERO);
             if (!term1)
                 goto fail;
 
             expr_retain(c2);
             expr_retain(a2ij ? a2ij : EXPR_ZERO);
-            term2 = expr_mul_simplify_local(c2, a2ij ? a2ij : EXPR_ZERO);
+            term2 = expr_mul_simplify_owned(c2, a2ij ? a2ij : EXPR_ZERO);
             if (!term2)
                 goto fail;
 
-            entry = expr_add_simplify_local(term1, term2);
+            entry = expr_add_simplify_owned(term1, term2);
             term1 = NULL;
             term2 = NULL;
             if (!entry)
@@ -2594,7 +2487,7 @@ static matrix_t *mat_fun_expr_cubic_linear_exact(const matrix_t *A,
 
             if (i == j) {
                 expr_retain(c0);
-                entry = expr_add_simplify_local(c0, entry);
+                entry = expr_add_simplify_owned(c0, entry);
                 if (!entry)
                     goto fail;
             }
@@ -2708,20 +2601,20 @@ static matrix_t *mat_fun_expr_quartic_biquadratic_exact(const matrix_t *A,
 
     expr_retain(step);
     expr_retain(step);
-    step_sq = expr_mul_simplify_local(step, step);
+    step_sq = expr_mul_simplify_owned(step, step);
     if (!step_sq)
         goto fail;
     expr_retain(step_sq);
-    s = expr_mul_simplify_local(expr_const_long_local(3), step_sq);
+    s = expr_mul_simplify_owned(expr_const_long(3), step_sq);
     if (!s)
         goto fail;
 
     expr_retain(step_sq);
     expr_retain(step_sq);
-    expr_t *step_four = expr_mul_simplify_local(step_sq, step_sq);
+    expr_t *step_four = expr_mul_simplify_owned(step_sq, step_sq);
     if (!step_four)
         goto fail;
-    t = expr_sub_simplify_local(expr_const_zero_local(), step_four);
+    t = expr_sub_simplify_owned(expr_const_zero(), step_four);
     if (!t)
         goto fail;
 
@@ -2736,13 +2629,13 @@ static matrix_t *mat_fun_expr_quartic_biquadratic_exact(const matrix_t *A,
             mat_get(A4, i, j, &a4ij);
             expr_retain(s);
             expr_retain(a2ij ? a2ij : EXPR_ZERO);
-            scaled = expr_mul_simplify_local(s, a2ij ? a2ij : EXPR_ZERO);
+            scaled = expr_mul_simplify_owned(s, a2ij ? a2ij : EXPR_ZERO);
             if (!scaled)
                 goto fail;
 
             if (i == j) {
                 expr_retain(t);
-                expected = expr_add_simplify_local(scaled, t);
+                expected = expr_add_simplify_owned(scaled, t);
             } else {
                 expected = scaled;
             }
@@ -2759,56 +2652,56 @@ static matrix_t *mat_fun_expr_quartic_biquadratic_exact(const matrix_t *A,
 
     expr_retain(s);
     expr_retain(s);
-    disc = expr_mul_simplify_local(s, s);
+    disc = expr_mul_simplify_owned(s, s);
     if (!disc)
         goto fail;
 
     expr_retain(t);
-    expr_t *four_t = expr_mul_simplify_local(expr_const_long_local(4), t);
+    expr_t *four_t = expr_mul_simplify_owned(expr_const_long(4), t);
     if (!four_t)
         goto fail;
-    disc = expr_add_simplify_local(disc, four_t);
+    disc = expr_add_simplify_owned(disc, four_t);
     if (!disc || expr_is_exact_zero(disc))
         goto fail;
 
     root = expr_sqrt(disc);
-    root = expr_simplify_owned_local(root);
+    root = expr_simplify_owned(root);
     if (!root)
         goto fail;
 
     expr_retain(s);
     expr_retain(root);
-    expr_t *sum = expr_add_simplify_local(s, root);
+    expr_t *sum = expr_add_simplify_owned(s, root);
     if (!sum)
         goto fail;
-    mu1 = expr_div_simplify_local(sum, expr_const_long_local(2));
+    mu1 = expr_div_simplify_owned(sum, expr_const_long(2));
     sum = NULL;
-    mu1 = expr_simplify_owned_local(mu1);
+    mu1 = expr_simplify_owned(mu1);
     if (!mu1)
         goto fail;
 
     expr_retain(s);
     expr_retain(root);
-    expr_t *diff = expr_sub_simplify_local(s, root);
+    expr_t *diff = expr_sub_simplify_owned(s, root);
     if (!diff)
         goto fail;
-    mu2 = expr_div_simplify_local(diff, expr_const_long_local(2));
+    mu2 = expr_div_simplify_owned(diff, expr_const_long(2));
     diff = NULL;
-    mu2 = expr_simplify_owned_local(mu2);
+    mu2 = expr_simplify_owned(mu2);
     if (!mu2 || expr_equal_exact_local(mu1, mu2))
         goto fail;
 
     r1 = expr_sqrt(mu1);
-    r1 = expr_simplify_owned_local(r1);
+    r1 = expr_simplify_owned(r1);
     r2 = expr_sqrt(mu2);
-    r2 = expr_simplify_owned_local(r2);
+    r2 = expr_simplify_owned(r2);
     if (!r1 || !r2)
         goto fail;
 
     expr_retain(r1);
-    nr1 = expr_sub_simplify_local(expr_const_zero_local(), r1);
+    nr1 = expr_sub_simplify_owned(expr_const_zero(), r1);
     expr_retain(r2);
-    nr2 = expr_sub_simplify_local(expr_const_zero_local(), r2);
+    nr2 = expr_sub_simplify_owned(expr_const_zero(), r2);
     if (!nr1 || !nr2)
         goto fail;
 
@@ -2821,22 +2714,22 @@ static matrix_t *mat_fun_expr_quartic_biquadratic_exact(const matrix_t *A,
 
     expr_retain(fp1);
     expr_retain(fm1);
-    g1 = expr_add_simplify_local(fp1, fm1);
+    g1 = expr_add_simplify_owned(fp1, fm1);
     if (g1) {
-        expr_t *half = expr_div_simplify_local(g1, expr_const_long_local(2));
+        expr_t *half = expr_div_simplify_owned(g1, expr_const_long(2));
         g1 = NULL;
-        g1 = half ? expr_simplify_owned_local(half) : NULL;
+        g1 = half ? expr_simplify_owned(half) : NULL;
     }
     if (!g1)
         goto fail;
 
     expr_retain(fp2);
     expr_retain(fm2);
-    g2 = expr_add_simplify_local(fp2, fm2);
+    g2 = expr_add_simplify_owned(fp2, fm2);
     if (g2) {
-        expr_t *half = expr_div_simplify_local(g2, expr_const_long_local(2));
+        expr_t *half = expr_div_simplify_owned(g2, expr_const_long(2));
         g2 = NULL;
-        g2 = half ? expr_simplify_owned_local(half) : NULL;
+        g2 = half ? expr_simplify_owned(half) : NULL;
     }
     if (!g2)
         goto fail;
@@ -2846,16 +2739,16 @@ static matrix_t *mat_fun_expr_quartic_biquadratic_exact(const matrix_t *A,
     } else {
         expr_retain(fp1);
         expr_retain(fm1);
-        expr_t *num = expr_sub_simplify_local(fp1, fm1);
+        expr_t *num = expr_sub_simplify_owned(fp1, fm1);
         expr_t *den = NULL;
 
         if (!num)
             goto fail;
         expr_retain(r1);
-        den = expr_mul_simplify_local(expr_const_long_local(2), r1);
+        den = expr_mul_simplify_owned(expr_const_long(2), r1);
         if (!den)
             goto fail;
-        h1 = expr_div_simplify_local(num, den);
+        h1 = expr_div_simplify_owned(num, den);
     }
     if (!h1)
         goto fail;
@@ -2865,16 +2758,16 @@ static matrix_t *mat_fun_expr_quartic_biquadratic_exact(const matrix_t *A,
     } else {
         expr_retain(fp2);
         expr_retain(fm2);
-        expr_t *num = expr_sub_simplify_local(fp2, fm2);
+        expr_t *num = expr_sub_simplify_owned(fp2, fm2);
         expr_t *den = NULL;
 
         if (!num)
             goto fail;
         expr_retain(r2);
-        den = expr_mul_simplify_local(expr_const_long_local(2), r2);
+        den = expr_mul_simplify_owned(expr_const_long(2), r2);
         if (!den)
             goto fail;
-        h2 = expr_div_simplify_local(num, den);
+        h2 = expr_div_simplify_owned(num, den);
     }
     if (!h2)
         goto fail;
@@ -2885,21 +2778,21 @@ static matrix_t *mat_fun_expr_quartic_biquadratic_exact(const matrix_t *A,
 
     expr_retain(g1);
     expr_retain(g2);
-    num = expr_sub_simplify_local(g1, g2);
+    num = expr_sub_simplify_owned(g1, g2);
     expr_retain(mu1);
     expr_retain(mu2);
-    den = expr_sub_simplify_local(mu1, mu2);
-    e1 = expr_div_simplify_local(num, den);
+    den = expr_sub_simplify_owned(mu1, mu2);
+    e1 = expr_div_simplify_owned(num, den);
     if (!e1)
         goto fail;
 
     expr_retain(e1);
     expr_retain(mu1);
-    e1mu = expr_mul_simplify_local(e1, mu1);
+    e1mu = expr_mul_simplify_owned(e1, mu1);
     if (!e1mu)
         goto fail;
     expr_retain(g1);
-    e0 = expr_sub_simplify_local(g1, e1mu);
+    e0 = expr_sub_simplify_owned(g1, e1mu);
     if (!e0)
         goto fail;
 
@@ -2909,21 +2802,21 @@ static matrix_t *mat_fun_expr_quartic_biquadratic_exact(const matrix_t *A,
 
     expr_retain(h1);
     expr_retain(h2);
-    num2 = expr_sub_simplify_local(h1, h2);
+    num2 = expr_sub_simplify_owned(h1, h2);
     expr_retain(mu1);
     expr_retain(mu2);
-    den2 = expr_sub_simplify_local(mu1, mu2);
-    o1 = expr_div_simplify_local(num2, den2);
+    den2 = expr_sub_simplify_owned(mu1, mu2);
+    o1 = expr_div_simplify_owned(num2, den2);
     if (!o1)
         goto fail;
 
     expr_retain(o1);
     expr_retain(mu1);
-    o1mu = expr_mul_simplify_local(o1, mu1);
+    o1mu = expr_mul_simplify_owned(o1, mu1);
     if (!o1mu)
         goto fail;
     expr_retain(h1);
-    o0 = expr_sub_simplify_local(h1, o1mu);
+    o0 = expr_sub_simplify_owned(h1, o1mu);
     if (!o0)
         goto fail;
 
@@ -2941,11 +2834,11 @@ static matrix_t *mat_fun_expr_quartic_biquadratic_exact(const matrix_t *A,
 
             if (i == j) {
                 expr_retain(e0);
-                entry = expr_simplify_owned_local(e0);
+                entry = expr_simplify_owned(e0);
                 if (!entry)
                     goto fail;
             } else {
-                entry = expr_const_zero_local();
+                entry = expr_const_zero();
                 if (!entry)
                     goto fail;
             }
@@ -2953,36 +2846,36 @@ static matrix_t *mat_fun_expr_quartic_biquadratic_exact(const matrix_t *A,
             mat_get(A, i, j, &aij);
             expr_retain(o0);
             expr_retain(aij ? aij : EXPR_ZERO);
-            term = expr_mul_simplify_local(o0, aij ? aij : EXPR_ZERO);
+            term = expr_mul_simplify_owned(o0, aij ? aij : EXPR_ZERO);
             if (!term) {
                 expr_free(entry);
                 goto fail;
             }
-            entry = expr_add_simplify_local(entry, term);
+            entry = expr_add_simplify_owned(entry, term);
             if (!entry)
                 goto fail;
 
             mat_get(A2, i, j, &a2ij);
             expr_retain(e1);
             expr_retain(a2ij ? a2ij : EXPR_ZERO);
-            term = expr_mul_simplify_local(e1, a2ij ? a2ij : EXPR_ZERO);
+            term = expr_mul_simplify_owned(e1, a2ij ? a2ij : EXPR_ZERO);
             if (!term) {
                 expr_free(entry);
                 goto fail;
             }
-            entry = expr_add_simplify_local(entry, term);
+            entry = expr_add_simplify_owned(entry, term);
             if (!entry)
                 goto fail;
 
             mat_get(A3, i, j, &a3ij);
             expr_retain(o1);
             expr_retain(a3ij ? a3ij : EXPR_ZERO);
-            term = expr_mul_simplify_local(o1, a3ij ? a3ij : EXPR_ZERO);
+            term = expr_mul_simplify_owned(o1, a3ij ? a3ij : EXPR_ZERO);
             if (!term) {
                 expr_free(entry);
                 goto fail;
             }
-            entry = expr_add_simplify_local(entry, term);
+            entry = expr_add_simplify_owned(entry, term);
             if (!entry)
                 goto fail;
 
@@ -3099,7 +2992,7 @@ static matrix_t *mat_fun_expr_quadratic_exact(const matrix_t *A,
             saw_offdiag = true;
             expr_retain(a2ij);
             expr_retain(aij);
-            expr_t *cand = expr_div_simplify_local(a2ij, aij);
+            expr_t *cand = expr_div_simplify_owned(a2ij, aij);
             if (!cand)
                 goto fail;
 
@@ -3127,12 +3020,12 @@ static matrix_t *mat_fun_expr_quadratic_exact(const matrix_t *A,
         mat_get(A2, i, i, &a2ii);
         expr_retain(p);
         expr_retain(aii ? aii : EXPR_ZERO);
-        p_aii = expr_mul_simplify_local(p, aii ? aii : EXPR_ZERO);
+        p_aii = expr_mul_simplify_owned(p, aii ? aii : EXPR_ZERO);
         if (!p_aii)
             goto fail;
 
         expr_retain(a2ii ? a2ii : EXPR_ZERO);
-        cand = expr_sub_simplify_local(a2ii ? a2ii : EXPR_ZERO, p_aii);
+        cand = expr_sub_simplify_owned(a2ii ? a2ii : EXPR_ZERO, p_aii);
         if (!cand)
             goto fail;
 
@@ -3151,15 +3044,15 @@ static matrix_t *mat_fun_expr_quadratic_exact(const matrix_t *A,
 
     expr_retain(p);
     expr_retain(p);
-    disc = expr_mul_simplify_local(p, p);
+    disc = expr_mul_simplify_owned(p, p);
     if (!disc)
         goto fail;
 
     expr_retain(q);
-    expr_t *four_q = expr_mul_simplify_local(expr_const_long_local(4), q);
+    expr_t *four_q = expr_mul_simplify_owned(expr_const_long(4), q);
     if (!four_q)
         goto fail;
-    disc = expr_add_simplify_local(disc, four_q);
+    disc = expr_add_simplify_owned(disc, four_q);
     if (!disc)
         goto fail;
 
@@ -3167,8 +3060,8 @@ static matrix_t *mat_fun_expr_quadratic_exact(const matrix_t *A,
         expr_t *lambda = NULL;
 
         expr_retain(p);
-        lambda = expr_div_simplify_local(p, expr_const_long_local(2));
-        lambda = expr_simplify_owned_local(lambda);
+        lambda = expr_div_simplify_owned(p, expr_const_long(2));
+        lambda = expr_simplify_owned(lambda);
         if (!lambda)
             goto fail;
 
@@ -3177,12 +3070,12 @@ static matrix_t *mat_fun_expr_quadratic_exact(const matrix_t *A,
 
         expr_retain(c1);
         expr_retain(lambda);
-        expr_t *lambda_df = expr_mul_simplify_local(c1, lambda);
+        expr_t *lambda_df = expr_mul_simplify_owned(c1, lambda);
         if (!lambda_df)
             goto fail;
 
         expr_retain(f1);
-        c0 = expr_sub_simplify_local(f1, lambda_df);
+        c0 = expr_sub_simplify_owned(f1, lambda_df);
         expr_free(lambda);
         if (!c0 || !c1)
             goto fail;
@@ -3193,27 +3086,27 @@ static matrix_t *mat_fun_expr_quadratic_exact(const matrix_t *A,
         expr_t *den = NULL;
 
         root = expr_sqrt(disc);
-        root = expr_simplify_owned_local(root);
+        root = expr_simplify_owned(root);
         if (!root)
             goto fail;
 
         expr_retain(p);
         expr_retain(root);
-        sum = expr_add_simplify_local(p, root);
+        sum = expr_add_simplify_owned(p, root);
         if (!sum)
             goto fail;
 
         expr_retain(p);
         expr_retain(root);
-        diff = expr_sub_simplify_local(p, root);
+        diff = expr_sub_simplify_owned(p, root);
         if (!diff)
             goto fail;
 
-        lambda1 = expr_div_simplify_local(sum, expr_const_long_local(2));
-        lambda1 = expr_simplify_owned_local(lambda1);
+        lambda1 = expr_div_simplify_owned(sum, expr_const_long(2));
+        lambda1 = expr_simplify_owned(lambda1);
         sum = NULL;
-        lambda2 = expr_div_simplify_local(diff, expr_const_long_local(2));
-        lambda2 = expr_simplify_owned_local(lambda2);
+        lambda2 = expr_div_simplify_owned(diff, expr_const_long(2));
+        lambda2 = expr_simplify_owned(lambda2);
         diff = NULL;
         if (!lambda1 || !lambda2)
             goto fail;
@@ -3225,22 +3118,22 @@ static matrix_t *mat_fun_expr_quadratic_exact(const matrix_t *A,
 
         expr_retain(f1);
         expr_retain(f2);
-        num = expr_sub_simplify_local(f1, f2);
+        num = expr_sub_simplify_owned(f1, f2);
         expr_retain(lambda1);
         expr_retain(lambda2);
-        den = expr_sub_simplify_local(lambda1, lambda2);
-        c1 = expr_div_simplify_local(num, den);
+        den = expr_sub_simplify_owned(lambda1, lambda2);
+        c1 = expr_div_simplify_owned(num, den);
         if (!c1)
             goto fail;
 
         expr_retain(c1);
         expr_retain(lambda1);
-        expr_t *c1_l1 = expr_mul_simplify_local(c1, lambda1);
+        expr_t *c1_l1 = expr_mul_simplify_owned(c1, lambda1);
         if (!c1_l1)
             goto fail;
 
         expr_retain(f1);
-        c0 = expr_sub_simplify_local(f1, c1_l1);
+        c0 = expr_sub_simplify_owned(f1, c1_l1);
         if (!c0)
             goto fail;
     }
@@ -3258,13 +3151,13 @@ static matrix_t *mat_fun_expr_quadratic_exact(const matrix_t *A,
             mat_get(A, i, j, &aij);
             expr_retain(c1);
             expr_retain(aij ? aij : EXPR_ZERO);
-            term = expr_mul_simplify_local(c1, aij ? aij : EXPR_ZERO);
+            term = expr_mul_simplify_owned(c1, aij ? aij : EXPR_ZERO);
             if (!term)
                 goto fail;
 
             if (i == j) {
                 expr_retain(c0);
-                entry = expr_add_simplify_local(c0, term);
+                entry = expr_add_simplify_owned(c0, term);
             } else {
                 entry = term;
             }

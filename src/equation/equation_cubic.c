@@ -2,6 +2,7 @@
 #include <stddef.h>
 
 #include "equation_internal.h"
+#include "internal/expr_internal.h"
 #include "number.h"
 
 static void equ_init_numbers(number_t *values, size_t count)
@@ -318,70 +319,11 @@ static int equ_append_cubic_cardano_roots(const expr_t *wrt,
     return rc;
 }
 
-static expr_t *equ_cubic_simplify_owned(expr_t *expr)
-{
-    expr_t *simplified;
-
-    if (!expr)
-        return NULL;
-
-    simplified = expr_simplify(expr);
-    expr_free(expr);
-    return simplified;
-}
-
-static expr_t *equ_cubic_retain_expr(const expr_t *expr)
-{
-    if (!expr)
-        return NULL;
-
-    expr_retain(expr);
-    return (expr_t *)expr;
-}
-
-static expr_t *equ_cubic_expr_const_long(long value)
-{
-    number_t number = num_create_from_long(value);
-    expr_t *expr = expr_new_const(number);
-
-    num_destroy(&number);
-    return expr;
-}
-
-static expr_t *equ_cubic_expr_mul_long(const expr_t *expr, long value)
-{
-    number_t number = num_create_from_long(value);
-    expr_t *out = expr ? expr_mul_num(expr, &number) : NULL;
-
-    num_destroy(&number);
-    return out;
-}
-
-static expr_t *equ_cubic_expr_div_long(const expr_t *expr, long value)
-{
-    number_t number = num_create_from_long(value);
-    expr_t *denom = expr_new_const(number);
-    expr_t *out = (expr && denom) ? expr_div(expr, denom) : NULL;
-
-    expr_free(denom);
-    num_destroy(&number);
-    return out;
-}
-
-static expr_t *equ_cubic_expr_pow_long(const expr_t *expr, long exponent)
-{
-    number_t number = num_create_from_long(exponent);
-    expr_t *out = expr ? expr_pow(expr, &number) : NULL;
-
-    num_destroy(&number);
-    return out;
-}
-
 static expr_t *equ_cubic_expr_cuberoot(const expr_t *expr)
 {
     number_t exponent = num_create_from_frac(1L, 3L);
     expr_t *root = expr ? expr_pow(expr, &exponent) : NULL;
-    expr_t *out = equ_cubic_simplify_owned(root);
+    expr_t *out = expr_simplify_owned(root);
 
     num_destroy(&exponent);
     return out;
@@ -391,16 +333,16 @@ static expr_t *equ_cubic_symbolic_p(const expr_t *a,
                                          const expr_t *b,
                                          const expr_t *c)
 {
-    expr_t *a_sq = equ_cubic_expr_pow_long(a, 2L);
+    expr_t *a_sq = expr_pow_long(a, 2L);
     expr_t *ac = expr_mul(a, c);
-    expr_t *three_ac = equ_cubic_expr_mul_long(ac, 3L);
-    expr_t *b_sq = equ_cubic_expr_pow_long(b, 2L);
+    expr_t *three_ac = expr_mul_long(ac, 3L);
+    expr_t *b_sq = expr_pow_long(b, 2L);
     expr_t *numerator = (three_ac && b_sq) ? expr_sub(three_ac, b_sq) : NULL;
-    expr_t *denominator = equ_cubic_expr_mul_long(a_sq, 3L);
+    expr_t *denominator = expr_mul_long(a_sq, 3L);
     expr_t *quotient = (numerator && denominator)
         ? expr_div(numerator, denominator)
         : NULL;
-    expr_t *out = equ_cubic_simplify_owned(quotient);
+    expr_t *out = expr_simplify_owned(quotient);
 
     expr_free(denominator);
     expr_free(numerator);
@@ -416,22 +358,22 @@ static expr_t *equ_cubic_symbolic_q(const expr_t *a,
                                          const expr_t *c,
                                          const expr_t *d)
 {
-    expr_t *a_sq = equ_cubic_expr_pow_long(a, 2L);
-    expr_t *a_cu = equ_cubic_expr_pow_long(a, 3L);
-    expr_t *b_cu = equ_cubic_expr_pow_long(b, 3L);
+    expr_t *a_sq = expr_pow_long(a, 2L);
+    expr_t *a_cu = expr_pow_long(a, 3L);
+    expr_t *b_cu = expr_pow_long(b, 3L);
     expr_t *a_sq_d = (a_sq && d) ? expr_mul(a_sq, d) : NULL;
-    expr_t *first = equ_cubic_expr_mul_long(a_sq_d, 27L);
+    expr_t *first = expr_mul_long(a_sq_d, 27L);
     expr_t *ab = expr_mul(a, b);
     expr_t *abc = (ab && c) ? expr_mul(ab, c) : NULL;
-    expr_t *second = equ_cubic_expr_mul_long(abc, 9L);
-    expr_t *third = equ_cubic_expr_mul_long(b_cu, 2L);
+    expr_t *second = expr_mul_long(abc, 9L);
+    expr_t *third = expr_mul_long(b_cu, 2L);
     expr_t *first_diff = (first && second) ? expr_sub(first, second) : NULL;
     expr_t *numerator = (first_diff && third) ? expr_add(first_diff, third) : NULL;
-    expr_t *denominator = equ_cubic_expr_mul_long(a_cu, 27L);
+    expr_t *denominator = expr_mul_long(a_cu, 27L);
     expr_t *quotient = (numerator && denominator)
         ? expr_div(numerator, denominator)
         : NULL;
-    expr_t *out = equ_cubic_simplify_owned(quotient);
+    expr_t *out = expr_simplify_owned(quotient);
 
     expr_free(denominator);
     expr_free(numerator);
@@ -451,9 +393,9 @@ static expr_t *equ_cubic_symbolic_q(const expr_t *a,
 static expr_t *equ_cubic_symbolic_shift(const expr_t *a,
                                              const expr_t *b)
 {
-    expr_t *denominator = equ_cubic_expr_mul_long(a, 3L);
+    expr_t *denominator = expr_mul_long(a, 3L);
     expr_t *quotient = denominator ? expr_div(b, denominator) : NULL;
-    expr_t *out = equ_cubic_simplify_owned(quotient);
+    expr_t *out = expr_simplify_owned(quotient);
 
     expr_free(denominator);
     return out;
@@ -462,14 +404,14 @@ static expr_t *equ_cubic_symbolic_shift(const expr_t *a,
 static expr_t *equ_cubic_symbolic_discriminant(const expr_t *p,
                                                     const expr_t *q)
 {
-    expr_t *q_half = equ_cubic_expr_div_long(q, 2L);
-    expr_t *p_third = equ_cubic_expr_div_long(p, 3L);
-    expr_t *q_half_sq = equ_cubic_expr_pow_long(q_half, 2L);
-    expr_t *p_third_cu = equ_cubic_expr_pow_long(p_third, 3L);
+    expr_t *q_half = expr_div_long(q, 2L);
+    expr_t *p_third = expr_div_long(p, 3L);
+    expr_t *q_half_sq = expr_pow_long(q_half, 2L);
+    expr_t *p_third_cu = expr_pow_long(p_third, 3L);
     expr_t *sum = (q_half_sq && p_third_cu)
         ? expr_add(q_half_sq, p_third_cu)
         : NULL;
-    expr_t *out = equ_cubic_simplify_owned(sum);
+    expr_t *out = expr_simplify_owned(sum);
 
     expr_free(p_third_cu);
     expr_free(q_half_sq);
@@ -483,7 +425,7 @@ static bool equ_cubic_symbolic_uv(const expr_t *q,
                                        expr_t **u_out,
                                        expr_t **v_out)
 {
-    expr_t *q_half = equ_cubic_expr_div_long(q, 2L);
+    expr_t *q_half = expr_div_long(q, 2L);
     expr_t *neg_q_half = q_half ? expr_neg(q_half) : NULL;
     expr_t *sqrt_discriminant = discriminant ? expr_sqrt(discriminant) : NULL;
     expr_t *u_arg = (neg_q_half && sqrt_discriminant)
@@ -508,8 +450,8 @@ static bool equ_cubic_symbolic_uv(const expr_t *q,
 
 static expr_t *equ_cubic_omega_expr(bool conjugate)
 {
-    expr_t *neg_one = equ_cubic_expr_const_long(-1L);
-    expr_t *three = equ_cubic_expr_const_long(3L);
+    expr_t *neg_one = expr_const_long(-1L);
+    expr_t *three = expr_const_long(3L);
     expr_t *sqrt_three = three ? expr_sqrt(three) : NULL;
     expr_t *imag_unit = expr_new_const(NUM_I);
     expr_t *imag = (imag_unit && sqrt_three)
@@ -518,7 +460,7 @@ static expr_t *equ_cubic_omega_expr(bool conjugate)
     expr_t *numerator = (neg_one && imag)
         ? (conjugate ? expr_sub(neg_one, imag) : expr_add(neg_one, imag))
         : NULL;
-    expr_t *out = equ_cubic_expr_div_long(numerator, 2L);
+    expr_t *out = expr_div_long(numerator, 2L);
 
     expr_free(numerator);
     expr_free(imag);
@@ -536,12 +478,12 @@ static expr_t *equ_cubic_symbolic_root(const expr_t *u,
                                             const expr_t *v_factor)
 {
     expr_t *u_term = u_factor ? expr_mul(u_factor, u)
-                              : equ_cubic_retain_expr(u);
+                              : expr_retain_expr(u);
     expr_t *v_term = v_factor ? expr_mul(v_factor, v)
-                              : equ_cubic_retain_expr(v);
+                              : expr_retain_expr(v);
     expr_t *sum = (u_term && v_term) ? expr_add(u_term, v_term) : NULL;
     expr_t *raw_root = (sum && shift) ? expr_sub(sum, shift) : NULL;
-    expr_t *root = equ_cubic_simplify_owned(raw_root);
+    expr_t *root = expr_simplify_owned(raw_root);
 
     expr_free(sum);
     expr_free(v_term);

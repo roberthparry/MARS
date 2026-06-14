@@ -87,6 +87,8 @@ enum {
 static expr_t *integrate_scaled_rule(const expr_t *expr, const expr_t *wrt);
 static expr_t *integrate_inverse_symbolic_square_sum(const expr_t *expr,
                                                      const expr_t *wrt);
+static expr_t *integrate_mul_rule_by_distribution(const expr_t *expr,
+                                                  const expr_t *wrt);
 static bool integrate_rule_kind_bit(expr_op_kind_t kind,
                                     expr_op_kind_t min_kind,
                                     expr_op_kind_t max_kind,
@@ -150,6 +152,7 @@ static const expr_integrate_mul_rule_t integrate_mul_always_rules[] = {
 };
 
 static const expr_integrate_mul_rule_t integrate_mul_exp_power_rules[] = {
+    { .kind = EXPR_INTEGRATE_MUL_RULE_DIRECT, .direct = integrate_polynomial_times_polynomial_exp },
     { .kind = EXPR_INTEGRATE_MUL_RULE_DIRECT, .direct = integrate_symbolic_integer_power_times_exp },
     { .kind = EXPR_INTEGRATE_MUL_RULE_END }
 };
@@ -534,10 +537,15 @@ expr_t *integrate_var_rule(const expr_t *expr, const expr_t *wrt)
 
 expr_t *integrate_add_rule(const expr_t *expr, const expr_t *wrt)
 {
-    expr_t *left = expr_integrate_dispatch(expr->a, wrt);
+    expr_t *left;
     expr_t *right;
     expr_t *sum;
 
+    sum = integrate_exact_substitution_product(expr, wrt);
+    if (sum)
+        return sum;
+
+    left = expr_integrate_dispatch(expr->a, wrt);
     if (!left)
         return NULL;
     right = expr_integrate_dispatch(expr->b, wrt);
@@ -553,10 +561,15 @@ expr_t *integrate_add_rule(const expr_t *expr, const expr_t *wrt)
 
 expr_t *integrate_sub_rule(const expr_t *expr, const expr_t *wrt)
 {
-    expr_t *left = expr_integrate_dispatch(expr->a, wrt);
+    expr_t *left;
     expr_t *right;
     expr_t *diff;
 
+    diff = integrate_exact_substitution_product(expr, wrt);
+    if (diff)
+        return diff;
+
+    left = expr_integrate_dispatch(expr->a, wrt);
     if (!left)
         return NULL;
     right = expr_integrate_dispatch(expr->b, wrt);
@@ -858,8 +871,16 @@ expr_t *integrate_mul_rule(const expr_t *expr, const expr_t *wrt)
     expr_t *inner;
     expr_t *product;
 
+    matched = integrate_exact_substitution_product(expr, wrt);
+    if (matched)
+        return matched;
+
     features = integrate_mul_rule_expr_features(expr);
     matched = integrate_mul_rule_dispatch(features, expr, wrt);
+    if (matched)
+        return matched;
+
+    matched = integrate_mul_rule_by_distribution(expr, wrt);
     if (matched)
         return matched;
 
@@ -877,6 +898,55 @@ expr_t *integrate_mul_rule(const expr_t *expr, const expr_t *wrt)
     }
     expr_free(inner);
     return simplify_owned(product);
+}
+
+static expr_t *integrate_mul_rule_by_distribution(const expr_t *expr,
+                                                  const expr_t *wrt)
+{
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+    expr_t *expanded = NULL;
+    expr_t *out = NULL;
+
+    if (!expr || !wrt || !expr_match_mul_expr(expr, &left, &right))
+        return NULL;
+
+    if (left && left->ops && left->ops->kind == EXPR_KIND_ADD) {
+        expr_t *first = expr_mul((expr_t *)left->a, (expr_t *)right);
+        expr_t *second = expr_mul((expr_t *)left->b, (expr_t *)right);
+        expanded = (first && second) ? expr_add(first, second) : NULL;
+        expr_free(second);
+        expr_free(first);
+    } else if (left && left->ops && left->ops->kind == EXPR_KIND_SUB) {
+        expr_t *first = expr_mul((expr_t *)left->a, (expr_t *)right);
+        expr_t *second = expr_mul((expr_t *)left->b, (expr_t *)right);
+        expanded = (first && second) ? expr_sub(first, second) : NULL;
+        expr_free(second);
+        expr_free(first);
+    } else if (right && right->ops && right->ops->kind == EXPR_KIND_ADD) {
+        expr_t *first = expr_mul((expr_t *)left, (expr_t *)right->a);
+        expr_t *second = expr_mul((expr_t *)left, (expr_t *)right->b);
+        expanded = (first && second) ? expr_add(first, second) : NULL;
+        expr_free(second);
+        expr_free(first);
+    } else if (right && right->ops && right->ops->kind == EXPR_KIND_SUB) {
+        expr_t *first = expr_mul((expr_t *)left, (expr_t *)right->a);
+        expr_t *second = expr_mul((expr_t *)left, (expr_t *)right->b);
+        expanded = (first && second) ? expr_sub(first, second) : NULL;
+        expr_free(second);
+        expr_free(first);
+    }
+
+    expanded = simplify_owned(expanded);
+    if (!expanded ||
+        (expanded->ops->kind != EXPR_KIND_ADD && expanded->ops->kind != EXPR_KIND_SUB) ||
+        expr_equal_exact_local(expanded, expr)) {
+        expr_free(expanded);
+        return NULL;
+    }
+    out = expanded ? expr_integrate_dispatch(expanded, wrt) : NULL;
+    expr_free(expanded);
+    return out;
 }
 
 static expr_t *integrate_div_constant_denominator(const expr_t *expr,

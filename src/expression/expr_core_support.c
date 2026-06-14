@@ -1092,3 +1092,217 @@ expr_t *expr_new_named_var_text(number_t x, const string_t *name)
 {
     return expr_attach_name_text(expr_new_var(x), name);
 }
+
+expr_t *expr_retain_expr(const expr_t *expr)
+{
+    if (!expr)
+        return NULL;
+    expr_retain(expr);
+    return (expr_t *)expr;
+}
+
+expr_t *expr_const_zero(void)
+{
+    return expr_new_const(NUM_ZERO);
+}
+
+expr_t *expr_const_one(void)
+{
+    return expr_new_const(NUM_ONE);
+}
+
+expr_t *expr_const_long(long value)
+{
+    number_t number = num_create_from_long(value);
+    expr_t *expr = expr_new_const(number);
+
+    num_destroy(&number);
+    return expr;
+}
+
+expr_t *expr_simplify_owned(expr_t *expr)
+{
+    expr_t *simplified;
+
+    if (!expr)
+        return NULL;
+    simplified = expr_simplify(expr);
+    expr_free(expr);
+    return simplified;
+}
+
+expr_t *expr_negate_owned(expr_t *expr)
+{
+    expr_t *negated;
+
+    if (!expr)
+        return NULL;
+    negated = expr_neg(expr);
+    expr_free(expr);
+    return expr_simplify_owned(negated);
+}
+
+expr_t *expr_add_owned(expr_t *left, expr_t *right)
+{
+    expr_t *sum;
+
+    if (!left)
+        return right;
+    if (!right)
+        return left;
+
+    sum = expr_add(left, right);
+    expr_free(right);
+    expr_free(left);
+    return sum;
+}
+
+static expr_t *expr_binary_simplify_owned(const expr_t *left,
+                                          const expr_t *right,
+                                          expr_apply_binary_fn apply)
+{
+    expr_t *raw;
+
+    if (!left || !right || !apply) {
+        expr_free((expr_t *)left);
+        expr_free((expr_t *)right);
+        return NULL;
+    }
+
+    raw = apply(left, right);
+    expr_free((expr_t *)right);
+    expr_free((expr_t *)left);
+    return expr_simplify_owned(raw);
+}
+
+expr_t *expr_add_long(const expr_t *expr, long value)
+{
+    number_t number = num_create_from_long(value);
+    expr_t *out = expr ? expr_add_num(expr, &number) : NULL;
+
+    num_destroy(&number);
+    return out;
+}
+
+expr_t *expr_mul_long(const expr_t *expr, long value)
+{
+    number_t number = num_create_from_long(value);
+    expr_t *out = expr ? expr_mul_num(expr, &number) : NULL;
+
+    num_destroy(&number);
+    return out;
+}
+
+expr_t *expr_div_long(const expr_t *expr, long value)
+{
+    expr_t *denominator = expr_const_long(value);
+    expr_t *out = (expr && denominator) ? expr_div(expr, denominator) : NULL;
+
+    expr_free(denominator);
+    return out;
+}
+
+expr_t *expr_pow_long(const expr_t *expr, long exponent)
+{
+    number_t number = num_create_from_long(exponent);
+    expr_t *out = expr ? expr_pow(expr, &number) : NULL;
+
+    num_destroy(&number);
+    return out;
+}
+
+expr_t *expr_add_simplify_owned(const expr_t *left, const expr_t *right)
+{
+    return expr_binary_simplify_owned(left, right, expr_add);
+}
+
+expr_t *expr_sub_simplify_owned(const expr_t *left, const expr_t *right)
+{
+    return expr_binary_simplify_owned(left, right, expr_sub);
+}
+
+expr_t *expr_mul_simplify_owned(const expr_t *left, const expr_t *right)
+{
+    return expr_binary_simplify_owned(left, right, expr_mul);
+}
+
+expr_t *expr_div_simplify_owned(const expr_t *left, const expr_t *right)
+{
+    return expr_binary_simplify_owned(left, right, expr_div);
+}
+
+static void expr_clone_copy_metadata(expr_t *out, const expr_t *expr)
+{
+    if (!out || !expr)
+        return;
+    if (expr_is_var(expr))
+        out->var_id = expr->var_id;
+    if (expr->binding_expr) {
+        if (out->binding_expr)
+            expr_binding_expr_free(out->binding_expr);
+        out->binding_expr = expr_binding_expr_clone(expr->binding_expr);
+    }
+}
+
+expr_t *expr_clone(const expr_t *expr)
+{
+    expr_t *left = NULL;
+    expr_t *right = NULL;
+    expr_t *out = NULL;
+
+    if (!expr)
+        return NULL;
+
+    if (expr->ops->kind == EXPR_KIND_CONST) {
+        out = (expr->name && *expr->name)
+                  ? expr_new_named_const(expr->c, expr->name)
+                  : expr_new_const(expr->c);
+        expr_clone_copy_metadata(out, expr);
+        return out;
+    }
+
+    if (expr->ops->kind == EXPR_KIND_VAR) {
+        out = (expr->name && *expr->name)
+                  ? expr_new_named_var(expr->x, expr->name)
+                  : expr_new_var(expr->x);
+        expr_clone_copy_metadata(out, expr);
+        return out;
+    }
+
+    if (expr->ops->kind == EXPR_KIND_POW_D && expr->a) {
+        left = expr_clone(expr->a);
+        if (!left)
+            return NULL;
+        out = expr_pow(left, &expr->c);
+        expr_free(left);
+        expr_clone_copy_metadata(out, expr);
+        return out;
+    }
+
+    if (expr->ops->arity == EXPR_OP_UNARY && expr->ops->apply_unary) {
+        left = expr_clone(expr->a);
+        if (!left)
+            return NULL;
+        out = expr->ops->apply_unary(left);
+        expr_free(left);
+        expr_clone_copy_metadata(out, expr);
+        return out;
+    }
+
+    if (expr->ops->arity == EXPR_OP_BINARY && expr->ops->apply_binary) {
+        left = expr_clone(expr->a);
+        right = expr_clone(expr->b);
+        if (!left || !right) {
+            expr_free(left);
+            expr_free(right);
+            return NULL;
+        }
+        out = expr->ops->apply_binary(left, right);
+        expr_free(left);
+        expr_free(right);
+        expr_clone_copy_metadata(out, expr);
+        return out;
+    }
+
+    return NULL;
+}

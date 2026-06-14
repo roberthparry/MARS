@@ -61,7 +61,7 @@ static expr_t *integrate_power_of_affine(const expr_t *base,
     }
 
     power = expr_pow(base, &next_exponent);
-    out = power ? expr_integrate_div_number_owned_by_product(power, coeff, next_exponent) : NULL;
+    out = power ? div_number_owned_by_product(power, coeff, next_exponent) : NULL;
 
     num_destroy(&next_exponent);
     num_destroy(&coeff);
@@ -152,27 +152,27 @@ expr_t *match_symbolic_wrt_factor_coeff(const expr_t *expr,
         return expr_new_const(NUM_NEG_ONE);
 
     if (expr_is_neg(expr))
-        return expr_integrate_negate_owned(match_symbolic_wrt_factor_coeff(expr->a, wrt));
+        return expr_negate_owned(match_symbolic_wrt_factor_coeff(expr->a, wrt));
 
     if (expr_match_mul_expr(expr, &left, &right)) {
         if (is_wrt_symbolic_affine_leaf(left, wrt) &&
             !depends_on_wrt(right, wrt))
-            return expr_integrate_clone_expr(right);
+            return expr_clone(right);
         if (is_wrt_symbolic_affine_leaf(right, wrt) &&
             !depends_on_wrt(left, wrt))
-            return expr_integrate_clone_expr(left);
+            return expr_clone(left);
         if (is_negated_wrt_symbolic_affine_leaf(left, wrt) &&
             !depends_on_wrt(right, wrt))
-            return expr_integrate_negate_owned(expr_integrate_clone_expr(right));
+            return expr_negate_owned(expr_clone(right));
         if (is_negated_wrt_symbolic_affine_leaf(right, wrt) &&
             !depends_on_wrt(left, wrt))
-            return expr_integrate_negate_owned(expr_integrate_clone_expr(left));
+            return expr_negate_owned(expr_clone(left));
     }
 
     if (expr_is_op(expr, &ops_div) && expr->a && expr->b &&
         !depends_on_wrt(expr->b, wrt)) {
         expr_t *numer_coeff = match_symbolic_wrt_factor_coeff(expr->a, wrt);
-        expr_t *denom = expr_integrate_clone_expr(expr->b);
+        expr_t *denom = expr_clone(expr->b);
         expr_t *quotient = (numer_coeff && denom) ? expr_div(numer_coeff, denom) : NULL;
 
         expr_free(denom);
@@ -208,7 +208,7 @@ static expr_t *match_symbolic_affine_base_coeff(const expr_t *base,
     coeff = match_symbolic_wrt_factor_coeff(right, wrt);
     if (coeff) {
         if (!depends_on_wrt(left, wrt))
-            return is_sub ? expr_integrate_negate_owned(coeff) : coeff;
+            return is_sub ? expr_negate_owned(coeff) : coeff;
         expr_free(coeff);
     }
 
@@ -288,7 +288,7 @@ static expr_t *integrate_power_of_symbolic_unit_affine(const expr_t *base,
     }
 
     power = expr_pow(base, &next_exponent);
-    out = power ? expr_integrate_div_number_owned_by_product(power, coeff, next_exponent) : NULL;
+    out = power ? div_number_owned_by_product(power, coeff, next_exponent) : NULL;
 
     num_destroy(&next_exponent);
     num_destroy(&coeff);

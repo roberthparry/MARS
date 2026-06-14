@@ -594,6 +594,36 @@ static expr_t *expr_double_arg_unary(const expr_t *arg, expr_apply_unary_fn buil
     return out;
 }
 
+bool expr_match_double_argument(const expr_t *expr, const expr_t *arg)
+{
+    const expr_t *factor = NULL;
+    const expr_t *other = NULL;
+    number_t factor_value = num_new();
+    bool matched = false;
+
+    if (!expr || !arg || !expr_match_mul_expr(expr, &factor, &other))
+        goto cleanup;
+
+    if (expr_match_const_value(factor, &factor_value) &&
+        num_eq(factor_value, NUM_TWO) &&
+        expr_struct_eq(other, arg)) {
+        matched = true;
+        goto cleanup;
+    }
+
+    num_destroy(&factor_value);
+    factor_value = num_new();
+    if (expr_match_const_value(other, &factor_value) &&
+        num_eq(factor_value, NUM_TWO) &&
+        expr_struct_eq(factor, arg)) {
+        matched = true;
+    }
+
+cleanup:
+    num_destroy(&factor_value);
+    return matched;
+}
+
 expr_t *expr_try_trig_pythagorean_identity(const addend_t *terms, size_t n,
                                          number_t c_const,
                                          number_t common_coeff)

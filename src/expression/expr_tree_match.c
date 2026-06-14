@@ -142,7 +142,9 @@ static bool expr_match_scaled_inner(const expr_t *factor,
 static int expr_match_var_index(size_t nvars, expr_t *const *vars, const expr_t *dv)
 {
     for (size_t i = 0; i < nvars; ++i)
-        if (vars[i] == dv)
+        if (vars[i] == dv ||
+            (expr_is_var(vars[i]) && expr_is_var(dv) &&
+             vars[i]->var_id != 0 && vars[i]->var_id == dv->var_id))
             return (int)i;
     return -1;
 }
@@ -317,15 +319,13 @@ expr_t *expr_substitute(const expr_t *expr,
     }
 
     if (expr_match_const_leaf(expr, NULL, &name)) {
-        if (name)
-            return expr_new_named_const(expr->c, name);
-        return expr_new_const(expr->c);
+        (void)name;
+        return expr_clone(expr);
     }
 
     if (expr_match_var_leaf(expr, NULL, &name)) {
-        if (name)
-            return expr_new_named_var(expr->x, name);
-        return expr_new_var(expr->x);
+        (void)name;
+        return expr_clone(expr);
     }
 
     if (expr_match_unary_op(expr, EXPR_KIND_POW_D, &arg)) {

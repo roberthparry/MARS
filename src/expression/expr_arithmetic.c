@@ -89,7 +89,11 @@ static expr_t *deriv_const(expr_t *dv)
 static expr_t *deriv_var(expr_t *dv)
 {
     const expr_t *wrt = expr_current_wrt_internal();
-    return expr_new_const((wrt == NULL || dv == wrt) ? NUM_ONE : NUM_ZERO);
+    bool same_var = wrt == NULL || dv == wrt ||
+                    (wrt && expr_is_var(wrt) &&
+                     dv->var_id != 0 && dv->var_id == wrt->var_id);
+
+    return expr_new_const(same_var ? NUM_ONE : NUM_ZERO);
 }
 
 static expr_t *deriv_add(expr_t *dv)

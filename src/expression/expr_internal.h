@@ -138,6 +138,8 @@ bool expr_match_binary_op(const expr_t *expr,
                           const expr_t **left_out,
                           const expr_t **right_out);
 
+expr_t *expr_apply_unary_kind(expr_op_kind_t kind, const expr_t *arg);
+
 typedef enum expr_diff_kind {
     EXPR_DIFF_SMOOTH = 0,
     EXPR_DIFF_NONE
@@ -645,6 +647,8 @@ expr_t * expr_simplify_try_trig_product           (expr_t *a, expr_t *b);
 expr_t * expr_simplify_try_lambert_product        (expr_t *a, expr_t *b);
 expr_t * expr_simplify_try_i_unit_product         (expr_t *a, expr_t *b);
 expr_t * expr_simplify_try_imag_trig_bridge       (const expr_t *op, expr_t *arg);
+bool     expr_match_double_argument               (const expr_t *expr,
+                                                   const expr_t *arg);
 expr_t * expr_try_trig_pythagorean_identity       (const addend_t *terms,
                                                    size_t n,
                                                    number_t c_const,

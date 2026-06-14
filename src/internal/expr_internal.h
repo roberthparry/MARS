@@ -30,6 +30,22 @@ bool expr_is_named_const(const expr_t *dv);
 expr_t *expr_substitute(const expr_t *expr,
                       const expr_t *needle,
                       expr_t *replacement);
+expr_t *expr_clone(const expr_t *expr);
+expr_t *expr_const_zero(void);
+expr_t *expr_const_one(void);
+expr_t *expr_const_long(long value);
+expr_t *expr_retain_expr(const expr_t *expr);
+expr_t *expr_simplify_owned(expr_t *expr);
+expr_t *expr_negate_owned(expr_t *expr);
+expr_t *expr_add_owned(expr_t *left, expr_t *right);
+expr_t *expr_add_long(const expr_t *expr, long value);
+expr_t *expr_mul_long(const expr_t *expr, long value);
+expr_t *expr_div_long(const expr_t *expr, long value);
+expr_t *expr_pow_long(const expr_t *expr, long exponent);
+expr_t *expr_add_simplify_owned(const expr_t *left, const expr_t *right);
+expr_t *expr_sub_simplify_owned(const expr_t *left, const expr_t *right);
+expr_t *expr_mul_simplify_owned(const expr_t *left, const expr_t *right);
+expr_t *expr_div_simplify_owned(const expr_t *left, const expr_t *right);
 
 /* ------------------------------------------------------------------------- */
 /* Structural matchers                                                       */

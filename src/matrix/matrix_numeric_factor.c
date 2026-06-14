@@ -1314,7 +1314,7 @@ static matrix_t *mat_shift_subtract_expr(const matrix_t *A, const expr_t *eigenv
 
         expr_retain(diag);
         expr_retain((expr_t *)eigenvalue);
-        new_diag = expr_sub_simplify(diag, (expr_t *)eigenvalue);
+        new_diag = expr_sub_simplify_owned(diag, (expr_t *)eigenvalue);
         if (!new_diag) {
             mat_free(Shifted);
             return NULL;
