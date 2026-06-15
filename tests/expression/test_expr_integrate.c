@@ -1964,6 +1964,12 @@ static void test_integrate_log_quadratic(void)
                                                  positive_points,
                                                  sizeof(positive_points) /
                                                      sizeof(positive_points[0]));
+    assert_string_antiderivative_matches_with_ab(
+        "{ (a*cos(x)-b*sin(x))/(a*sin(x)+b*cos(x)) }", 2.0, 3.0,
+        positive_points, sizeof(positive_points) / sizeof(positive_points[0]));
+    assert_string_antiderivative_matches_with_ab(
+        "{ 3*(a*cos(x)-b*sin(x))/(a*sin(x)+b*cos(x)) }", 2.0, 3.0,
+        positive_points, sizeof(positive_points) / sizeof(positive_points[0]));
     assert_string_antiderivative_matches_with_a("{ ln(a*x)/x }", 2.0,
                                                 positive_points,
                                                 sizeof(positive_points) /
@@ -2161,6 +2167,18 @@ static void test_integrate_mixed_frequency_exp_unary(void)
                                          points, sizeof(points) / sizeof(points[0]));
     assert_string_antiderivative_matches("{ exp(cos(x))*(1 - cos(x) - cos(x)^2) }",
                                          points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches_with_ab(
+        "{ exp(a*sin(x)+b*cos(x))*((a*cos(x)-b*sin(x))^2-a*sin(x)-b*cos(x)) }",
+        2.0, 3.0, points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches_with_abc(
+        "{ exp(a*sin(x)+b*cos(x)+c*tan(x))"
+        "*(b*sin(x)-a*cos(x)+2*c*(tan(x)^2+1)*(3*tan(x)^2+1)"
+        "+(a*cos(x)-b*sin(x)+c*(tan(x)^2+1))"
+        "*(2*c*tan(x)*(tan(x)^2+1)-a*sin(x)-b*cos(x)"
+        "+(a*cos(x)-b*sin(x)+c*(tan(x)^2+1))^2)"
+        "+2*(a*cos(x)-b*sin(x)+c*(tan(x)^2+1))"
+        "*(2*c*tan(x)*(tan(x)^2+1)-a*sin(x)-b*cos(x))) }",
+        2.0, 3.0, 0.4, points, sizeof(points) / sizeof(points[0]));
     assert_string_antiderivative_matches(
         "{ exp(sin(x))*(cos(x)*(cos(x)^2 - sin(x)) - sin(2*x) - cos(x)) }",
         points, sizeof(points) / sizeof(points[0]));

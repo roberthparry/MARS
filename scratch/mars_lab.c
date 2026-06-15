@@ -741,6 +741,7 @@ int main(int argc, char **argv)
     char *func_text = NULL;
     char *tex_text = NULL;
     char *deriv_text = NULL;
+    char *deriv_func_text = NULL;
     char *deriv_tex_text = NULL;
     int rc = 0;
 
@@ -791,10 +792,13 @@ int main(int argc, char **argv)
         if (!display_deriv)
             display_deriv = deriv;
         deriv_text = expr_text_dup(display_deriv, style_EXPRESSION);
+        deriv_func_text = expr_text_dup(display_deriv, style_FUNCTION);
         deriv_tex_text = expr_text_dup(display_deriv, style_TEX);
         printf("derivative  d/d%s = %s\n",
                wrt_name,
                deriv_text ? deriv_text : "(null)");
+        printf("derivative_function  %s\n",
+               deriv_func_text ? deriv_func_text : "(null)");
         printf("derivative_tex  %s\n", deriv_tex_text ? deriv_tex_text : "");
         print_owned_number("d value", expr_eval(deriv), precision);
     } else {
@@ -804,6 +808,7 @@ int main(int argc, char **argv)
 cleanup:
     free(wrapped_input);
     free(deriv_tex_text);
+    free(deriv_func_text);
     free(deriv_text);
     free(tex_text);
     free(func_text);

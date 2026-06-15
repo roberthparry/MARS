@@ -1854,6 +1854,7 @@ __THEME_OVERRIDES__
     <section id="workspacePanel">
       <div class="panel-head">
         <h2 id="leftPaneTitle">Workspace</h2>
+        <button class="card-action" id="inputCopy" type="button">Copy</button>
       </div>
       <textarea id="expr" spellcheck="false" aria-labelledby="leftPaneTitle">__INITIAL_EXPRESSION__</textarea>
       <div class="mode-panel hidden" id="matrixControls">
@@ -1920,6 +1921,7 @@ __THEME_OVERRIDES__
     <section>
       <div class="panel-head">
         <h2 id="rightPaneTitle">Result</h2>
+        <button class="card-action result-use-input hidden" id="resultUseInput" type="button">Use as input</button>
       </div>
       <div class="output-grid" id="resultPane">
         <div class="card result-card">
@@ -2122,7 +2124,9 @@ __THEME_OVERRIDES__
     const controlToken = __CONTROL_TOKEN__;
     enhanceRoundedSelect(matrixOperation);
     const statusEl = document.getElementById('status');
+    const inputCopy = document.getElementById('inputCopy');
     const rightPaneTitle = document.getElementById('rightPaneTitle');
+    const resultUseInput = document.getElementById('resultUseInput');
     const resultPane = document.getElementById('resultPane');
     const helpPane = document.getElementById('helpPane');
     const rendered = document.getElementById('rendered');
@@ -2251,6 +2255,7 @@ __THEME_OVERRIDES__
     }
 
     function captureCurrentModeEditor() {
+      commitVisibleBindingInputs();
       const mode = currentMode();
       if (mode === 'expression')
         modeEditorText.expression = currentExpressionText() || expr.value.trim() || modeEditorText.expression;
@@ -2373,6 +2378,7 @@ __THEME_OVERRIDES__
         renderedMore: snapshotButtonState(renderedMore),
         parsedMore: snapshotButtonState(parsedMore),
         functionMore: snapshotButtonState(functionMore),
+        resultInputText: resultUseInput.dataset.inputText || '',
         lastTex,
         lastDerivativeExpression,
         currentVariables: [...currentVariables],
@@ -2395,6 +2401,7 @@ __THEME_OVERRIDES__
       restoreButtonState(renderedMore, state.renderedMore);
       restoreButtonState(parsedMore, state.parsedMore);
       restoreButtonState(functionMore, state.functionMore);
+      setResultInputText(state.resultInputText || '');
       lastTex = state.lastTex || '';
       lastDerivativeExpression = state.lastDerivativeExpression || '';
       currentVariables = Array.isArray(state.currentVariables) ? [...state.currentVariables] : [];
@@ -2463,6 +2470,7 @@ __THEME_OVERRIDES__
       resultPane.classList.remove('hidden');
       helpPane.classList.add('hidden');
       rightPaneTitle.textContent = 'Result';
+      resultUseInput.classList.toggle('hidden', !resultUseInput.dataset.inputText);
       help.textContent = 'Help';
     }
 
@@ -2470,6 +2478,7 @@ __THEME_OVERRIDES__
       resultPane.classList.add('hidden');
       helpPane.classList.remove('hidden');
       rightPaneTitle.textContent = 'Help';
+      resultUseInput.classList.add('hidden');
       help.textContent = 'Result';
       setStatus('Help');
     }
@@ -3133,6 +3142,31 @@ __THEME_OVERRIDES__
       saveCurrentModeEditorState();
     }
 
+    function commitVisibleBindingInputs() {
+      const inputs = Array.from(variableValues.querySelectorAll('.binding-value-input'));
+      if (!inputs.length)
+        return false;
+
+      let current = currentExpressionText();
+      let updated = current;
+
+      inputs.forEach((input) => {
+        const name = input.dataset.bindingName || '';
+        const kind = input.dataset.bindingKind || 'variable';
+        const valueText = normalisedBindingInputValue(input);
+        updated = replaceBindingValueInExpression(updated, kind, name, valueText);
+      });
+
+      if (!updated || updated === current)
+        return false;
+
+      applyUpdatedBindingExpression(updated);
+      refreshVariableValuesFromEditor();
+      updateHistoryButtons();
+      saveCurrentModeEditorState();
+      return true;
+    }
+
     function toggleBindingKind(binding) {
       const current = currentExpressionText();
       const name = String(binding && binding.name || '').trim();
@@ -3202,7 +3236,7 @@ __THEME_OVERRIDES__
         currentBindingKinds.set(binding.name, kind);
         const displayValue = displayValueForBinding(binding);
         const fullValue = fullValueForBinding(binding);
-        if (kind !== 'constant' && fullValue)
+        if (fullValue)
           bindingValueCache.set(binding.name, fullValue);
 
         const box = document.createElement('div');
@@ -3939,7 +3973,7 @@ __THEME_OVERRIDES__
 
     function copyTextForTarget(target) {
       if (target === 'rendered') return rendered.classList.contains('error') ? rendered.textContent : lastTex;
-      if (target === 'expression') return currentMode() === 'expression' ? (fullExpressionText || parsed.textContent) : parsed.textContent;
+      if (target === 'expression') return parsedExpressionText();
       if (target === 'function') return functionStyle.dataset.fullText || functionStyle.textContent;
       if (target === 'value') return value.textContent;
       if (target === 'mobile') {
@@ -3947,6 +3981,47 @@ __THEME_OVERRIDES__
         return /^https?:\/\//.test(url) ? url : '';
       }
       return '';
+    }
+
+    function parsedExpressionText() {
+      return expressionForEditor(
+        parsed.dataset.fullText ||
+        parsed.dataset.displayText ||
+        parsed.textContent ||
+        ''
+      ).trim();
+    }
+
+    function setResultInputText(text) {
+      const inputText = expressionForEditor(String(text || '')).trim();
+      resultUseInput.dataset.inputText = inputText;
+      resultUseInput.disabled = !inputText;
+      resultUseInput.classList.toggle('hidden', !inputText);
+      resultUseInput.title = inputText
+        ? 'Send this result to the input pane'
+        : 'No reusable result is available';
+    }
+
+    function resultExpressionTextForInput() {
+      return (resultUseInput.dataset.inputText || parsedExpressionText()).trim();
+    }
+
+    function sendResultExpressionToInput() {
+      const resultText = resultExpressionTextForInput();
+      if (!resultText)
+        return;
+
+      const current = currentExpressionText();
+      if (currentMode() === 'expression' && current && current !== resultText)
+        pushExpressionHistory(current);
+
+      clearGoalSeekRequest();
+      hideTargetEntry();
+      applyUpdatedBindingExpression(resultText);
+      saveCurrentModeEditorState();
+      updateHistoryButtons();
+      expr.focus();
+      setStatus('Result sent to input');
     }
 
     async function refreshMobileAccess() {
@@ -4392,6 +4467,7 @@ __THEME_OVERRIDES__
       delete parsed.dataset.displayText;
       delete functionStyle.dataset.fullText;
       delete functionStyle.dataset.displayText;
+      setResultInputText('');
       value.textContent = '';
       lastTex = '';
       lastDerivativeExpression = '';
@@ -4403,6 +4479,7 @@ __THEME_OVERRIDES__
     }
 
     async function evaluateExpression(options = {}) {
+      commitVisibleBindingInputs();
       const editorText = currentExpressionText();
       const editorBodyText = String(expr.value || '').trim();
       const text = options.reuseLastInput && lastEvaluationInputText
@@ -4443,6 +4520,7 @@ __THEME_OVERRIDES__
           data.display_expression || (data.expression ? compactExpressionForEditor(data.expression).display : ''),
           data.full_display_expression || data.expression || ''
         );
+        setResultInputText(data.full_display_expression || data.expression || '');
         setExpandableText(
           functionStyle,
           functionMore,
@@ -4476,6 +4554,7 @@ __THEME_OVERRIDES__
     }
 
     async function evaluateMatrix() {
+      commitVisibleBindingInputs();
       const text = currentExpressionText() || expr.value.trim();
       if (!text)
         return;
@@ -4503,6 +4582,7 @@ __THEME_OVERRIDES__
         setRenderedContent(data.svg || '', data.render_error || (data.tex || 'No rendered TeX available'));
         resetMoreDigitsButton(renderedMore, false);
         setExpandableText(parsed, parsedMore, data.result || '', data.result || '');
+        setResultInputText(data.result || '');
         setMatrixPrettyResult(data.result || '', data.pretty || '');
         value.textContent = '';
         setValueCardVisible(false);
@@ -4527,6 +4607,7 @@ __THEME_OVERRIDES__
     }
 
     async function evaluateEquation() {
+      commitVisibleBindingInputs();
       const text = String(currentExpressionText() || expr.value || '').trim();
       if (!text)
         return;
@@ -4565,6 +4646,7 @@ __THEME_OVERRIDES__
           data.display_equation || data.equation || '',
           data.full_display_equation || data.equation || ''
         );
+        setResultInputText(data.full_display_equation || data.equation || '');
         {
           const valueLines = [];
           const residualValue = displayEquationValue(data.error);
@@ -4621,6 +4703,7 @@ __THEME_OVERRIDES__
     }
 
     async function evaluateIntegrator() {
+      commitVisibleBindingInputs();
       const text = currentExpressionText() || expr.value.trim();
       if (!text)
         return;
@@ -4648,6 +4731,7 @@ __THEME_OVERRIDES__
         setRenderedContent(data.svg || '', data.render_error || (data.tex || 'No rendered TeX available'));
         resetMoreDigitsButton(renderedMore, false);
         setExpandableText(parsed, parsedMore, data.expression || '', data.expression || '');
+        setResultInputText(data.antiderivative || '');
         const workUnits = data.work_units || data.intervals || '';
         const workCap = data.work_cap || data.max_intervals || '';
         const statusText = String(data.status || '');
@@ -4760,6 +4844,7 @@ __THEME_OVERRIDES__
         data.display_expression || compactExpressionForEditor(solvedExpression).display,
         data.full_display_expression || solvedExpression
       );
+      setResultInputText(data.full_display_expression || solvedExpression);
       setExpandableText(
         functionStyle,
         functionMore,
@@ -4800,6 +4885,7 @@ __THEME_OVERRIDES__
     });
 
     back.addEventListener('click', () => {
+      commitVisibleBindingInputs();
       const previous = expressionHistory.pop();
       if (!previous) {
         updateHistoryButtons();
@@ -4813,6 +4899,7 @@ __THEME_OVERRIDES__
     });
 
     forward.addEventListener('click', () => {
+      commitVisibleBindingInputs();
       const next = forwardHistory.pop();
       if (!next) {
         updateHistoryButtons();
@@ -4826,10 +4913,12 @@ __THEME_OVERRIDES__
     });
 
     async function takeDerivative(wrt) {
+      commitVisibleBindingInputs();
       const text = currentExpressionText();
       if (!text || !wrt) return;
 
       showResults();
+      rightPaneTitle.textContent = `${wrt} derivative RESULT`;
       setBusy(true);
       setStatus(`Differentiating d/d${wrt}...`);
       try {
@@ -4837,6 +4926,8 @@ __THEME_OVERRIDES__
         const derivativeExpression = derivativeExpressionFromLine(data.derivative);
         const derivativeTex = data.derivative_tex || '';
         const derivativeSvg = data.derivative_svg || '';
+        const derivativeFunction = data.display_derivative_function || data.derivative_function || derivativeExpression || '';
+        const fullDerivativeFunction = data.full_display_derivative_function || data.derivative_function || derivativeExpression || '';
 
         if (!response.ok || !data.ok || !derivativeExpression) {
           setRenderedError(data.error || data.raw || `No derivative for ${wrt}`);
@@ -4850,18 +4941,17 @@ __THEME_OVERRIDES__
         setExpandableText(
           parsed,
           parsedMore,
-          data.derivative || `d/d${wrt} = ${derivativeExpression}`,
-          data.derivative || `d/d${wrt} = ${derivativeExpression}`
-        );
-        setExpandableText(
-          functionStyle,
-          functionMore,
           derivativeExpression,
           derivativeExpression
         );
-        value.textContent = data.derivative_value
-          ? `d/d${wrt} value: ${data.derivative_value}`
-          : '';
+        setResultInputText(derivativeExpression);
+        setExpandableText(
+          functionStyle,
+          functionMore,
+          derivativeFunction,
+          fullDerivativeFunction
+        );
+        value.textContent = data.derivative_value || '';
         lastDerivativeExpression = derivativeExpression;
         {
           const variableBindings = variableNamesFromBindings(data.binding_values || []);
@@ -4998,6 +5088,7 @@ __THEME_OVERRIDES__
     goalSeek.addEventListener('click', async () => {
       if (currentMode() !== 'expression')
         return;
+      commitVisibleBindingInputs();
       const text = currentExpressionText();
       if (!text) return;
 
@@ -5094,6 +5185,7 @@ __THEME_OVERRIDES__
     });
 
     morePrecision.addEventListener('click', async () => {
+      commitVisibleBindingInputs();
       setRequestedPrecisionBits(nextPrecisionStepBits(requestedPrecisionBits()));
       savePrecisionState();
       setStatus('Precision changed');
@@ -5122,6 +5214,7 @@ __THEME_OVERRIDES__
     });
 
     lessPrecision.addEventListener('click', async () => {
+      commitVisibleBindingInputs();
       setRequestedPrecisionBits(previousPrecisionStepBits(requestedPrecisionBits()));
       savePrecisionState();
       setStatus('Precision changed');
@@ -5159,6 +5252,26 @@ __THEME_OVERRIDES__
 
     functionMore.addEventListener('click', () => {
       toggleTextDigits(functionStyle, functionMore);
+    });
+
+    resultUseInput.addEventListener('click', () => {
+      sendResultExpressionToInput();
+    });
+
+    inputCopy.addEventListener('click', async () => {
+      commitVisibleBindingInputs();
+      const text = String(expr.value || '').trim();
+      if (!text)
+        return;
+      try {
+        await writeClipboardText(text);
+        flashCopyButton(inputCopy, true);
+        setStatus('Copied input');
+        setTimeout(() => setStatus('Ready'), 1000);
+      } catch (err) {
+        flashCopyButton(inputCopy, false);
+        setStatus(String(err));
+      }
     });
 
     copyButtons.forEach((button) => {
@@ -6235,7 +6348,7 @@ def decimalize_long_terminating_rational_tokens(text: str) -> str:
 
 
 def precision_limit_result_fields(fields: dict[str, str], precision: int) -> None:
-    for key in ("expression", "unbound", "tex", "function"):
+    for key in ("expression", "unbound", "tex", "function", "derivative_function"):
         value = fields.get(key, "")
         if not value:
             continue
@@ -6362,10 +6475,11 @@ def parse_mars_lab_output(output: str) -> dict[str, str]:
         "iterations": r"^iterations\s+(.*)$",
         "complex": r"^complex\s+(.*)$",
         "derivative": r"^derivative\s+(.*)$",
+        "derivative_function": r"^derivative_function\s{2,}(.*)$",
         "derivative_tex": r"^derivative_tex\s*(.*)$",
         "derivative_value": r"^d value\s+(.*)$",
     }
-    return parse_keyed_output(output, patterns, {"function"})
+    return parse_keyed_output(output, patterns, {"function", "derivative_function"})
 
 
 def parse_matrix_lab_output(output: str) -> dict[str, str]:
@@ -7228,6 +7342,12 @@ def prepare_evaluation_fields(
     fields["display_expression"] = compact_display_text(str(fields["full_display_expression"]))
     fields["display_tex"] = compact_display_text(str(fields["full_display_tex"]))
     fields["display_function"] = compact_function_text(str(fields["full_display_function"]))
+    fields["full_display_derivative_function"] = function_for_display(
+        fields.get("derivative_function", "")
+    )
+    fields["display_derivative_function"] = compact_function_text(
+        str(fields["full_display_derivative_function"])
+    )
     derivative_tex = tex_for_display(str(fields.get("derivative_tex") or ""))
     fields["derivative_tex"] = derivative_tex
     if derivative_tex:

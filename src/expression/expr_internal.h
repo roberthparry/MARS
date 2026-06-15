@@ -154,6 +154,36 @@ typedef expr_t *(*expr_integrate_fn)(const expr_t *expr, const expr_t *wrt);
 typedef void (*expr_reverse_fn)(const expr_t *dv, const number_t *out_bar,
                                 number_t *a_bar, number_t *b_bar);
 
+static inline number_t expr_reverse_num_sq(const number_t value)
+{
+    return num_mul(value, value);
+}
+
+static inline number_t expr_reverse_num_inverse(const number_t value)
+{
+    return num_div(NUM_ONE, value);
+}
+
+static inline number_t expr_reverse_num_clone(const number_t value)
+{
+    return num_clone(value);
+}
+
+static inline number_t expr_reverse_num_neg(const number_t value)
+{
+    return num_neg(value);
+}
+
+static inline number_t expr_reverse_num_mul(const number_t a, const number_t b)
+{
+    return num_mul(a, b);
+}
+
+static inline number_t expr_reverse_num_div(const number_t a, const number_t b)
+{
+    return num_div(a, b);
+}
+
 /**
  * @brief Virtual function table for a differentiable value operator.
  *
@@ -656,6 +686,15 @@ expr_t * expr_try_trig_pythagorean_identity       (const addend_t *terms,
 
 /* Term collection and product rebuilding helpers. */
 int      expr_struct_eq                         (const expr_t *u, const expr_t *v);
+bool     expr_simplify_same_factor              (const expr_t *left,
+                                                 const expr_t *right);
+bool     expr_simplify_additive_terms_equal     (const expr_t *left,
+                                                 const expr_t *right);
+expr_t * expr_simplify_extract_exact_factor_quotient(const expr_t *expr,
+                                                     const expr_t *factor);
+expr_t * expr_simplify_extract_common_factor_quotient(const expr_t *expr,
+                                                      const expr_t *factor);
+expr_t * expr_simplify_normalize_negated_mul_factor(const expr_t *expr);
 expr_t * expr_make_scaled                       (number_t coeff, expr_t *base);
 expr_t * expr_make_pow_like                     (expr_t *base, number_t exponent);
 void     expr_collect_addends                   (expr_t *dv,

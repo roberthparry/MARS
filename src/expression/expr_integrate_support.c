@@ -111,6 +111,14 @@ void number_array_clear_local(number_t *values, size_t count)
         num_destroy(&values[i]);
 }
 
+void number_array_reset_zero_local(number_t *values, size_t count)
+{
+    for (size_t i = 0; i < count; ++i) {
+        num_destroy(&values[i]);
+        values[i] = num_new();
+    }
+}
+
 expr_t *build_affine_from_match(const expr_t *wrt,
                                 number_t constant,
                                 number_t coeff)
