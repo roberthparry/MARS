@@ -362,6 +362,117 @@ cleanup:
     return ok;
 }
 
+static bool expr_matches_unary_arg(const expr_t *expr,
+                                   expr_op_kind_t kind,
+                                   const expr_t *arg);
+
+static expr_t *substitution_build_replacement_poly_from_specs(
+    const expr_t *replacement,
+    const substitution_poly_term_spec_t *terms,
+    size_t count)
+{
+    expr_t *sum = NULL;
+
+    if (!replacement || !terms)
+        return NULL;
+
+    for (size_t i = 0u; i < count; ++i) {
+        number_t coeff = num_create_from_long(terms[i].value);
+        expr_t *base = NULL;
+        expr_t *term = NULL;
+
+        if (terms[i].index == 0u) {
+            term = expr_new_const(coeff);
+        } else {
+            if (terms[i].index == 1u) {
+                base = expr_retain_expr(replacement);
+            } else {
+                number_t exponent = num_create_from_long((long)terms[i].index);
+
+                base = expr_pow(replacement, &exponent);
+                num_destroy(&exponent);
+            }
+            term = base ? expr_mul_num(base, &coeff) : NULL;
+            expr_free(base);
+        }
+
+        num_destroy(&coeff);
+        if (!term) {
+            expr_free(sum);
+            return NULL;
+        }
+        sum = expr_add_owned(sum, term);
+    }
+
+    return simplify_owned(sum);
+}
+
+static expr_t *substitute_candidate_square_relation(const expr_t *expr,
+                                                    const expr_t *candidate,
+                                                    const expr_t *replacement)
+{
+    const exp_unary_rule_entry_t *entry = NULL;
+    const exp_unary_substitution_rule_spec_t *substitution = NULL;
+    const exp_unary_square_relation_spec_t *square_relation = NULL;
+    const expr_t *base = NULL;
+    expr_op_kind_t base_kind = EXPR_KIND_CONST;
+    number_t exponent = num_new();
+    expr_t *out = NULL;
+
+    if (!expr || !candidate || !replacement ||
+        !candidate->ops || !candidate->a) {
+        goto cleanup;
+    }
+
+    if (expr->ops && expr->ops->kind == EXPR_KIND_POW_D &&
+        expr->a && num_eq(expr->c, NUM_TWO)) {
+        base = expr->a;
+    } else if (expr->ops && expr->ops->kind == EXPR_KIND_POW &&
+               expr->a && expr->b &&
+               expr_match_const_value(expr->b, &exponent) &&
+               num_eq(exponent, NUM_TWO)) {
+        base = expr->a;
+    }
+
+    if (!base || !base->ops || !base->a ||
+        !expr_simplify_same_factor(base->a, candidate->a)) {
+        goto cleanup;
+    }
+
+    base_kind = base->ops->kind;
+    if (base_kind == candidate->ops->kind) {
+        out = expr_pow(replacement, &NUM_TWO);
+        goto cleanup;
+    }
+
+    entry = exp_unary_rule_entry_for_kind(candidate->ops->kind);
+    substitution = entry ? &entry->substitution : NULL;
+    if (substitution &&
+        substitution->has_companion &&
+        base_kind == substitution->companion_kind) {
+        out = substitution_build_replacement_poly_from_specs(
+            replacement,
+            substitution->companion_square,
+            substitution->companion_square_count);
+        goto cleanup;
+    }
+
+    square_relation = (entry && entry->has_square_relation)
+                          ? &entry->square_relation
+                          : NULL;
+    if (square_relation && base_kind == square_relation->squared_kind) {
+        out = substitution_build_replacement_poly_from_specs(
+            replacement,
+            square_relation->terms,
+            square_relation->term_count);
+        goto cleanup;
+    }
+
+cleanup:
+    num_destroy(&exponent);
+    return out;
+}
+
 static expr_t *substitute_candidate_with_powers(const expr_t *expr,
                                                 const expr_t *candidate,
                                                 const expr_t *replacement)
@@ -369,6 +480,7 @@ static expr_t *substitute_candidate_with_powers(const expr_t *expr,
     expr_t *left = NULL;
     expr_t *right = NULL;
     expr_t *out = NULL;
+    const expr_ops_t *reciprocal_ops = NULL;
 
     if (!expr)
         return NULL;
@@ -376,6 +488,48 @@ static expr_t *substitute_candidate_with_powers(const expr_t *expr,
     if (expr == candidate || expr_equal_exact_local(expr, candidate)) {
         expr_retain(replacement);
         return (expr_t *)replacement;
+    }
+
+    out = substitute_candidate_square_relation(expr, candidate, replacement);
+    if (out)
+        return out;
+
+    if (candidate && candidate->ops && candidate->a)
+        reciprocal_ops = expr_ops_reciprocal_unary(candidate->ops);
+    if (reciprocal_ops && expr_matches_unary_arg(expr, reciprocal_ops->kind,
+                                                candidate->a)) {
+        number_t exponent = num_neg(NUM_ONE);
+
+        out = expr_pow(replacement, &exponent);
+        num_destroy(&exponent);
+        return out;
+    }
+
+    if (reciprocal_ops && expr->ops && expr->a &&
+        expr_matches_unary_arg(expr->a, reciprocal_ops->kind, candidate->a) &&
+        expr->ops->kind == EXPR_KIND_POW_D) {
+        number_t exponent = num_neg(expr->c);
+
+        out = expr_pow(replacement, &exponent);
+        num_destroy(&exponent);
+        return out;
+    }
+
+    if (reciprocal_ops && expr->ops && expr->a && expr->b &&
+        expr_matches_unary_arg(expr->a, reciprocal_ops->kind, candidate->a) &&
+        expr->ops->kind == EXPR_KIND_POW) {
+        number_t exponent = num_new();
+        bool matched = expr_match_const_value(expr->b, &exponent);
+
+        if (matched) {
+            number_t neg_exponent = num_neg(exponent);
+
+            out = expr_pow(replacement, &neg_exponent);
+            num_destroy(&neg_exponent);
+            num_destroy(&exponent);
+            return out;
+        }
+        num_destroy(&exponent);
     }
 
     for (int power = 2; power <= 4; ++power) {
@@ -2319,7 +2473,7 @@ static expr_t *integrate_exact_substitution_candidate(
 
     transformed = u ? substitute_candidate_with_powers(quotient, candidate, u) : NULL;
     transformed = simplify_owned(transformed);
-    if (transformed && u) {
+    if (transformed && u && depends_on_wrt(transformed, wrt)) {
         const expr_t *product_left = NULL;
         const expr_t *product_right = NULL;
         expr_t *rewritten = rewrite_trig_candidate_relations(transformed, wrt, candidate, u);

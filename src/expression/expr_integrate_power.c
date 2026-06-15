@@ -425,6 +425,11 @@ expr_t *integrate_pow_rule(const expr_t *expr, const expr_t *wrt)
             num_destroy(&exponent);
             return out;
         }
+        out = integrate_squared_unary_affine(expr, wrt, EXPR_PATTERN_UNARY_COT);
+        if (out) {
+            num_destroy(&exponent);
+            return out;
+        }
         out = integrate_squared_unary_affine(expr, wrt, EXPR_PATTERN_UNARY_SEC);
         if (out) {
             num_destroy(&exponent);
@@ -471,6 +476,12 @@ expr_t *integrate_pow_rule(const expr_t *expr, const expr_t *wrt)
             return out;
         }
         out = integrate_cubed_unary_affine(expr, wrt, EXPR_PATTERN_UNARY_TAN);
+        if (out) {
+            num_destroy(&three);
+            num_destroy(&exponent);
+            return out;
+        }
+        out = integrate_cubed_unary_affine(expr, wrt, EXPR_PATTERN_UNARY_COT);
         if (out) {
             num_destroy(&three);
             num_destroy(&exponent);
@@ -601,6 +612,9 @@ expr_t *integrate_pow_d_rule(const expr_t *expr, const expr_t *wrt)
     out = integrate_squared_unary_affine(expr, wrt, EXPR_PATTERN_UNARY_TAN);
     if (out)
         return out;
+    out = integrate_squared_unary_affine(expr, wrt, EXPR_PATTERN_UNARY_COT);
+    if (out)
+        return out;
     out = integrate_squared_unary_affine(expr, wrt, EXPR_PATTERN_UNARY_SEC);
     if (out)
         return out;
@@ -636,6 +650,11 @@ expr_t *integrate_pow_d_rule(const expr_t *expr, const expr_t *wrt)
             return out;
         }
         out = integrate_cubed_unary_affine(expr, wrt, EXPR_PATTERN_UNARY_TAN);
+        if (out) {
+            num_destroy(&three);
+            return out;
+        }
+        out = integrate_cubed_unary_affine(expr, wrt, EXPR_PATTERN_UNARY_COT);
         if (out) {
             num_destroy(&three);
             return out;

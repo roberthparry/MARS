@@ -2701,6 +2701,70 @@ static expr_t *expr_simplify_try_reciprocal_unary(expr_t *numerator,
     return NULL;
 }
 
+static expr_t *expr_simplify_try_reciprocal_unary_power(expr_t *numerator,
+                                                      expr_t *denominator)
+{
+    const expr_t *base = NULL;
+    const expr_ops_t *replacement_ops = NULL;
+    number_t exponent = num_new();
+    bool matched_power = false;
+    expr_t *arg = NULL;
+    expr_t *replacement = NULL;
+    expr_t *out = NULL;
+
+    if (!expr_simplify_is_simplifiable_const(numerator) ||
+        !expr_const_is_one(numerator) ||
+        !denominator ||
+        !denominator->ops) {
+        goto cleanup;
+    }
+
+    if (expr_is_pow_d_expr(denominator) && denominator->a) {
+        base = denominator->a;
+        num_destroy(&exponent);
+        exponent = num_clone(denominator->c);
+        matched_power = true;
+    } else if (expr_is_op(denominator, &ops_pow) &&
+               denominator->a && denominator->b &&
+               expr_simplify_is_plain_real_const(denominator->b)) {
+        base = denominator->a;
+        num_destroy(&exponent);
+        exponent = num_clone(denominator->b->c);
+        matched_power = true;
+    }
+
+    if (!matched_power ||
+        !num_is_real(exponent) ||
+        !num_is_integer(exponent) ||
+        !num_gt(exponent, NUM_ZERO) ||
+        !base ||
+        !base->ops ||
+        !base->a) {
+        goto cleanup;
+    }
+
+    replacement_ops = expr_ops_reciprocal_unary(base->ops);
+    if (!replacement_ops || !replacement_ops->apply_unary)
+        goto cleanup;
+
+    expr_retain(base->a);
+    arg = base->a;
+    replacement = replacement_ops->apply_unary(arg);
+    out = replacement ? expr_make_pow_like_owned_local(replacement, exponent)
+                      : NULL;
+    replacement = NULL;
+    if (out) {
+        expr_free(numerator);
+        expr_free(denominator);
+    }
+
+cleanup:
+    expr_free(replacement);
+    expr_free(arg);
+    num_destroy(&exponent);
+    return out;
+}
+
 expr_t *expr_simplify_div_operator(const expr_t *dv, expr_t *a, expr_t *b)
 {
     NUM_SCOPE(scope);
@@ -2727,6 +2791,12 @@ expr_t *expr_simplify_div_operator(const expr_t *dv, expr_t *a, expr_t *b)
 
         if (reciprocal)
             return reciprocal;
+    }
+    {
+        expr_t *reciprocal_power = expr_simplify_try_reciprocal_unary_power(a, b);
+
+        if (reciprocal_power)
+            return reciprocal_power;
     }
     if (expr_is_pow_d_expr(b) && expr_struct_eq(a, b->a)) {
         number_t exponent = num_sub(b->c, NUM_ONE);
