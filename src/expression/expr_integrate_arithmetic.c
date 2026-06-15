@@ -116,6 +116,8 @@ static expr_t *integrate_mul_rule_candidate(const expr_integrate_mul_rule_t *rul
                                             const expr_t *wrt);
 static expr_t *integrate_div_constant_denominator(const expr_t *expr,
                                                   const expr_t *wrt);
+static expr_t *integrate_div_logarithmic_derivative(const expr_t *expr,
+                                                    const expr_t *wrt);
 static expr_t *integrate_div_wrt_denominator(const expr_t *expr,
                                              const expr_t *wrt);
 static expr_t *integrate_div_constant_over_power_denominator(const expr_t *expr,
@@ -402,6 +404,7 @@ static const expr_integrate_div_rule_feature_entry_t integrate_div_rule_feature_
 
 static const expr_integrate_binary_rule_fn integrate_div_initial_rules[] = {
     integrate_scaled_rule,
+    integrate_div_logarithmic_derivative,
     integrate_poly_times_affine_power,
     integrate_symbolic_monomial_times_affine_power,
     NULL
@@ -962,6 +965,117 @@ static expr_t *integrate_div_constant_denominator(const expr_t *expr,
     quotient = inner ? expr_div(inner, expr->b) : NULL;
     expr_free(inner);
     return simplify_owned(quotient);
+}
+
+static bool integrate_expr_equivalent_by_zero_difference(const expr_t *left,
+                                                         const expr_t *right)
+{
+    expr_t *difference = NULL;
+    expr_t *simplified = NULL;
+    bool equivalent = false;
+
+    if (!left || !right)
+        return false;
+    if (expr_equal_exact_local(left, right))
+        return true;
+
+    difference = expr_sub(left, right);
+    simplified = simplify_owned(difference);
+    difference = NULL;
+    equivalent = simplified && expr_is_exact_zero(simplified);
+    expr_free(simplified);
+    return equivalent;
+}
+
+static bool integrate_match_numeric_scaled_equivalent(const expr_t *expr,
+                                                      const expr_t *base,
+                                                      number_t *scale_out)
+{
+    number_t expr_scale = num_new();
+    number_t base_scale = num_new();
+    const expr_t *expr_base = NULL;
+    const expr_t *base_base = NULL;
+    bool expr_scaled = false;
+    bool base_scaled = false;
+    bool matched = false;
+
+    if (!expr || !base || !scale_out)
+        goto cleanup;
+
+    if (integrate_expr_equivalent_by_zero_difference(expr, base)) {
+        num_destroy(scale_out);
+        *scale_out = num_clone(NUM_ONE);
+        matched = true;
+        goto cleanup;
+    }
+
+    expr_scaled = expr_match_scaled_expr(expr, &expr_scale, &expr_base);
+    base_scaled = expr_match_scaled_expr(base, &base_scale, &base_base);
+
+    if (expr_scaled && expr_base &&
+        integrate_expr_equivalent_by_zero_difference(expr_base, base)) {
+        num_destroy(scale_out);
+        *scale_out = num_clone(expr_scale);
+        matched = true;
+        goto cleanup;
+    }
+
+    if (base_scaled && base_base && !num_eq(base_scale, NUM_ZERO) &&
+        integrate_expr_equivalent_by_zero_difference(expr, base_base)) {
+        num_destroy(scale_out);
+        *scale_out = num_div(NUM_ONE, base_scale);
+        matched = true;
+        goto cleanup;
+    }
+
+    if (expr_scaled && base_scaled && expr_base && base_base &&
+        !num_eq(base_scale, NUM_ZERO) &&
+        integrate_expr_equivalent_by_zero_difference(expr_base, base_base)) {
+        num_destroy(scale_out);
+        *scale_out = num_div(expr_scale, base_scale);
+        matched = true;
+        goto cleanup;
+    }
+
+cleanup:
+    num_destroy(&base_scale);
+    num_destroy(&expr_scale);
+    return matched;
+}
+
+static expr_t *integrate_div_logarithmic_derivative(const expr_t *expr,
+                                                    const expr_t *wrt)
+{
+    number_t scale = num_new();
+    expr_t *denominator_deriv = NULL;
+    expr_t *log_denominator = NULL;
+    expr_t *scaled = NULL;
+    expr_t *out = NULL;
+
+    if (!expr || !expr->a || !expr->b || !depends_on_wrt(expr->b, wrt))
+        goto cleanup;
+
+    denominator_deriv = expr_create_deriv(expr->b, wrt);
+    denominator_deriv = simplify_owned(denominator_deriv);
+    if (!denominator_deriv || expr_is_exact_zero(denominator_deriv))
+        goto cleanup;
+
+    if (!integrate_match_numeric_scaled_equivalent(expr->a, denominator_deriv,
+                                                   &scale))
+        goto cleanup;
+
+    log_denominator = expr_log(expr->b);
+    scaled = log_denominator ? mul_number_owned(log_denominator, scale) : NULL;
+    log_denominator = NULL;
+    out = simplify_owned(scaled);
+    scaled = NULL;
+
+cleanup:
+    expr_free(scaled);
+    expr_free(log_denominator);
+    expr_free(denominator_deriv);
+    num_destroy(&scale);
+    return out;
 }
 
 static expr_t *integrate_div_wrt_denominator(const expr_t *expr,

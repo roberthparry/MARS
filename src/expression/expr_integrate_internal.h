@@ -21,6 +21,7 @@ bool     match_nonconstant_affine_linear_expr            (const expr_t *expr,
                                                           number_t *coeff_out);
 void     number_array_zero_local                         (number_t *values, size_t count);
 void     number_array_clear_local                        (number_t *values, size_t count);
+void     number_array_reset_zero_local                   (number_t *values, size_t count);
 bool     expr_integrate_rewrite_poly_deg4_to_affine_basis(number_t *poly,
                                                           number_t from_constant,
                                                           number_t from_coeff,
