@@ -18,6 +18,11 @@ typedef struct {
     size_t total_multiplicity;
 } partial_fraction_factorization_t;
 
+enum {
+    partial_fraction_poly_coeff_count = 5u,
+    laurent_poly_coeff_count = 9u
+};
+
 static void partial_fraction_array_zero(number_t *values, size_t count)
 {
     for (size_t i = 0; i < count; ++i)
@@ -122,7 +127,7 @@ static bool same_wrt_var_local(const expr_t *expr, const expr_t *wrt)
 {
     if (!expr || !wrt || !expr_is_var(expr) || !expr_is_var(wrt))
         return false;
-    if (expr == wrt)
+    if (is_wrt(expr, wrt))
         return true;
     if (expr->name && wrt->name)
         return strcmp(expr->name, wrt->name) == 0;
@@ -223,19 +228,25 @@ static size_t poly_degree_local(const number_t *coeffs, size_t count)
     return 0u;
 }
 
-static bool poly_match_direct_deg4_rec(const expr_t *expr,
-                                       const expr_t *wrt,
-                                       number_t *coeffs)
+static bool poly_match_direct_limited_rec(const expr_t *expr,
+                                          const expr_t *wrt,
+                                          number_t *coeffs,
+                                          size_t count)
 {
     number_t constant = num_new();
     number_t exponent = num_new();
-    number_t lhs[5];
-    number_t rhs[5];
+    number_t lhs[laurent_poly_coeff_count];
+    number_t rhs[laurent_poly_coeff_count];
+    bool coeffs_ready = false;
     bool lhs_ready = false;
     bool rhs_ready = false;
     bool ok = false;
 
-    partial_fraction_array_zero(coeffs, 5);
+    if (count == 0u || count > laurent_poly_coeff_count)
+        goto cleanup;
+
+    partial_fraction_array_zero(coeffs, count);
+    coeffs_ready = true;
 
     if (!expr) {
         ok = false;
@@ -257,10 +268,10 @@ static bool poly_match_direct_deg4_rec(const expr_t *expr,
     }
 
     if (expr->ops && expr->ops->kind == EXPR_KIND_NEG) {
-        if (!poly_match_direct_deg4_rec(expr->a, wrt, lhs))
+        if (!poly_match_direct_limited_rec(expr->a, wrt, lhs, count))
             goto cleanup;
         lhs_ready = true;
-        for (size_t i = 0; i < 5u; ++i) {
+        for (size_t i = 0; i < count; ++i) {
             num_destroy(&coeffs[i]);
             coeffs[i] = num_neg(lhs[i]);
         }
@@ -270,15 +281,15 @@ static bool poly_match_direct_deg4_rec(const expr_t *expr,
 
     if (expr->ops &&
         (expr->ops->kind == EXPR_KIND_ADD || expr->ops->kind == EXPR_KIND_SUB)) {
-        if (!poly_match_direct_deg4_rec(expr->a, wrt, lhs)) {
+        if (!poly_match_direct_limited_rec(expr->a, wrt, lhs, count)) {
             goto cleanup;
         }
         lhs_ready = true;
-        if (!poly_match_direct_deg4_rec(expr->b, wrt, rhs)) {
+        if (!poly_match_direct_limited_rec(expr->b, wrt, rhs, count)) {
             goto cleanup;
         }
         rhs_ready = true;
-        for (size_t i = 0; i < 5u; ++i) {
+        for (size_t i = 0; i < count; ++i) {
             number_t next = (expr->ops->kind == EXPR_KIND_ADD)
                                 ? num_add(lhs[i], rhs[i])
                                 : num_sub(lhs[i], rhs[i]);
@@ -291,16 +302,18 @@ static bool poly_match_direct_deg4_rec(const expr_t *expr,
     }
 
     if (expr->ops && expr->ops->kind == EXPR_KIND_MUL) {
-        if (!poly_match_direct_deg4_rec(expr->a, wrt, lhs)) {
+        if (!poly_match_direct_limited_rec(expr->a, wrt, lhs, count)) {
             goto cleanup;
         }
         lhs_ready = true;
-        if (!poly_match_direct_deg4_rec(expr->b, wrt, rhs)) {
+        if (!poly_match_direct_limited_rec(expr->b, wrt, rhs, count)) {
             goto cleanup;
         }
         rhs_ready = true;
-        for (size_t i = 0; i < 5u; ++i) {
-            for (size_t j = 0; i + j < 5u; ++j) {
+        if (poly_degree_local(lhs, count) + poly_degree_local(rhs, count) >= count)
+            goto cleanup;
+        for (size_t i = 0; i < count; ++i) {
+            for (size_t j = 0; i + j < count; ++j) {
                 number_t term = num_mul(lhs[i], rhs[j]);
                 number_t next = num_add(coeffs[i + j], term);
 
@@ -309,8 +322,6 @@ static bool poly_match_direct_deg4_rec(const expr_t *expr,
                 num_destroy(&term);
             }
         }
-        if (poly_degree_local(lhs, 5u) + poly_degree_local(rhs, 5u) > 4u)
-            goto cleanup;
         ok = true;
         goto cleanup;
     }
@@ -319,10 +330,10 @@ static bool poly_match_direct_deg4_rec(const expr_t *expr,
         expr_match_const_value(expr->b, &constant) &&
         num_is_real(constant) &&
         !num_eq(constant, NUM_ZERO)) {
-        if (!poly_match_direct_deg4_rec(expr->a, wrt, lhs))
+        if (!poly_match_direct_limited_rec(expr->a, wrt, lhs, count))
             goto cleanup;
         lhs_ready = true;
-        for (size_t i = 0; i < 5u; ++i) {
+        for (size_t i = 0; i < count; ++i) {
             number_t next = num_div(lhs[i], constant);
 
             num_destroy(&coeffs[i]);
@@ -335,8 +346,9 @@ static bool poly_match_direct_deg4_rec(const expr_t *expr,
     if (expr->ops && expr->ops->kind == EXPR_KIND_POW_D) {
         size_t power = 0u;
 
-        if (!small_positive_int_from_number(expr->c, &power) || power > 4u ||
-            !poly_match_direct_deg4_rec(expr->a, wrt, lhs)) {
+        if (!small_positive_int_from_number(expr->c, &power) ||
+            power >= count ||
+            !poly_match_direct_limited_rec(expr->a, wrt, lhs, count)) {
             goto cleanup;
         }
         lhs_ready = true;
@@ -344,11 +356,13 @@ static bool poly_match_direct_deg4_rec(const expr_t *expr,
         num_destroy(&coeffs[0]);
         coeffs[0] = num_clone(NUM_ONE);
         for (size_t iter = 0; iter < power; ++iter) {
-            number_t next[5];
+            number_t next[laurent_poly_coeff_count];
 
-            partial_fraction_array_zero(next, 5);
-            for (size_t i = 0; i < 5u; ++i) {
-                for (size_t j = 0; i + j < 5u; ++j) {
+            if (poly_degree_local(coeffs, count) + poly_degree_local(lhs, count) >= count)
+                goto cleanup;
+            partial_fraction_array_zero(next, count);
+            for (size_t i = 0; i < count; ++i) {
+                for (size_t j = 0; i + j < count; ++j) {
                     number_t term = num_mul(coeffs[i], lhs[j]);
                     number_t sum = num_add(next[i + j], term);
 
@@ -357,12 +371,8 @@ static bool poly_match_direct_deg4_rec(const expr_t *expr,
                     num_destroy(&term);
                 }
             }
-            if (poly_degree_local(coeffs, 5u) + poly_degree_local(lhs, 5u) > 4u) {
-                number_array_clear_local(next, 5);
-                goto cleanup;
-            }
-            poly_copy_local(coeffs, next, 5u);
-            number_array_clear_local(next, 5);
+            poly_copy_local(coeffs, next, count);
+            number_array_clear_local(next, count);
         }
         ok = true;
         goto cleanup;
@@ -372,8 +382,9 @@ static bool poly_match_direct_deg4_rec(const expr_t *expr,
         expr->b && expr_match_const_value(expr->b, &exponent)) {
         size_t power = 0u;
 
-        if (!small_positive_int_from_number(exponent, &power) || power > 4u ||
-            !poly_match_direct_deg4_rec(expr->a, wrt, lhs)) {
+        if (!small_positive_int_from_number(exponent, &power) ||
+            power >= count ||
+            !poly_match_direct_limited_rec(expr->a, wrt, lhs, count)) {
             goto cleanup;
         }
         lhs_ready = true;
@@ -381,11 +392,13 @@ static bool poly_match_direct_deg4_rec(const expr_t *expr,
         num_destroy(&coeffs[0]);
         coeffs[0] = num_clone(NUM_ONE);
         for (size_t iter = 0; iter < power; ++iter) {
-            number_t next[5];
+            number_t next[laurent_poly_coeff_count];
 
-            partial_fraction_array_zero(next, 5);
-            for (size_t i = 0; i < 5u; ++i) {
-                for (size_t j = 0; i + j < 5u; ++j) {
+            if (poly_degree_local(coeffs, count) + poly_degree_local(lhs, count) >= count)
+                goto cleanup;
+            partial_fraction_array_zero(next, count);
+            for (size_t i = 0; i < count; ++i) {
+                for (size_t j = 0; i + j < count; ++j) {
                     number_t term = num_mul(coeffs[i], lhs[j]);
                     number_t sum = num_add(next[i + j], term);
 
@@ -394,12 +407,8 @@ static bool poly_match_direct_deg4_rec(const expr_t *expr,
                     num_destroy(&term);
                 }
             }
-            if (poly_degree_local(coeffs, 5u) + poly_degree_local(lhs, 5u) > 4u) {
-                number_array_clear_local(next, 5);
-                goto cleanup;
-            }
-            poly_copy_local(coeffs, next, 5u);
-            number_array_clear_local(next, 5);
+            poly_copy_local(coeffs, next, count);
+            number_array_clear_local(next, count);
         }
         ok = true;
         goto cleanup;
@@ -407,13 +416,13 @@ static bool poly_match_direct_deg4_rec(const expr_t *expr,
 
 cleanup:
     if (rhs_ready)
-        number_array_clear_local(rhs, 5);
+        number_array_clear_local(rhs, count);
     if (lhs_ready)
-        number_array_clear_local(lhs, 5);
+        number_array_clear_local(lhs, count);
     num_destroy(&exponent);
     num_destroy(&constant);
-    if (!ok)
-        number_array_clear_local(coeffs, 5);
+    if (!ok && coeffs_ready)
+        number_array_clear_local(coeffs, count);
     return ok;
 }
 
@@ -422,7 +431,8 @@ static bool poly_match_direct_deg4(const expr_t *expr,
                                    number_t *coeffs,
                                    size_t *degree_out)
 {
-    if (!poly_match_direct_deg4_rec(expr, wrt, coeffs)) {
+    if (!poly_match_direct_limited_rec(expr, wrt, coeffs,
+                                       partial_fraction_poly_coeff_count)) {
         if (!poly_match_affine_basis_deg4(expr, wrt, coeffs, degree_out))
             return false;
         return true;
@@ -866,6 +876,198 @@ static expr_t *build_polynomial_antiderivative(const expr_t *wrt, const number_t
     out = build_polynomial_expr(wrt, anti, 5u);
     number_array_clear_local(anti, 5);
     return out;
+}
+
+static bool poly_match_direct_deg8(const expr_t *expr,
+                                   const expr_t *wrt,
+                                   number_t *coeffs,
+                                   size_t *degree_out)
+{
+    if (!poly_match_direct_limited_rec(expr, wrt, coeffs,
+                                       laurent_poly_coeff_count))
+        return false;
+
+    if (!poly_is_exact_real_local(coeffs, laurent_poly_coeff_count - 1u))
+        goto fail;
+
+    if (degree_out)
+        *degree_out = poly_degree_local(coeffs, laurent_poly_coeff_count);
+    return true;
+
+fail:
+    number_array_clear_local(coeffs, laurent_poly_coeff_count);
+    return false;
+}
+
+static bool match_monomial_wrt_power_denominator_rec(const expr_t *expr,
+                                                     const expr_t *wrt,
+                                                     number_t *scale_io,
+                                                     size_t *power_io)
+{
+    number_t constant = num_new();
+    number_t exponent = num_new();
+    bool ok = false;
+
+    if (!expr || !wrt || !scale_io || !power_io)
+        goto cleanup;
+
+    if (expr_match_const_value(expr, &constant) && num_is_real(constant) &&
+        !num_eq(constant, NUM_ZERO)) {
+        number_t next = num_mul(*scale_io, constant);
+
+        num_destroy(scale_io);
+        *scale_io = next;
+        ok = true;
+        goto cleanup;
+    }
+
+    if (same_wrt_var_local(expr, wrt)) {
+        *power_io += 1u;
+        ok = true;
+        goto cleanup;
+    }
+
+    if (expr->ops && expr->ops->kind == EXPR_KIND_MUL) {
+        ok = match_monomial_wrt_power_denominator_rec(expr->a, wrt,
+                                                      scale_io, power_io) &&
+             match_monomial_wrt_power_denominator_rec(expr->b, wrt,
+                                                      scale_io, power_io);
+        goto cleanup;
+    }
+
+    if (expr->ops && expr->ops->kind == EXPR_KIND_POW_D &&
+        expr->a && same_wrt_var_local(expr->a, wrt)) {
+        size_t power = 0u;
+
+        if (!small_positive_int_from_number(expr->c, &power))
+            goto cleanup;
+        *power_io += power;
+        ok = true;
+        goto cleanup;
+    }
+
+    if (expr->ops && expr->ops->kind == EXPR_KIND_POW &&
+        expr->a && expr->b && same_wrt_var_local(expr->a, wrt) &&
+        expr_match_const_value(expr->b, &exponent)) {
+        size_t power = 0u;
+
+        if (!small_positive_int_from_number(exponent, &power))
+            goto cleanup;
+        *power_io += power;
+        ok = true;
+        goto cleanup;
+    }
+
+cleanup:
+    num_destroy(&exponent);
+    num_destroy(&constant);
+    return ok;
+}
+
+static bool match_monomial_wrt_power_denominator(const expr_t *expr,
+                                                 const expr_t *wrt,
+                                                 number_t *scale_out,
+                                                 size_t *power_out)
+{
+    number_t scale = num_clone(NUM_ONE);
+    size_t power = 0u;
+    bool ok = match_monomial_wrt_power_denominator_rec(expr, wrt,
+                                                       &scale, &power) &&
+              power > 0u;
+
+    if (ok) {
+        num_destroy(scale_out);
+        *scale_out = scale;
+        *power_out = power;
+    } else {
+        num_destroy(&scale);
+    }
+    return ok;
+}
+
+static expr_t *build_laurent_integral_term(const expr_t *wrt,
+                                           number_t coeff,
+                                           long exponent)
+{
+    expr_t *base = NULL;
+    expr_t *term = NULL;
+
+    if (exponent == -1L) {
+        base = expr_log(wrt);
+        term = base ? expr_mul_num(base, &coeff) : NULL;
+        expr_free(base);
+        return term;
+    }
+
+    {
+        long integrated_power = exponent + 1L;
+        number_t denom = num_create_from_long(integrated_power);
+        number_t scale = num_div(coeff, denom);
+
+        if (integrated_power == 1L) {
+            base = expr_retain_expr(wrt);
+        } else {
+            number_t power = num_create_from_long(integrated_power);
+
+            base = expr_pow(wrt, &power);
+            num_destroy(&power);
+        }
+        term = base ? expr_mul_num(base, &scale) : NULL;
+        expr_free(base);
+        num_destroy(&scale);
+        num_destroy(&denom);
+    }
+    return term;
+}
+
+expr_t *integrate_polynomial_over_monomial_power(const expr_t *expr, const expr_t *wrt)
+{
+    number_t numerator[laurent_poly_coeff_count];
+    number_t denom_scale = num_new();
+    size_t numerator_degree = 0u;
+    size_t denominator_power = 0u;
+    expr_t *sum = NULL;
+    bool numerator_ready = false;
+
+    if (!expr || !wrt || !expr->a || !expr->b)
+        goto cleanup;
+
+    if (!poly_match_direct_deg8(expr->a, wrt, numerator, &numerator_degree))
+        goto cleanup;
+    numerator_ready = true;
+
+    if (!match_monomial_wrt_power_denominator(expr->b, wrt,
+                                              &denom_scale,
+                                              &denominator_power) ||
+        num_eq(denom_scale, NUM_ZERO)) {
+        goto cleanup;
+    }
+
+    for (size_t i = 0u; i <= numerator_degree; ++i) {
+        number_t coeff;
+        expr_t *term = NULL;
+        long exponent;
+
+        if (num_eq(numerator[i], NUM_ZERO))
+            continue;
+
+        coeff = num_div(numerator[i], denom_scale);
+        exponent = (long)i - (long)denominator_power;
+        term = build_laurent_integral_term(wrt, coeff, exponent);
+        num_destroy(&coeff);
+        if (!term) {
+            expr_free(sum);
+            sum = NULL;
+            goto cleanup;
+        }
+        sum = expr_add_owned(sum, term);
+    }
+
+cleanup:
+    if (numerator_ready)
+        number_array_clear_local(numerator, laurent_poly_coeff_count);
+    num_destroy(&denom_scale);
+    return simplify_owned(sum);
 }
 
 static expr_t *build_partial_fraction_antiderivative(const partial_fraction_factorization_t *factors,

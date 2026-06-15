@@ -157,6 +157,7 @@ expr_t * integrate_exact_substitution_product           (const expr_t *expr, con
 expr_t * integrate_wrt_exp_times_trig_exact              (const expr_t *expr, const expr_t *wrt);
 expr_t * integrate_exp_tanh_exact                        (const expr_t *expr, const expr_t *wrt);
 expr_t * integrate_linear_poly_times_normal_logpdf_affine(const expr_t *expr, const expr_t *wrt);
+expr_t * integrate_polynomial_over_monomial_power          (const expr_t *expr, const expr_t *wrt);
 expr_t * integrate_rational_partial_fractions            (const expr_t *expr, const expr_t *wrt);
 expr_t * integrate_linear_over_symbolic_quadratic        (const expr_t *expr, const expr_t *wrt);
 expr_t * integrate_log_of_symbolic_quadratic             (const expr_t *expr, const expr_t *wrt);

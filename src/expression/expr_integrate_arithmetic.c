@@ -470,6 +470,7 @@ static const expr_integrate_binary_rule_fn integrate_div_rational_rules[] = {
     integrate_poly_over_matching_affine,
     integrate_linear_over_symbolic_quadratic,
     integrate_poly_over_centered_quadratic,
+    integrate_polynomial_over_monomial_power,
     integrate_rational_partial_fractions,
     NULL
 };
@@ -1353,8 +1354,11 @@ static expr_t *integrate_div_rule_dispatch(unsigned int features,
 expr_t *integrate_div_rule(const expr_t *expr, const expr_t *wrt)
 {
     unsigned int features = integrate_div_rule_features(expr, wrt);
+    expr_t *matched = integrate_div_rule_dispatch(features, expr, wrt);
 
-    return integrate_div_rule_dispatch(features, expr, wrt);
+    if (matched)
+        return matched;
+    return integrate_exact_substitution_product(expr, wrt);
 }
 
 static bool match_square_of_expr(const expr_t *expr, const expr_t **base_out)
