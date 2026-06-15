@@ -2099,6 +2099,10 @@ static void test_integrate_trig_power_products(void)
                                          points, sizeof(points) / sizeof(points[0]));
     assert_string_antiderivative_matches("{ tan(x)^3 }",
                                          points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches(
+        "{ (tan(x)^2+1)*(4*tan(x)^2*(tan(x)^2*(3*tan(x)^2+2)+1)"
+        "-6*(tan(x)^2+1)*(tan(x)^4+1))/tan(x)^4 }",
+        points, sizeof(points) / sizeof(points[0]));
     assert_string_antiderivative_matches("{ sec(x)^3 }",
                                          points, sizeof(points) / sizeof(points[0]));
     assert_string_antiderivative_matches("{ cosec(x)^3 }",

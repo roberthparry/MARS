@@ -441,6 +441,44 @@ static expr_t *substitute_candidate_with_powers(const expr_t *expr,
     return NULL;
 }
 
+static bool expr_contains_division_or_inverse_power(const expr_t *expr)
+{
+    number_t exponent = num_new();
+    bool found = false;
+
+    if (!expr || !expr->ops)
+        goto cleanup;
+
+    if (expr->ops->kind == EXPR_KIND_DIV) {
+        found = true;
+        goto cleanup;
+    }
+
+    if (expr->ops->kind == EXPR_KIND_POW_D &&
+        num_is_real(expr->c) && num_lt(expr->c, NUM_ZERO)) {
+        found = true;
+        goto cleanup;
+    }
+
+    if (expr->ops->kind == EXPR_KIND_POW && expr->b &&
+        expr_match_const_value(expr->b, &exponent) &&
+        num_is_real(exponent) && num_lt(exponent, NUM_ZERO)) {
+        found = true;
+        goto cleanup;
+    }
+
+    if (expr->ops->arity == EXPR_OP_UNARY) {
+        found = expr_contains_division_or_inverse_power(expr->a);
+    } else if (expr->ops->arity == EXPR_OP_BINARY) {
+        found = expr_contains_division_or_inverse_power(expr->a) ||
+                expr_contains_division_or_inverse_power(expr->b);
+    }
+
+cleanup:
+    num_destroy(&exponent);
+    return found;
+}
+
 static bool expr_matches_unary_arg(const expr_t *expr,
                                    expr_op_kind_t kind,
                                    const expr_t *arg)
@@ -2256,6 +2294,8 @@ static expr_t *integrate_exact_substitution_candidate(
     expr_t *out = NULL;
     expr_t *vars[2];
     bool used[2];
+    bool used_relation_rewrite = false;
+    bool derivative_contains_inverse = false;
     bool trusted_antiderivative = false;
 
     if (!expr || !wrt || !candidate || candidate == wrt)
@@ -2265,6 +2305,7 @@ static expr_t *integrate_exact_substitution_candidate(
     du = simplify_owned(du);
     if (!du || expr_is_exact_zero(du))
         goto cleanup;
+    derivative_contains_inverse = expr_contains_division_or_inverse_power(du);
 
     u = expr_new_named_var(NUM_ZERO, "u");
     quotient = expr_simplify_extract_exact_factor_quotient(expr, du);
@@ -2327,9 +2368,12 @@ static expr_t *integrate_exact_substitution_candidate(
             expr_free(direct);
         }
 
-        if (rewritten) {
+        if (rewritten && expr_equal_exact_local(rewritten, transformed)) {
+            expr_free(rewritten);
+        } else if (rewritten) {
             expr_free(transformed);
             transformed = simplify_owned(rewritten);
+            used_relation_rewrite = true;
         }
     }
     if (transformed) {
@@ -2350,6 +2394,8 @@ static expr_t *integrate_exact_substitution_candidate(
         goto cleanup;
 
     anti_u = expr_integrate(transformed, u);
+    if (anti_u && !used_relation_rewrite && !derivative_contains_inverse)
+        trusted_antiderivative = true;
     if (!anti_u) {
         anti_u = integrate_poly_times_exp_relaxed(transformed, u);
         trusted_antiderivative = (anti_u != NULL);
