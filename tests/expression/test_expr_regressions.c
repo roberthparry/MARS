@@ -1549,6 +1549,11 @@ static void test_simplify_trig_and_hyperbolic_identities(void)
             "1/tan(x) simplifies to cot(x)",
         },
         {
+            "{ 1/tan(x)^3 | x = NAN }",
+            "{ cot³(x) | x = NAN }",
+            "1/tan(x)^3 simplifies to cot^3(x)",
+        },
+        {
             "{ 1/sec(x) | x = NAN }",
             "{ cos(x) | x = NAN }",
             "1/sec(x) simplifies to cos(x)",

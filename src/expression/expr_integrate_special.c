@@ -16,6 +16,54 @@ typedef struct cubed_unary_rule {
     cubed_unary_raw_fn build_raw;
 } cubed_unary_rule_t;
 
+static bool squared_unary_kind_op(expr_pattern_unary_affine_kind_t kind,
+                                  expr_op_kind_t *op_kind_out)
+{
+    if (!op_kind_out)
+        return false;
+
+    switch (kind) {
+        case EXPR_PATTERN_UNARY_SIN:
+            *op_kind_out = EXPR_KIND_SIN;
+            return true;
+        case EXPR_PATTERN_UNARY_COS:
+            *op_kind_out = EXPR_KIND_COS;
+            return true;
+        case EXPR_PATTERN_UNARY_TAN:
+            *op_kind_out = EXPR_KIND_TAN;
+            return true;
+        case EXPR_PATTERN_UNARY_SEC:
+            *op_kind_out = EXPR_KIND_SEC;
+            return true;
+        case EXPR_PATTERN_UNARY_COSEC:
+            *op_kind_out = EXPR_KIND_COSEC;
+            return true;
+        case EXPR_PATTERN_UNARY_COT:
+            *op_kind_out = EXPR_KIND_COT;
+            return true;
+        case EXPR_PATTERN_UNARY_SINH:
+            *op_kind_out = EXPR_KIND_SINH;
+            return true;
+        case EXPR_PATTERN_UNARY_COSH:
+            *op_kind_out = EXPR_KIND_COSH;
+            return true;
+        case EXPR_PATTERN_UNARY_COSECH:
+            *op_kind_out = EXPR_KIND_COSECH;
+            return true;
+        case EXPR_PATTERN_UNARY_TANH:
+            *op_kind_out = EXPR_KIND_TANH;
+            return true;
+        case EXPR_PATTERN_UNARY_SECH:
+            *op_kind_out = EXPR_KIND_SECH;
+            return true;
+        case EXPR_PATTERN_UNARY_COTH:
+            *op_kind_out = EXPR_KIND_COTH;
+            return true;
+        default:
+            return false;
+    }
+}
+
 static expr_t *build_double_angle_squared_raw(const expr_t *u,
                                               expr_apply_unary_fn oscillation_fn,
                                               bool scaled_first,
@@ -101,6 +149,15 @@ static expr_t *build_cosec_squared_raw(const expr_t *u)
     return build_neg_unary_raw(u, expr_cot);
 }
 
+static expr_t *build_cot_squared_raw(const expr_t *u)
+{
+    expr_t *cot_u = build_neg_unary_raw(u, expr_cot);
+    expr_t *raw = (cot_u && u) ? expr_sub(cot_u, u) : NULL;
+
+    expr_free(cot_u);
+    return raw;
+}
+
 static expr_t *build_sech_squared_raw(const expr_t *u)
 {
     return build_unary_raw(u, expr_tanh);
@@ -168,6 +225,27 @@ static expr_t *build_tan_cubed_raw(const expr_t *u)
     return raw;
 }
 
+static expr_t *build_cot_cubed_raw(const expr_t *u)
+{
+    expr_t *cot_u = expr_cot(u);
+    expr_t *cot_sq = cot_u ? expr_pow(cot_u, &NUM_TWO) : NULL;
+    expr_t *half_cot_sq = cot_sq ? expr_mul_num(cot_sq, &NUM_HALF) : NULL;
+    expr_t *neg_half_cot_sq = half_cot_sq ? expr_neg(half_cot_sq) : NULL;
+    expr_t *sin_u = expr_sin(u);
+    expr_t *log_sin = sin_u ? expr_log(sin_u) : NULL;
+    expr_t *raw = (neg_half_cot_sq && log_sin)
+                      ? expr_sub(neg_half_cot_sq, log_sin)
+                      : NULL;
+
+    expr_free(log_sin);
+    expr_free(sin_u);
+    expr_free(neg_half_cot_sq);
+    expr_free(half_cot_sq);
+    expr_free(cot_sq);
+    expr_free(cot_u);
+    return raw;
+}
+
 static expr_t *build_sec_cubed_raw(const expr_t *u)
 {
     expr_t *sec_u = expr_sec(u);
@@ -214,6 +292,7 @@ static const squared_unary_rule_t squared_unary_rules[EXPR_PATTERN_UNARY_COUNT] 
     [EXPR_PATTERN_UNARY_SINH] = { build_sinh_squared_raw, 4 },
     [EXPR_PATTERN_UNARY_COSH] = { build_cosh_squared_raw, 4 },
     [EXPR_PATTERN_UNARY_TAN] = { build_tan_squared_raw, 1 },
+    [EXPR_PATTERN_UNARY_COT] = { build_cot_squared_raw, 1 },
     [EXPR_PATTERN_UNARY_SEC] = { build_sec_squared_raw, 1 },
     [EXPR_PATTERN_UNARY_COSEC] = { build_cosec_squared_raw, 1 },
     [EXPR_PATTERN_UNARY_SECH] = { build_sech_squared_raw, 1 },
@@ -226,6 +305,7 @@ static const cubed_unary_rule_t cubed_unary_rules[EXPR_PATTERN_UNARY_COUNT] = {
     [EXPR_PATTERN_UNARY_SIN] = { build_sin_cubed_raw },
     [EXPR_PATTERN_UNARY_COS] = { build_cos_cubed_raw },
     [EXPR_PATTERN_UNARY_TAN] = { build_tan_cubed_raw },
+    [EXPR_PATTERN_UNARY_COT] = { build_cot_cubed_raw },
     [EXPR_PATTERN_UNARY_SEC] = { build_sec_cubed_raw },
     [EXPR_PATTERN_UNARY_COSEC] = { build_cosec_cubed_raw }
 };
@@ -250,6 +330,96 @@ static const cubed_unary_rule_t *find_cubed_unary_rule(expr_pattern_unary_affine
     return rule->build_raw ? rule : NULL;
 }
 
+static bool match_symbolic_squared_unary_base(const expr_t *expr,
+                                              expr_pattern_unary_affine_kind_t kind,
+                                              const expr_t *wrt,
+                                              const expr_t **base_out,
+                                              expr_t **coeff_out)
+{
+    expr_op_kind_t op_kind;
+    number_t exponent = num_new();
+    const expr_t *base = NULL;
+    expr_t *constant = NULL;
+    expr_t *coeff = NULL;
+    bool ok = false;
+
+    if (!expr || !wrt || !base_out || !coeff_out)
+        goto cleanup;
+
+    if (expr->ops && expr->ops->kind == EXPR_KIND_POW_D && expr->a) {
+        if (num_eq(expr->c, NUM_TWO))
+            base = expr->a;
+    } else if (expr->ops && expr->ops->kind == EXPR_KIND_POW &&
+               expr->a && expr->b &&
+               expr_match_const_value(expr->b, &exponent) &&
+               num_eq(exponent, NUM_TWO)) {
+        base = expr->a;
+    }
+
+    if (!base ||
+        !base->ops ||
+        !base->a ||
+        !squared_unary_kind_op(kind, &op_kind) ||
+        base->ops->kind != op_kind ||
+        !match_symbolic_affine_constant_and_coeff(base->a, wrt, &constant, &coeff)) {
+        goto cleanup;
+    }
+
+    *base_out = base;
+    *coeff_out = coeff;
+    coeff = NULL;
+    ok = true;
+
+cleanup:
+    expr_free(coeff);
+    expr_free(constant);
+    num_destroy(&exponent);
+    return ok;
+}
+
+static expr_t *divide_owned_by_symbolic_factor(expr_t *numerator,
+                                               expr_t *factor)
+{
+    expr_t *quotient = (numerator && factor) ? expr_div(numerator, factor) : NULL;
+
+    expr_free(factor);
+    expr_free(numerator);
+    return simplify_owned(quotient);
+}
+
+static expr_t *integrate_symbolic_squared_unary_affine(
+    const expr_t *expr,
+    const expr_t *wrt,
+    expr_pattern_unary_affine_kind_t kind,
+    const squared_unary_rule_t *rule)
+{
+    const expr_t *base = NULL;
+    expr_t *coeff = NULL;
+    expr_t *u = NULL;
+    expr_t *raw = NULL;
+    expr_t *denom = NULL;
+
+    if (!rule || !match_symbolic_squared_unary_base(expr, kind, wrt, &base, &coeff))
+        return NULL;
+
+    u = expr_clone(base->a);
+    raw = u ? rule->build_raw(u) : NULL;
+    if (rule->divisor_factor == 1) {
+        denom = coeff;
+        coeff = NULL;
+    } else {
+        expr_t *factor = expr_const_long(rule->divisor_factor);
+
+        denom = (factor && coeff) ? expr_mul(factor, coeff) : NULL;
+        expr_free(factor);
+        expr_free(coeff);
+        coeff = NULL;
+    }
+
+    expr_free(u);
+    return divide_owned_by_symbolic_factor(raw, denom);
+}
+
 expr_t *integrate_squared_unary_affine(const expr_t *expr,
                                       const expr_t *wrt,
                                       expr_pattern_unary_affine_kind_t kind)
@@ -265,7 +435,7 @@ expr_t *integrate_squared_unary_affine(const expr_t *expr,
         !match_affine_unary_data(expr->a, wrt, kind, &constant, &coeff)) {
         num_destroy(&coeff);
         num_destroy(&constant);
-        return NULL;
+        return integrate_symbolic_squared_unary_affine(expr, wrt, kind, rule);
     }
 
     u = build_affine_from_match(wrt, constant, coeff);

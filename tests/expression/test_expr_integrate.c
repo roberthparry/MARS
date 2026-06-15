@@ -2099,9 +2099,25 @@ static void test_integrate_trig_power_products(void)
                                          points, sizeof(points) / sizeof(points[0]));
     assert_string_antiderivative_matches("{ tan(x)^3 }",
                                          points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ cot(x)^2 }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ tan(x)^2 - cot(x)^2 }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches_with_ab("{ tan(a*x+b)^2 - cot(a*x+b)^2 }",
+                                                 0.7, 0.2,
+                                                 points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches_with_a("{ a*(x^2-1)/x^2 }",
+                                                0.7,
+                                                points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches_with_ab(
+        "{ a^2*(tan(a*x+b)^2+1)*(tan(a*x+b)^2-1)/tan(a*x+b)^2 }",
+        0.7, 0.2, points, sizeof(points) / sizeof(points[0]));
     assert_string_antiderivative_matches(
         "{ (tan(x)^2+1)*(4*tan(x)^2*(tan(x)^2*(3*tan(x)^2+2)+1)"
         "-6*(tan(x)^2+1)*(tan(x)^4+1))/tan(x)^4 }",
+        points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches(
+        "{ 2*(tan(x)+1/tan(x)^3+1/tan(x)+tan(x)^3) }",
         points, sizeof(points) / sizeof(points[0]));
     assert_string_antiderivative_matches("{ sec(x)^3 }",
                                          points, sizeof(points) / sizeof(points[0]));
@@ -2430,7 +2446,7 @@ static void test_integrate_hyperbolic_table_tail(void)
     assert_string_antiderivative_matches_with_ab("{ sin(a*x)*sinh(b*x) }", 2.0, 3.0,
                                                  points, sizeof(points) / sizeof(points[0]));
     assert_string_antiderivative_contains("{ sinh(a*x)^2 }",
-                                          "¼·(sinh(2ax)/a - 2x)");
+                                          "(sinh(2ax) - 2ax)/(4a)");
     assert_string_antiderivative_matches_with_a("{ sinh(a*x)^2 }", 2.0,
                                                 points, sizeof(points) / sizeof(points[0]));
     assert_string_antiderivative_contains("{ sinh(a*x)*sinh(b*x) }",

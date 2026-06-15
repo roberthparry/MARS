@@ -219,6 +219,69 @@ static void poly_copy_local(number_t *dst, const number_t *src, size_t count)
     }
 }
 
+static bool split_wrt_independent_product_factor(const expr_t *expr,
+                                                 const expr_t *wrt,
+                                                 expr_t **factor_out,
+                                                 expr_t **rest_out)
+{
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+    expr_t *factor = NULL;
+    expr_t *rest = NULL;
+    expr_t *inner_rest = NULL;
+    bool ok = false;
+
+    if (!expr || !wrt || !factor_out || !rest_out)
+        return false;
+
+    if (!depends_on_wrt(expr, wrt)) {
+        factor = expr_clone(expr);
+        rest = expr_new_const(NUM_ONE);
+        ok = factor && rest;
+        goto cleanup;
+    }
+
+    if (!expr_match_mul_expr(expr, &left, &right))
+        return false;
+
+    if (!depends_on_wrt(left, wrt)) {
+        factor = expr_clone(left);
+        rest = expr_clone(right);
+        ok = factor && rest;
+        goto cleanup;
+    }
+
+    if (!depends_on_wrt(right, wrt)) {
+        factor = expr_clone(right);
+        rest = expr_clone(left);
+        ok = factor && rest;
+        goto cleanup;
+    }
+
+    if (split_wrt_independent_product_factor(left, wrt, &factor, &inner_rest)) {
+        rest = (inner_rest && right) ? expr_mul(inner_rest, right) : NULL;
+        ok = factor && rest;
+        goto cleanup;
+    }
+
+    if (split_wrt_independent_product_factor(right, wrt, &factor, &inner_rest)) {
+        rest = (left && inner_rest) ? expr_mul(left, inner_rest) : NULL;
+        ok = factor && rest;
+        goto cleanup;
+    }
+
+cleanup:
+    expr_free(inner_rest);
+    if (ok) {
+        *factor_out = factor;
+        *rest_out = rest;
+    } else {
+        expr_free(factor);
+        expr_free(rest);
+    }
+    return ok;
+}
+
 static size_t poly_degree_local(const number_t *coeffs, size_t count)
 {
     for (size_t i = count; i-- > 0u;) {
@@ -1032,8 +1095,30 @@ expr_t *integrate_polynomial_over_monomial_power(const expr_t *expr, const expr_
     if (!expr || !wrt || !expr->a || !expr->b)
         goto cleanup;
 
-    if (!poly_match_direct_deg8(expr->a, wrt, numerator, &numerator_degree))
+    if (!poly_match_direct_deg8(expr->a, wrt, numerator, &numerator_degree)) {
+        expr_t *scale = NULL;
+        expr_t *reduced_numerator = NULL;
+        expr_t *reduced_expr = NULL;
+        expr_t *inner = NULL;
+
+        if (!split_wrt_independent_product_factor(expr->a, wrt,
+                                                  &scale,
+                                                  &reduced_numerator)) {
+            goto cleanup;
+        }
+
+        reduced_expr = reduced_numerator ? expr_div(reduced_numerator, expr->b) : NULL;
+        inner = reduced_expr ? integrate_polynomial_over_monomial_power(reduced_expr,
+                                                                        wrt)
+                             : NULL;
+        sum = (scale && inner) ? expr_mul(scale, inner) : NULL;
+
+        expr_free(inner);
+        expr_free(reduced_expr);
+        expr_free(reduced_numerator);
+        expr_free(scale);
         goto cleanup;
+    }
     numerator_ready = true;
 
     if (!match_monomial_wrt_power_denominator(expr->b, wrt,
