@@ -673,9 +673,12 @@ static expr_t *rewrite_trig_candidate_relations(const expr_t *expr,
 
         if (expr && expr->ops && expr->ops->kind == EXPR_KIND_DIV && expr->a && expr->b &&
             expr_matches_unary_arg(expr->b, EXPR_KIND_COS, arg)) {
-            expr_t *double_arg = expr_mul_num(expr_clone(arg), &NUM_TWO);
+            expr_t *arg_clone = expr_clone(arg);
+            expr_t *double_arg = arg_clone ? expr_mul_num(arg_clone, &NUM_TWO) : NULL;
             expr_t *double_sin = double_arg ? expr_sin(double_arg) : NULL;
 
+            expr_free(arg_clone);
+            expr_free(double_arg);
             if (double_sin && expr_simplify_same_factor(expr->a, double_sin)) {
                 expr_free(double_sin);
                 return mul_number_owned(expr_clone(replacement), NUM_TWO);
@@ -719,9 +722,12 @@ static expr_t *rewrite_trig_candidate_relations(const expr_t *expr,
 
         if (expr && expr->ops && expr->ops->kind == EXPR_KIND_DIV && expr->a && expr->b &&
             expr_matches_unary_arg(expr->b, EXPR_KIND_SIN, arg)) {
-            expr_t *double_arg = expr_mul_num(expr_clone(arg), &NUM_TWO);
+            expr_t *arg_clone = expr_clone(arg);
+            expr_t *double_arg = arg_clone ? expr_mul_num(arg_clone, &NUM_TWO) : NULL;
             expr_t *double_sin = double_arg ? expr_sin(double_arg) : NULL;
 
+            expr_free(arg_clone);
+            expr_free(double_arg);
             if (double_sin && expr_simplify_same_factor(expr->a, double_sin)) {
                 expr_free(double_sin);
                 return mul_number_owned(expr_clone(replacement), NUM_TWO);
@@ -2416,7 +2422,6 @@ expr_t *integrate_exact_substitution_product(const expr_t *expr,
     for (size_t i = 0; i < count; ++i) {
         expr_t *out = integrate_exp_unary_substitution_product(expr, wrt,
                                                                candidates[i]);
-        number_t exponent = num_new();
 
         if (out) {
             num_destroy(&four);
@@ -2430,25 +2435,30 @@ expr_t *integrate_exact_substitution_product(const expr_t *expr,
             return out;
         }
 
-        if (candidates[i] &&
-            ((candidates[i]->ops->kind == EXPR_KIND_POW_D &&
-              num_is_real(candidates[i]->c) &&
-              num_eq(candidates[i]->c, four)) ||
-             (candidates[i]->ops->kind == EXPR_KIND_POW &&
-              candidates[i]->b &&
-              expr_match_const_value(candidates[i]->b, &exponent) &&
-              num_eq(exponent, four)))) {
-            expr_t *half_power = expr_pow(candidates[i]->a, &NUM_TWO);
+        if (candidates[i]) {
+            number_t exponent = num_new();
+            bool fourth_power =
+                (candidates[i]->ops->kind == EXPR_KIND_POW_D &&
+                 num_is_real(candidates[i]->c) &&
+                 num_eq(candidates[i]->c, four)) ||
+                (candidates[i]->ops->kind == EXPR_KIND_POW &&
+                 candidates[i]->b &&
+                 expr_match_const_value(candidates[i]->b, &exponent) &&
+                 num_eq(exponent, four));
 
-            out = integrate_exact_substitution_candidate(expr, wrt, half_power);
-            expr_free(half_power);
-            if (out) {
-                num_destroy(&exponent);
-                num_destroy(&four);
-                return out;
+            if (fourth_power) {
+                expr_t *half_power = expr_pow(candidates[i]->a, &NUM_TWO);
+
+                out = integrate_exact_substitution_candidate(expr, wrt, half_power);
+                expr_free(half_power);
+                if (out) {
+                    num_destroy(&exponent);
+                    num_destroy(&four);
+                    return out;
+                }
             }
+            num_destroy(&exponent);
         }
-        num_destroy(&exponent);
     }
 
 cleanup:
