@@ -141,6 +141,7 @@ static expr_t *build_symbolic_quadratic_power_trig_integral(
                                  : expr_retain_expr(sin_v);
     if (tail_trig) {
         term3 = expr_mul_num(tail_trig, &NUM_TWO);
+        expr_free(tail_trig);
         tail_trig = NULL;
     }
     term3 = divide_expr_by_expr_power_owned(term3, coeff, 3u);

@@ -413,6 +413,7 @@ static bool expr_simplify_split_factor_product_local(
     }
 
     if (expr_is_pow_d_expr(expr) && expr->a) {
+        num_destroy(&exponent);
         exponent = num_mul(expr->c, sign);
         ok = expr_simplify_append_factor_local(factors, count, capacity,
                                                expr->a, exponent);
