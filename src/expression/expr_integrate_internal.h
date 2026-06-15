@@ -168,6 +168,10 @@ expr_t * integrate_squared_unary_affine                  (const expr_t *expr,
 expr_t * integrate_cubed_unary_affine                    (const expr_t *expr,
                                                           const expr_t *wrt,
                                                           expr_pattern_unary_affine_kind_t kind);
+expr_t * integrate_matching_squared_unary_affine         (const expr_t *expr,
+                                                          const expr_t *wrt);
+expr_t * integrate_matching_cubed_unary_affine           (const expr_t *expr,
+                                                          const expr_t *wrt);
 expr_t * integrate_same_affine_special_product           (const expr_t *expr, const expr_t *wrt);
 void     exp_antiderivative_once_local                   (const number_t *src,
                                                           size_t count,

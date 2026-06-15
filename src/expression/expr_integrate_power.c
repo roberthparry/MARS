@@ -400,62 +400,7 @@ expr_t *integrate_pow_rule(const expr_t *expr, const expr_t *wrt)
             num_destroy(&exponent);
             return out;
         }
-        out = integrate_squared_unary_affine(expr, wrt, EXPR_PATTERN_UNARY_SIN);
-        if (out) {
-            num_destroy(&exponent);
-            return out;
-        }
-        out = integrate_squared_unary_affine(expr, wrt, EXPR_PATTERN_UNARY_COS);
-        if (out) {
-            num_destroy(&exponent);
-            return out;
-        }
-        out = integrate_squared_unary_affine(expr, wrt, EXPR_PATTERN_UNARY_SINH);
-        if (out) {
-            num_destroy(&exponent);
-            return out;
-        }
-        out = integrate_squared_unary_affine(expr, wrt, EXPR_PATTERN_UNARY_COSH);
-        if (out) {
-            num_destroy(&exponent);
-            return out;
-        }
-        out = integrate_squared_unary_affine(expr, wrt, EXPR_PATTERN_UNARY_TAN);
-        if (out) {
-            num_destroy(&exponent);
-            return out;
-        }
-        out = integrate_squared_unary_affine(expr, wrt, EXPR_PATTERN_UNARY_COT);
-        if (out) {
-            num_destroy(&exponent);
-            return out;
-        }
-        out = integrate_squared_unary_affine(expr, wrt, EXPR_PATTERN_UNARY_SEC);
-        if (out) {
-            num_destroy(&exponent);
-            return out;
-        }
-        out = integrate_squared_unary_affine(expr, wrt, EXPR_PATTERN_UNARY_COSEC);
-        if (out) {
-            num_destroy(&exponent);
-            return out;
-        }
-        out = integrate_squared_unary_affine(expr, wrt, EXPR_PATTERN_UNARY_SECH);
-        if (out) {
-            num_destroy(&exponent);
-            return out;
-        }
-        out = integrate_squared_unary_affine(expr, wrt, EXPR_PATTERN_UNARY_COSECH);
-        if (out) {
-            num_destroy(&exponent);
-            return out;
-        }
-        out = integrate_squared_unary_affine(expr, wrt, EXPR_PATTERN_UNARY_TANH);
-        if (out) {
-            num_destroy(&exponent);
-            return out;
-        }
-        out = integrate_squared_unary_affine(expr, wrt, EXPR_PATTERN_UNARY_COTH);
+        out = integrate_matching_squared_unary_affine(expr, wrt);
         if (out) {
             num_destroy(&exponent);
             return out;
@@ -463,37 +408,7 @@ expr_t *integrate_pow_rule(const expr_t *expr, const expr_t *wrt)
     }
     number_t three = num_create_from_long(3);
     if (num_eq(exponent, three)) {
-        out = integrate_cubed_unary_affine(expr, wrt, EXPR_PATTERN_UNARY_SIN);
-        if (out) {
-            num_destroy(&three);
-            num_destroy(&exponent);
-            return out;
-        }
-        out = integrate_cubed_unary_affine(expr, wrt, EXPR_PATTERN_UNARY_COS);
-        if (out) {
-            num_destroy(&three);
-            num_destroy(&exponent);
-            return out;
-        }
-        out = integrate_cubed_unary_affine(expr, wrt, EXPR_PATTERN_UNARY_TAN);
-        if (out) {
-            num_destroy(&three);
-            num_destroy(&exponent);
-            return out;
-        }
-        out = integrate_cubed_unary_affine(expr, wrt, EXPR_PATTERN_UNARY_COT);
-        if (out) {
-            num_destroy(&three);
-            num_destroy(&exponent);
-            return out;
-        }
-        out = integrate_cubed_unary_affine(expr, wrt, EXPR_PATTERN_UNARY_SEC);
-        if (out) {
-            num_destroy(&three);
-            num_destroy(&exponent);
-            return out;
-        }
-        out = integrate_cubed_unary_affine(expr, wrt, EXPR_PATTERN_UNARY_COSEC);
+        out = integrate_matching_cubed_unary_affine(expr, wrt);
         if (out) {
             num_destroy(&three);
             num_destroy(&exponent);
@@ -596,41 +511,8 @@ expr_t *integrate_constant_over_power_denominator(const expr_t *numerator,
 
 expr_t *integrate_pow_d_rule(const expr_t *expr, const expr_t *wrt)
 {
-    expr_t *out = integrate_squared_unary_affine(expr, wrt, EXPR_PATTERN_UNARY_SIN);
+    expr_t *out = integrate_matching_squared_unary_affine(expr, wrt);
 
-    if (out)
-        return out;
-    out = integrate_squared_unary_affine(expr, wrt, EXPR_PATTERN_UNARY_COS);
-    if (out)
-        return out;
-    out = integrate_squared_unary_affine(expr, wrt, EXPR_PATTERN_UNARY_SINH);
-    if (out)
-        return out;
-    out = integrate_squared_unary_affine(expr, wrt, EXPR_PATTERN_UNARY_COSH);
-    if (out)
-        return out;
-    out = integrate_squared_unary_affine(expr, wrt, EXPR_PATTERN_UNARY_TAN);
-    if (out)
-        return out;
-    out = integrate_squared_unary_affine(expr, wrt, EXPR_PATTERN_UNARY_COT);
-    if (out)
-        return out;
-    out = integrate_squared_unary_affine(expr, wrt, EXPR_PATTERN_UNARY_SEC);
-    if (out)
-        return out;
-    out = integrate_squared_unary_affine(expr, wrt, EXPR_PATTERN_UNARY_COSEC);
-    if (out)
-        return out;
-    out = integrate_squared_unary_affine(expr, wrt, EXPR_PATTERN_UNARY_SECH);
-    if (out)
-        return out;
-    out = integrate_squared_unary_affine(expr, wrt, EXPR_PATTERN_UNARY_COSECH);
-    if (out)
-        return out;
-    out = integrate_squared_unary_affine(expr, wrt, EXPR_PATTERN_UNARY_TANH);
-    if (out)
-        return out;
-    out = integrate_squared_unary_affine(expr, wrt, EXPR_PATTERN_UNARY_COTH);
     if (out)
         return out;
     out = integrate_symbolic_squared_hyperbolic(expr, wrt);
@@ -639,32 +521,7 @@ expr_t *integrate_pow_d_rule(const expr_t *expr, const expr_t *wrt)
 
     number_t three = num_create_from_long(3);
     if (num_eq(expr->c, three)) {
-        out = integrate_cubed_unary_affine(expr, wrt, EXPR_PATTERN_UNARY_SIN);
-        if (out) {
-            num_destroy(&three);
-            return out;
-        }
-        out = integrate_cubed_unary_affine(expr, wrt, EXPR_PATTERN_UNARY_COS);
-        if (out) {
-            num_destroy(&three);
-            return out;
-        }
-        out = integrate_cubed_unary_affine(expr, wrt, EXPR_PATTERN_UNARY_TAN);
-        if (out) {
-            num_destroy(&three);
-            return out;
-        }
-        out = integrate_cubed_unary_affine(expr, wrt, EXPR_PATTERN_UNARY_COT);
-        if (out) {
-            num_destroy(&three);
-            return out;
-        }
-        out = integrate_cubed_unary_affine(expr, wrt, EXPR_PATTERN_UNARY_SEC);
-        if (out) {
-            num_destroy(&three);
-            return out;
-        }
-        out = integrate_cubed_unary_affine(expr, wrt, EXPR_PATTERN_UNARY_COSEC);
+        out = integrate_matching_cubed_unary_affine(expr, wrt);
         if (out) {
             num_destroy(&three);
             return out;

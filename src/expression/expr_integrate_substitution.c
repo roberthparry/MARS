@@ -490,6 +490,24 @@ static expr_t *substitute_candidate_with_powers(const expr_t *expr,
         return (expr_t *)replacement;
     }
 
+    if (expr->ops && expr->ops->kind == EXPR_KIND_POW_D && expr->a &&
+        expr_equal_exact_local(expr->a, candidate)) {
+        return expr_pow(replacement, &expr->c);
+    }
+
+    if (expr->ops && expr->ops->kind == EXPR_KIND_POW && expr->a && expr->b &&
+        expr_equal_exact_local(expr->a, candidate)) {
+        number_t exponent = num_new();
+        bool matched = expr_match_const_value(expr->b, &exponent);
+
+        if (matched) {
+            out = expr_pow(replacement, &exponent);
+            num_destroy(&exponent);
+            return out;
+        }
+        num_destroy(&exponent);
+    }
+
     out = substitute_candidate_square_relation(expr, candidate, replacement);
     if (out)
         return out;
@@ -529,26 +547,6 @@ static expr_t *substitute_candidate_with_powers(const expr_t *expr,
             num_destroy(&exponent);
             return out;
         }
-        num_destroy(&exponent);
-    }
-
-    for (int power = 2; power <= 4; ++power) {
-        expr_t *candidate_power = NULL;
-        expr_t *replacement_power = NULL;
-        bool equal = false;
-        number_t exponent = num_create_from_long(power);
-
-        candidate_power = expr_pow(candidate, &exponent);
-        replacement_power = expr_pow(replacement, &exponent);
-        if (candidate_power)
-            equal = expr_equal_exact_local(expr, candidate_power);
-        if (equal) {
-            expr_free(candidate_power);
-            num_destroy(&exponent);
-            return replacement_power;
-        }
-        expr_free(replacement_power);
-        expr_free(candidate_power);
         num_destroy(&exponent);
     }
 
