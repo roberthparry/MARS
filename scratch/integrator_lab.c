@@ -393,6 +393,43 @@ static char *combine_antiderivative_tex(const char *lhs, const char *rhs)
     return out;
 }
 
+static void print_integrator_context(const char *input,
+                                     const char *expr_text,
+                                     const char *binding_expr_text,
+                                     size_t ndim,
+                                     const bound_kind_t *bound_kinds,
+                                     const char *const *var_names,
+                                     char *const *lo_display_inputs,
+                                     char *const *hi_display_inputs,
+                                     const char *const *lo_inputs,
+                                     const char *const *hi_inputs)
+{
+    printf("input       %s\n", input ? input : "");
+    printf("expression  %s\n", expr_text ? expr_text : "(null)");
+    printf("binding_expression  %s\n",
+           binding_expr_text ? binding_expr_text : "");
+    printf("dimensions  %zu\n", ndim);
+    for (size_t i = 0; i < ndim; ++i) {
+        const char *name = var_names && var_names[i] ? var_names[i] : "";
+        const char *lo = lo_display_inputs && lo_display_inputs[i]
+            ? lo_display_inputs[i]
+            : (lo_inputs && lo_inputs[i] ? lo_inputs[i] : "");
+        const char *hi = hi_display_inputs && hi_display_inputs[i]
+            ? hi_display_inputs[i]
+            : (hi_inputs && hi_inputs[i] ? hi_inputs[i] : "");
+
+        if (bound_kinds && bound_kinds[i] == BOUND_KIND_DEFINITE)
+            printf("bound       %s in [%s, %s]\n", name, lo, hi);
+        else if (bound_kinds && bound_kinds[i] == BOUND_KIND_UPPER_ONLY)
+            printf("bound       %s antiderivative at %s\n", name, hi);
+        else
+            printf("bound       antiderivative with respect to %s\n", name);
+        printf("bound_var   %s\n", name);
+        printf("bound_lower %s\n", lo);
+        printf("bound_upper %s\n", hi);
+    }
+}
+
 static int all_bounds_indefinite(size_t ndim, const bound_kind_t *kinds)
 {
     if (!kinds)
@@ -584,6 +621,7 @@ int main(int argc, char **argv)
     number_t error_num = num_new();
     number_t symbolic_num = num_new();
     char *expr_text = NULL;
+    char *binding_expr_text = NULL;
     char *tex_text = NULL;
     char *base_tex_text = NULL;
     char *integrand_tex = NULL;
@@ -767,6 +805,7 @@ int main(int argc, char **argv)
         intg_set_interval_count_max(ig, max_intervals);
 
     expr_text = expr_text_dup(expr, style_UNBOUND);
+    binding_expr_text = expr_text_dup(expr, style_EXPRESSION);
     if (expr_text) {
         display_input = wrap_expression(expr_text);
         display_expr = expr_from_string(display_input ? display_input : expr_text, NULL);
@@ -801,11 +840,17 @@ int main(int argc, char **argv)
                                   &value_num, &error_num);
         ran_numeric_integrator = 1;
     } else {
+        print_integrator_context(input, expr_text, binding_expr_text, ndim,
+                                 bound_kinds, var_names, lo_display_inputs,
+                                 hi_display_inputs, lo_inputs, hi_inputs);
         fprintf(stderr, "Symbolic bounds need an integrand with a supported symbolic antiderivative\n");
         goto cleanup;
     }
 
     if (ran_numeric_integrator && intg_rc < 0) {
+        print_integrator_context(input, expr_text, binding_expr_text, ndim,
+                                 bound_kinds, var_names, lo_display_inputs,
+                                 hi_display_inputs, lo_inputs, hi_inputs);
         fprintf(stderr, "Integration failed\n");
         goto cleanup;
     }
@@ -828,23 +873,9 @@ int main(int argc, char **argv)
     if (!tex_text)
         tex_text = dup_string(base_tex_text ? base_tex_text : "");
 
-    printf("input       %s\n", input);
-    printf("expression  %s\n", expr_text ? expr_text : "(null)");
-    printf("dimensions  %zu\n", ndim);
-    for (size_t i = 0; i < ndim; ++i) {
-        if (bound_kinds[i] == BOUND_KIND_DEFINITE)
-            printf("bound       %s in [%s, %s]\n", var_names[i],
-                   lo_display_inputs[i] ? lo_display_inputs[i] : lo_inputs[i],
-                   hi_display_inputs[i] ? hi_display_inputs[i] : hi_inputs[i]);
-        else if (bound_kinds[i] == BOUND_KIND_UPPER_ONLY)
-            printf("bound       %s antiderivative at %s\n", var_names[i],
-                   hi_display_inputs[i] ? hi_display_inputs[i] : hi_inputs[i]);
-        else
-            printf("bound       antiderivative with respect to %s\n", var_names[i]);
-        printf("bound_var   %s\n", var_names[i]);
-        printf("bound_lower %s\n", lo_display_inputs[i] ? lo_display_inputs[i] : "");
-        printf("bound_upper %s\n", hi_display_inputs[i] ? hi_display_inputs[i] : "");
-    }
+    print_integrator_context(input, expr_text, binding_expr_text, ndim,
+                             bound_kinds, var_names, lo_display_inputs,
+                             hi_display_inputs, lo_inputs, hi_inputs);
     printf("tex         %s\n", tex_text ? tex_text : "(null)");
     printf("antiderivative %s\n", antiderivative_text ? antiderivative_text : "");
     printf("antiderivative_tex %s\n", antiderivative_tex ? antiderivative_tex : "");
@@ -890,6 +921,7 @@ cleanup:
     free(integrand_tex);
     free(base_tex_text);
     free(tex_text);
+    free(binding_expr_text);
     free(expr_text);
     free(display_input);
     expr_free(first_antiderivative);

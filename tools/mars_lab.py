@@ -3402,6 +3402,26 @@ __THEME_OVERRIDES__
       renderDerivativeButtons(currentVariables);
     }
 
+    function applyIntegratorBindingState(data, fallbackExpression) {
+      const bindingExpression = expressionWithSortedConstants(
+        String(data && data.binding_expression || fallbackExpression || '').trim()
+      );
+      const editorBody = String(data && data.expression || expr.value || '').trim();
+
+      if (bindingExpression && bindingParts(bindingExpression)) {
+        setExpressionEditor(
+          bindingExpression,
+          Array.isArray(data && data.binding_values) ? data.binding_values : null,
+          editorBody || null
+        );
+        modeEditorText.integrator = bindingExpression;
+      } else if (Array.isArray(data && data.binding_values)) {
+        renderVariableValues(data.binding_values);
+      } else {
+        clearVariableValues();
+      }
+    }
+
     function validPrecisionBits(bits, fallback) {
       const parsed = parseInt(String(bits), 10);
       if (!Number.isFinite(parsed))
@@ -3620,7 +3640,7 @@ __THEME_OVERRIDES__
     }
 
     function saveLastIntegratorState() {
-      const text = String(currentExpressionText() || expr.value || '').trim();
+      const text = expressionWithSortedConstants(String(currentExpressionText() || expr.value || '').trim());
       const bounds = currentIntegratorBoundsText();
       const cap = requestedIntegratorIntervalCap();
       if (text)
@@ -4716,6 +4736,9 @@ __THEME_OVERRIDES__
           setRenderedError(data.error || 'Integration failed');
           resetMoreDigitsButton(renderedMore, false);
           clearResultDetails({keepBindings: true});
+          applyIntegratorBindingState(data, text);
+          applyIntegratorResultBound(data);
+          saveLastIntegratorState();
           setStatus('Error');
           return;
         }
@@ -4766,13 +4789,9 @@ __THEME_OVERRIDES__
             valueLines.push(data.status);
           value.textContent = valueLines.join('\n');
         }
-        modeEditorText.integrator = text;
+        applyIntegratorBindingState(data, text);
         applyIntegratorResultBound(data);
         saveLastIntegratorState();
-        if (Array.isArray(data.binding_values))
-          renderVariableValues(data.binding_values);
-        else
-          clearVariableValues();
         currentVariables = [];
         currentDifferentiable = false;
         renderDerivativeButtons(currentVariables);
@@ -5437,6 +5456,8 @@ def load_state_data() -> dict[str, object]:
     integrator_expression = str(state.get("integrator_expression", "")).strip()
     if "..." in integrator_expression:
         state["integrator_expression"] = DEFAULT_INTEGRATOR_EXPRESSION
+    else:
+        state["integrator_expression"] = expression_with_sorted_constants(integrator_expression)
 
     try:
         cap = int(state.get("integrator_interval_cap", DEFAULT_INTEGRATOR_INTERVAL_CAP))
@@ -5467,6 +5488,10 @@ def save_state_data(updates: dict[str, object]) -> None:
     if "equation" in normalized:
         normalized["equation"] = expression_with_sorted_constants(
             str(normalized.get("equation") or "").strip()
+        )
+    if "integrator_expression" in normalized:
+        normalized["integrator_expression"] = expression_with_sorted_constants(
+            str(normalized.get("integrator_expression") or "").strip()
         )
     state.update(normalized)
     STATE_FILE.write_text(
@@ -6507,6 +6532,7 @@ def parse_integrator_lab_output(output: str) -> dict[str, str]:
         {
             "input": r"^input\s+(.*)$",
             "expression": r"^expression\s+(.*)$",
+            "binding_expression": r"^binding_expression\s*(.*)$",
             "dimensions": r"^dimensions\s+(.*)$",
             "bound": r"^bound\s+(.*)$",
             "bound_var": r"^bound_var\s+(.*)$",
@@ -7430,6 +7456,9 @@ def prepare_integrator_fields(fields: dict[str, str], precision: int) -> dict[st
 
     tex = str(fields.get("tex") or "").strip()
     bounds = str(fields.get("bound") or "").strip()
+    binding_expression = str(
+        fields.get("binding_expression") or fields.get("input") or ""
+    ).strip()
     tex = integrator_tex_for_display(tex)
 
     svg = None
@@ -7441,6 +7470,7 @@ def prepare_integrator_fields(fields: dict[str, str], precision: int) -> dict[st
         "ok": True,
         "mode": "integrator",
         "expression": str(fields.get("expression") or "").strip(),
+        "binding_expression": binding_expression,
         "tex": "" if tex == "(null)" else tex,
         "antiderivative": str(fields.get("antiderivative") or "").strip(),
         "antiderivative_tex": str(fields.get("antiderivative_tex") or "").strip(),
@@ -7460,7 +7490,7 @@ def prepare_integrator_fields(fields: dict[str, str], precision: int) -> dict[st
         "bound_var": str(fields.get("bound_var") or "").strip().splitlines()[0] if str(fields.get("bound_var") or "").strip() else "",
         "bound_lower": str(fields.get("bound_lower") or "").strip().splitlines()[0] if str(fields.get("bound_lower") or "").strip() else "",
         "bound_upper": str(fields.get("bound_upper") or "").strip().splitlines()[0] if str(fields.get("bound_upper") or "").strip() else "",
-        "binding_values": expression_variable_binding_values(str(fields.get("input") or "").strip(), precision),
+        "binding_values": expression_variable_binding_values(binding_expression, precision),
     }
     if svg:
         payload["svg"] = svg
@@ -7963,22 +7993,39 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                 self.send_json(422, {"ok": False, "error": str(exc)})
                 return
 
-            if returncode != 0:
-                self.send_json(422, {"ok": False, "error": raw or "Integration failed"})
-                return
-
             bounds_text = "\n".join(
                 f"{item['name']} = {item['lo']} .. {item['hi']}"
                 if item["lo"] and item["hi"]
                 else (f"{item['name']} = {item['hi']}" if item["hi"] else item["name"])
                 for item in cleaned_bounds
             )
+            if returncode != 0:
+                response_payload = prepare_integrator_fields(fields, precision)
+                error_lines = [line.strip() for line in str(raw or "").splitlines() if line.strip()]
+                response_payload["ok"] = False
+                response_payload["error"] = error_lines[-1] if error_lines else "Integration failed"
+                normalized_expression = str(
+                    response_payload.get("binding_expression") or expression
+                ).strip()
+                if normalized_expression:
+                    save_state_data({
+                        "integrator_expression": normalized_expression,
+                        "integrator_bounds": bounds_text,
+                        "integrator_interval_cap": max_intervals,
+                    })
+                self.send_json(422, response_payload)
+                return
+
+            response_payload = prepare_integrator_fields(fields, precision)
+            normalized_expression = str(
+                response_payload.get("binding_expression") or expression
+            ).strip()
             save_state_data({
-                "integrator_expression": expression,
+                "integrator_expression": normalized_expression,
                 "integrator_bounds": bounds_text,
                 "integrator_interval_cap": max_intervals,
             })
-            self.send_json(200, prepare_integrator_fields(fields, precision))
+            self.send_json(200, response_payload)
             return
 
         if path == "/goal_seek":
