@@ -661,7 +661,7 @@ static int intg_eval_separable_term(integrator_t *ig,
             status = intg_eval_affine_expr(term.factors[i], 1u, one_var,
                                          &lo[i], &hi[i], &factor_value);
             if (status == 0)
-                status = intg_single_integral(ig, term.factors[i], vars[i],
+                status = intg_integral(ig, term.factors[i], vars[i],
                                             lo[i], hi[i], &factor_value, NULL);
             if (status < 0) {
                 intg_separable_term_clear(&term);

@@ -299,15 +299,22 @@ expr_t *expr_create_nth_deriv(unsigned int n, const expr_t *expr, const expr_t *
  * @brief Try to build a symbolic antiderivative of @p expr with respect to @p wrt.
  *
  * Returns an owning expression @c F such that dF/d(@p wrt) equals @p expr for
- * the currently supported rule set, or NULL when no safe symbolic rule is
- * known. Unsupported inputs are expected; callers may fall back to numerical
- * integration when NULL is returned.
+ * the currently supported rule set. Additive expressions may carry unsupported
+ * pieces as unevaluated integral nodes; a fully unsupported non-additive input
+ * still returns NULL so callers can fall back to numerical integration.
  *
  * The first rule set intentionally covers simple, reliable cases: constants,
  * sums/differences, constant multiples, powers of the integration variable,
  * reciprocal 1/x, log(x), and affine exp/sin/cos/tan/sinh/cosh/tanh terms.
  */
 expr_t *expr_integrate(const expr_t *expr, const expr_t *wrt);
+/**
+ * @brief Build an unevaluated integral node representing ∫^wrt f(t) dt.
+ *
+ * The node is symbolic: numeric evaluation returns NaN, but differentiating it
+ * with respect to @p wrt returns @p integrand.
+ */
+expr_t *expr_integral(const expr_t *integrand, const expr_t *wrt);
 
 /* ------------------------------------------------------------------------- */
 /* Arithmetic (graph-building, owning)                                       */

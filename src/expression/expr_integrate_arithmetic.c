@@ -539,52 +539,64 @@ expr_t *integrate_var_rule(const expr_t *expr, const expr_t *wrt)
     return expr_integrate_as_constant(expr, wrt);
 }
 
-expr_t *integrate_add_rule(const expr_t *expr, const expr_t *wrt)
+static expr_t *integrate_sum_terms_rule(const expr_t *expr,
+                                        const expr_t *wrt,
+                                        bool subtract)
 {
     expr_t *left;
     expr_t *right;
-    expr_t *sum;
-
-    sum = integrate_exact_substitution_product(expr, wrt);
-    if (sum)
-        return sum;
+    expr_t *whole;
+    expr_t *out;
 
     left = expr_integrate_dispatch(expr->a, wrt);
-    if (!left)
-        return NULL;
     right = expr_integrate_dispatch(expr->b, wrt);
-    if (!right) {
+
+    if (!left || !right) {
+        whole = integrate_exact_substitution_product(expr, wrt);
+        if (whole) {
+            expr_free(right);
+            expr_free(left);
+            return whole;
+        }
+        if (!left)
+            left = expr_integral(expr->a, wrt);
+        if (!right)
+            right = expr_integral(expr->b, wrt);
+    }
+
+    if (!left || !right) {
+        expr_free(right);
         expr_free(left);
         return NULL;
     }
-    sum = expr_add(left, right);
+
+    out = subtract ? expr_sub(left, right) : expr_add(left, right);
     expr_free(right);
     expr_free(left);
-    return simplify_owned(sum);
+    return simplify_owned(out);
+}
+
+expr_t *integrate_add_rule(const expr_t *expr, const expr_t *wrt)
+{
+    expr_t *sum;
+
+    sum = integrate_sum_terms_rule(expr, wrt, false);
+    if (sum)
+        return sum;
+
+    return integrate_exact_substitution_product(expr, wrt);
 }
 
 expr_t *integrate_sub_rule(const expr_t *expr, const expr_t *wrt)
 {
-    expr_t *left;
-    expr_t *right;
     expr_t *diff;
 
-    diff = integrate_exact_substitution_product(expr, wrt);
+    diff = integrate_sum_terms_rule(expr, wrt, true);
     if (diff)
         return diff;
 
-    left = expr_integrate_dispatch(expr->a, wrt);
-    if (!left)
-        return NULL;
-    right = expr_integrate_dispatch(expr->b, wrt);
-    if (!right) {
-        expr_free(left);
-        return NULL;
-    }
-    diff = expr_sub(left, right);
-    expr_free(right);
-    expr_free(left);
-    return simplify_owned(diff);
+    diff = integrate_exact_substitution_product(expr, wrt);
+    return diff;
 }
 
 expr_t *integrate_neg_rule(const expr_t *expr, const expr_t *wrt)

@@ -2154,8 +2154,23 @@ __THEME_OVERRIDES__
     let currentVariables = [];
     let currentBindingKinds = new Map();
     let currentDifferentiable = true;
-    let expressionHistory = [];
-    let forwardHistory = [];
+    function createEmptyModeHistory() {
+      return {
+        expression: [],
+        equation: [],
+        matrix: [],
+        integrator: []
+      };
+    }
+
+    let expressionHistory = createEmptyModeHistory();
+    let forwardHistory = createEmptyModeHistory();
+    const modeCommittedState = {
+      expression: null,
+      equation: null,
+      matrix: null,
+      integrator: null
+    };
     let workingPrecisionBits = 256;
     let fullExpressionText = '';
     let displayedExpressionText = '';
@@ -2773,7 +2788,8 @@ __THEME_OVERRIDES__
     }
 
     function expressionForEditor(text) {
-      return String(text || '').replace(/(=\s*)NAN\b/g, '$1?');
+      return String(text || '')
+        .replace(/(=\s*)NAN\b/g, '$1?');
     }
 
     function restoreCompactBindingValues(text) {
@@ -3402,21 +3418,30 @@ __THEME_OVERRIDES__
       renderDerivativeButtons(currentVariables);
     }
 
+    function integratorEditableBindings(bindings) {
+      const boundName = String(currentIntegratorBound().name || '').trim();
+      return (Array.isArray(bindings) ? bindings : [])
+        .filter((binding) => String(binding && binding.name || '').trim() !== boundName);
+    }
+
     function applyIntegratorBindingState(data, fallbackExpression) {
       const bindingExpression = expressionWithSortedConstants(
         String(data && data.binding_expression || fallbackExpression || '').trim()
       );
       const editorBody = String(data && data.expression || expr.value || '').trim();
+      const editableBindings = integratorEditableBindings(data && data.binding_values);
 
       if (bindingExpression && bindingParts(bindingExpression)) {
         setExpressionEditor(
           bindingExpression,
-          Array.isArray(data && data.binding_values) ? data.binding_values : null,
+          editableBindings,
           editorBody || null
         );
+        if (!editableBindings.length)
+          clearVariableValues();
         modeEditorText.integrator = bindingExpression;
-      } else if (Array.isArray(data && data.binding_values)) {
-        renderVariableValues(data.binding_values);
+      } else if (editableBindings.length) {
+        renderVariableValues(editableBindings);
       } else {
         clearVariableValues();
       }
@@ -3664,11 +3689,102 @@ __THEME_OVERRIDES__
       });
     }
 
+    function modeHistoryStack(store, mode = currentMode()) {
+      return store[mode] || [];
+    }
+
+    function currentHistoryLength() {
+      return modeHistoryStack(expressionHistory).length;
+    }
+
+    function currentForwardHistoryLength() {
+      return modeHistoryStack(forwardHistory).length;
+    }
+
+    function historyStateForMode(mode = currentMode(), textOverride = null) {
+      const text = String(
+        textOverride === null || textOverride === undefined
+          ? (currentExpressionText() || expr.value || '')
+          : textOverride
+      ).trim();
+      const state = {mode, text};
+
+      if (mode === 'equation' && equationVariable) {
+        state.variable = String(equationVariable.value || DEFAULT_EQUATION_VARIABLE_TEXT).trim() ||
+          DEFAULT_EQUATION_VARIABLE_TEXT;
+      } else if (mode === 'matrix') {
+        state.operation = matrixOperation.value;
+        state.operand = String(matrixOperand.value || '').trim();
+      } else if (mode === 'integrator') {
+        state.bounds = currentIntegratorBoundsText();
+        state.intervalCap = String(validIntegratorIntervalCap(
+          integratorIntervalCap && integratorIntervalCap.value
+        ));
+      }
+
+      return state;
+    }
+
+    function historyStatesEqual(left, right) {
+      return JSON.stringify(left || null) === JSON.stringify(right || null);
+    }
+
+    function previousModeStateForHistory(nextState) {
+      const previous = modeCommittedState[nextState && nextState.mode || currentMode()];
+
+      if (!previous || historyStatesEqual(previous, nextState))
+        return null;
+      return previous;
+    }
+
+    function commitModeState(mode = currentMode(), textOverride = null) {
+      modeCommittedState[mode] = historyStateForMode(mode, textOverride);
+    }
+
+    function restoreHistoryState(state) {
+      if (!state)
+        return;
+
+      if (state.mode === 'equation' && equationVariable) {
+        equationVariable.value = String(state.variable || DEFAULT_EQUATION_VARIABLE_TEXT).trim() ||
+          DEFAULT_EQUATION_VARIABLE_TEXT;
+      } else if (state.mode === 'matrix') {
+        matrixOperation.value = state.operation || 'inverse';
+        matrixOperand.value = String(state.operand || '').trim();
+      } else if (state.mode === 'integrator') {
+        restoreIntegratorBoundsText(state.bounds || DEFAULT_INTEGRATOR_BOUNDS_TEXT);
+        if (integratorIntervalCap)
+          integratorIntervalCap.value = String(validIntegratorIntervalCap(state.intervalCap));
+      }
+
+      applyUpdatedBindingExpression(state.text || '');
+    }
+
+    function clearForwardHistory(mode = currentMode()) {
+      forwardHistory[mode] = [];
+    }
+
+    function evaluateCurrentMode(options = {}) {
+      if (currentMode() === 'equation') {
+        evaluateEquation(options);
+        return;
+      }
+      if (currentMode() === 'matrix') {
+        evaluateMatrix(options);
+        return;
+      }
+      if (currentMode() === 'integrator') {
+        evaluateIntegrator(options);
+        return;
+      }
+      evaluateExpression(options);
+    }
+
     function setBusy(isBusy) {
       const expressionMode = currentMode() === 'expression';
       run.disabled = isBusy;
-      back.disabled = isBusy || !expressionMode || expressionHistory.length === 0;
-      forward.disabled = isBusy || !expressionMode || forwardHistory.length === 0;
+      back.disabled = isBusy || currentHistoryLength() === 0;
+      forward.disabled = isBusy || currentForwardHistoryLength() === 0;
       goalSeek.disabled = isBusy || !expressionMode || !canGoalSeek();
       goalSeek.title = goalSeek.disabled && !isBusy && expressionMode
         ? 'Goal seek needs at least one variable binding'
@@ -3706,8 +3822,8 @@ __THEME_OVERRIDES__
 
     function updateHistoryButtons() {
       const expressionMode = currentMode() === 'expression';
-      back.disabled = !expressionMode || expressionHistory.length === 0;
-      forward.disabled = !expressionMode || forwardHistory.length === 0;
+      back.disabled = currentHistoryLength() === 0;
+      forward.disabled = currentForwardHistoryLength() === 0;
       lessPrecision.disabled = atMinimumPrecision();
       morePrecision.disabled = atMaximumPrecision();
       goalSeek.disabled = !expressionMode || !canGoalSeek();
@@ -3719,12 +3835,16 @@ __THEME_OVERRIDES__
         : '';
     }
 
-    function pushExpressionHistory(text) {
-      const previous = expressionHistory[expressionHistory.length - 1];
-      if (text && text !== previous) {
-        expressionHistory.push(text);
-      }
-      forwardHistory = [];
+    function pushExpressionHistory(entry) {
+      const snapshot = typeof entry === 'string'
+        ? historyStateForMode(currentMode(), entry)
+        : (entry || historyStateForMode());
+      const stack = modeHistoryStack(expressionHistory, snapshot.mode);
+      const previous = stack[stack.length - 1];
+
+      if (snapshot && snapshot.text && !historyStatesEqual(snapshot, previous))
+        stack.push(snapshot);
+      clearForwardHistory(snapshot.mode);
       updateHistoryButtons();
     }
 
@@ -4031,8 +4151,9 @@ __THEME_OVERRIDES__
       if (!resultText)
         return;
 
-      const current = currentExpressionText();
-      if (currentMode() === 'expression' && current && current !== resultText)
+      const current = historyStateForMode();
+      const next = historyStateForMode(currentMode(), resultText);
+      if (current.text && !historyStatesEqual(current, next))
         pushExpressionHistory(current);
 
       clearGoalSeekRequest();
@@ -4505,17 +4626,24 @@ __THEME_OVERRIDES__
       const text = options.reuseLastInput && lastEvaluationInputText
         ? lastEvaluationInputText
         : editorText;
+      const nextState = historyStateForMode(currentMode(), text);
+      const previousState = !options.skipHistoryUpdate
+        ? previousModeStateForHistory(nextState)
+        : null;
       if (!text) return;
       showResults();
       setBusy(true);
       setStatus('Evaluating...');
       try {
+        if (previousState)
+          pushExpressionHistory(previousState);
         const {response, data} = await fetchEvaluation(text);
 
         if (!response.ok || !data.ok) {
           setRenderedError(data.error || 'Evaluation failed');
           resetMoreDigitsButton(renderedMore, false);
           clearResultDetails({keepBindings: true});
+          commitModeState();
           setStatus('Error');
           return;
         }
@@ -4560,11 +4688,13 @@ __THEME_OVERRIDES__
         }
         currentDifferentiable = String(data.differentiable || 'yes').trim().toLowerCase() !== 'no';
         renderDerivativeButtons(currentVariables);
+        commitModeState();
         setStatus(data.partial_error ? 'Error' : 'Ready');
       } catch (err) {
         setRenderedError(String(err));
         resetMoreDigitsButton(renderedMore, false);
         clearResultDetails({keepBindings: true});
+        commitModeState();
         setStatus('Error');
       } finally {
         setBusy(false);
@@ -4573,20 +4703,27 @@ __THEME_OVERRIDES__
       }
     }
 
-    async function evaluateMatrix() {
+    async function evaluateMatrix(options = {}) {
       commitVisibleBindingInputs();
       const text = currentExpressionText() || expr.value.trim();
+      const nextState = historyStateForMode(currentMode(), text);
+      const previousState = !options.skipHistoryUpdate
+        ? previousModeStateForHistory(nextState)
+        : null;
       if (!text)
         return;
       showResults();
       setBusy(true);
       setStatus('Evaluating matrix...');
       try {
+        if (previousState)
+          pushExpressionHistory(previousState);
         const {response, data} = await fetchMatrixEvaluation();
         if (!response.ok || !data.ok) {
           setRenderedError(data.error || 'Matrix evaluation failed');
           resetMoreDigitsButton(renderedMore, false);
           clearResultDetails({keepBindings: true});
+          commitModeState();
           setStatus('Error');
           return;
         }
@@ -4615,31 +4752,42 @@ __THEME_OVERRIDES__
         currentVariables = [];
         currentDifferentiable = false;
         renderDerivativeButtons(currentVariables);
+        commitModeState();
         setStatus('Ready');
       } catch (err) {
         setRenderedError(String(err));
         resetMoreDigitsButton(renderedMore, false);
         clearResultDetails({keepBindings: true});
+        commitModeState();
         setStatus('Error');
       } finally {
         setBusy(false);
+        if (!options.skipHistoryUpdate)
+          updateHistoryButtons();
       }
     }
 
-    async function evaluateEquation() {
+    async function evaluateEquation(options = {}) {
       commitVisibleBindingInputs();
       const text = String(currentExpressionText() || expr.value || '').trim();
+      const nextState = historyStateForMode(currentMode(), text);
+      const previousState = !options.skipHistoryUpdate
+        ? previousModeStateForHistory(nextState)
+        : null;
       if (!text)
         return;
       showResults();
       setBusy(true);
       setStatus('Solving equation...');
       try {
+        if (previousState)
+          pushExpressionHistory(previousState);
         const {response, data} = await fetchEquationEvaluation();
         if (!response.ok || !data.ok) {
           setRenderedError(data.error || 'Equation solving failed');
           resetMoreDigitsButton(renderedMore, false);
           clearResultDetails({keepBindings: true});
+          commitModeState();
           setStatus('Error');
           return;
         }
@@ -4711,26 +4859,36 @@ __THEME_OVERRIDES__
         currentVariables = [];
         currentDifferentiable = false;
         renderDerivativeButtons(currentVariables);
+        commitModeState();
         setStatus('Ready');
       } catch (err) {
         setRenderedError(String(err));
         resetMoreDigitsButton(renderedMore, false);
         clearResultDetails({keepBindings: true});
+        commitModeState();
         setStatus('Error');
       } finally {
         setBusy(false);
+        if (!options.skipHistoryUpdate)
+          updateHistoryButtons();
       }
     }
 
-    async function evaluateIntegrator() {
+    async function evaluateIntegrator(options = {}) {
       commitVisibleBindingInputs();
       const text = currentExpressionText() || expr.value.trim();
+      const nextState = historyStateForMode(currentMode(), text);
+      const previousState = !options.skipHistoryUpdate
+        ? previousModeStateForHistory(nextState)
+        : null;
       if (!text)
         return;
       showResults();
       setBusy(true);
       setStatus('Integrating...');
       try {
+        if (previousState)
+          pushExpressionHistory(previousState);
         const {response, data} = await fetchIntegratorEvaluation();
         if (!response.ok || !data.ok) {
           setRenderedError(data.error || 'Integration failed');
@@ -4739,6 +4897,7 @@ __THEME_OVERRIDES__
           applyIntegratorBindingState(data, text);
           applyIntegratorResultBound(data);
           saveLastIntegratorState();
+          commitModeState();
           setStatus('Error');
           return;
         }
@@ -4795,14 +4954,18 @@ __THEME_OVERRIDES__
         currentVariables = [];
         currentDifferentiable = false;
         renderDerivativeButtons(currentVariables);
+        commitModeState();
         setStatus('Ready');
       } catch (err) {
         setRenderedError(String(err));
         resetMoreDigitsButton(renderedMore, false);
         clearResultDetails({keepBindings: true});
+        commitModeState();
         setStatus('Error');
       } finally {
         setBusy(false);
+        if (!options.skipHistoryUpdate)
+          updateHistoryButtons();
       }
     }
 
@@ -4890,7 +5053,7 @@ __THEME_OVERRIDES__
 
     run.addEventListener('click', () => {
       if (currentMode() === 'expression') {
-        forwardHistory = [];
+        clearForwardHistory();
         clearGoalSeekRequest();
         hideTargetEntry();
         evaluateExpression();
@@ -4905,30 +5068,32 @@ __THEME_OVERRIDES__
 
     back.addEventListener('click', () => {
       commitVisibleBindingInputs();
-      const previous = expressionHistory.pop();
+      const previous = modeHistoryStack(expressionHistory).pop();
       if (!previous) {
         updateHistoryButtons();
         return;
       }
 
-      const current = currentExpressionText();
-      if (current) forwardHistory.push(current);
-      setExpressionEditor(previous);
-      evaluateExpression({skipHistoryUpdate: true});
+      const current = historyStateForMode();
+      if (current.text)
+        modeHistoryStack(forwardHistory).push(current);
+      restoreHistoryState(previous);
+      evaluateCurrentMode({skipHistoryUpdate: true});
     });
 
     forward.addEventListener('click', () => {
       commitVisibleBindingInputs();
-      const next = forwardHistory.pop();
+      const next = modeHistoryStack(forwardHistory).pop();
       if (!next) {
         updateHistoryButtons();
         return;
       }
 
-      const current = currentExpressionText();
-      if (current) expressionHistory.push(current);
-      setExpressionEditor(next);
-      evaluateExpression({skipHistoryUpdate: true});
+      const current = historyStateForMode();
+      if (current.text)
+        modeHistoryStack(expressionHistory).push(current);
+      restoreHistoryState(next);
+      evaluateCurrentMode({skipHistoryUpdate: true});
     });
 
     async function takeDerivative(wrt) {
@@ -5007,7 +5172,7 @@ __THEME_OVERRIDES__
     }
 
     function evaluateFromKeyboard() {
-      forwardHistory = [];
+      clearForwardHistory();
       if (currentMode() === 'equation')
         evaluateEquation();
       else if (currentMode() === 'matrix')
@@ -5074,12 +5239,10 @@ __THEME_OVERRIDES__
     });
 
     clear.addEventListener('click', () => {
-      if (currentMode() === 'expression') {
-        const current = currentExpressionText();
-        if (current)
-          expressionHistory.push(current);
-        forwardHistory = [];
-      }
+      const current = historyStateForMode();
+      if (current.text)
+        pushExpressionHistory(current);
+      clearForwardHistory();
       expr.value = '';
       if (currentMode() === 'matrix') {
         matrixOperand.value = '';
@@ -5097,6 +5260,7 @@ __THEME_OVERRIDES__
       hideTargetEntry();
       clearResultPane();
       saveCurrentModeResultState();
+      commitModeState();
       updateHistoryButtons();
       setStatus('Ready');
       expr.focus();

@@ -4,6 +4,7 @@
 #include <ctype.h>
 
 #include "expression.h"
+#include "expression/expr_internal.h"
 #include "integrator.h"
 #include "internal/expr_internal.h"
 #include "number.h"
@@ -234,6 +235,60 @@ static expr_t *binding_or_synthetic_var(expr_bindings_t *bindings,
     if (owned)
         *owned = 1;
     return expr_new_named_var(NUM_NAN, name);
+}
+
+static int expr_var_matches(const expr_t *left, const expr_t *right)
+{
+    if (!left || !right || !expr_is_var(left) || !expr_is_var(right))
+        return 0;
+    return left == right ||
+           (left->var_id != 0u && left->var_id == right->var_id);
+}
+
+static int expr_is_bound_in_var_list(const expr_t *expr,
+                                     size_t nvars,
+                                     expr_t *const *vars)
+{
+    size_t i;
+
+    if (!expr || !expr_is_var(expr) || !vars)
+        return 0;
+
+    for (i = 0u; i < nvars; ++i) {
+        if (expr_var_matches(expr, vars[i]))
+            return 1;
+    }
+    return 0;
+}
+
+static int expr_has_unbound_parameters(const expr_t *expr,
+                                       size_t nvars,
+                                       expr_t *const *vars)
+{
+    if (!expr)
+        return 0;
+    if ((expr_is_var(expr) || expr_is_const(expr)) &&
+        !expr_is_bound_in_var_list(expr, nvars, vars) &&
+        num_is_nan(expr->c)) {
+        return 1;
+    }
+    return expr_has_unbound_parameters(expr->a, nvars, vars) ||
+           expr_has_unbound_parameters(expr->b, nvars, vars);
+}
+
+static expr_t *make_unevaluated_antiderivative(const expr_t *integrand,
+                                               const expr_t *wrt)
+{
+    expr_t *simplified = NULL;
+    expr_t *out = NULL;
+
+    if (!integrand || !wrt || !expr_is_var(wrt))
+        return NULL;
+
+    simplified = expr_simplify(integrand);
+    out = expr_integral(simplified ? simplified : integrand, wrt);
+    expr_free(simplified);
+    return out;
 }
 
 static char *number_text(number_t value)
@@ -641,6 +696,8 @@ int main(int argc, char **argv)
     int all_bounds_numeric = 1;
     int ran_numeric_integrator = 0;
     int used_symbolic_numeric_result = 0;
+    int used_unevaluated_antiderivative_fallback = 0;
+    int has_unbound_params = 0;
 
     while (argi < argc && strncmp(argv[argi], "--", 2u) == 0) {
         if (strcmp(argv[argi], "--max-intervals") == 0) {
@@ -814,6 +871,8 @@ int main(int argc, char **argv)
 
     symbolic_result = symbolic_integral(expr, ndim, vars, bound_kinds, lo_expr, hi_expr,
                                         &first_antiderivative);
+    if (!symbolic_result && !first_antiderivative && ndim == 1u)
+        first_antiderivative = make_unevaluated_antiderivative(expr, vars[0]);
     if (first_antiderivative) {
         antiderivative_text = expr_text_dup(first_antiderivative, style_UNBOUND);
         antiderivative_tex = expr_tex_body(first_antiderivative);
@@ -825,14 +884,19 @@ int main(int argc, char **argv)
         if (!num_is_nan(symbolic_num) && num_is_finite(symbolic_num) && num_is_real(symbolic_num))
             symbolic_value_text = number_text(symbolic_num);
     }
+    has_unbound_params = expr_has_unbound_parameters(expr, ndim, vars);
 
     if (all_bounds_numeric && symbolic_value_text) {
         used_symbolic_numeric_result = 1;
         intg_rc = 0;
     } else if (symbolic_result) {
         intg_rc = 0;
+    } else if (first_antiderivative && ndim == 1u &&
+               (!all_bounds_numeric || has_unbound_params)) {
+        used_unevaluated_antiderivative_fallback = 1;
+        intg_rc = 0;
     } else if (all_bounds_numeric && ndim == 1u) {
-        intg_rc = intg_single_integral(ig, expr, vars[0], lo_num[0], hi_num[0],
+        intg_rc = intg_integral(ig, expr, vars[0], lo_num[0], hi_num[0],
                                    &value_num, &error_num);
         ran_numeric_integrator = 1;
     } else if (all_bounds_numeric) {
@@ -866,7 +930,9 @@ int main(int argc, char **argv)
                                                 var_names,
                                                 (const char *const *)lo_tex_inputs,
                                                 (const char *const *)hi_tex_inputs) : NULL;
-    if (symbolic_tex && all_bounds_indefinite(ndim, bound_kinds))
+    if (used_unevaluated_antiderivative_fallback)
+        tex_text = dup_string(antiderivative_tex ? antiderivative_tex : "");
+    else if (symbolic_tex && all_bounds_indefinite(ndim, bound_kinds))
         tex_text = combine_antiderivative_tex(base_tex_text, symbolic_tex);
     else
         tex_text = symbolic_tex ? combine_equation_tex(base_tex_text, symbolic_tex) : NULL;
@@ -891,6 +957,8 @@ int main(int argc, char **argv)
     if (!ran_numeric_integrator) {
         if (used_symbolic_numeric_result)
             printf("status      symbolic exact result\n");
+        else if (used_unevaluated_antiderivative_fallback)
+            printf("status      symbolic antiderivative fallback\n");
         else if (ndim == 1u && bound_kinds[0] == BOUND_KIND_INDEFINITE)
             printf("status      symbolic antiderivative\n");
         else if (ndim == 1u && bound_kinds[0] == BOUND_KIND_UPPER_ONLY)

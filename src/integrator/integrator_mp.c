@@ -863,7 +863,7 @@ cleanup:
 
 static int mp_eval_multi_outer(void *ctx, const number_t x, number_t *out);
 
-int intg_single_integral(integrator_t *ig, expr_t *expr, expr_t *x_var,
+int intg_integral(integrator_t *ig, expr_t *expr, expr_t *x_var,
                        number_t a, number_t b,
                        number_t *result, number_t *error_est)
 {

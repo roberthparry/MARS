@@ -2199,6 +2199,9 @@ static void test_integrate_mixed_frequency_exp_unary(void)
         "+2*(a*cos(x)-b*sin(x)+c*(tan(x)^2+1))"
         "*(2*c*tan(x)*(tan(x)^2+1)-a*sin(x)-b*cos(x))) }",
         2.0, 3.0, 0.4, points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches_with_abc(
+        "{ a*sinh(a*x+b)*exp(cosh(a*x+b)) + c*(a*x+b)/a }",
+        2.0, 0.3, 0.7, points, sizeof(points) / sizeof(points[0]));
     assert_string_antiderivative_matches(
         "{ exp(sin(x))*(cos(x)*(cos(x)^2 - sin(x)) - sin(2*x) - cos(x)) }",
         points, sizeof(points) / sizeof(points[0]));
@@ -2596,6 +2599,47 @@ static void test_integrate_partial_fractions(void)
     num_destroy(&three_num);
 }
 
+static void test_integrate_unevaluated_integral_derivative(void)
+{
+    static const double points[] = { -1.0, -0.25, 0.5, 1.25 };
+    expr_t *x = test_expr_new_named_var_d(0.0, "x");
+    expr_t *x_sq = test_expr_pow_d(x, 2.0);
+    expr_t *integral = expr_integral(x_sq, x);
+    expr_t *deriv = integral ? expr_create_deriv(integral, x) : NULL;
+    char *text = integral ? expr_to_string(integral, style_UNBOUND) : NULL;
+
+    ASSERT_NOT_NULL(integral);
+    ASSERT_NOT_NULL(deriv);
+    ASSERT_NOT_NULL(text);
+    print_antiderivative_text("unevaluated integral", text);
+    ASSERT_TRUE(strstr(text, "∫^x t²·dt") != NULL);
+
+    for (size_t i = 0; i < sizeof(points) / sizeof(points[0]); ++i) {
+        char label[160];
+
+        test_expr_set_val_d(x, points[i]);
+        snprintf(label, sizeof(label), "d/dx integral to x at x=%g", points[i]);
+        check_q_at(__FILE__, __LINE__, 1, label,
+                   expr_eval_qf(deriv), expr_eval_qf(x_sq));
+    }
+
+    free(text);
+    expr_free(deriv);
+    expr_free(integral);
+    expr_free(x_sq);
+    expr_free(x);
+}
+
+static void test_integrate_partial_symbolic_with_unevaluated_term(void)
+{
+    static const double points[] = { -0.75, -0.2, 0.4, 1.0 };
+
+    assert_string_antiderivative_matches("{ exp(cosh(x)) + x }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_contains("{ exp(cosh(x)) + x }",
+                                          "∫^x exp(cosh(t))·dt");
+}
+
 static void test_integrate_unsupported_product_returns_null(void)
 {
     expr_t *x = test_expr_new_named_var_d(0.5, "x");
@@ -2641,5 +2685,7 @@ void test_symbolic_integration(void)
     TEST_RUN_SUBTEST(test_integrate_frequency_product_families, NULL);
     TEST_RUN_SUBTEST(test_integrate_more_by_parts, NULL);
     TEST_RUN_SUBTEST(test_integrate_partial_fractions, NULL);
+    TEST_RUN_SUBTEST(test_integrate_unevaluated_integral_derivative, NULL);
+    TEST_RUN_SUBTEST(test_integrate_partial_symbolic_with_unevaluated_term, NULL);
     TEST_RUN_SUBTEST(test_integrate_unsupported_product_returns_null, NULL);
 }

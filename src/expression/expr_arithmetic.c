@@ -76,6 +76,12 @@ static number_t eval_pow_d(expr_t *dv)
     return num_pow(expr_eval_num_internal(dv->a), dv->c);
 }
 
+static number_t eval_integral(expr_t *dv)
+{
+    (void)dv;
+    return num_clone(NUM_NAN);
+}
+
 /* ------------------------------------------------------------------------- */
 /* DERIVATIVE FUNCTIONS — lazy, stored in each node                          */
 /* ------------------------------------------------------------------------- */
@@ -842,6 +848,26 @@ static expr_t *deriv_pow_d(expr_t *dv)
     return out;
 }
 
+static bool integral_wrt_matches_current_derivative(const expr_t *bound)
+{
+    const expr_t *wrt = expr_current_wrt_internal();
+
+    if (!bound || !expr_is_var(bound))
+        return false;
+    if (!wrt)
+        return true;
+    return bound == wrt ||
+           (expr_is_var(wrt) &&
+            bound->var_id != 0 && bound->var_id == wrt->var_id);
+}
+
+static expr_t *deriv_integral(expr_t *dv)
+{
+    if (integral_wrt_matches_current_derivative(dv->b))
+        return expr_retain_expr(dv->a);
+    return expr_new_const(NUM_NAN);
+}
+
 /* ------------------------------------------------------------------------- */
 /* Operator vtable instances                                                 */
 /* ------------------------------------------------------------------------- */
@@ -958,6 +984,23 @@ const expr_ops_t ops_pow_d = {
     .fold_const_unary = NULL
 };
 
+const expr_ops_t ops_integral = {
+    .eval = eval_integral,
+    .deriv = deriv_integral,
+    /* Unevaluated integrals support symbolic d/dx via the fundamental theorem,
+     * but they are not part of the numeric reverse-mode AD pipeline. */
+    .reverse = expr_reverse_not_differentiable,
+    .kind = EXPR_KIND_INTEGRAL,
+    .arity = EXPR_OP_BINARY,
+    .diff_kind = EXPR_DIFF_SMOOTH,
+    .name = "integral",
+    .tex_name = "\\int",
+    .apply_unary = NULL,
+    .apply_binary = expr_integral,
+    .simplify = expr_simplify_binary_operator,
+    .fold_const_unary = NULL
+};
+
 const expr_ops_t ops_neg = {
     .eval = eval_neg,
     .deriv = deriv_neg,
@@ -1027,6 +1070,15 @@ expr_t *expr_pow_xp(const expr_t *a, const expr_t *b)
     expr_retain(a);
     expr_retain(b);
     return expr_new_binary_internal(&ops_pow, a, b);
+}
+
+expr_t *expr_integral(const expr_t *integrand, const expr_t *wrt)
+{
+    if (!integrand || !wrt || !expr_is_var(wrt))
+        return NULL;
+    expr_retain(integrand);
+    expr_retain(wrt);
+    return expr_new_binary_internal(&ops_integral, integrand, wrt);
 }
 
 expr_t *expr_pow(const expr_t *dv, const number_t *exponent)

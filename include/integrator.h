@@ -69,7 +69,7 @@ void intg_set_interval_count_max(integrator_t *ig, size_t max_intervals);
  *   expr_t *expr = expr_sin(x);
  *   number_t result = num_new();
  *   number_t err = num_new();
- *   intg_single_integral(ig, expr, x, num_create_from_double(0.0), NUM_PI, &result, &err);
+ *   intg_integral(ig, expr, x, num_create_from_double(0.0), NUM_PI, &result, &err);
  *   // result ≈ 2.0
  *   num_destroy(&err); num_destroy(&result);
  *   expr_free(expr); expr_free(x); num_destroy(&x0); intg_free(ig);
@@ -88,7 +88,7 @@ void intg_set_interval_count_max(integrator_t *ig, size_t max_intervals);
  * @return  1  Maximum subintervals reached before convergence.
  * @return -1  Null argument or internal allocation failure.
  */
-int intg_single_integral(integrator_t *ig, expr_t *expr, expr_t *x_var,
+int intg_integral(integrator_t *ig, expr_t *expr, expr_t *x_var,
                        number_t a, number_t b,
                        number_t *result, number_t *error_est);
 
@@ -157,7 +157,7 @@ int intg_triple_integral(integrator_t *ig, expr_t *expr,
 /**
  * @brief Integrate a expr_t expression over an N-dimensional rectangular domain.
  *
- * Generalises intg_single_integral() to arbitrary dimension N using recursive
+ * Generalises intg_integral() to arbitrary dimension N using recursive
  * applications of the same number_t adaptive engine. The outermost variable
  * (vars[ndim-1]) is adapted by bisection; all inner variables use fixed bounds.
  *

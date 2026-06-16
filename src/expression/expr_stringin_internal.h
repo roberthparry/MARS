@@ -44,6 +44,8 @@ struct expr_bindings_t {
 
 /* Binding construction from parsed symbols. */
 expr_bindings_t * symtab_build_bindings   (const symtab_t *t);
+expr_bindings_t * symtab_build_bindings_for_expr(const symtab_t *t,
+                                                 const expr_t *expr);
 expr_bindings_t * single_binding_from_node(expr_t *node);
 
 #endif /* EXPR_STRINGIN_INTERNAL_H */

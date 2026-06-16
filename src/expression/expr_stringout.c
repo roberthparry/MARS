@@ -878,6 +878,96 @@ static void emit_tex_expr_abs(const expr_t *f, sbuf_t *b, int parent_prec);
 void emit_func(const expr_t *f, sbuf_t *b, int parent_prec);
 static void emit_func_abs(const expr_t *f, sbuf_t *b, int parent_prec);
 
+static expr_t *expr_integral_dummy_var(const expr_t *wrt)
+{
+    const char *name = "t";
+
+    if (wrt && wrt->name && strcmp(wrt->name, "t") == 0)
+        name = "u";
+    return expr_new_named_var(NUM_ZERO, name);
+}
+
+static expr_t *expr_integral_display_integrand(const expr_t *integral,
+                                               expr_t *dummy)
+{
+    expr_t *out;
+
+    if (!integral || !dummy)
+        return NULL;
+    out = expr_substitute(integral->a, integral->b, dummy);
+    return out ? out : expr_clone(integral->a);
+}
+
+static void emit_expr_integral(const expr_t *f, sbuf_t *b, int parent_prec)
+{
+    int need = PREC_UNARY < parent_prec;
+    expr_t *dummy = expr_integral_dummy_var(f->b);
+    expr_t *integrand = expr_integral_display_integrand(f, dummy);
+    const expr_t *display_integrand = integrand ? integrand : f->a;
+    const expr_t *display_dummy = dummy ? dummy : f->b;
+    bool group_integrand = expr_is_addsub(display_integrand);
+
+    if (need)
+        sbuf_putc(b, '(');
+    sbuf_puts(b, "∫^");
+    emit_expr(f->b, b, PREC_LOWEST);
+    sbuf_putc(b, ' ');
+    if (group_integrand)
+        sbuf_putc(b, '(');
+    emit_expr(display_integrand, b, PREC_LOWEST);
+    if (group_integrand)
+        sbuf_putc(b, ')');
+    sbuf_puts(b, "·d");
+    emit_expr(display_dummy, b, PREC_LOWEST);
+    if (need)
+        sbuf_putc(b, ')');
+
+    expr_free(integrand);
+    expr_free(dummy);
+}
+
+static void emit_tex_integral(const expr_t *f, sbuf_t *b, int parent_prec)
+{
+    int need = PREC_UNARY < parent_prec;
+    expr_t *dummy = expr_integral_dummy_var(f->b);
+    expr_t *integrand = expr_integral_display_integrand(f, dummy);
+    const expr_t *display_integrand = integrand ? integrand : f->a;
+    const expr_t *display_dummy = dummy ? dummy : f->b;
+
+    if (need)
+        sbuf_puts(b, "\\left(");
+    sbuf_puts(b, "\\int^{");
+    emit_tex_expr(f->b, b, PREC_LOWEST);
+    sbuf_puts(b, "} ");
+    emit_tex_expr(display_integrand, b, PREC_LOWEST);
+    sbuf_puts(b, "\\, d");
+    emit_tex_expr(display_dummy, b, PREC_LOWEST);
+    if (need)
+        sbuf_puts(b, "\\right)");
+
+    expr_free(integrand);
+    expr_free(dummy);
+}
+
+static void emit_func_integral(const expr_t *f, sbuf_t *b)
+{
+    expr_t *dummy = expr_integral_dummy_var(f->b);
+    expr_t *integrand = expr_integral_display_integrand(f, dummy);
+    const expr_t *display_integrand = integrand ? integrand : f->a;
+    const expr_t *display_dummy = dummy ? dummy : f->b;
+
+    sbuf_puts(b, "integral(");
+    emit_func(f->b, b, PREC_LOWEST);
+    sbuf_puts(b, ", ");
+    emit_func(display_integrand, b, PREC_LOWEST);
+    sbuf_puts(b, ", ");
+    emit_func(display_dummy, b, PREC_LOWEST);
+    sbuf_putc(b, ')');
+
+    expr_free(integrand);
+    expr_free(dummy);
+}
+
 static void emit_tex_sqrt_power(const expr_t *base,
                                 sbuf_t *b,
                                 int parent_prec,
@@ -1905,6 +1995,11 @@ void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec)
         return;
     }
 
+    if (expr_is_op(f, &ops_integral)) {
+        emit_tex_integral(f, b, parent_prec);
+        return;
+    }
+
     if (expr_is_neg(f)) {
         int need = PREC_UNARY < parent_prec;
         const expr_t *a = f->a;
@@ -2288,6 +2383,11 @@ void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
     /* Atoms */
     if (expr_is_const(f) || expr_is_var(f)) {
         emit_atom((expr_t *)f, b);
+        return;
+    }
+
+    if (expr_is_op(f, &ops_integral)) {
+        emit_expr_integral(f, b, parent_prec);
         return;
     }
 
@@ -2698,6 +2798,11 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
 
     if (expr_is_var(f)) {
         emit_name_func(b, f->name ? f->name : "x");
+        return;
+    }
+
+    if (expr_is_op(f, &ops_integral)) {
+        emit_func_integral(f, b);
         return;
     }
 
