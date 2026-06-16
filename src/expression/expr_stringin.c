@@ -28,6 +28,13 @@
  *               on a sub-expression, in place of Unicode superscripts
  *               (², ³, …)
  *
+ *   @S^x ... dt integral sign stand-in for an unevaluated integral
+ *
+ *   integral(x, f_expr, t)
+ *               ASCII function-style form for an unevaluated integral with
+ *               upper variable x, displayed integrand f_expr, and dummy
+ *               integration variable t
+ *
  * Bracketed names ([my var], [2pi], …) are supported for identifiers that
  * do not fit the single-letter-plus-subscript rule.
  *
@@ -168,6 +175,10 @@ static string_view_t expr_parse_text(const expr_parse_state_t *p)
 
 static expr_t *parse_addexpr(expr_parse_state_t *p);
 static expr_t *parse_signed_power(expr_parse_state_t *p);
+
+static expr_t *build_ascii_integral_expr(const expr_t *upper,
+                                         const expr_t *display_integrand,
+                                         const expr_t *dummy);
 static expr_t *parse_signed_power_operand(expr_parse_state_t *p);
 static size_t scan_unicode_fraction_len_view(string_view_t view, size_t pos);
 static size_t scan_special_number_literal_len_view(string_view_t view, size_t pos);
@@ -177,6 +188,8 @@ static expr_t *parse_expression_view(string_view_t text,
                                      const char *context_label,
                                      int report_errors);
 static void symtab_discard_storage(symtab_t *t);
+
+#define INTEGRAL_SIGN_CODEPOINT 0x222Bu
 
 /* True if we're at the middle dot · (U+00B7, UTF-8: 0xC2 0xB7). */
 static int at_middle_dot(const expr_parse_state_t *p)
@@ -202,7 +215,8 @@ static int can_start_factor(const expr_parse_state_t *p)
     if (scan_unicode_fraction_len_view(text, pos) > 0u) return 1;
     if (scan_special_number_literal_len_view(text, pos) > 0u) return 1;
     if (expr_parse_peek_value(p, &uc, &len) &&
-        (fs_is_letter(uc) || uc == 0x230A || uc == 0x2308))
+        (fs_is_letter(uc) || uc == 0x230A || uc == 0x2308 ||
+         uc == INTEGRAL_SIGN_CODEPOINT))
         return 1;
     if (!expr_parse_peek_ascii(p, &c))
         return 0;
@@ -541,6 +555,28 @@ static string_t *read_any_name_cursor(string_cursor_t *cursor)
     return expr_parse_read_name(cursor, false);
 }
 
+static expr_t *lookup_symbol_text_normalised(const symtab_t *syms,
+                                             const string_t *name)
+{
+    expr_t *sym;
+
+    if (!syms || !name)
+        return NULL;
+
+    sym = symtab_lookup_text(syms, name);
+    if (!sym) {
+        string_t *canonical = expr_default_constant_canonical_name_text(name);
+        string_t *normalised = expr_normalise_name_text(canonical);
+
+        if (normalised)
+            sym = symtab_lookup_text(syms, normalised);
+        string_free(normalised);
+        string_free(canonical);
+    }
+
+    return sym;
+}
+
 static string_view_t scan_binding_value(string_cursor_t *cursor)
 {
     size_t start_pos = string_cursor_position(cursor);
@@ -710,11 +746,71 @@ static size_t scan_ascii_identifier_len_view(string_view_t text, size_t pos)
     return end - pos;
 }
 
+static bool integral_ascii_standin_starts_view(string_view_t text, size_t pos)
+{
+    unsigned char first = 0u;
+    unsigned char second = 0u;
+    unsigned char next = 0u;
+
+    if (!expr_parse_view_peek_ascii(text, pos, &first) || first != '@' ||
+        !expr_parse_view_peek_ascii(text, pos + 1u, &second) ||
+        (second != 'S' && second != 's') ||
+        !expr_parse_view_peek_ascii(text, pos + 2u, &next))
+        return false;
+
+    return next == '^' || isspace(next);
+}
+
+static const func_entry_t *lookup_special_func_call_view(string_view_t text,
+                                                         size_t pos,
+                                                         size_t *paren_pos_out)
+{
+    static const func_entry_t s_integral_entry = {
+        .kw = "integral",
+        .arity = 3u,
+        .tfn = build_ascii_integral_expr
+    };
+    static const func_entry_t *const entries[] = {
+        &s_integral_entry
+    };
+    size_t id_len = scan_ascii_identifier_len_view(text, pos);
+    string_view_t ident;
+
+    if (paren_pos_out)
+        *paren_pos_out = SIZE_MAX;
+    if (id_len == 0u)
+        return NULL;
+
+    ident = string_view_slice(text, pos, id_len);
+    for (size_t i = 0u; i < sizeof(entries) / sizeof(entries[0]); ++i) {
+        const func_entry_t *entry = entries[i];
+        size_t paren_pos = SIZE_MAX;
+
+        if (!string_view_equals_literal(ident, entry->kw))
+            continue;
+        if (!func_call_start_view(text, pos, entry, &paren_pos))
+            return NULL;
+        if (paren_pos_out)
+            *paren_pos_out = paren_pos;
+        return entry;
+    }
+
+    return NULL;
+}
+
 static const func_entry_t *lookup_fixed_func_call_view(string_view_t text,
                                                        size_t pos,
                                                        size_t *paren_pos_out)
 {
     size_t id_len = scan_ascii_identifier_len_view(text, pos);
+
+    {
+        const func_entry_t *special =
+            lookup_special_func_call_view(text, pos, paren_pos_out);
+
+        if (special)
+            return special;
+    }
 
     if (paren_pos_out)
         *paren_pos_out = SIZE_MAX;
@@ -1077,6 +1173,377 @@ static expr_t *parse_enclosed_addexpr(expr_parse_state_t *p,
     return inner;
 }
 
+static int parse_integral_is_space(uint32_t cp)
+{
+    return (cp >= 0x09u && cp <= 0x0du) ||
+           cp == 0x20u ||
+           cp == 0x85u ||
+           cp == 0xa0u ||
+           cp == 0x1680u ||
+           (cp >= 0x2000u && cp <= 0x200au) ||
+           cp == 0x2028u ||
+           cp == 0x2029u ||
+           cp == 0x202fu ||
+           cp == 0x205fu ||
+           cp == 0x3000u;
+}
+
+static int parse_integral_after_differential_boundary(string_view_t text,
+                                                      size_t pos)
+{
+    string_cursor_t *cursor = string_cursor_new_view(text);
+    unsigned char c = 0u;
+    uint32_t cp = 0u;
+    size_t cp_len = 0u;
+    int ok = 0;
+
+    if (!cursor)
+        return 0;
+    if (string_cursor_seek(cursor, pos) != 0) {
+        string_cursor_free(cursor);
+        return 0;
+    }
+
+    string_cursor_skip_spaces(cursor);
+    pos = string_cursor_position(cursor);
+    if (string_cursor_done(cursor)) {
+        string_cursor_free(cursor);
+        return 1;
+    }
+
+    if (expr_parse_view_peek_ascii(text, pos, &c)) {
+        ok = (c == ')' || c == '}' || c == ']' ||
+              c == ',' || c == ';' || c == '|' ||
+              c == '+' || c == '-' || c == '*' || c == '/');
+    } else if (expr_parse_view_peek_value(text, pos, &cp, &cp_len)) {
+        (void)cp_len;
+        ok = (cp == 0x00B7u);
+    }
+
+    string_cursor_free(cursor);
+    return ok;
+}
+
+static int parse_integral_try_differential_at(string_view_t text,
+                                              size_t start,
+                                              size_t diff_pos,
+                                              size_t integrand_end,
+                                              size_t *integrand_end_out,
+                                              size_t *after_diff_out,
+                                              string_t **dummy_name_out)
+{
+    string_cursor_t *marker = string_cursor_new_view(text);
+    size_t marker_pos;
+
+    if (!marker)
+        return 0;
+    if (string_cursor_seek(marker, diff_pos) != 0) {
+        string_cursor_free(marker);
+        return 0;
+    }
+
+    string_cursor_skip_spaces(marker);
+    marker_pos = string_cursor_position(marker);
+    if (marker_pos <= start ||
+        !expr_parse_cursor_consume_char(marker, 'd')) {
+        string_cursor_free(marker);
+        return 0;
+    }
+
+    {
+        string_t *name = read_any_name_cursor(marker);
+
+        if (name) {
+            size_t after = string_cursor_position(marker);
+
+            if (parse_integral_after_differential_boundary(text, after)) {
+                if (integrand_end_out)
+                    *integrand_end_out = integrand_end;
+                if (after_diff_out)
+                    *after_diff_out = after;
+                if (dummy_name_out)
+                    *dummy_name_out = name;
+                else
+                    string_free(name);
+                string_cursor_free(marker);
+                return 1;
+            }
+            string_free(name);
+        }
+    }
+
+    string_cursor_free(marker);
+    return 0;
+}
+
+static int parse_integral_find_differential(expr_parse_state_t *p,
+                                            size_t start,
+                                            size_t *integrand_end_out,
+                                            size_t *after_diff_out,
+                                            string_t **dummy_name_out)
+{
+    string_view_t text = expr_parse_text(p);
+    size_t len = string_view_length(text);
+    size_t pos = start;
+    int depth = 0;
+
+    if (integrand_end_out)
+        *integrand_end_out = SIZE_MAX;
+    if (after_diff_out)
+        *after_diff_out = SIZE_MAX;
+    if (dummy_name_out)
+        *dummy_name_out = NULL;
+
+    while (pos < len) {
+        uint32_t cp = 0u;
+        size_t cp_len = 0u;
+        unsigned char c = 0u;
+
+        if (!expr_parse_view_peek_value(text, pos, &cp, &cp_len) || cp_len == 0u)
+            break;
+
+        if (expr_parse_view_peek_ascii(text, pos, &c)) {
+            if (c == '(' || c == '[') {
+                depth++;
+                pos += cp_len;
+                continue;
+            }
+            if (c == ')' || c == ']') {
+                if (depth == 0)
+                    break;
+                depth--;
+                pos += cp_len;
+                continue;
+            }
+            if (depth == 0 &&
+                ((parse_integral_is_space(cp) &&
+                  parse_integral_try_differential_at(text,
+                                                     start,
+                                                     pos,
+                                                     pos,
+                                                     integrand_end_out,
+                                                     after_diff_out,
+                                                     dummy_name_out)) ||
+                 ((c == '*' || c == '.') &&
+                  parse_integral_try_differential_at(text,
+                                                     start,
+                                                     pos + cp_len,
+                                                     pos,
+                                                     integrand_end_out,
+                                                     after_diff_out,
+                                                     dummy_name_out)) ||
+                 (c == 'd' &&
+                  parse_integral_try_differential_at(text,
+                                                     start,
+                                                     pos,
+                                                     pos,
+                                                     integrand_end_out,
+                                                     after_diff_out,
+                                                     dummy_name_out)))) {
+                return 1;
+            }
+            pos += cp_len;
+            continue;
+        }
+
+        if (depth == 0 &&
+            cp == 0x00B7u &&
+            parse_integral_try_differential_at(text,
+                                               start,
+                                               pos + cp_len,
+                                               pos,
+                                               integrand_end_out,
+                                               after_diff_out,
+                                               dummy_name_out)) {
+            return 1;
+        }
+
+        if (cp == 0x230Au || cp == 0x2308u)
+            depth++;
+        else if (cp == 0x230Bu || cp == 0x2309u) {
+            if (depth == 0)
+                break;
+            depth--;
+        }
+        pos += cp_len;
+    }
+
+    return 0;
+}
+
+static expr_t *parse_integral_substitute_dummy(const expr_t *expr,
+                                               const expr_t *dummy,
+                                               expr_t *upper)
+{
+    expr_t *left;
+    expr_t *right;
+    expr_t *out;
+
+    if (!expr)
+        return NULL;
+    if (expr == dummy ||
+        (expr_is_var(expr) &&
+         expr_is_var(dummy) &&
+         expr->var_id != 0 &&
+         expr->var_id == dummy->var_id)) {
+        expr_retain(upper);
+        return upper;
+    }
+
+    if (expr->ops->arity == EXPR_OP_ATOM) {
+        expr_retain(expr);
+        return (expr_t *)expr;
+    }
+
+    if (expr_is_op(expr, &ops_pow_d)) {
+        left = parse_integral_substitute_dummy(expr->a, dummy, upper);
+        if (!left)
+            return NULL;
+        out = expr_pow(left, &expr->c);
+        expr_free(left);
+        return out;
+    }
+
+    if (expr->ops->arity == EXPR_OP_UNARY && expr->ops->apply_unary) {
+        left = parse_integral_substitute_dummy(expr->a, dummy, upper);
+        if (!left)
+            return NULL;
+        out = expr->ops->apply_unary(left);
+        expr_free(left);
+        return out;
+    }
+
+    if (expr->ops->arity == EXPR_OP_BINARY && expr->ops->apply_binary) {
+        left = parse_integral_substitute_dummy(expr->a, dummy, upper);
+        right = parse_integral_substitute_dummy(expr->b, dummy, upper);
+        if (!left || !right) {
+            expr_free(left);
+            expr_free(right);
+            return NULL;
+        }
+        out = expr->ops->apply_binary(left, right);
+        expr_free(left);
+        expr_free(right);
+        return out;
+    }
+
+    return NULL;
+}
+
+static expr_t *build_ascii_integral_expr(const expr_t *upper,
+                                         const expr_t *display_integrand,
+                                         const expr_t *dummy)
+{
+    expr_t *integrand;
+    expr_t *result;
+
+    if (!expr_is_var(upper) || !expr_is_var(dummy))
+        return NULL;
+
+    integrand = parse_integral_substitute_dummy(display_integrand,
+                                                dummy,
+                                                (expr_t *)upper);
+    if (!integrand)
+        return NULL;
+
+    result = expr_integral(integrand, upper);
+    expr_free(integrand);
+    return result;
+}
+
+static expr_t *parse_integral_atom(expr_parse_state_t *p)
+{
+    string_view_t text = expr_parse_text(p);
+    uint32_t cp = 0u;
+    size_t cp_len = 0u;
+    size_t integrand_start;
+    size_t integrand_end = SIZE_MAX;
+    size_t after_diff = SIZE_MAX;
+    string_t *dummy_name = NULL;
+    expr_t *upper = NULL;
+    expr_t *display_integrand = NULL;
+    expr_t *dummy = NULL;
+    expr_t *result = NULL;
+    expr_t *sym;
+
+    if (expr_parse_peek_value(p, &cp, &cp_len) &&
+        cp == INTEGRAL_SIGN_CODEPOINT) {
+        expr_parse_skip(p, cp_len);
+    } else if (integral_ascii_standin_starts_view(text, expr_parse_pos(p))) {
+        expr_parse_skip(p, 2u);
+    } else {
+        set_error(p, "expected integral");
+        return NULL;
+    }
+
+    expr_parse_skip_spaces(p);
+    if (!parse_required_char(p, '^', "expected '^' after integral sign"))
+        return NULL;
+    expr_parse_skip_spaces(p);
+
+    upper = parse_signed_power_operand(p);
+    if (!upper)
+        return NULL;
+    if (!expr_is_var(upper)) {
+        expr_free(upper);
+        set_error(p, "expected variable after integral upper marker");
+        return NULL;
+    }
+
+    expr_parse_skip_spaces(p);
+    integrand_start = expr_parse_pos(p);
+    if (!parse_integral_find_differential(p, integrand_start,
+                                          &integrand_end,
+                                          &after_diff,
+                                          &dummy_name)) {
+        expr_free(upper);
+        set_error(p, "expected differential after integral integrand");
+        return NULL;
+    }
+
+    display_integrand = parse_expression_view(
+        string_view_slice(text,
+                          integrand_start,
+                          integrand_end - integrand_start),
+        p->syms,
+        "expr_from_string",
+        1);
+    if (!display_integrand) {
+        expr_free(upper);
+        string_free(dummy_name);
+        return NULL;
+    }
+
+    sym = lookup_symbol_text_normalised(p->syms, dummy_name);
+    if (sym) {
+        dummy = sym;
+        expr_retain(dummy);
+    } else {
+        dummy = expr_new_named_var_text(NUM_ZERO, dummy_name);
+    }
+    if (!dummy) {
+        expr_free(display_integrand);
+        expr_free(upper);
+        string_free(dummy_name);
+        set_error(p, "could not create integral dummy variable");
+        return NULL;
+    }
+
+    result = build_ascii_integral_expr(upper, display_integrand, dummy);
+    expr_free(dummy);
+    expr_free(display_integrand);
+    expr_free(upper);
+    string_free(dummy_name);
+
+    if (!result) {
+        set_error(p, "could not construct integral expression");
+        return NULL;
+    }
+
+    expr_parse_set_pos(p, after_diff);
+    return result;
+}
+
 /* ------------------------------------------------------------------ */
 /* Atom parser                                                          */
 /* ------------------------------------------------------------------ */
@@ -1137,6 +1604,11 @@ static expr_t *parse_atom(expr_parse_state_t *p)
             ? apply_unary_preserving_constexpr(&ops_floor, inner, expr_floor)
             : apply_unary_preserving_constexpr(&ops_ceil, inner, expr_ceil);
         return result;
+    }
+
+    if ((cp_len > 0 && cp == INTEGRAL_SIGN_CODEPOINT) ||
+        integral_ascii_standin_starts_view(text, pos)) {
+        return parse_integral_atom(p);
     }
 
     /* Numeric atom (integer/decimal/rational, optionally with trailing i) */
@@ -1322,6 +1794,10 @@ static expr_t *parse_atom(expr_parse_state_t *p)
                 expr_free(a);
                 expr_free(b);
                 expr_free(c);
+                if (!result) {
+                    set_error(p, "could not construct ternary function");
+                    return NULL;
+                }
                 if (!string_view_is_empty(symbolic_exp_text)) {
                     symbolic_exponent = parse_expression_view(symbolic_exp_text,
                                                               p->syms,
@@ -1409,16 +1885,7 @@ static expr_t *parse_atom(expr_parse_state_t *p)
         return NULL;
     }
 
-    expr_t *sym = symtab_lookup_text(p->syms, name);
-    if (!sym) {
-        string_t *canonical = expr_default_constant_canonical_name_text(name);
-        string_t *normalised = expr_normalise_name_text(canonical);
-
-        if (normalised)
-            sym = symtab_lookup_text(p->syms, normalised);
-        string_free(normalised);
-        string_free(canonical);
-    }
+    expr_t *sym = lookup_symbol_text_normalised(p->syms, name);
     if (!sym) {
         if (!p->error) {
             p->error = 1;
@@ -1561,7 +2028,7 @@ static expr_t *parse_signed_power_operand(expr_parse_state_t *p)
 }
 
 /* ------------------------------------------------------------------ */
-/* Multiplication / division (implicit, '*', '·', '/')                 */
+/* Multiplication / division (implicit, '*', '.', '·', '/')            */
 /* ------------------------------------------------------------------ */
 
 static expr_t *parse_mulexpr(expr_parse_state_t *p)
@@ -1582,9 +2049,9 @@ static expr_t *parse_mulexpr(expr_parse_state_t *p)
             continue;
         }
 
-        /* Explicit '*' or '/' accepted with or without surrounding spaces,
-         * e.g. "x*y", "x * y", "x/y", and "x / y". Peek past spaces before
-         * committing so a failed probe leaves the cursor untouched. */
+        /* Explicit '*', '.', or '/' accepted with or without surrounding
+         * spaces, e.g. "x*y", "x.y", "x / y", and "x/y". Peek past spaces
+         * before committing so a failed probe leaves the cursor untouched. */
         {
             string_cursor_t *scan = string_cursor_clone(p->cursor);
             unsigned char op = 0u;
@@ -1595,16 +2062,16 @@ static expr_t *parse_mulexpr(expr_parse_state_t *p)
             }
             string_cursor_skip_spaces(scan);
             if (string_cursor_peek_ascii(scan, &op) &&
-                (op == '*' || op == '/')) {
+                (op == '*' || op == '.' || op == '/')) {
                 string_cursor_seek(p->cursor, string_cursor_position(scan));
                 string_cursor_free(scan);
                 expr_parse_skip(p, 1u);
                 expr_parse_skip_spaces(p);
                 expr_t *rhs = parse_signed_power(p);
                 if (!rhs) { expr_free(lhs); return NULL; }
-                lhs = (op == '*')
-                    ? apply_binary_preserving_constexpr(&ops_mul, lhs, rhs, expr_mul)
-                    : apply_binary_preserving_constexpr(&ops_div, lhs, rhs, expr_div);
+                lhs = (op == '/')
+                    ? apply_binary_preserving_constexpr(&ops_div, lhs, rhs, expr_div)
+                    : apply_binary_preserving_constexpr(&ops_mul, lhs, rhs, expr_mul);
                 continue;
             }
             string_cursor_free(scan);
@@ -2254,7 +2721,7 @@ static expr_t *expr_from_string_view_impl(string_view_t source,
                                                &syms, "expr_from_string", 1);
             }
             if (result && bindings_out)
-                bindings = symtab_build_bindings(&syms);
+                bindings = symtab_build_bindings_for_expr(&syms, result);
             if (result && bindings_out)
                 symtab_discard_storage(&syms);
             else
@@ -2324,7 +2791,7 @@ static expr_t *expr_from_string_view_impl(string_view_t source,
 
     expr_t *result = parse_expression_view(expr_view, &syms, "expr_from_string", 1);
     if (result && bindings_out) {
-        bindings = symtab_build_bindings(&syms);
+        bindings = symtab_build_bindings_for_expr(&syms, result);
     }
 
     if (result && bindings_out) {

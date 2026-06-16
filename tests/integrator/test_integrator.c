@@ -526,7 +526,7 @@ void test_polynomial(void) {
     expr_t *expr = expr_mul(x, x);
 
     number_t result, err;
-    int s = intg_single_integral(ig, expr, x,
+    int s = intg_integral(ig, expr, x,
                                test_num_from_double(0.0), test_num_from_double(1.0),
                                &result, &err);
     number_t expected = num_create_from_string("0.33333333333333333333333333333333333333");
@@ -571,9 +571,9 @@ void test_single_integral_num_high_precision_log(void) {
     }
 
     intg_set_interval_count_max(ig, 5000u);
-    s = intg_single_integral(ig, expr, x, one, two, &result, &err);
+    s = intg_integral(ig, expr, x, one, two, &result, &err);
     if (s != 0 && s != 1) {
-        test_set_failure_detailf("intg_single_integral_num returned %d", s);
+        test_set_failure_detailf("intg_integral returned %d", s);
         test_mark_failure(__FILE__, __LINE__, "multiprecision integral did not converge");
         goto cleanup;
     }
@@ -611,7 +611,7 @@ void test_sin(void) {
     expr_t *expr = expr_sin(x);
     intg_set_tolerance(ig, num_create_from_string("1e-21"), num_create_from_string("1e-21"));
     number_t result, err;
-    int s = intg_single_integral(ig, expr, x,
+    int s = intg_integral(ig, expr, x,
                         test_num_from_double(0.0), NUM_PI,
                         &result, &err);
     number_t expected = test_num_from_double(2.0);
@@ -634,7 +634,7 @@ void test_exp(void) {
     expr_t *expr = expr_exp(x);
     intg_set_tolerance(ig, num_create_from_string("1e-21"), num_create_from_string("1e-21"));
     number_t result, err;
-    int s = intg_single_integral(ig, expr, x,
+    int s = intg_integral(ig, expr, x,
                         test_num_from_double(0.0), test_num_from_double(1.0),
                         &result, &err);
     number_t expected = num_sub(NUM_E, test_num_from_double(1.0));
@@ -660,7 +660,7 @@ void test_arctan(void) {
     expr_t *expr = expr_div(one, denom);
     intg_set_tolerance(ig, num_create_from_string("1e-21"), num_create_from_string("1e-21"));
     number_t result, err;
-    int s = intg_single_integral(ig, expr, x,
+    int s = intg_integral(ig, expr, x,
                         test_num_from_double(-1.0), test_num_from_double(1.0),
                         &result, &err);
     printf("  ∫₋₁¹ 1/(1+x²) dx\n");
@@ -685,7 +685,7 @@ void test_log(void) {
     expr_t *expr = expr_log(x);
     intg_set_tolerance(ig, num_create_from_string("1e-21"), num_create_from_string("1e-21"));
     number_t result, err;
-    int s = intg_single_integral(ig, expr, x,
+    int s = intg_integral(ig, expr, x,
                         test_num_from_double(1.0), NUM_E,
                         &result, &err);
     number_t expected = test_num_from_double(1.0);
@@ -708,7 +708,7 @@ void test_constant(void) {
     expr_t *expr = test_expr_new_const_d(1.0);
 
     number_t result, err;
-    int s = intg_single_integral(ig, expr, x,
+    int s = intg_integral(ig, expr, x,
                                test_num_from_double(0.0), test_num_from_double(5.0),
                                &result, &err);
     number_t expected = test_num_from_double(5.0);
@@ -730,7 +730,7 @@ void test_linear(void) {
     expr_t *x    = test_expr_new_var_num(test_num_from_double(0.0));
 
     number_t result, err;
-    int s = intg_single_integral(ig, x, x,
+    int s = intg_integral(ig, x, x,
                                test_num_from_double(0.0), test_num_from_double(5.0),
                                &result, &err);
     number_t expected = num_create_from_string("12.5");
@@ -753,7 +753,7 @@ void test_set_tol(void) {
     intg_set_tolerance(ig, loose, loose);
 
     number_t result, err;
-    int s = intg_single_integral(ig, expr, x,
+    int s = intg_integral(ig, expr, x,
                         test_num_from_double(0.0), NUM_PI,
                         &result, &err);
     printf("  ∫₀^π sin(x) dx  (tolerance 1e-10)\n");
@@ -775,7 +775,7 @@ void test_max_intervals(void) {
     intg_set_interval_count_max(ig, 1);
 
     number_t result, err;
-    int s = intg_single_integral(ig, expr, x,
+    int s = intg_integral(ig, expr, x,
                         test_num_from_double(0.0), NUM_PI,
                         &result, &err);
     size_t n = intg_get_interval_count_used(ig);
@@ -799,7 +799,7 @@ void test_last_intervals(void) {
     expr_t *x = test_expr_new_var_num(test_num_from_double(0.0));
     expr_t *expr = expr_exp(x);
     number_t result, err;
-    int s = intg_single_integral(ig, expr, x,
+    int s = intg_integral(ig, expr, x,
                         test_num_from_double(0.0), test_num_from_double(1.0),
                         &result, &err);
     size_t n = intg_get_interval_count_used(ig);
@@ -819,12 +819,12 @@ void test_null_safety(void) {
     expr_t *expr = expr_exp(x);
     number_t result;
     /* NULL expr */
-    int s = intg_single_integral(ig, NULL, x,
+    int s = intg_integral(ig, NULL, x,
                         test_num_from_double(0.0), test_num_from_double(1.0),
                         &result, NULL);
     ASSERT_TRUE(s == -1);
     /* NULL result */
-    s = intg_single_integral(ig, expr, x,
+    s = intg_integral(ig, expr, x,
                     test_num_from_double(0.0), test_num_from_double(1.0),
                     NULL, NULL);
     ASSERT_TRUE(s == -1);
@@ -840,7 +840,7 @@ void test_reversed_limits(void) {
     expr_t *expr = expr_mul(x, x);
 
     number_t result, err;
-    int s = intg_single_integral(ig, expr, x,
+    int s = intg_integral(ig, expr, x,
                                test_num_from_double(1.0), test_num_from_double(0.0),
                                &result, &err);
     number_t expected = num_create_from_string("-0.33333333333333333333333333333333333333");
@@ -857,7 +857,7 @@ void test_reversed_limits(void) {
 }
 
 /* -----------------------------------------------------------------------
- * intg_single_integral tests (Turán T15/T4 rule)
+ * intg_integral tests (Turán T15/T4 rule)
  * --------------------------------------------------------------------- */
 
 void test_expr_sin(void) {
@@ -867,7 +867,7 @@ void test_expr_sin(void) {
     expr_t *expr = expr_sin(x);
 
     number_t result, err;
-    int s = intg_single_integral(ig, expr, x,
+    int s = intg_integral(ig, expr, x,
                                test_num_from_double(0.0), NUM_PI,
                                &result, &err);
     number_t expected = test_num_from_double(2.0);
@@ -891,7 +891,7 @@ void test_expr_exp(void) {
     expr_t *expr = expr_exp(x);
 
     number_t result, err;
-    int s = intg_single_integral(ig, expr, x,
+    int s = intg_integral(ig, expr, x,
                                test_num_from_double(0.0), test_num_from_double(1.0),
                                &result, &err);
     number_t expected = num_sub(NUM_E, test_num_from_double(1.0));
@@ -918,7 +918,7 @@ void test_expr_arctan(void) {
     expr_t *expr = expr_div(one, denom);
 
     number_t result, err;
-    int s = intg_single_integral(ig, expr, x,
+    int s = intg_integral(ig, expr, x,
                                test_num_from_double(-1.0), test_num_from_double(1.0),
                                &result, &err);
     printf("  ∫₋₁¹ 1/(1+x²) dx  [Turán T15/T4]\n");
@@ -944,19 +944,19 @@ void test_expr_null_safety(void) {
     number_t result;
 
     /* NULL integrator */
-    int s = intg_single_integral(NULL, expr, x,
+    int s = intg_integral(NULL, expr, x,
                                test_num_from_double(0.0), test_num_from_double(1.0),
                                &result, NULL);
     ASSERT_TRUE(s == -1);
 
     /* NULL expr */
-    s = intg_single_integral(ig, NULL, x,
+    s = intg_integral(ig, NULL, x,
                            test_num_from_double(0.0), test_num_from_double(1.0),
                            &result, NULL);
     ASSERT_TRUE(s == -1);
 
     /* NULL result */
-    s = intg_single_integral(ig, expr, x,
+    s = intg_integral(ig, expr, x,
                            test_num_from_double(0.0), test_num_from_double(1.0),
                            NULL, NULL);
     ASSERT_TRUE(s == -1);
@@ -1243,7 +1243,7 @@ void test_multi_null_safety(void) {
 }
 
 void test_multi_nd1(void) {
-    /* ndim=1 degenerates to intg_single_integral: ∫₀¹ exp(x) dx = e−1 */
+    /* ndim=1 degenerates to intg_integral: ∫₀¹ exp(x) dx = e−1 */
     integrator_t *ig = intg_new();
     expr_t *x    = test_expr_new_var_num(test_num_from_double(0.0));
     expr_t *expr = expr_exp(x);
@@ -3116,71 +3116,130 @@ void test_multi_2d_affine_poly_times_sin_affine_combination(void) {
 static void example_integrator(void) {
     /* ∫₋₃³ exp(-x²) dx ≈ √π * erf(3) */
     integrator_t *ig = intg_new();
-    expr_t *x = test_expr_new_var_num(test_num_from_double(0.0));
+    number_t x0 = num_create_from_long(0);
+    number_t lo = num_create_from_long(-3);
+    number_t hi = num_create_from_long(3);
+    expr_t *x = expr_new_named_var(x0, "x");
     expr_t *x2 = expr_mul(x, x);
     expr_t *negx2 = expr_neg(x2);
     expr_t *expr = expr_exp(negx2);
-    number_t result, err;
+    number_t result = num_new();
+    number_t err = num_new();
 
-    intg_set_tolerance(ig, num_create_from_string("1e-21"), num_create_from_string("1e-21"));
-    intg_single_integral(ig, expr, x,
-                       test_num_from_double(-3.0), test_num_from_double(3.0),
-                       &result, &err);
+    intg_integral(ig, expr, x, lo, hi, &result, &err);
 
-    test_num_printf_compat("∫₋₃³ exp(-x²) dx ≈ %q\n", result);
-    test_num_printf_compat("  error estimate   ≈ %q\n", err);
+    num_printf("∫₋₃³ exp(-x²) dx ≈ %.64N\n", result);
+    num_printf("  error estimate   ≈ %.6N\n", err);
     printf("  subintervals used: %zu\n", intg_get_interval_count_used(ig));
 
+    num_destroy(&err);
+    num_destroy(&result);
     expr_free(expr);
     expr_free(negx2);
     expr_free(x2);
+    expr_free(x);
+    num_destroy(&hi);
+    num_destroy(&lo);
+    num_destroy(&x0);
+    intg_free(ig);
+}
+
+static void example_expression_backed_integration(void) {
+    /* ∫₀¹ exp(x) dx = e - 1, at default 1e-27 tolerance */
+    integrator_t *ig = intg_new();
+    number_t x0 = num_create_from_long(0);
+    number_t lo = num_create_from_long(0);
+    number_t hi = num_create_from_long(1);
+    expr_t *x = expr_new_var(x0);
+    expr_t *expr = expr_exp(x);
+    number_t result = num_new();
+    number_t err = num_new();
+
+    intg_integral(ig, expr, x, lo, hi, &result, &err);
+
+    num_printf("∫₀¹ exp(x) dx ≈ %.64N\n", result);
+    num_printf("  error estimate   ≈ %.6N\n", err);
+    printf("  subintervals used: %zu\n", intg_get_interval_count_used(ig));
+
+    num_destroy(&err);
+    num_destroy(&result);
+    expr_free(expr);
+    expr_free(x);
+    num_destroy(&hi);
+    num_destroy(&lo);
+    num_destroy(&x0);
+    intg_free(ig);
+}
+
+static void example_symbolic_fast_path(void) {
+    integrator_t *ig = intg_new();
+    number_t x0 = num_create_from_long(0);
+    number_t y0 = num_create_from_long(0);
+    number_t two = num_create_from_long(2);
+    number_t three = num_create_from_long(3);
+    expr_t *x = expr_new_var(x0);
+    expr_t *y = expr_new_var(y0);
+    expr_t *two_y = expr_mul_num(y, &two);
+    expr_t *sum = expr_add(x, two_y);
+    expr_t *affine = expr_add_num(sum, &three);
+    expr_t *exp_affine = expr_exp(affine);
+    expr_t *expr = expr_mul(affine, exp_affine);
+    expr_t *vars[2] = { x, y };
+    number_t lo[2] = { num_create_from_long(0), num_create_from_long(0) };
+    number_t hi[2] = { num_create_from_long(1), num_create_from_long(1) };
+    number_t result = num_new();
+    number_t err = num_new();
+
+    intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
+
+    num_printf("result = %.64N\n", result);
+    printf("intervals = %zu\n", intg_get_interval_count_used(ig));
+
+    num_destroy(&err);
+    num_destroy(&result);
+    num_destroy(&hi[1]);
+    num_destroy(&hi[0]);
+    num_destroy(&lo[1]);
+    num_destroy(&lo[0]);
+    num_destroy(&three);
+    num_destroy(&two);
+    num_destroy(&y0);
+    num_destroy(&x0);
+    expr_free(expr);
+    expr_free(exp_affine);
+    expr_free(affine);
+    expr_free(sum);
+    expr_free(two_y);
+    expr_free(y);
     expr_free(x);
     intg_free(ig);
 }
 
 static void example_ctx(void) {
-    /* ∫₀¹ x^2.5 dx = 1/3.5 */
+    /* ∫₀¹ x^2.5 dx = 1 / 3.5 */
     integrator_t *ig = intg_new();
-    expr_t *x = test_expr_new_var_num(test_num_from_double(0.0));
-    expr_t *expr = expr_pow_d(x, 2.5);
-    number_t result, err;
+    number_t x0 = num_create_from_long(0);
+    number_t lo = num_create_from_long(0);
+    number_t hi = num_create_from_long(1);
+    number_t exponent = num_create_from_string("2.5");
+    expr_t *x = expr_new_named_var(x0, "x");
+    expr_t *expr = expr_pow(x, &exponent);
+    number_t result = num_new();
+    number_t err = num_new();
 
-    intg_set_tolerance(ig, num_create_from_string("1e-21"), num_create_from_string("1e-21"));
-    intg_single_integral(ig, expr, x,
-                       test_num_from_double(0.0), test_num_from_double(1.0),
-                       &result, &err);
+    intg_integral(ig, expr, x, lo, hi, &result, &err);
 
-    test_num_printf_compat("∫₀¹ x^2.5 dx ≈ %q\n", result);
-    test_num_printf_compat("  error estimate   ≈ %q\n", err);
+    num_printf("∫₀¹ x^2.5 dx ≈ %.64N\n", result);
+    num_printf("  error estimate   ≈ %.6N\n", err);
 
+    num_destroy(&err);
+    num_destroy(&result);
     expr_free(expr);
     expr_free(x);
-    intg_free(ig);
-}
-
-static void example_integrator_expr(void) {
-    /* ∫₋₃³ exp(-x²) dx using Turán T15/T4 with automatic differentiation.
-     * Exact value: √π · erf(3).  Compare interval count with example_integrator(). */
-    integrator_t *ig = intg_new();
-
-    expr_t *x    = test_expr_new_var_num(test_num_from_double(0.0));
-    expr_t *x2   = expr_mul(x, x);
-    expr_t *negx2 = expr_neg(x2);
-    expr_t *expr = expr_exp(negx2);
-
-    number_t result, err;
-    intg_single_integral(ig, expr, x,
-                       test_num_from_double(-3.0), test_num_from_double(3.0),
-                       &result, &err);
-
-    test_num_printf_compat("∫₋₃³ exp(-x²) dx ≈ %q\n", result);
-    test_num_printf_compat("  error estimate   ≈ %q\n", err);
-    printf("  subintervals used: %zu\n", intg_get_interval_count_used(ig));
-
-    expr_free(expr);
-    expr_free(negx2);
-    expr_free(x2);
-    expr_free(x);
+    num_destroy(&exponent);
+    num_destroy(&hi);
+    num_destroy(&lo);
+    num_destroy(&x0);
     intg_free(ig);
 }
 
@@ -3274,9 +3333,11 @@ int tests_main(void) {
     printf(C_BOLD C_YELLOW "Running README examples...\n" C_RESET);
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_integrator, readme_examples,
                                   "integrator,readme,output");
-    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_ctx, readme_examples,
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_expression_backed_integration, readme_examples,
                                   "integrator,readme,output");
-    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_integrator_expr, readme_examples,
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_symbolic_fast_path, readme_examples,
+                                  "integrator,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_ctx, readme_examples,
                                   "integrator,readme,output");
 
     return TESTS_EXIT_CODE();

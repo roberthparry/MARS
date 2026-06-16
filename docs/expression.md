@@ -34,7 +34,8 @@ of these graphs.
 - expression construction from constants, variables, and operators
 - lazy evaluation with result caching
 - symbolic differentiation to arbitrary order
-- symbolic antiderivatives for conservative, reliable expression families
+- symbolic antiderivatives for conservative, reliable expression families,
+  including unevaluated integral fallback nodes for partially supported sums
 - evaluation of derivatives for scalar outputs
 - elementary and special functions exposed through the `expr` builder API and
   evaluated through `number_t`
@@ -89,8 +90,8 @@ end-user arithmetic code.
 
 `expr_integrate(expr, wrt)` tries to build an owning antiderivative expression
 with respect to the explicit variable node `wrt`. It returns NULL when no safe
-symbolic rule is known, which lets callers fall back to the numerical
-`integrator_t` path without guessing.
+symbolic rule is known for a fully non-additive expression, which lets callers
+fall back to the numerical `integrator_t` path without guessing.
 
 The current rule set is intentionally conservative. It covers constants,
 sums/differences, constant multiples, powers of the integration variable,
@@ -101,13 +102,31 @@ layer for rational functions whose denominator factors into supported affine
 linear terms. Affine `exp`, `sin`, `cos`, `tan`, `sinh`, `cosh`, and `tanh`
 terms such as `sin(3*x - 1)` are part of that fast path.
 
+For additive expressions, supported terms may still be integrated even when
+other terms are not. In that case the unsupported additive pieces are left as
+unevaluated `expr_integral(...)` nodes inside the returned antiderivative. An
+unevaluated integral node represents `∫^x f(t)·dt`: it is symbolically
+differentiable with respect to its upper variable by the fundamental theorem
+of calculus, but direct numeric evaluation of the node itself returns `NaN`.
+
 The implementation is split into logical integration modules:
 
 - `expr_integrate.c` owns the public orchestration and dispatch.
-- `expr_integrate_primitives.c` holds local primitive antiderivatives.
-- `expr_integrate_by_parts.c` holds integration-by-parts rules.
-- `expr_integrate_rational.c` holds rational factoring and partial fractions.
-- `expr_integrate_support.c` holds shared affine and ownership helpers.
+- `expr_integrate_arithmetic.c` handles additive decomposition, constant
+  factors, and shared arithmetic flow.
+- `expr_integrate_primitives.c`, `expr_integrate_power.c`,
+  `expr_integrate_logarithmic.c`, and `expr_integrate_inverse.c` hold local
+  primitive antiderivatives.
+- `expr_integrate_trigonometric.c`, `expr_integrate_hyperbolic.c`,
+  `expr_integrate_exponential.c`, and `expr_integrate_special.c` cover
+  function-family rules.
+- `expr_integrate_affine.c`, `expr_integrate_substitution.c`,
+  `expr_integrate_by_parts.c`, and the quadratic/general-quadratic helpers
+  handle structured transformations.
+- `expr_integrate_partialfrac.c` holds rational factoring and partial
+  fractions.
+- `expr_integrate_support.c` and `expr_integrate_owned.c` hold shared helper
+  logic.
 
 Rules are dispatched through tables where that keeps the code readable; more
 specialised pattern code remains local to the module that owns the rule family.
@@ -135,7 +154,9 @@ original expression at representative points.
 The integration tests include round-trip checks of the form
 `expr -> antiderivative -> derivative -> expr` at representative numeric
 points. Unsupported expressions deliberately return `NULL` rather than an
-unsafe symbolic guess.
+unsafe symbolic guess, unless they appear as additive subterms inside a larger
+expression that can safely return a partial antiderivative with unevaluated
+integral nodes.
 
 ## Example: Constructing an Expression
 
@@ -489,6 +510,11 @@ requested variable. It evaluates the primal once, then performs a reverse-mode
 adjoint sweep over the existing DAG and returns owning `number_t` results for
 the primal and requested first derivatives.
 
+That reverse-mode path is numeric rather than purely symbolic. Unevaluated
+integral nodes therefore remain symbolically differentiable through
+`expr_create_deriv(...)`, but they are not expected to participate in
+reverse-mode evaluation of a numeric primal.
+
 ### Ownership and Reference Counting
 
 Every owning handle has reference count ≥ 1. Arithmetic and function builders
@@ -681,7 +707,10 @@ decide whether derivative controls should be shown.
 
 `style_FUNCTION` prints a small C-like evaluable sketch. Untyped parameters are
 treated as differentiable variables, while `const` parameters and bindings are
-displayed as non-differentiable constants:
+displayed as non-differentiable constants. Unevaluated integral nodes are
+printed in function form as `integral(upper, integrand, dummy)` and in
+expression form as `∫^upper integrand d<dummy>`; for example,
+`∫^x exp(cosh(t))·dt`:
 
 ```text
 expression expr(x, y, const c₀) {
@@ -720,10 +749,17 @@ expression expr_eval() {
   - trailing ASCII digits are canonicalised to Unicode subscripts, so
     `a1`, `a12`, and `@pi2` normalise to `a₁`, `a₁₂`, and `π₂`
   - `*` for explicit multiplication
+  - `.` as an ASCII multiplication stand-in when it appears between factors,
+    so `x.y` parses like `x·y` while decimal numerals such as `1.5` remain
+    decimal numbers
   - `^N` or `^1.5` for ASCII exponents after a variable, constant, or parenthesised sub-expression
   - `sin^2(x)` style ASCII exponents on function names
   - postfix factorial `x!`, which lowers to `gamma(x + 1)` when it remains
     symbolic and differentiable
+  - unevaluated integral forms `integral(x, f_expr, t)`, `@S^x f(t)dt`,
+    `@S^x f(t)*dt`, `@S^x f(t).dt`, `@S^x f(t)·dt`, `∫^x f(t)dt`, `∫^x f(t)*dt`, and
+    `∫^x f(t)·dt`; the spaced form `∫^x f(t) dt` is also accepted on input,
+    but the canonical pretty-printed form uses `·dt`
   - `sqrt(x)` or `√(x)` for square roots
   - `ln(x)` for natural logarithm; `log(x)`, `lg(x)`, and `log10(x)` for common logarithm
   - `gamma(x)` and `Γ(x)` for the gamma function

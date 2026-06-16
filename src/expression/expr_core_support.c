@@ -462,6 +462,28 @@ static const greek_entry_t *lookup_greek_name_text(const string_t *name)
     return NULL;
 }
 
+size_t expr_match_leading_greek_alias_len(const string_cursor_t *cursor,
+                                          string_pos_t pos)
+{
+    size_t best = 0u;
+
+    if (!cursor)
+        return 0u;
+
+    for (size_t i = 0u; i < GREEK_HT_SIZE; ++i) {
+        const greek_entry_t *entry = &s_greek_names[i];
+
+        if (!entry->ascii)
+            continue;
+        if (entry->klen > best &&
+            string_cursor_match_at(cursor, pos, entry->ascii)) {
+            best = entry->klen;
+        }
+    }
+
+    return best;
+}
+
 static int expr_string_all_ascii_upper(const string_t *text)
 {
     string_cursor_t *cursor;

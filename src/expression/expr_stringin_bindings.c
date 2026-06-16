@@ -190,6 +190,69 @@ expr_bindings_t *symtab_build_bindings(const symtab_t *t)
     return bindings;
 }
 
+static int symtab_binding_is_needed_for_expr(const expr_t *expr,
+                                             const expr_t *node)
+{
+    expr_t *vars[1];
+    bool used[1];
+
+    if (!node)
+        return 0;
+    if (!expr || !expr_is_var(node))
+        return 1;
+    if (node->binding_expr)
+        return 1;
+
+    vars[0] = (expr_t *)node;
+    return expr_collect_var_usage(expr, 1u, vars, used) && used[0];
+}
+
+expr_bindings_t *symtab_build_bindings_for_expr(const symtab_t *t,
+                                                const expr_t *expr)
+{
+    expr_bindings_t *bindings;
+    size_t count = 0u;
+    size_t out = 0u;
+
+    if (!t || t->count <= 0)
+        return NULL;
+
+    for (int i = 0; i < t->count; ++i)
+        if (symtab_binding_is_needed_for_expr(expr, t->entries[i].node))
+            count++;
+
+    if (count == 0u)
+        return NULL;
+
+    bindings = bindings_create(count);
+    if (!bindings)
+        return NULL;
+
+    for (int i = 0; i < t->count; ++i) {
+        expr_binding_entry_t *entry;
+
+        if (!symtab_binding_is_needed_for_expr(expr, t->entries[i].node))
+            continue;
+
+        entry = &bindings->entries[out++];
+        entry->name = string_clone(t->entries[i].name);
+        if (!entry->name) {
+            bindings_destroy_partial(bindings);
+            return NULL;
+        }
+        entry->expr = t->entries[i].node;
+        expr_retain(entry->expr);
+        entry->is_constant = (t->entries[i].node &&
+                              t->entries[i].node->ops == &ops_const);
+        if (bindings_index_entry(bindings, entry) != 0) {
+            bindings_destroy_partial(bindings);
+            return NULL;
+        }
+    }
+
+    return bindings;
+}
+
 expr_bindings_t *single_binding_from_node(expr_t *node)
 {
     expr_bindings_t *bindings;

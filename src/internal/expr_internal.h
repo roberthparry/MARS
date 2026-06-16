@@ -149,6 +149,8 @@ string_t *expr_normalise_name_text(const string_t *name);
 char *expr_take_string_as_c_string(string_t *text);
 char *expr_normalise_binding_name(const char *name);
 string_t *expr_normalise_binding_name_text(const string_t *name);
+size_t expr_match_leading_greek_alias_len(const string_cursor_t *cursor,
+                                          string_pos_t pos);
 int expr_is_default_constant_name(const char *name);
 int expr_is_default_constant_name_text(const string_t *name);
 const char *expr_default_constant_canonical_name(const char *name);

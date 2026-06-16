@@ -128,6 +128,7 @@ typedef enum {
     EXPR_KIND_SHL,
     EXPR_KIND_SHR,
     EXPR_KIND_FACTORS,
+    EXPR_KIND_INTEGRAL,
     EXPR_KIND_COUNT
 } expr_op_kind_t;
 
@@ -414,6 +415,7 @@ extern const expr_ops_t ops_sub;
 extern const expr_ops_t ops_mul;
 extern const expr_ops_t ops_div;
 extern const expr_ops_t ops_neg;
+extern const expr_ops_t ops_integral;
 
 /* Trigonometric */
 extern const expr_ops_t ops_sin;

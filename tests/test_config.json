@@ -281,6 +281,7 @@
         "test_from_string_pure_const": true,
         "test_from_string_round_trips": true,
         "test_from_string_special_functions": true,
+        "test_from_string_unevaluated_integral": true,
         "test_from_text_api": true
       }
     }
@@ -325,6 +326,7 @@
         "test_integrate_negative_quadratic_exponential": true,
         "test_integrate_other_variable_as_constant": true,
         "test_integrate_partial_fractions": true,
+        "test_integrate_partial_symbolic_with_unevaluated_term": true,
         "test_integrate_poly_over_centered_quadratic": true,
         "test_integrate_poly_times_affine_power": true,
         "test_integrate_polynomial_sum": true,
@@ -335,6 +337,7 @@
         "test_integrate_symbolic_power_exponent": true,
         "test_integrate_symbolic_shifted_sqrt": true,
         "test_integrate_trig_power_products": true,
+        "test_integrate_unevaluated_integral_derivative": true,
         "test_integrate_unsupported_product_returns_null": true
       }
     }
@@ -720,8 +723,9 @@
     "readme_examples": {
       "enabled": true,
       "example_ctx": true,
+      "example_expression_backed_integration": true,
       "example_integrator": true,
-      "example_integrator_expr": true
+      "example_symbolic_fast_path": true
     },
     "tests": {
       "enabled": true,

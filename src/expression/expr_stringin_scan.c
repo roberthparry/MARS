@@ -386,42 +386,10 @@ static string_t *read_bracketed_name(string_cursor_t *cursor)
     return name;
 }
 
-static bool cursor_alias_is_accepted(const string_cursor_t *cursor,
-                                     string_pos_t alias_pos)
+static size_t cursor_alias_name_len(const string_cursor_t *cursor,
+                                    string_pos_t alias_pos)
 {
-    static const expr_parse_literal_t accepted[] = {
-        { .text = "pi" },
-        { .text = "phi" },
-        { .text = "gamma" },
-        { .text = "tau" }
-    };
-
-    for (size_t i = 0u; i < sizeof(accepted) / sizeof(accepted[0]); ++i) {
-        string_pos_t suffix_pos = alias_pos + expr_parse_literal_len(accepted[i]);
-        unsigned char suffix = 0u;
-        uint32_t suffix_value = 0;
-        size_t suffix_len = 0u;
-        bool suffix_is_subscript;
-
-        if (!string_cursor_match_at(cursor, alias_pos, accepted[i].text))
-            continue;
-
-        suffix_is_subscript =
-            expr_parse_cursor_peek_value_at(cursor,
-                                            suffix_pos,
-                                            &suffix_value,
-                                            &suffix_len) &&
-            expr_parse_is_subscript_digit(suffix_value);
-
-        if (!string_cursor_peek_ascii_at(cursor, suffix_pos, &suffix) ||
-            suffix == '_' ||
-            isdigit(suffix) ||
-            suffix_is_subscript ||
-            (!isalnum(suffix) && suffix != '_'))
-            return true;
-    }
-
-    return false;
+    return expr_match_leading_greek_alias_len(cursor, alias_pos);
 }
 
 static string_t *read_simple_name(string_cursor_t *cursor,
@@ -438,6 +406,7 @@ static string_t *read_simple_name(string_cursor_t *cursor,
     size_t width = 0u;
     unsigned char b = 0u;
     bool allow_alias = false;
+    size_t alias_len = 0u;
 
     scan = string_cursor_clone(cursor);
     if (!scan)
@@ -461,7 +430,11 @@ static string_t *read_simple_name(string_cursor_t *cursor,
     }
 
     if (string_cursor_peek_ascii(scan, &b) && b == '@') {
-        if (!cursor_alias_is_accepted(scan, string_cursor_position(scan) + 1u)) {
+        string_pos_t alias_start;
+
+        alias_start = string_cursor_position(scan) + 1u;
+        alias_len = cursor_alias_name_len(scan, alias_start);
+        if (alias_len == 0u) {
             string_free(out);
             string_cursor_free(scan);
             return NULL;
@@ -473,33 +446,33 @@ static string_t *read_simple_name(string_cursor_t *cursor,
         }
         string_cursor_skip(scan, 1u);
         allow_alias = true;
-    }
+        if (string_cursor_append_slice_between(out,
+                                               alias_start,
+                                               alias_start + alias_len,
+                                               cursor) != 0) {
+            string_free(out);
+            string_cursor_free(scan);
+            return NULL;
+        }
+        string_cursor_skip(scan, alias_len);
+    } else {
+        if (!expr_parse_cursor_peek_value(scan, &value, &width) ||
+            !fs_is_letter(value)) {
+            string_free(out);
+            string_cursor_free(scan);
+            return NULL;
+        }
 
-    if (!expr_parse_cursor_peek_value(scan, &value, &width) ||
-        !fs_is_letter(value)) {
-        string_free(out);
-        string_cursor_free(scan);
-        return NULL;
-    }
+        {
+            string_pos_t start_pos = string_cursor_position(scan);
 
-    if (allow_alias) {
-        while (string_cursor_peek_ascii(scan, &b) && isalpha(b)) {
-            if (string_append_char(out, (char)b) != 0) {
+            string_cursor_skip(scan, width);
+            if (string_cursor_append_slice_between(
+                    out, start_pos, string_cursor_position(scan), cursor) != 0) {
                 string_free(out);
                 string_cursor_free(scan);
                 return NULL;
             }
-            string_cursor_skip(scan, 1u);
-        }
-    } else {
-        string_pos_t start_pos = string_cursor_position(scan);
-
-        string_cursor_skip(scan, width);
-        if (string_cursor_append_slice_between(
-                out, start_pos, string_cursor_position(scan), cursor) != 0) {
-            string_free(out);
-            string_cursor_free(scan);
-            return NULL;
         }
     }
 
