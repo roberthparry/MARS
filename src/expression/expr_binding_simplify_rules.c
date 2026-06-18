@@ -580,6 +580,54 @@ static bool binding_string_is_decimal_literal(const string_t *text)
     return have_digit;
 }
 
+static expr_binding_expr_t *binding_expr_clone_matching_decimal_literal(
+    const expr_binding_expr_t *expr,
+    const number_t *target)
+{
+    expr_binding_expr_t *match = NULL;
+
+    if (!expr || !target)
+        return NULL;
+
+    if (expr->kind == EXPR_BINDING_EXPR_NUMBER) {
+        string_t *text;
+        number_t value;
+
+        text = string_new_with(expr->u.text);
+        if (text && binding_string_is_decimal_literal(text)) {
+            value = num_create_from_string(expr->u.text);
+            if (!num_is_nan(value) && num_eq(value, *target))
+                match = expr_binding_expr_clone(expr);
+            num_destroy(&value);
+        }
+        string_free(text);
+        return match;
+    }
+
+    switch (expr->kind) {
+    case EXPR_BINDING_EXPR_NEG:
+        return binding_expr_clone_matching_decimal_literal(
+            expr->u.unary.child, target);
+    case EXPR_BINDING_EXPR_ADD:
+    case EXPR_BINDING_EXPR_SUB:
+    case EXPR_BINDING_EXPR_MUL:
+    case EXPR_BINDING_EXPR_DIV:
+    case EXPR_BINDING_EXPR_BINARY_OP:
+        match = binding_expr_clone_matching_decimal_literal(
+            expr->u.binary.left, target);
+        return match ? match : binding_expr_clone_matching_decimal_literal(
+            expr->u.binary.right, target);
+    case EXPR_BINDING_EXPR_POWI:
+        return binding_expr_clone_matching_decimal_literal(
+            expr->u.powi.base, target);
+    case EXPR_BINDING_EXPR_UNARY_OP:
+        return binding_expr_clone_matching_decimal_literal(
+            expr->u.unary_op.child, target);
+    default:
+        return NULL;
+    }
+}
+
 static string_t *binding_negated_decimal_text(const char *text)
 {
     string_t *input = text ? string_new_with(text) : NULL;
@@ -707,7 +755,11 @@ expr_binding_expr_t *binding_expr_fold_to_number_owned(expr_binding_expr_t *expr
 {
     value = num_scope_detach(value);
 
-    expr_binding_expr_t *folded = binding_expr_number_from_value(value);
+    expr_binding_expr_t *folded =
+        binding_expr_clone_matching_decimal_literal(expr, &value);
+
+    if (!folded)
+        folded = binding_expr_number_from_value(value);
 
     num_destroy(&value);
     expr_binding_expr_free(expr);

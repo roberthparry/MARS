@@ -215,12 +215,21 @@ const expr_t *expr_get_deriv(const expr_t *expr, const expr_t *wrt)
 
 void expr_set_val(expr_t *dv, number_t value)
 {
+    bool preserve_binding_expr = false;
+
     if (!dv)
         abort();
     if (dv->ops != &ops_var &&
         !(dv->ops == &ops_const && dv->name && *dv->name))
         abort();
-    if (dv->binding_expr) {
+    if (dv->binding_expr &&
+        expr_binding_expr_is_numeric_literal(dv->binding_expr)) {
+        number_t binding_value = expr_binding_expr_eval(dv->binding_expr);
+
+        preserve_binding_expr = num_eq(binding_value, value);
+        num_destroy(&binding_value);
+    }
+    if (dv->binding_expr && !preserve_binding_expr) {
         expr_binding_expr_free(dv->binding_expr);
         dv->binding_expr = NULL;
     }

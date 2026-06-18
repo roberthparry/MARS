@@ -395,6 +395,7 @@ done:
 
 char *expr_number_to_string_local(number_t value)
 {
+    const char *constant_name;
     char *text;
     string_t *text_obj;
     size_t bits;
@@ -418,6 +419,11 @@ char *expr_number_to_string_local(number_t value)
     if (num_eq(value, NUM_NEG_I)) {
         num_destroy(&value);
         return expr_tostring_xstrdup("-i");
+    }
+    constant_name = !num_is_exact(value) ? num_constant_name(value) : NULL;
+    if (constant_name) {
+        num_destroy(&value);
+        return expr_tostring_xstrdup(constant_name);
     }
 
     if (!scientific &&

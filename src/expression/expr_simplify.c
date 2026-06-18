@@ -2143,6 +2143,13 @@ expr_t *expr_simplify_passthrough(const expr_t *dv, expr_t *a, expr_t *b)
     return (expr_t *)dv;
 }
 
+expr_t *expr_simplify_rebuild_binary_operator(const expr_t *dv, expr_t *a, expr_t *b)
+{
+    if (!dv || !a || !b)
+        return expr_simplify_passthrough(dv, a, b);
+    return expr_new_binary_internal(dv->ops, a, b);
+}
+
 expr_t *expr_simplify_unary_operator(const expr_t *dv, expr_t *a, expr_t *b)
 {
     NUM_SCOPE(scope);

@@ -5,7 +5,7 @@
 bool depends_on_wrt(const expr_t *expr, const expr_t *wrt)
 {
     expr_t *vars[1];
-    bool used[1];
+    bool used[1] = { false };
 
     vars[0] = (expr_t *)wrt;
     return expr_collect_var_usage(expr, 1u, vars, used) && used[0];

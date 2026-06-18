@@ -2076,6 +2076,135 @@ static void test_from_string_unevaluated_integral(void)
     bindings = NULL;
     expr = NULL;
 
+    expr = expr_from_string("{ @S^3 sin(t) dt }", &bindings);
+    text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
+    func_text = expr ? expr_to_string(expr, style_FUNCTION) : NULL;
+    if (text && strcmp(text, "∫^3 sin(t)·dt") == 0) {
+        printf(C_BOLD C_GREEN "PASS" C_RESET
+               " unevaluated integral literal upper bound parses without bindings\n");
+        printf(C_BOLD "  expr   " C_RESET "%s\n\n", text);
+    } else {
+        printf(C_BOLD C_RED "FAIL" C_RESET
+               " unevaluated integral literal upper bound parses without bindings %s:%d:1\n",
+               __FILE__, __LINE__);
+        printf(C_BOLD "  got    " C_RESET "%s\n\n", text ? text : "(null)");
+        TEST_FAIL();
+    }
+    if (func_text && strstr(func_text, "integral(3, sin(t), t)") != NULL) {
+        printf(C_BOLD C_GREEN "PASS" C_RESET
+               " unevaluated integral literal upper bound uses integral(3, ...)\n");
+        printf(C_BOLD "  expr   " C_RESET "%s\n\n", func_text);
+    } else {
+        printf(C_BOLD C_RED "FAIL" C_RESET
+               " unevaluated integral literal upper bound uses integral(3, ...) %s:%d:1\n",
+               __FILE__, __LINE__);
+        printf(C_BOLD "  got    " C_RESET "%s\n\n", func_text ? func_text : "(null)");
+        TEST_FAIL();
+    }
+    free(func_text);
+    free(text);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+    bindings = NULL;
+    expr = NULL;
+
+    expr = expr_from_string("{ @S^3_1 1/t dt }", &bindings);
+    text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
+    func_text = expr ? expr_to_string(expr, style_FUNCTION) : NULL;
+    if (text && strcmp(text, "∫^3_1 1/t·dt") == 0) {
+        printf(C_BOLD C_GREEN "PASS" C_RESET
+               " unevaluated integral with explicit lower bound parses\n");
+        printf(C_BOLD "  expr   " C_RESET "%s\n\n", text);
+    } else {
+        printf(C_BOLD C_RED "FAIL" C_RESET
+               " unevaluated integral with explicit lower bound parses %s:%d:1\n",
+               __FILE__, __LINE__);
+        printf(C_BOLD "  got    " C_RESET "%s\n\n", text ? text : "(null)");
+        TEST_FAIL();
+    }
+    if (func_text && strstr(func_text, "integral(1, 3, 1 / t, t)") != NULL) {
+        printf(C_BOLD C_GREEN "PASS" C_RESET
+               " unevaluated integral with explicit lower bound uses integral(lower, upper, ...)\n");
+        printf(C_BOLD "  expr   " C_RESET "%s\n\n", func_text);
+    } else {
+        printf(C_BOLD C_RED "FAIL" C_RESET
+               " unevaluated integral with explicit lower bound uses integral(lower, upper, ...) %s:%d:1\n",
+               __FILE__, __LINE__);
+        printf(C_BOLD "  got    " C_RESET "%s\n\n", func_text ? func_text : "(null)");
+        TEST_FAIL();
+    }
+    free(func_text);
+    free(text);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+    bindings = NULL;
+    expr = NULL;
+
+    expr = expr_from_string("{ ∫_1^3 1/t·dt }", &bindings);
+    text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
+    if (text && strcmp(text, "∫^3_1 1/t·dt") == 0) {
+        printf(C_BOLD C_GREEN "PASS" C_RESET
+               " unevaluated integral standard lower-then-upper form parses\n");
+        printf(C_BOLD "  expr   " C_RESET "%s\n\n", text);
+    } else {
+        printf(C_BOLD C_RED "FAIL" C_RESET
+               " unevaluated integral standard lower-then-upper form parses %s:%d:1\n",
+               __FILE__, __LINE__);
+        printf(C_BOLD "  got    " C_RESET "%s\n\n", text ? text : "(null)");
+        TEST_FAIL();
+    }
+    free(text);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+    bindings = NULL;
+    expr = NULL;
+
+    expr = expr_from_string("{ @S_1^3 1/t.dt }", &bindings);
+    text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
+    if (text && strcmp(text, "∫^3_1 1/t·dt") == 0) {
+        printf(C_BOLD C_GREEN "PASS" C_RESET
+               " unevaluated integral lower-then-upper @S form parses with full-stop differential\n");
+        printf(C_BOLD "  expr   " C_RESET "%s\n\n", text);
+    } else {
+        printf(C_BOLD C_RED "FAIL" C_RESET
+               " unevaluated integral lower-then-upper @S form parses with full-stop differential %s:%d:1\n",
+               __FILE__, __LINE__);
+        printf(C_BOLD "  got    " C_RESET "%s\n\n", text ? text : "(null)");
+        TEST_FAIL();
+    }
+    free(text);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+    bindings = NULL;
+    expr = NULL;
+
+    check_parse_simplified_expr("unevaluated integral explicit bounds simplify structurally",
+        "{ ∫_1^3 1/t·dt }",
+        "∫^3_1 1/t·dt", __LINE__);
+
+    check_parse_val("unevaluated integral explicit bounds evaluate numerically",
+        "{ @S^3_1 1/t dt }",
+        log(3.0), __LINE__);
+
+    expr = expr_from_string("{ integral(1, 3, 1/t, t) }", &bindings);
+    text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
+    if (text && strcmp(text, "∫^3_1 1/t·dt") == 0) {
+        printf(C_BOLD C_GREEN "PASS" C_RESET
+               " unevaluated integral four-argument ASCII function form parses\n");
+        printf(C_BOLD "  expr   " C_RESET "%s\n\n", text);
+    } else {
+        printf(C_BOLD C_RED "FAIL" C_RESET
+               " unevaluated integral four-argument ASCII function form parses %s:%d:1\n",
+               __FILE__, __LINE__);
+        printf(C_BOLD "  got    " C_RESET "%s\n\n", text ? text : "(null)");
+        TEST_FAIL();
+    }
+    free(text);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+    bindings = NULL;
+    expr = NULL;
+
     expr = expr_from_string("{ @S^x exp(cosh(t))dt }", &bindings);
     text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
     if (text && strcmp(text, "{ ∫^x exp(cosh(t))·dt | x = NAN }") == 0) {
@@ -2151,6 +2280,55 @@ static void test_from_string_unevaluated_integral(void)
     expr_free(expr);
 
     bindings = NULL;
+    expr = expr_from_string("{ @S^z exp(-x^2)dx }", &bindings);
+    text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
+    func_text = expr ? expr_to_string(expr, style_FUNCTION) : NULL;
+    if (text && strcmp(text, "{ ∫^z exp(-x²)·dx | z = NAN }") == 0) {
+        printf(C_BOLD C_GREEN "PASS" C_RESET
+               " unevaluated integral preserves supplied dummy for upper-bound function form\n");
+        printf(C_BOLD "  expr   " C_RESET "%s\n\n", text);
+    } else {
+        printf(C_BOLD C_RED "FAIL" C_RESET
+               " unevaluated integral preserves supplied dummy for upper-bound function form %s:%d:1\n",
+               __FILE__, __LINE__);
+        printf(C_BOLD "  got    " C_RESET "%s\n\n", text ? text : "(null)");
+        TEST_FAIL();
+    }
+    if (func_text && strstr(func_text, "integral(z, exp(-(x^2)), x)") != NULL) {
+        printf(C_BOLD C_GREEN "PASS" C_RESET
+               " unevaluated integral function form keeps supplied dummy variable\n");
+        printf(C_BOLD "  expr   " C_RESET "%s\n\n", func_text);
+    } else {
+        printf(C_BOLD C_RED "FAIL" C_RESET
+               " unevaluated integral function form keeps supplied dummy variable %s:%d:1\n",
+               __FILE__, __LINE__);
+        printf(C_BOLD "  got    " C_RESET "%s\n\n", func_text ? func_text : "(null)");
+        TEST_FAIL();
+    }
+    free(func_text);
+    free(text);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+
+    bindings = NULL;
+    expr = expr_from_string("{ @S_0^1 exp(-x^2)dx }", &bindings);
+    text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
+    if (text && strcmp(text, "∫^1_0 exp(-x²)·dx") == 0) {
+        printf(C_BOLD C_GREEN "PASS" C_RESET
+               " bounded unevaluated integral preserves supplied dummy for numeric form\n");
+        printf(C_BOLD "  expr   " C_RESET "%s\n\n", text);
+    } else {
+        printf(C_BOLD C_RED "FAIL" C_RESET
+               " bounded unevaluated integral preserves supplied dummy for numeric form %s:%d:1\n",
+               __FILE__, __LINE__);
+        printf(C_BOLD "  got    " C_RESET "%s\n\n", text ? text : "(null)");
+        TEST_FAIL();
+    }
+    free(text);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+
+    bindings = NULL;
     expr = expr_from_string("{ @S^xexp(cosh(t))*dt }", &bindings);
     text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
     if (text && strcmp(text, "{ ∫^x exp(cosh(t))·dt | x = NAN }") == 0) {
@@ -2207,7 +2385,7 @@ static void test_from_string_unevaluated_integral(void)
     bindings = NULL;
     expr = expr_from_string("{ @S^@lambdasin(@alpha)d@alpha }", &bindings);
     text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
-    if (text && strcmp(text, "{ ∫^λ sin(t)·dt | λ = NAN }") == 0) {
+    if (text && strcmp(text, "{ ∫^λ sin(α)·dα | λ = NAN }") == 0) {
         printf(C_BOLD C_GREEN "PASS" C_RESET
                " unevaluated integral @S form parses with Greek aliases\n");
         printf(C_BOLD "  expr   " C_RESET "%s\n\n", text);

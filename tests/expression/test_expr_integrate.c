@@ -2630,6 +2630,266 @@ static void test_integrate_unevaluated_integral_derivative(void)
     expr_free(x);
 }
 
+static void test_integrate_unevaluated_integral_leibniz_derivative(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_bindings_t *dx_bindings = NULL;
+    expr_bindings_t *dy_bindings = NULL;
+    expr_bindings_t *du_bindings = NULL;
+    expr_t *integral = expr_from_string("{ @S_x^y z*u dz }", &bindings);
+    expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    expr_t *y = bindings ? expr_bindings_get(bindings, "y") : NULL;
+    expr_t *u = bindings ? expr_bindings_get(bindings, "u") : NULL;
+    expr_t *dx = (integral && x) ? expr_create_deriv(integral, x) : NULL;
+    expr_t *dy = (integral && y) ? expr_create_deriv(integral, y) : NULL;
+    expr_t *du = (integral && u) ? expr_create_deriv(integral, u) : NULL;
+    expr_t *dx_eval = NULL;
+    expr_t *dy_eval = NULL;
+    expr_t *du_eval = NULL;
+    expr_t *dx_x = NULL;
+    expr_t *dx_u = NULL;
+    expr_t *dy_y = NULL;
+    expr_t *dy_u = NULL;
+    expr_t *du_x = NULL;
+    expr_t *du_y = NULL;
+    char *du_text = du ? expr_to_string(du, style_UNBOUND) : NULL;
+    char *dx_text = dx ? expr_to_string(dx, style_UNBOUND) : NULL;
+    char *dy_text = dy ? expr_to_string(dy, style_UNBOUND) : NULL;
+    size_t dx_input_len = dx_text ? strlen(dx_text) + 5u : 0u;
+    size_t dy_input_len = dy_text ? strlen(dy_text) + 5u : 0u;
+    size_t du_input_len = du_text ? strlen(du_text) + 5u : 0u;
+    char *dx_input = dx_text ? malloc(dx_input_len) : NULL;
+    char *dy_input = dy_text ? malloc(dy_input_len) : NULL;
+    char *du_input = du_text ? malloc(du_input_len) : NULL;
+
+    ASSERT_NOT_NULL(integral);
+    ASSERT_NOT_NULL(x);
+    ASSERT_NOT_NULL(y);
+    ASSERT_NOT_NULL(u);
+    ASSERT_NOT_NULL(dx);
+    ASSERT_NOT_NULL(dy);
+    ASSERT_NOT_NULL(du);
+    ASSERT_NOT_NULL(dx_text);
+    ASSERT_NOT_NULL(dy_text);
+    ASSERT_NOT_NULL(du_text);
+    ASSERT_NOT_NULL(dx_input);
+    ASSERT_NOT_NULL(dy_input);
+    ASSERT_NOT_NULL(du_input);
+    ASSERT_TRUE(strstr(du_text, "∫^y_x z·dz") != NULL);
+
+    snprintf(dx_input, dx_input_len, "{ %s }", dx_text);
+    snprintf(dy_input, dy_input_len, "{ %s }", dy_text);
+    snprintf(du_input, du_input_len, "{ %s }", du_text);
+
+    dx_eval = expr_from_string(dx_input, &dx_bindings);
+    dy_eval = expr_from_string(dy_input, &dy_bindings);
+    du_eval = expr_from_string(du_input, &du_bindings);
+    dx_x = dx_bindings ? expr_bindings_get(dx_bindings, "x") : NULL;
+    dx_u = dx_bindings ? expr_bindings_get(dx_bindings, "u") : NULL;
+    dy_y = dy_bindings ? expr_bindings_get(dy_bindings, "y") : NULL;
+    dy_u = dy_bindings ? expr_bindings_get(dy_bindings, "u") : NULL;
+    du_x = du_bindings ? expr_bindings_get(du_bindings, "x") : NULL;
+    du_y = du_bindings ? expr_bindings_get(du_bindings, "y") : NULL;
+
+    ASSERT_NOT_NULL(dx_eval);
+    ASSERT_NOT_NULL(dy_eval);
+    ASSERT_NOT_NULL(du_eval);
+    ASSERT_NOT_NULL(dx_x);
+    ASSERT_NOT_NULL(dx_u);
+    ASSERT_NOT_NULL(dy_y);
+    ASSERT_NOT_NULL(dy_u);
+    ASSERT_NOT_NULL(du_x);
+    ASSERT_NOT_NULL(du_y);
+
+    test_expr_set_val_d(dx_x, 1.0);
+    test_expr_set_val_d(dx_u, 4.0);
+    test_expr_set_val_d(dy_y, 3.0);
+    test_expr_set_val_d(dy_u, 4.0);
+    test_expr_set_val_d(du_x, 1.0);
+    test_expr_set_val_d(du_y, 3.0);
+
+    check_q_at(__FILE__, __LINE__, 1,
+               "d/dx ∫_x^y z*u dz = -u*x",
+               expr_eval_qf(dx_eval), qf_from_double(-4.0));
+    check_q_at(__FILE__, __LINE__, 1,
+               "d/dy ∫_x^y z*u dz = u*y",
+               expr_eval_qf(dy_eval), qf_from_double(12.0));
+    check_q_at(__FILE__, __LINE__, 1,
+               "d/du ∫_x^y z*u dz = ∫_x^y z dz",
+               expr_eval_qf(du_eval), qf_from_double(4.0));
+
+    free(du_input);
+    free(dy_input);
+    free(dx_input);
+    free(dy_text);
+    free(dx_text);
+    free(du_text);
+    expr_free(du_eval);
+    expr_bindings_free(du_bindings);
+    expr_free(dy_eval);
+    expr_bindings_free(dy_bindings);
+    expr_free(dx_eval);
+    expr_bindings_free(dx_bindings);
+    expr_free(du);
+    expr_free(dy);
+    expr_free(dx);
+    expr_free(integral);
+    expr_bindings_free(bindings);
+}
+
+static void test_integrate_unevaluated_integral_evaluation(void)
+{
+    static const double points[] = { -1.0, -0.25, 0.5, 1.25 };
+    expr_t *x = test_expr_new_named_var_d(0.0, "x");
+    expr_t *x_sq = test_expr_pow_d(x, 2.0);
+    expr_t *integral = expr_integral(x_sq, x);
+
+    ASSERT_NOT_NULL(integral);
+
+    for (size_t i = 0; i < sizeof(points) / sizeof(points[0]); ++i) {
+        char label[160];
+
+        test_expr_set_val_d(x, points[i]);
+        snprintf(label, sizeof(label), "integral to x at x=%g", points[i]);
+        check_q_at(__FILE__, __LINE__, 1, label,
+                   expr_eval_qf(integral),
+                   qf_from_double((points[i] * points[i] * points[i]) / 3.0));
+    }
+
+    expr_free(integral);
+    expr_free(x_sq);
+    expr_free(x);
+}
+
+static void test_integrate_unevaluated_integral_constant_upper(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = expr_from_string("{ @S^3 sin(t) dt }", &bindings);
+    expr_t *expected = expr_from_string("{ 1 - cos(3) }", NULL);
+    expr_t *z = bindings ? expr_bindings_get(bindings, "z") : NULL;
+    expr_t *t = bindings ? expr_bindings_get(bindings, "t") : NULL;
+    char *text = expr ? expr_to_string(expr, style_UNBOUND) : NULL;
+
+    ASSERT_NOT_NULL(expr);
+    ASSERT_NOT_NULL(expected);
+    ASSERT_TRUE(z == NULL);
+    ASSERT_TRUE(t == NULL);
+    ASSERT_NOT_NULL(text);
+    ASSERT_TRUE(strstr(text, "∫^3 sin(t)·dt") != NULL);
+    check_q_at(__FILE__, __LINE__, 1, "integral to 3 of sin(t)",
+               expr_eval_qf(expr), expr_eval_qf(expected));
+
+    free(text);
+    expr_free(expected);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+}
+
+static void test_integrate_unevaluated_integral_chain_rule_upper(void)
+{
+    static const double points[] = { -1.0, -0.25, 0.5, 1.25 };
+    expr_bindings_t *bindings = NULL;
+    expr_bindings_t *expected_deriv_bindings = NULL;
+    expr_bindings_t *expected_value_bindings = NULL;
+    expr_t *expr = expr_from_string("{ @S^(x+1) sin(t) dt | x = NAN }", &bindings);
+    expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    expr_t *deriv = (expr && x) ? expr_create_deriv(expr, x) : NULL;
+    expr_t *expected_deriv =
+        expr_from_string("{ sin(x + 1) | x = NAN }", &expected_deriv_bindings);
+    expr_t *expected_value =
+        expr_from_string("{ 1 - cos(x + 1) | x = NAN }", &expected_value_bindings);
+    expr_t *expected_deriv_x =
+        expected_deriv_bindings ? expr_bindings_get(expected_deriv_bindings, "x") : NULL;
+    expr_t *expected_value_x =
+        expected_value_bindings ? expr_bindings_get(expected_value_bindings, "x") : NULL;
+    char *text = expr ? expr_to_string(expr, style_UNBOUND) : NULL;
+
+    ASSERT_NOT_NULL(expr);
+    ASSERT_NOT_NULL(x);
+    ASSERT_NOT_NULL(deriv);
+    ASSERT_NOT_NULL(expected_deriv);
+    ASSERT_NOT_NULL(expected_value);
+    ASSERT_NOT_NULL(expected_deriv_x);
+    ASSERT_NOT_NULL(expected_value_x);
+    ASSERT_NOT_NULL(text);
+    ASSERT_TRUE(strstr(text, "∫^(x + 1) sin(t)·dt") != NULL);
+
+    for (size_t i = 0; i < sizeof(points) / sizeof(points[0]); ++i) {
+        char label[160];
+
+        test_expr_set_val_d(x, points[i]);
+        test_expr_set_val_d(expected_deriv_x, points[i]);
+        test_expr_set_val_d(expected_value_x, points[i]);
+        snprintf(label, sizeof(label), "d/dx integral to x+1 at x=%g", points[i]);
+        check_q_at(__FILE__, __LINE__, 1, label,
+                   expr_eval_qf(deriv), expr_eval_qf(expected_deriv));
+
+        snprintf(label, sizeof(label), "integral to x+1 at x=%g", points[i]);
+        check_q_at(__FILE__, __LINE__, 1, label,
+                   expr_eval_qf(expr), expr_eval_qf(expected_value));
+    }
+
+    free(text);
+    expr_free(expected_value);
+    expr_bindings_free(expected_value_bindings);
+    expr_free(expected_deriv);
+    expr_bindings_free(expected_deriv_bindings);
+    expr_free(deriv);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+}
+
+static void test_integrate_unevaluated_integral_explicit_bounds(void)
+{
+    static const double points[] = { -1.0, -0.25, 0.5, 1.25 };
+    expr_bindings_t *bindings = NULL;
+    expr_bindings_t *expected_deriv_bindings = NULL;
+    expr_t *expr = expr_from_string("{ @S^x_1 t² dt | x = NAN }", &bindings);
+    expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    expr_t *deriv = (expr && x) ? expr_create_deriv(expr, x) : NULL;
+    expr_t *expected_deriv =
+        expr_from_string("{ x² | x = NAN }", &expected_deriv_bindings);
+    expr_t *expected_deriv_x =
+        expected_deriv_bindings ? expr_bindings_get(expected_deriv_bindings, "x") : NULL;
+    char *text = expr ? expr_to_string(expr, style_UNBOUND) : NULL;
+
+    ASSERT_NOT_NULL(expr);
+    ASSERT_NOT_NULL(x);
+    ASSERT_NOT_NULL(deriv);
+    ASSERT_NOT_NULL(expected_deriv);
+    ASSERT_NOT_NULL(expected_deriv_x);
+    ASSERT_NOT_NULL(text);
+    ASSERT_TRUE(strstr(text, "∫^x_1 t²·dt") != NULL);
+
+    for (size_t i = 0; i < sizeof(points) / sizeof(points[0]); ++i) {
+        char label[160];
+
+        test_expr_set_val_d(x, points[i]);
+        test_expr_set_val_d(expected_deriv_x, points[i]);
+        snprintf(label, sizeof(label), "d/dx integral from 1 to x at x=%g", points[i]);
+        check_q_at(__FILE__, __LINE__, 1, label,
+                   expr_eval_qf(deriv), expr_eval_qf(expected_deriv));
+    }
+
+    for (size_t i = 0; i < sizeof(points) / sizeof(points[0]); ++i) {
+        char label[160];
+        double x_value = points[i];
+        qfloat_t expected = qf_from_double((x_value * x_value * x_value - 1.0) / 3.0);
+
+        test_expr_set_val_d(x, x_value);
+        snprintf(label, sizeof(label), "integral from 1 to x at x=%g", x_value);
+        check_q_at(__FILE__, __LINE__, 1, label,
+                   expr_eval_qf(expr), expected);
+    }
+
+    free(text);
+    expr_free(expected_deriv);
+    expr_bindings_free(expected_deriv_bindings);
+    expr_free(deriv);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+}
+
 static void test_integrate_partial_symbolic_with_unevaluated_term(void)
 {
     static const double points[] = { -0.75, -0.2, 0.4, 1.0 };
@@ -2686,6 +2946,11 @@ void test_symbolic_integration(void)
     TEST_RUN_SUBTEST(test_integrate_more_by_parts, NULL);
     TEST_RUN_SUBTEST(test_integrate_partial_fractions, NULL);
     TEST_RUN_SUBTEST(test_integrate_unevaluated_integral_derivative, NULL);
+    TEST_RUN_SUBTEST(test_integrate_unevaluated_integral_leibniz_derivative, NULL);
+    TEST_RUN_SUBTEST(test_integrate_unevaluated_integral_evaluation, NULL);
+    TEST_RUN_SUBTEST(test_integrate_unevaluated_integral_constant_upper, NULL);
+    TEST_RUN_SUBTEST(test_integrate_unevaluated_integral_chain_rule_upper, NULL);
+    TEST_RUN_SUBTEST(test_integrate_unevaluated_integral_explicit_bounds, NULL);
     TEST_RUN_SUBTEST(test_integrate_partial_symbolic_with_unevaluated_term, NULL);
     TEST_RUN_SUBTEST(test_integrate_unsupported_product_returns_null, NULL);
 }

@@ -2445,7 +2445,7 @@ static expr_t *integrate_exact_substitution_candidate(
     expr_t *back = NULL;
     expr_t *out = NULL;
     expr_t *vars[2];
-    bool used[2];
+    bool used[2] = { false, false };
     bool used_relation_rewrite = false;
     bool derivative_contains_inverse = false;
     bool trusted_antiderivative = false;

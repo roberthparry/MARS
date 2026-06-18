@@ -337,7 +337,12 @@
         "test_integrate_symbolic_power_exponent": true,
         "test_integrate_symbolic_shifted_sqrt": true,
         "test_integrate_trig_power_products": true,
+        "test_integrate_unevaluated_integral_chain_rule_upper": true,
+        "test_integrate_unevaluated_integral_constant_upper": true,
         "test_integrate_unevaluated_integral_derivative": true,
+        "test_integrate_unevaluated_integral_evaluation": true,
+        "test_integrate_unevaluated_integral_explicit_bounds": true,
+        "test_integrate_unevaluated_integral_leibniz_derivative": true,
         "test_integrate_unsupported_product_returns_null": true
       }
     }
@@ -390,6 +395,7 @@
         "test_high_precision_complex_function_values": true,
         "test_high_precision_mpfr_function_derivatives": true,
         "test_high_precision_mpfr_function_values": true,
+        "test_inexact_known_constant_uses_short_text": true,
         "test_inverse_power_function_notation_uses_supported_inverses_only": true,
         "test_lambert_inverse_argument_derivative_simplifies": true,
         "test_lambert_inverse_branch_selection": true,
@@ -775,6 +781,7 @@
       "test_multi_2d_sum_of_separable_products": true,
       "test_multi_2d_sum_of_specials": true,
       "test_multi_3d": true,
+      "test_multi_3d_affine_quintic": true,
       "test_multi_3d_cos_affine": true,
       "test_multi_3d_cosh_affine": true,
       "test_multi_3d_regrouped_separable_product": true,
@@ -787,6 +794,7 @@
       "test_multi_4d_exp_affine": true,
       "test_multi_nd1": true,
       "test_multi_null_safety": true,
+      "test_nested_unevaluated_integral_integrand": true,
       "test_null_safety": true,
       "test_polynomial": true,
       "test_reversed_limits": true,

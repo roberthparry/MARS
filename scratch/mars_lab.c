@@ -32,6 +32,125 @@ static char *expr_text_dup(const expr_t *expr, style_t style)
     return copy;
 }
 
+static int value_is_defined_for_integrand_at(const expr_t *integrand,
+                                             const expr_t *var,
+                                             number_t point)
+{
+    expr_t *point_const;
+    expr_t *eval_expr;
+    number_t value;
+    int ok;
+
+    if (!integrand || !var)
+        return 0;
+
+    point_const = expr_new_const(point);
+    eval_expr = point_const ? expr_substitute(integrand, var, point_const) : NULL;
+    if (!point_const || !eval_expr) {
+        expr_free(eval_expr);
+        expr_free(point_const);
+        return 0;
+    }
+
+    value = expr_eval(eval_expr);
+    ok = num_is_real(value) && num_is_finite(value);
+    num_destroy(&value);
+    expr_free(eval_expr);
+    expr_free(point_const);
+    return ok;
+}
+
+static int find_integral_value_note(const expr_t *expr, char *out, size_t out_size)
+{
+    const expr_t *lower_expr;
+    const expr_t *upper_expr;
+    const expr_t *dummy_expr;
+    expr_t *local_var = NULL;
+    expr_t *upper_const = NULL;
+    expr_t *lower_const = NULL;
+    expr_t *upper_integrand = NULL;
+    expr_t *lower_integrand = NULL;
+    number_t upper = num_new();
+    number_t lower = num_new();
+    char *upper_text = NULL;
+    char *lower_text = NULL;
+    char *integrand_text = NULL;
+    int found = 0;
+
+    if (!expr || !out || out_size == 0u)
+        return 0;
+
+    if (expr_is_op(expr, &ops_integral) && expr->a && expr->b) {
+        lower_expr = expr_integral_lower_bound_expr(expr);
+        upper_expr = expr_integral_upper_bound_expr(expr);
+        dummy_expr = expr_integral_dummy_expr(expr);
+
+        upper = upper_expr ? expr_eval(upper_expr) : num_clone(NUM_NAN);
+        lower = lower_expr ? expr_eval(lower_expr) : num_clone(NUM_ZERO);
+        if (upper_expr && dummy_expr &&
+            num_is_real(lower) && num_is_finite(lower) &&
+            num_is_real(upper) && num_is_finite(upper)) {
+            local_var = expr_clone(dummy_expr);
+            upper_const = expr_new_const(upper);
+            lower_const = expr_new_const(lower);
+            upper_integrand = (dummy_expr && upper_const)
+                ? expr_substitute(expr->a, dummy_expr, upper_const)
+                : NULL;
+            lower_integrand = (dummy_expr && lower_const)
+                ? expr_substitute(expr->a, dummy_expr, lower_const)
+                : NULL;
+            if (local_var && upper_const && lower_const &&
+                upper_integrand && lower_integrand) {
+                upper_text = expr_text_dup(upper_expr, style_UNBOUND);
+                lower_text = lower_expr ? expr_text_dup(lower_expr, style_UNBOUND) : NULL;
+                integrand_text = expr_text_dup(expr->a, style_UNBOUND);
+
+                if (!lower_expr &&
+                    !value_is_defined_for_integrand_at(expr->a, local_var, NUM_ZERO)) {
+                    snprintf(out, out_size,
+                             "Here ∫^%s means ∫₀^%s. The integrand %s is not finite at %s = 0, so that definite integral is undefined.",
+                             upper_text ? upper_text : "?",
+                             upper_text ? upper_text : "?",
+                             integrand_text ? integrand_text : "f(t)",
+                             local_var->name ? local_var->name : "t");
+                    found = 1;
+                } else if (!value_is_defined_for_integrand_at(expr->a, local_var, lower)) {
+                    snprintf(out, out_size,
+                             "The integrand %s is not finite at %s = %s, so that the lower bound makes this definite integral undefined.",
+                             integrand_text ? integrand_text : "f(t)",
+                             local_var->name ? local_var->name : "t",
+                             lower_text ? lower_text : "0");
+                    found = 1;
+                } else if (!value_is_defined_for_integrand_at(expr->a, local_var, upper)) {
+                    snprintf(out, out_size,
+                             "The integrand %s is not finite at %s = %s, so that the upper bound makes this definite integral undefined.",
+                             integrand_text ? integrand_text : "f(t)",
+                             local_var->name ? local_var->name : "t",
+                             upper_text ? upper_text : "?");
+                    found = 1;
+                }
+            }
+        }
+    }
+
+    free(integrand_text);
+    free(lower_text);
+    free(upper_text);
+    expr_free(lower_integrand);
+    expr_free(upper_integrand);
+    expr_free(lower_const);
+    expr_free(upper_const);
+    expr_free(local_var);
+    num_destroy(&lower);
+    num_destroy(&upper);
+
+    if (found)
+        return 1;
+
+    return find_integral_value_note(expr->a, out, out_size) ||
+           find_integral_value_note(expr->b, out, out_size);
+}
+
 static char *expr_tex_body_dup(const expr_t *expr)
 {
     char *body = NULL;
@@ -743,6 +862,7 @@ int main(int argc, char **argv)
     char *deriv_text = NULL;
     char *deriv_func_text = NULL;
     char *deriv_tex_text = NULL;
+    char value_note[512];
     int rc = 0;
 
     if (argc > 1 && strcmp(argv[1], "--goal-seek") == 0)
@@ -776,7 +896,16 @@ int main(int argc, char **argv)
     printf("function    %s\n", func_text ? func_text : "(null)");
     printf("tex         %s\n", tex_text ? tex_text : "(null)");
     printf("differentiable  %s\n", expr_is_differentiable(expr) ? "yes" : "no");
-    print_owned_number("value", expr_eval(expr), precision);
+    value_note[0] = '\0';
+    {
+        number_t value_number = expr_eval(expr);
+
+        print_owned_number("value", num_clone(value_number), precision);
+        if ((num_is_nan(value_number) || !num_is_finite(value_number)) &&
+            find_integral_value_note(expr, value_note, sizeof(value_note)))
+            printf("value_note  %s\n", value_note);
+        num_destroy(&value_number);
+    }
 
     if (bindings)
         wrt = expr_bindings_get(bindings, wrt_name);

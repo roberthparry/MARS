@@ -1,4 +1,6 @@
 #include <stddef.h>
+#include <string.h>
+#include "integrator.h"
 #include "expr_bindings.h"
 #include "expr_internal.h"
 
@@ -76,10 +78,126 @@ static number_t eval_pow_d(expr_t *dv)
     return num_pow(expr_eval_num_internal(dv->a), dv->c);
 }
 
-static number_t eval_integral(expr_t *dv)
+static number_t eval_integral_bounds(expr_t *dv)
 {
     (void)dv;
     return num_clone(NUM_NAN);
+}
+
+static number_t eval_integral_meta(expr_t *dv)
+{
+    (void)dv;
+    return num_clone(NUM_NAN);
+}
+
+static number_t eval_integral(expr_t *dv)
+{
+    integrator_t *ig;
+    const expr_t *lower_expr;
+    const expr_t *upper_expr;
+    const expr_t *dummy_expr;
+    number_t lower;
+    number_t upper;
+    number_t result;
+    expr_t *local_var;
+    expr_t *local_integrand;
+    expr_t *antiderivative;
+    int status;
+
+    if (!dv || !dv->a || !dv->b)
+        return num_clone(NUM_NAN);
+
+    lower_expr = expr_integral_lower_bound_expr(dv);
+    upper_expr = expr_integral_upper_bound_expr(dv);
+    dummy_expr = expr_integral_dummy_expr(dv);
+    if (!upper_expr || !dummy_expr)
+        return num_clone(NUM_NAN);
+
+    upper = expr_eval(upper_expr);
+    if (!num_is_real(upper) || num_is_nan(upper)) {
+        num_destroy(&upper);
+        return num_clone(NUM_NAN);
+    }
+    lower = lower_expr ? expr_eval(lower_expr) : num_clone(NUM_ZERO);
+    if (!num_is_real(lower) || num_is_nan(lower)) {
+        num_destroy(&lower);
+        num_destroy(&upper);
+        return num_clone(NUM_NAN);
+    }
+
+    ig = intg_new();
+    if (!ig) {
+        num_destroy(&lower);
+        num_destroy(&upper);
+        return num_clone(NUM_NAN);
+    }
+
+    local_var = expr_clone(dummy_expr);
+    if (!local_var) {
+        intg_free(ig);
+        num_destroy(&lower);
+        num_destroy(&upper);
+        return num_clone(NUM_NAN);
+    }
+    local_integrand = expr_substitute(dv->a, dummy_expr, local_var);
+    if (!local_integrand) {
+        expr_free(local_var);
+        intg_free(ig);
+        num_destroy(&lower);
+        num_destroy(&upper);
+        return num_clone(NUM_NAN);
+    }
+
+    result = num_new();
+    antiderivative = expr_integrate(local_integrand, local_var);
+    if (antiderivative) {
+        expr_t *upper_const = expr_new_const(upper);
+        expr_t *lower_const = expr_new_const(lower);
+        expr_t *upper_eval_expr = upper_const
+            ? expr_substitute(antiderivative, local_var, upper_const)
+            : NULL;
+        expr_t *lower_eval_expr = lower_const
+            ? expr_substitute(antiderivative, local_var, lower_const)
+            : NULL;
+
+        if (!upper_const || !lower_const || !upper_eval_expr || !lower_eval_expr) {
+            expr_free(lower_eval_expr);
+            expr_free(upper_eval_expr);
+            expr_free(lower_const);
+            expr_free(upper_const);
+            expr_free(antiderivative);
+            status = -1;
+        } else {
+            number_t upper_value = expr_eval(upper_eval_expr);
+            number_t lower_value = expr_eval(lower_eval_expr);
+
+            num_destroy(&result);
+            result = num_sub(upper_value, lower_value);
+            num_destroy(&lower_value);
+            num_destroy(&upper_value);
+            expr_free(lower_eval_expr);
+            expr_free(upper_eval_expr);
+            expr_free(lower_const);
+            expr_free(upper_const);
+            expr_free(antiderivative);
+            status = 0;
+        }
+    } else {
+        status = intg_integral(ig, local_integrand, local_var, lower, upper, &result, NULL);
+    }
+
+    expr_free(local_integrand);
+    expr_free(local_var);
+    intg_free(ig);
+    num_destroy(&lower);
+    num_destroy(&upper);
+
+    if (status < 0 || !num_is_real(result) || !num_is_finite(result)) {
+        num_destroy(&result);
+        return num_clone(NUM_NAN);
+    }
+
+    return result;
 }
 
 /* ------------------------------------------------------------------------- */
@@ -848,24 +966,192 @@ static expr_t *deriv_pow_d(expr_t *dv)
     return out;
 }
 
-static bool integral_wrt_matches_current_derivative(const expr_t *bound)
+static expr_t *deriv_integral_bounds(expr_t *dv)
 {
-    const expr_t *wrt = expr_current_wrt_internal();
+    (void)dv;
+    return expr_new_const(NUM_NAN);
+}
 
-    if (!bound || !expr_is_var(bound))
-        return false;
-    if (!wrt)
-        return true;
-    return bound == wrt ||
-           (expr_is_var(wrt) &&
-            bound->var_id != 0 && bound->var_id == wrt->var_id);
+static expr_t *deriv_integral_meta(expr_t *dv)
+{
+    (void)dv;
+    return expr_new_const(NUM_NAN);
 }
 
 static expr_t *deriv_integral(expr_t *dv)
 {
-    if (integral_wrt_matches_current_derivative(dv->b))
-        return expr_retain_expr(dv->a);
+    const expr_t *wrt;
+    const expr_t *lower;
+    const expr_t *upper;
+    const expr_t *dummy;
+    expr_t *integrand_deriv = NULL;
+    expr_t *integrand_term = NULL;
+    expr_t *upper_integrand = NULL;
+    expr_t *upper_deriv;
+    expr_t *upper_term;
+    expr_t *lower_integrand = NULL;
+    expr_t *lower_deriv = NULL;
+    expr_t *lower_term = NULL;
+    expr_t *boundary_term = NULL;
+    expr_t *out;
+
+    if (!dv || !dv->a || !dv->b)
+        return expr_new_const(NUM_NAN);
+    wrt = expr_current_wrt_internal();
+    lower = expr_integral_lower_bound_expr(dv);
+    upper = expr_integral_upper_bound_expr(dv);
+    dummy = expr_integral_dummy_expr(dv);
+    if (!upper || !dummy)
+        return expr_new_const(NUM_NAN);
+
+    integrand_deriv = wrt ? expr_create_deriv(dv->a, wrt) : expr_get_dx_internal(dv->a);
+    if (!integrand_deriv)
+        return expr_new_const(NUM_NAN);
+    if (!expr_is_exact_zero(integrand_deriv)) {
+        integrand_term = lower
+            ? expr_integral_with_bounds_internal(integrand_deriv, lower, upper, dummy)
+            : expr_integral_with_dummy_internal(integrand_deriv, upper, dummy);
+        if (!integrand_term) {
+            expr_free(integrand_deriv);
+            return expr_new_const(NUM_NAN);
+        }
+    }
+    expr_free(integrand_deriv);
+
+    upper_integrand = expr_substitute(dv->a, dummy, (expr_t *)upper);
+    if (!upper_integrand)
+        goto fail;
+
+    upper_deriv = expr_get_dx_internal(upper);
+    if (!upper_deriv) {
+        expr_free(upper_integrand);
+        goto fail;
+    }
+    upper_term = expr_mul(upper_integrand, upper_deriv);
+    expr_free(upper_deriv);
+    expr_free(upper_integrand);
+    if (!upper_term)
+        goto fail;
+
+    if (!lower) {
+        boundary_term = upper_term;
+    } else {
+        lower_integrand = expr_substitute(dv->a, dummy, (expr_t *)lower);
+        lower_deriv = expr_get_dx_internal(lower);
+        if (!lower_integrand || !lower_deriv) {
+            expr_free(lower_deriv);
+            expr_free(lower_integrand);
+            expr_free(upper_term);
+            goto fail;
+        }
+
+        lower_term = expr_mul(lower_integrand, lower_deriv);
+        expr_free(lower_deriv);
+        expr_free(lower_integrand);
+        if (!lower_term) {
+            expr_free(upper_term);
+            goto fail;
+        }
+
+        boundary_term = expr_sub(upper_term, lower_term);
+        expr_free(lower_term);
+        expr_free(upper_term);
+        if (!boundary_term)
+            goto fail;
+    }
+
+    if (!integrand_term)
+        return boundary_term;
+
+    out = expr_add(boundary_term, integrand_term);
+    expr_free(integrand_term);
+    expr_free(boundary_term);
+    return out ? out : expr_new_const(NUM_NAN);
+
+fail:
+    expr_free(integrand_term);
     return expr_new_const(NUM_NAN);
+}
+
+static expr_t *expr_integral_meta_apply(const expr_t *domain,
+                                        const expr_t *dummy)
+{
+    if (!domain || !dummy)
+        return NULL;
+    expr_retain(domain);
+    expr_retain(dummy);
+    return expr_new_binary_internal(&ops_integral_meta, domain, dummy);
+}
+
+static expr_t *expr_integral_bounds_apply(const expr_t *lower,
+                                          const expr_t *upper)
+{
+    if (!lower || !upper)
+        return NULL;
+    expr_retain(lower);
+    expr_retain(upper);
+    return expr_new_binary_internal(&ops_integral_bounds, lower, upper);
+}
+
+static bool expr_contains_free_var_named_impl(const expr_t *expr,
+                                              const char *name,
+                                              const expr_t *bound_dummy)
+{
+    const expr_t *dummy;
+    const expr_t *lower;
+    const expr_t *upper;
+
+    if (!expr || !name)
+        return false;
+
+    if (expr_is_var(expr)) {
+        bool shadowed = bound_dummy == expr ||
+            (bound_dummy && bound_dummy->var_id != 0 &&
+             expr->var_id != 0 &&
+             bound_dummy->var_id == expr->var_id);
+
+        return !shadowed && expr->name && strcmp(expr->name, name) == 0;
+    }
+
+    if (expr_is_op(expr, &ops_integral)) {
+        dummy = expr_integral_dummy_expr(expr);
+        lower = expr_integral_lower_bound_expr(expr);
+        upper = expr_integral_upper_bound_expr(expr);
+
+        return expr_contains_free_var_named_impl(lower, name, bound_dummy) ||
+               expr_contains_free_var_named_impl(upper, name, bound_dummy) ||
+               expr_contains_free_var_named_impl(expr->a, name, dummy);
+    }
+
+    return expr_contains_free_var_named_impl(expr->a, name, bound_dummy) ||
+           expr_contains_free_var_named_impl(expr->b, name, bound_dummy);
+}
+
+static bool expr_contains_free_var_named(const expr_t *expr, const char *name)
+{
+    return expr_contains_free_var_named_impl(expr, name, NULL);
+}
+
+static const char *expr_choose_integral_dummy_name(const expr_t *integrand,
+                                                   const expr_t *wrt)
+{
+    static const char *const candidates[] = {
+        "t", "u", "v", "w", "s", "r", "q", "p"
+    };
+
+    if (!integrand || !expr_is_var(wrt))
+        return wrt && wrt->name ? wrt->name : "t";
+
+    for (size_t i = 0u; i < sizeof(candidates) / sizeof(candidates[0]); ++i) {
+        const char *candidate = candidates[i];
+
+        if (wrt->name && strcmp(wrt->name, candidate) == 0)
+            continue;
+        if (!expr_contains_free_var_named(integrand, candidate))
+            return candidate;
+    }
+
+    return (wrt->name && *wrt->name) ? wrt->name : "t";
 }
 
 /* ------------------------------------------------------------------------- */
@@ -997,7 +1283,37 @@ const expr_ops_t ops_integral = {
     .tex_name = "\\int",
     .apply_unary = NULL,
     .apply_binary = expr_integral,
-    .simplify = expr_simplify_binary_operator,
+    .simplify = expr_simplify_rebuild_binary_operator,
+    .fold_const_unary = NULL
+};
+
+const expr_ops_t ops_integral_meta = {
+    .eval = eval_integral_meta,
+    .deriv = deriv_integral_meta,
+    .reverse = expr_reverse_not_differentiable,
+    .kind = EXPR_KIND_INTEGRAL_META,
+    .arity = EXPR_OP_BINARY,
+    .diff_kind = EXPR_DIFF_SMOOTH,
+    .name = "integral_meta",
+    .tex_name = NULL,
+    .apply_unary = NULL,
+    .apply_binary = expr_integral_meta_apply,
+    .simplify = expr_simplify_rebuild_binary_operator,
+    .fold_const_unary = NULL
+};
+
+const expr_ops_t ops_integral_bounds = {
+    .eval = eval_integral_bounds,
+    .deriv = deriv_integral_bounds,
+    .reverse = expr_reverse_not_differentiable,
+    .kind = EXPR_KIND_INTEGRAL_BOUNDS,
+    .arity = EXPR_OP_BINARY,
+    .diff_kind = EXPR_DIFF_SMOOTH,
+    .name = "integral_bounds",
+    .tex_name = NULL,
+    .apply_unary = NULL,
+    .apply_binary = expr_integral_bounds_apply,
+    .simplify = expr_simplify_rebuild_binary_operator,
     .fold_const_unary = NULL
 };
 
@@ -1074,11 +1390,97 @@ expr_t *expr_pow_xp(const expr_t *a, const expr_t *b)
 
 expr_t *expr_integral(const expr_t *integrand, const expr_t *wrt)
 {
-    if (!integrand || !wrt || !expr_is_var(wrt))
+    expr_t *dummy;
+    expr_t *display_integrand;
+    expr_t *integral;
+    const char *dummy_name;
+
+    if (!integrand || !wrt)
         return NULL;
+    if (!expr_is_var(wrt))
+        return expr_integral_with_dummy_internal(integrand, wrt, wrt);
+
+    dummy_name = expr_choose_integral_dummy_name(integrand, wrt);
+    dummy = expr_new_named_var(NUM_ZERO, dummy_name);
+    if (!dummy)
+        return NULL;
+
+    display_integrand = expr_substitute(integrand, wrt, dummy);
+    if (!display_integrand) {
+        expr_free(dummy);
+        return NULL;
+    }
+
+    integral = expr_integral_with_dummy_internal(display_integrand, wrt, dummy);
+    expr_free(display_integrand);
+    expr_free(dummy);
+    return integral;
+}
+
+expr_t *expr_integral_with_dummy_internal(const expr_t *integrand,
+                                          const expr_t *upper,
+                                          const expr_t *dummy)
+{
+    expr_t *meta;
+    expr_t *integral;
+
+    if (!integrand || !upper || !dummy)
+        return NULL;
+
+    expr_retain(upper);
+    expr_retain(dummy);
+    meta = expr_new_binary_internal(&ops_integral_meta, upper, dummy);
+    if (!meta) {
+        expr_free((expr_t *)dummy);
+        expr_free((expr_t *)upper);
+        return NULL;
+    }
+
     expr_retain(integrand);
-    expr_retain(wrt);
-    return expr_new_binary_internal(&ops_integral, integrand, wrt);
+    integral = expr_new_binary_internal(&ops_integral, integrand, meta);
+    if (!integral) {
+        expr_free(meta);
+        expr_free((expr_t *)integrand);
+    }
+    return integral;
+}
+
+expr_t *expr_integral_with_bounds_internal(const expr_t *integrand,
+                                           const expr_t *lower,
+                                           const expr_t *upper,
+                                           const expr_t *dummy)
+{
+    expr_t *bounds;
+    expr_t *meta;
+    expr_t *integral;
+
+    if (!integrand || !lower || !upper || !dummy)
+        return NULL;
+
+    expr_retain(lower);
+    expr_retain(upper);
+    bounds = expr_new_binary_internal(&ops_integral_bounds, lower, upper);
+    if (!bounds) {
+        expr_free((expr_t *)upper);
+        expr_free((expr_t *)lower);
+        return NULL;
+    }
+
+    expr_retain(dummy);
+    meta = expr_new_binary_internal(&ops_integral_meta, bounds, dummy);
+    if (!meta) {
+        expr_free(bounds);
+        expr_free((expr_t *)dummy);
+        return NULL;
+    }
+
+    expr_retain(integrand);
+    integral = expr_new_binary_internal(&ops_integral, integrand, meta);
+    if (!integral) {
+        expr_free(meta);
+        expr_free((expr_t *)integrand);
+    }
+    return integral;
 }
 
 expr_t *expr_pow(const expr_t *dv, const number_t *exponent)
