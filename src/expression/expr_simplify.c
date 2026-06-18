@@ -32,6 +32,7 @@
 
 /* forward declaration — helpers below call expr_simplify recursively */
 expr_t *expr_simplify(const expr_t *dv);
+static expr_t *expr_simplify_try_const_over_e_local(expr_t *a, expr_t *b);
 
 static int expr_simplify_text_to_long_local(const string_t *text, long *out)
 {
@@ -2575,6 +2576,13 @@ expr_t *expr_simplify_mul_operator(const expr_t *dv, expr_t *a, expr_t *b)
     }
 
     {
+        expr_t *const_over_e = expr_simplify_try_const_over_e_local(a, b);
+
+        if (const_over_e)
+            return const_over_e;
+    }
+
+    {
         expr_t *i_unit_product = expr_simplify_try_i_unit_product(a, b);
 
         if (i_unit_product) {
@@ -2769,6 +2777,45 @@ cleanup:
     expr_free(replacement);
     expr_free(arg);
     num_destroy(&exponent);
+    return out;
+}
+
+static bool expr_simplify_is_exp_minus_one_local(const expr_t *dv)
+{
+    return dv &&
+           expr_is_exp_expr(dv) &&
+           dv->a &&
+           expr_simplify_is_simplifiable_const(dv->a) &&
+           expr_const_is_minus_one(dv->a);
+}
+
+static expr_t *expr_simplify_try_const_over_e_local(expr_t *a, expr_t *b)
+{
+    expr_t *coeff = NULL;
+    expr_t *e_const = NULL;
+    expr_t *out = NULL;
+
+    if (expr_simplify_is_plain_real_const(a) &&
+        expr_simplify_is_exp_minus_one_local(b)) {
+        expr_retain(a);
+        coeff = a;
+    } else if (expr_simplify_is_plain_real_const(b) &&
+               expr_simplify_is_exp_minus_one_local(a)) {
+        expr_retain(b);
+        coeff = b;
+    } else {
+        return NULL;
+    }
+
+    e_const = expr_new_named_const(NUM_E, "e");
+    out = e_const ? expr_div(coeff, e_const) : NULL;
+    expr_free(e_const);
+    expr_free(coeff);
+    if (!out)
+        return NULL;
+
+    expr_free(a);
+    expr_free(b);
     return out;
 }
 

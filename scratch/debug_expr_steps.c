@@ -3,7 +3,7 @@
 #include <string.h>
 
 #include "expression.h"
-#include "expression/expr_internal.h"
+#include "internal/expr_internal.h"
 
 static char *expr_text_dup_local(const expr_t *expr, style_t style)
 {

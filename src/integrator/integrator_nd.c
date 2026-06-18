@@ -5,5 +5,6 @@ int intg_integral_multi(integrator_t *ig, expr_t *expr,
                       const number_t *lo, const number_t *hi,
                       number_t *result, number_t *error_est)
 {
+    intg_clear_exact_result(ig);
     return intg_integral_multi_num(ig, expr, ndim, vars, lo, hi, result, error_est);
 }

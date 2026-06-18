@@ -3986,3 +3986,36 @@ char *expr_binding_expr_to_tex(const expr_binding_expr_t *expr)
         return out;
     }
 }
+
+void expr_set_binding_pi_linear_family(expr_t *expr,
+                                       long denominator,
+                                       long n_coeff,
+                                       long offset)
+{
+    char n_term[64];
+    char offset_text[64];
+    char denominator_text[64];
+    expr_binding_expr_t *binding_expr;
+
+    if (!expr || denominator == 0L)
+        return;
+
+    snprintf(n_term, sizeof(n_term), "%ldn", n_coeff);
+    snprintf(offset_text, sizeof(offset_text), "%ld", offset);
+    snprintf(denominator_text, sizeof(denominator_text), "%ld", denominator);
+
+    binding_expr = expr_binding_expr_new_mul(
+        expr_binding_expr_new_div(
+            expr_binding_expr_new_number_text("1"),
+            expr_binding_expr_new_number_text(denominator_text)),
+        expr_binding_expr_new_mul(
+            expr_binding_expr_new_const(EXPR_BINDING_CONST_PI),
+            expr_binding_expr_new_add(
+                expr_binding_expr_new_number_text(n_term),
+                expr_binding_expr_new_number_text(offset_text))));
+    if (!binding_expr)
+        return;
+
+    expr_binding_expr_free(expr->binding_expr);
+    expr->binding_expr = binding_expr;
+}

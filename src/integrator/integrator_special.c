@@ -1,5 +1,9 @@
 #include "integrator_internal.h"
-#include "expression/expr_internal.h"
+#include "internal/expr_internal.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 enum {
     IG_POLY_COEFF_COUNT = 6,
@@ -151,8 +155,10 @@ static bool intg_match_scaled_affine_power_deg5_local(const expr_t *expr,
 {
     NUM_SCOPE(scope);
     const expr_t *base = NULL;
+    const expr_t *pow_base = NULL;
     number_t inner_scale = num_new();
     number_t degree = num_create_from_long(5);
+    number_t pow_degree = num_new();
     number_t constant = num_clone(NUM_ZERO);
 
     if (!expr || !scale_out || !constant_out || (ndim > 0u && (!vars || !coeffs_out)))
@@ -160,10 +166,9 @@ static bool intg_match_scaled_affine_power_deg5_local(const expr_t *expr,
 
     intg_number_array_zero(coeffs_out, ndim);
 
-    if (expr_is_pow_d_expr(expr) &&
-        expr->a &&
-        num_eq(expr->c, degree) &&
-        intg_match_affine_term_local(expr->a, ndim, vars, NUM_ONE, &constant, coeffs_out)) {
+    if (expr_match_pow_const(expr, &pow_base, &pow_degree) &&
+        num_eq(pow_degree, degree) &&
+        intg_match_affine_term_local(pow_base, ndim, vars, NUM_ONE, &constant, coeffs_out)) {
         num_destroy(scale_out);
         *scale_out = num_scope_detach(num_clone(NUM_ONE));
         num_destroy(constant_out);
@@ -176,10 +181,9 @@ static bool intg_match_scaled_affine_power_deg5_local(const expr_t *expr,
     constant = num_clone(NUM_ZERO);
     if (expr_match_scaled_expr(expr, &inner_scale, &base) &&
         num_is_real(inner_scale) &&
-        expr_is_pow_d_expr(base) &&
-        base->a &&
-        num_eq(base->c, degree) &&
-        intg_match_affine_term_local(base->a, ndim, vars, NUM_ONE, &constant, coeffs_out)) {
+        expr_match_pow_const(base, &pow_base, &pow_degree) &&
+        num_eq(pow_degree, degree) &&
+        intg_match_affine_term_local(pow_base, ndim, vars, NUM_ONE, &constant, coeffs_out)) {
         num_destroy(scale_out);
         *scale_out = num_scope_detach(inner_scale);
         num_destroy(constant_out);
@@ -215,6 +219,7 @@ static bool intg_collect_monomial_powers_local(const expr_t *expr,
     const expr_t *base = NULL;
     number_t value = num_new();
     number_t inner_scale = num_new();
+    number_t exponent = num_new();
     number_t degree_one = num_create_from_long(1);
     number_t degree_two = num_create_from_long(2);
     size_t index;
@@ -236,11 +241,10 @@ static bool intg_collect_monomial_powers_local(const expr_t *expr,
         return true;
     }
 
-    if (expr_is_pow_d_expr(expr) &&
-        expr->a &&
-        expr_match_var_expr(expr->a, ndim, vars, &index) &&
-        (num_eq(expr->c, degree_one) || num_eq(expr->c, degree_two))) {
-        powers_out[index] += num_eq(expr->c, degree_two) ? 2u : 1u;
+    if (expr_match_pow_const(expr, &base, &exponent) &&
+        expr_match_var_expr(base, ndim, vars, &index) &&
+        (num_eq(exponent, degree_one) || num_eq(exponent, degree_two))) {
+        powers_out[index] += num_eq(exponent, degree_two) ? 2u : 1u;
         return true;
     }
 
@@ -265,12 +269,65 @@ static bool intg_collect_monomial_powers_local(const expr_t *expr,
     return false;
 }
 
+static char *intg_dup_number_text_local(number_t value)
+{
+    string_t *text = num_to_string(value);
+    char *copy = text ? strdup(string_c_str(text)) : NULL;
+
+    string_free(text);
+    return copy;
+}
+
+static expr_t *intg_build_unit_box_exp_square_product_exact_expr(number_t a)
+{
+    expr_t *result = NULL;
+    char *a_text = NULL;
+    char *input = NULL;
+    size_t input_len;
+
+    if (!num_is_real(a) || !num_is_finite(a) || !num_gt(a, NUM_ZERO))
+        return NULL;
+
+    a_text = intg_dup_number_text_local(a);
+    if (!a_text)
+        return NULL;
+
+    if (num_eq(a, NUM_ONE)) {
+        input = strdup("{ 2*exp(-1) - 2 + 2*sqrt(pi)*erf(1) - gamma - E1(1) }");
+    } else {
+        input_len = strlen(a_text) * 7u + 128u;
+        input = malloc(input_len);
+        if (input) {
+            snprintf(input, input_len,
+                     "{ (2*exp(-(%s)) - 2 + 2*sqrt(pi)*sqrt(%s)*erf(sqrt(%s)) - gamma - ln(%s) - E1(%s))/(%s) }",
+                     a_text, a_text, a_text, a_text, a_text, a_text);
+        }
+    }
+
+    if (input) {
+        result = expr_from_string(input, NULL);
+        if (result) {
+            expr_t *simplified = expr_simplify(result);
+
+            if (simplified) {
+                expr_free(result);
+                result = simplified;
+            }
+        }
+    }
+
+    free(input);
+    free(a_text);
+    return result;
+}
+
 static int intg_eval_unit_box_exp_square_product(const expr_t *expr,
                                                  size_t ndim,
                                                  expr_t *const *vars,
                                                  const number_t *lo,
                                                  const number_t *hi,
-                                                 number_t *result)
+                                                 number_t *result,
+                                                 expr_t **exact_result_out)
 {
     const expr_t *arg = NULL;
     number_t scale = num_clone(NUM_ONE);
@@ -278,12 +335,14 @@ static int intg_eval_unit_box_exp_square_product(const expr_t *expr,
     size_t squared_count = 0u;
     size_t linear_count = 0u;
 
+    if (exact_result_out)
+        *exact_result_out = NULL;
+
     if (!expr || !vars || !result || ndim != 3u || !intg_bounds_are_unit_box(ndim, lo, hi))
         return 0;
-    if (!expr_is_op(expr, &ops_exp) || !expr->a)
+    if (!expr_match_exp_expr(expr, &arg))
         return 0;
 
-    arg = expr->a;
     if (!intg_collect_monomial_powers_local(arg, ndim, vars, &scale, powers)) {
         num_destroy(&scale);
         return 0;
@@ -342,6 +401,8 @@ static int intg_eval_unit_box_exp_square_product(const expr_t *expr,
             num_destroy(result);
             *result = num_scope_detach(out);
         }
+        if (exact_result_out)
+            *exact_result_out = intg_build_unit_box_exp_square_product_exact_expr(a);
         num_destroy(&a);
     }
 
@@ -1001,17 +1062,20 @@ int try_integral_multi_special_affine(integrator_t *ig, expr_t *expr,
     intg_affine_form_t form;
     int matched;
     number_t value = num_new();
+    expr_t *exact_result = NULL;
 
     (void)ig;
 
     if (!expr || !vars || !lo || !hi || !result || ndim == 0u || ndim > 4u)
         return 0;
 
-    matched = intg_eval_unit_box_exp_square_product(expr, ndim, vars, lo, hi, &value);
+    matched = intg_eval_unit_box_exp_square_product(expr, ndim, vars, lo, hi, &value,
+                                                    &exact_result);
     if (matched > 0) {
         *result = value;
         if (error_est)
             *error_est = num_clone(NUM_ZERO);
+        intg_set_exact_result_owned(ig, exact_result);
         if (ig)
             ig->last_intervals = 1u;
         return 1;

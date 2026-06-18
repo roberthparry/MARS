@@ -10,6 +10,7 @@
 
 #include "integrator.h"
 #include "expression.h"
+#include "internal/integrator_internal.h"
 #include "internal/number_internal.h"
 #include "ustring.h"
 
@@ -1292,6 +1293,8 @@ void test_multi_3d_exp_square_product(void) {
 
     {
         int s = intg_integral_multi(ig, expr, 3, vars, lo, hi, &result, &err);
+        const expr_t *exact = intg_get_exact_result(ig);
+        string_t *exact_text = exact ? expr_to_text(exact, style_UNBOUND) : NULL;
 
         printf("  ∫₀¹∫₀¹∫₀¹ exp(-x²yz) dx dy dz  [square-product exp]\n");
         test_num_printf_compat("  result   = %q\n", result);
@@ -1299,7 +1302,12 @@ void test_multi_3d_exp_square_product(void) {
         test_num_printf_compat("  err      = %q\n", err);
         test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
         ASSERT_TRUE(s == 0 || s == 1);
+        ASSERT_TRUE(exact != NULL);
+        ASSERT_TRUE(exact_text != NULL);
+        ASSERT_TRUE(strcmp(string_c_str(exact_text),
+                           "2·exp(-1) - 2 + 2·√(π)·erf(1) - γ - E1(1)") == 0);
         TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-27");
+        string_free(exact_text);
     }
 
     num_destroy(&expected);

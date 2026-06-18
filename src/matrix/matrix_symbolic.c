@@ -3,7 +3,6 @@
 #include <stdbool.h>
 #include "matrix_internal.h"
 #include "internal/expr_internal.h"
-#include "expression/expr_internal.h"
 
 static bool expr_node_is_exact_zero(const expr_t *dv)
 {

@@ -4,9 +4,9 @@
 #include <ctype.h>
 
 #include "expression.h"
-#include "expression/expr_internal.h"
 #include "integrator.h"
 #include "internal/expr_internal.h"
+#include "internal/integrator_internal.h"
 #include "number.h"
 #include "ustring.h"
 
@@ -273,45 +273,6 @@ static expr_t *binding_or_shadowing_var(expr_t **expr_io,
     return shadow;
 }
 
-static int expr_var_matches(const expr_t *left, const expr_t *right)
-{
-    if (!left || !right || !expr_is_var(left) || !expr_is_var(right))
-        return 0;
-    return left == right ||
-           (left->var_id != 0u && left->var_id == right->var_id);
-}
-
-static int expr_is_bound_in_var_list(const expr_t *expr,
-                                     size_t nvars,
-                                     expr_t *const *vars)
-{
-    size_t i;
-
-    if (!expr || !expr_is_var(expr) || !vars)
-        return 0;
-
-    for (i = 0u; i < nvars; ++i) {
-        if (expr_var_matches(expr, vars[i]))
-            return 1;
-    }
-    return 0;
-}
-
-static int expr_has_unbound_parameters(const expr_t *expr,
-                                       size_t nvars,
-                                       expr_t *const *vars)
-{
-    if (!expr)
-        return 0;
-    if ((expr_is_var(expr) || expr_is_const(expr)) &&
-        !expr_is_bound_in_var_list(expr, nvars, vars) &&
-        num_is_nan(expr->c)) {
-        return 1;
-    }
-    return expr_has_unbound_parameters(expr->a, nvars, vars) ||
-           expr_has_unbound_parameters(expr->b, nvars, vars);
-}
-
 static expr_t *make_unevaluated_antiderivative(const expr_t *integrand,
                                                const expr_t *wrt)
 {
@@ -336,11 +297,7 @@ static char *number_text(number_t value)
     return copy;
 }
 
-typedef enum {
-    BOUND_KIND_DEFINITE = 0,
-    BOUND_KIND_UPPER_ONLY,
-    BOUND_KIND_INDEFINITE
-} bound_kind_t;
+typedef expr_integration_bound_kind_t bound_kind_t;
 
 static char *dup_string(const char *text)
 {
@@ -509,9 +466,9 @@ static void print_integrator_context(const char *input,
             ? hi_display_inputs[i]
             : (hi_inputs && hi_inputs[i] ? hi_inputs[i] : "");
 
-        if (bound_kinds && bound_kinds[i] == BOUND_KIND_DEFINITE)
+        if (bound_kinds && bound_kinds[i] == EXPR_INTEGRATION_BOUND_DEFINITE)
             printf("bound       %s in [%s, %s]\n", name, lo, hi);
-        else if (bound_kinds && bound_kinds[i] == BOUND_KIND_UPPER_ONLY)
+        else if (bound_kinds && bound_kinds[i] == EXPR_INTEGRATION_BOUND_UPPER_ONLY)
             printf("bound       %s antiderivative at %s\n", name, hi);
         else
             printf("bound       antiderivative with respect to %s\n", name);
@@ -526,7 +483,7 @@ static int all_bounds_indefinite(size_t ndim, const bound_kind_t *kinds)
     if (!kinds)
         return 0;
     for (size_t i = 0; i < ndim; ++i) {
-        if (kinds[i] != BOUND_KIND_INDEFINITE)
+        if (kinds[i] != EXPR_INTEGRATION_BOUND_INDEFINITE)
             return 0;
     }
     return 1;
@@ -547,245 +504,6 @@ static int should_try_symbolic_first(const expr_t *expr,
         return 1;
 
     return expr_has_unbound_parameters(expr, ndim, vars);
-}
-
-static expr_t *symbolic_integral_prefix(const expr_t *integrand,
-                                        size_t ndim,
-                                        expr_t *const *vars,
-                                        const bound_kind_t *kinds,
-                                        expr_t *const *lo,
-                                        expr_t *const *hi,
-                                        size_t max_steps,
-                                        size_t *completed_steps_out,
-                                        expr_t **first_antiderivative_out);
-
-static expr_t *symbolic_integral(const expr_t *integrand,
-                                 size_t ndim,
-                                 expr_t *const *vars,
-                                 const bound_kind_t *kinds,
-                                 expr_t *const *lo,
-                                 expr_t *const *hi,
-                                 expr_t **first_antiderivative_out)
-{
-    size_t completed_steps = 0u;
-    size_t target_steps = ndim;
-
-    if (!integrand || !vars || !kinds || !lo || !hi)
-        return NULL;
-
-    return symbolic_integral_prefix(integrand, ndim, vars, kinds, lo, hi,
-                                    target_steps, &completed_steps,
-                                    first_antiderivative_out);
-}
-
-static expr_t *apply_symbolic_bound_step(expr_t *current,
-                                         expr_t *anti,
-                                         bound_kind_t kind,
-                                         expr_t *var,
-                                         expr_t *lo,
-                                         expr_t *hi)
-{
-    expr_t *upper = NULL;
-    expr_t *lower = NULL;
-    expr_t *diff = NULL;
-    expr_t *next = NULL;
-
-    if (!current || !anti || !var)
-        return NULL;
-
-    if (kind == BOUND_KIND_DEFINITE) {
-        if (!lo || !hi)
-            return NULL;
-        upper = expr_substitute(anti, var, hi);
-        lower = expr_substitute(anti, var, lo);
-        diff = (upper && lower) ? expr_sub(upper, lower) : NULL;
-        next = diff ? expr_simplify(diff) : NULL;
-    } else if (kind == BOUND_KIND_UPPER_ONLY) {
-        if (!hi)
-            return NULL;
-        upper = expr_substitute(anti, var, hi);
-        next = upper ? expr_simplify(upper) : NULL;
-    } else {
-        next = expr_simplify(anti);
-    }
-
-    expr_free(diff);
-    expr_free(lower);
-    expr_free(upper);
-    return next;
-}
-
-static expr_t *symbolic_integral_prefix(const expr_t *integrand,
-                                        size_t ndim,
-                                        expr_t *const *vars,
-                                        const bound_kind_t *kinds,
-                                        expr_t *const *lo,
-                                        expr_t *const *hi,
-                                        size_t max_steps,
-                                        size_t *completed_steps_out,
-                                        expr_t **first_antiderivative_out)
-{
-    expr_t *current = NULL;
-    size_t completed_steps = 0u;
-
-    if (!integrand || !vars || !kinds || !lo || !hi)
-        return NULL;
-
-    if (completed_steps_out)
-        *completed_steps_out = 0u;
-    if (first_antiderivative_out)
-        *first_antiderivative_out = NULL;
-
-    current = expr_simplify(integrand);
-    if (!current)
-        return NULL;
-
-    for (size_t i = 0; i < ndim && i < max_steps; ++i) {
-        expr_t *anti;
-        expr_t *upper = NULL;
-        expr_t *lower = NULL;
-        expr_t *diff = NULL;
-        expr_t *next;
-
-        anti = expr_integrate(current, vars[i]);
-        if (!anti) {
-            expr_free(current);
-            return NULL;
-        }
-
-        if (i == 0u && first_antiderivative_out) {
-            expr_retain(anti);
-            *first_antiderivative_out = anti;
-        }
-
-        if (kinds[i] == BOUND_KIND_DEFINITE) {
-            if (!lo[i] || !hi[i])
-                next = NULL;
-            else {
-                upper = expr_substitute(anti, vars[i], hi[i]);
-                lower = expr_substitute(anti, vars[i], lo[i]);
-                diff = (upper && lower) ? expr_sub(upper, lower) : NULL;
-                next = diff ? expr_simplify(diff) : NULL;
-            }
-        } else if (kinds[i] == BOUND_KIND_UPPER_ONLY) {
-            if (!hi[i])
-                next = NULL;
-            else {
-                upper = expr_substitute(anti, vars[i], hi[i]);
-                next = upper ? expr_simplify(upper) : NULL;
-            }
-        } else {
-            next = expr_simplify(anti);
-        }
-
-        expr_free(diff);
-        expr_free(lower);
-        expr_free(upper);
-        expr_free(anti);
-        expr_free(current);
-
-        if (!next) {
-            if (first_antiderivative_out) {
-                expr_free(*first_antiderivative_out);
-                *first_antiderivative_out = NULL;
-            }
-            return NULL;
-        }
-        current = next;
-        completed_steps = i + 1u;
-    }
-
-    if (completed_steps_out)
-        *completed_steps_out = completed_steps;
-    return current;
-}
-
-static expr_t *symbolic_integral_best_effort(const expr_t *integrand,
-                                             size_t ndim,
-                                             expr_t *const *vars,
-                                             const bound_kind_t *kinds,
-                                             expr_t *const *lo,
-                                             expr_t *const *hi,
-                                             size_t *completed_steps_out,
-                                             size_t *remaining_ndim_out,
-                                             expr_t **remaining_vars_out,
-                                             number_t *remaining_lo_num_out,
-                                             number_t *remaining_hi_num_out,
-                                             const number_t *lo_num,
-                                             const number_t *hi_num)
-{
-    expr_t *current = NULL;
-    int *active = NULL;
-    size_t remaining = ndim;
-    size_t completed = 0u;
-
-    if (!integrand || !vars || !kinds || !lo || !hi || !completed_steps_out ||
-        !remaining_ndim_out || !remaining_vars_out ||
-        (ndim > 0u && (!remaining_lo_num_out || !remaining_hi_num_out ||
-                       !lo_num || !hi_num)))
-        return NULL;
-
-    *completed_steps_out = 0u;
-    *remaining_ndim_out = 0u;
-
-    current = expr_simplify(integrand);
-    if (!current)
-        return NULL;
-
-    active = calloc(ndim, sizeof(*active));
-    if (!active) {
-        expr_free(current);
-        return NULL;
-    }
-
-    for (size_t i = 0; i < ndim; ++i)
-        active[i] = 1;
-
-    while (remaining > 0u) {
-        int progressed = 0;
-
-        for (size_t i = ndim; i-- > 0u;) {
-            expr_t *anti;
-            expr_t *next;
-
-            if (!active[i])
-                continue;
-
-            anti = expr_integrate(current, vars[i]);
-            if (!anti)
-                continue;
-
-            next = apply_symbolic_bound_step(current, anti, kinds[i], vars[i], lo[i], hi[i]);
-            expr_free(anti);
-            if (!next)
-                continue;
-
-            expr_free(current);
-            current = next;
-            active[i] = 0;
-            remaining--;
-            completed++;
-            progressed = 1;
-            break;
-        }
-
-        if (!progressed)
-            break;
-    }
-
-    for (size_t i = 0, out = 0u; i < ndim; ++i) {
-        if (!active[i])
-            continue;
-        remaining_vars_out[out] = vars[i];
-        remaining_lo_num_out[out] = num_clone(lo_num[i]);
-        remaining_hi_num_out[out] = num_clone(hi_num[i]);
-        out++;
-    }
-
-    free(active);
-    *completed_steps_out = completed;
-    *remaining_ndim_out = remaining;
-    return current;
 }
 
 static char *integral_tex(const char *body,
@@ -812,19 +530,19 @@ static char *integral_tex(const char *body,
     for (size_t i = ndim; i-- > 0;) {
         int wrote;
 
-        if (kinds[i] == BOUND_KIND_DEFINITE && (!lo[i] || !hi[i])) {
+        if (kinds[i] == EXPR_INTEGRATION_BOUND_DEFINITE && (!lo[i] || !hi[i])) {
             free(result);
             return NULL;
         }
-        if (kinds[i] == BOUND_KIND_UPPER_ONLY && !hi[i]) {
+        if (kinds[i] == EXPR_INTEGRATION_BOUND_UPPER_ONLY && !hi[i]) {
             free(result);
             return NULL;
         }
 
-        if (kinds[i] == BOUND_KIND_DEFINITE) {
+        if (kinds[i] == EXPR_INTEGRATION_BOUND_DEFINITE) {
             wrote = snprintf(result + len, cap - len,
                              "\\int_{%s}^{%s} ", lo[i], hi[i]);
-        } else if (kinds[i] == BOUND_KIND_UPPER_ONLY) {
+        } else if (kinds[i] == EXPR_INTEGRATION_BOUND_UPPER_ONLY) {
             wrote = snprintf(result + len, cap - len,
                              "\\int^{%s} ", hi[i]);
         } else {
@@ -917,6 +635,7 @@ int main(int argc, char **argv)
     int used_symbolic_numeric_result = 0;
     int used_unevaluated_antiderivative_fallback = 0;
     int used_partial_symbolic_numeric = 0;
+    int used_core_exact_result = 0;
     int has_unbound_params = 0;
     size_t partial_symbolic_steps = 0u;
     size_t remaining_numeric_ndim = 0u;
@@ -997,7 +716,7 @@ int main(int argc, char **argv)
         var_names[0] = "x";
         lo_inputs[0] = "0";
         hi_inputs[0] = "pi";
-        bound_kinds[0] = BOUND_KIND_DEFINITE;
+        bound_kinds[0] = EXPR_INTEGRATION_BOUND_DEFINITE;
         lo_num[0] = num_create_from_long(0);
         hi_num[0] = num_clone(NUM_PI);
         lo_expr[0] = parse_bound_expression(lo_inputs[0], precision);
@@ -1021,7 +740,7 @@ int main(int argc, char **argv)
             has_lo = lo_text_in && lo_text_in[0] != '\0';
             has_hi = hi_text_in && hi_text_in[0] != '\0';
             if (has_lo && has_hi) {
-                bound_kinds[i] = BOUND_KIND_DEFINITE;
+                bound_kinds[i] = EXPR_INTEGRATION_BOUND_DEFINITE;
                 lo_expr[i] = parse_bound_expression(lo_text_in, precision);
                 hi_expr[i] = parse_bound_expression(hi_text_in, precision);
                 if (!lo_expr[i] || !hi_expr[i]) {
@@ -1029,7 +748,7 @@ int main(int argc, char **argv)
                     goto cleanup;
                 }
             } else if (!has_lo && has_hi) {
-                bound_kinds[i] = BOUND_KIND_UPPER_ONLY;
+                bound_kinds[i] = EXPR_INTEGRATION_BOUND_UPPER_ONLY;
                 hi_expr[i] = parse_bound_expression(hi_text_in, precision);
                 if (!hi_expr[i]) {
                     fprintf(stderr, "Could not parse upper bound for %s\n", name);
@@ -1037,13 +756,13 @@ int main(int argc, char **argv)
                 }
                 all_bounds_numeric = 0;
             } else if (!has_lo && !has_hi) {
-                bound_kinds[i] = BOUND_KIND_INDEFINITE;
+                bound_kinds[i] = EXPR_INTEGRATION_BOUND_INDEFINITE;
                 all_bounds_numeric = 0;
             } else {
                 fprintf(stderr, "A one-sided bound for %s must be supplied as an upper bound\n", name);
                 goto cleanup;
             }
-            if (bound_kinds[i] == BOUND_KIND_DEFINITE) {
+            if (bound_kinds[i] == EXPR_INTEGRATION_BOUND_DEFINITE) {
                 int lo_numeric = parse_number_bound(lo_text_in, precision, &lo_num[i]) == 0;
                 int hi_numeric = parse_number_bound(hi_text_in, precision, &hi_num[i]) == 0;
 
@@ -1097,8 +816,8 @@ int main(int argc, char **argv)
 
     has_unbound_params = expr_has_unbound_parameters(expr, ndim, vars);
     if (should_try_symbolic_first(expr, ndim, vars, all_bounds_numeric)) {
-        symbolic_result = symbolic_integral(expr, ndim, vars, bound_kinds, lo_expr, hi_expr,
-                                            &first_antiderivative);
+        symbolic_result = expr_integrate_iterated(expr, ndim, vars, bound_kinds, lo_expr, hi_expr,
+                                                  ndim, NULL, &first_antiderivative);
         if (!symbolic_result && !first_antiderivative && ndim == 1u)
             first_antiderivative = make_unevaluated_antiderivative(expr, vars[0]);
         if (first_antiderivative) {
@@ -1128,7 +847,7 @@ int main(int argc, char **argv)
                                    &value_num, &error_num);
         ran_numeric_integrator = 1;
     } else if (all_bounds_numeric) {
-        partially_symbolic_result = symbolic_integral_best_effort(
+        partially_symbolic_result = expr_integrate_iterated_best_effort(
             expr, ndim, vars, bound_kinds, lo_expr, hi_expr,
             &partial_symbolic_steps, &remaining_numeric_ndim,
             remaining_numeric_vars, remaining_lo_num, remaining_hi_num,
@@ -1203,6 +922,22 @@ int main(int argc, char **argv)
         fprintf(stderr, "Integration failed\n");
         goto cleanup;
     }
+
+    if (ran_numeric_integrator && intg_rc >= 0 &&
+        !symbolic_result && !symbolic_text && !symbolic_tex) {
+        symbolic_result = expr_retain_expr(intg_get_exact_result(ig));
+        if (symbolic_result) {
+            used_core_exact_result = 1;
+            symbolic_text = expr_text_dup(symbolic_result, style_UNBOUND);
+            symbolic_tex = expr_tex_body(symbolic_result);
+            symbolic_num = expr_eval(symbolic_result);
+            if (!num_is_nan(symbolic_num) && num_is_finite(symbolic_num) &&
+                num_is_real(symbolic_num)) {
+                symbolic_value_text = number_text(symbolic_num);
+            }
+        }
+    }
+
     if (ran_numeric_integrator) {
         value_text = number_text(value_num);
         error_text = number_text(error_num);
@@ -1247,14 +982,16 @@ int main(int argc, char **argv)
                        "symbolic exact result");
         else if (used_unevaluated_antiderivative_fallback)
             printf("status      symbolic antiderivative fallback\n");
-        else if (ndim == 1u && bound_kinds[0] == BOUND_KIND_INDEFINITE)
+        else if (ndim == 1u && bound_kinds[0] == EXPR_INTEGRATION_BOUND_INDEFINITE)
             printf("status      symbolic antiderivative\n");
-        else if (ndim == 1u && bound_kinds[0] == BOUND_KIND_UPPER_ONLY)
+        else if (ndim == 1u && bound_kinds[0] == EXPR_INTEGRATION_BOUND_UPPER_ONLY)
             printf("status      symbolic upper-bound result\n");
         else
             printf("status      symbolic result\n");
     } else if (intg_rc == 0) {
         printf("status      %s\n",
+               used_core_exact_result ?
+                   "closed-form fast path" :
                used_partial_symbolic_numeric ?
                    "symbolic reduction + converged" :
                    "converged");

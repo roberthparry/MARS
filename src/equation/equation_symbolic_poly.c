@@ -2,7 +2,7 @@
 #include <stddef.h>
 
 #include "equation_internal.h"
-#include "expression/expr_internal.h"
+#include "internal/expr_internal.h"
 
 enum {
     EQUATION_SYMBOLIC_POLY_MAX_DEGREE = 3u,
@@ -232,24 +232,28 @@ static long equ_symbolic_power_number_to_long(number_t value)
     return -1L;
 }
 
-static long equ_symbolic_power_exponent(const expr_t *expr)
+static long equ_symbolic_power_exponent(const expr_t *expr, const expr_t **base_out)
 {
     number_t exponent = num_new();
+    const expr_t *base = NULL;
+    const expr_t *exponent_expr = NULL;
     long out = -1L;
 
     if (!expr)
         goto cleanup;
 
-    if (expr->ops && expr->ops->kind == EXPR_KIND_POW_D) {
-        out = equ_symbolic_power_number_to_long(expr->c);
+    if (expr_match_pow_const(expr, &base, &exponent)) {
+        out = equ_symbolic_power_number_to_long(exponent);
         goto cleanup;
     }
 
-    if (expr->ops && expr->ops->kind == EXPR_KIND_POW &&
-        expr->b && expr_match_const_value(expr->b, &exponent))
+    if (expr_match_pow_expr(expr, &base, &exponent_expr) &&
+        expr_match_const_value(exponent_expr, &exponent))
         out = equ_symbolic_power_number_to_long(exponent);
 
 cleanup:
+    if (out >= 0L && base_out)
+        *base_out = base;
     num_destroy(&exponent);
     return out;
 }
@@ -293,11 +297,12 @@ static bool equ_symbolic_poly_collect_power(const expr_t *expr,
                                                  const expr_t *wrt,
                                                  equation_symbolic_poly_t *poly)
 {
-    long exponent = equ_symbolic_power_exponent(expr);
+    const expr_t *base = NULL;
+    long exponent = equ_symbolic_power_exponent(expr, &base);
 
-    if (exponent < 0L)
+    if (exponent < 0L || !base)
         return false;
-    return equ_symbolic_poly_copy_power(expr->a, wrt, exponent, poly);
+    return equ_symbolic_poly_copy_power(base, wrt, exponent, poly);
 }
 
 static bool equ_symbolic_poly_collect(const expr_t *expr,
@@ -317,7 +322,7 @@ static bool equ_symbolic_poly_collect(const expr_t *expr,
     if (equ_expr_is_wrt(expr, wrt))
         return equ_symbolic_add_const(poly, 1u, 1L);
 
-    if (expr_match_unary_op(expr, EXPR_KIND_NEG, &left))
+    if (expr_match_neg_expr(expr, &left))
         return equ_symbolic_poly_collect_neg(left, wrt, poly);
 
     if (expr_match_add_sub_expr(expr, &left, &right, &is_sub)) {

@@ -4,7 +4,7 @@
 
 #include "equation.h"
 #include "equation_internal.h"
-#include "expression/expr_stringin_internal.h"
+#include "internal/expr_internal.h"
 
 typedef struct {
     string_view_t lhs;
