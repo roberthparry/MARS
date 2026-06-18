@@ -1,8 +1,9 @@
 #include "integrator_internal.h"
+#include "expression/expr_internal.h"
 
 enum {
-    IG_POLY_COEFF_COUNT = 5,
-    IG_POLY_WORK_COUNT = 10
+    IG_POLY_COEFF_COUNT = 6,
+    IG_POLY_WORK_COUNT = 11
 };
 
 typedef enum {
@@ -86,6 +87,267 @@ static bool intg_number_array_copy(number_t *dst, const number_t *src, size_t co
     return true;
 }
 
+static bool intg_match_affine_term_local(const expr_t *expr,
+                                         size_t ndim,
+                                         expr_t *const *vars,
+                                         number_t scale,
+                                         number_t *constant_io,
+                                         number_t *coeffs_io)
+{
+    NUM_SCOPE(scope);
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+    const expr_t *base = NULL;
+    number_t value = num_new();
+    number_t inner_scale = num_new();
+    bool is_sub = false;
+    size_t index;
+
+    if (!expr || !constant_io || (ndim > 0u && (!vars || !coeffs_io)))
+        return false;
+
+    if (expr_match_const_value(expr, &value)) {
+        number_t next = num_add(*constant_io, num_mul(scale, value));
+
+        num_destroy(constant_io);
+        *constant_io = num_scope_detach(next);
+        return true;
+    }
+
+    if (expr_match_var_expr(expr, ndim, vars, &index)) {
+        number_t next = num_add(coeffs_io[index], scale);
+
+        num_destroy(&coeffs_io[index]);
+        coeffs_io[index] = num_scope_detach(next);
+        return true;
+    }
+
+    if (expr_match_add_sub_expr(expr, &left, &right, &is_sub)) {
+        number_t right_scale = is_sub ? num_neg(scale) : num_clone(scale);
+
+        return intg_match_affine_term_local(left, ndim, vars, scale,
+                                            constant_io, coeffs_io) &&
+               intg_match_affine_term_local(right, ndim, vars, right_scale,
+                                            constant_io, coeffs_io);
+    }
+
+    if (expr_match_scaled_expr(expr, &inner_scale, &base) &&
+        num_is_real(inner_scale)) {
+        number_t product = num_mul(scale, inner_scale);
+
+        return intg_match_affine_term_local(base, ndim, vars, product,
+                                            constant_io, coeffs_io);
+    }
+
+    return false;
+}
+
+static bool intg_match_scaled_affine_power_deg5_local(const expr_t *expr,
+                                                      size_t ndim,
+                                                      expr_t *const *vars,
+                                                      number_t *scale_out,
+                                                      number_t *constant_out,
+                                                      number_t *coeffs_out)
+{
+    NUM_SCOPE(scope);
+    const expr_t *base = NULL;
+    number_t inner_scale = num_new();
+    number_t degree = num_create_from_long(5);
+    number_t constant = num_clone(NUM_ZERO);
+
+    if (!expr || !scale_out || !constant_out || (ndim > 0u && (!vars || !coeffs_out)))
+        return false;
+
+    intg_number_array_zero(coeffs_out, ndim);
+
+    if (expr_is_pow_d_expr(expr) &&
+        expr->a &&
+        num_eq(expr->c, degree) &&
+        intg_match_affine_term_local(expr->a, ndim, vars, NUM_ONE, &constant, coeffs_out)) {
+        num_destroy(scale_out);
+        *scale_out = num_scope_detach(num_clone(NUM_ONE));
+        num_destroy(constant_out);
+        *constant_out = num_scope_detach(constant);
+        return true;
+    }
+    num_destroy(&constant);
+
+    intg_number_array_zero(coeffs_out, ndim);
+    constant = num_clone(NUM_ZERO);
+    if (expr_match_scaled_expr(expr, &inner_scale, &base) &&
+        num_is_real(inner_scale) &&
+        expr_is_pow_d_expr(base) &&
+        base->a &&
+        num_eq(base->c, degree) &&
+        intg_match_affine_term_local(base->a, ndim, vars, NUM_ONE, &constant, coeffs_out)) {
+        num_destroy(scale_out);
+        *scale_out = num_scope_detach(inner_scale);
+        num_destroy(constant_out);
+        *constant_out = num_scope_detach(constant);
+        return true;
+    }
+
+    num_destroy(&constant);
+    return false;
+}
+
+static bool intg_bounds_are_unit_box(size_t ndim,
+                                     const number_t *lo,
+                                     const number_t *hi)
+{
+    if (!lo || !hi)
+        return false;
+    for (size_t i = 0; i < ndim; ++i) {
+        if (!num_eq(lo[i], NUM_ZERO) || !num_eq(hi[i], NUM_ONE))
+            return false;
+    }
+    return true;
+}
+
+static bool intg_collect_monomial_powers_local(const expr_t *expr,
+                                               size_t ndim,
+                                               expr_t *const *vars,
+                                               number_t *scale_io,
+                                               unsigned int *powers_out)
+{
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+    const expr_t *base = NULL;
+    number_t value = num_new();
+    number_t inner_scale = num_new();
+    number_t degree_one = num_create_from_long(1);
+    number_t degree_two = num_create_from_long(2);
+    size_t index;
+
+    if (!expr || !scale_io || !powers_out || ndim == 0u || !vars)
+        return false;
+
+    if (expr_match_const_value(expr, &value) &&
+        num_is_real(value) && num_is_finite(value)) {
+        number_t next = num_mul(*scale_io, value);
+
+        num_destroy(scale_io);
+        *scale_io = next;
+        return true;
+    }
+
+    if (expr_match_var_expr(expr, ndim, vars, &index)) {
+        powers_out[index] += 1u;
+        return true;
+    }
+
+    if (expr_is_pow_d_expr(expr) &&
+        expr->a &&
+        expr_match_var_expr(expr->a, ndim, vars, &index) &&
+        (num_eq(expr->c, degree_one) || num_eq(expr->c, degree_two))) {
+        powers_out[index] += num_eq(expr->c, degree_two) ? 2u : 1u;
+        return true;
+    }
+
+    if (expr_match_scaled_expr(expr, &inner_scale, &base) &&
+        base != expr &&
+        num_is_real(inner_scale) &&
+        num_is_finite(inner_scale)) {
+        number_t next = num_mul(*scale_io, inner_scale);
+
+        num_destroy(scale_io);
+        *scale_io = next;
+        return intg_collect_monomial_powers_local(base, ndim, vars, scale_io,
+                                                  powers_out);
+    }
+
+    if (expr_match_mul_expr(expr, &left, &right))
+        return intg_collect_monomial_powers_local(left, ndim, vars, scale_io,
+                                                  powers_out) &&
+               intg_collect_monomial_powers_local(right, ndim, vars, scale_io,
+                                                  powers_out);
+
+    return false;
+}
+
+static int intg_eval_unit_box_exp_square_product(const expr_t *expr,
+                                                 size_t ndim,
+                                                 expr_t *const *vars,
+                                                 const number_t *lo,
+                                                 const number_t *hi,
+                                                 number_t *result)
+{
+    const expr_t *arg = NULL;
+    number_t scale = num_clone(NUM_ONE);
+    unsigned int powers[4] = { 0u, 0u, 0u, 0u };
+    size_t squared_count = 0u;
+    size_t linear_count = 0u;
+
+    if (!expr || !vars || !result || ndim != 3u || !intg_bounds_are_unit_box(ndim, lo, hi))
+        return 0;
+    if (!expr_is_op(expr, &ops_exp) || !expr->a)
+        return 0;
+
+    arg = expr->a;
+    if (!intg_collect_monomial_powers_local(arg, ndim, vars, &scale, powers)) {
+        num_destroy(&scale);
+        return 0;
+    }
+    if (!num_is_real(scale) || !num_is_finite(scale) || !num_lt(scale, NUM_ZERO)) {
+        num_destroy(&scale);
+        return 0;
+    }
+
+    for (size_t i = 0; i < ndim; ++i) {
+        if (powers[i] == 2u)
+            squared_count++;
+        else if (powers[i] == 1u)
+            linear_count++;
+        else {
+            num_destroy(&scale);
+            return 0;
+        }
+    }
+    if (squared_count != 1u || linear_count != 2u) {
+        num_destroy(&scale);
+        return 0;
+    }
+
+    {
+        NUM_SCOPE(scope);
+        number_t a = num_scope_detach(num_neg(scale));
+
+        num_destroy(&scale);
+        if (!num_is_real(a) || !num_is_finite(a) || !num_gt(a, NUM_ZERO)) {
+            num_destroy(&a);
+            return 0;
+        }
+
+        {
+            number_t sqrt_a = num_sqrt(a);
+            number_t exp_neg_a = num_exp(num_neg(a));
+            number_t erf_sqrt_a = num_erf(sqrt_a);
+            number_t sqrt_pi = num_sqrt(NUM_PI);
+            number_t two = num_create_from_long(2L);
+            number_t two_exp = num_mul_long(exp_neg_a, 2L);
+            number_t two_sqrt_pi = num_mul_long(sqrt_pi, 2L);
+            number_t two_sqrt_pi_sqrt_a = num_mul(two_sqrt_pi, sqrt_a);
+            number_t erf_term = num_mul(two_sqrt_pi_sqrt_a, erf_sqrt_a);
+            number_t e1_term = num_e1(a);
+            number_t log_term = num_log(a);
+            number_t sum = num_add(two_exp, erf_term);
+            number_t out;
+
+            sum = num_sub(sum, two);
+            sum = num_sub(sum, NUM_EULER_MASCHERONI);
+            sum = num_sub(sum, log_term);
+            sum = num_sub(sum, e1_term);
+            out = num_div(sum, a);
+
+            num_destroy(result);
+            *result = num_scope_detach(out);
+        }
+        num_destroy(&a);
+    }
+
+    return 1;
+}
+
 static int intg_match_affine_form(const expr_t *expr, size_t ndim,
                                 expr_t *const *vars, intg_affine_form_t *form)
 {
@@ -132,6 +394,12 @@ static int intg_match_affine_form(const expr_t *expr, size_t ndim,
 
     if (expr_match_affine_poly_deg4(expr, ndim, vars, poly, &constant, coeffs)) {
         form->kind = IG_SPECIAL_POLY;
+        matched = true;
+    } else if (intg_match_scaled_affine_power_deg5_local(expr, ndim, vars,
+                                                         &scale, &constant, coeffs)) {
+        form->kind = IG_SPECIAL_POLY;
+        num_destroy(&poly[5]);
+        poly[5] = num_clone(scale);
         matched = true;
     } else if (expr_match_unary_affine_kind(expr, EXPR_PATTERN_UNARY_EXP, ndim, vars,
                                             &constant, coeffs)) {
@@ -738,6 +1006,16 @@ int try_integral_multi_special_affine(integrator_t *ig, expr_t *expr,
 
     if (!expr || !vars || !lo || !hi || !result || ndim == 0u || ndim > 4u)
         return 0;
+
+    matched = intg_eval_unit_box_exp_square_product(expr, ndim, vars, lo, hi, &value);
+    if (matched > 0) {
+        *result = value;
+        if (error_est)
+            *error_est = num_clone(NUM_ZERO);
+        if (ig)
+            ig->last_intervals = 1u;
+        return 1;
+    }
 
     intg_affine_form_init(&form, ndim);
     matched = intg_match_affine_form(expr, ndim, vars, &form);

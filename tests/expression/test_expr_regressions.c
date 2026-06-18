@@ -677,6 +677,20 @@ static void test_new_const_num_preserves_mpfr_precision(void)
     num_destroy(&n);
 }
 
+static void test_inexact_known_constant_uses_short_text(void)
+{
+    number_t n = num_const_prec_digits(NUM_SQRT1ONPI, 80u);
+    expr_t *expr = expr_new_const(n);
+    char *expr_text = expr ? expr_to_string(expr, style_UNBOUND) : NULL;
+
+    ASSERT_TRUE(expr_text != NULL);
+    ASSERT_TRUE(strcmp(expr_text, "1/√π") == 0);
+
+    free(expr_text);
+    expr_free(expr);
+    num_destroy(&n);
+}
+
 static void test_set_val_num_preserves_mpfr_precision(void)
 {
     number_t n = num_from_text_bits("1.25", 640u);
@@ -3695,6 +3709,7 @@ void test_runtime_regressions(void)
 {
     TEST_RUN_SUBTEST(test_cmp_qfloat_precision, NULL);
     TEST_RUN_SUBTEST(test_new_const_num_preserves_mpfr_precision, NULL);
+    TEST_RUN_SUBTEST(test_inexact_known_constant_uses_short_text, NULL);
     TEST_RUN_SUBTEST(test_set_val_num_preserves_mpfr_precision, NULL);
     TEST_RUN_SUBTEST(test_new_const_num_preserves_complex_precision, NULL);
     TEST_RUN_SUBTEST(test_set_val_num_preserves_complex_precision, NULL);

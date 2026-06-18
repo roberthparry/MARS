@@ -1223,6 +1223,100 @@ void test_multi_3d(void) {
     intg_free(ig);
 }
 
+void test_multi_3d_affine_quintic(void) {
+    /* ∫₀¹∫₀¹∫₀¹ (x+y+z)^5 dx dy dz = 69/4 — simple affine quintic */
+    integrator_t *ig = intg_new();
+    expr_t *x = test_expr_new_var_num(test_num_from_double(0.0));
+    expr_t *y = test_expr_new_var_num(test_num_from_double(0.0));
+    expr_t *z = test_expr_new_var_num(test_num_from_double(0.0));
+    expr_t *xy = expr_add(x, y);
+    expr_t *sum = expr_add(xy, z);
+    expr_t *expr = expr_pow_d(sum, 5.0);
+
+    expr_t *vars[3] = { x, y, z };
+    number_t lo[3] = { test_num_from_double(0.0), test_num_from_double(0.0),
+                       test_num_from_double(0.0) };
+    number_t hi[3] = { test_num_from_double(1.0), test_num_from_double(1.0),
+                       test_num_from_double(1.0) };
+
+    number_t result, err;
+    int s = intg_integral_multi(ig, expr, 3, vars, lo, hi, &result, &err);
+    number_t expected = num_create_from_string("17.25");
+
+    printf("  ∫₀¹∫₀¹∫₀¹ (x+y+z)^5 dx dy dz  [affine quintic]\n");
+    test_num_printf_compat("  result   = %q\n", result);
+    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  err      = %q\n", err);
+    test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
+    ASSERT_TRUE(s == 0 || s == 1);
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-27");
+
+    expr_free(expr);
+    expr_free(sum);
+    expr_free(xy);
+    expr_free(z);
+    expr_free(y);
+    expr_free(x);
+    intg_free(ig);
+}
+
+void test_multi_3d_exp_square_product(void) {
+    /* ∫₀¹∫₀¹∫₀¹ exp(-x²yz) dx dy dz = 2e⁻¹ - 2 + 2√π erf(1) - γ - E₁(1) */
+    integrator_t *ig = intg_new();
+    expr_t *x = test_expr_new_var_num(test_num_from_double(0.0));
+    expr_t *y = test_expr_new_var_num(test_num_from_double(0.0));
+    expr_t *z = test_expr_new_var_num(test_num_from_double(0.0));
+    expr_t *x2 = expr_pow_d(x, 2.0);
+    expr_t *yz = expr_mul(y, z);
+    expr_t *prod = expr_mul(x2, yz);
+    expr_t *neg_prod = expr_neg(prod);
+    expr_t *expr = expr_exp(neg_prod);
+
+    expr_t *vars[3] = { x, y, z };
+    number_t lo[3] = { test_num_from_double(0.0), test_num_from_double(0.0),
+                       test_num_from_double(0.0) };
+    number_t hi[3] = { test_num_from_double(1.0), test_num_from_double(1.0),
+                       test_num_from_double(1.0) };
+    number_t result;
+    number_t err;
+    number_t expected = num_new();
+    number_t term_exp = test_num_mul_double(num_exp(test_num_from_double(-1.0)), 2.0);
+    number_t term_erf = num_mul(test_num_mul_double(num_sqrt(NUM_PI), 2.0), num_erf(NUM_ONE));
+    number_t term_e1 = num_e1(NUM_ONE);
+    number_t sum = num_add(term_exp, term_erf);
+
+    sum = num_sub(sum, test_num_from_double(2.0));
+    sum = num_sub(sum, NUM_EULER_MASCHERONI);
+    sum = num_sub(sum, term_e1);
+    expected = sum;
+
+    {
+        int s = intg_integral_multi(ig, expr, 3, vars, lo, hi, &result, &err);
+
+        printf("  ∫₀¹∫₀¹∫₀¹ exp(-x²yz) dx dy dz  [square-product exp]\n");
+        test_num_printf_compat("  result   = %q\n", result);
+        test_num_printf_compat("  expected = %q\n", expected);
+        test_num_printf_compat("  err      = %q\n", err);
+        test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
+        ASSERT_TRUE(s == 0 || s == 1);
+        TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-27");
+    }
+
+    num_destroy(&expected);
+    num_destroy(&term_e1);
+    num_destroy(&term_erf);
+    num_destroy(&term_exp);
+    expr_free(expr);
+    expr_free(neg_prod);
+    expr_free(prod);
+    expr_free(yz);
+    expr_free(x2);
+    expr_free(z);
+    expr_free(y);
+    expr_free(x);
+    intg_free(ig);
+}
+
 void test_multi_null_safety(void) {
     integrator_t *ig = intg_new();
     expr_t *x    = test_expr_new_var_num(test_num_from_double(0.0));
@@ -3109,6 +3203,44 @@ void test_multi_2d_affine_poly_times_sin_affine_combination(void) {
     intg_free(ig);
 }
 
+static void test_nested_unevaluated_integral_integrand(void)
+{
+    integrator_t *ig = intg_new();
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = expr_from_string("{ integral(x, t^2, t) }", &bindings);
+    expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    number_t lo = num_create_from_long(0);
+    number_t hi = num_create_from_long(1);
+    number_t expected = num_create_from_string("1/12");
+    number_t result = num_new();
+    number_t err = num_new();
+    int s;
+
+    ASSERT_NOT_NULL(ig);
+    ASSERT_NOT_NULL(expr);
+    ASSERT_NOT_NULL(x);
+
+    s = intg_integral(ig, expr, x, lo, hi, &result, &err);
+
+    printf("  ∫₀¹ (∫₀ˣ t² dt) dx  [nested unevaluated integral]\n");
+    test_num_printf_compat("  result   = %q\n", result);
+    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  err      = %q\n", err);
+    test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
+    ASSERT_TRUE(s == 0 || s == 1);
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-20");
+    ASSERT_TRUE(intg_get_interval_count_used(ig) >= 1u);
+
+    num_destroy(&err);
+    num_destroy(&result);
+    num_destroy(&expected);
+    num_destroy(&hi);
+    num_destroy(&lo);
+    expr_free(expr);
+    expr_bindings_free(bindings);
+    intg_free(ig);
+}
+
 /* -----------------------------------------------------------------------
  * README examples
  * --------------------------------------------------------------------- */
@@ -3261,6 +3393,7 @@ int tests_main(void) {
     TEST_RUN_IN_GROUP(test_constant, tests, NULL);
     TEST_RUN_IN_GROUP(test_linear, tests, NULL);
     TEST_RUN_IN_GROUP(test_reversed_limits, tests, NULL);
+    TEST_RUN_IN_GROUP(test_nested_unevaluated_integral_integrand, tests, NULL);
 
     TEST_SECTION("Configuration Tests");
     TEST_RUN_IN_GROUP(test_set_tol, tests, NULL);
@@ -3288,6 +3421,8 @@ int tests_main(void) {
     TEST_SECTION("N-dimensional Turan T15/T4 Tests");
     TEST_RUN_IN_GROUP(test_multi_2d, tests, NULL);
     TEST_RUN_IN_GROUP(test_multi_3d, tests, NULL);
+    TEST_RUN_IN_GROUP(test_multi_3d_affine_quintic, tests, NULL);
+    TEST_RUN_IN_GROUP(test_multi_3d_exp_square_product, tests, NULL);
     TEST_RUN_IN_GROUP(test_multi_null_safety, tests, NULL);
     TEST_RUN_IN_GROUP(test_multi_nd1, tests, NULL);
     TEST_RUN_IN_GROUP(test_multi_4d, tests, NULL);

@@ -3,6 +3,51 @@
 #include <string.h>
 
 #include "expr_stringout.h"
+#include "expression.h"
+
+char *expr_tostring_texify(const char *text);
+
+static int expr_tostring_text_needs_parse_for_tex_local(const char *text)
+{
+    return text &&
+        (strchr(text, '/') != NULL ||
+         strchr(text, '^') != NULL ||
+         strchr(text, '(') != NULL ||
+         strchr(text, ')') != NULL ||
+         strstr(text, "√") != NULL ||
+         strstr(text, "·") != NULL);
+}
+
+static const char *expr_tostring_known_text_tex_local(const char *text)
+{
+    if (!text)
+        return NULL;
+    if (strcmp(text, "1/√π") == 0)
+        return "\\frac{1}{\\sqrt{\\pi}}";
+    if (strcmp(text, "2/√π") == 0)
+        return "\\frac{2}{\\sqrt{\\pi}}";
+    if (strcmp(text, "-2/√π") == 0)
+        return "-\\frac{2}{\\sqrt{\\pi}}";
+    if (strcmp(text, "√π") == 0)
+        return "\\sqrt{\\pi}";
+    if (strcmp(text, "√(2π)") == 0)
+        return "\\sqrt{2\\pi}";
+    if (strcmp(text, "1/√(2π)") == 0)
+        return "\\frac{1}{\\sqrt{2\\pi}}";
+    if (strcmp(text, "√(π/2)") == 0)
+        return "\\sqrt{\\pi/2}";
+    if (strcmp(text, "√2") == 0)
+        return "\\sqrt{2}";
+    if (strcmp(text, "√3") == 0)
+        return "\\sqrt{3}";
+    if (strcmp(text, "√(1/2)") == 0)
+        return "\\sqrt{1/2}";
+    if (strcmp(text, "√2/2") == 0)
+        return "\\frac{\\sqrt{2}}{2}";
+    if (strcmp(text, "√3/2") == 0)
+        return "\\frac{\\sqrt{3}}{2}";
+    return NULL;
+}
 
 void *expr_tostring_xmalloc(size_t n)
 {
@@ -27,6 +72,37 @@ char *expr_tostring_xstrdup(const char *s)
     p = (char *)expr_tostring_xmalloc(n);
     memcpy(p, s, n);
     return p;
+}
+
+char *expr_text_to_tex_local(const char *text)
+{
+    const char *known_tex;
+    expr_t *parsed;
+    string_t *wrapped = NULL;
+    string_t *tex_text;
+    char *tex;
+
+    if (!text)
+        return NULL;
+
+    known_tex = expr_tostring_known_text_tex_local(text);
+    if (known_tex)
+        return expr_tostring_xstrdup(known_tex);
+
+    if (!expr_tostring_text_needs_parse_for_tex_local(text))
+        return expr_tostring_texify(text);
+
+    wrapped = string_sprintf("{ %s }", text);
+    parsed = wrapped ? expr_from_string(string_c_str(wrapped), NULL) : NULL;
+    string_free(wrapped);
+    if (!parsed)
+        return expr_tostring_texify(text);
+
+    tex_text = expr_to_text(parsed, style_TEX);
+    tex = tex_text ? expr_tostring_xstrdup(string_c_str(tex_text)) : NULL;
+    string_free(tex_text);
+    expr_free(parsed);
+    return tex ? tex : expr_tostring_texify(text);
 }
 
 void sbuf_init(sbuf_t *b)

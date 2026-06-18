@@ -179,6 +179,10 @@ static expr_t *parse_signed_power(expr_parse_state_t *p);
 static expr_t *build_ascii_integral_expr(const expr_t *upper,
                                          const expr_t *display_integrand,
                                          const expr_t *dummy);
+static expr_t *build_ascii_bounded_integral_expr(const expr_t *lower,
+                                                 const expr_t *upper,
+                                                 const expr_t *display_integrand,
+                                                 const expr_t *dummy);
 static expr_t *parse_signed_power_operand(expr_parse_state_t *p);
 static size_t scan_unicode_fraction_len_view(string_view_t view, size_t pos);
 static size_t scan_special_number_literal_len_view(string_view_t view, size_t pos);
@@ -188,6 +192,10 @@ static expr_t *parse_expression_view(string_view_t text,
                                      const char *context_label,
                                      int report_errors);
 static void symtab_discard_storage(symtab_t *t);
+
+static int symtab_clone_borrowed_except_text(symtab_t *dst,
+                                             const symtab_t *src,
+                                             const string_t *except_name);
 
 #define INTEGRAL_SIGN_CODEPOINT 0x222Bu
 
@@ -499,6 +507,79 @@ static int parse_three_args(expr_parse_state_t *p,
     return 1;
 }
 
+static int parse_integral_call_args(expr_parse_state_t *p,
+                                    expr_t **lower_out,
+                                    expr_t **upper_out,
+                                    expr_t **integrand_out,
+                                    expr_t **dummy_out)
+{
+    expr_t *a = parse_addexpr(p);
+    expr_t *b = NULL;
+    expr_t *c = NULL;
+    expr_t *d = NULL;
+    unsigned char next = 0u;
+
+    if (!a)
+        return 0;
+    if (!expr_parse_consume_char(p, ',')) {
+        expr_free(a);
+        set_error(p, "expected ',' in integral(...)");
+        return 0;
+    }
+    expr_parse_skip_spaces(p);
+
+    b = parse_addexpr(p);
+    if (!b) {
+        expr_free(a);
+        return 0;
+    }
+    if (!expr_parse_consume_char(p, ',')) {
+        expr_free(b);
+        expr_free(a);
+        set_error(p, "expected ',' in integral(...)");
+        return 0;
+    }
+    expr_parse_skip_spaces(p);
+
+    c = parse_addexpr(p);
+    if (!c) {
+        expr_free(b);
+        expr_free(a);
+        return 0;
+    }
+
+    if (!expr_parse_peek_ascii(p, &next) || next == ')') {
+        *lower_out = NULL;
+        *upper_out = a;
+        *integrand_out = b;
+        *dummy_out = c;
+        return 1;
+    }
+
+    if (!expr_parse_consume_char(p, ',')) {
+        expr_free(c);
+        expr_free(b);
+        expr_free(a);
+        set_error(p, "expected ',' in integral(...)");
+        return 0;
+    }
+    expr_parse_skip_spaces(p);
+
+    d = parse_addexpr(p);
+    if (!d) {
+        expr_free(c);
+        expr_free(b);
+        expr_free(a);
+        return 0;
+    }
+
+    *lower_out = a;
+    *upper_out = b;
+    *integrand_out = c;
+    *dummy_out = d;
+    return 1;
+}
+
 static size_t scan_unicode_fraction_len_view(string_view_t view, size_t pos)
 {
     return expr_parse_scan_unicode_fraction_len(view, pos);
@@ -575,6 +656,32 @@ static expr_t *lookup_symbol_text_normalised(const symtab_t *syms,
     }
 
     return sym;
+}
+
+static int symtab_clone_borrowed_except_text(symtab_t *dst,
+                                             const symtab_t *src,
+                                             const string_t *except_name)
+{
+    if (!dst)
+        return -1;
+
+    symtab_init(dst);
+    if (!src)
+        return 0;
+
+    for (int i = 0; i < src->count; ++i) {
+        if (except_name &&
+            string_compare(src->entries[i].name, except_name) == 0)
+            continue;
+        if (symtab_add_borrowed_text(dst,
+                                     src->entries[i].name,
+                                     src->entries[i].node) != 0) {
+            symtab_free(dst);
+            return -1;
+        }
+    }
+
+    return 0;
 }
 
 static string_view_t scan_binding_value(string_cursor_t *cursor)
@@ -758,7 +865,7 @@ static bool integral_ascii_standin_starts_view(string_view_t text, size_t pos)
         !expr_parse_view_peek_ascii(text, pos + 2u, &next))
         return false;
 
-    return next == '^' || isspace(next);
+    return next == '^' || next == '_' || isspace(next);
 }
 
 static const func_entry_t *lookup_special_func_call_view(string_view_t text,
@@ -1371,84 +1478,173 @@ static int parse_integral_find_differential(expr_parse_state_t *p,
     return 0;
 }
 
-static expr_t *parse_integral_substitute_dummy(const expr_t *expr,
-                                               const expr_t *dummy,
-                                               expr_t *upper)
-{
-    expr_t *left;
-    expr_t *right;
-    expr_t *out;
-
-    if (!expr)
-        return NULL;
-    if (expr == dummy ||
-        (expr_is_var(expr) &&
-         expr_is_var(dummy) &&
-         expr->var_id != 0 &&
-         expr->var_id == dummy->var_id)) {
-        expr_retain(upper);
-        return upper;
-    }
-
-    if (expr->ops->arity == EXPR_OP_ATOM) {
-        expr_retain(expr);
-        return (expr_t *)expr;
-    }
-
-    if (expr_is_op(expr, &ops_pow_d)) {
-        left = parse_integral_substitute_dummy(expr->a, dummy, upper);
-        if (!left)
-            return NULL;
-        out = expr_pow(left, &expr->c);
-        expr_free(left);
-        return out;
-    }
-
-    if (expr->ops->arity == EXPR_OP_UNARY && expr->ops->apply_unary) {
-        left = parse_integral_substitute_dummy(expr->a, dummy, upper);
-        if (!left)
-            return NULL;
-        out = expr->ops->apply_unary(left);
-        expr_free(left);
-        return out;
-    }
-
-    if (expr->ops->arity == EXPR_OP_BINARY && expr->ops->apply_binary) {
-        left = parse_integral_substitute_dummy(expr->a, dummy, upper);
-        right = parse_integral_substitute_dummy(expr->b, dummy, upper);
-        if (!left || !right) {
-            expr_free(left);
-            expr_free(right);
-            return NULL;
-        }
-        out = expr->ops->apply_binary(left, right);
-        expr_free(left);
-        expr_free(right);
-        return out;
-    }
-
-    return NULL;
-}
-
 static expr_t *build_ascii_integral_expr(const expr_t *upper,
                                          const expr_t *display_integrand,
                                          const expr_t *dummy)
 {
-    expr_t *integrand;
-    expr_t *result;
+    return build_ascii_bounded_integral_expr(NULL, upper, display_integrand, dummy);
+}
 
-    if (!expr_is_var(upper) || !expr_is_var(dummy))
+static expr_t *build_ascii_bounded_integral_expr(const expr_t *lower,
+                                                 const expr_t *upper,
+                                                 const expr_t *display_integrand,
+                                                 const expr_t *dummy)
+{
+    if (!upper || !display_integrand || !expr_is_var(dummy))
         return NULL;
 
-    integrand = parse_integral_substitute_dummy(display_integrand,
-                                                dummy,
-                                                (expr_t *)upper);
-    if (!integrand)
+    return lower
+        ? expr_integral_with_bounds_internal(display_integrand, lower, upper, dummy)
+        : expr_integral_with_dummy_internal(display_integrand, upper, dummy);
+}
+
+static expr_t *parse_integral_bound_var_slice(symtab_t *syms, string_view_t text)
+{
+    string_cursor_t *cursor = string_cursor_new_view(text);
+    string_t *name;
+    expr_t *existing;
+    expr_t *var;
+    string_t *key;
+
+    if (!cursor)
+        return NULL;
+    name = expr_parse_read_name(cursor, true);
+    string_cursor_free(cursor);
+    if (!name)
         return NULL;
 
-    result = expr_integral(integrand, upper);
-    expr_free(integrand);
-    return result;
+    existing = lookup_symbol_text_normalised(syms, name);
+    if (existing) {
+        expr_retain(existing);
+        string_free(name);
+        return existing;
+    }
+
+    var = expr_new_named_var_text(NUM_NAN, name);
+    if (!var) {
+        string_free(name);
+        return NULL;
+    }
+
+    key = expr_node_name_as_text(var, name);
+    if (!key || symtab_add_borrowed_text(syms, key, var) != 0) {
+        string_free(key);
+        expr_free(var);
+        string_free(name);
+        return NULL;
+    }
+
+    string_free(key);
+    string_free(name);
+    return var;
+}
+
+static expr_t *parse_integral_bound_until_separator(expr_parse_state_t *p,
+                                                    unsigned char separator)
+{
+    string_view_t text = expr_parse_text(p);
+    size_t start = expr_parse_pos(p);
+    size_t len = string_view_length(text);
+    size_t pos = start;
+    int depth = 0;
+
+    while (pos < len) {
+        uint32_t cp = 0u;
+        size_t cp_len = 0u;
+        unsigned char c = 0u;
+
+        if (!expr_parse_view_peek_value(text, pos, &cp, &cp_len) || cp_len == 0u)
+            break;
+
+        if (expr_parse_view_peek_ascii(text, pos, &c)) {
+            if (c == '(' || c == '[') {
+                depth++;
+                pos += cp_len;
+                continue;
+            }
+            if (c == ')' || c == ']') {
+                if (depth == 0)
+                    break;
+                depth--;
+                pos += cp_len;
+                continue;
+            }
+            if (depth == 0 && c == separator)
+                break;
+            pos += cp_len;
+            continue;
+        }
+
+        if (cp == 0x230Au || cp == 0x2308u)
+            depth++;
+        else if (cp == 0x230Bu || cp == 0x2309u) {
+            if (depth == 0)
+                break;
+            depth--;
+        }
+        pos += cp_len;
+    }
+
+    if (pos == start) {
+        set_error(p, "expected expression");
+        return NULL;
+    }
+
+    {
+        expr_t *bound = parse_expression_view(
+            string_view_slice(text, start, pos - start),
+            p->syms,
+            "expr_from_string",
+            1);
+
+        if (!bound)
+            return NULL;
+        expr_parse_set_pos(p, pos);
+        return bound;
+    }
+}
+
+static expr_t *parse_integral_upper_bound_then_optional_lower(expr_parse_state_t *p)
+{
+    string_view_t text = expr_parse_text(p);
+    size_t start = expr_parse_pos(p);
+    unsigned char marker = 0u;
+    uint32_t cp = 0u;
+    size_t cp_len = 0u;
+    size_t end = start;
+
+    if (expr_parse_peek_ascii(p, &marker) && marker == '@') {
+        size_t ident_len = scan_ascii_identifier_len_view(text, start + 1u);
+
+        if (ident_len > 0u &&
+            expr_parse_view_peek_ascii(text, start + 1u + ident_len, &marker) &&
+            marker == '_') {
+            expr_t *upper = parse_integral_bound_var_slice(
+                p->syms,
+                string_view_slice(text, start, ident_len + 1u));
+
+            if (!upper)
+                return NULL;
+            expr_parse_set_pos(p, start + ident_len + 1u);
+            return upper;
+        }
+    }
+
+    if (expr_parse_peek_value(p, &cp, &cp_len) && fs_is_letter(cp)) {
+        end = start + cp_len;
+        if (expr_parse_view_peek_ascii(text, end, &marker) && marker == '_') {
+            expr_t *upper = parse_integral_bound_var_slice(
+                p->syms,
+                string_view_slice(text, start, cp_len));
+
+            if (!upper)
+                return NULL;
+            expr_parse_set_pos(p, end);
+            return upper;
+        }
+    }
+
+    return parse_signed_power_operand(p);
 }
 
 static expr_t *parse_integral_atom(expr_parse_state_t *p)
@@ -1460,11 +1656,16 @@ static expr_t *parse_integral_atom(expr_parse_state_t *p)
     size_t integrand_end = SIZE_MAX;
     size_t after_diff = SIZE_MAX;
     string_t *dummy_name = NULL;
+    expr_t *lower = NULL;
     expr_t *upper = NULL;
     expr_t *display_integrand = NULL;
     expr_t *dummy = NULL;
+    string_t *dummy_key = NULL;
     expr_t *result = NULL;
-    expr_t *sym;
+    unsigned char marker = 0u;
+    symtab_t local_syms;
+    symtab_t *integrand_syms = p->syms;
+    bool local_syms_ready = false;
 
     if (expr_parse_peek_value(p, &cp, &cp_len) &&
         cp == INTEGRAL_SIGN_CODEPOINT) {
@@ -1477,17 +1678,44 @@ static expr_t *parse_integral_atom(expr_parse_state_t *p)
     }
 
     expr_parse_skip_spaces(p);
-    if (!parse_required_char(p, '^', "expected '^' after integral sign"))
+    if (!expr_parse_peek_ascii(p, &marker) || (marker != '^' && marker != '_')) {
+        set_error(p, "expected '^' or '_' after integral sign");
         return NULL;
-    expr_parse_skip_spaces(p);
+    }
 
-    upper = parse_signed_power_operand(p);
-    if (!upper)
-        return NULL;
-    if (!expr_is_var(upper)) {
-        expr_free(upper);
-        set_error(p, "expected variable after integral upper marker");
-        return NULL;
+    if (marker == '^') {
+        expr_parse_skip(p, 1u);
+        expr_parse_skip_spaces(p);
+        upper = parse_integral_upper_bound_then_optional_lower(p);
+        if (!upper)
+            return NULL;
+        expr_parse_skip_spaces(p);
+        if (expr_parse_peek_ascii(p, &marker) && marker == '_') {
+            expr_parse_skip(p, 1u);
+            expr_parse_skip_spaces(p);
+            lower = parse_signed_power_operand(p);
+            if (!lower) {
+                expr_free(upper);
+                return NULL;
+            }
+        }
+    } else {
+        expr_parse_skip(p, 1u);
+        expr_parse_skip_spaces(p);
+        lower = parse_integral_bound_until_separator(p, '^');
+        if (!lower)
+            return NULL;
+        expr_parse_skip_spaces(p);
+        if (!parse_required_char(p, '^', "expected '^' after integral lower bound")) {
+            expr_free(lower);
+            return NULL;
+        }
+        expr_parse_skip_spaces(p);
+        upper = parse_signed_power_operand(p);
+        if (!upper) {
+            expr_free(lower);
+            return NULL;
+        }
     }
 
     expr_parse_skip_spaces(p);
@@ -1496,43 +1724,64 @@ static expr_t *parse_integral_atom(expr_parse_state_t *p)
                                           &integrand_end,
                                           &after_diff,
                                           &dummy_name)) {
+        expr_free(lower);
         expr_free(upper);
         set_error(p, "expected differential after integral integrand");
         return NULL;
     }
 
-    display_integrand = parse_expression_view(
-        string_view_slice(text,
-                          integrand_start,
-                          integrand_end - integrand_start),
-        p->syms,
-        "expr_from_string",
-        1);
-    if (!display_integrand) {
-        expr_free(upper);
-        string_free(dummy_name);
-        return NULL;
-    }
-
-    sym = lookup_symbol_text_normalised(p->syms, dummy_name);
-    if (sym) {
-        dummy = sym;
-        expr_retain(dummy);
-    } else {
-        dummy = expr_new_named_var_text(NUM_ZERO, dummy_name);
-    }
+    dummy = expr_new_named_var_text(NUM_ZERO, dummy_name);
     if (!dummy) {
-        expr_free(display_integrand);
+        expr_free(lower);
         expr_free(upper);
         string_free(dummy_name);
         set_error(p, "could not create integral dummy variable");
         return NULL;
     }
 
-    result = build_ascii_integral_expr(upper, display_integrand, dummy);
+    dummy_key = expr_node_name_as_text(dummy, dummy_name);
+    if (!dummy_key ||
+        symtab_clone_borrowed_except_text(&local_syms, p->syms, dummy_key) != 0 ||
+        symtab_add_borrowed_text(&local_syms, dummy_key, dummy) != 0) {
+        expr_free(dummy);
+        string_free(dummy_key);
+        expr_free(lower);
+        expr_free(upper);
+        string_free(dummy_name);
+        set_error(p, "could not create integral parser scope");
+        return NULL;
+    }
+    local_syms_ready = true;
+    integrand_syms = &local_syms;
+
+    display_integrand = parse_expression_view(
+        string_view_slice(text,
+                          integrand_start,
+                          integrand_end - integrand_start),
+        integrand_syms,
+        "expr_from_string",
+        1);
+    if (!display_integrand) {
+        symtab_free(&local_syms);
+        expr_free(dummy);
+        string_free(dummy_key);
+        expr_free(lower);
+        expr_free(upper);
+        string_free(dummy_name);
+        return NULL;
+    }
+
+    result = build_ascii_bounded_integral_expr(lower,
+                                               upper,
+                                               display_integrand,
+                                               dummy);
     expr_free(dummy);
     expr_free(display_integrand);
+    expr_free(lower);
     expr_free(upper);
+    if (local_syms_ready)
+        symtab_free(&local_syms);
+    string_free(dummy_key);
     string_free(dummy_name);
 
     if (!result) {
@@ -1739,7 +1988,57 @@ static expr_t *parse_atom(expr_parse_state_t *p)
             }
 
             expr_parse_set_pos(p, paren_pos + 1u);
-            if (fe->arity == 2u) {
+            if (fe->kw && strcmp(fe->kw, "integral") == 0 &&
+                fe->tfn == build_ascii_integral_expr) {
+                expr_t *lower = NULL;
+                expr_t *upper = NULL;
+                expr_t *display_integrand = NULL;
+                expr_t *dummy = NULL;
+                expr_t *result;
+                number_t minus_one;
+
+                if (!parse_integral_call_args(p,
+                                              &lower,
+                                              &upper,
+                                              &display_integrand,
+                                              &dummy))
+                    return NULL;
+                if (!parse_required_char(p, ')', "expected ')' after integral(...)")) {
+                    expr_free(dummy);
+                    expr_free(display_integrand);
+                    expr_free(upper);
+                    expr_free(lower);
+                    return NULL;
+                }
+                result = build_ascii_bounded_integral_expr(lower,
+                                                           upper,
+                                                           display_integrand,
+                                                           dummy);
+                expr_free(dummy);
+                expr_free(display_integrand);
+                expr_free(upper);
+                expr_free(lower);
+                if (!result) {
+                    set_error(p, "could not construct integral(...)");
+                    return NULL;
+                }
+                if (!string_view_is_empty(symbolic_exp_text)) {
+                    symbolic_exponent = parse_expression_view(symbolic_exp_text,
+                                                              p->syms,
+                                                              "expr_from_string", 1);
+                    if (!symbolic_exponent) {
+                        expr_free(result);
+                        return NULL;
+                    }
+                    return apply_binary_preserving_constexpr(
+                        &ops_pow, result, symbolic_exponent, expr_pow_xp);
+                }
+                if (inverse_power) {
+                    minus_one = num_create_from_long(-1);
+                    return apply_pow_const_preserving_constexpr(result, &minus_one);
+                }
+                return apply_integer_power_if_present(result, sup);
+            } else if (fe->arity == 2u) {
                 expr_t *a = NULL;
                 expr_t *b = NULL;
                 expr_t *result;

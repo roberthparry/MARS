@@ -672,9 +672,14 @@ INDEX_HTML = r"""<!doctype html>
       text-transform: uppercase;
     }
 
-    .integrator-bound-grid {
+    .integrator-bound-stack {
       display: grid;
-      grid-template-columns: minmax(5.5rem, 0.7fr) repeat(2, minmax(0, 1fr));
+      gap: 0.45rem;
+    }
+
+    .integrator-bound-row {
+      display: grid;
+      grid-template-columns: minmax(5rem, 0.58fr) minmax(5.5rem, 0.74fr) repeat(2, minmax(0, 1fr)) auto auto;
       gap: 0.7rem;
       align-items: end;
     }
@@ -682,6 +687,31 @@ INDEX_HTML = r"""<!doctype html>
     .integrator-bound-field {
       display: grid;
       gap: 0.4rem;
+    }
+
+    .integrator-bound-field.disabled label,
+    .integrator-bound-field.disabled input {
+      opacity: 0.48;
+    }
+
+    .integrator-bound-toggle,
+    .integrator-bound-add,
+    .integrator-bound-remove {
+      align-self: end;
+      white-space: nowrap;
+    }
+
+    .integrator-bound-actions {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: flex-start;
+      margin-top: 0.35rem;
+    }
+
+    .integrator-bound-summary {
+      color: #bed3c0;
+      font: 0.72rem/1.3 "Cascadia Code", "DejaVu Sans Mono", monospace;
+      letter-spacing: 0.04em;
     }
 
     .mode-panel input {
@@ -737,14 +767,6 @@ INDEX_HTML = r"""<!doctype html>
     .integrator-bound-field input:placeholder-shown {
       color: rgba(233, 244, 239, 0.10) !important;
       -webkit-text-fill-color: rgba(233, 244, 239, 0.10) !important;
-    }
-
-    #integratorLowerBound::placeholder,
-    #integratorUpperBound::placeholder,
-    #integratorLowerBound::-webkit-input-placeholder,
-    #integratorUpperBound::-webkit-input-placeholder {
-      color: rgba(233, 244, 239, 0.08) !important;
-      -webkit-text-fill-color: rgba(233, 244, 239, 0.08) !important;
     }
 
     .integrator-bound-field input:focus {
@@ -1581,7 +1603,7 @@ INDEX_HTML = r"""<!doctype html>
         line-height: 1.45;
       }
 
-      .integrator-bound-grid {
+      .integrator-bound-row {
         grid-template-columns: 1fr;
       }
 
@@ -1878,19 +1900,10 @@ __THEME_OVERRIDES__
         <p class="mode-hint">Enter an equation such as <code>{ M = E - e*sin(E) | E = 1.5; M = 1.5, e = 0.0167 }</code>. Bindings after <code>|</code> decide which symbols are variables, which are constants, and which starting values numeric fallback should use.</p>
       </div>
       <div class="mode-panel hidden" id="integratorControls">
-        <div class="integrator-bound-grid">
-          <div class="integrator-bound-field integrator-var-field">
-            <label for="integratorVariable">Variable</label>
-            <input id="integratorVariable" spellcheck="false" autocomplete="off" value="x">
-          </div>
-          <div class="integrator-bound-field">
-            <label for="integratorLowerBound">Lower bound</label>
-            <input id="integratorLowerBound" spellcheck="false" autocomplete="off" value="0" placeholder="blank for none">
-          </div>
-          <div class="integrator-bound-field">
-            <label for="integratorUpperBound">Upper bound</label>
-            <input id="integratorUpperBound" spellcheck="false" autocomplete="off" value="1" placeholder="blank for none">
-          </div>
+        <div class="integrator-bound-stack" id="integratorBoundStack"></div>
+        <div class="integrator-bound-actions">
+          <button class="card-action integrator-bound-add" id="integratorAddBound" type="button">+ Integral</button>
+          <span class="integrator-bound-summary">Use <code>Free</code> to leave a symbol as a parameter instead of integrating over it.</span>
         </div>
         <label for="integratorIntervalCap">Work budget ceiling</label>
         <select id="integratorIntervalCap">
@@ -2100,9 +2113,8 @@ __THEME_OVERRIDES__
     const equationControls = document.getElementById('equationControls');
     const equationVariable = null;
     const integratorControls = document.getElementById('integratorControls');
-    const integratorVariable = document.getElementById('integratorVariable');
-    const integratorLowerBound = document.getElementById('integratorLowerBound');
-    const integratorUpperBound = document.getElementById('integratorUpperBound');
+    const integratorBoundStack = document.getElementById('integratorBoundStack');
+    const integratorAddBound = document.getElementById('integratorAddBound');
     const integratorIntervalCap = document.getElementById('integratorIntervalCap');
     const run = document.getElementById('run');
     const back = document.getElementById('back');
@@ -2462,7 +2474,7 @@ __THEME_OVERRIDES__
         setValueCardVisible(false);
       } else {
         leftPaneTitle.textContent = 'Integrator';
-        subtitle.textContent = 'Enter an integrand expression on the left, then type the lower and upper bounds separately. Leave both blank for an antiderivative, or leave lower blank and fill upper to evaluate the antiderivative there.';
+        subtitle.textContent = 'Enter an integrand expression on the left, stack one or more integral rows, and use Free when a symbol should stay as a parameter. Leave both bounds blank for an antiderivative, or leave lower blank and fill upper to evaluate it there.';
         setResultTitles('Rendered TeX', 'Integrand', 'Exact result', 'Integral');
         setValueCardVisible(true);
       }
@@ -2475,7 +2487,7 @@ __THEME_OVERRIDES__
       setMode(validLabMode(mode), {force: true});
       restoreModeEditor(currentMode());
       syncModeUI();
-      if (currentMode() === 'integrator' && !currentIntegratorBound().name)
+      if (currentMode() === 'integrator' && currentIntegratorBoundRows().length === 0)
         resetIntegratorBoundsToDefault();
       if (currentMode() === 'integrator' && integratorIntervalCap)
         integratorIntervalCap.value = String(validIntegratorIntervalCap(integratorIntervalCap.value));
@@ -2512,6 +2524,12 @@ __THEME_OVERRIDES__
         .filter((binding) => String(binding.kind || 'variable') !== 'constant')
         .map((binding) => String(binding.name || '').trim())
         .filter(Boolean);
+    }
+
+    function visibleBindingsForCurrentMode(bindings) {
+      if (currentMode() !== 'integrator')
+        return Array.isArray(bindings) ? bindings : [];
+      return integratorEditableBindings(bindings);
     }
 
     function showTargetEntry() {
@@ -2875,6 +2893,8 @@ __THEME_OVERRIDES__
       const parts = bindingParts(full);
       if (!parts)
         return body;
+      if (!bodyReferencesBindingNames(body, compactExpressionForEditor(full).bindings || []))
+        return body;
 
       let bindingText = parts.variables;
       if (parts.constants)
@@ -3029,6 +3049,51 @@ __THEME_OVERRIDES__
         bindings: bindingValues,
         shortened
       };
+    }
+
+    function expressionWithBindings(bodyText, bindings) {
+      const body = String(bodyText || '').trim();
+      if (!body)
+        return '';
+      if (!Array.isArray(bindings) || !bindings.length)
+        return body;
+
+      const variableAssignments = [];
+      const constantAssignments = [];
+      bindings.forEach((binding) => {
+        const name = String(binding && binding.name || '').trim();
+        if (!name)
+          return;
+
+        let valueText = String(binding && (binding.value ?? binding.display) || '').trim();
+        if (!valueText || /^NAN$/i.test(valueText))
+          valueText = '?';
+
+        const assignment = `${name} = ${valueText}`;
+        if (String(binding && binding.kind || 'variable').trim() === 'constant')
+          constantAssignments.push(assignment);
+        else
+          variableAssignments.push(assignment);
+      });
+
+      constantAssignments.sort(compareBindingNames);
+      let bindingText = variableAssignments.join(', ');
+      if (constantAssignments.length) {
+        const constants = constantAssignments.join(', ');
+        bindingText = bindingText ? `${bindingText}; ${constants}` : `; ${constants}`;
+      }
+      return bindingText ? `{ ${body} | ${bindingText} }` : body;
+    }
+
+    function bodyReferencesBindingNames(bodyText, bindings) {
+      const body = String(bodyText || '').trim();
+      if (!body || !Array.isArray(bindings) || !bindings.length)
+        return true;
+
+      return bindings.every((binding) => {
+        const name = String(binding && binding.name || '').trim();
+        return !name || body.includes(name);
+      });
     }
 
     function replaceBindingValueInExpression(sourceExpression, kind, targetName, valueText) {
@@ -3224,7 +3289,10 @@ __THEME_OVERRIDES__
 
     function refreshVariableValuesFromEditor() {
       const compact = compactExpressionForEditor(currentExpressionText());
-      renderVariableValues(compact.bindings || []);
+      const bindings = visibleBindingsForCurrentMode(compact.bindings || []);
+      renderVariableValues(bindings);
+      currentVariables = variableNamesFromBindings(bindings);
+      renderDerivativeButtons(currentVariables);
     }
 
     function renderVariableValues(bindings) {
@@ -3402,26 +3470,33 @@ __THEME_OVERRIDES__
 
     function setExpressionEditor(fullText, evaluatedBindings = null, editorBodyText = null) {
       const compact = compactExpressionForEditor(fullText);
-      const editorBody = editorBodyText === null || editorBodyText === undefined
-        ? expressionBodyForEditor(fullText)
+      const editorBindings = Array.isArray(evaluatedBindings) ? evaluatedBindings : [];
+      const defaultEditorBody = expressionBodyForEditor(fullText);
+      let editorBody = editorBodyText === null || editorBodyText === undefined
+        ? defaultEditorBody
         : expressionForEditor(editorBodyText).trim();
-      fullExpressionText = expressionForEditor(fullText).trim();
+      if (!bodyReferencesBindingNames(editorBody, editorBindings))
+        editorBody = defaultEditorBody;
+      const fullEditorText = expressionForEditor(fullText).trim();
+      fullExpressionText = bindingParts(fullEditorText)
+        ? fullEditorText
+        : expressionWithBindings(editorBody, editorBindings) || fullEditorText;
       displayedExpressionText = editorBody;
       expr.dataset.fullExpression = fullExpressionText;
       expr.dataset.displayExpression = displayedExpressionText;
       expr.value = displayedExpressionText;
-      const bindings = (Array.isArray(evaluatedBindings) && evaluatedBindings.length)
-        ? evaluatedBindings
-        : compact.bindings;
+      const bindings = visibleBindingsForCurrentMode((editorBindings.length)
+        ? editorBindings
+        : compact.bindings);
       renderVariableValues(bindings || []);
       currentVariables = variableNamesFromBindings(bindings || []);
       renderDerivativeButtons(currentVariables);
     }
 
     function integratorEditableBindings(bindings) {
-      const boundName = String(currentIntegratorBound().name || '').trim();
+      const boundNames = currentIntegratorBoundNames();
       return (Array.isArray(bindings) ? bindings : [])
-        .filter((binding) => String(binding && binding.name || '').trim() !== boundName);
+        .filter((binding) => !boundNames.has(String(binding && binding.name || '').trim()));
     }
 
     function applyIntegratorBindingState(data, fallbackExpression) {
@@ -3795,14 +3870,22 @@ __THEME_OVERRIDES__
       morePrecision.title = !isBusy && atMaximumPrecision()
         ? 'Already at the current maximum precision setting'
         : '';
-      [integratorVariable, integratorLowerBound, integratorUpperBound].forEach((input) => {
-        if (input)
-          input.disabled = isBusy;
+      Array.from((integratorBoundStack || document.createElement('div')).querySelectorAll('input, button')).forEach((control) => {
+        if (isBusy) {
+          if (!control.disabled)
+            control.dataset.busyDisabled = '1';
+          control.disabled = true;
+        } else if (control.dataset.busyDisabled === '1') {
+          control.disabled = false;
+          delete control.dataset.busyDisabled;
+        }
       });
       if (equationVariable)
         equationVariable.disabled = isBusy;
       if (integratorIntervalCap)
         integratorIntervalCap.disabled = isBusy;
+      if (integratorAddBound)
+        integratorAddBound.disabled = isBusy;
       copyButtons.forEach((button) => {
         button.disabled = isBusy;
       });
@@ -3872,124 +3955,297 @@ __THEME_OVERRIDES__
       return {response, data};
     }
 
-    function parseIntegratorBoundsText(text) {
-      const bounds = [];
-      for (const rawLine of String(text || '').split(/\n+/)) {
-        const line = rawLine.trim();
-        if (!line)
-          continue;
-        let match = line.match(/^([^:=]+?)\s*(?:=|:)\s*(.+?)\s*\.\.\s*(.+)$/);
-        if (match) {
-          bounds.push({
-            name: match[1].trim(),
-            lo: match[2].trim(),
-            hi: match[3].trim(),
-          });
-          continue;
-        }
-        match = line.match(/^([^:=]+?)\s*(?:=|:)\s*(.+)$/);
-        if (match) {
-          bounds.push({
-            name: match[1].trim(),
-            lo: '',
-            hi: match[2].trim(),
-          });
-          continue;
-        }
-        if (!/[=:]/.test(line) && !line.includes('..')) {
-          bounds.push({
-            name: line.trim(),
-            lo: '',
-            hi: '',
-          });
-          continue;
-        }
-        throw new Error(`Bad bound line: ${line}`);
-      }
-      if (bounds.length === 0)
-        bounds.push({name: 'x', lo: '', hi: ''});
-      return bounds;
-    }
-
-    function firstIntegratorBoundFromText(text) {
-      try {
-        const bounds = parseIntegratorBoundsText(text);
-        return bounds[0] || {name: 'x', lo: '', hi: ''};
-      } catch (_) {
-        return {name: 'x', lo: '0', hi: '1'};
-      }
-    }
-
-    function setIntegratorBoundInputs(bound) {
-      const safeBound = bound || {name: 'x', lo: '', hi: ''};
-      if (integratorVariable)
-        integratorVariable.value = String(safeBound.name || 'x').trim() || 'x';
-      if (integratorLowerBound)
-        integratorLowerBound.value = cleanIntegratorBoundValue(safeBound.lo);
-      if (integratorUpperBound)
-        integratorUpperBound.value = cleanIntegratorBoundValue(safeBound.hi);
-    }
-
     function cleanIntegratorBoundValue(value) {
       const text = String(value || '').trim();
       return /^blank\s+for\s+(none|antiderivative)$/i.test(text) ? '' : text;
     }
 
-    function cleanIntegratorBoundInput(input) {
-      if (!input)
-        return;
-      const cleaned = cleanIntegratorBoundValue(input.value);
-      if (cleaned !== String(input.value || '').trim())
-        input.value = cleaned;
+    function normaliseIntegratorRowKind(kind) {
+      return String(kind || '').trim().toLowerCase() === 'free' ? 'free' : 'bound';
     }
 
-    function cleanIntegratorBoundInputs() {
-      cleanIntegratorBoundInput(integratorLowerBound);
-      cleanIntegratorBoundInput(integratorUpperBound);
+    function sanitizeIntegratorRow(row, fallbackName = 'x') {
+      const safe = row || {};
+      return {
+        kind: normaliseIntegratorRowKind(safe.kind),
+        name: String(safe.name || fallbackName).trim() || fallbackName,
+        lo: cleanIntegratorBoundValue(safe.lo),
+        hi: cleanIntegratorBoundValue(safe.hi),
+      };
+    }
+
+    function integratorDefaultVariableName(rows = []) {
+      const taken = new Set(
+        (Array.isArray(rows) ? rows : [])
+          .map((row) => String(row && row.name || '').trim())
+          .filter(Boolean)
+      );
+      const preferred = ['x', 'y', 'z', 't', 'u', 'v', 'w', 'r', 's'];
+      for (const name of preferred) {
+        if (!taken.has(name))
+          return name;
+      }
+      for (let i = 1; i < 100; i += 1) {
+        const name = `x${i}`;
+        if (!taken.has(name))
+          return name;
+      }
+      return 'x';
+    }
+
+    function integratorRowText(row) {
+      const safe = sanitizeIntegratorRow(row);
+      if (safe.kind === 'free')
+        return `free ${safe.name}`;
+      if (safe.lo && safe.hi)
+        return `${safe.name} = ${safe.lo} .. ${safe.hi}`;
+      if (safe.hi)
+        return `${safe.name} = ${safe.hi}`;
+      return safe.name;
+    }
+
+    function integratorBoundsTextFromRows(rows) {
+      return (Array.isArray(rows) ? rows : [])
+        .map((row) => integratorRowText(row))
+        .filter(Boolean)
+        .join('\n');
+    }
+
+    function parseIntegratorBoundsText(text) {
+      const rows = [];
+      for (const rawLine of String(text || '').split(/\n+/)) {
+        const line = rawLine.trim();
+        if (!line)
+          continue;
+        let match = line.match(/^free\s*(?::|\s)\s*(.+)$/i);
+        if (match) {
+          rows.push(sanitizeIntegratorRow({
+            kind: 'free',
+            name: match[1].trim(),
+            lo: '',
+            hi: '',
+          }));
+          continue;
+        }
+        match = line.match(/^([^:=]+?)\s*(?:=|:)\s*(.+?)\s*\.\.\s*(.+)$/);
+        if (match) {
+          rows.push(sanitizeIntegratorRow({
+            kind: 'bound',
+            name: match[1].trim(),
+            lo: match[2].trim(),
+            hi: match[3].trim(),
+          }));
+          continue;
+        }
+        match = line.match(/^([^:=]+?)\s*(?:=|:)\s*(.+)$/);
+        if (match) {
+          rows.push(sanitizeIntegratorRow({
+            kind: 'bound',
+            name: match[1].trim(),
+            lo: '',
+            hi: match[2].trim(),
+          }));
+          continue;
+        }
+        if (!/[=:]/.test(line) && !line.includes('..')) {
+          rows.push(sanitizeIntegratorRow({
+            kind: 'bound',
+            name: line.trim(),
+            lo: '',
+            hi: '',
+          }));
+          continue;
+        }
+        throw new Error(`Bad bound line: ${line}`);
+      }
+      if (!rows.length)
+        rows.push({kind: 'bound', name: 'x', lo: '0', hi: '1'});
+      return rows;
+    }
+
+    function integratorFallbackRows() {
+      return [{kind: 'bound', name: 'x', lo: '0', hi: '1'}];
+    }
+
+    function currentIntegratorRows() {
+      const rows = Array.from((integratorBoundStack || document.createElement('div')).querySelectorAll('.integrator-bound-row'))
+        .map((row) => sanitizeIntegratorRow({
+          kind: row.dataset.kind || 'bound',
+          name: row.querySelector('[data-integrator-name]')?.value || '',
+          lo: row.querySelector('[data-integrator-lower]')?.value || '',
+          hi: row.querySelector('[data-integrator-upper]')?.value || '',
+        }));
+      return rows.length ? rows : integratorFallbackRows();
+    }
+
+    function currentIntegratorBoundRows() {
+      return currentIntegratorRows().filter((row) => normaliseIntegratorRowKind(row.kind) === 'bound');
+    }
+
+    function currentIntegratorBoundNames() {
+      return new Set(currentIntegratorBoundRows().map((row) => row.name));
+    }
+
+    function renderIntegratorRows(rows) {
+      const sourceRows = Array.isArray(rows) && rows.length ? rows : integratorFallbackRows();
+      const safeRows = sourceRows.map((row, index) =>
+        sanitizeIntegratorRow(row, integratorDefaultVariableName(sourceRows.slice(0, index)))
+      );
+      integratorBoundStack.replaceChildren();
+
+      safeRows.forEach((row, index) => {
+        const boundCount = safeRows.filter((entry) => entry.kind !== 'free').length;
+        const item = document.createElement('div');
+        item.className = 'integrator-bound-row';
+        item.dataset.kind = row.kind;
+        item.dataset.index = String(index);
+
+        const toggle = document.createElement('button');
+        toggle.className = 'card-action integrator-bound-toggle';
+        toggle.type = 'button';
+        toggle.textContent = row.kind === 'free' ? 'Bound' : 'Free';
+        toggle.title = row.kind === 'free'
+          ? `Integrate with respect to ${row.name}`
+          : `Leave ${row.name} free`;
+        toggle.addEventListener('click', () => {
+          commitVisibleBindingInputs();
+          const nextRows = currentIntegratorRows();
+          const target = nextRows[index];
+          if (!target)
+            return;
+          target.kind = target.kind === 'free' ? 'bound' : 'free';
+          target.lo = target.kind === 'free' ? '' : target.lo;
+          target.hi = target.kind === 'free' ? '' : target.hi;
+          if (nextRows.filter((entry) => entry.kind !== 'free').length === 0)
+            nextRows.push({kind: 'bound', name: integratorDefaultVariableName(nextRows), lo: '', hi: ''});
+          renderIntegratorRows(nextRows);
+          refreshVariableValuesFromEditor();
+          updateHistoryButtons();
+          if (currentMode() === 'integrator')
+            saveLastIntegratorState();
+        });
+
+        const makeField = (labelText, value, datasetKey, placeholder = '', disabled = false) => {
+          const field = document.createElement('div');
+          field.className = disabled ? 'integrator-bound-field disabled' : 'integrator-bound-field';
+          const label = document.createElement('label');
+          label.textContent = labelText;
+          const input = document.createElement('input');
+          input.spellcheck = false;
+          input.autocomplete = 'off';
+          input.value = value;
+          input.placeholder = placeholder;
+          input.dataset[datasetKey] = '1';
+          input.disabled = disabled;
+          input.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              input.blur();
+            } else if (event.key === 'Escape') {
+              event.preventDefault();
+              input.value = value;
+              input.blur();
+            }
+          });
+          input.addEventListener('change', () => {
+            if (datasetKey !== 'integratorName')
+              input.value = cleanIntegratorBoundValue(input.value);
+            else
+              input.value = String(input.value || row.name || 'x').trim() || row.name || 'x';
+            if (currentMode() === 'integrator') {
+              refreshVariableValuesFromEditor();
+              updateHistoryButtons();
+              saveLastIntegratorState();
+            }
+          });
+          field.append(label, input);
+          return field;
+        };
+
+        const nameField = makeField('Variable', row.name, 'integratorName');
+        const lowerField = makeField('Lower bound', row.lo, 'integratorLower', 'blank for none', row.kind === 'free');
+        const upperField = makeField('Upper bound', row.hi, 'integratorUpper', 'blank for none', row.kind === 'free');
+
+        const add = document.createElement('button');
+        add.className = 'card-action integrator-bound-add';
+        add.type = 'button';
+        add.textContent = '+';
+        add.title = 'Add another integral row';
+        add.addEventListener('click', () => {
+          commitVisibleBindingInputs();
+          const nextRows = currentIntegratorRows();
+          nextRows.splice(index + 1, 0, {
+            kind: 'bound',
+            name: integratorDefaultVariableName(nextRows),
+            lo: '',
+            hi: '',
+          });
+          renderIntegratorRows(nextRows);
+          refreshVariableValuesFromEditor();
+          updateHistoryButtons();
+          if (currentMode() === 'integrator')
+            saveLastIntegratorState();
+        });
+
+        const remove = document.createElement('button');
+        remove.className = 'card-action integrator-bound-remove';
+        remove.type = 'button';
+        remove.textContent = '−';
+        remove.title = 'Remove this row';
+        remove.disabled = safeRows.length === 1 || (row.kind !== 'free' && boundCount === 1);
+        remove.addEventListener('click', () => {
+          commitVisibleBindingInputs();
+          const nextRows = currentIntegratorRows();
+          nextRows.splice(index, 1);
+          if (!nextRows.length)
+            nextRows.push({kind: 'bound', name: 'x', lo: '', hi: ''});
+          if (nextRows.filter((entry) => entry.kind !== 'free').length === 0)
+            nextRows.push({kind: 'bound', name: integratorDefaultVariableName(nextRows), lo: '', hi: ''});
+          renderIntegratorRows(nextRows);
+          refreshVariableValuesFromEditor();
+          updateHistoryButtons();
+          if (currentMode() === 'integrator')
+            saveLastIntegratorState();
+        });
+
+        item.append(toggle, nameField, lowerField, upperField, add, remove);
+        integratorBoundStack.appendChild(item);
+      });
     }
 
     function applyIntegratorResultBound(data) {
-      if (!data)
+      const responseBounds = Array.isArray(data && data.bounds) ? data.bounds : [];
+      if (!responseBounds.length)
         return;
-      if (!Object.prototype.hasOwnProperty.call(data, 'bound_var') &&
-          !Object.prototype.hasOwnProperty.call(data, 'bound_lower') &&
-          !Object.prototype.hasOwnProperty.call(data, 'bound_upper'))
-        return;
-      const currentBound = currentIntegratorBound();
-      const nextBound = {
-        name: String(data.bound_var || currentBound.name || 'x').trim() || 'x',
-        lo: currentBound.lo || String(data.bound_lower || '').trim(),
-        hi: currentBound.hi || String(data.bound_upper || '').trim(),
-      };
-      setIntegratorBoundInputs(nextBound);
+      const previousRows = currentIntegratorRows();
+      const mergedRows = [];
+      let boundIndex = 0;
+
+      previousRows.forEach((row) => {
+        if (row.kind === 'free') {
+          mergedRows.push(row);
+          return;
+        }
+        if (boundIndex < responseBounds.length)
+          mergedRows.push(responseBounds[boundIndex++]);
+      });
+
+      while (boundIndex < responseBounds.length)
+        mergedRows.push(responseBounds[boundIndex++]);
+
+      renderIntegratorRows(mergedRows);
     }
 
     function restoreIntegratorBoundsText(text) {
-      setIntegratorBoundInputs(firstIntegratorBoundFromText(text || DEFAULT_INTEGRATOR_BOUNDS_TEXT));
-    }
-
-    function currentIntegratorBound() {
-      cleanIntegratorBoundInputs();
-      return {
-        name: String(integratorVariable && integratorVariable.value || 'x').trim() || 'x',
-        lo: cleanIntegratorBoundValue(integratorLowerBound && integratorLowerBound.value),
-        hi: cleanIntegratorBoundValue(integratorUpperBound && integratorUpperBound.value),
-      };
-    }
-
-    function integratorBoundsTextFromBound(bound) {
-      const name = String(bound.name || 'x').trim() || 'x';
-      const lo = String(bound.lo || '').trim();
-      const hi = String(bound.hi || '').trim();
-      if (lo && hi)
-        return `${name} = ${lo} .. ${hi}`;
-      if (hi)
-        return `${name} = ${hi}`;
-      return name;
+      try {
+        renderIntegratorRows(parseIntegratorBoundsText(text || DEFAULT_INTEGRATOR_BOUNDS_TEXT));
+      } catch (_) {
+        renderIntegratorRows(integratorFallbackRows());
+      }
     }
 
     function currentIntegratorBoundsText() {
-      return integratorBoundsTextFromBound(currentIntegratorBound());
+      return integratorBoundsTextFromRows(currentIntegratorRows());
     }
 
     function resetIntegratorBoundsToDefault() {
@@ -4036,10 +4292,11 @@ __THEME_OVERRIDES__
     }
 
     async function fetchIntegratorEvaluation() {
-      const bound = currentIntegratorBound();
-      if (bound.lo && !bound.hi)
-        throw new Error('A one-sided bound should be entered as an upper bound. Leave lower blank and put the value in upper.');
-      const bounds = [bound];
+      const bounds = currentIntegratorBoundRows();
+      bounds.forEach((bound) => {
+        if (bound.lo && !bound.hi)
+          throw new Error(`A one-sided bound for ${bound.name} should be entered as an upper bound. Leave lower blank and put the value in upper.`);
+      });
       saveLastIntegratorState();
       const expressionText = currentExpressionText() || expr.value.trim();
       const response = await fetch('/integrator-eval', {
@@ -4656,7 +4913,7 @@ __THEME_OVERRIDES__
         }
         if (data.expression && !data.partial_error)
           setExpressionEditor(
-            editorText || text,
+            data.expression || editorText || text,
             data.binding_values || null,
             editorBodyText || null
           );
@@ -4675,7 +4932,9 @@ __THEME_OVERRIDES__
           data.display_function || data.function || '',
           data.full_display_function || data.function || ''
         );
-        value.textContent = data.value || '';
+        value.textContent = data.value_note
+          ? `${data.value || ''}\n${data.value_note}`
+          : (data.value || '');
         lastEvaluationInputText = data.partial_error ? text : (data.expression || text);
         if (!data.partial_error)
           saveLastExpression(editorText || fullExpressionText || expr.value.trim());
@@ -4937,11 +5196,8 @@ __THEME_OVERRIDES__
         setExpandableText(functionStyle, functionMore, detailText, detailText);
         {
           const valueLines = [];
-          const exactText = data.symbolic && antiderivativeStatus ? `${data.symbolic} + C` : data.symbolic;
-          if (exactText)
-            valueLines.push(`exact: ${exactText}`);
           if (data.value)
-            valueLines.push(`${data.symbolic ? 'numeric: ' : ''}${data.value}`);
+            valueLines.push(data.value);
           if (data.error)
             valueLines.push(`error ≈ ${data.error}`);
           if (!valueLines.length && data.status)
@@ -5307,7 +5563,7 @@ __THEME_OVERRIDES__
         restoreModeEditor(currentMode());
         syncModeUI();
         restoreModeResultState(currentMode());
-        if (currentMode() === 'integrator' && !currentIntegratorBound().name)
+        if (currentMode() === 'integrator' && currentIntegratorBoundRows().length === 0)
           resetIntegratorBoundsToDefault();
         if (currentMode() === 'integrator') {
           if (integratorIntervalCap)
@@ -5340,20 +5596,23 @@ __THEME_OVERRIDES__
           saveLastIntegratorState();
       });
 
-    [integratorVariable, integratorLowerBound, integratorUpperBound].forEach((input) => {
-      if (!input)
-        return;
-      input.addEventListener('focus', () => {
-        if (input === integratorLowerBound || input === integratorUpperBound)
-          cleanIntegratorBoundInput(input);
-      });
-      input.addEventListener('change', () => {
-        if (input === integratorLowerBound || input === integratorUpperBound)
-          cleanIntegratorBoundInput(input);
+    if (integratorAddBound) {
+      integratorAddBound.addEventListener('click', () => {
+        commitVisibleBindingInputs();
+        const nextRows = currentIntegratorRows();
+        nextRows.push({
+          kind: 'bound',
+          name: integratorDefaultVariableName(nextRows),
+          lo: '',
+          hi: '',
+        });
+        renderIntegratorRows(nextRows);
+        refreshVariableValuesFromEditor();
+        updateHistoryButtons();
         if (currentMode() === 'integrator')
           saveLastIntegratorState();
       });
-    });
+    }
 
     goalTarget.addEventListener('keydown', (event) => {
       if (event.key === 'Enter') {
@@ -5509,8 +5768,7 @@ __THEME_OVERRIDES__
 
     syncModeTabs();
     syncModeUI();
-    cleanIntegratorBoundInputs();
-    requestAnimationFrame(cleanIntegratorBoundInputs);
+    restoreIntegratorBoundsText(DEFAULT_INTEGRATOR_BOUNDS_TEXT);
     setStatus('Ready');
     refreshMobileAccess();
     setInterval(refreshMobileAccess, 5000);
@@ -6660,6 +6918,7 @@ def parse_mars_lab_output(output: str) -> dict[str, str]:
         "tex": r"^tex\s+(.*)$",
         "differentiable": r"^differentiable\s+(.*)$",
         "value": r"^value\s+(.*)$",
+        "value_note": r"^value_note\s+(.*)$",
         "residual": r"^residual\s+(.*)$",
         "iterations": r"^iterations\s+(.*)$",
         "complex": r"^complex\s+(.*)$",
@@ -7188,6 +7447,45 @@ def expression_with_binding_value(expression: str, target_name: str, value_text:
     return f"{{ {body} | {binding_text} }}"
 
 
+def expression_without_bindings_for_names(expression: str, names: set[str]) -> str:
+    text = str(expression or "").strip()
+    target_names = {str(name or "").strip() for name in names if str(name or "").strip()}
+
+    if not text or not target_names:
+        return text
+
+    body, var_text, const_text = parse_expression_body(text)
+    if not var_text and not const_text:
+        return body or text
+
+    def filtered_parts(assignments: str) -> list[str]:
+        out: list[str] = []
+
+        for part in split_top_level_text(assignments, ","):
+            eq = index_top_level_text(part, "=")
+            stripped = part.strip()
+
+            if eq < 0:
+                if stripped and stripped not in target_names:
+                    out.append(stripped)
+                continue
+
+            name = part[:eq].strip()
+            if name and name not in target_names:
+                out.append(stripped)
+
+        return out
+
+    var_parts = filtered_parts(var_text)
+    const_parts = sorted_assignment_parts(filtered_parts(const_text))
+    binding_text = ", ".join(var_parts)
+    if const_parts:
+        const_binding_text = ", ".join(const_parts)
+        binding_text = f"{binding_text}; {const_binding_text}" if binding_text else f"; {const_binding_text}"
+
+    return f"{{ {body} | {binding_text} }}" if binding_text else body
+
+
 def binding_syntax_error_details(raw: str) -> tuple[str, str] | None:
     first_line = str(raw or "").strip().splitlines()[0] if str(raw or "").strip() else ""
     match = re.match(r"^incorrect syntax for ([^:]+):\s*(.*)$", first_line)
@@ -7600,6 +7898,22 @@ def prepare_matrix_fields(fields: dict[str, str], precision: int) -> dict[str, o
     return payload
 
 
+def integrator_bound_rows_from_fields(fields: dict[str, str]) -> list[dict[str, str]]:
+    names = [line.strip() for line in str(fields.get("bound_var") or "").splitlines() if line.strip()]
+    los = [line.strip() for line in str(fields.get("bound_lower") or "").splitlines()]
+    his = [line.strip() for line in str(fields.get("bound_upper") or "").splitlines()]
+    rows: list[dict[str, str]] = []
+
+    for index, name in enumerate(names):
+        rows.append({
+            "kind": "bound",
+            "name": name,
+            "lo": los[index] if index < len(los) else "",
+            "hi": his[index] if index < len(his) else "",
+        })
+    return rows
+
+
 def prepare_integrator_fields(fields: dict[str, str], precision: int) -> dict[str, object]:
     if fields.get("value"):
         fields["value"] = format_number_text_for_precision(
@@ -7641,7 +7955,7 @@ def prepare_integrator_fields(fields: dict[str, str], precision: int) -> dict[st
         "symbolic": str(fields.get("symbolic") or "").strip(),
         "symbolic_tex": str(fields.get("symbolic_tex") or "").strip(),
         "symbolic_value": str(fields.get("symbolic_value") or "").strip(),
-        "value": str(fields.get("value") or fields.get("symbolic_value") or "").strip(),
+        "value": str(fields.get("value") or "").strip(),
         "error": str(fields.get("error") or "").strip(),
         "error": str(fields.get("error") or "").strip(),
         "intervals": str(fields.get("intervals") or "").strip(),
@@ -7651,6 +7965,7 @@ def prepare_integrator_fields(fields: dict[str, str], precision: int) -> dict[st
         "status": str(fields.get("status") or "").strip(),
         "dimensions": str(fields.get("dimensions") or "").strip(),
         "bound": bounds,
+        "bounds": integrator_bound_rows_from_fields(fields),
         "bound_var": str(fields.get("bound_var") or "").strip().splitlines()[0] if str(fields.get("bound_var") or "").strip() else "",
         "bound_lower": str(fields.get("bound_lower") or "").strip().splitlines()[0] if str(fields.get("bound_lower") or "").strip() else "",
         "bound_upper": str(fields.get("bound_upper") or "").strip().splitlines()[0] if str(fields.get("bound_upper") or "").strip() else "",
@@ -8141,6 +8456,11 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                     self.send_json(400, {"ok": False, "error": "A one-sided bound should be entered as an upper value"})
                     return
                 cleaned_bounds.append({"name": name, "lo": lo_text, "hi": hi_text})
+
+            expression = expression_without_bindings_for_names(
+                expression,
+                {item["name"] for item in cleaned_bounds},
+            )
 
             try:
                 precision = max(17, min(MAX_VALUE_PRECISION_DIGITS, precision))

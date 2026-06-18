@@ -36,6 +36,7 @@ typedef struct {
 char * expr_number_to_string_local          (number_t value);
 char * expr_const_to_string_local           (const expr_t *dv);
 char * expr_eval_to_string_local            (const expr_t *dv);
+char * expr_text_to_tex_local               (const char *text);
 bool   expr_is_immortal_default_const_local (const expr_t *dv);
 bool   expr_set_number_scientific_local     (bool scientific);
 int    expr_set_number_precision_local      (int precision);

@@ -271,6 +271,61 @@ static bool expr_collect_var_usage_impl(const expr_t *expr,
         return true;
     }
 
+    if (expr_is_op(expr, &ops_integral)) {
+        const expr_t *dummy = expr_integral_dummy_expr(expr);
+        const expr_t *lower = expr_integral_lower_bound_expr(expr);
+        const expr_t *upper = expr_integral_upper_bound_expr(expr);
+
+        if (lower && !expr_collect_var_usage_impl(lower, nvars, vars, used_out))
+            return false;
+        if (upper && !expr_collect_var_usage_impl(upper, nvars, vars, used_out))
+            return false;
+        if (expr->a) {
+            expr_t *const *filtered_vars = vars;
+            size_t filtered_nvars = nvars;
+
+            if (dummy && nvars > 0u) {
+                size_t out = 0u;
+                expr_t *stack_vars[16];
+                expr_t **filtered_storage = NULL;
+
+                filtered_storage = (nvars <= 16u)
+                    ? stack_vars
+                    : calloc(nvars, sizeof(*filtered_storage));
+                if (!filtered_storage)
+                    return false;
+                filtered_vars = filtered_storage;
+
+                for (size_t i = 0; i < nvars; ++i) {
+                    int same_dummy = vars[i] == dummy ||
+                        (expr_is_var(vars[i]) && expr_is_var(dummy) &&
+                         vars[i]->var_id != 0 &&
+                         vars[i]->var_id == dummy->var_id);
+                    if (!same_dummy)
+                        filtered_storage[out++] = vars[i];
+                }
+                filtered_nvars = out;
+                if (!expr_collect_var_usage_impl(expr->a,
+                                                 filtered_nvars,
+                                                 filtered_vars,
+                                                 used_out)) {
+                    if (filtered_storage != stack_vars)
+                        free(filtered_storage);
+                    return false;
+                }
+                if (filtered_storage != stack_vars)
+                    free(filtered_storage);
+                return true;
+            }
+
+            return expr_collect_var_usage_impl(expr->a,
+                                               filtered_nvars,
+                                               filtered_vars,
+                                               used_out);
+        }
+        return true;
+    }
+
     if (expr->a && !expr_collect_var_usage_impl(expr->a, nvars, vars, used_out))
         return false;
     if (expr->b && !expr_collect_var_usage_impl(expr->b, nvars, vars, used_out))
@@ -342,6 +397,52 @@ expr_t *expr_substitute(const expr_t *expr,
         if (!left)
             return NULL;
         out = expr->ops->apply_unary(left);
+        expr_free(left);
+        return out;
+    }
+
+    if (expr_is_op(expr, &ops_integral)) {
+        const expr_t *dummy = expr_integral_dummy_expr(expr);
+        const expr_t *lower = expr_integral_lower_bound_expr(expr);
+        const expr_t *upper = expr_integral_upper_bound_expr(expr);
+        bool shadowed = false;
+
+        if (dummy) {
+            shadowed = dummy == needle ||
+                       (expr_is_var(dummy) && expr_is_var(needle) &&
+                        dummy->var_id != 0 &&
+                        dummy->var_id == needle->var_id) ||
+                       expr_is_same_named_leaf_for_substitution(dummy, needle);
+        }
+
+        left = shadowed ? expr_clone(expr->a)
+                        : expr_substitute(expr->a, needle, replacement);
+        right = upper ? expr_substitute(upper, needle, replacement) : NULL;
+        if (!left || !right) {
+            expr_free(right);
+            expr_free(left);
+            return NULL;
+        }
+
+        if (lower) {
+            expr_t *lower_copy = expr_substitute(lower, needle, replacement);
+
+            if (!lower_copy) {
+                expr_free(right);
+                expr_free(left);
+                return NULL;
+            }
+            out = dummy
+                ? expr_integral_with_bounds_internal(left, lower_copy, right, dummy)
+                : expr_integral_with_bounds_internal(left, lower_copy, right, right);
+            expr_free(lower_copy);
+        } else {
+            out = dummy
+                ? expr_integral_with_dummy_internal(left, right, dummy)
+                : expr_integral_with_dummy_internal(left, right, right);
+        }
+
+        expr_free(right);
         expr_free(left);
         return out;
     }

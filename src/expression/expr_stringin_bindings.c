@@ -194,7 +194,7 @@ static int symtab_binding_is_needed_for_expr(const expr_t *expr,
                                              const expr_t *node)
 {
     expr_t *vars[1];
-    bool used[1];
+    bool used[1] = { false };
 
     if (!node)
         return 0;

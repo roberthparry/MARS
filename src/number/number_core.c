@@ -417,14 +417,45 @@ bool num_constant_value(const char *text, number_t *out)
 
 const char *num_constant_name(number_t value)
 {
+    number_const_id_t constant_id;
+    number_const_id_t candidate_id;
+    size_t precision_bits = 0u;
+
     if (num_is_nan(value))
-        return "NaN";
-    if (!number_value_is_immortal(&value))
+        return "NAN";
+    if (number_const_id_from_immortal(&value, &constant_id)) {
+        for (size_t i = 0u; i < number_constant_name_count(); ++i) {
+            if (number_constant_names[i].canonical &&
+                number_const_id_from_immortal(number_constant_names[i].value,
+                                              &candidate_id) &&
+                candidate_id == constant_id)
+                return number_constant_names[i].name;
+        }
+        return NULL;
+    }
+
+    if (num_is_exact(value))
         return NULL;
 
+    precision_bits = num_get_prec_bits(value);
+    if (precision_bits == 0u)
+        precision_bits = num_get_effective_prec_bits(value);
+    if (precision_bits == 0u)
+        precision_bits = number_default_precision_bits;
+
     for (size_t i = 0u; i < number_constant_name_count(); ++i) {
-        if (number_constant_names[i].canonical &&
-            num_eq(value, *number_constant_names[i].value))
+        number_t candidate;
+        bool match;
+
+        if (!number_constant_names[i].canonical ||
+            num_is_exact(*number_constant_names[i].value))
+            continue;
+
+        candidate = num_const_prec(*number_constant_names[i].value,
+                                   precision_bits);
+        match = num_eq(value, candidate);
+        num_destroy(&candidate);
+        if (match)
             return number_constant_names[i].name;
     }
 

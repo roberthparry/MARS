@@ -95,10 +95,84 @@ void varlist_init(varlist_t *vl)
     vl->cap = 0u;
 }
 
+static void varlist_add(varlist_t *vl, expr_t *v);
+
+static int varlist_contains_equiv(const varlist_t *vl, const expr_t *v)
+{
+    size_t i;
+
+    if (!vl || !v)
+        return 0;
+
+    for (i = 0u; i < vl->count; ++i) {
+        expr_t *existing = vl->vars[i];
+
+        if (existing == v)
+            return 1;
+        if (expr_is_var(existing) && expr_is_var(v) &&
+            existing->var_id != 0 && existing->var_id == v->var_id)
+            return 1;
+        if (existing->name && *existing->name &&
+            v->name && *v->name &&
+            strcmp(existing->name, v->name) == 0)
+            return 1;
+    }
+
+    return 0;
+}
+
+static void find_vars_dfs_impl(const expr_t *expr,
+                               varlist_t *vars,
+                               varlist_t *bound_vars)
+{
+    const expr_t *dummy;
+    const expr_t *lower;
+    const expr_t *upper;
+
+    if (!expr)
+        return;
+
+    if (expr_is_var(expr)) {
+        if (!varlist_contains_equiv(bound_vars, expr))
+            varlist_add(vars, (expr_t *)expr);
+        return;
+    }
+    if (expr_is_const(expr))
+        return;
+
+    if (expr_is_op(expr, &ops_integral)) {
+        lower = expr_integral_lower_bound_expr(expr);
+        upper = expr_integral_upper_bound_expr(expr);
+        dummy = expr_integral_dummy_expr(expr);
+
+        find_vars_dfs_impl(lower, vars, bound_vars);
+        find_vars_dfs_impl(upper, vars, bound_vars);
+
+        if (dummy)
+            varlist_add(bound_vars, (expr_t *)dummy);
+        find_vars_dfs_impl(expr->a, vars, bound_vars);
+        if (dummy && bound_vars->count > 0u)
+            --bound_vars->count;
+        return;
+    }
+
+    find_vars_dfs_impl(expr->a, vars, bound_vars);
+    find_vars_dfs_impl(expr->b, vars, bound_vars);
+}
+
 static void varlist_add(varlist_t *vl, expr_t *v)
 {
     for (size_t i = 0u; i < vl->count; ++i) {
-        if (vl->vars[i] == v)
+        expr_t *existing = vl->vars[i];
+
+        if (existing == v)
+            return;
+        if (expr_is_var(existing) && expr_is_var(v) &&
+            existing->var_id != 0 && existing->var_id == v->var_id)
+            return;
+        if (existing->name && *existing->name &&
+            v->name && *v->name &&
+            strcmp(existing->name, v->name) == 0)
             return;
     }
 
@@ -115,18 +189,14 @@ static void varlist_add(varlist_t *vl, expr_t *v)
 
 void find_vars_dfs(const expr_t *f, varlist_t *vl)
 {
-    if (!f)
+    varlist_t bound;
+
+    if (!f || !vl)
         return;
 
-    if (expr_is_var(f)) {
-        varlist_add(vl, (expr_t *)f);
-        return;
-    }
-    if (expr_is_const(f))
-        return;
-
-    find_vars_dfs(f->a, vl);
-    find_vars_dfs(f->b, vl);
+    varlist_init(&bound);
+    find_vars_dfs_impl(f, vl, &bound);
+    free(bound.vars);
 }
 
 void find_named_consts_dfs(const expr_t *f, varlist_t *cl)
@@ -171,21 +241,42 @@ const char *expr_name_or_default(const expr_t *dv, const char *fallback)
 
 char *binding_rhs_expr_string_local(const expr_t *dv)
 {
+    string_t *text;
+    char *out;
+
     if (dv && dv->binding_expr)
         return expr_binding_expr_to_string(dv->binding_expr);
-    return expr_const_to_string_local(dv);
+    text = dv ? num_to_string(dv->c) : NULL;
+    out = text ? expr_tostring_xstrdup(string_c_str(text)) : NULL;
+    string_free(text);
+    return out;
 }
 
 char *binding_rhs_tex_string_local(const expr_t *dv)
 {
+    string_t *number_text;
+    char *text;
+    char *tex;
+
     if (dv && dv->binding_expr)
         return expr_binding_expr_to_tex(dv->binding_expr);
-    return expr_const_to_string_local(dv);
+    number_text = dv ? num_to_string(dv->c) : NULL;
+    text = number_text ? expr_tostring_xstrdup(string_c_str(number_text)) : NULL;
+    string_free(number_text);
+    tex = expr_text_to_tex_local(text);
+    free(text);
+    return tex;
 }
 
 char *binding_rhs_c_string_local(const expr_t *dv)
 {
+    string_t *text;
+    char *out;
+
     if (dv && dv->binding_expr)
         return expr_binding_expr_to_function_string(dv->binding_expr);
-    return expr_const_to_string_local(dv);
+    text = dv ? num_to_string(dv->c) : NULL;
+    out = text ? expr_tostring_xstrdup(string_c_str(text)) : NULL;
+    string_free(text);
+    return out;
 }

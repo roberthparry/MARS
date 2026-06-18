@@ -221,20 +221,56 @@ cleanup:
     return simplified;
 }
 
-static expr_t *binding_or_synthetic_var(expr_bindings_t *bindings,
+static expr_t *binding_or_shadowing_var(expr_t **expr_io,
+                                        expr_bindings_t *bindings,
                                         const char *name,
                                         int *owned)
 {
-    expr_t *var = bindings ? expr_bindings_get(bindings, name) : NULL;
+    expr_t *bound = bindings ? expr_bindings_get(bindings, name) : NULL;
+    expr_t *needle = NULL;
+    expr_t *shadow = NULL;
+    expr_t *rewritten = NULL;
+    int owns_needle = 0;
 
     if (owned)
         *owned = 0;
-    if (var)
-        return var;
+
+    if (bound && expr_is_var(bound))
+        return bound;
+
+    needle = bound;
+    if (!needle) {
+        needle = expr_new_named_var(NUM_NAN, name);
+        if (!needle)
+            return NULL;
+        owns_needle = 1;
+    }
+
+    shadow = expr_new_named_var(NUM_NAN, name);
+    if (!shadow) {
+        if (owns_needle)
+            expr_free(needle);
+        return NULL;
+    }
+
+    if (expr_io && *expr_io) {
+        rewritten = expr_substitute(*expr_io, needle, shadow);
+        if (!rewritten) {
+            if (owns_needle)
+                expr_free(needle);
+            expr_free(shadow);
+            return NULL;
+        }
+        expr_free(*expr_io);
+        *expr_io = rewritten;
+    }
+
+    if (owns_needle)
+        expr_free(needle);
 
     if (owned)
         *owned = 1;
-    return expr_new_named_var(NUM_NAN, name);
+    return shadow;
 }
 
 static int expr_var_matches(const expr_t *left, const expr_t *right)
@@ -496,6 +532,33 @@ static int all_bounds_indefinite(size_t ndim, const bound_kind_t *kinds)
     return 1;
 }
 
+static int should_try_symbolic_first(const expr_t *expr,
+                                     size_t ndim,
+                                     expr_t *const *vars,
+                                     int all_bounds_numeric)
+{
+    if (!expr || !vars || ndim == 0u)
+        return 0;
+
+    if (ndim == 1u)
+        return 1;
+
+    if (!all_bounds_numeric)
+        return 1;
+
+    return expr_has_unbound_parameters(expr, ndim, vars);
+}
+
+static expr_t *symbolic_integral_prefix(const expr_t *integrand,
+                                        size_t ndim,
+                                        expr_t *const *vars,
+                                        const bound_kind_t *kinds,
+                                        expr_t *const *lo,
+                                        expr_t *const *hi,
+                                        size_t max_steps,
+                                        size_t *completed_steps_out,
+                                        expr_t **first_antiderivative_out);
+
 static expr_t *symbolic_integral(const expr_t *integrand,
                                  size_t ndim,
                                  expr_t *const *vars,
@@ -504,11 +567,72 @@ static expr_t *symbolic_integral(const expr_t *integrand,
                                  expr_t *const *hi,
                                  expr_t **first_antiderivative_out)
 {
-    expr_t *current = NULL;
+    size_t completed_steps = 0u;
+    size_t target_steps = ndim;
 
     if (!integrand || !vars || !kinds || !lo || !hi)
         return NULL;
 
+    return symbolic_integral_prefix(integrand, ndim, vars, kinds, lo, hi,
+                                    target_steps, &completed_steps,
+                                    first_antiderivative_out);
+}
+
+static expr_t *apply_symbolic_bound_step(expr_t *current,
+                                         expr_t *anti,
+                                         bound_kind_t kind,
+                                         expr_t *var,
+                                         expr_t *lo,
+                                         expr_t *hi)
+{
+    expr_t *upper = NULL;
+    expr_t *lower = NULL;
+    expr_t *diff = NULL;
+    expr_t *next = NULL;
+
+    if (!current || !anti || !var)
+        return NULL;
+
+    if (kind == BOUND_KIND_DEFINITE) {
+        if (!lo || !hi)
+            return NULL;
+        upper = expr_substitute(anti, var, hi);
+        lower = expr_substitute(anti, var, lo);
+        diff = (upper && lower) ? expr_sub(upper, lower) : NULL;
+        next = diff ? expr_simplify(diff) : NULL;
+    } else if (kind == BOUND_KIND_UPPER_ONLY) {
+        if (!hi)
+            return NULL;
+        upper = expr_substitute(anti, var, hi);
+        next = upper ? expr_simplify(upper) : NULL;
+    } else {
+        next = expr_simplify(anti);
+    }
+
+    expr_free(diff);
+    expr_free(lower);
+    expr_free(upper);
+    return next;
+}
+
+static expr_t *symbolic_integral_prefix(const expr_t *integrand,
+                                        size_t ndim,
+                                        expr_t *const *vars,
+                                        const bound_kind_t *kinds,
+                                        expr_t *const *lo,
+                                        expr_t *const *hi,
+                                        size_t max_steps,
+                                        size_t *completed_steps_out,
+                                        expr_t **first_antiderivative_out)
+{
+    expr_t *current = NULL;
+    size_t completed_steps = 0u;
+
+    if (!integrand || !vars || !kinds || !lo || !hi)
+        return NULL;
+
+    if (completed_steps_out)
+        *completed_steps_out = 0u;
     if (first_antiderivative_out)
         *first_antiderivative_out = NULL;
 
@@ -516,7 +640,7 @@ static expr_t *symbolic_integral(const expr_t *integrand,
     if (!current)
         return NULL;
 
-    for (size_t i = 0; i < ndim; ++i) {
+    for (size_t i = 0; i < ndim && i < max_steps; ++i) {
         expr_t *anti;
         expr_t *upper = NULL;
         expr_t *lower = NULL;
@@ -568,8 +692,99 @@ static expr_t *symbolic_integral(const expr_t *integrand,
             return NULL;
         }
         current = next;
+        completed_steps = i + 1u;
     }
 
+    if (completed_steps_out)
+        *completed_steps_out = completed_steps;
+    return current;
+}
+
+static expr_t *symbolic_integral_best_effort(const expr_t *integrand,
+                                             size_t ndim,
+                                             expr_t *const *vars,
+                                             const bound_kind_t *kinds,
+                                             expr_t *const *lo,
+                                             expr_t *const *hi,
+                                             size_t *completed_steps_out,
+                                             size_t *remaining_ndim_out,
+                                             expr_t **remaining_vars_out,
+                                             number_t *remaining_lo_num_out,
+                                             number_t *remaining_hi_num_out,
+                                             const number_t *lo_num,
+                                             const number_t *hi_num)
+{
+    expr_t *current = NULL;
+    int *active = NULL;
+    size_t remaining = ndim;
+    size_t completed = 0u;
+
+    if (!integrand || !vars || !kinds || !lo || !hi || !completed_steps_out ||
+        !remaining_ndim_out || !remaining_vars_out ||
+        (ndim > 0u && (!remaining_lo_num_out || !remaining_hi_num_out ||
+                       !lo_num || !hi_num)))
+        return NULL;
+
+    *completed_steps_out = 0u;
+    *remaining_ndim_out = 0u;
+
+    current = expr_simplify(integrand);
+    if (!current)
+        return NULL;
+
+    active = calloc(ndim, sizeof(*active));
+    if (!active) {
+        expr_free(current);
+        return NULL;
+    }
+
+    for (size_t i = 0; i < ndim; ++i)
+        active[i] = 1;
+
+    while (remaining > 0u) {
+        int progressed = 0;
+
+        for (size_t i = ndim; i-- > 0u;) {
+            expr_t *anti;
+            expr_t *next;
+
+            if (!active[i])
+                continue;
+
+            anti = expr_integrate(current, vars[i]);
+            if (!anti)
+                continue;
+
+            next = apply_symbolic_bound_step(current, anti, kinds[i], vars[i], lo[i], hi[i]);
+            expr_free(anti);
+            if (!next)
+                continue;
+
+            expr_free(current);
+            current = next;
+            active[i] = 0;
+            remaining--;
+            completed++;
+            progressed = 1;
+            break;
+        }
+
+        if (!progressed)
+            break;
+    }
+
+    for (size_t i = 0, out = 0u; i < ndim; ++i) {
+        if (!active[i])
+            continue;
+        remaining_vars_out[out] = vars[i];
+        remaining_lo_num_out[out] = num_clone(lo_num[i]);
+        remaining_hi_num_out[out] = num_clone(hi_num[i]);
+        out++;
+    }
+
+    free(active);
+    *completed_steps_out = completed;
+    *remaining_ndim_out = remaining;
     return current;
 }
 
@@ -691,13 +906,20 @@ int main(int argc, char **argv)
     expr_t *display_expr = NULL;
     expr_t *symbolic_result = NULL;
     expr_t *first_antiderivative = NULL;
+    expr_t *partially_symbolic_result = NULL;
+    expr_t **remaining_numeric_vars = NULL;
+    number_t *remaining_lo_num = NULL;
+    number_t *remaining_hi_num = NULL;
     int rc = 1;
     int intg_rc = 0;
     int all_bounds_numeric = 1;
     int ran_numeric_integrator = 0;
     int used_symbolic_numeric_result = 0;
     int used_unevaluated_antiderivative_fallback = 0;
+    int used_partial_symbolic_numeric = 0;
     int has_unbound_params = 0;
+    size_t partial_symbolic_steps = 0u;
+    size_t remaining_numeric_ndim = 0u;
 
     while (argi < argc && strncmp(argv[argi], "--", 2u) == 0) {
         if (strcmp(argv[argi], "--max-intervals") == 0) {
@@ -755,17 +977,21 @@ int main(int argc, char **argv)
     hi_num = calloc(ndim, sizeof(*hi_num));
     lo_expr = calloc(ndim, sizeof(*lo_expr));
     hi_expr = calloc(ndim, sizeof(*hi_expr));
+    remaining_numeric_vars = calloc(ndim, sizeof(*remaining_numeric_vars));
+    remaining_lo_num = calloc(ndim, sizeof(*remaining_lo_num));
+    remaining_hi_num = calloc(ndim, sizeof(*remaining_hi_num));
     lo_display_inputs = calloc(ndim, sizeof(*lo_display_inputs));
     hi_display_inputs = calloc(ndim, sizeof(*hi_display_inputs));
     lo_tex_inputs = calloc(ndim, sizeof(*lo_tex_inputs));
     hi_tex_inputs = calloc(ndim, sizeof(*hi_tex_inputs));
     if (!vars || !owned_vars || !var_names || !lo_inputs || !hi_inputs || !bound_kinds ||
         !lo_num || !hi_num || !lo_expr || !hi_expr ||
+        !remaining_numeric_vars || !remaining_lo_num || !remaining_hi_num ||
         !lo_display_inputs || !hi_display_inputs || !lo_tex_inputs || !hi_tex_inputs)
         goto cleanup;
 
     if (argi + 2 >= argc) {
-        vars[0] = binding_or_synthetic_var(bindings, "x", &owned_vars[0]);
+        vars[0] = binding_or_shadowing_var(&expr, bindings, "x", &owned_vars[0]);
         if (!vars[0])
             goto cleanup;
         var_names[0] = "x";
@@ -787,7 +1013,7 @@ int main(int argc, char **argv)
             int has_lo;
             int has_hi;
 
-            vars[i] = binding_or_synthetic_var(bindings, name, &owned_vars[i]);
+            vars[i] = binding_or_shadowing_var(&expr, bindings, name, &owned_vars[i]);
             if (!vars[i]) {
                 fprintf(stderr, "Could not create binding named '%s'\n", name);
                 goto cleanup;
@@ -869,22 +1095,24 @@ int main(int argc, char **argv)
     }
     integrand_tex = expr_tex_body(display_expr);
 
-    symbolic_result = symbolic_integral(expr, ndim, vars, bound_kinds, lo_expr, hi_expr,
-                                        &first_antiderivative);
-    if (!symbolic_result && !first_antiderivative && ndim == 1u)
-        first_antiderivative = make_unevaluated_antiderivative(expr, vars[0]);
-    if (first_antiderivative) {
-        antiderivative_text = expr_text_dup(first_antiderivative, style_UNBOUND);
-        antiderivative_tex = expr_tex_body(first_antiderivative);
-    }
-    if (symbolic_result) {
-        symbolic_text = expr_text_dup(symbolic_result, style_UNBOUND);
-        symbolic_tex = expr_tex_body(symbolic_result);
-        symbolic_num = expr_eval(symbolic_result);
-        if (!num_is_nan(symbolic_num) && num_is_finite(symbolic_num) && num_is_real(symbolic_num))
-            symbolic_value_text = number_text(symbolic_num);
-    }
     has_unbound_params = expr_has_unbound_parameters(expr, ndim, vars);
+    if (should_try_symbolic_first(expr, ndim, vars, all_bounds_numeric)) {
+        symbolic_result = symbolic_integral(expr, ndim, vars, bound_kinds, lo_expr, hi_expr,
+                                            &first_antiderivative);
+        if (!symbolic_result && !first_antiderivative && ndim == 1u)
+            first_antiderivative = make_unevaluated_antiderivative(expr, vars[0]);
+        if (first_antiderivative) {
+            antiderivative_text = expr_text_dup(first_antiderivative, style_UNBOUND);
+            antiderivative_tex = expr_tex_body(first_antiderivative);
+        }
+        if (symbolic_result) {
+            symbolic_text = expr_text_dup(symbolic_result, style_UNBOUND);
+            symbolic_tex = expr_tex_body(symbolic_result);
+            symbolic_num = expr_eval(symbolic_result);
+            if (!num_is_nan(symbolic_num) && num_is_finite(symbolic_num) && num_is_real(symbolic_num))
+                symbolic_value_text = number_text(symbolic_num);
+        }
+    }
 
     if (all_bounds_numeric && symbolic_value_text) {
         used_symbolic_numeric_result = 1;
@@ -900,15 +1128,72 @@ int main(int argc, char **argv)
                                    &value_num, &error_num);
         ran_numeric_integrator = 1;
     } else if (all_bounds_numeric) {
-        intg_rc = intg_integral_multi(ig, expr, ndim, vars, lo_num, hi_num,
-                                  &value_num, &error_num);
-        ran_numeric_integrator = 1;
+        partially_symbolic_result = symbolic_integral_best_effort(
+            expr, ndim, vars, bound_kinds, lo_expr, hi_expr,
+            &partial_symbolic_steps, &remaining_numeric_ndim,
+            remaining_numeric_vars, remaining_lo_num, remaining_hi_num,
+            lo_num, hi_num);
+
+        if (partially_symbolic_result && remaining_numeric_ndim == 0u) {
+            symbolic_result = partially_symbolic_result;
+            partially_symbolic_result = NULL;
+            symbolic_text = expr_text_dup(symbolic_result, style_UNBOUND);
+            symbolic_tex = expr_tex_body(symbolic_result);
+            symbolic_num = expr_eval(symbolic_result);
+            if (!num_is_nan(symbolic_num) && num_is_finite(symbolic_num) &&
+                num_is_real(symbolic_num)) {
+                symbolic_value_text = number_text(symbolic_num);
+            }
+            if (symbolic_value_text)
+                used_symbolic_numeric_result = 1;
+            used_partial_symbolic_numeric = 1;
+            intg_rc = 0;
+        } else if (partially_symbolic_result && partial_symbolic_steps > 0u &&
+                   remaining_numeric_ndim == 1u) {
+            intg_rc = intg_integral(ig, partially_symbolic_result,
+                                    remaining_numeric_vars[0],
+                                    remaining_lo_num[0], remaining_hi_num[0],
+                                    &value_num, &error_num);
+            ran_numeric_integrator = 1;
+            used_partial_symbolic_numeric = 1;
+        } else if (partially_symbolic_result && partial_symbolic_steps > 0u &&
+                   remaining_numeric_ndim > 1u &&
+                   remaining_numeric_ndim < ndim) {
+            intg_rc = intg_integral_multi(ig, partially_symbolic_result,
+                                          remaining_numeric_ndim,
+                                          remaining_numeric_vars,
+                                          remaining_lo_num, remaining_hi_num,
+                                          &value_num, &error_num);
+            ran_numeric_integrator = 1;
+            used_partial_symbolic_numeric = 1;
+        } else {
+            expr_free(partially_symbolic_result);
+            partially_symbolic_result = NULL;
+            partial_symbolic_steps = 0u;
+            remaining_numeric_ndim = 0u;
+            intg_rc = intg_integral_multi(ig, expr, ndim, vars, lo_num, hi_num,
+                                          &value_num, &error_num);
+            ran_numeric_integrator = 1;
+        }
     } else {
         print_integrator_context(input, expr_text, binding_expr_text, ndim,
                                  bound_kinds, var_names, lo_display_inputs,
                                  hi_display_inputs, lo_inputs, hi_inputs);
         fprintf(stderr, "Symbolic bounds need an integrand with a supported symbolic antiderivative\n");
         goto cleanup;
+    }
+
+    if (ran_numeric_integrator && intg_rc < 0) {
+        if (used_partial_symbolic_numeric && all_bounds_numeric && ndim > 1u) {
+            num_destroy(&value_num);
+            num_destroy(&error_num);
+            value_num = num_new();
+            error_num = num_new();
+            intg_rc = intg_integral_multi(ig, expr, ndim, vars, lo_num, hi_num,
+                                          &value_num, &error_num);
+            if (intg_rc >= 0)
+                used_partial_symbolic_numeric = 0;
+        }
     }
 
     if (ran_numeric_integrator && intg_rc < 0) {
@@ -956,7 +1241,10 @@ int main(int argc, char **argv)
     printf("max_intervals   %zu\n", ran_numeric_integrator ? (has_max_intervals ? max_intervals : 5000u) : 0u);
     if (!ran_numeric_integrator) {
         if (used_symbolic_numeric_result)
-            printf("status      symbolic exact result\n");
+            printf("status      %s\n",
+                   used_partial_symbolic_numeric ?
+                       "symbolic reduction exact result" :
+                       "symbolic exact result");
         else if (used_unevaluated_antiderivative_fallback)
             printf("status      symbolic antiderivative fallback\n");
         else if (ndim == 1u && bound_kinds[0] == BOUND_KIND_INDEFINITE)
@@ -966,7 +1254,10 @@ int main(int argc, char **argv)
         else
             printf("status      symbolic result\n");
     } else if (intg_rc == 0) {
-        printf("status      converged\n");
+        printf("status      %s\n",
+               used_partial_symbolic_numeric ?
+                   "symbolic reduction + converged" :
+                   "converged");
     } else if (intg_get_interval_count_used(ig) >=
                (has_max_intervals ? max_intervals : 5000u)) {
         printf("status      max intervals reached\n");
@@ -993,6 +1284,7 @@ cleanup:
     free(expr_text);
     free(display_input);
     expr_free(first_antiderivative);
+    expr_free(partially_symbolic_result);
     expr_free(symbolic_result);
     if (hi_expr) {
         for (size_t i = 0; i < ndim; ++i)
@@ -1026,6 +1318,17 @@ cleanup:
         for (size_t i = 0; i < ndim; ++i)
             num_destroy(&lo_num[i]);
     }
+    if (remaining_hi_num) {
+        for (size_t i = 0; i < ndim; ++i)
+            num_destroy(&remaining_hi_num[i]);
+    }
+    if (remaining_lo_num) {
+        for (size_t i = 0; i < ndim; ++i)
+            num_destroy(&remaining_lo_num[i]);
+    }
+    free(remaining_hi_num);
+    free(remaining_lo_num);
+    free(remaining_numeric_vars);
     free(hi_num);
     free(lo_num);
     free(bound_kinds);

@@ -878,39 +878,33 @@ static void emit_tex_expr_abs(const expr_t *f, sbuf_t *b, int parent_prec);
 void emit_func(const expr_t *f, sbuf_t *b, int parent_prec);
 static void emit_func_abs(const expr_t *f, sbuf_t *b, int parent_prec);
 
-static expr_t *expr_integral_dummy_var(const expr_t *wrt)
-{
-    const char *name = "t";
-
-    if (wrt && wrt->name && strcmp(wrt->name, "t") == 0)
-        name = "u";
-    return expr_new_named_var(NUM_ZERO, name);
-}
-
-static expr_t *expr_integral_display_integrand(const expr_t *integral,
-                                               expr_t *dummy)
-{
-    expr_t *out;
-
-    if (!integral || !dummy)
-        return NULL;
-    out = expr_substitute(integral->a, integral->b, dummy);
-    return out ? out : expr_clone(integral->a);
-}
-
 static void emit_expr_integral(const expr_t *f, sbuf_t *b, int parent_prec)
 {
     int need = PREC_UNARY < parent_prec;
-    expr_t *dummy = expr_integral_dummy_var(f->b);
-    expr_t *integrand = expr_integral_display_integrand(f, dummy);
-    const expr_t *display_integrand = integrand ? integrand : f->a;
-    const expr_t *display_dummy = dummy ? dummy : f->b;
+    const expr_t *lower = expr_integral_lower_bound_expr(f);
+    const expr_t *upper = expr_integral_upper_bound_expr(f);
+    const expr_t *display_integrand = f ? f->a : NULL;
+    const expr_t *display_dummy = expr_integral_dummy_expr(f);
+    bool group_upper = upper && expr_is_addsub(upper);
+    bool group_lower = lower && expr_is_addsub(lower);
     bool group_integrand = expr_is_addsub(display_integrand);
 
     if (need)
         sbuf_putc(b, '(');
     sbuf_puts(b, "∫^");
-    emit_expr(f->b, b, PREC_LOWEST);
+    if (group_upper)
+        sbuf_putc(b, '(');
+    emit_expr(upper, b, PREC_LOWEST);
+    if (group_upper)
+        sbuf_putc(b, ')');
+    if (lower) {
+        sbuf_putc(b, '_');
+        if (group_lower)
+            sbuf_putc(b, '(');
+        emit_expr(lower, b, PREC_LOWEST);
+        if (group_lower)
+            sbuf_putc(b, ')');
+    }
     sbuf_putc(b, ' ');
     if (group_integrand)
         sbuf_putc(b, '(');
@@ -921,51 +915,52 @@ static void emit_expr_integral(const expr_t *f, sbuf_t *b, int parent_prec)
     emit_expr(display_dummy, b, PREC_LOWEST);
     if (need)
         sbuf_putc(b, ')');
-
-    expr_free(integrand);
-    expr_free(dummy);
 }
 
 static void emit_tex_integral(const expr_t *f, sbuf_t *b, int parent_prec)
 {
     int need = PREC_UNARY < parent_prec;
-    expr_t *dummy = expr_integral_dummy_var(f->b);
-    expr_t *integrand = expr_integral_display_integrand(f, dummy);
-    const expr_t *display_integrand = integrand ? integrand : f->a;
-    const expr_t *display_dummy = dummy ? dummy : f->b;
+    const expr_t *lower = expr_integral_lower_bound_expr(f);
+    const expr_t *upper = expr_integral_upper_bound_expr(f);
+    const expr_t *display_integrand = f ? f->a : NULL;
+    const expr_t *display_dummy = expr_integral_dummy_expr(f);
 
     if (need)
         sbuf_puts(b, "\\left(");
-    sbuf_puts(b, "\\int^{");
-    emit_tex_expr(f->b, b, PREC_LOWEST);
+    sbuf_puts(b, "\\int");
+    if (lower) {
+        sbuf_puts(b, "_{");
+        emit_tex_expr(lower, b, PREC_LOWEST);
+        sbuf_putc(b, '}');
+    }
+    sbuf_puts(b, "^{");
+    emit_tex_expr(upper, b, PREC_LOWEST);
     sbuf_puts(b, "} ");
     emit_tex_expr(display_integrand, b, PREC_LOWEST);
     sbuf_puts(b, "\\, d");
     emit_tex_expr(display_dummy, b, PREC_LOWEST);
     if (need)
         sbuf_puts(b, "\\right)");
-
-    expr_free(integrand);
-    expr_free(dummy);
 }
 
 static void emit_func_integral(const expr_t *f, sbuf_t *b)
 {
-    expr_t *dummy = expr_integral_dummy_var(f->b);
-    expr_t *integrand = expr_integral_display_integrand(f, dummy);
-    const expr_t *display_integrand = integrand ? integrand : f->a;
-    const expr_t *display_dummy = dummy ? dummy : f->b;
+    const expr_t *lower = expr_integral_lower_bound_expr(f);
+    const expr_t *upper = expr_integral_upper_bound_expr(f);
+    const expr_t *display_integrand = f ? f->a : NULL;
+    const expr_t *display_dummy = expr_integral_dummy_expr(f);
 
     sbuf_puts(b, "integral(");
-    emit_func(f->b, b, PREC_LOWEST);
+    if (lower) {
+        emit_func(lower, b, PREC_LOWEST);
+        sbuf_puts(b, ", ");
+    }
+    emit_func(upper, b, PREC_LOWEST);
     sbuf_puts(b, ", ");
     emit_func(display_integrand, b, PREC_LOWEST);
     sbuf_puts(b, ", ");
     emit_func(display_dummy, b, PREC_LOWEST);
     sbuf_putc(b, ')');
-
-    expr_free(integrand);
-    expr_free(dummy);
 }
 
 static void emit_tex_sqrt_power(const expr_t *base,
@@ -1667,15 +1662,53 @@ void emit_tex_name(sbuf_t *b, const char *name)
     sbuf_putc(b, ']');
 }
 
+static const char *expr_known_constant_tex_local(number_t value)
+{
+    if (num_eq(value, NUM_SQRT1ONPI))
+        return "\\frac{1}{\\sqrt{\\pi}}";
+    if (num_eq(value, NUM_2_SQRTPI))
+        return "\\frac{2}{\\sqrt{\\pi}}";
+    if (num_eq(value, NUM_NEG_TWO_OVER_SQRT_PI))
+        return "-\\frac{2}{\\sqrt{\\pi}}";
+    if (num_eq(value, NUM_SQRT_PI))
+        return "\\sqrt{\\pi}";
+    if (num_eq(value, NUM_SQRT_2PI))
+        return "\\sqrt{2\\pi}";
+    if (num_eq(value, NUM_INV_SQRT_2PI))
+        return "\\frac{1}{\\sqrt{2\\pi}}";
+    if (num_eq(value, NUM_SQRT_PI_OVER_TWO))
+        return "\\sqrt{\\pi/2}";
+    if (num_eq(value, NUM_SQRT2))
+        return "\\sqrt{2}";
+    if (num_eq(value, NUM_SQRT3))
+        return "\\sqrt{3}";
+    if (num_eq(value, NUM_SQRT_HALF))
+        return "\\sqrt{1/2}";
+    if (num_eq(value, NUM_SQRT2_OVER_TWO))
+        return "\\frac{\\sqrt{2}}{2}";
+    if (num_eq(value, NUM_SQRT3_OVER_TWO))
+        return "\\frac{\\sqrt{3}}{2}";
+    return NULL;
+}
+
 static void emit_tex_number_value(sbuf_t *b, number_t value)
 {
+    const char *constant_tex = NULL;
     char *text = expr_number_to_string_local(value);
     char *tex;
 
     if (!text)
         return;
 
-    tex = expr_tostring_texify(text);
+    if (!num_is_exact(value))
+        constant_tex = expr_known_constant_tex_local(value);
+    if (constant_tex) {
+        sbuf_puts(b, constant_tex);
+        free(text);
+        return;
+    }
+
+    tex = expr_text_to_tex_local(text);
     if (tex) {
         sbuf_puts(b, tex);
         free(tex);
@@ -1687,13 +1720,22 @@ static void emit_tex_number_value(sbuf_t *b, number_t value)
 
 static void emit_tex_const_value(sbuf_t *b, const expr_t *dv)
 {
+    const char *constant_tex = NULL;
     char *text = expr_const_to_string_local(dv);
     char *tex;
 
     if (!text)
         return;
 
-    tex = expr_tostring_texify(text);
+    if (dv && !num_is_exact(dv->c))
+        constant_tex = expr_known_constant_tex_local(dv->c);
+    if (constant_tex) {
+        sbuf_puts(b, constant_tex);
+        free(text);
+        return;
+    }
+
+    tex = expr_text_to_tex_local(text);
     if (tex) {
         sbuf_puts(b, tex);
         free(tex);

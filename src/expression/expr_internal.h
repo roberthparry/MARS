@@ -129,6 +129,8 @@ typedef enum {
     EXPR_KIND_SHR,
     EXPR_KIND_FACTORS,
     EXPR_KIND_INTEGRAL,
+    EXPR_KIND_INTEGRAL_META,
+    EXPR_KIND_INTEGRAL_BOUNDS,
     EXPR_KIND_COUNT
 } expr_op_kind_t;
 
@@ -416,6 +418,8 @@ extern const expr_ops_t ops_mul;
 extern const expr_ops_t ops_div;
 extern const expr_ops_t ops_neg;
 extern const expr_ops_t ops_integral;
+extern const expr_ops_t ops_integral_meta;
+extern const expr_ops_t ops_integral_bounds;
 
 /* Trigonometric */
 extern const expr_ops_t ops_sin;
@@ -541,6 +545,13 @@ expr_t *       expr_new_binary_internal          (const expr_ops_t *ops,
                                                   const expr_t *a,
                                                   const expr_t *b);
 expr_t *       expr_new_pow_const_internal       (const expr_t *a, number_t exponent);
+expr_t *       expr_integral_with_dummy_internal (const expr_t *integrand,
+                                                  const expr_t *upper,
+                                                  const expr_t *dummy);
+expr_t *       expr_integral_with_bounds_internal(const expr_t *integrand,
+                                                  const expr_t *lower,
+                                                  const expr_t *upper,
+                                                  const expr_t *dummy);
 expr_t *       expr_polygamma_xp                 (const expr_t *order, const expr_t *arg);
 
 /* Small structural predicates. */
@@ -589,6 +600,55 @@ static inline int expr_is_div(const expr_t *dv)
     return expr_is_op(dv, &ops_div);
 }
 
+static inline int expr_is_integral_bounds(const expr_t *dv)
+{
+    return expr_is_op(dv, &ops_integral_bounds);
+}
+
+static inline int expr_is_integral_meta(const expr_t *dv)
+{
+    return expr_is_op(dv, &ops_integral_meta);
+}
+
+static inline const expr_t *expr_integral_dummy_expr(const expr_t *integral)
+{
+    if (!integral || !integral->b || !expr_is_integral_meta(integral->b))
+        return NULL;
+    return integral->b->b;
+}
+
+static inline const expr_t *expr_integral_upper_bound_expr(const expr_t *integral)
+{
+    const expr_t *domain;
+
+    if (!integral || !integral->b)
+        return NULL;
+    if (!expr_is_integral_meta(integral->b))
+        return expr_is_integral_bounds(integral->b) ? integral->b->b : integral->b;
+
+    domain = integral->b->a;
+    if (!domain)
+        return NULL;
+    return expr_is_integral_bounds(domain) ? domain->b : domain;
+}
+
+static inline const expr_t *expr_integral_lower_bound_expr(const expr_t *integral)
+{
+    const expr_t *domain;
+
+    if (!integral || !integral->b)
+        return NULL;
+    if (expr_is_integral_bounds(integral->b))
+        return integral->b->a;
+    if (!expr_is_integral_meta(integral->b))
+        return NULL;
+
+    domain = integral->b->a;
+    if (!domain || !expr_is_integral_bounds(domain))
+        return NULL;
+    return domain->a;
+}
+
 static inline int expr_is_addsub(const expr_t *dv)
 {
     return expr_is_op(dv, &ops_add) || expr_is_op(dv, &ops_sub);
@@ -616,6 +676,9 @@ static inline int expr_is_unnamed_const(const expr_t *dv)
 
 /* Simplification helpers. */
 expr_t *           expr_simplify_passthrough                    (const expr_t *dv,
+                                                                 expr_t *a,
+                                                                 expr_t *b);
+expr_t *           expr_simplify_rebuild_binary_operator        (const expr_t *dv,
                                                                  expr_t *a,
                                                                  expr_t *b);
 expr_t *           expr_simplify_unary_operator                 (const expr_t *dv,

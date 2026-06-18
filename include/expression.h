@@ -309,10 +309,12 @@ expr_t *expr_create_nth_deriv(unsigned int n, const expr_t *expr, const expr_t *
  */
 expr_t *expr_integrate(const expr_t *expr, const expr_t *wrt);
 /**
- * @brief Build an unevaluated integral node representing ∫^wrt f(t) dt.
+ * @brief Build an unevaluated integral node representing ∫^upper f(t) dt.
  *
- * The node is symbolic: numeric evaluation returns NaN, but differentiating it
- * with respect to @p wrt returns @p integrand.
+ * The node stores the displayed integrand with its dummy variable substituted
+ * by @p upper. Numeric evaluation computes the definite integral from 0 to
+ * @p upper, and differentiation applies the fundamental theorem of calculus
+ * with the chain rule.
  */
 expr_t *expr_integral(const expr_t *integrand, const expr_t *wrt);
 
