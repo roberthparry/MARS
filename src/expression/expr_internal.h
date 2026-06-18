@@ -5,8 +5,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "dictionary.h"
 #include "expression.h"
-#include "internal/expr_internal.h"
 #include "qfloat.h"
 
 /**
@@ -26,17 +26,6 @@
  *   • expr_create_* functions produce owning handles.
  */
 
-/* ------------------------------------------------------------------------- */
-/* Operator vtable                                                           */
-/* ------------------------------------------------------------------------- */
-
-/**
- * @brief Arity classification for operator vtable entries.
- *
- * EXPR_OP_ATOM   — leaf node; no child pointers (constants, variables)
- * EXPR_OP_UNARY  — single child stored in expr_t::a
- * EXPR_OP_BINARY — two children stored in expr_t::a and expr_t::b
- */
 typedef enum {
     EXPR_OP_ATOM,
     EXPR_OP_UNARY,
@@ -134,28 +123,19 @@ typedef enum {
     EXPR_KIND_COUNT
 } expr_op_kind_t;
 
-bool expr_match_unary_op(const expr_t *expr, expr_op_kind_t kind, const expr_t **arg_out);
-
-bool expr_match_binary_op(const expr_t *expr,
-                          expr_op_kind_t kind,
-                          const expr_t **left_out,
-                          const expr_t **right_out);
-
-expr_t *expr_apply_unary_kind(expr_op_kind_t kind, const expr_t *arg);
-
 typedef enum expr_diff_kind {
     EXPR_DIFF_SMOOTH = 0,
     EXPR_DIFF_NONE
 } expr_diff_kind_t;
 
+typedef void (*expr_reverse_fn)(const expr_t *dv, const number_t *out_bar,
+                                number_t *a_bar, number_t *b_bar);
 typedef expr_t *(*expr_apply_unary_fn)(const expr_t *arg);
 typedef expr_t *(*expr_apply_binary_fn)(const expr_t *left, const expr_t *right);
 typedef expr_t *(*expr_simplify_fn)(const expr_t *tmpl, expr_t *a, expr_t *b);
 typedef int (*expr_fold_const_unary_fn)(const number_t *in, number_t *out);
 typedef expr_t *(*expr_inverse_unary_fn)(const expr_t *arg);
 typedef expr_t *(*expr_integrate_fn)(const expr_t *expr, const expr_t *wrt);
-typedef void (*expr_reverse_fn)(const expr_t *dv, const number_t *out_bar,
-                                number_t *a_bar, number_t *b_bar);
 
 static inline number_t expr_reverse_num_sq(const number_t value)
 {
@@ -187,118 +167,27 @@ static inline number_t expr_reverse_num_div(const number_t a, const number_t b)
     return num_div(a, b);
 }
 
-/**
- * @brief Virtual function table for a differentiable value operator.
- *
- * Each node carries a pointer to one of these tables. The vtable defines:
- *   • how to evaluate the node (eval)
- *   • how to construct its derivative node (deriv)
- *
- * Both functions must return *new* nodes with refcount = 1.
- */
 typedef struct expr_ops {
-    /** Compute the primal value of the node. Returns an owning `number_t` by value. */
-    number_t  (*eval)(expr_t *dv);
-
-    /** Build a new DAG node for the symbolic derivative. Returns owning (refcount=1). */
+    number_t (*eval)(expr_t *dv);
     expr_t *(*deriv)(expr_t *dv);
-
-    /**
-     * Reverse-mode local adjoint propagation hook.
-     *
-     * Given the adjoint of the operator output in @p out_bar, write the
-     * contributions for child @p a to @p a_bar and child @p b to @p b_bar.
-     * Unused child outputs must be written as zero.
-     */
     expr_reverse_fn reverse;
-
-    /** Stable operator kind tag for structural matching/introspection. */
     expr_op_kind_t kind;
-
-    /** Arity of the operator; determines which child pointers are used. */
     expr_arity_t arity;
-
-    /** Differentiability class used by UI and solver front-ends. */
     expr_diff_kind_t diff_kind;
-
-    /** Human-readable operator name used in debug output and expr_to_text(). */
-    const char  *name;
-
-    /** TeX presentation name for renderers that emit native TeX. */
-    const char  *tex_name;
-
-    /**
-     * Optional direct inverse for safe structural simplification:
-     * op(op->direct_inverse(x)) -> x.
-     */
+    const char *name;
+    const char *tex_name;
     const struct expr_ops *direct_inverse;
-
-    /**
-     * Optional internal inverse constructor. This is metadata for symbolic
-     * rewrites and solver machinery, not a public API promise. Branch-sensitive
-     * pairs still need guards before simplifying inverse(op(x)) -> x.
-     */
     expr_inverse_unary_fn inverse_unary;
-
-    /**
-     * Convenience constructor for unary ops: builds a new node wrapping @p arg.
-     * NULL for non-unary operators. Returns owning (refcount=1).
-     */
     expr_apply_unary_fn apply_unary;
-
-    /**
-     * Convenience constructor for binary ops: builds a new node from
-     * @p left and @p right. NULL for non-binary operators. Returns owning
-     * (refcount=1).
-     */
     expr_apply_binary_fn apply_binary;
-
-    /**
-     * Optional local symbolic antiderivative hook.
-     *
-     * This is intended for operators whose primitives depend only on the node
-     * and a directly matched affine child. Structural multi-node rules still
-     * belong in the central integration dispatcher.
-     */
     expr_integrate_fn integrate;
-
-    /**
-     * Simplification hook for this operator.
-     *
-     * @p tmpl is the original node being simplified. @p a and @p b are already
-     * simplified owning children (or NULL if unused by the operator arity).
-     * The hook must return a new owning result and take responsibility for
-     * releasing any child handles it does not return.
-     */
     expr_simplify_fn simplify;
-
-    /**
-     * Optional fast path for unary operators with notable constant inputs such
-     * as sin(0), cos(0), exp(0), log(1), or sqrt(1). Returns non-zero when the
-     * input was recognised and @p out was filled.
-     */
     expr_fold_const_unary_fn fold_const_unary;
 } expr_ops_t;
 
-/* ------------------------------------------------------------------------- */
-/* Internal representation of expr_t                                         */
-/* ------------------------------------------------------------------------- */
-
-/**
- * @brief Per-variable derivative cache entry.
- *
- * The derivative of a node can vary depending on which variable it is
- * differentiated with respect to. Each computed node holds a singly-linked
- * list of (wrt, dx) pairs so that partial derivatives w.r.t. different
- * variables can all be cached simultaneously.
- *
- * wrt == NULL is the sentinel for the single-variable / "differentiate
- * w.r.t. the unique variable" case used by expr_get_deriv() and
- * expr_create_deriv().
- */
 typedef struct expr_deriv_cache {
-    uint64_t                 wrt_id; /* 0 = single-var sentinel; otherwise stable variable id */
-    expr_t                  *dx;     /* the derivative expression (owned) */
+    uint64_t wrt_id;
+    expr_t *dx;
     struct expr_deriv_cache *next;
 } expr_deriv_cache_t;
 
@@ -359,141 +248,95 @@ typedef struct expr_binding_expr {
     } u;
 } expr_binding_expr_t;
 
-/**
- * @brief Full internal definition of a differentiable value node.
- *
- * Fields:
- *   ops      — operator vtable
- *   a, b     — child pointers (retained)
- *   c        — constant field (used by const and pow_d)
- *   x        — cached primal value
- *   x_valid  — whether x is valid
- *   simplified — whether this node has been certified by expr_simplify()
- *   simplify_epoch — maximum subtree epoch when simplified was certified
- *   dx_cache — singly-linked list of (wrt, dx) cache entries (owned)
- *   name     — optional symbolic name (owned)
- *   binding_expr — optional preserved binding RHS constant expression for display (owned)
- *   refcount — reference count for DAG lifetime management
- */
 struct _expr_t {
     const expr_ops_t *ops;
-
     expr_t *a;
     expr_t *b;
-
-    number_t  c;
-
-    number_t  x;
-    int       x_valid;
-
-    /* epoch tracks the maximum variable generation seen at last evaluation.
-     * For variable nodes, incremented by `expr_set_val()`. For computed nodes,
-     * set to max(child epochs) after each recomputation. expr_eval() uses
-     * this to detect stale caches automatically. */
-    uint64_t  epoch;
-    bool      simplified;
-    uint64_t  simplify_epoch;
-
+    number_t c;
+    number_t x;
+    int x_valid;
+    uint64_t epoch;
+    bool simplified;
+    uint64_t simplify_epoch;
     expr_deriv_cache_t *dx_cache;
-
-    char                *name;
+    char *name;
     expr_binding_expr_t *binding_expr;
-
-    int     refcount;
+    int refcount;
     uint64_t var_id;
 };
 
-/* ------------------------------------------------------------------------- */
-/* Operator vtable instances                                                 */
-/* ------------------------------------------------------------------------- */
-
-/* Leaf nodes */
 extern const expr_ops_t ops_const;
 extern const expr_ops_t ops_var;
-
-/* Arithmetic */
 extern const expr_ops_t ops_add;
 extern const expr_ops_t ops_sub;
 extern const expr_ops_t ops_mul;
 extern const expr_ops_t ops_div;
+extern const expr_ops_t ops_pow;
+extern const expr_ops_t ops_pow_d;
+extern const expr_ops_t ops_atan2;
 extern const expr_ops_t ops_neg;
 extern const expr_ops_t ops_integral;
 extern const expr_ops_t ops_integral_meta;
 extern const expr_ops_t ops_integral_bounds;
-
-/* Trigonometric */
 extern const expr_ops_t ops_sin;
 extern const expr_ops_t ops_cos;
 extern const expr_ops_t ops_tan;
 extern const expr_ops_t ops_sec;
 extern const expr_ops_t ops_cosec;
 extern const expr_ops_t ops_cot;
-
-/* Hyperbolic */
 extern const expr_ops_t ops_sinh;
 extern const expr_ops_t ops_cosh;
 extern const expr_ops_t ops_tanh;
 extern const expr_ops_t ops_sech;
 extern const expr_ops_t ops_cosech;
 extern const expr_ops_t ops_coth;
-
-/* Inverse trigonometric */
 extern const expr_ops_t ops_asin;
 extern const expr_ops_t ops_acos;
 extern const expr_ops_t ops_atan;
 extern const expr_ops_t ops_asec;
 extern const expr_ops_t ops_acosec;
 extern const expr_ops_t ops_acot;
-extern const expr_ops_t ops_atan2;
-
-/* Inverse hyperbolic */
 extern const expr_ops_t ops_asinh;
 extern const expr_ops_t ops_acosh;
 extern const expr_ops_t ops_atanh;
 extern const expr_ops_t ops_asech;
 extern const expr_ops_t ops_acosech;
 extern const expr_ops_t ops_acoth;
-
-/* Exponential / logarithm / power */
 extern const expr_ops_t ops_exp;
 extern const expr_ops_t ops_log;
 extern const expr_ops_t ops_log10;
 extern const expr_ops_t ops_sqrt;
 extern const expr_ops_t ops_floor;
 extern const expr_ops_t ops_ceil;
-extern const expr_ops_t ops_pow_d;  /* dv^(constant numeric exponent) */
-extern const expr_ops_t ops_pow;    /* dv^dv */
-
-/* Miscellaneous / special functions */
 extern const expr_ops_t ops_abs;
 extern const expr_ops_t ops_hypot;
-
-/* Error functions */
 extern const expr_ops_t ops_erf;
 extern const expr_ops_t ops_erfc;
+extern const expr_ops_t ops_lgamma;
 extern const expr_ops_t ops_erfinv;
 extern const expr_ops_t ops_erfcinv;
-
-/* Gamma family */
 extern const expr_ops_t ops_gamma;
-extern const expr_ops_t ops_lgamma;
 extern const expr_ops_t ops_digamma;
 extern const expr_ops_t ops_trigamma;
-extern const expr_ops_t ops_polygamma;
 extern const expr_ops_t ops_gammainv;
-
-/* Lambert W (auto, principal and k=-1 branches) */
 extern const expr_ops_t ops_lambert_w;
 extern const expr_ops_t ops_lambert_w0;
 extern const expr_ops_t ops_lambert_wm1;
-
-/* Beta */
+extern const expr_ops_t ops_normal_pdf;
+extern const expr_ops_t ops_normal_cdf;
+extern const expr_ops_t ops_normal_logpdf;
+extern const expr_ops_t ops_pdf;
+extern const expr_ops_t ops_cdf;
+extern const expr_ops_t ops_logpdf;
+extern const expr_ops_t ops_ei;
+extern const expr_ops_t ops_e1;
 extern const expr_ops_t ops_beta;
 extern const expr_ops_t ops_logbeta;
 extern const expr_ops_t ops_gammainc_lower;
 extern const expr_ops_t ops_gammainc_upper;
 extern const expr_ops_t ops_gammainc_P;
 extern const expr_ops_t ops_gammainc_Q;
+extern const expr_ops_t ops_polygamma;
 extern const expr_ops_t ops_factorial;
 extern const expr_ops_t ops_fibonacci;
 extern const expr_ops_t ops_partition;
@@ -513,48 +356,6 @@ extern const expr_ops_t ops_shl;
 extern const expr_ops_t ops_shr;
 extern const expr_ops_t ops_factors;
 
-/* Normal distribution */
-extern const expr_ops_t ops_normal_pdf;
-extern const expr_ops_t ops_normal_cdf;
-extern const expr_ops_t ops_normal_logpdf;
-extern const expr_ops_t ops_pdf;
-extern const expr_ops_t ops_cdf;
-extern const expr_ops_t ops_logpdf;
-
-/* Exponential integrals */
-extern const expr_ops_t ops_ei;
-extern const expr_ops_t ops_e1;
-
-/* ------------------------------------------------------------------------- */
-/* Internal helpers                                                          */
-/* ------------------------------------------------------------------------- */
-
-/* Core construction and evaluation helpers. */
-expr_t *       expr_alloc                        (const expr_ops_t *ops);
-expr_t *       expr_make_const_num               (number_t x);
-expr_t *       expr_make_var_num                 (number_t x);
-int            expr_get_default_constant_num     (const char *name, number_t *value_out);
-int            expr_get_default_constant_num_text(const string_t *name, number_t *value_out);
-void           expr_store_const_num              (expr_t *dv, number_t value);
-void           expr_store_value_num              (expr_t *dv, number_t value);
-number_t       expr_eval_num_internal            (const expr_t *dv);
-expr_t *       expr_get_dx_internal              (const expr_t *dv);
-const expr_t * expr_current_wrt_internal         (void);
-expr_t *       expr_new_unary_internal           (const expr_ops_t *ops, const expr_t *a);
-expr_t *       expr_new_binary_internal          (const expr_ops_t *ops,
-                                                  const expr_t *a,
-                                                  const expr_t *b);
-expr_t *       expr_new_pow_const_internal       (const expr_t *a, number_t exponent);
-expr_t *       expr_integral_with_dummy_internal (const expr_t *integrand,
-                                                  const expr_t *upper,
-                                                  const expr_t *dummy);
-expr_t *       expr_integral_with_bounds_internal(const expr_t *integrand,
-                                                  const expr_t *lower,
-                                                  const expr_t *upper,
-                                                  const expr_t *dummy);
-expr_t *       expr_polygamma_xp                 (const expr_t *order, const expr_t *arg);
-
-/* Small structural predicates. */
 static inline int expr_const_is_zero(const expr_t *dv)
 {
     return dv && dv->ops == &ops_const && num_eq(dv->c, NUM_ZERO);
@@ -610,45 +411,6 @@ static inline int expr_is_integral_meta(const expr_t *dv)
     return expr_is_op(dv, &ops_integral_meta);
 }
 
-static inline const expr_t *expr_integral_dummy_expr(const expr_t *integral)
-{
-    if (!integral || !integral->b || !expr_is_integral_meta(integral->b))
-        return NULL;
-    return integral->b->b;
-}
-
-static inline const expr_t *expr_integral_upper_bound_expr(const expr_t *integral)
-{
-    const expr_t *domain;
-
-    if (!integral || !integral->b)
-        return NULL;
-    if (!expr_is_integral_meta(integral->b))
-        return expr_is_integral_bounds(integral->b) ? integral->b->b : integral->b;
-
-    domain = integral->b->a;
-    if (!domain)
-        return NULL;
-    return expr_is_integral_bounds(domain) ? domain->b : domain;
-}
-
-static inline const expr_t *expr_integral_lower_bound_expr(const expr_t *integral)
-{
-    const expr_t *domain;
-
-    if (!integral || !integral->b)
-        return NULL;
-    if (expr_is_integral_bounds(integral->b))
-        return integral->b->a;
-    if (!expr_is_integral_meta(integral->b))
-        return NULL;
-
-    domain = integral->b->a;
-    if (!domain || !expr_is_integral_bounds(domain))
-        return NULL;
-    return domain->a;
-}
-
 static inline int expr_is_addsub(const expr_t *dv)
 {
     return expr_is_op(dv, &ops_add) || expr_is_op(dv, &ops_sub);
@@ -661,18 +423,114 @@ static inline int expr_is_exp_expr(const expr_t *dv)
 
 static inline int expr_is_sqrt_expr(const expr_t *dv)
 {
-    return expr_is_op(dv, &ops_sqrt);
+    return dv && dv->ops && dv->ops->kind == EXPR_KIND_SQRT;
 }
 
 static inline int expr_is_pow_d_expr(const expr_t *dv)
 {
-    return expr_is_op(dv, &ops_pow_d);
+    return dv && dv->ops && dv->ops->kind == EXPR_KIND_POW_D;
 }
 
 static inline int expr_is_unnamed_const(const expr_t *dv)
 {
     return expr_is_const(dv) && (!dv->name || !*dv->name);
 }
+
+typedef enum expr_integration_bound_kind {
+    EXPR_INTEGRATION_BOUND_DEFINITE = 0,
+    EXPR_INTEGRATION_BOUND_UPPER_ONLY,
+    EXPR_INTEGRATION_BOUND_INDEFINITE
+} expr_integration_bound_kind_t;
+
+typedef enum {
+    EXPR_PATTERN_UNARY_EXP,
+    EXPR_PATTERN_UNARY_LOG,
+    EXPR_PATTERN_UNARY_LOG10,
+    EXPR_PATTERN_UNARY_SIN,
+    EXPR_PATTERN_UNARY_COS,
+    EXPR_PATTERN_UNARY_TAN,
+    EXPR_PATTERN_UNARY_SEC,
+    EXPR_PATTERN_UNARY_COSEC,
+    EXPR_PATTERN_UNARY_COT,
+    EXPR_PATTERN_UNARY_SINH,
+    EXPR_PATTERN_UNARY_COSH,
+    EXPR_PATTERN_UNARY_COSECH,
+    EXPR_PATTERN_UNARY_TANH,
+    EXPR_PATTERN_UNARY_SECH,
+    EXPR_PATTERN_UNARY_COTH,
+    EXPR_PATTERN_UNARY_ASIN,
+    EXPR_PATTERN_UNARY_ACOS,
+    EXPR_PATTERN_UNARY_ATAN,
+    EXPR_PATTERN_UNARY_ASEC,
+    EXPR_PATTERN_UNARY_ACOSEC,
+    EXPR_PATTERN_UNARY_ACOT,
+    EXPR_PATTERN_UNARY_ASINH,
+    EXPR_PATTERN_UNARY_ACOSH,
+    EXPR_PATTERN_UNARY_ATANH,
+    EXPR_PATTERN_UNARY_ASECH,
+    EXPR_PATTERN_UNARY_ACOSECH,
+    EXPR_PATTERN_UNARY_ACOTH,
+    EXPR_PATTERN_UNARY_ERF,
+    EXPR_PATTERN_UNARY_ERFC,
+    EXPR_PATTERN_UNARY_NORMAL_PDF,
+    EXPR_PATTERN_UNARY_NORMAL_CDF,
+    EXPR_PATTERN_UNARY_NORMAL_LOGPDF,
+    EXPR_PATTERN_UNARY_EI,
+    EXPR_PATTERN_UNARY_E1,
+    EXPR_PATTERN_UNARY_COUNT
+} expr_pattern_unary_affine_kind_t;
+
+typedef struct {
+    string_t *name;
+    expr_t *node;
+} sym_t;
+
+typedef struct {
+    sym_t *entries;
+    int count;
+    int cap;
+} symtab_t;
+
+typedef struct {
+    string_t *name;
+    expr_t *expr;
+    bool is_constant;
+} expr_binding_entry_t;
+
+struct expr_bindings_t {
+    size_t count;
+    expr_binding_entry_t *entries;
+    dictionary_t *index;
+};
+
+/* ------------------------------------------------------------------------- */
+/* Internal helpers                                                          */
+/* ------------------------------------------------------------------------- */
+
+/* Core construction and evaluation helpers. */
+expr_t *       expr_alloc                        (const expr_ops_t *ops);
+expr_t *       expr_make_const_num               (number_t x);
+expr_t *       expr_make_var_num                 (number_t x);
+int            expr_get_default_constant_num     (const char *name, number_t *value_out);
+int            expr_get_default_constant_num_text(const string_t *name, number_t *value_out);
+void           expr_store_const_num              (expr_t *dv, number_t value);
+void           expr_store_value_num              (expr_t *dv, number_t value);
+number_t       expr_eval_num_internal            (const expr_t *dv);
+expr_t *       expr_get_dx_internal              (const expr_t *dv);
+const expr_t * expr_current_wrt_internal         (void);
+expr_t *       expr_new_unary_internal           (const expr_ops_t *ops, const expr_t *a);
+expr_t *       expr_new_binary_internal          (const expr_ops_t *ops,
+                                                  const expr_t *a,
+                                                  const expr_t *b);
+expr_t *       expr_new_pow_const_internal       (const expr_t *a, number_t exponent);
+expr_t *       expr_integral_with_dummy_internal (const expr_t *integrand,
+                                                  const expr_t *upper,
+                                                  const expr_t *dummy);
+expr_t *       expr_integral_with_bounds_internal(const expr_t *integrand,
+                                                  const expr_t *lower,
+                                                  const expr_t *upper,
+                                                  const expr_t *dummy);
+expr_t *       expr_polygamma_xp                 (const expr_t *order, const expr_t *arg);
 
 /* Simplification helpers. */
 expr_t *           expr_simplify_passthrough                    (const expr_t *dv,
@@ -1090,6 +948,190 @@ void expr_reverse_not_differentiable(const expr_t *dv,
                                      const number_t *out_bar,
                                      number_t *a_bar,
                                      number_t *b_bar);
+
+bool expr_is_exact_zero(const expr_t *dv);
+bool expr_is_named_const(const expr_t *dv);
+expr_t *expr_substitute(const expr_t *expr,
+                        const expr_t *needle,
+                        expr_t *replacement);
+expr_t *expr_clone(const expr_t *expr);
+expr_t *expr_const_zero(void);
+expr_t *expr_const_one(void);
+expr_t *expr_const_long(long value);
+expr_t *expr_retain_expr(const expr_t *expr);
+expr_t *expr_simplify_owned(expr_t *expr);
+expr_t *expr_negate_owned(expr_t *expr);
+expr_t *expr_add_owned(expr_t *left, expr_t *right);
+expr_t *expr_add_long(const expr_t *expr, long value);
+expr_t *expr_mul_long(const expr_t *expr, long value);
+expr_t *expr_div_long(const expr_t *expr, long value);
+expr_t *expr_pow_long(const expr_t *expr, long exponent);
+expr_t *expr_add_simplify_owned(const expr_t *left, const expr_t *right);
+expr_t *expr_sub_simplify_owned(const expr_t *left, const expr_t *right);
+expr_t *expr_mul_simplify_owned(const expr_t *left, const expr_t *right);
+expr_t *expr_div_simplify_owned(const expr_t *left, const expr_t *right);
+bool expr_match_unary_op(const expr_t *expr,
+                         expr_op_kind_t kind,
+                         const expr_t **arg_out);
+bool expr_match_binary_op(const expr_t *expr,
+                          expr_op_kind_t kind,
+                          const expr_t **left_out,
+                          const expr_t **right_out);
+bool expr_match_pow_const(const expr_t *expr,
+                          const expr_t **base_out,
+                          number_t *exponent_out);
+bool expr_match_pow_expr(const expr_t *expr,
+                         const expr_t **base_out,
+                         const expr_t **exponent_out);
+bool expr_match_integral_expr(const expr_t *expr,
+                              const expr_t **integrand_out,
+                              const expr_t **domain_out);
+bool expr_child_exprs(const expr_t *expr,
+                      const expr_t **left_out,
+                      const expr_t **right_out);
+const expr_t *expr_integral_dummy_expr(const expr_t *integral);
+const expr_t *expr_integral_upper_bound_expr(const expr_t *integral);
+const expr_t *expr_integral_lower_bound_expr(const expr_t *integral);
+const char *expr_symbol_name(const expr_t *expr);
+void expr_set_binding_pi_linear_family(expr_t *expr,
+                                       long denominator,
+                                       long n_coeff,
+                                       long offset);
+expr_t *expr_apply_unary_kind(expr_op_kind_t kind, const expr_t *arg);
+bool expr_match_const_value(const expr_t *expr, number_t *value_out);
+bool expr_match_var_expr(const expr_t *expr,
+                         size_t nvars,
+                         expr_t *const *vars,
+                         size_t *index_out);
+bool expr_match_scaled_expr(const expr_t *expr,
+                            number_t *scale_out,
+                            const expr_t **base_out);
+bool expr_match_add_sub_expr(const expr_t *expr,
+                             const expr_t **left_out,
+                             const expr_t **right_out,
+                             bool *is_sub_out);
+bool expr_match_mul_expr(const expr_t *expr,
+                         const expr_t **left_out,
+                         const expr_t **right_out);
+bool expr_collect_var_usage(const expr_t *expr,
+                            size_t nvars,
+                            expr_t *const *vars,
+                            bool *used_out);
+bool expr_has_unbound_parameters(const expr_t *expr,
+                                 size_t nvars,
+                                 expr_t *const *vars);
+expr_t *expr_integrate_iterated(const expr_t *integrand,
+                                size_t ndim,
+                                expr_t *const *vars,
+                                const expr_integration_bound_kind_t *kinds,
+                                expr_t *const *lo,
+                                expr_t *const *hi,
+                                size_t max_steps,
+                                size_t *completed_steps_out,
+                                expr_t **first_antiderivative_out);
+expr_t *expr_integrate_iterated_best_effort(
+    const expr_t *integrand,
+    size_t ndim,
+    expr_t *const *vars,
+    const expr_integration_bound_kind_t *kinds,
+    expr_t *const *lo,
+    expr_t *const *hi,
+    size_t *completed_steps_out,
+    size_t *remaining_ndim_out,
+    expr_t **remaining_vars_out,
+    number_t *remaining_lo_num_out,
+    number_t *remaining_hi_num_out,
+    const number_t *lo_num,
+    const number_t *hi_num);
+bool expr_match_affine_poly_deg0(const expr_t *expr,
+                                 size_t nvars,
+                                 expr_t *const *vars,
+                                 number_t *constant_out);
+bool expr_match_affine_poly_deg1(const expr_t *expr,
+                                 size_t nvars,
+                                 expr_t *const *vars,
+                                 number_t *constant_out,
+                                 number_t *coeffs_out);
+bool expr_match_affine_poly_deg2(const expr_t *expr,
+                                 size_t nvars,
+                                 expr_t *const *vars,
+                                 number_t *poly_coeffs_out,
+                                 number_t *constant_out,
+                                 number_t *coeffs_out);
+bool expr_match_affine_poly_deg3(const expr_t *expr,
+                                 size_t nvars,
+                                 expr_t *const *vars,
+                                 number_t *poly_coeffs_out,
+                                 number_t *constant_out,
+                                 number_t *coeffs_out);
+bool expr_match_affine_poly_deg4(const expr_t *expr,
+                                 size_t nvars,
+                                 expr_t *const *vars,
+                                 number_t *poly_coeffs_out,
+                                 number_t *constant_out,
+                                 number_t *coeffs_out);
+bool expr_match_unary_affine_kind(const expr_t *expr,
+                                  expr_pattern_unary_affine_kind_t kind,
+                                  size_t nvars,
+                                  expr_t *const *vars,
+                                  number_t *constant_out,
+                                  number_t *coeffs_out);
+bool expr_match_affine_poly_deg1_times_unary_affine_kind(
+    const expr_t *expr,
+    expr_pattern_unary_affine_kind_t unary_kind,
+    size_t nvars,
+    expr_t *const *vars,
+    number_t *constant_out,
+    number_t *coeffs_out);
+bool expr_match_affine_poly_deg2_times_unary_affine_kind(
+    const expr_t *expr,
+    expr_pattern_unary_affine_kind_t unary_kind,
+    size_t nvars,
+    expr_t *const *vars,
+    number_t *poly_coeffs_out,
+    number_t *constant_out,
+    number_t *coeffs_out);
+bool expr_match_affine_poly_deg3_times_unary_affine_kind(
+    const expr_t *expr,
+    expr_pattern_unary_affine_kind_t unary_kind,
+    size_t nvars,
+    expr_t *const *vars,
+    number_t *poly_coeffs_out,
+    number_t *constant_out,
+    number_t *coeffs_out);
+bool expr_match_affine_poly_deg4_times_unary_affine_kind(
+    const expr_t *expr,
+    expr_pattern_unary_affine_kind_t unary_kind,
+    size_t nvars,
+    expr_t *const *vars,
+    number_t *poly_coeffs_out,
+    number_t *constant_out,
+    number_t *coeffs_out);
+char *expr_normalise_name(const char *name);
+string_t *expr_normalise_name_text(const string_t *name);
+char *expr_take_string_as_c_string(string_t *text);
+char *expr_normalise_binding_name(const char *name);
+string_t *expr_normalise_binding_name_text(const string_t *name);
+size_t expr_match_leading_greek_alias_len(const string_cursor_t *cursor,
+                                          string_pos_t pos);
+int expr_is_default_constant_name(const char *name);
+int expr_is_default_constant_name_text(const string_t *name);
+const char *expr_default_constant_canonical_name(const char *name);
+string_t *expr_default_constant_canonical_name_text(const string_t *name);
+char *expr_tostring_texify(const char *text);
+int expr_to_tex_parts(const expr_t *dv, char **expr_out, char **bindings_out);
+void *fs_xmalloc(size_t n);
+int fs_is_letter(unsigned int c);
+void symtab_init(symtab_t *t);
+int symtab_has_text(const symtab_t *t, const string_t *name);
+void symtab_add_text(symtab_t *t, const string_t *name, expr_t *node);
+expr_t *symtab_lookup_text(const symtab_t *t, const string_t *name);
+void symtab_free(symtab_t *t);
+int symtab_add_borrowed_text(symtab_t *t, const string_t *name, expr_t *node);
+expr_bindings_t *symtab_build_bindings(const symtab_t *t);
+expr_bindings_t *symtab_build_bindings_for_expr(const symtab_t *t,
+                                                const expr_t *expr);
+expr_bindings_t *single_binding_from_node(expr_t *node);
 
 typedef struct binding_exact_complex {
     number_t real;

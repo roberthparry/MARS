@@ -6,7 +6,6 @@
 #include "expr_internal.h"
 #include "expr_bindings.h"
 #include "expression.h"
-#include "internal/expr_internal.h"
 #include "internal/number_internal.h"
 
 static bool expr_is_op_kind(const expr_t *expr, expr_op_kind_t kind)
@@ -113,6 +112,148 @@ bool expr_match_binary_op(const expr_t *expr,
     if (right_out)
         *right_out = expr->b;
     return true;
+}
+
+bool expr_match_neg_expr(const expr_t *expr, const expr_t **arg_out)
+{
+    return expr_match_unary_op(expr, EXPR_KIND_NEG, arg_out);
+}
+
+bool expr_match_exp_expr(const expr_t *expr, const expr_t **arg_out)
+{
+    return expr_match_unary_op(expr, EXPR_KIND_EXP, arg_out);
+}
+
+bool expr_match_log_expr(const expr_t *expr, const expr_t **arg_out)
+{
+    return expr_match_unary_op(expr, EXPR_KIND_LOG, arg_out);
+}
+
+bool expr_match_sin_expr(const expr_t *expr, const expr_t **arg_out)
+{
+    return expr_match_unary_op(expr, EXPR_KIND_SIN, arg_out);
+}
+
+bool expr_match_cos_expr(const expr_t *expr, const expr_t **arg_out)
+{
+    return expr_match_unary_op(expr, EXPR_KIND_COS, arg_out);
+}
+
+bool expr_match_tan_expr(const expr_t *expr, const expr_t **arg_out)
+{
+    return expr_match_unary_op(expr, EXPR_KIND_TAN, arg_out);
+}
+
+bool expr_match_add_expr(const expr_t *expr,
+                         const expr_t **left_out,
+                         const expr_t **right_out)
+{
+    return expr_match_binary_op(expr, EXPR_KIND_ADD, left_out, right_out);
+}
+
+bool expr_match_sub_expr(const expr_t *expr,
+                         const expr_t **left_out,
+                         const expr_t **right_out)
+{
+    return expr_match_binary_op(expr, EXPR_KIND_SUB, left_out, right_out);
+}
+
+bool expr_match_pow_const(const expr_t *expr,
+                          const expr_t **base_out,
+                          number_t *exponent_out)
+{
+    if (!expr_is_op_kind(expr, EXPR_KIND_POW_D) || !expr->a)
+        return false;
+    if (base_out)
+        *base_out = expr->a;
+    if (exponent_out) {
+        num_destroy(exponent_out);
+        *exponent_out = num_clone(expr->c);
+    }
+    return true;
+}
+
+bool expr_match_pow_expr(const expr_t *expr,
+                         const expr_t **base_out,
+                         const expr_t **exponent_out)
+{
+    if (!expr_is_op_kind(expr, EXPR_KIND_POW) || !expr->a || !expr->b)
+        return false;
+    if (base_out)
+        *base_out = expr->a;
+    if (exponent_out)
+        *exponent_out = expr->b;
+    return true;
+}
+
+bool expr_match_integral_expr(const expr_t *expr,
+                              const expr_t **integrand_out,
+                              const expr_t **domain_out)
+{
+    if (!expr_is_op_kind(expr, EXPR_KIND_INTEGRAL) || !expr->a || !expr->b)
+        return false;
+    if (integrand_out)
+        *integrand_out = expr->a;
+    if (domain_out)
+        *domain_out = expr->b;
+    return true;
+}
+
+bool expr_child_exprs(const expr_t *expr,
+                      const expr_t **left_out,
+                      const expr_t **right_out)
+{
+    if (!expr)
+        return false;
+    if (left_out)
+        *left_out = expr->a;
+    if (right_out)
+        *right_out = expr->b;
+    return expr->a || expr->b;
+}
+
+const expr_t *expr_integral_dummy_expr(const expr_t *integral)
+{
+    if (!integral || !integral->b || !expr_is_integral_meta(integral->b))
+        return NULL;
+    return integral->b->b;
+}
+
+const expr_t *expr_integral_upper_bound_expr(const expr_t *integral)
+{
+    const expr_t *domain;
+
+    if (!integral || !integral->b)
+        return NULL;
+    if (!expr_is_integral_meta(integral->b))
+        return expr_is_integral_bounds(integral->b) ? integral->b->b : integral->b;
+
+    domain = integral->b->a;
+    if (!domain)
+        return NULL;
+    return expr_is_integral_bounds(domain) ? domain->b : domain;
+}
+
+const expr_t *expr_integral_lower_bound_expr(const expr_t *integral)
+{
+    const expr_t *domain;
+
+    if (!integral || !integral->b)
+        return NULL;
+    if (expr_is_integral_bounds(integral->b))
+        return integral->b->a;
+    if (!expr_is_integral_meta(integral->b))
+        return NULL;
+
+    domain = integral->b->a;
+    if (!domain || !expr_is_integral_bounds(domain))
+        return NULL;
+    return domain->a;
+}
+
+const char *expr_symbol_name(const expr_t *expr)
+{
+    return (expr && expr->name && *expr->name) ? expr->name : NULL;
 }
 
 static bool expr_match_scaled_inner(const expr_t *factor,

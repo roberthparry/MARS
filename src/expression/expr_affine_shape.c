@@ -4,7 +4,6 @@
 
 #include "expr_internal.h"
 #include "expression.h"
-#include "internal/expr_internal.h"
 #include "internal/number_internal.h"
 
 static void expr_zero_number_array(number_t *values, size_t n)

@@ -2,7 +2,7 @@
 #include <stddef.h>
 
 #include "equation_internal.h"
-#include "expression/expr_internal.h"
+#include "internal/expr_internal.h"
 
 static void equ_init_numbers(number_t *values, size_t count)
 {

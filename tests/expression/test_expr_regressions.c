@@ -2,6 +2,8 @@
 
 #include <math.h>
 
+#include "internal/expr_internal.h"
+
 static string_t *format_number_at_own_precision(const number_t value)
 {
     char fmt[32];
@@ -1483,6 +1485,30 @@ static void test_simplify_exp_quarter_turns(void)
     expr_free(pi_i);
     expr_free(i);
     expr_free(pi);
+}
+
+static void test_simplify_two_exp_minus_one_to_two_over_e(void)
+{
+    expr_t *two = test_expr_new_const_d(2.0);
+    expr_t *minus_one = test_expr_new_const_d(-1.0);
+    expr_t *exp_minus_one = expr_exp(minus_one);
+    expr_t *product = expr_mul(two, exp_minus_one);
+    expr_t *simp = expr_simplify(product);
+    char *expr_s = expr_to_string(simp, style_UNBOUND);
+    const char *expect = "2/e";
+
+    if (str_eq(expr_s, expect))
+        to_string_pass("2*exp(-1) simplification (UNBOUND)", expr_s, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "2*exp(-1) simplification (UNBOUND)", expr_s, expect);
+
+    free(expr_s);
+    expr_free(simp);
+    expr_free(product);
+    expr_free(exp_minus_one);
+    expr_free(minus_one);
+    expr_free(two);
 }
 
 static void test_simplify_trig_and_hyperbolic_identities(void)
@@ -3705,6 +3731,166 @@ static void test_goal_seek_large_target_uses_significant_digit_tolerance(void)
     expr_bindings_free(bindings);
 }
 
+static void test_iterated_symbolic_integration_moves_out_of_lab(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = expr_from_string("{ x*y | x = NAN, y = NAN }", &bindings);
+    expr_t *x;
+    expr_t *y;
+    expr_t *vars[2];
+    expr_integration_bound_kind_t kinds[2] = {
+        EXPR_INTEGRATION_BOUND_DEFINITE,
+        EXPR_INTEGRATION_BOUND_DEFINITE
+    };
+    expr_t *lo[2];
+    expr_t *hi[2];
+    expr_t *result = NULL;
+    expr_t *first_antiderivative = NULL;
+    number_t value = num_new();
+    number_t expected = num_create_from_string("0.25");
+    size_t completed_steps = 0u;
+
+    ASSERT_NOT_NULL(expr);
+    ASSERT_NOT_NULL(bindings);
+    x = expr_bindings_get(bindings, "x");
+    y = expr_bindings_get(bindings, "y");
+    ASSERT_NOT_NULL(x);
+    ASSERT_NOT_NULL(y);
+
+    vars[0] = x;
+    vars[1] = y;
+    lo[0] = test_expr_new_const_d(0.0);
+    lo[1] = test_expr_new_const_d(0.0);
+    hi[0] = test_expr_new_const_d(1.0);
+    hi[1] = test_expr_new_const_d(1.0);
+    ASSERT_NOT_NULL(lo[0]);
+    ASSERT_NOT_NULL(lo[1]);
+    ASSERT_NOT_NULL(hi[0]);
+    ASSERT_NOT_NULL(hi[1]);
+
+    result = expr_integrate_iterated(expr, 2u, vars, kinds, lo, hi, 2u,
+                                     &completed_steps, &first_antiderivative);
+    ASSERT_NOT_NULL(result);
+    ASSERT_NOT_NULL(first_antiderivative);
+    ASSERT_EQ_INT((int)completed_steps, 2);
+
+    num_destroy(&value);
+    value = expr_eval(result);
+    ASSERT_TRUE(number_close_with_tolerance_text(value, expected, "1e-20"));
+
+    num_destroy(&value);
+    num_destroy(&expected);
+    expr_free(first_antiderivative);
+    expr_free(result);
+    expr_free(hi[1]);
+    expr_free(hi[0]);
+    expr_free(lo[1]);
+    expr_free(lo[0]);
+    expr_free(expr);
+    expr_bindings_free(bindings);
+}
+
+static void test_iterated_symbolic_best_effort_reduces_remaining_numeric_dims(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = expr_from_string("{ sin(x^2) * y | x = NAN, y = NAN }", &bindings);
+    const char *expected_names[1];
+    expr_t *expected_symbols[1];
+    expr_t *expected = NULL;
+    expr_t *x;
+    expr_t *y;
+    expr_t *vars[2];
+    expr_t *remaining_vars[2] = { NULL, NULL };
+    expr_integration_bound_kind_t kinds[2] = {
+        EXPR_INTEGRATION_BOUND_DEFINITE,
+        EXPR_INTEGRATION_BOUND_DEFINITE
+    };
+    expr_t *lo[2];
+    expr_t *hi[2];
+    number_t lo_num[2];
+    number_t hi_num[2];
+    number_t remaining_lo_num[2];
+    number_t remaining_hi_num[2];
+    expr_t *result = NULL;
+    number_t got_value = num_new();
+    number_t expected_value = num_new();
+    size_t completed_steps = 0u;
+    size_t remaining_ndim = 0u;
+
+    ASSERT_NOT_NULL(expr);
+    ASSERT_NOT_NULL(bindings);
+    x = expr_bindings_get(bindings, "x");
+    y = expr_bindings_get(bindings, "y");
+    ASSERT_NOT_NULL(x);
+    ASSERT_NOT_NULL(y);
+
+    expected_names[0] = "x";
+    expected_symbols[0] = x;
+    expected = expr_from_expression_string("sin(x^2) / 2",
+                                           expected_names,
+                                           expected_symbols,
+                                           1u);
+    ASSERT_NOT_NULL(expected);
+
+    vars[0] = x;
+    vars[1] = y;
+    lo[0] = test_expr_new_const_d(0.0);
+    lo[1] = test_expr_new_const_d(0.0);
+    hi[0] = test_expr_new_const_d(1.0);
+    hi[1] = test_expr_new_const_d(1.0);
+    ASSERT_NOT_NULL(lo[0]);
+    ASSERT_NOT_NULL(lo[1]);
+    ASSERT_NOT_NULL(hi[0]);
+    ASSERT_NOT_NULL(hi[1]);
+
+    lo_num[0] = num_create_from_string("0");
+    lo_num[1] = num_create_from_string("0");
+    hi_num[0] = num_create_from_string("1");
+    hi_num[1] = num_create_from_string("1");
+    remaining_lo_num[0] = num_new();
+    remaining_lo_num[1] = num_new();
+    remaining_hi_num[0] = num_new();
+    remaining_hi_num[1] = num_new();
+
+    result = expr_integrate_iterated_best_effort(expr, 2u, vars, kinds, lo, hi,
+                                                 &completed_steps, &remaining_ndim,
+                                                 remaining_vars,
+                                                 remaining_lo_num, remaining_hi_num,
+                                                 lo_num, hi_num);
+    ASSERT_NOT_NULL(result);
+    ASSERT_EQ_INT((int)completed_steps, 1);
+    ASSERT_EQ_INT((int)remaining_ndim, 1);
+    ASSERT_TRUE(remaining_vars[0] == x);
+    ASSERT_TRUE(num_eq(remaining_lo_num[0], lo_num[0]));
+    ASSERT_TRUE(num_eq(remaining_hi_num[0], hi_num[0]));
+
+    test_expr_set_val_d(x, 0.3);
+    num_destroy(&got_value);
+    got_value = expr_eval(result);
+    num_destroy(&expected_value);
+    expected_value = expr_eval(expected);
+    ASSERT_TRUE(number_close_with_tolerance_text(got_value, expected_value, "1e-20"));
+
+    num_destroy(&expected_value);
+    num_destroy(&got_value);
+    expr_free(result);
+    num_destroy(&remaining_hi_num[1]);
+    num_destroy(&remaining_hi_num[0]);
+    num_destroy(&remaining_lo_num[1]);
+    num_destroy(&remaining_lo_num[0]);
+    num_destroy(&hi_num[1]);
+    num_destroy(&hi_num[0]);
+    num_destroy(&lo_num[1]);
+    num_destroy(&lo_num[0]);
+    expr_free(hi[1]);
+    expr_free(hi[0]);
+    expr_free(lo[1]);
+    expr_free(lo[0]);
+    expr_free(expected);
+    expr_free(expr);
+    expr_bindings_free(bindings);
+}
+
 void test_runtime_regressions(void)
 {
     TEST_RUN_SUBTEST(test_cmp_qfloat_precision, NULL);
@@ -3739,6 +3925,7 @@ void test_runtime_regressions(void)
     TEST_RUN_SUBTEST(test_log_constant_difference_simplifies_to_quotient, NULL);
     TEST_RUN_SUBTEST(test_simplify_inverse_unary_pairs, NULL);
     TEST_RUN_SUBTEST(test_simplify_exp_quarter_turns, NULL);
+    TEST_RUN_SUBTEST(test_simplify_two_exp_minus_one_to_two_over_e, NULL);
     TEST_RUN_SUBTEST(test_simplify_trig_and_hyperbolic_identities, NULL);
     TEST_RUN_SUBTEST(test_to_string_imaginary_unit_omits_one, NULL);
     TEST_RUN_SUBTEST(test_complex_coefficient_stays_grouped, NULL);
@@ -3780,6 +3967,8 @@ void test_runtime_regressions(void)
     TEST_RUN_SUBTEST(test_tan_poles_display_as_infinity, NULL);
     TEST_RUN_SUBTEST(test_sqrt_negative_exact_evaluates_to_i, NULL);
     TEST_RUN_SUBTEST(test_goal_seek_large_target_uses_significant_digit_tolerance, NULL);
+    TEST_RUN_SUBTEST(test_iterated_symbolic_integration_moves_out_of_lab, NULL);
+    TEST_RUN_SUBTEST(test_iterated_symbolic_best_effort_reduces_remaining_numeric_dims, NULL);
 }
 
 /* ------------------------------------------------------------------------- */

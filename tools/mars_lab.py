@@ -1526,6 +1526,14 @@ INDEX_HTML = r"""<!doctype html>
       color: var(--muted);
     }
 
+    .help-card .help-kicker {
+      margin: 0 0 0.8rem;
+      color: #d7e7b7;
+      font: 0.76rem/1.2 "Cascadia Code", "DejaVu Sans Mono", monospace;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
     .help-card ul {
       margin: 0;
       padding-left: 1.25rem;
@@ -1903,7 +1911,7 @@ __THEME_OVERRIDES__
         <div class="integrator-bound-stack" id="integratorBoundStack"></div>
         <div class="integrator-bound-actions">
           <button class="card-action integrator-bound-add" id="integratorAddBound" type="button">+ Integral</button>
-          <span class="integrator-bound-summary">Use <code>Free</code> to leave a symbol as a parameter instead of integrating over it.</span>
+          <span class="integrator-bound-summary">Use <code>Free</code> to keep a symbol as a parameter. Use <code>Bound</code> rows to integrate with respect to that variable.</span>
         </div>
         <label for="integratorIntervalCap">Work budget ceiling</label>
         <select id="integratorIntervalCap">
@@ -1913,7 +1921,7 @@ __THEME_OVERRIDES__
           <option value="50000">Up to 50,000</option>
           <option value="100000">Up to 100,000</option>
         </select>
-        <p class="mode-hint">Leave both bounds blank for an antiderivative. Fill only the upper bound to evaluate the antiderivative there, or fill both bounds for a definite integral. Bounds can be numbers or symbols.</p>
+        <p class="mode-hint">Examples: leave both bounds blank for an antiderivative, enter only an upper bound for an <code>&int;^x</code>-style result, or enter both bounds for a definite integral such as <code>x = 0 .. 1</code>. Bounds can be numbers or symbols.</p>
       </div>
       <div class="target-row hidden" id="targetRow">
         <label for="goalTarget">Target</label>
@@ -2000,7 +2008,46 @@ __THEME_OVERRIDES__
         </div>
       </div>
       <div class="help-pane hidden" id="helpPane">
-        <div class="help-card">
+        <div class="help-card" data-help-modes="expression,equation,matrix,integrator">
+          <div class="help-kicker">Start Here</div>
+          <p>MARS Lab works best when you type the mathematical object itself in the main editor, then use the controls underneath to tell the lab what kind of job you want.</p>
+          <ul>
+            <li><code>Expression</code>: type a formula, then set variable values in the binding boxes.</li>
+            <li><code>Equation</code>: type an equation and choose which variable to solve for.</li>
+            <li><code>Matrix</code>: type a matrix expression and pick an operation.</li>
+            <li><code>Integrator</code>: type the integrand, then add one row per variable you want to integrate over.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="integrator">
+          <div class="help-kicker">Integrator Workflow</div>
+          <p>The integrator editor is split into two parts: the expression at the top is the integrand, and the rows underneath describe the nested integrals.</p>
+          <ul>
+            <li>A <code>Bound</code> row means "integrate with respect to this variable".</li>
+            <li>A <code>Free</code> row means "keep this symbol as a parameter".</li>
+            <li>Row order matters. The first row is the outermost integral shown on screen, and later rows sit further inside.</li>
+            <li>Use <code>+</code> and <code>-</code> on each row to insert or remove nested integrals without retyping everything.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="integrator">
+          <div class="help-kicker">Common Recipes</div>
+          <ul>
+            <li>Antiderivative: integrand <code>sin(x)</code>, row <code>x</code>, both bounds blank.</li>
+            <li>Upper-limit form: integrand <code>sin(t)</code>, row <code>t</code>, lower blank, upper <code>x</code>.</li>
+            <li>Definite integral: integrand <code>x^2</code>, row <code>x</code>, lower <code>0</code>, upper <code>1</code>.</li>
+            <li>Parameterized integral: integrand <code>exp(-a*x^2)</code>, row <code>a</code> as <code>Free</code>, row <code>x</code> with bounds.</li>
+            <li>Nested integral: add one bound row per variable, for example <code>x = 0 .. 1</code>, <code>y = 0 .. 1</code>, <code>z = 0 .. 1</code>.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="integrator">
+          <div class="help-kicker">Reading Results</div>
+          <ul>
+            <li><code>Rendered TeX</code> shows the integral exactly as the lab interpreted it.</li>
+            <li><code>Exact result</code> explains the path taken, for example symbolic reduction, convergence, or a work-budget cap.</li>
+            <li><code>Integral</code> shows the numeric value and the reported integration error estimate.</li>
+            <li><code>work used</code> tells you how much of the numeric budget the solver spent. A value of <code>1</code> often means a fast closed-form path or a very simple special case.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="expression,equation,matrix,integrator">
           <h3>Expression Shape</h3>
           <p>Type the expression body in the editor. Variable and constant bindings appear as editable boxes underneath.</p>
           <ul>
@@ -2009,7 +2056,7 @@ __THEME_OVERRIDES__
             <li>Raw expr binding syntax still works when you paste it, but the lab keeps the large editor focused on the expression body.</li>
           </ul>
         </div>
-        <div class="help-card">
+        <div class="help-card" data-help-modes="expression,equation,matrix,integrator">
           <h3>Bindings</h3>
           <p>Yellow boxes are variables and blue boxes are constants.</p>
           <ul>
@@ -2018,7 +2065,7 @@ __THEME_OVERRIDES__
             <li>Binding values can use arithmetic: <code>3/2*pi</code>, <code>(pi^2)/2</code>, <code>3/2+pi/7+3*i/5</code>.</li>
           </ul>
         </div>
-        <div class="help-card">
+        <div class="help-card" data-help-modes="expression">
           <h3>Goal Seek</h3>
           <p>Goal seek changes variable bindings so the expression value reaches the value in the <code>Target</code> field.</p>
           <ul>
@@ -2032,7 +2079,7 @@ __THEME_OVERRIDES__
             <li>It only reports success when <code>abs(value - target)</code> is within the current working precision.</li>
           </ul>
         </div>
-        <div class="help-card">
+        <div class="help-card" data-help-modes="expression,equation,matrix,integrator">
           <h3>Constants And Functions</h3>
           <ul>
             <li>Built-in constants include <code>pi</code>/<code>π</code>, <code>e</code>, <code>i</code>, <code>phi</code>/<code>φ</code>, and <code>gamma</code>/<code>γ</code>.</li>
@@ -2041,7 +2088,7 @@ __THEME_OVERRIDES__
             <li>Standard gamma notation is supported in display: <code>gamma(x)</code> shows as <code>Γ(x)</code>, and polygamma shows as <code>ψ⁽ⁿ⁾(x)</code>.</li>
           </ul>
         </div>
-        <div class="help-card">
+        <div class="help-card" data-help-modes="expression,equation,integrator">
           <h3>Unary Functions</h3>
           <ul>
             <li>Elementary: <code>abs(x)</code>, <code>floor(x)</code>, <code>ceil(x)</code>, <code>sqrt(x)</code>, <code>exp(x)</code>, <code>ln(x)</code>, <code>log(x)</code>, <code>lg(x)</code>, <code>log10(x)</code>.</li>
@@ -2052,7 +2099,7 @@ __THEME_OVERRIDES__
             <li>Exponential integrals: <code>Ei(x)</code>, <code>E1(x)</code>.</li>
           </ul>
         </div>
-        <div class="help-card">
+        <div class="help-card" data-help-modes="expression,equation,integrator">
           <h3>Lambert W And Normal Functions</h3>
           <ul>
             <li>Principal Lambert W: <code>W(x)</code>, <code>W0(x)</code>, <code>W_0(x)</code>, <code>W₀(x)</code>, <code>productlog(x)</code>, <code>lambert_w0(x)</code>.</li>
@@ -2060,7 +2107,7 @@ __THEME_OVERRIDES__
             <li>Normal distribution: <code>normal_pdf(x)</code>, <code>normal_cdf(x)</code>, <code>normal_logpdf(x)</code>.</li>
           </ul>
         </div>
-        <div class="help-card">
+        <div class="help-card" data-help-modes="expression,equation,integrator">
           <h3>Binary Functions</h3>
           <ul>
             <li><code>pow(x, y)</code> is equivalent to <code>x^y</code>.</li>
@@ -2071,7 +2118,7 @@ __THEME_OVERRIDES__
             <li>Bitwise helpers use function syntax: <code>AND(a, b)</code>, <code>OR(a, b)</code>, <code>XOR(a, b)</code>, <code>NOT(a)</code>, <code>SHL(a, n)</code>, <code>SHR(a, n)</code>.</li>
           </ul>
         </div>
-        <div class="help-card">
+        <div class="help-card" data-help-modes="expression">
           <h3>Value-Only Helpers</h3>
           <ul>
             <li>Discrete functions evaluate normally but are not differentiable, so derivative buttons are hidden when they control the expression.</li>
@@ -2079,14 +2126,14 @@ __THEME_OVERRIDES__
             <li><code>factors(n)</code> returns the original value and shows its factorisation as constant bindings, for example <code>factors(360)</code> becomes <code>{ a₀³·a₁²·a₂ |; a₀ = 2, a₁ = 3, a₂ = 5 }</code>.</li>
           </ul>
         </div>
-        <div class="help-card">
+        <div class="help-card" data-help-modes="expression,equation,integrator">
           <h3>Distribution Functions</h3>
           <ul>
             <li>Normal distribution: <code>normal_pdf(x)</code>, <code>normal_cdf(x)</code>, <code>normal_logpdf(x)</code>.</li>
             <li>Beta distribution: <code>beta_pdf(x, a, b)</code>, <code>logbeta_pdf(x, a, b)</code>.</li>
           </ul>
         </div>
-        <div class="help-card">
+        <div class="help-card" data-help-modes="expression,equation,matrix,integrator">
           <h3>Shortcuts</h3>
           <ul>
             <li><code>Ctrl+Enter</code> evaluates the expression.</li>
@@ -2116,6 +2163,7 @@ __THEME_OVERRIDES__
     const integratorBoundStack = document.getElementById('integratorBoundStack');
     const integratorAddBound = document.getElementById('integratorAddBound');
     const integratorIntervalCap = document.getElementById('integratorIntervalCap');
+    const helpCards = Array.from(document.querySelectorAll('#helpPane .help-card'));
     const run = document.getElementById('run');
     const back = document.getElementById('back');
     const forward = document.getElementById('forward');
@@ -2480,7 +2528,21 @@ __THEME_OVERRIDES__
       }
 
       syncMatrixControls();
+      syncHelpCards();
       updateHistoryButtons();
+    }
+
+    function syncHelpCards() {
+      const mode = currentMode();
+
+      helpCards.forEach((card) => {
+        const modes = String(card.dataset.helpModes || '')
+          .split(',')
+          .map((item) => item.trim())
+          .filter(Boolean);
+        const visible = !modes.length || modes.includes(mode);
+        card.classList.toggle('hidden', !visible);
+      });
     }
 
     function applyLabMode(mode) {
@@ -5176,7 +5238,7 @@ __THEME_OVERRIDES__
         const workUnits = data.work_units || data.intervals || '';
         const workCap = data.work_cap || data.max_intervals || '';
         const statusText = String(data.status || '');
-        const symbolicStatus = /symbolic|antiderivative/i.test(statusText);
+        const symbolicStatus = /symbolic|antiderivative|closed-form|fast path/i.test(statusText);
         const antiderivativeStatus = /antiderivative/i.test(statusText);
         const stoppedEarly = !symbolicStatus && workUnits && workCap && String(workUnits) !== String(workCap);
         const workText = workUnits && workCap

@@ -4,7 +4,6 @@
 
 #include "equation.h"
 #include "equation_internal.h"
-#include "expression/expr_stringin_internal.h"
 #include "expression.h"
 #include "internal/expr_internal.h"
 #include "ustring.h"
@@ -516,21 +515,9 @@ static expr_t *equ_exact_tan_sqrt_three_family_expr(void)
     expr_t *pi_affine = (pi && affine) ? expr_mul(pi, affine) : NULL;
     expr_t *out = (one_third && pi_affine) ? expr_mul(one_third, pi_affine)
                                            : NULL;
-    expr_binding_expr_t *binding_expr = NULL;
 
-    if (out) {
-        /* Preserve the exact symbolic family shape for string/TeX output. */
-        binding_expr = expr_binding_expr_new_mul(
-            expr_binding_expr_new_div(
-                expr_binding_expr_new_number_text("1"),
-                expr_binding_expr_new_number_text("3")),
-            expr_binding_expr_new_mul(
-                expr_binding_expr_new_const(EXPR_BINDING_CONST_PI),
-                expr_binding_expr_new_add(
-                    expr_binding_expr_new_number_text("3n"),
-                    expr_binding_expr_new_number_text("1"))));
-        out->binding_expr = binding_expr;
-    }
+    if (out)
+        expr_set_binding_pi_linear_family(out, 3L, 3L, 1L);
 
     expr_free(pi_affine);
     expr_free(affine);
@@ -636,7 +623,13 @@ cleanup:
     return rc;
 }
 
-static int equ_try_solve_periodic_trig_kind(expr_op_kind_t kind,
+typedef enum {
+    EQU_PERIODIC_TRIG_SIN,
+    EQU_PERIODIC_TRIG_COS,
+    EQU_PERIODIC_TRIG_TAN
+} equ_periodic_trig_kind_t;
+
+static int equ_try_solve_periodic_trig_kind(equ_periodic_trig_kind_t kind,
                                                  const expr_t *inner,
                                                  const expr_t *target,
                                                  const expr_t *wrt,
@@ -666,7 +659,7 @@ static int equ_try_solve_periodic_trig_kind(expr_op_kind_t kind,
         goto cleanup;
 
     switch (kind) {
-        case EXPR_KIND_SIN:
+        case EQU_PERIODIC_TRIG_SIN:
             if (equ_expr_is_one(target)) {
                 exact_family = equ_exact_sin_one_family_expr();
                 if (!exact_family)
@@ -707,7 +700,7 @@ static int equ_try_solve_periodic_trig_kind(expr_op_kind_t kind,
             rc = 0;
             break;
 
-        case EXPR_KIND_COS:
+        case EQU_PERIODIC_TRIG_COS:
             base = expr_simplify_owned(expr_acos(target));
             period = equ_symbolic_two_pi_expr();
             if (!base || !period)
@@ -730,7 +723,7 @@ static int equ_try_solve_periodic_trig_kind(expr_op_kind_t kind,
             rc = 0;
             break;
 
-        case EXPR_KIND_TAN:
+        case EQU_PERIODIC_TRIG_TAN:
         {
             number_t target_value = num_new();
             bool is_sqrt_three = expr_match_const_value(target, &target_value) &&
@@ -792,14 +785,14 @@ static int equ_try_solve_unary_periodic_side(const expr_t *lhs,
     if (!equ_expr_uses_wrt(lhs, wrt) || equ_expr_uses_wrt(rhs, wrt))
         return 1;
 
-    if (expr_match_unary_op(lhs, EXPR_KIND_SIN, &inner))
-        return equ_try_solve_periodic_trig_kind(EXPR_KIND_SIN, inner, rhs,
+    if (expr_match_sin_expr(lhs, &inner))
+        return equ_try_solve_periodic_trig_kind(EQU_PERIODIC_TRIG_SIN, inner, rhs,
                                                 wrt, solutions);
-    if (expr_match_unary_op(lhs, EXPR_KIND_COS, &inner))
-        return equ_try_solve_periodic_trig_kind(EXPR_KIND_COS, inner, rhs,
+    if (expr_match_cos_expr(lhs, &inner))
+        return equ_try_solve_periodic_trig_kind(EQU_PERIODIC_TRIG_COS, inner, rhs,
                                                 wrt, solutions);
-    if (expr_match_unary_op(lhs, EXPR_KIND_TAN, &inner))
-        return equ_try_solve_periodic_trig_kind(EXPR_KIND_TAN, inner, rhs,
+    if (expr_match_tan_expr(lhs, &inner))
+        return equ_try_solve_periodic_trig_kind(EQU_PERIODIC_TRIG_TAN, inner, rhs,
                                                 wrt, solutions);
 
     return 1;
@@ -822,12 +815,17 @@ static int equ_try_solve_unary_periodic(const equation_t *equation,
                                              wrt, solutions);
 }
 
-static expr_t *equ_unary_inverse_rhs(expr_op_kind_t kind, const expr_t *rhs)
+typedef enum {
+    EQU_UNARY_INVERSE_EXP,
+    EQU_UNARY_INVERSE_LOG
+} equ_unary_inverse_kind_t;
+
+static expr_t *equ_unary_inverse_rhs(equ_unary_inverse_kind_t kind, const expr_t *rhs)
 {
     switch (kind) {
-        case EXPR_KIND_EXP:
+        case EQU_UNARY_INVERSE_EXP:
             return rhs ? expr_simplify_owned(expr_log(rhs)) : NULL;
-        case EXPR_KIND_LOG:
+        case EQU_UNARY_INVERSE_LOG:
             return rhs ? expr_simplify_owned(expr_exp(rhs)) : NULL;
         default:
             return NULL;
@@ -849,10 +847,10 @@ static int equ_try_solve_unary_inverse_side(const expr_t *lhs,
     if (!equ_expr_uses_wrt(lhs, wrt) || equ_expr_uses_wrt(rhs, wrt))
         return 1;
 
-    if (expr_match_unary_op(lhs, EXPR_KIND_EXP, &inner))
-        inverse_rhs = equ_unary_inverse_rhs(EXPR_KIND_EXP, rhs);
-    else if (expr_match_unary_op(lhs, EXPR_KIND_LOG, &inner))
-        inverse_rhs = equ_unary_inverse_rhs(EXPR_KIND_LOG, rhs);
+    if (expr_match_exp_expr(lhs, &inner))
+        inverse_rhs = equ_unary_inverse_rhs(EQU_UNARY_INVERSE_EXP, rhs);
+    else if (expr_match_log_expr(lhs, &inner))
+        inverse_rhs = equ_unary_inverse_rhs(EQU_UNARY_INVERSE_LOG, rhs);
     else
         return 1;
 

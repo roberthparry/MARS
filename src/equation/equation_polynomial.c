@@ -2,7 +2,7 @@
 #include <stddef.h>
 
 #include "equation_internal.h"
-#include "expression/expr_internal.h"
+#include "internal/expr_internal.h"
 
 enum {
     EQUATION_POLY_MAX_DEGREE = 3u,
@@ -184,28 +184,33 @@ static bool equ_collect_power_poly(const expr_t *expr,
     size_t count = max_degree + 1u;
     number_t base_poly[EQUATION_POLY_MAX_COEFFS];
     number_t square_poly[EQUATION_POLY_MAX_COEFFS];
+    const expr_t *base = NULL;
+    number_t exponent_value = num_new();
     long exponent;
     bool ok = false;
 
-    if (!expr || !expr->ops || expr->ops->kind != EXPR_KIND_POW_D)
-        return false;
+    if (!expr_match_pow_const(expr, &base, &exponent_value))
+        goto cleanup_exponent;
 
-    exponent = equ_power_exponent(expr->c, max_degree);
+    exponent = equ_power_exponent(exponent_value, max_degree);
     if (exponent < 0L)
-        return false;
+        goto cleanup_exponent;
 
     if (exponent == 0L) {
         equ_poly_zero(out, count);
         num_destroy(&out[0]);
         out[0] = num_clone(NUM_ONE);
-        return true;
+        ok = true;
+        goto cleanup_exponent;
     }
     if (exponent == 1L)
-        return equ_collect_poly(expr->a, wrt, max_degree, out);
+        ok = equ_collect_poly(base, wrt, max_degree, out);
+    if (exponent == 1L)
+        goto cleanup_exponent;
 
     equ_poly_init(base_poly, count);
     equ_poly_init(square_poly, count);
-    ok = equ_collect_poly(expr->a, wrt, max_degree, base_poly) &&
+    ok = equ_collect_poly(base, wrt, max_degree, base_poly) &&
          equ_poly_mul(base_poly, base_poly, square_poly, max_degree) &&
          (exponent == 2L ||
           equ_poly_mul(square_poly, base_poly, out, max_degree));
@@ -213,6 +218,9 @@ static bool equ_collect_power_poly(const expr_t *expr,
         equ_poly_copy(square_poly, out, count);
     equ_poly_destroy(square_poly, count);
     equ_poly_destroy(base_poly, count);
+
+cleanup_exponent:
+    num_destroy(&exponent_value);
     return ok;
 }
 

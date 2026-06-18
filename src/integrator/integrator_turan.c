@@ -18,6 +18,7 @@ int intg_double_integral(integrator_t *ig, expr_t *expr,
     hi[0] = bx;
     lo[1] = ay;
     hi[1] = by;
+    intg_clear_exact_result(ig);
     return intg_integral_multi_num(ig, expr, 2u, vars, lo, hi, result, error_est);
 }
 
@@ -43,5 +44,6 @@ int intg_triple_integral(integrator_t *ig, expr_t *expr,
     hi[1] = by;
     lo[2] = az;
     hi[2] = bz;
+    intg_clear_exact_result(ig);
     return intg_integral_multi_num(ig, expr, 3u, vars, lo, hi, result, error_est);
 }

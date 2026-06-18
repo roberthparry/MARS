@@ -2,7 +2,7 @@
 #include <stdlib.h>
 
 #include "integrator_internal.h"
-#include "number/number_internal.h"
+#include "internal/number_internal.h"
 
 typedef struct {
     number_t a;
@@ -876,6 +876,7 @@ int intg_integral(integrator_t *ig, expr_t *expr, expr_t *x_var,
     if (!ig || !expr || !x_var || !result)
         return -1;
 
+    intg_clear_exact_result(ig);
     vars[0] = x_var;
     lo[0] = a;
     hi[0] = b;
@@ -894,6 +895,7 @@ static int mp_eval_multi_outer(void *ctx, const number_t x, number_t *out)
     mp_multi_ctx_t *multi = (mp_multi_ctx_t *)ctx;
     size_t outer;
     size_t saved_last_intervals;
+    expr_t *saved_exact_result = NULL;
 
     if (!multi || !out || multi->ndim == 0)
         return -1;
@@ -905,16 +907,19 @@ static int mp_eval_multi_outer(void *ctx, const number_t x, number_t *out)
         return mp_eval_at(multi->expr, multi->vars[0], x, out);
 
     saved_last_intervals = multi->ig->last_intervals;
+    saved_exact_result = expr_retain_expr(intg_get_exact_result(multi->ig));
     {
         int status = intg_integral_multi_num(multi->ig, multi->expr, outer, multi->vars,
                                            multi->lo, multi->hi, out, NULL);
 
         if (status < 0) {
             multi->ig->last_intervals = saved_last_intervals;
+            intg_set_exact_result_owned(multi->ig, saved_exact_result);
             return -1;
         }
     }
     multi->ig->last_intervals = saved_last_intervals;
+    intg_set_exact_result_owned(multi->ig, saved_exact_result);
     return 0;
 }
 

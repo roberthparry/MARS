@@ -3,7 +3,6 @@
 #include <string.h>
 
 #include "equation.h"
-#include "expression/expr_stringin_internal.h"
 #include "expression.h"
 #include "internal/expr_internal.h"
 #include "number.h"
@@ -89,11 +88,15 @@ static expr_t *expanded_display_product(const expr_t *left, const expr_t *right)
     expr_t *left_expr;
     expr_t *right_expr;
     expr_t *out;
+    const expr_t *child_left = NULL;
+    const expr_t *child_right = NULL;
+    bool is_sub = false;
 
     if (!left || !right)
         return NULL;
 
-    if (expr_is_addsub(left) && expr_is_addsub(right)) {
+    if (expr_match_add_sub_expr(left, &child_left, &child_right, &is_sub) &&
+        expr_match_add_sub_expr(right, &child_left, &child_right, &is_sub)) {
         left_expr = expanded_display_expr(left);
         right_expr = expanded_display_expr(right);
         if (!left_expr || !right_expr) {
@@ -108,9 +111,9 @@ static expr_t *expanded_display_product(const expr_t *left, const expr_t *right)
         return out;
     }
 
-    if (expr_is_op(left, &ops_add)) {
-        expr_t *first = expanded_display_product(left->a, right);
-        expr_t *second = expanded_display_product(left->b, right);
+    if (expr_match_add_expr(left, &child_left, &child_right)) {
+        expr_t *first = expanded_display_product(child_left, right);
+        expr_t *second = expanded_display_product(child_right, right);
 
         if (!first || !second) {
             expr_free(first);
@@ -124,9 +127,9 @@ static expr_t *expanded_display_product(const expr_t *left, const expr_t *right)
         return out;
     }
 
-    if (expr_is_op(left, &ops_sub)) {
-        expr_t *first = expanded_display_product(left->a, right);
-        expr_t *second = expanded_display_product(left->b, right);
+    if (expr_match_sub_expr(left, &child_left, &child_right)) {
+        expr_t *first = expanded_display_product(child_left, right);
+        expr_t *second = expanded_display_product(child_right, right);
 
         if (!first || !second) {
             expr_free(first);
@@ -140,7 +143,7 @@ static expr_t *expanded_display_product(const expr_t *left, const expr_t *right)
         return out;
     }
 
-    if (expr_is_addsub(right))
+    if (expr_match_add_sub_expr(right, &child_left, &child_right, &is_sub))
         return expanded_display_product(right, left);
 
     left_expr = expanded_display_expr(left);
@@ -162,13 +165,15 @@ static expr_t *expanded_display_expr(const expr_t *expr)
     expr_t *left;
     expr_t *right;
     expr_t *out;
+    const expr_t *child_left = NULL;
+    const expr_t *child_right = NULL;
 
     if (!expr)
         return NULL;
 
-    if (expr_is_op(expr, &ops_add)) {
-        left = expanded_display_expr(expr->a);
-        right = expanded_display_expr(expr->b);
+    if (expr_match_add_expr(expr, &child_left, &child_right)) {
+        left = expanded_display_expr(child_left);
+        right = expanded_display_expr(child_right);
         if (!left || !right) {
             expr_free(left);
             expr_free(right);
@@ -180,9 +185,9 @@ static expr_t *expanded_display_expr(const expr_t *expr)
         return out;
     }
 
-    if (expr_is_op(expr, &ops_sub)) {
-        left = expanded_display_expr(expr->a);
-        right = expanded_display_expr(expr->b);
+    if (expr_match_sub_expr(expr, &child_left, &child_right)) {
+        left = expanded_display_expr(child_left);
+        right = expanded_display_expr(child_right);
         if (!left || !right) {
             expr_free(left);
             expr_free(right);
@@ -194,8 +199,8 @@ static expr_t *expanded_display_expr(const expr_t *expr)
         return out;
     }
 
-    if (expr_is_op(expr, &ops_mul))
-        return expanded_display_product(expr->a, expr->b);
+    if (expr_match_mul_expr(expr, &child_left, &child_right))
+        return expanded_display_product(child_left, child_right);
 
     return clone_expr_local(expr);
 }

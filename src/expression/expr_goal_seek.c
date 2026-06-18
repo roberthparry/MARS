@@ -1,7 +1,6 @@
 #include <stdlib.h>
 
 #include "expr_stringin_internal.h"
-#include "internal/expr_internal.h"
 #include "internal/number_internal.h"
 
 #define EXPR_GOAL_DEFAULT_DIGITS 64u
