@@ -610,6 +610,14 @@ All functions return owning handles.
 - `expr_t *expr_sec(const expr_t *expr)` — sec
 - `expr_t *expr_cosec(const expr_t *expr)` — cosec
 - `expr_t *expr_cot(const expr_t *expr)` — cot
+- `expr_t *expr_versin(const expr_t *expr)` — versed sine `1 - cos(x)`
+- `expr_t *expr_vercos(const expr_t *expr)` — versed cosine `1 + cos(x)`
+- `expr_t *expr_coversin(const expr_t *expr)` — coversed sine `1 - sin(x)`
+- `expr_t *expr_covercos(const expr_t *expr)` — coversed cosine `1 + sin(x)`
+- `expr_t *expr_haversin(const expr_t *expr)` — haversine `(1 - cos(x)) / 2`
+- `expr_t *expr_havercos(const expr_t *expr)` — havercosine `(1 + cos(x)) / 2`
+- `expr_t *expr_hacoversin(const expr_t *expr)` — hacoversine `(1 - sin(x)) / 2`
+- `expr_t *expr_hacovercos(const expr_t *expr)` — hacovercosine `(1 + sin(x)) / 2`
 - `expr_t *expr_sinh(const expr_t *expr)` — sinh
 - `expr_t *expr_cosh(const expr_t *expr)` — cosh
 - `expr_t *expr_tanh(const expr_t *expr)` — tanh
@@ -622,6 +630,14 @@ All functions return owning handles.
 - `expr_t *expr_asec(const expr_t *expr)` — arcsec
 - `expr_t *expr_acosec(const expr_t *expr)` — arccosec
 - `expr_t *expr_acot(const expr_t *expr)` — arccot
+- `expr_t *expr_arcversin(const expr_t *expr)` — inverse versed sine `acos(1 - x)`
+- `expr_t *expr_arcvercos(const expr_t *expr)` — inverse versed cosine `acos(x - 1)`
+- `expr_t *expr_arccoversin(const expr_t *expr)` — inverse coversed sine `asin(1 - x)`
+- `expr_t *expr_arccovercos(const expr_t *expr)` — inverse coversed cosine `asin(x - 1)`
+- `expr_t *expr_archaversin(const expr_t *expr)` — inverse haversine `acos(1 - 2x)`
+- `expr_t *expr_archavercos(const expr_t *expr)` — inverse havercosine `acos(2x - 1)`
+- `expr_t *expr_archacoversin(const expr_t *expr)` — inverse hacoversine `asin(1 - 2x)`
+- `expr_t *expr_archacovercos(const expr_t *expr)` — inverse hacovercosine `asin(2x - 1)`
 - `expr_t *expr_atan2(const expr_t *y, const expr_t *x)` — four-quadrant arctan2(y, x)
 - `expr_t *expr_asinh(const expr_t *expr)` — inverse hyperbolic sine
 - `expr_t *expr_acosh(const expr_t *expr)` — inverse hyperbolic cosine
@@ -762,6 +778,12 @@ expression expr_eval() {
     but the canonical pretty-printed form uses `·dt`
   - `sqrt(x)` or `√(x)` for square roots
   - `ln(x)` for natural logarithm; `log(x)`, `lg(x)`, and `log10(x)` for common logarithm
+  - `versin(x)`, `vercos(x)`, `coversin(x)`, `covercos(x)`,
+    `haversin(x)`, `havercos(x)`, `hacoversin(x)`, and `hacovercos(x)`
+    for the versine/haversine family
+  - `arcversin(x)`, `arcvercos(x)`, `arccoversin(x)`, `arccovercos(x)`,
+    `archaversin(x)`, `archavercos(x)`, `archacoversin(x)`, and
+    `archacovercos(x)` for the corresponding inverse functions
   - `gamma(x)` and `Γ(x)` for the gamma function
   - `digamma(x)`, `trigamma(x)`, and `polygamma(n, x)` for ψ⁽⁰⁾, ψ⁽¹⁾, and ψ⁽ⁿ⁾
   - `W(x)` and `productlog(x)` for branch-choosing Lambert W/ProductLog

@@ -15,7 +15,7 @@ some GNU C extensions, so MSVC/Windows builds are not currently guaranteed.
 - **`number_t`** — generic numeric value cluster spanning exact integer/rational,
   fixed-precision, and multiprecision real/complex backends behind one by-value
   public handle
-- **`qfloat_t`** — double-double arithmetic and special functions (~31-32 decimal digits of precision)
+- **`qfloat_t`** — double-double arithmetic, circular function families, and special functions (~31-32 decimal digits of precision)
 - **`matrix_t`** — generic high-precision matrix over numeric `number_t` values or symbolic `expr_t *` entries, with string-based matrix parsing and formatting, symbolic linear algebra support including Schur complements, block inverse/solve, Jordan helpers, entrywise matrix derivatives, Jacobian helpers, first matrix-calculus helpers for trace, determinant, inverse, block inverse, solve, and block solve, and high-precision eigendecomposition and matrix functions through the numeric `number_t` layer
 - **`expr_t`** — differentiable expression DAGs with first/second derivatives, symbolic antiderivatives for conservative rule families, symbolic matrix integration, and structural matcher helpers for higher-level symbolic code
 - **`datetime_t`** — civil and astronomical date/time helpers
@@ -291,8 +291,8 @@ int main(void) {
 | `array_t` | Generic array storage with copy/cleanup callbacks | [`docs/array.md`](docs/array.md) |
 | `bitset_t` | Dynamic thread-safe bitset | [`docs/bitset.md`](docs/bitset.md) |
 | `number_t` | Generic numeric value cluster over exact, fixed-precision, and multiprecision backends | [`docs/number.md`](docs/number.md) |
-| `qfloat_t` | Double-double arithmetic and special functions | [`docs/qfloat.md`](docs/qfloat.md) |
-| `qcomplex_t` | Double-double complex arithmetic and special functions | [`docs/qcomplex.md`](docs/qcomplex.md) |
+| `qfloat_t` | Double-double arithmetic, circular function families, and special functions | [`docs/qfloat.md`](docs/qfloat.md) |
+| `qcomplex_t` | Double-double complex arithmetic, circular function families, and special functions | [`docs/qcomplex.md`](docs/qcomplex.md) |
 | `matrix_t` | Generic high-precision matrix with numeric and symbolic element types | [`docs/matrix.md`](docs/matrix.md) |
 | `expr_t` | Differentiable expression DAGs with symbolic differentiation and conservative symbolic antiderivatives | [`docs/expression.md`](docs/expression.md) |
 | `integrator_t` | Adaptive G7K15 numerical integrator | [`docs/integrator.md`](docs/integrator.md) |

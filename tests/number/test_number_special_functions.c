@@ -63,6 +63,8 @@ void run_number_special_function_tests(void)
         number_t zero = num_create_from_string("0");
         number_t one = num_create_from_string("1");
         number_t two = num_create_from_string("2");
+        number_t three = num_create_from_string("3");
+        number_t four = num_create_from_string("4");
         number_t five = num_create_from_string("5");
         number_t fifty_two = num_create_from_string("52");
         number_t lgamma5 = num_lgamma(five);
@@ -101,6 +103,28 @@ void run_number_special_function_tests(void)
         number_t normal_pdf0 = num_normal_pdf(zero);
         number_t normal_cdf0 = num_normal_cdf(zero);
         number_t e1_1 = num_e1(one);
+        number_t pi_over_three = num_div(NUM_PI, three);
+        number_t pi_over_six = num_div(NUM_PI, six);
+        number_t one_half = num_div(one, two);
+        number_t three_halves = num_div(three, two);
+        number_t one_quarter = num_div(one, four);
+        number_t three_quarters = num_div(three, four);
+        number_t versin_pi3 = num_versin(pi_over_three);
+        number_t vercos_pi3 = num_vercos(pi_over_three);
+        number_t coversin_pi6 = num_coversin(pi_over_six);
+        number_t covercos_pi6 = num_covercos(pi_over_six);
+        number_t haversin_pi3 = num_haversin(pi_over_three);
+        number_t havercos_pi3 = num_havercos(pi_over_three);
+        number_t hacoversin_pi6 = num_hacoversin(pi_over_six);
+        number_t hacovercos_pi6 = num_hacovercos(pi_over_six);
+        number_t arcversin_half = num_arcversin(one_half);
+        number_t arcvercos_three_halves = num_arcvercos(three_halves);
+        number_t arccoversin_half = num_arccoversin(one_half);
+        number_t arccovercos_three_halves = num_arccovercos(three_halves);
+        number_t archaversin_quarter = num_archaversin(one_quarter);
+        number_t archavercos_three_quarters = num_archavercos(three_quarters);
+        number_t archacoversin_quarter = num_archacoversin(one_quarter);
+        number_t archacovercos_three_quarters = num_archacovercos(three_quarters);
 
         assert_number_string_prefix("num_lgamma(5)", lgamma5,
                                     "3.178053830347945619646941601297");
@@ -148,6 +172,38 @@ void run_number_special_function_tests(void)
         assert_number_string("num_normal_cdf(0)", normal_cdf0, "0.5");
         assert_number_string_prefix("num_e1(1)", e1_1,
                                     "0.219383934395520273677163775460");
+        assert_number_close_number("num_versin(pi/3) = 1/2",
+                                   versin_pi3, one_half, "1e-30");
+        assert_number_close_number("num_vercos(pi/3) = 3/2",
+                                   vercos_pi3, three_halves, "1e-30");
+        assert_number_close_number("num_coversin(pi/6) = 1/2",
+                                   coversin_pi6, one_half, "1e-30");
+        assert_number_close_number("num_covercos(pi/6) = 3/2",
+                                   covercos_pi6, three_halves, "1e-30");
+        assert_number_close_number("num_haversin(pi/3) = 1/4",
+                                   haversin_pi3, one_quarter, "1e-30");
+        assert_number_close_number("num_havercos(pi/3) = 3/4",
+                                   havercos_pi3, three_quarters, "1e-30");
+        assert_number_close_number("num_hacoversin(pi/6) = 1/4",
+                                   hacoversin_pi6, one_quarter, "1e-30");
+        assert_number_close_number("num_hacovercos(pi/6) = 3/4",
+                                   hacovercos_pi6, three_quarters, "1e-30");
+        assert_number_close_number("num_arcversin(1/2) = pi/3",
+                                   arcversin_half, pi_over_three, "1e-30");
+        assert_number_close_number("num_arcvercos(3/2) = pi/3",
+                                   arcvercos_three_halves, pi_over_three, "1e-30");
+        assert_number_close_number("num_arccoversin(1/2) = pi/6",
+                                   arccoversin_half, pi_over_six, "1e-30");
+        assert_number_close_number("num_arccovercos(3/2) = pi/6",
+                                   arccovercos_three_halves, pi_over_six, "1e-30");
+        assert_number_close_number("num_archaversin(1/4) = pi/3",
+                                   archaversin_quarter, pi_over_three, "1e-30");
+        assert_number_close_number("num_archavercos(3/4) = pi/3",
+                                   archavercos_three_quarters, pi_over_three, "1e-30");
+        assert_number_close_number("num_archacoversin(1/4) = pi/6",
+                                   archacoversin_quarter, pi_over_six, "1e-30");
+        assert_number_close_number("num_archacovercos(3/4) = pi/6",
+                                   archacovercos_three_quarters, pi_over_six, "1e-30");
 
         ASSERT_TRUE(num_is_real(lgamma5));
         ASSERT_TRUE(num_is_real(digamma1));
@@ -160,6 +216,8 @@ void run_number_special_function_tests(void)
         num_destroy(&zero);
         num_destroy(&one);
         num_destroy(&two);
+        num_destroy(&three);
+        num_destroy(&four);
         num_destroy(&five);
         num_destroy(&fifty_two);
         num_destroy(&lgamma5);
@@ -198,6 +256,28 @@ void run_number_special_function_tests(void)
         num_destroy(&normal_pdf0);
         num_destroy(&normal_cdf0);
         num_destroy(&e1_1);
+        num_destroy(&pi_over_three);
+        num_destroy(&pi_over_six);
+        num_destroy(&one_half);
+        num_destroy(&three_halves);
+        num_destroy(&one_quarter);
+        num_destroy(&three_quarters);
+        num_destroy(&versin_pi3);
+        num_destroy(&vercos_pi3);
+        num_destroy(&coversin_pi6);
+        num_destroy(&covercos_pi6);
+        num_destroy(&haversin_pi3);
+        num_destroy(&havercos_pi3);
+        num_destroy(&hacoversin_pi6);
+        num_destroy(&hacovercos_pi6);
+        num_destroy(&arcversin_half);
+        num_destroy(&arcvercos_three_halves);
+        num_destroy(&arccoversin_half);
+        num_destroy(&arccovercos_three_halves);
+        num_destroy(&archaversin_quarter);
+        num_destroy(&archavercos_three_quarters);
+        num_destroy(&archacoversin_quarter);
+        num_destroy(&archacovercos_three_quarters);
     }
 
     {

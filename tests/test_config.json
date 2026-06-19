@@ -685,6 +685,7 @@
         "test_gamma": true,
         "test_gammainc": true,
         "test_gammainv": true,
+        "test_haversine_family": true,
         "test_hypot": true,
         "test_lambert_w0": true,
         "test_lambert_wm1": true,
@@ -1364,6 +1365,7 @@
         "test_qf_asin": true,
         "test_qf_atan": true,
         "test_qf_atan2": true,
+        "test_qf_haversine_family": true,
         "test_qf_reciprocal_trig": true,
         "test_qf_trig": true
       }

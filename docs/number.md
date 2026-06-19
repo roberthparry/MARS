@@ -343,8 +343,12 @@ The generic layer exposes:
   - `num_sqrt`
   - `num_sin`, `num_cos`, `num_tan`
   - `num_sec`, `num_cosec`, `num_cot`
+  - `num_versin`, `num_vercos`, `num_coversin`, `num_covercos`
+  - `num_haversin`, `num_havercos`, `num_hacoversin`, `num_hacovercos`
   - `num_asin`, `num_acos`, `num_atan`
   - `num_asec`, `num_acosec`, `num_acot`
+  - `num_arcversin`, `num_arcvercos`, `num_arccoversin`, `num_arccovercos`
+  - `num_archaversin`, `num_archavercos`, `num_archacoversin`, `num_archacovercos`
   - `num_sinh`, `num_cosh`, `num_tanh`
   - `num_sech`, `num_cosech`, `num_coth`
   - `num_asinh`, `num_acosh`, `num_atanh`

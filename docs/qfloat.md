@@ -18,7 +18,7 @@ maintained after every operation.
 
 - ~106 bits of precision (~31–32 decimal digits)
 - arithmetic: add, subtract, multiply, divide, power
-- elementary functions: exp, log, sqrt, sin, cos, tan, atan2, hypot, and inverses
+- elementary functions: exp, log, sqrt, sin, cos, tan, atan2, hypot, the versine/haversine family, and inverses
 - special functions: gamma, polygamma, erf, Lambert W, beta, incomplete gamma, exponential integrals, normal distribution
 - decimal parsing and formatting
 - `printf` support through `%q` and `%Q`
@@ -213,12 +213,28 @@ All declarations are in `include/qfloat.h`.
 - `qfloat_t qf_sec(qfloat_t x)` — secant `1/cos(x)`
 - `qfloat_t qf_cosec(qfloat_t x)` — cosecant `1/sin(x)`
 - `qfloat_t qf_cot(qfloat_t x)` — cotangent `1/tan(x)`
+- `qfloat_t qf_versin(qfloat_t x)` — versed sine `1 - cos(x)`
+- `qfloat_t qf_vercos(qfloat_t x)` — versed cosine `1 + cos(x)`
+- `qfloat_t qf_coversin(qfloat_t x)` — coversed sine `1 - sin(x)`
+- `qfloat_t qf_covercos(qfloat_t x)` — coversed cosine `1 + sin(x)`
+- `qfloat_t qf_haversin(qfloat_t x)` — haversine `(1 - cos(x)) / 2`
+- `qfloat_t qf_havercos(qfloat_t x)` — havercosine `(1 + cos(x)) / 2`
+- `qfloat_t qf_hacoversin(qfloat_t x)` — hacoversine `(1 - sin(x)) / 2`
+- `qfloat_t qf_hacovercos(qfloat_t x)` — hacovercosine `(1 + sin(x)) / 2`
 - `qfloat_t qf_asin(qfloat_t x)` — inverse sine
 - `qfloat_t qf_acos(qfloat_t x)` — inverse cosine
 - `qfloat_t qf_atan(qfloat_t x)` — inverse tangent
 - `qfloat_t qf_asec(qfloat_t x)` — inverse secant
 - `qfloat_t qf_acosec(qfloat_t x)` — inverse cosecant
 - `qfloat_t qf_acot(qfloat_t x)` — inverse cotangent
+- `qfloat_t qf_arcversin(qfloat_t x)` — inverse versed sine `acos(1 - x)`
+- `qfloat_t qf_arcvercos(qfloat_t x)` — inverse versed cosine `acos(x - 1)`
+- `qfloat_t qf_arccoversin(qfloat_t x)` — inverse coversed sine `asin(1 - x)`
+- `qfloat_t qf_arccovercos(qfloat_t x)` — inverse coversed cosine `asin(x - 1)`
+- `qfloat_t qf_archaversin(qfloat_t x)` — inverse haversine `acos(1 - 2x)`
+- `qfloat_t qf_archavercos(qfloat_t x)` — inverse havercosine `acos(2x - 1)`
+- `qfloat_t qf_archacoversin(qfloat_t x)` — inverse hacoversine `asin(1 - 2x)`
+- `qfloat_t qf_archacovercos(qfloat_t x)` — inverse hacovercosine `asin(2x - 1)`
 - `qfloat_t qf_atan2(qfloat_t y, qfloat_t x)` — four-quadrant inverse tangent
 - `qfloat_t qf_sinh(qfloat_t x)` — hyperbolic sine
 - `qfloat_t qf_cosh(qfloat_t x)` — hyperbolic cosine

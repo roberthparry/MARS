@@ -488,6 +488,46 @@ qfloat_t qf_cot(qfloat_t x)
     return qf_div(qf_cos(x), qf_sin(x));
 }
 
+qfloat_t qf_versin(qfloat_t x)
+{
+    return qf_sub(QF_ONE, qf_cos(x));
+}
+
+qfloat_t qf_vercos(qfloat_t x)
+{
+    return qf_add(QF_ONE, qf_cos(x));
+}
+
+qfloat_t qf_coversin(qfloat_t x)
+{
+    return qf_sub(QF_ONE, qf_sin(x));
+}
+
+qfloat_t qf_covercos(qfloat_t x)
+{
+    return qf_add(QF_ONE, qf_sin(x));
+}
+
+qfloat_t qf_haversin(qfloat_t x)
+{
+    return qf_mul_double(qf_versin(x), 0.5);
+}
+
+qfloat_t qf_havercos(qfloat_t x)
+{
+    return qf_mul_double(qf_vercos(x), 0.5);
+}
+
+qfloat_t qf_hacoversin(qfloat_t x)
+{
+    return qf_mul_double(qf_coversin(x), 0.5);
+}
+
+qfloat_t qf_hacovercos(qfloat_t x)
+{
+    return qf_mul_double(qf_covercos(x), 0.5);
+}
+
 /* Taylor tail: atan(t) = t + t^3 * P(t^2),
    P(u) = sum_{k=0}^34 (-1)^k / (2k+3) * u^k
 */
@@ -683,6 +723,46 @@ qfloat_t qf_acot(qfloat_t x)
     if (qf_isneginf(x))
         return QF_PI;
     return qf_atan2(QF_ONE, x);
+}
+
+qfloat_t qf_arcversin(qfloat_t x)
+{
+    return qf_acos(qf_sub(QF_ONE, x));
+}
+
+qfloat_t qf_arcvercos(qfloat_t x)
+{
+    return qf_acos(qf_sub(x, QF_ONE));
+}
+
+qfloat_t qf_arccoversin(qfloat_t x)
+{
+    return qf_asin(qf_sub(QF_ONE, x));
+}
+
+qfloat_t qf_arccovercos(qfloat_t x)
+{
+    return qf_asin(qf_sub(x, QF_ONE));
+}
+
+qfloat_t qf_archaversin(qfloat_t x)
+{
+    return qf_acos(qf_sub(QF_ONE, qf_mul_double(x, 2.0)));
+}
+
+qfloat_t qf_archavercos(qfloat_t x)
+{
+    return qf_acos(qf_sub(qf_mul_double(x, 2.0), QF_ONE));
+}
+
+qfloat_t qf_archacoversin(qfloat_t x)
+{
+    return qf_asin(qf_sub(QF_ONE, qf_mul_double(x, 2.0)));
+}
+
+qfloat_t qf_archacovercos(qfloat_t x)
+{
+    return qf_asin(qf_sub(qf_mul_double(x, 2.0), QF_ONE));
 }
 
 qfloat_t qf_sinh(qfloat_t x)

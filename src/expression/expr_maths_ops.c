@@ -113,6 +113,78 @@ const expr_ops_t ops_cot = {
     .integrate = expr_integrate_dispatch_primitive,
     .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
 };
+const expr_ops_t ops_versin = {
+    .eval = eval_versin, .deriv = deriv_versin, .reverse = expr_reverse_versin,
+    .kind = EXPR_KIND_VERSIN, .arity = EXPR_OP_UNARY, .name = "versin",
+    .tex_name = "\\operatorname{versin}",
+    .direct_inverse = &ops_arcversin,
+    .inverse_unary = expr_arcversin,
+    .apply_unary = expr_versin, .apply_binary = NULL,
+    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
+};
+const expr_ops_t ops_vercos = {
+    .eval = eval_vercos, .deriv = deriv_vercos, .reverse = expr_reverse_vercos,
+    .kind = EXPR_KIND_VERCOS, .arity = EXPR_OP_UNARY, .name = "vercos",
+    .tex_name = "\\operatorname{vercos}",
+    .direct_inverse = &ops_arcvercos,
+    .inverse_unary = expr_arcvercos,
+    .apply_unary = expr_vercos, .apply_binary = NULL,
+    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
+};
+const expr_ops_t ops_coversin = {
+    .eval = eval_coversin, .deriv = deriv_coversin, .reverse = expr_reverse_coversin,
+    .kind = EXPR_KIND_COVERSIN, .arity = EXPR_OP_UNARY, .name = "coversin",
+    .tex_name = "\\operatorname{coversin}",
+    .direct_inverse = &ops_arccoversin,
+    .inverse_unary = expr_arccoversin,
+    .apply_unary = expr_coversin, .apply_binary = NULL,
+    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
+};
+const expr_ops_t ops_covercos = {
+    .eval = eval_covercos, .deriv = deriv_covercos, .reverse = expr_reverse_covercos,
+    .kind = EXPR_KIND_COVERCOS, .arity = EXPR_OP_UNARY, .name = "covercos",
+    .tex_name = "\\operatorname{covercos}",
+    .direct_inverse = &ops_arccovercos,
+    .inverse_unary = expr_arccovercos,
+    .apply_unary = expr_covercos, .apply_binary = NULL,
+    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
+};
+const expr_ops_t ops_haversin = {
+    .eval = eval_haversin, .deriv = deriv_haversin, .reverse = expr_reverse_haversin,
+    .kind = EXPR_KIND_HAVERSIN, .arity = EXPR_OP_UNARY, .name = "haversin",
+    .tex_name = "\\operatorname{haversin}",
+    .direct_inverse = &ops_archaversin,
+    .inverse_unary = expr_archaversin,
+    .apply_unary = expr_haversin, .apply_binary = NULL,
+    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
+};
+const expr_ops_t ops_havercos = {
+    .eval = eval_havercos, .deriv = deriv_havercos, .reverse = expr_reverse_havercos,
+    .kind = EXPR_KIND_HAVERCOS, .arity = EXPR_OP_UNARY, .name = "havercos",
+    .tex_name = "\\operatorname{havercos}",
+    .direct_inverse = &ops_archavercos,
+    .inverse_unary = expr_archavercos,
+    .apply_unary = expr_havercos, .apply_binary = NULL,
+    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
+};
+const expr_ops_t ops_hacoversin = {
+    .eval = eval_hacoversin, .deriv = deriv_hacoversin, .reverse = expr_reverse_hacoversin,
+    .kind = EXPR_KIND_HACOVERSIN, .arity = EXPR_OP_UNARY, .name = "hacoversin",
+    .tex_name = "\\operatorname{hacoversin}",
+    .direct_inverse = &ops_archacoversin,
+    .inverse_unary = expr_archacoversin,
+    .apply_unary = expr_hacoversin, .apply_binary = NULL,
+    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
+};
+const expr_ops_t ops_hacovercos = {
+    .eval = eval_hacovercos, .deriv = deriv_hacovercos, .reverse = expr_reverse_hacovercos,
+    .kind = EXPR_KIND_HACOVERCOS, .arity = EXPR_OP_UNARY, .name = "hacovercos",
+    .tex_name = "\\operatorname{hacovercos}",
+    .direct_inverse = &ops_archacovercos,
+    .inverse_unary = expr_archacovercos,
+    .apply_unary = expr_hacovercos, .apply_binary = NULL,
+    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
+};
 const expr_ops_t ops_sinh = {
     .eval = eval_sinh, .deriv = deriv_sinh, .reverse = expr_reverse_sinh,
     .kind = EXPR_KIND_SINH, .arity = EXPR_OP_UNARY, .name = "sinh",
@@ -226,6 +298,70 @@ const expr_ops_t ops_acot = {
     .apply_unary = expr_acot, .apply_binary = NULL,
     .integrate = expr_integrate_dispatch_primitive,
     .simplify = expr_simplify_unary_operator, .fold_const_unary = expr_fold_acot_const
+};
+const expr_ops_t ops_arcversin = {
+    .eval = eval_arcversin, .deriv = deriv_arcversin, .reverse = expr_reverse_arcversin,
+    .kind = EXPR_KIND_ARCVERSIN, .arity = EXPR_OP_UNARY, .name = "arcversin",
+    .tex_name = "\\operatorname{arcversin}",
+    .inverse_unary = expr_versin,
+    .apply_unary = expr_arcversin, .apply_binary = NULL,
+    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
+};
+const expr_ops_t ops_arcvercos = {
+    .eval = eval_arcvercos, .deriv = deriv_arcvercos, .reverse = expr_reverse_arcvercos,
+    .kind = EXPR_KIND_ARCVERCOS, .arity = EXPR_OP_UNARY, .name = "arcvercos",
+    .tex_name = "\\operatorname{arcvercos}",
+    .inverse_unary = expr_vercos,
+    .apply_unary = expr_arcvercos, .apply_binary = NULL,
+    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
+};
+const expr_ops_t ops_arccoversin = {
+    .eval = eval_arccoversin, .deriv = deriv_arccoversin, .reverse = expr_reverse_arccoversin,
+    .kind = EXPR_KIND_ARCCOVERSIN, .arity = EXPR_OP_UNARY, .name = "arccoversin",
+    .tex_name = "\\operatorname{arccoversin}",
+    .inverse_unary = expr_coversin,
+    .apply_unary = expr_arccoversin, .apply_binary = NULL,
+    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
+};
+const expr_ops_t ops_arccovercos = {
+    .eval = eval_arccovercos, .deriv = deriv_arccovercos, .reverse = expr_reverse_arccovercos,
+    .kind = EXPR_KIND_ARCCOVERCOS, .arity = EXPR_OP_UNARY, .name = "arccovercos",
+    .tex_name = "\\operatorname{arccovercos}",
+    .inverse_unary = expr_covercos,
+    .apply_unary = expr_arccovercos, .apply_binary = NULL,
+    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
+};
+const expr_ops_t ops_archaversin = {
+    .eval = eval_archaversin, .deriv = deriv_archaversin, .reverse = expr_reverse_archaversin,
+    .kind = EXPR_KIND_ARCHAVERSIN, .arity = EXPR_OP_UNARY, .name = "archaversin",
+    .tex_name = "\\operatorname{archaversin}",
+    .inverse_unary = expr_haversin,
+    .apply_unary = expr_archaversin, .apply_binary = NULL,
+    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
+};
+const expr_ops_t ops_archavercos = {
+    .eval = eval_archavercos, .deriv = deriv_archavercos, .reverse = expr_reverse_archavercos,
+    .kind = EXPR_KIND_ARCHAVERCOS, .arity = EXPR_OP_UNARY, .name = "archavercos",
+    .tex_name = "\\operatorname{archavercos}",
+    .inverse_unary = expr_havercos,
+    .apply_unary = expr_archavercos, .apply_binary = NULL,
+    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
+};
+const expr_ops_t ops_archacoversin = {
+    .eval = eval_archacoversin, .deriv = deriv_archacoversin, .reverse = expr_reverse_archacoversin,
+    .kind = EXPR_KIND_ARCHACOVERSIN, .arity = EXPR_OP_UNARY, .name = "archacoversin",
+    .tex_name = "\\operatorname{archacoversin}",
+    .inverse_unary = expr_hacoversin,
+    .apply_unary = expr_archacoversin, .apply_binary = NULL,
+    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
+};
+const expr_ops_t ops_archacovercos = {
+    .eval = eval_archacovercos, .deriv = deriv_archacovercos, .reverse = expr_reverse_archacovercos,
+    .kind = EXPR_KIND_ARCHACOVERCOS, .arity = EXPR_OP_UNARY, .name = "archacovercos",
+    .tex_name = "\\operatorname{archacovercos}",
+    .inverse_unary = expr_hacovercos,
+    .apply_unary = expr_archacovercos, .apply_binary = NULL,
+    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
 };
 const expr_ops_t ops_asinh = {
     .eval = eval_asinh, .deriv = deriv_asinh, .reverse = expr_reverse_asinh,
@@ -713,6 +849,14 @@ expr_t *expr_apply_unary_kind(expr_op_kind_t kind, const expr_t *arg)
         [EXPR_KIND_SEC] = &ops_sec,
         [EXPR_KIND_COSEC] = &ops_cosec,
         [EXPR_KIND_COT] = &ops_cot,
+        [EXPR_KIND_VERSIN] = &ops_versin,
+        [EXPR_KIND_VERCOS] = &ops_vercos,
+        [EXPR_KIND_COVERSIN] = &ops_coversin,
+        [EXPR_KIND_COVERCOS] = &ops_covercos,
+        [EXPR_KIND_HAVERSIN] = &ops_haversin,
+        [EXPR_KIND_HAVERCOS] = &ops_havercos,
+        [EXPR_KIND_HACOVERSIN] = &ops_hacoversin,
+        [EXPR_KIND_HACOVERCOS] = &ops_hacovercos,
         [EXPR_KIND_SINH] = &ops_sinh,
         [EXPR_KIND_COSH] = &ops_cosh,
         [EXPR_KIND_TANH] = &ops_tanh,
@@ -725,6 +869,14 @@ expr_t *expr_apply_unary_kind(expr_op_kind_t kind, const expr_t *arg)
         [EXPR_KIND_ASEC] = &ops_asec,
         [EXPR_KIND_ACOSEC] = &ops_acosec,
         [EXPR_KIND_ACOT] = &ops_acot,
+        [EXPR_KIND_ARCVERSIN] = &ops_arcversin,
+        [EXPR_KIND_ARCVERCOS] = &ops_arcvercos,
+        [EXPR_KIND_ARCCOVERSIN] = &ops_arccoversin,
+        [EXPR_KIND_ARCCOVERCOS] = &ops_arccovercos,
+        [EXPR_KIND_ARCHAVERSIN] = &ops_archaversin,
+        [EXPR_KIND_ARCHAVERCOS] = &ops_archavercos,
+        [EXPR_KIND_ARCHACOVERSIN] = &ops_archacoversin,
+        [EXPR_KIND_ARCHACOVERCOS] = &ops_archacovercos,
         [EXPR_KIND_ASINH] = &ops_asinh,
         [EXPR_KIND_ACOSH] = &ops_acosh,
         [EXPR_KIND_ATANH] = &ops_atanh,
@@ -787,6 +939,14 @@ expr_t *expr_tan(const expr_t *a) { return expr_math_wrap_unary(&ops_tan, a); }
 expr_t *expr_sec(const expr_t *a) { return expr_math_wrap_unary(&ops_sec, a); }
 expr_t *expr_cosec(const expr_t *a) { return expr_math_wrap_unary(&ops_cosec, a); }
 expr_t *expr_cot(const expr_t *a) { return expr_math_wrap_unary(&ops_cot, a); }
+expr_t *expr_versin(const expr_t *a) { return expr_math_wrap_unary(&ops_versin, a); }
+expr_t *expr_vercos(const expr_t *a) { return expr_math_wrap_unary(&ops_vercos, a); }
+expr_t *expr_coversin(const expr_t *a) { return expr_math_wrap_unary(&ops_coversin, a); }
+expr_t *expr_covercos(const expr_t *a) { return expr_math_wrap_unary(&ops_covercos, a); }
+expr_t *expr_haversin(const expr_t *a) { return expr_math_wrap_unary(&ops_haversin, a); }
+expr_t *expr_havercos(const expr_t *a) { return expr_math_wrap_unary(&ops_havercos, a); }
+expr_t *expr_hacoversin(const expr_t *a) { return expr_math_wrap_unary(&ops_hacoversin, a); }
+expr_t *expr_hacovercos(const expr_t *a) { return expr_math_wrap_unary(&ops_hacovercos, a); }
 expr_t *expr_sinh(const expr_t *a) { return expr_math_wrap_unary(&ops_sinh, a); }
 expr_t *expr_cosh(const expr_t *a) { return expr_math_wrap_unary(&ops_cosh, a); }
 expr_t *expr_tanh(const expr_t *a) { return expr_math_wrap_unary(&ops_tanh, a); }
@@ -799,6 +959,14 @@ expr_t *expr_atan(const expr_t *a) { return expr_math_wrap_unary(&ops_atan, a); 
 expr_t *expr_asec(const expr_t *a) { return expr_math_wrap_unary(&ops_asec, a); }
 expr_t *expr_acosec(const expr_t *a) { return expr_math_wrap_unary(&ops_acosec, a); }
 expr_t *expr_acot(const expr_t *a) { return expr_math_wrap_unary(&ops_acot, a); }
+expr_t *expr_arcversin(const expr_t *a) { return expr_math_wrap_unary(&ops_arcversin, a); }
+expr_t *expr_arcvercos(const expr_t *a) { return expr_math_wrap_unary(&ops_arcvercos, a); }
+expr_t *expr_arccoversin(const expr_t *a) { return expr_math_wrap_unary(&ops_arccoversin, a); }
+expr_t *expr_arccovercos(const expr_t *a) { return expr_math_wrap_unary(&ops_arccovercos, a); }
+expr_t *expr_archaversin(const expr_t *a) { return expr_math_wrap_unary(&ops_archaversin, a); }
+expr_t *expr_archavercos(const expr_t *a) { return expr_math_wrap_unary(&ops_archavercos, a); }
+expr_t *expr_archacoversin(const expr_t *a) { return expr_math_wrap_unary(&ops_archacoversin, a); }
+expr_t *expr_archacovercos(const expr_t *a) { return expr_math_wrap_unary(&ops_archacovercos, a); }
 expr_t *expr_atan2(const expr_t *a, const expr_t *b) { return expr_math_wrap_binary(&ops_atan2, a, b); }
 expr_t *expr_asinh(const expr_t *a) { return expr_math_wrap_unary(&ops_asinh, a); }
 expr_t *expr_acosh(const expr_t *a) { return expr_math_wrap_unary(&ops_acosh, a); }

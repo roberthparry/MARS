@@ -92,6 +92,22 @@ typedef enum {
     EXPR_KIND_NORMAL_LOGPDF,
     EXPR_KIND_EI,
     EXPR_KIND_E1,
+    EXPR_KIND_VERSIN,
+    EXPR_KIND_VERCOS,
+    EXPR_KIND_COVERSIN,
+    EXPR_KIND_COVERCOS,
+    EXPR_KIND_HAVERSIN,
+    EXPR_KIND_HAVERCOS,
+    EXPR_KIND_HACOVERSIN,
+    EXPR_KIND_HACOVERCOS,
+    EXPR_KIND_ARCVERSIN,
+    EXPR_KIND_ARCVERCOS,
+    EXPR_KIND_ARCCOVERSIN,
+    EXPR_KIND_ARCCOVERCOS,
+    EXPR_KIND_ARCHAVERSIN,
+    EXPR_KIND_ARCHAVERCOS,
+    EXPR_KIND_ARCHACOVERSIN,
+    EXPR_KIND_ARCHACOVERCOS,
     EXPR_KIND_BETA,
     EXPR_KIND_LOGBETA,
     EXPR_KIND_GAMMAINC_LOWER,
@@ -284,6 +300,14 @@ extern const expr_ops_t ops_tan;
 extern const expr_ops_t ops_sec;
 extern const expr_ops_t ops_cosec;
 extern const expr_ops_t ops_cot;
+extern const expr_ops_t ops_versin;
+extern const expr_ops_t ops_vercos;
+extern const expr_ops_t ops_coversin;
+extern const expr_ops_t ops_covercos;
+extern const expr_ops_t ops_haversin;
+extern const expr_ops_t ops_havercos;
+extern const expr_ops_t ops_hacoversin;
+extern const expr_ops_t ops_hacovercos;
 extern const expr_ops_t ops_sinh;
 extern const expr_ops_t ops_cosh;
 extern const expr_ops_t ops_tanh;
@@ -296,6 +320,14 @@ extern const expr_ops_t ops_atan;
 extern const expr_ops_t ops_asec;
 extern const expr_ops_t ops_acosec;
 extern const expr_ops_t ops_acot;
+extern const expr_ops_t ops_arcversin;
+extern const expr_ops_t ops_arcvercos;
+extern const expr_ops_t ops_arccoversin;
+extern const expr_ops_t ops_arccovercos;
+extern const expr_ops_t ops_archaversin;
+extern const expr_ops_t ops_archavercos;
+extern const expr_ops_t ops_archacoversin;
+extern const expr_ops_t ops_archacovercos;
 extern const expr_ops_t ops_asinh;
 extern const expr_ops_t ops_acosh;
 extern const expr_ops_t ops_atanh;
@@ -745,6 +777,38 @@ void expr_reverse_cot               (const expr_t *dv,
                                      const number_t *out_bar,
                                      number_t *a_bar,
                                      number_t *b_bar);
+void expr_reverse_versin            (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_vercos            (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_coversin          (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_covercos          (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_haversin          (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_havercos          (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_hacoversin        (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_hacovercos        (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
 void expr_reverse_sinh              (const expr_t *dv,
                                      const number_t *out_bar,
                                      number_t *a_bar,
@@ -790,6 +854,38 @@ void expr_reverse_acosec            (const expr_t *dv,
                                      number_t *a_bar,
                                      number_t *b_bar);
 void expr_reverse_acot              (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_arcversin         (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_arcvercos         (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_arccoversin       (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_arccovercos       (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_archaversin       (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_archavercos       (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_archacoversin     (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_archacovercos     (const expr_t *dv,
                                      const number_t *out_bar,
                                      number_t *a_bar,
                                      number_t *b_bar);

@@ -79,6 +79,89 @@ void expr_reverse_cot(const expr_t *dv, const number_t *out_bar, number_t *a_bar
     expr_reverse_unary(expr_reverse_num_neg(product), a_bar, b_bar);
 }
 
+static void expr_reverse_unary_factor(const number_t *out_bar,
+                                      number_t factor,
+                                      number_t *a_bar,
+                                      number_t *b_bar)
+{
+    number_t product = expr_reverse_num_mul(*out_bar, factor);
+
+    num_destroy(&factor);
+    expr_reverse_unary(product, a_bar, b_bar);
+}
+
+void expr_reverse_versin(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
+{
+    number_t factor = num_sin(expr_eval_num_internal(dv->a));
+
+    expr_reverse_unary_factor(out_bar, factor, a_bar, b_bar);
+}
+
+void expr_reverse_vercos(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
+{
+    number_t sin_x = num_sin(expr_eval_num_internal(dv->a));
+    number_t factor = num_neg(sin_x);
+
+    num_destroy(&sin_x);
+    expr_reverse_unary_factor(out_bar, factor, a_bar, b_bar);
+}
+
+void expr_reverse_coversin(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
+{
+    number_t cos_x = num_cos(expr_eval_num_internal(dv->a));
+    number_t factor = num_neg(cos_x);
+
+    num_destroy(&cos_x);
+    expr_reverse_unary_factor(out_bar, factor, a_bar, b_bar);
+}
+
+void expr_reverse_covercos(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
+{
+    number_t factor = num_cos(expr_eval_num_internal(dv->a));
+
+    expr_reverse_unary_factor(out_bar, factor, a_bar, b_bar);
+}
+
+void expr_reverse_haversin(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
+{
+    number_t sin_x = num_sin(expr_eval_num_internal(dv->a));
+    number_t factor = num_div(sin_x, NUM_TWO);
+
+    num_destroy(&sin_x);
+    expr_reverse_unary_factor(out_bar, factor, a_bar, b_bar);
+}
+
+void expr_reverse_havercos(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
+{
+    number_t sin_x = num_sin(expr_eval_num_internal(dv->a));
+    number_t neg_sin = num_neg(sin_x);
+    number_t factor = num_div(neg_sin, NUM_TWO);
+
+    num_destroy(&neg_sin);
+    num_destroy(&sin_x);
+    expr_reverse_unary_factor(out_bar, factor, a_bar, b_bar);
+}
+
+void expr_reverse_hacoversin(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
+{
+    number_t cos_x = num_cos(expr_eval_num_internal(dv->a));
+    number_t neg_cos = num_neg(cos_x);
+    number_t factor = num_div(neg_cos, NUM_TWO);
+
+    num_destroy(&neg_cos);
+    num_destroy(&cos_x);
+    expr_reverse_unary_factor(out_bar, factor, a_bar, b_bar);
+}
+
+void expr_reverse_hacovercos(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
+{
+    number_t cos_x = num_cos(expr_eval_num_internal(dv->a));
+    number_t factor = num_div(cos_x, NUM_TWO);
+
+    num_destroy(&cos_x);
+    expr_reverse_unary_factor(out_bar, factor, a_bar, b_bar);
+}
+
 void expr_reverse_sinh(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
     number_t cosh_x = num_cosh(expr_eval_num_internal(dv->a));
@@ -216,6 +299,69 @@ void expr_reverse_acot(const expr_t *dv, const number_t *out_bar, number_t *a_ba
     number_t factor = expr_reverse_inverse_reciprocal_factor(dv, expr_reverse_acot_inner);
 
     expr_reverse_unary(expr_reverse_num_mul(*out_bar, factor), a_bar, b_bar);
+}
+
+static number_t expr_reverse_haversine_inverse_factor(const expr_t *dv,
+                                                      int scale,
+                                                      int offset_sign,
+                                                      int coeff)
+{
+    number_t x = expr_eval_num_internal(dv->a);
+    number_t scaled = scale == 2 ? num_mul(NUM_TWO, x) : num_clone(x);
+    number_t inner = offset_sign < 0 ? num_sub(scaled, NUM_ONE) : num_sub(NUM_ONE, scaled);
+    number_t inner_sq = expr_reverse_num_sq(inner);
+    number_t radicand = num_sub(NUM_ONE, inner_sq);
+    number_t denom = num_sqrt(radicand);
+    number_t coeff_num = num_create_from_long((long)coeff);
+    number_t factor = num_div(coeff_num, denom);
+
+    num_destroy(&coeff_num);
+    num_destroy(&denom);
+    num_destroy(&radicand);
+    num_destroy(&inner_sq);
+    num_destroy(&inner);
+    num_destroy(&scaled);
+    return factor;
+}
+
+void expr_reverse_arcversin(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
+{
+    expr_reverse_unary_factor(out_bar, expr_reverse_haversine_inverse_factor(dv, 1, 1, 1), a_bar, b_bar);
+}
+
+void expr_reverse_arcvercos(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
+{
+    expr_reverse_unary_factor(out_bar, expr_reverse_haversine_inverse_factor(dv, 1, -1, -1), a_bar, b_bar);
+}
+
+void expr_reverse_arccoversin(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
+{
+    expr_reverse_unary_factor(out_bar, expr_reverse_haversine_inverse_factor(dv, 1, 1, -1), a_bar, b_bar);
+}
+
+void expr_reverse_arccovercos(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
+{
+    expr_reverse_unary_factor(out_bar, expr_reverse_haversine_inverse_factor(dv, 1, -1, 1), a_bar, b_bar);
+}
+
+void expr_reverse_archaversin(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
+{
+    expr_reverse_unary_factor(out_bar, expr_reverse_haversine_inverse_factor(dv, 2, 1, 2), a_bar, b_bar);
+}
+
+void expr_reverse_archavercos(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
+{
+    expr_reverse_unary_factor(out_bar, expr_reverse_haversine_inverse_factor(dv, 2, -1, -2), a_bar, b_bar);
+}
+
+void expr_reverse_archacoversin(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
+{
+    expr_reverse_unary_factor(out_bar, expr_reverse_haversine_inverse_factor(dv, 2, 1, -2), a_bar, b_bar);
+}
+
+void expr_reverse_archacovercos(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
+{
+    expr_reverse_unary_factor(out_bar, expr_reverse_haversine_inverse_factor(dv, 2, -1, 2), a_bar, b_bar);
 }
 
 void expr_reverse_asinh(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)

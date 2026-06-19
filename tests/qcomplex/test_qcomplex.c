@@ -516,6 +516,38 @@ static void test_trig(void)
         check_qc("cot(acot(z)) = z", qc_cot(qc_acot(z6)), z6, 1e-27);
     }
 
+    {
+        qcomplex_t z7 = qcz(0.5, 0.5);
+        qcomplex_t s = qc_sin(z7);
+        qcomplex_t c = qc_cos(z7);
+        check_qc("versin(z) = 1 - cos(z)", qc_versin(z7), qc_sub(QC_ONE, c), 1e-29);
+        check_qc("vercos(z) = 1 + cos(z)", qc_vercos(z7), qc_add(QC_ONE, c), 1e-29);
+        check_qc("coversin(z) = 1 - sin(z)", qc_coversin(z7), qc_sub(QC_ONE, s), 1e-29);
+        check_qc("covercos(z) = 1 + sin(z)", qc_covercos(z7), qc_add(QC_ONE, s), 1e-29);
+        check_qc("haversin(z) = versin(z)/2",
+                 qc_haversin(z7), qc_ldexp(qc_versin(z7), -1), 1e-29);
+        check_qc("havercos(z) = vercos(z)/2",
+                 qc_havercos(z7), qc_ldexp(qc_vercos(z7), -1), 1e-29);
+        check_qc("hacoversin(z) = coversin(z)/2",
+                 qc_hacoversin(z7), qc_ldexp(qc_coversin(z7), -1), 1e-29);
+        check_qc("hacovercos(z) = covercos(z)/2",
+                 qc_hacovercos(z7), qc_ldexp(qc_covercos(z7), -1), 1e-29);
+    }
+
+    {
+        qcomplex_t y = qcz(0.3, 0.2);
+        check_qc("versin(arcversin(y)) = y", qc_versin(qc_arcversin(y)), y, 1e-27);
+        check_qc("vercos(arcvercos(y)) = y", qc_vercos(qc_arcvercos(y)), y, 1e-27);
+        check_qc("coversin(arccoversin(y)) = y", qc_coversin(qc_arccoversin(y)), y, 1e-27);
+        check_qc("covercos(arccovercos(y)) = y", qc_covercos(qc_arccovercos(y)), y, 1e-27);
+        check_qc("haversin(archaversin(y)) = y", qc_haversin(qc_archaversin(y)), y, 1e-27);
+        check_qc("havercos(archavercos(y)) = y", qc_havercos(qc_archavercos(y)), y, 1e-27);
+        check_qc("hacoversin(archacoversin(y)) = y",
+                 qc_hacoversin(qc_archacoversin(y)), y, 1e-27);
+        check_qc("hacovercos(archacovercos(y)) = y",
+                 qc_hacovercos(qc_archacovercos(y)), y, 1e-27);
+    }
+
     check_qc("atan2(0,1) = 0",   qc_atan2(qcr(0.0), qcr( 1.0)), qcr(0.0),          1e-30);
     check_qc("atan2(1,0) = π/2", qc_atan2(qcr(1.0), qcr( 0.0)), qcrs("1.57079632679489661923132169163975144209858469968755"), 1e-30);
     check_qc("atan2(0,-1) = π",  qc_atan2(qcr(0.0), qcr(-1.0)), qcrs("3.14159265358979323846264338327950288419716939937510"), 1e-30);

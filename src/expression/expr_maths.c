@@ -273,6 +273,14 @@ number_t eval_tan(expr_t *dv)
 number_t eval_sec(expr_t *dv) { return expr_eval_unary_num(dv, num_sec); }
 number_t eval_cosec(expr_t *dv) { return expr_eval_unary_num(dv, num_cosec); }
 number_t eval_cot(expr_t *dv) { return expr_eval_unary_num(dv, num_cot); }
+number_t eval_versin(expr_t *dv) { return expr_eval_unary_num(dv, num_versin); }
+number_t eval_vercos(expr_t *dv) { return expr_eval_unary_num(dv, num_vercos); }
+number_t eval_coversin(expr_t *dv) { return expr_eval_unary_num(dv, num_coversin); }
+number_t eval_covercos(expr_t *dv) { return expr_eval_unary_num(dv, num_covercos); }
+number_t eval_haversin(expr_t *dv) { return expr_eval_unary_num(dv, num_haversin); }
+number_t eval_havercos(expr_t *dv) { return expr_eval_unary_num(dv, num_havercos); }
+number_t eval_hacoversin(expr_t *dv) { return expr_eval_unary_num(dv, num_hacoversin); }
+number_t eval_hacovercos(expr_t *dv) { return expr_eval_unary_num(dv, num_hacovercos); }
 
 number_t eval_sinh(expr_t *dv) { return expr_eval_unary_num(dv, num_sinh); }
 number_t eval_cosh(expr_t *dv) { return expr_eval_unary_num(dv, num_cosh); }
@@ -287,6 +295,14 @@ number_t eval_atan(expr_t *dv) { return expr_eval_unary_num(dv, num_atan); }
 number_t eval_asec(expr_t *dv) { return expr_eval_unary_num(dv, num_asec); }
 number_t eval_acosec(expr_t *dv) { return expr_eval_unary_num(dv, num_acosec); }
 number_t eval_acot(expr_t *dv) { return expr_eval_unary_num(dv, num_acot); }
+number_t eval_arcversin(expr_t *dv) { return expr_eval_unary_num(dv, num_arcversin); }
+number_t eval_arcvercos(expr_t *dv) { return expr_eval_unary_num(dv, num_arcvercos); }
+number_t eval_arccoversin(expr_t *dv) { return expr_eval_unary_num(dv, num_arccoversin); }
+number_t eval_arccovercos(expr_t *dv) { return expr_eval_unary_num(dv, num_arccovercos); }
+number_t eval_archaversin(expr_t *dv) { return expr_eval_unary_num(dv, num_archaversin); }
+number_t eval_archavercos(expr_t *dv) { return expr_eval_unary_num(dv, num_archavercos); }
+number_t eval_archacoversin(expr_t *dv) { return expr_eval_unary_num(dv, num_archacoversin); }
+number_t eval_archacovercos(expr_t *dv) { return expr_eval_unary_num(dv, num_archacovercos); }
 
 number_t eval_asinh(expr_t *dv) { return expr_eval_unary_num(dv, num_asinh); }
 number_t eval_acosh(expr_t *dv) { return expr_eval_unary_num(dv, num_acosh); }
@@ -496,6 +512,72 @@ expr_t *deriv_cot(expr_t *dv)
     return expr_chain_rule_with_factor(dv, fac);
 }
 
+static expr_t *expr_half_factor(expr_t *factor)
+{
+    expr_t *half = expr_new_const(NUM_HALF);
+    expr_t *out = expr_mul(half, factor);
+
+    expr_free(half);
+    expr_free(factor);
+    return out;
+}
+
+expr_t *deriv_versin(expr_t *dv)
+{
+    return expr_chain_rule_with_factor(dv, expr_sin(dv->a));
+}
+
+expr_t *deriv_vercos(expr_t *dv)
+{
+    expr_t *sin_a = expr_sin(dv->a);
+    expr_t *fac = expr_neg(sin_a);
+
+    expr_free(sin_a);
+    return expr_chain_rule_with_factor(dv, fac);
+}
+
+expr_t *deriv_coversin(expr_t *dv)
+{
+    expr_t *cos_a = expr_cos(dv->a);
+    expr_t *fac = expr_neg(cos_a);
+
+    expr_free(cos_a);
+    return expr_chain_rule_with_factor(dv, fac);
+}
+
+expr_t *deriv_covercos(expr_t *dv)
+{
+    return expr_chain_rule_with_factor(dv, expr_cos(dv->a));
+}
+
+expr_t *deriv_haversin(expr_t *dv)
+{
+    return expr_chain_rule_with_factor(dv, expr_half_factor(expr_sin(dv->a)));
+}
+
+expr_t *deriv_havercos(expr_t *dv)
+{
+    expr_t *sin_a = expr_sin(dv->a);
+    expr_t *neg_sin = expr_neg(sin_a);
+
+    expr_free(sin_a);
+    return expr_chain_rule_with_factor(dv, expr_half_factor(neg_sin));
+}
+
+expr_t *deriv_hacoversin(expr_t *dv)
+{
+    expr_t *cos_a = expr_cos(dv->a);
+    expr_t *neg_cos = expr_neg(cos_a);
+
+    expr_free(cos_a);
+    return expr_chain_rule_with_factor(dv, expr_half_factor(neg_cos));
+}
+
+expr_t *deriv_hacovercos(expr_t *dv)
+{
+    return expr_chain_rule_with_factor(dv, expr_half_factor(expr_cos(dv->a)));
+}
+
 expr_t *deriv_sinh(expr_t *dv)
 {
     return expr_chain_rule_with_factor(dv, expr_cosh(dv->a));
@@ -692,6 +774,83 @@ expr_t *deriv_acosec(expr_t *dv)
 expr_t *deriv_acot(expr_t *dv)
 {
     return expr_deriv_inverse_reciprocal(dv, expr_atan);
+}
+
+static expr_t *expr_haversine_inverse_arg(const expr_t *arg,
+                                          int scale,
+                                          int offset_sign)
+{
+    expr_t *offset = expr_new_const(offset_sign < 0 ? NUM_NEG_ONE : NUM_ONE);
+    expr_t *scaled = NULL;
+    expr_t *out;
+
+    if (scale == 1) {
+        out = offset_sign < 0 ? expr_add(arg, offset) : expr_sub(offset, arg);
+    } else {
+        expr_t *scale_expr = expr_new_const(NUM_TWO);
+
+        scaled = expr_mul(scale_expr, arg);
+        out = offset_sign < 0 ? expr_add(scaled, offset) : expr_sub(offset, scaled);
+        expr_free(scale_expr);
+    }
+
+    expr_free(scaled);
+    expr_free(offset);
+    return out;
+}
+
+static expr_t *expr_deriv_haversine_inverse(expr_t *dv,
+                                            int use_acos,
+                                            int scale,
+                                            int offset_sign)
+{
+    expr_t *inner = expr_haversine_inverse_arg(dv->a, scale, offset_sign);
+    expr_t *inverse = use_acos ? expr_acos(inner) : expr_asin(inner);
+    expr_t *out = expr_get_dx_internal(inverse);
+
+    expr_free(inverse);
+    expr_free(inner);
+    return out;
+}
+
+expr_t *deriv_arcversin(expr_t *dv)
+{
+    return expr_deriv_haversine_inverse(dv, 1, 1, 1);
+}
+
+expr_t *deriv_arcvercos(expr_t *dv)
+{
+    return expr_deriv_haversine_inverse(dv, 1, 1, -1);
+}
+
+expr_t *deriv_arccoversin(expr_t *dv)
+{
+    return expr_deriv_haversine_inverse(dv, 0, 1, 1);
+}
+
+expr_t *deriv_arccovercos(expr_t *dv)
+{
+    return expr_deriv_haversine_inverse(dv, 0, 1, -1);
+}
+
+expr_t *deriv_archaversin(expr_t *dv)
+{
+    return expr_deriv_haversine_inverse(dv, 1, 2, 1);
+}
+
+expr_t *deriv_archavercos(expr_t *dv)
+{
+    return expr_deriv_haversine_inverse(dv, 1, 2, -1);
+}
+
+expr_t *deriv_archacoversin(expr_t *dv)
+{
+    return expr_deriv_haversine_inverse(dv, 0, 2, 1);
+}
+
+expr_t *deriv_archacovercos(expr_t *dv)
+{
+    return expr_deriv_haversine_inverse(dv, 0, 2, -1);
 }
 
 expr_t *deriv_atan2(expr_t *dv)
