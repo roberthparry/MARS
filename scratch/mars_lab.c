@@ -6,7 +6,6 @@
 #include <limits.h>
 
 #include "expression.h"
-#include "internal/expr_internal.h"
 #include "ustring.h"
 
 static char *xstrdup_local(const char *text)
@@ -25,311 +24,14 @@ static char *xstrdup_local(const char *text)
 
 static char *expr_text_dup(const expr_t *expr, style_t style)
 {
-    string_t *text = expr_to_text(expr, style);
-    char *copy = text ? xstrdup_local(string_c_str(text)) : NULL;
-
-    string_free(text);
-    return copy;
-}
-
-static int value_is_defined_for_integrand_at(const expr_t *integrand,
-                                             const expr_t *var,
-                                             number_t point)
-{
-    expr_t *point_const;
-    expr_t *eval_expr;
-    number_t value;
-    int ok;
-
-    if (!integrand || !var)
-        return 0;
-
-    point_const = expr_new_const(point);
-    eval_expr = point_const ? expr_substitute(integrand, var, point_const) : NULL;
-    if (!point_const || !eval_expr) {
-        expr_free(eval_expr);
-        expr_free(point_const);
-        return 0;
-    }
-
-    value = expr_eval(eval_expr);
-    ok = num_is_real(value) && num_is_finite(value);
-    num_destroy(&value);
-    expr_free(eval_expr);
-    expr_free(point_const);
-    return ok;
-}
-
-static int find_integral_value_note(const expr_t *expr, char *out, size_t out_size)
-{
-    const expr_t *lower_expr;
-    const expr_t *upper_expr;
-    const expr_t *dummy_expr;
-    expr_t *local_var = NULL;
-    expr_t *upper_const = NULL;
-    expr_t *lower_const = NULL;
-    expr_t *upper_integrand = NULL;
-    expr_t *lower_integrand = NULL;
-    number_t upper = num_new();
-    number_t lower = num_new();
-    char *upper_text = NULL;
-    char *lower_text = NULL;
-    char *integrand_text = NULL;
-    const expr_t *integrand = NULL;
-    const expr_t *child_left = NULL;
-    const expr_t *child_right = NULL;
-    int found = 0;
-
-    if (!expr || !out || out_size == 0u)
-        return 0;
-
-    if (expr_match_integral_expr(expr, &integrand, NULL)) {
-        lower_expr = expr_integral_lower_bound_expr(expr);
-        upper_expr = expr_integral_upper_bound_expr(expr);
-        dummy_expr = expr_integral_dummy_expr(expr);
-
-        upper = upper_expr ? expr_eval(upper_expr) : num_clone(NUM_NAN);
-        lower = lower_expr ? expr_eval(lower_expr) : num_clone(NUM_ZERO);
-        if (upper_expr && dummy_expr &&
-            num_is_real(lower) && num_is_finite(lower) &&
-            num_is_real(upper) && num_is_finite(upper)) {
-            local_var = expr_clone(dummy_expr);
-            upper_const = expr_new_const(upper);
-            lower_const = expr_new_const(lower);
-            upper_integrand = (dummy_expr && upper_const)
-                ? expr_substitute(integrand, dummy_expr, upper_const)
-                : NULL;
-            lower_integrand = (dummy_expr && lower_const)
-                ? expr_substitute(integrand, dummy_expr, lower_const)
-                : NULL;
-            if (local_var && upper_const && lower_const &&
-                upper_integrand && lower_integrand) {
-                upper_text = expr_text_dup(upper_expr, style_UNBOUND);
-                lower_text = lower_expr ? expr_text_dup(lower_expr, style_UNBOUND) : NULL;
-                integrand_text = expr_text_dup(integrand, style_UNBOUND);
-
-                if (!lower_expr &&
-                    !value_is_defined_for_integrand_at(integrand, local_var, NUM_ZERO)) {
-                    snprintf(out, out_size,
-                             "Here ∫^%s means ∫₀^%s. The integrand %s is not finite at %s = 0, so that definite integral is undefined.",
-                             upper_text ? upper_text : "?",
-                             upper_text ? upper_text : "?",
-                             integrand_text ? integrand_text : "f(t)",
-                             expr_symbol_name(local_var) ? expr_symbol_name(local_var) : "t");
-                    found = 1;
-                } else if (!value_is_defined_for_integrand_at(integrand, local_var, lower)) {
-                    snprintf(out, out_size,
-                             "The integrand %s is not finite at %s = %s, so that the lower bound makes this definite integral undefined.",
-                             integrand_text ? integrand_text : "f(t)",
-                             expr_symbol_name(local_var) ? expr_symbol_name(local_var) : "t",
-                             lower_text ? lower_text : "0");
-                    found = 1;
-                } else if (!value_is_defined_for_integrand_at(integrand, local_var, upper)) {
-                    snprintf(out, out_size,
-                             "The integrand %s is not finite at %s = %s, so that the upper bound makes this definite integral undefined.",
-                             integrand_text ? integrand_text : "f(t)",
-                             expr_symbol_name(local_var) ? expr_symbol_name(local_var) : "t",
-                             upper_text ? upper_text : "?");
-                    found = 1;
-                }
-            }
-        }
-    }
-
-    free(integrand_text);
-    free(lower_text);
-    free(upper_text);
-    expr_free(lower_integrand);
-    expr_free(upper_integrand);
-    expr_free(lower_const);
-    expr_free(upper_const);
-    expr_free(local_var);
-    num_destroy(&lower);
-    num_destroy(&upper);
-
-    if (found)
-        return 1;
-
-    if (!expr_child_exprs(expr, &child_left, &child_right))
-        return 0;
-    return find_integral_value_note(child_left, out, out_size) ||
-           find_integral_value_note(child_right, out, out_size);
+    return expr_to_string(expr, style);
 }
 
 static char *expr_tex_body_dup(const expr_t *expr)
 {
-    char *body = NULL;
-    char *bindings = NULL;
+    char *body = expr_to_tex_body(expr);
 
-    if (!expr)
-        return NULL;
-    if (expr_to_tex_parts(expr, &body, &bindings) == 0) {
-        free(bindings);
-        return body;
-    }
-    free(body);
-    free(bindings);
-    return expr_text_dup(expr, style_TEX);
-}
-
-static expr_t *clone_expr_local(const expr_t *expr)
-{
-    number_t needle_value = num_new();
-    expr_t *needle = expr_new_named_var(needle_value, "__mars_display_clone__");
-    expr_t *replacement = expr_new_const(NUM_ZERO);
-    expr_t *copy = NULL;
-
-    num_destroy(&needle_value);
-    if (needle && replacement)
-        copy = expr_substitute(expr, needle, replacement);
-
-    expr_free(replacement);
-    expr_free(needle);
-    return copy;
-}
-
-static expr_t *expanded_display_expr(const expr_t *expr);
-
-static expr_t *expanded_display_product(const expr_t *left, const expr_t *right)
-{
-    expr_t *left_expr;
-    expr_t *right_expr;
-    expr_t *out;
-    const expr_t *child_left = NULL;
-    const expr_t *child_right = NULL;
-    bool is_sub = false;
-
-    if (!left || !right)
-        return NULL;
-
-    if (expr_match_add_sub_expr(left, &child_left, &child_right, &is_sub) &&
-        expr_match_add_sub_expr(right, &child_left, &child_right, &is_sub)) {
-        left_expr = expanded_display_expr(left);
-        right_expr = expanded_display_expr(right);
-        if (!left_expr || !right_expr) {
-            expr_free(left_expr);
-            expr_free(right_expr);
-            return NULL;
-        }
-
-        out = expr_mul(left_expr, right_expr);
-        expr_free(left_expr);
-        expr_free(right_expr);
-        return out;
-    }
-
-    if (expr_match_add_expr(left, &child_left, &child_right)) {
-        expr_t *first = expanded_display_product(child_left, right);
-        expr_t *second = expanded_display_product(child_right, right);
-
-        if (!first || !second) {
-            expr_free(first);
-            expr_free(second);
-            return NULL;
-        }
-
-        out = expr_add(first, second);
-        expr_free(first);
-        expr_free(second);
-        return out;
-    }
-
-    if (expr_match_sub_expr(left, &child_left, &child_right)) {
-        expr_t *first = expanded_display_product(child_left, right);
-        expr_t *second = expanded_display_product(child_right, right);
-
-        if (!first || !second) {
-            expr_free(first);
-            expr_free(second);
-            return NULL;
-        }
-
-        out = expr_sub(first, second);
-        expr_free(first);
-        expr_free(second);
-        return out;
-    }
-
-    if (expr_match_add_sub_expr(right, &child_left, &child_right, &is_sub))
-        return expanded_display_product(right, left);
-
-    left_expr = expanded_display_expr(left);
-    right_expr = expanded_display_expr(right);
-    if (!left_expr || !right_expr) {
-        expr_free(left_expr);
-        expr_free(right_expr);
-        return NULL;
-    }
-
-    out = expr_mul(left_expr, right_expr);
-    expr_free(left_expr);
-    expr_free(right_expr);
-    return out;
-}
-
-static expr_t *expanded_display_expr(const expr_t *expr)
-{
-    expr_t *left;
-    expr_t *right;
-    expr_t *out;
-    const expr_t *child_left = NULL;
-    const expr_t *child_right = NULL;
-
-    if (!expr)
-        return NULL;
-
-    if (expr_match_add_expr(expr, &child_left, &child_right)) {
-        left = expanded_display_expr(child_left);
-        right = expanded_display_expr(child_right);
-        if (!left || !right) {
-            expr_free(left);
-            expr_free(right);
-            return NULL;
-        }
-        out = expr_add(left, right);
-        expr_free(left);
-        expr_free(right);
-        return out;
-    }
-
-    if (expr_match_sub_expr(expr, &child_left, &child_right)) {
-        left = expanded_display_expr(child_left);
-        right = expanded_display_expr(child_right);
-        if (!left || !right) {
-            expr_free(left);
-            expr_free(right);
-            return NULL;
-        }
-        out = expr_sub(left, right);
-        expr_free(left);
-        expr_free(right);
-        return out;
-    }
-
-    if (expr_match_mul_expr(expr, &child_left, &child_right))
-        return expanded_display_product(child_left, child_right);
-
-    return clone_expr_local(expr);
-}
-
-static expr_t *display_simplified_expr(const expr_t *expr)
-{
-    expr_t *expanded;
-    expr_t *simplified;
-
-    if (!expr)
-        return NULL;
-
-    expanded = expanded_display_expr(expr);
-    if (!expanded)
-        return expr_simplify(expr);
-
-    simplified = expr_simplify(expanded);
-    if (!simplified)
-        return expanded;
-
-    expr_free(expanded);
-    return simplified;
+    return body ? body : expr_text_dup(expr, style_TEX);
 }
 
 static char *trim_ascii_in_place(char *text)
@@ -892,7 +594,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    display_expr = display_simplified_expr(expr);
+    display_expr = expr_display_simplified(expr);
     if (!display_expr)
         display_expr = expr;
 
@@ -913,7 +615,7 @@ int main(int argc, char **argv)
 
         print_owned_number("value", num_clone(value_number), precision);
         if ((num_is_nan(value_number) || !num_is_finite(value_number)) &&
-            find_integral_value_note(expr, value_note, sizeof(value_note)))
+            expr_integral_value_note(expr, value_note, sizeof(value_note)))
             printf("value_note  %s\n", value_note);
         num_destroy(&value_number);
     }

@@ -3102,6 +3102,25 @@ string_t *expr_to_text(const expr_t *dv, style_t style)
     return expr_trim_trailing_display_space(text);
 }
 
+char *expr_to_string(const expr_t *expr, style_t style)
+{
+    string_t *text = expr_to_text(expr, style);
+    const char *src;
+    size_t len;
+    char *out;
+
+    if (!text)
+        return NULL;
+
+    src = string_c_str(text);
+    len = strlen(src) + 1u;
+    out = malloc(len);
+    if (out)
+        memcpy(out, src, len);
+    string_free(text);
+    return out;
+}
+
 string_t *expr_vsprintf_text(const char *fmt, va_list ap)
 {
     return string_vsprintf_with_callback(fmt, ap, expr_format_callback, NULL);

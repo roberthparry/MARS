@@ -3,22 +3,6 @@
 #include <string.h>
 
 #include "expression.h"
-#include "internal/expr_internal.h"
-
-static char *expr_text_dup_local(const expr_t *expr, style_t style)
-{
-    string_t *text = expr_to_text(expr, style);
-    char *copy = NULL;
-
-    if (text) {
-        size_t len = strlen(string_c_str(text));
-        copy = malloc(len + 1u);
-        if (copy)
-            memcpy(copy, string_c_str(text), len + 1u);
-    }
-    string_free(text);
-    return copy;
-}
 
 static void dump_step(const expr_t *expr, expr_t *var, expr_t *zero, expr_t *one)
 {
@@ -31,7 +15,8 @@ static void dump_step(const expr_t *expr, expr_t *var, expr_t *zero, expr_t *one
     char *next_text = NULL;
 
     if (!anti) {
-        printf("%s: no antiderivative\n", var->name);
+        const char *name = expr_symbol_name(var);
+        printf("%s: no antiderivative\n", name ? name : "?");
         return;
     }
 
@@ -39,11 +24,15 @@ static void dump_step(const expr_t *expr, expr_t *var, expr_t *zero, expr_t *one
     lower = expr_substitute(anti, var, zero);
     diff = (upper && lower) ? expr_sub(upper, lower) : NULL;
     next = diff ? expr_simplify(diff) : NULL;
-    anti_text = expr_text_dup_local(anti, style_UNBOUND);
-    next_text = next ? expr_text_dup_local(next, style_UNBOUND) : NULL;
+    anti_text = expr_to_string(anti, style_UNBOUND);
+    next_text = next ? expr_to_string(next, style_UNBOUND) : NULL;
 
-    printf("%s anti: %s\n", var->name, anti_text ? anti_text : "(null)");
-    printf("%s step: %s\n", var->name, next_text ? next_text : "(null)");
+    {
+        const char *name = expr_symbol_name(var);
+
+        printf("%s anti: %s\n", name ? name : "?", anti_text ? anti_text : "(null)");
+        printf("%s step: %s\n", name ? name : "?", next_text ? next_text : "(null)");
+    }
 
     free(next_text);
     free(anti_text);
@@ -107,7 +96,7 @@ int main(void)
     if (bz) dump_step(expr, bz, zero, one);
     if (bz && by) {
         expr_t *after_z = step_expr(expr, bz, zero, one);
-        char *after_z_text = after_z ? expr_text_dup_local(after_z, style_UNBOUND) : NULL;
+        char *after_z_text = after_z ? expr_to_string(after_z, style_UNBOUND) : NULL;
 
         printf("after z: %s\n", after_z_text ? after_z_text : "(null)");
         free(after_z_text);
@@ -118,7 +107,7 @@ int main(void)
     }
     if (by && bz) {
         expr_t *after_y = step_expr(expr, by, zero, one);
-        char *after_y_text = after_y ? expr_text_dup_local(after_y, style_UNBOUND) : NULL;
+        char *after_y_text = after_y ? expr_to_string(after_y, style_UNBOUND) : NULL;
 
         printf("after y: %s\n", after_y_text ? after_y_text : "(null)");
         free(after_y_text);

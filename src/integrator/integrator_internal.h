@@ -7,7 +7,6 @@
 
 #include "expression.h"
 #include "integrator.h"
-#include "internal/integrator_internal.h"
 #include "internal/expr_internal.h"
 
 struct _integrator_t {
@@ -17,6 +16,9 @@ struct _integrator_t {
     size_t last_intervals;
     expr_t *last_exact_result;
 };
+
+void intg_clear_exact_result(integrator_t *ig);
+void intg_set_exact_result_owned(integrator_t *ig, expr_t *expr);
 
 int try_integral_multi_special_affine(integrator_t *ig, expr_t *expr,
                                       size_t ndim, expr_t *const *vars,

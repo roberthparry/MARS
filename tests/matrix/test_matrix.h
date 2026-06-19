@@ -7,7 +7,6 @@
 #include <string.h>
 
 #include "matrix.h"
-#include "internal/number_internal.h"
 #include "../expression/test_expr.h"
 #include "test_harness.h"
 

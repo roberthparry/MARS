@@ -3176,6 +3176,37 @@ expr_t *expr_bindings_get(expr_bindings_t *bnd, const char *name)
     return expr;
 }
 
+size_t expr_bindings_count(const expr_bindings_t *bnd)
+{
+    return bnd ? bnd->count : 0u;
+}
+
+const char *expr_bindings_name_at(const expr_bindings_t *bnd, size_t index)
+{
+    if (!bnd || index >= bnd->count || !bnd->entries[index].name)
+        return NULL;
+    return string_c_str(bnd->entries[index].name);
+}
+
+const string_t *expr_bindings_name_text_at(const expr_bindings_t *bnd, size_t index)
+{
+    if (!bnd || index >= bnd->count)
+        return NULL;
+    return bnd->entries[index].name;
+}
+
+expr_t *expr_bindings_expr_at(expr_bindings_t *bnd, size_t index)
+{
+    if (!bnd || index >= bnd->count)
+        return NULL;
+    return bnd->entries[index].expr;
+}
+
+bool expr_bindings_is_constant_at(const expr_bindings_t *bnd, size_t index)
+{
+    return bnd && index < bnd->count && bnd->entries[index].is_constant;
+}
+
 void expr_bindings_free(expr_bindings_t *bnd)
 {
     if (!bnd)

@@ -10,7 +10,6 @@
 
 #include "integrator.h"
 #include "expression.h"
-#include "internal/integrator_internal.h"
 #include "internal/number_internal.h"
 #include "ustring.h"
 

@@ -159,6 +159,19 @@ number_t expr_get_val(const expr_t *expr);
  */
 const expr_t *expr_get_deriv(const expr_t *expr, const expr_t *wrt);
 
+/**
+ * @brief Return true when @p expr is a variable node.
+ */
+bool expr_is_variable(const expr_t *expr);
+
+/**
+ * @brief Borrow the symbolic display name attached to @p expr, if any.
+ *
+ * The returned pointer is owned by @p expr and remains valid only while that
+ * expression node remains alive and unchanged.
+ */
+const char *expr_symbol_name(const expr_t *expr);
+
 /* ------------------------------------------------------------------------- */
 /* Evaluation                                                                */
 /* ------------------------------------------------------------------------- */
@@ -317,6 +330,37 @@ expr_t *expr_integrate(const expr_t *expr, const expr_t *wrt);
  * with the chain rule.
  */
 expr_t *expr_integral(const expr_t *integrand, const expr_t *wrt);
+
+/**
+ * @brief Return an owning copy of @p expr.
+ */
+expr_t *expr_clone(const expr_t *expr);
+
+/**
+ * @brief Substitute all references to @p needle in @p expr with @p replacement.
+ *
+ * Returns an owning expression. Inputs are borrowed and are not consumed.
+ */
+expr_t *expr_substitute(const expr_t *expr,
+                        const expr_t *needle,
+                        const expr_t *replacement);
+
+/**
+ * @brief Return an owning display-oriented simplification of @p expr.
+ *
+ * This helper expands simple products over sums before simplification so UI
+ * clients can present friendlier algebra without walking the expression tree.
+ */
+expr_t *expr_display_simplified(const expr_t *expr);
+
+/**
+ * @brief Find a user-facing note about undefined integral bounds, if any.
+ *
+ * Writes a short explanation into @p out and returns true when a note was
+ * found. This is intended for front-ends that display unevaluated integral
+ * expressions and want to explain domain failures near their bounds.
+ */
+bool expr_integral_value_note(const expr_t *expr, char *out, size_t out_size);
 
 /* ------------------------------------------------------------------------- */
 /* Arithmetic (graph-building, owning)                                       */
@@ -552,6 +596,23 @@ typedef enum {
 string_t *expr_to_text(const expr_t *expr, style_t style);
 
 /**
+ * @brief Serialise @p expr to a newly allocated C string.
+ *
+ * This is the plain C-string counterpart to expr_to_text(). The format is
+ * controlled by @p style (see style_t). The returned string is allocated with
+ * malloc() and must be released with free().
+ */
+char *expr_to_string(const expr_t *expr, style_t style);
+
+/**
+ * @brief Return the TeX expression body without binding wrappers.
+ *
+ * The returned C string is allocated with malloc() and must be released with
+ * free(). Returns NULL on invalid input or allocation failure.
+ */
+char *expr_to_tex_body(const expr_t *expr);
+
+/**
  * @brief Format expression-aware text into a new string_t from a va_list.
  *
  * Supports ordinary string formatting plus expression conversions:
@@ -685,6 +746,19 @@ expr_t *expr_bindings_get(expr_bindings_t *bnd, const char *name);
  * raw-string convenience wrapper.
  */
 expr_t *expr_bindings_get_text(expr_bindings_t *bnd, const string_t *name);
+
+/**
+ * @brief Borrow the number of entries in @p bnd.
+ */
+size_t expr_bindings_count(const expr_bindings_t *bnd);
+
+/**
+ * @brief Borrow binding metadata by index.
+ */
+const char *expr_bindings_name_at(const expr_bindings_t *bnd, size_t index);
+const string_t *expr_bindings_name_text_at(const expr_bindings_t *bnd, size_t index);
+expr_t *expr_bindings_expr_at(expr_bindings_t *bnd, size_t index);
+bool expr_bindings_is_constant_at(const expr_bindings_t *bnd, size_t index);
 
 /**
  * @brief Destroy an opaque bindings object returned by expr_from_string().

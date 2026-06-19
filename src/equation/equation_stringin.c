@@ -4,7 +4,7 @@
 
 #include "equation.h"
 #include "equation_internal.h"
-#include "internal/expr_internal.h"
+#include "ustring.h"
 
 typedef struct {
     string_view_t lhs;
@@ -210,7 +210,7 @@ static int equ_build_symbol_arrays(expr_bindings_t *bindings,
 {
     const string_t **names = NULL;
     expr_t **symbols = NULL;
-    size_t count = bindings ? bindings->count : 0u;
+    size_t count = expr_bindings_count(bindings);
 
     *names_out = NULL;
     *symbols_out = NULL;
@@ -228,8 +228,8 @@ static int equ_build_symbol_arrays(expr_bindings_t *bindings,
     }
 
     for (size_t i = 0u; i < count; ++i) {
-        names[i] = bindings->entries[i].name;
-        symbols[i] = bindings->entries[i].expr;
+        names[i] = expr_bindings_name_text_at(bindings, i);
+        symbols[i] = expr_bindings_expr_at(bindings, i);
     }
 
     *names_out = names;

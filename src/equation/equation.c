@@ -250,12 +250,14 @@ int equ_append_solution_expr(const expr_t *wrt,
 static size_t equ_variable_binding_count(expr_bindings_t *bindings)
 {
     size_t count = 0u;
+    size_t binding_count;
 
     if (!bindings)
         return 0u;
 
-    for (size_t i = 0u; i < bindings->count; ++i) {
-        if (!bindings->entries[i].is_constant)
+    binding_count = expr_bindings_count(bindings);
+    for (size_t i = 0u; i < binding_count; ++i) {
+        if (!expr_bindings_is_constant_at(bindings, i))
             ++count;
     }
 
@@ -306,33 +308,35 @@ static int equ_derive_symbolic_solutions(const equation_t *equation,
                                               equation_solutions_t *solutions)
 {
     number_t *original_values = NULL;
+    size_t binding_count;
     int rc = 0;
 
     if (!bindings)
         return 0;
-    if (bindings->count > 0u) {
+    binding_count = expr_bindings_count(bindings);
+    if (binding_count > 0u) {
         original_values = equ_snapshot_binding_values(bindings);
         if (!original_values)
             return -1;
     }
 
-    for (size_t i = 0u; i < bindings->count; ++i) {
-        expr_binding_entry_t *entry = &bindings->entries[i];
+    for (size_t i = 0u; i < binding_count; ++i) {
+        expr_t *expr = expr_bindings_expr_at(bindings, i);
 
-        if (!entry->is_constant)
-            expr_set_val(entry->expr, NUM_NAN);
+        if (!expr_bindings_is_constant_at(bindings, i) && expr)
+            expr_set_val(expr, NUM_NAN);
     }
 
-    for (size_t i = 0u; i < bindings->count; ++i) {
-        expr_binding_entry_t *entry = &bindings->entries[i];
+    for (size_t i = 0u; i < binding_count; ++i) {
+        expr_t *expr = expr_bindings_expr_at(bindings, i);
         equation_solutions_t partial;
         int solve_rc;
 
-        if (entry->is_constant)
+        if (expr_bindings_is_constant_at(bindings, i) || !expr)
             continue;
 
         equ_solutions_reset(&partial);
-        solve_rc = equ_solve_for_into(equation, entry->expr, &partial);
+        solve_rc = equ_solve_for_into(equation, expr, &partial);
         if (solve_rc < 0) {
             equ_solutions_clear(&partial);
             rc = -1;
@@ -1316,25 +1320,28 @@ static int equ_try_solve_zero_product(const equation_t *equation,
 static int equ_append_numeric_binding_solutions(expr_bindings_t *bindings,
                                                      equation_solutions_t *solutions)
 {
+    size_t binding_count;
+
     if (!bindings || !solutions)
         return -1;
 
-    for (size_t i = 0u; i < bindings->count; ++i) {
-        expr_binding_entry_t *entry = &bindings->entries[i];
+    binding_count = expr_bindings_count(bindings);
+    for (size_t i = 0u; i < binding_count; ++i) {
+        expr_t *expr = expr_bindings_expr_at(bindings, i);
         number_t value;
         expr_t *rhs;
         equation_t *solution;
 
-        if (entry->is_constant)
+        if (expr_bindings_is_constant_at(bindings, i) || !expr)
             continue;
 
-        value = expr_eval(entry->expr);
+        value = expr_eval(expr);
         rhs = expr_new_const(value);
         num_destroy(&value);
         if (!rhs)
             return -1;
 
-        solution = equ_new(entry->expr, rhs);
+        solution = equ_new(expr, rhs);
         expr_free(rhs);
         if (!solution)
             return -1;
@@ -1394,36 +1401,51 @@ static bool equ_numeric_residual_is_solved(const expr_t *residual,
 static number_t *equ_snapshot_binding_values(expr_bindings_t *bindings)
 {
     number_t *values;
+    size_t binding_count;
 
-    if (!bindings || bindings->count == 0u)
+    binding_count = expr_bindings_count(bindings);
+    if (binding_count == 0u)
         return NULL;
 
-    values = calloc(bindings->count, sizeof(*values));
+    values = calloc(binding_count, sizeof(*values));
     if (!values)
         return NULL;
 
-    for (size_t i = 0u; i < bindings->count; ++i)
-        values[i] = expr_eval(bindings->entries[i].expr);
+    for (size_t i = 0u; i < binding_count; ++i) {
+        expr_t *expr = expr_bindings_expr_at(bindings, i);
+
+        values[i] = expr ? expr_eval(expr) : num_new();
+    }
     return values;
 }
 
 static void equ_restore_binding_values(expr_bindings_t *bindings,
                                             number_t *values)
 {
+    size_t binding_count;
+
     if (!bindings || !values)
         return;
 
-    for (size_t i = 0u; i < bindings->count; ++i)
-        expr_set_val(bindings->entries[i].expr, values[i]);
+    binding_count = expr_bindings_count(bindings);
+    for (size_t i = 0u; i < binding_count; ++i) {
+        expr_t *expr = expr_bindings_expr_at(bindings, i);
+
+        if (expr)
+            expr_set_val(expr, values[i]);
+    }
 }
 
 static void equ_free_binding_value_snapshot(expr_bindings_t *bindings,
                                                  number_t *values)
 {
+    size_t binding_count;
+
     if (!bindings || !values)
         return;
 
-    for (size_t i = 0u; i < bindings->count; ++i)
+    binding_count = expr_bindings_count(bindings);
+    for (size_t i = 0u; i < binding_count; ++i)
         num_destroy(&values[i]);
     free(values);
 }
@@ -1451,7 +1473,7 @@ int equ_solve_numeric_into(const equation_t *equation,
     if (!residual)
         goto cleanup_no_goal;
     original_values = equ_snapshot_binding_values(bindings);
-    if (bindings->count > 0u && !original_values)
+    if (expr_bindings_count(bindings) > 0u && !original_values)
         goto cleanup_no_goal;
 
     if (expr_goal_seek(residual, bindings, target, options, &goal_result) != 0) {

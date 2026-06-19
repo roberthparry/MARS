@@ -23,11 +23,7 @@ static char *dup_string(const char *text)
 
 static char *expr_text_dup(const expr_t *expr, style_t style)
 {
-    string_t *text = expr_to_text(expr, style);
-    char *copy = text ? dup_string(string_c_str(text)) : NULL;
-
-    string_free(text);
-    return copy;
+    return expr_to_string(expr, style);
 }
 
 static char *number_text_dup(number_t value)

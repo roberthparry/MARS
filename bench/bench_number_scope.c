@@ -3,7 +3,7 @@
 #include <time.h>
 
 #include "number.h"
-#include "number/number_internal.h"
+#include "internal/number_internal.h"
 
 enum {
     REAL_BATCHES    = 600,

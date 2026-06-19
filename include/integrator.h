@@ -21,6 +21,12 @@
 /** Opaque integrator handle. */
 typedef struct _integrator_t integrator_t;
 
+typedef enum intg_bound_kind {
+    INTG_BOUND_DEFINITE = 0,
+    INTG_BOUND_UPPER_ONLY,
+    INTG_BOUND_INDEFINITE
+} intg_bound_kind_t;
+
 /**
  * @brief Create an integrator with default tolerances.
  *
@@ -96,6 +102,58 @@ int intg_integral(integrator_t *ig, expr_t *expr, expr_t *x_var,
  * @brief Number of subintervals used in the most recent integration call.
  */
 size_t intg_get_interval_count_used(const integrator_t *ig);
+
+/**
+ * @brief Borrow the exact symbolic result found by the most recent integration.
+ *
+ * Returns NULL when the latest integration did not use a closed-form fast path.
+ * The returned expression is owned by @p ig. Call expr_retain() if an owning
+ * handle is needed beyond the integrator lifetime or the next integration call.
+ */
+const expr_t *intg_get_exact_result(const integrator_t *ig);
+
+/**
+ * @brief Return true when @p integrand contains symbols other than @p vars.
+ */
+bool intg_integrand_has_unbound_parameters(const expr_t *integrand,
+                                           size_t ndim,
+                                           expr_t *const *vars);
+
+/**
+ * @brief Try symbolic iterated integration for a stack of integral rows.
+ *
+ * Returns an owning exact result when the requested rows are symbolically
+ * evaluated. @p first_antiderivative_out, when non-NULL, receives the first
+ * owning antiderivative found for UI display.
+ */
+expr_t *intg_integrate_iterated_symbolic(
+    const expr_t *integrand,
+    size_t ndim,
+    expr_t *const *vars,
+    const intg_bound_kind_t *kinds,
+    expr_t *const *lo,
+    expr_t *const *hi,
+    size_t max_steps,
+    size_t *completed_steps_out,
+    expr_t **first_antiderivative_out);
+
+/**
+ * @brief Symbolically reduce as many leading integral rows as possible.
+ */
+expr_t *intg_integrate_iterated_symbolic_best_effort(
+    const expr_t *integrand,
+    size_t ndim,
+    expr_t *const *vars,
+    const intg_bound_kind_t *kinds,
+    expr_t *const *lo,
+    expr_t *const *hi,
+    size_t *completed_steps_out,
+    size_t *remaining_ndim_out,
+    expr_t **remaining_vars_out,
+    number_t *remaining_lo_num_out,
+    number_t *remaining_hi_num_out,
+    const number_t *lo_num,
+    const number_t *hi_num);
 
 /**
  * @brief Integrate an expr_t expression over [ax,bx] × [ay,by].
