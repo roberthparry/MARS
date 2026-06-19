@@ -1,5 +1,4 @@
 #include "test_matrix.h"
-#include "internal/expr_internal.h"
 
 char current_matrix_input_label[128];
 static matrix_t *current_matrix_input = NULL;
@@ -122,28 +121,21 @@ static void precision_set_add(precision_set_t *set, const char *label_text)
 
 static const char *number_precision_label(number_t z, char *buf, size_t buf_size)
 {
-    number_kind_t kind = number_kind_value(&z);
     size_t bits = num_get_prec_bits(z);
 
-    switch (kind) {
-    case NUMBER_DOUBLE:
-        return "double";
-    case NUMBER_QFLOAT:
-        return "qfloat";
-    case NUMBER_QCOMPLEX:
-        return "qcomplex";
-    case NUMBER_MPFR:
-        snprintf(buf, buf_size, "mpfr-%zu", bits ? bits : num_get_default_prec_bits());
-        return buf;
-    case NUMBER_COMPLEX:
-        snprintf(buf, buf_size, "complex-%zu", bits ? bits : num_get_default_prec_bits());
-        return buf;
-    case NUMBER_MPZ:
-    case NUMBER_MPQ:
+    if (num_is_exact(z))
         return "exact";
-    default:
-        return "number";
+
+    if (!bits)
+        bits = num_get_default_prec_bits();
+
+    if (num_is_real(z)) {
+        snprintf(buf, buf_size, "real-%zu", bits);
+        return buf;
     }
+
+    snprintf(buf, buf_size, "complex-%zu", bits);
+    return buf;
 }
 
 static int number_display_is_truncated(number_t z)
@@ -504,7 +496,7 @@ static void collect_expr_bindings(const expr_t *dv,
                                   size_t *capconst_bindings,
                                   const char *binding_text)
 {
-    if (dv && expr_is_named_const(dv) &&
+    if (dv && expr_symbol_name(dv) && !expr_is_variable(dv) &&
         binding_text && *binding_text && !strchr(binding_text, ';')) {
         append_binding(const_bindings, nconst_bindings, capconst_bindings,
                        strdup(binding_text));

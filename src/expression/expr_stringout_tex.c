@@ -99,3 +99,19 @@ int expr_to_tex_parts(const expr_t *dv, char **expr_out, char **bindings_out)
 
     return 0;
 }
+
+char *expr_to_tex_body(const expr_t *expr)
+{
+    char *body = NULL;
+    char *bindings = NULL;
+
+    if (!expr)
+        return NULL;
+    if (expr_to_tex_parts(expr, &body, &bindings) == 0) {
+        free(bindings);
+        return body;
+    }
+    free(body);
+    free(bindings);
+    return NULL;
+}

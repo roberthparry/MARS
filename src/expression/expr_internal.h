@@ -953,7 +953,7 @@ bool expr_is_exact_zero(const expr_t *dv);
 bool expr_is_named_const(const expr_t *dv);
 expr_t *expr_substitute(const expr_t *expr,
                         const expr_t *needle,
-                        expr_t *replacement);
+                        const expr_t *replacement);
 expr_t *expr_clone(const expr_t *expr);
 expr_t *expr_const_zero(void);
 expr_t *expr_const_one(void);

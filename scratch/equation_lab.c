@@ -4,7 +4,6 @@
 
 #include "equation.h"
 #include "expression.h"
-#include "internal/expr_internal.h"
 #include "number.h"
 #include "ustring.h"
 
@@ -33,11 +32,7 @@ static char *equ_text_dup(const equation_t *equation, style_t style)
 
 static char *expr_text_dup(const expr_t *expr, style_t style)
 {
-    string_t *text = expr_to_text(expr, style);
-    char *copy = text ? dup_string(string_c_str(text)) : NULL;
-
-    string_free(text);
-    return copy;
+    return expr_to_string(expr, style);
 }
 
 static char *number_text_dup(number_t value)
@@ -51,178 +46,9 @@ static char *number_text_dup(number_t value)
 
 static char *expr_tex_body_dup(const expr_t *expr)
 {
-    char *body = NULL;
-    char *bindings = NULL;
+    char *body = expr_to_tex_body(expr);
 
-    if (!expr)
-        return NULL;
-    if (expr_to_tex_parts(expr, &body, &bindings) == 0) {
-        free(bindings);
-        return body;
-    }
-    free(body);
-    free(bindings);
-    return expr_text_dup(expr, style_TEX);
-}
-
-static expr_t *clone_expr_local(const expr_t *expr)
-{
-    number_t seed = num_new();
-    expr_t *needle = expr_new_named_var(seed, "__mars_equation_clone__");
-    expr_t *replacement = expr_new_const(NUM_ZERO);
-    expr_t *copy = NULL;
-
-    num_destroy(&seed);
-    if (needle && replacement)
-        copy = expr_substitute(expr, needle, replacement);
-
-    expr_free(replacement);
-    expr_free(needle);
-    return copy;
-}
-
-static expr_t *expanded_display_expr(const expr_t *expr);
-
-static expr_t *expanded_display_product(const expr_t *left, const expr_t *right)
-{
-    expr_t *left_expr;
-    expr_t *right_expr;
-    expr_t *out;
-    const expr_t *child_left = NULL;
-    const expr_t *child_right = NULL;
-    bool is_sub = false;
-
-    if (!left || !right)
-        return NULL;
-
-    if (expr_match_add_sub_expr(left, &child_left, &child_right, &is_sub) &&
-        expr_match_add_sub_expr(right, &child_left, &child_right, &is_sub)) {
-        left_expr = expanded_display_expr(left);
-        right_expr = expanded_display_expr(right);
-        if (!left_expr || !right_expr) {
-            expr_free(left_expr);
-            expr_free(right_expr);
-            return NULL;
-        }
-
-        out = expr_mul(left_expr, right_expr);
-        expr_free(left_expr);
-        expr_free(right_expr);
-        return out;
-    }
-
-    if (expr_match_add_expr(left, &child_left, &child_right)) {
-        expr_t *first = expanded_display_product(child_left, right);
-        expr_t *second = expanded_display_product(child_right, right);
-
-        if (!first || !second) {
-            expr_free(first);
-            expr_free(second);
-            return NULL;
-        }
-
-        out = expr_add(first, second);
-        expr_free(first);
-        expr_free(second);
-        return out;
-    }
-
-    if (expr_match_sub_expr(left, &child_left, &child_right)) {
-        expr_t *first = expanded_display_product(child_left, right);
-        expr_t *second = expanded_display_product(child_right, right);
-
-        if (!first || !second) {
-            expr_free(first);
-            expr_free(second);
-            return NULL;
-        }
-
-        out = expr_sub(first, second);
-        expr_free(first);
-        expr_free(second);
-        return out;
-    }
-
-    if (expr_match_add_sub_expr(right, &child_left, &child_right, &is_sub))
-        return expanded_display_product(right, left);
-
-    left_expr = expanded_display_expr(left);
-    right_expr = expanded_display_expr(right);
-    if (!left_expr || !right_expr) {
-        expr_free(left_expr);
-        expr_free(right_expr);
-        return NULL;
-    }
-
-    out = expr_mul(left_expr, right_expr);
-    expr_free(left_expr);
-    expr_free(right_expr);
-    return out;
-}
-
-static expr_t *expanded_display_expr(const expr_t *expr)
-{
-    expr_t *left;
-    expr_t *right;
-    expr_t *out;
-    const expr_t *child_left = NULL;
-    const expr_t *child_right = NULL;
-
-    if (!expr)
-        return NULL;
-
-    if (expr_match_add_expr(expr, &child_left, &child_right)) {
-        left = expanded_display_expr(child_left);
-        right = expanded_display_expr(child_right);
-        if (!left || !right) {
-            expr_free(left);
-            expr_free(right);
-            return NULL;
-        }
-        out = expr_add(left, right);
-        expr_free(left);
-        expr_free(right);
-        return out;
-    }
-
-    if (expr_match_sub_expr(expr, &child_left, &child_right)) {
-        left = expanded_display_expr(child_left);
-        right = expanded_display_expr(child_right);
-        if (!left || !right) {
-            expr_free(left);
-            expr_free(right);
-            return NULL;
-        }
-        out = expr_sub(left, right);
-        expr_free(left);
-        expr_free(right);
-        return out;
-    }
-
-    if (expr_match_mul_expr(expr, &child_left, &child_right))
-        return expanded_display_product(child_left, child_right);
-
-    return clone_expr_local(expr);
-}
-
-static expr_t *display_simplified_expr(const expr_t *expr)
-{
-    expr_t *expanded;
-    expr_t *simplified;
-
-    if (!expr)
-        return NULL;
-
-    expanded = expanded_display_expr(expr);
-    if (!expanded)
-        return expr_simplify((expr_t *)expr);
-
-    simplified = expr_simplify(expanded);
-    if (!simplified)
-        return expanded;
-
-    expr_free(expanded);
-    return simplified;
+    return body ? body : expr_text_dup(expr, style_TEX);
 }
 
 static equation_t *display_simplified_equation(const equation_t *equation)
@@ -234,8 +60,8 @@ static equation_t *display_simplified_equation(const equation_t *equation)
     if (!equation)
         return NULL;
 
-    lhs = display_simplified_expr(equ_lhs(equation));
-    rhs = display_simplified_expr(equ_rhs(equation));
+    lhs = expr_display_simplified(equ_lhs(equation));
+    rhs = expr_display_simplified(equ_rhs(equation));
     if (!lhs || !rhs) {
         expr_free(lhs);
         expr_free(rhs);
@@ -263,12 +89,12 @@ static expr_t *substitute_bound_constants(const expr_t *expr,
         return current;
     }
 
-    for (size_t i = 0u; i < bindings->count; ++i) {
-        expr_binding_entry_t *entry = &bindings->entries[i];
+    for (size_t i = 0u; i < expr_bindings_count(bindings); ++i) {
+        const char *name = expr_bindings_name_at(bindings, i);
 
-        if (!entry->is_constant)
+        if (!expr_bindings_is_constant_at(bindings, i))
             continue;
-        if (!entry->name || string_length(entry->name) == 0u)
+        if (!name || !name[0])
             continue;
         have_constant_bindings = true;
         break;
@@ -279,23 +105,21 @@ static expr_t *substitute_bound_constants(const expr_t *expr,
     if (!have_constant_bindings)
         return current;
 
-    for (size_t i = 0u; i < bindings->count; ++i) {
-        expr_binding_entry_t *entry = &bindings->entries[i];
+    for (size_t i = 0u; i < expr_bindings_count(bindings); ++i) {
         number_t value;
         number_t needle_seed;
         expr_t *needle;
         expr_t *replacement;
         expr_t *next;
-        const char *name;
+        const char *name = expr_bindings_name_at(bindings, i);
+        expr_t *binding_expr = expr_bindings_expr_at(bindings, i);
 
-        if (!entry->is_constant)
+        if (!expr_bindings_is_constant_at(bindings, i))
             continue;
-
-        name = entry->name ? string_c_str(entry->name) : NULL;
         if (!name || !name[0])
             continue;
 
-        value = expr_eval(entry->expr);
+        value = expr_eval(binding_expr);
         if (!num_is_finite(value)) {
             num_destroy(&value);
             continue;
@@ -359,12 +183,13 @@ static const char *solution_binding_name(expr_bindings_t *bindings,
     if (!bindings || !lhs)
         return NULL;
 
-    for (size_t i = 0u; i < bindings->count; ++i) {
-        expr_binding_entry_t *entry = &bindings->entries[i];
+    for (size_t i = 0u; i < expr_bindings_count(bindings); ++i) {
+        const char *name = expr_bindings_name_at(bindings, i);
+        expr_t *binding_expr = expr_bindings_expr_at(bindings, i);
 
-        if (entry->is_constant || entry->expr != lhs || !entry->name)
+        if (expr_bindings_is_constant_at(bindings, i) || binding_expr != lhs || !name)
             continue;
-        return string_c_str(entry->name);
+        return name;
     }
 
     return NULL;
@@ -437,7 +262,7 @@ static void print_equation_fields(const equation_t *equation,
                                   const char *status)
 {
     expr_t *residual = equ_residual(equation);
-    expr_t *display_residual = residual ? display_simplified_expr(residual) : NULL;
+    expr_t *display_residual = residual ? expr_display_simplified(residual) : NULL;
     equation_t *display_equation = display_simplified_equation(equation);
     const equation_t *shown_equation = display_equation ? display_equation : equation;
     number_t residual_value = residual ? expr_eval(residual) : num_new();
