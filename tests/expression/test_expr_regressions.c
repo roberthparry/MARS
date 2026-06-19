@@ -1460,6 +1460,44 @@ static void test_simplify_inverse_unary_pairs(void)
     expr_free(x);
 }
 
+static void test_simplify_lambert_exp_to_quotient(void)
+{
+    expr_t *zero;
+    expr_t *w_zero;
+    expr_t *exp_w_zero;
+    expr_t *simp_zero;
+    char *zero_text;
+
+    check_simplified_expression_string(
+        "exp(W(x)) simplification (EXPR)",
+        "{ exp(W(x)) | x = NAN }",
+        "{ x/W(x) | x = NAN }");
+    check_simplified_expression_string(
+        "exp(W(0)) keeps removable singularity folded (binding)",
+        "{ exp(W(0)) }",
+        "1");
+
+    zero = expr_new_const(NUM_ZERO);
+    w_zero = expr_lambert_w(zero);
+    exp_w_zero = expr_exp(w_zero);
+    simp_zero = expr_simplify(exp_w_zero);
+    zero_text = simp_zero ? expr_to_string(simp_zero, style_EXPRESSION) : NULL;
+
+    if (str_eq(zero_text, "1"))
+        to_string_pass("exp(W(0)) keeps removable singularity folded (EXPR)",
+                       zero_text, "1");
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "exp(W(0)) keeps removable singularity folded (EXPR)",
+                       zero_text ? zero_text : "(null)", "1");
+
+    free(zero_text);
+    expr_free(simp_zero);
+    expr_free(exp_w_zero);
+    expr_free(w_zero);
+    expr_free(zero);
+}
+
 static void test_simplify_exp_quarter_turns(void)
 {
     expr_t *pi = test_expr_new_named_const_qf(QF_PI, "@pi");
@@ -3924,6 +3962,7 @@ void test_runtime_regressions(void)
     TEST_RUN_SUBTEST(test_lgamma_successor_sum_simplifies, NULL);
     TEST_RUN_SUBTEST(test_log_constant_difference_simplifies_to_quotient, NULL);
     TEST_RUN_SUBTEST(test_simplify_inverse_unary_pairs, NULL);
+    TEST_RUN_SUBTEST(test_simplify_lambert_exp_to_quotient, NULL);
     TEST_RUN_SUBTEST(test_simplify_exp_quarter_turns, NULL);
     TEST_RUN_SUBTEST(test_simplify_two_exp_minus_one_to_two_over_e, NULL);
     TEST_RUN_SUBTEST(test_simplify_trig_and_hyperbolic_identities, NULL);

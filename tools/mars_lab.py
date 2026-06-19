@@ -7054,6 +7054,7 @@ def parse_equation_lab_output(output: str) -> dict[str, str]:
             "status": r"^status\s+(.*)$",
             "solutions_tex": r"^solutions_tex\s*(.*)$",
             "solutions": r"^solutions\s+(.*)$",
+            "numeric": r"^numeric\s+(.*)$",
         },
         {"solutions"},
     )
@@ -7420,9 +7421,26 @@ def numeric_equation_solution_lines(
         if not value:
             continue
         formatted = format_number_text_for_precision(value, precision, zero_subprecision=True)
+        if not numeric_solution_line_is_finite(formatted):
+            continue
         if formatted and formatted != expression:
             lines.append(f"{name} ≈ {formatted}")
     return lines
+
+
+def numeric_solution_line_is_finite(line: str) -> bool:
+    text = str(line or "")
+    return not re.search(r"(?i)(?:^|[^A-Z])(?:NAN|[+-]?INF(?:INITY)?)(?:[^A-Z]|$)", text)
+
+
+def equation_lab_numeric_solution_lines(fields: dict[str, str], precision: int) -> list[str]:
+    lines = [
+        line.strip()
+        for line in normalize_multiline_display_text(fields.get("numeric") or "").splitlines()
+        if line.strip()
+    ]
+    formatted_lines = [precision_numeric_tokens(line, precision) for line in lines]
+    return [line for line in formatted_lines if numeric_solution_line_is_finite(line)]
 
 
 def restore_compact_binding_values(expression: str, source_expression: str) -> str:
@@ -8077,11 +8095,13 @@ def prepare_equation_fields(fields: dict[str, str], precision: int) -> dict[str,
     render_tex = solutions_tex or equation_tex
     display_tex = compact_display_text(render_tex)
     solution_lines = [line.strip() for line in solutions_text.splitlines() if line.strip()]
-    numeric_solution_lines = numeric_equation_solution_lines(
-        DEFAULT_BIN,
-        solutions_text,
-        precision,
-    )
+    numeric_solution_lines = equation_lab_numeric_solution_lines(fields, precision)
+    if not numeric_solution_lines:
+        numeric_solution_lines = numeric_equation_solution_lines(
+            DEFAULT_BIN,
+            solutions_text,
+            precision,
+        )
 
     svg = None
     render_error = None

@@ -494,6 +494,51 @@ static void test_equation_solves_quadratic_two_roots(void)
     equ_free(equation);
 }
 
+static void test_equation_solves_quadratic_complex_roots(void)
+{
+    equation_t *equation = equ_from_string("{ x*x = -3 | x = NAN }");
+    expr_t *x;
+    ASSERT_NEW_RESULT(result);
+
+    ASSERT_NOT_NULL(equation);
+    x = equ_binding(equation, "x");
+    ASSERT_NOT_NULL(x);
+
+    ASSERT_EQ_INT(equ_solve_for(equation, x, result), 0);
+    ASSERT_TRUE(RESULT_IS_SOLVED(result));
+    ASSERT_EQ_INT((int)RESULT_COUNT(result), 2);
+    ASSERT_TRUE(equ_is_solved_for(RESULT_SOLUTION(result, 0u), x));
+    ASSERT_TRUE(equ_is_solved_for(RESULT_SOLUTION(result, 1u), x));
+    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(
+        result, style_UNBOUND, "i"));
+    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(
+        result, style_UNBOUND, "-"));
+
+    equ_solve_result_free(result);
+    equ_free(equation);
+}
+
+static void test_equation_solves_self_power_with_lambert_w(void)
+{
+    equation_t *equation = equ_from_string("{ x^x = -3 | x = NAN }");
+    expr_t *x;
+    ASSERT_NEW_RESULT(result);
+
+    ASSERT_NOT_NULL(equation);
+    x = equ_binding(equation, "x");
+    ASSERT_NOT_NULL(x);
+
+    ASSERT_EQ_INT(equ_solve_for(equation, x, result), 0);
+    ASSERT_TRUE(RESULT_IS_SOLVED(result));
+    ASSERT_EQ_INT((int)RESULT_COUNT(result), 1);
+    ASSERT_TRUE(equ_is_solved_for(RESULT_SOLUTION(result, 0u), x));
+    ASSERT_TRUE(test_equation_result_has_rhs_string(
+        result, "(ln(-3) + 2iπn)/W(ln(-3) + 2iπn)"));
+
+    equ_solve_result_free(result);
+    equ_free(equation);
+}
+
 static void test_equation_solves_quadratic_zero_product(void)
 {
     equation_t *equation = equ_from_string(
@@ -923,6 +968,8 @@ static void test_equation_basics(void)
     TEST_RUN_SUBTEST(test_equation_solves_affine_variable_from_rhs, NULL);
     TEST_RUN_SUBTEST(test_equation_solves_symbolic_quadratic_formula, NULL);
     TEST_RUN_SUBTEST(test_equation_solves_quadratic_two_roots, NULL);
+    TEST_RUN_SUBTEST(test_equation_solves_quadratic_complex_roots, NULL);
+    TEST_RUN_SUBTEST(test_equation_solves_self_power_with_lambert_w, NULL);
     TEST_RUN_SUBTEST(test_equation_solves_quadratic_zero_product, NULL);
     TEST_RUN_SUBTEST(test_equation_solves_symbolic_zero_product_factors, NULL);
     TEST_RUN_SUBTEST(test_equation_solves_quadratic_double_root_once, NULL);

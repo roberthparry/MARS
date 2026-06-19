@@ -385,6 +385,9 @@ static int equ_try_solve_unary_periodic(const equation_t *equation,
 static int equ_try_solve_unary_inverse(const equation_t *equation,
                                             const expr_t *wrt,
                                             equation_solutions_t *solutions);
+static int equ_try_solve_self_power(const equation_t *equation,
+                                         const expr_t *wrt,
+                                         equation_solutions_t *solutions);
 
 static int equ_try_solve_affine(const equation_t *equation,
                                      const expr_t *wrt,
@@ -890,6 +893,181 @@ static int equ_try_solve_unary_inverse(const equation_t *equation,
         return rc;
     return equ_try_solve_unary_inverse_side(equation->rhs, equation->lhs,
                                             wrt, solutions);
+}
+
+static bool equ_expr_is_self_power(const expr_t *expr, const expr_t *wrt)
+{
+    const expr_t *base = NULL;
+    const expr_t *exponent = NULL;
+
+    return expr_match_pow_expr(expr, &base, &exponent) &&
+           expr_struct_eq(base, wrt) &&
+           expr_struct_eq(exponent, wrt);
+}
+
+static expr_t *equ_self_power_log_family_arg(const expr_t *rhs)
+{
+    number_t i_value = num_clone(NUM_I);
+    expr_t *log_rhs = rhs ? expr_log(rhs) : NULL;
+    expr_t *two_pi = equ_symbolic_two_pi_expr();
+    expr_t *i_const = expr_new_named_const(i_value, "i");
+    expr_t *n = expr_new_named_var(NUM_NAN, "n");
+    expr_t *two_pi_i = (two_pi && i_const) ? expr_mul(two_pi, i_const) : NULL;
+    expr_t *period_term = (two_pi_i && n) ? expr_mul(two_pi_i, n) : NULL;
+    expr_t *sum = (log_rhs && period_term) ? expr_add(log_rhs, period_term) : NULL;
+    expr_t *out = expr_simplify_owned(sum);
+
+    expr_free(period_term);
+    expr_free(two_pi_i);
+    expr_free(n);
+    expr_free(i_const);
+    expr_free(two_pi);
+    expr_free(log_rhs);
+    num_destroy(&i_value);
+    return out;
+}
+
+static expr_t *equ_self_power_lambert_family_root(const expr_t *rhs)
+{
+    expr_t *arg = equ_self_power_log_family_arg(rhs);
+    expr_t *lambert = arg ? expr_lambert_w(arg) : NULL;
+    expr_t *root = lambert ? expr_exp(lambert) : NULL;
+    expr_t *out = expr_simplify_owned(root);
+
+    expr_free(lambert);
+    expr_free(arg);
+    return out;
+}
+
+static bool equ_self_power_candidate_valid(const expr_t *lhs,
+                                           const expr_t *rhs,
+                                           const expr_t *wrt,
+                                           const expr_t *candidate)
+{
+    expr_t *lhs_at = NULL;
+    expr_t *rhs_at = NULL;
+    expr_t *raw_residual = NULL;
+    expr_t *residual = NULL;
+    number_t value = NUM_ZERO;
+    number_t magnitude = NUM_ZERO;
+    number_t rhs_value = NUM_ZERO;
+    number_t rhs_scale = NUM_ZERO;
+    number_t tolerance = NUM_ZERO;
+    number_t scaled_tolerance = NUM_ZERO;
+    bool ok = true;
+
+    if (!lhs || !rhs || !wrt || !candidate)
+        return false;
+
+    lhs_at = expr_substitute(lhs, wrt, candidate);
+    rhs_at = expr_substitute(rhs, wrt, candidate);
+    raw_residual = (lhs_at && rhs_at) ? expr_sub(lhs_at, rhs_at) : NULL;
+    residual = raw_residual ? expr_simplify_owned(raw_residual) : NULL;
+    raw_residual = NULL;
+    if (!residual) {
+        ok = false;
+        goto cleanup;
+    }
+
+    value = expr_eval(residual);
+    if (!num_is_finite(value))
+        goto cleanup;
+
+    magnitude = num_abs(value);
+    rhs_value = expr_eval(rhs_at);
+    rhs_scale = num_abs(rhs_value);
+    if (!num_is_finite(rhs_scale) || num_lt(rhs_scale, NUM_ONE)) {
+        num_destroy(&rhs_scale);
+        rhs_scale = num_clone(NUM_ONE);
+    }
+
+    tolerance = num_create_from_string("1e-24");
+    scaled_tolerance = num_mul(tolerance, rhs_scale);
+    ok = num_is_finite(magnitude) && num_le(magnitude, scaled_tolerance);
+
+cleanup:
+    num_destroy(&scaled_tolerance);
+    num_destroy(&tolerance);
+    num_destroy(&rhs_scale);
+    num_destroy(&rhs_value);
+    num_destroy(&magnitude);
+    num_destroy(&value);
+    expr_free(residual);
+    expr_free(raw_residual);
+    expr_free(rhs_at);
+    expr_free(lhs_at);
+    return ok;
+}
+
+static int equ_append_self_power_root_if_valid(
+    const expr_t *lhs,
+    const expr_t *rhs,
+    const expr_t *wrt,
+    equation_solutions_t *solutions,
+    expr_t *root,
+    bool *appended_out)
+{
+    int rc = 0;
+
+    if (appended_out)
+        *appended_out = false;
+
+    if (!root)
+        return -1;
+
+    if (equ_self_power_candidate_valid(lhs, rhs, wrt, root)) {
+        if (equ_append_solution_expr(wrt, root, solutions) != 0)
+            rc = -1;
+        else if (appended_out)
+            *appended_out = true;
+    }
+
+    return rc;
+}
+
+static int equ_try_solve_self_power_side(const expr_t *lhs,
+                                              const expr_t *rhs,
+                                              const expr_t *wrt,
+                                              equation_solutions_t *solutions)
+{
+    expr_t *family_root = NULL;
+    bool appended;
+    bool saw_solution = false;
+
+    if (!lhs || !rhs || !wrt || !solutions)
+        return -1;
+    if (!equ_expr_uses_wrt(lhs, wrt) || equ_expr_uses_wrt(rhs, wrt))
+        return 1;
+    if (!equ_expr_is_self_power(lhs, wrt))
+        return 1;
+
+    family_root = equ_self_power_lambert_family_root(rhs);
+    if (equ_append_self_power_root_if_valid(
+            lhs, rhs, wrt, solutions, family_root, &appended) != 0) {
+        expr_free(family_root);
+        return -1;
+    }
+    saw_solution = saw_solution || appended;
+    expr_free(family_root);
+
+    return saw_solution ? 0 : 1;
+}
+
+static int equ_try_solve_self_power(const equation_t *equation,
+                                         const expr_t *wrt,
+                                         equation_solutions_t *solutions)
+{
+    int rc;
+
+    if (!equation || !wrt || !solutions)
+        return -1;
+
+    rc = equ_try_solve_self_power_side(equation->lhs, equation->rhs,
+                                       wrt, solutions);
+    if (rc != 1)
+        return rc;
+    return equ_try_solve_self_power_side(equation->rhs, equation->lhs,
+                                         wrt, solutions);
 }
 
 static int equ_try_solve_symbolic_affine(const expr_t *residual,
@@ -1509,6 +1687,7 @@ int equ_solve_for_into(const equation_t *equation,
 {
     int unary_inverse_rc;
     int unary_periodic_rc;
+    int self_power_rc;
     int affine_rc;
     int zero_product_rc;
     int quadratic_rc;
@@ -1537,6 +1716,12 @@ int equ_solve_for_into(const equation_t *equation,
     if (unary_periodic_rc == 0)
         return 0;
     if (unary_periodic_rc < 0)
+        return -1;
+
+    self_power_rc = equ_try_solve_self_power(equation, wrt, solutions);
+    if (self_power_rc == 0)
+        return 0;
+    if (self_power_rc < 0)
         return -1;
 
     affine_rc = equ_try_solve_affine(equation, wrt, solutions);

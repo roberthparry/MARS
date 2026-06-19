@@ -44,6 +44,32 @@ static char *number_text_dup(number_t value)
     return copy;
 }
 
+static char *number_precision_text_dup(number_t value, int precision)
+{
+    char fmt[32];
+    int digits = precision > 0 ? precision - 1 : 0;
+    int needed;
+    char *out;
+
+    if (precision <= 0)
+        return number_text_dup(value);
+
+    snprintf(fmt, sizeof(fmt), "%%.%dN", digits);
+    needed = num_sprintf(NULL, 0u, fmt, value);
+    if (needed < 0)
+        return NULL;
+
+    out = malloc((size_t)needed + 1u);
+    if (!out)
+        return NULL;
+    if (num_sprintf(out, (size_t)needed + 1u, fmt, value) < 0) {
+        free(out);
+        return NULL;
+    }
+
+    return out;
+}
+
 static char *expr_tex_body_dup(const expr_t *expr)
 {
     char *body = expr_to_tex_body(expr);
@@ -255,11 +281,86 @@ static void print_solutions_tex(const equation_solutions_t *solutions,
     printf(" \\end{aligned}\n");
 }
 
+static number_t eval_solution_rhs_with_sampled_n(const expr_t *rhs,
+                                                 bool *sampled_out)
+{
+    number_t value;
+
+    if (sampled_out)
+        *sampled_out = false;
+
+    value = expr_eval(rhs);
+    if (num_is_finite(value) && !num_is_nan(value))
+        return value;
+
+    {
+        number_t zero_value = num_create_from_long(0L);
+        expr_t *n = expr_new_named_var(NUM_NAN, "n");
+        expr_t *zero = expr_new_const(zero_value);
+        expr_t *sampled = (n && zero) ? expr_substitute(rhs, n, zero) : NULL;
+        expr_t *simplified = sampled ? expr_simplify(sampled) : NULL;
+        number_t sampled_value = simplified ? expr_eval(simplified) : num_new();
+
+        num_destroy(&zero_value);
+        expr_free(simplified);
+        expr_free(sampled);
+        expr_free(zero);
+        expr_free(n);
+
+        if (num_is_finite(sampled_value) && !num_is_nan(sampled_value)) {
+            num_destroy(&value);
+            if (sampled_out)
+                *sampled_out = true;
+            return sampled_value;
+        }
+
+        num_destroy(&sampled_value);
+    }
+
+    return value;
+}
+
+static void print_solution_numerics(const equation_solutions_t *solutions,
+                                    expr_bindings_t *bindings,
+                                    int precision)
+{
+    size_t count = equ_solutions_count(solutions);
+
+    if (count == 0u) {
+        printf("numeric     \n");
+        return;
+    }
+
+    for (size_t i = 0u; i < count; ++i) {
+        const equation_t *solution = equ_solutions_at(solutions, i);
+        const char *name = solution_binding_name(bindings, solution);
+        equation_t *display = solution_with_bound_constants(solution, bindings);
+        const equation_t *shown = display ? display : solution;
+        bool sampled_n = false;
+        number_t value = eval_solution_rhs_with_sampled_n(equ_rhs(shown),
+                                                          &sampled_n);
+        char *value_text = number_precision_text_dup(value, precision);
+
+        if (name && value_text)
+            printf("%s%s ≈ %s%s\n", i == 0u ? "numeric     " : "            ",
+                   name, value_text, sampled_n ? "  (n = 0)" : "");
+        else
+            printf("%s%s%s\n", i == 0u ? "numeric     " : "            ",
+                   value_text ? value_text : "(null)",
+                   sampled_n ? "  (n = 0)" : "");
+
+        free(value_text);
+        num_destroy(&value);
+        equ_free(display);
+    }
+}
+
 static void print_equation_fields(const equation_t *equation,
                                   const equation_solutions_t *solutions,
                                   expr_bindings_t *bindings,
                                   const char *input,
-                                  const char *status)
+                                  const char *status,
+                                  int precision)
 {
     expr_t *residual = equ_residual(equation);
     expr_t *display_residual = residual ? expr_display_simplified(residual) : NULL;
@@ -281,6 +382,7 @@ static void print_equation_fields(const equation_t *equation,
     printf("status      %s\n", status ? status : "unsolved");
     print_solutions(solutions, bindings);
     print_solutions_tex(solutions, bindings);
+    print_solution_numerics(solutions, bindings, precision);
 
     free(residual_value_text);
     free(residual_text);
@@ -318,7 +420,8 @@ int main(int argc, char **argv)
         status = "solved";
 
     if (rc == 0)
-        print_equation_fields(equation, solutions, equ_bindings(equation), input, status);
+        print_equation_fields(equation, solutions, equ_bindings(equation),
+                              input, status, precision);
     else
         fprintf(stderr, "could not solve equation\n");
 

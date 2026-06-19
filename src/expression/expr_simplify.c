@@ -2161,10 +2161,17 @@ expr_t *expr_simplify_unary_operator(const expr_t *dv, expr_t *a, expr_t *b)
     (void)b;
     if (expr_is_exp_expr(dv)) {
         expr_t *quarter_turn = expr_try_simplify_exp_quarter_turn(a);
+        expr_t *lambert_exp;
 
         if (quarter_turn) {
             expr_free(a);
             return quarter_turn;
+        }
+
+        lambert_exp = expr_simplify_try_lambert_exp(a);
+        if (lambert_exp) {
+            expr_free(a);
+            return lambert_exp;
         }
     }
 
