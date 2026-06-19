@@ -171,6 +171,29 @@ static void test_qf_reciprocal_trig(void)
     TEST_ASSERT_QFLOAT_CLOSE(qf_acot(QF_NINF), QF_PI);
 }
 
+static void test_qf_haversine_family(void)
+{
+    printf("\n== qf versine / haversine family ==\n");
+
+    TEST_ASSERT_QFLOAT_CLOSE(qf_versin(QF_PI_3), QF_HALF);
+    TEST_ASSERT_QFLOAT_CLOSE(qf_vercos(QF_PI_3), qf_from_double(1.5));
+    TEST_ASSERT_QFLOAT_CLOSE(qf_coversin(QF_PI_6), QF_HALF);
+    TEST_ASSERT_QFLOAT_CLOSE(qf_covercos(QF_PI_6), qf_from_double(1.5));
+    TEST_ASSERT_QFLOAT_CLOSE(qf_haversin(QF_PI_3), qf_from_double(0.25));
+    TEST_ASSERT_QFLOAT_CLOSE(qf_havercos(QF_PI_3), qf_from_double(0.75));
+    TEST_ASSERT_QFLOAT_CLOSE(qf_hacoversin(QF_PI_6), qf_from_double(0.25));
+    TEST_ASSERT_QFLOAT_CLOSE(qf_hacovercos(QF_PI_6), qf_from_double(0.75));
+
+    TEST_ASSERT_QFLOAT_CLOSE(qf_arcversin(QF_HALF), QF_PI_3);
+    TEST_ASSERT_QFLOAT_CLOSE(qf_arcvercos(qf_from_double(1.5)), QF_PI_3);
+    TEST_ASSERT_QFLOAT_CLOSE(qf_arccoversin(QF_HALF), QF_PI_6);
+    TEST_ASSERT_QFLOAT_CLOSE(qf_arccovercos(qf_from_double(1.5)), QF_PI_6);
+    TEST_ASSERT_QFLOAT_CLOSE(qf_archaversin(qf_from_double(0.25)), QF_PI_3);
+    TEST_ASSERT_QFLOAT_CLOSE(qf_archavercos(qf_from_double(0.75)), QF_PI_3);
+    TEST_ASSERT_QFLOAT_CLOSE(qf_archacoversin(qf_from_double(0.25)), QF_PI_6);
+    TEST_ASSERT_QFLOAT_CLOSE(qf_archacovercos(qf_from_double(0.75)), QF_PI_6);
+}
+
 /* ============================================================
  *  Inverse Trigonometric Function Tests
  * ============================================================ */
@@ -400,6 +423,7 @@ static void test_qf_atan2(void)
 void test_trigonometric(void) {
     TEST_RUN_SUBTEST(test_qf_trig, NULL);
     TEST_RUN_SUBTEST(test_qf_reciprocal_trig, NULL);
+    TEST_RUN_SUBTEST(test_qf_haversine_family, NULL);
     TEST_RUN_SUBTEST(test_qf_atan, NULL);
     TEST_RUN_SUBTEST(test_qf_atan2, NULL);
     TEST_RUN_SUBTEST(test_qf_asin, NULL);

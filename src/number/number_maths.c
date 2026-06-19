@@ -3694,6 +3694,78 @@ number_t num_cot(const number_t number)
         number_double_cot, qf_cot, qc_cot, number_mpfr_cot_mut, number_mpc_cot);
 }
 
+number_t num_versin(const number_t number)
+{
+    number_t cos_value = num_cos(number);
+    number_t out = num_sub(NUM_ONE, cos_value);
+
+    num_destroy(&cos_value);
+    return out;
+}
+
+number_t num_vercos(const number_t number)
+{
+    number_t cos_value = num_cos(number);
+    number_t out = num_add(NUM_ONE, cos_value);
+
+    num_destroy(&cos_value);
+    return out;
+}
+
+number_t num_coversin(const number_t number)
+{
+    number_t sin_value = num_sin(number);
+    number_t out = num_sub(NUM_ONE, sin_value);
+
+    num_destroy(&sin_value);
+    return out;
+}
+
+number_t num_covercos(const number_t number)
+{
+    number_t sin_value = num_sin(number);
+    number_t out = num_add(NUM_ONE, sin_value);
+
+    num_destroy(&sin_value);
+    return out;
+}
+
+number_t num_haversin(const number_t number)
+{
+    number_t versin_value = num_versin(number);
+    number_t out = num_div(versin_value, NUM_TWO);
+
+    num_destroy(&versin_value);
+    return out;
+}
+
+number_t num_havercos(const number_t number)
+{
+    number_t vercos_value = num_vercos(number);
+    number_t out = num_div(vercos_value, NUM_TWO);
+
+    num_destroy(&vercos_value);
+    return out;
+}
+
+number_t num_hacoversin(const number_t number)
+{
+    number_t coversin_value = num_coversin(number);
+    number_t out = num_div(coversin_value, NUM_TWO);
+
+    num_destroy(&coversin_value);
+    return out;
+}
+
+number_t num_hacovercos(const number_t number)
+{
+    number_t covercos_value = num_covercos(number);
+    number_t out = num_div(covercos_value, NUM_TWO);
+
+    num_destroy(&covercos_value);
+    return out;
+}
+
 number_t num_atan(const number_t number)
 {
     if (number_is_cdouble_value(&number))
@@ -3812,6 +3884,86 @@ number_t num_acos(const number_t number)
             : num_create_from_qfloat(qf_acos(qf));
     }
     return number_apply_nonreal_complex_unary_or_dispatch(number, acos, qf_acos, qc_acos, number_mpfr_acos_mut, mpc_acos);
+}
+
+number_t num_arcversin(const number_t number)
+{
+    number_t arg = num_sub(NUM_ONE, number);
+    number_t out = num_acos(arg);
+
+    num_destroy(&arg);
+    return out;
+}
+
+number_t num_arcvercos(const number_t number)
+{
+    number_t arg = num_sub(number, NUM_ONE);
+    number_t out = num_acos(arg);
+
+    num_destroy(&arg);
+    return out;
+}
+
+number_t num_arccoversin(const number_t number)
+{
+    number_t arg = num_sub(NUM_ONE, number);
+    number_t out = num_asin(arg);
+
+    num_destroy(&arg);
+    return out;
+}
+
+number_t num_arccovercos(const number_t number)
+{
+    number_t arg = num_sub(number, NUM_ONE);
+    number_t out = num_asin(arg);
+
+    num_destroy(&arg);
+    return out;
+}
+
+number_t num_archaversin(const number_t number)
+{
+    number_t twice = num_mul(NUM_TWO, number);
+    number_t arg = num_sub(NUM_ONE, twice);
+    number_t out = num_acos(arg);
+
+    num_destroy(&arg);
+    num_destroy(&twice);
+    return out;
+}
+
+number_t num_archavercos(const number_t number)
+{
+    number_t twice = num_mul(NUM_TWO, number);
+    number_t arg = num_sub(twice, NUM_ONE);
+    number_t out = num_acos(arg);
+
+    num_destroy(&arg);
+    num_destroy(&twice);
+    return out;
+}
+
+number_t num_archacoversin(const number_t number)
+{
+    number_t twice = num_mul(NUM_TWO, number);
+    number_t arg = num_sub(NUM_ONE, twice);
+    number_t out = num_asin(arg);
+
+    num_destroy(&arg);
+    num_destroy(&twice);
+    return out;
+}
+
+number_t num_archacovercos(const number_t number)
+{
+    number_t twice = num_mul(NUM_TWO, number);
+    number_t arg = num_sub(twice, NUM_ONE);
+    number_t out = num_asin(arg);
+
+    num_destroy(&arg);
+    num_destroy(&twice);
+    return out;
 }
 
 number_t num_sinh(const number_t number)

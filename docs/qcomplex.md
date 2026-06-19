@@ -25,7 +25,7 @@ currently remains a transparent by-value struct.
 - arithmetic: add, subtract, multiply, divide, negate, conjugate
 - magnitude and argument
 - elementary functions: exp, log, pow, sqrt
-- trigonometric and hyperbolic functions (and their inverses)
+- trigonometric, versine/haversine, and hyperbolic functions (and their inverses)
 - special functions: erf, gamma, polygamma, beta, Lambert W, incomplete gamma, exponential integrals, normal distribution
 - polar form conversion
 - parsing from string
@@ -123,12 +123,28 @@ All declarations are in `include/qcomplex.h`.
 | `qc_sec(z)` | secant `1/cos(z)` |
 | `qc_cosec(z)` | cosecant `1/sin(z)` |
 | `qc_cot(z)` | cotangent `1/tan(z)` |
+| `qc_versin(z)` | versed sine `1 - cos(z)` |
+| `qc_vercos(z)` | versed cosine `1 + cos(z)` |
+| `qc_coversin(z)` | coversed sine `1 - sin(z)` |
+| `qc_covercos(z)` | coversed cosine `1 + sin(z)` |
+| `qc_haversin(z)` | haversine `(1 - cos(z)) / 2` |
+| `qc_havercos(z)` | havercosine `(1 + cos(z)) / 2` |
+| `qc_hacoversin(z)` | hacoversine `(1 - sin(z)) / 2` |
+| `qc_hacovercos(z)` | hacovercosine `(1 + sin(z)) / 2` |
 | `qc_asin(z)` | arcsine (principal branch) |
 | `qc_acos(z)` | arccosine (principal branch) |
 | `qc_atan(z)` | arctangent |
 | `qc_asec(z)` | arcsecant (principal branch) |
 | `qc_acosec(z)` | arccosecant (principal branch) |
 | `qc_acot(z)` | arccotangent (principal branch) |
+| `qc_arcversin(z)` | inverse versed sine `acos(1 - z)` |
+| `qc_arcvercos(z)` | inverse versed cosine `acos(z - 1)` |
+| `qc_arccoversin(z)` | inverse coversed sine `asin(1 - z)` |
+| `qc_arccovercos(z)` | inverse coversed cosine `asin(z - 1)` |
+| `qc_archaversin(z)` | inverse haversine `acos(1 - 2z)` |
+| `qc_archavercos(z)` | inverse havercosine `acos(2z - 1)` |
+| `qc_archacoversin(z)` | inverse hacoversine `asin(1 - 2z)` |
+| `qc_archacovercos(z)` | inverse hacovercosine `asin(2z - 1)` |
 | `qc_atan2(y, x)` | four-quadrant arctangent |
 
 ### Hyperbolic Functions

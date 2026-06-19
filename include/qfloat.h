@@ -888,6 +888,14 @@ qfloat_t qf_cosec(qfloat_t x);
  * @return cot(x) as a quad-double, or NaN at a pole.
  */
 qfloat_t qf_cot(qfloat_t x);
+qfloat_t qf_versin(qfloat_t x);
+qfloat_t qf_vercos(qfloat_t x);
+qfloat_t qf_coversin(qfloat_t x);
+qfloat_t qf_covercos(qfloat_t x);
+qfloat_t qf_haversin(qfloat_t x);
+qfloat_t qf_havercos(qfloat_t x);
+qfloat_t qf_hacoversin(qfloat_t x);
+qfloat_t qf_hacovercos(qfloat_t x);
 
 /**
  * @brief Inverse tangent function.
@@ -962,6 +970,14 @@ qfloat_t qf_acosec(qfloat_t x);
  * @return acot(x) (double-double precision).
  */
 qfloat_t qf_acot(qfloat_t x);
+qfloat_t qf_arcversin(qfloat_t x);
+qfloat_t qf_arcvercos(qfloat_t x);
+qfloat_t qf_arccoversin(qfloat_t x);
+qfloat_t qf_arccovercos(qfloat_t x);
+qfloat_t qf_archaversin(qfloat_t x);
+qfloat_t qf_archavercos(qfloat_t x);
+qfloat_t qf_archacoversin(qfloat_t x);
+qfloat_t qf_archacovercos(qfloat_t x);
 
 /**
  * @brief High-precision hyperbolic sine.

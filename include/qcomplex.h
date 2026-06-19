@@ -284,12 +284,28 @@ qcomplex_t qc_tan(qcomplex_t z);                 /**< tan(z) */
 qcomplex_t qc_sec(qcomplex_t z);                 /**< sec(z) */
 qcomplex_t qc_cosec(qcomplex_t z);               /**< cosec(z) */
 qcomplex_t qc_cot(qcomplex_t z);                 /**< cot(z) */
+qcomplex_t qc_versin(qcomplex_t z);              /**< versin(z) = 1 - cos(z) */
+qcomplex_t qc_vercos(qcomplex_t z);              /**< vercos(z) = 1 + cos(z) */
+qcomplex_t qc_coversin(qcomplex_t z);            /**< coversin(z) = 1 - sin(z) */
+qcomplex_t qc_covercos(qcomplex_t z);            /**< covercos(z) = 1 + sin(z) */
+qcomplex_t qc_haversin(qcomplex_t z);            /**< haversin(z) = (1 - cos(z)) / 2 */
+qcomplex_t qc_havercos(qcomplex_t z);            /**< havercos(z) = (1 + cos(z)) / 2 */
+qcomplex_t qc_hacoversin(qcomplex_t z);          /**< hacoversin(z) = (1 - sin(z)) / 2 */
+qcomplex_t qc_hacovercos(qcomplex_t z);          /**< hacovercos(z) = (1 + sin(z)) / 2 */
 qcomplex_t qc_asin(qcomplex_t z);                /**< asin(z) */
 qcomplex_t qc_acos(qcomplex_t z);                /**< acos(z) */
 qcomplex_t qc_atan(qcomplex_t z);                /**< atan(z) */
 qcomplex_t qc_asec(qcomplex_t z);                /**< asec(z) */
 qcomplex_t qc_acosec(qcomplex_t z);              /**< acosec(z) */
 qcomplex_t qc_acot(qcomplex_t z);                /**< acot(z) */
+qcomplex_t qc_arcversin(qcomplex_t z);           /**< arcversin(z) = acos(1 - z) */
+qcomplex_t qc_arcvercos(qcomplex_t z);           /**< arcvercos(z) = acos(z - 1) */
+qcomplex_t qc_arccoversin(qcomplex_t z);         /**< arccoversin(z) = asin(1 - z) */
+qcomplex_t qc_arccovercos(qcomplex_t z);         /**< arccovercos(z) = asin(z - 1) */
+qcomplex_t qc_archaversin(qcomplex_t z);         /**< archaversin(z) = acos(1 - 2z) */
+qcomplex_t qc_archavercos(qcomplex_t z);         /**< archavercos(z) = acos(2z - 1) */
+qcomplex_t qc_archacoversin(qcomplex_t z);       /**< archacoversin(z) = asin(1 - 2z) */
+qcomplex_t qc_archacovercos(qcomplex_t z);       /**< archacovercos(z) = asin(2z - 1) */
 qcomplex_t qc_atan2(qcomplex_t y, qcomplex_t x); /**< atan2(y, x) */
 /** @} */
 

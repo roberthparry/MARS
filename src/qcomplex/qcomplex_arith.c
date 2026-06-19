@@ -127,6 +127,30 @@ qcomplex_t qc_cosec(qcomplex_t z) {
 qcomplex_t qc_cot(qcomplex_t z) {
     return qc_div(qc_cos(z), qc_sin(z));
 }
+qcomplex_t qc_versin(qcomplex_t z) {
+    return qc_sub(QC_ONE, qc_cos(z));
+}
+qcomplex_t qc_vercos(qcomplex_t z) {
+    return qc_add(QC_ONE, qc_cos(z));
+}
+qcomplex_t qc_coversin(qcomplex_t z) {
+    return qc_sub(QC_ONE, qc_sin(z));
+}
+qcomplex_t qc_covercos(qcomplex_t z) {
+    return qc_add(QC_ONE, qc_sin(z));
+}
+qcomplex_t qc_haversin(qcomplex_t z) {
+    return qc_ldexp(qc_versin(z), -1);
+}
+qcomplex_t qc_havercos(qcomplex_t z) {
+    return qc_ldexp(qc_vercos(z), -1);
+}
+qcomplex_t qc_hacoversin(qcomplex_t z) {
+    return qc_ldexp(qc_coversin(z), -1);
+}
+qcomplex_t qc_hacovercos(qcomplex_t z) {
+    return qc_ldexp(qc_covercos(z), -1);
+}
 qcomplex_t qc_asin(qcomplex_t z) {
     /* asin(z) = -i log(iz + sqrt(1-z^2)) */
     /* -i*(a+bi) = b - ai, so re=qc_imag(ln), im=-qc_real(ln) */
@@ -181,6 +205,30 @@ qcomplex_t qc_acot(qcomplex_t z) {
 
     return qc_make(qf_mul_double(qc_imag(diff), 0.5),
                    qf_mul_double(qf_neg(qc_real(diff)), 0.5));
+}
+qcomplex_t qc_arcversin(qcomplex_t z) {
+    return qc_acos(qc_sub(QC_ONE, z));
+}
+qcomplex_t qc_arcvercos(qcomplex_t z) {
+    return qc_acos(qc_sub(z, QC_ONE));
+}
+qcomplex_t qc_arccoversin(qcomplex_t z) {
+    return qc_asin(qc_sub(QC_ONE, z));
+}
+qcomplex_t qc_arccovercos(qcomplex_t z) {
+    return qc_asin(qc_sub(z, QC_ONE));
+}
+qcomplex_t qc_archaversin(qcomplex_t z) {
+    return qc_acos(qc_sub(QC_ONE, qc_mul(QC_TWO, z)));
+}
+qcomplex_t qc_archavercos(qcomplex_t z) {
+    return qc_acos(qc_sub(qc_mul(QC_TWO, z), QC_ONE));
+}
+qcomplex_t qc_archacoversin(qcomplex_t z) {
+    return qc_asin(qc_sub(QC_ONE, qc_mul(QC_TWO, z)));
+}
+qcomplex_t qc_archacovercos(qcomplex_t z) {
+    return qc_asin(qc_sub(qc_mul(QC_TWO, z), QC_ONE));
 }
 qcomplex_t qc_atan2(qcomplex_t y, qcomplex_t x) {
     if (qf_eq(qc_imag(y), qf_from_double(0.0)) && qf_eq(qc_imag(x), qf_from_double(0.0)))

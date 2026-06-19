@@ -36,6 +36,56 @@ void test_tan(void)
     expr_free(c);
 }
 
+static void check_expr_string_qf(const char *label,
+                                 const char *input,
+                                 qfloat_t expected)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = expr_from_string(input, &bindings);
+
+    ASSERT_NOT_NULL(expr);
+    check_q_at(__FILE__, __LINE__, 1, label, expr_eval_qf(expr), expected);
+
+    expr_free(expr);
+    expr_bindings_free(bindings);
+}
+
+void test_haversine_family(void)
+{
+    check_expr_string_qf("versin(0) = 0",
+                         "{ versin(0) }", QF_ZERO);
+    check_expr_string_qf("vercos(0) = 2",
+                         "{ vercos(0) }", QF_TWO);
+    check_expr_string_qf("coversin(0) = 1",
+                         "{ coversin(0) }", QF_ONE);
+    check_expr_string_qf("covercos(0) = 1",
+                         "{ covercos(0) }", QF_ONE);
+    check_expr_string_qf("haversin(0) = 0",
+                         "{ haversin(0) }", QF_ZERO);
+    check_expr_string_qf("havercos(0) = 1",
+                         "{ havercos(0) }", QF_ONE);
+    check_expr_string_qf("hacoversin(0) = 1/2",
+                         "{ hacoversin(0) }", QF_HALF);
+    check_expr_string_qf("hacovercos(0) = 1/2",
+                         "{ hacovercos(0) }", QF_HALF);
+    check_expr_string_qf("arcversin(0) = 0",
+                         "{ arcversin(0) }", QF_ZERO);
+    check_expr_string_qf("arcvercos(2) = 0",
+                         "{ arcvercos(2) }", QF_ZERO);
+    check_expr_string_qf("arccoversin(1) = 0",
+                         "{ arccoversin(1) }", QF_ZERO);
+    check_expr_string_qf("arccovercos(1) = 0",
+                         "{ arccovercos(1) }", QF_ZERO);
+    check_expr_string_qf("archaversin(0) = 0",
+                         "{ archaversin(0) }", QF_ZERO);
+    check_expr_string_qf("archavercos(1) = 0",
+                         "{ archavercos(1) }", QF_ZERO);
+    check_expr_string_qf("archacoversin(1/2) = 0",
+                         "{ archacoversin(1/2) }", QF_ZERO);
+    check_expr_string_qf("archacovercos(1/2) = 0",
+                         "{ archacovercos(1/2) }", QF_ZERO);
+}
+
 void test_sinh(void)
 {
     expr_t *c = test_expr_new_var_d(0.5);
@@ -333,6 +383,7 @@ void test_maths_functions(void)
     TEST_RUN_SUBTEST(test_sin, NULL);
     TEST_RUN_SUBTEST(test_cos, NULL);
     TEST_RUN_SUBTEST(test_tan, NULL);
+    TEST_RUN_SUBTEST(test_haversine_family, NULL);
     TEST_RUN_SUBTEST(test_sinh, NULL);
     TEST_RUN_SUBTEST(test_cosh, NULL);
     TEST_RUN_SUBTEST(test_tanh, NULL);
