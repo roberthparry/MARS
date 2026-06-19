@@ -2493,6 +2493,8 @@ number_t num_log(const number_t number)
         return number_log_imag_multiple(&number, NUMBER_CONST_PI_2, -1);
     }
     num_destroy(&neg_i);
+    if (num_lt(number, NUM_ZERO))
+        return number_apply_qcomplex_unary(number, qc_log);
 
     return number_log_backend(&number);
 }

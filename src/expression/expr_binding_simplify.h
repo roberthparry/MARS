@@ -64,6 +64,7 @@ expr_binding_expr_t * binding_expr_try_simplify_trig_sum          (expr_binding_
 expr_binding_expr_t * binding_expr_try_simplify_principal_inverse (expr_binding_expr_t *expr);
 expr_binding_expr_t * binding_expr_try_simplify_direct_inverse    (expr_binding_expr_t *expr);
 expr_binding_expr_t * binding_expr_try_simplify_imag_trig_bridge  (expr_binding_expr_t *expr);
+expr_binding_expr_t * binding_expr_try_simplify_lambert_exp       (expr_binding_expr_t *expr);
 expr_binding_expr_t * binding_expr_try_simplify_lambert_product   (expr_binding_expr_t *expr);
 expr_binding_expr_t * binding_expr_try_simplify_lambert_inverse   (expr_binding_expr_t *expr);
 expr_binding_expr_t * binding_expr_try_simplify_complex_floor_ceil(expr_binding_expr_t *expr);

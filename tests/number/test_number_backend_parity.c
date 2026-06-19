@@ -537,6 +537,7 @@ static void test_number_complex_elementary_parity(void)
     number_t small = number_text("0.321 + 0.123i");
     number_t exp_i_pi = num_exp(num_mul(NUM_I, NUM_PI));
     number_t log_neg_one = num_log(number_text("-1 + 0i"));
+    number_t log_neg_three = num_log(number_text("-3"));
     number_t log10_neg_one = num_log10(number_text("-1"));
     number_t log10_100 = num_log10(number_text("100"));
     number_t sin_z = num_sin(z);
@@ -563,6 +564,10 @@ static void test_number_complex_elementary_parity(void)
     assert_number_real_imag_close("exp(i*pi)", exp_i_pi, "-1", "0",
                                   NUMBER_PARITY_LOOSE_TOL);
     assert_number_real_imag_close("log(-1 + 0i)", log_neg_one, "0",
+                                  "3.141592653589793238462643383279502",
+                                  NUMBER_PARITY_BRANCH_TOL);
+    assert_number_real_imag_close("log(-3)", log_neg_three,
+                                  "1.098612288668109691395245236922526",
                                   "3.141592653589793238462643383279502",
                                   NUMBER_PARITY_BRANCH_TOL);
     assert_number_real_imag_close("log10(-1)", log10_neg_one, "0",

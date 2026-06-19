@@ -770,6 +770,27 @@ static bool expr_is_lambert_expr(const expr_t *dv)
     return dv && expr_ops_is_lambert(dv->ops);
 }
 
+expr_t *expr_simplify_try_lambert_exp(expr_t *arg)
+{
+    number_t inner_value = NUM_ZERO;
+
+    if (!expr_is_lambert_expr(arg))
+        return NULL;
+    if (expr_is_const(arg->a) && num_is_real(arg->a->c) &&
+        num_eq(arg->a->c, NUM_ZERO)) {
+        num_destroy(&inner_value);
+        return expr_new_const(NUM_ONE);
+    }
+    if (expr_simplify_try_get_plain_real_const(arg->a, &inner_value) &&
+        num_eq(inner_value, NUM_ZERO)) {
+        num_destroy(&inner_value);
+        return expr_new_const(NUM_ONE);
+    }
+    num_destroy(&inner_value);
+
+    return expr_div(arg->a, arg);
+}
+
 expr_t *expr_simplify_try_lambert_product(expr_t *a, expr_t *b)
 {
     expr_t *w;

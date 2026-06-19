@@ -2419,6 +2419,17 @@ static bool binding_expr_is_exp_of_same_lambert(const expr_binding_expr_t *expr,
     return match;
 }
 
+static bool binding_expr_is_arg_over_same_lambert(const expr_binding_expr_t *expr,
+                                                  const expr_binding_expr_t *arg,
+                                                  const expr_binding_expr_t *lambert_expr)
+{
+    if (!expr || !arg || !lambert_expr || expr->kind != EXPR_BINDING_EXPR_DIV)
+        return false;
+
+    return binding_expr_lambert_args_match(expr->u.binary.left, arg) &&
+           expr_binding_expr_struct_eq(expr->u.binary.right, lambert_expr);
+}
+
 expr_binding_expr_t *binding_expr_try_simplify_lambert_product(expr_binding_expr_t *expr)
 {
     const expr_binding_expr_t *arg = NULL;
@@ -2429,12 +2440,18 @@ expr_binding_expr_t *binding_expr_try_simplify_lambert_product(expr_binding_expr
 
     arg = binding_expr_lambert_arg(expr->u.binary.left);
     if (!arg ||
-        !binding_expr_is_exp_of_same_lambert(expr->u.binary.right,
-                                             expr->u.binary.left)) {
+        (!binding_expr_is_exp_of_same_lambert(expr->u.binary.right,
+                                              expr->u.binary.left) &&
+         !binding_expr_is_arg_over_same_lambert(expr->u.binary.right,
+                                                arg,
+                                                expr->u.binary.left))) {
         arg = binding_expr_lambert_arg(expr->u.binary.right);
         if (!arg ||
-            !binding_expr_is_exp_of_same_lambert(expr->u.binary.left,
-                                                 expr->u.binary.right))
+            (!binding_expr_is_exp_of_same_lambert(expr->u.binary.left,
+                                                  expr->u.binary.right) &&
+             !binding_expr_is_arg_over_same_lambert(expr->u.binary.left,
+                                                    arg,
+                                                    expr->u.binary.right)))
             return expr;
     }
 
@@ -2444,6 +2461,46 @@ expr_binding_expr_t *binding_expr_try_simplify_lambert_product(expr_binding_expr
 
     expr_binding_expr_free(expr);
     return out;
+}
+
+expr_binding_expr_t *binding_expr_try_simplify_lambert_exp(expr_binding_expr_t *expr)
+{
+    expr_binding_expr_t *exp_arg = NULL;
+    const expr_binding_expr_t *lambert_arg;
+    expr_binding_expr_t *numerator;
+    expr_binding_expr_t *out;
+    number_t value;
+    bool is_zero;
+
+    if (!expr ||
+        expr->kind != EXPR_BINDING_EXPR_UNARY_OP ||
+        expr->u.unary_op.ops != &ops_exp ||
+        !binding_expr_extract_exp_arg(expr, &exp_arg))
+        return expr;
+
+    lambert_arg = binding_expr_lambert_arg(exp_arg);
+    if (!lambert_arg) {
+        expr_binding_expr_free(exp_arg);
+        return expr;
+    }
+
+    value = expr_binding_expr_eval(lambert_arg);
+    is_zero = num_is_zero(value);
+    num_destroy(&value);
+
+    if (is_zero) {
+        expr_binding_expr_free(exp_arg);
+        return binding_expr_fold_to_expr_owned(expr, binding_expr_new_long(1L));
+    }
+
+    numerator = expr_binding_expr_clone(lambert_arg);
+    if (!numerator) {
+        expr_binding_expr_free(exp_arg);
+        return expr;
+    }
+
+    out = expr_binding_expr_new_div(numerator, exp_arg);
+    return binding_expr_fold_to_expr_owned(expr, expr_binding_expr_simplify(out));
 }
 
 static bool binding_expr_extract_exp_factor(const expr_binding_expr_t *expr,

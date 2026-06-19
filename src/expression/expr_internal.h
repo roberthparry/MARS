@@ -597,6 +597,7 @@ expr_t * expr_simplify_try_vtable_inverse_argument(const expr_t *outer, const ex
 expr_t * expr_simplify_try_basic_sum              (expr_t *a, expr_t *b);
 expr_t * expr_simplify_try_basic_product          (expr_t *a, expr_t *b);
 expr_t * expr_simplify_try_trig_product           (expr_t *a, expr_t *b);
+expr_t * expr_simplify_try_lambert_exp            (expr_t *arg);
 expr_t * expr_simplify_try_lambert_product        (expr_t *a, expr_t *b);
 expr_t * expr_simplify_try_i_unit_product         (expr_t *a, expr_t *b);
 expr_t * expr_simplify_try_imag_trig_bridge       (const expr_t *op, expr_t *arg);
