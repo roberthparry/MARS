@@ -75,6 +75,10 @@ static const char *sup_digits[10] = {
     "⁰","¹","²","³","⁴","⁵","⁶","⁷","⁸","⁹"
 };
 
+static const char *sub_digits[10] = {
+    "₀","₁","₂","₃","₄","₅","₆","₇","₈","₉"
+};
+
 static int expr_append_padding(string_t *out, int count)
 {
     for (int i = 0; i < count; ++i) {
@@ -195,6 +199,28 @@ static void emit_superscript_int(sbuf_t *b, long n)
     for (int i = len - 1; i >= 0; --i) {
         int d = tmp[i] - '0';
         sbuf_puts(b, sup_digits[d]);
+    }
+}
+
+static void emit_subscript_int(sbuf_t *b, long n)
+{
+    if (n < 0) {
+        sbuf_puts(b, "₋");
+        n = -n;
+    }
+    if (n == 0) {
+        sbuf_puts(b, "₀");
+        return;
+    }
+    char tmp[32];
+    int  len = 0;
+    while (n > 0 && len < (int)sizeof(tmp)) {
+        tmp[len++] = (char)('0' + (n % 10));
+        n /= 10;
+    }
+    for (int i = len - 1; i >= 0; --i) {
+        int d = tmp[i] - '0';
+        sbuf_puts(b, sub_digits[d]);
     }
 }
 
@@ -1694,7 +1720,7 @@ static const char *expr_known_constant_tex_local(number_t value)
 static void emit_tex_number_value(sbuf_t *b, number_t value)
 {
     const char *constant_tex = NULL;
-    char *text = expr_number_to_string_local(value);
+    char *text = expr_number_to_string_local(num_clone(value));
     char *tex;
 
     if (!text)
@@ -1833,6 +1859,33 @@ static int expr_has_polygamma_order(const expr_t *f)
     return expr_polygamma_order(f, &order);
 }
 
+static int expr_polylog_order(const expr_t *f, long *order)
+{
+    return f && expr_is_op(f, &ops_polylog) && f->a && expr_is_const(f->a) &&
+           expr_try_get_small_integer_exponent(f->a->c, order) && *order >= 0;
+}
+
+static int expr_has_polylog_order(const expr_t *f)
+{
+    long order;
+
+    return expr_polylog_order(f, &order);
+}
+
+static int expr_legendre_chi_order(const expr_t *f, long *order)
+{
+    return f && expr_is_op(f, &ops_legendre_chi) && f->a &&
+           expr_is_const(f->a) &&
+           expr_try_get_small_integer_exponent(f->a->c, order) && *order >= 0;
+}
+
+static int expr_has_legendre_chi_order(const expr_t *f)
+{
+    long order;
+
+    return expr_legendre_chi_order(f, &order);
+}
+
 static void emit_expr_polygamma(const expr_t *f, sbuf_t *b)
 {
     long order;
@@ -1843,6 +1896,58 @@ static void emit_expr_polygamma(const expr_t *f, sbuf_t *b)
     emit_superscript_int(b, order);
     sbuf_puts(b, "⁾(");
     emit_expr(f->b, b, 0);
+    sbuf_putc(b, ')');
+}
+
+static void emit_expr_polylog(const expr_t *f, sbuf_t *b)
+{
+    long order;
+
+    if (!expr_polylog_order(f, &order))
+        return;
+    sbuf_puts(b, "Li");
+    emit_subscript_int(b, order);
+    sbuf_putc(b, '(');
+    emit_expr(f->b, b, 0);
+    sbuf_putc(b, ')');
+}
+
+static void emit_expr_legendre_chi(const expr_t *f, sbuf_t *b)
+{
+    long order;
+
+    if (!expr_legendre_chi_order(f, &order))
+        return;
+    sbuf_puts(b, "χ");
+    emit_subscript_int(b, order);
+    sbuf_putc(b, '(');
+    emit_expr(f->b, b, 0);
+    sbuf_putc(b, ')');
+}
+
+static void emit_expr_appell_f1(const expr_t *f, sbuf_t *b)
+{
+    const expr_t *a = NULL;
+    const expr_t *b1 = NULL;
+    const expr_t *b2 = NULL;
+    const expr_t *c = NULL;
+    const expr_t *x = NULL;
+    const expr_t *y = NULL;
+
+    if (!expr_appell_f1_unpack(f, &a, &b1, &b2, &c, &x, &y))
+        return;
+    sbuf_puts(b, "F₁(");
+    emit_expr(a, b, 0);
+    sbuf_puts(b, "; ");
+    emit_expr(b1, b, 0);
+    sbuf_puts(b, ", ");
+    emit_expr(b2, b, 0);
+    sbuf_puts(b, "; ");
+    emit_expr(c, b, 0);
+    sbuf_puts(b, "; ");
+    emit_expr(x, b, 0);
+    sbuf_puts(b, ", ");
+    emit_expr(y, b, 0);
     sbuf_putc(b, ')');
 }
 
@@ -1861,6 +1966,62 @@ static void emit_tex_polygamma(const expr_t *f, sbuf_t *b)
     sbuf_putc(b, ')');
 }
 
+static void emit_tex_polylog(const expr_t *f, sbuf_t *b)
+{
+    long order;
+    char buf[32];
+
+    if (!expr_polylog_order(f, &order))
+        return;
+    snprintf(buf, sizeof(buf), "%ld", order);
+    sbuf_puts(b, "\\operatorname{Li}_{");
+    sbuf_puts(b, buf);
+    sbuf_puts(b, "}(");
+    emit_tex_expr(f->b, b, 0);
+    sbuf_putc(b, ')');
+}
+
+static void emit_tex_legendre_chi(const expr_t *f, sbuf_t *b)
+{
+    long order;
+    char buf[32];
+
+    if (!expr_legendre_chi_order(f, &order))
+        return;
+    snprintf(buf, sizeof(buf), "%ld", order);
+    sbuf_puts(b, "\\chi_{");
+    sbuf_puts(b, buf);
+    sbuf_puts(b, "}(");
+    emit_tex_expr(f->b, b, 0);
+    sbuf_putc(b, ')');
+}
+
+static void emit_tex_appell_f1(const expr_t *f, sbuf_t *b)
+{
+    const expr_t *a = NULL;
+    const expr_t *b1 = NULL;
+    const expr_t *b2 = NULL;
+    const expr_t *c = NULL;
+    const expr_t *x = NULL;
+    const expr_t *y = NULL;
+
+    if (!expr_appell_f1_unpack(f, &a, &b1, &b2, &c, &x, &y))
+        return;
+    sbuf_puts(b, "F_{1}\\left(");
+    emit_tex_expr(a, b, 0);
+    sbuf_puts(b, "; ");
+    emit_tex_expr(b1, b, 0);
+    sbuf_puts(b, ", ");
+    emit_tex_expr(b2, b, 0);
+    sbuf_puts(b, "; ");
+    emit_tex_expr(c, b, 0);
+    sbuf_puts(b, "; ");
+    emit_tex_expr(x, b, 0);
+    sbuf_puts(b, ", ");
+    emit_tex_expr(y, b, 0);
+    sbuf_puts(b, "\\right)");
+}
+
 static void emit_func_polygamma(const expr_t *f, sbuf_t *b)
 {
     long order;
@@ -1873,6 +2034,32 @@ static void emit_func_polygamma(const expr_t *f, sbuf_t *b)
     sbuf_puts(b, buf);
     sbuf_puts(b, ", ");
     emit_func(f->b, b, 0);
+    sbuf_putc(b, ')');
+}
+
+static void emit_func_appell_f1(const expr_t *f, sbuf_t *b)
+{
+    const expr_t *a = NULL;
+    const expr_t *b1 = NULL;
+    const expr_t *b2 = NULL;
+    const expr_t *c = NULL;
+    const expr_t *x = NULL;
+    const expr_t *y = NULL;
+
+    if (!expr_appell_f1_unpack(f, &a, &b1, &b2, &c, &x, &y))
+        return;
+    sbuf_puts(b, "appell_f1(");
+    emit_func(a, b, 0);
+    sbuf_puts(b, ", ");
+    emit_func(b1, b, 0);
+    sbuf_puts(b, ", ");
+    emit_func(b2, b, 0);
+    sbuf_puts(b, ", ");
+    emit_func(c, b, 0);
+    sbuf_puts(b, ", ");
+    emit_func(x, b, 0);
+    sbuf_puts(b, ", ");
+    emit_func(y, b, 0);
     sbuf_putc(b, ')');
 }
 
@@ -1909,14 +2096,24 @@ static void emit_tex_expr_abs(const expr_t *f, sbuf_t *b, int parent_prec)
     if (expr_tostring_is_negative_const(f)) {
         if (emit_negative_const_binding_expr_abs(f, b, true))
             return;
-        emit_tex_number_value(b, num_neg(f->c));
+        {
+            number_t positive = num_neg(f->c);
+
+            emit_tex_number_value(b, positive);
+            num_destroy(&positive);
+        }
         return;
     }
 
     if (expr_is_const(f) && expr_renders_negative(f)) {
         if (emit_negative_const_binding_expr_abs(f, b, true))
             return;
-        emit_tex_number_value(b, num_neg(f->c));
+        {
+            number_t positive = num_neg(f->c);
+
+            emit_tex_number_value(b, positive);
+            num_destroy(&positive);
+        }
         return;
     }
 
@@ -2405,6 +2602,18 @@ void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec)
             emit_tex_polygamma(f, b);
             return;
         }
+        if (expr_has_polylog_order(f)) {
+            emit_tex_polylog(f, b);
+            return;
+        }
+        if (expr_has_legendre_chi_order(f)) {
+            emit_tex_legendre_chi(f, b);
+            return;
+        }
+        if (expr_is_op(f, &ops_appell_f1)) {
+            emit_tex_appell_f1(f, b);
+            return;
+        }
         sbuf_puts(b, "\\operatorname{");
         sbuf_puts(b, f->ops->name);
         sbuf_puts(b, "}(");
@@ -2797,6 +3006,18 @@ void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
             emit_expr_polygamma(f, b);
             return;
         }
+        if (expr_has_polylog_order(f)) {
+            emit_expr_polylog(f, b);
+            return;
+        }
+        if (expr_has_legendre_chi_order(f)) {
+            emit_expr_legendre_chi(f, b);
+            return;
+        }
+        if (expr_is_op(f, &ops_appell_f1)) {
+            emit_expr_appell_f1(f, b);
+            return;
+        }
         sbuf_puts(b, f->ops->name);
         sbuf_putc(b, '(');
         emit_expr(f->a, b, 0);
@@ -3007,6 +3228,10 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
     if (f->ops->arity == EXPR_OP_BINARY) {
         if (expr_has_polygamma_order(f)) {
             emit_func_polygamma(f, b);
+            return;
+        }
+        if (expr_is_op(f, &ops_appell_f1)) {
+            emit_func_appell_f1(f, b);
             return;
         }
         sbuf_puts(b, f->ops->name);

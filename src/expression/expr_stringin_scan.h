@@ -29,6 +29,7 @@ bool expr_parse_view_peek_value              (string_view_t view,
 bool expr_parse_is_superscript_digit   (uint32_t value);
 int  expr_parse_superscript_digit_value(uint32_t value);
 bool expr_parse_is_subscript_digit     (uint32_t value);
+int  expr_parse_subscript_digit_value  (uint32_t value);
 bool expr_parse_is_fraction_glyph      (uint32_t value);
 
 /* Literal scanning. */

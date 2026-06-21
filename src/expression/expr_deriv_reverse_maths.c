@@ -604,6 +604,76 @@ void expr_reverse_polygamma(const expr_t *dv, const number_t *out_bar, number_t 
     expr_reverse_binary(NUM_ZERO, expr_reverse_num_clone(factor), a_bar, b_bar);
 }
 
+void expr_reverse_dilog(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
+{
+    number_t one_minus = num_sub(NUM_ONE, expr_eval_num_internal(dv->a));
+    number_t log_term = num_log(one_minus);
+    number_t neg_log = num_neg(log_term);
+    number_t factor = num_div(neg_log, expr_eval_num_internal(dv->a));
+
+    expr_reverse_unary(expr_reverse_num_mul(*out_bar, factor), a_bar, b_bar);
+}
+
+void expr_reverse_polylog(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
+{
+    number_t order_value = expr_eval_num_internal(dv->a);
+    number_t z = expr_eval_num_internal(dv->b);
+    number_t factor;
+    number_t scaled;
+    unsigned int order;
+
+    if (!expr_number_to_polygamma_order(order_value, &order)) {
+        expr_reverse_binary(NUM_ZERO, NUM_NAN, a_bar, b_bar);
+        return;
+    }
+
+    if (order == 0u) {
+        number_t one_minus = num_sub(NUM_ONE, z);
+        number_t den = num_sqr(one_minus);
+
+        factor = num_div(NUM_ONE, den);
+    } else {
+        number_t prev_order = num_create_from_long((long)order - 1L);
+        number_t prev = num_polylog(prev_order, z);
+
+        factor = num_div(prev, z);
+    }
+
+    scaled = num_mul(*out_bar, factor);
+    expr_reverse_binary(NUM_ZERO, expr_reverse_num_clone(scaled), a_bar, b_bar);
+}
+
+void expr_reverse_legendre_chi(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
+{
+    number_t order_value = expr_eval_num_internal(dv->a);
+    number_t z = expr_eval_num_internal(dv->b);
+    number_t factor;
+    number_t scaled;
+    unsigned int order;
+
+    if (!expr_number_to_polygamma_order(order_value, &order)) {
+        expr_reverse_binary(NUM_ZERO, NUM_NAN, a_bar, b_bar);
+        return;
+    }
+
+    if (order == 0u) {
+        number_t z_sq = num_sqr(z);
+        number_t numerator = num_add(NUM_ONE, z_sq);
+        number_t one_minus_z_sq = num_sub(NUM_ONE, z_sq);
+        number_t den = num_sqr(one_minus_z_sq);
+
+        factor = num_div(numerator, den);
+    } else {
+        number_t prev_order = num_create_from_long((long)order - 1L);
+        number_t prev = num_legendre_chi(prev_order, z);
+
+        factor = num_div(prev, z);
+    }
+
+    scaled = num_mul(*out_bar, factor);
+    expr_reverse_binary(NUM_ZERO, expr_reverse_num_clone(scaled), a_bar, b_bar);
+}
+
 void expr_reverse_gammainv(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
     number_t y = expr_eval_num_internal(dv);

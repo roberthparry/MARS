@@ -168,6 +168,14 @@ expr_t * integrate_squared_unary_affine                  (const expr_t *expr,
 expr_t * integrate_cubed_unary_affine                    (const expr_t *expr,
                                                           const expr_t *wrt,
                                                           expr_pattern_unary_affine_kind_t kind);
+expr_t * integrate_sec_double_angle_log_tan_cot          (const expr_t *expr,
+                                                          const expr_t *wrt);
+expr_t * integrate_sec_squared_log_tan_cot               (const expr_t *expr,
+                                                          const expr_t *wrt);
+expr_t * integrate_inverse_sqrt_sin_cos_sin3_cos         (const expr_t *expr,
+                                                          const expr_t *wrt);
+expr_t * integrate_inverse_quartic_appell_f1             (const expr_t *expr,
+                                                          const expr_t *wrt);
 expr_t * integrate_matching_squared_unary_affine         (const expr_t *expr,
                                                           const expr_t *wrt);
 expr_t * integrate_matching_cubed_unary_affine           (const expr_t *expr,

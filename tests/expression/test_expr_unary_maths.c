@@ -415,6 +415,7 @@ void test_maths_functions(void)
     TEST_RUN_SUBTEST(test_digamma, NULL);
     TEST_RUN_SUBTEST(test_trigamma, NULL);
     TEST_RUN_SUBTEST(test_polygamma, NULL);
+    TEST_RUN_SUBTEST(test_dilog_polylog, NULL);
     TEST_RUN_SUBTEST(test_lambert_w0, NULL);
     TEST_RUN_SUBTEST(test_lambert_wm1, NULL);
     TEST_RUN_SUBTEST(test_normal_pdf, NULL);

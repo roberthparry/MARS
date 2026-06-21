@@ -519,6 +519,56 @@ void test_polygamma(void)
     expr_free(c);
 }
 
+void test_dilog_polylog(void)
+{
+    expr_t *c = test_expr_new_var_d(0.5);
+    expr_t *f = expr_dilog(c);
+    qfloat_t log2 = qf_log(qf_from_double(2.0));
+    qfloat_t expect = qf_sub(qf_div(qf_sqr(QF_PI), qf_from_double(12.0)),
+                             qf_div(qf_sqr(log2), qf_from_double(2.0)));
+
+    check_q_at(__FILE__, __LINE__, 1,
+               "dilog(1/2) = pi^2/12 - log(2)^2/2", expr_eval_qf(f), expect);
+    print_expr_of(f);
+
+    expr_free(f);
+    expr_free(c);
+
+    c = test_expr_new_var_d(0.5);
+    f = expr_polylog(2u, c);
+    check_q_at(__FILE__, __LINE__, 1,
+               "polylog(2, 1/2) = dilog(1/2)", expr_eval_qf(f), expect);
+    print_expr_of(f);
+
+    expr_free(f);
+    expr_free(c);
+
+    {
+        expr_t *a = test_expr_new_const_d(1.0);
+        expr_t *b1 = test_expr_new_const_d(1.0);
+        expr_t *b2 = test_expr_new_const_d(1.0);
+        expr_t *cc = test_expr_new_const_d(2.0);
+        expr_t *x = test_expr_new_const_d(0.1);
+        expr_t *y = test_expr_new_const_d(0.2);
+        qfloat_t appell_expect =
+            qf_from_string("1.1778303565638345453879410947052170506848071256473314110734863879480772052813379");
+
+        f = expr_appell_f1(a, b1, b2, cc, x, y);
+        check_q_at(__FILE__, __LINE__, 1,
+                   "appell_f1(1;1,1;2;0.1,0.2)",
+                   expr_eval_qf(f), appell_expect);
+        print_expr_of(f);
+
+        expr_free(f);
+        expr_free(y);
+        expr_free(x);
+        expr_free(cc);
+        expr_free(b2);
+        expr_free(b1);
+        expr_free(a);
+    }
+}
+
 void test_gammainv(void)
 {
     /* gammainv(gamma(2.5)) = 2.5 */

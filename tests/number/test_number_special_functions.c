@@ -106,6 +106,9 @@ void run_number_special_function_tests(void)
         number_t pi_over_three = num_div(NUM_PI, three);
         number_t pi_over_six = num_div(NUM_PI, six);
         number_t one_half = num_div(one, two);
+        number_t dilog_half = num_dilog(one_half);
+        number_t polylog2_half = num_polylog(two, one_half);
+        number_t dilog_two = num_dilog(two);
         number_t three_halves = num_div(three, two);
         number_t one_quarter = num_div(one, four);
         number_t three_quarters = num_div(three, four);
@@ -172,6 +175,15 @@ void run_number_special_function_tests(void)
         assert_number_string("num_normal_cdf(0)", normal_cdf0, "0.5");
         assert_number_string_prefix("num_e1(1)", e1_1,
                                     "0.219383934395520273677163775460");
+        assert_number_close_text("num_dilog(1/2) = pi^2/12 - log(2)^2/2",
+                                 dilog_half,
+                                 "0.58224052646501250590265632015968",
+                                 "1e-30");
+        assert_number_close_text("num_polylog(2, 1/2) = num_dilog(1/2)",
+                                 polylog2_half,
+                                 "0.58224052646501250590265632015968",
+                                 "1e-30");
+        ASSERT_TRUE(!num_is_real(dilog_two));
         assert_number_close_number("num_versin(pi/3) = 1/2",
                                    versin_pi3, one_half, "1e-30");
         assert_number_close_number("num_vercos(pi/3) = 3/2",
@@ -259,6 +271,9 @@ void run_number_special_function_tests(void)
         num_destroy(&pi_over_three);
         num_destroy(&pi_over_six);
         num_destroy(&one_half);
+        num_destroy(&dilog_half);
+        num_destroy(&polylog2_half);
+        num_destroy(&dilog_two);
         num_destroy(&three_halves);
         num_destroy(&one_quarter);
         num_destroy(&three_quarters);
@@ -278,6 +293,86 @@ void run_number_special_function_tests(void)
         num_destroy(&archavercos_three_quarters);
         num_destroy(&archacoversin_quarter);
         num_destroy(&archacovercos_three_quarters);
+    }
+
+    {
+        size_t saved_precision = num_get_default_prec_bits();
+        number_t one;
+        number_t two;
+        number_t half;
+        number_t dilog_half;
+        number_t polylog2_half;
+        number_t pi;
+        number_t pi2;
+        number_t twelve;
+        number_t pi2_over_12;
+        number_t log2;
+        number_t log2_sq;
+        number_t log2_sq_half;
+        number_t dilog_half_expected;
+        number_t dilog_two;
+        number_t dilog_two_real;
+        number_t dilog_two_imag;
+        number_t four;
+        number_t pi2_over_4;
+        number_t pi_log2;
+        number_t neg_pi_log2;
+
+        ASSERT_EQ_INT(num_set_default_prec_bits(640u), 0);
+        one = num_create_from_long(1);
+        two = num_create_from_long(2);
+        four = num_create_from_long(4);
+        twelve = num_create_from_long(12);
+        half = num_div(one, two);
+        pi = num_const_prec(NUM_PI, 640u);
+        pi2 = num_mul(pi, pi);
+        pi2_over_12 = num_div(pi2, twelve);
+        log2 = num_log(two);
+        log2_sq = num_mul(log2, log2);
+        log2_sq_half = num_div(log2_sq, two);
+        dilog_half_expected = num_sub(pi2_over_12, log2_sq_half);
+        dilog_half = num_dilog(half);
+        polylog2_half = num_polylog(two, half);
+        dilog_two = num_dilog(two);
+        dilog_two_real = num_real_part(dilog_two);
+        dilog_two_imag = num_imag_part(dilog_two);
+        pi2_over_4 = num_div(pi2, four);
+        pi_log2 = num_mul(pi, log2);
+        neg_pi_log2 = num_neg(pi_log2);
+
+        assert_number_close_number("high-precision num_dilog(1/2)",
+                                   dilog_half, dilog_half_expected,
+                                   "1e-180");
+        assert_number_close_number("high-precision num_polylog(2, 1/2)",
+                                   polylog2_half, dilog_half_expected,
+                                   "1e-180");
+        ASSERT_TRUE(!num_is_real(dilog_two));
+        assert_number_close_number("high-precision Re num_dilog(2) = pi^2/4",
+                                   dilog_two_real, pi2_over_4, "1e-180");
+        assert_number_close_number("high-precision Im num_dilog(2) = -pi ln 2",
+                                   dilog_two_imag, neg_pi_log2, "1e-180");
+
+        num_destroy(&neg_pi_log2);
+        num_destroy(&pi_log2);
+        num_destroy(&pi2_over_4);
+        num_destroy(&dilog_two_imag);
+        num_destroy(&dilog_two_real);
+        num_destroy(&dilog_two);
+        num_destroy(&polylog2_half);
+        num_destroy(&dilog_half);
+        num_destroy(&dilog_half_expected);
+        num_destroy(&log2_sq_half);
+        num_destroy(&log2_sq);
+        num_destroy(&log2);
+        num_destroy(&pi2_over_12);
+        num_destroy(&twelve);
+        num_destroy(&pi2);
+        num_destroy(&pi);
+        num_destroy(&half);
+        num_destroy(&four);
+        num_destroy(&two);
+        num_destroy(&one);
+        ASSERT_EQ_INT(num_set_default_prec_bits(saved_precision), 0);
     }
 
     {

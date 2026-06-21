@@ -90,6 +90,54 @@ static number_t eval_integral_meta(expr_t *dv)
     return num_clone(NUM_NAN);
 }
 
+static bool eval_integral_antiderivative_difference(const expr_t *antiderivative,
+                                                    const expr_t *local_var,
+                                                    const expr_t *upper_expr,
+                                                    const expr_t *lower_expr,
+                                                    number_t *out)
+{
+    expr_t *zero_lower = NULL;
+    expr_t *upper_eval_expr = NULL;
+    expr_t *lower_eval_expr = NULL;
+    expr_t *diff_expr = NULL;
+    expr_t *simplified_diff = NULL;
+    const expr_t *effective_lower = lower_expr;
+    const expr_t *value_expr;
+    number_t value;
+    bool ok;
+
+    if (!antiderivative || !local_var || !upper_expr || !out)
+        return false;
+
+    if (!effective_lower) {
+        zero_lower = expr_new_const(NUM_ZERO);
+        effective_lower = zero_lower;
+    }
+
+    upper_eval_expr = expr_substitute(antiderivative, local_var, upper_expr);
+    lower_eval_expr = effective_lower
+        ? expr_substitute(antiderivative, local_var, effective_lower)
+        : NULL;
+    diff_expr = (upper_eval_expr && lower_eval_expr)
+        ? expr_sub(upper_eval_expr, lower_eval_expr)
+        : NULL;
+    simplified_diff = diff_expr ? expr_simplify(diff_expr) : NULL;
+    value_expr = simplified_diff ? simplified_diff : diff_expr;
+    value = value_expr ? expr_eval(value_expr) : num_clone(NUM_NAN);
+    ok = num_is_real(value) && num_is_finite(value);
+    if (ok)
+        *out = value;
+    else
+        num_destroy(&value);
+
+    expr_free(simplified_diff);
+    expr_free(diff_expr);
+    expr_free(lower_eval_expr);
+    expr_free(upper_eval_expr);
+    expr_free(zero_lower);
+    return ok;
+}
+
 static number_t eval_integral(expr_t *dv)
 {
     integrator_t *ig;
@@ -151,36 +199,49 @@ static number_t eval_integral(expr_t *dv)
     result = num_new();
     antiderivative = expr_integrate(local_integrand, local_var);
     if (antiderivative) {
-        expr_t *upper_const = expr_new_const(upper);
-        expr_t *lower_const = expr_new_const(lower);
-        expr_t *upper_eval_expr = upper_const
-            ? expr_substitute(antiderivative, local_var, upper_const)
-            : NULL;
-        expr_t *lower_eval_expr = lower_const
-            ? expr_substitute(antiderivative, local_var, lower_const)
-            : NULL;
+        number_t symbolic_value;
 
-        if (!upper_const || !lower_const || !upper_eval_expr || !lower_eval_expr) {
-            expr_free(lower_eval_expr);
-            expr_free(upper_eval_expr);
-            expr_free(lower_const);
-            expr_free(upper_const);
-            expr_free(antiderivative);
-            status = -1;
-        } else {
-            number_t upper_value = expr_eval(upper_eval_expr);
-            number_t lower_value = expr_eval(lower_eval_expr);
-
+        if (eval_integral_antiderivative_difference(antiderivative,
+                                                    local_var,
+                                                    upper_expr,
+                                                    lower_expr,
+                                                    &symbolic_value)) {
             num_destroy(&result);
-            result = num_sub(upper_value, lower_value);
-            num_destroy(&lower_value);
-            num_destroy(&upper_value);
-            expr_free(lower_eval_expr);
-            expr_free(upper_eval_expr);
-            expr_free(lower_const);
-            expr_free(upper_const);
+            result = symbolic_value;
             expr_free(antiderivative);
             status = 0;
+        } else {
+            expr_t *upper_const = expr_new_const(upper);
+            expr_t *lower_const = expr_new_const(lower);
+            expr_t *upper_eval_expr = upper_const
+                ? expr_substitute(antiderivative, local_var, upper_const)
+                : NULL;
+            expr_t *lower_eval_expr = lower_const
+                ? expr_substitute(antiderivative, local_var, lower_const)
+                : NULL;
+
+            if (!upper_const || !lower_const || !upper_eval_expr || !lower_eval_expr) {
+                expr_free(lower_eval_expr);
+                expr_free(upper_eval_expr);
+                expr_free(lower_const);
+                expr_free(upper_const);
+                expr_free(antiderivative);
+                status = -1;
+            } else {
+                number_t upper_value = expr_eval(upper_eval_expr);
+                number_t lower_value = expr_eval(lower_eval_expr);
+
+                num_destroy(&result);
+                result = num_sub(upper_value, lower_value);
+                num_destroy(&lower_value);
+                num_destroy(&upper_value);
+                expr_free(lower_eval_expr);
+                expr_free(upper_eval_expr);
+                expr_free(lower_const);
+                expr_free(upper_const);
+                expr_free(antiderivative);
+                status = 0;
+            }
         }
     } else {
         status = intg_integral(ig, local_integrand, local_var, lower, upper, &result, NULL);

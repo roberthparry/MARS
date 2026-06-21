@@ -341,6 +341,11 @@ qcomplex_t qc_digamma(qcomplex_t z);             /**< digamma */
 qcomplex_t qc_trigamma(qcomplex_t z);            /**< trigamma */
 qcomplex_t qc_tetragamma(qcomplex_t z);          /**< tetragamma */
 qcomplex_t qc_polygamma(unsigned int order, qcomplex_t z); /**< polygamma ψ⁽ⁿ⁾ */
+qcomplex_t qc_dilog(qcomplex_t z);                 /**< dilogarithm Li₂(z) */
+qcomplex_t qc_polylog(qcomplex_t s, qcomplex_t z); /**< polylogarithm Li_s(z), integer s */
+qcomplex_t qc_appell_f1(qcomplex_t a, qcomplex_t b1, qcomplex_t b2,
+                        qcomplex_t c, qcomplex_t x, qcomplex_t y); /**< Appell F1(a;b1,b2;c;x,y) */
+qcomplex_t qc_legendre_chi(qcomplex_t s, qcomplex_t z); /**< Legendre chi chi_s(z), integer s */
 qcomplex_t qc_gammainv(qcomplex_t z);            /**< inverse gamma */
 qcomplex_t qc_beta(qcomplex_t a, qcomplex_t b);  /**< beta function */
 qcomplex_t qc_logbeta(qcomplex_t a, qcomplex_t b); /**< log beta */

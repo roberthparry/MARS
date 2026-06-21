@@ -1,5 +1,6 @@
 #include "qfloat_internal.h"
 
+#include <limits.h>
 #include <math.h>
 
 static int qf_is_integer(qfloat_t x);
@@ -17,7 +18,9 @@ enum {
     QF_GAMMAINC_MAX_TERMS = 2000,
     QF_EI_ASYMP_MAX_TERMS = 50,
     QF_EI_SERIES_MAX_TERMS = 800,
-    QF_EI_NEG_ASYMP_MAX_TERMS = 100
+    QF_EI_NEG_ASYMP_MAX_TERMS = 100,
+    QF_POLYLOG_SERIES_MAX_TERMS = 10000,
+    QF_APPELL_F1_SERIES_MAX_TERMS = 10000
 };
 
 static inline int qf_round_to_int(qfloat_t y)
@@ -2769,4 +2772,177 @@ qfloat_t qf_e1(qfloat_t x)
         return qf_neg(qf_ei(qf_neg(x)));
 
     return qf_e1_asymp_pos(x);
+}
+
+static int qf_to_integer_order(qfloat_t value, int *order)
+{
+    double raw;
+    double rounded;
+
+    if (!order || qf_isnan(value) || qf_isinf(value))
+        return 0;
+
+    raw = qf_to_double(value);
+    rounded = nearbyint(raw);
+    if (fabs(raw - rounded) > 1e-28 ||
+        rounded < (double)INT_MIN ||
+        rounded > (double)INT_MAX)
+        return 0;
+
+    *order = (int)rounded;
+    return 1;
+}
+
+static qfloat_t qf_polylog_series_int(int order, qfloat_t z)
+{
+    qfloat_t sum = QF_ZERO;
+    qfloat_t term = z;
+    qfloat_t tol = qf_from_double(1e-34);
+
+    for (int k = 1; k < QF_POLYLOG_SERIES_MAX_TERMS; ++k) {
+        qfloat_t denom = qf_pow_int(qf_from_double((double)k), order);
+        qfloat_t add = qf_div(term, denom);
+
+        sum = qf_add(sum, add);
+        if (qf_le(qf_abs(add), qf_mul(tol, qf_add(QF_ONE, qf_abs(sum)))))
+            break;
+        term = qf_mul(term, z);
+    }
+
+    return sum;
+}
+
+qfloat_t qf_dilog(qfloat_t x)
+{
+    qfloat_t pi2_over_6;
+    qfloat_t log_term;
+    qfloat_t reduced;
+    qfloat_t inner;
+
+    if (qf_isnan(x) || qf_isinf(x))
+        return QF_NAN;
+    if (qf_eq(x, QF_ZERO))
+        return QF_ZERO;
+    if (qf_eq(x, QF_ONE))
+        return qf_div(qf_mul(QF_PI, QF_PI), qf_from_double(6.0));
+    if (qf_gt(x, QF_ONE))
+        return QF_NAN;
+
+    if (qf_lt(x, qf_from_double(-0.5))) {
+        qfloat_t one_minus = qf_sub(QF_ONE, x);
+
+        reduced = qf_div(x, one_minus);
+        inner = qf_dilog(reduced);
+        log_term = qf_log(one_minus);
+        return qf_sub(qf_neg(inner),
+                      qf_mul_double(qf_mul(log_term, log_term), 0.5));
+    }
+
+    if (qf_gt(x, qf_from_double(0.5))) {
+        qfloat_t one_minus_x = qf_sub(QF_ONE, x);
+
+        pi2_over_6 = qf_div(qf_mul(QF_PI, QF_PI), qf_from_double(6.0));
+        log_term = qf_mul(qf_log(x), qf_log(one_minus_x));
+        inner = qf_dilog(one_minus_x);
+        return qf_sub(qf_sub(pi2_over_6, log_term), inner);
+    }
+
+    return qf_polylog_series_int(2, x);
+}
+
+qfloat_t qf_polylog(qfloat_t s, qfloat_t x)
+{
+    int order;
+
+    if (!qf_to_integer_order(s, &order))
+        return QF_NAN;
+    if (order < 0)
+        return QF_NAN;
+    if (order == 0)
+        return qf_div(x, qf_sub(QF_ONE, x));
+    if (order == 1)
+        return qf_neg(qf_log(qf_sub(QF_ONE, x)));
+    if (order == 2)
+        return qf_dilog(x);
+    if (qf_ge(qf_abs(x), qf_from_double(0.95)))
+        return QF_NAN;
+
+    return qf_polylog_series_int(order, x);
+}
+
+qfloat_t qf_appell_f1(qfloat_t a, qfloat_t b1, qfloat_t b2,
+                      qfloat_t c, qfloat_t x, qfloat_t y)
+{
+    qfloat_t sum = QF_ZERO;
+    qfloat_t row_start = QF_ONE;
+    qfloat_t tol = qf_from_double(1e-34);
+
+    if (qf_isnan(a) || qf_isnan(b1) || qf_isnan(b2) || qf_isnan(c) ||
+        qf_isnan(x) || qf_isnan(y) ||
+        qf_isinf(a) || qf_isinf(b1) || qf_isinf(b2) || qf_isinf(c) ||
+        qf_isinf(x) || qf_isinf(y))
+        return QF_NAN;
+    if (qf_ge(qf_abs(x), qf_from_double(0.95)) ||
+        qf_ge(qf_abs(y), qf_from_double(0.95)))
+        return QF_NAN;
+
+    for (int m = 0; m < QF_APPELL_F1_SERIES_MAX_TERMS; ++m) {
+        qfloat_t row_sum = QF_ZERO;
+        qfloat_t term = row_start;
+
+        for (int n = 0; n < QF_APPELL_F1_SERIES_MAX_TERMS; ++n) {
+            qfloat_t scale = qf_mul(tol, qf_add(QF_ONE, qf_abs(row_sum)));
+
+            row_sum = qf_add(row_sum, term);
+            if (qf_le(qf_abs(term), scale))
+                break;
+
+            qfloat_t mn = qf_from_double((double)(m + n));
+            qfloat_t np1 = qf_from_double((double)(n + 1));
+            qfloat_t num = qf_mul(qf_add(a, mn), qf_add(b2, qf_from_double((double)n)));
+            qfloat_t den = qf_mul(qf_add(c, mn), np1);
+
+            if (qf_eq(den, QF_ZERO))
+                return QF_NAN;
+            term = qf_mul(term, qf_mul(qf_div(num, den), y));
+        }
+
+        sum = qf_add(sum, row_sum);
+        if (qf_le(qf_abs(row_sum), qf_mul(tol, qf_add(QF_ONE, qf_abs(sum)))))
+            break;
+
+        qfloat_t mp1 = qf_from_double((double)(m + 1));
+        qfloat_t mm = qf_from_double((double)m);
+        qfloat_t num = qf_mul(qf_add(a, mm), qf_add(b1, mm));
+        qfloat_t den = qf_mul(qf_add(c, mm), mp1);
+
+        if (qf_eq(den, QF_ZERO))
+            return QF_NAN;
+        row_start = qf_mul(row_start, qf_mul(qf_div(num, den), x));
+    }
+
+    return sum;
+}
+
+qfloat_t qf_legendre_chi(qfloat_t s, qfloat_t x)
+{
+    int order;
+    qfloat_t x_sq;
+    qfloat_t pos;
+    qfloat_t neg;
+
+    if (!qf_to_integer_order(s, &order))
+        return QF_NAN;
+    if (order < 0)
+        return QF_NAN;
+    if (order == 0) {
+        x_sq = qf_mul(x, x);
+        return qf_div(x, qf_sub(QF_ONE, x_sq));
+    }
+    if (order == 1)
+        return qf_atanh(x);
+
+    pos = qf_polylog(s, x);
+    neg = qf_polylog(s, qf_neg(x));
+    return qf_mul_double(qf_sub(pos, neg), 0.5);
 }

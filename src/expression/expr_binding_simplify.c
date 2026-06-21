@@ -68,6 +68,7 @@ static void binding_simplify_binary_op_children(expr_binding_expr_t *expr)
 static const binding_simplify_rule_t s_binding_addsub_rules[] = {
     { binding_expr_try_fold_exact_complex_owned },
     { binding_expr_try_fold_number_owned },
+    { binding_expr_try_simplify_scaled_const_addsub },
     { binding_expr_try_simplify_log_difference },
     { binding_expr_try_simplify_basic_sum },
     { binding_expr_try_simplify_trig_sum }

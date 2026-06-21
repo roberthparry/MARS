@@ -271,6 +271,15 @@ static void test_from_string_special_functions(void)
     check_parse_expr("polygamma expression uses standard symbol",
         "{ polygamma(2, x) | x = ? }",
         "{ ψ⁽²⁾(x) | x = NAN }", __LINE__);
+    check_parse_val("dilog(1/2) = pi^2/12 - log(2)^2/2",
+        "{ dilog(x) | x = 0.5 }",
+        0.5822405264650125, __LINE__);
+    check_parse_val("Li2(1/2) aliases dilog",
+        "{ Li2(x) | x = 0.5 }",
+        0.5822405264650125, __LINE__);
+    check_parse_val("polylog(2, 1/2) = dilog(1/2)",
+        "{ polylog(2, x) | x = 0.5 }",
+        0.5822405264650125, __LINE__);
     {
         expr_t *expr = expr_from_string(
             "{ Γ(x + 1)·(ψ⁽¹⁾(x + 1) + ψ⁽⁰⁾²(x + 1)) | x = ? }",

@@ -22,6 +22,9 @@ static inline expr_t *expr_math_wrap_binary(const expr_ops_t *ops, const expr_t 
     return expr_new_binary_internal(ops, a, b);
 }
 
+static expr_t *expr_appell_f1_pack(const expr_t *left, const expr_t *right);
+static expr_t *expr_appell_f1_from_packs(const expr_t *params, const expr_t *vars);
+
 static expr_t *expr_inverse_log10_internal(const expr_t *a)
 {
     expr_t *ten = expr_new_const(NUM_TEN);
@@ -248,7 +251,7 @@ const expr_ops_t ops_coth = {
 const expr_ops_t ops_asin = {
     .eval = eval_asin, .deriv = deriv_asin, .reverse = expr_reverse_asin,
     .kind = EXPR_KIND_ASIN, .arity = EXPR_OP_UNARY, .name = "asin",
-    .tex_name = "\\arcsin",
+    .tex_name = "\\sin^{-1}",
     .inverse_unary = expr_sin,
     .apply_unary = expr_asin, .apply_binary = NULL,
     .integrate = expr_integrate_dispatch_primitive,
@@ -257,7 +260,7 @@ const expr_ops_t ops_asin = {
 const expr_ops_t ops_acos = {
     .eval = eval_acos, .deriv = deriv_acos, .reverse = expr_reverse_acos,
     .kind = EXPR_KIND_ACOS, .arity = EXPR_OP_UNARY, .name = "acos",
-    .tex_name = "\\arccos",
+    .tex_name = "\\cos^{-1}",
     .inverse_unary = expr_cos,
     .apply_unary = expr_acos, .apply_binary = NULL,
     .integrate = expr_integrate_dispatch_primitive,
@@ -266,7 +269,7 @@ const expr_ops_t ops_acos = {
 const expr_ops_t ops_atan = {
     .eval = eval_atan, .deriv = deriv_atan, .reverse = expr_reverse_atan,
     .kind = EXPR_KIND_ATAN, .arity = EXPR_OP_UNARY, .name = "atan",
-    .tex_name = "\\arctan",
+    .tex_name = "\\tan^{-1}",
     .inverse_unary = expr_tan,
     .apply_unary = expr_atan, .apply_binary = NULL,
     .integrate = expr_integrate_dispatch_primitive,
@@ -275,7 +278,7 @@ const expr_ops_t ops_atan = {
 const expr_ops_t ops_asec = {
     .eval = eval_asec, .deriv = deriv_asec, .reverse = expr_reverse_asec,
     .kind = EXPR_KIND_ASEC, .arity = EXPR_OP_UNARY, .name = "asec",
-    .tex_name = "\\operatorname{arcsec}",
+    .tex_name = "\\sec^{-1}",
     .inverse_unary = expr_sec,
     .apply_unary = expr_asec, .apply_binary = NULL,
     .integrate = expr_integrate_dispatch_primitive,
@@ -284,7 +287,7 @@ const expr_ops_t ops_asec = {
 const expr_ops_t ops_acosec = {
     .eval = eval_acosec, .deriv = deriv_acosec, .reverse = expr_reverse_acosec,
     .kind = EXPR_KIND_ACOSEC, .arity = EXPR_OP_UNARY, .name = "acosec",
-    .tex_name = "\\operatorname{arccosec}",
+    .tex_name = "\\operatorname{cosec}^{-1}",
     .inverse_unary = expr_cosec,
     .apply_unary = expr_acosec, .apply_binary = NULL,
     .integrate = expr_integrate_dispatch_primitive,
@@ -293,7 +296,7 @@ const expr_ops_t ops_acosec = {
 const expr_ops_t ops_acot = {
     .eval = eval_acot, .deriv = deriv_acot, .reverse = expr_reverse_acot,
     .kind = EXPR_KIND_ACOT, .arity = EXPR_OP_UNARY, .name = "acot",
-    .tex_name = "\\operatorname{arccot}",
+    .tex_name = "\\cot^{-1}",
     .inverse_unary = expr_cot,
     .apply_unary = expr_acot, .apply_binary = NULL,
     .integrate = expr_integrate_dispatch_primitive,
@@ -366,7 +369,7 @@ const expr_ops_t ops_archacovercos = {
 const expr_ops_t ops_asinh = {
     .eval = eval_asinh, .deriv = deriv_asinh, .reverse = expr_reverse_asinh,
     .kind = EXPR_KIND_ASINH, .arity = EXPR_OP_UNARY, .name = "asinh",
-    .tex_name = "\\operatorname{asinh}",
+    .tex_name = "\\sinh^{-1}",
     .inverse_unary = expr_sinh,
     .apply_unary = expr_asinh, .apply_binary = NULL,
     .integrate = expr_integrate_dispatch_primitive,
@@ -375,7 +378,7 @@ const expr_ops_t ops_asinh = {
 const expr_ops_t ops_acosh = {
     .eval = eval_acosh, .deriv = deriv_acosh, .reverse = expr_reverse_acosh,
     .kind = EXPR_KIND_ACOSH, .arity = EXPR_OP_UNARY, .name = "acosh",
-    .tex_name = "\\operatorname{acosh}",
+    .tex_name = "\\cosh^{-1}",
     .inverse_unary = expr_cosh,
     .apply_unary = expr_acosh, .apply_binary = NULL,
     .integrate = expr_integrate_dispatch_primitive,
@@ -384,7 +387,7 @@ const expr_ops_t ops_acosh = {
 const expr_ops_t ops_atanh = {
     .eval = eval_atanh, .deriv = deriv_atanh, .reverse = expr_reverse_atanh,
     .kind = EXPR_KIND_ATANH, .arity = EXPR_OP_UNARY, .name = "atanh",
-    .tex_name = "\\operatorname{atanh}",
+    .tex_name = "\\tanh^{-1}",
     .inverse_unary = expr_tanh,
     .apply_unary = expr_atanh, .apply_binary = NULL,
     .integrate = expr_integrate_dispatch_primitive,
@@ -393,7 +396,7 @@ const expr_ops_t ops_atanh = {
 const expr_ops_t ops_asech = {
     .eval = eval_asech, .deriv = deriv_asech, .reverse = expr_reverse_asech,
     .kind = EXPR_KIND_ASECH, .arity = EXPR_OP_UNARY, .name = "asech",
-    .tex_name = "\\operatorname{arsech}",
+    .tex_name = "\\operatorname{sech}^{-1}",
     .inverse_unary = expr_sech,
     .apply_unary = expr_asech, .apply_binary = NULL,
     .integrate = expr_integrate_dispatch_primitive,
@@ -402,7 +405,7 @@ const expr_ops_t ops_asech = {
 const expr_ops_t ops_acosech = {
     .eval = eval_acosech, .deriv = deriv_acosech, .reverse = expr_reverse_acosech,
     .kind = EXPR_KIND_ACOSECH, .arity = EXPR_OP_UNARY, .name = "acosech",
-    .tex_name = "\\operatorname{arcosech}",
+    .tex_name = "\\operatorname{cosech}^{-1}",
     .inverse_unary = expr_cosech,
     .apply_unary = expr_acosech, .apply_binary = NULL,
     .integrate = expr_integrate_dispatch_primitive,
@@ -411,7 +414,7 @@ const expr_ops_t ops_acosech = {
 const expr_ops_t ops_acoth = {
     .eval = eval_acoth, .deriv = deriv_acoth, .reverse = expr_reverse_acoth,
     .kind = EXPR_KIND_ACOTH, .arity = EXPR_OP_UNARY, .name = "acoth",
-    .tex_name = "\\operatorname{arcoth}",
+    .tex_name = "\\coth^{-1}",
     .inverse_unary = expr_coth,
     .apply_unary = expr_acoth, .apply_binary = NULL,
     .integrate = expr_integrate_dispatch_primitive,
@@ -555,6 +558,43 @@ const expr_ops_t ops_polygamma = {
     .tex_name = "\\psi",
     .apply_unary = NULL, .apply_binary = expr_polygamma_xp,
     .simplify = expr_simplify_binary_operator, .fold_const_unary = NULL
+};
+const expr_ops_t ops_dilog = {
+    .eval = eval_dilog, .deriv = deriv_dilog, .reverse = expr_reverse_dilog,
+    .kind = EXPR_KIND_DILOG, .arity = EXPR_OP_UNARY, .name = "dilog",
+    .tex_name = "\\operatorname{Li}_{2}",
+    .apply_unary = expr_dilog, .apply_binary = NULL,
+    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
+};
+const expr_ops_t ops_polylog = {
+    .eval = eval_polylog, .deriv = deriv_polylog, .reverse = expr_reverse_polylog,
+    .kind = EXPR_KIND_POLYLOG, .arity = EXPR_OP_BINARY, .name = "polylog",
+    .tex_name = "\\operatorname{Li}",
+    .apply_unary = NULL, .apply_binary = expr_polylog_xp,
+    .simplify = expr_simplify_binary_operator, .fold_const_unary = NULL
+};
+const expr_ops_t ops_legendre_chi = {
+    .eval = eval_legendre_chi, .deriv = deriv_legendre_chi,
+    .reverse = expr_reverse_legendre_chi,
+    .kind = EXPR_KIND_LEGENDRE_CHI, .arity = EXPR_OP_BINARY,
+    .name = "legendre_chi", .tex_name = "\\chi",
+    .apply_unary = NULL, .apply_binary = expr_legendre_chi_xp,
+    .simplify = expr_simplify_binary_operator, .fold_const_unary = NULL
+};
+const expr_ops_t ops_appell_f1 = {
+    .eval = eval_appell_f1, .deriv = deriv_appell_f1, .reverse = NULL,
+    .kind = EXPR_KIND_APPELL_F1, .arity = EXPR_OP_BINARY,
+    .name = "appell_f1", .tex_name = "\\operatorname{F}_{1}",
+    .apply_unary = NULL, .apply_binary = expr_appell_f1_from_packs,
+    .simplify = expr_simplify_rebuild_binary_operator, .fold_const_unary = NULL
+};
+const expr_ops_t ops_appell_f1_pack = {
+    .eval = eval_appell_f1_pack, .deriv = deriv_appell_f1_pack, .reverse = NULL,
+    .kind = EXPR_KIND_APPELL_F1_PACK, .arity = EXPR_OP_BINARY,
+    .diff_kind = EXPR_DIFF_NONE,
+    .name = "appell_f1_pack", .tex_name = "\\operatorname{pack}",
+    .apply_unary = NULL, .apply_binary = expr_appell_f1_pack,
+    .simplify = expr_simplify_rebuild_binary_operator, .fold_const_unary = NULL
 };
 const expr_ops_t ops_gammainv = {
     .eval = eval_gammainv, .deriv = deriv_gammainv, .reverse = expr_reverse_gammainv,
@@ -898,6 +938,7 @@ expr_t *expr_apply_unary_kind(expr_op_kind_t kind, const expr_t *arg)
         [EXPR_KIND_GAMMA] = &ops_gamma,
         [EXPR_KIND_DIGAMMA] = &ops_digamma,
         [EXPR_KIND_TRIGAMMA] = &ops_trigamma,
+        [EXPR_KIND_DILOG] = &ops_dilog,
         [EXPR_KIND_GAMMAINV] = &ops_gammainv,
         [EXPR_KIND_LAMBERT_W] = &ops_lambert_w,
         [EXPR_KIND_LAMBERT_W0] = &ops_lambert_w0,
@@ -995,6 +1036,66 @@ expr_t *expr_polygamma(unsigned int order, const expr_t *a)
     expr_free(order_xp);
     return out;
 }
+expr_t *expr_dilog(const expr_t *a) { return expr_math_wrap_unary(&ops_dilog, a); }
+expr_t *expr_polylog_xp(const expr_t *order, const expr_t *arg) { return expr_math_wrap_binary(&ops_polylog, order, arg); }
+expr_t *expr_polylog(unsigned int order, const expr_t *a)
+{
+    NUM_SCOPE(scope);
+    number_t order_value = num_create_from_long((long)order);
+    expr_t *order_xp = expr_new_const(order_value);
+    expr_t *out = expr_polylog_xp(order_xp, a);
+
+    expr_free(order_xp);
+    return out;
+}
+expr_t *expr_legendre_chi_xp(const expr_t *order, const expr_t *arg) { return expr_math_wrap_binary(&ops_legendre_chi, order, arg); }
+expr_t *expr_legendre_chi(unsigned int order, const expr_t *a)
+{
+    NUM_SCOPE(scope);
+    number_t order_value = num_create_from_long((long)order);
+    expr_t *order_xp = expr_new_const(order_value);
+    expr_t *out = expr_legendre_chi_xp(order_xp, a);
+
+    expr_free(order_xp);
+    return out;
+}
+
+static expr_t *expr_appell_f1_pack(const expr_t *left, const expr_t *right)
+{
+    return expr_math_wrap_binary(&ops_appell_f1_pack, left, right);
+}
+
+static expr_t *expr_appell_f1_from_packs(const expr_t *params, const expr_t *vars)
+{
+    return expr_math_wrap_binary(&ops_appell_f1, params, vars);
+}
+
+expr_t *expr_appell_f1(const expr_t *a, const expr_t *b1,
+                       const expr_t *b2, const expr_t *c,
+                       const expr_t *x, const expr_t *y)
+{
+    expr_t *ab = NULL;
+    expr_t *bc = NULL;
+    expr_t *params = NULL;
+    expr_t *vars = NULL;
+    expr_t *out = NULL;
+
+    if (!a || !b1 || !b2 || !c || !x || !y)
+        return NULL;
+
+    ab = expr_appell_f1_pack(a, b1);
+    bc = expr_appell_f1_pack(b2, c);
+    params = ab && bc ? expr_appell_f1_pack(ab, bc) : NULL;
+    vars = expr_appell_f1_pack(x, y);
+    out = params && vars ? expr_math_wrap_binary(&ops_appell_f1, params, vars) : NULL;
+
+    expr_free(vars);
+    expr_free(params);
+    expr_free(bc);
+    expr_free(ab);
+    return out;
+}
+
 expr_t *expr_gammainv(const expr_t *a) { return expr_math_wrap_unary(&ops_gammainv, a); }
 expr_t *expr_lambert_w(const expr_t *a) { return expr_math_wrap_unary(&ops_lambert_w, a); }
 expr_t *expr_lambert_w0(const expr_t *a) { return expr_math_wrap_unary(&ops_lambert_w0, a); }

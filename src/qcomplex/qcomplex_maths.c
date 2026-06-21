@@ -1,4 +1,5 @@
 #include <math.h>
+#include <limits.h>
 
 #include "internal/qfloat_internal.h"
 #include "qcomplex.h"
@@ -10,7 +11,9 @@ enum {
     QC_LAMBERT_WM1_HALLEY_MAX_STEPS = 60,
     QC_PRODUCTLOG_HALLEY_MAX_STEPS = 40,
     QC_GAMMAINC_SERIES_MAX_TERMS = 10000,
-    QC_EI_SERIES_MAX_TERMS = 10000
+    QC_EI_SERIES_MAX_TERMS = 10000,
+    QC_POLYLOG_SERIES_MAX_TERMS = 10000,
+    QC_APPELL_F1_SERIES_MAX_TERMS = 10000
 };
 
 static qfloat_t qc_abs2_local(qcomplex_t z)
@@ -647,4 +650,179 @@ qcomplex_t qc_e1(qcomplex_t z)
         return qc_make(qf_e1(qc_real(z)), QF_ZERO);
 
     return qc_neg(qc_ei(qc_neg(z)));
+}
+
+static int qc_to_integer_order(qcomplex_t value, int *order)
+{
+    double raw;
+    double rounded;
+
+    if (!order || !qf_eq(qc_imag(value), QF_ZERO) ||
+        qf_isnan(qc_real(value)) || qf_isinf(qc_real(value)))
+        return 0;
+
+    raw = qf_to_double(qc_real(value));
+    rounded = nearbyint(raw);
+    if (fabs(raw - rounded) > 1e-28 ||
+        rounded < (double)INT_MIN ||
+        rounded > (double)INT_MAX)
+        return 0;
+
+    *order = (int)rounded;
+    return 1;
+}
+
+static qcomplex_t qc_polylog_series_int(int order, qcomplex_t z)
+{
+    qcomplex_t sum = QC_ZERO;
+    qcomplex_t term = z;
+    qfloat_t tol = qf_from_double(1e-34);
+
+    for (int k = 1; k < QC_POLYLOG_SERIES_MAX_TERMS; ++k) {
+        qfloat_t denom = qf_pow_int(qf_from_double((double)k), order);
+        qcomplex_t add = qc_div(term, qc_make(denom, QF_ZERO));
+
+        sum = qc_add(sum, add);
+        if (qf_le(qc_abs(add), qf_mul(tol, qf_add(QF_ONE, qc_abs(sum)))))
+            break;
+        term = qc_mul(term, z);
+    }
+
+    return sum;
+}
+
+qcomplex_t qc_dilog(qcomplex_t z)
+{
+    qcomplex_t pi2_over_6;
+    qcomplex_t log_term;
+    qcomplex_t inner;
+
+    if (qc_isnan(z) || qc_isinf(z))
+        return QC_NAN;
+    if (qc_eq(z, QC_ZERO))
+        return QC_ZERO;
+    if (qc_eq(z, QC_ONE))
+        return qc_make(qf_div(qf_mul(QF_PI, QF_PI), qf_from_double(6.0)), QF_ZERO);
+    if (qf_eq(qc_imag(z), QF_ZERO) && qf_le(qc_real(z), QF_ONE))
+        return qc_make(qf_dilog(qc_real(z)), QF_ZERO);
+
+    if (qf_gt(qc_abs(z), QF_ONE)) {
+        qcomplex_t inv_z = qc_div(QC_ONE, z);
+        qcomplex_t log_neg_z = qc_log(qc_neg(z));
+        qcomplex_t half_log_sq = qc_mul(qc_make(qf_from_double(0.5), QF_ZERO),
+                                        qc_mul(log_neg_z, log_neg_z));
+
+        inner = qc_dilog(inv_z);
+        pi2_over_6 = qc_make(qf_div(qf_mul(QF_PI, QF_PI), qf_from_double(6.0)), QF_ZERO);
+        return qc_neg(qc_add(qc_add(inner, pi2_over_6), half_log_sq));
+    }
+
+    if (qf_lt(qc_abs(qc_sub(QC_ONE, z)), qf_from_double(0.5))) {
+        qcomplex_t one_minus_z = qc_sub(QC_ONE, z);
+
+        pi2_over_6 = qc_make(qf_div(qf_mul(QF_PI, QF_PI), qf_from_double(6.0)), QF_ZERO);
+        log_term = qc_mul(qc_log(z), qc_log(one_minus_z));
+        inner = qc_dilog(one_minus_z);
+        return qc_sub(qc_sub(pi2_over_6, log_term), inner);
+    }
+
+    return qc_polylog_series_int(2, z);
+}
+
+qcomplex_t qc_polylog(qcomplex_t s, qcomplex_t z)
+{
+    int order;
+
+    if (!qc_to_integer_order(s, &order))
+        return QC_NAN;
+    if (order < 0)
+        return QC_NAN;
+    if (order == 0)
+        return qc_div(z, qc_sub(QC_ONE, z));
+    if (order == 1)
+        return qc_neg(qc_log(qc_sub(QC_ONE, z)));
+    if (order == 2)
+        return qc_dilog(z);
+    if (qf_ge(qc_abs(z), qf_from_double(0.95)))
+        return QC_NAN;
+
+    return qc_polylog_series_int(order, z);
+}
+
+qcomplex_t qc_appell_f1(qcomplex_t a, qcomplex_t b1, qcomplex_t b2,
+                        qcomplex_t c, qcomplex_t x, qcomplex_t y)
+{
+    qcomplex_t sum = QC_ZERO;
+    qcomplex_t row_start = QC_ONE;
+    qfloat_t tol = qf_from_double(1e-34);
+
+    if (qc_isnan(a) || qc_isnan(b1) || qc_isnan(b2) || qc_isnan(c) ||
+        qc_isnan(x) || qc_isnan(y) ||
+        qc_isinf(a) || qc_isinf(b1) || qc_isinf(b2) || qc_isinf(c) ||
+        qc_isinf(x) || qc_isinf(y))
+        return QC_NAN;
+    if (qf_ge(qc_abs(x), qf_from_double(0.95)) ||
+        qf_ge(qc_abs(y), qf_from_double(0.95)))
+        return QC_NAN;
+
+    for (int m = 0; m < QC_APPELL_F1_SERIES_MAX_TERMS; ++m) {
+        qcomplex_t row_sum = QC_ZERO;
+        qcomplex_t term = row_start;
+
+        for (int n = 0; n < QC_APPELL_F1_SERIES_MAX_TERMS; ++n) {
+            qfloat_t scale = qf_mul(tol, qf_add(QF_ONE, qc_abs(row_sum)));
+
+            row_sum = qc_add(row_sum, term);
+            if (qf_le(qc_abs(term), scale))
+                break;
+
+            qcomplex_t mn = qc_make(qf_from_double((double)(m + n)), QF_ZERO);
+            qcomplex_t nn = qc_make(qf_from_double((double)n), QF_ZERO);
+            qcomplex_t np1 = qc_make(qf_from_double((double)(n + 1)), QF_ZERO);
+            qcomplex_t num = qc_mul(qc_add(a, mn), qc_add(b2, nn));
+            qcomplex_t den = qc_mul(qc_add(c, mn), np1);
+
+            if (qc_eq(den, QC_ZERO))
+                return QC_NAN;
+            term = qc_mul(term, qc_mul(qc_div(num, den), y));
+        }
+
+        sum = qc_add(sum, row_sum);
+        if (qf_le(qc_abs(row_sum), qf_mul(tol, qf_add(QF_ONE, qc_abs(sum)))))
+            break;
+
+        qcomplex_t mm = qc_make(qf_from_double((double)m), QF_ZERO);
+        qcomplex_t mp1 = qc_make(qf_from_double((double)(m + 1)), QF_ZERO);
+        qcomplex_t num = qc_mul(qc_add(a, mm), qc_add(b1, mm));
+        qcomplex_t den = qc_mul(qc_add(c, mm), mp1);
+
+        if (qc_eq(den, QC_ZERO))
+            return QC_NAN;
+        row_start = qc_mul(row_start, qc_mul(qc_div(num, den), x));
+    }
+
+    return sum;
+}
+
+qcomplex_t qc_legendre_chi(qcomplex_t s, qcomplex_t z)
+{
+    int order;
+    qcomplex_t z_sq;
+    qcomplex_t pos;
+    qcomplex_t neg;
+
+    if (!qc_to_integer_order(s, &order))
+        return QC_NAN;
+    if (order < 0)
+        return QC_NAN;
+    if (order == 0) {
+        z_sq = qc_mul(z, z);
+        return qc_div(z, qc_sub(QC_ONE, z_sq));
+    }
+    if (order == 1)
+        return qc_atanh(z);
+
+    pos = qc_polylog(s, z);
+    neg = qc_polylog(s, qc_neg(z));
+    return qc_mul(qc_make(qf_from_double(0.5), QF_ZERO), qc_sub(pos, neg));
 }

@@ -320,6 +320,9 @@
         "test_integrate_definite_symbolic_bounds": true,
         "test_integrate_frequency_product_families": true,
         "test_integrate_hyperbolic_table_tail": true,
+        "test_integrate_inverse_one_plus_unit_circle_root": true,
+        "test_integrate_inverse_quartic_appell_f1": true,
+        "test_integrate_inverse_sqrt_sin_cos_sin3_cos": true,
         "test_integrate_inverse_square_with_exact_bound": true,
         "test_integrate_iterated_exp_unary_derivatives": true,
         "test_integrate_log_quadratic": true,
@@ -333,15 +336,19 @@
         "test_integrate_poly_times_affine_power": true,
         "test_integrate_polynomial_sum": true,
         "test_integrate_reciprocal_and_log": true,
+        "test_integrate_sec_double_angle_log_tan_cot": true,
         "test_integrate_shifted_inverse_square_with_symbolic_constant": true,
+        "test_integrate_sin_integer_multiple_quotient": true,
         "test_integrate_symbolic_general_quadratic_denominator": true,
         "test_integrate_symbolic_general_quadratic_roots": true,
+        "test_integrate_symbolic_improper_endpoint_value": true,
         "test_integrate_symbolic_power_exponent": true,
         "test_integrate_symbolic_shifted_sqrt": true,
         "test_integrate_trig_power_products": true,
         "test_integrate_unevaluated_integral_chain_rule_upper": true,
         "test_integrate_unevaluated_integral_constant_upper": true,
         "test_integrate_unevaluated_integral_derivative": true,
+        "test_integrate_unevaluated_integral_display_symbolic_result": true,
         "test_integrate_unevaluated_integral_evaluation": true,
         "test_integrate_unevaluated_integral_explicit_bounds": true,
         "test_integrate_unevaluated_integral_leibniz_derivative": true,
@@ -441,6 +448,7 @@
         "test_symbolic_function_power_matches_parenthesized_power": true,
         "test_symbolic_negative_pi_derivative_stays_symbolic": true,
         "test_symbolic_negative_pi_quotient_stays_symbolic": true,
+        "test_symbolic_pi_ratio_addsub_uses_number_fraction_arithmetic": true,
         "test_symbolic_power_derivative_uses_n_minus_one_form": true,
         "test_tan_poles_display_as_infinity": true,
         "test_to_string_does_not_simplify_plain_expressions": true,
@@ -547,6 +555,7 @@
             "test_to_string_addition_expr": true,
             "test_to_string_addition_func": true
           },
+          "test_to_string_appell_f1": true,
           "test_to_string_atan2": {
             "enabled": true,
             "test_to_string_atan2_expr": true,
@@ -623,7 +632,9 @@
             "enabled": true,
             "test_to_string_unary_sqrt_expr": true,
             "test_to_string_unary_sqrt_func": true
-          }
+          },
+          "test_to_string_wrapped_tex_aligned_subtraction": true,
+          "test_to_string_wrapped_tex_distributes_scale": true
         }
       }
     }
@@ -674,6 +685,7 @@
         "test_cos": true,
         "test_cosh": true,
         "test_digamma": true,
+        "test_dilog_polylog": true,
         "test_e1": true,
         "test_ei": true,
         "test_erf": true,
@@ -1101,6 +1113,7 @@
         "test_gammainv": true,
         "test_lambert_wm1": true,
         "test_normal": true,
+        "test_polylog": true,
         "test_productlog": true
       },
       "test_trig_group": {
@@ -1169,6 +1182,7 @@
         "test_qf_gammainv": true,
         "test_qf_lgamma": true,
         "test_qf_polygamma": true,
+        "test_qf_polylog": true,
         "test_qf_tetragamma": true,
         "test_qf_trigamma": true
       },

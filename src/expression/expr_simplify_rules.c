@@ -5,6 +5,8 @@ bool expr_simplify_is_plain_real_const(const expr_t *dv)
 {
     if (!expr_is_unnamed_const(dv) || !num_is_real(dv->c))
         return false;
+    if (!num_is_exact(dv->c) && num_constant_name(dv->c))
+        return false;
     if (dv->binding_expr && dv->binding_expr->kind != EXPR_BINDING_EXPR_NUMBER)
         return false;
     return true;

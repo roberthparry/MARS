@@ -10,6 +10,11 @@
 #include "internal/number_internal.h"
 #include "ustring.h"
 
+static expr_binding_expr_t *binding_expr_fold_to_expr_owned(
+    expr_binding_expr_t *expr,
+    expr_binding_expr_t *folded);
+static expr_binding_expr_t *binding_expr_number_from_value(number_t value);
+
 static bool binding_simplify_cursor_peek_digit(const string_cursor_t *cursor,
                                                unsigned int *digit_out)
 {
@@ -230,6 +235,90 @@ static expr_binding_expr_t *binding_expr_new_long(long value)
 
     snprintf(text, sizeof(text), "%ld", value);
     return expr_binding_expr_new_number_text(text);
+}
+
+static expr_binding_expr_t *binding_expr_new_scaled_const_coeff(
+    number_t coeff,
+    expr_binding_const_id_t const_id)
+{
+    expr_binding_expr_t *base;
+    expr_binding_expr_t *out;
+
+    if (num_is_zero(coeff))
+        return binding_expr_number_from_value(coeff);
+
+    base = expr_binding_expr_new_const(const_id);
+    if (!base)
+        return NULL;
+
+    if (num_eq(coeff, NUM_ONE))
+        return base;
+
+    if (num_eq(coeff, NUM_NEG_ONE))
+        return expr_binding_expr_new_neg(base);
+
+    {
+        expr_binding_expr_t *coeff_expr = binding_expr_number_from_value(coeff);
+
+        out = coeff_expr ? expr_binding_expr_new_mul(coeff_expr, base) : NULL;
+        return out ? expr_binding_expr_simplify(out) : NULL;
+    }
+}
+
+expr_binding_expr_t *binding_expr_try_simplify_scaled_const_addsub(
+    expr_binding_expr_t *expr)
+{
+    long left_numer;
+    long left_denom;
+    long right_numer;
+    long right_denom;
+    expr_binding_const_id_t left_const;
+    expr_binding_const_id_t right_const;
+    number_t left_coeff;
+    number_t right_coeff;
+    number_t combined;
+    expr_binding_expr_t *folded;
+
+    if (!expr || (expr->kind != EXPR_BINDING_EXPR_ADD &&
+                  expr->kind != EXPR_BINDING_EXPR_SUB))
+        return expr;
+
+    if (!binding_expr_scaled_const_ratio(expr->u.binary.left,
+                                         &left_numer,
+                                         &left_denom,
+                                         &left_const) ||
+        !binding_expr_scaled_const_ratio(expr->u.binary.right,
+                                         &right_numer,
+                                         &right_denom,
+                                         &right_const) ||
+        left_const != right_const ||
+        left_denom == 0L ||
+        right_denom == 0L) {
+        return expr;
+    }
+
+    {
+        number_t left_numer_value = num_create_from_long(left_numer);
+        number_t left_denom_value = num_create_from_long(left_denom);
+        number_t right_numer_value = num_create_from_long(right_numer);
+        number_t right_denom_value = num_create_from_long(right_denom);
+
+        left_coeff = num_div(left_numer_value, left_denom_value);
+        right_coeff = num_div(right_numer_value, right_denom_value);
+        num_destroy(&right_denom_value);
+        num_destroy(&right_numer_value);
+        num_destroy(&left_denom_value);
+        num_destroy(&left_numer_value);
+    }
+
+    combined = (expr->kind == EXPR_BINDING_EXPR_SUB)
+        ? num_sub(left_coeff, right_coeff)
+        : num_add(left_coeff, right_coeff);
+    folded = binding_expr_new_scaled_const_coeff(combined, left_const);
+    num_destroy(&combined);
+    num_destroy(&right_coeff);
+    num_destroy(&left_coeff);
+    return folded ? binding_expr_fold_to_expr_owned(expr, folded) : expr;
 }
 
 expr_binding_expr_t *binding_expr_try_simplify_logbeta_integers(expr_binding_expr_t *expr)
@@ -1517,7 +1606,8 @@ expr_binding_expr_t *binding_expr_try_fold_number_owned(expr_binding_expr_t *exp
 {
     number_t value;
 
-    if (expr_binding_expr_number_value(expr, &value))
+    if (expr_binding_expr_is_numeric_literal(expr) &&
+        expr_binding_expr_number_value(expr, &value))
         return binding_expr_fold_to_number_owned(expr, value);
     return expr;
 }

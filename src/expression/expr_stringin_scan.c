@@ -129,6 +129,13 @@ bool expr_parse_is_subscript_digit(uint32_t value)
     return value >= 0x2080 && value <= 0x2089;
 }
 
+int expr_parse_subscript_digit_value(uint32_t value)
+{
+    if (!expr_parse_is_subscript_digit(value))
+        return -1;
+    return (int)(value - 0x2080);
+}
+
 bool expr_parse_is_fraction_glyph(uint32_t value)
 {
     return value == 0x00BC || value == 0x00BD || value == 0x00BE ||

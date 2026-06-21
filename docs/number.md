@@ -383,6 +383,10 @@ The generic layer exposes:
   - `num_gammainc_Q`
   - `num_e1`
   - `num_ei`
+  - `num_dilog`
+  - `num_polylog`
+  - `num_legendre_chi`
+  - `num_appell_f1`
 - exact integer and number-theory helpers:
   - `num_factorial`
   - `num_fibonacci`

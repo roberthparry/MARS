@@ -478,6 +478,8 @@ expr_t *expr_pow_xp(const expr_t *expr1, const expr_t *expr2);
  *                    expr_trigamma (ψ⁽¹⁾), expr_polygamma (ψ⁽ⁿ⁾),
  *                    expr_gammainv (Γ⁻¹), expr_gammainc_lower,
  *                    expr_gammainc_upper, expr_gammainc_P, expr_gammainc_Q
+ * Polylogarithms:    expr_dilog (Li₂), expr_polylog (Liₙ),
+ *                    expr_legendre_chi (χₙ), expr_appell_f1 (F₁)
  * Lambert W:         expr_lambert_w0 (principal branch), expr_lambert_wm1 (k=-1)
  * Beta/binomial:     expr_beta (B), expr_logbeta (log B), expr_beta_pdf,
  *                    expr_logbeta_pdf, expr_binomial
@@ -498,6 +500,12 @@ expr_t *expr_lgamma(const expr_t *expr);
 expr_t *expr_digamma(const expr_t *expr);
 expr_t *expr_trigamma(const expr_t *expr);
 expr_t *expr_polygamma(unsigned int order, const expr_t *expr);
+expr_t *expr_dilog(const expr_t *expr);
+expr_t *expr_polylog(unsigned int order, const expr_t *expr);
+expr_t *expr_legendre_chi(unsigned int order, const expr_t *expr);
+expr_t *expr_appell_f1(const expr_t *a, const expr_t *b1,
+                       const expr_t *b2, const expr_t *c,
+                       const expr_t *x, const expr_t *y);
 expr_t *expr_gammainv(const expr_t *expr);
 expr_t *expr_gammainc_lower(const expr_t *s, const expr_t *x);
 expr_t *expr_gammainc_upper(const expr_t *s, const expr_t *x);
@@ -627,6 +635,19 @@ char *expr_to_string(const expr_t *expr, style_t style);
  * free(). Returns NULL on invalid input or allocation failure.
  */
 char *expr_to_tex_body(const expr_t *expr);
+
+/**
+ * @brief Return a display-oriented TeX expression body with line breaks.
+ *
+ * This keeps the ordinary expr_to_tex_body() spelling available for exact
+ * serialisation, but may wrap long additive expressions in an amsmath
+ * aligned environment for display. @p line_limit is a soft character budget;
+ * pass 0 for the default.
+ *
+ * The returned C string is allocated with malloc() and must be released with
+ * free(). Returns NULL on invalid input or allocation failure.
+ */
+char *expr_to_tex_body_wrapped(const expr_t *expr, size_t line_limit);
 
 /**
  * @brief Format expression-aware text into a new string_t from a va_list.

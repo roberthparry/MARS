@@ -525,6 +525,723 @@ expr_t *integrate_cubed_unary_affine(const expr_t *expr,
     return div_number_owned_consuming(raw, &coeff);
 }
 
+static bool expr_affine_parts_match_double(const expr_t *single_constant,
+                                           const expr_t *single_coeff,
+                                           const expr_t *double_constant,
+                                           const expr_t *double_coeff)
+{
+    expr_t *twice_constant = single_constant ? expr_mul_num(single_constant, &NUM_TWO) : NULL;
+    expr_t *twice_coeff = single_coeff ? expr_mul_num(single_coeff, &NUM_TWO) : NULL;
+    bool ok = twice_constant && twice_coeff &&
+              expr_equal_exact_local(twice_constant, double_constant) &&
+              expr_equal_exact_local(twice_coeff, double_coeff);
+
+    expr_free(twice_coeff);
+    expr_free(twice_constant);
+    return ok;
+}
+
+static bool match_tan_plus_cot_same_arg(const expr_t *expr,
+                                        const expr_t **arg_out)
+{
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+    const expr_t *tan_expr = NULL;
+    const expr_t *cot_expr = NULL;
+
+    if (!expr || !arg_out || !expr_is_op(expr, &ops_add) || !expr->a || !expr->b)
+        return false;
+    left = expr->a;
+    right = expr->b;
+
+    if (expr_is_op(left, &ops_tan) && expr_is_op(right, &ops_cot)) {
+        tan_expr = left;
+        cot_expr = right;
+    } else if (expr_is_op(left, &ops_cot) && expr_is_op(right, &ops_tan)) {
+        tan_expr = right;
+        cot_expr = left;
+    } else {
+        return false;
+    }
+
+    if (!tan_expr->a || !cot_expr->a ||
+        !expr_equal_exact_local(tan_expr->a, cot_expr->a)) {
+        return false;
+    }
+
+    *arg_out = tan_expr->a;
+    return true;
+}
+
+static bool match_sec_log_tan_cot_product(const expr_t *expr,
+                                          const expr_t **sec_expr_out,
+                                          const expr_t **log_expr_out)
+{
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+
+    if (!expr || !sec_expr_out || !log_expr_out ||
+        !expr_match_mul_expr(expr, &left, &right))
+        return false;
+
+    if (expr_is_op(left, &ops_sec) && expr_is_op(right, &ops_log)) {
+        *sec_expr_out = left;
+        *log_expr_out = right;
+        return true;
+    }
+
+    if (expr_is_op(right, &ops_sec) && expr_is_op(left, &ops_log)) {
+        *sec_expr_out = right;
+        *log_expr_out = left;
+        return true;
+    }
+
+    return false;
+}
+
+static bool match_sec_squared_log_tan_cot_product(const expr_t *expr,
+                                                  const expr_t **sec_expr_out,
+                                                  const expr_t **log_expr_out)
+{
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+    const expr_t *sec_sq = NULL;
+    const expr_t *log_expr = NULL;
+    number_t exponent = num_new();
+    bool ok = false;
+
+    if (!expr || !sec_expr_out || !log_expr_out ||
+        !expr_match_mul_expr(expr, &left, &right)) {
+        goto cleanup;
+    }
+
+    if (expr_is_op(left, &ops_log)) {
+        log_expr = left;
+        sec_sq = right;
+    } else if (expr_is_op(right, &ops_log)) {
+        log_expr = right;
+        sec_sq = left;
+    } else {
+        goto cleanup;
+    }
+
+    if (sec_sq && sec_sq->ops && sec_sq->ops->kind == EXPR_KIND_POW_D &&
+        sec_sq->a && expr_is_op(sec_sq->a, &ops_sec) &&
+        num_eq(sec_sq->c, NUM_TWO)) {
+        *sec_expr_out = sec_sq->a;
+        *log_expr_out = log_expr;
+        ok = true;
+        goto cleanup;
+    }
+
+    if (sec_sq && sec_sq->ops && sec_sq->ops->kind == EXPR_KIND_POW &&
+        sec_sq->a && sec_sq->b &&
+        expr_is_op(sec_sq->a, &ops_sec) &&
+        expr_match_const_value(sec_sq->b, &exponent) &&
+        num_eq(exponent, NUM_TWO)) {
+        *sec_expr_out = sec_sq->a;
+        *log_expr_out = log_expr;
+        ok = true;
+    }
+
+cleanup:
+    num_destroy(&exponent);
+    return ok;
+}
+
+static expr_t *build_tan_pi_over_four_minus(const expr_t *u)
+{
+    expr_t *pi = expr_new_named_const(NUM_PI, "@pi");
+    expr_t *pi_over_four = pi ? expr_div_long(pi, 4) : NULL;
+    expr_t *arg = (pi_over_four && u) ? expr_sub(pi_over_four, u) : NULL;
+    expr_t *out = arg ? expr_tan(arg) : NULL;
+
+    expr_free(arg);
+    expr_free(pi_over_four);
+    expr_free(pi);
+    return out;
+}
+
+static expr_t *build_sec_double_angle_log_tan_cot_raw(const expr_t *u)
+{
+    number_t neg_half = num_neg(NUM_HALF);
+    expr_t *y = build_tan_pi_over_four_minus(u);
+    expr_t *y_sq = y ? expr_pow(y, &NUM_TWO) : NULL;
+    expr_t *chi = y_sq ? expr_legendre_chi(2u, y_sq) : NULL;
+    expr_t *chi_part = chi ? mul_number_owned(chi, neg_half) : NULL;
+    expr_t *two = expr_new_const(NUM_TWO);
+    expr_t *log_two = two ? expr_log(two) : NULL;
+    expr_t *log_y = y ? expr_log(y) : NULL;
+    expr_t *log_product = (log_two && log_y) ? expr_mul(log_two, log_y) : NULL;
+    expr_t *log_part = log_product ? mul_number_owned(log_product, NUM_HALF) : NULL;
+    expr_t *raw = (chi_part && log_part) ? expr_sub(chi_part, log_part) : NULL;
+
+    chi = NULL;
+    log_product = NULL;
+    expr_free(log_part);
+    expr_free(log_product);
+    expr_free(log_y);
+    expr_free(log_two);
+    expr_free(two);
+    expr_free(chi_part);
+    expr_free(chi);
+    expr_free(y_sq);
+    expr_free(y);
+    num_destroy(&neg_half);
+    return raw;
+}
+
+static expr_t *build_sec_squared_log_tan_cot_raw(const expr_t *u)
+{
+    expr_t *tan_u = u ? expr_tan(u) : NULL;
+    expr_t *cot_u = u ? expr_cot(u) : NULL;
+    expr_t *sum = (tan_u && cot_u) ? expr_add(tan_u, cot_u) : NULL;
+    expr_t *log_sum = sum ? expr_log(sum) : NULL;
+    expr_t *product = (tan_u && log_sum) ? expr_mul(tan_u, log_sum) : NULL;
+    expr_t *minus_tan = tan_u ? expr_neg(tan_u) : NULL;
+    expr_t *two_u = u ? expr_mul_num(u, &NUM_TWO) : NULL;
+    expr_t *first_sum = (product && minus_tan) ? expr_add(product, minus_tan) : NULL;
+    expr_t *raw = (first_sum && two_u) ? expr_add(first_sum, two_u) : NULL;
+
+    expr_free(first_sum);
+    expr_free(two_u);
+    expr_free(minus_tan);
+    expr_free(product);
+    expr_free(log_sum);
+    expr_free(sum);
+    expr_free(cot_u);
+    expr_free(tan_u);
+    return raw;
+}
+
+expr_t *integrate_sec_squared_log_tan_cot(const expr_t *expr,
+                                          const expr_t *wrt)
+{
+    const expr_t *sec_expr = NULL;
+    const expr_t *log_expr = NULL;
+    const expr_t *tan_arg = NULL;
+    expr_t *tan_constant = NULL;
+    expr_t *tan_coeff = NULL;
+    expr_t *sec_constant = NULL;
+    expr_t *sec_coeff = NULL;
+    expr_t *raw = NULL;
+    expr_t *out = NULL;
+
+    if (!expr || !wrt ||
+        !match_sec_squared_log_tan_cot_product(expr, &sec_expr, &log_expr) ||
+        !sec_expr->a || !log_expr->a ||
+        !match_tan_plus_cot_same_arg(log_expr->a, &tan_arg) ||
+        !match_symbolic_affine_constant_and_coeff(tan_arg, wrt, &tan_constant, &tan_coeff) ||
+        !match_symbolic_affine_constant_and_coeff(sec_expr->a, wrt, &sec_constant, &sec_coeff) ||
+        expr_const_is_zero(tan_coeff) ||
+        !expr_equal_exact_local(tan_constant, sec_constant) ||
+        !expr_equal_exact_local(tan_coeff, sec_coeff)) {
+        goto cleanup;
+    }
+
+    raw = build_sec_squared_log_tan_cot_raw(tan_arg);
+    out = raw ? expr_div(raw, tan_coeff) : NULL;
+    expr_free(raw);
+    raw = NULL;
+    out = simplify_owned(out);
+
+cleanup:
+    expr_free(raw);
+    expr_free(sec_coeff);
+    expr_free(sec_constant);
+    expr_free(tan_coeff);
+    expr_free(tan_constant);
+    return out;
+}
+
+expr_t *integrate_sec_double_angle_log_tan_cot(const expr_t *expr,
+                                               const expr_t *wrt)
+{
+    const expr_t *sec_expr = NULL;
+    const expr_t *log_expr = NULL;
+    const expr_t *tan_arg = NULL;
+    expr_t *tan_constant = NULL;
+    expr_t *tan_coeff = NULL;
+    expr_t *sec_constant = NULL;
+    expr_t *sec_coeff = NULL;
+    expr_t *raw = NULL;
+    expr_t *out = NULL;
+
+    if (!expr || !wrt ||
+        !match_sec_log_tan_cot_product(expr, &sec_expr, &log_expr) ||
+        !sec_expr->a || !log_expr->a ||
+        !match_tan_plus_cot_same_arg(log_expr->a, &tan_arg) ||
+        !match_symbolic_affine_constant_and_coeff(tan_arg, wrt, &tan_constant, &tan_coeff) ||
+        !match_symbolic_affine_constant_and_coeff(sec_expr->a, wrt, &sec_constant, &sec_coeff) ||
+        expr_const_is_zero(tan_coeff) ||
+        !expr_affine_parts_match_double(tan_constant, tan_coeff, sec_constant, sec_coeff)) {
+        goto cleanup;
+    }
+
+    raw = build_sec_double_angle_log_tan_cot_raw(tan_arg);
+    out = raw ? expr_div(raw, tan_coeff) : NULL;
+    expr_free(raw);
+    raw = NULL;
+    out = simplify_owned(out);
+
+cleanup:
+    expr_free(raw);
+    expr_free(sec_coeff);
+    expr_free(sec_constant);
+    expr_free(tan_coeff);
+    expr_free(tan_constant);
+    return out;
+}
+
+static bool match_wrt_trig_coeff(const expr_t *expr,
+                                 const expr_t *wrt,
+                                 bool want_sin,
+                                 long want_coeff)
+{
+    bool is_sin = false;
+    expr_t *coeff_expr = NULL;
+    number_t coeff = num_new();
+    number_t expected = num_create_from_long(want_coeff);
+    bool ok = false;
+
+    if (!match_trig_proportional_wrt_coeff(expr, wrt, &is_sin, &coeff_expr))
+        goto cleanup;
+    if (is_sin != want_sin || !expr_match_const_value(coeff_expr, &coeff))
+        goto cleanup;
+    ok = num_eq(coeff, expected);
+
+cleanup:
+    expr_free(coeff_expr);
+    num_destroy(&expected);
+    num_destroy(&coeff);
+    return ok;
+}
+
+static bool match_sum_of_sin_cos_coeffs(const expr_t *expr,
+                                        const expr_t *wrt,
+                                        long sin_coeff,
+                                        long cos_coeff)
+{
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+
+    if (!expr || !expr_is_op(expr, &ops_add))
+        return false;
+    left = expr->a;
+    right = expr->b;
+    return (match_wrt_trig_coeff(left, wrt, true, sin_coeff) &&
+            match_wrt_trig_coeff(right, wrt, false, cos_coeff)) ||
+           (match_wrt_trig_coeff(left, wrt, false, cos_coeff) &&
+            match_wrt_trig_coeff(right, wrt, true, sin_coeff));
+}
+
+static bool match_sqrt_sin_cos_factor(const expr_t *expr,
+                                      const expr_t *wrt,
+                                      long sin_coeff,
+                                      long cos_coeff)
+{
+    return expr && expr_is_op(expr, &ops_sqrt) &&
+           match_sum_of_sin_cos_coeffs(expr->a, wrt, sin_coeff, cos_coeff);
+}
+
+static bool match_sqrt_sin_cos_sin3_cos_denominator(const expr_t *expr,
+                                                    const expr_t *wrt)
+{
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+
+    if (!expr_match_mul_expr(expr, &left, &right))
+        return false;
+    return (match_sqrt_sin_cos_factor(left, wrt, 1, 1) &&
+            match_sqrt_sin_cos_factor(right, wrt, 3, 1)) ||
+           (match_sqrt_sin_cos_factor(left, wrt, 3, 1) &&
+            match_sqrt_sin_cos_factor(right, wrt, 1, 1));
+}
+
+static expr_t *build_sin_cos_sin3_cos_double_radicand(const expr_t *wrt)
+{
+    number_t three = num_create_from_long(3);
+    expr_t *sin_x = NULL;
+    expr_t *cos_x = NULL;
+    expr_t *three_x = NULL;
+    expr_t *sin_3x = NULL;
+    expr_t *first = NULL;
+    expr_t *second = NULL;
+    expr_t *product = NULL;
+    expr_t *doubled = NULL;
+    expr_t *out = NULL;
+
+    if (!wrt)
+        goto cleanup;
+
+    sin_x = expr_sin(wrt);
+    cos_x = expr_cos(wrt);
+    three_x = expr_mul_num(wrt, &three);
+    sin_3x = three_x ? expr_sin(three_x) : NULL;
+    first = (sin_x && cos_x) ? expr_add(sin_x, cos_x) : NULL;
+    second = (sin_3x && cos_x) ? expr_add(sin_3x, cos_x) : NULL;
+    product = (first && second) ? expr_mul(first, second) : NULL;
+    doubled = product ? expr_mul_num(product, &NUM_TWO) : NULL;
+    out = simplify_owned(doubled);
+    doubled = NULL;
+
+cleanup:
+    expr_free(doubled);
+    expr_free(product);
+    expr_free(second);
+    expr_free(first);
+    expr_free(sin_3x);
+    expr_free(three_x);
+    expr_free(cos_x);
+    expr_free(sin_x);
+    num_destroy(&three);
+    return out;
+}
+
+static bool match_sqrt_sin_cos_sin3_cos_simplified_denominator(const expr_t *expr,
+                                                               const expr_t *wrt)
+{
+    expr_t *expected = NULL;
+    bool ok = false;
+
+    if (!expr || !expr_is_op(expr, &ops_sqrt) || !expr->a)
+        return false;
+
+    expected = build_sin_cos_sin3_cos_double_radicand(wrt);
+    ok = expected && expr_struct_eq(expr->a, expected);
+    expr_free(expected);
+    return ok;
+}
+
+static bool match_sqrt_sin_cos_sin3_cos_scaled_denominator(const expr_t *expr,
+                                                           const expr_t *wrt)
+{
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+    number_t scale = num_new();
+    bool ok = false;
+
+    if (!expr_match_mul_expr(expr, &left, &right))
+        goto cleanup;
+
+    if (expr_match_const_value(left, &scale) &&
+        num_eq(scale, NUM_SQRT_HALF) &&
+        match_sqrt_sin_cos_sin3_cos_simplified_denominator(right, wrt)) {
+        ok = true;
+        goto cleanup;
+    }
+
+    if (expr_match_const_value(right, &scale) &&
+        num_eq(scale, NUM_SQRT_HALF) &&
+        match_sqrt_sin_cos_sin3_cos_simplified_denominator(left, wrt)) {
+        ok = true;
+        goto cleanup;
+    }
+
+cleanup:
+    num_destroy(&scale);
+    return ok;
+}
+
+static expr_t *build_inverse_sqrt_sin_cos_sin3_cos_raw(const expr_t *wrt)
+{
+    expr_t *tan_x = NULL;
+    expr_t *one = NULL;
+    expr_t *tan_minus_one = NULL;
+    expr_t *scaled_tan_minus_one = NULL;
+    expr_t *tan_sq = NULL;
+    expr_t *neg_tan_sq = NULL;
+    expr_t *two_tan = NULL;
+    expr_t *quad_part = NULL;
+    expr_t *quad = NULL;
+    expr_t *quad_root = NULL;
+    expr_t *sqrt_two = NULL;
+    expr_t *denom = NULL;
+    expr_t *fraction = NULL;
+    expr_t *atan_arg = NULL;
+    expr_t *atan_term = NULL;
+    expr_t *out = NULL;
+
+    if (!wrt)
+        return NULL;
+
+    tan_x = expr_tan(wrt);
+    one = expr_new_const(NUM_ONE);
+    tan_minus_one = (tan_x && one) ? expr_sub(tan_x, one) : NULL;
+    scaled_tan_minus_one = tan_minus_one ? expr_mul_num(tan_minus_one, &NUM_SQRT2) : NULL;
+    tan_sq = tan_x ? expr_pow(tan_x, &NUM_TWO) : NULL;
+    neg_tan_sq = tan_sq ? expr_neg(tan_sq) : NULL;
+    two_tan = tan_x ? expr_mul_num(tan_x, &NUM_TWO) : NULL;
+    quad_part = (neg_tan_sq && two_tan) ? expr_add(neg_tan_sq, two_tan) : NULL;
+    quad = (quad_part && one) ? expr_add(quad_part, one) : NULL;
+    quad_root = quad ? expr_sqrt(quad) : NULL;
+    sqrt_two = expr_new_const(NUM_SQRT2);
+    denom = (sqrt_two && quad_root) ? expr_add(sqrt_two, quad_root) : NULL;
+    fraction = (scaled_tan_minus_one && denom) ? expr_div(scaled_tan_minus_one, denom) : NULL;
+    atan_arg = (one && fraction) ? expr_add(one, fraction) : NULL;
+    atan_term = atan_arg ? expr_atan(atan_arg) : NULL;
+    out = atan_term ? expr_mul_num(atan_term, &NUM_SQRT2) : NULL;
+
+    expr_free(atan_term);
+    expr_free(atan_arg);
+    expr_free(fraction);
+    expr_free(denom);
+    expr_free(sqrt_two);
+    expr_free(quad_root);
+    expr_free(quad);
+    expr_free(quad_part);
+    expr_free(two_tan);
+    expr_free(neg_tan_sq);
+    expr_free(tan_sq);
+    expr_free(scaled_tan_minus_one);
+    expr_free(tan_minus_one);
+    expr_free(one);
+    expr_free(tan_x);
+    return out;
+}
+
+expr_t *integrate_inverse_sqrt_sin_cos_sin3_cos(const expr_t *expr,
+                                                const expr_t *wrt)
+{
+    number_t numerator = num_new();
+    expr_t *raw = NULL;
+    expr_t *out = NULL;
+    bool matched = false;
+
+    if (!expr || !wrt || !expr_is_div(expr) ||
+        !expr_match_const_value(expr->a, &numerator))
+        goto cleanup;
+
+    if (num_eq(numerator, NUM_ONE))
+        matched = match_sqrt_sin_cos_sin3_cos_denominator(expr->b, wrt) ||
+                  match_sqrt_sin_cos_sin3_cos_scaled_denominator(expr->b, wrt);
+    else if (num_eq(numerator, NUM_SQRT2))
+        matched = match_sqrt_sin_cos_sin3_cos_simplified_denominator(expr->b, wrt);
+
+    if (!matched)
+        goto cleanup;
+
+    raw = build_inverse_sqrt_sin_cos_sin3_cos_raw(wrt);
+    out = simplify_owned(raw);
+    raw = NULL;
+
+cleanup:
+    expr_free(raw);
+    num_destroy(&numerator);
+    return out;
+}
+
+static expr_t *build_scaled_quartic_minus_one(const expr_t *wrt, long scale)
+{
+    number_t four = num_create_from_long(4);
+    number_t scale_num = num_create_from_long(scale);
+    expr_t *x4 = NULL;
+    expr_t *scaled = NULL;
+    expr_t *one = NULL;
+    expr_t *diff = NULL;
+    expr_t *out = NULL;
+
+    if (!wrt)
+        goto cleanup;
+
+    x4 = expr_pow(wrt, &four);
+    scaled = (scale == 1) ? (x4 ? expr_simplify(x4) : NULL)
+                          : (x4 ? expr_mul_num(x4, &scale_num) : NULL);
+    one = expr_new_const(NUM_ONE);
+    diff = (scaled && one) ? expr_sub(scaled, one) : NULL;
+    out = simplify_owned(diff);
+    diff = NULL;
+
+cleanup:
+    expr_free(diff);
+    expr_free(one);
+    expr_free(scaled);
+    expr_free(x4);
+    num_destroy(&scale_num);
+    num_destroy(&four);
+    return out;
+}
+
+static expr_t *build_inverse_quartic_appell_denominator(const expr_t *wrt)
+{
+    number_t one = num_create_from_long(1);
+    number_t eight = num_create_from_long(8);
+    number_t one_eighth = num_div(one, eight);
+    expr_t *first = NULL;
+    expr_t *second_base = NULL;
+    expr_t *second_root = NULL;
+    expr_t *product = NULL;
+    expr_t *out = NULL;
+
+    first = build_scaled_quartic_minus_one(wrt, 1);
+    second_base = build_scaled_quartic_minus_one(wrt, 2);
+    second_root = second_base ? expr_pow(second_base, &one_eighth) : NULL;
+    product = (first && second_root) ? expr_mul(first, second_root) : NULL;
+    out = simplify_owned(product);
+    product = NULL;
+
+    expr_free(product);
+    expr_free(second_root);
+    expr_free(second_base);
+    expr_free(first);
+    num_destroy(&one_eighth);
+    num_destroy(&eight);
+    num_destroy(&one);
+    return out;
+}
+
+static bool match_inverse_quartic_appell_denominator(const expr_t *expr,
+                                                     const expr_t *wrt)
+{
+    expr_t *actual = expr ? expr_simplify(expr) : NULL;
+    expr_t *expected = build_inverse_quartic_appell_denominator(wrt);
+    bool ok = actual && expected && expr_struct_eq(actual, expected);
+
+    expr_free(expected);
+    expr_free(actual);
+    return ok;
+}
+
+static expr_t *build_inverse_quartic_elementary_raw(const expr_t *wrt)
+{
+    number_t one = num_create_from_long(1);
+    number_t two = num_create_from_long(2);
+    number_t four = num_create_from_long(4);
+    number_t eight = num_create_from_long(8);
+    number_t one_eighth = num_div(one, eight);
+    number_t one_fourth = num_div(one, four);
+    number_t inv_eight = num_div(one, eight);
+    number_t neg_two = num_create_from_long(-2);
+    number_t neg_sqrt2 = num_neg(NUM_SQRT2);
+    expr_t *base = NULL;
+    expr_t *root8 = NULL;
+    expr_t *root4 = NULL;
+    expr_t *x2 = NULL;
+    expr_t *sqrt2 = NULL;
+    expr_t *sqrt2_term3 = NULL;
+    expr_t *sqrt2_term4 = NULL;
+    expr_t *arg1 = NULL;
+    expr_t *atan1 = NULL;
+    expr_t *term1 = NULL;
+    expr_t *arg2 = NULL;
+    expr_t *acoth2 = NULL;
+    expr_t *term2 = NULL;
+    expr_t *num3 = NULL;
+    expr_t *sqrt2_x = NULL;
+    expr_t *den3 = NULL;
+    expr_t *arg3 = NULL;
+    expr_t *atan3 = NULL;
+    expr_t *term3 = NULL;
+    expr_t *den4 = NULL;
+    expr_t *arg4 = NULL;
+    expr_t *atanh4 = NULL;
+    expr_t *sqrt2_atanh4 = NULL;
+    expr_t *term4 = NULL;
+    expr_t *left = NULL;
+    expr_t *right = NULL;
+    expr_t *sum = NULL;
+    expr_t *raw = NULL;
+
+    if (!wrt)
+        goto cleanup;
+
+    base = build_scaled_quartic_minus_one(wrt, 2);
+    root8 = base ? expr_pow(base, &one_eighth) : NULL;
+    root4 = base ? expr_pow(base, &one_fourth) : NULL;
+    x2 = expr_pow(wrt, &two);
+    sqrt2 = expr_new_const(NUM_SQRT2);
+
+    arg1 = (root8 && wrt) ? expr_div(root8, wrt) : NULL;
+    atan1 = arg1 ? expr_atan(arg1) : NULL;
+    term1 = atan1 ? expr_mul_num(atan1, &two) : NULL;
+
+    arg2 = (wrt && root8) ? expr_div(wrt, root8) : NULL;
+    acoth2 = arg2 ? expr_acoth(arg2) : NULL;
+    term2 = acoth2 ? expr_mul_num(acoth2, &neg_two) : NULL;
+
+    num3 = (root4 && x2) ? expr_sub(root4, x2) : NULL;
+    sqrt2_x = (sqrt2 && wrt) ? expr_mul(sqrt2, wrt) : NULL;
+    den3 = (sqrt2_x && root8) ? expr_mul(sqrt2_x, root8) : NULL;
+    arg3 = (num3 && den3) ? expr_div(num3, den3) : NULL;
+    atan3 = arg3 ? expr_atan(arg3) : NULL;
+    sqrt2_term3 = expr_new_const(NUM_SQRT2);
+    term3 = (sqrt2_term3 && atan3) ? expr_mul(sqrt2_term3, atan3) : NULL;
+
+    den4 = (root4 && x2) ? expr_add(root4, x2) : NULL;
+    arg4 = (den3 && den4) ? expr_div(den3, den4) : NULL;
+    atanh4 = arg4 ? expr_atanh(arg4) : NULL;
+    sqrt2_term4 = expr_new_const(NUM_SQRT2);
+    sqrt2_atanh4 = (sqrt2_term4 && atanh4) ? expr_mul(sqrt2_term4, atanh4) : NULL;
+    term4 = sqrt2_atanh4 ? expr_neg(sqrt2_atanh4) : NULL;
+
+    left = (term1 && term2) ? expr_add(term1, term2) : NULL;
+    right = (term3 && term4) ? expr_add(term3, term4) : NULL;
+    sum = (left && right) ? expr_add(left, right) : NULL;
+    raw = sum ? expr_mul_num(sum, &inv_eight) : NULL;
+
+cleanup:
+    expr_free(sum);
+    expr_free(right);
+    expr_free(left);
+    expr_free(term4);
+    expr_free(sqrt2_atanh4);
+    expr_free(atanh4);
+    expr_free(arg4);
+    expr_free(den4);
+    expr_free(term3);
+    expr_free(sqrt2_term4);
+    expr_free(sqrt2_term3);
+    expr_free(atan3);
+    expr_free(arg3);
+    expr_free(den3);
+    expr_free(sqrt2_x);
+    expr_free(num3);
+    expr_free(term2);
+    expr_free(acoth2);
+    expr_free(arg2);
+    expr_free(term1);
+    expr_free(atan1);
+    expr_free(arg1);
+    expr_free(sqrt2);
+    expr_free(x2);
+    expr_free(root4);
+    expr_free(root8);
+    expr_free(base);
+    num_destroy(&neg_sqrt2);
+    num_destroy(&neg_two);
+    num_destroy(&inv_eight);
+    num_destroy(&one_fourth);
+    num_destroy(&one_eighth);
+    num_destroy(&eight);
+    num_destroy(&four);
+    num_destroy(&two);
+    num_destroy(&one);
+    return raw;
+}
+
+expr_t *integrate_inverse_quartic_appell_f1(const expr_t *expr,
+                                            const expr_t *wrt)
+{
+    number_t numerator = num_new();
+    expr_t *raw = NULL;
+    expr_t *out = NULL;
+
+    if (!expr || !wrt || !expr_is_div(expr) ||
+        !expr_match_const_value(expr->a, &numerator) ||
+        !num_eq(numerator, NUM_ONE) ||
+        !match_inverse_quartic_appell_denominator(expr->b, wrt))
+        goto cleanup;
+
+    raw = build_inverse_quartic_elementary_raw(wrt);
+    out = simplify_owned(raw);
+    raw = NULL;
+
+cleanup:
+    expr_free(raw);
+    num_destroy(&numerator);
+    return out;
+}
+
 expr_t *integrate_matching_squared_unary_affine(const expr_t *expr,
                                                 const expr_t *wrt)
 {
