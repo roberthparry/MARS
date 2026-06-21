@@ -329,7 +329,9 @@ expr_t *expr_integrate_iterated_best_effort(
         if (!active[i])
             continue;
         remaining_vars_out[out] = vars[i];
+        num_destroy(&remaining_lo_num_out[out]);
         remaining_lo_num_out[out] = num_clone(lo_num[i]);
+        num_destroy(&remaining_hi_num_out[out]);
         remaining_hi_num_out[out] = num_clone(hi_num[i]);
         out++;
     }

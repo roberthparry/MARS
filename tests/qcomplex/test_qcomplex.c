@@ -811,7 +811,8 @@ static void test_polylog(void)
 
     {
         qcomplex_t got = qc_appell_f1(QC_ONE, QC_ONE, QC_ONE, qcr(2.0),
-                                      qcr(0.1), qcr(0.2));
+                                      qc_make(qf_from_string("0.1"), QF_ZERO),
+                                      qc_make(qf_from_string("0.2"), QF_ZERO));
         qcomplex_t expect = qc_make(
             qf_from_string("1.1778303565638345453879410947052170506848071256473314110734863879480772052813379"),
             QF_ZERO);
