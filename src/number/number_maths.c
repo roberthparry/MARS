@@ -12,7 +12,9 @@ enum {
     NUMBER_BERNOULLI_EVEN_TERM_COUNT = 260,
     NUMBER_BERNOULLI_WORK_COUNT = (2 * NUMBER_BERNOULLI_EVEN_TERM_COUNT) + 1,
     NUMBER_POLYGAMMA_GUARD_BITS = 128,
-    NUMBER_POLYGAMMA_TERM_GUARD_BITS = 16
+    NUMBER_POLYGAMMA_TERM_GUARD_BITS = 16,
+    NUMBER_POLYLOG_SERIES_MAX_TERMS = 100000,
+    NUMBER_APPELL_F1_SERIES_MAX_TERMS = 10000
 };
 
 static mpq_t number_bernoulli_even_terms[NUMBER_BERNOULLI_EVEN_TERM_COUNT];
@@ -240,6 +242,7 @@ NUMBER_MPFR_UNARY(number_mpfr_digamma_mut, mpfr_digamma)
 NUMBER_MPFR_UNARY(number_mpfr_erf_mut, mpfr_erf)
 NUMBER_MPFR_UNARY(number_mpfr_erfc_mut, mpfr_erfc)
 NUMBER_MPFR_UNARY(number_mpfr_ei_mut, mpfr_eint)
+NUMBER_MPFR_UNARY(number_mpfr_dilog_mut, mpfr_li2)
 
 NUMBER_MPFR_BINARY(number_mpfr_atan2_mut, mpfr_atan2)
 NUMBER_MPFR_BINARY(number_mpfr_pow_mut, mpfr_pow)
@@ -4272,6 +4275,796 @@ number_t num_polygamma(unsigned int order, const number_t number)
         return number_invalid();
     }
     return number_take(promoted);
+}
+
+static void number_polylog_tolerance(mpfr_t tolerance, mpfr_prec_t precision)
+{
+    unsigned long bits = (unsigned long)(precision > 0 ? precision : 128);
+
+    if (bits > ULONG_MAX - 32ul)
+        bits = ULONG_MAX - 32ul;
+    mpfr_set_ui(tolerance, 1u, MPFR_RNDN);
+    mpfr_div_2ui(tolerance, tolerance, bits + 16ul, MPFR_RNDN);
+}
+
+static int number_mpfr_polylog_series_int(mpfr_t out, int order,
+                                          const mpfr_t z)
+{
+    mpfr_prec_t precision = mpfr_get_prec(out);
+    mpfr_t sum, term, add, denom, abs_add, abs_sum, threshold, tolerance;
+
+    if (order < 0)
+        return -1;
+
+    mpfr_inits2(precision, sum, term, add, denom, abs_add, abs_sum,
+                threshold, tolerance, (mpfr_ptr)0);
+    number_polylog_tolerance(tolerance, precision);
+    mpfr_set_zero(sum, 0);
+    mpfr_set(term, z, MPFR_RNDN);
+
+    for (unsigned long k = 1ul; k < NUMBER_POLYLOG_SERIES_MAX_TERMS; ++k) {
+        if (order == 0)
+            mpfr_set_ui(denom, 1u, MPFR_RNDN);
+        else
+            mpfr_ui_pow_ui(denom, k, (unsigned long)order, MPFR_RNDN);
+
+        mpfr_div(add, term, denom, MPFR_RNDN);
+        mpfr_add(sum, sum, add, MPFR_RNDN);
+
+        mpfr_abs(abs_add, add, MPFR_RNDN);
+        mpfr_abs(abs_sum, sum, MPFR_RNDN);
+        mpfr_add_ui(threshold, abs_sum, 1u, MPFR_RNDN);
+        mpfr_mul(threshold, threshold, tolerance, MPFR_RNDN);
+        if (mpfr_cmp(abs_add, threshold) <= 0) {
+            mpfr_set(out, sum, MPFR_RNDN);
+            mpfr_clears(sum, term, add, denom, abs_add, abs_sum, threshold,
+                        tolerance, (mpfr_ptr)0);
+            return 0;
+        }
+
+        mpfr_mul(term, term, z, MPFR_RNDN);
+    }
+
+    mpfr_set(out, sum, MPFR_RNDN);
+    mpfr_clears(sum, term, add, denom, abs_add, abs_sum, threshold,
+                tolerance, (mpfr_ptr)0);
+    return 0;
+}
+
+static int number_mpfr_polylog_int_mut(mpfr_t value, int order)
+{
+    mpfr_prec_t precision = mpfr_get_prec(value);
+    mpfr_t tmp, abs_value, cutoff;
+    int rc = 0;
+
+    if (order < 0)
+        return -1;
+    if (order == 0) {
+        mpfr_init2(tmp, precision);
+        mpfr_ui_sub(tmp, 1u, value, MPFR_RNDN);
+        mpfr_div(value, value, tmp, MPFR_RNDN);
+        mpfr_clear(tmp);
+        return 0;
+    }
+    if (order == 1) {
+        mpfr_init2(tmp, precision);
+        mpfr_ui_sub(tmp, 1u, value, MPFR_RNDN);
+        mpfr_log(value, tmp, MPFR_RNDN);
+        mpfr_neg(value, value, MPFR_RNDN);
+        mpfr_clear(tmp);
+        return 0;
+    }
+    if (order == 2)
+        return number_mpfr_dilog_mut(value);
+
+    mpfr_inits2(precision, tmp, abs_value, cutoff, (mpfr_ptr)0);
+    mpfr_abs(abs_value, value, MPFR_RNDN);
+    mpfr_set_d(cutoff, 0.95, MPFR_RNDN);
+    if (mpfr_cmp(abs_value, cutoff) >= 0) {
+        mpfr_set_nan(value);
+        rc = 0;
+    } else {
+        mpfr_set(tmp, value, MPFR_RNDN);
+        rc = number_mpfr_polylog_series_int(value, order, tmp);
+    }
+    mpfr_clears(tmp, abs_value, cutoff, (mpfr_ptr)0);
+    return rc;
+}
+
+static int number_mpc_polylog_series_int(mpc_ptr out, int order,
+                                         mpc_srcptr z, mpc_rnd_t rnd)
+{
+    mpfr_prec_t precision = mpc_get_prec(out);
+    mpc_t sum, term, add;
+    mpfr_t denom, abs_add, abs_sum, threshold, tolerance;
+
+    if (order < 0)
+        return -1;
+
+    mpc_init2(sum, precision);
+    mpc_init2(term, precision);
+    mpc_init2(add, precision);
+    mpfr_inits2(precision, denom, abs_add, abs_sum, threshold, tolerance,
+                (mpfr_ptr)0);
+    number_polylog_tolerance(tolerance, precision);
+    mpc_set_ui_ui(sum, 0u, 0u, rnd);
+    mpc_set(term, z, rnd);
+
+    for (unsigned long k = 1ul; k < NUMBER_POLYLOG_SERIES_MAX_TERMS; ++k) {
+        if (order == 0)
+            mpfr_set_ui(denom, 1u, MPFR_RNDN);
+        else
+            mpfr_ui_pow_ui(denom, k, (unsigned long)order, MPFR_RNDN);
+
+        mpc_div_fr(add, term, denom, rnd);
+        mpc_add(sum, sum, add, rnd);
+
+        mpc_abs(abs_add, add, MPFR_RNDN);
+        mpc_abs(abs_sum, sum, MPFR_RNDN);
+        mpfr_add_ui(threshold, abs_sum, 1u, MPFR_RNDN);
+        mpfr_mul(threshold, threshold, tolerance, MPFR_RNDN);
+        if (mpfr_cmp(abs_add, threshold) <= 0) {
+            mpc_set(out, sum, rnd);
+            mpc_clear(add);
+            mpc_clear(term);
+            mpc_clear(sum);
+            mpfr_clears(denom, abs_add, abs_sum, threshold, tolerance,
+                        (mpfr_ptr)0);
+            return 0;
+        }
+
+        mpc_mul(term, term, z, rnd);
+    }
+
+    mpc_set(out, sum, rnd);
+    mpc_clear(add);
+    mpc_clear(term);
+    mpc_clear(sum);
+    mpfr_clears(denom, abs_add, abs_sum, threshold, tolerance, (mpfr_ptr)0);
+    return 0;
+}
+
+static int number_mpc_dilog(mpc_ptr out, mpc_srcptr z, mpc_rnd_t rnd)
+{
+    mpfr_prec_t precision = mpc_get_prec(out);
+    mpfr_t abs_z, abs_one_minus_z, pi2_over_6;
+    mpc_t inv_z, log_neg_z, log_sq, half_log_sq, inner, one_minus_z;
+    mpc_t log_z, log_one_minus_z, log_product, pi2_complex;
+
+    if (mpc_cmp_si_si(z, 0l, 0l) == 0) {
+        mpc_set_ui_ui(out, 0u, 0u, rnd);
+        return 0;
+    }
+    if (mpc_cmp_si_si(z, 1l, 0l) == 0) {
+        mpfr_init2(pi2_over_6, precision);
+        mpfr_const_pi(pi2_over_6, MPFR_RNDN);
+        mpfr_mul(pi2_over_6, pi2_over_6, pi2_over_6, MPFR_RNDN);
+        mpfr_div_ui(pi2_over_6, pi2_over_6, 6u, MPFR_RNDN);
+        mpc_set_fr(out, pi2_over_6, rnd);
+        mpfr_clear(pi2_over_6);
+        return 0;
+    }
+    if (mpfr_zero_p(mpc_imagref(z)) && mpfr_cmp_ui(mpc_realref(z), 1u) <= 0) {
+        mpfr_li2(mpc_realref(out), mpc_realref(z), MPFR_RNDN);
+        mpfr_set_zero(mpc_imagref(out), 0);
+        return 0;
+    }
+
+    mpfr_inits2(precision, abs_z, abs_one_minus_z, pi2_over_6,
+                (mpfr_ptr)0);
+    mpc_init2(inv_z, precision);
+    mpc_init2(log_neg_z, precision);
+    mpc_init2(log_sq, precision);
+    mpc_init2(half_log_sq, precision);
+    mpc_init2(inner, precision);
+    mpc_init2(one_minus_z, precision);
+    mpc_init2(log_z, precision);
+    mpc_init2(log_one_minus_z, precision);
+    mpc_init2(log_product, precision);
+    mpc_init2(pi2_complex, precision);
+    mpc_abs(abs_z, z, MPFR_RNDN);
+
+    if (mpfr_cmp_ui(abs_z, 1u) > 0) {
+        mpc_ui_div(inv_z, 1u, z, rnd);
+        mpc_neg(log_neg_z, z, rnd);
+        mpc_log(log_neg_z, log_neg_z, rnd);
+        mpc_mul(log_sq, log_neg_z, log_neg_z, rnd);
+        mpc_div_ui(half_log_sq, log_sq, 2u, rnd);
+        number_mpc_dilog(inner, inv_z, rnd);
+        mpfr_const_pi(pi2_over_6, MPFR_RNDN);
+        mpfr_mul(pi2_over_6, pi2_over_6, pi2_over_6, MPFR_RNDN);
+        mpfr_div_ui(pi2_over_6, pi2_over_6, 6u, MPFR_RNDN);
+        mpc_set_fr(pi2_complex, pi2_over_6, rnd);
+        mpc_add(out, inner, pi2_complex, rnd);
+        mpc_add(out, out, half_log_sq, rnd);
+        mpc_neg(out, out, rnd);
+        goto done;
+    }
+
+    mpc_ui_sub(one_minus_z, 1u, z, rnd);
+    mpc_abs(abs_one_minus_z, one_minus_z, MPFR_RNDN);
+    if (mpfr_cmp_d(abs_one_minus_z, 0.5) < 0) {
+        number_mpc_dilog(inner, one_minus_z, rnd);
+        mpc_log(log_z, z, rnd);
+        mpc_log(log_one_minus_z, one_minus_z, rnd);
+        mpc_mul(log_product, log_z, log_one_minus_z, rnd);
+        mpfr_const_pi(pi2_over_6, MPFR_RNDN);
+        mpfr_mul(pi2_over_6, pi2_over_6, pi2_over_6, MPFR_RNDN);
+        mpfr_div_ui(pi2_over_6, pi2_over_6, 6u, MPFR_RNDN);
+        mpc_set_fr(pi2_complex, pi2_over_6, rnd);
+        mpc_sub(out, pi2_complex, log_product, rnd);
+        mpc_sub(out, out, inner, rnd);
+        goto done;
+    }
+
+    number_mpc_polylog_series_int(out, 2, z, rnd);
+
+done:
+    mpc_clear(pi2_complex);
+    mpc_clear(log_product);
+    mpc_clear(log_one_minus_z);
+    mpc_clear(log_z);
+    mpc_clear(one_minus_z);
+    mpc_clear(inner);
+    mpc_clear(half_log_sq);
+    mpc_clear(log_sq);
+    mpc_clear(log_neg_z);
+    mpc_clear(inv_z);
+    mpfr_clears(abs_z, abs_one_minus_z, pi2_over_6, (mpfr_ptr)0);
+    return 0;
+}
+
+static int number_mpc_polylog_int(mpc_ptr out, int order, mpc_srcptr z,
+                                  mpc_rnd_t rnd)
+{
+    mpfr_prec_t precision = mpc_get_prec(out);
+    mpfr_t abs_z, cutoff;
+    mpc_t denominator;
+    int rc = 0;
+
+    if (order < 0)
+        return -1;
+    if (order == 0) {
+        mpc_init2(denominator, precision);
+        mpc_ui_sub(denominator, 1u, z, rnd);
+        mpc_div(out, z, denominator, rnd);
+        mpc_clear(denominator);
+        return 0;
+    }
+    if (order == 1) {
+        mpc_init2(denominator, precision);
+        mpc_ui_sub(denominator, 1u, z, rnd);
+        mpc_log(out, denominator, rnd);
+        mpc_neg(out, out, rnd);
+        mpc_clear(denominator);
+        return 0;
+    }
+    if (order == 2)
+        return number_mpc_dilog(out, z, rnd);
+
+    mpfr_inits2(precision, abs_z, cutoff, (mpfr_ptr)0);
+    mpc_abs(abs_z, z, MPFR_RNDN);
+    mpfr_set_d(cutoff, 0.95, MPFR_RNDN);
+    if (mpfr_cmp(abs_z, cutoff) >= 0) {
+        mpc_set_nan(out);
+        rc = 0;
+    } else {
+        rc = number_mpc_polylog_series_int(out, order, z, rnd);
+    }
+    mpfr_clears(abs_z, cutoff, (mpfr_ptr)0);
+    return rc;
+}
+
+static int number_mpfr_appell_f1(mpfr_ptr out, mpfr_srcptr a,
+                                 mpfr_srcptr b1, mpfr_srcptr b2,
+                                 mpfr_srcptr c, mpfr_srcptr x,
+                                 mpfr_srcptr y)
+{
+    mpfr_prec_t precision = mpfr_get_prec(out);
+    mpfr_t sum, row_start, row_sum, term, num, den, mn, nn, np1;
+    mpfr_t abs_term, abs_sum, threshold, tolerance, abs_x, abs_y, cutoff;
+
+    mpfr_inits2(precision, sum, row_start, row_sum, term, num, den, mn, nn,
+                np1, abs_term, abs_sum, threshold, tolerance, abs_x, abs_y,
+                cutoff, (mpfr_ptr)0);
+    number_polylog_tolerance(tolerance, precision);
+    mpfr_abs(abs_x, x, MPFR_RNDN);
+    mpfr_abs(abs_y, y, MPFR_RNDN);
+    mpfr_set_d(cutoff, 0.95, MPFR_RNDN);
+    if (mpfr_cmp(abs_x, cutoff) >= 0 || mpfr_cmp(abs_y, cutoff) >= 0) {
+        mpfr_set_nan(out);
+        goto done;
+    }
+
+    mpfr_set_zero(sum, 0);
+    mpfr_set_ui(row_start, 1u, MPFR_RNDN);
+
+    for (unsigned long m = 0ul; m < NUMBER_APPELL_F1_SERIES_MAX_TERMS; ++m) {
+        mpfr_set_zero(row_sum, 0);
+        mpfr_set(term, row_start, MPFR_RNDN);
+
+        for (unsigned long n = 0ul; n < NUMBER_APPELL_F1_SERIES_MAX_TERMS; ++n) {
+            mpfr_add(row_sum, row_sum, term, MPFR_RNDN);
+            mpfr_abs(abs_term, term, MPFR_RNDN);
+            mpfr_abs(abs_sum, row_sum, MPFR_RNDN);
+            mpfr_add_ui(threshold, abs_sum, 1u, MPFR_RNDN);
+            mpfr_mul(threshold, threshold, tolerance, MPFR_RNDN);
+            if (mpfr_cmp(abs_term, threshold) <= 0)
+                break;
+
+            mpfr_set_ui(mn, m + n, MPFR_RNDN);
+            mpfr_set_ui(nn, n, MPFR_RNDN);
+            mpfr_set_ui(np1, n + 1ul, MPFR_RNDN);
+            mpfr_add(num, a, mn, MPFR_RNDN);
+            mpfr_add(den, b2, nn, MPFR_RNDN);
+            mpfr_mul(num, num, den, MPFR_RNDN);
+            mpfr_add(den, c, mn, MPFR_RNDN);
+            mpfr_mul(den, den, np1, MPFR_RNDN);
+            if (mpfr_zero_p(den)) {
+                mpfr_set_nan(out);
+                goto done;
+            }
+            mpfr_div(num, num, den, MPFR_RNDN);
+            mpfr_mul(num, num, y, MPFR_RNDN);
+            mpfr_mul(term, term, num, MPFR_RNDN);
+        }
+
+        mpfr_add(sum, sum, row_sum, MPFR_RNDN);
+        mpfr_abs(abs_term, row_sum, MPFR_RNDN);
+        mpfr_abs(abs_sum, sum, MPFR_RNDN);
+        mpfr_add_ui(threshold, abs_sum, 1u, MPFR_RNDN);
+        mpfr_mul(threshold, threshold, tolerance, MPFR_RNDN);
+        if (mpfr_cmp(abs_term, threshold) <= 0)
+            break;
+
+        mpfr_set_ui(mn, m, MPFR_RNDN);
+        mpfr_set_ui(np1, m + 1ul, MPFR_RNDN);
+        mpfr_add(num, a, mn, MPFR_RNDN);
+        mpfr_add(den, b1, mn, MPFR_RNDN);
+        mpfr_mul(num, num, den, MPFR_RNDN);
+        mpfr_add(den, c, mn, MPFR_RNDN);
+        mpfr_mul(den, den, np1, MPFR_RNDN);
+        if (mpfr_zero_p(den)) {
+            mpfr_set_nan(out);
+            goto done;
+        }
+        mpfr_div(num, num, den, MPFR_RNDN);
+        mpfr_mul(num, num, x, MPFR_RNDN);
+        mpfr_mul(row_start, row_start, num, MPFR_RNDN);
+    }
+
+    mpfr_set(out, sum, MPFR_RNDN);
+
+done:
+    mpfr_clears(sum, row_start, row_sum, term, num, den, mn, nn, np1,
+                abs_term, abs_sum, threshold, tolerance, abs_x, abs_y, cutoff,
+                (mpfr_ptr)0);
+    return 0;
+}
+
+static int number_mpc_appell_f1(mpc_ptr out, mpc_srcptr a, mpc_srcptr b1,
+                                mpc_srcptr b2, mpc_srcptr c, mpc_srcptr x,
+                                mpc_srcptr y, mpc_rnd_t rnd)
+{
+    mpfr_prec_t precision = mpc_get_prec(out);
+    mpc_t sum, row_start, row_sum, term, num, den, mn, nn, np1;
+    mpfr_t abs_term, abs_sum, threshold, tolerance, abs_x, abs_y, cutoff;
+
+    mpc_init2(sum, precision);
+    mpc_init2(row_start, precision);
+    mpc_init2(row_sum, precision);
+    mpc_init2(term, precision);
+    mpc_init2(num, precision);
+    mpc_init2(den, precision);
+    mpc_init2(mn, precision);
+    mpc_init2(nn, precision);
+    mpc_init2(np1, precision);
+    mpfr_inits2(precision, abs_term, abs_sum, threshold, tolerance, abs_x,
+                abs_y, cutoff, (mpfr_ptr)0);
+    number_polylog_tolerance(tolerance, precision);
+    mpc_abs(abs_x, x, MPFR_RNDN);
+    mpc_abs(abs_y, y, MPFR_RNDN);
+    mpfr_set_d(cutoff, 0.95, MPFR_RNDN);
+    if (mpfr_cmp(abs_x, cutoff) >= 0 || mpfr_cmp(abs_y, cutoff) >= 0) {
+        mpc_set_nan(out);
+        goto done;
+    }
+
+    mpc_set_ui_ui(sum, 0u, 0u, rnd);
+    mpc_set_ui_ui(row_start, 1u, 0u, rnd);
+
+    for (unsigned long m = 0ul; m < NUMBER_APPELL_F1_SERIES_MAX_TERMS; ++m) {
+        mpc_set_ui_ui(row_sum, 0u, 0u, rnd);
+        mpc_set(term, row_start, rnd);
+
+        for (unsigned long n = 0ul; n < NUMBER_APPELL_F1_SERIES_MAX_TERMS; ++n) {
+            mpc_add(row_sum, row_sum, term, rnd);
+            mpc_abs(abs_term, term, MPFR_RNDN);
+            mpc_abs(abs_sum, row_sum, MPFR_RNDN);
+            mpfr_add_ui(threshold, abs_sum, 1u, MPFR_RNDN);
+            mpfr_mul(threshold, threshold, tolerance, MPFR_RNDN);
+            if (mpfr_cmp(abs_term, threshold) <= 0)
+                break;
+
+            mpc_set_ui_ui(mn, m + n, 0u, rnd);
+            mpc_set_ui_ui(nn, n, 0u, rnd);
+            mpc_set_ui_ui(np1, n + 1ul, 0u, rnd);
+            mpc_add(num, a, mn, rnd);
+            mpc_add(den, b2, nn, rnd);
+            mpc_mul(num, num, den, rnd);
+            mpc_add(den, c, mn, rnd);
+            mpc_mul(den, den, np1, rnd);
+            if (mpc_cmp_si_si(den, 0l, 0l) == 0) {
+                mpc_set_nan(out);
+                goto done;
+            }
+            mpc_div(num, num, den, rnd);
+            mpc_mul(num, num, y, rnd);
+            mpc_mul(term, term, num, rnd);
+        }
+
+        mpc_add(sum, sum, row_sum, rnd);
+        mpc_abs(abs_term, row_sum, MPFR_RNDN);
+        mpc_abs(abs_sum, sum, MPFR_RNDN);
+        mpfr_add_ui(threshold, abs_sum, 1u, MPFR_RNDN);
+        mpfr_mul(threshold, threshold, tolerance, MPFR_RNDN);
+        if (mpfr_cmp(abs_term, threshold) <= 0)
+            break;
+
+        mpc_set_ui_ui(mn, m, 0u, rnd);
+        mpc_set_ui_ui(np1, m + 1ul, 0u, rnd);
+        mpc_add(num, a, mn, rnd);
+        mpc_add(den, b1, mn, rnd);
+        mpc_mul(num, num, den, rnd);
+        mpc_add(den, c, mn, rnd);
+        mpc_mul(den, den, np1, rnd);
+        if (mpc_cmp_si_si(den, 0l, 0l) == 0) {
+            mpc_set_nan(out);
+            goto done;
+        }
+        mpc_div(num, num, den, rnd);
+        mpc_mul(num, num, x, rnd);
+        mpc_mul(row_start, row_start, num, rnd);
+    }
+
+    mpc_set(out, sum, rnd);
+
+done:
+    mpfr_clears(abs_term, abs_sum, threshold, tolerance, abs_x, abs_y, cutoff,
+                (mpfr_ptr)0);
+    mpc_clear(np1);
+    mpc_clear(nn);
+    mpc_clear(mn);
+    mpc_clear(den);
+    mpc_clear(num);
+    mpc_clear(term);
+    mpc_clear(row_sum);
+    mpc_clear(row_start);
+    mpc_clear(sum);
+    return 0;
+}
+
+static number_t number_dilog_real_gt_one(const number_t *number)
+{
+    number_t *promoted = NULL;
+    number_t result = number_invalid();
+    size_t precision_bits;
+    mpfr_t x, one_minus_x, x_minus_one, li2_one_minus_x, log_x;
+    mpfr_t log_x_minus_one, pi, real, imag;
+    mpc_t out;
+
+    if (!number)
+        return number_invalid();
+    precision_bits = num_get_prec_bits(*number);
+    if (precision_bits == 0u)
+        precision_bits = num_get_default_prec_bits();
+    promoted = number_coerce(number, NUMBER_MPFR);
+    if (!promoted ||
+        number_mpfr_ensure(number_impl(promoted)->value.mpfr,
+            precision_bits) != 0)
+        goto done;
+
+    mpfr_inits2((mpfr_prec_t)precision_bits, x, one_minus_x, x_minus_one,
+                li2_one_minus_x, log_x, log_x_minus_one, pi, real, imag,
+                (mpfr_ptr)0);
+    mpc_init2(out, (mpfr_prec_t)precision_bits);
+
+    mpfr_set(x, number_impl_const(promoted)->value.mpfr->value, MPFR_RNDN);
+    mpfr_ui_sub(one_minus_x, 1u, x, MPFR_RNDN);
+    mpfr_li2(li2_one_minus_x, one_minus_x, MPFR_RNDN);
+    mpfr_sub_ui(x_minus_one, x, 1u, MPFR_RNDN);
+    mpfr_log(log_x, x, MPFR_RNDN);
+    mpfr_log(log_x_minus_one, x_minus_one, MPFR_RNDN);
+    mpfr_const_pi(pi, MPFR_RNDN);
+
+    mpfr_mul(real, pi, pi, MPFR_RNDN);
+    mpfr_div_ui(real, real, 6u, MPFR_RNDN);
+    mpfr_sub(real, real, li2_one_minus_x, MPFR_RNDN);
+    mpfr_mul(log_x_minus_one, log_x_minus_one, log_x, MPFR_RNDN);
+    mpfr_sub(real, real, log_x_minus_one, MPFR_RNDN);
+    mpfr_mul(imag, pi, log_x, MPFR_RNDN);
+    mpfr_neg(imag, imag, MPFR_RNDN);
+
+    mpc_set_fr_fr(out, real, imag, MPC_RNDNN);
+    result = number_take_mpc_complex_result(out, precision_bits);
+
+    mpc_clear(out);
+    mpfr_clears(x, one_minus_x, x_minus_one, li2_one_minus_x, log_x,
+                log_x_minus_one, pi, real, imag, (mpfr_ptr)0);
+
+done:
+    number_box_free(promoted);
+    return result;
+}
+
+static number_t number_mpc_polylog_number(const number_t *number, int order)
+{
+    number_t *promoted = NULL;
+    number_t result = number_invalid();
+    size_t precision_bits;
+    mpc_t in, out;
+
+    if (!number)
+        return number_invalid();
+    promoted = number_coerce(number, NUMBER_COMPLEX);
+    if (!promoted)
+        return number_invalid();
+    precision_bits = num_get_prec_bits(*promoted);
+    if (precision_bits == 0u)
+        precision_bits = num_get_default_prec_bits();
+
+    mpc_init2(in, (mpfr_prec_t)precision_bits);
+    mpc_init2(out, (mpfr_prec_t)precision_bits);
+    if (number_complex_get_mpc(in, number_impl_const(promoted)->value.cx,
+            precision_bits) == 0 &&
+        number_mpc_polylog_int(out, order, in, MPC_RNDNN) == 0)
+        result = number_take_mpc_complex_result(out, precision_bits);
+
+    mpc_clear(out);
+    mpc_clear(in);
+    number_box_free(promoted);
+    return result;
+}
+
+static number_t number_mpfr_polylog_number(const number_t *number, int order)
+{
+    number_t *promoted = NULL;
+
+    if (!number)
+        return number_invalid();
+    promoted = number_coerce(number, NUMBER_MPFR);
+    if (!promoted ||
+        number_mpfr_ensure(number_impl(promoted)->value.mpfr,
+            num_get_prec_bits(*promoted)) != 0 ||
+        number_mpfr_polylog_int_mut(
+            number_impl(promoted)->value.mpfr->value, order) != 0) {
+        number_box_free(promoted);
+        return number_invalid();
+    }
+    return number_take(promoted);
+}
+
+static size_t number_max_prec6(const number_t *a, const number_t *b1,
+                               const number_t *b2, const number_t *c,
+                               const number_t *x, const number_t *y)
+{
+    const number_t *values[6] = { a, b1, b2, c, x, y };
+    size_t precision_bits = 0u;
+
+    for (size_t i = 0u; i < 6u; ++i) {
+        size_t candidate = values[i] ? num_get_prec_bits(*values[i]) : 0u;
+        if (candidate > precision_bits)
+            precision_bits = candidate;
+    }
+    return precision_bits ? precision_bits : num_get_default_prec_bits();
+}
+
+static number_t number_mpfr_appell_f1_number(const number_t *a,
+                                             const number_t *b1,
+                                             const number_t *b2,
+                                             const number_t *c,
+                                             const number_t *x,
+                                             const number_t *y)
+{
+    number_t *na = NULL;
+    number_t *nb1 = NULL;
+    number_t *nb2 = NULL;
+    number_t *nc = NULL;
+    number_t *nx = NULL;
+    number_t *ny = NULL;
+    size_t precision_bits;
+
+    if (!a || !b1 || !b2 || !c || !x || !y)
+        return number_invalid();
+    na = number_coerce(a, NUMBER_MPFR);
+    nb1 = number_coerce(b1, NUMBER_MPFR);
+    nb2 = number_coerce(b2, NUMBER_MPFR);
+    nc = number_coerce(c, NUMBER_MPFR);
+    nx = number_coerce(x, NUMBER_MPFR);
+    ny = number_coerce(y, NUMBER_MPFR);
+    if (!na || !nb1 || !nb2 || !nc || !nx || !ny)
+        goto fail;
+
+    precision_bits = number_max_prec6(na, nb1, nb2, nc, nx, ny);
+    if (number_mpfr_ensure(number_impl(na)->value.mpfr, precision_bits) != 0 ||
+        number_mpfr_ensure(number_impl(nb1)->value.mpfr, precision_bits) != 0 ||
+        number_mpfr_ensure(number_impl(nb2)->value.mpfr, precision_bits) != 0 ||
+        number_mpfr_ensure(number_impl(nc)->value.mpfr, precision_bits) != 0 ||
+        number_mpfr_ensure(number_impl(nx)->value.mpfr, precision_bits) != 0 ||
+        number_mpfr_ensure(number_impl(ny)->value.mpfr, precision_bits) != 0 ||
+        number_mpfr_appell_f1(number_impl(na)->value.mpfr->value,
+                              number_impl_const(na)->value.mpfr->value,
+                              number_impl_const(nb1)->value.mpfr->value,
+                              number_impl_const(nb2)->value.mpfr->value,
+                              number_impl_const(nc)->value.mpfr->value,
+                              number_impl_const(nx)->value.mpfr->value,
+                              number_impl_const(ny)->value.mpfr->value) != 0)
+        goto fail;
+
+    number_box_free(nb1);
+    number_box_free(nb2);
+    number_box_free(nc);
+    number_box_free(nx);
+    number_box_free(ny);
+    return number_take(na);
+
+fail:
+    number_box_free(na);
+    number_box_free(nb1);
+    number_box_free(nb2);
+    number_box_free(nc);
+    number_box_free(nx);
+    number_box_free(ny);
+    return number_invalid();
+}
+
+static number_t number_mpc_appell_f1_number(const number_t *a,
+                                            const number_t *b1,
+                                            const number_t *b2,
+                                            const number_t *c,
+                                            const number_t *x,
+                                            const number_t *y)
+{
+    number_t *values[6] = { NULL, NULL, NULL, NULL, NULL, NULL };
+    const number_t *inputs[6] = { a, b1, b2, c, x, y };
+    mpc_t z[6];
+    mpc_t out;
+    size_t precision_bits = 0u;
+    number_t result = number_invalid();
+    bool mpc_initialised = false;
+
+    if (!a || !b1 || !b2 || !c || !x || !y)
+        return number_invalid();
+    for (size_t i = 0u; i < 6u; ++i) {
+        values[i] = number_coerce(inputs[i], NUMBER_COMPLEX);
+        if (!values[i])
+            goto done;
+        if (num_get_prec_bits(*values[i]) > precision_bits)
+            precision_bits = num_get_prec_bits(*values[i]);
+    }
+    if (precision_bits == 0u)
+        precision_bits = num_get_default_prec_bits();
+
+    for (size_t i = 0u; i < 6u; ++i)
+        mpc_init2(z[i], (mpfr_prec_t)precision_bits);
+    mpc_init2(out, (mpfr_prec_t)precision_bits);
+    mpc_initialised = true;
+
+    for (size_t i = 0u; i < 6u; ++i) {
+        if (number_complex_get_mpc(z[i], number_impl_const(values[i])->value.cx,
+                precision_bits) != 0)
+            goto done;
+    }
+    if (number_mpc_appell_f1(out, z[0], z[1], z[2], z[3], z[4], z[5],
+                             MPC_RNDNN) == 0)
+        result = number_take_mpc_complex_result(out, precision_bits);
+
+done:
+    if (mpc_initialised) {
+        mpc_clear(out);
+        for (size_t i = 0u; i < 6u; ++i)
+            mpc_clear(z[i]);
+    }
+    for (size_t i = 0u; i < 6u; ++i)
+        number_box_free(values[i]);
+    return result;
+}
+
+number_t num_dilog(const number_t number)
+{
+    if (!num_is_real(number))
+        return number_mpc_polylog_number(&number, 2);
+    if (num_gt(number, NUM_ONE))
+        return number_dilog_real_gt_one(&number);
+    return number_apply_unary_math(number, qf_dilog, qc_dilog,
+                                   number_mpfr_dilog_mut, number_mpc_dilog);
+}
+
+number_t num_polylog(const number_t order, const number_t number)
+{
+    int order_int;
+
+    if (!number_try_get_exact_int(order, &order_int))
+        return NUM_NAN;
+    if (order_int < 0)
+        return NUM_NAN;
+    if (order_int == 2)
+        return num_dilog(number);
+    if (!num_is_real(number))
+        return number_mpc_polylog_number(&number, order_int);
+    if (number_kind_value(&number) == NUMBER_QFLOAT)
+        return num_create_from_qfloat(qf_polylog(qf_from_double((double)order_int),
+                                                 number_value_to_qfloat(&number)));
+    if (number_kind_value(&number) == NUMBER_QCOMPLEX)
+        return num_create_from_qcomplex(qc_polylog(
+            qc_make(qf_from_double((double)order_int), QF_ZERO),
+            number_value_to_qcomplex(&number)));
+    return number_mpfr_polylog_number(&number, order_int);
+}
+
+number_t num_appell_f1(const number_t a, const number_t b1,
+                       const number_t b2, const number_t c,
+                       const number_t x, const number_t y)
+{
+    bool any_qcomplex =
+        number_kind_value(&a) == NUMBER_QCOMPLEX ||
+        number_kind_value(&b1) == NUMBER_QCOMPLEX ||
+        number_kind_value(&b2) == NUMBER_QCOMPLEX ||
+        number_kind_value(&c) == NUMBER_QCOMPLEX ||
+        number_kind_value(&x) == NUMBER_QCOMPLEX ||
+        number_kind_value(&y) == NUMBER_QCOMPLEX;
+    bool any_qfloat =
+        number_kind_value(&a) == NUMBER_QFLOAT ||
+        number_kind_value(&b1) == NUMBER_QFLOAT ||
+        number_kind_value(&b2) == NUMBER_QFLOAT ||
+        number_kind_value(&c) == NUMBER_QFLOAT ||
+        number_kind_value(&x) == NUMBER_QFLOAT ||
+        number_kind_value(&y) == NUMBER_QFLOAT;
+
+    if (any_qcomplex)
+        return num_create_from_qcomplex(qc_appell_f1(
+            number_value_to_qcomplex(&a), number_value_to_qcomplex(&b1),
+            number_value_to_qcomplex(&b2), number_value_to_qcomplex(&c),
+            number_value_to_qcomplex(&x), number_value_to_qcomplex(&y)));
+    if (!num_is_real(a) || !num_is_real(b1) || !num_is_real(b2) ||
+        !num_is_real(c) || !num_is_real(x) || !num_is_real(y))
+        return number_mpc_appell_f1_number(&a, &b1, &b2, &c, &x, &y);
+    if (any_qfloat)
+        return num_create_from_qfloat(qf_appell_f1(
+            number_value_to_qfloat(&a), number_value_to_qfloat(&b1),
+            number_value_to_qfloat(&b2), number_value_to_qfloat(&c),
+            number_value_to_qfloat(&x), number_value_to_qfloat(&y)));
+    return number_mpfr_appell_f1_number(&a, &b1, &b2, &c, &x, &y);
+}
+
+number_t num_legendre_chi(const number_t order, const number_t number)
+{
+    int order_int;
+    number_t canonical_order;
+    number_t neg_number;
+    number_t pos;
+    number_t neg;
+    number_t diff;
+    number_t out;
+
+    if (!number_try_get_exact_int(order, &order_int))
+        return NUM_NAN;
+    if (order_int < 0)
+        return NUM_NAN;
+
+    canonical_order = num_create_from_long((long)order_int);
+    neg_number = num_neg(number);
+    pos = num_polylog(canonical_order, number);
+    neg = num_polylog(canonical_order, neg_number);
+    diff = num_sub(pos, neg);
+    out = num_div(diff, NUM_TWO);
+
+    num_destroy(&diff);
+    num_destroy(&neg);
+    num_destroy(&pos);
+    num_destroy(&neg_number);
+    num_destroy(&canonical_order);
+    return out;
 }
 
 number_t num_gammainv(const number_t number)

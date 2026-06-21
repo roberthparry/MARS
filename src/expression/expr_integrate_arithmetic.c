@@ -2,6 +2,7 @@
 #include <stdint.h>
 
 #include "expr_integrate_internal.h"
+#include "internal/number_internal.h"
 
 typedef expr_t *(*expr_integrate_binary_rule_fn)(const expr_t *expr,
                                                  const expr_t *wrt);
@@ -116,6 +117,12 @@ static expr_t *integrate_mul_rule_candidate(const expr_integrate_mul_rule_t *rul
                                             const expr_t *wrt);
 static expr_t *integrate_div_constant_denominator(const expr_t *expr,
                                                   const expr_t *wrt);
+static expr_t *integrate_div_rule_by_numerator_distribution(const expr_t *expr,
+                                                            const expr_t *wrt);
+static expr_t *integrate_div_by_exp_denominator(const expr_t *expr,
+                                                const expr_t *wrt);
+static expr_t *integrate_div_sin_integer_multiple_quotient(const expr_t *expr,
+                                                           const expr_t *wrt);
 static expr_t *integrate_div_logarithmic_derivative(const expr_t *expr,
                                                     const expr_t *wrt);
 static expr_t *integrate_div_wrt_denominator(const expr_t *expr,
@@ -126,6 +133,8 @@ static expr_t *integrate_div_inverse_affine_square(const expr_t *expr,
                                                    const expr_t *wrt);
 static expr_t *integrate_div_inverse_affine_square_root(const expr_t *expr,
                                                         const expr_t *wrt);
+static expr_t *integrate_div_inverse_one_plus_unit_circle_root(const expr_t *expr,
+                                                               const expr_t *wrt);
 static expr_t *integrate_div_constant_over_affine(const expr_t *expr,
                                                   const expr_t *wrt);
 static expr_t *integrate_div_affine_over_affine(const expr_t *expr,
@@ -222,6 +231,8 @@ static const expr_integrate_mul_rule_t integrate_mul_poly_hyperbolic_rules[] = {
 };
 
 static const expr_integrate_mul_rule_t integrate_mul_log_rules[] = {
+    { .kind = EXPR_INTEGRATE_MUL_RULE_DIRECT, .direct = integrate_sec_squared_log_tan_cot },
+    { .kind = EXPR_INTEGRATE_MUL_RULE_DIRECT, .direct = integrate_sec_double_angle_log_tan_cot },
     { .kind = EXPR_INTEGRATE_MUL_RULE_DIRECT, .direct = integrate_poly_times_log_affine },
     { .kind = EXPR_INTEGRATE_MUL_RULE_DIRECT, .direct = integrate_wrt_times_log_symbolic_affine },
     { .kind = EXPR_INTEGRATE_MUL_RULE_DIRECT, .direct = integrate_wrt_times_log_symbolic_quadratic },
@@ -404,6 +415,11 @@ static const expr_integrate_div_rule_feature_entry_t integrate_div_rule_feature_
 
 static const expr_integrate_binary_rule_fn integrate_div_initial_rules[] = {
     integrate_scaled_rule,
+    integrate_div_rule_by_numerator_distribution,
+    integrate_div_by_exp_denominator,
+    integrate_div_sin_integer_multiple_quotient,
+    integrate_inverse_sqrt_sin_cos_sin3_cos,
+    integrate_inverse_quartic_appell_f1,
     integrate_div_logarithmic_derivative,
     integrate_poly_times_affine_power,
     integrate_symbolic_monomial_times_affine_power,
@@ -457,6 +473,7 @@ static const expr_integrate_binary_rule_fn integrate_div_root_family_rules[] = {
 static const expr_integrate_binary_rule_fn integrate_div_elementary_inverse_rules[] = {
     integrate_div_inverse_affine_square,
     integrate_div_inverse_affine_square_root,
+    integrate_div_inverse_one_plus_unit_circle_root,
     NULL
 };
 
@@ -980,6 +997,241 @@ static expr_t *integrate_div_constant_denominator(const expr_t *expr,
     return simplify_owned(quotient);
 }
 
+static expr_t *integrate_div_rule_by_numerator_distribution(const expr_t *expr,
+                                                            const expr_t *wrt)
+{
+    expr_t *left_div = NULL;
+    expr_t *right_div = NULL;
+    expr_t *left_anti = NULL;
+    expr_t *right_anti = NULL;
+    expr_t *combined = NULL;
+
+    if (!expr || !expr->a || !expr->a->ops || !expr->b ||
+        (expr->a->ops->kind != EXPR_KIND_ADD && expr->a->ops->kind != EXPR_KIND_SUB)) {
+        return NULL;
+    }
+
+    left_div = expr_div(expr->a->a, expr->b);
+    right_div = expr_div(expr->a->b, expr->b);
+    left_anti = left_div ? expr_integrate_dispatch(left_div, wrt) : NULL;
+    right_anti = right_div ? expr_integrate_dispatch(right_div, wrt) : NULL;
+
+    if (left_anti && right_anti)
+        combined = expr->a->ops->kind == EXPR_KIND_SUB
+            ? expr_sub(left_anti, right_anti)
+            : expr_add(left_anti, right_anti);
+
+    expr_free(right_anti);
+    expr_free(left_anti);
+    expr_free(right_div);
+    expr_free(left_div);
+    return simplify_owned(combined);
+}
+
+static expr_t *integrate_div_by_exp_denominator(const expr_t *expr,
+                                                const expr_t *wrt)
+{
+    expr_t *neg_arg = NULL;
+    expr_t *reciprocal = NULL;
+    expr_t *product = NULL;
+    expr_t *out = NULL;
+
+    if (!expr || !expr->a || !expr->b || !expr_is_exp_expr(expr->b))
+        return NULL;
+
+    neg_arg = expr_neg(expr->b->a);
+    reciprocal = neg_arg ? expr_exp(neg_arg) : NULL;
+    product = reciprocal ? expr_mul(expr->a, reciprocal) : NULL;
+    expr_free(reciprocal);
+    expr_free(neg_arg);
+
+    if (!product || expr_equal_exact_local(product, expr)) {
+        expr_free(product);
+        return NULL;
+    }
+
+    out = expr_integrate_dispatch(product, wrt);
+    expr_free(product);
+    return out;
+}
+
+static bool integrate_small_positive_integer_coeff(const expr_t *expr,
+                                                   long *out)
+{
+    number_t value = num_new();
+    long numerator = 0;
+    long denominator = 0;
+    bool ok = false;
+
+    if (!expr || !out ||
+        !expr_match_const_value(expr, &value) ||
+        !num_is_real(value) ||
+        !num_is_integer(value) ||
+        !num_get_small_rational(value, &numerator, &denominator) ||
+        denominator != 1 ||
+        numerator <= 0) {
+        goto cleanup;
+    }
+
+    *out = numerator;
+    ok = true;
+
+cleanup:
+    num_destroy(&value);
+    return ok;
+}
+
+static expr_t *integrate_build_pi_rational(long numerator, long denominator)
+{
+    number_t ratio = num_create_from_frac(numerator, denominator);
+    expr_t *pi = expr_new_named_const(NUM_PI, "@pi");
+    expr_t *scaled = pi ? expr_mul_num(pi, &ratio) : NULL;
+    expr_t *out = simplify_owned(scaled);
+
+    expr_free(pi);
+    num_destroy(&ratio);
+    return out;
+}
+
+static expr_t *integrate_sin_quotient_paired_log_term(const expr_t *wrt,
+                                                      long k,
+                                                      long denominator)
+{
+    expr_t *angle = NULL;
+    expr_t *left_arg = NULL;
+    expr_t *right_arg = NULL;
+    expr_t *left_sin = NULL;
+    expr_t *right_sin = NULL;
+    expr_t *left_abs = NULL;
+    expr_t *right_abs = NULL;
+    expr_t *left_log = NULL;
+    expr_t *right_log = NULL;
+    expr_t *out = NULL;
+
+    angle = integrate_build_pi_rational(k, denominator);
+    left_arg = angle ? expr_sub(wrt, angle) : NULL;
+    right_arg = angle ? expr_add(wrt, angle) : NULL;
+    left_sin = left_arg ? expr_sin(left_arg) : NULL;
+    right_sin = right_arg ? expr_sin(right_arg) : NULL;
+    left_abs = left_sin ? expr_abs(left_sin) : NULL;
+    right_abs = right_sin ? expr_abs(right_sin) : NULL;
+    left_log = left_abs ? expr_log(left_abs) : NULL;
+    right_log = right_abs ? expr_log(right_abs) : NULL;
+    out = (left_log && right_log) ? expr_sub(left_log, right_log) : NULL;
+
+    expr_free(right_log);
+    expr_free(left_log);
+    expr_free(right_abs);
+    expr_free(left_abs);
+    expr_free(right_sin);
+    expr_free(left_sin);
+    expr_free(right_arg);
+    expr_free(left_arg);
+    expr_free(angle);
+    return out;
+}
+
+static expr_t *integrate_sin_quotient_residue_coeff(long numerator,
+                                                    long denominator,
+                                                    long k)
+{
+    number_t scale = num_create_from_frac((k & 1L) ? -1L : 1L, denominator);
+    expr_t *angle = NULL;
+    expr_t *sin_angle = NULL;
+    expr_t *scaled = NULL;
+    expr_t *out = NULL;
+
+    angle = integrate_build_pi_rational(numerator * k, denominator);
+    sin_angle = angle ? expr_sin(angle) : NULL;
+    scaled = sin_angle ? expr_mul_num(sin_angle, &scale) : NULL;
+    out = simplify_owned(scaled);
+
+    expr_free(sin_angle);
+    expr_free(angle);
+    num_destroy(&scale);
+    return out;
+}
+
+static expr_t *integrate_build_odd_sin_integer_multiple_quotient(long numerator,
+                                                                 long denominator,
+                                                                 const expr_t *wrt)
+{
+    expr_t *sum = NULL;
+
+    for (long k = 1; k <= (denominator - 1L) / 2L; ++k) {
+        expr_t *coeff = integrate_sin_quotient_residue_coeff(numerator,
+                                                             denominator,
+                                                             k);
+        expr_t *log_term = integrate_sin_quotient_paired_log_term(wrt,
+                                                                  k,
+                                                                  denominator);
+        expr_t *term = (coeff && log_term) ? expr_mul(coeff, log_term) : NULL;
+
+        if (!term) {
+            expr_free(log_term);
+            expr_free(coeff);
+            expr_free(sum);
+            return NULL;
+        }
+
+        if (sum) {
+            expr_t *next = expr_add(sum, term);
+
+            expr_free(sum);
+            expr_free(term);
+            term = NULL;
+            sum = next;
+        } else {
+            sum = term;
+            term = NULL;
+        }
+
+        expr_free(term);
+        expr_free(log_term);
+        expr_free(coeff);
+    }
+
+    return sum;
+}
+
+static expr_t *integrate_div_sin_integer_multiple_quotient(const expr_t *expr,
+                                                           const expr_t *wrt)
+{
+    enum { MAX_DENOMINATOR = 65 };
+    expr_t *numerator_coeff = NULL;
+    expr_t *denominator_coeff = NULL;
+    long numerator = 0;
+    long denominator = 0;
+    bool numerator_is_sin = false;
+    bool denominator_is_sin = false;
+    expr_t *out = NULL;
+
+    if (!expr || !expr->a || !expr->b || !wrt ||
+        !match_trig_proportional_wrt_coeff(expr->a, wrt, &numerator_is_sin,
+                                           &numerator_coeff) ||
+        !match_trig_proportional_wrt_coeff(expr->b, wrt, &denominator_is_sin,
+                                           &denominator_coeff) ||
+        !numerator_is_sin ||
+        !denominator_is_sin ||
+        !integrate_small_positive_integer_coeff(numerator_coeff, &numerator) ||
+        !integrate_small_positive_integer_coeff(denominator_coeff, &denominator) ||
+        denominator <= 1 ||
+        denominator > MAX_DENOMINATOR ||
+        (denominator % 2L) == 0L ||
+        numerator == denominator) {
+        goto cleanup;
+    }
+
+    out = integrate_build_odd_sin_integer_multiple_quotient(numerator,
+                                                           denominator,
+                                                           wrt);
+
+cleanup:
+    expr_free(denominator_coeff);
+    expr_free(numerator_coeff);
+    return out;
+}
+
 static bool integrate_expr_equivalent_by_zero_difference(const expr_t *left,
                                                          const expr_t *right)
 {
@@ -1184,6 +1436,77 @@ cleanup:
     num_destroy(&numer_constant);
     num_destroy(&coeff);
     num_destroy(&constant);
+    return out;
+}
+
+static bool match_one_plus_unit_circle_root(const expr_t *expr,
+                                            const expr_t *wrt)
+{
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+    const expr_t *root = NULL;
+    number_t constant = num_new();
+    number_t coeff = num_new();
+    number_t one = num_new();
+    bool is_sub = false;
+    bool is_plus_square = false;
+    bool ok = false;
+
+    if (!expr || !wrt ||
+        !expr_match_add_sub_expr(expr, &left, &right, &is_sub) ||
+        is_sub)
+        goto cleanup;
+
+    if (expr_match_const_value(left, &one) && num_eq(one, NUM_ONE)) {
+        root = right;
+    } else if (expr_match_const_value(right, &one) && num_eq(one, NUM_ONE)) {
+        root = left;
+    } else {
+        goto cleanup;
+    }
+
+    ok = expr_is_op(root, &ops_sqrt) &&
+         root->a &&
+         match_one_plus_minus_affine_square(root->a, wrt, &is_plus_square,
+                                            &constant, &coeff) &&
+         !is_plus_square &&
+         num_eq(constant, NUM_ZERO) &&
+         (num_eq(coeff, NUM_ONE) || num_eq(coeff, NUM_NEG_ONE));
+
+cleanup:
+    num_destroy(&one);
+    num_destroy(&coeff);
+    num_destroy(&constant);
+    return ok;
+}
+
+static expr_t *integrate_div_inverse_one_plus_unit_circle_root(const expr_t *expr,
+                                                               const expr_t *wrt)
+{
+    number_t numer_constant = num_new();
+    expr_t *asin_x = NULL;
+    expr_t *correction = NULL;
+    expr_t *raw = NULL;
+    expr_t *out = NULL;
+
+    if (!expr || !expr->a || !expr->b ||
+        depends_on_wrt(expr->a, wrt) ||
+        !expr_match_const_value(expr->a, &numer_constant) ||
+        !num_eq(numer_constant, NUM_ONE) ||
+        !match_one_plus_unit_circle_root(expr->b, wrt))
+        goto cleanup;
+
+    asin_x = expr_asin(wrt);
+    correction = expr_div(wrt, expr->b);
+    raw = (asin_x && correction) ? expr_sub(asin_x, correction) : NULL;
+    out = simplify_owned(raw);
+    raw = NULL;
+
+cleanup:
+    expr_free(raw);
+    expr_free(correction);
+    expr_free(asin_x);
+    num_destroy(&numer_constant);
     return out;
 }
 

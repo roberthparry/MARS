@@ -1196,6 +1196,59 @@ qfloat_t qf_tetragamma(qfloat_t x);
 qfloat_t qf_polygamma(unsigned int order, qfloat_t x);
 
 /**
+ * @brief Compute the principal dilogarithm Li₂(x).
+ *
+ * Real-valued for x <= 1 on the principal branch. Arguments beyond the real
+ * branch cut return NaN in qfloat; use qcomplex for complex branch values.
+ *
+ * @param x Input value.
+ * @return Li₂(x) (double-double precision where covered).
+ */
+qfloat_t qf_dilog(qfloat_t x);
+
+/**
+ * @brief Compute the polylogarithm Li_s(x) for integer real orders.
+ *
+ * The order argument must be an integer-valued qfloat. Orders 0, 1, and 2 have
+ * direct formulae; higher positive orders use the defining series in its
+ * convergence disk.
+ *
+ * @param s Integer order.
+ * @param x Input value.
+ * @return Li_s(x), or NaN outside implemented coverage.
+ */
+qfloat_t qf_polylog(qfloat_t s, qfloat_t x);
+
+/**
+ * @brief Compute Appell's hypergeometric function F1.
+ *
+ * Uses the defining double series in the bidisc |x| < 1, |y| < 1. Arguments
+ * outside the implemented convergence region return NaN.
+ *
+ * @param a First numerator parameter.
+ * @param b1 First Appell numerator parameter.
+ * @param b2 Second Appell numerator parameter.
+ * @param c Denominator parameter.
+ * @param x First variable.
+ * @param y Second variable.
+ * @return F1(a; b1, b2; c; x, y), or NaN outside implemented coverage.
+ */
+qfloat_t qf_appell_f1(qfloat_t a, qfloat_t b1, qfloat_t b2,
+                      qfloat_t c, qfloat_t x, qfloat_t y);
+
+/**
+ * @brief Compute the Legendre chi function chi_s(x) for integer real orders.
+ *
+ * Uses chi_s(x) = (Li_s(x) - Li_s(-x)) / 2. The order argument must be an
+ * integer-valued qfloat.
+ *
+ * @param s Integer order.
+ * @param x Input value.
+ * @return chi_s(x), or NaN outside implemented coverage.
+ */
+qfloat_t qf_legendre_chi(qfloat_t s, qfloat_t x);
+
+/**
  * @brief Compute the main branch of the inverse of the gamma function.
  *
  * @param y Input value.

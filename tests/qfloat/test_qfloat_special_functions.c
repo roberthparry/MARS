@@ -866,6 +866,45 @@ void test_qf_polygamma(void) {
            C_GREEN, C_RESET);
 }
 
+void test_qf_polylog(void) {
+    printf(C_CYAN "TEST: qf_dilog/qf_polylog\n" C_RESET);
+
+    {
+        qfloat_t half = qf_from_double(0.5);
+        qfloat_t log2 = qf_log(qf_from_double(2.0));
+        qfloat_t expect = qf_sub(qf_div(qf_sqr(QF_PI), qf_from_double(12.0)),
+                                 qf_div(qf_sqr(log2), qf_from_double(2.0)));
+
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_dilog(half), expect, 1e-27);
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_polylog(qf_from_double(2.0), half),
+                                     expect, 1e-27);
+    }
+
+    {
+        qfloat_t x = qf_from_double(0.25);
+        qfloat_t one_minus_x = qf_sub(QF_ONE, x);
+
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_polylog(QF_ONE, x),
+                                     qf_neg(qf_log(one_minus_x)), 1e-28);
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_polylog(QF_ZERO, x),
+                                     qf_div(x, one_minus_x), 1e-28);
+    }
+
+    {
+        qfloat_t got = qf_appell_f1(QF_ONE, QF_ONE, QF_ONE,
+                                    qf_from_double(2.0),
+                                    qf_from_double(0.1),
+                                    qf_from_double(0.2));
+        qfloat_t expect =
+            qf_from_string("1.1778303565638345453879410947052170506848071256473314110734863879480772052813379");
+
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(got, expect, 1e-28);
+    }
+
+    printf("%s  OK: qf_dilog, qf_polylog, and qf_appell_f1 identities%s\n\n",
+           C_GREEN, C_RESET);
+}
+
 void test_arithmetic_extensions(void) {
     TEST_RUN_SUBTEST(test_qf_add_double, NULL);
     TEST_RUN_SUBTEST(test_qf_mul_double, NULL);

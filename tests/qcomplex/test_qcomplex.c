@@ -784,6 +784,43 @@ static void test_digamma(void)
     }
 }
 
+static void test_polylog(void)
+{
+    printf(C_CYAN "TEST: dilog/polylog\n" C_RESET);
+
+    {
+        qfloat_t log2 = qf_log(qf_from_double(2.0));
+        qfloat_t expect = qf_sub(qf_div(qf_sqr(QF_PI), qf_from_double(12.0)),
+                                 qf_div(qf_sqr(log2), qf_from_double(2.0)));
+
+        check_qc("Li₂(1/2) = pi²/12 - log(2)²/2",
+                 qc_dilog(qcr(0.5)), qc_make(expect, QF_ZERO), 1e-27);
+        check_qc("polylog(2, 1/2) = Li₂(1/2)",
+                 qc_polylog(qcr(2.0), qcr(0.5)), qc_make(expect, QF_ZERO), 1e-27);
+    }
+
+    {
+        qcomplex_t z = qcz(0.2, 0.1);
+        qcomplex_t one_minus_z = qc_sub(QC_ONE, z);
+
+        check_qc("polylog(1, z) = -log(1-z)",
+                 qc_polylog(QC_ONE, z), qc_neg(qc_log(one_minus_z)), 1e-27);
+        check_qc("polylog(0, z) = z/(1-z)",
+                 qc_polylog(QC_ZERO, z), qc_div(z, one_minus_z), 1e-27);
+    }
+
+    {
+        qcomplex_t got = qc_appell_f1(QC_ONE, QC_ONE, QC_ONE, qcr(2.0),
+                                      qcr(0.1), qcr(0.2));
+        qcomplex_t expect = qc_make(
+            qf_from_string("1.1778303565638345453879410947052170506848071256473314110734863879480772052813379"),
+            QF_ZERO);
+
+        check_qc("appell_f1(1,1,1,2,0.1,0.2)",
+                 got, expect, 1e-27);
+    }
+}
+
 static void test_gammainv(void)
 {
     printf(C_CYAN "TEST: gammainv\n" C_RESET);
@@ -1290,6 +1327,7 @@ static void test_special_group(void)
     TEST_RUN_SUBTEST(test_erfinv, NULL);
     TEST_RUN_SUBTEST(test_gamma, NULL);
     TEST_RUN_SUBTEST(test_digamma, NULL);
+    TEST_RUN_SUBTEST(test_polylog, NULL);
     TEST_RUN_SUBTEST(test_gammainv, NULL);
     TEST_RUN_SUBTEST(test_beta, NULL);
     TEST_RUN_SUBTEST(test_normal, NULL);

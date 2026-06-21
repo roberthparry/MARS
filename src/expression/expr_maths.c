@@ -335,6 +335,82 @@ number_t eval_polygamma(expr_t *dv)
         return NUM_NAN;
     return num_polygamma(order, expr_eval_num_internal(dv->b));
 }
+number_t eval_dilog(expr_t *dv) { return expr_eval_unary_num(dv, num_dilog); }
+number_t eval_polylog(expr_t *dv)
+{
+    return expr_eval_binary_num(dv, num_polylog);
+}
+number_t eval_legendre_chi(expr_t *dv)
+{
+    return expr_eval_binary_num(dv, num_legendre_chi);
+}
+number_t eval_appell_f1_pack(expr_t *dv)
+{
+    (void)dv;
+    return NUM_NAN;
+}
+bool expr_appell_f1_unpack(const expr_t *expr,
+                           const expr_t **a,
+                           const expr_t **b1,
+                           const expr_t **b2,
+                           const expr_t **c,
+                           const expr_t **x,
+                           const expr_t **y)
+{
+    const expr_t *params;
+    const expr_t *vars;
+    const expr_t *ab;
+    const expr_t *bc;
+
+    if (a) *a = NULL;
+    if (b1) *b1 = NULL;
+    if (b2) *b2 = NULL;
+    if (c) *c = NULL;
+    if (x) *x = NULL;
+    if (y) *y = NULL;
+    if (!expr || !expr_is_op(expr, &ops_appell_f1) || !expr->a || !expr->b)
+        return false;
+
+    params = expr->a;
+    vars = expr->b;
+    if (!expr_is_op(params, &ops_appell_f1_pack) ||
+        !expr_is_op(vars, &ops_appell_f1_pack) ||
+        !params->a || !params->b || !vars->a || !vars->b)
+        return false;
+
+    ab = params->a;
+    bc = params->b;
+    if (!expr_is_op(ab, &ops_appell_f1_pack) ||
+        !expr_is_op(bc, &ops_appell_f1_pack) ||
+        !ab->a || !ab->b || !bc->a || !bc->b)
+        return false;
+
+    if (a) *a = ab->a;
+    if (b1) *b1 = ab->b;
+    if (b2) *b2 = bc->a;
+    if (c) *c = bc->b;
+    if (x) *x = vars->a;
+    if (y) *y = vars->b;
+    return true;
+}
+number_t eval_appell_f1(expr_t *dv)
+{
+    const expr_t *a = NULL;
+    const expr_t *b1 = NULL;
+    const expr_t *b2 = NULL;
+    const expr_t *c = NULL;
+    const expr_t *x = NULL;
+    const expr_t *y = NULL;
+
+    if (!expr_appell_f1_unpack(dv, &a, &b1, &b2, &c, &x, &y))
+        return NUM_NAN;
+    return num_appell_f1(expr_eval_num_internal(a),
+                         expr_eval_num_internal(b1),
+                         expr_eval_num_internal(b2),
+                         expr_eval_num_internal(c),
+                         expr_eval_num_internal(x),
+                         expr_eval_num_internal(y));
+}
 number_t eval_gammainv(expr_t *dv) { return expr_eval_unary_num(dv, num_gammainv); }
 number_t eval_lambert_w(expr_t *dv) { return expr_eval_unary_num(dv, num_productlog); }
 number_t eval_lambert_w0(expr_t *dv) { return expr_eval_unary_num(dv, num_lambert_w0); }
@@ -1080,6 +1156,187 @@ expr_t *deriv_polygamma(expr_t *dv)
     out = expr_mul(factor, db);
     expr_free(factor);
     expr_free(db);
+    return out;
+}
+
+expr_t *deriv_dilog(expr_t *dv)
+{
+    expr_t *da = expr_get_dx_internal(dv->a);
+    expr_t *one = expr_new_const(NUM_ONE);
+    expr_t *one_minus_a = expr_sub(one, dv->a);
+    expr_t *log_term = expr_log(one_minus_a);
+    expr_t *neg_log = expr_neg(log_term);
+    expr_t *factor = expr_div(neg_log, dv->a);
+    expr_t *out = expr_mul(factor, da);
+
+    expr_free(da);
+    expr_free(one);
+    expr_free(one_minus_a);
+    expr_free(log_term);
+    expr_free(neg_log);
+    expr_free(factor);
+    return out;
+}
+
+expr_t *deriv_polylog(expr_t *dv)
+{
+    number_t order_value = expr_eval_num_internal(dv->a);
+    unsigned int order;
+    expr_t *factor = NULL;
+    expr_t *db;
+    expr_t *out;
+
+    if (!expr_number_to_polygamma_order(order_value, &order))
+        return expr_new_const(NUM_NAN);
+
+    if (order == 0u) {
+        expr_t *one = expr_new_const(NUM_ONE);
+        expr_t *one_minus = expr_sub(one, dv->b);
+        expr_t *den = expr_pow_long(one_minus, 2);
+
+        factor = expr_div(one, den);
+        expr_free(one);
+        expr_free(one_minus);
+        expr_free(den);
+    } else {
+        expr_t *prev = expr_polylog(order - 1u, dv->b);
+
+        factor = expr_div(prev, dv->b);
+        expr_free(prev);
+    }
+
+    db = expr_get_dx_internal(dv->b);
+    out = expr_mul(factor, db);
+    expr_free(factor);
+    expr_free(db);
+    return out;
+}
+
+expr_t *deriv_legendre_chi(expr_t *dv)
+{
+    number_t order_value = expr_eval_num_internal(dv->a);
+    unsigned int order;
+    expr_t *factor = NULL;
+    expr_t *db;
+    expr_t *out;
+
+    if (!expr_number_to_polygamma_order(order_value, &order))
+        return expr_new_const(NUM_NAN);
+
+    if (order == 0u) {
+        expr_t *one = expr_new_const(NUM_ONE);
+        expr_t *z_sq = expr_pow_long(dv->b, 2);
+        expr_t *one_plus_z_sq = expr_add(one, z_sq);
+        expr_t *one_minus_z_sq = expr_sub(one, z_sq);
+        expr_t *den = expr_pow_long(one_minus_z_sq, 2);
+
+        factor = expr_div(one_plus_z_sq, den);
+        expr_free(one);
+        expr_free(z_sq);
+        expr_free(one_plus_z_sq);
+        expr_free(one_minus_z_sq);
+        expr_free(den);
+    } else {
+        expr_t *prev = expr_legendre_chi(order - 1u, dv->b);
+
+        factor = expr_div(prev, dv->b);
+        expr_free(prev);
+    }
+
+    db = expr_get_dx_internal(dv->b);
+    out = expr_mul(factor, db);
+    expr_free(factor);
+    expr_free(db);
+    return out;
+}
+
+expr_t *deriv_appell_f1_pack(expr_t *dv)
+{
+    (void)dv;
+    return expr_new_const(NUM_NAN);
+}
+
+static bool expr_derivative_is_zero_local(const expr_t *expr)
+{
+    expr_t *dx = expr_get_dx_internal(expr);
+    expr_t *simplified = dx ? expr_simplify(dx) : NULL;
+    bool zero = simplified && expr_is_const(simplified) &&
+                num_is_zero(simplified->c);
+
+    expr_free(simplified);
+    expr_free(dx);
+    return zero;
+}
+
+expr_t *deriv_appell_f1(expr_t *dv)
+{
+    const expr_t *a = NULL;
+    const expr_t *b1 = NULL;
+    const expr_t *b2 = NULL;
+    const expr_t *c = NULL;
+    const expr_t *x = NULL;
+    const expr_t *y = NULL;
+    expr_t *dx = NULL;
+    expr_t *dy = NULL;
+    expr_t *a1 = NULL;
+    expr_t *b11 = NULL;
+    expr_t *b21 = NULL;
+    expr_t *c1 = NULL;
+    expr_t *ab1 = NULL;
+    expr_t *ab2 = NULL;
+    expr_t *coef_x = NULL;
+    expr_t *coef_y = NULL;
+    expr_t *shift_x = NULL;
+    expr_t *shift_y = NULL;
+    expr_t *factor_x = NULL;
+    expr_t *factor_y = NULL;
+    expr_t *term_x = NULL;
+    expr_t *term_y = NULL;
+    expr_t *out = NULL;
+
+    if (!expr_appell_f1_unpack(dv, &a, &b1, &b2, &c, &x, &y))
+        return expr_new_const(NUM_NAN);
+    if (!expr_derivative_is_zero_local(a) ||
+        !expr_derivative_is_zero_local(b1) ||
+        !expr_derivative_is_zero_local(b2) ||
+        !expr_derivative_is_zero_local(c))
+        return expr_new_const(NUM_NAN);
+
+    dx = expr_get_dx_internal(x);
+    dy = expr_get_dx_internal(y);
+    a1 = expr_add_long(a, 1);
+    b11 = expr_add_long(b1, 1);
+    b21 = expr_add_long(b2, 1);
+    c1 = expr_add_long(c, 1);
+
+    ab1 = expr_mul(a, b1);
+    ab2 = expr_mul(a, b2);
+    coef_x = expr_div(ab1, c);
+    coef_y = expr_div(ab2, c);
+    shift_x = expr_appell_f1(a1, b11, b2, c1, x, y);
+    shift_y = expr_appell_f1(a1, b1, b21, c1, x, y);
+    factor_x = coef_x && shift_x ? expr_mul(coef_x, shift_x) : NULL;
+    factor_y = coef_y && shift_y ? expr_mul(coef_y, shift_y) : NULL;
+    term_x = factor_x && dx ? expr_mul(factor_x, dx) : NULL;
+    term_y = factor_y && dy ? expr_mul(factor_y, dy) : NULL;
+    out = term_x && term_y ? expr_add(term_x, term_y) : expr_new_const(NUM_NAN);
+
+    expr_free(term_y);
+    expr_free(term_x);
+    expr_free(factor_y);
+    expr_free(factor_x);
+    expr_free(shift_y);
+    expr_free(shift_x);
+    expr_free(coef_y);
+    expr_free(coef_x);
+    expr_free(ab2);
+    expr_free(ab1);
+    expr_free(c1);
+    expr_free(b21);
+    expr_free(b11);
+    expr_free(a1);
+    expr_free(dy);
+    expr_free(dx);
     return out;
 }
 

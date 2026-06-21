@@ -892,6 +892,12 @@ number_t num_digamma      (const number_t number);
 number_t num_trigamma     (const number_t number);
 number_t num_tetragamma   (const number_t number);
 number_t num_polygamma    (unsigned int order, const number_t number);
+number_t num_dilog        (const number_t number);
+number_t num_polylog      (const number_t order, const number_t number);
+number_t num_appell_f1    (const number_t a, const number_t b1,
+                           const number_t b2, const number_t c,
+                           const number_t x, const number_t y);
+number_t num_legendre_chi (const number_t order, const number_t number);
 number_t num_gammainv     (const number_t number);
 number_t num_erf          (const number_t number);
 number_t num_erfc         (const number_t number);

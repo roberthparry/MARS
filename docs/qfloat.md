@@ -19,7 +19,7 @@ maintained after every operation.
 - ~106 bits of precision (~31–32 decimal digits)
 - arithmetic: add, subtract, multiply, divide, power
 - elementary functions: exp, log, sqrt, sin, cos, tan, atan2, hypot, the versine/haversine family, and inverses
-- special functions: gamma, polygamma, erf, Lambert W, beta, incomplete gamma, exponential integrals, normal distribution
+- special functions: gamma, polygamma, erf, Lambert W, beta, incomplete gamma, exponential integrals, polylogarithms, Appell F₁, normal distribution
 - decimal parsing and formatting
 - `printf` support through `%q` and `%Q`
 
@@ -296,6 +296,13 @@ All declarations are in `include/qfloat.h`.
 
 - `qfloat_t qf_ei(qfloat_t x)` — Ei(x) = −PV∫_{-x}^∞ (e^{-t}/t) dt, principal value; branch cut on (−∞, 0]
 - `qfloat_t qf_e1(qfloat_t x)` — E₁(x) = ∫_x^∞ (e^{-t}/t) dt, for x > 0
+
+**Polylogarithms**
+
+- `qfloat_t qf_dilog(qfloat_t x)` — principal dilogarithm Li₂(x)
+- `qfloat_t qf_polylog(qfloat_t s, qfloat_t x)` — polylogarithm Li_s(x) for integer real orders currently supported by the implementation
+- `qfloat_t qf_legendre_chi(qfloat_t s, qfloat_t x)` — Legendre chi χ_s(x) for integer real orders currently supported by the implementation
+- `qfloat_t qf_appell_f1(qfloat_t a, qfloat_t b1, qfloat_t b2, qfloat_t c, qfloat_t x, qfloat_t y)` — Appell hypergeometric function F₁(a; b₁, b₂; c; x, y), within the currently implemented convergence region
 
 ### Formatted Output
 

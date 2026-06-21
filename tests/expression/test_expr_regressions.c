@@ -3149,6 +3149,46 @@ static void test_binding_exact_trig_numeric_expression_simplifies(void)
     expr_free(expr);
 }
 
+static void test_symbolic_pi_ratio_addsub_uses_number_fraction_arithmetic(void)
+{
+    static const struct {
+        const char *input;
+        const char *expect;
+        const char *label;
+    } cases[] = {
+        {
+            "{ π - ⅔π }",
+            "⅓π",
+            "pi minus two thirds pi simplifies via numeric fraction arithmetic",
+        },
+        {
+            "{ pi - 4*pi/6 }",
+            "⅓π",
+            "pi minus four pi sixths simplifies via numeric fraction arithmetic",
+        },
+        {
+            "{ -4*(pi/6) }",
+            "-⅔π",
+            "scaled pi sixth remains symbolic",
+        },
+    };
+
+    for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+        expr_t *expr = expr_from_string(cases[i].input, NULL);
+        char *expr_text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
+
+        if (str_eq(expr_text, cases[i].expect))
+            to_string_pass(cases[i].label, expr_text, cases[i].expect);
+        else
+            to_string_fail(__FILE__, __LINE__, 1, cases[i].label,
+                           expr_text ? expr_text : "(null)",
+                           cases[i].expect);
+
+        free(expr_text);
+        expr_free(expr);
+    }
+}
+
 static void test_binding_direct_inverse_numeric_expression_simplifies(void)
 {
     struct {
@@ -3998,6 +4038,7 @@ void test_runtime_regressions(void)
     TEST_RUN_SUBTEST(test_nested_symbolic_pi_derivative_has_no_decimalized_coefficients, NULL);
     TEST_RUN_SUBTEST(test_binding_exact_unary_numeric_expression_simplifies, NULL);
     TEST_RUN_SUBTEST(test_binding_exact_trig_numeric_expression_simplifies, NULL);
+    TEST_RUN_SUBTEST(test_symbolic_pi_ratio_addsub_uses_number_fraction_arithmetic, NULL);
     TEST_RUN_SUBTEST(test_binding_direct_inverse_numeric_expression_simplifies, NULL);
     TEST_RUN_SUBTEST(test_binding_principal_inverse_numeric_expression_simplifies, NULL);
     TEST_RUN_SUBTEST(test_binding_lambert_inverse_numeric_expression_simplifies, NULL);

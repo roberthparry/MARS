@@ -34,57 +34,6 @@
 expr_t *expr_simplify(const expr_t *dv);
 static expr_t *expr_simplify_try_const_over_e_local(expr_t *a, expr_t *b);
 
-static int expr_simplify_text_to_long_local(const string_t *text, long *out)
-{
-    string_cursor_t *cursor;
-    bool negative = false;
-    bool saw_digit = false;
-    unsigned long value = 0u;
-    unsigned long limit;
-
-    if (!text || !out || string_length(text) == 0u)
-        return 0;
-
-    cursor = string_cursor_new(text);
-    if (!cursor)
-        return 0;
-
-    if (rune_is_equal(string_cursor_peek(cursor), '-')) {
-        negative = true;
-        (void)string_cursor_next(cursor);
-    }
-
-    limit = negative ? (unsigned long)LONG_MAX + 1u : (unsigned long)LONG_MAX;
-    while (!string_cursor_done(cursor)) {
-        rune_t rune = string_cursor_peek(cursor);
-        char ch = '\0';
-        unsigned int digit;
-
-        if (!rune_to_ascii(rune, &ch) || ch < '0' || ch > '9') {
-            string_cursor_free(cursor);
-            return 0;
-        }
-
-        digit = (unsigned int)(ch - '0');
-        if (value > (limit - digit) / 10u) {
-            string_cursor_free(cursor);
-            return 0;
-        }
-        value = value * 10u + digit;
-        saw_digit = true;
-        (void)string_cursor_next(cursor);
-    }
-
-    string_cursor_free(cursor);
-    if (!saw_digit)
-        return 0;
-
-    *out = negative && value == (unsigned long)LONG_MAX + 1u
-        ? LONG_MIN
-        : (negative ? -(long)value : (long)value);
-    return 1;
-}
-
 static void *expr_xrealloc(void *ptr, size_t size)
 {
     void *grown = realloc(ptr, size);
@@ -240,9 +189,9 @@ static expr_t *expr_simplify_try_euler_square_local(expr_t *base)
     return out;
 }
 
-static int binding_expr_integer_power_base_local(const expr_binding_expr_t *expr,
-                                                 expr_binding_expr_t **base_out,
-                                                 number_t *exponent_out);
+static int binding_expr_power_base_local(const expr_binding_expr_t *expr,
+                                         expr_binding_expr_t **base_out,
+                                         number_t *exponent_out);
 static expr_t *expr_from_preserved_binding_expr_local(expr_binding_expr_t *expr);
 
 typedef struct {
@@ -1031,6 +980,12 @@ static bool expr_is_numeric_arithmetic_const_local(const expr_t *dv)
     if (!expr_is_op(dv, &ops_const) || !num_is_finite(dv->c))
         return false;
 
+    if (num_is_real(dv->c) &&
+        !num_is_exact(dv->c) &&
+        num_constant_name(dv->c) &&
+        !num_eq(dv->c, NUM_I) && !num_eq(dv->c, NUM_NEG_I))
+        return false;
+
     if (dv->name && *dv->name &&
         !num_eq(dv->c, NUM_I) && !num_eq(dv->c, NUM_NEG_I))
         return false;
@@ -1612,6 +1567,7 @@ static void collect_mul_flat(
     }
 
     if (expr_is_unnamed_const(dv) &&
+        (num_is_exact(dv->c) || !num_constant_name(dv->c)) &&
         (!dv->binding_expr || dv->binding_expr->kind == EXPR_BINDING_EXPR_NUMBER)) {
         if (num_is_zero(dv->c)) {
             *is_zero = 1;
@@ -1627,50 +1583,6 @@ static void collect_mul_flat(
         }
         num_scope_leave(&(scope));
         return;
-    }
-    if (expr_is_unnamed_const(dv) && dv->binding_expr &&
-        dv->binding_expr->kind == EXPR_BINDING_EXPR_DIV) {
-        expr_t *expanded = expr_binding_expr_eval_expr(dv->binding_expr);
-
-        if (expanded) {
-            collect_mul_flat(expanded, c_acc, is_zero, terms, nterms, cap);
-            expr_free(expanded);
-            num_scope_leave(&(scope));
-            return;
-        }
-    }
-    if (expr_is_unnamed_const(dv) && dv->binding_expr) {
-        expr_binding_expr_t *base_expr = NULL;
-        number_t exponent;
-
-        if (binding_expr_integer_power_base_local(dv->binding_expr,
-                                                  &base_expr,
-                                                  &exponent)) {
-            expr_t *i_power =
-                expr_try_simplify_preserved_i_power_local(base_expr, exponent);
-
-            if (i_power) {
-                expr_binding_expr_free(base_expr);
-                num_destroy(&exponent);
-                collect_mul_flat(i_power, c_acc, is_zero, terms, nterms, cap);
-                expr_free(i_power);
-                num_scope_leave(&(scope));
-                return;
-            }
-
-            expr_t *base = expr_from_preserved_binding_expr_local(base_expr);
-            expr_t *powered = base ? expr_pow(base, &exponent) : NULL;
-
-            num_destroy(&exponent);
-            if (base)
-                expr_free(base);
-            if (powered) {
-                collect_mul_flat(powered, c_acc, is_zero, terms, nterms, cap);
-                expr_free(powered);
-                num_scope_leave(&(scope));
-                return;
-            }
-        }
     }
     if (expr_is_unnamed_const(dv) && num_is_real(dv->c) && dv->binding_expr) {
         number_t coeff;
@@ -1706,6 +1618,50 @@ static void collect_mul_flat(
             }
             num_scope_leave(&(scope));
             return;
+        }
+    }
+    if (expr_is_unnamed_const(dv) && dv->binding_expr &&
+        dv->binding_expr->kind == EXPR_BINDING_EXPR_DIV) {
+        expr_t *expanded = expr_binding_expr_eval_expr(dv->binding_expr);
+
+        if (expanded) {
+            collect_mul_flat(expanded, c_acc, is_zero, terms, nterms, cap);
+            expr_free(expanded);
+            num_scope_leave(&(scope));
+            return;
+        }
+    }
+    if (expr_is_unnamed_const(dv) && dv->binding_expr) {
+        expr_binding_expr_t *base_expr = NULL;
+        number_t exponent;
+
+        if (binding_expr_power_base_local(dv->binding_expr,
+                                          &base_expr,
+                                          &exponent)) {
+            expr_t *i_power =
+                expr_try_simplify_preserved_i_power_local(base_expr, exponent);
+
+            if (i_power) {
+                expr_binding_expr_free(base_expr);
+                num_destroy(&exponent);
+                collect_mul_flat(i_power, c_acc, is_zero, terms, nterms, cap);
+                expr_free(i_power);
+                num_scope_leave(&(scope));
+                return;
+            }
+
+            expr_t *base = expr_from_preserved_binding_expr_local(base_expr);
+            expr_t *powered = base ? expr_pow(base, &exponent) : NULL;
+
+            num_destroy(&exponent);
+            if (base)
+                expr_free(base);
+            if (powered) {
+                collect_mul_flat(powered, c_acc, is_zero, terms, nterms, cap);
+                expr_free(powered);
+                num_scope_leave(&(scope));
+                return;
+            }
         }
     }
     {
@@ -1780,16 +1736,11 @@ static expr_t *expr_try_simplify_i_power_local(expr_t *base, number_t exponent)
     }
 }
 
-static int binding_expr_integer_power_base_local(const expr_binding_expr_t *expr,
-                                                 expr_binding_expr_t **base_out,
-                                                 number_t *exponent_out)
+static int binding_expr_power_base_local(const expr_binding_expr_t *expr,
+                                         expr_binding_expr_t **base_out,
+                                         number_t *exponent_out)
 {
     number_t exponent_value;
-    number_t exponent_floor;
-    string_t *exponent_text;
-    long exponent_long = 0L;
-    int ok = 0;
-
     if (!expr || !base_out || !exponent_out)
         return 0;
 
@@ -1802,25 +1753,15 @@ static int binding_expr_integer_power_base_local(const expr_binding_expr_t *expr
     if (expr->kind == EXPR_BINDING_EXPR_BINARY_OP &&
         expr->u.binary_op.ops == &ops_pow &&
         expr_binding_expr_number_value(expr->u.binary_op.right, &exponent_value)) {
-        exponent_floor = num_floor(exponent_value);
-        if (!num_eq(exponent_value, exponent_floor))
-            goto done;
-
-        exponent_text = num_to_string(exponent_value);
-        ok = expr_simplify_text_to_long_local(exponent_text, &exponent_long);
-        string_free(exponent_text);
-        if (!ok)
-            goto done;
+        if (!num_is_real(exponent_value) || !num_is_finite(exponent_value)) {
+            num_destroy(&exponent_value);
+            return 0;
+        }
 
         *base_out = expr_binding_expr_clone(expr->u.binary_op.left);
-        *exponent_out = num_create_from_long(exponent_long);
-        num_destroy(&exponent_floor);
+        *exponent_out = num_clone(exponent_value);
         num_destroy(&exponent_value);
         return 1;
-
-done:
-        num_destroy(&exponent_floor);
-        num_destroy(&exponent_value);
     }
 
     return 0;
@@ -1865,6 +1806,54 @@ static expr_t *expr_try_simplify_preserved_integer_power_local(expr_t *base,
     return out;
 }
 
+static expr_t *expr_try_simplify_preserved_rational_const_power_local(expr_t *base,
+                                                                      number_t exponent)
+{
+    long numerator;
+    long denominator;
+    expr_binding_expr_t *base_expr = NULL;
+    expr_binding_expr_t *exponent_expr = NULL;
+    expr_binding_expr_t *pow_expr = NULL;
+    expr_t *out = NULL;
+    string_t *base_text = NULL;
+    string_t *exponent_text = NULL;
+
+    if (!expr_simplify_is_plain_real_const(base) ||
+        !num_is_finite(base->c) ||
+        !num_gt(base->c, NUM_ZERO) ||
+        !num_get_small_rational(exponent, &numerator, &denominator) ||
+        denominator == 1L) {
+        return NULL;
+    }
+
+    if (base->binding_expr) {
+        base_expr = expr_binding_expr_clone(base->binding_expr);
+    } else {
+        base_text = num_to_string(base->c);
+        base_expr = expr_binding_expr_new_number_text(base_text ? string_c_str(base_text) : "NAN");
+    }
+
+    exponent_text = num_to_string(exponent);
+    exponent_expr = expr_binding_expr_new_number_text(
+        exponent_text ? string_c_str(exponent_text) : "NAN");
+    pow_expr = base_expr && exponent_expr
+        ? expr_binding_expr_new_binary_op(&ops_pow, base_expr, exponent_expr)
+        : NULL;
+    if (pow_expr) {
+        base_expr = NULL;
+        exponent_expr = NULL;
+        out = expr_from_preserved_binding_expr_local(pow_expr);
+    }
+
+    expr_binding_expr_free(exponent_expr);
+    expr_binding_expr_free(base_expr);
+    string_free(exponent_text);
+    string_free(base_text);
+    if (out)
+        expr_free(base);
+    return out;
+}
+
 static expr_t *expr_try_simplify_preserved_i_power_local(
     const expr_binding_expr_t *base_expr, number_t exponent)
 {
@@ -1897,7 +1886,8 @@ static void collect_quotient_flat(
         return;
     }
 
-    if (expr_simplify_is_plain_real_const(dv)) {
+    if (expr_simplify_is_plain_real_const(dv) &&
+        (num_is_exact(dv->c) || !num_constant_name(dv->c))) {
         NUM_SCOPE_SUSPEND(saved_scope);
         number_t next;
 
@@ -1919,9 +1909,9 @@ static void collect_quotient_flat(
         expr_binding_expr_t *base_expr = NULL;
         number_t exponent;
 
-        if (binding_expr_integer_power_base_local(dv->binding_expr,
-                                                  &base_expr,
-                                                  &exponent)) {
+        if (binding_expr_power_base_local(dv->binding_expr,
+                                          &base_expr,
+                                          &exponent)) {
             expr_t *base = expr_from_preserved_binding_expr_local(base_expr);
             expr_t *powered = base ? expr_pow(base, &exponent) : NULL;
 
@@ -3150,6 +3140,14 @@ expr_t *expr_simplify_pow_d_operator(const expr_t *dv, expr_t *a, expr_t *b)
     {
         expr_t *preserved_power =
             expr_try_simplify_preserved_integer_power_local(a, exponent);
+
+        if (preserved_power)
+            return preserved_power;
+    }
+
+    {
+        expr_t *preserved_power =
+            expr_try_simplify_preserved_rational_const_power_local(a, exponent);
 
         if (preserved_power)
             return preserved_power;

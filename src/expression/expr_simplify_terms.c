@@ -163,6 +163,20 @@ static int term_coeff(const expr_t *term, const expr_t **base, number_t *coeff_o
     return 1;
 }
 
+static int addend_bases_equal(const expr_t *lhs, const expr_t *rhs)
+{
+    if (expr_struct_eq(lhs, rhs))
+        return 1;
+
+    if (expr_is_const(lhs) && expr_is_const(rhs) &&
+        num_is_real(lhs->c) && num_is_real(rhs->c) &&
+        num_eq(lhs->c, rhs->c)) {
+        return 1;
+    }
+
+    return 0;
+}
+
 static int split_leading_real_scalar(const expr_t *term,
                                      number_t *scalar_out,
                                      const expr_t **rest_out)
@@ -226,24 +240,32 @@ static expr_t *expr_try_fold_scaled_product(number_t coeff, expr_t *base)
         expr_t *r;
 
         if (expr_simplify_is_plain_real_const(left)) {
+            number_t folded = num_mul(coeff, left->c);
+
             expr_retain(left);
             expr_retain(right);
             expr_free(base);
-            scaled_left = expr_make_scaled(coeff, left);
+            scaled_left = expr_new_const(folded);
             r = expr_mul(scaled_left, right);
+            num_destroy(&folded);
             expr_free(scaled_left);
             expr_free(right);
+            expr_free(left);
             return r;
         }
 
         if (expr_simplify_is_plain_real_const(right)) {
+            number_t folded = num_mul(coeff, right->c);
+
             expr_retain(left);
             expr_retain(right);
             expr_free(base);
-            scaled_right = expr_make_scaled(coeff, right);
+            scaled_right = expr_new_const(folded);
             r = expr_mul(left, scaled_right);
+            num_destroy(&folded);
             expr_free(left);
             expr_free(scaled_right);
+            expr_free(right);
             return r;
         }
 
@@ -275,6 +297,144 @@ static expr_t *expr_try_fold_scaled_product(number_t coeff, expr_t *base)
     return NULL;
 }
 
+static int expr_term_has_foldable_exact_scalar_local(const expr_t *dv)
+{
+    if (!dv)
+        return 0;
+
+    if (expr_is_op(dv, &ops_neg))
+        return expr_term_has_foldable_exact_scalar_local(dv->a);
+
+    if (expr_simplify_is_plain_real_const(dv))
+        return !num_eq(dv->c, NUM_ONE) && !num_eq(dv->c, NUM_NEG_ONE);
+
+    if (expr_is_op(dv, &ops_mul))
+        return expr_simplify_is_plain_real_const(dv->a) ||
+               expr_simplify_is_plain_real_const(dv->b);
+
+    return 0;
+}
+
+static int expr_term_has_sqrt2_scalar_local(const expr_t *dv)
+{
+    if (!dv)
+        return 0;
+
+    if (expr_is_op(dv, &ops_neg))
+        return expr_term_has_sqrt2_scalar_local(dv->a);
+
+    if (expr_is_unnamed_const(dv) &&
+        (num_eq(dv->c, NUM_SQRT2) || num_eq(dv->c, NUM_SQRT2_OVER_TWO))) {
+        return 1;
+    }
+
+    if (expr_is_op(dv, &ops_mul))
+        return expr_term_has_sqrt2_scalar_local(dv->a) ||
+               expr_term_has_sqrt2_scalar_local(dv->b);
+
+    return 0;
+}
+
+static int expr_addsub_term_count_limited_local(const expr_t *dv,
+                                                size_t limit,
+                                                size_t *count)
+{
+    if (!dv || !count || *count > limit)
+        return 0;
+
+    if (expr_is_addsub(dv)) {
+        if (!expr_addsub_term_count_limited_local(dv->a, limit, count))
+            return 0;
+        return expr_addsub_term_count_limited_local(dv->b, limit, count);
+    }
+
+    ++*count;
+    return *count <= limit;
+}
+
+static int expr_sum_has_foldable_exact_scalar_local(const expr_t *dv)
+{
+    if (expr_is_addsub(dv))
+        return expr_sum_has_foldable_exact_scalar_local(dv->a) ||
+               expr_sum_has_foldable_exact_scalar_local(dv->b);
+    return expr_term_has_foldable_exact_scalar_local(dv);
+}
+
+static int expr_sum_has_sqrt2_scalar_local(const expr_t *dv)
+{
+    if (expr_is_addsub(dv))
+        return expr_sum_has_sqrt2_scalar_local(dv->a) ||
+               expr_sum_has_sqrt2_scalar_local(dv->b);
+    return expr_term_has_sqrt2_scalar_local(dv);
+}
+
+static int expr_sum_scaling_can_distribute_local(const expr_t *dv)
+{
+    size_t count = 0;
+
+    if (!expr_addsub_term_count_limited_local(dv, 8u, &count))
+        return 0;
+    return expr_sum_has_foldable_exact_scalar_local(dv) &&
+           expr_sum_has_sqrt2_scalar_local(dv);
+}
+
+static expr_t *expr_distribute_scale_over_sum_forced_local(number_t coeff,
+                                                           expr_t *base)
+{
+    if (expr_is_op(base, &ops_add)) {
+        expr_t *left;
+        expr_t *right;
+        expr_t *raw;
+
+        expr_retain(base->a);
+        expr_retain(base->b);
+        left = base->a;
+        right = base->b;
+        expr_free(base);
+
+        left = expr_distribute_scale_over_sum_forced_local(coeff, left);
+        right = expr_distribute_scale_over_sum_forced_local(coeff, right);
+        raw = expr_add(left, right);
+        expr_free(left);
+        expr_free(right);
+        return raw;
+    }
+
+    if (expr_is_op(base, &ops_sub)) {
+        expr_t *left;
+        expr_t *right;
+        expr_t *raw;
+
+        expr_retain(base->a);
+        expr_retain(base->b);
+        left = base->a;
+        right = base->b;
+        expr_free(base);
+
+        left = expr_distribute_scale_over_sum_forced_local(coeff, left);
+        right = expr_distribute_scale_over_sum_forced_local(coeff, right);
+        raw = expr_sub(left, right);
+        expr_free(left);
+        expr_free(right);
+        return raw;
+    }
+
+    if (expr_is_op(base, &ops_neg)) {
+        number_t neg_coeff = num_neg(coeff);
+        expr_t *child;
+        expr_t *out;
+
+        expr_retain(base->a);
+        child = base->a;
+        expr_free(base);
+        out = expr_make_scaled(neg_coeff, child);
+        num_destroy(&neg_coeff);
+        return out;
+    }
+
+    return expr_make_scaled(coeff, base);
+}
+
 expr_t *expr_make_scaled(number_t coeff, expr_t *base)
 {
     NUM_SCOPE(scope);
@@ -291,6 +451,9 @@ expr_t *expr_make_scaled(number_t coeff, expr_t *base)
         expr_free(base);
         return r;
     }
+    if (num_is_exact(coeff) && num_is_real(coeff) &&
+        expr_is_addsub(base) && expr_sum_scaling_can_distribute_local(base))
+        return expr_distribute_scale_over_sum_forced_local(coeff, base);
     if (expr_is_unnamed_const(base) && base->binding_expr && num_is_real(base->c)) {
         number_t leading_coeff;
         expr_binding_expr_t *rest_expr = NULL;
@@ -310,7 +473,15 @@ expr_t *expr_make_scaled(number_t coeff, expr_t *base)
                 num_destroy(&folded);
                 return out;
             }
-            num_destroy(&leading_coeff);
+            {
+                number_t folded = num_mul(coeff, leading_coeff);
+                expr_t *out = expr_new_const(folded);
+
+                num_destroy(&folded);
+                num_destroy(&leading_coeff);
+                expr_free(base);
+                return out;
+            }
         }
         string_t *coeff_text = num_to_string(coeff);
         expr_binding_expr_t *coeff_expr =
@@ -352,6 +523,7 @@ expr_t *expr_make_scaled(number_t coeff, expr_t *base)
     }
     if (expr_is_op(base, &ops_mul) &&
         expr_is_unnamed_const(base->a) &&
+        (num_is_exact(base->a->c) || !num_constant_name(base->a->c)) &&
         (!base->a->binding_expr ||
          base->a->binding_expr->kind == EXPR_BINDING_EXPR_NUMBER) &&
         num_is_real(base->a->c)) {
@@ -366,6 +538,7 @@ expr_t *expr_make_scaled(number_t coeff, expr_t *base)
     if (expr_is_op(base, &ops_mul) &&
         expr_is_op(base->a, &ops_mul) &&
         expr_is_unnamed_const(base->a->a) &&
+        (num_is_exact(base->a->a->c) || !num_constant_name(base->a->a->c)) &&
         (!base->a->a->binding_expr ||
          base->a->a->binding_expr->kind == EXPR_BINDING_EXPR_NUMBER) &&
         num_is_real(base->a->a->c)) {
@@ -716,7 +889,7 @@ void expr_collect_addends(expr_t *dv, number_t scale, number_t *c_const,
                     size_t i;
 
                     for (i = 0; i < *n; ++i) {
-                        if (expr_struct_eq((*terms)[i].base, normalised)) {
+                        if (addend_bases_equal((*terms)[i].base, normalised)) {
                             number_t sum = num_add((*terms)[i].coeff, ns);
 
                             num_destroy(&(*terms)[i].coeff);
@@ -745,6 +918,34 @@ void expr_collect_addends(expr_t *dv, number_t scale, number_t *c_const,
             return;
         }
     }
+    if (expr_is_unnamed_const(dv) && num_is_real(dv->c) && dv->binding_expr) {
+        number_t leading_coeff;
+        expr_binding_expr_t *rest_expr = NULL;
+
+        if (expr_binding_expr_split_leading_number(dv->binding_expr,
+                                                   &leading_coeff,
+                                                   &rest_expr)) {
+            number_t ns = num_mul(scale, leading_coeff);
+
+            if (rest_expr) {
+                expr_t *rest = expr_binding_expr_eval_expr(rest_expr);
+                expr_t *simp = rest ? expr_simplify(rest) : NULL;
+
+                expr_binding_expr_free(rest_expr);
+                expr_collect_addends(simp ? simp : rest, ns, c_const,
+                                     terms, n, cap);
+                expr_free(simp);
+                expr_free(rest);
+            } else {
+                number_t sum = num_add(*c_const, ns);
+
+                num_destroy(c_const);
+                *c_const = num_scope_detach(sum);
+            }
+            num_destroy(&leading_coeff);
+            return;
+        }
+    }
 
     const expr_t *base;
     number_t coeff = num_new();
@@ -765,7 +966,7 @@ void expr_collect_addends(expr_t *dv, number_t scale, number_t *c_const,
     }
 
     for (size_t i = 0; i < *n; ++i) {
-        if (expr_struct_eq((*terms)[i].base, base)) {
+        if (addend_bases_equal((*terms)[i].base, base)) {
             number_t sum = num_add((*terms)[i].coeff, coeff);
 
             num_destroy(&(*terms)[i].coeff);
@@ -946,6 +1147,7 @@ static void expr_append_denominator_factor(number_t *c_acc, int *is_zero,
     }
 
     if (expr_is_unnamed_const(den) &&
+        (num_is_exact(den->c) || !num_constant_name(den->c)) &&
         (!den->binding_expr || den->binding_expr->kind == EXPR_BINDING_EXPR_NUMBER) &&
         num_is_real(den->c)) {
         number_t quotient = num_div(*c_acc, den->c);
@@ -981,6 +1183,7 @@ void expr_split_division_terms(number_t *c_acc, int *is_zero,
         terms[i] = NULL;
 
         if (expr_is_unnamed_const(num) &&
+            (num_is_exact(num->c) || !num_constant_name(num->c)) &&
             (!num->binding_expr || num->binding_expr->kind == EXPR_BINDING_EXPR_NUMBER) &&
             num_is_real(num->c)) {
             if (num_is_zero(num->c))
@@ -1304,8 +1507,27 @@ expr_t *expr_try_expand_shallow_product(number_t c_acc,
 expr_t *expr_rebuild_product_chain(number_t c_acc, expr_t **terms, size_t nterms)
 {
     expr_t *cur = NULL;
+    size_t sole = nterms;
+    size_t live = 0;
 
     expr_sort_product_factors(terms, nterms);
+
+    for (size_t i = 0; i < nterms; ++i) {
+        if (!terms[i])
+            continue;
+        sole = i;
+        ++live;
+    }
+
+    if (live == 1 && !num_eq(c_acc, NUM_ONE)) {
+        number_t normalised = expr_simplify_normalise_simple_rational_coeff(c_acc);
+
+        cur = expr_make_scaled(normalised, terms[sole]);
+        terms[sole] = NULL;
+        num_destroy(&normalised);
+        free(terms);
+        return cur;
+    }
 
     if (!num_eq(c_acc, NUM_ONE)) {
         number_t normalised = expr_simplify_normalise_simple_rational_coeff(c_acc);

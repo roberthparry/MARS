@@ -92,6 +92,11 @@ typedef enum {
     EXPR_KIND_NORMAL_LOGPDF,
     EXPR_KIND_EI,
     EXPR_KIND_E1,
+    EXPR_KIND_DILOG,
+    EXPR_KIND_POLYLOG,
+    EXPR_KIND_LEGENDRE_CHI,
+    EXPR_KIND_APPELL_F1,
+    EXPR_KIND_APPELL_F1_PACK,
     EXPR_KIND_VERSIN,
     EXPR_KIND_VERCOS,
     EXPR_KIND_COVERSIN,
@@ -350,6 +355,11 @@ extern const expr_ops_t ops_erfcinv;
 extern const expr_ops_t ops_gamma;
 extern const expr_ops_t ops_digamma;
 extern const expr_ops_t ops_trigamma;
+extern const expr_ops_t ops_dilog;
+extern const expr_ops_t ops_polylog;
+extern const expr_ops_t ops_legendre_chi;
+extern const expr_ops_t ops_appell_f1;
+extern const expr_ops_t ops_appell_f1_pack;
 extern const expr_ops_t ops_gammainv;
 extern const expr_ops_t ops_lambert_w;
 extern const expr_ops_t ops_lambert_w0;
@@ -563,6 +573,15 @@ expr_t *       expr_integral_with_bounds_internal(const expr_t *integrand,
                                                   const expr_t *upper,
                                                   const expr_t *dummy);
 expr_t *       expr_polygamma_xp                 (const expr_t *order, const expr_t *arg);
+expr_t *       expr_polylog_xp                   (const expr_t *order, const expr_t *arg);
+expr_t *       expr_legendre_chi_xp              (const expr_t *order, const expr_t *arg);
+bool           expr_appell_f1_unpack             (const expr_t *expr,
+                                                  const expr_t **a,
+                                                  const expr_t **b1,
+                                                  const expr_t **b2,
+                                                  const expr_t **c,
+                                                  const expr_t **x,
+                                                  const expr_t **y);
 
 /* Simplification helpers. */
 expr_t *           expr_simplify_passthrough                    (const expr_t *dv,
@@ -981,6 +1000,18 @@ void expr_reverse_polygamma         (const expr_t *dv,
                                      const number_t *out_bar,
                                      number_t *a_bar,
                                      number_t *b_bar);
+void expr_reverse_dilog             (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_polylog           (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_legendre_chi      (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
 void expr_reverse_gammainv          (const expr_t *dv,
                                      const number_t *out_bar,
                                      number_t *a_bar,
@@ -1217,6 +1248,7 @@ const char *expr_default_constant_canonical_name(const char *name);
 string_t *expr_default_constant_canonical_name_text(const string_t *name);
 char *expr_tostring_texify(const char *text);
 int expr_to_tex_parts(const expr_t *dv, char **expr_out, char **bindings_out);
+char *expr_to_tex_body_wrapped(const expr_t *expr, size_t line_limit);
 void *fs_xmalloc(size_t n);
 int fs_is_letter(unsigned int c);
 void symtab_init(symtab_t *t);

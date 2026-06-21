@@ -1,5 +1,6 @@
 #include <stdio.h>
 
+#include "integrator.h"
 #include "test_expr.h"
 #include "internal/expr_internal.h"
 
@@ -2161,6 +2162,10 @@ static void test_integrate_mixed_frequency_exp_unary(void)
                                                  points, sizeof(points) / sizeof(points[0]));
     assert_string_antiderivative_matches_with_ab("{ exp(b*x)*cos(a*x) }", 2.0, 3.0,
                                                  points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ (sin(x) + cos(x))/exp(x) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ (sin(x) + cos(x))/e^x }",
+                                         points, sizeof(points) / sizeof(points[0]));
     assert_string_antiderivative_matches("{ sin(2*x)*exp(3*x) }",
                                          points, sizeof(points) / sizeof(points[0]));
     assert_string_antiderivative_matches("{ cos(2*x)*exp(3*x) }",
@@ -2900,6 +2905,303 @@ static void test_integrate_partial_symbolic_with_unevaluated_term(void)
                                           "∫^x exp(cosh(t))·dt");
 }
 
+static void test_integrate_unevaluated_integral_display_symbolic_result(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_bindings_t *indefinite_bindings = NULL;
+    expr_bindings_t *mismatch_bindings = NULL;
+    expr_bindings_t *unsupported_bindings = NULL;
+    expr_t *expr = expr_from_string("{ ∫^x sec²(t)·ln(tan(t) + cot(t))·dt | x = NAN }",
+                                    &bindings);
+    expr_t *display = expr ? expr_display_simplified(expr) : NULL;
+    expr_t *indefinite = expr_from_string("{ @S sec²(x)·ln(tan(x) + cot(x))·dx }",
+                                          &indefinite_bindings);
+    expr_t *indefinite_display = indefinite
+        ? expr_display_simplified(indefinite)
+        : NULL;
+    expr_t *mismatch = expr_from_string(
+        "{ ∫_0^t sec²(x)·ln(tan(x) + cot(x))·dt | t = pi/6, x = NAN }",
+        &mismatch_bindings);
+    expr_t *finite_improper = expr_from_string(
+        "{ ∫_0^(pi/6) sec²(x)·ln(tan(x) + cot(x))·dx }",
+        NULL);
+    expr_t *unsupported = expr_from_string("{ ∫^x exp(cosh(t)) dt | x = NAN }",
+                                           &unsupported_bindings);
+    expr_t *unsupported_display = unsupported
+        ? expr_display_simplified(unsupported)
+        : NULL;
+    char *text = display ? expr_to_string(display, style_UNBOUND) : NULL;
+    char *indefinite_text = indefinite_display
+        ? expr_to_string(indefinite_display, style_UNBOUND)
+        : NULL;
+    char *unsupported_text = unsupported_display
+        ? expr_to_string(unsupported_display, style_UNBOUND)
+        : NULL;
+    char mismatch_note[256];
+    char finite_improper_note[256];
+
+    mismatch_note[0] = '\0';
+    finite_improper_note[0] = '\0';
+
+    ASSERT_NOT_NULL(text);
+    ASSERT_TRUE(strstr(text, "2x + tan(x)·(ln(tan(x) + cot(x)) - 1)") != NULL);
+    ASSERT_TRUE(strstr(text, "∫") == NULL);
+    ASSERT_TRUE(strstr(text, "+ C") == NULL);
+
+    ASSERT_NOT_NULL(indefinite_text);
+    ASSERT_TRUE(strstr(indefinite_text,
+                       "2x + tan(x)·(ln(tan(x) + cot(x)) - 1) + C") != NULL);
+    ASSERT_TRUE(strstr(indefinite_text, "∫") == NULL);
+
+    ASSERT_TRUE(expr_integral_value_note(mismatch,
+                                         mismatch_note,
+                                         sizeof(mismatch_note)));
+    ASSERT_TRUE(strstr(mismatch_note, "The differential is dt") != NULL);
+    ASSERT_TRUE(strstr(mismatch_note, "Use dx") != NULL);
+    ASSERT_TRUE(!expr_integral_value_note(finite_improper,
+                                          finite_improper_note,
+                                          sizeof(finite_improper_note)));
+
+    ASSERT_NOT_NULL(unsupported_text);
+    ASSERT_TRUE(strstr(unsupported_text, "∫^x exp(cosh(t))·dt") != NULL);
+    ASSERT_TRUE(strstr(unsupported_text, "integral_meta") == NULL);
+
+    free(unsupported_text);
+    free(indefinite_text);
+    free(text);
+    expr_free(unsupported_display);
+    expr_bindings_free(unsupported_bindings);
+    expr_free(unsupported);
+    expr_free(indefinite_display);
+    expr_bindings_free(indefinite_bindings);
+    expr_free(indefinite);
+    expr_bindings_free(mismatch_bindings);
+    expr_free(mismatch);
+    expr_free(finite_improper);
+    expr_free(display);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+}
+
+static void test_integrate_symbolic_improper_endpoint_value(void)
+{
+    const qfloat_t expected = qf_from_string(
+        "0.95308265427681911114860742901137407666719210437174689401288329794029642679413097217556799413057238923482062905166545");
+    expr_bindings_t *bound_bindings = NULL;
+    expr_t *bound = expr_from_string(
+        "{ ∫_0^t sec²(x)·ln(tan(x) + cot(x))·dx | t = pi/6 }",
+        &bound_bindings);
+    expr_t *constant = expr_from_string(
+        "{ ∫_0^(pi/6) sec²(x)·ln(tan(x) + cot(x))·dx }",
+        NULL);
+
+    ASSERT_NOT_NULL(bound);
+    ASSERT_NOT_NULL(constant);
+    check_q_at(__FILE__, __LINE__, 1,
+               "symbolic improper endpoint integral to t=pi/6",
+               expr_eval_qf(bound), expected);
+    check_q_at(__FILE__, __LINE__, 1,
+               "symbolic improper endpoint integral to pi/6",
+               expr_eval_qf(constant), expected);
+
+    expr_free(constant);
+    expr_bindings_free(bound_bindings);
+    expr_free(bound);
+}
+
+static void test_integrate_inverse_one_plus_unit_circle_root(void)
+{
+    static const double points[] = { -0.5, -0.1, 0.25, 0.75 };
+    expr_bindings_t *bindings = NULL;
+    expr_t *integral = expr_from_string(
+        "{ ∫ 1/(1 + sqrt(1 - x^2)) dx | x = NAN }",
+        &bindings);
+    expr_t *display = integral ? expr_display_simplified(integral) : NULL;
+    char *text = display ? expr_to_string(display, style_UNBOUND) : NULL;
+
+    assert_string_antiderivative_matches("{ 1/(1 + sqrt(1 - x^2)) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+
+    ASSERT_NOT_NULL(text);
+    ASSERT_TRUE(strstr(text, "asin(x)") != NULL);
+    ASSERT_TRUE(strstr(text, "x/(√(1 - x²) + 1)") != NULL);
+    ASSERT_TRUE(strstr(text, "+ C") != NULL);
+
+    free(text);
+    expr_free(display);
+    expr_bindings_free(bindings);
+    expr_free(integral);
+}
+
+static void test_integrate_sin_integer_multiple_quotient(void)
+{
+    static const double points[] = { 0.05, 0.2, 0.45, 0.8 };
+    expr_bindings_t *bindings = NULL;
+    expr_t *integral = expr_from_string(
+        "{ ∫ sin(5*x)/sin(9*x) dx | x = NAN }",
+        &bindings);
+    expr_t *display = integral ? expr_display_simplified(integral) : NULL;
+    char *text = display ? expr_to_string(display, style_UNBOUND) : NULL;
+
+    assert_string_antiderivative_matches("{ sin(5*x)/sin(9*x) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+
+    ASSERT_NOT_NULL(text);
+    ASSERT_TRUE(strstr(text, "ln(") != NULL);
+    ASSERT_TRUE(strstr(text, "sin(") != NULL);
+    ASSERT_TRUE(strstr(text, "+ C") != NULL);
+    ASSERT_TRUE(strstr(text, "∫") == NULL);
+
+    free(text);
+    expr_free(display);
+    expr_bindings_free(bindings);
+    expr_free(integral);
+}
+
+static void test_integrate_inverse_sqrt_sin_cos_sin3_cos(void)
+{
+    static const double points[] = { 0.05, 0.2, 0.45, 0.65 };
+    expr_bindings_t *bindings = NULL;
+    expr_t *integral = expr_from_string(
+        "{ ∫ 1/(sqrt(sin(x)+cos(x))*sqrt(sin(3*x)+cos(x))) dx | x = NAN }",
+        &bindings);
+    expr_t *display = integral ? expr_display_simplified(integral) : NULL;
+    char *text = display ? expr_to_string(display, style_UNBOUND) : NULL;
+
+    assert_string_antiderivative_matches(
+        "{ 1/(sqrt(sin(x)+cos(x))*sqrt(sin(3*x)+cos(x))) }",
+        points, sizeof(points) / sizeof(points[0]));
+
+    ASSERT_NOT_NULL(text);
+    ASSERT_TRUE(strstr(text, "atan(") != NULL);
+    ASSERT_TRUE(strstr(text, "tan(x)") != NULL);
+    ASSERT_TRUE(strstr(text, "+ C") != NULL);
+    ASSERT_TRUE(strstr(text, "∫") == NULL);
+
+    free(text);
+    expr_free(display);
+    expr_bindings_free(bindings);
+    expr_free(integral);
+}
+
+static void test_integrate_inverse_quartic_appell_f1(void)
+{
+    static const double points[] = { 1.2, 1.4, 1.8, 2.3 };
+    expr_bindings_t *bindings = NULL;
+    expr_bindings_t *definite_bindings = NULL;
+    expr_t *integral = expr_from_string(
+        "{ ∫ 1/((x^4-1)*(2*x^4-1)^(1/8)) dx | x = NAN }",
+        &bindings);
+    expr_t *display = integral ? expr_display_simplified(integral) : NULL;
+    char *text = display ? expr_to_string(display, style_UNBOUND) : NULL;
+    expr_t *definite = expr_from_string(
+        "{ ∫_2^5 1/((x^4-1)*(2*x^4-1)^(1/8)) dx | x = NAN }",
+        &definite_bindings);
+    expr_t *definite_display = definite ? expr_display_simplified(definite) : NULL;
+    char *definite_text = definite_display
+        ? expr_to_string(definite_display, style_UNBOUND)
+        : NULL;
+    number_t definite_value = num_new();
+
+    assert_string_antiderivative_matches(
+        "{ 1/((x^4-1)*(2*x^4-1)^(1/8)) }",
+        points, sizeof(points) / sizeof(points[0]));
+
+    ASSERT_NOT_NULL(text);
+    ASSERT_TRUE(strstr(text, "atan(") != NULL);
+    ASSERT_TRUE(strstr(text, "atanh(") != NULL);
+    ASSERT_TRUE(strstr(text, "√2") != NULL);
+    ASSERT_TRUE(strstr(text, "¼·atan(") != NULL);
+    ASSERT_TRUE(strstr(text, "⅛2") == NULL);
+    ASSERT_TRUE(strstr(text, "⅛·2") == NULL);
+    ASSERT_TRUE(strstr(text, "F₁(") == NULL);
+    ASSERT_TRUE(strstr(text, "+ C") != NULL);
+    ASSERT_TRUE(strstr(text, "∫") == NULL);
+
+    ASSERT_NOT_NULL(definite_text);
+    ASSERT_TRUE(strstr(definite_text, "atan(") != NULL);
+    ASSERT_TRUE(strstr(definite_text, "atanh(") != NULL);
+    ASSERT_TRUE(strstr(definite_text, "¼·atan(") != NULL);
+    ASSERT_TRUE(strstr(definite_text, "⅛2") == NULL);
+    ASSERT_TRUE(strstr(definite_text, "⅛·2") == NULL);
+    ASSERT_TRUE(strstr(definite_text, "√2") != NULL);
+    ASSERT_TRUE(strstr(definite_text, "0.176776") == NULL);
+    ASSERT_TRUE(strstr(definite_text, "7.071067") == NULL);
+    ASSERT_TRUE(strstr(definite_text, "2.828427") == NULL);
+    ASSERT_TRUE(strstr(definite_text, "F₁(") == NULL);
+    ASSERT_TRUE(strstr(definite_text, "∫") == NULL);
+    num_destroy(&definite_value);
+    definite_value = expr_eval(definite_display);
+    ASSERT_TRUE(num_is_real(definite_value));
+    ASSERT_TRUE(num_is_finite(definite_value));
+
+    num_destroy(&definite_value);
+    free(definite_text);
+    expr_free(definite_display);
+    expr_bindings_free(definite_bindings);
+    expr_free(definite);
+    free(text);
+    expr_free(display);
+    expr_bindings_free(bindings);
+    expr_free(integral);
+}
+
+static void test_integrate_sec_double_angle_log_tan_cot(void)
+{
+    static const double points[] = { 0.1, 0.2, 0.5 };
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = NULL;
+    expr_t *x = NULL;
+    expr_t *lo = NULL;
+    expr_t *hi = NULL;
+    expr_t *vars[1];
+    expr_t *los[1];
+    expr_t *his[1];
+    intg_bound_kind_t kinds[1] = {
+        INTG_BOUND_DEFINITE,
+    };
+    expr_t *symbolic = NULL;
+    char *symbolic_text = NULL;
+
+    assert_string_antiderivative_matches("{ sec(2*x)*ln(tan(x)+cot(x)) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ sec(x)^2*ln(tan(x)+cot(x)) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_contains("{ sec(x)^2*ln(tan(x)+cot(x)) }",
+                                          "tan(x)·(ln(tan(x) + cot(x)) - 1)");
+    assert_string_antiderivative_contains("{ sec(2*x)*ln(tan(x)+cot(x)) }",
+                                          "χ₂");
+    assert_string_antiderivative_contains("{ sec(2*x)*ln(tan(x)+cot(x)) }",
+                                          "tan(¼·(π - 4x))");
+    assert_string_antiderivative_matches("{ ln(cot(x)+tan(x))*sec(2*x) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+
+    expr = expr_from_string("{ sec(2*x)*ln(tan(x)+cot(x)) | x = NAN }",
+                            &bindings);
+    x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    lo = expr_from_string("{ 0 }", NULL);
+    hi = expr_from_string("{ pi/6 }", NULL);
+    vars[0] = x;
+    los[0] = lo;
+    his[0] = hi;
+    symbolic = (expr && x && lo && hi)
+        ? intg_integrate_iterated_symbolic(expr, 1u, vars, kinds, los, his,
+                                           1u, NULL, NULL)
+        : NULL;
+    symbolic_text = symbolic ? expr_to_string(symbolic, style_UNBOUND) : NULL;
+
+    ASSERT_NOT_NULL(symbolic_text);
+    ASSERT_TRUE(strstr(symbolic_text, "¹⁄₁₂π") != NULL);
+    ASSERT_TRUE(strstr(symbolic_text, "2.094") == NULL);
+
+    free(symbolic_text);
+    expr_free(symbolic);
+    expr_free(hi);
+    expr_free(lo);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+}
+
 static void test_integrate_unsupported_product_returns_null(void)
 {
     expr_t *x = test_expr_new_named_var_d(0.5, "x");
@@ -2952,5 +3254,12 @@ void test_symbolic_integration(void)
     TEST_RUN_SUBTEST(test_integrate_unevaluated_integral_chain_rule_upper, NULL);
     TEST_RUN_SUBTEST(test_integrate_unevaluated_integral_explicit_bounds, NULL);
     TEST_RUN_SUBTEST(test_integrate_partial_symbolic_with_unevaluated_term, NULL);
+    TEST_RUN_SUBTEST(test_integrate_unevaluated_integral_display_symbolic_result, NULL);
+    TEST_RUN_SUBTEST(test_integrate_symbolic_improper_endpoint_value, NULL);
+    TEST_RUN_SUBTEST(test_integrate_inverse_one_plus_unit_circle_root, NULL);
+    TEST_RUN_SUBTEST(test_integrate_sin_integer_multiple_quotient, NULL);
+    TEST_RUN_SUBTEST(test_integrate_inverse_sqrt_sin_cos_sin3_cos, NULL);
+    TEST_RUN_SUBTEST(test_integrate_inverse_quartic_appell_f1, NULL);
+    TEST_RUN_SUBTEST(test_integrate_sec_double_angle_log_tan_cot, NULL);
     TEST_RUN_SUBTEST(test_integrate_unsupported_product_returns_null, NULL);
 }

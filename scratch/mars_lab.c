@@ -601,7 +601,7 @@ int main(int argc, char **argv)
     expr_text = expr_text_dup(expr, style_EXPRESSION);
     unbound_text = expr_text_dup(display_expr, style_UNBOUND);
     func_text = expr_text_dup(expr, style_FUNCTION);
-    tex_text = expr_tex_body_dup(expr);
+    tex_text = expr_tex_body_dup(display_expr);
 
     printf("input       %s\n", input);
     printf("expression  %s\n", expr_text ? expr_text : "(null)");
@@ -614,8 +614,7 @@ int main(int argc, char **argv)
         number_t value_number = expr_eval(expr);
 
         print_owned_number("value", num_clone(value_number), precision);
-        if ((num_is_nan(value_number) || !num_is_finite(value_number)) &&
-            expr_integral_value_note(expr, value_note, sizeof(value_note)))
+        if (expr_integral_value_note(expr, value_note, sizeof(value_note)))
             printf("value_note  %s\n", value_note);
         num_destroy(&value_number);
     }

@@ -735,6 +735,134 @@ static expr_t *expr_display_expanded_expr(const expr_t *expr)
     return expr_clone(expr);
 }
 
+static bool expr_display_integral_is_indefinite(const expr_t *upper,
+                                                const expr_t *dummy)
+{
+    return upper &&
+           dummy &&
+           expr_is_var(upper) &&
+           expr_is_var(dummy) &&
+           (upper == dummy ||
+            (upper->var_id != 0 &&
+             dummy->var_id != 0 &&
+             upper->var_id == dummy->var_id));
+}
+
+static expr_t *expr_display_add_integration_constant(expr_t *anti)
+{
+    expr_t *constant;
+    expr_t *out;
+
+    if (!anti)
+        return NULL;
+
+    constant = expr_new_named_const(NUM_ZERO, "C");
+    if (!constant)
+        return anti;
+
+    out = expr_add(anti, constant);
+    expr_free(constant);
+    if (!out)
+        return anti;
+    expr_free(anti);
+    return out;
+}
+
+static expr_t *expr_display_simplified_integral(const expr_t *expr)
+{
+    const expr_t *dummy;
+    const expr_t *lower;
+    const expr_t *upper;
+    expr_t *local_var = NULL;
+    expr_t *local_integrand = NULL;
+    expr_t *anti = NULL;
+    expr_t *upper_eval = NULL;
+    expr_t *lower_eval = NULL;
+    expr_t *diff = NULL;
+    expr_t *simplified = NULL;
+    expr_t *out = NULL;
+    bool indefinite;
+
+    if (!expr_is_op(expr, &ops_integral) || !expr->a)
+        return NULL;
+
+    dummy = expr_integral_dummy_expr(expr);
+    upper = expr_integral_upper_bound_expr(expr);
+    lower = expr_integral_lower_bound_expr(expr);
+    if (!dummy || !upper)
+        return NULL;
+    indefinite = !lower && expr_display_integral_is_indefinite(upper, dummy);
+
+    local_var = expr_clone(dummy);
+    local_integrand = local_var ? expr_substitute(expr->a, dummy, local_var) : NULL;
+    anti = local_integrand ? expr_integrate(local_integrand, local_var) : NULL;
+    if (!anti)
+        goto cleanup;
+
+    upper_eval = expr_substitute(anti, local_var, upper);
+    if (!upper_eval)
+        goto cleanup;
+
+    if (lower) {
+        lower_eval = expr_substitute(anti, local_var, lower);
+        diff = lower_eval ? expr_sub(upper_eval, lower_eval) : NULL;
+        simplified = diff ? expr_simplify(diff) : NULL;
+        if (simplified) {
+            out = simplified;
+            simplified = NULL;
+        } else {
+            out = diff;
+            diff = NULL;
+        }
+    } else {
+        /*
+         * Display-only: a missing lower bound mirrors the Integrator's
+         * upper-bound antiderivative output. Numeric evaluation still keeps
+         * the existing expression semantics.
+         */
+        simplified = expr_simplify(upper_eval);
+        if (simplified) {
+            out = simplified;
+            simplified = NULL;
+        } else {
+            out = upper_eval;
+            upper_eval = NULL;
+        }
+        if (indefinite)
+            out = expr_display_add_integration_constant(out);
+    }
+
+cleanup:
+    expr_free(simplified);
+    expr_free(diff);
+    expr_free(lower_eval);
+    expr_free(upper_eval);
+    expr_free(anti);
+    expr_free(local_integrand);
+    expr_free(local_var);
+    return out;
+}
+
+static expr_t *expr_display_clone_integral(const expr_t *expr)
+{
+    const expr_t *dummy;
+    const expr_t *lower;
+    const expr_t *upper;
+
+    if (!expr_is_op(expr, &ops_integral) || !expr->a)
+        return NULL;
+
+    dummy = expr_integral_dummy_expr(expr);
+    upper = expr_integral_upper_bound_expr(expr);
+    lower = expr_integral_lower_bound_expr(expr);
+    if (!dummy || !upper)
+        return NULL;
+
+    return lower
+        ? expr_integral_with_bounds_internal(expr->a, lower, upper, dummy)
+        : expr_integral_with_dummy_internal(expr->a, upper, dummy);
+}
+
 expr_t *expr_display_simplified(const expr_t *expr)
 {
     expr_t *expanded;
@@ -742,6 +870,12 @@ expr_t *expr_display_simplified(const expr_t *expr)
 
     if (!expr)
         return NULL;
+
+    simplified = expr_display_simplified_integral(expr);
+    if (simplified)
+        return simplified;
+    if (expr_is_op(expr, &ops_integral))
+        return expr_display_clone_integral(expr);
 
     expanded = expr_display_expanded_expr(expr);
     if (!expanded)
@@ -792,6 +926,69 @@ static bool expr_note_value_is_defined_at(const expr_t *integrand,
     return ok;
 }
 
+static bool expr_note_integrand_uses_dummy(const expr_t *integrand,
+                                           const expr_t *dummy)
+{
+    expr_t *vars[1];
+    bool used[1] = { false };
+
+    if (!integrand || !dummy)
+        return false;
+    vars[0] = (expr_t *)dummy;
+    return expr_collect_var_usage(integrand, 1u, vars, used) && used[0];
+}
+
+static const expr_t *expr_note_first_free_var_other_than(const expr_t *expr,
+                                                         const expr_t *dummy)
+{
+    const expr_t *nested_dummy;
+    const expr_t *left;
+
+    if (!expr)
+        return NULL;
+
+    if (expr_is_var(expr)) {
+        if (expr_display_integral_is_indefinite(expr, dummy))
+            return NULL;
+        return expr;
+    }
+
+    if (expr_is_op(expr, &ops_integral)) {
+        nested_dummy = expr_integral_dummy_expr(expr);
+        left = expr_note_first_free_var_other_than(
+            expr_integral_lower_bound_expr(expr), dummy);
+        if (left)
+            return left;
+        left = expr_note_first_free_var_other_than(
+            expr_integral_upper_bound_expr(expr), dummy);
+        if (left)
+            return left;
+        return expr_note_first_free_var_other_than(expr->a, nested_dummy);
+    }
+
+    left = expr_note_first_free_var_other_than(expr->a, dummy);
+    if (left)
+        return left;
+    return expr_note_first_free_var_other_than(expr->b, dummy);
+}
+
+static bool expr_note_symbolic_integral_value_is_finite(const expr_t *expr)
+{
+    expr_t *display;
+    number_t value;
+    bool ok;
+
+    display = expr_display_simplified_integral(expr);
+    if (!display)
+        return false;
+
+    value = expr_eval(display);
+    ok = num_is_real(value) && num_is_finite(value);
+    num_destroy(&value);
+    expr_free(display);
+    return ok;
+}
+
 bool expr_integral_value_note(const expr_t *expr, char *out, size_t out_size)
 {
     const expr_t *lower_expr;
@@ -809,7 +1006,9 @@ bool expr_integral_value_note(const expr_t *expr, char *out, size_t out_size)
     const expr_t *integrand = NULL;
     const expr_t *child_left = NULL;
     const expr_t *child_right = NULL;
+    const expr_t *parameter_var = NULL;
     const char *dummy_name;
+    const char *parameter_name;
     bool found = false;
 
     if (!expr || !out || out_size == 0u)
@@ -819,12 +1018,30 @@ bool expr_integral_value_note(const expr_t *expr, char *out, size_t out_size)
         lower_expr = expr_integral_lower_bound_expr(expr);
         upper_expr = expr_integral_upper_bound_expr(expr);
         dummy_expr = expr_integral_dummy_expr(expr);
+        dummy_name = expr_symbol_name(dummy_expr);
+
+        if (dummy_expr &&
+            !expr_note_integrand_uses_dummy(integrand, dummy_expr)) {
+            parameter_var = expr_note_first_free_var_other_than(integrand, dummy_expr);
+            parameter_name = expr_symbol_name(parameter_var);
+            if (parameter_name) {
+                snprintf(out, out_size,
+                         "The differential is d%s, so %s is treated as a parameter. Use d%s if you intended to integrate with respect to %s.",
+                         dummy_name ? dummy_name : "t",
+                         parameter_name,
+                         parameter_name,
+                         parameter_name);
+                found = true;
+            }
+        }
 
         upper = upper_expr ? expr_eval(upper_expr) : num_clone(NUM_NAN);
         lower = lower_expr ? expr_eval(lower_expr) : num_clone(NUM_ZERO);
-        if (upper_expr && dummy_expr &&
+        if (!found &&
+            upper_expr && dummy_expr &&
             num_is_real(lower) && num_is_finite(lower) &&
-            num_is_real(upper) && num_is_finite(upper)) {
+            num_is_real(upper) && num_is_finite(upper) &&
+            !expr_note_symbolic_integral_value_is_finite(expr)) {
             upper_const = expr_new_const(upper);
             lower_const = expr_new_const(lower);
             upper_integrand = upper_const
@@ -838,7 +1055,6 @@ bool expr_integral_value_note(const expr_t *expr, char *out, size_t out_size)
                 upper_text = expr_note_text_dup(upper_expr, style_UNBOUND);
                 lower_text = lower_expr ? expr_note_text_dup(lower_expr, style_UNBOUND) : NULL;
                 integrand_text = expr_note_text_dup(integrand, style_UNBOUND);
-                dummy_name = expr_symbol_name(dummy_expr);
 
                 if (!lower_expr &&
                     !expr_note_value_is_defined_at(integrand, dummy_expr, NUM_ZERO)) {

@@ -685,6 +685,10 @@ All functions return owning handles.
 - `expr_t *expr_normal_logpdf(const expr_t *expr)` — ln φ(x)
 - `expr_t *expr_ei(const expr_t *expr)` — Ei(x), exponential integral
 - `expr_t *expr_e1(const expr_t *expr)` — E₁(x), exponential integral
+- `expr_t *expr_dilog(const expr_t *expr)` — principal dilogarithm Li₂(x)
+- `expr_t *expr_polylog(unsigned int order, const expr_t *expr)` — polylogarithm Liₙ(x) for non-negative integer orders currently supported by the implementation
+- `expr_t *expr_legendre_chi(unsigned int order, const expr_t *expr)` — Legendre chi χₙ(x) for non-negative integer orders currently supported by the implementation
+- `expr_t *expr_appell_f1(const expr_t *a, const expr_t *b1, const expr_t *b2, const expr_t *c, const expr_t *x, const expr_t *y)` — Appell hypergeometric function F₁(a; b₁, b₂; c; x, y)
 
 ### Value-Only Functions (owning)
 
@@ -786,6 +790,11 @@ expression expr_eval() {
     `archacovercos(x)` for the corresponding inverse functions
   - `gamma(x)` and `Γ(x)` for the gamma function
   - `digamma(x)`, `trigamma(x)`, and `polygamma(n, x)` for ψ⁽⁰⁾, ψ⁽¹⁾, and ψ⁽ⁿ⁾
+  - `dilog(x)`, `Li2(x)`, and `polylog(n, x)` for Li₂(x) and Liₙ(x)
+  - `chi(n, x)` and `legendre_chi(n, x)` for the Legendre chi function χₙ(x)
+  - `appell_f1(a, b1, b2, c, x, y)`, `F1(a, b1, b2, c, x, y)`,
+    `F_1(a, b1, b2, c, x, y)`, and `F₁(a, b1, b2, c, x, y)` for
+    Appell's hypergeometric function F₁(a; b₁, b₂; c; x, y)
   - `W(x)` and `productlog(x)` for branch-choosing Lambert W/ProductLog
   - `W0(x)`, `W_0(x)`, `W₀(x)`, and `lambert_w0(x)` for W₀
   - `W-1(x)`, `W_-1(x)`, `W₋₁(x)`, and `lambert_wm1(x)` for W₋₁

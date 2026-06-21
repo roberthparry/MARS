@@ -1032,6 +1032,71 @@ void test_to_string_addition(void)
     TEST_RUN_SUBTEST(test_to_string_addition_func, NULL);
 }
 
+static void test_to_string_wrapped_tex_aligned_subtraction(void)
+{
+    expr_t *x = test_expr_new_named_var_d(1, "x");
+    expr_t *y = test_expr_new_named_var_d(2, "y");
+    expr_t *z = test_expr_new_named_var_d(3, "z");
+    expr_t *neg_y = expr_neg(y);
+    expr_t *x_minus_y = expr_add(x, neg_y);
+    expr_t *f = expr_add(x_minus_y, z);
+    char *got = expr_to_tex_body_wrapped(f, 1u);
+    const char *expect = "aligned wrapped TeX with subtraction, not + -";
+
+    if (got &&
+        strstr(got, "\\begin{aligned}[t]") &&
+        strstr(got, "\\\\") &&
+        strstr(got, "{} - y") &&
+        !strstr(got, "+ -"))
+        to_string_pass("wrapped TeX aligned subtraction", got, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "wrapped TeX aligned subtraction", got, expect);
+
+    free(got);
+    expr_free(f);
+    expr_free(x_minus_y);
+    expr_free(neg_y);
+    expr_free(x);
+    expr_free(y);
+    expr_free(z);
+}
+
+static void test_to_string_wrapped_tex_distributes_scale(void)
+{
+    expr_t *x = test_expr_new_named_var_d(1, "x");
+    expr_t *y = test_expr_new_named_var_d(2, "y");
+    expr_t *z = test_expr_new_named_var_d(3, "z");
+    expr_t *k = test_expr_new_named_var_d(4, "k");
+    expr_t *neg_y = expr_neg(y);
+    expr_t *x_minus_y = expr_add(x, neg_y);
+    expr_t *sum = expr_add(x_minus_y, z);
+    expr_t *f = expr_mul(k, sum);
+    char *got = expr_to_tex_body_wrapped(f, 1u);
+    const char *expect = "scaled wrapped TeX distributes factor without tall delimiters";
+
+    if (got &&
+        strstr(got, "\\begin{aligned}[t]") &&
+        strstr(got, "k\\cdot x") &&
+        strstr(got, "{} - k\\cdot y") &&
+        strstr(got, "{} + k\\cdot z") &&
+        !strstr(got, "\\left(\\begin{aligned}"))
+        to_string_pass("wrapped TeX distributes scale", got, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "wrapped TeX distributes scale", got, expect);
+
+    free(got);
+    expr_free(f);
+    expr_free(sum);
+    expr_free(x_minus_y);
+    expr_free(neg_y);
+    expr_free(x);
+    expr_free(y);
+    expr_free(z);
+    expr_free(k);
+}
+
 static void test_to_string_negative_rhs_expr(void)
 {
     expr_t *x = test_expr_new_named_var_d(2, "x");
@@ -1870,6 +1935,49 @@ void test_to_string_special_functions(void)
     }
 }
 
+static void test_to_string_appell_f1(void)
+{
+    static const char *const inputs[] = {
+        "{ appell_f1(1, 1, 1, 2, x, y) }",
+        "{ F1(1, 1, 1, 2, x, y) }",
+        "{ F_1(1, 1, 1, 2, x, y) }",
+        "{ F₁(1, 1, 1, 2, x, y) }",
+        NULL
+    };
+    const char *expect_expr = "F₁(1; 1, 1; 2; x, y)";
+    const char *expect_func = "appell_f1(1, 1, 1, 2, x, y)";
+    const char *expect_tex = "F_{1}\\left(1; 1, 1; 2; x, y\\right)";
+
+    for (size_t i = 0u; inputs[i]; ++i) {
+        expr_t *f = expr_from_string(inputs[i], NULL);
+        char *got_expr = f ? expr_to_string(f, style_EXPRESSION) : NULL;
+        char *got_func = f ? expr_to_string(f, style_FUNCTION) : NULL;
+        char *got_tex = f ? expr_to_string(f, style_TEX) : NULL;
+
+        ASSERT_NOT_NULL(f);
+        if (got_expr)
+            to_string_pass("appell_f1 alias (EXPR)", got_expr, expect_expr);
+        else
+            to_string_fail(__FILE__, __LINE__, 1,
+                           "appell_f1 alias (EXPR)", "(null)", expect_expr);
+        if (got_func)
+            to_string_pass("appell_f1 alias (FUNCTION)", got_func, expect_func);
+        else
+            to_string_fail(__FILE__, __LINE__, 1,
+                           "appell_f1 alias (FUNCTION)", "(null)", expect_func);
+        if (got_tex)
+            to_string_pass("appell_f1 alias (TEX)", got_tex, expect_tex);
+        else
+            to_string_fail(__FILE__, __LINE__, 1,
+                           "appell_f1 alias (TEX)", "(null)", expect_tex);
+
+        free(got_tex);
+        free(got_func);
+        free(got_expr);
+        expr_free(f);
+    }
+}
+
 /* ============================================================
  * TEST SUITE RUNNER
  * ============================================================ */
@@ -1891,6 +1999,8 @@ void test_to_string_all(void)
     TEST_RUN_SUBTEST(test_to_string_gamma_polygamma_standard_names, NULL);
     TEST_RUN_SUBTEST(test_to_string_non_simple_var_bracketed, NULL);
     TEST_RUN_SUBTEST(test_to_string_addition, NULL);
+    TEST_RUN_SUBTEST(test_to_string_wrapped_tex_aligned_subtraction, NULL);
+    TEST_RUN_SUBTEST(test_to_string_wrapped_tex_distributes_scale, NULL);
     TEST_RUN_SUBTEST(test_to_string_negative_rhs_expr, NULL);
     TEST_RUN_SUBTEST(test_to_string_double_negative_expr, NULL);
     TEST_RUN_SUBTEST(test_to_string_nested_negative_rhs_expr, NULL);
@@ -1902,6 +2012,7 @@ void test_to_string_all(void)
     TEST_RUN_SUBTEST(test_to_string_function_style, NULL);
     TEST_RUN_SUBTEST(test_to_string_floor_ceil, NULL);
     TEST_RUN_SUBTEST(test_to_string_special_functions, NULL);
+    TEST_RUN_SUBTEST(test_to_string_appell_f1, NULL);
 }
 
 /* ============================================================

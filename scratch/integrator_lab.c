@@ -392,6 +392,21 @@ static char *expr_tex_body(const expr_t *expr)
     return expr_text_dup(expr, style_TEX);
 }
 
+static char *expr_tex_body_display(const expr_t *expr)
+{
+    char *body;
+
+    if (!expr)
+        return NULL;
+    body = expr_to_tex_body_wrapped(expr, 110u);
+    if (body)
+        return body;
+    return expr_tex_body(expr);
+}
+
+static char *combine_aligned_equation_tex(const char *lhs, const char *rhs,
+                                          int add_constant);
+
 static char *combine_equation_tex(const char *lhs, const char *rhs)
 {
     size_t lhs_n;
@@ -400,12 +415,66 @@ static char *combine_equation_tex(const char *lhs, const char *rhs)
 
     if (!lhs || !*lhs || !rhs || !*rhs)
         return NULL;
+    out = combine_aligned_equation_tex(lhs, rhs, 0);
+    if (out)
+        return out;
     lhs_n = strlen(lhs);
     rhs_n = strlen(rhs);
     out = malloc(lhs_n + rhs_n + 6u);
     if (!out)
         return NULL;
     snprintf(out, lhs_n + rhs_n + 6u, "%s = %s", lhs, rhs);
+    return out;
+}
+
+static char *combine_aligned_equation_tex(const char *lhs, const char *rhs,
+                                          int add_constant)
+{
+    static const char prefix[] = "\\begin{aligned}[t]\n";
+    static const char suffix[] = "\n\\end{aligned}";
+    const char *body;
+    const char *end;
+    size_t lhs_n;
+    size_t body_n;
+    size_t suffix_n = strlen(suffix);
+    size_t extra_n;
+    char *out;
+
+    if (!lhs || !*lhs || !rhs || !*rhs)
+        return NULL;
+    if (strncmp(rhs, prefix, strlen(prefix)) != 0)
+        return NULL;
+    end = rhs + strlen(rhs);
+    if ((size_t)(end - rhs) < suffix_n ||
+        strcmp(end - suffix_n, suffix) != 0)
+        return NULL;
+
+    body = rhs + strlen(prefix);
+    if (*body == '&')
+        body++;
+    end -= suffix_n;
+    while (end > body && (end[-1] == ' ' || end[-1] == '\n' || end[-1] == '\r' ||
+                          end[-1] == '\t'))
+        end--;
+
+    lhs_n = strlen(lhs);
+    body_n = (size_t)(end - body);
+    extra_n = add_constant ? strlen(" \\\\\n&{} + C") : 0u;
+    out = malloc(strlen(prefix) + lhs_n + strlen(" ={}& ") + body_n +
+                 extra_n + suffix_n + 1u);
+    if (!out)
+        return NULL;
+
+    snprintf(out,
+             strlen(prefix) + lhs_n + strlen(" ={}& ") + body_n +
+                 extra_n + suffix_n + 1u,
+             "%s%s ={}& %.*s%s%s",
+             prefix,
+             lhs,
+             (int)body_n,
+             body,
+             add_constant ? " \\\\\n&{} + C" : "",
+             suffix);
     return out;
 }
 
@@ -417,6 +486,9 @@ static char *combine_antiderivative_tex(const char *lhs, const char *rhs)
 
     if (!lhs || !*lhs || !rhs || !*rhs)
         return NULL;
+    out = combine_aligned_equation_tex(lhs, rhs, 1);
+    if (out)
+        return out;
     lhs_n = strlen(lhs);
     rhs_n = strlen(rhs);
     out = malloc(lhs_n + rhs_n + 10u);
@@ -808,11 +880,11 @@ int main(int argc, char **argv)
             first_antiderivative = make_unevaluated_antiderivative(expr, vars[0]);
         if (first_antiderivative) {
             antiderivative_text = expr_text_dup(first_antiderivative, style_UNBOUND);
-            antiderivative_tex = expr_tex_body(first_antiderivative);
+            antiderivative_tex = expr_tex_body_display(first_antiderivative);
         }
         if (symbolic_result) {
             symbolic_text = expr_text_dup(symbolic_result, style_UNBOUND);
-            symbolic_tex = expr_tex_body(symbolic_result);
+            symbolic_tex = expr_tex_body_display(symbolic_result);
             symbolic_num = expr_eval(symbolic_result);
             if (!num_is_nan(symbolic_num) && num_is_finite(symbolic_num) && num_is_real(symbolic_num))
                 symbolic_value_text = number_text(symbolic_num);
@@ -843,7 +915,7 @@ int main(int argc, char **argv)
             symbolic_result = partially_symbolic_result;
             partially_symbolic_result = NULL;
             symbolic_text = expr_text_dup(symbolic_result, style_UNBOUND);
-            symbolic_tex = expr_tex_body(symbolic_result);
+            symbolic_tex = expr_tex_body_display(symbolic_result);
             symbolic_num = expr_eval(symbolic_result);
             if (!num_is_nan(symbolic_num) && num_is_finite(symbolic_num) &&
                 num_is_real(symbolic_num)) {
@@ -917,7 +989,7 @@ int main(int argc, char **argv)
         if (symbolic_result) {
             used_core_exact_result = 1;
             symbolic_text = expr_text_dup(symbolic_result, style_UNBOUND);
-            symbolic_tex = expr_tex_body(symbolic_result);
+            symbolic_tex = expr_tex_body_display(symbolic_result);
             symbolic_num = expr_eval(symbolic_result);
             if (!num_is_nan(symbolic_num) && num_is_finite(symbolic_num) &&
                 num_is_real(symbolic_num)) {

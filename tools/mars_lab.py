@@ -1911,7 +1911,7 @@ __THEME_OVERRIDES__
         <div class="integrator-bound-stack" id="integratorBoundStack"></div>
         <div class="integrator-bound-actions">
           <button class="card-action integrator-bound-add" id="integratorAddBound" type="button">+ Integral</button>
-          <span class="integrator-bound-summary">Use <code>Free</code> to keep a symbol as a parameter. Use <code>Bound</code> rows to integrate with respect to that variable.</span>
+          <span class="integrator-bound-summary">Use <code>Bound</code> rows for variables you actually want to integrate. Use <code>Free</code> only for symbols that appear in the integrand but should stay as parameters.</span>
         </div>
         <label for="integratorIntervalCap">Work budget ceiling</label>
         <select id="integratorIntervalCap">
@@ -1921,7 +1921,7 @@ __THEME_OVERRIDES__
           <option value="50000">Up to 50,000</option>
           <option value="100000">Up to 100,000</option>
         </select>
-        <p class="mode-hint">Examples: leave both bounds blank for an antiderivative, enter only an upper bound for an <code>&int;^x</code>-style result, or enter both bounds for a definite integral such as <code>x = 0 .. 1</code>. Bounds can be numbers or symbols.</p>
+        <p class="mode-hint">Examples: use <code>x = 0 .. 1</code> for a definite integral, leave only <code>x</code> with both bounds blank for an antiderivative, or use <code>Free</code> for a parameter such as <code>a</code> in <code>exp(-a*x^2)</code>. Blank spare rows are ignored unless their variable appears in the integrand.</p>
       </div>
       <div class="target-row hidden" id="targetRow">
         <label for="goalTarget">Target</label>
@@ -2024,8 +2024,20 @@ __THEME_OVERRIDES__
           <ul>
             <li>A <code>Bound</code> row means "integrate with respect to this variable".</li>
             <li>A <code>Free</code> row means "keep this symbol as a parameter".</li>
+            <li>Do not add rows for variables that are not in the integrand. A row named <code>y</code> means "integrate with respect to y", not "reserve a possible future variable".</li>
             <li>Row order matters. The first row is the outermost integral shown on screen, and later rows sit further inside.</li>
             <li>Use <code>+</code> and <code>-</code> on each row to insert or remove nested integrals without retyping everything.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="integrator">
+          <div class="help-kicker">Rows That Count</div>
+          <p>The lab sends only active rows to the integrator.</p>
+          <ul>
+            <li>A row with both bounds filled is active, such as <code>x = 0 .. 1</code>.</li>
+            <li>A row with only an upper bound is active, such as <code>t = x</code>, and gives an upper-limit integral.</li>
+            <li>A blank <code>Bound</code> row is active only when its variable appears in the integrand, or when it is the only bound row.</li>
+            <li>A <code>Free</code> row is active only when its symbol appears in the integrand.</li>
+            <li>Spare blank rows that do not match the integrand are ignored and pruned after evaluation.</li>
           </ul>
         </div>
         <div class="help-card" data-help-modes="integrator">
@@ -2084,6 +2096,7 @@ __THEME_OVERRIDES__
           <ul>
             <li>Built-in constants include <code>pi</code>/<code>π</code>, <code>e</code>, <code>i</code>, <code>phi</code>/<code>φ</code>, and <code>gamma</code>/<code>γ</code>.</li>
             <li><code>ln(x)</code> is natural log; <code>log(x)</code>, <code>lg(x)</code>, and <code>log10(x)</code> are base-10 log.</li>
+            <li>Versine/haversine family names include <code>versin</code>, <code>coversin</code>, <code>haversin</code>, <code>hacoversin</code>, and their <code>arc...</code>/<code>arch...</code> inverses.</li>
             <li><code>W(x)</code>, <code>W0(x)</code>, and <code>W_0(x)</code> mean <code>W₀(x)</code>. Use <code>W-1(x)</code> for <code>W₋₁(x)</code>.</li>
             <li>Standard gamma notation is supported in display: <code>gamma(x)</code> shows as <code>Γ(x)</code>, and polygamma shows as <code>ψ⁽ⁿ⁾(x)</code>.</li>
           </ul>
@@ -2093,6 +2106,8 @@ __THEME_OVERRIDES__
           <ul>
             <li>Elementary: <code>abs(x)</code>, <code>floor(x)</code>, <code>ceil(x)</code>, <code>sqrt(x)</code>, <code>exp(x)</code>, <code>ln(x)</code>, <code>log(x)</code>, <code>lg(x)</code>, <code>log10(x)</code>.</li>
             <li>Trigonometric: <code>sin(x)</code>, <code>cos(x)</code>, <code>tan(x)</code>, <code>asin(x)</code>, <code>acos(x)</code>, <code>atan(x)</code>.</li>
+            <li>Versine/haversine: <code>versin(x)</code>, <code>vercos(x)</code>, <code>coversin(x)</code>, <code>covercos(x)</code>, <code>haversin(x)</code>, <code>havercos(x)</code>, <code>hacoversin(x)</code>, <code>hacovercos(x)</code>.</li>
+            <li>Versine/haversine inverses: <code>arcversin(x)</code>, <code>arcvercos(x)</code>, <code>arccoversin(x)</code>, <code>arccovercos(x)</code>, <code>archaversin(x)</code>, <code>archavercos(x)</code>, <code>archacoversin(x)</code>, <code>archacovercos(x)</code>.</li>
             <li>Hyperbolic: <code>sinh(x)</code>, <code>cosh(x)</code>, <code>tanh(x)</code>, <code>asinh(x)</code>, <code>acosh(x)</code>, <code>atanh(x)</code>.</li>
             <li>Gamma family: <code>gamma(x)</code>, <code>gammainv(x)</code>, <code>lgamma(x)</code>, <code>digamma(x)</code>, <code>trigamma(x)</code>, <code>polygamma(n, x)</code>.</li>
             <li>Error functions: <code>erf(x)</code>, <code>erfc(x)</code>, <code>erfinv(x)</code>, <code>erfcinv(x)</code>.</li>
@@ -2548,6 +2563,8 @@ __THEME_OVERRIDES__
     function applyLabMode(mode) {
       setMode(validLabMode(mode), {force: true});
       restoreModeEditor(currentMode());
+      if (currentMode() === 'integrator')
+        renderIntegratorRows(activeIntegratorRows());
       syncModeUI();
       if (currentMode() === 'integrator' && currentIntegratorBoundRows().length === 0)
         resetIntegratorBoundsToDefault();
@@ -4129,6 +4146,10 @@ __THEME_OVERRIDES__
       return [{kind: 'bound', name: 'x', lo: '0', hi: '1'}];
     }
 
+    function integratorBlankRows() {
+      return [{kind: 'bound', name: 'x', lo: '', hi: ''}];
+    }
+
     function currentIntegratorRows() {
       const rows = Array.from((integratorBoundStack || document.createElement('div')).querySelectorAll('.integrator-bound-row'))
         .map((row) => sanitizeIntegratorRow({
@@ -4140,8 +4161,49 @@ __THEME_OVERRIDES__
       return rows.length ? rows : integratorFallbackRows();
     }
 
+    function escapeRegexLiteral(text) {
+      return String(text || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    function integratorExpressionReferencesName(expressionText, name) {
+      const needle = String(name || '').trim();
+      if (!needle)
+        return false;
+      const body = expressionBodyForEditor(expressionText || currentExpressionText() || expr.value || '');
+      if (!body)
+        return false;
+      if (needle.startsWith('[') && needle.endsWith(']'))
+        return body.includes(needle);
+      const pattern = new RegExp(`(^|[^A-Za-z0-9_])${escapeRegexLiteral(needle)}(?=$|[^A-Za-z0-9_])`);
+      return pattern.test(body);
+    }
+
+    function activeIntegratorBoundRows(rows = currentIntegratorRows(), expressionText = '') {
+      const boundRows = (Array.isArray(rows) ? rows : [])
+        .filter((row) => normaliseIntegratorRowKind(row.kind) === 'bound');
+      const activeRows = boundRows.filter((row) =>
+        row.lo ||
+        row.hi ||
+        boundRows.length === 1 ||
+        integratorExpressionReferencesName(expressionText, row.name)
+      );
+      return activeRows.length ? activeRows : integratorFallbackRows();
+    }
+
+    function activeIntegratorRows(rows = currentIntegratorRows(), expressionText = '') {
+      const activeBounds = activeIntegratorBoundRows(rows, expressionText);
+      const activeBoundSet = new Set(activeBounds);
+      const activeRows = (Array.isArray(rows) ? rows : [])
+        .filter((row) => {
+          if (normaliseIntegratorRowKind(row.kind) === 'free')
+            return integratorExpressionReferencesName(expressionText, row.name);
+          return activeBoundSet.has(row);
+        });
+      return activeRows.length ? activeRows : integratorFallbackRows();
+    }
+
     function currentIntegratorBoundRows() {
-      return currentIntegratorRows().filter((row) => normaliseIntegratorRowKind(row.kind) === 'bound');
+      return activeIntegratorBoundRows();
     }
 
     function currentIntegratorBoundNames() {
@@ -4279,13 +4341,19 @@ __THEME_OVERRIDES__
       const responseBounds = Array.isArray(data && data.bounds) ? data.bounds : [];
       if (!responseBounds.length)
         return;
+      const parameterNames = new Set(
+        variableNamesFromBindings(data && data.binding_values)
+          .map((name) => String(name || '').trim())
+          .filter(Boolean)
+      );
       const previousRows = currentIntegratorRows();
       const mergedRows = [];
       let boundIndex = 0;
 
       previousRows.forEach((row) => {
         if (row.kind === 'free') {
-          mergedRows.push(row);
+          if (parameterNames.has(String(row.name || '').trim()))
+            mergedRows.push(row);
           return;
         }
         if (boundIndex < responseBounds.length)
@@ -4307,11 +4375,15 @@ __THEME_OVERRIDES__
     }
 
     function currentIntegratorBoundsText() {
-      return integratorBoundsTextFromRows(currentIntegratorRows());
+      return integratorBoundsTextFromRows(activeIntegratorRows());
     }
 
     function resetIntegratorBoundsToDefault() {
       restoreIntegratorBoundsText(DEFAULT_INTEGRATOR_BOUNDS_TEXT);
+    }
+
+    function resetIntegratorBoundsToBlank() {
+      renderIntegratorRows(integratorBlankRows());
     }
 
     function requestedIntegratorIntervalCap() {
@@ -4354,13 +4426,16 @@ __THEME_OVERRIDES__
     }
 
     async function fetchIntegratorEvaluation() {
-      const bounds = currentIntegratorBoundRows();
+      const expressionText = currentExpressionText() || expr.value.trim();
+      const rows = currentIntegratorRows();
+      const activeRows = activeIntegratorRows(rows, expressionText);
+      const bounds = activeIntegratorBoundRows(rows, expressionText);
+      renderIntegratorRows(activeRows);
       bounds.forEach((bound) => {
         if (bound.lo && !bound.hi)
           throw new Error(`A one-sided bound for ${bound.name} should be entered as an upper bound. Leave lower blank and put the value in upper.`);
       });
       saveLastIntegratorState();
-      const expressionText = currentExpressionText() || expr.value.trim();
       const response = await fetch('/integrator-eval', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -5057,7 +5132,10 @@ __THEME_OVERRIDES__
         rendered.dataset.displaySvg = data.svg || '';
         rendered.dataset.fullSvg = '';
         rendered.dataset.renderError = data.render_error || '';
-        setRenderedContent(data.svg || '', data.render_error || (data.tex || 'No rendered TeX available'));
+        setRenderedContent(
+          data.svg || '',
+          data.render_error || (data.tex || 'No rendered TeX available')
+        );
         resetMoreDigitsButton(renderedMore, false);
         setExpandableText(parsed, parsedMore, data.result || '', data.result || '');
         setResultInputText(data.result || '');
@@ -5212,7 +5290,13 @@ __THEME_OVERRIDES__
           pushExpressionHistory(previousState);
         const {response, data} = await fetchIntegratorEvaluation();
         if (!response.ok || !data.ok) {
-          setRenderedError(data.error || 'Integration failed');
+          const errorText = String(data.error || '').trim();
+          const rawError = String(data.raw_error || '').trim();
+          setRenderedError(
+            errorText && errorText !== 'Integration failed'
+              ? errorText
+              : (rawError || errorText || 'Integration failed')
+          );
           resetMoreDigitsButton(renderedMore, false);
           clearResultDetails({keepBindings: true});
           applyIntegratorBindingState(data, text);
@@ -5231,7 +5315,10 @@ __THEME_OVERRIDES__
         rendered.dataset.displaySvg = data.svg || '';
         rendered.dataset.fullSvg = '';
         rendered.dataset.renderError = data.render_error || '';
-        setRenderedContent(data.svg || '', data.render_error || (data.tex || 'No rendered TeX available'));
+        setRenderedContent(
+          data.svg || '',
+          data.render_error || (data.tex || 'No rendered TeX available')
+        );
         resetMoreDigitsButton(renderedMore, false);
         setExpandableText(parsed, parsedMore, data.expression || '', data.expression || '');
         setResultInputText(data.antiderivative || '');
@@ -5569,7 +5656,7 @@ __THEME_OVERRIDES__
       if (currentMode() === 'equation' && equationVariable)
         equationVariable.value = DEFAULT_EQUATION_VARIABLE_TEXT;
       if (currentMode() === 'integrator') {
-        resetIntegratorBoundsToDefault();
+        resetIntegratorBoundsToBlank();
         if (integratorIntervalCap)
           integratorIntervalCap.value = String(DEFAULT_INTEGRATOR_INTERVAL_CAP);
       }
@@ -6930,9 +7017,6 @@ def ensure_mars_lab(binary: Path) -> None:
 
 
 def ensure_scratch_binary(binary: Path, target: str) -> None:
-    if binary.exists() and os.access(binary, os.X_OK):
-        return
-
     subprocess.run(
         ["make", target],
         cwd=ROOT,
@@ -7038,6 +7122,7 @@ def parse_integrator_lab_output(output: str) -> dict[str, str]:
             "max_intervals": r"^max_intervals\s+(.*)$",
             "status": r"^status\s+(.*)$",
         },
+        {"tex", "symbolic_tex", "antiderivative_tex"},
     )
 
 
@@ -7648,14 +7733,6 @@ def run_integrator_lab_fields(
     raw = completed.stdout
     if completed.stderr:
         raw = raw + ("\n" if raw else "") + completed.stderr
-    if completed.returncode == 0:
-        return parse_integrator_lab_output(raw), raw, completed.returncode
-
-    fallback = integrator_endpoint_log_fallback(expression, bounds, precision, max_intervals)
-    if fallback is not None:
-        fields = fallback
-        return fields, "Integration recovered via analytic endpoint-limit fallback", 0
-
     return parse_integrator_lab_output(raw), raw, completed.returncode
 
 
@@ -7680,80 +7757,6 @@ def run_equation_lab_fields(
     if completed.stderr:
         raw = raw + ("\n" if raw else "") + completed.stderr
     return parse_equation_lab_output(raw), raw, completed.returncode
-
-
-def _parse_decimal_bound(text: str) -> Decimal | None:
-    try:
-        return Decimal(str(text).strip())
-    except (InvalidOperation, ValueError):
-        return None
-
-
-def integrator_endpoint_log_fallback(
-    expression: str,
-    bounds: list[dict[str, str]],
-    precision: int,
-    max_intervals: int | None = None,
-) -> dict[str, str] | None:
-    if len(bounds) != 1:
-        return None
-
-    expr_text = str(expression or "").strip()
-    match = re.fullmatch(r"(ln|log|lg|log10)\(\s*([A-Za-z][A-Za-z0-9_]*)\s*\)", expr_text)
-    if not match:
-        return None
-
-    func_name, var_name = match.groups()
-    bound = bounds[0]
-    if str(bound.get("name", "")).strip() != var_name:
-        return None
-
-    lo_text = str(bound.get("lo", "")).strip()
-    hi_text = str(bound.get("hi", "")).strip()
-    lo = _parse_decimal_bound(lo_text)
-    hi = _parse_decimal_bound(hi_text)
-    if lo is None or hi is None:
-        return None
-
-    if lo == hi:
-        value = Decimal(0)
-    else:
-        with localcontext() as ctx:
-            ctx.prec = max(precision + 20, 60)
-
-            def zero_endpoint_log_integral(upper: Decimal) -> Decimal | None:
-                if upper <= 0:
-                    return None
-                value_out = upper * upper.ln() - upper
-                if func_name != "ln":
-                    value_out /= Decimal(10).ln()
-                return +value_out
-
-            if lo.is_zero() and hi > 0:
-                computed = zero_endpoint_log_integral(hi)
-            elif hi.is_zero() and lo > 0:
-                computed = zero_endpoint_log_integral(lo)
-                computed = -computed if computed is not None else None
-            else:
-                return None
-
-            if computed is None:
-                return None
-            value = +computed
-
-    log_tex = "\\ln" if func_name == "ln" else "\\log"
-    return {
-        "input": expr_text,
-        "expression": expr_text,
-        "dimensions": "1",
-        "bound": f"{var_name} in [{lo_text}, {hi_text}]",
-        "tex": rf"\int_{{{lo_text}}}^{{{hi_text}}} {log_tex}({var_name})\, d{var_name}",
-        "value": str(value),
-        "error": "0",
-        "intervals": "0",
-        "max_intervals": str(max_intervals or DEFAULT_INTEGRATOR_INTERVAL_CAP),
-        "status": "analytic endpoint limit",
-    }
 
 
 def matrix_failure_hint(
@@ -8014,10 +8017,15 @@ def prepare_integrator_fields(fields: dict[str, str], precision: int) -> dict[st
 
     tex = str(fields.get("tex") or "").strip()
     bounds = str(fields.get("bound") or "").strip()
+    bound_rows = integrator_bound_rows_from_fields(fields)
     binding_expression = str(
         fields.get("binding_expression") or fields.get("input") or ""
     ).strip()
     tex = integrator_tex_for_display(tex)
+    symbolic_text = str(fields.get("symbolic") or "").strip()
+    symbolic_tex = str(fields.get("symbolic_tex") or "").strip()
+    antiderivative_text = str(fields.get("antiderivative") or "").strip()
+    antiderivative_tex = str(fields.get("antiderivative_tex") or "").strip()
 
     svg = None
     render_error = None
@@ -8030,10 +8038,10 @@ def prepare_integrator_fields(fields: dict[str, str], precision: int) -> dict[st
         "expression": str(fields.get("expression") or "").strip(),
         "binding_expression": binding_expression,
         "tex": "" if tex == "(null)" else tex,
-        "antiderivative": str(fields.get("antiderivative") or "").strip(),
-        "antiderivative_tex": str(fields.get("antiderivative_tex") or "").strip(),
-        "symbolic": str(fields.get("symbolic") or "").strip(),
-        "symbolic_tex": str(fields.get("symbolic_tex") or "").strip(),
+        "antiderivative": antiderivative_text,
+        "antiderivative_tex": antiderivative_tex,
+        "symbolic": symbolic_text,
+        "symbolic_tex": symbolic_tex,
         "symbolic_value": str(fields.get("symbolic_value") or "").strip(),
         "value": str(fields.get("value") or "").strip(),
         "error": str(fields.get("error") or "").strip(),
@@ -8045,7 +8053,7 @@ def prepare_integrator_fields(fields: dict[str, str], precision: int) -> dict[st
         "status": str(fields.get("status") or "").strip(),
         "dimensions": str(fields.get("dimensions") or "").strip(),
         "bound": bounds,
-        "bounds": integrator_bound_rows_from_fields(fields),
+        "bounds": bound_rows,
         "bound_var": str(fields.get("bound_var") or "").strip().splitlines()[0] if str(fields.get("bound_var") or "").strip() else "",
         "bound_lower": str(fields.get("bound_lower") or "").strip().splitlines()[0] if str(fields.get("bound_lower") or "").strip() else "",
         "bound_upper": str(fields.get("bound_upper") or "").strip().splitlines()[0] if str(fields.get("bound_upper") or "").strip() else "",
@@ -8556,6 +8564,14 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                     max_intervals,
                 )
             except Exception as exc:
+                self.log_message(
+                    'integrator exception expression=%r bounds=%r precision=%r max_intervals=%r error=%s',
+                    expression,
+                    cleaned_bounds,
+                    precision,
+                    max_intervals,
+                    exc,
+                )
                 self.send_json(422, {"ok": False, "error": str(exc)})
                 return
 
@@ -8570,6 +8586,17 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                 error_lines = [line.strip() for line in str(raw or "").splitlines() if line.strip()]
                 response_payload["ok"] = False
                 response_payload["error"] = error_lines[-1] if error_lines else "Integration failed"
+                response_payload["raw_error"] = str(raw or "").strip()
+                response_payload["returncode"] = returncode
+                self.log_message(
+                    'integrator failure expression=%r bounds=%r precision=%r max_intervals=%r returncode=%r raw=%r',
+                    expression,
+                    cleaned_bounds,
+                    precision,
+                    max_intervals,
+                    returncode,
+                    str(raw or "").strip(),
+                )
                 normalized_expression = str(
                     response_payload.get("binding_expression") or expression
                 ).strip()
