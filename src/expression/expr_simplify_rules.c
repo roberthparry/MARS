@@ -141,7 +141,7 @@ static expr_t *expr_new_pi_ratio_long(long numer, unsigned long denom)
             goto cleanup;
         expr_free(base);
         expr_free(coeff);
-        base = expr_simplify(scaled);
+        base = expr_simplify_owned(scaled);
         scaled = NULL;
         coeff = NULL;
         if (!base)
@@ -160,7 +160,7 @@ static expr_t *expr_new_pi_ratio_long(long numer, unsigned long denom)
             goto cleanup;
         expr_free(base);
         expr_free(divisor);
-        base = expr_simplify(quotient);
+        base = expr_simplify_owned(quotient);
         quotient = NULL;
         divisor = NULL;
         if (!base)
@@ -176,7 +176,7 @@ static expr_t *expr_new_pi_ratio_long(long numer, unsigned long denom)
     negative = expr_neg(base);
     if (!negative)
         goto cleanup;
-    out = expr_simplify(negative);
+    out = expr_simplify_owned(negative);
     negative = NULL;
 
 cleanup:

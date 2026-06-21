@@ -893,8 +893,8 @@ void test_qf_polylog(void) {
     {
         qfloat_t got = qf_appell_f1(QF_ONE, QF_ONE, QF_ONE,
                                     qf_from_double(2.0),
-                                    qf_from_double(0.1),
-                                    qf_from_double(0.2));
+                                    qf_from_string("0.1"),
+                                    qf_from_string("0.2"));
         qfloat_t expect =
             qf_from_string("1.1778303565638345453879410947052170506848071256473314110734863879480772052813379");
 

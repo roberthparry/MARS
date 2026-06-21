@@ -275,8 +275,11 @@ static bool expr_match_scaled_inner(const expr_t *factor,
     if (!expr_is_unnamed_const(factor) || !expr_match_const_value(factor, &factor_value))
         return false;
     if (expr_match_scaled_expr(other, &inner_scale, &inner_base)) {
+        number_t scale = num_mul(factor_value, inner_scale);
+
+        num_destroy(&inner_scale);
         num_destroy(scale_out);
-        *scale_out = num_scope_detach(num_mul(factor_value, inner_scale));
+        *scale_out = num_scope_detach(scale);
         *base_out = inner_base;
         return true;
     }
@@ -337,8 +340,11 @@ bool expr_match_scaled_expr(const expr_t *expr,
     if (expr_match_unary_op(expr, EXPR_KIND_NEG, &arg)) {
         inner_scale = num_new();
         if (expr_match_scaled_expr(arg, &inner_scale, &inner_base)) {
+            number_t scale = num_neg(inner_scale);
+
+            num_destroy(&inner_scale);
             num_destroy(scale_out);
-            *scale_out = num_scope_detach(num_neg(inner_scale));
+            *scale_out = num_scope_detach(scale);
             *base_out = inner_base;
             return true;
         }
@@ -360,8 +366,11 @@ bool expr_match_scaled_expr(const expr_t *expr,
             return false;
         inner_scale = num_new();
         if (expr_match_scaled_expr(left, &inner_scale, &inner_base)) {
+            number_t scale = num_div(inner_scale, const_value);
+
+            num_destroy(&inner_scale);
             num_destroy(scale_out);
-            *scale_out = num_scope_detach(num_div(inner_scale, const_value));
+            *scale_out = num_scope_detach(scale);
             *base_out = inner_base;
             return true;
         }
@@ -998,8 +1007,8 @@ bool expr_integral_value_note(const expr_t *expr, char *out, size_t out_size)
     expr_t *lower_const = NULL;
     expr_t *upper_integrand = NULL;
     expr_t *lower_integrand = NULL;
-    number_t upper = num_new();
-    number_t lower = num_new();
+    number_t upper = number_invalid();
+    number_t lower = number_invalid();
     char *upper_text = NULL;
     char *lower_text = NULL;
     char *integrand_text = NULL;
@@ -1035,7 +1044,9 @@ bool expr_integral_value_note(const expr_t *expr, char *out, size_t out_size)
             }
         }
 
+        num_destroy(&upper);
         upper = upper_expr ? expr_eval(upper_expr) : num_clone(NUM_NAN);
+        num_destroy(&lower);
         lower = lower_expr ? expr_eval(lower_expr) : num_clone(NUM_ZERO);
         if (!found &&
             upper_expr && dummy_expr &&
