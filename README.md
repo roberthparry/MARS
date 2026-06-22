@@ -21,6 +21,7 @@ some GNU C extensions, so MSVC/Windows builds are not currently guaranteed.
 - **`datetime_t`** — civil and astronomical date/time helpers
 - **`timeseries_t`** — datetime-indexed forecasting and time-series analysis for regression and ARIMA-family models
 - **`json_t`** — opaque JSON value tree with string-backed parsing, serialisation, file round-tripping, and `number_t` extension support
+- **`sqlite_t`** — opaque SQLCipher-backed SQLite storage for encrypted MARS object persistence
 - **`dictionary_t` / `set_t` / `array_t`** — generic containers with user-defined ownership
 - **`string_t`** — UTF-8-aware dynamic strings and grapheme operations
 - **`bitset_t`** — dynamic thread-safe bitset with bitwise operations
@@ -31,12 +32,13 @@ some GNU C extensions, so MSVC/Windows builds are not currently guaranteed.
 - GCC or Clang on Linux, compiling C99/GNU C
 - Standard C library plus `libm` and pthreads
 - GMP, MPFR, and MPC development libraries
+- SQLCipher development libraries
 - Optional `libunistring` support for the UTF-8/string layer (`ENABLE_UNISTRING=1` by default in the Makefile)
 
 On Debian/Ubuntu, install the default build requirements with:
 
 ```sh
-sudo apt install build-essential libgmp-dev libmpfr-dev libmpc-dev libunistring-dev
+sudo apt install build-essential libgmp-dev libmpfr-dev libmpc-dev libsqlcipher-dev libunistring-dev
 ```
 
 Use `make check-deps` to check for required development headers and link
