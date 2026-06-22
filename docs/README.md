@@ -19,6 +19,7 @@ This directory contains the longer module documentation for MARS.
 - [`datetime_t`](datetime.md) — civil and astronomical date/time utilities
 - [`timeseries_t`](timeseries.md) — datetime-indexed forecasting and time-series analysis
 - [`json_t`](json.md) — opaque JSON value tree with string-backed parsing and `number_t` fidelity
+- [`sqlite_t`](sqlite.md) — opaque SQLCipher-backed SQLite storage for encrypted object persistence
 - [`dictionary_t`](dictionary.md) — generic key/value storage
 - [`set_t`](set.md) — generic set storage
 - [`array_t`](array.md) — generic array storage
@@ -40,6 +41,9 @@ multiprecision backends:
 - [GMP](https://gmplib.org/) for integer and rational arithmetic
 - [MPFR](https://www.mpfr.org/) for correctly rounded multiprecision floats
 - [MPC](https://www.multiprecision.org/mpc/) for multiprecision complex numbers
+
+`sqlite_t` uses [SQLCipher](https://www.zetetic.net/sqlcipher/) for encrypted
+SQLite-compatible storage.
 
 ## Notes
 

@@ -19,6 +19,7 @@ Required libraries:
 - GMP
 - MPFR
 - MPC
+- SQLCipher
 
 Optional libraries:
 
@@ -27,13 +28,13 @@ Optional libraries:
 On Debian/Ubuntu, install everything used by the default build with:
 
 ```sh
-sudo apt install build-essential libgmp-dev libmpfr-dev libmpc-dev libunistring-dev
+sudo apt install build-essential libgmp-dev libmpfr-dev libmpc-dev libsqlcipher-dev libunistring-dev
 ```
 
 If you disable libunistring support, it is not required:
 
 ```sh
-sudo apt install build-essential libgmp-dev libmpfr-dev libmpc-dev
+sudo apt install build-essential libgmp-dev libmpfr-dev libmpc-dev libsqlcipher-dev
 make ENABLE_UNISTRING=0
 ```
 
@@ -163,10 +164,10 @@ make help
   `__attribute__`, so GCC or Clang is required.
 - The Linux system toolchain is the supported path; MSVC/Windows builds are not
   currently guaranteed.
-- `libm`, pthreads, GMP, MPFR, and MPC are required.
+- `libm`, pthreads, GMP, MPFR, MPC, and SQLCipher are required.
 - `libunistring` is optional but enabled by default through `ENABLE_UNISTRING=1`.
 - `make install` installs MARS headers and libraries only. It does not install
-  external dependencies such as GMP, MPFR, MPC, or libunistring; install those
+  external dependencies such as GMP, MPFR, MPC, SQLCipher, or libunistring; install those
   through your OS package manager before building MARS.
 - Benchmarks are discovered automatically from `bench/bench_*.c`.
 - Current benchmark targets include `bench_integrator` and
