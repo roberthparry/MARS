@@ -612,6 +612,13 @@ const expr_ops_t ops_lambert_w = {
     .apply_unary = expr_lambert_w, .apply_binary = NULL,
     .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
 };
+const expr_ops_t ops_lambert_wn = {
+    .eval = eval_lambert_wn, .deriv = deriv_lambert_wn, .reverse = expr_reverse_lambert_wn,
+    .kind = EXPR_KIND_LAMBERT_WN, .arity = EXPR_OP_BINARY, .name = "Wₙ",
+    .tex_name = "W",
+    .apply_unary = NULL, .apply_binary = expr_lambert_wn_xp,
+    .simplify = expr_simplify_binary_operator, .fold_const_unary = NULL
+};
 const expr_ops_t ops_lambert_w0 = {
     .eval = eval_lambert_w0, .deriv = deriv_lambert_w0, .reverse = expr_reverse_lambert_w0,
     .kind = EXPR_KIND_LAMBERT_W0, .arity = EXPR_OP_UNARY, .name = "W₀",
@@ -941,6 +948,7 @@ expr_t *expr_apply_unary_kind(expr_op_kind_t kind, const expr_t *arg)
         [EXPR_KIND_DILOG] = &ops_dilog,
         [EXPR_KIND_GAMMAINV] = &ops_gammainv,
         [EXPR_KIND_LAMBERT_W] = &ops_lambert_w,
+        [EXPR_KIND_LAMBERT_WN] = &ops_lambert_wn,
         [EXPR_KIND_LAMBERT_W0] = &ops_lambert_w0,
         [EXPR_KIND_LAMBERT_WM1] = &ops_lambert_wm1,
         [EXPR_KIND_NORMAL_PDF] = &ops_normal_pdf,
@@ -1098,6 +1106,17 @@ expr_t *expr_appell_f1(const expr_t *a, const expr_t *b1,
 
 expr_t *expr_gammainv(const expr_t *a) { return expr_math_wrap_unary(&ops_gammainv, a); }
 expr_t *expr_lambert_w(const expr_t *a) { return expr_math_wrap_unary(&ops_lambert_w, a); }
+expr_t *expr_lambert_wn_xp(const expr_t *branch, const expr_t *arg)
+{
+    if (branch && expr_is_const(branch)) {
+        if (num_eq(branch->c, NUM_ZERO))
+            return expr_lambert_w0(arg);
+        if (num_eq(branch->c, NUM_NEG_ONE))
+            return expr_lambert_wm1(arg);
+    }
+    return expr_math_wrap_binary(&ops_lambert_wn, branch, arg);
+}
+expr_t *expr_lambert_wn(const expr_t *branch, const expr_t *arg) { return expr_lambert_wn_xp(branch, arg); }
 expr_t *expr_lambert_w0(const expr_t *a) { return expr_math_wrap_unary(&ops_lambert_w0, a); }
 expr_t *expr_lambert_wm1(const expr_t *a) { return expr_math_wrap_unary(&ops_lambert_wm1, a); }
 expr_t *expr_normal_pdf(const expr_t *a) { return expr_math_wrap_unary(&ops_normal_pdf, a); }

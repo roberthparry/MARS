@@ -1886,6 +1886,15 @@ static int expr_has_legendre_chi_order(const expr_t *f)
     return expr_legendre_chi_order(f, &order);
 }
 
+static void emit_expr_lambert_wn(const expr_t *f, sbuf_t *b)
+{
+    sbuf_puts(b, "Wₙ(");
+    emit_expr(f->a, b, 0);
+    sbuf_puts(b, ", ");
+    emit_expr(f->b, b, 0);
+    sbuf_putc(b, ')');
+}
+
 static void emit_expr_polygamma(const expr_t *f, sbuf_t *b)
 {
     long order;
@@ -2022,6 +2031,15 @@ static void emit_tex_appell_f1(const expr_t *f, sbuf_t *b)
     sbuf_puts(b, "\\right)");
 }
 
+static void emit_tex_lambert_wn(const expr_t *f, sbuf_t *b)
+{
+    sbuf_puts(b, "W_{");
+    emit_tex_expr(f->a, b, 0);
+    sbuf_puts(b, "}(");
+    emit_tex_expr(f->b, b, 0);
+    sbuf_putc(b, ')');
+}
+
 static void emit_func_polygamma(const expr_t *f, sbuf_t *b)
 {
     long order;
@@ -2060,6 +2078,15 @@ static void emit_func_appell_f1(const expr_t *f, sbuf_t *b)
     emit_func(x, b, 0);
     sbuf_puts(b, ", ");
     emit_func(y, b, 0);
+    sbuf_putc(b, ')');
+}
+
+static void emit_func_lambert_wn(const expr_t *f, sbuf_t *b)
+{
+    sbuf_puts(b, "lambert_wn(");
+    emit_func(f->a, b, 0);
+    sbuf_puts(b, ", ");
+    emit_func(f->b, b, 0);
     sbuf_putc(b, ')');
 }
 
@@ -2610,6 +2637,10 @@ void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec)
             emit_tex_legendre_chi(f, b);
             return;
         }
+        if (expr_is_op(f, &ops_lambert_wn)) {
+            emit_tex_lambert_wn(f, b);
+            return;
+        }
         if (expr_is_op(f, &ops_appell_f1)) {
             emit_tex_appell_f1(f, b);
             return;
@@ -3014,6 +3045,10 @@ void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
             emit_expr_legendre_chi(f, b);
             return;
         }
+        if (expr_is_op(f, &ops_lambert_wn)) {
+            emit_expr_lambert_wn(f, b);
+            return;
+        }
         if (expr_is_op(f, &ops_appell_f1)) {
             emit_expr_appell_f1(f, b);
             return;
@@ -3232,6 +3267,10 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
         }
         if (expr_is_op(f, &ops_appell_f1)) {
             emit_func_appell_f1(f, b);
+            return;
+        }
+        if (expr_is_op(f, &ops_lambert_wn)) {
+            emit_func_lambert_wn(f, b);
             return;
         }
         sbuf_puts(b, f->ops->name);

@@ -192,6 +192,60 @@ datetime_t *datetime_init_easter(datetime_t *dttm, int year)
     return dttm;
 }
 
+static long datetime_julian_ymd_to_jdn(int year, int month, int day)
+{
+    int a = (14 - month) / 12;
+    int y = year + 4800 - a;
+    int m = month + 12 * a - 3;
+    return day + (153 * m + 2) / 5 + 365 * y + y / 4 - 32083;
+}
+
+datetime_t *datetime_init_orthodox_easter(datetime_t *dttm, int year)
+{
+    int a;
+    int b;
+    int c;
+    int d;
+    int e;
+    int daysIntoYear;
+    int month;
+    int day;
+
+    if (!dttm || year < 1 || year > 9999)
+        return NULL;
+
+    a = year % 4;
+    b = year % 7;
+    c = year % 19;
+    d = (19 * c + 15) % 30;
+    e = (2 * a + 4 * b - d + 34) % 7;
+    daysIntoYear = d + e + 114;
+    month = daysIntoYear / 31;
+    day = (daysIntoYear % 31) + 1;
+
+    datetime_init_jdn(dttm, datetime_julian_ymd_to_jdn(year, month, day));
+    datetime_year(dttm);
+    return dttm;
+}
+
+datetime_t *datetime_init_christmas(datetime_t *dttm, int year)
+{
+    if (!dttm || year < 1 || year > 9999)
+        return NULL;
+
+    return datetime_init_ymd(dttm, (short)year, DT_December, 25);
+}
+
+datetime_t *datetime_init_orthodox_christmas(datetime_t *dttm, int year)
+{
+    if (!dttm || year < 2 || year > 9999)
+        return NULL;
+
+    datetime_init_jdn(dttm, datetime_julian_ymd_to_jdn(year - 1, DT_December, 25));
+    datetime_year(dttm);
+    return dttm;
+}
+
 /**
  * @brief calculates the time of the true new moon for a given lunation number lunationIndex.
  * The algorithm used is the ELP2000-85 algorithm, which is a well-known method for calculating the time of the true new moon.
@@ -242,6 +296,56 @@ static double datetime_true_new_moon_tt(int lunationIndex)
         + 0.00739 * E * sin(moonMeanAnomaly - sunMeanAnomaly)
         - 0.00514 * E * sin(moonMeanAnomaly + sunMeanAnomaly)
         + 0.00208 * E * E * sin(2 * sunMeanAnomaly)
+        - 0.00111 * sin(moonMeanAnomaly - 2 * moonArgumentLatitude)
+        - 0.00057 * sin(moonMeanAnomaly + 2 * moonArgumentLatitude)
+        + 0.00056 * E * sin(2 * moonMeanAnomaly + sunMeanAnomaly)
+        - 0.00042 * sin(3 * moonMeanAnomaly)
+        + 0.00042 * E * sin(sunMeanAnomaly + 2 * moonArgumentLatitude)
+        + 0.00038 * E * sin(sunMeanAnomaly - 2 * moonArgumentLatitude)
+        - 0.00024 * E * sin(2 * moonMeanAnomaly - sunMeanAnomaly)
+        - 0.00017 * sin(ascendingNodeLongitude)
+        - 0.00007 * sin(moonMeanAnomaly + 2 * sunMeanAnomaly)
+        + 0.00004 * sin(2 * moonMeanAnomaly - 2 * moonArgumentLatitude)
+        + 0.00004 * sin(3 * sunMeanAnomaly)
+        + 0.00003 * sin(moonMeanAnomaly + sunMeanAnomaly - 2 * moonArgumentLatitude)
+        + 0.00003 * sin(2 * moonMeanAnomaly + 2 * moonArgumentLatitude)
+        - 0.00003 * sin(moonMeanAnomaly - sunMeanAnomaly + 2 * moonArgumentLatitude)
+        - 0.00002 * sin(moonMeanAnomaly - sunMeanAnomaly - 2 * moonArgumentLatitude)
+        - 0.00002 * sin(3 * moonMeanAnomaly + sunMeanAnomaly)
+        + 0.00002 * sin(4 * moonMeanAnomaly);
+
+    return jdeMean + correction;
+}
+
+static double datetime_true_full_moon_tt(int lunationIndex)
+{
+    double k = lunationIndex + 0.5;
+    double T  = k / 1236.85;
+    double T2 = T * T;
+    double T3 = T2 * T;
+    double T4 = T3 * T;
+    double jdeMean = 2451550.09765 + 29.530588853 * k + 0.0001337 * T2 - 0.000000150 * T3 + 0.00000000073 * T4;
+    double sunMeanAnomaly = 2.5534 + 29.10535670 * k - 0.0000014 * T2 - 0.00000011 * T3;
+    double moonMeanAnomaly = 201.5643 + 385.81693528 * k + 0.0107582 * T2 + 0.00001238 * T3 - 0.000000058 * T4;
+    double moonArgumentLatitude = 160.7108 + 390.67050284 * k - 0.0016118 * T2 - 0.00000227 * T3 + 0.000000011 * T4;
+    double ascendingNodeLongitude = 124.7746 - 1.56375580 * k + 0.0020691 * T2 + 0.00000215 * T3;
+    const double degToRad = M_PI / 180.0;
+    double E = 1 - 0.002516 * T - 0.0000074 * T2;
+    double correction;
+
+    sunMeanAnomaly *= degToRad;
+    moonMeanAnomaly *= degToRad;
+    moonArgumentLatitude *= degToRad;
+    ascendingNodeLongitude *= degToRad;
+
+    correction =
+        -0.40614 * sin(moonMeanAnomaly)
+        + 0.17302 * E * sin(sunMeanAnomaly)
+        + 0.01614 * sin(2 * moonMeanAnomaly)
+        + 0.01043 * sin(2 * moonArgumentLatitude)
+        + 0.00734 * E * sin(moonMeanAnomaly - sunMeanAnomaly)
+        - 0.00515 * E * sin(moonMeanAnomaly + sunMeanAnomaly)
+        + 0.00209 * E * E * sin(2 * sunMeanAnomaly)
         - 0.00111 * sin(moonMeanAnomaly - 2 * moonArgumentLatitude)
         - 0.00057 * sin(moonMeanAnomaly + 2 * moonArgumentLatitude)
         + 0.00056 * E * sin(2 * moonMeanAnomaly + sunMeanAnomaly)
@@ -399,6 +503,470 @@ datetime_t *datetime_init_chinese_new_year(datetime_t *dttm, int year)
     datetime_year(dttm);
 
     return dttm;
+}
+
+static datetime_t *datetime_init_materialised_jdn(datetime_t *dttm, long jdn)
+{
+    if (!dttm || jdn == LONG_MAX)
+        return NULL;
+    datetime_init_jdn(dttm, jdn);
+    datetime_year(dttm);
+    return dttm;
+}
+
+static long datetime_islamic_ymd_to_jdn(int year, int month, int day)
+{
+    return (long)(day
+        + (int)ceil(29.5 * (month - 1))
+        + (year - 1) * 354
+        + (3 + 11 * year) / 30
+        + 1948439 - 1);
+}
+
+static datetime_t *datetime_init_civil_islamic_observance(datetime_t *dttm,
+                                                          int gregorianYear,
+                                                          int islamicMonth,
+                                                          int islamicDay)
+{
+    int estimateIslamicYear;
+
+    if (!dttm || gregorianYear < 1 || gregorianYear > 9999)
+        return NULL;
+
+    estimateIslamicYear = (int)floor(((gregorianYear - 622) * 33.0) / 32.0) + 1;
+    for (int islamicYear = estimateIslamicYear - 2; islamicYear <= estimateIslamicYear + 2; islamicYear++) {
+        long jdn;
+        datetime_t probe;
+
+        if (islamicYear < 1)
+            continue;
+
+        jdn = datetime_islamic_ymd_to_jdn(islamicYear, islamicMonth, islamicDay);
+        datetime_init_jdn(&probe, jdn);
+        datetime_year(&probe);
+        if (probe.year == gregorianYear)
+            return datetime_init_materialised_jdn(dttm, jdn);
+    }
+
+    return NULL;
+}
+
+datetime_t *datetime_init_ramadan(datetime_t *dttm, int year)
+{
+    return datetime_init_civil_islamic_observance(dttm, year, 9, 1);
+}
+
+datetime_t *datetime_init_eid_al_fitr(datetime_t *dttm, int year)
+{
+    return datetime_init_civil_islamic_observance(dttm, year, 10, 1);
+}
+
+datetime_t *datetime_init_muslim_new_year(datetime_t *dttm, int year)
+{
+    return datetime_init_civil_islamic_observance(dttm, year, 1, 1);
+}
+
+static long datetime_hebrew_new_year_jdn(int hebrewYear)
+{
+    const long hebrewEpochRd = -1373427L;
+    long monthsElapsed = (235L * hebrewYear - 234L) / 19L;
+    long partsElapsed = 12084L + 13753L * monthsElapsed;
+    long day = 29L * monthsElapsed + partsElapsed / 25920L;
+
+    if ((3L * (day + 1L)) % 7L < 3L)
+        day++;
+
+    return hebrewEpochRd + day + 1721425L;
+}
+
+datetime_t *datetime_init_jewish_new_year(datetime_t *dttm, int year)
+{
+    if (!dttm || year < 1 || year > 9999)
+        return NULL;
+
+    return datetime_init_materialised_jdn(dttm, datetime_hebrew_new_year_jdn(year + 3761));
+}
+
+datetime_t *datetime_init_passover(datetime_t *dttm, int year)
+{
+    if (!dttm || year < 1 || year > 9999)
+        return NULL;
+
+    return datetime_init_materialised_jdn(dttm, datetime_hebrew_new_year_jdn(year + 3761) - 163L);
+}
+
+static long datetime_india_new_moon_jdn_in_window(int year,
+                                                  month_t startMonth,
+                                                  uint8_t startDay,
+                                                  month_t endMonth,
+                                                  uint8_t endDay)
+{
+    long windowStart;
+    long windowEnd;
+    int lunationIndex;
+
+    if (year < 1700 || year > 2400)
+        return LONG_MAX;
+
+    windowStart = datetime_ymd_to_jdn((short)year, startMonth, startDay);
+    windowEnd = datetime_ymd_to_jdn((short)year, endMonth, endDay);
+    lunationIndex = (int)((windowStart - 2451550.09765) / 29.530588853) - 2;
+
+    for (int i = 0; i < 8; i++, lunationIndex++) {
+        double newMoonTT = datetime_true_new_moon_tt(lunationIndex);
+        double newMoonUTC = newMoonTT - datetime_delta_t(year) / 86400.0;
+        long indiaJdn = (long)floor(newMoonUTC + 5.5 / 24.0 + 0.5);
+
+        if (indiaJdn >= windowStart && indiaJdn <= windowEnd)
+            return indiaJdn;
+    }
+
+    return LONG_MAX;
+}
+
+static long datetime_india_full_moon_jdn_between(int year,
+                                                 long windowStart,
+                                                 long windowEnd,
+                                                 double *dayFraction)
+{
+    int lunationIndex;
+
+    if (year < 1700 || year > 2400 || windowStart > windowEnd)
+        return LONG_MAX;
+
+    lunationIndex = (int)((windowStart - 2451550.09765) / 29.530588853) - 2;
+
+    for (int i = 0; i < 8; i++, lunationIndex++) {
+        double fullMoonTT = datetime_true_full_moon_tt(lunationIndex);
+        double fullMoonUTC = fullMoonTT - datetime_delta_t(year) / 86400.0;
+        double fullMoonIndia = fullMoonUTC + 5.5 / 24.0;
+        double civilDay = floor(fullMoonIndia + 0.5);
+        long indiaJdn = (long)civilDay;
+
+        if (indiaJdn >= windowStart && indiaJdn <= windowEnd) {
+            if (dayFraction)
+                *dayFraction = fullMoonIndia + 0.5 - civilDay;
+            return indiaJdn;
+        }
+    }
+
+    return LONG_MAX;
+}
+
+static long datetime_last_india_full_moon_jdn_between(int year,
+                                                      long windowStart,
+                                                      long windowEnd)
+{
+    long found = LONG_MAX;
+    int lunationIndex;
+
+    if (year < 1700 || year > 2400 || windowStart > windowEnd)
+        return LONG_MAX;
+
+    lunationIndex = (int)((windowStart - 2451550.09765) / 29.530588853) - 2;
+
+    for (int i = 0; i < 8; i++, lunationIndex++) {
+        double fullMoonTT = datetime_true_full_moon_tt(lunationIndex);
+        double fullMoonUTC = fullMoonTT - datetime_delta_t(year) / 86400.0;
+        double fullMoonIndia = fullMoonUTC + 5.5 / 24.0;
+        long indiaJdn = (long)floor(fullMoonIndia + 0.5);
+
+        if (indiaJdn >= windowStart && indiaJdn <= windowEnd)
+            found = indiaJdn;
+    }
+
+    return found;
+}
+
+datetime_t *datetime_init_diwali(datetime_t *dttm, int year)
+{
+    long indiaJdn;
+
+    if (!dttm || year < 1700 || year > 2400)
+        return NULL;
+
+    indiaJdn = datetime_india_new_moon_jdn_in_window(year, DT_October, 15, DT_November, 20);
+    return datetime_init_materialised_jdn(dttm, indiaJdn);
+}
+
+datetime_t *datetime_init_holi(datetime_t *dttm, int year)
+{
+    double dayFraction = 0.0;
+    long newYearJdn;
+    long indiaJdn;
+
+    if (!dttm || year < 1700 || year > 2400)
+        return NULL;
+
+    newYearJdn = datetime_india_new_moon_jdn_in_window(year, DT_March, 15, DT_April, 15);
+    indiaJdn = datetime_india_full_moon_jdn_between(year, newYearJdn - 25L, newYearJdn - 8L, &dayFraction);
+    if (indiaJdn != LONG_MAX && dayFraction >= 16.0 / 24.0)
+        indiaJdn++;
+
+    return datetime_init_materialised_jdn(dttm, indiaJdn);
+}
+
+datetime_t *datetime_init_hindu_new_year(datetime_t *dttm, int year)
+{
+    long indiaJdn;
+
+    if (!dttm || year < 1700 || year > 2400)
+        return NULL;
+
+    indiaJdn = datetime_india_new_moon_jdn_in_window(year, DT_March, 15, DT_April, 15);
+    if (indiaJdn == LONG_MAX)
+        return NULL;
+
+    return datetime_init_materialised_jdn(dttm, indiaJdn);
+}
+
+static datetime_t *datetime_init_india_full_moon_observance(datetime_t *dttm,
+                                                            int year,
+                                                            month_t month)
+{
+    long indiaJdn;
+
+    if (!dttm || year < 1700 || year > 2400)
+        return NULL;
+
+    indiaJdn = datetime_india_full_moon_jdn_between(
+        year,
+        datetime_ymd_to_jdn((short)year, month, 1),
+        datetime_ymd_to_jdn((short)year, month, (uint8_t)datetime_days_in_month((short)year, month)),
+        NULL
+    );
+
+    return datetime_init_materialised_jdn(dttm, indiaJdn);
+}
+
+datetime_t *datetime_init_buddhist_new_year(datetime_t *dttm, int year)
+{
+    return datetime_init_india_full_moon_observance(dttm, year, DT_April);
+}
+
+datetime_t *datetime_init_vesak(datetime_t *dttm, int year)
+{
+    long indiaJdn;
+
+    if (!dttm || year < 1700 || year > 2400)
+        return NULL;
+
+    indiaJdn = datetime_last_india_full_moon_jdn_between(
+        year,
+        datetime_ymd_to_jdn((short)year, DT_May, 1),
+        datetime_ymd_to_jdn((short)year, DT_May, 31)
+    );
+
+    return datetime_init_materialised_jdn(dttm, indiaJdn);
+}
+
+datetime_t *datetime_init_asalha_puja(datetime_t *dttm, int year)
+{
+    return datetime_init_india_full_moon_observance(dttm, year, DT_July);
+}
+
+static void datetime_holiday_from_datetime(datetime_holiday_t *holiday,
+                                           const char *name,
+                                           const datetime_t *dttm)
+{
+    holiday->name = name;
+    holiday->year = datetime_year(dttm);
+    holiday->month = datetime_month(dttm);
+    holiday->day = datetime_day(dttm);
+}
+
+static void datetime_holiday_from_ymd(datetime_holiday_t *holiday,
+                                      const char *name,
+                                      short year,
+                                      month_t month,
+                                      uint8_t day)
+{
+    holiday->name = name;
+    holiday->year = year;
+    holiday->month = month;
+    holiday->day = day;
+}
+
+static long datetime_holiday_jdn(const datetime_holiday_t *holiday)
+{
+    return datetime_ymd_to_jdn(holiday->year, holiday->month, holiday->day);
+}
+
+static void datetime_sort_holidays(datetime_holiday_list_t *list)
+{
+    for (uint8_t i = 1; i < list->count; i++) {
+        datetime_holiday_t value = list->items[i];
+        uint8_t j = i;
+
+        while (j > 0 && datetime_holiday_jdn(&list->items[j - 1]) > datetime_holiday_jdn(&value)) {
+            list->items[j] = list->items[j - 1];
+            j--;
+        }
+        list->items[j] = value;
+    }
+}
+
+static datetime_t *datetime_nth_weekday(datetime_t *dttm,
+                                        int year,
+                                        month_t month,
+                                        weekday_t weekday,
+                                        int nth)
+{
+    datetime_init_ymd(dttm, (short)year, month, 1);
+    int offset = (weekday - datetime_weekday(dttm) + 7) % 7;
+    datetime_add_days(dttm, offset + 7 * (nth - 1));
+    return dttm;
+}
+
+static datetime_t *datetime_last_weekday(datetime_t *dttm,
+                                         int year,
+                                         month_t month,
+                                         weekday_t weekday)
+{
+    datetime_init_ymd(dttm, (short)year, month, (uint8_t)datetime_days_in_month((short)year, month));
+    int offset = (datetime_weekday(dttm) - weekday + 7) % 7;
+    datetime_add_days(dttm, -offset);
+    return dttm;
+}
+
+static datetime_t *datetime_substitute_public_holiday(datetime_t *dttm)
+{
+    weekday_t weekday = datetime_weekday(dttm);
+
+    if (weekday == DT_Saturday)
+        datetime_add_days(dttm, 2);
+    else if (weekday == DT_Sunday)
+        datetime_add_days(dttm, 1);
+    return dttm;
+}
+
+bool datetime_english_bank_holidays(int year, datetime_holiday_list_t *out)
+{
+    datetime_t easter;
+    datetime_t work;
+    datetime_t christmas;
+    datetime_t boxing;
+
+    if (!out || year < 1 || year > 9999)
+        return false;
+
+    memset(out, 0, sizeof(*out));
+
+#define ADD_HOLIDAY(name_, dttm_) \
+    do { \
+        if (out->count < DATETIME_BANK_HOLIDAY_MAX) \
+            datetime_holiday_from_datetime(&out->items[out->count++], (name_), (dttm_)); \
+    } while (0)
+#define ADD_HOLIDAY_YMD(name_, month_, day_) \
+    do { \
+        if (out->count < DATETIME_BANK_HOLIDAY_MAX) \
+            datetime_holiday_from_ymd(&out->items[out->count++], (name_), (short)year, (month_), (day_)); \
+    } while (0)
+
+    datetime_init_ymd(&work, (short)year, DT_January, 1);
+    datetime_substitute_public_holiday(&work);
+    ADD_HOLIDAY(datetime_month(&work) == DT_January && datetime_day(&work) == 1
+        ? "New Years Day"
+        : "Bank Holiday in Lieu of New Years Day", &work);
+
+    datetime_init_easter(&easter, year);
+    datetime_init_copy(&work, &easter);
+    datetime_add_days(&work, -2);
+    ADD_HOLIDAY("Good Friday", &work);
+    datetime_init_copy(&work, &easter);
+    datetime_add_days(&work, 1);
+    ADD_HOLIDAY("Easter Monday", &work);
+
+    if (year == 2020)
+        datetime_init_ymd(&work, 2020, DT_May, 8);
+    else
+        datetime_nth_weekday(&work, year, DT_May, DT_Monday, 1);
+    ADD_HOLIDAY(year == 2020 ? "75th anniversary of Victory in Europe (VE Day)" : "May Day Bank Holiday", &work);
+
+    if (year == 2022)
+        datetime_init_ymd(&work, 2022, DT_June, 2);
+    else
+        datetime_last_weekday(&work, year, DT_May, DT_Monday);
+    ADD_HOLIDAY("Spring Bank Holiday", &work);
+
+    if (year == 2022)
+        ADD_HOLIDAY_YMD("Platinum Jubilee Bank Holiday", DT_June, 3);
+    if (year == 2022)
+        ADD_HOLIDAY_YMD("State Funeral of Queen Elizabeth II", DT_September, 19);
+    if (year == 2023)
+        ADD_HOLIDAY_YMD("Coronation of King Charles III", DT_May, 8);
+
+    datetime_last_weekday(&work, year, DT_August, DT_Monday);
+    ADD_HOLIDAY("August Bank Holiday", &work);
+
+    datetime_init_ymd(&christmas, (short)year, DT_December, 25);
+    datetime_init_copy(&work, &christmas);
+    if (datetime_weekday(&work) == DT_Saturday || datetime_weekday(&work) == DT_Sunday)
+        datetime_add_days(&work, 2);
+    ADD_HOLIDAY(datetime_day(&work) == 25 ? "Christmas Day" : "Bank Holiday in Lieu of Christmas Day", &work);
+
+    datetime_init_ymd(&boxing, (short)year, DT_December, 26);
+    datetime_init_copy(&work, &boxing);
+    if (datetime_weekday(&christmas) == DT_Friday || datetime_weekday(&christmas) == DT_Saturday)
+        datetime_add_days(&work, 2);
+    ADD_HOLIDAY(datetime_day(&work) == 26 ? "Boxing Day" : "Bank Holiday in Lieu of Boxing Day", &work);
+
+    datetime_sort_holidays(out);
+
+#undef ADD_HOLIDAY
+#undef ADD_HOLIDAY_YMD
+    return true;
+}
+
+bool datetime_english_bank_holidays_between(const datetime_t *start, const datetime_t *end, datetime_holiday_list_t *out)
+{
+    long start_jdn;
+    long end_jdn;
+    int start_year;
+    int end_year;
+
+    if (!start || !end || !out)
+        return false;
+
+    start_jdn = datetime_jdn(start);
+    end_jdn = datetime_jdn(end);
+    if (start_jdn == LONG_MAX || end_jdn == LONG_MAX)
+        return false;
+    if (start_jdn > end_jdn) {
+        long swap = start_jdn;
+        start_jdn = end_jdn;
+        end_jdn = swap;
+    }
+
+    start_year = datetime_year(start);
+    end_year = datetime_year(end);
+    if (start_year < 1 || end_year < 1)
+        return false;
+    if (start_year > end_year) {
+        int swap = start_year;
+        start_year = end_year;
+        end_year = swap;
+    }
+
+    memset(out, 0, sizeof(*out));
+    for (int year = start_year; year <= end_year; year++) {
+        datetime_holiday_list_t year_holidays;
+
+        if (!datetime_english_bank_holidays(year, &year_holidays))
+            return false;
+
+        for (uint8_t i = 0; i < year_holidays.count; i++) {
+            long holiday_jdn = datetime_holiday_jdn(&year_holidays.items[i]);
+
+            if (holiday_jdn < start_jdn || holiday_jdn > end_jdn)
+                continue;
+            if (out->count >= DATETIME_BANK_HOLIDAY_MAX)
+                return false;
+            out->items[out->count++] = year_holidays.items[i];
+        }
+    }
+
+    return true;
 }
 
 double datetime_tz_offset(const datetime_t *dttm) {
@@ -658,6 +1226,24 @@ weekday_t datetime_weekday(const datetime_t *dttm)
     return (weekday_t)((jdn + 1) % 7 + 1);
 }
 
+const char *datetime_weekday_name(weekday_t weekday)
+{
+    static const char *names[] = {
+        "Unknown",
+        "Sunday",
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday"
+    };
+
+    if (weekday < DT_Sunday || weekday > DT_Saturday)
+        return names[0];
+    return names[weekday];
+}
+
 bool datetime_equal(const datetime_t *dttm1, const datetime_t *dttm2)
 {
     if (dttm1->year == SHRT_MAX) datetime_year(dttm1); // Try to calculate the year, month, day, ... if it is not initialised
@@ -718,6 +1304,16 @@ unsigned short datetime_days_in_month(short year, month_t month)
     if (month < DT_January || month > DT_December) return 0;
     if (month == DT_February) return datetime_is_leap_year(year) ? 29 : 28;
     return daysInMonth[ month ];
+}
+
+bool datetime_valid_ymd(short year, month_t month, uint8_t day)
+{
+    unsigned short days;
+
+    if (year < 1 || year > 9999)
+        return false;
+    days = datetime_days_in_month(year, month);
+    return days != 0u && day >= 1u && day <= days;
 }
 
 unsigned short datetime_days_in_this_month(const datetime_t *dttm)
@@ -1587,6 +2183,83 @@ double datetime_sun_time(long julianDayNumber, double latitude, double longitude
     return gmtTime;
 }
 
+static int datetime_day_of_year(const datetime_t *dttm)
+{
+    short year;
+    month_t month;
+    uint8_t day;
+    int dayOfYear = 0;
+
+    if (!dttm)
+        return 0;
+
+    year = datetime_year(dttm);
+    month = datetime_month(dttm);
+    day = datetime_day(dttm);
+    if (!datetime_valid_ymd(year, month, day))
+        return 0;
+
+    for (month_t m = DT_January; m < month; m++)
+        dayOfYear += datetime_days_in_month(year, m);
+    return dayOfYear + day;
+}
+
+double datetime_solar_declination(const datetime_t *dttm)
+{
+    const double radToDeg = 180.0 / M_PI;
+    int dayOfYear;
+    double hour;
+    double gamma;
+    double declination;
+
+    if (!dttm)
+        return DBL_MAX;
+
+    dayOfYear = datetime_day_of_year(dttm);
+    if (dayOfYear <= 0)
+        return DBL_MAX;
+
+    hour = (double)datetime_hour(dttm)
+         + (double)datetime_minute(dttm) / 60.0
+         + datetime_second(dttm) / 3600.0;
+    gamma = 2.0 * M_PI / 365.0 * ((double)dayOfYear - 1.0 + (hour - 12.0) / 24.0);
+
+    declination = 0.006918
+        - 0.399912 * cos(gamma)
+        + 0.070257 * sin(gamma)
+        - 0.006758 * cos(2.0 * gamma)
+        + 0.000907 * sin(2.0 * gamma)
+        - 0.002697 * cos(3.0 * gamma)
+        + 0.001480 * sin(3.0 * gamma);
+
+    return declination * radToDeg;
+}
+
+double datetime_solar_max_altitude(const datetime_t *dttm, double latitude)
+{
+    double declination;
+
+    if (!isfinite(latitude) || latitude < -90.0 || latitude > 90.0)
+        return DBL_MAX;
+
+    declination = datetime_solar_declination(dttm);
+    if (declination == DBL_MAX)
+        return DBL_MAX;
+
+    return 90.0 - fabs(latitude - declination);
+}
+
+double datetime_solar_inclination(const datetime_t *dttm, double latitude)
+{
+    double maxAltitude;
+
+    maxAltitude = datetime_solar_max_altitude(dttm, latitude);
+    if (maxAltitude == DBL_MAX)
+        return DBL_MAX;
+
+    return 90.0 - maxAltitude;
+}
+
 /**
  * @brief set the time components of a datetime object to the sunrise or sunset time for its date and a given location.
  *        This function calculates the sunrise or sunset time for the date represented by the datetime object and a given location,
@@ -1696,6 +2369,28 @@ inline void datetime_set_sunset(datetime_t *dttm, double latitude, double longit
     datetime_set_sun_time(dttm, latitude, longitude, timeZoneOffset, false);
 }
 
+datetime_t *datetime_init_sunset_observance_start(datetime_t *dttm,
+                                                  const datetime_t *observance_date,
+                                                  double latitude,
+                                                  double longitude,
+                                                  double timeZoneOffset)
+{
+    datetime_t start_date;
+
+    if (!dttm || !observance_date)
+        return NULL;
+
+    datetime_init_copy(&start_date, observance_date);
+    if (!datetime_add_days(&start_date, -1))
+        return NULL;
+
+    return datetime_init_sunset(dttm,
+                                datetime_jdn(&start_date),
+                                latitude,
+                                longitude,
+                                timeZoneOffset);
+}
+
 // reference julian day number of a recent full moon
 #define NEWMOON_JDN 2451550
 
@@ -1746,6 +2441,24 @@ moon_phase_t datetime_moon_phase(const datetime_t *dttm)
         return DT_NewMoon; // Default value if datetime is not initialised
     }
     return datetime_moon_phase_on_jdn(julianDayNumber);
+}
+
+const char *datetime_moon_phase_name(moon_phase_t phase)
+{
+    static const char *names[] = {
+        "New Moon",
+        "Waxing Crescent",
+        "First Quarter",
+        "Waxing Gibbous",
+        "Full Moon",
+        "Waning Gibbous",
+        "Last Quarter",
+        "Waning Crescent"
+    };
+
+    if (phase < DT_NewMoon || phase > DT_WaningCrescent)
+        return "Unknown";
+    return names[phase];
 }
 
 datetime_t *datetime_next_moon_phase(const datetime_t *dttm, moon_phase_t phase)

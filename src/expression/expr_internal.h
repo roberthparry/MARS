@@ -85,6 +85,7 @@ typedef enum {
     EXPR_KIND_TRIGAMMA,
     EXPR_KIND_GAMMAINV,
     EXPR_KIND_LAMBERT_W,
+    EXPR_KIND_LAMBERT_WN,
     EXPR_KIND_LAMBERT_W0,
     EXPR_KIND_LAMBERT_WM1,
     EXPR_KIND_NORMAL_PDF,
@@ -362,6 +363,7 @@ extern const expr_ops_t ops_appell_f1;
 extern const expr_ops_t ops_appell_f1_pack;
 extern const expr_ops_t ops_gammainv;
 extern const expr_ops_t ops_lambert_w;
+extern const expr_ops_t ops_lambert_wn;
 extern const expr_ops_t ops_lambert_w0;
 extern const expr_ops_t ops_lambert_wm1;
 extern const expr_ops_t ops_normal_pdf;
@@ -575,6 +577,7 @@ expr_t *       expr_integral_with_bounds_internal(const expr_t *integrand,
 expr_t *       expr_polygamma_xp                 (const expr_t *order, const expr_t *arg);
 expr_t *       expr_polylog_xp                   (const expr_t *order, const expr_t *arg);
 expr_t *       expr_legendre_chi_xp              (const expr_t *order, const expr_t *arg);
+expr_t *       expr_lambert_wn_xp                (const expr_t *branch, const expr_t *arg);
 bool           expr_appell_f1_unpack             (const expr_t *expr,
                                                   const expr_t **a,
                                                   const expr_t **b1,
@@ -635,6 +638,7 @@ expr_t *           expr_simplify_direct_inverse_pair_from_raw   (const expr_t *o
                                                                  const expr_t *raw_inner,
                                                                  expr_t *simplified_inner);
 bool               expr_ops_is_lambert                          (const expr_ops_t *ops);
+const expr_t *     expr_lambert_arg                             (const expr_t *expr);
 bool               expr_ops_is_floor_or_ceil                    (const expr_ops_t *ops);
 bool               expr_ops_are_direct_inverse_pair             (const expr_ops_t *outer,
                                                                  const expr_ops_t *inner);
@@ -1017,6 +1021,10 @@ void expr_reverse_gammainv          (const expr_t *dv,
                                      number_t *a_bar,
                                      number_t *b_bar);
 void expr_reverse_lambert_w         (const expr_t *dv,
+                                     const number_t *out_bar,
+                                     number_t *a_bar,
+                                     number_t *b_bar);
+void expr_reverse_lambert_wn        (const expr_t *dv,
                                      const number_t *out_bar,
                                      number_t *a_bar,
                                      number_t *b_bar);

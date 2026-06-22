@@ -353,6 +353,26 @@ static void check_binary_eval_case(const binary_eval_case_t *tc)
     num_destroy(&lhs);
 }
 
+static void test_removable_trig_quotient_at_zero_evaluates_to_limit(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = expr_from_string("{ sin(5*x)/sin(9*x) | x = 0 }",
+                                    &bindings);
+    number_t value = expr ? expr_eval(expr) : num_clone(NUM_NAN);
+    number_t five = num_create_from_long(5);
+    number_t nine = num_create_from_long(9);
+    number_t expected = num_div(five, nine);
+
+    ASSERT_TRUE(num_eq(value, expected));
+
+    num_destroy(&expected);
+    num_destroy(&nine);
+    num_destroy(&five);
+    num_destroy(&value);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+}
+
 static void check_unary_derivative_case(const unary_eval_case_t *tc)
 {
     qfloat_t input_q = qf_from_number_text(tc->input);
@@ -3990,6 +4010,7 @@ void test_runtime_regressions(void)
     TEST_RUN_SUBTEST(test_named_number_constructors, NULL);
     TEST_RUN_SUBTEST(test_eval_num_on_expression, NULL);
     TEST_RUN_SUBTEST(test_eval_num_function_values, NULL);
+    TEST_RUN_SUBTEST(test_removable_trig_quotient_at_zero_evaluates_to_limit, NULL);
     TEST_RUN_SUBTEST(test_eval_num_function_derivatives, NULL);
     TEST_RUN_SUBTEST(test_high_precision_mpfr_function_values, NULL);
     TEST_RUN_SUBTEST(test_high_precision_mpfr_function_derivatives, NULL);

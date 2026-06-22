@@ -1,4 +1,6 @@
+#include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "expr_internal.h"
 #include "expr_integrate_internal.h"
@@ -174,6 +176,103 @@ expr_t *expr_integrate(const expr_t *expr, const expr_t *wrt)
     raw = expr_integrate_dispatch(simplified, wrt);
     expr_free(simplified);
     return simplify_owned(raw);
+}
+
+static bool expr_tree_has_symbol_name(const expr_t *expr, const char *name)
+{
+    if (!expr || !name)
+        return false;
+    if (expr->name && strcmp(expr->name, name) == 0)
+        return true;
+    return expr_tree_has_symbol_name(expr->a, name) ||
+           expr_tree_has_symbol_name(expr->b, name);
+}
+
+static void expr_integral_constant_name(char *out, size_t out_size,
+                                        unsigned int index)
+{
+    if (!out || out_size == 0u)
+        return;
+    snprintf(out, out_size, "C_%u", index);
+}
+
+static void expr_integral_constant_unicode_name(char *out, size_t out_size,
+                                                unsigned int index)
+{
+    static const char *subdigits[] = {
+        "\xE2\x82\x80", "\xE2\x82\x81", "\xE2\x82\x82",
+        "\xE2\x82\x83", "\xE2\x82\x84", "\xE2\x82\x85",
+        "\xE2\x82\x86", "\xE2\x82\x87", "\xE2\x82\x88",
+        "\xE2\x82\x89",
+    };
+    char digits[16];
+    size_t pos = 0u;
+
+    if (!out || out_size == 0u)
+        return;
+
+    out[0] = '\0';
+    if (out_size < 2u)
+        return;
+    out[pos++] = 'C';
+    out[pos] = '\0';
+
+    snprintf(digits, sizeof(digits), "%u", index);
+    for (size_t i = 0u; digits[i] != '\0'; ++i) {
+        const char *sub = subdigits[(unsigned)(digits[i] - '0')];
+        size_t len = strlen(sub);
+
+        if (pos + len + 1u > out_size)
+            return;
+        memcpy(out + pos, sub, len);
+        pos += len;
+        out[pos] = '\0';
+    }
+}
+
+static expr_t *expr_new_integral_constant_not_in(const expr_t *expr,
+                                                 const expr_t *wrt,
+                                                 const expr_t *anti)
+{
+    char name[32];
+    char unicode_name[32];
+
+    for (unsigned int i = 0u; i < 1000u; ++i) {
+        expr_integral_constant_name(name, sizeof(name), i);
+        expr_integral_constant_unicode_name(unicode_name, sizeof(unicode_name), i);
+        if (!expr_tree_has_symbol_name(expr, name) &&
+            !expr_tree_has_symbol_name(expr, unicode_name) &&
+            !expr_tree_has_symbol_name(wrt, name) &&
+            !expr_tree_has_symbol_name(wrt, unicode_name) &&
+            !expr_tree_has_symbol_name(anti, unicode_name) &&
+            !expr_tree_has_symbol_name(anti, name)) {
+            return expr_new_named_const(NUM_NAN, name);
+        }
+    }
+
+    return expr_new_named_const(NUM_NAN, "C");
+}
+
+expr_t *expr_integrate_family(const expr_t *expr, const expr_t *wrt)
+{
+    expr_t *anti;
+    expr_t *constant;
+    expr_t *family;
+
+    anti = expr_integrate(expr, wrt);
+    if (!anti)
+        return NULL;
+
+    constant = expr_new_integral_constant_not_in(expr, wrt, anti);
+    if (!constant) {
+        expr_free(anti);
+        return NULL;
+    }
+
+    family = expr_add(anti, constant);
+    expr_free(constant);
+    expr_free(anti);
+    return family;
 }
 
 bool expr_has_unbound_parameters(const expr_t *expr,

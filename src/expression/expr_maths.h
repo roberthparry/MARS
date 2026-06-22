@@ -77,6 +77,7 @@ number_t eval_appell_f1  (expr_t *dv);
 number_t eval_appell_f1_pack(expr_t *dv);
 number_t eval_gammainv   (expr_t *dv);
 number_t eval_lambert_w  (expr_t *dv);
+number_t eval_lambert_wn (expr_t *dv);
 number_t eval_lambert_w0 (expr_t *dv);
 number_t eval_lambert_wm1(expr_t *dv);
 
@@ -187,6 +188,7 @@ expr_t * deriv_appell_f1  (expr_t *dv);
 expr_t * deriv_appell_f1_pack(expr_t *dv);
 expr_t * deriv_gammainv   (expr_t *dv);
 expr_t * deriv_lambert_w  (expr_t *dv);
+expr_t * deriv_lambert_wn (expr_t *dv);
 expr_t * deriv_lambert_w0 (expr_t *dv);
 expr_t * deriv_lambert_wm1(expr_t *dv);
 

@@ -5112,6 +5112,21 @@ number_t num_lambert_wm1(const number_t number)
     return number_apply_nonreal_complex_unary_or_dispatch(number, NULL, qf_lambert_wm1, qc_lambert_wm1, number_mpfr_lambert_wm1_mut, NULL);
 }
 
+number_t num_lambert_wn(const number_t branch, const number_t number)
+{
+    int branch_int;
+
+    if (!number_try_get_exact_int(branch, &branch_int))
+        return NUM_NAN;
+    if (branch_int == 0)
+        return num_lambert_w0(number);
+    if (branch_int == -1)
+        return num_lambert_wm1(number);
+
+    return num_create_from_qcomplex(
+        qc_lambert_wn(branch_int, number_value_to_qcomplex(&number)));
+}
+
 number_t num_beta(const number_t a, const number_t b)
 {
     return number_apply_binary_math_with_double(a, b, number_double_beta,

@@ -93,6 +93,9 @@ void run_number_special_function_tests(void)
         number_t productlog_neg_two = num_productlog(neg_two);
         number_t productlog_exp = num_exp(productlog_neg_two);
         number_t productlog_check = num_mul(productlog_neg_two, productlog_exp);
+        number_t lambert_wn_two = num_lambert_wn(two, neg_two);
+        number_t lambert_wn_two_exp = num_exp(lambert_wn_two);
+        number_t lambert_wn_two_check = num_mul(lambert_wn_two, lambert_wn_two_exp);
         number_t i_over_13 = num_create_from_string("1/13i");
         number_t exp_i_over_13 = num_exp(i_over_13);
         number_t productlog_inverse_arg = num_mul(i_over_13, exp_i_over_13);
@@ -163,6 +166,8 @@ void run_number_special_function_tests(void)
         ASSERT_TRUE(!num_is_real(productlog_neg_two));
         assert_number_close_text("num_productlog(-2) satisfies w*exp(w) = -2",
                                  productlog_check, "-2", "1e-25");
+        assert_number_close_text("num_lambert_wn(2, -2) satisfies w*exp(w) = -2",
+                                 lambert_wn_two_check, "-2", "1e-25");
         assert_number_close_text("num_productlog((i/13)*exp(i/13)) = i/13",
                                  productlog_inverse, "1/13i", "1e-30");
         assert_number_string_prefix("num_beta(2, 2)", beta22,
@@ -258,6 +263,9 @@ void run_number_special_function_tests(void)
         num_destroy(&productlog_neg_two);
         num_destroy(&productlog_exp);
         num_destroy(&productlog_check);
+        num_destroy(&lambert_wn_two);
+        num_destroy(&lambert_wn_two_exp);
+        num_destroy(&lambert_wn_two_check);
         num_destroy(&i_over_13);
         num_destroy(&exp_i_over_13);
         num_destroy(&productlog_inverse_arg);

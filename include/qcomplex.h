@@ -355,6 +355,7 @@ qcomplex_t qc_logbeta_pdf(qcomplex_t x, qcomplex_t a, qcomplex_t b); /**< log be
 qcomplex_t qc_normal_pdf(qcomplex_t z);          /**< normal PDF */
 qcomplex_t qc_normal_cdf(qcomplex_t z);          /**< normal CDF */
 qcomplex_t qc_normal_logpdf(qcomplex_t z);       /**< normal log PDF */
+qcomplex_t qc_lambert_wn(int branch, qcomplex_t z); /**< Lambert W integer branch */
 qcomplex_t qc_lambert_wm1(qcomplex_t z);         /**< Lambert W branch -1 */
 qcomplex_t qc_productlog(qcomplex_t z);          /**< product log (Lambert W principal branch) */
 qcomplex_t qc_gammainc_lower(qcomplex_t s, qcomplex_t x); /**< lower incomplete gamma */

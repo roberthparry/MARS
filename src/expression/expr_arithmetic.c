@@ -45,7 +45,7 @@ static expr_t *lambert_product_inner(expr_t *a, expr_t *b)
         return NULL;
     }
 
-    return expr_struct_eq(w, exp_term->a) ? w->a : NULL;
+    return expr_struct_eq(w, exp_term->a) ? (expr_t *)expr_lambert_arg(w) : NULL;
 }
 
 static number_t eval_mul(expr_t *dv)
@@ -58,9 +58,67 @@ static number_t eval_mul(expr_t *dv)
     return num_mul(expr_eval_num_internal(dv->a), expr_eval_num_internal(dv->b));
 }
 
+static bool expr_same_var_local(const expr_t *left, const expr_t *right)
+{
+    if (!left || !right || !expr_is_var(left) || !expr_is_var(right))
+        return false;
+    return left == right ||
+           (left->var_id != 0u &&
+            right->var_id != 0u &&
+            left->var_id == right->var_id);
+}
+
+static bool expr_find_single_var_local(const expr_t *expr, const expr_t **var_io)
+{
+    if (!expr)
+        return true;
+    if (expr_is_var(expr)) {
+        if (!*var_io) {
+            *var_io = expr;
+            return true;
+        }
+        return expr_same_var_local(*var_io, expr);
+    }
+    return expr_find_single_var_local(expr->a, var_io) &&
+           expr_find_single_var_local(expr->b, var_io);
+}
+
+static number_t eval_div_removable_singularity(expr_t *dv)
+{
+    const expr_t *wrt = NULL;
+    const expr_t *numer = dv->a;
+    const expr_t *denom = dv->b;
+
+    if (!expr_find_single_var_local(dv, &wrt) || !wrt)
+        return num_div(expr_eval_num_internal(dv->a), expr_eval_num_internal(dv->b));
+
+    for (size_t depth = 0u; depth < 8u; ++depth) {
+        number_t numer_value = expr_eval_num_internal(numer);
+        number_t denom_value = expr_eval_num_internal(denom);
+
+        if (!num_is_zero(numer_value) || !num_is_zero(denom_value))
+            return num_div(numer_value, denom_value);
+
+        const expr_t *dnumer = expr_get_deriv(numer, wrt);
+        const expr_t *ddenom = expr_get_deriv(denom, wrt);
+
+        if (!dnumer || !ddenom)
+            break;
+        numer = dnumer;
+        denom = ddenom;
+    }
+
+    return num_div(expr_eval_num_internal(dv->a), expr_eval_num_internal(dv->b));
+}
+
 static number_t eval_div(expr_t *dv)
 {
-    return num_div(expr_eval_num_internal(dv->a), expr_eval_num_internal(dv->b));
+    number_t numerator = expr_eval_num_internal(dv->a);
+    number_t denominator = expr_eval_num_internal(dv->b);
+
+    if (num_is_zero(numerator) && num_is_zero(denominator))
+        return eval_div_removable_singularity(dv);
+    return num_div(numerator, denominator);
 }
 
 static number_t eval_neg(expr_t *dv)

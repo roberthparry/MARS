@@ -502,6 +502,185 @@ void test_datetime_days_in_month(void) {
     ASSERT_EQ_INT(datetime_days_in_month(2024, DT_January),  31);
 }
 
+void test_datetime_valid_ymd(void) {
+    ASSERT_TRUE(datetime_valid_ymd(2024, DT_February, 29));
+    ASSERT_FALSE(datetime_valid_ymd(2023, DT_February, 29));
+    ASSERT_FALSE(datetime_valid_ymd(2024, DT_April, 31));
+    ASSERT_FALSE(datetime_valid_ymd(0, DT_January, 1));
+}
+
+void test_datetime_display_names(void) {
+    TEST_ASSERT_STR_EQ(datetime_weekday_name(DT_Sunday), "Sunday");
+    TEST_ASSERT_STR_EQ(datetime_weekday_name(DT_Saturday), "Saturday");
+    TEST_ASSERT_STR_EQ(datetime_weekday_name((weekday_t)0), "Unknown");
+    TEST_ASSERT_STR_EQ(datetime_moon_phase_name(DT_NewMoon), "New Moon");
+    TEST_ASSERT_STR_EQ(datetime_moon_phase_name(DT_WaningCrescent), "Waning Crescent");
+    TEST_ASSERT_STR_EQ(datetime_moon_phase_name((moon_phase_t)99), "Unknown");
+}
+
+void test_datetime_solar_position_helpers(void) {
+    datetime_t *solstice = datetime_init_ymdt(
+        datetime_alloc(), 2024, DT_June, 21, 12, 0, 0.0
+    );
+    double declination = datetime_solar_declination(solstice);
+    double maxAltitude = datetime_solar_max_altitude(solstice, 51.5074);
+    double inclination = datetime_solar_inclination(solstice, 51.5074);
+
+    ASSERT_EQ_DOUBLE(declination, 23.45, 0.35);
+    ASSERT_EQ_DOUBLE(maxAltitude, 61.94, 0.35);
+    ASSERT_EQ_DOUBLE(inclination, 28.06, 0.35);
+
+    datetime_dealloc(solstice);
+}
+
+void test_datetime_orthodox_easter_known_date(void) {
+    datetime_t *dt = datetime_init_orthodox_easter(datetime_alloc(), 2024);
+
+    ASSERT_EQ_INT(datetime_year(dt), 2024);
+    ASSERT_EQ_INT(datetime_month(dt), DT_May);
+    ASSERT_EQ_INT(datetime_day(dt), 5);
+    ASSERT_EQ_INT(datetime_weekday(dt), DT_Sunday);
+
+    datetime_dealloc(dt);
+}
+
+void test_datetime_christmas_known_dates(void) {
+    datetime_t *christmas = datetime_init_christmas(datetime_alloc(), 2026);
+    datetime_t *orthodox = datetime_init_orthodox_christmas(datetime_alloc(), 2026);
+
+    ASSERT_EQ_INT(datetime_year(christmas), 2026);
+    ASSERT_EQ_INT(datetime_month(christmas), DT_December);
+    ASSERT_EQ_INT(datetime_day(christmas), 25);
+
+    ASSERT_EQ_INT(datetime_year(orthodox), 2026);
+    ASSERT_EQ_INT(datetime_month(orthodox), DT_January);
+    ASSERT_EQ_INT(datetime_day(orthodox), 7);
+
+    datetime_dealloc(christmas);
+    datetime_dealloc(orthodox);
+}
+
+void test_datetime_jewish_new_year_known_date(void) {
+    datetime_t *dt = datetime_init_jewish_new_year(datetime_alloc(), 2024);
+
+    ASSERT_EQ_INT(datetime_year(dt), 2024);
+    ASSERT_EQ_INT(datetime_month(dt), DT_October);
+    ASSERT_EQ_INT(datetime_day(dt), 3);
+
+    datetime_dealloc(dt);
+}
+
+void test_datetime_eid_al_fitr_known_date(void) {
+    datetime_t *dt = datetime_init_eid_al_fitr(datetime_alloc(), 2026);
+
+    ASSERT_EQ_INT(datetime_year(dt), 2026);
+    ASSERT_EQ_INT(datetime_month(dt), DT_March);
+    ASSERT_EQ_INT(datetime_day(dt), 19);
+
+    datetime_dealloc(dt);
+}
+
+void test_datetime_passover_known_date(void) {
+    datetime_t *dt = datetime_init_passover(datetime_alloc(), 2026);
+
+    ASSERT_EQ_INT(datetime_year(dt), 2026);
+    ASSERT_EQ_INT(datetime_month(dt), DT_April);
+    ASSERT_EQ_INT(datetime_day(dt), 2);
+
+    datetime_dealloc(dt);
+}
+
+void test_datetime_hindu_observance_known_dates(void) {
+    datetime_t *holi = datetime_init_holi(datetime_alloc(), 2024);
+    datetime_t *new_year = datetime_init_hindu_new_year(datetime_alloc(), 2026);
+
+    ASSERT_EQ_INT(datetime_year(holi), 2024);
+    ASSERT_EQ_INT(datetime_month(holi), DT_March);
+    ASSERT_EQ_INT(datetime_day(holi), 25);
+
+    ASSERT_EQ_INT(datetime_year(new_year), 2026);
+    ASSERT_EQ_INT(datetime_month(new_year), DT_March);
+    ASSERT_EQ_INT(datetime_day(new_year), 19);
+
+    datetime_dealloc(holi);
+    datetime_dealloc(new_year);
+}
+
+void test_datetime_buddhist_observance_known_dates(void) {
+    datetime_t *new_year = datetime_init_buddhist_new_year(datetime_alloc(), 2026);
+    datetime_t *vesak = datetime_init_vesak(datetime_alloc(), 2026);
+    datetime_t *asalha = datetime_init_asalha_puja(datetime_alloc(), 2026);
+
+    ASSERT_EQ_INT(datetime_year(new_year), 2026);
+    ASSERT_EQ_INT(datetime_month(new_year), DT_April);
+    ASSERT_EQ_INT(datetime_day(new_year), 2);
+
+    ASSERT_EQ_INT(datetime_year(vesak), 2026);
+    ASSERT_EQ_INT(datetime_month(vesak), DT_May);
+    ASSERT_EQ_INT(datetime_day(vesak), 31);
+
+    ASSERT_EQ_INT(datetime_year(asalha), 2026);
+    ASSERT_EQ_INT(datetime_month(asalha), DT_July);
+    ASSERT_EQ_INT(datetime_day(asalha), 29);
+
+    datetime_dealloc(new_year);
+    datetime_dealloc(vesak);
+    datetime_dealloc(asalha);
+}
+
+void test_datetime_sunset_observance_start_gmt(void) {
+    datetime_t *rosh = datetime_init_jewish_new_year(datetime_alloc(), 2024);
+    datetime_t *start = datetime_init_sunset_observance_start(
+        datetime_alloc(), rosh, 51.5074, -0.1278, 0.0
+    );
+
+    ASSERT_EQ_INT(datetime_year(start), 2024);
+    ASSERT_EQ_INT(datetime_month(start), DT_October);
+    ASSERT_EQ_INT(datetime_day(start), 2);
+    ASSERT_TRUE(datetime_hour(start) >= 16 && datetime_hour(start) <= 19);
+
+    datetime_dealloc(rosh);
+    datetime_dealloc(start);
+}
+
+void test_datetime_english_bank_holidays_2022_specials(void) {
+    datetime_holiday_list_t holidays;
+
+    ASSERT_TRUE(datetime_english_bank_holidays(2022, &holidays));
+    ASSERT_EQ_INT(holidays.count, 10);
+    TEST_ASSERT_STR_EQ(holidays.items[4].name, "Spring Bank Holiday");
+    ASSERT_EQ_INT(holidays.items[4].month, DT_June);
+    ASSERT_EQ_INT(holidays.items[4].day, 2);
+    TEST_ASSERT_STR_EQ(holidays.items[5].name, "Platinum Jubilee Bank Holiday");
+    ASSERT_EQ_INT(holidays.items[5].month, DT_June);
+    ASSERT_EQ_INT(holidays.items[5].day, 3);
+    TEST_ASSERT_STR_EQ(holidays.items[7].name, "State Funeral of Queen Elizabeth II");
+    ASSERT_EQ_INT(holidays.items[7].month, DT_September);
+    ASSERT_EQ_INT(holidays.items[7].day, 19);
+}
+
+void test_datetime_english_bank_holidays_between_dates(void) {
+    datetime_t *start = datetime_init_ymd(datetime_alloc(), 2026, DT_December, 24);
+    datetime_t *end = datetime_init_ymd(datetime_alloc(), 2027, DT_January, 4);
+    datetime_holiday_list_t holidays;
+
+    ASSERT_TRUE(datetime_english_bank_holidays_between(start, end, &holidays));
+    ASSERT_EQ_INT(holidays.count, 3);
+    TEST_ASSERT_STR_EQ(holidays.items[0].name, "Christmas Day");
+    ASSERT_EQ_INT(holidays.items[0].year, 2026);
+    ASSERT_EQ_INT(holidays.items[0].month, DT_December);
+    ASSERT_EQ_INT(holidays.items[0].day, 25);
+    TEST_ASSERT_STR_EQ(holidays.items[1].name, "Bank Holiday in Lieu of Boxing Day");
+    ASSERT_EQ_INT(holidays.items[1].day, 28);
+    TEST_ASSERT_STR_EQ(holidays.items[2].name, "New Years Day");
+    ASSERT_EQ_INT(holidays.items[2].year, 2027);
+    ASSERT_EQ_INT(holidays.items[2].month, DT_January);
+    ASSERT_EQ_INT(holidays.items[2].day, 1);
+
+    datetime_dealloc(start);
+    datetime_dealloc(end);
+}
+
 void test_datetime_format_uses_string_builder(void) {
     datetime_t *dt = datetime_init_ymdt(
         datetime_alloc(), 2024, DT_June, 15, 13, 5, 9.0
@@ -607,6 +786,19 @@ int tests_main(void) {
     TEST_RUN_IN_GROUP(test_datetime_compare_less, tests, NULL);
     TEST_RUN_IN_GROUP(test_datetime_compare_greater, tests, NULL);
     TEST_RUN_IN_GROUP(test_datetime_days_in_month, tests, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_valid_ymd, tests, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_display_names, tests, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_solar_position_helpers, tests, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_orthodox_easter_known_date, tests, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_christmas_known_dates, tests, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_jewish_new_year_known_date, tests, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_eid_al_fitr_known_date, tests, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_passover_known_date, tests, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_hindu_observance_known_dates, tests, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_buddhist_observance_known_dates, tests, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_sunset_observance_start_gmt, tests, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_english_bank_holidays_2022_specials, tests, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_english_bank_holidays_between_dates, tests, NULL);
     TEST_RUN_IN_GROUP(test_datetime_format_uses_string_builder, tests, NULL);
 
     printf(C_YELLOW "\nRunning README examples...\n" C_RESET);
