@@ -384,6 +384,11 @@ const char *string_c_str(const string_t *s)
     return s ? s->data : "";
 }
 
+size_t string_byte_length(const string_t *s)
+{
+    return string_encoded_len(s);
+}
+
 /* Return the encoded length of the string. Returns 0 if s is NULL. */
 
 size_t string_encoded_len(const string_t *s)

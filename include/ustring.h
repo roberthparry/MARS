@@ -154,6 +154,18 @@ void string_free(string_t *s);
 const char *string_c_str(const string_t *s);
 
 /**
+ * @brief Return the number of encoded UTF-8 bytes in the string.
+ *
+ * This excludes the trailing NUL terminator and may differ from
+ * string_length(), which counts user-visible characters. Use this when
+ * passing string_t data to byte-oriented APIs such as database bindings.
+ *
+ * @param s  String to query. Must not be @c NULL.
+ * @return   Number of encoded bytes.
+ */
+size_t string_byte_length(const string_t *s);
+
+/**
  * @brief Return the number of user-visible characters in the string.
  *
  * This is the ordinary character count users expect for readable text:

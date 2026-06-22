@@ -115,6 +115,17 @@ static void test_string_new_wide(void)
     string_free(s);
 }
 
+static void test_string_byte_length_counts_utf8_bytes(void)
+{
+    string_t *text = string_new_with("π🙂");
+
+    ASSERT_NOT_NULL(text);
+    ASSERT_EQ(string_length(text), 2);
+    ASSERT_EQ(string_byte_length(text), strlen("π🙂"));
+
+    string_free(text);
+}
+
 static void test_string_trim_unicode_whitespace(void)
 {
     string_t *s = string_new_with("　alpha ");
@@ -908,6 +919,7 @@ int tests_main(void)
     TEST_RUN_IN_GROUP(test_join_empty_fields, tests, NULL);
     TEST_RUN_IN_GROUP(test_string_replace, tests, NULL);
     TEST_RUN_IN_GROUP(test_string_new_wide, tests, NULL);
+    TEST_RUN_IN_GROUP(test_string_byte_length_counts_utf8_bytes, tests, NULL);
     TEST_RUN_IN_GROUP(test_string_trim_unicode_whitespace, tests, NULL);
 
     TEST_SECTION("Builder And Views");
