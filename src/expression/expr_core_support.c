@@ -853,6 +853,7 @@ int expr_is_default_constant_name_text(const string_t *name)
     string_cursor_t *cursor;
     rune_t rune;
     char ch;
+    int uppercase_integral_constant = 0;
     int saw_digit = 0;
     int ok = 0;
 
@@ -866,13 +867,16 @@ int expr_is_default_constant_name_text(const string_t *name)
     rune = string_cursor_peek(cursor);
     if (!rune_to_ascii(rune, &ch))
         goto done;
+    uppercase_integral_constant = ch == 'C';
     if (ch != 'a' && ch != 'b' && ch != 'c' && ch != 'd' &&
         ch != 'j' && ch != 'k' && ch != 'l' && ch != 'm' &&
-        ch != 'n')
+        ch != 'n' && !uppercase_integral_constant)
         goto done;
 
     string_cursor_next(cursor);
     if (string_cursor_done(cursor)) {
+        if (uppercase_integral_constant)
+            goto done;
         ok = 1;
         goto done;
     }

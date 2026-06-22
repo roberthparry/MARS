@@ -609,6 +609,8 @@ static void test_from_string_implicit_symbolic_bindings(void)
     expr_t *gamma_alias = expr_from_string("{ @gamma }", NULL);
     expr_t *tau_alias = expr_from_string("{ @tau }", NULL);
     expr_t *f = expr_from_string("{ [radius]^2 + c_1 + π + e }", NULL);
+    expr_t *integral_family = expr_from_string(
+        "{ C_0*x + C₁ + cos(x)*exp(sin(x)) }", NULL);
     char *xs = x ? expr_to_string(x, style_EXPRESSION) : NULL;
     char *x_pow_ns = x_pow_n ? expr_to_string(x_pow_n, style_EXPRESSION) : NULL;
     char *es = e ? expr_to_string(e, style_EXPRESSION) : NULL;
@@ -622,6 +624,9 @@ static void test_from_string_implicit_symbolic_bindings(void)
     char *gamma_as = gamma_alias ? expr_to_string(gamma_alias, style_EXPRESSION) : NULL;
     char *tau_as = tau_alias ? expr_to_string(tau_alias, style_EXPRESSION) : NULL;
     char *fs = f ? expr_to_string(f, style_EXPRESSION) : NULL;
+    char *integral_family_s = integral_family
+        ? expr_to_string(integral_family, style_EXPRESSION)
+        : NULL;
 
     if (x && xs && str_eq(xs, "{ x | x = NAN }")) {
         to_string_pass("implicit symbolic var inference", xs, "{ x | x = NAN }");
@@ -718,6 +723,19 @@ static void test_from_string_implicit_symbolic_bindings(void)
         to_string_fail(__FILE__, __LINE__, 1, "implicit mixed symbolic inference",
                        fs ? fs : "(null)",
                        "{ [radius]² + c₁ + π + e | [radius] = NAN; c₁ = NAN }");
+    }
+
+    if (integral_family && integral_family_s &&
+        str_eq(integral_family_s,
+               "{ C₀x + C₁ + cos(x)·exp(sin(x)) | x = NAN; C₀ = NAN, C₁ = NAN }")) {
+        to_string_pass("implicit integration constants stay constant",
+                       integral_family_s,
+                       "{ C₀x + C₁ + cos(x)·exp(sin(x)) | x = NAN; C₀ = NAN, C₁ = NAN }");
+    } else {
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "implicit integration constants stay constant",
+                       integral_family_s ? integral_family_s : "(null)",
+                       "{ C₀x + C₁ + cos(x)·exp(sin(x)) | x = NAN; C₀ = NAN, C₁ = NAN }");
     }
 
     if (x && qf_isnan(expr_eval_qf(x))) {
@@ -842,6 +860,7 @@ static void test_from_string_implicit_symbolic_bindings(void)
     }
 
     free(fs);
+    free(integral_family_s);
     free(tau_as);
     free(gamma_as);
     free(gamma_plain);
@@ -854,6 +873,7 @@ static void test_from_string_implicit_symbolic_bindings(void)
     free(es);
     free(x_pow_ns);
     free(xs);
+    expr_free(integral_family);
     expr_free(f);
     expr_free(tau_alias);
     expr_free(gamma_alias);

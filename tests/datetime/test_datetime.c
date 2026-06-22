@@ -9,6 +9,7 @@
 #include <string.h>
 
 #include "datetime.h"
+#include "ustring.h"
 
 #include "test_harness.h"
 
@@ -628,6 +629,42 @@ void test_datetime_buddhist_observance_known_dates(void) {
     datetime_dealloc(asalha);
 }
 
+void test_datetime_calendar_date_texts_known_dates(void) {
+    datetime_t *june = datetime_init_ymd(datetime_alloc(), 2026, DT_June, 21);
+    datetime_t *rosh = datetime_init_ymd(datetime_alloc(), 2024, DT_October, 3);
+    datetime_t *ramadan = datetime_init_ymd(datetime_alloc(), 2026, DT_February, 17);
+    string_t *christian = datetime_christian_calendar_date_text(june);
+    string_t *chinese = datetime_chinese_calendar_date_text(ramadan);
+    string_t *hindu = datetime_hindu_calendar_date_text(june);
+    string_t *buddhist = datetime_buddhist_calendar_date_text(june);
+    string_t *muslim = datetime_muslim_calendar_date_text(ramadan);
+    string_t *jewish = datetime_jewish_calendar_date_text(rosh);
+
+    ASSERT_NOT_NULL(christian);
+    ASSERT_NOT_NULL(chinese);
+    ASSERT_NOT_NULL(hindu);
+    ASSERT_NOT_NULL(buddhist);
+    ASSERT_NOT_NULL(muslim);
+    ASSERT_NOT_NULL(jewish);
+
+    TEST_ASSERT_STR_EQ(string_c_str(christian), "Gregorian 2026-06-21; Julian 2026-06-08");
+    TEST_ASSERT_STR_EQ(string_c_str(chinese), "Year 4724 (Horse), month 1, day 1");
+    TEST_ASSERT_STR_EQ(string_c_str(hindu), "Vikram Samvat 2083, Ashadha Shukla 7, lunar day 7");
+    TEST_ASSERT_STR_EQ(string_c_str(buddhist), "B.E. 2569-06-21 (Thai solar)");
+    TEST_ASSERT_STR_EQ(string_c_str(muslim), "1 Ramadan 1447 AH");
+    TEST_ASSERT_STR_EQ(string_c_str(jewish), "1 Tishrei 5785 AM");
+
+    string_free(christian);
+    string_free(chinese);
+    string_free(hindu);
+    string_free(buddhist);
+    string_free(muslim);
+    string_free(jewish);
+    datetime_dealloc(june);
+    datetime_dealloc(rosh);
+    datetime_dealloc(ramadan);
+}
+
 void test_datetime_sunset_observance_start_gmt(void) {
     datetime_t *rosh = datetime_init_jewish_new_year(datetime_alloc(), 2024);
     datetime_t *start = datetime_init_sunset_observance_start(
@@ -796,6 +833,7 @@ int tests_main(void) {
     TEST_RUN_IN_GROUP(test_datetime_passover_known_date, tests, NULL);
     TEST_RUN_IN_GROUP(test_datetime_hindu_observance_known_dates, tests, NULL);
     TEST_RUN_IN_GROUP(test_datetime_buddhist_observance_known_dates, tests, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_calendar_date_texts_known_dates, tests, NULL);
     TEST_RUN_IN_GROUP(test_datetime_sunset_observance_start_gmt, tests, NULL);
     TEST_RUN_IN_GROUP(test_datetime_english_bank_holidays_2022_specials, tests, NULL);
     TEST_RUN_IN_GROUP(test_datetime_english_bank_holidays_between_dates, tests, NULL);

@@ -706,6 +706,34 @@ INDEX_HTML = r"""<!doctype html>
       align-items: end;
     }
 
+    .datetime-field-groups {
+      display: grid;
+      gap: 0.85rem;
+    }
+
+    .datetime-field-group {
+      display: grid;
+      gap: 0.7rem;
+      border: 1px solid rgba(233, 244, 239, 0.16);
+      border-radius: 20px;
+      padding: 0.85rem;
+      background:
+        linear-gradient(135deg, rgba(7, 28, 24, 0.42), rgba(24, 59, 44, 0.24));
+      box-shadow: inset 0 1px 0 rgba(233, 244, 239, 0.08);
+    }
+
+    .datetime-field-group-title {
+      color: #ebc171;
+      font: 0.72rem/1.15 "Cascadia Code", "DejaVu Sans Mono", monospace;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    .datetime-grid.two-up {
+      grid-template-columns: repeat(2, minmax(9rem, 1fr));
+    }
+
     .datetime-briefing {
       display: grid;
       grid-template-columns: auto minmax(0, 1fr);
@@ -821,7 +849,7 @@ INDEX_HTML = r"""<!doctype html>
       opacity: 0.78;
     }
 
-    .datetime-england {
+    .datetime-local {
       display: grid;
       gap: 0.55rem;
       margin-top: 0.35rem;
@@ -833,14 +861,14 @@ INDEX_HTML = r"""<!doctype html>
       box-shadow: inset 0 1px 0 rgba(233, 244, 239, 0.12);
     }
 
-    .datetime-england-title {
+    .datetime-local-title {
       color: #d7e7b7;
       font: 0.78rem/1.2 "Cascadia Code", "DejaVu Sans Mono", monospace;
       letter-spacing: 0.1em;
       text-transform: uppercase;
     }
 
-    .datetime-england-body {
+    .datetime-local-body {
       max-height: 20rem;
       overflow: auto;
       color: var(--code);
@@ -1809,6 +1837,14 @@ INDEX_HTML = r"""<!doctype html>
         grid-template-columns: 1fr;
       }
 
+      .datetime-grid.two-up {
+        grid-template-columns: 1fr;
+      }
+
+      .datetime-field-group {
+        padding: 0.75rem;
+      }
+
       .target-row {
         padding: 0 0.75rem 0.75rem;
       }
@@ -2127,40 +2163,59 @@ __THEME_OVERRIDES__
             <div class="datetime-briefing-copy">Choose a civil date, a range, and an observation point. The core datetime module handles the calendar and solar calculations; this panel is only the flight deck.</div>
           </div>
         </div>
-        <div class="datetime-grid">
-          <div class="integrator-bound-field">
-            <label for="datetimeDate">Date</label>
-            <input id="datetimeDate" type="date">
+        <div class="datetime-field-groups">
+          <div class="datetime-field-group">
+            <div class="datetime-field-group-title">Selected date</div>
+            <div class="datetime-grid">
+              <div class="integrator-bound-field">
+                <label for="datetimeDate">Date</label>
+                <input id="datetimeDate" type="date">
+              </div>
+              <div class="integrator-bound-field">
+                <label for="datetimeJdn">Julian Day Number</label>
+                <input id="datetimeJdn" inputmode="numeric" pattern="[0-9]*" placeholder="e.g. 2460117">
+              </div>
+              <div class="integrator-bound-field">
+                <label for="datetimeYear">Calendar year</label>
+                <input id="datetimeYear" type="number" min="1" max="9999" step="1">
+              </div>
+            </div>
           </div>
-          <div class="integrator-bound-field">
-            <label for="datetimeStart">Start date</label>
-            <input id="datetimeStart" type="date">
+          <div class="datetime-field-group">
+            <div class="datetime-field-group-title">Date range</div>
+            <div class="datetime-grid two-up">
+              <div class="integrator-bound-field">
+                <label for="datetimeStart">Start date</label>
+                <input id="datetimeStart" type="date">
+              </div>
+              <div class="integrator-bound-field">
+                <label for="datetimeEnd">End date</label>
+                <input id="datetimeEnd" type="date">
+              </div>
+            </div>
           </div>
-          <div class="integrator-bound-field">
-            <label for="datetimeEnd">End date</label>
-            <input id="datetimeEnd" type="date">
-          </div>
-          <div class="integrator-bound-field">
-            <label for="datetimeYear">Year</label>
-            <input id="datetimeYear" type="number" min="1" max="9999" step="1">
-          </div>
-          <div class="integrator-bound-field">
-            <label for="datetimeLatitude">Latitude</label>
-            <input id="datetimeLatitude" inputmode="decimal" placeholder="51.5074">
-          </div>
-          <div class="integrator-bound-field">
-            <label for="datetimeLongitude">Longitude</label>
-            <input id="datetimeLongitude" inputmode="decimal" placeholder="-0.1278">
-          </div>
-          <div class="integrator-bound-field">
-            <label for="datetimeGmtOffset">GMT offset, including daylight saving</label>
-            <input id="datetimeGmtOffset" inputmode="decimal" placeholder="blank for local, 1 for BST">
+          <div class="datetime-field-group">
+            <div class="datetime-field-group-title">Observatory</div>
+            <div class="datetime-grid">
+              <div class="integrator-bound-field">
+                <label for="datetimeLatitude">Latitude</label>
+                <input id="datetimeLatitude" inputmode="decimal" placeholder="51.5074">
+              </div>
+              <div class="integrator-bound-field">
+                <label for="datetimeLongitude">Longitude</label>
+                <input id="datetimeLongitude" inputmode="decimal" placeholder="-0.1278">
+              </div>
+              <div class="integrator-bound-field">
+                <label for="datetimeGmtOffset">GMT offset, including daylight saving</label>
+                <input id="datetimeGmtOffset" inputmode="decimal" placeholder="blank for local, 1 for BST">
+              </div>
+            </div>
           </div>
         </div>
         <p class="mode-hint">Blank GMT offset uses this machine's local offset for the selected date. For other locations, enter the local offset yourself, including daylight saving where applicable.</p>
-        <div class="datetime-england hidden" id="datetimeEngland">
-          <div class="datetime-england-title">England</div>
-          <div class="datetime-england-body" id="datetimeEnglandBody"></div>
+        <div class="datetime-local hidden" id="datetimeLocal">
+          <div class="datetime-local-title">Local</div>
+          <div class="datetime-local-body" id="datetimeLocalBody"></div>
         </div>
       </div>
       <div class="target-row hidden" id="targetRow">
@@ -2265,7 +2320,7 @@ __THEME_OVERRIDES__
           <ul>
             <li><code>Date</code> drives weekday, moon phase, sunrise, sunset, solar declination, inclination, and maximum altitude.</li>
             <li><code>Start date</code> and <code>End date</code> drive the days-between result.</li>
-            <li><code>Year</code> drives Christian, Chinese, Hindu, Buddhist, Muslim, Jewish, and English bank holiday observances.</li>
+            <li><code>Year</code> drives Christian, Chinese, Hindu, Buddhist, Muslim, Jewish, and local holiday observances.</li>
             <li><code>GMT offset</code> should include daylight saving. Leave it blank to use this machine's local offset for the selected date.</li>
             <li>Ramadan, Eid al-Fitr, and Muslim New Year use the civil Islamic calendar; Hindu and Buddhist observances are estimated from India-window lunar events, so observed dates can differ locally.</li>
           </ul>
@@ -2432,14 +2487,15 @@ __THEME_OVERRIDES__
     const integratorIntervalCap = document.getElementById('integratorIntervalCap');
     const datetimeControls = document.getElementById('datetimeControls');
     const datetimeDate = document.getElementById('datetimeDate');
+    const datetimeJdn = document.getElementById('datetimeJdn');
     const datetimeStart = document.getElementById('datetimeStart');
     const datetimeEnd = document.getElementById('datetimeEnd');
     const datetimeYear = document.getElementById('datetimeYear');
     const datetimeLatitude = document.getElementById('datetimeLatitude');
     const datetimeLongitude = document.getElementById('datetimeLongitude');
     const datetimeGmtOffset = document.getElementById('datetimeGmtOffset');
-    const datetimeEngland = document.getElementById('datetimeEngland');
-    const datetimeEnglandBody = document.getElementById('datetimeEnglandBody');
+    const datetimeLocal = document.getElementById('datetimeLocal');
+    const datetimeLocalBody = document.getElementById('datetimeLocalBody');
     const helpCards = Array.from(document.querySelectorAll('#helpPane .help-card'));
     const run = document.getElementById('run');
     const back = document.getElementById('back');
@@ -2801,8 +2857,8 @@ __THEME_OVERRIDES__
       equationControls.classList.toggle('hidden', !equationMode);
       integratorControls.classList.toggle('hidden', !integratorMode);
       datetimeControls.classList.toggle('hidden', !datetimeMode);
-      if (datetimeEngland)
-        datetimeEngland.classList.toggle('hidden', !datetimeMode || !String(datetimeEnglandBody?.textContent || '').trim());
+      if (datetimeLocal)
+        datetimeLocal.classList.toggle('hidden', !datetimeMode || !String(datetimeLocalBody?.textContent || '').trim());
       targetRow.classList.toggle('hidden', !expressionMode || targetRow.classList.contains('hidden'));
       derivativeButtons.classList.toggle('hidden', !expressionMode);
       goalSeek.classList.toggle('hidden', !expressionMode);
@@ -2829,7 +2885,7 @@ __THEME_OVERRIDES__
         setValueCardVisible(true);
       } else {
         leftPaneTitle.textContent = 'Datetime';
-        subtitle.textContent = 'Choose dates, a year, and a location. MARS datetime calculates calendar observances, English bank holidays, moon phase, and solar times.';
+        subtitle.textContent = 'Choose dates, a year, and a location. MARS datetime calculates calendar observances, local holidays, moon phase, and solar times.';
         setResultTitles('Overview', 'Date Range', 'Calendar', 'Solar And Moon');
         setValueCardVisible(true);
       }
@@ -3939,6 +3995,7 @@ __THEME_OVERRIDES__
       restoreDatetimeDefaultsIfBlank();
       return {
         date: validDateText(datetimeDate && datetimeDate.value),
+        jdn: String(datetimeJdn && datetimeJdn.value || '').trim(),
         start: validDateText(datetimeStart && datetimeStart.value, datetimeDate && datetimeDate.value || DEFAULT_DATETIME_DATE),
         end: validDateText(datetimeEnd && datetimeEnd.value, datetimeDate && datetimeDate.value || DEFAULT_DATETIME_DATE),
         year: String(datetimeYear && datetimeYear.value || (datetimeDate && datetimeDate.value || DEFAULT_DATETIME_DATE).slice(0, 4)).trim(),
@@ -3952,19 +4009,20 @@ __THEME_OVERRIDES__
       return [
         'MARS datetime observation',
         `Date: ${state.date}`,
+        state.jdn ? `Julian Day Number: ${state.jdn}` : '',
         `Range: ${state.start} to ${state.end}`,
         `Year: ${state.year}`,
         `Location: ${state.latitude}, ${state.longitude}`,
         `GMT offset: ${state.gmt_offset || 'local machine offset'}`
-      ].join('\n');
+      ].filter(Boolean).join('\n');
     }
 
-    function setDatetimeEnglandText(text, sections = null) {
+    function setDatetimeLocalText(text, sections = null) {
       const body = String(text || '').trim();
-      if (datetimeEnglandBody)
-        renderDatetimeSections(datetimeEnglandBody, null, sections, body);
-      if (datetimeEngland)
-        datetimeEngland.classList.toggle('hidden', !body || currentMode() !== 'datetime');
+      if (datetimeLocalBody)
+        renderDatetimeSections(datetimeLocalBody, null, sections, body);
+      if (datetimeLocal)
+        datetimeLocal.classList.toggle('hidden', !body || currentMode() !== 'datetime');
     }
 
     function validMatrixOperation(value) {
@@ -4021,6 +4079,8 @@ __THEME_OVERRIDES__
 
       if (datetimeDate)
         datetimeDate.value = validDateText(data.datetime_date, DEFAULT_DATETIME_DATE);
+      if (datetimeJdn)
+        datetimeJdn.value = String(data.datetime_jdn || '');
       if (datetimeStart)
         datetimeStart.value = validDateText(data.datetime_start, datetimeDate?.value || DEFAULT_DATETIME_DATE);
       if (datetimeEnd)
@@ -4091,6 +4151,8 @@ __THEME_OVERRIDES__
           const state = JSON.parse(datetimeStateText);
           if (datetimeDate)
             datetimeDate.value = validDateText(state.date, DEFAULT_DATETIME_DATE);
+          if (datetimeJdn)
+            datetimeJdn.value = String(state.jdn || '');
           if (datetimeStart)
             datetimeStart.value = validDateText(state.start, datetimeDate?.value || DEFAULT_DATETIME_DATE);
           if (datetimeEnd)
@@ -4239,6 +4301,7 @@ __THEME_OVERRIDES__
 
       saveLabState({
         datetime_date: state.date,
+        datetime_jdn: state.jdn,
         datetime_start: state.start,
         datetime_end: state.end,
         datetime_year: state.year,
@@ -4324,6 +4387,8 @@ __THEME_OVERRIDES__
         const datetimeState = state.datetime || {};
         if (datetimeDate)
           datetimeDate.value = validDateText(datetimeState.date, DEFAULT_DATETIME_DATE);
+        if (datetimeJdn)
+          datetimeJdn.value = String(datetimeState.jdn || '');
         if (datetimeStart)
           datetimeStart.value = validDateText(datetimeState.start, datetimeDate?.value || DEFAULT_DATETIME_DATE);
         if (datetimeEnd)
@@ -5513,7 +5578,7 @@ __THEME_OVERRIDES__
       rendered.replaceChildren();
       rendered.textContent = '';
       clearRenderedError();
-      setDatetimeEnglandText('');
+      setDatetimeLocalText('');
       resetMoreDigitsButton(renderedMore, false);
       clearResultDetails();
     }
@@ -5919,7 +5984,7 @@ __THEME_OVERRIDES__
         if (!response.ok || !data.ok) {
           setRenderedError(data.error || 'Datetime calculation failed');
           resetMoreDigitsButton(renderedMore, false);
-          setDatetimeEnglandText('');
+          setDatetimeLocalText('');
           clearResultDetails({keepBindings: true});
           commitModeState();
           setStatus('Error');
@@ -5933,7 +5998,15 @@ __THEME_OVERRIDES__
         renderDatetimeSections(parsed, parsedMore, data.range_sections || [], data.range || '');
         renderDatetimeSections(functionStyle, functionMore, data.calendar_sections || [], data.calendar || '');
         renderDatetimeSections(value, null, data.solar_sections || [], data.solar || '');
-        setDatetimeEnglandText(data.england || '', data.england_sections || []);
+        setDatetimeLocalText(data.local || '', data.local_sections || []);
+        if (data.fields) {
+          if (datetimeDate && data.fields.date)
+            datetimeDate.value = validDateText(data.fields.date, datetimeDate.value || DEFAULT_DATETIME_DATE);
+          if (datetimeJdn)
+            datetimeJdn.value = String(data.fields.julian_day_number || '');
+          if (datetimeYear && datetimeDate && datetimeDate.value)
+            datetimeYear.value = datetimeDate.value.slice(0, 4);
+        }
         setResultInputText('');
         clearVariableValues();
         currentVariables = [];
@@ -5945,7 +6018,7 @@ __THEME_OVERRIDES__
       } catch (err) {
         setRenderedError(String(err));
         resetMoreDigitsButton(renderedMore, false);
-        setDatetimeEnglandText('');
+        setDatetimeLocalText('');
         clearResultDetails({keepBindings: true});
         commitModeState();
         setStatus('Error');
@@ -6335,6 +6408,8 @@ __THEME_OVERRIDES__
       if (currentMode() === 'datetime') {
         if (datetimeDate)
           datetimeDate.value = DEFAULT_DATETIME_DATE;
+        if (datetimeJdn)
+          datetimeJdn.value = '';
         if (datetimeStart)
           datetimeStart.value = DEFAULT_DATETIME_DATE;
         if (datetimeEnd)
@@ -6439,12 +6514,16 @@ __THEME_OVERRIDES__
           saveLastIntegratorState();
       });
 
-    [datetimeDate, datetimeStart, datetimeEnd, datetimeYear, datetimeLatitude, datetimeLongitude, datetimeGmtOffset]
+    [datetimeDate, datetimeJdn, datetimeStart, datetimeEnd, datetimeYear, datetimeLatitude, datetimeLongitude, datetimeGmtOffset]
       .filter(Boolean)
       .forEach((control) => {
         control.addEventListener('change', () => {
-          if (control === datetimeDate && datetimeYear && datetimeDate.value)
-            datetimeYear.value = datetimeDate.value.slice(0, 4);
+          if (control === datetimeDate) {
+            if (datetimeYear && datetimeDate.value)
+              datetimeYear.value = datetimeDate.value.slice(0, 4);
+            if (datetimeJdn)
+              datetimeJdn.value = '';
+          }
           if (currentMode() === 'datetime') {
             saveLastDatetimeState();
             updateHistoryButtons();
@@ -6675,6 +6754,7 @@ def default_state() -> dict[str, object]:
         "integrator_bounds": DEFAULT_INTEGRATOR_BOUNDS,
         "integrator_interval_cap": DEFAULT_INTEGRATOR_INTERVAL_CAP,
         "datetime_date": DEFAULT_DATETIME_DATE,
+        "datetime_jdn": "",
         "datetime_start": DEFAULT_DATETIME_DATE,
         "datetime_end": DEFAULT_DATETIME_DATE,
         "datetime_year": DEFAULT_DATETIME_DATE[:4],
@@ -6776,6 +6856,8 @@ def load_state_data() -> dict[str, object]:
         ("datetime_gmt_offset", DEFAULT_DATETIME_GMT_OFFSET),
     ):
         state[key] = str(state.get(key, default)).strip()
+    jdn = str(state.get("datetime_jdn", "")).strip()
+    state["datetime_jdn"] = jdn if re.fullmatch(r"\d+", jdn) else ""
     return state
 
 
@@ -7913,6 +7995,12 @@ def parse_datetime_lab_output(output: str) -> dict[str, str]:
             "date": r"^date\s+(.*)$",
             "weekday": r"^weekday\s+(.*)$",
             "julian_day_number": r"^julian_day_number\s+(.*)$",
+            "christian_calendar_date": r"^christian_calendar_date\s+(.*)$",
+            "chinese_calendar_date": r"^chinese_calendar_date\s+(.*)$",
+            "hindu_calendar_date": r"^hindu_calendar_date\s+(.*)$",
+            "buddhist_calendar_date": r"^buddhist_calendar_date\s+(.*)$",
+            "muslim_calendar_date": r"^muslim_calendar_date\s+(.*)$",
+            "jewish_calendar_date": r"^jewish_calendar_date\s+(.*)$",
             "moon_phase": r"^moon_phase\s+(.*)$",
             "solar_declination": r"^solar_declination\s+(.*)$",
             "solar_max_altitude": r"^solar_max_altitude\s+(.*)$",
@@ -8582,6 +8670,7 @@ def run_datetime_lab_fields(
     command = [str(binary)]
     for key in (
         "date",
+        "jdn",
         "start",
         "end",
         "year",
@@ -9083,34 +9172,40 @@ def prepare_datetime_fields(fields: dict[str, str]) -> dict[str, object]:
         },
     ]
     calendar_lines = [
+        f"Christian calendar date: {str(fields.get('christian_calendar_date') or '').strip()}",
         f"Easter Sunday: {str(fields.get('easter') or '').strip()}",
         f"Orthodox Easter Sunday: {str(fields.get('orthodox_easter') or '').strip()}",
         f"Christmas Day: {str(fields.get('christmas') or '').strip()}",
         f"Orthodox Christmas Day: {str(fields.get('orthodox_christmas') or '').strip()}",
+        f"Chinese calendar date: {str(fields.get('chinese_calendar_date') or '').strip()}",
         f"Chinese New Year: {str(fields.get('chinese_new_year') or '').strip()}",
+        f"Hindu calendar date: {str(fields.get('hindu_calendar_date') or '').strip()}",
         f"Diwali (estimated): {str(fields.get('diwali') or '').strip()}",
         f"Holi (estimated): {str(fields.get('holi') or '').strip()}",
         f"Hindu New Year (estimated): {str(fields.get('hindu_new_year') or '').strip()}",
+        f"Buddhist calendar date: {str(fields.get('buddhist_calendar_date') or '').strip()}",
         f"Buddhist New Year (estimated): {str(fields.get('buddhist_new_year') or '').strip()}",
         f"Vesak / Buddha Day (estimated): {str(fields.get('vesak') or '').strip()}",
         f"Asalha Puja / Dharma Day (estimated): {str(fields.get('asalha_puja') or '').strip()}",
+        f"Muslim calendar date: {str(fields.get('muslim_calendar_date') or '').strip()}",
         f"Ramadan begins (civil Islamic): {str(fields.get('ramadan') or '').strip()}",
         f"Ramadan begins at sunset (GMT): {str(fields.get('ramadan_starts_gmt') or '').strip()}",
         f"Eid al-Fitr (civil Islamic): {str(fields.get('eid_al_fitr') or '').strip()}",
         f"Eid al-Fitr begins at sunset (GMT): {str(fields.get('eid_al_fitr_starts_gmt') or '').strip()}",
         f"Muslim New Year (civil Islamic): {str(fields.get('muslim_new_year') or '').strip()}",
         f"Muslim New Year begins at sunset (GMT): {str(fields.get('muslim_new_year_starts_gmt') or '').strip()}",
+        f"Jewish calendar date: {str(fields.get('jewish_calendar_date') or '').strip()}",
         f"Passover: {str(fields.get('passover') or '').strip()}",
         f"Passover begins at sunset (GMT): {str(fields.get('passover_starts_gmt') or '').strip()}",
         f"Jewish New Year: {str(fields.get('jewish_new_year') or '').strip()}",
         f"Jewish New Year begins at sunset (GMT): {str(fields.get('jewish_new_year_starts_gmt') or '').strip()}",
-        f"Julian Day Number: {str(fields.get('julian_day_number') or '').strip()}",
     ]
     calendar_sections = [
         {
             "title": "Christian",
             "open": False,
             "rows": [
+                {"label": "Current date", "value": str(fields.get("christian_calendar_date") or "").strip()},
                 {"label": "Easter Sunday", "value": str(fields.get("easter") or "").strip()},
                 {"label": "Orthodox Easter Sunday", "value": str(fields.get("orthodox_easter") or "").strip()},
                 {"label": "Christmas Day", "value": str(fields.get("christmas") or "").strip()},
@@ -9121,6 +9216,7 @@ def prepare_datetime_fields(fields: dict[str, str]) -> dict[str, object]:
             "title": "Chinese",
             "open": False,
             "rows": [
+                {"label": "Current date", "value": str(fields.get("chinese_calendar_date") or "").strip()},
                 {"label": "New Year", "value": str(fields.get("chinese_new_year") or "").strip()},
             ],
         },
@@ -9128,6 +9224,7 @@ def prepare_datetime_fields(fields: dict[str, str]) -> dict[str, object]:
             "title": "Hindu",
             "open": False,
             "rows": [
+                {"label": "Current date", "value": str(fields.get("hindu_calendar_date") or "").strip()},
                 {"label": "Diwali (estimated)", "value": str(fields.get("diwali") or "").strip()},
                 {"label": "Holi (estimated)", "value": str(fields.get("holi") or "").strip()},
                 {"label": "Hindu New Year (estimated)", "value": str(fields.get("hindu_new_year") or "").strip()},
@@ -9137,6 +9234,7 @@ def prepare_datetime_fields(fields: dict[str, str]) -> dict[str, object]:
             "title": "Buddhist",
             "open": False,
             "rows": [
+                {"label": "Current date", "value": str(fields.get("buddhist_calendar_date") or "").strip()},
                 {"label": "Buddhist New Year (estimated)", "value": str(fields.get("buddhist_new_year") or "").strip()},
                 {"label": "Vesak / Buddha Day (estimated)", "value": str(fields.get("vesak") or "").strip()},
                 {"label": "Asalha Puja / Dharma Day (estimated)", "value": str(fields.get("asalha_puja") or "").strip()},
@@ -9146,6 +9244,7 @@ def prepare_datetime_fields(fields: dict[str, str]) -> dict[str, object]:
             "title": "Muslim",
             "open": False,
             "rows": [
+                {"label": "Current date", "value": str(fields.get("muslim_calendar_date") or "").strip()},
                 {"label": "Ramadan begins (civil Islamic)", "value": str(fields.get("ramadan") or "").strip()},
                 {"label": "Ramadan begins at sunset (GMT)", "value": str(fields.get("ramadan_starts_gmt") or "").strip()},
                 {"label": "Eid al-Fitr (civil Islamic)", "value": str(fields.get("eid_al_fitr") or "").strip()},
@@ -9158,44 +9257,38 @@ def prepare_datetime_fields(fields: dict[str, str]) -> dict[str, object]:
             "title": "Jewish",
             "open": False,
             "rows": [
+                {"label": "Current date", "value": str(fields.get("jewish_calendar_date") or "").strip()},
                 {"label": "Passover", "value": str(fields.get("passover") or "").strip()},
                 {"label": "Passover begins at sunset (GMT)", "value": str(fields.get("passover_starts_gmt") or "").strip()},
                 {"label": "Jewish New Year", "value": str(fields.get("jewish_new_year") or "").strip()},
                 {"label": "Jewish New Year begins at sunset (GMT)", "value": str(fields.get("jewish_new_year_starts_gmt") or "").strip()},
             ],
         },
-        {
-            "title": "Reference",
-            "open": False,
-            "rows": [
-                {"label": "Julian Day Number", "value": str(fields.get("julian_day_number") or "").strip()},
-            ],
-        },
     ]
     bank_holiday_text = str(fields.get("bank_holiday") or "").strip()
-    england_lines = []
-    england_rows = []
+    local_lines = []
+    local_rows = []
     if bank_holiday_text:
-        england_lines.append(
-            "English bank holidays between "
+        local_lines.append(
+            "Local holidays between "
             f"{str(fields.get('start') or '').strip()} and {str(fields.get('end') or '').strip()}:"
         )
         for line in bank_holiday_text.splitlines():
             line = line.strip()
             if not line:
                 continue
-            england_lines.append(line)
+            local_lines.append(line)
             match = re.match(r"^(.*?):\s*(\d{4}-\d{2}-\d{2})$", line)
             if match:
-                england_rows.append({"label": match.group(1).strip(), "value": match.group(2)})
+                local_rows.append({"label": match.group(1).strip(), "value": match.group(2)})
             else:
-                england_rows.append({"label": line, "value": ""})
-    england_sections = []
-    if england_rows:
-        england_sections.append({
-            "title": f"English bank holidays ({str(fields.get('start') or '').strip()} to {str(fields.get('end') or '').strip()})",
+                local_rows.append({"label": line, "value": ""})
+    local_sections = []
+    if local_rows:
+        local_sections.append({
+            "title": f"Local holidays ({str(fields.get('start') or '').strip()} to {str(fields.get('end') or '').strip()})",
             "open": True,
-            "rows": england_rows,
+            "rows": local_rows,
         })
     solar_lines = [
         f"Latitude: {str(fields.get('latitude') or '').strip()}",
@@ -9233,8 +9326,8 @@ def prepare_datetime_fields(fields: dict[str, str]) -> dict[str, object]:
         "range_sections": range_sections,
         "calendar": "\n".join(line for line in calendar_lines if line.strip(": ")),
         "calendar_sections": calendar_sections,
-        "england": "\n".join(line for line in england_lines if line.strip(": ")),
-        "england_sections": england_sections,
+        "local": "\n".join(line for line in local_lines if line.strip(": ")),
+        "local_sections": local_sections,
         "solar": "\n".join(line for line in solar_lines if line.strip(": ")),
         "solar_sections": solar_sections,
         "fields": fields,
@@ -9483,6 +9576,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
 
                 for key in (
                     "datetime_date",
+                    "datetime_jdn",
                     "datetime_start",
                     "datetime_end",
                     "datetime_year",
@@ -9744,6 +9838,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                 body = self.rfile.read(length)
                 payload = json.loads(body.decode("utf-8"))
                 date_text = str(payload.get("date", DEFAULT_DATETIME_DATE)).strip()
+                jdn_text = str(payload.get("jdn", "")).strip()
                 start_text = str(payload.get("start", date_text)).strip()
                 end_text = str(payload.get("end", date_text)).strip()
                 year_text = str(payload.get("year", date_text[:4] or DEFAULT_DATETIME_DATE[:4])).strip()
@@ -9763,23 +9858,28 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                     gmt_offset = float(gmt_offset_text)
                     if gmt_offset < -14.0 or gmt_offset > 14.0:
                         raise ValueError("GMT offset must be between -14 and 14")
+                if jdn_text and not re.fullmatch(r"\d+", jdn_text):
+                    raise ValueError("Julian Day Number must be a positive integer")
             except Exception as exc:
                 self.send_json(400, {"ok": False, "error": f"Bad request: {exc}"})
                 return
 
             try:
                 ensure_scratch_binary(self.datetime_binary, "scratch/datetime_lab")
+                datetime_options = {
+                    "date": date_text,
+                    "start": start_text,
+                    "end": end_text,
+                    "year": str(year),
+                    "lat": str(latitude),
+                    "lon": str(longitude),
+                    "gmt_offset": gmt_offset_text,
+                }
+                if jdn_text:
+                    datetime_options["jdn"] = jdn_text
                 fields, raw, returncode = run_datetime_lab_fields(
                     self.datetime_binary,
-                    {
-                        "date": date_text,
-                        "start": start_text,
-                        "end": end_text,
-                        "year": str(year),
-                        "lat": str(latitude),
-                        "lon": str(longitude),
-                        "gmt_offset": gmt_offset_text,
-                    },
+                    datetime_options,
                 )
             except Exception as exc:
                 self.send_json(422, {"ok": False, "error": str(exc)})
@@ -9789,8 +9889,11 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                 self.send_json(422, {"ok": False, "error": raw or "Datetime calculation failed"})
                 return
 
+            selected_date_text = str(fields.get("date") or date_text).strip()
+            selected_jdn_text = str(fields.get("julian_day_number") or jdn_text).strip()
             save_state_data({
-                "datetime_date": date_text,
+                "datetime_date": selected_date_text,
+                "datetime_jdn": selected_jdn_text,
                 "datetime_start": start_text,
                 "datetime_end": end_text,
                 "datetime_year": str(year),

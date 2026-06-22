@@ -64,6 +64,7 @@
       "enabled": true,
       "test_datetime_alloc": true,
       "test_datetime_buddhist_observance_known_dates": true,
+      "test_datetime_calendar_date_texts_known_dates": true,
       "test_datetime_christmas_known_dates": true,
       "test_datetime_compare_equal": true,
       "test_datetime_compare_greater": true,
