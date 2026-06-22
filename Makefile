@@ -63,6 +63,19 @@ LDLIBS += -lpthread
 LDLIBS += -lmpfr -lmpc -lgmp
 
 # ------------------------------------------------------------
+# SQLCipher-backed SQLite storage
+# ------------------------------------------------------------
+SQLCIPHER_CFLAGS := $(shell pkg-config --cflags sqlcipher 2>/dev/null)
+SQLCIPHER_LIBS   := $(shell pkg-config --libs   sqlcipher 2>/dev/null)
+
+CFLAGS += $(SQLCIPHER_CFLAGS) -DSQLITE_HAS_CODEC
+ifneq ($(SQLCIPHER_LIBS),)
+    LDLIBS += $(SQLCIPHER_LIBS)
+else
+    LDLIBS += -lsqlcipher
+endif
+
+# ------------------------------------------------------------
 # Source discovery
 # ------------------------------------------------------------
 SRCS    := $(shell find src -name '*.c' | sort)
@@ -128,6 +141,7 @@ check-deps:
 	check_dep "GMP" "gmp.h" "-lgmp" "libgmp-dev" "mpz_t x; mpz_init(x); mpz_clear(x)"; \
 	check_dep "MPFR" "mpfr.h" "-lmpfr -lgmp" "libmpfr-dev" "mpfr_t x; mpfr_init2(x, 53); mpfr_clear(x)"; \
 	check_dep "MPC" "mpc.h" "-lmpc -lmpfr -lgmp" "libmpc-dev" "mpc_t x; mpc_init2(x, 53); mpc_clear(x)"; \
+	check_dep "SQLCipher" "sqlcipher/sqlite3.h" "-lsqlcipher" "libsqlcipher-dev" "sqlite3 *db = 0; sqlite3_open(\":memory:\", &db); sqlite3_close(db)"; \
 	if [ "$(ENABLE_UNISTRING)" = "1" ]; then \
 	    check_dep "libunistring" "unistr.h" "-lunistring" "libunistring-dev" "(void)u8_strlen((const uint8_t *)\"x\")"; \
 	fi; \

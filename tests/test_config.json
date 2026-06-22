@@ -1416,6 +1416,15 @@
       "test_strings": true
     }
   },
+  "tests/sqlite/test_sqlite.c": {
+    "tests": {
+      "enabled": true,
+      "test_sqlite_object_blob_round_trip": true,
+      "test_sqlite_rejects_wrong_key": true,
+      "test_sqlite_requires_key": true,
+      "test_sqlite_string_round_trip_is_encrypted": true
+    }
+  },
   "tests/string/test_string.c": {
     "readme_examples": {
       "enabled": true,
@@ -1434,6 +1443,7 @@
       "test_split_edge_cases": true,
       "test_starts_with_ends_with": true,
       "test_string_builder": true,
+      "test_string_byte_length_counts_utf8_bytes": true,
       "test_string_cursor_parser_example": true,
       "test_string_cursor_parsing_api": true,
       "test_string_cursor_view_rune_values": true,
