@@ -2393,8 +2393,17 @@ expr_binding_expr_t *binding_expr_try_simplify_direct_inverse(expr_binding_expr_
 static const expr_binding_expr_t *binding_expr_lambert_arg(const expr_binding_expr_t *expr)
 {
     if (!expr ||
-        expr->kind != EXPR_BINDING_EXPR_UNARY_OP ||
-        !expr_ops_is_lambert(expr->u.unary_op.ops))
+        ((expr->kind != EXPR_BINDING_EXPR_UNARY_OP &&
+          expr->kind != EXPR_BINDING_EXPR_BINARY_OP)))
+        return NULL;
+
+    if (expr->kind == EXPR_BINDING_EXPR_BINARY_OP) {
+        if (expr->u.binary_op.ops == &ops_lambert_wn)
+            return expr->u.binary_op.right;
+        return NULL;
+    }
+
+    if (!expr_ops_is_lambert(expr->u.unary_op.ops))
         return NULL;
 
     return expr->u.unary_op.child;

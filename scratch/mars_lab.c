@@ -29,7 +29,7 @@ static char *expr_text_dup(const expr_t *expr, style_t style)
 
 static char *expr_tex_body_dup(const expr_t *expr)
 {
-    char *body = expr_to_tex_body(expr);
+    char *body = expr_to_tex_body_wrapped(expr, 110u);
 
     return body ? body : expr_text_dup(expr, style_TEX);
 }
@@ -344,18 +344,16 @@ static char *format_complex_number(number_t value, int precision)
 static void print_owned_number(const char *label, number_t value, int precision)
 {
     char *text = NULL;
+    int display_precision = precision > 0 ? precision : 64;
 
-    if (num_is_inf(value)) {
+    if (num_is_nan(value)) {
+        text = xstrdup_local("NAN");
+    } else if (num_is_inf(value)) {
         text = xstrdup_local(num_get_sign(value) < 0 ? "-∞" : "∞");
-    } else if (precision >= 0) {
-        text = num_is_real(value)
-             ? format_real_number(num_clone(value), precision)
-             : format_complex_number(value, precision);
     } else {
-        string_t *number_text = num_to_string(value);
-
-        text = number_text ? xstrdup_local(string_c_str(number_text)) : NULL;
-        string_free(number_text);
+        text = num_is_real(value)
+             ? format_real_number(num_clone(value), display_precision)
+             : format_complex_number(value, display_precision);
     }
 
     printf("%-12s %s\n", label, text ? text : "(num_to_string failed)");
@@ -527,7 +525,7 @@ static int run_goal_seek(int argc, char **argv)
     expr_text = expr_text_dup(result.expr, style_EXPRESSION);
     unbound_text = expr_text_dup(result.expr, style_UNBOUND);
     func_text = expr_text_dup(result.expr, style_FUNCTION);
-    tex_text = expr_text_dup(result.expr, style_TEX);
+    tex_text = expr_tex_body_dup(result.expr);
 
     printf("input       %s\n", input);
     printf("expression  %s\n", expr_text ? expr_text : "(null)");
@@ -561,12 +559,15 @@ int main(int argc, char **argv)
     const char *input = raw_input;
     const char *wrt_name = argc > 2 ? argv[2] : "x";
     int precision = argc > 3 ? atoi(argv[3]) : -1;
+    const char *action = argc > 4 ? argv[4] : "";
     char *wrapped_input = NULL;
     expr_bindings_t *bindings = NULL;
     expr_t *expr = NULL;
     expr_t *display_expr = NULL;
     expr_t *deriv = NULL;
     expr_t *display_deriv = NULL;
+    expr_t *integral = NULL;
+    expr_t *display_integral = NULL;
     expr_t *wrt = NULL;
     char *expr_text = NULL;
     char *unbound_text = NULL;
@@ -575,7 +576,11 @@ int main(int argc, char **argv)
     char *deriv_text = NULL;
     char *deriv_func_text = NULL;
     char *deriv_tex_text = NULL;
+    char *integral_text = NULL;
+    char *integral_func_text = NULL;
+    char *integral_tex_text = NULL;
     char value_note[512];
+    bool integral_request = strcmp(action, "integral") == 0;
     int rc = 0;
 
     if (argc > 1 && strcmp(argv[1], "--goal-seek") == 0)
@@ -600,7 +605,7 @@ int main(int argc, char **argv)
 
     expr_text = expr_text_dup(expr, style_EXPRESSION);
     unbound_text = expr_text_dup(display_expr, style_UNBOUND);
-    func_text = expr_text_dup(expr, style_FUNCTION);
+    func_text = expr_text_dup(display_expr, style_FUNCTION);
     tex_text = expr_tex_body_dup(display_expr);
 
     printf("input       %s\n", input);
@@ -634,7 +639,7 @@ int main(int argc, char **argv)
             display_deriv = deriv;
         deriv_text = expr_text_dup(display_deriv, style_EXPRESSION);
         deriv_func_text = expr_text_dup(display_deriv, style_FUNCTION);
-        deriv_tex_text = expr_text_dup(display_deriv, style_TEX);
+        deriv_tex_text = expr_tex_body_dup(display_deriv);
         printf("derivative  d/d%s = %s\n",
                wrt_name,
                deriv_text ? deriv_text : "(null)");
@@ -646,8 +651,38 @@ int main(int argc, char **argv)
         printf("derivative  no binding named '%s'\n", wrt_name);
     }
 
+    if (integral_request) {
+        if (wrt) {
+            integral = expr_integrate_family(expr, wrt);
+            if (!integral) {
+                printf("integral  no symbolic integral with respect to %s\n",
+                       wrt_name);
+            } else {
+                display_integral = integral;
+                integral_text = expr_text_dup(display_integral,
+                                             style_EXPRESSION);
+                integral_func_text = expr_text_dup(display_integral,
+                                                  style_FUNCTION);
+                integral_tex_text = expr_tex_body_dup(display_integral);
+                printf("integral  ∫d%s = %s\n",
+                       wrt_name,
+                       integral_text ? integral_text : "(null)");
+                printf("integral_function  %s\n",
+                       integral_func_text ? integral_func_text : "(null)");
+                printf("integral_tex  %s\n",
+                       integral_tex_text ? integral_tex_text : "");
+                print_owned_number("i value", expr_eval(integral), precision);
+            }
+        } else {
+            printf("integral  no binding named '%s'\n", wrt_name);
+        }
+    }
+
 cleanup:
     free(wrapped_input);
+    free(integral_tex_text);
+    free(integral_func_text);
+    free(integral_text);
     free(deriv_tex_text);
     free(deriv_func_text);
     free(deriv_text);
@@ -657,8 +692,11 @@ cleanup:
     free(expr_text);
     if (display_deriv && display_deriv != deriv)
         expr_free(display_deriv);
+    if (display_integral && display_integral != integral)
+        expr_free(display_integral);
     if (display_expr && display_expr != expr)
         expr_free(display_expr);
+    expr_free(integral);
     expr_free(deriv);
     expr_free(expr);
     expr_bindings_free(bindings);

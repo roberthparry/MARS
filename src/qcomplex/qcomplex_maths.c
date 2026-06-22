@@ -541,6 +541,47 @@ qcomplex_t qc_lambert_wm1(qcomplex_t z)
     return qc_lambert_wm1_complex(z);
 }
 
+qcomplex_t qc_lambert_wn(int branch, qcomplex_t z)
+{
+    qfloat_t zero_tol = qf_from_double(1e-30);
+    qcomplex_t w;
+
+    if (branch == 0)
+        return qc_productlog(z);
+    if (branch == -1)
+        return qc_lambert_wm1_complex(z);
+    if (qc_isnan(z))
+        return QC_NAN;
+    if (qf_eq(qc_real(z), QF_ZERO) && qf_eq(qc_imag(z), QF_ZERO))
+        return QC_NAN;
+
+    w = qc_lambert_w_asymptotic_guess(z, branch);
+
+    for (int i = 0; i < QC_LAMBERT_WM1_HALLEY_MAX_STEPS; i++) {
+        qcomplex_t ew = qc_exp(w);
+        qcomplex_t wew = qc_mul(w, ew);
+        qcomplex_t f = qc_sub(wew, z);
+        qcomplex_t wp1 = qc_add(w, QC_ONE);
+        qcomplex_t denom;
+
+        if (qf_lt(qc_abs(wp1), zero_tol)) {
+            denom = ew;
+        } else {
+            qcomplex_t halley_corr = qc_div(qc_mul(qc_add(w, QC_TWO), f),
+                                            qc_mul(QC_TWO, wp1));
+            denom = qc_sub(qc_mul(ew, wp1), halley_corr);
+        }
+
+        qcomplex_t delta = qc_div(f, denom);
+        w = qc_sub(w, delta);
+
+        if (qf_lt(qc_abs2_local(delta), qf_mul(zero_tol, zero_tol)))
+            break;
+    }
+
+    return w;
+}
+
 qcomplex_t qc_productlog(qcomplex_t z)
 {
     if (qf_eq(qc_imag(z), qf_from_double(0.0)) &&

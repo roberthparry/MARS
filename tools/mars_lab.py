@@ -11,6 +11,7 @@ dependency to the project.
 from __future__ import annotations
 
 import argparse
+import datetime as py_datetime
 import errno
 import ipaddress
 from decimal import Decimal, InvalidOperation, localcontext
@@ -41,14 +42,15 @@ LAB_DESCRIPTION = os.environ.get(
 ).strip() or "Explore MARS mathematics with rendered TeX."
 LAB_SUBTITLE = os.environ.get(
     "MARS_LAB_SUBTITLE",
-    "Switch between expression, equation, matrix, and integrator experiments. Each mode runs through a local MARS scratch binary and shows the result on the right.",
-).strip() or "Switch between expression, equation, matrix, and integrator experiments. Each mode runs through a local MARS scratch binary and shows the result on the right."
+    "Switch between expression, equation, matrix, integrator, and datetime experiments. Each mode runs through a local MARS scratch binary and shows the result on the right.",
+).strip() or "Switch between expression, equation, matrix, integrator, and datetime experiments. Each mode runs through a local MARS scratch binary and shows the result on the right."
 LAB_THEME = os.environ.get("MARS_LAB_THEME", "mars").strip().lower() or "mars"
 DEFAULT_SCRATCH_TARGET = os.environ.get("MARS_LAB_SCRATCH_TARGET", "scratch/mars_lab").strip() or "scratch/mars_lab"
 DEFAULT_BIN = ROOT / os.environ.get("MARS_LAB_BINARY", "build/release/scratch/mars_lab")
 DEFAULT_MATRIX_BIN = ROOT / "build" / "release" / "scratch" / "matrix_lab"
 DEFAULT_INTEGRATOR_BIN = ROOT / "build" / "release" / "scratch" / "integrator_lab"
 DEFAULT_EQUATION_BIN = ROOT / "build" / "release" / "scratch" / "equation_lab"
+DEFAULT_DATETIME_BIN = ROOT / "build" / "release" / "scratch" / "datetime_lab"
 STATE_FILE = ROOT / os.environ.get("MARS_LAB_STATE_FILE", ".mars_lab_state.json")
 LAB_ICON_FILE = ROOT / "packaging" / "linux" / "mars-lab.svg"
 LAB_FAVICON_FILE = LAB_ICON_FILE
@@ -63,6 +65,11 @@ DEFAULT_MATRIX_OPERATION = "inverse"
 DEFAULT_INTEGRATOR_EXPRESSION = "{ exp(-x^2) | x = ? }"
 DEFAULT_INTEGRATOR_BOUNDS = "x = 0 .. 1"
 DEFAULT_INTEGRATOR_INTERVAL_CAP = 5000
+DEFAULT_DATETIME_DATE = py_datetime.date.today().isoformat()
+DEFAULT_DATETIME_TEXT = "Calendar and solar calculations"
+DEFAULT_DATETIME_LATITUDE = "51.5074"
+DEFAULT_DATETIME_LONGITUDE = "-0.1278"
+DEFAULT_DATETIME_GMT_OFFSET = ""
 MIN_INTEGRATOR_INTERVAL_CAP = 500
 MAX_INTEGRATOR_INTERVAL_CAP = 100000
 INTEGRATOR_INTERVAL_CAP_CHOICES = (500, 5000, 20000, 50000, 100000)
@@ -652,6 +659,14 @@ INDEX_HTML = r"""<!doctype html>
       font: 1.05rem/1.5 "Cascadia Code", "Fira Code", "DejaVu Sans Mono", monospace;
     }
 
+    body.datetime-mode #expr {
+      display: none;
+    }
+
+    body.datetime-mode #resultPane .zoom-action {
+      display: none;
+    }
+
     .secondary-editor {
       min-height: 6.5rem;
       border-top: 1px solid rgba(233, 244, 239, 0.12);
@@ -682,6 +697,74 @@ INDEX_HTML = r"""<!doctype html>
       grid-template-columns: minmax(5rem, 0.58fr) minmax(5.5rem, 0.74fr) repeat(2, minmax(0, 1fr)) auto auto;
       gap: 0.7rem;
       align-items: end;
+    }
+
+    .datetime-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(9rem, 1fr));
+      gap: 0.8rem;
+      align-items: end;
+    }
+
+    .datetime-briefing {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 0.85rem;
+      align-items: center;
+      border: 1px solid rgba(228, 168, 88, 0.34);
+      border-radius: 20px;
+      padding: 0.85rem;
+      background:
+        radial-gradient(circle at 1.4rem 1.4rem, rgba(234, 174, 87, 0.3), transparent 2.5rem),
+        linear-gradient(135deg, rgba(86, 36, 24, 0.5), rgba(15, 56, 48, 0.44));
+      box-shadow:
+        inset 0 1px 0 rgba(255, 231, 184, 0.14),
+        0 16px 34px rgba(0, 0, 0, 0.16);
+    }
+
+    .datetime-orbit {
+      position: relative;
+      width: 3.25rem;
+      height: 3.25rem;
+      border-radius: 999px;
+      background:
+        radial-gradient(circle at 35% 30%, #f2c06f 0 0.38rem, transparent 0.42rem),
+        radial-gradient(circle at 62% 66%, rgba(64, 21, 16, 0.48) 0 0.36rem, transparent 0.4rem),
+        radial-gradient(circle at 44% 46%, #c46139, #772f24 68%, #351914 100%);
+      box-shadow:
+        0 0 0 1px rgba(255, 218, 149, 0.24),
+        0 0 28px rgba(217, 111, 57, 0.3);
+    }
+
+    .datetime-orbit::after {
+      content: "";
+      position: absolute;
+      inset: 0.28rem -0.7rem;
+      border: 1px solid rgba(240, 195, 103, 0.46);
+      border-left-color: transparent;
+      border-right-color: transparent;
+      border-radius: 50%;
+      transform: rotate(-18deg);
+    }
+
+    .datetime-briefing-kicker {
+      color: #efc36a;
+      font: 0.72rem/1.2 "Cascadia Code", "DejaVu Sans Mono", monospace;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    .datetime-briefing-title {
+      margin-top: 0.12rem;
+      color: #f3ead1;
+      font: 1.1rem/1.2 Georgia, "Times New Roman", serif;
+    }
+
+    .datetime-briefing-copy {
+      margin-top: 0.3rem;
+      color: rgba(233, 244, 239, 0.78);
+      font-size: 0.85rem;
+      line-height: 1.45;
     }
 
     .integrator-bound-field {
@@ -731,6 +814,113 @@ INDEX_HTML = r"""<!doctype html>
       box-shadow: 0 0 0 1000px rgba(0, 0, 0, 0.14) inset;
       caret-color: var(--code);
       color-scheme: dark;
+    }
+
+    .datetime-controls input[type="date"]::-webkit-calendar-picker-indicator {
+      filter: invert(1) sepia(0.4) saturate(0.8) hue-rotate(76deg);
+      opacity: 0.78;
+    }
+
+    .datetime-england {
+      display: grid;
+      gap: 0.55rem;
+      margin-top: 0.35rem;
+      border: 1px solid rgba(233, 244, 239, 0.22);
+      border-radius: 18px;
+      padding: 0.8rem;
+      background:
+        linear-gradient(135deg, rgba(6, 22, 18, 0.44), rgba(28, 61, 42, 0.38));
+      box-shadow: inset 0 1px 0 rgba(233, 244, 239, 0.12);
+    }
+
+    .datetime-england-title {
+      color: #d7e7b7;
+      font: 0.78rem/1.2 "Cascadia Code", "DejaVu Sans Mono", monospace;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .datetime-england-body {
+      max-height: 20rem;
+      overflow: auto;
+      color: var(--code);
+      white-space: normal;
+      font: 0.82rem/1.45 "Cascadia Code", "Fira Code", "DejaVu Sans Mono", monospace;
+      scrollbar-color: rgba(207, 160, 82, 0.74) rgba(7, 25, 19, 0.62);
+    }
+
+    .datetime-section-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+      gap: 0.75rem;
+      white-space: normal;
+      font: 0.86rem/1.45 "Cascadia Code", "Fira Code", "DejaVu Sans Mono", monospace;
+    }
+
+    .datetime-section {
+      border: 1px solid rgba(233, 244, 239, 0.2);
+      border-radius: 15px;
+      overflow: hidden;
+      background:
+        linear-gradient(135deg, rgba(7, 25, 19, 0.42), rgba(35, 73, 49, 0.26));
+    }
+
+    .datetime-section summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.7rem;
+      padding: 0.62rem 0.75rem;
+      color: #f3e4a4;
+      cursor: pointer;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      background: rgba(196, 131, 48, 0.09);
+    }
+
+    .datetime-section summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .datetime-section summary::after {
+      content: "+";
+      color: #d7e7b7;
+      font-weight: 900;
+    }
+
+    .datetime-section[open] summary::after {
+      content: "-";
+    }
+
+    .datetime-section-rows {
+      display: grid;
+      gap: 0.4rem;
+      padding: 0.7rem 0.75rem 0.8rem;
+    }
+
+    .datetime-row {
+      display: grid;
+      grid-template-columns: minmax(8rem, 1fr) auto;
+      gap: 0.7rem;
+      align-items: start;
+      border-bottom: 1px solid rgba(233, 244, 239, 0.09);
+      padding-bottom: 0.38rem;
+    }
+
+    .datetime-row:last-child {
+      border-bottom: 0;
+      padding-bottom: 0;
+    }
+
+    .datetime-row-label {
+      color: #d7e7b7;
+      font-weight: 800;
+    }
+
+    .datetime-row-value {
+      color: var(--code);
+      text-align: right;
+      overflow-wrap: anywhere;
     }
 
     .integrator-bound-field input:-webkit-autofill,
@@ -1615,6 +1805,10 @@ INDEX_HTML = r"""<!doctype html>
         grid-template-columns: 1fr;
       }
 
+      .datetime-grid {
+        grid-template-columns: 1fr;
+      }
+
       .target-row {
         padding: 0 0.75rem 0.75rem;
       }
@@ -1874,6 +2068,7 @@ __THEME_OVERRIDES__
         <button class="mode-tab" id="modeTabEquation" type="button" role="tab" aria-selected="false" aria-controls="workspacePanel" data-mode="equation">Equation</button>
         <button class="mode-tab" id="modeTabMatrix" type="button" role="tab" aria-selected="false" aria-controls="workspacePanel" data-mode="matrix">Matrix</button>
         <button class="mode-tab" id="modeTabIntegrator" type="button" role="tab" aria-selected="false" aria-controls="workspacePanel" data-mode="integrator">Integrator</button>
+        <button class="mode-tab" id="modeTabDatetime" type="button" role="tab" aria-selected="false" aria-controls="workspacePanel" data-mode="datetime">Datetime</button>
       </div>
       <div class="precision-toolbar" aria-label="Precision controls">
         <span class="precision-label">Precision</span>
@@ -1922,6 +2117,51 @@ __THEME_OVERRIDES__
           <option value="100000">Up to 100,000</option>
         </select>
         <p class="mode-hint">Examples: use <code>x = 0 .. 1</code> for a definite integral, leave only <code>x</code> with both bounds blank for an antiderivative, or use <code>Free</code> for a parameter such as <code>a</code> in <code>exp(-a*x^2)</code>. Blank spare rows are ignored unless their variable appears in the integrand.</p>
+      </div>
+      <div class="mode-panel hidden datetime-controls" id="datetimeControls">
+        <div class="datetime-briefing" aria-hidden="true">
+          <div class="datetime-orbit"></div>
+          <div>
+            <div class="datetime-briefing-kicker">Sol calendar uplink</div>
+            <div class="datetime-briefing-title">Plan an Earth date from the MARS observatory.</div>
+            <div class="datetime-briefing-copy">Choose a civil date, a range, and an observation point. The core datetime module handles the calendar and solar calculations; this panel is only the flight deck.</div>
+          </div>
+        </div>
+        <div class="datetime-grid">
+          <div class="integrator-bound-field">
+            <label for="datetimeDate">Date</label>
+            <input id="datetimeDate" type="date">
+          </div>
+          <div class="integrator-bound-field">
+            <label for="datetimeStart">Start date</label>
+            <input id="datetimeStart" type="date">
+          </div>
+          <div class="integrator-bound-field">
+            <label for="datetimeEnd">End date</label>
+            <input id="datetimeEnd" type="date">
+          </div>
+          <div class="integrator-bound-field">
+            <label for="datetimeYear">Year</label>
+            <input id="datetimeYear" type="number" min="1" max="9999" step="1">
+          </div>
+          <div class="integrator-bound-field">
+            <label for="datetimeLatitude">Latitude</label>
+            <input id="datetimeLatitude" inputmode="decimal" placeholder="51.5074">
+          </div>
+          <div class="integrator-bound-field">
+            <label for="datetimeLongitude">Longitude</label>
+            <input id="datetimeLongitude" inputmode="decimal" placeholder="-0.1278">
+          </div>
+          <div class="integrator-bound-field">
+            <label for="datetimeGmtOffset">GMT offset, including daylight saving</label>
+            <input id="datetimeGmtOffset" inputmode="decimal" placeholder="blank for local, 1 for BST">
+          </div>
+        </div>
+        <p class="mode-hint">Blank GMT offset uses this machine's local offset for the selected date. For other locations, enter the local offset yourself, including daylight saving where applicable.</p>
+        <div class="datetime-england hidden" id="datetimeEngland">
+          <div class="datetime-england-title">England</div>
+          <div class="datetime-england-body" id="datetimeEnglandBody"></div>
+        </div>
       </div>
       <div class="target-row hidden" id="targetRow">
         <label for="goalTarget">Target</label>
@@ -2008,7 +2248,7 @@ __THEME_OVERRIDES__
         </div>
       </div>
       <div class="help-pane hidden" id="helpPane">
-        <div class="help-card" data-help-modes="expression,equation,matrix,integrator">
+        <div class="help-card" data-help-modes="expression,equation,matrix,integrator,datetime">
           <div class="help-kicker">Start Here</div>
           <p>MARS Lab works best when you type the mathematical object itself in the main editor, then use the controls underneath to tell the lab what kind of job you want.</p>
           <ul>
@@ -2016,6 +2256,18 @@ __THEME_OVERRIDES__
             <li><code>Equation</code>: type an equation and choose which variable to solve for.</li>
             <li><code>Matrix</code>: type a matrix expression and pick an operation.</li>
             <li><code>Integrator</code>: type the integrand, then add one row per variable you want to integrate over.</li>
+            <li><code>Datetime</code>: choose dates, a year, and a location to calculate calendar and solar facts.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="datetime">
+          <div class="help-kicker">Datetime Workflow</div>
+          <p>Use the calendar controls for the main date, date range, holiday year, and location.</p>
+          <ul>
+            <li><code>Date</code> drives weekday, moon phase, sunrise, sunset, solar declination, inclination, and maximum altitude.</li>
+            <li><code>Start date</code> and <code>End date</code> drive the days-between result.</li>
+            <li><code>Year</code> drives Christian, Chinese, Hindu, Buddhist, Muslim, Jewish, and English bank holiday observances.</li>
+            <li><code>GMT offset</code> should include daylight saving. Leave it blank to use this machine's local offset for the selected date.</li>
+            <li>Ramadan, Eid al-Fitr, and Muslim New Year use the civil Islamic calendar; Hindu and Buddhist observances are estimated from India-window lunar events, so observed dates can differ locally.</li>
           </ul>
         </div>
         <div class="help-card" data-help-modes="integrator">
@@ -2178,6 +2430,16 @@ __THEME_OVERRIDES__
     const integratorBoundStack = document.getElementById('integratorBoundStack');
     const integratorAddBound = document.getElementById('integratorAddBound');
     const integratorIntervalCap = document.getElementById('integratorIntervalCap');
+    const datetimeControls = document.getElementById('datetimeControls');
+    const datetimeDate = document.getElementById('datetimeDate');
+    const datetimeStart = document.getElementById('datetimeStart');
+    const datetimeEnd = document.getElementById('datetimeEnd');
+    const datetimeYear = document.getElementById('datetimeYear');
+    const datetimeLatitude = document.getElementById('datetimeLatitude');
+    const datetimeLongitude = document.getElementById('datetimeLongitude');
+    const datetimeGmtOffset = document.getElementById('datetimeGmtOffset');
+    const datetimeEngland = document.getElementById('datetimeEngland');
+    const datetimeEnglandBody = document.getElementById('datetimeEnglandBody');
     const helpCards = Array.from(document.querySelectorAll('#helpPane .help-card'));
     const run = document.getElementById('run');
     const back = document.getElementById('back');
@@ -2234,7 +2496,8 @@ __THEME_OVERRIDES__
         expression: [],
         equation: [],
         matrix: [],
-        integrator: []
+        integrator: [],
+        datetime: []
       };
     }
 
@@ -2244,7 +2507,8 @@ __THEME_OVERRIDES__
       expression: null,
       equation: null,
       matrix: null,
-      integrator: null
+      integrator: null,
+      datetime: null
     };
     let workingPrecisionBits = 256;
     let fullExpressionText = '';
@@ -2263,13 +2527,15 @@ __THEME_OVERRIDES__
       expression: 256,
       equation: 256,
       matrix: 256,
-      integrator: DOUBLE_PRECISION_BITS
+      integrator: DOUBLE_PRECISION_BITS,
+      datetime: DOUBLE_PRECISION_BITS
     };
     const modePrecisionBits = {
       expression: MODE_DEFAULT_PRECISION_BITS.expression,
       equation: MODE_DEFAULT_PRECISION_BITS.equation,
       matrix: MODE_DEFAULT_PRECISION_BITS.matrix,
-      integrator: MODE_DEFAULT_PRECISION_BITS.integrator
+      integrator: MODE_DEFAULT_PRECISION_BITS.integrator,
+      datetime: MODE_DEFAULT_PRECISION_BITS.datetime
     };
     const START_FORBIDDEN_PATTERN = /[=,;|{}]/;
     const COMPACT_BINDING_VALUE_LIMIT = 20;
@@ -2281,19 +2547,26 @@ __THEME_OVERRIDES__
     const DEFAULT_INTEGRATOR_TEXT = __DEFAULT_INTEGRATOR__;
     const DEFAULT_INTEGRATOR_BOUNDS_TEXT = __DEFAULT_INTEGRATOR_BOUNDS__;
     const DEFAULT_INTEGRATOR_INTERVAL_CAP = __DEFAULT_INTEGRATOR_INTERVAL_CAP__;
+    const DEFAULT_DATETIME_TEXT = __DEFAULT_DATETIME_TEXT__;
+    const DEFAULT_DATETIME_DATE = __DEFAULT_DATETIME_DATE__;
+    const DEFAULT_DATETIME_LATITUDE = __DEFAULT_DATETIME_LATITUDE__;
+    const DEFAULT_DATETIME_LONGITUDE = __DEFAULT_DATETIME_LONGITUDE__;
+    const DEFAULT_DATETIME_GMT_OFFSET = __DEFAULT_DATETIME_GMT_OFFSET__;
     const LAB_MODE_STORAGE_KEY = 'mars.exprLab.lastMode';
     let currentLabMode = 'expression';
     const modeEditorText = {
       expression: DEFAULT_EXPRESSION_TEXT,
       equation: DEFAULT_EQUATION_TEXT,
       matrix: DEFAULT_MATRIX_TEXT,
-      integrator: DEFAULT_INTEGRATOR_TEXT
+      integrator: DEFAULT_INTEGRATOR_TEXT,
+      datetime: DEFAULT_DATETIME_TEXT
     };
     const modeResultState = {
       expression: null,
       equation: null,
       matrix: null,
-      integrator: null
+      integrator: null,
+      datetime: null
     };
 
     function precisionDigitsForBits(bits) {
@@ -2332,7 +2605,7 @@ __THEME_OVERRIDES__
     }
 
     function setMode(mode, options = {}) {
-      const nextMode = mode === 'equation' || mode === 'matrix' || mode === 'integrator'
+      const nextMode = mode === 'equation' || mode === 'matrix' || mode === 'integrator' || mode === 'datetime'
         ? mode
         : 'expression';
       const changed = nextMode !== currentLabMode;
@@ -2356,9 +2629,12 @@ __THEME_OVERRIDES__
       else if (mode === 'matrix') {
         modeEditorText.matrix = currentExpressionText() || expr.value.trim() || modeEditorText.matrix;
         saveLastMatrixState();
-      } else {
+      } else if (mode === 'integrator') {
         modeEditorText.integrator = currentExpressionText() || expr.value.trim() || modeEditorText.integrator;
         saveLastIntegratorState();
+      } else {
+        modeEditorText.datetime = DEFAULT_DATETIME_TEXT;
+        saveLastDatetimeState();
       }
     }
 
@@ -2377,6 +2653,12 @@ __THEME_OVERRIDES__
           clearVariableValues();
         }
       } else {
+        if (mode === 'datetime') {
+          expr.value = DEFAULT_DATETIME_TEXT;
+          clearExpressionSource();
+          clearVariableValues();
+          return;
+        }
         const text = modeEditorText.integrator || DEFAULT_INTEGRATOR_TEXT;
         if (bindingParts(text))
           setExpressionEditor(text);
@@ -2512,10 +2794,15 @@ __THEME_OVERRIDES__
       const equationMode = mode === 'equation';
       const matrixMode = mode === 'matrix';
       const integratorMode = mode === 'integrator';
+      const datetimeMode = mode === 'datetime';
 
+      document.body.classList.toggle('datetime-mode', datetimeMode);
       matrixControls.classList.toggle('hidden', !matrixMode);
       equationControls.classList.toggle('hidden', !equationMode);
       integratorControls.classList.toggle('hidden', !integratorMode);
+      datetimeControls.classList.toggle('hidden', !datetimeMode);
+      if (datetimeEngland)
+        datetimeEngland.classList.toggle('hidden', !datetimeMode || !String(datetimeEnglandBody?.textContent || '').trim());
       targetRow.classList.toggle('hidden', !expressionMode || targetRow.classList.contains('hidden'));
       derivativeButtons.classList.toggle('hidden', !expressionMode);
       goalSeek.classList.toggle('hidden', !expressionMode);
@@ -2535,10 +2822,15 @@ __THEME_OVERRIDES__
         subtitle.textContent = 'Enter a matrix expression on the left, choose an operation, and inspect both the formatted result and the raw matrix output.';
         setResultTitles('Rendered TeX', 'Result', 'Layout', 'Summary');
         setValueCardVisible(false);
-      } else {
+      } else if (integratorMode) {
         leftPaneTitle.textContent = 'Integrator';
         subtitle.textContent = 'Enter an integrand expression on the left, stack one or more integral rows, and use Free when a symbol should stay as a parameter. Leave both bounds blank for an antiderivative, or leave lower blank and fill upper to evaluate it there.';
         setResultTitles('Rendered TeX', 'Integrand', 'Exact result', 'Integral');
+        setValueCardVisible(true);
+      } else {
+        leftPaneTitle.textContent = 'Datetime';
+        subtitle.textContent = 'Choose dates, a year, and a location. MARS datetime calculates calendar observances, English bank holidays, moon phase, and solar times.';
+        setResultTitles('Overview', 'Date Range', 'Calendar', 'Solar And Moon');
         setValueCardVisible(true);
       }
 
@@ -2565,6 +2857,8 @@ __THEME_OVERRIDES__
       restoreModeEditor(currentMode());
       if (currentMode() === 'integrator')
         renderIntegratorRows(activeIntegratorRows());
+      if (currentMode() === 'datetime')
+        restoreDatetimeDefaultsIfBlank();
       syncModeUI();
       if (currentMode() === 'integrator' && currentIntegratorBoundRows().length === 0)
         resetIntegratorBoundsToDefault();
@@ -2877,6 +3171,11 @@ __THEME_OVERRIDES__
 
     function derivativeExpressionFromLine(line) {
       const match = String(line || '').match(/^d\/d[^=]*=\s*(.+)$/);
+      return match ? match[1].trim() : '';
+    }
+
+    function integralExpressionFromLine(line) {
+      const match = String(line || '').match(/^∫d[^=]*=\s*(.+)$/);
       return match ? match[1].trim() : '';
     }
 
@@ -3616,6 +3915,58 @@ __THEME_OVERRIDES__
       return allowed.includes(parsed) ? parsed : DEFAULT_INTEGRATOR_INTERVAL_CAP;
     }
 
+    function validDateText(value, fallback = DEFAULT_DATETIME_DATE) {
+      const text = String(value || '').trim();
+      return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : fallback;
+    }
+
+    function restoreDatetimeDefaultsIfBlank() {
+      if (datetimeDate && !datetimeDate.value)
+        datetimeDate.value = DEFAULT_DATETIME_DATE;
+      if (datetimeStart && !datetimeStart.value)
+        datetimeStart.value = datetimeDate?.value || DEFAULT_DATETIME_DATE;
+      if (datetimeEnd && !datetimeEnd.value)
+        datetimeEnd.value = datetimeDate?.value || DEFAULT_DATETIME_DATE;
+      if (datetimeYear && !datetimeYear.value)
+        datetimeYear.value = String((datetimeDate?.value || DEFAULT_DATETIME_DATE).slice(0, 4));
+      if (datetimeLatitude && !datetimeLatitude.value)
+        datetimeLatitude.value = DEFAULT_DATETIME_LATITUDE;
+      if (datetimeLongitude && !datetimeLongitude.value)
+        datetimeLongitude.value = DEFAULT_DATETIME_LONGITUDE;
+    }
+
+    function currentDatetimeState() {
+      restoreDatetimeDefaultsIfBlank();
+      return {
+        date: validDateText(datetimeDate && datetimeDate.value),
+        start: validDateText(datetimeStart && datetimeStart.value, datetimeDate && datetimeDate.value || DEFAULT_DATETIME_DATE),
+        end: validDateText(datetimeEnd && datetimeEnd.value, datetimeDate && datetimeDate.value || DEFAULT_DATETIME_DATE),
+        year: String(datetimeYear && datetimeYear.value || (datetimeDate && datetimeDate.value || DEFAULT_DATETIME_DATE).slice(0, 4)).trim(),
+        latitude: String(datetimeLatitude && datetimeLatitude.value || DEFAULT_DATETIME_LATITUDE).trim(),
+        longitude: String(datetimeLongitude && datetimeLongitude.value || DEFAULT_DATETIME_LONGITUDE).trim(),
+        gmt_offset: String(datetimeGmtOffset && datetimeGmtOffset.value || '').trim()
+      };
+    }
+
+    function datetimeSummaryText(state = currentDatetimeState()) {
+      return [
+        'MARS datetime observation',
+        `Date: ${state.date}`,
+        `Range: ${state.start} to ${state.end}`,
+        `Year: ${state.year}`,
+        `Location: ${state.latitude}, ${state.longitude}`,
+        `GMT offset: ${state.gmt_offset || 'local machine offset'}`
+      ].join('\n');
+    }
+
+    function setDatetimeEnglandText(text, sections = null) {
+      const body = String(text || '').trim();
+      if (datetimeEnglandBody)
+        renderDatetimeSections(datetimeEnglandBody, null, sections, body);
+      if (datetimeEngland)
+        datetimeEngland.classList.toggle('hidden', !body || currentMode() !== 'datetime');
+    }
+
     function validMatrixOperation(value) {
       const operation = String(value || '').trim();
       const allowed = Array.from(matrixOperation.options).map((option) => option.value);
@@ -3624,7 +3975,7 @@ __THEME_OVERRIDES__
 
     function validLabMode(value) {
       const mode = String(value || '').trim();
-      return mode === 'equation' || mode === 'matrix' || mode === 'integrator' ? mode : 'expression';
+      return mode === 'equation' || mode === 'matrix' || mode === 'integrator' || mode === 'datetime' ? mode : 'expression';
     }
 
     function applySavedState(data) {
@@ -3667,6 +4018,21 @@ __THEME_OVERRIDES__
       const savedCap = validIntegratorIntervalCap(data.integrator_interval_cap);
       if (integratorIntervalCap)
         integratorIntervalCap.value = String(savedCap);
+
+      if (datetimeDate)
+        datetimeDate.value = validDateText(data.datetime_date, DEFAULT_DATETIME_DATE);
+      if (datetimeStart)
+        datetimeStart.value = validDateText(data.datetime_start, datetimeDate?.value || DEFAULT_DATETIME_DATE);
+      if (datetimeEnd)
+        datetimeEnd.value = validDateText(data.datetime_end, datetimeDate?.value || DEFAULT_DATETIME_DATE);
+      if (datetimeYear)
+        datetimeYear.value = String(data.datetime_year || (datetimeDate?.value || DEFAULT_DATETIME_DATE).slice(0, 4));
+      if (datetimeLatitude)
+        datetimeLatitude.value = String(data.datetime_latitude || DEFAULT_DATETIME_LATITUDE);
+      if (datetimeLongitude)
+        datetimeLongitude.value = String(data.datetime_longitude || DEFAULT_DATETIME_LONGITUDE);
+      if (datetimeGmtOffset)
+        datetimeGmtOffset.value = String(data.datetime_gmt_offset || DEFAULT_DATETIME_GMT_OFFSET);
 
       if (data.precision_bits && typeof data.precision_bits === 'object') {
         Object.entries(data.precision_bits).forEach(([mode, bits]) => {
@@ -3720,6 +4086,24 @@ __THEME_OVERRIDES__
         const integratorCap = localStorage.getItem('mars.exprLab.lastIntegratorIntervalCap');
         if (integratorIntervalCap && integratorCap)
           integratorIntervalCap.value = String(validIntegratorIntervalCap(integratorCap));
+        const datetimeStateText = localStorage.getItem('mars.exprLab.lastDatetimeState');
+        if (datetimeStateText) {
+          const state = JSON.parse(datetimeStateText);
+          if (datetimeDate)
+            datetimeDate.value = validDateText(state.date, DEFAULT_DATETIME_DATE);
+          if (datetimeStart)
+            datetimeStart.value = validDateText(state.start, datetimeDate?.value || DEFAULT_DATETIME_DATE);
+          if (datetimeEnd)
+            datetimeEnd.value = validDateText(state.end, datetimeDate?.value || DEFAULT_DATETIME_DATE);
+          if (datetimeYear)
+            datetimeYear.value = String(state.year || (datetimeDate?.value || DEFAULT_DATETIME_DATE).slice(0, 4));
+          if (datetimeLatitude)
+            datetimeLatitude.value = String(state.latitude || DEFAULT_DATETIME_LATITUDE);
+          if (datetimeLongitude)
+            datetimeLongitude.value = String(state.longitude || DEFAULT_DATETIME_LONGITUDE);
+          if (datetimeGmtOffset)
+            datetimeGmtOffset.value = String(state.gmt_offset || DEFAULT_DATETIME_GMT_OFFSET);
+        }
         const labMode = localStorage.getItem(LAB_MODE_STORAGE_KEY);
         if (labMode)
           applyLabMode(labMode);
@@ -3843,6 +4227,28 @@ __THEME_OVERRIDES__
       });
     }
 
+    function saveLastDatetimeState() {
+      const state = currentDatetimeState();
+      modeEditorText.datetime = DEFAULT_DATETIME_TEXT;
+
+      try {
+        localStorage.setItem('mars.exprLab.lastDatetimeState', JSON.stringify(state));
+      } catch (_) {
+        // The lab still works fine without persistence.
+      }
+
+      saveLabState({
+        datetime_date: state.date,
+        datetime_start: state.start,
+        datetime_end: state.end,
+        datetime_year: state.year,
+        datetime_latitude: state.latitude,
+        datetime_longitude: state.longitude,
+        datetime_gmt_offset: state.gmt_offset,
+        precision_bits: modePrecisionBits
+      });
+    }
+
     function modeHistoryStack(store, mode = currentMode()) {
       return store[mode] || [];
     }
@@ -3856,7 +4262,7 @@ __THEME_OVERRIDES__
     }
 
     function historyStateForMode(mode = currentMode(), textOverride = null) {
-      const text = String(
+      let text = String(
         textOverride === null || textOverride === undefined
           ? (currentExpressionText() || expr.value || '')
           : textOverride
@@ -3874,6 +4280,11 @@ __THEME_OVERRIDES__
         state.intervalCap = String(validIntegratorIntervalCap(
           integratorIntervalCap && integratorIntervalCap.value
         ));
+      } else if (mode === 'datetime') {
+        state.datetime = currentDatetimeState();
+        if (textOverride === null || textOverride === undefined)
+          text = datetimeSummaryText(state.datetime);
+        state.text = text || DEFAULT_DATETIME_TEXT;
       }
 
       return state;
@@ -3909,9 +4320,31 @@ __THEME_OVERRIDES__
         restoreIntegratorBoundsText(state.bounds || DEFAULT_INTEGRATOR_BOUNDS_TEXT);
         if (integratorIntervalCap)
           integratorIntervalCap.value = String(validIntegratorIntervalCap(state.intervalCap));
+      } else if (state.mode === 'datetime') {
+        const datetimeState = state.datetime || {};
+        if (datetimeDate)
+          datetimeDate.value = validDateText(datetimeState.date, DEFAULT_DATETIME_DATE);
+        if (datetimeStart)
+          datetimeStart.value = validDateText(datetimeState.start, datetimeDate?.value || DEFAULT_DATETIME_DATE);
+        if (datetimeEnd)
+          datetimeEnd.value = validDateText(datetimeState.end, datetimeDate?.value || DEFAULT_DATETIME_DATE);
+        if (datetimeYear)
+          datetimeYear.value = String(datetimeState.year || (datetimeDate?.value || DEFAULT_DATETIME_DATE).slice(0, 4));
+        if (datetimeLatitude)
+          datetimeLatitude.value = String(datetimeState.latitude || DEFAULT_DATETIME_LATITUDE);
+        if (datetimeLongitude)
+          datetimeLongitude.value = String(datetimeState.longitude || DEFAULT_DATETIME_LONGITUDE);
+        if (datetimeGmtOffset)
+          datetimeGmtOffset.value = String(datetimeState.gmt_offset || DEFAULT_DATETIME_GMT_OFFSET);
       }
 
-      applyUpdatedBindingExpression(state.text || '');
+      if (state.mode === 'datetime') {
+        expr.value = DEFAULT_DATETIME_TEXT;
+        clearExpressionSource();
+        clearVariableValues();
+      } else {
+        applyUpdatedBindingExpression(state.text || '');
+      }
     }
 
     function clearForwardHistory(mode = currentMode()) {
@@ -3929,6 +4362,10 @@ __THEME_OVERRIDES__
       }
       if (currentMode() === 'integrator') {
         evaluateIntegrator(options);
+        return;
+      }
+      if (currentMode() === 'datetime') {
+        evaluateDatetime(options);
         return;
       }
       evaluateExpression(options);
@@ -3950,6 +4387,16 @@ __THEME_OVERRIDES__
         ? 'Already at the current maximum precision setting'
         : '';
       Array.from((integratorBoundStack || document.createElement('div')).querySelectorAll('input, button')).forEach((control) => {
+        if (isBusy) {
+          if (!control.disabled)
+            control.dataset.busyDisabled = '1';
+          control.disabled = true;
+        } else if (control.dataset.busyDisabled === '1') {
+          control.disabled = false;
+          delete control.dataset.busyDisabled;
+        }
+      });
+      Array.from((datetimeControls || document.createElement('div')).querySelectorAll('input, button')).forEach((control) => {
         if (isBusy) {
           if (!control.disabled)
             control.dataset.busyDisabled = '1';
@@ -4014,21 +4461,28 @@ __THEME_OVERRIDES__
       derivativeButtons.replaceChildren();
       if (!currentDifferentiable) return;
       variables.forEach((name) => {
-        const button = document.createElement('button');
-        button.className = 'secondary';
-        button.type = 'button';
-        button.textContent = `${name} derivative`;
-        button.addEventListener('click', () => takeDerivative(name));
-        derivativeButtons.appendChild(button);
+        const derivativeButton = document.createElement('button');
+        derivativeButton.className = 'secondary';
+        derivativeButton.type = 'button';
+        derivativeButton.textContent = `${name} derivative`;
+        derivativeButton.addEventListener('click', () => takeDerivative(name));
+        derivativeButtons.appendChild(derivativeButton);
+
+        const integralButton = document.createElement('button');
+        integralButton.className = 'secondary';
+        integralButton.type = 'button';
+        integralButton.textContent = `${name} integral`;
+        integralButton.addEventListener('click', () => takeIntegral(name));
+        derivativeButtons.appendChild(integralButton);
       });
     }
 
-    async function fetchEvaluation(text, wrt = '') {
+    async function fetchEvaluation(text, wrt = '', action = '') {
       const precision = requestedValuePrecision();
       const response = await fetch('/eval', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({expression: expressionForEvaluation(text), wrt, precision})
+        body: JSON.stringify({expression: expressionForEvaluation(text), wrt, precision, action})
       });
       const data = await response.json();
       return {response, data};
@@ -4450,6 +4904,18 @@ __THEME_OVERRIDES__
       return {response, data};
     }
 
+    async function fetchDatetimeEvaluation() {
+      const state = currentDatetimeState();
+      saveLastDatetimeState();
+      const response = await fetch('/datetime-eval', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(state)
+      });
+      const data = await response.json();
+      return {response, data};
+    }
+
     function estimateValuePrecision() {
       const style = getComputedStyle(value);
       const canvas = estimateValuePrecision.canvas || document.createElement('canvas');
@@ -4806,6 +5272,67 @@ __THEME_OVERRIDES__
       );
     }
 
+    function renderDatetimeSections(element, button, sections, fallbackText = '') {
+      const text = String(fallbackText || '').trim();
+      const items = Array.isArray(sections) ? sections : [];
+
+      element.replaceChildren();
+      element.dataset.displayText = text;
+      element.dataset.fullText = text;
+      if (button)
+        resetMoreDigitsButton(button, false);
+
+      if (!items.length) {
+        element.textContent = text;
+        return;
+      }
+
+      const grid = document.createElement('div');
+      grid.className = 'datetime-section-grid';
+      items.forEach((section) => {
+        const rows = Array.isArray(section && section.rows) ? section.rows : [];
+        if (!rows.length)
+          return;
+
+        const details = document.createElement('details');
+        details.className = 'datetime-section';
+        if (section.open !== false)
+          details.open = true;
+
+        const summary = document.createElement('summary');
+        summary.textContent = String(section.title || 'Calendar');
+        details.appendChild(summary);
+
+        const body = document.createElement('div');
+        body.className = 'datetime-section-rows';
+        rows.forEach((row) => {
+          const labelText = String(row && row.label || '').trim();
+          const valueText = String(row && row.value || '').trim();
+          if (!labelText && !valueText)
+            return;
+
+          const line = document.createElement('div');
+          line.className = 'datetime-row';
+          const label = document.createElement('span');
+          label.className = 'datetime-row-label';
+          label.textContent = labelText;
+          const value = document.createElement('span');
+          value.className = 'datetime-row-value';
+          value.textContent = valueText || 'unavailable';
+          line.append(label, value);
+          body.appendChild(line);
+        });
+
+        details.appendChild(body);
+        grid.appendChild(details);
+      });
+
+      if (grid.childElementCount)
+        element.appendChild(grid);
+      else
+        element.textContent = text;
+    }
+
     function parseMatrixResultText(text) {
       const source = String(text || '').trim();
       if (!source.startsWith('(') || !source.endsWith(')'))
@@ -4986,6 +5513,7 @@ __THEME_OVERRIDES__
       rendered.replaceChildren();
       rendered.textContent = '';
       clearRenderedError();
+      setDatetimeEnglandText('');
       resetMoreDigitsButton(renderedMore, false);
       clearResultDetails();
     }
@@ -5374,6 +5902,60 @@ __THEME_OVERRIDES__
       }
     }
 
+    async function evaluateDatetime(options = {}) {
+      const state = currentDatetimeState();
+      const snapshotText = datetimeSummaryText(state);
+      const nextState = historyStateForMode(currentMode(), snapshotText);
+      const previousState = !options.skipHistoryUpdate
+        ? previousModeStateForHistory(nextState)
+        : null;
+      showResults();
+      setBusy(true);
+      setStatus('Calculating dates...');
+      try {
+        if (previousState)
+          pushExpressionHistory(previousState);
+        const {response, data} = await fetchDatetimeEvaluation();
+        if (!response.ok || !data.ok) {
+          setRenderedError(data.error || 'Datetime calculation failed');
+          resetMoreDigitsButton(renderedMore, false);
+          setDatetimeEnglandText('');
+          clearResultDetails({keepBindings: true});
+          commitModeState();
+          setStatus('Error');
+          return;
+        }
+
+        clearResultDetails({keepBindings: true});
+        clearRenderedError();
+        renderDatetimeSections(rendered, null, data.overview_sections || [], data.overview || '');
+        resetMoreDigitsButton(renderedMore, false);
+        renderDatetimeSections(parsed, parsedMore, data.range_sections || [], data.range || '');
+        renderDatetimeSections(functionStyle, functionMore, data.calendar_sections || [], data.calendar || '');
+        renderDatetimeSections(value, null, data.solar_sections || [], data.solar || '');
+        setDatetimeEnglandText(data.england || '', data.england_sections || []);
+        setResultInputText('');
+        clearVariableValues();
+        currentVariables = [];
+        currentDifferentiable = false;
+        renderDerivativeButtons(currentVariables);
+        saveLastDatetimeState();
+        commitModeState();
+        setStatus('Ready');
+      } catch (err) {
+        setRenderedError(String(err));
+        resetMoreDigitsButton(renderedMore, false);
+        setDatetimeEnglandText('');
+        clearResultDetails({keepBindings: true});
+        commitModeState();
+        setStatus('Error');
+      } finally {
+        setBusy(false);
+        if (!options.skipHistoryUpdate)
+          updateHistoryButtons();
+      }
+    }
+
     function evaluateActiveModeOnLoad() {
       if (currentMode() === 'matrix') {
         evaluateMatrix();
@@ -5385,6 +5967,10 @@ __THEME_OVERRIDES__
       }
       if (currentMode() === 'integrator') {
         evaluateIntegrator();
+        return;
+      }
+      if (currentMode() === 'datetime') {
+        evaluateDatetime();
         return;
       }
       evaluateExpression();
@@ -5466,8 +6052,10 @@ __THEME_OVERRIDES__
         evaluateEquation();
       } else if (currentMode() === 'matrix') {
         evaluateMatrix();
-      } else {
+      } else if (currentMode() === 'integrator') {
         evaluateIntegrator();
+      } else {
+        evaluateDatetime();
       }
     });
 
@@ -5576,6 +6164,81 @@ __THEME_OVERRIDES__
       }
     }
 
+    async function takeIntegral(wrt) {
+      commitVisibleBindingInputs();
+      const text = currentExpressionText();
+      if (!text || !wrt) return;
+
+      showResults();
+      rightPaneTitle.textContent = `${wrt} integral RESULT`;
+      setBusy(true);
+      setStatus(`Integrating with respect to ${wrt}...`);
+      try {
+        const {response, data} = await fetchEvaluation(text, wrt, 'integral');
+        const integralExpression = integralExpressionFromLine(data.integral);
+        const integralTex = data.integral_tex || '';
+        const integralSvg = data.integral_svg || '';
+        const integralFunction = data.display_integral_function || data.integral_function || integralExpression || '';
+        const fullIntegralFunction = data.full_display_integral_function || data.integral_function || integralExpression || '';
+
+        if (!response.ok || !data.ok || !integralExpression) {
+          setRenderedError(data.error || data.raw || `No integral for ${wrt}`);
+          resetMoreDigitsButton(renderedMore, false);
+          setStatus('Error');
+          return;
+        }
+
+        clearResultDetails({keepBindings: true});
+        clearRenderedError();
+        setExpandableText(
+          parsed,
+          parsedMore,
+          integralExpression,
+          integralExpression
+        );
+        setResultInputText(integralExpression);
+        setExpandableText(
+          functionStyle,
+          functionMore,
+          integralFunction,
+          fullIntegralFunction
+        );
+        value.textContent = data.integral_value || '';
+        lastDerivativeExpression = '';
+        {
+          const variableBindings = variableNamesFromBindings(data.binding_values || []);
+          currentVariables = variableBindings.length
+            ? variableBindings
+            : variablesFromExpression(data.expression || text);
+        }
+        currentDifferentiable = String(data.differentiable || 'yes').trim().toLowerCase() !== 'no';
+        renderDerivativeButtons(currentVariables);
+        if (integralTex) {
+          lastTex = integralTex;
+          rendered.dataset.displayTex = integralTex;
+          rendered.dataset.fullTex = integralTex;
+          rendered.dataset.displaySvg = integralSvg;
+          rendered.dataset.fullSvg = '';
+          rendered.dataset.renderError = data.integral_render_error || '';
+          setRenderedContent(
+            integralSvg,
+            data.integral_render_error || integralTex
+          );
+          resetMoreDigitsButton(renderedMore, false);
+        } else {
+          setRenderedContent('', integralExpression);
+          resetMoreDigitsButton(renderedMore, false);
+        }
+        setStatus('Ready');
+      } catch (err) {
+        setRenderedError(String(err));
+        resetMoreDigitsButton(renderedMore, false);
+        setStatus('Error');
+      } finally {
+        setBusy(false);
+      }
+    }
+
     function evaluateFromKeyboard() {
       clearForwardHistory();
       if (currentMode() === 'equation')
@@ -5584,6 +6247,8 @@ __THEME_OVERRIDES__
         evaluateMatrix();
       else if (currentMode() === 'integrator')
         evaluateIntegrator();
+      else if (currentMode() === 'datetime')
+        evaluateDatetime();
       else
         evaluateExpression();
     }
@@ -5597,12 +6262,19 @@ __THEME_OVERRIDES__
           evaluateEquation();
         else if (currentMode() === 'matrix')
           evaluateMatrix();
-        else
+        else if (currentMode() === 'integrator')
           evaluateIntegrator();
+        else
+          evaluateDatetime();
       }
     });
 
     expr.addEventListener('input', () => {
+      if (currentMode() === 'datetime') {
+        modeEditorText.datetime = expr.value.trim() || DEFAULT_DATETIME_TEXT;
+        updateHistoryButtons();
+        return;
+      }
       if (currentMode() === 'equation') {
         if (!bindingParts(expr.value)) {
           fullExpressionText = expr.value.trim();
@@ -5659,6 +6331,23 @@ __THEME_OVERRIDES__
         resetIntegratorBoundsToBlank();
         if (integratorIntervalCap)
           integratorIntervalCap.value = String(DEFAULT_INTEGRATOR_INTERVAL_CAP);
+      }
+      if (currentMode() === 'datetime') {
+        if (datetimeDate)
+          datetimeDate.value = DEFAULT_DATETIME_DATE;
+        if (datetimeStart)
+          datetimeStart.value = DEFAULT_DATETIME_DATE;
+        if (datetimeEnd)
+          datetimeEnd.value = DEFAULT_DATETIME_DATE;
+        if (datetimeYear)
+          datetimeYear.value = DEFAULT_DATETIME_DATE.slice(0, 4);
+        if (datetimeLatitude)
+          datetimeLatitude.value = DEFAULT_DATETIME_LATITUDE;
+        if (datetimeLongitude)
+          datetimeLongitude.value = DEFAULT_DATETIME_LONGITUDE;
+        if (datetimeGmtOffset)
+          datetimeGmtOffset.value = DEFAULT_DATETIME_GMT_OFFSET;
+        expr.value = DEFAULT_DATETIME_TEXT;
       }
       captureCurrentModeEditor();
       clearExpressionSource();
@@ -5718,7 +6407,12 @@ __THEME_OVERRIDES__
           if (integratorIntervalCap)
             integratorIntervalCap.value = String(validIntegratorIntervalCap(integratorIntervalCap.value));
         }
-        expr.focus();
+        if (currentMode() === 'datetime') {
+          restoreDatetimeDefaultsIfBlank();
+          datetimeDate?.focus();
+        } else {
+          expr.focus();
+        }
       }));
     }
 
@@ -5743,6 +6437,19 @@ __THEME_OVERRIDES__
         integratorIntervalCap.value = String(validIntegratorIntervalCap(integratorIntervalCap.value));
         if (currentMode() === 'integrator')
           saveLastIntegratorState();
+      });
+
+    [datetimeDate, datetimeStart, datetimeEnd, datetimeYear, datetimeLatitude, datetimeLongitude, datetimeGmtOffset]
+      .filter(Boolean)
+      .forEach((control) => {
+        control.addEventListener('change', () => {
+          if (control === datetimeDate && datetimeYear && datetimeDate.value)
+            datetimeYear.value = datetimeDate.value.slice(0, 4);
+          if (currentMode() === 'datetime') {
+            saveLastDatetimeState();
+            updateHistoryButtons();
+          }
+        });
       });
 
     if (integratorAddBound) {
@@ -5851,7 +6558,9 @@ __THEME_OVERRIDES__
 
     inputCopy.addEventListener('click', async () => {
       commitVisibleBindingInputs();
-      const text = String(expr.value || '').trim();
+      const text = currentMode() === 'datetime'
+        ? datetimeSummaryText()
+        : String(expr.value || '').trim();
       if (!text)
         return;
       try {
@@ -5965,11 +6674,19 @@ def default_state() -> dict[str, object]:
         "integrator_expression": DEFAULT_INTEGRATOR_EXPRESSION,
         "integrator_bounds": DEFAULT_INTEGRATOR_BOUNDS,
         "integrator_interval_cap": DEFAULT_INTEGRATOR_INTERVAL_CAP,
+        "datetime_date": DEFAULT_DATETIME_DATE,
+        "datetime_start": DEFAULT_DATETIME_DATE,
+        "datetime_end": DEFAULT_DATETIME_DATE,
+        "datetime_year": DEFAULT_DATETIME_DATE[:4],
+        "datetime_latitude": DEFAULT_DATETIME_LATITUDE,
+        "datetime_longitude": DEFAULT_DATETIME_LONGITUDE,
+        "datetime_gmt_offset": DEFAULT_DATETIME_GMT_OFFSET,
         "precision_bits": {
             "expression": 256,
             "equation": 256,
             "matrix": 256,
             "integrator": 17,
+            "datetime": 17,
         },
     }
 
@@ -5996,7 +6713,7 @@ def load_state_data() -> dict[str, object]:
         state["matrix"] = DEFAULT_MATRIX
 
     lab_mode = str(state.get("lab_mode", "")).strip()
-    if lab_mode not in {"expression", "equation", "matrix", "integrator"}:
+    if lab_mode not in {"expression", "equation", "matrix", "integrator", "datetime"}:
         state["lab_mode"] = "expression"
 
     equation = str(state.get("equation", "")).strip()
@@ -6037,6 +6754,28 @@ def load_state_data() -> dict[str, object]:
     if cap not in INTEGRATOR_INTERVAL_CAP_CHOICES:
         cap = DEFAULT_INTEGRATOR_INTERVAL_CAP
     state["integrator_interval_cap"] = cap
+    for key, default in (
+        ("datetime_date", DEFAULT_DATETIME_DATE),
+        ("datetime_start", DEFAULT_DATETIME_DATE),
+        ("datetime_end", DEFAULT_DATETIME_DATE),
+    ):
+        value = str(state.get(key, "")).strip()
+        try:
+            py_datetime.date.fromisoformat(value)
+        except ValueError:
+            value = default
+        state[key] = value
+    try:
+        year = int(str(state.get("datetime_year", DEFAULT_DATETIME_DATE[:4])).strip())
+    except ValueError:
+        year = int(DEFAULT_DATETIME_DATE[:4])
+    state["datetime_year"] = str(max(1, min(9999, year)))
+    for key, default in (
+        ("datetime_latitude", DEFAULT_DATETIME_LATITUDE),
+        ("datetime_longitude", DEFAULT_DATETIME_LONGITUDE),
+        ("datetime_gmt_offset", DEFAULT_DATETIME_GMT_OFFSET),
+    ):
+        state[key] = str(state.get(key, default)).strip()
     return state
 
 
@@ -6944,7 +7683,14 @@ def decimalize_long_terminating_rational_tokens(text: str) -> str:
 
 
 def precision_limit_result_fields(fields: dict[str, str], precision: int) -> None:
-    for key in ("expression", "unbound", "tex", "function", "derivative_function"):
+    for key in (
+        "expression",
+        "unbound",
+        "tex",
+        "function",
+        "derivative_function",
+        "integral_function",
+    ):
         value = fields.get(key, "")
         if not value:
             continue
@@ -7043,7 +7789,7 @@ def parse_keyed_output(
             match = re.match(pattern, line)
             if match:
                 value = match.group(1).rstrip()
-                if key in fields and key not in multiline_fields:
+                if key in fields:
                     fields[key] = fields[key] + "\n" + value
                 else:
                     fields[key] = value
@@ -7072,8 +7818,23 @@ def parse_mars_lab_output(output: str) -> dict[str, str]:
         "derivative_function": r"^derivative_function\s{2,}(.*)$",
         "derivative_tex": r"^derivative_tex\s*(.*)$",
         "derivative_value": r"^d value\s+(.*)$",
+        "integral": r"^integral\s+(.*)$",
+        "integral_function": r"^integral_function\s{2,}(.*)$",
+        "integral_tex": r"^integral_tex\s*(.*)$",
+        "integral_value": r"^i value\s+(.*)$",
     }
-    return parse_keyed_output(output, patterns, {"function", "derivative_function"})
+    return parse_keyed_output(
+        output,
+        patterns,
+        {
+            "function",
+            "tex",
+            "derivative_function",
+            "derivative_tex",
+            "integral_function",
+            "integral_tex",
+        },
+    )
 
 
 def parse_matrix_lab_output(output: str) -> dict[str, str]:
@@ -7091,7 +7852,7 @@ def parse_matrix_lab_output(output: str) -> dict[str, str]:
             "tex": r"^tex\s+(.*)$",
             "error": r"^error\s+(.*)$",
         },
-        {"pretty"},
+        {"pretty", "tex"},
     )
 
 
@@ -7141,7 +7902,59 @@ def parse_equation_lab_output(output: str) -> dict[str, str]:
             "solutions": r"^solutions\s+(.*)$",
             "numeric": r"^numeric\s+(.*)$",
         },
-        {"solutions"},
+        {"tex", "solutions_tex", "solutions"},
+    )
+
+
+def parse_datetime_lab_output(output: str) -> dict[str, str]:
+    return parse_keyed_output(
+        output,
+        {
+            "date": r"^date\s+(.*)$",
+            "weekday": r"^weekday\s+(.*)$",
+            "julian_day_number": r"^julian_day_number\s+(.*)$",
+            "moon_phase": r"^moon_phase\s+(.*)$",
+            "solar_declination": r"^solar_declination\s+(.*)$",
+            "solar_max_altitude": r"^solar_max_altitude\s+(.*)$",
+            "solar_inclination": r"^solar_inclination\s+(.*)$",
+            "latitude": r"^latitude\s+(.*)$",
+            "longitude": r"^longitude\s+(.*)$",
+            "gmt_offset": r"^gmt_offset\s+(.*)$",
+            "sunrise": r"^sunrise\s+(.*)$",
+            "sunrise_status": r"^sunrise_status\s+(.*)$",
+            "sunset": r"^sunset\s+(.*)$",
+            "sunset_status": r"^sunset_status\s+(.*)$",
+            "start": r"^start\s+(.*)$",
+            "end": r"^end\s+(.*)$",
+            "days_between": r"^days_between\s+(.*)$",
+            "days_between_abs": r"^days_between_abs\s+(.*)$",
+            "duration_years": r"^duration_years\s+(.*)$",
+            "duration_months": r"^duration_months\s+(.*)$",
+            "duration_days": r"^duration_days\s+(.*)$",
+            "easter": r"^easter\s+(.*)$",
+            "orthodox_easter": r"^orthodox_easter\s+(.*)$",
+            "christmas": r"^christmas\s+(.*)$",
+            "orthodox_christmas": r"^orthodox_christmas\s+(.*)$",
+            "chinese_new_year": r"^chinese_new_year\s+(.*)$",
+            "diwali": r"^diwali\s+(.*)$",
+            "holi": r"^holi\s+(.*)$",
+            "hindu_new_year": r"^hindu_new_year\s+(.*)$",
+            "buddhist_new_year": r"^buddhist_new_year\s+(.*)$",
+            "vesak": r"^vesak\s+(.*)$",
+            "asalha_puja": r"^asalha_puja\s+(.*)$",
+            "ramadan": r"^ramadan\s+(.*)$",
+            "ramadan_starts_gmt": r"^ramadan_starts_gmt\s+(.*)$",
+            "eid_al_fitr": r"^eid_al_fitr\s+(.*)$",
+            "eid_al_fitr_starts_gmt": r"^eid_al_fitr_starts_gmt\s+(.*)$",
+            "muslim_new_year": r"^muslim_new_year\s+(.*)$",
+            "muslim_new_year_starts_gmt": r"^muslim_new_year_starts_gmt\s+(.*)$",
+            "passover": r"^passover\s+(.*)$",
+            "passover_starts_gmt": r"^passover_starts_gmt\s+(.*)$",
+            "jewish_new_year": r"^jewish_new_year\s+(.*)$",
+            "jewish_new_year_starts_gmt": r"^jewish_new_year_starts_gmt\s+(.*)$",
+            "bank_holiday": r"^bank_holiday\s+(.*)$",
+        },
+        {"bank_holiday"},
     )
 
 
@@ -7664,8 +8477,11 @@ def run_mars_lab_fields(
     expression: str,
     precision: int,
     wrt: str = "x",
+    action: str = "",
 ) -> tuple[dict[str, str], str, int]:
     command = [str(binary), expression, wrt, str(max(17, precision))]
+    if action:
+        command.append(action)
     completed = subprocess.run(
         command,
         cwd=ROOT,
@@ -7757,6 +8573,36 @@ def run_equation_lab_fields(
     if completed.stderr:
         raw = raw + ("\n" if raw else "") + completed.stderr
     return parse_equation_lab_output(raw), raw, completed.returncode
+
+
+def run_datetime_lab_fields(
+    binary: Path,
+    options: dict[str, str],
+) -> tuple[dict[str, str], str, int]:
+    command = [str(binary)]
+    for key in (
+        "date",
+        "start",
+        "end",
+        "year",
+        "lat",
+        "lon",
+        "gmt_offset",
+    ):
+        if key in options:
+            command.append(f"{key}={str(options.get(key, '')).strip()}")
+
+    completed = subprocess.run(
+        command,
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        timeout=10,
+    )
+    raw = completed.stdout
+    if completed.stderr:
+        raw = raw + ("\n" if raw else "") + completed.stderr
+    return parse_datetime_lab_output(raw), raw, completed.returncode
 
 
 def matrix_failure_hint(
@@ -7901,13 +8747,18 @@ def prepare_evaluation_fields(
         fields["derivative_value"] = format_number_text_for_precision(
             fields["derivative_value"], precision, zero_subprecision=True
         )
+    if fields.get("integral_value"):
+        fields["integral_value"] = format_number_text_for_precision(
+            fields["integral_value"], precision, zero_subprecision=True
+        )
 
     precision_limit_result_fields(fields, precision)
     fields["editor_expression"] = editor_expression_from_fields(fields)
     if save_expression and fields.get("expression"):
         save_state_expression(expression_for_editor(expression))
 
-    fields["full_display_expression"] = expression_for_display(fields.get("expression", ""))
+    display_expression_source = fields.get("unbound", "") or fields.get("expression", "")
+    fields["full_display_expression"] = expression_for_display(display_expression_source)
     fields["full_display_tex"] = tex_for_display(fields.get("tex", ""))
     fields["full_display_function"] = function_for_display(fields.get("function", ""))
     fields["display_expression"] = compact_display_text(str(fields["full_display_expression"]))
@@ -7927,6 +8778,20 @@ def prepare_evaluation_fields(
             fields["derivative_svg"] = derivative_svg
         elif derivative_render_error:
             fields["derivative_render_error"] = derivative_render_error
+    fields["full_display_integral_function"] = function_for_display(
+        fields.get("integral_function", "")
+    )
+    fields["display_integral_function"] = compact_function_text(
+        str(fields["full_display_integral_function"])
+    )
+    integral_tex = tex_for_display(str(fields.get("integral_tex") or ""))
+    fields["integral_tex"] = integral_tex
+    if integral_tex:
+        integral_svg, integral_render_error = render_tex_to_svg(integral_tex)
+        if integral_svg:
+            fields["integral_svg"] = integral_svg
+        elif integral_render_error:
+            fields["integral_render_error"] = integral_render_error
     fields["binding_values"] = expression_variable_binding_values(
         fields.get("expression", "") or expression,
         precision,
@@ -8143,6 +9008,239 @@ def prepare_equation_fields(fields: dict[str, str], precision: int) -> dict[str,
     return payload
 
 
+def prepare_datetime_fields(fields: dict[str, str]) -> dict[str, object]:
+    date = str(fields.get("date") or "").strip()
+    weekday = str(fields.get("weekday") or "").strip()
+    moon_phase = str(fields.get("moon_phase") or "").strip()
+    sunrise = str(fields.get("sunrise") or "").strip()
+    sunset = str(fields.get("sunset") or "").strip()
+    sunrise_status = str(fields.get("sunrise_status") or "").strip()
+    sunset_status = str(fields.get("sunset_status") or "").strip()
+    gmt_offset = str(fields.get("gmt_offset") or "").strip()
+    offset_text = "local machine GMT offset" if gmt_offset == "local" else f"GMT offset {gmt_offset}"
+
+    overview_lines = [
+        f"{weekday} {date}".strip(),
+        f"Moon phase: {moon_phase}" if moon_phase else "",
+        f"Sunrise: {sunrise}" if sunrise and sunrise != "unavailable" else f"Sunrise: {sunrise_status or 'unavailable'}",
+        f"Sunset: {sunset}" if sunset and sunset != "unavailable" else f"Sunset: {sunset_status or 'unavailable'}",
+        offset_text if gmt_offset else "",
+    ]
+    overview_sections = [
+        {
+            "title": "Date",
+            "open": True,
+            "rows": [
+                {"label": "Date", "value": date},
+                {"label": "Weekday", "value": weekday},
+                {"label": "Moon phase", "value": moon_phase},
+                {"label": "Time basis", "value": offset_text},
+            ],
+        },
+        {
+            "title": "Sunlight",
+            "open": True,
+            "rows": [
+                {
+                    "label": "Sunrise",
+                    "value": sunrise if sunrise and sunrise != "unavailable" else (sunrise_status or "unavailable"),
+                },
+                {
+                    "label": "Sunset",
+                    "value": sunset if sunset and sunset != "unavailable" else (sunset_status or "unavailable"),
+                },
+            ],
+        },
+    ]
+    range_lines = [
+        f"Start date: {str(fields.get('start') or '').strip()}",
+        f"End date: {str(fields.get('end') or '').strip()}",
+        f"Days between: {str(fields.get('days_between') or '').strip()}",
+        f"Absolute days: {str(fields.get('days_between_abs') or '').strip()}",
+        "Calendar span: "
+        f"{str(fields.get('duration_years') or '0').strip()} years, "
+        f"{str(fields.get('duration_months') or '0').strip()} months, "
+        f"{str(fields.get('duration_days') or '0').strip()} days",
+    ]
+    range_sections = [
+        {
+            "title": "Range",
+            "open": True,
+            "rows": [
+                {"label": "Start date", "value": str(fields.get("start") or "").strip()},
+                {"label": "End date", "value": str(fields.get("end") or "").strip()},
+                {"label": "Days between", "value": str(fields.get("days_between") or "").strip()},
+                {"label": "Absolute days", "value": str(fields.get("days_between_abs") or "").strip()},
+                {
+                    "label": "Calendar span",
+                    "value": (
+                        f"{str(fields.get('duration_years') or '0').strip()} years, "
+                        f"{str(fields.get('duration_months') or '0').strip()} months, "
+                        f"{str(fields.get('duration_days') or '0').strip()} days"
+                    ),
+                },
+            ],
+        },
+    ]
+    calendar_lines = [
+        f"Easter Sunday: {str(fields.get('easter') or '').strip()}",
+        f"Orthodox Easter Sunday: {str(fields.get('orthodox_easter') or '').strip()}",
+        f"Christmas Day: {str(fields.get('christmas') or '').strip()}",
+        f"Orthodox Christmas Day: {str(fields.get('orthodox_christmas') or '').strip()}",
+        f"Chinese New Year: {str(fields.get('chinese_new_year') or '').strip()}",
+        f"Diwali (estimated): {str(fields.get('diwali') or '').strip()}",
+        f"Holi (estimated): {str(fields.get('holi') or '').strip()}",
+        f"Hindu New Year (estimated): {str(fields.get('hindu_new_year') or '').strip()}",
+        f"Buddhist New Year (estimated): {str(fields.get('buddhist_new_year') or '').strip()}",
+        f"Vesak / Buddha Day (estimated): {str(fields.get('vesak') or '').strip()}",
+        f"Asalha Puja / Dharma Day (estimated): {str(fields.get('asalha_puja') or '').strip()}",
+        f"Ramadan begins (civil Islamic): {str(fields.get('ramadan') or '').strip()}",
+        f"Ramadan begins at sunset (GMT): {str(fields.get('ramadan_starts_gmt') or '').strip()}",
+        f"Eid al-Fitr (civil Islamic): {str(fields.get('eid_al_fitr') or '').strip()}",
+        f"Eid al-Fitr begins at sunset (GMT): {str(fields.get('eid_al_fitr_starts_gmt') or '').strip()}",
+        f"Muslim New Year (civil Islamic): {str(fields.get('muslim_new_year') or '').strip()}",
+        f"Muslim New Year begins at sunset (GMT): {str(fields.get('muslim_new_year_starts_gmt') or '').strip()}",
+        f"Passover: {str(fields.get('passover') or '').strip()}",
+        f"Passover begins at sunset (GMT): {str(fields.get('passover_starts_gmt') or '').strip()}",
+        f"Jewish New Year: {str(fields.get('jewish_new_year') or '').strip()}",
+        f"Jewish New Year begins at sunset (GMT): {str(fields.get('jewish_new_year_starts_gmt') or '').strip()}",
+        f"Julian Day Number: {str(fields.get('julian_day_number') or '').strip()}",
+    ]
+    calendar_sections = [
+        {
+            "title": "Christian",
+            "open": False,
+            "rows": [
+                {"label": "Easter Sunday", "value": str(fields.get("easter") or "").strip()},
+                {"label": "Orthodox Easter Sunday", "value": str(fields.get("orthodox_easter") or "").strip()},
+                {"label": "Christmas Day", "value": str(fields.get("christmas") or "").strip()},
+                {"label": "Orthodox Christmas Day", "value": str(fields.get("orthodox_christmas") or "").strip()},
+            ],
+        },
+        {
+            "title": "Chinese",
+            "open": False,
+            "rows": [
+                {"label": "New Year", "value": str(fields.get("chinese_new_year") or "").strip()},
+            ],
+        },
+        {
+            "title": "Hindu",
+            "open": False,
+            "rows": [
+                {"label": "Diwali (estimated)", "value": str(fields.get("diwali") or "").strip()},
+                {"label": "Holi (estimated)", "value": str(fields.get("holi") or "").strip()},
+                {"label": "Hindu New Year (estimated)", "value": str(fields.get("hindu_new_year") or "").strip()},
+            ],
+        },
+        {
+            "title": "Buddhist",
+            "open": False,
+            "rows": [
+                {"label": "Buddhist New Year (estimated)", "value": str(fields.get("buddhist_new_year") or "").strip()},
+                {"label": "Vesak / Buddha Day (estimated)", "value": str(fields.get("vesak") or "").strip()},
+                {"label": "Asalha Puja / Dharma Day (estimated)", "value": str(fields.get("asalha_puja") or "").strip()},
+            ],
+        },
+        {
+            "title": "Muslim",
+            "open": False,
+            "rows": [
+                {"label": "Ramadan begins (civil Islamic)", "value": str(fields.get("ramadan") or "").strip()},
+                {"label": "Ramadan begins at sunset (GMT)", "value": str(fields.get("ramadan_starts_gmt") or "").strip()},
+                {"label": "Eid al-Fitr (civil Islamic)", "value": str(fields.get("eid_al_fitr") or "").strip()},
+                {"label": "Eid al-Fitr begins at sunset (GMT)", "value": str(fields.get("eid_al_fitr_starts_gmt") or "").strip()},
+                {"label": "Muslim New Year (civil Islamic)", "value": str(fields.get("muslim_new_year") or "").strip()},
+                {"label": "Muslim New Year begins at sunset (GMT)", "value": str(fields.get("muslim_new_year_starts_gmt") or "").strip()},
+            ],
+        },
+        {
+            "title": "Jewish",
+            "open": False,
+            "rows": [
+                {"label": "Passover", "value": str(fields.get("passover") or "").strip()},
+                {"label": "Passover begins at sunset (GMT)", "value": str(fields.get("passover_starts_gmt") or "").strip()},
+                {"label": "Jewish New Year", "value": str(fields.get("jewish_new_year") or "").strip()},
+                {"label": "Jewish New Year begins at sunset (GMT)", "value": str(fields.get("jewish_new_year_starts_gmt") or "").strip()},
+            ],
+        },
+        {
+            "title": "Reference",
+            "open": False,
+            "rows": [
+                {"label": "Julian Day Number", "value": str(fields.get("julian_day_number") or "").strip()},
+            ],
+        },
+    ]
+    bank_holiday_text = str(fields.get("bank_holiday") or "").strip()
+    england_lines = []
+    england_rows = []
+    if bank_holiday_text:
+        england_lines.append(
+            "English bank holidays between "
+            f"{str(fields.get('start') or '').strip()} and {str(fields.get('end') or '').strip()}:"
+        )
+        for line in bank_holiday_text.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            england_lines.append(line)
+            match = re.match(r"^(.*?):\s*(\d{4}-\d{2}-\d{2})$", line)
+            if match:
+                england_rows.append({"label": match.group(1).strip(), "value": match.group(2)})
+            else:
+                england_rows.append({"label": line, "value": ""})
+    england_sections = []
+    if england_rows:
+        england_sections.append({
+            "title": f"English bank holidays ({str(fields.get('start') or '').strip()} to {str(fields.get('end') or '').strip()})",
+            "open": True,
+            "rows": england_rows,
+        })
+    solar_lines = [
+        f"Latitude: {str(fields.get('latitude') or '').strip()}",
+        f"Longitude: {str(fields.get('longitude') or '').strip()}",
+        f"Solar declination: {str(fields.get('solar_declination') or '').strip()}°",
+        f"Sun's noon inclination: {str(fields.get('solar_inclination') or '').strip()}°",
+        f"Sun's maximum altitude: {str(fields.get('solar_max_altitude') or '').strip()}°",
+    ]
+    solar_sections = [
+        {
+            "title": "Location",
+            "open": True,
+            "rows": [
+                {"label": "Latitude", "value": str(fields.get("latitude") or "").strip()},
+                {"label": "Longitude", "value": str(fields.get("longitude") or "").strip()},
+            ],
+        },
+        {
+            "title": "Solar",
+            "open": True,
+            "rows": [
+                {"label": "Solar declination", "value": f"{str(fields.get('solar_declination') or '').strip()}°"},
+                {"label": "Sun's noon inclination", "value": f"{str(fields.get('solar_inclination') or '').strip()}°"},
+                {"label": "Sun's maximum altitude", "value": f"{str(fields.get('solar_max_altitude') or '').strip()}°"},
+            ],
+        },
+    ]
+
+    return {
+        "ok": True,
+        "mode": "datetime",
+        "overview": "\n".join(line for line in overview_lines if line),
+        "overview_sections": overview_sections,
+        "range": "\n".join(line for line in range_lines if line.strip(": ")),
+        "range_sections": range_sections,
+        "calendar": "\n".join(line for line in calendar_lines if line.strip(": ")),
+        "calendar_sections": calendar_sections,
+        "england": "\n".join(line for line in england_lines if line.strip(": ")),
+        "england_sections": england_sections,
+        "solar": "\n".join(line for line in solar_lines if line.strip(": ")),
+        "solar_sections": solar_sections,
+        "fields": fields,
+    }
+
+
 def integrator_tex_for_display(tex: str) -> str:
     tex = str(tex or "").strip()
     if not tex:
@@ -8168,6 +9266,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
     equation_binary: Path = DEFAULT_EQUATION_BIN
     matrix_binary: Path = DEFAULT_MATRIX_BIN
     integrator_binary: Path = DEFAULT_INTEGRATOR_BIN
+    datetime_binary: Path = DEFAULT_DATETIME_BIN
     server_host: str = "127.0.0.1"
     server_port: int = 0
     mobile_url: str = ""
@@ -8295,6 +9394,11 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
             .replace("__DEFAULT_INTEGRATOR__", json.dumps(DEFAULT_INTEGRATOR_EXPRESSION))
             .replace("__DEFAULT_INTEGRATOR_BOUNDS__", json.dumps(DEFAULT_INTEGRATOR_BOUNDS))
             .replace("__DEFAULT_INTEGRATOR_INTERVAL_CAP__", json.dumps(DEFAULT_INTEGRATOR_INTERVAL_CAP))
+            .replace("__DEFAULT_DATETIME_TEXT__", json.dumps(DEFAULT_DATETIME_TEXT))
+            .replace("__DEFAULT_DATETIME_DATE__", json.dumps(DEFAULT_DATETIME_DATE))
+            .replace("__DEFAULT_DATETIME_LATITUDE__", json.dumps(DEFAULT_DATETIME_LATITUDE))
+            .replace("__DEFAULT_DATETIME_LONGITUDE__", json.dumps(DEFAULT_DATETIME_LONGITUDE))
+            .replace("__DEFAULT_DATETIME_GMT_OFFSET__", json.dumps(DEFAULT_DATETIME_GMT_OFFSET))
             .replace("__CONTROL_TOKEN__", json.dumps(CONTROL_TOKEN if control_allowed else ""))
         )
         data = page.encode("utf-8")
@@ -8334,7 +9438,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                     updates["matrix"] = matrix
 
                 lab_mode = str(payload.get("lab_mode", "")).strip()
-                if lab_mode in {"expression", "equation", "matrix", "integrator"}:
+                if lab_mode in {"expression", "equation", "matrix", "integrator", "datetime"}:
                     updates["lab_mode"] = lab_mode
 
                 equation = str(payload.get("equation", "")).strip()
@@ -8377,10 +9481,22 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                     if cap in INTEGRATOR_INTERVAL_CAP_CHOICES:
                         updates["integrator_interval_cap"] = cap
 
+                for key in (
+                    "datetime_date",
+                    "datetime_start",
+                    "datetime_end",
+                    "datetime_year",
+                    "datetime_latitude",
+                    "datetime_longitude",
+                    "datetime_gmt_offset",
+                ):
+                    if key in payload:
+                        updates[key] = str(payload.get(key, "")).strip()
+
                 if isinstance(payload.get("precision_bits"), dict):
                     saved_precision = load_state_data().get("precision_bits", {})
                     precision_bits = dict(saved_precision) if isinstance(saved_precision, dict) else {}
-                    for mode in ("expression", "equation", "matrix", "integrator"):
+                    for mode in ("expression", "equation", "matrix", "integrator", "datetime"):
                         if mode in payload["precision_bits"]:
                             bits = int(payload["precision_bits"][mode])
                             precision_bits[mode] = max(17, min(MAX_VALUE_PRECISION_BITS, bits))
@@ -8392,6 +9508,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                         "equation": 256,
                         "matrix": 256,
                         "integrator": 17,
+                        "datetime": 17,
                     }
 
                 if updates:
@@ -8621,6 +9738,69 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
             self.send_json(200, response_payload)
             return
 
+        if path == "/datetime-eval":
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                body = self.rfile.read(length)
+                payload = json.loads(body.decode("utf-8"))
+                date_text = str(payload.get("date", DEFAULT_DATETIME_DATE)).strip()
+                start_text = str(payload.get("start", date_text)).strip()
+                end_text = str(payload.get("end", date_text)).strip()
+                year_text = str(payload.get("year", date_text[:4] or DEFAULT_DATETIME_DATE[:4])).strip()
+                latitude_text = str(payload.get("latitude", DEFAULT_DATETIME_LATITUDE)).strip()
+                longitude_text = str(payload.get("longitude", DEFAULT_DATETIME_LONGITUDE)).strip()
+                gmt_offset_text = str(payload.get("gmt_offset", "")).strip()
+                for date_value in (date_text, start_text, end_text):
+                    py_datetime.date.fromisoformat(date_value)
+                year = max(1, min(9999, int(year_text)))
+                latitude = float(latitude_text)
+                longitude = float(longitude_text)
+                if latitude < -90.0 or latitude > 90.0:
+                    raise ValueError("Latitude must be between -90 and 90")
+                if longitude < -180.0 or longitude > 180.0:
+                    raise ValueError("Longitude must be between -180 and 180")
+                if gmt_offset_text:
+                    gmt_offset = float(gmt_offset_text)
+                    if gmt_offset < -14.0 or gmt_offset > 14.0:
+                        raise ValueError("GMT offset must be between -14 and 14")
+            except Exception as exc:
+                self.send_json(400, {"ok": False, "error": f"Bad request: {exc}"})
+                return
+
+            try:
+                ensure_scratch_binary(self.datetime_binary, "scratch/datetime_lab")
+                fields, raw, returncode = run_datetime_lab_fields(
+                    self.datetime_binary,
+                    {
+                        "date": date_text,
+                        "start": start_text,
+                        "end": end_text,
+                        "year": str(year),
+                        "lat": str(latitude),
+                        "lon": str(longitude),
+                        "gmt_offset": gmt_offset_text,
+                    },
+                )
+            except Exception as exc:
+                self.send_json(422, {"ok": False, "error": str(exc)})
+                return
+
+            if returncode != 0:
+                self.send_json(422, {"ok": False, "error": raw or "Datetime calculation failed"})
+                return
+
+            save_state_data({
+                "datetime_date": date_text,
+                "datetime_start": start_text,
+                "datetime_end": end_text,
+                "datetime_year": str(year),
+                "datetime_latitude": str(latitude),
+                "datetime_longitude": str(longitude),
+                "datetime_gmt_offset": gmt_offset_text,
+            })
+            self.send_json(200, prepare_datetime_fields(fields))
+            return
+
         if path == "/goal_seek":
             try:
                 length = int(self.headers.get("Content-Length", "0"))
@@ -8686,7 +9866,12 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
             payload = json.loads(body.decode("utf-8"))
             expression = str(payload.get("expression", "")).strip()
             requested_wrt = str(payload.get("wrt", "")).strip()
-            derivative_request = bool(requested_wrt)
+            action = str(payload.get("action", "")).strip().lower()
+            if action not in {"", "derivative", "integral"}:
+                raise ValueError("Action must be derivative or integral")
+            operation_request = bool(requested_wrt) or action in {"derivative", "integral"}
+            derivative_request = bool(requested_wrt) and action != "integral"
+            integral_request = action == "integral"
             wrt = requested_wrt or "x"
             precision = int(payload.get("precision", 96))
         except Exception as exc:
@@ -8702,6 +9887,8 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
         try:
             command = [str(self.binary), expression]
             command.extend([wrt, str(precision)])
+            if integral_request:
+                command.append("integral")
             completed = subprocess.run(
                 command,
                 cwd=ROOT,
@@ -8726,11 +9913,12 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                 fallback_expression = expression_with_binding_value(expression, binding_name, "NAN")
                 if fallback_expression:
                     fallback_fields, fallback_raw, fallback_rc = run_mars_lab_fields(
-                        self.binary,
-                        fallback_expression,
-                        precision,
-                        wrt,
-                    )
+                            self.binary,
+                            fallback_expression,
+                            precision,
+                            wrt,
+                            "integral" if integral_request else "",
+                        )
                     if fallback_rc == 0:
                         fallback_fields["ok"] = True
                         fallback_fields["partial_error"] = True
@@ -8762,7 +9950,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
             fields,
             expression,
             precision,
-            save_expression=not derivative_request,
+            save_expression=not operation_request,
             wrt=wrt,
         )
 
@@ -8818,14 +10006,17 @@ def main() -> int:
     parser.add_argument("--browser", default="", help="browser executable to open the lab URL")
     parser.add_argument("--binary", type=Path, default=DEFAULT_BIN, help="path to the scratch lab binary")
     parser.add_argument("--equation-binary", type=Path, default=DEFAULT_EQUATION_BIN, help="path to the equation scratch binary")
+    parser.add_argument("--datetime-binary", type=Path, default=DEFAULT_DATETIME_BIN, help="path to the datetime scratch binary")
     args = parser.parse_args()
 
     binary = args.binary if args.binary.is_absolute() else ROOT / args.binary
     equation_binary = args.equation_binary if args.equation_binary.is_absolute() else ROOT / args.equation_binary
+    datetime_binary = args.datetime_binary if args.datetime_binary.is_absolute() else ROOT / args.datetime_binary
     ensure_mars_lab(binary)
 
     MarsLabHandler.binary = binary
     MarsLabHandler.equation_binary = equation_binary
+    MarsLabHandler.datetime_binary = datetime_binary
 
     port = args.port or find_free_port(args.host)
     MarsLabHandler.server_host = args.host

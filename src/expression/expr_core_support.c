@@ -108,8 +108,16 @@ void expr_store_value_num(expr_t *dv, number_t value)
 bool expr_ops_is_lambert(const expr_ops_t *ops)
 {
     return ops == &ops_lambert_w ||
+           ops == &ops_lambert_wn ||
            ops == &ops_lambert_w0 ||
            ops == &ops_lambert_wm1;
+}
+
+const expr_t *expr_lambert_arg(const expr_t *expr)
+{
+    if (!expr || !expr_ops_is_lambert(expr->ops))
+        return NULL;
+    return expr_is_op(expr, &ops_lambert_wn) ? expr->b : expr->a;
 }
 
 bool expr_ops_is_floor_or_ceil(const expr_ops_t *ops)

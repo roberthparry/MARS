@@ -533,7 +533,7 @@ static void test_equation_solves_self_power_with_lambert_w(void)
     ASSERT_EQ_INT((int)RESULT_COUNT(result), 1);
     ASSERT_TRUE(equ_is_solved_for(RESULT_SOLUTION(result, 0u), x));
     ASSERT_TRUE(test_equation_result_has_rhs_string(
-        result, "(ln(-3) + 2iπn)/W(ln(-3) + 2iπn)"));
+        result, "(ln(-3) + 2iπn)/Wₙ(k, ln(-3) + 2iπn)"));
 
     equ_solve_result_free(result);
     equ_free(equation);

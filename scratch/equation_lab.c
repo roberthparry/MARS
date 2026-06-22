@@ -72,9 +72,109 @@ static char *number_precision_text_dup(number_t value, int precision)
 
 static char *expr_tex_body_dup(const expr_t *expr)
 {
-    char *body = expr_to_tex_body(expr);
+    char *body = expr_to_tex_body_wrapped(expr, 110u);
 
     return body ? body : expr_text_dup(expr, style_TEX);
+}
+
+static bool tex_wrapped_aligned_body(const char *tex,
+                                     const char **body_out,
+                                     size_t *body_len_out)
+{
+    static const char prefix[] = "\\begin{aligned}[t]\n";
+    static const char suffix[] = "\n\\end{aligned}";
+    const char *body;
+    const char *end;
+    size_t suffix_len = strlen(suffix);
+
+    if (body_out)
+        *body_out = NULL;
+    if (body_len_out)
+        *body_len_out = 0u;
+    if (!tex || strncmp(tex, prefix, strlen(prefix)) != 0)
+        return false;
+
+    end = tex + strlen(tex);
+    if ((size_t)(end - tex) < suffix_len ||
+        strcmp(end - suffix_len, suffix) != 0)
+        return false;
+
+    body = tex + strlen(prefix);
+    if (*body == '&')
+        body++;
+    end -= suffix_len;
+    while (end > body && (end[-1] == ' ' || end[-1] == '\n' || end[-1] == '\r' ||
+                          end[-1] == '\t'))
+        end--;
+
+    if (body_out)
+        *body_out = body;
+    if (body_len_out)
+        *body_len_out = (size_t)(end - body);
+    return true;
+}
+
+static void print_aligned_equation_fragment(const char *lhs, const char *rhs)
+{
+    const char *body = NULL;
+    size_t body_len = 0u;
+
+    if (!lhs)
+        lhs = "\\text{null}";
+    if (!rhs)
+        rhs = "\\text{null}";
+    if (tex_wrapped_aligned_body(rhs, &body, &body_len))
+        printf("%s &= %.*s", lhs, (int)body_len, body);
+    else
+        printf("%s &= %s", lhs, rhs);
+}
+
+static char *equation_display_tex_dup(const equation_t *equation)
+{
+    char *lhs = NULL;
+    char *rhs = NULL;
+    char *out = NULL;
+    const char *rhs_body = NULL;
+    size_t rhs_body_len = 0u;
+    int needed;
+
+    if (!equation)
+        return NULL;
+
+    lhs = expr_tex_body_dup(equ_lhs(equation));
+    rhs = expr_tex_body_dup(equ_rhs(equation));
+    if (!lhs || !rhs)
+        goto cleanup;
+
+    if (tex_wrapped_aligned_body(rhs, &rhs_body, &rhs_body_len)) {
+        needed = snprintf(NULL, 0,
+                          "\\begin{aligned}[t]\n%s ={}& %.*s\n\\end{aligned}",
+                          lhs, (int)rhs_body_len, rhs_body);
+    } else {
+        needed = snprintf(NULL, 0,
+                          "\\begin{aligned}[t]\n%s &= %s\n\\end{aligned}",
+                          lhs, rhs);
+    }
+    if (needed < 0)
+        goto cleanup;
+
+    out = malloc((size_t)needed + 1u);
+    if (!out)
+        goto cleanup;
+    if (tex_wrapped_aligned_body(rhs, &rhs_body, &rhs_body_len)) {
+        snprintf(out, (size_t)needed + 1u,
+                 "\\begin{aligned}[t]\n%s ={}& %.*s\n\\end{aligned}",
+                 lhs, (int)rhs_body_len, rhs_body);
+    } else {
+        snprintf(out, (size_t)needed + 1u,
+                 "\\begin{aligned}[t]\n%s &= %s\n\\end{aligned}",
+                 lhs, rhs);
+    }
+
+cleanup:
+    free(rhs);
+    free(lhs);
+    return out;
 }
 
 static equation_t *display_simplified_equation(const equation_t *equation)
@@ -270,10 +370,12 @@ static void print_solutions_tex(const equation_solutions_t *solutions,
         char *rhs_tex = expr_tex_body_dup(equ_rhs(shown));
         char *tex = equ_text_dup(shown, style_TEX);
 
-        if (name && rhs_tex)
-            printf("%s%s &= %s", i == 0u ? " " : " \\\\ ", name, rhs_tex);
+        if (name && rhs_tex) {
+            printf("%s", i == 0u ? " " : " \\\\\n");
+            print_aligned_equation_fragment(name, rhs_tex);
+        }
         else
-            printf("%s%s", i == 0u ? " " : " \\\\ ", tex ? tex : "\\text{null}");
+            printf("%s%s", i == 0u ? " " : " \\\\\n", tex ? tex : "\\text{null}");
         equ_free(display);
         free(tex);
         free(rhs_tex);
@@ -281,36 +383,97 @@ static void print_solutions_tex(const equation_solutions_t *solutions,
     printf(" \\end{aligned}\n");
 }
 
-static number_t eval_solution_rhs_with_sampled_n(const expr_t *rhs,
-                                                 bool *sampled_out)
+static bool substitute_named_zero_if_present(expr_t **expr_io, const char *name)
+{
+    number_t zero_value;
+    expr_t *needle;
+    expr_t *zero;
+    expr_t *next;
+    char *before;
+    char *after;
+    bool changed = false;
+
+    if (!expr_io || !*expr_io || !name)
+        return false;
+
+    before = expr_text_dup(*expr_io, style_UNBOUND);
+    zero_value = num_create_from_long(0L);
+    needle = expr_new_named_var(NUM_NAN, name);
+    zero = expr_new_const(zero_value);
+    num_destroy(&zero_value);
+    next = (needle && zero) ? expr_substitute(*expr_io, needle, zero) : NULL;
+    expr_free(needle);
+    expr_free(zero);
+    if (!next) {
+        free(before);
+        return false;
+    }
+
+    after = expr_text_dup(next, style_UNBOUND);
+    changed = before && after && strcmp(before, after) != 0;
+    free(before);
+    free(after);
+
+    expr_free(*expr_io);
+    *expr_io = next;
+    return changed;
+}
+
+static const char *sample_note(bool sampled_k, bool sampled_n)
+{
+    if (sampled_k && sampled_n)
+        return "  (k = 0, n = 0)";
+    if (sampled_k)
+        return "  (k = 0)";
+    if (sampled_n)
+        return "  (n = 0)";
+    return "";
+}
+
+static number_t eval_solution_rhs_with_sampled_indices(const expr_t *rhs,
+                                                       bool *sampled_k_out,
+                                                       bool *sampled_n_out)
 {
     number_t value;
 
-    if (sampled_out)
-        *sampled_out = false;
+    if (sampled_k_out)
+        *sampled_k_out = false;
+    if (sampled_n_out)
+        *sampled_n_out = false;
 
     value = expr_eval(rhs);
     if (num_is_finite(value) && !num_is_nan(value))
         return value;
 
     {
-        number_t zero_value = num_create_from_long(0L);
-        expr_t *n = expr_new_named_var(NUM_NAN, "n");
-        expr_t *zero = expr_new_const(zero_value);
-        expr_t *sampled = (n && zero) ? expr_substitute(rhs, n, zero) : NULL;
+        bool sampled_k = false;
+        bool sampled_n = false;
+        expr_t *sampled = expr_clone(rhs);
         expr_t *simplified = sampled ? expr_simplify(sampled) : NULL;
         number_t sampled_value = simplified ? expr_eval(simplified) : num_new();
 
-        num_destroy(&zero_value);
+        expr_free(simplified);
+        if (num_is_finite(sampled_value) && !num_is_nan(sampled_value)) {
+            expr_free(sampled);
+            num_destroy(&value);
+            return sampled_value;
+        }
+        num_destroy(&sampled_value);
+
+        sampled_k = substitute_named_zero_if_present(&sampled, "k");
+        sampled_n = substitute_named_zero_if_present(&sampled, "n");
+        simplified = sampled ? expr_simplify(sampled) : NULL;
+        sampled_value = simplified ? expr_eval(simplified) : num_new();
+
         expr_free(simplified);
         expr_free(sampled);
-        expr_free(zero);
-        expr_free(n);
 
         if (num_is_finite(sampled_value) && !num_is_nan(sampled_value)) {
             num_destroy(&value);
-            if (sampled_out)
-                *sampled_out = true;
+            if (sampled_k_out)
+                *sampled_k_out = sampled_k;
+            if (sampled_n_out)
+                *sampled_n_out = sampled_n;
             return sampled_value;
         }
 
@@ -336,18 +499,21 @@ static void print_solution_numerics(const equation_solutions_t *solutions,
         const char *name = solution_binding_name(bindings, solution);
         equation_t *display = solution_with_bound_constants(solution, bindings);
         const equation_t *shown = display ? display : solution;
+        bool sampled_k = false;
         bool sampled_n = false;
-        number_t value = eval_solution_rhs_with_sampled_n(equ_rhs(shown),
-                                                          &sampled_n);
+        number_t value = eval_solution_rhs_with_sampled_indices(equ_rhs(shown),
+                                                                &sampled_k,
+                                                                &sampled_n);
         char *value_text = number_precision_text_dup(value, precision);
+        const char *note = sample_note(sampled_k, sampled_n);
 
         if (name && value_text)
             printf("%s%s ≈ %s%s\n", i == 0u ? "numeric     " : "            ",
-                   name, value_text, sampled_n ? "  (n = 0)" : "");
+                   name, value_text, note);
         else
             printf("%s%s%s\n", i == 0u ? "numeric     " : "            ",
                    value_text ? value_text : "(null)",
-                   sampled_n ? "  (n = 0)" : "");
+                   note);
 
         free(value_text);
         num_destroy(&value);
@@ -369,7 +535,7 @@ static void print_equation_fields(const equation_t *equation,
     number_t residual_value = residual ? expr_eval(residual) : num_new();
     char *equation_text = equ_text_dup(equation, style_EXPRESSION);
     char *unbound_text = equ_text_dup(shown_equation, style_UNBOUND);
-    char *tex = equ_text_dup(shown_equation, style_TEX);
+    char *tex = equation_display_tex_dup(shown_equation);
     char *residual_text = display_residual ? expr_text_dup(display_residual, style_UNBOUND) : NULL;
     char *residual_value_text = number_text_dup(residual_value);
 

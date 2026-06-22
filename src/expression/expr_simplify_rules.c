@@ -778,19 +778,21 @@ expr_t *expr_simplify_try_lambert_exp(expr_t *arg)
 
     if (!expr_is_lambert_expr(arg))
         return NULL;
-    if (expr_is_const(arg->a) && num_is_real(arg->a->c) &&
-        num_eq(arg->a->c, NUM_ZERO)) {
+    const expr_t *lambert_arg = expr_lambert_arg(arg);
+
+    if (expr_is_const(lambert_arg) && num_is_real(lambert_arg->c) &&
+        num_eq(lambert_arg->c, NUM_ZERO)) {
         num_destroy(&inner_value);
         return expr_new_const(NUM_ONE);
     }
-    if (expr_simplify_try_get_plain_real_const(arg->a, &inner_value) &&
+    if (expr_simplify_try_get_plain_real_const(lambert_arg, &inner_value) &&
         num_eq(inner_value, NUM_ZERO)) {
         num_destroy(&inner_value);
         return expr_new_const(NUM_ONE);
     }
     num_destroy(&inner_value);
 
-    return expr_div(arg->a, arg);
+    return expr_div(lambert_arg, arg);
 }
 
 expr_t *expr_simplify_try_lambert_product(expr_t *a, expr_t *b)
@@ -812,7 +814,7 @@ expr_t *expr_simplify_try_lambert_product(expr_t *a, expr_t *b)
     if (!expr_struct_eq(w, exp_term->a))
         return NULL;
 
-    inner = w->a;
+    inner = (expr_t *)expr_lambert_arg(w);
 
     if (!expr_current_wrt_internal() && expr_is_var(inner) && inner->binding_expr)
         return expr_binding_expr_eval_expr(inner->binding_expr);

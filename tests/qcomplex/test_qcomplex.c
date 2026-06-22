@@ -991,6 +991,29 @@ static void test_lambert_wm1(void)
     }
 }
 
+static void test_lambert_wn(void)
+{
+    printf(C_CYAN "TEST: lambert_wn (integer complex branch)\n" C_RESET);
+
+    {
+        qcomplex_t z = qcz(-2.0, 0.25);
+        qcomplex_t w = qc_lambert_wn(2, z);
+        qcomplex_t w0 = qc_productlog(z);
+
+        check_qc_rel("W_2(-2+0.25i) * exp(W_2(-2+0.25i)) = -2+0.25i",
+                     qc_mul(w, qc_exp(w)), z, 1e-24);
+        check_bool("W_2(-2+0.25i) is distinct from W0",
+                   qf_gt(qc_abs(qc_sub(w, w0)), qf_from_double(1e-8)));
+    }
+
+    check_qc("W_n branch 0 delegates to W0",
+             qc_lambert_wn(0, qcz(1.0, 0.5)),
+             qc_productlog(qcz(1.0, 0.5)), 1e-28);
+    check_qc("W_n branch -1 delegates to W_-1",
+             qc_lambert_wn(-1, qcz(-0.2, -0.1)),
+             qc_lambert_wm1(qcz(-0.2, -0.1)), 1e-28);
+}
+
 /* ====================================================================
    Incomplete gamma
    ==================================================================== */
@@ -1334,6 +1357,7 @@ static void test_special_group(void)
     TEST_RUN_SUBTEST(test_normal, NULL);
     TEST_RUN_SUBTEST(test_productlog, NULL);
     TEST_RUN_SUBTEST(test_lambert_wm1, NULL);
+    TEST_RUN_SUBTEST(test_lambert_wn, NULL);
     TEST_RUN_SUBTEST(test_gammainc, NULL);
     TEST_RUN_SUBTEST(test_ei_e1, NULL);
     TEST_RUN_SUBTEST(test_difficult_cases, NULL);

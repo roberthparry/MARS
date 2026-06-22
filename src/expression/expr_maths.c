@@ -413,6 +413,7 @@ number_t eval_appell_f1(expr_t *dv)
 }
 number_t eval_gammainv(expr_t *dv) { return expr_eval_unary_num(dv, num_gammainv); }
 number_t eval_lambert_w(expr_t *dv) { return expr_eval_unary_num(dv, num_productlog); }
+number_t eval_lambert_wn(expr_t *dv) { return expr_eval_binary_num(dv, num_lambert_wn); }
 number_t eval_lambert_w0(expr_t *dv) { return expr_eval_unary_num(dv, num_lambert_w0); }
 number_t eval_lambert_wm1(expr_t *dv) { return expr_eval_unary_num(dv, num_lambert_wm1); }
 number_t eval_normal_pdf(expr_t *dv) { return expr_eval_unary_num(dv, num_normal_pdf); }
@@ -1374,6 +1375,18 @@ expr_t *deriv_lambert_w(expr_t *dv)
     expr_t *fac = expr_div(w, den);
     expr_t *out = expr_mul(fac, da);
     expr_free(da); expr_free(w); expr_free(wp1); expr_free(den); expr_free(fac);
+    return out;
+}
+
+expr_t *deriv_lambert_wn(expr_t *dv)
+{
+    expr_t *db  = expr_get_dx_internal(dv->b);
+    expr_t *w   = expr_lambert_wn_xp(dv->a, dv->b);
+    expr_t *wp1 = expr_add_long(w, 1);
+    expr_t *den = expr_mul(dv->b, wp1);
+    expr_t *fac = expr_div(w, den);
+    expr_t *out = expr_mul(fac, db);
+    expr_free(db); expr_free(w); expr_free(wp1); expr_free(den); expr_free(fac);
     return out;
 }
 

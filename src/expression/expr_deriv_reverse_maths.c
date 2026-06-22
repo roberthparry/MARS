@@ -709,6 +709,13 @@ void expr_reverse_lambert_w(const expr_t *dv, const number_t *out_bar, number_t 
     expr_reverse_unary(expr_reverse_num_mul(*out_bar, factor), a_bar, b_bar);
 }
 
+void expr_reverse_lambert_wn(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
+{
+    number_t factor = num_lambert_reverse_factor(expr_eval_num_internal(dv->b), expr_eval_num_internal(dv));
+
+    expr_reverse_binary(NUM_ZERO, expr_reverse_num_mul(*out_bar, factor), a_bar, b_bar);
+}
+
 void expr_reverse_lambert_wm1(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
     number_t factor = num_lambert_reverse_factor(expr_eval_num_internal(dv->a), expr_eval_num_internal(dv));

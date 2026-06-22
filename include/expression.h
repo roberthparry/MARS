@@ -321,6 +321,16 @@ expr_t *expr_create_nth_deriv(unsigned int n, const expr_t *expr, const expr_t *
  * reciprocal 1/x, log(x), and affine exp/sin/cos/tan/sinh/cosh/tanh terms.
  */
 expr_t *expr_integrate(const expr_t *expr, const expr_t *wrt);
+
+/**
+ * @brief Build a user-facing indefinite-integral family.
+ *
+ * Returns the symbolic antiderivative from expr_integrate() plus an arbitrary
+ * named constant. The first constant is C_0, with later C_n names chosen if
+ * earlier ones already appear in the expression.
+ */
+expr_t *expr_integrate_family(const expr_t *expr, const expr_t *wrt);
+
 /**
  * @brief Build an unevaluated integral node representing ∫^upper f(t) dt.
  *
@@ -480,7 +490,8 @@ expr_t *expr_pow_xp(const expr_t *expr1, const expr_t *expr2);
  *                    expr_gammainc_upper, expr_gammainc_P, expr_gammainc_Q
  * Polylogarithms:    expr_dilog (Li₂), expr_polylog (Liₙ),
  *                    expr_legendre_chi (χₙ), expr_appell_f1 (F₁)
- * Lambert W:         expr_lambert_w0 (principal branch), expr_lambert_wm1 (k=-1)
+ * Lambert W:         expr_lambert_w0 (principal branch), expr_lambert_wm1 (k=-1),
+ *                    expr_lambert_wn (integer branch n)
  * Beta/binomial:     expr_beta (B), expr_logbeta (log B), expr_beta_pdf,
  *                    expr_logbeta_pdf, expr_binomial
  * Normal dist.:      expr_normal_pdf, expr_normal_cdf, expr_normal_logpdf
@@ -512,6 +523,7 @@ expr_t *expr_gammainc_upper(const expr_t *s, const expr_t *x);
 expr_t *expr_gammainc_P(const expr_t *s, const expr_t *x);
 expr_t *expr_gammainc_Q(const expr_t *s, const expr_t *x);
 expr_t *expr_lambert_w(const expr_t *expr);
+expr_t *expr_lambert_wn(const expr_t *branch, const expr_t *expr);
 expr_t *expr_lambert_w0(const expr_t *expr);
 expr_t *expr_lambert_wm1(const expr_t *expr);
 expr_t *expr_beta(const expr_t *expr1, const expr_t *expr2);

@@ -83,6 +83,20 @@ typedef struct _datetime_span_t {
     double seconds;
 } datetime_span_t;
 
+#define DATETIME_BANK_HOLIDAY_MAX 512
+
+typedef struct _datetime_holiday_t {
+    const char *name;
+    short year;
+    month_t month;
+    uint8_t day;
+} datetime_holiday_t;
+
+typedef struct _datetime_holiday_list_t {
+    unsigned short count;
+    datetime_holiday_t items[DATETIME_BANK_HOLIDAY_MAX];
+} datetime_holiday_list_t;
+
 datetime_t *datetime_alloc();
 
 /**
@@ -165,12 +179,177 @@ datetime_t *datetime_init_now(datetime_t *dttm);
 datetime_t *datetime_init_easter(datetime_t *dttm, int year);
 
 /**
+ * @brief initialise/set a preallocated datetime with Orthodox Easter Sunday.
+ *
+ * This is the Julian-calendar Pascha date converted to the Gregorian calendar,
+ * used by Russian and Greek Orthodox churches for modern dates.
+ *
+ * @param dttm the datetime variable to be initialised.
+ * @param year the Gregorian year.
+ * @return the address of the initialised datetime, or NULL if the year is invalid.
+ */
+datetime_t *datetime_init_orthodox_easter(datetime_t *dttm, int year);
+
+/**
+ * @brief initialise/set a preallocated datetime with Christmas Day in the Gregorian calendar.
+ * @param dttm the datetime variable to be initialised.
+ * @param year the Gregorian year.
+ * @return the address of the initialised datetime, or NULL if the year is invalid.
+ */
+datetime_t *datetime_init_christmas(datetime_t *dttm, int year);
+
+/**
+ * @brief initialise/set a preallocated datetime with Orthodox Christmas Day observed in a Gregorian civil year.
+ *
+ * This is Julian-calendar 25 December from the previous Julian year, converted
+ * to the Gregorian calendar date on which Orthodox Christmas is observed in the
+ * requested civil year.
+ *
+ * @param dttm the datetime variable to be initialised.
+ * @param year the Gregorian civil year of the observance.
+ * @return the address of the initialised datetime, or NULL if the year is invalid.
+ */
+datetime_t *datetime_init_orthodox_christmas(datetime_t *dttm, int year);
+
+/**
  * @brief initialise/set a preallocated datetime with the Chinese New Year date.
  * @param dttm the datetime variable to be initialised.
  * @param year the year of the Chinese New Year (1700..2400).
  * @return the address of the initialised datetime, or NULL if the year is outside the valid range.
  */
 datetime_t *datetime_init_chinese_new_year(datetime_t *dttm, int year);
+
+/**
+ * @brief initialise/set a preallocated datetime with estimated Diwali.
+ *
+ * The calculation uses the astronomical new moon in the usual October/November
+ * window for India. It is suitable for calendar assistance; local religious
+ * observance can differ by region.
+ *
+ * @param dttm the datetime variable to be initialised.
+ * @param year the Gregorian year.
+ * @return the address of the initialised datetime, or NULL if the year is invalid.
+ */
+datetime_t *datetime_init_diwali(datetime_t *dttm, int year);
+
+/**
+ * @brief initialise/set a preallocated datetime with estimated Holi.
+ *
+ * The calculation uses the India civil date around the Phalguna full moon.
+ * It is suitable for calendar assistance; local religious observance can
+ * differ by region and tithi rules.
+ *
+ * @param dttm the datetime variable to be initialised.
+ * @param year the Gregorian year.
+ * @return the address of the initialised datetime, or NULL if the year is invalid.
+ */
+datetime_t *datetime_init_holi(datetime_t *dttm, int year);
+
+/**
+ * @brief initialise/set a preallocated datetime with estimated Hindu lunar New Year.
+ *
+ * This uses the Chaitra lunar new year convention, observed as Ugadi/Gudi
+ * Padwa in several regions. It is suitable for calendar assistance; local
+ * religious observance can differ by region and tithi rules.
+ *
+ * @param dttm the datetime variable to be initialised.
+ * @param year the Gregorian year.
+ * @return the address of the initialised datetime, or NULL if the year is invalid.
+ */
+datetime_t *datetime_init_hindu_new_year(datetime_t *dttm, int year);
+
+/**
+ * @brief initialise/set a preallocated datetime with estimated Theravada Buddhist New Year.
+ *
+ * This uses the first April full moon convention. Buddhist New Year varies by
+ * tradition and country, so the date is intended for calendar assistance.
+ *
+ * @param dttm the datetime variable to be initialised.
+ * @param year the Gregorian year.
+ * @return the address of the initialised datetime, or NULL if the year is invalid.
+ */
+datetime_t *datetime_init_buddhist_new_year(datetime_t *dttm, int year);
+
+/**
+ * @brief initialise/set a preallocated datetime with estimated Vesak, or Buddha Day.
+ *
+ * This uses the May full moon convention. Local observance can differ by
+ * tradition and country.
+ *
+ * @param dttm the datetime variable to be initialised.
+ * @param year the Gregorian year.
+ * @return the address of the initialised datetime, or NULL if the year is invalid.
+ */
+datetime_t *datetime_init_vesak(datetime_t *dttm, int year);
+
+/**
+ * @brief initialise/set a preallocated datetime with estimated Asalha Puja, or Dharma Day.
+ *
+ * This uses the July full moon convention. Local observance can differ by
+ * tradition and country.
+ *
+ * @param dttm the datetime variable to be initialised.
+ * @param year the Gregorian year.
+ * @return the address of the initialised datetime, or NULL if the year is invalid.
+ */
+datetime_t *datetime_init_asalha_puja(datetime_t *dttm, int year);
+
+/**
+ * @brief initialise/set a preallocated datetime with the first day of Ramadan in the civil Islamic calendar.
+ * @param dttm the datetime variable to be initialised.
+ * @param year the Gregorian year in which to search.
+ * @return the address of the initialised datetime, or NULL if the year is invalid.
+ */
+datetime_t *datetime_init_ramadan(datetime_t *dttm, int year);
+
+/**
+ * @brief initialise/set a preallocated datetime with Eid al-Fitr in the civil Islamic calendar.
+ * @param dttm the datetime variable to be initialised.
+ * @param year the Gregorian year in which to search.
+ * @return the address of the initialised datetime, or NULL if the year is invalid.
+ */
+datetime_t *datetime_init_eid_al_fitr(datetime_t *dttm, int year);
+
+/**
+ * @brief initialise/set a preallocated datetime with Muslim New Year in the civil Islamic calendar.
+ * @param dttm the datetime variable to be initialised.
+ * @param year the Gregorian year in which to search.
+ * @return the address of the initialised datetime, or NULL if the year is invalid.
+ */
+datetime_t *datetime_init_muslim_new_year(datetime_t *dttm, int year);
+
+/**
+ * @brief initialise/set a preallocated datetime with Rosh Hashanah, the Jewish New Year.
+ * @param dttm the datetime variable to be initialised.
+ * @param year the Gregorian year.
+ * @return the address of the initialised datetime, or NULL if the year is invalid.
+ */
+datetime_t *datetime_init_jewish_new_year(datetime_t *dttm, int year);
+
+/**
+ * @brief initialise/set a preallocated datetime with Passover, Nisan 15 in the Jewish calendar.
+ * @param dttm the datetime variable to be initialised.
+ * @param year the Gregorian year of the Passover observance.
+ * @return the address of the initialised datetime, or NULL if the year is invalid.
+ */
+datetime_t *datetime_init_passover(datetime_t *dttm, int year);
+
+/**
+ * @brief list English bank holidays for a Gregorian year.
+ * @param year the Gregorian year.
+ * @param out output list to fill.
+ * @return true on success, false if the year/list is invalid.
+ */
+bool datetime_english_bank_holidays(int year, datetime_holiday_list_t *out);
+
+/**
+ * @brief list English bank holidays whose dates fall within an inclusive date range.
+ * @param start the first date in the range.
+ * @param end the final date in the range.
+ * @param out output list to fill, sorted by date.
+ * @return true on success, false if the dates/list are invalid or the output list would overflow.
+ */
+bool datetime_english_bank_holidays_between(const datetime_t *start, const datetime_t *end, datetime_holiday_list_t *out);
 
 /**
  * @brief calculate the timezone offset in hours for a given datetime. This function uses the system's time zone information to
@@ -273,6 +452,13 @@ double datetime_jd(const datetime_t *dttm);
 weekday_t datetime_weekday(const datetime_t *dttm);
 
 /**
+ * @brief get a display name for a weekday.
+ * @param weekday the weekday value.
+ * @return a constant string such as "Sunday", or "Unknown" for invalid values.
+ */
+const char *datetime_weekday_name(weekday_t weekday);
+
+/**
  * @brief check if two datetimes are equal (i.e. represent the same point in time).
  * @param dttm1 the first datetime to compare.
  * @param dttm2 the second datetime to compare.
@@ -327,6 +513,15 @@ int datetime_compare(const datetime_t *dttm1, const datetime_t *dttm2);
  * @return true if the year is a leap year, false otherwise.
  */
 bool datetime_is_leap_year(short year);
+
+/**
+ * @brief check whether a year/month/day triple is a valid calendar date.
+ * @param year the year to check.
+ * @param month the month to check.
+ * @param day the day to check.
+ * @return true if the date is valid, false otherwise.
+ */
+bool datetime_valid_ymd(short year, month_t month, uint8_t day);
 
 /**
  * @brief get the number of days in a month for a given year and month. This is needed for adding months to a datetime,
@@ -532,6 +727,34 @@ string_t *datetime_format_text(const datetime_t *dttm, const string_t *format);
 double datetime_sun_time(long julianDayNumber, double latitude, double longitude, bool isSunrise);
 
 /**
+ * @brief approximate the solar declination for a datetime.
+ *
+ * The returned value is in degrees, positive north of the celestial equator.
+ * The calculation is the NOAA fractional-year approximation, suitable for
+ * calendar and daylight calculations rather than precision ephemerides.
+ *
+ * @param dttm the datetime to evaluate.
+ * @return declination in degrees, or DBL_MAX if it cannot be calculated.
+ */
+double datetime_solar_declination(const datetime_t *dttm);
+
+/**
+ * @brief approximate the Sun's maximum altitude on a date at a latitude.
+ * @param dttm the date to evaluate.
+ * @param latitude the observer latitude in degrees.
+ * @return maximum altitude in degrees above the horizon, or DBL_MAX on error.
+ */
+double datetime_solar_max_altitude(const datetime_t *dttm, double latitude);
+
+/**
+ * @brief approximate the Sun's solar-noon inclination from the local vertical.
+ * @param dttm the date to evaluate.
+ * @param latitude the observer latitude in degrees.
+ * @return solar-noon inclination in degrees, or DBL_MAX on error.
+ */
+double datetime_solar_inclination(const datetime_t *dttm, double latitude);
+
+/**
  * @brief initialise a datetime object with the sunrise time for a given date and location. This function is a wrapper around
  *        datetime_init_sun_time() that calls it with the isSunrise parameter set to true to calculate the sunrise time.
  *        The date is specified by the Julian Day Number, and the location is specified by the latitude and longitude. The time zone
@@ -590,6 +813,26 @@ void datetime_set_sunrise(datetime_t *dttm, double latitude, double longitude, d
 void datetime_set_sunset(datetime_t *dttm, double latitude, double longitude, double timeZoneOffset);
 
 /**
+ * @brief initialise a datetime with the sunset start instant for a sunset-to-sunset calendar date.
+ *
+ * Some religious calendars treat a date as beginning at sunset on the preceding
+ * civil day. This helper takes the civil observance date and returns sunset on
+ * the preceding civil day at the requested location.
+ *
+ * @param dttm the datetime object to initialise.
+ * @param observance_date the civil date of the observance.
+ * @param latitude observer latitude in degrees.
+ * @param longitude observer longitude in degrees.
+ * @param timeZoneOffset offset from GMT in hours for the returned clock time; use 0 for GMT.
+ * @return a pointer to the initialised datetime, or NULL on invalid input.
+ */
+datetime_t *datetime_init_sunset_observance_start(datetime_t *dttm,
+                                                  const datetime_t *observance_date,
+                                                  double latitude,
+                                                  double longitude,
+                                                  double timeZoneOffset);
+
+/**
  * @brief get the moon phase for a given datetime object. This function calculates the Julian Day Number for the given datetime
  *        object, and then uses that Julian Day Number to calculate the moon phase using the datetime_moon_phase_on_jdn()
  *        function. The moon phase is returned as a value of the moon_phase_t enum, which represents the different phases of the
@@ -601,6 +844,13 @@ void datetime_set_sunset(datetime_t *dttm, double latitude, double longitude, do
  *         is not initialised (i.e. its year component is SHRT_MAX), the function will return DT_NewMoon as a default value.
  */
 moon_phase_t datetime_moon_phase(const datetime_t *dttm);
+
+/**
+ * @brief get a display name for a moon phase.
+ * @param phase the moon phase value.
+ * @return a constant string such as "Waxing Crescent", or "Unknown" for invalid values.
+ */
+const char *datetime_moon_phase_name(moon_phase_t phase);
 
 /**
  * @brief find the next datetime with a specific moon phase after a given datetime. This function calculates the moon phase for

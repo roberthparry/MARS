@@ -903,6 +903,7 @@ number_t num_erf          (const number_t number);
 number_t num_erfc         (const number_t number);
 number_t num_erfinv       (const number_t number);
 number_t num_erfcinv      (const number_t number);
+number_t num_lambert_wn   (const number_t branch, const number_t number);
 number_t num_lambert_w0   (const number_t number);
 number_t num_lambert_wm1  (const number_t number);
 number_t num_beta         (const number_t a, const number_t b);
