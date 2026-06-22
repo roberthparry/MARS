@@ -335,6 +335,65 @@ datetime_t *datetime_init_jewish_new_year(datetime_t *dttm, int year);
 datetime_t *datetime_init_passover(datetime_t *dttm, int year);
 
 /**
+ * @brief format the selected date in the Christian civil calendar systems.
+ *
+ * The result uses datetime_format_text() internally and includes both the
+ * Gregorian civil date and the corresponding Julian calendar date.
+ *
+ * @param dttm the datetime to format.
+ * @return owned text, or NULL if the date is invalid.
+ */
+string_t *datetime_christian_calendar_date_text(const datetime_t *dttm);
+
+/**
+ * @brief format the selected date in the Chinese lunisolar calendar.
+ *
+ * The result contains the Chinese year, zodiac animal, lunar month, leap-month
+ * marker where applicable, and lunar day. The calculation is astronomical and
+ * intended for calendar assistance.
+ *
+ * @param dttm the datetime to format.
+ * @return owned text, or NULL if the date is outside the supported range.
+ */
+string_t *datetime_chinese_calendar_date_text(const datetime_t *dttm);
+
+/**
+ * @brief format the selected date in an Indian Hindu lunisolar calendar style.
+ *
+ * The result contains a Vikram Samvat year, lunar month, paksha, tithi, and
+ * lunar day. The calculation uses India-local lunar events and is intended for
+ * calendar assistance because regional rules vary.
+ *
+ * @param dttm the datetime to format.
+ * @return owned text, or NULL if the date is outside the supported range.
+ */
+string_t *datetime_hindu_calendar_date_text(const datetime_t *dttm);
+
+/**
+ * @brief format the selected date in the Thai solar Buddhist Era.
+ *
+ * @param dttm the datetime to format.
+ * @return owned text, or NULL if the date is invalid.
+ */
+string_t *datetime_buddhist_calendar_date_text(const datetime_t *dttm);
+
+/**
+ * @brief format the selected date in the civil Islamic calendar.
+ *
+ * @param dttm the datetime to format.
+ * @return owned text, or NULL if the date is invalid.
+ */
+string_t *datetime_muslim_calendar_date_text(const datetime_t *dttm);
+
+/**
+ * @brief format the selected date in the Jewish calendar.
+ *
+ * @param dttm the datetime to format.
+ * @return owned text, or NULL if the date is invalid.
+ */
+string_t *datetime_jewish_calendar_date_text(const datetime_t *dttm);
+
+/**
  * @brief list English bank holidays for a Gregorian year.
  * @param year the Gregorian year.
  * @param out output list to fill.

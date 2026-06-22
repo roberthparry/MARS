@@ -581,6 +581,7 @@ int main(int argc, char **argv)
     char *integral_tex_text = NULL;
     char value_note[512];
     bool integral_request = strcmp(action, "integral") == 0;
+    bool wrt_is_variable = false;
     int rc = 0;
 
     if (argc > 1 && strcmp(argv[1], "--goal-seek") == 0)
@@ -626,7 +627,8 @@ int main(int argc, char **argv)
 
     if (bindings)
         wrt = expr_bindings_get(bindings, wrt_name);
-    if (wrt) {
+    wrt_is_variable = wrt && expr_is_variable(wrt);
+    if (wrt_is_variable) {
         deriv = expr_create_deriv(expr, wrt);
         if (!deriv) {
             fprintf(stderr, "Failed to build derivative with respect to %s\n",
@@ -648,11 +650,11 @@ int main(int argc, char **argv)
         printf("derivative_tex  %s\n", deriv_tex_text ? deriv_tex_text : "");
         print_owned_number("d value", expr_eval(deriv), precision);
     } else {
-        printf("derivative  no binding named '%s'\n", wrt_name);
+        printf("derivative  no variable binding named '%s'\n", wrt_name);
     }
 
     if (integral_request) {
-        if (wrt) {
+        if (wrt_is_variable) {
             integral = expr_integrate_family(expr, wrt);
             if (!integral) {
                 printf("integral  no symbolic integral with respect to %s\n",
@@ -674,7 +676,7 @@ int main(int argc, char **argv)
                 print_owned_number("i value", expr_eval(integral), precision);
             }
         } else {
-            printf("integral  no binding named '%s'\n", wrt_name);
+            printf("integral  no variable binding named '%s'\n", wrt_name);
         }
     }
 

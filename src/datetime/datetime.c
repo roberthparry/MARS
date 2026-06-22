@@ -523,6 +523,12 @@ static long datetime_islamic_ymd_to_jdn(int year, int month, int day)
         + 1948439 - 1);
 }
 
+static long datetime_india_new_moon_jdn_in_window(int year,
+                                                  month_t startMonth,
+                                                  uint8_t startDay,
+                                                  month_t endMonth,
+                                                  uint8_t endDay);
+
 static datetime_t *datetime_init_civil_islamic_observance(datetime_t *dttm,
                                                           int gregorianYear,
                                                           int islamicMonth,
@@ -593,6 +599,500 @@ datetime_t *datetime_init_passover(datetime_t *dttm, int year)
         return NULL;
 
     return datetime_init_materialised_jdn(dttm, datetime_hebrew_new_year_jdn(year + 3761) - 163L);
+}
+
+static double datetime_normalise_degrees(double degrees)
+{
+    double out = fmod(degrees, 360.0);
+    if (out < 0.0)
+        out += 360.0;
+    return out;
+}
+
+static double datetime_solar_ecliptic_longitude(double jd)
+{
+    double T = (jd - 2451545.0) / 36525.0;
+    double L0 = datetime_normalise_degrees(280.46646 + 36000.76983 * T + 0.0003032 * T * T);
+    double M = datetime_normalise_degrees(357.52911 + 35999.05029 * T - 0.0001537 * T * T);
+    double Mrad = M * M_PI / 180.0;
+    double C = (1.914602 - 0.004817 * T - 0.000014 * T * T) * sin(Mrad)
+             + (0.019993 - 0.000101 * T) * sin(2.0 * Mrad)
+             + 0.000289 * sin(3.0 * Mrad);
+    double omega = (125.04 - 1934.136 * T) * M_PI / 180.0;
+
+    return datetime_normalise_degrees(L0 + C - 0.00569 - 0.00478 * sin(omega));
+}
+
+static long datetime_local_new_moon_jdn_for_lunation(int lunationIndex,
+                                                     int year,
+                                                     double gmtOffsetHours)
+{
+    double newMoonTT = datetime_true_new_moon_tt(lunationIndex);
+    double newMoonUTC = newMoonTT - datetime_delta_t(year) / 86400.0;
+    double localNewMoon = newMoonUTC + gmtOffsetHours / 24.0;
+
+    return (long)floor(localNewMoon + 0.5);
+}
+
+static long datetime_next_local_new_moon_jdn(long afterJdn,
+                                             int year,
+                                             double gmtOffsetHours)
+{
+    int lunationIndex = (int)floor((afterJdn - 2451550.09765) / 29.530588853) - 2;
+    long best = LONG_MAX;
+
+    for (int i = 0; i < 10; i++, lunationIndex++) {
+        long newMoonJdn = datetime_local_new_moon_jdn_for_lunation(lunationIndex,
+                                                                   year,
+                                                                   gmtOffsetHours);
+        if (newMoonJdn > afterJdn && newMoonJdn < best)
+            best = newMoonJdn;
+    }
+
+    return best;
+}
+
+static bool datetime_lunar_month_contains_principal_term(long startJdn,
+                                                         long endJdn)
+{
+    double startLongitude;
+    double endLongitude;
+    double travelled;
+    int firstPrincipalTerm;
+
+    if (startJdn == LONG_MAX || endJdn == LONG_MAX || startJdn >= endJdn)
+        return false;
+
+    startLongitude = datetime_solar_ecliptic_longitude((double)startJdn - 0.5);
+    endLongitude = datetime_solar_ecliptic_longitude((double)endJdn - 0.5);
+    travelled = datetime_normalise_degrees(endLongitude - startLongitude);
+    firstPrincipalTerm = (int)floor(startLongitude / 30.0) + 1;
+
+    return firstPrincipalTerm * 30.0 <= startLongitude + travelled + 0.25;
+}
+
+static void datetime_jdn_to_julian_ymd(long jdn, int *year, int *month, int *day)
+{
+    long c = jdn + 32082L;
+    long d = (4L * c + 3L) / 1461L;
+    long e = c - (1461L * d) / 4L;
+    long m = (5L * e + 2L) / 153L;
+
+    *day = (int)(e - (153L * m + 2L) / 5L + 1L);
+    *month = (int)(m + 3L - 12L * (m / 10L));
+    *year = (int)(d - 4800L + m / 10L);
+}
+
+string_t *datetime_christian_calendar_date_text(const datetime_t *dttm)
+{
+    string_t *format;
+    string_t *gregorian;
+    string_t *out;
+    int julianYear;
+    int julianMonth;
+    int julianDay;
+
+    if (!dttm || datetime_jdn(dttm) == LONG_MAX)
+        return NULL;
+
+    format = string_new_with("%yyyy-%mm-%dd");
+    gregorian = format ? datetime_format_text(dttm, format) : NULL;
+    string_free(format);
+    if (!gregorian)
+        return NULL;
+
+    datetime_jdn_to_julian_ymd(datetime_jdn(dttm), &julianYear, &julianMonth, &julianDay);
+    out = string_new();
+    if (!out ||
+        string_append_format(out,
+                             "Gregorian %s; Julian %04d-%02d-%02d",
+                             string_c_str(gregorian),
+                             julianYear,
+                             julianMonth,
+                             julianDay) < 0) {
+        string_free(gregorian);
+        string_free(out);
+        return NULL;
+    }
+
+    string_free(gregorian);
+    return out;
+}
+
+string_t *datetime_chinese_calendar_date_text(const datetime_t *dttm)
+{
+    static const char *zodiac[] = {
+        "Rat", "Ox", "Tiger", "Rabbit", "Dragon", "Snake",
+        "Horse", "Goat", "Monkey", "Rooster", "Dog", "Pig"
+    };
+    long starts[16];
+    int gregorianYear;
+    int chineseYearStart;
+    int monthCount = 1;
+    int currentMonthIndex = 0;
+    int leapMonthIndex = -1;
+    int lunarMonth;
+    int lunarDay;
+    int zodiacIndex;
+    long jdn;
+    long cny;
+    long nextCny;
+    string_t *out;
+
+    if (!dttm)
+        return NULL;
+
+    gregorianYear = datetime_year(dttm);
+    jdn = datetime_jdn(dttm);
+    if (gregorianYear < 1700 || gregorianYear > 2400 || jdn == LONG_MAX)
+        return NULL;
+
+    chineseYearStart = gregorianYear;
+    cny = datetime_chinese_new_year_jdn(chineseYearStart);
+    if (cny == LONG_MAX)
+        return NULL;
+    if (jdn < cny) {
+        chineseYearStart--;
+        cny = datetime_chinese_new_year_jdn(chineseYearStart);
+    }
+    nextCny = datetime_chinese_new_year_jdn(chineseYearStart + 1);
+    if (cny == LONG_MAX || nextCny == LONG_MAX || jdn < cny || jdn >= nextCny)
+        return NULL;
+
+    starts[0] = cny;
+    while (monthCount < 15) {
+        long nextStart = datetime_next_local_new_moon_jdn(starts[monthCount - 1],
+                                                          chineseYearStart,
+                                                          8.0);
+        if (nextStart == LONG_MAX || nextStart >= nextCny)
+            break;
+        starts[monthCount++] = nextStart;
+    }
+
+    if (nextCny - cny > 360L) {
+        for (int i = 1; i < monthCount; i++) {
+            long endJdn = (i + 1 < monthCount) ? starts[i + 1] : nextCny;
+            if (!datetime_lunar_month_contains_principal_term(starts[i], endJdn)) {
+                leapMonthIndex = i;
+                break;
+            }
+        }
+    }
+
+    for (int i = 0; i < monthCount; i++) {
+        long endJdn = (i + 1 < monthCount) ? starts[i + 1] : nextCny;
+        if (jdn >= starts[i] && jdn < endJdn) {
+            currentMonthIndex = i;
+            break;
+        }
+    }
+
+    lunarDay = (int)(jdn - starts[currentMonthIndex] + 1L);
+    lunarMonth = currentMonthIndex + 1;
+    if (leapMonthIndex >= 0) {
+        if (currentMonthIndex == leapMonthIndex)
+            lunarMonth = currentMonthIndex;
+        else if (currentMonthIndex > leapMonthIndex)
+            lunarMonth--;
+    }
+    zodiacIndex = (chineseYearStart - 4) % 12;
+    if (zodiacIndex < 0)
+        zodiacIndex += 12;
+
+    out = string_new();
+    if (!out ||
+        string_append_format(out,
+                             "Year %d (%s), %smonth %d, day %d",
+                             chineseYearStart + 2698,
+                             zodiac[zodiacIndex],
+                             currentMonthIndex == leapMonthIndex ? "leap " : "",
+                             lunarMonth,
+                             lunarDay) < 0) {
+        string_free(out);
+        return NULL;
+    }
+    return out;
+}
+
+static const char *datetime_hindu_month_name(int month)
+{
+    static const char *names[] = {
+        NULL, "Chaitra", "Vaishakha", "Jyeshtha", "Ashadha",
+        "Shravana", "Bhadrapada", "Ashvina", "Kartika",
+        "Margashirsha", "Pausha", "Magha", "Phalguna"
+    };
+
+    return month >= 1 && month <= 12 ? names[month] : "Unknown";
+}
+
+string_t *datetime_hindu_calendar_date_text(const datetime_t *dttm)
+{
+    long starts[16];
+    long jdn;
+    long newYearJdn;
+    long nextYearJdn;
+    int gregorianYear;
+    int hinduYearStart;
+    int monthCount = 1;
+    int monthIndex = 0;
+    int month;
+    int lunarDay;
+    int vikramSamvatYear;
+    int tithi;
+    const char *paksha;
+    string_t *out;
+
+    if (!dttm)
+        return NULL;
+
+    gregorianYear = datetime_year(dttm);
+    jdn = datetime_jdn(dttm);
+    if (gregorianYear < 1700 || gregorianYear > 2400 || jdn == LONG_MAX)
+        return NULL;
+
+    hinduYearStart = gregorianYear;
+    newYearJdn = datetime_india_new_moon_jdn_in_window(hinduYearStart,
+                                                       DT_March,
+                                                       15,
+                                                       DT_April,
+                                                       15);
+    if (newYearJdn == LONG_MAX)
+        return NULL;
+    if (jdn < newYearJdn) {
+        hinduYearStart--;
+        newYearJdn = datetime_india_new_moon_jdn_in_window(hinduYearStart,
+                                                           DT_March,
+                                                           15,
+                                                           DT_April,
+                                                           15);
+    }
+    nextYearJdn = datetime_india_new_moon_jdn_in_window(hinduYearStart + 1,
+                                                        DT_March,
+                                                        15,
+                                                        DT_April,
+                                                        15);
+    if (newYearJdn == LONG_MAX || nextYearJdn == LONG_MAX || jdn < newYearJdn || jdn >= nextYearJdn)
+        return NULL;
+
+    starts[0] = newYearJdn;
+    while (monthCount < 15) {
+        long nextStart = datetime_next_local_new_moon_jdn(starts[monthCount - 1],
+                                                          hinduYearStart,
+                                                          5.5);
+        if (nextStart == LONG_MAX || nextStart >= nextYearJdn)
+            break;
+        starts[monthCount++] = nextStart;
+    }
+
+    for (int i = 0; i < monthCount; i++) {
+        long endJdn = (i + 1 < monthCount) ? starts[i + 1] : nextYearJdn;
+        if (jdn >= starts[i] && jdn < endJdn) {
+            monthIndex = i;
+            break;
+        }
+    }
+
+    month = monthIndex % 12 + 1;
+    lunarDay = (int)(jdn - starts[monthIndex] + 1L);
+    if (monthIndex + 1 < monthCount) {
+        double fraction = (double)(jdn - starts[monthIndex]) /
+                          (double)(starts[monthIndex + 1] - starts[monthIndex]);
+        tithi = (int)floor(fraction * 30.0) + 1;
+    } else {
+        tithi = lunarDay;
+    }
+    if (tithi < 1)
+        tithi = 1;
+    if (tithi > 30)
+        tithi = 30;
+    paksha = tithi <= 15 ? "Shukla" : "Krishna";
+    vikramSamvatYear = hinduYearStart + 57;
+
+    out = string_new();
+    if (!out ||
+        string_append_format(out,
+                             "Vikram Samvat %d, %s %s %d, lunar day %d",
+                             vikramSamvatYear,
+                             datetime_hindu_month_name(month),
+                             paksha,
+                             tithi <= 15 ? tithi : tithi - 15,
+                             lunarDay) < 0) {
+        string_free(out);
+        return NULL;
+    }
+    return out;
+}
+
+string_t *datetime_buddhist_calendar_date_text(const datetime_t *dttm)
+{
+    string_t *out;
+
+    if (!dttm || datetime_year(dttm) == SHRT_MAX)
+        return NULL;
+
+    out = string_new();
+    if (!out ||
+        string_append_format(out,
+                             "B.E. %04d-%02d-%02d (Thai solar)",
+                             datetime_year(dttm) + 543,
+                             (int)datetime_month(dttm),
+                             (int)datetime_day(dttm)) < 0) {
+        string_free(out);
+        return NULL;
+    }
+    return out;
+}
+
+static void datetime_jdn_to_islamic_ymd(long jdn, int *year, int *month, int *day)
+{
+    *year = (int)((30L * (jdn - 1948439L) + 10646L) / 10631L);
+    if (*year < 1)
+        *year = 1;
+
+    *month = (int)ceil((jdn - (29L + datetime_islamic_ymd_to_jdn(*year, 1, 1))) / 29.5) + 1;
+    if (*month < 1)
+        *month = 1;
+    if (*month > 12)
+        *month = 12;
+
+    *day = (int)(jdn - datetime_islamic_ymd_to_jdn(*year, *month, 1) + 1L);
+    while (*day < 1) {
+        (*month)--;
+        if (*month < 1) {
+            (*year)--;
+            *month = 12;
+        }
+        *day = (int)(jdn - datetime_islamic_ymd_to_jdn(*year, *month, 1) + 1L);
+    }
+    while (*month < 12 && jdn >= datetime_islamic_ymd_to_jdn(*year, *month + 1, 1)) {
+        (*month)++;
+        *day = (int)(jdn - datetime_islamic_ymd_to_jdn(*year, *month, 1) + 1L);
+    }
+}
+
+string_t *datetime_muslim_calendar_date_text(const datetime_t *dttm)
+{
+    static const char *monthNames[] = {
+        NULL, "Muharram", "Safar", "Rabi al-awwal", "Rabi al-thani",
+        "Jumada al-awwal", "Jumada al-thani", "Rajab", "Sha'ban",
+        "Ramadan", "Shawwal", "Dhu al-Qadah", "Dhu al-Hijjah"
+    };
+    int year;
+    int month;
+    int day;
+    string_t *out;
+
+    if (!dttm || datetime_jdn(dttm) == LONG_MAX)
+        return NULL;
+
+    datetime_jdn_to_islamic_ymd(datetime_jdn(dttm), &year, &month, &day);
+    out = string_new();
+    if (!out ||
+        string_append_format(out, "%d %s %d AH", day, monthNames[month], year) < 0) {
+        string_free(out);
+        return NULL;
+    }
+    return out;
+}
+
+static bool datetime_hebrew_leap_year(int year)
+{
+    return ((7 * year + 1) % 19) < 7;
+}
+
+static int datetime_hebrew_year_length(int year)
+{
+    return (int)(datetime_hebrew_new_year_jdn(year + 1) - datetime_hebrew_new_year_jdn(year));
+}
+
+static bool datetime_hebrew_cheshvan_long(int year)
+{
+    return datetime_hebrew_year_length(year) % 10 == 5;
+}
+
+static bool datetime_hebrew_kislev_short(int year)
+{
+    return datetime_hebrew_year_length(year) % 10 == 3;
+}
+
+static int datetime_hebrew_month_length(int year, int monthIndexFromTishrei)
+{
+    static const int commonLengths[] = { 30, 29, 30, 29, 30, 29, 30, 29, 30, 29, 30, 29 };
+    static const int leapLengths[] = { 30, 29, 30, 29, 30, 30, 29, 30, 29, 30, 29, 30, 29 };
+
+    if (monthIndexFromTishrei == 1 && datetime_hebrew_cheshvan_long(year))
+        return 30;
+    if (monthIndexFromTishrei == 2 && datetime_hebrew_kislev_short(year))
+        return 29;
+
+    if (datetime_hebrew_leap_year(year))
+        return leapLengths[monthIndexFromTishrei];
+    return commonLengths[monthIndexFromTishrei];
+}
+
+static const char *datetime_hebrew_month_name(int year, int monthIndexFromTishrei)
+{
+    static const char *commonNames[] = {
+        "Tishrei", "Cheshvan", "Kislev", "Tevet", "Shevat", "Adar",
+        "Nisan", "Iyar", "Sivan", "Tammuz", "Av", "Elul"
+    };
+    static const char *leapNames[] = {
+        "Tishrei", "Cheshvan", "Kislev", "Tevet", "Shevat",
+        "Adar I", "Adar II", "Nisan", "Iyar", "Sivan", "Tammuz", "Av", "Elul"
+    };
+
+    if (datetime_hebrew_leap_year(year))
+        return leapNames[monthIndexFromTishrei];
+    return commonNames[monthIndexFromTishrei];
+}
+
+string_t *datetime_jewish_calendar_date_text(const datetime_t *dttm)
+{
+    long jdn;
+    long newYearJdn;
+    int hebrewYear;
+    int dayOfYear;
+    int monthIndex;
+    int monthCount;
+    int day;
+    string_t *out;
+
+    if (!dttm || datetime_jdn(dttm) == LONG_MAX)
+        return NULL;
+
+    jdn = datetime_jdn(dttm);
+    hebrewYear = datetime_year(dttm) + 3760;
+    while (jdn >= datetime_hebrew_new_year_jdn(hebrewYear + 1))
+        hebrewYear++;
+    while (jdn < datetime_hebrew_new_year_jdn(hebrewYear))
+        hebrewYear--;
+
+    newYearJdn = datetime_hebrew_new_year_jdn(hebrewYear);
+    dayOfYear = (int)(jdn - newYearJdn) + 1;
+    monthCount = datetime_hebrew_leap_year(hebrewYear) ? 13 : 12;
+    monthIndex = 0;
+    while (monthIndex < monthCount) {
+        int monthLength = datetime_hebrew_month_length(hebrewYear, monthIndex);
+        if (dayOfYear <= monthLength)
+            break;
+        dayOfYear -= monthLength;
+        monthIndex++;
+    }
+    if (monthIndex >= monthCount)
+        return NULL;
+    day = dayOfYear;
+
+    out = string_new();
+    if (!out ||
+        string_append_format(out,
+                             "%d %s %d AM",
+                             day,
+                             datetime_hebrew_month_name(hebrewYear, monthIndex),
+                             hebrewYear) < 0) {
+        string_free(out);
+        return NULL;
+    }
+    return out;
 }
 
 static long datetime_india_new_moon_jdn_in_window(int year,

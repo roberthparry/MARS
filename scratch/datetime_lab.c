@@ -1,5 +1,6 @@
 #include <ctype.h>
 #include <float.h>
+#include <limits.h>
 #include <math.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -14,6 +15,8 @@ typedef struct datetime_lab_options_t {
     short date_year;
     month_t date_month;
     uint8_t date_day;
+    long julian_day_number;
+    bool use_julian_day_number;
     short start_year;
     month_t start_month;
     uint8_t start_day;
@@ -96,6 +99,30 @@ static bool parse_int_text(const char *text, int *out)
     return true;
 }
 
+static bool parse_long_text(const char *text, long *out)
+{
+    char *end = NULL;
+    long value;
+
+    if (!text || !out)
+        return false;
+    while (isspace((unsigned char)*text))
+        text++;
+    if (*text == '\0')
+        return false;
+
+    value = strtol(text, &end, 10);
+    if (end == text || value < 1 || value == LONG_MAX || value == LONG_MIN)
+        return false;
+    while (isspace((unsigned char)*end))
+        end++;
+    if (*end != '\0')
+        return false;
+
+    *out = value;
+    return true;
+}
+
 static bool key_equals(const char *got, size_t got_len, const char *want)
 {
     return strlen(want) == got_len && strncmp(got, want, got_len) == 0;
@@ -111,6 +138,8 @@ static void set_today(datetime_lab_options_t *options)
     options->date_year = (short)(local_tm.tm_year + 1900);
     options->date_month = (month_t)(local_tm.tm_mon + 1);
     options->date_day = (uint8_t)local_tm.tm_mday;
+    options->julian_day_number = 0;
+    options->use_julian_day_number = false;
 }
 
 static void init_defaults(datetime_lab_options_t *options)
@@ -138,6 +167,7 @@ static bool apply_arg(datetime_lab_options_t *options, const char *arg)
     uint8_t d;
     double number;
     int integer;
+    long long_integer;
 
     if (!equals)
         return false;
@@ -151,6 +181,31 @@ static bool apply_arg(datetime_lab_options_t *options, const char *arg)
         options->date_year = y;
         options->date_month = m;
         options->date_day = d;
+        options->use_julian_day_number = false;
+        return true;
+    }
+    if (key_equals(arg, key_len, "jdn") ||
+        key_equals(arg, key_len, "julian_day_number")) {
+        datetime_t *probe;
+
+        if (!parse_long_text(value, &long_integer))
+            return false;
+        probe = datetime_init_jdn(datetime_alloc(), long_integer);
+        if (!probe)
+            return false;
+        if (datetime_year(probe) < 1 || datetime_year(probe) > 9999 ||
+            !datetime_valid_ymd(datetime_year(probe),
+                                datetime_month(probe),
+                                datetime_day(probe))) {
+            datetime_dealloc(probe);
+            return false;
+        }
+        options->julian_day_number = long_integer;
+        options->date_year = datetime_year(probe);
+        options->date_month = datetime_month(probe);
+        options->date_day = datetime_day(probe);
+        options->use_julian_day_number = true;
+        datetime_dealloc(probe);
         return true;
     }
     if (key_equals(arg, key_len, "start")) {
@@ -251,6 +306,12 @@ static void print_time_field(const char *name, const datetime_t *dttm)
     char *text = format_datetime_minutes(dttm);
     printf("%s %s\n", name, text ? text : "unavailable");
     free(text);
+}
+
+static void print_owned_text_field(const char *name, string_t *text)
+{
+    printf("%s %s\n", name, text ? string_c_str(text) : "unavailable");
+    string_free(text);
 }
 
 static void print_optional_date_field(const char *name, const datetime_t *dttm)
@@ -524,6 +585,12 @@ int main(int argc, char **argv)
     print_date_field("date", date);
     printf("weekday %s\n", datetime_weekday_name(datetime_weekday(date)));
     printf("julian_day_number %ld\n", jdn);
+    print_owned_text_field("christian_calendar_date", datetime_christian_calendar_date_text(date));
+    print_owned_text_field("chinese_calendar_date", datetime_chinese_calendar_date_text(date));
+    print_owned_text_field("hindu_calendar_date", datetime_hindu_calendar_date_text(date));
+    print_owned_text_field("buddhist_calendar_date", datetime_buddhist_calendar_date_text(date));
+    print_owned_text_field("muslim_calendar_date", datetime_muslim_calendar_date_text(date));
+    print_owned_text_field("jewish_calendar_date", datetime_jewish_calendar_date_text(date));
     printf("moon_phase %s\n", datetime_moon_phase_name(datetime_moon_phase(date)));
     printf("solar_declination %.10g\n", solar_declination);
     printf("solar_max_altitude %.10g\n", solar_max_altitude);
