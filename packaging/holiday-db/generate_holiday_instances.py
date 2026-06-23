@@ -18,7 +18,7 @@ import holidays
 from dateutil.easter import easter
 from workalendar.registry import registry as workalendar_registry
 
-YEARS = tuple(range(1926, 2028))
+YEARS = tuple(range(1926, 2031))
 OUT_PATH = "packaging/holiday-db/mars_generated_holiday_instances.sql"
 SUBDIVISION_OUT_PATH = "packaging/holiday-db/mars_target_subdivisions.sql"
 RULES_OUT_PATH = "packaging/holiday-db/mars_generated_first_class_rules.sql"
@@ -212,6 +212,23 @@ def infer_segments(date_rows: list[tuple[int, date]]) -> list[tuple[str, dict[st
     return by_pattern
 
 
+def definition_valid_to_year(
+    segments: list[tuple[str, dict[str, int | str], int, int, list[date]]],
+    years: list[int],
+) -> int | None:
+    if not segments:
+        return max(years) if years else None
+    if any(kind != "one_off" and end_year == YEARS[-1] for kind, _attrs, _start_year, end_year, _dates in segments):
+        return None
+    return max(years) if years else None
+
+
+def segment_valid_to_year(pattern_kind: str, end_year: int) -> int | None:
+    if pattern_kind != "one_off" and end_year == YEARS[-1]:
+        return None
+    return end_year
+
+
 def generate_first_class_rules() -> None:
     holiday_id = 1_000_000
     holiday_name_id = 2_000_000
@@ -247,6 +264,7 @@ def generate_first_class_rules() -> None:
 
         for holiday_name, date_rows in sorted(by_name.items()):
             years = [year for year, _ in date_rows]
+            segments = infer_segments(date_rows)
             base_key = slugify(holiday_name)
             holiday_key = base_key
             suffix = 2
@@ -267,7 +285,7 @@ def generate_first_class_rules() -> None:
                         sql_quote("full_day"),
                         sql_quote("gregory"),
                         str(min(years)),
-                        str(max(years)),
+                        "NULL" if definition_valid_to_year(segments, years) is None else str(definition_valid_to_year(segments, years)),
                         sql_quote("Inferred first-class holiday definition from materialized country-level holiday history."),
                     ]
                 )
@@ -288,13 +306,14 @@ def generate_first_class_rules() -> None:
             )
             holiday_name_id += 1
 
-            for pattern_kind, attrs, start_year, end_year, _segment_dates in infer_segments(date_rows):
+            for pattern_kind, attrs, start_year, end_year, _segment_dates in segments:
                 month = attrs.get("month")
                 day = attrs.get("day")
                 weekday = attrs.get("weekday")
                 ordinal = attrs.get("ordinal")
                 offset_days = attrs.get("offset_days")
                 holiday_date = attrs.get("holiday_date")
+                open_end_year = segment_valid_to_year(pattern_kind, end_year)
 
                 rule_lines.append(
                     "("
@@ -315,7 +334,7 @@ def generate_first_class_rules() -> None:
                             "NULL",
                             "NULL" if holiday_date is None else sql_quote(str(holiday_date)),
                             str(start_year),
-                            str(end_year),
+                            "NULL" if open_end_year is None else str(open_end_year),
                             "500",
                             sql_quote("Inferred recurring rule from materialized holiday instances."),
                         ]

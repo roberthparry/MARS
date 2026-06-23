@@ -17,7 +17,9 @@
 --   - RRULE text is reserved for RFC 5545 / RFC 7529 style recurrence data.
 --   - expression_text is the escape hatch for rules that need a custom
 --     evaluator, such as astronomical calculations or government-specific
---     observance policies.
+--     observance policies. For expression_language = 'mars_sql', the runtime
+--     expects expression_text to be a single SQL SELECT that returns one
+--     holiday date in YYYY-MM-DD form for the bound rule year/context.
 --   - Targeted subdivision coverage is loaded alongside the worldwide country
 --     set so UI clients can expose first-class jurisdiction choices such as
 --     AU-NSW and AU-VIC instead of only the national AU calendar.
@@ -400,7 +402,22 @@ VALUES
      'Weekend reference set for seeded jurisdictions',
      NULL,
      '2026-06-23',
-     'Used to seed jurisdiction-wide weekly rest-day rules where holiday observance behaviour depends on the normal weekend.');
+     'Used to seed jurisdiction-wide weekly rest-day rules where holiday observance behaviour depends on the normal weekend.'),
+    (15, 'ZA', 'other',
+     'Historical South Africa public holiday reference set',
+     NULL,
+     '2026-06-24',
+     'Used to hand-model South Africa''s national public-holiday regimes from the Union period through the post-1994 calendar.'),
+    (16, 'IE', 'other',
+     'Historical Ireland public holiday reference set',
+     NULL,
+     '2026-06-24',
+     'Used to hand-model Ireland''s public-holiday regimes from the Free State period onward, including the Whit Monday to June Holiday change.'),
+    (17, 'NL', 'other',
+     'Historical Netherlands royal-holiday reference set',
+     NULL,
+     '2026-06-24',
+     'Used to hand-model the Netherlands'' royal-holiday transitions from Queen''s Day to King''s Day, including Sunday replacement behaviour.');
 
 INSERT INTO jurisdiction_weekend_rule(
     weekend_rule_id,
@@ -884,26 +901,28 @@ INSERT INTO holiday_definition(
     notes
 )
 VALUES
-    (140, 'IE', 'new_years_day', 'New Year''s Day', 'public', 'full_day', 'gregory', 1975, NULL,
+    (140, 'IE', 'new_years_day', 'New Year''s Day', 'public', 'full_day', 'gregory', 1974, NULL,
      'Country-level public holiday seed.'),
     (141, 'IE', 'saint_brigids_day', 'Saint Brigid''s Day', 'public', 'full_day', 'gregory', 2023, NULL,
      '1 February when Friday, otherwise first Monday from 1 February.'),
     (142, 'IE', 'saint_patricks_day', 'Saint Patrick''s Day', 'public', 'full_day', 'gregory', 1903, NULL,
      'Country-level public holiday seed.'),
-    (143, 'IE', 'easter_monday', 'Easter Monday', 'public', 'full_day', 'gregory', NULL, NULL,
+    (143, 'IE', 'easter_monday', 'Easter Monday', 'public', 'full_day', 'gregory', 1926, NULL,
      'Relative to Gregorian Easter Sunday.'),
     (144, 'IE', 'may_day', 'May Day', 'public', 'full_day', 'gregory', 1994, NULL,
      'Usually first Monday in May.'),
     (145, 'IE', 'june_bank_holiday', 'June Bank Holiday', 'public', 'full_day', 'gregory', 1973, NULL,
      'First Monday in June.'),
-    (146, 'IE', 'august_bank_holiday', 'August Bank Holiday', 'public', 'full_day', 'gregory', NULL, NULL,
+    (146, 'IE', 'august_bank_holiday', 'August Bank Holiday', 'public', 'full_day', 'gregory', 1926, NULL,
      'First Monday in August.'),
     (147, 'IE', 'october_bank_holiday', 'October Bank Holiday', 'public', 'full_day', 'gregory', 1977, NULL,
      'Last Monday in October.'),
-    (148, 'IE', 'christmas_day', 'Christmas Day', 'public', 'full_day', 'gregory', NULL, NULL,
+    (148, 'IE', 'christmas_day', 'Christmas Day', 'public', 'full_day', 'gregory', 1926, NULL,
      'Country-level public holiday seed.'),
-    (149, 'IE', 'saint_stephens_day', 'Saint Stephen''s Day', 'public', 'full_day', 'gregory', NULL, NULL,
-     'Country-level public holiday seed.');
+    (149, 'IE', 'saint_stephens_day', 'Saint Stephen''s Day', 'public', 'full_day', 'gregory', 1926, NULL,
+     'Country-level public holiday seed.'),
+    (150, 'IE', 'whit_monday', 'Whit Monday', 'public', 'full_day', 'gregory', 1926, 1972,
+     'Historic holiday observed on the Monday after Pentecost before the move to the June Holiday in 1973.');
 
 INSERT INTO holiday_name(holiday_id, locale, localized_name, is_primary)
 VALUES
@@ -916,7 +935,8 @@ VALUES
     (146, 'en-IE', 'August Bank Holiday', 1),
     (147, 'en-IE', 'October Bank Holiday', 1),
     (148, 'en-IE', 'Christmas Day', 1),
-    (149, 'en-IE', 'Saint Stephen''s Day', 1);
+    (149, 'en-IE', 'Saint Stephen''s Day', 1),
+    (150, 'en-IE', 'Whit Monday', 1);
 
 INSERT INTO holiday_rule(
     rule_id,
@@ -929,30 +949,33 @@ INSERT INTO holiday_rule(
     ordinal,
     offset_days,
     valid_from_year,
+    valid_to_year,
     priority,
     notes
 )
 VALUES
-    (140, 140, 1, 'fixed_date', 1, 1, NULL, NULL, NULL, 1975, 100,
+    (140, 140, 1, 'fixed_date', 1, 1, NULL, NULL, NULL, 1974, NULL, 100,
      'Base legal date.'),
-    (141, 141, 1, 'weekday_after_date', 2, 1, 1, NULL, NULL, 2023, 100,
+    (141, 141, 1, 'weekday_after_date', 2, 1, 1, NULL, NULL, 2023, NULL, 100,
      'First Monday from 1 February.'),
-    (142, 142, 1, 'fixed_date', 3, 17, NULL, NULL, NULL, 1903, 100,
+    (142, 142, 1, 'fixed_date', 3, 17, NULL, NULL, NULL, 1903, NULL, 100,
      'Base legal date.'),
-    (143, 143, 1, 'easter_offset', NULL, NULL, NULL, NULL, 1, NULL, 100,
+    (143, 143, 1, 'easter_offset', NULL, NULL, NULL, NULL, 1, 1926, NULL, 100,
      'Relative to Gregorian Easter Sunday.'),
-    (144, 144, 1, 'nth_weekday', 5, NULL, 1, 1, NULL, 1994, 100,
+    (144, 144, 1, 'nth_weekday', 5, NULL, 1, 1, NULL, 1994, NULL, 100,
      'First Monday in May.'),
-    (145, 145, 1, 'nth_weekday', 6, NULL, 1, 1, NULL, 1973, 100,
+    (145, 145, 1, 'nth_weekday', 6, NULL, 1, 1, NULL, 1973, NULL, 100,
      'First Monday in June.'),
-    (146, 146, 1, 'nth_weekday', 8, NULL, 1, 1, NULL, NULL, 100,
+    (146, 146, 1, 'nth_weekday', 8, NULL, 1, 1, NULL, 1926, NULL, 100,
      'First Monday in August.'),
-    (147, 147, 1, 'last_weekday', 10, NULL, 1, -1, NULL, 1977, 100,
+    (147, 147, 1, 'last_weekday', 10, NULL, 1, -1, NULL, 1977, NULL, 100,
      'Last Monday in October.'),
-    (148, 148, 1, 'fixed_date', 12, 25, NULL, NULL, NULL, NULL, 100,
+    (148, 148, 1, 'fixed_date', 12, 25, NULL, NULL, NULL, 1926, NULL, 100,
      'Base legal date.'),
-    (149, 149, 1, 'fixed_date', 12, 26, NULL, NULL, NULL, NULL, 100,
-     'Base legal date.');
+    (149, 149, 1, 'fixed_date', 12, 26, NULL, NULL, NULL, 1926, NULL, 100,
+     'Base legal date.'),
+    (150, 150, 1, 'easter_offset', NULL, NULL, NULL, NULL, 50, 1926, 1972, 100,
+     'Whit Monday before replacement by the June Holiday.');
 
 INSERT INTO holiday_rule_source(
     holiday_id,
@@ -973,7 +996,8 @@ VALUES
     (146, 146, NULL, NULL, 6, 'definition', 'Ireland August Bank Holiday seed rule.'),
     (147, 147, NULL, NULL, 6, 'definition', 'Ireland October Bank Holiday seed rule.'),
     (148, 148, NULL, NULL, 6, 'definition', 'Ireland Christmas Day seed rule.'),
-    (149, 149, NULL, NULL, 6, 'definition', 'Ireland Saint Stephen''s Day seed rule.');
+    (149, 149, NULL, NULL, 6, 'definition', 'Ireland Saint Stephen''s Day seed rule.'),
+    (150, 150, NULL, NULL, 16, 'definition', 'Ireland Whit Monday historic rule window.');
 
 -- France national/public holiday seed rules.
 INSERT INTO holiday_definition(
@@ -1469,8 +1493,8 @@ VALUES
     (233, 'NL', 'easter_monday', 'Tweede Paasdag', 'public', 'full_day', 'gregory', 1926, NULL,
      'Second Easter Day.'),
     (234, 'NL', 'kings_day', 'Koningsdag', 'public', 'full_day', 'gregory', 2014, NULL,
-     '27 April, moved to 26 April when 27 April falls on a Sunday.'),
-    (235, 'NL', 'liberation_day', 'Bevrijdingsdag', 'public', 'full_day', 'gregory', 1990, NULL,
+     '27 April, moved to the previous weekday when 27 April falls on a Sunday.'),
+    (235, 'NL', 'liberation_day', 'Bevrijdingsdag', 'public', 'full_day', 'gregory', 1945, NULL,
      'National holiday, but employer practice differs on whether it is a paid day off every year.'),
     (236, 'NL', 'ascension_day', 'Hemelvaartsdag', 'public', 'full_day', 'gregory', 1926, NULL,
      '39 days after Easter Sunday.'),
@@ -1523,41 +1547,34 @@ VALUES
     (232, 232, 1, 'easter_offset', NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, 1926, NULL, 100, 'Gregorian Easter Sunday.'),
     (233, 233, 1, 'easter_offset', NULL, NULL, NULL, NULL, 1, NULL, NULL, NULL, NULL, NULL, 1926, NULL, 100, 'Relative to Gregorian Easter Sunday.'),
     (234, 234, 1, 'fixed_date', 4, 27, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 2014, NULL, 100, 'Base legal date from 2014 onward.'),
-    (235, 235, 1, 'fixed_date', 5, 5, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1990, NULL, 100, 'Base legal date.'),
+    (235, 235, 1, 'fixed_date', 5, 5, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1945, NULL, 100, 'Base legal date.'),
     (236, 236, 1, 'easter_offset', NULL, NULL, NULL, NULL, 39, NULL, NULL, NULL, NULL, NULL, 1926, NULL, 100, 'Relative to Gregorian Easter Sunday.'),
     (237, 237, 1, 'easter_offset', NULL, NULL, NULL, NULL, 49, NULL, NULL, NULL, NULL, NULL, 1926, NULL, 100, 'Relative to Gregorian Easter Sunday.'),
     (238, 238, 1, 'easter_offset', NULL, NULL, NULL, NULL, 50, NULL, NULL, NULL, NULL, NULL, 1926, NULL, 100, 'Relative to Gregorian Easter Sunday.'),
     (239, 239, 1, 'fixed_date', 12, 25, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1926, NULL, 100, 'Base legal date.'),
-    (240, 240, 1, 'fixed_date', 12, 26, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1926, NULL, 100, 'Base legal date.'),
-    (241, 234, 2, 'one_off', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '2014-04-26', 2014, 2014, 10, 'Koningsdag observed on 26 April when 27 April fell on a Sunday.'),
-    (242, 234, 3, 'one_off', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '2025-04-26', 2025, 2025, 10, 'Koningsdag observed on 26 April when 27 April fell on a Sunday.');
+    (240, 240, 1, 'fixed_date', 12, 26, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1926, NULL, 100, 'Base legal date.');
 
-INSERT INTO holiday_exception(
-    exception_id,
-    jurisdiction_id,
+INSERT INTO holiday_observance_rule(
+    observance_rule_id,
     holiday_id,
-    target_rule_id,
-    holiday_date,
-    action,
-    name,
-    replacement_holiday_key,
+    applies_to_rule_id,
+    observed_rule_kind,
+    observed_name,
+    weekend_mask,
+    suppress_original,
+    move_days,
+    second_move_days,
     expression_language,
     expression_text,
     valid_from_year,
     valid_to_year,
     priority,
-    source_document_id,
     notes
 )
 VALUES
-    (190, 'NL', 234, 234, '2014-04-26', 'replace',
-     'Koningsdag', 'kings_day',
-     NULL, NULL, 2014, 2014, 0, 13,
-     '27 April 2014 fell on a Sunday, so King''s Day was held on 26 April.'),
-    (191, 'NL', 234, 234, '2025-04-26', 'replace',
-     'Koningsdag', 'kings_day',
-     NULL, NULL, 2025, 2025, 0, 13,
-     '27 April 2025 fell on a Sunday, so King''s Day was held on 26 April.');
+    (230, 234, 234, 'previous_weekday', 'Koningsdag', '7', 1,
+     NULL, NULL, NULL, NULL, 2014, NULL, 100,
+     'When 27 April falls on a Sunday, King''s Day is observed on the previous weekday.');
 
 INSERT INTO holiday_rule_source(
     holiday_id,
@@ -1573,7 +1590,7 @@ VALUES
     (231, 231, NULL, NULL, 13, 'definition', 'Netherlands Good Friday seed rule.'),
     (232, 232, NULL, NULL, 13, 'definition', 'Netherlands First Easter Day seed rule.'),
     (233, 233, NULL, NULL, 13, 'definition', 'Netherlands Second Easter Day seed rule.'),
-    (234, 234, NULL, 190, 13, 'exception', 'Netherlands King''s Day seed rule with Sunday replacement.'),
+    (234, 234, 230, NULL, 13, 'observance', 'Netherlands King''s Day seed rule with Sunday replacement.'),
     (235, 235, NULL, NULL, 13, 'definition', 'Netherlands Liberation Day seed rule.'),
     (236, 236, NULL, NULL, 13, 'definition', 'Netherlands Ascension Day seed rule.'),
     (237, 237, NULL, NULL, 13, 'definition', 'Netherlands First Pentecost Day seed rule.'),
@@ -1582,4 +1599,4 @@ VALUES
     (240, 240, NULL, NULL, 13, 'definition', 'Netherlands Second Christmas Day seed rule.');
 
 .read packaging/holiday-db/mars_generated_first_class_rules.sql
-.read packaging/holiday-db/mars_generated_holiday_instances.sql
+.read packaging/holiday-db/mars_manual_first_class_rules.sql

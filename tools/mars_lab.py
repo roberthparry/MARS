@@ -2733,6 +2733,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       datetimeJurisdiction.value = DEFAULT_DATETIME_JURISDICTION;
     enhanceRoundedSelect(matrixOperation);
     enhanceRoundedSelect(datetimeJurisdiction);
+    let datetimeLocalRefreshSequence = 0;
     const statusEl = document.getElementById('status');
     const inputCopy = document.getElementById('inputCopy');
     const rightPaneTitle = document.getElementById('rightPaneTitle');
@@ -5219,8 +5220,37 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(state)
       });
-      const data = await response.json();
+      const raw = await response.text();
+      let data;
+      try {
+        data = raw ? JSON.parse(raw) : {};
+      } catch (_) {
+        throw new Error(raw || `Datetime request failed with HTTP ${response.status}`);
+      }
       return {response, data};
+    }
+
+    async function refreshDatetimeLocalHolidays() {
+      if (currentMode() !== 'datetime')
+        return;
+
+      const refreshId = ++datetimeLocalRefreshSequence;
+      setStatus('Refreshing holidays...');
+      try {
+        const {response, data} = await fetchDatetimeEvaluation();
+        if (refreshId !== datetimeLocalRefreshSequence || currentMode() !== 'datetime')
+          return;
+        if (!response.ok || !data.ok) {
+          setStatus('Error');
+          return;
+        }
+        setDatetimeLocalText(data.local || '', data.local_sections || []);
+        setStatus('Ready');
+      } catch (_) {
+        if (refreshId !== datetimeLocalRefreshSequence || currentMode() !== 'datetime')
+          return;
+        setStatus('Error');
+      }
     }
 
     function estimateValuePrecision() {
@@ -6770,6 +6800,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           }
           if (currentMode() === 'datetime') {
             saveLastDatetimeState();
+            if (control === datetimeJurisdiction || control === datetimeStart || control === datetimeEnd)
+              refreshDatetimeLocalHolidays();
             updateHistoryButtons();
           }
         });
@@ -9559,9 +9591,12 @@ def prepare_datetime_fields(fields: dict[str, str]) -> dict[str, object]:
             if not line:
                 continue
             local_lines.append(line)
-            match = re.match(r"^(.*?):\s*(\d{4}-\d{2}-\d{2})$", line)
+            match = re.match(r"^(.*?):\s*(.+)$", line)
             if match:
-                local_rows.append({"label": match.group(1).strip(), "value": match.group(2)})
+                local_rows.append({
+                    "label": match.group(1).strip(),
+                    "value": match.group(2).strip(),
+                })
             else:
                 local_rows.append({"label": line, "value": ""})
     local_sections = []
@@ -10173,47 +10208,59 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                 self.send_json(422, {"ok": False, "error": str(exc)})
                 return
 
-            if returncode != 0:
-                self.send_json(422, {"ok": False, "error": raw or "Datetime calculation failed"})
-                return
-
             try:
-                ensure_scratch_binary(self.holiday_binary, "scratch/holiday_lab")
-                holiday_fields, holiday_raw, holiday_returncode = run_holiday_lab_fields(
-                    self.holiday_binary,
-                    {
-                        "start": start_text,
-                        "end": end_text,
-                        "jurisdiction": jurisdiction,
-                    },
-                )
-                if holiday_returncode == 0:
-                    fields.update(holiday_fields)
-                else:
-                    self.log_message(
-                        "holiday helper failure jurisdiction=%r returncode=%r raw=%r",
-                        jurisdiction,
-                        holiday_returncode,
-                        str(holiday_raw or "").strip(),
-                    )
-            except Exception as exc:
-                self.log_message("holiday helper unavailable jurisdiction=%r error=%r", jurisdiction, exc)
+                if returncode != 0:
+                    self.send_json(422, {"ok": False, "error": raw or "Datetime calculation failed"})
+                    return
 
-            selected_date_text = str(fields.get("date") or date_text).strip()
-            selected_jdn_text = str(fields.get("julian_day_number") or jdn_text).strip()
-            save_state_data({
-                "datetime_date": selected_date_text,
-                "datetime_jdn": selected_jdn_text,
-                "datetime_start": start_text,
-                "datetime_end": end_text,
-                "datetime_year": str(year),
-                "datetime_jurisdiction": jurisdiction,
-                "datetime_latitude": str(latitude),
-                "datetime_longitude": str(longitude),
-                "datetime_gmt_offset": gmt_offset_text,
-            })
-            self.send_json(200, prepare_datetime_fields(fields))
-            return
+                try:
+                    ensure_scratch_binary(self.holiday_binary, "scratch/holiday_lab")
+                    holiday_fields, holiday_raw, holiday_returncode = run_holiday_lab_fields(
+                        self.holiday_binary,
+                        {
+                            "start": start_text,
+                            "end": end_text,
+                            "jurisdiction": jurisdiction,
+                        },
+                    )
+                    if holiday_returncode == 0:
+                        fields.update(holiday_fields)
+                    else:
+                        self.log_message(
+                            "holiday helper failure jurisdiction=%r returncode=%r raw=%r",
+                            jurisdiction,
+                            holiday_returncode,
+                            str(holiday_raw or "").strip(),
+                        )
+                except Exception as exc:
+                    self.log_message("holiday helper unavailable jurisdiction=%r error=%r", jurisdiction, exc)
+
+                selected_date_text = str(fields.get("date") or date_text).strip()
+                selected_jdn_text = str(fields.get("julian_day_number") or jdn_text).strip()
+                save_state_data({
+                    "datetime_date": selected_date_text,
+                    "datetime_jdn": selected_jdn_text,
+                    "datetime_start": start_text,
+                    "datetime_end": end_text,
+                    "datetime_year": str(year),
+                    "datetime_jurisdiction": jurisdiction,
+                    "datetime_latitude": str(latitude),
+                    "datetime_longitude": str(longitude),
+                    "datetime_gmt_offset": gmt_offset_text,
+                })
+                self.send_json(200, prepare_datetime_fields(fields))
+                return
+            except Exception as exc:
+                self.log_message(
+                    "datetime response assembly failure jurisdiction=%r date=%r start=%r end=%r error=%r",
+                    jurisdiction,
+                    date_text,
+                    start_text,
+                    end_text,
+                    exc,
+                )
+                self.send_json(500, {"ok": False, "error": f"Datetime response failed: {exc}"})
+                return
 
         if path == "/goal_seek":
             try:

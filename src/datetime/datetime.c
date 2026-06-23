@@ -2241,6 +2241,29 @@ string_t *datetime_format_text(const datetime_t *dttm,
                break;
             }
 
+            case 'q':
+            case 'Q':
+            {
+               const char *suffix = "ᵗʰ";
+
+               if (!(10 < dttm->day && dttm->day < 20)) {
+                  switch (dttm->day % 10) {
+                     case 1: suffix = "ˢᵗ"; break;
+                     case 2: suffix = "ⁿᵈ"; break;
+                     case 3: suffix = "ʳᵈ"; break;
+                     default: suffix = "ᵗʰ"; break;
+                  }
+               }
+               datetime_format_append_name(formattedString,
+                                           &append_failed,
+                                           suffix,
+                                           SIZE_MAX,
+                                           0,
+                                           0);
+               (void)datetime_cursor_advance(cursor);
+               break;
+            }
+
             case 'm':
             case 'M':
             {
