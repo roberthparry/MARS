@@ -680,44 +680,6 @@ void test_datetime_sunset_observance_start_gmt(void) {
     datetime_dealloc(start);
 }
 
-void test_datetime_english_bank_holidays_2022_specials(void) {
-    datetime_holiday_list_t holidays;
-
-    ASSERT_TRUE(datetime_english_bank_holidays(2022, &holidays));
-    ASSERT_EQ_INT(holidays.count, 10);
-    TEST_ASSERT_STR_EQ(holidays.items[4].name, "Spring Bank Holiday");
-    ASSERT_EQ_INT(holidays.items[4].month, DT_June);
-    ASSERT_EQ_INT(holidays.items[4].day, 2);
-    TEST_ASSERT_STR_EQ(holidays.items[5].name, "Platinum Jubilee Bank Holiday");
-    ASSERT_EQ_INT(holidays.items[5].month, DT_June);
-    ASSERT_EQ_INT(holidays.items[5].day, 3);
-    TEST_ASSERT_STR_EQ(holidays.items[7].name, "State Funeral of Queen Elizabeth II");
-    ASSERT_EQ_INT(holidays.items[7].month, DT_September);
-    ASSERT_EQ_INT(holidays.items[7].day, 19);
-}
-
-void test_datetime_english_bank_holidays_between_dates(void) {
-    datetime_t *start = datetime_init_ymd(datetime_alloc(), 2026, DT_December, 24);
-    datetime_t *end = datetime_init_ymd(datetime_alloc(), 2027, DT_January, 4);
-    datetime_holiday_list_t holidays;
-
-    ASSERT_TRUE(datetime_english_bank_holidays_between(start, end, &holidays));
-    ASSERT_EQ_INT(holidays.count, 3);
-    TEST_ASSERT_STR_EQ(holidays.items[0].name, "Christmas Day");
-    ASSERT_EQ_INT(holidays.items[0].year, 2026);
-    ASSERT_EQ_INT(holidays.items[0].month, DT_December);
-    ASSERT_EQ_INT(holidays.items[0].day, 25);
-    TEST_ASSERT_STR_EQ(holidays.items[1].name, "Bank Holiday in Lieu of Boxing Day");
-    ASSERT_EQ_INT(holidays.items[1].day, 28);
-    TEST_ASSERT_STR_EQ(holidays.items[2].name, "New Years Day");
-    ASSERT_EQ_INT(holidays.items[2].year, 2027);
-    ASSERT_EQ_INT(holidays.items[2].month, DT_January);
-    ASSERT_EQ_INT(holidays.items[2].day, 1);
-
-    datetime_dealloc(start);
-    datetime_dealloc(end);
-}
-
 void test_datetime_format_uses_string_builder(void) {
     datetime_t *dt = datetime_init_ymdt(
         datetime_alloc(), 2024, DT_June, 15, 13, 5, 9.0
@@ -835,8 +797,6 @@ int tests_main(void) {
     TEST_RUN_IN_GROUP(test_datetime_buddhist_observance_known_dates, tests, NULL);
     TEST_RUN_IN_GROUP(test_datetime_calendar_date_texts_known_dates, tests, NULL);
     TEST_RUN_IN_GROUP(test_datetime_sunset_observance_start_gmt, tests, NULL);
-    TEST_RUN_IN_GROUP(test_datetime_english_bank_holidays_2022_specials, tests, NULL);
-    TEST_RUN_IN_GROUP(test_datetime_english_bank_holidays_between_dates, tests, NULL);
     TEST_RUN_IN_GROUP(test_datetime_format_uses_string_builder, tests, NULL);
 
     printf(C_YELLOW "\nRunning README examples...\n" C_RESET);

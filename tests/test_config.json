@@ -72,8 +72,6 @@
       "test_datetime_days_in_month": true,
       "test_datetime_display_names": true,
       "test_datetime_eid_al_fitr_known_date": true,
-      "test_datetime_english_bank_holidays_2022_specials": true,
-      "test_datetime_english_bank_holidays_between_dates": true,
       "test_datetime_format_uses_string_builder": true,
       "test_datetime_getters": true,
       "test_datetime_hindu_observance_known_dates": true,

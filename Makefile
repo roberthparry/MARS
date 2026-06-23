@@ -21,6 +21,7 @@ CFLAGS += -D_GNU_SOURCE
 CC := gcc
 AR := ar rcs
 INSTALL ?= install
+SQLCIPHER ?= sqlcipher
 
 PREFIX ?= /usr/local
 LIBDIR ?= $(PREFIX)/lib
@@ -34,6 +35,9 @@ MARS_LAB_LAUNCHER ?= $(MARS_LAB_BINDIR)/mars-lab
 MARS_LAB_DESKTOP ?= $(MARS_LAB_APPDIR)/mars-lab.desktop
 MARS_LAB_ICON ?= $(MARS_LAB_ICONDIR)/mars-lab.svg
 MARS_LAB_ICON_CONCEPTS := $(wildcard packaging/linux/icon-concepts/*.svg)
+HOLIDAY_DB_SOURCE_DIR ?= packaging/holiday-db
+HOLIDAY_RULES_SQL ?= $(HOLIDAY_DB_SOURCE_DIR)/mars_holiday_rules.sql
+HOLIDAY_RULES_SOURCES := $(HOLIDAY_RULES_SQL) $(HOLIDAY_DB_SOURCE_DIR)/mars_country_jurisdictions.sql $(HOLIDAY_DB_SOURCE_DIR)/mars_generated_first_class_rules.sql $(HOLIDAY_DB_SOURCE_DIR)/mars_generated_holiday_instances.sql $(HOLIDAY_DB_SOURCE_DIR)/mars_target_subdivisions.sql
 TO_BE_ANNOUNCED_LAB_LAUNCHER ?= $(MARS_LAB_BINDIR)/to-be-announced-lab
 TO_BE_ANNOUNCED_LAB_DESKTOP ?= $(MARS_LAB_APPDIR)/to-be-announced-lab.desktop
 TO_BE_ANNOUNCED_LAB_ICON ?= $(MARS_LAB_ICONDIR)/to-be-announced-lab.svg
@@ -167,6 +171,7 @@ check-lab-deps: check-deps
 	}; \
 	check_tool "LaTeX" "latex" "texlive-latex-base"; \
 	check_tool "dvisvgm" "dvisvgm" "dvisvgm"; \
+	check_tool "SQLCipher CLI" "$(SQLCIPHER)" "sqlcipher"; \
 	if [ "$$missing" -ne 0 ]; then \
 	    echo; \
 	    echo "Install the missing MARS Lab runtime tool(s), then rerun make."; \
@@ -328,7 +333,7 @@ mars-lab: check-lab-deps $(BUILD_DIR)/scratch/mars_lab
 to-be-announced-lab: $(BUILD_DIR)/scratch/to-be-announced_lab
 	@tools/to-be-announced-lab
 
-install-mars-lab: check-lab-deps tools/mars-lab packaging/linux/mars-lab.desktop.in packaging/linux/mars-lab.svg $(MARS_LAB_ICON_CONCEPTS)
+install-mars-lab: check-lab-deps tools/mars-lab tools/configure_mars_lab_holiday_db.py $(HOLIDAY_RULES_SOURCES) packaging/linux/mars-lab.desktop.in packaging/linux/mars-lab.svg $(MARS_LAB_ICON_CONCEPTS)
 	$(INSTALL) -d "$(MARS_LAB_BINDIR)" "$(MARS_LAB_APPDIR)" "$(MARS_LAB_ICONDIR)"
 	rm -f "$(MARS_LAB_BINDIR)/mars-expr-lab" "$(MARS_LAB_APPDIR)/mars-expr-lab.desktop" "$(MARS_LAB_ICONDIR)/mars-expr-lab.svg" "$(MARS_LAB_ICONDIR)"/mars-expr-lab-*.svg
 	@printf '%s\n' \
@@ -362,6 +367,7 @@ install-mars-lab: check-lab-deps tools/mars-lab packaging/linux/mars-lab.desktop
 	@if command -v update-desktop-database >/dev/null 2>&1; then update-desktop-database "$(MARS_LAB_APPDIR)" >/dev/null 2>&1 || true; fi
 	@if command -v gtk-update-icon-cache >/dev/null 2>&1; then gtk-update-icon-cache "$(MARS_LAB_INSTALL_PREFIX)/share/icons/hicolor" >/dev/null 2>&1 || true; fi
 	@if command -v kbuildsycoca6 >/dev/null 2>&1; then kbuildsycoca6 >/dev/null 2>&1 || true; elif command -v kbuildsycoca5 >/dev/null 2>&1; then kbuildsycoca5 >/dev/null 2>&1 || true; fi
+	@python3 tools/configure_mars_lab_holiday_db.py
 	@echo "Installed MARS Lab desktop launcher:"
 	@echo "  $(MARS_LAB_DESKTOP)"
 

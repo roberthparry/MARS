@@ -44,11 +44,12 @@ sudo apt install build-essential libgmp-dev libmpfr-dev libmpc-dev libsqlcipher-
 Use `make check-deps` to check for required development headers and link
 libraries before building or installing.
 
-MARS Lab also renders TeX through `latex` and `dvisvgm`. For the desktop Lab,
-install the rendering tools and check them with:
+MARS Lab also renders TeX through `latex` and `dvisvgm`. The desktop Lab now
+uses the `sqlcipher` CLI to bootstrap the holiday database during
+installation. Install the runtime tools and check them with:
 
 ```sh
-sudo apt install texlive-latex-base dvisvgm
+sudo apt install texlive-latex-base dvisvgm sqlcipher
 make check-lab-deps
 ```
 
@@ -327,6 +328,17 @@ By default this installs to `/usr/local`, with headers under
 
 `make install` installs MARS itself only. It does not install system libraries;
 install the requirements above with your system package manager first.
+
+To install the desktop MARS Lab launcher, run:
+
+```sh
+make install-mars-lab
+```
+
+That setup asks for a password to protect the private datetime database, stores
+the resulting configuration in `~/.mars/config/holiday-db.env`, and builds the
+encrypted holiday database at `~/.mars/holiday/mars_holiday_rules.db`.
+Reinstalling MARS Lab recreates `~/.mars` from scratch.
 
 ## Run Tests
 

@@ -252,7 +252,6 @@ static bool apply_arg(datetime_lab_options_t *options, const char *arg)
         options->gmt_offset = number;
         return true;
     }
-
     return false;
 }
 
@@ -350,28 +349,6 @@ static void print_optional_start_gmt_field(const char *name,
 
     print_time_field(name, start);
     datetime_dealloc(start);
-}
-
-static void print_bank_holidays_between(const datetime_t *start, const datetime_t *end)
-{
-    datetime_holiday_list_t holidays;
-
-    if (!datetime_english_bank_holidays_between(start, end, &holidays)) {
-        printf("bank_holidays unavailable\n");
-        return;
-    }
-
-    for (unsigned short i = 0; i < holidays.count; i++) {
-        const datetime_holiday_t *holiday = &holidays.items[i];
-        datetime_t *date = datetime_init_ymd(datetime_alloc(),
-                                             holiday->year,
-                                             holiday->month,
-                                             holiday->day);
-        char *text = format_date(date);
-        printf("bank_holiday %s: %s\n", holiday->name, text ? text : "unavailable");
-        free(text);
-        datetime_dealloc(date);
-    }
 }
 
 static void print_sun_time_field(const char *name,
@@ -634,7 +611,6 @@ int main(int argc, char **argv)
     print_optional_start_gmt_field("passover_starts_gmt", passover, options.latitude, options.longitude);
     print_optional_date_field("jewish_new_year", jewish_new_year);
     print_optional_start_gmt_field("jewish_new_year_starts_gmt", jewish_new_year, options.latitude, options.longitude);
-    print_bank_holidays_between(start, end);
 
     datetime_dealloc(date);
     datetime_dealloc(start);
