@@ -48,11 +48,12 @@ make check-deps
 If a required dependency is missing, the check prints the Debian/Ubuntu package
 name to install, for example `sudo apt install libmpfr-dev`.
 
-MARS Lab uses server-side TeX rendering, so the desktop Lab also needs `latex`
-and `dvisvgm`:
+MARS Lab uses server-side TeX rendering, and the desktop installer now uses the
+`sqlcipher` CLI to bootstrap the holiday database, so the desktop Lab also
+needs `latex`, `dvisvgm`, and `sqlcipher`:
 
 ```sh
-sudo apt install texlive-latex-base dvisvgm
+sudo apt install texlive-latex-base dvisvgm sqlcipher
 make check-lab-deps
 ```
 
@@ -116,6 +117,18 @@ make install PREFIX=/opt/mars
 make install DESTDIR=/tmp/package-root PREFIX=/usr
 ```
 
+Install the desktop MARS Lab launcher with:
+
+```sh
+make install-mars-lab
+```
+
+That installer now prompts for a password to protect the private datetime
+database, stores the resulting configuration in
+`~/.mars/config/holiday-db.env`, and builds the encrypted holiday database at
+`~/.mars/holiday/mars_holiday_rules.db`. Reinstalling MARS Lab recreates
+`~/.mars` from scratch.
+
 Remove installed MARS files:
 
 ```sh
@@ -167,8 +180,8 @@ make help
 - `libm`, pthreads, GMP, MPFR, MPC, and SQLCipher are required.
 - `libunistring` is optional but enabled by default through `ENABLE_UNISTRING=1`.
 - `make install` installs MARS headers and libraries only. It does not install
-  external dependencies such as GMP, MPFR, MPC, SQLCipher, or libunistring; install those
-  through your OS package manager before building MARS.
+  external dependencies such as GMP, MPFR, MPC, SQLCipher, or libunistring;
+  install those through your OS package manager before building MARS.
 - Benchmarks are discovered automatically from `bench/bench_*.c`.
 - Current benchmark targets include `bench_integrator` and
   `bench_matrix_expr`.

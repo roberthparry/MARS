@@ -8,6 +8,13 @@ else
     root=$(CDPATH= cd "$script_dir/.." && pwd)
 fi
 
+mars_home=${MARS_HOME:-"$HOME/.mars"}
+holiday_config="$mars_home/config/holiday-db.env"
+if [ -f "$holiday_config" ]; then
+    # shellcheck disable=SC1090
+    . "$holiday_config"
+fi
+
 cd "$root"
 
 if [ ! -x build/release/scratch/mars_lab ]; then

@@ -1,7 +1,7 @@
 # `datetime_t`
 
 `datetime_t` provides civil calendar utilities together with higher-level
-astronomical helpers.
+astronomical and calendar-observance helpers.
 
 ## Capabilities
 
@@ -14,8 +14,28 @@ astronomical helpers.
 - sunrise and sunset calculation
 - moon phase classification and next-phase search
 - weekday navigation
-- holiday helpers: Easter (Anonymous Gregorian algorithm) and Chinese New Year (1700–2400)
+- calendar observance helpers, including Easter, Orthodox Easter, Chinese New Year, selected Hindu, Buddhist, Muslim, and Jewish observances
 - rich `printf`-style formatting
+
+## Scope Boundary
+
+`datetime_t` computes reusable calendar and observance dates such as Easter,
+Chinese New Year, Ramadan, Passover, and Jewish New Year.
+
+It does not model jurisdiction-specific public holiday policy such as:
+
+- whether an observance is a legal public or bank holiday in a given country or subdivision
+- substitute-day naming such as `Bank Holiday in Lieu of Boxing Day`
+- weekend-dependent observance rules that vary by jurisdiction
+
+In MARS Lab, that jurisdiction-specific layer now lives in the separate holiday
+database and `holiday_lab` helper. The Lab UI composes:
+
+- `datetime_lab` for core calendar, moon, and solar calculations
+- `holiday_lab` for local holiday instances between two dates
+
+This keeps `datetime_t` useful for general date, astronomical, and time-series
+work without coupling it to one country's holiday law.
 
 ## Example: Chinese New Year
 
@@ -157,7 +177,21 @@ initialise it, and return the same pointer (or NULL on error).
 - `datetime_t *datetime_init_jd(datetime_t *dttm, double JulianDay)` — from floating-point Julian Day
 - `datetime_t *datetime_init_now(datetime_t *dttm)` — current local date and time
 - `datetime_t *datetime_init_easter(datetime_t *dttm, int year)` — Easter Sunday for `year` (1–9999); returns NULL if year is out of range
+- `datetime_t *datetime_init_orthodox_easter(datetime_t *dttm, int year)` — Orthodox Easter Sunday for `year` (1–9999); returns NULL if year is out of range
+- `datetime_t *datetime_init_christmas(datetime_t *dttm, int year)` — Christmas Day for `year`
+- `datetime_t *datetime_init_orthodox_christmas(datetime_t *dttm, int year)` — Orthodox Christmas observance in the Gregorian civil year
 - `datetime_t *datetime_init_chinese_new_year(datetime_t *dttm, int year)` — Chinese New Year for `year` (1700–2400); returns NULL if year is out of range
+- `datetime_t *datetime_init_diwali(datetime_t *dttm, int year)` — estimated Diwali date
+- `datetime_t *datetime_init_holi(datetime_t *dttm, int year)` — estimated Holi date
+- `datetime_t *datetime_init_hindu_new_year(datetime_t *dttm, int year)` — estimated Hindu lunar New Year
+- `datetime_t *datetime_init_buddhist_new_year(datetime_t *dttm, int year)` — estimated Buddhist New Year
+- `datetime_t *datetime_init_vesak(datetime_t *dttm, int year)` — estimated Vesak date
+- `datetime_t *datetime_init_asalha_puja(datetime_t *dttm, int year)` — estimated Asalha Puja date
+- `datetime_t *datetime_init_ramadan(datetime_t *dttm, int year)` — civil Islamic Ramadan start
+- `datetime_t *datetime_init_eid_al_fitr(datetime_t *dttm, int year)` — civil Islamic Eid al-Fitr date
+- `datetime_t *datetime_init_muslim_new_year(datetime_t *dttm, int year)` — civil Islamic New Year date
+- `datetime_t *datetime_init_passover(datetime_t *dttm, int year)` — Passover date
+- `datetime_t *datetime_init_jewish_new_year(datetime_t *dttm, int year)` — Jewish New Year date
 
 ### Field Accessors
 

@@ -83,20 +83,6 @@ typedef struct _datetime_span_t {
     double seconds;
 } datetime_span_t;
 
-#define DATETIME_BANK_HOLIDAY_MAX 512
-
-typedef struct _datetime_holiday_t {
-    const char *name;
-    short year;
-    month_t month;
-    uint8_t day;
-} datetime_holiday_t;
-
-typedef struct _datetime_holiday_list_t {
-    unsigned short count;
-    datetime_holiday_t items[DATETIME_BANK_HOLIDAY_MAX];
-} datetime_holiday_list_t;
-
 datetime_t *datetime_alloc();
 
 /**
@@ -392,23 +378,6 @@ string_t *datetime_muslim_calendar_date_text(const datetime_t *dttm);
  * @return owned text, or NULL if the date is invalid.
  */
 string_t *datetime_jewish_calendar_date_text(const datetime_t *dttm);
-
-/**
- * @brief list English bank holidays for a Gregorian year.
- * @param year the Gregorian year.
- * @param out output list to fill.
- * @return true on success, false if the year/list is invalid.
- */
-bool datetime_english_bank_holidays(int year, datetime_holiday_list_t *out);
-
-/**
- * @brief list English bank holidays whose dates fall within an inclusive date range.
- * @param start the first date in the range.
- * @param end the final date in the range.
- * @param out output list to fill, sorted by date.
- * @return true on success, false if the dates/list are invalid or the output list would overflow.
- */
-bool datetime_english_bank_holidays_between(const datetime_t *start, const datetime_t *end, datetime_holiday_list_t *out);
 
 /**
  * @brief calculate the timezone offset in hours for a given datetime. This function uses the system's time zone information to

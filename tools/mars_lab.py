@@ -34,6 +34,173 @@ import shutil
 
 
 ROOT = Path(__file__).resolve().parents[1]
+HOLIDAY_DB_SOURCE_DIR = ROOT / "packaging" / "holiday-db"
+COUNTRY_JURISDICTIONS_SQL = HOLIDAY_DB_SOURCE_DIR / "mars_country_jurisdictions.sql"
+TARGET_SUBDIVISIONS_SQL = HOLIDAY_DB_SOURCE_DIR / "mars_target_subdivisions.sql"
+HOLIDAY_DB_PATH_ENV = "MARS_HOLIDAY_DB_PATH"
+HOLIDAY_DB_KEY_ENV = "MARS_HOLIDAY_DB_KEY"
+
+
+def detect_system_timezone_name() -> str:
+    tz_env = os.environ.get("TZ", "").strip()
+    if tz_env:
+        return tz_env
+    localtime_path = "/etc/localtime"
+    try:
+        resolved = os.path.realpath(localtime_path)
+    except OSError:
+        return ""
+    marker = "/zoneinfo/"
+    if marker in resolved:
+        return resolved.split(marker, 1)[1]
+    return ""
+
+
+def infer_defaults_from_timezone() -> tuple[str, str, str]:
+    timezone_name = detect_system_timezone_name()
+    candidates = [
+        ("Australia/", ("-33.8688", "151.2093", "AU")),
+        ("Pacific/Auckland", ("-36.8485", "174.7633", "NZ")),
+        ("Africa/Johannesburg", ("-26.2041", "28.0473", "ZA")),
+        ("Europe/Amsterdam", ("52.3676", "4.9041", "NL")),
+        ("Europe/Copenhagen", ("55.6761", "12.5683", "DK")),
+        ("Europe/Dublin", ("53.3498", "-6.2603", "IE")),
+        ("Europe/Lisbon", ("38.7223", "-9.1393", "PT")),
+        ("Europe/Rome", ("41.9028", "12.4964", "IT")),
+        ("Europe/Athens", ("37.9838", "23.7275", "GR")),
+        ("Europe/Berlin", ("52.52", "13.405", "DE")),
+        ("Europe/Paris", ("48.8566", "2.3522", "FR")),
+        ("Europe/London", ("51.5074", "-0.1278", "GB-ENG")),
+        ("America/Toronto", ("43.6532", "-79.3832", "CA")),
+        ("America/Vancouver", ("49.2827", "-123.1207", "CA")),
+        ("America/Halifax", ("44.6488", "-63.5752", "CA")),
+        ("America/", ("40.7128", "-74.006", "US")),
+    ]
+    for prefix, defaults in candidates:
+        if timezone_name.startswith(prefix):
+            return defaults
+    return ("51.5074", "-0.1278", "GB-ENG")
+
+
+DEFAULT_TIMEZONE_LATITUDE, DEFAULT_TIMEZONE_LONGITUDE, DEFAULT_HOLIDAY_JURISDICTION = infer_defaults_from_timezone()
+
+
+def mars_home_dir() -> Path:
+    custom = os.environ.get("MARS_HOME", "").strip()
+    if custom:
+        return Path(custom).expanduser()
+    return Path.home() / ".mars"
+
+
+def default_holiday_db_path() -> Path:
+    return mars_home_dir() / "holiday" / "mars_holiday_rules.db"
+
+
+def holiday_db_runtime_env() -> dict[str, str]:
+    env_updates: dict[str, str] = {}
+    configured_path = os.environ.get(HOLIDAY_DB_PATH_ENV, "").strip()
+    db_path = Path(configured_path).expanduser() if configured_path else default_holiday_db_path()
+    env_updates[HOLIDAY_DB_PATH_ENV] = str(db_path)
+
+    configured_key = os.environ.get(HOLIDAY_DB_KEY_ENV, "").strip()
+    if configured_key:
+        env_updates[HOLIDAY_DB_KEY_ENV] = configured_key
+
+    return env_updates
+
+
+def load_holiday_jurisdiction_options() -> list[tuple[str, str]]:
+    country_pattern = re.compile(
+        r"\s*\('([^']+)', NULL, 'country', '[^']+', NULL, '[^']+', '([^']*)',"
+    )
+    subdivision_pattern = re.compile(
+        r"\s*\('([^']+)', '([^']+)', 'subdivision', '[^']+', '[^']+', '[^']+', '([^']*)',"
+    )
+    country_names: dict[str, str] = {}
+    subdivisions_by_parent: dict[str, list[tuple[str, str]]] = {}
+
+    try:
+        lines = COUNTRY_JURISDICTIONS_SQL.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        lines = []
+
+    for line in lines:
+        match = country_pattern.match(line)
+        if not match:
+            continue
+        code, name = match.groups()
+        if code == "GB":
+            name = "United Kingdom"
+        country_names[code] = name
+
+    try:
+        subdivision_lines = TARGET_SUBDIVISIONS_SQL.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        subdivision_lines = []
+
+    for line in subdivision_lines:
+        match = subdivision_pattern.match(line)
+        if not match:
+            continue
+        code, parent_code, name = match.groups()
+        subdivisions_by_parent.setdefault(parent_code, []).append((code, name))
+
+    options: list[tuple[str, str]] = []
+    for country_code, country_name in sorted(country_names.items(), key=lambda item: item[1]):
+        if country_code == "GB":
+            options.append(("GB-ENG", "United Kingdom - England"))
+            options.extend(
+                (code, f"United Kingdom - {name}")
+                for code, name in sorted(subdivisions_by_parent.get("GB", []), key=lambda item: item[1])
+            )
+            continue
+        options.append((country_code, country_name))
+        options.extend(
+            (code, f"{country_name} - {name}")
+            for code, name in sorted(subdivisions_by_parent.get(country_code, []), key=lambda item: item[1])
+        )
+
+    return options
+
+
+HOLIDAY_JURISDICTION_OPTIONS = load_holiday_jurisdiction_options()
+VALID_HOLIDAY_JURISDICTIONS = {code for code, _ in HOLIDAY_JURISDICTION_OPTIONS}
+HOLIDAY_JURISDICTION_OPTIONS_HTML = "\n".join(
+    f'          <option value="{html.escape(code)}">{html.escape(name)}</option>'
+    for code, name in HOLIDAY_JURISDICTION_OPTIONS
+)
+
+
+def infer_holiday_jurisdiction(latitude: float, longitude: float) -> str:
+    boxes = [
+        ("AU", -44.5, -10.0, 112.0, 154.5),
+        ("NZ", -48.5, -33.0, 165.0, 179.9),
+        ("ZA", -35.5, -21.0, 16.0, 33.5),
+        ("NL", 50.0, 54.2, 3.0, 8.0),
+        ("DK", 54.0, 58.0, 7.5, 15.5),
+        ("IE", 51.0, 55.8, -11.0, -5.0),
+        ("PT", 36.5, 42.5, -10.0, -6.0),
+        ("GR", 34.0, 42.5, 19.0, 29.5),
+        ("IT", 35.0, 47.5, 6.0, 19.0),
+        ("FR", 41.0, 51.5, -5.5, 10.5),
+        ("DE", 47.0, 55.5, 5.0, 16.5),
+        ("GB-ENG", 49.5, 56.2, -7.8, 2.2),
+        ("CA", 41.0, 84.5, -141.5, -52.0),
+        ("US", 18.0, 72.0, -171.0, -66.0),
+    ]
+    for jurisdiction, min_lat, max_lat, min_lon, max_lon in boxes:
+        if min_lat <= latitude <= max_lat and min_lon <= longitude <= max_lon:
+            return jurisdiction
+    return DEFAULT_HOLIDAY_JURISDICTION
+
+
+def normalize_holiday_jurisdiction(value: str) -> str:
+    jurisdiction = str(value or "").strip()
+    if jurisdiction in VALID_HOLIDAY_JURISDICTIONS:
+        return jurisdiction
+    return DEFAULT_HOLIDAY_JURISDICTION
+
+
 LAB_APP_NAME = os.environ.get("MARS_LAB_APP_NAME", "MARS Lab").strip() or "MARS Lab"
 LAB_SHORT_NAME = os.environ.get("MARS_LAB_SHORT_NAME", LAB_APP_NAME).strip() or LAB_APP_NAME
 LAB_DESCRIPTION = os.environ.get(
@@ -51,6 +218,7 @@ DEFAULT_MATRIX_BIN = ROOT / "build" / "release" / "scratch" / "matrix_lab"
 DEFAULT_INTEGRATOR_BIN = ROOT / "build" / "release" / "scratch" / "integrator_lab"
 DEFAULT_EQUATION_BIN = ROOT / "build" / "release" / "scratch" / "equation_lab"
 DEFAULT_DATETIME_BIN = ROOT / "build" / "release" / "scratch" / "datetime_lab"
+DEFAULT_HOLIDAY_BIN = ROOT / "build" / "release" / "scratch" / "holiday_lab"
 STATE_FILE = ROOT / os.environ.get("MARS_LAB_STATE_FILE", ".mars_lab_state.json")
 LAB_ICON_FILE = ROOT / "packaging" / "linux" / "mars-lab.svg"
 LAB_FAVICON_FILE = LAB_ICON_FILE
@@ -66,9 +234,9 @@ DEFAULT_INTEGRATOR_EXPRESSION = "{ exp(-x^2) | x = ? }"
 DEFAULT_INTEGRATOR_BOUNDS = "x = 0 .. 1"
 DEFAULT_INTEGRATOR_INTERVAL_CAP = 5000
 DEFAULT_DATETIME_DATE = py_datetime.date.today().isoformat()
-DEFAULT_DATETIME_TEXT = "Calendar and solar calculations"
-DEFAULT_DATETIME_LATITUDE = "51.5074"
-DEFAULT_DATETIME_LONGITUDE = "-0.1278"
+DEFAULT_DATETIME_TEXT = "Calendar and solar calculations, with optional holiday lookup"
+DEFAULT_DATETIME_LATITUDE = DEFAULT_TIMEZONE_LATITUDE
+DEFAULT_DATETIME_LONGITUDE = DEFAULT_TIMEZONE_LONGITUDE
 DEFAULT_DATETIME_GMT_OFFSET = ""
 MIN_INTEGRATOR_INTERVAL_CAP = 500
 MAX_INTEGRATOR_INTERVAL_CAP = 100000
@@ -2165,6 +2333,17 @@ __THEME_OVERRIDES__
         </div>
         <div class="datetime-field-groups">
           <div class="datetime-field-group">
+            <div class="datetime-field-group-title">Holiday calendar</div>
+            <div class="datetime-grid">
+              <div class="integrator-bound-field">
+                <label for="datetimeJurisdiction">Holiday country or jurisdiction</label>
+                <select id="datetimeJurisdiction">
+__HOLIDAY_JURISDICTION_OPTIONS__
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="datetime-field-group">
             <div class="datetime-field-group-title">Selected date</div>
             <div class="datetime-grid">
               <div class="integrator-bound-field">
@@ -2316,11 +2495,12 @@ __THEME_OVERRIDES__
         </div>
         <div class="help-card" data-help-modes="datetime">
           <div class="help-kicker">Datetime Workflow</div>
-          <p>Use the calendar controls for the main date, date range, holiday year, and location.</p>
+          <p>Use the calendar controls for the main date, date range, observance year, and location.</p>
           <ul>
             <li><code>Date</code> drives weekday, moon phase, sunrise, sunset, solar declination, inclination, and maximum altitude.</li>
             <li><code>Start date</code> and <code>End date</code> drive the days-between result.</li>
-            <li><code>Year</code> drives Christian, Chinese, Hindu, Buddhist, Muslim, Jewish, and local holiday observances.</li>
+            <li><code>Year</code> drives Christian, Chinese, Hindu, Buddhist, Muslim, and Jewish observances.</li>
+            <li><code>Holiday country or jurisdiction</code> is only used when you want the optional local holiday panel.</li>
             <li><code>GMT offset</code> should include daylight saving. Leave it blank to use this machine's local offset for the selected date.</li>
             <li>Ramadan, Eid al-Fitr, and Muslim New Year use the civil Islamic calendar; Hindu and Buddhist observances are estimated from India-window lunar events, so observed dates can differ locally.</li>
           </ul>
@@ -2491,6 +2671,7 @@ __THEME_OVERRIDES__
     const datetimeStart = document.getElementById('datetimeStart');
     const datetimeEnd = document.getElementById('datetimeEnd');
     const datetimeYear = document.getElementById('datetimeYear');
+    const datetimeJurisdiction = document.getElementById('datetimeJurisdiction');
     const datetimeLatitude = document.getElementById('datetimeLatitude');
     const datetimeLongitude = document.getElementById('datetimeLongitude');
     const datetimeGmtOffset = document.getElementById('datetimeGmtOffset');
@@ -2516,6 +2697,7 @@ __THEME_OVERRIDES__
     const mobileQr = document.getElementById('mobileQr');
     const controlToken = __CONTROL_TOKEN__;
     enhanceRoundedSelect(matrixOperation);
+    enhanceRoundedSelect(datetimeJurisdiction);
     const statusEl = document.getElementById('status');
     const inputCopy = document.getElementById('inputCopy');
     const rightPaneTitle = document.getElementById('rightPaneTitle');
@@ -2605,9 +2787,11 @@ __THEME_OVERRIDES__
     const DEFAULT_INTEGRATOR_INTERVAL_CAP = __DEFAULT_INTEGRATOR_INTERVAL_CAP__;
     const DEFAULT_DATETIME_TEXT = __DEFAULT_DATETIME_TEXT__;
     const DEFAULT_DATETIME_DATE = __DEFAULT_DATETIME_DATE__;
+    const DEFAULT_DATETIME_JURISDICTION = __DEFAULT_DATETIME_JURISDICTION__;
     const DEFAULT_DATETIME_LATITUDE = __DEFAULT_DATETIME_LATITUDE__;
     const DEFAULT_DATETIME_LONGITUDE = __DEFAULT_DATETIME_LONGITUDE__;
     const DEFAULT_DATETIME_GMT_OFFSET = __DEFAULT_DATETIME_GMT_OFFSET__;
+    const HOLIDAY_JURISDICTION_SET = new Set(__HOLIDAY_JURISDICTION_CODES__);
     const LAB_MODE_STORAGE_KEY = 'mars.exprLab.lastMode';
     let currentLabMode = 'expression';
     const modeEditorText = {
@@ -2885,7 +3069,7 @@ __THEME_OVERRIDES__
         setValueCardVisible(true);
       } else {
         leftPaneTitle.textContent = 'Datetime';
-        subtitle.textContent = 'Choose dates, a year, and a location. MARS datetime calculates calendar observances, local holidays, moon phase, and solar times.';
+        subtitle.textContent = 'Choose dates, a year, and a location. MARS datetime calculates calendar observances, moon phase, and solar times, with local holidays added when available.';
         setResultTitles('Overview', 'Date Range', 'Calendar', 'Solar And Moon');
         setValueCardVisible(true);
       }
@@ -3976,6 +4160,11 @@ __THEME_OVERRIDES__
       return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : fallback;
     }
 
+    function validDatetimeJurisdiction(value, fallback = DEFAULT_DATETIME_JURISDICTION) {
+      const jurisdiction = String(value || '').trim();
+      return HOLIDAY_JURISDICTION_SET.has(jurisdiction) ? jurisdiction : fallback;
+    }
+
     function restoreDatetimeDefaultsIfBlank() {
       if (datetimeDate && !datetimeDate.value)
         datetimeDate.value = DEFAULT_DATETIME_DATE;
@@ -3985,6 +4174,8 @@ __THEME_OVERRIDES__
         datetimeEnd.value = datetimeDate?.value || DEFAULT_DATETIME_DATE;
       if (datetimeYear && !datetimeYear.value)
         datetimeYear.value = String((datetimeDate?.value || DEFAULT_DATETIME_DATE).slice(0, 4));
+      if (datetimeJurisdiction && !datetimeJurisdiction.value)
+        datetimeJurisdiction.value = DEFAULT_DATETIME_JURISDICTION;
       if (datetimeLatitude && !datetimeLatitude.value)
         datetimeLatitude.value = DEFAULT_DATETIME_LATITUDE;
       if (datetimeLongitude && !datetimeLongitude.value)
@@ -3999,6 +4190,7 @@ __THEME_OVERRIDES__
         start: validDateText(datetimeStart && datetimeStart.value, datetimeDate && datetimeDate.value || DEFAULT_DATETIME_DATE),
         end: validDateText(datetimeEnd && datetimeEnd.value, datetimeDate && datetimeDate.value || DEFAULT_DATETIME_DATE),
         year: String(datetimeYear && datetimeYear.value || (datetimeDate && datetimeDate.value || DEFAULT_DATETIME_DATE).slice(0, 4)).trim(),
+        jurisdiction: validDatetimeJurisdiction(datetimeJurisdiction && datetimeJurisdiction.value),
         latitude: String(datetimeLatitude && datetimeLatitude.value || DEFAULT_DATETIME_LATITUDE).trim(),
         longitude: String(datetimeLongitude && datetimeLongitude.value || DEFAULT_DATETIME_LONGITUDE).trim(),
         gmt_offset: String(datetimeGmtOffset && datetimeGmtOffset.value || '').trim()
@@ -4012,6 +4204,7 @@ __THEME_OVERRIDES__
         state.jdn ? `Julian Day Number: ${state.jdn}` : '',
         `Range: ${state.start} to ${state.end}`,
         `Year: ${state.year}`,
+        `Holiday jurisdiction: ${state.jurisdiction}`,
         `Location: ${state.latitude}, ${state.longitude}`,
         `GMT offset: ${state.gmt_offset || 'local machine offset'}`
       ].filter(Boolean).join('\n');
@@ -4087,6 +4280,8 @@ __THEME_OVERRIDES__
         datetimeEnd.value = validDateText(data.datetime_end, datetimeDate?.value || DEFAULT_DATETIME_DATE);
       if (datetimeYear)
         datetimeYear.value = String(data.datetime_year || (datetimeDate?.value || DEFAULT_DATETIME_DATE).slice(0, 4));
+      if (datetimeJurisdiction)
+        datetimeJurisdiction.value = validDatetimeJurisdiction(data.datetime_jurisdiction, DEFAULT_DATETIME_JURISDICTION);
       if (datetimeLatitude)
         datetimeLatitude.value = String(data.datetime_latitude || DEFAULT_DATETIME_LATITUDE);
       if (datetimeLongitude)
@@ -4159,6 +4354,8 @@ __THEME_OVERRIDES__
             datetimeEnd.value = validDateText(state.end, datetimeDate?.value || DEFAULT_DATETIME_DATE);
           if (datetimeYear)
             datetimeYear.value = String(state.year || (datetimeDate?.value || DEFAULT_DATETIME_DATE).slice(0, 4));
+          if (datetimeJurisdiction)
+            datetimeJurisdiction.value = validDatetimeJurisdiction(state.jurisdiction, DEFAULT_DATETIME_JURISDICTION);
           if (datetimeLatitude)
             datetimeLatitude.value = String(state.latitude || DEFAULT_DATETIME_LATITUDE);
           if (datetimeLongitude)
@@ -4305,6 +4502,7 @@ __THEME_OVERRIDES__
         datetime_start: state.start,
         datetime_end: state.end,
         datetime_year: state.year,
+        datetime_jurisdiction: state.jurisdiction,
         datetime_latitude: state.latitude,
         datetime_longitude: state.longitude,
         datetime_gmt_offset: state.gmt_offset,
@@ -4395,6 +4593,8 @@ __THEME_OVERRIDES__
           datetimeEnd.value = validDateText(datetimeState.end, datetimeDate?.value || DEFAULT_DATETIME_DATE);
         if (datetimeYear)
           datetimeYear.value = String(datetimeState.year || (datetimeDate?.value || DEFAULT_DATETIME_DATE).slice(0, 4));
+        if (datetimeJurisdiction)
+          datetimeJurisdiction.value = validDatetimeJurisdiction(datetimeState.jurisdiction, DEFAULT_DATETIME_JURISDICTION);
         if (datetimeLatitude)
           datetimeLatitude.value = String(datetimeState.latitude || DEFAULT_DATETIME_LATITUDE);
         if (datetimeLongitude)
@@ -6416,6 +6616,8 @@ __THEME_OVERRIDES__
           datetimeEnd.value = DEFAULT_DATETIME_DATE;
         if (datetimeYear)
           datetimeYear.value = DEFAULT_DATETIME_DATE.slice(0, 4);
+        if (datetimeJurisdiction)
+          datetimeJurisdiction.value = DEFAULT_DATETIME_JURISDICTION;
         if (datetimeLatitude)
           datetimeLatitude.value = DEFAULT_DATETIME_LATITUDE;
         if (datetimeLongitude)
@@ -6514,7 +6716,7 @@ __THEME_OVERRIDES__
           saveLastIntegratorState();
       });
 
-    [datetimeDate, datetimeJdn, datetimeStart, datetimeEnd, datetimeYear, datetimeLatitude, datetimeLongitude, datetimeGmtOffset]
+    [datetimeDate, datetimeJdn, datetimeStart, datetimeEnd, datetimeYear, datetimeJurisdiction, datetimeLatitude, datetimeLongitude, datetimeGmtOffset]
       .filter(Boolean)
       .forEach((control) => {
         control.addEventListener('change', () => {
@@ -6758,6 +6960,7 @@ def default_state() -> dict[str, object]:
         "datetime_start": DEFAULT_DATETIME_DATE,
         "datetime_end": DEFAULT_DATETIME_DATE,
         "datetime_year": DEFAULT_DATETIME_DATE[:4],
+        "datetime_jurisdiction": DEFAULT_HOLIDAY_JURISDICTION,
         "datetime_latitude": DEFAULT_DATETIME_LATITUDE,
         "datetime_longitude": DEFAULT_DATETIME_LONGITUDE,
         "datetime_gmt_offset": DEFAULT_DATETIME_GMT_OFFSET,
@@ -6850,6 +7053,9 @@ def load_state_data() -> dict[str, object]:
     except ValueError:
         year = int(DEFAULT_DATETIME_DATE[:4])
     state["datetime_year"] = str(max(1, min(9999, year)))
+    state["datetime_jurisdiction"] = normalize_holiday_jurisdiction(
+        str(state.get("datetime_jurisdiction", DEFAULT_HOLIDAY_JURISDICTION)).strip()
+    )
     for key, default in (
         ("datetime_latitude", DEFAULT_DATETIME_LATITUDE),
         ("datetime_longitude", DEFAULT_DATETIME_LONGITUDE),
@@ -8040,7 +8246,16 @@ def parse_datetime_lab_output(output: str) -> dict[str, str]:
             "passover_starts_gmt": r"^passover_starts_gmt\s+(.*)$",
             "jewish_new_year": r"^jewish_new_year\s+(.*)$",
             "jewish_new_year_starts_gmt": r"^jewish_new_year_starts_gmt\s+(.*)$",
+        },
+    )
+
+
+def parse_holiday_lab_output(output: str) -> dict[str, str]:
+    return parse_keyed_output(
+        output,
+        {
             "bank_holiday": r"^bank_holiday\s+(.*)$",
+            "holiday_status": r"^holiday_status\s+(.*)$",
         },
         {"bank_holiday"},
     )
@@ -8680,7 +8895,6 @@ def run_datetime_lab_fields(
     ):
         if key in options:
             command.append(f"{key}={str(options.get(key, '')).strip()}")
-
     completed = subprocess.run(
         command,
         cwd=ROOT,
@@ -8692,6 +8906,31 @@ def run_datetime_lab_fields(
     if completed.stderr:
         raw = raw + ("\n" if raw else "") + completed.stderr
     return parse_datetime_lab_output(raw), raw, completed.returncode
+
+
+def run_holiday_lab_fields(
+    binary: Path,
+    options: dict[str, str],
+) -> tuple[dict[str, str], str, int]:
+    command = [str(binary)]
+    for key in ("start", "end", "jurisdiction"):
+        if key in options:
+            command.append(f"{key}={str(options.get(key, '')).strip()}")
+
+    child_env = os.environ.copy()
+    child_env.update(holiday_db_runtime_env())
+    completed = subprocess.run(
+        command,
+        cwd=ROOT,
+        env=child_env,
+        text=True,
+        capture_output=True,
+        timeout=10,
+    )
+    raw = completed.stdout
+    if completed.stderr:
+        raw = raw + ("\n" if raw else "") + completed.stderr
+    return parse_holiday_lab_output(raw), raw, completed.returncode
 
 
 def matrix_failure_hint(
@@ -9360,6 +9599,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
     matrix_binary: Path = DEFAULT_MATRIX_BIN
     integrator_binary: Path = DEFAULT_INTEGRATOR_BIN
     datetime_binary: Path = DEFAULT_DATETIME_BIN
+    holiday_binary: Path = DEFAULT_HOLIDAY_BIN
     server_host: str = "127.0.0.1"
     server_port: int = 0
     mobile_url: str = ""
@@ -9489,9 +9729,12 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
             .replace("__DEFAULT_INTEGRATOR_INTERVAL_CAP__", json.dumps(DEFAULT_INTEGRATOR_INTERVAL_CAP))
             .replace("__DEFAULT_DATETIME_TEXT__", json.dumps(DEFAULT_DATETIME_TEXT))
             .replace("__DEFAULT_DATETIME_DATE__", json.dumps(DEFAULT_DATETIME_DATE))
+            .replace("__DEFAULT_DATETIME_JURISDICTION__", json.dumps(DEFAULT_HOLIDAY_JURISDICTION))
             .replace("__DEFAULT_DATETIME_LATITUDE__", json.dumps(DEFAULT_DATETIME_LATITUDE))
             .replace("__DEFAULT_DATETIME_LONGITUDE__", json.dumps(DEFAULT_DATETIME_LONGITUDE))
             .replace("__DEFAULT_DATETIME_GMT_OFFSET__", json.dumps(DEFAULT_DATETIME_GMT_OFFSET))
+            .replace("__HOLIDAY_JURISDICTION_CODES__", json.dumps(sorted(VALID_HOLIDAY_JURISDICTIONS)))
+            .replace("__HOLIDAY_JURISDICTION_OPTIONS__", HOLIDAY_JURISDICTION_OPTIONS_HTML)
             .replace("__CONTROL_TOKEN__", json.dumps(CONTROL_TOKEN if control_allowed else ""))
         )
         data = page.encode("utf-8")
@@ -9580,6 +9823,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                     "datetime_start",
                     "datetime_end",
                     "datetime_year",
+                    "datetime_jurisdiction",
                     "datetime_latitude",
                     "datetime_longitude",
                     "datetime_gmt_offset",
@@ -9842,6 +10086,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                 start_text = str(payload.get("start", date_text)).strip()
                 end_text = str(payload.get("end", date_text)).strip()
                 year_text = str(payload.get("year", date_text[:4] or DEFAULT_DATETIME_DATE[:4])).strip()
+                jurisdiction_text = str(payload.get("jurisdiction", DEFAULT_HOLIDAY_JURISDICTION)).strip()
                 latitude_text = str(payload.get("latitude", DEFAULT_DATETIME_LATITUDE)).strip()
                 longitude_text = str(payload.get("longitude", DEFAULT_DATETIME_LONGITUDE)).strip()
                 gmt_offset_text = str(payload.get("gmt_offset", "")).strip()
@@ -9854,6 +10099,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                     raise ValueError("Latitude must be between -90 and 90")
                 if longitude < -180.0 or longitude > 180.0:
                     raise ValueError("Longitude must be between -180 and 180")
+                jurisdiction = normalize_holiday_jurisdiction(jurisdiction_text)
                 if gmt_offset_text:
                     gmt_offset = float(gmt_offset_text)
                     if gmt_offset < -14.0 or gmt_offset > 14.0:
@@ -9889,6 +10135,28 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                 self.send_json(422, {"ok": False, "error": raw or "Datetime calculation failed"})
                 return
 
+            try:
+                ensure_scratch_binary(self.holiday_binary, "scratch/holiday_lab")
+                holiday_fields, holiday_raw, holiday_returncode = run_holiday_lab_fields(
+                    self.holiday_binary,
+                    {
+                        "start": start_text,
+                        "end": end_text,
+                        "jurisdiction": jurisdiction,
+                    },
+                )
+                if holiday_returncode == 0:
+                    fields.update(holiday_fields)
+                else:
+                    self.log_message(
+                        "holiday helper failure jurisdiction=%r returncode=%r raw=%r",
+                        jurisdiction,
+                        holiday_returncode,
+                        str(holiday_raw or "").strip(),
+                    )
+            except Exception as exc:
+                self.log_message("holiday helper unavailable jurisdiction=%r error=%r", jurisdiction, exc)
+
             selected_date_text = str(fields.get("date") or date_text).strip()
             selected_jdn_text = str(fields.get("julian_day_number") or jdn_text).strip()
             save_state_data({
@@ -9897,6 +10165,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                 "datetime_start": start_text,
                 "datetime_end": end_text,
                 "datetime_year": str(year),
+                "datetime_jurisdiction": jurisdiction,
                 "datetime_latitude": str(latitude),
                 "datetime_longitude": str(longitude),
                 "datetime_gmt_offset": gmt_offset_text,
@@ -10110,16 +10379,19 @@ def main() -> int:
     parser.add_argument("--binary", type=Path, default=DEFAULT_BIN, help="path to the scratch lab binary")
     parser.add_argument("--equation-binary", type=Path, default=DEFAULT_EQUATION_BIN, help="path to the equation scratch binary")
     parser.add_argument("--datetime-binary", type=Path, default=DEFAULT_DATETIME_BIN, help="path to the datetime scratch binary")
+    parser.add_argument("--holiday-binary", type=Path, default=DEFAULT_HOLIDAY_BIN, help="path to the holiday scratch binary")
     args = parser.parse_args()
 
     binary = args.binary if args.binary.is_absolute() else ROOT / args.binary
     equation_binary = args.equation_binary if args.equation_binary.is_absolute() else ROOT / args.equation_binary
     datetime_binary = args.datetime_binary if args.datetime_binary.is_absolute() else ROOT / args.datetime_binary
+    holiday_binary = args.holiday_binary if args.holiday_binary.is_absolute() else ROOT / args.holiday_binary
     ensure_mars_lab(binary)
 
     MarsLabHandler.binary = binary
     MarsLabHandler.equation_binary = equation_binary
     MarsLabHandler.datetime_binary = datetime_binary
+    MarsLabHandler.holiday_binary = holiday_binary
 
     port = args.port or find_free_port(args.host)
     MarsLabHandler.server_host = args.host
