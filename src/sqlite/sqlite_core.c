@@ -10,6 +10,7 @@
 #include <sqlcipher/sqlite3.h>
 
 #include "sqlite.h"
+#include "sqlite_internal.h"
 
 struct _sqlite_t {
     sqlite3 *handle;
@@ -411,4 +412,9 @@ done:
     string_free(encoding);
     string_free(type);
     return ok;
+}
+
+sqlite3 *sqlite_native_handle(sqlite_t *db)
+{
+    return db ? db->handle : NULL;
 }

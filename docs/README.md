@@ -17,6 +17,7 @@ This directory contains the longer module documentation for MARS.
 - [`equation_t`](equation.md) — parsed equations with symbolic isolation and numeric fallback
 - [`expr_t`](expression.md) — differentiable expression DAGs and symbolic helper APIs
 - [`datetime_t`](datetime.md) — civil and astronomical date/time utilities
+- [`holiday_t`](holiday.md) — jurisdiction-aware holiday and working-day queries
 - [`timeseries_t`](timeseries.md) — datetime-indexed forecasting and time-series analysis
 - [`json_t`](json.md) — opaque JSON value tree with string-backed parsing and `number_t` fidelity
 - [`sqlite_t`](sqlite.md) — opaque SQLCipher-backed SQLite storage for encrypted object persistence

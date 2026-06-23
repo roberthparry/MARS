@@ -3,13 +3,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <sqlcipher/sqlite3.h>
-
 #include "datetime.h"
+#include "holiday.h"
 #include "ustring.h"
-
-#define HOLIDAY_DB_PATH_ENV "MARS_HOLIDAY_DB_PATH"
-#define HOLIDAY_DB_KEY_ENV "MARS_HOLIDAY_DB_KEY"
 
 typedef struct holiday_lab_options_t {
     short start_year;
@@ -56,7 +52,7 @@ static void init_defaults(holiday_lab_options_t *options)
     options->end_year = 2026;
     options->end_month = DT_December;
     options->end_day = 31;
-    strcpy(options->jurisdiction, "GB-ENG");
+    options->jurisdiction[0] = '\0';
 }
 
 static bool apply_arg(holiday_lab_options_t *options, const char *arg)
@@ -102,26 +98,18 @@ static bool apply_arg(holiday_lab_options_t *options, const char *arg)
     return false;
 }
 
-static const char *holiday_db_path(void)
+static char *format_display_date(const datetime_t *dttm)
 {
-    const char *path = getenv(HOLIDAY_DB_PATH_ENV);
-
-    return (path && *path) ? path : NULL;
-}
-
-static const char *holiday_db_key(void)
-{
-    const char *key = getenv(HOLIDAY_DB_KEY_ENV);
-
-    return (key && *key) ? key : NULL;
-}
-
-static char *format_date(const datetime_t *dttm)
-{
-    string_t *format = string_new_with("%yyyy-%mm-%dd");
-    string_t *text = format ? datetime_format_text(dttm, format) : NULL;
-    const char *c_text = text ? string_c_str(text) : NULL;
+    string_t *format = NULL;
+    string_t *formatted = NULL;
+    const char *c_text = NULL;
     char *out = NULL;
+
+    if (!dttm)
+        return NULL;
+    format = string_new_with("%Dddd %d%q %Mmmm %yyyy");
+    formatted = format ? datetime_format_text(dttm, format) : NULL;
+    c_text = formatted ? string_c_str(formatted) : NULL;
 
     if (c_text) {
         size_t len = strlen(c_text);
@@ -130,7 +118,7 @@ static char *format_date(const datetime_t *dttm)
             memcpy(out, c_text, len + 1u);
     }
 
-    string_free(text);
+    string_free(formatted);
     string_free(format);
     return out;
 }
@@ -139,111 +127,74 @@ static bool print_bank_holidays_from_database(const char *jurisdiction,
                                               const datetime_t *start,
                                               const datetime_t *end)
 {
-    static const char sql[] =
-        "SELECT holiday_name, holiday_date "
-        "FROM holiday_instance "
-        "WHERE jurisdiction_id = ?1 "
-        "  AND holiday_date >= ?2 "
-        "  AND holiday_date <= ?3 "
-        "ORDER BY holiday_date, holiday_name;";
-    sqlite3 *db = NULL;
-    sqlite3_stmt *stmt = NULL;
-    char *start_text = NULL;
-    char *end_text = NULL;
-    const char *db_path;
-    const char *db_key;
-    bool found_rows = false;
-    int rc;
+    holiday_t *holiday = NULL;
+    array_t *events = NULL;
+    bool produced = false;
+    size_t i;
 
-    if (!jurisdiction || *jurisdiction == '\0' || !start || !end)
+    if (!start || !end)
         return false;
 
-    db_path = holiday_db_path();
-    db_key = holiday_db_key();
-    if (!db_path)
-        return false;
+    holiday = holiday_open(jurisdiction);
+    if (!holiday)
+        goto done;
 
-    start_text = format_date(start);
-    end_text = format_date(end);
-    if (!start_text || !end_text)
-        goto fail;
+    events = holiday_between(holiday, start, end);
+    if (!events)
+        goto done;
 
-    rc = sqlite3_open_v2(db_path, &db, SQLITE_OPEN_READONLY, NULL);
-    if (rc != SQLITE_OK)
-        goto fail;
+    for (i = 0u; i < array_size(events); ++i) {
+        const holiday_event_t *event = array_get(events, i);
+        char *display_date;
 
-    if (db_key) {
-        rc = sqlite3_key(db, db_key, (int)strlen(db_key));
-        if (rc != SQLITE_OK)
-            goto fail;
-    }
-
-    rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
-    if (rc != SQLITE_OK)
-        goto fail;
-
-    if (sqlite3_bind_text(stmt, 1, jurisdiction, -1, SQLITE_STATIC) != SQLITE_OK ||
-        sqlite3_bind_text(stmt, 2, start_text, -1, SQLITE_TRANSIENT) != SQLITE_OK ||
-        sqlite3_bind_text(stmt, 3, end_text, -1, SQLITE_TRANSIENT) != SQLITE_OK)
-        goto fail;
-
-    while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
-        const unsigned char *holiday_name = sqlite3_column_text(stmt, 0);
-        const unsigned char *holiday_date = sqlite3_column_text(stmt, 1);
-
-        found_rows = true;
+        if (!event)
+            continue;
+        display_date = format_display_date(event->holiday_date);
         printf("bank_holiday %s: %s\n",
-               holiday_name ? (const char *)holiday_name : "unavailable",
-               holiday_date ? (const char *)holiday_date : "unavailable");
+               event->holiday_name ? event->holiday_name : "unavailable",
+               display_date ? display_date : "unavailable");
+        free(display_date);
+        produced = true;
     }
-    if (rc != SQLITE_DONE)
-        goto fail;
 
-    sqlite3_finalize(stmt);
-    sqlite3_close(db);
-    free(start_text);
-    free(end_text);
-    return found_rows;
-
-fail:
-    if (stmt)
-        sqlite3_finalize(stmt);
-    if (db)
-        sqlite3_close(db);
-    free(start_text);
-    free(end_text);
-    return false;
+done:
+    array_destroy(events);
+    holiday_close(holiday);
+    return produced;
 }
 
 int main(int argc, char **argv)
 {
     holiday_lab_options_t options;
-    datetime_t *start;
-    datetime_t *end;
+    datetime_t *start = NULL;
+    datetime_t *end = NULL;
     bool produced = false;
+    int i;
 
     init_defaults(&options);
-    for (int i = 1; i < argc; i++) {
+    for (i = 1; i < argc; ++i) {
         if (!apply_arg(&options, argv[i])) {
             fprintf(stderr, "Bad holiday argument: %s\n", argv[i]);
             return 2;
         }
     }
 
-    start = datetime_alloc();
-    end = datetime_alloc();
+    start = datetime_init_ymd(datetime_alloc(),
+                              options.start_year,
+                              options.start_month,
+                              options.start_day);
+    end = datetime_init_ymd(datetime_alloc(),
+                            options.end_year,
+                            options.end_month,
+                            options.end_day);
     if (!start || !end) {
-        fprintf(stderr, "Holiday allocation failed\n");
         datetime_dealloc(start);
         datetime_dealloc(end);
+        fprintf(stderr, "Failed to initialise holiday date range\n");
         return 1;
     }
 
-    datetime_init_ymd(start, options.start_year, options.start_month, options.start_day);
-    datetime_init_ymd(end, options.end_year, options.end_month, options.end_day);
-
     produced = print_bank_holidays_from_database(options.jurisdiction, start, end);
-
     printf("holiday_status %s\n", produced ? "ok" : "unavailable");
 
     datetime_dealloc(start);

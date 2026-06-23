@@ -698,6 +698,7 @@ double datetime_duration(const datetime_t *dttm1, const datetime_t *dttm2, datet
  *        %DDDD: FULL day of week ( eg MONDAY, TUESDAY, ... )
  *        %o   : cardinal for day number ( eg st, nd, th, ... )
  *        %O   : cardinal for day number ( eg ST, ND, TH, ... )
+ *        %q   : superscript cardinal for day number ( eg ˢᵗ, ⁿᵈ, ᵗʰ, ... )
  *        %m   : month number - minimum digits.
  *        %mm  : month number - always 2 digits.
  *        %mmm : shortened month name ( eg jan, feb, ... )

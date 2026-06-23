@@ -695,6 +695,19 @@ void test_datetime_format_uses_string_builder(void) {
     datetime_dealloc(dt);
 }
 
+void test_datetime_format_superscript_ordinal_suffix(void) {
+    datetime_t *dt = datetime_init_ymd(
+        datetime_alloc(), 2026, DT_April, 1
+    );
+    char *formatted = datetime_format(dt, "%Dddd %d%q %Mmmm %yyyy");
+
+    ASSERT_NOT_NULL(formatted);
+    TEST_ASSERT_STR_EQ(formatted, "Wednesday 1ˢᵗ April 2026");
+
+    free(formatted);
+    datetime_dealloc(dt);
+}
+
 static void example_chinese_new_years(void) {
     struct {
         int year;
@@ -798,6 +811,7 @@ int tests_main(void) {
     TEST_RUN_IN_GROUP(test_datetime_calendar_date_texts_known_dates, tests, NULL);
     TEST_RUN_IN_GROUP(test_datetime_sunset_observance_start_gmt, tests, NULL);
     TEST_RUN_IN_GROUP(test_datetime_format_uses_string_builder, tests, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_format_superscript_ordinal_suffix, tests, NULL);
 
     printf(C_YELLOW "\nRunning README examples...\n" C_RESET);
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_chinese_new_years, readme_examples,

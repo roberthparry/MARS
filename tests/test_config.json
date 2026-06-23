@@ -757,6 +757,24 @@
       "test_symbolic_integration": true
     }
   },
+  "tests/holiday/test_holiday.c": {
+    "readme_examples": {
+      "enabled": true,
+      "example_holiday_readme_queries": true
+    },
+    "tests": {
+      "enabled": true,
+      "test_england_christmas_pair_substitutions_in_2021": true,
+      "test_england_exception_holidays_land_on_correct_dates_in_2022": true,
+      "test_holiday_database_builds_and_opens": true,
+      "test_holiday_queries_weekend_and_holiday_status": true,
+      "test_holiday_working_days_between_counts_business_days": true,
+      "test_ireland_historic_whit_monday_exists_in_1960": true,
+      "test_netherlands_kings_day_moves_to_previous_weekday_in_2025": true,
+      "test_south_africa_observes_sunday_only_not_saturday": true,
+      "test_ukraine_future_rule_windows_cover_2030": true
+    }
+  },
   "tests/integrator/test_integrator.c": {
     "readme_examples": {
       "enabled": true,
