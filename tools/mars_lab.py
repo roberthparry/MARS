@@ -8335,6 +8335,10 @@ def parse_holiday_lab_output(output: str) -> dict[str, str]:
     )
 
 
+def holiday_install_hint() -> str:
+    return "Holiday database unavailable. Run `make install-holiday-db` to enable local holiday lookups."
+
+
 def _trim_decimal_tail(text: str) -> str:
     mantissa, sep, exponent = text.partition("E")
 
@@ -9579,6 +9583,7 @@ def prepare_datetime_fields(fields: dict[str, str]) -> dict[str, object]:
         },
     ]
     bank_holiday_text = str(fields.get("bank_holiday") or "").strip()
+    holiday_notice_text = str(fields.get("holiday_notice") or "").strip()
     local_lines = []
     local_rows = []
     if bank_holiday_text:
@@ -9599,10 +9604,17 @@ def prepare_datetime_fields(fields: dict[str, str]) -> dict[str, object]:
                 })
             else:
                 local_rows.append({"label": line, "value": ""})
+    elif holiday_notice_text:
+        local_lines.append(holiday_notice_text)
+        local_rows.append({"label": "Holiday database", "value": holiday_notice_text})
     local_sections = []
     if local_rows:
         local_sections.append({
-            "title": f"Local holidays ({str(fields.get('start') or '').strip()} to {str(fields.get('end') or '').strip()})",
+            "title": (
+                f"Local holidays ({str(fields.get('start') or '').strip()} to {str(fields.get('end') or '').strip()})"
+                if bank_holiday_text
+                else "Local holidays"
+            ),
             "open": True,
             "rows": local_rows,
         })
@@ -10223,9 +10235,12 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                             "jurisdiction": jurisdiction,
                         },
                     )
-                    if holiday_returncode == 0:
+                    if holiday_returncode == 0 and str(holiday_fields.get("holiday_status") or "").strip() == "ok":
                         fields.update(holiday_fields)
                     else:
+                        fields["holiday_notice"] = holiday_install_hint()
+                        if holiday_returncode == 0:
+                            fields.update(holiday_fields)
                         self.log_message(
                             "holiday helper failure jurisdiction=%r returncode=%r raw=%r",
                             jurisdiction,
@@ -10233,6 +10248,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                             str(holiday_raw or "").strip(),
                         )
                 except Exception as exc:
+                    fields["holiday_notice"] = holiday_install_hint()
                     self.log_message("holiday helper unavailable jurisdiction=%r error=%r", jurisdiction, exc)
 
                 selected_date_text = str(fields.get("date") or date_text).strip()
