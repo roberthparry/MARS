@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Configure the MARS Lab holiday database connection for the current user.
+Configure the private holiday database for the current user.
 """
 
 from __future__ import annotations
@@ -80,14 +80,14 @@ def prompt_secret(prompt: str, default: str, *, confirm: bool) -> str:
         if not response and default:
             return default
         if not response:
-            print("A holiday database key is required.", file=sys.stderr)
+            print("A holiday database password is required.", file=sys.stderr)
             continue
         if not confirm and not default:
             return response
         repeat = getpass.getpass("Confirm password: ").strip()
         if response == repeat:
             return response
-        print("Keys did not match. Please try again.", file=sys.stderr)
+        print("Passwords did not match. Please try again.", file=sys.stderr)
 
 
 def shell_export(name: str, value: str) -> str:
@@ -215,7 +215,7 @@ def main() -> int:
 
     interactive = sys.stdin.isatty() and not args.noninteractive
     if interactive:
-        print("MARS Lab holiday database setup")
+        print("Holiday database setup")
         print(f"Config file: {path}")
         db_path = default_path
         db_key = prompt_secret(
@@ -231,19 +231,19 @@ def main() -> int:
         print("No holiday database path was provided.", file=sys.stderr)
         return 1
     if not db_key:
-        print("No holiday database key was provided.", file=sys.stderr)
+        print("No holiday database password was provided.", file=sys.stderr)
         return 1
 
     try:
         build_holiday_database(Path(db_path).expanduser(), db_key)
-        with Spinner("Saving MARS Lab configuration"):
+        with Spinner("Saving holiday database configuration"):
             write_config(path, db_path, db_key)
     except Exception as exc:
-        print(f"Failed to configure MARS Lab holiday database: {exc}", file=sys.stderr)
+        print(f"Failed to configure the holiday database: {exc}", file=sys.stderr)
         return 1
 
-    print(f"Built MARS Lab holiday DB at {db_path}")
-    print(f"Wrote MARS Lab holiday DB config to {path}")
+    print(f"Built holiday database at {db_path}")
+    print(f"Wrote holiday database configuration to {path}")
     return 0
 
 

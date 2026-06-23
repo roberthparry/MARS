@@ -39,6 +39,23 @@ When you are finished, release it with:
 holiday_close(holiday);
 ```
 
+## Installation
+
+To provision the private holiday database without installing the full desktop
+app, run:
+
+```sh
+make install-holiday-db
+```
+
+To remove that private holiday database again, run:
+
+```sh
+make uninstall-holiday-db
+```
+
+If you want the desktop app as well, use `make install-mars-lab`.
+
 ## Range Queries
 
 `holiday_between()` returns an `array_t *` of `holiday_event_t` values:
