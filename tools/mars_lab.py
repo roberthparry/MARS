@@ -2729,6 +2729,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     const mobileUrl = document.getElementById('mobileUrl');
     const mobileQr = document.getElementById('mobileQr');
     const controlToken = __CONTROL_TOKEN__;
+    if (datetimeJurisdiction && !datetimeJurisdiction.value)
+      datetimeJurisdiction.value = DEFAULT_DATETIME_JURISDICTION;
     enhanceRoundedSelect(matrixOperation);
     enhanceRoundedSelect(datetimeJurisdiction);
     const statusEl = document.getElementById('status');
