@@ -115,7 +115,7 @@ TEST_BINS  := $(patsubst tests/%.c,$(TEST_BUILD_DIR)/%,$(TEST_SRCS))
 # ------------------------------------------------------------
 # Default target
 # ------------------------------------------------------------
-.PHONY: all clean test memtest debug release check-deps check-lab-deps install uninstall mars-lab to-be-announced-lab install-mars-lab uninstall-mars-lab help
+.PHONY: all clean test memtest debug release check-deps check-holiday-db-deps check-lab-deps install uninstall mars-lab to-be-announced-lab install-holiday-db uninstall-holiday-db install-mars-lab uninstall-mars-lab help
 
 all: $(STATIC_LIB) $(SHARED_LIB) $(TEST_BINS) $(BENCH_BINS) $(SCRATCH_BINS)
 
@@ -157,7 +157,28 @@ check-deps:
 	    exit 1; \
 	fi
 
-check-lab-deps: check-deps
+check-holiday-db-deps: check-deps
+	@missing=0; \
+	packages=""; \
+	check_tool() { \
+	    name="$$1"; command="$$2"; package="$$3"; note="$$4"; \
+	    if ! command -v "$$command" >/dev/null 2>&1; then \
+	        echo "Missing $$name$$note."; \
+	        echo "  Debian/Ubuntu: sudo apt install $$package"; \
+	        packages="$$packages $$package"; \
+	        missing=1; \
+	    fi; \
+	}; \
+	check_tool "SQLCipher CLI" "$(SQLCIPHER)" "sqlcipher" " for holiday database installation"; \
+	if [ "$$missing" -ne 0 ]; then \
+	    echo; \
+	    echo "Install the missing holiday database runtime tool(s), then rerun make."; \
+	    echo "Debian/Ubuntu command:"; \
+	    echo "  sudo apt install$$packages"; \
+	    exit 1; \
+	fi
+
+check-lab-deps: check-holiday-db-deps
 	@missing=0; \
 	packages=""; \
 	check_tool() { \
@@ -171,7 +192,6 @@ check-lab-deps: check-deps
 	}; \
 	check_tool "LaTeX" "latex" "texlive-latex-base"; \
 	check_tool "dvisvgm" "dvisvgm" "dvisvgm"; \
-	check_tool "SQLCipher CLI" "$(SQLCIPHER)" "sqlcipher"; \
 	if [ "$$missing" -ne 0 ]; then \
 	    echo; \
 	    echo "Install the missing MARS Lab runtime tool(s), then rerun make."; \
@@ -325,13 +345,19 @@ $(foreach bin,$(SCRATCH_BINS),$(eval $(call SCRATCH_ALIAS_RULES,$(notdir $(bin))
 .PHONY: scratch
 scratch: $(SCRATCH_BINS)
 
-.PHONY: mars-lab to-be-announced-lab install-mars-lab uninstall-mars-lab install-to-be-announced-lab uninstall-to-be-announced-lab
+.PHONY: mars-lab to-be-announced-lab install-holiday-db uninstall-holiday-db install-mars-lab uninstall-mars-lab install-to-be-announced-lab uninstall-to-be-announced-lab
 mars-lab: check-lab-deps $(BUILD_DIR)/scratch/mars_lab
 	@tools/mars-lab
 
 .PHONY: to-be-announced-lab
 to-be-announced-lab: $(BUILD_DIR)/scratch/to-be-announced_lab
 	@tools/to-be-announced-lab
+
+install-holiday-db: check-holiday-db-deps tools/configure_mars_lab_holiday_db.py $(HOLIDAY_RULES_SOURCES)
+	@python3 tools/configure_mars_lab_holiday_db.py
+
+uninstall-holiday-db:
+	rm -rf "$(HOME)/.mars"
 
 install-mars-lab: check-lab-deps tools/mars-lab tools/configure_mars_lab_holiday_db.py $(HOLIDAY_RULES_SOURCES) packaging/linux/mars-lab.desktop.in packaging/linux/mars-lab.svg $(MARS_LAB_ICON_CONCEPTS)
 	$(INSTALL) -d "$(MARS_LAB_BINDIR)" "$(MARS_LAB_APPDIR)" "$(MARS_LAB_ICONDIR)"
@@ -367,7 +393,7 @@ install-mars-lab: check-lab-deps tools/mars-lab tools/configure_mars_lab_holiday
 	@if command -v update-desktop-database >/dev/null 2>&1; then update-desktop-database "$(MARS_LAB_APPDIR)" >/dev/null 2>&1 || true; fi
 	@if command -v gtk-update-icon-cache >/dev/null 2>&1; then gtk-update-icon-cache "$(MARS_LAB_INSTALL_PREFIX)/share/icons/hicolor" >/dev/null 2>&1 || true; fi
 	@if command -v kbuildsycoca6 >/dev/null 2>&1; then kbuildsycoca6 >/dev/null 2>&1 || true; elif command -v kbuildsycoca5 >/dev/null 2>&1; then kbuildsycoca5 >/dev/null 2>&1 || true; fi
-	@python3 tools/configure_mars_lab_holiday_db.py
+	@$(MAKE) install-holiday-db
 	@echo "Installed MARS Lab desktop launcher:"
 	@echo "  $(MARS_LAB_DESKTOP)"
 
@@ -448,9 +474,12 @@ help:
 	@echo "  make to-be-announced-lab              Launch the local To-Be-Announced Lab"
 	@echo "  make install-mars-lab       Install a user desktop launcher for MARS Lab"
 	@echo "  make uninstall-mars-lab     Remove the user desktop launcher for MARS Lab"
+	@echo "  make install-holiday-db     Build and configure the private holiday database only"
+	@echo "  make uninstall-holiday-db   Remove ~/.mars, including the private holiday database"
 	@echo "  make install-to-be-announced-lab      Install a user desktop launcher for To-Be-Announced Lab"
 	@echo "  make uninstall-to-be-announced-lab    Remove the user desktop launcher for To-Be-Announced Lab"
 	@echo "  make check-deps             Check required external development libraries"
+	@echo "  make check-holiday-db-deps  Check runtime tools needed for holiday database installation"
 	@echo "  make check-lab-deps         Check development libraries and MARS Lab TeX tools"
 	@echo "  make install                Install libraries and headers under PREFIX (default /usr/local)"
 	@echo "  make uninstall              Remove installed libraries and headers from PREFIX"

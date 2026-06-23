@@ -495,7 +495,8 @@ static bool holiday_suite_setup(void)
 
     fprintf(stderr,
             "Holiday tests require the configured holiday rule source.\n"
-            "Install MARS Lab first, for example with `make install-mars-lab`.\n");
+            "Install the holiday database first, for example with `make install-holiday-db`.\n"
+            "If you also want the desktop app, use `make install-mars-lab`.\n");
     return false;
 }
 
