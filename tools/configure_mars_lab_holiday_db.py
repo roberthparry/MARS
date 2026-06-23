@@ -174,7 +174,7 @@ def build_holiday_database(db_path: Path, db_key: str) -> None:
             "",
         ]
     )
-    with Spinner("Building encrypted datetime database"):
+    with Spinner("Building encrypted holiday database"):
         completed = subprocess.run(
             [SQLCIPHER, str(db_path)],
             cwd=ROOT,
