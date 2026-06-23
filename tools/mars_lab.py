@@ -41,6 +41,18 @@ HOLIDAY_DB_PATH_ENV = "MARS_HOLIDAY_DB_PATH"
 HOLIDAY_DB_KEY_ENV = "MARS_HOLIDAY_DB_KEY"
 
 
+def detect_system_locale_country_code() -> str:
+    for key in ("LC_ALL", "LC_MESSAGES", "LANG"):
+        raw = os.environ.get(key, "").strip()
+        if not raw:
+            continue
+        match = re.match(r"^[A-Za-z]+(?:[_-]([A-Za-z]{2}))(?:[.@].*)?$", raw)
+        if not match:
+            continue
+        return match.group(1).upper()
+    return ""
+
+
 def detect_system_timezone_name() -> str:
     tz_env = os.environ.get("TZ", "").strip()
     if tz_env:
@@ -82,7 +94,19 @@ def infer_defaults_from_timezone() -> tuple[str, str, str]:
     return ("51.5074", "-0.1278", "GB-ENG")
 
 
-DEFAULT_TIMEZONE_LATITUDE, DEFAULT_TIMEZONE_LONGITUDE, DEFAULT_HOLIDAY_JURISDICTION = infer_defaults_from_timezone()
+def locale_country_to_holiday_jurisdiction(country_code: str) -> str:
+    country_code = str(country_code or "").strip().upper()
+    if not country_code:
+        return ""
+    if country_code == "GB":
+        return "GB-ENG"
+    return country_code
+
+
+DEFAULT_TIMEZONE_LATITUDE, DEFAULT_TIMEZONE_LONGITUDE, DEFAULT_HOLIDAY_JURISDICTION_FROM_TIMEZONE = infer_defaults_from_timezone()
+DEFAULT_HOLIDAY_JURISDICTION_FROM_LOCALE = locale_country_to_holiday_jurisdiction(
+    detect_system_locale_country_code()
+)
 
 
 def mars_home_dir() -> Path:
@@ -165,8 +189,17 @@ def load_holiday_jurisdiction_options() -> list[tuple[str, str]]:
 
 HOLIDAY_JURISDICTION_OPTIONS = load_holiday_jurisdiction_options()
 VALID_HOLIDAY_JURISDICTIONS = {code for code, _ in HOLIDAY_JURISDICTION_OPTIONS}
+DEFAULT_HOLIDAY_JURISDICTION = (
+    DEFAULT_HOLIDAY_JURISDICTION_FROM_LOCALE
+    if DEFAULT_HOLIDAY_JURISDICTION_FROM_LOCALE in VALID_HOLIDAY_JURISDICTIONS
+    else DEFAULT_HOLIDAY_JURISDICTION_FROM_TIMEZONE
+)
 HOLIDAY_JURISDICTION_OPTIONS_HTML = "\n".join(
-    f'          <option value="{html.escape(code)}">{html.escape(name)}</option>'
+    (
+        f'          <option value="{html.escape(code)}" selected>{html.escape(name)}</option>'
+        if code == DEFAULT_HOLIDAY_JURISDICTION
+        else f'          <option value="{html.escape(code)}">{html.escape(name)}</option>'
+    )
     for code, name in HOLIDAY_JURISDICTION_OPTIONS
 )
 
@@ -3163,6 +3196,13 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         select.__marsSyncRoundedSelect();
     }
 
+    function setSelectValue(select, value) {
+      if (!select)
+        return;
+      select.value = value;
+      syncRoundedSelect(select);
+    }
+
     function enhanceRoundedSelect(select) {
       if (!select)
         return null;
@@ -4175,7 +4215,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       if (datetimeYear && !datetimeYear.value)
         datetimeYear.value = String((datetimeDate?.value || DEFAULT_DATETIME_DATE).slice(0, 4));
       if (datetimeJurisdiction && !datetimeJurisdiction.value)
-        datetimeJurisdiction.value = DEFAULT_DATETIME_JURISDICTION;
+        setSelectValue(datetimeJurisdiction, DEFAULT_DATETIME_JURISDICTION);
       if (datetimeLatitude && !datetimeLatitude.value)
         datetimeLatitude.value = DEFAULT_DATETIME_LATITUDE;
       if (datetimeLongitude && !datetimeLongitude.value)
@@ -4281,7 +4321,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       if (datetimeYear)
         datetimeYear.value = String(data.datetime_year || (datetimeDate?.value || DEFAULT_DATETIME_DATE).slice(0, 4));
       if (datetimeJurisdiction)
-        datetimeJurisdiction.value = validDatetimeJurisdiction(data.datetime_jurisdiction, DEFAULT_DATETIME_JURISDICTION);
+        setSelectValue(datetimeJurisdiction, validDatetimeJurisdiction(data.datetime_jurisdiction, DEFAULT_DATETIME_JURISDICTION));
       if (datetimeLatitude)
         datetimeLatitude.value = String(data.datetime_latitude || DEFAULT_DATETIME_LATITUDE);
       if (datetimeLongitude)
@@ -4355,7 +4395,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           if (datetimeYear)
             datetimeYear.value = String(state.year || (datetimeDate?.value || DEFAULT_DATETIME_DATE).slice(0, 4));
           if (datetimeJurisdiction)
-            datetimeJurisdiction.value = validDatetimeJurisdiction(state.jurisdiction, DEFAULT_DATETIME_JURISDICTION);
+            setSelectValue(datetimeJurisdiction, validDatetimeJurisdiction(state.jurisdiction, DEFAULT_DATETIME_JURISDICTION));
           if (datetimeLatitude)
             datetimeLatitude.value = String(state.latitude || DEFAULT_DATETIME_LATITUDE);
           if (datetimeLongitude)
@@ -4594,7 +4634,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         if (datetimeYear)
           datetimeYear.value = String(datetimeState.year || (datetimeDate?.value || DEFAULT_DATETIME_DATE).slice(0, 4));
         if (datetimeJurisdiction)
-          datetimeJurisdiction.value = validDatetimeJurisdiction(datetimeState.jurisdiction, DEFAULT_DATETIME_JURISDICTION);
+          setSelectValue(datetimeJurisdiction, validDatetimeJurisdiction(datetimeState.jurisdiction, DEFAULT_DATETIME_JURISDICTION));
         if (datetimeLatitude)
           datetimeLatitude.value = String(datetimeState.latitude || DEFAULT_DATETIME_LATITUDE);
         if (datetimeLongitude)
@@ -6617,7 +6657,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         if (datetimeYear)
           datetimeYear.value = DEFAULT_DATETIME_DATE.slice(0, 4);
         if (datetimeJurisdiction)
-          datetimeJurisdiction.value = DEFAULT_DATETIME_JURISDICTION;
+          setSelectValue(datetimeJurisdiction, DEFAULT_DATETIME_JURISDICTION);
         if (datetimeLatitude)
           datetimeLatitude.value = DEFAULT_DATETIME_LATITUDE;
         if (datetimeLongitude)
