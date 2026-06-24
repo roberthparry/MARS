@@ -67,6 +67,78 @@ array_t *events = holiday_between(holiday, start, end);
 Destroy the returned array with `array_destroy(events)`. The array performs a
 deep destroy of the holiday events it owns.
 
+## API Reference
+
+### Types
+
+`holiday_t`
+
+- Opaque holiday engine for one jurisdiction.
+- Open it with `holiday_open()` and release it with `holiday_close()`.
+
+`holiday_event_t`
+
+- One holiday occurrence.
+- Fields:
+- `holiday_id` stable holiday identifier from the configured rule source.
+- `rule_id` stable rule identifier for the rule that produced the occurrence.
+- `event_year` civil year used to evaluate the holiday rule.
+- `holiday_date` holiday date as a `datetime_t`.
+- `holiday_name` display name for the holiday.
+- `holiday_class` holiday class, typically `public`.
+- `derived_from_observance` `true` when the event came from an observance or substitute-day rule rather than the base rule date.
+
+`holiday_visit_fn`
+
+- Visitor callback used by `holiday_each_between()`.
+- Return `true` to continue enumeration, or `false` to stop early.
+
+### Functions
+
+`holiday_t *holiday_open(const char *jurisdiction);`
+
+- Opens a holiday engine for a jurisdiction such as `GB-ENG`, `ZA`, `NL`, or `UA`.
+- Pass `NULL` or an empty string to use the machine default jurisdiction.
+- Returns `NULL` if the configured holiday rule source cannot be opened.
+
+`void holiday_close(holiday_t *holiday);`
+
+- Releases an open holiday engine.
+- Safe to call with `NULL`.
+
+`const char *holiday_last_error(const holiday_t *holiday);`
+
+- Returns the last error message recorded on the engine.
+- The returned pointer is borrowed and becomes invalid after the next holiday API call on that engine or after `holiday_close()`.
+
+`array_t *holiday_between(holiday_t *holiday, const datetime_t *start, const datetime_t *end);`
+
+- Returns all holidays in the inclusive range `[start, end]`.
+- The returned `array_t` owns deep copies of its `holiday_event_t` elements.
+- Destroy it with `array_destroy()`.
+
+`bool holiday_is_weekend(holiday_t *holiday, const datetime_t *date);`
+
+- Returns whether the date is a weekend day in the selected jurisdiction.
+- This uses jurisdiction-specific weekend rules, not a hardcoded Saturday/Sunday assumption.
+
+`bool holiday_is_national_holiday(holiday_t *holiday, const datetime_t *date);`
+
+- Returns whether the date is a holiday in the selected jurisdiction.
+- Weekend status is separate; a date may be a weekend, a holiday, both, or neither.
+
+`long holiday_working_days_between(holiday_t *holiday, const datetime_t *start, const datetime_t *end);`
+
+- Counts working days in the inclusive range `[start, end]`.
+- A working day is any day that is neither a jurisdictional weekend nor a holiday.
+- Returns `-1` on failure.
+
+`bool holiday_each_between(holiday_t *holiday, const datetime_t *start, const datetime_t *end, holiday_visit_fn visitor, void *ctx);`
+
+- Enumerates holidays in ascending date order without building your own result array first.
+- Useful when you want to stream results into your own container or stop early.
+- Returns `false` on rule-loading or rule-evaluation failure.
+
 ## Example: Range, Holiday, and Working-Day Queries
 
 ```c
