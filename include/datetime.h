@@ -738,6 +738,16 @@ char *datetime_format(const datetime_t *dttm, const char *format);
 string_t *datetime_format_text(const datetime_t *dttm, const string_t *format);
 
 /**
+ * @brief status of a sunrise or sunset calculation.
+ */
+typedef enum datetime_sun_status_t {
+    DATETIME_SUN_OK = 0,
+    DATETIME_SUN_NEVER_RISES,
+    DATETIME_SUN_NEVER_SETS,
+    DATETIME_SUN_UNAVAILABLE
+} datetime_sun_status_t;
+
+/**
  * @brief calculate the sunrise or sunset time for a given date and location. The sunrise/sunset time is calculated using the
  *        algorithm described in the NOAA Solar Calculator, which is based on the equations from the Astronomical Algorithms book
  *        by Jean Meeus. The function takes the Julian Day Number for the date, the latitude and longitude of the location, and a
@@ -802,6 +812,27 @@ double datetime_solar_inclination(const datetime_t *dttm, double latitude);
 datetime_t *datetime_init_sunrise(datetime_t *dttm, long julianDayNumber, double latitude, double longitude, double timeZoneOffset);
 
 /**
+ * @brief initialise a datetime object with sunrise and return the calculation status.
+ *
+ * This keeps sunrise calculation and its status reporting inside the datetime
+ * layer so callers do not need to interpret low-level solar sentinel values.
+ *
+ * @param dttm destination datetime object.
+ * @param julianDayNumber the Julian Day Number for the date.
+ * @param latitude observer latitude in degrees.
+ * @param longitude observer longitude in degrees.
+ * @param timeZoneOffset time-zone offset in hours, or @c DBL_MAX for local.
+ * @param status output status pointer, optional.
+ * @return @p dttm on success, or @c NULL on allocation/initialisation failure.
+ */
+datetime_t *datetime_init_sunrise_checked(datetime_t *dttm,
+                                          long julianDayNumber,
+                                          double latitude,
+                                          double longitude,
+                                          double timeZoneOffset,
+                                          datetime_sun_status_t *status);
+
+/**
  * @brief initialise a datetime object with the sunset time for a given date and location. This function is a wrapper around
  *        datetime_init_sun_time() that calls it with the isSunrise parameter set to false to calculate the sunset time.
  *        The date is specified by the Julian Day Number. The location is specified by the latitude and longitude. The time zone
@@ -818,6 +849,27 @@ datetime_t *datetime_init_sunrise(datetime_t *dttm, long julianDayNumber, double
  *         datetime object with the date set to the given Julian Day Number.
  */
 datetime_t *datetime_init_sunset(datetime_t *dttm, long julianDayNumber, double latitude, double longitude, double timeZoneOffset);
+
+/**
+ * @brief initialise a datetime object with sunset and return the calculation status.
+ *
+ * This keeps sunset calculation and its status reporting inside the datetime
+ * layer so callers do not need to interpret low-level solar sentinel values.
+ *
+ * @param dttm destination datetime object.
+ * @param julianDayNumber the Julian Day Number for the date.
+ * @param latitude observer latitude in degrees.
+ * @param longitude observer longitude in degrees.
+ * @param timeZoneOffset time-zone offset in hours, or @c DBL_MAX for local.
+ * @param status output status pointer, optional.
+ * @return @p dttm on success, or @c NULL on allocation/initialisation failure.
+ */
+datetime_t *datetime_init_sunset_checked(datetime_t *dttm,
+                                         long julianDayNumber,
+                                         double latitude,
+                                         double longitude,
+                                         double timeZoneOffset,
+                                         datetime_sun_status_t *status);
 
 /**
  * @brief set the time components of a datetime object to the sunrise time for its date and a given location. This function is a

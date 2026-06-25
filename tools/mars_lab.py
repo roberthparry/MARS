@@ -34,11 +34,13 @@ import shutil
 
 
 ROOT = Path(__file__).resolve().parents[1]
-HOLIDAY_DB_SOURCE_DIR = ROOT / "packaging" / "holiday-db"
-COUNTRY_JURISDICTIONS_SQL = HOLIDAY_DB_SOURCE_DIR / "mars_country_jurisdictions.sql"
-TARGET_SUBDIVISIONS_SQL = HOLIDAY_DB_SOURCE_DIR / "mars_target_subdivisions.sql"
-HOLIDAY_DB_PATH_ENV = "MARS_HOLIDAY_DB_PATH"
-HOLIDAY_DB_KEY_ENV = "MARS_HOLIDAY_DB_KEY"
+JURISDICTION_DB_SOURCE_DIR = ROOT / "packaging" / "holiday-db"
+COUNTRY_JURISDICTIONS_SQL = JURISDICTION_DB_SOURCE_DIR / "mars_country_jurisdictions.sql"
+TARGET_SUBDIVISIONS_SQL = JURISDICTION_DB_SOURCE_DIR / "mars_target_subdivisions.sql"
+JURISDICTION_DB_PATH_ENV = "MARS_JURISDICTION_DB_PATH"
+JURISDICTION_DB_KEY_ENV = "MARS_JURISDICTION_DB_KEY"
+LEGACY_HOLIDAY_DB_PATH_ENV = "MARS_HOLIDAY_DB_PATH"
+LEGACY_HOLIDAY_DB_KEY_ENV = "MARS_HOLIDAY_DB_KEY"
 
 
 def detect_system_locale_country_code() -> str:
@@ -116,19 +118,25 @@ def mars_home_dir() -> Path:
     return Path.home() / ".mars"
 
 
-def default_holiday_db_path() -> Path:
-    return mars_home_dir() / "holiday" / "mars_holiday_rules.db"
+def default_jurisdiction_db_path() -> Path:
+    return mars_home_dir() / "jurisdiction" / "mars_jurisdiction_rules.db"
 
 
-def holiday_db_runtime_env() -> dict[str, str]:
+def jurisdiction_db_runtime_env() -> dict[str, str]:
     env_updates: dict[str, str] = {}
-    configured_path = os.environ.get(HOLIDAY_DB_PATH_ENV, "").strip()
-    db_path = Path(configured_path).expanduser() if configured_path else default_holiday_db_path()
-    env_updates[HOLIDAY_DB_PATH_ENV] = str(db_path)
+    configured_path = os.environ.get(JURISDICTION_DB_PATH_ENV, "").strip()
+    if not configured_path:
+        configured_path = os.environ.get(LEGACY_HOLIDAY_DB_PATH_ENV, "").strip()
+    db_path = Path(configured_path).expanduser() if configured_path else default_jurisdiction_db_path()
+    env_updates[JURISDICTION_DB_PATH_ENV] = str(db_path)
+    env_updates[LEGACY_HOLIDAY_DB_PATH_ENV] = str(db_path)
 
-    configured_key = os.environ.get(HOLIDAY_DB_KEY_ENV, "").strip()
+    configured_key = os.environ.get(JURISDICTION_DB_KEY_ENV, "").strip()
+    if not configured_key:
+        configured_key = os.environ.get(LEGACY_HOLIDAY_DB_KEY_ENV, "").strip()
     if configured_key:
-        env_updates[HOLIDAY_DB_KEY_ENV] = configured_key
+        env_updates[JURISDICTION_DB_KEY_ENV] = configured_key
+        env_updates[LEGACY_HOLIDAY_DB_KEY_ENV] = configured_key
 
     return env_updates
 
@@ -1048,6 +1056,201 @@ INDEX_HTML = r"""<!doctype html>
     .datetime-controls input[type="date"]::-webkit-calendar-picker-indicator {
       filter: invert(1) sepia(0.4) saturate(0.8) hue-rotate(76deg);
       opacity: 0.78;
+    }
+
+    .mars-date-shell {
+      position: relative;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 0.45rem;
+      align-items: center;
+    }
+
+    .mars-date-shell input {
+      min-width: 0;
+    }
+
+    .mars-date-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 2.7rem;
+      min-width: 2.7rem;
+      min-height: 2.7rem;
+      border: 1px solid rgba(233, 244, 239, 0.24);
+      border-radius: 999px;
+      background:
+        linear-gradient(180deg, rgba(26, 64, 47, 0.96), rgba(10, 31, 23, 0.98));
+      color: #efc36a;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 240, 199, 0.08),
+        0 9px 24px rgba(0, 0, 0, 0.22);
+      cursor: pointer;
+      transition: transform 120ms ease, border-color 140ms ease, box-shadow 140ms ease;
+    }
+
+    .mars-date-button:hover {
+      transform: translateY(-1px);
+      border-color: rgba(233, 244, 239, 0.36);
+    }
+
+    .mars-date-button:focus-visible,
+    .mars-date-shell.open .mars-date-button {
+      outline: none;
+      border-color: color-mix(in srgb, var(--accent), var(--line) 18%);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 240, 199, 0.1),
+        0 0 0 3px rgba(113, 198, 180, 0.18),
+        0 12px 28px rgba(0, 0, 0, 0.24);
+    }
+
+    .mars-date-button::before {
+      content: "CAL";
+      display: inline-block;
+      font: 0.62rem/1 "Cascadia Code", "DejaVu Sans Mono", monospace;
+      letter-spacing: 0.11em;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .mars-date-picker {
+      position: fixed;
+      z-index: 120;
+      width: min(100%, 24rem);
+      border: 1px solid rgba(233, 244, 239, 0.22);
+      border-radius: 24px;
+      padding: 0.8rem;
+      background:
+        radial-gradient(circle at top left, rgba(205, 135, 60, 0.14), transparent 34%),
+        linear-gradient(145deg, rgba(8, 30, 24, 0.98), rgba(13, 47, 34, 0.98));
+      box-shadow:
+        inset 0 1px 0 rgba(255, 243, 214, 0.08),
+        0 24px 70px rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(10px);
+    }
+
+    .mars-date-picker.hidden {
+      display: none;
+    }
+
+    .mars-date-picker-head {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      gap: 0.55rem;
+      align-items: center;
+      margin-bottom: 0.7rem;
+    }
+
+    .mars-date-picker-title {
+      text-align: center;
+      color: #f3ead1;
+      font: 0.98rem/1.2 Georgia, "Times New Roman", serif;
+      letter-spacing: 0.03em;
+    }
+
+    .mars-date-picker-nav {
+      min-width: 2.3rem;
+      min-height: 2.3rem;
+      border: 1px solid rgba(233, 244, 239, 0.22);
+      border-radius: 999px;
+      background: rgba(0, 0, 0, 0.14);
+      color: #d7e7b7;
+      font: 0.98rem/1 "Cascadia Code", "DejaVu Sans Mono", monospace;
+      cursor: pointer;
+    }
+
+    .mars-date-picker-nav:hover,
+    .mars-date-picker-nav:focus-visible {
+      border-color: rgba(239, 195, 106, 0.46);
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(113, 198, 180, 0.16);
+    }
+
+    .mars-date-picker-weekdays,
+    .mars-date-picker-grid {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 0.35rem;
+    }
+
+    .mars-date-picker-weekdays {
+      margin-bottom: 0.45rem;
+    }
+
+    .mars-date-picker-weekday {
+      text-align: center;
+      color: rgba(215, 231, 183, 0.82);
+      font: 0.66rem/1.2 "Cascadia Code", "DejaVu Sans Mono", monospace;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .mars-date-picker-day {
+      min-height: 2.45rem;
+      border: 1px solid rgba(233, 244, 239, 0.14);
+      border-radius: 13px;
+      background: rgba(0, 0, 0, 0.14);
+      color: var(--code);
+      font: 0.85rem/1 "Cascadia Code", "DejaVu Sans Mono", monospace;
+      cursor: pointer;
+      transition: transform 120ms ease, border-color 140ms ease, background 140ms ease;
+    }
+
+    .mars-date-picker-day:hover,
+    .mars-date-picker-day:focus-visible {
+      transform: translateY(-1px);
+      border-color: rgba(239, 195, 106, 0.42);
+      outline: none;
+      background: rgba(33, 82, 55, 0.52);
+    }
+
+    .mars-date-picker-day.outside {
+      color: rgba(233, 244, 239, 0.26);
+      background: rgba(0, 0, 0, 0.08);
+    }
+
+    .mars-date-picker-day.today {
+      border-color: rgba(113, 198, 180, 0.36);
+      color: #d7f0d7;
+    }
+
+    .mars-date-picker-day.selected {
+      border-color: rgba(239, 195, 106, 0.58);
+      background:
+        linear-gradient(180deg, rgba(205, 135, 60, 0.24), rgba(66, 123, 86, 0.24));
+      color: #fff3cf;
+      box-shadow: inset 0 1px 0 rgba(255, 241, 196, 0.12);
+    }
+
+    .mars-date-picker-foot {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.6rem;
+      margin-top: 0.72rem;
+    }
+
+    .mars-date-picker-foot button {
+      flex: 1;
+      min-height: 2.35rem;
+      border-radius: 999px;
+      border: 1px solid rgba(233, 244, 239, 0.2);
+      background: rgba(0, 0, 0, 0.14);
+      color: #bed3c0;
+      font: 0.76rem/1 "Cascadia Code", "DejaVu Sans Mono", monospace;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+
+    .mars-date-picker-foot button:hover,
+    .mars-date-picker-foot button:focus-visible {
+      outline: none;
+      border-color: rgba(239, 195, 106, 0.4);
+      box-shadow: 0 0 0 3px rgba(113, 198, 180, 0.14);
+    }
+
+    .mars-date-picker-anchor {
+      position: relative;
     }
 
     .datetime-local {
@@ -2381,7 +2584,10 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             <div class="datetime-grid">
               <div class="integrator-bound-field">
                 <label for="datetimeDate">Date</label>
-                <input id="datetimeDate" type="date">
+                <div class="mars-date-shell">
+                  <input id="datetimeDate" type="text" inputmode="numeric" placeholder="YYYY-MM-DD" autocomplete="off">
+                  <button class="mars-date-button" type="button" data-date-target="datetimeDate" aria-label="Open date picker for selected date"></button>
+                </div>
               </div>
               <div class="integrator-bound-field">
                 <label for="datetimeJdn">Julian Day Number</label>
@@ -2398,11 +2604,17 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             <div class="datetime-grid two-up">
               <div class="integrator-bound-field">
                 <label for="datetimeStart">Start date</label>
-                <input id="datetimeStart" type="date">
+                <div class="mars-date-shell">
+                  <input id="datetimeStart" type="text" inputmode="numeric" placeholder="YYYY-MM-DD" autocomplete="off">
+                  <button class="mars-date-button" type="button" data-date-target="datetimeStart" aria-label="Open date picker for start date"></button>
+                </div>
               </div>
               <div class="integrator-bound-field">
                 <label for="datetimeEnd">End date</label>
-                <input id="datetimeEnd" type="date">
+                <div class="mars-date-shell">
+                  <input id="datetimeEnd" type="text" inputmode="numeric" placeholder="YYYY-MM-DD" autocomplete="off">
+                  <button class="mars-date-button" type="button" data-date-target="datetimeEnd" aria-label="Open date picker for end date"></button>
+                </div>
               </div>
             </div>
           </div>
@@ -2419,15 +2631,28 @@ __HOLIDAY_JURISDICTION_OPTIONS__
               </div>
               <div class="integrator-bound-field">
                 <label for="datetimeGmtOffset">GMT offset, including daylight saving</label>
-                <input id="datetimeGmtOffset" inputmode="decimal" placeholder="blank for local, 1 for BST">
+                <input id="datetimeGmtOffset" inputmode="decimal" placeholder="blank for jurisdiction local, 1 for BST">
               </div>
             </div>
           </div>
         </div>
-        <p class="mode-hint">Blank GMT offset uses this machine's local offset for the selected date. For other locations, enter the local offset yourself, including daylight saving where applicable.</p>
+        <p class="mode-hint">Blank GMT offset uses the selected jurisdiction's local offset for the selected date. Enter a value yourself only if you want to override that, including daylight saving where applicable.</p>
         <div class="datetime-local hidden" id="datetimeLocal">
           <div class="datetime-local-title">Local</div>
           <div class="datetime-local-body" id="datetimeLocalBody"></div>
+        </div>
+        <div class="mars-date-picker hidden" id="marsDatePicker" role="dialog" aria-label="Date picker">
+          <div class="mars-date-picker-head">
+            <button class="mars-date-picker-nav" id="marsDatePickerPrev" type="button" aria-label="Previous month">‹</button>
+            <div class="mars-date-picker-title" id="marsDatePickerTitle"></div>
+            <button class="mars-date-picker-nav" id="marsDatePickerNext" type="button" aria-label="Next month">›</button>
+          </div>
+          <div class="mars-date-picker-weekdays" id="marsDatePickerWeekdays"></div>
+          <div class="mars-date-picker-grid" id="marsDatePickerGrid"></div>
+          <div class="mars-date-picker-foot">
+            <button id="marsDatePickerToday" type="button">Today</button>
+            <button id="marsDatePickerClose" type="button">Close</button>
+          </div>
         </div>
       </div>
       <div class="target-row hidden" id="targetRow">
@@ -2534,7 +2759,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             <li><code>Start date</code> and <code>End date</code> drive the days-between result.</li>
             <li><code>Year</code> drives Christian, Chinese, Hindu, Buddhist, Muslim, and Jewish observances.</li>
             <li><code>Holiday country or jurisdiction</code> is only used when you want the optional local holiday panel.</li>
-            <li><code>GMT offset</code> should include daylight saving. Leave it blank to use this machine's local offset for the selected date.</li>
+            <li><code>GMT offset</code> should include daylight saving. Leave it blank to use the selected jurisdiction's local offset for the selected date.</li>
             <li>Ramadan, Eid al-Fitr, and Muslim New Year use the civil Islamic calendar; Hindu and Buddhist observances are estimated from India-window lunar events, so observed dates can differ locally.</li>
           </ul>
         </div>
@@ -2710,6 +2935,15 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     const datetimeGmtOffset = document.getElementById('datetimeGmtOffset');
     const datetimeLocal = document.getElementById('datetimeLocal');
     const datetimeLocalBody = document.getElementById('datetimeLocalBody');
+    const marsDatePicker = document.getElementById('marsDatePicker');
+    const marsDatePickerTitle = document.getElementById('marsDatePickerTitle');
+    const marsDatePickerWeekdays = document.getElementById('marsDatePickerWeekdays');
+    const marsDatePickerGrid = document.getElementById('marsDatePickerGrid');
+    const marsDatePickerPrev = document.getElementById('marsDatePickerPrev');
+    const marsDatePickerNext = document.getElementById('marsDatePickerNext');
+    const marsDatePickerToday = document.getElementById('marsDatePickerToday');
+    const marsDatePickerClose = document.getElementById('marsDatePickerClose');
+    const marsDateButtons = Array.from(document.querySelectorAll('[data-date-target]'));
     const helpCards = Array.from(document.querySelectorAll('#helpPane .help-card'));
     const run = document.getElementById('run');
     const back = document.getElementById('back');
@@ -2729,8 +2963,6 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     const mobileUrl = document.getElementById('mobileUrl');
     const mobileQr = document.getElementById('mobileQr');
     const controlToken = __CONTROL_TOKEN__;
-    if (datetimeJurisdiction && !datetimeJurisdiction.value)
-      datetimeJurisdiction.value = DEFAULT_DATETIME_JURISDICTION;
     enhanceRoundedSelect(matrixOperation);
     enhanceRoundedSelect(datetimeJurisdiction);
     let datetimeLocalRefreshSequence = 0;
@@ -2827,6 +3059,10 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     const DEFAULT_DATETIME_LATITUDE = __DEFAULT_DATETIME_LATITUDE__;
     const DEFAULT_DATETIME_LONGITUDE = __DEFAULT_DATETIME_LONGITUDE__;
     const DEFAULT_DATETIME_GMT_OFFSET = __DEFAULT_DATETIME_GMT_OFFSET__;
+    if (datetimeJurisdiction && !datetimeJurisdiction.value)
+      datetimeJurisdiction.value = DEFAULT_DATETIME_JURISDICTION;
+    let datetimeAutoGmtOffset = String(datetimeGmtOffset && datetimeGmtOffset.value || DEFAULT_DATETIME_GMT_OFFSET);
+    let datetimeGmtOffsetTouched = false;
     const HOLIDAY_JURISDICTION_SET = new Set(__HOLIDAY_JURISDICTION_CODES__);
     const LAB_MODE_STORAGE_KEY = 'mars.exprLab.lastMode';
     let currentLabMode = 'expression';
@@ -2844,6 +3080,55 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       integrator: null,
       datetime: null
     };
+
+    marsDateButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        const targetId = String(button.dataset.dateTarget || '').trim();
+        const input = targetId ? document.getElementById(targetId) : null;
+        if (!input)
+          return;
+        if (marsDatePickerState.input === input && marsDatePicker && !marsDatePicker.classList.contains('hidden')) {
+          closeMarsDatePicker({restoreFocus: true});
+          return;
+        }
+        openMarsDatePicker(input, button);
+      });
+    });
+
+    if (datetimeGmtOffset) {
+      datetimeGmtOffset.addEventListener('input', () => {
+        datetimeGmtOffsetTouched = true;
+      });
+    }
+
+    if (marsDatePickerPrev)
+      marsDatePickerPrev.addEventListener('click', () => shiftMarsDatePickerMonth(-1));
+    if (marsDatePickerNext)
+      marsDatePickerNext.addEventListener('click', () => shiftMarsDatePickerMonth(1));
+    if (marsDatePickerToday)
+      marsDatePickerToday.addEventListener('click', () => {
+        if (!marsDatePickerState.input)
+          return;
+        commitMarsDateValue(marsDatePickerState.input, marsTodayIsoDate());
+        closeMarsDatePicker({restoreFocus: true});
+      });
+    if (marsDatePickerClose)
+      marsDatePickerClose.addEventListener('click', () => closeMarsDatePicker({restoreFocus: true}));
+
+    document.addEventListener('click', (event) => {
+      if (!marsDatePicker || marsDatePicker.classList.contains('hidden'))
+        return;
+      if (marsDatePicker.contains(event.target))
+        return;
+      if (event.target.closest && event.target.closest('.mars-date-shell'))
+        return;
+      closeMarsDatePicker();
+    });
+
+    window.addEventListener('resize', () => {
+      if (marsDatePicker && !marsDatePicker.classList.contains('hidden'))
+        placeMarsDatePicker(marsDatePickerState.shell);
+    });
 
     function precisionDigitsForBits(bits) {
       if (bits <= DOUBLE_PRECISION_BITS)
@@ -3133,8 +3418,13 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       restoreModeEditor(currentMode());
       if (currentMode() === 'integrator')
         renderIntegratorRows(activeIntegratorRows());
-      if (currentMode() === 'datetime')
+      if (currentMode() === 'datetime') {
         restoreDatetimeDefaultsIfBlank();
+        refreshDatetimeJurisdictionLocation().then(() => {
+          if (currentMode() === 'datetime')
+            saveLastDatetimeState();
+        });
+      }
       syncModeUI();
       if (currentMode() === 'integrator' && currentIntegratorBoundRows().length === 0)
         resetIntegratorBoundsToDefault();
@@ -3344,6 +3634,197 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       select.__marsSyncRoundedSelect = sync;
       sync();
       return {sync, close};
+    }
+
+    const MARS_DATE_WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const MARS_DATE_MONTHS = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    const marsDatePickerState = {
+      input: null,
+      button: null,
+      shell: null,
+      year: 0,
+      month: 0
+    };
+
+    function parseMarsIsoDate(text) {
+      const match = String(text || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (!match)
+        return null;
+      const year = Number(match[1]);
+      const month = Number(match[2]);
+      const day = Number(match[3]);
+      if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day))
+        return null;
+      const probe = new Date(Date.UTC(year, month - 1, day));
+      if (probe.getUTCFullYear() !== year || probe.getUTCMonth() !== month - 1 || probe.getUTCDate() !== day)
+        return null;
+      return {year, month, day};
+    }
+
+    function marsDaysInMonth(year, month) {
+      return new Date(Date.UTC(year, month, 0)).getUTCDate();
+    }
+
+    function marsIsoDate(year, month, day) {
+      return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    }
+
+    function marsTodayIsoDate() {
+      const now = new Date();
+      return marsIsoDate(now.getFullYear(), now.getMonth() + 1, now.getDate());
+    }
+
+    function marsStartWeekdayIndex(year, month) {
+      const weekday = new Date(Date.UTC(year, month - 1, 1)).getUTCDay();
+      return (weekday + 6) % 7;
+    }
+
+    function closeMarsDatePicker({restoreFocus = false} = {}) {
+      if (!marsDatePicker)
+        return;
+      marsDatePicker.classList.add('hidden');
+      if (marsDatePickerState.shell)
+        marsDatePickerState.shell.classList.remove('open');
+      if (restoreFocus && marsDatePickerState.button)
+        marsDatePickerState.button.focus();
+      marsDatePickerState.input = null;
+      marsDatePickerState.button = null;
+      marsDatePickerState.shell = null;
+    }
+
+    function placeMarsDatePicker(shell) {
+      if (!marsDatePicker || !shell)
+        return;
+      const rect = shell.getBoundingClientRect();
+      const width = rect.width;
+      const margin = 12;
+      const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+      const left = Math.max(margin, Math.min(rect.left, viewportWidth - width - margin));
+      let top = rect.bottom + 8;
+
+      marsDatePicker.style.width = `${width}px`;
+      marsDatePicker.style.left = `${left}px`;
+      marsDatePicker.style.top = `${top}px`;
+
+      const pickerRect = marsDatePicker.getBoundingClientRect();
+      const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+      if (pickerRect.bottom > viewportHeight - margin) {
+        top = Math.max(margin, rect.top - pickerRect.height - 8);
+        marsDatePicker.style.top = `${top}px`;
+      }
+    }
+
+    function commitMarsDateValue(input, value) {
+      if (!input)
+        return;
+      const changed = input.value !== value;
+      input.value = value;
+      if (changed)
+        input.dispatchEvent(new Event('change', {bubbles: true}));
+    }
+
+    function renderMarsDatePicker() {
+      if (!marsDatePicker || !marsDatePickerGrid || !marsDatePickerTitle || !marsDatePickerWeekdays)
+        return;
+
+      const {input, year, month} = marsDatePickerState;
+      const selected = parseMarsIsoDate(input && input.value);
+      const today = parseMarsIsoDate(marsTodayIsoDate());
+      const daysInMonth = marsDaysInMonth(year, month);
+      const startIndex = marsStartWeekdayIndex(year, month);
+      const previousMonth = month === 1 ? 12 : month - 1;
+      const previousYear = month === 1 ? year - 1 : year;
+      const previousDays = marsDaysInMonth(previousYear, previousMonth);
+      let nextDay = 1;
+
+      marsDatePickerTitle.textContent = `${MARS_DATE_MONTHS[month - 1]} ${year}`;
+      marsDatePickerWeekdays.replaceChildren(...MARS_DATE_WEEKDAYS.map((name) => {
+        const cell = document.createElement('div');
+        cell.className = 'mars-date-picker-weekday';
+        cell.textContent = name;
+        return cell;
+      }));
+
+      const dayButtons = [];
+      for (let slot = 0; slot < 42; slot += 1) {
+        const button = document.createElement('button');
+        let displayDay;
+        let buttonYear = year;
+        let buttonMonth = month;
+
+        button.type = 'button';
+        button.className = 'mars-date-picker-day';
+
+        if (slot < startIndex) {
+          displayDay = previousDays - startIndex + slot + 1;
+          buttonYear = previousYear;
+          buttonMonth = previousMonth;
+          button.classList.add('outside');
+        } else if (slot >= startIndex + daysInMonth) {
+          displayDay = nextDay++;
+          buttonMonth = month === 12 ? 1 : month + 1;
+          buttonYear = month === 12 ? year + 1 : year;
+          button.classList.add('outside');
+        } else {
+          displayDay = slot - startIndex + 1;
+        }
+
+        const isoValue = marsIsoDate(buttonYear, buttonMonth, displayDay);
+        button.textContent = String(displayDay);
+        button.dataset.isoDate = isoValue;
+
+        if (today && today.year === buttonYear && today.month === buttonMonth && today.day === displayDay)
+          button.classList.add('today');
+        if (selected && selected.year === buttonYear && selected.month === buttonMonth && selected.day === displayDay)
+          button.classList.add('selected');
+
+        button.addEventListener('click', () => {
+          commitMarsDateValue(input, isoValue);
+          closeMarsDatePicker({restoreFocus: true});
+        });
+        dayButtons.push(button);
+      }
+
+      marsDatePickerGrid.replaceChildren(...dayButtons);
+      marsDatePicker.classList.remove('hidden');
+      placeMarsDatePicker(marsDatePickerState.shell);
+    }
+
+    function openMarsDatePicker(input, button) {
+      if (!input || !button || !marsDatePicker)
+        return;
+
+      const shell = button.closest('.mars-date-shell');
+      const parsed = parseMarsIsoDate(input.value) || parseMarsIsoDate(marsTodayIsoDate());
+      marsDatePickerState.input = input;
+      marsDatePickerState.button = button;
+      marsDatePickerState.shell = shell;
+      marsDatePickerState.year = parsed.year;
+      marsDatePickerState.month = parsed.month;
+      if (shell)
+        shell.classList.add('open');
+      renderMarsDatePicker();
+    }
+
+    function shiftMarsDatePickerMonth(delta) {
+      if (!marsDatePickerState.input)
+        return;
+      let nextMonth = marsDatePickerState.month + delta;
+      let nextYear = marsDatePickerState.year;
+      while (nextMonth < 1) {
+        nextMonth += 12;
+        nextYear -= 1;
+      }
+      while (nextMonth > 12) {
+        nextMonth -= 12;
+        nextYear += 1;
+      }
+      marsDatePickerState.year = nextYear;
+      marsDatePickerState.month = nextMonth;
+      renderMarsDatePicker();
     }
 
     function splitTopLevel(text, separator) {
@@ -4227,6 +4708,10 @@ __HOLIDAY_JURISDICTION_OPTIONS__
 
     function currentDatetimeState() {
       restoreDatetimeDefaultsIfBlank();
+      const currentOffsetText = String(datetimeGmtOffset && datetimeGmtOffset.value || '').trim();
+      const effectiveOffsetText = (!datetimeGmtOffsetTouched || currentOffsetText === datetimeAutoGmtOffset)
+        ? ''
+        : currentOffsetText;
       return {
         date: validDateText(datetimeDate && datetimeDate.value),
         jdn: String(datetimeJdn && datetimeJdn.value || '').trim(),
@@ -4236,7 +4721,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         jurisdiction: validDatetimeJurisdiction(datetimeJurisdiction && datetimeJurisdiction.value),
         latitude: String(datetimeLatitude && datetimeLatitude.value || DEFAULT_DATETIME_LATITUDE).trim(),
         longitude: String(datetimeLongitude && datetimeLongitude.value || DEFAULT_DATETIME_LONGITUDE).trim(),
-        gmt_offset: String(datetimeGmtOffset && datetimeGmtOffset.value || '').trim()
+        gmt_offset: effectiveOffsetText
       };
     }
 
@@ -4329,8 +4814,11 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         datetimeLatitude.value = String(data.datetime_latitude || DEFAULT_DATETIME_LATITUDE);
       if (datetimeLongitude)
         datetimeLongitude.value = String(data.datetime_longitude || DEFAULT_DATETIME_LONGITUDE);
-      if (datetimeGmtOffset)
+      if (datetimeGmtOffset) {
         datetimeGmtOffset.value = String(data.datetime_gmt_offset || DEFAULT_DATETIME_GMT_OFFSET);
+        datetimeAutoGmtOffset = String(datetimeGmtOffset.value || '').trim();
+        datetimeGmtOffsetTouched = false;
+      }
 
       if (data.precision_bits && typeof data.precision_bits === 'object') {
         Object.entries(data.precision_bits).forEach(([mode, bits]) => {
@@ -4397,14 +4885,17 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             datetimeEnd.value = validDateText(state.end, datetimeDate?.value || DEFAULT_DATETIME_DATE);
           if (datetimeYear)
             datetimeYear.value = String(state.year || (datetimeDate?.value || DEFAULT_DATETIME_DATE).slice(0, 4));
-          if (datetimeJurisdiction)
-            setSelectValue(datetimeJurisdiction, validDatetimeJurisdiction(state.jurisdiction, DEFAULT_DATETIME_JURISDICTION));
-          if (datetimeLatitude)
-            datetimeLatitude.value = String(state.latitude || DEFAULT_DATETIME_LATITUDE);
-          if (datetimeLongitude)
-            datetimeLongitude.value = String(state.longitude || DEFAULT_DATETIME_LONGITUDE);
-          if (datetimeGmtOffset)
-            datetimeGmtOffset.value = String(state.gmt_offset || DEFAULT_DATETIME_GMT_OFFSET);
+        if (datetimeJurisdiction)
+          setSelectValue(datetimeJurisdiction, validDatetimeJurisdiction(state.jurisdiction, DEFAULT_DATETIME_JURISDICTION));
+        if (datetimeLatitude)
+          datetimeLatitude.value = String(state.latitude || DEFAULT_DATETIME_LATITUDE);
+        if (datetimeLongitude)
+          datetimeLongitude.value = String(state.longitude || DEFAULT_DATETIME_LONGITUDE);
+        if (datetimeGmtOffset) {
+          datetimeGmtOffset.value = String(state.gmt_offset || DEFAULT_DATETIME_GMT_OFFSET);
+          datetimeAutoGmtOffset = String(datetimeGmtOffset.value || '').trim();
+          datetimeGmtOffsetTouched = false;
+        }
         }
         const labMode = localStorage.getItem(LAB_MODE_STORAGE_KEY);
         if (labMode)
@@ -4642,8 +5133,11 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           datetimeLatitude.value = String(datetimeState.latitude || DEFAULT_DATETIME_LATITUDE);
         if (datetimeLongitude)
           datetimeLongitude.value = String(datetimeState.longitude || DEFAULT_DATETIME_LONGITUDE);
-        if (datetimeGmtOffset)
+        if (datetimeGmtOffset) {
           datetimeGmtOffset.value = String(datetimeState.gmt_offset || DEFAULT_DATETIME_GMT_OFFSET);
+          datetimeAutoGmtOffset = String(datetimeGmtOffset.value || '').trim();
+          datetimeGmtOffsetTouched = false;
+        }
       }
 
       if (state.mode === 'datetime') {
@@ -5250,6 +5744,39 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         if (refreshId !== datetimeLocalRefreshSequence || currentMode() !== 'datetime')
           return;
         setStatus('Error');
+      }
+    }
+
+    async function refreshDatetimeJurisdictionLocation() {
+      if (!datetimeJurisdiction)
+        return;
+
+      const jurisdiction = validDatetimeJurisdiction(datetimeJurisdiction.value, DEFAULT_DATETIME_JURISDICTION);
+      const date = validDateText(datetimeDate && datetimeDate.value, DEFAULT_DATETIME_DATE);
+      try {
+        const response = await fetch('/datetime-jurisdiction-location', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({jurisdiction, date})
+        });
+        const data = await response.json();
+        if (!response.ok || !data.ok)
+          return;
+        if (datetimeLatitude && data.latitude)
+          datetimeLatitude.value = String(data.latitude);
+        if (datetimeLongitude && data.longitude)
+          datetimeLongitude.value = String(data.longitude);
+        if (datetimeGmtOffset) {
+          const currentOffset = String(datetimeGmtOffset.value || '').trim();
+          const suggestedOffset = String(data.gmt_offset || '').trim();
+          if (!datetimeGmtOffsetTouched || !currentOffset || currentOffset === datetimeAutoGmtOffset) {
+            datetimeGmtOffset.value = suggestedOffset;
+            datetimeAutoGmtOffset = suggestedOffset;
+            datetimeGmtOffsetTouched = false;
+          }
+        }
+      } catch (_) {
+        // Keep the current location if the helper is unavailable.
       }
     }
 
@@ -6278,6 +6805,15 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             datetimeJdn.value = String(data.fields.julian_day_number || '');
           if (datetimeYear && datetimeDate && datetimeDate.value)
             datetimeYear.value = datetimeDate.value.slice(0, 4);
+          if (datetimeGmtOffset) {
+            const currentOffset = String(datetimeGmtOffset.value || '').trim();
+            const returnedOffset = String(data.fields.gmt_offset || '').trim();
+            if (returnedOffset && (!datetimeGmtOffsetTouched || !currentOffset || currentOffset === datetimeAutoGmtOffset)) {
+              datetimeGmtOffset.value = returnedOffset;
+              datetimeAutoGmtOffset = returnedOffset;
+              datetimeGmtOffsetTouched = false;
+            }
+          }
         }
         setResultInputText('');
         clearVariableValues();
@@ -6301,7 +6837,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       }
     }
 
-    function evaluateActiveModeOnLoad() {
+    async function evaluateActiveModeOnLoad() {
       if (currentMode() === 'matrix') {
         evaluateMatrix();
         return;
@@ -6315,6 +6851,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         return;
       }
       if (currentMode() === 'datetime') {
+        await refreshDatetimeJurisdictionLocation();
         evaluateDatetime();
         return;
       }
@@ -6694,8 +7231,11 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           datetimeLatitude.value = DEFAULT_DATETIME_LATITUDE;
         if (datetimeLongitude)
           datetimeLongitude.value = DEFAULT_DATETIME_LONGITUDE;
-        if (datetimeGmtOffset)
+        if (datetimeGmtOffset) {
           datetimeGmtOffset.value = DEFAULT_DATETIME_GMT_OFFSET;
+          datetimeAutoGmtOffset = String(datetimeGmtOffset.value || '').trim();
+          datetimeGmtOffsetTouched = false;
+        }
         expr.value = DEFAULT_DATETIME_TEXT;
       }
       captureCurrentModeEditor();
@@ -6791,6 +7331,20 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     [datetimeDate, datetimeJdn, datetimeStart, datetimeEnd, datetimeYear, datetimeJurisdiction, datetimeLatitude, datetimeLongitude, datetimeGmtOffset]
       .filter(Boolean)
       .forEach((control) => {
+        if (control === datetimeDate || control === datetimeStart || control === datetimeEnd) {
+          control.addEventListener('keydown', (event) => {
+            const shell = control.closest('.mars-date-shell');
+            const button = shell ? shell.querySelector('[data-date-target]') : null;
+            if (!button)
+              return;
+            if (event.key === 'ArrowDown' || event.key === 'Enter') {
+              event.preventDefault();
+              openMarsDatePicker(control, button);
+            } else if (event.key === 'Escape') {
+              closeMarsDatePicker();
+            }
+          });
+        }
         control.addEventListener('change', () => {
           if (control === datetimeDate) {
             if (datetimeYear && datetimeDate.value)
@@ -6799,8 +7353,17 @@ __HOLIDAY_JURISDICTION_OPTIONS__
               datetimeJdn.value = '';
           }
           if (currentMode() === 'datetime') {
+            if (control === datetimeJurisdiction || control === datetimeDate) {
+              refreshDatetimeJurisdictionLocation().then(() => {
+                saveLastDatetimeState();
+                if (control === datetimeJurisdiction)
+                  evaluateDatetime({skipHistoryUpdate: true});
+                updateHistoryButtons();
+              });
+              return;
+            }
             saveLastDatetimeState();
-            if (control === datetimeJurisdiction || control === datetimeStart || control === datetimeEnd)
+            if (control === datetimeStart || control === datetimeEnd)
               refreshDatetimeLocalHolidays();
             updateHistoryButtons();
           }
@@ -8330,13 +8893,18 @@ def parse_holiday_lab_output(output: str) -> dict[str, str]:
         {
             "bank_holiday": r"^bank_holiday\s+(.*)$",
             "holiday_status": r"^holiday_status\s+(.*)$",
+            "jurisdiction_latitude": r"^jurisdiction_latitude\s+(.*)$",
+            "jurisdiction_longitude": r"^jurisdiction_longitude\s+(.*)$",
+            "jurisdiction_gmt_offset": r"^jurisdiction_gmt_offset\s+(.*)$",
+            "jurisdiction_status": r"^jurisdiction_status\s+(.*)$",
+            "jurisdiction_gmt_offset_status": r"^jurisdiction_gmt_offset_status\s+(.*)$",
         },
         {"bank_holiday"},
     )
 
 
 def holiday_install_hint() -> str:
-    return "Holiday database unavailable. Run `make install-holiday-db` to enable local holiday lookups."
+    return "Jurisdiction database unavailable. Run `make install-jurisdiction-db` to enable local holiday lookups."
 
 
 def _trim_decimal_tail(text: str) -> str:
@@ -8970,6 +9538,7 @@ def run_datetime_lab_fields(
         "lat",
         "lon",
         "gmt_offset",
+        "jurisdiction",
     ):
         if key in options:
             command.append(f"{key}={str(options.get(key, '')).strip()}")
@@ -8996,7 +9565,7 @@ def run_holiday_lab_fields(
             command.append(f"{key}={str(options.get(key, '')).strip()}")
 
     child_env = os.environ.copy()
-    child_env.update(holiday_db_runtime_env())
+    child_env.update(jurisdiction_db_runtime_env())
     completed = subprocess.run(
         command,
         cwd=ROOT,
@@ -10209,6 +10778,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                     "lat": str(latitude),
                     "lon": str(longitude),
                     "gmt_offset": gmt_offset_text,
+                    "jurisdiction": jurisdiction,
                 }
                 if jdn_text:
                     datetime_options["jdn"] = jdn_text
@@ -10238,7 +10808,13 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                     if holiday_returncode == 0 and str(holiday_fields.get("holiday_status") or "").strip() == "ok":
                         fields.update(holiday_fields)
                     else:
-                        fields["holiday_notice"] = holiday_install_hint()
+                        holiday_status = str(holiday_fields.get("holiday_status") or "").strip()
+                        if holiday_returncode == 0 and holiday_status == "unavailable":
+                            fields["holiday_notice"] = (
+                                "No holiday rules are available yet for the selected jurisdiction and date range."
+                            )
+                        else:
+                            fields["holiday_notice"] = holiday_install_hint()
                         if holiday_returncode == 0:
                             fields.update(holiday_fields)
                         self.log_message(
@@ -10277,6 +10853,52 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                 )
                 self.send_json(500, {"ok": False, "error": f"Datetime response failed: {exc}"})
                 return
+
+        if path == "/datetime-jurisdiction-location":
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                body = self.rfile.read(length)
+                payload = json.loads(body.decode("utf-8"))
+                jurisdiction = normalize_holiday_jurisdiction(
+                    str(payload.get("jurisdiction", DEFAULT_HOLIDAY_JURISDICTION)).strip()
+                )
+                date_text = str(payload.get("date", DEFAULT_DATETIME_DATE)).strip()
+                py_datetime.date.fromisoformat(date_text)
+            except Exception as exc:
+                self.send_json(400, {"ok": False, "error": f"Bad request: {exc}"})
+                return
+
+            try:
+                ensure_scratch_binary(self.holiday_binary, "scratch/holiday_lab")
+                holiday_fields, holiday_raw, holiday_returncode = run_holiday_lab_fields(
+                    self.holiday_binary,
+                    {
+                        "date": date_text,
+                        "jurisdiction": jurisdiction,
+                    },
+                )
+            except Exception as exc:
+                self.send_json(422, {"ok": False, "error": str(exc)})
+                return
+
+            if holiday_returncode != 0 or str(holiday_fields.get("jurisdiction_status") or "").strip() != "ok":
+                self.log_message(
+                    "holiday location unavailable jurisdiction=%r returncode=%r raw=%r",
+                    jurisdiction,
+                    holiday_returncode,
+                    str(holiday_raw or "").strip(),
+                )
+                self.send_json(200, {"ok": False, "error": "Jurisdiction location unavailable"})
+                return
+
+            self.send_json(200, {
+                "ok": True,
+                "jurisdiction": jurisdiction,
+                "latitude": str(holiday_fields.get("jurisdiction_latitude") or "").strip(),
+                "longitude": str(holiday_fields.get("jurisdiction_longitude") or "").strip(),
+                "gmt_offset": str(holiday_fields.get("jurisdiction_gmt_offset") or "").strip(),
+            })
+            return
 
         if path == "/goal_seek":
             try:

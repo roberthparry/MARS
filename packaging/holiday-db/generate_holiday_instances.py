@@ -29,7 +29,7 @@ COUNTRY_ALIASES = {
     "UK": "GB",
 }
 TARGET_SUBDIVISION_COUNTRIES = ("AU", "CA", "US", "GB", "NZ", "PT", "IT")
-SEEDED_RULE_JURISDICTIONS = {"GB-ENG", "AU", "NZ", "IE", "FR", "DE", "ZA", "DK", "NL"}
+SEEDED_RULE_JURISDICTIONS = {"GB", "GB-ENG", "AU", "NZ", "IE", "FR", "DE", "ZA", "DK", "NL"}
 
 
 def sql_quote(value: str) -> str:

@@ -45,7 +45,7 @@ Use `make check-deps` to check for required development headers and link
 libraries before building or installing.
 
 MARS Lab also renders TeX through `latex` and `dvisvgm`. The desktop Lab now
-uses the `sqlcipher` CLI to bootstrap the holiday database during
+uses the `sqlcipher` CLI to bootstrap the jurisdiction database during
 installation. Install the runtime tools and check them with:
 
 ```sh
@@ -336,8 +336,8 @@ make install-mars-lab
 ```
 
 That setup asks for a password to protect the private datetime database, stores
-the resulting configuration in `~/.mars/config/holiday-db.env`, and builds the
-encrypted holiday database at `~/.mars/holiday/mars_holiday_rules.db`.
+the resulting configuration in `~/.mars/config/jurisdiction-db.env`, and builds the
+encrypted jurisdiction database at `~/.mars/jurisdiction/mars_jurisdiction_rules.db`.
 Reinstalling MARS Lab recreates `~/.mars` from scratch.
 
 ## Run Tests
