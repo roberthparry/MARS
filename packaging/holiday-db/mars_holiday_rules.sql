@@ -1,4 +1,4 @@
--- SQLCipher holiday database source script.
+-- SQLCipher jurisdiction database source script.
 -- The installer supplies the chosen PRAGMA key before reading this file.
 --
 -- Worldwide holiday rules need to handle:
@@ -39,6 +39,10 @@ DROP TABLE IF EXISTS calendar_system;
 DROP TABLE IF EXISTS jurisdiction;
 DROP TABLE IF EXISTS holiday_override;
 DROP TABLE IF EXISTS locality;
+DROP TABLE IF EXISTS jurisdiction_location_default;
+DROP TABLE IF EXISTS timezone_transition_rule;
+DROP TABLE IF EXISTS timezone_era;
+DROP TABLE IF EXISTS timezone_definition;
 
 CREATE TABLE jurisdiction (
     jurisdiction_id TEXT PRIMARY KEY,
@@ -58,6 +62,65 @@ CREATE TABLE jurisdiction (
     valid_from_year INTEGER,
     valid_to_year INTEGER,
     notes TEXT
+);
+
+CREATE TABLE jurisdiction_location_default (
+    jurisdiction_id TEXT PRIMARY KEY REFERENCES jurisdiction(jurisdiction_id) ON DELETE CASCADE,
+    latitude TEXT NOT NULL,
+    longitude TEXT NOT NULL,
+    timezone_name TEXT NOT NULL,
+    locality_name TEXT,
+    notes TEXT
+);
+
+CREATE TABLE timezone_definition (
+    timezone_name TEXT PRIMARY KEY,
+    canonical_timezone_name TEXT NOT NULL,
+    notes TEXT
+);
+
+CREATE TABLE timezone_era (
+    timezone_era_id INTEGER PRIMARY KEY,
+    timezone_name TEXT NOT NULL REFERENCES timezone_definition(timezone_name) ON DELETE CASCADE,
+    sequence_no INTEGER NOT NULL,
+    gmtoff_minutes INTEGER NOT NULL,
+    rules_kind TEXT NOT NULL CHECK (rules_kind IN ('none', 'fixed', 'named')),
+    fixed_save_minutes INTEGER,
+    rule_name TEXT,
+    format_text TEXT NOT NULL,
+    until_year INTEGER,
+    until_month INTEGER CHECK (until_month BETWEEN 1 AND 12),
+    until_day_kind TEXT CHECK (until_day_kind IN (
+        'day_of_month',
+        'last_weekday',
+        'weekday_on_or_after',
+        'weekday_on_or_before'
+    )),
+    until_day_value INTEGER,
+    until_weekday INTEGER CHECK (until_weekday BETWEEN 1 AND 7),
+    until_seconds INTEGER,
+    until_suffix TEXT CHECK (until_suffix IN ('w', 's', 'u', 'g', 'z')),
+    UNIQUE(timezone_name, sequence_no)
+);
+
+CREATE TABLE timezone_transition_rule (
+    timezone_transition_rule_id INTEGER PRIMARY KEY,
+    rule_name TEXT NOT NULL,
+    from_year INTEGER,
+    to_year INTEGER,
+    in_month INTEGER NOT NULL CHECK (in_month BETWEEN 1 AND 12),
+    on_kind TEXT NOT NULL CHECK (on_kind IN (
+        'day_of_month',
+        'last_weekday',
+        'weekday_on_or_after',
+        'weekday_on_or_before'
+    )),
+    on_day INTEGER NOT NULL,
+    on_weekday INTEGER CHECK (on_weekday BETWEEN 1 AND 7),
+    at_seconds INTEGER NOT NULL,
+    at_suffix TEXT NOT NULL CHECK (at_suffix IN ('w', 's', 'u', 'g', 'z')),
+    save_minutes INTEGER NOT NULL,
+    letters TEXT
 );
 
 CREATE TABLE calendar_system (
@@ -287,6 +350,12 @@ CREATE INDEX holiday_rule_source_doc_idx
 CREATE INDEX holiday_instance_jurisdiction_date_idx
     ON holiday_instance(jurisdiction_id, holiday_date, holiday_name);
 
+CREATE INDEX timezone_era_timezone_idx
+    ON timezone_era(timezone_name, sequence_no);
+
+CREATE INDEX timezone_transition_rule_name_idx
+    ON timezone_transition_rule(rule_name, from_year, to_year, in_month);
+
 .read packaging/holiday-db/mars_country_jurisdictions.sql
 .read packaging/holiday-db/mars_target_subdivisions.sql
 
@@ -322,6 +391,9 @@ VALUES
      'Special-case jurisdiction used for imported holiday datasets that expose Kosovo under XK.'),
     ('GB-ENG', 'GB', 'subdivision', 'GB', 'GB-ENG', 'GB', 'England',
      'Subdivision rule set for English bank holidays.');
+
+.read packaging/holiday-db/mars_jurisdiction_location_defaults.sql
+.read packaging/holiday-db/mars_timezone_rules.sql
 
 INSERT INTO source_document(
     source_document_id,

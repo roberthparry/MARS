@@ -49,7 +49,7 @@ If a required dependency is missing, the check prints the Debian/Ubuntu package
 name to install, for example `sudo apt install libmpfr-dev`.
 
 MARS Lab uses server-side TeX rendering, and the desktop installer now uses the
-`sqlcipher` CLI to bootstrap the holiday database, so the desktop Lab also
+`sqlcipher` CLI to bootstrap the jurisdiction database, so the desktop Lab also
 needs `latex`, `dvisvgm`, and `sqlcipher`:
 
 ```sh
@@ -125,8 +125,8 @@ make install-mars-lab
 
 That installer now prompts for a password to protect the private datetime
 database, stores the resulting configuration in
-`~/.mars/config/holiday-db.env`, and builds the encrypted holiday database at
-`~/.mars/holiday/mars_holiday_rules.db`. Reinstalling MARS Lab recreates
+`~/.mars/config/jurisdiction-db.env`, and builds the encrypted jurisdiction database at
+`~/.mars/jurisdiction/mars_jurisdiction_rules.db`. Reinstalling MARS Lab recreates
 `~/.mars` from scratch.
 
 Remove installed MARS files:

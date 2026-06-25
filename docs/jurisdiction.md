@@ -1,7 +1,7 @@
-# `holiday_t`
+# `jurisdiction_t`
 
-`holiday_t` provides jurisdiction-aware public holiday lookups on top of the
-configured holiday rule source installed with MARS Lab.
+`jurisdiction_t` provides jurisdiction-aware public holiday lookups on top of the
+configured jurisdiction database installed with MARS Lab.
 
 It answers questions such as:
 
@@ -12,11 +12,11 @@ It answers questions such as:
 
 ## Scope
 
-`holiday_t` is the jurisdiction-policy layer that sits above `datetime_t`.
+`jurisdiction_t` is the jurisdiction-policy layer that sits above `datetime_t`.
 
 `datetime_t` remains responsible for reusable calendar calculations such as
 Easter, Orthodox Easter, Chinese New Year, and other observance dates.
-`holiday_t` applies jurisdiction-specific rules such as:
+`jurisdiction_t` applies jurisdiction-specific rules such as:
 
 - substitute-day behaviour
 - weekend definitions that vary by country
@@ -25,43 +25,43 @@ Easter, Orthodox Easter, Chinese New Year, and other observance dates.
 
 ## Basic Usage
 
-Open a holiday engine for a jurisdiction:
+Open a jurisdiction engine for a jurisdiction:
 
 ```c
-#include "holiday.h"
+#include "jurisdiction.h"
 
-holiday_t *holiday = holiday_open("GB-ENG");
+jurisdiction_t *jurisdiction = jurisdict_open("GB-ENG");
 ```
 
 When you are finished, release it with:
 
 ```c
-holiday_close(holiday);
+jurisdict_close(jurisdiction);
 ```
 
 ## Installation
 
-To provision the private holiday database without installing the full desktop
+To provision the private jurisdiction database without installing the full desktop
 app, run:
 
 ```sh
-make install-holiday-db
+make install-jurisdiction-db
 ```
 
-To remove that private holiday database again, run:
+To remove that private jurisdiction database again, run:
 
 ```sh
-make uninstall-holiday-db
+make uninstall-jurisdiction-db
 ```
 
 If you want the desktop app as well, use `make install-mars-lab`.
 
 ## Range Queries
 
-`holiday_between()` returns an `array_t *` of `holiday_event_t` values:
+`jurisdict_holidays_between()` returns an `array_t *` of `holiday_event_t` values:
 
 ```c
-array_t *events = holiday_between(holiday, start, end);
+array_t *events = jurisdict_holidays_between(jurisdiction, start, end);
 ```
 
 Destroy the returned array with `array_destroy(events)`. The array performs a
@@ -71,10 +71,10 @@ deep destroy of the holiday events it owns.
 
 ### Types
 
-`holiday_t`
+`jurisdiction_t`
 
-- Opaque holiday engine for one jurisdiction.
-- Open it with `holiday_open()` and release it with `holiday_close()`.
+- Opaque jurisdiction engine for one jurisdiction.
+- Open it with `jurisdict_open()` and release it with `jurisdict_close()`.
 
 `holiday_event_t`
 
@@ -88,52 +88,58 @@ deep destroy of the holiday events it owns.
 - `holiday_class` holiday class, typically `public`.
 - `derived_from_observance` `true` when the event came from an observance or substitute-day rule rather than the base rule date.
 
-`holiday_visit_fn`
+`jurisdict_visit_fn`
 
-- Visitor callback used by `holiday_each_between()`.
+- Visitor callback used by `jurisdict_each_holiday_between()`.
 - Return `true` to continue enumeration, or `false` to stop early.
 
 ### Functions
 
-`holiday_t *holiday_open(const char *jurisdiction);`
+`jurisdiction_t *jurisdict_open(const char *jurisdiction_code);`
 
-- Opens a holiday engine for a jurisdiction such as `GB-ENG`, `ZA`, `NL`, or `UA`.
+- Opens a jurisdiction engine for a jurisdiction such as `GB-ENG`, `ZA`, `NL`, or `UA`.
 - Pass `NULL` or an empty string to use the machine default jurisdiction.
-- Returns `NULL` if the configured holiday rule source cannot be opened.
+- Returns `NULL` if the configured jurisdiction rule source cannot be opened.
 
-`void holiday_close(holiday_t *holiday);`
+`void jurisdict_close(jurisdiction_t *jurisdiction);`
 
-- Releases an open holiday engine.
+- Releases an open jurisdiction engine.
 - Safe to call with `NULL`.
 
-`const char *holiday_last_error(const holiday_t *holiday);`
+`const char *jurisdict_last_error(const jurisdiction_t *jurisdiction);`
 
 - Returns the last error message recorded on the engine.
-- The returned pointer is borrowed and becomes invalid after the next holiday API call on that engine or after `holiday_close()`.
+- The returned pointer is borrowed and becomes invalid after the next jurisdiction API call on that engine or after `jurisdict_close()`.
 
-`array_t *holiday_between(holiday_t *holiday, const datetime_t *start, const datetime_t *end);`
+`array_t *jurisdict_holidays_between(jurisdiction_t *jurisdiction, const datetime_t *start, const datetime_t *end);`
 
 - Returns all holidays in the inclusive range `[start, end]`.
 - The returned `array_t` owns deep copies of its `holiday_event_t` elements.
 - Destroy it with `array_destroy()`.
 
-`bool holiday_is_weekend(holiday_t *holiday, const datetime_t *date);`
+`bool jurisdict_is_weekend(jurisdiction_t *jurisdiction, const datetime_t *date);`
 
 - Returns whether the date is a weekend day in the selected jurisdiction.
 - This uses jurisdiction-specific weekend rules, not a hardcoded Saturday/Sunday assumption.
 
-`bool holiday_is_national_holiday(holiday_t *holiday, const datetime_t *date);`
+`bool jurisdict_is_national_holiday(jurisdiction_t *jurisdiction, const datetime_t *date);`
 
 - Returns whether the date is a holiday in the selected jurisdiction.
 - Weekend status is separate; a date may be a weekend, a holiday, both, or neither.
 
-`long holiday_working_days_between(holiday_t *holiday, const datetime_t *start, const datetime_t *end);`
+`bool jurisdict_default_location(jurisdiction_t *jurisdiction, double *latitude, double *longitude);`
+
+- Returns a representative default location for the selected jurisdiction.
+- This is intended for UI defaults such as capital-city latitude and longitude.
+- Returns `false` when no default location is configured.
+
+`long jurisdict_working_days_between(jurisdiction_t *jurisdiction, const datetime_t *start, const datetime_t *end);`
 
 - Counts working days in the inclusive range `[start, end]`.
 - A working day is any day that is neither a jurisdictional weekend nor a holiday.
 - Returns `-1` on failure.
 
-`bool holiday_each_between(holiday_t *holiday, const datetime_t *start, const datetime_t *end, holiday_visit_fn visitor, void *ctx);`
+`bool jurisdict_each_holiday_between(jurisdiction_t *jurisdiction, const datetime_t *start, const datetime_t *end, jurisdict_visit_fn visitor, void *ctx);`
 
 - Enumerates holidays in ascending date order without building your own result array first.
 - Useful when you want to stream results into your own container or stop early.
@@ -146,10 +152,10 @@ deep destroy of the holiday events it owns.
 #include <stdlib.h>
 #include "array.h"
 #include "datetime.h"
-#include "holiday.h"
+#include "jurisdiction.h"
 
 int main(void) {
-    holiday_t *holiday = holiday_open("GB-ENG");
+    jurisdiction_t *jurisdiction = jurisdict_open("GB-ENG");
     array_t *events = NULL;
     datetime_t *bank_holiday = datetime_init_ymd(datetime_alloc(), 2021, DT_December, 25);
     datetime_t *range_start = datetime_init_ymd(datetime_alloc(), 2021, DT_December, 24);
@@ -157,14 +163,14 @@ int main(void) {
     long working_days;
     size_t i;
 
-    if (!holiday || !bank_holiday || !range_start || !range_end) {
-        fprintf(stderr, "Holiday data is unavailable.\n");
+    if (!jurisdiction || !bank_holiday || !range_start || !range_end) {
+        fprintf(stderr, "Jurisdiction data is unavailable.\n");
         return 1;
     }
 
-    events = holiday_between(holiday, range_start, range_end);
+    events = jurisdict_holidays_between(jurisdiction, range_start, range_end);
     if (!events) {
-        fprintf(stderr, "Holiday query failed.\n");
+        fprintf(stderr, "Jurisdiction query failed.\n");
         return 1;
     }
 
@@ -180,18 +186,18 @@ int main(void) {
     }
 
     printf("2021-12-25 weekend: %s\n",
-           holiday_is_weekend(holiday, bank_holiday) ? "yes" : "no");
+           jurisdict_is_weekend(jurisdiction, bank_holiday) ? "yes" : "no");
     printf("2021-12-25 national holiday: %s\n",
-           holiday_is_national_holiday(holiday, bank_holiday) ? "yes" : "no");
+           jurisdict_is_national_holiday(jurisdiction, bank_holiday) ? "yes" : "no");
 
-    working_days = holiday_working_days_between(holiday, range_start, range_end);
+    working_days = jurisdict_working_days_between(jurisdiction, range_start, range_end);
     printf("Working days between 2021-12-24 and 2021-12-31: %ld\n", working_days);
 
     array_destroy(events);
     datetime_dealloc(range_end);
     datetime_dealloc(range_start);
     datetime_dealloc(bank_holiday);
-    holiday_close(holiday);
+    jurisdict_close(jurisdiction);
     return 0;
 }
 ```
@@ -200,20 +206,18 @@ Expected output:
 
 ```text
 Holidays between 2021-12-24 and 2021-12-31:
-- Christmas Day: 2021-12-25
-- Boxing Day: 2021-12-26
 - Bank Holiday in Lieu of Christmas Day: 2021-12-27
 - Bank Holiday in Lieu of Boxing Day: 2021-12-28
 2021-12-25 weekend: yes
-2021-12-25 national holiday: yes
+2021-12-25 national holiday: no
 Working days between 2021-12-24 and 2021-12-31: 4
 ```
 
 ## Notes
 
-- Jurisdiction codes follow the holiday rule source, for example `GB-ENG`,
+- Jurisdiction codes follow the jurisdiction rule source, for example `GB-ENG`,
   `ZA`, `NL`, or `UA`.
-- If you pass `NULL` or an empty string to `holiday_open()`, the engine uses
+- If you pass `NULL` or an empty string to `jurisdict_open()`, the engine uses
   the machine's configured default jurisdiction.
-- `holiday_is_weekend()` and `holiday_is_national_holiday()` answer different
+- `jurisdict_is_weekend()` and `jurisdict_is_national_holiday()` answer different
   questions. A date can be one, the other, both, or neither.

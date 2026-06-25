@@ -4,10 +4,13 @@
 #include <string.h>
 
 #include "datetime.h"
-#include "holiday.h"
+#include "jurisdiction.h"
 #include "ustring.h"
 
 typedef struct holiday_lab_options_t {
+    short date_year;
+    month_t date_month;
+    uint8_t date_day;
     short start_year;
     month_t start_month;
     uint8_t start_day;
@@ -46,6 +49,9 @@ static bool key_equals(const char *got, size_t got_len, const char *want)
 
 static void init_defaults(holiday_lab_options_t *options)
 {
+    options->date_year = 2026;
+    options->date_month = DT_January;
+    options->date_day = 1;
     options->start_year = 2026;
     options->start_month = DT_January;
     options->start_day = 1;
@@ -70,6 +76,14 @@ static bool apply_arg(holiday_lab_options_t *options, const char *arg)
     key_len = (size_t)(equals - arg);
     value = equals + 1;
 
+    if (key_equals(arg, key_len, "date")) {
+        if (!parse_date_text(value, &y, &m, &d))
+            return false;
+        options->date_year = y;
+        options->date_month = m;
+        options->date_day = d;
+        return true;
+    }
     if (key_equals(arg, key_len, "start")) {
         if (!parse_date_text(value, &y, &m, &d))
             return false;
@@ -127,7 +141,7 @@ static bool print_bank_holidays_from_database(const char *jurisdiction,
                                               const datetime_t *start,
                                               const datetime_t *end)
 {
-    holiday_t *holiday = NULL;
+    jurisdiction_t *holiday = NULL;
     array_t *events = NULL;
     bool produced = false;
     size_t i;
@@ -135,11 +149,11 @@ static bool print_bank_holidays_from_database(const char *jurisdiction,
     if (!start || !end)
         return false;
 
-    holiday = holiday_open(jurisdiction);
+    holiday = jurisdict_open(jurisdiction);
     if (!holiday)
         goto done;
 
-    events = holiday_between(holiday, start, end);
+    events = jurisdict_holidays_between(holiday, start, end);
     if (!events)
         goto done;
 
@@ -159,16 +173,65 @@ static bool print_bank_holidays_from_database(const char *jurisdiction,
 
 done:
     array_destroy(events);
-    holiday_close(holiday);
+    jurisdict_close(holiday);
     return produced;
+}
+
+static bool print_jurisdiction_location_from_database(const char *jurisdiction)
+{
+    jurisdiction_t *holiday = NULL;
+    double latitude;
+    double longitude;
+
+    holiday = jurisdict_open(jurisdiction);
+    if (!holiday)
+        goto done;
+    if (!jurisdict_default_location(holiday, &latitude, &longitude))
+        goto done;
+
+    printf("jurisdiction_latitude %.6f\n", latitude);
+    printf("jurisdiction_longitude %.6f\n", longitude);
+    jurisdict_close(holiday);
+    return true;
+
+done:
+    jurisdict_close(holiday);
+    return false;
+}
+
+static bool print_jurisdiction_gmt_offset_from_database(const char *jurisdiction,
+                                                        const datetime_t *date)
+{
+    jurisdiction_t *holiday = NULL;
+    double offset_hours;
+
+    if (!date)
+        return false;
+
+    holiday = jurisdict_open(jurisdiction);
+    if (!holiday)
+        goto done;
+    if (!jurisdict_default_gmt_offset(holiday, date, &offset_hours))
+        goto done;
+
+    printf("jurisdiction_gmt_offset %.10g\n", offset_hours);
+    jurisdict_close(holiday);
+    return true;
+
+done:
+    jurisdict_close(holiday);
+    return false;
 }
 
 int main(int argc, char **argv)
 {
+    datetime_t *date = NULL;
     holiday_lab_options_t options;
     datetime_t *start = NULL;
     datetime_t *end = NULL;
     bool produced = false;
+    bool location_available = false;
+    bool gmt_offset_available = false;
     int i;
 
     init_defaults(&options);
@@ -179,6 +242,10 @@ int main(int argc, char **argv)
         }
     }
 
+    date = datetime_init_ymd(datetime_alloc(),
+                             options.date_year,
+                             options.date_month,
+                             options.date_day);
     start = datetime_init_ymd(datetime_alloc(),
                               options.start_year,
                               options.start_month,
@@ -187,16 +254,22 @@ int main(int argc, char **argv)
                             options.end_year,
                             options.end_month,
                             options.end_day);
-    if (!start || !end) {
+    if (!date || !start || !end) {
+        datetime_dealloc(date);
         datetime_dealloc(start);
         datetime_dealloc(end);
         fprintf(stderr, "Failed to initialise holiday date range\n");
         return 1;
     }
 
+    location_available = print_jurisdiction_location_from_database(options.jurisdiction);
+    gmt_offset_available = print_jurisdiction_gmt_offset_from_database(options.jurisdiction, date);
     produced = print_bank_holidays_from_database(options.jurisdiction, start, end);
     printf("holiday_status %s\n", produced ? "ok" : "unavailable");
+    printf("jurisdiction_status %s\n", location_available ? "ok" : "unavailable");
+    printf("jurisdiction_gmt_offset_status %s\n", gmt_offset_available ? "ok" : "unavailable");
 
+    datetime_dealloc(date);
     datetime_dealloc(start);
     datetime_dealloc(end);
     return 0;

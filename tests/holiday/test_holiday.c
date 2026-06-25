@@ -1,4 +1,5 @@
 #include <limits.h>
+#include <math.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -6,7 +7,7 @@
 
 #include "array.h"
 #include "datetime.h"
-#include "holiday.h"
+#include "jurisdiction.h"
 #include "test_harness.h"
 #include "ustring.h"
 
@@ -165,7 +166,7 @@ static array_t *load_events(const char *jurisdiction,
                             month_t end_month,
                             uint8_t end_day)
 {
-    holiday_t *holiday = holiday_open(jurisdiction);
+    jurisdiction_t *holiday = jurisdict_open(jurisdiction);
     datetime_t *start = datetime_init_ymd(datetime_alloc(), start_year, start_month, start_day);
     datetime_t *end = datetime_init_ymd(datetime_alloc(), end_year, end_month, end_day);
     array_t *raw_events = NULL;
@@ -174,19 +175,19 @@ static array_t *load_events(const char *jurisdiction,
 
     if (!holiday || !start || !end || !rows) {
         array_destroy(rows);
-        holiday_close(holiday);
+        jurisdict_close(holiday);
         datetime_dealloc(end);
         datetime_dealloc(start);
         if (!holiday) {
-            test_set_failure_detailf("holiday data unavailable; install MARS Lab to provision the holiday rule source");
+            test_set_failure_detailf("jurisdiction data unavailable; install the jurisdiction database to provision the rule source");
         }
         return NULL;
     }
 
-    raw_events = holiday_between(holiday, start, end);
+    raw_events = jurisdict_holidays_between(holiday, start, end);
     if (!raw_events) {
         test_set_failure_detailf("holiday query failed: %s",
-                                 holiday_last_error(holiday) ? holiday_last_error(holiday) : "holiday error");
+                                 jurisdict_last_error(holiday) ? jurisdict_last_error(holiday) : "holiday error");
         array_destroy(rows);
         rows = NULL;
         goto done;
@@ -205,7 +206,7 @@ static array_t *load_events(const char *jurisdiction,
 
 done:
     array_destroy(raw_events);
-    holiday_close(holiday);
+    jurisdict_close(holiday);
     datetime_dealloc(end);
     datetime_dealloc(start);
     return rows;
@@ -288,11 +289,11 @@ static bool assert_event_absent(const array_t *events,
 
 static void test_holiday_database_builds_and_opens(void)
 {
-    holiday_t *holiday;
+    jurisdiction_t *holiday;
 
-    holiday = holiday_open(NULL);
+    holiday = jurisdict_open(NULL);
     ASSERT_NOT_NULL(holiday);
-    holiday_close(holiday);
+    jurisdict_close(holiday);
 }
 
 static void test_england_christmas_pair_substitutions_in_2021(void)
@@ -301,11 +302,11 @@ static void test_england_christmas_pair_substitutions_in_2021(void)
 
     ASSERT_NOT_NULL(events);
     print_events_summary("England 2021 Christmas window", events);
-    ASSERT_EQ_LONG((long)array_size(events), 4L);
+    ASSERT_EQ_LONG((long)array_size(events), 2L);
     ASSERT_TRUE(assert_event_present(events, "Bank Holiday in Lieu of Christmas Day", "2021-12-27"));
     ASSERT_TRUE(assert_event_present(events, "Bank Holiday in Lieu of Boxing Day", "2021-12-28"));
-    ASSERT_TRUE(assert_event_present(events, "Christmas Day", "2021-12-25"));
-    ASSERT_TRUE(assert_event_present(events, "Boxing Day", "2021-12-26"));
+    ASSERT_TRUE(assert_event_absent(events, "Christmas Day", "2021-12-25"));
+    ASSERT_TRUE(assert_event_absent(events, "Boxing Day", "2021-12-26"));
 
     array_destroy(events);
 }
@@ -393,9 +394,29 @@ static void test_ukraine_future_rule_windows_cover_2030(void)
     array_destroy(events);
 }
 
+static void test_scotland_modern_rules_cover_2026_without_generated_noise(void)
+{
+    array_t *events = load_events("GB-SCT", 2026, DT_January, 1, 2026, DT_December, 31);
+
+    ASSERT_NOT_NULL(events);
+    print_events_summary("Scotland 2026 holidays", events);
+    ASSERT_TRUE(assert_event_present(events, "New Year's Day", "2026-01-01"));
+    ASSERT_TRUE(assert_event_present(events, "New Year Holiday", "2026-01-02"));
+    ASSERT_TRUE(assert_event_present(events, "Good Friday", "2026-04-03"));
+    ASSERT_TRUE(assert_event_present(events, "May Day", "2026-05-04"));
+    ASSERT_TRUE(assert_event_present(events, "Spring Bank Holiday", "2026-05-25"));
+    ASSERT_TRUE(assert_event_present(events, "Summer Bank Holiday", "2026-08-03"));
+    ASSERT_TRUE(assert_event_present(events, "Saint Andrew's Day", "2026-11-30"));
+    ASSERT_TRUE(assert_event_present(events, "Christmas Day", "2026-12-25"));
+    ASSERT_TRUE(assert_event_present(events, "Boxing Day (observed)", "2026-12-28"));
+    ASSERT_TRUE(assert_event_absent(events, "Scotland's participation in the FIFA World Cup final", "2026-06-15"));
+
+    array_destroy(events);
+}
+
 static void test_holiday_queries_weekend_and_holiday_status(void)
 {
-    holiday_t *holiday = holiday_open("ZA");
+    jurisdiction_t *holiday = jurisdict_open("ZA");
     datetime_t *new_year = datetime_init_ymd(datetime_alloc(), 2023, DT_January, 1);
     datetime_t *working_tuesday = datetime_init_ymd(datetime_alloc(), 2023, DT_January, 3);
 
@@ -403,24 +424,93 @@ static void test_holiday_queries_weekend_and_holiday_status(void)
     ASSERT_NOT_NULL(new_year);
     ASSERT_NOT_NULL(working_tuesday);
     printf("    South Africa 2023-01-01: weekend=%s national_holiday=%s\n",
-           holiday_is_weekend(holiday, new_year) ? "true" : "false",
-           holiday_is_national_holiday(holiday, new_year) ? "true" : "false");
+           jurisdict_is_weekend(holiday, new_year) ? "true" : "false",
+           jurisdict_is_national_holiday(holiday, new_year) ? "true" : "false");
     printf("    South Africa 2023-01-03: weekend=%s national_holiday=%s\n",
-           holiday_is_weekend(holiday, working_tuesday) ? "true" : "false",
-           holiday_is_national_holiday(holiday, working_tuesday) ? "true" : "false");
-    ASSERT_TRUE(holiday_is_weekend(holiday, new_year));
-    ASSERT_TRUE(holiday_is_national_holiday(holiday, new_year));
-    ASSERT_TRUE(!holiday_is_weekend(holiday, working_tuesday));
-    ASSERT_TRUE(!holiday_is_national_holiday(holiday, working_tuesday));
+           jurisdict_is_weekend(holiday, working_tuesday) ? "true" : "false",
+           jurisdict_is_national_holiday(holiday, working_tuesday) ? "true" : "false");
+    ASSERT_TRUE(jurisdict_is_weekend(holiday, new_year));
+    ASSERT_TRUE(jurisdict_is_national_holiday(holiday, new_year));
+    ASSERT_TRUE(!jurisdict_is_weekend(holiday, working_tuesday));
+    ASSERT_TRUE(!jurisdict_is_national_holiday(holiday, working_tuesday));
 
     datetime_dealloc(working_tuesday);
     datetime_dealloc(new_year);
-    holiday_close(holiday);
+    jurisdict_close(holiday);
+}
+
+static void test_holiday_default_location_returns_capital_coordinates(void)
+{
+    jurisdiction_t *holiday = jurisdict_open("GB-ENG");
+    double latitude = 0.0;
+    double longitude = 0.0;
+
+    ASSERT_NOT_NULL(holiday);
+    ASSERT_TRUE(jurisdict_default_location(holiday, &latitude, &longitude));
+    printf("    England default location: latitude=%.4f longitude=%.4f\n", latitude, longitude);
+    ASSERT_TRUE(fabs(latitude - 52.7077) < 0.01);
+    ASSERT_TRUE(fabs(longitude - (-2.7541)) < 0.01);
+
+    jurisdict_close(holiday);
+}
+
+static void test_holiday_default_location_falls_back_for_country_only_jurisdiction(void)
+{
+    jurisdiction_t *holiday = jurisdict_open("AF");
+    double latitude = 0.0;
+    double longitude = 0.0;
+
+    ASSERT_NOT_NULL(holiday);
+    ASSERT_TRUE(jurisdict_default_location(holiday, &latitude, &longitude));
+    printf("    Afghanistan default location: latitude=%.4f longitude=%.4f\n", latitude, longitude);
+    ASSERT_TRUE(fabs(latitude - 34.5167) < 0.01);
+    ASSERT_TRUE(fabs(longitude - 69.2000) < 0.01);
+
+    jurisdict_close(holiday);
+}
+
+static void test_holiday_default_gmt_offset_uses_database_dst_rules(void)
+{
+    jurisdiction_t *denmark = jurisdict_open("DK");
+    jurisdiction_t *england = jurisdict_open("GB-ENG");
+    jurisdiction_t *south_africa = jurisdict_open("ZA");
+    datetime_t *summer = datetime_init_ymd(datetime_alloc(), 2026, DT_June, 23);
+    datetime_t *winter = datetime_init_ymd(datetime_alloc(), 2026, DT_January, 23);
+    double denmark_summer = 0.0;
+    double denmark_winter = 0.0;
+    double england_summer = 0.0;
+    double south_africa_summer = 0.0;
+
+    ASSERT_NOT_NULL(denmark);
+    ASSERT_NOT_NULL(england);
+    ASSERT_NOT_NULL(south_africa);
+    ASSERT_NOT_NULL(summer);
+    ASSERT_NOT_NULL(winter);
+
+    ASSERT_TRUE(jurisdict_default_gmt_offset(denmark, summer, &denmark_summer));
+    ASSERT_TRUE(jurisdict_default_gmt_offset(denmark, winter, &denmark_winter));
+    ASSERT_TRUE(jurisdict_default_gmt_offset(england, summer, &england_summer));
+    ASSERT_TRUE(jurisdict_default_gmt_offset(south_africa, summer, &south_africa_summer));
+
+    printf("    Denmark offsets in 2026: winter=%.1f summer=%.1f\n", denmark_winter, denmark_summer);
+    printf("    England offset on 2026-06-23: %.1f\n", england_summer);
+    printf("    South Africa offset on 2026-06-23: %.1f\n", south_africa_summer);
+
+    ASSERT_TRUE(fabs(denmark_winter - 1.0) < 0.001);
+    ASSERT_TRUE(fabs(denmark_summer - 2.0) < 0.001);
+    ASSERT_TRUE(fabs(england_summer - 1.0) < 0.001);
+    ASSERT_TRUE(fabs(south_africa_summer - 2.0) < 0.001);
+
+    datetime_dealloc(winter);
+    datetime_dealloc(summer);
+    jurisdict_close(south_africa);
+    jurisdict_close(england);
+    jurisdict_close(denmark);
 }
 
 static void test_holiday_working_days_between_counts_business_days(void)
 {
-    holiday_t *holiday = holiday_open("GB-ENG");
+    jurisdiction_t *holiday = jurisdict_open("GB-ENG");
     datetime_t *start = datetime_init_ymd(datetime_alloc(), 2021, DT_December, 24);
     datetime_t *end = datetime_init_ymd(datetime_alloc(), 2021, DT_December, 31);
     long working_days;
@@ -428,18 +518,18 @@ static void test_holiday_working_days_between_counts_business_days(void)
     ASSERT_NOT_NULL(holiday);
     ASSERT_NOT_NULL(start);
     ASSERT_NOT_NULL(end);
-    working_days = holiday_working_days_between(holiday, start, end);
+    working_days = jurisdict_working_days_between(holiday, start, end);
     printf("    England working days from 2021-12-24 to 2021-12-31: %ld\n", working_days);
     ASSERT_EQ_LONG(working_days, 4L);
 
     datetime_dealloc(end);
     datetime_dealloc(start);
-    holiday_close(holiday);
+    jurisdict_close(holiday);
 }
 
 static void example_holiday_readme_queries(void)
 {
-    holiday_t *holiday = holiday_open("GB-ENG");
+    jurisdiction_t *holiday = jurisdict_open("GB-ENG");
     array_t *events = NULL;
     datetime_t *bank_holiday = datetime_init_ymd(datetime_alloc(), 2021, DT_December, 25);
     datetime_t *range_start = datetime_init_ymd(datetime_alloc(), 2021, DT_December, 24);
@@ -451,9 +541,9 @@ static void example_holiday_readme_queries(void)
     ASSERT_NOT_NULL(bank_holiday);
     ASSERT_NOT_NULL(range_start);
     ASSERT_NOT_NULL(range_end);
-    events = holiday_between(holiday, range_start, range_end);
+    events = jurisdict_holidays_between(holiday, range_start, range_end);
     ASSERT_NOT_NULL(events);
-    ASSERT_EQ_LONG((long)array_size(events), 4L);
+    ASSERT_EQ_LONG((long)array_size(events), 2L);
 
     printf("Holidays between 2021-12-24 and 2021-12-31:\n");
     for (i = 0u; i < array_size(events); ++i) {
@@ -469,11 +559,11 @@ static void example_holiday_readme_queries(void)
     }
 
     printf("2021-12-25 weekend: %s\n",
-           holiday_is_weekend(holiday, bank_holiday) ? "yes" : "no");
+           jurisdict_is_weekend(holiday, bank_holiday) ? "yes" : "no");
     printf("2021-12-25 national holiday: %s\n",
-           holiday_is_national_holiday(holiday, bank_holiday) ? "yes" : "no");
+           jurisdict_is_national_holiday(holiday, bank_holiday) ? "yes" : "no");
 
-    working_days = holiday_working_days_between(holiday, range_start, range_end);
+    working_days = jurisdict_working_days_between(holiday, range_start, range_end);
     ASSERT_EQ_LONG(working_days, 4L);
     printf("Working days between 2021-12-24 and 2021-12-31: %ld\n", working_days);
 
@@ -481,21 +571,21 @@ static void example_holiday_readme_queries(void)
     datetime_dealloc(range_end);
     datetime_dealloc(range_start);
     datetime_dealloc(bank_holiday);
-    holiday_close(holiday);
+    jurisdict_close(holiday);
 }
 
 static bool holiday_suite_setup(void)
 {
-    holiday_t *holiday = holiday_open("GB-ENG");
+    jurisdiction_t *holiday = jurisdict_open("GB-ENG");
 
     if (holiday) {
-        holiday_close(holiday);
+        jurisdict_close(holiday);
         return true;
     }
 
     fprintf(stderr,
-            "Holiday tests require the configured holiday rule source.\n"
-            "Install the holiday database first, for example with `make install-holiday-db`.\n"
+            "Holiday tests require the configured jurisdiction rule source.\n"
+            "Install the jurisdiction database first, for example with `make install-jurisdiction-db`.\n"
             "If you also want the desktop app, use `make install-mars-lab`.\n");
     return false;
 }
@@ -514,7 +604,11 @@ int tests_main(void)
     TEST_RUN_IN_GROUP(test_netherlands_kings_day_moves_to_previous_weekday_in_2025, tests, NULL);
     TEST_RUN_IN_GROUP(test_ireland_historic_whit_monday_exists_in_1960, tests, NULL);
     TEST_RUN_IN_GROUP(test_ukraine_future_rule_windows_cover_2030, tests, NULL);
+    TEST_RUN_IN_GROUP(test_scotland_modern_rules_cover_2026_without_generated_noise, tests, NULL);
     TEST_RUN_IN_GROUP(test_holiday_queries_weekend_and_holiday_status, tests, NULL);
+    TEST_RUN_IN_GROUP(test_holiday_default_location_returns_capital_coordinates, tests, NULL);
+    TEST_RUN_IN_GROUP(test_holiday_default_location_falls_back_for_country_only_jurisdiction, tests, NULL);
+    TEST_RUN_IN_GROUP(test_holiday_default_gmt_offset_uses_database_dst_rules, tests, NULL);
     TEST_RUN_IN_GROUP(test_holiday_working_days_between_counts_business_days, tests, NULL);
 
     TEST_SECTION("README Output Examples");

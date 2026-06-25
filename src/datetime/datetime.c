@@ -45,6 +45,9 @@ typedef struct _datetime_t {
     double JulianDay;
 } datetime_t;
 
+static int datetime_day_of_year(const datetime_t *dttm);
+static datetime_sun_status_t datetime_sun_status_from_raw(double raw_time);
+
 /**
  * @brief allocates enough memory for a datetime_t structure.
  * @return the start address of the allocated memory.
@@ -2444,62 +2447,69 @@ double datetime_sun_time(long julianDayNumber, double latitude, double longitude
 {
     const double degToRad = M_PI / 180.0;
     const double radToDeg = 180.0 / M_PI;
-    const double zenith = 90.833 * degToRad;   // official sunrise/sunset zenith
+    const double zenith = 90.833 * degToRad;
+    datetime_t *date = NULL;
+    int dayOfYear;
+    double gamma;
+    double equationOfTime;
+    double solarDeclination;
+    double cosHourAngle;
+    double hourAngleDegrees;
+    double solarNoonMinutesUtc;
+    double minutesUtc;
+    double hoursUtc;
 
-    double longitudeHour = longitude / 15.0;
+    if (!isfinite(latitude) || !isfinite(longitude) ||
+        latitude < -90.0 || latitude > 90.0 ||
+        longitude < -180.0 || longitude > 180.0)
+        return -1.0;
 
-    // Step 1: Approximate solar time
-    double approxSolarTime = julianDayNumber + ((isSunrise ? 6.0 : 18.0) - longitudeHour) / 24.0;
+    date = datetime_init_jdn(datetime_alloc(), julianDayNumber);
+    if (!date)
+        return -1.0;
 
-    // Step 2: Sun's mean anomaly
-    double solarMeanAnomaly = (0.9856 * (approxSolarTime - 2451545.0)) - 3.289;
+    dayOfYear = datetime_day_of_year(date);
+    datetime_dealloc(date);
+    if (dayOfYear <= 0)
+        return -1.0;
 
-    // Step 3: Sun's true longitude
-    double sunsTrueLongitude = solarMeanAnomaly
-        + 1.916 * sin(solarMeanAnomaly * degToRad)
-        + 0.020 * sin(2.0 * solarMeanAnomaly * degToRad)
-        + 282.634;
+    gamma = 2.0 * M_PI / 365.0 * ((double)dayOfYear - 1.0);
 
-    sunsTrueLongitude = fmod(sunsTrueLongitude, 360.0);
-    if (sunsTrueLongitude < 0.0) sunsTrueLongitude += 360.0;
+    equationOfTime = 229.18 * (
+        0.000075
+        + 0.001868 * cos(gamma)
+        - 0.032077 * sin(gamma)
+        - 0.014615 * cos(2.0 * gamma)
+        - 0.040849 * sin(2.0 * gamma)
+    );
 
-    // Step 4: Sun's right ascension
-    double sunsRightAscension = radToDeg * atan(0.91764 * tan(sunsTrueLongitude * degToRad));
+    solarDeclination =
+        0.006918
+        - 0.399912 * cos(gamma)
+        + 0.070257 * sin(gamma)
+        - 0.006758 * cos(2.0 * gamma)
+        + 0.000907 * sin(2.0 * gamma)
+        - 0.002697 * cos(3.0 * gamma)
+        + 0.001480 * sin(3.0 * gamma);
 
-    sunsRightAscension = fmod(sunsRightAscension, 360.0);
-    if (sunsRightAscension < 0.0) sunsRightAscension += 360.0;
+    cosHourAngle = (cos(zenith) - sin(latitude * degToRad) * sin(solarDeclination)) /
+        (cos(latitude * degToRad) * cos(solarDeclination));
 
-    // Adjust RA to same quadrant as true longitude
-    double L_quadrant = floor(sunsTrueLongitude / 90.0) * 90.0;
-    double RA_quadrant = floor(sunsRightAscension / 90.0) * 90.0;
-    sunsRightAscension += (L_quadrant - RA_quadrant);
+    if (cosHourAngle > 1.0)
+        return -1.0;
+    if (cosHourAngle < -1.0)
+        return -2.0;
 
-    sunsRightAscension /= 15.0;  // convert degrees → hours
+    hourAngleDegrees = acos(cosHourAngle) * radToDeg;
+    solarNoonMinutesUtc = 720.0 - (4.0 * longitude) - equationOfTime;
+    minutesUtc = solarNoonMinutesUtc + (isSunrise ? -4.0 * hourAngleDegrees : 4.0 * hourAngleDegrees);
+    hoursUtc = minutesUtc / 60.0;
 
-    // Step 5: Sun's declination
-    double sinDeclination = 0.39782 * sin(sunsTrueLongitude * degToRad);
-    double cosDeclination = cos(asin(sinDeclination));
+    hoursUtc = fmod(hoursUtc, 24.0);
+    if (hoursUtc < 0.0)
+        hoursUtc += 24.0;
 
-    // Step 6: Sun's local hour angle
-    double cosHourAngle = (cos(zenith) - (sinDeclination * sin(latitude * degToRad))) / (cosDeclination * cos(latitude * degToRad));
-
-    if (cosHourAngle > 1.0) return -1.0;    // Sun never rises
-    if (cosHourAngle < -1.0) return -2.0;   // Sun never sets
-
-    double hourAngle = isSunrise ? 360.0 - radToDeg * acos(cosHourAngle) : radToDeg * acos(cosHourAngle);
-    hourAngle /= 15.0;
-
-    // Step 7: Local mean time
-    double localMeanTime = hourAngle + sunsRightAscension - (0.06571 * (approxSolarTime - 2451545.0)) - 6.622;
-
-    // Step 8: Convert to GMT
-    double gmtTime = localMeanTime - longitudeHour;
-
-    // Normalise to [0, 24)
-    gmtTime = fmod(gmtTime, 24.0);
-    if (gmtTime < 0.0) gmtTime += 24.0;
-
-    return gmtTime;
+    return hoursUtc;
 }
 
 static int datetime_day_of_year(const datetime_t *dttm)
@@ -2632,6 +2642,17 @@ static void datetime_set_sun_time(datetime_t *dttm, double latitude, double long
     dttm->second = 0.0;
 }
 
+static datetime_sun_status_t datetime_sun_status_from_raw(double raw_time)
+{
+    if (raw_time == -1.0)
+        return DATETIME_SUN_NEVER_RISES;
+    if (raw_time == -2.0)
+        return DATETIME_SUN_NEVER_SETS;
+    if (raw_time < 0.0 || !isfinite(raw_time))
+        return DATETIME_SUN_UNAVAILABLE;
+    return DATETIME_SUN_OK;
+}
+
 /**
  * @brief initialise a datetime object with the sunrise or sunset time for a given date and location. This function calculates
  *        the sunrise or sunset time for a given date and location, and sets the time components of the datetime object accordingly.
@@ -2668,14 +2689,94 @@ static datetime_t *datetime_init_sun_time(datetime_t *dttm, long julianDayNumber
     return dttm;
 }
 
+static datetime_t *datetime_init_sun_time_checked(datetime_t *dttm,
+                                                  long julianDayNumber,
+                                                  double latitude,
+                                                  double longitude,
+                                                  double timeZoneOffset,
+                                                  bool isSunrise,
+                                                  datetime_sun_status_t *status)
+{
+    double raw_time;
+    datetime_sun_status_t resolved_status;
+
+    if (!dttm)
+        return NULL;
+
+    raw_time = datetime_sun_time(julianDayNumber, latitude, longitude, isSunrise);
+    resolved_status = datetime_sun_status_from_raw(raw_time);
+    if (status)
+        *status = resolved_status;
+
+    if (resolved_status != DATETIME_SUN_OK) {
+        datetime_init_jdn(dttm, julianDayNumber);
+        datetime_year(dttm);
+        dttm->hour = 0;
+        dttm->minute = 0;
+        dttm->second = 0.0;
+        return dttm;
+    }
+
+    return datetime_init_sun_time(dttm,
+                                  julianDayNumber,
+                                  latitude,
+                                  longitude,
+                                  timeZoneOffset,
+                                  isSunrise);
+}
+
 inline datetime_t *datetime_init_sunrise(datetime_t *dttm, long julianDayNumber, double latitude, double longitude, double timeZoneOffset)
 {
-    return datetime_init_sun_time(dttm, julianDayNumber, latitude, longitude, timeZoneOffset, true);
+    return datetime_init_sun_time_checked(dttm,
+                                          julianDayNumber,
+                                          latitude,
+                                          longitude,
+                                          timeZoneOffset,
+                                          true,
+                                          NULL);
+}
+
+datetime_t *datetime_init_sunrise_checked(datetime_t *dttm,
+                                          long julianDayNumber,
+                                          double latitude,
+                                          double longitude,
+                                          double timeZoneOffset,
+                                          datetime_sun_status_t *status)
+{
+    return datetime_init_sun_time_checked(dttm,
+                                          julianDayNumber,
+                                          latitude,
+                                          longitude,
+                                          timeZoneOffset,
+                                          true,
+                                          status);
 }
 
 inline datetime_t *datetime_init_sunset(datetime_t *dttm, long julianDayNumber, double latitude, double longitude, double timeZoneOffset)
 {
-    return datetime_init_sun_time(dttm, julianDayNumber, latitude, longitude, timeZoneOffset, false);
+    return datetime_init_sun_time_checked(dttm,
+                                          julianDayNumber,
+                                          latitude,
+                                          longitude,
+                                          timeZoneOffset,
+                                          false,
+                                          NULL);
+}
+
+datetime_t *datetime_init_sunset_checked(datetime_t *dttm,
+                                         long julianDayNumber,
+                                         double latitude,
+                                         double longitude,
+                                         double timeZoneOffset,
+                                         datetime_sun_status_t *status)
+{
+    return datetime_init_sun_time_checked(dttm,
+                                          julianDayNumber,
+                                          latitude,
+                                          longitude,
+                                          timeZoneOffset,
+                                          false,
+                                          status);
 }
 
 inline void datetime_set_sunrise(datetime_t *dttm, double latitude, double longitude, double timeZoneOffset)

@@ -1,4 +1,4 @@
--- SQLCipher holiday database query helpers.
+-- SQLCipher jurisdiction database query helpers.
 -- Open the target database first, then run:
 --   PRAGMA key = 'your chosen key';
 

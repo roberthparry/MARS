@@ -9,10 +9,14 @@ else
 fi
 
 mars_home=${MARS_HOME:-"$HOME/.mars"}
-holiday_config="$mars_home/config/holiday-db.env"
-if [ -f "$holiday_config" ]; then
+jurisdiction_config="$mars_home/config/jurisdiction-db.env"
+legacy_holiday_config="$mars_home/config/holiday-db.env"
+if [ -f "$jurisdiction_config" ]; then
     # shellcheck disable=SC1090
-    . "$holiday_config"
+    . "$jurisdiction_config"
+elif [ -f "$legacy_holiday_config" ]; then
+    # shellcheck disable=SC1090
+    . "$legacy_holiday_config"
 fi
 
 cd "$root"

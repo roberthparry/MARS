@@ -35,9 +35,12 @@ MARS_LAB_LAUNCHER ?= $(MARS_LAB_BINDIR)/mars-lab
 MARS_LAB_DESKTOP ?= $(MARS_LAB_APPDIR)/mars-lab.desktop
 MARS_LAB_ICON ?= $(MARS_LAB_ICONDIR)/mars-lab.svg
 MARS_LAB_ICON_CONCEPTS := $(wildcard packaging/linux/icon-concepts/*.svg)
-HOLIDAY_DB_SOURCE_DIR ?= packaging/holiday-db
-HOLIDAY_RULES_SQL ?= $(HOLIDAY_DB_SOURCE_DIR)/mars_holiday_rules.sql
-HOLIDAY_RULES_SOURCES := $(HOLIDAY_RULES_SQL) $(HOLIDAY_DB_SOURCE_DIR)/mars_country_jurisdictions.sql $(HOLIDAY_DB_SOURCE_DIR)/mars_generated_first_class_rules.sql $(HOLIDAY_DB_SOURCE_DIR)/mars_target_subdivisions.sql $(HOLIDAY_DB_SOURCE_DIR)/mars_manual_first_class_rules.sql
+JURISDICTION_DB_SOURCE_DIR ?= packaging/holiday-db
+HOLIDAY_DB_SOURCE_DIR ?= $(JURISDICTION_DB_SOURCE_DIR)
+JURISDICTION_RULES_SQL ?= $(JURISDICTION_DB_SOURCE_DIR)/mars_holiday_rules.sql
+HOLIDAY_RULES_SQL ?= $(JURISDICTION_RULES_SQL)
+JURISDICTION_RULES_SOURCES := $(JURISDICTION_RULES_SQL) $(JURISDICTION_DB_SOURCE_DIR)/mars_country_jurisdictions.sql $(JURISDICTION_DB_SOURCE_DIR)/mars_generated_first_class_rules.sql $(JURISDICTION_DB_SOURCE_DIR)/mars_target_subdivisions.sql $(JURISDICTION_DB_SOURCE_DIR)/mars_manual_first_class_rules.sql $(JURISDICTION_DB_SOURCE_DIR)/mars_jurisdiction_location_defaults.sql $(JURISDICTION_DB_SOURCE_DIR)/mars_timezone_rules.sql
+HOLIDAY_RULES_SOURCES := $(JURISDICTION_RULES_SOURCES)
 TO_BE_ANNOUNCED_LAB_LAUNCHER ?= $(MARS_LAB_BINDIR)/to-be-announced-lab
 TO_BE_ANNOUNCED_LAB_DESKTOP ?= $(MARS_LAB_APPDIR)/to-be-announced-lab.desktop
 TO_BE_ANNOUNCED_LAB_ICON ?= $(MARS_LAB_ICONDIR)/to-be-announced-lab.svg
@@ -115,7 +118,7 @@ TEST_BINS  := $(patsubst tests/%.c,$(TEST_BUILD_DIR)/%,$(TEST_SRCS))
 # ------------------------------------------------------------
 # Default target
 # ------------------------------------------------------------
-.PHONY: all clean test memtest debug release check-deps check-holiday-db-deps check-lab-deps install uninstall mars-lab to-be-announced-lab install-holiday-db uninstall-holiday-db install-mars-lab uninstall-mars-lab help
+.PHONY: all clean test memtest debug release check-deps check-jurisdiction-db-deps check-lab-deps install uninstall mars-lab to-be-announced-lab install-jurisdiction-db uninstall-jurisdiction-db install-mars-lab uninstall-mars-lab help
 
 all: $(STATIC_LIB) $(SHARED_LIB) $(TEST_BINS) $(BENCH_BINS) $(SCRATCH_BINS)
 
@@ -157,7 +160,7 @@ check-deps:
 	    exit 1; \
 	fi
 
-check-holiday-db-deps: check-deps
+check-jurisdiction-db-deps: check-deps
 	@missing=0; \
 	packages=""; \
 	check_tool() { \
@@ -169,16 +172,16 @@ check-holiday-db-deps: check-deps
 	        missing=1; \
 	    fi; \
 	}; \
-	check_tool "SQLCipher CLI" "$(SQLCIPHER)" "sqlcipher" " for holiday database installation"; \
+	check_tool "SQLCipher CLI" "$(SQLCIPHER)" "sqlcipher" " for jurisdiction database installation"; \
 	if [ "$$missing" -ne 0 ]; then \
 	    echo; \
-	    echo "Install the missing holiday database runtime tool(s), then rerun make."; \
+	    echo "Install the missing jurisdiction database runtime tool(s), then rerun make."; \
 	    echo "Debian/Ubuntu command:"; \
 	    echo "  sudo apt install$$packages"; \
 	    exit 1; \
 	fi
 
-check-lab-deps: check-holiday-db-deps
+check-lab-deps: check-jurisdiction-db-deps
 	@missing=0; \
 	packages=""; \
 	check_tool() { \
@@ -345,7 +348,7 @@ $(foreach bin,$(SCRATCH_BINS),$(eval $(call SCRATCH_ALIAS_RULES,$(notdir $(bin))
 .PHONY: scratch
 scratch: $(SCRATCH_BINS)
 
-.PHONY: mars-lab to-be-announced-lab install-holiday-db uninstall-holiday-db install-mars-lab uninstall-mars-lab install-to-be-announced-lab uninstall-to-be-announced-lab
+.PHONY: mars-lab to-be-announced-lab install-jurisdiction-db uninstall-jurisdiction-db install-mars-lab uninstall-mars-lab install-to-be-announced-lab uninstall-to-be-announced-lab
 mars-lab: check-lab-deps $(BUILD_DIR)/scratch/mars_lab
 	@tools/mars-lab
 
@@ -353,13 +356,13 @@ mars-lab: check-lab-deps $(BUILD_DIR)/scratch/mars_lab
 to-be-announced-lab: $(BUILD_DIR)/scratch/to-be-announced_lab
 	@tools/to-be-announced-lab
 
-install-holiday-db: check-holiday-db-deps tools/configure_mars_lab_holiday_db.py $(HOLIDAY_RULES_SOURCES)
-	@python3 tools/configure_mars_lab_holiday_db.py
+install-jurisdiction-db: check-jurisdiction-db-deps tools/configure_mars_lab_jurisdiction_db.py $(JURISDICTION_RULES_SOURCES)
+	@python3 tools/configure_mars_lab_jurisdiction_db.py
 
-uninstall-holiday-db:
+uninstall-jurisdiction-db:
 	rm -rf "$(HOME)/.mars"
 
-install-mars-lab: check-lab-deps tools/mars-lab tools/configure_mars_lab_holiday_db.py $(HOLIDAY_RULES_SOURCES) packaging/linux/mars-lab.desktop.in packaging/linux/mars-lab.svg $(MARS_LAB_ICON_CONCEPTS)
+install-mars-lab: check-lab-deps tools/mars-lab tools/configure_mars_lab_jurisdiction_db.py $(JURISDICTION_RULES_SOURCES) packaging/linux/mars-lab.desktop.in packaging/linux/mars-lab.svg $(MARS_LAB_ICON_CONCEPTS)
 	$(INSTALL) -d "$(MARS_LAB_BINDIR)" "$(MARS_LAB_APPDIR)" "$(MARS_LAB_ICONDIR)"
 	rm -f "$(MARS_LAB_BINDIR)/mars-expr-lab" "$(MARS_LAB_APPDIR)/mars-expr-lab.desktop" "$(MARS_LAB_ICONDIR)/mars-expr-lab.svg" "$(MARS_LAB_ICONDIR)"/mars-expr-lab-*.svg
 	@printf '%s\n' \
@@ -393,7 +396,7 @@ install-mars-lab: check-lab-deps tools/mars-lab tools/configure_mars_lab_holiday
 	@if command -v update-desktop-database >/dev/null 2>&1; then update-desktop-database "$(MARS_LAB_APPDIR)" >/dev/null 2>&1 || true; fi
 	@if command -v gtk-update-icon-cache >/dev/null 2>&1; then gtk-update-icon-cache "$(MARS_LAB_INSTALL_PREFIX)/share/icons/hicolor" >/dev/null 2>&1 || true; fi
 	@if command -v kbuildsycoca6 >/dev/null 2>&1; then kbuildsycoca6 >/dev/null 2>&1 || true; elif command -v kbuildsycoca5 >/dev/null 2>&1; then kbuildsycoca5 >/dev/null 2>&1 || true; fi
-	@$(MAKE) install-holiday-db
+	@$(MAKE) install-jurisdiction-db
 	@echo "Installed MARS Lab desktop launcher:"
 	@echo "  $(MARS_LAB_DESKTOP)"
 
@@ -474,12 +477,12 @@ help:
 	@echo "  make to-be-announced-lab              Launch the local To-Be-Announced Lab"
 	@echo "  make install-mars-lab       Install a user desktop launcher for MARS Lab"
 	@echo "  make uninstall-mars-lab     Remove the user desktop launcher for MARS Lab"
-	@echo "  make install-holiday-db     Build and configure the private holiday database only"
-	@echo "  make uninstall-holiday-db   Remove ~/.mars, including the private holiday database"
+	@echo "  make install-jurisdiction-db Build and configure the private jurisdiction database only"
+	@echo "  make uninstall-jurisdiction-db Remove ~/.mars, including the private jurisdiction database"
 	@echo "  make install-to-be-announced-lab      Install a user desktop launcher for To-Be-Announced Lab"
 	@echo "  make uninstall-to-be-announced-lab    Remove the user desktop launcher for To-Be-Announced Lab"
 	@echo "  make check-deps             Check required external development libraries"
-	@echo "  make check-holiday-db-deps  Check runtime tools needed for holiday database installation"
+	@echo "  make check-jurisdiction-db-deps Check runtime tools needed for jurisdiction database installation"
 	@echo "  make check-lab-deps         Check development libraries and MARS Lab TeX tools"
 	@echo "  make install                Install libraries and headers under PREFIX (default /usr/local)"
 	@echo "  make uninstall              Remove installed libraries and headers from PREFIX"

@@ -9,6 +9,7 @@
 #include <time.h>
 
 #include "datetime.h"
+#include "jurisdiction.h"
 #include "ustring.h"
 
 typedef struct datetime_lab_options_t {
@@ -27,6 +28,7 @@ typedef struct datetime_lab_options_t {
     double latitude;
     double longitude;
     double gmt_offset;
+    char jurisdiction[32];
 } datetime_lab_options_t;
 
 static bool parse_date_text(const char *text, short *year, month_t *month, uint8_t *day)
@@ -155,6 +157,7 @@ static void init_defaults(datetime_lab_options_t *options)
     options->latitude = 51.5074;
     options->longitude = -0.1278;
     options->gmt_offset = DBL_MAX;
+    options->jurisdiction[0] = '\0';
 }
 
 static bool apply_arg(datetime_lab_options_t *options, const char *arg)
@@ -252,7 +255,46 @@ static bool apply_arg(datetime_lab_options_t *options, const char *arg)
         options->gmt_offset = number;
         return true;
     }
+    if (key_equals(arg, key_len, "jurisdiction")) {
+        size_t value_len = strlen(value);
+
+        if (value_len == 0 || value_len >= sizeof(options->jurisdiction))
+            return false;
+        memcpy(options->jurisdiction, value, value_len + 1u);
+        return true;
+    }
     return false;
+}
+
+static void resolve_jurisdiction_gmt_offset(datetime_lab_options_t *options)
+{
+    jurisdiction_t *holiday = NULL;
+    datetime_t *date = NULL;
+    double offset_hours;
+
+    if (!options || options->gmt_offset != DBL_MAX || options->jurisdiction[0] == '\0')
+        return;
+
+    holiday = jurisdict_open(options->jurisdiction);
+    if (!holiday)
+        goto done;
+
+    date = options->use_julian_day_number
+        ? datetime_init_jdn(datetime_alloc(), options->julian_day_number)
+        : datetime_init_ymd(datetime_alloc(),
+                            options->date_year,
+                            options->date_month,
+                            options->date_day);
+    if (!date)
+        goto done;
+    if (!jurisdict_default_gmt_offset(holiday, date, &offset_hours))
+        goto done;
+
+    options->gmt_offset = offset_hours;
+
+done:
+    datetime_dealloc(date);
+    jurisdict_close(holiday);
 }
 
 static char *format_date(const datetime_t *dttm)
@@ -358,31 +400,44 @@ static void print_sun_time_field(const char *name,
                                  double gmt_offset,
                                  bool sunrise)
 {
-    double raw = datetime_sun_time(jdn, latitude, longitude, sunrise);
+    datetime_sun_status_t status = DATETIME_SUN_UNAVAILABLE;
     datetime_t *dttm;
 
-    if (raw == -1.0) {
-        printf("%s unavailable\n", name);
-        printf("%s_status sun never rises\n", name);
-        return;
-    }
-    if (raw == -2.0) {
-        printf("%s unavailable\n", name);
-        printf("%s_status sun never sets\n", name);
-        return;
-    }
-    if (raw < 0.0) {
-        printf("%s unavailable\n", name);
-        printf("%s_status unavailable\n", name);
-        return;
-    }
-
     dttm = sunrise
-        ? datetime_init_sunrise(datetime_alloc(), jdn, latitude, longitude, gmt_offset)
-        : datetime_init_sunset(datetime_alloc(), jdn, latitude, longitude, gmt_offset);
+        ? datetime_init_sunrise_checked(datetime_alloc(),
+                                        jdn,
+                                        latitude,
+                                        longitude,
+                                        gmt_offset,
+                                        &status)
+        : datetime_init_sunset_checked(datetime_alloc(),
+                                       jdn,
+                                       latitude,
+                                       longitude,
+                                       gmt_offset,
+                                       &status);
     if (!dttm) {
         printf("%s unavailable\n", name);
         printf("%s_status unavailable\n", name);
+        return;
+    }
+
+    if (status == DATETIME_SUN_NEVER_RISES) {
+        printf("%s unavailable\n", name);
+        printf("%s_status sun never rises\n", name);
+        datetime_dealloc(dttm);
+        return;
+    }
+    if (status == DATETIME_SUN_NEVER_SETS) {
+        printf("%s unavailable\n", name);
+        printf("%s_status sun never sets\n", name);
+        datetime_dealloc(dttm);
+        return;
+    }
+    if (status != DATETIME_SUN_OK) {
+        printf("%s unavailable\n", name);
+        printf("%s_status unavailable\n", name);
+        datetime_dealloc(dttm);
         return;
     }
 
@@ -428,6 +483,8 @@ int main(int argc, char **argv)
             return 2;
         }
     }
+
+    resolve_jurisdiction_gmt_offset(&options);
 
     date = datetime_alloc();
     start = datetime_alloc();
