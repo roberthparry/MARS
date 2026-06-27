@@ -120,6 +120,64 @@ bool jurisdict_default_gmt_offset(jurisdiction_t *jurisdiction,
                                   double *offset_hours);
 
 /**
+ * @brief Return the daylight-saving transition moments for a jurisdiction year.
+ *
+ * When the jurisdiction observes daylight saving in the requested year,
+ * @p clocks_forward and/or @p clocks_back receive newly allocated
+ * @c datetime_t values naming the local date and time at which the offset
+ * changes.
+ * The caller owns any returned dates and must destroy them with
+ * @c datetime_dealloc().
+ *
+ * Jurisdictions without daylight saving return @c true with both outputs left
+ * as @c NULL.
+ *
+ * @param jurisdiction open jurisdiction engine.
+ * @param year calendar year to inspect.
+ * @param clocks_forward optional output for the local moment clocks move
+ *        forward.
+ * @param clocks_back optional output for the local moment clocks move back.
+ * @return @c true when the query succeeds, otherwise @c false.
+ */
+bool jurisdict_dst_transition_datetimes(jurisdiction_t *jurisdiction,
+                                        int year,
+                                        datetime_t **clocks_forward,
+                                        datetime_t **clocks_back);
+
+/**
+ * @brief Return daylight-saving transition moments together with offset change.
+ *
+ * This is the detailed counterpart to
+ * @c jurisdict_dst_transition_datetimes(). When a transition exists, the
+ * returned moment describes when the change occurs in local civil time, while
+ * the paired offset outputs describe the GMT offset immediately before and
+ * immediately after the change.
+ *
+ * @param jurisdiction open jurisdiction engine.
+ * @param year calendar year to inspect.
+ * @param clocks_forward optional output for the local moment clocks move
+ *        forward.
+ * @param forward_from_offset_hours optional output for the GMT offset before
+ *        the forward transition.
+ * @param forward_to_offset_hours optional output for the GMT offset after the
+ *        forward transition.
+ * @param clocks_back optional output for the local moment clocks move back.
+ * @param back_from_offset_hours optional output for the GMT offset before the
+ *        backward transition.
+ * @param back_to_offset_hours optional output for the GMT offset after the
+ *        backward transition.
+ * @return @c true when the query succeeds, otherwise @c false.
+ */
+bool jurisdict_dst_transition_details(jurisdiction_t *jurisdiction,
+                                      int year,
+                                      datetime_t **clocks_forward,
+                                      double *forward_from_offset_hours,
+                                      double *forward_to_offset_hours,
+                                      datetime_t **clocks_back,
+                                      double *back_from_offset_hours,
+                                      double *back_to_offset_hours);
+
+/**
  * @brief Return all holidays in the inclusive range [@p start, @p end].
  *
  * The returned array contains @c holiday_event_t values and owns all event

@@ -11,12 +11,17 @@ fi
 mars_home=${MARS_HOME:-"$HOME/.mars"}
 jurisdiction_config="$mars_home/config/jurisdiction-db.env"
 legacy_holiday_config="$mars_home/config/holiday-db.env"
+weather_config="$mars_home/config/weather.env"
 if [ -f "$jurisdiction_config" ]; then
     # shellcheck disable=SC1090
     . "$jurisdiction_config"
 elif [ -f "$legacy_holiday_config" ]; then
     # shellcheck disable=SC1090
     . "$legacy_holiday_config"
+fi
+if [ -f "$weather_config" ]; then
+    # shellcheck disable=SC1090
+    . "$weather_config"
 fi
 
 cd "$root"

@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Generate jurisdiction default locations for the jurisdiction database.
 
-Country-level rows are derived from the local tzdata ``zone1970.tab`` principal
-locations so every country in the holiday chooser has a sensible fallback.
-Hand-curated overrides remain in place for jurisdictions where we want a known
-capital or subdivision centre instead.
+Country-level rows are derived from the local tzdata ``zone.tab`` entries so
+each ISO country code keeps its own principal coordinate and timezone instead of
+inheriting a shared multi-country representative row. Hand-curated overrides
+remain in place for jurisdictions where we want a known capital or subdivision
+centre instead.
 """
 
 from __future__ import annotations
@@ -14,7 +15,7 @@ import re
 
 OUT_PATH = Path("packaging/holiday-db/mars_jurisdiction_location_defaults.sql")
 COUNTRY_SQL_PATH = Path("packaging/holiday-db/mars_country_jurisdictions.sql")
-ZONE1970_PATH = Path("/usr/share/zoneinfo/zone1970.tab")
+ZONE_TAB_PATH = Path("/usr/share/zoneinfo/zone.tab")
 
 
 def sql_quote(value: str) -> str:
@@ -66,41 +67,29 @@ def fallback_locality_name(tz_name: str, comment: str) -> str:
     return tz_name.rsplit("/", 1)[-1].replace("_", " ")
 
 
-def parse_zone1970_rows() -> dict[str, tuple[str, str, str]]:
-    direct_rows: dict[str, tuple[str, str, str]] = {}
-    fallback_rows: dict[str, tuple[str, str, str]] = {}
+def parse_zone_tab_rows() -> dict[str, tuple[str, str, str]]:
+    rows: dict[str, tuple[str, str, str]] = {}
 
-    for raw_line in ZONE1970_PATH.read_text(encoding="utf-8").splitlines():
+    for raw_line in ZONE_TAB_PATH.read_text(encoding="utf-8").splitlines():
         line = raw_line.strip()
         if not line or line.startswith("#"):
             continue
         parts = raw_line.split("\t")
         if len(parts) < 3:
             continue
-        country_codes, coords, tz_name = parts[:3]
+        country_code, coords, tz_name = parts[:3]
         comment = parts[3].strip() if len(parts) > 3 else ""
-        parsed_codes = [code.strip().upper() for code in country_codes.split(",") if code.strip()]
+        code = country_code.strip().upper()
 
-        if parsed_codes:
-            first_code = parsed_codes[0]
-            if len(first_code) == 2 and first_code not in direct_rows:
-                direct_rows[first_code] = (
-                    coords.strip(),
-                    tz_name.strip(),
-                    fallback_locality_name(tz_name, ""),
-                )
+        if len(code) != 2 or code in rows:
+            continue
 
-        for code in parsed_codes:
-            if len(code) != 2 or code in fallback_rows:
-                continue
-            fallback_rows[code] = (
-                coords.strip(),
-                tz_name.strip(),
-                fallback_locality_name(tz_name, comment),
-            )
+        rows[code] = (
+            coords.strip(),
+            tz_name.strip(),
+            fallback_locality_name(tz_name, comment),
+        )
 
-    rows = dict(fallback_rows)
-    rows.update(direct_rows)
     return rows
 
 
@@ -137,6 +126,7 @@ EXPLICIT_ROWS: dict[str, tuple[str, str, str, str, str]] = {
     "GB-SCT": ("55.9533", "-3.1883", "Europe/London", "Edinburgh", "Scotland default."),
     "GB-WLS": ("53.3210", "-3.4800", "Europe/London", "Rhyl", "Wales default."),
     "GR": ("37.9838", "23.7275", "Europe/Athens", "Athens", "Country capital default."),
+    "IS": ("64.1466", "-21.9426", "Atlantic/Reykjavik", "Reykjavik", "Country capital default."),
     "IE": ("53.3498", "-6.2603", "Europe/Dublin", "Dublin", "Country capital default."),
     "IT": ("41.9028", "12.4964", "Europe/Rome", "Rome", "Country capital default."),
     "NL": ("52.5697", "4.6948", "Europe/Amsterdam", "Limmen", "Country default."),
@@ -146,8 +136,10 @@ EXPLICIT_ROWS: dict[str, tuple[str, str, str, str, str]] = {
     "PT": ("38.7223", "-9.1393", "Europe/Lisbon", "Lisbon", "Country capital default."),
     "PT-11": ("38.7223", "-9.1393", "Europe/Lisbon", "Lisbon", "District centre default."),
     "PT-13": ("41.1579", "-8.6291", "Europe/Lisbon", "Porto", "District centre default."),
+    "SJ": ("78.2232", "15.6469", "Arctic/Longyearbyen", "Longyearbyen", "Country principal settlement default."),
     "UA": ("50.4501", "30.5234", "Europe/Kyiv", "Kyiv", "Country capital default."),
     "US": ("38.9072", "-77.0369", "America/New_York", "Washington, D.C.", "Country capital default."),
+    "US-AK": ("58.3019", "-134.4197", "America/Juneau", "Juneau", "State capital default."),
     "US-DC": ("38.9072", "-77.0369", "America/New_York", "Washington, D.C.", "District default."),
     "ZA": ("-33.9249", "18.4241", "Africa/Johannesburg", "Cape Town", "Country default."),
 }
@@ -155,7 +147,7 @@ EXPLICIT_ROWS: dict[str, tuple[str, str, str, str, str]] = {
 
 def build_rows() -> list[tuple[str, str, str, str, str, str]]:
     country_ids = parse_country_ids()
-    zone_rows = parse_zone1970_rows()
+    zone_rows = parse_zone_tab_rows()
     rows: dict[str, tuple[str, str, str, str, str]] = {}
 
     for country_id in country_ids:
@@ -172,7 +164,7 @@ def build_rows() -> list[tuple[str, str, str, str, str, str]]:
             f"{longitude:.4f}",
             tz_name,
             locality,
-            "Representative principal location default generated from tzdata zone1970.tab.",
+            "Representative principal location default generated from tzdata zone.tab.",
         )
 
     for jurisdiction_id, data in EXPLICIT_ROWS.items():
@@ -186,7 +178,7 @@ def main() -> None:
     rows = build_rows()
     lines = [
         "-- Generated by packaging/holiday-db/generate_jurisdiction_location_defaults.py",
-        "-- Country rows fall back to tzdata principal locations; curated overrides pin known capitals and subdivision centres.",
+        "-- Country rows fall back to tzdata zone.tab principal locations; curated overrides pin known capitals and subdivision centres.",
         "",
         "INSERT INTO jurisdiction_location_default(",
         "    jurisdiction_id,",

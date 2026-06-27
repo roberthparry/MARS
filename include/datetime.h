@@ -91,6 +91,10 @@ datetime_t *datetime_alloc();
  *        After calling this function, the pointer to the datetime structure should not be used, as it will point to deallocated memory.
  * @param dttm the datetime structure to be deallocated.
  */
+/**
+ * @brief deallocate a datetime object.
+ * @param dttm the datetime to free. Passing NULL is safe and has no effect.
+ */
 void datetime_dealloc(datetime_t *dttm);
 
 /**
@@ -146,6 +150,20 @@ datetime_t *datetime_init_jd(datetime_t *dttm, double JulianDay);
  * @return the address of the initialised datetime.
  */
 datetime_t *datetime_init_now(datetime_t *dttm);
+
+/**
+ * @brief parse an ISO civil date and return a newly allocated datetime.
+ *
+ * Accepts dates in either `YYYY-MM-DD` or `DD/MM/YYYY` form. Leading and
+ * trailing whitespace is ignored, but no other trailing characters are
+ * permitted. The returned datetime is initialised to midnight on that civil
+ * date.
+ *
+ * @param text the text to parse.
+ * @return a newly allocated datetime on success, or NULL if the text is not a
+ *         valid ISO civil date or allocation fails.
+ */
+datetime_t *datetime_from_string(const char *text);
 
 /**
  * @brief calculate the date of Easter Sunday for a given year and initialise a datetime structure with that date. The algorithm
@@ -321,6 +339,126 @@ datetime_t *datetime_init_jewish_new_year(datetime_t *dttm, int year);
 datetime_t *datetime_init_passover(datetime_t *dttm, int year);
 
 /**
+ * @brief initialise/set a preallocated datetime with Ethiopian New Year (Enkutatash).
+ * @param dttm the datetime variable to be initialised.
+ * @param year the Gregorian year of the observance.
+ * @return the address of the initialised datetime, or NULL if the year is invalid.
+ */
+datetime_t *datetime_init_ethiopian_new_year(datetime_t *dttm, int year);
+
+/**
+ * @brief initialise/set a preallocated datetime with Genna, Ethiopian Christmas.
+ * @param dttm the datetime variable to be initialised.
+ * @param year the Gregorian year of the observance.
+ * @return the address of the initialised datetime, or NULL if the year is invalid.
+ */
+datetime_t *datetime_init_genna(datetime_t *dttm, int year);
+
+/**
+ * @brief initialise/set a preallocated datetime with Timkat.
+ * @param dttm the datetime variable to be initialised.
+ * @param year the Gregorian year of the observance.
+ * @return the address of the initialised datetime, or NULL if the year is invalid.
+ */
+datetime_t *datetime_init_timkat(datetime_t *dttm, int year);
+
+/**
+ * @brief initialise/set a preallocated datetime with Meskel.
+ * @param dttm the datetime variable to be initialised.
+ * @param year the Gregorian year of the observance.
+ * @return the address of the initialised datetime, or NULL if the year is invalid.
+ */
+datetime_t *datetime_init_meskel(datetime_t *dttm, int year);
+
+/**
+ * @brief initialise/set a preallocated datetime with Fasika, Ethiopian Easter.
+ * @param dttm the datetime variable to be initialised.
+ * @param year the Gregorian year of the observance.
+ * @return the address of the initialised datetime, or NULL if the year is invalid.
+ */
+datetime_t *datetime_init_fasika(datetime_t *dttm, int year);
+
+/**
+ * @brief initialise/set a preallocated datetime with the Mayan Haab New Year in the requested Gregorian year.
+ * @param dttm the datetime variable to be initialised.
+ * @param year the Gregorian year of the observance.
+ * @return the address of the initialised datetime, or NULL if the year is invalid.
+ */
+datetime_t *datetime_init_mayan_haab_new_year(datetime_t *dttm, int year);
+
+/**
+ * @brief initialise/set a preallocated datetime with the first day of Wayeb in the requested Gregorian year.
+ * @param dttm the datetime variable to be initialised.
+ * @param year the Gregorian year of the observance.
+ * @return the address of the initialised datetime, or NULL if the year is invalid.
+ */
+datetime_t *datetime_init_mayan_wayeb_start(datetime_t *dttm, int year);
+
+/**
+ * @brief initialise/set a preallocated datetime with the Aztec Xiuhpohualli New Year in the requested Gregorian year.
+ * @param dttm the datetime variable to be initialised.
+ * @param year the Gregorian year of the observance.
+ * @return the address of the initialised datetime, or NULL if the year is invalid.
+ */
+datetime_t *datetime_init_aztec_xiuhpohualli_new_year(datetime_t *dttm, int year);
+
+/**
+ * @brief initialise/set a preallocated datetime with the first day of Nemontemi in the requested Gregorian year.
+ * @param dttm the datetime variable to be initialised.
+ * @param year the Gregorian year of the observance.
+ * @return the address of the initialised datetime, or NULL if the year is invalid.
+ */
+datetime_t *datetime_init_aztec_nemontemi_start(datetime_t *dttm, int year);
+
+/**
+ * @brief initialise/set a preallocated datetime with an estimated Cherokee New Moon Festival date.
+ *
+ * The calculation uses a modern reconstructed lunar model centred on the
+ * Cherokee Nation region and selects the first local new moon in January.
+ *
+ * @param dttm the datetime variable to be initialised.
+ * @param year the Gregorian year of the observance.
+ * @return the address of the initialised datetime, or NULL if the year is invalid.
+ */
+datetime_t *datetime_init_cherokee_new_moon_festival(datetime_t *dttm, int year);
+
+/**
+ * @brief initialise/set a preallocated datetime with an estimated Cherokee Green Corn Ceremony date.
+ *
+ * The calculation uses a modern reconstructed lunar model centred on the
+ * Cherokee Nation region and selects the first local new moon in July.
+ *
+ * @param dttm the datetime variable to be initialised.
+ * @param year the Gregorian year of the observance.
+ * @return the address of the initialised datetime, or NULL if the year is invalid.
+ */
+datetime_t *datetime_init_cherokee_green_corn_ceremony(datetime_t *dttm, int year);
+
+/**
+ * @brief initialise/set a preallocated datetime with an estimated Cherokee Ripe Corn Ceremony date.
+ *
+ * The calculation uses a modern reconstructed lunar model centred on the
+ * Cherokee Nation region and selects the first local new moon in August.
+ *
+ * @param dttm the datetime variable to be initialised.
+ * @param year the Gregorian year of the observance.
+ * @return the address of the initialised datetime, or NULL if the year is invalid.
+ */
+datetime_t *datetime_init_cherokee_ripe_corn_ceremony(datetime_t *dttm, int year);
+
+/**
+ * @brief initialise/set a preallocated datetime with an estimated Cherokee Great New Moon Festival date.
+ *
+ * The calculation uses a modern reconstructed lunar model centred on the
+ * Cherokee Nation region and selects the first local new moon in September.
+ *
+ * @param dttm the datetime variable to be initialised.
+ * @param year the Gregorian year of the observance.
+ * @return the address of the initialised datetime, or NULL if the year is invalid.
+ */
+datetime_t *datetime_init_cherokee_great_new_moon_festival(datetime_t *dttm, int year);
+
+/**
  * @brief format the selected date in the Christian civil calendar systems.
  *
  * The result uses datetime_format_text() internally and includes both the
@@ -378,6 +516,52 @@ string_t *datetime_muslim_calendar_date_text(const datetime_t *dttm);
  * @return owned text, or NULL if the date is invalid.
  */
 string_t *datetime_jewish_calendar_date_text(const datetime_t *dttm);
+
+/**
+ * @brief format the selected date in an adapted Cherokee civil calendar style.
+ *
+ * Cherokee calendrical practice is traditionally lunar and local, so this
+ * formatter presents the Gregorian civil date with Cherokee month naming for
+ * calendar assistance rather than ceremonial observance.
+ *
+ * @param dttm the datetime to format.
+ * @return owned text, or NULL if the date is invalid.
+ */
+string_t *datetime_cherokee_calendar_date_text(const datetime_t *dttm);
+
+/**
+ * @brief format the selected date in the Mayan calendar.
+ *
+ * The result includes the Long Count, the 260-day Tzolk'in round, and the
+ * 365-day Haab cycle using the Goodman-Martinez-Thompson correlation.
+ *
+ * @param dttm the datetime to format.
+ * @return owned text, or NULL if the date is invalid.
+ */
+string_t *datetime_mayan_calendar_date_text(const datetime_t *dttm);
+
+/**
+ * @brief format the selected date in an Aztec calendar style.
+ *
+ * The result includes the 260-day Tonalpohualli round, the 365-day
+ * Xiuhpohualli cycle, and the current year bearer in the modern
+ * Gregorian-aligned convention.
+ *
+ * @param dttm the datetime to format.
+ * @return owned text, or NULL if the date is invalid.
+ */
+string_t *datetime_aztec_calendar_date_text(const datetime_t *dttm);
+
+/**
+ * @brief format the selected date in the Ethiopian calendar.
+ *
+ * The result uses the proleptic Ethiopian civil calendar with its 13-month
+ * structure and Era of the Incarnation year numbering.
+ *
+ * @param dttm the datetime to format.
+ * @return owned text, or NULL if the date is invalid.
+ */
+string_t *datetime_ethiopian_calendar_date_text(const datetime_t *dttm);
 
 /**
  * @brief calculate the timezone offset in hours for a given datetime. This function uses the system's time zone information to
@@ -870,6 +1054,90 @@ datetime_t *datetime_init_sunset_checked(datetime_t *dttm,
                                          double longitude,
                                          double timeZoneOffset,
                                          datetime_sun_status_t *status);
+
+/**
+ * @brief initialise the previous sunrise before a given civil date.
+ *
+ * This searches backwards from the supplied Julian day until it finds the most
+ * recent date on which sunrise can be calculated for the location.
+ *
+ * @param dttm destination datetime object.
+ * @param julianDayNumber the Julian Day Number for the reference civil date.
+ * @param latitude observer latitude in degrees.
+ * @param longitude observer longitude in degrees.
+ * @param timeZoneOffset time-zone offset in hours, or @c DBL_MAX for local.
+ * @param status output status pointer, optional.
+ * @return @p dttm on success, or @c NULL on allocation/initialisation failure.
+ */
+datetime_t *datetime_init_previous_sunrise_checked(datetime_t *dttm,
+                                                   long julianDayNumber,
+                                                   double latitude,
+                                                   double longitude,
+                                                   double timeZoneOffset,
+                                                   datetime_sun_status_t *status);
+
+/**
+ * @brief initialise the next sunrise after a given civil date.
+ *
+ * This searches forwards from the supplied Julian day until it finds the next
+ * date on which sunrise can be calculated for the location.
+ *
+ * @param dttm destination datetime object.
+ * @param julianDayNumber the Julian Day Number for the reference civil date.
+ * @param latitude observer latitude in degrees.
+ * @param longitude observer longitude in degrees.
+ * @param timeZoneOffset time-zone offset in hours, or @c DBL_MAX for local.
+ * @param status output status pointer, optional.
+ * @return @p dttm on success, or @c NULL on allocation/initialisation failure.
+ */
+datetime_t *datetime_init_next_sunrise_checked(datetime_t *dttm,
+                                               long julianDayNumber,
+                                               double latitude,
+                                               double longitude,
+                                               double timeZoneOffset,
+                                               datetime_sun_status_t *status);
+
+/**
+ * @brief initialise the previous sunset before a given civil date.
+ *
+ * This searches backwards from the supplied Julian day until it finds the most
+ * recent date on which sunset can be calculated for the location.
+ *
+ * @param dttm destination datetime object.
+ * @param julianDayNumber the Julian Day Number for the reference civil date.
+ * @param latitude observer latitude in degrees.
+ * @param longitude observer longitude in degrees.
+ * @param timeZoneOffset time-zone offset in hours, or @c DBL_MAX for local.
+ * @param status output status pointer, optional.
+ * @return @p dttm on success, or @c NULL on allocation/initialisation failure.
+ */
+datetime_t *datetime_init_previous_sunset_checked(datetime_t *dttm,
+                                                  long julianDayNumber,
+                                                  double latitude,
+                                                  double longitude,
+                                                  double timeZoneOffset,
+                                                  datetime_sun_status_t *status);
+
+/**
+ * @brief initialise the next sunset after a given civil date.
+ *
+ * This searches forwards from the supplied Julian day until it finds the next
+ * date on which sunset can be calculated for the location.
+ *
+ * @param dttm destination datetime object.
+ * @param julianDayNumber the Julian Day Number for the reference civil date.
+ * @param latitude observer latitude in degrees.
+ * @param longitude observer longitude in degrees.
+ * @param timeZoneOffset time-zone offset in hours, or @c DBL_MAX for local.
+ * @param status output status pointer, optional.
+ * @return @p dttm on success, or @c NULL on allocation/initialisation failure.
+ */
+datetime_t *datetime_init_next_sunset_checked(datetime_t *dttm,
+                                              long julianDayNumber,
+                                              double latitude,
+                                              double longitude,
+                                              double timeZoneOffset,
+                                              datetime_sun_status_t *status);
 
 /**
  * @brief set the time components of a datetime object to the sunrise time for its date and a given location. This function is a

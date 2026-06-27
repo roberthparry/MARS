@@ -233,6 +233,27 @@ static const holiday_case_row_t *find_event_by_name_and_date(const array_t *even
     return NULL;
 }
 
+static size_t count_equivalent_events(const array_t *events,
+                                      const char *holiday_name,
+                                      const char *holiday_date)
+{
+    size_t i;
+    size_t count = 0u;
+
+    if (!events || !holiday_name || !holiday_date)
+        return 0u;
+
+    for (i = 0u; i < array_size(events); ++i) {
+        const holiday_case_row_t *row = array_get(events, i);
+
+        if (!row || !row->holiday_name || !datetime_matches_iso_date(row->holiday_date, holiday_date))
+            continue;
+        if (strcmp(row->holiday_name, holiday_name) == 0)
+            ++count;
+    }
+    return count;
+}
+
 static const holiday_case_row_t *find_event_by_id_and_date(const array_t *events,
                                                            int holiday_id,
                                                            const char *holiday_date)
@@ -414,6 +435,20 @@ static void test_scotland_modern_rules_cover_2026_without_generated_noise(void)
     array_destroy(events);
 }
 
+static void test_slovenia_2026_does_not_repeat_identical_holidays(void)
+{
+    array_t *events = load_events("SI", 2026, DT_January, 1u, 2027, DT_January, 2u);
+
+    ASSERT_NOT_NULL(events);
+    print_events_summary("Slovenia 2026 holidays", events);
+    ASSERT_EQ_LONG((long)count_equivalent_events(events, "novo leto", "2026-01-01"), 1L);
+    ASSERT_EQ_LONG((long)count_equivalent_events(events, "novo leto", "2026-01-02"), 1L);
+    ASSERT_EQ_LONG((long)count_equivalent_events(events, "velikonočna nedelja", "2026-04-05"), 1L);
+    ASSERT_EQ_LONG((long)count_equivalent_events(events, "velikonočni ponedeljek", "2026-04-06"), 1L);
+
+    array_destroy(events);
+}
+
 static void test_holiday_queries_weekend_and_holiday_status(void)
 {
     jurisdiction_t *holiday = jurisdict_open("ZA");
@@ -469,6 +504,72 @@ static void test_holiday_default_location_falls_back_for_country_only_jurisdicti
     jurisdict_close(holiday);
 }
 
+static void test_holiday_alaska_default_location_uses_juneau(void)
+{
+    jurisdiction_t *holiday = jurisdict_open("US-AK");
+    datetime_t *summer = datetime_init_ymd(datetime_alloc(), 2026, DT_June, 23);
+    double latitude = 0.0;
+    double longitude = 0.0;
+    double offset = 0.0;
+
+    ASSERT_NOT_NULL(holiday);
+    ASSERT_NOT_NULL(summer);
+    ASSERT_TRUE(jurisdict_default_location(holiday, &latitude, &longitude));
+    ASSERT_TRUE(jurisdict_default_gmt_offset(holiday, summer, &offset));
+    printf("    Alaska default location: latitude=%.4f longitude=%.4f offset=%.1f\n",
+           latitude, longitude, offset);
+    ASSERT_TRUE(fabs(latitude - 58.3019) < 0.01);
+    ASSERT_TRUE(fabs(longitude - (-134.4197)) < 0.01);
+    ASSERT_TRUE(fabs(offset - (-8.0)) < 0.001);
+
+    datetime_dealloc(summer);
+    jurisdict_close(holiday);
+}
+
+static void test_holiday_iceland_default_location_uses_reykjavik(void)
+{
+    jurisdiction_t *holiday = jurisdict_open("IS");
+    datetime_t *summer = datetime_init_ymd(datetime_alloc(), 2026, DT_June, 23);
+    double latitude = 0.0;
+    double longitude = 0.0;
+    double offset = 0.0;
+
+    ASSERT_NOT_NULL(holiday);
+    ASSERT_NOT_NULL(summer);
+    ASSERT_TRUE(jurisdict_default_location(holiday, &latitude, &longitude));
+    ASSERT_TRUE(jurisdict_default_gmt_offset(holiday, summer, &offset));
+    printf("    Iceland default location: latitude=%.4f longitude=%.4f offset=%.1f\n",
+           latitude, longitude, offset);
+    ASSERT_TRUE(fabs(latitude - 64.1466) < 0.01);
+    ASSERT_TRUE(fabs(longitude - (-21.9426)) < 0.01);
+    ASSERT_TRUE(fabs(offset - 0.0) < 0.001);
+
+    datetime_dealloc(summer);
+    jurisdict_close(holiday);
+}
+
+static void test_holiday_svalbard_default_location_uses_longyearbyen(void)
+{
+    jurisdiction_t *holiday = jurisdict_open("SJ");
+    datetime_t *summer = datetime_init_ymd(datetime_alloc(), 2026, DT_June, 23);
+    double latitude = 0.0;
+    double longitude = 0.0;
+    double offset = 0.0;
+
+    ASSERT_NOT_NULL(holiday);
+    ASSERT_NOT_NULL(summer);
+    ASSERT_TRUE(jurisdict_default_location(holiday, &latitude, &longitude));
+    ASSERT_TRUE(jurisdict_default_gmt_offset(holiday, summer, &offset));
+    printf("    Svalbard default location: latitude=%.4f longitude=%.4f offset=%.1f\n",
+           latitude, longitude, offset);
+    ASSERT_TRUE(fabs(latitude - 78.2232) < 0.01);
+    ASSERT_TRUE(fabs(longitude - 15.6469) < 0.01);
+    ASSERT_TRUE(fabs(offset - 2.0) < 0.001);
+
+    datetime_dealloc(summer);
+    jurisdict_close(holiday);
+}
+
 static void test_holiday_default_gmt_offset_uses_database_dst_rules(void)
 {
     jurisdiction_t *denmark = jurisdict_open("DK");
@@ -506,6 +607,72 @@ static void test_holiday_default_gmt_offset_uses_database_dst_rules(void)
     jurisdict_close(south_africa);
     jurisdict_close(england);
     jurisdict_close(denmark);
+}
+
+static void test_holiday_dst_transition_datetimes_expose_forward_and_back_changes(void)
+{
+    jurisdiction_t *england = jurisdict_open("GB-ENG");
+    jurisdiction_t *denmark = jurisdict_open("DK");
+    datetime_t *england_forward = NULL;
+    datetime_t *england_back = NULL;
+    datetime_t *denmark_forward = NULL;
+    datetime_t *denmark_back = NULL;
+    double england_forward_from = 0.0;
+    double england_forward_to = 0.0;
+    double england_back_from = 0.0;
+    double england_back_to = 0.0;
+    double denmark_forward_from = 0.0;
+    double denmark_forward_to = 0.0;
+    double denmark_back_from = 0.0;
+    double denmark_back_to = 0.0;
+
+    ASSERT_NOT_NULL(england);
+    ASSERT_NOT_NULL(denmark);
+    ASSERT_TRUE(jurisdict_dst_transition_details(england, 2026,
+                                                 &england_forward, &england_forward_from, &england_forward_to,
+                                                 &england_back, &england_back_from, &england_back_to));
+    ASSERT_TRUE(jurisdict_dst_transition_details(denmark, 2026,
+                                                 &denmark_forward, &denmark_forward_from, &denmark_forward_to,
+                                                 &denmark_back, &denmark_back_from, &denmark_back_to));
+    ASSERT_NOT_NULL(england_forward);
+    ASSERT_NOT_NULL(england_back);
+    ASSERT_NOT_NULL(denmark_forward);
+    ASSERT_NOT_NULL(denmark_back);
+
+    printf("    England DST 2026: forward=%04d-%02d-%02d %02d:%02d back=%04d-%02d-%02d %02d:%02d\n",
+           datetime_year(england_forward), (int)datetime_month(england_forward), (int)datetime_day(england_forward),
+           (int)datetime_hour(england_forward), (int)datetime_minute(england_forward),
+           datetime_year(england_back), (int)datetime_month(england_back), (int)datetime_day(england_back),
+           (int)datetime_hour(england_back), (int)datetime_minute(england_back));
+    printf("    Denmark DST 2026: forward=%04d-%02d-%02d %02d:%02d back=%04d-%02d-%02d %02d:%02d\n",
+           datetime_year(denmark_forward), (int)datetime_month(denmark_forward), (int)datetime_day(denmark_forward),
+           (int)datetime_hour(denmark_forward), (int)datetime_minute(denmark_forward),
+           datetime_year(denmark_back), (int)datetime_month(denmark_back), (int)datetime_day(denmark_back),
+           (int)datetime_hour(denmark_back), (int)datetime_minute(denmark_back));
+
+    ASSERT_TRUE(datetime_matches_iso_date(england_forward, "2026-03-29"));
+    ASSERT_TRUE(datetime_matches_iso_date(england_back, "2026-10-25"));
+    ASSERT_EQ_LONG(datetime_hour(england_forward), 1);
+    ASSERT_EQ_LONG(datetime_hour(england_back), 2);
+    ASSERT_TRUE(fabs(england_forward_from - 0.0) < 0.001);
+    ASSERT_TRUE(fabs(england_forward_to - 1.0) < 0.001);
+    ASSERT_TRUE(fabs(england_back_from - 1.0) < 0.001);
+    ASSERT_TRUE(fabs(england_back_to - 0.0) < 0.001);
+    ASSERT_TRUE(datetime_matches_iso_date(denmark_forward, "2026-03-29"));
+    ASSERT_TRUE(datetime_matches_iso_date(denmark_back, "2026-10-25"));
+    ASSERT_EQ_LONG(datetime_hour(denmark_forward), 2);
+    ASSERT_EQ_LONG(datetime_hour(denmark_back), 3);
+    ASSERT_TRUE(fabs(denmark_forward_from - 1.0) < 0.001);
+    ASSERT_TRUE(fabs(denmark_forward_to - 2.0) < 0.001);
+    ASSERT_TRUE(fabs(denmark_back_from - 2.0) < 0.001);
+    ASSERT_TRUE(fabs(denmark_back_to - 1.0) < 0.001);
+
+    datetime_dealloc(denmark_back);
+    datetime_dealloc(denmark_forward);
+    datetime_dealloc(england_back);
+    datetime_dealloc(england_forward);
+    jurisdict_close(denmark);
+    jurisdict_close(england);
 }
 
 static void test_holiday_working_days_between_counts_business_days(void)
@@ -605,10 +772,15 @@ int tests_main(void)
     TEST_RUN_IN_GROUP(test_ireland_historic_whit_monday_exists_in_1960, tests, NULL);
     TEST_RUN_IN_GROUP(test_ukraine_future_rule_windows_cover_2030, tests, NULL);
     TEST_RUN_IN_GROUP(test_scotland_modern_rules_cover_2026_without_generated_noise, tests, NULL);
+    TEST_RUN_IN_GROUP(test_slovenia_2026_does_not_repeat_identical_holidays, tests, NULL);
     TEST_RUN_IN_GROUP(test_holiday_queries_weekend_and_holiday_status, tests, NULL);
     TEST_RUN_IN_GROUP(test_holiday_default_location_returns_capital_coordinates, tests, NULL);
     TEST_RUN_IN_GROUP(test_holiday_default_location_falls_back_for_country_only_jurisdiction, tests, NULL);
+    TEST_RUN_IN_GROUP(test_holiday_alaska_default_location_uses_juneau, tests, NULL);
+    TEST_RUN_IN_GROUP(test_holiday_iceland_default_location_uses_reykjavik, tests, NULL);
+    TEST_RUN_IN_GROUP(test_holiday_svalbard_default_location_uses_longyearbyen, tests, NULL);
     TEST_RUN_IN_GROUP(test_holiday_default_gmt_offset_uses_database_dst_rules, tests, NULL);
+    TEST_RUN_IN_GROUP(test_holiday_dst_transition_datetimes_expose_forward_and_back_changes, tests, NULL);
     TEST_RUN_IN_GROUP(test_holiday_working_days_between_counts_business_days, tests, NULL);
 
     TEST_SECTION("README Output Examples");

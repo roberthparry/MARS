@@ -15,6 +15,7 @@ astronomical and calendar-observance helpers.
 - moon phase classification and next-phase search
 - weekday navigation
 - calendar observance helpers, including Easter, Orthodox Easter, Chinese New Year, selected Hindu, Buddhist, Muslim, and Jewish observances
+- calendar-format helpers for Christian, Chinese, Hindu, Buddhist, Muslim, Jewish, Cherokee, Mayan, Aztec, and Ethiopian date views
 - rich `printf`-style formatting
 
 ## Scope Boundary
@@ -100,6 +101,42 @@ int main(void) {
     datetime_dealloc(today);
     return 0;
 }
+```
+
+## Example: Additional Calendar Views
+
+```c
+#include <stdio.h>
+#include "datetime.h"
+
+int main(void) {
+    datetime_t *dt = datetime_init_ymd(datetime_alloc(), 2026, DT_June, 21);
+    string_t *cherokee = datetime_cherokee_calendar_date_text(dt);
+    string_t *mayan = datetime_mayan_calendar_date_text(dt);
+    string_t *aztec = datetime_aztec_calendar_date_text(dt);
+    string_t *ethiopian = datetime_ethiopian_calendar_date_text(dt);
+
+    printf("Cherokee: %s\n", string_c_str(cherokee));
+    printf("Mayan: %s\n", string_c_str(mayan));
+    printf("Aztec: %s\n", string_c_str(aztec));
+    printf("Ethiopian: %s\n", string_c_str(ethiopian));
+
+    string_free(cherokee);
+    string_free(mayan);
+    string_free(aztec);
+    string_free(ethiopian);
+    datetime_dealloc(dt);
+    return 0;
+}
+```
+
+Expected output:
+
+```text
+Cherokee: Cherokee civil Green Corn Moon, day 21, year 2026
+Mayan: Long Count 13.0.13.12.10; Tzolk'in 7 Ok; Haab 3 Sek
+Aztec: Tonalpohualli 5 Mazatl; Xiuhpohualli day 19 of Etzalcualiztli; year 1 Tochtli
+Ethiopian: 14 Sene 2018 EC
 ```
 
 ## Design Notes
@@ -192,6 +229,19 @@ initialise it, and return the same pointer (or NULL on error).
 - `datetime_t *datetime_init_muslim_new_year(datetime_t *dttm, int year)` — civil Islamic New Year date
 - `datetime_t *datetime_init_passover(datetime_t *dttm, int year)` — Passover date
 - `datetime_t *datetime_init_jewish_new_year(datetime_t *dttm, int year)` — Jewish New Year date
+
+### Calendar Text Formatters
+
+- `string_t *datetime_christian_calendar_date_text(const datetime_t *dttm)` — Gregorian and Julian civil date text
+- `string_t *datetime_chinese_calendar_date_text(const datetime_t *dttm)` — Chinese lunisolar date text
+- `string_t *datetime_hindu_calendar_date_text(const datetime_t *dttm)` — Hindu calendar-style date text
+- `string_t *datetime_buddhist_calendar_date_text(const datetime_t *dttm)` — Thai Buddhist Era date text
+- `string_t *datetime_muslim_calendar_date_text(const datetime_t *dttm)` — civil Islamic date text
+- `string_t *datetime_jewish_calendar_date_text(const datetime_t *dttm)` — Jewish calendar date text
+- `string_t *datetime_cherokee_calendar_date_text(const datetime_t *dttm)` — adapted Cherokee civil month naming
+- `string_t *datetime_mayan_calendar_date_text(const datetime_t *dttm)` — Mayan Long Count, Tzolk'in, and Haab text
+- `string_t *datetime_aztec_calendar_date_text(const datetime_t *dttm)` — Aztec Tonalpohualli and Xiuhpohualli text
+- `string_t *datetime_ethiopian_calendar_date_text(const datetime_t *dttm)` — Ethiopian civil calendar date text
 
 ### Field Accessors
 
