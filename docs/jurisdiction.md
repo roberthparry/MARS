@@ -56,6 +56,10 @@ make uninstall-jurisdiction-db
 
 If you want the desktop app as well, use `make install-mars-lab`.
 
+When weather lookups are configured for MARS Lab, the optional WeatherAPI key
+is stored separately in `~/.mars/config/weather.env` and is preserved when the
+jurisdiction database is rebuilt.
+
 ## Range Queries
 
 `jurisdict_holidays_between()` returns an `array_t *` of `holiday_event_t` values:

@@ -292,7 +292,11 @@ def resolve_zone_name(zone_name: str, links: dict[str, str]) -> str:
 def build_sql() -> str:
     target_timezones = parse_target_timezones()
     rules, zones, links = parse_tzdata()
-    canonical_timezones = sorted({resolve_zone_name(zone_name, links) for zone_name in target_timezones})
+    target_to_canonical = {
+        zone_name: resolve_zone_name(zone_name, links)
+        for zone_name in target_timezones
+    }
+    canonical_timezones = sorted(set(target_to_canonical.values()))
 
     missing = [zone_name for zone_name in canonical_timezones if zone_name not in zones]
     if missing:
@@ -321,8 +325,9 @@ def build_sql() -> str:
         ") VALUES",
     ]
     lines.append(",\n".join(
-        f"    ({sql_quote(zone_name)}, {sql_quote(zone_name)}, {sql_quote('Representative timezone imported from host tzdata.zi.')})"
-        for zone_name in canonical_timezones
+        f"    ({sql_quote(zone_name)}, {sql_quote(canonical_zone_name)}, "
+        f"{sql_quote('Representative timezone imported from host tzdata.zi.')})"
+        for zone_name, canonical_zone_name in sorted(target_to_canonical.items())
     ) + ";")
     lines.append("")
     lines.extend([

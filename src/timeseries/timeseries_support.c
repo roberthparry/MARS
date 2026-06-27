@@ -162,53 +162,10 @@ int ts_infer_season_period(ts_frequency_t frequency)
     return ts_frequency_season_period_dispatch[idx];
 }
 
-static bool ts_date_cursor_parse_int(string_cursor_t *cursor, int *out)
-{
-    int value = 0;
-    bool saw_digit = false;
-
-    if (!cursor || !out)
-        return false;
-
-    while (!string_cursor_done(cursor)) {
-        rune_t rune = string_cursor_peek(cursor);
-        char ch = '\0';
-
-        if (!rune_to_ascii(rune, &ch) || ch < '0' || ch > '9')
-            break;
-        saw_digit = true;
-        value = value * 10 + (ch - '0');
-        (void)string_cursor_next(cursor);
-    }
-
-    if (!saw_digit)
-        return false;
-    *out = value;
-    return true;
-}
-
-static bool ts_date_cursor_consume_slash(string_cursor_t *cursor)
-{
-    rune_t rune;
-
-    if (!cursor)
-        return false;
-
-    rune = string_cursor_peek(cursor);
-    if (!rune_is_equal(rune, '/'))
-        return false;
-
-    (void)string_cursor_next(cursor);
-    return true;
-}
-
 int ts_parse_date_text(const string_t *text, datetime_t **out)
 {
     string_t *trimmed;
-    string_cursor_t *cursor;
-    int day = 0;
-    int month = 0;
-    int year = 0;
+    const char *raw;
     datetime_t *dt;
 
     if (!text || !out)
@@ -219,27 +176,9 @@ int ts_parse_date_text(const string_t *text, datetime_t **out)
         return -1;
     string_trim(trimmed);
 
-    cursor = string_cursor_new(trimmed);
-    if (!cursor) {
-        string_free(trimmed);
-        return -1;
-    }
-
-    if (!ts_date_cursor_parse_int(cursor, &day) ||
-        !ts_date_cursor_consume_slash(cursor) ||
-        !ts_date_cursor_parse_int(cursor, &month) ||
-        !ts_date_cursor_consume_slash(cursor) ||
-        !ts_date_cursor_parse_int(cursor, &year) ||
-        !string_cursor_done(cursor)) {
-        string_cursor_free(cursor);
-        string_free(trimmed);
-        return -1;
-    }
-
-    string_cursor_free(cursor);
+    raw = string_c_str(trimmed);
+    dt = datetime_from_string(raw);
     string_free(trimmed);
-
-    dt = datetime_init_ymd(datetime_alloc(), (short)year, (month_t)month, (uint8_t)day);
     if (!dt)
         return -1;
     *out = dt;

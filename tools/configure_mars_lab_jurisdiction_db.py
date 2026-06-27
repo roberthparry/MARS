@@ -36,6 +36,10 @@ def config_path() -> Path:
     return mars_home() / "config" / "jurisdiction-db.env"
 
 
+def weather_config_path() -> Path:
+    return mars_home() / "config" / "weather.env"
+
+
 def default_db_path() -> Path:
     return mars_home() / "jurisdiction" / "mars_jurisdiction_rules.db"
 
@@ -132,9 +136,20 @@ class Spinner:
 
 def recreate_mars_home() -> None:
     home = mars_home()
+    weather_backup: bytes | None = None
+
+    try:
+        weather_backup = weather_config_path().read_bytes()
+    except OSError:
+        weather_backup = None
+
     if home.exists():
         shutil.rmtree(home)
     ensure_private_dir(home)
+    if weather_backup is not None:
+        ensure_private_dir(weather_config_path().parent)
+        weather_config_path().write_bytes(weather_backup)
+        weather_config_path().chmod(stat.S_IRUSR | stat.S_IWUSR)
 
 
 def write_config(path: Path, db_path: str, db_key: str) -> None:
@@ -214,7 +229,7 @@ def main() -> int:
         print(f"Config file: {path}")
         db_path = default_path
         db_key = prompt_secret(
-            "Choose a password to protect your private datetime database",
+            "Choose a password to protect your private jurisdiction database",
             default_key,
             confirm=not bool(default_key),
         )

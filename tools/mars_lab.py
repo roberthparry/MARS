@@ -28,7 +28,9 @@ import subprocess
 import sys
 import tempfile
 import threading
+import urllib.error
 import urllib.parse
+import urllib.request
 import webbrowser
 import shutil
 
@@ -116,6 +118,34 @@ def mars_home_dir() -> Path:
     if custom:
         return Path(custom).expanduser()
     return Path.home() / ".mars"
+
+
+def config_env_path(name: str) -> Path:
+    return mars_home_dir() / "config" / name
+
+
+def read_env_like_value(path: Path, variable_name: str) -> str:
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return ""
+
+    prefix = f"{variable_name}="
+    export_prefix = f"export {variable_name}="
+    for raw_line in lines:
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith(export_prefix):
+            value = line[len(export_prefix):].strip()
+        elif line.startswith(prefix):
+            value = line[len(prefix):].strip()
+        else:
+            continue
+        if len(value) >= 2 and ((value[0] == "'" and value[-1] == "'") or (value[0] == '"' and value[-1] == '"')):
+            value = value[1:-1]
+        return value.strip()
+    return ""
 
 
 def default_jurisdiction_db_path() -> Path:
@@ -1513,9 +1543,8 @@ INDEX_HTML = r"""<!doctype html>
       top: calc(100% + 0.4rem);
       z-index: 40;
       display: grid;
-      gap: 0.18rem;
+      gap: 0.3rem;
       max-height: min(19rem, 48vh);
-      overflow-y: auto;
       padding: 0.35rem;
       border: 1px solid rgba(233, 244, 239, 0.32);
       border-radius: 18px;
@@ -1530,6 +1559,35 @@ INDEX_HTML = r"""<!doctype html>
 
     .select-menu.hidden {
       display: none;
+    }
+
+    .select-search {
+      width: 100%;
+      border: 1px solid rgba(233, 244, 239, 0.22);
+      border-radius: 12px;
+      padding: 0.55rem 0.7rem;
+      color: var(--code);
+      background: rgba(0, 0, 0, 0.18);
+      font: 0.84rem/1.2 "Cascadia Code", "Fira Code", "DejaVu Sans Mono", monospace;
+      outline: 0;
+    }
+
+    .select-search::placeholder {
+      color: rgba(215, 231, 183, 0.52);
+    }
+
+    .select-search:focus {
+      border-color: color-mix(in srgb, var(--accent), var(--line) 25%);
+      box-shadow: 0 0 0 3px rgba(113, 198, 180, 0.14);
+    }
+
+    .select-options {
+      display: grid;
+      gap: 0.18rem;
+      max-height: min(15.5rem, 38vh);
+      overflow-y: auto;
+      padding-right: 0.08rem;
+      scrollbar-color: rgba(207, 160, 82, 0.74) rgba(7, 25, 19, 0.62);
     }
 
     .select-option {
@@ -1556,6 +1614,23 @@ INDEX_HTML = r"""<!doctype html>
     .select-option.selected {
       color: #10190f;
       background: linear-gradient(135deg, rgba(233, 187, 90, 0.96), rgba(140, 216, 184, 0.94));
+    }
+
+    .select-option.hidden {
+      display: none;
+    }
+
+    .select-empty {
+      display: none;
+      border-radius: 12px;
+      padding: 0.65rem 0.7rem;
+      color: rgba(215, 231, 183, 0.72);
+      background: rgba(0, 0, 0, 0.14);
+      font: 0.82rem/1.3 "Cascadia Code", "Fira Code", "DejaVu Sans Mono", monospace;
+    }
+
+    .select-empty.visible {
+      display: block;
     }
 
     .mode-hint {
@@ -2757,10 +2832,11 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           <ul>
             <li><code>Date</code> drives weekday, moon phase, sunrise, sunset, solar declination, inclination, and maximum altitude.</li>
             <li><code>Start date</code> and <code>End date</code> drive the days-between result.</li>
-            <li><code>Year</code> drives Christian, Chinese, Hindu, Buddhist, Muslim, and Jewish observances.</li>
+            <li><code>Year</code> drives Christian, Chinese, Hindu, Buddhist, Muslim, Jewish, Cherokee, Mayan, Aztec, and Ethiopian calendar views.</li>
             <li><code>Holiday country or jurisdiction</code> is only used when you want the optional local holiday panel.</li>
             <li><code>GMT offset</code> should include daylight saving. Leave it blank to use the selected jurisdiction's local offset for the selected date.</li>
             <li>Ramadan, Eid al-Fitr, and Muslim New Year use the civil Islamic calendar; Hindu and Buddhist observances are estimated from India-window lunar events, so observed dates can differ locally.</li>
+            <li>Weather, humidity, wind, and rain chance appear only when a weather API key is configured and the selected date is supported by the provider.</li>
           </ul>
         </div>
         <div class="help-card" data-help-modes="integrator">
@@ -2964,8 +3040,13 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     const mobileQr = document.getElementById('mobileQr');
     const controlToken = __CONTROL_TOKEN__;
     enhanceRoundedSelect(matrixOperation);
-    enhanceRoundedSelect(datetimeJurisdiction);
+    enhanceRoundedSelect(datetimeJurisdiction, {
+      searchable: true,
+      searchPlaceholder: 'Search jurisdictions',
+      emptyText: 'No matching jurisdiction'
+    });
     let datetimeLocalRefreshSequence = 0;
+    let datetimeEvaluationSequence = 0;
     const statusEl = document.getElementById('status');
     const inputCopy = document.getElementById('inputCopy');
     const rightPaneTitle = document.getElementById('rightPaneTitle');
@@ -3390,7 +3471,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         setValueCardVisible(true);
       } else {
         leftPaneTitle.textContent = 'Datetime';
-        subtitle.textContent = 'Choose dates, a year, and a location. MARS datetime calculates calendar observances, moon phase, and solar times, with local holidays added when available.';
+        subtitle.textContent = 'Choose dates, a year, and a location. MARS datetime calculates calendar observances, moon phase, solar times, and optional local weather, with jurisdiction holidays added when available.';
         setResultTitles('Overview', 'Date Range', 'Calendar', 'Solar And Moon');
         setValueCardVisible(true);
       }
@@ -3496,7 +3577,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       syncRoundedSelect(select);
     }
 
-    function enhanceRoundedSelect(select) {
+    function enhanceRoundedSelect(select, options = {}) {
       if (!select)
         return null;
 
@@ -3504,6 +3585,10 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       const shell = document.createElement('div');
       const button = document.createElement('button');
       const menu = document.createElement('div');
+      const searchable = options && options.searchable;
+      const searchInput = searchable ? document.createElement('input') : null;
+      const optionsWrap = document.createElement('div');
+      const emptyState = document.createElement('div');
 
       shell.className = 'select-shell';
       button.type = 'button';
@@ -3517,6 +3602,19 @@ __HOLIDAY_JURISDICTION_OPTIONS__
 
       menu.className = 'select-menu hidden';
       menu.setAttribute('role', 'listbox');
+      optionsWrap.className = 'select-options';
+      emptyState.className = 'select-empty';
+      emptyState.textContent = (options && options.emptyText) || 'No matches';
+
+      if (searchInput) {
+        searchInput.type = 'search';
+        searchInput.className = 'select-search';
+        searchInput.placeholder = (options && options.searchPlaceholder) || 'Search';
+        searchInput.setAttribute('aria-label', searchInput.placeholder);
+        searchInput.autocomplete = 'off';
+        searchInput.spellcheck = false;
+        menu.appendChild(searchInput);
+      }
 
       select.classList.add('select-native-source');
       select.tabIndex = -1;
@@ -3525,6 +3623,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       shell.appendChild(select);
       shell.appendChild(button);
       shell.appendChild(menu);
+      menu.appendChild(optionsWrap);
+      menu.appendChild(emptyState);
 
       const optionButtons = Array.from(select.options).map((option) => {
         const item = document.createElement('button');
@@ -3542,12 +3642,30 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           if (changed)
             select.dispatchEvent(new Event('change', {bubbles: true}));
         });
-        menu.appendChild(item);
+        optionsWrap.appendChild(item);
         return item;
       });
 
+      function visibleOptionButtons() {
+        return optionButtons.filter((item) => !item.classList.contains('hidden'));
+      }
+
       function selectedOption() {
         return select.selectedOptions[0] || select.options[select.selectedIndex] || select.options[0];
+      }
+
+      function filterOptions() {
+        const query = String(searchInput && searchInput.value || '').trim().toLowerCase();
+        let visibleCount = 0;
+
+        optionButtons.forEach((item) => {
+          const haystack = `${item.textContent || ''} ${item.dataset.value || ''}`.toLowerCase();
+          const visible = !query || haystack.includes(query);
+          item.classList.toggle('hidden', !visible);
+          if (visible)
+            visibleCount += 1;
+        });
+        emptyState.classList.toggle('visible', visibleCount === 0);
       }
 
       function sync() {
@@ -3558,6 +3676,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           item.classList.toggle('selected', selectedItem);
           item.setAttribute('aria-selected', selectedItem ? 'true' : 'false');
         });
+        filterOptions();
       }
 
       function close() {
@@ -3567,6 +3686,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       }
 
       function open() {
+        if (searchInput)
+          searchInput.value = '';
         sync();
         shell.classList.add('open');
         button.setAttribute('aria-expanded', 'true');
@@ -3574,18 +3695,20 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       }
 
       function focusSelectedOption() {
-        const selected = optionButtons.find((item) => item.dataset.value === select.value);
-        (selected || optionButtons[0] || button).focus();
+        const visible = visibleOptionButtons();
+        const selected = visible.find((item) => item.dataset.value === select.value);
+        (selected || visible[0] || searchInput || button).focus();
       }
 
       function focusRelativeOption(step) {
-        if (!optionButtons.length)
+        const visible = visibleOptionButtons();
+        if (!visible.length)
           return;
-        const currentIndex = optionButtons.indexOf(document.activeElement);
-        const selectedIndex = optionButtons.findIndex((item) => item.dataset.value === select.value);
+        const currentIndex = visible.indexOf(document.activeElement);
+        const selectedIndex = visible.findIndex((item) => item.dataset.value === select.value);
         const index = currentIndex >= 0 ? currentIndex : Math.max(0, selectedIndex);
-        const nextIndex = (index + step + optionButtons.length) % optionButtons.length;
-        optionButtons[nextIndex].focus();
+        const nextIndex = (index + step + visible.length) % visible.length;
+        visible[nextIndex].focus();
       }
 
       button.addEventListener('click', () => {
@@ -3599,11 +3722,30 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         if (event.key === 'ArrowDown' || event.key === 'Enter' || event.key === ' ') {
           event.preventDefault();
           open();
-          focusSelectedOption();
+          if (searchInput)
+            searchInput.focus();
+          else
+            focusSelectedOption();
         } else if (event.key === 'Escape') {
           close();
         }
       });
+
+      if (searchInput) {
+        searchInput.addEventListener('input', () => {
+          filterOptions();
+        });
+        searchInput.addEventListener('keydown', (event) => {
+          if (event.key === 'Escape') {
+            event.preventDefault();
+            close();
+            button.focus();
+          } else if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            focusSelectedOption();
+          }
+        });
+      }
 
       menu.addEventListener('keydown', (event) => {
         if (event.key === 'Escape') {
@@ -5780,6 +5922,16 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       }
     }
 
+    async function triggerDatetimeAutoEvaluation({refreshJurisdiction = false} = {}) {
+      if (currentMode() !== 'datetime')
+        return;
+      if (refreshJurisdiction)
+        await refreshDatetimeJurisdictionLocation();
+      saveLastDatetimeState();
+      await evaluateDatetime({skipHistoryUpdate: true});
+      updateHistoryButtons();
+    }
+
     function estimateValuePrecision() {
       const style = getComputedStyle(value);
       const canvas = estimateValuePrecision.canvas || document.createElement('canvas');
@@ -6767,6 +6919,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     }
 
     async function evaluateDatetime(options = {}) {
+      const evaluationId = ++datetimeEvaluationSequence;
       const state = currentDatetimeState();
       const snapshotText = datetimeSummaryText(state);
       const nextState = historyStateForMode(currentMode(), snapshotText);
@@ -6780,6 +6933,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         if (previousState)
           pushExpressionHistory(previousState);
         const {response, data} = await fetchDatetimeEvaluation();
+        if (evaluationId !== datetimeEvaluationSequence || currentMode() !== 'datetime')
+          return;
         if (!response.ok || !data.ok) {
           setRenderedError(data.error || 'Datetime calculation failed');
           resetMoreDigitsButton(renderedMore, false);
@@ -6824,6 +6979,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         commitModeState();
         setStatus('Ready');
       } catch (err) {
+        if (evaluationId !== datetimeEvaluationSequence || currentMode() !== 'datetime')
+          return;
         setRenderedError(String(err));
         resetMoreDigitsButton(renderedMore, false);
         setDatetimeLocalText('');
@@ -6831,7 +6988,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         commitModeState();
         setStatus('Error');
       } finally {
-        setBusy(false);
+        if (evaluationId === datetimeEvaluationSequence)
+          setBusy(false);
         if (!options.skipHistoryUpdate)
           updateHistoryButtons();
       }
@@ -7353,19 +7511,9 @@ __HOLIDAY_JURISDICTION_OPTIONS__
               datetimeJdn.value = '';
           }
           if (currentMode() === 'datetime') {
-            if (control === datetimeJurisdiction || control === datetimeDate) {
-              refreshDatetimeJurisdictionLocation().then(() => {
-                saveLastDatetimeState();
-                if (control === datetimeJurisdiction)
-                  evaluateDatetime({skipHistoryUpdate: true});
-                updateHistoryButtons();
-              });
-              return;
-            }
-            saveLastDatetimeState();
-            if (control === datetimeStart || control === datetimeEnd)
-              refreshDatetimeLocalHolidays();
-            updateHistoryButtons();
+            triggerDatetimeAutoEvaluation({
+              refreshJurisdiction: control === datetimeJurisdiction || control === datetimeDate
+            });
           }
         });
       });
@@ -8844,6 +8992,10 @@ def parse_datetime_lab_output(output: str) -> dict[str, str]:
             "buddhist_calendar_date": r"^buddhist_calendar_date\s+(.*)$",
             "muslim_calendar_date": r"^muslim_calendar_date\s+(.*)$",
             "jewish_calendar_date": r"^jewish_calendar_date\s+(.*)$",
+            "cherokee_calendar_date": r"^cherokee_calendar_date\s+(.*)$",
+            "mayan_calendar_date": r"^mayan_calendar_date\s+(.*)$",
+            "aztec_calendar_date": r"^aztec_calendar_date\s+(.*)$",
+            "ethiopian_calendar_date": r"^ethiopian_calendar_date\s+(.*)$",
             "moon_phase": r"^moon_phase\s+(.*)$",
             "solar_declination": r"^solar_declination\s+(.*)$",
             "solar_max_altitude": r"^solar_max_altitude\s+(.*)$",
@@ -8855,6 +9007,13 @@ def parse_datetime_lab_output(output: str) -> dict[str, str]:
             "sunrise_status": r"^sunrise_status\s+(.*)$",
             "sunset": r"^sunset\s+(.*)$",
             "sunset_status": r"^sunset_status\s+(.*)$",
+            "dst_forward": r"^dst_forward\s+(.*)$",
+            "dst_back": r"^dst_back\s+(.*)$",
+            "dst_forward_from_offset": r"^dst_forward_from_offset\s+(.*)$",
+            "dst_forward_to_offset": r"^dst_forward_to_offset\s+(.*)$",
+            "dst_back_from_offset": r"^dst_back_from_offset\s+(.*)$",
+            "dst_back_to_offset": r"^dst_back_to_offset\s+(.*)$",
+            "dst_status": r"^dst_status\s+(.*)$",
             "start": r"^start\s+(.*)$",
             "end": r"^end\s+(.*)$",
             "days_between": r"^days_between\s+(.*)$",
@@ -8874,15 +9033,28 @@ def parse_datetime_lab_output(output: str) -> dict[str, str]:
             "vesak": r"^vesak\s+(.*)$",
             "asalha_puja": r"^asalha_puja\s+(.*)$",
             "ramadan": r"^ramadan\s+(.*)$",
-            "ramadan_starts_gmt": r"^ramadan_starts_gmt\s+(.*)$",
+            "ramadan_starts_local": r"^ramadan_starts_local\s+(.*)$",
             "eid_al_fitr": r"^eid_al_fitr\s+(.*)$",
-            "eid_al_fitr_starts_gmt": r"^eid_al_fitr_starts_gmt\s+(.*)$",
+            "eid_al_fitr_starts_local": r"^eid_al_fitr_starts_local\s+(.*)$",
             "muslim_new_year": r"^muslim_new_year\s+(.*)$",
-            "muslim_new_year_starts_gmt": r"^muslim_new_year_starts_gmt\s+(.*)$",
+            "muslim_new_year_starts_local": r"^muslim_new_year_starts_local\s+(.*)$",
             "passover": r"^passover\s+(.*)$",
-            "passover_starts_gmt": r"^passover_starts_gmt\s+(.*)$",
+            "passover_starts_local": r"^passover_starts_local\s+(.*)$",
             "jewish_new_year": r"^jewish_new_year\s+(.*)$",
-            "jewish_new_year_starts_gmt": r"^jewish_new_year_starts_gmt\s+(.*)$",
+            "jewish_new_year_starts_local": r"^jewish_new_year_starts_local\s+(.*)$",
+            "ethiopian_new_year": r"^ethiopian_new_year\s+(.*)$",
+            "genna": r"^genna\s+(.*)$",
+            "timkat": r"^timkat\s+(.*)$",
+            "meskel": r"^meskel\s+(.*)$",
+            "fasika": r"^fasika\s+(.*)$",
+            "cherokee_new_moon_festival": r"^cherokee_new_moon_festival\s+(.*)$",
+            "cherokee_green_corn_ceremony": r"^cherokee_green_corn_ceremony\s+(.*)$",
+            "cherokee_ripe_corn_ceremony": r"^cherokee_ripe_corn_ceremony\s+(.*)$",
+            "cherokee_great_new_moon_festival": r"^cherokee_great_new_moon_festival\s+(.*)$",
+            "mayan_haab_new_year": r"^mayan_haab_new_year\s+(.*)$",
+            "mayan_wayeb_start": r"^mayan_wayeb_start\s+(.*)$",
+            "aztec_xiuhpohualli_new_year": r"^aztec_xiuhpohualli_new_year\s+(.*)$",
+            "aztec_nemontemi_start": r"^aztec_nemontemi_start\s+(.*)$",
         },
     )
 
@@ -8905,6 +9077,170 @@ def parse_holiday_lab_output(output: str) -> dict[str, str]:
 
 def holiday_install_hint() -> str:
     return "Jurisdiction database unavailable. Run `make install-jurisdiction-db` to enable local holiday lookups."
+
+
+WEATHER_HISTORY_START = py_datetime.date(2010, 1, 1)
+WEATHER_FORECAST_WINDOW_DAYS = 14
+WEATHER_FUTURE_WINDOW_DAYS = 300
+WEATHER_REQUEST_TIMEOUT_SECONDS = 4.0
+WEATHER_TOTAL_BUDGET_SECONDS = 0.8
+WEATHER_API_BASE_URL = "https://api.weatherapi.com/v1"
+WEATHER_API_KEY_ENV = "MARS_WEATHER_API_KEY"
+LEGACY_WEATHER_API_KEY_ENV = "WEATHERAPI_KEY"
+WEATHER_CONFIG_FILE = "weather.env"
+
+
+def weather_api_key() -> str:
+    for env_name in (WEATHER_API_KEY_ENV, LEGACY_WEATHER_API_KEY_ENV):
+        value = os.environ.get(env_name, "").strip()
+        if value:
+            return value
+    for env_name in (WEATHER_API_KEY_ENV, LEGACY_WEATHER_API_KEY_ENV):
+        value = read_env_like_value(config_env_path(WEATHER_CONFIG_FILE), env_name)
+        if value:
+            return value
+    return ""
+
+
+def weather_relative_day_span(date_text: str) -> int | None:
+    try:
+        selected_date = py_datetime.date.fromisoformat(str(date_text or "").strip())
+    except ValueError:
+        return None
+    today = py_datetime.date.today()
+    return (selected_date - today).days
+
+
+def weather_date_is_supported(date_text: str) -> bool:
+    day_span: int | None
+    selected_date: py_datetime.date
+
+    day_span = weather_relative_day_span(date_text)
+
+    if day_span is None:
+        return False
+    selected_date = py_datetime.date.fromisoformat(str(date_text or "").strip())
+    if selected_date < WEATHER_HISTORY_START:
+        return False
+    if day_span < 0:
+        return True
+    if day_span <= (WEATHER_FORECAST_WINDOW_DAYS - 1):
+        return True
+    return day_span <= WEATHER_FUTURE_WINDOW_DAYS
+
+
+def format_celsius_text(value: object) -> str:
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return ""
+    text = f"{numeric:.1f}".rstrip("0").rstrip(".")
+    return f"{text}°C"
+
+
+def fetch_daily_weather_for_datetime(date_text: str,
+                                     latitude: float,
+                                     longitude: float) -> dict[str, str] | None:
+    day_payload: dict[str, object]
+    forecast_payload: dict[str, object]
+    forecast_days: list[object]
+    query: str
+    request: urllib.request.Request
+    endpoint: str
+    api_key: str
+
+    day_span = weather_relative_day_span(date_text)
+
+    if day_span is None or not weather_date_is_supported(date_text):
+        return None
+    api_key = weather_api_key()
+    if not api_key:
+        return None
+
+    endpoint = "history.json" if day_span < 0 else ("forecast.json" if day_span <= (WEATHER_FORECAST_WINDOW_DAYS - 1) else "future.json")
+    query_params = {
+        "key": api_key,
+        "q": f"{latitude:.6f},{longitude:.6f}",
+        "dt": date_text,
+    }
+    if endpoint == "forecast.json":
+        query_params["days"] = str(min(WEATHER_FORECAST_WINDOW_DAYS, day_span + 1))
+    query = urllib.parse.urlencode(query_params)
+    request = urllib.request.Request(
+        f"{WEATHER_API_BASE_URL}/{endpoint}?{query}",
+        headers={
+            "Accept": "application/json",
+            "User-Agent": "MARS-Lab/1.0",
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=WEATHER_REQUEST_TIMEOUT_SECONDS) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (OSError, ValueError, urllib.error.URLError):
+        return None
+
+    forecast_payload = payload.get("forecast") if isinstance(payload, dict) else None
+    if not isinstance(forecast_payload, dict):
+        return None
+    forecast_days = forecast_payload.get("forecastday")
+    if not isinstance(forecast_days, list) or not forecast_days:
+        return None
+    if not isinstance(forecast_days[0], dict):
+        return None
+    if str(forecast_days[0].get("date") or "").strip() != date_text:
+        return None
+    day_payload = forecast_days[0].get("day")
+    if not isinstance(day_payload, dict):
+        return None
+
+    min_text = format_celsius_text(day_payload.get("mintemp_c"))
+    max_text = format_celsius_text(day_payload.get("maxtemp_c"))
+    humidity_text = str(day_payload.get("avghumidity") or "").strip()
+    rain_chance = str(day_payload.get("daily_chance_of_rain") or "").strip()
+    max_wind_raw = day_payload.get("maxwind_kph")
+    if not min_text or not max_text:
+        return None
+    if humidity_text and not humidity_text.endswith("%"):
+        humidity_text = f"{humidity_text}%"
+    if rain_chance and not rain_chance.endswith("%"):
+        rain_chance = f"{rain_chance}%"
+    try:
+        max_wind_value = float(max_wind_raw)
+        wind_text = f"{max_wind_value:.1f} km/h"
+        if wind_text.endswith(".0 km/h"):
+            wind_text = wind_text.replace(".0 km/h", " km/h")
+    except (TypeError, ValueError):
+        wind_text = ""
+
+    return {
+        "weather_min_c": min_text,
+        "weather_max_c": max_text,
+        "weather_humidity": humidity_text,
+        "weather_wind": wind_text,
+        "weather_rain_chance": rain_chance,
+        "weather_summary": f"Min {min_text}, max {max_text}",
+        "weather_source": "WeatherAPI.com",
+    }
+
+
+def fetch_daily_weather_with_budget(date_text: str,
+                                    latitude: float,
+                                    longitude: float) -> dict[str, str] | None:
+    result: dict[str, str] | None = None
+    finished = threading.Event()
+
+    def worker() -> None:
+        nonlocal result
+        try:
+            result = fetch_daily_weather_for_datetime(date_text, latitude, longitude)
+        finally:
+            finished.set()
+
+    thread = threading.Thread(target=worker, daemon=True)
+    thread.start()
+    if not finished.wait(WEATHER_TOTAL_BUDGET_SECONDS):
+        return None
+    return result
 
 
 def _trim_decimal_tail(text: str) -> str:
@@ -9991,14 +10327,98 @@ def prepare_datetime_fields(fields: dict[str, str]) -> dict[str, object]:
     sunset = str(fields.get("sunset") or "").strip()
     sunrise_status = str(fields.get("sunrise_status") or "").strip()
     sunset_status = str(fields.get("sunset_status") or "").strip()
+    dst_forward = str(fields.get("dst_forward") or "").strip()
+    dst_back = str(fields.get("dst_back") or "").strip()
+    dst_forward_from_offset = str(fields.get("dst_forward_from_offset") or "").strip()
+    dst_forward_to_offset = str(fields.get("dst_forward_to_offset") or "").strip()
+    dst_back_from_offset = str(fields.get("dst_back_from_offset") or "").strip()
+    dst_back_to_offset = str(fields.get("dst_back_to_offset") or "").strip()
+    dst_status = str(fields.get("dst_status") or "").strip()
     gmt_offset = str(fields.get("gmt_offset") or "").strip()
+    weather_min_c = str(fields.get("weather_min_c") or "").strip()
+    weather_max_c = str(fields.get("weather_max_c") or "").strip()
+    weather_humidity = str(fields.get("weather_humidity") or "").strip()
+    weather_wind = str(fields.get("weather_wind") or "").strip()
+    weather_rain_chance = str(fields.get("weather_rain_chance") or "").strip()
+    weather_summary = str(fields.get("weather_summary") or "").strip()
+    weather_source = str(fields.get("weather_source") or "").strip()
     offset_text = "local machine GMT offset" if gmt_offset == "local" else f"GMT offset {gmt_offset}"
+
+    def format_offset_text(text: str) -> str:
+        if not text:
+            return ""
+        try:
+            value = float(text)
+        except ValueError:
+            return text
+        sign = "+" if value >= 0 else "-"
+        abs_value = abs(value)
+        hours = int(abs_value)
+        minutes = int(round((abs_value - hours) * 60.0))
+        if minutes == 60:
+            hours += 1
+            minutes = 0
+        if minutes:
+            return f"GMT{sign}{hours:01d}:{minutes:02d}"
+        return f"GMT{sign}{hours}"
+
+    def format_transition_text(text: str) -> str:
+        try:
+            parsed = py_datetime.datetime.strptime(text, "%Y-%m-%d %H:%M")
+        except ValueError:
+            return text
+        day = parsed.day
+        if 10 <= day % 100 <= 20:
+            suffix = "th"
+        else:
+            suffix = {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
+        return parsed.strftime("%A ") + f"{day}{suffix} " + parsed.strftime("%B %Y at %H:%M")
+
+    dst_forward_time = format_transition_text(dst_forward) if dst_forward and dst_forward != "unavailable" else ""
+    dst_back_time = format_transition_text(dst_back) if dst_back and dst_back != "unavailable" else ""
+    dst_forward_text = (
+        f"{dst_forward_time}, from {format_offset_text(dst_forward_from_offset)} to {format_offset_text(dst_forward_to_offset)}"
+        if dst_forward_time and dst_forward_from_offset and dst_forward_to_offset else dst_forward_time
+    )
+    dst_back_text = (
+        f"{dst_back_time}, from {format_offset_text(dst_back_from_offset)} to {format_offset_text(dst_back_to_offset)}"
+        if dst_back_time and dst_back_from_offset and dst_back_to_offset else dst_back_time
+    )
+    dst_summary = "No daylight saving changes this year" if dst_status == "none" else ""
+
+    def calendar_sort_key(text: str) -> tuple[int, str]:
+        stripped = str(text or "").strip()
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", stripped):
+            return (0, stripped)
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}", stripped):
+            return (0, stripped)
+        return (1, stripped)
+
+    def build_calendar_rows(current_value: str,
+                            observances: list[tuple[str, str, str]]) -> list[dict[str, str]]:
+        rows = [{"label": "Current date", "value": current_value}]
+        grouped: dict[str, list[tuple[str, str]]] = {}
+        for label, value, sort_value in observances:
+            value_text = str(value or "").strip()
+            if not value_text:
+                continue
+            grouped.setdefault(str(sort_value or "").strip(), []).append((label, value_text))
+        for _, items in sorted(grouped.items(), key=lambda item: calendar_sort_key(item[0])):
+            for label, value_text in items:
+                rows.append({"label": label, "value": value_text})
+        return rows
 
     overview_lines = [
         f"{weekday} {date}".strip(),
         f"Moon phase: {moon_phase}" if moon_phase else "",
         f"Sunrise: {sunrise}" if sunrise and sunrise != "unavailable" else f"Sunrise: {sunrise_status or 'unavailable'}",
         f"Sunset: {sunset}" if sunset and sunset != "unavailable" else f"Sunset: {sunset_status or 'unavailable'}",
+        f"Temperature: {weather_summary}" if weather_summary else "",
+        f"Humidity: {weather_humidity}" if weather_humidity else "",
+        f"Wind: {weather_wind}" if weather_wind else "",
+        f"Clocks forward: {dst_forward_text}" if dst_forward_text else "",
+        f"Clocks back: {dst_back_text}" if dst_back_text else "",
+        dst_summary,
         offset_text if gmt_offset else "",
     ]
     overview_sections = [
@@ -10024,8 +10444,39 @@ def prepare_datetime_fields(fields: dict[str, str]) -> dict[str, object]:
                     "label": "Sunset",
                     "value": sunset if sunset and sunset != "unavailable" else (sunset_status or "unavailable"),
                 },
+                *([
+                    {"label": "Clocks forward", "value": dst_forward_text},
+                ] if dst_forward_text else []),
+                *([
+                    {"label": "Clocks back", "value": dst_back_text},
+                ] if dst_back_text else []),
+                *([
+                    {"label": "Daylight saving", "value": dst_summary},
+                ] if dst_summary else []),
             ],
         },
+        *([
+            {
+                "title": "Weather",
+                "open": True,
+                "rows": [
+                    {"label": "Minimum", "value": weather_min_c},
+                    {"label": "Maximum", "value": weather_max_c},
+                    *([
+                        {"label": "Humidity", "value": weather_humidity},
+                    ] if weather_humidity else []),
+                    *([
+                        {"label": "Wind", "value": weather_wind},
+                    ] if weather_wind else []),
+                    *([
+                        {"label": "Chance of rain", "value": weather_rain_chance},
+                    ] if weather_rain_chance else []),
+                    *([
+                        {"label": "Source", "value": weather_source},
+                    ] if weather_source else []),
+                ],
+            },
+        ] if weather_min_c and weather_max_c else []),
     ]
     range_lines = [
         f"Start date: {str(fields.get('start') or '').strip()}",
@@ -10075,80 +10526,158 @@ def prepare_datetime_fields(fields: dict[str, str]) -> dict[str, object]:
         f"Asalha Puja / Dharma Day (estimated): {str(fields.get('asalha_puja') or '').strip()}",
         f"Muslim calendar date: {str(fields.get('muslim_calendar_date') or '').strip()}",
         f"Ramadan begins (civil Islamic): {str(fields.get('ramadan') or '').strip()}",
-        f"Ramadan begins at sunset (GMT): {str(fields.get('ramadan_starts_gmt') or '').strip()}",
+        f"Ramadan begins at sunset (local time): {str(fields.get('ramadan_starts_local') or '').strip()}",
         f"Eid al-Fitr (civil Islamic): {str(fields.get('eid_al_fitr') or '').strip()}",
-        f"Eid al-Fitr begins at sunset (GMT): {str(fields.get('eid_al_fitr_starts_gmt') or '').strip()}",
+        f"Eid al-Fitr begins at sunset (local time): {str(fields.get('eid_al_fitr_starts_local') or '').strip()}",
         f"Muslim New Year (civil Islamic): {str(fields.get('muslim_new_year') or '').strip()}",
-        f"Muslim New Year begins at sunset (GMT): {str(fields.get('muslim_new_year_starts_gmt') or '').strip()}",
+        f"Muslim New Year begins at sunset (local time): {str(fields.get('muslim_new_year_starts_local') or '').strip()}",
         f"Jewish calendar date: {str(fields.get('jewish_calendar_date') or '').strip()}",
         f"Passover: {str(fields.get('passover') or '').strip()}",
-        f"Passover begins at sunset (GMT): {str(fields.get('passover_starts_gmt') or '').strip()}",
+        f"Passover begins at sunset (local time): {str(fields.get('passover_starts_local') or '').strip()}",
         f"Jewish New Year: {str(fields.get('jewish_new_year') or '').strip()}",
-        f"Jewish New Year begins at sunset (GMT): {str(fields.get('jewish_new_year_starts_gmt') or '').strip()}",
+        f"Jewish New Year begins at sunset (local time): {str(fields.get('jewish_new_year_starts_local') or '').strip()}",
+        f"Cherokee calendar date: {str(fields.get('cherokee_calendar_date') or '').strip()}",
+        f"Cherokee New Moon Festival (estimated): {str(fields.get('cherokee_new_moon_festival') or '').strip()}",
+        f"Cherokee Green Corn Ceremony (estimated): {str(fields.get('cherokee_green_corn_ceremony') or '').strip()}",
+        f"Cherokee Ripe Corn Ceremony (estimated): {str(fields.get('cherokee_ripe_corn_ceremony') or '').strip()}",
+        f"Cherokee Great New Moon Festival (estimated): {str(fields.get('cherokee_great_new_moon_festival') or '').strip()}",
+        f"Mayan calendar date: {str(fields.get('mayan_calendar_date') or '').strip()}",
+        f"Mayan Haab New Year: {str(fields.get('mayan_haab_new_year') or '').strip()}",
+        f"Wayeb begins: {str(fields.get('mayan_wayeb_start') or '').strip()}",
+        f"Aztec calendar date: {str(fields.get('aztec_calendar_date') or '').strip()}",
+        f"Aztec Xiuhpohualli New Year: {str(fields.get('aztec_xiuhpohualli_new_year') or '').strip()}",
+        f"Nemontemi begins: {str(fields.get('aztec_nemontemi_start') or '').strip()}",
+        f"Ethiopian calendar date: {str(fields.get('ethiopian_calendar_date') or '').strip()}",
+        f"Enkutatash: {str(fields.get('ethiopian_new_year') or '').strip()}",
+        f"Genna: {str(fields.get('genna') or '').strip()}",
+        f"Timkat: {str(fields.get('timkat') or '').strip()}",
+        f"Meskel: {str(fields.get('meskel') or '').strip()}",
+        f"Fasika: {str(fields.get('fasika') or '').strip()}",
     ]
     calendar_sections = [
         {
             "title": "Christian",
             "open": False,
-            "rows": [
-                {"label": "Current date", "value": str(fields.get("christian_calendar_date") or "").strip()},
-                {"label": "Easter Sunday", "value": str(fields.get("easter") or "").strip()},
-                {"label": "Orthodox Easter Sunday", "value": str(fields.get("orthodox_easter") or "").strip()},
-                {"label": "Christmas Day", "value": str(fields.get("christmas") or "").strip()},
-                {"label": "Orthodox Christmas Day", "value": str(fields.get("orthodox_christmas") or "").strip()},
-            ],
+            "rows": build_calendar_rows(
+                str(fields.get("christian_calendar_date") or "").strip(),
+                [
+                    ("Easter Sunday", str(fields.get("easter") or "").strip(), str(fields.get("easter") or "").strip()),
+                    ("Orthodox Easter Sunday", str(fields.get("orthodox_easter") or "").strip(), str(fields.get("orthodox_easter") or "").strip()),
+                    ("Christmas Day", str(fields.get("christmas") or "").strip(), str(fields.get("christmas") or "").strip()),
+                    ("Orthodox Christmas Day", str(fields.get("orthodox_christmas") or "").strip(), str(fields.get("orthodox_christmas") or "").strip()),
+                ],
+            ),
         },
         {
             "title": "Chinese",
             "open": False,
-            "rows": [
-                {"label": "Current date", "value": str(fields.get("chinese_calendar_date") or "").strip()},
-                {"label": "New Year", "value": str(fields.get("chinese_new_year") or "").strip()},
-            ],
+            "rows": build_calendar_rows(
+                str(fields.get("chinese_calendar_date") or "").strip(),
+                [
+                    ("New Year", str(fields.get("chinese_new_year") or "").strip(), str(fields.get("chinese_new_year") or "").strip()),
+                ],
+            ),
         },
         {
             "title": "Hindu",
             "open": False,
-            "rows": [
-                {"label": "Current date", "value": str(fields.get("hindu_calendar_date") or "").strip()},
-                {"label": "Diwali (estimated)", "value": str(fields.get("diwali") or "").strip()},
-                {"label": "Holi (estimated)", "value": str(fields.get("holi") or "").strip()},
-                {"label": "Hindu New Year (estimated)", "value": str(fields.get("hindu_new_year") or "").strip()},
-            ],
+            "rows": build_calendar_rows(
+                str(fields.get("hindu_calendar_date") or "").strip(),
+                [
+                    ("Diwali (estimated)", str(fields.get("diwali") or "").strip(), str(fields.get("diwali") or "").strip()),
+                    ("Holi (estimated)", str(fields.get("holi") or "").strip(), str(fields.get("holi") or "").strip()),
+                    ("Hindu New Year (estimated)", str(fields.get("hindu_new_year") or "").strip(), str(fields.get("hindu_new_year") or "").strip()),
+                ],
+            ),
         },
         {
             "title": "Buddhist",
             "open": False,
-            "rows": [
-                {"label": "Current date", "value": str(fields.get("buddhist_calendar_date") or "").strip()},
-                {"label": "Buddhist New Year (estimated)", "value": str(fields.get("buddhist_new_year") or "").strip()},
-                {"label": "Vesak / Buddha Day (estimated)", "value": str(fields.get("vesak") or "").strip()},
-                {"label": "Asalha Puja / Dharma Day (estimated)", "value": str(fields.get("asalha_puja") or "").strip()},
-            ],
+            "rows": build_calendar_rows(
+                str(fields.get("buddhist_calendar_date") or "").strip(),
+                [
+                    ("Buddhist New Year (estimated)", str(fields.get("buddhist_new_year") or "").strip(), str(fields.get("buddhist_new_year") or "").strip()),
+                    ("Vesak / Buddha Day (estimated)", str(fields.get("vesak") or "").strip(), str(fields.get("vesak") or "").strip()),
+                    ("Asalha Puja / Dharma Day (estimated)", str(fields.get("asalha_puja") or "").strip(), str(fields.get("asalha_puja") or "").strip()),
+                ],
+            ),
         },
         {
             "title": "Muslim",
             "open": False,
-            "rows": [
-                {"label": "Current date", "value": str(fields.get("muslim_calendar_date") or "").strip()},
-                {"label": "Ramadan begins (civil Islamic)", "value": str(fields.get("ramadan") or "").strip()},
-                {"label": "Ramadan begins at sunset (GMT)", "value": str(fields.get("ramadan_starts_gmt") or "").strip()},
-                {"label": "Eid al-Fitr (civil Islamic)", "value": str(fields.get("eid_al_fitr") or "").strip()},
-                {"label": "Eid al-Fitr begins at sunset (GMT)", "value": str(fields.get("eid_al_fitr_starts_gmt") or "").strip()},
-                {"label": "Muslim New Year (civil Islamic)", "value": str(fields.get("muslim_new_year") or "").strip()},
-                {"label": "Muslim New Year begins at sunset (GMT)", "value": str(fields.get("muslim_new_year_starts_gmt") or "").strip()},
-            ],
+            "rows": build_calendar_rows(
+                str(fields.get("muslim_calendar_date") or "").strip(),
+                [
+                    ("Ramadan begins (civil Islamic)", str(fields.get("ramadan") or "").strip(), str(fields.get("ramadan") or "").strip()),
+                    ("Ramadan begins at sunset (local time)", str(fields.get("ramadan_starts_local") or "").strip(), str(fields.get("ramadan") or "").strip()),
+                    ("Eid al-Fitr (civil Islamic)", str(fields.get("eid_al_fitr") or "").strip(), str(fields.get("eid_al_fitr") or "").strip()),
+                    ("Eid al-Fitr begins at sunset (local time)", str(fields.get("eid_al_fitr_starts_local") or "").strip(), str(fields.get("eid_al_fitr") or "").strip()),
+                    ("Muslim New Year (civil Islamic)", str(fields.get("muslim_new_year") or "").strip(), str(fields.get("muslim_new_year") or "").strip()),
+                    ("Muslim New Year begins at sunset (local time)", str(fields.get("muslim_new_year_starts_local") or "").strip(), str(fields.get("muslim_new_year") or "").strip()),
+                ],
+            ),
         },
         {
             "title": "Jewish",
             "open": False,
-            "rows": [
-                {"label": "Current date", "value": str(fields.get("jewish_calendar_date") or "").strip()},
-                {"label": "Passover", "value": str(fields.get("passover") or "").strip()},
-                {"label": "Passover begins at sunset (GMT)", "value": str(fields.get("passover_starts_gmt") or "").strip()},
-                {"label": "Jewish New Year", "value": str(fields.get("jewish_new_year") or "").strip()},
-                {"label": "Jewish New Year begins at sunset (GMT)", "value": str(fields.get("jewish_new_year_starts_gmt") or "").strip()},
-            ],
+            "rows": build_calendar_rows(
+                str(fields.get("jewish_calendar_date") or "").strip(),
+                [
+                    ("Passover", str(fields.get("passover") or "").strip(), str(fields.get("passover") or "").strip()),
+                    ("Passover begins at sunset (local time)", str(fields.get("passover_starts_local") or "").strip(), str(fields.get("passover") or "").strip()),
+                    ("Jewish New Year", str(fields.get("jewish_new_year") or "").strip(), str(fields.get("jewish_new_year") or "").strip()),
+                    ("Jewish New Year begins at sunset (local time)", str(fields.get("jewish_new_year_starts_local") or "").strip(), str(fields.get("jewish_new_year") or "").strip()),
+                ],
+            ),
+        },
+        {
+            "title": "Cherokee",
+            "open": False,
+            "rows": build_calendar_rows(
+                str(fields.get("cherokee_calendar_date") or "").strip(),
+                [
+                    ("New Moon Festival (estimated)", str(fields.get("cherokee_new_moon_festival") or "").strip(), str(fields.get("cherokee_new_moon_festival") or "").strip()),
+                    ("Green Corn Ceremony (estimated)", str(fields.get("cherokee_green_corn_ceremony") or "").strip(), str(fields.get("cherokee_green_corn_ceremony") or "").strip()),
+                    ("Ripe Corn Ceremony (estimated)", str(fields.get("cherokee_ripe_corn_ceremony") or "").strip(), str(fields.get("cherokee_ripe_corn_ceremony") or "").strip()),
+                    ("Great New Moon Festival (estimated)", str(fields.get("cherokee_great_new_moon_festival") or "").strip(), str(fields.get("cherokee_great_new_moon_festival") or "").strip()),
+                ],
+            ),
+        },
+        {
+            "title": "Mayan",
+            "open": False,
+            "rows": build_calendar_rows(
+                str(fields.get("mayan_calendar_date") or "").strip(),
+                [
+                    ("Haab New Year", str(fields.get("mayan_haab_new_year") or "").strip(), str(fields.get("mayan_haab_new_year") or "").strip()),
+                    ("Wayeb begins", str(fields.get("mayan_wayeb_start") or "").strip(), str(fields.get("mayan_wayeb_start") or "").strip()),
+                ],
+            ),
+        },
+        {
+            "title": "Aztec",
+            "open": False,
+            "rows": build_calendar_rows(
+                str(fields.get("aztec_calendar_date") or "").strip(),
+                [
+                    ("Xiuhpohualli New Year", str(fields.get("aztec_xiuhpohualli_new_year") or "").strip(), str(fields.get("aztec_xiuhpohualli_new_year") or "").strip()),
+                    ("Nemontemi begins", str(fields.get("aztec_nemontemi_start") or "").strip(), str(fields.get("aztec_nemontemi_start") or "").strip()),
+                ],
+            ),
+        },
+        {
+            "title": "Ethiopian",
+            "open": False,
+            "rows": build_calendar_rows(
+                str(fields.get("ethiopian_calendar_date") or "").strip(),
+                [
+                    ("Enkutatash", str(fields.get("ethiopian_new_year") or "").strip(), str(fields.get("ethiopian_new_year") or "").strip()),
+                    ("Genna", str(fields.get("genna") or "").strip(), str(fields.get("genna") or "").strip()),
+                    ("Timkat", str(fields.get("timkat") or "").strip(), str(fields.get("timkat") or "").strip()),
+                    ("Meskel", str(fields.get("meskel") or "").strip(), str(fields.get("meskel") or "").strip()),
+                    ("Fasika", str(fields.get("fasika") or "").strip(), str(fields.get("fasika") or "").strip()),
+                ],
+            ),
         },
     ]
     bank_holiday_text = str(fields.get("bank_holiday") or "").strip()
@@ -10795,6 +11324,8 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                     self.send_json(422, {"ok": False, "error": raw or "Datetime calculation failed"})
                     return
 
+                effective_weather_latitude = latitude
+                effective_weather_longitude = longitude
                 try:
                     ensure_scratch_binary(self.holiday_binary, "scratch/holiday_lab")
                     holiday_fields, holiday_raw, holiday_returncode = run_holiday_lab_fields(
@@ -10823,12 +11354,26 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                             holiday_returncode,
                             str(holiday_raw or "").strip(),
                         )
+                    try:
+                        jurisdiction_latitude = float(str(holiday_fields.get("jurisdiction_latitude") or "").strip())
+                        jurisdiction_longitude = float(str(holiday_fields.get("jurisdiction_longitude") or "").strip())
+                        effective_weather_latitude = jurisdiction_latitude
+                        effective_weather_longitude = jurisdiction_longitude
+                    except (TypeError, ValueError):
+                        pass
                 except Exception as exc:
                     fields["holiday_notice"] = holiday_install_hint()
                     self.log_message("holiday helper unavailable jurisdiction=%r error=%r", jurisdiction, exc)
 
                 selected_date_text = str(fields.get("date") or date_text).strip()
                 selected_jdn_text = str(fields.get("julian_day_number") or jdn_text).strip()
+                weather_fields = fetch_daily_weather_with_budget(
+                    selected_date_text,
+                    effective_weather_latitude,
+                    effective_weather_longitude,
+                )
+                if weather_fields:
+                    fields.update(weather_fields)
                 save_state_data({
                     "datetime_date": selected_date_text,
                     "datetime_jdn": selected_jdn_text,

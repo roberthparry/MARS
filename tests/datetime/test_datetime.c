@@ -84,6 +84,53 @@ void test_datetime_alloc(void) {
     datetime_dealloc(dt);
 }
 
+void test_datetime_dealloc_null_is_safe(void) {
+    datetime_dealloc(NULL);
+    ASSERT_TRUE(true);
+}
+
+void test_datetime_from_string_valid_iso_date(void) {
+    datetime_t *dt = datetime_from_string("2026-06-25");
+
+    ASSERT_NOT_NULL(dt);
+    ASSERT_EQ_INT(datetime_year(dt), 2026);
+    ASSERT_EQ_INT(datetime_month(dt), DT_June);
+    ASSERT_EQ_INT(datetime_day(dt), 25);
+    ASSERT_EQ_INT(datetime_hour(dt), 0);
+    ASSERT_EQ_INT(datetime_minute(dt), 0);
+    ASSERT_EQ_DOUBLE(datetime_second(dt), 0.0, 1e-9);
+
+    datetime_dealloc(dt);
+}
+
+void test_datetime_from_string_rejects_invalid_iso_date(void) {
+    ASSERT_NULL(datetime_from_string("2026-02-30"));
+    ASSERT_NULL(datetime_from_string("2026/06/25"));
+    ASSERT_NULL(datetime_from_string(NULL));
+}
+
+void test_datetime_from_string_accepts_dmy_slash_date(void) {
+    datetime_t *dt = datetime_from_string("25/06/2026");
+
+    ASSERT_NOT_NULL(dt);
+    ASSERT_EQ_INT(datetime_year(dt), 2026);
+    ASSERT_EQ_INT(datetime_month(dt), DT_June);
+    ASSERT_EQ_INT(datetime_day(dt), 25);
+
+    datetime_dealloc(dt);
+}
+
+void test_datetime_from_string_ignores_outer_whitespace(void) {
+    datetime_t *dt = datetime_from_string("  2026-06-25  ");
+
+    ASSERT_NOT_NULL(dt);
+    ASSERT_EQ_INT(datetime_year(dt), 2026);
+    ASSERT_EQ_INT(datetime_month(dt), DT_June);
+    ASSERT_EQ_INT(datetime_day(dt), 25);
+
+    datetime_dealloc(dt);
+}
+
 void test_datetime_init_ymd(void) {
     datetime_t *dt = datetime_init_ymd(datetime_alloc(), 2024, 6, 15);
     ASSERT_NOT_NULL(dt);
@@ -633,12 +680,17 @@ void test_datetime_calendar_date_texts_known_dates(void) {
     datetime_t *june = datetime_init_ymd(datetime_alloc(), 2026, DT_June, 21);
     datetime_t *rosh = datetime_init_ymd(datetime_alloc(), 2024, DT_October, 3);
     datetime_t *ramadan = datetime_init_ymd(datetime_alloc(), 2026, DT_February, 17);
+    datetime_t *ethiopian_new_year = datetime_init_ymd(datetime_alloc(), 2023, DT_September, 11);
     string_t *christian = datetime_christian_calendar_date_text(june);
     string_t *chinese = datetime_chinese_calendar_date_text(ramadan);
     string_t *hindu = datetime_hindu_calendar_date_text(june);
     string_t *buddhist = datetime_buddhist_calendar_date_text(june);
     string_t *muslim = datetime_muslim_calendar_date_text(ramadan);
     string_t *jewish = datetime_jewish_calendar_date_text(rosh);
+    string_t *cherokee = datetime_cherokee_calendar_date_text(june);
+    string_t *mayan = datetime_mayan_calendar_date_text(june);
+    string_t *aztec = datetime_aztec_calendar_date_text(june);
+    string_t *ethiopian = datetime_ethiopian_calendar_date_text(ethiopian_new_year);
 
     ASSERT_NOT_NULL(christian);
     ASSERT_NOT_NULL(chinese);
@@ -646,6 +698,10 @@ void test_datetime_calendar_date_texts_known_dates(void) {
     ASSERT_NOT_NULL(buddhist);
     ASSERT_NOT_NULL(muslim);
     ASSERT_NOT_NULL(jewish);
+    ASSERT_NOT_NULL(cherokee);
+    ASSERT_NOT_NULL(mayan);
+    ASSERT_NOT_NULL(aztec);
+    ASSERT_NOT_NULL(ethiopian);
 
     TEST_ASSERT_STR_EQ(string_c_str(christian), "Gregorian 2026-06-21; Julian 2026-06-08");
     TEST_ASSERT_STR_EQ(string_c_str(chinese), "Year 4724 (Horse), month 1, day 1");
@@ -653,6 +709,10 @@ void test_datetime_calendar_date_texts_known_dates(void) {
     TEST_ASSERT_STR_EQ(string_c_str(buddhist), "B.E. 2569-06-21 (Thai solar)");
     TEST_ASSERT_STR_EQ(string_c_str(muslim), "1 Ramadan 1447 AH");
     TEST_ASSERT_STR_EQ(string_c_str(jewish), "1 Tishrei 5785 AM");
+    TEST_ASSERT_STR_EQ(string_c_str(cherokee), "Cherokee civil Green Corn Moon, day 21, year 2026");
+    TEST_ASSERT_STR_EQ(string_c_str(mayan), "Long Count 13.0.13.12.10; Tzolk'in 7 Ok; Haab 3 Sek");
+    TEST_ASSERT_STR_EQ(string_c_str(aztec), "Tonalpohualli 5 Mazatl; Xiuhpohualli day 19 of Etzalcualiztli; year 1 Tochtli");
+    TEST_ASSERT_STR_EQ(string_c_str(ethiopian), "1 Meskerem 2016 EC");
 
     string_free(christian);
     string_free(chinese);
@@ -660,9 +720,98 @@ void test_datetime_calendar_date_texts_known_dates(void) {
     string_free(buddhist);
     string_free(muslim);
     string_free(jewish);
+    string_free(cherokee);
+    string_free(mayan);
+    string_free(aztec);
+    string_free(ethiopian);
     datetime_dealloc(june);
     datetime_dealloc(rosh);
     datetime_dealloc(ramadan);
+    datetime_dealloc(ethiopian_new_year);
+}
+
+void test_datetime_additional_calendar_observances_known_dates(void) {
+    datetime_t *enkutatash = datetime_init_ethiopian_new_year(datetime_alloc(), 2026);
+    datetime_t *genna = datetime_init_genna(datetime_alloc(), 2026);
+    datetime_t *timkat = datetime_init_timkat(datetime_alloc(), 2026);
+    datetime_t *meskel = datetime_init_meskel(datetime_alloc(), 2026);
+    datetime_t *fasika = datetime_init_fasika(datetime_alloc(), 2026);
+    datetime_t *cherokee_new_moon_festival = datetime_init_cherokee_new_moon_festival(datetime_alloc(), 2026);
+    datetime_t *cherokee_green_corn_ceremony = datetime_init_cherokee_green_corn_ceremony(datetime_alloc(), 2026);
+    datetime_t *cherokee_ripe_corn_ceremony = datetime_init_cherokee_ripe_corn_ceremony(datetime_alloc(), 2026);
+    datetime_t *cherokee_great_new_moon_festival = datetime_init_cherokee_great_new_moon_festival(datetime_alloc(), 2026);
+    datetime_t *haab_new_year = datetime_init_mayan_haab_new_year(datetime_alloc(), 2026);
+    datetime_t *wayeb = datetime_init_mayan_wayeb_start(datetime_alloc(), 2026);
+    datetime_t *xiuh_new_year = datetime_init_aztec_xiuhpohualli_new_year(datetime_alloc(), 2026);
+    datetime_t *nemontemi = datetime_init_aztec_nemontemi_start(datetime_alloc(), 2026);
+
+    ASSERT_NOT_NULL(enkutatash);
+    ASSERT_NOT_NULL(genna);
+    ASSERT_NOT_NULL(timkat);
+    ASSERT_NOT_NULL(meskel);
+    ASSERT_NOT_NULL(fasika);
+    ASSERT_NOT_NULL(cherokee_new_moon_festival);
+    ASSERT_NOT_NULL(cherokee_green_corn_ceremony);
+    ASSERT_NOT_NULL(cherokee_ripe_corn_ceremony);
+    ASSERT_NOT_NULL(cherokee_great_new_moon_festival);
+    ASSERT_NOT_NULL(haab_new_year);
+    ASSERT_NOT_NULL(wayeb);
+    ASSERT_NOT_NULL(xiuh_new_year);
+    ASSERT_NOT_NULL(nemontemi);
+
+    ASSERT_EQ_INT(datetime_year(enkutatash), 2026);
+    ASSERT_EQ_INT(datetime_month(enkutatash), DT_September);
+    ASSERT_EQ_INT(datetime_day(enkutatash), 11);
+
+    ASSERT_EQ_INT(datetime_month(genna), DT_January);
+    ASSERT_EQ_INT(datetime_day(genna), 7);
+
+    ASSERT_EQ_INT(datetime_month(timkat), DT_January);
+    ASSERT_EQ_INT(datetime_day(timkat), 19);
+
+    ASSERT_EQ_INT(datetime_month(meskel), DT_September);
+    ASSERT_EQ_INT(datetime_day(meskel), 27);
+
+    ASSERT_EQ_INT(datetime_month(fasika), DT_April);
+    ASSERT_EQ_INT(datetime_day(fasika), 12);
+
+    ASSERT_EQ_INT(datetime_month(cherokee_new_moon_festival), DT_January);
+    ASSERT_EQ_INT(datetime_day(cherokee_new_moon_festival), 18);
+
+    ASSERT_EQ_INT(datetime_month(cherokee_green_corn_ceremony), DT_July);
+    ASSERT_EQ_INT(datetime_day(cherokee_green_corn_ceremony), 14);
+
+    ASSERT_EQ_INT(datetime_month(cherokee_ripe_corn_ceremony), DT_August);
+    ASSERT_EQ_INT(datetime_day(cherokee_ripe_corn_ceremony), 12);
+
+    ASSERT_EQ_INT(datetime_month(cherokee_great_new_moon_festival), DT_September);
+    ASSERT_EQ_INT(datetime_day(cherokee_great_new_moon_festival), 10);
+
+    ASSERT_EQ_INT(datetime_month(haab_new_year), DT_March);
+    ASSERT_EQ_INT(datetime_day(haab_new_year), 30);
+
+    ASSERT_EQ_INT(datetime_month(wayeb), DT_March);
+    ASSERT_EQ_INT(datetime_day(wayeb), 25);
+
+    ASSERT_EQ_INT(datetime_month(xiuh_new_year), DT_February);
+    ASSERT_EQ_INT(datetime_day(xiuh_new_year), 23);
+
+    ASSERT_EQ_INT(datetime_month(nemontemi), DT_February);
+    ASSERT_EQ_INT(datetime_day(nemontemi), 18);
+
+    datetime_dealloc(enkutatash);
+    datetime_dealloc(genna);
+    datetime_dealloc(timkat);
+    datetime_dealloc(meskel);
+    datetime_dealloc(fasika);
+    datetime_dealloc(cherokee_new_moon_festival);
+    datetime_dealloc(cherokee_green_corn_ceremony);
+    datetime_dealloc(cherokee_ripe_corn_ceremony);
+    datetime_dealloc(cherokee_great_new_moon_festival);
+    datetime_dealloc(haab_new_year);
+    datetime_dealloc(wayeb);
+    datetime_dealloc(xiuh_new_year);
+    datetime_dealloc(nemontemi);
 }
 
 void test_datetime_sunset_observance_start_gmt(void) {
@@ -678,6 +827,84 @@ void test_datetime_sunset_observance_start_gmt(void) {
 
     datetime_dealloc(rosh);
     datetime_dealloc(start);
+}
+
+void test_datetime_sunset_rolls_into_following_civil_day_when_needed(void) {
+    datetime_t *date = datetime_init_ymd(datetime_alloc(), 2026, DT_June, 23);
+    datetime_t *sunset;
+
+    ASSERT_NOT_NULL(date);
+    sunset = datetime_init_sunset(datetime_alloc(),
+                                  datetime_jdn(date),
+                                  64.1466,
+                                  -21.9426,
+                                  0.0);
+
+    ASSERT_NOT_NULL(sunset);
+    ASSERT_EQ_INT(datetime_year(sunset), 2026);
+    ASSERT_EQ_INT(datetime_month(sunset), DT_June);
+    ASSERT_EQ_INT(datetime_day(sunset), 24);
+    ASSERT_EQ_INT(datetime_hour(sunset), 0);
+    ASSERT_TRUE(datetime_minute(sunset) <= 10);
+
+    datetime_dealloc(sunset);
+    datetime_dealloc(date);
+}
+
+void test_datetime_svalbard_boundary_sunrise_keeps_after_midnight_local_time(void) {
+    datetime_t *date = datetime_init_ymd(datetime_alloc(), 2026, DT_April, 19);
+    datetime_t *sunrise;
+    datetime_sun_status_t status = DATETIME_SUN_UNAVAILABLE;
+
+    ASSERT_NOT_NULL(date);
+    sunrise = datetime_init_sunrise_checked(datetime_alloc(),
+                                            datetime_jdn(date),
+                                            78.2232,
+                                            15.6469,
+                                            2.0,
+                                            &status);
+    ASSERT_NOT_NULL(sunrise);
+    ASSERT_EQ_INT(status, DATETIME_SUN_OK);
+    ASSERT_EQ_INT(datetime_year(sunrise), 2026);
+    ASSERT_EQ_INT(datetime_month(sunrise), DT_April);
+    ASSERT_EQ_INT(datetime_day(sunrise), 19);
+    ASSERT_EQ_INT(datetime_hour(sunrise), 1);
+    ASSERT_TRUE(datetime_minute(sunrise) >= 10 && datetime_minute(sunrise) <= 25);
+
+    datetime_dealloc(sunrise);
+    datetime_dealloc(date);
+}
+
+void test_datetime_adjacent_sun_events_resolve_neighbouring_days(void) {
+    datetime_t *date = datetime_init_ymd(datetime_alloc(), 2026, DT_June, 23);
+    datetime_t *previous_sunset;
+    datetime_t *next_sunrise;
+    datetime_sun_status_t status = DATETIME_SUN_UNAVAILABLE;
+
+    ASSERT_NOT_NULL(date);
+    previous_sunset = datetime_init_previous_sunset_checked(datetime_alloc(),
+                                                            datetime_jdn(date),
+                                                            51.5074,
+                                                            -0.1278,
+                                                            1.0,
+                                                            &status);
+    ASSERT_NOT_NULL(previous_sunset);
+    ASSERT_EQ_INT(status, DATETIME_SUN_OK);
+    ASSERT_TRUE(datetime_compare(previous_sunset, date) < 0);
+
+    next_sunrise = datetime_init_next_sunrise_checked(datetime_alloc(),
+                                                      datetime_jdn(date),
+                                                      51.5074,
+                                                      -0.1278,
+                                                      1.0,
+                                                      &status);
+    ASSERT_NOT_NULL(next_sunrise);
+    ASSERT_EQ_INT(status, DATETIME_SUN_OK);
+    ASSERT_TRUE(datetime_compare(next_sunrise, date) > 0);
+
+    datetime_dealloc(next_sunrise);
+    datetime_dealloc(previous_sunset);
+    datetime_dealloc(date);
 }
 
 void test_datetime_format_uses_string_builder(void) {
@@ -775,6 +1002,11 @@ int tests_main(void) {
 
     /* Basic allocation and initialisation tests */
     TEST_RUN_IN_GROUP(test_datetime_alloc, tests, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_dealloc_null_is_safe, tests, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_from_string_valid_iso_date, tests, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_from_string_rejects_invalid_iso_date, tests, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_from_string_accepts_dmy_slash_date, tests, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_from_string_ignores_outer_whitespace, tests, NULL);
     TEST_RUN_IN_GROUP(test_datetime_init_ymd, tests, NULL);
     TEST_RUN_IN_GROUP(test_datetime_init_ymdt, tests, NULL);
     TEST_RUN_IN_GROUP(test_datetime_init_copy, tests, NULL);
@@ -809,7 +1041,11 @@ int tests_main(void) {
     TEST_RUN_IN_GROUP(test_datetime_hindu_observance_known_dates, tests, NULL);
     TEST_RUN_IN_GROUP(test_datetime_buddhist_observance_known_dates, tests, NULL);
     TEST_RUN_IN_GROUP(test_datetime_calendar_date_texts_known_dates, tests, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_additional_calendar_observances_known_dates, tests, NULL);
     TEST_RUN_IN_GROUP(test_datetime_sunset_observance_start_gmt, tests, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_sunset_rolls_into_following_civil_day_when_needed, tests, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_svalbard_boundary_sunrise_keeps_after_midnight_local_time, tests, NULL);
+    TEST_RUN_IN_GROUP(test_datetime_adjacent_sun_events_resolve_neighbouring_days, tests, NULL);
     TEST_RUN_IN_GROUP(test_datetime_format_uses_string_builder, tests, NULL);
     TEST_RUN_IN_GROUP(test_datetime_format_superscript_ordinal_suffix, tests, NULL);
 

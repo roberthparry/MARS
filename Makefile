@@ -362,7 +362,7 @@ install-jurisdiction-db: check-jurisdiction-db-deps tools/configure_mars_lab_jur
 uninstall-jurisdiction-db:
 	rm -rf "$(HOME)/.mars"
 
-install-mars-lab: check-lab-deps tools/mars-lab tools/configure_mars_lab_jurisdiction_db.py $(JURISDICTION_RULES_SOURCES) packaging/linux/mars-lab.desktop.in packaging/linux/mars-lab.svg $(MARS_LAB_ICON_CONCEPTS)
+install-mars-lab: check-lab-deps tools/mars-lab tools/configure_mars_lab_jurisdiction_db.py tools/configure_mars_lab_weather.py $(JURISDICTION_RULES_SOURCES) packaging/linux/mars-lab.desktop.in packaging/linux/mars-lab.svg $(MARS_LAB_ICON_CONCEPTS)
 	$(INSTALL) -d "$(MARS_LAB_BINDIR)" "$(MARS_LAB_APPDIR)" "$(MARS_LAB_ICONDIR)"
 	rm -f "$(MARS_LAB_BINDIR)/mars-expr-lab" "$(MARS_LAB_APPDIR)/mars-expr-lab.desktop" "$(MARS_LAB_ICONDIR)/mars-expr-lab.svg" "$(MARS_LAB_ICONDIR)"/mars-expr-lab-*.svg
 	@printf '%s\n' \
@@ -397,6 +397,7 @@ install-mars-lab: check-lab-deps tools/mars-lab tools/configure_mars_lab_jurisdi
 	@if command -v gtk-update-icon-cache >/dev/null 2>&1; then gtk-update-icon-cache "$(MARS_LAB_INSTALL_PREFIX)/share/icons/hicolor" >/dev/null 2>&1 || true; fi
 	@if command -v kbuildsycoca6 >/dev/null 2>&1; then kbuildsycoca6 >/dev/null 2>&1 || true; elif command -v kbuildsycoca5 >/dev/null 2>&1; then kbuildsycoca5 >/dev/null 2>&1 || true; fi
 	@$(MAKE) install-jurisdiction-db
+	@python3 tools/configure_mars_lab_weather.py
 	@echo "Installed MARS Lab desktop launcher:"
 	@echo "  $(MARS_LAB_DESKTOP)"
 

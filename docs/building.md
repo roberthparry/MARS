@@ -123,11 +123,13 @@ Install the desktop MARS Lab launcher with:
 make install-mars-lab
 ```
 
-That installer now prompts for a password to protect the private datetime
+That installer now prompts for a password to protect the private jurisdiction
 database, stores the resulting configuration in
 `~/.mars/config/jurisdiction-db.env`, and builds the encrypted jurisdiction database at
-`~/.mars/jurisdiction/mars_jurisdiction_rules.db`. Reinstalling MARS Lab recreates
-`~/.mars` from scratch.
+`~/.mars/jurisdiction/mars_jurisdiction_rules.db`. If you choose to enable
+weather lookups, the optional WeatherAPI key is stored in
+`~/.mars/config/weather.env`. Reinstalling MARS Lab recreates `~/.mars` while
+preserving `weather.env`.
 
 Remove installed MARS files:
 

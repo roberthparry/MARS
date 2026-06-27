@@ -25,6 +25,7 @@
 #include <time.h>
 #include <stdio.h>
 #include <string.h>
+#include <ctype.h>
 
 #include "datetime.h"
 #include "ustring.h"
@@ -69,6 +70,8 @@ datetime_t *datetime_alloc() {
 
 inline void datetime_dealloc(datetime_t *dttm)
 {
+    if (!dttm)
+        return;
     free(dttm);
 }
 
@@ -153,6 +156,42 @@ datetime_t *datetime_init_now(datetime_t *dttm) {
     // The actual conversion to Julian Day Number and Julian Day will be done lazily when needed
 
     return dttm;
+}
+
+datetime_t *datetime_from_string(const char *text)
+{
+    int year = 0;
+    int month = 0;
+    int day = 0;
+    int consumed = 0;
+    datetime_t *dttm;
+
+    if (!text)
+        return NULL;
+
+    while (isspace((unsigned char)*text))
+        text++;
+    if (*text == '\0')
+        return NULL;
+
+    if (sscanf(text, "%d-%d-%d %n", &year, &month, &day, &consumed) == 3) {
+        if (text[consumed] != '\0')
+            return NULL;
+    } else if (sscanf(text, "%d/%d/%d %n", &day, &month, &year, &consumed) == 3) {
+        if (text[consumed] != '\0')
+            return NULL;
+    } else {
+        return NULL;
+    }
+
+    if (!datetime_valid_ymd((short)year, (month_t)month, (uint8_t)day))
+        return NULL;
+
+    dttm = datetime_alloc();
+    if (!dttm)
+        return NULL;
+
+    return datetime_init_ymd(dttm, (short)year, (month_t)month, (uint8_t)day);
 }
 
 datetime_t *datetime_init_easter(datetime_t *dttm, int year)
@@ -531,6 +570,12 @@ static long datetime_india_new_moon_jdn_in_window(int year,
                                                   uint8_t startDay,
                                                   month_t endMonth,
                                                   uint8_t endDay);
+static long datetime_local_new_moon_jdn_in_window(int year,
+                                                  month_t startMonth,
+                                                  uint8_t startDay,
+                                                  month_t endMonth,
+                                                  uint8_t endDay,
+                                                  double gmtOffsetHours);
 
 static datetime_t *datetime_init_civil_islamic_observance(datetime_t *dttm,
                                                           int gregorianYear,
@@ -1003,6 +1048,56 @@ static bool datetime_hebrew_leap_year(int year)
     return ((7 * year + 1) % 19) < 7;
 }
 
+static long datetime_ethiopian_ymd_to_jdn(int year, int month, int day);
+static void datetime_jdn_to_ethiopian_ymd(long jdn, int *year, int *month, int *day);
+static datetime_t *datetime_init_materialised_jdn(datetime_t *dttm, long jdn);
+
+static datetime_t *datetime_init_civil_ethiopian_observance(datetime_t *dttm,
+                                                            int gregorianYear,
+                                                            int ethiopianMonth,
+                                                            int ethiopianDay)
+{
+    datetime_t probe;
+    int estimateEthiopianYear;
+
+    if (!dttm || gregorianYear < 1 || gregorianYear > 9999)
+        return NULL;
+
+    estimateEthiopianYear = gregorianYear - 8;
+    for (int ethiopianYear = estimateEthiopianYear - 1; ethiopianYear <= estimateEthiopianYear + 1; ethiopianYear++) {
+        long jdn = datetime_ethiopian_ymd_to_jdn(ethiopianYear, ethiopianMonth, ethiopianDay);
+        datetime_init_jdn(&probe, jdn);
+        if (datetime_year(&probe) == gregorianYear)
+            return datetime_init_materialised_jdn(dttm, jdn);
+    }
+    return NULL;
+}
+
+datetime_t *datetime_init_ethiopian_new_year(datetime_t *dttm, int year)
+{
+    return datetime_init_civil_ethiopian_observance(dttm, year, 1, 1);
+}
+
+datetime_t *datetime_init_genna(datetime_t *dttm, int year)
+{
+    return datetime_init_civil_ethiopian_observance(dttm, year, 4, 29);
+}
+
+datetime_t *datetime_init_timkat(datetime_t *dttm, int year)
+{
+    return datetime_init_civil_ethiopian_observance(dttm, year, 5, 11);
+}
+
+datetime_t *datetime_init_meskel(datetime_t *dttm, int year)
+{
+    return datetime_init_civil_ethiopian_observance(dttm, year, 1, 17);
+}
+
+datetime_t *datetime_init_fasika(datetime_t *dttm, int year)
+{
+    return datetime_init_orthodox_easter(dttm, year);
+}
+
 static int datetime_hebrew_year_length(int year)
 {
     return (int)(datetime_hebrew_new_year_jdn(year + 1) - datetime_hebrew_new_year_jdn(year));
@@ -1098,6 +1193,365 @@ string_t *datetime_jewish_calendar_date_text(const datetime_t *dttm)
     return out;
 }
 
+static const char *datetime_cherokee_civil_month_name(month_t month)
+{
+    static const char *names[] = {
+        NULL,
+        "Cold Moon",
+        "Bony Moon",
+        "Windy Moon",
+        "Flower Moon",
+        "Planting Moon",
+        "Green Corn Moon",
+        "Ripe Corn Moon",
+        "Fruit Moon",
+        "Nut Moon",
+        "Harvest Moon",
+        "Trading Moon",
+        "Snow Moon"
+    };
+
+    return month >= DT_January && month <= DT_December ? names[month] : "Unknown";
+}
+
+string_t *datetime_cherokee_calendar_date_text(const datetime_t *dttm)
+{
+    string_t *out;
+
+    if (!dttm || datetime_jdn(dttm) == LONG_MAX)
+        return NULL;
+
+    out = string_new();
+    if (!out ||
+        string_append_format(out,
+                             "Cherokee civil %s, day %d, year %d",
+                             datetime_cherokee_civil_month_name(datetime_month(dttm)),
+                             (int)datetime_day(dttm),
+                             (int)datetime_year(dttm)) < 0) {
+        string_free(out);
+        return NULL;
+    }
+    return out;
+}
+
+static datetime_t *datetime_init_cherokee_window_new_moon(datetime_t *dttm,
+                                                          int year,
+                                                          month_t startMonth,
+                                                          month_t endMonth)
+{
+    long jdn;
+
+    /* Cherokee Nation civil centre: Tahlequah / central time approximation. */
+    jdn = datetime_local_new_moon_jdn_in_window(year,
+                                                startMonth,
+                                                1,
+                                                endMonth,
+                                                (uint8_t)datetime_days_in_month((short)year, endMonth),
+                                                -6.0);
+    return datetime_init_materialised_jdn(dttm, jdn);
+}
+
+datetime_t *datetime_init_cherokee_new_moon_festival(datetime_t *dttm, int year)
+{
+    return datetime_init_cherokee_window_new_moon(dttm, year, DT_January, DT_January);
+}
+
+datetime_t *datetime_init_cherokee_green_corn_ceremony(datetime_t *dttm, int year)
+{
+    return datetime_init_cherokee_window_new_moon(dttm, year, DT_July, DT_July);
+}
+
+datetime_t *datetime_init_cherokee_ripe_corn_ceremony(datetime_t *dttm, int year)
+{
+    return datetime_init_cherokee_window_new_moon(dttm, year, DT_August, DT_August);
+}
+
+datetime_t *datetime_init_cherokee_great_new_moon_festival(datetime_t *dttm, int year)
+{
+    return datetime_init_cherokee_window_new_moon(dttm, year, DT_September, DT_September);
+}
+
+string_t *datetime_mayan_calendar_date_text(const datetime_t *dttm)
+{
+    static const char *tzolkin_names[] = {
+        "Imix", "Ik'", "Ak'bal", "K'an", "Chikchan",
+        "Kimi", "Manik'", "Lamat", "Muluk", "Ok",
+        "Chuwen", "Eb'", "B'en", "Ix", "Men",
+        "K'ib'", "Kab'an", "Etz'nab'", "Kawak", "Ajaw"
+    };
+    static const char *haab_names[] = {
+        "Pop", "Wo'", "Sip", "Sotz'", "Sek",
+        "Xul", "Yaxk'in", "Mol", "Ch'en", "Yax",
+        "Sak'", "Keh", "Mak", "K'ank'in", "Muwan",
+        "Pax", "K'ayab", "Kumk'u", "Wayeb"
+    };
+    static const long mayan_epoch_jdn = 584283L;
+    long jdn;
+    long days;
+    long baktun;
+    long katun;
+    long tun;
+    long uinal;
+    long kin;
+    long tzolkin_number;
+    long tzolkin_name_index;
+    long haab_count;
+    long haab_month_index;
+    long haab_day;
+    string_t *out;
+
+    if (!dttm || datetime_jdn(dttm) == LONG_MAX)
+        return NULL;
+
+    jdn = datetime_jdn(dttm);
+    days = jdn - mayan_epoch_jdn;
+    if (days < 0)
+        return NULL;
+
+    baktun = days / 144000L;
+    days %= 144000L;
+    katun = days / 7200L;
+    days %= 7200L;
+    tun = days / 360L;
+    days %= 360L;
+    uinal = days / 20L;
+    kin = days % 20L;
+
+    days = jdn - mayan_epoch_jdn;
+    tzolkin_number = ((days + 3L) % 13L) + 1L;
+    tzolkin_name_index = (days + 19L) % 20L;
+    haab_count = (days + 348L) % 365L;
+    if (haab_count < 360L) {
+        haab_month_index = haab_count / 20L;
+        haab_day = haab_count % 20L;
+    } else {
+        haab_month_index = 18L;
+        haab_day = haab_count - 360L;
+    }
+
+    out = string_new();
+    if (!out ||
+        string_append_format(out,
+                             "Long Count %ld.%ld.%ld.%ld.%ld; Tzolk'in %ld %s; Haab %ld %s",
+                             baktun,
+                             katun,
+                             tun,
+                             uinal,
+                             kin,
+                             tzolkin_number,
+                             tzolkin_names[tzolkin_name_index],
+                             haab_day,
+                             haab_names[haab_month_index]) < 0) {
+        string_free(out);
+        return NULL;
+    }
+    return out;
+}
+
+static void datetime_mayan_haab_components(long jdn, int *monthIndex, int *day)
+{
+    long haabCount = (jdn - 584283L + 348L) % 365L;
+
+    if (haabCount < 0)
+        haabCount += 365L;
+    if (haabCount < 360L) {
+        *monthIndex = (int)(haabCount / 20L);
+        *day = (int)(haabCount % 20L);
+    } else {
+        *monthIndex = 18;
+        *day = (int)(haabCount - 360L);
+    }
+}
+
+static datetime_t *datetime_init_mayan_haab_marker(datetime_t *dttm,
+                                                   int gregorianYear,
+                                                   int targetMonthIndex,
+                                                   int targetDay)
+{
+    long startJdn;
+    long endJdn;
+
+    if (!dttm || gregorianYear < 1 || gregorianYear > 9999)
+        return NULL;
+
+    startJdn = datetime_ymd_to_jdn((short)gregorianYear, DT_January, 1);
+    endJdn = datetime_ymd_to_jdn((short)(gregorianYear + 1), DT_January, 1);
+    for (long jdn = startJdn; jdn < endJdn; jdn++) {
+        int monthIndex;
+        int day;
+
+        datetime_mayan_haab_components(jdn, &monthIndex, &day);
+        if (monthIndex == targetMonthIndex && day == targetDay)
+            return datetime_init_materialised_jdn(dttm, jdn);
+    }
+    return NULL;
+}
+
+datetime_t *datetime_init_mayan_haab_new_year(datetime_t *dttm, int year)
+{
+    return datetime_init_mayan_haab_marker(dttm, year, 0, 0);
+}
+
+datetime_t *datetime_init_mayan_wayeb_start(datetime_t *dttm, int year)
+{
+    return datetime_init_mayan_haab_marker(dttm, year, 18, 0);
+}
+
+static datetime_t *datetime_init_aztec_year_start(datetime_t *dttm, int gregorianYear)
+{
+    return datetime_init_ymd(dttm, gregorianYear, DT_February, 23);
+}
+
+datetime_t *datetime_init_aztec_xiuhpohualli_new_year(datetime_t *dttm, int year)
+{
+    return datetime_init_aztec_year_start(dttm, year);
+}
+
+datetime_t *datetime_init_aztec_nemontemi_start(datetime_t *dttm, int year)
+{
+    if (!dttm || year < 1 || year > 9999)
+        return NULL;
+    return datetime_init_ymd(dttm, (short)year, DT_February, 18);
+}
+
+string_t *datetime_aztec_calendar_date_text(const datetime_t *dttm)
+{
+    static const char *tonalpohualli_names[] = {
+        "Cipactli", "Ehecatl", "Calli", "Cuetzpalin", "Coatl",
+        "Miquiztli", "Mazatl", "Tochtli", "Atl", "Itzcuintli",
+        "Ozomatli", "Malinalli", "Acatl", "Ocelotl", "Cuauhtli",
+        "Cozcacuauhtli", "Ollin", "Tecpatl", "Quiahuitl", "Xochitl"
+    };
+    static const char *xiuhpohualli_names[] = {
+        "Atlcahualo", "Tlacaxipehualiztli", "Tozoztontli", "Hueytozoztli",
+        "Toxcatl", "Etzalcualiztli", "Tecuilhuitontli", "Huey Tecuilhuitl",
+        "Tlaxochimaco", "Xocotlhuetzi", "Ochpaniztli", "Teotleco",
+        "Tepeilhuitl", "Quecholli", "Panquetzaliztli", "Atemoztli",
+        "Tititl", "Izcalli", "Nemontemi"
+    };
+    static const char *year_bearer_names[] = {
+        "Calli", "Tochtli", "Acatl", "Tecpatl"
+    };
+    long jdn;
+    long aztec_number;
+    long aztec_name_index;
+    long day_index;
+    long xiuh_month_index;
+    long xiuh_day;
+    int civilYear;
+    int year_number;
+    int year_bearer_index;
+    datetime_t *year_start;
+    string_t *out;
+
+    if (!dttm || datetime_jdn(dttm) == LONG_MAX)
+        return NULL;
+
+    jdn = datetime_jdn(dttm);
+    aztec_number = ((jdn + 3L) % 13L) + 1L;
+    aztec_name_index = (jdn + 13L) % 20L;
+
+    civilYear = datetime_year(dttm);
+    year_start = datetime_init_aztec_year_start(datetime_alloc(), civilYear);
+    if (!year_start) {
+        datetime_dealloc(year_start);
+        return NULL;
+    }
+    if (datetime_compare(dttm, year_start) < 0) {
+        civilYear--;
+        datetime_init_aztec_year_start(year_start, civilYear);
+    }
+
+    day_index = datetime_jdn(dttm) - datetime_jdn(year_start);
+    if (day_index < 0)
+        day_index = 0;
+    if (day_index < 360L) {
+        xiuh_month_index = day_index / 20L;
+        xiuh_day = (day_index % 20L) + 1L;
+    } else {
+        xiuh_month_index = 18L;
+        xiuh_day = (day_index - 360L) + 1L;
+    }
+
+    year_number = ((civilYear - 2013) % 13 + 13) % 13 + 1;
+    year_bearer_index = ((civilYear - 2013) % 4 + 4) % 4;
+
+    out = string_new();
+    if (!out ||
+        string_append_format(out,
+                             "Tonalpohualli %ld %s; Xiuhpohualli day %ld of %s; year %d %s",
+                             aztec_number,
+                             tonalpohualli_names[aztec_name_index],
+                             xiuh_day,
+                             xiuhpohualli_names[xiuh_month_index],
+                             year_number,
+                             year_bearer_names[year_bearer_index]) < 0) {
+        string_free(out);
+        out = NULL;
+    }
+
+    datetime_dealloc(year_start);
+    return out;
+}
+
+static long datetime_ethiopian_ymd_to_jdn(int year, int month, int day)
+{
+    return 1724221L + 365L * (long)(year - 1) + (long)((year - 1) / 4) + 30L * (long)(month - 1) + (long)day - 1L;
+}
+
+static void datetime_jdn_to_ethiopian_ymd(long jdn, int *year, int *month, int *day)
+{
+    int estimate;
+    long year_start;
+
+    estimate = (int)((jdn - 1724221L) / 366L) + 1;
+    if (estimate < 1)
+        estimate = 1;
+
+    while (datetime_ethiopian_ymd_to_jdn(estimate + 1, 1, 1) <= jdn)
+        estimate++;
+    while (datetime_ethiopian_ymd_to_jdn(estimate, 1, 1) > jdn)
+        estimate--;
+
+    year_start = datetime_ethiopian_ymd_to_jdn(estimate, 1, 1);
+    *year = estimate;
+    *month = (int)((jdn - year_start) / 30L) + 1;
+    *day = (int)(jdn - datetime_ethiopian_ymd_to_jdn(*year, *month, 1) + 1L);
+}
+
+string_t *datetime_ethiopian_calendar_date_text(const datetime_t *dttm)
+{
+    static const char *month_names[] = {
+        NULL,
+        "Meskerem", "Tikimt", "Hidar", "Tahsas", "Tir",
+        "Yekatit", "Megabit", "Miyazya", "Genbot", "Sene",
+        "Hamle", "Nehasse", "Pagume"
+    };
+    int year;
+    int month;
+    int day;
+    string_t *out;
+
+    if (!dttm || datetime_jdn(dttm) == LONG_MAX)
+        return NULL;
+
+    datetime_jdn_to_ethiopian_ymd(datetime_jdn(dttm), &year, &month, &day);
+    if (month < 1 || month > 13)
+        return NULL;
+
+    out = string_new();
+    if (!out ||
+        string_append_format(out,
+                             "%d %s %d EC",
+                             day,
+                             month_names[month],
+                             year) < 0) {
+        string_free(out);
+        return NULL;
+    }
+    return out;
+}
+
 static long datetime_india_new_moon_jdn_in_window(int year,
                                                   month_t startMonth,
                                                   uint8_t startDay,
@@ -1122,6 +1576,35 @@ static long datetime_india_new_moon_jdn_in_window(int year,
 
         if (indiaJdn >= windowStart && indiaJdn <= windowEnd)
             return indiaJdn;
+    }
+
+    return LONG_MAX;
+}
+
+static long datetime_local_new_moon_jdn_in_window(int year,
+                                                  month_t startMonth,
+                                                  uint8_t startDay,
+                                                  month_t endMonth,
+                                                  uint8_t endDay,
+                                                  double gmtOffsetHours)
+{
+    long windowStart;
+    long windowEnd;
+    int lunationIndex;
+
+    if (year < 1700 || year > 2400)
+        return LONG_MAX;
+
+    windowStart = datetime_ymd_to_jdn((short)year, startMonth, startDay);
+    windowEnd = datetime_ymd_to_jdn((short)year, endMonth, endDay);
+    lunationIndex = (int)((windowStart - 2451550.09765) / 29.530588853) - 2;
+
+    for (int i = 0; i < 8; i++, lunationIndex++) {
+        long localJdn = datetime_local_new_moon_jdn_for_lunation(lunationIndex,
+                                                                 year,
+                                                                 gmtOffsetHours);
+        if (localJdn >= windowStart && localJdn <= windowEnd)
+            return localJdn;
     }
 
     return LONG_MAX;
@@ -2505,10 +2988,6 @@ double datetime_sun_time(long julianDayNumber, double latitude, double longitude
     minutesUtc = solarNoonMinutesUtc + (isSunrise ? -4.0 * hourAngleDegrees : 4.0 * hourAngleDegrees);
     hoursUtc = minutesUtc / 60.0;
 
-    hoursUtc = fmod(hoursUtc, 24.0);
-    if (hoursUtc < 0.0)
-        hoursUtc += 24.0;
-
     return hoursUtc;
 }
 
@@ -2610,11 +3089,18 @@ double datetime_solar_inclination(const datetime_t *dttm, double latitude)
 static void datetime_set_sun_time(datetime_t *dttm, double latitude, double longitude, double timeZoneOffset, bool isSunrise)
 {
     long julianDayNumber = datetime_jdn(dttm);
+    double time = datetime_sun_time(julianDayNumber, latitude, longitude, isSunrise);
+    double minute_value;
+    long rounded_minutes;
+    datetime_sun_status_t status;
+
     datetime_year(dttm);
 
-    double time = datetime_sun_time(julianDayNumber, latitude, longitude, isSunrise);
-    if (time < 0.0) {
+    status = datetime_sun_status_from_raw(time);
+    if (status != DATETIME_SUN_OK) {
         dttm->hour = 0;
+        dttm->minute = 0;
+        dttm->second = 0.0;
         return; // Sunrise/sunset cannot be calculated for this date and location (e.g. polar night)
     }
 
@@ -2636,9 +3122,19 @@ static void datetime_set_sun_time(datetime_t *dttm, double latitude, double long
         datetime_add_days(dttm, 1);
     }
 
+    minute_value = time * 60.0;
+    rounded_minutes = lround(minute_value);
+    if (rounded_minutes < 0) {
+        rounded_minutes += 24L * 60L;
+        datetime_add_days(dttm, -1);
+    } else if (rounded_minutes >= 24L * 60L) {
+        rounded_minutes -= 24L * 60L;
+        datetime_add_days(dttm, 1);
+    }
+
     // Update the time components of the datetime object
-    dttm->hour = (uint8_t)time;
-    dttm->minute = (uint8_t)((time - dttm->hour) * 60.0);
+    dttm->hour = (uint8_t)(rounded_minutes / 60L);
+    dttm->minute = (uint8_t)(rounded_minutes % 60L);
     dttm->second = 0.0;
 }
 
@@ -2648,7 +3144,7 @@ static datetime_sun_status_t datetime_sun_status_from_raw(double raw_time)
         return DATETIME_SUN_NEVER_RISES;
     if (raw_time == -2.0)
         return DATETIME_SUN_NEVER_SETS;
-    if (raw_time < 0.0 || !isfinite(raw_time))
+    if (!isfinite(raw_time))
         return DATETIME_SUN_UNAVAILABLE;
     return DATETIME_SUN_OK;
 }
@@ -2725,6 +3221,122 @@ static datetime_t *datetime_init_sun_time_checked(datetime_t *dttm,
                                   isSunrise);
 }
 
+static datetime_t *datetime_init_adjacent_sun_time_checked(datetime_t *dttm,
+                                                           long julianDayNumber,
+                                                           double latitude,
+                                                           double longitude,
+                                                           double timeZoneOffset,
+                                                           bool isSunrise,
+                                                           int direction,
+                                                           datetime_sun_status_t *status)
+{
+    const int max_search_days = 370;
+    datetime_sun_status_t seed_status;
+    int seed_offset;
+    int low_same_status;
+    int high_same_status;
+    int answer = -1;
+
+    if (status)
+        *status = DATETIME_SUN_UNAVAILABLE;
+
+    if (!dttm || (direction != -1 && direction != 1))
+        return NULL;
+
+    seed_status = datetime_sun_status_from_raw(
+        datetime_sun_time(julianDayNumber, latitude, longitude, isSunrise)
+    );
+    if (seed_status == DATETIME_SUN_UNAVAILABLE)
+        return NULL;
+
+    seed_offset = 1;
+    {
+        long candidate_jdn = julianDayNumber + (long)(direction * seed_offset);
+        datetime_sun_status_t candidate_status = datetime_sun_status_from_raw(
+            datetime_sun_time(candidate_jdn, latitude, longitude, isSunrise)
+        );
+
+        if (candidate_status == DATETIME_SUN_UNAVAILABLE)
+            return NULL;
+        if (candidate_status == DATETIME_SUN_OK) {
+            if (status)
+                *status = DATETIME_SUN_OK;
+            return datetime_init_sun_time(dttm,
+                                          candidate_jdn,
+                                          latitude,
+                                          longitude,
+                                          timeZoneOffset,
+                                          isSunrise);
+        }
+        seed_status = candidate_status;
+    }
+
+    low_same_status = seed_offset;
+    high_same_status = seed_offset;
+    for (;;) {
+        long candidate_jdn = julianDayNumber + (long)(direction * high_same_status);
+        double raw_time = datetime_sun_time(candidate_jdn, latitude, longitude, isSunrise);
+        datetime_sun_status_t resolved_status = datetime_sun_status_from_raw(raw_time);
+
+        if (resolved_status != seed_status)
+            break;
+
+        if (resolved_status == DATETIME_SUN_UNAVAILABLE)
+            return NULL;
+
+        if (high_same_status >= max_search_days)
+            return NULL;
+
+        low_same_status = high_same_status;
+        high_same_status *= 2;
+        if (high_same_status > max_search_days)
+            high_same_status = max_search_days;
+    }
+
+    {
+        int left = low_same_status + 1;
+        int right = high_same_status;
+
+        while (left <= right) {
+            int mid = left + (right - left) / 2;
+            long candidate_jdn = julianDayNumber + (long)(direction * mid);
+            double raw_time = datetime_sun_time(candidate_jdn, latitude, longitude, isSunrise);
+            datetime_sun_status_t resolved_status = datetime_sun_status_from_raw(raw_time);
+
+            if (resolved_status == DATETIME_SUN_UNAVAILABLE)
+                return NULL;
+
+            if (resolved_status != seed_status) {
+                answer = mid;
+                right = mid - 1;
+            } else {
+                left = mid + 1;
+            }
+        }
+    }
+
+    if (answer < 0)
+        return NULL;
+
+    {
+        long candidate_jdn = julianDayNumber + (long)(direction * answer);
+        double raw_time = datetime_sun_time(candidate_jdn, latitude, longitude, isSunrise);
+        datetime_sun_status_t resolved_status = datetime_sun_status_from_raw(raw_time);
+
+        if (resolved_status != DATETIME_SUN_OK)
+            return NULL;
+    }
+
+    if (status)
+        *status = DATETIME_SUN_OK;
+    return datetime_init_sun_time(dttm,
+                                  julianDayNumber + (long)(direction * answer),
+                                  latitude,
+                                  longitude,
+                                  timeZoneOffset,
+                                  isSunrise);
+}
+
 inline datetime_t *datetime_init_sunrise(datetime_t *dttm, long julianDayNumber, double latitude, double longitude, double timeZoneOffset)
 {
     return datetime_init_sun_time_checked(dttm,
@@ -2752,6 +3364,40 @@ datetime_t *datetime_init_sunrise_checked(datetime_t *dttm,
                                           status);
 }
 
+datetime_t *datetime_init_previous_sunrise_checked(datetime_t *dttm,
+                                                   long julianDayNumber,
+                                                   double latitude,
+                                                   double longitude,
+                                                   double timeZoneOffset,
+                                                   datetime_sun_status_t *status)
+{
+    return datetime_init_adjacent_sun_time_checked(dttm,
+                                                   julianDayNumber,
+                                                   latitude,
+                                                   longitude,
+                                                   timeZoneOffset,
+                                                   true,
+                                                   -1,
+                                                   status);
+}
+
+datetime_t *datetime_init_next_sunrise_checked(datetime_t *dttm,
+                                               long julianDayNumber,
+                                               double latitude,
+                                               double longitude,
+                                               double timeZoneOffset,
+                                               datetime_sun_status_t *status)
+{
+    return datetime_init_adjacent_sun_time_checked(dttm,
+                                                   julianDayNumber,
+                                                   latitude,
+                                                   longitude,
+                                                   timeZoneOffset,
+                                                   true,
+                                                   1,
+                                                   status);
+}
+
 inline datetime_t *datetime_init_sunset(datetime_t *dttm, long julianDayNumber, double latitude, double longitude, double timeZoneOffset)
 {
     return datetime_init_sun_time_checked(dttm,
@@ -2775,8 +3421,42 @@ datetime_t *datetime_init_sunset_checked(datetime_t *dttm,
                                           latitude,
                                           longitude,
                                           timeZoneOffset,
-                                          false,
-                                          status);
+                                         false,
+                                         status);
+}
+
+datetime_t *datetime_init_previous_sunset_checked(datetime_t *dttm,
+                                                  long julianDayNumber,
+                                                  double latitude,
+                                                  double longitude,
+                                                  double timeZoneOffset,
+                                                  datetime_sun_status_t *status)
+{
+    return datetime_init_adjacent_sun_time_checked(dttm,
+                                                   julianDayNumber,
+                                                   latitude,
+                                                   longitude,
+                                                   timeZoneOffset,
+                                                   false,
+                                                   -1,
+                                                   status);
+}
+
+datetime_t *datetime_init_next_sunset_checked(datetime_t *dttm,
+                                              long julianDayNumber,
+                                              double latitude,
+                                              double longitude,
+                                              double timeZoneOffset,
+                                              datetime_sun_status_t *status)
+{
+    return datetime_init_adjacent_sun_time_checked(dttm,
+                                                   julianDayNumber,
+                                                   latitude,
+                                                   longitude,
+                                                   timeZoneOffset,
+                                                   false,
+                                                   1,
+                                                   status);
 }
 
 inline void datetime_set_sunrise(datetime_t *dttm, double latitude, double longitude, double timeZoneOffset)
