@@ -84,3 +84,4 @@ packaging/linux/*.png
 .to_be_announced_uploads/
 
 test_data/
+src/almanac/Explanatory Supplement Astronomical Almanac.pdf
