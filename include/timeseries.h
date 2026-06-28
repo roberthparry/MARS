@@ -427,6 +427,41 @@ int ts_arima_summary_write_file(const char *path,
                                 const ts_arima_result_t *result,
                                 ts_string_style_t style);
 
+/**
+ * @brief Serialise a timeseries into a SQLite-ready payload.
+ *
+ * The payload uses CSV text, while the encoding metadata records the series
+ * frequency and year convention needed for reconstruction. On success, the
+ * caller owns @p out_type, @p out_encoding, and @p out_data and must release
+ * them with @c string_free() and @c free().
+ *
+ * @param series Timeseries to serialise.
+ * @param out_type Receives a newly allocated type label.
+ * @param out_encoding Receives a newly allocated encoding label.
+ * @param out_data Receives a newly allocated payload buffer.
+ * @param out_len Receives the payload length in bytes.
+ * @return @c true on success, otherwise @c false.
+ */
+bool ts_serialize(const timeseries_t *series,
+                  string_t **out_type,
+                  string_t **out_encoding,
+                  void **out_data,
+                  size_t *out_len);
+
+/**
+ * @brief Reconstruct a timeseries from a serialised payload.
+ *
+ * @param data Serialised payload bytes.
+ * @param len Payload length in bytes.
+ * @param type Stored type label.
+ * @param encoding Stored encoding label.
+ * @return Newly allocated timeseries on success, otherwise @c NULL.
+ */
+timeseries_t *ts_deserialise(const void *data,
+                             size_t len,
+                             const string_t *type,
+                             const string_t *encoding);
+
 /* -------------------------------------------------------------------------
    Basic inspection
    ------------------------------------------------------------------------- */

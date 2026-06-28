@@ -2,6 +2,8 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "json_internal.h"
 
@@ -336,4 +338,74 @@ int json_to_file_pretty(const json_t *json, const string_t *path, int indent_siz
     rc = json_write_file_text(text, path);
     string_free(text);
     return rc;
+}
+
+bool json_serialize(const json_t *json,
+                    string_t **out_type,
+                    string_t **out_encoding,
+                    void **out_data,
+                    size_t *out_len)
+{
+    string_t *type = NULL;
+    string_t *encoding = NULL;
+    string_t *text = NULL;
+    void *payload = NULL;
+
+    if (!json || !out_type || !out_encoding || !out_data || !out_len)
+        return false;
+
+    text = json_to_string(json);
+    if (!text)
+        return false;
+
+    payload = malloc(string_byte_length(text));
+    if (!payload) {
+        string_free(text);
+        return false;
+    }
+    memcpy(payload, string_c_str(text), string_byte_length(text));
+
+    type = string_new_with("json_t");
+    encoding = string_new_with("application/json");
+    if (!type || !encoding) {
+        free(payload);
+        string_free(text);
+        string_free(type);
+        string_free(encoding);
+        return false;
+    }
+
+    *out_type = type;
+    *out_encoding = encoding;
+    *out_data = payload;
+    *out_len = string_byte_length(text);
+    string_free(text);
+    return true;
+}
+
+json_t *json_deserialise(const void *data,
+                         size_t len,
+                         const string_t *type,
+                         const string_t *encoding)
+{
+    string_t *text;
+    json_t *json;
+
+    if (!data || !type || !encoding)
+        return NULL;
+    if (strcmp(string_c_str(type), "json_t") != 0 ||
+        strcmp(string_c_str(encoding), "application/json") != 0)
+        return NULL;
+
+    text = string_new();
+    if (!text)
+        return NULL;
+    if (string_append_chars(text, (const char *)data, len) != 0) {
+        string_free(text);
+        return NULL;
+    }
+
+    json = json_from_text(text);
+    string_free(text);
+    return json;
 }

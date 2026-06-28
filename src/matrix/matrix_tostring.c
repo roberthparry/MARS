@@ -1028,3 +1028,72 @@ char *mat_to_string(const matrix_t *A, mat_string_style_t style)
     string_free(text);
     return out;
 }
+
+bool mat_serialize(const matrix_t *A,
+                   string_t **out_type,
+                   string_t **out_encoding,
+                   void **out_data,
+                   size_t *out_len)
+{
+    string_t *type = NULL;
+    string_t *encoding = NULL;
+    string_t *text = NULL;
+    void *payload = NULL;
+
+    if (!A || !out_type || !out_encoding || !out_data || !out_len)
+        return false;
+
+    text = mat_to_text(A, MAT_STRING_INLINE_PRETTY);
+    if (!text)
+        return false;
+
+    payload = malloc(string_byte_length(text));
+    if (!payload) {
+        string_free(text);
+        return false;
+    }
+    memcpy(payload, string_c_str(text), string_byte_length(text));
+
+    type = string_new_with("matrix_t");
+    encoding = string_new_with("mars/matrix-text");
+    if (!type || !encoding) {
+        free(payload);
+        string_free(text);
+        string_free(type);
+        string_free(encoding);
+        return false;
+    }
+
+    *out_type = type;
+    *out_encoding = encoding;
+    *out_data = payload;
+    *out_len = string_byte_length(text);
+    string_free(text);
+    return true;
+}
+
+matrix_t *mat_deserialise(const void *data,
+                          size_t len,
+                          const string_t *type,
+                          const string_t *encoding)
+{
+    string_t *text;
+    matrix_t *matrix;
+
+    if (!data || !type || !encoding)
+        return NULL;
+    if (strcmp(string_c_str(type), "matrix_t") != 0 ||
+        strcmp(string_c_str(encoding), "mars/matrix-text") != 0)
+        return NULL;
+
+    text = string_new();
+    if (!text)
+        return NULL;
+    if (string_append_chars(text, (const char *)data, len) != 0) {
+        string_free(text);
+        return NULL;
+    }
+    matrix = mat_from_text_expr(text, NULL);
+    string_free(text);
+    return matrix;
+}

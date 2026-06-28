@@ -17,6 +17,12 @@ struct _sqlite_t {
     string_t *error;
 };
 
+struct _sqlite_stmt_t {
+    sqlite_t *db;
+    sqlite3_stmt *handle;
+    string_t *error;
+};
+
 static bool sqlite_text_is_empty(const string_t *text)
 {
     return !text || string_byte_length(text) == 0u;
@@ -34,6 +40,20 @@ static void sqlite_set_error(sqlite_t *db, const char *message)
 
     string_clear(db->error);
     (void)string_append_cstr(db->error, message ? message : "sqlite error");
+}
+
+static void sqlite_stmt_set_error(sqlite_stmt_t *stmt, const char *message)
+{
+    if (!stmt)
+        return;
+
+    if (!stmt->error)
+        stmt->error = string_new();
+    if (!stmt->error)
+        return;
+
+    string_clear(stmt->error);
+    (void)string_append_cstr(stmt->error, message ? message : "sqlite statement error");
 }
 
 static bool sqlite_set_error_code(sqlite_t *db, int rc)
@@ -339,7 +359,7 @@ done:
     return ok;
 }
 
-void sqlite_free_blob(void *data)
+void sqlite_free_object_data(void *data)
 {
     free(data);
 }
@@ -408,7 +428,7 @@ bool sqlite_load_string(sqlite_t *db,
 
 done:
     string_free(value);
-    sqlite_free_blob(data);
+    sqlite_free_object_data(data);
     string_free(encoding);
     string_free(type);
     return ok;
@@ -417,4 +437,197 @@ done:
 sqlite3 *sqlite_native_handle(sqlite_t *db)
 {
     return db ? db->handle : NULL;
+}
+
+sqlite_stmt_t *sqlite_stmt_prepare(sqlite_t *db, const char *sql)
+{
+    sqlite_stmt_t *stmt;
+    int rc;
+
+    if (!db || !db->handle || !sql)
+        return NULL;
+
+    stmt = calloc(1u, sizeof(*stmt));
+    if (!stmt)
+        return NULL;
+    stmt->db = db;
+    stmt->error = string_new();
+    if (!stmt->error) {
+        free(stmt);
+        return NULL;
+    }
+
+    rc = sqlite3_prepare_v2(db->handle, sql, -1, &stmt->handle, NULL);
+    if (rc != SQLITE_OK) {
+        sqlite_set_error_code(db, rc);
+        sqlite_stmt_set_error(stmt, sqlite3_errmsg(db->handle));
+        sqlite_stmt_finalize(stmt);
+        return NULL;
+    }
+    return stmt;
+}
+
+void sqlite_stmt_finalize(sqlite_stmt_t *stmt)
+{
+    if (!stmt)
+        return;
+    if (stmt->handle)
+        sqlite3_finalize(stmt->handle);
+    string_free(stmt->error);
+    free(stmt);
+}
+
+bool sqlite_stmt_bind_text(sqlite_stmt_t *stmt, int index, const char *value)
+{
+    int rc;
+
+    if (!stmt || !stmt->handle || !value)
+        return false;
+    rc = sqlite3_bind_text(stmt->handle, index, value, -1, SQLITE_TRANSIENT);
+    if (rc != SQLITE_OK) {
+        sqlite_set_error_code(stmt->db, rc);
+        sqlite_stmt_set_error(stmt, sqlite3_errmsg(stmt->db->handle));
+        return false;
+    }
+    return true;
+}
+
+bool sqlite_stmt_bind_int(sqlite_stmt_t *stmt, int index, int value)
+{
+    int rc;
+
+    if (!stmt || !stmt->handle)
+        return false;
+    rc = sqlite3_bind_int(stmt->handle, index, value);
+    if (rc != SQLITE_OK) {
+        sqlite_set_error_code(stmt->db, rc);
+        sqlite_stmt_set_error(stmt, sqlite3_errmsg(stmt->db->handle));
+        return false;
+    }
+    return true;
+}
+
+bool sqlite_stmt_bind_double(sqlite_stmt_t *stmt, int index, double value)
+{
+    int rc;
+
+    if (!stmt || !stmt->handle)
+        return false;
+    rc = sqlite3_bind_double(stmt->handle, index, value);
+    if (rc != SQLITE_OK) {
+        sqlite_set_error_code(stmt->db, rc);
+        sqlite_stmt_set_error(stmt, sqlite3_errmsg(stmt->db->handle));
+        return false;
+    }
+    return true;
+}
+
+bool sqlite_stmt_bind_blob(sqlite_stmt_t *stmt, int index, const void *value, size_t value_len)
+{
+    int rc;
+
+    if (!stmt || !stmt->handle || (!value && value_len > 0u))
+        return false;
+    rc = sqlite3_bind_blob(stmt->handle, index, value, (int)value_len, SQLITE_TRANSIENT);
+    if (rc != SQLITE_OK) {
+        sqlite_set_error_code(stmt->db, rc);
+        sqlite_stmt_set_error(stmt, sqlite3_errmsg(stmt->db->handle));
+        return false;
+    }
+    return true;
+}
+
+bool sqlite_stmt_bind_null(sqlite_stmt_t *stmt, int index)
+{
+    int rc;
+
+    if (!stmt || !stmt->handle)
+        return false;
+    rc = sqlite3_bind_null(stmt->handle, index);
+    if (rc != SQLITE_OK) {
+        sqlite_set_error_code(stmt->db, rc);
+        sqlite_stmt_set_error(stmt, sqlite3_errmsg(stmt->db->handle));
+        return false;
+    }
+    return true;
+}
+
+sqlite_step_result_t sqlite_stmt_step(sqlite_stmt_t *stmt)
+{
+    int rc;
+
+    if (!stmt || !stmt->handle)
+        return SQLITE_STEP_ERROR;
+    rc = sqlite3_step(stmt->handle);
+    if (rc == SQLITE_ROW)
+        return SQLITE_STEP_ROW;
+    if (rc == SQLITE_DONE)
+        return SQLITE_STEP_DONE;
+    sqlite_set_error_code(stmt->db, rc);
+    sqlite_stmt_set_error(stmt, sqlite3_errmsg(stmt->db->handle));
+    return SQLITE_STEP_ERROR;
+}
+
+void sqlite_stmt_reset(sqlite_stmt_t *stmt)
+{
+    if (!stmt || !stmt->handle)
+        return;
+    sqlite3_reset(stmt->handle);
+}
+
+void sqlite_stmt_clear_bindings(sqlite_stmt_t *stmt)
+{
+    if (!stmt || !stmt->handle)
+        return;
+    sqlite3_clear_bindings(stmt->handle);
+}
+
+const char *sqlite_stmt_column_text(sqlite_stmt_t *stmt, int column)
+{
+    const unsigned char *text;
+
+    if (!stmt || !stmt->handle)
+        return NULL;
+    text = sqlite3_column_text(stmt->handle, column);
+    return text ? (const char *)text : NULL;
+}
+
+int sqlite_stmt_column_int(sqlite_stmt_t *stmt, int column)
+{
+    if (!stmt || !stmt->handle)
+        return 0;
+    return sqlite3_column_int(stmt->handle, column);
+}
+
+double sqlite_stmt_column_double(sqlite_stmt_t *stmt, int column)
+{
+    if (!stmt || !stmt->handle)
+        return 0.0;
+    return sqlite3_column_double(stmt->handle, column);
+}
+
+const void *sqlite_stmt_column_blob(sqlite_stmt_t *stmt, int column)
+{
+    if (!stmt || !stmt->handle)
+        return NULL;
+    return sqlite3_column_blob(stmt->handle, column);
+}
+
+size_t sqlite_stmt_column_bytes(sqlite_stmt_t *stmt, int column)
+{
+    if (!stmt || !stmt->handle)
+        return 0u;
+    return (size_t)sqlite3_column_bytes(stmt->handle, column);
+}
+
+bool sqlite_stmt_column_is_null(sqlite_stmt_t *stmt, int column)
+{
+    if (!stmt || !stmt->handle)
+        return true;
+    return sqlite3_column_type(stmt->handle, column) == SQLITE_NULL;
+}
+
+const string_t *sqlite_stmt_last_error(const sqlite_stmt_t *stmt)
+{
+    return stmt ? stmt->error : NULL;
 }

@@ -775,6 +775,43 @@ expr_t *expr_from_string(const char *s, expr_bindings_t **bnd_out);
 expr_t *expr_from_text(const string_t *text, expr_bindings_t **bnd_out);
 
 /**
+ * @brief Serialise an expression into a SQLite-ready payload.
+ *
+ * The payload uses the round-trippable @c style_EXPRESSION text format. On
+ * success, the caller owns @p out_type, @p out_encoding, and @p out_data and
+ * must release them with @c string_free() and @c free().
+ *
+ * @param expr Expression to serialise.
+ * @param out_type Receives a newly allocated type label.
+ * @param out_encoding Receives a newly allocated encoding label.
+ * @param out_data Receives a newly allocated payload buffer.
+ * @param out_len Receives the payload length in bytes.
+ * @return @c true on success, otherwise @c false.
+ */
+bool expr_serialize(const expr_t *expr,
+                    string_t **out_type,
+                    string_t **out_encoding,
+                    void **out_data,
+                    size_t *out_len);
+
+/**
+ * @brief Reconstruct an expression from a serialised payload.
+ *
+ * Parsed bindings, if any, are created internally and owned by the returned
+ * expression in the usual way.
+ *
+ * @param data Serialised payload bytes.
+ * @param len Payload length in bytes.
+ * @param type Stored type label.
+ * @param encoding Stored encoding label.
+ * @return Newly allocated expression on success, otherwise @c NULL.
+ */
+expr_t *expr_deserialise(const void *data,
+                         size_t len,
+                         const string_t *type,
+                         const string_t *encoding);
+
+/**
  * @brief Look up a parsed binding by name.
  *
  * The lookup accepts normalised binding names. Bracketed names may be queried

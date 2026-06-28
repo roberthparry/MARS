@@ -798,3 +798,183 @@ int ts_arima_summary_write_file(const char *path,
     }
     return ts_write_owned_text_to_path(path, text);
 }
+
+static const char *ts_frequency_name(ts_frequency_t frequency)
+{
+    switch (frequency) {
+        case TS_FREQ_DAILY: return "daily";
+        case TS_FREQ_MONTHLY: return "monthly";
+        case TS_FREQ_QUARTERLY: return "quarterly";
+        case TS_FREQ_YEARLY: return "yearly";
+        case TS_FREQ_IRREGULAR: return "irregular";
+        case TS_FREQ_UNKNOWN:
+        default:
+            return "unknown";
+    }
+}
+
+static ts_frequency_t ts_frequency_from_name(const char *name)
+{
+    if (!name) return TS_FREQ_UNKNOWN;
+    if (strcmp(name, "daily") == 0) return TS_FREQ_DAILY;
+    if (strcmp(name, "monthly") == 0) return TS_FREQ_MONTHLY;
+    if (strcmp(name, "quarterly") == 0) return TS_FREQ_QUARTERLY;
+    if (strcmp(name, "yearly") == 0) return TS_FREQ_YEARLY;
+    if (strcmp(name, "irregular") == 0) return TS_FREQ_IRREGULAR;
+    return TS_FREQ_UNKNOWN;
+}
+
+static const char *ts_year_type_name(ts_year_type_t year_type)
+{
+    switch (year_type) {
+        case TS_YEAR_FISCAL_UK_APR: return "fiscal-uk-apr";
+        case TS_YEAR_CALENDAR:
+        default:
+            return "calendar";
+    }
+}
+
+static ts_year_type_t ts_year_type_from_name(const char *name)
+{
+    if (name && strcmp(name, "fiscal-uk-apr") == 0)
+        return TS_YEAR_FISCAL_UK_APR;
+    return TS_YEAR_CALENDAR;
+}
+
+bool ts_serialize(const timeseries_t *series,
+                  string_t **out_type,
+                  string_t **out_encoding,
+                  void **out_data,
+                  size_t *out_len)
+{
+    string_t *type = NULL;
+    string_t *encoding = NULL;
+    string_t *text = NULL;
+    void *payload = NULL;
+
+    if (!series || !out_type || !out_encoding || !out_data || !out_len)
+        return false;
+
+    text = ts_to_text(series, TS_STRING_CSV);
+    if (!text)
+        return false;
+
+    payload = malloc(string_byte_length(text));
+    if (!payload) {
+        string_free(text);
+        return false;
+    }
+    memcpy(payload, string_c_str(text), string_byte_length(text));
+
+    encoding = ts_sprintf_text("text/csv;frequency=%s;year_type=%s",
+                               ts_frequency_name(ts_frequency(series)),
+                               ts_year_type_name(ts_year_type(series)));
+    type = string_new_with("timeseries_t");
+    if (!type || !encoding) {
+        free(payload);
+        string_free(text);
+        string_free(type);
+        string_free(encoding);
+        return false;
+    }
+
+    *out_type = type;
+    *out_encoding = encoding;
+    *out_data = payload;
+    *out_len = string_byte_length(text);
+    string_free(text);
+    return true;
+}
+
+timeseries_t *ts_deserialise(const void *data,
+                             size_t len,
+                             const string_t *type,
+                             const string_t *encoding)
+{
+    char *buffer;
+    char *saveptr = NULL;
+    char *line;
+    ts_frequency_t frequency;
+    ts_year_type_t year_type;
+    ts_builder_t *builder;
+    timeseries_t *series = NULL;
+    const char *enc;
+    const char *freq_text;
+    const char *year_text;
+
+    if (!data || !type || !encoding)
+        return NULL;
+    if (strcmp(string_c_str(type), "timeseries_t") != 0)
+        return NULL;
+
+    enc = string_c_str(encoding);
+    freq_text = strstr(enc, "frequency=");
+    year_text = strstr(enc, "year_type=");
+    frequency = ts_frequency_from_name(freq_text ? freq_text + strlen("frequency=") : "unknown");
+    year_type = ts_year_type_from_name(year_text ? year_text + strlen("year_type=") : "calendar");
+
+    if (freq_text) {
+        char token[32];
+        size_t i = 0u;
+        const char *p = freq_text + strlen("frequency=");
+        while (p[i] && p[i] != ';' && i + 1u < sizeof(token)) {
+            token[i] = p[i];
+            i++;
+        }
+        token[i] = '\0';
+        frequency = ts_frequency_from_name(token);
+    }
+    if (year_text) {
+        char token[32];
+        size_t i = 0u;
+        const char *p = year_text + strlen("year_type=");
+        while (p[i] && p[i] != ';' && i + 1u < sizeof(token)) {
+            token[i] = p[i];
+            i++;
+        }
+        token[i] = '\0';
+        year_type = ts_year_type_from_name(token);
+    }
+
+    buffer = malloc(len + 1u);
+    if (!buffer)
+        return NULL;
+    memcpy(buffer, data, len);
+    buffer[len] = '\0';
+
+    builder = ts_builder_new(frequency, year_type);
+    if (!builder) {
+        free(buffer);
+        return NULL;
+    }
+
+    for (line = strtok_r(buffer, "\n", &saveptr);
+         line != NULL;
+         line = strtok_r(NULL, "\n", &saveptr)) {
+        char *comma;
+        double value;
+        char *end = NULL;
+
+        if (*line == '\0' || strcmp(line, "date,value") == 0)
+            continue;
+        comma = strrchr(line, ',');
+        if (!comma) {
+            ts_builder_destroy(builder);
+            free(buffer);
+            return NULL;
+        }
+        *comma = '\0';
+        value = strtod(comma + 1, &end);
+        if (end == comma + 1 || (end && *end != '\0') ||
+            ts_builder_append_date_string_double(builder, line, value) != 0) {
+            ts_builder_destroy(builder);
+            free(buffer);
+            return NULL;
+        }
+    }
+
+    series = ts_builder_build(builder);
+    ts_builder_destroy(builder);
+    free(buffer);
+    return series;
+}

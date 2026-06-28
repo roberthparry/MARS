@@ -194,6 +194,102 @@ datetime_t *datetime_from_string(const char *text)
     return datetime_init_ymd(dttm, (short)year, (month_t)month, (uint8_t)day);
 }
 
+bool datetime_serialize(const datetime_t *dttm,
+                        string_t **out_type,
+                        string_t **out_encoding,
+                        void **out_data,
+                        size_t *out_len)
+{
+    string_t *type = NULL;
+    string_t *encoding = NULL;
+    char buffer[128];
+    int n;
+    char *payload;
+
+    if (!dttm || !out_type || !out_encoding || !out_data || !out_len)
+        return false;
+
+    n = snprintf(buffer,
+                 sizeof(buffer),
+                 "%04d-%02d-%02dT%02d:%02d:%09.6f",
+                 (int)datetime_year(dttm),
+                 (int)datetime_month(dttm),
+                 (int)datetime_day(dttm),
+                 (int)datetime_hour(dttm),
+                 (int)datetime_minute(dttm),
+                 datetime_second(dttm));
+    if (n <= 0 || (size_t)n >= sizeof(buffer))
+        return false;
+
+    payload = malloc((size_t)n);
+    if (!payload)
+        return false;
+    memcpy(payload, buffer, (size_t)n);
+
+    type = string_new_with("datetime_t");
+    encoding = string_new_with("iso8601/local-v1");
+    if (!type || !encoding) {
+        free(payload);
+        string_free(type);
+        string_free(encoding);
+        return false;
+    }
+
+    *out_type = type;
+    *out_encoding = encoding;
+    *out_data = payload;
+    *out_len = (size_t)n;
+    return true;
+}
+
+datetime_t *datetime_deserialise(const void *data,
+                                 size_t len,
+                                 const string_t *type,
+                                 const string_t *encoding)
+{
+    char buffer[128];
+    int year;
+    int month;
+    int day;
+    int hour;
+    int minute;
+    double second;
+    datetime_t *dttm;
+
+    if (!data || len == 0u || len >= sizeof(buffer) || !type || !encoding)
+        return NULL;
+    if (strcmp(string_c_str(type), "datetime_t") != 0 ||
+        strcmp(string_c_str(encoding), "iso8601/local-v1") != 0)
+        return NULL;
+
+    memcpy(buffer, data, len);
+    buffer[len] = '\0';
+    if (sscanf(buffer,
+               "%d-%d-%dT%d:%d:%lf",
+               &year,
+               &month,
+               &day,
+               &hour,
+               &minute,
+               &second) != 6)
+        return NULL;
+    if (!datetime_valid_ymd((short)year, (month_t)month, (uint8_t)day))
+        return NULL;
+    if (hour < 0 || hour > 23 || minute < 0 || minute > 59 || second < 0.0 || second >= 60.0)
+        return NULL;
+
+    dttm = datetime_alloc();
+    if (!dttm)
+        return NULL;
+    return datetime_init_ymdt(dttm,
+                              (short)year,
+                              (month_t)month,
+                              (uint8_t)day,
+                              (uint8_t)hour,
+                              (uint8_t)minute,
+                              second);
+}
+
 datetime_t *datetime_init_easter(datetime_t *dttm, int year)
 {
     if (year < 1 || year > 9999) return NULL;
@@ -425,7 +521,7 @@ static double datetime_true_full_moon_tt(int lunationIndex)
  *        year.
  * @return the difference in seconds between TT and UT for the given year.
  */
-static double datetime_delta_t(int year)
+static double datetime_delta_t_estimate(int year)
 {
     double offsetYears;   /* Years offset from reference epoch for this segment */
     double deltaT;        /* Resulting ΔT in seconds */
@@ -503,7 +599,7 @@ static long datetime_chinese_new_year_jdn(int year)
     double solsticeTerrestrialTime = datetime_dec_solstice_tt(year - 1);
 
     /* Convert solstice from Terrestrial Time to UTC */
-    double deltaTPreviousYearDays = datetime_delta_t(year - 1) / 86400.0;
+    double deltaTPreviousYearDays = datetime_delta_t_estimate(year - 1) / 86400.0;
     double solsticeUTC = solsticeTerrestrialTime - deltaTPreviousYearDays;
 
     /* 2. Estimate lunation index for new moons around the solstice */
@@ -521,7 +617,7 @@ static long datetime_chinese_new_year_jdn(int year)
 
     /* 4. Second new moon = Chinese New Year */
     double secondNewMoonTerrestrial = datetime_true_new_moon_tt(lunationIndex + 1);
-    double deltaTCurrentYearDays = datetime_delta_t(year) / 86400.0;
+    double deltaTCurrentYearDays = datetime_delta_t_estimate(year) / 86400.0;
     double secondNewMoonUTC = secondNewMoonTerrestrial - deltaTCurrentYearDays;
 
     /* Convert UTC → China Standard Time (UTC+8) */
@@ -676,7 +772,7 @@ static long datetime_local_new_moon_jdn_for_lunation(int lunationIndex,
                                                      double gmtOffsetHours)
 {
     double newMoonTT = datetime_true_new_moon_tt(lunationIndex);
-    double newMoonUTC = newMoonTT - datetime_delta_t(year) / 86400.0;
+    double newMoonUTC = newMoonTT - datetime_delta_t_estimate(year) / 86400.0;
     double localNewMoon = newMoonUTC + gmtOffsetHours / 24.0;
 
     return (long)floor(localNewMoon + 0.5);
@@ -1571,7 +1667,7 @@ static long datetime_india_new_moon_jdn_in_window(int year,
 
     for (int i = 0; i < 8; i++, lunationIndex++) {
         double newMoonTT = datetime_true_new_moon_tt(lunationIndex);
-        double newMoonUTC = newMoonTT - datetime_delta_t(year) / 86400.0;
+        double newMoonUTC = newMoonTT - datetime_delta_t_estimate(year) / 86400.0;
         long indiaJdn = (long)floor(newMoonUTC + 5.5 / 24.0 + 0.5);
 
         if (indiaJdn >= windowStart && indiaJdn <= windowEnd)
@@ -1624,7 +1720,7 @@ static long datetime_india_full_moon_jdn_between(int year,
 
     for (int i = 0; i < 8; i++, lunationIndex++) {
         double fullMoonTT = datetime_true_full_moon_tt(lunationIndex);
-        double fullMoonUTC = fullMoonTT - datetime_delta_t(year) / 86400.0;
+        double fullMoonUTC = fullMoonTT - datetime_delta_t_estimate(year) / 86400.0;
         double fullMoonIndia = fullMoonUTC + 5.5 / 24.0;
         double civilDay = floor(fullMoonIndia + 0.5);
         long indiaJdn = (long)civilDay;
@@ -1653,7 +1749,7 @@ static long datetime_last_india_full_moon_jdn_between(int year,
 
     for (int i = 0; i < 8; i++, lunationIndex++) {
         double fullMoonTT = datetime_true_full_moon_tt(lunationIndex);
-        double fullMoonUTC = fullMoonTT - datetime_delta_t(year) / 86400.0;
+        double fullMoonUTC = fullMoonTT - datetime_delta_t_estimate(year) / 86400.0;
         double fullMoonIndia = fullMoonUTC + 5.5 / 24.0;
         long indiaJdn = (long)floor(fullMoonIndia + 0.5);
 
@@ -1996,6 +2092,44 @@ double datetime_jd(const datetime_t *dttm) {
     ((datetime_t *)dttm)->JulianDay = jdn + (dttm->hour - 12) / 24.0 + dttm->minute / 1440.0 + dttm->second / 86400.0;
 
     return dttm->JulianDay;
+}
+
+double datetime_delta_t_seconds(int year)
+{
+    return datetime_delta_t_estimate(year);
+}
+
+double datetime_jd_tt(const datetime_t *dttm)
+{
+    double jd;
+    int year;
+
+    if (!dttm)
+        return DBL_MAX;
+    jd = datetime_jd(dttm);
+    if (jd == DBL_MAX)
+        return DBL_MAX;
+    year = datetime_year(dttm);
+    if (year == SHRT_MAX)
+        return DBL_MAX;
+    return jd + datetime_delta_t_seconds(year) / 86400.0;
+}
+
+double datetime_jd_tdb(const datetime_t *dttm)
+{
+    double jd_tt;
+    double g_degrees;
+    double g_radians;
+    double correction_seconds;
+
+    jd_tt = datetime_jd_tt(dttm);
+    if (jd_tt == DBL_MAX)
+        return DBL_MAX;
+
+    g_degrees = 357.53 + 0.9856003 * (jd_tt - 2451545.0);
+    g_radians = g_degrees * (M_PI / 180.0);
+    correction_seconds = 0.001657 * sin(g_radians) + 0.000022 * sin(2.0 * g_radians);
+    return jd_tt + correction_seconds / 86400.0;
 }
 
 weekday_t datetime_weekday(const datetime_t *dttm)

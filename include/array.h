@@ -12,6 +12,8 @@
 #include <stddef.h>
 #include <stdbool.h>
 
+typedef struct _string_t string_t;
+
 /* --- Function pointer types --- */
 
 /**
@@ -94,6 +96,14 @@ void array_clear(array_t *arr);
  */
 size_t array_size(const array_t *arr);
 
+/**
+ * @brief Return the size in bytes of one stored element.
+ *
+ * @param arr Pointer to the array.
+ * @return Element size in bytes, or 0 when @p arr is NULL.
+ */
+size_t array_elem_size(const array_t *arr);
+
 /* --- Element access --- */
 
 /**
@@ -104,6 +114,47 @@ size_t array_size(const array_t *arr);
  * @return Pointer to the element, or NULL if out of bounds.
  */
 void *array_get(const array_t *arr, size_t index);
+
+/**
+ * @brief Serialise a bytewise-stable array into a SQLite-ready payload.
+ *
+ * This serialiser is intended for arrays whose elements are safe to copy as
+ * raw bytes and which do not rely on custom clone or destroy callbacks.
+ * Arrays holding pointers or other ownership-bearing values should use a
+ * higher-level serialisation format instead.
+ *
+ * On success, the caller owns @p out_type, @p out_encoding, and @p out_data
+ * and must release them with @c string_free() and @c free().
+ *
+ * @param arr Array to serialise.
+ * @param out_type Receives a newly allocated type label.
+ * @param out_encoding Receives a newly allocated encoding label.
+ * @param out_data Receives a newly allocated payload buffer.
+ * @param out_len Receives the payload length in bytes.
+ * @return @c true on success, otherwise @c false.
+ */
+bool array_serialize(const array_t *arr,
+                     string_t **out_type,
+                     string_t **out_encoding,
+                     void **out_data,
+                     size_t *out_len);
+
+/**
+ * @brief Reconstruct a bytewise-stable array from a serialised payload.
+ *
+ * This is the counterpart to @c array_serialize(). The returned array uses
+ * shallow byte copies with no clone or destroy callbacks.
+ *
+ * @param data Serialised payload bytes.
+ * @param len Payload length in bytes.
+ * @param type Stored type label.
+ * @param encoding Stored encoding label.
+ * @return Newly allocated array on success, otherwise @c NULL.
+ */
+array_t *array_deserialise(const void *data,
+                           size_t len,
+                           const string_t *type,
+                           const string_t *encoding);
 
 /* --- Mutation: add, insert, remove, bulk ops --- */
 

@@ -356,8 +356,8 @@ CREATE INDEX timezone_era_timezone_idx
 CREATE INDEX timezone_transition_rule_name_idx
     ON timezone_transition_rule(rule_name, from_year, to_year, in_month);
 
-.read packaging/holiday-db/mars_country_jurisdictions.sql
-.read packaging/holiday-db/mars_target_subdivisions.sql
+.read packaging/jurisdiction-db/mars_country_jurisdictions.sql
+.read packaging/jurisdiction-db/mars_target_subdivisions.sql
 
 INSERT INTO calendar_system(calendar_system_id, cldr_rscale, name, family, notes)
 VALUES
@@ -392,8 +392,8 @@ VALUES
     ('GB-ENG', 'GB', 'subdivision', 'GB', 'GB-ENG', 'GB', 'England',
      'Subdivision rule set for English bank holidays.');
 
-.read packaging/holiday-db/mars_jurisdiction_location_defaults.sql
-.read packaging/holiday-db/mars_timezone_rules.sql
+.read packaging/jurisdiction-db/mars_jurisdiction_location_defaults.sql
+.read packaging/jurisdiction-db/mars_timezone_rules.sql
 
 INSERT INTO source_document(
     source_document_id,
@@ -1670,5 +1670,5 @@ VALUES
     (239, 239, NULL, NULL, 13, 'definition', 'Netherlands First Christmas Day seed rule.'),
     (240, 240, NULL, NULL, 13, 'definition', 'Netherlands Second Christmas Day seed rule.');
 
-.read packaging/holiday-db/mars_generated_first_class_rules.sql
-.read packaging/holiday-db/mars_manual_first_class_rules.sql
+.read packaging/jurisdiction-db/mars_generated_first_class_rules.sql
+.read packaging/jurisdiction-db/mars_manual_first_class_rules.sql

@@ -36,7 +36,7 @@ import shutil
 
 
 ROOT = Path(__file__).resolve().parents[1]
-JURISDICTION_DB_SOURCE_DIR = ROOT / "packaging" / "holiday-db"
+JURISDICTION_DB_SOURCE_DIR = ROOT / "packaging" / "jurisdiction-db"
 COUNTRY_JURISDICTIONS_SQL = JURISDICTION_DB_SOURCE_DIR / "mars_country_jurisdictions.sql"
 TARGET_SUBDIVISIONS_SQL = JURISDICTION_DB_SOURCE_DIR / "mars_target_subdivisions.sql"
 JURISDICTION_DB_PATH_ENV = "MARS_JURISDICTION_DB_PATH"

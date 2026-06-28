@@ -308,7 +308,7 @@ static bool assert_event_absent(const array_t *events,
     return false;
 }
 
-static void test_holiday_database_builds_and_opens(void)
+static void test_jurisdiction_database_builds_and_opens(void)
 {
     jurisdiction_t *holiday;
 
@@ -449,7 +449,7 @@ static void test_slovenia_2026_does_not_repeat_identical_holidays(void)
     array_destroy(events);
 }
 
-static void test_holiday_queries_weekend_and_holiday_status(void)
+static void test_jurisdiction_queries_weekend_and_holiday_status(void)
 {
     jurisdiction_t *holiday = jurisdict_open("ZA");
     datetime_t *new_year = datetime_init_ymd(datetime_alloc(), 2023, DT_January, 1);
@@ -474,7 +474,7 @@ static void test_holiday_queries_weekend_and_holiday_status(void)
     jurisdict_close(holiday);
 }
 
-static void test_holiday_default_location_returns_capital_coordinates(void)
+static void test_jurisdiction_default_location_returns_capital_coordinates(void)
 {
     jurisdiction_t *holiday = jurisdict_open("GB-ENG");
     double latitude = 0.0;
@@ -489,7 +489,7 @@ static void test_holiday_default_location_returns_capital_coordinates(void)
     jurisdict_close(holiday);
 }
 
-static void test_holiday_default_location_falls_back_for_country_only_jurisdiction(void)
+static void test_jurisdiction_default_location_falls_back_for_country_only_jurisdiction(void)
 {
     jurisdiction_t *holiday = jurisdict_open("AF");
     double latitude = 0.0;
@@ -504,7 +504,7 @@ static void test_holiday_default_location_falls_back_for_country_only_jurisdicti
     jurisdict_close(holiday);
 }
 
-static void test_holiday_alaska_default_location_uses_juneau(void)
+static void test_jurisdiction_alaska_default_location_uses_juneau(void)
 {
     jurisdiction_t *holiday = jurisdict_open("US-AK");
     datetime_t *summer = datetime_init_ymd(datetime_alloc(), 2026, DT_June, 23);
@@ -526,7 +526,7 @@ static void test_holiday_alaska_default_location_uses_juneau(void)
     jurisdict_close(holiday);
 }
 
-static void test_holiday_iceland_default_location_uses_reykjavik(void)
+static void test_jurisdiction_iceland_default_location_uses_reykjavik(void)
 {
     jurisdiction_t *holiday = jurisdict_open("IS");
     datetime_t *summer = datetime_init_ymd(datetime_alloc(), 2026, DT_June, 23);
@@ -548,7 +548,7 @@ static void test_holiday_iceland_default_location_uses_reykjavik(void)
     jurisdict_close(holiday);
 }
 
-static void test_holiday_svalbard_default_location_uses_longyearbyen(void)
+static void test_jurisdiction_svalbard_default_location_uses_longyearbyen(void)
 {
     jurisdiction_t *holiday = jurisdict_open("SJ");
     datetime_t *summer = datetime_init_ymd(datetime_alloc(), 2026, DT_June, 23);
@@ -570,7 +570,7 @@ static void test_holiday_svalbard_default_location_uses_longyearbyen(void)
     jurisdict_close(holiday);
 }
 
-static void test_holiday_default_gmt_offset_uses_database_dst_rules(void)
+static void test_jurisdiction_default_gmt_offset_uses_database_dst_rules(void)
 {
     jurisdiction_t *denmark = jurisdict_open("DK");
     jurisdiction_t *england = jurisdict_open("GB-ENG");
@@ -609,7 +609,7 @@ static void test_holiday_default_gmt_offset_uses_database_dst_rules(void)
     jurisdict_close(denmark);
 }
 
-static void test_holiday_dst_transition_datetimes_expose_forward_and_back_changes(void)
+static void test_jurisdiction_dst_transition_datetimes_expose_forward_and_back_changes(void)
 {
     jurisdiction_t *england = jurisdict_open("GB-ENG");
     jurisdiction_t *denmark = jurisdict_open("DK");
@@ -675,7 +675,7 @@ static void test_holiday_dst_transition_datetimes_expose_forward_and_back_change
     jurisdict_close(england);
 }
 
-static void test_holiday_working_days_between_counts_business_days(void)
+static void test_jurisdiction_working_days_between_counts_business_days(void)
 {
     jurisdiction_t *holiday = jurisdict_open("GB-ENG");
     datetime_t *start = datetime_init_ymd(datetime_alloc(), 2021, DT_December, 24);
@@ -763,8 +763,8 @@ static void holiday_suite_cleanup(void)
 
 int tests_main(void)
 {
-    TEST_SECTION("Holiday Rules");
-    TEST_RUN_IN_GROUP(test_holiday_database_builds_and_opens, tests, NULL);
+    TEST_SECTION("Jurisdiction Rules");
+    TEST_RUN_IN_GROUP(test_jurisdiction_database_builds_and_opens, tests, NULL);
     TEST_RUN_IN_GROUP(test_england_christmas_pair_substitutions_in_2021, tests, NULL);
     TEST_RUN_IN_GROUP(test_england_exception_holidays_land_on_correct_dates_in_2022, tests, NULL);
     TEST_RUN_IN_GROUP(test_south_africa_observes_sunday_only_not_saturday, tests, NULL);
@@ -773,15 +773,15 @@ int tests_main(void)
     TEST_RUN_IN_GROUP(test_ukraine_future_rule_windows_cover_2030, tests, NULL);
     TEST_RUN_IN_GROUP(test_scotland_modern_rules_cover_2026_without_generated_noise, tests, NULL);
     TEST_RUN_IN_GROUP(test_slovenia_2026_does_not_repeat_identical_holidays, tests, NULL);
-    TEST_RUN_IN_GROUP(test_holiday_queries_weekend_and_holiday_status, tests, NULL);
-    TEST_RUN_IN_GROUP(test_holiday_default_location_returns_capital_coordinates, tests, NULL);
-    TEST_RUN_IN_GROUP(test_holiday_default_location_falls_back_for_country_only_jurisdiction, tests, NULL);
-    TEST_RUN_IN_GROUP(test_holiday_alaska_default_location_uses_juneau, tests, NULL);
-    TEST_RUN_IN_GROUP(test_holiday_iceland_default_location_uses_reykjavik, tests, NULL);
-    TEST_RUN_IN_GROUP(test_holiday_svalbard_default_location_uses_longyearbyen, tests, NULL);
-    TEST_RUN_IN_GROUP(test_holiday_default_gmt_offset_uses_database_dst_rules, tests, NULL);
-    TEST_RUN_IN_GROUP(test_holiday_dst_transition_datetimes_expose_forward_and_back_changes, tests, NULL);
-    TEST_RUN_IN_GROUP(test_holiday_working_days_between_counts_business_days, tests, NULL);
+    TEST_RUN_IN_GROUP(test_jurisdiction_queries_weekend_and_holiday_status, tests, NULL);
+    TEST_RUN_IN_GROUP(test_jurisdiction_default_location_returns_capital_coordinates, tests, NULL);
+    TEST_RUN_IN_GROUP(test_jurisdiction_default_location_falls_back_for_country_only_jurisdiction, tests, NULL);
+    TEST_RUN_IN_GROUP(test_jurisdiction_alaska_default_location_uses_juneau, tests, NULL);
+    TEST_RUN_IN_GROUP(test_jurisdiction_iceland_default_location_uses_reykjavik, tests, NULL);
+    TEST_RUN_IN_GROUP(test_jurisdiction_svalbard_default_location_uses_longyearbyen, tests, NULL);
+    TEST_RUN_IN_GROUP(test_jurisdiction_default_gmt_offset_uses_database_dst_rules, tests, NULL);
+    TEST_RUN_IN_GROUP(test_jurisdiction_dst_transition_datetimes_expose_forward_and_back_changes, tests, NULL);
+    TEST_RUN_IN_GROUP(test_jurisdiction_working_days_between_counts_business_days, tests, NULL);
 
     TEST_SECTION("README Output Examples");
     printf(C_BOLD C_YELLOW "Running README examples...\n" C_RESET);

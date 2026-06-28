@@ -190,6 +190,41 @@ void test_datetime_jdn_and_getJulianDay(void) {
     datetime_dealloc(dt);
 }
 
+void test_datetime_delta_t_seconds_is_reasonable_for_j2000(void) {
+    double delta_t = datetime_delta_t_seconds(2000);
+
+    ASSERT_TRUE(delta_t > 60.0 && delta_t < 70.0);
+}
+
+void test_datetime_jd_tt_offsets_civil_jd_by_delta_t(void) {
+    datetime_t *dt = datetime_init_ymdt(datetime_alloc(),
+                                                       2000, 1, 1,
+                                                       12, 0, 0.0);
+    double jd = datetime_jd(dt);
+    double jd_tt = datetime_jd_tt(dt);
+    double expected = jd + datetime_delta_t_seconds(2000) / 86400.0;
+
+    ASSERT_EQ_DOUBLE(jd, 2451545.0, 1e-9);
+    ASSERT_EQ_DOUBLE(jd_tt, expected, 1e-12);
+
+    datetime_dealloc(dt);
+}
+
+void test_datetime_jd_tdb_stays_close_to_jd_tt(void) {
+    datetime_t *dt = datetime_init_ymdt(datetime_alloc(),
+                                                       2000, 1, 1,
+                                                       12, 0, 0.0);
+    double jd_tt = datetime_jd_tt(dt);
+    double jd_tdb = datetime_jd_tdb(dt);
+    double difference_seconds = fabs(jd_tdb - jd_tt) * 86400.0;
+
+    ASSERT_TRUE(jd_tdb != DBL_MAX);
+    ASSERT_TRUE(difference_seconds > 0.0);
+    ASSERT_TRUE(difference_seconds < 0.002);
+
+    datetime_dealloc(dt);
+}
+
 void test_datetime_year_initialised(void) {
     datetime_t *dt = datetime_init_ymd(datetime_alloc(), 2022, 5, 10);
     ASSERT_EQ_INT(datetime_year(dt), 2022);
