@@ -1,7 +1,9 @@
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 #include <pthread.h>
 #include "array.h"
+#include "ustring.h"
 
 #define ARRAY_INIT_CAPACITY 8
 #define STACK_CHUNK_SIZE 32
@@ -28,6 +30,16 @@ typedef struct _array_slice_t {
 typedef struct _stack_t {
     array_t *array;
 } stack_t;
+
+typedef struct array_serial_header_t {
+    uint32_t magic;
+    uint32_t version;
+    uint64_t elem_size;
+    uint64_t count;
+} array_serial_header_t;
+
+#define ARRAY_SERIAL_MAGIC 0x5252414du
+#define ARRAY_SERIAL_VERSION 1u
 
 /* --- Internal helpers (caller must hold arr->mutex where noted) --- */
 
@@ -135,6 +147,14 @@ size_t array_size(const array_t *arr) {
     return sz;
 }
 
+size_t array_elem_size(const array_t *arr) {
+    if (!arr) return 0u;
+    pthread_mutex_lock((pthread_mutex_t *)&arr->mutex);
+    size_t elem_size = arr->elem_size;
+    pthread_mutex_unlock((pthread_mutex_t *)&arr->mutex);
+    return elem_size;
+}
+
 /* --- Element access --- */
 
 void *array_get(const array_t *arr, size_t index) {
@@ -145,6 +165,99 @@ void *array_get(const array_t *arr, size_t index) {
         result = (char*)arr->arena + index * arr->elem_size;
     pthread_mutex_unlock((pthread_mutex_t *)&arr->mutex);
     return result;
+}
+
+bool array_serialize(const array_t *arr,
+                     string_t **out_type,
+                     string_t **out_encoding,
+                     void **out_data,
+                     size_t *out_len)
+{
+    array_serial_header_t header;
+    size_t payload_len;
+    void *payload = NULL;
+    string_t *type = NULL;
+    string_t *encoding = NULL;
+
+    if (!arr || !out_type || !out_encoding || !out_data || !out_len)
+        return false;
+
+    pthread_mutex_lock((pthread_mutex_t *)&arr->mutex);
+    if (arr->clone || arr->destroy) {
+        pthread_mutex_unlock((pthread_mutex_t *)&arr->mutex);
+        return false;
+    }
+
+    header.magic = ARRAY_SERIAL_MAGIC;
+    header.version = ARRAY_SERIAL_VERSION;
+    header.elem_size = (uint64_t)arr->elem_size;
+    header.count = (uint64_t)arr->size;
+    payload_len = sizeof(header) + arr->size * arr->elem_size;
+    payload = malloc(payload_len);
+    if (payload) {
+        memcpy(payload, &header, sizeof(header));
+        if (arr->size > 0u)
+            memcpy((char *)payload + sizeof(header),
+                   arr->arena,
+                   arr->size * arr->elem_size);
+    }
+    pthread_mutex_unlock((pthread_mutex_t *)&arr->mutex);
+
+    if (!payload)
+        return false;
+
+    type = string_new_with("array_t");
+    encoding = string_new_with("mars/raw-elements-v1");
+    if (!type || !encoding) {
+        string_free(type);
+        string_free(encoding);
+        free(payload);
+        return false;
+    }
+
+    *out_type = type;
+    *out_encoding = encoding;
+    *out_data = payload;
+    *out_len = payload_len;
+    return true;
+}
+
+array_t *array_deserialise(const void *data,
+                           size_t len,
+                           const string_t *type,
+                           const string_t *encoding)
+{
+    const array_serial_header_t *header;
+    size_t data_bytes;
+    array_t *arr;
+
+    if (!data || len < sizeof(array_serial_header_t) || !type || !encoding)
+        return NULL;
+    if (strcmp(string_c_str(type), "array_t") != 0 ||
+        strcmp(string_c_str(encoding), "mars/raw-elements-v1") != 0)
+        return NULL;
+
+    header = (const array_serial_header_t *)data;
+    if (header->magic != ARRAY_SERIAL_MAGIC || header->version != ARRAY_SERIAL_VERSION)
+        return NULL;
+    if (header->elem_size == 0u)
+        return NULL;
+
+    data_bytes = (size_t)header->elem_size * (size_t)header->count;
+    if (sizeof(*header) + data_bytes != len)
+        return NULL;
+
+    arr = array_create((size_t)header->elem_size, NULL, NULL);
+    if (!arr)
+        return NULL;
+    if (header->count > 0u &&
+        !array_append_carray(arr,
+                             (const char *)data + sizeof(*header),
+                             (size_t)header->count)) {
+        array_destroy(arr);
+        return NULL;
+    }
+    return arr;
 }
 
 /* --- Mutation: add, insert, remove, bulk ops --- */

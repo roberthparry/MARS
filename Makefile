@@ -35,7 +35,10 @@ MARS_LAB_LAUNCHER ?= $(MARS_LAB_BINDIR)/mars-lab
 MARS_LAB_DESKTOP ?= $(MARS_LAB_APPDIR)/mars-lab.desktop
 MARS_LAB_ICON ?= $(MARS_LAB_ICONDIR)/mars-lab.svg
 MARS_LAB_ICON_CONCEPTS := $(wildcard packaging/linux/icon-concepts/*.svg)
-JURISDICTION_DB_SOURCE_DIR ?= packaging/holiday-db
+ALMANAC_DB_SOURCE_DIR ?= packaging/almanac-db
+ALMANAC_RULES_SQL ?= $(ALMANAC_DB_SOURCE_DIR)/mars_almanac.sql
+ALMANAC_RULES_SOURCES := $(ALMANAC_RULES_SQL)
+JURISDICTION_DB_SOURCE_DIR ?= packaging/jurisdiction-db
 HOLIDAY_DB_SOURCE_DIR ?= $(JURISDICTION_DB_SOURCE_DIR)
 JURISDICTION_RULES_SQL ?= $(JURISDICTION_DB_SOURCE_DIR)/mars_holiday_rules.sql
 HOLIDAY_RULES_SQL ?= $(JURISDICTION_RULES_SQL)
@@ -118,7 +121,7 @@ TEST_BINS  := $(patsubst tests/%.c,$(TEST_BUILD_DIR)/%,$(TEST_SRCS))
 # ------------------------------------------------------------
 # Default target
 # ------------------------------------------------------------
-.PHONY: all clean test memtest debug release check-deps check-jurisdiction-db-deps check-lab-deps install uninstall mars-lab to-be-announced-lab install-jurisdiction-db uninstall-jurisdiction-db install-mars-lab uninstall-mars-lab help
+.PHONY: all clean test memtest debug release check-deps check-jurisdiction-db-deps check-lab-deps install uninstall mars-lab to-be-announced-lab install-almanac-db uninstall-almanac-db install-jurisdiction-db uninstall-jurisdiction-db install-mars-lab uninstall-mars-lab help
 
 all: $(STATIC_LIB) $(SHARED_LIB) $(TEST_BINS) $(BENCH_BINS) $(SCRATCH_BINS)
 
@@ -324,7 +327,43 @@ mem$(1): $(2)
 	$(VALGRIND) $(2)
 endef
 
-$(foreach bin,$(TEST_BINS),$(eval $(call TEST_ALIAS_RULES,$(notdir $(bin)),$(bin))))
+TEST_ALIAS_EXCLUDES := test_almanac memtest_almanac
+$(foreach bin,$(filter-out $(addprefix tests/build/release/almanac/,$(TEST_ALIAS_EXCLUDES)),$(TEST_BINS)),$(eval $(call TEST_ALIAS_RULES,$(notdir $(bin)),$(bin))))
+
+.PHONY: test_almanac memtest_almanac
+test_almanac: tests/build/release/almanac/test_almanac tools/configure_mars_lab_almanac_db.py
+	@tmp_out=$$(mktemp); \
+	if $< >"$$tmp_out" 2>&1; then \
+	    cat "$$tmp_out"; \
+	    rm -f "$$tmp_out"; \
+	    exit 0; \
+	fi; \
+	if grep -q "Almanac tests require a configured almanac database." "$$tmp_out"; then \
+	    cat "$$tmp_out"; \
+	    rm -f "$$tmp_out"; \
+	    python3 tools/configure_mars_lab_almanac_db.py || exit $$?; \
+	    exec $<; \
+	fi; \
+	cat "$$tmp_out"; \
+	rm -f "$$tmp_out"; \
+	exit 1
+
+memtest_almanac: tests/build/release/almanac/test_almanac tools/configure_mars_lab_almanac_db.py
+	@tmp_out=$$(mktemp); \
+	if $(VALGRIND) $< >"$$tmp_out" 2>&1; then \
+	    cat "$$tmp_out"; \
+	    rm -f "$$tmp_out"; \
+	    exit 0; \
+	fi; \
+	if grep -q "Almanac tests require a configured almanac database." "$$tmp_out"; then \
+	    cat "$$tmp_out"; \
+	    rm -f "$$tmp_out"; \
+	    python3 tools/configure_mars_lab_almanac_db.py || exit $$?; \
+	    exec $(VALGRIND) $<; \
+	fi; \
+	cat "$$tmp_out"; \
+	rm -f "$$tmp_out"; \
+	exit 1
 
 define BENCH_ALIAS_RULES
 .PHONY: $(1)
@@ -348,13 +387,19 @@ $(foreach bin,$(SCRATCH_BINS),$(eval $(call SCRATCH_ALIAS_RULES,$(notdir $(bin))
 .PHONY: scratch
 scratch: $(SCRATCH_BINS)
 
-.PHONY: mars-lab to-be-announced-lab install-jurisdiction-db uninstall-jurisdiction-db install-mars-lab uninstall-mars-lab install-to-be-announced-lab uninstall-to-be-announced-lab
+.PHONY: mars-lab to-be-announced-lab install-almanac-db uninstall-almanac-db install-jurisdiction-db uninstall-jurisdiction-db install-mars-lab uninstall-mars-lab install-to-be-announced-lab uninstall-to-be-announced-lab
 mars-lab: check-lab-deps $(BUILD_DIR)/scratch/mars_lab
 	@tools/mars-lab
 
 .PHONY: to-be-announced-lab
 to-be-announced-lab: $(BUILD_DIR)/scratch/to-be-announced_lab
 	@tools/to-be-announced-lab
+
+install-almanac-db: check-jurisdiction-db-deps tools/configure_mars_lab_almanac_db.py $(ALMANAC_RULES_SOURCES)
+	@python3 tools/configure_mars_lab_almanac_db.py
+
+uninstall-almanac-db:
+	rm -f "$(HOME)/.mars/almanac/almanac.db" "$(HOME)/.mars/config/almanac-db.env"
 
 install-jurisdiction-db: check-jurisdiction-db-deps tools/configure_mars_lab_jurisdiction_db.py $(JURISDICTION_RULES_SOURCES)
 	@python3 tools/configure_mars_lab_jurisdiction_db.py

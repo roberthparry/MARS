@@ -8,7 +8,6 @@
 
 #include "array.h"
 #include "jurisdiction.h"
-#include "sqlite/sqlite_internal.h"
 #include "sqlite.h"
 #include "ustring.h"
 
@@ -497,14 +496,14 @@ static bool vec_push(pointer_vec_t *vec, const void *item)
     return true;
 }
 
-static char *dup_text(const unsigned char *text)
+static char *dup_text(const char *text)
 {
     size_t len;
     char *out;
 
     if (!text)
         return NULL;
-    len = strlen((const char *)text);
+    len = strlen(text);
     out = malloc(len + 1u);
     if (!out)
         return NULL;
@@ -999,16 +998,16 @@ static char *previous_observed_date(const char *base_date,
     return NULL;
 }
 
-static char *evaluate_sql_rule_date(sqlite3 *db,
+static char *evaluate_sql_rule_date(sqlite_t *db,
                                     const holiday_rule_row_t *rule,
                                     int year,
                                     const char *jurisdiction)
 {
-    sqlite3_stmt *stmt = NULL;
+    sqlite_stmt_t *stmt = NULL;
     char *sql = NULL;
-    const unsigned char *date_text;
+    const char *date_text;
     char *out = NULL;
-    int rc;
+    sqlite_step_result_t rc;
     size_t sql_len;
     static const char prefix[] =
         "WITH holiday_rule_context(rule_year, jurisdiction_id, holiday_id, rule_id) AS ("
@@ -1026,29 +1025,29 @@ static char *evaluate_sql_rule_date(sqlite3 *db,
         return NULL;
     snprintf(sql, sql_len, "%s%s", prefix, rule->expression_text);
 
-    rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    stmt = sqlite_stmt_prepare(db, sql);
     free(sql);
-    if (rc != SQLITE_OK)
+    if (!stmt)
         return NULL;
-    if (sqlite3_bind_int(stmt, 1, year) != SQLITE_OK ||
-        sqlite3_bind_text(stmt, 2, jurisdiction, -1, SQLITE_STATIC) != SQLITE_OK ||
-        sqlite3_bind_int(stmt, 3, rule->holiday_id) != SQLITE_OK ||
-        sqlite3_bind_int(stmt, 4, rule->rule_id) != SQLITE_OK) {
-        sqlite3_finalize(stmt);
+    if (!sqlite_stmt_bind_int(stmt, 1, year) ||
+        !sqlite_stmt_bind_text(stmt, 2, jurisdiction) ||
+        !sqlite_stmt_bind_int(stmt, 3, rule->holiday_id) ||
+        !sqlite_stmt_bind_int(stmt, 4, rule->rule_id)) {
+        sqlite_stmt_finalize(stmt);
         return NULL;
     }
 
-    rc = sqlite3_step(stmt);
-    if (rc == SQLITE_ROW) {
-        date_text = sqlite3_column_text(stmt, 0);
+    rc = sqlite_stmt_step(stmt);
+    if (rc == SQLITE_STEP_ROW) {
+        date_text = sqlite_stmt_column_text(stmt, 0);
         if (date_text)
-            out = dup_text(date_text);
+            out = dup_c_string(date_text);
     }
-    sqlite3_finalize(stmt);
+    sqlite_stmt_finalize(stmt);
     return out;
 }
 
-static bool load_lineage(sqlite3 *db, const char *jurisdiction, pointer_vec_t *lineage_rows)
+static bool load_lineage(sqlite_t *db, const char *jurisdiction, pointer_vec_t *lineage_rows)
 {
     static const char sql[] =
         "WITH RECURSIVE lineage(jurisdiction_id, depth) AS ("
@@ -1060,82 +1059,83 @@ static bool load_lineage(sqlite3 *db, const char *jurisdiction, pointer_vec_t *l
         "  WHERE j.parent_jurisdiction_id IS NOT NULL"
         ") "
         "SELECT jurisdiction_id, depth FROM lineage ORDER BY depth;";
-    sqlite3_stmt *stmt = NULL;
-    int rc;
+    sqlite_stmt_t *stmt = sqlite_stmt_prepare(db, sql);
+    sqlite_step_result_t rc;
 
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK)
+    if (!stmt)
         return false;
-    if (sqlite3_bind_text(stmt, 1, jurisdiction, -1, SQLITE_STATIC) != SQLITE_OK)
+    if (!sqlite_stmt_bind_text(stmt, 1, jurisdiction))
         goto fail;
 
-    while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
+    while ((rc = sqlite_stmt_step(stmt)) == SQLITE_STEP_ROW) {
         lineage_row_t row;
-        const unsigned char *jurisdiction_id = sqlite3_column_text(stmt, 0);
+        const char *jurisdiction_id = sqlite_stmt_column_text(stmt, 0);
 
         memset(&row, 0, sizeof(row));
         if (!jurisdiction_id)
             goto fail;
-        snprintf(row.jurisdiction_id, sizeof(row.jurisdiction_id), "%s", (const char *)jurisdiction_id);
-        row.depth = sqlite3_column_int(stmt, 1);
+        snprintf(row.jurisdiction_id, sizeof(row.jurisdiction_id), "%s", jurisdiction_id);
+        row.depth = sqlite_stmt_column_int(stmt, 1);
         if (!vec_push(lineage_rows, &row))
             goto fail;
     }
 
-    sqlite3_finalize(stmt);
-    return rc == SQLITE_DONE;
+    sqlite_stmt_finalize(stmt);
+    return rc == SQLITE_STEP_DONE;
 
 fail:
-    sqlite3_finalize(stmt);
+    sqlite_stmt_finalize(stmt);
     return false;
 }
 
-static bool load_weekend_rules(sqlite3 *db, const pointer_vec_t *lineage_rows, pointer_vec_t *weekend_rules)
+static bool load_weekend_rules(sqlite_t *db, const pointer_vec_t *lineage_rows, pointer_vec_t *weekend_rules)
 {
     static const char sql[] =
         "SELECT jurisdiction_id, weekend_mask, valid_from_year, valid_to_year "
         "FROM jurisdiction_weekend_rule WHERE jurisdiction_id = ?1 "
         "ORDER BY COALESCE(valid_from_year, -999999), COALESCE(valid_to_year, 999999);";
-    sqlite3_stmt *stmt = NULL;
+    sqlite_stmt_t *stmt = NULL;
     const lineage_row_t *lineage = lineage_rows ? lineage_rows->items : NULL;
     size_t i;
 
     if (!lineage)
         return false;
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK)
+    stmt = sqlite_stmt_prepare(db, sql);
+    if (!stmt)
         return false;
 
     for (i = 0; i < lineage_rows->count; ++i) {
-        int rc;
+        sqlite_step_result_t rc;
 
-        sqlite3_reset(stmt);
-        sqlite3_clear_bindings(stmt);
-        if (sqlite3_bind_text(stmt, 1, lineage[i].jurisdiction_id, -1, SQLITE_STATIC) != SQLITE_OK)
+        sqlite_stmt_reset(stmt);
+        sqlite_stmt_clear_bindings(stmt);
+        if (!sqlite_stmt_bind_text(stmt, 1, lineage[i].jurisdiction_id))
             goto fail;
-        while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
+        while ((rc = sqlite_stmt_step(stmt)) == SQLITE_STEP_ROW) {
             weekend_rule_t row;
 
             memset(&row, 0, sizeof(row));
             snprintf(row.jurisdiction_id, sizeof(row.jurisdiction_id), "%s", lineage[i].jurisdiction_id);
             row.depth = lineage[i].depth;
-            row.weekend_mask = normalise_weekend_mask((const char *)sqlite3_column_text(stmt, 1));
-            row.valid_from_year = sqlite3_column_type(stmt, 2) == SQLITE_NULL ? 0 : sqlite3_column_int(stmt, 2);
-            row.valid_to_year = sqlite3_column_type(stmt, 3) == SQLITE_NULL ? 0 : sqlite3_column_int(stmt, 3);
+            row.weekend_mask = normalise_weekend_mask(sqlite_stmt_column_text(stmt, 1));
+            row.valid_from_year = sqlite_stmt_column_is_null(stmt, 2) ? 0 : sqlite_stmt_column_int(stmt, 2);
+            row.valid_to_year = sqlite_stmt_column_is_null(stmt, 3) ? 0 : sqlite_stmt_column_int(stmt, 3);
             if (!row.weekend_mask || !vec_push(weekend_rules, &row))
                 goto fail;
         }
-        if (rc != SQLITE_DONE)
+        if (rc != SQLITE_STEP_DONE)
             goto fail;
     }
 
-    sqlite3_finalize(stmt);
+    sqlite_stmt_finalize(stmt);
     return true;
 
 fail:
-    sqlite3_finalize(stmt);
+    sqlite_stmt_finalize(stmt);
     return false;
 }
 
-static bool load_default_location(sqlite3 *db,
+static bool load_default_location(sqlite_t *db,
                                   const pointer_vec_t *lineage_rows,
                                   double *latitude,
                                   double *longitude)
@@ -1143,32 +1143,33 @@ static bool load_default_location(sqlite3 *db,
     static const char sql[] =
         "SELECT latitude, longitude "
         "FROM jurisdiction_location_default WHERE jurisdiction_id = ?1;";
-    sqlite3_stmt *stmt = NULL;
+    sqlite_stmt_t *stmt = NULL;
     const lineage_row_t *lineage = lineage_rows ? lineage_rows->items : NULL;
     size_t i;
     bool found = false;
 
     if (!lineage || !latitude || !longitude)
         return false;
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK)
+    stmt = sqlite_stmt_prepare(db, sql);
+    if (!stmt)
         return false;
 
     for (i = 0; i < lineage_rows->count; ++i) {
         const char *lat_text;
         const char *lon_text;
-        int rc;
+        sqlite_step_result_t rc;
         double parsed_latitude;
         double parsed_longitude;
 
-        sqlite3_reset(stmt);
-        sqlite3_clear_bindings(stmt);
-        if (sqlite3_bind_text(stmt, 1, lineage[i].jurisdiction_id, -1, SQLITE_STATIC) != SQLITE_OK)
+        sqlite_stmt_reset(stmt);
+        sqlite_stmt_clear_bindings(stmt);
+        if (!sqlite_stmt_bind_text(stmt, 1, lineage[i].jurisdiction_id))
             goto done;
-        rc = sqlite3_step(stmt);
-        if (rc != SQLITE_ROW)
+        rc = sqlite_stmt_step(stmt);
+        if (rc != SQLITE_STEP_ROW)
             continue;
-        lat_text = (const char *)sqlite3_column_text(stmt, 0);
-        lon_text = (const char *)sqlite3_column_text(stmt, 1);
+        lat_text = sqlite_stmt_column_text(stmt, 0);
+        lon_text = sqlite_stmt_column_text(stmt, 1);
         if (!parse_double_text(lat_text, &parsed_latitude) ||
             !parse_double_text(lon_text, &parsed_longitude)) {
             goto done;
@@ -1180,11 +1181,11 @@ static bool load_default_location(sqlite3 *db,
     }
 
 done:
-    sqlite3_finalize(stmt);
+    sqlite_stmt_finalize(stmt);
     return found;
 }
 
-static bool load_default_timezone_name(sqlite3 *db,
+static bool load_default_timezone_name(sqlite_t *db,
                                        const pointer_vec_t *lineage_rows,
                                        char *timezone_name,
                                        size_t timezone_name_size)
@@ -1192,29 +1193,30 @@ static bool load_default_timezone_name(sqlite3 *db,
     static const char sql[] =
         "SELECT timezone_name "
         "FROM jurisdiction_location_default WHERE jurisdiction_id = ?1;";
-    sqlite3_stmt *stmt = NULL;
+    sqlite_stmt_t *stmt = NULL;
     const lineage_row_t *lineage = lineage_rows ? lineage_rows->items : NULL;
     size_t i;
     bool found = false;
 
     if (!lineage || !timezone_name || timezone_name_size == 0u)
         return false;
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK)
+    stmt = sqlite_stmt_prepare(db, sql);
+    if (!stmt)
         return false;
 
     timezone_name[0] = '\0';
     for (i = 0; i < lineage_rows->count; ++i) {
         const char *tz_text;
-        int rc;
+        sqlite_step_result_t rc;
 
-        sqlite3_reset(stmt);
-        sqlite3_clear_bindings(stmt);
-        if (sqlite3_bind_text(stmt, 1, lineage[i].jurisdiction_id, -1, SQLITE_STATIC) != SQLITE_OK)
+        sqlite_stmt_reset(stmt);
+        sqlite_stmt_clear_bindings(stmt);
+        if (!sqlite_stmt_bind_text(stmt, 1, lineage[i].jurisdiction_id))
             goto done;
-        rc = sqlite3_step(stmt);
-        if (rc != SQLITE_ROW)
+        rc = sqlite_stmt_step(stmt);
+        if (rc != SQLITE_STEP_ROW)
             continue;
-        tz_text = (const char *)sqlite3_column_text(stmt, 0);
+        tz_text = sqlite_stmt_column_text(stmt, 0);
         if (!tz_text || *tz_text == '\0')
             goto done;
         snprintf(timezone_name, timezone_name_size, "%s", tz_text);
@@ -1223,47 +1225,58 @@ static bool load_default_timezone_name(sqlite3 *db,
     }
 
 done:
-    sqlite3_finalize(stmt);
+    sqlite_stmt_finalize(stmt);
     return found;
 }
 
-static bool load_timezone_eras(sqlite3 *db,
+static bool load_timezone_eras(sqlite_t *db,
                                const char *timezone_name,
                                pointer_vec_t *rows)
 {
+    static const char canonical_sql[] =
+        "SELECT canonical_timezone_name "
+        "FROM timezone_definition WHERE timezone_name = ?1;";
     static const char sql[] =
         "SELECT sequence_no, gmtoff_minutes, rules_kind, fixed_save_minutes, rule_name, "
         "       until_year, until_month, until_day_kind, until_day_value, "
         "       until_weekday, until_seconds, until_suffix "
         "FROM timezone_era WHERE timezone_name = ?1 ORDER BY sequence_no;";
-    sqlite3_stmt *stmt = NULL;
-    int rc;
+    sqlite_stmt_t *stmt = NULL;
+    sqlite_stmt_t *canonical_stmt = NULL;
+    const char *query_timezone_name = timezone_name;
+    char canonical_timezone_name[128];
+    sqlite_step_result_t rc = SQLITE_STEP_DONE;
+    bool retried_with_canonical = false;
 
     if (!db || !timezone_name || !*timezone_name || !rows)
         return false;
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK)
+    canonical_timezone_name[0] = '\0';
+
+retry:
+    stmt = sqlite_stmt_prepare(db, sql);
+    if (!stmt)
         return false;
-    if (sqlite3_bind_text(stmt, 1, timezone_name, -1, SQLITE_STATIC) != SQLITE_OK)
+    if (!sqlite_stmt_bind_text(stmt, 1, query_timezone_name))
         goto fail;
 
-    while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
+    while ((rc = sqlite_stmt_step(stmt)) == SQLITE_STEP_ROW) {
         timezone_era_row_t row;
 
         memset(&row, 0, sizeof(row));
-        row.sequence_no = sqlite3_column_int(stmt, 0);
-        row.gmtoff_minutes = sqlite3_column_int(stmt, 1);
-        row.rules_kind = dup_text(sqlite3_column_text(stmt, 2));
-        row.fixed_save_minutes = sqlite3_column_type(stmt, 3) == SQLITE_NULL ? 0 : sqlite3_column_int(stmt, 3);
-        row.rule_name = dup_text(sqlite3_column_text(stmt, 4));
-        row.until_year = sqlite3_column_type(stmt, 5) == SQLITE_NULL ? 0 : sqlite3_column_int(stmt, 5);
-        row.until_month = sqlite3_column_type(stmt, 6) == SQLITE_NULL ? 0 : sqlite3_column_int(stmt, 6);
-        row.until_day_kind = dup_text(sqlite3_column_text(stmt, 7));
-        row.until_day_value = sqlite3_column_type(stmt, 8) == SQLITE_NULL ? 0 : sqlite3_column_int(stmt, 8);
-        row.until_weekday = sqlite3_column_type(stmt, 9) == SQLITE_NULL ? 0 : sqlite3_column_int(stmt, 9);
-        row.until_seconds = sqlite3_column_type(stmt, 10) == SQLITE_NULL ? 0 : sqlite3_column_int(stmt, 10);
-        row.until_suffix = sqlite3_column_type(stmt, 11) == SQLITE_NULL
+        row.sequence_no = sqlite_stmt_column_int(stmt, 0);
+        row.gmtoff_minutes = sqlite_stmt_column_int(stmt, 1);
+        row.rules_kind = dup_text(sqlite_stmt_column_text(stmt, 2));
+        row.fixed_save_minutes = sqlite_stmt_column_is_null(stmt, 3) ? 0 : sqlite_stmt_column_int(stmt, 3);
+        row.rule_name = dup_text(sqlite_stmt_column_text(stmt, 4));
+        row.until_year = sqlite_stmt_column_is_null(stmt, 5) ? 0 : sqlite_stmt_column_int(stmt, 5);
+        row.until_month = sqlite_stmt_column_is_null(stmt, 6) ? 0 : sqlite_stmt_column_int(stmt, 6);
+        row.until_day_kind = dup_text(sqlite_stmt_column_text(stmt, 7));
+        row.until_day_value = sqlite_stmt_column_is_null(stmt, 8) ? 0 : sqlite_stmt_column_int(stmt, 8);
+        row.until_weekday = sqlite_stmt_column_is_null(stmt, 9) ? 0 : sqlite_stmt_column_int(stmt, 9);
+        row.until_seconds = sqlite_stmt_column_is_null(stmt, 10) ? 0 : sqlite_stmt_column_int(stmt, 10);
+        row.until_suffix = sqlite_stmt_column_is_null(stmt, 11)
             ? '\0'
-            : (char)sqlite3_column_text(stmt, 11)[0];
+            : sqlite_stmt_column_text(stmt, 11)[0];
         if (!row.rules_kind || !vec_push(rows, &row)) {
             free(row.rules_kind);
             free(row.rule_name);
@@ -1272,15 +1285,42 @@ static bool load_timezone_eras(sqlite3 *db,
         }
     }
 
-    sqlite3_finalize(stmt);
-    return rc == SQLITE_DONE;
+    sqlite_stmt_finalize(stmt);
+    stmt = NULL;
+    if (rows->count == 0u && !retried_with_canonical) {
+        canonical_stmt = sqlite_stmt_prepare(db, canonical_sql);
+        if (!canonical_stmt)
+            return false;
+        if (!sqlite_stmt_bind_text(canonical_stmt, 1, timezone_name))
+            goto fail;
+        if (sqlite_stmt_step(canonical_stmt) == SQLITE_STEP_ROW) {
+            const char *canonical_text = sqlite_stmt_column_text(canonical_stmt, 0);
+
+            if (canonical_text && *canonical_text) {
+                snprintf(canonical_timezone_name,
+                         sizeof(canonical_timezone_name),
+                         "%s",
+                         canonical_text);
+                if (strcmp(canonical_timezone_name, timezone_name) != 0) {
+                    query_timezone_name = canonical_timezone_name;
+                    retried_with_canonical = true;
+                }
+            }
+        }
+        sqlite_stmt_finalize(canonical_stmt);
+        canonical_stmt = NULL;
+        if (retried_with_canonical)
+            goto retry;
+    }
+    return rc == SQLITE_STEP_DONE;
 
 fail:
-    sqlite3_finalize(stmt);
+    sqlite_stmt_finalize(stmt);
+    sqlite_stmt_finalize(canonical_stmt);
     return false;
 }
 
-static bool load_timezone_transition_rules(sqlite3 *db,
+static bool load_timezone_transition_rules(sqlite_t *db,
                                            const char *rule_name,
                                            pointer_vec_t *rows)
 {
@@ -1289,32 +1329,33 @@ static bool load_timezone_transition_rules(sqlite3 *db,
         "       at_seconds, at_suffix, save_minutes "
         "FROM timezone_transition_rule WHERE rule_name = ?1 "
         "ORDER BY COALESCE(from_year, -999999), COALESCE(to_year, 999999), in_month, on_day;";
-    sqlite3_stmt *stmt = NULL;
-    int rc;
+    sqlite_stmt_t *stmt = NULL;
+    sqlite_step_result_t rc;
 
     if (!db || !rule_name || !*rule_name || !rows)
         return false;
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK)
+    stmt = sqlite_stmt_prepare(db, sql);
+    if (!stmt)
         return false;
-    if (sqlite3_bind_text(stmt, 1, rule_name, -1, SQLITE_STATIC) != SQLITE_OK)
+    if (!sqlite_stmt_bind_text(stmt, 1, rule_name))
         goto fail;
 
-    while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
+    while ((rc = sqlite_stmt_step(stmt)) == SQLITE_STEP_ROW) {
         timezone_transition_rule_row_t row;
 
         memset(&row, 0, sizeof(row));
-        row.rule_name = dup_text(sqlite3_column_text(stmt, 0));
-        row.from_year = sqlite3_column_type(stmt, 1) == SQLITE_NULL ? 0 : sqlite3_column_int(stmt, 1);
-        row.to_year = sqlite3_column_type(stmt, 2) == SQLITE_NULL ? 0 : sqlite3_column_int(stmt, 2);
-        row.in_month = sqlite3_column_int(stmt, 3);
-        row.on_kind = dup_text(sqlite3_column_text(stmt, 4));
-        row.on_day = sqlite3_column_int(stmt, 5);
-        row.on_weekday = sqlite3_column_type(stmt, 6) == SQLITE_NULL ? 0 : sqlite3_column_int(stmt, 6);
-        row.at_seconds = sqlite3_column_int(stmt, 7);
-        row.at_suffix = sqlite3_column_type(stmt, 8) == SQLITE_NULL
+        row.rule_name = dup_text(sqlite_stmt_column_text(stmt, 0));
+        row.from_year = sqlite_stmt_column_is_null(stmt, 1) ? 0 : sqlite_stmt_column_int(stmt, 1);
+        row.to_year = sqlite_stmt_column_is_null(stmt, 2) ? 0 : sqlite_stmt_column_int(stmt, 2);
+        row.in_month = sqlite_stmt_column_int(stmt, 3);
+        row.on_kind = dup_text(sqlite_stmt_column_text(stmt, 4));
+        row.on_day = sqlite_stmt_column_int(stmt, 5);
+        row.on_weekday = sqlite_stmt_column_is_null(stmt, 6) ? 0 : sqlite_stmt_column_int(stmt, 6);
+        row.at_seconds = sqlite_stmt_column_int(stmt, 7);
+        row.at_suffix = sqlite_stmt_column_is_null(stmt, 8)
             ? 'w'
-            : (char)sqlite3_column_text(stmt, 8)[0];
-        row.save_minutes = sqlite3_column_int(stmt, 9);
+            : sqlite_stmt_column_text(stmt, 8)[0];
+        row.save_minutes = sqlite_stmt_column_int(stmt, 9);
         if (!row.rule_name || !row.on_kind || !vec_push(rows, &row)) {
             free(row.rule_name);
             free(row.on_kind);
@@ -1322,11 +1363,11 @@ static bool load_timezone_transition_rules(sqlite3 *db,
         }
     }
 
-    sqlite3_finalize(stmt);
-    return rc == SQLITE_DONE;
+    sqlite_stmt_finalize(stmt);
+    return rc == SQLITE_STEP_DONE;
 
 fail:
-    sqlite3_finalize(stmt);
+    sqlite_stmt_finalize(stmt);
     return false;
 }
 
@@ -1618,7 +1659,7 @@ static bool materialise_transition_display_datetime(const timezone_transition_oc
     return *out != NULL;
 }
 
-static bool resolve_named_rule_save_minutes(sqlite3 *db,
+static bool resolve_named_rule_save_minutes(sqlite_t *db,
                                             const char *rule_name,
                                             const datetime_t *date,
                                             int *save_minutes)
@@ -1694,7 +1735,7 @@ static bool resolve_named_rule_save_minutes(sqlite3 *db,
     return true;
 }
 
-static bool timezone_offset_for_name_on_date(sqlite3 *db,
+static bool timezone_offset_for_name_on_date(sqlite_t *db,
                                              const char *timezone_name,
                                              const datetime_t *date,
                                              double *offset_hours)
@@ -1731,7 +1772,7 @@ static bool timezone_offset_for_name_on_date(sqlite3 *db,
     return true;
 }
 
-static bool load_holiday_rules(sqlite3 *db, const pointer_vec_t *lineage_rows, pointer_vec_t *rules)
+static bool load_holiday_rules(sqlite_t *db, const pointer_vec_t *lineage_rows, pointer_vec_t *rules)
 {
     static const char sql[] =
         "SELECT hd.holiday_id, hr.rule_id, hd.jurisdiction_id, "
@@ -1744,58 +1785,59 @@ static bool load_holiday_rules(sqlite3 *db, const pointer_vec_t *lineage_rows, p
         "LEFT JOIN holiday_name hn ON hn.holiday_id = hd.holiday_id AND hn.is_primary = 1 "
         "WHERE hd.jurisdiction_id = ?1 "
         "ORDER BY hd.holiday_id, hr.priority, hr.sequence_no;";
-    sqlite3_stmt *stmt = NULL;
+    sqlite_stmt_t *stmt = NULL;
     const lineage_row_t *lineage = lineage_rows ? lineage_rows->items : NULL;
     size_t i;
 
     if (!lineage)
         return false;
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK)
+    stmt = sqlite_stmt_prepare(db, sql);
+    if (!stmt)
         return false;
 
     for (i = 0; i < lineage_rows->count; ++i) {
-        int rc;
+        sqlite_step_result_t rc;
 
-        sqlite3_reset(stmt);
-        sqlite3_clear_bindings(stmt);
-        if (sqlite3_bind_text(stmt, 1, lineage[i].jurisdiction_id, -1, SQLITE_STATIC) != SQLITE_OK)
+        sqlite_stmt_reset(stmt);
+        sqlite_stmt_clear_bindings(stmt);
+        if (!sqlite_stmt_bind_text(stmt, 1, lineage[i].jurisdiction_id))
             goto fail;
-        while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
+        while ((rc = sqlite_stmt_step(stmt)) == SQLITE_STEP_ROW) {
             holiday_rule_row_t row;
 
             memset(&row, 0, sizeof(row));
-            row.holiday_id = sqlite3_column_int(stmt, 0);
-            row.rule_id = sqlite3_column_int(stmt, 1);
-            snprintf(row.jurisdiction_id, sizeof(row.jurisdiction_id), "%s", (const char *)sqlite3_column_text(stmt, 2));
-            row.holiday_name = dup_text(sqlite3_column_text(stmt, 3));
-            row.holiday_class = dup_text(sqlite3_column_text(stmt, 4));
-            row.rule_kind = dup_text(sqlite3_column_text(stmt, 5));
-            row.month = sqlite3_column_type(stmt, 6) == SQLITE_NULL ? 0 : sqlite3_column_int(stmt, 6);
-            row.day = sqlite3_column_type(stmt, 7) == SQLITE_NULL ? 0 : sqlite3_column_int(stmt, 7);
-            row.weekday = sqlite3_column_type(stmt, 8) == SQLITE_NULL ? 0 : sqlite3_column_int(stmt, 8);
-            row.ordinal = sqlite3_column_type(stmt, 9) == SQLITE_NULL ? 0 : sqlite3_column_int(stmt, 9);
-            row.offset_days = sqlite3_column_type(stmt, 10) == SQLITE_NULL ? 0 : sqlite3_column_int(stmt, 10);
-            row.holiday_date = dup_text(sqlite3_column_text(stmt, 11));
-            row.expression_language = dup_text(sqlite3_column_text(stmt, 12));
-            row.expression_text = dup_text(sqlite3_column_text(stmt, 13));
-            row.valid_from_year = sqlite3_column_type(stmt, 14) == SQLITE_NULL ? 0 : sqlite3_column_int(stmt, 14);
-            row.valid_to_year = sqlite3_column_type(stmt, 15) == SQLITE_NULL ? 0 : sqlite3_column_int(stmt, 15);
+            row.holiday_id = sqlite_stmt_column_int(stmt, 0);
+            row.rule_id = sqlite_stmt_column_int(stmt, 1);
+            snprintf(row.jurisdiction_id, sizeof(row.jurisdiction_id), "%s", sqlite_stmt_column_text(stmt, 2));
+            row.holiday_name = dup_text(sqlite_stmt_column_text(stmt, 3));
+            row.holiday_class = dup_text(sqlite_stmt_column_text(stmt, 4));
+            row.rule_kind = dup_text(sqlite_stmt_column_text(stmt, 5));
+            row.month = sqlite_stmt_column_is_null(stmt, 6) ? 0 : sqlite_stmt_column_int(stmt, 6);
+            row.day = sqlite_stmt_column_is_null(stmt, 7) ? 0 : sqlite_stmt_column_int(stmt, 7);
+            row.weekday = sqlite_stmt_column_is_null(stmt, 8) ? 0 : sqlite_stmt_column_int(stmt, 8);
+            row.ordinal = sqlite_stmt_column_is_null(stmt, 9) ? 0 : sqlite_stmt_column_int(stmt, 9);
+            row.offset_days = sqlite_stmt_column_is_null(stmt, 10) ? 0 : sqlite_stmt_column_int(stmt, 10);
+            row.holiday_date = dup_text(sqlite_stmt_column_text(stmt, 11));
+            row.expression_language = dup_text(sqlite_stmt_column_text(stmt, 12));
+            row.expression_text = dup_text(sqlite_stmt_column_text(stmt, 13));
+            row.valid_from_year = sqlite_stmt_column_is_null(stmt, 14) ? 0 : sqlite_stmt_column_int(stmt, 14);
+            row.valid_to_year = sqlite_stmt_column_is_null(stmt, 15) ? 0 : sqlite_stmt_column_int(stmt, 15);
             if (!row.holiday_name || !row.holiday_class || !row.rule_kind || !vec_push(rules, &row))
                 goto fail;
         }
-        if (rc != SQLITE_DONE)
+        if (rc != SQLITE_STEP_DONE)
             goto fail;
     }
 
-    sqlite3_finalize(stmt);
+    sqlite_stmt_finalize(stmt);
     return true;
 
 fail:
-    sqlite3_finalize(stmt);
+    sqlite_stmt_finalize(stmt);
     return false;
 }
 
-static bool load_observance_rules(sqlite3 *db, const pointer_vec_t *lineage_rows, pointer_vec_t *observances)
+static bool load_observance_rules(sqlite_t *db, const pointer_vec_t *lineage_rows, pointer_vec_t *observances)
 {
     static const char sql[] =
         "SELECT hor.holiday_id, hor.applies_to_rule_id, hor.observed_rule_kind, hor.observed_name, "
@@ -1804,97 +1846,99 @@ static bool load_observance_rules(sqlite3 *db, const pointer_vec_t *lineage_rows
         "JOIN holiday_definition hd ON hd.holiday_id = hor.holiday_id "
         "WHERE hd.jurisdiction_id = ?1 "
         "ORDER BY hor.holiday_id, hor.priority;";
-    sqlite3_stmt *stmt = NULL;
+    sqlite_stmt_t *stmt = NULL;
     const lineage_row_t *lineage = lineage_rows ? lineage_rows->items : NULL;
     size_t i;
 
     if (!lineage)
         return false;
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK)
+    stmt = sqlite_stmt_prepare(db, sql);
+    if (!stmt)
         return false;
 
     for (i = 0; i < lineage_rows->count; ++i) {
-        int rc;
+        sqlite_step_result_t rc;
 
-        sqlite3_reset(stmt);
-        sqlite3_clear_bindings(stmt);
-        if (sqlite3_bind_text(stmt, 1, lineage[i].jurisdiction_id, -1, SQLITE_STATIC) != SQLITE_OK)
+        sqlite_stmt_reset(stmt);
+        sqlite_stmt_clear_bindings(stmt);
+        if (!sqlite_stmt_bind_text(stmt, 1, lineage[i].jurisdiction_id))
             goto fail;
-        while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
+        while ((rc = sqlite_stmt_step(stmt)) == SQLITE_STEP_ROW) {
             observance_rule_row_t row;
 
             memset(&row, 0, sizeof(row));
-            row.holiday_id = sqlite3_column_int(stmt, 0);
-            row.applies_to_rule_id = sqlite3_column_type(stmt, 1) == SQLITE_NULL ? 0 : sqlite3_column_int(stmt, 1);
-            row.observed_rule_kind = dup_text(sqlite3_column_text(stmt, 2));
-            row.observed_name = dup_text(sqlite3_column_text(stmt, 3));
-            row.weekend_mask = normalise_weekend_mask((const char *)sqlite3_column_text(stmt, 4));
-            row.suppress_original = sqlite3_column_int(stmt, 5) != 0;
-            row.valid_from_year = sqlite3_column_type(stmt, 6) == SQLITE_NULL ? 0 : sqlite3_column_int(stmt, 6);
-            row.valid_to_year = sqlite3_column_type(stmt, 7) == SQLITE_NULL ? 0 : sqlite3_column_int(stmt, 7);
+            row.holiday_id = sqlite_stmt_column_int(stmt, 0);
+            row.applies_to_rule_id = sqlite_stmt_column_is_null(stmt, 1) ? 0 : sqlite_stmt_column_int(stmt, 1);
+            row.observed_rule_kind = dup_text(sqlite_stmt_column_text(stmt, 2));
+            row.observed_name = dup_text(sqlite_stmt_column_text(stmt, 3));
+            row.weekend_mask = normalise_weekend_mask(sqlite_stmt_column_text(stmt, 4));
+            row.suppress_original = sqlite_stmt_column_int(stmt, 5) != 0;
+            row.valid_from_year = sqlite_stmt_column_is_null(stmt, 6) ? 0 : sqlite_stmt_column_int(stmt, 6);
+            row.valid_to_year = sqlite_stmt_column_is_null(stmt, 7) ? 0 : sqlite_stmt_column_int(stmt, 7);
             if (!row.observed_rule_kind || !row.weekend_mask || !vec_push(observances, &row))
                 goto fail;
         }
-        if (rc != SQLITE_DONE)
+        if (rc != SQLITE_STEP_DONE)
             goto fail;
     }
 
-    sqlite3_finalize(stmt);
+    sqlite_stmt_finalize(stmt);
     return true;
 
 fail:
-    sqlite3_finalize(stmt);
+    sqlite_stmt_finalize(stmt);
     return false;
 }
 
-static bool load_exceptions(sqlite3 *db, const pointer_vec_t *lineage_rows, pointer_vec_t *exceptions)
+static bool load_exceptions(sqlite_t *db, const pointer_vec_t *lineage_rows, pointer_vec_t *exceptions)
 {
     static const char sql[] =
         "SELECT holiday_id, target_rule_id, holiday_date, action, name, valid_from_year, valid_to_year "
         "FROM holiday_exception WHERE jurisdiction_id = ?1 ORDER BY holiday_date, priority;";
-    sqlite3_stmt *stmt = NULL;
+    sqlite_stmt_t *stmt = NULL;
     const lineage_row_t *lineage = lineage_rows ? lineage_rows->items : NULL;
     size_t i;
 
     if (!lineage)
         return false;
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK)
+    stmt = sqlite_stmt_prepare(db, sql);
+    if (!stmt)
         return false;
 
     for (i = 0; i < lineage_rows->count; ++i) {
-        int rc;
+        sqlite_step_result_t rc;
 
-        sqlite3_reset(stmt);
-        sqlite3_clear_bindings(stmt);
-        if (sqlite3_bind_text(stmt, 1, lineage[i].jurisdiction_id, -1, SQLITE_STATIC) != SQLITE_OK)
+        sqlite_stmt_reset(stmt);
+        sqlite_stmt_clear_bindings(stmt);
+        if (!sqlite_stmt_bind_text(stmt, 1, lineage[i].jurisdiction_id))
             goto fail;
-        while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
+        while ((rc = sqlite_stmt_step(stmt)) == SQLITE_STEP_ROW) {
             holiday_exception_row_t row;
 
             memset(&row, 0, sizeof(row));
-            row.holiday_id = sqlite3_column_type(stmt, 0) == SQLITE_NULL ? 0 : sqlite3_column_int(stmt, 0);
-            row.target_rule_id = sqlite3_column_type(stmt, 1) == SQLITE_NULL ? 0 : sqlite3_column_int(stmt, 1);
-            row.holiday_date = dup_text(sqlite3_column_text(stmt, 2));
-            row.action = dup_text(sqlite3_column_text(stmt, 3));
-            row.name = dup_text(sqlite3_column_text(stmt, 4));
-            row.valid_from_year = sqlite3_column_type(stmt, 5) == SQLITE_NULL ? 0 : sqlite3_column_int(stmt, 5);
-            row.valid_to_year = sqlite3_column_type(stmt, 6) == SQLITE_NULL ? 0 : sqlite3_column_int(stmt, 6);
+            row.holiday_id = sqlite_stmt_column_is_null(stmt, 0) ? 0 : sqlite_stmt_column_int(stmt, 0);
+            row.target_rule_id = sqlite_stmt_column_is_null(stmt, 1) ? 0 : sqlite_stmt_column_int(stmt, 1);
+            row.holiday_date = dup_text(sqlite_stmt_column_text(stmt, 2));
+            row.action = dup_text(sqlite_stmt_column_text(stmt, 3));
+            row.name = dup_text(sqlite_stmt_column_text(stmt, 4));
+            row.valid_from_year = sqlite_stmt_column_is_null(stmt, 5) ? 0 : sqlite_stmt_column_int(stmt, 5);
+            row.valid_to_year = sqlite_stmt_column_is_null(stmt, 6) ? 0 : sqlite_stmt_column_int(stmt, 6);
             if (!row.holiday_date || !row.action || !vec_push(exceptions, &row))
                 goto fail;
         }
-        if (rc != SQLITE_DONE)
+        if (rc != SQLITE_STEP_DONE)
             goto fail;
     }
 
-    sqlite3_finalize(stmt);
+    sqlite_stmt_finalize(stmt);
     return true;
 
 fail:
-    sqlite3_finalize(stmt);
+    sqlite_stmt_finalize(stmt);
     return false;
 }
 
-static char *evaluate_rule_date(sqlite3 *db,
+static char *evaluate_rule_date(sqlite_t *db,
                                 const holiday_rule_row_t *rule,
                                 int year,
                                 const char *jurisdiction)
@@ -2209,7 +2253,7 @@ bool jurisdict_default_location(jurisdiction_t *holiday,
                               double *latitude,
                               double *longitude)
 {
-    sqlite3 *db = holiday ? sqlite_native_handle(holiday->db) : NULL;
+    sqlite_t *db = holiday ? holiday->db : NULL;
     const char *jurisdiction = holiday ? holiday->jurisdiction : NULL;
     pointer_vec_t lineage_rows = {0};
     bool ok;
@@ -2236,7 +2280,7 @@ bool jurisdict_default_gmt_offset(jurisdiction_t *holiday,
                                 const datetime_t *date,
                                 double *offset_hours)
 {
-    sqlite3 *db = holiday ? sqlite_native_handle(holiday->db) : NULL;
+    sqlite_t *db = holiday ? holiday->db : NULL;
     const char *jurisdiction = holiday ? holiday->jurisdiction : NULL;
     pointer_vec_t lineage_rows = {0};
     char timezone_name[128];
@@ -2266,7 +2310,7 @@ bool jurisdict_default_gmt_offset(jurisdiction_t *holiday,
     return true;
 }
 
-static bool timezone_load_named_rule_names_for_year(sqlite3 *db,
+static bool timezone_load_named_rule_names_for_year(sqlite_t *db,
                                                     const char *timezone_name,
                                                     int year,
                                                     pointer_vec_t *rule_names)
@@ -2337,7 +2381,7 @@ done:
     return ok;
 }
 
-static bool timezone_collect_transition_occurrences(sqlite3 *db,
+static bool timezone_collect_transition_occurrences(sqlite_t *db,
                                                     const timezone_named_rule_ref_t *rule_ref,
                                                     int year,
                                                     pointer_vec_t *occurrences)
@@ -2388,7 +2432,7 @@ bool jurisdict_dst_transition_details(jurisdiction_t *holiday,
                                       double *back_from_offset_hours,
                                       double *back_to_offset_hours)
 {
-    sqlite3 *db = holiday ? sqlite_native_handle(holiday->db) : NULL;
+    sqlite_t *db = holiday ? holiday->db : NULL;
     const char *jurisdiction = holiday ? holiday->jurisdiction : NULL;
     pointer_vec_t lineage_rows = {0};
     char timezone_name[128];
@@ -2655,7 +2699,7 @@ bool jurisdict_is_national_holiday(jurisdiction_t *holiday, const datetime_t *da
 
 bool jurisdict_is_weekend(jurisdiction_t *holiday, const datetime_t *date)
 {
-    sqlite3 *db = holiday ? sqlite_native_handle(holiday->db) : NULL;
+    sqlite_t *db = holiday ? holiday->db : NULL;
     const char *jurisdiction = holiday ? holiday->jurisdiction : NULL;
     pointer_vec_t lineage_rows = {0};
     pointer_vec_t weekend_rules = {0};
@@ -2730,12 +2774,12 @@ long jurisdict_working_days_between(jurisdiction_t *holiday,
 }
 
 bool jurisdict_each_holiday_between(jurisdiction_t *holiday,
-                          const datetime_t *start,
-                          const datetime_t *end,
-                          jurisdict_visit_fn visitor,
-                          void *ctx)
+                                    const datetime_t *start,
+                                    const datetime_t *end,
+                                    jurisdict_visit_fn visitor,
+                                    void *ctx)
 {
-    sqlite3 *db = holiday ? sqlite_native_handle(holiday->db) : NULL;
+    sqlite_t *db = holiday ? holiday->db : NULL;
     const char *jurisdiction = holiday ? holiday->jurisdiction : NULL;
     char *start_text = NULL;
     char *end_text = NULL;
@@ -2860,4 +2904,58 @@ done:
     free(start_text);
     free(end_text);
     return ok;
+}
+
+bool jurisdict_serialize(const jurisdiction_t *jurisdiction,
+                         string_t **out_type,
+                         string_t **out_encoding,
+                         void **out_data,
+                         size_t *out_len)
+{
+    string_t *type = NULL;
+    string_t *encoding = NULL;
+    char *payload;
+    size_t len;
+
+    if (!jurisdiction || !out_type || !out_encoding || !out_data || !out_len)
+        return false;
+
+    len = strlen(jurisdiction->jurisdiction);
+    payload = malloc(len);
+    if (!payload)
+        return false;
+    memcpy(payload, jurisdiction->jurisdiction, len);
+
+    type = string_new_with("jurisdiction_t");
+    encoding = string_new_with("jurisdiction-code/plain");
+    if (!type || !encoding) {
+        free(payload);
+        string_free(type);
+        string_free(encoding);
+        return false;
+    }
+
+    *out_type = type;
+    *out_encoding = encoding;
+    *out_data = payload;
+    *out_len = len;
+    return true;
+}
+
+jurisdiction_t *jurisdict_deserialise(const void *data,
+                                      size_t len,
+                                      const string_t *type,
+                                      const string_t *encoding)
+{
+    char code[32];
+
+    if (!data || !type || !encoding || len == 0u || len >= sizeof(code))
+        return NULL;
+    if (strcmp(string_c_str(type), "jurisdiction_t") != 0 ||
+        strcmp(string_c_str(encoding), "jurisdiction-code/plain") != 0)
+        return NULL;
+
+    memcpy(code, data, len);
+    code[len] = '\0';
+    return jurisdict_open(code);
 }

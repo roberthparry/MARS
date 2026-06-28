@@ -816,6 +816,25 @@ bool test_case_end_stderr_capture(int saved_stderr)
     return true;
 }
 
+static void test_print_capture_file(const char *path)
+{
+    FILE *f;
+    char buffer[4096];
+    size_t n;
+
+    if (!path || *path == '\0')
+        return;
+
+    f = fopen(path, "rb");
+    if (!f)
+        return;
+
+    while ((n = fread(buffer, 1u, sizeof(buffer), f)) > 0u)
+        fwrite(buffer, 1u, n, stdout);
+
+    fclose(f);
+}
+
 static int test_missing_config_path_seen(const string_t *full_key)
 {
     size_t i;
@@ -1575,6 +1594,8 @@ void test_run_output_in_group(const char *file,
     string_t *full_path_text = NULL;
     const string_t *print_file;
     const char *file_boundary;
+    const char *stdout_capture_path = NULL;
+    int saved_stdout = -1;
 
     if (g_test_abort_requested)
         return;
@@ -1626,12 +1647,22 @@ void test_run_output_in_group(const char *file,
     if (fixture_continue &&
         g_test_failure_count == failure_count_before &&
         !g_test_skip_requested) {
+        saved_stdout = test_case_begin_stdout_capture("output-example-stdout.txt",
+                                                      &stdout_capture_path);
+    }
+    if (fixture_continue &&
+        g_test_failure_count == failure_count_before &&
+        !g_test_skip_requested) {
         fn();
+    }
+    if (saved_stdout >= 0) {
+        if (!test_case_end_stdout_capture(saved_stdout))
+            test_mark_failure(file, line, "failed to restore stdout after output capture");
+        saved_stdout = -1;
     }
     if (fixture_ran && fixture_continue)
         test_run_case_fixture_teardown(file_boundary, line);
     clock_gettime(CLOCK_MONOTONIC, &t1);
-    test_case_cleanup_all();
     ms = test_elapsed_ms(t0, t1);
 
     if (g_test_skip_requested) {
@@ -1675,6 +1706,9 @@ void test_run_output_in_group(const char *file,
 
     test_print_time(ms);
     string_printf("\n");
+    if (stdout_capture_path && *stdout_capture_path)
+        test_print_capture_file(stdout_capture_path);
+    test_case_cleanup_all();
 cleanup:
     string_free(full_path_text);
     string_free(tags_text);

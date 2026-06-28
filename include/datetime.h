@@ -166,6 +166,40 @@ datetime_t *datetime_init_now(datetime_t *dttm);
 datetime_t *datetime_from_string(const char *text);
 
 /**
+ * @brief Serialise a datetime into a SQLite-ready payload.
+ *
+ * The payload uses an ISO 8601 civil timestamp with seconds preserved. On
+ * success, the caller owns @p out_type, @p out_encoding, and @p out_data and
+ * must release them with @c string_free() and @c free().
+ *
+ * @param dttm Datetime to serialise.
+ * @param out_type Receives a newly allocated type label.
+ * @param out_encoding Receives a newly allocated encoding label.
+ * @param out_data Receives a newly allocated payload buffer.
+ * @param out_len Receives the payload length in bytes.
+ * @return @c true on success, otherwise @c false.
+ */
+bool datetime_serialize(const datetime_t *dttm,
+                        string_t **out_type,
+                        string_t **out_encoding,
+                        void **out_data,
+                        size_t *out_len);
+
+/**
+ * @brief Reconstruct a datetime from a serialised payload.
+ *
+ * @param data Serialised payload bytes.
+ * @param len Payload length in bytes.
+ * @param type Stored type label.
+ * @param encoding Stored encoding label.
+ * @return Newly allocated datetime on success, otherwise @c NULL.
+ */
+datetime_t *datetime_deserialise(const void *data,
+                                 size_t len,
+                                 const string_t *type,
+                                 const string_t *encoding);
+
+/**
  * @brief calculate the date of Easter Sunday for a given year and initialise a datetime structure with that date. The algorithm
  *        used is the Anonymous Gregorian algorithm, which is a well-known method for calculating the date of Easter Sunday in the
  *        Gregorian calendar. The algorithm takes the year as input and calculates the month and day of Easter Sunday based on a
@@ -652,6 +686,44 @@ long datetime_jdn(const datetime_t *dttm);
  * @return the Julian Day of the datetime.
  */
 double datetime_jd(const datetime_t *dttm);
+
+/**
+ * @brief estimate Delta T, the difference TT - UT, in seconds for a given year.
+ *
+ * This is suitable for astronomical calendar and ephemeris support across the
+ * historical range used by the library. It uses the library's built-in
+ * piecewise polynomial approximation and returns an estimated civil-year value
+ * rather than a daily observational series.
+ *
+ * @param year the Gregorian civil year.
+ * @return the estimated Delta T in seconds.
+ */
+double datetime_delta_t_seconds(int year);
+
+/**
+ * @brief convert a civil datetime to Julian Date on the Terrestrial Time scale.
+ *
+ * The input datetime is treated as a civil UT-style timestamp. The conversion
+ * applies the library's Delta T estimate for the datetime's civil year, so the
+ * result is effectively `JD(UT-like civil time) + DeltaT/86400`.
+ *
+ * @param dttm the datetime to convert.
+ * @return Julian Date on the TT scale, or DBL_MAX if the datetime is invalid.
+ */
+double datetime_jd_tt(const datetime_t *dttm);
+
+/**
+ * @brief convert a civil datetime to Julian Date on the Barycentric Dynamical Time scale.
+ *
+ * This uses the Terrestrial Time conversion together with the standard small
+ * periodic TT-to-TDB correction suitable for almanac work:
+ * `0.001657 sin(g) + 0.000022 sin(2g)` seconds, where `g` is the Sun's mean
+ * anomaly derived from `JD(TT)`.
+ *
+ * @param dttm the datetime to convert.
+ * @return Julian Date on the TDB scale, or DBL_MAX if the datetime is invalid.
+ */
+double datetime_jd_tdb(const datetime_t *dttm);
 
 /**
  * @brief get the weekday of a datetime. If the weekday is not initialised, it will be calculated from the Julian Day Number or the

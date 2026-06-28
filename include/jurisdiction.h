@@ -245,4 +245,39 @@ bool jurisdict_each_holiday_between(jurisdiction_t *jurisdiction,
                                     jurisdict_visit_fn visitor,
                                     void *ctx);
 
+/**
+ * @brief Serialise a jurisdiction engine into a SQLite-ready payload.
+ *
+ * The payload stores the active jurisdiction code, not the private database
+ * handle or cached rule state. On success, the caller owns @p out_type,
+ * @p out_encoding, and @p out_data and must release them with
+ * @c string_free() and @c free().
+ *
+ * @param jurisdiction Jurisdiction engine to serialise.
+ * @param out_type Receives a newly allocated type label.
+ * @param out_encoding Receives a newly allocated encoding label.
+ * @param out_data Receives a newly allocated payload buffer.
+ * @param out_len Receives the payload length in bytes.
+ * @return @c true on success, otherwise @c false.
+ */
+bool jurisdict_serialize(const jurisdiction_t *jurisdiction,
+                         string_t **out_type,
+                         string_t **out_encoding,
+                         void **out_data,
+                         size_t *out_len);
+
+/**
+ * @brief Reconstruct a jurisdiction engine from a serialised payload.
+ *
+ * @param data Serialised payload bytes.
+ * @param len Payload length in bytes.
+ * @param type Stored type label.
+ * @param encoding Stored encoding label.
+ * @return Newly allocated jurisdiction engine on success, otherwise @c NULL.
+ */
+jurisdiction_t *jurisdict_deserialise(const void *data,
+                                      size_t len,
+                                      const string_t *type,
+                                      const string_t *encoding);
+
 #endif /* MARS_JURISDICTION_H */

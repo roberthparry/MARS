@@ -18,7 +18,7 @@ import threading
 
 
 ROOT = Path(__file__).resolve().parents[1]
-JURISDICTION_DB_SOURCE_DIR = ROOT / "packaging" / "holiday-db"
+JURISDICTION_DB_SOURCE_DIR = ROOT / "packaging" / "jurisdiction-db"
 JURISDICTION_RULES_SQL = JURISDICTION_DB_SOURCE_DIR / "mars_holiday_rules.sql"
 DB_PATH_ENV = "MARS_JURISDICTION_DB_PATH"
 DB_KEY_ENV = "MARS_JURISDICTION_DB_KEY"

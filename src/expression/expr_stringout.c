@@ -3449,3 +3449,72 @@ void expr_print(const expr_t *dv)
     if (expr_printf("%n\n", dv) < 0)
         string_printf("NULL\n");
 }
+
+bool expr_serialize(const expr_t *expr,
+                    string_t **out_type,
+                    string_t **out_encoding,
+                    void **out_data,
+                    size_t *out_len)
+{
+    string_t *type = NULL;
+    string_t *encoding = NULL;
+    string_t *text = NULL;
+    void *payload = NULL;
+
+    if (!expr || !out_type || !out_encoding || !out_data || !out_len)
+        return false;
+
+    text = expr_to_text(expr, style_EXPRESSION);
+    if (!text)
+        return false;
+
+    payload = malloc(string_byte_length(text));
+    if (!payload) {
+        string_free(text);
+        return false;
+    }
+    memcpy(payload, string_c_str(text), string_byte_length(text));
+
+    type = string_new_with("expr_t");
+    encoding = string_new_with("mars/expression");
+    if (!type || !encoding) {
+        free(payload);
+        string_free(text);
+        string_free(type);
+        string_free(encoding);
+        return false;
+    }
+
+    *out_type = type;
+    *out_encoding = encoding;
+    *out_data = payload;
+    *out_len = string_byte_length(text);
+    string_free(text);
+    return true;
+}
+
+expr_t *expr_deserialise(const void *data,
+                         size_t len,
+                         const string_t *type,
+                         const string_t *encoding)
+{
+    string_t *text;
+    expr_t *expr;
+
+    if (!data || !type || !encoding)
+        return NULL;
+    if (strcmp(string_c_str(type), "expr_t") != 0 ||
+        strcmp(string_c_str(encoding), "mars/expression") != 0)
+        return NULL;
+
+    text = string_new();
+    if (!text)
+        return NULL;
+    if (string_append_chars(text, (const char *)data, len) != 0) {
+        string_free(text);
+        return NULL;
+    }
+    expr = expr_from_text(text, NULL);
+    string_free(text);
+    return expr;
+}

@@ -1307,4 +1307,42 @@ int mat_sprintf(char *out, size_t out_size, const char *fmt, ...);
 int mat_printf(const char *fmt, ...);
 void mat_print(const matrix_t *A);
 
+/**
+ * @brief Serialise a matrix into a SQLite-ready payload.
+ *
+ * The payload uses the matrix text format that can be read back with
+ * @c mat_from_text_expr(). On success, the caller owns @p out_type,
+ * @p out_encoding, and @p out_data and must release them with
+ * @c string_free() and @c free().
+ *
+ * @param A Matrix to serialise.
+ * @param out_type Receives a newly allocated type label.
+ * @param out_encoding Receives a newly allocated encoding label.
+ * @param out_data Receives a newly allocated payload buffer.
+ * @param out_len Receives the payload length in bytes.
+ * @return @c true on success, otherwise @c false.
+ */
+bool mat_serialize(const matrix_t *A,
+                   string_t **out_type,
+                   string_t **out_encoding,
+                   void **out_data,
+                   size_t *out_len);
+
+/**
+ * @brief Reconstruct a matrix from a serialised payload.
+ *
+ * This deserialiser accepts matrices containing either numeric or symbolic
+ * entries.
+ *
+ * @param data Serialised payload bytes.
+ * @param len Payload length in bytes.
+ * @param type Stored type label.
+ * @param encoding Stored encoding label.
+ * @return Newly allocated matrix on success, otherwise @c NULL.
+ */
+matrix_t *mat_deserialise(const void *data,
+                          size_t len,
+                          const string_t *type,
+                          const string_t *encoding);
+
 #endif /* MATRIX_H */
