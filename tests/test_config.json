@@ -1,10 +1,16 @@
 {
   "tests/almanac/test_almanac.c": {
+    "readme_examples": {
+      "enabled": true,
+      "example_almanac_shrewsbury_eclipse_watch": true
+    },
     "tests": {
       "enabled": true,
       "test_almanac_gha_aries_matches_j2000_reference": true,
+      "test_almanac_lookup_resolves_jupiter": true,
       "test_almanac_lookup_resolves_moon": true,
       "test_almanac_lookup_resolves_sirius": true,
+      "test_almanac_matches_oracle_across_supported_range": true,
       "test_almanac_snapshot_returns_catalogue_order": true
     }
   },

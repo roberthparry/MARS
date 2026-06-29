@@ -96,6 +96,20 @@ cartesian3_t cartesian_rotate_x(const cartesian3_t *value, double radians)
     return out;
 }
 
+cartesian3_t cartesian_rotate_y(const cartesian3_t *value, double radians)
+{
+    cartesian3_t out;
+    double c;
+    double s;
+
+    sincos(radians, &s, &c);
+
+    out.x = value ? value->x * c + value->z * s : 0.0;
+    out.y = value ? value->y : 0.0;
+    out.z = value ? -value->x * s + value->z * c : 0.0;
+    return out;
+}
+
 cartesian3_t cartesian_rotate_z(const cartesian3_t *value, double radians)
 {
     cartesian3_t out;

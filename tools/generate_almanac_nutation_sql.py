@@ -8,8 +8,8 @@ from dataclasses import dataclass
 import erfa
 import numpy as np
 
-START_JD = 2086302.5
-END_JD = 2816787.5
+START_JD = 2287185.5
+END_JD = 2688952.5
 SEGMENT_DAYS = 365.25 * 5.0
 DEGREE = 7
 SAMPLES_PER_SEGMENT = 256

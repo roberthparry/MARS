@@ -23,6 +23,15 @@ typedef struct _almanac_t {
     double mean_obliquity_c1_arcsec;
     double mean_obliquity_c2_arcsec;
     double mean_obliquity_c3_arcsec;
+    double precession_zeta_c1_deg;
+    double precession_zeta_c2_deg;
+    double precession_zeta_c3_deg;
+    double precession_theta_c1_deg;
+    double precession_theta_c2_deg;
+    double precession_theta_c3_deg;
+    double precession_z_c1_deg;
+    double precession_z_c2_deg;
+    double precession_z_c3_deg;
     double omega_c0_deg;
     double omega_c1_deg_per_century;
     double omega_c2_deg_per_century2;
@@ -31,6 +40,7 @@ typedef struct _almanac_t {
     double solar_mean_longitude_c1_deg_per_century;
     double lunar_mean_longitude_c0_deg;
     double lunar_mean_longitude_c1_deg_per_century;
+    double moon_earth_system_mass_fraction;
     double speed_of_light_au_per_day;
     struct almanac_nutation_term_t *nutation_terms;
     size_t nutation_term_count;
@@ -78,64 +88,36 @@ typedef struct almanac_model_row_t {
 
 typedef struct almanac_state_t {
     cartesian3_t geocentric_equatorial_au;
+    cartesian3_t geocentric_ecliptic_au;
     bool has_geocentric_vector;
+    bool has_ecliptic_vector;
     bool has_direction_vector;
+    bool apparent_place_complete;
     double right_ascension_hours;
     double declination_degrees;
 } almanac_state_t;
 
-typedef struct almanac_orbital_segment_t {
+#define ALMANAC_CHEB_COMPONENT_COUNT 3
+#define ALMANAC_FRAME_ROTATION_COMPONENT_COUNT 9
+#define ALMANAC_CHEB_MAX_COEFF_COUNT 33
+
+typedef struct almanac_chebyshev_position_segment_t {
     double start_jd;
     double end_jd;
     double reference_jd;
-    double span_days;
-    double Omega_c0;
-    double Omega_c1;
-    double Omega_c2;
-    double i_c0;
-    double i_c1;
-    double i_c2;
-    double varpi_c0;
-    double varpi_c1;
-    double varpi_c2;
-    double a_c0;
-    double a_c1;
-    double a_c2;
-    double e_c0;
-    double e_c1;
-    double e_c2;
-    double L_c0;
-    double L_c1;
-    double L_c2;
-} almanac_orbital_segment_t;
+    double radius_days;
+    int degree;
+    double coeff[ALMANAC_CHEB_COMPONENT_COUNT][ALMANAC_CHEB_MAX_COEFF_COUNT];
+} almanac_chebyshev_position_segment_t;
 
-typedef struct almanac_poly4_t {
-    double c0;
-    double c1;
-    double c2;
-    double c3;
-    double c4;
-} almanac_poly4_t;
-
-typedef struct almanac_lunar_fundamentals_t {
-    almanac_poly4_t Lp;
-    almanac_poly4_t D;
-    almanac_poly4_t M;
-    almanac_poly4_t Mp;
-    almanac_poly4_t F;
-} almanac_lunar_fundamentals_t;
-
-typedef struct almanac_lunar_fundamentals_segment_t {
+typedef struct almanac_frame_rotation_segment_t {
     double start_jd;
     double end_jd;
     double reference_jd;
-    double span_days;
-    almanac_poly4_t Lp;
-    almanac_poly4_t D;
-    almanac_poly4_t M;
-    almanac_poly4_t Mp;
-    almanac_poly4_t F;
-} almanac_lunar_fundamentals_segment_t;
+    double radius_days;
+    int degree;
+    double coeff[ALMANAC_FRAME_ROTATION_COMPONENT_COUNT][ALMANAC_CHEB_MAX_COEFF_COUNT];
+} almanac_frame_rotation_segment_t;
 
 typedef struct almanac_poly8_t {
     double c0;
@@ -157,15 +139,12 @@ typedef struct almanac_nutation_segment_t {
     almanac_poly8_t deps;
 } almanac_nutation_segment_t;
 
-typedef struct almanac_lunar_correction_segment_t {
-    double start_jd;
-    double end_jd;
-    double reference_jd;
-    double span_days;
-    almanac_poly8_t lon;
-    almanac_poly8_t lat;
-    almanac_poly8_t radius;
-} almanac_lunar_correction_segment_t;
+static bool almanac_lunar_geocentric_ecliptic_vector(almanac_t *almanac,
+                                                     double jd,
+                                                     cartesian3_t *out);
+static bool almanac_lunar_geocentric_ecliptic_velocity(almanac_t *almanac,
+                                                       double jd,
+                                                       cartesian3_t *out_velocity_au_per_day);
 
 static void almanac_set_error(almanac_t *almanac, const char *message)
 {
@@ -202,21 +181,6 @@ static double degrees_to_radians(double degrees)
 static double radians_to_degrees(double radians)
 {
     return radians * (180.0 / M_PI);
-}
-
-static double almanac_poly4_eval(const almanac_poly4_t *poly, double x)
-{
-    if (!poly)
-        return 0.0;
-    return ((((poly->c4 * x) + poly->c3) * x + poly->c2) * x + poly->c1) * x + poly->c0;
-}
-
-static double almanac_poly8_eval(const almanac_poly8_t *poly, double x)
-{
-    if (!poly)
-        return 0.0;
-    return (((((((poly->c7 * x) + poly->c6) * x + poly->c5) * x + poly->c4) * x
-        + poly->c3) * x + poly->c2) * x + poly->c1) * x + poly->c0;
 }
 
 static double almanac_cheb8_eval(const almanac_poly8_t *poly, double x)
@@ -604,6 +568,15 @@ static bool almanac_load_correction_model(almanac_t *almanac)
         !almanac_fetch_constant(almanac, "mean_obliquity_c1_arcsec", &almanac->mean_obliquity_c1_arcsec) ||
         !almanac_fetch_constant(almanac, "mean_obliquity_c2_arcsec", &almanac->mean_obliquity_c2_arcsec) ||
         !almanac_fetch_constant(almanac, "mean_obliquity_c3_arcsec", &almanac->mean_obliquity_c3_arcsec) ||
+        !almanac_fetch_constant(almanac, "precession_zeta_c1_deg", &almanac->precession_zeta_c1_deg) ||
+        !almanac_fetch_constant(almanac, "precession_zeta_c2_deg", &almanac->precession_zeta_c2_deg) ||
+        !almanac_fetch_constant(almanac, "precession_zeta_c3_deg", &almanac->precession_zeta_c3_deg) ||
+        !almanac_fetch_constant(almanac, "precession_theta_c1_deg", &almanac->precession_theta_c1_deg) ||
+        !almanac_fetch_constant(almanac, "precession_theta_c2_deg", &almanac->precession_theta_c2_deg) ||
+        !almanac_fetch_constant(almanac, "precession_theta_c3_deg", &almanac->precession_theta_c3_deg) ||
+        !almanac_fetch_constant(almanac, "precession_z_c1_deg", &almanac->precession_z_c1_deg) ||
+        !almanac_fetch_constant(almanac, "precession_z_c2_deg", &almanac->precession_z_c2_deg) ||
+        !almanac_fetch_constant(almanac, "precession_z_c3_deg", &almanac->precession_z_c3_deg) ||
         !almanac_fetch_constant(almanac, "omega_c0_deg", &almanac->omega_c0_deg) ||
         !almanac_fetch_constant(almanac, "omega_c1_deg_per_century", &almanac->omega_c1_deg_per_century) ||
         !almanac_fetch_constant(almanac, "omega_c2_deg_per_century2", &almanac->omega_c2_deg_per_century2) ||
@@ -612,6 +585,7 @@ static bool almanac_load_correction_model(almanac_t *almanac)
         !almanac_fetch_constant(almanac, "solar_mean_longitude_c1_deg_per_century", &almanac->solar_mean_longitude_c1_deg_per_century) ||
         !almanac_fetch_constant(almanac, "lunar_mean_longitude_c0_deg", &almanac->lunar_mean_longitude_c0_deg) ||
         !almanac_fetch_constant(almanac, "lunar_mean_longitude_c1_deg_per_century", &almanac->lunar_mean_longitude_c1_deg_per_century) ||
+        !almanac_fetch_constant(almanac, "moon_earth_system_mass_fraction", &almanac->moon_earth_system_mass_fraction) ||
         !almanac_fetch_constant(almanac, "speed_of_light_au_per_day", &almanac->speed_of_light_au_per_day) ||
         !almanac_load_nutation_terms(almanac)) {
         return false;
@@ -628,11 +602,9 @@ static bool almanac_fetch_model(almanac_t *almanac,
     static const char *sql =
         "SELECT b.body_code, b.display_name, b.body_kind, b.model_kind, b.brightness_model, b.sort_order,"
         "       b.magnitude_constant, b.magnitude_linear, b.magnitude_quadratic, b.magnitude_cubic, b.magnitude_quartic,"
-        "       f.epoch_jd, f.ra_hours, f.dec_degrees, f.pm_ra_mas_per_year, f.pm_dec_mas_per_year,"
-        "       k.epoch_jd, k.N0, k.N_dot, k.i0, k.i_dot, k.w0, k.w_dot, k.a0, k.a_dot, k.e0, k.e_dot, k.M0, k.M_dot "
+        "       f.epoch_jd, f.ra_hours, f.dec_degrees, f.pm_ra_mas_per_year, f.pm_dec_mas_per_year "
         "FROM almanac_body AS b "
         "LEFT JOIN almanac_fixed_equatorial_model AS f ON f.body_code = b.body_code "
-        "LEFT JOIN almanac_keplerian_model AS k ON k.body_code = b.body_code "
         "WHERE b.body_code = ?1";
     sqlite_stmt_t *stmt = NULL;
     sqlite_step_result_t rc;
@@ -679,280 +651,9 @@ static bool almanac_fetch_model(almanac_t *almanac,
     out->fixed_dec_degrees = sqlite_stmt_column_double(stmt, 13);
     out->fixed_pm_ra_mas_per_year = sqlite_stmt_column_double(stmt, 14);
     out->fixed_pm_dec_mas_per_year = sqlite_stmt_column_double(stmt, 15);
-    out->orbit_epoch_jd = sqlite_stmt_column_double(stmt, 16);
-    out->N0 = sqlite_stmt_column_double(stmt, 17);
-    out->N_dot = sqlite_stmt_column_double(stmt, 18);
-    out->i0 = sqlite_stmt_column_double(stmt, 19);
-    out->i_dot = sqlite_stmt_column_double(stmt, 20);
-    out->w0 = sqlite_stmt_column_double(stmt, 21);
-    out->w_dot = sqlite_stmt_column_double(stmt, 22);
-    out->a0 = sqlite_stmt_column_double(stmt, 23);
-    out->a_dot = sqlite_stmt_column_double(stmt, 24);
-    out->e0 = sqlite_stmt_column_double(stmt, 25);
-    out->e_dot = sqlite_stmt_column_double(stmt, 26);
-    out->M0 = sqlite_stmt_column_double(stmt, 27);
-    out->M_dot = sqlite_stmt_column_double(stmt, 28);
 
     sqlite_stmt_finalize(stmt);
     return true;
-}
-
-static bool almanac_load_lunar_fundamentals(almanac_t *almanac,
-                                            almanac_lunar_fundamentals_t *out)
-{
-    static const char *sql =
-        "SELECT term_code, c0, c1, c2, c3, c4 "
-        "FROM almanac_lunar_fundamental_coeff "
-        "ORDER BY sort_order ASC, term_code ASC";
-    sqlite_stmt_t *stmt = NULL;
-    sqlite_step_result_t rc;
-    bool have_Lp = false;
-    bool have_D = false;
-    bool have_M = false;
-    bool have_Mp = false;
-    bool have_F = false;
-
-    if (!almanac || !almanac->db || !out) {
-        almanac_set_error(almanac, "invalid lunar fundamentals lookup");
-        return false;
-    }
-
-    memset(out, 0, sizeof(*out));
-    stmt = sqlite_stmt_prepare(almanac->db, sql);
-    if (!stmt) {
-        almanac_set_sqlite_error(almanac);
-        return false;
-    }
-
-    while ((rc = sqlite_stmt_step(stmt)) == SQLITE_STEP_ROW) {
-        const char *term_code = sqlite_stmt_column_text(stmt, 0);
-        almanac_poly4_t poly;
-
-        poly.c0 = sqlite_stmt_column_double(stmt, 1);
-        poly.c1 = sqlite_stmt_column_double(stmt, 2);
-        poly.c2 = sqlite_stmt_column_double(stmt, 3);
-        poly.c3 = sqlite_stmt_column_double(stmt, 4);
-        poly.c4 = sqlite_stmt_column_double(stmt, 5);
-
-        if (!term_code)
-            continue;
-        if (strcmp(term_code, "Lp") == 0) {
-            out->Lp = poly;
-            have_Lp = true;
-        } else if (strcmp(term_code, "D") == 0) {
-            out->D = poly;
-            have_D = true;
-        } else if (strcmp(term_code, "M") == 0) {
-            out->M = poly;
-            have_M = true;
-        } else if (strcmp(term_code, "Mp") == 0) {
-            out->Mp = poly;
-            have_Mp = true;
-        } else if (strcmp(term_code, "F") == 0) {
-            out->F = poly;
-            have_F = true;
-        }
-    }
-
-    sqlite_stmt_finalize(stmt);
-    if (rc != SQLITE_STEP_DONE) {
-        almanac_set_sqlite_error(almanac);
-        return false;
-    }
-    if (!have_Lp || !have_D || !have_M || !have_Mp || !have_F) {
-        almanac_set_error(almanac, "lunar fundamentals are incomplete");
-        return false;
-    }
-    return true;
-}
-
-static bool almanac_fetch_lunar_fundamentals_segment(almanac_t *almanac,
-                                                     double jd,
-                                                     almanac_lunar_fundamentals_segment_t *out)
-{
-    static const char *sql =
-        "SELECT start_jd, end_jd, reference_jd, span_days, "
-        "       Lp_c0, Lp_c1, Lp_c2, Lp_c3, Lp_c4, "
-        "       D_c0, D_c1, D_c2, D_c3, D_c4, "
-        "       M_c0, M_c1, M_c2, M_c3, M_c4, "
-        "       Mp_c0, Mp_c1, Mp_c2, Mp_c3, Mp_c4, "
-        "       F_c0, F_c1, F_c2, F_c3, F_c4 "
-        "FROM almanac_lunar_fundamentals_model "
-        "WHERE body_code = 'MOON' AND start_jd <= ? AND end_jd > ? "
-        "ORDER BY sort_order ASC, model_id ASC "
-        "LIMIT 1";
-    sqlite_stmt_t *stmt = NULL;
-    sqlite_step_result_t rc;
-
-    if (!almanac || !almanac->db || !out) {
-        almanac_set_error(almanac, "invalid lunar fundamentals segment lookup");
-        return false;
-    }
-
-    memset(out, 0, sizeof(*out));
-    stmt = sqlite_stmt_prepare(almanac->db, sql);
-    if (!stmt) {
-        almanac_set_sqlite_error(almanac);
-        return false;
-    }
-    sqlite_stmt_bind_double(stmt, 1, jd);
-    sqlite_stmt_bind_double(stmt, 2, jd);
-    rc = sqlite_stmt_step(stmt);
-    if (rc == SQLITE_STEP_DONE) {
-        sqlite_stmt_finalize(stmt);
-        return false;
-    }
-    if (rc != SQLITE_STEP_ROW) {
-        sqlite_stmt_finalize(stmt);
-        almanac_set_sqlite_error(almanac);
-        return false;
-    }
-
-    out->start_jd = sqlite_stmt_column_double(stmt, 0);
-    out->end_jd = sqlite_stmt_column_double(stmt, 1);
-    out->reference_jd = sqlite_stmt_column_double(stmt, 2);
-    out->span_days = sqlite_stmt_column_double(stmt, 3);
-    out->Lp.c0 = sqlite_stmt_column_double(stmt, 4);
-    out->Lp.c1 = sqlite_stmt_column_double(stmt, 5);
-    out->Lp.c2 = sqlite_stmt_column_double(stmt, 6);
-    out->Lp.c3 = sqlite_stmt_column_double(stmt, 7);
-    out->Lp.c4 = sqlite_stmt_column_double(stmt, 8);
-    out->D.c0 = sqlite_stmt_column_double(stmt, 9);
-    out->D.c1 = sqlite_stmt_column_double(stmt, 10);
-    out->D.c2 = sqlite_stmt_column_double(stmt, 11);
-    out->D.c3 = sqlite_stmt_column_double(stmt, 12);
-    out->D.c4 = sqlite_stmt_column_double(stmt, 13);
-    out->M.c0 = sqlite_stmt_column_double(stmt, 14);
-    out->M.c1 = sqlite_stmt_column_double(stmt, 15);
-    out->M.c2 = sqlite_stmt_column_double(stmt, 16);
-    out->M.c3 = sqlite_stmt_column_double(stmt, 17);
-    out->M.c4 = sqlite_stmt_column_double(stmt, 18);
-    out->Mp.c0 = sqlite_stmt_column_double(stmt, 19);
-    out->Mp.c1 = sqlite_stmt_column_double(stmt, 20);
-    out->Mp.c2 = sqlite_stmt_column_double(stmt, 21);
-    out->Mp.c3 = sqlite_stmt_column_double(stmt, 22);
-    out->Mp.c4 = sqlite_stmt_column_double(stmt, 23);
-    out->F.c0 = sqlite_stmt_column_double(stmt, 24);
-    out->F.c1 = sqlite_stmt_column_double(stmt, 25);
-    out->F.c2 = sqlite_stmt_column_double(stmt, 26);
-    out->F.c3 = sqlite_stmt_column_double(stmt, 27);
-    out->F.c4 = sqlite_stmt_column_double(stmt, 28);
-    sqlite_stmt_finalize(stmt);
-    return out->span_days > 0.0;
-}
-
-static bool almanac_lunar_fundamental_angles(almanac_t *almanac,
-                                             double jd,
-                                             double *Lp_deg,
-                                             double *D_deg,
-                                             double *M_deg,
-                                             double *Mp_deg,
-                                             double *F_deg)
-{
-    almanac_lunar_fundamentals_segment_t segment;
-    almanac_lunar_fundamentals_t global;
-
-    if (!almanac || !Lp_deg || !D_deg || !M_deg || !Mp_deg || !F_deg) {
-        almanac_set_error(almanac, "invalid lunar angle request");
-        return false;
-    }
-
-    if (almanac_fetch_lunar_fundamentals_segment(almanac, jd, &segment)) {
-        double x = (jd - segment.reference_jd) / segment.span_days;
-
-        *Lp_deg = almanac_poly4_eval(&segment.Lp, x);
-        *D_deg = almanac_poly4_eval(&segment.D, x);
-        *M_deg = almanac_poly4_eval(&segment.M, x);
-        *Mp_deg = almanac_poly4_eval(&segment.Mp, x);
-        *F_deg = almanac_poly4_eval(&segment.F, x);
-        return true;
-    }
-
-    if (!almanac_load_lunar_fundamentals(almanac, &global))
-        return false;
-
-    {
-        double T = (jd - 2451545.0) / 36525.0;
-
-        *Lp_deg = almanac_poly4_eval(&global.Lp, T);
-        *D_deg = almanac_poly4_eval(&global.D, T);
-        *M_deg = almanac_poly4_eval(&global.M, T);
-        *Mp_deg = almanac_poly4_eval(&global.Mp, T);
-        *F_deg = almanac_poly4_eval(&global.F, T);
-    }
-    return true;
-}
-
-static bool almanac_fetch_lunar_correction_segment(almanac_t *almanac,
-                                                   double jd,
-                                                   almanac_lunar_correction_segment_t *out)
-{
-    static const char *sql =
-        "SELECT start_jd, end_jd, reference_jd, span_days, "
-        "       lon_c0_deg, lon_c1_deg, lon_c2_deg, lon_c3_deg, lon_c4_deg, lon_c5_deg, lon_c6_deg, lon_c7_deg, "
-        "       lat_c0_deg, lat_c1_deg, lat_c2_deg, lat_c3_deg, lat_c4_deg, lat_c5_deg, lat_c6_deg, lat_c7_deg, "
-        "       radius_c0_km, radius_c1_km, radius_c2_km, radius_c3_km, radius_c4_km, radius_c5_km, radius_c6_km, radius_c7_km "
-        "FROM almanac_lunar_correction_model "
-        "WHERE body_code = 'MOON' AND start_jd <= ? AND end_jd > ? "
-        "ORDER BY sort_order ASC, model_id ASC "
-        "LIMIT 1";
-    sqlite_stmt_t *stmt = NULL;
-    sqlite_step_result_t rc;
-
-    if (!almanac || !almanac->db || !out) {
-        almanac_set_error(almanac, "invalid lunar correction segment lookup");
-        return false;
-    }
-
-    memset(out, 0, sizeof(*out));
-    stmt = sqlite_stmt_prepare(almanac->db, sql);
-    if (!stmt) {
-        almanac_set_sqlite_error(almanac);
-        return false;
-    }
-    sqlite_stmt_bind_double(stmt, 1, jd);
-    sqlite_stmt_bind_double(stmt, 2, jd);
-    rc = sqlite_stmt_step(stmt);
-    if (rc == SQLITE_STEP_DONE) {
-        sqlite_stmt_finalize(stmt);
-        return false;
-    }
-    if (rc != SQLITE_STEP_ROW) {
-        sqlite_stmt_finalize(stmt);
-        almanac_set_sqlite_error(almanac);
-        return false;
-    }
-
-    out->start_jd = sqlite_stmt_column_double(stmt, 0);
-    out->end_jd = sqlite_stmt_column_double(stmt, 1);
-    out->reference_jd = sqlite_stmt_column_double(stmt, 2);
-    out->span_days = sqlite_stmt_column_double(stmt, 3);
-    out->lon.c0 = sqlite_stmt_column_double(stmt, 4);
-    out->lon.c1 = sqlite_stmt_column_double(stmt, 5);
-    out->lon.c2 = sqlite_stmt_column_double(stmt, 6);
-    out->lon.c3 = sqlite_stmt_column_double(stmt, 7);
-    out->lon.c4 = sqlite_stmt_column_double(stmt, 8);
-    out->lon.c5 = sqlite_stmt_column_double(stmt, 9);
-    out->lon.c6 = sqlite_stmt_column_double(stmt, 10);
-    out->lon.c7 = sqlite_stmt_column_double(stmt, 11);
-    out->lat.c0 = sqlite_stmt_column_double(stmt, 12);
-    out->lat.c1 = sqlite_stmt_column_double(stmt, 13);
-    out->lat.c2 = sqlite_stmt_column_double(stmt, 14);
-    out->lat.c3 = sqlite_stmt_column_double(stmt, 15);
-    out->lat.c4 = sqlite_stmt_column_double(stmt, 16);
-    out->lat.c5 = sqlite_stmt_column_double(stmt, 17);
-    out->lat.c6 = sqlite_stmt_column_double(stmt, 18);
-    out->lat.c7 = sqlite_stmt_column_double(stmt, 19);
-    out->radius.c0 = sqlite_stmt_column_double(stmt, 20);
-    out->radius.c1 = sqlite_stmt_column_double(stmt, 21);
-    out->radius.c2 = sqlite_stmt_column_double(stmt, 22);
-    out->radius.c3 = sqlite_stmt_column_double(stmt, 23);
-    out->radius.c4 = sqlite_stmt_column_double(stmt, 24);
-    out->radius.c5 = sqlite_stmt_column_double(stmt, 25);
-    out->radius.c6 = sqlite_stmt_column_double(stmt, 26);
-    out->radius.c7 = sqlite_stmt_column_double(stmt, 27);
-    sqlite_stmt_finalize(stmt);
-    return out->span_days > 0.0;
 }
 
 static double almanac_gha_aries_for_jd(almanac_t *almanac, double jd)
@@ -1074,32 +775,47 @@ static bool almanac_body_kind_from_text(const char *text, almanac_body_kind_t *o
     return false;
 }
 
-static double almanac_quadratic_eval(double c0, double c1, double c2, double x)
-{
-    return (c2 * x + c1) * x + c0;
-}
-static bool almanac_fetch_orbital_segment(almanac_t *almanac,
-                                          const char *body_code,
-                                          double jd,
-                                          almanac_orbital_segment_t *out)
+static bool almanac_fetch_chebyshev_position_segment(almanac_t *almanac,
+                                                     const char *body_code,
+                                                     double jd,
+                                                     almanac_chebyshev_position_segment_t *out)
 {
     static const char *sql =
-        "SELECT start_jd, end_jd, reference_jd, span_days, "
-        "       Omega_c0, Omega_c1, Omega_c2, "
-        "       i_c0, i_c1, i_c2, "
-        "       varpi_c0, varpi_c1, varpi_c2, "
-        "       a_c0, a_c1, a_c2, "
-        "       e_c0, e_c1, e_c2, "
-        "       L_c0, L_c1, L_c2 "
-        "FROM almanac_orbital_elements_model "
-        "WHERE body_code = ?1 AND start_jd <= ?2 AND end_jd >= ?2 "
-        "ORDER BY start_jd ASC "
-        "LIMIT 1";
+        "SELECT selected.start_jd, selected.end_jd, selected.segment_span_days, "
+        "       selected.degree, selected.segment_index, segment.coefficient_blob "
+        "FROM ( "
+        "    SELECT series_id, start_jd, end_jd, segment_span_days, degree, "
+        "           CASE WHEN ?2 >= end_jd THEN segment_count - 1 "
+        "                ELSE CAST((?2 - start_jd) / segment_span_days AS INTEGER) "
+        "           END AS segment_index "
+        "    FROM almanac_chebyshev_position_series AS series "
+        "    JOIN almanac_body_ref AS body_ref "
+        "      ON body_ref.body_ref_id = series.body_ref_id "
+        "    JOIN almanac_frame AS frame "
+        "      ON frame.frame_id = series.frame_id "
+        "    WHERE body_ref.body_code = ?1 AND frame.frame_code = 'ECLIPJ2000' "
+        "      AND series.start_jd <= ?2 AND series.end_jd >= ?2 "
+        "    ORDER BY series.start_jd ASC "
+        "    LIMIT 1 "
+        ") AS selected "
+        "JOIN almanac_chebyshev_position_segment AS segment "
+        "  ON segment.series_id = selected.series_id "
+        " AND segment.segment_index = selected.segment_index";
     sqlite_stmt_t *stmt = NULL;
     sqlite_step_result_t rc;
+    const unsigned char *blob;
+    size_t blob_size;
+    size_t expected_size;
+    int component;
+    int coeff;
+    int degree;
+    int segment_index;
+    double series_start_jd;
+    double series_end_jd;
+    double segment_span_days;
 
     if (!almanac || !almanac->db || !body_code || !out) {
-        almanac_set_error(almanac, "invalid orbital-elements segment lookup");
+        almanac_set_error(almanac, "invalid Chebyshev position segment lookup");
         return false;
     }
 
@@ -1113,7 +829,7 @@ static bool almanac_fetch_orbital_segment(almanac_t *almanac,
         !sqlite_stmt_bind_double(stmt, 2, jd)) {
         const string_t *stmt_error = sqlite_stmt_last_error(stmt);
 
-        almanac_set_error(almanac, stmt_error ? string_c_str(stmt_error) : "failed to bind orbital-elements lookup");
+        almanac_set_error(almanac, stmt_error ? string_c_str(stmt_error) : "failed to bind Chebyshev lookup");
         sqlite_stmt_finalize(stmt);
         return false;
     }
@@ -1122,41 +838,254 @@ static bool almanac_fetch_orbital_segment(almanac_t *almanac,
     if (rc != SQLITE_STEP_ROW) {
         sqlite_stmt_finalize(stmt);
         if (rc == SQLITE_STEP_DONE)
-            almanac_set_error(almanac, "no orbital-elements segment matched the requested date");
+            almanac_set_error(almanac, "no Chebyshev position segment matched the requested date");
         else
             almanac_set_sqlite_error(almanac);
         return false;
     }
 
-    out->start_jd = sqlite_stmt_column_double(stmt, 0);
-    out->end_jd = sqlite_stmt_column_double(stmt, 1);
-    out->reference_jd = sqlite_stmt_column_double(stmt, 2);
-    out->span_days = sqlite_stmt_column_double(stmt, 3);
-    out->Omega_c0 = sqlite_stmt_column_double(stmt, 4);
-    out->Omega_c1 = sqlite_stmt_column_double(stmt, 5);
-    out->Omega_c2 = sqlite_stmt_column_double(stmt, 6);
-    out->i_c0 = sqlite_stmt_column_double(stmt, 7);
-    out->i_c1 = sqlite_stmt_column_double(stmt, 8);
-    out->i_c2 = sqlite_stmt_column_double(stmt, 9);
-    out->varpi_c0 = sqlite_stmt_column_double(stmt, 10);
-    out->varpi_c1 = sqlite_stmt_column_double(stmt, 11);
-    out->varpi_c2 = sqlite_stmt_column_double(stmt, 12);
-    out->a_c0 = sqlite_stmt_column_double(stmt, 13);
-    out->a_c1 = sqlite_stmt_column_double(stmt, 14);
-    out->a_c2 = sqlite_stmt_column_double(stmt, 15);
-    out->e_c0 = sqlite_stmt_column_double(stmt, 16);
-    out->e_c1 = sqlite_stmt_column_double(stmt, 17);
-    out->e_c2 = sqlite_stmt_column_double(stmt, 18);
-    out->L_c0 = sqlite_stmt_column_double(stmt, 19);
-    out->L_c1 = sqlite_stmt_column_double(stmt, 20);
-    out->L_c2 = sqlite_stmt_column_double(stmt, 21);
-    sqlite_stmt_finalize(stmt);
+    series_start_jd = sqlite_stmt_column_double(stmt, 0);
+    series_end_jd = sqlite_stmt_column_double(stmt, 1);
+    segment_span_days = sqlite_stmt_column_double(stmt, 2);
+    degree = sqlite_stmt_column_int(stmt, 3);
+    segment_index = sqlite_stmt_column_int(stmt, 4);
+    blob = sqlite_stmt_column_blob(stmt, 5);
+    blob_size = sqlite_stmt_column_bytes(stmt, 5);
 
-    if (out->span_days <= 0.0) {
-        almanac_set_error(almanac, "orbital-elements segment has invalid span");
+    if (degree < 1 || degree >= ALMANAC_CHEB_MAX_COEFF_COUNT ||
+        segment_index < 0 || segment_span_days <= 0.0 || !blob) {
+        sqlite_stmt_finalize(stmt);
+        almanac_set_error(almanac, "Chebyshev position segment is malformed");
         return false;
     }
+    out->start_jd = series_start_jd + (double)segment_index * segment_span_days;
+    out->end_jd = out->start_jd + segment_span_days;
+    if (out->end_jd > series_end_jd)
+        out->end_jd = series_end_jd;
+    out->reference_jd = 0.5 * (out->start_jd + out->end_jd);
+    out->radius_days = 0.5 * (out->end_jd - out->start_jd);
+    if (out->radius_days <= 0.0) {
+        sqlite_stmt_finalize(stmt);
+        almanac_set_error(almanac, "Chebyshev position segment has invalid time span");
+        return false;
+    }
+    expected_size = (size_t)ALMANAC_CHEB_COMPONENT_COUNT * (size_t)(degree + 1) * sizeof(double);
+    if (blob_size != expected_size) {
+        sqlite_stmt_finalize(stmt);
+        almanac_set_error(almanac, "Chebyshev position coefficient blob has invalid size");
+        return false;
+    }
+
+    out->degree = degree;
+    for (component = 0; component < ALMANAC_CHEB_COMPONENT_COUNT; ++component) {
+        for (coeff = 0; coeff <= degree; ++coeff) {
+            double value;
+
+            memcpy(&value,
+                   blob + sizeof(double) * ((size_t)component * (size_t)(degree + 1) + (size_t)coeff),
+                   sizeof(value));
+            out->coeff[component][coeff] = value;
+        }
+    }
+    sqlite_stmt_finalize(stmt);
     return true;
+}
+
+static bool almanac_fetch_frame_rotation_segment(almanac_t *almanac,
+                                                 double jd,
+                                                 almanac_frame_rotation_segment_t *out)
+{
+    static const char *sql =
+        "SELECT selected.start_jd, selected.end_jd, selected.segment_span_days, "
+        "       selected.degree, selected.segment_index, segment.coefficient_blob "
+        "FROM ( "
+        "    SELECT series_id, start_jd, end_jd, segment_span_days, degree, "
+        "           CASE WHEN ?1 >= end_jd THEN segment_count - 1 "
+        "                ELSE CAST((?1 - start_jd) / segment_span_days AS INTEGER) "
+        "           END AS segment_index "
+        "    FROM almanac_frame_rotation_series AS series "
+        "    JOIN almanac_frame AS source_frame "
+        "      ON source_frame.frame_id = series.source_frame_id "
+        "    JOIN almanac_frame AS target_frame "
+        "      ON target_frame.frame_id = series.target_frame_id "
+        "    WHERE source_frame.frame_code = 'ECLIPJ2000' "
+        "      AND target_frame.frame_code = 'TRUE_EQUATOR_DATE' "
+        "      AND series.start_jd <= ?1 AND series.end_jd >= ?1 "
+        "    ORDER BY series.start_jd ASC "
+        "    LIMIT 1 "
+        ") AS selected "
+        "JOIN almanac_frame_rotation_segment AS segment "
+        "  ON segment.series_id = selected.series_id "
+        " AND segment.segment_index = selected.segment_index";
+    sqlite_stmt_t *stmt = NULL;
+    sqlite_step_result_t rc;
+    const unsigned char *blob;
+    size_t blob_size;
+    size_t expected_size;
+    int component;
+    int coeff;
+    int degree;
+    int segment_index;
+    double series_start_jd;
+    double series_end_jd;
+    double segment_span_days;
+
+    if (!almanac || !almanac->db || !out) {
+        almanac_set_error(almanac, "invalid frame rotation segment lookup");
+        return false;
+    }
+
+    memset(out, 0, sizeof(*out));
+    stmt = sqlite_stmt_prepare(almanac->db, sql);
+    if (!stmt) {
+        almanac_set_sqlite_error(almanac);
+        return false;
+    }
+    if (!sqlite_stmt_bind_double(stmt, 1, jd)) {
+        const string_t *stmt_error = sqlite_stmt_last_error(stmt);
+
+        almanac_set_error(almanac, stmt_error ? string_c_str(stmt_error) : "failed to bind frame rotation lookup");
+        sqlite_stmt_finalize(stmt);
+        return false;
+    }
+
+    rc = sqlite_stmt_step(stmt);
+    if (rc != SQLITE_STEP_ROW) {
+        sqlite_stmt_finalize(stmt);
+        if (rc == SQLITE_STEP_DONE)
+            almanac_set_error(almanac, "no frame rotation segment matched the requested date");
+        else
+            almanac_set_sqlite_error(almanac);
+        return false;
+    }
+
+    series_start_jd = sqlite_stmt_column_double(stmt, 0);
+    series_end_jd = sqlite_stmt_column_double(stmt, 1);
+    segment_span_days = sqlite_stmt_column_double(stmt, 2);
+    degree = sqlite_stmt_column_int(stmt, 3);
+    segment_index = sqlite_stmt_column_int(stmt, 4);
+    blob = sqlite_stmt_column_blob(stmt, 5);
+    blob_size = sqlite_stmt_column_bytes(stmt, 5);
+
+    if (degree < 1 || degree >= ALMANAC_CHEB_MAX_COEFF_COUNT ||
+        segment_index < 0 || segment_span_days <= 0.0 || !blob) {
+        sqlite_stmt_finalize(stmt);
+        almanac_set_error(almanac, "frame rotation segment is malformed");
+        return false;
+    }
+    out->start_jd = series_start_jd + (double)segment_index * segment_span_days;
+    out->end_jd = out->start_jd + segment_span_days;
+    if (out->end_jd > series_end_jd)
+        out->end_jd = series_end_jd;
+    out->reference_jd = 0.5 * (out->start_jd + out->end_jd);
+    out->radius_days = 0.5 * (out->end_jd - out->start_jd);
+    if (out->radius_days <= 0.0) {
+        sqlite_stmt_finalize(stmt);
+        almanac_set_error(almanac, "frame rotation segment has invalid time span");
+        return false;
+    }
+    expected_size = (size_t)ALMANAC_FRAME_ROTATION_COMPONENT_COUNT * (size_t)(degree + 1) * sizeof(double);
+    if (blob_size != expected_size) {
+        sqlite_stmt_finalize(stmt);
+        almanac_set_error(almanac, "frame rotation coefficient blob has invalid size");
+        return false;
+    }
+
+    out->degree = degree;
+    for (component = 0; component < ALMANAC_FRAME_ROTATION_COMPONENT_COUNT; ++component) {
+        for (coeff = 0; coeff <= degree; ++coeff) {
+            double value;
+
+            memcpy(&value,
+                   blob + sizeof(double) * ((size_t)component * (size_t)(degree + 1) + (size_t)coeff),
+                   sizeof(value));
+            out->coeff[component][coeff] = value;
+        }
+    }
+    sqlite_stmt_finalize(stmt);
+    return true;
+}
+
+static double almanac_chebyshev_eval(const double *coeff, int degree, double x)
+{
+    double b_kplus1 = 0.0;
+    double b_kplus2 = 0.0;
+    double b_k;
+    int i;
+
+    for (i = degree; i >= 1; --i) {
+        b_k = 2.0 * x * b_kplus1 - b_kplus2 + coeff[i];
+        b_kplus2 = b_kplus1;
+        b_kplus1 = b_k;
+    }
+    return x * b_kplus1 - b_kplus2 + coeff[0];
+}
+
+static double almanac_chebyshev_derivative_eval(const double *coeff, int degree, double x)
+{
+    double u_minus2 = 1.0;
+    double value = degree >= 1 ? coeff[1] : 0.0;
+    double u_minus1 = 2.0 * x;
+    int n;
+
+    for (n = 2; n <= degree; ++n) {
+        double u;
+
+        if (n == 2) {
+            u = u_minus1;
+        } else {
+            u = 2.0 * x * u_minus1 - u_minus2;
+            u_minus2 = u_minus1;
+            u_minus1 = u;
+        }
+        value += (double)n * coeff[n] * u;
+    }
+    return value;
+}
+
+static void almanac_eval_chebyshev_position_segment(const almanac_chebyshev_position_segment_t *segment,
+                                                    double jd,
+                                                    cartesian3_t *position_au,
+                                                    cartesian3_t *velocity_au_per_day)
+{
+    double x;
+
+    if (!segment)
+        return;
+    x = (jd - segment->reference_jd) / segment->radius_days;
+    if (position_au) {
+        position_au->x = almanac_chebyshev_eval(segment->coeff[0], segment->degree, x);
+        position_au->y = almanac_chebyshev_eval(segment->coeff[1], segment->degree, x);
+        position_au->z = almanac_chebyshev_eval(segment->coeff[2], segment->degree, x);
+    }
+    if (velocity_au_per_day) {
+        velocity_au_per_day->x =
+            almanac_chebyshev_derivative_eval(segment->coeff[0], segment->degree, x) / segment->radius_days;
+        velocity_au_per_day->y =
+            almanac_chebyshev_derivative_eval(segment->coeff[1], segment->degree, x) / segment->radius_days;
+        velocity_au_per_day->z =
+            almanac_chebyshev_derivative_eval(segment->coeff[2], segment->degree, x) / segment->radius_days;
+    }
+}
+
+static void almanac_eval_frame_rotation_segment(const almanac_frame_rotation_segment_t *segment,
+                                                double jd,
+                                                double matrix[3][3])
+{
+    double x;
+    int row;
+    int column;
+
+    if (!segment || !matrix)
+        return;
+    x = (jd - segment->reference_jd) / segment->radius_days;
+    for (row = 0; row < 3; ++row) {
+        for (column = 0; column < 3; ++column) {
+            int component = row * 3 + column;
+
+            matrix[row][column] = almanac_chebyshev_eval(segment->coeff[component], segment->degree, x);
+        }
+    }
 }
 
 static void almanac_state_fill_equatorial(almanac_state_t *state)
@@ -1174,179 +1103,47 @@ static void almanac_state_fill_equatorial(almanac_state_t *state)
         radians_to_degrees(atan2(state->geocentric_equatorial_au.z, radius_xy));
 }
 
-static bool solve_kepler(double mean_anomaly_radians,
-                         double eccentricity,
-                         double *eccentric_anomaly_radians)
-{
-    double E;
-    int i;
-
-    if (!eccentric_anomaly_radians)
-        return false;
-
-    E = mean_anomaly_radians;
-    for (i = 0; i < 16; i++) {
-        double delta = (E - eccentricity * sin(E) - mean_anomaly_radians) /
-                       (1.0 - eccentricity * cos(E));
-        E -= delta;
-        if (fabs(delta) < 1e-12)
-            break;
-    }
-    *eccentric_anomaly_radians = E;
-    return true;
-}
-
-static bool heliocentric_from_model(const almanac_model_row_t *model,
-                                    double jd,
-                                    cartesian3_t *out)
-{
-    double days;
-    double N;
-    double i;
-    double w;
-    double a;
-    double e;
-    double M;
-    double E;
-    double xv;
-    double yv;
-    double v;
-    double r;
-    double cos_N;
-    double sin_N;
-    double cos_i;
-    double sin_i;
-    double cos_vw;
-    double sin_vw;
-
-    if (!model || !out)
-        return false;
-
-    days = jd - model->orbit_epoch_jd;
-    N = normalize_degrees(model->N0 + model->N_dot * days);
-    i = model->i0 + model->i_dot * days;
-    w = normalize_degrees(model->w0 + model->w_dot * days);
-    a = model->a0 + model->a_dot * days;
-    e = model->e0 + model->e_dot * days;
-    M = normalize_degrees(model->M0 + model->M_dot * days);
-
-    if (!solve_kepler(degrees_to_radians(M), e, &E))
-        return false;
-
-    xv = a * (cos(E) - e);
-    yv = a * (sqrt(1.0 - e * e) * sin(E));
-    v = atan2(yv, xv);
-    r = sqrt(xv * xv + yv * yv);
-
-    cos_N = cos(degrees_to_radians(N));
-    sin_N = sin(degrees_to_radians(N));
-    cos_i = cos(degrees_to_radians(i));
-    sin_i = sin(degrees_to_radians(i));
-    cos_vw = cos(v + degrees_to_radians(w));
-    sin_vw = sin(v + degrees_to_radians(w));
-
-    out->x = r * (cos_N * cos_vw - sin_N * sin_vw * cos_i);
-    out->y = r * (sin_N * cos_vw + cos_N * sin_vw * cos_i);
-    out->z = r * (sin_vw * sin_i);
-    return true;
-}
-
-static bool heliocentric_velocity_from_model(const almanac_model_row_t *model,
+static bool almanac_earth_heliocentric_state(almanac_t *almanac,
                                              double jd,
-                                             cartesian3_t *out_velocity_au_per_day)
+                                             cartesian3_t *position_ecliptic_au,
+                                             cartesian3_t *velocity_ecliptic_au_per_day)
 {
-    const double h = 0.0005;
-    cartesian3_t before;
-    cartesian3_t after;
+    almanac_chebyshev_position_segment_t cheb_segment;
+    cartesian3_t earth_moon_barycenter;
+    cartesian3_t earth_moon_barycenter_velocity;
+    cartesian3_t moon_geocentric;
+    cartesian3_t moon_geocentric_velocity;
+    cartesian3_t moon_offset;
+    cartesian3_t position_storage;
+    bool have_velocity = velocity_ecliptic_au_per_day != NULL;
 
-    if (!model || !out_velocity_au_per_day)
+    if (!almanac || (!position_ecliptic_au && !velocity_ecliptic_au_per_day)) {
+        almanac_set_error(almanac, "invalid Earth-state request");
         return false;
-    if (!heliocentric_from_model(model, jd - h, &before) ||
-        !heliocentric_from_model(model, jd + h, &after))
-        return false;
+    }
+    if (!position_ecliptic_au)
+        position_ecliptic_au = &position_storage;
 
-    out_velocity_au_per_day->x = (after.x - before.x) / (2.0 * h);
-    out_velocity_au_per_day->y = (after.y - before.y) / (2.0 * h);
-    out_velocity_au_per_day->z = (after.z - before.z) / (2.0 * h);
-    return true;
-}
-
-static bool heliocentric_from_orbital_segment(const almanac_orbital_segment_t *segment,
-                                              double jd,
-                                              cartesian3_t *out)
-{
-    double x;
-    double Omega;
-    double i;
-    double varpi;
-    double a;
-    double e;
-    double L;
-    double M;
-    double E;
-    double xv;
-    double yv;
-    double v;
-    double r;
-    double cos_Omega;
-    double sin_Omega;
-    double cos_i;
-    double sin_i;
-    double cos_vw;
-    double sin_vw;
-    double arg_perihelion;
-
-    if (!segment || !out || segment->span_days <= 0.0)
+    if (!almanac_load_correction_model(almanac))
         return false;
 
-    x = (jd - segment->reference_jd) / segment->span_days;
-    Omega = normalize_degrees(almanac_quadratic_eval(segment->Omega_c0, segment->Omega_c1, segment->Omega_c2, x));
-    i = almanac_quadratic_eval(segment->i_c0, segment->i_c1, segment->i_c2, x);
-    varpi = normalize_degrees(almanac_quadratic_eval(segment->varpi_c0, segment->varpi_c1, segment->varpi_c2, x));
-    a = almanac_quadratic_eval(segment->a_c0, segment->a_c1, segment->a_c2, x);
-    e = almanac_quadratic_eval(segment->e_c0, segment->e_c1, segment->e_c2, x);
-    L = normalize_degrees(almanac_quadratic_eval(segment->L_c0, segment->L_c1, segment->L_c2, x));
-    M = normalize_degrees(L - varpi);
-    arg_perihelion = normalize_degrees(varpi - Omega);
-
-    if (!solve_kepler(degrees_to_radians(M), e, &E))
+    if (!almanac_fetch_chebyshev_position_segment(almanac, "EARTH_BARYCENTER", jd, &cheb_segment))
         return false;
-
-    xv = a * (cos(E) - e);
-    yv = a * (sqrt(1.0 - e * e) * sin(E));
-    v = atan2(yv, xv);
-    r = sqrt(xv * xv + yv * yv);
-
-    cos_Omega = cos(degrees_to_radians(Omega));
-    sin_Omega = sin(degrees_to_radians(Omega));
-    cos_i = cos(degrees_to_radians(i));
-    sin_i = sin(degrees_to_radians(i));
-    cos_vw = cos(v + degrees_to_radians(arg_perihelion));
-    sin_vw = sin(v + degrees_to_radians(arg_perihelion));
-
-    out->x = r * (cos_Omega * cos_vw - sin_Omega * sin_vw * cos_i);
-    out->y = r * (sin_Omega * cos_vw + cos_Omega * sin_vw * cos_i);
-    out->z = r * (sin_vw * sin_i);
-    return true;
-}
-
-static bool heliocentric_velocity_from_orbital_segment(const almanac_orbital_segment_t *segment,
-                                                       double jd,
-                                                       cartesian3_t *out_velocity_au_per_day)
-{
-    const double h = 0.0005;
-    cartesian3_t before;
-    cartesian3_t after;
-
-    if (!segment || !out_velocity_au_per_day)
+    almanac_eval_chebyshev_position_segment(&cheb_segment,
+                                            jd,
+                                            &earth_moon_barycenter,
+                                            have_velocity ? &earth_moon_barycenter_velocity : NULL);
+    if (!almanac_lunar_geocentric_ecliptic_vector(almanac, jd, &moon_geocentric))
         return false;
-    if (!heliocentric_from_orbital_segment(segment, jd - h, &before) ||
-        !heliocentric_from_orbital_segment(segment, jd + h, &after))
-        return false;
-
-    out_velocity_au_per_day->x = (after.x - before.x) / (2.0 * h);
-    out_velocity_au_per_day->y = (after.y - before.y) / (2.0 * h);
-    out_velocity_au_per_day->z = (after.z - before.z) / (2.0 * h);
+    moon_offset = cartesian_scale(&moon_geocentric, almanac->moon_earth_system_mass_fraction);
+    *position_ecliptic_au = cartesian_subtract(&earth_moon_barycenter, &moon_offset);
+    if (have_velocity) {
+        if (!almanac_lunar_geocentric_ecliptic_velocity(almanac, jd, &moon_geocentric_velocity))
+            return false;
+        moon_offset = cartesian_scale(&moon_geocentric_velocity, almanac->moon_earth_system_mass_fraction);
+        *velocity_ecliptic_au_per_day =
+            cartesian_subtract(&earth_moon_barycenter_velocity, &moon_offset);
+    }
     return true;
 }
 
@@ -1355,6 +1152,87 @@ static cartesian3_t equatorial_from_ecliptic_vector(const cartesian3_t *ecliptic
                                                     double jd)
 {
     return cartesian_rotate_x(ecliptic, almanac_mean_obliquity_radians(almanac, jd));
+}
+
+static bool almanac_true_equatorial_from_ecliptic(almanac_t *almanac,
+                                                 const cartesian3_t *ecliptic,
+                                                 double jd,
+                                                 cartesian3_t *out_equatorial)
+{
+    almanac_frame_rotation_segment_t rotation_segment;
+    double T;
+    double epsilon_j2000;
+    double epsilon_date;
+    double cos_epsilon;
+    double sin_epsilon;
+    double zeta;
+    double theta;
+    double z;
+    double delta_psi;
+    double delta_epsilon;
+    cartesian3_t equatorial;
+    double x;
+    double y;
+
+    if (!almanac || !ecliptic || !out_equatorial)
+        return false;
+
+    if (almanac_fetch_frame_rotation_segment(almanac, jd, &rotation_segment)) {
+        double matrix[3][3];
+        double in_x = ecliptic->x;
+        double in_y = ecliptic->y;
+        double in_z = ecliptic->z;
+
+        almanac_eval_frame_rotation_segment(&rotation_segment, jd, matrix);
+        out_equatorial->x = matrix[0][0] * in_x
+                          + matrix[0][1] * in_y
+                          + matrix[0][2] * in_z;
+        out_equatorial->y = matrix[1][0] * in_x
+                          + matrix[1][1] * in_y
+                          + matrix[1][2] * in_z;
+        out_equatorial->z = matrix[2][0] * in_x
+                          + matrix[2][1] * in_y
+                          + matrix[2][2] * in_z;
+        return true;
+    }
+    if (almanac->error)
+        string_clear(almanac->error);
+
+    T = (jd - 2451545.0) / 36525.0;
+    epsilon_j2000 = almanac_mean_obliquity_radians(almanac, 2451545.0);
+    epsilon_date = almanac_mean_obliquity_radians(almanac, jd);
+    if (epsilon_j2000 == DBL_MAX || epsilon_date == DBL_MAX)
+        return false;
+
+    equatorial = cartesian_rotate_x(ecliptic, epsilon_j2000);
+
+    zeta = degrees_to_radians(((almanac->precession_zeta_c3_deg * T +
+                                almanac->precession_zeta_c2_deg) * T +
+                               almanac->precession_zeta_c1_deg) * T);
+    theta = degrees_to_radians(((almanac->precession_theta_c3_deg * T +
+                                 almanac->precession_theta_c2_deg) * T +
+                                almanac->precession_theta_c1_deg) * T);
+    z = degrees_to_radians(((almanac->precession_z_c3_deg * T +
+                             almanac->precession_z_c2_deg) * T +
+                            almanac->precession_z_c1_deg) * T);
+
+    equatorial = cartesian_rotate_z(&equatorial, zeta);
+    equatorial = cartesian_rotate_y(&equatorial, -theta);
+    equatorial = cartesian_rotate_z(&equatorial, z);
+
+    if (!almanac_nutation_angles(almanac, jd, &delta_psi, &delta_epsilon))
+        return false;
+
+    cos_epsilon = cos(epsilon_date);
+    sin_epsilon = sin(epsilon_date);
+    x = equatorial.x;
+    y = equatorial.y;
+    equatorial.x = x - y * delta_psi * cos_epsilon - equatorial.z * delta_psi * sin_epsilon;
+    equatorial.y = x * delta_psi * cos_epsilon + y - equatorial.z * delta_epsilon;
+    equatorial.z = x * delta_psi * sin_epsilon + y * delta_epsilon + equatorial.z;
+
+    *out_equatorial = equatorial;
+    return true;
 }
 
 static double almanac_relativistic_light_time_days(const cartesian3_t *earth_heliocentric_au,
@@ -1484,30 +1362,50 @@ static bool almanac_apply_apparent_direction_corrections(almanac_t *almanac,
                                                          double jd,
                                                          almanac_state_t *state)
 {
-    almanac_model_row_t earth;
-    almanac_orbital_segment_t earth_segment;
     cartesian3_t earth_velocity_ecliptic;
     cartesian3_t earth_velocity_equatorial;
     cartesian3_t earth_heliocentric_ecliptic;
     cartesian3_t earth_heliocentric_equatorial;
     cartesian3_t sun_to_body_direction;
     cartesian3_t direction;
+    double distance;
 
     if (!almanac || !model || !state || !state->has_direction_vector)
         return false;
     if (!almanac_load_correction_model(almanac))
         return false;
-    if (!almanac_fetch_model(almanac, "EARTH", &earth))
+    if (!almanac_earth_heliocentric_state(almanac, jd, &earth_heliocentric_ecliptic, &earth_velocity_ecliptic))
         return false;
-    if (strcmp(earth.model_kind, "orbital_elements") == 0) {
-        if (!almanac_fetch_orbital_segment(almanac, "EARTH", jd, &earth_segment) ||
-            !heliocentric_from_orbital_segment(&earth_segment, jd, &earth_heliocentric_ecliptic) ||
-            !heliocentric_velocity_from_orbital_segment(&earth_segment, jd, &earth_velocity_ecliptic))
+
+    if (state->has_ecliptic_vector) {
+        direction = state->geocentric_ecliptic_au;
+        distance = cartesian_length(&direction);
+        if (distance <= 0.0)
             return false;
-    } else {
-        if (!heliocentric_from_model(&earth, jd, &earth_heliocentric_ecliptic) ||
-            !heliocentric_velocity_from_model(&earth, jd, &earth_velocity_ecliptic))
+        if (!cartesian_normalize_in_place(&direction))
             return false;
+
+        if (strcmp(model->body_code, "SUN") != 0) {
+            if (strcmp(model->body_kind, "star") == 0) {
+                sun_to_body_direction = direction;
+            } else {
+                sun_to_body_direction = cartesian_add(&earth_heliocentric_ecliptic,
+                                                      &state->geocentric_ecliptic_au);
+            }
+            if (!almanac_apply_gravitational_deflection(&earth_heliocentric_ecliptic,
+                                                        &direction,
+                                                        &sun_to_body_direction,
+                                                        &direction)) {
+                return false;
+            }
+        }
+        if (!almanac_apply_annual_aberration(&direction, &earth_velocity_ecliptic, &direction))
+            return false;
+        if (!almanac_true_equatorial_from_ecliptic(almanac, &direction, jd, &direction))
+            return false;
+
+        state->geocentric_equatorial_au = cartesian_scale(&direction, distance);
+        return true;
     }
 
     earth_heliocentric_equatorial = equatorial_from_ecliptic_vector(&earth_heliocentric_ecliptic, almanac, jd);
@@ -1540,138 +1438,37 @@ static bool almanac_apply_apparent_direction_corrections(almanac_t *almanac,
     return true;
 }
 
-static double almanac_lunar_eccentricity_factor(double e, int exponent)
+static bool almanac_lunar_geocentric_ecliptic_vector(almanac_t *almanac,
+                                                     double jd,
+                                                     cartesian3_t *out)
 {
-    double factor = 1.0;
-    int i;
+    almanac_chebyshev_position_segment_t cheb_segment;
 
-    for (i = 0; i < exponent; ++i)
-        factor *= e;
-    return factor;
+    if (!out) {
+        almanac_set_error(almanac, "invalid lunar ecliptic vector request");
+        return false;
+    }
+
+    if (!almanac_fetch_chebyshev_position_segment(almanac, "MOON", jd, &cheb_segment))
+        return false;
+    almanac_eval_chebyshev_position_segment(&cheb_segment, jd, out, NULL);
+    return true;
 }
 
-static bool almanac_lunar_geocentric_ecliptic(almanac_t *almanac,
-                                              double jd,
-                                              double *longitude_radians,
-                                              double *latitude_radians,
-                                              double *distance_km)
+static bool almanac_lunar_geocentric_ecliptic_velocity(almanac_t *almanac,
+                                                       double jd,
+                                                       cartesian3_t *out_velocity_au_per_day)
 {
-    static const char *lonrad_sql =
-        "SELECT multiplier_D, multiplier_M, multiplier_Mp, multiplier_F, "
-        "       longitude_coeff_microdeg, radius_coeff_millikm "
-        "FROM almanac_lunar_longitude_radius_term "
-        "ORDER BY sort_order ASC, term_id ASC";
-    static const char *lat_sql =
-        "SELECT multiplier_D, multiplier_M, multiplier_Mp, multiplier_F, latitude_coeff_microdeg "
-        "FROM almanac_lunar_latitude_term "
-        "ORDER BY sort_order ASC, term_id ASC";
-    sqlite_stmt_t *stmt = NULL;
-    sqlite_step_result_t rc;
-    double T;
-    double e;
-    double Lp_deg;
-    double D_deg;
-    double M_deg;
-    double Mp_deg;
-    double F_deg;
-    double Lp;
-    double D;
-    double M;
-    double Mp;
-    double F;
-    double A1;
-    double A2;
-    double A3;
-    double sl = 0.0;
-    double sr = 0.0;
-    double sb = 0.0;
+    almanac_chebyshev_position_segment_t cheb_segment;
 
-    if (!almanac || !longitude_radians || !latitude_radians || !distance_km) {
-        almanac_set_error(almanac, "invalid lunar series request");
-        return false;
-    }
-    if (!almanac_lunar_fundamental_angles(almanac, jd, &Lp_deg, &D_deg, &M_deg, &Mp_deg, &F_deg))
-        return false;
-
-    T = (jd - 2451545.0) / 36525.0;
-    e = 1.0 - 0.002516 * T - 0.0000074 * T * T;
-    Lp = degrees_to_radians(normalize_degrees(Lp_deg));
-    D = degrees_to_radians(normalize_degrees(D_deg));
-    M = degrees_to_radians(normalize_degrees(M_deg));
-    Mp = degrees_to_radians(normalize_degrees(Mp_deg));
-    F = degrees_to_radians(normalize_degrees(F_deg));
-    A1 = degrees_to_radians(normalize_degrees(119.75 + 131.849 * T));
-    A2 = degrees_to_radians(normalize_degrees(53.09 + 479264.29 * T));
-    A3 = degrees_to_radians(normalize_degrees(313.45 + 481266.484 * T));
-
-    stmt = sqlite_stmt_prepare(almanac->db, lonrad_sql);
-    if (!stmt) {
-        almanac_set_sqlite_error(almanac);
-        return false;
-    }
-    while ((rc = sqlite_stmt_step(stmt)) == SQLITE_STEP_ROW) {
-        int multiplier_D = sqlite_stmt_column_int(stmt, 0);
-        int multiplier_M = sqlite_stmt_column_int(stmt, 1);
-        int multiplier_Mp = sqlite_stmt_column_int(stmt, 2);
-        int multiplier_F = sqlite_stmt_column_int(stmt, 3);
-        double lon_coeff = sqlite_stmt_column_double(stmt, 4);
-        double rad_coeff = sqlite_stmt_column_double(stmt, 5);
-        double arg = multiplier_D * D + multiplier_M * M + multiplier_Mp * Mp + multiplier_F * F;
-        double scale = almanac_lunar_eccentricity_factor(e, abs(multiplier_M));
-
-        if (lon_coeff != 0.0)
-            sl += scale * lon_coeff * sin(arg);
-        if (rad_coeff != 0.0)
-            sr += scale * rad_coeff * cos(arg);
-    }
-    sqlite_stmt_finalize(stmt);
-    if (rc != SQLITE_STEP_DONE) {
-        almanac_set_sqlite_error(almanac);
+    if (!out_velocity_au_per_day) {
+        almanac_set_error(almanac, "invalid lunar ecliptic velocity request");
         return false;
     }
 
-    stmt = sqlite_stmt_prepare(almanac->db, lat_sql);
-    if (!stmt) {
-        almanac_set_sqlite_error(almanac);
+    if (!almanac_fetch_chebyshev_position_segment(almanac, "MOON", jd, &cheb_segment))
         return false;
-    }
-    while ((rc = sqlite_stmt_step(stmt)) == SQLITE_STEP_ROW) {
-        int multiplier_D = sqlite_stmt_column_int(stmt, 0);
-        int multiplier_M = sqlite_stmt_column_int(stmt, 1);
-        int multiplier_Mp = sqlite_stmt_column_int(stmt, 2);
-        int multiplier_F = sqlite_stmt_column_int(stmt, 3);
-        double lat_coeff = sqlite_stmt_column_double(stmt, 4);
-        double arg = multiplier_D * D + multiplier_M * M + multiplier_Mp * Mp + multiplier_F * F;
-        double scale = almanac_lunar_eccentricity_factor(e, abs(multiplier_M));
-
-        if (lat_coeff != 0.0)
-            sb += scale * lat_coeff * sin(arg);
-    }
-    sqlite_stmt_finalize(stmt);
-    if (rc != SQLITE_STEP_DONE) {
-        almanac_set_sqlite_error(almanac);
-        return false;
-    }
-
-    sl += 3958.0 * sin(A1) + 1962.0 * sin(Lp - F) + 318.0 * sin(A2);
-    sb += -2235.0 * sin(Lp) + 382.0 * sin(A3) + 175.0 * sin(A1 - F)
-        + 175.0 * sin(A1 + F) + 127.0 * sin(Lp - Mp) - 115.0 * sin(Lp + Mp);
-
-    {
-        almanac_lunar_correction_segment_t correction;
-
-        if (almanac_fetch_lunar_correction_segment(almanac, jd, &correction)) {
-            double x = (jd - correction.reference_jd) / correction.span_days;
-
-            Lp_deg += almanac_poly8_eval(&correction.lon, x);
-            sb += almanac_poly8_eval(&correction.lat, x) * 1.0e6;
-            sr += almanac_poly8_eval(&correction.radius, x) * 1000.0;
-        }
-    }
-
-    *longitude_radians = degrees_to_radians(normalize_degrees(Lp_deg + sl * 1.0e-6));
-    *latitude_radians = degrees_to_radians(sb * 1.0e-6);
-    *distance_km = 385000.56 + sr / 1000.0;
+    almanac_eval_chebyshev_position_segment(&cheb_segment, jd, NULL, out_velocity_au_per_day);
     return true;
 }
 
@@ -1680,39 +1477,34 @@ static bool almanac_equatorial_from_moon(almanac_t *almanac,
                                          double jd,
                                          almanac_state_t *state)
 {
-    double lon;
-    double lat;
-    double distance_km;
-    double cos_lat;
-    double sin_lat;
-    double cos_lon;
-    double sin_lon;
-    double xh;
-    double yh;
-    double zh;
-    double obliquity;
-
-    (void)model;
+    cartesian3_t earth_velocity_ecliptic;
+    double light_time_days = 0.0;
+    int iteration;
 
     if (!almanac || !model || !state)
         return false;
-    if (!almanac_lunar_geocentric_ecliptic(almanac, jd, &lon, &lat, &distance_km))
+    if (!almanac_load_correction_model(almanac))
         return false;
-    cos_lat = cos(lat);
-    sin_lat = sin(lat);
-    cos_lon = cos(lon);
-    sin_lon = sin(lon);
-    xh = distance_km * cos_lat * cos_lon;
-    yh = distance_km * cos_lat * sin_lon;
-    zh = distance_km * sin_lat;
 
-    obliquity = almanac_mean_obliquity_radians(almanac, jd);
-    if (obliquity == DBL_MAX)
+    for (iteration = 0; iteration < 3; ++iteration) {
+        double distance_au;
+
+        if (!almanac_lunar_geocentric_ecliptic_vector(almanac,
+                                                      jd - light_time_days,
+                                                      &state->geocentric_ecliptic_au))
+            return false;
+        distance_au = cartesian_length(&state->geocentric_ecliptic_au);
+        if (distance_au <= 0.0)
+            return false;
+        light_time_days = distance_au / almanac->speed_of_light_au_per_day;
+    }
+    if (!almanac_earth_heliocentric_state(almanac, jd, NULL, &earth_velocity_ecliptic))
         return false;
-    state->geocentric_equatorial_au.x = xh / 149597870.7;
-    state->geocentric_equatorial_au.y = (yh * cos(obliquity) - zh * sin(obliquity)) / 149597870.7;
-    state->geocentric_equatorial_au.z = (yh * sin(obliquity) + zh * cos(obliquity)) / 149597870.7;
+    state->geocentric_ecliptic_au.x -= earth_velocity_ecliptic.x * light_time_days;
+    state->geocentric_ecliptic_au.y -= earth_velocity_ecliptic.y * light_time_days;
+    state->geocentric_ecliptic_au.z -= earth_velocity_ecliptic.z * light_time_days;
     state->has_geocentric_vector = true;
+    state->has_ecliptic_vector = true;
     state->has_direction_vector = true;
     return true;
 }
@@ -1778,25 +1570,21 @@ static bool almanac_equatorial_from_fixed(const almanac_model_row_t *model,
     return true;
 }
 
-static bool almanac_equatorial_from_keplerian(almanac_t *almanac,
+static bool almanac_equatorial_from_chebyshev(almanac_t *almanac,
                                               const almanac_model_row_t *model,
                                               double jd,
                                               almanac_state_t *state)
 {
-    almanac_model_row_t earth;
+    almanac_chebyshev_position_segment_t cheb_segment;
     cartesian3_t body_helio;
     cartesian3_t earth_helio;
     cartesian3_t geocentric;
     double light_time_days = 0.0;
     int iteration;
-    double days;
-    double obliquity;
+
     if (!almanac || !model || !state)
         return false;
-
-    if (!almanac_fetch_model(almanac, "EARTH", &earth))
-        return false;
-    if (!heliocentric_from_model(&earth, jd, &earth_helio))
+    if (!almanac_earth_heliocentric_state(almanac, jd, &earth_helio, NULL))
         return false;
 
     if (strcmp(model->body_code, "SUN") == 0) {
@@ -1805,8 +1593,12 @@ static bool almanac_equatorial_from_keplerian(almanac_t *almanac,
         geocentric.z = -earth_helio.z;
     } else {
         for (iteration = 0; iteration < 3; ++iteration) {
-            if (!heliocentric_from_model(model, jd - light_time_days, &body_helio))
+            if (!almanac_fetch_chebyshev_position_segment(almanac,
+                                                          model->body_code,
+                                                          jd - light_time_days,
+                                                          &cheb_segment))
                 return false;
+            almanac_eval_chebyshev_position_segment(&cheb_segment, jd - light_time_days, &body_helio, NULL);
             geocentric.x = body_helio.x - earth_helio.x;
             geocentric.y = body_helio.y - earth_helio.y;
             geocentric.z = body_helio.z - earth_helio.z;
@@ -1816,66 +1608,15 @@ static bool almanac_equatorial_from_keplerian(almanac_t *almanac,
         }
     }
 
-    days = jd - 2451545.0;
-    (void)days;
-    obliquity = almanac_mean_obliquity_radians(almanac, jd);
-    if (obliquity == DBL_MAX)
+    state->geocentric_ecliptic_au = geocentric;
+    if (!almanac_true_equatorial_from_ecliptic(almanac,
+                                               &state->geocentric_ecliptic_au,
+                                               jd,
+                                               &state->geocentric_equatorial_au)) {
         return false;
-
-    state->geocentric_equatorial_au.x = geocentric.x;
-    state->geocentric_equatorial_au.y = geocentric.y * cos(obliquity) - geocentric.z * sin(obliquity);
-    state->geocentric_equatorial_au.z = geocentric.y * sin(obliquity) + geocentric.z * cos(obliquity);
-    state->has_geocentric_vector = true;
-    state->has_direction_vector = true;
-    return true;
-}
-
-static bool almanac_equatorial_from_orbital_elements(almanac_t *almanac,
-                                                     const almanac_model_row_t *model,
-                                                     double jd,
-                                                     almanac_state_t *state)
-{
-    almanac_orbital_segment_t body_segment;
-    almanac_orbital_segment_t earth_segment;
-    cartesian3_t body_helio;
-    cartesian3_t earth_helio;
-    cartesian3_t geocentric;
-    double light_time_days = 0.0;
-    int iteration;
-    double obliquity;
-
-    if (!almanac || !model || !state)
-        return false;
-    if (!almanac_fetch_orbital_segment(almanac, "EARTH", jd, &earth_segment) ||
-        !heliocentric_from_orbital_segment(&earth_segment, jd, &earth_helio))
-        return false;
-
-    if (strcmp(model->body_code, "SUN") == 0) {
-        geocentric.x = -earth_helio.x;
-        geocentric.y = -earth_helio.y;
-        geocentric.z = -earth_helio.z;
-    } else {
-        for (iteration = 0; iteration < 3; ++iteration) {
-            if (!almanac_fetch_orbital_segment(almanac, model->body_code, jd - light_time_days, &body_segment) ||
-                !heliocentric_from_orbital_segment(&body_segment, jd - light_time_days, &body_helio))
-                return false;
-            geocentric.x = body_helio.x - earth_helio.x;
-            geocentric.y = body_helio.y - earth_helio.y;
-            geocentric.z = body_helio.z - earth_helio.z;
-            if (!almanac_load_correction_model(almanac))
-                return false;
-            light_time_days = almanac_relativistic_light_time_days(&earth_helio, &body_helio, &geocentric);
-        }
     }
-
-    obliquity = almanac_mean_obliquity_radians(almanac, jd);
-    if (obliquity == DBL_MAX)
-        return false;
-
-    state->geocentric_equatorial_au.x = geocentric.x;
-    state->geocentric_equatorial_au.y = geocentric.y * cos(obliquity) - geocentric.z * sin(obliquity);
-    state->geocentric_equatorial_au.z = geocentric.y * sin(obliquity) + geocentric.z * cos(obliquity);
     state->has_geocentric_vector = true;
+    state->has_ecliptic_vector = true;
     state->has_direction_vector = true;
     return true;
 }
@@ -2007,22 +1748,16 @@ static bool almanac_compute_entry(almanac_t *almanac,
             almanac_set_error(almanac, "failed to compute fixed-star position");
             return false;
         }
-    } else if (strcmp(model->model_kind, "orbital_elements") == 0) {
-        if (!almanac_equatorial_from_orbital_elements(almanac, model, ephemeris_jd, &state)) {
+    } else if (strcmp(model->model_kind, "chebyshev_position") == 0) {
+        if (!almanac_equatorial_from_chebyshev(almanac, model, ephemeris_jd, &state)) {
             if (!string_length(almanac->error))
-                almanac_set_error(almanac, "failed to compute orbital-elements position");
+                almanac_set_error(almanac, "failed to compute Chebyshev position");
             return false;
         }
-    } else if (strcmp(model->model_kind, "lunar_keplerian") == 0) {
+    } else if (strcmp(model->model_kind, "lunar_chebyshev") == 0) {
         if (!almanac_equatorial_from_moon(almanac, model, ephemeris_jd, &state)) {
             if (!string_length(almanac->error))
                 almanac_set_error(almanac, "failed to compute lunar position");
-            return false;
-        }
-    } else if (strcmp(model->model_kind, "keplerian") == 0) {
-        if (!almanac_equatorial_from_keplerian(almanac, model, ephemeris_jd, &state)) {
-            if (!string_length(almanac->error))
-                almanac_set_error(almanac, "failed to compute planetary position");
             return false;
         }
     } else {
@@ -2030,7 +1765,8 @@ static bool almanac_compute_entry(almanac_t *almanac,
         return false;
     }
 
-    if (!almanac_apply_apparent_direction_corrections(almanac, model, ephemeris_jd, &state)) {
+    if (!state.apparent_place_complete &&
+        !almanac_apply_apparent_direction_corrections(almanac, model, ephemeris_jd, &state)) {
         if (!string_length(almanac->error))
             almanac_set_error(almanac, "failed to apply apparent-place corrections");
         return false;
@@ -2066,11 +1802,8 @@ static bool almanac_compute_entry(almanac_t *almanac,
 
         if (!almanac_fetch_model(almanac, "SUN", &sun_model))
             return false;
-        if (strcmp(sun_model.model_kind, "keplerian") == 0) {
-            if (!almanac_equatorial_from_keplerian(almanac, &sun_model, ephemeris_jd, &sun_state))
-                return false;
-        } else if (strcmp(sun_model.model_kind, "orbital_elements") == 0) {
-            if (!almanac_equatorial_from_orbital_elements(almanac, &sun_model, ephemeris_jd, &sun_state))
+        if (strcmp(sun_model.model_kind, "chebyshev_position") == 0) {
+            if (!almanac_equatorial_from_chebyshev(almanac, &sun_model, ephemeris_jd, &sun_state))
                 return false;
         }
         if (sun_state.has_geocentric_vector)

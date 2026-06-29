@@ -19,6 +19,10 @@ import threading
 ROOT = Path(__file__).resolve().parents[1]
 ALMANAC_DB_SOURCE_DIR = ROOT / "packaging" / "almanac-db"
 ALMANAC_SQL = ALMANAC_DB_SOURCE_DIR / "mars_almanac.sql"
+ALMANAC_SUPPLEMENTAL_SQL = [
+    ALMANAC_DB_SOURCE_DIR / "mars_almanac_chebyshev.sql",
+    ALMANAC_DB_SOURCE_DIR / "mars_almanac_frame_rotation.sql",
+]
 DB_PATH_ENV = "MARS_ALMANAC_DB_PATH"
 DB_KEY_ENV = "MARS_ALMANAC_DB_KEY"
 SQLCIPHER = os.environ.get("SQLCIPHER", "sqlcipher").strip() or "sqlcipher"
@@ -179,6 +183,9 @@ def build_almanac_database(db_path: Path, db_key: str) -> None:
         "PRAGMA foreign_keys = ON;",
         f".read {ALMANAC_SQL.relative_to(ROOT)}",
     ]
+    for sql_path in ALMANAC_SUPPLEMENTAL_SQL:
+        if sql_path.exists():
+            script_lines.append(f".read {sql_path.relative_to(ROOT)}")
     script_lines.append("")
     script = "\n".join(script_lines)
 

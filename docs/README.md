@@ -16,6 +16,7 @@ This directory contains the longer module documentation for MARS.
 - [`matrix_t`](matrix.md) — generic high-precision matrix with pluggable element types and storage kinds
 - [`equation_t`](equation.md) — parsed equations with symbolic isolation and numeric fallback
 - [`expr_t`](expression.md) — differentiable expression DAGs and symbolic helper APIs
+- [`almanac_t`](almanac.md) — ephemeris-backed SHA/declination lookups and snapshot queries
 - [`datetime_t`](datetime.md) — civil and astronomical date/time utilities
 - [`jurisdiction_t`](jurisdiction.md) — jurisdiction-aware holiday and working-day queries
 - [`timeseries_t`](timeseries.md) — datetime-indexed forecasting and time-series analysis
