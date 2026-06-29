@@ -14,6 +14,7 @@
  * almanac database.
  */
 typedef struct _almanac_t almanac_t;
+typedef struct _jurisdiction_t jurisdiction_t;
 
 /**
  * @brief Catalogued body kind supported by the almanac.
@@ -26,15 +27,88 @@ typedef enum _almanac_body_kind_t {
 } almanac_body_kind_t;
 
 /**
+ * @brief Stable body identifier for supported almanac bodies.
+ */
+typedef enum _almanac_body_id_t {
+    ALMANAC_BODY_ID_UNKNOWN = 0,
+    ALMANAC_BODY_ID_SUN,
+    ALMANAC_BODY_ID_MOON,
+    ALMANAC_BODY_ID_MERCURY,
+    ALMANAC_BODY_ID_VENUS,
+    ALMANAC_BODY_ID_MARS,
+    ALMANAC_BODY_ID_JUPITER,
+    ALMANAC_BODY_ID_SATURN,
+    ALMANAC_BODY_ID_URANUS,
+    ALMANAC_BODY_ID_NEPTUNE,
+    ALMANAC_BODY_ID_ACAMAR,
+    ALMANAC_BODY_ID_ACHERNAR,
+    ALMANAC_BODY_ID_ACRUX,
+    ALMANAC_BODY_ID_ADHARA,
+    ALMANAC_BODY_ID_ALNAIR,
+    ALMANAC_BODY_ID_ALDEBARAN,
+    ALMANAC_BODY_ID_ALIOTH,
+    ALMANAC_BODY_ID_ALKAID,
+    ALMANAC_BODY_ID_ALNILAM,
+    ALMANAC_BODY_ID_ALPHARD,
+    ALMANAC_BODY_ID_ALPHECCA,
+    ALMANAC_BODY_ID_ALPHERATZ,
+    ALMANAC_BODY_ID_ALTAIR,
+    ALMANAC_BODY_ID_ANKAA,
+    ALMANAC_BODY_ID_ANTARES,
+    ALMANAC_BODY_ID_ARCTURUS,
+    ALMANAC_BODY_ID_ATRIA,
+    ALMANAC_BODY_ID_AVIOR,
+    ALMANAC_BODY_ID_BELLATRIX,
+    ALMANAC_BODY_ID_BETELGEUSE,
+    ALMANAC_BODY_ID_CANOPUS,
+    ALMANAC_BODY_ID_CAPELLA,
+    ALMANAC_BODY_ID_DENEB,
+    ALMANAC_BODY_ID_DENEBOLA,
+    ALMANAC_BODY_ID_DIPHDA,
+    ALMANAC_BODY_ID_DUBHE,
+    ALMANAC_BODY_ID_ELNATH,
+    ALMANAC_BODY_ID_ELTANIN,
+    ALMANAC_BODY_ID_ENIF,
+    ALMANAC_BODY_ID_FOMALHAUT,
+    ALMANAC_BODY_ID_GACRUX,
+    ALMANAC_BODY_ID_GIENAH,
+    ALMANAC_BODY_ID_HADAR,
+    ALMANAC_BODY_ID_HAMAL,
+    ALMANAC_BODY_ID_KAUS_AUSTRALIS,
+    ALMANAC_BODY_ID_KOCHAB,
+    ALMANAC_BODY_ID_MARKAB,
+    ALMANAC_BODY_ID_MENKAR,
+    ALMANAC_BODY_ID_MENKENT,
+    ALMANAC_BODY_ID_MIAPLACIDUS,
+    ALMANAC_BODY_ID_MIRFAK,
+    ALMANAC_BODY_ID_NUNKI,
+    ALMANAC_BODY_ID_PEACOCK,
+    ALMANAC_BODY_ID_POLARIS,
+    ALMANAC_BODY_ID_POLLUX,
+    ALMANAC_BODY_ID_PROCYON,
+    ALMANAC_BODY_ID_RASALHAGUE,
+    ALMANAC_BODY_ID_REGULUS,
+    ALMANAC_BODY_ID_RIGEL,
+    ALMANAC_BODY_ID_RIGIL_KENTAURUS,
+    ALMANAC_BODY_ID_SABIK,
+    ALMANAC_BODY_ID_SCHEDAR,
+    ALMANAC_BODY_ID_SHAULA,
+    ALMANAC_BODY_ID_SIRIUS,
+    ALMANAC_BODY_ID_SPICA,
+    ALMANAC_BODY_ID_SUHAIL,
+    ALMANAC_BODY_ID_VEGA,
+    ALMANAC_BODY_ID_ZUBENELGENUBI,
+    ALMANAC_BODY_ID_SIGMA_OCTANTIS,
+    ALMANAC_BODY_ID_COUNT
+} almanac_body_id_t;
+
+/**
  * @brief One computed almanac position.
  *
- * Values of this type are plain value objects. When returned inside an
- * @c array_t from @c almanac_snapshot(), the array owns the storage for the
- * array itself, while each element stores its own fixed-size text fields.
+ * Values of this type are plain value objects.
  */
 typedef struct _almanac_entry_t {
-    char body_code[32];
-    char display_name[96];
+    almanac_body_id_t body_id;
     almanac_body_kind_t body_kind;
     double gha_aries_degrees;
     double sha_degrees;
@@ -45,6 +119,249 @@ typedef struct _almanac_entry_t {
     double phase_angle_degrees;
     double visual_magnitude;
 } almanac_entry_t;
+
+/**
+ * @brief Parse a body code into its stable enum identifier.
+ *
+ * This is intended for user-interface and compatibility boundaries. Runtime
+ * almanac lookups should carry the returned @c almanac_body_id_t.
+ *
+ * @param body_code body code such as @c SUN, @c MOON, or @c SIRIUS.
+ * @return matching body id, or @c ALMANAC_BODY_ID_UNKNOWN.
+ */
+almanac_body_id_t almanac_body_id_from_code(const char *body_code);
+
+/**
+ * @brief Return the canonical body code for an enum identifier.
+ *
+ * @param body_id stable body identifier.
+ * @return borrowed canonical code, or @c NULL when @p body_id is invalid.
+ */
+const char *almanac_body_code(almanac_body_id_t body_id);
+
+/**
+ * @brief Return a display label for an enum identifier.
+ *
+ * @param body_id stable body identifier.
+ * @return borrowed display label, or @c NULL when @p body_id is invalid.
+ */
+const char *almanac_body_display_name(almanac_body_id_t body_id);
+
+/**
+ * @brief One observer location for horizon-style almanac calculations.
+ */
+typedef struct _almanac_observer_t {
+    double latitude_degrees;
+    double longitude_degrees;
+    double elevation_metres;
+} almanac_observer_t;
+
+/**
+ * @brief One set of observer-relative almanac observables.
+ */
+typedef struct _almanac_observables_t {
+    double altitude_degrees;
+    double azimuth_degrees;
+    double semi_diameter_degrees;
+    bool above_horizon;
+    bool visible;
+} almanac_observables_t;
+
+/**
+ * @brief Exact phase event kind for the Moon.
+ */
+typedef enum _almanac_moon_phase_kind_t {
+    ALMANAC_MOON_PHASE_NEW = 0,
+    ALMANAC_MOON_PHASE_FIRST_QUARTER,
+    ALMANAC_MOON_PHASE_FULL,
+    ALMANAC_MOON_PHASE_LAST_QUARTER
+} almanac_moon_phase_kind_t;
+
+/**
+ * @brief Broad phase classification for the Moon and planets.
+ */
+typedef enum _almanac_phase_class_t {
+    ALMANAC_PHASE_UNKNOWN = 0,
+    ALMANAC_PHASE_NEW,
+    ALMANAC_PHASE_CRESCENT,
+    ALMANAC_PHASE_QUARTER,
+    ALMANAC_PHASE_GIBBOUS,
+    ALMANAC_PHASE_FULL
+} almanac_phase_class_t;
+
+/**
+ * @brief One set of phase details derived from an almanac body entry.
+ */
+typedef struct _almanac_phase_details_t {
+    double phase_angle_degrees;
+    double illuminated_fraction;
+    almanac_phase_class_t phase_class;
+} almanac_phase_details_t;
+
+/**
+ * @brief One exact Moon phase event.
+ */
+typedef struct _almanac_moon_phase_event_t {
+    almanac_moon_phase_kind_t kind;
+    double moment_jd;
+    double phase_angle_degrees;
+    double illuminated_fraction;
+} almanac_moon_phase_event_t;
+
+/**
+ * @brief One local civil event time.
+ */
+typedef struct _almanac_event_time_t {
+    bool valid;
+    double jd;
+    short year;
+    month_t month;
+    uint8_t day;
+    uint8_t hour;
+    uint8_t minute;
+    double second;
+} almanac_event_time_t;
+
+/**
+ * @brief Status for an almanac rise/set calculation.
+ */
+typedef enum _almanac_rise_set_status_t {
+    ALMANAC_RISE_SET_OK = 0,
+    ALMANAC_RISE_SET_NOT_ON_DATE,
+    ALMANAC_RISE_SET_NEVER_RISES,
+    ALMANAC_RISE_SET_NEVER_SETS,
+    ALMANAC_RISE_SET_UNAVAILABLE
+} almanac_rise_set_status_t;
+
+/**
+ * @brief One local sunrise or sunset result from the almanac ephemeris.
+ *
+ * The @c jd member is the absolute event Julian date used for the ephemeris;
+ * @c local_time contains the jurisdiction-local civil date and time.
+ */
+typedef struct _almanac_sun_event_t {
+    almanac_rise_set_status_t status;
+    double jd;
+    almanac_event_time_t local_time;
+    double azimuth_degrees;
+} almanac_sun_event_t;
+
+/**
+ * @brief Sunrise and sunset circumstances for one local civil day.
+ */
+typedef struct _almanac_sun_times_t {
+    almanac_sun_event_t sunrise;
+    almanac_sun_event_t sunset;
+} almanac_sun_times_t;
+
+/**
+ * @brief One local moonrise or moonset result from the almanac ephemeris.
+ */
+typedef struct _almanac_moon_event_t {
+    almanac_rise_set_status_t status;
+    double jd;
+    almanac_event_time_t local_time;
+    double azimuth_degrees;
+} almanac_moon_event_t;
+
+/**
+ * @brief Moonrise and moonset circumstances for one local civil day.
+ */
+typedef struct _almanac_moon_times_t {
+    almanac_moon_event_t moonrise;
+    almanac_moon_event_t moonset;
+} almanac_moon_times_t;
+
+/**
+ * @brief Broad solar eclipse classification.
+ */
+typedef enum _almanac_solar_eclipse_kind_t {
+    ALMANAC_SOLAR_ECLIPSE_PARTIAL = 0,
+    ALMANAC_SOLAR_ECLIPSE_ANNULAR,
+    ALMANAC_SOLAR_ECLIPSE_TOTAL
+} almanac_solar_eclipse_kind_t;
+
+/**
+ * @brief One solar eclipse event approximation.
+ */
+typedef struct _almanac_solar_eclipse_t {
+    almanac_solar_eclipse_kind_t kind;
+    almanac_event_time_t first_contact_time;
+    double first_contact_jd;
+    almanac_event_time_t second_contact_time;
+    double second_contact_jd;
+    almanac_event_time_t greatest_eclipse_time;
+    double greatest_eclipse_jd;
+    almanac_event_time_t third_contact_time;
+    double third_contact_jd;
+    almanac_event_time_t fourth_contact_time;
+    double fourth_contact_jd;
+    double separation_degrees;
+    double magnitude;
+    double totality_percent;
+    double sun_semi_diameter_degrees;
+    double moon_semi_diameter_degrees;
+    bool central;
+} almanac_solar_eclipse_t;
+
+/**
+ * @brief Broad lunar eclipse classification.
+ */
+typedef enum _almanac_lunar_eclipse_kind_t {
+    ALMANAC_LUNAR_ECLIPSE_PENUMBRAL = 0,
+    ALMANAC_LUNAR_ECLIPSE_PARTIAL,
+    ALMANAC_LUNAR_ECLIPSE_TOTAL
+} almanac_lunar_eclipse_kind_t;
+
+/**
+ * @brief One lunar eclipse event approximation.
+ */
+typedef struct _almanac_lunar_eclipse_t {
+    almanac_lunar_eclipse_kind_t kind;
+    almanac_event_time_t p1_contact_time;
+    double p1_contact_jd;
+    almanac_event_time_t u1_contact_time;
+    double u1_contact_jd;
+    almanac_event_time_t u2_contact_time;
+    double u2_contact_jd;
+    almanac_event_time_t greatest_eclipse_time;
+    double greatest_eclipse_jd;
+    almanac_event_time_t u3_contact_time;
+    double u3_contact_jd;
+    almanac_event_time_t u4_contact_time;
+    double u4_contact_jd;
+    almanac_event_time_t p4_contact_time;
+    double p4_contact_jd;
+    double opposition_error_degrees;
+    double umbral_magnitude;
+    double penumbral_magnitude;
+    double totality_percent;
+    double umbral_radius_degrees;
+    double penumbral_radius_degrees;
+    double moon_semi_diameter_degrees;
+} almanac_lunar_eclipse_t;
+
+/**
+ * @brief One Mercury or Venus solar transit event approximation.
+ */
+typedef struct _almanac_solar_transit_t {
+    almanac_body_id_t body_id;
+    almanac_event_time_t first_contact_time;
+    double first_contact_jd;
+    almanac_event_time_t second_contact_time;
+    double second_contact_jd;
+    almanac_event_time_t greatest_transit_time;
+    double greatest_transit_jd;
+    almanac_event_time_t third_contact_time;
+    double third_contact_jd;
+    almanac_event_time_t fourth_contact_time;
+    double fourth_contact_jd;
+    double separation_degrees;
+    double solar_semi_diameter_degrees;
+    double planet_semi_diameter_degrees;
+    double chord_distance_fraction;
+    bool interior;
+} almanac_solar_transit_t;
 
 /**
  * @brief Open the configured almanac engine.
@@ -88,9 +405,26 @@ bool almanac_gha_aries(almanac_t *almanac,
                        double *gha_aries_degrees);
 
 /**
- * @brief Compute SHA and declination for one catalogued body.
+ * @brief Compute SHA and declination for one catalogued body by enum id.
  *
  * The returned entry includes the matching GHA Aries for the same moment.
+ *
+ * @param almanac open almanac engine.
+ * @param body_id stable body identifier such as @c ALMANAC_BODY_ID_SUN.
+ * @param moment civil moment to evaluate.
+ * @param out output entry to fill.
+ * @return @c true on success, otherwise @c false.
+ */
+bool almanac_lookup_body(almanac_t *almanac,
+                         almanac_body_id_t body_id,
+                         const datetime_t *moment,
+                         almanac_entry_t *out);
+
+/**
+ * @brief Compute SHA and declination for one catalogued body by legacy code.
+ *
+ * This is a compatibility wrapper over @c almanac_lookup_body(); database and
+ * runtime model lookups are performed with @c almanac_body_id_t.
  *
  * @param almanac open almanac engine.
  * @param body_code body code such as @c SUN, @c MARS, or @c SIRIUS.
@@ -102,6 +436,171 @@ bool almanac_lookup(almanac_t *almanac,
                     const char *body_code,
                     const datetime_t *moment,
                     almanac_entry_t *out);
+
+/**
+ * @brief Derive observer-relative observables from one computed almanac entry.
+ *
+ * This uses the apparent place already resolved into @p body together with the
+ * observer location. The first implementation derives horizon observables from
+ * the geocentric apparent place and geocentric distance already stored in the
+ * entry.
+ *
+ * @param almanac open almanac engine, used for error reporting.
+ * @param body computed almanac entry for the body of interest.
+ * @param observer observer location in degrees/metres.
+ * @param out output observables to fill.
+ * @return @c true on success, otherwise @c false.
+ */
+bool almanac_observables(almanac_t *almanac,
+                         const almanac_entry_t *body,
+                         const almanac_observer_t *observer,
+                         almanac_observables_t *out);
+
+/**
+ * @brief Find accurate local sunrise and sunset for one observer and day.
+ *
+ * This uses the almanac Sun ephemeris, topocentric observer position,
+ * standard apparent-horizon refraction, solar semi-diameter, and observer
+ * elevation. The supplied jurisdiction is used only to convert the absolute
+ * event instants to local civil date/time, including daylight-saving rules.
+ *
+ * @param almanac open almanac engine.
+ * @param jurisdiction open jurisdiction engine for local civil time.
+ * @param date local civil date to evaluate; the time component is ignored.
+ * @param observer observer latitude, longitude, and elevation.
+ * @param out output sunrise and sunset circumstances.
+ * @return @c true when the day was evaluated, otherwise @c false.
+ */
+bool almanac_sunrise_sunset(almanac_t *almanac,
+                            jurisdiction_t *jurisdiction,
+                            const datetime_t *date,
+                            const almanac_observer_t *observer,
+                            almanac_sun_times_t *out);
+
+/**
+ * @brief Find accurate local moonrise and moonset for one observer and day.
+ *
+ * This uses the almanac Moon ephemeris, topocentric observer position,
+ * standard apparent-horizon refraction, lunar semi-diameter, and observer
+ * elevation. The supplied jurisdiction is used only to convert the absolute
+ * event instants to local civil date/time, including daylight-saving rules.
+ *
+ * @param almanac open almanac engine.
+ * @param jurisdiction open jurisdiction engine for local civil time.
+ * @param date local civil date to evaluate; the time component is ignored.
+ * @param observer observer latitude, longitude, and elevation.
+ * @param out output moonrise and moonset circumstances.
+ * @return @c true when the day was evaluated, otherwise @c false.
+ */
+bool almanac_moonrise_moonset(almanac_t *almanac,
+                              jurisdiction_t *jurisdiction,
+                              const datetime_t *date,
+                              const almanac_observer_t *observer,
+                              almanac_moon_times_t *out);
+
+/**
+ * @brief Derive illuminated fraction and phase classification for a body entry.
+ *
+ * @param body computed almanac entry for the body of interest.
+ * @param out output phase details to fill.
+ * @return @c true on success, otherwise @c false.
+ */
+bool almanac_phase_details(const almanac_entry_t *body,
+                           almanac_phase_details_t *out);
+
+/**
+ * @brief Find the next exact Moon phase after a civil moment.
+ *
+ * The returned event moment is recorded as a local civil Julian Day.
+ *
+ * @param almanac open almanac engine.
+ * @param after starting moment after which to search.
+ * @param kind exact phase kind to search for.
+ * @param out output event to fill.
+ * @return @c true on success, otherwise @c false.
+ */
+bool almanac_next_moon_phase_exact(almanac_t *almanac,
+                                   const datetime_t *after,
+                                   almanac_moon_phase_kind_t kind,
+                                   almanac_moon_phase_event_t *out);
+
+/**
+ * @brief Find solar eclipses within a civil time window.
+ *
+ * The returned array contains @c almanac_solar_eclipse_t values sorted by
+ * event time. Destroy it with @c array_destroy() when finished.
+ *
+ * @param almanac open almanac engine.
+ * @param observer observer location for local eclipse circumstances.
+ * @param start inclusive window start.
+ * @param end inclusive window end.
+ * @return newly allocated array of @c almanac_solar_eclipse_t values, or
+ *         @c NULL on failure.
+ */
+array_t *almanac_find_solar_eclipses(almanac_t *almanac,
+                                     const almanac_observer_t *observer,
+                                     const datetime_t *start,
+                                     const datetime_t *end);
+
+/**
+ * @brief Find lunar eclipses within a civil time window.
+ *
+ * The returned array contains @c almanac_lunar_eclipse_t values sorted by
+ * event time. Destroy it with @c array_destroy() when finished.
+ *
+ * @param almanac open almanac engine.
+ * @param observer observer location for local eclipse visibility.
+ * @param start inclusive window start.
+ * @param end inclusive window end.
+ * @return newly allocated array of @c almanac_lunar_eclipse_t values, or
+ *         @c NULL on failure.
+ */
+array_t *almanac_find_lunar_eclipses(almanac_t *almanac,
+                                     const almanac_observer_t *observer,
+                                     const datetime_t *start,
+                                     const datetime_t *end);
+
+/**
+ * @brief Find Mercury or Venus transits of the Sun by enum id.
+ *
+ * The returned array contains @c almanac_solar_transit_t values sorted by
+ * event time. Destroy it with @c array_destroy() when finished.
+ *
+ * @param almanac open almanac engine.
+ * @param body_id target planet id, currently expected to be
+ *                @c ALMANAC_BODY_ID_MERCURY or @c ALMANAC_BODY_ID_VENUS.
+ * @param observer observer location for local transit circumstances.
+ * @param start inclusive window start.
+ * @param end inclusive window end.
+ * @return newly allocated array of @c almanac_solar_transit_t values, or
+ *         @c NULL on failure.
+ */
+array_t *almanac_find_solar_transits_for_body(almanac_t *almanac,
+                                              almanac_body_id_t body_id,
+                                              const almanac_observer_t *observer,
+                                              const datetime_t *start,
+                                              const datetime_t *end);
+
+/**
+ * @brief Find Mercury or Venus transits of the Sun by legacy body code.
+ *
+ * This is a compatibility wrapper over
+ * @c almanac_find_solar_transits_for_body().
+ *
+ * @param almanac open almanac engine.
+ * @param body_code target planet code, currently expected to be @c MERCURY or
+ *                  @c VENUS.
+ * @param observer observer location for local transit circumstances.
+ * @param start inclusive window start.
+ * @param end inclusive window end.
+ * @return newly allocated array of @c almanac_solar_transit_t values, or
+ *         @c NULL on failure.
+ */
+array_t *almanac_find_solar_transits(almanac_t *almanac,
+                                     const char *body_code,
+                                     const almanac_observer_t *observer,
+                                     const datetime_t *start,
+                                     const datetime_t *end);
 
 /**
  * @brief Compute SHA and declination for every enabled catalogued body.

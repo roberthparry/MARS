@@ -240,6 +240,16 @@ HOLIDAY_JURISDICTION_OPTIONS_HTML = "\n".join(
     )
     for code, name in HOLIDAY_JURISDICTION_OPTIONS
 )
+ALMANAC_BODY_OPTIONS = (
+    ("MOON", "Moon"),
+    ("SUN", "Sun"),
+    ("VENUS", "Venus"),
+    ("MARS", "Mars"),
+    ("JUPITER", "Jupiter"),
+    ("SATURN", "Saturn"),
+    ("SIRIUS", "Sirius"),
+    ("POLARIS", "Polaris"),
+)
 
 
 def infer_holiday_jurisdiction(latitude: float, longitude: float) -> str:
@@ -289,6 +299,7 @@ DEFAULT_MATRIX_BIN = ROOT / "build" / "release" / "scratch" / "matrix_lab"
 DEFAULT_INTEGRATOR_BIN = ROOT / "build" / "release" / "scratch" / "integrator_lab"
 DEFAULT_EQUATION_BIN = ROOT / "build" / "release" / "scratch" / "equation_lab"
 DEFAULT_DATETIME_BIN = ROOT / "build" / "release" / "scratch" / "datetime_lab"
+DEFAULT_ALMANAC_BIN = ROOT / "build" / "release" / "scratch" / "almanac_lab"
 DEFAULT_HOLIDAY_BIN = ROOT / "build" / "release" / "scratch" / "holiday_lab"
 STATE_FILE = ROOT / os.environ.get("MARS_LAB_STATE_FILE", ".mars_lab_state.json")
 LAB_ICON_FILE = ROOT / "packaging" / "linux" / "mars-lab.svg"
@@ -308,7 +319,23 @@ DEFAULT_DATETIME_DATE = py_datetime.date.today().isoformat()
 DEFAULT_DATETIME_TEXT = "Calendar and solar calculations, with optional holiday lookup"
 DEFAULT_DATETIME_LATITUDE = DEFAULT_TIMEZONE_LATITUDE
 DEFAULT_DATETIME_LONGITUDE = DEFAULT_TIMEZONE_LONGITUDE
+DEFAULT_DATETIME_ELEVATION = "0"
 DEFAULT_DATETIME_GMT_OFFSET = ""
+DEFAULT_ALMANAC_TEXT = "Navigation almanac worksheet"
+DEFAULT_ALMANAC_DATE = DEFAULT_DATETIME_DATE
+DEFAULT_ALMANAC_TIME = py_datetime.datetime.now(py_datetime.timezone.utc).strftime("%H:%M:%S")
+DEFAULT_ALMANAC_ZONE = "0"
+DEFAULT_ALMANAC_LATITUDE = DEFAULT_TIMEZONE_LATITUDE
+DEFAULT_ALMANAC_LONGITUDE = DEFAULT_TIMEZONE_LONGITUDE
+DEFAULT_ALMANAC_BODY = "MOON"
+ALMANAC_BODY_OPTIONS_HTML = "\n".join(
+    (
+        f'          <option value="{html.escape(code)}" selected>{html.escape(name)}</option>'
+        if code == DEFAULT_ALMANAC_BODY
+        else f'          <option value="{html.escape(code)}">{html.escape(name)}</option>'
+    )
+    for code, name in ALMANAC_BODY_OPTIONS
+)
 MIN_INTEGRATOR_INTERVAL_CAP = 500
 MAX_INTEGRATOR_INTERVAL_CAP = 100000
 INTEGRATOR_INTERVAL_CAP_CHOICES = (500, 5000, 20000, 50000, 100000)
@@ -898,11 +925,13 @@ INDEX_HTML = r"""<!doctype html>
       font: 1.05rem/1.5 "Cascadia Code", "Fira Code", "DejaVu Sans Mono", monospace;
     }
 
-    body.datetime-mode #expr {
+    body.datetime-mode #expr,
+    body.almanac-mode #expr {
       display: none;
     }
 
-    body.datetime-mode #resultPane .zoom-action {
+    body.datetime-mode #resultPane .zoom-action,
+    body.almanac-mode #resultPane .zoom-action {
       display: none;
     }
 
@@ -1032,6 +1061,86 @@ INDEX_HTML = r"""<!doctype html>
       color: rgba(233, 244, 239, 0.78);
       font-size: 0.85rem;
       line-height: 1.45;
+    }
+
+    .almanac-sheet {
+      display: grid;
+      gap: 0.9rem;
+      color: #f3ead1;
+      font: 0.84rem/1.4 "Cascadia Code", "DejaVu Sans Mono", monospace;
+    }
+
+    .almanac-sheet-header {
+      display: grid;
+      gap: 0.18rem;
+      padding: 0.95rem 1rem;
+      border: 1px solid rgba(236, 195, 106, 0.26);
+      border-radius: 18px;
+      background:
+        linear-gradient(180deg, rgba(76, 50, 21, 0.44), rgba(18, 36, 27, 0.34));
+      box-shadow: inset 0 1px 0 rgba(255, 239, 190, 0.09);
+    }
+
+    .almanac-sheet-title {
+      color: #f0c873;
+      font: 700 0.8rem/1.2 "Cascadia Code", "DejaVu Sans Mono", monospace;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .almanac-sheet-note {
+      color: rgba(233, 244, 239, 0.76);
+      font-size: 0.8rem;
+    }
+
+    .almanac-grid-table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border: 1px solid rgba(233, 244, 239, 0.14);
+      border-radius: 18px;
+      background: rgba(8, 24, 19, 0.46);
+    }
+
+    .almanac-grid-table th,
+    .almanac-grid-table td {
+      padding: 0.62rem 0.7rem;
+      border-bottom: 1px solid rgba(233, 244, 239, 0.08);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .almanac-grid-table thead th {
+      color: #efc36a;
+      font-size: 0.72rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      background: rgba(36, 61, 40, 0.52);
+    }
+
+    .almanac-grid-table tbody tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .almanac-grid-table tbody tr.selected {
+      background: rgba(231, 177, 80, 0.11);
+    }
+
+    .almanac-grid-table tbody tr.reference {
+      background: rgba(120, 179, 160, 0.08);
+    }
+
+    .almanac-grid-table td.body-name {
+      color: #f4ecda;
+      font-weight: 700;
+    }
+
+    .almanac-grid-table td.reference-name {
+      color: #cde3d5;
+    }
+
+    .almanac-grid-table td.number {
+      white-space: nowrap;
     }
 
     .integrator-bound-field {
@@ -2584,6 +2693,7 @@ __THEME_OVERRIDES__
         <button class="mode-tab" id="modeTabMatrix" type="button" role="tab" aria-selected="false" aria-controls="workspacePanel" data-mode="matrix">Matrix</button>
         <button class="mode-tab" id="modeTabIntegrator" type="button" role="tab" aria-selected="false" aria-controls="workspacePanel" data-mode="integrator">Integrator</button>
         <button class="mode-tab" id="modeTabDatetime" type="button" role="tab" aria-selected="false" aria-controls="workspacePanel" data-mode="datetime">Datetime</button>
+        <button class="mode-tab" id="modeTabAlmanac" type="button" role="tab" aria-selected="false" aria-controls="workspacePanel" data-mode="almanac">Almanac</button>
       </div>
       <div class="precision-toolbar" aria-label="Precision controls">
         <span class="precision-label">Precision</span>
@@ -2705,6 +2815,10 @@ __HOLIDAY_JURISDICTION_OPTIONS__
                 <input id="datetimeLongitude" inputmode="decimal" placeholder="-0.1278">
               </div>
               <div class="integrator-bound-field">
+                <label for="datetimeElevation">Elevation metres</label>
+                <input id="datetimeElevation" inputmode="decimal" placeholder="0">
+              </div>
+              <div class="integrator-bound-field">
                 <label for="datetimeGmtOffset">GMT offset, including daylight saving</label>
                 <input id="datetimeGmtOffset" inputmode="decimal" placeholder="blank for jurisdiction local, 1 for BST">
               </div>
@@ -2729,6 +2843,57 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             <button id="marsDatePickerClose" type="button">Close</button>
           </div>
         </div>
+      </div>
+      <div class="mode-panel hidden almanac-controls" id="almanacControls">
+        <div class="almanac-briefing" aria-hidden="true">
+          <div>
+            <div class="datetime-briefing-kicker">AstroNav worksheet</div>
+            <div class="datetime-briefing-title">Location of Navigational Bodies</div>
+            <div class="datetime-briefing-copy">Enter date and time in GMT, then zone, latitude, and longitude. The worksheet starts out in the voice of AstroNav 2000-2040 and uses the live almanac engine underneath.</div>
+          </div>
+        </div>
+        <div class="datetime-field-groups">
+          <div class="datetime-field-group">
+            <div class="datetime-field-group-title">Set the moment</div>
+            <div class="datetime-grid">
+              <div class="integrator-bound-field">
+                <label for="almanacDate">Date</label>
+                <div class="mars-date-shell">
+                  <input id="almanacDate" type="text" inputmode="numeric" placeholder="YYYY-MM-DD" autocomplete="off">
+                  <button class="mars-date-button" type="button" data-date-target="almanacDate" aria-label="Open date picker for almanac date"></button>
+                </div>
+              </div>
+              <div class="integrator-bound-field">
+                <label for="almanacTime">GMT time</label>
+                <input id="almanacTime" type="text" inputmode="decimal" placeholder="17:47:05.8">
+              </div>
+              <div class="integrator-bound-field">
+                <label for="almanacZone">Zone</label>
+                <input id="almanacZone" inputmode="decimal" placeholder="0">
+              </div>
+            </div>
+          </div>
+          <div class="datetime-field-group">
+            <div class="datetime-field-group-title">Observer</div>
+            <div class="datetime-grid">
+              <div class="integrator-bound-field">
+                <label for="almanacLatitude">Latitude</label>
+                <input id="almanacLatitude" inputmode="decimal" placeholder="51.5074">
+              </div>
+              <div class="integrator-bound-field">
+                <label for="almanacLongitude">Longitude</label>
+                <input id="almanacLongitude" inputmode="decimal" placeholder="-0.1278">
+              </div>
+              <div class="integrator-bound-field">
+                <label for="almanacBody">Body</label>
+                <select id="almanacBody">
+__ALMANAC_BODY_OPTIONS__
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="mode-hint">For 2000-2040 GMT, the workbook intention is navigation-grade output within 6 arc-seconds after rounding to the nearest arc-second for the listed navigation bodies.</p>
       </div>
       <div class="target-row hidden" id="targetRow">
         <label for="goalTarget">Target</label>
@@ -2830,7 +2995,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           <div class="help-kicker">Datetime Workflow</div>
           <p>Use the calendar controls for the main date, date range, observance year, and location.</p>
           <ul>
-            <li><code>Date</code> drives weekday, moon phase, sunrise, sunset, solar declination, inclination, and maximum altitude.</li>
+            <li><code>Date</code> drives weekday, moon phase, estimated and almanac-backed actual sunrise/sunset, solar declination, inclination, and maximum altitude.</li>
             <li><code>Start date</code> and <code>End date</code> drive the days-between result.</li>
             <li><code>Year</code> drives Christian, Chinese, Hindu, Buddhist, Muslim, Jewish, Cherokee, Mayan, Aztec, and Ethiopian calendar views.</li>
             <li><code>Holiday country or jurisdiction</code> is only used when you want the optional local holiday panel.</li>
@@ -3008,9 +3173,17 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     const datetimeJurisdiction = document.getElementById('datetimeJurisdiction');
     const datetimeLatitude = document.getElementById('datetimeLatitude');
     const datetimeLongitude = document.getElementById('datetimeLongitude');
+    const datetimeElevation = document.getElementById('datetimeElevation');
     const datetimeGmtOffset = document.getElementById('datetimeGmtOffset');
     const datetimeLocal = document.getElementById('datetimeLocal');
     const datetimeLocalBody = document.getElementById('datetimeLocalBody');
+    const almanacControls = document.getElementById('almanacControls');
+    const almanacDate = document.getElementById('almanacDate');
+    const almanacTime = document.getElementById('almanacTime');
+    const almanacZone = document.getElementById('almanacZone');
+    const almanacLatitude = document.getElementById('almanacLatitude');
+    const almanacLongitude = document.getElementById('almanacLongitude');
+    const almanacBody = document.getElementById('almanacBody');
     const marsDatePicker = document.getElementById('marsDatePicker');
     const marsDatePickerTitle = document.getElementById('marsDatePickerTitle');
     const marsDatePickerWeekdays = document.getElementById('marsDatePickerWeekdays');
@@ -3045,8 +3218,10 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       searchPlaceholder: 'Search jurisdictions',
       emptyText: 'No matching jurisdiction'
     });
+    enhanceRoundedSelect(almanacBody);
     let datetimeLocalRefreshSequence = 0;
     let datetimeEvaluationSequence = 0;
+    let almanacEvaluationSequence = 0;
     const statusEl = document.getElementById('status');
     const inputCopy = document.getElementById('inputCopy');
     const rightPaneTitle = document.getElementById('rightPaneTitle');
@@ -3084,7 +3259,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         equation: [],
         matrix: [],
         integrator: [],
-        datetime: []
+        datetime: [],
+        almanac: []
       };
     }
 
@@ -3095,7 +3271,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       equation: null,
       matrix: null,
       integrator: null,
-      datetime: null
+      datetime: null,
+      almanac: null
     };
     let workingPrecisionBits = 256;
     let fullExpressionText = '';
@@ -3115,14 +3292,16 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       equation: 256,
       matrix: 256,
       integrator: DOUBLE_PRECISION_BITS,
-      datetime: DOUBLE_PRECISION_BITS
+      datetime: DOUBLE_PRECISION_BITS,
+      almanac: DOUBLE_PRECISION_BITS
     };
     const modePrecisionBits = {
       expression: MODE_DEFAULT_PRECISION_BITS.expression,
       equation: MODE_DEFAULT_PRECISION_BITS.equation,
       matrix: MODE_DEFAULT_PRECISION_BITS.matrix,
       integrator: MODE_DEFAULT_PRECISION_BITS.integrator,
-      datetime: MODE_DEFAULT_PRECISION_BITS.datetime
+      datetime: MODE_DEFAULT_PRECISION_BITS.datetime,
+      almanac: MODE_DEFAULT_PRECISION_BITS.almanac
     };
     const START_FORBIDDEN_PATTERN = /[=,;|{}]/;
     const COMPACT_BINDING_VALUE_LIMIT = 20;
@@ -3139,7 +3318,15 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     const DEFAULT_DATETIME_JURISDICTION = __DEFAULT_DATETIME_JURISDICTION__;
     const DEFAULT_DATETIME_LATITUDE = __DEFAULT_DATETIME_LATITUDE__;
     const DEFAULT_DATETIME_LONGITUDE = __DEFAULT_DATETIME_LONGITUDE__;
+    const DEFAULT_DATETIME_ELEVATION = __DEFAULT_DATETIME_ELEVATION__;
     const DEFAULT_DATETIME_GMT_OFFSET = __DEFAULT_DATETIME_GMT_OFFSET__;
+    const DEFAULT_ALMANAC_TEXT = __DEFAULT_ALMANAC_TEXT__;
+    const DEFAULT_ALMANAC_DATE = __DEFAULT_ALMANAC_DATE__;
+    const DEFAULT_ALMANAC_TIME = __DEFAULT_ALMANAC_TIME__;
+    const DEFAULT_ALMANAC_ZONE = __DEFAULT_ALMANAC_ZONE__;
+    const DEFAULT_ALMANAC_LATITUDE = __DEFAULT_ALMANAC_LATITUDE__;
+    const DEFAULT_ALMANAC_LONGITUDE = __DEFAULT_ALMANAC_LONGITUDE__;
+    const DEFAULT_ALMANAC_BODY = __DEFAULT_ALMANAC_BODY__;
     if (datetimeJurisdiction && !datetimeJurisdiction.value)
       datetimeJurisdiction.value = DEFAULT_DATETIME_JURISDICTION;
     let datetimeAutoGmtOffset = String(datetimeGmtOffset && datetimeGmtOffset.value || DEFAULT_DATETIME_GMT_OFFSET);
@@ -3152,14 +3339,16 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       equation: DEFAULT_EQUATION_TEXT,
       matrix: DEFAULT_MATRIX_TEXT,
       integrator: DEFAULT_INTEGRATOR_TEXT,
-      datetime: DEFAULT_DATETIME_TEXT
+      datetime: DEFAULT_DATETIME_TEXT,
+      almanac: DEFAULT_ALMANAC_TEXT
     };
     const modeResultState = {
       expression: null,
       equation: null,
       matrix: null,
       integrator: null,
-      datetime: null
+      datetime: null,
+      almanac: null
     };
 
     marsDateButtons.forEach((button) => {
@@ -3247,7 +3436,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     }
 
     function setMode(mode, options = {}) {
-      const nextMode = mode === 'equation' || mode === 'matrix' || mode === 'integrator' || mode === 'datetime'
+      const nextMode = mode === 'equation' || mode === 'matrix' || mode === 'integrator' || mode === 'datetime' || mode === 'almanac'
         ? mode
         : 'expression';
       const changed = nextMode !== currentLabMode;
@@ -3274,9 +3463,12 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       } else if (mode === 'integrator') {
         modeEditorText.integrator = currentExpressionText() || expr.value.trim() || modeEditorText.integrator;
         saveLastIntegratorState();
-      } else {
+      } else if (mode === 'datetime') {
         modeEditorText.datetime = DEFAULT_DATETIME_TEXT;
         saveLastDatetimeState();
+      } else {
+        modeEditorText.almanac = DEFAULT_ALMANAC_TEXT;
+        saveLastAlmanacState();
       }
     }
 
@@ -3297,6 +3489,12 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       } else {
         if (mode === 'datetime') {
           expr.value = DEFAULT_DATETIME_TEXT;
+          clearExpressionSource();
+          clearVariableValues();
+          return;
+        }
+        if (mode === 'almanac') {
+          expr.value = DEFAULT_ALMANAC_TEXT;
           clearExpressionSource();
           clearVariableValues();
           return;
@@ -3437,12 +3635,15 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       const matrixMode = mode === 'matrix';
       const integratorMode = mode === 'integrator';
       const datetimeMode = mode === 'datetime';
+      const almanacMode = mode === 'almanac';
 
       document.body.classList.toggle('datetime-mode', datetimeMode);
+      document.body.classList.toggle('almanac-mode', almanacMode);
       matrixControls.classList.toggle('hidden', !matrixMode);
       equationControls.classList.toggle('hidden', !equationMode);
       integratorControls.classList.toggle('hidden', !integratorMode);
       datetimeControls.classList.toggle('hidden', !datetimeMode);
+      almanacControls.classList.toggle('hidden', !almanacMode);
       if (datetimeLocal)
         datetimeLocal.classList.toggle('hidden', !datetimeMode || !String(datetimeLocalBody?.textContent || '').trim());
       targetRow.classList.toggle('hidden', !expressionMode || targetRow.classList.contains('hidden'));
@@ -3468,6 +3669,11 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         leftPaneTitle.textContent = 'Integrator';
         subtitle.textContent = 'Enter an integrand expression on the left, stack one or more integral rows, and use Free when a symbol should stay as a parameter. Leave both bounds blank for an antiderivative, or leave lower blank and fill upper to evaluate it there.';
         setResultTitles('Rendered TeX', 'Integrand', 'Exact result', 'Integral');
+        setValueCardVisible(true);
+      } else if (almanacMode) {
+        leftPaneTitle.textContent = 'Almanac';
+        subtitle.textContent = 'Enter date and time in GMT, then zone, latitude, and longitude. This starts out like AstroNav 2000-2040 while using the live almanac engine underneath.';
+        setResultTitles('Worksheet', 'Selected Body', 'All Bodies', 'Notes');
         setValueCardVisible(true);
       } else {
         leftPaneTitle.textContent = 'Datetime';
@@ -3505,6 +3711,10 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           if (currentMode() === 'datetime')
             saveLastDatetimeState();
         });
+      }
+      if (currentMode() === 'almanac') {
+        restoreAlmanacDefaultsIfBlank();
+        saveLastAlmanacState();
       }
       syncModeUI();
       if (currentMode() === 'integrator' && currentIntegratorBoundRows().length === 0)
@@ -4846,6 +5056,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         datetimeLatitude.value = DEFAULT_DATETIME_LATITUDE;
       if (datetimeLongitude && !datetimeLongitude.value)
         datetimeLongitude.value = DEFAULT_DATETIME_LONGITUDE;
+      if (datetimeElevation && !datetimeElevation.value)
+        datetimeElevation.value = DEFAULT_DATETIME_ELEVATION;
     }
 
     function currentDatetimeState() {
@@ -4863,8 +5075,56 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         jurisdiction: validDatetimeJurisdiction(datetimeJurisdiction && datetimeJurisdiction.value),
         latitude: String(datetimeLatitude && datetimeLatitude.value || DEFAULT_DATETIME_LATITUDE).trim(),
         longitude: String(datetimeLongitude && datetimeLongitude.value || DEFAULT_DATETIME_LONGITUDE).trim(),
+        elevation: String(datetimeElevation && datetimeElevation.value || DEFAULT_DATETIME_ELEVATION).trim(),
         gmt_offset: effectiveOffsetText
       };
+    }
+
+    function restoreAlmanacDefaultsIfBlank() {
+      if (almanacDate && !almanacDate.value)
+        almanacDate.value = DEFAULT_ALMANAC_DATE;
+      if (almanacTime && !almanacTime.value)
+        almanacTime.value = DEFAULT_ALMANAC_TIME;
+      if (almanacZone && !almanacZone.value)
+        almanacZone.value = DEFAULT_ALMANAC_ZONE;
+      if (almanacLatitude && !almanacLatitude.value)
+        almanacLatitude.value = DEFAULT_ALMANAC_LATITUDE;
+      if (almanacLongitude && !almanacLongitude.value)
+        almanacLongitude.value = DEFAULT_ALMANAC_LONGITUDE;
+      if (almanacBody && !almanacBody.value)
+        setSelectValue(almanacBody, DEFAULT_ALMANAC_BODY);
+    }
+
+    function validAlmanacBody(value, fallback = DEFAULT_ALMANAC_BODY) {
+      const raw = String(value || '').trim();
+      const allowed = Array.from((almanacBody && almanacBody.options) || []).map((option) => option.value);
+      if (allowed.includes(raw))
+        return raw;
+      return fallback;
+    }
+
+    function currentAlmanacState() {
+      restoreAlmanacDefaultsIfBlank();
+      return {
+        date: validDateText(almanacDate && almanacDate.value, DEFAULT_ALMANAC_DATE),
+        time: String(almanacTime && almanacTime.value || DEFAULT_ALMANAC_TIME).trim(),
+        zone: String(almanacZone && almanacZone.value || DEFAULT_ALMANAC_ZONE).trim(),
+        latitude: String(almanacLatitude && almanacLatitude.value || DEFAULT_ALMANAC_LATITUDE).trim(),
+        longitude: String(almanacLongitude && almanacLongitude.value || DEFAULT_ALMANAC_LONGITUDE).trim(),
+        body: validAlmanacBody(almanacBody && almanacBody.value, DEFAULT_ALMANAC_BODY)
+      };
+    }
+
+    function almanacSummaryText(state = currentAlmanacState()) {
+      return [
+        'AstroNav 2000-2040 Navigation Almanac',
+        `Date: ${state.date}`,
+        `GMT time: ${state.time}`,
+        `Zone: ${state.zone}`,
+        `Latitude: ${state.latitude}`,
+        `Longitude: ${state.longitude}`,
+        `Body: ${state.body}`
+      ].join('\n');
     }
 
     function datetimeSummaryText(state = currentDatetimeState()) {
@@ -4896,7 +5156,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
 
     function validLabMode(value) {
       const mode = String(value || '').trim();
-      return mode === 'equation' || mode === 'matrix' || mode === 'integrator' || mode === 'datetime' ? mode : 'expression';
+      return mode === 'equation' || mode === 'matrix' || mode === 'integrator' || mode === 'datetime' || mode === 'almanac' ? mode : 'expression';
     }
 
     function applySavedState(data) {
@@ -4956,11 +5216,25 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         datetimeLatitude.value = String(data.datetime_latitude || DEFAULT_DATETIME_LATITUDE);
       if (datetimeLongitude)
         datetimeLongitude.value = String(data.datetime_longitude || DEFAULT_DATETIME_LONGITUDE);
+      if (datetimeElevation)
+        datetimeElevation.value = String(data.datetime_elevation || DEFAULT_DATETIME_ELEVATION);
       if (datetimeGmtOffset) {
         datetimeGmtOffset.value = String(data.datetime_gmt_offset || DEFAULT_DATETIME_GMT_OFFSET);
         datetimeAutoGmtOffset = String(datetimeGmtOffset.value || '').trim();
         datetimeGmtOffsetTouched = false;
       }
+      if (almanacDate)
+        almanacDate.value = validDateText(data.almanac_date, DEFAULT_ALMANAC_DATE);
+      if (almanacTime)
+        almanacTime.value = String(data.almanac_time || DEFAULT_ALMANAC_TIME).trim() || DEFAULT_ALMANAC_TIME;
+      if (almanacZone)
+        almanacZone.value = String(data.almanac_zone || DEFAULT_ALMANAC_ZONE).trim();
+      if (almanacLatitude)
+        almanacLatitude.value = String(data.almanac_latitude || DEFAULT_ALMANAC_LATITUDE).trim();
+      if (almanacLongitude)
+        almanacLongitude.value = String(data.almanac_longitude || DEFAULT_ALMANAC_LONGITUDE).trim();
+      if (almanacBody)
+        setSelectValue(almanacBody, validAlmanacBody(data.almanac_body, DEFAULT_ALMANAC_BODY));
 
       if (data.precision_bits && typeof data.precision_bits === 'object') {
         Object.entries(data.precision_bits).forEach(([mode, bits]) => {
@@ -5033,11 +5307,29 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           datetimeLatitude.value = String(state.latitude || DEFAULT_DATETIME_LATITUDE);
         if (datetimeLongitude)
           datetimeLongitude.value = String(state.longitude || DEFAULT_DATETIME_LONGITUDE);
+        if (datetimeElevation)
+          datetimeElevation.value = String(state.elevation || DEFAULT_DATETIME_ELEVATION);
         if (datetimeGmtOffset) {
           datetimeGmtOffset.value = String(state.gmt_offset || DEFAULT_DATETIME_GMT_OFFSET);
           datetimeAutoGmtOffset = String(datetimeGmtOffset.value || '').trim();
           datetimeGmtOffsetTouched = false;
         }
+        }
+        const almanacStateText = localStorage.getItem('mars.exprLab.lastAlmanacState');
+        if (almanacStateText) {
+          const state = JSON.parse(almanacStateText);
+          if (almanacDate)
+            almanacDate.value = validDateText(state.date, DEFAULT_ALMANAC_DATE);
+          if (almanacTime)
+            almanacTime.value = String(state.time || DEFAULT_ALMANAC_TIME).trim() || DEFAULT_ALMANAC_TIME;
+          if (almanacZone)
+            almanacZone.value = String(state.zone || DEFAULT_ALMANAC_ZONE).trim();
+          if (almanacLatitude)
+            almanacLatitude.value = String(state.latitude || DEFAULT_ALMANAC_LATITUDE).trim();
+          if (almanacLongitude)
+            almanacLongitude.value = String(state.longitude || DEFAULT_ALMANAC_LONGITUDE).trim();
+          if (almanacBody)
+            setSelectValue(almanacBody, validAlmanacBody(state.body, DEFAULT_ALMANAC_BODY));
         }
         const labMode = localStorage.getItem(LAB_MODE_STORAGE_KEY);
         if (labMode)
@@ -5181,7 +5473,29 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         datetime_jurisdiction: state.jurisdiction,
         datetime_latitude: state.latitude,
         datetime_longitude: state.longitude,
+        datetime_elevation: state.elevation,
         datetime_gmt_offset: state.gmt_offset,
+        precision_bits: modePrecisionBits
+      });
+    }
+
+    function saveLastAlmanacState() {
+      const state = currentAlmanacState();
+      modeEditorText.almanac = DEFAULT_ALMANAC_TEXT;
+
+      try {
+        localStorage.setItem('mars.exprLab.lastAlmanacState', JSON.stringify(state));
+      } catch (_) {
+        // The lab still works fine without persistence.
+      }
+
+      saveLabState({
+        almanac_date: state.date,
+        almanac_time: state.time,
+        almanac_zone: state.zone,
+        almanac_latitude: state.latitude,
+        almanac_longitude: state.longitude,
+        almanac_body: state.body,
         precision_bits: modePrecisionBits
       });
     }
@@ -5222,6 +5536,11 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         if (textOverride === null || textOverride === undefined)
           text = datetimeSummaryText(state.datetime);
         state.text = text || DEFAULT_DATETIME_TEXT;
+      } else if (mode === 'almanac') {
+        state.almanac = currentAlmanacState();
+        if (textOverride === null || textOverride === undefined)
+          text = almanacSummaryText(state.almanac);
+        state.text = text || DEFAULT_ALMANAC_TEXT;
       }
 
       return state;
@@ -5275,15 +5594,35 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           datetimeLatitude.value = String(datetimeState.latitude || DEFAULT_DATETIME_LATITUDE);
         if (datetimeLongitude)
           datetimeLongitude.value = String(datetimeState.longitude || DEFAULT_DATETIME_LONGITUDE);
+        if (datetimeElevation)
+          datetimeElevation.value = String(datetimeState.elevation || DEFAULT_DATETIME_ELEVATION);
         if (datetimeGmtOffset) {
           datetimeGmtOffset.value = String(datetimeState.gmt_offset || DEFAULT_DATETIME_GMT_OFFSET);
           datetimeAutoGmtOffset = String(datetimeGmtOffset.value || '').trim();
           datetimeGmtOffsetTouched = false;
         }
+      } else if (state.mode === 'almanac') {
+        const almanacState = state.almanac || {};
+        if (almanacDate)
+          almanacDate.value = validDateText(almanacState.date, DEFAULT_ALMANAC_DATE);
+        if (almanacTime)
+          almanacTime.value = String(almanacState.time || DEFAULT_ALMANAC_TIME).trim() || DEFAULT_ALMANAC_TIME;
+        if (almanacZone)
+          almanacZone.value = String(almanacState.zone || DEFAULT_ALMANAC_ZONE).trim();
+        if (almanacLatitude)
+          almanacLatitude.value = String(almanacState.latitude || DEFAULT_ALMANAC_LATITUDE).trim();
+        if (almanacLongitude)
+          almanacLongitude.value = String(almanacState.longitude || DEFAULT_ALMANAC_LONGITUDE).trim();
+        if (almanacBody)
+          setSelectValue(almanacBody, validAlmanacBody(almanacState.body, DEFAULT_ALMANAC_BODY));
       }
 
       if (state.mode === 'datetime') {
         expr.value = DEFAULT_DATETIME_TEXT;
+        clearExpressionSource();
+        clearVariableValues();
+      } else if (state.mode === 'almanac') {
+        expr.value = DEFAULT_ALMANAC_TEXT;
         clearExpressionSource();
         clearVariableValues();
       } else {
@@ -5310,6 +5649,10 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       }
       if (currentMode() === 'datetime') {
         evaluateDatetime(options);
+        return;
+      }
+      if (currentMode() === 'almanac') {
+        evaluateAlmanac(options);
         return;
       }
       evaluateExpression(options);
@@ -5340,7 +5683,17 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           delete control.dataset.busyDisabled;
         }
       });
-      Array.from((datetimeControls || document.createElement('div')).querySelectorAll('input, button')).forEach((control) => {
+      Array.from((datetimeControls || document.createElement('div')).querySelectorAll('input, button, select')).forEach((control) => {
+        if (isBusy) {
+          if (!control.disabled)
+            control.dataset.busyDisabled = '1';
+          control.disabled = true;
+        } else if (control.dataset.busyDisabled === '1') {
+          control.disabled = false;
+          delete control.dataset.busyDisabled;
+        }
+      });
+      Array.from((almanacControls || document.createElement('div')).querySelectorAll('input, button, select')).forEach((control) => {
         if (isBusy) {
           if (!control.disabled)
             control.dataset.busyDisabled = '1';
@@ -5864,6 +6217,84 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         throw new Error(raw || `Datetime request failed with HTTP ${response.status}`);
       }
       return {response, data};
+    }
+
+    async function fetchAlmanacEvaluation() {
+      const state = currentAlmanacState();
+      saveLastAlmanacState();
+      const response = await fetch('/almanac-eval', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(state)
+      });
+      const raw = await response.text();
+      let data;
+      try {
+        data = raw ? JSON.parse(raw) : {};
+      } catch (_) {
+        throw new Error(raw || `Almanac request failed with HTTP ${response.status}`);
+      }
+      return {response, data};
+    }
+
+    function escapeHtml(text) {
+      return String(text || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function renderAlmanacWorksheet(target, data) {
+      const rows = Array.isArray(data.rows) ? data.rows : [];
+      const worksheetTitle = escapeHtml(data.worksheet_title || 'AstroNav 2000-2040 Navigation Almanac');
+      const momentText = escapeHtml(data.moment_text || '');
+      const observerText = escapeHtml(data.observer_text || '');
+      const bodyText = escapeHtml(data.body_text || '');
+      const rangeText = escapeHtml(data.range_text || '');
+      target.innerHTML = `
+        <div class="almanac-sheet">
+          <div class="almanac-sheet-header">
+            <div class="almanac-sheet-title">${worksheetTitle}</div>
+            <div>${momentText}</div>
+            <div>${observerText}</div>
+            <div>${bodyText}</div>
+            <div class="almanac-sheet-note">${rangeText}</div>
+          </div>
+          <table class="almanac-grid-table">
+            <thead>
+              <tr>
+                <th>Body</th>
+                <th>Kind</th>
+                <th>Declination</th>
+                <th>GHA</th>
+                <th>SHA</th>
+                <th>LHA</th>
+                <th>RA</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows.map((row) => {
+                const classes = [
+                  row.code === data.selected_code ? 'selected' : '',
+                  row.kind === 'reference' ? 'reference' : ''
+                ].filter(Boolean).join(' ');
+                const nameClass = row.kind === 'reference' ? 'reference-name' : 'body-name';
+                return `
+                  <tr class="${classes}">
+                    <td class="${nameClass}">${escapeHtml(row.name || row.code || '')}</td>
+                    <td>${escapeHtml(row.kind || '')}</td>
+                    <td class="number">${escapeHtml(row.declination || '')}</td>
+                    <td class="number">${escapeHtml(row.gha || '')}</td>
+                    <td class="number">${escapeHtml(row.sha || '')}</td>
+                    <td class="number">${escapeHtml(row.lha || '')}</td>
+                    <td class="number">${escapeHtml(row.right_ascension || '')}</td>
+                  </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>`;
     }
 
     async function refreshDatetimeLocalHolidays() {
@@ -6995,6 +7426,64 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       }
     }
 
+    async function evaluateAlmanac(options = {}) {
+      const evaluationId = ++almanacEvaluationSequence;
+      const state = currentAlmanacState();
+      const snapshotText = almanacSummaryText(state);
+      const nextState = historyStateForMode(currentMode(), snapshotText);
+      const previousState = !options.skipHistoryUpdate
+        ? previousModeStateForHistory(nextState)
+        : null;
+      showResults();
+      setBusy(true);
+      setStatus('Working the almanac...');
+      try {
+        if (previousState)
+          pushExpressionHistory(previousState);
+        const {response, data} = await fetchAlmanacEvaluation();
+        if (evaluationId !== almanacEvaluationSequence || currentMode() !== 'almanac')
+          return;
+        if (!response.ok || !data.ok) {
+          setRenderedError(data.error || 'Almanac calculation failed');
+          resetMoreDigitsButton(renderedMore, false);
+          clearResultDetails({keepBindings: true});
+          commitModeState();
+          setStatus('Error');
+          return;
+        }
+
+        clearResultDetails({keepBindings: true});
+        clearRenderedError();
+        renderAlmanacWorksheet(rendered, data);
+        rendered.dataset.copyText = data.worksheet || '';
+        resetMoreDigitsButton(renderedMore, false);
+        setExpandableText(parsed, parsedMore, data.selected_summary || '', data.selected_summary || '');
+        setExpandableText(functionStyle, functionMore, data.body_listing || '', data.body_listing || '');
+        value.textContent = data.notes || '';
+        setResultInputText('');
+        clearVariableValues();
+        currentVariables = [];
+        currentDifferentiable = false;
+        renderDerivativeButtons(currentVariables);
+        saveLastAlmanacState();
+        commitModeState();
+        setStatus('Ready');
+      } catch (err) {
+        if (evaluationId !== almanacEvaluationSequence || currentMode() !== 'almanac')
+          return;
+        setRenderedError(String(err));
+        resetMoreDigitsButton(renderedMore, false);
+        clearResultDetails({keepBindings: true});
+        commitModeState();
+        setStatus('Error');
+      } finally {
+        if (evaluationId === almanacEvaluationSequence)
+          setBusy(false);
+        if (!options.skipHistoryUpdate)
+          updateHistoryButtons();
+      }
+    }
+
     async function evaluateActiveModeOnLoad() {
       if (currentMode() === 'matrix') {
         evaluateMatrix();
@@ -7011,6 +7500,10 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       if (currentMode() === 'datetime') {
         await refreshDatetimeJurisdictionLocation();
         evaluateDatetime();
+        return;
+      }
+      if (currentMode() === 'almanac') {
+        evaluateAlmanac();
         return;
       }
       evaluateExpression();
@@ -7389,12 +7882,29 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           datetimeLatitude.value = DEFAULT_DATETIME_LATITUDE;
         if (datetimeLongitude)
           datetimeLongitude.value = DEFAULT_DATETIME_LONGITUDE;
+        if (datetimeElevation)
+          datetimeElevation.value = DEFAULT_DATETIME_ELEVATION;
         if (datetimeGmtOffset) {
           datetimeGmtOffset.value = DEFAULT_DATETIME_GMT_OFFSET;
           datetimeAutoGmtOffset = String(datetimeGmtOffset.value || '').trim();
           datetimeGmtOffsetTouched = false;
         }
         expr.value = DEFAULT_DATETIME_TEXT;
+      }
+      if (currentMode() === 'almanac') {
+        if (almanacDate)
+          almanacDate.value = DEFAULT_ALMANAC_DATE;
+        if (almanacTime)
+          almanacTime.value = DEFAULT_ALMANAC_TIME;
+        if (almanacZone)
+          almanacZone.value = DEFAULT_ALMANAC_ZONE;
+        if (almanacLatitude)
+          almanacLatitude.value = DEFAULT_ALMANAC_LATITUDE;
+        if (almanacLongitude)
+          almanacLongitude.value = DEFAULT_ALMANAC_LONGITUDE;
+        if (almanacBody)
+          setSelectValue(almanacBody, DEFAULT_ALMANAC_BODY);
+        expr.value = DEFAULT_ALMANAC_TEXT;
       }
       captureCurrentModeEditor();
       clearExpressionSource();
@@ -7457,6 +7967,9 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         if (currentMode() === 'datetime') {
           restoreDatetimeDefaultsIfBlank();
           datetimeDate?.focus();
+        } else if (currentMode() === 'almanac') {
+          restoreAlmanacDefaultsIfBlank();
+          almanacDate?.focus();
         } else {
           expr.focus();
         }
@@ -7486,7 +7999,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           saveLastIntegratorState();
       });
 
-    [datetimeDate, datetimeJdn, datetimeStart, datetimeEnd, datetimeYear, datetimeJurisdiction, datetimeLatitude, datetimeLongitude, datetimeGmtOffset]
+    [datetimeDate, datetimeJdn, datetimeStart, datetimeEnd, datetimeYear, datetimeJurisdiction, datetimeLatitude, datetimeLongitude, datetimeElevation, datetimeGmtOffset]
       .filter(Boolean)
       .forEach((control) => {
         if (control === datetimeDate || control === datetimeStart || control === datetimeEnd) {
@@ -7514,6 +8027,31 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             triggerDatetimeAutoEvaluation({
               refreshJurisdiction: control === datetimeJurisdiction || control === datetimeDate
             });
+          }
+        });
+      });
+
+    [almanacDate, almanacTime, almanacZone, almanacLatitude, almanacLongitude, almanacBody]
+      .filter(Boolean)
+      .forEach((control) => {
+        if (control === almanacDate) {
+          control.addEventListener('keydown', (event) => {
+            const shell = control.closest('.mars-date-shell');
+            const button = shell ? shell.querySelector('[data-date-target]') : null;
+            if (!button)
+              return;
+            if (event.key === 'ArrowDown' || event.key === 'Enter') {
+              event.preventDefault();
+              openMarsDatePicker(control, button);
+            } else if (event.key === 'Escape') {
+              closeMarsDatePicker();
+            }
+          });
+        }
+        control.addEventListener('change', () => {
+          if (currentMode() === 'almanac') {
+            saveLastAlmanacState();
+            evaluateAlmanac({skipHistoryUpdate: true});
           }
         });
       });
@@ -7748,13 +8286,21 @@ def default_state() -> dict[str, object]:
         "datetime_jurisdiction": DEFAULT_HOLIDAY_JURISDICTION,
         "datetime_latitude": DEFAULT_DATETIME_LATITUDE,
         "datetime_longitude": DEFAULT_DATETIME_LONGITUDE,
+        "datetime_elevation": DEFAULT_DATETIME_ELEVATION,
         "datetime_gmt_offset": DEFAULT_DATETIME_GMT_OFFSET,
+        "almanac_date": DEFAULT_ALMANAC_DATE,
+        "almanac_time": DEFAULT_ALMANAC_TIME,
+        "almanac_zone": DEFAULT_ALMANAC_ZONE,
+        "almanac_latitude": DEFAULT_ALMANAC_LATITUDE,
+        "almanac_longitude": DEFAULT_ALMANAC_LONGITUDE,
+        "almanac_body": DEFAULT_ALMANAC_BODY,
         "precision_bits": {
             "expression": 256,
             "equation": 256,
             "matrix": 256,
             "integrator": 17,
             "datetime": 17,
+            "almanac": 17,
         },
     }
 
@@ -7781,7 +8327,7 @@ def load_state_data() -> dict[str, object]:
         state["matrix"] = DEFAULT_MATRIX
 
     lab_mode = str(state.get("lab_mode", "")).strip()
-    if lab_mode not in {"expression", "equation", "matrix", "integrator", "datetime"}:
+    if lab_mode not in {"expression", "equation", "matrix", "integrator", "datetime", "almanac"}:
         state["lab_mode"] = "expression"
 
     equation = str(state.get("equation", "")).strip()
@@ -7844,11 +8390,29 @@ def load_state_data() -> dict[str, object]:
     for key, default in (
         ("datetime_latitude", DEFAULT_DATETIME_LATITUDE),
         ("datetime_longitude", DEFAULT_DATETIME_LONGITUDE),
+        ("datetime_elevation", DEFAULT_DATETIME_ELEVATION),
         ("datetime_gmt_offset", DEFAULT_DATETIME_GMT_OFFSET),
     ):
         state[key] = str(state.get(key, default)).strip()
     jdn = str(state.get("datetime_jdn", "")).strip()
     state["datetime_jdn"] = jdn if re.fullmatch(r"\d+", jdn) else ""
+    try:
+        py_datetime.date.fromisoformat(str(state.get("almanac_date", "")).strip())
+    except ValueError:
+        state["almanac_date"] = DEFAULT_ALMANAC_DATE
+    else:
+        state["almanac_date"] = str(state.get("almanac_date", DEFAULT_ALMANAC_DATE)).strip()
+    almanac_time = str(state.get("almanac_time", DEFAULT_ALMANAC_TIME)).strip()
+    if not re.fullmatch(r"\d{2}:\d{2}(:\d{2}(\.\d+)?)?", almanac_time):
+        almanac_time = DEFAULT_ALMANAC_TIME
+    state["almanac_time"] = almanac_time
+    for key, default in (
+        ("almanac_zone", DEFAULT_ALMANAC_ZONE),
+        ("almanac_latitude", DEFAULT_ALMANAC_LATITUDE),
+        ("almanac_longitude", DEFAULT_ALMANAC_LONGITUDE),
+        ("almanac_body", DEFAULT_ALMANAC_BODY),
+    ):
+        state[key] = str(state.get(key, default)).strip() or str(default)
     return state
 
 
@@ -9002,11 +9566,16 @@ def parse_datetime_lab_output(output: str) -> dict[str, str]:
             "solar_inclination": r"^solar_inclination\s+(.*)$",
             "latitude": r"^latitude\s+(.*)$",
             "longitude": r"^longitude\s+(.*)$",
+            "elevation_metres": r"^elevation_metres\s+(.*)$",
             "gmt_offset": r"^gmt_offset\s+(.*)$",
             "sunrise": r"^sunrise\s+(.*)$",
             "sunrise_status": r"^sunrise_status\s+(.*)$",
             "sunset": r"^sunset\s+(.*)$",
             "sunset_status": r"^sunset_status\s+(.*)$",
+            "actual_sunrise": r"^actual_sunrise\s+(.*)$",
+            "actual_sunrise_status": r"^actual_sunrise_status\s+(.*)$",
+            "actual_sunset": r"^actual_sunset\s+(.*)$",
+            "actual_sunset_status": r"^actual_sunset_status\s+(.*)$",
             "dst_forward": r"^dst_forward\s+(.*)$",
             "dst_back": r"^dst_back\s+(.*)$",
             "dst_forward_from_offset": r"^dst_forward_from_offset\s+(.*)$",
@@ -9057,6 +9626,40 @@ def parse_datetime_lab_output(output: str) -> dict[str, str]:
             "aztec_nemontemi_start": r"^aztec_nemontemi_start\s+(.*)$",
         },
     )
+
+
+def parse_almanac_lab_output(output: str) -> dict[str, str]:
+    fields = parse_keyed_output(
+        output,
+        {
+            "date": r"^date\s+(.*)$",
+            "time": r"^time\s+(.*)$",
+            "zone": r"^zone\s+(.*)$",
+            "latitude": r"^latitude\s+(.*)$",
+            "longitude": r"^longitude\s+(.*)$",
+            "body": r"^body\s+(.*)$",
+            "gha_aries": r"^gha_aries\s+(.*)$",
+            "selected_name": r"^selected_name\s+(.*)$",
+            "selected_kind": r"^selected_kind\s+(.*)$",
+            "selected_declination": r"^selected_declination\s+(.*)$",
+            "selected_right_ascension": r"^selected_right_ascension\s+(.*)$",
+            "selected_gha": r"^selected_gha\s+(.*)$",
+            "selected_sha": r"^selected_sha\s+(.*)$",
+            "selected_lha": r"^selected_lha\s+(.*)$",
+            "selected_geo_distance": r"^selected_geo_distance\s+(.*)$",
+            "selected_helio_distance": r"^selected_helio_distance\s+(.*)$",
+            "selected_phase": r"^selected_phase\s+(.*)$",
+            "selected_visual_magnitude": r"^selected_visual_magnitude\s+(.*)$",
+        },
+    )
+    snapshot_lines = []
+    for line in output.splitlines():
+        match = re.match(r"^snapshot\s+(.*)$", line)
+        if match:
+            snapshot_lines.append(match.group(1).rstrip())
+    if snapshot_lines:
+        fields["snapshot"] = "\n".join(snapshot_lines)
+    return fields
 
 
 def parse_holiday_lab_output(output: str) -> dict[str, str]:
@@ -9873,6 +10476,7 @@ def run_datetime_lab_fields(
         "year",
         "lat",
         "lon",
+        "elevation",
         "gmt_offset",
         "jurisdiction",
     ):
@@ -9889,6 +10493,27 @@ def run_datetime_lab_fields(
     if completed.stderr:
         raw = raw + ("\n" if raw else "") + completed.stderr
     return parse_datetime_lab_output(raw), raw, completed.returncode
+
+
+def run_almanac_lab_fields(
+    binary: Path,
+    options: dict[str, str],
+) -> tuple[dict[str, str], str, int]:
+    command = [str(binary)]
+    for key in ("date", "time", "zone", "lat", "lon", "body"):
+        if key in options:
+            command.append(f"{key}={str(options.get(key, '')).strip()}")
+    completed = subprocess.run(
+        command,
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        timeout=10,
+    )
+    raw = completed.stdout
+    if completed.stderr:
+        raw = raw + ("\n" if raw else "") + completed.stderr
+    return parse_almanac_lab_output(raw), raw, completed.returncode
 
 
 def run_holiday_lab_fields(
@@ -10327,6 +10952,10 @@ def prepare_datetime_fields(fields: dict[str, str]) -> dict[str, object]:
     sunset = str(fields.get("sunset") or "").strip()
     sunrise_status = str(fields.get("sunrise_status") or "").strip()
     sunset_status = str(fields.get("sunset_status") or "").strip()
+    actual_sunrise = str(fields.get("actual_sunrise") or "").strip()
+    actual_sunset = str(fields.get("actual_sunset") or "").strip()
+    actual_sunrise_status = str(fields.get("actual_sunrise_status") or "").strip()
+    actual_sunset_status = str(fields.get("actual_sunset_status") or "").strip()
     dst_forward = str(fields.get("dst_forward") or "").strip()
     dst_back = str(fields.get("dst_back") or "").strip()
     dst_forward_from_offset = str(fields.get("dst_forward_from_offset") or "").strip()
@@ -10412,7 +11041,9 @@ def prepare_datetime_fields(fields: dict[str, str]) -> dict[str, object]:
         f"{weekday} {date}".strip(),
         f"Moon phase: {moon_phase}" if moon_phase else "",
         f"Sunrise: {sunrise}" if sunrise and sunrise != "unavailable" else f"Sunrise: {sunrise_status or 'unavailable'}",
+        f"Actual sunrise: {actual_sunrise}" if actual_sunrise and actual_sunrise != "unavailable" else f"Actual sunrise: {actual_sunrise_status or 'unavailable'}",
         f"Sunset: {sunset}" if sunset and sunset != "unavailable" else f"Sunset: {sunset_status or 'unavailable'}",
+        f"Actual sunset: {actual_sunset}" if actual_sunset and actual_sunset != "unavailable" else f"Actual sunset: {actual_sunset_status or 'unavailable'}",
         f"Temperature: {weather_summary}" if weather_summary else "",
         f"Humidity: {weather_humidity}" if weather_humidity else "",
         f"Wind: {weather_wind}" if weather_wind else "",
@@ -10437,12 +11068,20 @@ def prepare_datetime_fields(fields: dict[str, str]) -> dict[str, object]:
             "open": True,
             "rows": [
                 {
-                    "label": "Sunrise",
+                    "label": "Sunrise estimate",
                     "value": sunrise if sunrise and sunrise != "unavailable" else (sunrise_status or "unavailable"),
                 },
                 {
-                    "label": "Sunset",
+                    "label": "Sunrise actual (almanac)",
+                    "value": actual_sunrise if actual_sunrise and actual_sunrise != "unavailable" else (actual_sunrise_status or "unavailable"),
+                },
+                {
+                    "label": "Sunset estimate",
                     "value": sunset if sunset and sunset != "unavailable" else (sunset_status or "unavailable"),
+                },
+                {
+                    "label": "Sunset actual (almanac)",
+                    "value": actual_sunset if actual_sunset and actual_sunset != "unavailable" else (actual_sunset_status or "unavailable"),
                 },
                 *([
                     {"label": "Clocks forward", "value": dst_forward_text},
@@ -10719,6 +11358,7 @@ def prepare_datetime_fields(fields: dict[str, str]) -> dict[str, object]:
     solar_lines = [
         f"Latitude: {str(fields.get('latitude') or '').strip()}",
         f"Longitude: {str(fields.get('longitude') or '').strip()}",
+        f"Elevation: {str(fields.get('elevation_metres') or '').strip()} m",
         f"Solar declination: {str(fields.get('solar_declination') or '').strip()}°",
         f"Sun's noon inclination: {str(fields.get('solar_inclination') or '').strip()}°",
         f"Sun's maximum altitude: {str(fields.get('solar_max_altitude') or '').strip()}°",
@@ -10730,6 +11370,7 @@ def prepare_datetime_fields(fields: dict[str, str]) -> dict[str, object]:
             "rows": [
                 {"label": "Latitude", "value": str(fields.get("latitude") or "").strip()},
                 {"label": "Longitude", "value": str(fields.get("longitude") or "").strip()},
+                {"label": "Elevation", "value": f"{str(fields.get('elevation_metres') or '').strip()} m"},
             ],
         },
         {
@@ -10760,6 +11401,113 @@ def prepare_datetime_fields(fields: dict[str, str]) -> dict[str, object]:
     }
 
 
+def parse_almanac_snapshot_rows(text: str) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    for line in str(text or "").splitlines():
+      parts = line.split("|")
+      if len(parts) != 11:
+          continue
+      rows.append({
+          "code": parts[0].strip(),
+          "name": parts[1].strip(),
+          "kind": parts[2].strip(),
+          "declination": parts[3].strip(),
+          "right_ascension": parts[4].strip(),
+          "gha": parts[5].strip(),
+          "sha": parts[6].strip(),
+          "lha": parts[7].strip(),
+          "distance_au": parts[8].strip(),
+          "phase": parts[9].strip(),
+          "magnitude": parts[10].strip(),
+      })
+    return rows
+
+
+def prepare_almanac_fields(fields: dict[str, str]) -> dict[str, object]:
+    rows = parse_almanac_snapshot_rows(fields.get("snapshot", ""))
+    selected_code = str(fields.get("body") or "").strip().upper()
+    selected_name = str(fields.get("selected_name") or selected_code).strip()
+    date_text = str(fields.get("date") or "").strip()
+    time_text = str(fields.get("time") or "").strip()
+    zone_text = str(fields.get("zone") or "").strip()
+    latitude_text = str(fields.get("latitude") or "").strip()
+    longitude_text = str(fields.get("longitude") or "").strip()
+    gha_aries = str(fields.get("gha_aries") or "").strip()
+
+    worksheet_lines = [
+        "AstroNav 2000-2040 Navigation Almanac",
+        f"Date (GMT): {date_text}",
+        f"Time (GMT): {time_text}",
+        f"Zone: {zone_text}",
+        f"Latitude: {latitude_text}",
+        f"Longitude: {longitude_text}",
+        f"Selected body: {selected_name} ({selected_code})",
+        "",
+        "Body | Kind | Declination | GHA | SHA | LHA | RA",
+    ]
+    for row in rows:
+        worksheet_lines.append(
+            " | ".join(
+                [
+                    str(row.get("name") or row.get("code") or "").strip(),
+                    str(row.get("kind") or "").strip(),
+                    str(row.get("declination") or "").strip(),
+                    str(row.get("gha") or "").strip(),
+                    str(row.get("sha") or "").strip(),
+                    str(row.get("lha") or "").strip(),
+                    str(row.get("right_ascension") or "").strip(),
+                ]
+            )
+        )
+
+    selected_summary = "\n".join(
+        [
+            f"Selected body: {selected_name} ({selected_code})",
+            f"Kind: {str(fields.get('selected_kind') or '').strip()}",
+            f"Declination: {str(fields.get('selected_declination') or '').strip()} deg",
+            f"GHA: {str(fields.get('selected_gha') or '').strip()} deg",
+            f"SHA: {str(fields.get('selected_sha') or '').strip()} deg",
+            f"LHA: {str(fields.get('selected_lha') or '').strip()} deg",
+            f"Right ascension: {str(fields.get('selected_right_ascension') or '').strip()} h",
+            f"Geocentric distance: {str(fields.get('selected_geo_distance') or '').strip()} AU",
+            f"Heliocentric distance: {str(fields.get('selected_helio_distance') or '').strip()} AU",
+            f"Phase angle: {str(fields.get('selected_phase') or '').strip()} deg",
+            f"Visual magnitude: {str(fields.get('selected_visual_magnitude') or '').strip()}",
+        ]
+    )
+    body_listing = "\n".join(
+        [
+            f"{str(row.get('name') or row.get('code') or '').strip()}: "
+            f"SHA {str(row.get('sha') or '').strip()} deg, "
+            f"Declination {str(row.get('declination') or '').strip()} deg"
+            for row in rows
+        ]
+    )
+    notes = "\n".join(
+        [
+            f"GHA Aries: {gha_aries} deg",
+            "Enter date and time in GMT, then zone, latitude, and longitude.",
+            "For 2000-2040 GMT, the workbook intention is navigation-grade output within 6 arc-seconds after rounding to the nearest arc-second for the listed navigation bodies.",
+        ]
+    )
+    return {
+        "ok": True,
+        "mode": "almanac",
+        "worksheet_title": "AstroNav 2000-2040 Navigation Almanac",
+        "moment_text": f"GMT moment: {date_text} {time_text}".strip(),
+        "observer_text": f"Observer: zone {zone_text}, latitude {latitude_text}, longitude {longitude_text}",
+        "body_text": f"Location of Navigational Bodies for {selected_name} ({selected_code})",
+        "range_text": "Beyond 2040, use at your own risk.",
+        "selected_code": selected_code,
+        "rows": rows,
+        "worksheet": "\n".join(worksheet_lines),
+        "selected_summary": selected_summary,
+        "body_listing": body_listing,
+        "notes": notes,
+        "fields": fields,
+    }
+
+
 def integrator_tex_for_display(tex: str) -> str:
     tex = str(tex or "").strip()
     if not tex:
@@ -10786,6 +11534,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
     matrix_binary: Path = DEFAULT_MATRIX_BIN
     integrator_binary: Path = DEFAULT_INTEGRATOR_BIN
     datetime_binary: Path = DEFAULT_DATETIME_BIN
+    almanac_binary: Path = DEFAULT_ALMANAC_BIN
     holiday_binary: Path = DEFAULT_HOLIDAY_BIN
     server_host: str = "127.0.0.1"
     server_port: int = 0
@@ -10919,7 +11668,16 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
             .replace("__DEFAULT_DATETIME_JURISDICTION__", json.dumps(DEFAULT_HOLIDAY_JURISDICTION))
             .replace("__DEFAULT_DATETIME_LATITUDE__", json.dumps(DEFAULT_DATETIME_LATITUDE))
             .replace("__DEFAULT_DATETIME_LONGITUDE__", json.dumps(DEFAULT_DATETIME_LONGITUDE))
+            .replace("__DEFAULT_DATETIME_ELEVATION__", json.dumps(DEFAULT_DATETIME_ELEVATION))
             .replace("__DEFAULT_DATETIME_GMT_OFFSET__", json.dumps(DEFAULT_DATETIME_GMT_OFFSET))
+            .replace("__DEFAULT_ALMANAC_TEXT__", json.dumps(DEFAULT_ALMANAC_TEXT))
+            .replace("__DEFAULT_ALMANAC_DATE__", json.dumps(DEFAULT_ALMANAC_DATE))
+            .replace("__DEFAULT_ALMANAC_TIME__", json.dumps(DEFAULT_ALMANAC_TIME))
+            .replace("__DEFAULT_ALMANAC_ZONE__", json.dumps(DEFAULT_ALMANAC_ZONE))
+            .replace("__DEFAULT_ALMANAC_LATITUDE__", json.dumps(DEFAULT_ALMANAC_LATITUDE))
+            .replace("__DEFAULT_ALMANAC_LONGITUDE__", json.dumps(DEFAULT_ALMANAC_LONGITUDE))
+            .replace("__DEFAULT_ALMANAC_BODY__", json.dumps(DEFAULT_ALMANAC_BODY))
+            .replace("__ALMANAC_BODY_OPTIONS__", ALMANAC_BODY_OPTIONS_HTML)
             .replace("__HOLIDAY_JURISDICTION_CODES__", json.dumps(sorted(VALID_HOLIDAY_JURISDICTIONS)))
             .replace("__HOLIDAY_JURISDICTION_OPTIONS__", HOLIDAY_JURISDICTION_OPTIONS_HTML)
             .replace("__CONTROL_TOKEN__", json.dumps(CONTROL_TOKEN if control_allowed else ""))
@@ -10961,7 +11719,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                     updates["matrix"] = matrix
 
                 lab_mode = str(payload.get("lab_mode", "")).strip()
-                if lab_mode in {"expression", "equation", "matrix", "integrator", "datetime"}:
+                if lab_mode in {"expression", "equation", "matrix", "integrator", "datetime", "almanac"}:
                     updates["lab_mode"] = lab_mode
 
                 equation = str(payload.get("equation", "")).strip()
@@ -11013,7 +11771,14 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                     "datetime_jurisdiction",
                     "datetime_latitude",
                     "datetime_longitude",
+                    "datetime_elevation",
                     "datetime_gmt_offset",
+                    "almanac_date",
+                    "almanac_time",
+                    "almanac_zone",
+                    "almanac_latitude",
+                    "almanac_longitude",
+                    "almanac_body",
                 ):
                     if key in payload:
                         updates[key] = str(payload.get(key, "")).strip()
@@ -11021,7 +11786,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                 if isinstance(payload.get("precision_bits"), dict):
                     saved_precision = load_state_data().get("precision_bits", {})
                     precision_bits = dict(saved_precision) if isinstance(saved_precision, dict) else {}
-                    for mode in ("expression", "equation", "matrix", "integrator", "datetime"):
+                    for mode in ("expression", "equation", "matrix", "integrator", "datetime", "almanac"):
                         if mode in payload["precision_bits"]:
                             bits = int(payload["precision_bits"][mode])
                             precision_bits[mode] = max(17, min(MAX_VALUE_PRECISION_BITS, bits))
@@ -11034,6 +11799,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                         "matrix": 256,
                         "integrator": 17,
                         "datetime": 17,
+                        "almanac": 17,
                     }
 
                 if updates:
@@ -11276,16 +12042,20 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                 jurisdiction_text = str(payload.get("jurisdiction", DEFAULT_HOLIDAY_JURISDICTION)).strip()
                 latitude_text = str(payload.get("latitude", DEFAULT_DATETIME_LATITUDE)).strip()
                 longitude_text = str(payload.get("longitude", DEFAULT_DATETIME_LONGITUDE)).strip()
+                elevation_text = str(payload.get("elevation", DEFAULT_DATETIME_ELEVATION)).strip()
                 gmt_offset_text = str(payload.get("gmt_offset", "")).strip()
                 for date_value in (date_text, start_text, end_text):
                     py_datetime.date.fromisoformat(date_value)
                 year = max(1, min(9999, int(year_text)))
                 latitude = float(latitude_text)
                 longitude = float(longitude_text)
+                elevation = float(elevation_text)
                 if latitude < -90.0 or latitude > 90.0:
                     raise ValueError("Latitude must be between -90 and 90")
                 if longitude < -180.0 or longitude > 180.0:
                     raise ValueError("Longitude must be between -180 and 180")
+                if not math.isfinite(elevation):
+                    raise ValueError("Elevation must be finite")
                 jurisdiction = normalize_holiday_jurisdiction(jurisdiction_text)
                 if gmt_offset_text:
                     gmt_offset = float(gmt_offset_text)
@@ -11306,6 +12076,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                     "year": str(year),
                     "lat": str(latitude),
                     "lon": str(longitude),
+                    "elevation": str(elevation),
                     "gmt_offset": gmt_offset_text,
                     "jurisdiction": jurisdiction,
                 }
@@ -11383,6 +12154,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                     "datetime_jurisdiction": jurisdiction,
                     "datetime_latitude": str(latitude),
                     "datetime_longitude": str(longitude),
+                    "datetime_elevation": str(elevation),
                     "datetime_gmt_offset": gmt_offset_text,
                 })
                 self.send_json(200, prepare_datetime_fields(fields))
@@ -11443,6 +12215,67 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                 "longitude": str(holiday_fields.get("jurisdiction_longitude") or "").strip(),
                 "gmt_offset": str(holiday_fields.get("jurisdiction_gmt_offset") or "").strip(),
             })
+            return
+
+        if path == "/almanac-eval":
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                body = self.rfile.read(length)
+                payload = json.loads(body.decode("utf-8"))
+                date_text = str(payload.get("date", DEFAULT_ALMANAC_DATE)).strip()
+                time_text = str(payload.get("time", DEFAULT_ALMANAC_TIME)).strip()
+                zone_text = str(payload.get("zone", DEFAULT_ALMANAC_ZONE)).strip()
+                latitude_text = str(payload.get("latitude", DEFAULT_ALMANAC_LATITUDE)).strip()
+                longitude_text = str(payload.get("longitude", DEFAULT_ALMANAC_LONGITUDE)).strip()
+                body_text = str(payload.get("body", DEFAULT_ALMANAC_BODY)).strip().upper()
+                py_datetime.date.fromisoformat(date_text)
+                if not re.fullmatch(r"\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?", time_text):
+                    raise ValueError("Time must look like HH:MM or HH:MM:SS")
+                zone = float(zone_text)
+                latitude = float(latitude_text)
+                longitude = float(longitude_text)
+                if zone < -14.0 or zone > 14.0:
+                    raise ValueError("Zone must be between -14 and 14")
+                if latitude < -90.0 or latitude > 90.0:
+                    raise ValueError("Latitude must be between -90 and 90")
+                if longitude < -180.0 or longitude > 180.0:
+                    raise ValueError("Longitude must be between -180 and 180")
+                if body_text not in {code for code, _ in ALMANAC_BODY_OPTIONS}:
+                    raise ValueError("Unknown almanac body")
+            except Exception as exc:
+                self.send_json(400, {"ok": False, "error": f"Bad request: {exc}"})
+                return
+
+            try:
+                ensure_scratch_binary(self.almanac_binary, "scratch/almanac_lab")
+                fields, raw, returncode = run_almanac_lab_fields(
+                    self.almanac_binary,
+                    {
+                        "date": date_text,
+                        "time": time_text,
+                        "zone": zone_text,
+                        "lat": latitude_text,
+                        "lon": longitude_text,
+                        "body": body_text,
+                    },
+                )
+            except Exception as exc:
+                self.send_json(422, {"ok": False, "error": str(exc)})
+                return
+
+            if returncode != 0:
+                self.send_json(422, {"ok": False, "error": raw or "Almanac calculation failed"})
+                return
+
+            save_state_data({
+                "almanac_date": date_text,
+                "almanac_time": time_text,
+                "almanac_zone": zone_text,
+                "almanac_latitude": latitude_text,
+                "almanac_longitude": longitude_text,
+                "almanac_body": body_text,
+            })
+            self.send_json(200, prepare_almanac_fields(fields))
             return
 
         if path == "/goal_seek":
@@ -11651,18 +12484,21 @@ def main() -> int:
     parser.add_argument("--binary", type=Path, default=DEFAULT_BIN, help="path to the scratch lab binary")
     parser.add_argument("--equation-binary", type=Path, default=DEFAULT_EQUATION_BIN, help="path to the equation scratch binary")
     parser.add_argument("--datetime-binary", type=Path, default=DEFAULT_DATETIME_BIN, help="path to the datetime scratch binary")
+    parser.add_argument("--almanac-binary", type=Path, default=DEFAULT_ALMANAC_BIN, help="path to the almanac scratch binary")
     parser.add_argument("--holiday-binary", type=Path, default=DEFAULT_HOLIDAY_BIN, help="path to the holiday scratch binary")
     args = parser.parse_args()
 
     binary = args.binary if args.binary.is_absolute() else ROOT / args.binary
     equation_binary = args.equation_binary if args.equation_binary.is_absolute() else ROOT / args.equation_binary
     datetime_binary = args.datetime_binary if args.datetime_binary.is_absolute() else ROOT / args.datetime_binary
+    almanac_binary = args.almanac_binary if args.almanac_binary.is_absolute() else ROOT / args.almanac_binary
     holiday_binary = args.holiday_binary if args.holiday_binary.is_absolute() else ROOT / args.holiday_binary
     ensure_mars_lab(binary)
 
     MarsLabHandler.binary = binary
     MarsLabHandler.equation_binary = equation_binary
     MarsLabHandler.datetime_binary = datetime_binary
+    MarsLabHandler.almanac_binary = almanac_binary
     MarsLabHandler.holiday_binary = holiday_binary
 
     port = args.port or find_free_port(args.host)

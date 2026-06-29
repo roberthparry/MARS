@@ -45,6 +45,12 @@ DEFAULT_CASES = (
     ("MARS", "MARS BARYCENTER", 2649, 1, 1, 0, 0, 0.0),
     ("JUPITER", "JUPITER BARYCENTER", 2649, 1, 1, 0, 0, 0.0),
 )
+BODY_IDS = {
+    "SUN": "ALMANAC_BODY_ID_SUN",
+    "MOON": "ALMANAC_BODY_ID_MOON",
+    "MARS": "ALMANAC_BODY_ID_MARS",
+    "JUPITER": "ALMANAC_BODY_ID_JUPITER",
+}
 
 
 def jd_from_mars_civil(year: int, month: int, day: int, hour: int, minute: int, second: float) -> float:
@@ -166,6 +172,7 @@ def render_header() -> str:
         "",
         "typedef struct almanac_spice_oracle_case_t {",
         "    const char *body_code;",
+        "    almanac_body_id_t body_id;",
         "    int year;",
         "    int month;",
         "    int day;",
@@ -183,7 +190,7 @@ def render_header() -> str:
     for body_code, spice_target, year, month, day, hour, minute, second in DEFAULT_CASES:
         sha, dec, distance = apparent_sha_dec(spice_target, year, month, day, hour, minute, second)
         lines.append(
-            f'    {{"{body_code}", {year}, {month}, {day}, {hour}, {minute}, {second:.1f}, '
+            f'    {{"{body_code}", {BODY_IDS[body_code]}, {year}, {month}, {day}, {hour}, {minute}, {second:.1f}, '
             f"{sha:.12f}, {dec:.12f}, {distance:.12f}}},"
         )
 

@@ -335,35 +335,37 @@ $(foreach bin,$(filter-out $(addprefix tests/build/release/almanac/,$(TEST_ALIAS
 .PHONY: test_almanac memtest_almanac
 test_almanac: tests/build/release/almanac/test_almanac tools/configure_mars_lab_almanac_db.py
 	@tmp_out=$$(mktemp); \
-	if $< >"$$tmp_out" 2>&1; then \
-	    cat "$$tmp_out"; \
+	tmp_status=$$(mktemp); \
+	{ stdbuf -oL -eL $< 2>&1; echo $$? >"$$tmp_status"; } | tee "$$tmp_out"; \
+	rc=$$(cat "$$tmp_status"); \
+	rm -f "$$tmp_status"; \
+	if [ "$$rc" -eq 0 ]; then \
 	    rm -f "$$tmp_out"; \
 	    exit 0; \
 	fi; \
 	if grep -q "Almanac tests require a configured almanac database." "$$tmp_out"; then \
-	    cat "$$tmp_out"; \
 	    rm -f "$$tmp_out"; \
 	    python3 tools/configure_mars_lab_almanac_db.py || exit $$?; \
-	    exec $<; \
+	    exec stdbuf -oL -eL $<; \
 	fi; \
-	cat "$$tmp_out"; \
 	rm -f "$$tmp_out"; \
 	exit 1
 
 memtest_almanac: tests/build/release/almanac/test_almanac tools/configure_mars_lab_almanac_db.py
 	@tmp_out=$$(mktemp); \
-	if $(VALGRIND) $< >"$$tmp_out" 2>&1; then \
-	    cat "$$tmp_out"; \
+	tmp_status=$$(mktemp); \
+	{ $(VALGRIND) stdbuf -oL -eL $< 2>&1; echo $$? >"$$tmp_status"; } | tee "$$tmp_out"; \
+	rc=$$(cat "$$tmp_status"); \
+	rm -f "$$tmp_status"; \
+	if [ "$$rc" -eq 0 ]; then \
 	    rm -f "$$tmp_out"; \
 	    exit 0; \
 	fi; \
 	if grep -q "Almanac tests require a configured almanac database." "$$tmp_out"; then \
-	    cat "$$tmp_out"; \
 	    rm -f "$$tmp_out"; \
 	    python3 tools/configure_mars_lab_almanac_db.py || exit $$?; \
-	    exec $(VALGRIND) $<; \
+	    exec $(VALGRIND) stdbuf -oL -eL $<; \
 	fi; \
-	cat "$$tmp_out"; \
 	rm -f "$$tmp_out"; \
 	exit 1
 

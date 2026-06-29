@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import struct
 
 import erfa
 import numpy as np
@@ -62,17 +63,11 @@ def build_segments() -> list[Segment]:
 
 def format_segment(segment: Segment) -> str:
     coeffs = [*segment.dpsi_coeffs.tolist(), *segment.deps_coeffs.tolist()]
-    coeff_text = ", ".join(f"{value:.18e}" for value in coeffs)
+    coeff_blob = b"".join(struct.pack("<d", float(value)) for value in coeffs)
     return (
         "INSERT INTO almanac_nutation_model "
-        "(model_id, start_jd, end_jd, reference_jd, span_days, "
-        "dpsi_c0_rad, dpsi_c1_rad, dpsi_c2_rad, dpsi_c3_rad, "
-        "dpsi_c4_rad, dpsi_c5_rad, dpsi_c6_rad, dpsi_c7_rad, "
-        "deps_c0_rad, deps_c1_rad, deps_c2_rad, deps_c3_rad, "
-        "deps_c4_rad, deps_c5_rad, deps_c6_rad, deps_c7_rad, sort_order) "
-        f"VALUES ({segment.model_id}, {segment.start_jd:.8f}, {segment.end_jd:.8f}, "
-        f"{segment.reference_jd:.8f}, {segment.span_days:.8f}, {coeff_text}, "
-        f"{segment.model_id * 10});"
+        "(model_id, coefficient_blob, sort_order) "
+        f"VALUES ({segment.model_id}, X'{coeff_blob.hex()}', {segment.model_id * 10});"
     )
 
 

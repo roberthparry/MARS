@@ -297,7 +297,11 @@ int main(void) {
 | `qfloat_t` | Double-double arithmetic, circular function families, and special functions | [`docs/qfloat.md`](docs/qfloat.md) |
 | `qcomplex_t` | Double-double complex arithmetic, circular function families, and special functions | [`docs/qcomplex.md`](docs/qcomplex.md) |
 | `matrix_t` | Generic high-precision matrix with numeric and symbolic element types | [`docs/matrix.md`](docs/matrix.md) |
+| `equation_t` | Parsed equations with symbolic isolation and numeric fallback | [`docs/equation.md`](docs/equation.md) |
 | `expr_t` | Differentiable expression DAGs with symbolic differentiation and conservative symbolic antiderivatives | [`docs/expression.md`](docs/expression.md) |
+| `almanac_t` | Ephemeris-backed SHA and declination lookups and snapshot queries | [`docs/almanac.md`](docs/almanac.md) |
+| `jurisdiction_t` | Jurisdiction-aware holiday and working-day queries | [`docs/jurisdiction.md`](docs/jurisdiction.md) |
+| `sqlite_t` | Opaque SQLCipher-backed SQLite storage for encrypted object persistence | [`docs/sqlite.md`](docs/sqlite.md) |
 | `integrator_t` | Adaptive G7K15 numerical integrator | [`docs/integrator.md`](docs/integrator.md) |
 
 ## Build
