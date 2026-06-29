@@ -8,6 +8,7 @@
 #include <string.h>
 #include <time.h>
 
+#include "almanac.h"
 #include "array.h"
 #include "datetime.h"
 #include "jurisdiction.h"
@@ -28,6 +29,7 @@ typedef struct datetime_lab_options_t {
     int year;
     double latitude;
     double longitude;
+    double elevation_metres;
     double gmt_offset;
     char jurisdiction[32];
 } datetime_lab_options_t;
@@ -278,6 +280,7 @@ static void init_defaults(datetime_lab_options_t *options)
     options->year = options->date_year;
     options->latitude = 51.5074;
     options->longitude = -0.1278;
+    options->elevation_metres = 0.0;
     options->gmt_offset = DBL_MAX;
     options->jurisdiction[0] = '\0';
 }
@@ -365,6 +368,12 @@ static bool apply_arg(datetime_lab_options_t *options, const char *arg)
         if (!parse_double_text(value, &number) || number < -180.0 || number > 180.0)
             return false;
         options->longitude = number;
+        return true;
+    }
+    if (key_equals(arg, key_len, "elevation") || key_equals(arg, key_len, "elevation_metres")) {
+        if (!parse_double_text(value, &number) || !isfinite(number))
+            return false;
+        options->elevation_metres = number;
         return true;
     }
     if (key_equals(arg, key_len, "gmt_offset")) {
@@ -503,6 +512,63 @@ static char *format_datetime_minutes(const datetime_t *dttm)
 static char *format_datetime_iso_minutes(const datetime_t *dttm)
 {
     return datetime_format(dttm, "%yyyy-%mm-%dd @Hh:@mm");
+}
+
+static char *format_almanac_event_seconds(const almanac_event_time_t *event_time)
+{
+    int year;
+    int month;
+    int day;
+    int hour;
+    int minute;
+    int second;
+    char *out;
+
+    if (!event_time || !event_time->valid)
+        return NULL;
+
+    year = event_time->year;
+    month = (int)event_time->month;
+    day = event_time->day;
+    hour = event_time->hour;
+    minute = event_time->minute;
+    second = (int)lround(event_time->second);
+
+    if (second >= 60) {
+        second -= 60;
+        minute += 1;
+    }
+    if (minute >= 60) {
+        minute -= 60;
+        hour += 1;
+    }
+    if (hour >= 24) {
+        unsigned short days_this_month;
+
+        hour -= 24;
+        days_this_month = datetime_days_in_month((short)year, (month_t)month);
+        day += 1;
+        if (day > (int)days_this_month) {
+            day = 1;
+            month += 1;
+            if (month > 12) {
+                month = 1;
+                year += 1;
+            }
+        }
+    }
+
+    out = malloc(64u);
+    if (!out)
+        return NULL;
+    snprintf(out, 64u, "%04d-%02d-%02d %02d:%02d:%02d",
+             year,
+             month,
+             day,
+             hour,
+             minute,
+             second);
+    return out;
 }
 
 static void print_date_field(const char *name, const datetime_t *dttm)
@@ -1056,6 +1122,88 @@ static void print_sun_time_field(const char *name,
     datetime_dealloc(dttm);
 }
 
+static const char *rise_set_status_text(almanac_rise_set_status_t status)
+{
+    switch (status) {
+    case ALMANAC_RISE_SET_OK:
+        return "ok";
+    case ALMANAC_RISE_SET_NOT_ON_DATE:
+        return "not on selected date";
+    case ALMANAC_RISE_SET_NEVER_RISES:
+        return "never rises";
+    case ALMANAC_RISE_SET_NEVER_SETS:
+        return "never sets";
+    case ALMANAC_RISE_SET_UNAVAILABLE:
+    default:
+        return "unavailable";
+    }
+}
+
+static void print_actual_sun_event_field(const char *name,
+                                         const almanac_sun_event_t *event)
+{
+    char *text;
+
+    if (!event || event->status != ALMANAC_RISE_SET_OK) {
+        printf("%s unavailable\n", name);
+        printf("%s_status %s\n", name, event ? rise_set_status_text(event->status) : "unavailable");
+        return;
+    }
+
+    text = format_almanac_event_seconds(&event->local_time);
+    printf("%s %s\n", name, text ? text : "unavailable");
+    printf("%s_status %s\n", name, text ? "ok" : "unavailable");
+    free(text);
+}
+
+static void print_actual_sun_times(const datetime_lab_options_t *options,
+                                   const datetime_t *date)
+{
+    almanac_t *almanac;
+    jurisdiction_t *jurisdiction;
+    almanac_sun_times_t sun_times;
+    almanac_observer_t observer;
+
+    if (!options || !date || options->jurisdiction[0] == '\0') {
+        printf("actual_sunrise unavailable\n");
+        printf("actual_sunrise_status unavailable\n");
+        printf("actual_sunset unavailable\n");
+        printf("actual_sunset_status unavailable\n");
+        return;
+    }
+
+    almanac = almanac_open();
+    jurisdiction = jurisdict_open(options->jurisdiction);
+    if (!almanac || !jurisdiction) {
+        printf("actual_sunrise unavailable\n");
+        printf("actual_sunrise_status unavailable\n");
+        printf("actual_sunset unavailable\n");
+        printf("actual_sunset_status unavailable\n");
+        almanac_close(almanac);
+        jurisdict_close(jurisdiction);
+        return;
+    }
+
+    observer.latitude_degrees = options->latitude;
+    observer.longitude_degrees = options->longitude;
+    observer.elevation_metres = options->elevation_metres;
+    if (!almanac_sunrise_sunset(almanac, jurisdiction, date, &observer, &sun_times)) {
+        printf("actual_sunrise unavailable\n");
+        printf("actual_sunrise_status unavailable\n");
+        printf("actual_sunset unavailable\n");
+        printf("actual_sunset_status unavailable\n");
+        almanac_close(almanac);
+        jurisdict_close(jurisdiction);
+        return;
+    }
+
+    print_actual_sun_event_field("actual_sunrise", &sun_times.sunrise);
+    print_actual_sun_event_field("actual_sunset", &sun_times.sunset);
+
+    almanac_close(almanac);
+    jurisdict_close(jurisdiction);
+}
+
 int main(int argc, char **argv)
 {
     datetime_lab_options_t options;
@@ -1157,6 +1305,7 @@ int main(int argc, char **argv)
         printf("solar_inclination %.10g\n", solar_inclination);
         printf("latitude %.10g\n", options.latitude);
         printf("longitude %.10g\n", options.longitude);
+        printf("elevation_metres %.10g\n", options.elevation_metres);
         if (options.gmt_offset == DBL_MAX)
             printf("gmt_offset local\n");
         else
@@ -1164,6 +1313,7 @@ int main(int argc, char **argv)
 
         print_sun_time_field("sunrise", jdn, options.latitude, options.longitude, options.gmt_offset, true);
         print_sun_time_field("sunset", jdn, options.latitude, options.longitude, options.gmt_offset, false);
+        print_actual_sun_times(&options, date);
         if (dst_forward || dst_back) {
             print_iso_time_field("dst_forward", dst_forward);
             print_iso_time_field("dst_back", dst_back);
