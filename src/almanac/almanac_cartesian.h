@@ -18,6 +18,7 @@ cartesian3_t cartesian_negate(const cartesian3_t *value);
 cartesian3_t cartesian_cross(const cartesian3_t *a, const cartesian3_t *b);
 double cartesian_dot(const cartesian3_t *a, const cartesian3_t *b);
 cartesian3_t cartesian_rotate_x(const cartesian3_t *value, double radians);
+cartesian3_t cartesian_rotate_y(const cartesian3_t *value, double radians);
 cartesian3_t cartesian_rotate_z(const cartesian3_t *value, double radians);
 
 #endif /* MARS_ALMANAC_CARTESIAN_H */
