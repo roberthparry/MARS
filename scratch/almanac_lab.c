@@ -220,7 +220,11 @@ static void print_snapshot_row(const char *code,
                                double lha,
                                double distance_au,
                                double phase_degrees,
-                               double magnitude)
+                               double magnitude,
+                               double altitude,
+                               double azimuth,
+                               double semi_diameter,
+                               const char *visible)
 {
     char declination_text[32];
     char right_ascension_text[32];
@@ -230,6 +234,9 @@ static void print_snapshot_row(const char *code,
     char distance_text[32];
     char phase_text[32];
     char magnitude_text[32];
+    char altitude_text[32];
+    char azimuth_text[32];
+    char semi_diameter_text[32];
 
     format_optional_double(declination_text, sizeof(declination_text), "%.9f", declination);
     format_optional_double(right_ascension_text, sizeof(right_ascension_text), "%.9f", right_ascension_hours);
@@ -239,8 +246,11 @@ static void print_snapshot_row(const char *code,
     format_optional_double(distance_text, sizeof(distance_text), "%.12f", distance_au);
     format_optional_double(phase_text, sizeof(phase_text), "%.9f", phase_degrees);
     format_optional_double(magnitude_text, sizeof(magnitude_text), "%.9f", magnitude);
+    format_optional_double(altitude_text, sizeof(altitude_text), "%.9f", altitude);
+    format_optional_double(azimuth_text, sizeof(azimuth_text), "%.9f", azimuth);
+    format_optional_double(semi_diameter_text, sizeof(semi_diameter_text), "%.9f", semi_diameter);
 
-    printf("snapshot %s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s\n",
+    printf("snapshot %s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s\n",
            code ? code : "",
            name ? name : "",
            kind ? kind : "",
@@ -251,7 +261,11 @@ static void print_snapshot_row(const char *code,
            lha_text,
            distance_text,
            phase_text,
-           magnitude_text);
+           magnitude_text,
+           altitude_text,
+           azimuth_text,
+           semi_diameter_text,
+           visible ? visible : "");
 }
 
 int main(int argc, char **argv)
@@ -260,6 +274,8 @@ int main(int argc, char **argv)
     datetime_t *moment = NULL;
     almanac_t *almanac = NULL;
     almanac_entry_t selected;
+    almanac_observer_t observer;
+    almanac_observables_t selected_observables;
     array_t *snapshot = NULL;
     double gha_aries = NAN;
     size_t i;
@@ -319,6 +335,16 @@ int main(int argc, char **argv)
     printf("longitude %.6f\n", options.longitude);
     printf("body %s\n", almanac_body_code(options.body_id));
     printf("gha_aries %.9f\n", gha_aries);
+    observer.latitude_degrees = options.latitude;
+    observer.longitude_degrees = options.longitude;
+    observer.elevation_metres = 0.0;
+    if (!almanac_observables(almanac, &selected, &observer, &selected_observables)) {
+        selected_observables.altitude_degrees = NAN;
+        selected_observables.azimuth_degrees = NAN;
+        selected_observables.semi_diameter_degrees = NAN;
+        selected_observables.above_horizon = false;
+        selected_observables.visible = false;
+    }
     printf("selected_name %s\n", almanac_body_display_name(selected.body_id));
     printf("selected_kind %s\n", body_kind_text(selected.body_kind));
     printf("selected_declination %.9f\n", selected.declination_degrees);
@@ -331,6 +357,10 @@ int main(int argc, char **argv)
     printf("selected_helio_distance %.12f\n", selected.heliocentric_distance_au);
     printf("selected_phase %.9f\n", selected.phase_angle_degrees);
     printf("selected_visual_magnitude %.9f\n", selected.visual_magnitude);
+    printf("selected_altitude %.9f\n", selected_observables.altitude_degrees);
+    printf("selected_azimuth %.9f\n", selected_observables.azimuth_degrees);
+    printf("selected_semi_diameter %.9f\n", selected_observables.semi_diameter_degrees);
+    printf("selected_visible %s\n", selected_observables.visible ? "YES" : "NO");
 
     print_snapshot_row("ARIES",
                        "Aries",
@@ -342,13 +372,25 @@ int main(int argc, char **argv)
                        normalize_degrees(gha_aries - options.longitude),
                        NAN,
                        NAN,
-                       NAN);
+                       NAN,
+                       NAN,
+                       NAN,
+                       NAN,
+                       "");
     for (i = 0u; i < array_size(snapshot); ++i) {
         const almanac_entry_t *entry = array_get(snapshot, i);
+        almanac_observables_t observables;
         double gha;
 
         if (!entry)
             continue;
+        if (!almanac_observables(almanac, entry, &observer, &observables)) {
+            observables.altitude_degrees = NAN;
+            observables.azimuth_degrees = NAN;
+            observables.semi_diameter_degrees = NAN;
+            observables.above_horizon = false;
+            observables.visible = false;
+        }
         gha = normalize_degrees(entry->gha_aries_degrees + entry->sha_degrees);
         print_snapshot_row(almanac_body_code(entry->body_id),
                            almanac_body_display_name(entry->body_id),
@@ -360,7 +402,11 @@ int main(int argc, char **argv)
                            normalize_degrees(gha - options.longitude),
                            entry->geocentric_distance_au,
                            entry->phase_angle_degrees,
-                           entry->visual_magnitude);
+                           entry->visual_magnitude,
+                           observables.altitude_degrees,
+                           observables.azimuth_degrees,
+                           observables.semi_diameter_degrees,
+                           observables.visible ? "YES" : "NO");
     }
 
     array_destroy(snapshot);
