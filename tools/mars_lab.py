@@ -300,6 +300,7 @@ DEFAULT_INTEGRATOR_BIN = ROOT / "build" / "release" / "scratch" / "integrator_la
 DEFAULT_EQUATION_BIN = ROOT / "build" / "release" / "scratch" / "equation_lab"
 DEFAULT_DATETIME_BIN = ROOT / "build" / "release" / "scratch" / "datetime_lab"
 DEFAULT_ALMANAC_BIN = ROOT / "build" / "release" / "scratch" / "almanac_lab"
+DEFAULT_ALMANAC_EVENT_BIN = ROOT / "build" / "release" / "scratch" / "almanac_event_lab"
 DEFAULT_HOLIDAY_BIN = ROOT / "build" / "release" / "scratch" / "holiday_lab"
 STATE_FILE = ROOT / os.environ.get("MARS_LAB_STATE_FILE", ".mars_lab_state.json")
 LAB_ICON_FILE = ROOT / "packaging" / "linux" / "mars-lab.svg"
@@ -322,6 +323,12 @@ DEFAULT_DATETIME_LONGITUDE = DEFAULT_TIMEZONE_LONGITUDE
 DEFAULT_DATETIME_ELEVATION = "0"
 DEFAULT_DATETIME_GMT_OFFSET = ""
 DEFAULT_ALMANAC_TEXT = "Navigation almanac worksheet"
+ALMANAC_COVERAGE_TEXT = "1550-2649 GMT"
+ALMANAC_WORKSHEET_TITLE = "AstroNav Navigation Almanac"
+ALMANAC_ACCURACY_NOTE = (
+    f"Packaged ephemeris coverage: {ALMANAC_COVERAGE_TEXT}. "
+    "Navigation body positions are reported rounded to the nearest arc-second."
+)
 DEFAULT_ALMANAC_DATE = DEFAULT_DATETIME_DATE
 DEFAULT_ALMANAC_TIME = py_datetime.datetime.now(py_datetime.timezone.utc).strftime("%H:%M:%S")
 DEFAULT_ALMANAC_ZONE = "0"
@@ -1141,6 +1148,34 @@ INDEX_HTML = r"""<!doctype html>
 
     .almanac-grid-table td.number {
       white-space: nowrap;
+    }
+
+    .almanac-events-title {
+      margin: 0.3rem 0 -0.15rem;
+      color: #f0c873;
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .almanac-grid-table td.event-details {
+      min-width: 18rem;
+      white-space: normal;
+    }
+
+    .almanac-grid-table .visible-cell {
+      color: #d6f9df;
+      font-weight: 800;
+      text-align: center;
+    }
+
+    .almanac-grid-table .visible-cell.yes {
+      background: rgba(29, 126, 78, 0.36);
+    }
+
+    .almanac-grid-table .visible-cell.no {
+      background: rgba(18, 84, 60, 0.32);
     }
 
     .integrator-bound-field {
@@ -2849,7 +2884,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           <div>
             <div class="datetime-briefing-kicker">AstroNav worksheet</div>
             <div class="datetime-briefing-title">Location of Navigational Bodies</div>
-            <div class="datetime-briefing-copy">Enter date and time in GMT, then zone, latitude, and longitude. The worksheet starts out in the voice of AstroNav 2000-2040 and uses the live almanac engine underneath.</div>
+            <div class="datetime-briefing-copy">Enter date and time in GMT, then zone, latitude, and longitude. The worksheet uses the live almanac engine underneath, with ephemeris coverage for __ALMANAC_COVERAGE_TEXT__.</div>
           </div>
         </div>
         <div class="datetime-field-groups">
@@ -2877,6 +2912,12 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             <div class="datetime-field-group-title">Observer</div>
             <div class="datetime-grid">
               <div class="integrator-bound-field">
+                <label for="almanacJurisdiction">Jurisdiction</label>
+                <select id="almanacJurisdiction">
+__HOLIDAY_JURISDICTION_OPTIONS__
+                </select>
+              </div>
+              <div class="integrator-bound-field">
                 <label for="almanacLatitude">Latitude</label>
                 <input id="almanacLatitude" inputmode="decimal" placeholder="51.5074">
               </div>
@@ -2893,7 +2934,7 @@ __ALMANAC_BODY_OPTIONS__
             </div>
           </div>
         </div>
-        <p class="mode-hint">For 2000-2040 GMT, the workbook intention is navigation-grade output within 6 arc-seconds after rounding to the nearest arc-second for the listed navigation bodies.</p>
+        <p class="mode-hint">__ALMANAC_ACCURACY_NOTE__</p>
       </div>
       <div class="target-row hidden" id="targetRow">
         <label for="goalTarget">Target</label>
@@ -3181,6 +3222,7 @@ __ALMANAC_BODY_OPTIONS__
     const almanacDate = document.getElementById('almanacDate');
     const almanacTime = document.getElementById('almanacTime');
     const almanacZone = document.getElementById('almanacZone');
+    const almanacJurisdiction = document.getElementById('almanacJurisdiction');
     const almanacLatitude = document.getElementById('almanacLatitude');
     const almanacLongitude = document.getElementById('almanacLongitude');
     const almanacBody = document.getElementById('almanacBody');
@@ -3214,6 +3256,11 @@ __ALMANAC_BODY_OPTIONS__
     const controlToken = __CONTROL_TOKEN__;
     enhanceRoundedSelect(matrixOperation);
     enhanceRoundedSelect(datetimeJurisdiction, {
+      searchable: true,
+      searchPlaceholder: 'Search jurisdictions',
+      emptyText: 'No matching jurisdiction'
+    });
+    enhanceRoundedSelect(almanacJurisdiction, {
       searchable: true,
       searchPlaceholder: 'Search jurisdictions',
       emptyText: 'No matching jurisdiction'
@@ -3327,6 +3374,9 @@ __ALMANAC_BODY_OPTIONS__
     const DEFAULT_ALMANAC_LATITUDE = __DEFAULT_ALMANAC_LATITUDE__;
     const DEFAULT_ALMANAC_LONGITUDE = __DEFAULT_ALMANAC_LONGITUDE__;
     const DEFAULT_ALMANAC_BODY = __DEFAULT_ALMANAC_BODY__;
+    const ALMANAC_WORKSHEET_TITLE = __ALMANAC_WORKSHEET_TITLE__;
+    const ALMANAC_COVERAGE_TEXT = __ALMANAC_COVERAGE_TEXT_JS__;
+    const ALMANAC_ACCURACY_NOTE = __ALMANAC_ACCURACY_NOTE_JS__;
     if (datetimeJurisdiction && !datetimeJurisdiction.value)
       datetimeJurisdiction.value = DEFAULT_DATETIME_JURISDICTION;
     let datetimeAutoGmtOffset = String(datetimeGmtOffset && datetimeGmtOffset.value || DEFAULT_DATETIME_GMT_OFFSET);
@@ -3517,6 +3567,17 @@ __ALMANAC_BODY_OPTIONS__
       valueTitle.textContent = valueText;
     }
 
+    function setAuxResultCardsVisible(visible) {
+      [parsed, functionStyle, value].filter(Boolean).forEach((element) => {
+        const card = element.closest('.result-card');
+        if (!card)
+          return;
+        if (!visible && card.classList.contains('expanded-card'))
+          collapseResultCards();
+        card.classList.toggle('hidden', !visible);
+      });
+    }
+
     function setValueCardVisible(visible) {
       if (!valueCard)
         return;
@@ -3654,31 +3715,36 @@ __ALMANAC_BODY_OPTIONS__
         leftPaneTitle.textContent = 'Expression';
         subtitle.textContent = 'Switch between expression, equation, matrix, and integrator experiments. Each mode runs through a local MARS scratch binary and shows the result on the right.';
         setResultTitles('Rendered TeX', 'Expression', 'Function', 'Value');
+        setAuxResultCardsVisible(true);
         setValueCardVisible(true);
       } else if (equationMode) {
         leftPaneTitle.textContent = 'Equation';
         subtitle.textContent = 'Enter an equation on the left. The lab tries symbolic isolation first, then numeric solving for all variable bindings.';
         setResultTitles('Rendered TeX', 'Equation', 'Solutions', 'Details');
+        setAuxResultCardsVisible(true);
         setValueCardVisible(true);
       } else if (matrixMode) {
         leftPaneTitle.textContent = 'Matrix';
         subtitle.textContent = 'Enter a matrix expression on the left, choose an operation, and inspect both the formatted result and the raw matrix output.';
         setResultTitles('Rendered TeX', 'Result', 'Layout', 'Summary');
+        setAuxResultCardsVisible(true);
         setValueCardVisible(false);
       } else if (integratorMode) {
         leftPaneTitle.textContent = 'Integrator';
         subtitle.textContent = 'Enter an integrand expression on the left, stack one or more integral rows, and use Free when a symbol should stay as a parameter. Leave both bounds blank for an antiderivative, or leave lower blank and fill upper to evaluate it there.';
         setResultTitles('Rendered TeX', 'Integrand', 'Exact result', 'Integral');
+        setAuxResultCardsVisible(true);
         setValueCardVisible(true);
       } else if (almanacMode) {
         leftPaneTitle.textContent = 'Almanac';
-        subtitle.textContent = 'Enter date and time in GMT, then zone, latitude, and longitude. This starts out like AstroNav 2000-2040 while using the live almanac engine underneath.';
-        setResultTitles('Worksheet', 'Selected Body', 'All Bodies', 'Notes');
-        setValueCardVisible(true);
+        subtitle.textContent = `Enter date and time in GMT, then zone, latitude, and longitude. The live almanac engine covers ${ALMANAC_COVERAGE_TEXT}.`;
+        setResultTitles('Worksheet', '', '', '');
+        setAuxResultCardsVisible(false);
       } else {
         leftPaneTitle.textContent = 'Datetime';
         subtitle.textContent = 'Choose dates, a year, and a location. MARS datetime calculates calendar observances, moon phase, solar times, and optional local weather, with jurisdiction holidays added when available.';
         setResultTitles('Overview', 'Date Range', 'Calendar', 'Solar And Moon');
+        setAuxResultCardsVisible(true);
         setValueCardVisible(true);
       }
 
@@ -5087,6 +5153,8 @@ __ALMANAC_BODY_OPTIONS__
         almanacTime.value = DEFAULT_ALMANAC_TIME;
       if (almanacZone && !almanacZone.value)
         almanacZone.value = DEFAULT_ALMANAC_ZONE;
+      if (almanacJurisdiction && !almanacJurisdiction.value)
+        setSelectValue(almanacJurisdiction, DEFAULT_DATETIME_JURISDICTION);
       if (almanacLatitude && !almanacLatitude.value)
         almanacLatitude.value = DEFAULT_ALMANAC_LATITUDE;
       if (almanacLongitude && !almanacLongitude.value)
@@ -5109,6 +5177,7 @@ __ALMANAC_BODY_OPTIONS__
         date: validDateText(almanacDate && almanacDate.value, DEFAULT_ALMANAC_DATE),
         time: String(almanacTime && almanacTime.value || DEFAULT_ALMANAC_TIME).trim(),
         zone: String(almanacZone && almanacZone.value || DEFAULT_ALMANAC_ZONE).trim(),
+        jurisdiction: validDatetimeJurisdiction(almanacJurisdiction && almanacJurisdiction.value),
         latitude: String(almanacLatitude && almanacLatitude.value || DEFAULT_ALMANAC_LATITUDE).trim(),
         longitude: String(almanacLongitude && almanacLongitude.value || DEFAULT_ALMANAC_LONGITUDE).trim(),
         body: validAlmanacBody(almanacBody && almanacBody.value, DEFAULT_ALMANAC_BODY)
@@ -5117,9 +5186,10 @@ __ALMANAC_BODY_OPTIONS__
 
     function almanacSummaryText(state = currentAlmanacState()) {
       return [
-        'AstroNav 2000-2040 Navigation Almanac',
+        ALMANAC_WORKSHEET_TITLE,
         `Date: ${state.date}`,
         `GMT time: ${state.time}`,
+        `Jurisdiction: ${state.jurisdiction}`,
         `Zone: ${state.zone}`,
         `Latitude: ${state.latitude}`,
         `Longitude: ${state.longitude}`,
@@ -5229,6 +5299,8 @@ __ALMANAC_BODY_OPTIONS__
         almanacTime.value = String(data.almanac_time || DEFAULT_ALMANAC_TIME).trim() || DEFAULT_ALMANAC_TIME;
       if (almanacZone)
         almanacZone.value = String(data.almanac_zone || DEFAULT_ALMANAC_ZONE).trim();
+      if (almanacJurisdiction)
+        setSelectValue(almanacJurisdiction, validDatetimeJurisdiction(data.almanac_jurisdiction, DEFAULT_DATETIME_JURISDICTION));
       if (almanacLatitude)
         almanacLatitude.value = String(data.almanac_latitude || DEFAULT_ALMANAC_LATITUDE).trim();
       if (almanacLongitude)
@@ -5324,6 +5396,8 @@ __ALMANAC_BODY_OPTIONS__
             almanacTime.value = String(state.time || DEFAULT_ALMANAC_TIME).trim() || DEFAULT_ALMANAC_TIME;
           if (almanacZone)
             almanacZone.value = String(state.zone || DEFAULT_ALMANAC_ZONE).trim();
+          if (almanacJurisdiction)
+            setSelectValue(almanacJurisdiction, validDatetimeJurisdiction(state.jurisdiction, DEFAULT_DATETIME_JURISDICTION));
           if (almanacLatitude)
             almanacLatitude.value = String(state.latitude || DEFAULT_ALMANAC_LATITUDE).trim();
           if (almanacLongitude)
@@ -5493,6 +5567,7 @@ __ALMANAC_BODY_OPTIONS__
         almanac_date: state.date,
         almanac_time: state.time,
         almanac_zone: state.zone,
+        almanac_jurisdiction: state.jurisdiction,
         almanac_latitude: state.latitude,
         almanac_longitude: state.longitude,
         almanac_body: state.body,
@@ -5609,6 +5684,8 @@ __ALMANAC_BODY_OPTIONS__
           almanacTime.value = String(almanacState.time || DEFAULT_ALMANAC_TIME).trim() || DEFAULT_ALMANAC_TIME;
         if (almanacZone)
           almanacZone.value = String(almanacState.zone || DEFAULT_ALMANAC_ZONE).trim();
+        if (almanacJurisdiction)
+          setSelectValue(almanacJurisdiction, validDatetimeJurisdiction(almanacState.jurisdiction, DEFAULT_DATETIME_JURISDICTION));
         if (almanacLatitude)
           almanacLatitude.value = String(almanacState.latitude || DEFAULT_ALMANAC_LATITUDE).trim();
         if (almanacLongitude)
@@ -6248,11 +6325,12 @@ __ALMANAC_BODY_OPTIONS__
 
     function renderAlmanacWorksheet(target, data) {
       const rows = Array.isArray(data.rows) ? data.rows : [];
-      const worksheetTitle = escapeHtml(data.worksheet_title || 'AstroNav 2000-2040 Navigation Almanac');
+      const events = Array.isArray(data.events) ? data.events : [];
+      const worksheetTitle = escapeHtml(data.worksheet_title || ALMANAC_WORKSHEET_TITLE);
       const momentText = escapeHtml(data.moment_text || '');
       const observerText = escapeHtml(data.observer_text || '');
       const bodyText = escapeHtml(data.body_text || '');
-      const rangeText = escapeHtml(data.range_text || '');
+      const eventTitle = escapeHtml(data.event_title || '');
       target.innerHTML = `
         <div class="almanac-sheet">
           <div class="almanac-sheet-header">
@@ -6260,22 +6338,24 @@ __ALMANAC_BODY_OPTIONS__
             <div>${momentText}</div>
             <div>${observerText}</div>
             <div>${bodyText}</div>
-            <div class="almanac-sheet-note">${rangeText}</div>
           </div>
           <table class="almanac-grid-table">
             <thead>
               <tr>
                 <th>Body</th>
-                <th>Kind</th>
                 <th>Declination</th>
-                <th>GHA</th>
-                <th>SHA</th>
-                <th>LHA</th>
                 <th>RA</th>
+                <th>GHA</th>
+                <th>Altitude</th>
+                <th>Azimuth</th>
+                <th>s.d.</th>
+                <th>Vmag.</th>
+                <th>Visible</th>
               </tr>
             </thead>
             <tbody>
               ${rows.map((row) => {
+                const visible = String(row.visible || '').trim().toUpperCase();
                 const classes = [
                   row.code === data.selected_code ? 'selected' : '',
                   row.kind === 'reference' ? 'reference' : ''
@@ -6284,14 +6364,41 @@ __ALMANAC_BODY_OPTIONS__
                 return `
                   <tr class="${classes}">
                     <td class="${nameClass}">${escapeHtml(row.name || row.code || '')}</td>
-                    <td>${escapeHtml(row.kind || '')}</td>
                     <td class="number">${escapeHtml(row.declination || '')}</td>
-                    <td class="number">${escapeHtml(row.gha || '')}</td>
-                    <td class="number">${escapeHtml(row.sha || '')}</td>
-                    <td class="number">${escapeHtml(row.lha || '')}</td>
                     <td class="number">${escapeHtml(row.right_ascension || '')}</td>
+                    <td class="number">${escapeHtml(row.gha || '')}</td>
+                    <td class="number">${escapeHtml(row.altitude || '')}</td>
+                    <td class="number">${escapeHtml(row.azimuth || '')}</td>
+                    <td class="number">${escapeHtml(row.semi_diameter || '')}</td>
+                    <td class="number">${escapeHtml(row.magnitude || '')}</td>
+                    <td class="visible-cell ${visible === 'YES' ? 'yes' : 'no'}">${escapeHtml(visible)}</td>
                   </tr>`;
               }).join('')}
+            </tbody>
+          </table>
+          <div class="almanac-events-title">${eventTitle}</div>
+          <table class="almanac-grid-table">
+            <thead>
+              <tr>
+                <th>Class</th>
+                <th>Event</th>
+                <th>Kind</th>
+                <th>Local Time</th>
+                <th>Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${events.length ? events.map((event) => `
+                <tr>
+                  <td>${escapeHtml(event.category || '')}</td>
+                  <td class="body-name">${escapeHtml(event.name || '')}</td>
+                  <td>${escapeHtml(event.kind || '')}</td>
+                  <td class="number">${escapeHtml(event.time || '')}</td>
+                  <td class="event-details">${escapeHtml(event.details || '')}</td>
+                </tr>`).join('') : `
+                <tr>
+                  <td colspan="5">No eclipses or Mercury/Venus transits found in this one-year window.</td>
+                </tr>`}
             </tbody>
           </table>
         </div>`;
@@ -7457,9 +7564,19 @@ __ALMANAC_BODY_OPTIONS__
         renderAlmanacWorksheet(rendered, data);
         rendered.dataset.copyText = data.worksheet || '';
         resetMoreDigitsButton(renderedMore, false);
-        setExpandableText(parsed, parsedMore, data.selected_summary || '', data.selected_summary || '');
-        setExpandableText(functionStyle, functionMore, data.body_listing || '', data.body_listing || '');
-        value.textContent = data.notes || '';
+        setExpandableText(parsed, parsedMore, '', '');
+        setExpandableText(functionStyle, functionMore, '', '');
+        value.textContent = '';
+        if (data.fields) {
+          if (almanacZone && data.fields.zone)
+            almanacZone.value = String(data.fields.zone || '').trim();
+          if (almanacLatitude && data.fields.latitude)
+            almanacLatitude.value = String(data.fields.latitude || '').trim();
+          if (almanacLongitude && data.fields.longitude)
+            almanacLongitude.value = String(data.fields.longitude || '').trim();
+          if (almanacJurisdiction && data.fields.jurisdiction)
+            setSelectValue(almanacJurisdiction, validDatetimeJurisdiction(data.fields.jurisdiction, DEFAULT_DATETIME_JURISDICTION));
+        }
         setResultInputText('');
         clearVariableValues();
         currentVariables = [];
@@ -8031,7 +8148,7 @@ __ALMANAC_BODY_OPTIONS__
         });
       });
 
-    [almanacDate, almanacTime, almanacZone, almanacLatitude, almanacLongitude, almanacBody]
+    [almanacDate, almanacTime, almanacZone, almanacJurisdiction, almanacLatitude, almanacLongitude, almanacBody]
       .filter(Boolean)
       .forEach((control) => {
         if (control === almanacDate) {
@@ -8291,6 +8408,7 @@ def default_state() -> dict[str, object]:
         "almanac_date": DEFAULT_ALMANAC_DATE,
         "almanac_time": DEFAULT_ALMANAC_TIME,
         "almanac_zone": DEFAULT_ALMANAC_ZONE,
+        "almanac_jurisdiction": DEFAULT_HOLIDAY_JURISDICTION,
         "almanac_latitude": DEFAULT_ALMANAC_LATITUDE,
         "almanac_longitude": DEFAULT_ALMANAC_LONGITUDE,
         "almanac_body": DEFAULT_ALMANAC_BODY,
@@ -8406,6 +8524,9 @@ def load_state_data() -> dict[str, object]:
     if not re.fullmatch(r"\d{2}:\d{2}(:\d{2}(\.\d+)?)?", almanac_time):
         almanac_time = DEFAULT_ALMANAC_TIME
     state["almanac_time"] = almanac_time
+    state["almanac_jurisdiction"] = normalize_holiday_jurisdiction(
+        str(state.get("almanac_jurisdiction", DEFAULT_HOLIDAY_JURISDICTION)).strip()
+    )
     for key, default in (
         ("almanac_zone", DEFAULT_ALMANAC_ZONE),
         ("almanac_latitude", DEFAULT_ALMANAC_LATITUDE),
@@ -9650,15 +9771,27 @@ def parse_almanac_lab_output(output: str) -> dict[str, str]:
             "selected_helio_distance": r"^selected_helio_distance\s+(.*)$",
             "selected_phase": r"^selected_phase\s+(.*)$",
             "selected_visual_magnitude": r"^selected_visual_magnitude\s+(.*)$",
+            "selected_altitude": r"^selected_altitude\s+(.*)$",
+            "selected_azimuth": r"^selected_azimuth\s+(.*)$",
+            "selected_semi_diameter": r"^selected_semi_diameter\s+(.*)$",
+            "selected_visible": r"^selected_visible\s+(.*)$",
+            "event_year": r"^event_year\s+(.*)$",
+            "event_window": r"^event_window\s+(.*)$",
         },
     )
     snapshot_lines = []
+    event_lines = []
     for line in output.splitlines():
         match = re.match(r"^snapshot\s+(.*)$", line)
         if match:
             snapshot_lines.append(match.group(1).rstrip())
+        match = re.match(r"^event\s+(.*)$", line)
+        if match:
+            event_lines.append(match.group(1).rstrip())
     if snapshot_lines:
         fields["snapshot"] = "\n".join(snapshot_lines)
+    if event_lines:
+        fields["events"] = "\n".join(event_lines)
     return fields
 
 
@@ -10521,7 +10654,7 @@ def run_holiday_lab_fields(
     options: dict[str, str],
 ) -> tuple[dict[str, str], str, int]:
     command = [str(binary)]
-    for key in ("start", "end", "jurisdiction"):
+    for key in ("date", "start", "end", "jurisdiction"):
         if key in options:
             command.append(f"{key}={str(options.get(key, '')).strip()}")
 
@@ -10539,6 +10672,48 @@ def run_holiday_lab_fields(
     if completed.stderr:
         raw = raw + ("\n" if raw else "") + completed.stderr
     return parse_holiday_lab_output(raw), raw, completed.returncode
+
+
+def parse_almanac_event_lab_rows(output: str) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    for line in str(output or "").splitlines():
+        match = re.match(r"^event\s+(.*)$", line)
+        if not match:
+            continue
+        parts = match.group(1).split("|")
+        if len(parts) != 8:
+            continue
+        rows.append({
+            "category": parts[0].strip(),
+            "name": parts[1].strip(),
+            "kind": parts[2].strip(),
+            "jd": parts[3].strip(),
+            "first_jd": parts[4].strip(),
+            "last_jd": parts[5].strip(),
+            "magnitude": parts[6].strip(),
+            "percent": parts[7].strip(),
+        })
+    return rows
+
+
+def run_almanac_event_lab_rows(options: dict[str, str]) -> list[dict[str, str]]:
+    command = [str(DEFAULT_ALMANAC_EVENT_BIN)]
+    for key in ("start", "end", "lat", "lon"):
+        if key in options:
+            command.append(f"{key}={str(options.get(key, '')).strip()}")
+    completed = subprocess.run(
+        command,
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        timeout=20,
+    )
+    raw = completed.stdout
+    if completed.stderr:
+        raw = raw + ("\n" if raw else "") + completed.stderr
+    if completed.returncode != 0:
+        return []
+    return parse_almanac_event_lab_rows(raw)
 
 
 def matrix_failure_hint(
@@ -11401,26 +11576,366 @@ def prepare_datetime_fields(fields: dict[str, str]) -> dict[str, object]:
     }
 
 
+def parse_optional_float(text: object) -> float | None:
+    try:
+        value = float(str(text or "").strip())
+    except (TypeError, ValueError):
+        return None
+    return value if math.isfinite(value) else None
+
+
+def format_almanac_unsigned_angle(value: float | None) -> str:
+    if value is None:
+        return ""
+    total_minutes = round((value % 360.0) * 60.0, 2)
+    degrees = int(total_minutes // 60)
+    minutes = total_minutes - degrees * 60
+    if minutes >= 60.0:
+        degrees = (degrees + 1) % 360
+        minutes = 0.0
+    return f"{degrees:03d}° {minutes:05.2f}"
+
+
+def format_almanac_signed_angle(value: float | None) -> str:
+    if value is None:
+        return ""
+    sign = "-" if value < 0.0 else ""
+    total_minutes = round(abs(value) * 60.0, 2)
+    degrees = int(total_minutes // 60)
+    minutes = total_minutes - degrees * 60
+    if minutes >= 60.0:
+        degrees += 1
+        minutes = 0.0
+    return f"{sign}{degrees:03d}° {minutes:05.2f}"
+
+
+def format_almanac_declination(value: float | None) -> str:
+    if value is None:
+        return ""
+    hemisphere = "S" if value < 0.0 else "N"
+    total_minutes = round(abs(value) * 60.0, 2)
+    degrees = int(total_minutes // 60)
+    minutes = total_minutes - degrees * 60
+    if minutes >= 60.0:
+        degrees += 1
+        minutes = 0.0
+    return f"{hemisphere} {degrees:03d}° {minutes:05.2f}"
+
+
+def format_almanac_ra(value_hours: float | None) -> str:
+    if value_hours is None:
+        return ""
+    return format_almanac_unsigned_angle(value_hours * 15.0)
+
+
+def format_almanac_semi_diameter(value_degrees: float | None) -> str:
+    if value_degrees is None:
+        return ""
+    return f"{value_degrees * 60.0:05.2f}"
+
+
+def format_almanac_magnitude(value: float | None) -> str:
+    if value is None:
+        return ""
+    text = f"{value:.1f}"
+    return text[:-2] if text.endswith(".0") else text
+
+
 def parse_almanac_snapshot_rows(text: str) -> list[dict[str, str]]:
     rows: list[dict[str, str]] = []
     for line in str(text or "").splitlines():
       parts = line.split("|")
-      if len(parts) != 11:
+      if len(parts) not in (11, 15):
+          continue
+      declination = parse_optional_float(parts[3])
+      right_ascension = parse_optional_float(parts[4])
+      gha = parse_optional_float(parts[5])
+      altitude = parse_optional_float(parts[11] if len(parts) >= 15 else "")
+      azimuth = parse_optional_float(parts[12] if len(parts) >= 15 else "")
+      semi_diameter = parse_optional_float(parts[13] if len(parts) >= 15 else "")
+      magnitude = parse_optional_float(parts[10])
+      kind = parts[2].strip()
+      if kind == "reference":
           continue
       rows.append({
           "code": parts[0].strip(),
           "name": parts[1].strip(),
-          "kind": parts[2].strip(),
-          "declination": parts[3].strip(),
-          "right_ascension": parts[4].strip(),
-          "gha": parts[5].strip(),
+          "kind": kind,
+          "declination": format_almanac_declination(declination),
+          "right_ascension": format_almanac_ra(right_ascension),
+          "gha": format_almanac_unsigned_angle(gha),
           "sha": parts[6].strip(),
           "lha": parts[7].strip(),
           "distance_au": parts[8].strip(),
           "phase": parts[9].strip(),
-          "magnitude": parts[10].strip(),
+          "magnitude": format_almanac_magnitude(magnitude),
+          "altitude": format_almanac_signed_angle(altitude),
+          "azimuth": format_almanac_unsigned_angle(azimuth),
+          "semi_diameter": format_almanac_semi_diameter(semi_diameter),
+          "visible": (parts[14].strip().upper() if len(parts) >= 15 else ""),
       })
     return rows
+
+
+def parse_almanac_event_rows(text: str) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    for line in str(text or "").splitlines():
+      parts = line.split("|")
+      if len(parts) != 5:
+          continue
+      rows.append({
+          "category": parts[0].strip(),
+          "name": parts[1].strip(),
+          "kind": parts[2].strip(),
+          "time": parts[3].strip(),
+          "details": parts[4].strip(),
+      })
+    rows.sort(key=lambda row: str(row.get("time") or ""))
+    return rows
+
+
+def almanac_mean_phase_jde(k: float) -> float:
+    t = k / 1236.85
+    return (
+        2451550.09766
+        + 29.530588861 * k
+        + 0.00015437 * t * t
+        - 0.000000150 * t * t * t
+        + 0.00000000073 * t * t * t * t
+    )
+
+
+def almanac_phase_angles(k: float) -> tuple[float, float, float, float, float, float]:
+    t = k / 1236.85
+    e = 1.0 - 0.002516 * t - 0.0000074 * t * t
+    sun_anomaly = math.radians((2.5534 + 29.10535670 * k - 0.0000014 * t * t - 0.00000011 * t * t * t) % 360.0)
+    moon_anomaly = math.radians((201.5643 + 385.81693528 * k + 0.0107582 * t * t + 0.00001238 * t * t * t - 0.000000058 * t ** 4) % 360.0)
+    argument = math.radians(almanac_moon_argument_latitude_degrees(k))
+    omega = math.radians((124.7746 - 1.56375588 * k + 0.0020672 * t * t + 0.00000215 * t * t * t) % 360.0)
+    return t, e, sun_anomaly, moon_anomaly, argument, omega
+
+
+def almanac_phase_jde(k: float, full: bool) -> float:
+    _, e, m, mp, f, omega = almanac_phase_angles(k)
+    jde = almanac_mean_phase_jde(k)
+    correction = (
+        (-0.40614 if full else -0.40720) * math.sin(mp)
+        + (0.17302 if full else 0.17241) * e * math.sin(m)
+        + (0.01614 if full else 0.01608) * math.sin(2.0 * mp)
+        + (0.01043 if full else 0.01039) * math.sin(2.0 * f)
+        + 0.00734 * e * math.sin(mp - m)
+        - 0.00515 * e * math.sin(mp + m)
+        + 0.00209 * e * e * math.sin(2.0 * m)
+        - 0.00111 * math.sin(mp - 2.0 * f)
+        - 0.00057 * math.sin(mp + 2.0 * f)
+        + 0.00056 * e * math.sin(2.0 * mp + m)
+        - 0.00042 * math.sin(3.0 * mp)
+        + 0.00042 * e * math.sin(m + 2.0 * f)
+        + 0.00038 * e * math.sin(m - 2.0 * f)
+        - 0.00024 * e * math.sin(2.0 * mp - m)
+        - 0.00017 * math.sin(omega)
+        - 0.00007 * math.sin(mp + 2.0 * m)
+        + 0.00004 * math.sin(2.0 * mp - 2.0 * f)
+        + 0.00004 * math.sin(3.0 * m)
+        + 0.00003 * math.sin(mp + m - 2.0 * f)
+        + 0.00003 * math.sin(2.0 * mp + 2.0 * f)
+        - 0.00003 * math.sin(mp + m + 2.0 * f)
+        + 0.00003 * math.sin(mp - m + 2.0 * f)
+        - 0.00002 * math.sin(mp - m - 2.0 * f)
+        - 0.00002 * math.sin(3.0 * mp + m)
+        + 0.00002 * math.sin(4.0 * mp)
+    )
+    return jde + correction
+
+
+def almanac_moon_argument_latitude_degrees(k: float) -> float:
+    t = k / 1236.85
+    return (
+        160.7108
+        + 390.67050284 * k
+        - 0.0016118 * t * t
+        - 0.00000227 * t * t * t
+        + 0.000000011 * t * t * t * t
+    ) % 360.0
+
+
+def almanac_eclipse_node_distance(k: float) -> float:
+    argument = math.radians(almanac_moon_argument_latitude_degrees(k))
+    return abs(math.sin(argument))
+
+
+def almanac_zone_label(zone_hours: float) -> str:
+    sign = "+" if zone_hours >= 0.0 else "-"
+    total_minutes = int(round(abs(zone_hours) * 60.0))
+    return f"GMT{sign}{total_minutes // 60:02d}:{total_minutes % 60:02d}"
+
+
+ALMANAC_EVENT_OFFSET_CACHE: dict[tuple[str, str], float] = {}
+
+
+def almanac_jurisdiction_offset_for_date(jurisdiction: str, date_text: str, fallback: float) -> float:
+    key = (normalize_holiday_jurisdiction(jurisdiction), date_text)
+    if key in ALMANAC_EVENT_OFFSET_CACHE:
+        return ALMANAC_EVENT_OFFSET_CACHE[key]
+    offset = fallback
+    try:
+        if DEFAULT_HOLIDAY_BIN.exists():
+            fields, _, returncode = run_holiday_lab_fields(
+                DEFAULT_HOLIDAY_BIN,
+                {
+                    "date": date_text,
+                    "start": date_text,
+                    "end": date_text,
+                    "jurisdiction": key[0],
+                },
+            )
+            if returncode == 0 and str(fields.get("jurisdiction_status") or "").strip() == "ok":
+                candidate = float(str(fields.get("jurisdiction_gmt_offset") or "").strip())
+                if -14.0 <= candidate <= 14.0:
+                    offset = candidate
+    except Exception:
+        offset = fallback
+    ALMANAC_EVENT_OFFSET_CACHE[key] = offset
+    return offset
+
+
+def generate_annual_almanac_events(
+    year: int,
+    zone_hours: float = 0.0,
+    jurisdiction: str = "",
+    latitude: str = DEFAULT_ALMANAC_LATITUDE,
+    longitude: str = DEFAULT_ALMANAC_LONGITUDE,
+) -> list[dict[str, str]]:
+    events: list[dict[str, str]] = []
+    jurisdiction = normalize_holiday_jurisdiction(jurisdiction or DEFAULT_HOLIDAY_JURISDICTION)
+    exact_eclipse_keys: set[tuple[str, str]] = set()
+
+    def local_event_time_from_jd(jd: float) -> tuple[str, str]:
+        epoch = py_datetime.datetime(1970, 1, 1, tzinfo=py_datetime.timezone.utc)
+        utc_moment = epoch + py_datetime.timedelta(days=float(jd) - 2440587.5)
+        event_zone = almanac_jurisdiction_offset_for_date(jurisdiction, utc_moment.strftime("%Y-%m-%d"), zone_hours)
+        zone_label = almanac_zone_label(event_zone)
+        local_moment = utc_moment + py_datetime.timedelta(hours=event_zone)
+        return f"{local_moment:%Y-%m-%d %H:%M} {zone_label}", utc_moment.isoformat()
+
+    def add_jd(category: str, name: str, kind: str, jd: float, details: str) -> None:
+        time_text, sort_text = local_event_time_from_jd(jd)
+        local_year = int(time_text[:4])
+        if local_year == year:
+            events.append({
+                "category": category,
+                "name": name,
+                "kind": kind,
+                "time": time_text,
+                "sort_time": sort_text,
+                "details": details,
+            })
+
+    def add_exact_eclipse(row: dict[str, str]) -> None:
+        try:
+            jd = float(str(row.get("jd") or "").strip())
+            percent = float(str(row.get("percent") or "").strip())
+            magnitude = float(str(row.get("magnitude") or "").strip())
+        except ValueError:
+            return
+        time_text, sort_text = local_event_time_from_jd(jd)
+        if int(time_text[:4]) != year:
+            return
+        category = str(row.get("category") or "").strip()
+        name = str(row.get("name") or "").strip()
+        kind = str(row.get("kind") or "").strip()
+        key = (category, f"{jd:.5f}")
+        if key in exact_eclipse_keys:
+            return
+        exact_eclipse_keys.add(key)
+        events.append({
+            "category": category,
+            "name": name,
+            "kind": kind,
+            "time": time_text,
+            "sort_time": sort_text,
+            "details": f"Local magnitude {magnitude:.3f}; local obscuration/totality {percent:.1f}%.",
+        })
+
+    def add_exact_window(jd: float) -> bool:
+        if not DEFAULT_ALMANAC_EVENT_BIN.exists():
+            return False
+        epoch = py_datetime.datetime(1970, 1, 1, tzinfo=py_datetime.timezone.utc)
+        center = epoch + py_datetime.timedelta(days=float(jd) - 2440587.5)
+        start = (center - py_datetime.timedelta(days=5)).strftime("%Y-%m-%d")
+        end = (center + py_datetime.timedelta(days=5)).strftime("%Y-%m-%d")
+        before = len(events)
+        for row in run_almanac_event_lab_rows({
+            "start": start,
+            "end": end,
+            "lat": latitude,
+            "lon": longitude,
+        }):
+            add_exact_eclipse(row)
+        return len(events) > before
+
+    k0 = math.floor((year - 2000) * 12.3685) - 2
+    exact_helper_available = DEFAULT_ALMANAC_EVENT_BIN.exists()
+    for lunation in range(k0, k0 + 18):
+        solar_distance = almanac_eclipse_node_distance(float(lunation))
+        if solar_distance <= 0.242:
+            solar_jd = almanac_phase_jde(float(lunation), full=False)
+            if exact_helper_available:
+                add_exact_window(solar_jd)
+                continue
+            kind = "central/near-central" if solar_distance <= 0.18 else "partial"
+            add_jd(
+                "Solar",
+                "Solar eclipse",
+                kind,
+                solar_jd,
+                "Approximate eclipse candidate; local obscuration unavailable.",
+            )
+
+        lunar_k = lunation + 0.5
+        lunar_distance = almanac_eclipse_node_distance(lunar_k)
+        if lunar_distance <= 0.36:
+            lunar_jd = almanac_phase_jde(lunar_k, full=True)
+            if exact_helper_available:
+                add_exact_window(lunar_jd)
+                continue
+            if lunar_distance <= 0.13:
+                kind = "total"
+            elif lunar_distance <= 0.25:
+                kind = "partial"
+            else:
+                kind = "penumbral"
+            add_jd(
+                "Lunar",
+                "Lunar eclipse",
+                kind,
+                lunar_jd,
+                "Approximate eclipse candidate; local obscuration unavailable.",
+            )
+
+    known_transits = [
+        (2003, 5, 7, "Mercury transit", "Mercury"),
+        (2004, 6, 8, "Venus transit", "Venus"),
+        (2006, 11, 8, "Mercury transit", "Mercury"),
+        (2012, 6, 6, "Venus transit", "Venus"),
+        (2016, 5, 9, "Mercury transit", "Mercury"),
+        (2019, 11, 11, "Mercury transit", "Mercury"),
+        (2032, 11, 13, "Mercury transit", "Mercury"),
+        (2039, 11, 7, "Mercury transit", "Mercury"),
+    ]
+    for event_year, month, day, name, body in known_transits:
+        if event_year == year:
+            events.append({
+                "category": "Inner planet",
+                "name": name,
+                "kind": "solar transit",
+                "time": f"{event_year:04d}-{month:02d}-{day:02d}",
+                "sort_time": f"{event_year:04d}-{month:02d}-{day:02d}",
+                "details": f"{body} crosses the solar disc; circumstances depend on observer location.",
+            })
+
+    events.sort(key=lambda row: str(row.get("sort_time") or row.get("time") or ""))
+    return events
 
 
 def prepare_almanac_fields(fields: dict[str, str]) -> dict[str, object]:
@@ -11433,9 +11948,32 @@ def prepare_almanac_fields(fields: dict[str, str]) -> dict[str, object]:
     latitude_text = str(fields.get("latitude") or "").strip()
     longitude_text = str(fields.get("longitude") or "").strip()
     gha_aries = str(fields.get("gha_aries") or "").strip()
+    jurisdiction_text = normalize_holiday_jurisdiction(str(fields.get("jurisdiction") or DEFAULT_HOLIDAY_JURISDICTION).strip())
+    event_year = str(fields.get("event_year") or date_text[:4]).strip()
+    event_window = str(fields.get("event_window") or "").strip().replace("|", " to ")
+    try:
+        event_year_int = int(event_year)
+    except ValueError:
+        event_year_int = py_datetime.date.today().year
+        event_year = str(event_year_int)
+    try:
+        event_zone = float(zone_text)
+    except ValueError:
+        event_zone = 0.0
+    events = parse_almanac_event_rows(fields.get("events", ""))
+    if not events:
+        events = generate_annual_almanac_events(
+            event_year_int,
+            event_zone,
+            jurisdiction_text,
+            latitude_text,
+            longitude_text,
+        )
+    if not event_window:
+        event_window = f"{event_year_int:04d}-01-01 to {event_year_int + 1:04d}-01-01"
 
     worksheet_lines = [
-        "AstroNav 2000-2040 Navigation Almanac",
+        ALMANAC_WORKSHEET_TITLE,
         f"Date (GMT): {date_text}",
         f"Time (GMT): {time_text}",
         f"Zone: {zone_text}",
@@ -11443,66 +11981,95 @@ def prepare_almanac_fields(fields: dict[str, str]) -> dict[str, object]:
         f"Longitude: {longitude_text}",
         f"Selected body: {selected_name} ({selected_code})",
         "",
-        "Body | Kind | Declination | GHA | SHA | LHA | RA",
+        "Body | Declination | RA | GHA | Altitude | Azimuth | s.d. | Vmag. | Visible",
     ]
     for row in rows:
         worksheet_lines.append(
             " | ".join(
                 [
                     str(row.get("name") or row.get("code") or "").strip(),
-                    str(row.get("kind") or "").strip(),
                     str(row.get("declination") or "").strip(),
-                    str(row.get("gha") or "").strip(),
-                    str(row.get("sha") or "").strip(),
-                    str(row.get("lha") or "").strip(),
                     str(row.get("right_ascension") or "").strip(),
+                    str(row.get("gha") or "").strip(),
+                    str(row.get("altitude") or "").strip(),
+                    str(row.get("azimuth") or "").strip(),
+                    str(row.get("semi_diameter") or "").strip(),
+                    str(row.get("magnitude") or "").strip(),
+                    str(row.get("visible") or "").strip(),
                 ]
             )
         )
+    worksheet_lines.extend([
+        "",
+        f"Eclipses and inner planetary transits for {event_year}",
+        "Class | Event | Kind | Local Time | Details",
+    ])
+    if events:
+        for event in events:
+            worksheet_lines.append(
+                " | ".join(
+                    [
+                        str(event.get("category") or "").strip(),
+                        str(event.get("name") or "").strip(),
+                        str(event.get("kind") or "").strip(),
+                        str(event.get("time") or "").strip(),
+                        str(event.get("details") or "").strip(),
+                    ]
+                )
+            )
+    else:
+        worksheet_lines.append("No events found.")
 
     selected_summary = "\n".join(
         [
             f"Selected body: {selected_name} ({selected_code})",
             f"Kind: {str(fields.get('selected_kind') or '').strip()}",
-            f"Declination: {str(fields.get('selected_declination') or '').strip()} deg",
-            f"GHA: {str(fields.get('selected_gha') or '').strip()} deg",
-            f"SHA: {str(fields.get('selected_sha') or '').strip()} deg",
-            f"LHA: {str(fields.get('selected_lha') or '').strip()} deg",
-            f"Right ascension: {str(fields.get('selected_right_ascension') or '').strip()} h",
+            f"Declination: {format_almanac_declination(parse_optional_float(fields.get('selected_declination')))}",
+            f"Right ascension: {format_almanac_ra(parse_optional_float(fields.get('selected_right_ascension')))}",
+            f"GHA: {format_almanac_unsigned_angle(parse_optional_float(fields.get('selected_gha')))}",
+            f"Altitude: {format_almanac_signed_angle(parse_optional_float(fields.get('selected_altitude')))}",
+            f"Azimuth: {format_almanac_unsigned_angle(parse_optional_float(fields.get('selected_azimuth')))}",
+            f"s.d.: {format_almanac_semi_diameter(parse_optional_float(fields.get('selected_semi_diameter')))}",
+            f"Visible: {str(fields.get('selected_visible') or '').strip()}",
             f"Geocentric distance: {str(fields.get('selected_geo_distance') or '').strip()} AU",
             f"Heliocentric distance: {str(fields.get('selected_helio_distance') or '').strip()} AU",
             f"Phase angle: {str(fields.get('selected_phase') or '').strip()} deg",
-            f"Visual magnitude: {str(fields.get('selected_visual_magnitude') or '').strip()}",
+            f"Visual magnitude: {format_almanac_magnitude(parse_optional_float(fields.get('selected_visual_magnitude')))}",
         ]
     )
-    body_listing = "\n".join(
+    events_listing = "\n".join(
         [
-            f"{str(row.get('name') or row.get('code') or '').strip()}: "
-            f"SHA {str(row.get('sha') or '').strip()} deg, "
-            f"Declination {str(row.get('declination') or '').strip()} deg"
-            for row in rows
+            f"{str(event.get('time') or '').strip()}  "
+            f"{str(event.get('category') or '').strip()}  "
+            f"{str(event.get('name') or '').strip()} "
+            f"({str(event.get('kind') or '').strip()})"
+            + (f"\n  {str(event.get('details') or '').strip()}" if str(event.get("details") or "").strip() else "")
+            for event in events
         ]
     )
     notes = "\n".join(
         [
             f"GHA Aries: {gha_aries} deg",
+            f"Jurisdiction: {jurisdiction_text}",
+            f"Event year: {event_year} ({event_window})",
             "Enter date and time in GMT, then zone, latitude, and longitude.",
-            "For 2000-2040 GMT, the workbook intention is navigation-grade output within 6 arc-seconds after rounding to the nearest arc-second for the listed navigation bodies.",
+            ALMANAC_ACCURACY_NOTE,
         ]
     )
     return {
         "ok": True,
         "mode": "almanac",
-        "worksheet_title": "AstroNav 2000-2040 Navigation Almanac",
+        "worksheet_title": ALMANAC_WORKSHEET_TITLE,
         "moment_text": f"GMT moment: {date_text} {time_text}".strip(),
-        "observer_text": f"Observer: zone {zone_text}, latitude {latitude_text}, longitude {longitude_text}",
+        "observer_text": f"Observer: {jurisdiction_text}, zone {zone_text}, latitude {latitude_text}, longitude {longitude_text}",
         "body_text": f"Location of Navigational Bodies for {selected_name} ({selected_code})",
-        "range_text": "Beyond 2040, use at your own risk.",
+        "event_title": f"Eclipses and inner planetary transits for {event_year}",
         "selected_code": selected_code,
         "rows": rows,
+        "events": events,
         "worksheet": "\n".join(worksheet_lines),
         "selected_summary": selected_summary,
-        "body_listing": body_listing,
+        "events_listing": events_listing,
         "notes": notes,
         "fields": fields,
     }
@@ -11677,6 +12244,11 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
             .replace("__DEFAULT_ALMANAC_LATITUDE__", json.dumps(DEFAULT_ALMANAC_LATITUDE))
             .replace("__DEFAULT_ALMANAC_LONGITUDE__", json.dumps(DEFAULT_ALMANAC_LONGITUDE))
             .replace("__DEFAULT_ALMANAC_BODY__", json.dumps(DEFAULT_ALMANAC_BODY))
+            .replace("__ALMANAC_WORKSHEET_TITLE__", json.dumps(ALMANAC_WORKSHEET_TITLE))
+            .replace("__ALMANAC_COVERAGE_TEXT_JS__", json.dumps(ALMANAC_COVERAGE_TEXT))
+            .replace("__ALMANAC_COVERAGE_TEXT__", html.escape(ALMANAC_COVERAGE_TEXT, quote=False))
+            .replace("__ALMANAC_ACCURACY_NOTE_JS__", json.dumps(ALMANAC_ACCURACY_NOTE))
+            .replace("__ALMANAC_ACCURACY_NOTE__", html.escape(ALMANAC_ACCURACY_NOTE, quote=False))
             .replace("__ALMANAC_BODY_OPTIONS__", ALMANAC_BODY_OPTIONS_HTML)
             .replace("__HOLIDAY_JURISDICTION_CODES__", json.dumps(sorted(VALID_HOLIDAY_JURISDICTIONS)))
             .replace("__HOLIDAY_JURISDICTION_OPTIONS__", HOLIDAY_JURISDICTION_OPTIONS_HTML)
@@ -11776,6 +12348,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                     "almanac_date",
                     "almanac_time",
                     "almanac_zone",
+                    "almanac_jurisdiction",
                     "almanac_latitude",
                     "almanac_longitude",
                     "almanac_body",
@@ -12225,6 +12798,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                 date_text = str(payload.get("date", DEFAULT_ALMANAC_DATE)).strip()
                 time_text = str(payload.get("time", DEFAULT_ALMANAC_TIME)).strip()
                 zone_text = str(payload.get("zone", DEFAULT_ALMANAC_ZONE)).strip()
+                jurisdiction_text = str(payload.get("jurisdiction", DEFAULT_HOLIDAY_JURISDICTION)).strip()
                 latitude_text = str(payload.get("latitude", DEFAULT_ALMANAC_LATITUDE)).strip()
                 longitude_text = str(payload.get("longitude", DEFAULT_ALMANAC_LONGITUDE)).strip()
                 body_text = str(payload.get("body", DEFAULT_ALMANAC_BODY)).strip().upper()
@@ -12234,6 +12808,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                 zone = float(zone_text)
                 latitude = float(latitude_text)
                 longitude = float(longitude_text)
+                jurisdiction = normalize_holiday_jurisdiction(jurisdiction_text)
                 if zone < -14.0 or zone > 14.0:
                     raise ValueError("Zone must be between -14 and 14")
                 if latitude < -90.0 or latitude > 90.0:
@@ -12247,6 +12822,31 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                 return
 
             try:
+                try:
+                    ensure_scratch_binary(self.holiday_binary, "scratch/holiday_lab")
+                    holiday_fields, _, holiday_returncode = run_holiday_lab_fields(
+                        self.holiday_binary,
+                        {
+                            "date": date_text,
+                            "start": date_text,
+                            "end": date_text,
+                            "jurisdiction": jurisdiction,
+                        },
+                    )
+                    if holiday_returncode == 0 and str(holiday_fields.get("jurisdiction_status") or "").strip() == "ok":
+                        jurisdiction_latitude = str(holiday_fields.get("jurisdiction_latitude") or "").strip()
+                        jurisdiction_longitude = str(holiday_fields.get("jurisdiction_longitude") or "").strip()
+                        jurisdiction_offset = str(holiday_fields.get("jurisdiction_gmt_offset") or "").strip()
+                        if jurisdiction_latitude:
+                            latitude_text = jurisdiction_latitude
+                        if jurisdiction_longitude:
+                            longitude_text = jurisdiction_longitude
+                        if jurisdiction_offset:
+                            zone_text = jurisdiction_offset
+                except Exception as exc:
+                    self.log_message("almanac jurisdiction helper unavailable jurisdiction=%r error=%r", jurisdiction, exc)
+
+                ensure_scratch_binary(DEFAULT_ALMANAC_EVENT_BIN, "scratch/almanac_event_lab")
                 ensure_scratch_binary(self.almanac_binary, "scratch/almanac_lab")
                 fields, raw, returncode = run_almanac_lab_fields(
                     self.almanac_binary,
@@ -12271,10 +12871,12 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                 "almanac_date": date_text,
                 "almanac_time": time_text,
                 "almanac_zone": zone_text,
+                "almanac_jurisdiction": jurisdiction,
                 "almanac_latitude": latitude_text,
                 "almanac_longitude": longitude_text,
                 "almanac_body": body_text,
             })
+            fields["jurisdiction"] = jurisdiction
             self.send_json(200, prepare_almanac_fields(fields))
             return
 
