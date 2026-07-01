@@ -79,8 +79,10 @@ tests/**/*.synctex.gz
 packaging/linux/*.desktop
 packaging/linux/*.png
 
+# Generated SPICE/workbook state-vector helper artefacts
+tools/*_state_*.json
+
 .codex
-.mars_lab_state.json
 .to_be_announced_lab_state.json
 .to_be_announced_uploads/
 
