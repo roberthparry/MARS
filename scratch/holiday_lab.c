@@ -137,21 +137,16 @@ static char *format_display_date(const datetime_t *dttm)
     return out;
 }
 
-static bool print_bank_holidays_from_database(const char *jurisdiction,
+static bool print_bank_holidays_from_database(jurisdiction_t *holiday,
                                               const datetime_t *start,
                                               const datetime_t *end)
 {
-    jurisdiction_t *holiday = NULL;
     array_t *events = NULL;
     bool produced = false;
     size_t i;
 
-    if (!start || !end)
+    if (!holiday || !start || !end)
         return false;
-
-    holiday = jurisdict_open(jurisdiction);
-    if (!holiday)
-        goto done;
 
     events = jurisdict_holidays_between(holiday, start, end);
     if (!events)
@@ -173,54 +168,37 @@ static bool print_bank_holidays_from_database(const char *jurisdiction,
 
 done:
     array_destroy(events);
-    jurisdict_close(holiday);
     return produced;
 }
 
-static bool print_jurisdiction_location_from_database(const char *jurisdiction)
+static bool print_jurisdiction_location_from_database(jurisdiction_t *holiday)
 {
-    jurisdiction_t *holiday = NULL;
     double latitude;
     double longitude;
 
-    holiday = jurisdict_open(jurisdiction);
     if (!holiday)
-        goto done;
+        return false;
     if (!jurisdict_default_location(holiday, &latitude, &longitude))
-        goto done;
+        return false;
 
     printf("jurisdiction_latitude %.6f\n", latitude);
     printf("jurisdiction_longitude %.6f\n", longitude);
-    jurisdict_close(holiday);
     return true;
-
-done:
-    jurisdict_close(holiday);
-    return false;
 }
 
-static bool print_jurisdiction_gmt_offset_from_database(const char *jurisdiction,
+static bool print_jurisdiction_gmt_offset_from_database(jurisdiction_t *holiday,
                                                         const datetime_t *date)
 {
-    jurisdiction_t *holiday = NULL;
     double offset_hours;
 
-    if (!date)
+    if (!holiday || !date)
         return false;
 
-    holiday = jurisdict_open(jurisdiction);
-    if (!holiday)
-        goto done;
     if (!jurisdict_default_gmt_offset(holiday, date, &offset_hours))
-        goto done;
+        return false;
 
     printf("jurisdiction_gmt_offset %.10g\n", offset_hours);
-    jurisdict_close(holiday);
     return true;
-
-done:
-    jurisdict_close(holiday);
-    return false;
 }
 
 int main(int argc, char **argv)
@@ -232,6 +210,7 @@ int main(int argc, char **argv)
     bool produced = false;
     bool location_available = false;
     bool gmt_offset_available = false;
+    jurisdiction_t *holiday = NULL;
     int i;
 
     init_defaults(&options);
@@ -262,13 +241,17 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    location_available = print_jurisdiction_location_from_database(options.jurisdiction);
-    gmt_offset_available = print_jurisdiction_gmt_offset_from_database(options.jurisdiction, date);
-    produced = print_bank_holidays_from_database(options.jurisdiction, start, end);
+    holiday = jurisdict_open(options.jurisdiction);
+    if (holiday) {
+        location_available = print_jurisdiction_location_from_database(holiday);
+        gmt_offset_available = print_jurisdiction_gmt_offset_from_database(holiday, date);
+        produced = print_bank_holidays_from_database(holiday, start, end);
+    }
     printf("holiday_status %s\n", produced ? "ok" : "unavailable");
     printf("jurisdiction_status %s\n", location_available ? "ok" : "unavailable");
     printf("jurisdiction_gmt_offset_status %s\n", gmt_offset_available ? "ok" : "unavailable");
 
+    jurisdict_close(holiday);
     datetime_dealloc(date);
     datetime_dealloc(start);
     datetime_dealloc(end);

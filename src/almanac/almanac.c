@@ -13,14 +13,6 @@
 #include "sqlite.h"
 #include "ustring.h"
 
-typedef struct _almanac_t {
-    sqlite_t *db;
-    string_t *error;
-    bool correction_model_loaded;
-    struct almanac_nutation_term_t *nutation_terms;
-    size_t nutation_term_count;
-} almanac_t;
-
 typedef struct almanac_nutation_term_t {
     int multiplier_L;
     int multiplier_Lprime;
@@ -41,6 +33,8 @@ typedef enum almanac_body_ref_id_t {
     ALMANAC_BODY_REF_ID_SATURN = 8,
     ALMANAC_BODY_REF_ID_EARTH = 9
 } almanac_body_ref_id_t;
+
+#define ALMANAC_BODY_REF_ID_LIMIT (ALMANAC_BODY_REF_ID_EARTH + 1)
 
 typedef struct almanac_model_row_t {
     almanac_body_id_t body_id;
@@ -436,6 +430,18 @@ typedef struct almanac_frame_rotation_segment_t {
     int degree;
     double coeff[ALMANAC_FRAME_ROTATION_COMPONENT_COUNT][ALMANAC_CHEB_MAX_COEFF_COUNT];
 } almanac_frame_rotation_segment_t;
+
+struct _almanac_t {
+    sqlite_t *db;
+    string_t *error;
+    bool correction_model_loaded;
+    almanac_nutation_term_t *nutation_terms;
+    size_t nutation_term_count;
+    bool chebyshev_position_segment_cached[ALMANAC_BODY_REF_ID_LIMIT];
+    almanac_chebyshev_position_segment_t chebyshev_position_segment_cache[ALMANAC_BODY_REF_ID_LIMIT];
+    bool frame_rotation_segment_cached;
+    almanac_frame_rotation_segment_t frame_rotation_segment_cache;
+};
 
 typedef struct almanac_poly8_t {
     double c0;
@@ -882,9 +888,25 @@ static bool almanac_unpack_magnitude_coeff_blob(const unsigned char *blob,
 static bool almanac_load_nutation_terms(almanac_t *almanac)
 {
     static const char *sql =
-        "SELECT multiplier_L, multiplier_Lprime, multiplier_omega, sin_coeff_arcsec, cos_coeff_arcsec "
-        "FROM almanac_nutation_term "
-        "ORDER BY sort_order ASC, term_id ASC";
+        "select l_multiplier.multiplier_L, "
+        "       lprime_multiplier.multiplier_Lprime, "
+        "       omega_multiplier.multiplier_omega, "
+        "       sin_coeff.sin_coeff_arcsec, "
+        "       cos_coeff.cos_coeff_arcsec "
+        "from almanac_nutation_term as term "
+        "join almanac_nutation_term_l_multiplier as l_multiplier "
+        "  on l_multiplier.term_id = term.term_id "
+        "join almanac_nutation_term_lprime_multiplier as lprime_multiplier "
+        "  on lprime_multiplier.term_id = term.term_id "
+        "join almanac_nutation_term_omega_multiplier as omega_multiplier "
+        "  on omega_multiplier.term_id = term.term_id "
+        "join almanac_nutation_term_sin_coeff as sin_coeff "
+        "  on sin_coeff.term_id = term.term_id "
+        "join almanac_nutation_term_cos_coeff as cos_coeff "
+        "  on cos_coeff.term_id = term.term_id "
+        "join almanac_nutation_term_sort_order as sort_order "
+        "  on sort_order.term_id = term.term_id "
+        "order by sort_order.sort_order asc, term.term_id asc";
     sqlite_stmt_t *stmt = NULL;
     sqlite_step_result_t rc;
     almanac_nutation_term_t *terms = NULL;
@@ -942,11 +964,15 @@ static bool almanac_fetch_nutation_segment(almanac_t *almanac,
                                            almanac_nutation_segment_t *out)
 {
     static const char *sql =
-        "SELECT model_id, coefficient_blob "
-        "FROM almanac_nutation_model "
-        "WHERE model_id = ? "
-        "ORDER BY sort_order ASC, model_id ASC "
-        "LIMIT 1";
+        "select model.model_id, coeff.coefficient_blob "
+        "from almanac_nutation_model as model "
+        "join almanac_nutation_model_coeff as coeff "
+        "  on coeff.model_id = model.model_id "
+        "join almanac_nutation_model_sort_order as sort_order "
+        "  on sort_order.model_id = model.model_id "
+        "where model.model_id = ? "
+        "order by sort_order.sort_order asc, model.model_id asc "
+        "limit 1";
     sqlite_stmt_t *stmt = NULL;
     sqlite_step_result_t rc;
     const unsigned char *blob;
@@ -1039,13 +1065,18 @@ static bool almanac_fetch_model(almanac_t *almanac,
                                 almanac_model_row_t *out)
 {
     static const char *sql =
-        "SELECT b.body_id, "
-        "       b.body_kind, b.model_kind, b.brightness_model, b.sort_order,"
-        "       b.magnitude_coeff_blob, "
+        "select b.body_id, "
+        "       kind.body_kind, model.model_kind, brightness.brightness_model, sort.sort_order,"
+        "       magnitude.magnitude_coeff_blob, "
         "       f.coefficient_blob "
-        "FROM almanac_body AS b "
-        "LEFT JOIN almanac_fixed_equatorial_model AS f ON f.body_id = b.body_id "
-        "WHERE b.body_id = ?1";
+        "from almanac_body as b "
+        "join almanac_body_kind as kind on kind.body_id = b.body_id "
+        "join almanac_body_model_kind as model on model.body_id = b.body_id "
+        "join almanac_body_brightness_model as brightness on brightness.body_id = b.body_id "
+        "join almanac_body_sort_order as sort on sort.body_id = b.body_id "
+        "join almanac_body_magnitude_coeff as magnitude on magnitude.body_id = b.body_id "
+        "left join almanac_fixed_equatorial_model as f on f.body_id = b.body_id "
+        "where b.body_id = ?1";
     sqlite_stmt_t *stmt = NULL;
     sqlite_step_result_t rc;
     const unsigned char *magnitude_blob;
@@ -1230,24 +1261,39 @@ static bool almanac_fetch_chebyshev_position_segment(almanac_t *almanac,
                                                      almanac_chebyshev_position_segment_t *out)
 {
     static const char *sql =
-        "SELECT selected.start_jd, selected.end_jd, selected.segment_span_days, "
+        "select selected.start_jd, selected.end_jd, selected.segment_span_days, "
         "       selected.degree, selected.segment_index, segment.coefficient_blob "
-        "FROM ( "
-        "    SELECT series_id, start_jd, end_jd, segment_span_days, degree, "
-        "           CASE WHEN ?2 >= end_jd THEN segment_count - 1 "
-        "                ELSE CAST((?2 - start_jd) / segment_span_days AS INTEGER) "
-        "           END AS segment_index "
-        "    FROM almanac_chebyshev_position_series AS series "
-        "    JOIN almanac_frame AS frame "
-        "      ON frame.frame_id = series.frame_id "
-        "    WHERE series.body_ref_id = ?1 AND frame.frame_code = 'ECLIPJ2000' "
-        "      AND series.start_jd <= ?2 AND series.end_jd >= ?2 "
-        "    ORDER BY series.start_jd ASC "
-        "    LIMIT 1 "
-        ") AS selected "
-        "JOIN almanac_chebyshev_position_segment AS segment "
-        "  ON segment.series_id = selected.series_id "
-        " AND segment.segment_index = selected.segment_index";
+        "from ( "
+        "    select series.series_id, start.start_jd, finish.end_jd, "
+        "           span.segment_span_days, degree.degree, "
+        "           case when ?2 >= finish.end_jd then segment_count.segment_count - 1 "
+        "                else cast((?2 - start.start_jd) / span.segment_span_days as integer) "
+        "           end as segment_index "
+        "    from almanac_chebyshev_position_series as series "
+        "    join almanac_chebyshev_position_series_body_ref as body_ref "
+        "      on body_ref.series_id = series.series_id "
+        "    join almanac_chebyshev_position_series_frame as series_frame "
+        "      on series_frame.series_id = series.series_id "
+        "    join almanac_frame_code as frame_code "
+        "      on frame_code.frame_id = series_frame.frame_id "
+        "    join almanac_chebyshev_position_series_start_jd as start "
+        "      on start.series_id = series.series_id "
+        "    join almanac_chebyshev_position_series_end_jd as finish "
+        "      on finish.series_id = series.series_id "
+        "    join almanac_chebyshev_position_series_segment_span_days as span "
+        "      on span.series_id = series.series_id "
+        "    join almanac_chebyshev_position_series_segment_count as segment_count "
+        "      on segment_count.series_id = series.series_id "
+        "    join almanac_chebyshev_position_series_degree as degree "
+        "      on degree.series_id = series.series_id "
+        "    where body_ref.body_ref_id = ?1 and frame_code.frame_code = 'ECLIPJ2000' "
+        "      and start.start_jd <= ?2 and finish.end_jd >= ?2 "
+        "    order by start.start_jd asc "
+        "    limit 1 "
+        ") as selected "
+        "join almanac_chebyshev_position_segment as segment "
+        "  on segment.series_id = selected.series_id "
+        " and segment.segment_index = selected.segment_index";
     sqlite_stmt_t *stmt = NULL;
     sqlite_step_result_t rc;
     const unsigned char *blob;
@@ -1264,6 +1310,13 @@ static bool almanac_fetch_chebyshev_position_segment(almanac_t *almanac,
     if (!almanac || !almanac->db || body_ref_id <= ALMANAC_BODY_REF_ID_NONE || !out) {
         almanac_set_error(almanac, "invalid Chebyshev position segment lookup");
         return false;
+    }
+    if (body_ref_id < ALMANAC_BODY_REF_ID_LIMIT &&
+        almanac->chebyshev_position_segment_cached[body_ref_id] &&
+        jd >= almanac->chebyshev_position_segment_cache[body_ref_id].start_jd &&
+        jd <= almanac->chebyshev_position_segment_cache[body_ref_id].end_jd) {
+        *out = almanac->chebyshev_position_segment_cache[body_ref_id];
+        return true;
     }
 
     memset(out, 0, sizeof(*out));
@@ -1335,6 +1388,10 @@ static bool almanac_fetch_chebyshev_position_segment(almanac_t *almanac,
         }
     }
     sqlite_stmt_finalize(stmt);
+    if (body_ref_id < ALMANAC_BODY_REF_ID_LIMIT) {
+        almanac->chebyshev_position_segment_cache[body_ref_id] = *out;
+        almanac->chebyshev_position_segment_cached[body_ref_id] = true;
+    }
     return true;
 }
 
@@ -1343,27 +1400,42 @@ static bool almanac_fetch_frame_rotation_segment(almanac_t *almanac,
                                                  almanac_frame_rotation_segment_t *out)
 {
     static const char *sql =
-        "SELECT selected.start_jd, selected.end_jd, selected.segment_span_days, "
+        "select selected.start_jd, selected.end_jd, selected.segment_span_days, "
         "       selected.degree, selected.segment_index, segment.coefficient_blob "
-        "FROM ( "
-        "    SELECT series_id, start_jd, end_jd, segment_span_days, degree, "
-        "           CASE WHEN ?1 >= end_jd THEN segment_count - 1 "
-        "                ELSE CAST((?1 - start_jd) / segment_span_days AS INTEGER) "
-        "           END AS segment_index "
-        "    FROM almanac_frame_rotation_series AS series "
-        "    JOIN almanac_frame AS source_frame "
-        "      ON source_frame.frame_id = series.source_frame_id "
-        "    JOIN almanac_frame AS target_frame "
-        "      ON target_frame.frame_id = series.target_frame_id "
-        "    WHERE source_frame.frame_code = 'ECLIPJ2000' "
-        "      AND target_frame.frame_code = 'TRUE_EQUATOR_DATE' "
-        "      AND series.start_jd <= ?1 AND series.end_jd >= ?1 "
-        "    ORDER BY series.start_jd ASC "
-        "    LIMIT 1 "
-        ") AS selected "
-        "JOIN almanac_frame_rotation_segment AS segment "
-        "  ON segment.series_id = selected.series_id "
-        " AND segment.segment_index = selected.segment_index";
+        "from ( "
+        "    select series.series_id, start.start_jd, finish.end_jd, "
+        "           span.segment_span_days, degree.degree, "
+        "           case when ?1 >= finish.end_jd then segment_count.segment_count - 1 "
+        "                else cast((?1 - start.start_jd) / span.segment_span_days as integer) "
+        "           end as segment_index "
+        "    from almanac_frame_rotation_series as series "
+        "    join almanac_frame_rotation_series_source_frame as source_frame "
+        "      on source_frame.series_id = series.series_id "
+        "    join almanac_frame_rotation_series_target_frame as target_frame "
+        "      on target_frame.series_id = series.series_id "
+        "    join almanac_frame_code as source_frame_code "
+        "      on source_frame_code.frame_id = source_frame.frame_id "
+        "    join almanac_frame_code as target_frame_code "
+        "      on target_frame_code.frame_id = target_frame.frame_id "
+        "    join almanac_frame_rotation_series_start_jd as start "
+        "      on start.series_id = series.series_id "
+        "    join almanac_frame_rotation_series_end_jd as finish "
+        "      on finish.series_id = series.series_id "
+        "    join almanac_frame_rotation_series_segment_span_days as span "
+        "      on span.series_id = series.series_id "
+        "    join almanac_frame_rotation_series_segment_count as segment_count "
+        "      on segment_count.series_id = series.series_id "
+        "    join almanac_frame_rotation_series_degree as degree "
+        "      on degree.series_id = series.series_id "
+        "    where source_frame_code.frame_code = 'ECLIPJ2000' "
+        "      and target_frame_code.frame_code = 'TRUE_EQUATOR_DATE' "
+        "      and start.start_jd <= ?1 and finish.end_jd >= ?1 "
+        "    order by start.start_jd asc "
+        "    limit 1 "
+        ") as selected "
+        "join almanac_frame_rotation_segment as segment "
+        "  on segment.series_id = selected.series_id "
+        " and segment.segment_index = selected.segment_index";
     sqlite_stmt_t *stmt = NULL;
     sqlite_step_result_t rc;
     const unsigned char *blob;
@@ -1380,6 +1452,12 @@ static bool almanac_fetch_frame_rotation_segment(almanac_t *almanac,
     if (!almanac || !almanac->db || !out) {
         almanac_set_error(almanac, "invalid frame rotation segment lookup");
         return false;
+    }
+    if (almanac->frame_rotation_segment_cached &&
+        jd >= almanac->frame_rotation_segment_cache.start_jd &&
+        jd <= almanac->frame_rotation_segment_cache.end_jd) {
+        *out = almanac->frame_rotation_segment_cache;
+        return true;
     }
 
     memset(out, 0, sizeof(*out));
@@ -1450,6 +1528,8 @@ static bool almanac_fetch_frame_rotation_segment(almanac_t *almanac,
         }
     }
     sqlite_stmt_finalize(stmt);
+    almanac->frame_rotation_segment_cache = *out;
+    almanac->frame_rotation_segment_cached = true;
     return true;
 }
 
@@ -3248,6 +3328,85 @@ static bool almanac_find_body_horizon_crossing(almanac_t *almanac,
     return false;
 }
 
+static bool almanac_find_solar_horizon_crossing(almanac_t *almanac,
+                                                const datetime_t *date,
+                                                const almanac_observer_t *observer,
+                                                double start_jd,
+                                                double end_jd,
+                                                double offset_guess_hours,
+                                                bool rising,
+                                                double *out_jd)
+{
+    static const double initial_radius_days = 10.0 / 1440.0;
+    static const double max_radius_days = 8.0 / 24.0;
+    almanac_horizon_context_t context = { ALMANAC_BODY_ID_SUN, observer };
+    datetime_sun_status_t status = DATETIME_SUN_UNAVAILABLE;
+    datetime_t *estimate;
+    double estimate_utc_jd;
+    double radius_days;
+
+    if (!almanac || !date || !observer || !out_jd || !(end_jd > start_jd))
+        return false;
+
+    estimate = rising
+        ? datetime_init_sunrise_checked(datetime_alloc(),
+                                        datetime_jdn(date),
+                                        observer->latitude_degrees,
+                                        observer->longitude_degrees,
+                                        offset_guess_hours,
+                                        &status)
+        : datetime_init_sunset_checked(datetime_alloc(),
+                                       datetime_jdn(date),
+                                       observer->latitude_degrees,
+                                       observer->longitude_degrees,
+                                       offset_guess_hours,
+                                       &status);
+    if (!estimate)
+        return false;
+    estimate_utc_jd = datetime_jd(estimate) - offset_guess_hours / 24.0;
+    datetime_dealloc(estimate);
+    if (status != DATETIME_SUN_OK || !(estimate_utc_jd == estimate_utc_jd))
+        return false;
+
+    for (radius_days = initial_radius_days;
+         radius_days <= max_radius_days + 1e-12;
+         radius_days *= 2.0) {
+        double left_jd = estimate_utc_jd - radius_days;
+        double right_jd = estimate_utc_jd + radius_days;
+        double left_value;
+        double right_value;
+
+        if (left_jd < start_jd)
+            left_jd = start_jd;
+        if (right_jd > end_jd)
+            right_jd = end_jd;
+        if (!(right_jd > left_jd))
+            continue;
+
+        left_value = almanac_body_horizon_residual(almanac, left_jd, &context);
+        right_value = almanac_body_horizon_residual(almanac, right_jd, &context);
+        if (!(left_value == left_value) || !(right_value == right_value))
+            return false;
+        if ((rising && left_value <= 0.0 && right_value > 0.0) ||
+            (!rising && left_value >= 0.0 && right_value < 0.0)) {
+            return almanac_bisect_event_residual(almanac,
+                                                 almanac_body_horizon_residual,
+                                                 &context,
+                                                 left_jd,
+                                                 right_jd,
+                                                 out_jd);
+        }
+    }
+
+    return almanac_find_body_horizon_crossing(almanac,
+                                             ALMANAC_BODY_ID_SUN,
+                                             observer,
+                                             start_jd,
+                                             end_jd,
+                                             rising,
+                                             out_jd);
+}
+
 static almanac_rise_set_status_t almanac_body_rise_set_status_for_day(almanac_t *almanac,
                                                                       almanac_body_id_t body_id,
                                                                       const almanac_observer_t *observer,
@@ -3372,20 +3531,22 @@ bool almanac_sunrise_sunset(almanac_t *almanac,
         return false;
     }
 
-    has_sunrise = almanac_find_body_horizon_crossing(almanac,
-                                                     ALMANAC_BODY_ID_SUN,
+    has_sunrise = almanac_find_solar_horizon_crossing(almanac,
+                                                      date,
+                                                      observer,
+                                                      start_jd,
+                                                      end_jd,
+                                                      offset_guess_hours,
+                                                      true,
+                                                      &sunrise_jd);
+    has_sunset = almanac_find_solar_horizon_crossing(almanac,
+                                                     date,
                                                      observer,
                                                      start_jd,
                                                      end_jd,
-                                                     true,
-                                                     &sunrise_jd);
-    has_sunset = almanac_find_body_horizon_crossing(almanac,
-                                                    ALMANAC_BODY_ID_SUN,
-                                                    observer,
-                                                    start_jd,
-                                                    end_jd,
-                                                    false,
-                                                    &sunset_jd);
+                                                     offset_guess_hours,
+                                                     false,
+                                                     &sunset_jd);
     if (!has_sunrise || !has_sunset)
         missing_status = almanac_body_rise_set_status_for_day(almanac,
                                                               ALMANAC_BODY_ID_SUN,
@@ -4006,6 +4167,532 @@ static bool almanac_fill_solar_eclipse(almanac_t *almanac,
     return true;
 }
 
+static double almanac_surface_distance_km(double lat1_degrees,
+                                          double lon1_degrees,
+                                          double lat2_degrees,
+                                          double lon2_degrees)
+{
+    static const double earth_radius_km = 6371.0088;
+    double lat1 = degrees_to_radians(lat1_degrees);
+    double lat2 = degrees_to_radians(lat2_degrees);
+    double dlat = degrees_to_radians(lat2_degrees - lat1_degrees);
+    double dlon = degrees_to_radians(lon2_degrees - lon1_degrees);
+    double a = sin(dlat * 0.5) * sin(dlat * 0.5) +
+               cos(lat1) * cos(lat2) * sin(dlon * 0.5) * sin(dlon * 0.5);
+
+    return earth_radius_km * 2.0 * atan2(sqrt(a), sqrt(fmax(0.0, 1.0 - a)));
+}
+
+static void almanac_destination_point(double lat_degrees,
+                                      double lon_degrees,
+                                      double distance_km,
+                                      double bearing_degrees,
+                                      double *out_lat_degrees,
+                                      double *out_lon_degrees)
+{
+    static const double earth_radius_km = 6371.0088;
+    double angular_distance = distance_km / earth_radius_km;
+    double bearing = degrees_to_radians(bearing_degrees);
+    double lat1 = degrees_to_radians(lat_degrees);
+    double lon1 = degrees_to_radians(lon_degrees);
+    double sin_lat1 = sin(lat1);
+    double cos_lat1 = cos(lat1);
+    double sin_distance = sin(angular_distance);
+    double cos_distance = cos(angular_distance);
+    double lat2 = asin(clamp_unit(sin_lat1 * cos_distance +
+                                  cos_lat1 * sin_distance * cos(bearing)));
+    double lon2 = lon1 + atan2(sin(bearing) * sin_distance * cos_lat1,
+                               cos_distance - sin_lat1 * sin(lat2));
+
+    if (out_lat_degrees)
+        *out_lat_degrees = radians_to_degrees(lat2);
+    if (out_lon_degrees)
+        *out_lon_degrees = normalize_degrees(radians_to_degrees(lon2) + 180.0) - 180.0;
+}
+
+static bool almanac_probe_solar_totality(almanac_t *almanac,
+                                         const almanac_observer_t *origin,
+                                         double seed_jd,
+                                         double latitude_degrees,
+                                         double longitude_degrees,
+                                         almanac_solar_totality_location_t *out)
+{
+    almanac_observer_t observer;
+    almanac_solar_eclipse_geometry_t geometry;
+    double magnitude;
+    double totality_percent;
+
+    if (!almanac || !origin || !out)
+        return false;
+    observer.latitude_degrees = latitude_degrees;
+    observer.longitude_degrees = longitude_degrees;
+    observer.elevation_metres = origin->elevation_metres;
+    if (!almanac_observer_is_valid(almanac, &observer))
+        return false;
+
+    if (!almanac_solar_eclipse_geometry(almanac, seed_jd, &observer, &geometry))
+        return false;
+    if (geometry.sun_altitude_degrees + geometry.sun_sd <= 0.0 ||
+        geometry.moon_sd < geometry.sun_sd ||
+        geometry.separation > geometry.moon_sd - geometry.sun_sd) {
+        return false;
+    }
+
+    magnitude = (geometry.sun_sd + geometry.moon_sd - geometry.separation) / (2.0 * geometry.sun_sd);
+    totality_percent = almanac_disc_coverage_percent(geometry.sun_sd,
+                                                     geometry.moon_sd,
+                                                     geometry.apparent_separation);
+    if (!(magnitude == magnitude) || !(totality_percent == totality_percent))
+        return false;
+
+    memset(out, 0, sizeof(*out));
+    out->found = true;
+    out->greatest_eclipse_jd = seed_jd;
+    almanac_event_time_from_jd(seed_jd, &out->greatest_eclipse_time);
+    out->latitude_degrees = latitude_degrees;
+    out->longitude_degrees = longitude_degrees;
+    out->distance_km = almanac_surface_distance_km(origin->latitude_degrees,
+                                                  origin->longitude_degrees,
+                                                  latitude_degrees,
+                                                  longitude_degrees);
+    out->magnitude = magnitude;
+    out->totality_percent = fmax(0.0, fmin(100.0, totality_percent));
+    return true;
+}
+
+static bool almanac_probe_solar_totality_candidate(almanac_t *almanac,
+                                                   const almanac_observer_t *origin,
+                                                   double seed_jd,
+                                                   double latitude_degrees,
+                                                   double longitude_degrees,
+                                                   double tolerance_degrees,
+                                                   almanac_solar_totality_location_t *out)
+{
+    almanac_observer_t observer;
+    almanac_solar_eclipse_geometry_t geometry;
+
+    if (!almanac || !origin || !out)
+        return false;
+    observer.latitude_degrees = latitude_degrees;
+    observer.longitude_degrees = longitude_degrees;
+    observer.elevation_metres = origin->elevation_metres;
+    if (!almanac_observer_is_valid(almanac, &observer))
+        return false;
+    if (!almanac_solar_eclipse_geometry(almanac, seed_jd, &observer, &geometry))
+        return false;
+    if (geometry.sun_altitude_degrees + geometry.sun_sd <= 0.0 ||
+        geometry.moon_sd < geometry.sun_sd ||
+        geometry.separation > (geometry.moon_sd - geometry.sun_sd) + tolerance_degrees) {
+        return false;
+    }
+
+    memset(out, 0, sizeof(*out));
+    out->found = true;
+    out->greatest_eclipse_jd = seed_jd;
+    almanac_event_time_from_jd(seed_jd, &out->greatest_eclipse_time);
+    out->latitude_degrees = latitude_degrees;
+    out->longitude_degrees = longitude_degrees;
+    out->distance_km = almanac_surface_distance_km(origin->latitude_degrees,
+                                                  origin->longitude_degrees,
+                                                  latitude_degrees,
+                                                  longitude_degrees);
+    out->magnitude = NAN;
+    out->totality_percent = NAN;
+    return true;
+}
+
+static bool almanac_refine_solar_totality(almanac_t *almanac,
+                                          const almanac_observer_t *origin,
+                                          double seed_jd,
+                                          const almanac_solar_totality_location_t *coarse,
+                                          almanac_solar_totality_location_t *out)
+{
+    almanac_observer_t observer;
+    almanac_eclipse_contact_context_t contact;
+    almanac_solar_eclipse_geometry_t geometry;
+    double local_jd;
+    double magnitude;
+    double totality_percent;
+
+    if (!almanac || !origin || !coarse || !coarse->found || !out)
+        return false;
+    observer.latitude_degrees = coarse->latitude_degrees;
+    observer.longitude_degrees = coarse->longitude_degrees;
+    observer.elevation_metres = origin->elevation_metres;
+    if (!almanac_observer_is_valid(almanac, &observer))
+        return false;
+
+    contact.body_id = ALMANAC_BODY_ID_MOON;
+    contact.observer = &observer;
+    contact.contact_kind = 0;
+    local_jd = almanac_find_local_minimum_jd(almanac,
+                                             almanac_solar_eclipse_metric,
+                                             &contact,
+                                             seed_jd,
+                                             0.125,
+                                             1.0 / 96.0);
+    if (!almanac_solar_eclipse_geometry(almanac, local_jd, &observer, &geometry))
+        return false;
+    if (geometry.sun_altitude_degrees + geometry.sun_sd <= 0.0 ||
+        geometry.moon_sd < geometry.sun_sd ||
+        geometry.separation > geometry.moon_sd - geometry.sun_sd) {
+        return false;
+    }
+    magnitude = (geometry.sun_sd + geometry.moon_sd - geometry.separation) / (2.0 * geometry.sun_sd);
+    totality_percent = almanac_disc_coverage_percent(geometry.sun_sd,
+                                                     geometry.moon_sd,
+                                                     geometry.apparent_separation);
+    if (!(magnitude == magnitude) || !(totality_percent == totality_percent))
+        return false;
+
+    *out = *coarse;
+    out->greatest_eclipse_jd = local_jd;
+    almanac_event_time_from_jd(local_jd, &out->greatest_eclipse_time);
+    out->magnitude = magnitude;
+    out->totality_percent = fmax(0.0, fmin(100.0, totality_percent));
+    return true;
+}
+
+static void almanac_remember_nearest_totality(const almanac_solar_totality_location_t *candidate,
+                                              almanac_solar_totality_location_t *best)
+{
+    if (!candidate || !candidate->found || !best)
+        return;
+    if (!best->found || candidate->distance_km < best->distance_km)
+        *best = *candidate;
+}
+
+typedef struct almanac_land_box_t {
+    double min_lat;
+    double max_lat;
+    double min_lon;
+    double max_lon;
+} almanac_land_box_t;
+
+static const almanac_land_box_t ALMANAC_PROBABLE_LAND_BOXES[] = {
+    {35.5, 44.5, -10.0, 4.5},     /* Iberia */
+    {41.0, 51.5, -5.5, 10.5},     /* France */
+    {49.0, 59.0, -11.0, 2.5},     /* Britain and Ireland */
+    {63.0, 67.5, -25.0, -13.0},   /* Iceland */
+    {59.0, 84.0, -75.0, -10.0},   /* Greenland */
+    {-35.5, 37.5, -18.0, 52.0},   /* Africa */
+    {5.0, 80.0, 25.0, 180.0},     /* Asia */
+    {-47.0, 10.0, 95.0, 155.0},   /* Australia and nearby islands */
+    {-56.0, 15.0, -82.0, -34.0},  /* South America */
+    {15.0, 84.0, -170.0, -52.0},  /* North America */
+    {-48.5, -33.0, 165.0, 180.0}, /* New Zealand */
+    {-48.5, -33.0, -180.0, -175.0}
+};
+
+typedef struct almanac_land_box_distance_t {
+    size_t index;
+    double distance_km;
+} almanac_land_box_distance_t;
+
+static int almanac_land_box_distance_compare(const void *lhs, const void *rhs)
+{
+    const almanac_land_box_distance_t *left = lhs;
+    const almanac_land_box_distance_t *right = rhs;
+
+    if (left->distance_km < right->distance_km)
+        return -1;
+    if (left->distance_km > right->distance_km)
+        return 1;
+    return 0;
+}
+
+static double almanac_land_box_min_distance_km(const almanac_land_box_t *box,
+                                               const almanac_observer_t *observer)
+{
+    double lat;
+    double lon;
+
+    if (!box || !observer)
+        return DBL_MAX;
+    lat = fmax(box->min_lat, fmin(box->max_lat, observer->latitude_degrees));
+    lon = fmax(box->min_lon, fmin(box->max_lon, observer->longitude_degrees));
+    return almanac_surface_distance_km(observer->latitude_degrees,
+                                       observer->longitude_degrees,
+                                       lat,
+                                       lon);
+}
+
+static bool almanac_probable_land_point(double latitude_degrees, double longitude_degrees)
+{
+    size_t i;
+
+    for (i = 0u; i < sizeof(ALMANAC_PROBABLE_LAND_BOXES) / sizeof(ALMANAC_PROBABLE_LAND_BOXES[0]); ++i) {
+        if (latitude_degrees >= ALMANAC_PROBABLE_LAND_BOXES[i].min_lat &&
+            latitude_degrees <= ALMANAC_PROBABLE_LAND_BOXES[i].max_lat &&
+            longitude_degrees >= ALMANAC_PROBABLE_LAND_BOXES[i].min_lon &&
+            longitude_degrees <= ALMANAC_PROBABLE_LAND_BOXES[i].max_lon) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool almanac_nearest_solar_totality(almanac_t *almanac,
+                                    const almanac_observer_t *observer,
+                                    const almanac_solar_eclipse_t *eclipse,
+                                    almanac_solar_totality_location_t *out)
+{
+    almanac_solar_totality_location_t best;
+    almanac_solar_totality_location_t candidate;
+    double radius_km;
+    bool coarse_found = false;
+
+    if (!almanac || !observer || !eclipse || !out) {
+        almanac_set_error(almanac, "invalid nearest solar totality request");
+        return false;
+    }
+    memset(out, 0, sizeof(*out));
+    memset(&best, 0, sizeof(best));
+    if (!almanac_observer_is_valid(almanac, observer) ||
+        !(eclipse->greatest_eclipse_jd == eclipse->greatest_eclipse_jd)) {
+        return false;
+    }
+
+    if (almanac_probe_solar_totality(almanac,
+                                     observer,
+                                     eclipse->greatest_eclipse_jd,
+                                     observer->latitude_degrees,
+                                     observer->longitude_degrees,
+                                     &candidate)) {
+        *out = candidate;
+        return true;
+    }
+
+    for (radius_km = 75.0; radius_km <= 12000.0 && !coarse_found; radius_km += 75.0) {
+        double bearing_step = radius_km < 750.0 ? 15.0 : 7.5;
+        double bearing;
+
+        for (bearing = 0.0; bearing < 360.0; bearing += bearing_step) {
+            double lat;
+            double lon;
+
+            almanac_destination_point(observer->latitude_degrees,
+                                      observer->longitude_degrees,
+                                      radius_km,
+                                      bearing,
+                                      &lat,
+                                      &lon);
+            if (almanac_probe_solar_totality_candidate(almanac,
+                                                       observer,
+                                                       eclipse->greatest_eclipse_jd,
+                                                       lat,
+                                                       lon,
+                                                       1.0,
+                                                       &candidate) &&
+                almanac_refine_solar_totality(almanac,
+                                              observer,
+                                              eclipse->greatest_eclipse_jd,
+                                              &candidate,
+                                              &candidate)) {
+                almanac_remember_nearest_totality(&candidate, &best);
+                coarse_found = true;
+            }
+        }
+    }
+
+    if (best.found) {
+        double north_km;
+        almanac_solar_totality_location_t refined = best;
+
+        for (north_km = -300.0; north_km <= 300.0; north_km += 25.0) {
+            double east_km;
+
+            for (east_km = -300.0; east_km <= 300.0; east_km += 25.0) {
+                double lat;
+                double lon;
+
+                almanac_destination_point(best.latitude_degrees,
+                                          best.longitude_degrees,
+                                          hypot(north_km, east_km),
+                                          radians_to_degrees(atan2(east_km, north_km)),
+                                          &lat,
+                                          &lon);
+                if (almanac_probe_solar_totality(almanac,
+                                                 observer,
+                                                 eclipse->greatest_eclipse_jd,
+                                                 lat,
+                                                 lon,
+                                                 &candidate)) {
+                    almanac_remember_nearest_totality(&candidate, &refined);
+                }
+            }
+        }
+        best = refined;
+        if (almanac_refine_solar_totality(almanac,
+                                          observer,
+                                          eclipse->greatest_eclipse_jd,
+                                          &best,
+                                          &candidate)) {
+            best = candidate;
+        }
+    }
+
+    *out = best;
+    return true;
+}
+
+bool almanac_nearest_solar_totality_land(almanac_t *almanac,
+                                         const almanac_observer_t *observer,
+                                         const almanac_solar_eclipse_t *eclipse,
+                                         almanac_solar_totality_location_t *out)
+{
+    almanac_solar_totality_location_t best;
+    almanac_solar_totality_location_t candidate;
+    almanac_land_box_distance_t box_distances[sizeof(ALMANAC_PROBABLE_LAND_BOXES) /
+                                             sizeof(ALMANAC_PROBABLE_LAND_BOXES[0])];
+    size_t box_count = sizeof(ALMANAC_PROBABLE_LAND_BOXES) / sizeof(ALMANAC_PROBABLE_LAND_BOXES[0]);
+    size_t box_index;
+
+    if (!almanac || !observer || !eclipse || !out) {
+        almanac_set_error(almanac, "invalid nearest land solar totality request");
+        return false;
+    }
+    memset(out, 0, sizeof(*out));
+    memset(&best, 0, sizeof(best));
+    if (!almanac_observer_is_valid(almanac, observer) ||
+        !(eclipse->greatest_eclipse_jd == eclipse->greatest_eclipse_jd)) {
+        return false;
+    }
+
+    if (almanac_probable_land_point(observer->latitude_degrees, observer->longitude_degrees) &&
+        almanac_probe_solar_totality(almanac,
+                                     observer,
+                                     eclipse->greatest_eclipse_jd,
+                                     observer->latitude_degrees,
+                                     observer->longitude_degrees,
+                                     &candidate)) {
+        *out = candidate;
+        return true;
+    }
+
+    {
+        static const struct {
+            double latitude_degrees;
+            double longitude_degrees;
+        } candidate_landfalls[] = {
+            {43.3619, -5.8494},   /* northern Spain */
+            {42.7771, -1.7533},   /* northern Spain */
+            {40.5075, -3.5931},   /* central Spain */
+            {64.1466, -21.9426},  /* Iceland */
+            {64.1833, -51.7333},  /* Greenland */
+            {38.7223, -9.1393},   /* Portugal */
+            {48.8566, 2.3522}     /* France */
+        };
+        size_t i;
+
+        for (i = 0u; i < sizeof(candidate_landfalls) / sizeof(candidate_landfalls[0]); ++i) {
+            if (almanac_probe_solar_totality_candidate(almanac,
+                                                       observer,
+                                                       eclipse->greatest_eclipse_jd,
+                                                       candidate_landfalls[i].latitude_degrees,
+                                                       candidate_landfalls[i].longitude_degrees,
+                                                       1.0,
+                                                       &candidate) &&
+                almanac_refine_solar_totality(almanac,
+                                              observer,
+                                              eclipse->greatest_eclipse_jd,
+                                              &candidate,
+                                              &candidate)) {
+                almanac_remember_nearest_totality(&candidate, &best);
+            }
+        }
+    }
+
+    if (!best.found) {
+        for (box_index = 0u; box_index < box_count; ++box_index) {
+            box_distances[box_index].index = box_index;
+            box_distances[box_index].distance_km =
+                almanac_land_box_min_distance_km(&ALMANAC_PROBABLE_LAND_BOXES[box_index], observer);
+        }
+        qsort(box_distances, box_count, sizeof(box_distances[0]), almanac_land_box_distance_compare);
+
+        for (box_index = 0u; box_index < box_count; ++box_index) {
+            const almanac_land_box_t *box = &ALMANAC_PROBABLE_LAND_BOXES[box_distances[box_index].index];
+            double lat_step = (box->max_lat - box->min_lat) > 20.0 ? 1.0 : 0.5;
+            double lon_step = (box->max_lon - box->min_lon) > 20.0 ? 1.0 : 0.5;
+            double lat;
+
+            if (best.found && box_distances[box_index].distance_km > best.distance_km + 25.0)
+                break;
+
+            for (lat = box->min_lat; lat <= box->max_lat + 1e-9; lat += lat_step) {
+                double lon;
+
+                for (lon = box->min_lon; lon <= box->max_lon + 1e-9; lon += lon_step) {
+                    if (best.found &&
+                        almanac_surface_distance_km(observer->latitude_degrees,
+                                                    observer->longitude_degrees,
+                                                    lat,
+                                                    lon) > best.distance_km + 25.0) {
+                        continue;
+                    }
+                    if (almanac_probe_solar_totality_candidate(almanac,
+                                                               observer,
+                                                               eclipse->greatest_eclipse_jd,
+                                                               lat,
+                                                               lon,
+                                                               0.35,
+                                                               &candidate) &&
+                        almanac_refine_solar_totality(almanac,
+                                                      observer,
+                                                      eclipse->greatest_eclipse_jd,
+                                                      &candidate,
+                                                      &candidate)) {
+                        almanac_remember_nearest_totality(&candidate, &best);
+                    }
+                }
+            }
+        }
+    }
+
+    if (best.found) {
+        double north_km;
+        almanac_solar_totality_location_t refined = best;
+
+        for (north_km = -250.0; north_km <= 250.0; north_km += 10.0) {
+            double east_km;
+
+            for (east_km = -250.0; east_km <= 250.0; east_km += 10.0) {
+                double lat;
+                double lon;
+
+                almanac_destination_point(best.latitude_degrees,
+                                          best.longitude_degrees,
+                                          hypot(north_km, east_km),
+                                          radians_to_degrees(atan2(east_km, north_km)),
+                                          &lat,
+                                          &lon);
+                if (!almanac_probable_land_point(lat, lon))
+                    continue;
+                if (almanac_probe_solar_totality(almanac,
+                                                 observer,
+                                                 eclipse->greatest_eclipse_jd,
+                                                 lat,
+                                                 lon,
+                                                 &candidate)) {
+                    almanac_remember_nearest_totality(&candidate, &refined);
+                }
+            }
+        }
+        best = refined;
+        if (almanac_refine_solar_totality(almanac,
+                                          observer,
+                                          eclipse->greatest_eclipse_jd,
+                                          &best,
+                                          &candidate)) {
+            best = candidate;
+        }
+    }
+
+    *out = best;
+    return true;
+}
+
 static bool almanac_fill_lunar_eclipse(almanac_t *almanac,
                                        double jd,
                                        const almanac_observer_t *observer,
@@ -4410,7 +5097,12 @@ array_t *almanac_find_solar_transits(almanac_t *almanac,
 array_t *almanac_snapshot(almanac_t *almanac, const datetime_t *moment)
 {
     static const char *sql =
-        "SELECT body_id FROM almanac_body WHERE enabled = 1 ORDER BY sort_order ASC, body_id ASC";
+        "select b.body_id "
+        "from almanac_body as b "
+        "join almanac_body_enabled as enabled on enabled.body_id = b.body_id "
+        "join almanac_body_sort_order as sort on sort.body_id = b.body_id "
+        "where enabled.enabled = 'Y' "
+        "order by sort.sort_order asc, b.body_id asc";
     sqlite_stmt_t *stmt = NULL;
     array_t *entries = NULL;
     sqlite_step_result_t rc;

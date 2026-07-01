@@ -130,6 +130,11 @@ typedef struct pointer_vec_t {
     size_t item_size;
 } pointer_vec_t;
 
+static bool text_equals(const char *left, const char *right)
+{
+    return left && right && strcmp(left, right) == 0;
+}
+
 static void jurisdiction_set_error(jurisdiction_t *jurisdiction, const char *message)
 {
     if (!jurisdiction || !jurisdiction->error)
@@ -1010,8 +1015,8 @@ static char *evaluate_sql_rule_date(sqlite_t *db,
     sqlite_step_result_t rc;
     size_t sql_len;
     static const char prefix[] =
-        "WITH holiday_rule_context(rule_year, jurisdiction_id, holiday_id, rule_id) AS ("
-        " SELECT ?1, ?2, ?3, ?4"
+        "with holiday_rule_context(rule_year, jurisdiction_id, holiday_id, holiday_rule_id) as ("
+        " select ?1, ?2, ?3, ?4"
         ") ";
 
     if (!db || !rule || !rule->expression_language || !rule->expression_text || !jurisdiction)
@@ -1050,15 +1055,15 @@ static char *evaluate_sql_rule_date(sqlite_t *db,
 static bool load_lineage(sqlite_t *db, const char *jurisdiction, pointer_vec_t *lineage_rows)
 {
     static const char sql[] =
-        "WITH RECURSIVE lineage(jurisdiction_id, depth) AS ("
-        "  SELECT ?1, 0 "
-        "  UNION ALL "
-        "  SELECT j.parent_jurisdiction_id, lineage.depth + 1 "
-        "  FROM jurisdiction j "
-        "  JOIN lineage ON j.jurisdiction_id = lineage.jurisdiction_id "
-        "  WHERE j.parent_jurisdiction_id IS NOT NULL"
+        "with recursive lineage(jurisdiction_id, depth) as ("
+        "  select ?1, 0 "
+        "  union all "
+        "  select j.parent_jurisdiction_id, lineage.depth + 1 "
+        "  from jurisdiction j "
+        "  join lineage on j.jurisdiction_id = lineage.jurisdiction_id "
+        "  where j.parent_jurisdiction_id is not null"
         ") "
-        "SELECT jurisdiction_id, depth FROM lineage ORDER BY depth;";
+        "select jurisdiction_id, depth from lineage order by depth;";
     sqlite_stmt_t *stmt = sqlite_stmt_prepare(db, sql);
     sqlite_step_result_t rc;
 
@@ -1091,9 +1096,9 @@ fail:
 static bool load_weekend_rules(sqlite_t *db, const pointer_vec_t *lineage_rows, pointer_vec_t *weekend_rules)
 {
     static const char sql[] =
-        "SELECT jurisdiction_id, weekend_mask, valid_from_year, valid_to_year "
-        "FROM jurisdiction_weekend_rule WHERE jurisdiction_id = ?1 "
-        "ORDER BY COALESCE(valid_from_year, -999999), COALESCE(valid_to_year, 999999);";
+        "select jurisdiction_id, weekend_mask, valid_from_year, valid_to_year "
+        "from jurisdiction_weekend_rule where jurisdiction_id = ?1 "
+        "order by coalesce(valid_from_year, -999999), coalesce(valid_to_year, 999999);";
     sqlite_stmt_t *stmt = NULL;
     const lineage_row_t *lineage = lineage_rows ? lineage_rows->items : NULL;
     size_t i;
@@ -1141,8 +1146,13 @@ static bool load_default_location(sqlite_t *db,
                                   double *longitude)
 {
     static const char sql[] =
-        "SELECT latitude, longitude "
-        "FROM jurisdiction_location_default WHERE jurisdiction_id = ?1;";
+        "select lat.latitude, lon.longitude "
+        "from jurisdiction_location_default as loc "
+        "join jurisdiction_location_default_latitude as lat "
+        "  on lat.jurisdiction_id = loc.jurisdiction_id "
+        "join jurisdiction_location_default_longitude as lon "
+        "  on lon.jurisdiction_id = loc.jurisdiction_id "
+        "where loc.jurisdiction_id = ?1;";
     sqlite_stmt_t *stmt = NULL;
     const lineage_row_t *lineage = lineage_rows ? lineage_rows->items : NULL;
     size_t i;
@@ -1191,8 +1201,13 @@ static bool load_default_timezone_name(sqlite_t *db,
                                        size_t timezone_name_size)
 {
     static const char sql[] =
-        "SELECT timezone_name "
-        "FROM jurisdiction_location_default WHERE jurisdiction_id = ?1;";
+        "select code.timezone_name "
+        "from jurisdiction_location_default as loc "
+        "join jurisdiction_location_default_timezone as tz "
+        "  on tz.jurisdiction_id = loc.jurisdiction_id "
+        "join timezone_code as code "
+        "  on code.timezone_code = tz.timezone_code "
+        "where loc.jurisdiction_id = ?1;";
     sqlite_stmt_t *stmt = NULL;
     const lineage_row_t *lineage = lineage_rows ? lineage_rows->items : NULL;
     size_t i;
@@ -1234,13 +1249,13 @@ static bool load_timezone_eras(sqlite_t *db,
                                pointer_vec_t *rows)
 {
     static const char canonical_sql[] =
-        "SELECT canonical_timezone_name "
-        "FROM timezone_definition WHERE timezone_name = ?1;";
+        "select canonical_timezone_name "
+        "from timezone_canonical where timezone_name = ?1;";
     static const char sql[] =
-        "SELECT sequence_no, gmtoff_minutes, rules_kind, fixed_save_minutes, rule_name, "
+        "select sequence_no, gmtoff_minutes, rules_kind, fixed_save_minutes, rule_name, "
         "       until_year, until_month, until_day_kind, until_day_value, "
         "       until_weekday, until_seconds, until_suffix "
-        "FROM timezone_era WHERE timezone_name = ?1 ORDER BY sequence_no;";
+        "from timezone_era where timezone_name = ?1 order by sequence_no;";
     sqlite_stmt_t *stmt = NULL;
     sqlite_stmt_t *canonical_stmt = NULL;
     const char *query_timezone_name = timezone_name;
@@ -1325,10 +1340,10 @@ static bool load_timezone_transition_rules(sqlite_t *db,
                                            pointer_vec_t *rows)
 {
     static const char sql[] =
-        "SELECT rule_name, from_year, to_year, in_month, on_kind, on_day, on_weekday, "
+        "select rule_name, from_year, to_year, in_month, on_kind, on_day, on_weekday, "
         "       at_seconds, at_suffix, save_minutes "
-        "FROM timezone_transition_rule WHERE rule_name = ?1 "
-        "ORDER BY COALESCE(from_year, -999999), COALESCE(to_year, 999999), in_month, on_day;";
+        "from timezone_transition_rule where rule_name = ?1 "
+        "order by coalesce(from_year, -999999), coalesce(to_year, 999999), in_month, on_day;";
     sqlite_stmt_t *stmt = NULL;
     sqlite_step_result_t rc;
 
@@ -1772,19 +1787,25 @@ static bool timezone_offset_for_name_on_date(sqlite_t *db,
     return true;
 }
 
-static bool load_holiday_rules(sqlite_t *db, const pointer_vec_t *lineage_rows, pointer_vec_t *rules)
+static bool load_holiday_rules(sqlite_t *db,
+                               const pointer_vec_t *lineage_rows,
+                               int start_year,
+                               int end_year,
+                               pointer_vec_t *rules)
 {
     static const char sql[] =
-        "SELECT hd.holiday_id, hr.rule_id, hd.jurisdiction_id, "
-        "       COALESCE(hn.localized_name, hd.default_name), hd.holiday_class, "
+        "select hd.holiday_id, hr.holiday_rule_id, hd.jurisdiction_id, "
+        "       coalesce(hn.localized_name, hd.default_name), hd.holiday_class, "
         "       hr.rule_kind, hr.month, hr.day, hr.weekday, hr.ordinal, hr.offset_days, "
         "       hr.holiday_date, hr.expression_language, hr.expression_text, "
         "       hr.valid_from_year, hr.valid_to_year "
-        "FROM holiday_definition hd "
-        "JOIN holiday_rule hr ON hr.holiday_id = hd.holiday_id "
-        "LEFT JOIN holiday_name hn ON hn.holiday_id = hd.holiday_id AND hn.is_primary = 1 "
-        "WHERE hd.jurisdiction_id = ?1 "
-        "ORDER BY hd.holiday_id, hr.priority, hr.sequence_no;";
+        "from holiday_definition hd "
+        "join holiday_rule hr on hr.holiday_id = hd.holiday_id "
+        "left join holiday_name hn on hn.holiday_id = hd.holiday_id and hn.is_primary = 'Y' "
+        "where hd.jurisdiction_id = ?1 "
+        "  and (hr.valid_from_year is null or hr.valid_from_year <= ?2) "
+        "  and (hr.valid_to_year is null or hr.valid_to_year >= ?3) "
+        "order by hd.holiday_id, hr.priority, hr.sequence_no;";
     sqlite_stmt_t *stmt = NULL;
     const lineage_row_t *lineage = lineage_rows ? lineage_rows->items : NULL;
     size_t i;
@@ -1800,7 +1821,9 @@ static bool load_holiday_rules(sqlite_t *db, const pointer_vec_t *lineage_rows, 
 
         sqlite_stmt_reset(stmt);
         sqlite_stmt_clear_bindings(stmt);
-        if (!sqlite_stmt_bind_text(stmt, 1, lineage[i].jurisdiction_id))
+        if (!sqlite_stmt_bind_text(stmt, 1, lineage[i].jurisdiction_id) ||
+            !sqlite_stmt_bind_int(stmt, 2, end_year) ||
+            !sqlite_stmt_bind_int(stmt, 3, start_year))
             goto fail;
         while ((rc = sqlite_stmt_step(stmt)) == SQLITE_STEP_ROW) {
             holiday_rule_row_t row;
@@ -1840,12 +1863,12 @@ fail:
 static bool load_observance_rules(sqlite_t *db, const pointer_vec_t *lineage_rows, pointer_vec_t *observances)
 {
     static const char sql[] =
-        "SELECT hor.holiday_id, hor.applies_to_rule_id, hor.observed_rule_kind, hor.observed_name, "
+        "select hor.holiday_id, hor.holiday_rule_id, hor.observed_rule_kind, hor.observed_name, "
         "       hor.weekend_mask, hor.suppress_original, hor.valid_from_year, hor.valid_to_year "
-        "FROM holiday_observance_rule hor "
-        "JOIN holiday_definition hd ON hd.holiday_id = hor.holiday_id "
-        "WHERE hd.jurisdiction_id = ?1 "
-        "ORDER BY hor.holiday_id, hor.priority;";
+        "from holiday_observance_rule hor "
+        "join holiday_definition hd on hd.holiday_id = hor.holiday_id "
+        "where hd.jurisdiction_id = ?1 "
+        "order by hor.holiday_id, hor.priority;";
     sqlite_stmt_t *stmt = NULL;
     const lineage_row_t *lineage = lineage_rows ? lineage_rows->items : NULL;
     size_t i;
@@ -1872,7 +1895,7 @@ static bool load_observance_rules(sqlite_t *db, const pointer_vec_t *lineage_row
             row.observed_rule_kind = dup_text(sqlite_stmt_column_text(stmt, 2));
             row.observed_name = dup_text(sqlite_stmt_column_text(stmt, 3));
             row.weekend_mask = normalise_weekend_mask(sqlite_stmt_column_text(stmt, 4));
-            row.suppress_original = sqlite_stmt_column_int(stmt, 5) != 0;
+            row.suppress_original = text_equals(sqlite_stmt_column_text(stmt, 5), "Y");
             row.valid_from_year = sqlite_stmt_column_is_null(stmt, 6) ? 0 : sqlite_stmt_column_int(stmt, 6);
             row.valid_to_year = sqlite_stmt_column_is_null(stmt, 7) ? 0 : sqlite_stmt_column_int(stmt, 7);
             if (!row.observed_rule_kind || !row.weekend_mask || !vec_push(observances, &row))
@@ -1893,8 +1916,8 @@ fail:
 static bool load_exceptions(sqlite_t *db, const pointer_vec_t *lineage_rows, pointer_vec_t *exceptions)
 {
     static const char sql[] =
-        "SELECT holiday_id, target_rule_id, holiday_date, action, name, valid_from_year, valid_to_year "
-        "FROM holiday_exception WHERE jurisdiction_id = ?1 ORDER BY holiday_date, priority;";
+        "select holiday_id, holiday_rule_id, holiday_date, action, name, valid_from_year, valid_to_year "
+        "from holiday_exception where jurisdiction_id = ?1 order by holiday_date, priority;";
     sqlite_stmt_t *stmt = NULL;
     const lineage_row_t *lineage = lineage_rows ? lineage_rows->items : NULL;
     size_t i;
@@ -2817,7 +2840,7 @@ bool jurisdict_each_holiday_between(jurisdiction_t *holiday,
 
     if (!load_lineage(db, jurisdiction, &lineage_rows) ||
         !load_weekend_rules(db, &lineage_rows, &weekend_rules) ||
-        !load_holiday_rules(db, &lineage_rows, &rules) ||
+        !load_holiday_rules(db, &lineage_rows, datetime_year(start), datetime_year(end), &rules) ||
         !load_observance_rules(db, &lineage_rows, &observances) ||
         !load_exceptions(db, &lineage_rows, &exceptions)) {
         jurisdiction_set_error(holiday, "failed to load holiday rules");

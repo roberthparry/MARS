@@ -122,7 +122,7 @@ static bool sqlite_verify_key(sqlite_t *db)
     sqlite3_stmt *stmt = NULL;
     bool ok = false;
 
-    if (!sqlite_prepare(db, "SELECT count(*) FROM sqlite_master", &stmt))
+    if (!sqlite_prepare(db, "select count(*) from sqlite_master", &stmt))
         return false;
 
     ok = sqlite3_step(stmt) == SQLITE_ROW;
@@ -168,8 +168,8 @@ sqlite_t *sqlite_open_encrypted(const string_t *path, const string_t *key)
         return NULL;
     }
 
-    if (!sqlite_exec_cstr(db, "PRAGMA cipher_memory_security = ON") ||
-        !sqlite_exec_cstr(db, "PRAGMA foreign_keys = ON") ||
+    if (!sqlite_exec_cstr(db, "pragma cipher_memory_security = on") ||
+        !sqlite_exec_cstr(db, "pragma foreign_keys = on") ||
         !sqlite_verify_key(db)) {
         sqlite_close(db);
         return NULL;
@@ -224,13 +224,13 @@ bool sqlite_exec_cstr(sqlite_t *db, const char *sql)
 bool sqlite_init_object_store(sqlite_t *db)
 {
     return sqlite_exec_cstr(db,
-        "CREATE TABLE IF NOT EXISTS mars_object ("
-        "name TEXT PRIMARY KEY NOT NULL,"
-        "type TEXT NOT NULL,"
-        "encoding TEXT NOT NULL,"
-        "value BLOB NOT NULL,"
-        "created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,"
-        "updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP"
+        "create table if not exists mars_object ("
+        "name text primary key not null,"
+        "type text not null,"
+        "encoding text not null,"
+        "value blob not null,"
+        "created_at text not null default current_timestamp,"
+        "updated_at text not null default current_timestamp"
         ")");
 }
 
@@ -249,13 +249,13 @@ bool sqlite_store_object(sqlite_t *db,
         return false;
     }
     if (!sqlite_prepare(db,
-            "INSERT INTO mars_object(name, type, encoding, value) "
-            "VALUES(?1, ?2, ?3, ?4) "
-            "ON CONFLICT(name) DO UPDATE SET "
+            "insert into mars_object(name, type, encoding, value) "
+            "values(?1, ?2, ?3, ?4) "
+            "on conflict(name) do update set "
             "type = excluded.type, "
             "encoding = excluded.encoding, "
             "value = excluded.value, "
-            "updated_at = CURRENT_TIMESTAMP",
+            "updated_at = current_timestamp",
             &stmt)) {
         return false;
     }
@@ -304,7 +304,7 @@ bool sqlite_load_object(sqlite_t *db,
         return false;
     }
     if (!sqlite_prepare(db,
-            "SELECT type, encoding, value FROM mars_object WHERE name = ?1",
+            "select type, encoding, value from mars_object where name = ?1",
             &stmt)) {
         return false;
     }
