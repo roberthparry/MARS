@@ -28,17 +28,21 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
 import webbrowser
 import shutil
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 
 ROOT = Path(__file__).resolve().parents[1]
 JURISDICTION_DB_SOURCE_DIR = ROOT / "packaging" / "jurisdiction-db"
 COUNTRY_JURISDICTIONS_SQL = JURISDICTION_DB_SOURCE_DIR / "mars_country_jurisdictions.sql"
 TARGET_SUBDIVISIONS_SQL = JURISDICTION_DB_SOURCE_DIR / "mars_target_subdivisions.sql"
+JURISDICTION_LOCATION_DEFAULTS_SQL = JURISDICTION_DB_SOURCE_DIR / "mars_jurisdiction_location_defaults.sql"
+JURISDICTION_TOWNS_SQL = JURISDICTION_DB_SOURCE_DIR / "mars_jurisdiction_towns.sql"
 JURISDICTION_DB_PATH_ENV = "MARS_JURISDICTION_DB_PATH"
 JURISDICTION_DB_KEY_ENV = "MARS_JURISDICTION_DB_KEY"
 LEGACY_HOLIDAY_DB_PATH_ENV = "MARS_HOLIDAY_DB_PATH"
@@ -124,6 +128,20 @@ def config_env_path(name: str) -> Path:
     return mars_home_dir() / "config" / name
 
 
+def mars_lab_data_dir() -> Path:
+    return mars_home_dir() / "lab"
+
+
+def mars_lab_path_from_env(variable_name: str, default_path: Path) -> Path:
+    configured = os.environ.get(variable_name, "").strip()
+    if not configured:
+        return default_path
+    path = Path(configured).expanduser()
+    if path.is_absolute():
+        return path
+    return mars_lab_data_dir() / path
+
+
 def read_env_like_value(path: Path, variable_name: str) -> str:
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
@@ -146,6 +164,73 @@ def read_env_like_value(path: Path, variable_name: str) -> str:
             value = value[1:-1]
         return value.strip()
     return ""
+
+
+def shell_single_quote(value: str) -> str:
+    return "'" + value.replace("'", "'\"'\"'") + "'"
+
+
+def ensure_private_directory(path: Path) -> None:
+    path.mkdir(parents=True, exist_ok=True)
+    try:
+        path.chmod(0o700)
+    except OSError:
+        pass
+
+
+def write_env_like_value(path: Path, variable_name: str, value: str) -> None:
+    ensure_private_directory(path.parent)
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        lines = []
+
+    prefix = f"{variable_name}="
+    export_prefix = f"export {variable_name}="
+    replacement = f"export {variable_name}={shell_single_quote(value)}"
+    replaced = False
+    next_lines: list[str] = []
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith(prefix) or stripped.startswith(export_prefix):
+            if not replaced:
+                next_lines.append(replacement)
+                replaced = True
+            continue
+        next_lines.append(line)
+    if not replaced:
+        if next_lines and next_lines[-1].strip():
+            next_lines.append("")
+        next_lines.append(replacement)
+
+    path.write_text("\n".join(next_lines) + "\n", encoding="utf-8")
+    try:
+        path.chmod(0o600)
+    except OSError:
+        pass
+
+
+def mars_lab_object_store_key() -> str:
+    configured = os.environ.get(MARS_LAB_OBJECT_STORE_KEY_ENV, "").strip()
+    if configured:
+        return configured
+
+    config_path = config_env_path(MARS_LAB_CONFIG_FILE)
+    stored = read_env_like_value(config_path, MARS_LAB_OBJECT_STORE_KEY_ENV)
+    if stored:
+        return stored
+
+    key = secrets.token_urlsafe(48)
+    write_env_like_value(config_path, MARS_LAB_OBJECT_STORE_KEY_ENV, key)
+    return key
+
+
+def mars_lab_object_store_runtime_env() -> dict[str, str]:
+    ensure_private_directory(CACHE_FILE.parent)
+    return {
+        MARS_LAB_OBJECT_STORE_PATH_ENV: str(CACHE_FILE),
+        MARS_LAB_OBJECT_STORE_KEY_ENV: mars_lab_object_store_key(),
+    }
 
 
 def default_jurisdiction_db_path() -> Path:
@@ -172,11 +257,31 @@ def jurisdiction_db_runtime_env() -> dict[str, str]:
 
 
 def load_holiday_jurisdiction_options() -> list[tuple[str, str]]:
-    country_pattern = re.compile(
-        r"\s*\('([^']+)', NULL, 'country', '[^']+', NULL, '[^']+', '([^']*)',"
+    country_patterns = (
+        re.compile(
+            r"\s*\('((?:[^']|'')*)'\s*,\s*'country'\s*,\s*'((?:[^']|'')*)'\s*,"
+            r"\s*'((?:[^']|'')*)'\s*,\s*'((?:[^']|'')*)'\s*\)",
+            re.IGNORECASE,
+        ),
+        re.compile(
+            r"\s*\('((?:[^']|'')*)'\s*,\s*null\s*,\s*'country'\s*,\s*'((?:[^']|'')*)'\s*,"
+            r"\s*null\s*,\s*'((?:[^']|'')*)'\s*,\s*'((?:[^']|'')*)'",
+            re.IGNORECASE,
+        ),
     )
-    subdivision_pattern = re.compile(
-        r"\s*\('([^']+)', '([^']+)', 'subdivision', '[^']+', '[^']+', '[^']+', '([^']*)',"
+    subdivision_patterns = (
+        re.compile(
+            r"\s*\('((?:[^']|'')*)'\s*,\s*'((?:[^']|'')*)'\s*,\s*'subdivision'\s*,"
+            r"\s*'((?:[^']|'')*)'\s*,\s*'((?:[^']|'')*)'\s*,\s*'((?:[^']|'')*)'\s*,"
+            r"\s*'((?:[^']|'')*)'\s*\)",
+            re.IGNORECASE,
+        ),
+        re.compile(
+            r"\s*\('((?:[^']|'')*)'\s*,\s*'((?:[^']|'')*)'\s*,\s*'subdivision'\s*,"
+            r"\s*'((?:[^']|'')*)'\s*,\s*'((?:[^']|'')*)'\s*,\s*'((?:[^']|'')*)'\s*,"
+            r"\s*'((?:[^']|'')*)'",
+            re.IGNORECASE,
+        ),
     )
     country_names: dict[str, str] = {}
     subdivisions_by_parent: dict[str, list[tuple[str, str]]] = {}
@@ -187,10 +292,11 @@ def load_holiday_jurisdiction_options() -> list[tuple[str, str]]:
         lines = []
 
     for line in lines:
-        match = country_pattern.match(line)
+        match = next((pattern.match(line) for pattern in country_patterns if pattern.match(line)), None)
         if not match:
             continue
-        code, name = match.groups()
+        groups = match.groups()
+        code, name = sql_unescape_text(groups[0]), sql_unescape_text(groups[-1])
         if code == "GB":
             name = "United Kingdom"
         country_names[code] = name
@@ -201,10 +307,15 @@ def load_holiday_jurisdiction_options() -> list[tuple[str, str]]:
         subdivision_lines = []
 
     for line in subdivision_lines:
-        match = subdivision_pattern.match(line)
+        match = next((pattern.match(line) for pattern in subdivision_patterns if pattern.match(line)), None)
         if not match:
             continue
-        code, parent_code, name = match.groups()
+        groups = match.groups()
+        code, parent_code, name = (
+            sql_unescape_text(groups[0]),
+            sql_unescape_text(groups[1]),
+            sql_unescape_text(groups[-1]),
+        )
         subdivisions_by_parent.setdefault(parent_code, []).append((code, name))
 
     options: list[tuple[str, str]] = []
@@ -225,8 +336,154 @@ def load_holiday_jurisdiction_options() -> list[tuple[str, str]]:
     return options
 
 
+def sql_unescape_text(value: str) -> str:
+    return str(value or "").replace("''", "'")
+
+
+def sql_insert_values_block(sql_text: str, table_name: str) -> str:
+    pattern = re.compile(
+        rf"INSERT\s+INTO\s+{re.escape(table_name)}\s*\([^;]*?\)\s*VALUES\s*(.*?);",
+        re.IGNORECASE | re.DOTALL,
+    )
+    match = pattern.search(sql_text)
+    return match.group(1) if match else ""
+
+
+def load_jurisdiction_location_defaults() -> dict[str, tuple[str, str, str, str]]:
+    row_pattern = re.compile(
+        r"\(\s*'((?:[^']|'')*)'\s*,\s*'((?:[^']|'')*)'\s*,\s*'((?:[^']|'')*)'\s*,"
+        r"\s*'((?:[^']|'')*)'\s*,\s*'((?:[^']|'')*)'",
+        re.MULTILINE,
+    )
+    defaults: dict[str, tuple[str, str, str, str]] = {}
+
+    try:
+        text = JURISDICTION_LOCATION_DEFAULTS_SQL.read_text(encoding="utf-8")
+    except OSError:
+        return defaults
+
+    for match in row_pattern.finditer(text):
+        jurisdiction, latitude, longitude, timezone_name, locality_name = (
+            sql_unescape_text(part.strip())
+            for part in match.groups()
+        )
+        try:
+            lat = float(latitude)
+            lon = float(longitude)
+        except ValueError:
+            continue
+        if not jurisdiction or not timezone_name or not (-90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0):
+            continue
+        defaults[jurisdiction] = (latitude, longitude, timezone_name, locality_name)
+    return defaults
+
+
+def load_jurisdiction_town_options(
+    defaults: dict[str, tuple[str, str, str, str]]
+) -> dict[str, list[dict[str, object]]]:
+    row_pattern = re.compile(
+        r"\(\s*'((?:[^']|'')*)'\s*,\s*'((?:[^']|'')*)'\s*,\s*'((?:[^']|'')*)'\s*,"
+        r"\s*'((?:[^']|'')*)'\s*,\s*'((?:[^']|'')*)'\s*,\s*(\d+)\s*,\s*'([YN])'\s*\)",
+        re.MULTILINE,
+    )
+    timezone_pattern = re.compile(
+        r"\(\s*'((?:[^']|'')*)'\s*,\s*(\d+)\s*,",
+        re.MULTILINE,
+    )
+    timezone_names_by_code: dict[str, str] = {}
+    towns: dict[str, list[dict[str, object]]] = {}
+    seen: dict[str, set[tuple[str, str, str]]] = {}
+
+    try:
+        timezone_text = JURISDICTION_DB_SOURCE_DIR.joinpath("mars_timezone_rules.sql").read_text(encoding="utf-8")
+    except OSError:
+        timezone_text = ""
+
+    timezone_values = sql_insert_values_block(timezone_text, "timezone_definition_seed")
+    if not timezone_values:
+        timezone_values = sql_insert_values_block(timezone_text, "timezone_definition")
+
+    for match in timezone_pattern.finditer(timezone_values):
+        timezone_name, timezone_code = (
+            sql_unescape_text(part.strip())
+            for part in match.groups()
+        )
+        timezone_names_by_code[str(timezone_code)] = timezone_name
+
+    def add_town(jurisdiction: str,
+                 name: str,
+                 latitude: str,
+                 longitude: str,
+                 elevation: str,
+                 timezone_name: str,
+                 is_default: bool) -> None:
+        jurisdiction = str(jurisdiction or "").strip()
+        name = str(name or "").strip()
+        latitude = str(latitude or "").strip()
+        longitude = str(longitude or "").strip()
+        elevation = str(elevation or "").strip()
+        timezone_name = str(timezone_name or "").strip()
+        if not jurisdiction or not name or not timezone_name:
+            return
+        try:
+            lat = float(latitude)
+            lon = float(longitude)
+            elev = float(elevation)
+        except ValueError:
+            return
+        if not (-90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0 and -500.0 <= elev <= 9000.0):
+            return
+        key = (name.casefold(), f"{lat:.6f}", f"{lon:.6f}")
+        if key in seen.setdefault(jurisdiction, set()):
+            return
+        seen[jurisdiction].add(key)
+        towns.setdefault(jurisdiction, []).append({
+            "name": name,
+            "latitude": latitude,
+            "longitude": longitude,
+            "elevation": elevation,
+            "timezone": timezone_name,
+            "default": bool(is_default),
+        })
+
+    try:
+        text = JURISDICTION_TOWNS_SQL.read_text(encoding="utf-8")
+    except OSError:
+        text = ""
+
+    for match in row_pattern.finditer(text):
+        jurisdiction, name, latitude, longitude, elevation, timezone_code, is_default = (
+            sql_unescape_text(part.strip())
+            for part in match.groups()
+        )
+        timezone_name = timezone_names_by_code.get(str(timezone_code), "")
+        add_town(jurisdiction, name, latitude, longitude, elevation, timezone_name, is_default == "Y")
+
+    for jurisdiction, (latitude, longitude, timezone_name, locality_name) in defaults.items():
+        if jurisdiction not in towns:
+            add_town(jurisdiction, locality_name or jurisdiction, latitude, longitude, "0", timezone_name, True)
+
+    for jurisdiction, rows in towns.items():
+        if not any(bool(row.get("default")) for row in rows):
+            default_locality = defaults.get(jurisdiction, ("", "", "", ""))[3]
+            for row in rows:
+                if default_locality and str(row.get("name") or "") == default_locality:
+                    row["default"] = True
+                    break
+        if not any(bool(row.get("default")) for row in rows) and rows:
+            rows[0]["default"] = True
+        rows.sort(key=lambda row: (
+            0 if bool(row.get("default")) else 1,
+            str(row.get("name") or "").casefold(),
+        ))
+    return towns
+
+
 HOLIDAY_JURISDICTION_OPTIONS = load_holiday_jurisdiction_options()
+HOLIDAY_JURISDICTION_LABELS = dict(HOLIDAY_JURISDICTION_OPTIONS)
 VALID_HOLIDAY_JURISDICTIONS = {code for code, _ in HOLIDAY_JURISDICTION_OPTIONS}
+JURISDICTION_LOCATION_DEFAULTS = load_jurisdiction_location_defaults()
+JURISDICTION_TOWN_OPTIONS = load_jurisdiction_town_options(JURISDICTION_LOCATION_DEFAULTS)
 DEFAULT_HOLIDAY_JURISDICTION = (
     DEFAULT_HOLIDAY_JURISDICTION_FROM_LOCALE
     if DEFAULT_HOLIDAY_JURISDICTION_FROM_LOCALE in VALID_HOLIDAY_JURISDICTIONS
@@ -252,27 +509,49 @@ ALMANAC_BODY_OPTIONS = (
 )
 
 
-def infer_holiday_jurisdiction(latitude: float, longitude: float) -> str:
-    boxes = [
-        ("AU", -44.5, -10.0, 112.0, 154.5),
-        ("NZ", -48.5, -33.0, 165.0, 179.9),
-        ("ZA", -35.5, -21.0, 16.0, 33.5),
-        ("NL", 50.0, 54.2, 3.0, 8.0),
-        ("DK", 54.0, 58.0, 7.5, 15.5),
-        ("IE", 51.0, 55.8, -11.0, -5.0),
-        ("PT", 36.5, 42.5, -10.0, -6.0),
-        ("GR", 34.0, 42.5, 19.0, 29.5),
-        ("IT", 35.0, 47.5, 6.0, 19.0),
-        ("FR", 41.0, 51.5, -5.5, 10.5),
-        ("DE", 47.0, 55.5, 5.0, 16.5),
-        ("GB-ENG", 49.5, 56.2, -7.8, 2.2),
-        ("CA", 41.0, 84.5, -141.5, -52.0),
-        ("US", 18.0, 72.0, -171.0, -66.0),
-    ]
-    for jurisdiction, min_lat, max_lat, min_lon, max_lon in boxes:
+HOLIDAY_JURISDICTION_BOXES = [
+    ("AU", -44.5, -10.0, 112.0, 154.5),
+    ("NZ", -48.5, -33.0, 165.0, 179.9),
+    ("ZA", -35.5, -21.0, 16.0, 33.5),
+    ("GL", 59.0, 84.0, -75.0, -10.0),
+    ("IS", 63.0, 67.5, -25.0, -13.0),
+    ("NL", 50.0, 54.2, 3.0, 8.0),
+    ("DK", 54.0, 58.0, 7.5, 15.5),
+    ("IE", 51.0, 55.8, -11.0, -5.0),
+    ("PT", 36.5, 42.5, -10.0, -6.0),
+    ("ES", 35.5, 43.9, -9.5, 4.5),
+    ("GR", 34.0, 42.5, 19.0, 29.5),
+    ("IT", 35.0, 47.5, 6.0, 19.0),
+    ("FR", 41.0, 51.5, -5.5, 10.5),
+    ("DE", 47.0, 55.5, 5.0, 16.5),
+    ("GB-ENG", 49.5, 56.2, -7.8, 2.2),
+    ("CA", 41.0, 84.5, -141.5, -52.0),
+    ("US", 18.0, 72.0, -171.0, -66.0),
+]
+
+
+def holiday_jurisdiction_for_coordinates(latitude: float, longitude: float) -> str:
+    for jurisdiction, min_lat, max_lat, min_lon, max_lon in HOLIDAY_JURISDICTION_BOXES:
         if min_lat <= latitude <= max_lat and min_lon <= longitude <= max_lon:
             return jurisdiction
+    return ""
+
+
+def infer_holiday_jurisdiction(latitude: float, longitude: float) -> str:
+    jurisdiction = holiday_jurisdiction_for_coordinates(latitude, longitude)
+    if jurisdiction:
+        return jurisdiction
     return DEFAULT_HOLIDAY_JURISDICTION
+
+
+def geographic_water_label(latitude: float, longitude: float) -> str:
+    if 0.0 <= latitude <= 70.0 and -85.0 <= longitude <= 25.0:
+        return "North Atlantic Ocean"
+    if -60.0 <= latitude <= 20.0 and -70.0 <= longitude <= 20.0:
+        return "South Atlantic Ocean"
+    if latitude >= 60.0 and -180.0 <= longitude <= 180.0:
+        return "Arctic Ocean"
+    return "Open ocean"
 
 
 def normalize_holiday_jurisdiction(value: str) -> str:
@@ -302,7 +581,11 @@ DEFAULT_DATETIME_BIN = ROOT / "build" / "release" / "scratch" / "datetime_lab"
 DEFAULT_ALMANAC_BIN = ROOT / "build" / "release" / "scratch" / "almanac_lab"
 DEFAULT_ALMANAC_EVENT_BIN = ROOT / "build" / "release" / "scratch" / "almanac_event_lab"
 DEFAULT_HOLIDAY_BIN = ROOT / "build" / "release" / "scratch" / "holiday_lab"
-STATE_FILE = ROOT / os.environ.get("MARS_LAB_STATE_FILE", ".mars_lab_state.json")
+MARS_LAB_CONFIG_FILE = "mars-lab.env"
+MARS_LAB_OBJECT_STORE_PATH_ENV = "MARS_LAB_OBJECT_STORE_PATH"
+MARS_LAB_OBJECT_STORE_KEY_ENV = "MARS_LAB_OBJECT_STORE_KEY"
+STATE_FILE = mars_lab_path_from_env("MARS_LAB_STATE_FILE", mars_lab_data_dir() / "mars_lab_state.json")
+CACHE_FILE = mars_lab_path_from_env("MARS_LAB_CACHE_FILE", mars_lab_data_dir() / "mars_lab_object_store.sqlite3")
 LAB_ICON_FILE = ROOT / "packaging" / "linux" / "mars-lab.svg"
 LAB_FAVICON_FILE = LAB_ICON_FILE
 LAB_TOUCH_ICON_FILE = ROOT / "packaging" / "linux" / "icon-concepts" / "wizard-prism-180.png"
@@ -334,15 +617,10 @@ DEFAULT_ALMANAC_TIME = py_datetime.datetime.now(py_datetime.timezone.utc).strfti
 DEFAULT_ALMANAC_ZONE = "0"
 DEFAULT_ALMANAC_LATITUDE = DEFAULT_TIMEZONE_LATITUDE
 DEFAULT_ALMANAC_LONGITUDE = DEFAULT_TIMEZONE_LONGITUDE
+DEFAULT_ALMANAC_ELEVATION = "0"
 DEFAULT_ALMANAC_BODY = "MOON"
-ALMANAC_BODY_OPTIONS_HTML = "\n".join(
-    (
-        f'          <option value="{html.escape(code)}" selected>{html.escape(name)}</option>'
-        if code == DEFAULT_ALMANAC_BODY
-        else f'          <option value="{html.escape(code)}">{html.escape(name)}</option>'
-    )
-    for code, name in ALMANAC_BODY_OPTIONS
-)
+DEFAULT_ALMANAC_VISIBILITY = "all"
+ALMANAC_LAND_TOTALITY_SEARCH_TIMEOUT_SECONDS = 8
 MIN_INTEGRATOR_INTERVAL_CAP = 500
 MAX_INTEGRATOR_INTERVAL_CAP = 100000
 INTEGRATOR_INTERVAL_CAP_CHOICES = (500, 5000, 20000, 50000, 100000)
@@ -1009,6 +1287,18 @@ INDEX_HTML = r"""<!doctype html>
       grid-template-columns: repeat(2, minmax(9rem, 1fr));
     }
 
+    .datetime-grid.location-grid {
+      grid-template-columns: repeat(2, minmax(10rem, 1fr));
+    }
+
+    .location-coordinate-grid {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(8rem, 1fr));
+      gap: 0.8rem;
+      align-items: end;
+    }
+
     .datetime-briefing {
       display: grid;
       grid-template-columns: auto minmax(0, 1fr);
@@ -1086,6 +1376,53 @@ INDEX_HTML = r"""<!doctype html>
       background:
         linear-gradient(180deg, rgba(76, 50, 21, 0.44), rgba(18, 36, 27, 0.34));
       box-shadow: inset 0 1px 0 rgba(255, 239, 190, 0.09);
+    }
+
+    .almanac-sheet-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.45rem;
+      margin-top: 0.3rem;
+    }
+
+    .almanac-sheet-toolbar-label {
+      color: rgba(233, 244, 239, 0.72);
+      font-size: 0.72rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .almanac-visibility-toggle {
+      display: inline-flex;
+      gap: 0.2rem;
+      padding: 0.18rem;
+      border: 1px solid rgba(233, 244, 239, 0.18);
+      border-radius: 999px;
+      background: rgba(7, 23, 18, 0.48);
+    }
+
+    .almanac-visibility-toggle button {
+      border: 0;
+      border-radius: 999px;
+      padding: 0.34rem 0.7rem;
+      color: rgba(233, 244, 239, 0.76);
+      background: transparent;
+      font: 700 0.68rem/1 "Cascadia Code", "DejaVu Sans Mono", monospace;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+
+    .almanac-visibility-toggle button.active {
+      color: #17231c;
+      background: #e7b150;
+      box-shadow: 0 8px 18px rgba(231, 177, 80, 0.22);
+    }
+
+    .almanac-visibility-toggle button:focus-visible {
+      outline: 2px solid rgba(231, 177, 80, 0.8);
+      outline-offset: 2px;
     }
 
     .almanac-sheet-title {
@@ -2464,6 +2801,11 @@ INDEX_HTML = r"""<!doctype html>
         grid-template-columns: 1fr;
       }
 
+      .datetime-grid.location-grid,
+      .location-coordinate-grid {
+        grid-template-columns: 1fr;
+      }
+
       .datetime-field-group {
         padding: 0.75rem;
       }
@@ -2840,22 +3182,28 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           </div>
           <div class="datetime-field-group">
             <div class="datetime-field-group-title">Observatory</div>
-            <div class="datetime-grid">
+            <div class="datetime-grid location-grid">
               <div class="integrator-bound-field">
-                <label for="datetimeLatitude">Latitude</label>
-                <input id="datetimeLatitude" inputmode="decimal" placeholder="51.5074">
-              </div>
-              <div class="integrator-bound-field">
-                <label for="datetimeLongitude">Longitude</label>
-                <input id="datetimeLongitude" inputmode="decimal" placeholder="-0.1278">
-              </div>
-              <div class="integrator-bound-field">
-                <label for="datetimeElevation">Elevation metres</label>
-                <input id="datetimeElevation" inputmode="decimal" placeholder="0">
+                <label for="datetimeTown">Town/location</label>
+                <select id="datetimeTown"></select>
               </div>
               <div class="integrator-bound-field">
                 <label for="datetimeGmtOffset">GMT offset, including daylight saving</label>
                 <input id="datetimeGmtOffset" inputmode="decimal" placeholder="blank for jurisdiction local, 1 for BST">
+              </div>
+              <div class="location-coordinate-grid">
+                <div class="integrator-bound-field">
+                  <label for="datetimeLatitude">Latitude</label>
+                  <input id="datetimeLatitude" inputmode="decimal" placeholder="51.5074">
+                </div>
+                <div class="integrator-bound-field">
+                  <label for="datetimeLongitude">Longitude</label>
+                  <input id="datetimeLongitude" inputmode="decimal" placeholder="-0.1278">
+                </div>
+                <div class="integrator-bound-field">
+                  <label for="datetimeElevation">Altitude metres</label>
+                  <input id="datetimeElevation" inputmode="decimal" placeholder="0">
+                </div>
               </div>
             </div>
           </div>
@@ -2864,19 +3212,6 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         <div class="datetime-local hidden" id="datetimeLocal">
           <div class="datetime-local-title">Local</div>
           <div class="datetime-local-body" id="datetimeLocalBody"></div>
-        </div>
-        <div class="mars-date-picker hidden" id="marsDatePicker" role="dialog" aria-label="Date picker">
-          <div class="mars-date-picker-head">
-            <button class="mars-date-picker-nav" id="marsDatePickerPrev" type="button" aria-label="Previous month">‹</button>
-            <div class="mars-date-picker-title" id="marsDatePickerTitle"></div>
-            <button class="mars-date-picker-nav" id="marsDatePickerNext" type="button" aria-label="Next month">›</button>
-          </div>
-          <div class="mars-date-picker-weekdays" id="marsDatePickerWeekdays"></div>
-          <div class="mars-date-picker-grid" id="marsDatePickerGrid"></div>
-          <div class="mars-date-picker-foot">
-            <button id="marsDatePickerToday" type="button">Today</button>
-            <button id="marsDatePickerClose" type="button">Close</button>
-          </div>
         </div>
       </div>
       <div class="mode-panel hidden almanac-controls" id="almanacControls">
@@ -2910,7 +3245,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           </div>
           <div class="datetime-field-group">
             <div class="datetime-field-group-title">Observer</div>
-            <div class="datetime-grid">
+            <div class="datetime-grid location-grid">
               <div class="integrator-bound-field">
                 <label for="almanacJurisdiction">Jurisdiction</label>
                 <select id="almanacJurisdiction">
@@ -2918,23 +3253,40 @@ __HOLIDAY_JURISDICTION_OPTIONS__
                 </select>
               </div>
               <div class="integrator-bound-field">
-                <label for="almanacLatitude">Latitude</label>
-                <input id="almanacLatitude" inputmode="decimal" placeholder="51.5074">
+                <label for="almanacTown">Town/location</label>
+                <select id="almanacTown"></select>
               </div>
-              <div class="integrator-bound-field">
-                <label for="almanacLongitude">Longitude</label>
-                <input id="almanacLongitude" inputmode="decimal" placeholder="-0.1278">
-              </div>
-              <div class="integrator-bound-field">
-                <label for="almanacBody">Body</label>
-                <select id="almanacBody">
-__ALMANAC_BODY_OPTIONS__
-                </select>
+              <div class="location-coordinate-grid">
+                <div class="integrator-bound-field">
+                  <label for="almanacLatitude">Latitude</label>
+                  <input id="almanacLatitude" inputmode="decimal" placeholder="51.5074">
+                </div>
+                <div class="integrator-bound-field">
+                  <label for="almanacLongitude">Longitude</label>
+                  <input id="almanacLongitude" inputmode="decimal" placeholder="-0.1278">
+                </div>
+                <div class="integrator-bound-field">
+                  <label for="almanacElevation">Altitude metres</label>
+                  <input id="almanacElevation" inputmode="decimal" placeholder="0">
+                </div>
               </div>
             </div>
           </div>
         </div>
         <p class="mode-hint">__ALMANAC_ACCURACY_NOTE__</p>
+      </div>
+      <div class="mars-date-picker hidden" id="marsDatePicker" role="dialog" aria-label="Date picker">
+        <div class="mars-date-picker-head">
+          <button class="mars-date-picker-nav" id="marsDatePickerPrev" type="button" aria-label="Previous month">‹</button>
+          <div class="mars-date-picker-title" id="marsDatePickerTitle"></div>
+          <button class="mars-date-picker-nav" id="marsDatePickerNext" type="button" aria-label="Next month">›</button>
+        </div>
+        <div class="mars-date-picker-weekdays" id="marsDatePickerWeekdays"></div>
+        <div class="mars-date-picker-grid" id="marsDatePickerGrid"></div>
+        <div class="mars-date-picker-foot">
+          <button id="marsDatePickerToday" type="button">Now</button>
+          <button id="marsDatePickerClose" type="button">Close</button>
+        </div>
       </div>
       <div class="target-row hidden" id="targetRow">
         <label for="goalTarget">Target</label>
@@ -3212,6 +3564,7 @@ __ALMANAC_BODY_OPTIONS__
     const datetimeEnd = document.getElementById('datetimeEnd');
     const datetimeYear = document.getElementById('datetimeYear');
     const datetimeJurisdiction = document.getElementById('datetimeJurisdiction');
+    const datetimeTown = document.getElementById('datetimeTown');
     const datetimeLatitude = document.getElementById('datetimeLatitude');
     const datetimeLongitude = document.getElementById('datetimeLongitude');
     const datetimeElevation = document.getElementById('datetimeElevation');
@@ -3223,9 +3576,10 @@ __ALMANAC_BODY_OPTIONS__
     const almanacTime = document.getElementById('almanacTime');
     const almanacZone = document.getElementById('almanacZone');
     const almanacJurisdiction = document.getElementById('almanacJurisdiction');
+    const almanacTown = document.getElementById('almanacTown');
     const almanacLatitude = document.getElementById('almanacLatitude');
     const almanacLongitude = document.getElementById('almanacLongitude');
-    const almanacBody = document.getElementById('almanacBody');
+    const almanacElevation = document.getElementById('almanacElevation');
     const marsDatePicker = document.getElementById('marsDatePicker');
     const marsDatePickerTitle = document.getElementById('marsDatePickerTitle');
     const marsDatePickerWeekdays = document.getElementById('marsDatePickerWeekdays');
@@ -3260,15 +3614,25 @@ __ALMANAC_BODY_OPTIONS__
       searchPlaceholder: 'Search jurisdictions',
       emptyText: 'No matching jurisdiction'
     });
+    enhanceRoundedSelect(datetimeTown, {
+      searchable: true,
+      searchPlaceholder: 'Search towns',
+      emptyText: 'No towns for this jurisdiction'
+    });
     enhanceRoundedSelect(almanacJurisdiction, {
       searchable: true,
       searchPlaceholder: 'Search jurisdictions',
       emptyText: 'No matching jurisdiction'
     });
-    enhanceRoundedSelect(almanacBody);
+    enhanceRoundedSelect(almanacTown, {
+      searchable: true,
+      searchPlaceholder: 'Search towns',
+      emptyText: 'No towns for this jurisdiction'
+    });
     let datetimeLocalRefreshSequence = 0;
     let datetimeEvaluationSequence = 0;
     let almanacEvaluationSequence = 0;
+    let almanacLocationRefreshSequence = 0;
     const statusEl = document.getElementById('status');
     const inputCopy = document.getElementById('inputCopy');
     const rightPaneTitle = document.getElementById('rightPaneTitle');
@@ -3373,7 +3737,9 @@ __ALMANAC_BODY_OPTIONS__
     const DEFAULT_ALMANAC_ZONE = __DEFAULT_ALMANAC_ZONE__;
     const DEFAULT_ALMANAC_LATITUDE = __DEFAULT_ALMANAC_LATITUDE__;
     const DEFAULT_ALMANAC_LONGITUDE = __DEFAULT_ALMANAC_LONGITUDE__;
-    const DEFAULT_ALMANAC_BODY = __DEFAULT_ALMANAC_BODY__;
+    const DEFAULT_ALMANAC_ELEVATION = __DEFAULT_ALMANAC_ELEVATION__;
+    const DEFAULT_ALMANAC_VISIBILITY = __DEFAULT_ALMANAC_VISIBILITY__;
+    const ALMANAC_LAND_TOTALITY_SEARCH_TIMEOUT_MS = __ALMANAC_LAND_TOTALITY_SEARCH_TIMEOUT_MS__;
     const ALMANAC_WORKSHEET_TITLE = __ALMANAC_WORKSHEET_TITLE__;
     const ALMANAC_COVERAGE_TEXT = __ALMANAC_COVERAGE_TEXT_JS__;
     const ALMANAC_ACCURACY_NOTE = __ALMANAC_ACCURACY_NOTE_JS__;
@@ -3381,7 +3747,11 @@ __ALMANAC_BODY_OPTIONS__
       datetimeJurisdiction.value = DEFAULT_DATETIME_JURISDICTION;
     let datetimeAutoGmtOffset = String(datetimeGmtOffset && datetimeGmtOffset.value || DEFAULT_DATETIME_GMT_OFFSET);
     let datetimeGmtOffsetTouched = false;
+    let almanacVisibilityMode = DEFAULT_ALMANAC_VISIBILITY;
+    let almanacLastWorksheetData = null;
+    let almanacLandTotalitySequence = 0;
     const HOLIDAY_JURISDICTION_SET = new Set(__HOLIDAY_JURISDICTION_CODES__);
+    const JURISDICTION_TOWN_OPTIONS = __JURISDICTION_TOWN_OPTIONS__;
     const LAB_MODE_STORAGE_KEY = 'mars.exprLab.lastMode';
     let currentLabMode = 'expression';
     const modeEditorText = {
@@ -3429,7 +3799,7 @@ __ALMANAC_BODY_OPTIONS__
       marsDatePickerToday.addEventListener('click', () => {
         if (!marsDatePickerState.input)
           return;
-        commitMarsDateValue(marsDatePickerState.input, marsTodayIsoDate());
+        commitMarsTodayValue(marsDatePickerState.input);
         closeMarsDatePicker({restoreFocus: true});
       });
     if (marsDatePickerClose)
@@ -3902,25 +4272,32 @@ __ALMANAC_BODY_OPTIONS__
       menu.appendChild(optionsWrap);
       menu.appendChild(emptyState);
 
-      const optionButtons = Array.from(select.options).map((option) => {
-        const item = document.createElement('button');
-        item.type = 'button';
-        item.className = 'select-option';
-        item.setAttribute('role', 'option');
-        item.dataset.value = option.value;
-        item.textContent = option.textContent;
-        item.addEventListener('click', () => {
-          const changed = select.value !== option.value;
-          select.value = option.value;
-          sync();
-          close();
-          button.focus();
-          if (changed)
-            select.dispatchEvent(new Event('change', {bubbles: true}));
+      let optionButtons = [];
+
+      function rebuildOptionButtons() {
+        optionsWrap.textContent = '';
+        optionButtons = Array.from(select.options).map((option) => {
+          const item = document.createElement('button');
+          item.type = 'button';
+          item.className = 'select-option';
+          item.setAttribute('role', 'option');
+          item.dataset.value = option.value;
+          item.textContent = option.textContent;
+          item.addEventListener('click', () => {
+            const changed = select.value !== option.value;
+            select.value = option.value;
+            sync();
+            close();
+            button.focus();
+            if (changed)
+              select.dispatchEvent(new Event('change', {bubbles: true}));
+          });
+          optionsWrap.appendChild(item);
+          return item;
         });
-        optionsWrap.appendChild(item);
-        return item;
-      });
+      }
+
+      rebuildOptionButtons();
 
       function visibleOptionButtons() {
         return optionButtons.filter((item) => !item.classList.contains('hidden'));
@@ -4048,9 +4425,13 @@ __ALMANAC_BODY_OPTIONS__
           close();
       });
 
-      select.addEventListener('change', sync);
-      select.__marsSyncRoundedSelect = sync;
-      sync();
+	      select.addEventListener('change', sync);
+	      select.__marsSyncRoundedSelect = sync;
+	      select.__marsRebuildRoundedSelect = () => {
+	        rebuildOptionButtons();
+	        sync();
+	      };
+	      sync();
       return {sync, close};
     }
 
@@ -4090,9 +4471,26 @@ __ALMANAC_BODY_OPTIONS__
       return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     }
 
+    function marsClockTime(hours, minutes, seconds) {
+      return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }
+
     function marsTodayIsoDate() {
       const now = new Date();
       return marsIsoDate(now.getFullYear(), now.getMonth() + 1, now.getDate());
+    }
+
+    function marsCurrentGmtMoment(now = new Date()) {
+      return {
+        date: marsIsoDate(now.getUTCFullYear(), now.getUTCMonth() + 1, now.getUTCDate()),
+        time: marsClockTime(now.getUTCHours(), now.getUTCMinutes(), now.getUTCSeconds())
+      };
+    }
+
+    function marsTodayIsoDateForInput(input) {
+      if (input === almanacDate)
+        return marsCurrentGmtMoment().date;
+      return marsTodayIsoDate();
     }
 
     function marsStartWeekdayIndex(year, month) {
@@ -4142,6 +4540,19 @@ __ALMANAC_BODY_OPTIONS__
       input.value = value;
       if (changed)
         input.dispatchEvent(new Event('change', {bubbles: true}));
+      return changed;
+    }
+
+    function commitMarsTodayValue(input) {
+      if (input === almanacDate && almanacTime) {
+        const moment = marsCurrentGmtMoment();
+        const timeChanged = almanacTime.value !== moment.time;
+        almanacTime.value = moment.time;
+        if (!commitMarsDateValue(input, moment.date) && timeChanged)
+          almanacTime.dispatchEvent(new Event('change', {bubbles: true}));
+        return;
+      }
+      commitMarsDateValue(input, marsTodayIsoDate());
     }
 
     function renderMarsDatePicker() {
@@ -4150,7 +4561,7 @@ __ALMANAC_BODY_OPTIONS__
 
       const {input, year, month} = marsDatePickerState;
       const selected = parseMarsIsoDate(input && input.value);
-      const today = parseMarsIsoDate(marsTodayIsoDate());
+      const today = parseMarsIsoDate(marsTodayIsoDateForInput(input));
       const daysInMonth = marsDaysInMonth(year, month);
       const startIndex = marsStartWeekdayIndex(year, month);
       const previousMonth = month === 1 ? 12 : month - 1;
@@ -4216,7 +4627,7 @@ __ALMANAC_BODY_OPTIONS__
         return;
 
       const shell = button.closest('.mars-date-shell');
-      const parsed = parseMarsIsoDate(input.value) || parseMarsIsoDate(marsTodayIsoDate());
+      const parsed = parseMarsIsoDate(input.value) || parseMarsIsoDate(marsTodayIsoDateForInput(input));
       marsDatePickerState.input = input;
       marsDatePickerState.button = button;
       marsDatePickerState.shell = shell;
@@ -5107,6 +5518,140 @@ __ALMANAC_BODY_OPTIONS__
       return HOLIDAY_JURISDICTION_SET.has(jurisdiction) ? jurisdiction : fallback;
     }
 
+    function townsForJurisdiction(jurisdiction) {
+      const code = validDatetimeJurisdiction(jurisdiction, DEFAULT_DATETIME_JURISDICTION);
+      if (Array.isArray(JURISDICTION_TOWN_OPTIONS[code]))
+        return JURISDICTION_TOWN_OPTIONS[code];
+      const country = code.split('-', 1)[0];
+      return Array.isArray(JURISDICTION_TOWN_OPTIONS[country]) ? JURISDICTION_TOWN_OPTIONS[country] : [];
+    }
+
+    function syncRoundedSelect(select) {
+      if (select && typeof select.__marsRebuildRoundedSelect === 'function')
+        select.__marsRebuildRoundedSelect();
+      else if (select && typeof select.__marsSyncRoundedSelect === 'function')
+        select.__marsSyncRoundedSelect();
+    }
+
+    function populateTownSelect(select, jurisdiction, {selectDefault = true} = {}) {
+      if (!select)
+        return [];
+      const previous = String(select.value || '');
+      const towns = townsForJurisdiction(jurisdiction);
+      select.textContent = '';
+
+      towns.forEach((town, index) => {
+        const option = document.createElement('option');
+        option.value = String(index);
+        option.textContent = String(town.name || 'Location');
+        option.dataset.latitude = String(town.latitude || '');
+        option.dataset.longitude = String(town.longitude || '');
+        option.dataset.elevation = String(town.elevation || '');
+        option.dataset.timezone = String(town.timezone || '');
+        if (town.default)
+          option.dataset.default = '1';
+        select.appendChild(option);
+      });
+
+      if (selectDefault && towns.length) {
+        const defaultIndex = towns.findIndex((town) => !!town.default);
+        select.value = String(defaultIndex >= 0 ? defaultIndex : 0);
+      } else if (previous && Array.from(select.options).some((option) => option.value === previous)) {
+        select.value = previous;
+      } else if (towns.length) {
+        select.value = '0';
+      } else {
+        select.value = '';
+      }
+      syncRoundedSelect(select);
+      return towns;
+    }
+
+    function selectedTownOption(select) {
+      if (!select || !select.value)
+        return null;
+      return select.selectedOptions[0] || null;
+    }
+
+    function timeZoneOffsetHours(timeZone, dateText) {
+      if (!timeZone)
+        return null;
+      const parsed = validDateText(dateText, '');
+      if (!parsed)
+        return null;
+      const probe = new Date(`${parsed}T12:00:00Z`);
+      if (Number.isNaN(probe.getTime()))
+        return null;
+      try {
+        const formatter = new Intl.DateTimeFormat('en-GB', {
+          timeZone,
+          hour12: false,
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        });
+        const parts = Object.fromEntries(formatter.formatToParts(probe).map((part) => [part.type, part.value]));
+        const localAsUtc = Date.UTC(
+          Number(parts.year),
+          Number(parts.month) - 1,
+          Number(parts.day),
+          Number(parts.hour),
+          Number(parts.minute),
+          Number(parts.second)
+        );
+        return (localAsUtc - probe.getTime()) / 3600000;
+      } catch (_) {
+        return null;
+      }
+    }
+
+    function formatOffsetHours(offset) {
+      if (offset === null || !Number.isFinite(offset))
+        return '';
+      if (Math.abs(offset - Math.round(offset)) < 1e-9)
+        return String(Math.round(offset));
+      return String(Math.round(offset * 100) / 100);
+    }
+
+    function applySelectedTown({townSelect, latitudeInput, longitudeInput, elevationInput, zoneInput, dateInput, resetOffsetTouched = false} = {}) {
+      const option = selectedTownOption(townSelect);
+      if (!option)
+        return false;
+      if (latitudeInput && option.dataset.latitude)
+        latitudeInput.value = option.dataset.latitude;
+      if (longitudeInput && option.dataset.longitude)
+        longitudeInput.value = option.dataset.longitude;
+      if (elevationInput && option.dataset.elevation)
+        elevationInput.value = option.dataset.elevation;
+      if (zoneInput) {
+        const offset = timeZoneOffsetHours(option.dataset.timezone || '', dateInput && dateInput.value);
+        const offsetText = formatOffsetHours(offset);
+        if (offsetText)
+          zoneInput.value = offsetText;
+      }
+      if (resetOffsetTouched) {
+        datetimeAutoGmtOffset = String(zoneInput && zoneInput.value || '').trim();
+        datetimeGmtOffsetTouched = false;
+      }
+      return true;
+    }
+
+    function syncTownSelectors({selectDefault = false} = {}) {
+      populateTownSelect(
+        datetimeTown,
+        datetimeJurisdiction && datetimeJurisdiction.value,
+        {selectDefault}
+      );
+      populateTownSelect(
+        almanacTown,
+        almanacJurisdiction && almanacJurisdiction.value,
+        {selectDefault}
+      );
+    }
+
     function restoreDatetimeDefaultsIfBlank() {
       if (datetimeDate && !datetimeDate.value)
         datetimeDate.value = DEFAULT_DATETIME_DATE;
@@ -5159,16 +5704,14 @@ __ALMANAC_BODY_OPTIONS__
         almanacLatitude.value = DEFAULT_ALMANAC_LATITUDE;
       if (almanacLongitude && !almanacLongitude.value)
         almanacLongitude.value = DEFAULT_ALMANAC_LONGITUDE;
-      if (almanacBody && !almanacBody.value)
-        setSelectValue(almanacBody, DEFAULT_ALMANAC_BODY);
+      if (almanacElevation && !almanacElevation.value)
+        almanacElevation.value = DEFAULT_ALMANAC_ELEVATION;
+      almanacVisibilityMode = validAlmanacVisibility(almanacVisibilityMode, DEFAULT_ALMANAC_VISIBILITY);
     }
 
-    function validAlmanacBody(value, fallback = DEFAULT_ALMANAC_BODY) {
-      const raw = String(value || '').trim();
-      const allowed = Array.from((almanacBody && almanacBody.options) || []).map((option) => option.value);
-      if (allowed.includes(raw))
-        return raw;
-      return fallback;
+    function validAlmanacVisibility(value, fallback = DEFAULT_ALMANAC_VISIBILITY) {
+      const raw = String(value || '').trim().toLowerCase();
+      return raw === 'visible' || raw === 'all' ? raw : fallback;
     }
 
     function currentAlmanacState() {
@@ -5180,7 +5723,8 @@ __ALMANAC_BODY_OPTIONS__
         jurisdiction: validDatetimeJurisdiction(almanacJurisdiction && almanacJurisdiction.value),
         latitude: String(almanacLatitude && almanacLatitude.value || DEFAULT_ALMANAC_LATITUDE).trim(),
         longitude: String(almanacLongitude && almanacLongitude.value || DEFAULT_ALMANAC_LONGITUDE).trim(),
-        body: validAlmanacBody(almanacBody && almanacBody.value, DEFAULT_ALMANAC_BODY)
+        elevation: String(almanacElevation && almanacElevation.value || DEFAULT_ALMANAC_ELEVATION).trim(),
+        visibility: validAlmanacVisibility(almanacVisibilityMode, DEFAULT_ALMANAC_VISIBILITY)
       };
     }
 
@@ -5193,7 +5737,8 @@ __ALMANAC_BODY_OPTIONS__
         `Zone: ${state.zone}`,
         `Latitude: ${state.latitude}`,
         `Longitude: ${state.longitude}`,
-        `Body: ${state.body}`
+        `Altitude: ${state.elevation} m`,
+        `Show bodies: ${state.visibility === 'visible' ? 'visible only' : 'all bodies'}`
       ].join('\n');
     }
 
@@ -5305,8 +5850,9 @@ __ALMANAC_BODY_OPTIONS__
         almanacLatitude.value = String(data.almanac_latitude || DEFAULT_ALMANAC_LATITUDE).trim();
       if (almanacLongitude)
         almanacLongitude.value = String(data.almanac_longitude || DEFAULT_ALMANAC_LONGITUDE).trim();
-      if (almanacBody)
-        setSelectValue(almanacBody, validAlmanacBody(data.almanac_body, DEFAULT_ALMANAC_BODY));
+      if (almanacElevation)
+        almanacElevation.value = String(data.almanac_elevation || DEFAULT_ALMANAC_ELEVATION).trim();
+      almanacVisibilityMode = validAlmanacVisibility(data.almanac_visibility, DEFAULT_ALMANAC_VISIBILITY);
 
       if (data.precision_bits && typeof data.precision_bits === 'object') {
         Object.entries(data.precision_bits).forEach(([mode, bits]) => {
@@ -5316,9 +5862,10 @@ __ALMANAC_BODY_OPTIONS__
       } else if (data.precision_bits !== undefined) {
         modePrecisionBits.expression = validPrecisionBits(data.precision_bits, modePrecisionBits.expression);
       }
-      workingPrecisionBits = modePrecisionBits[currentMode()] || workingPrecisionBits;
+	      workingPrecisionBits = modePrecisionBits[currentMode()] || workingPrecisionBits;
+	      syncTownSelectors({selectDefault: false});
 
-      applyLabMode(validLabMode(data.lab_mode));
+	      applyLabMode(validLabMode(data.lab_mode));
     }
 
     async function loadLastState() {
@@ -5402,12 +5949,14 @@ __ALMANAC_BODY_OPTIONS__
             almanacLatitude.value = String(state.latitude || DEFAULT_ALMANAC_LATITUDE).trim();
           if (almanacLongitude)
             almanacLongitude.value = String(state.longitude || DEFAULT_ALMANAC_LONGITUDE).trim();
-          if (almanacBody)
-            setSelectValue(almanacBody, validAlmanacBody(state.body, DEFAULT_ALMANAC_BODY));
+          if (almanacElevation)
+            almanacElevation.value = String(state.elevation || DEFAULT_ALMANAC_ELEVATION).trim();
+          almanacVisibilityMode = validAlmanacVisibility(state.visibility, DEFAULT_ALMANAC_VISIBILITY);
         }
-        const labMode = localStorage.getItem(LAB_MODE_STORAGE_KEY);
-        if (labMode)
-          applyLabMode(labMode);
+	        const labMode = localStorage.getItem(LAB_MODE_STORAGE_KEY);
+	        syncTownSelectors({selectDefault: false});
+	        if (labMode)
+	          applyLabMode(labMode);
       } catch (_) {
         // Private browsing or locked-down webviews can disable localStorage.
       }
@@ -5570,7 +6119,8 @@ __ALMANAC_BODY_OPTIONS__
         almanac_jurisdiction: state.jurisdiction,
         almanac_latitude: state.latitude,
         almanac_longitude: state.longitude,
-        almanac_body: state.body,
+        almanac_elevation: state.elevation,
+        almanac_visibility: state.visibility,
         precision_bits: modePrecisionBits
       });
     }
@@ -5690,8 +6240,9 @@ __ALMANAC_BODY_OPTIONS__
           almanacLatitude.value = String(almanacState.latitude || DEFAULT_ALMANAC_LATITUDE).trim();
         if (almanacLongitude)
           almanacLongitude.value = String(almanacState.longitude || DEFAULT_ALMANAC_LONGITUDE).trim();
-        if (almanacBody)
-          setSelectValue(almanacBody, validAlmanacBody(almanacState.body, DEFAULT_ALMANAC_BODY));
+        if (almanacElevation)
+          almanacElevation.value = String(almanacState.elevation || DEFAULT_ALMANAC_ELEVATION).trim();
+        almanacVisibilityMode = validAlmanacVisibility(almanacState.visibility, DEFAULT_ALMANAC_VISIBILITY);
       }
 
       if (state.mode === 'datetime') {
@@ -5711,28 +6262,28 @@ __ALMANAC_BODY_OPTIONS__
       forwardHistory[mode] = [];
     }
 
-    function evaluateCurrentMode(options = {}) {
+    async function evaluateCurrentMode(options = {}) {
       if (currentMode() === 'equation') {
-        evaluateEquation(options);
+        await evaluateEquation(options);
         return;
       }
       if (currentMode() === 'matrix') {
-        evaluateMatrix(options);
+        await evaluateMatrix(options);
         return;
       }
       if (currentMode() === 'integrator') {
-        evaluateIntegrator(options);
+        await evaluateIntegrator(options);
         return;
       }
       if (currentMode() === 'datetime') {
-        evaluateDatetime(options);
+        await evaluateDatetime(options);
         return;
       }
       if (currentMode() === 'almanac') {
-        evaluateAlmanac(options);
+        await evaluateAlmanac(options);
         return;
       }
-      evaluateExpression(options);
+      await evaluateExpression(options);
     }
 
     function setBusy(isBusy) {
@@ -6314,6 +6865,54 @@ __ALMANAC_BODY_OPTIONS__
       return {response, data};
     }
 
+    async function refreshAlmanacLandTotality(data) {
+      const cells = Array.from(rendered.querySelectorAll('[data-almanac-land-totality]'));
+      if (!cells.length || !data)
+        return;
+      const refreshId = ++almanacLandTotalitySequence;
+      const fields = data.fields || {};
+      const controller = new AbortController();
+      const timer = window.setTimeout(() => controller.abort(), ALMANAC_LAND_TOTALITY_SEARCH_TIMEOUT_MS);
+      try {
+        const response = await fetch('/almanac-land-totality', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          signal: controller.signal,
+          body: JSON.stringify({
+            event_year: data.event_year || fields.event_year || '',
+            jurisdiction: fields.jurisdiction || (almanacJurisdiction && almanacJurisdiction.value) || DEFAULT_DATETIME_JURISDICTION,
+            zone: fields.zone || (almanacZone && almanacZone.value) || DEFAULT_ALMANAC_ZONE,
+            latitude: fields.latitude || (almanacLatitude && almanacLatitude.value) || DEFAULT_ALMANAC_LATITUDE,
+            longitude: fields.longitude || (almanacLongitude && almanacLongitude.value) || DEFAULT_ALMANAC_LONGITUDE,
+            events: cells.map((cell) => ({jd: String(cell.dataset.almanacLandTotality || '').trim()}))
+          })
+        });
+        const payload = await response.json();
+        if (refreshId !== almanacLandTotalitySequence || currentMode() !== 'almanac')
+          return;
+        if (!response.ok || !payload.ok)
+          throw new Error(payload.error || 'Nearest land totality search failed');
+        const items = Array.isArray(payload.items) ? payload.items : [];
+        cells.forEach((cell) => {
+          const jd = String(cell.dataset.almanacLandTotality || '').trim();
+          const match = items.find((item) => String(item.jd || '').trim() === jd);
+          cell.textContent = match && match.nearest_totality
+            ? String(match.nearest_totality)
+            : (payload.timed_out ? 'Nearest land totality search timed out' : 'No land totality found');
+        });
+      } catch (err) {
+        if (refreshId !== almanacLandTotalitySequence || currentMode() !== 'almanac')
+          return;
+        cells.forEach((cell) => {
+          cell.textContent = err && err.name === 'AbortError'
+            ? 'Nearest land totality search timed out'
+            : 'Nearest land totality unavailable';
+        });
+      } finally {
+        window.clearTimeout(timer);
+      }
+    }
+
     function escapeHtml(text) {
       return String(text || '')
         .replace(/&/g, '&amp;')
@@ -6323,14 +6922,90 @@ __ALMANAC_BODY_OPTIONS__
         .replace(/'/g, '&#39;');
     }
 
+    function almanacRowsForVisibility(data, visibility) {
+      const allRows = Array.isArray(data && data.all_rows)
+        ? data.all_rows
+        : (Array.isArray(data && data.rows) ? data.rows : []);
+      if (visibility === 'visible')
+        return allRows.filter((row) => String(row && row.visible || '').trim().toUpperCase() === 'YES');
+      return allRows;
+    }
+
+    function almanacBodyTextForVisibility(visibility) {
+      return `Location of Navigational Bodies; ${visibility === 'visible' ? 'visible bodies only' : 'all bodies shown'}`;
+    }
+
+    function almanacWorksheetCopyText(data, visibility) {
+      const rows = almanacRowsForVisibility(data, visibility);
+      const events = Array.isArray(data && data.events) ? data.events : [];
+      const showVisibleColumn = visibility === 'all';
+      const lines = [
+        data && data.worksheet_title || ALMANAC_WORKSHEET_TITLE,
+        data && data.moment_text || '',
+        data && data.observer_text || '',
+        almanacBodyTextForVisibility(visibility),
+        `Body filter: ${visibility === 'visible' ? 'visible only' : 'all bodies'}`,
+        '',
+        showVisibleColumn
+          ? 'Body | Declination | RA | GHA | Altitude | Azimuth | s.d. | Vmag. | Visible'
+          : 'Body | Declination | RA | GHA | Altitude | Azimuth | s.d. | Vmag.'
+      ].filter((line, index) => index >= 4 || String(line || '').trim());
+
+      if (rows.length) {
+        rows.forEach((row) => {
+          const cells = [
+            String(row.name || row.code || '').trim(),
+            String(row.declination || '').trim(),
+            String(row.right_ascension || '').trim(),
+            String(row.gha || '').trim(),
+            String(row.altitude || '').trim(),
+            String(row.azimuth || '').trim(),
+            String(row.semi_diameter || '').trim(),
+            String(row.magnitude || '').trim()
+          ];
+          if (showVisibleColumn)
+            cells.push(String(row.visible || '').trim());
+          lines.push(cells.join(' | '));
+        });
+      } else {
+        lines.push(showVisibleColumn
+          ? 'No bodies found for the current visibility filter. |  |  |  |  |  |  |  | '
+          : 'No bodies found for the current visibility filter. |  |  |  |  |  |  | ');
+      }
+
+      lines.push('', data && data.event_title || '');
+      lines.push('Class | Event | Kind | Local Time | Details | Nearest totality');
+      if (events.length) {
+        events.forEach((event) => {
+          lines.push([
+            String(event.category || '').trim(),
+            String(event.name || '').trim(),
+            String(event.kind || '').trim(),
+            String(event.time || '').trim(),
+            String(event.details || '').trim(),
+            String(event.nearest_totality || '').trim()
+          ].join(' | '));
+        });
+      } else {
+        lines.push('No events found.');
+      }
+      return lines.join('\n');
+    }
+
     function renderAlmanacWorksheet(target, data) {
-      const rows = Array.isArray(data.rows) ? data.rows : [];
+      data = data || {};
       const events = Array.isArray(data.events) ? data.events : [];
+      const visibility = validAlmanacVisibility(data.visibility, almanacVisibilityMode);
+      const rows = almanacRowsForVisibility(data, visibility);
       const worksheetTitle = escapeHtml(data.worksheet_title || ALMANAC_WORKSHEET_TITLE);
       const momentText = escapeHtml(data.moment_text || '');
       const observerText = escapeHtml(data.observer_text || '');
-      const bodyText = escapeHtml(data.body_text || '');
+      const bodyText = escapeHtml(almanacBodyTextForVisibility(visibility));
       const eventTitle = escapeHtml(data.event_title || '');
+      const showVisibleColumn = visibility === 'all';
+      const bodyColumnCount = showVisibleColumn ? 9 : 8;
+      almanacVisibilityMode = visibility;
+      target.dataset.copyText = almanacWorksheetCopyText(data, visibility);
       target.innerHTML = `
         <div class="almanac-sheet">
           <div class="almanac-sheet-header">
@@ -6338,6 +7013,13 @@ __ALMANAC_BODY_OPTIONS__
             <div>${momentText}</div>
             <div>${observerText}</div>
             <div>${bodyText}</div>
+            <div class="almanac-sheet-toolbar" aria-label="Body list filter">
+              <span class="almanac-sheet-toolbar-label">Body list</span>
+              <span class="almanac-visibility-toggle" role="group" aria-label="Body list filter">
+                <button type="button" class="${visibility === 'all' ? 'active' : ''}" data-almanac-visibility="all" aria-pressed="${visibility === 'all' ? 'true' : 'false'}">All</button>
+                <button type="button" class="${visibility === 'visible' ? 'active' : ''}" data-almanac-visibility="visible" aria-pressed="${visibility === 'visible' ? 'true' : 'false'}">Visible</button>
+              </span>
+            </div>
           </div>
           <table class="almanac-grid-table">
             <thead>
@@ -6350,16 +7032,13 @@ __ALMANAC_BODY_OPTIONS__
                 <th>Azimuth</th>
                 <th>s.d.</th>
                 <th>Vmag.</th>
-                <th>Visible</th>
+                ${showVisibleColumn ? '<th>Visible</th>' : ''}
               </tr>
             </thead>
             <tbody>
-              ${rows.map((row) => {
+              ${rows.length ? rows.map((row) => {
                 const visible = String(row.visible || '').trim().toUpperCase();
-                const classes = [
-                  row.code === data.selected_code ? 'selected' : '',
-                  row.kind === 'reference' ? 'reference' : ''
-                ].filter(Boolean).join(' ');
+                const classes = row.kind === 'reference' ? 'reference' : '';
                 const nameClass = row.kind === 'reference' ? 'reference-name' : 'body-name';
                 return `
                   <tr class="${classes}">
@@ -6371,9 +7050,9 @@ __ALMANAC_BODY_OPTIONS__
                     <td class="number">${escapeHtml(row.azimuth || '')}</td>
                     <td class="number">${escapeHtml(row.semi_diameter || '')}</td>
                     <td class="number">${escapeHtml(row.magnitude || '')}</td>
-                    <td class="visible-cell ${visible === 'YES' ? 'yes' : 'no'}">${escapeHtml(visible)}</td>
+                    ${showVisibleColumn ? `<td class="visible-cell ${visible === 'YES' ? 'yes' : 'no'}">${escapeHtml(visible)}</td>` : ''}
                   </tr>`;
-              }).join('')}
+              }).join('') : `<tr><td colspan="${bodyColumnCount}">No bodies found for the current visibility filter.</td></tr>`}
             </tbody>
           </table>
           <div class="almanac-events-title">${eventTitle}</div>
@@ -6385,23 +7064,50 @@ __ALMANAC_BODY_OPTIONS__
                 <th>Kind</th>
                 <th>Local Time</th>
                 <th>Details</th>
+                <th>Nearest Totality</th>
               </tr>
             </thead>
             <tbody>
-              ${events.length ? events.map((event) => `
-                <tr>
+              ${events.length ? events.map((event) => {
+                const needsLandSearch = String(event.category || '').trim() === 'Solar'
+                  && String(event.name || '').trim() === 'Solar eclipse'
+                  && String(event.kind || '').trim() !== 'total'
+                  && !String(event.nearest_totality || '').trim();
+                const nearestTotality = needsLandSearch
+                  ? 'Searching for nearest location on land...'
+                  : String(event.nearest_totality || '').trim();
+                return `
+                <tr data-almanac-event-jd="${escapeHtml(event.jd || '')}">
                   <td>${escapeHtml(event.category || '')}</td>
                   <td class="body-name">${escapeHtml(event.name || '')}</td>
                   <td>${escapeHtml(event.kind || '')}</td>
                   <td class="number">${escapeHtml(event.time || '')}</td>
                   <td class="event-details">${escapeHtml(event.details || '')}</td>
-                </tr>`).join('') : `
+                  <td class="event-details" ${needsLandSearch ? `data-almanac-land-totality="${escapeHtml(event.jd || '')}"` : ''}>${escapeHtml(nearestTotality)}</td>
+                </tr>`;
+              }).join('') : `
                 <tr>
-                  <td colspan="5">No eclipses or Mercury/Venus transits found in this one-year window.</td>
+                  <td colspan="6">No eclipses or Mercury/Venus transits found in this one-year window.</td>
                 </tr>`}
             </tbody>
           </table>
         </div>`;
+      target.querySelectorAll('[data-almanac-visibility]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const nextVisibility = validAlmanacVisibility(button.dataset.almanacVisibility, almanacVisibilityMode);
+          if (nextVisibility === almanacVisibilityMode)
+            return;
+          almanacVisibilityMode = nextVisibility;
+          saveLastAlmanacState();
+          if (almanacLastWorksheetData) {
+            renderAlmanacWorksheet(target, {...almanacLastWorksheetData, visibility: nextVisibility});
+            refreshAlmanacLandTotality(almanacLastWorksheetData);
+            setStatus('Ready');
+          } else {
+            evaluateAlmanac({skipHistoryUpdate: true});
+          }
+        });
+      });
     }
 
     async function refreshDatetimeLocalHolidays() {
@@ -6427,12 +7133,32 @@ __ALMANAC_BODY_OPTIONS__
       }
     }
 
-    async function refreshDatetimeJurisdictionLocation() {
+    async function refreshDatetimeJurisdictionLocation({updateCoordinates = true} = {}) {
       if (!datetimeJurisdiction)
         return;
 
       const jurisdiction = validDatetimeJurisdiction(datetimeJurisdiction.value, DEFAULT_DATETIME_JURISDICTION);
       const date = validDateText(datetimeDate && datetimeDate.value, DEFAULT_DATETIME_DATE);
+      let townApplied = false;
+      if (updateCoordinates) {
+        populateTownSelect(datetimeTown, jurisdiction, {selectDefault: true});
+        townApplied = applySelectedTown({
+          townSelect: datetimeTown,
+          latitudeInput: datetimeLatitude,
+          longitudeInput: datetimeLongitude,
+          elevationInput: datetimeElevation,
+          zoneInput: datetimeGmtOffset,
+          dateInput: datetimeDate,
+          resetOffsetTouched: true
+        });
+      } else {
+        applySelectedTown({
+          townSelect: datetimeTown,
+          zoneInput: datetimeGmtOffset,
+          dateInput: datetimeDate,
+          resetOffsetTouched: true
+        });
+      }
       try {
         const response = await fetch('/datetime-jurisdiction-location', {
           method: 'POST',
@@ -6442,14 +7168,14 @@ __ALMANAC_BODY_OPTIONS__
         const data = await response.json();
         if (!response.ok || !data.ok)
           return;
-        if (datetimeLatitude && data.latitude)
+        if (updateCoordinates && !townApplied && datetimeLatitude && data.latitude)
           datetimeLatitude.value = String(data.latitude);
-        if (datetimeLongitude && data.longitude)
+        if (updateCoordinates && !townApplied && datetimeLongitude && data.longitude)
           datetimeLongitude.value = String(data.longitude);
         if (datetimeGmtOffset) {
           const currentOffset = String(datetimeGmtOffset.value || '').trim();
           const suggestedOffset = String(data.gmt_offset || '').trim();
-          if (!datetimeGmtOffsetTouched || !currentOffset || currentOffset === datetimeAutoGmtOffset) {
+          if (!townApplied && (!datetimeGmtOffsetTouched || !currentOffset || currentOffset === datetimeAutoGmtOffset)) {
             datetimeGmtOffset.value = suggestedOffset;
             datetimeAutoGmtOffset = suggestedOffset;
             datetimeGmtOffsetTouched = false;
@@ -6460,13 +7186,72 @@ __ALMANAC_BODY_OPTIONS__
       }
     }
 
-    async function triggerDatetimeAutoEvaluation({refreshJurisdiction = false} = {}) {
+    async function refreshAlmanacJurisdictionLocation({updateCoordinates = true} = {}) {
+      if (!almanacJurisdiction)
+        return;
+
+      const refreshId = ++almanacLocationRefreshSequence;
+      const jurisdiction = validDatetimeJurisdiction(almanacJurisdiction.value, DEFAULT_DATETIME_JURISDICTION);
+      const date = validDateText(almanacDate && almanacDate.value, DEFAULT_ALMANAC_DATE);
+      let townApplied = false;
+      if (updateCoordinates) {
+        populateTownSelect(almanacTown, jurisdiction, {selectDefault: true});
+        townApplied = applySelectedTown({
+          townSelect: almanacTown,
+          latitudeInput: almanacLatitude,
+          longitudeInput: almanacLongitude,
+          elevationInput: almanacElevation,
+          zoneInput: almanacZone,
+          dateInput: almanacDate
+        });
+      } else {
+        applySelectedTown({
+          townSelect: almanacTown,
+          zoneInput: almanacZone,
+          dateInput: almanacDate
+        });
+      }
+      setStatus('Updating almanac location...');
+      try {
+        const response = await fetch('/datetime-jurisdiction-location', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({jurisdiction, date})
+        });
+        const data = await response.json();
+        if (refreshId !== almanacLocationRefreshSequence || currentMode() !== 'almanac')
+          return;
+        if (!response.ok || !data.ok)
+          return;
+        if (updateCoordinates && !townApplied && almanacLatitude && data.latitude)
+          almanacLatitude.value = String(data.latitude);
+        if (updateCoordinates && !townApplied && almanacLongitude && data.longitude)
+          almanacLongitude.value = String(data.longitude);
+        if (!townApplied && almanacZone && data.gmt_offset)
+          almanacZone.value = String(data.gmt_offset);
+      } catch (_) {
+        // Keep the current observer if the helper is unavailable.
+      }
+    }
+
+    async function triggerDatetimeAutoEvaluation({refreshJurisdiction = false, refreshCoordinates = false} = {}) {
       if (currentMode() !== 'datetime')
         return;
       if (refreshJurisdiction)
-        await refreshDatetimeJurisdictionLocation();
+        await refreshDatetimeJurisdictionLocation({updateCoordinates: refreshCoordinates});
       saveLastDatetimeState();
       await evaluateDatetime({skipHistoryUpdate: true});
+      updateHistoryButtons();
+    }
+
+    async function triggerAlmanacAutoEvaluation({refreshJurisdiction = false, refreshCoordinates = false} = {}) {
+      if (currentMode() !== 'almanac')
+        return;
+      almanacLastWorksheetData = null;
+      if (refreshJurisdiction)
+        await refreshAlmanacJurisdictionLocation({updateCoordinates: refreshCoordinates});
+      saveLastAlmanacState();
+      await evaluateAlmanac({skipHistoryUpdate: true});
       updateHistoryButtons();
     }
 
@@ -7561,8 +8346,9 @@ __ALMANAC_BODY_OPTIONS__
 
         clearResultDetails({keepBindings: true});
         clearRenderedError();
+        almanacLastWorksheetData = data;
         renderAlmanacWorksheet(rendered, data);
-        rendered.dataset.copyText = data.worksheet || '';
+        refreshAlmanacLandTotality(data);
         resetMoreDigitsButton(renderedMore, false);
         setExpandableText(parsed, parsedMore, '', '');
         setExpandableText(functionStyle, functionMore, '', '');
@@ -7574,6 +8360,8 @@ __ALMANAC_BODY_OPTIONS__
             almanacLatitude.value = String(data.fields.latitude || '').trim();
           if (almanacLongitude && data.fields.longitude)
             almanacLongitude.value = String(data.fields.longitude || '').trim();
+          if (almanacElevation && data.fields.elevation)
+            almanacElevation.value = String(data.fields.elevation || '').trim();
           if (almanacJurisdiction && data.fields.jurisdiction)
             setSelectValue(almanacJurisdiction, validDatetimeJurisdiction(data.fields.jurisdiction, DEFAULT_DATETIME_JURISDICTION));
         }
@@ -7692,21 +8480,13 @@ __ALMANAC_BODY_OPTIONS__
       return true;
     }
 
-    run.addEventListener('click', () => {
+    run.addEventListener('click', async () => {
       if (currentMode() === 'expression') {
         clearForwardHistory();
         clearGoalSeekRequest();
         hideTargetEntry();
-        evaluateExpression();
-      } else if (currentMode() === 'equation') {
-        evaluateEquation();
-      } else if (currentMode() === 'matrix') {
-        evaluateMatrix();
-      } else if (currentMode() === 'integrator') {
-        evaluateIntegrator();
-      } else {
-        evaluateDatetime();
       }
+      await evaluateCurrentMode();
     });
 
     back.addEventListener('click', () => {
@@ -8019,8 +8799,9 @@ __ALMANAC_BODY_OPTIONS__
           almanacLatitude.value = DEFAULT_ALMANAC_LATITUDE;
         if (almanacLongitude)
           almanacLongitude.value = DEFAULT_ALMANAC_LONGITUDE;
-        if (almanacBody)
-          setSelectValue(almanacBody, DEFAULT_ALMANAC_BODY);
+        if (almanacElevation)
+          almanacElevation.value = DEFAULT_ALMANAC_ELEVATION;
+        almanacVisibilityMode = DEFAULT_ALMANAC_VISIBILITY;
         expr.value = DEFAULT_ALMANAC_TEXT;
       }
       captureCurrentModeEditor();
@@ -8116,7 +8897,7 @@ __ALMANAC_BODY_OPTIONS__
           saveLastIntegratorState();
       });
 
-    [datetimeDate, datetimeJdn, datetimeStart, datetimeEnd, datetimeYear, datetimeJurisdiction, datetimeLatitude, datetimeLongitude, datetimeElevation, datetimeGmtOffset]
+    [datetimeDate, datetimeJdn, datetimeStart, datetimeEnd, datetimeYear, datetimeJurisdiction, datetimeTown, datetimeLatitude, datetimeLongitude, datetimeElevation, datetimeGmtOffset]
       .filter(Boolean)
       .forEach((control) => {
         if (control === datetimeDate || control === datetimeStart || control === datetimeEnd) {
@@ -8140,15 +8921,27 @@ __ALMANAC_BODY_OPTIONS__
             if (datetimeJdn)
               datetimeJdn.value = '';
           }
-          if (currentMode() === 'datetime') {
-            triggerDatetimeAutoEvaluation({
-              refreshJurisdiction: control === datetimeJurisdiction || control === datetimeDate
+          if (control === datetimeTown) {
+            applySelectedTown({
+              townSelect: datetimeTown,
+              latitudeInput: datetimeLatitude,
+              longitudeInput: datetimeLongitude,
+              elevationInput: datetimeElevation,
+              zoneInput: datetimeGmtOffset,
+              dateInput: datetimeDate,
+              resetOffsetTouched: true
             });
           }
+          if (currentMode() === 'datetime') {
+            triggerDatetimeAutoEvaluation({
+              refreshJurisdiction: control === datetimeJurisdiction || control === datetimeDate,
+	              refreshCoordinates: control === datetimeJurisdiction
+	            });
+	          }
         });
       });
 
-    [almanacDate, almanacTime, almanacZone, almanacJurisdiction, almanacLatitude, almanacLongitude, almanacBody]
+    [almanacDate, almanacTime, almanacZone, almanacJurisdiction, almanacTown, almanacLatitude, almanacLongitude, almanacElevation]
       .filter(Boolean)
       .forEach((control) => {
         if (control === almanacDate) {
@@ -8166,10 +8959,22 @@ __ALMANAC_BODY_OPTIONS__
           });
         }
         control.addEventListener('change', () => {
-          if (currentMode() === 'almanac') {
-            saveLastAlmanacState();
-            evaluateAlmanac({skipHistoryUpdate: true});
+          if (control === almanacTown) {
+            applySelectedTown({
+              townSelect: almanacTown,
+              latitudeInput: almanacLatitude,
+              longitudeInput: almanacLongitude,
+              elevationInput: almanacElevation,
+              zoneInput: almanacZone,
+              dateInput: almanacDate
+            });
           }
+          if (currentMode() === 'almanac') {
+	            triggerAlmanacAutoEvaluation({
+	              refreshJurisdiction: control === almanacJurisdiction || control === almanacDate,
+	              refreshCoordinates: control === almanacJurisdiction
+	            });
+	          }
         });
       });
 
@@ -8411,7 +9216,8 @@ def default_state() -> dict[str, object]:
         "almanac_jurisdiction": DEFAULT_HOLIDAY_JURISDICTION,
         "almanac_latitude": DEFAULT_ALMANAC_LATITUDE,
         "almanac_longitude": DEFAULT_ALMANAC_LONGITUDE,
-        "almanac_body": DEFAULT_ALMANAC_BODY,
+        "almanac_elevation": DEFAULT_ALMANAC_ELEVATION,
+        "almanac_visibility": DEFAULT_ALMANAC_VISIBILITY,
         "precision_bits": {
             "expression": 256,
             "equation": 256,
@@ -8531,9 +9337,11 @@ def load_state_data() -> dict[str, object]:
         ("almanac_zone", DEFAULT_ALMANAC_ZONE),
         ("almanac_latitude", DEFAULT_ALMANAC_LATITUDE),
         ("almanac_longitude", DEFAULT_ALMANAC_LONGITUDE),
-        ("almanac_body", DEFAULT_ALMANAC_BODY),
+        ("almanac_elevation", DEFAULT_ALMANAC_ELEVATION),
     ):
         state[key] = str(state.get(key, default)).strip() or str(default)
+    almanac_visibility = str(state.get("almanac_visibility", DEFAULT_ALMANAC_VISIBILITY)).strip().lower()
+    state["almanac_visibility"] = almanac_visibility if almanac_visibility in {"all", "visible"} else DEFAULT_ALMANAC_VISIBILITY
     return state
 
 
@@ -8562,10 +9370,15 @@ def save_state_data(updates: dict[str, object]) -> None:
             str(normalized.get("integrator_expression") or "").strip()
         )
     state.update(normalized)
+    ensure_private_directory(STATE_FILE.parent)
     STATE_FILE.write_text(
         json.dumps(state, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
+    try:
+        STATE_FILE.chmod(0o600)
+    except OSError:
+        pass
 
 
 def save_state_expression(expression: str) -> None:
@@ -9521,6 +10334,9 @@ def ensure_mars_lab(binary: Path) -> None:
 
 
 def ensure_scratch_binary(binary: Path, target: str) -> None:
+    if binary.exists():
+        return
+
     subprocess.run(
         ["make", target],
         cwd=ROOT,
@@ -9693,6 +10509,10 @@ def parse_datetime_lab_output(output: str) -> dict[str, str]:
             "sunrise_status": r"^sunrise_status\s+(.*)$",
             "sunset": r"^sunset\s+(.*)$",
             "sunset_status": r"^sunset_status\s+(.*)$",
+            "moonrise": r"^moonrise\s+(.*)$",
+            "moonrise_status": r"^moonrise_status\s+(.*)$",
+            "moonset": r"^moonset\s+(.*)$",
+            "moonset_status": r"^moonset_status\s+(.*)$",
             "actual_sunrise": r"^actual_sunrise\s+(.*)$",
             "actual_sunrise_status": r"^actual_sunrise_status\s+(.*)$",
             "actual_sunset": r"^actual_sunset\s+(.*)$",
@@ -9745,7 +10565,16 @@ def parse_datetime_lab_output(output: str) -> dict[str, str]:
             "mayan_wayeb_start": r"^mayan_wayeb_start\s+(.*)$",
             "aztec_xiuhpohualli_new_year": r"^aztec_xiuhpohualli_new_year\s+(.*)$",
             "aztec_nemontemi_start": r"^aztec_nemontemi_start\s+(.*)$",
+            "bank_holiday": r"^bank_holiday\s+(.*)$",
+            "holiday_status": r"^holiday_status\s+(.*)$",
+            "holiday_notice": r"^holiday_notice\s+(.*)$",
+            "jurisdiction_latitude": r"^jurisdiction_latitude\s+(.*)$",
+            "jurisdiction_longitude": r"^jurisdiction_longitude\s+(.*)$",
+            "jurisdiction_gmt_offset": r"^jurisdiction_gmt_offset\s+(.*)$",
+            "jurisdiction_status": r"^jurisdiction_status\s+(.*)$",
+            "jurisdiction_gmt_offset_status": r"^jurisdiction_gmt_offset_status\s+(.*)$",
         },
+        {"bank_holiday", "holiday_notice"},
     )
 
 
@@ -9777,6 +10606,7 @@ def parse_almanac_lab_output(output: str) -> dict[str, str]:
             "selected_visible": r"^selected_visible\s+(.*)$",
             "event_year": r"^event_year\s+(.*)$",
             "event_window": r"^event_window\s+(.*)$",
+            "events_cached": r"^events_cached\s+(.*)$",
         },
     )
     snapshot_lines = []
@@ -10612,12 +11442,16 @@ def run_datetime_lab_fields(
         "elevation",
         "gmt_offset",
         "jurisdiction",
+        "cache_only",
     ):
         if key in options:
             command.append(f"{key}={str(options.get(key, '')).strip()}")
+    child_env = os.environ.copy()
+    child_env.update(mars_lab_object_store_runtime_env())
     completed = subprocess.run(
         command,
         cwd=ROOT,
+        env=child_env,
         text=True,
         capture_output=True,
         timeout=10,
@@ -10628,17 +11462,80 @@ def run_datetime_lab_fields(
     return parse_datetime_lab_output(raw), raw, completed.returncode
 
 
+def datetime_cache_output_from_fields(fields: dict[str, str]) -> str:
+    multiline_fields = {"bank_holiday", "holiday_notice"}
+    lines: list[str] = []
+
+    for key, value in fields.items():
+        if key.startswith("weather_"):
+            continue
+        key_text = str(key or "").strip()
+        if not key_text or not re.fullmatch(r"[A-Za-z0-9_]+", key_text):
+            continue
+        value_text = str(value or "").rstrip()
+        if not value_text:
+            continue
+        value_lines = value_text.splitlines()
+        if key_text in multiline_fields:
+            lines.append(f"{key_text} {value_lines[0] if value_lines else ''}")
+            lines.extend(value_lines[1:])
+        else:
+            lines.append(f"{key_text} {' '.join(line.strip() for line in value_lines)}")
+    return "\n".join(lines) + ("\n" if lines else "")
+
+
+def store_datetime_lab_cached_output(
+    binary: Path,
+    options: dict[str, str],
+    output: str,
+) -> bool:
+    command = [str(binary)]
+    for key in (
+        "date",
+        "jdn",
+        "start",
+        "end",
+        "year",
+        "lat",
+        "lon",
+        "elevation",
+        "gmt_offset",
+        "jurisdiction",
+    ):
+        if key in options:
+            command.append(f"{key}={str(options.get(key, '')).strip()}")
+    command.append("cache_put=1")
+    child_env = os.environ.copy()
+    child_env.update(mars_lab_object_store_runtime_env())
+    try:
+        completed = subprocess.run(
+            command,
+            cwd=ROOT,
+            env=child_env,
+            input=output,
+            text=True,
+            capture_output=True,
+            timeout=10,
+        )
+    except Exception:
+        return False
+    return completed.returncode == 0
+
+
 def run_almanac_lab_fields(
     binary: Path,
     options: dict[str, str],
 ) -> tuple[dict[str, str], str, int]:
     command = [str(binary)]
-    for key in ("date", "time", "zone", "lat", "lon", "body"):
+    for key in ("date", "time", "zone", "lat", "lon", "body", "cache_only"):
         if key in options:
             command.append(f"{key}={str(options.get(key, '')).strip()}")
+    child_env = os.environ.copy()
+    child_env.update(mars_lab_object_store_runtime_env())
     completed = subprocess.run(
         command,
         cwd=ROOT,
+        env=child_env,
         text=True,
         capture_output=True,
         timeout=10,
@@ -10647,6 +11544,33 @@ def run_almanac_lab_fields(
     if completed.stderr:
         raw = raw + ("\n" if raw else "") + completed.stderr
     return parse_almanac_lab_output(raw), raw, completed.returncode
+
+
+def store_almanac_lab_cached_output(
+    binary: Path,
+    options: dict[str, str],
+    output: str,
+) -> bool:
+    command = [str(binary)]
+    for key in ("date", "time", "zone", "lat", "lon", "body"):
+        if key in options:
+            command.append(f"{key}={str(options.get(key, '')).strip()}")
+    command.append("cache_put=1")
+    child_env = os.environ.copy()
+    child_env.update(mars_lab_object_store_runtime_env())
+    try:
+        completed = subprocess.run(
+            command,
+            cwd=ROOT,
+            env=child_env,
+            input=output,
+            text=True,
+            capture_output=True,
+            timeout=10,
+        )
+    except Exception:
+        return False
+    return completed.returncode == 0
 
 
 def run_holiday_lab_fields(
@@ -10674,6 +11598,39 @@ def run_holiday_lab_fields(
     return parse_holiday_lab_output(raw), raw, completed.returncode
 
 
+HOLIDAY_FIELDS_CACHE: dict[tuple[str, str, str, str, str], tuple[dict[str, str], str, int]] = {}
+HOLIDAY_FIELDS_CACHE_LOCK = threading.Lock()
+
+
+def holiday_fields_cache_key(binary: Path,
+                             options: dict[str, str]) -> tuple[str, str, str, str, str]:
+    return (
+        str(binary),
+        str(options.get("date", "")).strip(),
+        str(options.get("start", "")).strip(),
+        str(options.get("end", "")).strip(),
+        normalize_holiday_jurisdiction(str(options.get("jurisdiction", "")).strip()),
+    )
+
+
+def run_holiday_lab_fields_cached(
+    binary: Path,
+    options: dict[str, str],
+) -> tuple[dict[str, str], str, int]:
+    key = holiday_fields_cache_key(binary, options)
+
+    with HOLIDAY_FIELDS_CACHE_LOCK:
+        cached = HOLIDAY_FIELDS_CACHE.get(key)
+    if cached is not None:
+        fields, raw, returncode = cached
+        return dict(fields), raw, returncode
+
+    fields, raw, returncode = run_holiday_lab_fields(binary, options)
+    with HOLIDAY_FIELDS_CACHE_LOCK:
+        HOLIDAY_FIELDS_CACHE[key] = (dict(fields), raw, returncode)
+    return fields, raw, returncode
+
+
 def parse_almanac_event_lab_rows(output: str) -> list[dict[str, str]]:
     rows: list[dict[str, str]] = []
     for line in str(output or "").splitlines():
@@ -10681,7 +11638,7 @@ def parse_almanac_event_lab_rows(output: str) -> list[dict[str, str]]:
         if not match:
             continue
         parts = match.group(1).split("|")
-        if len(parts) != 8:
+        if len(parts) < 8:
             continue
         rows.append({
             "category": parts[0].strip(),
@@ -10692,21 +11649,28 @@ def parse_almanac_event_lab_rows(output: str) -> list[dict[str, str]]:
             "last_jd": parts[5].strip(),
             "magnitude": parts[6].strip(),
             "percent": parts[7].strip(),
+            "nearest_totality": parts[8].strip() if len(parts) > 8 else "",
         })
     return rows
 
 
-def run_almanac_event_lab_rows(options: dict[str, str]) -> list[dict[str, str]]:
+def run_almanac_event_lab_rows(options: dict[str, str],
+                               timeout_seconds: int | None = None) -> list[dict[str, str]]:
     command = [str(DEFAULT_ALMANAC_EVENT_BIN)]
-    for key in ("start", "end", "lat", "lon"):
+    for key in ("start", "end", "lat", "lon", "totality"):
         if key in options:
             command.append(f"{key}={str(options.get(key, '')).strip()}")
+    child_env = os.environ.copy()
+    child_env.update(mars_lab_object_store_runtime_env())
+    if timeout_seconds is None:
+        timeout_seconds = ALMANAC_LAND_TOTALITY_SEARCH_TIMEOUT_SECONDS if str(options.get("totality") or "").strip() == "land" else 20
     completed = subprocess.run(
         command,
         cwd=ROOT,
+        env=child_env,
         text=True,
         capture_output=True,
-        timeout=20,
+        timeout=timeout_seconds,
     )
     raw = completed.stdout
     if completed.stderr:
@@ -11125,12 +12089,12 @@ def prepare_datetime_fields(fields: dict[str, str]) -> dict[str, object]:
     moon_phase = str(fields.get("moon_phase") or "").strip()
     sunrise = str(fields.get("sunrise") or "").strip()
     sunset = str(fields.get("sunset") or "").strip()
+    moonrise = str(fields.get("moonrise") or "").strip()
+    moonset = str(fields.get("moonset") or "").strip()
     sunrise_status = str(fields.get("sunrise_status") or "").strip()
     sunset_status = str(fields.get("sunset_status") or "").strip()
-    actual_sunrise = str(fields.get("actual_sunrise") or "").strip()
-    actual_sunset = str(fields.get("actual_sunset") or "").strip()
-    actual_sunrise_status = str(fields.get("actual_sunrise_status") or "").strip()
-    actual_sunset_status = str(fields.get("actual_sunset_status") or "").strip()
+    moonrise_status = str(fields.get("moonrise_status") or "").strip()
+    moonset_status = str(fields.get("moonset_status") or "").strip()
     dst_forward = str(fields.get("dst_forward") or "").strip()
     dst_back = str(fields.get("dst_back") or "").strip()
     dst_forward_from_offset = str(fields.get("dst_forward_from_offset") or "").strip()
@@ -11216,9 +12180,9 @@ def prepare_datetime_fields(fields: dict[str, str]) -> dict[str, object]:
         f"{weekday} {date}".strip(),
         f"Moon phase: {moon_phase}" if moon_phase else "",
         f"Sunrise: {sunrise}" if sunrise and sunrise != "unavailable" else f"Sunrise: {sunrise_status or 'unavailable'}",
-        f"Actual sunrise: {actual_sunrise}" if actual_sunrise and actual_sunrise != "unavailable" else f"Actual sunrise: {actual_sunrise_status or 'unavailable'}",
         f"Sunset: {sunset}" if sunset and sunset != "unavailable" else f"Sunset: {sunset_status or 'unavailable'}",
-        f"Actual sunset: {actual_sunset}" if actual_sunset and actual_sunset != "unavailable" else f"Actual sunset: {actual_sunset_status or 'unavailable'}",
+        f"Moonrise: {moonrise}" if moonrise and moonrise != "unavailable" else f"Moonrise: {moonrise_status or 'unavailable'}",
+        f"Moonset: {moonset}" if moonset and moonset != "unavailable" else f"Moonset: {moonset_status or 'unavailable'}",
         f"Temperature: {weather_summary}" if weather_summary else "",
         f"Humidity: {weather_humidity}" if weather_humidity else "",
         f"Wind: {weather_wind}" if weather_wind else "",
@@ -11234,30 +12198,32 @@ def prepare_datetime_fields(fields: dict[str, str]) -> dict[str, object]:
             "rows": [
                 {"label": "Date", "value": date},
                 {"label": "Weekday", "value": weekday},
-                {"label": "Moon phase", "value": moon_phase},
                 {"label": "Time basis", "value": offset_text},
             ],
         },
         {
-            "title": "Sunlight",
+            "title": "Sun and Moon",
             "open": True,
             "rows": [
                 {
-                    "label": "Sunrise estimate",
+                    "label": "Sunrise",
                     "value": sunrise if sunrise and sunrise != "unavailable" else (sunrise_status or "unavailable"),
                 },
                 {
-                    "label": "Sunrise actual (almanac)",
-                    "value": actual_sunrise if actual_sunrise and actual_sunrise != "unavailable" else (actual_sunrise_status or "unavailable"),
-                },
-                {
-                    "label": "Sunset estimate",
+                    "label": "Sunset",
                     "value": sunset if sunset and sunset != "unavailable" else (sunset_status or "unavailable"),
                 },
                 {
-                    "label": "Sunset actual (almanac)",
-                    "value": actual_sunset if actual_sunset and actual_sunset != "unavailable" else (actual_sunset_status or "unavailable"),
+                    "label": "Moonrise",
+                    "value": moonrise if moonrise and moonrise != "unavailable" else (moonrise_status or "unavailable"),
                 },
+                {
+                    "label": "Moonset",
+                    "value": moonset if moonset and moonset != "unavailable" else (moonset_status or "unavailable"),
+                },
+                *([
+                    {"label": "Moon phase", "value": moon_phase},
+                ] if moon_phase else []),
                 *([
                     {"label": "Clocks forward", "value": dst_forward_text},
                 ] if dst_forward_text else []),
@@ -11681,7 +12647,7 @@ def parse_almanac_event_rows(text: str) -> list[dict[str, str]]:
     rows: list[dict[str, str]] = []
     for line in str(text or "").splitlines():
       parts = line.split("|")
-      if len(parts) != 5:
+      if len(parts) < 5:
           continue
       rows.append({
           "category": parts[0].strip(),
@@ -11689,9 +12655,64 @@ def parse_almanac_event_rows(text: str) -> list[dict[str, str]]:
           "kind": parts[2].strip(),
           "time": parts[3].strip(),
           "details": parts[4].strip(),
+          "nearest_totality": parts[5].strip() if len(parts) > 5 else "",
+          "jd": parts[6].strip() if len(parts) > 6 else "",
       })
     rows.sort(key=lambda row: str(row.get("time") or ""))
     return rows
+
+
+def almanac_cache_field_value(value: object) -> str:
+    return str(value or "").replace("\n", " ").replace("|", "/").strip()
+
+
+def almanac_output_with_events(
+    raw: str,
+    fields: dict[str, str],
+    payload: dict[str, object],
+) -> str:
+    lines = [line for line in str(raw or "").splitlines() if not line.startswith("event ")]
+    date_text = str(fields.get("date") or "").strip()
+    event_year = str(fields.get("event_year") or date_text[:4]).strip()
+    event_window = str(fields.get("event_window") or "").strip()
+    events = payload.get("events")
+
+    if not event_year:
+        event_year = str(py_datetime.date.today().year)
+    if not event_window:
+        try:
+            event_year_int = int(event_year)
+        except ValueError:
+            event_year_int = py_datetime.date.today().year
+            event_year = str(event_year_int)
+        event_window = f"{event_year_int:04d}-01-01|{event_year_int + 1:04d}-01-01"
+
+    if not any(line.startswith("event_year ") for line in lines):
+        lines.append(f"event_year {event_year}")
+    if not any(line.startswith("event_window ") for line in lines):
+        lines.append(f"event_window {event_window}")
+    if not any(line.startswith("events_cached ") for line in lines):
+        lines.append("events_cached yes")
+
+    if isinstance(events, list):
+        for event in events:
+            if not isinstance(event, dict):
+                continue
+            lines.append(
+                "event "
+                + "|".join(
+                    [
+                        almanac_cache_field_value(event.get("category")),
+                        almanac_cache_field_value(event.get("name")),
+                        almanac_cache_field_value(event.get("kind")),
+                        almanac_cache_field_value(event.get("time")),
+                        almanac_cache_field_value(event.get("details")),
+                        almanac_cache_field_value(event.get("nearest_totality")),
+                        almanac_cache_field_value(event.get("jd")),
+                    ]
+                )
+            )
+    return "\n".join(lines) + "\n"
 
 
 def almanac_mean_phase_jde(k: float) -> float:
@@ -11771,6 +12792,184 @@ def almanac_zone_label(zone_hours: float) -> str:
 
 
 ALMANAC_EVENT_OFFSET_CACHE: dict[tuple[str, str], float] = {}
+ALMANAC_JURISDICTION_LOCATION_CACHE: dict[tuple[str, str], tuple[str, str, str]] = {}
+JURISDICTION_OFFSET_TEXT_CACHE: dict[tuple[str, str], str] = {}
+DATETIME_FIELDS_CACHE: dict[tuple[str, str, str, str, str, str, str, str, str, str], dict[str, str]] = {}
+ALMANAC_RESPONSE_CACHE: dict[tuple[str, str, str, str, str, str, str, str], dict[str, object]] = {}
+
+
+def canonical_float_cache_text(value: object) -> str:
+    try:
+        return f"{float(value):.9f}"
+    except (TypeError, ValueError):
+        return str(value or "").strip()
+
+
+def datetime_response_cache_key(date_text: str,
+                                jdn_text: str,
+                                start_text: str,
+                                end_text: str,
+                                year_text: str,
+                                jurisdiction: str,
+                                latitude_text: str,
+                                longitude_text: str,
+                                elevation_text: str,
+                                gmt_offset_text: str) -> tuple[str, str, str, str, str, str, str, str, str, str]:
+    return (
+        str(date_text or "").strip(),
+        str(jdn_text or "").strip(),
+        str(start_text or "").strip(),
+        str(end_text or "").strip(),
+        str(year_text or "").strip(),
+        normalize_holiday_jurisdiction(str(jurisdiction or "").strip()),
+        canonical_float_cache_text(latitude_text),
+        canonical_float_cache_text(longitude_text),
+        canonical_float_cache_text(elevation_text),
+        canonical_float_cache_text(gmt_offset_text) if str(gmt_offset_text or "").strip() else "",
+    )
+
+
+def almanac_response_cache_key(date_text: str,
+                               time_text: str,
+                               zone_text: str,
+                               jurisdiction: str,
+                               latitude_text: str,
+                               longitude_text: str,
+                               body_text: str,
+                               visibility_text: str) -> tuple[str, str, str, str, str, str, str, str]:
+    time_match = re.fullmatch(r"(\d{2}):(\d{2})(?::(\d{2}(?:\.\d+)?))?", str(time_text or "").strip())
+    if time_match:
+        hour = int(time_match.group(1))
+        minute = int(time_match.group(2))
+        second = float(time_match.group(3) or "0")
+        canonical_time = f"{hour:02d}:{minute:02d}:{second:010.6f}"
+    else:
+        canonical_time = str(time_text or "").strip()
+    try:
+        canonical_zone = f"{float(zone_text):.9f}"
+    except (TypeError, ValueError):
+        canonical_zone = str(zone_text or "").strip()
+    try:
+        canonical_latitude = f"{float(latitude_text):.9f}"
+    except (TypeError, ValueError):
+        canonical_latitude = str(latitude_text or "").strip()
+    try:
+        canonical_longitude = f"{float(longitude_text):.9f}"
+    except (TypeError, ValueError):
+        canonical_longitude = str(longitude_text or "").strip()
+    return (
+        str(date_text or "").strip(),
+        canonical_time,
+        canonical_zone,
+        normalize_holiday_jurisdiction(str(jurisdiction or "").strip()),
+        canonical_latitude,
+        canonical_longitude,
+        str(body_text or "").strip().upper(),
+        str(visibility_text or "").strip().lower(),
+    )
+
+
+def timezone_offset_text_for_date(timezone_name: str, date_text: str) -> str:
+    timezone_name = str(timezone_name or "").strip()
+    date_text = str(date_text or "").strip()
+    if not timezone_name or not date_text:
+        return ""
+
+    key = (timezone_name, date_text)
+    cached = JURISDICTION_OFFSET_TEXT_CACHE.get(key)
+    if cached is not None:
+        return cached
+
+    try:
+        date_value = py_datetime.date.fromisoformat(date_text)
+        zone = ZoneInfo(timezone_name)
+        local_noon = py_datetime.datetime(
+            date_value.year,
+            date_value.month,
+            date_value.day,
+            12,
+            0,
+            0,
+            tzinfo=zone,
+        )
+        offset = local_noon.utcoffset()
+        if offset is None:
+            return ""
+        offset_hours = offset.total_seconds() / 3600.0
+    except (OSError, ValueError, ZoneInfoNotFoundError):
+        return ""
+
+    if not -14.0 <= offset_hours <= 14.0:
+        return ""
+
+    text = f"{offset_hours:.2f}"
+    JURISDICTION_OFFSET_TEXT_CACHE[key] = text
+    return text
+
+
+def jurisdiction_default_location_for_date(jurisdiction: str, date_text: str) -> tuple[str, str, str] | None:
+    jurisdiction = normalize_holiday_jurisdiction(jurisdiction)
+    entry = JURISDICTION_LOCATION_DEFAULTS.get(jurisdiction)
+    if entry is None:
+        entry = JURISDICTION_LOCATION_DEFAULTS.get(jurisdiction.split("-", 1)[0])
+    if entry is None:
+        return None
+
+    latitude, longitude, timezone_name, _locality_name = entry
+    offset_text = timezone_offset_text_for_date(timezone_name, date_text)
+    if not offset_text:
+        return None
+    return (offset_text, latitude, longitude)
+
+
+def almanac_jurisdiction_location_for_date(jurisdiction: str,
+                                           date_text: str,
+                                           zone_text: str,
+                                           latitude_text: str,
+                                           longitude_text: str) -> tuple[str, str, str]:
+    key = (normalize_holiday_jurisdiction(jurisdiction), date_text)
+    if key in ALMANAC_JURISDICTION_LOCATION_CACHE:
+        return ALMANAC_JURISDICTION_LOCATION_CACHE[key]
+
+    result = (
+        str(zone_text or "").strip(),
+        str(latitude_text or "").strip(),
+        str(longitude_text or "").strip(),
+    )
+
+    resident_result = jurisdiction_default_location_for_date(key[0], date_text)
+    if resident_result is not None:
+        ALMANAC_JURISDICTION_LOCATION_CACHE[key] = resident_result
+        return resident_result
+
+    resolved = False
+    try:
+        ensure_scratch_binary(DEFAULT_HOLIDAY_BIN, "scratch/holiday_lab")
+        fields, _, returncode = run_holiday_lab_fields_cached(
+            DEFAULT_HOLIDAY_BIN,
+            {
+                "date": date_text,
+                "start": date_text,
+                "end": date_text,
+                "jurisdiction": key[0],
+            },
+        )
+        if returncode == 0 and str(fields.get("jurisdiction_status") or "").strip() == "ok":
+            candidate_zone = str(fields.get("jurisdiction_gmt_offset") or "").strip()
+            candidate_latitude = str(fields.get("jurisdiction_latitude") or "").strip()
+            candidate_longitude = str(fields.get("jurisdiction_longitude") or "").strip()
+            zone = float(candidate_zone)
+            latitude = float(candidate_latitude)
+            longitude = float(candidate_longitude)
+            if -14.0 <= zone <= 14.0 and -90.0 <= latitude <= 90.0 and -180.0 <= longitude <= 180.0:
+                result = (candidate_zone, candidate_latitude, candidate_longitude)
+                resolved = True
+    except Exception:
+        pass
+
+    if resolved:
+        ALMANAC_JURISDICTION_LOCATION_CACHE[key] = result
+    return result
 
 
 def almanac_jurisdiction_offset_for_date(jurisdiction: str, date_text: str, fallback: float) -> float:
@@ -11778,9 +12977,17 @@ def almanac_jurisdiction_offset_for_date(jurisdiction: str, date_text: str, fall
     if key in ALMANAC_EVENT_OFFSET_CACHE:
         return ALMANAC_EVENT_OFFSET_CACHE[key]
     offset = fallback
+    resident_result = jurisdiction_default_location_for_date(key[0], date_text)
+    if resident_result is not None:
+        try:
+            offset = float(resident_result[0])
+            ALMANAC_EVENT_OFFSET_CACHE[key] = offset
+            return offset
+        except ValueError:
+            offset = fallback
     try:
         if DEFAULT_HOLIDAY_BIN.exists():
-            fields, _, returncode = run_holiday_lab_fields(
+            fields, _, returncode = run_holiday_lab_fields_cached(
                 DEFAULT_HOLIDAY_BIN,
                 {
                     "date": date_text,
@@ -11799,6 +13006,45 @@ def almanac_jurisdiction_offset_for_date(jurisdiction: str, date_text: str, fall
     return offset
 
 
+def almanac_local_event_time_from_jd(jd: float,
+                                     jurisdiction: str,
+                                     fallback_zone_hours: float = 0.0) -> tuple[str, str]:
+    epoch = py_datetime.datetime(1970, 1, 1, tzinfo=py_datetime.timezone.utc)
+    utc_moment = epoch + py_datetime.timedelta(days=float(jd) - 2440587.5)
+    event_zone = almanac_jurisdiction_offset_for_date(jurisdiction, utc_moment.strftime("%Y-%m-%d"), fallback_zone_hours)
+    zone_label = almanac_zone_label(event_zone)
+    local_moment = utc_moment + py_datetime.timedelta(hours=event_zone)
+    return f"{local_moment:%Y-%m-%d %H:%M} {zone_label}", utc_moment.isoformat()
+
+
+def format_almanac_totality_location(payload: str,
+                                     fallback_zone_hours: float,
+                                     observer_jurisdiction: str) -> str:
+    parts = [part.strip() for part in str(payload or "").split(",")]
+    if len(parts) != 4:
+        return ""
+    try:
+        totality_latitude = float(parts[0])
+        totality_longitude = float(parts[1])
+        totality_jd = float(parts[2])
+        distance_km = float(parts[3])
+    except ValueError:
+        return ""
+    totality_jurisdiction = holiday_jurisdiction_for_coordinates(totality_latitude, totality_longitude)
+    location_label = (
+        HOLIDAY_JURISDICTION_LABELS.get(totality_jurisdiction, totality_jurisdiction)
+        if totality_jurisdiction else geographic_water_label(totality_latitude, totality_longitude)
+    )
+    totality_time_jurisdiction = totality_jurisdiction or normalize_holiday_jurisdiction(observer_jurisdiction)
+    time_text, _ = almanac_local_event_time_from_jd(totality_jd, totality_time_jurisdiction, fallback_zone_hours)
+    return (
+        f"{location_label}; "
+        f"{totality_latitude:.4f}, {totality_longitude:.4f}; "
+        f"{time_text}; "
+        f"{distance_km:,.0f} km from observer"
+    )
+
+
 def generate_annual_almanac_events(
     year: int,
     zone_hours: float = 0.0,
@@ -11810,13 +13056,11 @@ def generate_annual_almanac_events(
     jurisdiction = normalize_holiday_jurisdiction(jurisdiction or DEFAULT_HOLIDAY_JURISDICTION)
     exact_eclipse_keys: set[tuple[str, str]] = set()
 
+    def local_event_time_from_jd_for_jurisdiction(jd: float, event_jurisdiction: str) -> tuple[str, str]:
+        return almanac_local_event_time_from_jd(jd, event_jurisdiction, zone_hours)
+
     def local_event_time_from_jd(jd: float) -> tuple[str, str]:
-        epoch = py_datetime.datetime(1970, 1, 1, tzinfo=py_datetime.timezone.utc)
-        utc_moment = epoch + py_datetime.timedelta(days=float(jd) - 2440587.5)
-        event_zone = almanac_jurisdiction_offset_for_date(jurisdiction, utc_moment.strftime("%Y-%m-%d"), zone_hours)
-        zone_label = almanac_zone_label(event_zone)
-        local_moment = utc_moment + py_datetime.timedelta(hours=event_zone)
-        return f"{local_moment:%Y-%m-%d %H:%M} {zone_label}", utc_moment.isoformat()
+        return local_event_time_from_jd_for_jurisdiction(jd, jurisdiction)
 
     def add_jd(category: str, name: str, kind: str, jd: float, details: str) -> None:
         time_text, sort_text = local_event_time_from_jd(jd)
@@ -11829,6 +13073,8 @@ def generate_annual_almanac_events(
                 "time": time_text,
                 "sort_time": sort_text,
                 "details": details,
+                "nearest_totality": "",
+                "jd": f"{jd:.9f}",
             })
 
     def add_exact_eclipse(row: dict[str, str]) -> None:
@@ -11844,17 +13090,23 @@ def generate_annual_almanac_events(
         category = str(row.get("category") or "").strip()
         name = str(row.get("name") or "").strip()
         kind = str(row.get("kind") or "").strip()
+        totality_text = format_almanac_totality_location(str(row.get("nearest_totality") or ""), zone_hours, jurisdiction)
         key = (category, f"{jd:.5f}")
         if key in exact_eclipse_keys:
             return
         exact_eclipse_keys.add(key)
+        percent_text = f"{percent:.1f}%"
+        if kind != "total" and percent < 100.0 and round(percent, 1) >= 100.0:
+            percent_text = f"{percent:.3f}%"
         events.append({
             "category": category,
             "name": name,
             "kind": kind,
             "time": time_text,
             "sort_time": sort_text,
-            "details": f"Local magnitude {magnitude:.3f}; local obscuration/totality {percent:.1f}%.",
+            "details": f"Local magnitude {magnitude:.3f}; local obscuration/totality {percent_text}.",
+            "nearest_totality": totality_text,
+            "jd": f"{jd:.9f}",
         })
 
     def add_exact_window(jd: float) -> bool:
@@ -11932,6 +13184,8 @@ def generate_annual_almanac_events(
                 "time": f"{event_year:04d}-{month:02d}-{day:02d}",
                 "sort_time": f"{event_year:04d}-{month:02d}-{day:02d}",
                 "details": f"{body} crosses the solar disc; circumstances depend on observer location.",
+                "nearest_totality": "",
+                "jd": "",
             })
 
     events.sort(key=lambda row: str(row.get("sort_time") or row.get("time") or ""))
@@ -11939,9 +13193,13 @@ def generate_annual_almanac_events(
 
 
 def prepare_almanac_fields(fields: dict[str, str]) -> dict[str, object]:
-    rows = parse_almanac_snapshot_rows(fields.get("snapshot", ""))
-    selected_code = str(fields.get("body") or "").strip().upper()
-    selected_name = str(fields.get("selected_name") or selected_code).strip()
+    all_rows = parse_almanac_snapshot_rows(fields.get("snapshot", ""))
+    rows = list(all_rows)
+    visibility_text = str(fields.get("visibility") or DEFAULT_ALMANAC_VISIBILITY).strip().lower()
+    if visibility_text not in {"all", "visible"}:
+        visibility_text = DEFAULT_ALMANAC_VISIBILITY
+    if visibility_text == "visible":
+        rows = [row for row in rows if str(row.get("visible") or "").strip().upper() == "YES"]
     date_text = str(fields.get("date") or "").strip()
     time_text = str(fields.get("time") or "").strip()
     zone_text = str(fields.get("zone") or "").strip()
@@ -11961,7 +13219,8 @@ def prepare_almanac_fields(fields: dict[str, str]) -> dict[str, object]:
     except ValueError:
         event_zone = 0.0
     events = parse_almanac_event_rows(fields.get("events", ""))
-    if not events:
+    events_cached = str(fields.get("events_cached") or "").strip().lower() in {"1", "yes", "true"}
+    if not events and not events_cached:
         events = generate_annual_almanac_events(
             event_year_int,
             event_zone,
@@ -11979,30 +13238,35 @@ def prepare_almanac_fields(fields: dict[str, str]) -> dict[str, object]:
         f"Zone: {zone_text}",
         f"Latitude: {latitude_text}",
         f"Longitude: {longitude_text}",
-        f"Selected body: {selected_name} ({selected_code})",
+        f"Body filter: {'visible only' if visibility_text == 'visible' else 'all bodies'}",
         "",
         "Body | Declination | RA | GHA | Altitude | Azimuth | s.d. | Vmag. | Visible",
     ]
-    for row in rows:
-        worksheet_lines.append(
-            " | ".join(
-                [
-                    str(row.get("name") or row.get("code") or "").strip(),
-                    str(row.get("declination") or "").strip(),
-                    str(row.get("right_ascension") or "").strip(),
-                    str(row.get("gha") or "").strip(),
-                    str(row.get("altitude") or "").strip(),
-                    str(row.get("azimuth") or "").strip(),
-                    str(row.get("semi_diameter") or "").strip(),
-                    str(row.get("magnitude") or "").strip(),
-                    str(row.get("visible") or "").strip(),
-                ]
+    if rows:
+        for row in rows:
+            worksheet_lines.append(
+                " | ".join(
+                    [
+                        str(row.get("name") or row.get("code") or "").strip(),
+                        str(row.get("declination") or "").strip(),
+                        str(row.get("right_ascension") or "").strip(),
+                        str(row.get("gha") or "").strip(),
+                        str(row.get("altitude") or "").strip(),
+                        str(row.get("azimuth") or "").strip(),
+                        str(row.get("semi_diameter") or "").strip(),
+                        str(row.get("magnitude") or "").strip(),
+                        str(row.get("visible") or "").strip(),
+                    ]
+                )
             )
+    else:
+        worksheet_lines.append(
+            "No bodies found for the current visibility filter. |  |  |  |  |  |  |  | "
         )
     worksheet_lines.extend([
         "",
         f"Eclipses and inner planetary transits for {event_year}",
-        "Class | Event | Kind | Local Time | Details",
+        "Class | Event | Kind | Local Time | Details | Nearest totality",
     ])
     if events:
         for event in events:
@@ -12014,29 +13278,14 @@ def prepare_almanac_fields(fields: dict[str, str]) -> dict[str, object]:
                         str(event.get("kind") or "").strip(),
                         str(event.get("time") or "").strip(),
                         str(event.get("details") or "").strip(),
+                        str(event.get("nearest_totality") or "").strip(),
                     ]
                 )
             )
     else:
         worksheet_lines.append("No events found.")
 
-    selected_summary = "\n".join(
-        [
-            f"Selected body: {selected_name} ({selected_code})",
-            f"Kind: {str(fields.get('selected_kind') or '').strip()}",
-            f"Declination: {format_almanac_declination(parse_optional_float(fields.get('selected_declination')))}",
-            f"Right ascension: {format_almanac_ra(parse_optional_float(fields.get('selected_right_ascension')))}",
-            f"GHA: {format_almanac_unsigned_angle(parse_optional_float(fields.get('selected_gha')))}",
-            f"Altitude: {format_almanac_signed_angle(parse_optional_float(fields.get('selected_altitude')))}",
-            f"Azimuth: {format_almanac_unsigned_angle(parse_optional_float(fields.get('selected_azimuth')))}",
-            f"s.d.: {format_almanac_semi_diameter(parse_optional_float(fields.get('selected_semi_diameter')))}",
-            f"Visible: {str(fields.get('selected_visible') or '').strip()}",
-            f"Geocentric distance: {str(fields.get('selected_geo_distance') or '').strip()} AU",
-            f"Heliocentric distance: {str(fields.get('selected_helio_distance') or '').strip()} AU",
-            f"Phase angle: {str(fields.get('selected_phase') or '').strip()} deg",
-            f"Visual magnitude: {format_almanac_magnitude(parse_optional_float(fields.get('selected_visual_magnitude')))}",
-        ]
-    )
+    selected_summary = ""
     events_listing = "\n".join(
         [
             f"{str(event.get('time') or '').strip()}  "
@@ -12044,6 +13293,7 @@ def prepare_almanac_fields(fields: dict[str, str]) -> dict[str, object]:
             f"{str(event.get('name') or '').strip()} "
             f"({str(event.get('kind') or '').strip()})"
             + (f"\n  {str(event.get('details') or '').strip()}" if str(event.get("details") or "").strip() else "")
+            + (f"\n  Nearest totality: {str(event.get('nearest_totality') or '').strip()}" if str(event.get("nearest_totality") or "").strip() else "")
             for event in events
         ]
     )
@@ -12051,6 +13301,7 @@ def prepare_almanac_fields(fields: dict[str, str]) -> dict[str, object]:
         [
             f"GHA Aries: {gha_aries} deg",
             f"Jurisdiction: {jurisdiction_text}",
+            f"Body filter: {'visible only' if visibility_text == 'visible' else 'all bodies'}",
             f"Event year: {event_year} ({event_window})",
             "Enter date and time in GMT, then zone, latitude, and longitude.",
             ALMANAC_ACCURACY_NOTE,
@@ -12062,9 +13313,15 @@ def prepare_almanac_fields(fields: dict[str, str]) -> dict[str, object]:
         "worksheet_title": ALMANAC_WORKSHEET_TITLE,
         "moment_text": f"GMT moment: {date_text} {time_text}".strip(),
         "observer_text": f"Observer: {jurisdiction_text}, zone {zone_text}, latitude {latitude_text}, longitude {longitude_text}",
-        "body_text": f"Location of Navigational Bodies for {selected_name} ({selected_code})",
+        "body_text": (
+            "Location of Navigational Bodies; "
+            f"{'visible bodies only' if visibility_text == 'visible' else 'all bodies shown'}"
+        ),
         "event_title": f"Eclipses and inner planetary transits for {event_year}",
-        "selected_code": selected_code,
+        "event_year": event_year,
+        "selected_code": "",
+        "visibility": visibility_text,
+        "all_rows": all_rows,
         "rows": rows,
         "events": events,
         "worksheet": "\n".join(worksheet_lines),
@@ -12243,15 +13500,17 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
             .replace("__DEFAULT_ALMANAC_ZONE__", json.dumps(DEFAULT_ALMANAC_ZONE))
             .replace("__DEFAULT_ALMANAC_LATITUDE__", json.dumps(DEFAULT_ALMANAC_LATITUDE))
             .replace("__DEFAULT_ALMANAC_LONGITUDE__", json.dumps(DEFAULT_ALMANAC_LONGITUDE))
-            .replace("__DEFAULT_ALMANAC_BODY__", json.dumps(DEFAULT_ALMANAC_BODY))
+            .replace("__DEFAULT_ALMANAC_ELEVATION__", json.dumps(DEFAULT_ALMANAC_ELEVATION))
+            .replace("__DEFAULT_ALMANAC_VISIBILITY__", json.dumps(DEFAULT_ALMANAC_VISIBILITY))
+            .replace("__ALMANAC_LAND_TOTALITY_SEARCH_TIMEOUT_MS__", json.dumps((ALMANAC_LAND_TOTALITY_SEARCH_TIMEOUT_SECONDS + 2) * 1000))
             .replace("__ALMANAC_WORKSHEET_TITLE__", json.dumps(ALMANAC_WORKSHEET_TITLE))
             .replace("__ALMANAC_COVERAGE_TEXT_JS__", json.dumps(ALMANAC_COVERAGE_TEXT))
             .replace("__ALMANAC_COVERAGE_TEXT__", html.escape(ALMANAC_COVERAGE_TEXT, quote=False))
             .replace("__ALMANAC_ACCURACY_NOTE_JS__", json.dumps(ALMANAC_ACCURACY_NOTE))
-            .replace("__ALMANAC_ACCURACY_NOTE__", html.escape(ALMANAC_ACCURACY_NOTE, quote=False))
-            .replace("__ALMANAC_BODY_OPTIONS__", ALMANAC_BODY_OPTIONS_HTML)
-            .replace("__HOLIDAY_JURISDICTION_CODES__", json.dumps(sorted(VALID_HOLIDAY_JURISDICTIONS)))
-            .replace("__HOLIDAY_JURISDICTION_OPTIONS__", HOLIDAY_JURISDICTION_OPTIONS_HTML)
+	            .replace("__ALMANAC_ACCURACY_NOTE__", html.escape(ALMANAC_ACCURACY_NOTE, quote=False))
+	            .replace("__HOLIDAY_JURISDICTION_CODES__", json.dumps(sorted(VALID_HOLIDAY_JURISDICTIONS)))
+	            .replace("__JURISDICTION_TOWN_OPTIONS__", json.dumps(JURISDICTION_TOWN_OPTIONS, ensure_ascii=False))
+	            .replace("__HOLIDAY_JURISDICTION_OPTIONS__", HOLIDAY_JURISDICTION_OPTIONS_HTML)
             .replace("__CONTROL_TOKEN__", json.dumps(CONTROL_TOKEN if control_allowed else ""))
         )
         data = page.encode("utf-8")
@@ -12351,7 +13610,8 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                     "almanac_jurisdiction",
                     "almanac_latitude",
                     "almanac_longitude",
-                    "almanac_body",
+                    "almanac_elevation",
+                    "almanac_visibility",
                 ):
                     if key in payload:
                         updates[key] = str(payload.get(key, "")).strip()
@@ -12603,6 +13863,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
             return
 
         if path == "/datetime-eval":
+            request_start = time.perf_counter()
             try:
                 length = int(self.headers.get("Content-Length", "0"))
                 body = self.rfile.read(length)
@@ -12655,10 +13916,49 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                 }
                 if jdn_text:
                     datetime_options["jdn"] = jdn_text
-                fields, raw, returncode = run_datetime_lab_fields(
-                    self.datetime_binary,
-                    datetime_options,
+                response_cache_key = datetime_response_cache_key(
+                    date_text,
+                    jdn_text,
+                    start_text,
+                    end_text,
+                    str(year),
+                    jurisdiction,
+                    str(latitude),
+                    str(longitude),
+                    str(elevation),
+                    gmt_offset_text,
                 )
+                cached_fields = DATETIME_FIELDS_CACHE.get(response_cache_key)
+                if cached_fields is not None:
+                    fields = dict(cached_fields)
+                    raw = ""
+                    returncode = 0
+                    cached_datetime = True
+                    cache_source = "memory"
+                    cache_ms = 0.0
+                    compute_ms = 0.0
+                else:
+                    cache_options = dict(datetime_options)
+                    cache_options["cache_only"] = "1"
+                    cache_start = time.perf_counter()
+                    fields, raw, returncode = run_datetime_lab_fields(
+                        self.datetime_binary,
+                        cache_options,
+                    )
+                    cache_ms = (time.perf_counter() - cache_start) * 1000.0
+                    cached_datetime = returncode == 0
+                    if cached_datetime:
+                        cache_source = "object"
+                        DATETIME_FIELDS_CACHE[response_cache_key] = dict(fields)
+                        compute_ms = 0.0
+                    else:
+                        cache_source = "miss"
+                        compute_start = time.perf_counter()
+                        fields, raw, returncode = run_datetime_lab_fields(
+                            self.datetime_binary,
+                            datetime_options,
+                        )
+                        compute_ms = (time.perf_counter() - compute_start) * 1000.0
             except Exception as exc:
                 self.send_json(422, {"ok": False, "error": str(exc)})
                 return
@@ -12670,52 +13970,80 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
 
                 effective_weather_latitude = latitude
                 effective_weather_longitude = longitude
-                try:
-                    ensure_scratch_binary(self.holiday_binary, "scratch/holiday_lab")
-                    holiday_fields, holiday_raw, holiday_returncode = run_holiday_lab_fields(
-                        self.holiday_binary,
-                        {
-                            "start": start_text,
-                            "end": end_text,
-                            "jurisdiction": jurisdiction,
-                        },
-                    )
-                    if holiday_returncode == 0 and str(holiday_fields.get("holiday_status") or "").strip() == "ok":
-                        fields.update(holiday_fields)
-                    else:
-                        holiday_status = str(holiday_fields.get("holiday_status") or "").strip()
-                        if holiday_returncode == 0 and holiday_status == "unavailable":
-                            fields["holiday_notice"] = (
-                                "No holiday rules are available yet for the selected jurisdiction and date range."
-                            )
-                        else:
-                            fields["holiday_notice"] = holiday_install_hint()
-                        if holiday_returncode == 0:
-                            fields.update(holiday_fields)
-                        self.log_message(
-                            "holiday helper failure jurisdiction=%r returncode=%r raw=%r",
-                            jurisdiction,
-                            holiday_returncode,
-                            str(holiday_raw or "").strip(),
-                        )
+                if not cached_datetime:
+                    holiday_ms = 0.0
                     try:
-                        jurisdiction_latitude = float(str(holiday_fields.get("jurisdiction_latitude") or "").strip())
-                        jurisdiction_longitude = float(str(holiday_fields.get("jurisdiction_longitude") or "").strip())
-                        effective_weather_latitude = jurisdiction_latitude
-                        effective_weather_longitude = jurisdiction_longitude
-                    except (TypeError, ValueError):
-                        pass
-                except Exception as exc:
-                    fields["holiday_notice"] = holiday_install_hint()
-                    self.log_message("holiday helper unavailable jurisdiction=%r error=%r", jurisdiction, exc)
+                        ensure_scratch_binary(self.holiday_binary, "scratch/holiday_lab")
+                        holiday_start = time.perf_counter()
+                        holiday_fields, holiday_raw, holiday_returncode = run_holiday_lab_fields_cached(
+                            self.holiday_binary,
+                            {
+                                "start": start_text,
+                                "end": end_text,
+                                "jurisdiction": jurisdiction,
+                            },
+                        )
+                        holiday_ms = (time.perf_counter() - holiday_start) * 1000.0
+                        if holiday_returncode == 0 and str(holiday_fields.get("holiday_status") or "").strip() == "ok":
+                            fields.update(holiday_fields)
+                        else:
+                            holiday_status = str(holiday_fields.get("holiday_status") or "").strip()
+                            if holiday_returncode == 0 and holiday_status == "unavailable":
+                                fields["holiday_notice"] = (
+                                    "No holiday rules are available yet for the selected jurisdiction and date range."
+                                )
+                            else:
+                                fields["holiday_notice"] = holiday_install_hint()
+                            if holiday_returncode == 0:
+                                fields.update(holiday_fields)
+                            self.log_message(
+                                "holiday helper failure jurisdiction=%r returncode=%r raw=%r",
+                                jurisdiction,
+                                holiday_returncode,
+                                str(holiday_raw or "").strip(),
+                            )
+                    except Exception as exc:
+                        fields["holiday_notice"] = holiday_install_hint()
+                        self.log_message("holiday helper unavailable jurisdiction=%r error=%r", jurisdiction, exc)
+
+                    cache_output = datetime_cache_output_from_fields(fields)
+                    store_ms = 0.0
+                    cache_stored = False
+                    if cache_output:
+                        store_start = time.perf_counter()
+                        cache_stored = store_datetime_lab_cached_output(
+                            self.datetime_binary,
+                            datetime_options,
+                            cache_output,
+                        )
+                        store_ms = (time.perf_counter() - store_start) * 1000.0
+                    self.log_message(
+                        "datetime eval cache miss cache=%.1fms compute=%.1fms holiday=%.1fms store=%.1fms stored=%s",
+                        cache_ms,
+                        compute_ms,
+                        holiday_ms,
+                        store_ms,
+                        "yes" if cache_stored else "no",
+                    )
+                    DATETIME_FIELDS_CACHE[response_cache_key] = dict(fields)
+
+                try:
+                    jurisdiction_latitude = float(str(fields.get("jurisdiction_latitude") or "").strip())
+                    jurisdiction_longitude = float(str(fields.get("jurisdiction_longitude") or "").strip())
+                    effective_weather_latitude = jurisdiction_latitude
+                    effective_weather_longitude = jurisdiction_longitude
+                except (TypeError, ValueError):
+                    pass
 
                 selected_date_text = str(fields.get("date") or date_text).strip()
                 selected_jdn_text = str(fields.get("julian_day_number") or jdn_text).strip()
+                weather_start = time.perf_counter()
                 weather_fields = fetch_daily_weather_with_budget(
                     selected_date_text,
                     effective_weather_latitude,
                     effective_weather_longitude,
                 )
+                weather_ms = (time.perf_counter() - weather_start) * 1000.0
                 if weather_fields:
                     fields.update(weather_fields)
                 save_state_data({
@@ -12730,6 +14058,14 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                     "datetime_elevation": str(elevation),
                     "datetime_gmt_offset": gmt_offset_text,
                 })
+                self.log_message(
+                    "datetime eval cache=%s cache=%.1fms compute=%.1fms weather=%.1fms total=%.1fms",
+                    cache_source,
+                    cache_ms,
+                    compute_ms,
+                    weather_ms,
+                    (time.perf_counter() - request_start) * 1000.0,
+                )
                 self.send_json(200, prepare_datetime_fields(fields))
                 return
             except Exception as exc:
@@ -12758,9 +14094,22 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                 self.send_json(400, {"ok": False, "error": f"Bad request: {exc}"})
                 return
 
+            resident_result = jurisdiction_default_location_for_date(jurisdiction, date_text)
+            if resident_result is not None:
+                zone_text, latitude_text, longitude_text = resident_result
+                self.send_json(200, {
+                    "ok": True,
+                    "jurisdiction": jurisdiction,
+                    "latitude": latitude_text,
+                    "longitude": longitude_text,
+                    "gmt_offset": zone_text,
+                    "source": "resident",
+                })
+                return
+
             try:
                 ensure_scratch_binary(self.holiday_binary, "scratch/holiday_lab")
-                holiday_fields, holiday_raw, holiday_returncode = run_holiday_lab_fields(
+                holiday_fields, holiday_raw, holiday_returncode = run_holiday_lab_fields_cached(
                     self.holiday_binary,
                     {
                         "date": date_text,
@@ -12787,10 +14136,126 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                 "latitude": str(holiday_fields.get("jurisdiction_latitude") or "").strip(),
                 "longitude": str(holiday_fields.get("jurisdiction_longitude") or "").strip(),
                 "gmt_offset": str(holiday_fields.get("jurisdiction_gmt_offset") or "").strip(),
+                "source": "holiday_lab",
             })
             return
 
+        if path == "/almanac-land-totality":
+            request_start = time.perf_counter()
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                body = self.rfile.read(length)
+                payload = json.loads(body.decode("utf-8"))
+                event_year = int(str(payload.get("event_year", DEFAULT_ALMANAC_DATE[:4])).strip())
+                jurisdiction = normalize_holiday_jurisdiction(
+                    str(payload.get("jurisdiction", DEFAULT_HOLIDAY_JURISDICTION)).strip()
+                )
+                zone_text = str(payload.get("zone", DEFAULT_ALMANAC_ZONE)).strip()
+                latitude_text = str(payload.get("latitude", DEFAULT_ALMANAC_LATITUDE)).strip()
+                longitude_text = str(payload.get("longitude", DEFAULT_ALMANAC_LONGITUDE)).strip()
+                requested_events = payload.get("events", [])
+                zone = float(zone_text)
+                latitude = float(latitude_text)
+                longitude = float(longitude_text)
+                if event_year < 1 or event_year > 9998:
+                    raise ValueError("Event year is outside the supported range")
+                if zone < -14.0 or zone > 14.0:
+                    raise ValueError("Zone must be between -14 and 14")
+                if latitude < -90.0 or latitude > 90.0:
+                    raise ValueError("Latitude must be between -90 and 90")
+                if longitude < -180.0 or longitude > 180.0:
+                    raise ValueError("Longitude must be between -180 and 180")
+            except Exception as exc:
+                self.send_json(400, {"ok": False, "error": f"Bad request: {exc}"})
+                return
+
+            solar_rows = []
+            if isinstance(requested_events, list):
+                for event in requested_events:
+                    if isinstance(event, dict):
+                        jd_text = str(event.get("jd") or "").strip()
+                    else:
+                        jd_text = str(event or "").strip()
+                    if not jd_text:
+                        continue
+                    try:
+                        float(jd_text)
+                    except ValueError:
+                        continue
+                    solar_rows.append({"jd": jd_text})
+            if not solar_rows:
+                try:
+                    ensure_scratch_binary(DEFAULT_ALMANAC_EVENT_BIN, "scratch/almanac_event_lab")
+                    solar_rows = [
+                        row for row in run_almanac_event_lab_rows({
+                            "start": f"{event_year:04d}-01-01",
+                            "end": f"{event_year + 1:04d}-01-01",
+                            "lat": latitude_text,
+                            "lon": longitude_text,
+                        })
+                        if str(row.get("category") or "").strip() == "Solar"
+                    ]
+                except Exception as exc:
+                    self.send_json(422, {"ok": False, "error": str(exc)})
+                    return
+
+            items = []
+            timed_out = False
+            for solar_row in solar_rows:
+                try:
+                    jd = float(str(solar_row.get("jd") or "").strip())
+                except ValueError:
+                    continue
+                epoch = py_datetime.datetime(1970, 1, 1, tzinfo=py_datetime.timezone.utc)
+                centre = epoch + py_datetime.timedelta(days=jd - 2440587.5)
+                start_text = (centre - py_datetime.timedelta(days=1)).strftime("%Y-%m-%d")
+                end_text = (centre + py_datetime.timedelta(days=1)).strftime("%Y-%m-%d")
+                try:
+                    land_rows = run_almanac_event_lab_rows({
+                        "start": start_text,
+                        "end": end_text,
+                        "lat": latitude_text,
+                        "lon": longitude_text,
+                        "totality": "land",
+                    }, timeout_seconds=ALMANAC_LAND_TOTALITY_SEARCH_TIMEOUT_SECONDS)
+                except subprocess.TimeoutExpired:
+                    timed_out = True
+                    self.log_message(
+                        "almanac land totality timed out jd=%s timeout=%ss",
+                        str(solar_row.get("jd") or "").strip(),
+                        ALMANAC_LAND_TOTALITY_SEARCH_TIMEOUT_SECONDS,
+                    )
+                    continue
+                except Exception:
+                    continue
+                for row in land_rows:
+                    if str(row.get("category") or "").strip() != "Solar":
+                        continue
+                    totality_text = format_almanac_totality_location(
+                        str(row.get("nearest_totality") or ""),
+                        zone,
+                        jurisdiction,
+                    )
+                    if not totality_text:
+                        continue
+                    items.append({
+                        "jd": str(solar_row.get("jd") or "").strip(),
+                        "nearest_totality": totality_text,
+                    })
+                    break
+            self.log_message(
+                "almanac land totality year=%s solar_events=%d items=%d timed_out=%s total=%.1fms",
+                event_year,
+                len(solar_rows),
+                len(items),
+                "yes" if timed_out else "no",
+                (time.perf_counter() - request_start) * 1000.0,
+            )
+            self.send_json(200, {"ok": True, "items": items, "timed_out": timed_out})
+            return
+
         if path == "/almanac-eval":
+            request_start = time.perf_counter()
             try:
                 length = int(self.headers.get("Content-Length", "0"))
                 body = self.rfile.read(length)
@@ -12801,7 +14266,8 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                 jurisdiction_text = str(payload.get("jurisdiction", DEFAULT_HOLIDAY_JURISDICTION)).strip()
                 latitude_text = str(payload.get("latitude", DEFAULT_ALMANAC_LATITUDE)).strip()
                 longitude_text = str(payload.get("longitude", DEFAULT_ALMANAC_LONGITUDE)).strip()
-                body_text = str(payload.get("body", DEFAULT_ALMANAC_BODY)).strip().upper()
+                body_text = DEFAULT_ALMANAC_BODY
+                visibility_text = str(payload.get("visibility", DEFAULT_ALMANAC_VISIBILITY)).strip().lower()
                 py_datetime.date.fromisoformat(date_text)
                 if not re.fullmatch(r"\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?", time_text):
                     raise ValueError("Time must look like HH:MM or HH:MM:SS")
@@ -12815,39 +14281,119 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                     raise ValueError("Latitude must be between -90 and 90")
                 if longitude < -180.0 or longitude > 180.0:
                     raise ValueError("Longitude must be between -180 and 180")
-                if body_text not in {code for code, _ in ALMANAC_BODY_OPTIONS}:
-                    raise ValueError("Unknown almanac body")
+                if visibility_text not in {"all", "visible"}:
+                    raise ValueError("Show bodies must be all or visible")
+                location_ms = 0.0
+                zone = float(zone_text)
+                latitude = float(latitude_text)
+                longitude = float(longitude_text)
+                if zone < -14.0 or zone > 14.0:
+                    raise ValueError("Zone must be between -14 and 14")
+                if latitude < -90.0 or latitude > 90.0:
+                    raise ValueError("Latitude must be between -90 and 90")
+                if longitude < -180.0 or longitude > 180.0:
+                    raise ValueError("Longitude must be between -180 and 180")
             except Exception as exc:
                 self.send_json(400, {"ok": False, "error": f"Bad request: {exc}"})
                 return
 
+            response_cache_key = almanac_response_cache_key(
+                date_text,
+                time_text,
+                zone_text,
+                jurisdiction,
+                latitude_text,
+                longitude_text,
+                body_text,
+                visibility_text,
+            )
+            cached_response = ALMANAC_RESPONSE_CACHE.get(response_cache_key)
+            if cached_response is not None:
+                save_state_data({
+                    "almanac_date": date_text,
+                    "almanac_time": time_text,
+                    "almanac_zone": zone_text,
+                    "almanac_jurisdiction": jurisdiction,
+                    "almanac_latitude": latitude_text,
+                    "almanac_longitude": longitude_text,
+                    "almanac_visibility": visibility_text,
+                })
+                self.log_message(
+                    "almanac eval response cache hit location=%.1fms total=%.1fms",
+                    location_ms,
+                    (time.perf_counter() - request_start) * 1000.0,
+                )
+                self.send_json(200, cached_response)
+                return
+
             try:
-                try:
-                    ensure_scratch_binary(self.holiday_binary, "scratch/holiday_lab")
-                    holiday_fields, _, holiday_returncode = run_holiday_lab_fields(
-                        self.holiday_binary,
-                        {
-                            "date": date_text,
-                            "start": date_text,
-                            "end": date_text,
-                            "jurisdiction": jurisdiction,
-                        },
+                ensure_scratch_binary(self.almanac_binary, "scratch/almanac_lab")
+                cache_start = time.perf_counter()
+                fields, raw, returncode = run_almanac_lab_fields(
+                    self.almanac_binary,
+                    {
+                        "date": date_text,
+                        "time": time_text,
+                        "zone": zone_text,
+                        "lat": latitude_text,
+                        "lon": longitude_text,
+                        "body": body_text,
+                        "cache_only": "1",
+                    },
+                )
+                cache_ms = (time.perf_counter() - cache_start) * 1000.0
+                if returncode == 0:
+                    save_state_data({
+                        "almanac_date": date_text,
+                        "almanac_time": time_text,
+                        "almanac_zone": zone_text,
+                        "almanac_jurisdiction": jurisdiction,
+                        "almanac_latitude": latitude_text,
+                        "almanac_longitude": longitude_text,
+                        "almanac_visibility": visibility_text,
+                    })
+                    fields["jurisdiction"] = jurisdiction
+                    fields["visibility"] = visibility_text
+                    prepare_start = time.perf_counter()
+                    response_payload = prepare_almanac_fields(fields)
+                    prepare_ms = (time.perf_counter() - prepare_start) * 1000.0
+                    enrich_ms = 0.0
+                    enrich_stored = True
+                    if not str(fields.get("events_cached") or "").strip():
+                        enrich_start = time.perf_counter()
+                        enrich_stored = store_almanac_lab_cached_output(
+                            self.almanac_binary,
+                            {
+                                "date": date_text,
+                                "time": time_text,
+                                "zone": zone_text,
+                                "lat": latitude_text,
+                                "lon": longitude_text,
+                                "body": body_text,
+                            },
+                            almanac_output_with_events(raw, fields, response_payload),
+                        )
+                        enrich_ms = (time.perf_counter() - enrich_start) * 1000.0
+                    self.log_message(
+                        "almanac eval cache hit location=%.1fms cache=%.1fms prepare=%.1fms enrich=%.1fms total=%.1fms events_cached=%s enrich_stored=%s",
+                        location_ms,
+                        cache_ms,
+                        prepare_ms,
+                        enrich_ms,
+                        (time.perf_counter() - request_start) * 1000.0,
+                        str(fields.get("events_cached") or "").strip() or "no",
+                        "yes" if enrich_stored else "no",
                     )
-                    if holiday_returncode == 0 and str(holiday_fields.get("jurisdiction_status") or "").strip() == "ok":
-                        jurisdiction_latitude = str(holiday_fields.get("jurisdiction_latitude") or "").strip()
-                        jurisdiction_longitude = str(holiday_fields.get("jurisdiction_longitude") or "").strip()
-                        jurisdiction_offset = str(holiday_fields.get("jurisdiction_gmt_offset") or "").strip()
-                        if jurisdiction_latitude:
-                            latitude_text = jurisdiction_latitude
-                        if jurisdiction_longitude:
-                            longitude_text = jurisdiction_longitude
-                        if jurisdiction_offset:
-                            zone_text = jurisdiction_offset
-                except Exception as exc:
-                    self.log_message("almanac jurisdiction helper unavailable jurisdiction=%r error=%r", jurisdiction, exc)
+                    ALMANAC_RESPONSE_CACHE[response_cache_key] = response_payload
+                    self.send_json(200, response_payload)
+                    return
+                if returncode != 3:
+                    self.send_json(422, {"ok": False, "error": raw or "Almanac cache lookup failed"})
+                    return
 
                 ensure_scratch_binary(DEFAULT_ALMANAC_EVENT_BIN, "scratch/almanac_event_lab")
                 ensure_scratch_binary(self.almanac_binary, "scratch/almanac_lab")
+                compute_start = time.perf_counter()
                 fields, raw, returncode = run_almanac_lab_fields(
                     self.almanac_binary,
                     {
@@ -12859,6 +14405,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                         "body": body_text,
                     },
                 )
+                compute_ms = (time.perf_counter() - compute_start) * 1000.0
             except Exception as exc:
                 self.send_json(422, {"ok": False, "error": str(exc)})
                 return
@@ -12874,10 +14421,50 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                 "almanac_jurisdiction": jurisdiction,
                 "almanac_latitude": latitude_text,
                 "almanac_longitude": longitude_text,
-                "almanac_body": body_text,
+                "almanac_visibility": visibility_text,
             })
             fields["jurisdiction"] = jurisdiction
-            self.send_json(200, prepare_almanac_fields(fields))
+            fields["visibility"] = visibility_text
+            prepare_start = time.perf_counter()
+            response_payload = prepare_almanac_fields(fields)
+            prepare_ms = (time.perf_counter() - prepare_start) * 1000.0
+            enrich_start = time.perf_counter()
+            enrich_stored = store_almanac_lab_cached_output(
+                self.almanac_binary,
+                {
+                    "date": date_text,
+                    "time": time_text,
+                    "zone": zone_text,
+                    "lat": latitude_text,
+                    "lon": longitude_text,
+                    "body": body_text,
+                },
+                almanac_output_with_events(raw, fields, response_payload),
+            )
+            enrich_ms = (time.perf_counter() - enrich_start) * 1000.0
+            self.log_message(
+                "almanac eval cache miss location=%.1fms cache=%.1fms compute=%.1fms prepare=%.1fms enrich=%.1fms total=%.1fms enrich_stored=%s",
+                location_ms,
+                cache_ms,
+                compute_ms,
+                prepare_ms,
+                enrich_ms,
+                (time.perf_counter() - request_start) * 1000.0,
+                "yes" if enrich_stored else "no",
+            )
+            ALMANAC_RESPONSE_CACHE[
+                almanac_response_cache_key(
+                    str(fields.get("date") or date_text).strip(),
+                    str(fields.get("time") or time_text).strip(),
+                    str(fields.get("zone") or zone_text).strip(),
+                    jurisdiction,
+                    str(fields.get("latitude") or latitude_text).strip(),
+                    str(fields.get("longitude") or longitude_text).strip(),
+                    body_text,
+                    visibility_text,
+                )
+            ] = response_payload
+            self.send_json(200, response_payload)
             return
 
         if path == "/goal_seek":

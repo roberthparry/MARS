@@ -9,7 +9,6 @@ import argparse
 import getpass
 import os
 from pathlib import Path
-import shutil
 import shlex
 import stat
 import subprocess
@@ -134,22 +133,16 @@ class Spinner:
             index += 1
 
 
-def recreate_mars_home() -> None:
+def prepare_private_storage(db_path: Path) -> None:
     home = mars_home()
-    weather_backup: bytes | None = None
 
-    try:
-        weather_backup = weather_config_path().read_bytes()
-    except OSError:
-        weather_backup = None
-
-    if home.exists():
-        shutil.rmtree(home)
     ensure_private_dir(home)
-    if weather_backup is not None:
-        ensure_private_dir(weather_config_path().parent)
-        weather_config_path().write_bytes(weather_backup)
-        weather_config_path().chmod(stat.S_IRUSR | stat.S_IWUSR)
+    ensure_private_dir(config_path().parent)
+    ensure_private_dir(db_path.parent)
+    try:
+        db_path.unlink()
+    except FileNotFoundError:
+        pass
 
 
 def write_config(path: Path, db_path: str, db_key: str) -> None:
@@ -172,8 +165,7 @@ def sql_quote(value: str) -> str:
 
 def build_jurisdiction_database(db_path: Path, db_key: str) -> None:
     with Spinner("Preparing private MARS storage"):
-        recreate_mars_home()
-        ensure_private_dir(db_path.parent)
+        prepare_private_storage(db_path)
 
     script = "\n".join(
         [

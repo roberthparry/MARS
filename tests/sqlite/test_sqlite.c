@@ -186,15 +186,15 @@ static void example_sqlite_readme_prepared_statement_query(void)
     ASSERT_NOT_NULL(db);
 
     TEST_ASSERT_TRUE(sqlite_exec_cstr(db,
-                                      "CREATE TABLE IF NOT EXISTS city ("
-                                      "  name TEXT NOT NULL,"
-                                      "  population INTEGER NOT NULL"
+                                      "create table if not exists city ("
+                                      "  name text not null,"
+                                      "  population integer not null"
                                       ");"),
                      "city table creates");
-    TEST_ASSERT_TRUE(sqlite_exec_cstr(db, "DELETE FROM city;"),
+    TEST_ASSERT_TRUE(sqlite_exec_cstr(db, "delete from city;"),
                      "city table clears");
     TEST_ASSERT_TRUE(sqlite_exec_cstr(db,
-                                      "INSERT INTO city(name, population) VALUES "
+                                      "insert into city(name, population) values "
                                       "('Liverpool', 486100),"
                                       "('Leeds', 536280),"
                                       "('Manchester', 395500),"
@@ -202,9 +202,9 @@ static void example_sqlite_readme_prepared_statement_query(void)
                      "city rows insert");
 
     stmt = sqlite_stmt_prepare(db,
-                               "SELECT name, population FROM city "
-                               "WHERE population >= ?1 "
-                               "ORDER BY population DESC;");
+                               "select name, population from city "
+                               "where population >= ?1 "
+                               "order by population desc;");
     ASSERT_NOT_NULL(stmt);
     TEST_ASSERT_TRUE(sqlite_stmt_bind_int(stmt, 1, 350000),
                      "population threshold binds");

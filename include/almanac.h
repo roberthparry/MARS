@@ -305,6 +305,20 @@ typedef struct _almanac_solar_eclipse_t {
 } almanac_solar_eclipse_t;
 
 /**
+ * @brief Nearest known observing point for solar totality.
+ */
+typedef struct _almanac_solar_totality_location_t {
+    bool found;
+    almanac_event_time_t greatest_eclipse_time;
+    double greatest_eclipse_jd;
+    double latitude_degrees;
+    double longitude_degrees;
+    double distance_km;
+    double magnitude;
+    double totality_percent;
+} almanac_solar_totality_location_t;
+
+/**
  * @brief Broad lunar eclipse classification.
  */
 typedef enum _almanac_lunar_eclipse_kind_t {
@@ -541,6 +555,42 @@ array_t *almanac_find_solar_eclipses(almanac_t *almanac,
                                      const almanac_observer_t *observer,
                                      const datetime_t *start,
                                      const datetime_t *end);
+
+/**
+ * @brief Find the nearest place where a solar eclipse is total.
+ *
+ * The search is intended for UI guidance around a local partial eclipse. It
+ * returns the nearest point found on Earth where the same eclipse is total,
+ * together with the local greatest-eclipse instant for that point.
+ *
+ * @param almanac open almanac engine.
+ * @param observer original observer location.
+ * @param eclipse local solar eclipse event to use as the search seed.
+ * @param out output location to fill.
+ * @return @c true when the search ran, otherwise @c false.
+ */
+bool almanac_nearest_solar_totality(almanac_t *almanac,
+                                    const almanac_observer_t *observer,
+                                    const almanac_solar_eclipse_t *eclipse,
+                                    almanac_solar_totality_location_t *out);
+
+/**
+ * @brief Find the nearest land location where a solar eclipse is total.
+ *
+ * This is a UI-oriented companion to @c almanac_nearest_solar_totality().
+ * It searches probable land regions and returns the nearest land point found
+ * where the same eclipse is total.
+ *
+ * @param almanac open almanac engine.
+ * @param observer original observer location.
+ * @param eclipse local solar eclipse event to use as the search seed.
+ * @param out output location to fill.
+ * @return @c true when the search ran, otherwise @c false.
+ */
+bool almanac_nearest_solar_totality_land(almanac_t *almanac,
+                                         const almanac_observer_t *observer,
+                                         const almanac_solar_eclipse_t *eclipse,
+                                         almanac_solar_totality_location_t *out);
 
 /**
  * @brief Find lunar eclipses within a civil time window.

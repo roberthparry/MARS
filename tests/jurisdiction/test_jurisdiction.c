@@ -753,7 +753,7 @@ static bool holiday_suite_setup(void)
     fprintf(stderr,
             "Holiday tests require the configured jurisdiction rule source.\n"
             "Install the jurisdiction database first, for example with `make install-jurisdiction-db`.\n"
-            "If you also want the desktop app, use `make install-mars-lab`.\n");
+            "if you also want the desktop app, use `make install-mars-lab`.\n");
     return false;
 }
 

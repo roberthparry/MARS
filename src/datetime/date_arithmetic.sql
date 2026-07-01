@@ -1,9 +1,9 @@
 
 /****** Object:  UserDefinedFunction [dbo].[f_EasterSunday]    Script Date: 18/02/2026 15:12:05 ******/
-SET ANSI_NULLS ON
+set ANSI_NULLS on
 GO
 
-SET QUOTED_IDENTIFIER ON
+set QUOTED_IDENTIFIER on
 GO
 
 
@@ -11,10 +11,10 @@ GO
     Returns the date of Easter Sunday for the given year number.
     Easter Sunday is the first Sunday after the full moon date that falls on or after 21st March.
  */
-CREATE FUNCTION [dbo].[f_EasterSunday] (@YearNo INT)
-RETURNS DATE
-AS
-BEGIN
+create function [dbo].[f_EasterSunday] (@YearNo int)
+returns date
+as
+begin
     declare @a int = @YearNo % 19
     declare @b int = @YearNo / 100
     declare @c int = @YearNo % 100
@@ -32,17 +32,17 @@ BEGIN
     declare @day int = (@n % 31) + 1
 
     return datefromparts(@YearNo, @month, @day)
-END
+end
 GO
 
-CREATE FUNCTION [dbo].[ft_SunriseAndSetTimes](@Date DATE)
-RETURNS @SUNRISEANDSETTIMES TABLE (
+create function [dbo].[ft_SunriseAndSetTimes](@date date)
+returns @SUNRISEANDSETTIMES table (
     Sunrise TIME,
     Sunset  TIME
 )
-AS
-BEGIN
-    if @Date is null return
+as
+begin
+    if @date is null return
 
     declare @hours_past_local_midnight float = 0.5
     declare @latitude float = 52.7073
@@ -87,7 +87,7 @@ BEGIN
             dateadd(hour, datepart(hour, @sunset), cast('00:00' as time(4))))
 
     return
-END
+end
 GO
 
 /*
@@ -116,10 +116,10 @@ GO
                 (datetimefromparts(2024, 10, 27, 3, 0, 0, 0))
         ) as Tests(datetimeval)
  */
-CREATE FUNCTION [dbo].[f_DatetimeToGMT] (@date DATETIME)
-RETURNS DATETIME
-AS
-BEGIN
+create function [dbo].[f_DatetimeToGMT] (@date datetime)
+returns datetime
+as
+begin
     declare @DatetimeGMT datetime
 
     select
@@ -136,7 +136,7 @@ BEGIN
     ) as DST
 
     return @DatetimeGMT
-END
+end
 GO
 
 
@@ -154,12 +154,12 @@ GO
  | 2023   | 2023-01-02  | 2023-04-07 | 2023-04-10   | 2023-05-01        | 2023-05-29        | 2023-08-28        | 2023-12-25          | 2023-12-26       | 2023-05-08         |                     |
  ____________________________________________________________________________________________________________________________________________________________________________________________________
  */
-CREATE FUNCTION [dbo].[ft_BankHolidays](
-    @StartYear AS SMALLINT,
-    @CountYears AS SMALLINT
+create function [dbo].[ft_BankHolidays](
+    @StartYear as SMALLINT,
+    @CountYears as SMALLINT
 )
-RETURNS TABLE
-AS RETURN (
+returns table
+as return (
     select
         yr.Number as YearNo,
         newyear.[Date] as NewYearsDay,
