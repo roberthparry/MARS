@@ -1287,6 +1287,43 @@ INDEX_HTML = r"""<!doctype html>
       grid-template-columns: repeat(2, minmax(9rem, 1fr));
     }
 
+    .datetime-grid.selected-date-grid {
+      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) minmax(7rem, 0.42fr);
+    }
+
+    .selected-date-grid .selected-date-field {
+      display: contents;
+    }
+
+    .selected-date-grid .selected-date-field > label {
+      grid-column: 1;
+      grid-row: 1;
+    }
+
+    .selected-date-grid .selected-date-field > .mars-date-shell {
+      display: contents;
+    }
+
+    .selected-date-grid .selected-date-field input {
+      grid-column: 1;
+      grid-row: 2;
+    }
+
+    .selected-date-grid .selected-date-field .mars-date-button {
+      grid-column: 2;
+      grid-row: 2;
+    }
+
+    .selected-date-grid .selected-jdn-field {
+      grid-column: 3;
+      grid-row: 1 / span 2;
+    }
+
+    .selected-date-grid .selected-year-field {
+      grid-column: 4;
+      grid-row: 1 / span 2;
+    }
+
     .datetime-grid.location-grid {
       grid-template-columns: repeat(2, minmax(10rem, 1fr));
     }
@@ -2868,6 +2905,27 @@ INDEX_HTML = r"""<!doctype html>
         grid-template-columns: 1fr;
       }
 
+      .datetime-grid.selected-date-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .selected-date-grid .selected-date-field {
+        display: grid;
+      }
+
+      .selected-date-grid .selected-date-field > .mars-date-shell {
+        display: grid;
+      }
+
+      .selected-date-grid .selected-date-field > label,
+      .selected-date-grid .selected-date-field input,
+      .selected-date-grid .selected-date-field .mars-date-button,
+      .selected-date-grid .selected-jdn-field,
+      .selected-date-grid .selected-year-field {
+        grid-column: auto;
+        grid-row: auto;
+      }
+
       .datetime-grid.location-grid,
       .location-coordinate-grid {
         grid-template-columns: 1fr;
@@ -3210,19 +3268,19 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           </div>
           <div class="datetime-field-group">
             <div class="datetime-field-group-title">Selected date</div>
-            <div class="datetime-grid">
-              <div class="integrator-bound-field">
+            <div class="datetime-grid selected-date-grid">
+              <div class="integrator-bound-field selected-date-field">
                 <label for="datetimeDate">Date</label>
                 <div class="mars-date-shell">
                   <input id="datetimeDate" type="text" inputmode="numeric" placeholder="YYYY-MM-DD" autocomplete="off">
                   <button class="mars-date-button" type="button" data-date-target="datetimeDate" aria-label="Open date picker for selected date"></button>
                 </div>
               </div>
-              <div class="integrator-bound-field">
+              <div class="integrator-bound-field selected-jdn-field">
                 <label for="datetimeJdn">Julian Day Number</label>
                 <input id="datetimeJdn" inputmode="numeric" pattern="[0-9]*" placeholder="e.g. 2460117">
               </div>
-              <div class="integrator-bound-field">
+              <div class="integrator-bound-field selected-year-field">
                 <label for="datetimeYear">Calendar year</label>
                 <input id="datetimeYear" type="number" min="1" max="9999" step="1">
               </div>
@@ -4626,10 +4684,42 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       marsDatePickerState.shell = null;
     }
 
+    function marsDatePickerAnchorRect(shell) {
+      if (!shell)
+        return null;
+      const rect = shell.getBoundingClientRect();
+      if (rect.width > 1 && rect.height > 1)
+        return rect;
+
+      const input = shell.querySelector('input');
+      const button = shell.querySelector('[data-date-target]');
+      const boxes = [input, button]
+        .filter(Boolean)
+        .map((node) => node.getBoundingClientRect())
+        .filter((box) => box.width > 1 && box.height > 1);
+      if (!boxes.length)
+        return null;
+
+      const left = Math.min(...boxes.map((box) => box.left));
+      const right = Math.max(...boxes.map((box) => box.right));
+      const top = Math.min(...boxes.map((box) => box.top));
+      const bottom = Math.max(...boxes.map((box) => box.bottom));
+      return {
+        left,
+        right,
+        top,
+        bottom,
+        width: right - left,
+        height: bottom - top
+      };
+    }
+
     function placeMarsDatePicker(shell) {
       if (!marsDatePicker || !shell)
         return;
-      const rect = shell.getBoundingClientRect();
+      const rect = marsDatePickerAnchorRect(shell);
+      if (!rect)
+        return;
       const width = rect.width;
       const margin = 12;
       const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
