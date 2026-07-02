@@ -620,7 +620,7 @@ DEFAULT_ALMANAC_LONGITUDE = DEFAULT_TIMEZONE_LONGITUDE
 DEFAULT_ALMANAC_ELEVATION = "0"
 DEFAULT_ALMANAC_BODY = "MOON"
 DEFAULT_ALMANAC_VISIBILITY = "all"
-ALMANAC_LAND_TOTALITY_SEARCH_TIMEOUT_SECONDS = 8
+ALMANAC_LAND_TOTALITY_SEARCH_TIMEOUT_SECONDS = 12
 MIN_INTEGRATOR_INTERVAL_CAP = 500
 MAX_INTEGRATOR_INTERVAL_CAP = 100000
 INTEGRATOR_INTERVAL_CAP_CHOICES = (500, 5000, 20000, 50000, 100000)
@@ -1487,6 +1487,45 @@ INDEX_HTML = r"""<!doctype html>
       white-space: nowrap;
     }
 
+    .almanac-event-table {
+      table-layout: fixed;
+    }
+
+    .almanac-event-table th,
+    .almanac-event-table td {
+      padding: 0.5rem 0.42rem;
+    }
+
+    .almanac-event-table .event-class {
+      width: 3.8rem;
+    }
+
+    .almanac-event-table .event-name {
+      width: 5.3rem;
+    }
+
+    .almanac-event-table .event-kind {
+      width: 4.1rem;
+    }
+
+    .almanac-event-table .event-measure {
+      width: 4.2rem;
+    }
+
+    .almanac-event-table .event-time {
+      width: 5.7rem;
+      white-space: nowrap;
+    }
+
+    .almanac-event-table .event-gmt {
+      width: 5.7rem;
+      white-space: nowrap;
+    }
+
+    .almanac-event-table .event-totality {
+      min-width: 8rem;
+    }
+
     .almanac-events-title {
       margin: 0.3rem 0 -0.15rem;
       color: #f0c873;
@@ -1494,6 +1533,13 @@ INDEX_HTML = r"""<!doctype html>
       font-weight: 700;
       letter-spacing: 0.08em;
       text-transform: uppercase;
+    }
+
+    .almanac-event-note {
+      margin: -0.15rem 0 0.1rem;
+      color: rgba(233, 244, 239, 0.72);
+      font-size: 0.78rem;
+      line-height: 1.45;
     }
 
     .almanac-grid-table td.event-details {
@@ -2095,6 +2141,27 @@ INDEX_HTML = r"""<!doctype html>
     .select-option.selected {
       color: #10190f;
       background: linear-gradient(135deg, rgba(233, 187, 90, 0.96), rgba(140, 216, 184, 0.94));
+    }
+
+    .select-option.two-column {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 16.5ch;
+      gap: 1rem;
+      align-items: center;
+    }
+
+    .select-option-detail {
+      color: rgba(215, 231, 183, 0.74);
+      font-size: 0.78em;
+      letter-spacing: 0.02em;
+      font-variant-numeric: tabular-nums;
+      justify-self: end;
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .select-option.selected .select-option-detail {
+      color: rgba(16, 25, 15, 0.78);
     }
 
     .select-option.hidden {
@@ -3608,6 +3675,24 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     const mobileUrl = document.getElementById('mobileUrl');
     const mobileQr = document.getElementById('mobileQr');
     const controlToken = __CONTROL_TOKEN__;
+    function formatTownCoordinate(value, width) {
+      const number = Number(value);
+      if (!Number.isFinite(number))
+        return String(value || '').trim();
+      const sign = number >= 0 ? '+' : '-';
+      const magnitude = Math.abs(number).toFixed(4).padStart(width - 1, '0');
+      return `${sign}${magnitude}`;
+    }
+
+    function townOptionDisplay(option) {
+      const lat = String(option && option.dataset.latitude || '').trim();
+      const lon = String(option && option.dataset.longitude || '').trim();
+      return {
+        label: option ? option.textContent : '',
+        detail: lat && lon ? `${formatTownCoordinate(lat, 8)}  ${formatTownCoordinate(lon, 9)}` : ''
+      };
+    }
+
     enhanceRoundedSelect(matrixOperation);
     enhanceRoundedSelect(datetimeJurisdiction, {
       searchable: true,
@@ -3617,7 +3702,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     enhanceRoundedSelect(datetimeTown, {
       searchable: true,
       searchPlaceholder: 'Search towns',
-      emptyText: 'No towns for this jurisdiction'
+      emptyText: 'No towns for this jurisdiction',
+      renderOption: townOptionDisplay
     });
     enhanceRoundedSelect(almanacJurisdiction, {
       searchable: true,
@@ -3627,7 +3713,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     enhanceRoundedSelect(almanacTown, {
       searchable: true,
       searchPlaceholder: 'Search towns',
-      emptyText: 'No towns for this jurisdiction'
+      emptyText: 'No towns for this jurisdiction',
+      renderOption: townOptionDisplay
     });
     let datetimeLocalRefreshSequence = 0;
     let datetimeEvaluationSequence = 0;
@@ -4235,6 +4322,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       const searchInput = searchable ? document.createElement('input') : null;
       const optionsWrap = document.createElement('div');
       const emptyState = document.createElement('div');
+      const optionRenderer = options && typeof options.renderOption === 'function' ? options.renderOption : null;
 
       shell.className = 'select-shell';
       button.type = 'button';
@@ -4274,15 +4362,41 @@ __HOLIDAY_JURISDICTION_OPTIONS__
 
       let optionButtons = [];
 
+      function optionParts(option) {
+        if (!optionRenderer)
+          return null;
+        return optionRenderer(option) || null;
+      }
+
+      function renderOptionContent(target, parts, classPrefix) {
+        target.textContent = '';
+        if (!parts || !parts.detail) {
+          target.textContent = parts && parts.label ? parts.label : '';
+          return;
+        }
+        const labelSpan = document.createElement('span');
+        const detailSpan = document.createElement('span');
+        labelSpan.className = `${classPrefix}-label`;
+        detailSpan.className = `${classPrefix}-detail`;
+        labelSpan.textContent = parts.label || '';
+        detailSpan.textContent = parts.detail || '';
+        target.appendChild(labelSpan);
+        target.appendChild(detailSpan);
+      }
+
       function rebuildOptionButtons() {
         optionsWrap.textContent = '';
         optionButtons = Array.from(select.options).map((option) => {
+          const parts = optionParts(option);
           const item = document.createElement('button');
           item.type = 'button';
-          item.className = 'select-option';
+          item.className = parts && parts.detail ? 'select-option two-column' : 'select-option';
           item.setAttribute('role', 'option');
           item.dataset.value = option.value;
-          item.textContent = option.textContent;
+          item.dataset.searchText = [option.textContent, option.dataset.latitude, option.dataset.longitude, parts && parts.detail]
+            .filter(Boolean)
+            .join(' ');
+          renderOptionContent(item, parts || {label: option.textContent}, 'select-option');
           item.addEventListener('click', () => {
             const changed = select.value !== option.value;
             select.value = option.value;
@@ -4312,7 +4426,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         let visibleCount = 0;
 
         optionButtons.forEach((item) => {
-          const haystack = `${item.textContent || ''} ${item.dataset.value || ''}`.toLowerCase();
+          const haystack = `${item.dataset.searchText || item.textContent || ''} ${item.dataset.value || ''}`.toLowerCase();
           const visible = !query || haystack.includes(query);
           item.classList.toggle('hidden', !visible);
           if (visible)
@@ -4323,7 +4437,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
 
       function sync() {
         const selected = selectedOption();
-        button.textContent = selected ? selected.textContent : '';
+        const parts = selected ? optionParts(selected) : null;
+        button.textContent = parts && parts.label ? parts.label : (selected ? selected.textContent : '');
         optionButtons.forEach((item) => {
           const selectedItem = item.dataset.value === select.value;
           item.classList.toggle('selected', selectedItem);
@@ -4425,13 +4540,13 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           close();
       });
 
-	      select.addEventListener('change', sync);
-	      select.__marsSyncRoundedSelect = sync;
-	      select.__marsRebuildRoundedSelect = () => {
-	        rebuildOptionButtons();
-	        sync();
-	      };
-	      sync();
+      select.addEventListener('change', sync);
+      select.__marsSyncRoundedSelect = sync;
+      select.__marsRebuildRoundedSelect = () => {
+        rebuildOptionButtons();
+        sync();
+      };
+      sync();
       return {sync, close};
     }
 
@@ -5526,11 +5641,81 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       return Array.isArray(JURISDICTION_TOWN_OPTIONS[country]) ? JURISDICTION_TOWN_OPTIONS[country] : [];
     }
 
+    function townOptionValue(town) {
+      return [
+        String(town && town.name || '').trim(),
+        String(town && town.latitude || '').trim(),
+        String(town && town.longitude || '').trim(),
+        String(town && town.elevation || '').trim()
+      ].join('|');
+    }
+
+    function townValueParts(value) {
+      const parts = String(value || '').split('|');
+      return {
+        name: String(parts[0] || '').trim(),
+        latitude: String(parts[1] || '').trim(),
+        longitude: String(parts[2] || '').trim(),
+        elevation: String(parts[3] || '').trim()
+      };
+    }
+
+    function townOptionMatchesValue(option, value) {
+      if (!option || !value)
+        return false;
+      const wanted = townValueParts(value);
+      const candidate = townValueParts(option.value);
+      if (!wanted.name || candidate.name !== wanted.name)
+        return false;
+      if (!numbersNearlyEqual(candidate.latitude, wanted.latitude))
+        return false;
+      if (!numbersNearlyEqual(candidate.longitude, wanted.longitude))
+        return false;
+      return !wanted.elevation || !candidate.elevation || candidate.elevation === wanted.elevation;
+    }
+
+    function numbersNearlyEqual(left, right, tolerance = 0.000001) {
+      const a = Number(left);
+      const b = Number(right);
+      return Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) <= tolerance;
+    }
+
     function syncRoundedSelect(select) {
       if (select && typeof select.__marsRebuildRoundedSelect === 'function')
         select.__marsRebuildRoundedSelect();
       else if (select && typeof select.__marsSyncRoundedSelect === 'function')
         select.__marsSyncRoundedSelect();
+    }
+
+    function selectTownByCoordinates(select, latitude, longitude) {
+      if (!select)
+        return false;
+      const option = Array.from(select.options).find((candidate) =>
+        numbersNearlyEqual(candidate.dataset.latitude, latitude) &&
+        numbersNearlyEqual(candidate.dataset.longitude, longitude)
+      );
+      if (!option)
+        return false;
+      select.value = option.value;
+      syncRoundedSelect(select);
+      return true;
+    }
+
+    function restoreTownSelection(select, jurisdiction, townValue, latitude, longitude) {
+      populateTownSelect(select, jurisdiction, {selectDefault: false});
+      const wanted = String(townValue || '').trim();
+      if (wanted && Array.from(select.options).some((option) => option.value === wanted)) {
+        select.value = wanted;
+        syncRoundedSelect(select);
+        return true;
+      }
+      const compatible = Array.from(select.options).find((option) => townOptionMatchesValue(option, wanted));
+      if (compatible) {
+        select.value = compatible.value;
+        syncRoundedSelect(select);
+        return true;
+      }
+      return selectTownByCoordinates(select, latitude, longitude);
     }
 
     function populateTownSelect(select, jurisdiction, {selectDefault = true} = {}) {
@@ -5542,7 +5727,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
 
       towns.forEach((town, index) => {
         const option = document.createElement('option');
-        option.value = String(index);
+        option.value = townOptionValue(town) || String(index);
         option.textContent = String(town.name || 'Location');
         option.dataset.latitude = String(town.latitude || '');
         option.dataset.longitude = String(town.longitude || '');
@@ -5555,11 +5740,11 @@ __HOLIDAY_JURISDICTION_OPTIONS__
 
       if (selectDefault && towns.length) {
         const defaultIndex = towns.findIndex((town) => !!town.default);
-        select.value = String(defaultIndex >= 0 ? defaultIndex : 0);
+        select.value = townOptionValue(towns[defaultIndex >= 0 ? defaultIndex : 0]);
       } else if (previous && Array.from(select.options).some((option) => option.value === previous)) {
         select.value = previous;
       } else if (towns.length) {
-        select.value = '0';
+        select.value = townOptionValue(towns[0]);
       } else {
         select.value = '';
       }
@@ -5570,7 +5755,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     function selectedTownOption(select) {
       if (!select || !select.value)
         return null;
-      return select.selectedOptions[0] || null;
+      const byValue = Array.from(select.options).find((option) => option.value === select.value);
+      return byValue || select.selectedOptions[0] || null;
     }
 
     function timeZoneOffsetHours(timeZone, dateText) {
@@ -5636,6 +5822,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         datetimeAutoGmtOffset = String(zoneInput && zoneInput.value || '').trim();
         datetimeGmtOffsetTouched = false;
       }
+      syncRoundedSelect(townSelect);
       return true;
     }
 
@@ -5684,6 +5871,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         end: validDateText(datetimeEnd && datetimeEnd.value, datetimeDate && datetimeDate.value || DEFAULT_DATETIME_DATE),
         year: String(datetimeYear && datetimeYear.value || (datetimeDate && datetimeDate.value || DEFAULT_DATETIME_DATE).slice(0, 4)).trim(),
         jurisdiction: validDatetimeJurisdiction(datetimeJurisdiction && datetimeJurisdiction.value),
+        town: String(datetimeTown && datetimeTown.value || '').trim(),
         latitude: String(datetimeLatitude && datetimeLatitude.value || DEFAULT_DATETIME_LATITUDE).trim(),
         longitude: String(datetimeLongitude && datetimeLongitude.value || DEFAULT_DATETIME_LONGITUDE).trim(),
         elevation: String(datetimeElevation && datetimeElevation.value || DEFAULT_DATETIME_ELEVATION).trim(),
@@ -5721,6 +5909,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         time: String(almanacTime && almanacTime.value || DEFAULT_ALMANAC_TIME).trim(),
         zone: String(almanacZone && almanacZone.value || DEFAULT_ALMANAC_ZONE).trim(),
         jurisdiction: validDatetimeJurisdiction(almanacJurisdiction && almanacJurisdiction.value),
+        town: String(almanacTown && almanacTown.value || '').trim(),
         latitude: String(almanacLatitude && almanacLatitude.value || DEFAULT_ALMANAC_LATITUDE).trim(),
         longitude: String(almanacLongitude && almanacLongitude.value || DEFAULT_ALMANAC_LONGITUDE).trim(),
         elevation: String(almanacElevation && almanacElevation.value || DEFAULT_ALMANAC_ELEVATION).trim(),
@@ -5864,6 +6053,20 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       }
 	      workingPrecisionBits = modePrecisionBits[currentMode()] || workingPrecisionBits;
 	      syncTownSelectors({selectDefault: false});
+      restoreTownSelection(
+        datetimeTown,
+        datetimeJurisdiction && datetimeJurisdiction.value,
+        data.datetime_town,
+        datetimeLatitude && datetimeLatitude.value,
+        datetimeLongitude && datetimeLongitude.value
+      );
+      restoreTownSelection(
+        almanacTown,
+        almanacJurisdiction && almanacJurisdiction.value,
+        data.almanac_town,
+        almanacLatitude && almanacLatitude.value,
+        almanacLongitude && almanacLongitude.value
+      );
 
 	      applyLabMode(validLabMode(data.lab_mode));
     }
@@ -5955,6 +6158,20 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         }
 	        const labMode = localStorage.getItem(LAB_MODE_STORAGE_KEY);
 	        syncTownSelectors({selectDefault: false});
+        restoreTownSelection(
+          datetimeTown,
+          datetimeJurisdiction && datetimeJurisdiction.value,
+          datetimeStateText ? JSON.parse(datetimeStateText).town : '',
+          datetimeLatitude && datetimeLatitude.value,
+          datetimeLongitude && datetimeLongitude.value
+        );
+        restoreTownSelection(
+          almanacTown,
+          almanacJurisdiction && almanacJurisdiction.value,
+          almanacStateText ? JSON.parse(almanacStateText).town : '',
+          almanacLatitude && almanacLatitude.value,
+          almanacLongitude && almanacLongitude.value
+        );
 	        if (labMode)
 	          applyLabMode(labMode);
       } catch (_) {
@@ -6094,6 +6311,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         datetime_end: state.end,
         datetime_year: state.year,
         datetime_jurisdiction: state.jurisdiction,
+        datetime_town: state.town,
         datetime_latitude: state.latitude,
         datetime_longitude: state.longitude,
         datetime_elevation: state.elevation,
@@ -6117,6 +6335,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         almanac_time: state.time,
         almanac_zone: state.zone,
         almanac_jurisdiction: state.jurisdiction,
+        almanac_town: state.town,
         almanac_latitude: state.latitude,
         almanac_longitude: state.longitude,
         almanac_elevation: state.elevation,
@@ -6226,6 +6445,13 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           datetimeAutoGmtOffset = String(datetimeGmtOffset.value || '').trim();
           datetimeGmtOffsetTouched = false;
         }
+        restoreTownSelection(
+          datetimeTown,
+          datetimeJurisdiction && datetimeJurisdiction.value,
+          datetimeState.town,
+          datetimeLatitude && datetimeLatitude.value,
+          datetimeLongitude && datetimeLongitude.value
+        );
       } else if (state.mode === 'almanac') {
         const almanacState = state.almanac || {};
         if (almanacDate)
@@ -6243,6 +6469,13 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         if (almanacElevation)
           almanacElevation.value = String(almanacState.elevation || DEFAULT_ALMANAC_ELEVATION).trim();
         almanacVisibilityMode = validAlmanacVisibility(almanacState.visibility, DEFAULT_ALMANAC_VISIBILITY);
+        restoreTownSelection(
+          almanacTown,
+          almanacJurisdiction && almanacJurisdiction.value,
+          almanacState.town,
+          almanacLatitude && almanacLatitude.value,
+          almanacLongitude && almanacLongitude.value
+        );
       }
 
       if (state.mode === 'datetime') {
@@ -6935,6 +7168,18 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       return `Location of Navigational Bodies; ${visibility === 'visible' ? 'visible bodies only' : 'all bodies shown'}`;
     }
 
+    function compactAlmanacLocalTime(value) {
+      const text = String(value || '').trim();
+      const match = text.match(/^\d{4}-\d{2}-\d{2}\s+(\d{2}:\d{2}:\d{2})(?:\s+GMT[+-]\d{2}:\d{2})?$/);
+      return match ? match[1] : text;
+    }
+
+    function compactAlmanacGmtTime(value) {
+      const text = String(value || '').trim();
+      const match = text.match(/^\d{4}-\d{2}-\d{2}\s+(\d{2}:\d{2}:\d{2})(?:\s+GMT)?$/);
+      return match ? match[1] : text.replace(/\s+GMT$/, '');
+    }
+
     function almanacWorksheetCopyText(data, visibility) {
       const rows = almanacRowsForVisibility(data, visibility);
       const events = Array.isArray(data && data.events) ? data.events : [];
@@ -6974,14 +7219,19 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       }
 
       lines.push('', data && data.event_title || '');
-      lines.push('Class | Event | Kind | Local Time | Details | Nearest totality');
+      lines.push('Class | Event | Kind | Magnitude | Obscuration | First contact | Greatest eclipse | Fourth contact | Greatest GMT | Notes | Nearest totality');
       if (events.length) {
         events.forEach((event) => {
           lines.push([
             String(event.category || '').trim(),
             String(event.name || '').trim(),
             String(event.kind || '').trim(),
-            String(event.time || '').trim(),
+            String(event.magnitude || '').trim(),
+            String(event.obscuration || '').trim(),
+            String(event.first_contact || '').trim(),
+            String(event.greatest || event.time || '').trim(),
+            String(event.fourth_contact || '').trim(),
+            String(event.gmt_time || '').trim(),
             String(event.details || '').trim(),
             String(event.nearest_totality || '').trim()
           ].join(' | '));
@@ -7056,15 +7306,19 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             </tbody>
           </table>
           <div class="almanac-events-title">${eventTitle}</div>
-          <table class="almanac-grid-table">
+          <table class="almanac-grid-table almanac-event-table">
             <thead>
               <tr>
-                <th>Class</th>
-                <th>Event</th>
-                <th>Kind</th>
-                <th>Local Time</th>
-                <th>Details</th>
-                <th>Nearest Totality</th>
+                <th class="event-class">Class</th>
+                <th class="event-name">Event</th>
+                <th class="event-kind">Kind</th>
+                <th class="event-measure" title="Magnitude">Mag.</th>
+                <th class="event-measure" title="Obscuration">Obsc.</th>
+                <th class="event-time">First</th>
+                <th class="event-time">Greatest</th>
+                <th class="event-time">Fourth</th>
+                <th class="event-gmt" title="Greatest GMT">GMT</th>
+                <th class="event-totality">Nearest Totality</th>
               </tr>
             </thead>
             <tbody>
@@ -7081,13 +7335,17 @@ __HOLIDAY_JURISDICTION_OPTIONS__
                   <td>${escapeHtml(event.category || '')}</td>
                   <td class="body-name">${escapeHtml(event.name || '')}</td>
                   <td>${escapeHtml(event.kind || '')}</td>
-                  <td class="number">${escapeHtml(event.time || '')}</td>
-                  <td class="event-details">${escapeHtml(event.details || '')}</td>
+                  <td class="number">${escapeHtml(event.magnitude || '')}</td>
+                  <td class="number">${escapeHtml(event.obscuration || '')}</td>
+                  <td class="number event-time" title="${escapeHtml(event.first_contact || '')}">${escapeHtml(compactAlmanacLocalTime(event.first_contact || ''))}</td>
+                  <td class="number event-time" title="${escapeHtml(event.greatest || event.time || '')}">${escapeHtml(compactAlmanacLocalTime(event.greatest || event.time || ''))}</td>
+                  <td class="number event-time" title="${escapeHtml(event.fourth_contact || '')}">${escapeHtml(compactAlmanacLocalTime(event.fourth_contact || ''))}</td>
+                  <td class="number event-gmt" title="${escapeHtml(event.gmt_time || '')}">${escapeHtml(compactAlmanacGmtTime(event.gmt_time || ''))}</td>
                   <td class="event-details" ${needsLandSearch ? `data-almanac-land-totality="${escapeHtml(event.jd || '')}"` : ''}>${escapeHtml(nearestTotality)}</td>
                 </tr>`;
               }).join('') : `
                 <tr>
-                  <td colspan="6">No eclipses or Mercury/Venus transits found in this one-year window.</td>
+                  <td colspan="10">No eclipses or Mercury/Venus transits found in this one-year window.</td>
                 </tr>`}
             </tbody>
           </table>
@@ -7141,7 +7399,9 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       const date = validDateText(datetimeDate && datetimeDate.value, DEFAULT_DATETIME_DATE);
       let townApplied = false;
       if (updateCoordinates) {
-        populateTownSelect(datetimeTown, jurisdiction, {selectDefault: true});
+        populateTownSelect(datetimeTown, jurisdiction, {selectDefault: false});
+        if (!selectTownByCoordinates(datetimeTown, datetimeLatitude && datetimeLatitude.value, datetimeLongitude && datetimeLongitude.value))
+          populateTownSelect(datetimeTown, jurisdiction, {selectDefault: true});
         townApplied = applySelectedTown({
           townSelect: datetimeTown,
           latitudeInput: datetimeLatitude,
@@ -7195,7 +7455,9 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       const date = validDateText(almanacDate && almanacDate.value, DEFAULT_ALMANAC_DATE);
       let townApplied = false;
       if (updateCoordinates) {
-        populateTownSelect(almanacTown, jurisdiction, {selectDefault: true});
+        populateTownSelect(almanacTown, jurisdiction, {selectDefault: false});
+        if (!selectTownByCoordinates(almanacTown, almanacLatitude && almanacLatitude.value, almanacLongitude && almanacLongitude.value))
+          populateTownSelect(almanacTown, jurisdiction, {selectDefault: true});
         townApplied = applySelectedTown({
           townSelect: almanacTown,
           latitudeInput: almanacLatitude,
@@ -9206,6 +9468,7 @@ def default_state() -> dict[str, object]:
         "datetime_end": DEFAULT_DATETIME_DATE,
         "datetime_year": DEFAULT_DATETIME_DATE[:4],
         "datetime_jurisdiction": DEFAULT_HOLIDAY_JURISDICTION,
+        "datetime_town": "",
         "datetime_latitude": DEFAULT_DATETIME_LATITUDE,
         "datetime_longitude": DEFAULT_DATETIME_LONGITUDE,
         "datetime_elevation": DEFAULT_DATETIME_ELEVATION,
@@ -9214,6 +9477,7 @@ def default_state() -> dict[str, object]:
         "almanac_time": DEFAULT_ALMANAC_TIME,
         "almanac_zone": DEFAULT_ALMANAC_ZONE,
         "almanac_jurisdiction": DEFAULT_HOLIDAY_JURISDICTION,
+        "almanac_town": "",
         "almanac_latitude": DEFAULT_ALMANAC_LATITUDE,
         "almanac_longitude": DEFAULT_ALMANAC_LONGITUDE,
         "almanac_elevation": DEFAULT_ALMANAC_ELEVATION,
@@ -9229,6 +9493,18 @@ def default_state() -> dict[str, object]:
     }
 
 
+def write_state_data(state: dict[str, object]) -> None:
+    ensure_private_directory(STATE_FILE.parent)
+    STATE_FILE.write_text(
+        json.dumps(state, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    try:
+        STATE_FILE.chmod(0o600)
+    except OSError:
+        pass
+
+
 def load_state_data() -> dict[str, object]:
     state = default_state()
     try:
@@ -9239,6 +9515,13 @@ def load_state_data() -> dict[str, object]:
     if not isinstance(data, dict):
         return state
 
+    missing_persistent_keys = any(
+        key not in data
+        for key in (
+            "datetime_town",
+            "almanac_town",
+        )
+    )
     state.update(data)
     expression = str(state.get("expression", "")).strip()
     if "..." in expression:
@@ -9311,6 +9594,7 @@ def load_state_data() -> dict[str, object]:
     state["datetime_jurisdiction"] = normalize_holiday_jurisdiction(
         str(state.get("datetime_jurisdiction", DEFAULT_HOLIDAY_JURISDICTION)).strip()
     )
+    state["datetime_town"] = str(state.get("datetime_town", "")).strip()
     for key, default in (
         ("datetime_latitude", DEFAULT_DATETIME_LATITUDE),
         ("datetime_longitude", DEFAULT_DATETIME_LONGITUDE),
@@ -9333,6 +9617,7 @@ def load_state_data() -> dict[str, object]:
     state["almanac_jurisdiction"] = normalize_holiday_jurisdiction(
         str(state.get("almanac_jurisdiction", DEFAULT_HOLIDAY_JURISDICTION)).strip()
     )
+    state["almanac_town"] = str(state.get("almanac_town", "")).strip()
     for key, default in (
         ("almanac_zone", DEFAULT_ALMANAC_ZONE),
         ("almanac_latitude", DEFAULT_ALMANAC_LATITUDE),
@@ -9342,6 +9627,11 @@ def load_state_data() -> dict[str, object]:
         state[key] = str(state.get(key, default)).strip() or str(default)
     almanac_visibility = str(state.get("almanac_visibility", DEFAULT_ALMANAC_VISIBILITY)).strip().lower()
     state["almanac_visibility"] = almanac_visibility if almanac_visibility in {"all", "visible"} else DEFAULT_ALMANAC_VISIBILITY
+    if missing_persistent_keys:
+        try:
+            write_state_data(state)
+        except OSError:
+            pass
     return state
 
 
@@ -9370,15 +9660,7 @@ def save_state_data(updates: dict[str, object]) -> None:
             str(normalized.get("integrator_expression") or "").strip()
         )
     state.update(normalized)
-    ensure_private_directory(STATE_FILE.parent)
-    STATE_FILE.write_text(
-        json.dumps(state, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
-    try:
-        STATE_FILE.chmod(0o600)
-    except OSError:
-        pass
+    write_state_data(state)
 
 
 def save_state_expression(expression: str) -> None:
@@ -12657,6 +12939,12 @@ def parse_almanac_event_rows(text: str) -> list[dict[str, str]]:
           "details": parts[4].strip(),
           "nearest_totality": parts[5].strip() if len(parts) > 5 else "",
           "jd": parts[6].strip() if len(parts) > 6 else "",
+          "magnitude": parts[7].strip() if len(parts) > 7 else "",
+          "obscuration": parts[8].strip() if len(parts) > 8 else "",
+          "first_contact": parts[9].strip() if len(parts) > 9 else "",
+          "greatest": parts[10].strip() if len(parts) > 10 else "",
+          "fourth_contact": parts[11].strip() if len(parts) > 11 else "",
+          "gmt_time": parts[12].strip() if len(parts) > 12 else "",
       })
     rows.sort(key=lambda row: str(row.get("time") or ""))
     return rows
@@ -12709,6 +12997,12 @@ def almanac_output_with_events(
                         almanac_cache_field_value(event.get("details")),
                         almanac_cache_field_value(event.get("nearest_totality")),
                         almanac_cache_field_value(event.get("jd")),
+                        almanac_cache_field_value(event.get("magnitude")),
+                        almanac_cache_field_value(event.get("obscuration")),
+                        almanac_cache_field_value(event.get("first_contact")),
+                        almanac_cache_field_value(event.get("greatest")),
+                        almanac_cache_field_value(event.get("fourth_contact")),
+                        almanac_cache_field_value(event.get("gmt_time")),
                     ]
                 )
             )
@@ -13006,6 +13300,16 @@ def almanac_jurisdiction_offset_for_date(jurisdiction: str, date_text: str, fall
     return offset
 
 
+def round_datetime_to_nearest_second(moment: py_datetime.datetime) -> py_datetime.datetime:
+    return (moment + py_datetime.timedelta(microseconds=500_000)).replace(microsecond=0)
+
+
+def almanac_gmt_event_time_from_jd(jd: float) -> str:
+    epoch = py_datetime.datetime(1970, 1, 1, tzinfo=py_datetime.timezone.utc)
+    utc_moment = round_datetime_to_nearest_second(epoch + py_datetime.timedelta(days=float(jd) - 2440587.5))
+    return f"{utc_moment:%Y-%m-%d %H:%M:%S} GMT"
+
+
 def almanac_local_event_time_from_jd(jd: float,
                                      jurisdiction: str,
                                      fallback_zone_hours: float = 0.0) -> tuple[str, str]:
@@ -13013,8 +13317,9 @@ def almanac_local_event_time_from_jd(jd: float,
     utc_moment = epoch + py_datetime.timedelta(days=float(jd) - 2440587.5)
     event_zone = almanac_jurisdiction_offset_for_date(jurisdiction, utc_moment.strftime("%Y-%m-%d"), fallback_zone_hours)
     zone_label = almanac_zone_label(event_zone)
-    local_moment = utc_moment + py_datetime.timedelta(hours=event_zone)
-    return f"{local_moment:%Y-%m-%d %H:%M} {zone_label}", utc_moment.isoformat()
+    local_moment = round_datetime_to_nearest_second(utc_moment + py_datetime.timedelta(hours=event_zone))
+    sort_moment = round_datetime_to_nearest_second(utc_moment)
+    return f"{local_moment:%Y-%m-%d %H:%M:%S} {zone_label}", sort_moment.isoformat()
 
 
 def format_almanac_totality_location(payload: str,
@@ -13075,6 +13380,12 @@ def generate_annual_almanac_events(
                 "details": details,
                 "nearest_totality": "",
                 "jd": f"{jd:.9f}",
+                "magnitude": "",
+                "obscuration": "",
+                "first_contact": "",
+                "greatest": time_text,
+                "fourth_contact": "",
+                "gmt_time": almanac_gmt_event_time_from_jd(jd),
             })
 
     def add_exact_eclipse(row: dict[str, str]) -> None:
@@ -13098,15 +13409,35 @@ def generate_annual_almanac_events(
         percent_text = f"{percent:.1f}%"
         if kind != "total" and percent < 100.0 and round(percent, 1) >= 100.0:
             percent_text = f"{percent:.3f}%"
+        progress_times: dict[str, str] = {}
+        for output_name, key_name in (
+            ("first_contact", "first_jd"),
+            ("greatest", "jd"),
+            ("fourth_contact", "last_jd"),
+        ):
+            try:
+                contact_jd = float(str(row.get(key_name) or "").strip())
+            except ValueError:
+                continue
+            if not math.isfinite(contact_jd):
+                continue
+            contact_time, _ = local_event_time_from_jd(contact_jd)
+            progress_times[output_name] = contact_time
         events.append({
             "category": category,
             "name": name,
             "kind": kind,
             "time": time_text,
             "sort_time": sort_text,
-            "details": f"Local magnitude {magnitude:.3f}; local obscuration/totality {percent_text}.",
+            "details": "",
             "nearest_totality": totality_text,
             "jd": f"{jd:.9f}",
+            "magnitude": f"{magnitude:.3f}",
+            "obscuration": percent_text,
+            "first_contact": progress_times.get("first_contact", ""),
+            "greatest": progress_times.get("greatest", time_text),
+            "fourth_contact": progress_times.get("fourth_contact", ""),
+            "gmt_time": almanac_gmt_event_time_from_jd(jd),
         })
 
     def add_exact_window(jd: float) -> bool:
@@ -13186,6 +13517,12 @@ def generate_annual_almanac_events(
                 "details": f"{body} crosses the solar disc; circumstances depend on observer location.",
                 "nearest_totality": "",
                 "jd": "",
+                "magnitude": "",
+                "obscuration": "",
+                "first_contact": "",
+                "greatest": "",
+                "fourth_contact": "",
+                "gmt_time": "",
             })
 
     events.sort(key=lambda row: str(row.get("sort_time") or row.get("time") or ""))
@@ -13266,7 +13603,8 @@ def prepare_almanac_fields(fields: dict[str, str]) -> dict[str, object]:
     worksheet_lines.extend([
         "",
         f"Eclipses and inner planetary transits for {event_year}",
-        "Class | Event | Kind | Local Time | Details | Nearest totality",
+        "Progress times are local civil times. Use Greatest GMT in the GMT time field when comparing the body table.",
+        "Class | Event | Kind | Magnitude | Obscuration | First contact | Greatest eclipse | Fourth contact | Greatest GMT | Notes | Nearest totality",
     ])
     if events:
         for event in events:
@@ -13276,7 +13614,12 @@ def prepare_almanac_fields(fields: dict[str, str]) -> dict[str, object]:
                         str(event.get("category") or "").strip(),
                         str(event.get("name") or "").strip(),
                         str(event.get("kind") or "").strip(),
-                        str(event.get("time") or "").strip(),
+                        str(event.get("magnitude") or "").strip(),
+                        str(event.get("obscuration") or "").strip(),
+                        str(event.get("first_contact") or "").strip(),
+                        str(event.get("greatest") or event.get("time") or "").strip(),
+                        str(event.get("fourth_contact") or "").strip(),
+                        str(event.get("gmt_time") or "").strip(),
                         str(event.get("details") or "").strip(),
                         str(event.get("nearest_totality") or "").strip(),
                     ]
@@ -13292,6 +13635,12 @@ def prepare_almanac_fields(fields: dict[str, str]) -> dict[str, object]:
             f"{str(event.get('category') or '').strip()}  "
             f"{str(event.get('name') or '').strip()} "
             f"({str(event.get('kind') or '').strip()})"
+            + (f"\n  Magnitude: {str(event.get('magnitude') or '').strip()}" if str(event.get("magnitude") or "").strip() else "")
+            + (f"\n  Obscuration/totality: {str(event.get('obscuration') or '').strip()}" if str(event.get("obscuration") or "").strip() else "")
+            + (f"\n  First contact: {str(event.get('first_contact') or '').strip()}" if str(event.get("first_contact") or "").strip() else "")
+            + (f"\n  Greatest eclipse: {str(event.get('greatest') or '').strip()}" if str(event.get("greatest") or "").strip() else "")
+            + (f"\n  Fourth contact: {str(event.get('fourth_contact') or '').strip()}" if str(event.get("fourth_contact") or "").strip() else "")
+            + (f"\n  Greatest eclipse GMT: {str(event.get('gmt_time') or '').strip()}" if str(event.get("gmt_time") or "").strip() else "")
             + (f"\n  {str(event.get('details') or '').strip()}" if str(event.get("details") or "").strip() else "")
             + (f"\n  Nearest totality: {str(event.get('nearest_totality') or '').strip()}" if str(event.get("nearest_totality") or "").strip() else "")
             for event in events
@@ -13600,6 +13949,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                     "datetime_end",
                     "datetime_year",
                     "datetime_jurisdiction",
+                    "datetime_town",
                     "datetime_latitude",
                     "datetime_longitude",
                     "datetime_elevation",
@@ -13608,6 +13958,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                     "almanac_time",
                     "almanac_zone",
                     "almanac_jurisdiction",
+                    "almanac_town",
                     "almanac_latitude",
                     "almanac_longitude",
                     "almanac_elevation",
@@ -13874,6 +14225,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                 end_text = str(payload.get("end", date_text)).strip()
                 year_text = str(payload.get("year", date_text[:4] or DEFAULT_DATETIME_DATE[:4])).strip()
                 jurisdiction_text = str(payload.get("jurisdiction", DEFAULT_HOLIDAY_JURISDICTION)).strip()
+                town_text = str(payload.get("town", "")).strip()
                 latitude_text = str(payload.get("latitude", DEFAULT_DATETIME_LATITUDE)).strip()
                 longitude_text = str(payload.get("longitude", DEFAULT_DATETIME_LONGITUDE)).strip()
                 elevation_text = str(payload.get("elevation", DEFAULT_DATETIME_ELEVATION)).strip()
@@ -14053,6 +14405,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                     "datetime_end": end_text,
                     "datetime_year": str(year),
                     "datetime_jurisdiction": jurisdiction,
+                    "datetime_town": town_text,
                     "datetime_latitude": str(latitude),
                     "datetime_longitude": str(longitude),
                     "datetime_elevation": str(elevation),
@@ -14264,8 +14617,10 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                 time_text = str(payload.get("time", DEFAULT_ALMANAC_TIME)).strip()
                 zone_text = str(payload.get("zone", DEFAULT_ALMANAC_ZONE)).strip()
                 jurisdiction_text = str(payload.get("jurisdiction", DEFAULT_HOLIDAY_JURISDICTION)).strip()
+                town_text = str(payload.get("town", "")).strip()
                 latitude_text = str(payload.get("latitude", DEFAULT_ALMANAC_LATITUDE)).strip()
                 longitude_text = str(payload.get("longitude", DEFAULT_ALMANAC_LONGITUDE)).strip()
+                elevation_text = str(payload.get("elevation", DEFAULT_ALMANAC_ELEVATION)).strip()
                 body_text = DEFAULT_ALMANAC_BODY
                 visibility_text = str(payload.get("visibility", DEFAULT_ALMANAC_VISIBILITY)).strip().lower()
                 py_datetime.date.fromisoformat(date_text)
@@ -14314,8 +14669,10 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                     "almanac_time": time_text,
                     "almanac_zone": zone_text,
                     "almanac_jurisdiction": jurisdiction,
+                    "almanac_town": town_text,
                     "almanac_latitude": latitude_text,
                     "almanac_longitude": longitude_text,
+                    "almanac_elevation": elevation_text,
                     "almanac_visibility": visibility_text,
                 })
                 self.log_message(
@@ -14348,8 +14705,10 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                         "almanac_time": time_text,
                         "almanac_zone": zone_text,
                         "almanac_jurisdiction": jurisdiction,
+                        "almanac_town": town_text,
                         "almanac_latitude": latitude_text,
                         "almanac_longitude": longitude_text,
+                        "almanac_elevation": elevation_text,
                         "almanac_visibility": visibility_text,
                     })
                     fields["jurisdiction"] = jurisdiction
@@ -14419,8 +14778,10 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                 "almanac_time": time_text,
                 "almanac_zone": zone_text,
                 "almanac_jurisdiction": jurisdiction,
+                "almanac_town": town_text,
                 "almanac_latitude": latitude_text,
                 "almanac_longitude": longitude_text,
+                "almanac_elevation": elevation_text,
                 "almanac_visibility": visibility_text,
             })
             fields["jurisdiction"] = jurisdiction
