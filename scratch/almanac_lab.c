@@ -25,7 +25,7 @@ typedef struct almanac_lab_options_t {
     bool cache_put;
 } almanac_lab_options_t;
 
-#define ALMANAC_LAB_CACHE_SCHEMA "almanac_lab_output_v2"
+#define ALMANAC_LAB_CACHE_SCHEMA "almanac_lab_output_v6"
 #define ALMANAC_LAB_CACHE_PATH_ENV "MARS_LAB_OBJECT_STORE_PATH"
 #define ALMANAC_LAB_CACHE_KEY_ENV "MARS_LAB_OBJECT_STORE_KEY"
 
@@ -297,7 +297,8 @@ static double angular_separation_degrees(const almanac_entry_t *a,
 static bool visually_visible(const almanac_entry_t *entry,
                              const almanac_observables_t *observables,
                              double sun_altitude_degrees,
-                             const almanac_entry_t *sun_entry)
+                             const almanac_entry_t *sun_entry,
+                             bool local_solar_eclipse_in_progress)
 {
     static const double CIVIL_TWILIGHT_SUN_ALTITUDE_DEGREES = -6.0;
     static const double NAUTICAL_TWILIGHT_SUN_ALTITUDE_DEGREES = -12.0;
@@ -307,6 +308,8 @@ static bool visually_visible(const almanac_entry_t *entry,
     if (!entry || !observables || !observables->visible)
         return false;
     if (entry->body_kind == ALMANAC_BODY_SUN)
+        return true;
+    if (entry->body_id == ALMANAC_BODY_ID_MOON && local_solar_eclipse_in_progress)
         return true;
 
     solar_separation = angular_separation_degrees(entry, sun_entry);
@@ -532,10 +535,12 @@ int main(int argc, char **argv)
     almanac_entry_t selected;
     almanac_observer_t observer;
     almanac_observables_t selected_observables;
+    almanac_observables_t sun_observables;
     array_t *snapshot = NULL;
     double gha_aries = NAN;
     double sun_altitude_degrees = NAN;
     const almanac_entry_t *sun_entry = NULL;
+    bool local_solar_eclipse_in_progress = false;
     size_t i;
 
     if (!parse_options(argc, argv, &options)) {
@@ -632,9 +637,13 @@ int main(int argc, char **argv)
     observer.latitude_degrees = options.latitude;
     observer.longitude_degrees = options.longitude;
     observer.elevation_metres = 0.0;
+    sun_observables.altitude_degrees = NAN;
+    sun_observables.azimuth_degrees = NAN;
+    sun_observables.semi_diameter_degrees = NAN;
+    sun_observables.above_horizon = false;
+    sun_observables.visible = false;
     for (i = 0u; i < array_size(snapshot); ++i) {
         const almanac_entry_t *entry = array_get(snapshot, i);
-        almanac_observables_t sun_observables;
 
         if (!entry || entry->body_id != ALMANAC_BODY_ID_SUN)
             continue;
@@ -643,6 +652,7 @@ int main(int argc, char **argv)
             sun_altitude_degrees = sun_observables.altitude_degrees;
         break;
     }
+    local_solar_eclipse_in_progress = almanac_solar_eclipse_in_progress(almanac, &observer, moment);
     if (!almanac_observables(almanac, &selected, &observer, &selected_observables)) {
         selected_observables.altitude_degrees = NAN;
         selected_observables.azimuth_degrees = NAN;
@@ -668,7 +678,11 @@ int main(int argc, char **argv)
     (void)string_append_format(output, "selected_semi_diameter %.9f\n", selected_observables.semi_diameter_degrees);
     (void)string_append_format(output,
                                "selected_visible %s\n",
-                               visually_visible(&selected, &selected_observables, sun_altitude_degrees, sun_entry) ? "YES" : "NO");
+                               visually_visible(&selected,
+                                                &selected_observables,
+                                                sun_altitude_degrees,
+                                                sun_entry,
+                                                local_solar_eclipse_in_progress) ? "YES" : "NO");
 
     append_snapshot_row(output,
                         "ARIES",
@@ -702,7 +716,11 @@ int main(int argc, char **argv)
             observables.visible = false;
         }
         gha = normalize_degrees(entry->gha_aries_degrees + entry->sha_degrees);
-        visible = visually_visible(entry, &observables, sun_altitude_degrees, sun_entry);
+        visible = visually_visible(entry,
+                                   &observables,
+                                   sun_altitude_degrees,
+                                   sun_entry,
+                                   local_solar_eclipse_in_progress);
         append_snapshot_row(output,
                             almanac_body_code(entry->body_id),
                             almanac_body_display_name(entry->body_id),

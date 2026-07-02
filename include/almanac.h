@@ -110,6 +110,7 @@ typedef enum _almanac_body_id_t {
 typedef struct _almanac_entry_t {
     almanac_body_id_t body_id;
     almanac_body_kind_t body_kind;
+    double moment_jd;
     double gha_aries_degrees;
     double sha_degrees;
     double declination_degrees;
@@ -555,6 +556,23 @@ array_t *almanac_find_solar_eclipses(almanac_t *almanac,
                                      const almanac_observer_t *observer,
                                      const datetime_t *start,
                                      const datetime_t *end);
+
+/**
+ * @brief Test whether a solar eclipse is locally in progress.
+ *
+ * The calculation uses the observer-relative topocentric solar-eclipse
+ * geometry, so lunar parallax is included in the same way as the local eclipse
+ * event search.
+ *
+ * @param almanac open almanac engine.
+ * @param observer observer location for local eclipse circumstances.
+ * @param moment civil moment to test.
+ * @return @c true when the Sun is above the apparent horizon and the lunar
+ *         and solar discs overlap for the observer.
+ */
+bool almanac_solar_eclipse_in_progress(almanac_t *almanac,
+                                       const almanac_observer_t *observer,
+                                       const datetime_t *moment);
 
 /**
  * @brief Find the nearest place where a solar eclipse is total.
