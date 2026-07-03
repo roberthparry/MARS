@@ -207,6 +207,16 @@ typedef struct _almanac_observables_t {
 } almanac_observables_t;
 
 /**
+ * @brief The point on Earth where a body is directly overhead.
+ *
+ * Longitudes are signed east-positive degrees, matching @c almanac_observer_t.
+ */
+typedef struct _almanac_geographical_position_t {
+    double latitude_degrees;
+    double longitude_degrees;
+} almanac_geographical_position_t;
+
+/**
  * @brief Exact phase event kind for the Moon.
  */
 typedef enum _almanac_moon_phase_kind_t {
@@ -420,6 +430,20 @@ bool almanac_observables(almanac_t *almanac,
                          const almanac_entry_t *body,
                          const almanac_observer_t *observer,
                          almanac_observables_t *out);
+
+/**
+ * @brief Derive the geographical position for one computed body entry.
+ *
+ * The geographical position is the Earth location where the body is at the
+ * zenith. Latitude is the body's declination; longitude is derived from the
+ * body's Greenwich Hour Angle and returned as signed east-positive degrees.
+ *
+ * @param body computed almanac entry for the body of interest.
+ * @param out output geographical position to fill.
+ * @return @c true on success, otherwise @c false.
+ */
+bool almanac_body_geographical_position(const almanac_entry_t *body,
+                                        almanac_geographical_position_t *out);
 
 /**
  * @brief Find accurate local rise and set for one supported body and day.

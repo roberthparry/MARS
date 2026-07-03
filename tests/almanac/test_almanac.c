@@ -344,6 +344,43 @@ static void test_almanac_observables_validate_observer_range(void)
     assert_observables_validation_case();
 }
 
+static void assert_geographical_position_case(void)
+{
+    datetime_t *moment;
+    almanac_t *almanac;
+    almanac_entry_t *sun;
+    almanac_geographical_position_t gp;
+    double body_gha;
+
+    moment = datetime_alloc();
+    TEST_ASSERT_NOT_NULL(moment);
+    TEST_ASSERT_NOT_NULL(datetime_init_ymdt(moment, 2026, DT_June, 30, 8, 14, 7.0));
+
+    almanac = almanac_open();
+    TEST_ASSERT_NOT_NULL(almanac);
+    sun = almanac_new_body_entry(almanac, ALMANAC_BODY_ID_SUN, moment);
+    TEST_ASSERT_TRUE(sun != NULL, almanac_last_error(almanac));
+    TEST_ASSERT_TRUE(almanac_body_geographical_position(sun, &gp),
+                     "Sun geographical position is available");
+
+    body_gha = almanac_entry_gha_aries_degrees(sun) + almanac_entry_sha_degrees(sun);
+    TEST_ASSERT_TRUE(fabs(gp.latitude_degrees - almanac_entry_declination_degrees(sun)) < 1.0e-12,
+                     "GP latitude is the body declination");
+    TEST_ASSERT_TRUE(fabs(angular_delta_degrees(gp.longitude_degrees, -body_gha)) < 1.0e-12,
+                     "GP longitude is the east-positive inverse of body GHA");
+    TEST_ASSERT_TRUE(gp.longitude_degrees >= -180.0 && gp.longitude_degrees < 180.0,
+                     "GP longitude uses signed east-positive degrees");
+
+    almanac_close(almanac);
+    almanac_entry_dealloc(sun);
+    datetime_dealloc(moment);
+}
+
+static void test_almanac_body_geographical_position_resolves_gp(void)
+{
+    assert_geographical_position_case();
+}
+
 static void assert_phase_details_case(void)
 {
     datetime_t *moment;
@@ -1007,6 +1044,7 @@ int tests_main(void)
     TEST_RUN_IN_GROUP(test_almanac_new_body_entry_resolves_jupiter, tests, NULL);
     TEST_RUN_IN_GROUP(test_almanac_observables_resolve_horizon_values, tests, NULL);
     TEST_RUN_IN_GROUP(test_almanac_observables_validate_observer_range, tests, NULL);
+    TEST_RUN_IN_GROUP(test_almanac_body_geographical_position_resolves_gp, tests, NULL);
     TEST_RUN_IN_GROUP(test_almanac_phase_details_resolve_planetary_phase, tests, NULL);
     TEST_RUN_IN_GROUP(test_almanac_next_moon_phase_exact_finds_august_2026_new_moon, tests, NULL);
     TEST_RUN_IN_GROUP(test_almanac_sunrise_sunset_returns_local_day_times, tests, NULL);

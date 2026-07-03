@@ -647,6 +647,7 @@ int main(int argc, char **argv)
     almanac_entry_t *selected = NULL;
     almanac_observer_t observer;
     almanac_observables_t selected_observables;
+    almanac_geographical_position_t selected_gp;
     almanac_observables_t sun_observables;
     array_t *snapshot = NULL;
     double gha_aries = NAN;
@@ -773,6 +774,10 @@ int main(int argc, char **argv)
         selected_observables.above_horizon = false;
         selected_observables.visible = false;
     }
+    if (!almanac_body_geographical_position(selected, &selected_gp)) {
+        selected_gp.latitude_degrees = NAN;
+        selected_gp.longitude_degrees = NAN;
+    }
     (void)string_append_format(output, "selected_name %s\n", almanac_body_display_name(almanac_entry_body_id(selected)));
     (void)string_append_format(output, "selected_kind %s\n", body_kind_text(almanac_entry_body_kind(selected)));
     (void)string_append_format(output, "selected_declination %.9f\n", almanac_entry_declination_degrees(selected));
@@ -798,6 +803,8 @@ int main(int argc, char **argv)
     (void)string_append_format(output, "selected_altitude %.9f\n", selected_observables.altitude_degrees);
     (void)string_append_format(output, "selected_azimuth %.9f\n", selected_observables.azimuth_degrees);
     (void)string_append_format(output, "selected_semi_diameter %.9f\n", selected_observables.semi_diameter_degrees);
+    (void)string_append_format(output, "selected_gp_latitude %.9f\n", selected_gp.latitude_degrees);
+    (void)string_append_format(output, "selected_gp_longitude %.9f\n", selected_gp.longitude_degrees);
     (void)string_append_format(output,
                                "selected_visible %s\n",
                                visually_visible(selected,
