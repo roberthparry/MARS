@@ -1626,17 +1626,25 @@ INDEX_HTML = r"""<!doctype html>
     }
 
     .almanac-grid-table .visible-cell {
-      color: #d6f9df;
       font-weight: 800;
       text-align: center;
     }
 
-    .almanac-grid-table .visible-cell.yes {
-      background: rgba(29, 126, 78, 0.36);
+    .almanac-visible-icon {
+      display: inline-grid;
+      width: 1.85rem;
+      height: 1.85rem;
+      place-items: center;
+      font: 1.45rem/1 "Cascadia Code", "DejaVu Sans Mono", monospace;
+      font-weight: 900;
     }
 
-    .almanac-grid-table .visible-cell.no {
-      background: rgba(18, 84, 60, 0.32);
+    .almanac-grid-table .visible-cell.yes .almanac-visible-icon {
+      color: #70f59c;
+    }
+
+    .almanac-grid-table .visible-cell.no .almanac-visible-icon {
+      color: #ff7676;
     }
 
     .integrator-bound-field {
@@ -3465,7 +3473,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             </div>
           </div>
           <div class="datetime-field-group">
-            <div class="datetime-field-group-title">Observer location</div>
+            <div class="datetime-field-group-title">Observer</div>
             <div class="datetime-grid location-grid">
               <div class="integrator-bound-field">
                 <label for="datetimeTown">Town/location</label>
@@ -7767,6 +7775,9 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             <tbody>
               ${rows.length ? rows.map((row) => {
                 const visible = String(row.visible || '').trim().toUpperCase();
+                const isVisible = visible === 'YES';
+                const visibleLabel = isVisible ? 'Visible' : 'Not visible';
+                const visibleIcon = isVisible ? '✓' : '✕';
                 const classes = row.kind === 'reference' ? 'reference' : '';
                 const nameClass = row.kind === 'reference' ? 'reference-name' : 'body-name';
                 return `
@@ -7779,7 +7790,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
                     <td class="number">${escapeHtml(row.azimuth || '')}</td>
                     <td class="number">${escapeHtml(row.semi_diameter || '')}</td>
                     <td class="number">${escapeHtml(row.magnitude || '')}</td>
-                    ${showVisibleColumn ? `<td class="visible-cell ${visible === 'YES' ? 'yes' : 'no'}">${escapeHtml(visible)}</td>` : ''}
+                    ${showVisibleColumn ? `<td class="visible-cell ${isVisible ? 'yes' : 'no'}" title="${escapeHtml(visibleLabel)}"><span class="almanac-visible-icon" aria-label="${escapeHtml(visibleLabel)}" role="img">${visibleIcon}</span></td>` : ''}
                   </tr>`;
               }).join('') : `<tr><td colspan="${bodyColumnCount}">No bodies found for the current visibility filter.</td></tr>`}
             </tbody>
