@@ -3487,6 +3487,37 @@ insert into jurisdiction_town_seed(
     ('ZW', 'Ruwa', '-17.8897', '31.2447', '1562', 23, 'N'),
     ('ZW', 'Zvishavane', '-20.3267', '30.0665', '998', 23, 'N');
 
+create temp table jurisdiction_town_totality_seed(
+    jurisdiction_id,
+    town_name,
+    totality_seed_priority
+);
+
+insert into jurisdiction_town_totality_seed(
+    jurisdiction_id,
+    town_name,
+    totality_seed_priority
+)
+values
+    ('ES', 'Oviedo', 0),
+    ('ES', 'Madrid', 1),
+    ('ES', 'Santander', 2),
+    ('ES', 'Bilbao', 3),
+    ('ES', 'Burgos', 4),
+    ('ES', 'Zaragoza', 5),
+    ('ES', 'Valencia', 6),
+    ('GI', 'Gibraltar', 7),
+    ('MA', 'Tangier', 8),
+    ('MA', 'Rabat', 9),
+    ('TN', 'Tunis', 10),
+    ('LY', 'Tripoli', 11),
+    ('EG', 'Alexandria', 12),
+    ('EG', 'Cairo', 13),
+    ('IS', 'Reykjavík', 14),
+    ('GL', 'Nuuk', 15),
+    ('PT', 'Lisbon', 16),
+    ('FR', 'Paris', 17);
+
 insert into jurisdiction_town(jurisdiction_id, town_name)
 select jurisdiction_id, town_name
 from jurisdiction_town_seed
@@ -3520,6 +3551,13 @@ join jurisdiction_town as town
   on town.jurisdiction_id = seed.jurisdiction_id
  and town.town_name = seed.town_name;
 
+insert into jurisdiction_town_totality_seed_priority(jurisdiction_town_id, totality_seed_priority)
+select town.jurisdiction_town_id, seed.totality_seed_priority
+from jurisdiction_town_totality_seed as seed
+join jurisdiction_town as town
+  on town.jurisdiction_id = seed.jurisdiction_id
+ and town.town_name = seed.town_name;
+
 insert or ignore into jurisdiction_default_town(jurisdiction_id, jurisdiction_town_id)
 select seed.jurisdiction_id, town.jurisdiction_town_id
 from jurisdiction_town_seed as seed
@@ -3543,4 +3581,5 @@ select town.jurisdiction_id, MIN(town.jurisdiction_town_id)
 from jurisdiction_town as town
 group by town.jurisdiction_id;
 
+drop table jurisdiction_town_totality_seed;
 drop table jurisdiction_town_seed;

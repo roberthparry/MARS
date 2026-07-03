@@ -254,18 +254,16 @@ static bool parse_boolean_text(const char *text, bool *out)
 
 static const char *body_kind_text(almanac_body_kind_t kind)
 {
-    switch (kind) {
-    case ALMANAC_BODY_STAR:
-        return "star";
-    case ALMANAC_BODY_PLANET:
-        return "planet";
-    case ALMANAC_BODY_SUN:
-        return "sun";
-    case ALMANAC_BODY_MOON:
-        return "moon";
-    default:
+    static const char *const text_by_kind[ALMANAC_BODY_MOON + 1] = {
+        [ALMANAC_BODY_STAR] = "star",
+        [ALMANAC_BODY_PLANET] = "planet",
+        [ALMANAC_BODY_SUN] = "sun",
+        [ALMANAC_BODY_MOON] = "moon"
+    };
+
+    if (kind < ALMANAC_BODY_STAR || kind > ALMANAC_BODY_MOON)
         return "body";
-    }
+    return text_by_kind[kind];
 }
 
 static double angular_separation_degrees(const almanac_entry_t *a,
@@ -279,10 +277,10 @@ static double angular_separation_degrees(const almanac_entry_t *a,
 
     if (!a || !b)
         return NAN;
-    ra_a = a->right_ascension_hours * (M_PI / 12.0);
-    ra_b = b->right_ascension_hours * (M_PI / 12.0);
-    dec_a = a->declination_degrees * (M_PI / 180.0);
-    dec_b = b->declination_degrees * (M_PI / 180.0);
+    ra_a = almanac_entry_right_ascension_hours(a) * (M_PI / 12.0);
+    ra_b = almanac_entry_right_ascension_hours(b) * (M_PI / 12.0);
+    dec_a = almanac_entry_declination_degrees(a) * (M_PI / 180.0);
+    dec_b = almanac_entry_declination_degrees(b) * (M_PI / 180.0);
     if (!isfinite(ra_a) || !isfinite(ra_b) || !isfinite(dec_a) || !isfinite(dec_b))
         return NAN;
     cos_separation = sin(dec_a) * sin(dec_b) +
@@ -304,26 +302,30 @@ static bool visually_visible(const almanac_entry_t *entry,
     static const double NAUTICAL_TWILIGHT_SUN_ALTITUDE_DEGREES = -12.0;
     double solar_separation;
     double magnitude;
+    almanac_body_id_t body_id;
+    almanac_body_kind_t body_kind;
 
     if (!entry || !observables || !observables->visible)
         return false;
-    if (entry->body_kind == ALMANAC_BODY_SUN)
+    body_id = almanac_entry_body_id(entry);
+    body_kind = almanac_entry_body_kind(entry);
+    if (body_kind == ALMANAC_BODY_SUN)
         return true;
-    if (entry->body_id == ALMANAC_BODY_ID_MOON && local_solar_eclipse_in_progress)
+    if (body_id == ALMANAC_BODY_ID_MOON && local_solar_eclipse_in_progress)
         return true;
 
     solar_separation = angular_separation_degrees(entry, sun_entry);
-    magnitude = entry->visual_magnitude;
+    magnitude = almanac_entry_visual_magnitude(entry);
 
     if (!isfinite(sun_altitude_degrees))
-        return entry->body_kind == ALMANAC_BODY_MOON;
+        return body_kind == ALMANAC_BODY_MOON;
 
     if (sun_altitude_degrees > 0.0) {
-        if (entry->body_kind == ALMANAC_BODY_MOON) {
+        if (body_kind == ALMANAC_BODY_MOON) {
             return observables->altitude_degrees > 5.0 &&
                    (!isfinite(solar_separation) || solar_separation >= 12.0);
         }
-        if (entry->body_id == ALMANAC_BODY_ID_VENUS) {
+        if (body_id == ALMANAC_BODY_ID_VENUS) {
             return isfinite(magnitude) && magnitude <= -3.5 &&
                    observables->altitude_degrees >= 10.0 &&
                    isfinite(solar_separation) && solar_separation >= 20.0;
@@ -332,30 +334,30 @@ static bool visually_visible(const almanac_entry_t *entry,
     }
 
     if (sun_altitude_degrees > CIVIL_TWILIGHT_SUN_ALTITUDE_DEGREES) {
-        if (entry->body_kind == ALMANAC_BODY_MOON)
+        if (body_kind == ALMANAC_BODY_MOON)
             return true;
-        if (entry->body_kind == ALMANAC_BODY_PLANET)
+        if (body_kind == ALMANAC_BODY_PLANET)
             return isfinite(magnitude) && magnitude <= -1.0 &&
                    observables->altitude_degrees >= 3.0;
         return false;
     }
 
     if (sun_altitude_degrees > NAUTICAL_TWILIGHT_SUN_ALTITUDE_DEGREES) {
-        if (entry->body_kind == ALMANAC_BODY_MOON)
+        if (body_kind == ALMANAC_BODY_MOON)
             return true;
-        if (entry->body_kind == ALMANAC_BODY_PLANET)
+        if (body_kind == ALMANAC_BODY_PLANET)
             return !isfinite(magnitude) || magnitude <= 2.0;
-        if (entry->body_kind == ALMANAC_BODY_STAR)
+        if (body_kind == ALMANAC_BODY_STAR)
             return isfinite(magnitude) && magnitude <= 1.5 &&
                    observables->altitude_degrees >= 5.0;
         return false;
     }
 
-    if (entry->body_kind == ALMANAC_BODY_MOON)
+    if (body_kind == ALMANAC_BODY_MOON)
         return true;
-    if (entry->body_kind == ALMANAC_BODY_PLANET)
+    if (body_kind == ALMANAC_BODY_PLANET)
         return !isfinite(magnitude) || magnitude <= 6.0;
-    if (entry->body_kind == ALMANAC_BODY_STAR)
+    if (body_kind == ALMANAC_BODY_STAR)
         return !isfinite(magnitude) || magnitude <= 6.5;
     return true;
 }
@@ -532,7 +534,7 @@ int main(int argc, char **argv)
     string_t *output = NULL;
     datetime_t *moment = NULL;
     almanac_t *almanac = NULL;
-    almanac_entry_t selected;
+    almanac_entry_t *selected = NULL;
     almanac_observer_t observer;
     almanac_observables_t selected_observables;
     almanac_observables_t sun_observables;
@@ -603,7 +605,6 @@ int main(int argc, char **argv)
         datetime_dealloc(moment);
         return 1;
     }
-
     if (!almanac_gha_aries(almanac, moment, &gha_aries)) {
         fprintf(stderr, "%s\n", almanac_last_error(almanac));
         almanac_close(almanac);
@@ -611,7 +612,8 @@ int main(int argc, char **argv)
         datetime_dealloc(moment);
         return 1;
     }
-    if (!almanac_lookup_body(almanac, options.body_id, moment, &selected)) {
+    selected = almanac_new_body_entry(almanac, options.body_id, moment);
+    if (!selected) {
         fprintf(stderr, "%s\n", almanac_last_error(almanac));
         almanac_close(almanac);
         string_free(output);
@@ -621,6 +623,7 @@ int main(int argc, char **argv)
     snapshot = almanac_snapshot(almanac, moment);
     if (!snapshot) {
         fprintf(stderr, "%s\n", almanac_last_error(almanac));
+        almanac_entry_dealloc(selected);
         almanac_close(almanac);
         string_free(output);
         datetime_dealloc(moment);
@@ -645,7 +648,7 @@ int main(int argc, char **argv)
     for (i = 0u; i < array_size(snapshot); ++i) {
         const almanac_entry_t *entry = array_get(snapshot, i);
 
-        if (!entry || entry->body_id != ALMANAC_BODY_ID_SUN)
+        if (!entry || almanac_entry_body_id(entry) != ALMANAC_BODY_ID_SUN)
             continue;
         sun_entry = entry;
         if (almanac_observables(almanac, entry, &observer, &sun_observables))
@@ -653,32 +656,41 @@ int main(int argc, char **argv)
         break;
     }
     local_solar_eclipse_in_progress = almanac_solar_eclipse_in_progress(almanac, &observer, moment);
-    if (!almanac_observables(almanac, &selected, &observer, &selected_observables)) {
+    if (!almanac_observables(almanac, selected, &observer, &selected_observables)) {
         selected_observables.altitude_degrees = NAN;
         selected_observables.azimuth_degrees = NAN;
         selected_observables.semi_diameter_degrees = NAN;
         selected_observables.above_horizon = false;
         selected_observables.visible = false;
     }
-    (void)string_append_format(output, "selected_name %s\n", almanac_body_display_name(selected.body_id));
-    (void)string_append_format(output, "selected_kind %s\n", body_kind_text(selected.body_kind));
-    (void)string_append_format(output, "selected_declination %.9f\n", selected.declination_degrees);
-    (void)string_append_format(output, "selected_right_ascension %.9f\n", selected.right_ascension_hours);
-    (void)string_append_format(output, "selected_gha %.9f\n", normalize_degrees(selected.gha_aries_degrees + selected.sha_degrees));
-    (void)string_append_format(output, "selected_sha %.9f\n", selected.sha_degrees);
+    (void)string_append_format(output, "selected_name %s\n", almanac_body_display_name(almanac_entry_body_id(selected)));
+    (void)string_append_format(output, "selected_kind %s\n", body_kind_text(almanac_entry_body_kind(selected)));
+    (void)string_append_format(output, "selected_declination %.9f\n", almanac_entry_declination_degrees(selected));
+    (void)string_append_format(output, "selected_right_ascension %.9f\n", almanac_entry_right_ascension_hours(selected));
+    (void)string_append_format(output,
+                               "selected_gha %.9f\n",
+                               normalize_degrees(almanac_entry_gha_aries_degrees(selected) +
+                                                 almanac_entry_sha_degrees(selected)));
+    (void)string_append_format(output, "selected_sha %.9f\n", almanac_entry_sha_degrees(selected));
     (void)string_append_format(output,
                                "selected_lha %.9f\n",
-                               normalize_degrees(selected.gha_aries_degrees + selected.sha_degrees - options.longitude));
-    (void)string_append_format(output, "selected_geo_distance %.12f\n", selected.geocentric_distance_au);
-    (void)string_append_format(output, "selected_helio_distance %.12f\n", selected.heliocentric_distance_au);
-    (void)string_append_format(output, "selected_phase %.9f\n", selected.phase_angle_degrees);
-    (void)string_append_format(output, "selected_visual_magnitude %.9f\n", selected.visual_magnitude);
+                               normalize_degrees(almanac_entry_gha_aries_degrees(selected) +
+                                                 almanac_entry_sha_degrees(selected) -
+                                                 options.longitude));
+    (void)string_append_format(output,
+                               "selected_geo_distance %.12f\n",
+                               almanac_entry_geocentric_distance_au(selected));
+    (void)string_append_format(output,
+                               "selected_helio_distance %.12f\n",
+                               almanac_entry_heliocentric_distance_au(selected));
+    (void)string_append_format(output, "selected_phase %.9f\n", almanac_entry_phase_angle_degrees(selected));
+    (void)string_append_format(output, "selected_visual_magnitude %.9f\n", almanac_entry_visual_magnitude(selected));
     (void)string_append_format(output, "selected_altitude %.9f\n", selected_observables.altitude_degrees);
     (void)string_append_format(output, "selected_azimuth %.9f\n", selected_observables.azimuth_degrees);
     (void)string_append_format(output, "selected_semi_diameter %.9f\n", selected_observables.semi_diameter_degrees);
     (void)string_append_format(output,
                                "selected_visible %s\n",
-                               visually_visible(&selected,
+                               visually_visible(selected,
                                                 &selected_observables,
                                                 sun_altitude_degrees,
                                                 sun_entry,
@@ -715,24 +727,24 @@ int main(int argc, char **argv)
             observables.above_horizon = false;
             observables.visible = false;
         }
-        gha = normalize_degrees(entry->gha_aries_degrees + entry->sha_degrees);
+        gha = normalize_degrees(almanac_entry_gha_aries_degrees(entry) + almanac_entry_sha_degrees(entry));
         visible = visually_visible(entry,
                                    &observables,
                                    sun_altitude_degrees,
                                    sun_entry,
                                    local_solar_eclipse_in_progress);
         append_snapshot_row(output,
-                            almanac_body_code(entry->body_id),
-                            almanac_body_display_name(entry->body_id),
-                            body_kind_text(entry->body_kind),
-                            entry->declination_degrees,
-                            entry->right_ascension_hours,
+                            almanac_body_code(almanac_entry_body_id(entry)),
+                            almanac_body_display_name(almanac_entry_body_id(entry)),
+                            body_kind_text(almanac_entry_body_kind(entry)),
+                            almanac_entry_declination_degrees(entry),
+                            almanac_entry_right_ascension_hours(entry),
                             gha,
-                            entry->sha_degrees,
+                            almanac_entry_sha_degrees(entry),
                             normalize_degrees(gha - options.longitude),
-                            entry->geocentric_distance_au,
-                            entry->phase_angle_degrees,
-                            entry->visual_magnitude,
+                            almanac_entry_geocentric_distance_au(entry),
+                            almanac_entry_phase_angle_degrees(entry),
+                            almanac_entry_visual_magnitude(entry),
                             observables.altitude_degrees,
                             observables.azimuth_degrees,
                             observables.semi_diameter_degrees,
@@ -743,6 +755,7 @@ int main(int argc, char **argv)
     fputs(string_c_str(output), stdout);
     string_free(output);
     array_destroy(snapshot);
+    almanac_entry_dealloc(selected);
     almanac_close(almanac);
     datetime_dealloc(moment);
     return 0;
