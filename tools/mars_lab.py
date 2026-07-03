@@ -1559,6 +1559,11 @@ INDEX_HTML = r"""<!doctype html>
       width: 4.2rem;
     }
 
+    .almanac-event-table .event-date {
+      width: 6.4rem;
+      white-space: nowrap;
+    }
+
     .almanac-event-table .event-time {
       width: 5.7rem;
       white-space: nowrap;
@@ -1746,7 +1751,8 @@ INDEX_HTML = r"""<!doctype html>
     .mars-date-picker {
       position: fixed;
       z-index: 120;
-      width: min(100%, 24rem);
+      width: min(28rem, calc(100vw - 1.5rem));
+      min-width: min(28rem, calc(100vw - 1.5rem));
       border: 1px solid rgba(233, 244, 239, 0.22);
       border-radius: 24px;
       padding: 0.8rem;
@@ -1765,7 +1771,7 @@ INDEX_HTML = r"""<!doctype html>
 
     .mars-date-picker-head {
       display: grid;
-      grid-template-columns: auto minmax(0, 1fr) auto;
+      grid-template-columns: 2.35rem minmax(0, 1fr) 2.35rem;
       gap: 0.55rem;
       align-items: center;
       margin-bottom: 0.7rem;
@@ -1773,9 +1779,18 @@ INDEX_HTML = r"""<!doctype html>
 
     .mars-date-picker-title {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) 6.2rem;
+      grid-template-columns: minmax(7.7rem, 1fr) minmax(8.35rem, auto);
       gap: 0.45rem;
       align-items: center;
+      min-width: 0;
+    }
+
+    .mars-date-picker-year-group {
+      display: grid;
+      grid-template-columns: 2.2rem minmax(4.5rem, 1fr) 2.2rem;
+      gap: 0.28rem;
+      align-items: center;
+      min-width: 0;
     }
 
     .mars-date-picker-nav {
@@ -1803,19 +1818,99 @@ INDEX_HTML = r"""<!doctype html>
       border: 1px solid rgba(233, 244, 239, 0.2);
       border-radius: 999px;
       outline: 0;
-      background: rgba(0, 0, 0, 0.14);
       color: #f3ead1;
       font: 0.82rem/1.1 "Cascadia Code", "DejaVu Sans Mono", monospace;
       letter-spacing: 0.03em;
     }
 
     .mars-date-picker-title select {
-      padding: 0.45rem 0.75rem;
+      appearance: none;
+      -webkit-appearance: none;
+      padding: 0.45rem 2.05rem 0.45rem 0.82rem;
+      background:
+        linear-gradient(45deg, transparent 50%, rgba(243, 234, 209, 0.9) 50%) calc(100% - 1.05rem) 50% / 0.42rem 0.42rem no-repeat,
+        linear-gradient(135deg, rgba(243, 234, 209, 0.9) 50%, transparent 50%) calc(100% - 0.78rem) 50% / 0.42rem 0.42rem no-repeat,
+        linear-gradient(180deg, rgba(18, 61, 44, 0.96), rgba(7, 25, 19, 0.98));
+      box-shadow:
+        inset 0 1px 0 rgba(255, 243, 214, 0.08),
+        0 0.45rem 1rem rgba(0, 0, 0, 0.18);
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+
+    .mars-date-picker-title select:hover {
+      border-color: rgba(239, 195, 106, 0.42);
+    }
+
+    .mars-date-picker-title select option {
+      color: #f3ead1;
+      background: #071913;
+      font: 0.86rem/1.2 "Cascadia Code", "Fira Code", "DejaVu Sans Mono", monospace;
+    }
+
+    .mars-date-picker-title select option:checked {
+      color: #10190f;
+      background: #cfa052;
     }
 
     .mars-date-picker-title input {
       padding: 0.45rem 0.65rem;
+      background: rgba(0, 0, 0, 0.14);
       text-align: center;
+    }
+
+    .mars-date-picker-title input[type="number"] {
+      appearance: textfield;
+      -moz-appearance: textfield;
+    }
+
+    .mars-date-picker-title input[type="number"]::-webkit-inner-spin-button,
+    .mars-date-picker-title input[type="number"]::-webkit-outer-spin-button {
+      appearance: none;
+      -webkit-appearance: none;
+      margin: 0;
+    }
+
+    .mars-date-picker-year-step {
+      position: relative;
+      display: grid;
+      place-items: center;
+      min-width: 2.2rem;
+      min-height: 2.2rem;
+      border: 1px solid rgba(233, 244, 239, 0.22);
+      border-radius: 999px;
+      color: #f3ead1;
+      background:
+        radial-gradient(circle at 50% 25%, rgba(239, 195, 106, 0.18), transparent 55%),
+        linear-gradient(180deg, rgba(22, 70, 50, 0.94), rgba(7, 25, 19, 0.98));
+      box-shadow:
+        inset 0 1px 0 rgba(255, 243, 214, 0.08),
+        0 0.45rem 1rem rgba(0, 0, 0, 0.18);
+      font: 1.15rem/1 "Cascadia Code", "DejaVu Sans Mono", monospace;
+      font-weight: 800;
+      text-indent: -9999px;
+      overflow: hidden;
+      cursor: pointer;
+    }
+
+    .mars-date-picker-year-step::before {
+      content: attr(data-symbol);
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      text-indent: 0;
+      transform: translateY(-0.03rem);
+    }
+
+    .mars-date-picker-year-step:hover,
+    .mars-date-picker-year-step:focus-visible {
+      border-color: rgba(239, 195, 106, 0.5);
+      outline: none;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 243, 214, 0.1),
+        0 0 0 3px rgba(113, 198, 180, 0.16),
+        0 0.55rem 1.2rem rgba(0, 0, 0, 0.22);
     }
 
     .mars-date-picker-title select:focus-visible,
@@ -3314,7 +3409,7 @@ __THEME_OVERRIDES__
           <div class="datetime-orbit"></div>
           <div>
             <div class="datetime-briefing-kicker">Sol calendar uplink</div>
-            <div class="datetime-briefing-title">Plan an Earth date from the MARS observatory.</div>
+            <div class="datetime-briefing-title">Plan an Earth date from the observer location.</div>
             <div class="datetime-briefing-copy">Choose a civil date, a range, and an observation point. The core datetime module handles the calendar and solar calculations; this panel is only the flight deck.</div>
           </div>
         </div>
@@ -3370,7 +3465,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             </div>
           </div>
           <div class="datetime-field-group">
-            <div class="datetime-field-group-title">Observatory</div>
+            <div class="datetime-field-group-title">Observer location</div>
             <div class="datetime-grid location-grid">
               <div class="integrator-bound-field">
                 <label for="datetimeTown">Town/location</label>
@@ -3469,7 +3564,11 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           <button class="mars-date-picker-nav" id="marsDatePickerPrev" type="button" aria-label="Previous month">‹</button>
           <div class="mars-date-picker-title" id="marsDatePickerTitle">
             <select id="marsDatePickerMonth" aria-label="Calendar month"></select>
-            <input id="marsDatePickerYear" type="number" inputmode="numeric" min="1" max="9999" step="1" aria-label="Calendar year">
+            <div class="mars-date-picker-year-group" aria-label="Calendar year controls">
+              <button class="mars-date-picker-year-step" id="marsDatePickerYearDown" type="button" aria-label="Previous year" title="Previous year; Shift for 10 years; Ctrl for 100 years" data-symbol="−">−</button>
+              <input id="marsDatePickerYear" type="number" inputmode="numeric" min="1" max="9999" step="1" aria-label="Calendar year">
+              <button class="mars-date-picker-year-step" id="marsDatePickerYearUp" type="button" aria-label="Next year" title="Next year; Shift for 10 years; Ctrl for 100 years" data-symbol="+">+</button>
+            </div>
           </div>
           <button class="mars-date-picker-nav" id="marsDatePickerNext" type="button" aria-label="Next month">›</button>
         </div>
@@ -3565,7 +3664,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         </div>
       </div>
       <div class="help-pane hidden" id="helpPane">
-        <div class="help-card" data-help-modes="expression,equation,matrix,integrator,datetime">
+        <div class="help-card" data-help-modes="expression,equation,matrix,integrator,datetime,almanac">
           <div class="help-kicker">Start Here</div>
           <p>MARS Lab works best when you type the mathematical object itself in the main editor, then use the controls underneath to tell the lab what kind of job you want.</p>
           <ul>
@@ -3574,6 +3673,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             <li><code>Matrix</code>: type a matrix expression and pick an operation.</li>
             <li><code>Integrator</code>: type the integrand, then add one row per variable you want to integrate over.</li>
             <li><code>Datetime</code>: choose dates, a year, and a location to calculate calendar and solar facts.</li>
+            <li><code>Almanac</code>: choose a GMT moment and observer location to inspect navigational bodies, visibility, and local eclipse/transit events.</li>
           </ul>
         </div>
         <div class="help-card" data-help-modes="datetime">
@@ -3587,6 +3687,38 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             <li><code>GMT offset</code> should include daylight saving. Leave it blank to use the selected jurisdiction's local offset for the selected date.</li>
             <li>Ramadan, Eid al-Fitr, and Muslim New Year use the civil Islamic calendar; Hindu and Buddhist observances are estimated from India-window lunar events, so observed dates can differ locally.</li>
             <li>Weather, humidity, wind, and rain chance appear only when a weather API key is configured and the selected date is supported by the provider.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="almanac">
+          <div class="help-kicker">Almanac Workflow</div>
+          <p>Use Almanac mode when you want celestial navigation style positions for a precise moment and observer.</p>
+          <ul>
+            <li><code>Date</code> and <code>GMT time</code> define the instant used by the ephemeris. The body table is calculated for that GMT instant.</li>
+            <li><code>Zone</code> is used to present local event times, such as eclipse contacts. It does not change the GMT instant entered above.</li>
+            <li><code>Jurisdiction</code> and <code>Town/location</code> fill in latitude, longitude, altitude, and local time rules where available.</li>
+            <li>You can type latitude, longitude, and altitude directly if the exact observing point is not in the town list.</li>
+            <li>The <code>All</code>/<code>Visible</code> toggle controls the body table only; events are still searched for the selected observer and year.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="almanac">
+          <div class="help-kicker">Reading The Body Table</div>
+          <ul>
+            <li><code>Declination</code>, <code>RA</code>, and <code>GHA</code> are apparent body coordinates for the selected GMT moment.</li>
+            <li><code>Altitude</code> and <code>Azimuth</code> are observer-relative horizon coordinates for the selected latitude, longitude, and altitude.</li>
+            <li><code>s.d.</code> is the apparent semi-diameter in arcminutes where the body has a visible disc.</li>
+            <li><code>Vmag.</code> is visual magnitude. Lower numbers are brighter; negative values are very bright.</li>
+            <li><code>Visible</code> means the body is above the usable local horizon and passes the daylight/eclipse visibility checks.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="almanac">
+          <div class="help-kicker">Eclipses And Transits</div>
+          <ul>
+            <li>The event table covers the selected calendar year and reports only events that occur locally for the selected observer.</li>
+            <li><code>Date</code> gives the local civil date of greatest eclipse or transit, so the row remains meaningful even if nearest totality cannot be found.</li>
+            <li><code>First</code>, <code>Greatest</code>, and <code>Fourth</code> are local civil progress times. Use <code>GMT</code> when comparing against the body table.</li>
+            <li><code>Mag.</code> is eclipse magnitude; <code>Obsc.</code> is obscuration or totality percentage.</li>
+            <li><code>Nearest totality</code> lists the nearest town or location where totality can be observed when the selected observer sees only a partial eclipse.</li>
+            <li>Use the <code>Use</code> button on a nearest-totality result to jump the almanac to that town and moment.</li>
           </ul>
         </div>
         <div class="help-card" data-help-modes="integrator">
@@ -3776,6 +3908,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     const marsDatePickerTitle = document.getElementById('marsDatePickerTitle');
     const marsDatePickerMonth = document.getElementById('marsDatePickerMonth');
     const marsDatePickerYear = document.getElementById('marsDatePickerYear');
+    const marsDatePickerYearDown = document.getElementById('marsDatePickerYearDown');
+    const marsDatePickerYearUp = document.getElementById('marsDatePickerYearUp');
     const marsDatePickerWeekdays = document.getElementById('marsDatePickerWeekdays');
     const marsDatePickerGrid = document.getElementById('marsDatePickerGrid');
     const marsDatePickerPrev = document.getElementById('marsDatePickerPrev');
@@ -4009,18 +4143,22 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       marsDatePickerPrev.addEventListener('click', () => shiftMarsDatePickerMonth(-1));
     if (marsDatePickerNext)
       marsDatePickerNext.addEventListener('click', () => shiftMarsDatePickerMonth(1));
+    if (marsDatePickerYearDown)
+      marsDatePickerYearDown.addEventListener('click', (event) => shiftMarsDatePickerYear(-marsDatePickerYearStep(event)));
+    if (marsDatePickerYearUp)
+      marsDatePickerYearUp.addEventListener('click', (event) => shiftMarsDatePickerYear(marsDatePickerYearStep(event)));
     if (marsDatePickerMonth)
       marsDatePickerMonth.addEventListener('change', () => {
-        setMarsDatePickerMonthYear(marsDatePickerState.year, marsDatePickerMonth.value);
+        setMarsDatePickerMonthYear(marsDatePickerState.year, marsDatePickerMonth.value, {commit: true});
       });
     if (marsDatePickerYear) {
       marsDatePickerYear.addEventListener('change', () => {
-        setMarsDatePickerMonthYear(marsDatePickerYear.value, marsDatePickerState.month);
+        setMarsDatePickerMonthYear(marsDatePickerYear.value, marsDatePickerState.month, {commit: true});
       });
       marsDatePickerYear.addEventListener('keydown', (event) => {
         if (event.key === 'Enter') {
           event.preventDefault();
-          setMarsDatePickerMonthYear(marsDatePickerYear.value, marsDatePickerState.month);
+          setMarsDatePickerMonthYear(marsDatePickerYear.value, marsDatePickerState.month, {commit: true});
         }
       });
     }
@@ -4577,6 +4715,19 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         emptyState.classList.toggle('visible', visibleCount === 0);
       }
 
+      function selectedOptionButton() {
+        return optionButtons.find((item) =>
+          item.dataset.value === select.value && !item.classList.contains('hidden')
+        );
+      }
+
+      function scrollSelectedOptionIntoView() {
+        const selected = selectedOptionButton();
+        if (!selected)
+          return;
+        selected.scrollIntoView({block: 'nearest', inline: 'nearest'});
+      }
+
       function sync() {
         const selected = selectedOption();
         const parts = selected ? optionParts(selected) : null;
@@ -4602,11 +4753,12 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         shell.classList.add('open');
         button.setAttribute('aria-expanded', 'true');
         menu.classList.remove('hidden');
+        requestAnimationFrame(scrollSelectedOptionIntoView);
       }
 
       function focusSelectedOption() {
         const visible = visibleOptionButtons();
-        const selected = visible.find((item) => item.dataset.value === select.value);
+        const selected = selectedOptionButton();
         (selected || visible[0] || searchInput || button).focus();
       }
 
@@ -4644,6 +4796,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       if (searchInput) {
         searchInput.addEventListener('input', () => {
           filterOptions();
+          scrollSelectedOptionIntoView();
         });
         searchInput.addEventListener('keydown', (event) => {
           if (event.key === 'Escape') {
@@ -4831,9 +4984,11 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       const rect = marsDatePickerAnchorRect(shell);
       if (!rect)
         return;
-      const width = rect.width;
       const margin = 12;
       const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+      const maxWidth = Math.max(0, viewportWidth - margin * 2);
+      const minWidth = Math.min(448, maxWidth);
+      const width = Math.min(maxWidth, Math.max(rect.width, minWidth));
       const left = Math.max(margin, Math.min(rect.left, viewportWidth - width - margin));
       let top = rect.bottom + 8;
 
@@ -4958,12 +5113,38 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       renderMarsDatePicker();
     }
 
-    function setMarsDatePickerMonthYear(year, month) {
+    function commitMarsDatePickerMonthYear(year, month) {
+      const input = marsDatePickerState.input;
+      if (!input)
+        return;
+      const selected = parseMarsIsoDate(input.value);
+      const day = selected ? selected.day : 1;
+      const safeDay = Math.min(day, marsDaysInMonth(year, month));
+      commitMarsDateValue(input, marsIsoDate(year, month, safeDay));
+    }
+
+    function setMarsDatePickerMonthYear(year, month, {commit = false} = {}) {
       if (!marsDatePickerState.input)
         return;
       marsDatePickerState.year = marsClampYear(year);
       marsDatePickerState.month = marsClampMonth(month);
+      if (commit)
+        commitMarsDatePickerMonthYear(marsDatePickerState.year, marsDatePickerState.month);
       renderMarsDatePicker();
+    }
+
+    function marsDatePickerYearStep(event) {
+      if (event && event.ctrlKey)
+        return 100;
+      if (event && event.shiftKey)
+        return 10;
+      return 1;
+    }
+
+    function shiftMarsDatePickerYear(delta) {
+      if (!marsDatePickerState.input)
+        return;
+      setMarsDatePickerMonthYear(marsDatePickerState.year + delta, marsDatePickerState.month, {commit: true});
     }
 
     function shiftMarsDatePickerMonth(delta) {
@@ -4979,7 +5160,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         nextMonth -= 12;
         nextYear += 1;
       }
-      setMarsDatePickerMonthYear(nextYear, nextMonth);
+      setMarsDatePickerMonthYear(nextYear, nextMonth, {commit: true});
     }
 
     function splitTopLevel(text, separator) {
@@ -7397,6 +7578,24 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       return match ? match[1] : text.replace(/\s+GMT$/, '');
     }
 
+    function almanacEventDateText(event) {
+      if (!event || typeof event !== 'object')
+        return '';
+      const candidates = [
+        event.greatest,
+        event.time,
+        event.first_contact,
+        event.fourth_contact,
+        event.gmt_time
+      ];
+      for (const value of candidates) {
+        const match = String(value || '').trim().match(/^(\d{4}-\d{2}-\d{2})\b/);
+        if (match)
+          return match[1];
+      }
+      return '';
+    }
+
     function almanacTotalityActionAttributes(action) {
       if (!action || typeof action !== 'object')
         return '';
@@ -7471,8 +7670,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         `Body filter: ${visibility === 'visible' ? 'visible only' : 'all bodies'}`,
         '',
         showVisibleColumn
-          ? 'Body | Declination | RA | GHA | Altitude | Azimuth | s.d. | Vmag. | Visible'
-          : 'Body | Declination | RA | GHA | Altitude | Azimuth | s.d. | Vmag.'
+          ? 'Body | Declination | GHA | RA | Altitude | Azimuth | s.d. | Vmag. | Visible'
+          : 'Body | Declination | GHA | RA | Altitude | Azimuth | s.d. | Vmag.'
       ].filter((line, index) => index >= 4 || String(line || '').trim());
 
       if (rows.length) {
@@ -7480,8 +7679,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           const cells = [
             String(row.name || row.code || '').trim(),
             String(row.declination || '').trim(),
-            String(row.right_ascension || '').trim(),
             String(row.gha || '').trim(),
+            String(row.right_ascension || '').trim(),
             String(row.altitude || '').trim(),
             String(row.azimuth || '').trim(),
             String(row.semi_diameter || '').trim(),
@@ -7498,7 +7697,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       }
 
       lines.push('', data && data.event_title || '');
-      lines.push('Class | Event | Kind | Magnitude | Obscuration | First contact | Greatest eclipse | Fourth contact | Greatest GMT | Notes | Nearest totality');
+      lines.push('Class | Event | Kind | Magnitude | Obscuration | Date | First contact | Greatest eclipse | Fourth contact | Greatest GMT | Notes | Nearest totality');
       if (events.length) {
         events.forEach((event) => {
           lines.push([
@@ -7507,6 +7706,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             String(event.kind || '').trim(),
             String(event.magnitude || '').trim(),
             String(event.obscuration || '').trim(),
+            almanacEventDateText(event),
             String(event.first_contact || '').trim(),
             String(event.greatest || event.time || '').trim(),
             String(event.fourth_contact || '').trim(),
@@ -7555,8 +7755,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
               <tr>
                 <th>Body</th>
                 <th>Declination</th>
-                <th>RA</th>
                 <th>GHA</th>
+                <th>RA</th>
                 <th>Altitude</th>
                 <th>Azimuth</th>
                 <th>s.d.</th>
@@ -7573,8 +7773,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
                   <tr class="${classes}">
                     <td class="${nameClass}">${escapeHtml(row.name || row.code || '')}</td>
                     <td class="number">${escapeHtml(row.declination || '')}</td>
-                    <td class="number">${escapeHtml(row.right_ascension || '')}</td>
                     <td class="number">${escapeHtml(row.gha || '')}</td>
+                    <td class="number">${escapeHtml(row.right_ascension || '')}</td>
                     <td class="number">${escapeHtml(row.altitude || '')}</td>
                     <td class="number">${escapeHtml(row.azimuth || '')}</td>
                     <td class="number">${escapeHtml(row.semi_diameter || '')}</td>
@@ -7593,6 +7793,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
                 <th class="event-kind">Kind</th>
                 <th class="event-measure" title="Magnitude">Mag.</th>
                 <th class="event-measure" title="Obscuration">Obsc.</th>
+                <th class="event-date">Date</th>
                 <th class="event-time">First</th>
                 <th class="event-time">Greatest</th>
                 <th class="event-time">Fourth</th>
@@ -7616,6 +7817,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
                   <td>${escapeHtml(event.kind || '')}</td>
                   <td class="number">${escapeHtml(event.magnitude || '')}</td>
                   <td class="number">${escapeHtml(event.obscuration || '')}</td>
+                  <td class="number event-date">${escapeHtml(almanacEventDateText(event))}</td>
                   <td class="number event-time" title="${escapeHtml(event.first_contact || '')}">${escapeHtml(compactAlmanacLocalTime(event.first_contact || ''))}</td>
                   <td class="number event-time" title="${escapeHtml(event.greatest || event.time || '')}">${escapeHtml(compactAlmanacLocalTime(event.greatest || event.time || ''))}</td>
                   <td class="number event-time" title="${escapeHtml(event.fourth_contact || '')}">${escapeHtml(compactAlmanacLocalTime(event.fourth_contact || ''))}</td>
@@ -7624,7 +7826,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
                 </tr>`;
               }).join('') : `
                 <tr>
-                  <td colspan="10">No eclipses or Mercury/Venus transits found in this one-year window.</td>
+                  <td colspan="11">No eclipses or Mercury/Venus transits found in this one-year window.</td>
                 </tr>`}
             </tbody>
           </table>
@@ -13666,6 +13868,14 @@ def almanac_gmt_event_time_from_jd(jd: float) -> str:
     return f"{utc_moment:%Y-%m-%d %H:%M:%S} GMT"
 
 
+def almanac_event_date_text(event: dict[str, object]) -> str:
+    for key in ("greatest", "time", "first_contact", "fourth_contact", "gmt_time"):
+        text = str(event.get(key) or "").strip()
+        if len(text) >= 10 and text[4:5] == "-" and text[7:8] == "-":
+            return text[:10]
+    return ""
+
+
 def almanac_local_event_time_from_jd(jd: float,
                                      jurisdiction: str,
                                      fallback_zone_hours: float = 0.0) -> tuple[str, str]:
@@ -13967,7 +14177,7 @@ def prepare_almanac_fields(fields: dict[str, str]) -> dict[str, object]:
         f"Longitude: {longitude_text}",
         f"Body filter: {'visible only' if visibility_text == 'visible' else 'all bodies'}",
         "",
-        "Body | Declination | RA | GHA | Altitude | Azimuth | s.d. | Vmag. | Visible",
+        "Body | Declination | GHA | RA | Altitude | Azimuth | s.d. | Vmag. | Visible",
     ]
     if rows:
         for row in rows:
@@ -13976,8 +14186,8 @@ def prepare_almanac_fields(fields: dict[str, str]) -> dict[str, object]:
                     [
                         str(row.get("name") or row.get("code") or "").strip(),
                         str(row.get("declination") or "").strip(),
-                        str(row.get("right_ascension") or "").strip(),
                         str(row.get("gha") or "").strip(),
+                        str(row.get("right_ascension") or "").strip(),
                         str(row.get("altitude") or "").strip(),
                         str(row.get("azimuth") or "").strip(),
                         str(row.get("semi_diameter") or "").strip(),
@@ -13994,7 +14204,7 @@ def prepare_almanac_fields(fields: dict[str, str]) -> dict[str, object]:
         "",
         f"Eclipses and inner planetary transits for {event_year}",
         "Progress times are local civil times. Use Greatest GMT in the GMT time field when comparing the body table.",
-        "Class | Event | Kind | Magnitude | Obscuration | First contact | Greatest eclipse | Fourth contact | Greatest GMT | Notes | Nearest totality",
+        "Class | Event | Kind | Magnitude | Obscuration | Date | First contact | Greatest eclipse | Fourth contact | Greatest GMT | Notes | Nearest totality",
     ])
     if events:
         for event in events:
@@ -14006,6 +14216,7 @@ def prepare_almanac_fields(fields: dict[str, str]) -> dict[str, object]:
                         str(event.get("kind") or "").strip(),
                         str(event.get("magnitude") or "").strip(),
                         str(event.get("obscuration") or "").strip(),
+                        almanac_event_date_text(event),
                         str(event.get("first_contact") or "").strip(),
                         str(event.get("greatest") or event.get("time") or "").strip(),
                         str(event.get("fourth_contact") or "").strip(),
@@ -14025,6 +14236,7 @@ def prepare_almanac_fields(fields: dict[str, str]) -> dict[str, object]:
             f"{str(event.get('category') or '').strip()}  "
             f"{str(event.get('name') or '').strip()} "
             f"({str(event.get('kind') or '').strip()})"
+            + (f"\n  Date: {almanac_event_date_text(event)}" if almanac_event_date_text(event) else "")
             + (f"\n  Magnitude: {str(event.get('magnitude') or '').strip()}" if str(event.get("magnitude") or "").strip() else "")
             + (f"\n  Obscuration/totality: {str(event.get('obscuration') or '').strip()}" if str(event.get("obscuration") or "").strip() else "")
             + (f"\n  First contact: {str(event.get('first_contact') or '').strip()}" if str(event.get("first_contact") or "").strip() else "")
