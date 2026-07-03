@@ -637,6 +637,23 @@ static double normalize_degrees_signed(double degrees)
     return value - 180.0;
 }
 
+bool almanac_body_geographical_position(const almanac_entry_t *body,
+                                        almanac_geographical_position_t *out)
+{
+    double gha_body_degrees;
+
+    if (!body || !out)
+        return false;
+
+    gha_body_degrees = normalize_degrees(body->gha_aries_degrees + body->sha_degrees);
+    if (!isfinite(body->declination_degrees) || !isfinite(gha_body_degrees))
+        return false;
+
+    out->latitude_degrees = body->declination_degrees;
+    out->longitude_degrees = normalize_degrees_signed(-gha_body_degrees);
+    return true;
+}
+
 static double degrees_to_radians(double degrees)
 {
     return degrees * (M_PI / 180.0);

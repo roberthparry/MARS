@@ -99,6 +99,7 @@ report a finite geocentric distance, and some brightness-related values may be
 - `almanac_gha_aries()` to compute Greenwich Hour Angle of Aries for a moment
 - `almanac_new_body_entry()` to resolve one catalogued body enum into an `almanac_entry_t`
 - `almanac_observables()` to derive observer-relative horizon observables from one entry
+- `almanac_body_geographical_position()` to derive the Earth position where one body is directly overhead
 - `almanac_body_rise_set()` to find almanac-based local rise and set for one body, observer, and jurisdiction
 - `almanac_sunrise_sunset()` to find almanac-based local sunrise and sunset for an observer and jurisdiction
 - `almanac_moonrise_moonset()` to find almanac-based local moonrise and moonset for an observer and jurisdiction
@@ -457,6 +458,20 @@ and two horizon flags.
 
 Returns `true` on success. Returns `false` if any pointer is invalid or the
 observer latitude/longitude is out of range.
+
+**`bool almanac_body_geographical_position(const almanac_entry_t *body, almanac_geographical_position_t *out)`**
+
+Derive the geographical position, or GP, for one computed body entry. This is
+the point on Earth where the body is directly overhead.
+
+- `body` — previously computed almanac entry for the target body
+- `out` — caller-provided geographical position structure to fill on success
+
+On success, `out->latitude_degrees` is the body's declination and
+`out->longitude_degrees` is the body longitude in signed east-positive degrees.
+
+Returns `true` on success. Returns `false` if any pointer is invalid or the
+entry does not contain finite GHA/declination values.
 
 **`bool almanac_body_rise_set(almanac_t *almanac, jurisdiction_t *jurisdiction, almanac_body_id_t body_id, const datetime_t *date, const almanac_observer_t *observer, almanac_rise_set_t *out)`**
 

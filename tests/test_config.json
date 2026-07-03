@@ -6,6 +6,7 @@
     },
     "tests": {
       "enabled": true,
+      "test_almanac_body_geographical_position_resolves_gp": true,
       "test_almanac_find_lunar_eclipses_returns_events_in_2025": true,
       "test_almanac_find_solar_eclipses_returns_august_2026_event": true,
       "test_almanac_find_solar_transits_returns_mercury_event": true,
