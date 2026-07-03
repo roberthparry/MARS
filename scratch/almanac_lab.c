@@ -465,6 +465,98 @@ static void format_optional_double(char *out, size_t out_size, const char *forma
     snprintf(out, out_size, format, value);
 }
 
+static void format_unsigned_angle(char *out, size_t out_size, double degrees)
+{
+    double total_minutes;
+    int whole_degrees;
+    double minutes;
+
+    if (!out || out_size == 0u)
+        return;
+    if (!isfinite(degrees)) {
+        out[0] = '\0';
+        return;
+    }
+
+    total_minutes = round(normalize_degrees(degrees) * 6000.0) / 100.0;
+    whole_degrees = (int)(total_minutes / 60.0);
+    minutes = total_minutes - (double)(whole_degrees * 60);
+    if (minutes >= 60.0) {
+        whole_degrees = (whole_degrees + 1) % 360;
+        minutes = 0.0;
+    }
+
+    snprintf(out, out_size, "%03d\xC2\xB0 %05.2f", whole_degrees, minutes);
+}
+
+static void format_signed_angle(char *out, size_t out_size, double degrees)
+{
+    double total_minutes;
+    int whole_degrees;
+    double minutes;
+    const char *sign;
+
+    if (!out || out_size == 0u)
+        return;
+    if (!isfinite(degrees)) {
+        out[0] = '\0';
+        return;
+    }
+
+    sign = degrees < 0.0 ? "-" : "";
+    total_minutes = round(fabs(degrees) * 6000.0) / 100.0;
+    whole_degrees = (int)(total_minutes / 60.0);
+    minutes = total_minutes - (double)(whole_degrees * 60);
+    if (minutes >= 60.0) {
+        ++whole_degrees;
+        minutes = 0.0;
+    }
+
+    snprintf(out, out_size, "%s%03d\xC2\xB0 %05.2f", sign, whole_degrees, minutes);
+}
+
+static void format_declination_angle(char *out, size_t out_size, double degrees)
+{
+    double total_minutes;
+    int whole_degrees;
+    double minutes;
+    const char *hemisphere;
+
+    if (!out || out_size == 0u)
+        return;
+    if (!isfinite(degrees)) {
+        out[0] = '\0';
+        return;
+    }
+
+    hemisphere = degrees < 0.0 ? "S" : "N";
+    total_minutes = round(fabs(degrees) * 6000.0) / 100.0;
+    whole_degrees = (int)(total_minutes / 60.0);
+    minutes = total_minutes - (double)(whole_degrees * 60);
+    if (minutes >= 60.0) {
+        ++whole_degrees;
+        minutes = 0.0;
+    }
+
+    snprintf(out, out_size, "%s %03d\xC2\xB0 %05.2f", hemisphere, whole_degrees, minutes);
+}
+
+static void format_right_ascension(char *out, size_t out_size, double hours)
+{
+    format_unsigned_angle(out, out_size, hours * 15.0);
+}
+
+static void format_semi_diameter(char *out, size_t out_size, double degrees)
+{
+    if (!out || out_size == 0u)
+        return;
+    if (!isfinite(degrees)) {
+        out[0] = '\0';
+        return;
+    }
+    snprintf(out, out_size, "%05.2f", degrees * 60.0);
+}
+
 static void append_snapshot_row(string_t *out,
                                 const char *code,
                                 const char *name,
@@ -493,6 +585,12 @@ static void append_snapshot_row(string_t *out,
     char altitude_text[32];
     char azimuth_text[32];
     char semi_diameter_text[32];
+    char declination_display[32];
+    char right_ascension_display[32];
+    char gha_display[32];
+    char altitude_display[32];
+    char azimuth_display[32];
+    char semi_diameter_display[32];
 
     format_optional_double(declination_text, sizeof(declination_text), "%.9f", declination);
     format_optional_double(right_ascension_text, sizeof(right_ascension_text), "%.9f", right_ascension_hours);
@@ -505,11 +603,17 @@ static void append_snapshot_row(string_t *out,
     format_optional_double(altitude_text, sizeof(altitude_text), "%.9f", altitude);
     format_optional_double(azimuth_text, sizeof(azimuth_text), "%.9f", azimuth);
     format_optional_double(semi_diameter_text, sizeof(semi_diameter_text), "%.9f", semi_diameter);
+    format_declination_angle(declination_display, sizeof(declination_display), declination);
+    format_right_ascension(right_ascension_display, sizeof(right_ascension_display), right_ascension_hours);
+    format_unsigned_angle(gha_display, sizeof(gha_display), gha);
+    format_signed_angle(altitude_display, sizeof(altitude_display), altitude);
+    format_unsigned_angle(azimuth_display, sizeof(azimuth_display), azimuth);
+    format_semi_diameter(semi_diameter_display, sizeof(semi_diameter_display), semi_diameter);
 
     if (!out)
         return;
     (void)string_append_format(out,
-                               "snapshot %s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s\n",
+                               "snapshot %s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s\n",
                                code ? code : "",
                                name ? name : "",
                                kind ? kind : "",
@@ -524,7 +628,13 @@ static void append_snapshot_row(string_t *out,
                                altitude_text,
                                azimuth_text,
                                semi_diameter_text,
-                               visible ? visible : "");
+                               visible ? visible : "",
+                               declination_display,
+                               right_ascension_display,
+                               gha_display,
+                               altitude_display,
+                               azimuth_display,
+                               semi_diameter_display);
 }
 
 int main(int argc, char **argv)

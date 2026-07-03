@@ -13243,7 +13243,7 @@ def parse_almanac_snapshot_rows(text: str) -> list[dict[str, str]]:
     rows: list[dict[str, str]] = []
     for line in str(text or "").splitlines():
       parts = line.split("|")
-      if len(parts) not in (11, 15):
+      if len(parts) not in (11, 15, 21):
           continue
       declination = parse_optional_float(parts[3])
       right_ascension = parse_optional_float(parts[4])
@@ -13255,21 +13255,27 @@ def parse_almanac_snapshot_rows(text: str) -> list[dict[str, str]]:
       kind = parts[2].strip()
       if kind == "reference":
           continue
+      declination_text = parts[15].strip() if len(parts) >= 21 else format_almanac_declination(declination)
+      right_ascension_text = parts[16].strip() if len(parts) >= 21 else format_almanac_ra(right_ascension)
+      gha_text = parts[17].strip() if len(parts) >= 21 else format_almanac_unsigned_angle(gha)
+      altitude_text = parts[18].strip() if len(parts) >= 21 else format_almanac_signed_angle(altitude)
+      azimuth_text = parts[19].strip() if len(parts) >= 21 else format_almanac_unsigned_angle(azimuth)
+      semi_diameter_text = parts[20].strip() if len(parts) >= 21 else format_almanac_semi_diameter(semi_diameter)
       rows.append({
           "code": parts[0].strip(),
           "name": parts[1].strip(),
           "kind": kind,
-          "declination": format_almanac_declination(declination),
-          "right_ascension": format_almanac_ra(right_ascension),
-          "gha": format_almanac_unsigned_angle(gha),
+          "declination": declination_text,
+          "right_ascension": right_ascension_text,
+          "gha": gha_text,
           "sha": parts[6].strip(),
           "lha": parts[7].strip(),
           "distance_au": parts[8].strip(),
           "phase": parts[9].strip(),
           "magnitude": format_almanac_magnitude(magnitude),
-          "altitude": format_almanac_signed_angle(altitude),
-          "azimuth": format_almanac_unsigned_angle(azimuth),
-          "semi_diameter": format_almanac_semi_diameter(semi_diameter),
+          "altitude": altitude_text,
+          "azimuth": azimuth_text,
+          "semi_diameter": semi_diameter_text,
           "visible": (parts[14].strip().upper() if len(parts) >= 15 else ""),
       })
     return rows
