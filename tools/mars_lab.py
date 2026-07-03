@@ -47,6 +47,7 @@ JURISDICTION_DB_PATH_ENV = "MARS_JURISDICTION_DB_PATH"
 JURISDICTION_DB_KEY_ENV = "MARS_JURISDICTION_DB_KEY"
 LEGACY_HOLIDAY_DB_PATH_ENV = "MARS_HOLIDAY_DB_PATH"
 LEGACY_HOLIDAY_DB_KEY_ENV = "MARS_HOLIDAY_DB_KEY"
+JURISDICTION_CONFIG_FILE = "jurisdiction-db.env"
 
 
 def detect_system_locale_country_code() -> str:
@@ -239,9 +240,14 @@ def default_jurisdiction_db_path() -> Path:
 
 def jurisdiction_db_runtime_env() -> dict[str, str]:
     env_updates: dict[str, str] = {}
+    config_path = config_env_path(JURISDICTION_CONFIG_FILE)
     configured_path = os.environ.get(JURISDICTION_DB_PATH_ENV, "").strip()
     if not configured_path:
         configured_path = os.environ.get(LEGACY_HOLIDAY_DB_PATH_ENV, "").strip()
+    if not configured_path:
+        configured_path = read_env_like_value(config_path, JURISDICTION_DB_PATH_ENV)
+    if not configured_path:
+        configured_path = read_env_like_value(config_path, LEGACY_HOLIDAY_DB_PATH_ENV)
     db_path = Path(configured_path).expanduser() if configured_path else default_jurisdiction_db_path()
     env_updates[JURISDICTION_DB_PATH_ENV] = str(db_path)
     env_updates[LEGACY_HOLIDAY_DB_PATH_ENV] = str(db_path)
@@ -249,6 +255,10 @@ def jurisdiction_db_runtime_env() -> dict[str, str]:
     configured_key = os.environ.get(JURISDICTION_DB_KEY_ENV, "").strip()
     if not configured_key:
         configured_key = os.environ.get(LEGACY_HOLIDAY_DB_KEY_ENV, "").strip()
+    if not configured_key:
+        configured_key = read_env_like_value(config_path, JURISDICTION_DB_KEY_ENV)
+    if not configured_key:
+        configured_key = read_env_like_value(config_path, LEGACY_HOLIDAY_DB_KEY_ENV)
     if configured_key:
         env_updates[JURISDICTION_DB_KEY_ENV] = configured_key
         env_updates[LEGACY_HOLIDAY_DB_KEY_ENV] = configured_key
@@ -1584,6 +1594,32 @@ INDEX_HTML = r"""<!doctype html>
       white-space: normal;
     }
 
+    .almanac-totality-action {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      flex-wrap: wrap;
+    }
+
+    .almanac-use-totality {
+      border: 1px solid rgba(240, 200, 115, 0.45);
+      border-radius: 999px;
+      padding: 0.22rem 0.62rem;
+      background: rgba(240, 200, 115, 0.16);
+      color: #ffe3a5;
+      font: 0.68rem/1.1 "Cascadia Code", "DejaVu Sans Mono", monospace;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+
+    .almanac-use-totality:hover,
+    .almanac-use-totality:focus-visible {
+      background: rgba(240, 200, 115, 0.28);
+      box-shadow: 0 0 0 3px rgba(113, 198, 180, 0.14);
+      outline: 0;
+    }
+
     .almanac-grid-table .visible-cell {
       color: #d6f9df;
       font-weight: 800;
@@ -1736,10 +1772,10 @@ INDEX_HTML = r"""<!doctype html>
     }
 
     .mars-date-picker-title {
-      text-align: center;
-      color: #f3ead1;
-      font: 0.98rem/1.2 Georgia, "Times New Roman", serif;
-      letter-spacing: 0.03em;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 6.2rem;
+      gap: 0.45rem;
+      align-items: center;
     }
 
     .mars-date-picker-nav {
@@ -1757,6 +1793,34 @@ INDEX_HTML = r"""<!doctype html>
     .mars-date-picker-nav:focus-visible {
       border-color: rgba(239, 195, 106, 0.46);
       outline: none;
+      box-shadow: 0 0 0 3px rgba(113, 198, 180, 0.16);
+    }
+
+    .mars-date-picker-title select,
+    .mars-date-picker-title input {
+      width: 100%;
+      min-height: 2.3rem;
+      border: 1px solid rgba(233, 244, 239, 0.2);
+      border-radius: 999px;
+      outline: 0;
+      background: rgba(0, 0, 0, 0.14);
+      color: #f3ead1;
+      font: 0.82rem/1.1 "Cascadia Code", "DejaVu Sans Mono", monospace;
+      letter-spacing: 0.03em;
+    }
+
+    .mars-date-picker-title select {
+      padding: 0.45rem 0.75rem;
+    }
+
+    .mars-date-picker-title input {
+      padding: 0.45rem 0.65rem;
+      text-align: center;
+    }
+
+    .mars-date-picker-title select:focus-visible,
+    .mars-date-picker-title input:focus-visible {
+      border-color: rgba(239, 195, 106, 0.46);
       box-shadow: 0 0 0 3px rgba(113, 198, 180, 0.16);
     }
 
@@ -3403,7 +3467,10 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       <div class="mars-date-picker hidden" id="marsDatePicker" role="dialog" aria-label="Date picker">
         <div class="mars-date-picker-head">
           <button class="mars-date-picker-nav" id="marsDatePickerPrev" type="button" aria-label="Previous month">‹</button>
-          <div class="mars-date-picker-title" id="marsDatePickerTitle"></div>
+          <div class="mars-date-picker-title" id="marsDatePickerTitle">
+            <select id="marsDatePickerMonth" aria-label="Calendar month"></select>
+            <input id="marsDatePickerYear" type="number" inputmode="numeric" min="1" max="9999" step="1" aria-label="Calendar year">
+          </div>
           <button class="mars-date-picker-nav" id="marsDatePickerNext" type="button" aria-label="Next month">›</button>
         </div>
         <div class="mars-date-picker-weekdays" id="marsDatePickerWeekdays"></div>
@@ -3707,6 +3774,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     const almanacElevation = document.getElementById('almanacElevation');
     const marsDatePicker = document.getElementById('marsDatePicker');
     const marsDatePickerTitle = document.getElementById('marsDatePickerTitle');
+    const marsDatePickerMonth = document.getElementById('marsDatePickerMonth');
+    const marsDatePickerYear = document.getElementById('marsDatePickerYear');
     const marsDatePickerWeekdays = document.getElementById('marsDatePickerWeekdays');
     const marsDatePickerGrid = document.getElementById('marsDatePickerGrid');
     const marsDatePickerPrev = document.getElementById('marsDatePickerPrev');
@@ -3940,6 +4009,21 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       marsDatePickerPrev.addEventListener('click', () => shiftMarsDatePickerMonth(-1));
     if (marsDatePickerNext)
       marsDatePickerNext.addEventListener('click', () => shiftMarsDatePickerMonth(1));
+    if (marsDatePickerMonth)
+      marsDatePickerMonth.addEventListener('change', () => {
+        setMarsDatePickerMonthYear(marsDatePickerState.year, marsDatePickerMonth.value);
+      });
+    if (marsDatePickerYear) {
+      marsDatePickerYear.addEventListener('change', () => {
+        setMarsDatePickerMonthYear(marsDatePickerYear.value, marsDatePickerState.month);
+      });
+      marsDatePickerYear.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          setMarsDatePickerMonthYear(marsDatePickerYear.value, marsDatePickerState.month);
+        }
+      });
+    }
     if (marsDatePickerToday)
       marsDatePickerToday.addEventListener('click', () => {
         if (!marsDatePickerState.input)
@@ -4613,6 +4697,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       'January', 'February', 'March', 'April', 'May', 'June',
       'July', 'August', 'September', 'October', 'November', 'December'
     ];
+    const MARS_DATE_MIN_YEAR = 1;
+    const MARS_DATE_MAX_YEAR = 9999;
     const marsDatePickerState = {
       input: null,
       button: null,
@@ -4634,6 +4720,20 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       if (probe.getUTCFullYear() !== year || probe.getUTCMonth() !== month - 1 || probe.getUTCDate() !== day)
         return null;
       return {year, month, day};
+    }
+
+    function marsClampYear(year) {
+      const number = Number.parseInt(String(year || ''), 10);
+      if (!Number.isFinite(number))
+        return new Date().getFullYear();
+      return Math.max(MARS_DATE_MIN_YEAR, Math.min(MARS_DATE_MAX_YEAR, number));
+    }
+
+    function marsClampMonth(month) {
+      const number = Number.parseInt(String(month || ''), 10);
+      if (!Number.isFinite(number))
+        return 1;
+      return Math.max(1, Math.min(12, number));
     }
 
     function marsDaysInMonth(year, month) {
@@ -4664,6 +4764,17 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       if (input === almanacDate)
         return marsCurrentGmtMoment().date;
       return marsTodayIsoDate();
+    }
+
+    function initialiseMarsDatePickerControls() {
+      if (!marsDatePickerMonth || marsDatePickerMonth.options.length)
+        return;
+      marsDatePickerMonth.replaceChildren(...MARS_DATE_MONTHS.map((name, index) => {
+        const option = document.createElement('option');
+        option.value = String(index + 1);
+        option.textContent = name;
+        return option;
+      }));
     }
 
     function marsStartWeekdayIndex(year, month) {
@@ -4764,6 +4875,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       if (!marsDatePicker || !marsDatePickerGrid || !marsDatePickerTitle || !marsDatePickerWeekdays)
         return;
 
+      initialiseMarsDatePickerControls();
       const {input, year, month} = marsDatePickerState;
       const selected = parseMarsIsoDate(input && input.value);
       const today = parseMarsIsoDate(marsTodayIsoDateForInput(input));
@@ -4774,7 +4886,10 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       const previousDays = marsDaysInMonth(previousYear, previousMonth);
       let nextDay = 1;
 
-      marsDatePickerTitle.textContent = `${MARS_DATE_MONTHS[month - 1]} ${year}`;
+      if (marsDatePickerMonth)
+        marsDatePickerMonth.value = String(month);
+      if (marsDatePickerYear)
+        marsDatePickerYear.value = String(year).padStart(4, '0');
       marsDatePickerWeekdays.replaceChildren(...MARS_DATE_WEEKDAYS.map((name) => {
         const cell = document.createElement('div');
         cell.className = 'mars-date-picker-weekday';
@@ -4836,10 +4951,18 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       marsDatePickerState.input = input;
       marsDatePickerState.button = button;
       marsDatePickerState.shell = shell;
-      marsDatePickerState.year = parsed.year;
-      marsDatePickerState.month = parsed.month;
+      marsDatePickerState.year = marsClampYear(parsed.year);
+      marsDatePickerState.month = marsClampMonth(parsed.month);
       if (shell)
         shell.classList.add('open');
+      renderMarsDatePicker();
+    }
+
+    function setMarsDatePickerMonthYear(year, month) {
+      if (!marsDatePickerState.input)
+        return;
+      marsDatePickerState.year = marsClampYear(year);
+      marsDatePickerState.month = marsClampMonth(month);
       renderMarsDatePicker();
     }
 
@@ -4856,9 +4979,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         nextMonth -= 12;
         nextYear += 1;
       }
-      marsDatePickerState.year = nextYear;
-      marsDatePickerState.month = nextMonth;
-      renderMarsDatePicker();
+      setMarsDatePickerMonthYear(nextYear, nextMonth);
     }
 
     function splitTopLevel(text, separator) {
@@ -7219,10 +7340,16 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         cells.forEach((cell) => {
           const jd = String(cell.dataset.almanacLandTotality || '').trim();
           const match = items.find((item) => String(item.jd || '').trim() === jd);
-          cell.textContent = match && match.nearest_totality
-            ? String(match.nearest_totality)
-            : (payload.timed_out ? 'Nearest land totality search timed out' : 'No land totality found');
+          if (match && match.nearest_totality) {
+            cell.innerHTML = almanacNearestTotalityCellHtml(
+              String(match.nearest_totality),
+              match.nearest_totality_action || null
+            );
+          } else {
+            cell.textContent = payload.timed_out ? 'Nearest land totality search timed out' : 'No land totality found';
+          }
         });
+        bindAlmanacTotalityActions(rendered);
       } catch (err) {
         if (refreshId !== almanacLandTotalitySequence || currentMode() !== 'almanac')
           return;
@@ -7268,6 +7395,68 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       const text = String(value || '').trim();
       const match = text.match(/^\d{4}-\d{2}-\d{2}\s+(\d{2}:\d{2}:\d{2})(?:\s+GMT)?$/);
       return match ? match[1] : text.replace(/\s+GMT$/, '');
+    }
+
+    function almanacTotalityActionAttributes(action) {
+      if (!action || typeof action !== 'object')
+        return '';
+      const fields = ['date', 'time', 'zone', 'jurisdiction', 'town', 'latitude', 'longitude', 'elevation'];
+      return fields.map((field) =>
+        ` data-${field.replace(/_/g, '-')}="${escapeHtml(action[field] || '')}"`
+      ).join('');
+    }
+
+    function almanacNearestTotalityCellHtml(text, action) {
+      const body = escapeHtml(text || '');
+      if (!action || typeof action !== 'object' || !String(action.town || '').trim())
+        return body;
+      return `
+        <span class="almanac-totality-action">
+          <span>${body}</span>
+          <button type="button" class="almanac-use-totality" data-almanac-use-totality="1"${almanacTotalityActionAttributes(action)}>Use</button>
+        </span>`;
+    }
+
+    function applyAlmanacTotalityAction(button) {
+      if (!button)
+        return;
+      const date = validDateText(button.dataset.date, '');
+      const time = String(button.dataset.time || '').trim();
+      const zone = String(button.dataset.zone || '').trim();
+      const jurisdiction = validDatetimeJurisdiction(button.dataset.jurisdiction, DEFAULT_DATETIME_JURISDICTION);
+      const town = String(button.dataset.town || '').trim();
+      const latitude = String(button.dataset.latitude || '').trim();
+      const longitude = String(button.dataset.longitude || '').trim();
+      const elevation = String(button.dataset.elevation || '').trim();
+
+      if (almanacDate && date)
+        almanacDate.value = date;
+      if (almanacTime && time)
+        almanacTime.value = time;
+      if (almanacZone && zone)
+        almanacZone.value = zone;
+      if (almanacJurisdiction)
+        setSelectValue(almanacJurisdiction, jurisdiction);
+      populateTownSelect(almanacTown, jurisdiction, {selectDefault: false});
+      if (!restoreTownSelection(almanacTown, jurisdiction, town, latitude, longitude) && almanacTown)
+        almanacTown.value = '';
+      if (almanacLatitude && latitude)
+        almanacLatitude.value = latitude;
+      if (almanacLongitude && longitude)
+        almanacLongitude.value = longitude;
+      if (almanacElevation && elevation)
+        almanacElevation.value = elevation;
+      saveLastAlmanacState();
+      evaluateCurrentMode();
+    }
+
+    function bindAlmanacTotalityActions(root) {
+      (root || document).querySelectorAll('[data-almanac-use-totality]').forEach((button) => {
+        if (button.dataset.boundTotalityAction === '1')
+          return;
+        button.dataset.boundTotalityAction = '1';
+        button.addEventListener('click', () => applyAlmanacTotalityAction(button));
+      });
     }
 
     function almanacWorksheetCopyText(data, visibility) {
@@ -7431,7 +7620,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
                   <td class="number event-time" title="${escapeHtml(event.greatest || event.time || '')}">${escapeHtml(compactAlmanacLocalTime(event.greatest || event.time || ''))}</td>
                   <td class="number event-time" title="${escapeHtml(event.fourth_contact || '')}">${escapeHtml(compactAlmanacLocalTime(event.fourth_contact || ''))}</td>
                   <td class="number event-gmt" title="${escapeHtml(event.gmt_time || '')}">${escapeHtml(compactAlmanacGmtTime(event.gmt_time || ''))}</td>
-                  <td class="event-details" ${needsLandSearch ? `data-almanac-land-totality="${escapeHtml(event.jd || '')}"` : ''}>${escapeHtml(nearestTotality)}</td>
+                  <td class="event-details" ${needsLandSearch ? `data-almanac-land-totality="${escapeHtml(event.jd || '')}"` : ''}>${almanacNearestTotalityCellHtml(nearestTotality, event.nearest_totality_action || null)}</td>
                 </tr>`;
               }).join('') : `
                 <tr>
@@ -7456,6 +7645,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           }
         });
       });
+      bindAlmanacTotalityActions(target);
     }
 
     async function refreshDatetimeLocalHolidays() {
@@ -11820,6 +12010,7 @@ def run_datetime_lab_fields(
             command.append(f"{key}={str(options.get(key, '')).strip()}")
     child_env = os.environ.copy()
     child_env.update(mars_lab_object_store_runtime_env())
+    child_env.update(jurisdiction_db_runtime_env())
     completed = subprocess.run(
         command,
         cwd=ROOT,
@@ -12050,6 +12241,75 @@ def run_almanac_event_lab_rows(options: dict[str, str],
     if completed.returncode != 0:
         return []
     return parse_almanac_event_lab_rows(raw)
+
+
+def almanac_local_event_time_from_jd_for_timezone(jd: float,
+                                                  timezone_name: str,
+                                                  fallback_zone_hours: float,
+                                                  fallback_jurisdiction: str) -> str:
+    epoch = py_datetime.datetime(1970, 1, 1, tzinfo=py_datetime.timezone.utc)
+    utc_moment = round_datetime_to_nearest_second(epoch + py_datetime.timedelta(days=float(jd) - 2440587.5))
+    try:
+        zone = ZoneInfo(str(timezone_name or "").strip())
+        local_moment = utc_moment.astimezone(zone)
+        offset = local_moment.utcoffset()
+        if offset is None:
+            raise ZoneInfoNotFoundError
+        zone_label = almanac_zone_label(offset.total_seconds() / 3600.0)
+        return f"{local_moment:%Y-%m-%d %H:%M:%S} {zone_label}"
+    except (OSError, ZoneInfoNotFoundError, ValueError):
+        local_time, _ = almanac_local_event_time_from_jd(jd, fallback_jurisdiction, fallback_zone_hours)
+        return local_time
+
+
+def almanac_totality_action_from_payload(payload: str,
+                                         fallback_zone_hours: float,
+                                         observer_jurisdiction: str) -> dict[str, str]:
+    payload_text = str(payload or "")
+    if not (payload_text.startswith("town\t") or payload_text.startswith("near_town\t")):
+        return {}
+    parts = payload_text.split("\t")
+    if len(parts) < 8:
+        return {}
+    _kind, town_name, jurisdiction, timezone_name, latitude, longitude, totality_jd, _distance_km = parts[:8]
+    elevation = str(parts[8]).strip() if len(parts) > 8 else "0"
+    try:
+        totality_jd_value = float(totality_jd)
+        lat_value = float(latitude)
+        lon_value = float(longitude)
+        elevation_value = float(elevation)
+    except ValueError:
+        return {}
+    epoch = py_datetime.datetime(1970, 1, 1, tzinfo=py_datetime.timezone.utc)
+    utc_moment = round_datetime_to_nearest_second(epoch + py_datetime.timedelta(days=totality_jd_value - 2440587.5))
+    try:
+        zone = ZoneInfo(str(timezone_name or "").strip())
+        local_moment = utc_moment.astimezone(zone)
+        offset = local_moment.utcoffset()
+        if offset is None:
+            raise ZoneInfoNotFoundError
+        zone_hours = offset.total_seconds() / 3600.0
+    except (OSError, ZoneInfoNotFoundError, ValueError):
+        zone_hours = almanac_jurisdiction_offset_for_date(
+            jurisdiction or observer_jurisdiction,
+            utc_moment.strftime("%Y-%m-%d"),
+            fallback_zone_hours,
+        )
+        local_moment = utc_moment + py_datetime.timedelta(hours=zone_hours)
+    jurisdiction = normalize_holiday_jurisdiction(jurisdiction)
+    latitude_text = f"{lat_value:.6f}"
+    longitude_text = f"{lon_value:.6f}"
+    elevation_text = f"{elevation_value:.0f}"
+    return {
+        "date": f"{local_moment:%Y-%m-%d}",
+        "time": f"{local_moment:%H:%M:%S}",
+        "zone": f"{zone_hours:.2f}",
+        "jurisdiction": jurisdiction,
+        "town": f"{town_name}|{latitude_text}|{longitude_text}|{elevation_text}",
+        "latitude": latitude_text,
+        "longitude": longitude_text,
+        "elevation": elevation_text,
+    }
 
 
 def matrix_failure_hint(
@@ -13415,6 +13675,37 @@ def almanac_local_event_time_from_jd(jd: float,
 def format_almanac_totality_location(payload: str,
                                      fallback_zone_hours: float,
                                      observer_jurisdiction: str) -> str:
+    payload_text = str(payload or "")
+    if payload_text.startswith("town\t") or payload_text.startswith("near_town\t"):
+        parts = payload_text.split("\t")
+        if len(parts) < 8:
+            return ""
+        kind, town_name, jurisdiction, timezone_name, latitude, longitude, totality_jd, distance_km = parts[:8]
+        try:
+            totality_latitude = float(latitude)
+            totality_longitude = float(longitude)
+            totality_jd_value = float(totality_jd)
+            distance_value = float(distance_km)
+        except ValueError:
+            return ""
+        jurisdiction = normalize_holiday_jurisdiction(jurisdiction)
+        jurisdiction_label = HOLIDAY_JURISDICTION_LABELS.get(jurisdiction, jurisdiction)
+        location_label = f"{town_name}, {jurisdiction_label}" if jurisdiction_label else town_name
+        if kind == "near_town":
+            location_label = f"Nearest town: {location_label}"
+        time_text = almanac_local_event_time_from_jd_for_timezone(
+            totality_jd_value,
+            timezone_name,
+            fallback_zone_hours,
+            jurisdiction or observer_jurisdiction,
+        )
+        return (
+            f"{location_label}; "
+            f"{totality_latitude:.4f}, {totality_longitude:.4f}; "
+            f"{time_text}; "
+            f"{distance_value:,.0f} km from observer"
+        )
+
     parts = [part.strip() for part in str(payload or "").split(",")]
     if len(parts) != 4:
         return ""
@@ -13491,7 +13782,9 @@ def generate_annual_almanac_events(
         category = str(row.get("category") or "").strip()
         name = str(row.get("name") or "").strip()
         kind = str(row.get("kind") or "").strip()
-        totality_text = format_almanac_totality_location(str(row.get("nearest_totality") or ""), zone_hours, jurisdiction)
+        totality_payload = str(row.get("nearest_totality") or "")
+        totality_text = format_almanac_totality_location(totality_payload, zone_hours, jurisdiction)
+        totality_action = almanac_totality_action_from_payload(totality_payload, zone_hours, jurisdiction)
         key = (category, f"{jd:.5f}")
         if key in exact_eclipse_keys:
             return
@@ -13521,6 +13814,7 @@ def generate_annual_almanac_events(
             "sort_time": sort_text,
             "details": "",
             "nearest_totality": totality_text,
+            "nearest_totality_action": totality_action,
             "jd": f"{jd:.9f}",
             "magnitude": f"{magnitude:.3f}",
             "obscuration": percent_text,
@@ -14679,11 +14973,17 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                         zone,
                         jurisdiction,
                     )
+                    totality_action = almanac_totality_action_from_payload(
+                        str(row.get("nearest_totality") or ""),
+                        zone,
+                        jurisdiction,
+                    )
                     if not totality_text:
                         continue
                     items.append({
                         "jd": str(solar_row.get("jd") or "").strip(),
                         "nearest_totality": totality_text,
+                        "nearest_totality_action": totality_action,
                     })
                     break
             self.log_message(

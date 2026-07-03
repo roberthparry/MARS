@@ -714,6 +714,7 @@ static char *format_datetime_iso_minutes(const datetime_t *dttm)
 
 static char *format_almanac_event_seconds(const almanac_event_time_t *event_time)
 {
+    datetime_t *local_time;
     int year;
     int month;
     int day;
@@ -725,12 +726,21 @@ static char *format_almanac_event_seconds(const almanac_event_time_t *event_time
     if (!event_time || !event_time->valid)
         return NULL;
 
-    year = event_time->year;
-    month = (int)event_time->month;
-    day = event_time->day;
-    hour = event_time->hour;
-    minute = event_time->minute;
-    second = (int)lround(event_time->second);
+    local_time = datetime_alloc();
+    if (!local_time)
+        return NULL;
+    if (!almanac_event_time_datetime(event_time, local_time)) {
+        datetime_dealloc(local_time);
+        return NULL;
+    }
+
+    year = datetime_year(local_time);
+    month = (int)datetime_month(local_time);
+    day = datetime_day(local_time);
+    hour = datetime_hour(local_time);
+    minute = datetime_minute(local_time);
+    second = (int)lround(datetime_second(local_time));
+    datetime_dealloc(local_time);
 
     if (second >= 60) {
         second -= 60;
@@ -1195,13 +1205,28 @@ static datetime_t *datetime_init_almanac_event_time(datetime_t *dttm,
 {
     if (!dttm || !event_time || !event_time->valid)
         return NULL;
-    return datetime_init_ymdt(dttm,
-                              event_time->year,
-                              event_time->month,
-                              event_time->day,
-                              event_time->hour,
-                              event_time->minute,
-                              event_time->second);
+    return almanac_event_time_datetime(event_time, dttm) ? dttm : NULL;
+}
+
+static almanac_observer_t datetime_lab_observer(double latitude,
+                                                double longitude,
+                                                double elevation_metres)
+{
+    almanac_observer_t observer;
+
+    observer.latitude_degrees = latitude;
+    observer.longitude_degrees = longitude;
+    observer.elevation_metres = elevation_metres;
+    return observer;
+}
+
+static almanac_observer_t datetime_lab_observer_from_options(const datetime_lab_options_t *options)
+{
+    if (!options)
+        return datetime_lab_observer(0.0, 0.0, 0.0);
+    return datetime_lab_observer(options->latitude,
+                                 options->longitude,
+                                 options->elevation_metres);
 }
 
 static datetime_t *datetime_init_observance_start_local(datetime_t *dttm,
@@ -1221,17 +1246,14 @@ static datetime_t *datetime_init_observance_start_local(datetime_t *dttm,
 
     if (almanac && jurisdiction) {
         datetime_t *previous_day = datetime_init_copy(datetime_alloc(), observance);
-        almanac_observer_t observer;
+        almanac_observer_t observer = datetime_lab_observer(latitude, longitude, elevation_metres);
         almanac_sun_times_t sun_times;
 
-        observer.latitude_degrees = latitude;
-        observer.longitude_degrees = longitude;
-        observer.elevation_metres = elevation_metres;
         if (previous_day &&
             datetime_add_days(previous_day, -1) &&
             almanac_sunrise_sunset(almanac, jurisdiction, previous_day, &observer, &sun_times) &&
-            sun_times.sunset.status == ALMANAC_RISE_SET_OK &&
-            datetime_init_almanac_event_time(dttm, &sun_times.sunset.local_time)) {
+            sun_times.set.status == ALMANAC_RISE_SET_OK &&
+            datetime_init_almanac_event_time(dttm, &sun_times.set.time)) {
             datetime_dealloc(previous_day);
             return dttm;
         }
@@ -1325,23 +1347,21 @@ static void print_sun_time_field(const char *name,
 
 static const char *rise_set_status_text(almanac_rise_set_status_t status)
 {
-    switch (status) {
-    case ALMANAC_RISE_SET_OK:
-        return "ok";
-    case ALMANAC_RISE_SET_NOT_ON_DATE:
-        return "not on selected date";
-    case ALMANAC_RISE_SET_NEVER_RISES:
-        return "never rises";
-    case ALMANAC_RISE_SET_NEVER_SETS:
-        return "never sets";
-    case ALMANAC_RISE_SET_UNAVAILABLE:
-    default:
+    static const char *const text_by_status[ALMANAC_RISE_SET_UNAVAILABLE + 1] = {
+        [ALMANAC_RISE_SET_OK] = "ok",
+        [ALMANAC_RISE_SET_NOT_ON_DATE] = "not on selected date",
+        [ALMANAC_RISE_SET_NEVER_RISES] = "never rises",
+        [ALMANAC_RISE_SET_NEVER_SETS] = "never sets",
+        [ALMANAC_RISE_SET_UNAVAILABLE] = "unavailable"
+    };
+
+    if (status < ALMANAC_RISE_SET_OK || status > ALMANAC_RISE_SET_UNAVAILABLE)
         return "unavailable";
-    }
+    return text_by_status[status];
 }
 
-static void print_actual_sun_event_field(const char *name,
-                                         const almanac_sun_event_t *event)
+static void print_rise_set_event_field(const char *name,
+                                       const almanac_rise_set_event_t *event)
 {
     char *text;
 
@@ -1351,7 +1371,7 @@ static void print_actual_sun_event_field(const char *name,
         return;
     }
 
-    text = format_almanac_event_seconds(&event->local_time);
+    text = format_almanac_event_seconds(&event->time);
     printf("%s %s\n", name, text ? text : "unavailable");
     printf("%s_status %s\n", name, text ? "ok" : "unavailable");
     free(text);
@@ -1363,23 +1383,6 @@ static void print_unavailable_actual_sun_times(void)
     printf("actual_sunrise_status unavailable\n");
     printf("actual_sunset unavailable\n");
     printf("actual_sunset_status unavailable\n");
-}
-
-static void print_moon_event_field(const char *name,
-                                   const almanac_moon_event_t *event)
-{
-    char *text;
-
-    if (!event || event->status != ALMANAC_RISE_SET_OK) {
-        printf("%s unavailable\n", name);
-        printf("%s_status %s\n", name, event ? rise_set_status_text(event->status) : "unavailable");
-        return;
-    }
-
-    text = format_almanac_event_seconds(&event->local_time);
-    printf("%s %s\n", name, text ? text : "unavailable");
-    printf("%s_status %s\n", name, text ? "ok" : "unavailable");
-    free(text);
 }
 
 static void print_unavailable_moon_times(void)
@@ -1402,17 +1405,15 @@ static bool print_actual_sun_times(const datetime_lab_options_t *options,
         return false;
     }
 
-    observer.latitude_degrees = options->latitude;
-    observer.longitude_degrees = options->longitude;
-    observer.elevation_metres = options->elevation_metres;
+    observer = datetime_lab_observer_from_options(options);
     if (!almanac_sunrise_sunset(almanac, jurisdiction, date, &observer, &sun_times)) {
         return false;
     }
 
-    print_actual_sun_event_field("sunrise", &sun_times.sunrise);
-    print_actual_sun_event_field("actual_sunrise", &sun_times.sunrise);
-    print_actual_sun_event_field("sunset", &sun_times.sunset);
-    print_actual_sun_event_field("actual_sunset", &sun_times.sunset);
+    print_rise_set_event_field("sunrise", &sun_times.rise);
+    print_rise_set_event_field("actual_sunrise", &sun_times.rise);
+    print_rise_set_event_field("sunset", &sun_times.set);
+    print_rise_set_event_field("actual_sunset", &sun_times.set);
 
     return true;
 }
@@ -1429,15 +1430,13 @@ static bool print_moon_times(const datetime_lab_options_t *options,
         return false;
     }
 
-    observer.latitude_degrees = options->latitude;
-    observer.longitude_degrees = options->longitude;
-    observer.elevation_metres = options->elevation_metres;
+    observer = datetime_lab_observer_from_options(options);
     if (!almanac_moonrise_moonset(almanac, jurisdiction, date, &observer, &moon_times)) {
         return false;
     }
 
-    print_moon_event_field("moonrise", &moon_times.moonrise);
-    print_moon_event_field("moonset", &moon_times.moonset);
+    print_rise_set_event_field("moonrise", &moon_times.rise);
+    print_rise_set_event_field("moonset", &moon_times.set);
 
     return true;
 }

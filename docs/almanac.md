@@ -50,11 +50,14 @@ failure reason.
 `almanac_open()` returns a heap-allocated engine that the caller must release
 with `almanac_close()`.
 
-`almanac_lookup_body()` writes into a caller-provided `almanac_entry_t`.
+`almanac_entry_t` is opaque. Create standalone body entries with
+`almanac_new_body_entry()` or `almanac_new_entry()` and release them with
+`almanac_entry_dealloc()`.
 
 `almanac_snapshot()` returns a newly allocated `array_t` containing
-`almanac_entry_t` values. Destroy that array with `array_destroy()` when you
-are finished with it.
+`almanac_entry_t` values. Entries obtained with `array_get()` are borrowed from
+the array. Destroy the array with `array_destroy()` when you are finished with
+it.
 
 `almanac_last_error()` returns a borrowed pointer owned by the engine. It
 remains valid until the next almanac API call on the same engine or until
@@ -62,7 +65,7 @@ remains valid until the next almanac API call on the same engine or until
 
 ## Body Kinds
 
-`almanac_entry_t.body_kind` uses `almanac_body_kind_t`:
+`almanac_entry_body_kind()` returns an `almanac_body_kind_t`:
 
 | Value | Meaning |
 |---|---|
@@ -71,20 +74,21 @@ remains valid until the next almanac API call on the same engine or until
 | `ALMANAC_BODY_SUN` | The Sun |
 | `ALMANAC_BODY_MOON` | The Moon |
 
-## Entry Fields
+## Entry Accessors
 
-Each `almanac_entry_t` includes:
+Use the accessors below to inspect an `almanac_entry_t`:
 
-- `body_id` — stable enum identifier for the resolved body
-- `body_kind` — one of the `almanac_body_kind_t` values above
-- `gha_aries_degrees` — apparent GHA of Aries for the requested civil moment
-- `sha_degrees` — sidereal hour angle of the body, normalised to `[0, 360)`
-- `declination_degrees` — declination in degrees
-- `right_ascension_hours` — apparent right ascension in hours
-- `geocentric_distance_au` — distance from Earth in astronomical units when applicable
-- `heliocentric_distance_au` — distance from the Sun in astronomical units when applicable
-- `phase_angle_degrees` — illuminated-geometry phase angle when applicable
-- `visual_magnitude` — apparent visual magnitude when available
+- `almanac_entry_body_id()` — stable enum identifier for the resolved body
+- `almanac_entry_body_kind()` — one of the `almanac_body_kind_t` values above
+- `almanac_entry_moment_jd()` — Julian date for the requested civil moment
+- `almanac_entry_gha_aries_degrees()` — apparent GHA of Aries for the requested civil moment
+- `almanac_entry_sha_degrees()` — sidereal hour angle of the body, normalised to `[0, 360)`
+- `almanac_entry_declination_degrees()` — declination in degrees
+- `almanac_entry_right_ascension_hours()` — apparent right ascension in hours
+- `almanac_entry_geocentric_distance_au()` — distance from Earth in astronomical units when applicable
+- `almanac_entry_heliocentric_distance_au()` — distance from the Sun in astronomical units when applicable
+- `almanac_entry_phase_angle_degrees()` — illuminated-geometry phase angle when applicable
+- `almanac_entry_visual_magnitude()` — apparent visual magnitude when available
 
 Some fields are not meaningful for every body. Fixed stars, for example, do not
 report a finite geocentric distance, and some brightness-related values may be
@@ -93,8 +97,9 @@ report a finite geocentric distance, and some brightness-related values may be
 ## Main Entry Points
 
 - `almanac_gha_aries()` to compute Greenwich Hour Angle of Aries for a moment
-- `almanac_lookup_body()` to resolve one catalogued body enum into an `almanac_entry_t`
+- `almanac_new_body_entry()` to resolve one catalogued body enum into an `almanac_entry_t`
 - `almanac_observables()` to derive observer-relative horizon observables from one entry
+- `almanac_body_rise_set()` to find almanac-based local rise and set for one body, observer, and jurisdiction
 - `almanac_sunrise_sunset()` to find almanac-based local sunrise and sunset for an observer and jurisdiction
 - `almanac_moonrise_moonset()` to find almanac-based local moonrise and moonset for an observer and jurisdiction
 - `almanac_phase_details()` to derive illuminated fraction and a broad phase class
@@ -127,30 +132,26 @@ apply topocentric parallax, atmospheric refraction, or twilight policy rules.
 That means `visible` is a practical horizon flag, not a full naked-eye
 visibility model.
 
-`almanac_sunrise_sunset()` and `almanac_moonrise_moonset()` compute rise/set
-times for one local civil day using the almanac ephemeris and observer
-topocentric geometry. They use the supplied jurisdiction to convert each
-absolute event instant into local civil time, including daylight-saving rules.
-The horizon crossing is the standard apparent upper-limb event: geometric
-centre altitude plus body semi-diameter, standard refraction, and elevation
-horizon dip. For the Moon, topocentric parallax is already included in the
-observer-relative vector.
+`almanac_body_rise_set()` computes rise/set times for one local civil day using
+the almanac ephemeris and observer topocentric geometry. It uses the supplied
+jurisdiction to convert each absolute event instant into local civil time,
+including daylight-saving rules. The horizon crossing is the standard apparent
+upper-limb event: geometric centre altitude plus body semi-diameter, standard
+refraction, and elevation horizon dip. For the Moon, topocentric parallax is
+already included in the observer-relative vector.
 
-`almanac_sun_times_t` contains:
+`almanac_rise_set_t` contains two `almanac_rise_set_event_t` values:
 
-- `sunrise` — sunrise status, absolute event JD, local civil time, and azimuth
-- `sunset` — sunset status, absolute event JD, local civil time, and azimuth
-
-`almanac_moon_times_t` contains:
-
-- `moonrise` — moonrise status, absolute event JD, local civil time, and azimuth
-- `moonset` — moonset status, absolute event JD, local civil time, and azimuth
+- `rise` — rise status, local civil event time, absolute event JD, and azimuth
+- `set` — set status, local civil event time, absolute event JD, and azimuth
 
 Rise/set events use `ALMANAC_RISE_SET_OK`,
 `ALMANAC_RISE_SET_NOT_ON_DATE`, `ALMANAC_RISE_SET_NEVER_RISES`,
 `ALMANAC_RISE_SET_NEVER_SETS`, or `ALMANAC_RISE_SET_UNAVAILABLE` as their
-status. When status is `ALMANAC_RISE_SET_OK`, `local_time` is valid and
-contains the local date and time for the jurisdiction.
+status. When status is `ALMANAC_RISE_SET_OK`, `time` is valid, `time.jd` is
+the absolute event Julian date, and `time.local_jd` is the jurisdiction-local
+civil Julian date. Use `almanac_event_time_datetime()` to initialise a
+`datetime_t` for display.
 
 ## Phases And Event Searches
 
@@ -167,24 +168,27 @@ contains the local date and time for the jurisdiction.
 - `ALMANAC_MOON_PHASE_FULL`
 - `ALMANAC_MOON_PHASE_LAST_QUARTER`
 
-The returned `almanac_moon_phase_event_t` stores its event time as
-`moment_jd`, using the same local civil Julian Day scale as the input
-`datetime_t`.
+The returned `almanac_moon_phase_event_t` stores its event time in
+`time`. Exact Moon phases are not observer-local, so `time.jd` and
+`time.local_jd` are the same.
 
 `almanac_find_solar_eclipses()`, `almanac_find_lunar_eclipses()`, and
 `almanac_find_solar_transits_for_body()` each return an `array_t` of plain value
 records. These searches require an `almanac_observer_t`; the returned arrays
 only include events that occur locally for that observer, with the Sun above
 the horizon for solar eclipses and solar transits, or the Moon above the
-horizon for lunar eclipses. Their event times are recorded as local civil
-Julian Days and as broken-out local civil time fields:
+horizon for lunar eclipses. Their event times are recorded as
+`almanac_event_time_t` values:
 
-- `greatest_eclipse_jd` for eclipse records
-- `greatest_transit_jd` for solar transit records
-- `*_time` fields for local civil year, month, day, hour, minute, and second
+- `greatest_eclipse` for eclipse records
+- `greatest_transit` for solar transit records
+- contact fields with an absolute Julian date and a local civil Julian date
 - `totality_percent` for eclipse records, as an apparent-disc area percentage
-- `first_contact_jd` through `fourth_contact_jd` for solar eclipse and solar transit records
-- `p1_contact_jd`, `u1_contact_jd`, `u2_contact_jd`, `u3_contact_jd`, `u4_contact_jd`, and `p4_contact_jd` for lunar eclipse records
+- `first_contact` through `fourth_contact` for solar eclipse and solar transit records
+- `p1_contact`, `u1_contact`, `u2_contact`, `u3_contact`, `u4_contact`, and `p4_contact` for lunar eclipse records
+
+Use `almanac_event_time_datetime()` when you want to present an
+`almanac_event_time_t` as a local civil `datetime_t`.
 
 This first implementation is intended to be useful and testable, but it is
 still an approximation layer:
@@ -200,8 +204,8 @@ still an approximation layer:
 
 ## Quick Example
 
-Use `almanac_lookup_body(almanac, ALMANAC_BODY_ID_SUN, ...)` or
-`almanac_lookup_body(almanac, ALMANAC_BODY_ID_MOON, ...)` when you need a
+Use `almanac_new_body_entry(almanac, ALMANAC_BODY_ID_SUN, ...)` or
+`almanac_new_body_entry(almanac, ALMANAC_BODY_ID_MOON, ...)` when you need a
 single body entry. For solar eclipses, prefer the dedicated local event search:
 `almanac_find_solar_eclipses()`.
 
@@ -209,7 +213,21 @@ single body entry. For solar eclipses, prefer the dedicated local event search:
 #include <stdio.h>
 
 #include "almanac.h"
+#include "array.h"
 #include "datetime.h"
+
+static datetime_t *datetime_from_event_time(const almanac_event_time_t *event_time)
+{
+    datetime_t *dttm = datetime_alloc();
+
+    if (!dttm)
+        return NULL;
+    if (!almanac_event_time_datetime(event_time, dttm)) {
+        datetime_dealloc(dttm);
+        return NULL;
+    }
+    return dttm;
+}
 
 int main(void)
 {
@@ -218,6 +236,13 @@ int main(void)
     almanac_t *almanac = NULL;
     array_t *events = NULL;
     const almanac_solar_eclipse_t *event;
+    almanac_event_time_t greatest;
+    almanac_event_time_t first;
+    almanac_event_time_t fourth;
+    datetime_t *greatest_time = NULL;
+    datetime_t *first_time = NULL;
+    datetime_t *fourth_time = NULL;
+    almanac_solar_eclipse_kind_t event_kind;
     almanac_observer_t observer = {52.7073, -2.7540, 75.0};
     const char *kind;
     int status = 1;
@@ -248,40 +273,55 @@ int main(void)
     event = array_get(events, 0u);
     if (!event)
         goto done;
-    kind = event->kind == ALMANAC_SOLAR_ECLIPSE_TOTAL ? "total" :
-           event->kind == ALMANAC_SOLAR_ECLIPSE_ANNULAR ? "annular" :
+    if (!almanac_solar_eclipse_time(event, ALMANAC_EVENT_TIME_GREATEST, &greatest))
+        goto done;
+    if (!almanac_solar_eclipse_time(event, ALMANAC_EVENT_TIME_FIRST_CONTACT, &first))
+        goto done;
+    if (!almanac_solar_eclipse_time(event, ALMANAC_EVENT_TIME_FOURTH_CONTACT, &fourth))
+        goto done;
+    greatest_time = datetime_from_event_time(&greatest);
+    first_time = datetime_from_event_time(&first);
+    fourth_time = datetime_from_event_time(&fourth);
+    if (!greatest_time || !first_time || !fourth_time)
+        goto done;
+    event_kind = almanac_solar_eclipse_kind(event);
+    kind = event_kind == ALMANAC_SOLAR_ECLIPSE_TOTAL ? "total" :
+           event_kind == ALMANAC_SOLAR_ECLIPSE_ANNULAR ? "annular" :
            "partial";
     printf("Local solar eclipse found in August 2026.\n");
     printf("Greatest local circumstance: %04d-%02d-%02d %02u:%02u:%04.1f local time\n",
-           event->greatest_eclipse_time.year,
-           (int)event->greatest_eclipse_time.month,
-           event->greatest_eclipse_time.day,
-           event->greatest_eclipse_time.hour,
-           event->greatest_eclipse_time.minute,
-           event->greatest_eclipse_time.second);
+           datetime_year(greatest_time),
+           (int)datetime_month(greatest_time),
+           datetime_day(greatest_time),
+           datetime_hour(greatest_time),
+           datetime_minute(greatest_time),
+           datetime_second(greatest_time));
     printf("Kind: %s\n", kind);
-    printf("Magnitude: %.3f\n", event->magnitude);
-    printf("Obscuration: %.1f%%\n", event->totality_percent);
+    printf("Magnitude: %.3f\n", almanac_solar_eclipse_magnitude(event));
+    printf("Obscuration: %.1f%%\n", almanac_solar_eclipse_totality_percent(event));
     printf("First contact: %04d-%02d-%02d %02u:%02u:%04.1f local time\n",
-           event->first_contact_time.year,
-           (int)event->first_contact_time.month,
-           event->first_contact_time.day,
-           event->first_contact_time.hour,
-           event->first_contact_time.minute,
-           event->first_contact_time.second);
+           datetime_year(first_time),
+           (int)datetime_month(first_time),
+           datetime_day(first_time),
+           datetime_hour(first_time),
+           datetime_minute(first_time),
+           datetime_second(first_time));
     printf("Fourth contact: %04d-%02d-%02d %02u:%02u:%04.1f local time\n",
-           event->fourth_contact_time.year,
-           (int)event->fourth_contact_time.month,
-           event->fourth_contact_time.day,
-           event->fourth_contact_time.hour,
-           event->fourth_contact_time.minute,
-           event->fourth_contact_time.second);
+           datetime_year(fourth_time),
+           (int)datetime_month(fourth_time),
+           datetime_day(fourth_time),
+           datetime_hour(fourth_time),
+           datetime_minute(fourth_time),
+           datetime_second(fourth_time));
 
     status = 0;
 
 done:
     array_destroy(events);
     almanac_close(almanac);
+    datetime_dealloc(fourth_time);
+    datetime_dealloc(first_time);
+    datetime_dealloc(greatest_time);
     datetime_dealloc(start);
     datetime_dealloc(end);
     return status;
@@ -371,32 +411,37 @@ Compute the apparent Greenwich Hour Angle of Aries for a civil moment.
 Returns `true` on success. Returns `false` on failure and records an engine
 error.
 
-**`bool almanac_lookup_body(almanac_t *almanac, almanac_body_id_t body_id, const datetime_t *moment, almanac_entry_t *out)`**
+**`almanac_entry_t *almanac_new_body_entry(almanac_t *almanac, almanac_body_id_t body_id, const datetime_t *moment)`**
 
-Compute one almanac entry for a catalogue body enum at a given moment.
+Create one populated almanac entry for a catalogue body enum at a given moment.
 
 - `almanac` — open almanac engine
 - `body_id` — stable body enum such as `ALMANAC_BODY_ID_SUN`, `ALMANAC_BODY_ID_MOON`, `ALMANAC_BODY_ID_MARS`, `ALMANAC_BODY_ID_JUPITER`, or `ALMANAC_BODY_ID_SIRIUS`
 - `moment` — civil moment to evaluate
-- `out` — caller-provided entry structure to fill on success
 
-On success, `out` receives the resolved body metadata, GHA Aries, SHA,
+Returns a newly allocated entry on success. The caller owns it and must release
+it with `almanac_entry_dealloc()`. Returns `NULL` if the body id is unsupported,
+the moment cannot be evaluated, or the engine encounters a database or model
+error.
+
+On success, the entry contains the resolved body metadata, GHA Aries, SHA,
 declination, right ascension, and any applicable distance or brightness fields.
 
-Returns `true` on success. Returns `false` if the body id is unsupported, the
-moment cannot be evaluated, or the engine encounters a database or model error.
+**`almanac_entry_t *almanac_new_entry(almanac_t *almanac, const char *body_code, const datetime_t *moment)`**
 
-**`bool almanac_lookup(almanac_t *almanac, const char *body_code, const datetime_t *moment, almanac_entry_t *out)`**
-
-Compatibility wrapper for legacy body-code callers.
+Compatibility constructor for legacy body-code callers.
 
 - `almanac` — open almanac engine
 - `body_code` — catalogue code such as `SUN`, `MOON`, `MARS`, `JUPITER`, or `SIRIUS`
 - `moment` — civil moment to evaluate
-- `out` — caller-provided entry structure to fill on success
 
-New code should prefer `almanac_lookup_body()` so runtime lookups stay on the
-stable `almanac_body_id_t` enum path.
+New code should prefer `almanac_new_body_entry()` so runtime lookups stay on
+the stable `almanac_body_id_t` enum path.
+
+**`void almanac_entry_dealloc(almanac_entry_t *entry)`**
+
+Release an entry allocated by an almanac entry constructor. Passing `NULL` is
+safe.
 
 **`bool almanac_observables(almanac_t *almanac, const almanac_entry_t *body, const almanac_observer_t *observer, almanac_observables_t *out)`**
 
@@ -413,24 +458,25 @@ and two horizon flags.
 Returns `true` on success. Returns `false` if any pointer is invalid or the
 observer latitude/longitude is out of range.
 
-**`bool almanac_sunrise_sunset(almanac_t *almanac, jurisdiction_t *jurisdiction, const datetime_t *date, const almanac_observer_t *observer, almanac_sun_times_t *out)`**
+**`bool almanac_body_rise_set(almanac_t *almanac, jurisdiction_t *jurisdiction, almanac_body_id_t body_id, const datetime_t *date, const almanac_observer_t *observer, almanac_rise_set_t *out)`**
 
-Find accurate local sunrise and sunset for one observer and civil day.
+Find accurate local rise and set times for one supported body and civil day.
 
 - `almanac` — open almanac engine
 - `jurisdiction` — open jurisdiction engine used for local GMT/DST offset
+- `body_id` — body enum identifier
 - `date` — local civil date to evaluate; the time component is ignored
 - `observer` — latitude, longitude, and elevation
 - `out` — caller-provided result structure to fill
 
 Returns `true` when the day was evaluated. Each result carries its own status,
-so polar day or polar night is reported without treating the call as an error.
-When an event occurs, `jd` is the absolute event Julian date and `local_time`
-contains the jurisdiction-local civil date and time.
+so a body that does not rise or set on that date is reported without treating
+the call as an error.
 
-**`bool almanac_moonrise_moonset(almanac_t *almanac, jurisdiction_t *jurisdiction, const datetime_t *date, const almanac_observer_t *observer, almanac_moon_times_t *out)`**
+**`bool almanac_sunrise_sunset(almanac_t *almanac, jurisdiction_t *jurisdiction, const datetime_t *date, const almanac_observer_t *observer, almanac_sun_times_t *out)`**
 
-Find accurate local moonrise and moonset for one observer and civil day.
+Convenience wrapper for `almanac_body_rise_set()` with
+`ALMANAC_BODY_ID_SUN`.
 
 - `almanac` — open almanac engine
 - `jurisdiction` — open jurisdiction engine used for local GMT/DST offset
@@ -438,10 +484,26 @@ Find accurate local moonrise and moonset for one observer and civil day.
 - `observer` — latitude, longitude, and elevation
 - `out` — caller-provided result structure to fill
 
-Returns `true` when the day was evaluated. Each moon event carries its own
-status because a civil day can have only a moonrise, only a moonset, both, or
-neither. When an event occurs, `jd` is the absolute event Julian date and
-`local_time` contains the jurisdiction-local civil date and time.
+When an event occurs, `time` contains the jurisdiction-local civil date and
+time, and `time.jd` is the absolute event Julian date.
+The returned `almanac_sun_times_t` uses `rise` for sunrise and `set` for
+sunset.
+
+**`bool almanac_moonrise_moonset(almanac_t *almanac, jurisdiction_t *jurisdiction, const datetime_t *date, const almanac_observer_t *observer, almanac_moon_times_t *out)`**
+
+Convenience wrapper for `almanac_body_rise_set()` with
+`ALMANAC_BODY_ID_MOON`.
+
+- `almanac` — open almanac engine
+- `jurisdiction` — open jurisdiction engine used for local GMT/DST offset
+- `date` — local civil date to evaluate; the time component is ignored
+- `observer` — latitude, longitude, and elevation
+- `out` — caller-provided result structure to fill
+
+When an event occurs, `time` contains the jurisdiction-local civil date and
+time, and `time.jd` is the absolute event Julian date.
+The returned `almanac_moon_times_t` uses `rise` for moonrise and `set` for
+moonset.
 
 **`bool almanac_phase_details(const almanac_entry_t *body, almanac_phase_details_t *out)`**
 
@@ -461,8 +523,9 @@ Find the next exact Moon phase after a starting moment.
 - `kind` — exact lunar phase kind to search for
 - `out` — caller-provided event structure to fill
 
-Returns `true` on success. On success, `out->moment_jd` stores the event time
-as a local civil Julian Day.
+Returns `true` on success. On success, `out->time` stores the event time. Exact
+Moon phases are not observer-local, so `out->time.jd` and
+`out->time.local_jd` are the same.
 
 **`array_t *almanac_find_solar_eclipses(almanac_t *almanac, const almanac_observer_t *observer, const datetime_t *start, const datetime_t *end)`**
 
@@ -473,16 +536,15 @@ Search a civil time window for solar eclipses visible from an observer.
 - `start` — inclusive window start
 - `end` — inclusive window end
 
-Returns a newly allocated `array_t` of `almanac_solar_eclipse_t` values on
-success, or `NULL` on failure. Destroy the returned array with `array_destroy()`
-when finished. Only locally visible eclipses are included. Each record includes
-`magnitude` as a diameter-style eclipse magnitude and `totality_percent` as the
-approximate percentage of the Sun's apparent disc covered by the Moon at the
-best visible local circumstance. Contact fields use accepted eclipse
-terminology: first contact, greatest eclipse, and fourth contact are populated
-for detected eclipses; second and third contact are populated for total or
-annular eclipses and are `NaN` for partial eclipses. Each populated Julian Day
-also has a matching `almanac_event_time_t` local civil time field.
+Returns a newly allocated `array_t` of opaque `almanac_solar_eclipse_t` records
+on success, or `NULL` on failure. Destroy the returned array with
+`array_destroy()` when finished. Only locally visible eclipses are included.
+Use `almanac_solar_eclipse_kind()`, `almanac_solar_eclipse_time()`,
+`almanac_solar_eclipse_magnitude()`, and
+`almanac_solar_eclipse_totality_percent()` to inspect each record. Contact
+times use accepted eclipse terminology: first contact, greatest eclipse, and
+fourth contact are populated for detected eclipses; second and third contact
+are populated for total or annular eclipses.
 
 **`array_t *almanac_find_lunar_eclipses(almanac_t *almanac, const almanac_observer_t *observer, const datetime_t *start, const datetime_t *end)`**
 
@@ -493,17 +555,16 @@ Search a civil time window for lunar eclipses visible from an observer.
 - `start` — inclusive window start
 - `end` — inclusive window end
 
-Returns a newly allocated `array_t` of `almanac_lunar_eclipse_t` values on
-success, or `NULL` on failure. Destroy the returned array with `array_destroy()`
-when finished. Only locally visible eclipses are included. Each record includes
-umbral and penumbral diameter-style magnitudes and `totality_percent` as the
-approximate percentage of the Moon's apparent disc inside Earth's umbra at the
-best visible local circumstance. Penumbral-only events report `0.0` totality.
-Contact fields use the standard lunar eclipse labels: `P1` and `P4` for
-penumbral contacts, `U1` and `U4` for umbral partial contacts, and `U2` and
-`U3` for totality contacts. Contacts that do not apply to the eclipse kind are
-`NaN`. Each populated Julian Day also has a matching `almanac_event_time_t`
-local civil time field.
+Returns a newly allocated `array_t` of opaque `almanac_lunar_eclipse_t` records
+on success, or `NULL` on failure. Destroy the returned array with
+`array_destroy()` when finished. Only locally visible eclipses are included.
+Use `almanac_lunar_eclipse_kind()`, `almanac_lunar_eclipse_time()`,
+`almanac_lunar_eclipse_umbral_magnitude()`,
+`almanac_lunar_eclipse_penumbral_magnitude()`, and
+`almanac_lunar_eclipse_totality_percent()` to inspect each record. Contact
+times use the standard lunar eclipse labels: `P1` and `P4` for penumbral
+contacts, `U1` and `U4` for umbral partial contacts, and `U2` and `U3` for
+totality contacts.
 
 **`array_t *almanac_find_solar_transits_for_body(almanac_t *almanac, almanac_body_id_t body_id, const almanac_observer_t *observer, const datetime_t *start, const datetime_t *end)`**
 
@@ -516,13 +577,14 @@ from an observer.
 - `start` — inclusive window start
 - `end` — inclusive window end
 
-Returns a newly allocated `array_t` of `almanac_solar_transit_t` values on
-success, or `NULL` on failure. Destroy the returned array with `array_destroy()`
-when finished. Only locally visible transits are included. Contact fields use
-the accepted transit terminology: first and fourth contact are the external
-ingress and egress contacts, while second and third contact are the internal
-ingress and egress contacts. Each populated Julian Day also has a matching
-`almanac_event_time_t` local civil time field.
+Returns a newly allocated `array_t` of opaque `almanac_solar_transit_t` records
+on success, or `NULL` on failure. Destroy the returned array with
+`array_destroy()` when finished. Only locally visible transits are included.
+Use `almanac_solar_transit_body_id()`, `almanac_solar_transit_time()`, and the
+solar-transit geometry accessors to inspect each record. Contact times use the
+accepted transit terminology: first and fourth contact are the external ingress
+and egress contacts, while second and third contact are the internal ingress
+and egress contacts.
 
 **`array_t *almanac_find_solar_transits(almanac_t *almanac, const char *body_code, const almanac_observer_t *observer, const datetime_t *start, const datetime_t *end)`**
 
@@ -545,8 +607,9 @@ Compute almanac entries for every enabled catalogue body.
 - `moment` — civil moment to evaluate
 
 Returns a newly allocated `array_t` of `almanac_entry_t` values on success, or
-`NULL` on failure. Entries are returned in configured catalogue order. Destroy
-the returned array with `array_destroy()` when finished.
+`NULL` on failure. Entries are returned in configured catalogue order. Pointers
+returned by `array_get()` are borrowed from the array and must not be freed
+individually. Destroy the returned array with `array_destroy()` when finished.
 
 ### Persistence
 

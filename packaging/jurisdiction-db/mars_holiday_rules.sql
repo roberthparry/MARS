@@ -802,6 +802,11 @@ create table jurisdiction_town_timezone (
     jurisdiction_town_id integer primary key references jurisdiction_town_entity(jurisdiction_town_id) on delete cascade,
     timezone_code integer not null references timezone_code(timezone_code)
 );
+create table jurisdiction_town_totality_seed_priority (
+    jurisdiction_town_id integer primary key references jurisdiction_town_entity(jurisdiction_town_id) on delete cascade,
+    totality_seed_priority integer not null,
+    check (totality_seed_priority >= 0)
+);
 create table jurisdiction_default_town (
     jurisdiction_id text primary key references jurisdiction_entity(jurisdiction_id) on delete cascade,
     jurisdiction_town_id integer not null references jurisdiction_town_entity(jurisdiction_town_id) on delete cascade
