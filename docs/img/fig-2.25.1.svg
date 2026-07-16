@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="500" viewBox="0 0 1200 500" role="img" aria-labelledby="title description">
+  <title id="title">Meridian relations and time</title>
+  <desc id="description">Relations among the ephemeris, universal, local, and solar meridians, the true Sun, and the equinox.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="8" refX="8.5" refY="4" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L9,4 L0,8 Z" fill="#e7f1e8"/>
+    </marker>
+    <style>
+      .line { stroke: #e7f1e8; stroke-width: 2; fill: none; }
+      .arrow { stroke: #e7f1e8; stroke-width: 2; fill: none; marker-end: url(#arrow); }
+      .label { fill: #e7f1e8; font: 700 22px Georgia, 'Times New Roman', serif; }
+      .text { fill: #e7f1e8; font: 21px Georgia, 'Times New Roman', serif; }
+      .math { fill: #e7f1e8; font: italic 21px Georgia, 'Times New Roman', serif; }
+      .mask { fill: #071b14; }
+    </style>
+  </defs>
+
+  <rect width="1200" height="500" rx="4" fill="#071b14"/>
+
+  <g aria-hidden="true">
+    <path class="line" d="M50 72V398"/>
+    <path class="line" d="M235 106V374"/>
+    <path class="line" d="M495 72V398"/>
+    <path class="line" d="M540 117V374"/>
+    <path class="line" d="M795 72V398"/>
+    <path class="line" d="M1110 72V398"/>
+
+    <path class="arrow" d="M235 150H540"/>
+    <path class="arrow" d="M540 108H795"/>
+    <path class="arrow" d="M1110 178H795"/>
+    <path class="arrow" d="M540 224H795"/>
+    <path class="arrow" d="M235 270H495"/>
+    <path class="arrow" d="M235 312H795"/>
+    <path class="arrow" d="M235 354H1110"/>
+    <path class="arrow" d="M50 382H235"/>
+  </g>
+
+  <g>
+    <text class="label" x="50" y="54">Ephemeris meridian</text>
+    <text class="label" x="495" y="54">Local meridian</text>
+    <text class="label" x="795" y="54">True Sun</text>
+    <text class="label" x="1110" y="54" text-anchor="end">Equinox</text>
+
+    <rect class="mask" x="327" y="132" width="125" height="31"/>
+    <text class="math" x="339" y="155">12<tspan baseline-shift="super" font-size="15">h</tspan> + UT</text>
+
+    <rect class="mask" x="595" y="89" width="157" height="31"/>
+    <text class="text" x="606" y="112">Equation of time</text>
+
+    <rect class="mask" x="881" y="159" width="197" height="31"/>
+    <text class="text" x="892" y="182">Right ascension of Sun</text>
+
+    <rect class="mask" x="586" y="205" width="205" height="31"/>
+    <text class="text" x="597" y="228">Local hour angle of Sun</text>
+
+    <rect class="mask" x="334" y="251" width="103" height="31"/>
+    <text class="text" x="345" y="274">Longitude</text>
+
+    <rect class="mask" x="334" y="293" width="168" height="31"/>
+    <text class="text" x="345" y="316">Hour angle of Sun</text>
+
+    <rect class="mask" x="334" y="335" width="122" height="31"/>
+    <text class="text" x="345" y="358">Sidereal time</text>
+
+    <rect class="mask" x="73" y="363" width="142" height="31"/>
+    <text class="math" x="83" y="386">1.002738 ΔT</text>
+
+    <text class="label" x="235" y="426">Universal meridian</text>
+    <text class="label" x="235" y="453">(Greenwich)</text>
+    <text class="label" x="540" y="426">Mean Sun of UT</text>
+  </g>
+</svg>
