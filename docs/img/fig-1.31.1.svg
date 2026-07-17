@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="730" viewBox="0 0 760 730" role="img" aria-labelledby="title desc">
+  <title id="title">Representation of a vector in rectangular coordinates</title>
+  <desc id="desc">A vector r in a three-dimensional rectangular coordinate system, showing longitude lambda and latitude beta.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#E6EDF3"/>
+    </marker>
+  </defs>
+
+  <rect width="760" height="730" fill="#0D1117"/>
+
+  <g fill="none" stroke="#E6EDF3" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Rectangular coordinate axes. -->
+    <path d="M 230 465 L 225 48" stroke-width="2" marker-end="url(#arrow)"/>
+    <path d="M 230 465 L 681 520" stroke-width="2" marker-end="url(#arrow)"/>
+    <path d="M 230 465 L 78 700" stroke-width="2" marker-end="url(#arrow)"/>
+
+    <!-- Position vector and its rectangular projections. -->
+    <path d="M 230 465 L 510 170" stroke-width="3.2" marker-end="url(#arrow)"/>
+    <path d="M 500 688 L 505 187" stroke-width="3" stroke-dasharray="13 13"/>
+    <path d="M 230 465 L 500 688" stroke-width="3" stroke-dasharray="13 13"/>
+    <path d="M 116 643 L 500 688" stroke-width="3" stroke-dasharray="13 13"/>
+    <path d="M 575 507 L 500 688" stroke-width="3" stroke-dasharray="13 13"/>
+
+    <!-- Projection tick on the y-axis. -->
+    <path d="M 566 503 L 578 506 L 573 519" stroke-width="2.5"/>
+
+    <!-- Polar angle, latitude, and longitude arcs. -->
+    <path d="M 229 280 C 257 302 281 341 296 386" stroke-width="2.3" marker-end="url(#arrow)"/>
+    <path d="M 297 391 A 101 101 0 0 1 307 536" stroke-width="2.3" marker-start="url(#arrow)"/>
+    <path d="M 181 539 A 91 91 0 0 0 298 522" stroke-width="2.3" marker-end="url(#arrow)"/>
+  </g>
+
+  <g fill="#E6EDF3" font-family="Georgia, 'Times New Roman', serif">
+    <text x="218" y="39" font-size="27" font-style="italic">z</text>
+    <text x="690" y="532" font-size="27" font-style="italic">y</text>
+    <text x="60" y="721" font-size="27" font-style="italic">x</text>
+    <text x="516" y="166" font-size="29" font-style="italic" font-weight="bold">r</text>
+    <text x="201" y="478" font-size="29" font-style="italic">O</text>
+
+    <text x="262" y="312" font-size="27">90&#176; &#8722; <tspan font-style="italic">&#946;</tspan></text>
+    <text x="315" y="466" font-size="28" font-style="italic">&#946;</text>
+    <text x="236" y="568" font-size="28" font-style="italic">&#955;</text>
+  </g>
+</svg>
