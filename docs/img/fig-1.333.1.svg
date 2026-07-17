@@ -66,15 +66,15 @@
 
   <!-- Radius and normal to the spheroid meet at the observed point. -->
   <path class="line" d="M560 355 L738 232 L854 152" stroke-width="3"/>
-  <path class="line" d="M640.755 375.606 L738 232 L824 105" stroke-width="3"/>
+  <path class="line" d="M642.749 370.399 L738 232 L825.406 105" stroke-width="3"/>
   <circle class="point" cx="738" cy="232" r="4.5" fill="#d8e3df" stroke="none"/>
 
   <!-- Geocentric and geodetic latitude constructions. -->
-  <path class="line" d="M560 355 L754.215 404.558" stroke-width="3"/>
+  <path class="line" d="M560 355 L782 396.313" stroke-width="3"/>
   <!-- φ′ is measured at the center from the equatorial ray to the radius. -->
-  <path class="angle" d="M627.827 372.307 A70 70 0 0 0 617.588 315.206" stroke-width="2.4"/>
+  <path class="angle" d="M628.819 367.807 A70 70 0 0 0 617.588 315.206" stroke-width="2.4"/>
   <!-- φ is measured where the spheroid normal meets the equatorial ray. -->
-  <path class="angle" d="M689.202 387.969 A50 50 0 0 0 668.790 334.205" stroke-width="2.4"/>
+  <path class="angle" d="M691.905 379.547 A50 50 0 0 0 671.096 329.211" stroke-width="2.4"/>
   </g>
 
   <!-- Labels follow the original figure's placement. -->
