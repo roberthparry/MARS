@@ -93,3 +93,18 @@ src/almanac/Explanatory Supplement Astronomical Almanac TeX/
 texput.log
 src/almanac/explanatory_supplement_page.sh
 src/almanac/Explanatory Supplement Astronomical Almanac.pdf
+
+# Local Explanatory Supplement repair/generation workers
+src/almanac/generate_explanatory_supplement_pages.py
+tools/add_almanac_pdf_links.py
+tools/almanac_transparent_diagrams.py
+tools/extract_almanac_figure.py
+tools/find_almanac_split_sentences.py
+tools/render_gemt1_markdown_table.py
+tools/render_ocean_loading_markdown_table.py
+tools/render_short_period_zonal_tides_markdown.py
+tools/repair_almanac_constant_tables.py
+tools/repair_almanac_markdown_math.py
+tools/repair_almanac_nutation_tables.py
+tools/repair_almanac_saturn_tables.py
+tools/restore_almanac_splice.py
