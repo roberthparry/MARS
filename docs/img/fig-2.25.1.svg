@@ -3,19 +3,19 @@
   <desc id="description">Relations among the ephemeris, universal, local, and solar meridians, the true Sun, and the equinox.</desc>
   <defs>
     <marker id="arrow" markerWidth="10" markerHeight="8" refX="8.5" refY="4" orient="auto" markerUnits="strokeWidth">
-      <path d="M0,0 L9,4 L0,8 Z" fill="#e7f1e8"/>
+      <path d="M0,0 L9,4 L0,8 Z" fill="#c9d1d9"/>
     </marker>
     <style>
-      .line { stroke: #e7f1e8; stroke-width: 2; fill: none; }
-      .arrow { stroke: #e7f1e8; stroke-width: 2; fill: none; marker-end: url(#arrow); }
-      .label { fill: #e7f1e8; font: 700 22px Georgia, 'Times New Roman', serif; }
-      .text { fill: #e7f1e8; font: 21px Georgia, 'Times New Roman', serif; }
-      .math { fill: #e7f1e8; font: italic 21px Georgia, 'Times New Roman', serif; }
-      .mask { fill: #071b14; }
+      .line { stroke: #c9d1d9; stroke-width: 2; fill: none; }
+      .arrow { stroke: #c9d1d9; stroke-width: 2; fill: none; marker-end: url(#arrow); }
+      .label { fill: #c9d1d9; font: 700 22px Georgia, 'Times New Roman', serif; }
+      .text { fill: #c9d1d9; font: 21px Georgia, 'Times New Roman', serif; }
+      .math { fill: #c9d1d9; font: italic 21px Georgia, 'Times New Roman', serif; }
+      .mask { fill: #0d1117; }
     </style>
   </defs>
 
-  <rect width="1200" height="500" rx="4" fill="#071b14"/>
+  <rect width="1200" height="500" rx="4" fill="#0d1117"/>
 
   <g aria-hidden="true">
     <path class="line" d="M50 72V398"/>
