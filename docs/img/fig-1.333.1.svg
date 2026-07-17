@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="680" viewBox="0 0 1100 680" role="img" aria-labelledby="fig13331-title fig13331-desc">
+  <title id="fig13331-title">Geocentric and geodetic coordinates</title>
+  <desc id="fig13331-desc">A terrestrial spheroid showing its equator, prime meridian, geocentric radius, normal to the spheroid, and geocentric and geodetic latitudes.</desc>
+  <defs>
+    <marker id="fig13331-arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="5.5" markerHeight="5.5" orient="auto">
+      <path d="M0 0 L10 5 L0 10 Z" fill="#d8e3df"/>
+    </marker>
+    <style>
+      .outline, .front, .line, .angle {
+        fill: none;
+        stroke: #d8e3df;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .outline { stroke-width: 4.1; }
+      .front { stroke-width: 4.0; }
+      .line { stroke-width: 3.0; }
+      .angle { stroke-width: 2.4; }
+      .back {
+        fill: none;
+        stroke: #8b9996;
+        stroke-width: 2.2;
+        stroke-linecap: round;
+      }
+      .point { fill: #d8e3df; }
+      .label, .math {
+        fill: #e6edf3;
+        font-family: Georgia, "Times New Roman", serif;
+      }
+      .label { font-size: 27px; font-weight: 600; }
+      .math { font-size: 29px; font-style: italic; }
+      .sub { font-size: 18px; }
+    </style>
+  </defs>
+
+  <g fill="none" stroke="#d8e3df" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Reference spheroid. -->
+  <circle class="outline" cx="560" cy="355" r="275" stroke-width="4.1"/>
+
+  <!-- Fitted equatorial ellipse: rear half subdued, near half emphasized. -->
+  <ellipse class="back" cx="560" cy="355" rx="275" ry="70" stroke="#8b9996" stroke-width="2.2"/>
+  <path class="front" d="M285 355 A275 70 0 0 0 835 355" stroke-width="4"/>
+
+  <!-- Only the source-visible arcs of the prime-meridian ellipse. -->
+  <path class="front" d="M560 80 A150 290 12 0 0 480 421.973" stroke-width="4"/>
+  <path class="back" d="M560 80 A286.949 212.911 -109.256 0 1 782 396.313" stroke="#8b9996" stroke-width="2.2"/>
+
+  <!-- Cartesian axes. -->
+  <path class="line" d="M560 355 L560 24" stroke-width="3" marker-end="url(#fig13331-arrow)"/>
+  <path class="line" d="M560 355 L946 355" stroke-width="3" marker-end="url(#fig13331-arrow)"/>
+  <path d="M559.262 354.118
+           L440.588 452.164
+           L437.924 448.981
+           L432 462.157
+           L446.012 458.643
+           L443.348 455.461
+           L560.738 355.882 Z"
+        fill="#d8e3df" stroke="none"/>
+
+  <!-- Radius and normal to the spheroid meet at the observed point. -->
+  <path class="line" d="M560 355 L738 232 L854 152" stroke-width="3"/>
+  <path class="line" d="M640.755 375.606 L738 232 L824 105" stroke-width="3"/>
+  <circle class="point" cx="738" cy="232" r="4.5" fill="#d8e3df" stroke="none"/>
+
+  <!-- Geocentric and geodetic latitude constructions. -->
+  <path class="line" d="M560 355 L754.215 404.558" stroke-width="3"/>
+  <!-- φ′ is measured at the center from the equatorial ray to the radius. -->
+  <path class="angle" d="M627.827 372.307 A70 70 0 0 0 617.588 315.206" stroke-width="2.4"/>
+  <!-- φ is measured where the spheroid normal meets the equatorial ray. -->
+  <path class="angle" d="M689.202 387.969 A50 50 0 0 0 668.790 334.205" stroke-width="2.4"/>
+  </g>
+
+  <!-- Labels follow the original figure's placement. -->
+  <g fill="#e6edf3" font-family="Georgia, 'Times New Roman', serif">
+  <text class="math" x="550" y="22" font-size="29" font-style="italic">z</text>
+  <text class="label" x="595" y="59" font-size="27" font-weight="600">North Pole</text>
+  <text class="label" x="155" y="367" font-size="27" font-weight="600">Equator</text>
+
+  <text class="label" x="390" y="247" font-size="27" font-weight="600">Prime</text>
+  <text class="label" x="372" y="278" font-size="27" font-weight="600">meridian</text>
+  <circle class="point" cx="498" cy="213" r="5" fill="#d8e3df"/>
+  <text class="math" x="463" y="210" font-size="29" font-style="italic">G</text>
+
+  <text class="label" x="834" y="115" font-size="27" font-weight="600">Normal to spheroid</text>
+  <text class="label" x="866" y="170" font-size="27" font-weight="600">Radius</text>
+  <text class="math" x="675" y="250" font-size="29" font-style="italic">ρ</text>
+
+  <text class="math" x="631" y="321" font-size="29" font-style="italic">φ′</text>
+  <text class="math" x="714" y="345" font-size="29" font-style="italic">φ</text>
+  <text class="math" x="602" y="449" font-size="29" font-style="italic">λ<tspan class="sub" font-size="18" baseline-shift="super">′</tspan> = λ</text>
+
+  <text class="math" x="428" y="491" font-size="29" font-style="italic">x</text>
+  <text class="math" x="965" y="366" font-size="29" font-style="italic">y</text>
+  </g>
+</svg>
