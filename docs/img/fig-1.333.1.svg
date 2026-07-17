@@ -40,11 +40,17 @@
 
   <!-- Fitted equatorial ellipse: rear half subdued, near half emphasized. -->
   <ellipse class="back" cx="560" cy="355" rx="275" ry="70" stroke="#8b9996" stroke-width="2.2"/>
-  <path class="front" d="M285 355 A275 70 0 0 0 835 355" stroke-width="4"/>
 
   <!-- Only the source-visible arcs of the prime-meridian ellipse. -->
-  <path class="front" d="M560 80 A150 290 12 0 0 480 421.973" stroke-width="4"/>
-  <path class="back" d="M560 80 A286.949 212.911 -109.256 0 1 782 396.313" stroke="#8b9996" stroke-width="2.2"/>
+  <path class="front" d="M560 80 A150 290 12 0 0 480 421.973 L479.7 423.5" stroke-width="4"/>
+  <path class="back" d="M560 80
+                        A286.949 212.911 -109.256 0 1 738 232
+                        A286.949 212.911 -109.256 0 1 782 396.313
+                        L782.1 398"
+        stroke="#8b9996" stroke-width="2.2"/>
+
+  <!-- Drawn last at the crossings to conceal the tiny overlap and prevent gaps. -->
+  <path class="front" d="M285 355 A275 70 0 0 0 835 355" stroke-width="4"/>
 
   <!-- Cartesian axes. -->
   <path class="line" d="M560 355 L560 24" stroke-width="3" marker-end="url(#fig13331-arrow)"/>
@@ -87,7 +93,7 @@
   <text class="math" x="675" y="250" font-size="29" font-style="italic">ρ</text>
 
   <text class="math" x="631" y="321" font-size="29" font-style="italic">φ′</text>
-  <text class="math" x="714" y="345" font-size="29" font-style="italic">φ</text>
+  <text class="math" x="694" y="337" font-size="29" font-style="italic">φ</text>
   <text class="math" x="602" y="449" font-size="29" font-style="italic">λ<tspan class="sub" font-size="18" baseline-shift="super">′</tspan> = λ</text>
 
   <text class="math" x="428" y="491" font-size="29" font-style="italic">x</text>
