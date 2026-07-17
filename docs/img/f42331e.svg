@@ -1,0 +1,360 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="1500" viewBox="0 0 1040 1500" role="img" aria-labelledby="title description">
+  <title id="title">UTM and UPS grid zone designations</title>
+  <desc id="description">Universal Transverse Mercator zones from 80 degrees south to 84 degrees north, with Universal Polar Stereographic zone insets.</desc>
+  <rect width="1040" height="1500" fill="#0D1117"/>
+  <g fill="#E6EDF3" stroke="#E6EDF3" stroke-width="1.35" stroke-linecap="square" font-family="Georgia, 'Times New Roman', serif">
+  <rect x="125.00" y="70.00" width="620.00" height="1360.00" fill="none" stroke-width="2"/>
+  <rect x="780.00" y="70.00" width="70.00" height="1360.00" fill="none" stroke-width="2"/>
+  <line x1="156.00" y1="70.00" x2="156.00" y2="1430.00"/>
+  <line x1="187.00" y1="70.00" x2="187.00" y2="1430.00"/>
+  <line x1="218.00" y1="70.00" x2="218.00" y2="1430.00"/>
+  <line x1="249.00" y1="70.00" x2="249.00" y2="1430.00"/>
+  <line x1="280.00" y1="70.00" x2="280.00" y2="1430.00"/>
+  <line x1="311.00" y1="70.00" x2="311.00" y2="1430.00"/>
+  <line x1="342.00" y1="70.00" x2="342.00" y2="1430.00"/>
+  <line x1="373.00" y1="70.00" x2="373.00" y2="1430.00"/>
+  <line x1="404.00" y1="70.00" x2="404.00" y2="1430.00"/>
+  <line x1="435.00" y1="70.00" x2="435.00" y2="1430.00"/>
+  <line x1="466.00" y1="70.00" x2="466.00" y2="1430.00"/>
+  <line x1="497.00" y1="70.00" x2="497.00" y2="1430.00"/>
+  <line x1="528.00" y1="70.00" x2="528.00" y2="1430.00"/>
+  <line x1="559.00" y1="70.00" x2="559.00" y2="1430.00"/>
+  <line x1="590.00" y1="70.00" x2="590.00" y2="1430.00"/>
+  <line x1="621.00" y1="70.00" x2="621.00" y2="1430.00"/>
+  <line x1="652.00" y1="70.00" x2="652.00" y2="1430.00"/>
+  <line x1="683.00" y1="70.00" x2="683.00" y2="1430.00"/>
+  <line x1="714.00" y1="70.00" x2="714.00" y2="1430.00"/>
+  <line x1="125.00" y1="92.67" x2="745.00" y2="92.67"/>
+  <line x1="780.00" y1="92.67" x2="850.00" y2="92.67"/>
+  <line x1="125.00" y1="115.33" x2="745.00" y2="115.33"/>
+  <line x1="780.00" y1="115.33" x2="850.00" y2="115.33"/>
+  <line x1="125.00" y1="138.00" x2="745.00" y2="138.00"/>
+  <line x1="780.00" y1="138.00" x2="850.00" y2="138.00"/>
+  <line x1="125.00" y1="160.67" x2="745.00" y2="160.67"/>
+  <line x1="780.00" y1="160.67" x2="850.00" y2="160.67"/>
+  <line x1="125.00" y1="183.33" x2="745.00" y2="183.33"/>
+  <line x1="780.00" y1="183.33" x2="850.00" y2="183.33"/>
+  <line x1="125.00" y1="206.00" x2="745.00" y2="206.00"/>
+  <line x1="780.00" y1="206.00" x2="850.00" y2="206.00"/>
+  <line x1="125.00" y1="228.67" x2="745.00" y2="228.67"/>
+  <line x1="780.00" y1="228.67" x2="850.00" y2="228.67"/>
+  <line x1="125.00" y1="251.33" x2="745.00" y2="251.33"/>
+  <line x1="780.00" y1="251.33" x2="850.00" y2="251.33"/>
+  <line x1="125.00" y1="274.00" x2="745.00" y2="274.00"/>
+  <line x1="780.00" y1="274.00" x2="850.00" y2="274.00"/>
+  <line x1="125.00" y1="296.67" x2="745.00" y2="296.67"/>
+  <line x1="780.00" y1="296.67" x2="850.00" y2="296.67"/>
+  <line x1="125.00" y1="319.33" x2="745.00" y2="319.33"/>
+  <line x1="780.00" y1="319.33" x2="850.00" y2="319.33"/>
+  <line x1="125.00" y1="342.00" x2="745.00" y2="342.00"/>
+  <line x1="780.00" y1="342.00" x2="850.00" y2="342.00"/>
+  <line x1="125.00" y1="364.67" x2="745.00" y2="364.67"/>
+  <line x1="780.00" y1="364.67" x2="850.00" y2="364.67"/>
+  <line x1="125.00" y1="387.33" x2="745.00" y2="387.33"/>
+  <line x1="780.00" y1="387.33" x2="850.00" y2="387.33"/>
+  <line x1="125.00" y1="410.00" x2="745.00" y2="410.00"/>
+  <line x1="780.00" y1="410.00" x2="850.00" y2="410.00"/>
+  <line x1="125.00" y1="432.67" x2="745.00" y2="432.67"/>
+  <line x1="780.00" y1="432.67" x2="850.00" y2="432.67"/>
+  <line x1="125.00" y1="455.33" x2="745.00" y2="455.33"/>
+  <line x1="780.00" y1="455.33" x2="850.00" y2="455.33"/>
+  <line x1="125.00" y1="478.00" x2="745.00" y2="478.00"/>
+  <line x1="780.00" y1="478.00" x2="850.00" y2="478.00"/>
+  <line x1="125.00" y1="500.67" x2="745.00" y2="500.67"/>
+  <line x1="780.00" y1="500.67" x2="850.00" y2="500.67"/>
+  <line x1="125.00" y1="523.33" x2="745.00" y2="523.33"/>
+  <line x1="780.00" y1="523.33" x2="850.00" y2="523.33"/>
+  <line x1="125.00" y1="546.00" x2="745.00" y2="546.00"/>
+  <line x1="780.00" y1="546.00" x2="850.00" y2="546.00"/>
+  <line x1="125.00" y1="568.67" x2="745.00" y2="568.67"/>
+  <line x1="780.00" y1="568.67" x2="850.00" y2="568.67"/>
+  <line x1="125.00" y1="591.33" x2="745.00" y2="591.33"/>
+  <line x1="780.00" y1="591.33" x2="850.00" y2="591.33"/>
+  <line x1="125.00" y1="614.00" x2="745.00" y2="614.00"/>
+  <line x1="780.00" y1="614.00" x2="850.00" y2="614.00"/>
+  <line x1="125.00" y1="636.67" x2="745.00" y2="636.67"/>
+  <line x1="780.00" y1="636.67" x2="850.00" y2="636.67"/>
+  <line x1="125.00" y1="659.33" x2="745.00" y2="659.33"/>
+  <line x1="780.00" y1="659.33" x2="850.00" y2="659.33"/>
+  <line x1="125.00" y1="682.00" x2="745.00" y2="682.00"/>
+  <line x1="780.00" y1="682.00" x2="850.00" y2="682.00"/>
+  <line x1="125.00" y1="704.67" x2="745.00" y2="704.67"/>
+  <line x1="780.00" y1="704.67" x2="850.00" y2="704.67"/>
+  <line x1="125.00" y1="727.33" x2="745.00" y2="727.33"/>
+  <line x1="780.00" y1="727.33" x2="850.00" y2="727.33"/>
+  <line x1="125.00" y1="750.00" x2="745.00" y2="750.00"/>
+  <line x1="780.00" y1="750.00" x2="850.00" y2="750.00"/>
+  <line x1="125.00" y1="772.67" x2="745.00" y2="772.67"/>
+  <line x1="780.00" y1="772.67" x2="850.00" y2="772.67"/>
+  <line x1="125.00" y1="795.33" x2="745.00" y2="795.33"/>
+  <line x1="780.00" y1="795.33" x2="850.00" y2="795.33"/>
+  <line x1="125.00" y1="818.00" x2="745.00" y2="818.00"/>
+  <line x1="780.00" y1="818.00" x2="850.00" y2="818.00"/>
+  <line x1="125.00" y1="840.67" x2="745.00" y2="840.67"/>
+  <line x1="780.00" y1="840.67" x2="850.00" y2="840.67"/>
+  <line x1="125.00" y1="863.33" x2="745.00" y2="863.33"/>
+  <line x1="780.00" y1="863.33" x2="850.00" y2="863.33"/>
+  <line x1="125.00" y1="886.00" x2="745.00" y2="886.00"/>
+  <line x1="780.00" y1="886.00" x2="850.00" y2="886.00"/>
+  <line x1="125.00" y1="908.67" x2="745.00" y2="908.67"/>
+  <line x1="780.00" y1="908.67" x2="850.00" y2="908.67"/>
+  <line x1="125.00" y1="931.33" x2="745.00" y2="931.33"/>
+  <line x1="780.00" y1="931.33" x2="850.00" y2="931.33"/>
+  <line x1="125.00" y1="954.00" x2="745.00" y2="954.00"/>
+  <line x1="780.00" y1="954.00" x2="850.00" y2="954.00"/>
+  <line x1="125.00" y1="976.67" x2="745.00" y2="976.67"/>
+  <line x1="780.00" y1="976.67" x2="850.00" y2="976.67"/>
+  <line x1="125.00" y1="999.33" x2="745.00" y2="999.33"/>
+  <line x1="780.00" y1="999.33" x2="850.00" y2="999.33"/>
+  <line x1="125.00" y1="1022.00" x2="745.00" y2="1022.00"/>
+  <line x1="780.00" y1="1022.00" x2="850.00" y2="1022.00"/>
+  <line x1="125.00" y1="1044.67" x2="745.00" y2="1044.67"/>
+  <line x1="780.00" y1="1044.67" x2="850.00" y2="1044.67"/>
+  <line x1="125.00" y1="1067.33" x2="745.00" y2="1067.33"/>
+  <line x1="780.00" y1="1067.33" x2="850.00" y2="1067.33"/>
+  <line x1="125.00" y1="1090.00" x2="745.00" y2="1090.00"/>
+  <line x1="780.00" y1="1090.00" x2="850.00" y2="1090.00"/>
+  <line x1="125.00" y1="1112.67" x2="745.00" y2="1112.67"/>
+  <line x1="780.00" y1="1112.67" x2="850.00" y2="1112.67"/>
+  <line x1="125.00" y1="1135.33" x2="745.00" y2="1135.33"/>
+  <line x1="780.00" y1="1135.33" x2="850.00" y2="1135.33"/>
+  <line x1="125.00" y1="1158.00" x2="745.00" y2="1158.00"/>
+  <line x1="780.00" y1="1158.00" x2="850.00" y2="1158.00"/>
+  <line x1="125.00" y1="1180.67" x2="745.00" y2="1180.67"/>
+  <line x1="780.00" y1="1180.67" x2="850.00" y2="1180.67"/>
+  <line x1="125.00" y1="1203.33" x2="745.00" y2="1203.33"/>
+  <line x1="780.00" y1="1203.33" x2="850.00" y2="1203.33"/>
+  <line x1="125.00" y1="1226.00" x2="745.00" y2="1226.00"/>
+  <line x1="780.00" y1="1226.00" x2="850.00" y2="1226.00"/>
+  <line x1="125.00" y1="1248.67" x2="745.00" y2="1248.67"/>
+  <line x1="780.00" y1="1248.67" x2="850.00" y2="1248.67"/>
+  <line x1="125.00" y1="1271.33" x2="745.00" y2="1271.33"/>
+  <line x1="780.00" y1="1271.33" x2="850.00" y2="1271.33"/>
+  <line x1="125.00" y1="1294.00" x2="745.00" y2="1294.00"/>
+  <line x1="780.00" y1="1294.00" x2="850.00" y2="1294.00"/>
+  <line x1="125.00" y1="1316.67" x2="745.00" y2="1316.67"/>
+  <line x1="780.00" y1="1316.67" x2="850.00" y2="1316.67"/>
+  <line x1="125.00" y1="1339.33" x2="745.00" y2="1339.33"/>
+  <line x1="780.00" y1="1339.33" x2="850.00" y2="1339.33"/>
+  <line x1="125.00" y1="1362.00" x2="745.00" y2="1362.00"/>
+  <line x1="780.00" y1="1362.00" x2="850.00" y2="1362.00"/>
+  <line x1="125.00" y1="1384.67" x2="745.00" y2="1384.67"/>
+  <line x1="780.00" y1="1384.67" x2="850.00" y2="1384.67"/>
+  <line x1="125.00" y1="1407.33" x2="745.00" y2="1407.33"/>
+  <line x1="780.00" y1="1407.33" x2="850.00" y2="1407.33"/>
+  <text x="140.50" y="42.00" font-size="15" text-anchor="middle" transform="rotate(-90 140.5 42)" font-weight="bold" font-style="normal" stroke="none">X</text>
+  <text x="171.50" y="42.00" font-size="15" text-anchor="middle" transform="rotate(-90 171.5 42)" font-weight="bold" font-style="normal" stroke="none">W</text>
+  <text x="202.50" y="42.00" font-size="15" text-anchor="middle" transform="rotate(-90 202.5 42)" font-weight="bold" font-style="normal" stroke="none">V</text>
+  <text x="233.50" y="42.00" font-size="15" text-anchor="middle" transform="rotate(-90 233.5 42)" font-weight="bold" font-style="normal" stroke="none">U</text>
+  <text x="264.50" y="42.00" font-size="15" text-anchor="middle" transform="rotate(-90 264.5 42)" font-weight="bold" font-style="normal" stroke="none">T</text>
+  <text x="295.50" y="42.00" font-size="15" text-anchor="middle" transform="rotate(-90 295.5 42)" font-weight="bold" font-style="normal" stroke="none">S</text>
+  <text x="326.50" y="42.00" font-size="15" text-anchor="middle" transform="rotate(-90 326.5 42)" font-weight="bold" font-style="normal" stroke="none">R</text>
+  <text x="357.50" y="42.00" font-size="15" text-anchor="middle" transform="rotate(-90 357.5 42)" font-weight="bold" font-style="normal" stroke="none">Q</text>
+  <text x="388.50" y="42.00" font-size="15" text-anchor="middle" transform="rotate(-90 388.5 42)" font-weight="bold" font-style="normal" stroke="none">P</text>
+  <text x="419.50" y="42.00" font-size="15" text-anchor="middle" transform="rotate(-90 419.5 42)" font-weight="bold" font-style="normal" stroke="none">N</text>
+  <text x="450.50" y="42.00" font-size="15" text-anchor="middle" transform="rotate(-90 450.5 42)" font-weight="bold" font-style="normal" stroke="none">M</text>
+  <text x="481.50" y="42.00" font-size="15" text-anchor="middle" transform="rotate(-90 481.5 42)" font-weight="bold" font-style="normal" stroke="none">L</text>
+  <text x="512.50" y="42.00" font-size="15" text-anchor="middle" transform="rotate(-90 512.5 42)" font-weight="bold" font-style="normal" stroke="none">K</text>
+  <text x="543.50" y="42.00" font-size="15" text-anchor="middle" transform="rotate(-90 543.5 42)" font-weight="bold" font-style="normal" stroke="none">J</text>
+  <text x="574.50" y="42.00" font-size="15" text-anchor="middle" transform="rotate(-90 574.5 42)" font-weight="bold" font-style="normal" stroke="none">H</text>
+  <text x="605.50" y="42.00" font-size="15" text-anchor="middle" transform="rotate(-90 605.5 42)" font-weight="bold" font-style="normal" stroke="none">G</text>
+  <text x="636.50" y="42.00" font-size="15" text-anchor="middle" transform="rotate(-90 636.5 42)" font-weight="bold" font-style="normal" stroke="none">F</text>
+  <text x="667.50" y="42.00" font-size="15" text-anchor="middle" transform="rotate(-90 667.5 42)" font-weight="bold" font-style="normal" stroke="none">E</text>
+  <text x="698.50" y="42.00" font-size="15" text-anchor="middle" transform="rotate(-90 698.5 42)" font-weight="bold" font-style="normal" stroke="none">D</text>
+  <text x="729.50" y="42.00" font-size="15" text-anchor="middle" transform="rotate(-90 729.5 42)" font-weight="bold" font-style="normal" stroke="none">C</text>
+  <text x="125.00" y="67.00" font-size="12" text-anchor="start" transform="rotate(-90 125 67)" font-weight="normal" font-style="normal" stroke="none">84&#176;</text>
+  <text x="156.00" y="67.00" font-size="12" text-anchor="start" transform="rotate(-90 156 67)" font-weight="normal" font-style="normal" stroke="none">72&#176;</text>
+  <text x="187.00" y="67.00" font-size="12" text-anchor="start" transform="rotate(-90 187 67)" font-weight="normal" font-style="normal" stroke="none">64&#176;</text>
+  <text x="218.00" y="67.00" font-size="12" text-anchor="start" transform="rotate(-90 218 67)" font-weight="normal" font-style="normal" stroke="none">56&#176;</text>
+  <text x="249.00" y="67.00" font-size="12" text-anchor="start" transform="rotate(-90 249 67)" font-weight="normal" font-style="normal" stroke="none">48&#176;</text>
+  <text x="280.00" y="67.00" font-size="12" text-anchor="start" transform="rotate(-90 280 67)" font-weight="normal" font-style="normal" stroke="none">40&#176;</text>
+  <text x="311.00" y="67.00" font-size="12" text-anchor="start" transform="rotate(-90 311 67)" font-weight="normal" font-style="normal" stroke="none">32&#176;</text>
+  <text x="342.00" y="67.00" font-size="12" text-anchor="start" transform="rotate(-90 342 67)" font-weight="normal" font-style="normal" stroke="none">24&#176;</text>
+  <text x="373.00" y="67.00" font-size="12" text-anchor="start" transform="rotate(-90 373 67)" font-weight="normal" font-style="normal" stroke="none">16&#176;</text>
+  <text x="404.00" y="67.00" font-size="12" text-anchor="start" transform="rotate(-90 404 67)" font-weight="normal" font-style="normal" stroke="none">8&#176;</text>
+  <text x="435.00" y="67.00" font-size="12" text-anchor="start" transform="rotate(-90 435 67)" font-weight="normal" font-style="normal" stroke="none">0&#176;</text>
+  <text x="466.00" y="67.00" font-size="12" text-anchor="start" transform="rotate(-90 466 67)" font-weight="normal" font-style="normal" stroke="none">8&#176;</text>
+  <text x="497.00" y="67.00" font-size="12" text-anchor="start" transform="rotate(-90 497 67)" font-weight="normal" font-style="normal" stroke="none">16&#176;</text>
+  <text x="528.00" y="67.00" font-size="12" text-anchor="start" transform="rotate(-90 528 67)" font-weight="normal" font-style="normal" stroke="none">24&#176;</text>
+  <text x="559.00" y="67.00" font-size="12" text-anchor="start" transform="rotate(-90 559 67)" font-weight="normal" font-style="normal" stroke="none">32&#176;</text>
+  <text x="590.00" y="67.00" font-size="12" text-anchor="start" transform="rotate(-90 590 67)" font-weight="normal" font-style="normal" stroke="none">40&#176;</text>
+  <text x="621.00" y="67.00" font-size="12" text-anchor="start" transform="rotate(-90 621 67)" font-weight="normal" font-style="normal" stroke="none">48&#176;</text>
+  <text x="652.00" y="67.00" font-size="12" text-anchor="start" transform="rotate(-90 652 67)" font-weight="normal" font-style="normal" stroke="none">56&#176;</text>
+  <text x="683.00" y="67.00" font-size="12" text-anchor="start" transform="rotate(-90 683 67)" font-weight="normal" font-style="normal" stroke="none">64&#176;</text>
+  <text x="714.00" y="67.00" font-size="12" text-anchor="start" transform="rotate(-90 714 67)" font-weight="normal" font-style="normal" stroke="none">72&#176;</text>
+  <text x="745.00" y="67.00" font-size="12" text-anchor="start" transform="rotate(-90 745 67)" font-weight="normal" font-style="normal" stroke="none">80&#176;</text>
+  <text x="815.00" y="85.33" font-size="12" text-anchor="middle" transform="rotate(-90 815 85.3333)" font-weight="normal" font-style="normal" stroke="none">60</text>
+  <text x="815.00" y="108.00" font-size="12" text-anchor="middle" transform="rotate(-90 815 108)" font-weight="normal" font-style="normal" stroke="none">59</text>
+  <text x="815.00" y="130.67" font-size="12" text-anchor="middle" transform="rotate(-90 815 130.667)" font-weight="normal" font-style="normal" stroke="none">58</text>
+  <text x="815.00" y="153.33" font-size="12" text-anchor="middle" transform="rotate(-90 815 153.333)" font-weight="normal" font-style="normal" stroke="none">57</text>
+  <text x="815.00" y="176.00" font-size="12" text-anchor="middle" transform="rotate(-90 815 176)" font-weight="normal" font-style="normal" stroke="none">56</text>
+  <text x="815.00" y="198.67" font-size="12" text-anchor="middle" transform="rotate(-90 815 198.667)" font-weight="normal" font-style="normal" stroke="none">55</text>
+  <text x="815.00" y="221.33" font-size="12" text-anchor="middle" transform="rotate(-90 815 221.333)" font-weight="normal" font-style="normal" stroke="none">54</text>
+  <text x="815.00" y="244.00" font-size="12" text-anchor="middle" transform="rotate(-90 815 244)" font-weight="normal" font-style="normal" stroke="none">53</text>
+  <text x="815.00" y="266.67" font-size="12" text-anchor="middle" transform="rotate(-90 815 266.667)" font-weight="normal" font-style="normal" stroke="none">52</text>
+  <text x="815.00" y="289.33" font-size="12" text-anchor="middle" transform="rotate(-90 815 289.333)" font-weight="normal" font-style="normal" stroke="none">51</text>
+  <text x="815.00" y="312.00" font-size="12" text-anchor="middle" transform="rotate(-90 815 312)" font-weight="normal" font-style="normal" stroke="none">50</text>
+  <text x="815.00" y="334.67" font-size="12" text-anchor="middle" transform="rotate(-90 815 334.667)" font-weight="normal" font-style="normal" stroke="none">49</text>
+  <text x="815.00" y="357.33" font-size="12" text-anchor="middle" transform="rotate(-90 815 357.333)" font-weight="normal" font-style="normal" stroke="none">48</text>
+  <text x="815.00" y="380.00" font-size="12" text-anchor="middle" transform="rotate(-90 815 380)" font-weight="normal" font-style="normal" stroke="none">47</text>
+  <text x="815.00" y="402.67" font-size="12" text-anchor="middle" transform="rotate(-90 815 402.667)" font-weight="normal" font-style="normal" stroke="none">46</text>
+  <text x="815.00" y="425.33" font-size="12" text-anchor="middle" transform="rotate(-90 815 425.333)" font-weight="normal" font-style="normal" stroke="none">45</text>
+  <text x="815.00" y="448.00" font-size="12" text-anchor="middle" transform="rotate(-90 815 448)" font-weight="normal" font-style="normal" stroke="none">44</text>
+  <text x="815.00" y="470.67" font-size="12" text-anchor="middle" transform="rotate(-90 815 470.667)" font-weight="normal" font-style="normal" stroke="none">43</text>
+  <text x="815.00" y="493.33" font-size="12" text-anchor="middle" transform="rotate(-90 815 493.333)" font-weight="normal" font-style="normal" stroke="none">42</text>
+  <text x="815.00" y="516.00" font-size="12" text-anchor="middle" transform="rotate(-90 815 516)" font-weight="normal" font-style="normal" stroke="none">41</text>
+  <text x="815.00" y="538.67" font-size="12" text-anchor="middle" transform="rotate(-90 815 538.667)" font-weight="normal" font-style="normal" stroke="none">40</text>
+  <text x="815.00" y="561.33" font-size="12" text-anchor="middle" transform="rotate(-90 815 561.333)" font-weight="normal" font-style="normal" stroke="none">39</text>
+  <text x="815.00" y="584.00" font-size="12" text-anchor="middle" transform="rotate(-90 815 584)" font-weight="normal" font-style="normal" stroke="none">38</text>
+  <text x="815.00" y="606.67" font-size="12" text-anchor="middle" transform="rotate(-90 815 606.667)" font-weight="normal" font-style="normal" stroke="none">37</text>
+  <text x="815.00" y="629.33" font-size="12" text-anchor="middle" transform="rotate(-90 815 629.333)" font-weight="normal" font-style="normal" stroke="none">36</text>
+  <text x="815.00" y="652.00" font-size="12" text-anchor="middle" transform="rotate(-90 815 652)" font-weight="normal" font-style="normal" stroke="none">35</text>
+  <text x="815.00" y="674.67" font-size="12" text-anchor="middle" transform="rotate(-90 815 674.667)" font-weight="normal" font-style="normal" stroke="none">34</text>
+  <text x="815.00" y="697.33" font-size="12" text-anchor="middle" transform="rotate(-90 815 697.333)" font-weight="normal" font-style="normal" stroke="none">33</text>
+  <text x="815.00" y="720.00" font-size="12" text-anchor="middle" transform="rotate(-90 815 720)" font-weight="normal" font-style="normal" stroke="none">32</text>
+  <text x="815.00" y="742.67" font-size="12" text-anchor="middle" transform="rotate(-90 815 742.667)" font-weight="normal" font-style="normal" stroke="none">31</text>
+  <text x="815.00" y="765.33" font-size="12" text-anchor="middle" transform="rotate(-90 815 765.333)" font-weight="normal" font-style="normal" stroke="none">30</text>
+  <text x="815.00" y="788.00" font-size="12" text-anchor="middle" transform="rotate(-90 815 788)" font-weight="normal" font-style="normal" stroke="none">29</text>
+  <text x="815.00" y="810.67" font-size="12" text-anchor="middle" transform="rotate(-90 815 810.667)" font-weight="normal" font-style="normal" stroke="none">28</text>
+  <text x="815.00" y="833.33" font-size="12" text-anchor="middle" transform="rotate(-90 815 833.333)" font-weight="normal" font-style="normal" stroke="none">27</text>
+  <text x="815.00" y="856.00" font-size="12" text-anchor="middle" transform="rotate(-90 815 856)" font-weight="normal" font-style="normal" stroke="none">26</text>
+  <text x="815.00" y="878.67" font-size="12" text-anchor="middle" transform="rotate(-90 815 878.667)" font-weight="normal" font-style="normal" stroke="none">25</text>
+  <text x="815.00" y="901.33" font-size="12" text-anchor="middle" transform="rotate(-90 815 901.333)" font-weight="normal" font-style="normal" stroke="none">24</text>
+  <text x="815.00" y="924.00" font-size="12" text-anchor="middle" transform="rotate(-90 815 924)" font-weight="normal" font-style="normal" stroke="none">23</text>
+  <text x="815.00" y="946.67" font-size="12" text-anchor="middle" transform="rotate(-90 815 946.667)" font-weight="normal" font-style="normal" stroke="none">22</text>
+  <text x="815.00" y="969.33" font-size="12" text-anchor="middle" transform="rotate(-90 815 969.333)" font-weight="normal" font-style="normal" stroke="none">21</text>
+  <text x="815.00" y="992.00" font-size="12" text-anchor="middle" transform="rotate(-90 815 992)" font-weight="normal" font-style="normal" stroke="none">20</text>
+  <text x="815.00" y="1014.67" font-size="12" text-anchor="middle" transform="rotate(-90 815 1014.67)" font-weight="normal" font-style="normal" stroke="none">19</text>
+  <text x="815.00" y="1037.33" font-size="12" text-anchor="middle" transform="rotate(-90 815 1037.33)" font-weight="normal" font-style="normal" stroke="none">18</text>
+  <text x="815.00" y="1060.00" font-size="12" text-anchor="middle" transform="rotate(-90 815 1060)" font-weight="normal" font-style="normal" stroke="none">17</text>
+  <text x="815.00" y="1082.67" font-size="12" text-anchor="middle" transform="rotate(-90 815 1082.67)" font-weight="normal" font-style="normal" stroke="none">16</text>
+  <text x="815.00" y="1105.33" font-size="12" text-anchor="middle" transform="rotate(-90 815 1105.33)" font-weight="normal" font-style="normal" stroke="none">15</text>
+  <text x="815.00" y="1128.00" font-size="12" text-anchor="middle" transform="rotate(-90 815 1128)" font-weight="normal" font-style="normal" stroke="none">14</text>
+  <text x="815.00" y="1150.67" font-size="12" text-anchor="middle" transform="rotate(-90 815 1150.67)" font-weight="normal" font-style="normal" stroke="none">13</text>
+  <text x="815.00" y="1173.33" font-size="12" text-anchor="middle" transform="rotate(-90 815 1173.33)" font-weight="normal" font-style="normal" stroke="none">12</text>
+  <text x="815.00" y="1196.00" font-size="12" text-anchor="middle" transform="rotate(-90 815 1196)" font-weight="normal" font-style="normal" stroke="none">11</text>
+  <text x="815.00" y="1218.67" font-size="12" text-anchor="middle" transform="rotate(-90 815 1218.67)" font-weight="normal" font-style="normal" stroke="none">10</text>
+  <text x="815.00" y="1241.33" font-size="12" text-anchor="middle" transform="rotate(-90 815 1241.33)" font-weight="normal" font-style="normal" stroke="none">9</text>
+  <text x="815.00" y="1264.00" font-size="12" text-anchor="middle" transform="rotate(-90 815 1264)" font-weight="normal" font-style="normal" stroke="none">8</text>
+  <text x="815.00" y="1286.67" font-size="12" text-anchor="middle" transform="rotate(-90 815 1286.67)" font-weight="normal" font-style="normal" stroke="none">7</text>
+  <text x="815.00" y="1309.33" font-size="12" text-anchor="middle" transform="rotate(-90 815 1309.33)" font-weight="normal" font-style="normal" stroke="none">6</text>
+  <text x="815.00" y="1332.00" font-size="12" text-anchor="middle" transform="rotate(-90 815 1332)" font-weight="normal" font-style="normal" stroke="none">5</text>
+  <text x="815.00" y="1354.67" font-size="12" text-anchor="middle" transform="rotate(-90 815 1354.67)" font-weight="normal" font-style="normal" stroke="none">4</text>
+  <text x="815.00" y="1377.33" font-size="12" text-anchor="middle" transform="rotate(-90 815 1377.33)" font-weight="normal" font-style="normal" stroke="none">3</text>
+  <text x="815.00" y="1400.00" font-size="12" text-anchor="middle" transform="rotate(-90 815 1400)" font-weight="normal" font-style="normal" stroke="none">2</text>
+  <text x="815.00" y="1422.67" font-size="12" text-anchor="middle" transform="rotate(-90 815 1422.67)" font-weight="normal" font-style="normal" stroke="none">1</text>
+  <text x="748.00" y="70.00" font-size="14" text-anchor="middle" transform="rotate(90 748.00 70.00)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">180&#176;</text>
+  <text x="748.00" y="92.67" font-size="14" text-anchor="middle" transform="rotate(90 748.00 92.67)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">174&#176;</text>
+  <text x="748.00" y="115.33" font-size="14" text-anchor="middle" transform="rotate(90 748.00 115.33)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">168&#176;</text>
+  <text x="748.00" y="138.00" font-size="14" text-anchor="middle" transform="rotate(90 748.00 138.00)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">162&#176;</text>
+  <text x="748.00" y="160.67" font-size="14" text-anchor="middle" transform="rotate(90 748.00 160.67)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">156&#176;</text>
+  <text x="748.00" y="183.33" font-size="14" text-anchor="middle" transform="rotate(90 748.00 183.33)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">150&#176;</text>
+  <text x="748.00" y="206.00" font-size="14" text-anchor="middle" transform="rotate(90 748.00 206.00)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">144&#176;</text>
+  <text x="748.00" y="228.67" font-size="14" text-anchor="middle" transform="rotate(90 748.00 228.67)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">138&#176;</text>
+  <text x="748.00" y="251.33" font-size="14" text-anchor="middle" transform="rotate(90 748.00 251.33)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">132&#176;</text>
+  <text x="748.00" y="274.00" font-size="14" text-anchor="middle" transform="rotate(90 748.00 274.00)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">126&#176;</text>
+  <text x="748.00" y="296.67" font-size="14" text-anchor="middle" transform="rotate(90 748.00 296.67)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">120&#176;</text>
+  <text x="748.00" y="319.33" font-size="14" text-anchor="middle" transform="rotate(90 748.00 319.33)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">114&#176;</text>
+  <text x="748.00" y="342.00" font-size="14" text-anchor="middle" transform="rotate(90 748.00 342.00)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">108&#176;</text>
+  <text x="748.00" y="364.67" font-size="14" text-anchor="middle" transform="rotate(90 748.00 364.67)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">102&#176;</text>
+  <text x="748.00" y="387.33" font-size="14" text-anchor="middle" transform="rotate(90 748.00 387.33)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">96&#176;</text>
+  <text x="748.00" y="410.00" font-size="14" text-anchor="middle" transform="rotate(90 748.00 410.00)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">90&#176;</text>
+  <text x="748.00" y="432.67" font-size="14" text-anchor="middle" transform="rotate(90 748.00 432.67)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">84&#176;</text>
+  <text x="748.00" y="455.33" font-size="14" text-anchor="middle" transform="rotate(90 748.00 455.33)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">78&#176;</text>
+  <text x="748.00" y="478.00" font-size="14" text-anchor="middle" transform="rotate(90 748.00 478.00)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">72&#176;</text>
+  <text x="748.00" y="500.67" font-size="14" text-anchor="middle" transform="rotate(90 748.00 500.67)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">66&#176;</text>
+  <text x="748.00" y="523.33" font-size="14" text-anchor="middle" transform="rotate(90 748.00 523.33)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">60&#176;</text>
+  <text x="748.00" y="546.00" font-size="14" text-anchor="middle" transform="rotate(90 748.00 546.00)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">54&#176;</text>
+  <text x="748.00" y="568.67" font-size="14" text-anchor="middle" transform="rotate(90 748.00 568.67)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">48&#176;</text>
+  <text x="748.00" y="591.33" font-size="14" text-anchor="middle" transform="rotate(90 748.00 591.33)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">42&#176;</text>
+  <text x="748.00" y="614.00" font-size="14" text-anchor="middle" transform="rotate(90 748.00 614.00)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">36&#176;</text>
+  <text x="748.00" y="636.67" font-size="14" text-anchor="middle" transform="rotate(90 748.00 636.67)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">30&#176;</text>
+  <text x="748.00" y="659.33" font-size="14" text-anchor="middle" transform="rotate(90 748.00 659.33)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">24&#176;</text>
+  <text x="748.00" y="682.00" font-size="14" text-anchor="middle" transform="rotate(90 748.00 682.00)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">18&#176;</text>
+  <text x="748.00" y="704.67" font-size="14" text-anchor="middle" transform="rotate(90 748.00 704.67)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">12&#176;</text>
+  <text x="748.00" y="727.33" font-size="14" text-anchor="middle" transform="rotate(90 748.00 727.33)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">6&#176;</text>
+  <text x="748.00" y="750.00" font-size="14" text-anchor="middle" transform="rotate(90 748.00 750.00)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">0&#176;</text>
+  <text x="748.00" y="772.67" font-size="14" text-anchor="middle" transform="rotate(90 748.00 772.67)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">6&#176;</text>
+  <text x="748.00" y="795.33" font-size="14" text-anchor="middle" transform="rotate(90 748.00 795.33)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">12&#176;</text>
+  <text x="748.00" y="818.00" font-size="14" text-anchor="middle" transform="rotate(90 748.00 818.00)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">18&#176;</text>
+  <text x="748.00" y="840.67" font-size="14" text-anchor="middle" transform="rotate(90 748.00 840.67)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">24&#176;</text>
+  <text x="748.00" y="863.33" font-size="14" text-anchor="middle" transform="rotate(90 748.00 863.33)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">30&#176;</text>
+  <text x="748.00" y="886.00" font-size="14" text-anchor="middle" transform="rotate(90 748.00 886.00)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">36&#176;</text>
+  <text x="748.00" y="908.67" font-size="14" text-anchor="middle" transform="rotate(90 748.00 908.67)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">42&#176;</text>
+  <text x="748.00" y="931.33" font-size="14" text-anchor="middle" transform="rotate(90 748.00 931.33)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">48&#176;</text>
+  <text x="748.00" y="954.00" font-size="14" text-anchor="middle" transform="rotate(90 748.00 954.00)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">54&#176;</text>
+  <text x="748.00" y="976.67" font-size="14" text-anchor="middle" transform="rotate(90 748.00 976.67)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">60&#176;</text>
+  <text x="748.00" y="999.33" font-size="14" text-anchor="middle" transform="rotate(90 748.00 999.33)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">66&#176;</text>
+  <text x="748.00" y="1022.00" font-size="14" text-anchor="middle" transform="rotate(90 748.00 1022.00)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">72&#176;</text>
+  <text x="748.00" y="1044.67" font-size="14" text-anchor="middle" transform="rotate(90 748.00 1044.67)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">78&#176;</text>
+  <text x="748.00" y="1067.33" font-size="14" text-anchor="middle" transform="rotate(90 748.00 1067.33)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">84&#176;</text>
+  <text x="748.00" y="1090.00" font-size="14" text-anchor="middle" transform="rotate(90 748.00 1090.00)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">90&#176;</text>
+  <text x="748.00" y="1112.67" font-size="14" text-anchor="middle" transform="rotate(90 748.00 1112.67)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">96&#176;</text>
+  <text x="748.00" y="1135.33" font-size="14" text-anchor="middle" transform="rotate(90 748.00 1135.33)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">102&#176;</text>
+  <text x="748.00" y="1158.00" font-size="14" text-anchor="middle" transform="rotate(90 748.00 1158.00)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">108&#176;</text>
+  <text x="748.00" y="1180.67" font-size="14" text-anchor="middle" transform="rotate(90 748.00 1180.67)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">114&#176;</text>
+  <text x="748.00" y="1203.33" font-size="14" text-anchor="middle" transform="rotate(90 748.00 1203.33)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">120&#176;</text>
+  <text x="748.00" y="1226.00" font-size="14" text-anchor="middle" transform="rotate(90 748.00 1226.00)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">126&#176;</text>
+  <text x="748.00" y="1248.67" font-size="14" text-anchor="middle" transform="rotate(90 748.00 1248.67)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">132&#176;</text>
+  <text x="748.00" y="1271.33" font-size="14" text-anchor="middle" transform="rotate(90 748.00 1271.33)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">138&#176;</text>
+  <text x="748.00" y="1294.00" font-size="14" text-anchor="middle" transform="rotate(90 748.00 1294.00)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">144&#176;</text>
+  <text x="748.00" y="1316.67" font-size="14" text-anchor="middle" transform="rotate(90 748.00 1316.67)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">150&#176;</text>
+  <text x="748.00" y="1339.33" font-size="14" text-anchor="middle" transform="rotate(90 748.00 1339.33)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">156&#176;</text>
+  <text x="748.00" y="1362.00" font-size="14" text-anchor="middle" transform="rotate(90 748.00 1362.00)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">162&#176;</text>
+  <text x="748.00" y="1384.67" font-size="14" text-anchor="middle" transform="rotate(90 748.00 1384.67)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">168&#176;</text>
+  <text x="748.00" y="1407.33" font-size="14" text-anchor="middle" transform="rotate(90 748.00 1407.33)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">174&#176;</text>
+  <text x="748.00" y="1430.00" font-size="14" text-anchor="middle" transform="rotate(90 748.00 1430.00)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">180&#176;</text>
+  <rect x="123.00" y="589.33" width="128.00" height="162.67" fill="#0D1117" stroke="none"/>
+  <line x1="125.00" y1="591.33" x2="125.00" y2="750.00"/>
+  <line x1="156.00" y1="591.33" x2="156.00" y2="750.00"/>
+  <line x1="187.00" y1="591.33" x2="187.00" y2="750.00"/>
+  <line x1="218.00" y1="591.33" x2="218.00" y2="750.00"/>
+  <line x1="249.00" y1="591.33" x2="249.00" y2="750.00"/>
+  <line x1="156.00" y1="591.33" x2="249.00" y2="591.33"/>
+  <line x1="156.00" y1="614.00" x2="249.00" y2="614.00"/>
+  <line x1="156.00" y1="636.67" x2="249.00" y2="636.67"/>
+  <line x1="156.00" y1="659.33" x2="249.00" y2="659.33"/>
+  <line x1="156.00" y1="682.00" x2="249.00" y2="682.00"/>
+  <line x1="156.00" y1="704.67" x2="249.00" y2="704.67"/>
+  <line x1="156.00" y1="727.33" x2="187.00" y2="727.33"/>
+  <line x1="218.00" y1="727.33" x2="249.00" y2="727.33"/>
+  <line x1="187.00" y1="738.67" x2="218.00" y2="738.67"/>
+  <line x1="156.00" y1="750.00" x2="249.00" y2="750.00"/>
+  <line x1="125.00" y1="625.33" x2="156.00" y2="625.33"/>
+  <text x="117.00" y="628.33" font-size="11" text-anchor="middle" transform="rotate(-90 117 628.333)" font-weight="normal" font-style="normal" stroke="none">33&#176;</text>
+  <line x1="125.00" y1="670.67" x2="156.00" y2="670.67"/>
+  <text x="117.00" y="673.67" font-size="11" text-anchor="middle" transform="rotate(-90 117 673.667)" font-weight="normal" font-style="normal" stroke="none">21&#176;</text>
+  <line x1="125.00" y1="716.00" x2="156.00" y2="716.00"/>
+  <text x="117.00" y="719.00" font-size="11" text-anchor="middle" transform="rotate(-90 117 719)" font-weight="normal" font-style="normal" stroke="none">9&#176;</text>
+  <line x1="125.00" y1="750.00" x2="156.00" y2="750.00"/>
+  <text x="117.00" y="753.00" font-size="11" text-anchor="middle" transform="rotate(-90 117 753)" font-weight="normal" font-style="normal" stroke="none">0&#176;</text>
+  <text x="171.50" y="739.80" font-size="11" text-anchor="middle" transform="rotate(-90 171.5 739.8)" font-weight="normal" font-style="normal" stroke="none">3&#176;</text>
+  <g fill="none" stroke-width="1.8">
+    <circle cx="57" cy="750" r="46"/>
+    <line x1="11" y1="750" x2="103" y2="750"/>
+    <line x1="57" y1="704" x2="57" y2="796"/>
+    <circle cx="955" cy="750" r="72"/>
+    <line x1="883" y1="750" x2="1027" y2="750"/>
+    <line x1="955" y1="678" x2="955" y2="822"/>
+  </g>
+  <text x="57.00" y="738.00" font-size="15" text-anchor="middle" font-weight="bold" font-style="normal" stroke="none">Z</text>
+  <text x="57.00" y="775.00" font-size="15" text-anchor="middle" font-weight="bold" font-style="normal" stroke="none">Y</text>
+  <text x="955.00" y="738.00" font-size="15" text-anchor="middle" font-weight="bold" font-style="normal" stroke="none">B</text>
+  <text x="955.00" y="775.00" font-size="15" text-anchor="middle" font-weight="bold" font-style="normal" stroke="none">A</text>
+  <text x="57.00" y="687.00" font-size="11" text-anchor="middle" transform="rotate(-90 57 687)" font-weight="normal" font-style="normal" stroke="none">90&#176; E</text>
+  <text x="57.00" y="813.00" font-size="11" text-anchor="middle" transform="rotate(-90 57 813)" font-weight="normal" font-style="normal" stroke="none">90&#176; W</text>
+  <text x="7.00" y="750.00" font-size="11" text-anchor="middle" transform="rotate(-90 7 750)" font-weight="normal" font-style="normal" stroke="none">180&#176;</text>
+  <text x="119.00" y="750.00" font-size="11" text-anchor="middle" transform="rotate(-90 119 750)" font-weight="normal" font-style="normal" stroke="none">0&#176;</text>
+  <text x="955.00" y="663.00" font-size="11" text-anchor="middle" transform="rotate(-90 955 663)" font-weight="normal" font-style="normal" stroke="none">90&#176; E</text>
+  <text x="955.00" y="837.00" font-size="11" text-anchor="middle" transform="rotate(-90 955 837)" font-weight="normal" font-style="normal" stroke="none">90&#176; W</text>
+  <text x="877.00" y="750.00" font-size="11" text-anchor="middle" transform="rotate(-90 877 750)" font-weight="normal" font-style="normal" stroke="none">0&#176;</text>
+  <text x="1033.00" y="750.00" font-size="11" text-anchor="middle" transform="rotate(-90 1033 750)" font-weight="normal" font-style="normal" stroke="none">180&#176;</text>
+  <rect x="435.00" y="1362.00" width="31.00" height="22.67" fill="#E6EDF3" stroke="#E6EDF3"/>
+  <line x1="395.50" y1="1268.33" x2="442.50" y2="1351.33" stroke-width="2"/>
+  <polygon points="442.50,1351.33 430.50,1345.33 437.50,1334.33" stroke="none"/>
+  <text x="392.50" y="1261.33" font-size="12" text-anchor="middle" transform="rotate(-90 392.5 1261.33)" font-weight="normal" font-style="normal" stroke="none">13N</text>
+  <line x1="595.50" y1="1377.33" x2="545.50" y2="1377.33" stroke-width="2"/>
+  <polygon points="545.50,1377.33 558.50,1370.33 558.50,1384.33" stroke="none"/>
+  </g>
+</svg>
