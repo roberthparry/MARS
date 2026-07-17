@@ -88,3 +88,8 @@ tools/*_state_*.json
 
 test_data/
 src/almanac/Explanatory Supplement Astronomical Almanac.pdf
+src/almanac/Explanatory Supplement Astronomical Almanac OCR Sample/
+src/almanac/Explanatory Supplement Astronomical Almanac TeX/
+texput.log
+src/almanac/explanatory_supplement_page.sh
+src/almanac/Explanatory Supplement Astronomical Almanac.pdf
