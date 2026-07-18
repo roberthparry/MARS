@@ -2,8 +2,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1040" height="1500" viewBox="0 0 1040 1500" role="img" aria-labelledby="title description">
   <title id="title">UTM and UPS grid zone designations</title>
   <desc id="description">Universal Transverse Mercator zones from 80 degrees south to 84 degrees north, with Universal Polar Stereographic zone insets.</desc>
-  <rect width="1040" height="1500" fill="#0D1117"/>
+  <rect width="1040" height="1500" fill="none"/>
+  <defs>
+    <clipPath id="grid-with-cutout" clipPathUnits="userSpaceOnUse">
+      <rect x="0" y="0" width="1040" height="589.33"/>
+      <rect x="0" y="752" width="1040" height="748"/>
+      <rect x="0" y="589.33" width="123" height="162.67"/>
+      <rect x="251" y="589.33" width="789" height="162.67"/>
+    </clipPath>
+  </defs>
   <g fill="#E6EDF3" stroke="#E6EDF3" stroke-width="1.35" stroke-linecap="square" font-family="Georgia, 'Times New Roman', serif">
+  <g clip-path="url(#grid-with-cutout)">
   <rect x="125.00" y="70.00" width="620.00" height="1360.00" fill="none" stroke-width="2"/>
   <rect x="780.00" y="70.00" width="70.00" height="1360.00" fill="none" stroke-width="2"/>
   <line x1="156.00" y1="70.00" x2="156.00" y2="1430.00"/>
@@ -305,7 +314,7 @@
   <text x="748.00" y="1384.67" font-size="14" text-anchor="middle" transform="rotate(90 748.00 1384.67)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">168&#176;</text>
   <text x="748.00" y="1407.33" font-size="14" text-anchor="middle" transform="rotate(90 748.00 1407.33)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">174&#176;</text>
   <text x="748.00" y="1430.00" font-size="14" text-anchor="middle" transform="rotate(90 748.00 1430.00)" font-family="'Times New Roman', Times, serif" font-weight="normal" font-style="normal" stroke="none">180&#176;</text>
-  <rect x="123.00" y="589.33" width="128.00" height="162.67" fill="#0D1117" stroke="none"/>
+  </g>
   <line x1="125.00" y1="591.33" x2="125.00" y2="750.00"/>
   <line x1="156.00" y1="591.33" x2="156.00" y2="750.00"/>
   <line x1="187.00" y1="591.33" x2="187.00" y2="750.00"/>

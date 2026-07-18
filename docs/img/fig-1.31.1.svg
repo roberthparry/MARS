@@ -8,13 +8,13 @@
     </marker>
   </defs>
 
-  <rect width="760" height="730" fill="#0D1117"/>
-
   <g fill="none" stroke="#E6EDF3" stroke-linecap="round" stroke-linejoin="round">
     <!-- Rectangular coordinate axes. -->
     <path d="M 230 465 L 225 48" stroke-width="2" marker-end="url(#arrow)"/>
     <path d="M 230 465 L 681 520" stroke-width="2" marker-end="url(#arrow)"/>
-    <path d="M 230 465 L 78 700" stroke-width="2" marker-end="url(#arrow)"/>
+    <!-- The x-axis projects toward the viewer, so its shaft widens subtly. -->
+    <path d="M 229.3 464.6 L 87.0 684.4 L 81.0 681.8 L 76.0 704.0 L 96.0 691.0 L 90.0 688.8 L 230.7 465.4 Z"
+          fill="#E6EDF3" stroke="none"/>
 
     <!-- Position vector and its rectangular projections. -->
     <path d="M 230 465 L 510 170" stroke-width="3.2" marker-end="url(#arrow)"/>
@@ -23,12 +23,9 @@
     <path d="M 116 643 L 500 688" stroke-width="3" stroke-dasharray="13 13"/>
     <path d="M 575 507 L 500 688" stroke-width="3" stroke-dasharray="13 13"/>
 
-    <!-- Projection tick on the y-axis. -->
-    <path d="M 566 503 L 578 506 L 573 519" stroke-width="2.5"/>
-
     <!-- Polar angle, latitude, and longitude arcs. -->
     <path d="M 229 280 C 257 302 281 341 296 386" stroke-width="2.3" marker-end="url(#arrow)"/>
-    <path d="M 297 391 A 101 101 0 0 1 307 536" stroke-width="2.3" marker-start="url(#arrow)"/>
+    <path d="M 299.6 391.7 A 101 101 0 0 1 307.9 529.3" stroke-width="2.3" marker-start="url(#arrow)"/>
     <path d="M 181 539 A 91 91 0 0 0 298 522" stroke-width="2.3" marker-end="url(#arrow)"/>
   </g>
 
@@ -36,10 +33,10 @@
     <text x="218" y="39" font-size="27" font-style="italic">z</text>
     <text x="690" y="532" font-size="27" font-style="italic">y</text>
     <text x="60" y="721" font-size="27" font-style="italic">x</text>
-    <text x="516" y="166" font-size="29" font-style="italic" font-weight="bold">r</text>
+    <text x="526" y="168" font-size="31" font-style="italic">r</text>
     <text x="201" y="478" font-size="29" font-style="italic">O</text>
 
-    <text x="262" y="312" font-size="27">90&#176; &#8722; <tspan font-style="italic">&#946;</tspan></text>
+    <text x="262" y="312" font-size="27">90&#176; - <tspan font-style="italic">&#946;</tspan></text>
     <text x="315" y="466" font-size="28" font-style="italic">&#946;</text>
     <text x="236" y="568" font-size="28" font-style="italic">&#955;</text>
   </g>

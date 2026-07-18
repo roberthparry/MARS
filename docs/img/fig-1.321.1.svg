@@ -4,7 +4,6 @@
   <desc id="desc">Centerline tracing of the original celestial-sphere construction.</desc>
   <defs>
     <style>
-      .bg { fill: #0d1117; }
       .main, .fine, .angle, .symbol {
         fill: none;
         stroke: #d8e3df;
@@ -32,8 +31,6 @@
       <path d="M0 0 L11 5 L0 10 Z" fill="#d8e3df"/>
     </marker>
   </defs>
-
-  <rect class="bg" width="1075" height="785"/>
 
   <!-- Least-squares circle fitted to the source sphere. -->
   <circle class="main" cx="585.981" cy="424.461" r="338.711"/>
