@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="430" height="330" viewBox="0 0 430 330"
+     role="img" aria-labelledby="fig32521-title fig32521-desc">
+  <title id="fig32521-title">Stellar aberration</title>
+  <desc id="fig32521-desc">The observer at E moves with velocity V, changing the apparent direction of the object from vector p toward vector p subscript one by angle delta theta.</desc>
+
+  <g fill="none" stroke="#d8e3df" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Reference baseline and the two sight lines. -->
+    <path d="M48.2 289 L383 289" stroke-width="2.2"/>
+    <path d="M146 289 L214.7 46.1" stroke-width="2.2"/>
+    <path d="M146 289 L320.8 120.1" stroke-width="2.2"/>
+
+    <!-- Observer velocity and direction vectors. -->
+    <path d="M146 289 L303 289" stroke-width="2.2"/>
+    <path d="M171.5 197.2 L178.6 171.7" stroke-width="2.2"/>
+    <path d="M224.8 213.2 L240.8 197.2" stroke-width="2.2"/>
+
+    <!-- Aberration angles theta and delta theta. -->
+    <path d="M175.6 289 A29.6 29.6 0 0 0 154.2 260.5" stroke-width="1.8"/>
+    <path d="M192.1 242.9 A65.2 65.2 0 0 0 164.0 226.3" stroke-width="1.8"/>
+  </g>
+
+  <!-- Explicit arrowheads render consistently in Markdown and PDF converters. -->
+  <g fill="#d8e3df">
+    <path d="M303 289 L291 283 L291 295 Z"/>
+    <path d="M178.6 171.7 L180.2 184.6 L170.6 181.9 Z"/>
+    <path d="M240.8 197.2 L235.9 209.2 L228.8 202.2 Z"/>
+  </g>
+
+  <g fill="#e6edf3" font-family="Georgia, 'Times New Roman', serif"
+     font-size="21" font-style="italic">
+    <text x="204" y="36">P′</text>
+    <text x="331" y="130">P″</text>
+    <text x="24" y="299">A</text>
+    <text x="393" y="299">B</text>
+    <text x="119" y="316">E</text>
+    <text x="296" y="316" font-weight="700">V</text>
+    <text x="149" y="194" font-style="normal" font-weight="700">p</text>
+    <text x="250" y="205" font-style="normal" font-weight="700">p<tspan dx="1" dy="5" font-size="14">1</tspan></text>
+    <text x="177" y="276">θ</text>
+    <text x="195" y="244">Δθ</text>
+  </g>
+</svg>

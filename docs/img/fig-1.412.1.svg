@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="720" viewBox="0 0 1100 720"
+     role="img" aria-labelledby="title description">
+  <title id="title">Angular orbital elements</title>
+  <desc id="description">An inclined elliptical orbit centered at M, with reference axes, the normal line N prime N, body m, periapsis P, and the angular elements nu, omega, inclination, and longitude of the ascending node.</desc>
+
+  <defs>
+    <marker id="axis-arrow" viewBox="0 0 10 10" refX="8.5" refY="5"
+            markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 Z" fill="#E6EDF3"/>
+    </marker>
+    <marker id="orbit-arrow" viewBox="0 0 12 12" refX="10.5" refY="6"
+            markerWidth="18" markerHeight="18" markerUnits="userSpaceOnUse" orient="auto">
+      <path d="M 1 1 L 11 6 L 1 11" fill="none" stroke="#E6EDF3"
+            stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+
+  <!-- Reference axes through the central body M. -->
+  <g fill="none" stroke="#E6EDF3" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 550 390 L 550 38" stroke-width="2.2" marker-end="url(#axis-arrow)"/>
+    <path d="M 550 390 L 896 590" stroke-width="2.2" marker-end="url(#axis-arrow)"/>
+    <path d="M 550 390 L 365 575" stroke-width="2.2" marker-end="url(#axis-arrow)"/>
+  </g>
+
+  <!-- Orbital ellipse, rotated 45 degrees counter-clockwise. -->
+  <ellipse cx="550" cy="390" rx="310" ry="155" transform="rotate(-45 550 390)"
+           fill="none" stroke="#B9C9BE" stroke-width="2.8"/>
+
+  <g fill="none" stroke="#E6EDF3" stroke-linecap="round" stroke-linejoin="round">
+    <!-- The normal line extends beyond both crossings of the ellipse. -->
+    <path d="M 400 240 L 700 540" stroke-width="4"/>
+
+    <!-- Radius vectors to the body m and periapsis P. -->
+    <path d="M 550 390 L 720.3 146.9" stroke-width="5"/>
+    <path d="M 550 390 L 788.1 293.8" stroke-width="5"/>
+
+    <!-- True anomaly nu, argument of periapsis omega, and node longitude Omega. -->
+    <path d="M 642.7 352.5 A 100 100 0 0 0 607.4 308.1"
+          stroke-width="2.6"/>
+    <path d="M 645.5 485.5 A 135 135 0 0 0 675.2 339.4"
+          stroke-width="2.6"/>
+    <path d="M 493.4 446.6 A 80 80 0 0 0 606.6 446.6"
+          stroke-width="2.6"/>
+
+    <!-- Inclination at the ascending node. -->
+    <path d="M 659.6 499.6 L 745.9 477.9" stroke-width="2.2"/>
+    <path d="M 695.0 464.2 A 50 50 0 0 1 708.1 487.5"
+          stroke-width="2.4"/>
+  </g>
+
+  <!-- Explicit rotations keep angle-arrow orientation identical in SVG and PDF. -->
+  <g fill="#E6EDF3">
+    <path d="M 0 0 L -12 -5.5 L -12 5.5 Z" transform="translate(607.4 308.1) rotate(-145)"/>
+    <path d="M 0 0 L -12 -5.5 L -12 5.5 Z" transform="translate(675.2 339.4) rotate(-112)"/>
+    <path d="M 0 0 L -12 -5.5 L -12 5.5 Z" transform="translate(606.6 446.6) rotate(-45)"/>
+    <path d="M 0 0 L -12 -5.5 L -12 5.5 Z" transform="translate(708.1 487.5) rotate(76)"/>
+  </g>
+
+  <!-- The invisible guide leaves only a seamless arrowhead on the orbit. -->
+  <path d="M 590.94 170.99 L 564.69 185.48" fill="none"
+        stroke="#E6EDF3" stroke-opacity="0" marker-end="url(#orbit-arrow)"/>
+
+  <g fill="#E6EDF3">
+    <circle cx="550" cy="390" r="5"/>
+    <circle cx="720.3" cy="146.9" r="5"/>
+    <circle cx="788.1" cy="293.8" r="5"/>
+  </g>
+
+  <g fill="#E6EDF3" font-family="Georgia, 'Times New Roman', serif"
+     font-size="29" font-style="italic">
+    <text x="536" y="31">z</text>
+    <text x="910" y="607">y</text>
+    <text x="340" y="603">x</text>
+    <text x="509" y="410" font-style="normal" font-weight="bold">M</text>
+    <text x="357" y="231" font-style="normal" font-weight="bold">N&#8242;</text>
+    <text x="708" y="570" font-style="normal" font-weight="bold">N</text>
+    <text x="726" y="139" font-style="normal" font-weight="bold">m</text>
+    <text x="799" y="295" font-style="normal" font-weight="bold">P</text>
+    <text x="621" y="319">&#957;</text>
+    <text x="652" y="419">&#969;</text>
+    <text x="539" y="499">&#937;</text>
+    <text x="715" y="475">i</text>
+  </g>
+
+  <text x="810" y="76" fill="#E6EDF3"
+        font-family="Georgia, 'Times New Roman', serif" font-size="27" font-weight="bold">
+    <tspan font-style="italic">&#957;</tspan><tspan> = true anomaly</tspan>
+  </text>
+</svg>

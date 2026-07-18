@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="330" viewBox="0 0 960 330"
+     role="img" aria-labelledby="title description">
+  <title id="title">Parallax of an object</title>
+  <desc id="description">Sight lines from two positions of Earth in its orbit meet at a nearby object, showing the annual parallax angle pi against background stars.</desc>
+
+  <defs>
+    <g id="star" fill="#E6EDF3">
+      <path d="M 0 -6 L 1.8 -1.8 L 6 0 L 1.8 1.8 L 0 6 L -1.8 1.8 L -6 0 L -1.8 -1.8 Z"/>
+    </g>
+  </defs>
+
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Earth's approximately circular orbit around the Sun. -->
+    <circle cx="210" cy="165" r="124" stroke="#B9C9BE" stroke-width="2.2"/>
+    <path d="M 210 165 L 210 41" stroke="#E6EDF3" stroke-width="1.7"/>
+
+    <!-- The two observing positions and their sight lines through the object. -->
+    <path d="M 243 45 L 713 166 L 848 200" stroke="#E6EDF3" stroke-width="3.2"/>
+    <path d="M 240 286 L 713 166 L 848 132" stroke="#E6EDF3" stroke-width="3.2"/>
+    <path d="M 210 165 L 839 166" stroke="#E6EDF3" stroke-width="3"/>
+
+    <!-- Annual parallax angle at the object. -->
+    <path d="M 591.1 134.6 A 125 125 0 0 0 588 166"
+          stroke="#E6EDF3" stroke-width="2.2"/>
+  </g>
+
+  <g fill="#E6EDF3">
+    <circle cx="210" cy="165" r="7"/>
+    <circle cx="243" cy="45" r="6.5"/>
+    <circle cx="240" cy="286" r="6.5"/>
+    <circle cx="713" cy="166" r="6.5"/>
+    <use href="#star" transform="translate(909 78)"/>
+    <use href="#star" transform="translate(934 105)"/>
+    <use href="#star" transform="translate(921 243)"/>
+  </g>
+
+  <g fill="#E6EDF3" font-family="Georgia, 'Times New Roman', serif" font-size="25">
+    <text x="213" y="29" font-weight="bold">Earth</text>
+    <text x="214" y="320" font-weight="bold">Earth</text>
+    <text x="191" y="199" font-weight="bold">Sun</text>
+    <text x="156" y="109">1 AU</text>
+    <text x="17" y="158" font-weight="bold">Earth</text>
+    <text x="18" y="184" font-weight="bold">orbit</text>
+    <text x="565" y="159" font-size="28" font-style="italic">&#960;</text>
+  </g>
+</svg>
