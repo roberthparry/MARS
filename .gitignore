@@ -87,8 +87,7 @@ tools/*_state_*.json
 .to_be_announced_uploads/
 
 test_data/
-docs/books/ESAA/pdf/ESAA-original.pdf
-docs/books/ESAA/pdf/ESAA TeX/
+docs/books/ESAA/pdf/
 texput.log
 
 # Local Explanatory Supplement repair/generation workers
