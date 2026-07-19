@@ -167,5 +167,6 @@
     },
     "makefile.buildLog": "",
     "terminal.integrated.scrollback": 10000,
-    "C_Cpp.default.compilerPath": "/usr/bin/gcc"
+    "C_Cpp.default.compilerPath": "/usr/bin/gcc",
+    "editor.inlineSuggest.enabled": true
 }
