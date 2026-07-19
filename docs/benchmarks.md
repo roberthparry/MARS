@@ -29,13 +29,13 @@ To refresh the benchmark tables in the numeric docs from the release benches,
 run:
 
 ```sh
-tools/bench-docs/update_bench_docs.sh
+tools/render/bench-docs/update_bench_docs.sh
 ```
 
 To refresh only a subset of those docs, pass one or more target names:
 
 ```sh
-tools/bench-docs/update_bench_docs.sh qfloat qcomplex
+tools/render/bench-docs/update_bench_docs.sh qfloat qcomplex
 ```
 
 ## Output Units
