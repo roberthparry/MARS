@@ -168,5 +168,8 @@
     "makefile.buildLog": "",
     "terminal.integrated.scrollback": 10000,
     "C_Cpp.default.compilerPath": "/usr/bin/gcc",
-    "editor.inlineSuggest.enabled": true
+    "editor.inlineSuggest.enabled": true,
+    "markdown.styles": [
+        "docs/books/ESAA/preview.css"
+    ]
 }
