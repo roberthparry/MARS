@@ -499,6 +499,7 @@ static bool expr_match_scaled_affine_power_deg4(const expr_t *expr,
         return true;
     }
 
+    num_destroy(&inner_scale);
     return false;
 }
 
@@ -736,6 +737,10 @@ static bool expr_match_affine_poly_deg4_num_local(const expr_t *expr,
 
     if (!expr_match_affine_poly_deg4_rec(expr, nvars, vars, poly_coeffs_out,
                                        &constant, coeffs_out, &have_basis)) {
+        expr_clear_number_array(poly_coeffs_out, 5);
+        expr_clear_number_array(coeffs_out, nvars);
+        expr_zero_number_array(poly_coeffs_out, 5);
+        expr_zero_number_array(coeffs_out, nvars);
         num_destroy(&constant);
         return false;
     }
@@ -837,6 +842,257 @@ static bool expr_rewrite_poly_deg4_basis(number_t *poly_coeffs,
     num_destroy(&scaled_to_constant);
     num_destroy(&alpha);
     return true;
+}
+
+static bool expr_same_var_local(const expr_t *left, const expr_t *right)
+{
+    if (!left || !right || !expr_is_var(left) || !expr_is_var(right))
+        return false;
+    return left == right ||
+           (left->var_id != 0u &&
+            right->var_id != 0u &&
+            left->var_id == right->var_id);
+}
+
+static bool expr_collect_single_var_local(const expr_t *expr,
+                                          const expr_t **var_io)
+{
+    if (!expr)
+        return true;
+    if (expr_is_var(expr)) {
+        if (!*var_io) {
+            *var_io = expr;
+            return true;
+        }
+        return expr_same_var_local(*var_io, expr);
+    }
+    return expr_collect_single_var_local(expr->a, var_io) &&
+           expr_collect_single_var_local(expr->b, var_io);
+}
+
+static bool expr_poly_deg4_multiply_local(const number_t *left,
+                                          const number_t *right,
+                                          number_t *out)
+{
+    number_t product[9];
+    bool fits = true;
+
+    expr_zero_number_array(product, 9);
+    for (size_t i = 0; i < 5u; ++i) {
+        for (size_t j = 0; j < 5u; ++j) {
+            number_t term = num_mul(left[i], right[j]);
+            number_t sum = num_add(product[i + j], term);
+
+            num_destroy(&product[i + j]);
+            product[i + j] = sum;
+            num_destroy(&term);
+        }
+    }
+
+    for (size_t i = 5u; i < 9u; ++i) {
+        if (!num_is_zero(product[i])) {
+            fits = false;
+            break;
+        }
+    }
+    if (fits) {
+        for (size_t i = 0; i < 5u; ++i) {
+            num_destroy(&out[i]);
+            out[i] = num_clone(product[i]);
+        }
+    }
+    expr_clear_number_array(product, 9);
+    return fits;
+}
+
+static long expr_poly_deg4_exponent_local(number_t value)
+{
+    if (!num_is_real(value) || !num_is_integer(value))
+        return -1L;
+
+    for (long exponent = 0L; exponent <= 4L; ++exponent) {
+        number_t candidate = num_create_from_long(exponent);
+        bool equal = num_eq(value, candidate);
+
+        num_destroy(&candidate);
+        if (equal)
+            return exponent;
+    }
+    return -1L;
+}
+
+static bool expr_collect_poly_deg4_local(const expr_t *expr,
+                                         const expr_t *var,
+                                         number_t *out)
+{
+    number_t value = num_new();
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+    bool is_sub = false;
+
+    if (!expr || !var || !out)
+        goto no_match;
+
+    if (expr_match_const_value(expr, &value)) {
+        expr_reset_number_array(out, 5);
+        num_destroy(&out[0]);
+        out[0] = num_clone(value);
+        num_destroy(&value);
+        return true;
+    }
+
+    if (expr_same_var_local(expr, var)) {
+        expr_reset_number_array(out, 5);
+        num_destroy(&out[1]);
+        out[1] = num_clone(NUM_ONE);
+        num_destroy(&value);
+        return true;
+    }
+
+    if (expr_match_add_sub_expr(expr, &left, &right, &is_sub)) {
+        number_t left_poly[5];
+        number_t right_poly[5];
+        bool ok;
+
+        expr_zero_number_array(left_poly, 5);
+        expr_zero_number_array(right_poly, 5);
+        ok = expr_collect_poly_deg4_local(left, var, left_poly) &&
+             expr_collect_poly_deg4_local(right, var, right_poly);
+        if (ok) {
+            for (size_t i = 0; i < 5u; ++i) {
+                number_t sum = is_sub ? num_sub(left_poly[i], right_poly[i])
+                                      : num_add(left_poly[i], right_poly[i]);
+
+                num_destroy(&out[i]);
+                out[i] = sum;
+            }
+        }
+        expr_clear_number_array(left_poly, 5);
+        expr_clear_number_array(right_poly, 5);
+        num_destroy(&value);
+        return ok;
+    }
+
+    if (expr_match_mul_expr(expr, &left, &right)) {
+        number_t left_poly[5];
+        number_t right_poly[5];
+        bool ok;
+
+        expr_zero_number_array(left_poly, 5);
+        expr_zero_number_array(right_poly, 5);
+        ok = expr_collect_poly_deg4_local(left, var, left_poly) &&
+             expr_collect_poly_deg4_local(right, var, right_poly) &&
+             expr_poly_deg4_multiply_local(left_poly, right_poly, out);
+        expr_clear_number_array(left_poly, 5);
+        expr_clear_number_array(right_poly, 5);
+        num_destroy(&value);
+        return ok;
+    }
+
+    {
+        const expr_t *base = NULL;
+
+        if (expr_match_pow_const(expr, &base, &value)) {
+            long exponent = expr_poly_deg4_exponent_local(value);
+            number_t base_poly[5];
+            number_t result[5];
+            bool ok = exponent >= 0L;
+
+            expr_zero_number_array(base_poly, 5);
+            expr_zero_number_array(result, 5);
+            num_destroy(&result[0]);
+            result[0] = num_clone(NUM_ONE);
+
+            if (ok)
+                ok = expr_collect_poly_deg4_local(base, var, base_poly);
+            for (long i = 0L; ok && i < exponent; ++i) {
+                number_t next[5];
+
+                expr_zero_number_array(next, 5);
+                ok = expr_poly_deg4_multiply_local(result, base_poly, next);
+                if (ok) {
+                    for (size_t j = 0; j < 5u; ++j) {
+                        num_destroy(&result[j]);
+                        result[j] = num_clone(next[j]);
+                    }
+                }
+                expr_clear_number_array(next, 5);
+            }
+            if (ok) {
+                for (size_t i = 0; i < 5u; ++i) {
+                    num_destroy(&out[i]);
+                    out[i] = num_clone(result[i]);
+                }
+            }
+            expr_clear_number_array(result, 5);
+            expr_clear_number_array(base_poly, 5);
+            num_destroy(&value);
+            return ok;
+        }
+    }
+
+no_match:
+    num_destroy(&value);
+    return false;
+}
+
+bool expr_polynomials_equal_deg4(const expr_t *left,
+                                 const expr_t *right)
+{
+    const expr_t *var = NULL;
+    number_t left_poly[5];
+    number_t right_poly[5];
+    bool equal = false;
+
+    expr_zero_number_array(left_poly, 5);
+    expr_zero_number_array(right_poly, 5);
+
+    if (!left || !right ||
+        !expr_collect_single_var_local(left, &var) ||
+        !expr_collect_single_var_local(right, &var) ||
+        !var)
+        goto cleanup;
+
+    if (!expr_collect_poly_deg4_local(left, var, left_poly) ||
+        !expr_collect_poly_deg4_local(right, var, right_poly))
+        goto cleanup;
+
+    equal = true;
+    for (size_t i = 0; i < 5u; ++i) {
+        if (!num_eq(left_poly[i], right_poly[i])) {
+            equal = false;
+            break;
+        }
+    }
+
+cleanup:
+    expr_clear_number_array(left_poly, 5);
+    expr_clear_number_array(right_poly, 5);
+    return equal;
+}
+
+bool expr_polynomial_is_zero_deg4(const expr_t *expr)
+{
+    const expr_t *var = NULL;
+    number_t poly[5];
+    bool is_zero = false;
+
+    expr_zero_number_array(poly, 5);
+    if (!expr || !expr_collect_single_var_local(expr, &var) || !var ||
+        !expr_collect_poly_deg4_local(expr, var, poly))
+        goto cleanup;
+
+    is_zero = true;
+    for (size_t i = 0; i < 5u; ++i) {
+        if (!num_is_zero(poly[i])) {
+            is_zero = false;
+            break;
+        }
+    }
+
+cleanup:
+    expr_clear_number_array(poly, 5);
+    return is_zero;
 }
 
 static bool expr_match_affine_poly_deg4_times_unary_affine_op(const expr_t *expr,

@@ -1394,6 +1394,56 @@ static void check_simplified_expression_string(const char *label,
     expr_free(expr);
 }
 
+static void test_simplify_exact_rational_square_roots(void)
+{
+    number_t four = num_create_from_long(4L);
+    number_t nine = num_create_from_long(9L);
+    number_t denominator = num_create_from_long(4L);
+    number_t nine_quarters = num_div(nine, denominator);
+    expr_t *four_expr = expr_new_const(four);
+    expr_t *nine_quarters_expr = expr_new_const(nine_quarters);
+    expr_t *sqrt_four = four_expr ? expr_sqrt(four_expr) : NULL;
+    expr_t *sqrt_nine_quarters =
+        nine_quarters_expr ? expr_sqrt(nine_quarters_expr) : NULL;
+    expr_t *simplified_four = sqrt_four ? expr_simplify(sqrt_four) : NULL;
+    expr_t *simplified_nine_quarters =
+        sqrt_nine_quarters ? expr_simplify(sqrt_nine_quarters) : NULL;
+    char *four_text =
+        simplified_four ? expr_to_string(simplified_four, style_UNBOUND) : NULL;
+    char *nine_quarters_text = simplified_nine_quarters
+        ? expr_to_string(simplified_nine_quarters, style_UNBOUND)
+        : NULL;
+
+    if (str_eq(four_text, "2"))
+        to_string_pass("generated sqrt(4) simplifies exactly", four_text, "2");
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "generated sqrt(4) simplifies exactly",
+                       four_text ? four_text : "(null)", "2");
+
+    if (str_eq(nine_quarters_text, "³⁄₂"))
+        to_string_pass("generated sqrt(9/4) simplifies exactly",
+                       nine_quarters_text, "³⁄₂");
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "generated sqrt(9/4) simplifies exactly",
+                       nine_quarters_text ? nine_quarters_text : "(null)",
+                       "³⁄₂");
+
+    free(nine_quarters_text);
+    free(four_text);
+    expr_free(simplified_nine_quarters);
+    expr_free(simplified_four);
+    expr_free(sqrt_nine_quarters);
+    expr_free(sqrt_four);
+    expr_free(nine_quarters_expr);
+    expr_free(four_expr);
+    num_destroy(&nine_quarters);
+    num_destroy(&denominator);
+    num_destroy(&nine);
+    num_destroy(&four);
+}
+
 static void test_simplify_inverse_unary_pairs(void)
 {
     expr_t *x = test_expr_new_named_var_d(3.0, "x");
@@ -4022,6 +4072,7 @@ void test_runtime_regressions(void)
     TEST_RUN_SUBTEST(test_gamma_successor_product_simplifies, NULL);
     TEST_RUN_SUBTEST(test_lgamma_successor_sum_simplifies, NULL);
     TEST_RUN_SUBTEST(test_log_constant_difference_simplifies_to_quotient, NULL);
+    TEST_RUN_SUBTEST(test_simplify_exact_rational_square_roots, NULL);
     TEST_RUN_SUBTEST(test_simplify_inverse_unary_pairs, NULL);
     TEST_RUN_SUBTEST(test_simplify_lambert_exp_to_quotient, NULL);
     TEST_RUN_SUBTEST(test_simplify_exp_quarter_turns, NULL);

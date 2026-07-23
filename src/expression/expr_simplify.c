@@ -1431,19 +1431,64 @@ int expr_fold_log_const(const number_t *in, number_t *out)
     return 0;
 }
 
+static bool expr_long_perfect_square_root_local(long value, long *root_out)
+{
+    long lo = 0L;
+    long hi = value;
+
+    if (value < 0L || !root_out)
+        return false;
+
+    while (lo <= hi) {
+        long mid = lo + (hi - lo) / 2L;
+        long square;
+
+        if (mid != 0L && mid > value / mid) {
+            hi = mid - 1L;
+            continue;
+        }
+
+        square = mid * mid;
+        if (square == value) {
+            *root_out = mid;
+            return true;
+        }
+        if (square < value)
+            lo = mid + 1L;
+        else
+            hi = mid - 1L;
+    }
+
+    return false;
+}
+
 int expr_fold_sqrt_const(const number_t *in, number_t *out)
 {
+    long numerator;
+    long denominator;
+    long root_numerator;
+    long root_denominator;
+    number_t numerator_value;
+    number_t denominator_value;
+    number_t root;
+
     if (!in || !out)
         return 0;
-    if (num_eq(*in, NUM_ZERO)) {
-        *out = NUM_ZERO;
-        return 1;
-    }
-    if (num_eq(*in, NUM_ONE)) {
-        *out = NUM_ONE;
-        return 1;
-    }
-    return 0;
+    if (!num_get_small_rational(*in, &numerator, &denominator) ||
+        numerator < 0L || denominator <= 0L ||
+        !expr_long_perfect_square_root_local(numerator, &root_numerator) ||
+        !expr_long_perfect_square_root_local(denominator, &root_denominator) ||
+        root_denominator == 0L)
+        return 0;
+
+    numerator_value = num_create_from_long(root_numerator);
+    denominator_value = num_create_from_long(root_denominator);
+    root = num_div(numerator_value, denominator_value);
+    num_destroy(&denominator_value);
+    num_destroy(&numerator_value);
+    num_destroy(out);
+    *out = root;
+    return 1;
 }
 
 int expr_fold_floor_const(const number_t *in, number_t *out)
@@ -2327,7 +2372,8 @@ static expr_t *expr_try_simplify_log_const_difference_local(expr_t *a,
     }
 
     quotient_expr = expr_new_const_owned_local(quotient);
-    if (quotient_expr && num_is_integer(left) && num_is_integer(right)) {
+    if (quotient_expr && !num_is_integer(quotient) &&
+        num_is_integer(left) && num_is_integer(right)) {
         left_text = num_to_string(left);
         right_text = num_to_string(right);
         if (left_text && right_text) {
@@ -2389,7 +2435,13 @@ static int expr_simplify_atan_const_over_sqrt_local(const expr_t *expr,
         return 0;
     arg = expr->a;
 
-    if (expr_is_div(arg)) {
+    if (expr_simplify_is_plain_real_const(arg)) {
+        num_destroy(numerator_out);
+        *numerator_out = num_clone(arg->c);
+        num_destroy(radicand_out);
+        *radicand_out = num_const(NUM_ONE);
+        return 1;
+    } else if (expr_is_div(arg)) {
         numerator = expr_retain_expr(arg->a);
         root = expr_retain_expr(arg->b);
     } else if (expr_is_unnamed_const(arg) && arg->binding_expr &&
@@ -2460,9 +2512,13 @@ static expr_t *expr_try_simplify_atan_const_difference_local(expr_t *a,
     abs_difference = num_abs(difference);
     num_destroy(&coefficient);
     coefficient = num_div(abs_difference, denominator);
-    radicand = expr_new_const(left_radicand);
-    root = radicand ? expr_sqrt(radicand) : NULL;
-    if (root) {
+    if (num_is_one(left_radicand)) {
+        argument = expr_new_const_owned_local(coefficient);
+    } else {
+        radicand = expr_new_const(left_radicand);
+        root = radicand ? expr_sqrt(radicand) : NULL;
+    }
+    if (root && !argument) {
         long numerator_value;
         long denominator_value;
 
@@ -2562,6 +2618,54 @@ static int expr_combine_atan_difference_addends_local(addend_t *terms,
     return combined_any;
 }
 
+static int expr_combine_log_difference_addends_local(addend_t *terms, size_t n)
+{
+    int combined_any = 0;
+
+    for (size_t i = 0; i < n; ++i) {
+        if (!terms[i].base || num_is_zero(terms[i].coeff))
+            continue;
+        for (size_t j = i + 1; j < n; ++j) {
+            number_t neg_j;
+            expr_t *combined;
+            number_t combined_coeff;
+
+            if (!terms[j].base || num_is_zero(terms[j].coeff))
+                continue;
+            neg_j = num_neg(terms[j].coeff);
+            if (!num_eq(terms[i].coeff, neg_j)) {
+                num_destroy(&neg_j);
+                continue;
+            }
+            num_destroy(&neg_j);
+
+            if (num_gt(terms[i].coeff, NUM_ZERO)) {
+                combined = expr_try_simplify_log_const_difference_local(
+                    terms[i].base, terms[j].base);
+                combined_coeff = num_clone(terms[i].coeff);
+            } else {
+                combined = expr_try_simplify_log_const_difference_local(
+                    terms[j].base, terms[i].base);
+                combined_coeff = num_clone(terms[j].coeff);
+            }
+            if (!combined) {
+                num_destroy(&combined_coeff);
+                continue;
+            }
+
+            expr_free(terms[i].base);
+            terms[i].base = combined;
+            num_destroy(&terms[i].coeff);
+            terms[i].coeff = combined_coeff;
+            num_destroy(&terms[j].coeff);
+            terms[j].coeff = num_const(NUM_ZERO);
+            combined_any = 1;
+            break;
+        }
+    }
+    return combined_any;
+}
+
 static int expr_contains_atan_local(const expr_t *expr)
 {
     return expr && (expr_is_op(expr, &ops_atan) ||
@@ -2596,6 +2700,14 @@ expr_t *expr_simplify_add_sub_operator(const expr_t *dv, expr_t *a, expr_t *b)
         num_destroy(&c_const);
         num_destroy(&common_coeff);
         return folded_numeric;
+    }
+
+    if (expr_polynomial_is_zero_deg4(dv)) {
+        expr_free(a);
+        expr_free(b);
+        num_destroy(&c_const);
+        num_destroy(&common_coeff);
+        return expr_new_const(NUM_ZERO);
     }
 
     if (expr_is_op(dv, &ops_add)) {
@@ -2661,6 +2773,7 @@ expr_t *expr_simplify_add_sub_operator(const expr_t *dv, expr_t *a, expr_t *b)
 
     combined_atan_difference =
         expr_combine_atan_difference_addends_local(terms, n);
+    expr_combine_log_difference_addends_local(terms, n);
     expr_combine_common_denominator_addends(terms, n);
     expr_sort_addends(terms, n);
     expr_extract_common_addend_coeff(terms, n, c_const, &common_coeff);
@@ -3294,7 +3407,7 @@ expr_t *expr_simplify_div_operator(const expr_t *dv, expr_t *a, expr_t *b)
          expr_is_negative_real_power_local(b)))
         return expr_simplify_flat_quotient_local(a, b);
 
-    if (expr_struct_eq(a, b)) {
+    if (expr_struct_eq(a, b) || expr_polynomials_equal_deg4(a, b)) {
         expr_free(a);
         expr_free(b);
         return expr_new_const(NUM_ONE);

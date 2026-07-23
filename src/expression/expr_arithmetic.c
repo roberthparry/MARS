@@ -1251,6 +1251,8 @@ static expr_t *deriv_atan_over_matching_sqrt(expr_t *dv,
 
     x = expr_retain_expr(wrt);
     x_sq = x ? expr_mul(x, x) : NULL;
+    expr_free(x);
+    x = NULL;
     quadratic_term = x_sq ? expr_make_scaled(linear_sq, x_sq) : NULL;
     x_sq = NULL;
     x = expr_retain_expr(wrt);
