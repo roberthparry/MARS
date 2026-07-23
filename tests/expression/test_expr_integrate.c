@@ -1365,6 +1365,40 @@ static void test_integrate_definite_symbolic_bounds(void)
     expr_free(x);
 }
 
+static void test_integrate_definite_quadratic_compact_exact_result(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *integrand = expr_from_string("{ (x+1)/(x^2+3*x+5) }", &bindings);
+    expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    expr_t *simplified_integrand = integrand ? expr_simplify(integrand) : NULL;
+    expr_t *zero = expr_new_const(NUM_ZERO);
+    expr_t *one = expr_new_const(NUM_ONE);
+    expr_t *anti = simplified_integrand
+        ? expr_integrate(simplified_integrand, x)
+        : NULL;
+    expr_t *upper = (anti && one) ? expr_substitute(anti, x, one) : NULL;
+    expr_t *lower = (anti && zero) ? expr_substitute(anti, x, zero) : NULL;
+    expr_t *difference = (upper && lower) ? expr_sub(upper, lower) : NULL;
+    expr_t *simplified = difference ? expr_simplify(difference) : NULL;
+    char *text = simplified ? expr_to_string(simplified, style_UNBOUND) : NULL;
+
+    ASSERT_NOT_NULL(text);
+    ASSERT_TRUE(str_eq(text,
+        "½·ln(9/5) - atan(√(11)/13)/√(11)"));
+
+    free(text);
+    expr_free(simplified);
+    expr_free(difference);
+    expr_free(lower);
+    expr_free(upper);
+    expr_free(anti);
+    expr_free(one);
+    expr_free(zero);
+    expr_free(simplified_integrand);
+    expr_free(integrand);
+    expr_bindings_free(bindings);
+}
+
 static void test_integrate_inverse_square_with_exact_bound(void)
 {
     expr_bindings_t *bindings = NULL;
@@ -1923,12 +1957,44 @@ static void test_integrate_poly_over_centered_quadratic(void)
 
 static void test_integrate_symbolic_general_quadratic_denominator(void)
 {
+    static const double points[] = { -1.0, -0.25, 0.5, 2.0 };
+    expr_bindings_t *bindings = NULL;
+    expr_t *antiderivative = expr_from_string(
+        "{ 1/2*(ln(x^2+3*x+5)-2*atan((2*x+3)/sqrt(11))/sqrt(11)) }",
+        &bindings);
+    expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    expr_t *derivative = (antiderivative && x)
+        ? expr_create_deriv(antiderivative, x)
+        : NULL;
+    char *derivative_text = derivative
+        ? expr_to_string(derivative, style_UNBOUND)
+        : NULL;
+
     assert_string_antiderivative_contains("{ 1/(a*x^2+b*x+c) }",
                                           "2·atan((2ax + b)/√(4ac - b²))/√(4ac - b²)");
     assert_string_antiderivative_contains("{ x/(a*x^2+b*x+c) }",
                                           "ln(ax² + bx + c)/a");
     assert_string_antiderivative_contains("{ x/(a*x^2+b*x+c) }",
                                           "atan((2ax + b)/√(4ac - b²))");
+    assert_string_antiderivative_matches("{ (x+1)/(x^2+3*x+5) }",
+                                         points,
+                                         sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_contains("{ (x+1)/(x^2+3*x+5) }",
+                                          "atan((2x + 3)/√(11))/√(11)");
+
+    ASSERT_NOT_NULL(derivative_text);
+    if (str_eq(derivative_text, "(x + 1)/(x² + 3x + 5)"))
+        to_string_pass("exact quadratic antiderivative simplifies back",
+                       derivative_text, "(x + 1)/(x² + 3x + 5)");
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "exact quadratic antiderivative simplifies back",
+                       derivative_text, "(x + 1)/(x² + 3x + 5)");
+
+    free(derivative_text);
+    expr_free(derivative);
+    expr_free(antiderivative);
+    expr_bindings_free(bindings);
 }
 
 static void test_integrate_symbolic_general_quadratic_roots(void)
@@ -2604,6 +2670,15 @@ static void test_integrate_partial_fractions(void)
     num_destroy(&three_num);
 }
 
+static void test_integrate_quotient_rule_derivative(void)
+{
+    static const double points[] = { -0.1, 0.25, 1.0, 2.0 };
+
+    assert_nth_derivative_integrates_back(
+        "{ (3*x^2 + 4*x + 5)/(x^3 + 2*x^2 + 5*x + 1) }",
+        1u, points, sizeof(points) / sizeof(points[0]));
+}
+
 static void test_integrate_unevaluated_integral_derivative(void)
 {
     static const double points[] = { -1.0, -0.25, 0.5, 1.25 };
@@ -3229,6 +3304,7 @@ void test_symbolic_integration(void)
     TEST_RUN_SUBTEST(test_integrate_affine_poly_times_specials, NULL);
     TEST_RUN_SUBTEST(test_integrate_other_variable_as_constant, NULL);
     TEST_RUN_SUBTEST(test_integrate_definite_symbolic_bounds, NULL);
+    TEST_RUN_SUBTEST(test_integrate_definite_quadratic_compact_exact_result, NULL);
     TEST_RUN_SUBTEST(test_integrate_inverse_square_with_exact_bound, NULL);
     TEST_RUN_SUBTEST(test_integrate_shifted_inverse_square_with_symbolic_constant, NULL);
     TEST_RUN_SUBTEST(test_integrate_symbolic_power_exponent, NULL);
@@ -3247,6 +3323,7 @@ void test_symbolic_integration(void)
     TEST_RUN_SUBTEST(test_integrate_frequency_product_families, NULL);
     TEST_RUN_SUBTEST(test_integrate_more_by_parts, NULL);
     TEST_RUN_SUBTEST(test_integrate_partial_fractions, NULL);
+    TEST_RUN_SUBTEST(test_integrate_quotient_rule_derivative, NULL);
     TEST_RUN_SUBTEST(test_integrate_unevaluated_integral_derivative, NULL);
     TEST_RUN_SUBTEST(test_integrate_unevaluated_integral_leibniz_derivative, NULL);
     TEST_RUN_SUBTEST(test_integrate_unevaluated_integral_evaluation, NULL);

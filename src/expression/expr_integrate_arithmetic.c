@@ -119,6 +119,8 @@ static expr_t *integrate_div_constant_denominator(const expr_t *expr,
                                                   const expr_t *wrt);
 static expr_t *integrate_div_rule_by_numerator_distribution(const expr_t *expr,
                                                             const expr_t *wrt);
+static expr_t *integrate_div_quotient_derivative(const expr_t *expr,
+                                                 const expr_t *wrt);
 static expr_t *integrate_div_by_exp_denominator(const expr_t *expr,
                                                 const expr_t *wrt);
 static expr_t *integrate_div_sin_integer_multiple_quotient(const expr_t *expr,
@@ -151,6 +153,7 @@ static bool integrate_div_rule_stage_matches(const expr_integrate_div_rule_stage
 static expr_t *integrate_div_rule_list(const expr_integrate_binary_rule_fn *rules,
                                        const expr_t *expr,
                                        const expr_t *wrt);
+static bool match_square_of_expr(const expr_t *expr, const expr_t **base_out);
 
 static const expr_integrate_mul_rule_t integrate_mul_always_rules[] = {
     { .kind = EXPR_INTEGRATE_MUL_RULE_DIRECT, .direct = integrate_scaled_rule },
@@ -415,6 +418,7 @@ static const expr_integrate_div_rule_feature_entry_t integrate_div_rule_feature_
 
 static const expr_integrate_binary_rule_fn integrate_div_initial_rules[] = {
     integrate_scaled_rule,
+    integrate_div_quotient_derivative,
     integrate_div_rule_by_numerator_distribution,
     integrate_div_by_exp_denominator,
     integrate_div_sin_integer_multiple_quotient,
@@ -1306,6 +1310,96 @@ cleanup:
     num_destroy(&base_scale);
     num_destroy(&expr_scale);
     return matched;
+}
+
+static expr_t *integrate_div_quotient_derivative(const expr_t *expr,
+                                                 const expr_t *wrt)
+{
+    const expr_t *denominator = NULL;
+    const expr_t *positive_term = NULL;
+    const expr_t *negative_term = NULL;
+    const expr_t *negative_base = NULL;
+    bool is_subtraction = false;
+    expr_t *denominator_deriv = NULL;
+    expr_t *numerator = NULL;
+    expr_t *numerator_deriv = NULL;
+    expr_t *expected_positive = NULL;
+    expr_t *candidate = NULL;
+    expr_t *out = NULL;
+
+    if (!expr || !expr->a || !expr->b ||
+        !match_square_of_expr(expr->b, &denominator) ||
+        !denominator || !depends_on_wrt(denominator, wrt)) {
+        goto cleanup;
+    }
+
+    if (!expr_match_add_sub_expr(expr->a, &positive_term, &negative_term,
+                                 &is_subtraction)) {
+        goto cleanup;
+    }
+    if (!is_subtraction) {
+        if (negative_term->ops &&
+            negative_term->ops->kind == EXPR_KIND_NEG && negative_term->a) {
+            negative_term = negative_term->a;
+            is_subtraction = true;
+        } else if (positive_term->ops &&
+                   positive_term->ops->kind == EXPR_KIND_NEG &&
+                   positive_term->a) {
+            const expr_t *negated_left = positive_term->a;
+
+            positive_term = negative_term;
+            negative_term = negated_left;
+            is_subtraction = true;
+        }
+    }
+    if (!is_subtraction || !positive_term || !negative_term)
+        goto cleanup;
+
+    denominator_deriv = expr_create_deriv(denominator, wrt);
+    denominator_deriv = simplify_owned(denominator_deriv);
+    if (!denominator_deriv || expr_is_exact_zero(denominator_deriv))
+        goto cleanup;
+
+    if (match_square_of_expr(negative_term, &negative_base) &&
+        negative_base &&
+        integrate_expr_equivalent_by_zero_difference(negative_base,
+                                                     denominator_deriv)) {
+        expr_retain(negative_base);
+        numerator = (expr_t *)negative_base;
+    } else {
+        numerator = expr_simplify_extract_exact_factor_quotient(
+            negative_term, denominator_deriv);
+        numerator = simplify_owned(numerator);
+    }
+    if (!numerator)
+        goto cleanup;
+
+    numerator_deriv = expr_create_deriv(numerator, wrt);
+    numerator_deriv = simplify_owned(numerator_deriv);
+    expected_positive = numerator_deriv
+                            ? expr_mul(numerator_deriv, denominator)
+                            : NULL;
+    expected_positive = simplify_owned(expected_positive);
+    if (!expected_positive ||
+        !integrate_expr_equivalent_by_zero_difference(positive_term,
+                                                       expected_positive)) {
+        goto cleanup;
+    }
+
+    candidate = expr_div(numerator, denominator);
+    candidate = simplify_owned(candidate);
+    if (candidate) {
+        out = candidate;
+        candidate = NULL;
+    }
+
+cleanup:
+    expr_free(candidate);
+    expr_free(expected_positive);
+    expr_free(numerator_deriv);
+    expr_free(numerator);
+    expr_free(denominator_deriv);
+    return out;
 }
 
 static expr_t *integrate_div_logarithmic_derivative(const expr_t *expr,

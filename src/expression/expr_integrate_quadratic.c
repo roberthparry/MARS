@@ -211,6 +211,48 @@ static bool symbolic_poly2_all_coeffs_numeric(const symbolic_poly2_t *poly)
     return all_numeric;
 }
 
+static bool symbolic_poly2_has_positive_numeric_discriminant(
+    const symbolic_poly2_t *poly)
+{
+    number_t a = num_new();
+    number_t b = num_new();
+    number_t c = num_new();
+    number_t four = num_create_from_long(4L);
+    number_t ac = num_new();
+    number_t four_ac = num_new();
+    number_t b_squared = num_new();
+    number_t discriminant = num_new();
+    bool positive = false;
+
+    if (!poly || !poly->coeff[2] ||
+        !expr_match_const_value(poly->coeff[2], &a) ||
+        (poly->coeff[1] && !expr_match_const_value(poly->coeff[1], &b)) ||
+        (poly->coeff[0] && !expr_match_const_value(poly->coeff[0], &c))) {
+        goto cleanup;
+    }
+
+    num_destroy(&ac);
+    ac = num_scope_detach(num_mul(a, c));
+    num_destroy(&four_ac);
+    four_ac = num_scope_detach(num_mul(four, ac));
+    num_destroy(&b_squared);
+    b_squared = num_scope_detach(num_mul(b, b));
+    num_destroy(&discriminant);
+    discriminant = num_scope_detach(num_sub(four_ac, b_squared));
+    positive = num_is_finite(discriminant) && num_gt(discriminant, NUM_ZERO);
+
+cleanup:
+    num_destroy(&discriminant);
+    num_destroy(&b_squared);
+    num_destroy(&four_ac);
+    num_destroy(&ac);
+    num_destroy(&four);
+    num_destroy(&c);
+    num_destroy(&b);
+    num_destroy(&a);
+    return positive;
+}
+
 static bool symbolic_poly2_write_numeric_deg4(const symbolic_poly2_t *source,
                                               number_t *target)
 {
@@ -237,127 +279,74 @@ cleanup:
     return ok;
 }
 
-static expr_t *symbolic_general_quadratic_inverse_integral_numeric(const expr_t *wrt,
-                                                                   const expr_t *a,
-                                                                   const expr_t *b,
-                                                                   const expr_t *c)
-{
-    number_t av = num_new();
-    number_t bv = num_new();
-    number_t cv = num_new();
-    number_t four = num_create_from_long(4L);
-    number_t ac = num_new();
-    number_t four_ac = num_new();
-    number_t b_sq = num_new();
-    number_t delta = num_new();
-    number_t sqrt_delta = num_new();
-    number_t two_a = num_new();
-    number_t arg_scale = num_new();
-    number_t arg_offset = num_new();
-    number_t out_scale = num_new();
-    expr_t *scaled_x = NULL;
-    expr_t *arg = NULL;
-    expr_t *atan_arg = NULL;
-    expr_t *out = NULL;
-
-    if (!wrt ||
-        !expr_match_const_value(a, &av) ||
-        !expr_match_const_value(b, &bv) ||
-        !expr_match_const_value(c, &cv))
-        goto cleanup;
-
-    num_destroy(&ac);
-    ac = num_scope_detach(num_mul(av, cv));
-    num_destroy(&four_ac);
-    four_ac = num_scope_detach(num_mul(four, ac));
-    num_destroy(&b_sq);
-    b_sq = num_scope_detach(num_mul(bv, bv));
-    num_destroy(&delta);
-    delta = num_scope_detach(num_sub(four_ac, b_sq));
-    if (!num_is_finite(delta) || num_eq(delta, NUM_ZERO))
-        goto cleanup;
-
-    num_destroy(&sqrt_delta);
-    sqrt_delta = num_scope_detach(num_sqrt(delta));
-    if (!num_is_finite(sqrt_delta) || num_eq(sqrt_delta, NUM_ZERO))
-        goto cleanup;
-
-    num_destroy(&two_a);
-    two_a = num_scope_detach(num_mul(NUM_TWO, av));
-    num_destroy(&arg_scale);
-    arg_scale = num_scope_detach(num_div(two_a, sqrt_delta));
-    num_destroy(&arg_offset);
-    arg_offset = num_scope_detach(num_div(bv, sqrt_delta));
-    num_destroy(&out_scale);
-    out_scale = num_scope_detach(num_div(NUM_TWO, sqrt_delta));
-
-    scaled_x = expr_mul_num(wrt, &arg_scale);
-    arg = scaled_x ? expr_add_num(scaled_x, &arg_offset) : NULL;
-    atan_arg = arg ? expr_atan(arg) : NULL;
-    out = atan_arg ? expr_mul_num(atan_arg, &out_scale) : NULL;
-
-cleanup:
-    expr_free(atan_arg);
-    expr_free(arg);
-    expr_free(scaled_x);
-    num_destroy(&out_scale);
-    num_destroy(&arg_offset);
-    num_destroy(&arg_scale);
-    num_destroy(&two_a);
-    num_destroy(&sqrt_delta);
-    num_destroy(&delta);
-    num_destroy(&b_sq);
-    num_destroy(&four_ac);
-    num_destroy(&ac);
-    num_destroy(&four);
-    num_destroy(&cv);
-    num_destroy(&bv);
-    num_destroy(&av);
-    return out;
-}
-
 static expr_t *symbolic_general_quadratic_inverse_integral(const expr_t *wrt,
                                                            const expr_t *a,
                                                            const expr_t *b,
                                                            const expr_t *c)
 {
-    expr_t *numeric = symbolic_general_quadratic_inverse_integral_numeric(wrt, a, b, c);
     expr_t *four = expr_const_long(4L);
-    expr_t *two = expr_const_long(2L);
+    expr_t *two_for_arg = expr_const_long(2L);
+    expr_t *two_for_scale = expr_const_long(2L);
     expr_t *ac = (a && c) ? expr_mul(a, c) : NULL;
     expr_t *four_ac = (four && ac) ? expr_mul(four, ac) : NULL;
     expr_t *b_sq = b ? expr_mul(b, b) : NULL;
     expr_t *delta_raw = (four_ac && b_sq) ? expr_sub(four_ac, b_sq) : NULL;
     expr_t *delta = simplify_owned(delta_raw);
-    expr_t *sqrt_delta = delta ? expr_sqrt(delta) : NULL;
-    expr_t *two_a = (two && a) ? expr_mul(two, a) : NULL;
-    expr_t *two_ax = (two_a && wrt) ? expr_mul(two_a, wrt) : NULL;
-    expr_t *arg_num = (two_ax && b) ? expr_add(two_ax, b) : NULL;
-    expr_t *arg = (arg_num && sqrt_delta) ? expr_div(arg_num, sqrt_delta) : NULL;
-    expr_t *atan_arg = arg ? expr_atan(arg) : NULL;
-    expr_t *scaled_atan = two ? expr_mul(two, atan_arg) : NULL;
-    expr_t *out = (scaled_atan && sqrt_delta) ? expr_div(scaled_atan, sqrt_delta) : NULL;
+    expr_t *delta_for_arg = NULL;
+    expr_t *delta_for_scale = NULL;
+    expr_t *sqrt_delta_for_arg = NULL;
+    expr_t *sqrt_delta_for_scale = NULL;
+    expr_t *two_a = NULL;
+    expr_t *two_ax = NULL;
+    expr_t *arg_num = NULL;
+    expr_t *arg = NULL;
+    expr_t *atan_arg = NULL;
+    expr_t *scale = NULL;
+    expr_t *out = NULL;
 
-    if (numeric) {
-        expr_free(out);
-        out = numeric;
-        numeric = NULL;
+    if (delta) {
+        number_t delta_value = num_new();
+
+        if (expr_match_const_value(delta, &delta_value)) {
+            delta_for_arg = expr_new_const(delta_value);
+            delta_for_scale = expr_new_const(delta_value);
+        } else {
+            delta_for_arg = expr_retain_expr(delta);
+            delta_for_scale = expr_retain_expr(delta);
+        }
+        num_destroy(&delta_value);
     }
+    sqrt_delta_for_arg = delta_for_arg ? expr_sqrt(delta_for_arg) : NULL;
+    sqrt_delta_for_scale = delta_for_scale ? expr_sqrt(delta_for_scale) : NULL;
+    two_a = (two_for_arg && a) ? expr_mul(two_for_arg, a) : NULL;
+    two_ax = (two_a && wrt) ? expr_mul(two_a, wrt) : NULL;
+    arg_num = (two_ax && b) ? expr_add(two_ax, b) : NULL;
+    arg = (arg_num && sqrt_delta_for_arg)
+              ? expr_div(arg_num, sqrt_delta_for_arg)
+              : NULL;
+    atan_arg = arg ? expr_atan(arg) : NULL;
+    scale = (two_for_scale && sqrt_delta_for_scale)
+                ? expr_div(two_for_scale, sqrt_delta_for_scale)
+                : NULL;
+    out = (scale && atan_arg) ? expr_mul(scale, atan_arg) : NULL;
 
-    expr_free(scaled_atan);
+    expr_free(scale);
     expr_free(atan_arg);
     expr_free(arg);
     expr_free(arg_num);
     expr_free(two_ax);
     expr_free(two_a);
-    expr_free(sqrt_delta);
+    expr_free(sqrt_delta_for_scale);
+    expr_free(sqrt_delta_for_arg);
+    expr_free(delta_for_scale);
+    expr_free(delta_for_arg);
     expr_free(delta);
     expr_free(b_sq);
     expr_free(four_ac);
     expr_free(ac);
-    expr_free(two);
+    expr_free(two_for_scale);
+    expr_free(two_for_arg);
     expr_free(four);
-    expr_free(numeric);
     return out;
 }
 
@@ -571,7 +560,9 @@ expr_t *integrate_linear_over_symbolic_quadratic(const expr_t *expr, const expr_
         numer.coeff[2] ||
         !denom.coeff[2] ||
         (symbolic_poly2_all_coeffs_numeric(&numer) &&
-         symbolic_poly2_all_coeffs_numeric(&denom)))
+         symbolic_poly2_all_coeffs_numeric(&denom) &&
+         (!denom.coeff[1] || expr_is_exact_zero(denom.coeff[1]) ||
+          !symbolic_poly2_has_positive_numeric_discriminant(&denom))))
         goto cleanup;
 
     a = symbolic_poly2_coeff_or_zero(&denom, 2u);
