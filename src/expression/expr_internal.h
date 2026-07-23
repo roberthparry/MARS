@@ -1206,6 +1206,9 @@ bool expr_match_affine_poly_deg4(const expr_t *expr,
                                  number_t *poly_coeffs_out,
                                  number_t *constant_out,
                                  number_t *coeffs_out);
+bool expr_polynomials_equal_deg4(const expr_t *left,
+                                 const expr_t *right);
+bool expr_polynomial_is_zero_deg4(const expr_t *expr);
 bool expr_match_unary_affine_kind(const expr_t *expr,
                                   expr_pattern_unary_affine_kind_t kind,
                                   size_t nvars,

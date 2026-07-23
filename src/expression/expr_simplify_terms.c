@@ -682,7 +682,8 @@ void expr_combine_common_denominator_addends(addend_t *terms, size_t n)
 
             if (!expr_is_div(jbase))
                 continue;
-            if (!expr_struct_eq(ibase->b, jbase->b))
+            if (!expr_struct_eq(ibase->b, jbase->b) &&
+                !expr_polynomials_equal_deg4(ibase->b, jbase->b))
                 continue;
 
             if (!merged_any) {
