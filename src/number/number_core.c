@@ -666,12 +666,39 @@ static void number_scope_trim_block(number_scope_block_t *block)
 
 void number_scope_register_value(const number_t *number)
 {
+    num_scope_t *scope;
     number_scope_state_t *state;
     number_scope_block_t *block;
     number_scope_record_t *record;
+    number_kind_t kind;
+    void *payload;
 
     if (!number_scope_trackable_value(number))
         return;
+    kind = number_kind_value(number);
+    payload = number_scope_payload_pointer(number);
+
+    /* Some conversion paths return an already-scoped payload. Registering it
+     * again would leave a second owner behind after num_scope_detach(). */
+    for (scope = number_scope_current; scope; scope = scope->previous) {
+        number_scope_state_t *existing_state = number_scope_state_get(scope);
+        number_scope_block_t *existing_block = existing_state
+            ? existing_state->records : NULL;
+
+        while (existing_block) {
+            size_t i = existing_block->used;
+
+            while (i-- > 0u) {
+                const number_scope_record_t *existing =
+                    &existing_block->records[i];
+
+                if (existing->kind == kind && existing->payload == payload)
+                    return;
+            }
+            existing_block = existing_block->next;
+        }
+    }
+
     state = number_scope_state_ensure(number_scope_current);
     if (!state)
         return;
@@ -684,8 +711,8 @@ void number_scope_register_value(const number_t *number)
         state->records = block;
     }
     record = &block->records[block->used++];
-    record->kind = number_kind_value(number);
-    record->payload = number_scope_payload_pointer(number);
+    record->kind = kind;
+    record->payload = payload;
 }
 
 int number_scope_unregister_value(const number_t *number)

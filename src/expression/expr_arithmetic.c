@@ -977,6 +977,362 @@ static expr_t *deriv_exp_inverse_scaled_sqrt_product(expr_t *dv)
     return out;
 }
 
+static int split_scaled_atan(const expr_t *dv,
+                             number_t *scale_out,
+                             const expr_t **atan_out)
+{
+    if (expr_is_op(dv, &ops_atan)) {
+        num_destroy(scale_out);
+        *scale_out = num_clone(NUM_ONE);
+        *atan_out = dv;
+        return 1;
+    }
+
+    if (!expr_is_op(dv, &ops_mul))
+        return 0;
+
+    if (expr_is_deriv_foldable_real_const(dv->a) &&
+        expr_is_op(dv->b, &ops_atan)) {
+        num_destroy(scale_out);
+        *scale_out = num_clone(dv->a->c);
+        *atan_out = dv->b;
+        return 1;
+    }
+
+    if (expr_is_deriv_foldable_real_const(dv->b) &&
+        expr_is_op(dv->a, &ops_atan)) {
+        num_destroy(scale_out);
+        *scale_out = num_clone(dv->b->c);
+        *atan_out = dv->a;
+        return 1;
+    }
+
+    return 0;
+}
+
+static int expr_has_sqrt_like_factor(const expr_t *dv)
+{
+    return expr_is_sqrt_like_expr(dv) ||
+           (expr_is_op(dv, &ops_mul) &&
+            (expr_is_sqrt_like_expr(dv->a) ||
+             expr_is_sqrt_like_expr(dv->b)));
+}
+
+static void replace_deriv_number(number_t *target, number_t value)
+{
+    num_destroy(target);
+    *target = value;
+}
+
+static int split_numeric_affine_in_current_wrt(const expr_t *dv,
+                                               number_t *linear_out,
+                                               number_t *constant_out)
+{
+    const expr_t *wrt = expr_current_wrt_internal();
+
+    if (!dv || !wrt)
+        return 0;
+
+    if (dv == wrt || expr_struct_eq(dv, wrt)) {
+        replace_deriv_number(linear_out, num_clone(NUM_ONE));
+        replace_deriv_number(constant_out, num_clone(NUM_ZERO));
+        return 1;
+    }
+
+    if (expr_is_deriv_foldable_real_const(dv)) {
+        replace_deriv_number(linear_out, num_clone(NUM_ZERO));
+        replace_deriv_number(constant_out, num_clone(dv->c));
+        return 1;
+    }
+
+    if (expr_is_neg(dv)) {
+        number_t linear = num_new();
+        number_t constant = num_new();
+
+        if (!split_numeric_affine_in_current_wrt(dv->a, &linear, &constant)) {
+            num_destroy(&constant);
+            num_destroy(&linear);
+            return 0;
+        }
+        replace_deriv_number(linear_out, num_neg(linear));
+        replace_deriv_number(constant_out, num_neg(constant));
+        num_destroy(&constant);
+        num_destroy(&linear);
+        return 1;
+    }
+
+    if (expr_is_addsub(dv)) {
+        number_t left_linear = num_new();
+        number_t left_constant = num_new();
+        number_t right_linear = num_new();
+        number_t right_constant = num_new();
+        int matched =
+            split_numeric_affine_in_current_wrt(dv->a,
+                                                &left_linear,
+                                                &left_constant) &&
+            split_numeric_affine_in_current_wrt(dv->b,
+                                                &right_linear,
+                                                &right_constant);
+
+        if (matched && expr_is_op(dv, &ops_sub)) {
+            replace_deriv_number(linear_out,
+                                 num_sub(left_linear, right_linear));
+            replace_deriv_number(constant_out,
+                                 num_sub(left_constant, right_constant));
+        } else if (matched) {
+            replace_deriv_number(linear_out,
+                                 num_add(left_linear, right_linear));
+            replace_deriv_number(constant_out,
+                                 num_add(left_constant, right_constant));
+        }
+
+        num_destroy(&right_constant);
+        num_destroy(&right_linear);
+        num_destroy(&left_constant);
+        num_destroy(&left_linear);
+        return matched;
+    }
+
+    if (expr_is_mul(dv)) {
+        const expr_t *factor = NULL;
+        const expr_t *affine = NULL;
+        number_t linear = num_new();
+        number_t constant = num_new();
+        int matched = 0;
+
+        if (expr_is_deriv_foldable_real_const(dv->a)) {
+            factor = dv->a;
+            affine = dv->b;
+        } else if (expr_is_deriv_foldable_real_const(dv->b)) {
+            factor = dv->b;
+            affine = dv->a;
+        }
+
+        if (factor &&
+            split_numeric_affine_in_current_wrt(affine, &linear, &constant)) {
+            replace_deriv_number(linear_out, num_mul(factor->c, linear));
+            replace_deriv_number(constant_out, num_mul(factor->c, constant));
+            matched = 1;
+        }
+
+        num_destroy(&constant);
+        num_destroy(&linear);
+        return matched;
+    }
+
+    return 0;
+}
+
+static int split_numeric_scaled_sqrt_denominator(const expr_t *dv,
+                                                 number_t *scale_out,
+                                                 number_t *radicand_out)
+{
+    if (!dv)
+        return 0;
+
+    if (expr_is_sqrt_like_expr(dv) &&
+        expr_is_deriv_foldable_real_const(expr_sqrt_like_arg(dv))) {
+        replace_deriv_number(scale_out, num_clone(NUM_ONE));
+        replace_deriv_number(radicand_out,
+                             num_clone(expr_sqrt_like_arg(dv)->c));
+        return 1;
+    }
+
+    if (expr_is_unnamed_const(dv) && dv->binding_expr &&
+        dv->binding_expr->kind == EXPR_BINDING_EXPR_UNARY_OP &&
+        dv->binding_expr->u.unary_op.ops == &ops_sqrt) {
+        expr_t *radicand = expr_binding_expr_eval_expr(
+            dv->binding_expr->u.unary_op.child);
+        int matched = expr_is_deriv_foldable_real_const(radicand);
+
+        if (matched) {
+            replace_deriv_number(scale_out, num_clone(NUM_ONE));
+            replace_deriv_number(radicand_out, num_clone(radicand->c));
+        }
+        expr_free(radicand);
+        return matched;
+    }
+
+    if (expr_is_mul(dv)) {
+        const expr_t *factor = NULL;
+        const expr_t *root = NULL;
+        number_t inner_scale = num_new();
+        number_t radicand = num_new();
+        int matched = 0;
+
+        if (expr_is_deriv_foldable_real_const(dv->a)) {
+            factor = dv->a;
+            root = dv->b;
+        } else if (expr_is_deriv_foldable_real_const(dv->b)) {
+            factor = dv->b;
+            root = dv->a;
+        }
+
+        if (factor && split_numeric_scaled_sqrt_denominator(root,
+                                                            &inner_scale,
+                                                            &radicand)) {
+            replace_deriv_number(scale_out,
+                                 num_mul(factor->c, inner_scale));
+            replace_deriv_number(radicand_out, num_clone(radicand));
+            matched = 1;
+        }
+        num_destroy(&radicand);
+        num_destroy(&inner_scale);
+        return matched;
+    }
+
+    return 0;
+}
+
+static expr_t *deriv_atan_over_matching_sqrt(expr_t *dv,
+                                             number_t atan_scale,
+                                             const expr_t *atan_node)
+{
+    NUM_SCOPE(scope);
+    const expr_t *arg = atan_node ? atan_node->a : NULL;
+    const expr_t *wrt = expr_current_wrt_internal();
+    number_t arg_den_scale = num_new();
+    number_t outer_den_scale = num_new();
+    number_t arg_radicand = num_new();
+    number_t outer_radicand = num_new();
+    number_t linear = num_new();
+    number_t constant = num_new();
+    number_t delta = num_new();
+    number_t linear_sq = num_new();
+    number_t linear_term_coeff = num_new();
+    number_t constant_sq = num_new();
+    number_t arg_den_scale_sq = num_new();
+    number_t scaled_delta = num_new();
+    number_t denominator_constant = num_new();
+    number_t numerator_coeff = num_new();
+    expr_t *x = NULL;
+    expr_t *x_sq = NULL;
+    expr_t *quadratic_term = NULL;
+    expr_t *linear_term = NULL;
+    expr_t *constant_term = NULL;
+    expr_t *partial_denominator = NULL;
+    expr_t *denominator = NULL;
+    expr_t *numerator = NULL;
+    expr_t *quotient = NULL;
+    expr_t *out = NULL;
+
+    if (!arg || !expr_is_div(arg) || !wrt)
+        goto cleanup;
+    if (!split_numeric_scaled_sqrt_denominator(arg->b,
+                                               &arg_den_scale,
+                                               &arg_radicand) ||
+        !split_numeric_scaled_sqrt_denominator(dv->b,
+                                               &outer_den_scale,
+                                               &outer_radicand))
+        goto cleanup;
+    if (!num_eq(arg_radicand, outer_radicand))
+        goto cleanup;
+
+    if (!num_gt(arg_radicand, NUM_ZERO) ||
+        !split_numeric_affine_in_current_wrt(arg->a, &linear, &constant) ||
+        num_is_zero(linear))
+        goto cleanup;
+
+    replace_deriv_number(&delta, num_clone(arg_radicand));
+    replace_deriv_number(&linear_sq, num_mul(linear, linear));
+    replace_deriv_number(&linear_term_coeff,
+                         num_mul(NUM_TWO, num_mul(linear, constant)));
+    replace_deriv_number(&constant_sq, num_mul(constant, constant));
+    replace_deriv_number(&arg_den_scale_sq,
+                         num_mul(arg_den_scale, arg_den_scale));
+    replace_deriv_number(&scaled_delta,
+                         num_mul(arg_den_scale_sq, delta));
+    replace_deriv_number(&denominator_constant,
+                         num_add(constant_sq, scaled_delta));
+    replace_deriv_number(&numerator_coeff,
+                         num_div(num_mul(num_mul(atan_scale, linear),
+                                         arg_den_scale),
+                                 outer_den_scale));
+
+    x = expr_retain_expr(wrt);
+    x_sq = x ? expr_mul(x, x) : NULL;
+    quadratic_term = x_sq ? expr_make_scaled(linear_sq, x_sq) : NULL;
+    x_sq = NULL;
+    x = expr_retain_expr(wrt);
+    linear_term = x ? expr_make_scaled(linear_term_coeff, x) : NULL;
+    x = NULL;
+    constant_term = expr_new_const(denominator_constant);
+    partial_denominator = (quadratic_term && linear_term)
+        ? expr_add(quadratic_term, linear_term)
+        : NULL;
+    denominator = (partial_denominator && constant_term)
+        ? expr_add(partial_denominator, constant_term)
+        : NULL;
+    numerator = expr_new_const(numerator_coeff);
+    quotient = (numerator && denominator) ? expr_div(numerator, denominator) : NULL;
+    out = quotient ? expr_simplify(quotient) : NULL;
+
+cleanup:
+    expr_free(quotient);
+    expr_free(numerator);
+    expr_free(denominator);
+    expr_free(partial_denominator);
+    expr_free(constant_term);
+    expr_free(linear_term);
+    expr_free(quadratic_term);
+    expr_free(x_sq);
+    expr_free(x);
+    num_destroy(&numerator_coeff);
+    num_destroy(&denominator_constant);
+    num_destroy(&scaled_delta);
+    num_destroy(&arg_den_scale_sq);
+    num_destroy(&constant_sq);
+    num_destroy(&linear_term_coeff);
+    num_destroy(&linear_sq);
+    num_destroy(&delta);
+    num_destroy(&constant);
+    num_destroy(&linear);
+    num_destroy(&outer_radicand);
+    num_destroy(&arg_radicand);
+    num_destroy(&outer_den_scale);
+    num_destroy(&arg_den_scale);
+    return out;
+}
+
+static expr_t *deriv_atan_over_scaled_sqrt(expr_t *dv)
+{
+    const expr_t *atan_node = NULL;
+    number_t scale = num_new();
+    expr_t *arg_dx = NULL;
+    expr_t *arg_sq = NULL;
+    expr_t *one = NULL;
+    expr_t *atan_den = NULL;
+    expr_t *full_den = NULL;
+    expr_t *quotient = NULL;
+    expr_t *out = NULL;
+
+    if (!split_scaled_atan(dv->a, &scale, &atan_node))
+        goto cleanup;
+
+    out = deriv_atan_over_matching_sqrt(dv, scale, atan_node);
+    if (out)
+        goto cleanup;
+    if (!expr_has_sqrt_like_factor(dv->b))
+        goto cleanup;
+
+    arg_dx = expr_get_dx_internal(atan_node->a);
+    arg_sq = expr_mul(atan_node->a, atan_node->a);
+    one = expr_new_const(NUM_ONE);
+    atan_den = expr_add(one, arg_sq);
+    full_den = expr_mul(dv->b, atan_den);
+    quotient = expr_div(arg_dx, full_den);
+    out = expr_make_scaled(scale, quotient);
+
+cleanup:
+    expr_free(arg_dx);
+    expr_free(arg_sq);
+    expr_free(one);
+    expr_free(atan_den);
+    expr_free(full_den);
+    num_destroy(&scale);
+    return out;
+}
+
 static expr_t *deriv_div(expr_t *dv)
 {
     NUM_SCOPE(scope);
@@ -985,6 +1341,9 @@ static expr_t *deriv_div(expr_t *dv)
     if (special)
         return special;
     special = deriv_sqrt_affine_over_power(dv);
+    if (special)
+        return special;
+    special = deriv_atan_over_scaled_sqrt(dv);
     if (special)
         return special;
 

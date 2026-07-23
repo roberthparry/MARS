@@ -1432,6 +1432,32 @@ static void test_from_string_deriv(void)
         expr_free(t2); expr_free(t); expr_free(x2); expr_free(esinx); expr_free(sinx);
         expr_free(xvar);
     }
+
+    /* Long decimal coefficients can exceed the exact-rational work budget.
+     * Their precision-bounded conversion must remain alive while the parsed
+     * antiderivative is simplified and differentiated. */
+    {
+        const char *input =
+            "{ 1/2*ln(x^2+3*x+5)"
+            "-0.30151134457776362264681206697006242581155350414448669064169837691968042205536762242807"
+            "*atan(0.60302268915552724529362413394012485162310700828897338128339675383936084411073524485615"
+            "*x+0.90453403373329086794043620091018727743466051243346007192509513075904126616610286728422)"
+            "+C₀ | x=1 }";
+        expr_bindings_t *bindings = NULL;
+        expr_t *parsed = expr_from_string(input, &bindings);
+        expr_t *xvar = bindings ? expr_bindings_get(bindings, "x") : NULL;
+        expr_t *deriv = (parsed && xvar) ? expr_create_deriv(parsed, xvar) : NULL;
+
+        ASSERT_NOT_NULL(parsed);
+        ASSERT_NOT_NULL(xvar);
+        ASSERT_NOT_NULL(deriv);
+        check_expr_d("long-decimal integral differentiates at x=1",
+                     deriv, 2.0 / 9.0, __LINE__);
+
+        expr_free(deriv);
+        expr_free(parsed);
+        expr_bindings_free(bindings);
+    }
 }
 
 /* ---- Error paths — all must return NULL ----
