@@ -32,6 +32,7 @@
 
 /* forward declaration — helpers below call expr_simplify recursively */
 expr_t *expr_simplify(const expr_t *dv);
+static expr_t *expr_simplify_mark_current(expr_t *dv);
 static expr_t *expr_simplify_try_const_over_e_local(expr_t *a, expr_t *b);
 
 static void *expr_xrealloc(void *ptr, size_t size)
@@ -3193,6 +3194,469 @@ static expr_t *expr_simplify_try_const_over_e_local(expr_t *a, expr_t *b)
     return out;
 }
 
+static void expr_simplify_zero_number_array_local(number_t *values, size_t n)
+{
+    for (size_t i = 0u; i < n; ++i)
+        values[i] = num_new();
+}
+
+static void expr_simplify_reset_number_array_local(number_t *values, size_t n)
+{
+    for (size_t i = 0u; i < n; ++i) {
+        num_destroy(&values[i]);
+        values[i] = num_new();
+    }
+}
+
+static void expr_simplify_clear_number_array_local(number_t *values, size_t n)
+{
+    for (size_t i = 0u; i < n; ++i)
+        num_destroy(&values[i]);
+}
+
+static void expr_simplify_copy_number_array_local(number_t *dst,
+                                                  const number_t *src,
+                                                  size_t n)
+{
+    for (size_t i = 0u; i < n; ++i) {
+        num_destroy(&dst[i]);
+        dst[i] = num_clone(src[i]);
+    }
+}
+
+static number_t *expr_simplify_number_array_alloc_local(size_t n)
+{
+    number_t *values = calloc(n, sizeof(*values));
+
+    if (!values)
+        return NULL;
+    expr_simplify_zero_number_array_local(values, n);
+    return values;
+}
+
+static void expr_simplify_number_array_free_local(number_t *values,
+                                                  size_t n)
+{
+    if (!values)
+        return;
+    expr_simplify_clear_number_array_local(values, n);
+    free(values);
+}
+
+static bool expr_simplify_poly_mul_local(const number_t *left,
+                                         const number_t *right,
+                                         number_t *out,
+                                         size_t n)
+{
+    size_t product_count = 2u * n - 1u;
+    number_t *product = NULL;
+    bool fits = true;
+
+    if (n == 0u || n > 65u)
+        return false;
+
+    product = expr_simplify_number_array_alloc_local(product_count);
+    if (!product)
+        return false;
+    for (size_t i = 0u; i < n; ++i) {
+        for (size_t j = 0u; j < n; ++j) {
+            number_t term = num_mul(left[i], right[j]);
+            number_t sum = num_add(product[i + j], term);
+
+            num_destroy(&product[i + j]);
+            product[i + j] = sum;
+            num_destroy(&term);
+        }
+    }
+
+    for (size_t i = n; i < product_count; ++i) {
+        if (!num_is_zero(product[i])) {
+            fits = false;
+            break;
+        }
+    }
+    if (fits)
+        expr_simplify_copy_number_array_local(out, product, n);
+    expr_simplify_number_array_free_local(product, product_count);
+    return fits;
+}
+
+static long expr_simplify_poly_exponent_local(number_t value, size_t n)
+{
+    if (!num_is_real(value) || !num_is_integer(value))
+        return -1L;
+
+    for (long exponent = 0L; exponent < (long)n; ++exponent) {
+        number_t candidate = num_create_from_long(exponent);
+        bool equal = num_eq(value, candidate);
+
+        num_destroy(&candidate);
+        if (equal)
+            return exponent;
+    }
+    return -1L;
+}
+
+static bool expr_simplify_poly_degree_local(const expr_t *expr,
+                                            const expr_t *var,
+                                            size_t max_degree,
+                                            size_t *degree_out)
+{
+    const expr_t *base = NULL;
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+    number_t value = num_new();
+    size_t left_degree = 0u;
+    size_t right_degree = 0u;
+    long exponent = 0L;
+    bool is_sub = false;
+    bool ok = false;
+
+    if (!expr || !var || !degree_out)
+        goto cleanup;
+
+    if (expr_struct_eq(expr, var)) {
+        *degree_out = 1u;
+        ok = max_degree >= 1u;
+        goto cleanup;
+    }
+
+    if (expr_match_const_value(expr, &value)) {
+        *degree_out = 0u;
+        ok = true;
+        goto cleanup;
+    }
+
+    if (expr_match_unary_op(expr, EXPR_KIND_NEG, &base)) {
+        ok = expr_simplify_poly_degree_local(base, var, max_degree,
+                                             degree_out);
+        goto cleanup;
+    }
+
+    if (expr_match_add_sub_expr(expr, &left, &right, &is_sub)) {
+        (void)is_sub;
+        ok = expr_simplify_poly_degree_local(left, var, max_degree,
+                                             &left_degree) &&
+             expr_simplify_poly_degree_local(right, var, max_degree,
+                                             &right_degree);
+        if (ok) {
+            *degree_out = left_degree > right_degree ? left_degree
+                                                     : right_degree;
+            ok = *degree_out <= max_degree;
+        }
+        goto cleanup;
+    }
+
+    if (expr_match_mul_expr(expr, &left, &right)) {
+        ok = expr_simplify_poly_degree_local(left, var, max_degree,
+                                             &left_degree) &&
+             expr_simplify_poly_degree_local(right, var, max_degree,
+                                             &right_degree);
+        if (ok) {
+            ok = left_degree <= max_degree &&
+                 right_degree <= max_degree &&
+                 left_degree + right_degree <= max_degree;
+            if (ok)
+                *degree_out = left_degree + right_degree;
+        }
+        goto cleanup;
+    }
+
+    if (expr_match_pow_const(expr, &base, &value)) {
+        exponent = expr_simplify_poly_exponent_local(value, max_degree + 1u);
+        ok = exponent >= 0L &&
+             expr_simplify_poly_degree_local(base, var, max_degree,
+                                             &left_degree) &&
+             left_degree <= max_degree &&
+             (size_t)exponent <= max_degree &&
+             left_degree * (size_t)exponent <= max_degree;
+        if (ok)
+            *degree_out = left_degree * (size_t)exponent;
+        goto cleanup;
+    }
+
+cleanup:
+    num_destroy(&value);
+    return ok;
+}
+
+static bool expr_simplify_collect_poly_local(const expr_t *expr,
+                                             const expr_t *var,
+                                             number_t *out,
+                                             size_t n)
+{
+    number_t value = num_new();
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+    bool is_sub = false;
+
+    if (!expr || !var || !out || n < 2u || n > 65u)
+        goto no_match;
+
+    if (expr_struct_eq(expr, var)) {
+        expr_simplify_reset_number_array_local(out, n);
+        num_destroy(&out[1]);
+        out[1] = num_clone(NUM_ONE);
+        num_destroy(&value);
+        return true;
+    }
+
+    if (expr_match_const_value(expr, &value)) {
+        expr_simplify_reset_number_array_local(out, n);
+        num_destroy(&out[0]);
+        out[0] = num_clone(value);
+        num_destroy(&value);
+        return true;
+    }
+
+    if (expr_match_add_sub_expr(expr, &left, &right, &is_sub)) {
+        number_t *left_poly = NULL;
+        number_t *right_poly = NULL;
+        bool ok;
+
+        left_poly = expr_simplify_number_array_alloc_local(n);
+        right_poly = expr_simplify_number_array_alloc_local(n);
+        if (!left_poly || !right_poly) {
+            expr_simplify_number_array_free_local(right_poly, n);
+            expr_simplify_number_array_free_local(left_poly, n);
+            num_destroy(&value);
+            return false;
+        }
+        ok = expr_simplify_collect_poly_local(left, var, left_poly, n) &&
+             expr_simplify_collect_poly_local(right, var, right_poly, n);
+        if (ok) {
+            for (size_t i = 0u; i < n; ++i) {
+                number_t sum = is_sub ? num_sub(left_poly[i], right_poly[i])
+                                      : num_add(left_poly[i], right_poly[i]);
+
+                num_destroy(&out[i]);
+                out[i] = sum;
+            }
+        }
+        expr_simplify_number_array_free_local(right_poly, n);
+        expr_simplify_number_array_free_local(left_poly, n);
+        num_destroy(&value);
+        return ok;
+    }
+
+    if (expr_match_unary_op(expr, EXPR_KIND_NEG, &left)) {
+        number_t *inner_poly = NULL;
+        bool ok;
+
+        inner_poly = expr_simplify_number_array_alloc_local(n);
+        if (!inner_poly) {
+            num_destroy(&value);
+            return false;
+        }
+        ok = expr_simplify_collect_poly_local(left, var, inner_poly, n);
+        if (ok) {
+            for (size_t i = 0u; i < n; ++i) {
+                number_t negated = num_neg(inner_poly[i]);
+
+                num_destroy(&out[i]);
+                out[i] = negated;
+            }
+        }
+        expr_simplify_number_array_free_local(inner_poly, n);
+        num_destroy(&value);
+        return ok;
+    }
+
+    if (expr_match_mul_expr(expr, &left, &right)) {
+        number_t *left_poly = NULL;
+        number_t *right_poly = NULL;
+        bool ok;
+
+        left_poly = expr_simplify_number_array_alloc_local(n);
+        right_poly = expr_simplify_number_array_alloc_local(n);
+        if (!left_poly || !right_poly) {
+            expr_simplify_number_array_free_local(right_poly, n);
+            expr_simplify_number_array_free_local(left_poly, n);
+            num_destroy(&value);
+            return false;
+        }
+        ok = expr_simplify_collect_poly_local(left, var, left_poly, n) &&
+             expr_simplify_collect_poly_local(right, var, right_poly, n) &&
+             expr_simplify_poly_mul_local(left_poly, right_poly, out, n);
+        expr_simplify_number_array_free_local(right_poly, n);
+        expr_simplify_number_array_free_local(left_poly, n);
+        num_destroy(&value);
+        return ok;
+    }
+
+    if (expr_match_pow_const(expr, &left, &value)) {
+        long exponent = expr_simplify_poly_exponent_local(value, n);
+        number_t *base_poly = NULL;
+        number_t *result = NULL;
+        bool ok = exponent >= 0L;
+
+        base_poly = expr_simplify_number_array_alloc_local(n);
+        result = expr_simplify_number_array_alloc_local(n);
+        if (!base_poly || !result) {
+            expr_simplify_number_array_free_local(result, n);
+            expr_simplify_number_array_free_local(base_poly, n);
+            num_destroy(&value);
+            return false;
+        }
+        num_destroy(&result[0]);
+        result[0] = num_clone(NUM_ONE);
+
+        if (ok)
+            ok = expr_simplify_collect_poly_local(left, var, base_poly, n);
+        for (long i = 0L; ok && i < exponent; ++i) {
+            number_t *next = expr_simplify_number_array_alloc_local(n);
+
+            if (!next) {
+                ok = false;
+                break;
+            }
+            ok = expr_simplify_poly_mul_local(result, base_poly, next, n);
+            if (ok)
+                expr_simplify_copy_number_array_local(result, next, n);
+            expr_simplify_number_array_free_local(next, n);
+        }
+        if (ok)
+            expr_simplify_copy_number_array_local(out, result, n);
+        expr_simplify_number_array_free_local(result, n);
+        expr_simplify_number_array_free_local(base_poly, n);
+        num_destroy(&value);
+        return ok;
+    }
+
+no_match:
+    num_destroy(&value);
+    return false;
+}
+
+static expr_t *expr_simplify_build_flat_poly_local(
+    const expr_t *var,
+    const number_t *coeffs,
+    size_t n)
+{
+    expr_t *sum = NULL;
+
+    if (!var || !coeffs)
+        return NULL;
+
+    for (size_t i = n; i-- > 0u;) {
+        expr_t *base = NULL;
+        expr_t *term = NULL;
+
+        if (num_is_zero(coeffs[i]))
+            continue;
+
+        if (i == 0u) {
+            term = expr_new_const(coeffs[i]);
+        } else {
+            if (i == 1u) {
+                base = expr_retain_expr(var);
+            } else {
+                number_t exponent = num_create_from_long((long)i);
+
+                base = expr_pow(var, &exponent);
+                num_destroy(&exponent);
+            }
+            term = base ? expr_mul_num(base, &coeffs[i]) : NULL;
+            expr_free(base);
+        }
+
+        if (!term) {
+            expr_free(sum);
+            return NULL;
+        }
+        if (sum) {
+            expr_t *next = expr_add(sum, term);
+
+            expr_free(sum);
+            expr_free(term);
+            sum = next;
+        } else {
+            sum = term;
+        }
+    }
+
+    return sum ? expr_simplify_owned(sum) : expr_new_const(NUM_ZERO);
+}
+
+static bool expr_simplify_denominator_is_quadratic_poly_local(const expr_t *expr,
+                                                              const expr_t *var)
+{
+    const expr_t *base = NULL;
+    number_t exponent = num_new();
+    number_t *poly = NULL;
+    size_t count = 3u;
+    bool ok = false;
+
+    poly = expr_simplify_number_array_alloc_local(count);
+    if (!poly)
+        goto cleanup_exponent;
+
+    if (expr_match_pow_const(expr, &base, &exponent)) {
+        if (!num_is_integer(exponent) || !num_gt(exponent, NUM_ZERO))
+            goto cleanup;
+    } else {
+        base = expr;
+    }
+
+    if (!expr_simplify_collect_poly_local(base, var, poly, count))
+        goto cleanup;
+
+    if (num_is_zero(poly[2]))
+        goto cleanup;
+
+    ok = true;
+
+cleanup:
+    expr_simplify_number_array_free_local(poly, count);
+cleanup_exponent:
+    num_destroy(&exponent);
+    return ok;
+}
+
+static expr_t *expr_simplify_try_poly_quotient_numerator_local(expr_t *a,
+                                                               expr_t *b)
+{
+    enum { MAX_EAGER_QUOTIENT_NUMERATOR_DEGREE = 7 };
+    const expr_t *var = NULL;
+    number_t *poly = NULL;
+    size_t numerator_degree = 0u;
+    size_t count = 0u;
+    expr_t *rewritten_a = NULL;
+    expr_t *quotient = NULL;
+    expr_t *out = NULL;
+
+    if (!a || !b ||
+        !expr_collect_single_var(a, &var) ||
+        !var ||
+        !expr_simplify_poly_degree_local(
+            a, var, MAX_EAGER_QUOTIENT_NUMERATOR_DEGREE,
+            &numerator_degree) ||
+        !expr_simplify_denominator_is_quadratic_poly_local(b, var))
+        goto cleanup;
+
+    count = numerator_degree + 1u;
+    if (count < 2u)
+        count = 2u;
+    poly = expr_simplify_number_array_alloc_local(count);
+    if (!poly ||
+        !expr_simplify_collect_poly_local(a, var, poly, count))
+        goto cleanup;
+
+    rewritten_a = expr_simplify_build_flat_poly_local(var, poly, count);
+    if (!rewritten_a || expr_struct_eq(a, rewritten_a))
+        goto cleanup;
+
+    quotient = expr_div(rewritten_a, b);
+    out = expr_simplify_mark_current(quotient);
+    quotient = NULL;
+
+cleanup:
+    expr_free(quotient);
+    expr_free(rewritten_a);
+    expr_simplify_number_array_free_local(poly, count);
+    return out;
+}
+
 expr_t *expr_simplify_div_operator(const expr_t *dv, expr_t *a, expr_t *b)
 {
     NUM_SCOPE(scope);
@@ -3208,6 +3672,15 @@ expr_t *expr_simplify_div_operator(const expr_t *dv, expr_t *a, expr_t *b)
     }
 
     if (expr_is_op(b, &ops_const) && expr_const_is_one(b)) { expr_free(b); return a; }
+    {
+        expr_t *poly_quotient = expr_simplify_try_poly_quotient_numerator_local(a, b);
+
+        if (poly_quotient) {
+            expr_free(a);
+            expr_free(b);
+            return poly_quotient;
+        }
+    }
     {
         expr_t *sqrt_quotient = expr_simplify_try_sqrt_quotient(a, b);
 

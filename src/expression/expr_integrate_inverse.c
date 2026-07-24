@@ -158,19 +158,22 @@ expr_t *integrate_acos_rule(const expr_t *expr, const expr_t *wrt)
 
 expr_t *integrate_atan_rule(const expr_t *expr, const expr_t *wrt)
 {
-    number_t constant = num_new();
-    number_t coeff = num_new();
+    expr_t *constant = NULL;
+    expr_t *coeff = NULL;
     expr_t *u_atan_u;
     expr_t *u_sq;
     expr_t *one_plus_u_sq;
     expr_t *log_term;
     expr_t *half_log_term;
     expr_t *raw;
+    expr_t *out;
 
-    if (!match_affine_unary(expr, wrt, EXPR_PATTERN_UNARY_ATAN,
-                            &constant, &coeff)) {
-        num_destroy(&coeff);
-        num_destroy(&constant);
+    if (!expr_is_op(expr, &ops_atan) || !expr->a ||
+        !match_symbolic_affine_constant_and_coeff(expr->a, wrt,
+                                                  &constant, &coeff) ||
+        expr_const_is_zero(coeff)) {
+        expr_free(coeff);
+        expr_free(constant);
         return NULL;
     }
 
@@ -186,8 +189,11 @@ expr_t *integrate_atan_rule(const expr_t *expr, const expr_t *wrt)
     expr_free(one_plus_u_sq);
     expr_free(u_sq);
     expr_free(u_atan_u);
-    num_destroy(&constant);
-    return div_number_owned_consuming(raw, &coeff);
+    out = raw ? expr_div(raw, coeff) : NULL;
+    expr_free(raw);
+    expr_free(coeff);
+    expr_free(constant);
+    return simplify_owned(out);
 }
 
 expr_t *integrate_asinh_rule(const expr_t *expr, const expr_t *wrt)

@@ -1,5 +1,8 @@
+#include <math.h>
+#include <limits.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 #include "expr_integrate_internal.h"
 #include "internal/number_internal.h"
@@ -121,6 +124,30 @@ static expr_t *integrate_div_rule_by_numerator_distribution(const expr_t *expr,
                                                             const expr_t *wrt);
 static expr_t *integrate_div_quotient_derivative(const expr_t *expr,
                                                  const expr_t *wrt);
+static expr_t *integrate_div_quotient_power_polynomial_derivative(
+    const expr_t *expr,
+    const expr_t *wrt,
+    const expr_t *denominator,
+    unsigned int candidate_power);
+static bool integrate_collect_numeric_poly_local(const expr_t *expr,
+                                                 const expr_t *wrt,
+                                                 size_t max_degree,
+                                                 number_t *out);
+static bool integrate_poly_scale_local(const number_t *src,
+                                       number_t scale,
+                                       number_t *out,
+                                       size_t count);
+static number_t *integrate_number_array_alloc_local(size_t count);
+static void integrate_number_array_free_local(number_t *values, size_t count);
+static number_t *integrate_number_matrix_alloc_local(size_t rows,
+                                                     size_t cols);
+static inline number_t *integrate_matrix_cell_local(number_t *matrix,
+                                                    size_t cols,
+                                                    size_t row,
+                                                    size_t col);
+static expr_t *quotient_power_build_flat_polynomial_expr(const expr_t *var,
+                                                         const number_t *coeffs,
+                                                         size_t count);
 static expr_t *integrate_div_by_exp_denominator(const expr_t *expr,
                                                 const expr_t *wrt);
 static expr_t *integrate_div_sin_integer_multiple_quotient(const expr_t *expr,
@@ -131,6 +158,10 @@ static expr_t *integrate_div_wrt_denominator(const expr_t *expr,
                                              const expr_t *wrt);
 static expr_t *integrate_div_constant_over_power_denominator(const expr_t *expr,
                                                              const expr_t *wrt);
+static expr_t *integrate_div_cubic_over_quadratic_square(const expr_t *expr,
+                                                         const expr_t *wrt);
+static expr_t *integrate_div_poly_over_quadratic_square(const expr_t *expr,
+                                                        const expr_t *wrt);
 static expr_t *integrate_div_inverse_affine_square(const expr_t *expr,
                                                    const expr_t *wrt);
 static expr_t *integrate_div_inverse_affine_square_root(const expr_t *expr,
@@ -154,6 +185,9 @@ static expr_t *integrate_div_rule_list(const expr_integrate_binary_rule_fn *rule
                                        const expr_t *expr,
                                        const expr_t *wrt);
 static bool match_square_of_expr(const expr_t *expr, const expr_t **base_out);
+static bool match_positive_integer_power_of_expr(const expr_t *expr,
+                                                 const expr_t **base_out,
+                                                 unsigned int *exponent_out);
 
 static const expr_integrate_mul_rule_t integrate_mul_always_rules[] = {
     { .kind = EXPR_INTEGRATE_MUL_RULE_DIRECT, .direct = integrate_scaled_rule },
@@ -441,6 +475,8 @@ static const expr_integrate_binary_rule_fn integrate_div_wrt_denominator_rules[]
 };
 
 static const expr_integrate_binary_rule_fn integrate_div_power_denominator_rules[] = {
+    integrate_div_cubic_over_quadratic_square,
+    integrate_div_poly_over_quadratic_square,
     integrate_div_constant_over_power_denominator,
     NULL
 };
@@ -497,11 +533,11 @@ static const expr_integrate_binary_rule_fn integrate_div_rational_rules[] = {
 };
 
 static const expr_integrate_div_rule_stage_t integrate_div_rule_stages[] = {
-    { .rules = integrate_div_initial_rules },
     {
         .rules             = integrate_div_constant_denominator_rules,
         .required_features = EXPR_INTEGRATE_DIV_FEATURE_DEN_INDEPENDENT
     },
+    { .rules = integrate_div_initial_rules },
     {
         .rules             = integrate_div_wrt_denominator_rules,
         .required_features = EXPR_INTEGRATE_DIV_FEATURE_NUM_INDEPENDENT |
@@ -648,6 +684,21 @@ static expr_t *integrate_scaled_rule(const expr_t *expr, const expr_t *wrt)
     if (!inner) {
         num_destroy(&scale);
         return NULL;
+    }
+    if (expr_is_div(inner) && inner->a && inner->b) {
+        expr_t *scale_expr = expr_new_const(scale);
+        expr_t *scaled_numerator = (scale_expr && inner->a)
+                                       ? expr_mul(scale_expr, inner->a)
+                                       : NULL;
+
+        out = (scaled_numerator && inner->b)
+                  ? expr_div(scaled_numerator, inner->b)
+                  : NULL;
+        expr_free(scaled_numerator);
+        expr_free(scale_expr);
+        expr_free(inner);
+        num_destroy(&scale);
+        return out;
     }
     out = mul_number_owned(inner, scale);
     num_destroy(&scale);
@@ -908,6 +959,21 @@ expr_t *integrate_mul_rule(const expr_t *expr, const expr_t *wrt)
     expr_t *inner;
     expr_t *product;
 
+    left_depends = depends_on_wrt(expr->a, wrt);
+    right_depends = depends_on_wrt(expr->b, wrt);
+    if (left_depends != right_depends) {
+        if (!left_depends) {
+            inner = expr_integrate_dispatch(expr->b, wrt);
+            product = inner ? expr_mul(expr->a, inner) : NULL;
+        } else {
+            inner = expr_integrate_dispatch(expr->a, wrt);
+            product = inner ? expr_mul(inner, expr->b) : NULL;
+        }
+        expr_free(inner);
+        if (product)
+            return simplify_owned(product);
+    }
+
     matched = integrate_exact_substitution_product(expr, wrt);
     if (matched)
         return matched;
@@ -921,8 +987,6 @@ expr_t *integrate_mul_rule(const expr_t *expr, const expr_t *wrt)
     if (matched)
         return matched;
 
-    left_depends = depends_on_wrt(expr->a, wrt);
-    right_depends = depends_on_wrt(expr->b, wrt);
     if (left_depends && right_depends)
         return NULL;
 
@@ -1312,6 +1376,291 @@ cleanup:
     return matched;
 }
 
+static bool integrate_poly_expr_equivalent_local(const expr_t *left,
+                                                 const expr_t *right,
+                                                 const expr_t *wrt)
+{
+    enum { MAX_EQUIV_DEGREE = 2 };
+    number_t *left_poly = NULL;
+    number_t *right_poly = NULL;
+    size_t count = MAX_EQUIV_DEGREE + 1u;
+    bool ok = false;
+
+    left_poly = integrate_number_array_alloc_local(count);
+    right_poly = integrate_number_array_alloc_local(count);
+    if (!left_poly || !right_poly)
+        goto cleanup;
+
+    if (integrate_collect_numeric_poly_local(left, wrt, MAX_EQUIV_DEGREE,
+                                             left_poly) &&
+        integrate_collect_numeric_poly_local(right, wrt, MAX_EQUIV_DEGREE,
+                                             right_poly)) {
+        ok = true;
+        for (size_t i = 0u; i < count; ++i)
+            ok = ok && num_eq(left_poly[i], right_poly[i]);
+    }
+
+cleanup:
+    integrate_number_array_free_local(right_poly, count);
+    integrate_number_array_free_local(left_poly, count);
+    return ok;
+}
+
+static bool integrate_product_with_factor_local(const expr_t *expr,
+                                                const expr_t *factor,
+                                                const expr_t *wrt,
+                                                const expr_t **other_out)
+{
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+
+    if (!expr || !factor || !wrt || !other_out ||
+        !expr_match_mul_expr(expr, &left, &right))
+        return false;
+
+    if (expr_struct_eq(left, factor) ||
+        integrate_poly_expr_equivalent_local(left, factor, wrt)) {
+        *other_out = right;
+        return true;
+    }
+    if (expr_struct_eq(right, factor) ||
+        integrate_poly_expr_equivalent_local(right, factor, wrt)) {
+        *other_out = left;
+        return true;
+    }
+    return false;
+}
+
+static bool integrate_extract_common_scaled_sub_terms(const expr_t *expr,
+                                                     const expr_t **positive_out,
+                                                     const expr_t **negative_out,
+                                                     number_t *scale_out)
+{
+    const expr_t *base = expr;
+    const expr_t *positive = NULL;
+    const expr_t *negative = NULL;
+    const expr_t *positive_base = NULL;
+    const expr_t *negative_base = NULL;
+    number_t scale = num_new();
+    number_t positive_scale = num_new();
+    number_t negative_scale = num_new();
+    number_t add_negative_scale = num_new();
+    bool is_sub = false;
+    bool ok = false;
+
+    if (!expr || !positive_out || !negative_out || !scale_out)
+        goto cleanup;
+
+    num_destroy(&scale);
+    scale = num_clone(NUM_ONE);
+    if (expr_match_scaled_expr(expr, &scale, &base) && base && base != expr) {
+        if (!expr_match_add_sub_expr(base, &positive, &negative, &is_sub))
+            goto cleanup;
+        if (!is_sub && negative &&
+            negative->ops && negative->ops->kind == EXPR_KIND_NEG &&
+            negative->a) {
+            negative = negative->a;
+            is_sub = true;
+        }
+        if (!is_sub &&
+            expr_match_scaled_expr(negative, &add_negative_scale,
+                                   &negative_base) &&
+            negative_base && negative_base != negative &&
+            num_eq(add_negative_scale, NUM_NEG_ONE)) {
+            negative = negative_base;
+            is_sub = true;
+        }
+        if (!is_sub)
+            goto cleanup;
+        *positive_out = positive;
+        *negative_out = negative;
+        num_destroy(scale_out);
+        *scale_out = num_clone(scale);
+        ok = true;
+        goto cleanup;
+    }
+
+    if (!expr_match_add_sub_expr(expr, &positive, &negative, &is_sub))
+        goto cleanup;
+    if (!is_sub && negative &&
+        negative->ops && negative->ops->kind == EXPR_KIND_NEG &&
+        negative->a) {
+        negative = negative->a;
+        is_sub = true;
+    }
+    if (!is_sub &&
+        expr_match_scaled_expr(negative, &add_negative_scale,
+                               &negative_base) &&
+        negative_base && negative_base != negative &&
+        num_eq(add_negative_scale, NUM_NEG_ONE)) {
+        negative = negative_base;
+        is_sub = true;
+    }
+    if (!is_sub)
+        goto cleanup;
+
+    if (expr_match_scaled_expr(positive, &positive_scale, &positive_base) &&
+        positive_base && positive_base != positive &&
+        expr_match_scaled_expr(negative, &negative_scale, &negative_base) &&
+        negative_base && negative_base != negative &&
+        num_eq(positive_scale, negative_scale)) {
+        *positive_out = positive_base;
+        *negative_out = negative_base;
+        num_destroy(scale_out);
+        *scale_out = num_clone(positive_scale);
+        ok = true;
+        goto cleanup;
+    }
+
+    *positive_out = positive;
+    *negative_out = negative;
+    num_destroy(scale_out);
+    *scale_out = num_clone(NUM_ONE);
+    ok = true;
+
+cleanup:
+    num_destroy(&negative_scale);
+    num_destroy(&positive_scale);
+    num_destroy(&add_negative_scale);
+    num_destroy(&scale);
+    return ok;
+}
+
+static expr_t *integrate_div_scaled_quadratic_power_derivative_form(
+    const expr_t *expr,
+    const expr_t *wrt,
+    const expr_t *denominator,
+    unsigned int candidate_power)
+{
+    const expr_t *positive = NULL;
+    const expr_t *negative = NULL;
+    const expr_t *a_expr = NULL;
+    const expr_t *b_expr = NULL;
+    expr_t *numerator_view = NULL;
+    expr_t *denominator_deriv = NULL;
+    expr_t *anti_numerator = NULL;
+    expr_t *anti_denominator = NULL;
+    expr_t *out = NULL;
+    number_t scale = num_new();
+    number_t candidate_power_number = num_new();
+    number_t anti_scale = num_new();
+    number_t *a_poly = NULL;
+    number_t *b_poly = NULL;
+    number_t *b_deriv = NULL;
+    number_t *scaled_a = NULL;
+    number_t *anti_poly = NULL;
+    size_t poly_count = (size_t)candidate_power + 1u;
+    size_t a_max_degree = candidate_power > 0u
+                              ? (size_t)candidate_power - 1u
+                              : 0u;
+    size_t b_max_degree = (size_t)candidate_power;
+    number_t power_number = num_new();
+    bool ok = false;
+
+    if (!expr || !expr->a || !wrt || !denominator || candidate_power == 0u)
+        goto cleanup_uninit;
+    if (candidate_power > 64u)
+        goto cleanup_uninit;
+
+    a_poly = integrate_number_array_alloc_local(poly_count);
+    b_poly = integrate_number_array_alloc_local(poly_count);
+    b_deriv = integrate_number_array_alloc_local(poly_count);
+    scaled_a = integrate_number_array_alloc_local(poly_count);
+    anti_poly = integrate_number_array_alloc_local(poly_count);
+    if (!a_poly || !b_poly || !b_deriv || !scaled_a || !anti_poly)
+        goto cleanup;
+
+    denominator_deriv = expr_create_deriv(denominator, wrt);
+    denominator_deriv = simplify_owned(denominator_deriv);
+    if (!denominator_deriv)
+        goto cleanup;
+
+    if (!integrate_extract_common_scaled_sub_terms(expr->a, &positive,
+                                                  &negative, &scale)) {
+        numerator_view = simplify_owned(expr_clone(expr->a));
+        if (!integrate_extract_common_scaled_sub_terms(numerator_view,
+                                                       &positive,
+                                                       &negative, &scale))
+        {
+            goto cleanup;
+        }
+    }
+    if (!integrate_product_with_factor_local(positive, denominator, wrt,
+                                             &a_expr)) {
+        goto cleanup;
+    }
+    if (!integrate_product_with_factor_local(negative, denominator_deriv, wrt,
+                                             &b_expr)) {
+        goto cleanup;
+    }
+    if (!integrate_collect_numeric_poly_local(a_expr, wrt, a_max_degree,
+                                              a_poly)) {
+        goto cleanup;
+    }
+    if (!integrate_collect_numeric_poly_local(b_expr, wrt, b_max_degree,
+                                              b_poly)) {
+        goto cleanup;
+    }
+
+    for (size_t i = 1u; i < poly_count; ++i) {
+        number_t factor = num_create_from_long((long)i);
+
+        num_destroy(&b_deriv[i - 1u]);
+        b_deriv[i - 1u] = num_mul(factor, b_poly[i]);
+        num_destroy(&factor);
+    }
+
+    num_destroy(&candidate_power_number);
+    candidate_power_number = num_create_from_long((long)candidate_power);
+    if (!integrate_poly_scale_local(a_poly, candidate_power_number, scaled_a,
+                                    poly_count))
+        goto cleanup;
+
+    ok = true;
+    for (size_t i = 0u; i < poly_count; ++i)
+        ok = ok && num_eq(b_deriv[i], scaled_a[i]);
+    if (!ok) {
+        goto cleanup;
+    }
+
+    num_destroy(&anti_scale);
+    anti_scale = num_div(scale, candidate_power_number);
+    if (!integrate_poly_scale_local(b_poly, anti_scale, anti_poly,
+                                    poly_count))
+        goto cleanup;
+
+    anti_numerator = quotient_power_build_flat_polynomial_expr(wrt, anti_poly,
+                                                               poly_count);
+    if (candidate_power == 1u) {
+        expr_retain((expr_t *)denominator);
+        anti_denominator = (expr_t *)denominator;
+    } else {
+        num_destroy(&power_number);
+        power_number = num_create_from_long((long)candidate_power);
+        anti_denominator = expr_pow(denominator, &power_number);
+    }
+    out = (anti_numerator && anti_denominator)
+              ? expr_div(anti_numerator, anti_denominator)
+              : NULL;
+
+cleanup:
+    expr_free(anti_denominator);
+    expr_free(anti_numerator);
+    expr_free(denominator_deriv);
+    expr_free(numerator_view);
+    integrate_number_array_free_local(anti_poly, poly_count);
+    integrate_number_array_free_local(scaled_a, poly_count);
+    integrate_number_array_free_local(b_deriv, poly_count);
+    integrate_number_array_free_local(b_poly, poly_count);
+    integrate_number_array_free_local(a_poly, poly_count);
+cleanup_uninit:
+    num_destroy(&power_number);
+    num_destroy(&anti_scale);
+    num_destroy(&candidate_power_number);
+    num_destroy(&scale);
+    return out;
+}
+
 static expr_t *integrate_div_quotient_derivative(const expr_t *expr,
                                                  const expr_t *wrt)
 {
@@ -1319,23 +1668,62 @@ static expr_t *integrate_div_quotient_derivative(const expr_t *expr,
     const expr_t *positive_term = NULL;
     const expr_t *negative_term = NULL;
     const expr_t *negative_base = NULL;
+    const expr_t *scaled_numerator_base = NULL;
     bool is_subtraction = false;
+    bool is_factored_power_derivative = false;
+    unsigned int denominator_power = 0u;
+    unsigned int candidate_power = 0u;
     expr_t *denominator_deriv = NULL;
+    expr_t *scaled_denominator_deriv = NULL;
     expr_t *numerator = NULL;
     expr_t *numerator_deriv = NULL;
     expr_t *expected_positive = NULL;
+    expr_t *scaled_positive_term = NULL;
+    expr_t *candidate_denominator = NULL;
     expr_t *candidate = NULL;
     expr_t *out = NULL;
+    number_t candidate_power_number = num_new();
+    number_t numerator_scale = num_new();
 
     if (!expr || !expr->a || !expr->b ||
-        !match_square_of_expr(expr->b, &denominator) ||
+        !match_positive_integer_power_of_expr(expr->b,
+                                              &denominator,
+                                              &denominator_power) ||
+        denominator_power < 2u ||
         !denominator || !depends_on_wrt(denominator, wrt)) {
         goto cleanup;
     }
+    candidate_power = denominator_power - 1u;
+
+    out = integrate_div_scaled_quadratic_power_derivative_form(
+        expr, wrt, denominator, candidate_power);
+    if (out)
+        goto cleanup;
+
+    out = integrate_div_quotient_power_polynomial_derivative(
+        expr, wrt, denominator, candidate_power);
+    if (out)
+        goto cleanup;
 
     if (!expr_match_add_sub_expr(expr->a, &positive_term, &negative_term,
                                  &is_subtraction)) {
-        goto cleanup;
+        number_t power_scale = num_create_from_long((long)candidate_power);
+
+        if (expr_match_scaled_expr(expr->a, &numerator_scale,
+                                   &scaled_numerator_base) &&
+            scaled_numerator_base &&
+            scaled_numerator_base != expr->a &&
+            num_eq(numerator_scale, power_scale) &&
+            expr_match_add_sub_expr(scaled_numerator_base,
+                                    &positive_term,
+                                    &negative_term,
+                                    &is_subtraction)) {
+            is_factored_power_derivative = true;
+        } else {
+            num_destroy(&power_scale);
+            goto cleanup;
+        }
+        num_destroy(&power_scale);
     }
     if (!is_subtraction) {
         if (negative_term->ops &&
@@ -1352,6 +1740,12 @@ static expr_t *integrate_div_quotient_derivative(const expr_t *expr,
             is_subtraction = true;
         }
     }
+    if (negative_term &&
+        negative_term->ops &&
+        negative_term->ops->kind == EXPR_KIND_NEG &&
+        negative_term->a) {
+        negative_term = negative_term->a;
+    }
     if (!is_subtraction || !positive_term || !negative_term)
         goto cleanup;
 
@@ -1360,7 +1754,23 @@ static expr_t *integrate_div_quotient_derivative(const expr_t *expr,
     if (!denominator_deriv || expr_is_exact_zero(denominator_deriv))
         goto cleanup;
 
-    if (match_square_of_expr(negative_term, &negative_base) &&
+    if (is_factored_power_derivative) {
+        scaled_denominator_deriv = expr_clone(denominator_deriv);
+    } else if (candidate_power > 1u) {
+        number_t scale = num_create_from_long((long)candidate_power);
+
+        scaled_denominator_deriv = mul_number_owned(expr_clone(denominator_deriv),
+                                                    scale);
+        scaled_denominator_deriv = simplify_owned(scaled_denominator_deriv);
+        num_destroy(&scale);
+    } else {
+        scaled_denominator_deriv = expr_clone(denominator_deriv);
+    }
+    if (!scaled_denominator_deriv)
+        goto cleanup;
+
+    if (candidate_power == 1u &&
+        match_square_of_expr(negative_term, &negative_base) &&
         negative_base &&
         integrate_expr_equivalent_by_zero_difference(negative_base,
                                                      denominator_deriv)) {
@@ -1368,8 +1778,26 @@ static expr_t *integrate_div_quotient_derivative(const expr_t *expr,
         numerator = (expr_t *)negative_base;
     } else {
         numerator = expr_simplify_extract_exact_factor_quotient(
-            negative_term, denominator_deriv);
+            negative_term, scaled_denominator_deriv);
         numerator = simplify_owned(numerator);
+        if (!numerator) {
+            expr_t *trial = expr_div(negative_term, scaled_denominator_deriv);
+            expr_t *trial_product = NULL;
+
+            trial = simplify_owned(trial);
+            trial_product = trial
+                                ? expr_mul(trial, scaled_denominator_deriv)
+                                : NULL;
+            trial_product = simplify_owned(trial_product);
+            if (trial && trial_product &&
+                integrate_expr_equivalent_by_zero_difference(trial_product,
+                                                             negative_term)) {
+                numerator = trial;
+                trial = NULL;
+            }
+            expr_free(trial_product);
+            expr_free(trial);
+        }
     }
     if (!numerator)
         goto cleanup;
@@ -1380,13 +1808,30 @@ static expr_t *integrate_div_quotient_derivative(const expr_t *expr,
                             ? expr_mul(numerator_deriv, denominator)
                             : NULL;
     expected_positive = simplify_owned(expected_positive);
+    if (is_factored_power_derivative) {
+        scaled_positive_term = mul_number_owned(expr_clone(positive_term),
+                                                numerator_scale);
+    }
     if (!expected_positive ||
-        !integrate_expr_equivalent_by_zero_difference(positive_term,
+        !integrate_expr_equivalent_by_zero_difference(
+            is_factored_power_derivative ? scaled_positive_term : positive_term,
                                                        expected_positive)) {
         goto cleanup;
     }
 
-    candidate = expr_div(numerator, denominator);
+    if (candidate_power == 1u) {
+        expr_retain((expr_t *)denominator);
+        candidate_denominator = (expr_t *)denominator;
+    } else {
+        num_destroy(&candidate_power_number);
+        candidate_power_number = num_create_from_long((long)candidate_power);
+        candidate_denominator = expr_pow(denominator, &candidate_power_number);
+        candidate_denominator = simplify_owned(candidate_denominator);
+    }
+    if (!candidate_denominator)
+        goto cleanup;
+
+    candidate = expr_div(numerator, candidate_denominator);
     candidate = simplify_owned(candidate);
     if (candidate) {
         out = candidate;
@@ -1394,11 +1839,1098 @@ static expr_t *integrate_div_quotient_derivative(const expr_t *expr,
     }
 
 cleanup:
+    if (!out && denominator && candidate_power > 0u)
+        out = integrate_div_quotient_power_polynomial_derivative(
+            expr, wrt, denominator, candidate_power);
     expr_free(candidate);
+    expr_free(candidate_denominator);
+    expr_free(scaled_positive_term);
     expr_free(expected_positive);
     expr_free(numerator_deriv);
     expr_free(numerator);
+    expr_free(scaled_denominator_deriv);
     expr_free(denominator_deriv);
+    num_destroy(&numerator_scale);
+    num_destroy(&candidate_power_number);
+    return out;
+}
+
+static void quotient_power_add_number(number_t *target, number_t value)
+{
+    number_t next = num_add(*target, value);
+
+    num_destroy(target);
+    *target = next;
+}
+
+static void quotient_power_swap_numbers(number_t *left, number_t *right)
+{
+    number_t tmp = *left;
+
+    *left = *right;
+    *right = tmp;
+}
+
+static number_t *integrate_number_array_alloc_local(size_t count)
+{
+    number_t *values = calloc(count, sizeof(*values));
+
+    if (!values)
+        return NULL;
+    number_array_zero_local(values, count);
+    return values;
+}
+
+static void integrate_number_array_free_local(number_t *values, size_t count)
+{
+    if (!values)
+        return;
+    number_array_clear_local(values, count);
+    free(values);
+}
+
+static number_t *integrate_number_matrix_alloc_local(size_t rows,
+                                                     size_t cols)
+{
+    return integrate_number_array_alloc_local(rows * cols);
+}
+
+static inline number_t *integrate_matrix_cell_local(number_t *matrix,
+                                                    size_t cols,
+                                                    size_t row,
+                                                    size_t col)
+{
+    return &matrix[row * cols + col];
+}
+
+static bool quotient_power_number_is_effectively_zero(number_t value)
+{
+    if (num_is_zero(value))
+        return true;
+    if (!num_is_finite(value))
+        return false;
+    return fabs(num_to_double(value)) <= 1.0e-24;
+}
+
+static bool quotient_power_solve_linear_system(size_t rows,
+                                               size_t cols,
+                                               number_t *matrix,
+                                               number_t *solution)
+{
+    size_t matrix_cols = cols + 1u;
+    size_t *pivot_rows = calloc(cols, sizeof(*pivot_rows));
+    bool *has_pivot = calloc(cols, sizeof(*has_pivot));
+    size_t pivot_row = 0u;
+    bool ok = false;
+
+    if (!matrix || !solution || !pivot_rows || !has_pivot)
+        goto cleanup;
+
+    for (size_t col = 0u; col < cols; ++col) {
+        pivot_rows[col] = 0u;
+        has_pivot[col] = false;
+    }
+
+    for (size_t col = 0u; col < cols && pivot_row < rows; ++col) {
+        size_t selected = rows;
+
+        for (size_t row = pivot_row; row < rows; ++row) {
+            if (!quotient_power_number_is_effectively_zero(
+                    *integrate_matrix_cell_local(matrix, matrix_cols,
+                                                 row, col))) {
+                selected = row;
+                break;
+            }
+        }
+        if (selected == rows)
+            continue;
+
+        if (selected != pivot_row) {
+            for (size_t c = col; c <= cols; ++c)
+                quotient_power_swap_numbers(
+                    integrate_matrix_cell_local(matrix, matrix_cols,
+                                                pivot_row, c),
+                    integrate_matrix_cell_local(matrix, matrix_cols,
+                                                selected, c));
+        }
+
+        {
+            number_t pivot = num_clone(*integrate_matrix_cell_local(
+                matrix, matrix_cols, pivot_row, col));
+
+            for (size_t c = col; c <= cols; ++c) {
+                number_t *cell = integrate_matrix_cell_local(
+                    matrix, matrix_cols, pivot_row, c);
+                number_t normalized = num_div(*cell, pivot);
+
+                num_destroy(cell);
+                *cell = normalized;
+            }
+            num_destroy(&pivot);
+        }
+
+        for (size_t row = 0u; row < rows; ++row) {
+            if (row == pivot_row ||
+                quotient_power_number_is_effectively_zero(
+                    *integrate_matrix_cell_local(matrix, matrix_cols,
+                                                 row, col)))
+                continue;
+
+            {
+                number_t factor = num_clone(*integrate_matrix_cell_local(
+                    matrix, matrix_cols, row, col));
+
+                for (size_t c = col; c <= cols; ++c) {
+                    number_t *cell = integrate_matrix_cell_local(
+                        matrix, matrix_cols, row, c);
+                    number_t scaled = num_mul(
+                        factor,
+                        *integrate_matrix_cell_local(matrix, matrix_cols,
+                                                     pivot_row, c));
+                    number_t reduced = num_sub(*cell, scaled);
+
+                    num_destroy(cell);
+                    *cell = reduced;
+                    num_destroy(&scaled);
+                }
+                num_destroy(&factor);
+            }
+        }
+
+        has_pivot[col] = true;
+        pivot_rows[col] = pivot_row;
+        ++pivot_row;
+    }
+
+    for (size_t row = 0u; row < rows; ++row) {
+        bool all_zero = true;
+
+        for (size_t col = 0u; col < cols; ++col) {
+            if (!quotient_power_number_is_effectively_zero(
+                    *integrate_matrix_cell_local(matrix, matrix_cols,
+                                                 row, col))) {
+                all_zero = false;
+                break;
+            }
+        }
+        if (all_zero &&
+            !quotient_power_number_is_effectively_zero(
+                *integrate_matrix_cell_local(matrix, matrix_cols,
+                                             row, cols)))
+            goto cleanup;
+    }
+
+    for (size_t col = 0u; col < cols; ++col) {
+        num_destroy(&solution[col]);
+        solution[col] = has_pivot[col]
+                            ? num_clone(*integrate_matrix_cell_local(
+                                  matrix, matrix_cols, pivot_rows[col], cols))
+                            : num_clone(NUM_ZERO);
+    }
+    ok = true;
+
+cleanup:
+    free(has_pivot);
+    free(pivot_rows);
+    return ok;
+}
+
+static void quotient_power_normalize_near_integer_solution(number_t *solution,
+                                                           size_t count)
+{
+    for (size_t i = 0u; i < count; ++i) {
+        double value = num_to_double(solution[i]);
+        double rounded = round(value);
+
+        if (!isfinite(value) ||
+            fabs(value - rounded) > 1.0e-9 ||
+            rounded < (double)LONG_MIN ||
+            rounded > (double)LONG_MAX) {
+            continue;
+        }
+
+        {
+            number_t exact = num_create_from_long((long)rounded);
+
+            num_destroy(&solution[i]);
+            solution[i] = exact;
+        }
+    }
+}
+
+static void integrate_normalize_small_rational_local(number_t *value)
+{
+    double value_d;
+
+    if (!value || !num_is_real(*value) || !num_is_finite(*value))
+        return;
+
+    value_d = num_to_double(*value);
+    if (!isfinite(value_d))
+        return;
+
+    for (long denominator = 1L; denominator <= 64L; ++denominator) {
+        long numerator = lround(value_d * (double)denominator);
+        number_t candidate;
+        number_t diff;
+        number_t abs_diff;
+        double error;
+        double scale;
+
+        if (numerator < -1024L || numerator > 1024L)
+            continue;
+
+        candidate = num_create_from_frac(numerator, denominator);
+        diff = num_sub(*value, candidate);
+        abs_diff = num_abs(diff);
+        error = fabs(num_to_double(abs_diff));
+        scale = fmax(1.0, fabs(value_d));
+        num_destroy(&abs_diff);
+        num_destroy(&diff);
+
+        if (error <= scale * 1.0e-30) {
+            num_destroy(value);
+            *value = candidate;
+            return;
+        }
+        num_destroy(&candidate);
+    }
+}
+
+static expr_t *quotient_power_build_flat_polynomial_expr(const expr_t *var,
+                                                         const number_t *coeffs,
+                                                         size_t count)
+{
+    expr_t *sum = NULL;
+
+    if (!var || !coeffs)
+        return NULL;
+
+    for (size_t i = count; i-- > 0u;) {
+        expr_t *base = NULL;
+        expr_t *term = NULL;
+
+        if (num_is_zero(coeffs[i]))
+            continue;
+
+        if (i == 0u) {
+            term = expr_new_const(coeffs[i]);
+        } else {
+            if (i == 1u) {
+                base = expr_retain_expr(var);
+            } else {
+                number_t exponent = num_create_from_long((long)i);
+
+                base = expr_pow(var, &exponent);
+                num_destroy(&exponent);
+            }
+            term = base ? expr_mul_num(base, &coeffs[i]) : NULL;
+            expr_free(base);
+        }
+
+        if (!term) {
+            expr_free(sum);
+            return NULL;
+        }
+        if (sum) {
+            expr_t *next = expr_add(sum, term);
+
+            expr_free(sum);
+            expr_free(term);
+            sum = next;
+        } else {
+            sum = term;
+        }
+    }
+
+    return sum ? sum : expr_new_const(NUM_ZERO);
+}
+
+static size_t quotient_power_polynomial_degree(const number_t *coeffs,
+                                               size_t count)
+{
+    size_t degree = count ? count - 1u : 0u;
+
+    while (degree > 0u && num_is_zero(coeffs[degree]))
+        --degree;
+    return degree;
+}
+
+static void integrate_poly_copy_local(const number_t *src,
+                                      number_t *dst,
+                                      size_t count)
+{
+    for (size_t i = 0u; i < count; ++i) {
+        num_destroy(&dst[i]);
+        dst[i] = num_clone(src[i]);
+    }
+}
+
+static bool integrate_poly_add_sub_local(const number_t *left,
+                                         const number_t *right,
+                                         bool subtract,
+                                         number_t *out,
+                                         size_t count)
+{
+    for (size_t i = 0u; i < count; ++i) {
+        number_t value = subtract ? num_sub(left[i], right[i])
+                                  : num_add(left[i], right[i]);
+
+        num_destroy(&out[i]);
+        out[i] = value;
+    }
+    return true;
+}
+
+static bool integrate_poly_scale_local(const number_t *src,
+                                       number_t scale,
+                                       number_t *out,
+                                       size_t count)
+{
+    if (!num_is_real(scale))
+        return false;
+
+    for (size_t i = 0u; i < count; ++i) {
+        number_t value = num_mul(src[i], scale);
+
+        num_destroy(&out[i]);
+        out[i] = value;
+    }
+    return true;
+}
+
+static bool integrate_poly_mul_local(const number_t *left,
+                                     const number_t *right,
+                                     number_t *out,
+                                     size_t max_degree)
+{
+    size_t count = max_degree + 1u;
+    size_t product_count = max_degree * 2u + 1u;
+    number_t *tmp = NULL;
+    bool ok = true;
+
+    if (max_degree > 64u)
+        return false;
+
+    tmp = integrate_number_array_alloc_local(product_count);
+    if (!tmp)
+        return false;
+    for (size_t i = 0u; i < count; ++i) {
+        for (size_t j = 0u; j < count; ++j) {
+            number_t product = num_mul(left[i], right[j]);
+            number_t next = num_add(tmp[i + j], product);
+
+            num_destroy(&tmp[i + j]);
+            tmp[i + j] = next;
+            num_destroy(&product);
+        }
+    }
+
+    for (size_t i = count; i < product_count; ++i)
+        ok = ok && num_is_zero(tmp[i]);
+    if (ok)
+        integrate_poly_copy_local(tmp, out, count);
+    integrate_number_array_free_local(tmp, product_count);
+    return ok;
+}
+
+static bool integrate_collect_numeric_poly_local(const expr_t *expr,
+                                                const expr_t *wrt,
+                                                size_t max_degree,
+                                                number_t *out)
+{
+    size_t count = max_degree + 1u;
+    expr_t *vars[1];
+    size_t var_index = 0u;
+    number_t value = num_new();
+    number_t scale = num_new();
+    const expr_t *base = NULL;
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+    number_t *left_poly = NULL;
+    number_t *right_poly = NULL;
+    bool is_sub = false;
+    unsigned int exponent = 0u;
+    bool ok = false;
+
+    if (!expr || !wrt || !out || max_degree > 64u)
+        goto cleanup_value;
+
+    vars[0] = (expr_t *)wrt;
+    if (max_degree >= 1u &&
+        expr_match_var_expr(expr, 1u, vars, &var_index) &&
+        var_index == 0u) {
+        number_array_reset_zero_local(out, count);
+        num_destroy(&out[1]);
+        out[1] = num_clone(NUM_ONE);
+        ok = true;
+        goto cleanup_value;
+    }
+
+    if (expr_match_const_value(expr, &value) && num_is_real(value)) {
+        number_array_reset_zero_local(out, count);
+        num_destroy(&out[0]);
+        out[0] = num_clone(value);
+        ok = true;
+        goto cleanup_value;
+    }
+
+    left_poly = integrate_number_array_alloc_local(count);
+    right_poly = integrate_number_array_alloc_local(count);
+    if (!left_poly || !right_poly)
+        goto cleanup_value;
+
+    if (expr_match_unary_op(expr, EXPR_KIND_NEG, &base)) {
+        ok = integrate_collect_numeric_poly_local(base, wrt, max_degree,
+                                                  left_poly) &&
+             integrate_poly_scale_local(left_poly, NUM_NEG_ONE, out, count);
+    } else if (expr_match_scaled_expr(expr, &scale, &base) && base &&
+               base != expr) {
+        ok = integrate_collect_numeric_poly_local(base, wrt, max_degree,
+                                                  left_poly) &&
+             integrate_poly_scale_local(left_poly, scale, out, count);
+    } else if (match_positive_integer_power_of_expr(expr, &base,
+                                                    &exponent) &&
+               exponent <= max_degree) {
+        number_t *product = integrate_number_array_alloc_local(count);
+
+        if (!product)
+            goto cleanup_poly;
+        number_array_reset_zero_local(product, count);
+        num_destroy(&product[0]);
+        product[0] = num_clone(NUM_ONE);
+        ok = integrate_collect_numeric_poly_local(base, wrt, max_degree,
+                                                  left_poly);
+        for (size_t i = 0u; ok && i < exponent; ++i) {
+            ok = integrate_poly_mul_local(product, left_poly, right_poly,
+                                          max_degree);
+            if (ok)
+                integrate_poly_copy_local(right_poly, product, count);
+        }
+        if (ok)
+            integrate_poly_copy_local(product, out, count);
+        integrate_number_array_free_local(product, count);
+    } else if (expr_match_add_sub_expr(expr, &left, &right, &is_sub)) {
+        ok = integrate_collect_numeric_poly_local(left, wrt, max_degree,
+                                                  left_poly) &&
+             integrate_collect_numeric_poly_local(right, wrt, max_degree,
+                                                  right_poly) &&
+             integrate_poly_add_sub_local(left_poly, right_poly, is_sub,
+                                          out, count);
+    } else if (expr_match_mul_expr(expr, &left, &right)) {
+        ok = integrate_collect_numeric_poly_local(left, wrt, max_degree,
+                                                  left_poly) &&
+             integrate_collect_numeric_poly_local(right, wrt, max_degree,
+                                                  right_poly) &&
+             integrate_poly_mul_local(left_poly, right_poly, out, max_degree);
+    }
+
+cleanup_poly:
+    integrate_number_array_free_local(right_poly, count);
+    integrate_number_array_free_local(left_poly, count);
+
+cleanup_value:
+    num_destroy(&scale);
+    num_destroy(&value);
+    return ok;
+}
+
+static expr_t *integrate_div_quotient_power_polynomial_derivative(
+    const expr_t *expr,
+    const expr_t *wrt,
+    const expr_t *denominator,
+    unsigned int candidate_power)
+{
+    enum { MAX_QUOTIENT_POWER_DEGREE = 64 };
+    expr_t *vars[1];
+    number_t *numerator = NULL;
+    number_t *denom = NULL;
+    number_t *solution = NULL;
+    number_t *reconstructed = NULL;
+    number_t *matrix = NULL;
+    size_t coeff_count = MAX_QUOTIENT_POWER_DEGREE + 1u;
+    size_t matrix_cols = 0u;
+    number_t numerator_constant = num_new();
+    number_t numerator_coeff = num_new();
+    number_t denom_constant = num_new();
+    number_t denom_coeff = num_new();
+    size_t numerator_degree = 0u;
+    size_t denom_degree = 0u;
+    size_t anti_degree = 0u;
+    size_t rows = 0u;
+    size_t cols = 0u;
+    expr_t *anti_numerator = NULL;
+    expr_t *anti_denominator = NULL;
+    expr_t *candidate = NULL;
+    expr_t *candidate_deriv = NULL;
+    expr_t *out = NULL;
+    number_t power_number = num_new();
+    bool numerator_ok = false;
+    bool denom_ok = false;
+    bool algebra_ok = false;
+
+    if (!expr || !expr->a || !expr->b || !wrt || !denominator ||
+        candidate_power == 0u)
+        goto cleanup_uninit;
+    if (candidate_power > MAX_QUOTIENT_POWER_DEGREE)
+        goto cleanup_uninit;
+
+    vars[0] = (expr_t *)wrt;
+    numerator = integrate_number_array_alloc_local(coeff_count);
+    denom = integrate_number_array_alloc_local(coeff_count);
+    reconstructed = integrate_number_array_alloc_local(coeff_count);
+    if (!numerator || !denom || !reconstructed)
+        goto cleanup;
+
+    denom_ok = integrate_collect_numeric_poly_local(
+        denominator, wrt, MAX_QUOTIENT_POWER_DEGREE, denom);
+    if (denom_ok) {
+        num_destroy(&denom_constant);
+        denom_constant = num_clone(NUM_ZERO);
+        num_destroy(&denom_coeff);
+        denom_coeff = num_clone(NUM_ONE);
+    } else {
+        denom_ok = expr_match_affine_poly_deg4(denominator, 1u, vars, denom,
+                                               &denom_constant, &denom_coeff);
+    }
+
+    if (!(denom_ok &&
+          num_eq(denom_constant, NUM_ZERO) &&
+          num_eq(denom_coeff, NUM_ONE)))
+        goto cleanup;
+
+    denom_degree = quotient_power_polynomial_degree(denom, coeff_count);
+    if (denom_degree == 0u || denom_degree > 2u)
+        goto cleanup;
+
+    numerator_ok = integrate_collect_numeric_poly_local(
+        expr->a, wrt, MAX_QUOTIENT_POWER_DEGREE, numerator);
+    if (numerator_ok) {
+        num_destroy(&numerator_constant);
+        numerator_constant = num_clone(NUM_ZERO);
+        num_destroy(&numerator_coeff);
+        numerator_coeff = num_clone(NUM_ONE);
+    } else {
+        numerator_ok = expr_match_affine_poly_deg4(expr->a, 1u, vars,
+                                                   numerator,
+                                                   &numerator_constant,
+                                                   &numerator_coeff);
+    }
+
+    if (!(numerator_ok &&
+          num_eq(numerator_constant, NUM_ZERO) &&
+          num_eq(numerator_coeff, NUM_ONE)))
+        goto cleanup;
+
+    numerator_degree = quotient_power_polynomial_degree(numerator,
+                                                        coeff_count);
+
+    anti_degree = (numerator_degree + 1u >= denom_degree)
+                      ? numerator_degree + 1u - denom_degree
+                      : 0u;
+    if (anti_degree > MAX_QUOTIENT_POWER_DEGREE)
+        goto cleanup;
+
+    rows = numerator_degree > anti_degree + denom_degree - 1u
+               ? numerator_degree + 1u
+               : anti_degree + denom_degree;
+    cols = anti_degree + 1u;
+    if (rows > coeff_count || cols > coeff_count)
+        goto cleanup;
+    matrix_cols = cols + 1u;
+    solution = integrate_number_array_alloc_local(cols);
+    matrix = integrate_number_matrix_alloc_local(rows, matrix_cols);
+    if (!solution || !matrix)
+        goto cleanup;
+
+    for (size_t row = 0u; row < rows; ++row) {
+        number_t *rhs = integrate_matrix_cell_local(matrix, matrix_cols,
+                                                    row, cols);
+
+        num_destroy(rhs);
+        *rhs = num_clone(numerator[row]);
+
+        for (size_t ai = 0u; ai < cols; ++ai) {
+            if (ai > 0u && row >= ai - 1u) {
+                size_t q = row - (ai - 1u);
+
+                if (q <= denom_degree && !num_is_zero(denom[q])) {
+                    number_t scale = num_create_from_long((long)ai);
+                    number_t term = num_mul(scale, denom[q]);
+
+                    quotient_power_add_number(
+                        integrate_matrix_cell_local(matrix, matrix_cols,
+                                                    row, ai),
+                        term);
+                    num_destroy(&term);
+                    num_destroy(&scale);
+                }
+            }
+
+            if (row >= ai) {
+                size_t q = row - ai + 1u;
+
+                if (q > 0u && q <= denom_degree && !num_is_zero(denom[q])) {
+                    long signed_scale = -((long)candidate_power * (long)q);
+                    number_t scale = num_create_from_long(signed_scale);
+                    number_t term = num_mul(scale, denom[q]);
+
+                    quotient_power_add_number(
+                        integrate_matrix_cell_local(matrix, matrix_cols,
+                                                    row, ai),
+                        term);
+                    num_destroy(&term);
+                    num_destroy(&scale);
+                }
+            }
+        }
+    }
+
+    if (!quotient_power_solve_linear_system(rows, cols, matrix, solution))
+        goto cleanup;
+    quotient_power_normalize_near_integer_solution(solution, cols);
+
+    for (size_t ai = 0u; ai < cols; ++ai) {
+        for (size_t q = 0u; q <= denom_degree; ++q) {
+            if (ai > 0u && q + ai - 1u < coeff_count &&
+                !num_is_zero(denom[q])) {
+                number_t ai_scale = num_create_from_long((long)ai);
+                number_t scaled = num_mul(ai_scale, solution[ai]);
+                number_t term = num_mul(scaled, denom[q]);
+
+                quotient_power_add_number(&reconstructed[q + ai - 1u],
+                                          term);
+                num_destroy(&term);
+                num_destroy(&scaled);
+                num_destroy(&ai_scale);
+            }
+            if (q > 0u && q + ai - 1u < coeff_count &&
+                !num_is_zero(denom[q])) {
+                long signed_scale = -((long)candidate_power * (long)q);
+                number_t power_scale = num_create_from_long(signed_scale);
+                number_t scaled = num_mul(power_scale, solution[ai]);
+                number_t term = num_mul(scaled, denom[q]);
+
+                quotient_power_add_number(&reconstructed[q + ai - 1u],
+                                          term);
+                num_destroy(&term);
+                num_destroy(&scaled);
+                num_destroy(&power_scale);
+            }
+        }
+    }
+    algebra_ok = true;
+    for (size_t i = 0u; i < coeff_count; ++i)
+        algebra_ok = algebra_ok && num_eq(reconstructed[i], numerator[i]);
+
+    anti_numerator = quotient_power_build_flat_polynomial_expr(wrt, solution,
+                                                               cols);
+    if (candidate_power == 1u) {
+        expr_retain((expr_t *)denominator);
+        anti_denominator = (expr_t *)denominator;
+    } else {
+        num_destroy(&power_number);
+        power_number = num_create_from_long((long)candidate_power);
+        anti_denominator = expr_pow(denominator, &power_number);
+    }
+    candidate = anti_numerator && anti_denominator
+                    ? expr_div(anti_numerator, anti_denominator)
+                    : NULL;
+    if (candidate && algebra_ok) {
+        out = candidate;
+        candidate = NULL;
+        goto cleanup;
+    }
+    candidate = simplify_owned(candidate);
+    candidate_deriv = candidate ? expr_create_deriv(candidate, wrt) : NULL;
+    candidate_deriv = simplify_owned(candidate_deriv);
+    if (candidate && candidate_deriv &&
+        integrate_expr_equivalent_by_zero_difference(candidate_deriv, expr)) {
+        out = candidate;
+        candidate = NULL;
+    }
+
+cleanup:
+    integrate_number_array_free_local(matrix, rows * matrix_cols);
+    integrate_number_array_free_local(reconstructed, coeff_count);
+    integrate_number_array_free_local(solution, cols);
+    integrate_number_array_free_local(denom, coeff_count);
+    integrate_number_array_free_local(numerator, coeff_count);
+cleanup_uninit:
+    expr_free(candidate_deriv);
+    expr_free(candidate);
+    expr_free(anti_denominator);
+    expr_free(anti_numerator);
+    num_destroy(&power_number);
+    num_destroy(&denom_coeff);
+    num_destroy(&denom_constant);
+    num_destroy(&numerator_coeff);
+    num_destroy(&numerator_constant);
+    return out;
+}
+
+static expr_t *integrate_div_cubic_over_quadratic_square(const expr_t *expr,
+                                                         const expr_t *wrt)
+{
+    const expr_t *denominator = NULL;
+    unsigned int denominator_power = 0u;
+    number_t numer[5];
+    number_t denom[5];
+    number_t quotient[2];
+    number_t remainder[2];
+    number_t leading_product = num_new();
+    number_t reduced_quadratic = num_new();
+    number_t linear_product = num_new();
+    number_t constant_product = num_new();
+    number_t reconstructed[4];
+    expr_t *quotient_numerator = NULL;
+    expr_t *remainder_numerator = NULL;
+    expr_t *quotient_fraction = NULL;
+    expr_t *remainder_fraction = NULL;
+    expr_t *quotient_integral = NULL;
+    expr_t *remainder_integral = NULL;
+    expr_t *sum = NULL;
+    expr_t *out = NULL;
+    bool arrays_ready = false;
+
+    if (!expr || !expr->a || !expr->b || !wrt ||
+        !match_positive_integer_power_of_expr(expr->b,
+                                              &denominator,
+                                              &denominator_power) ||
+        denominator_power != 2u ||
+        !denominator)
+        goto cleanup;
+
+    number_array_zero_local(numer, 5u);
+    number_array_zero_local(denom, 5u);
+    number_array_zero_local(quotient, 2u);
+    number_array_zero_local(remainder, 2u);
+    number_array_zero_local(reconstructed, 4u);
+    arrays_ready = true;
+
+    if (!integrate_collect_numeric_poly_local(expr->a, wrt, 4u, numer) ||
+        !integrate_collect_numeric_poly_local(denominator, wrt, 4u, denom) ||
+        !num_is_zero(numer[4]) ||
+        num_is_zero(numer[3]) ||
+        !num_is_zero(denom[3]) ||
+        !num_is_zero(denom[4]) ||
+        num_is_zero(denom[2]))
+        goto cleanup;
+
+    num_destroy(&quotient[1]);
+    quotient[1] = num_div(numer[3], denom[2]);
+    integrate_normalize_small_rational_local(&quotient[1]);
+
+    num_destroy(&leading_product);
+    leading_product = num_mul(quotient[1], denom[1]);
+    num_destroy(&reduced_quadratic);
+    reduced_quadratic = num_sub(numer[2], leading_product);
+    num_destroy(&quotient[0]);
+    quotient[0] = num_div(reduced_quadratic, denom[2]);
+    integrate_normalize_small_rational_local(&quotient[0]);
+
+    num_destroy(&linear_product);
+    linear_product = num_mul(quotient[1], denom[0]);
+    num_destroy(&constant_product);
+    constant_product = num_mul(quotient[0], denom[1]);
+    {
+        number_t removed_linear = num_add(linear_product, constant_product);
+
+            num_destroy(&remainder[1]);
+            remainder[1] = num_sub(numer[1], removed_linear);
+            integrate_normalize_small_rational_local(&remainder[1]);
+            num_destroy(&removed_linear);
+        }
+
+    num_destroy(&constant_product);
+    constant_product = num_mul(quotient[0], denom[0]);
+    num_destroy(&remainder[0]);
+    remainder[0] = num_sub(numer[0], constant_product);
+    integrate_normalize_small_rational_local(&remainder[0]);
+
+    {
+        number_t q0d1 = num_mul(quotient[0], denom[1]);
+        number_t q1d0 = num_mul(quotient[1], denom[0]);
+
+        num_destroy(&reconstructed[0]);
+        reconstructed[0] = num_add(constant_product, remainder[0]);
+        num_destroy(&reconstructed[1]);
+        reconstructed[1] = num_add(q0d1, q1d0);
+        {
+            number_t with_remainder = num_add(reconstructed[1], remainder[1]);
+
+            num_destroy(&reconstructed[1]);
+            reconstructed[1] = with_remainder;
+        }
+        num_destroy(&reconstructed[2]);
+        reconstructed[2] = num_add(leading_product, reduced_quadratic);
+        num_destroy(&reconstructed[3]);
+        reconstructed[3] = num_mul(quotient[1], denom[2]);
+        num_destroy(&q1d0);
+        num_destroy(&q0d1);
+    }
+    for (size_t i = 0u; i < 4u; ++i) {
+        if (!num_eq(reconstructed[i], numer[i]))
+            goto cleanup;
+    }
+
+    quotient_numerator =
+        quotient_power_build_flat_polynomial_expr(wrt, quotient, 2u);
+    remainder_numerator =
+        quotient_power_build_flat_polynomial_expr(wrt, remainder, 2u);
+    quotient_fraction = quotient_numerator
+                            ? expr_div(quotient_numerator, denominator)
+                            : NULL;
+    remainder_fraction = remainder_numerator
+                             ? expr_div(remainder_numerator, expr->b)
+                             : NULL;
+    quotient_integral = quotient_fraction
+                            ? expr_integrate_dispatch(quotient_fraction, wrt)
+                            : NULL;
+    remainder_integral = remainder_fraction
+                             ? expr_integrate_dispatch(remainder_fraction, wrt)
+                             : NULL;
+    if (!quotient_integral || !remainder_integral)
+        goto cleanup;
+
+    sum = expr_add(quotient_integral, remainder_integral);
+    if (sum) {
+        out = sum;
+        sum = NULL;
+    }
+
+cleanup:
+    expr_free(sum);
+    expr_free(remainder_integral);
+    expr_free(quotient_integral);
+    expr_free(remainder_fraction);
+    expr_free(quotient_fraction);
+    expr_free(remainder_numerator);
+    expr_free(quotient_numerator);
+    if (arrays_ready) {
+        number_array_clear_local(reconstructed, 4u);
+        number_array_clear_local(remainder, 2u);
+        number_array_clear_local(quotient, 2u);
+        number_array_clear_local(denom, 5u);
+        number_array_clear_local(numer, 5u);
+    }
+    num_destroy(&constant_product);
+    num_destroy(&linear_product);
+    num_destroy(&reduced_quadratic);
+    num_destroy(&leading_product);
+    return out;
+}
+
+static expr_t *integrate_div_poly_over_quadratic_square(const expr_t *expr,
+                                                        const expr_t *wrt)
+{
+    const expr_t *denominator = NULL;
+    unsigned int denominator_power = 0u;
+    number_t numer[5];
+    number_t denom[5];
+    number_t linear_coeffs[2];
+    number_t four = num_create_from_long(4L);
+    number_t ac = num_new();
+    number_t four_ac = num_new();
+    number_t b_sq = num_new();
+    number_t delta = num_new();
+    number_t ar = num_new();
+    number_t two_ar = num_new();
+    number_t bq = num_new();
+    number_t cp = num_new();
+    number_t two_cp = num_new();
+    number_t k_num_left = num_new();
+    number_t k_num = num_new();
+    number_t k = num_new();
+    number_t p_over_a = num_new();
+    number_t m = num_new();
+    number_t bk = num_new();
+    number_t bk_minus_q = num_new();
+    number_t two_a = num_new();
+    number_t n = num_new();
+    number_t reconstructed[3];
+    expr_t *linear_numerator = NULL;
+    expr_t *derivative_part = NULL;
+    expr_t *k_expr = NULL;
+    expr_t *k_over_denominator = NULL;
+    expr_t *quadratic_part = NULL;
+    expr_t *sum = NULL;
+    expr_t *out = NULL;
+    bool numer_ok = false;
+    bool denom_ok = false;
+    bool reconstructed_ready = false;
+
+    if (!expr || !expr->a || !expr->b || !wrt ||
+        !match_positive_integer_power_of_expr(expr->b,
+                                              &denominator,
+                                              &denominator_power) ||
+        denominator_power != 2u ||
+        !denominator) {
+        goto cleanup_uninit;
+    }
+
+    number_array_zero_local(numer, 5u);
+    number_array_zero_local(denom, 5u);
+    number_array_zero_local(linear_coeffs, 2u);
+    number_array_zero_local(reconstructed, 3u);
+    reconstructed_ready = true;
+
+    numer_ok = integrate_collect_numeric_poly_local(expr->a, wrt, 4u, numer);
+    denom_ok =
+        integrate_collect_numeric_poly_local(denominator, wrt, 4u, denom);
+
+    if (!numer_ok ||
+        !denom_ok ||
+        !num_is_zero(numer[3]) ||
+        !num_is_zero(numer[4]) ||
+        !num_is_zero(denom[3]) ||
+        !num_is_zero(denom[4]) ||
+        num_is_zero(denom[2])) {
+        goto cleanup;
+    }
+
+    num_destroy(&ac);
+    ac = num_mul(denom[2], denom[0]);
+    num_destroy(&four_ac);
+    four_ac = num_mul(four, ac);
+    num_destroy(&b_sq);
+    b_sq = num_mul(denom[1], denom[1]);
+    num_destroy(&delta);
+    delta = num_sub(four_ac, b_sq);
+    if (num_is_zero(delta))
+        goto cleanup;
+
+    num_destroy(&ar);
+    ar = num_mul(denom[2], numer[0]);
+    num_destroy(&two_ar);
+    two_ar = num_mul(NUM_TWO, ar);
+    num_destroy(&bq);
+    bq = num_mul(denom[1], numer[1]);
+    num_destroy(&cp);
+    cp = num_mul(denom[0], numer[2]);
+    num_destroy(&two_cp);
+    two_cp = num_mul(NUM_TWO, cp);
+    num_destroy(&k_num_left);
+    k_num_left = num_sub(two_ar, bq);
+    num_destroy(&k_num);
+    k_num = num_add(k_num_left, two_cp);
+    num_destroy(&k);
+    k = num_div(k_num, delta);
+    integrate_normalize_small_rational_local(&k);
+
+    num_destroy(&p_over_a);
+    p_over_a = num_div(numer[2], denom[2]);
+    integrate_normalize_small_rational_local(&p_over_a);
+    num_destroy(&m);
+    m = num_sub(k, p_over_a);
+    integrate_normalize_small_rational_local(&m);
+
+    num_destroy(&bk);
+    bk = num_mul(denom[1], k);
+    num_destroy(&bk_minus_q);
+    bk_minus_q = num_sub(bk, numer[1]);
+    num_destroy(&two_a);
+    two_a = num_mul(NUM_TWO, denom[2]);
+    num_destroy(&n);
+    n = num_div(bk_minus_q, two_a);
+    integrate_normalize_small_rational_local(&n);
+
+    {
+        number_t k_minus_m = num_sub(k, m);
+        number_t bk_check = num_mul(denom[1], k);
+        number_t two_an = num_mul(two_a, n);
+        number_t m_plus_k = num_add(m, k);
+        number_t c_m_plus_k = num_mul(denom[0], m_plus_k);
+        number_t bn = num_mul(denom[1], n);
+
+        num_destroy(&reconstructed[2]);
+        reconstructed[2] = num_mul(denom[2], k_minus_m);
+        num_destroy(&reconstructed[1]);
+        reconstructed[1] = num_sub(bk_check, two_an);
+        num_destroy(&reconstructed[0]);
+        reconstructed[0] = num_sub(c_m_plus_k, bn);
+
+        num_destroy(&bn);
+        num_destroy(&c_m_plus_k);
+        num_destroy(&m_plus_k);
+        num_destroy(&two_an);
+        num_destroy(&bk_check);
+        num_destroy(&k_minus_m);
+    }
+    for (size_t i = 0u; i < 3u; ++i) {
+        if (!num_eq(reconstructed[i], numer[i]))
+            goto cleanup;
+    }
+
+    num_destroy(&linear_coeffs[0]);
+    linear_coeffs[0] = num_clone(n);
+    num_destroy(&linear_coeffs[1]);
+    linear_coeffs[1] = num_clone(m);
+
+    linear_numerator =
+        quotient_power_build_flat_polynomial_expr(wrt, linear_coeffs, 2u);
+    derivative_part = linear_numerator
+                          ? expr_div(linear_numerator, denominator)
+                          : NULL;
+
+    if (!num_is_zero(k)) {
+        k_expr = expr_new_const(k);
+        k_over_denominator = k_expr ? expr_div(k_expr, denominator) : NULL;
+        k_over_denominator = simplify_owned(k_over_denominator);
+        quadratic_part = k_over_denominator
+                             ? expr_integrate_dispatch(k_over_denominator, wrt)
+                             : NULL;
+        quadratic_part = simplify_owned(quadratic_part);
+        if (!quadratic_part)
+            goto cleanup;
+    }
+
+    if (derivative_part && quadratic_part) {
+        sum = expr_add(derivative_part, quadratic_part);
+    } else if (derivative_part) {
+        sum = derivative_part;
+        derivative_part = NULL;
+    } else if (quadratic_part) {
+        sum = quadratic_part;
+        quadratic_part = NULL;
+    }
+    if (sum) {
+        out = sum;
+        sum = NULL;
+    }
+
+cleanup:
+    expr_free(sum);
+    expr_free(quadratic_part);
+    expr_free(k_over_denominator);
+    expr_free(k_expr);
+    expr_free(derivative_part);
+    expr_free(linear_numerator);
+    number_array_clear_local(linear_coeffs, 2u);
+    number_array_clear_local(denom, 5u);
+    number_array_clear_local(numer, 5u);
+cleanup_uninit:
+    if (reconstructed_ready)
+        number_array_clear_local(reconstructed, 3u);
+    num_destroy(&n);
+    num_destroy(&two_a);
+    num_destroy(&bk_minus_q);
+    num_destroy(&bk);
+    num_destroy(&m);
+    num_destroy(&p_over_a);
+    num_destroy(&k);
+    num_destroy(&k_num);
+    num_destroy(&k_num_left);
+    num_destroy(&two_cp);
+    num_destroy(&cp);
+    num_destroy(&bq);
+    num_destroy(&two_ar);
+    num_destroy(&ar);
+    num_destroy(&delta);
+    num_destroy(&b_sq);
+    num_destroy(&four_ac);
+    num_destroy(&ac);
+    num_destroy(&four);
     return out;
 }
 
@@ -1792,23 +3324,45 @@ expr_t *integrate_div_rule(const expr_t *expr, const expr_t *wrt)
 
 static bool match_square_of_expr(const expr_t *expr, const expr_t **base_out)
 {
+    unsigned int exponent = 0u;
+
+    return match_positive_integer_power_of_expr(expr, base_out, &exponent) &&
+           exponent == 2u;
+}
+
+static bool match_positive_integer_power_of_expr(const expr_t *expr,
+                                                 const expr_t **base_out,
+                                                 unsigned int *exponent_out)
+{
     number_t exponent = num_new();
+    long numerator = 0;
+    long denominator = 0;
     bool ok = false;
 
-    if (!expr || !base_out) {
+    if (!expr || !base_out || !exponent_out) {
         num_destroy(&exponent);
         return false;
     }
 
     if (expr->ops && expr->ops->kind == EXPR_KIND_POW_D && expr->a &&
-        num_eq(expr->c, NUM_TWO)) {
+        num_is_real(expr->c) &&
+        num_is_integer(expr->c) &&
+        num_get_small_rational(expr->c, &numerator, &denominator) &&
+        denominator == 1 &&
+        numerator > 0) {
         *base_out = expr->a;
+        *exponent_out = (unsigned int)numerator;
         ok = true;
     } else if (expr->ops && expr->ops->kind == EXPR_KIND_POW &&
                expr->a && expr->b &&
                expr_match_const_value(expr->b, &exponent) &&
-               num_eq(exponent, NUM_TWO)) {
+               num_is_real(exponent) &&
+               num_is_integer(exponent) &&
+               num_get_small_rational(exponent, &numerator, &denominator) &&
+               denominator == 1 &&
+               numerator > 0) {
         *base_out = expr->a;
+        *exponent_out = (unsigned int)numerator;
         ok = true;
     }
 

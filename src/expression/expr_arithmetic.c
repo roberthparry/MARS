@@ -1,8 +1,12 @@
+#include <limits.h>
+#include <stdint.h>
 #include <stddef.h>
+#include <stdlib.h>
 #include <string.h>
 #include "integrator.h"
 #include "expr_bindings.h"
 #include "expr_internal.h"
+#include "internal/number_internal.h"
 
 /* ------------------------------------------------------------------------- */
 /* EVALUATION FUNCTIONS                                                      */
@@ -383,6 +387,580 @@ static expr_t *deriv_mul(expr_t *dv)
     expr_free(t1);
     expr_free(t2);
     return out;
+}
+
+static void deriv_zero_number_array_local(number_t *values, size_t n)
+{
+    for (size_t i = 0u; i < n; ++i)
+        values[i] = num_new();
+}
+
+static void deriv_reset_number_array_local(number_t *values, size_t n)
+{
+    for (size_t i = 0u; i < n; ++i) {
+        num_destroy(&values[i]);
+        values[i] = num_new();
+    }
+}
+
+static void deriv_clear_number_array_local(number_t *values, size_t n)
+{
+    for (size_t i = 0u; i < n; ++i)
+        num_destroy(&values[i]);
+}
+
+static number_t *deriv_alloc_number_array_local(size_t n)
+{
+    number_t *values;
+
+    if (n == 0u || n > SIZE_MAX / sizeof(*values))
+        return NULL;
+    values = calloc(n, sizeof(*values));
+    if (values)
+        deriv_zero_number_array_local(values, n);
+    return values;
+}
+
+static void deriv_free_number_array_local(number_t *values, size_t n)
+{
+    if (!values)
+        return;
+    deriv_clear_number_array_local(values, n);
+    free(values);
+}
+
+static void deriv_copy_number_array_local(number_t *dst,
+                                          const number_t *src,
+                                          size_t n)
+{
+    for (size_t i = 0u; i < n; ++i) {
+        num_destroy(&dst[i]);
+        dst[i] = num_clone(src[i]);
+    }
+}
+
+static bool deriv_poly_mul_local(const number_t *left,
+                                 const number_t *right,
+                                 number_t *out,
+                                 size_t n)
+{
+    size_t product_count = 2u * n - 1u;
+    number_t *product = NULL;
+    bool fits = true;
+
+    if (n == 0u || n > SIZE_MAX / 2u + 1u)
+        return false;
+
+    product = deriv_alloc_number_array_local(product_count);
+    if (!product)
+        return false;
+    for (size_t i = 0u; i < n; ++i) {
+        for (size_t j = 0u; j < n; ++j) {
+            number_t term = num_mul(left[i], right[j]);
+            number_t sum = num_add(product[i + j], term);
+
+            num_destroy(&product[i + j]);
+            product[i + j] = sum;
+            num_destroy(&term);
+        }
+    }
+
+    for (size_t i = n; i < product_count; ++i) {
+        if (!num_is_zero(product[i])) {
+            fits = false;
+            break;
+        }
+    }
+    if (fits)
+        deriv_copy_number_array_local(out, product, n);
+    deriv_free_number_array_local(product, product_count);
+    return fits;
+}
+
+static bool deriv_poly_scale_local(const number_t *src,
+                                   number_t scale,
+                                   number_t *out,
+                                   size_t n)
+{
+    if (!num_is_real(scale))
+        return false;
+
+    for (size_t i = 0u; i < n; ++i) {
+        number_t value = num_mul(src[i], scale);
+
+        num_destroy(&out[i]);
+        out[i] = value;
+    }
+    return true;
+}
+
+static long deriv_poly_exponent_local(number_t value, size_t n)
+{
+    if (!num_is_real(value) || !num_is_integer(value))
+        return -1L;
+
+    for (long exponent = 0L; exponent < (long)n; ++exponent) {
+        number_t candidate = num_create_from_long(exponent);
+        bool equal = num_eq(value, candidate);
+
+        num_destroy(&candidate);
+        if (equal)
+            return exponent;
+    }
+    return -1L;
+}
+
+static bool deriv_poly_expr_degree_local(const expr_t *expr,
+                                         const expr_t *wrt,
+                                         size_t *degree_out)
+{
+    expr_t *vars[1];
+    size_t var_index = 0u;
+    number_t value = num_new();
+    number_t scale = num_new();
+    const expr_t *base = NULL;
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+    size_t left_degree = 0u;
+    size_t right_degree = 0u;
+    long numerator = 0L;
+    long denominator = 0L;
+    bool is_sub = false;
+    bool ok = false;
+
+    if (!expr || !wrt || !degree_out)
+        goto cleanup;
+
+    vars[0] = (expr_t *)wrt;
+    if (expr_match_var_expr(expr, 1u, vars, &var_index) && var_index == 0u) {
+        *degree_out = 1u;
+        ok = true;
+    } else if (expr_match_const_value(expr, &value) && num_is_real(value)) {
+        *degree_out = 0u;
+        ok = true;
+    } else if (expr_match_unary_op(expr, EXPR_KIND_NEG, &base)) {
+        ok = deriv_poly_expr_degree_local(base, wrt, degree_out);
+    } else if (expr_match_scaled_expr(expr, &scale, &base) && base &&
+               base != expr) {
+        ok = num_is_real(scale) &&
+             deriv_poly_expr_degree_local(base, wrt, degree_out);
+    } else if (expr_match_add_sub_expr(expr, &left, &right, &is_sub)) {
+        (void)is_sub;
+        ok = deriv_poly_expr_degree_local(left, wrt, &left_degree) &&
+             deriv_poly_expr_degree_local(right, wrt, &right_degree);
+        if (ok)
+            *degree_out = left_degree > right_degree
+                              ? left_degree
+                              : right_degree;
+    } else if (expr_match_mul_expr(expr, &left, &right)) {
+        ok = deriv_poly_expr_degree_local(left, wrt, &left_degree) &&
+             deriv_poly_expr_degree_local(right, wrt, &right_degree) &&
+             left_degree <= SIZE_MAX - right_degree;
+        if (ok)
+            *degree_out = left_degree + right_degree;
+    } else if (expr_match_pow_const(expr, &base, &value) &&
+               num_get_small_rational(value, &numerator, &denominator) &&
+               denominator == 1L && numerator >= 0L) {
+        ok = deriv_poly_expr_degree_local(base, wrt, &left_degree) &&
+             (numerator == 0L ||
+              left_degree <= SIZE_MAX / (size_t)numerator);
+        if (ok)
+            *degree_out = left_degree * (size_t)numerator;
+    }
+
+cleanup:
+    num_destroy(&scale);
+    num_destroy(&value);
+    return ok;
+}
+
+static bool deriv_collect_poly_local(const expr_t *expr,
+                                     const expr_t *wrt,
+                                     number_t *out,
+                                     size_t n)
+{
+    expr_t *vars[1];
+    size_t var_index = 0u;
+    number_t value = num_new();
+    number_t scale = num_new();
+    const expr_t *base = NULL;
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+    number_t *left_poly = NULL;
+    number_t *right_poly = NULL;
+    bool is_sub = false;
+    bool ok = false;
+
+    if (!expr || !wrt || !out || n < 2u)
+        goto cleanup_value;
+
+    vars[0] = (expr_t *)wrt;
+    if (expr_match_var_expr(expr, 1u, vars, &var_index) && var_index == 0u) {
+        deriv_reset_number_array_local(out, n);
+        num_destroy(&out[1]);
+        out[1] = num_clone(NUM_ONE);
+        ok = true;
+        goto cleanup_value;
+    }
+
+    if (expr_match_const_value(expr, &value) && num_is_real(value)) {
+        deriv_reset_number_array_local(out, n);
+        num_destroy(&out[0]);
+        out[0] = num_clone(value);
+        ok = true;
+        goto cleanup_value;
+    }
+
+    left_poly = deriv_alloc_number_array_local(n);
+    right_poly = deriv_alloc_number_array_local(n);
+    if (!left_poly || !right_poly)
+        goto cleanup_arrays;
+
+    if (expr_match_unary_op(expr, EXPR_KIND_NEG, &base)) {
+        ok = deriv_collect_poly_local(base, wrt, out, n) &&
+             deriv_poly_scale_local(out, NUM_NEG_ONE, out, n);
+    } else if (expr_match_scaled_expr(expr, &scale, &base) && base &&
+               base != expr) {
+        ok = deriv_collect_poly_local(base, wrt, left_poly, n) &&
+             deriv_poly_scale_local(left_poly, scale, out, n);
+    } else if (expr_match_add_sub_expr(expr, &left, &right, &is_sub)) {
+        ok = deriv_collect_poly_local(left, wrt, left_poly, n) &&
+             deriv_collect_poly_local(right, wrt, right_poly, n);
+        if (ok) {
+            for (size_t i = 0u; i < n; ++i) {
+                number_t sum = is_sub ? num_sub(left_poly[i], right_poly[i])
+                                      : num_add(left_poly[i], right_poly[i]);
+
+                num_destroy(&out[i]);
+                out[i] = sum;
+            }
+        }
+    } else if (expr_match_mul_expr(expr, &left, &right)) {
+        ok = deriv_collect_poly_local(left, wrt, left_poly, n) &&
+             deriv_collect_poly_local(right, wrt, right_poly, n) &&
+             deriv_poly_mul_local(left_poly, right_poly, out, n);
+    } else if (expr_match_pow_const(expr, &base, &value)) {
+        long exponent = deriv_poly_exponent_local(value, n);
+        number_t *result = deriv_alloc_number_array_local(n);
+
+        ok = result && exponent >= 0L &&
+             deriv_collect_poly_local(base, wrt, left_poly, n);
+        if (result) {
+            num_destroy(&result[0]);
+            result[0] = num_clone(NUM_ONE);
+        }
+        for (long i = 0L; ok && i < exponent; ++i) {
+            ok = deriv_poly_mul_local(result, left_poly, right_poly, n);
+            if (ok)
+                deriv_copy_number_array_local(result, right_poly, n);
+        }
+        if (ok)
+            deriv_copy_number_array_local(out, result, n);
+        deriv_free_number_array_local(result, n);
+    }
+
+cleanup_arrays:
+    deriv_free_number_array_local(right_poly, n);
+    deriv_free_number_array_local(left_poly, n);
+
+cleanup_value:
+    num_destroy(&scale);
+    num_destroy(&value);
+    return ok;
+}
+
+static size_t deriv_poly_degree_local(const number_t *coeffs, size_t n)
+{
+    size_t degree = n ? n - 1u : 0u;
+
+    while (degree > 0u && num_is_zero(coeffs[degree]))
+        --degree;
+    return degree;
+}
+
+static long deriv_long_gcd_local(long a, long b)
+{
+    a = labs(a);
+    b = labs(b);
+    while (b != 0L) {
+        long r = a % b;
+
+        a = b;
+        b = r;
+    }
+    return a;
+}
+
+static long deriv_poly_integer_content_local(const number_t *coeffs, size_t n)
+{
+    long content = 0L;
+
+    for (size_t i = 0u; i < n; ++i) {
+        long numerator = 0L;
+        long denominator = 0L;
+
+        if (num_is_zero(coeffs[i]))
+            continue;
+        if (!num_get_small_rational(coeffs[i], &numerator, &denominator) ||
+            denominator != 1L) {
+            return 0L;
+        }
+        content = content == 0L
+                      ? labs(numerator)
+                      : deriv_long_gcd_local(content, numerator);
+    }
+    return content > 1L ? content : 0L;
+}
+
+static bool deriv_poly_divide_integer_local(const number_t *src,
+                                            long divisor,
+                                            number_t *out,
+                                            size_t n)
+{
+    number_t d = num_create_from_long(divisor);
+
+    if (divisor == 0L) {
+        num_destroy(&d);
+        return false;
+    }
+
+    for (size_t i = 0u; i < n; ++i) {
+        number_t value = num_div(src[i], d);
+
+        num_destroy(&out[i]);
+        out[i] = value;
+    }
+    num_destroy(&d);
+    return true;
+}
+
+static expr_t *deriv_build_poly_local(const expr_t *var,
+                                      const number_t *coeffs,
+                                      size_t n)
+{
+    expr_t *sum = NULL;
+
+    for (size_t i = n; i-- > 0u;) {
+        expr_t *base = NULL;
+        expr_t *term = NULL;
+
+        if (num_is_zero(coeffs[i]))
+            continue;
+
+        if (i == 0u) {
+            term = expr_new_const(coeffs[i]);
+        } else {
+            if (i == 1u) {
+                base = expr_retain_expr(var);
+            } else {
+                number_t exponent = num_create_from_long((long)i);
+
+                base = expr_pow(var, &exponent);
+                num_destroy(&exponent);
+            }
+            term = base ? expr_mul_num(base, &coeffs[i]) : NULL;
+            expr_free(base);
+        }
+
+        if (!term) {
+            expr_free(sum);
+            return NULL;
+        }
+        if (sum) {
+            expr_t *next = expr_add(sum, term);
+
+            expr_free(sum);
+            expr_free(term);
+            sum = next;
+        } else {
+            sum = term;
+        }
+    }
+
+    return sum ? sum : expr_new_const(NUM_ZERO);
+}
+
+static uint64_t deriv_subtree_epoch_local(const expr_t *expr)
+{
+    uint64_t epoch;
+    uint64_t child_epoch;
+
+    if (!expr)
+        return 0u;
+
+    epoch = expr->epoch;
+    child_epoch = deriv_subtree_epoch_local(expr->a);
+    if (child_epoch > epoch)
+        epoch = child_epoch;
+    child_epoch = deriv_subtree_epoch_local(expr->b);
+    if (child_epoch > epoch)
+        epoch = child_epoch;
+    return epoch;
+}
+
+static expr_t *deriv_mark_simplified_local(expr_t *expr)
+{
+    if (expr) {
+        expr->simplified = true;
+        expr->simplify_epoch = deriv_subtree_epoch_local(expr);
+    }
+    return expr;
+}
+
+static bool deriv_match_positive_power_local(const expr_t *expr,
+                                             const expr_t **base_out,
+                                             unsigned int *exponent_out)
+{
+    const expr_t *base = NULL;
+    number_t exponent = num_new();
+    long numerator = 0L;
+    long denominator = 0L;
+    bool ok = false;
+
+    if (!expr || !base_out || !exponent_out)
+        goto cleanup;
+
+    if (!expr_match_pow_const(expr, &base, &exponent) ||
+        !num_get_small_rational(exponent, &numerator, &denominator) ||
+        denominator != 1L ||
+        numerator <= 0L) {
+        goto cleanup;
+    }
+
+    *base_out = base;
+    *exponent_out = (unsigned int)numerator;
+    ok = true;
+
+cleanup:
+    num_destroy(&exponent);
+    return ok;
+}
+
+expr_t *expr_deriv_rational_over_quadratic_power(const expr_t *expr,
+                                                 const expr_t *wrt)
+{
+    const expr_t *denom_base = NULL;
+    unsigned int denom_power = 0u;
+    number_t *p = NULL;
+    number_t *q = NULL;
+    number_t *dp = NULL;
+    number_t *dq = NULL;
+    number_t *left = NULL;
+    number_t *right = NULL;
+    number_t *numer = NULL;
+    number_t scale = num_new();
+    number_t exponent = num_new();
+    expr_t *numer_expr = NULL;
+    expr_t *scaled_numer_expr = NULL;
+    expr_t *denom_expr = NULL;
+    expr_t *out = NULL;
+    size_t numerator_degree = 0u;
+    size_t coefficient_count = 0u;
+    long content = 0L;
+
+    if (!expr || !expr->a || !expr->b || !wrt ||
+        !deriv_match_positive_power_local(expr->b, &denom_base, &denom_power) ||
+        denom_power == 0u || !denom_base ||
+        !deriv_poly_expr_degree_local(expr->a, wrt, &numerator_degree) ||
+        numerator_degree > SIZE_MAX - 2u)
+        goto cleanup;
+
+    coefficient_count = numerator_degree + 2u;
+    if (coefficient_count < 3u)
+        coefficient_count = 3u;
+
+    p = deriv_alloc_number_array_local(coefficient_count);
+    q = deriv_alloc_number_array_local(coefficient_count);
+    dp = deriv_alloc_number_array_local(coefficient_count);
+    dq = deriv_alloc_number_array_local(coefficient_count);
+    left = deriv_alloc_number_array_local(coefficient_count);
+    right = deriv_alloc_number_array_local(coefficient_count);
+    numer = deriv_alloc_number_array_local(coefficient_count);
+    if (!p || !q || !dp || !dq || !left || !right || !numer ||
+        !deriv_collect_poly_local(expr->a, wrt, p, coefficient_count) ||
+        !deriv_collect_poly_local(denom_base, wrt, q, coefficient_count) ||
+        deriv_poly_degree_local(q, coefficient_count) != 2u)
+        goto cleanup;
+
+    for (size_t i = 1u; i < coefficient_count; ++i) {
+        if (i > (size_t)LONG_MAX)
+            goto cleanup;
+        number_t factor = num_create_from_long((long)i);
+
+        num_destroy(&dp[i - 1u]);
+        dp[i - 1u] = num_mul(factor, p[i]);
+        num_destroy(&dq[i - 1u]);
+        dq[i - 1u] = num_mul(factor, q[i]);
+        num_destroy(&factor);
+    }
+
+    if (!deriv_poly_mul_local(dp, q, left, coefficient_count) ||
+        !deriv_poly_mul_local(p, dq, right, coefficient_count))
+        goto cleanup;
+
+    num_destroy(&scale);
+    scale = num_create_from_long((long)denom_power);
+    if (!deriv_poly_scale_local(right, scale, right, coefficient_count))
+        goto cleanup;
+
+    for (size_t i = 0u; i < coefficient_count; ++i) {
+        number_t value = num_sub(left[i], right[i]);
+
+        num_destroy(&numer[i]);
+        numer[i] = value;
+    }
+
+    content = deriv_poly_integer_content_local(numer, coefficient_count);
+    if (content != 0L) {
+        number_t *reduced = deriv_alloc_number_array_local(coefficient_count);
+        number_t content_num = num_create_from_long(content);
+        expr_t *content_expr = NULL;
+
+        if (reduced &&
+            deriv_poly_divide_integer_local(numer, content, reduced,
+                                             coefficient_count)) {
+            numer_expr = deriv_build_poly_local(wrt, reduced,
+                                                coefficient_count);
+            content_expr = expr_new_const(content_num);
+            scaled_numer_expr = (content_expr && numer_expr)
+                                    ? expr_mul(content_expr, numer_expr)
+                                    : NULL;
+        }
+        expr_free(content_expr);
+        deriv_free_number_array_local(reduced, coefficient_count);
+        num_destroy(&content_num);
+    } else {
+        numer_expr = deriv_build_poly_local(wrt, numer, coefficient_count);
+    }
+    num_destroy(&exponent);
+    exponent = num_create_from_long((long)denom_power + 1L);
+    denom_expr = expr_pow(denom_base, &exponent);
+    out = ((scaled_numer_expr ? scaled_numer_expr : numer_expr) && denom_expr)
+              ? expr_div(scaled_numer_expr ? scaled_numer_expr : numer_expr,
+                         denom_expr)
+              : NULL;
+    deriv_mark_simplified_local(out);
+
+cleanup:
+    expr_free(denom_expr);
+    expr_free(scaled_numer_expr);
+    expr_free(numer_expr);
+    deriv_free_number_array_local(numer, coefficient_count);
+    deriv_free_number_array_local(right, coefficient_count);
+    deriv_free_number_array_local(left, coefficient_count);
+    deriv_free_number_array_local(dq, coefficient_count);
+    deriv_free_number_array_local(dp, coefficient_count);
+    deriv_free_number_array_local(q, coefficient_count);
+    deriv_free_number_array_local(p, coefficient_count);
+    num_destroy(&exponent);
+    num_destroy(&scale);
+    return out;
+}
+
+static expr_t *deriv_rational_over_quadratic_power(expr_t *dv)
+{
+    return expr_deriv_rational_over_quadratic_power(dv,
+                                                    expr_current_wrt_internal());
 }
 
 static int expr_has_composite_preserved_binding_expr_node(const expr_t *dv)
@@ -1346,6 +1924,9 @@ static expr_t *deriv_div(expr_t *dv)
     if (special)
         return special;
     special = deriv_atan_over_scaled_sqrt(dv);
+    if (special)
+        return special;
+    special = deriv_rational_over_quadratic_power(dv);
     if (special)
         return special;
 

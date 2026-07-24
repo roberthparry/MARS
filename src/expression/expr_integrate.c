@@ -4,6 +4,7 @@
 
 #include "expr_internal.h"
 #include "expr_integrate_internal.h"
+#include "internal/number_internal.h"
 
 typedef expr_t *(*expr_integrate_rule_fn)(const expr_t *expr, const expr_t *wrt);
 
@@ -90,6 +91,183 @@ static int expr_is_bound_in_var_list_local(const expr_t *expr,
     return 0;
 }
 
+static bool expr_integrate_positive_small_integer_local(number_t value,
+                                                        unsigned int *out)
+{
+    long numerator;
+    long denominator;
+
+    if (!out ||
+        !num_get_small_rational(value, &numerator, &denominator) ||
+        denominator != 1L ||
+        numerator <= 0L ||
+        numerator > 64L)
+        return false;
+    *out = (unsigned int)numerator;
+    return true;
+}
+
+static bool expr_integrate_poly_degree_local(const expr_t *expr,
+                                             const expr_t *var,
+                                             unsigned int max_degree,
+                                             unsigned int *degree_out)
+{
+    expr_t *vars[1];
+    size_t var_index = 0u;
+    const expr_t *base = NULL;
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+    number_t value = num_new();
+    unsigned int left_degree = 0u;
+    unsigned int right_degree = 0u;
+    unsigned int exponent = 0u;
+    bool is_sub = false;
+    bool ok = false;
+
+    if (!expr || !var || !degree_out)
+        goto cleanup;
+
+    vars[0] = (expr_t *)var;
+    if (expr_match_var_expr(expr, 1u, vars, &var_index) &&
+        var_index == 0u) {
+        *degree_out = 1u;
+        ok = max_degree >= 1u;
+        goto cleanup;
+    }
+
+    if (expr_match_const_value(expr, &value)) {
+        *degree_out = 0u;
+        ok = true;
+        goto cleanup;
+    }
+
+    if (expr_match_unary_op(expr, EXPR_KIND_NEG, &base)) {
+        ok = expr_integrate_poly_degree_local(base, var, max_degree,
+                                              degree_out);
+        goto cleanup;
+    }
+
+    if (expr_match_add_sub_expr(expr, &left, &right, &is_sub)) {
+        (void)is_sub;
+        ok = expr_integrate_poly_degree_local(left, var, max_degree,
+                                              &left_degree) &&
+             expr_integrate_poly_degree_local(right, var, max_degree,
+                                              &right_degree);
+        if (ok) {
+            *degree_out = left_degree > right_degree ? left_degree
+                                                     : right_degree;
+            ok = *degree_out <= max_degree;
+        }
+        goto cleanup;
+    }
+
+    if (expr_match_mul_expr(expr, &left, &right)) {
+        ok = expr_integrate_poly_degree_local(left, var, max_degree,
+                                              &left_degree) &&
+             expr_integrate_poly_degree_local(right, var, max_degree,
+                                              &right_degree);
+        if (ok) {
+            if (left_degree > max_degree ||
+                right_degree > max_degree ||
+                left_degree + right_degree > max_degree) {
+                ok = false;
+            } else {
+                *degree_out = left_degree + right_degree;
+            }
+        }
+        goto cleanup;
+    }
+
+    if (expr_match_pow_const(expr, &base, &value) &&
+        expr_integrate_positive_small_integer_local(value, &exponent) &&
+        expr_integrate_poly_degree_local(base, var, max_degree,
+                                         &left_degree) &&
+        left_degree <= max_degree &&
+        exponent <= max_degree &&
+        left_degree * exponent <= max_degree) {
+        *degree_out = left_degree * exponent;
+        ok = true;
+        goto cleanup;
+    }
+
+cleanup:
+    num_destroy(&value);
+    return ok;
+}
+
+static bool expr_integrate_raw_poly_quotient_is_final_local(const expr_t *expr,
+                                                            const expr_t *wrt)
+{
+    const expr_t *denominator_base = NULL;
+    number_t exponent = num_new();
+    unsigned int degree = 0u;
+    unsigned int denominator_power = 0u;
+    bool ok = false;
+
+    if (!expr || !wrt || !expr_is_op(expr, &ops_div) || !expr->a || !expr->b)
+        goto cleanup;
+
+    if (!expr_match_pow_const(expr->b, &denominator_base, &exponent) ||
+        !expr_integrate_positive_small_integer_local(exponent,
+                                                    &denominator_power) ||
+        denominator_power == 0u)
+        goto cleanup;
+
+    ok = expr_integrate_poly_degree_local(expr->a, wrt, 9u, &degree) &&
+         expr_integrate_poly_degree_local(denominator_base, wrt, 2u, &degree);
+
+cleanup:
+    num_destroy(&exponent);
+    return ok;
+}
+
+static void expr_integrate_normalize_small_rationals_local(expr_t *expr)
+{
+    double value;
+
+    if (!expr)
+        return;
+
+    expr_integrate_normalize_small_rationals_local(expr->a);
+    expr_integrate_normalize_small_rationals_local(expr->b);
+
+    if (!expr_is_const(expr) ||
+        expr->refcount != 1 ||
+        !num_is_real(expr->c) ||
+        !num_is_finite(expr->c))
+        return;
+    value = num_to_double(expr->c);
+    if (!isfinite(value))
+        return;
+
+    for (long denominator = 1L; denominator <= 64L; ++denominator) {
+        long numerator = lround(value * (double)denominator);
+        number_t candidate;
+        number_t difference;
+        number_t absolute_difference;
+        double error;
+        double scale;
+
+        if (numerator < -1024L || numerator > 1024L)
+            continue;
+
+        candidate = num_create_from_frac(numerator, denominator);
+        difference = num_sub(expr->c, candidate);
+        absolute_difference = num_abs(difference);
+        error = fabs(num_to_double(absolute_difference));
+        scale = fmax(1.0, fabs(value));
+        num_destroy(&absolute_difference);
+        num_destroy(&difference);
+
+        if (error <= scale * 1.0e-30) {
+            num_destroy(&expr->c);
+            expr->c = candidate;
+            return;
+        }
+        num_destroy(&candidate);
+    }
+}
+
 static expr_t *expr_apply_symbolic_bound_step_local(expr_t *anti,
                                                     expr_integration_bound_kind_t kind,
                                                     expr_t *var,
@@ -165,6 +343,7 @@ expr_t *expr_integrate(const expr_t *expr, const expr_t *wrt)
 {
     expr_t *simplified;
     expr_t *raw;
+    expr_t *result;
 
     if (!expr || !wrt || !expr_is_var(wrt))
         return NULL;
@@ -175,7 +354,12 @@ expr_t *expr_integrate(const expr_t *expr, const expr_t *wrt)
 
     raw = expr_integrate_dispatch(simplified, wrt);
     expr_free(simplified);
-    return simplify_owned(raw);
+    if (expr_integrate_raw_poly_quotient_is_final_local(raw, wrt))
+        return raw;
+
+    result = simplify_owned(raw);
+    expr_integrate_normalize_small_rationals_local(result);
+    return result;
 }
 
 static bool expr_tree_has_symbol_name(const expr_t *expr, const char *name)

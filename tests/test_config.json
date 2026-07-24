@@ -304,6 +304,7 @@
       "enabled": true,
       "test_expr_t_from_string": {
         "enabled": true,
+        "test_binding_edit_is_owned_by_expression_library": true,
         "test_from_expression_string_api": true,
         "test_from_string_arithmetic": true,
         "test_from_string_ascii_alternatives": {
@@ -367,6 +368,7 @@
         "test_integrate_definite_quadratic_combines_exact_constants": true,
         "test_integrate_definite_quadratic_compact_exact_result": true,
         "test_integrate_definite_symbolic_bounds": true,
+        "test_integrate_exact_symbolic_atan_affine_scale": true,
         "test_integrate_frequency_product_families": true,
         "test_integrate_hyperbolic_table_tail": true,
         "test_integrate_inverse_one_plus_unit_circle_root": true,
@@ -386,6 +388,7 @@
         "test_integrate_polynomial_sum": true,
         "test_integrate_quotient_rule_derivative": true,
         "test_integrate_reciprocal_and_log": true,
+        "test_integrate_scaled_symbolic_sum_before_product_search": true,
         "test_integrate_sec_double_angle_log_tan_cot": true,
         "test_integrate_shifted_inverse_square_with_symbolic_constant": true,
         "test_integrate_sin_integer_multiple_quotient": true,

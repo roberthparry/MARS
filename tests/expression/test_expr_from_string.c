@@ -456,6 +456,27 @@ static void test_from_string_exact_value_functions(void)
     expr_free(deriv);
     expr_bindings_free(bindings);
     expr_free(expr);
+
+    bindings = NULL;
+    expr = expr_from_string(
+        "{ 1/2*(ln(x^2 + 3*x + 5) "
+        "- 2*atan((2*x + 3)/sqrt(11))/sqrt(11)) + C_0 "
+        "| x = NAN; C_0 = NAN }",
+        &bindings);
+    TEST_ASSERT_TRUE(expr != NULL,
+                     "ln/atan antiderivative binding parse succeeds");
+    TEST_ASSERT_TRUE(expr_bindings_count(bindings) == 2u,
+                     "function names add no implicit bindings");
+    TEST_ASSERT_TRUE(expr_bindings_get(bindings, "x") != NULL,
+                     "antiderivative retains x binding");
+    TEST_ASSERT_TRUE(expr_bindings_get(bindings, "C_0") != NULL,
+                     "antiderivative retains C_0 binding");
+    TEST_ASSERT_TRUE(expr_bindings_get(bindings, "l") == NULL &&
+                     expr_bindings_get(bindings, "n") == NULL &&
+                     expr_bindings_get(bindings, "a") == NULL,
+                     "ln and atan letters are not bindings");
+    expr_bindings_free(bindings);
+    expr_free(expr);
 }
 
 /* ---- Named constants (binding section) ---- */
@@ -1409,6 +1430,57 @@ static void test_from_string_deriv(void)
         "{ (x^2 + 1)^2 | x = 2 }",
         25.0, __LINE__);
 
+    check_parse_simplified_expr("Dx(...) parses as expression derivative",
+        "{ Dx(exp(x^2)) | x = ? }",
+        "{ 2x·exp(x²) | x = NAN }", __LINE__);
+    check_parse_simplified_expr("Dx(...) infers only its derivative variable",
+        "{ Dx(exp(x^2)) }",
+        "{ 2x·exp(x²) | x = NAN }", __LINE__);
+    check_parse_simplified_expr("Dxx(...) parses as repeated expression derivative",
+        "{ Dxx(x^3) | x = ? }",
+        "{ 6x | x = NAN }", __LINE__);
+    check_parse_simplified_expr("Dxy(...) parses as mixed expression derivative",
+        "{ Dxy(x^2*y^3) | x = ?, y = ? }",
+        "{ 6xy² | x = NAN, y = NAN }", __LINE__);
+    check_parse_simplified_expr("D[x^5](...) parses as compact high-order derivative",
+        "{ D[x^5](x^7) }",
+        "{ 2520x² | x = NAN }", __LINE__);
+    check_parse_simplified_expr("D[x^2y^3](...) preserves mixed derivative order",
+        "{ D[x^2y^3](x^3*y^4) }",
+        "{ 144xy | x = NAN, y = NAN }", __LINE__);
+    check_parse_simplified_expr("canonical superscript derivative input round trips",
+        "{ Dx²(x^3) }",
+        "{ 6x | x = NAN }", __LINE__);
+    {
+        expr_bindings_t *bindings = NULL;
+        expr_t *parsed = expr_from_string(
+            "{ Dxxxxx((x + 1)/(x^2 + 3*x + 5)) | x = ? }",
+            &bindings);
+
+        TEST_ASSERT_TRUE(parsed != NULL,
+                         "high-order derivative metadata input parses");
+        TEST_ASSERT_TRUE(expr_bindings_has_symbolic_derivative(bindings),
+                         "bindings retain explicit derivative syntax");
+        expr_free(parsed);
+        expr_bindings_free(bindings);
+    }
+    {
+        expr_bindings_t *bindings = NULL;
+        expr_t *parsed = expr_from_string(
+            "{ (x + 1)/(x^2 + 3*x + 5) | x = ? }",
+            &bindings);
+
+        TEST_ASSERT_TRUE(parsed != NULL,
+                         "ordinary rational metadata input parses");
+        TEST_ASSERT_TRUE(!expr_bindings_has_symbolic_derivative(bindings),
+                         "ordinary expression has no derivative metadata");
+        expr_free(parsed);
+        expr_bindings_free(bindings);
+    }
+    check_parse_val("Dx(...) derivative evaluates numerically",
+        "{ Dx(exp(x^2)) | x = 1.25 }",
+        2.0*xv*exp(xv*xv), __LINE__);
+
     /* ---- Programmatic differentiation ---- */
     /* Build f(x) = exp(sin(x)) + 3*x^2 - 7 explicitly so we hold the wrt pointer. */
     {
@@ -1789,6 +1861,72 @@ static void test_from_string_bindings_with_constant_expression_value(void)
                      "{ (-2π·exp(π·√(x)) + 2·π²·√(x)·exp(π·√(x)))/(2·√(x))/(2·√(x))² | x = 163 }",
                      "{ exp(π·√(x))·(π^2·√(x) - π)/(4x^³⁄₂) | x = 163 }",
                      __LINE__);
+    check_parse_simplified_expr("nested rational derivative numerator canonicalizes",
+                     "{ (2*(x^2 + 3*x + 5)*(2*(x + 1)*(2*x + 3) - 9*x - (-x - 1)*(2*x + 3) - 3*x^2 - 15) - 6*(2*x + 3)*((-x - 1)*(x^2 + 3*x + 5) - (2*x + 3)*(3*x - (x + 1)*(2*x + 3) + x^2 + 5)))/(x^2 + 3*x + 5)^4 | x = 1 }",
+                     "{ 6·(12x² + 44x - x⁴ - 4x³ + 23)/(x² + 3x + 5)⁴ | x = 1 }",
+                     __LINE__);
+    check_parse_simplified_expr("higher rational derivative numerator canonicalizes",
+                     "{ (24*(x^2 + 3*x + 5)*(6*x - x^3 - 3*x^2 + 11) - 24*(2*x + 3)*(12*x^2 + 44*x - x^4 - 4*x^3 + 23))/(x^2 + 3*x + 5)^5 | x = ? }",
+                     "{ 24·(x⁵ + 5x⁴ - 20x³ - 110x² - 115x - 14)/(x² + 3x + 5)⁵ | x = NAN }",
+                     __LINE__);
+    bindings = NULL;
+    expr = expr_from_string("{ 720*(x^7 + 7*x^6 - 42*x^5 - 385*x^4 - 805*x^3 - 294*x^2 + 511*x + 289)/(x^2 + 3*x + 5)^7 | x = ? }",
+                            &bindings);
+    x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    deriv = (expr && x) ? expr_create_deriv(expr, x) : NULL;
+    deriv_text = deriv ? expr_to_string(deriv, style_EXPRESSION) : NULL;
+    if (deriv_text &&
+        strcmp(deriv_text,
+               "{ (-5040x⁸ - 40320x⁷ + 282240x⁶ + 3104640x⁵ + 8114400x⁴ + 3951360x³ - 10301760x² - 11652480x - 2530080)/(x² + 3x + 5)⁸ | x = NAN }") == 0) {
+        printf(C_BOLD C_GREEN "PASS" C_RESET
+               " rational quadratic-power derivative uses polynomial fast path\n");
+        printf(C_BOLD "  expr   " C_RESET "%s\n\n", deriv_text);
+    } else {
+        printf(C_BOLD C_RED "FAIL" C_RESET
+               " rational quadratic-power derivative uses polynomial fast path %s:%d:1\n",
+               __FILE__, __LINE__);
+        printf(C_BOLD "  got    " C_RESET "%s\n\n",
+               deriv_text ? deriv_text : "(null)");
+        TEST_FAIL();
+    }
+    free(deriv_text);
+    expr_free(deriv);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+    bindings = NULL;
+    expr = NULL;
+    x = NULL;
+    deriv = NULL;
+
+    bindings = NULL;
+    expr = expr_from_string(
+        "{ 5040*(56*x^6 - 2312*x - x^8 - 8*x^7 + 616*x^5 + 1610*x^4 + 784*x^3 - 2044*x^2 - 502)/(x^2 + 3*x + 5)^8 | x = ? }",
+        &bindings);
+    x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    deriv = (expr && x) ? expr_create_deriv(expr, x) : NULL;
+    deriv_text = deriv ? expr_to_string(deriv, style_EXPRESSION) : NULL;
+    if (deriv_text &&
+        strcmp(deriv_text,
+               "{ (40320x⁹ + 362880x⁸ - 2903040x⁷ - 37255680x⁶ - 116847360x⁵ - 71124480x⁴ + 247242240x³ + 419489280x² + 182165760x + 2459520)/(x² + 3x + 5)⁹ | x = NAN }") == 0) {
+        printf(C_BOLD C_GREEN "PASS" C_RESET
+               " rational derivative polynomial storage follows degree\n");
+        printf(C_BOLD "  expr   " C_RESET "%s\n\n", deriv_text);
+    } else {
+        printf(C_BOLD C_RED "FAIL" C_RESET
+               " rational derivative polynomial storage follows degree %s:%d:1\n",
+               __FILE__, __LINE__);
+        printf(C_BOLD "  got    " C_RESET "%s\n\n",
+               deriv_text ? deriv_text : "(null)");
+        TEST_FAIL();
+    }
+    free(deriv_text);
+    expr_free(deriv);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+    bindings = NULL;
+    expr = NULL;
+    x = NULL;
+    deriv = NULL;
 
     old_precision_bits = num_get_default_prec_bits();
     ASSERT_EQ_INT(num_set_default_prec_bits(80u), 0);
@@ -2026,6 +2164,33 @@ static void test_from_string_bindings_skip_function_name_letters(void)
         TEST_FAIL();
     }
 
+    expr_bindings_free(bindings);
+    expr_free(expr);
+}
+
+static void test_binding_edit_is_owned_by_expression_library(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_bindings_t *edited_bindings = NULL;
+    expr_t *expr = expr_from_string(
+        "{ a*x + C_0 + C_1 | x = NAN; a = 2, C_0 = NAN, C_1 = NAN }",
+        &bindings);
+    expr_t *edited = expr_edit_binding(
+        expr, bindings, "C_0", "", &edited_bindings);
+
+    TEST_ASSERT_TRUE(edited != NULL,
+                     "binding edit returns a canonical expression");
+    TEST_ASSERT_TRUE(expr_bindings_get(edited_bindings, "x") != NULL,
+                     "binding edit retains x");
+    TEST_ASSERT_TRUE(expr_bindings_get(edited_bindings, "a") != NULL,
+                     "binding edit retains ordinary constants");
+    TEST_ASSERT_TRUE(expr_bindings_get(edited_bindings, "C_0") == NULL,
+                     "binding edit removes only the selected constant");
+    TEST_ASSERT_TRUE(expr_bindings_get(edited_bindings, "C_1") != NULL,
+                     "binding edit retains other integration constants");
+
+    expr_bindings_free(edited_bindings);
+    expr_free(edited);
     expr_bindings_free(bindings);
     expr_free(expr);
 }
@@ -2516,6 +2681,7 @@ void test_expr_t_from_string(void)
     TEST_RUN_SUBTEST(test_from_string_bindings_with_implicit_builtin_constant, NULL);
     TEST_RUN_SUBTEST(test_from_string_bindings_with_constant_expression_value, NULL);
     TEST_RUN_SUBTEST(test_from_string_bindings_skip_function_name_letters, NULL);
+    TEST_RUN_SUBTEST(test_binding_edit_is_owned_by_expression_library, NULL);
     TEST_RUN_SUBTEST(test_from_string_unevaluated_integral, NULL);
     TEST_RUN_SUBTEST(test_from_string_round_trips, NULL);
     TEST_RUN_SUBTEST(test_from_string_deriv, NULL);

@@ -2771,6 +2771,39 @@ static void test_integrate_quotient_rule_derivative(void)
     assert_nth_derivative_integrates_back(
         "{ (3*x^2 + 4*x + 5)/(x^3 + 2*x^2 + 5*x + 1) }",
         1u, points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches(
+        "{ (3*x - (x + 1)*(2*x + 3) + x^2 + 5)/"
+        "(x^2 + 3*x + 5)^2 }",
+        points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches(
+        "{ (2*(-x - 1)*(x^2 + 3*x + 5) - "
+        "2*(2*x + 3)*(3*x - (x + 1)*(2*x + 3) + x^2 + 5))/"
+        "(x^2 + 3*x + 5)^3 }",
+        points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches(
+        "{ 120*(30*x^4 + 84*x - x^6 - 6*x^5 + 220*x^3 + "
+        "345*x^2 - 73)/(x^2 + 3*x + 5)^6 }",
+        points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches(
+        "{ (40320*(x^2 + 3*x + 5)*(42*x^5 - 511*x - x^7 - "
+        "7*x^6 + 385*x^4 + 805*x^3 + 294*x^2 - 289) - "
+        "40320*(2*x + 3)*(56*x^6 - 2312*x - x^8 - 8*x^7 + "
+        "616*x^5 + 1610*x^4 + 784*x^3 - 2044*x^2 - 502))/"
+        "(x^2 + 3*x + 5)^9 }",
+        points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches(
+        "{ ((x^2 + 3*x + 5)*(10*x^9) - "
+        "10*(2*x + 3)*x^10)/(x^2 + 3*x + 5)^11 }",
+        points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches(
+        "{ 1/(x^2 + 3*x + 5)^2 }",
+        points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches(
+        "{ (-4*x^3 - 14*x^2 - 22*x - 15)/(x^2 + 3*x + 5)^2 }",
+        points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_contains(
+        "{ (-4*x^3 - 14*x^2 - 22*x - 15)/(x^2 + 3*x + 5)^2 }",
+        "(-2x - 5)/(x² + 3x + 5)");
 }
 
 static void test_integrate_unevaluated_integral_derivative(void)
@@ -3371,6 +3404,42 @@ static void test_integrate_sec_double_angle_log_tan_cot(void)
     expr_free(expr);
 }
 
+static void test_integrate_exact_symbolic_atan_affine_scale(void)
+{
+    static const double points[] = { -1.0, -0.25, 0.5, 2.0 };
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = expr_from_string(
+        "{ 1/2*(ln(x^2 + 3*x + 5)"
+        " - 2*atan((2*x + 3)/sqrt(11))/sqrt(11)) | x = NAN }",
+        &bindings);
+    expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    expr_t *anti = (expr && x) ? expr_integrate(expr, x) : NULL;
+    expr_t *deriv = (anti && x) ? expr_create_deriv(anti, x) : NULL;
+    char *text = anti ? expr_to_string(anti, style_UNBOUND) : NULL;
+
+    ASSERT_NOT_NULL(anti);
+    ASSERT_NOT_NULL(deriv);
+    ASSERT_NOT_NULL(text);
+    ASSERT_TRUE(strstr(text, "√(11)") != NULL);
+    ASSERT_TRUE(strstr(text, "1.658312") == NULL);
+
+    for (size_t i = 0; i < sizeof(points) / sizeof(points[0]); ++i) {
+        char label[160];
+
+        test_expr_set_val_d(x, points[i]);
+        snprintf(label, sizeof(label),
+                 "exact symbolic atan affine scale at x=%g", points[i]);
+        check_q_at(__FILE__, __LINE__, 1, label,
+                   expr_eval_qf(deriv), expr_eval_qf(expr));
+    }
+
+    free(text);
+    expr_free(deriv);
+    expr_free(anti);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+}
+
 static void test_integrate_unsupported_product_returns_null(void)
 {
     expr_t *x = test_expr_new_named_var_d(0.5, "x");
@@ -3384,6 +3453,31 @@ static void test_integrate_unsupported_product_returns_null(void)
     expr_free(x_w0_x);
     expr_free(w0_x);
     expr_free(x);
+}
+
+static void test_integrate_scaled_symbolic_sum_before_product_search(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = expr_from_string(
+        "{ 1/2*(C_0*x^2 + 2*C_1*x "
+        "+ 4*(x^3 + 3*x^2 - 6*x - 11)/(x^2 + 3*x + 5)^3) + C_2 "
+        "| x = NAN; C_0 = NAN, C_1 = NAN, C_2 = NAN }",
+        &bindings);
+    expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    expr_t *anti = (expr && x) ? expr_integrate(expr, x) : NULL;
+    char *text = anti ? expr_to_string(anti, style_EXPRESSION) : NULL;
+
+    ASSERT_NOT_NULL(anti);
+    ASSERT_NOT_NULL(text);
+    ASSERT_TRUE(strstr(text, "C₀") != NULL);
+    ASSERT_TRUE(strstr(text, "C₁") != NULL);
+    ASSERT_TRUE(strstr(text, "C₂") != NULL);
+    ASSERT_TRUE(strstr(text, "(x² + 3x + 5)²") != NULL);
+
+    free(text);
+    expr_free(anti);
+    expr_bindings_free(bindings);
+    expr_free(expr);
 }
 
 void test_symbolic_integration(void)
@@ -3433,5 +3527,7 @@ void test_symbolic_integration(void)
     TEST_RUN_SUBTEST(test_integrate_inverse_sqrt_sin_cos_sin3_cos, NULL);
     TEST_RUN_SUBTEST(test_integrate_inverse_quartic_appell_f1, NULL);
     TEST_RUN_SUBTEST(test_integrate_sec_double_angle_log_tan_cot, NULL);
+    TEST_RUN_SUBTEST(test_integrate_exact_symbolic_atan_affine_scale, NULL);
+    TEST_RUN_SUBTEST(test_integrate_scaled_symbolic_sum_before_product_search, NULL);
     TEST_RUN_SUBTEST(test_integrate_unsupported_product_returns_null, NULL);
 }
