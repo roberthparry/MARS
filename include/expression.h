@@ -847,6 +847,29 @@ expr_t *expr_bindings_expr_at(expr_bindings_t *bnd, size_t index);
 bool expr_bindings_is_constant_at(const expr_bindings_t *bnd, size_t index);
 
 /**
+ * @brief Report whether parsing applied explicit derivative syntax.
+ *
+ * This distinguishes an input such as @c Dxx(f(x)) from the ordinary
+ * expression tree produced after that derivative has been evaluated.
+ */
+bool expr_bindings_has_symbolic_derivative(const expr_bindings_t *bnd);
+
+/**
+ * @brief Apply one binding value edit and return a canonical expression.
+ *
+ * Binding lookup, value parsing, constant removal, and expression
+ * simplification are all performed by the expression library. An empty value
+ * removes a constant binding from the expression and leaves a variable
+ * unresolved. On success, @p bindings_out receives bindings for the returned
+ * expression.
+ */
+expr_t *expr_edit_binding(const expr_t *expr,
+                          const expr_bindings_t *bindings,
+                          const char *name,
+                          const char *value_text,
+                          expr_bindings_t **bindings_out);
+
+/**
  * @brief Destroy an opaque bindings object returned by expr_from_string().
  */
 void expr_bindings_free(expr_bindings_t *bnd);

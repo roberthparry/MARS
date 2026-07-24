@@ -67,6 +67,7 @@ typedef struct {
     symtab_t            *syms;
     int                  error;
     string_t            *errmsg;
+    bool                 has_symbolic_derivative;
 } expr_parse_state_t;
 
 static void set_error(expr_parse_state_t *p, const char *msg)
@@ -99,6 +100,7 @@ static int expr_parse_state_init(expr_parse_state_t *p,
     p->syms = syms;
     p->error = 0;
     p->errmsg = string_new();
+    p->has_symbolic_derivative = false;
 
     if (!p->errmsg) {
         string_cursor_free(p->cursor);
@@ -176,6 +178,9 @@ static string_view_t expr_parse_text(const expr_parse_state_t *p)
 
 static expr_t *parse_addexpr(expr_parse_state_t *p);
 static expr_t *parse_signed_power(expr_parse_state_t *p);
+static expr_t *parse_enclosed_addexpr(expr_parse_state_t *p,
+                                      char closing,
+                                      const char *errmsg);
 
 static expr_t *build_ascii_integral_expr(const expr_t *upper,
                                          const expr_t *display_integrand,
@@ -192,6 +197,12 @@ static expr_t *parse_expression_view(string_view_t text,
                                      symtab_t *syms,
                                      const char *context_label,
                                      int report_errors);
+static expr_t *parse_expression_view_with_metadata(
+    string_view_t text,
+    symtab_t *syms,
+    const char *context_label,
+    int report_errors,
+    bool *has_symbolic_derivative_out);
 static void symtab_discard_storage(symtab_t *t);
 
 static int symtab_clone_borrowed_except_text(symtab_t *dst,
@@ -1046,6 +1057,306 @@ static const func_entry_t *lookup_fixed_func_call_view(string_view_t text,
         return entry;
     }
 
+    return NULL;
+}
+
+static int scan_derivative_call_view(string_view_t text,
+                                     size_t pos,
+                                     size_t *suffix_start_out,
+                                     size_t *suffix_end_out,
+                                     size_t *paren_pos_out)
+{
+    size_t p = pos;
+    int bracketed = 0;
+    int have_variable = 0;
+    uint32_t cp = 0u;
+    size_t len = 0u;
+    unsigned char c = 0u;
+
+    if (suffix_start_out)
+        *suffix_start_out = SIZE_MAX;
+    if (suffix_end_out)
+        *suffix_end_out = SIZE_MAX;
+    if (paren_pos_out)
+        *paren_pos_out = SIZE_MAX;
+
+    if (!expr_parse_view_peek_ascii(text, p, &c) || c != 'D')
+        return 0;
+    p++;
+
+    if (expr_parse_view_peek_ascii(text, p, &c) && c == '[') {
+        bracketed = 1;
+        p++;
+    }
+
+    if (suffix_start_out)
+        *suffix_start_out = p;
+
+    while (expr_parse_view_peek_value(text, p, &cp, &len) &&
+           len > 0u && fs_is_letter(cp)) {
+        unsigned long repeat = 0ul;
+        int repeat_digits = 0;
+
+        have_variable = 1;
+        p += len;
+
+        if (bracketed &&
+            expr_parse_view_peek_ascii(text, p, &c) && c == '^') {
+            p++;
+            while (expr_parse_view_peek_ascii(text, p, &c) && isdigit(c)) {
+                unsigned int digit = (unsigned int)(c - '0');
+
+                if (repeat > (ULONG_MAX - digit) / 10ul)
+                    return 0;
+                repeat = repeat * 10ul + digit;
+                repeat_digits = 1;
+                p++;
+            }
+            if (!repeat_digits || repeat == 0ul)
+                return 0;
+        } else {
+            while (expr_parse_view_peek_value(text, p, &cp, &len) &&
+                   expr_parse_is_superscript_digit(cp)) {
+                int digit = expr_parse_superscript_digit_value(cp);
+
+                if (digit < 0 ||
+                    repeat > (ULONG_MAX - (unsigned long)digit) / 10ul)
+                    return 0;
+                repeat = repeat * 10ul + (unsigned long)digit;
+                repeat_digits = 1;
+                p += len;
+            }
+            if (repeat_digits && repeat == 0ul)
+                return 0;
+        }
+    }
+
+    if (!have_variable)
+        return 0;
+
+    if (bracketed) {
+        if (!expr_parse_view_peek_ascii(text, p, &c) || c != ']')
+            return 0;
+        if (suffix_end_out)
+            *suffix_end_out = p;
+        p++;
+    } else if (suffix_end_out) {
+        *suffix_end_out = p;
+    }
+
+    if (!expr_parse_view_peek_ascii(text, p, &c) || c != '(')
+        return 0;
+
+    if (paren_pos_out)
+        *paren_pos_out = p;
+    return 1;
+}
+
+static expr_t *lookup_or_create_derivative_wrt(expr_parse_state_t *p,
+                                               string_view_t name_view)
+{
+    string_t *name = string_from_view(&name_view);
+    expr_t *sym;
+    expr_t *var;
+    string_t *key;
+
+    if (!name)
+        return NULL;
+
+    sym = lookup_symbol_text_normalised(p->syms, name);
+    if (sym) {
+        expr_retain(sym);
+        string_free(name);
+        return sym;
+    }
+
+    var = expr_new_named_var_text(NUM_NAN, name);
+    if (!var) {
+        string_free(name);
+        return NULL;
+    }
+
+    if (p->syms) {
+        key = expr_node_name_as_text(var, name);
+        if (!key || symtab_add_borrowed_text(p->syms, key, var) != 0) {
+            string_free(key);
+            expr_free(var);
+            string_free(name);
+            return NULL;
+        }
+        string_free(key);
+    }
+
+    string_free(name);
+    return var;
+}
+
+static expr_t *parse_derivative_atom(expr_parse_state_t *p,
+                                     size_t suffix_start,
+                                     size_t suffix_end,
+                                     size_t paren_pos)
+{
+    string_view_t text = expr_parse_text(p);
+    int bracketed = suffix_start > 0u;
+    expr_t **wrts = NULL;
+    size_t wrt_count = 0u;
+    size_t wrt_cap = 0u;
+    size_t pos = suffix_start;
+    expr_t *arg = NULL;
+    expr_t *cur = NULL;
+
+    if (bracketed) {
+        unsigned char before = 0u;
+
+        bracketed =
+            expr_parse_view_peek_ascii(text, suffix_start - 1u, &before) &&
+            before == '[';
+    }
+
+    while (pos < suffix_end) {
+        uint32_t cp = 0u;
+        size_t len = 0u;
+        unsigned long repeat = 1ul;
+        expr_t *wrt;
+
+        if (!expr_parse_view_peek_value(text, pos, &cp, &len) ||
+            len == 0u ||
+            !fs_is_letter(cp)) {
+            set_error(p, "invalid derivative variable");
+            goto fail;
+        }
+
+        wrt = lookup_or_create_derivative_wrt(
+            p, string_view_slice(text, pos, len));
+        if (!wrt) {
+            set_error(p, "could not construct derivative variable");
+            goto fail;
+        }
+        pos += len;
+
+        {
+            unsigned long parsed_repeat = 0ul;
+            int repeat_digits = 0;
+            unsigned char c = 0u;
+
+            if (bracketed &&
+                expr_parse_view_peek_ascii(text, pos, &c) && c == '^') {
+                pos++;
+                while (pos < suffix_end &&
+                       expr_parse_view_peek_ascii(text, pos, &c) &&
+                       isdigit(c)) {
+                    unsigned int digit = (unsigned int)(c - '0');
+
+                    if (parsed_repeat >
+                        (ULONG_MAX - digit) / 10ul) {
+                        expr_free(wrt);
+                        set_error(p, "derivative order is too large");
+                        goto fail;
+                    }
+                    parsed_repeat = parsed_repeat * 10ul + digit;
+                    repeat_digits = 1;
+                    pos++;
+                }
+                if (!repeat_digits || parsed_repeat == 0ul) {
+                    expr_free(wrt);
+                    set_error(p, "derivative order must be positive");
+                    goto fail;
+                }
+            } else {
+                while (pos < suffix_end &&
+                       expr_parse_view_peek_value(text, pos, &cp, &len) &&
+                       expr_parse_is_superscript_digit(cp)) {
+                    int digit = expr_parse_superscript_digit_value(cp);
+
+                    if (digit < 0 ||
+                        parsed_repeat >
+                            (ULONG_MAX - (unsigned long)digit) / 10ul) {
+                        expr_free(wrt);
+                        set_error(p, "derivative order is too large");
+                        goto fail;
+                    }
+                    parsed_repeat =
+                        parsed_repeat * 10ul + (unsigned long)digit;
+                    repeat_digits = 1;
+                    pos += len;
+                }
+                if (repeat_digits && parsed_repeat == 0ul) {
+                    expr_free(wrt);
+                    set_error(p, "derivative order must be positive");
+                    goto fail;
+                }
+            }
+
+            if (repeat_digits)
+                repeat = parsed_repeat;
+        }
+
+        if (repeat > SIZE_MAX - wrt_count ||
+            wrt_count + (size_t)repeat > SIZE_MAX / sizeof(*wrts)) {
+            expr_free(wrt);
+            set_error(p, "derivative order is too large");
+            goto fail;
+        }
+
+        if (wrt_count + (size_t)repeat > wrt_cap) {
+            size_t required = wrt_count + (size_t)repeat;
+            size_t new_cap = wrt_cap ? wrt_cap : 4u;
+            expr_t **new_wrts;
+
+            while (new_cap < required) {
+                if (new_cap > SIZE_MAX / 2u) {
+                    new_cap = required;
+                    break;
+                }
+                new_cap *= 2u;
+            }
+            new_wrts = realloc(wrts, new_cap * sizeof(*wrts));
+            if (!new_wrts) {
+                expr_free(wrt);
+                set_error(p, "out of memory");
+                goto fail;
+            }
+            wrts = new_wrts;
+            wrt_cap = new_cap;
+        }
+
+        for (unsigned long i = 0ul; i < repeat; ++i) {
+            if (i + 1ul < repeat)
+                expr_retain(wrt);
+            wrts[wrt_count++] = wrt;
+        }
+    }
+
+    expr_parse_set_pos(p, paren_pos + 1u);
+    arg = parse_enclosed_addexpr(p, ')', "expected ')' after derivative argument");
+    if (!arg)
+        goto fail;
+
+    cur = arg;
+    arg = NULL;
+    for (size_t i = 0u; i < wrt_count; ++i) {
+        expr_t *next = expr_create_deriv(cur, wrts[i]);
+
+        expr_free(cur);
+        cur = next;
+        if (!cur) {
+            set_error(p, "could not construct derivative");
+            goto fail;
+        }
+    }
+
+    for (size_t i = 0u; i < wrt_count; ++i)
+        expr_free(wrts[i]);
+    free(wrts);
+    p->has_symbolic_derivative = true;
+    return cur;
+
+fail:
+    expr_free(cur);
+    expr_free(arg);
+    for (size_t i = 0u; i < wrt_count; ++i)
+        expr_free(wrts[i]);
+    free(wrts);
     return NULL;
 }
 
@@ -2093,6 +2404,20 @@ static expr_t *parse_atom(expr_parse_state_t *p)
     }
 
     {
+        size_t suffix_start = SIZE_MAX;
+        size_t suffix_end = SIZE_MAX;
+        size_t paren_pos = SIZE_MAX;
+
+        if (scan_derivative_call_view(text,
+                                      pos,
+                                      &suffix_start,
+                                      &suffix_end,
+                                      &paren_pos)) {
+            return parse_derivative_atom(p, suffix_start, suffix_end, paren_pos);
+        }
+    }
+
+    {
         size_t paren_pos = SIZE_MAX;
         const func_entry_t *fe =
             lookup_fixed_func_call_view(text, pos, &paren_pos);
@@ -2905,18 +3230,35 @@ static int collect_implicit_symbols(string_view_t text,
         }
 
         {
-            size_t paren_pos = SIZE_MAX;
+            size_t function_paren_pos = SIZE_MAX;
+            size_t derivative_paren_pos = SIZE_MAX;
+            size_t legendre_paren_pos = SIZE_MAX;
+            size_t suffix_start = SIZE_MAX;
+            size_t suffix_end = SIZE_MAX;
             const func_entry_t *fe =
-                lookup_fixed_func_call_view(text, pos, &paren_pos);
+                lookup_fixed_func_call_view(
+                    text, pos, &function_paren_pos);
             unsigned int order = 0u;
 
-            if (fe && paren_pos != SIZE_MAX) {
+            if (scan_derivative_call_view(text,
+                                          pos,
+                                          &suffix_start,
+                                          &suffix_end,
+                                          &derivative_paren_pos) &&
+                derivative_paren_pos != SIZE_MAX) {
+                string_cursor_skip(
+                    cursor, derivative_paren_pos - pos);
+                continue;
+            }
+            if (fe && function_paren_pos != SIZE_MAX) {
                 string_cursor_skip(cursor, func_entry_kw_len(fe));
                 continue;
             }
-            if (scan_legendre_chi_symbol_call_view(text, pos, &order, &paren_pos) &&
-                paren_pos != SIZE_MAX) {
-                string_cursor_skip(cursor, paren_pos - pos + 1u);
+            if (scan_legendre_chi_symbol_call_view(
+                    text, pos, &order, &legendre_paren_pos) &&
+                legendre_paren_pos != SIZE_MAX) {
+                string_cursor_skip(
+                    cursor, legendre_paren_pos - pos + 1u);
                 continue;
             }
         }
@@ -2983,15 +3325,19 @@ static void symtab_discard_storage(symtab_t *t)
     symtab_free(t);
 }
 
-static expr_t *parse_expression_view(string_view_t text,
-                                     symtab_t *syms,
-                                     const char *context_label,
-                                     int report_errors)
+static expr_t *parse_expression_view_with_metadata(
+    string_view_t text,
+    symtab_t *syms,
+    const char *context_label,
+    int report_errors,
+    bool *has_symbolic_derivative_out)
 {
     expr_parse_state_t ps;
     expr_t *result;
     expr_t *out = NULL;
 
+    if (has_symbolic_derivative_out)
+        *has_symbolic_derivative_out = false;
     text = string_view_trim(text);
     if (string_view_is_empty(text))
         return NULL;
@@ -3020,8 +3366,19 @@ static expr_t *parse_expression_view(string_view_t text,
         fprintf(stderr, "parse error: %s\n", string_c_str(ps.errmsg));
 
 done:
+    if (out && has_symbolic_derivative_out)
+        *has_symbolic_derivative_out = ps.has_symbolic_derivative;
     expr_parse_state_dispose(&ps);
     return out;
+}
+
+static expr_t *parse_expression_view(string_view_t text,
+                                     symtab_t *syms,
+                                     const char *context_label,
+                                     int report_errors)
+{
+    return parse_expression_view_with_metadata(
+        text, syms, context_label, report_errors, NULL);
 }
 
 /* ------------------------------------------------------------------ */
@@ -3113,6 +3470,7 @@ static expr_t *expr_from_string_view_impl(string_view_t source,
     size_t close_pos = SIZE_MAX;
     int depth = 0;
     unsigned char c;
+    bool has_symbolic_derivative = false;
 
     if (bindings_out)
         *bindings_out = NULL;
@@ -3212,11 +3570,16 @@ static expr_t *expr_from_string_view_impl(string_view_t source,
 
         content_has_top_level_equals = has_top_level_equals(content);
 
-        expr_t *result = parse_expression_view(content, NULL, "expr_from_string", 0);
+        expr_t *result = parse_expression_view_with_metadata(
+            content, NULL, "expr_from_string", 0,
+            &has_symbolic_derivative);
 
         if (result) {
             if (bindings_out)
                 *bindings_out = single_binding_from_node(result);
+            if (bindings_out && *bindings_out)
+                (*bindings_out)->has_symbolic_derivative =
+                    has_symbolic_derivative;
             string_free(errmsg);
             return result;
         }
@@ -3224,11 +3587,15 @@ static expr_t *expr_from_string_view_impl(string_view_t source,
         if (!content_has_top_level_equals) {
             symtab_init(&syms);
             if (collect_implicit_symbols(content, &syms) == 0 && syms.count > 0) {
-                result = parse_expression_view(content,
-                                               &syms, "expr_from_string", 1);
+                result = parse_expression_view_with_metadata(
+                    content, &syms, "expr_from_string", 1,
+                    &has_symbolic_derivative);
             }
             if (result && bindings_out)
                 bindings = symtab_build_bindings_for_expr(&syms, result);
+            if (bindings)
+                bindings->has_symbolic_derivative =
+                    has_symbolic_derivative;
             if (result && bindings_out)
                 symtab_discard_storage(&syms);
             else
@@ -3296,10 +3663,14 @@ static expr_t *expr_from_string_view_impl(string_view_t source,
         return NULL;
     }
 
-    expr_t *result = parse_expression_view(expr_view, &syms, "expr_from_string", 1);
+    expr_t *result = parse_expression_view_with_metadata(
+        expr_view, &syms, "expr_from_string", 1,
+        &has_symbolic_derivative);
     if (result && bindings_out) {
         bindings = symtab_build_bindings_for_expr(&syms, result);
     }
+    if (bindings)
+        bindings->has_symbolic_derivative = has_symbolic_derivative;
 
     if (result && bindings_out) {
         symtab_discard_storage(&syms);
@@ -3413,6 +3784,100 @@ expr_t *expr_bindings_expr_at(expr_bindings_t *bnd, size_t index)
 bool expr_bindings_is_constant_at(const expr_bindings_t *bnd, size_t index)
 {
     return bnd && index < bnd->count && bnd->entries[index].is_constant;
+}
+
+bool expr_bindings_has_symbolic_derivative(const expr_bindings_t *bnd)
+{
+    return bnd && bnd->has_symbolic_derivative;
+}
+
+expr_t *expr_edit_binding(const expr_t *expr,
+                          const expr_bindings_t *bindings,
+                          const char *name,
+                          const char *value_text,
+                          expr_bindings_t **bindings_out)
+{
+    const expr_binding_entry_t *entry = NULL;
+    string_t *name_text = NULL;
+    const char *value_start = value_text;
+    const char *value_end;
+    expr_t *value_expr = NULL;
+    expr_t *replacement = NULL;
+    expr_t *edited = NULL;
+    expr_t *simplified = NULL;
+    expr_t *canonical = NULL;
+    string_t *text = NULL;
+    number_t value = NUM_NAN;
+    bool empty;
+
+    if (bindings_out)
+        *bindings_out = NULL;
+    if (!expr || !bindings || !name)
+        return NULL;
+
+    name_text = string_new_with(name);
+    if (name_text)
+        entry = bnd_find_entry_text((expr_bindings_t *)bindings, name_text);
+    if (!entry)
+        goto cleanup;
+
+    if (!value_start)
+        value_start = "";
+    while (*value_start && isspace((unsigned char)*value_start))
+        value_start++;
+    value_end = value_start + strlen(value_start);
+    while (value_end > value_start &&
+           isspace((unsigned char)value_end[-1]))
+        value_end--;
+    empty = value_end == value_start;
+
+    if (empty && entry->is_constant) {
+        replacement = expr_new_const(NUM_ZERO);
+    } else {
+        if (!empty) {
+            char *value_copy = strndup(
+                value_start, (size_t)(value_end - value_start));
+
+            if (!value_copy)
+                goto cleanup;
+            value_expr = expr_from_string(value_copy, NULL);
+            free(value_copy);
+            if (!value_expr)
+                goto cleanup;
+            value = expr_eval(value_expr);
+        }
+
+        replacement = entry->is_constant
+            ? expr_new_named_const(value, name)
+            : expr_new_named_var(value, name);
+        if (!empty)
+            num_destroy(&value);
+    }
+    if (!replacement)
+        goto cleanup;
+
+    edited = expr_substitute(expr, entry->expr, replacement);
+    if (!edited)
+        goto cleanup;
+    simplified = expr_simplify(edited);
+    if (!simplified)
+        simplified = expr_clone(edited);
+    if (!simplified)
+        goto cleanup;
+
+    text = expr_to_text(simplified, style_EXPRESSION);
+    if (!text)
+        goto cleanup;
+    canonical = expr_from_text(text, bindings_out);
+
+cleanup:
+    string_free(name_text);
+    string_free(text);
+    expr_free(simplified);
+    expr_free(edited);
+    expr_free(replacement);
+    expr_free(value_expr);
+    return canonical;
 }
 
 void expr_bindings_free(expr_bindings_t *bnd)

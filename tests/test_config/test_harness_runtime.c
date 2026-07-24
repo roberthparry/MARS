@@ -95,7 +95,6 @@ static size_t g_test_case_cleanup_count = 0u;
 static size_t g_test_case_cleanup_cap = 0u;
 /* Borrowed from the per-case cleanup stack and cleared after that stack runs. */
 static const string_t *g_test_case_temp_dir = NULL;
-static string_t *g_test_inferred_junit_path = NULL;
 
 static int test_run_case_fixture_setup(const char *file, int line);
 static void test_run_case_fixture_teardown(const char *file, int line);
@@ -168,14 +167,6 @@ static void test_string_replace_boundary(string_t **target, const char *text)
 static int test_string_has_text(const string_t *text)
 {
     return text && string_length(text) > 0u;
-}
-
-static int test_write_string(FILE *f, const string_t *text)
-{
-    if (!f || !text)
-        return 0;
-
-    return string_fprintf(f, "%S", text) >= 0;
 }
 
 typedef bool (*test_config_string_query_fn)(const string_t *file,
@@ -262,53 +253,6 @@ void test_section(const char *title)
 
     string_printf(C_BOLD C_CYAN "=== %S ===\n" C_RESET, title_text);
     string_free(title_text);
-}
-
-static const string_t *test_report_junit_path(void)
-{
-    size_t i;
-
-    for (i = 0; i < g_test_record_count; ++i) {
-        const string_t *file = g_test_records[i].file;
-        string_cursor_t *cursor;
-        string_pos_t dot_pos = 0u;
-        int have_dot = 0;
-
-        if (!test_string_has_text(file))
-            continue;
-
-        cursor = string_cursor_new(file);
-        if (!cursor)
-            continue;
-
-        while (!string_cursor_done(cursor)) {
-            string_pos_t pos = string_cursor_position(cursor);
-            if (rune_is_equal(string_cursor_peek(cursor), '.')) {
-                dot_pos = pos;
-                have_dot = 1;
-            }
-            if (string_cursor_next(cursor) != 0)
-                break;
-        }
-
-        string_free(g_test_inferred_junit_path);
-        g_test_inferred_junit_path = have_dot
-            ? string_cursor_slice_between(0u, dot_pos, cursor)
-            : string_clone(file);
-        string_cursor_free(cursor);
-
-        if (!g_test_inferred_junit_path)
-            return NULL;
-        if (string_append_cstr(g_test_inferred_junit_path, ".junit.xml") != 0) {
-            string_free(g_test_inferred_junit_path);
-            g_test_inferred_junit_path = NULL;
-            return NULL;
-        }
-
-        return g_test_inferred_junit_path;
-    }
-
-    return NULL;
 }
 
 void test_register_validity_checker(const char *name,
@@ -498,73 +442,6 @@ static void test_case_cleanup_all(void)
     }
 
     g_test_case_temp_dir = NULL;
-}
-
-static int test_xml_append_escaped_rune(string_t *out, rune_t rune)
-{
-    uint32_t value;
-
-    if (!out || rune_is_none(rune))
-        return -1;
-
-    value = rune_value(rune);
-
-    switch (value) {
-    case '&':
-        return string_append_cstr(out, "&amp;");
-    case '<':
-        return string_append_cstr(out, "&lt;");
-    case '>':
-        return string_append_cstr(out, "&gt;");
-    case '"':
-        return string_append_cstr(out, "&quot;");
-    case '\'':
-        return string_append_cstr(out, "&apos;");
-    default:
-        if (value < 0x20u && value != '\n' && value != '\r' && value != '\t')
-            return string_append_format(out, "&#x%02X;", (unsigned int)value) < 0 ? -1 : 0;
-        return string_append_rune(out, rune);
-    }
-}
-
-static string_t *test_xml_escaped_string(const string_t *text)
-{
-    string_t *out;
-    string_cursor_t *cursor;
-
-    out = string_new();
-    if (!out)
-        return NULL;
-
-    cursor = string_cursor_new(text);
-    if (!cursor) {
-        string_free(out);
-        return NULL;
-    }
-
-    while (!string_cursor_done(cursor)) {
-        if (test_xml_append_escaped_rune(out, string_cursor_peek(cursor)) != 0 ||
-            string_cursor_next(cursor) != 0) {
-            string_cursor_free(cursor);
-            string_free(out);
-            return NULL;
-        }
-    }
-
-    string_cursor_free(cursor);
-    return out;
-}
-
-static void test_xml_write_escaped(FILE *f, const string_t *text)
-{
-    string_t *fallback = text ? NULL : string_new();
-    string_t *escaped = test_xml_escaped_string(text ? text : fallback);
-
-    if (escaped) {
-        test_write_string(f, escaped);
-        string_free(escaped);
-    }
-    string_free(fallback);
 }
 
 static void test_print_tags(const string_t *tags)
@@ -993,9 +870,6 @@ static void test_destroy_records(void)
     g_test_case_cleanup_cap = 0u;
 
     g_test_case_temp_dir = NULL;
-
-    string_free(g_test_inferred_junit_path);
-    g_test_inferred_junit_path = NULL;
 
     string_free(g_test_last_fail_detail);
     g_test_last_fail_detail = NULL;
@@ -1849,144 +1723,6 @@ static void test_report_missing_config_keys(void)
                 g_test_missing_config_paths[i]);
 }
 
-static void test_write_junit_report(int exit_code)
-{
-    const string_t *path = test_report_junit_path();
-    string_t *fallback_text = NULL;
-    FILE *f;
-    size_t i;
-
-    if (!path)
-        return;
-
-    f = fopen(string_c_str(path), "w");
-    if (!f) {
-        string_fprintf(stderr, "test_harness: failed to open JUnit report path '%S'\n", path);
-        return;
-    }
-
-    fputs("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n", f);
-    string_fprintf(f,
-            "<testsuite name=\"mars\" tests=\"%d\" failures=\"%d\" skipped=\"%d\" errors=\"0\" time=\"%.9f\">\n",
-            g_test_run_count + g_test_output_count,
-            g_test_failed_cases + g_test_output_failure_count,
-            g_test_skip_count + g_test_output_skip_count,
-            g_test_total_ms / 1000.0);
-
-    for (i = 0; i < g_test_record_count; ++i) {
-        const test_record_t *rec = &g_test_records[i];
-
-        fputs("  <testcase classname=\"", f);
-        if (test_string_has_text(rec->file))
-            test_xml_write_escaped(f, rec->file);
-        else {
-            fallback_text = string_new_with("mars");
-            test_xml_write_escaped(f, fallback_text);
-            string_free(fallback_text);
-            fallback_text = NULL;
-        }
-        fputs("\" name=\"", f);
-        test_xml_write_escaped(f, test_string_has_text(rec->path) ? rec->path : rec->name);
-        string_fprintf(f, "\" time=\"%.9f\"", rec->ms / 1000.0);
-        if (test_string_has_text(rec->tags)) {
-            fputs(" assertions=\"0\">", f);
-            fputs("\n    <properties>\n", f);
-            fputs("      <property name=\"tags\" value=\"", f);
-            test_xml_write_escaped(f, rec->tags);
-            fputs("\"/>\n", f);
-            if (rec->is_output)
-                fputs("      <property name=\"kind\" value=\"output\"/>\n", f);
-            else if (rec->is_group)
-                fputs("      <property name=\"kind\" value=\"group\"/>\n", f);
-            if (test_string_has_text(rec->parent)) {
-                fputs("      <property name=\"parent\" value=\"", f);
-                test_xml_write_escaped(f, rec->parent);
-                fputs("\"/>\n", f);
-            }
-            fputs("    </properties>\n", f);
-        } else {
-            fputs(">", f);
-            if (test_string_has_text(rec->parent) || rec->is_output || rec->is_group) {
-                fputs("\n    <properties>\n", f);
-                if (rec->is_output)
-                    fputs("      <property name=\"kind\" value=\"output\"/>\n", f);
-                else if (rec->is_group)
-                    fputs("      <property name=\"kind\" value=\"group\"/>\n", f);
-                fputs("      <property name=\"parent\" value=\"", f);
-                test_xml_write_escaped(f, rec->parent);
-                fputs("\"/>\n", f);
-                if (rec->is_group) {
-                    string_fprintf(f, "      <property name=\"group_passed\" value=\"%d\"/>\n",
-                            rec->group_passed);
-                    string_fprintf(f, "      <property name=\"group_failed\" value=\"%d\"/>\n",
-                            rec->group_failed);
-                    string_fprintf(f, "      <property name=\"group_skipped\" value=\"%d\"/>\n",
-                            rec->group_skipped);
-                }
-                fputs("    </properties>\n", f);
-            }
-        }
-
-        if (rec->outcome == TEST_OUTCOME_SKIP) {
-            const string_t *skip_message = rec->failure_detail;
-
-            if (!test_string_has_text(skip_message)) {
-                fallback_text = string_new_with(rec->enabled
-                    ? "test skipped"
-                    : "disabled by test_config");
-                skip_message = fallback_text;
-            }
-
-            fputs("    <skipped message=\"", f);
-            test_xml_write_escaped(f, skip_message);
-            string_free(fallback_text);
-            fallback_text = NULL;
-            fputs("\">", f);
-            if (test_string_has_text(rec->failure_file)) {
-                test_xml_write_escaped(f, rec->failure_file);
-                string_fprintf(f, ":%d", rec->failure_line);
-                if (test_string_has_text(rec->failure_detail)) {
-                    fputs(" ", f);
-                    test_xml_write_escaped(f, rec->failure_detail);
-                }
-            } else if (test_string_has_text(rec->failure_detail)) {
-                test_xml_write_escaped(f, rec->failure_detail);
-            }
-            fputs("</skipped>\n", f);
-        } else if (rec->outcome == TEST_OUTCOME_FAIL) {
-            fputs("    <failure message=\"", f);
-            if (test_string_has_text(rec->failure_detail))
-                test_xml_write_escaped(f, rec->failure_detail);
-            else {
-                fallback_text = string_new_with("test failed");
-                test_xml_write_escaped(f, fallback_text);
-                string_free(fallback_text);
-                fallback_text = NULL;
-            }
-            fputs("\" type=\"assertion\">", f);
-            if (test_string_has_text(rec->failure_file)) {
-                test_xml_write_escaped(f, rec->failure_file);
-                string_fprintf(f, ":%d", rec->failure_line);
-                if (test_string_has_text(rec->failure_detail)) {
-                    fputs(" ", f);
-                    test_xml_write_escaped(f, rec->failure_detail);
-                }
-            } else if (test_string_has_text(rec->failure_detail)) {
-                test_xml_write_escaped(f, rec->failure_detail);
-            }
-            fputs("</failure>\n", f);
-        }
-
-        fputs("  </testcase>\n", f);
-    }
-
-    fputs("  <properties>\n", f);
-    string_fprintf(f, "    <property name=\"exit_code\" value=\"%d\"/>\n", exit_code);
-    fputs("  </properties>\n", f);
-    fputs("</testsuite>\n", f);
-    fclose(f);
-}
-
 int main(void)
 {
     int rc;
@@ -2039,7 +1775,6 @@ int main(void)
     test_print_time(g_test_total_ms);
     string_printf("\n");
     test_print_slowest_cases();
-    test_write_junit_report(exit_code);
     test_destroy_records();
     if (test_post_summary_hook)
         test_post_summary_hook();

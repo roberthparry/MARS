@@ -545,6 +545,7 @@ struct expr_bindings_t {
     size_t count;
     expr_binding_entry_t *entries;
     dictionary_t *index;
+    bool has_symbolic_derivative;
 };
 
 /* ------------------------------------------------------------------------- */
@@ -562,6 +563,8 @@ void           expr_store_value_num              (expr_t *dv, number_t value);
 number_t       expr_eval_num_internal            (const expr_t *dv);
 expr_t *       expr_get_dx_internal              (const expr_t *dv);
 const expr_t * expr_current_wrt_internal         (void);
+expr_t *       expr_deriv_rational_over_quadratic_power(const expr_t *expr,
+                                                        const expr_t *wrt);
 expr_t *       expr_new_unary_internal           (const expr_ops_t *ops, const expr_t *a);
 expr_t *       expr_new_binary_internal          (const expr_ops_t *ops,
                                                   const expr_t *a,
@@ -1206,6 +1209,11 @@ bool expr_match_affine_poly_deg4(const expr_t *expr,
                                  number_t *poly_coeffs_out,
                                  number_t *constant_out,
                                  number_t *coeffs_out);
+bool expr_collect_single_var(const expr_t *expr,
+                             const expr_t **var_out);
+bool expr_collect_poly_deg4(const expr_t *expr,
+                            const expr_t *var,
+                            number_t *coeffs_out);
 bool expr_polynomials_equal_deg4(const expr_t *left,
                                  const expr_t *right);
 bool expr_polynomial_is_zero_deg4(const expr_t *expr);

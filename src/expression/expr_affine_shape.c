@@ -933,18 +933,18 @@ static bool expr_collect_poly_deg4_local(const expr_t *expr,
     if (!expr || !var || !out)
         goto no_match;
 
-    if (expr_match_const_value(expr, &value)) {
-        expr_reset_number_array(out, 5);
-        num_destroy(&out[0]);
-        out[0] = num_clone(value);
-        num_destroy(&value);
-        return true;
-    }
-
     if (expr_same_var_local(expr, var)) {
         expr_reset_number_array(out, 5);
         num_destroy(&out[1]);
         out[1] = num_clone(NUM_ONE);
+        num_destroy(&value);
+        return true;
+    }
+
+    if (expr_match_const_value(expr, &value)) {
+        expr_reset_number_array(out, 5);
+        num_destroy(&out[0]);
+        out[0] = num_clone(value);
         num_destroy(&value);
         return true;
     }
@@ -969,6 +969,25 @@ static bool expr_collect_poly_deg4_local(const expr_t *expr,
         }
         expr_clear_number_array(left_poly, 5);
         expr_clear_number_array(right_poly, 5);
+        num_destroy(&value);
+        return ok;
+    }
+
+    if (expr_match_unary_op(expr, EXPR_KIND_NEG, &left)) {
+        number_t inner_poly[5];
+        bool ok;
+
+        expr_zero_number_array(inner_poly, 5);
+        ok = expr_collect_poly_deg4_local(left, var, inner_poly);
+        if (ok) {
+            for (size_t i = 0; i < 5u; ++i) {
+                number_t negated = num_neg(inner_poly[i]);
+
+                num_destroy(&out[i]);
+                out[i] = negated;
+            }
+        }
+        expr_clear_number_array(inner_poly, 5);
         num_destroy(&value);
         return ok;
     }
@@ -1034,6 +1053,20 @@ static bool expr_collect_poly_deg4_local(const expr_t *expr,
 no_match:
     num_destroy(&value);
     return false;
+}
+
+bool expr_collect_single_var(const expr_t *expr, const expr_t **var_out)
+{
+    if (!var_out)
+        return false;
+    return expr_collect_single_var_local(expr, var_out);
+}
+
+bool expr_collect_poly_deg4(const expr_t *expr,
+                            const expr_t *var,
+                            number_t *coeffs_out)
+{
+    return expr_collect_poly_deg4_local(expr, var, coeffs_out);
 }
 
 bool expr_polynomials_equal_deg4(const expr_t *left,

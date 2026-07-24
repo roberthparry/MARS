@@ -38,6 +38,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 
 ROOT = Path(__file__).resolve().parents[1]
+EXPRESSION_OPERATION_TIMEOUT_SECONDS = 30
 JURISDICTION_DB_SOURCE_DIR = ROOT / "packaging" / "jurisdiction-db"
 COUNTRY_JURISDICTIONS_SQL = JURISDICTION_DB_SOURCE_DIR / "mars_country_jurisdictions.sql"
 TARGET_SUBDIVISIONS_SQL = JURISDICTION_DB_SOURCE_DIR / "mars_target_subdivisions.sql"
@@ -2631,6 +2632,7 @@ INDEX_HTML = r"""<!doctype html>
     }
 
     button {
+      position: relative;
       border: 2px solid #243238;
       border-radius: 999px;
       padding: 0.7rem 1rem;
@@ -2639,12 +2641,60 @@ INDEX_HTML = r"""<!doctype html>
       font-weight: 700;
       cursor: pointer;
       box-shadow: 0 0.38rem 0 rgba(0, 0, 0, 0.2), 0 10px 24px rgba(196, 131, 48, 0.16);
+      transition:
+        transform 90ms ease,
+        box-shadow 90ms ease,
+        filter 90ms ease,
+        opacity 90ms ease;
     }
 
     button.secondary {
       color: #d7e7b7;
       background: rgba(113, 198, 180, 0.12);
       box-shadow: 0 0.18rem 0 rgba(0, 0, 0, 0.18);
+    }
+
+    button:active:not(:disabled),
+    button.action-running {
+      transform: translateY(0.28rem);
+      filter: brightness(0.86) saturate(1.08);
+      box-shadow:
+        inset 0 0.2rem 0.45rem rgba(0, 0, 0, 0.34),
+        0 0.06rem 0 rgba(0, 0, 0, 0.22);
+    }
+
+    button.action-running::after {
+      content: "";
+      position: absolute;
+      top: 0.24rem;
+      right: 0.3rem;
+      width: 0.42rem;
+      height: 0.42rem;
+      border-radius: 50%;
+      background: #fff3cf;
+      box-shadow: 0 0 0 0 rgba(255, 243, 207, 0.6);
+      animation: action-running-pulse 900ms ease-out infinite;
+      pointer-events: none;
+    }
+
+    button.action-running:disabled {
+      cursor: wait;
+      opacity: 1;
+    }
+
+    @keyframes action-running-pulse {
+      70% {
+        box-shadow: 0 0 0 0.34rem rgba(255, 243, 207, 0);
+      }
+      100% {
+        box-shadow: 0 0 0 0 rgba(255, 243, 207, 0);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      button.action-running::after {
+        animation: none;
+      }
     }
 
     button:disabled {
@@ -3200,6 +3250,83 @@ INDEX_HTML = r"""<!doctype html>
         margin-bottom: var(--render-margin-bottom);
       }
 
+      .almanac-sheet {
+        min-width: 0;
+      }
+
+      .almanac-sheet > * {
+        min-width: 0;
+        max-width: 100%;
+      }
+
+      .almanac-grid-table:not(.almanac-event-table) {
+        display: block;
+        width: 100%;
+        overflow-x: auto;
+      }
+
+      .almanac-event-table {
+        max-width: 100%;
+        table-layout: auto;
+      }
+
+      .almanac-event-table thead {
+        display: none;
+      }
+
+      .almanac-event-table,
+      .almanac-event-table tbody,
+      .almanac-event-table tr,
+      .almanac-event-table td {
+        display: block;
+        width: 100%;
+      }
+
+      .almanac-event-table tbody tr {
+        padding: 0.35rem 0;
+        border-bottom: 1px solid rgba(233, 244, 239, 0.16);
+      }
+
+      .almanac-event-table tbody tr:last-child {
+        border-bottom: 0;
+      }
+
+      .almanac-event-table td[data-label] {
+        display: grid;
+        grid-template-columns: 7rem minmax(0, 1fr);
+        gap: 0.65rem;
+        width: auto;
+        min-width: 0;
+        padding: 0.38rem 0.7rem;
+        border: 0;
+        white-space: normal;
+        overflow-wrap: anywhere;
+      }
+
+      .almanac-event-table td[data-label]::before {
+        content: attr(data-label);
+        color: #efc36a;
+        font-size: 0.68rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .almanac-event-table td.event-date,
+      .almanac-event-table td.event-time,
+      .almanac-event-table td.event-gmt,
+      .almanac-event-table td.event-details {
+        width: auto;
+        min-width: 0;
+        white-space: normal;
+      }
+
+      .almanac-event-table td:not([data-label]) {
+        width: auto;
+        padding: 0.75rem;
+        white-space: normal;
+      }
+
       .mobile-panel {
         position: static;
         margin-top: 0.5rem;
@@ -3305,6 +3432,12 @@ INDEX_HTML = r"""<!doctype html>
       .rendered svg {
         transform: scale(var(--render-zoom));
         margin-bottom: var(--render-margin-bottom);
+      }
+
+      .almanac-event-table td[data-label] {
+        grid-template-columns: 5.75rem minmax(0, 1fr);
+        gap: 0.5rem;
+        padding-inline: 0.55rem;
       }
 
       .help-pane {
@@ -3676,7 +3809,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           <div class="help-kicker">Start Here</div>
           <p>MARS Lab works best when you type the mathematical object itself in the main editor, then use the controls underneath to tell the lab what kind of job you want.</p>
           <ul>
-            <li><code>Expression</code>: type a formula, then set variable values in the binding boxes.</li>
+            <li><code>Expression</code>: type a formula, then set any variable values needed for numeric evaluation. Symbolic operations such as <code>Dx(...)</code> can run with their differentiation variables left blank.</li>
             <li><code>Equation</code>: type an equation and choose which variable to solve for.</li>
             <li><code>Matrix</code>: type a matrix expression and pick an operation.</li>
             <li><code>Integrator</code>: type the integrand, then add one row per variable you want to integrate over.</li>
@@ -3789,6 +3922,26 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           </ul>
         </div>
         <div class="help-card" data-help-modes="expression">
+          <h3>Symbolic Derivatives</h3>
+          <p>Derivative operators can be written directly inside an expression. MARS evaluates the derivative symbolically, so the differentiation variables can remain blank.</p>
+          <ul>
+            <li><code>Dx(f(x))</code> differentiates <code>f(x)</code> once with respect to <code>x</code>.</li>
+            <li><code>Dxx(f(x))</code> and <code>Dxxxxx(f(x))</code> take the second and fifth derivatives with respect to <code>x</code>.</li>
+            <li><code>Dxy(f(x,y))</code> takes a mixed derivative, first with respect to <code>x</code> and then <code>y</code>.</li>
+            <li><code>D[x^5](f(x))</code> is the compact form for a fifth derivative. Mixed compact orders such as <code>D[x^2y^3](f(x,y))</code> are also accepted.</li>
+            <li>The <code>x derivative</code> button differentiates the whole current expression. Direct <code>D...</code> syntax is useful when the derivative is only one part of a larger expression.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="expression">
+          <h3>When Evaluate Is Available</h3>
+          <ul>
+            <li>An ordinary expression such as <code>sin(x)</code> needs a value in every variable binding box before <code>Evaluate</code> becomes available.</li>
+            <li>A symbolic derivative such as <code>Dx(sin(x))</code> can be evaluated with <code>x</code> blank because the result is another expression.</li>
+            <li>Constants may remain blank when you want them preserved symbolically in the result.</li>
+            <li>The binding boxes and Evaluate state come from the parsed MARS expression, including while you edit or remove symbols.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="expression">
           <h3>Goal Seek</h3>
           <p>Goal seek changes variable bindings so the expression value reaches the value in the <code>Target</code> field.</p>
           <ul>
@@ -3862,7 +4015,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         <div class="help-card" data-help-modes="expression,equation,matrix,integrator">
           <h3>Shortcuts</h3>
           <ul>
-            <li><code>Ctrl+Enter</code> evaluates the expression.</li>
+            <li><code>Ctrl+Enter</code> evaluates whenever the <code>Evaluate</code> button is available.</li>
             <li>Derivative buttons appear from the current variable bindings.</li>
             <li>Enter the goal-seek target in the left pane's <code>Target</code> field.</li>
             <li>Use the binding boxes in the editor when goal seek needs better initial guesses.</li>
@@ -4044,6 +4197,9 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     let workingPrecisionBits = 256;
     let fullExpressionText = '';
     let displayedExpressionText = '';
+    let expressionBindingRefreshTimer = 0;
+    let expressionBindingRefreshSequence = 0;
+    let pendingExpressionBindingCommit = Promise.resolve();
 
     if (controlToken && window.location.search.includes('__CONTROL_QUERY_PREFIX__')) {
       window.history.replaceState(null, '', window.location.pathname + window.location.hash);
@@ -5211,27 +5367,6 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       return found;
     }
 
-    function variablesFromExpression(text) {
-      text = String(text || '').trim();
-      if (text.startsWith('{') && text.endsWith('}')) {
-        text = text.slice(1, -1).trim();
-      }
-
-      const pipe = lastIndexOfTopLevel(text, '|');
-      if (pipe < 0) return [];
-
-      let bindings = text.slice(pipe + 1).trim();
-      const semi = indexOfTopLevel(bindings, ';');
-      if (semi >= 0) bindings = bindings.slice(0, semi);
-
-      return splitTopLevel(bindings, ',')
-        .map((part) => {
-          const eq = indexOfTopLevel(part, '=');
-          return eq >= 0 ? part.slice(0, eq).trim() : '';
-        })
-        .filter(Boolean);
-    }
-
     function compareBindingNames(left, right) {
       const leftName = String((left && left.name) || left || '');
       const rightName = String((right && right.name) || right || '');
@@ -5363,29 +5498,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         return full;
       if (text.includes('...'))
         return restoreCompactBindingValues(text);
-      return expressionWithEditorBody(text);
-    }
-
-    function expressionWithEditorBody(bodyText) {
-      const body = String(bodyText || '').trim();
-      if (!body)
-        return '';
-      if (bindingParts(body))
-        return body;
-      if (currentMode() === 'equation')
-        return body;
-
-      const full = expr.dataset.fullExpression || fullExpressionText;
-      const parts = bindingParts(full);
-      if (!parts)
-        return body;
-      if (!bodyReferencesBindingNames(body, compactExpressionForEditor(full).bindings || []))
-        return body;
-
-      let bindingText = parts.variables;
-      if (parts.constants)
-        bindingText = bindingText ? `${bindingText}; ${parts.constants}` : `; ${parts.constants}`;
-      return bindingText ? `{ ${body} | ${bindingText} }` : body;
+      return text;
     }
 
     function expressionBodyForEditor(fullText) {
@@ -5401,6 +5514,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       bindingValueCache = new Map();
       delete expr.dataset.fullExpression;
       delete expr.dataset.displayExpression;
+      delete expr.dataset.bindingRefreshValid;
+      delete expr.dataset.evaluationReady;
       clearGoalSeekRequest();
     }
 
@@ -5433,6 +5548,26 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         const valueText = part.slice(eq + 1).trim();
         return valueText && valueText !== '?' && !/^NAN$/i.test(valueText);
       });
+    }
+
+    function isUnsetBindingValue(valueText) {
+      const text = String(valueText || '').trim();
+      return !text || text === '?' || /^NAN$/i.test(text);
+    }
+
+    function expressionReadyToEvaluate() {
+      if (currentMode() !== 'expression')
+        return true;
+
+      if (expr.dataset.bindingRefreshValid === 'false' ||
+          expr.dataset.bindingRefreshValid === 'pending')
+        return false;
+
+      const text = currentExpressionText();
+      if (!text)
+        return false;
+
+      return expr.dataset.evaluationReady === 'true';
     }
 
     function bindingParts(text) {
@@ -5571,17 +5706,6 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       return bindingText ? `{ ${body} | ${bindingText} }` : body;
     }
 
-    function bodyReferencesBindingNames(bodyText, bindings) {
-      const body = String(bodyText || '').trim();
-      if (!body || !Array.isArray(bindings) || !bindings.length)
-        return true;
-
-      return bindings.every((binding) => {
-        const name = String(binding && binding.name || '').trim();
-        return !name || body.includes(name);
-      });
-    }
-
     function replaceBindingValueInExpression(sourceExpression, kind, targetName, valueText) {
       const parts = bindingParts(sourceExpression);
       if (!parts || !targetName)
@@ -5659,6 +5783,90 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       return `{ ${parts.body} | ${bindingText} }`;
     }
 
+    function isIntegrationConstantName(name) {
+      return /^C(?:_\d+|[₀₁₂₃₄₅₆₇₈₉]+)$/.test(String(name || '').trim());
+    }
+
+    function splitTopLevelAddSubTerms(text) {
+      const terms = [];
+      let depth = 0;
+      let start = 0;
+      let sign = '+';
+      const source = String(text || '');
+
+      for (let i = 0; i < source.length; i++) {
+        const ch = source[i];
+        if (ch === '(' || ch === '[' || ch === '{') depth++;
+        else if (ch === ')' || ch === ']' || ch === '}') depth = Math.max(0, depth - 1);
+        else if ((ch === '+' || ch === '-') && depth === 0 && i > 0) {
+          const term = source.slice(start, i).trim();
+          if (term)
+            terms.push({sign, text: term});
+          sign = ch;
+          start = i + 1;
+        }
+      }
+
+      const tail = source.slice(start).trim();
+      if (tail)
+        terms.push({sign, text: tail});
+      return terms;
+    }
+
+    function joinTopLevelAddSubTerms(terms) {
+      return (terms || []).map((term, index) => {
+        const sign = term.sign === '-' ? '-' : '+';
+        const text = String(term.text || '').trim();
+        if (!text)
+          return '';
+        if (index === 0)
+          return sign === '-' ? `-${text}` : text;
+        return sign === '-' ? ` - ${text}` : ` + ${text}`;
+      }).filter(Boolean).join('');
+    }
+
+    function removeBindingFromExpression(sourceExpression, kind, targetName) {
+      const parts = bindingParts(sourceExpression);
+      if (!parts || !targetName)
+        return sourceExpression;
+
+      let changed = false;
+      function keepAssignments(assignmentsText, shouldRemove) {
+        return splitTopLevel(assignmentsText, ',')
+          .map((part) => part.trim())
+          .filter(Boolean)
+          .filter((part) => {
+            const eq = indexOfTopLevel(part, '=');
+            const name = eq >= 0 ? part.slice(0, eq).trim() : part.trim();
+            if (!shouldRemove || name !== targetName)
+              return true;
+            changed = true;
+            return false;
+          })
+          .join(', ');
+      }
+
+      const variables = keepAssignments(parts.variables, kind !== 'constant');
+      const constants = keepAssignments(parts.constants, kind === 'constant');
+      let body = parts.body;
+      if (kind === 'constant' && isIntegrationConstantName(targetName)) {
+        const terms = splitTopLevelAddSubTerms(body);
+        const filteredTerms = terms.filter((term) => term.text !== targetName);
+        if (filteredTerms.length !== terms.length) {
+          body = joinTopLevelAddSubTerms(filteredTerms) || '0';
+          changed = true;
+        }
+      }
+
+      if (!changed)
+        return sourceExpression;
+
+      let bindingText = variables;
+      if (constants)
+        bindingText = bindingText ? `${bindingText}; ${constants}` : `; ${constants}`;
+      return bindingText ? `{ ${body} | ${bindingText} }` : body;
+    }
+
     function applyUpdatedBindingExpression(updated) {
       if (currentMode() === 'expression' || currentMode() === 'equation') {
         setExpressionEditor(updated);
@@ -5672,6 +5880,102 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         clearExpressionSource();
         clearVariableValues();
       }
+    }
+
+    async function applyMarsBindingExpression(updated) {
+      setBusy(true);
+      setStatus('Updating bindings...');
+      try {
+        const {response, data} = await fetchEvaluation(updated, '', 'bindings');
+        if (!response.ok || !data.ok)
+          throw new Error(data.error || 'MARS could not update the bindings');
+
+        setExpressionEditor(
+          data.expression || updated,
+          Array.isArray(data.binding_values) ? data.binding_values : [],
+          null,
+          data.evaluation_ready
+        );
+        updateHistoryButtons();
+        saveCurrentModeEditorState();
+        setStatus('Ready');
+        return true;
+      } catch (err) {
+        setStatus(String(err));
+        return false;
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    function applyMarsBindingsToEditedExpression(editedBody, data) {
+      const bindings = Array.isArray(data && data.binding_values)
+        ? data.binding_values
+        : [];
+      fullExpressionText = expressionForEditor(
+        String(data && data.expression || editedBody)
+      ).trim();
+      displayedExpressionText = editedBody;
+      expr.dataset.fullExpression = fullExpressionText;
+      expr.dataset.displayExpression = displayedExpressionText;
+      expr.dataset.bindingRefreshValid = 'true';
+      expr.dataset.evaluationReady =
+        String(data && data.evaluation_ready || 'no').trim().toLowerCase() === 'yes'
+          ? 'true'
+          : 'false';
+      renderVariableValues(bindings);
+      currentVariables = variableNamesFromBindings(bindings);
+      currentDifferentiable =
+        String(data && data.differentiable || 'yes').trim().toLowerCase() !== 'no';
+      renderDerivativeButtons(currentVariables);
+    }
+
+    async function refreshEditedExpressionBindings(editedBody, sourceExpression, sequence) {
+      try {
+        const {response, data} = await fetchEvaluation(
+          editedBody,
+          '',
+          'bindings',
+          sourceExpression
+        );
+        if (sequence !== expressionBindingRefreshSequence ||
+            currentMode() !== 'expression' ||
+            expr.value.trim() !== editedBody)
+          return;
+
+        if (!response.ok || !data.ok) {
+          expr.dataset.bindingRefreshValid = 'false';
+          updateHistoryButtons();
+          return;
+        }
+
+        applyMarsBindingsToEditedExpression(editedBody, data);
+        updateHistoryButtons();
+      } catch (err) {
+        if (sequence !== expressionBindingRefreshSequence ||
+            currentMode() !== 'expression' ||
+            expr.value.trim() !== editedBody)
+          return;
+        expr.dataset.bindingRefreshValid = 'false';
+        updateHistoryButtons();
+      }
+    }
+
+    function scheduleEditedExpressionBindingRefresh() {
+      const editedBody = expr.value.trim();
+      const sourceExpression = expr.dataset.fullExpression || fullExpressionText;
+      const sequence = ++expressionBindingRefreshSequence;
+
+      clearTimeout(expressionBindingRefreshTimer);
+      expr.dataset.bindingRefreshValid = 'pending';
+      updateHistoryButtons();
+      expressionBindingRefreshTimer = setTimeout(() => {
+        void refreshEditedExpressionBindings(
+          editedBody,
+          sourceExpression,
+          sequence
+        );
+      }, 300);
     }
 
     function saveCurrentModeEditorState() {
@@ -5690,18 +5994,49 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       return text || '?';
     }
 
-    function commitBindingInput(input) {
+    async function commitBindingInput(input) {
       const name = input.dataset.bindingName || '';
       const kind = input.dataset.bindingKind || 'variable';
       const valueText = normalisedBindingInputValue(input);
       const current = currentExpressionText();
-      const updated = replaceBindingValueInExpression(current, kind, name, valueText);
+
+      if (currentMode() === 'expression') {
+        const {response, data} = await fetchEvaluation(
+          current,
+          name,
+          'binding-edit',
+          '',
+          valueText === '?' ? '' : valueText
+        );
+        if (!response.ok || !data.ok)
+          throw new Error(data.error || `MARS could not update ${name}`);
+        setExpressionEditor(
+          data.expression || current,
+          Array.isArray(data.binding_values) ? data.binding_values : [],
+          null,
+          data.evaluation_ready
+        );
+        updateHistoryButtons();
+        saveCurrentModeEditorState();
+        return;
+      }
+
+      const removesIntegrationConstant =
+        kind === 'constant' && valueText === '?' && isIntegrationConstantName(name);
+      const updated = removesIntegrationConstant
+        ? removeBindingFromExpression(current, kind, name)
+        : replaceBindingValueInExpression(current, kind, name, valueText);
 
       input.value = (valueText === '?' || /^NAN$/i.test(valueText)) ? '' : valueText;
       input.title = valueText;
 
       if (updated === current)
         return;
+
+      if (removesIntegrationConstant) {
+        await applyMarsBindingExpression(updated);
+        return;
+      }
 
       applyUpdatedBindingExpression(updated);
       refreshVariableValuesFromEditor();
@@ -5710,6 +6045,9 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     }
 
     function commitVisibleBindingInputs() {
+      if (currentMode() === 'expression')
+        return false;
+
       const inputs = Array.from(variableValues.querySelectorAll('.binding-value-input'));
       if (!inputs.length)
         return false;
@@ -5721,7 +6059,9 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         const name = input.dataset.bindingName || '';
         const kind = input.dataset.bindingKind || 'variable';
         const valueText = normalisedBindingInputValue(input);
-        updated = replaceBindingValueInExpression(updated, kind, name, valueText);
+        updated = kind === 'constant' && valueText === '?' && isIntegrationConstantName(name)
+          ? removeBindingFromExpression(updated, kind, name)
+          : replaceBindingValueInExpression(updated, kind, name, valueText);
       });
 
       if (!updated || updated === current)
@@ -5774,6 +6114,10 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     }
 
     function refreshVariableValuesFromEditor() {
+      if (currentMode() === 'expression') {
+        scheduleEditedExpressionBindingRefresh();
+        return;
+      }
       const compact = compactExpressionForEditor(currentExpressionText());
       const bindings = visibleBindingsForCurrentMode(compact.bindings || []);
       renderVariableValues(bindings);
@@ -5832,8 +6176,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         text.addEventListener('keydown', (event) => {
           if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
             event.preventDefault();
-            commitBindingInput(text);
-            evaluateFromKeyboard();
+            commitBindingInput(text).then(() => evaluateFromKeyboard());
           } else if (event.key === 'Enter') {
             event.preventDefault();
             text.blur();
@@ -5843,7 +6186,18 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             text.blur();
           }
         });
-        text.addEventListener('change', () => commitBindingInput(text));
+        text.addEventListener('change', () => {
+          if (currentMode() === 'expression') {
+            pendingExpressionBindingCommit = pendingExpressionBindingCommit
+              .then(() => commitBindingInput(text))
+              .catch((err) => {
+                setStatus(String(err));
+              });
+          } else {
+            void commitBindingInput(text);
+          }
+        });
+        text.addEventListener('input', () => updateHistoryButtons());
 
         const actions = document.createElement('div');
         actions.className = 'variable-value-actions';
@@ -5954,29 +6308,48 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       };
     }
 
-    function setExpressionEditor(fullText, evaluatedBindings = null, editorBodyText = null) {
-      const compact = compactExpressionForEditor(fullText);
-      const editorBindings = Array.isArray(evaluatedBindings) ? evaluatedBindings : [];
+    function setExpressionEditor(
+      fullText,
+      evaluatedBindings = null,
+      editorBodyText = null,
+      evaluationReady = null
+    ) {
+      const compact = currentMode() === 'expression'
+        ? null
+        : compactExpressionForEditor(fullText);
+      const hasEvaluatedBindings = Array.isArray(evaluatedBindings);
+      const editorBindings = hasEvaluatedBindings ? evaluatedBindings : [];
       const defaultEditorBody = expressionBodyForEditor(fullText);
       let editorBody = editorBodyText === null || editorBodyText === undefined
         ? defaultEditorBody
         : expressionForEditor(editorBodyText).trim();
-      if (!bodyReferencesBindingNames(editorBody, editorBindings))
-        editorBody = defaultEditorBody;
       const fullEditorText = expressionForEditor(fullText).trim();
-      fullExpressionText = bindingParts(fullEditorText)
-        ? fullEditorText
-        : expressionWithBindings(editorBody, editorBindings) || fullEditorText;
+      fullExpressionText = fullEditorText;
       displayedExpressionText = editorBody;
       expr.dataset.fullExpression = fullExpressionText;
       expr.dataset.displayExpression = displayedExpressionText;
+      expr.dataset.bindingRefreshValid = 'true';
+      if (evaluationReady !== null && evaluationReady !== undefined) {
+        expr.dataset.evaluationReady =
+          String(evaluationReady).trim().toLowerCase() === 'yes'
+            ? 'true'
+            : 'false';
+      } else {
+        delete expr.dataset.evaluationReady;
+      }
       expr.value = displayedExpressionText;
-      const bindings = visibleBindingsForCurrentMode((editorBindings.length)
-        ? editorBindings
-        : compact.bindings);
+      const bindings = visibleBindingsForCurrentMode(
+        hasEvaluatedBindings
+          ? editorBindings
+          : (compact ? compact.bindings : [])
+      );
       renderVariableValues(bindings || []);
       currentVariables = variableNamesFromBindings(bindings || []);
       renderDerivativeButtons(currentVariables);
+      if (currentMode() === 'expression' &&
+          (evaluationReady === null || evaluationReady === undefined)) {
+        scheduleEditedExpressionBindingRefresh();
+      }
     }
 
     function integratorEditableBindings(bindings) {
@@ -6921,7 +7294,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
 
     function setBusy(isBusy) {
       const expressionMode = currentMode() === 'expression';
-      run.disabled = isBusy;
+      run.disabled = isBusy || !expressionReadyToEvaluate();
       back.disabled = isBusy || currentHistoryLength() === 0;
       forward.disabled = isBusy || currentForwardHistoryLength() === 0;
       goalSeek.disabled = isBusy || !expressionMode || !canGoalSeek();
@@ -6989,6 +7362,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
 
     function updateHistoryButtons() {
       const expressionMode = currentMode() === 'expression';
+      run.disabled = !expressionReadyToEvaluate();
       back.disabled = currentHistoryLength() === 0;
       forward.disabled = currentForwardHistoryLength() === 0;
       lessPrecision.disabled = atMinimumPrecision();
@@ -7023,24 +7397,47 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         derivativeButton.className = 'secondary';
         derivativeButton.type = 'button';
         derivativeButton.textContent = `${name} derivative`;
-        derivativeButton.addEventListener('click', () => takeDerivative(name));
+        derivativeButton.addEventListener('click', () => takeDerivative(name, derivativeButton));
         derivativeButtons.appendChild(derivativeButton);
 
         const integralButton = document.createElement('button');
         integralButton.className = 'secondary';
         integralButton.type = 'button';
         integralButton.textContent = `${name} integral`;
-        integralButton.addEventListener('click', () => takeIntegral(name));
+        integralButton.addEventListener('click', () => takeIntegral(name, integralButton));
         derivativeButtons.appendChild(integralButton);
       });
     }
 
-    async function fetchEvaluation(text, wrt = '', action = '') {
+    function setActionRunning(button, running) {
+      if (!button)
+        return;
+      button.classList.toggle('action-running', running);
+      if (running)
+        button.setAttribute('aria-busy', 'true');
+      else
+        button.removeAttribute('aria-busy');
+    }
+
+    async function fetchEvaluation(
+      text,
+      wrt = '',
+      action = '',
+      bindingSource = '',
+      bindingValue = ''
+    ) {
       const precision = requestedValuePrecision();
       const response = await fetch('/eval', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({expression: expressionForEvaluation(text), wrt, precision, action})
+        body: JSON.stringify({
+          expression: expressionForEvaluation(text),
+          binding_source: expressionForEvaluation(bindingSource),
+          binding_value: bindingValue,
+          wrt,
+          precision,
+          action
+        })
       });
       const data = await response.json();
       return {response, data};
@@ -7823,17 +8220,17 @@ __HOLIDAY_JURISDICTION_OPTIONS__
                   : String(event.nearest_totality || '').trim();
                 return `
                 <tr data-almanac-event-jd="${escapeHtml(event.jd || '')}">
-                  <td>${escapeHtml(event.category || '')}</td>
-                  <td class="body-name">${escapeHtml(event.name || '')}</td>
-                  <td>${escapeHtml(event.kind || '')}</td>
-                  <td class="number">${escapeHtml(event.magnitude || '')}</td>
-                  <td class="number">${escapeHtml(event.obscuration || '')}</td>
-                  <td class="number event-date">${escapeHtml(almanacEventDateText(event))}</td>
-                  <td class="number event-time" title="${escapeHtml(event.first_contact || '')}">${escapeHtml(compactAlmanacLocalTime(event.first_contact || ''))}</td>
-                  <td class="number event-time" title="${escapeHtml(event.greatest || event.time || '')}">${escapeHtml(compactAlmanacLocalTime(event.greatest || event.time || ''))}</td>
-                  <td class="number event-time" title="${escapeHtml(event.fourth_contact || '')}">${escapeHtml(compactAlmanacLocalTime(event.fourth_contact || ''))}</td>
-                  <td class="number event-gmt" title="${escapeHtml(event.gmt_time || '')}">${escapeHtml(compactAlmanacGmtTime(event.gmt_time || ''))}</td>
-                  <td class="event-details" ${needsLandSearch ? `data-almanac-land-totality="${escapeHtml(event.jd || '')}"` : ''}>${almanacNearestTotalityCellHtml(nearestTotality, event.nearest_totality_action || null)}</td>
+                  <td data-label="Class">${escapeHtml(event.category || '')}</td>
+                  <td class="body-name" data-label="Event">${escapeHtml(event.name || '')}</td>
+                  <td data-label="Kind">${escapeHtml(event.kind || '')}</td>
+                  <td class="number" data-label="Magnitude">${escapeHtml(event.magnitude || '')}</td>
+                  <td class="number" data-label="Obscuration">${escapeHtml(event.obscuration || '')}</td>
+                  <td class="number event-date" data-label="Date">${escapeHtml(almanacEventDateText(event))}</td>
+                  <td class="number event-time" data-label="First" title="${escapeHtml(event.first_contact || '')}">${escapeHtml(compactAlmanacLocalTime(event.first_contact || ''))}</td>
+                  <td class="number event-time" data-label="Greatest" title="${escapeHtml(event.greatest || event.time || '')}">${escapeHtml(compactAlmanacLocalTime(event.greatest || event.time || ''))}</td>
+                  <td class="number event-time" data-label="Fourth" title="${escapeHtml(event.fourth_contact || '')}">${escapeHtml(compactAlmanacLocalTime(event.fourth_contact || ''))}</td>
+                  <td class="number event-gmt" data-label="GMT" title="${escapeHtml(event.gmt_time || '')}">${escapeHtml(compactAlmanacGmtTime(event.gmt_time || ''))}</td>
+                  <td class="event-details" data-label="Nearest totality" ${needsLandSearch ? `data-almanac-land-totality="${escapeHtml(event.jd || '')}"` : ''}>${almanacNearestTotalityCellHtml(nearestTotality, event.nearest_totality_action || null)}</td>
                 </tr>`;
               }).join('') : `
                 <tr>
@@ -8100,7 +8497,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       return (resultUseInput.dataset.inputText || parsedExpressionText()).trim();
     }
 
-    function sendResultExpressionToInput() {
+    async function sendResultExpressionToInput() {
       const resultText = resultExpressionTextForInput();
       if (!resultText)
         return;
@@ -8112,7 +8509,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
 
       clearGoalSeekRequest();
       hideTargetEntry();
-      applyUpdatedBindingExpression(resultText);
+      if (!await applyMarsBindingExpression(resultText))
+        return;
       saveCurrentModeEditorState();
       updateHistoryButtons();
       expr.focus();
@@ -8500,7 +8898,10 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       rendered.dataset.displaySvg = data.svg || '';
       rendered.dataset.fullSvg = '';
       rendered.dataset.renderError = data.render_error || '';
-      setRenderedContent(data.svg || '', data.render_error || 'No rendered TeX available');
+      setRenderedContent(
+        data.svg || '',
+        data.display_expression || data.expression || 'Could not render result'
+      );
       resetMoreDigitsButton(
         renderedMore,
         !!fullDisplayTex &&
@@ -8637,6 +9038,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
 
     async function evaluateExpression(options = {}) {
       commitVisibleBindingInputs();
+      await pendingExpressionBindingCommit;
       const editorText = currentExpressionText();
       const editorBodyText = String(expr.value || '').trim();
       const text = options.reuseLastInput && lastEvaluationInputText
@@ -8674,7 +9076,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           setExpressionEditor(
             data.expression || editorText || text,
             data.binding_values || null,
-            editorBodyText || null
+            editorBodyText || null,
+            data.evaluation_ready
           );
         else if (data.binding_values)
           renderVariableValues(data.binding_values || []);
@@ -8684,7 +9087,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           data.display_expression || (data.expression ? compactExpressionForEditor(data.expression).display : ''),
           data.full_display_expression || data.expression || ''
         );
-        setResultInputText(data.full_display_expression || data.expression || '');
+        setResultInputText(data.expression || data.full_display_expression || '');
         setExpandableText(
           functionStyle,
           functionMore,
@@ -8700,9 +9103,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         lastDerivativeExpression = derivativeExpressionFromLine(data.derivative);
         {
           const variableBindings = variableNamesFromBindings(data.binding_values || []);
-          currentVariables = variableBindings.length
-            ? variableBindings
-            : variablesFromExpression(data.expression || '');
+          currentVariables = variableBindings;
         }
         currentDifferentiable = String(data.differentiable || 'yes').trim().toLowerCase() !== 'no';
         renderDerivativeButtons(currentVariables);
@@ -9202,7 +9603,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       setExpressionEditor(
         solvedExpression,
         data.binding_values || null,
-        data.editor_expression || null
+        data.editor_expression || null,
+        data.evaluation_ready
       );
       setExpandableText(
         parsed,
@@ -9222,9 +9624,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       lastDerivativeExpression = '';
       {
         const variableBindings = variableNamesFromBindings(data.binding_values || []);
-        currentVariables = variableBindings.length
-          ? variableBindings
-          : variablesFromExpression(solvedExpression);
+        currentVariables = variableBindings;
       }
       currentDifferentiable = String(data.differentiable || 'yes').trim().toLowerCase() !== 'no';
       renderDerivativeButtons(currentVariables);
@@ -9236,12 +9636,17 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     }
 
     run.addEventListener('click', async () => {
+      setActionRunning(run, true);
       if (currentMode() === 'expression') {
         clearForwardHistory();
         clearGoalSeekRequest();
         hideTargetEntry();
       }
-      await evaluateCurrentMode();
+      try {
+        await evaluateCurrentMode();
+      } finally {
+        setActionRunning(run, false);
+      }
     });
 
     back.addEventListener('click', () => {
@@ -9274,11 +9679,13 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       evaluateCurrentMode({skipHistoryUpdate: true});
     });
 
-    async function takeDerivative(wrt) {
+    async function takeDerivative(wrt, actionButton = null) {
       commitVisibleBindingInputs();
+      await pendingExpressionBindingCommit;
       const text = currentExpressionText();
       if (!text || !wrt) return;
 
+      setActionRunning(actionButton, true);
       showResults();
       rightPaneTitle.textContent = `${wrt} derivative RESULT`;
       setBusy(true);
@@ -9317,9 +9724,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         lastDerivativeExpression = derivativeExpression;
         {
           const variableBindings = variableNamesFromBindings(data.binding_values || []);
-          currentVariables = variableBindings.length
-            ? variableBindings
-            : variablesFromExpression(data.expression || text);
+          currentVariables = variableBindings;
         }
         currentDifferentiable = String(data.differentiable || 'yes').trim().toLowerCase() !== 'no';
         renderDerivativeButtons(currentVariables);
@@ -9346,14 +9751,17 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         setStatus('Error');
       } finally {
         setBusy(false);
+        setActionRunning(actionButton, false);
       }
     }
 
-    async function takeIntegral(wrt) {
+    async function takeIntegral(wrt, actionButton = null) {
       commitVisibleBindingInputs();
+      await pendingExpressionBindingCommit;
       const text = currentExpressionText();
       if (!text || !wrt) return;
 
+      setActionRunning(actionButton, true);
       showResults();
       rightPaneTitle.textContent = `${wrt} integral RESULT`;
       setBusy(true);
@@ -9392,9 +9800,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         lastDerivativeExpression = '';
         {
           const variableBindings = variableNamesFromBindings(data.binding_values || []);
-          currentVariables = variableBindings.length
-            ? variableBindings
-            : variablesFromExpression(data.expression || text);
+          currentVariables = variableBindings;
         }
         currentDifferentiable = String(data.differentiable || 'yes').trim().toLowerCase() !== 'no';
         renderDerivativeButtons(currentVariables);
@@ -9421,10 +9827,15 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         setStatus('Error');
       } finally {
         setBusy(false);
+        setActionRunning(actionButton, false);
       }
     }
 
     function evaluateFromKeyboard() {
+      if (!expressionReadyToEvaluate()) {
+        updateHistoryButtons();
+        return;
+      }
       clearForwardHistory();
       if (currentMode() === 'equation')
         evaluateEquation();
@@ -9486,18 +9897,16 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         updateHistoryButtons();
         return;
       }
-      if (expr.value.trim() === (expr.dataset.displayExpression || displayedExpressionText))
+      if (expr.value.trim() === (expr.dataset.displayExpression || displayedExpressionText)) {
+        clearTimeout(expressionBindingRefreshTimer);
+        expressionBindingRefreshSequence++;
+        expr.dataset.bindingRefreshValid = 'true';
+        updateHistoryButtons();
         return;
-      /*
-       * Keep the previous full { body | bindings } expression while the body is
-       * edited.  The parser will drop bindings for symbols that disappear, but
-       * carrying the old source forward lets newly edited bodies keep existing
-       * values such as x = π/4 or a = e.
-       */
+      }
       clearGoalSeekRequest();
       lastEvaluationInputText = '';
-      refreshVariableValuesFromEditor();
-      updateHistoryButtons();
+      scheduleEditedExpressionBindingRefresh();
     });
 
     clear.addEventListener('click', () => {
@@ -9834,7 +10243,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     });
 
     resultUseInput.addEventListener('click', () => {
-      sendResultExpressionToInput();
+      void sendResultExpressionToInput();
     });
 
     inputCopy.addEventListener('click', async () => {
@@ -11157,7 +11566,9 @@ def parse_mars_lab_output(output: str) -> dict[str, str]:
         "unbound": r"^unbound\s+(.*)$",
         "function": r"^function\s+(.*)$",
         "tex": r"^tex\s+(.*)$",
+        "bindings": r"^binding\s{2,}(.*)$",
         "differentiable": r"^differentiable\s+(.*)$",
+        "evaluation_ready": r"^evaluation_ready\s+(.*)$",
         "value": r"^value\s+(.*)$",
         "value_note": r"^value_note\s+(.*)$",
         "residual": r"^residual\s+(.*)$",
@@ -11166,10 +11577,12 @@ def parse_mars_lab_output(output: str) -> dict[str, str]:
         "derivative": r"^derivative\s+(.*)$",
         "derivative_function": r"^derivative_function\s{2,}(.*)$",
         "derivative_tex": r"^derivative_tex\s*(.*)$",
+        "derivative_bindings": r"^derivative_binding\s{2,}(.*)$",
         "derivative_value": r"^d value\s+(.*)$",
         "integral": r"^integral\s+(.*)$",
         "integral_function": r"^integral_function\s{2,}(.*)$",
         "integral_tex": r"^integral_tex\s*(.*)$",
+        "integral_bindings": r"^integral_binding\s{2,}(.*)$",
         "integral_value": r"^i value\s+(.*)$",
     }
     return parse_keyed_output(
@@ -12098,6 +12511,35 @@ def binding_syntax_error_details(raw: str) -> tuple[str, str] | None:
     return match.group(1).strip(), match.group(2).strip()
 
 
+def tidy_lab_error_text(error: object) -> str:
+    if isinstance(error, subprocess.TimeoutExpired):
+        command = error.cmd if isinstance(error.cmd, list) else []
+        tool = Path(str(command[0])).name if command else "mars_lab"
+        timeout = error.timeout
+        if timeout is None:
+            return f"{tool} timed out"
+        return f"{tool} timed out after {timeout:g} seconds"
+
+    text = str(error or "").strip()
+    if not text:
+        return ""
+
+    root_text = str(ROOT)
+    text = text.replace(root_text + "/", "")
+    text = text.replace(root_text, ".")
+    text = re.sub(
+        r"Command '\[[^\]]*\]' timed out after ([0-9.]+) seconds",
+        r"mars_lab timed out after \1 seconds",
+        text,
+    )
+    text = re.sub(
+        r"Command '\([^)]*\)' timed out after ([0-9.]+) seconds",
+        r"mars_lab timed out after \1 seconds",
+        text,
+    )
+    return text
+
+
 def run_mars_lab_fields(
     binary: Path,
     expression: str,
@@ -12113,7 +12555,7 @@ def run_mars_lab_fields(
         cwd=ROOT,
         text=True,
         capture_output=True,
-        timeout=10,
+        timeout=EXPRESSION_OPERATION_TIMEOUT_SECONDS,
     )
     raw = completed.stdout
     if completed.stderr:
@@ -12606,6 +13048,28 @@ def expression_variable_binding_values(
     return values
 
 
+def mars_binding_values(records: object) -> list[dict[str, str]]:
+    values: list[dict[str, str]] = []
+
+    for record in str(records or "").splitlines():
+        parts = record.split("\t", 2)
+        if len(parts) != 3:
+            continue
+
+        kind, name, value = (part.strip() for part in parts)
+        if kind not in {"variable", "constant"} or not name:
+            continue
+
+        values.append({
+            "name": name,
+            "value": value,
+            "display": "" if value.upper() == "NAN" else _compact_long_text_value(value),
+            "kind": kind,
+        })
+
+    return values
+
+
 def goal_seek_expression(
     binary: Path,
     expression: str,
@@ -12712,9 +13176,12 @@ def prepare_evaluation_fields(
             fields["integral_svg"] = integral_svg
         elif integral_render_error:
             fields["integral_render_error"] = integral_render_error
-    fields["binding_values"] = expression_variable_binding_values(
-        fields.get("expression", "") or expression,
-        precision,
+    fields["binding_values"] = mars_binding_values(fields.get("bindings"))
+    fields["derivative_binding_values"] = mars_binding_values(
+        fields.get("derivative_bindings")
+    )
+    fields["integral_binding_values"] = mars_binding_values(
+        fields.get("integral_bindings")
     )
 
     svg, render_error = render_tex_to_svg(str(fields.get("display_tex", "")))
@@ -15490,10 +15957,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
             fields["display_expression"] = compact_display_text(fields["full_display_expression"])
             fields["display_tex"] = compact_display_text(fields["full_display_tex"])
             fields["display_function"] = compact_function_text(fields["full_display_function"])
-            fields["binding_values"] = expression_variable_binding_values(
-                fields.get("expression", "") or solved,
-                precision,
-            )
+            fields["binding_values"] = mars_binding_values(fields.get("bindings"))
             svg, render_error = render_tex_to_svg(fields.get("display_tex", ""))
             if svg:
                 fields["svg"] = svg
@@ -15511,12 +15975,26 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
             body = self.rfile.read(length)
             payload = json.loads(body.decode("utf-8"))
             expression = str(payload.get("expression", "")).strip()
+            binding_source = str(payload.get("binding_source", "")).strip()
+            binding_value = str(payload.get("binding_value", ""))
             requested_wrt = str(payload.get("wrt", "")).strip()
             action = str(payload.get("action", "")).strip().lower()
-            if action not in {"", "derivative", "integral"}:
-                raise ValueError("Action must be derivative or integral")
-            operation_request = bool(requested_wrt) or action in {"derivative", "integral"}
-            derivative_request = bool(requested_wrt) and action != "integral"
+            if action not in {
+                "",
+                "bindings",
+                "binding-edit",
+                "derivative",
+                "integral",
+            }:
+                raise ValueError(
+                    "Action must be bindings, binding-edit, derivative, or integral"
+                )
+            operation_request = bool(requested_wrt) or action in {
+                "bindings",
+                "derivative",
+                "integral",
+            }
+            derivative_request = bool(requested_wrt) and action in {"", "derivative"}
             integral_request = action == "integral"
             wrt = requested_wrt or "x"
             precision = int(payload.get("precision", 96))
@@ -15535,20 +16013,30 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
             command.extend([wrt, str(precision)])
             if integral_request:
                 command.append("integral")
+            elif action == "binding-edit":
+                command.extend(["binding-edit", binding_value])
+            elif action == "bindings":
+                command.append("bindings")
+                command.append(binding_source)
+            elif derivative_request:
+                command.append("derivative")
+            else:
+                command.append("evaluate")
             completed = subprocess.run(
                 command,
                 cwd=ROOT,
                 text=True,
                 capture_output=True,
-                timeout=10,
+                timeout=EXPRESSION_OPERATION_TIMEOUT_SECONDS,
             )
         except Exception as exc:
-            self.send_json(500, {"ok": False, "error": str(exc)})
+            self.send_json(500, {"ok": False, "error": tidy_lab_error_text(exc)})
             return
 
         raw = completed.stdout
         if completed.stderr:
             raw = raw + ("\n" if raw else "") + completed.stderr
+        raw = tidy_lab_error_text(raw)
 
         fields = parse_mars_lab_output(raw)
         fields["ok"] = completed.returncode == 0
@@ -15568,7 +16056,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                     if fallback_rc == 0:
                         fallback_fields["ok"] = True
                         fallback_fields["partial_error"] = True
-                        fallback_fields["error"] = raw.strip()
+                        fallback_fields["error"] = tidy_lab_error_text(raw)
                         fallback_fields["raw"] = raw
                         fallback_fields["recovery_expression"] = fallback_expression
                         prepare_evaluation_fields(
@@ -15579,16 +16067,23 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                             save_expression=False,
                             wrt=wrt,
                         )
-                        fallback_fields["binding_values"] = expression_variable_binding_values(
-                            expression,
-                            precision,
-                        )
                         self.send_json(200, fallback_fields)
                         return
                     fields["recovery_raw"] = fallback_raw
             fields["raw"] = raw
             fields["error"] = raw or f"mars_lab exited with {completed.returncode}"
             self.send_json(422, fields)
+            return
+
+        if action == "bindings":
+            self.send_json(200, {
+                "ok": True,
+                "expression": fields.get("expression", "") or expression,
+                "bindings": fields.get("bindings", ""),
+                "binding_values": mars_binding_values(fields.get("bindings")),
+                "differentiable": fields.get("differentiable", "yes"),
+                "evaluation_ready": fields.get("evaluation_ready", "no"),
+            })
             return
 
         prepare_evaluation_fields(

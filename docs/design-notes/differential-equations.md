@@ -3,6 +3,81 @@
 > Design note: this syntax is agreed for future ODE and PDE support but is not
 > yet implemented.
 
+Differential-equation support sits above the existing expression/equation
+split:
+
+1. `expr_t` remains the evaluable and transformable expression DAG.
+2. `equation_t` remains the relationship-solving object built from expressions.
+3. `diffequ_t` represents a differential-equation problem: a base equation,
+   independent variables, constant bindings, and initial/boundary conditions.
+
+The implementation module should live in `src/diffeqy/`, with a public
+`include/diffequ.h` header. The public type is opaque:
+
+```c
+typedef struct diffequ_t diffequ_t;
+```
+
+Public differential-equation functions use the `de_` prefix. The initial API
+should expose construction, destruction, and borrowed accessors before any
+solver entry points are added:
+
+```c
+diffequ_t *de_new(const equation_t *equation);
+void de_free(diffequ_t *de);
+
+const equation_t *de_equation(const diffequ_t *de);
+
+size_t de_independent_count(const diffequ_t *de);
+const expr_t *de_independent_at(const diffequ_t *de, size_t index);
+
+expr_bindings_t *de_constants(const diffequ_t *de);
+expr_t *de_constant(const diffequ_t *de, const char *name);
+
+size_t de_condition_count(const diffequ_t *de);
+const equation_t *de_condition_at(const diffequ_t *de, size_t index);
+```
+
+An internal representation can mirror the source syntax directly:
+
+```c
+struct diffequ_t {
+    equation_t *equation;
+
+    expr_t **independent_vars;
+    size_t independent_count;
+
+    expr_bindings_t *constants;
+
+    equation_t **conditions;
+    size_t condition_count;
+};
+```
+
+This keeps constant bindings separate from the base equation bindings. In
+
+```text
+{ Dxx(y) + y = 0 | x = ?; A = 1, C = 0; y(0) = A, Dx(y)(0) = C }
+```
+
+`x = ?` declares an independent variable, `A` and `C` are fixed problem
+parameters, and the final section contains equations that constrain the
+solution.
+
+Derivative syntax is implemented first at expression level. `Dx(expr)` means
+"differentiate `expr` with respect to `x`". If the argument is an evaluable
+expression, the expression parser may lower it immediately:
+
+```text
+Dx(exp(x^2)) -> 2x·exp(x²)
+Dxx(x^3)    -> 6x
+Dxy(x^2y^3) -> 6xy²
+```
+
+Formal derivatives of unknown dependent functions, such as `Dx(y)`, need a
+future formal derivative expression node once function/dependent-variable
+semantics are introduced.
+
 Differential equations extend the existing bound equation form with a third
 section:
 
@@ -122,6 +197,36 @@ Dx(y)(0) = C
 u(x, 0) = A
 Dy(u)(x, 1) = sin(x)
 ```
+
+Postfix evaluation by itself is still an expression-level operation. For
+example:
+
+```text
+Dx(f(x))(0)
+```
+
+is equivalent to evaluating the derivative expression with a local point
+binding:
+
+```text
+{ Dx(f(x)) | x = 0 }
+```
+
+Once the evaluated derivative is related to another expression, it becomes an
+equation condition rather than a plain expression:
+
+```text
+Dx(f(x))(0) = 1
+```
+
+is represented as:
+
+```text
+{ Dx(f(x)) = 1 | ; x = 0 }
+```
+
+The empty first binding section is intentional: `x = 0` is not declaring an
+independent variable there, it is the local point binding for the condition.
 
 For ODEs, prime notation can be evaluated in the same way and serves as
 shorthand for the corresponding explicit derivative condition:
