@@ -372,6 +372,14 @@ expr_t *expr_display_simplified(const expr_t *expr);
  */
 bool expr_integral_value_note(const expr_t *expr, char *out, size_t out_size);
 
+/**
+ * @brief Report whether @p expr contains an integral operation.
+ *
+ * Front-ends can use this to distinguish an integral operation that should be
+ * evaluated symbolically from an ordinary expression awaiting binding values.
+ */
+bool expr_contains_integral_operation(const expr_t *expr);
+
 /* ------------------------------------------------------------------------- */
 /* Arithmetic (graph-building, owning)                                       */
 /* ------------------------------------------------------------------------- */
@@ -745,15 +753,25 @@ void expr_print(const expr_t *expr);
  *   everything else, including @p τ and @p @tau, becomes a named variable
  *   initialised to NaN
  *
+ * The @p @S integral operator is completed during parsing. Without an upper
+ * substitution, @c @S f(x) dx returns the indefinite family @c F(x)+C_0.
+ * With an upper substitution, @c @S^u f(x) dx returns the single
+ * antiderivative @c F(u). Literal @c ∫ syntax constructs an integral node
+ * instead.
+ *
  * If @p bnd_out is non-NULL and the parsed expression is symbolic, the
  * function also returns an opaque bindings object that can be queried with
  * expr_bindings_get() and later released with expr_bindings_free(). If bindings are not needed,
  * pass NULL.
  *
- * Parsing is source-preserving: it canonicalises notation such as @p pi to
+ * Apart from operators such as @p @S that explicitly request evaluation,
+ * parsing is source-preserving: it canonicalises notation such as @p pi to
  * @p π and @p e to @p e, but it does not run a whole-expression algebraic
  * simplification pass. Call expr_simplify() explicitly when the simplified
  * equivalent is wanted.
+ *
+ * The outer expression braces are optional on input. Bare shorthand such as
+ * @c x+y is equivalent to @c {x+y}; MARS infers and returns its bindings.
  *
  * Returns an owning handle on success, or NULL on error (details written to
  * stderr). The caller must call expr_free() on the returned pointer exactly
@@ -853,6 +871,14 @@ bool expr_bindings_is_constant_at(const expr_bindings_t *bnd, size_t index);
  * expression tree produced after that derivative has been evaluated.
  */
 bool expr_bindings_has_symbolic_derivative(const expr_bindings_t *bnd);
+
+/**
+ * @brief Report whether parsing applied symbolic integral syntax.
+ *
+ * This records an @c @S operation even when expr_from_string() completed it
+ * into an antiderivative expression containing no integral node.
+ */
+bool expr_bindings_has_symbolic_integral(const expr_bindings_t *bnd);
 
 /**
  * @brief Apply one binding value edit and return a canonical expression.

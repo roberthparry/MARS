@@ -2843,7 +2843,7 @@ static void test_integrate_unevaluated_integral_leibniz_derivative(void)
     expr_bindings_t *dx_bindings = NULL;
     expr_bindings_t *dy_bindings = NULL;
     expr_bindings_t *du_bindings = NULL;
-    expr_t *integral = expr_from_string("{ @S_x^y z*u dz }", &bindings);
+    expr_t *integral = expr_from_string("{ ∫_x^y z*u dz }", &bindings);
     expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
     expr_t *y = bindings ? expr_bindings_get(bindings, "y") : NULL;
     expr_t *u = bindings ? expr_bindings_get(bindings, "u") : NULL;
@@ -2971,7 +2971,7 @@ static void test_integrate_unevaluated_integral_evaluation(void)
 static void test_integrate_unevaluated_integral_constant_upper(void)
 {
     expr_bindings_t *bindings = NULL;
-    expr_t *expr = expr_from_string("{ @S^3 sin(t) dt }", &bindings);
+    expr_t *expr = expr_from_string("{ ∫^3 sin(t) dt }", &bindings);
     expr_t *expected = expr_from_string("{ 1 - cos(3) }", NULL);
     expr_t *z = bindings ? expr_bindings_get(bindings, "z") : NULL;
     expr_t *t = bindings ? expr_bindings_get(bindings, "t") : NULL;
@@ -2998,7 +2998,7 @@ static void test_integrate_unevaluated_integral_chain_rule_upper(void)
     expr_bindings_t *bindings = NULL;
     expr_bindings_t *expected_deriv_bindings = NULL;
     expr_bindings_t *expected_value_bindings = NULL;
-    expr_t *expr = expr_from_string("{ @S^(x+1) sin(t) dt | x = NAN }", &bindings);
+    expr_t *expr = expr_from_string("{ ∫^(x+1) sin(t) dt | x = NAN }", &bindings);
     expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
     expr_t *deriv = (expr && x) ? expr_create_deriv(expr, x) : NULL;
     expr_t *expected_deriv =
@@ -3051,7 +3051,7 @@ static void test_integrate_unevaluated_integral_explicit_bounds(void)
     static const double points[] = { -1.0, -0.25, 0.5, 1.25 };
     expr_bindings_t *bindings = NULL;
     expr_bindings_t *expected_deriv_bindings = NULL;
-    expr_t *expr = expr_from_string("{ @S^x_1 t² dt | x = NAN }", &bindings);
+    expr_t *expr = expr_from_string("{ ∫^x_1 t² dt | x = NAN }", &bindings);
     expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
     expr_t *deriv = (expr && x) ? expr_create_deriv(expr, x) : NULL;
     expr_t *expected_deriv =
@@ -3152,7 +3152,8 @@ static void test_integrate_unevaluated_integral_display_symbolic_result(void)
 
     ASSERT_NOT_NULL(indefinite_text);
     ASSERT_TRUE(strstr(indefinite_text,
-                       "2x + tan(x)·(ln(tan(x) + cot(x)) - 1) + C") != NULL);
+                       "tan(x)·(ln(tan(x) + cot(x)) - 1)") != NULL);
+    ASSERT_TRUE(strstr(indefinite_text, "C₀") != NULL);
     ASSERT_TRUE(strstr(indefinite_text, "∫") == NULL);
 
     ASSERT_TRUE(expr_integral_value_note(mismatch,

@@ -3937,6 +3937,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           <ul>
             <li>An ordinary expression such as <code>sin(x)</code> needs a value in every variable binding box before <code>Evaluate</code> becomes available.</li>
             <li>A symbolic derivative such as <code>Dx(sin(x))</code> can be evaluated with <code>x</code> blank because the result is another expression.</li>
+            <li>An unevaluated integral such as <code>@S^x exp(u)du</code> can likewise be evaluated with its bindings blank.</li>
             <li>Constants may remain blank when you want them preserved symbolically in the result.</li>
             <li>The binding boxes and Evaluate state come from the parsed MARS expression, including while you edit or remove symbols.</li>
           </ul>
@@ -6480,15 +6481,44 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       if (wanted && Array.from(select.options).some((option) => option.value === wanted)) {
         select.value = wanted;
         syncRoundedSelect(select);
+        applyRestoredTownSelection(select);
         return true;
       }
       const compatible = Array.from(select.options).find((option) => townOptionMatchesValue(option, wanted));
       if (compatible) {
         select.value = compatible.value;
         syncRoundedSelect(select);
+        applyRestoredTownSelection(select);
         return true;
       }
-      return selectTownByCoordinates(select, latitude, longitude);
+      if (selectTownByCoordinates(select, latitude, longitude))
+        return true;
+      select.value = '';
+      syncRoundedSelect(select);
+      return false;
+    }
+
+    function applyRestoredTownSelection(select) {
+      if (select === datetimeTown) {
+        applySelectedTown({
+          townSelect: datetimeTown,
+          latitudeInput: datetimeLatitude,
+          longitudeInput: datetimeLongitude,
+          elevationInput: datetimeElevation,
+          zoneInput: datetimeGmtOffset,
+          dateInput: datetimeDate,
+          resetOffsetTouched: true
+        });
+      } else if (select === almanacTown) {
+        applySelectedTown({
+          townSelect: almanacTown,
+          latitudeInput: almanacLatitude,
+          longitudeInput: almanacLongitude,
+          elevationInput: almanacElevation,
+          zoneInput: almanacZone,
+          dateInput: almanacDate
+        });
+      }
     }
 
     function populateTownSelect(select, jurisdiction, {selectDefault = true} = {}) {
@@ -6530,6 +6560,22 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         return null;
       const byValue = Array.from(select.options).find((option) => option.value === select.value);
       return byValue || select.selectedOptions[0] || null;
+    }
+
+    function clearTownForCustomCoordinates(townSelect, latitudeInput, longitudeInput, elevationInput) {
+      const option = selectedTownOption(townSelect);
+      if (!option)
+        return;
+      const latitudeMatches = numbersNearlyEqual(option.dataset.latitude, latitudeInput && latitudeInput.value);
+      const longitudeMatches = numbersNearlyEqual(option.dataset.longitude, longitudeInput && longitudeInput.value);
+      const selectedElevation = String(option.dataset.elevation || '').trim();
+      const currentElevation = String(elevationInput && elevationInput.value || '').trim();
+      const elevationMatches = !selectedElevation || !currentElevation ||
+        numbersNearlyEqual(selectedElevation, currentElevation, 0.01);
+      if (latitudeMatches && longitudeMatches && elevationMatches)
+        return;
+      townSelect.value = '';
+      syncRoundedSelect(townSelect);
     }
 
     function timeZoneOffsetHours(timeZone, dateText) {
@@ -10095,6 +10141,13 @@ __HOLIDAY_JURISDICTION_OPTIONS__
               dateInput: datetimeDate,
               resetOffsetTouched: true
             });
+          } else if (control === datetimeLatitude || control === datetimeLongitude || control === datetimeElevation) {
+            clearTownForCustomCoordinates(
+              datetimeTown,
+              datetimeLatitude,
+              datetimeLongitude,
+              datetimeElevation
+            );
           }
           if (currentMode() === 'datetime') {
             triggerDatetimeAutoEvaluation({
@@ -10132,6 +10185,13 @@ __HOLIDAY_JURISDICTION_OPTIONS__
               zoneInput: almanacZone,
               dateInput: almanacDate
             });
+          } else if (control === almanacLatitude || control === almanacLongitude || control === almanacElevation) {
+            clearTownForCustomCoordinates(
+              almanacTown,
+              almanacLatitude,
+              almanacLongitude,
+              almanacElevation
+            );
           }
           if (currentMode() === 'almanac') {
 	            triggerAlmanacAutoEvaluation({

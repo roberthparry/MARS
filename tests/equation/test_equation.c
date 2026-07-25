@@ -238,12 +238,18 @@ static void test_equation_from_string_shares_symbols_across_sides(void)
 static void test_equation_from_string_accepts_bare_equation(void)
 {
     equation_t *equation = equ_from_string("2*x + 3 = 7");
+    equation_t *multi = equ_from_string("x + y = z");
     expr_t *x;
     ASSERT_NEW_RESULT(result);
 
     ASSERT_NOT_NULL(equation);
+    ASSERT_NOT_NULL(multi);
     x = equ_binding(equation, "x");
     ASSERT_NOT_NULL(x);
+    ASSERT_EQ_INT((int)expr_bindings_count(equ_bindings(multi)), 3);
+    ASSERT_NOT_NULL(equ_binding(multi, "x"));
+    ASSERT_NOT_NULL(equ_binding(multi, "y"));
+    ASSERT_NOT_NULL(equ_binding(multi, "z"));
 
     ASSERT_EQ_INT(equ_solve_for(equation, x, result), 0);
     ASSERT_TRUE(RESULT_IS_SOLVED(result));
@@ -251,6 +257,7 @@ static void test_equation_from_string_accepts_bare_equation(void)
     ASSERT_TRUE(test_equation_result_contains_long(result, 2L));
 
     equ_solve_result_free(result);
+    equ_free(multi);
     equ_free(equation);
 }
 

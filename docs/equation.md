@@ -31,6 +31,31 @@ lhs = rhs
 { lhs = rhs | x = val, ...; [name] = val, ... }
 ```
 
+The first form is shorthand handled directly by `equ_from_string(...)` and
+`equ_from_text(...)`. For example:
+
+```text
+x + y = z
+```
+
+is equivalent to:
+
+```text
+{ x + y = z | x = ?, y = ?, z = ? }
+```
+
+MARS infers one shared binding table before parsing the two sides, so every
+occurrence of a name resolves to the same expression leaf. Callers should pass
+the bare equation unchanged; Python, scratch programs, and other clients do not
+need to add braces or binding declarations.
+
+Calculus operators retain their expression-level scope within an equation.
+Consequently, the `x` in `@S_0^1 f(x) dx` is local to the definite integral and
+does not enter the equation's shared binding table. The completed indefinite
+form `@S f(x) dx` remains a family in `x`, so `x` is included in that table.
+An occurrence of `x` elsewhere on either side of the equation is free and is
+therefore included normally.
+
 The binding section is significant:
 
 - variable bindings before `;` identify symbols that may be solved for
