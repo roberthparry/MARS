@@ -1540,9 +1540,6 @@ static void test_from_string_errors(void)
     /* NULL input (silent — no stderr output) */
     check_parse_null("NULL input",
         NULL, __LINE__);
-    /* Missing opening '{' */
-    check_parse_null_stderr_contains("no opening brace",
-        "x + 1", "{", __LINE__);
     /* Missing closing '}' */
     check_parse_null_stderr_contains("no closing brace",
         "{ x | x = 1", "}", __LINE__);
@@ -1626,6 +1623,30 @@ static void test_from_expression_string_api(void)
             TEST_FAIL();
         }
         expr_free(ok);
+    }
+
+    {
+        expr_bindings_t *bare_bindings = NULL;
+        expr_t *bare = expr_from_string("x + y", &bare_bindings);
+        string_t *bare_text = string_new_with("x + y");
+        expr_bindings_t *text_bindings = NULL;
+        expr_t *from_text = expr_from_text(bare_text, &text_bindings);
+
+        TEST_ASSERT_NOT_NULL(bare);
+        TEST_ASSERT_NOT_NULL(bare_bindings);
+        TEST_ASSERT_TRUE(expr_bindings_count(bare_bindings) == 2u,
+                         "bare shorthand returns both inferred bindings");
+        TEST_ASSERT_NOT_NULL(expr_bindings_get(bare_bindings, "x"));
+        TEST_ASSERT_NOT_NULL(expr_bindings_get(bare_bindings, "y"));
+        TEST_ASSERT_NOT_NULL(from_text);
+        TEST_ASSERT_TRUE(expr_bindings_count(text_bindings) == 2u,
+                         "expr_from_text infers bare shorthand bindings");
+
+        expr_free(from_text);
+        expr_bindings_free(text_bindings);
+        string_free(bare_text);
+        expr_free(bare);
+        expr_bindings_free(bare_bindings);
     }
 
     if (expr_from_expression_string("x + y", names, NULL, 2) != NULL) {
@@ -2228,6 +2249,16 @@ static void test_from_string_unevaluated_integral(void)
         TEST_FAIL();
     }
 
+    if (expr_contains_integral_operation(expr)) {
+        printf(C_BOLD C_GREEN "PASS" C_RESET
+               " unevaluated integral is reported as an evaluation operation\n\n");
+    } else {
+        printf(C_BOLD C_RED "FAIL" C_RESET
+               " unevaluated integral is reported as an evaluation operation %s:%d:1\n\n",
+               __FILE__, __LINE__);
+        TEST_FAIL();
+    }
+
     if (!t) {
         printf(C_BOLD C_GREEN "PASS" C_RESET
                " unevaluated integral dummy does not leak into bindings\n\n");
@@ -2311,24 +2342,24 @@ static void test_from_string_unevaluated_integral(void)
     expr = expr_from_string("{ @S^3 sin(t) dt }", &bindings);
     text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
     func_text = expr ? expr_to_string(expr, style_FUNCTION) : NULL;
-    if (text && strcmp(text, "∫^3 sin(t)·dt") == 0) {
+    if (text && strcmp(text, "-cos(3)") == 0) {
         printf(C_BOLD C_GREEN "PASS" C_RESET
-               " unevaluated integral literal upper bound parses without bindings\n");
+               " @S literal upper bound returns a completed antiderivative\n");
         printf(C_BOLD "  expr   " C_RESET "%s\n\n", text);
     } else {
         printf(C_BOLD C_RED "FAIL" C_RESET
-               " unevaluated integral literal upper bound parses without bindings %s:%d:1\n",
+               " @S literal upper bound returns a completed antiderivative %s:%d:1\n",
                __FILE__, __LINE__);
         printf(C_BOLD "  got    " C_RESET "%s\n\n", text ? text : "(null)");
         TEST_FAIL();
     }
-    if (func_text && strstr(func_text, "integral(3, sin(t), t)") != NULL) {
+    if (func_text && strstr(func_text, "return -(cos(3));") != NULL) {
         printf(C_BOLD C_GREEN "PASS" C_RESET
-               " unevaluated integral literal upper bound uses integral(3, ...)\n");
+               " @S literal upper bound function is completed by MARS\n");
         printf(C_BOLD "  expr   " C_RESET "%s\n\n", func_text);
     } else {
         printf(C_BOLD C_RED "FAIL" C_RESET
-               " unevaluated integral literal upper bound uses integral(3, ...) %s:%d:1\n",
+               " @S literal upper bound function is completed by MARS %s:%d:1\n",
                __FILE__, __LINE__);
         printf(C_BOLD "  got    " C_RESET "%s\n\n", func_text ? func_text : "(null)");
         TEST_FAIL();
@@ -2343,24 +2374,24 @@ static void test_from_string_unevaluated_integral(void)
     expr = expr_from_string("{ @S^3_1 1/t dt }", &bindings);
     text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
     func_text = expr ? expr_to_string(expr, style_FUNCTION) : NULL;
-    if (text && strcmp(text, "∫^3_1 1/t·dt") == 0) {
+    if (text && strcmp(text, "ln(3)") == 0) {
         printf(C_BOLD C_GREEN "PASS" C_RESET
-               " unevaluated integral with explicit lower bound parses\n");
+               " @S with explicit bounds returns a completed value expression\n");
         printf(C_BOLD "  expr   " C_RESET "%s\n\n", text);
     } else {
         printf(C_BOLD C_RED "FAIL" C_RESET
-               " unevaluated integral with explicit lower bound parses %s:%d:1\n",
+               " @S with explicit bounds returns a completed value expression %s:%d:1\n",
                __FILE__, __LINE__);
         printf(C_BOLD "  got    " C_RESET "%s\n\n", text ? text : "(null)");
         TEST_FAIL();
     }
-    if (func_text && strstr(func_text, "integral(1, 3, 1 / t, t)") != NULL) {
+    if (func_text && strstr(func_text, "return ln(3);") != NULL) {
         printf(C_BOLD C_GREEN "PASS" C_RESET
-               " unevaluated integral with explicit lower bound uses integral(lower, upper, ...)\n");
+               " @S bounded function is completed by MARS\n");
         printf(C_BOLD "  expr   " C_RESET "%s\n\n", func_text);
     } else {
         printf(C_BOLD C_RED "FAIL" C_RESET
-               " unevaluated integral with explicit lower bound uses integral(lower, upper, ...) %s:%d:1\n",
+               " @S bounded function is completed by MARS %s:%d:1\n",
                __FILE__, __LINE__);
         printf(C_BOLD "  got    " C_RESET "%s\n\n", func_text ? func_text : "(null)");
         TEST_FAIL();
@@ -2393,13 +2424,13 @@ static void test_from_string_unevaluated_integral(void)
 
     expr = expr_from_string("{ @S_1^3 1/t.dt }", &bindings);
     text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
-    if (text && strcmp(text, "∫^3_1 1/t·dt") == 0) {
+    if (text && strcmp(text, "ln(3)") == 0) {
         printf(C_BOLD C_GREEN "PASS" C_RESET
-               " unevaluated integral lower-then-upper @S form parses with full-stop differential\n");
+               " lower-then-upper @S form completes with full-stop differential\n");
         printf(C_BOLD "  expr   " C_RESET "%s\n\n", text);
     } else {
         printf(C_BOLD C_RED "FAIL" C_RESET
-               " unevaluated integral lower-then-upper @S form parses with full-stop differential %s:%d:1\n",
+               " lower-then-upper @S form completes with full-stop differential %s:%d:1\n",
                __FILE__, __LINE__);
         printf(C_BOLD "  got    " C_RESET "%s\n\n", text ? text : "(null)");
         TEST_FAIL();
@@ -2512,27 +2543,350 @@ static void test_from_string_unevaluated_integral(void)
     expr_free(expr);
 
     bindings = NULL;
-    expr = expr_from_string("{ @S^z exp(-x^2)dx }", &bindings);
+    expr = expr_from_string("{ @S^x exp(u)du + x }", &bindings);
     text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
-    func_text = expr ? expr_to_string(expr, style_FUNCTION) : NULL;
-    if (text && strcmp(text, "{ ∫^z exp(-x²)·dx | z = NAN }") == 0) {
+    if (text &&
+        strcmp(text, "{ exp(x) + x | x = NAN }") == 0 &&
+        bindings &&
+        expr_bindings_count(bindings) == 1u &&
+        expr_bindings_get(bindings, "x") &&
+        !expr_bindings_get(bindings, "d") &&
+        !expr_bindings_get(bindings, "u")) {
         printf(C_BOLD C_GREEN "PASS" C_RESET
-               " unevaluated integral preserves supplied dummy for upper-bound function form\n");
+               " completed @S does not expose its local dummy\n");
         printf(C_BOLD "  expr   " C_RESET "%s\n\n", text);
     } else {
         printf(C_BOLD C_RED "FAIL" C_RESET
-               " unevaluated integral preserves supplied dummy for upper-bound function form %s:%d:1\n",
+               " completed @S does not expose its local dummy %s:%d:1\n",
                __FILE__, __LINE__);
         printf(C_BOLD "  got    " C_RESET "%s\n\n", text ? text : "(null)");
         TEST_FAIL();
     }
-    if (func_text && strstr(func_text, "integral(z, exp(-(x^2)), x)") != NULL) {
+    free(text);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+
+    bindings = NULL;
+    expr = expr_from_string("{ @S^x u du + @S^x c dc }", &bindings);
+    text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
+    if (text &&
+        strstr(text, "½x² + ½x²") &&
+        bindings &&
+        expr_bindings_count(bindings) == 1u &&
+        expr_bindings_get(bindings, "x") &&
+        !expr_bindings_get(bindings, "d") &&
+        !expr_bindings_get(bindings, "u") &&
+        !expr_bindings_get(bindings, "c")) {
         printf(C_BOLD C_GREEN "PASS" C_RESET
-               " unevaluated integral function form keeps supplied dummy variable\n");
+               " completed @S operations keep their dummy variables local\n");
+        printf(C_BOLD "  expr   " C_RESET "%s\n\n", text);
+    } else {
+        printf(C_BOLD C_RED "FAIL" C_RESET
+               " completed @S operations keep their dummy variables local %s:%d:1\n",
+               __FILE__, __LINE__);
+        printf(C_BOLD "  got    " C_RESET "%s\n\n", text ? text : "(null)");
+        TEST_FAIL();
+    }
+    free(text);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+
+    bindings = NULL;
+    expr = expr_from_string(
+        "{ @S^z exp(sin(x))*(cos(x)^2 - sin(x)) + C_0 dx }",
+        &bindings);
+    text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
+    if (text &&
+        strstr(text, "z = NAN") &&
+        strstr(text, "C₀ = NAN") &&
+        !expr_bindings_get(bindings, "x")) {
+        printf(C_BOLD C_GREEN "PASS" C_RESET
+               " completed @S hides a dummy used only in its integrand\n");
+        printf(C_BOLD "  expr   " C_RESET "%s\n\n", text);
+    } else {
+        printf(C_BOLD C_RED "FAIL" C_RESET
+               " completed @S hides a dummy used only in its integrand %s:%d:1\n",
+               __FILE__, __LINE__);
+        printf(C_BOLD "  got    " C_RESET "%s\n\n", text ? text : "(null)");
+        TEST_FAIL();
+    }
+    free(text);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+
+    bindings = NULL;
+    expr = expr_from_string(
+        "{ exp(x)*@S^z exp(sin(x))*(cos(x)^2 - sin(x)) + C_0 dx }",
+        &bindings);
+    text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
+    if (text &&
+        strstr(text, "x = NAN") &&
+        expr_bindings_get(bindings, "x")) {
+        printf(C_BOLD C_GREEN "PASS" C_RESET
+               " completed @S retains a free dummy-name occurrence outside the integral\n");
+        printf(C_BOLD "  expr   " C_RESET "%s\n\n", text);
+    } else {
+        printf(C_BOLD C_RED "FAIL" C_RESET
+               " completed @S retains a free dummy-name occurrence outside the integral %s:%d:1\n",
+               __FILE__, __LINE__);
+        printf(C_BOLD "  got    " C_RESET "%s\n\n", text ? text : "(null)");
+        TEST_FAIL();
+    }
+    free(text);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+
+    bindings = NULL;
+    expr = expr_from_string("{ @S^x exp(c)dc + c }", &bindings);
+    text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
+    if (text &&
+        strcmp(text, "{ exp(x) + c | x = NAN; c = NAN }") == 0 &&
+        bindings &&
+        expr_bindings_count(bindings) == 2u &&
+        expr_bindings_get(bindings, "x") &&
+        expr_bindings_get(bindings, "c") &&
+        expr_bindings_is_constant_at(bindings, 1u) &&
+        !expr_bindings_get(bindings, "d")) {
+        printf(C_BOLD C_GREEN "PASS" C_RESET
+               " integral dummy scope ends at dc before a free c\n");
+        printf(C_BOLD "  expr   " C_RESET "%s\n\n", text);
+    } else {
+        printf(C_BOLD C_RED "FAIL" C_RESET
+               " integral dummy scope ends at dc before a free c %s:%d:1\n",
+               __FILE__, __LINE__);
+        printf(C_BOLD "  got    " C_RESET "%s\n\n", text ? text : "(null)");
+        TEST_FAIL();
+    }
+    free(text);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+
+    bindings = NULL;
+    expr = expr_from_string("{ @S^x exp(i)di }", &bindings);
+    text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
+    if (!expr && !text && !bindings) {
+        printf(C_BOLD C_GREEN "PASS" C_RESET
+               " di remains d times imaginary i, not an @S differential\n\n");
+    } else {
+        printf(C_BOLD C_RED "FAIL" C_RESET
+               " di remains d times imaginary i, not an @S differential %s:%d:1\n",
+               __FILE__, __LINE__);
+        printf(C_BOLD "  got    " C_RESET "%s\n\n", text ? text : "(null)");
+        TEST_FAIL();
+    }
+    free(text);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+
+    bindings = NULL;
+    expr = expr_from_string("{ @S^x exp(i)Di }", &bindings);
+    text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
+    if (!expr && !text && !bindings) {
+        printf(C_BOLD C_GREEN "PASS" C_RESET
+               " Di remains D times imaginary i, not an @S differential\n\n");
+    } else {
+        printf(C_BOLD C_RED "FAIL" C_RESET
+               " Di remains D times imaginary i, not an @S differential %s:%d:1\n",
+               __FILE__, __LINE__);
+        printf(C_BOLD "  got    " C_RESET "%s\n\n", text ? text : "(null)");
+        TEST_FAIL();
+    }
+    free(text);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+
+    bindings = NULL;
+    expr = expr_from_string("{ @S^x exp(i)di + i }", &bindings);
+    text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
+    if (!expr && !text && !bindings) {
+        printf(C_BOLD C_GREEN "PASS" C_RESET
+               " di cannot terminate @S before a trailing imaginary i\n\n");
+    } else {
+        printf(C_BOLD C_RED "FAIL" C_RESET
+               " di cannot terminate @S before a trailing imaginary i %s:%d:1\n",
+               __FILE__, __LINE__);
+        printf(C_BOLD "  got    " C_RESET "%s\n\n", text ? text : "(null)");
+        TEST_FAIL();
+    }
+    free(text);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+
+    bindings = NULL;
+    expr = expr_from_string("{ @S x dx }", &bindings);
+    {
+        char *display_text = expr
+            ? expr_to_string(expr, style_EXPRESSION)
+            : NULL;
+
+        if (display_text &&
+            strstr(display_text, "x²") &&
+            strstr(display_text, "C₀") &&
+            strstr(display_text, "x = NAN") &&
+            strstr(display_text, "C₀ = NAN") &&
+            expr_bindings_has_symbolic_integral(bindings)) {
+            printf(C_BOLD C_GREEN "PASS" C_RESET
+                   " @S without an upper substitution returns an indefinite family\n");
+            printf(C_BOLD "  expr   " C_RESET "%s\n\n", display_text);
+        } else {
+            printf(C_BOLD C_RED "FAIL" C_RESET
+                   " @S without an upper substitution returns an indefinite family %s:%d:1\n",
+                   __FILE__, __LINE__);
+            printf(C_BOLD "  got    " C_RESET "%s\n\n",
+                   display_text ? display_text : "(null)");
+            TEST_FAIL();
+        }
+        free(display_text);
+    }
+    expr_bindings_free(bindings);
+    expr_free(expr);
+
+    bindings = NULL;
+    expr = expr_from_string("{ @S x^2 dx }", &bindings);
+    text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
+    if (text &&
+        expr_bindings_get(bindings, "x") &&
+        strstr(text, "x = NAN")) {
+        printf(C_BOLD C_GREEN "PASS" C_RESET
+               " indefinite @S exposes its result variable as a binding\n");
+        printf(C_BOLD "  expr   " C_RESET "%s\n\n", text);
+    } else {
+        printf(C_BOLD C_RED "FAIL" C_RESET
+               " indefinite @S exposes its result variable as a binding %s:%d:1\n",
+               __FILE__, __LINE__);
+        printf(C_BOLD "  got    " C_RESET "%s\n\n", text ? text : "(null)");
+        TEST_FAIL();
+    }
+    free(text);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+
+    bindings = NULL;
+    expr = expr_from_string("{ @S_0^1 x^2 dx }", &bindings);
+    text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
+    if (text &&
+        (!bindings || !expr_bindings_get(bindings, "x")) &&
+        !strstr(text, "x = NAN")) {
+        printf(C_BOLD C_GREEN "PASS" C_RESET
+               " definite @S does not expose its bound variable\n");
+        printf(C_BOLD "  expr   " C_RESET "%s\n\n", text);
+    } else {
+        printf(C_BOLD C_RED "FAIL" C_RESET
+               " definite @S does not expose its bound variable %s:%d:1\n",
+               __FILE__, __LINE__);
+        printf(C_BOLD "  got    " C_RESET "%s\n\n", text ? text : "(null)");
+        TEST_FAIL();
+    }
+    free(text);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+
+    bindings = NULL;
+    expr = expr_from_string("{ @S^x x dx }", &bindings);
+    {
+        char *display_text = expr
+            ? expr_to_string(expr, style_EXPRESSION)
+            : NULL;
+
+        if (display_text &&
+            strstr(display_text, "½x²") &&
+            !strstr(display_text, "C₀") &&
+            expr_bindings_has_symbolic_integral(bindings)) {
+            printf(C_BOLD C_GREEN "PASS" C_RESET
+                   " explicit @S^x returns one antiderivative without a family constant\n");
+            printf(C_BOLD "  expr   " C_RESET "%s\n\n", display_text);
+        } else {
+            printf(C_BOLD C_RED "FAIL" C_RESET
+                   " explicit @S^x returns one antiderivative without a family constant %s:%d:1\n",
+                   __FILE__, __LINE__);
+            printf(C_BOLD "  got    " C_RESET "%s\n\n",
+                   display_text ? display_text : "(null)");
+            TEST_FAIL();
+        }
+        free(display_text);
+    }
+    expr_bindings_free(bindings);
+    expr_free(expr);
+
+    bindings = NULL;
+    expr = expr_from_string("{ @S^u x dx }", &bindings);
+    {
+        char *display_text = expr
+            ? expr_to_string(expr, style_EXPRESSION)
+            : NULL;
+
+        if (display_text &&
+            strstr(display_text, "½u²") &&
+            !strstr(display_text, "C₀") &&
+            expr_bindings_has_symbolic_integral(bindings)) {
+            printf(C_BOLD C_GREEN "PASS" C_RESET
+                   " @S^u returns an antiderivative substituted with u\n");
+            printf(C_BOLD "  expr   " C_RESET "%s\n\n", display_text);
+        } else {
+            printf(C_BOLD C_RED "FAIL" C_RESET
+                   " @S^u returns an antiderivative substituted with u %s:%d:1\n",
+                   __FILE__, __LINE__);
+            printf(C_BOLD "  got    " C_RESET "%s\n\n",
+                   display_text ? display_text : "(null)");
+            TEST_FAIL();
+        }
+        free(display_text);
+    }
+    expr_bindings_free(bindings);
+    expr_free(expr);
+
+    bindings = NULL;
+    expr = expr_from_string("{ @S (x + C_0) dx }", &bindings);
+    {
+        char *display_text = expr
+            ? expr_to_string(expr, style_EXPRESSION)
+            : NULL;
+
+        if (display_text &&
+            strstr(display_text, "C₀x") &&
+            strstr(display_text, "C₁") &&
+            strstr(display_text, "C₁ = NAN") &&
+            expr_bindings_get(bindings, "C_0") &&
+            expr_bindings_get(bindings, "C_1")) {
+            printf(C_BOLD C_GREEN "PASS" C_RESET
+                   " indefinite integral chooses the next unused family constant\n");
+            printf(C_BOLD "  expr   " C_RESET "%s\n\n", display_text);
+        } else {
+            printf(C_BOLD C_RED "FAIL" C_RESET
+                   " indefinite integral chooses the next unused family constant %s:%d:1\n",
+                   __FILE__, __LINE__);
+            printf(C_BOLD "  got    " C_RESET "%s\n\n",
+                   display_text ? display_text : "(null)");
+            TEST_FAIL();
+        }
+        free(display_text);
+    }
+    expr_bindings_free(bindings);
+    expr_free(expr);
+
+    bindings = NULL;
+    expr = expr_from_string("{ @S^z exp(-x^2)dx }", &bindings);
+    text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
+    func_text = expr ? expr_to_string(expr, style_FUNCTION) : NULL;
+    if (text && strstr(text, "√(π)·erf(z)") && strstr(text, "z = NAN")) {
+        printf(C_BOLD C_GREEN "PASS" C_RESET
+               " @S substitutes its explicit upper variable in the antiderivative\n");
+        printf(C_BOLD "  expr   " C_RESET "%s\n\n", text);
+    } else {
+        printf(C_BOLD C_RED "FAIL" C_RESET
+               " @S substitutes its explicit upper variable in the antiderivative %s:%d:1\n",
+               __FILE__, __LINE__);
+        printf(C_BOLD "  got    " C_RESET "%s\n\n", text ? text : "(null)");
+        TEST_FAIL();
+    }
+    if (func_text && strstr(func_text, "erf(z)") != NULL &&
+        strstr(func_text, "integral(") == NULL) {
+        printf(C_BOLD C_GREEN "PASS" C_RESET
+               " completed @S function contains no integral node\n");
         printf(C_BOLD "  expr   " C_RESET "%s\n\n", func_text);
     } else {
         printf(C_BOLD C_RED "FAIL" C_RESET
-               " unevaluated integral function form keeps supplied dummy variable %s:%d:1\n",
+               " completed @S function contains no integral node %s:%d:1\n",
                __FILE__, __LINE__);
         printf(C_BOLD "  got    " C_RESET "%s\n\n", func_text ? func_text : "(null)");
         TEST_FAIL();
@@ -2545,13 +2899,15 @@ static void test_from_string_unevaluated_integral(void)
     bindings = NULL;
     expr = expr_from_string("{ @S_0^1 exp(-x^2)dx }", &bindings);
     text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
-    if (text && strcmp(text, "∫^1_0 exp(-x²)·dx") == 0) {
+    if (text && strstr(text, "√(π)") &&
+        strstr(text, "erf(1) - erf(0)") &&
+        strstr(text, "∫") == NULL) {
         printf(C_BOLD C_GREEN "PASS" C_RESET
-               " bounded unevaluated integral preserves supplied dummy for numeric form\n");
+               " bounded @S returns a completed expression\n");
         printf(C_BOLD "  expr   " C_RESET "%s\n\n", text);
     } else {
         printf(C_BOLD C_RED "FAIL" C_RESET
-               " bounded unevaluated integral preserves supplied dummy for numeric form %s:%d:1\n",
+               " bounded @S returns a completed expression %s:%d:1\n",
                __FILE__, __LINE__);
         printf(C_BOLD "  got    " C_RESET "%s\n\n", text ? text : "(null)");
         TEST_FAIL();
@@ -2617,13 +2973,13 @@ static void test_from_string_unevaluated_integral(void)
     bindings = NULL;
     expr = expr_from_string("{ @S^@lambdasin(@alpha)d@alpha }", &bindings);
     text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
-    if (text && strcmp(text, "{ ∫^λ sin(α)·dα | λ = NAN }") == 0) {
+    if (text && strcmp(text, "{ -cos(λ) | λ = NAN }") == 0) {
         printf(C_BOLD C_GREEN "PASS" C_RESET
-               " unevaluated integral @S form parses with Greek aliases\n");
+               " @S completes with Greek aliases\n");
         printf(C_BOLD "  expr   " C_RESET "%s\n\n", text);
     } else {
         printf(C_BOLD C_RED "FAIL" C_RESET
-               " unevaluated integral @S form parses with Greek aliases %s:%d:1\n",
+               " @S completes with Greek aliases %s:%d:1\n",
                __FILE__, __LINE__);
         printf(C_BOLD "  got    " C_RESET "%s\n\n", text ? text : "(null)");
         TEST_FAIL();

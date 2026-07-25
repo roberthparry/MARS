@@ -1,8 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "qfloat.h"
 #include "expr_stringin_internal.h"
+#include "expr_stringout.h"
+#include "expr_stringout_internal.h"
 
 void *fs_xmalloc(size_t n)
 {
@@ -153,9 +156,159 @@ static expr_bindings_t *bindings_create(size_t count)
 }
 
 static int bindings_index_entry(expr_bindings_t *bindings,
+                                expr_binding_entry_t *entry);
+
+expr_bindings_t *expr_bindings_from_expr_internal(const expr_t *expr)
+{
+    varlist_t vars;
+    varlist_t constants;
+    expr_bindings_t *bindings;
+    size_t count = 0u;
+    size_t out = 0u;
+
+    if (!expr)
+        return NULL;
+
+    varlist_init(&vars);
+    varlist_init(&constants);
+    find_vars_dfs(expr, &vars);
+    find_named_consts_dfs(expr, &constants);
+
+    for (size_t i = 0u; i < vars.count; ++i)
+        if (vars.vars[i]->name && *vars.vars[i]->name)
+            count++;
+    for (size_t i = 0u; i < constants.count; ++i)
+        if (constants.vars[i]->name && *constants.vars[i]->name)
+            count++;
+
+    if (count == 0u) {
+        free(constants.vars);
+        free(vars.vars);
+        return NULL;
+    }
+
+    bindings = bindings_create(count);
+    if (!bindings)
+        goto fail;
+
+    for (size_t group = 0u; group < 2u; ++group) {
+        varlist_t *list = group == 0u ? &vars : &constants;
+
+        for (size_t i = 0u; i < list->count; ++i) {
+            expr_t *node = list->vars[i];
+            expr_binding_entry_t *entry;
+
+            if (!node->name || !*node->name)
+                continue;
+            entry = &bindings->entries[out++];
+            entry->name = string_new_with(node->name);
+            if (!entry->name) {
+                bindings_destroy_partial(bindings);
+                bindings = NULL;
+                goto fail;
+            }
+            entry->expr = node;
+            expr_retain(entry->expr);
+            entry->is_constant = expr_is_const(node);
+            if (bindings_index_entry(bindings, entry) != 0) {
+                bindings_destroy_partial(bindings);
+                bindings = NULL;
+                goto fail;
+            }
+        }
+    }
+
+    free(constants.vars);
+    free(vars.vars);
+    return bindings;
+
+fail:
+    free(constants.vars);
+    free(vars.vars);
+    return NULL;
+}
+
+static int bindings_index_entry(expr_bindings_t *bindings,
                                 expr_binding_entry_t *entry)
 {
     return dictionary_set(bindings->index, &entry->name, &entry) ? 0 : -1;
+}
+
+static bool bindings_has_name(const expr_bindings_t *bindings,
+                              const string_t *name)
+{
+    if (!bindings || !name)
+        return false;
+
+    for (size_t i = 0u; i < bindings->count; ++i)
+        if (string_compare(bindings->entries[i].name, name) == 0)
+            return true;
+    return false;
+}
+
+expr_bindings_t *expr_bindings_merge_internal(
+    const expr_bindings_t *bindings,
+    const expr_bindings_t *additional_bindings)
+{
+    expr_bindings_t *merged;
+    size_t count = bindings ? bindings->count : 0u;
+    size_t out = 0u;
+
+    if (!bindings && !additional_bindings)
+        return NULL;
+
+    if (additional_bindings) {
+        for (size_t i = 0u; i < additional_bindings->count; ++i) {
+            const expr_binding_entry_t *entry = &additional_bindings->entries[i];
+
+            if (!bindings_has_name(bindings, entry->name))
+                count++;
+        }
+    }
+
+    merged = bindings_create(count);
+    if (!merged)
+        return NULL;
+
+    for (size_t group = 0u; group < 2u; ++group) {
+        const expr_bindings_t *source =
+            group == 0u ? bindings : additional_bindings;
+
+        if (!source)
+            continue;
+        for (size_t i = 0u; i < source->count; ++i) {
+            const expr_binding_entry_t *source_entry = &source->entries[i];
+            expr_binding_entry_t *entry;
+
+            if (group == 1u &&
+                bindings_has_name(bindings, source_entry->name))
+                continue;
+
+            entry = &merged->entries[out++];
+            entry->name = string_clone(source_entry->name);
+            if (!entry->name) {
+                bindings_destroy_partial(merged);
+                return NULL;
+            }
+            entry->expr = source_entry->expr;
+            expr_retain(entry->expr);
+            entry->is_constant = source_entry->is_constant;
+            if (bindings_index_entry(merged, entry) != 0) {
+                bindings_destroy_partial(merged);
+                return NULL;
+            }
+        }
+    }
+
+    merged->has_symbolic_derivative =
+        (bindings && bindings->has_symbolic_derivative) ||
+        (additional_bindings &&
+         additional_bindings->has_symbolic_derivative);
+    merged->has_symbolic_integral =
+        (bindings && bindings->has_symbolic_integral) ||
+        (additional_bindings &&
+         additional_bindings->has_symbolic_integral);
+    return merged;
 }
 
 expr_bindings_t *symtab_build_bindings(const symtab_t *t)
@@ -190,6 +343,41 @@ expr_bindings_t *symtab_build_bindings(const symtab_t *t)
     return bindings;
 }
 
+static int expr_contains_node(const expr_t *expr, const expr_t *node)
+{
+    if (!expr || !node)
+        return 0;
+    if (expr == node)
+        return 1;
+    return expr_contains_node(expr->a, node) ||
+           expr_contains_node(expr->b, node);
+}
+
+static int expr_integral_binds_name(const expr_t *expr, const char *name)
+{
+    const expr_t *dummy;
+
+    if (!expr || !name)
+        return 0;
+    if (expr_is_op(expr, &ops_integral)) {
+        dummy = expr_integral_dummy_expr(expr);
+        if (dummy && dummy->name && strcmp(dummy->name, name) == 0)
+            return 1;
+    }
+    return expr_integral_binds_name(expr->a, name) ||
+           expr_integral_binds_name(expr->b, name);
+}
+
+static int expr_contains_integral(const expr_t *expr)
+{
+    if (!expr)
+        return 0;
+    if (expr_is_op(expr, &ops_integral))
+        return 1;
+    return expr_contains_integral(expr->a) ||
+           expr_contains_integral(expr->b);
+}
+
 static int symtab_binding_is_needed_for_expr(const expr_t *expr,
                                              const expr_t *node)
 {
@@ -198,8 +386,20 @@ static int symtab_binding_is_needed_for_expr(const expr_t *expr,
 
     if (!node)
         return 0;
-    if (!expr || !expr_is_var(node))
+    if (!expr)
+        return 0;
+    if (expr_is_const(node)) {
+        if (expr_contains_node(expr, node))
+            return 1;
+        if (node->name && expr_integral_binds_name(expr, node->name))
+            return 0;
+        if (node->name && strcmp(node->name, "d") == 0 &&
+            expr_contains_integral(expr))
+            return 0;
         return 1;
+    }
+    if (!expr_is_var(node))
+        return 0;
     if (node->binding_expr)
         return 1;
 

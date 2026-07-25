@@ -252,6 +252,16 @@ const expr_t *expr_integral_lower_bound_expr(const expr_t *integral)
     return domain->a;
 }
 
+bool expr_contains_integral_operation(const expr_t *expr)
+{
+    if (!expr)
+        return false;
+    if (expr_is_op(expr, &ops_integral))
+        return true;
+    return expr_contains_integral_operation(expr->a) ||
+           expr_contains_integral_operation(expr->b);
+}
+
 const char *expr_symbol_name(const expr_t *expr)
 {
     return (expr && expr->name && *expr->name) ? expr->name : NULL;
@@ -765,7 +775,7 @@ static expr_t *expr_display_add_integration_constant(expr_t *anti)
     if (!anti)
         return NULL;
 
-    constant = expr_new_named_const(NUM_ZERO, "C");
+    constant = expr_new_integration_constant_internal(anti, NULL, anti);
     if (!constant)
         return anti;
 
@@ -783,6 +793,7 @@ static expr_t *expr_display_simplified_integral(const expr_t *expr)
     const expr_t *lower;
     const expr_t *upper;
     expr_t *local_var = NULL;
+    expr_t *family_var = NULL;
     expr_t *local_integrand = NULL;
     expr_t *anti = NULL;
     expr_t *upper_eval = NULL;
@@ -808,7 +819,13 @@ static expr_t *expr_display_simplified_integral(const expr_t *expr)
     if (!anti)
         goto cleanup;
 
-    upper_eval = expr_substitute(anti, local_var, upper);
+    if (indefinite) {
+        family_var = expr_new_named_var(
+            NUM_NAN,
+            expr_symbol_name(dummy) ? expr_symbol_name(dummy) : "x");
+    }
+    upper_eval = expr_substitute(
+        anti, local_var, family_var ? family_var : upper);
     if (!upper_eval)
         goto cleanup;
 
@@ -848,6 +865,7 @@ cleanup:
     expr_free(upper_eval);
     expr_free(anti);
     expr_free(local_integrand);
+    expr_free(family_var);
     expr_free(local_var);
     return out;
 }

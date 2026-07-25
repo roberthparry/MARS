@@ -1,7 +1,9 @@
 /* expr_stringin.c - construct a expr_t from an expression-style string
  *
- * Accepts strings in the format produced by expr_to_text(f, style_EXPRESSION):
+ * Accepts bare expression shorthand or strings in the format produced by
+ * expr_to_text(f, style_EXPRESSION):
  *
+ *   expr
  *   { expr }
  *   { expr | x₀ = val, ...; [name] = val, ... }
  *
@@ -68,6 +70,9 @@ typedef struct {
     int                  error;
     string_t            *errmsg;
     bool                 has_symbolic_derivative;
+    bool                 has_symbolic_integral;
+    symtab_t             symbolic_integral_variables;
+    bool                 report_errors;
 } expr_parse_state_t;
 
 static void set_error(expr_parse_state_t *p, const char *msg)
@@ -101,6 +106,9 @@ static int expr_parse_state_init(expr_parse_state_t *p,
     p->error = 0;
     p->errmsg = string_new();
     p->has_symbolic_derivative = false;
+    p->has_symbolic_integral = false;
+    symtab_init(&p->symbolic_integral_variables);
+    p->report_errors = true;
 
     if (!p->errmsg) {
         string_cursor_free(p->cursor);
@@ -119,6 +127,7 @@ static void expr_parse_state_dispose(expr_parse_state_t *p)
     p->cursor = NULL;
     string_free(p->errmsg);
     p->errmsg = NULL;
+    symtab_free(&p->symbolic_integral_variables);
 }
 
 static size_t expr_parse_pos(const expr_parse_state_t *p)
@@ -202,7 +211,9 @@ static expr_t *parse_expression_view_with_metadata(
     symtab_t *syms,
     const char *context_label,
     int report_errors,
-    bool *has_symbolic_derivative_out);
+    bool *has_symbolic_derivative_out,
+    bool *has_symbolic_integral_out,
+    expr_bindings_t **symbolic_integral_bindings_out);
 static void symtab_discard_storage(symtab_t *t);
 
 static int symtab_clone_borrowed_except_text(symtab_t *dst,
@@ -1804,7 +1815,8 @@ static int parse_integral_try_differential_at(string_view_t text,
     string_cursor_skip_spaces(marker);
     marker_pos = string_cursor_position(marker);
     if (marker_pos <= start ||
-        !expr_parse_cursor_consume_char(marker, 'd')) {
+        (!expr_parse_cursor_consume_char(marker, 'd') &&
+         !expr_parse_cursor_consume_char(marker, 'D'))) {
         string_cursor_free(marker);
         return 0;
     }
@@ -1815,7 +1827,8 @@ static int parse_integral_try_differential_at(string_view_t text,
         if (name) {
             size_t after = string_cursor_position(marker);
 
-            if (parse_integral_after_differential_boundary(text, after)) {
+            if (strcmp(string_c_str(name), "i") != 0 &&
+                parse_integral_after_differential_boundary(text, after)) {
                 if (integrand_end_out)
                     *integrand_end_out = integrand_end;
                 if (after_diff_out)
@@ -1891,7 +1904,7 @@ static int parse_integral_find_differential(expr_parse_state_t *p,
                                                      integrand_end_out,
                                                      after_diff_out,
                                                      dummy_name_out)) ||
-                 (c == 'd' &&
+                 ((c == 'd' || c == 'D') &&
                   parse_integral_try_differential_at(text,
                                                      start,
                                                      pos,
@@ -2047,7 +2060,7 @@ static expr_t *parse_integral_bound_until_separator(expr_parse_state_t *p,
             string_view_slice(text, start, pos - start),
             p->syms,
             "expr_from_string",
-            1);
+            p->report_errors);
 
         if (!bound)
             return NULL;
@@ -2118,11 +2131,14 @@ static expr_t *parse_integral_atom(expr_parse_state_t *p)
     symtab_t local_syms;
     symtab_t *integrand_syms = p->syms;
     bool local_syms_ready = false;
+    bool evaluate_symbolically;
 
     if (expr_parse_peek_value(p, &cp, &cp_len) &&
         cp == INTEGRAL_SIGN_CODEPOINT) {
+        evaluate_symbolically = false;
         expr_parse_skip(p, cp_len);
     } else if (integral_ascii_standin_starts_view(text, expr_parse_pos(p))) {
+        evaluate_symbolically = true;
         expr_parse_skip(p, 2u);
     } else {
         set_error(p, "expected integral");
@@ -2211,7 +2227,7 @@ static expr_t *parse_integral_atom(expr_parse_state_t *p)
                           integrand_end - integrand_start),
         integrand_syms,
         "expr_from_string",
-        1);
+        p->report_errors);
     if (!display_integrand) {
         symtab_free(&local_syms);
         expr_free(dummy);
@@ -2226,6 +2242,15 @@ static expr_t *parse_integral_atom(expr_parse_state_t *p)
                                                upper,
                                                display_integrand,
                                                dummy);
+    if (result && evaluate_symbolically) {
+        expr_t *completed = expr_display_simplified(result);
+
+        p->has_symbolic_integral = true;
+        if (completed) {
+            expr_free(result);
+            result = completed;
+        }
+    }
     expr_free(dummy);
     expr_free(display_integrand);
     expr_free(lower);
@@ -2488,9 +2513,9 @@ static expr_t *parse_atom(expr_parse_state_t *p)
                     return NULL;
                 }
                 if (!string_view_is_empty(symbolic_exp_text)) {
-                    symbolic_exponent = parse_expression_view(symbolic_exp_text,
-                                                              p->syms,
-                                                              "expr_from_string", 1);
+                    symbolic_exponent = parse_expression_view(
+                        symbolic_exp_text, p->syms, "expr_from_string",
+                        p->report_errors);
                     if (!symbolic_exponent) {
                         expr_free(result);
                         return NULL;
@@ -2524,9 +2549,9 @@ static expr_t *parse_atom(expr_parse_state_t *p)
                     expr_free(b);
                 }
                 if (!string_view_is_empty(symbolic_exp_text)) {
-                    symbolic_exponent = parse_expression_view(symbolic_exp_text,
-                                                              p->syms,
-                                                              "expr_from_string", 1);
+                    symbolic_exponent = parse_expression_view(
+                        symbolic_exp_text, p->syms, "expr_from_string",
+                        p->report_errors);
                     if (!symbolic_exponent) {
                         expr_free(result);
                         return NULL;
@@ -2563,9 +2588,9 @@ static expr_t *parse_atom(expr_parse_state_t *p)
                     return NULL;
                 }
                 if (!string_view_is_empty(symbolic_exp_text)) {
-                    symbolic_exponent = parse_expression_view(symbolic_exp_text,
-                                                              p->syms,
-                                                              "expr_from_string", 1);
+                    symbolic_exponent = parse_expression_view(
+                        symbolic_exp_text, p->syms, "expr_from_string",
+                        p->report_errors);
                     if (!symbolic_exponent) {
                         expr_free(result);
                         return NULL;
@@ -2611,9 +2636,9 @@ static expr_t *parse_atom(expr_parse_state_t *p)
                     return NULL;
                 }
                 if (!string_view_is_empty(symbolic_exp_text)) {
-                    symbolic_exponent = parse_expression_view(symbolic_exp_text,
-                                                              p->syms,
-                                                              "expr_from_string", 1);
+                    symbolic_exponent = parse_expression_view(
+                        symbolic_exp_text, p->syms, "expr_from_string",
+                        p->report_errors);
                     if (!symbolic_exponent) {
                         expr_free(result);
                         return NULL;
@@ -2652,9 +2677,9 @@ static expr_t *parse_atom(expr_parse_state_t *p)
                     result = apply_unary_preserving_constexpr(fe->ops, arg, fe->ufn);
                 }
                 if (!string_view_is_empty(symbolic_exp_text)) {
-                    symbolic_exponent = parse_expression_view(symbolic_exp_text,
-                                                              p->syms,
-                                                              "expr_from_string", 1);
+                    symbolic_exponent = parse_expression_view(
+                        symbolic_exp_text, p->syms, "expr_from_string",
+                        p->report_errors);
                     if (!symbolic_exponent) {
                         expr_free(result);
                         return NULL;
@@ -3325,12 +3350,30 @@ static void symtab_discard_storage(symtab_t *t)
     symtab_free(t);
 }
 
+static expr_bindings_t *merge_symbolic_integral_bindings(
+    expr_bindings_t *bindings,
+    expr_bindings_t *symbolic_integral_bindings)
+{
+    expr_bindings_t *merged;
+
+    if (!symbolic_integral_bindings)
+        return bindings;
+
+    merged = expr_bindings_merge_internal(bindings,
+                                          symbolic_integral_bindings);
+    expr_bindings_free(symbolic_integral_bindings);
+    expr_bindings_free(bindings);
+    return merged;
+}
+
 static expr_t *parse_expression_view_with_metadata(
     string_view_t text,
     symtab_t *syms,
     const char *context_label,
     int report_errors,
-    bool *has_symbolic_derivative_out)
+    bool *has_symbolic_derivative_out,
+    bool *has_symbolic_integral_out,
+    expr_bindings_t **symbolic_integral_bindings_out)
 {
     expr_parse_state_t ps;
     expr_t *result;
@@ -3338,12 +3381,17 @@ static expr_t *parse_expression_view_with_metadata(
 
     if (has_symbolic_derivative_out)
         *has_symbolic_derivative_out = false;
+    if (has_symbolic_integral_out)
+        *has_symbolic_integral_out = false;
+    if (symbolic_integral_bindings_out)
+        *symbolic_integral_bindings_out = NULL;
     text = string_view_trim(text);
     if (string_view_is_empty(text))
         return NULL;
 
     if (expr_parse_state_init(&ps, text, syms) != 0)
         return NULL;
+    ps.report_errors = report_errors != 0;
 
     result = parse_addexpr(&ps);
     if (result && !ps.error) {
@@ -3368,6 +3416,11 @@ static expr_t *parse_expression_view_with_metadata(
 done:
     if (out && has_symbolic_derivative_out)
         *has_symbolic_derivative_out = ps.has_symbolic_derivative;
+    if (out && has_symbolic_integral_out)
+        *has_symbolic_integral_out = ps.has_symbolic_integral;
+    if (out && symbolic_integral_bindings_out)
+        *symbolic_integral_bindings_out =
+            symtab_build_bindings(&ps.symbolic_integral_variables);
     expr_parse_state_dispose(&ps);
     return out;
 }
@@ -3378,7 +3431,7 @@ static expr_t *parse_expression_view(string_view_t text,
                                      int report_errors)
 {
     return parse_expression_view_with_metadata(
-        text, syms, context_label, report_errors, NULL);
+        text, syms, context_label, report_errors, NULL, NULL, NULL);
 }
 
 /* ------------------------------------------------------------------ */
@@ -3471,6 +3524,8 @@ static expr_t *expr_from_string_view_impl(string_view_t source,
     int depth = 0;
     unsigned char c;
     bool has_symbolic_derivative = false;
+    bool has_symbolic_integral = false;
+    expr_bindings_t *symbolic_integral_bindings = NULL;
 
     if (bindings_out)
         *bindings_out = NULL;
@@ -3572,15 +3627,28 @@ static expr_t *expr_from_string_view_impl(string_view_t source,
 
         expr_t *result = parse_expression_view_with_metadata(
             content, NULL, "expr_from_string", 0,
-            &has_symbolic_derivative);
+            &has_symbolic_derivative,
+            &has_symbolic_integral,
+            &symbolic_integral_bindings);
 
         if (result) {
-            if (bindings_out)
-                *bindings_out = single_binding_from_node(result);
+            if (bindings_out) {
+                *bindings_out = has_symbolic_integral
+                    ? expr_bindings_from_expr_internal(result)
+                    : single_binding_from_node(result);
+                *bindings_out = merge_symbolic_integral_bindings(
+                    *bindings_out,
+                    symbolic_integral_bindings);
+                symbolic_integral_bindings = NULL;
+            }
             if (bindings_out && *bindings_out)
                 (*bindings_out)->has_symbolic_derivative =
                     has_symbolic_derivative;
+            if (bindings_out && *bindings_out)
+                (*bindings_out)->has_symbolic_integral =
+                    has_symbolic_integral;
             string_free(errmsg);
+            expr_bindings_free(symbolic_integral_bindings);
             return result;
         }
 
@@ -3589,13 +3657,25 @@ static expr_t *expr_from_string_view_impl(string_view_t source,
             if (collect_implicit_symbols(content, &syms) == 0 && syms.count > 0) {
                 result = parse_expression_view_with_metadata(
                     content, &syms, "expr_from_string", 1,
-                    &has_symbolic_derivative);
+                    &has_symbolic_derivative,
+                    &has_symbolic_integral,
+                    &symbolic_integral_bindings);
             }
-            if (result && bindings_out)
-                bindings = symtab_build_bindings_for_expr(&syms, result);
+            if (result && bindings_out) {
+                bindings = has_symbolic_integral
+                    ? expr_bindings_from_expr_internal(result)
+                    : symtab_build_bindings_for_expr(&syms, result);
+                bindings = merge_symbolic_integral_bindings(
+                    bindings,
+                    symbolic_integral_bindings);
+                symbolic_integral_bindings = NULL;
+            }
             if (bindings)
                 bindings->has_symbolic_derivative =
                     has_symbolic_derivative;
+            if (bindings)
+                bindings->has_symbolic_integral =
+                    has_symbolic_integral;
             if (result && bindings_out)
                 symtab_discard_storage(&syms);
             else
@@ -3604,10 +3684,12 @@ static expr_t *expr_from_string_view_impl(string_view_t source,
                 if (bindings_out)
                     *bindings_out = bindings;
                 string_free(errmsg);
+                expr_bindings_free(symbolic_integral_bindings);
                 return result;
             }
 
             string_free(errmsg);
+            expr_bindings_free(symbolic_integral_bindings);
             return NULL;
         }
 
@@ -3665,12 +3747,22 @@ static expr_t *expr_from_string_view_impl(string_view_t source,
 
     expr_t *result = parse_expression_view_with_metadata(
         expr_view, &syms, "expr_from_string", 1,
-        &has_symbolic_derivative);
+        &has_symbolic_derivative,
+        &has_symbolic_integral,
+        &symbolic_integral_bindings);
     if (result && bindings_out) {
-        bindings = symtab_build_bindings_for_expr(&syms, result);
+        bindings = has_symbolic_integral
+            ? expr_bindings_from_expr_internal(result)
+            : symtab_build_bindings_for_expr(&syms, result);
+        bindings = merge_symbolic_integral_bindings(
+            bindings,
+            symbolic_integral_bindings);
+        symbolic_integral_bindings = NULL;
     }
     if (bindings)
         bindings->has_symbolic_derivative = has_symbolic_derivative;
+    if (bindings)
+        bindings->has_symbolic_integral = has_symbolic_integral;
 
     if (result && bindings_out) {
         symtab_discard_storage(&syms);
@@ -3679,19 +3771,49 @@ static expr_t *expr_from_string_view_impl(string_view_t source,
     }
     if (result && bindings_out)
         *bindings_out = bindings;
+    expr_bindings_free(symbolic_integral_bindings);
     string_free(errmsg);
     return result;
 }
 
 expr_t *expr_from_text(const string_t *text, expr_bindings_t **bnd_out)
 {
+    string_view_t source;
+    string_cursor_t *cursor;
+    string_t *wrapped;
+    expr_t *result;
+    unsigned char first = 0u;
+
     if (!text) {
         if (bnd_out)
             *bnd_out = NULL;
         return NULL;
     }
 
-    return expr_from_string_view_impl(string_view_all(text), bnd_out);
+    source = string_view_trim(string_view_all(text));
+    cursor = string_cursor_new_view(source);
+    if (!cursor)
+        return NULL;
+    string_cursor_skip_spaces(cursor);
+    if (string_cursor_peek_ascii(cursor, &first) && first == '{') {
+        string_cursor_free(cursor);
+        return expr_from_string_view_impl(source, bnd_out);
+    }
+    string_cursor_free(cursor);
+
+    wrapped = string_new_with("{ ");
+    if (!wrapped ||
+        string_append_string(wrapped, text) != 0 ||
+        string_append_cstr(wrapped, " }") != 0) {
+        string_free(wrapped);
+        if (bnd_out)
+            *bnd_out = NULL;
+        return NULL;
+    }
+
+    result = expr_from_string_view_impl(string_view_all(wrapped), bnd_out);
+    string_free(wrapped);
+    return result;
 }
 
 expr_t *expr_from_string(const char *s, expr_bindings_t **bnd_out)
@@ -3789,6 +3911,11 @@ bool expr_bindings_is_constant_at(const expr_bindings_t *bnd, size_t index)
 bool expr_bindings_has_symbolic_derivative(const expr_bindings_t *bnd)
 {
     return bnd && bnd->has_symbolic_derivative;
+}
+
+bool expr_bindings_has_symbolic_integral(const expr_bindings_t *bnd)
+{
+    return bnd && bnd->has_symbolic_integral;
 }
 
 expr_t *expr_edit_binding(const expr_t *expr,

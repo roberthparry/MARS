@@ -394,11 +394,14 @@ static void print_bindings(const char *label,
     }
 }
 
-static bool expression_evaluation_ready(expr_bindings_t *bindings)
+static bool expression_evaluation_ready(const expr_t *expr,
+                                        expr_bindings_t *bindings)
 {
     size_t count = expr_bindings_count(bindings);
 
-    if (expr_bindings_has_symbolic_derivative(bindings))
+    if (expr_bindings_has_symbolic_derivative(bindings) ||
+        expr_bindings_has_symbolic_integral(bindings) ||
+        expr_contains_integral_operation(expr))
         return true;
 
     for (size_t i = 0u; i < count; ++i) {
@@ -462,37 +465,20 @@ static void preserve_matching_binding_values(expr_bindings_t *bindings,
         if (!name || !binding)
             continue;
         source_binding = expr_bindings_get(source_bindings, name);
-        if (source_binding)
-            expr_set_val(binding, expr_get_val(source_binding));
+        if (source_binding) {
+            number_t value = expr_get_val(source_binding);
+
+            expr_set_val(binding, value);
+            num_destroy(&value);
+        }
     }
 
     expr_free(source_expr);
     expr_bindings_free(source_bindings);
 }
 
-static char *wrap_expression(const char *raw_input)
-{
-    size_t n;
-    char *wrapped_input;
-
-    if (!raw_input || raw_input[0] == '{')
-        return NULL;
-
-    n = strlen(raw_input);
-    wrapped_input = malloc(n + 5u);
-    if (!wrapped_input)
-        return NULL;
-
-    memcpy(wrapped_input, "{ ", 2u);
-    memcpy(wrapped_input + 2u, raw_input, n);
-    memcpy(wrapped_input + 2u + n, " }", 3u);
-    return wrapped_input;
-}
-
 static int parse_number_expression(const char *text, int precision, number_t *out)
 {
-    const char *input = text;
-    char *wrapped_input = NULL;
     expr_t *expr = NULL;
     int rc = 1;
 
@@ -502,11 +488,7 @@ static int parse_number_expression(const char *text, int precision, number_t *ou
     if (precision > 0)
         num_set_default_prec_digits((size_t)precision + 8u);
 
-    wrapped_input = wrap_expression(text);
-    if (wrapped_input)
-        input = wrapped_input;
-
-    expr = expr_from_string(input, NULL);
+    expr = expr_from_string(text, NULL);
     if (!expr) {
         goto cleanup;
     }
@@ -516,7 +498,6 @@ static int parse_number_expression(const char *text, int precision, number_t *ou
 
 cleanup:
     expr_free(expr);
-    free(wrapped_input);
     return rc;
 }
 
@@ -570,10 +551,8 @@ cleanup:
 static int run_goal_seek(int argc, char **argv)
 {
     const char *raw_input;
-    const char *input;
     const char *target_text;
     int precision;
-    char *wrapped_input = NULL;
     expr_bindings_t *bindings = NULL;
     expr_t *expr = NULL;
     number_t target = (number_t){0};
@@ -593,18 +572,13 @@ static int run_goal_seek(int argc, char **argv)
     }
 
     raw_input = argv[2];
-    input = raw_input;
     target_text = argv[3];
     precision = atoi(argv[4]);
 
     if (precision > 0)
         num_set_default_prec_digits((size_t)precision + 8u);
 
-    wrapped_input = wrap_expression(raw_input);
-    if (wrapped_input)
-        input = wrapped_input;
-
-    expr = expr_from_string(input, &bindings);
+    expr = expr_from_string(raw_input, &bindings);
     if (!expr) {
         goto cleanup;
     }
@@ -636,7 +610,7 @@ static int run_goal_seek(int argc, char **argv)
     func_text = expr_text_dup(result.expr, style_FUNCTION);
     tex_text = expr_tex_body_dup(result.expr);
 
-    printf("input       %s\n", input);
+    printf("input       %s\n", raw_input);
     printf("expression  %s\n", expr_text ? expr_text : "(null)");
     printf("unbound     %s\n", unbound_text ? unbound_text : "(null)");
     printf("function    %s\n", func_text ? func_text : "(null)");
@@ -658,7 +632,6 @@ cleanup:
     num_destroy(&target);
     expr_free(expr);
     expr_bindings_free(bindings);
-    free(wrapped_input);
     return rc;
 }
 
@@ -666,14 +639,11 @@ int main(int argc, char **argv)
 {
     const char *raw_input =
         argc > 1 ? argv[1] : "{ exp(sin(x)) + 3*x^2 - 7 | x = 1.25 }";
-    const char *input = raw_input;
     const char *wrt_name = argc > 2 ? argv[2] : "x";
     int precision = argc > 3 ? atoi(argv[3]) : -1;
     const char *action = argc > 4 ? argv[4] : "";
-    char *wrapped_input = NULL;
     expr_bindings_t *bindings = NULL;
     expr_t *expr = NULL;
-    expr_t *display_expr = NULL;
     expr_t *deriv = NULL;
     expr_t *display_deriv = NULL;
     expr_t *integral = NULL;
@@ -698,7 +668,6 @@ int main(int argc, char **argv)
                             binding_edit_request;
     bool derivative_request = !integral_request && !evaluate_request;
     bool wrt_is_variable = false;
-    bool display_expr_owned = false;
     bool display_deriv_owned = false;
     int rc = 0;
 
@@ -708,14 +677,11 @@ int main(int argc, char **argv)
     if (precision > 0)
         num_set_default_prec_digits((size_t)precision + 8u);
 
-    wrapped_input = wrap_expression(raw_input);
-    if (wrapped_input)
-        input = wrapped_input;
-
-    expr = expr_from_string(input, &bindings);
+    expr = expr_from_string(raw_input, &bindings);
 
     if (!expr) {
-        return 1;
+        rc = 1;
+        goto cleanup;
     }
 
     if (binding_edit_request) {
@@ -741,20 +707,12 @@ int main(int argc, char **argv)
     if (bindings_request && argc > 5)
         preserve_matching_binding_values(bindings, argv[5]);
 
-    display_expr = integral_request ? expr_simplify(expr)
-                                    : expr_display_simplified(expr);
-    if (display_expr) {
-        display_expr_owned = true;
-    } else {
-        display_expr = expr;
-    }
-
     expr_text = expr_text_dup(expr, style_EXPRESSION);
-    unbound_text = expr_text_dup(display_expr, style_UNBOUND);
-    func_text = expr_text_dup(display_expr, style_FUNCTION);
-    tex_text = expr_tex_body_dup(display_expr);
+    unbound_text = expr_text_dup(expr, style_UNBOUND);
+    func_text = expr_text_dup(expr, style_FUNCTION);
+    tex_text = expr_tex_body_dup(expr);
 
-    printf("input       %s\n", input);
+    printf("input       %s\n", raw_input);
     printf("expression  %s\n", expr_text ? expr_text : "(null)");
     printf("unbound     %s\n", unbound_text ? unbound_text : "(null)");
     printf("function    %s\n", func_text ? func_text : "(null)");
@@ -762,7 +720,7 @@ int main(int argc, char **argv)
     print_bindings("binding", bindings, precision);
     printf("differentiable  %s\n", expr_is_differentiable(expr) ? "yes" : "no");
     printf("evaluation_ready  %s\n",
-           expression_evaluation_ready(bindings) ? "yes" : "no");
+           expression_evaluation_ready(expr, bindings) ? "yes" : "no");
     value_note[0] = '\0';
     {
         number_t value_number = expr_eval(expr);
@@ -838,7 +796,6 @@ int main(int argc, char **argv)
     }
 
 cleanup:
-    free(wrapped_input);
     free(integral_tex_text);
     free(integral_func_text);
     free(integral_text);
@@ -853,8 +810,6 @@ cleanup:
         expr_free(display_deriv);
     if (display_integral && display_integral != integral)
         expr_free(display_integral);
-    if (display_expr_owned)
-        expr_free(display_expr);
     expr_free(integral);
     expr_free(deriv);
     expr_free(expr);

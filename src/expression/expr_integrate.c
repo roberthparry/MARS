@@ -414,9 +414,9 @@ static void expr_integral_constant_unicode_name(char *out, size_t out_size,
     }
 }
 
-static expr_t *expr_new_integral_constant_not_in(const expr_t *expr,
-                                                 const expr_t *wrt,
-                                                 const expr_t *anti)
+expr_t *expr_new_integration_constant_internal(const expr_t *expr,
+                                               const expr_t *wrt,
+                                               const expr_t *anti)
 {
     char name[32];
     char unicode_name[32];
@@ -447,7 +447,7 @@ expr_t *expr_integrate_family(const expr_t *expr, const expr_t *wrt)
     if (!anti)
         return NULL;
 
-    constant = expr_new_integral_constant_not_in(expr, wrt, anti);
+    constant = expr_new_integration_constant_internal(expr, wrt, anti);
     if (!constant) {
         expr_free(anti);
         return NULL;

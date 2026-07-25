@@ -165,11 +165,14 @@
         "editor.detectIndentation": false,
         "editor.tabSize": 4
     },
+    "[markdown]": {
+        "editor.wordWrap": "off"
+    },
+    "markdown.styles": [
+        "docs/books/ESAA/preview.css"
+    ],
     "makefile.buildLog": "",
     "terminal.integrated.scrollback": 10000,
     "C_Cpp.default.compilerPath": "/usr/bin/gcc",
-    "editor.inlineSuggest.enabled": true,
-    "markdown.styles": [
-        "docs/books/ESAA/preview.css"
-    ]
+    "editor.inlineSuggest.enabled": true
 }

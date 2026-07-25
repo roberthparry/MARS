@@ -252,6 +252,23 @@ string. It preserves the expression shape while canonicalising notation, so
 simplified equivalent. For differentiation, hold an explicit variable pointer
 so you can pass it to the derivative API.
 
+The outer braces and binding footer are optional. A bare expression is
+shorthand for a wrapped expression with bindings inferred by MARS:
+
+```text
+x + y
+```
+
+is equivalent to:
+
+```text
+{ x + y | x = ?, y = ? }
+```
+
+The parser stores unassigned values as `NaN`; `?` is the input spelling for the
+same unassigned state. The caller does not need to add braces or discover
+bindings before calling `expr_from_string(...)`.
+
 ```c
 #include <stdio.h>
 #include <stdlib.h>
@@ -747,15 +764,18 @@ expression expr_eval() {
 
 ### Parsing
 
-- `expr_t *expr_from_string(const char *s, expr_bindings_t **bnd_out)` — construct an `expr_t` from a string in the format produced by `expr_to_text(..., style_EXPRESSION)`. The parser preserves the written expression shape while canonicalising notation; call `expr_simplify(...)` explicitly for algebraic simplification. When `bnd_out` is non-NULL and the parse is symbolic, the parser also returns an opaque bindings object.
+- `expr_t *expr_from_string(const char *s, expr_bindings_t **bnd_out)` — construct an `expr_t` from either bare shorthand or the wrapped format produced by `expr_to_text(..., style_EXPRESSION)`. The parser preserves the written expression shape while canonicalising notation; call `expr_simplify(...)` explicitly for algebraic simplification. When `bnd_out` is non-NULL and the parse is symbolic, the parser also returns an opaque bindings object.
 - `expr_t *expr_bindings_get(expr_bindings_t *bnd, const char *name)` — find a returned symbolic binding by name; lookup accepts the same normalisation rules as parsing, so aliases like `@pi`/`π`, `@phi`/`φ`, `@gamma`/`γ`, and `@tau`/`τ` all resolve to the same binding
 - `void expr_bindings_free(expr_bindings_t *bnd)` — destroy a bindings object returned by `expr_from_string(...)`
 
   ```
+  expr
   { expr }
   { expr | x₀ = val, ...; [name] = val, ... }
   ```
 
+  Bare `expr` is equivalent to `{ expr }`. MARS itself infers the binding
+  names and classifications; callers should pass the original text unchanged.
   Variables appear before the `;`; named constants appear after it.
   If there is no `;`, all bindings are treated as variables.
   If the binding section begins with `;`, all bindings are treated as named constants.
@@ -776,10 +796,13 @@ expression expr_eval() {
   - `sin^2(x)` style ASCII exponents on function names
   - postfix factorial `x!`, which lowers to `gamma(x + 1)` when it remains
     symbolic and differentiable
-  - unevaluated integral forms `integral(x, f_expr, t)`, `@S^x f(t)dt`,
-    `@S^x f(t)*dt`, `@S^x f(t).dt`, `@S^x f(t)·dt`, `∫^x f(t)dt`, `∫^x f(t)*dt`, and
-    `∫^x f(t)·dt`; the spaced form `∫^x f(t) dt` is also accepted on input,
-    but the canonical pretty-printed form uses `·dt`
+  - literal unevaluated integral forms `integral(x, f_expr, t)`,
+    `∫^x f(t)dt`, `∫^x f(t)*dt`, and `∫^x f(t)·dt`; the spaced form
+    `∫^x f(t) dt` is also accepted on input, but the canonical pretty-printed
+    form uses `·dt`
+  - symbolic integral requests `@S f(x) dx`, `@S^u f(x) dx`,
+    `@S^b_a f(x) dx`, and `@S_a^b f(x) dx`; `*`, `.`, or `·` may appear
+    before the terminal differential
   - `sqrt(x)` or `√(x)` for square roots
   - `ln(x)` for natural logarithm; `log(x)`, `lg(x)`, and `log10(x)` for common logarithm
   - `versin(x)`, `vercos(x)`, `coversin(x)`, `covercos(x)`,
@@ -812,6 +835,32 @@ expression expr_eval() {
   The built-in-value inference is exact-name only. For example, `@pi` becomes
   the built-in constant `π`, but `@pi1`, `@pi2`, and `@pi_3` normalise to
   `π₁`, `π₂`, and `π₃` and remain ordinary symbolic variables.
+
+  `@S` changes the interpretation from a stored integral node to a symbolic
+  integration request:
+
+  ```text
+  @S f(x) dx       -> F(x) + C₀
+  @S^u f(x) dx     -> F(u)
+  @S^5 f(x) dx     -> F(5)
+  @S^5_0 f(x) dx   -> F(5) - F(0)
+  @S_0^5 f(x) dx   -> F(5) - F(0)
+  ```
+
+  The upper-only form evaluates one chosen antiderivative at the supplied
+  argument; it does not imply a lower bound of zero. Both two-bound spellings
+  denote the same definite integral. The terminal `d<name>` identifies the
+  integration variable, except that `di` and `Di` are currently multiplication
+  by the built-in imaginary constant `i`, not differentials. Consequently an
+  `@S` request cannot use `di` as its terminal differential.
+
+  The terminal differential also establishes the scope of its integration
+  variable. In `@S_0^1 f(x) dx`, `x` is bound throughout the integrand and is
+  not returned as an input binding. In `@S f(x) dx`, the completed indefinite
+  family contains `x`, so `x` is returned as a binding alongside the arbitrary
+  constant. A free occurrence outside the integral remains a binding: for
+  example, the outer `x` in `exp(x) * @S_0^1 f(x) dx` is not hidden by the
+  integral's local `x`.
 
   Repeated occurrences of the same normalised symbol name within one parsed
   expression resolve to the same underlying leaf node. Reusing the same name as

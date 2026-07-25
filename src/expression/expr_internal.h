@@ -546,6 +546,7 @@ struct expr_bindings_t {
     expr_binding_entry_t *entries;
     dictionary_t *index;
     bool has_symbolic_derivative;
+    bool has_symbolic_integral;
 };
 
 /* ------------------------------------------------------------------------- */
@@ -649,6 +650,13 @@ const expr_ops_t * expr_ops_reciprocal_unary                    (const expr_ops_
 
 /* Integration and inverse-function simplification helpers. */
 expr_t * expr_integrate_dispatch_primitive        (const expr_t *expr, const expr_t *wrt);
+expr_t * expr_new_integration_constant_internal   (const expr_t *expr,
+                                                    const expr_t *wrt,
+                                                    const expr_t *anti);
+expr_bindings_t *expr_bindings_from_expr_internal (const expr_t *expr);
+expr_bindings_t *expr_bindings_merge_internal     (
+    const expr_bindings_t *bindings,
+    const expr_bindings_t *additional_bindings);
 bool     expr_ops_has_inverse_unary_simplify_rule (const expr_ops_t *ops);
 bool     expr_inverse_unary_candidate_value_ok    (const expr_ops_t *ops, number_t value);
 expr_t * expr_simplify_try_vtable_inverse_argument(const expr_t *outer, const expr_t *arg);
