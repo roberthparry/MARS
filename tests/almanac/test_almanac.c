@@ -459,6 +459,39 @@ static void test_almanac_next_moon_phase_exact_finds_august_2026_new_moon(void)
     assert_exact_moon_phase_case();
 }
 
+static void test_almanac_next_moon_phase_exact_advances_past_previous_phase(void)
+{
+    datetime_t *after;
+    almanac_t *almanac;
+    almanac_moon_phase_event_t first;
+    almanac_moon_phase_event_t next;
+
+    after = datetime_alloc();
+    TEST_ASSERT_NOT_NULL(after);
+    TEST_ASSERT_NOT_NULL(datetime_init_ymd(after, 2031, DT_October, 25));
+
+    almanac = almanac_open();
+    TEST_ASSERT_NOT_NULL(almanac);
+    TEST_ASSERT_TRUE(almanac_next_moon_phase_exact(almanac,
+                                                   after,
+                                                   ALMANAC_MOON_PHASE_FULL,
+                                                   &first),
+                     almanac_last_error(almanac));
+    TEST_ASSERT_NOT_NULL(datetime_init_jd(after, first.time.jd + 0.5));
+    TEST_ASSERT_TRUE(almanac_next_moon_phase_exact(almanac,
+                                                   after,
+                                                   ALMANAC_MOON_PHASE_FULL,
+                                                   &next),
+                     almanac_last_error(almanac));
+    TEST_ASSERT_TRUE(next.time.jd > datetime_jd(after),
+                     "next full Moon advances beyond the requested instant");
+    TEST_ASSERT_TRUE(next.time.jd > first.time.jd + 25.0,
+                     "successive full Moons are distinct lunations");
+
+    almanac_close(almanac);
+    datetime_dealloc(after);
+}
+
 static void assert_sunrise_sunset_case(void)
 {
     datetime_t *date;
@@ -778,6 +811,45 @@ static void test_almanac_find_lunar_eclipses_returns_events_in_2025(void)
     assert_lunar_eclipse_search_case();
 }
 
+static void test_almanac_find_lunar_eclipses_matches_july_2028_partial_event(void)
+{
+    datetime_t *start = datetime_alloc();
+    datetime_t *end = datetime_alloc();
+    almanac_t *almanac;
+    array_t *events;
+    const almanac_lunar_eclipse_t *event;
+    almanac_event_time_t greatest;
+    almanac_observer_t cape_town = {-33.9258, 18.4232, 25.0};
+
+    TEST_ASSERT_NOT_NULL(start);
+    TEST_ASSERT_NOT_NULL(end);
+    TEST_ASSERT_NOT_NULL(datetime_init_ymdt(start, 2028, DT_July, 5, 0, 0, 0.0));
+    TEST_ASSERT_NOT_NULL(datetime_init_ymdt(end, 2028, DT_July, 7, 0, 0, 0.0));
+
+    almanac = almanac_open();
+    TEST_ASSERT_NOT_NULL(almanac);
+    events = almanac_find_lunar_eclipses(almanac, &cape_town, start, end);
+    TEST_ASSERT_NOT_NULL(events);
+    TEST_ASSERT_TRUE(array_size(events) == 1u, "July 2028 window contains one visible lunar eclipse");
+    event = array_get(events, 0u);
+    TEST_ASSERT_NOT_NULL(event);
+    TEST_ASSERT_TRUE(almanac_lunar_eclipse_kind(event) == ALMANAC_LUNAR_ECLIPSE_PARTIAL,
+                     "July 2028 lunar eclipse is partial");
+    TEST_ASSERT_TRUE(almanac_lunar_eclipse_time(event, ALMANAC_EVENT_TIME_GREATEST, &greatest),
+                     "July 2028 greatest eclipse is available");
+    TEST_ASSERT_TRUE(greatest.jd > 2461959.263 &&
+                     greatest.jd < 2461959.265,
+                     "July 2028 greatest eclipse is near 18:20 GMT");
+    TEST_ASSERT_TRUE(almanac_lunar_eclipse_umbral_magnitude(event) > 0.35 &&
+                     almanac_lunar_eclipse_umbral_magnitude(event) < 0.45,
+                     "July 2028 umbral magnitude is approximately 0.39");
+
+    array_destroy(events);
+    almanac_close(almanac);
+    datetime_dealloc(start);
+    datetime_dealloc(end);
+}
+
 static void assert_solar_transit_search_case(void)
 {
     datetime_t *start;
@@ -848,6 +920,45 @@ static void assert_solar_transit_search_case(void)
 static void test_almanac_find_solar_transits_returns_mercury_event(void)
 {
     assert_solar_transit_search_case();
+}
+
+static void test_almanac_find_solar_transits_returns_venus_event(void)
+{
+    datetime_t *start;
+    datetime_t *end;
+    almanac_t *almanac;
+    array_t *events;
+    const almanac_solar_transit_t *event;
+    almanac_event_time_t greatest;
+    almanac_observer_t observer = {35.6762, 139.6503, 40.0};
+
+    start = datetime_alloc();
+    end = datetime_alloc();
+    TEST_ASSERT_NOT_NULL(start);
+    TEST_ASSERT_NOT_NULL(end);
+    TEST_ASSERT_NOT_NULL(datetime_init_ymd(start, 2012, DT_June, 1));
+    TEST_ASSERT_NOT_NULL(datetime_init_ymd(end, 2012, DT_June, 10));
+
+    almanac = almanac_open();
+    TEST_ASSERT_NOT_NULL(almanac);
+    events = almanac_find_solar_transits_for_body(almanac,
+                                                  ALMANAC_BODY_ID_VENUS,
+                                                  &observer,
+                                                  start,
+                                                  end);
+    TEST_ASSERT_NOT_NULL(events);
+    TEST_ASSERT_TRUE(array_size(events) == 1u, "June 2012 includes one Venus transit");
+    event = array_get(events, 0u);
+    TEST_ASSERT_NOT_NULL(event);
+    TEST_ASSERT_TRUE(almanac_solar_transit_time(event, ALMANAC_EVENT_TIME_GREATEST, &greatest),
+                     "Venus transit greatest time is valid");
+    TEST_ASSERT_TRUE(greatest.jd > 2456084.5 && greatest.jd < 2456084.7,
+                     "Venus transit greatest phase is on 2012 June 6");
+
+    array_destroy(events);
+    almanac_close(almanac);
+    datetime_dealloc(start);
+    datetime_dealloc(end);
 }
 
 static void assert_spice_oracle_cases(void)
@@ -1047,11 +1158,14 @@ int tests_main(void)
     TEST_RUN_IN_GROUP(test_almanac_body_geographical_position_resolves_gp, tests, NULL);
     TEST_RUN_IN_GROUP(test_almanac_phase_details_resolve_planetary_phase, tests, NULL);
     TEST_RUN_IN_GROUP(test_almanac_next_moon_phase_exact_finds_august_2026_new_moon, tests, NULL);
+    TEST_RUN_IN_GROUP(test_almanac_next_moon_phase_exact_advances_past_previous_phase, tests, NULL);
     TEST_RUN_IN_GROUP(test_almanac_sunrise_sunset_returns_local_day_times, tests, NULL);
     TEST_RUN_IN_GROUP(test_almanac_moonrise_moonset_returns_local_day_times, tests, NULL);
     TEST_RUN_IN_GROUP(test_almanac_find_solar_eclipses_returns_august_2026_event, tests, NULL);
     TEST_RUN_IN_GROUP(test_almanac_find_lunar_eclipses_returns_events_in_2025, tests, NULL);
+    TEST_RUN_IN_GROUP(test_almanac_find_lunar_eclipses_matches_july_2028_partial_event, tests, NULL);
     TEST_RUN_IN_GROUP(test_almanac_find_solar_transits_returns_mercury_event, tests, NULL);
+    TEST_RUN_IN_GROUP(test_almanac_find_solar_transits_returns_venus_event, tests, NULL);
     TEST_RUN_IN_GROUP(test_almanac_matches_oracle_across_supported_range, tests, NULL);
     TEST_RUN_IN_GROUP(test_almanac_snapshot_returns_catalogue_order, tests, NULL);
     TEST_SECTION("README Output Examples");

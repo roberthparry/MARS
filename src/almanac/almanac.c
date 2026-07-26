@@ -2924,87 +2924,6 @@ static double almanac_body_sun_longitude_residual_degrees(almanac_t *almanac,
     return normalize_degrees_signed((body_longitude - sun_longitude) - target_degrees);
 }
 
-static bool almanac_bracket_residual(almanac_t *almanac,
-                                     almanac_body_id_t body_id,
-                                     double target_degrees,
-                                     double start_jd,
-                                     double end_jd,
-                                     double step_days,
-                                     double *out_left,
-                                     double *out_right)
-{
-    double left = start_jd;
-    double left_value = almanac_body_sun_longitude_residual_degrees(almanac, body_id, left, target_degrees);
-    double probe;
-
-    if (!(left_value == left_value))
-        return false;
-    for (probe = start_jd + step_days; probe <= end_jd + 1e-9; probe += step_days) {
-        double right_value = almanac_body_sun_longitude_residual_degrees(almanac,
-                                                                         body_id,
-                                                                         probe,
-                                                                         target_degrees);
-
-        if (!(right_value == right_value))
-            return false;
-        if (left_value == 0.0 || right_value == 0.0 || left_value * right_value < 0.0) {
-            *out_left = left;
-            *out_right = probe;
-            return true;
-        }
-        left = probe;
-        left_value = right_value;
-    }
-    return false;
-}
-
-static bool almanac_bisect_body_sun_longitude(almanac_t *almanac,
-                                              almanac_body_id_t body_id,
-                                              double target_degrees,
-                                              double left_jd,
-                                              double right_jd,
-                                              double *out_jd)
-{
-    double left_value = almanac_body_sun_longitude_residual_degrees(almanac, body_id, left_jd, target_degrees);
-    double right_value = almanac_body_sun_longitude_residual_degrees(almanac, body_id, right_jd, target_degrees);
-    int iteration;
-
-    if (!(left_value == left_value) || !(right_value == right_value))
-        return false;
-    if (left_value == 0.0) {
-        *out_jd = left_jd;
-        return true;
-    }
-    if (right_value == 0.0) {
-        *out_jd = right_jd;
-        return true;
-    }
-    if (left_value * right_value > 0.0)
-        return false;
-
-    for (iteration = 0; iteration < 80; ++iteration) {
-        double mid_jd = 0.5 * (left_jd + right_jd);
-        double mid_value = almanac_body_sun_longitude_residual_degrees(almanac, body_id, mid_jd, target_degrees);
-
-        if (!(mid_value == mid_value))
-            return false;
-        if (fabs(mid_value) < 1e-8 || fabs(right_jd - left_jd) < 1e-8) {
-            *out_jd = mid_jd;
-            return true;
-        }
-        if (left_value * mid_value <= 0.0) {
-            right_jd = mid_jd;
-            right_value = mid_value;
-        } else {
-            left_jd = mid_jd;
-            left_value = mid_value;
-        }
-    }
-
-    *out_jd = 0.5 * (left_jd + right_jd);
-    return true;
-}
-
 static double almanac_moon_phase_target_degrees(almanac_moon_phase_kind_t kind)
 {
     static const double target_degrees_by_kind[ALMANAC_MOON_PHASE_LAST_QUARTER + 1] = {
@@ -3019,20 +2938,116 @@ static double almanac_moon_phase_target_degrees(almanac_moon_phase_kind_t kind)
     return target_degrees_by_kind[kind];
 }
 
+static double almanac_mean_moon_phase_jd(double k)
+{
+    double T = k / 1236.85;
+
+    return 2451550.09766
+         + 29.530588861 * k
+         + 0.00015437 * T * T
+         - 0.000000150 * T * T * T
+         + 0.00000000073 * T * T * T * T;
+}
+
+static double almanac_moon_argument_latitude_radians(double k)
+{
+    double T = k / 1236.85;
+    double degrees = 160.7108
+                   + 390.67050284 * k
+                   - 0.0016118 * T * T
+                   - 0.00000227 * T * T * T
+                   + 0.000000011 * T * T * T * T;
+
+    return degrees_to_radians(normalize_degrees(degrees));
+}
+
+static bool almanac_eclipse_candidate_near_node(double k)
+{
+    /*
+     * ESAA 8.22 requires conjunction or opposition near a lunar node.
+     * The 0.36 limit is deliberately conservative (about 21 degrees in
+     * argument of latitude); exact geometry remains the final test.
+     */
+    return fabs(sin(almanac_moon_argument_latitude_radians(k))) <= 0.36;
+}
+
+static bool almanac_refine_body_sun_longitude_near(almanac_t *almanac,
+                                                   almanac_body_id_t body_id,
+                                                   double target_degrees,
+                                                   double estimate_jd,
+                                                   double max_step_days,
+                                                   double *out_jd)
+{
+    static const double derivative_step_days = 1.0 / 48.0;
+    double jd = estimate_jd;
+    int iteration;
+
+    if (!almanac || !out_jd || !(max_step_days > 0.0))
+        return false;
+    for (iteration = 0; iteration < 12; ++iteration) {
+        double value = almanac_body_sun_longitude_residual_degrees(almanac,
+                                                                   body_id,
+                                                                   jd,
+                                                                   target_degrees);
+        double before;
+        double after;
+        double slope;
+        double correction;
+
+        if (!(value == value))
+            return false;
+        if (fabs(value) < 1e-9) {
+            *out_jd = jd;
+            return true;
+        }
+        before = almanac_body_sun_longitude_residual_degrees(almanac,
+                                                              body_id,
+                                                              jd - derivative_step_days,
+                                                              target_degrees);
+        after = almanac_body_sun_longitude_residual_degrees(almanac,
+                                                             body_id,
+                                                             jd + derivative_step_days,
+                                                             target_degrees);
+        if (!(before == before) || !(after == after))
+            return false;
+        slope = normalize_degrees_signed(after - before) / (2.0 * derivative_step_days);
+        if (fabs(slope) < 1e-9)
+            return false;
+        correction = value / slope;
+        if (correction > max_step_days)
+            correction = max_step_days;
+        else if (correction < -max_step_days)
+            correction = -max_step_days;
+        jd -= correction;
+        if (fabs(correction) < 1e-9) {
+            *out_jd = jd;
+            return true;
+        }
+    }
+    if (fabs(almanac_body_sun_longitude_residual_degrees(almanac,
+                                                          body_id,
+                                                          jd,
+                                                          target_degrees)) >= 1e-7) {
+        return false;
+    }
+    *out_jd = jd;
+    return true;
+}
+
 bool almanac_next_moon_phase_exact(almanac_t *almanac,
                                    const datetime_t *after,
                                    almanac_moon_phase_kind_t kind,
                                    almanac_moon_phase_event_t *out)
 {
-    static const double synodic_month_days = 29.530588853;
-    static const double base_new_moon_jd = 2451550.09765;
+    static const double synodic_month_days = 29.530588861;
+    static const double base_new_moon_jd = 2451550.09766;
     double target_degrees;
-    double phase_offset_days;
+    double phase_fraction;
     double after_jd;
+    double k;
     double guess_jd;
-    double left_jd;
-    double right_jd;
     double root_jd;
+    int attempt;
     almanac_entry_t moon_entry;
     almanac_phase_details_t phase_details;
 
@@ -3051,25 +3066,28 @@ bool almanac_next_moon_phase_exact(almanac_t *almanac,
         return false;
     }
 
-    phase_offset_days = (target_degrees / 360.0) * synodic_month_days;
-    guess_jd = base_new_moon_jd + phase_offset_days
-             + synodic_month_days *
-               (floor((after_jd - base_new_moon_jd - phase_offset_days) / synodic_month_days) + 1.0);
+    phase_fraction = target_degrees / 360.0;
+    k = floor((after_jd - base_new_moon_jd) / synodic_month_days - phase_fraction)
+      + 1.0
+      + phase_fraction;
 
-    if (!almanac_bracket_residual(almanac,
-                                  ALMANAC_BODY_ID_MOON,
-                                  target_degrees,
-                                  guess_jd - 3.0,
-                                  guess_jd + 3.0,
-                                  0.25,
-                                  &left_jd,
-                                  &right_jd) ||
-        !almanac_bisect_body_sun_longitude(almanac,
-                                           ALMANAC_BODY_ID_MOON,
-                                           target_degrees,
-                                           left_jd,
-                                           right_jd,
-                                           &root_jd)) {
+    root_jd = NAN;
+    for (attempt = 0; attempt < 2; ++attempt) {
+        guess_jd = almanac_mean_moon_phase_jd(k);
+        if (!almanac_refine_body_sun_longitude_near(almanac,
+                                                     ALMANAC_BODY_ID_MOON,
+                                                     target_degrees,
+                                                     guess_jd,
+                                                     2.0,
+                                                     &root_jd)) {
+            almanac_set_error(almanac, "failed to bracket exact Moon phase");
+            return false;
+        }
+        if (root_jd > after_jd + 1e-9)
+            break;
+        k += 1.0;
+    }
+    if (!(root_jd > after_jd + 1e-9)) {
         almanac_set_error(almanac, "failed to bracket exact Moon phase");
         return false;
     }
@@ -3899,6 +3917,8 @@ static bool almanac_bisect_event_residual(almanac_t *almanac,
 {
     double left_value;
     double right_value;
+    bool last_replaced_left = false;
+    bool last_replaced_right = false;
     int iteration;
 
     if (!residual || !out_jd)
@@ -3918,22 +3938,40 @@ static bool almanac_bisect_event_residual(almanac_t *almanac,
     if (left_value * right_value > 0.0)
         return false;
 
-    for (iteration = 0; iteration < 64; ++iteration) {
-        double mid_jd = 0.5 * (left_jd + right_jd);
-        double mid_value = residual(almanac, mid_jd, context);
+    /*
+     * ESAA 8.422 recommends inverse interpolation of a contact
+     * discriminant.  Illinois regula falsi keeps the root bracketed like
+     * bisection, but normally converges in a handful of ephemeris samples.
+     */
+    for (iteration = 0; iteration < 24; ++iteration) {
+        double candidate_jd =
+            (left_jd * right_value - right_jd * left_value) /
+            (right_value - left_value);
+        double candidate_value;
 
-        if (!(mid_value == mid_value))
+        if (!(candidate_jd > left_jd && candidate_jd < right_jd))
+            candidate_jd = 0.5 * (left_jd + right_jd);
+        candidate_value = residual(almanac, candidate_jd, context);
+        if (!(candidate_value == candidate_value))
             return false;
-        if (fabs(mid_value) < 1e-9 || fabs(right_jd - left_jd) < 1e-8) {
-            *out_jd = mid_jd;
+        if (fabs(candidate_value) < 1e-9 || fabs(right_jd - left_jd) < 1e-8) {
+            *out_jd = candidate_jd;
             return true;
         }
-        if (left_value * mid_value <= 0.0) {
-            right_jd = mid_jd;
-            right_value = mid_value;
+        if (left_value * candidate_value <= 0.0) {
+            right_jd = candidate_jd;
+            right_value = candidate_value;
+            if (last_replaced_right)
+                left_value *= 0.5;
+            last_replaced_right = true;
+            last_replaced_left = false;
         } else {
-            left_jd = mid_jd;
-            left_value = mid_value;
+            left_jd = candidate_jd;
+            left_value = candidate_value;
+            if (last_replaced_left)
+                right_value *= 0.5;
+            last_replaced_left = true;
+            last_replaced_right = false;
         }
     }
 
@@ -4000,13 +4038,7 @@ static double almanac_find_local_minimum_jd(almanac_t *almanac,
     double best_jd = centre_jd;
     double best_value;
     double probe;
-    double left;
-    double right;
-    double gr;
-    double c;
-    double d;
-    double fc;
-    double fd;
+    double step;
     int iteration;
 
     if (!metric || !(half_span_days > 0.0) || !(sample_step_days > 0.0))
@@ -4026,40 +4058,58 @@ static double almanac_find_local_minimum_jd(almanac_t *almanac,
     if (best_value == DBL_MAX)
         return centre_jd;
 
-    left = fmax(centre_jd - half_span_days, best_jd - sample_step_days);
-    right = fmin(centre_jd + half_span_days, best_jd + sample_step_days);
-    if (!(right > left))
+    /*
+     * ESAA 8.42 obtains greatest eclipse by rapidly interpolating the
+     * minimum of the squared separation.  Three-point parabolic
+     * interpolation is the scalar equivalent here.  The phase/conjunction
+     * estimate has already put us close to the event, so this converges in
+     * a handful of ephemeris evaluations instead of a long golden-section
+     * search.
+     */
+    step = fmin(sample_step_days,
+                fmin(best_jd - (centre_jd - half_span_days),
+                     centre_jd + half_span_days - best_jd));
+    if (!(step > 0.0))
         return best_jd;
 
-    gr = (sqrt(5.0) - 1.0) / 2.0;
-    c = right - gr * (right - left);
-    d = left + gr * (right - left);
-    fc = metric(almanac, c, context);
-    fd = metric(almanac, d, context);
-    if (!(fc == fc) || !(fd == fd))
-        return best_jd;
+    for (iteration = 0; iteration < 9 && step > 1e-10; ++iteration) {
+        double left_value = metric(almanac, best_jd - step, context);
+        double centre_value = metric(almanac, best_jd, context);
+        double right_value = metric(almanac, best_jd + step, context);
+        double denominator;
+        double offset;
+        double candidate_jd;
+        double candidate_value;
 
-    for (iteration = 0; iteration < 48 && fabs(right - left) > 1e-8; ++iteration) {
-        if (fc < fd) {
-            right = d;
-            d = c;
-            fd = fc;
-            c = right - gr * (right - left);
-            fc = metric(almanac, c, context);
-            if (!(fc == fc))
-                return best_jd;
-        } else {
-            left = c;
-            c = d;
-            fc = fd;
-            d = left + gr * (right - left);
-            fd = metric(almanac, d, context);
-            if (!(fd == fd))
-                return best_jd;
+        if (!(left_value == left_value) ||
+            !(centre_value == centre_value) ||
+            !(right_value == right_value)) {
+            step *= 0.25;
+            continue;
         }
+        left_value *= left_value;
+        centre_value *= centre_value;
+        right_value *= right_value;
+        denominator = left_value - 2.0 * centre_value + right_value;
+        if (!(denominator > DBL_EPSILON)) {
+            step *= 0.25;
+            continue;
+        }
+        offset = 0.5 * step * (left_value - right_value) / denominator;
+        if (offset > step)
+            offset = step;
+        else if (offset < -step)
+            offset = -step;
+        candidate_jd = best_jd + offset;
+        candidate_value = metric(almanac, candidate_jd, context);
+        if (candidate_value == candidate_value) {
+            best_jd = candidate_jd;
+            best_value = candidate_value;
+        }
+        step *= 0.25;
     }
 
-    return 0.5 * (left + right);
+    return best_jd;
 }
 
 static bool almanac_solar_eclipse_geometry(almanac_t *almanac,
@@ -4182,13 +4232,15 @@ static bool almanac_lunar_eclipse_geometry(almanac_t *almanac,
                                            almanac_lunar_eclipse_geometry_t *out)
 {
     static const double earth_radius_au = 6378.137 / 149597870.7;
+    static const double reduced_parallax_factor = 0.9983407;
+    static const double shadow_enlargement = 1.02;
     almanac_state_t sun_state;
     almanac_state_t moon_state;
-    cartesian3_t sun_topocentric;
     cartesian3_t moon_topocentric;
-    cartesian3_t antisolar_topocentric;
-    double umbra_ratio;
-    double penumbra_ratio;
+    cartesian3_t antisolar_geocentric;
+    double sun_distance;
+    double moon_parallax;
+    double sun_parallax;
 
     if (!almanac || !observer || !out)
         return false;
@@ -4198,19 +4250,24 @@ static bool almanac_lunar_eclipse_geometry(almanac_t *almanac,
         !almanac_state_for_body_at_jd(almanac, ALMANAC_BODY_ID_MOON, jd, &moon_state)) {
         return false;
     }
-    if (!almanac_topocentric_vector(almanac, &sun_state.geocentric_equatorial_au, observer, jd, &sun_topocentric) ||
-        !almanac_topocentric_vector(almanac, &moon_state.geocentric_equatorial_au, observer, jd, &moon_topocentric)) {
+    if (!almanac_topocentric_vector(almanac,
+                                    &moon_state.geocentric_equatorial_au,
+                                    observer,
+                                    jd,
+                                    &moon_topocentric)) {
         return false;
     }
 
     memset(out, 0, sizeof(*out));
-    antisolar_topocentric = cartesian_negate(&sun_topocentric);
-    out->opposition_error = angular_separation_degrees(&antisolar_topocentric, &moon_topocentric);
+    antisolar_geocentric = cartesian_negate(&sun_state.geocentric_equatorial_au);
+    out->opposition_error =
+        angular_separation_degrees(&antisolar_geocentric, &moon_state.geocentric_equatorial_au);
+    sun_distance = cartesian_length(&sun_state.geocentric_equatorial_au);
+    out->delta_moon = cartesian_length(&moon_state.geocentric_equatorial_au);
     out->sun_sd = almanac_body_semi_diameter_from_distance_degrees(ALMANAC_BODY_ID_SUN,
-                                                                   cartesian_length(&sun_topocentric));
+                                                                   sun_distance);
     out->moon_sd = almanac_body_semi_diameter_from_distance_degrees(ALMANAC_BODY_ID_MOON,
-                                                                    cartesian_length(&moon_topocentric));
-    out->delta_moon = cartesian_length(&moon_topocentric);
+                                                                    out->delta_moon);
     out->moon_altitude_degrees = almanac_topocentric_altitude_degrees(almanac, &moon_topocentric, observer, jd);
     if (!(out->opposition_error == out->opposition_error) || !(out->sun_sd > 0.0) ||
         !(out->moon_altitude_degrees == out->moon_altitude_degrees) ||
@@ -4218,12 +4275,15 @@ static bool almanac_lunar_eclipse_geometry(almanac_t *almanac,
         return false;
     }
 
-    umbra_ratio = earth_radius_au / out->delta_moon - tan(degrees_to_radians(out->sun_sd));
-    penumbra_ratio = earth_radius_au / out->delta_moon + tan(degrees_to_radians(out->sun_sd));
-    if (!(penumbra_ratio > 0.0))
+    moon_parallax = radians_to_degrees(
+        asin(clamp_unit(reduced_parallax_factor * earth_radius_au / out->delta_moon)));
+    sun_parallax = radians_to_degrees(asin(clamp_unit(earth_radius_au / sun_distance)));
+    out->umbra_radius =
+        shadow_enlargement * (moon_parallax + sun_parallax - out->sun_sd);
+    out->penumbra_radius =
+        shadow_enlargement * (moon_parallax + sun_parallax + out->sun_sd);
+    if (!(out->umbra_radius > 0.0) || !(out->penumbra_radius > 0.0))
         return false;
-    out->umbra_radius = umbra_ratio > 0.0 ? radians_to_degrees(asin(clamp_unit(umbra_ratio))) : 0.0;
-    out->penumbra_radius = radians_to_degrees(asin(clamp_unit(penumbra_ratio)));
     return true;
 }
 
@@ -4253,8 +4313,6 @@ static double almanac_lunar_eclipse_metric(almanac_t *almanac,
     almanac_lunar_eclipse_geometry_t geometry;
 
     if (!contact || !almanac_lunar_eclipse_geometry(almanac, jd, contact->observer, &geometry))
-        return NAN;
-    if (geometry.moon_altitude_degrees + geometry.moon_sd <= 0.0)
         return NAN;
     return geometry.opposition_error;
 }
@@ -5477,9 +5535,13 @@ array_t *almanac_find_solar_eclipses(almanac_t *almanac,
                                      const datetime_t *start,
                                      const datetime_t *end)
 {
+    static const double synodic_month_days = 29.530588861;
+    static const double base_new_moon_jd = 2451550.09766;
     double start_jd;
     double end_jd;
-    datetime_t *cursor;
+    long first_k;
+    long last_k;
+    long k;
     array_t *events;
     almanac_eclipse_contact_context_t contact = { ALMANAC_BODY_ID_MOON, observer, 0 };
 
@@ -5492,46 +5554,43 @@ array_t *almanac_find_solar_eclipses(almanac_t *almanac,
         almanac_set_error(almanac, "failed to allocate solar eclipse array");
         return NULL;
     }
-    cursor = datetime_alloc();
-    if (!cursor || !datetime_init_jd(cursor, start_jd - 1.0)) {
-        datetime_dealloc(cursor);
-        array_destroy(events);
-        almanac_set_error(almanac, "failed to allocate solar eclipse search cursor");
-        return NULL;
-    }
-
-    while (1) {
-        almanac_moon_phase_event_t phase_event;
+    first_k = (long)floor((start_jd - base_new_moon_jd) / synodic_month_days) - 2L;
+    last_k = (long)ceil((end_jd - base_new_moon_jd) / synodic_month_days) + 2L;
+    for (k = first_k; k <= last_k; ++k) {
         almanac_solar_eclipse_t eclipse;
+        double phase_jd;
         double local_jd;
 
-        if (!almanac_next_moon_phase_exact(almanac, cursor, ALMANAC_MOON_PHASE_NEW, &phase_event)) {
-            datetime_dealloc(cursor);
+        if (!almanac_eclipse_candidate_near_node((double)k))
+            continue;
+        if (!almanac_refine_body_sun_longitude_near(almanac,
+                                                     ALMANAC_BODY_ID_MOON,
+                                                     0.0,
+                                                     almanac_mean_moon_phase_jd((double)k),
+                                                     2.0,
+                                                     &phase_jd)) {
             array_destroy(events);
+            almanac_set_error(almanac, "failed to refine solar eclipse conjunction");
             return NULL;
         }
-        if (phase_event.time.jd > end_jd + 1e-9)
-            break;
+        if (phase_jd < start_jd - 1.0 || phase_jd > end_jd + 1.0)
+            continue;
         local_jd = almanac_find_local_minimum_jd(almanac,
                                                  almanac_solar_eclipse_metric,
                                                  &contact,
-                                                 phase_event.time.jd,
+                                                 phase_jd,
                                                  0.75,
-                                                 1.0 / 24.0);
+                                                 1.0 / 8.0);
         if (local_jd >= start_jd - 1e-9 &&
             local_jd <= end_jd + 1e-9 &&
             almanac_fill_solar_eclipse(almanac, local_jd, observer, &eclipse) &&
             !array_add(events, &eclipse)) {
-            datetime_dealloc(cursor);
             array_destroy(events);
             almanac_set_error(almanac, "failed to append solar eclipse event");
             return NULL;
         }
-        if (!datetime_init_jd(cursor, phase_event.time.jd + 0.5))
-            break;
     }
 
-    datetime_dealloc(cursor);
     return events;
 }
 
@@ -5560,9 +5619,13 @@ array_t *almanac_find_lunar_eclipses(almanac_t *almanac,
                                      const datetime_t *start,
                                      const datetime_t *end)
 {
+    static const double synodic_month_days = 29.530588861;
+    static const double base_new_moon_jd = 2451550.09766;
     double start_jd;
     double end_jd;
-    datetime_t *cursor;
+    long first_k;
+    long last_k;
+    long k;
     array_t *events;
     almanac_eclipse_contact_context_t contact = { ALMANAC_BODY_ID_MOON, observer, 0 };
 
@@ -5575,46 +5638,44 @@ array_t *almanac_find_lunar_eclipses(almanac_t *almanac,
         almanac_set_error(almanac, "failed to allocate lunar eclipse array");
         return NULL;
     }
-    cursor = datetime_alloc();
-    if (!cursor || !datetime_init_jd(cursor, start_jd - 1.0)) {
-        datetime_dealloc(cursor);
-        array_destroy(events);
-        almanac_set_error(almanac, "failed to allocate lunar eclipse search cursor");
-        return NULL;
-    }
-
-    while (1) {
-        almanac_moon_phase_event_t phase_event;
+    first_k = (long)floor((start_jd - base_new_moon_jd) / synodic_month_days - 0.5) - 2L;
+    last_k = (long)ceil((end_jd - base_new_moon_jd) / synodic_month_days - 0.5) + 2L;
+    for (k = first_k; k <= last_k; ++k) {
         almanac_lunar_eclipse_t eclipse;
+        double phase_k = (double)k + 0.5;
+        double phase_jd;
         double local_jd;
 
-        if (!almanac_next_moon_phase_exact(almanac, cursor, ALMANAC_MOON_PHASE_FULL, &phase_event)) {
-            datetime_dealloc(cursor);
+        if (!almanac_eclipse_candidate_near_node(phase_k))
+            continue;
+        if (!almanac_refine_body_sun_longitude_near(almanac,
+                                                     ALMANAC_BODY_ID_MOON,
+                                                     180.0,
+                                                     almanac_mean_moon_phase_jd(phase_k),
+                                                     2.0,
+                                                     &phase_jd)) {
             array_destroy(events);
+            almanac_set_error(almanac, "failed to refine lunar eclipse opposition");
             return NULL;
         }
-        if (phase_event.time.jd > end_jd + 1e-9)
-            break;
+        if (phase_jd < start_jd - 1.0 || phase_jd > end_jd + 1.0)
+            continue;
         local_jd = almanac_find_local_minimum_jd(almanac,
                                                  almanac_lunar_eclipse_metric,
                                                  &contact,
-                                                 phase_event.time.jd,
+                                                 phase_jd,
                                                  0.75,
-                                                 1.0 / 24.0);
+                                                 1.0 / 8.0);
         if (local_jd >= start_jd - 1e-9 &&
             local_jd <= end_jd + 1e-9 &&
             almanac_fill_lunar_eclipse(almanac, local_jd, observer, &eclipse) &&
             !array_add(events, &eclipse)) {
-            datetime_dealloc(cursor);
             array_destroy(events);
             almanac_set_error(almanac, "failed to append lunar eclipse event");
             return NULL;
         }
-        if (!datetime_init_jd(cursor, phase_event.time.jd + 0.5))
-            break;
     }
 
-    datetime_dealloc(cursor);
     return events;
 }
 
@@ -5624,13 +5685,15 @@ array_t *almanac_find_solar_transits_for_body(almanac_t *almanac,
                                               const datetime_t *start,
                                               const datetime_t *end)
 {
+    double reference_jd;
+    double synodic_period_days;
     double start_jd;
     double end_jd;
-    double left_jd;
-    double right_jd;
     double previous_root = DBL_MAX;
+    long first_cycle;
+    long last_cycle;
+    long cycle;
     array_t *events;
-    double step;
 
     if (!almanac) {
         almanac_set_error(almanac, "invalid solar transit request");
@@ -5645,42 +5708,51 @@ array_t *almanac_find_solar_transits_for_body(almanac_t *almanac,
         return NULL;
     if (!almanac_observer_is_valid(almanac, observer))
         return NULL;
+    if (body_id == ALMANAC_BODY_ID_MERCURY) {
+        /*
+         * ESAA 9.222 gives a 116-day mean synodic period.  This more precise
+         * value and the 2019 transit epoch keep each inferior-conjunction
+         * estimate close enough for rapid ephemeris refinement.
+         */
+        reference_jd = 2458799.139;
+        synodic_period_days = 115.8774771;
+    } else {
+        reference_jd = 2456084.562;
+        synodic_period_days = 583.921361;
+    }
     events = array_create(sizeof(almanac_solar_transit_t), NULL, NULL);
     if (!events) {
         almanac_set_error(almanac, "failed to allocate solar transit array");
         return NULL;
     }
 
-    for (step = start_jd - 2.0; step < end_jd + 2.0; step += 0.5) {
-        if (!almanac_bracket_residual(almanac,
-                                      body_id,
-                                      0.0,
-                                      step,
-                                      step + 0.5,
-                                      0.125,
-                                      &left_jd,
-                                      &right_jd)) {
-            continue;
-        }
-        if (almanac_bisect_body_sun_longitude(almanac,
-                                              body_id,
-                                              0.0,
-                                              left_jd,
-                                              right_jd,
-                                              &left_jd)) {
+    first_cycle = (long)floor((start_jd - reference_jd) / synodic_period_days) - 1L;
+    last_cycle = (long)ceil((end_jd - reference_jd) / synodic_period_days) + 1L;
+    for (cycle = first_cycle; cycle <= last_cycle; ++cycle) {
+        double estimate_jd = reference_jd + (double)cycle * synodic_period_days;
+        double conjunction_jd;
+
+        if (almanac_refine_body_sun_longitude_near(almanac,
+                                                   body_id,
+                                                   0.0,
+                                                   estimate_jd,
+                                                   8.0,
+                                                   &conjunction_jd)) {
             almanac_solar_transit_t transit;
             almanac_eclipse_contact_context_t contact = { body_id, observer, 0 };
             double local_jd;
 
-            if (previous_root != DBL_MAX && fabs(left_jd - previous_root) < 1.0)
+            if (conjunction_jd < start_jd - 1.0 || conjunction_jd > end_jd + 1.0)
                 continue;
-            previous_root = left_jd;
+            if (previous_root != DBL_MAX && fabs(conjunction_jd - previous_root) < 1.0)
+                continue;
+            previous_root = conjunction_jd;
             local_jd = almanac_find_local_minimum_jd(almanac,
                                                      almanac_solar_transit_metric,
                                                      &contact,
-                                                     left_jd,
+                                                     conjunction_jd,
                                                      0.75,
-                                                     1.0 / 24.0);
+                                                     1.0 / 8.0);
             if (local_jd < start_jd - 1e-9 || local_jd > end_jd + 1e-9)
                 continue;
             if (almanac_fill_solar_transit(almanac, body_id, local_jd, observer, &transit) &&

@@ -4134,6 +4134,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       searchable: true,
       searchPlaceholder: 'Search towns',
       emptyText: 'No towns for this jurisdiction',
+      placeholder: 'Custom location',
       renderOption: townOptionDisplay
     });
     enhanceRoundedSelect(almanacJurisdiction, {
@@ -4145,6 +4146,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       searchable: true,
       searchPlaceholder: 'Search towns',
       emptyText: 'No towns for this jurisdiction',
+      placeholder: 'Custom location',
       renderOption: townOptionDisplay
     });
     let datetimeLocalRefreshSequence = 0;
@@ -4776,6 +4778,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       const optionsWrap = document.createElement('div');
       const emptyState = document.createElement('div');
       const optionRenderer = options && typeof options.renderOption === 'function' ? options.renderOption : null;
+      const placeholder = String(options && options.placeholder || 'Select option');
 
       shell.className = 'select-shell';
       button.type = 'button';
@@ -4871,7 +4874,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       }
 
       function selectedOption() {
-        return select.selectedOptions[0] || select.options[select.selectedIndex] || select.options[0];
+        return select.selectedOptions[0] || select.options[select.selectedIndex] || null;
       }
 
       function filterOptions() {
@@ -4904,7 +4907,9 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       function sync() {
         const selected = selectedOption();
         const parts = selected ? optionParts(selected) : null;
-        button.textContent = parts && parts.label ? parts.label : (selected ? selected.textContent : '');
+        button.textContent = parts && parts.label
+          ? parts.label
+          : (selected ? selected.textContent : placeholder);
         optionButtons.forEach((item) => {
           const selectedItem = item.dataset.value === select.value;
           item.classList.toggle('selected', selectedItem);
@@ -12961,7 +12966,7 @@ def parse_almanac_event_lab_rows(output: str) -> list[dict[str, str]]:
 def run_almanac_event_lab_rows(options: dict[str, str],
                                timeout_seconds: int | None = None) -> list[dict[str, str]]:
     command = [str(DEFAULT_ALMANAC_EVENT_BIN)]
-    for key in ("start", "end", "lat", "lon", "totality"):
+    for key in ("start", "end", "lat", "lon", "totality", "kind"):
         if key in options:
             command.append(f"{key}={str(options.get(key, '')).strip()}")
     child_env = os.environ.copy()
@@ -14616,61 +14621,48 @@ def generate_annual_almanac_events(
             "gmt_time": almanac_gmt_event_time_from_jd(jd),
         })
 
-    def add_exact_window(jd: float) -> bool:
-        if not DEFAULT_ALMANAC_EVENT_BIN.exists():
-            return False
-        epoch = py_datetime.datetime(1970, 1, 1, tzinfo=py_datetime.timezone.utc)
-        center = epoch + py_datetime.timedelta(days=float(jd) - 2440587.5)
-        start = (center - py_datetime.timedelta(days=5)).strftime("%Y-%m-%d")
-        end = (center + py_datetime.timedelta(days=5)).strftime("%Y-%m-%d")
-        before = len(events)
-        for row in run_almanac_event_lab_rows({
-            "start": start,
-            "end": end,
-            "lat": latitude,
-            "lon": longitude,
-        }):
-            add_exact_eclipse(row)
-        return len(events) > before
-
     k0 = math.floor((year - 2000) * 12.3685) - 2
     exact_helper_available = DEFAULT_ALMANAC_EVENT_BIN.exists()
-    for lunation in range(k0, k0 + 18):
-        solar_distance = almanac_eclipse_node_distance(float(lunation))
-        if solar_distance <= 0.242:
-            solar_jd = almanac_phase_jde(float(lunation), full=False)
-            if exact_helper_available:
-                add_exact_window(solar_jd)
-                continue
-            kind = "central/near-central" if solar_distance <= 0.18 else "partial"
-            add_jd(
-                "Solar",
-                "Solar eclipse",
-                kind,
-                solar_jd,
-                "Approximate eclipse candidate; local obscuration unavailable.",
-            )
+    if exact_helper_available:
+        for row in run_almanac_event_lab_rows({
+            "start": f"{year:04d}-01-01",
+            "end": f"{year:04d}-12-31",
+            "lat": latitude,
+            "lon": longitude,
+            "kind": "all",
+        }):
+            add_exact_eclipse(row)
+    else:
+        for lunation in range(k0, k0 + 18):
+            solar_distance = almanac_eclipse_node_distance(float(lunation))
+            if solar_distance <= 0.242:
+                solar_jd = almanac_phase_jde(float(lunation), full=False)
+                kind = "central/near-central" if solar_distance <= 0.18 else "partial"
+                add_jd(
+                    "Solar",
+                    "Solar eclipse",
+                    kind,
+                    solar_jd,
+                    "Approximate eclipse candidate; local obscuration unavailable.",
+                )
 
-        lunar_k = lunation + 0.5
-        lunar_distance = almanac_eclipse_node_distance(lunar_k)
-        if lunar_distance <= 0.36:
-            lunar_jd = almanac_phase_jde(lunar_k, full=True)
-            if exact_helper_available:
-                add_exact_window(lunar_jd)
-                continue
-            if lunar_distance <= 0.13:
-                kind = "total"
-            elif lunar_distance <= 0.25:
-                kind = "partial"
-            else:
-                kind = "penumbral"
-            add_jd(
-                "Lunar",
-                "Lunar eclipse",
-                kind,
-                lunar_jd,
-                "Approximate eclipse candidate; local obscuration unavailable.",
-            )
+            lunar_k = lunation + 0.5
+            lunar_distance = almanac_eclipse_node_distance(lunar_k)
+            if lunar_distance <= 0.36:
+                lunar_jd = almanac_phase_jde(lunar_k, full=True)
+                if lunar_distance <= 0.13:
+                    kind = "total"
+                elif lunar_distance <= 0.25:
+                    kind = "partial"
+                else:
+                    kind = "penumbral"
+                add_jd(
+                    "Lunar",
+                    "Lunar eclipse",
+                    kind,
+                    lunar_jd,
+                    "Approximate eclipse candidate; local obscuration unavailable.",
+                )
 
     known_transits = [
         (2003, 5, 7, "Mercury transit", "Mercury"),
@@ -15723,6 +15715,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                             "end": f"{event_year + 1:04d}-01-01",
                             "lat": latitude_text,
                             "lon": longitude_text,
+                            "kind": "solar",
                         })
                         if str(row.get("category") or "").strip() == "Solar"
                     ]
@@ -15748,6 +15741,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                         "lat": latitude_text,
                         "lon": longitude_text,
                         "totality": "land",
+                        "kind": "solar",
                     }, timeout_seconds=ALMANAC_LAND_TOTALITY_SEARCH_TIMEOUT_SECONDS)
                 except subprocess.TimeoutExpired:
                     timed_out = True
@@ -15970,9 +15964,13 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
             })
             fields["jurisdiction"] = jurisdiction
             fields["visibility"] = visibility_text
-            prepare_start = time.perf_counter()
-            response_payload = prepare_almanac_fields(fields)
-            prepare_ms = (time.perf_counter() - prepare_start) * 1000.0
+            try:
+                prepare_start = time.perf_counter()
+                response_payload = prepare_almanac_fields(fields)
+                prepare_ms = (time.perf_counter() - prepare_start) * 1000.0
+            except Exception as exc:
+                self.send_json(422, {"ok": False, "error": str(exc)})
+                return
             enrich_start = time.perf_counter()
             enrich_stored = store_almanac_lab_cached_output(
                 self.almanac_binary,

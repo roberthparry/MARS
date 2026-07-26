@@ -191,14 +191,18 @@ horizon for lunar eclipses. Their event times are recorded as
 Use `almanac_event_time_datetime()` when you want to present an
 `almanac_event_time_t` as a local civil `datetime_t`.
 
-This first implementation is intended to be useful and testable, but it is
-still an approximation layer:
+The event searches use the short periodic estimates described in ESAA to
+select candidate lunations or inferior conjunctions, reject eclipse
+candidates far from a lunar node, and then refine the surviving candidates
+against the packaged almanac ephemeris:
 
-- exact Moon phases are numerically searched from the almanac geometry
+- exact Moon phases start from a mean lunation estimate and are refined from the almanac geometry
 - solar eclipses are detected with observer-local topocentric geometry
 - solar eclipse `totality_percent` is the approximate percentage of the Sun's apparent disc covered by the Moon at greatest eclipse
-- lunar eclipses use a practical shadow-cone approximation evaluated for the observer's visible local circumstances
+- lunar eclipse contacts, greatest eclipse, and magnitudes use ESAA geocentric shadow-cone geometry; the observer is used only to decide local visibility
 - lunar eclipse `totality_percent` is the approximate percentage of the Moon's apparent disc inside Earth's umbra
+- solar transits use the Mercury or Venus synodic cycle to estimate inferior conjunctions before ephemeris refinement
+- contact times use bracketed inverse interpolation and greatest-event times use parabolic interpolation of squared separation
 - solar transits currently support `ALMANAC_BODY_ID_MERCURY` and `ALMANAC_BODY_ID_VENUS`
 - Besselian elements, atmospheric refraction, and full central-line path
   modelling are not yet exposed
@@ -573,6 +577,9 @@ Search a civil time window for lunar eclipses visible from an observer.
 Returns a newly allocated `array_t` of opaque `almanac_lunar_eclipse_t` records
 on success, or `NULL` on failure. Destroy the returned array with
 `array_destroy()` when finished. Only locally visible eclipses are included.
+The event circumstances are geocentric and therefore do not change with the
+observer; the observer's topocentric Moon altitude controls whether the event
+is included.
 Use `almanac_lunar_eclipse_kind()`, `almanac_lunar_eclipse_time()`,
 `almanac_lunar_eclipse_umbral_magnitude()`,
 `almanac_lunar_eclipse_penumbral_magnitude()`, and
