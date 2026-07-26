@@ -14,7 +14,8 @@ typedef enum expr_integrate_mul_rule_kind {
     EXPR_INTEGRATE_MUL_RULE_END,
     EXPR_INTEGRATE_MUL_RULE_DIRECT,
     EXPR_INTEGRATE_MUL_RULE_POLY_UNARY_AFFINE,
-    EXPR_INTEGRATE_MUL_RULE_LINEAR_INVERSE_AFFINE
+    EXPR_INTEGRATE_MUL_RULE_LINEAR_INVERSE_AFFINE,
+    EXPR_INTEGRATE_MUL_RULE_KIND_COUNT
 } expr_integrate_mul_rule_kind_t;
 
 typedef enum expr_integrate_mul_rule_feature {
@@ -77,6 +78,11 @@ typedef struct expr_integrate_div_rule_feature_entry {
     unsigned int numerator_features;
     unsigned int denominator_features;
 } expr_integrate_div_rule_feature_entry_t;
+
+typedef expr_t *(*expr_integrate_mul_rule_dispatch_fn)(
+    const expr_integrate_mul_rule_t *rule,
+    const expr_t *expr,
+    const expr_t *wrt);
 
 enum {
     EXPR_INTEGRATE_MUL_FEATURE_KIND_MIN = EXPR_KIND_SIN,
@@ -882,25 +888,53 @@ static unsigned int integrate_mul_rule_expr_features(const expr_t *expr)
     return child_features;
 }
 
+static expr_t *integrate_mul_rule_direct_dispatch(
+    const expr_integrate_mul_rule_t *rule,
+    const expr_t *expr,
+    const expr_t *wrt)
+{
+    return rule->direct ? rule->direct(expr, wrt) : NULL;
+}
+
+static expr_t *integrate_mul_rule_poly_unary_affine_dispatch(
+    const expr_integrate_mul_rule_t *rule,
+    const expr_t *expr,
+    const expr_t *wrt)
+{
+    return integrate_poly_times_unary_affine_kind(expr, wrt,
+                                                  rule->unary_kind);
+}
+
+static expr_t *integrate_mul_rule_linear_inverse_affine_dispatch(
+    const expr_integrate_mul_rule_t *rule,
+    const expr_t *expr,
+    const expr_t *wrt)
+{
+    return integrate_linear_poly_times_inverse_affine(expr, wrt,
+                                                      rule->unary_kind);
+}
+
+static const expr_integrate_mul_rule_dispatch_fn
+integrate_mul_rule_candidate_dispatch[EXPR_INTEGRATE_MUL_RULE_KIND_COUNT] = {
+    [EXPR_INTEGRATE_MUL_RULE_DIRECT] =
+        integrate_mul_rule_direct_dispatch,
+    [EXPR_INTEGRATE_MUL_RULE_POLY_UNARY_AFFINE] =
+        integrate_mul_rule_poly_unary_affine_dispatch,
+    [EXPR_INTEGRATE_MUL_RULE_LINEAR_INVERSE_AFFINE] =
+        integrate_mul_rule_linear_inverse_affine_dispatch
+};
+
 static expr_t *integrate_mul_rule_candidate(const expr_integrate_mul_rule_t *rule,
                                             const expr_t *expr,
                                             const expr_t *wrt)
 {
-    if (!rule)
+    expr_integrate_mul_rule_dispatch_fn dispatch;
+
+    if (!rule || (unsigned)rule->kind >= EXPR_INTEGRATE_MUL_RULE_KIND_COUNT)
         return NULL;
 
-    switch (rule->kind) {
-        case EXPR_INTEGRATE_MUL_RULE_END:
-            return NULL;
-        case EXPR_INTEGRATE_MUL_RULE_DIRECT:
-            return rule->direct ? rule->direct(expr, wrt) : NULL;
-        case EXPR_INTEGRATE_MUL_RULE_POLY_UNARY_AFFINE:
-            return integrate_poly_times_unary_affine_kind(expr, wrt, rule->unary_kind);
-        case EXPR_INTEGRATE_MUL_RULE_LINEAR_INVERSE_AFFINE:
-            return integrate_linear_poly_times_inverse_affine(expr, wrt, rule->unary_kind);
-    }
-
-    return NULL;
+    dispatch = integrate_mul_rule_candidate_dispatch[rule->kind];
+    return dispatch ? dispatch(rule, expr, wrt) : NULL;
 }
 
 static expr_t *integrate_mul_rule_list(const expr_integrate_mul_rule_t *rules,
