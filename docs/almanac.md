@@ -191,10 +191,11 @@ horizon for lunar eclipses. Their event times are recorded as
 Use `almanac_event_time_datetime()` when you want to present an
 `almanac_event_time_t` as a local civil `datetime_t`.
 
-The event searches use the short periodic estimates described in ESAA to
-select candidate lunations or inferior conjunctions, reject eclipse
-candidates far from a lunar node, and then refine the surviving candidates
-against the packaged almanac ephemeris:
+The event searches use the short periodic estimates described in the
+*Explanatory Supplement to the Astronomical Almanac* (ESAA) to select candidate
+lunations or inferior conjunctions, reject eclipse candidates far from a lunar
+node, and then refine the surviving candidates against the packaged almanac
+ephemeris:
 
 - exact Moon phases start from a mean lunation estimate and are refined from the almanac geometry
 - solar eclipses are detected with observer-local topocentric geometry
