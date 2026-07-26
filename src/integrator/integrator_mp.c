@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <limits.h>
+
 #include "integrator_internal.h"
 #include "internal/number_internal.h"
 
@@ -487,12 +489,28 @@ static int mp_tanh_sinh_integral(mp_eval_fn eval, void *ctx,
         goto cleanup;
     }
 
-    if (max_intervals < 1000u)
+    if (max_intervals < 1000u) {
         max_steps = 128;
-    else if (max_intervals < 10000u)
+    } else if (max_intervals < 10000u) {
         max_steps = 512;
-    else
+    } else {
         max_steps = 2048;
+        /*
+         * Large, precision-derived work budgets need a proportionally wider
+         * transformed interval.  Keeping max_steps fixed at 2048 truncates
+         * the tanh-sinh tails once h becomes small, so additional refinement
+         * cannot improve the result.  Retain room for at least eight complete
+         * refinement levels while growing the per-level range.
+         */
+        while (max_steps <= INT_MAX / 2) {
+            size_t next_steps = (size_t)max_steps * 2u;
+
+            if (next_steps > (SIZE_MAX - 1u) / 8u ||
+                (next_steps + 1u) * 8u > max_intervals)
+                break;
+            max_steps *= 2;
+        }
+    }
 
     if (max_steps < 8)
         max_steps = 8;

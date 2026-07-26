@@ -51,6 +51,16 @@ expr_t *equ_binding(const equation_t *equation, const char *name);
 expr_t *equ_residual(const equation_t *equation);
 
 /**
+ * @brief Build an owning display equation with polynomial sides expanded in
+ *        descending powers of @p wrt.
+ *
+ * Non-polynomial sides fall back to the general display expansion. Inputs are
+ * borrowed; release the returned equation with equ_free().
+ */
+equation_t *equ_display_expanded(const equation_t *equation,
+                                 const expr_t *wrt);
+
+/**
  * @brief Return true when the equation is already isolated as @c wrt = f(...)
  *        and the right-hand side does not contain @p wrt.
  */
@@ -95,6 +105,12 @@ const equation_t *equ_solutions_at(
  *
  *   { lhs = rhs }
  *
+ * Function style produces an equation-valued callable that preserves both
+ * sides of the relation, followed by a compact solve-and-output call:
+ *
+ *   equation equ(x) { return equation(lhs = rhs); }
+ *   output(equ(x).solve());
+ *
  * Use equ_from_text() or equ_from_string() to parse it back.
  */
 string_t *equ_to_text(const equation_t *equation, style_t style);
@@ -103,7 +119,8 @@ string_t *equ_to_text(const equation_t *equation, style_t style);
  * @brief Format equation-aware text into a new string_t from a va_list.
  *
  * Supports ordinary string formatting plus equation conversions:
- * `%n` expression style, `%nu` unbound style, and `%nt` TeX style.
+ * `%n` expression style, `%nu` unbound style, `%nt` TeX style, and `%nf`
+ * function style.
  *
  * `%N` selects scientific numeric formatting for embedded number_t values
  * while keeping the same equation style selection rules.

@@ -60,6 +60,7 @@ char * binding_rhs_c_string_local   (const expr_t *dv);
 void emit_expr    (const expr_t *f, sbuf_t *b, int parent_prec);
 void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec);
 void emit_func    (const expr_t *f, sbuf_t *b, int parent_prec);
+void emit_func_display(const expr_t *f, sbuf_t *b, int parent_prec);
 void emit_tex_name(sbuf_t *b, const char *name);
 
 /* Top-level text builders. */

@@ -982,7 +982,7 @@ static bool integral_ascii_standin_starts_view(string_view_t text, size_t pos)
         !expr_parse_view_peek_ascii(text, pos + 2u, &next))
         return false;
 
-    return next == '^' || next == '_' || isspace(next);
+    return next == '^' || next == '_' || next == '(' || isspace(next);
 }
 
 static const func_entry_t *lookup_special_func_call_view(string_view_t text,
@@ -3979,6 +3979,12 @@ expr_t *expr_edit_binding(const expr_t *expr,
             : expr_new_named_var(value, name);
         if (!empty)
             num_destroy(&value);
+        if (replacement && value_expr && value_expr->binding_expr) {
+            replacement->binding_expr =
+                expr_binding_expr_clone(value_expr->binding_expr);
+            if (!replacement->binding_expr)
+                goto cleanup;
+        }
     }
     if (!replacement)
         goto cleanup;

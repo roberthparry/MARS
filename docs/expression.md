@@ -235,7 +235,7 @@ int main(void) {
 Example: Constructing an Expression
 f(x)    = { exp(sin(x)) + 3x² - 7 | x = 1.25 }
 f'(x)   = { 6x + cos(x)·exp(sin(x)) | x = 1.25 }
-f''(x)  = { 0x + 61 + (1·cos(x)·cos(x)·exp(sin(x)) - 1·sin(x)·exp(sin(x))) | x = 1.25 }
+f''(x)  = { exp(sin(x))·(cos²(x) - sin(x)) + 6 | x = 1.25 }
 
 At x = 1.25 (384 bits, 115 significant digits):
 f(x)     = 2.705855122552273437029639300167354701622137229515609890757472472673785676415953638138922546147659851426132733903704E-01
@@ -332,7 +332,7 @@ int main(void) {
 Example: Parsing from a String
 f(x)    = { exp(sin(x)) + 3x² - 7 | x = 1.25 }
 f'(x)   = { 6x + cos(x)·exp(sin(x)) | x = 1.25 }
-f''(x)  = { 0x + 61 + (1·cos(x)·cos(x)·exp(sin(x)) - 1·sin(x)·exp(sin(x))) | x = 1.25 }
+f''(x)  = { exp(sin(x))·(cos²(x) - sin(x)) + 6 | x = 1.25 }
 
 At x = 1.25 (384 bits, 115 significant digits):
 f(x)     = 2.705855122552273437029639300167354701622137229515609890757472472673785676415953638138922546147659851426132733903704E-01
@@ -744,8 +744,12 @@ decide whether derivative controls should be shown.
 
 `style_FUNCTION` prints a small C-like evaluable sketch. Untyped parameters are
 treated as differentiable variables, while `const` parameters and bindings are
-displayed as non-differentiable constants. Unevaluated integral nodes are
-printed in function form as `integral(upper, integrand, dummy)` and in
+displayed as non-differentiable constants. Its final `output(expr(...))` call
+uses variable names. Known variable bindings are assigned immediately before
+the call, while unknown variables use a hint such as `// x = ?`. Symbolic
+assignment values use input aliases such as `@pi`.
+Unevaluated integral nodes are
+printed in function form as `@S^upper integrand d<dummy>` and in
 expression form as `∫^upper integrand d<dummy>`; for example,
 `∫^x exp(cosh(t))·dt`:
 
@@ -754,12 +758,9 @@ expression expr(x, y, const c₀) {
     return tan(x * y * c₀ / 2);
 }
 
-expression expr_eval() {
-    x = 3.29929295579108949982756921421358070866178174810740656177232818327906094186165;
-    y = 3.29929295579108949982756921421358070866178174810740656177232818327906094186165;
-    const c₀ = γ;
-    return expr(x, y, c₀);
-}
+x = 3.29929295579108949982756921421358070866178174810740656177232818327906094186165
+y = 3.29929295579108949982756921421358070866178174810740656177232818327906094186165
+output(expr(x, y, γ));
 ```
 
 ### Parsing

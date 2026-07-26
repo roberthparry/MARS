@@ -19,12 +19,7 @@
  *                             return sin(x) * cos(y);
  *                         }
  *
- *                         expression expr_eval() {
- *                             x = 1;
- *                             y = π/2;
- *                             const c₀ = γ;
- *                             return expr(x, y, c₀);
- *                         }
+ *                         output(expr(x, y, c₀));
  *                       Useful for debugging graph structure and generated
  *                       callable forms.
  *
@@ -975,18 +970,32 @@ static void emit_func_integral(const expr_t *f, sbuf_t *b)
     const expr_t *upper = expr_integral_upper_bound_expr(f);
     const expr_t *display_integrand = f ? f->a : NULL;
     const expr_t *display_dummy = expr_integral_dummy_expr(f);
+    bool group_upper = upper && expr_is_addsub(upper);
+    bool group_lower = lower && expr_is_addsub(lower);
+    bool group_integrand = expr_is_addsub(display_integrand);
 
-    sbuf_puts(b, "integral(");
-    if (lower) {
-        emit_func(lower, b, PREC_LOWEST);
-        sbuf_puts(b, ", ");
-    }
+    sbuf_puts(b, "@S^");
+    if (group_upper)
+        sbuf_putc(b, '(');
     emit_func(upper, b, PREC_LOWEST);
-    sbuf_puts(b, ", ");
+    if (group_upper)
+        sbuf_putc(b, ')');
+    if (lower) {
+        sbuf_putc(b, '_');
+        if (group_lower)
+            sbuf_putc(b, '(');
+        emit_func(lower, b, PREC_LOWEST);
+        if (group_lower)
+            sbuf_putc(b, ')');
+    }
+    sbuf_putc(b, ' ');
+    if (group_integrand)
+        sbuf_putc(b, '(');
     emit_func(display_integrand, b, PREC_LOWEST);
-    sbuf_puts(b, ", ");
+    if (group_integrand)
+        sbuf_putc(b, ')');
+    sbuf_puts(b, " d");
     emit_func(display_dummy, b, PREC_LOWEST);
-    sbuf_putc(b, ')');
 }
 
 static void emit_tex_sqrt_power(const expr_t *base,
@@ -1560,6 +1569,56 @@ static bool emit_tex_display_polynomial_sum(const expr_t *expr,
     if (need)
         sbuf_puts(b, "\\right)");
     return true;
+}
+
+static bool emit_func_display_polynomial_sum(const expr_t *expr,
+                                             sbuf_t *b,
+                                             int parent_prec)
+{
+    display_poly_term_t terms[96];
+    size_t count = 0u;
+    int need = PREC_ADD < parent_prec;
+
+    if (!display_poly_prepare_terms(expr, terms, &count,
+                                    sizeof(terms) / sizeof(terms[0])))
+        return false;
+
+    if (need)
+        sbuf_putc(b, '(');
+
+    for (size_t i = 0u; i < count; ++i) {
+        bool term_negative = expr_renders_negative(terms[i].expr);
+        bool effective_negative = terms[i].subtract != term_negative;
+        bool term_needs_parens = expr_is_addsub(terms[i].expr);
+
+        if (i == 0u) {
+            if (effective_negative)
+                sbuf_putc(b, '-');
+        } else {
+            sbuf_puts(b, effective_negative ? " - " : " + ");
+        }
+
+        if (term_needs_parens)
+            sbuf_putc(b, '(');
+        if (term_negative)
+            emit_func_abs(terms[i].expr, b, PREC_ADD);
+        else
+            emit_func(terms[i].expr, b, PREC_ADD);
+        if (term_needs_parens)
+            sbuf_putc(b, ')');
+    }
+
+    if (need)
+        sbuf_putc(b, ')');
+    return true;
+}
+
+void emit_func_display(const expr_t *f, sbuf_t *b, int parent_prec)
+{
+    if (f && expr_is_addsub(f) &&
+        emit_func_display_polynomial_sum(f, b, parent_prec))
+        return;
+    emit_func(f, b, parent_prec);
 }
 
 static void emit_expr_abs(const expr_t *f, sbuf_t *b, int parent_prec)

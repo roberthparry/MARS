@@ -1116,7 +1116,7 @@ static int string_append_vformat_with_string_module_objects(
         if (string_cursor_next(cursor) != 0)
             goto done;
         if (callback &&
-            !string_format_char_is_standard_conversion(conv) &&
+            (!string_format_char_is_standard_conversion(conv) || conv == 'n') &&
             string_format_cursor_peek_ascii(cursor, &ch) &&
             isalpha((unsigned char)ch)) {
             spec.trailing_modifier = (char)ch;

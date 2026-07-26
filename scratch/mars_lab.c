@@ -5,6 +5,7 @@
 #include <ctype.h>
 #include <limits.h>
 
+#include "equation.h"
 #include "expression.h"
 #include "ustring.h"
 
@@ -32,6 +33,31 @@ static char *expr_tex_body_dup(const expr_t *expr)
     char *body = expr_to_tex_body_wrapped(expr, 110u);
 
     return body ? body : expr_text_dup(expr, style_TEX);
+}
+
+static expr_t *display_polynomial_simplified(const expr_t *expr,
+                                             const expr_t *wrt)
+{
+    expr_t *zero = NULL;
+    expr_t *display = NULL;
+    equation_t *polynomial = NULL;
+    equation_t *expanded = NULL;
+
+    if (!expr)
+        return NULL;
+    if (expr_contains_integral_operation(expr))
+        return NULL;
+
+    zero = expr_new_const(NUM_ZERO);
+    polynomial = zero ? equ_new(expr, zero) : NULL;
+    expanded = polynomial ? equ_display_expanded(polynomial, wrt) : NULL;
+    if (expanded)
+        display = expr_clone(equ_lhs(expanded));
+
+    equ_free(expanded);
+    equ_free(polynomial);
+    expr_free(zero);
+    return display ? display : expr_simplify(expr);
 }
 
 static char *trim_ascii_in_place(char *text)
@@ -394,33 +420,9 @@ static void print_bindings(const char *label,
     }
 }
 
-static bool expression_evaluation_ready(const expr_t *expr,
-                                        expr_bindings_t *bindings)
+static bool expression_evaluation_ready(const expr_t *expr)
 {
-    size_t count = expr_bindings_count(bindings);
-
-    if (expr_bindings_has_symbolic_derivative(bindings) ||
-        expr_bindings_has_symbolic_integral(bindings) ||
-        expr_contains_integral_operation(expr))
-        return true;
-
-    for (size_t i = 0u; i < count; ++i) {
-        expr_t *binding;
-        number_t value;
-        bool unset;
-
-        if (expr_bindings_is_constant_at(bindings, i))
-            continue;
-        binding = expr_bindings_expr_at(bindings, i);
-        if (!binding)
-            continue;
-        value = expr_get_val(binding);
-        unset = num_is_nan(value);
-        num_destroy(&value);
-        if (unset)
-            return false;
-    }
-    return true;
+    return expr != NULL;
 }
 
 static void print_expression_bindings(const char *label,
@@ -644,6 +646,7 @@ int main(int argc, char **argv)
     const char *action = argc > 4 ? argv[4] : "";
     expr_bindings_t *bindings = NULL;
     expr_t *expr = NULL;
+    expr_t *display_expr = NULL;
     expr_t *deriv = NULL;
     expr_t *display_deriv = NULL;
     expr_t *integral = NULL;
@@ -668,6 +671,7 @@ int main(int argc, char **argv)
                             binding_edit_request;
     bool derivative_request = !integral_request && !evaluate_request;
     bool wrt_is_variable = false;
+    bool display_expr_owned = false;
     bool display_deriv_owned = false;
     int rc = 0;
 
@@ -707,10 +711,20 @@ int main(int argc, char **argv)
     if (bindings_request && argc > 5)
         preserve_matching_binding_values(bindings, argv[5]);
 
-    expr_text = expr_text_dup(expr, style_EXPRESSION);
-    unbound_text = expr_text_dup(expr, style_UNBOUND);
-    func_text = expr_text_dup(expr, style_FUNCTION);
-    tex_text = expr_tex_body_dup(expr);
+    if (bindings)
+        wrt = expr_bindings_get(bindings, wrt_name);
+    wrt_is_variable = wrt && expr_is_variable(wrt);
+    if (evaluate_request && wrt_is_variable) {
+        display_expr = display_polynomial_simplified(expr, wrt);
+        display_expr_owned = display_expr != NULL;
+    }
+    if (!display_expr)
+        display_expr = expr;
+
+    expr_text = expr_text_dup(display_expr, style_EXPRESSION);
+    unbound_text = expr_text_dup(display_expr, style_UNBOUND);
+    func_text = expr_text_dup(display_expr, style_FUNCTION);
+    tex_text = expr_tex_body_dup(display_expr);
 
     printf("input       %s\n", raw_input);
     printf("expression  %s\n", expr_text ? expr_text : "(null)");
@@ -720,7 +734,7 @@ int main(int argc, char **argv)
     print_bindings("binding", bindings, precision);
     printf("differentiable  %s\n", expr_is_differentiable(expr) ? "yes" : "no");
     printf("evaluation_ready  %s\n",
-           expression_evaluation_ready(expr, bindings) ? "yes" : "no");
+           expression_evaluation_ready(expr) ? "yes" : "no");
     value_note[0] = '\0';
     {
         number_t value_number = expr_eval(expr);
@@ -731,9 +745,6 @@ int main(int argc, char **argv)
         num_destroy(&value_number);
     }
 
-    if (bindings)
-        wrt = expr_bindings_get(bindings, wrt_name);
-    wrt_is_variable = wrt && expr_is_variable(wrt);
     if (wrt_is_variable && derivative_request) {
         deriv = expr_create_deriv(expr, wrt);
         if (!deriv) {
@@ -742,7 +753,7 @@ int main(int argc, char **argv)
             rc = 1;
             goto cleanup;
         }
-        display_deriv = expr_simplify(deriv);
+        display_deriv = display_polynomial_simplified(deriv, wrt);
         if (display_deriv) {
             display_deriv_owned = true;
         } else {
@@ -796,6 +807,8 @@ int main(int argc, char **argv)
     }
 
 cleanup:
+    if (display_expr_owned)
+        expr_free(display_expr);
     free(integral_tex_text);
     free(integral_func_text);
     free(integral_text);

@@ -5,9 +5,230 @@
 #include <string.h>
 
 #include "equation.h"
+#include "expression/expr_stringout.h"
+#include "expression/expr_stringout_internal.h"
 
 bool expr_set_number_scientific_local(bool scientific);
 int expr_set_number_precision_local(int precision);
+
+static void equ_emit_function_name(sbuf_t *buffer, const char *name)
+{
+    emit_name_func(buffer, name);
+}
+
+static void equ_emit_function_parameter_list(sbuf_t *buffer,
+                                             const varlist_t *variables,
+                                             const varlist_t *constants)
+{
+    if (variables->count == 0u && constants->count == 0u) {
+        sbuf_puts(buffer, "void");
+        return;
+    }
+
+    for (size_t i = 0u; i < variables->count; ++i) {
+        if (i > 0u)
+            sbuf_puts(buffer, ", ");
+        equ_emit_function_name(
+            buffer, expr_name_or_default(variables->vars[i], "x"));
+    }
+    for (size_t i = 0u; i < constants->count; ++i) {
+        if (variables->count > 0u || i > 0u)
+            sbuf_puts(buffer, ", ");
+        sbuf_puts(buffer, "const ");
+        equ_emit_function_name(buffer, constants->vars[i]->name);
+    }
+}
+
+static void equ_emit_function_argument_list(sbuf_t *buffer,
+                                            const varlist_t *variables,
+                                            const varlist_t *constants)
+{
+    for (size_t i = 0u; i < variables->count; ++i) {
+        if (i > 0u)
+            sbuf_puts(buffer, ", ");
+        equ_emit_function_name(
+            buffer, expr_name_or_default(variables->vars[i], "x"));
+    }
+    for (size_t i = 0u; i < constants->count; ++i) {
+        if (variables->count > 0u || i > 0u)
+            sbuf_puts(buffer, ", ");
+        equ_emit_function_name(buffer, constants->vars[i]->name);
+    }
+}
+
+static void equ_emit_unknown_variable_hint(sbuf_t *buffer,
+                                           const varlist_t *variables)
+{
+    bool emitted = false;
+
+    for (size_t i = 0u; i < variables->count; ++i) {
+        number_t value = expr_get_val(variables->vars[i]);
+        bool unknown = num_is_nan(value);
+
+        num_destroy(&value);
+        if (!unknown)
+            continue;
+
+        if (!emitted)
+            sbuf_puts(buffer, "// ");
+        else
+            sbuf_puts(buffer, ", ");
+        equ_emit_function_name(
+            buffer, expr_name_or_default(variables->vars[i], "x"));
+        sbuf_puts(buffer, " = ?");
+        emitted = true;
+    }
+
+    if (emitted)
+        sbuf_putc(buffer, '\n');
+}
+
+static char *equ_function_expression_dup(const expr_t *expression)
+{
+    sbuf_t buffer;
+    char *text;
+
+    sbuf_init(&buffer);
+    emit_func_display(expression, &buffer, PREC_LOWEST);
+    text = sbuf_take_c_string(&buffer);
+    sbuf_free(&buffer);
+    return text;
+}
+
+static bool equ_is_function_break_operator(char operation,
+                                           bool multiplicative)
+{
+    return multiplicative
+        ? operation == '*' || operation == '/'
+        : operation == '+' || operation == '-';
+}
+
+static const char *equ_find_top_level_function_separator(
+    const char *text,
+    bool multiplicative)
+{
+    int parentheses = 0;
+    int brackets = 0;
+
+    if (!text)
+        return NULL;
+
+    for (const char *cursor = text; *cursor; ++cursor) {
+        if (*cursor == '(')
+            parentheses++;
+        else if (*cursor == ')' && parentheses > 0)
+            parentheses--;
+        else if (*cursor == '[')
+            brackets++;
+        else if (*cursor == ']' && brackets > 0)
+            brackets--;
+        else if (parentheses == 0 && brackets == 0 &&
+                 *cursor == ' ' &&
+                 equ_is_function_break_operator(cursor[1], multiplicative) &&
+                 cursor[2] == ' ')
+            return cursor;
+    }
+
+    return NULL;
+}
+
+static void equ_emit_function_text_range(sbuf_t *buffer,
+                                         const char *start,
+                                         const char *end)
+{
+    for (const char *cursor = start; cursor && cursor < end; ++cursor)
+        sbuf_putc(buffer, *cursor);
+}
+
+static void equ_emit_aligned_function_expression(sbuf_t *buffer,
+                                                 const char *text)
+{
+    static const size_t line_limit = 88u;
+    const char *term = text ? text : "0";
+    bool multiplicative =
+        equ_find_top_level_function_separator(term, false) == NULL;
+    const char *separator = equ_find_top_level_function_separator(
+        term, multiplicative);
+    const char *end = separator ? separator : term + strlen(term);
+    size_t column;
+
+    if (*term == '-') {
+        sbuf_puts(buffer, "        - ");
+        term++;
+    } else {
+        sbuf_puts(buffer, "          ");
+    }
+    equ_emit_function_text_range(buffer, term, end);
+    column = 10u + (size_t)(end - term);
+
+    while (separator) {
+        char operation = separator[1];
+        size_t term_length;
+
+        term = separator + 3;
+        separator = equ_find_top_level_function_separator(
+            term, multiplicative);
+        end = separator ? separator : term + strlen(term);
+        term_length = (size_t)(end - term);
+        if (column + 3u + term_length > line_limit) {
+            sbuf_puts(buffer, "\n        ");
+            sbuf_putc(buffer, operation);
+            sbuf_putc(buffer, ' ');
+            column = 10u + term_length;
+        } else {
+            sbuf_putc(buffer, ' ');
+            sbuf_putc(buffer, operation);
+            sbuf_putc(buffer, ' ');
+            column += 3u + term_length;
+        }
+        equ_emit_function_text_range(buffer, term, end);
+    }
+
+    sbuf_putc(buffer, '\n');
+}
+
+static void equ_emit_function_equation_return(sbuf_t *buffer,
+                                              const equation_t *equation)
+{
+    static const size_t compact_line_limit = 88u;
+    char *lhs = equ_function_expression_dup(equ_lhs(equation));
+    char *rhs = equ_function_expression_dup(equ_rhs(equation));
+    char *relation = NULL;
+    size_t relation_length;
+    size_t compact_length;
+
+    if (!lhs || !rhs) {
+        free(rhs);
+        free(lhs);
+        sbuf_puts(buffer, "    return equation(0 = 0);\n");
+        return;
+    }
+
+    relation_length = strlen(lhs) + strlen(" = ") + strlen(rhs);
+    relation = malloc(relation_length + 1u);
+    if (!relation) {
+        free(rhs);
+        free(lhs);
+        sbuf_puts(buffer, "    return equation(0 = 0);\n");
+        return;
+    }
+    snprintf(relation, relation_length + 1u, "%s = %s", lhs, rhs);
+
+    compact_length = strlen("    return equation();") + relation_length;
+    if (compact_length <= compact_line_limit) {
+        sbuf_puts(buffer, "    return equation(");
+        sbuf_puts(buffer, relation);
+        sbuf_puts(buffer, ");\n");
+    } else {
+        sbuf_puts(buffer, "    return equation(\n");
+        equ_emit_aligned_function_expression(buffer, relation);
+        sbuf_puts(buffer, "    );\n");
+    }
+
+    free(relation);
+    free(rhs);
+    free(lhs);
+}
 
 static int equ_append_padding(string_t *out, int count)
 {
@@ -33,6 +254,10 @@ static style_t equ_format_style(const string_format_spec_t *spec,
         case 'T':
             *result = STRING_FORMAT_HANDLED_WITH_TRAILING_MODIFIER;
             return style_TEX;
+        case 'f':
+        case 'F':
+            *result = STRING_FORMAT_HANDLED_WITH_TRAILING_MODIFIER;
+            return style_FUNCTION;
         default:
             return style_EXPRESSION;
     }
@@ -217,6 +442,48 @@ cleanup:
     return out;
 }
 
+static string_t *equ_to_text_function(const equation_t *equation)
+{
+    sbuf_t buffer;
+    autoname_table_t names;
+    varlist_t variables;
+    varlist_t constants;
+    string_t *out;
+
+    sbuf_init(&buffer);
+    autoname_init(&names);
+    assign_unnamed_vars_dfs((expr_t *)equ_lhs(equation), &names);
+    assign_unnamed_vars_dfs((expr_t *)equ_rhs(equation), &names);
+
+    varlist_init(&variables);
+    find_vars_dfs(equ_lhs(equation), &variables);
+    find_vars_dfs(equ_rhs(equation), &variables);
+
+    varlist_init(&constants);
+    find_explicit_named_consts_dfs(equ_lhs(equation), &constants);
+    find_explicit_named_consts_dfs(equ_rhs(equation), &constants);
+    find_named_consts_dfs(equ_lhs(equation), &constants);
+    find_named_consts_dfs(equ_rhs(equation), &constants);
+
+    sbuf_puts(&buffer, "equation equ(");
+    equ_emit_function_parameter_list(&buffer, &variables, &constants);
+    sbuf_puts(&buffer, ") {\n");
+    equ_emit_function_equation_return(&buffer, equation);
+    sbuf_puts(&buffer, "}\n\n");
+
+    equ_emit_unknown_variable_hint(&buffer, &variables);
+    sbuf_puts(&buffer, "output(equ(");
+    equ_emit_function_argument_list(&buffer, &variables, &constants);
+    sbuf_puts(&buffer, ").solve());");
+
+    out = sbuf_to_string(&buffer);
+    sbuf_free(&buffer);
+    free(constants.vars);
+    free(variables.vars);
+    autoname_restore(&names);
+    return out;
+}
+
 string_t *equ_to_text(const equation_t *equation, style_t style)
 {
     if (!equation)
@@ -226,6 +493,8 @@ string_t *equ_to_text(const equation_t *equation, style_t style)
         return equ_to_text_tex(equation);
     if (style == style_UNBOUND)
         return equ_to_text_unbound(equation);
+    if (style == style_FUNCTION)
+        return equ_to_text_function(equation);
 
     return equ_to_text_expression(equation);
 }

@@ -1762,7 +1762,10 @@ static void test_from_string_bindings_with_implicit_builtin_constant(void)
     const char *expect =
         "{ exp(π·√(x)) | x = 163 }";
 
-    if (expr && got && str_eq(got, expect))
+    if (expr && got && str_eq(got, expect) &&
+        expr_bindings_count(bindings) == 1u &&
+        expr_bindings_get(bindings, "x") != NULL &&
+        expr_bindings_get(bindings, "@pi") == NULL)
         to_string_pass("bindings keep implicit pi constant inference", got, expect);
     else
         to_string_fail(__FILE__, __LINE__, 1,
@@ -2216,6 +2219,47 @@ static void test_binding_edit_is_owned_by_expression_library(void)
     expr_free(expr);
 }
 
+static void test_binding_edit_preserves_symbolic_value(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_bindings_t *edited_bindings = NULL;
+    expr_bindings_t *fraction_bindings = NULL;
+    expr_t *expr = expr_from_string("{ x^2 | x = NAN }", &bindings);
+    expr_t *edited = expr_edit_binding(
+        expr, bindings, "x", "pi", &edited_bindings);
+    expr_t *fraction = expr_edit_binding(
+        expr, bindings, "x", "½", &fraction_bindings);
+    char *expr_text = edited
+        ? expr_to_string(edited, style_EXPRESSION)
+        : NULL;
+    char *func_text = edited
+        ? expr_to_string(edited, style_FUNCTION)
+        : NULL;
+    char *fraction_func_text = fraction
+        ? expr_to_string(fraction, style_FUNCTION)
+        : NULL;
+
+    TEST_ASSERT_TRUE(expr_text && strstr(expr_text, "x = π"),
+                     "binding edit preserves pi in expression output");
+    TEST_ASSERT_TRUE(func_text &&
+                         strstr(func_text, "x = @pi\noutput(expr(x));"),
+                     "binding edit preserves pi in function output");
+    TEST_ASSERT_TRUE(fraction_func_text &&
+                         strstr(fraction_func_text,
+                                "x = ½\noutput(expr(x));"),
+                     "function output preserves a Unicode fraction binding");
+
+    free(fraction_func_text);
+    free(func_text);
+    free(expr_text);
+    expr_bindings_free(fraction_bindings);
+    expr_free(fraction);
+    expr_bindings_free(edited_bindings);
+    expr_free(edited);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+}
+
 static void test_from_string_unevaluated_integral(void)
 {
     expr_bindings_t *bindings = NULL;
@@ -2282,13 +2326,13 @@ static void test_from_string_unevaluated_integral(void)
         TEST_FAIL();
     }
 
-    if (func_text && strstr(func_text, "integral(x, exp(cosh(t)), t)") != NULL) {
+    if (func_text && strstr(func_text, "@S^x exp(cosh(t)) dt") != NULL) {
         printf(C_BOLD C_GREEN "PASS" C_RESET
-               " unevaluated integral function form uses integral(...)\n");
+               " unevaluated integral function form uses @S notation\n");
         printf(C_BOLD "  expr   " C_RESET "%s\n\n", func_text);
     } else {
         printf(C_BOLD C_RED "FAIL" C_RESET
-               " unevaluated integral function form uses integral(...) %s:%d:1\n",
+               " unevaluated integral function form uses @S notation %s:%d:1\n",
                __FILE__, __LINE__);
         printf(C_BOLD "  got    " C_RESET "%s\n\n", func_text ? func_text : "(null)");
         TEST_FAIL();
@@ -2742,6 +2786,29 @@ static void test_from_string_unevaluated_integral(void)
     expr_free(expr);
 
     bindings = NULL;
+    expr = expr_from_string("{ @S(x^2)dx }", &bindings);
+    text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
+    if (text &&
+        strstr(text, "⅓x³") &&
+        strstr(text, "C₀") &&
+        strstr(text, "x = NAN") &&
+        strstr(text, "C₀ = NAN") &&
+        expr_bindings_has_symbolic_integral(bindings)) {
+        printf(C_BOLD C_GREEN "PASS" C_RESET
+               " parenthesized @S without whitespace returns an indefinite family\n");
+        printf(C_BOLD "  expr   " C_RESET "%s\n\n", text);
+    } else {
+        printf(C_BOLD C_RED "FAIL" C_RESET
+               " parenthesized @S without whitespace returns an indefinite family %s:%d:1\n",
+               __FILE__, __LINE__);
+        printf(C_BOLD "  got    " C_RESET "%s\n\n", text ? text : "(null)");
+        TEST_FAIL();
+    }
+    free(text);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+
+    bindings = NULL;
     expr = expr_from_string("{ @S x^2 dx }", &bindings);
     text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
     if (text &&
@@ -3038,6 +3105,7 @@ void test_expr_t_from_string(void)
     TEST_RUN_SUBTEST(test_from_string_bindings_with_constant_expression_value, NULL);
     TEST_RUN_SUBTEST(test_from_string_bindings_skip_function_name_letters, NULL);
     TEST_RUN_SUBTEST(test_binding_edit_is_owned_by_expression_library, NULL);
+    TEST_RUN_SUBTEST(test_binding_edit_preserves_symbolic_value, NULL);
     TEST_RUN_SUBTEST(test_from_string_unevaluated_integral, NULL);
     TEST_RUN_SUBTEST(test_from_string_round_trips, NULL);
     TEST_RUN_SUBTEST(test_from_string_deriv, NULL);

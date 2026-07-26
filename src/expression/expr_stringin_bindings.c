@@ -158,6 +158,12 @@ static expr_bindings_t *bindings_create(size_t count)
 static int bindings_index_entry(expr_bindings_t *bindings,
                                 expr_binding_entry_t *entry);
 
+static bool binding_is_noneditable_builtin(const expr_t *node)
+{
+    return expr_is_immortal_default_const_local(node) &&
+           (!node->name || strcmp(node->name, "i") != 0);
+}
+
 expr_bindings_t *expr_bindings_from_expr_internal(const expr_t *expr)
 {
     varlist_t vars;
@@ -178,7 +184,8 @@ expr_bindings_t *expr_bindings_from_expr_internal(const expr_t *expr)
         if (vars.vars[i]->name && *vars.vars[i]->name)
             count++;
     for (size_t i = 0u; i < constants.count; ++i)
-        if (constants.vars[i]->name && *constants.vars[i]->name)
+        if (constants.vars[i]->name && *constants.vars[i]->name &&
+            !binding_is_noneditable_builtin(constants.vars[i]))
             count++;
 
     if (count == 0u) {
@@ -199,6 +206,8 @@ expr_bindings_t *expr_bindings_from_expr_internal(const expr_t *expr)
             expr_binding_entry_t *entry;
 
             if (!node->name || !*node->name)
+                continue;
+            if (group == 1u && binding_is_noneditable_builtin(node))
                 continue;
             entry = &bindings->entries[out++];
             entry->name = string_new_with(node->name);
@@ -389,6 +398,8 @@ static int symtab_binding_is_needed_for_expr(const expr_t *expr,
     if (!expr)
         return 0;
     if (expr_is_const(node)) {
+        if (binding_is_noneditable_builtin(node))
+            return 0;
         if (expr_contains_node(expr, node))
             return 1;
         if (node->name && expr_integral_binds_name(expr, node->name))
@@ -457,7 +468,8 @@ expr_bindings_t *single_binding_from_node(expr_t *node)
 {
     expr_bindings_t *bindings;
 
-    if (!node || !node->name || !*node->name)
+    if (!node || !node->name || !*node->name ||
+        binding_is_noneditable_builtin(node))
         return NULL;
 
     bindings = bindings_create(1u);
