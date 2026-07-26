@@ -10,6 +10,12 @@
 #include "almanac/almanac_internal.h"
 #include "sqlite.h"
 
+typedef enum almanac_event_lab_kind_t {
+    ALMANAC_EVENT_LAB_KIND_ALL = 0,
+    ALMANAC_EVENT_LAB_KIND_SOLAR,
+    ALMANAC_EVENT_LAB_KIND_LUNAR
+} almanac_event_lab_kind_t;
+
 typedef struct almanac_event_lab_options_t {
     short start_year;
     month_t start_month;
@@ -20,9 +26,10 @@ typedef struct almanac_event_lab_options_t {
     double latitude;
     double longitude;
     bool totality_land;
+    almanac_event_lab_kind_t kind;
 } almanac_event_lab_options_t;
 
-#define ALMANAC_EVENT_LAB_CACHE_SCHEMA "almanac_event_lab_output_v17"
+#define ALMANAC_EVENT_LAB_CACHE_SCHEMA "almanac_event_lab_output_v19"
 #define ALMANAC_EVENT_LAB_CACHE_PATH_ENV "MARS_LAB_OBJECT_STORE_PATH"
 #define ALMANAC_EVENT_LAB_CACHE_KEY_ENV "MARS_LAB_OBJECT_STORE_KEY"
 #define JURISDICTION_DB_PATH_ENV "MARS_JURISDICTION_DB_PATH"
@@ -168,12 +175,16 @@ done:
 static string_t *cache_key_for_options(const almanac_event_lab_options_t *options)
 {
     char key[256];
+    const char *kind;
 
     if (!options)
         return NULL;
+    kind = options->kind == ALMANAC_EVENT_LAB_KIND_SOLAR
+        ? "solar"
+        : options->kind == ALMANAC_EVENT_LAB_KIND_LUNAR ? "lunar" : "all";
     if (snprintf(key,
                  sizeof(key),
-                 "mars_lab/%s/start=%04d-%02d-%02d/end=%04d-%02d-%02d/lat=%.9f/lon=%.9f/totality=%s",
+                 "mars_lab/%s/start=%04d-%02d-%02d/end=%04d-%02d-%02d/lat=%.9f/lon=%.9f/totality=%s/kind=%s",
                  ALMANAC_EVENT_LAB_CACHE_SCHEMA,
                  options->start_year,
                  (int)options->start_month,
@@ -183,7 +194,8 @@ static string_t *cache_key_for_options(const almanac_event_lab_options_t *option
                  (int)options->end_day,
                  options->latitude,
                  options->longitude,
-                 options->totality_land ? "land" : "none") >= (int)sizeof(key)) {
+                 options->totality_land ? "land" : "none",
+                 kind) >= (int)sizeof(key)) {
         return NULL;
     }
     return string_new_with(key);
@@ -239,6 +251,7 @@ static void init_defaults(almanac_event_lab_options_t *options)
     options->latitude = 52.7073;
     options->longitude = -2.7540;
     options->totality_land = false;
+    options->kind = ALMANAC_EVENT_LAB_KIND_ALL;
 }
 
 static bool parse_options(int argc, char **argv, almanac_event_lab_options_t *options)
@@ -272,6 +285,15 @@ static bool parse_options(int argc, char **argv, almanac_event_lab_options_t *op
                 return false;
         } else if (key_equals(arg, key_len, "totality")) {
             options->totality_land = strcmp(value, "land") == 0;
+        } else if (key_equals(arg, key_len, "kind")) {
+            if (strcmp(value, "solar") == 0)
+                options->kind = ALMANAC_EVENT_LAB_KIND_SOLAR;
+            else if (strcmp(value, "lunar") == 0)
+                options->kind = ALMANAC_EVENT_LAB_KIND_LUNAR;
+            else if (strcmp(value, "all") == 0)
+                options->kind = ALMANAC_EVENT_LAB_KIND_ALL;
+            else
+                return false;
         } else {
             return false;
         }
@@ -760,7 +782,9 @@ int main(int argc, char **argv)
     int status = 1;
 
     if (!parse_options(argc, argv, &options)) {
-        fprintf(stderr, "usage: %s start=YYYY-MM-DD end=YYYY-MM-DD lat=52.7073 lon=-2.7540\n", argc > 0 ? argv[0] : "almanac_event_lab");
+        fprintf(stderr,
+                "usage: %s start=YYYY-MM-DD end=YYYY-MM-DD lat=52.7073 lon=-2.7540 kind=all|solar|lunar\n",
+                argc > 0 ? argv[0] : "almanac_event_lab");
         return 2;
     }
     cached_output = load_cached_output(&options);
@@ -789,12 +813,16 @@ int main(int argc, char **argv)
     if (!almanac)
         goto done;
 
-    solar_events = almanac_find_solar_eclipses(almanac, &observer, start, end);
-    if (!solar_events)
-        goto done;
-    lunar_events = almanac_find_lunar_eclipses(almanac, &observer, start, end);
-    if (!lunar_events)
-        goto done;
+    if (options.kind != ALMANAC_EVENT_LAB_KIND_LUNAR) {
+        solar_events = almanac_find_solar_eclipses(almanac, &observer, start, end);
+        if (!solar_events)
+            goto done;
+    }
+    if (options.kind != ALMANAC_EVENT_LAB_KIND_SOLAR) {
+        lunar_events = almanac_find_lunar_eclipses(almanac, &observer, start, end);
+        if (!lunar_events)
+            goto done;
+    }
 
     append_solar_events(output, almanac, &observer, options.totality_land, solar_events);
     append_lunar_events(output, lunar_events);

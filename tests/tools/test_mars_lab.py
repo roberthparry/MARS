@@ -2,6 +2,7 @@ import subprocess
 import sys
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -330,6 +331,66 @@ class ExpressionResultTests(unittest.TestCase):
             payload["full_display_function"],
         )
         self.assertEqual(payload["binding_values"][0]["value"], "π")
+
+
+class AlmanacLocationTests(unittest.TestCase):
+    def test_unmatched_coordinates_do_not_display_the_first_town(self) -> None:
+        selected_option = mars_lab.INDEX_HTML.split(
+            "function selectedOption() {", 1
+        )[1].split("\n      }", 1)[0]
+
+        self.assertIn(
+            "return select.selectedOptions[0] || "
+            "select.options[select.selectedIndex] || null;",
+            selected_option,
+        )
+        self.assertNotIn("select.options[0]", selected_option)
+        self.assertEqual(
+            mars_lab.INDEX_HTML.count("placeholder: 'Custom location'"),
+            2,
+        )
+
+    def test_shrewsbury_town_data_has_observer_coordinates(self) -> None:
+        shrewsbury = next(
+            town
+            for town in mars_lab.JURISDICTION_TOWN_OPTIONS["GB-ENG"]
+            if town["name"] == "Shrewsbury"
+        )
+
+        self.assertEqual(shrewsbury["latitude"], "52.7077")
+        self.assertEqual(shrewsbury["longitude"], "-2.7541")
+        self.assertEqual(shrewsbury["elevation"], "75")
+        self.assertTrue(shrewsbury["default"])
+
+    def test_annual_events_use_one_native_estimate_and_refine_search(self) -> None:
+        searched_kinds: list[str] = []
+
+        def record_search(options: dict[str, str], timeout_seconds=None):
+            del timeout_seconds
+            searched_kinds.append(options["kind"])
+            return []
+
+        with (
+            mock.patch.object(
+                mars_lab,
+                "DEFAULT_ALMANAC_EVENT_BIN",
+                ROOT / "Makefile",
+            ),
+            mock.patch.object(
+                mars_lab,
+                "run_almanac_event_lab_rows",
+                side_effect=record_search,
+            ),
+        ):
+            mars_lab.generate_annual_almanac_events(
+                2031,
+                2.0,
+                "ZA",
+                "-33.9258",
+                "18.4232",
+            )
+
+        self.assertEqual(searched_kinds, ["all"])
 
 
 if __name__ == "__main__":
