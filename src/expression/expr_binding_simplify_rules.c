@@ -669,52 +669,97 @@ static bool binding_string_is_decimal_literal(const string_t *text)
     return have_digit;
 }
 
+typedef expr_binding_expr_t *(*binding_decimal_match_fn)(
+    const expr_binding_expr_t *expr,
+    const number_t *target);
+
 static expr_binding_expr_t *binding_expr_clone_matching_decimal_literal(
+    const expr_binding_expr_t *expr,
+    const number_t *target);
+
+static expr_binding_expr_t *binding_decimal_match_number(
     const expr_binding_expr_t *expr,
     const number_t *target)
 {
     expr_binding_expr_t *match = NULL;
+    string_t *text;
+    number_t value;
 
-    if (!expr || !target)
+    text = string_new_with(expr->u.text);
+    if (text && binding_string_is_decimal_literal(text)) {
+        value = num_create_from_string(expr->u.text);
+        if (!num_is_nan(value) && num_eq(value, *target))
+            match = expr_binding_expr_clone(expr);
+        num_destroy(&value);
+    }
+    string_free(text);
+    return match;
+}
+
+static expr_binding_expr_t *binding_decimal_match_unary(
+    const expr_binding_expr_t *expr,
+    const number_t *target)
+{
+    return binding_expr_clone_matching_decimal_literal(expr->u.unary.child,
+                                                       target);
+}
+
+static expr_binding_expr_t *binding_decimal_match_binary(
+    const expr_binding_expr_t *expr,
+    const number_t *target)
+{
+    expr_binding_expr_t *match =
+        binding_expr_clone_matching_decimal_literal(expr->u.binary.left,
+                                                    target);
+
+    return match ? match :
+        binding_expr_clone_matching_decimal_literal(expr->u.binary.right,
+                                                    target);
+}
+
+static expr_binding_expr_t *binding_decimal_match_powi(
+    const expr_binding_expr_t *expr,
+    const number_t *target)
+{
+    return binding_expr_clone_matching_decimal_literal(expr->u.powi.base,
+                                                       target);
+}
+
+static expr_binding_expr_t *binding_decimal_match_unary_op(
+    const expr_binding_expr_t *expr,
+    const number_t *target)
+{
+    return binding_expr_clone_matching_decimal_literal(expr->u.unary_op.child,
+                                                       target);
+}
+
+static const binding_decimal_match_fn
+s_binding_decimal_match_dispatch[EXPR_BINDING_EXPR_BINARY_OP + 1u] = {
+    [EXPR_BINDING_EXPR_NUMBER] = binding_decimal_match_number,
+    [EXPR_BINDING_EXPR_NEG] = binding_decimal_match_unary,
+    [EXPR_BINDING_EXPR_ADD] = binding_decimal_match_binary,
+    [EXPR_BINDING_EXPR_SUB] = binding_decimal_match_binary,
+    [EXPR_BINDING_EXPR_MUL] = binding_decimal_match_binary,
+    [EXPR_BINDING_EXPR_DIV] = binding_decimal_match_binary,
+    [EXPR_BINDING_EXPR_POWI] = binding_decimal_match_powi,
+    [EXPR_BINDING_EXPR_UNARY_OP] = binding_decimal_match_unary_op,
+    [EXPR_BINDING_EXPR_BINARY_OP] = binding_decimal_match_binary
+};
+
+static expr_binding_expr_t *binding_expr_clone_matching_decimal_literal(
+    const expr_binding_expr_t *expr,
+    const number_t *target)
+{
+    binding_decimal_match_fn match;
+
+    if (!expr || !target ||
+        (unsigned)expr->kind >=
+            sizeof(s_binding_decimal_match_dispatch) /
+                sizeof(s_binding_decimal_match_dispatch[0]))
         return NULL;
 
-    if (expr->kind == EXPR_BINDING_EXPR_NUMBER) {
-        string_t *text;
-        number_t value;
-
-        text = string_new_with(expr->u.text);
-        if (text && binding_string_is_decimal_literal(text)) {
-            value = num_create_from_string(expr->u.text);
-            if (!num_is_nan(value) && num_eq(value, *target))
-                match = expr_binding_expr_clone(expr);
-            num_destroy(&value);
-        }
-        string_free(text);
-        return match;
-    }
-
-    switch (expr->kind) {
-    case EXPR_BINDING_EXPR_NEG:
-        return binding_expr_clone_matching_decimal_literal(
-            expr->u.unary.child, target);
-    case EXPR_BINDING_EXPR_ADD:
-    case EXPR_BINDING_EXPR_SUB:
-    case EXPR_BINDING_EXPR_MUL:
-    case EXPR_BINDING_EXPR_DIV:
-    case EXPR_BINDING_EXPR_BINARY_OP:
-        match = binding_expr_clone_matching_decimal_literal(
-            expr->u.binary.left, target);
-        return match ? match : binding_expr_clone_matching_decimal_literal(
-            expr->u.binary.right, target);
-    case EXPR_BINDING_EXPR_POWI:
-        return binding_expr_clone_matching_decimal_literal(
-            expr->u.powi.base, target);
-    case EXPR_BINDING_EXPR_UNARY_OP:
-        return binding_expr_clone_matching_decimal_literal(
-            expr->u.unary_op.child, target);
-    default:
-        return NULL;
-    }
+    match = s_binding_decimal_match_dispatch[expr->kind];
+    return match ? match(expr, target) : NULL;
 }
 
 static string_t *binding_negated_decimal_text(const char *text)
