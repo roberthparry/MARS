@@ -200,6 +200,34 @@ static bool eval_integral_antiderivative_difference(const expr_t *antiderivative
     return ok;
 }
 
+static size_t eval_integral_interval_budget(void)
+{
+    size_t digits = num_get_default_prec_digits();
+    size_t refinements = 0u;
+    size_t scale = 1u;
+    size_t steps_per_refinement;
+
+    if (digits < 2u)
+        digits = 2u;
+    while (scale < digits && scale <= SIZE_MAX / 2u) {
+        scale *= 2u;
+        refinements++;
+    }
+    refinements += 2u;
+    /*
+     * At refinement h = 1/scale, tanh-sinh needs a transformed range of
+     * roughly eight units to make its endpoint tails negligible at the
+     * requested precision.  Calculate that complete final-level width up
+     * front instead of discovering an inadequate cap by retrying.
+     */
+    if (scale > (SIZE_MAX - 1u) / 8u)
+        return SIZE_MAX;
+    steps_per_refinement = scale * 8u + 1u;
+    if (refinements > SIZE_MAX / steps_per_refinement)
+        return SIZE_MAX;
+    return refinements * steps_per_refinement;
+}
+
 static number_t eval_integral(expr_t *dv)
 {
     integrator_t *ig;
@@ -306,7 +334,11 @@ static number_t eval_integral(expr_t *dv)
             }
         }
     } else {
-        status = intg_integral(ig, local_integrand, local_var, lower, upper, &result, NULL);
+        size_t interval_budget = eval_integral_interval_budget();
+
+        intg_set_interval_count_max(ig, interval_budget);
+        status = intg_integral(ig, local_integrand, local_var, lower, upper,
+                               &result, NULL);
     }
 
     expr_free(local_integrand);
@@ -315,7 +347,7 @@ static number_t eval_integral(expr_t *dv)
     num_destroy(&lower);
     num_destroy(&upper);
 
-    if (status < 0 || !num_is_real(result) || !num_is_finite(result)) {
+    if (status != 0 || !num_is_real(result) || !num_is_finite(result)) {
         num_destroy(&result);
         return num_clone(NUM_NAN);
     }

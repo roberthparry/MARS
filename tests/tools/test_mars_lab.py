@@ -1,0 +1,336 @@
+import subprocess
+import sys
+import unittest
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "tools"))
+
+import mars_lab
+
+
+class EquationResultTests(unittest.TestCase):
+    def test_use_as_input_reads_the_equation_card(self) -> None:
+        self.assertIn(
+            "if (currentMode() === 'equation')\n"
+            "        return parsedExpressionText();",
+            mars_lab.INDEX_HTML,
+        )
+        self.assertIn(
+            "if (currentMode() === 'equation')\n"
+            "        setExpressionEditor(resultText);\n"
+            "      else if (!await applyMarsBindingExpression(resultText))",
+            mars_lab.INDEX_HTML,
+        )
+
+    def test_multiline_numeric_solutions_reach_payload(self) -> None:
+        raw = "\n".join(
+            (
+                "input       x^2 - 1 = 0",
+                "equation    { x² - 1 = 0 | x = NAN }",
+                "unbound     x² - 1 = 0",
+                "function    equation equ(x) {",
+                "    return equation(x^2 - 1 = 0);",
+                "}",
+                "status      solved",
+                "solutions   x = 1",
+                "            x = -1",
+                "numeric     x ≈ 1",
+                "            x ≈ -1",
+            )
+        )
+
+        fields = mars_lab.parse_equation_lab_output(raw)
+        payload = mars_lab.prepare_equation_fields(fields, 72)
+
+        self.assertEqual(payload["solution_count"], 2)
+        self.assertEqual(
+            payload["function"],
+            "equation equ(x) {\n    return equation(x^2 - 1 = 0);\n}",
+        )
+        self.assertEqual(
+            payload["solutions"].splitlines(),
+            ["x = 1", "x = -1"],
+        )
+        self.assertEqual(
+            payload["numeric_solutions"],
+            ["x ≈ 1", "x ≈ -1"],
+        )
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "equation_lab").is_file(),
+        "release equation_lab helper is not built",
+    )
+    def test_solution_pane_orders_real_roots_then_complex_pairs(self) -> None:
+        equation_binary = (
+            ROOT / "build" / "release" / "scratch" / "equation_lab"
+        )
+        equation = (
+            "{ x^9 - 8x^8 + 16x^7 + 2x^6 - 66x^5 + 158x^4"
+            " - 16x^3 - 2x^2 + 65x - 150 = 0 | x = NAN }"
+        )
+        completed = subprocess.run(
+            [str(equation_binary), equation, "32"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        fields = mars_lab.parse_equation_lab_output(completed.stdout)
+        payload = mars_lab.prepare_equation_fields(fields, 32)
+
+        self.assertEqual(
+            payload["solutions"].splitlines(),
+            [
+                "x = -2",
+                "x = -1",
+                "x = 1",
+                "x = 3",
+                "x = 5",
+                "x = i",
+                "x = -i",
+                "x = 1 + 2i",
+                "x = 1 - 2i",
+            ],
+        )
+
+
+class ExpressionResultTests(unittest.TestCase):
+    @property
+    def expression_binary(self) -> Path:
+        return ROOT / "build" / "release" / "scratch" / "mars_lab"
+
+    def test_calculus_errors_clear_stale_result_cards(self) -> None:
+        self.assertGreaterEqual(
+            mars_lab.INDEX_HTML.count(
+                "clearResultDetails({keepBindings: true});\n"
+                "          setRenderedError("
+            ),
+            2,
+        )
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_symbolic_expression_can_be_evaluated_with_unset_values(self) -> None:
+        ready_function = mars_lab.INDEX_HTML.split(
+            "function expressionReadyToEvaluate() {", 1
+        )[1].split("\n    }", 1)[0]
+
+        self.assertIn("return Boolean(currentExpressionText());", ready_function)
+        self.assertNotIn("bindingRefreshValid", ready_function)
+        self.assertNotIn("evaluationReady", ready_function)
+
+        completed = subprocess.run(
+            [
+                str(self.expression_binary),
+                "z^2 + C_0",
+                "z",
+                "72",
+                "evaluate",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        fields = mars_lab.parse_mars_lab_output(completed.stdout)
+
+        self.assertEqual(fields["evaluation_ready"], "yes")
+        self.assertEqual(fields["value"], "NAN")
+
+        mars_lab.prepare_evaluation_fields(
+            self.expression_binary,
+            fields,
+            "z^2 + C_0",
+            72,
+            save_expression=False,
+            wrt="z",
+        )
+        self.assertEqual(fields["value"], "?")
+
+    def test_lab_displays_nan_numeric_values_as_unknown(self) -> None:
+        for value in ("NAN", "nan", "+NAN", "-nan"):
+            self.assertEqual(mars_lab.numeric_value_for_display(value), "?")
+        self.assertEqual(mars_lab.numeric_value_for_display("∞"), "∞")
+        self.assertEqual(mars_lab.numeric_value_for_display("1 + 2i"), "1 + 2i")
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_literal_integral_is_not_treated_as_a_polynomial(self) -> None:
+        completed = subprocess.run(
+            [
+                str(self.expression_binary),
+                "∫^x exp(cosh(t)) dt",
+                "x",
+                "72",
+                "evaluate",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        fields = mars_lab.parse_mars_lab_output(completed.stdout)
+
+        self.assertEqual(
+            fields["unbound"],
+            "∫^x exp(cosh(t))·dt",
+        )
+        self.assertIn(
+            "return @S^x exp(cosh(t)) dt;",
+            fields["function"],
+        )
+        self.assertNotIn("integral_meta", completed.stdout)
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_expression_integral_budget_meets_requested_precision(self) -> None:
+        expected_prefix = (
+            "3.282019361716804048203463607517520581316512948427583727395760606137631894"
+            "015783088440537589426605283721284926282407788662778821709500932676521399"
+            "828735288142794080090483179244993998261773966813476082324682815018690186"
+            "492563007652463798476124904692754615156634336326824749216188283034513313"
+        )
+        completed = subprocess.run(
+            [
+                str(self.expression_binary),
+                "{ ∫^x exp(cosh(t)) dt | x = 1 }",
+                "x",
+                "320",
+                "evaluate",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        fields = mars_lab.parse_mars_lab_output(completed.stdout)
+
+        self.assertTrue(fields["value"].startswith(expected_prefix))
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_builtin_pi_integral_is_not_an_editable_binding(self) -> None:
+        expected_prefix = (
+            "10392.468738822600980420744462117841678573566419462679673329278087957084"
+            "631825897792198285830927860943628524047869766350810032768610623859138947"
+            "497641471731730305680684554908473134666515367819801469199656685560045049"
+            "151577259888029495308795693406074695607243495921403465215672885517849177"
+            "337682115675"
+        )
+        completed = subprocess.run(
+            [
+                str(self.expression_binary),
+                "∫^@pi exp(cosh(t)) dt",
+                "x",
+                "347",
+                "evaluate",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        fields = mars_lab.parse_mars_lab_output(completed.stdout)
+        mars_lab.prepare_evaluation_fields(
+            self.expression_binary,
+            fields,
+            "∫^@pi exp(cosh(t)) dt",
+            320,
+            save_expression=False,
+        )
+
+        self.assertTrue(fields["value"].startswith(expected_prefix))
+        self.assertEqual(fields["binding_values"], [])
+        self.assertNotIn("binding              constant\tπ", completed.stdout)
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_derivative_collects_numeric_polynomial(self) -> None:
+        completed = subprocess.run(
+            [
+                str(self.expression_binary),
+                "(x - 1)*(x^2 - 3*x - 10)*(x^2 - 2*x - 3)",
+                "x",
+                "72",
+                "derivative",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        fields = mars_lab.parse_mars_lab_output(completed.stdout)
+
+        self.assertEqual(
+            fields["derivative"],
+            "d/dx = { 5x⁴ - 24x³ - 6x² + 72x + 1 | x = NAN }",
+        )
+        self.assertIn(
+            "return 5 * x^4 - 24 * x^3 - 6 * x^2 + 72 * x + 1;",
+            fields["derivative_function"],
+        )
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_binding_edit_preserves_pi_and_collects_polynomial(self) -> None:
+        expression = (
+            "2*((x - 1)*((x - 1)*(2*x - 3) - 3*x + x^2 - 10)"
+            " + (3*x - 4)*(x^2 - 2*x - 3)"
+            " + (x - 1)*((x - 1)*(2*x - 3) - 6*x + 2*x^2 - 20))"
+        )
+        completed = subprocess.run(
+            [
+                str(self.expression_binary),
+                expression,
+                "x",
+                "72",
+                "binding-edit",
+                "pi",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        fields = mars_lab.parse_mars_lab_output(completed.stdout)
+        payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary,
+            fields,
+            expression,
+            72,
+            False,
+        )
+
+        self.assertEqual(
+            fields["expression"],
+            "{ 20x³ - 72x² - 12x + 72 | x = π }",
+        )
+        self.assertEqual(
+            payload["full_display_expression"],
+            "20x³ - 72x² - 12x + 72",
+        )
+        self.assertIn(
+            "return 20 * x^3 - 72 * x^2 - 12 * x + 72;",
+            payload["full_display_function"],
+        )
+        self.assertIn(
+            "x = @pi\noutput(expr(x));",
+            payload["full_display_function"],
+        )
+        self.assertEqual(payload["binding_values"][0]["value"], "π")
+
+
+if __name__ == "__main__":
+    unittest.main()

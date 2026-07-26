@@ -364,6 +364,15 @@ expr_t *expr_substitute(const expr_t *expr,
 expr_t *expr_display_simplified(const expr_t *expr);
 
 /**
+ * @brief Return an owning fully expanded display form of @p expr.
+ *
+ * Unlike expr_display_simplified(), this explicitly distributes products when
+ * both factors are sums. It is intended for callers that request expanded
+ * polynomial or algebraic output.
+ */
+expr_t *expr_display_expanded(const expr_t *expr);
+
+/**
  * @brief Find a user-facing note about undefined integral bounds, if any.
  *
  * Writes a short explanation into @p out and returns true when a note was
@@ -615,7 +624,7 @@ expr_t *expr_simplify(const expr_t *expr);
  * @brief Output style for expr_to_text().
  *
  * style_FUNCTION    — C-like function notation, e.g.
- *                     "expression expr(x) { return sin(x); }"
+ *                     "expression expr(x) { return sin(x); } output(expr(1));"
  * style_EXPRESSION  — round-trip infix notation, e.g.
  *                     "{ sin(x₀) | x₀ = 1.0 }"
  * style_TEX         — TeX mathematical notation, e.g. "\left\{ x_{0} \;\middle|\; x_{0} = 1.0 \right\}"

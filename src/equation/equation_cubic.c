@@ -273,7 +273,7 @@ static int equ_append_cubic_cardano_roots(const expr_t *wrt,
     number_t u_arg = num_add(neg_q_half, sqrt_discriminant);
     number_t v_arg = num_sub(neg_q_half, sqrt_discriminant);
     number_t u = equ_cubic_real_cuberoot(u_arg);
-    number_t v = equ_cubic_real_cuberoot(v_arg);
+    number_t v;
     number_t omega = equ_cubic_omega(false);
     number_t omega_conj = equ_cubic_omega(true);
     number_t omega_u;
@@ -281,7 +281,16 @@ static int equ_append_cubic_cardano_roots(const expr_t *wrt,
     number_t root;
     int rc;
 
-    (void)p;
+    if (!num_is_zero(u)) {
+        number_t neg_p = num_neg(p);
+        number_t three_u = num_mul_long(u, 3L);
+
+        v = num_div(neg_p, three_u);
+        num_destroy(&three_u);
+        num_destroy(&neg_p);
+    } else {
+        v = equ_cubic_real_cuberoot(v_arg);
+    }
 
     root = equ_cubic_sum_root(u, v, shift);
     rc = equ_append_distinct_root(wrt, root, seen, seen_count, solutions);
@@ -565,31 +574,20 @@ cleanup:
     return rc;
 }
 
-int equ_try_solve_cubic(const equation_t *equation,
-                             const expr_t *wrt,
-                             equation_solutions_t *solutions)
+int equ_solve_cubic_coefficients(const number_t *coeffs,
+                                 const expr_t *wrt,
+                                 equation_solutions_t *solutions)
 {
-    expr_t *residual = equ_residual(equation);
-    number_t coeffs[4];
     number_t p = num_new();
     number_t q = num_new();
     number_t shift = num_new();
     number_t discriminant = num_new();
     number_t seen[3];
     size_t seen_count = 0u;
-    bool ok;
     int rc = -1;
 
-    equ_init_numbers(coeffs, 4u);
-    if (!residual)
+    if (!coeffs || !wrt || !solutions || num_is_zero(coeffs[3]))
         goto cleanup;
-
-    ok = equ_match_polynomial_expr(residual, wrt, 3u, coeffs) &&
-         !num_is_zero(coeffs[3]);
-    if (!ok) {
-        rc = equ_try_solve_symbolic_cubic(residual, wrt, solutions);
-        goto cleanup;
-    }
 
     equ_cubic_reduce(coeffs, &p, &q, &shift);
     num_destroy(&discriminant);
@@ -615,6 +613,30 @@ cleanup:
     num_destroy(&shift);
     num_destroy(&q);
     num_destroy(&p);
+    return rc;
+}
+
+int equ_try_solve_cubic(const equation_t *equation,
+                        const expr_t *wrt,
+                        equation_solutions_t *solutions)
+{
+    expr_t *residual = equ_residual(equation);
+    number_t coeffs[4];
+    bool ok;
+    int rc = -1;
+
+    equ_init_numbers(coeffs, 4u);
+    if (!residual)
+        goto cleanup;
+
+    ok = equ_match_polynomial_expr(residual, wrt, 3u, coeffs) &&
+         !num_is_zero(coeffs[3]);
+    if (ok)
+        rc = equ_solve_cubic_coefficients(coeffs, wrt, solutions);
+    else
+        rc = equ_try_solve_symbolic_cubic(residual, wrt, solutions);
+
+cleanup:
     equ_destroy_numbers(coeffs, 4u);
     expr_free(residual);
     return rc;

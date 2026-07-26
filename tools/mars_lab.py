@@ -592,6 +592,7 @@ DEFAULT_DATETIME_BIN = ROOT / "build" / "release" / "scratch" / "datetime_lab"
 DEFAULT_ALMANAC_BIN = ROOT / "build" / "release" / "scratch" / "almanac_lab"
 DEFAULT_ALMANAC_EVENT_BIN = ROOT / "build" / "release" / "scratch" / "almanac_event_lab"
 DEFAULT_HOLIDAY_BIN = ROOT / "build" / "release" / "scratch" / "holiday_lab"
+VERIFIED_SCRATCH_BINARIES: set[tuple[str, str]] = set()
 MARS_LAB_CONFIG_FILE = "mars-lab.env"
 MARS_LAB_OBJECT_STORE_PATH_ENV = "MARS_LAB_OBJECT_STORE_PATH"
 MARS_LAB_OBJECT_STORE_KEY_ENV = "MARS_LAB_OBJECT_STORE_KEY"
@@ -2907,6 +2908,13 @@ INDEX_HTML = r"""<!doctype html>
       word-break: break-all;
     }
 
+    #functionStyle.equation-function {
+      overflow-x: auto;
+      white-space: pre;
+      overflow-wrap: normal;
+      word-break: normal;
+    }
+
     .matrix-pretty {
       overflow-x: auto;
       overflow-y: visible;
@@ -4622,7 +4630,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       } else if (equationMode) {
         leftPaneTitle.textContent = 'Equation';
         subtitle.textContent = 'Enter an equation on the left. The lab tries symbolic isolation first, then numeric solving for all variable bindings.';
-        setResultTitles('Rendered TeX', 'Equation', 'Solutions', 'Details');
+        setResultTitles('Rendered TeX', 'Equation', 'Function', 'Solutions');
         setAuxResultCardsVisible(true);
         setValueCardVisible(true);
       } else if (matrixMode) {
@@ -5560,15 +5568,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       if (currentMode() !== 'expression')
         return true;
 
-      if (expr.dataset.bindingRefreshValid === 'false' ||
-          expr.dataset.bindingRefreshValid === 'pending')
-        return false;
-
-      const text = currentExpressionText();
-      if (!text)
-        return false;
-
-      return expr.dataset.evaluationReady === 'true';
+      return Boolean(currentExpressionText());
     }
 
     function bindingParts(text) {
@@ -6098,9 +6098,17 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       return (value === '?' || /^NAN$/i.test(value)) ? '' : value;
     }
 
-    function displayEquationValue(valueText) {
-      const value = String(valueText || '').trim();
-      return /^NAN$/i.test(value) ? 'unresolved' : value;
+    function solutionLineIsNumericLiteral(line) {
+      const match = String(line || '').match(/^[^=≈]+(?:=|≈)\s*(.+)$/);
+      if (!match)
+        return false;
+
+      const rhs = match[1].replace(/\s+/g, '');
+      const number = '(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:[Ee][+-]?\\d+)?';
+      const numeric = new RegExp(
+        `^(?:[+-]?${number}|[+-]?(?:${number})?i|[+-]?${number}[+-](?:${number})?i)$`
+      );
+      return numeric.test(rhs);
     }
 
     function fullValueForBinding(binding) {
@@ -8540,6 +8548,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     }
 
     function resultExpressionTextForInput() {
+      if (currentMode() === 'equation')
+        return parsedExpressionText();
       return (resultUseInput.dataset.inputText || parsedExpressionText()).trim();
     }
 
@@ -8555,7 +8565,9 @@ __HOLIDAY_JURISDICTION_OPTIONS__
 
       clearGoalSeekRequest();
       hideTargetEntry();
-      if (!await applyMarsBindingExpression(resultText))
+      if (currentMode() === 'equation')
+        setExpressionEditor(resultText);
+      else if (!await applyMarsBindingExpression(resultText))
         return;
       saveCurrentModeEditorState();
       updateHistoryButtons();
@@ -9062,6 +9074,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     function clearResultDetails(options = {}) {
       parsed.classList.remove('matrix-pretty');
       functionStyle.classList.remove('matrix-pretty');
+      functionStyle.classList.remove('equation-function');
       value.classList.remove('matrix-pretty');
       parsed.textContent = '';
       functionStyle.textContent = '';
@@ -9282,10 +9295,9 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           data.display_equation || data.equation || '',
           data.full_display_equation || data.equation || ''
         );
-        setResultInputText(data.full_display_equation || data.equation || '');
+        setResultInputText(parsedExpressionText());
         {
           const valueLines = [];
-          const residualValue = displayEquationValue(data.error);
           const solutionLines = String(data.solutions || '')
             .split('\n')
             .map((line) => line.trim())
@@ -9293,29 +9305,23 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           const numericSolutionLines = Array.isArray(data.numeric_solutions)
             ? data.numeric_solutions.map((line) => String(line).trim()).filter(Boolean)
             : [];
-          const combinedSolutionLines = [...solutionLines];
-          if (numericSolutionLines.length) {
-            if (combinedSolutionLines.length)
-              combinedSolutionLines.push('');
-            numericSolutionLines.forEach((line) => combinedSolutionLines.push(`numeric: ${line}`));
-          }
+          functionStyle.classList.add('equation-function');
           setExpandableText(
             functionStyle,
             functionMore,
-            combinedSolutionLines.join('\n') || data.status || '',
-            combinedSolutionLines.join('\n') || data.status || ''
+            data.function || '',
+            data.function || ''
           );
-          if (solutionLines.length === 1)
-            valueLines.push(`solution: ${solutionLines[0]}`);
-          numericSolutionLines.forEach((line) => valueLines.push(`numeric: ${line}`));
-          if (data.status)
-            valueLines.push(`solve status: ${data.status}`);
-          if (Number.isFinite(Number(data.solution_count)) && Number(data.solution_count) > 0)
-            valueLines.push(`solutions found: ${data.solution_count}`);
-          if (data.residual)
-            valueLines.push(`residual expression: ${data.residual}`);
-          if (data.error && residualValue !== 'unresolved')
-            valueLines.push(`residual value: ${residualValue}`);
+          solutionLines.forEach((line) => valueLines.push(line));
+          numericSolutionLines.forEach((line, index) => {
+            if (!solutionLineIsNumericLiteral(solutionLines[index] || '')) {
+              if (valueLines.length && !valueLines.includes(''))
+                valueLines.push('');
+              valueLines.push(line);
+            }
+          });
+          if (!valueLines.length && data.status)
+            valueLines.push(data.status);
           value.textContent = valueLines.join('\n');
         }
         if (Array.isArray(data.binding_values))
@@ -9745,6 +9751,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         const fullDerivativeFunction = data.full_display_derivative_function || data.derivative_function || derivativeExpression || '';
 
         if (!response.ok || !data.ok || !derivativeExpression) {
+          clearResultDetails({keepBindings: true});
           setRenderedError(data.error || data.raw || `No derivative for ${wrt}`);
           resetMoreDigitsButton(renderedMore, false);
           setStatus('Error');
@@ -9792,6 +9799,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         }
         setStatus('Ready');
       } catch (err) {
+        clearResultDetails({keepBindings: true});
         setRenderedError(String(err));
         resetMoreDigitsButton(renderedMore, false);
         setStatus('Error');
@@ -9821,6 +9829,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         const fullIntegralFunction = data.full_display_integral_function || data.integral_function || integralExpression || '';
 
         if (!response.ok || !data.ok || !integralExpression) {
+          clearResultDetails({keepBindings: true});
           setRenderedError(data.error || data.raw || `No integral for ${wrt}`);
           resetMoreDigitsButton(renderedMore, false);
           setStatus('Error');
@@ -9868,6 +9877,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         }
         setStatus('Ready');
       } catch (err) {
+        clearResultDetails({keepBindings: true});
         setRenderedError(String(err));
         resetMoreDigitsButton(renderedMore, false);
         setStatus('Error');
@@ -10652,6 +10662,11 @@ def function_for_display(function: str) -> str:
 
 def tex_for_display(tex: str) -> str:
     return re.sub(r"(=\s*)NAN\b", r"\1?", str(tex or ""))
+
+
+def numeric_value_for_display(value: object) -> str:
+    text = str(value or "").strip()
+    return "?" if re.fullmatch(r"[+-]?NAN", text, re.IGNORECASE) else text
 
 
 def _is_loopback_or_wildcard_host(host: str) -> bool:
@@ -11563,22 +11578,31 @@ def find_free_port(host: str) -> int:
 
 
 def ensure_mars_lab(binary: Path) -> None:
-    if binary.exists() and os.access(binary, os.X_OK):
-        return
-
-    subprocess.run(
-        ["make", DEFAULT_SCRATCH_TARGET],
-        cwd=ROOT,
-        check=True,
-        text=True,
-    )
-
-    if not binary.exists():
-        raise RuntimeError(f"scratch binary was not created at {binary}")
+    ensure_scratch_binary(binary, DEFAULT_SCRATCH_TARGET)
 
 
 def ensure_scratch_binary(binary: Path, target: str) -> None:
-    if binary.exists():
+    verification_key = (str(binary.resolve()), target)
+    if (verification_key in VERIFIED_SCRATCH_BINARIES and
+            binary.exists() and os.access(binary, os.X_OK)):
+        return
+
+    build_target = target
+    try:
+        build_target = str(binary.resolve().relative_to(ROOT))
+    except (OSError, ValueError):
+        if binary.exists() and os.access(binary, os.X_OK):
+            VERIFIED_SCRATCH_BINARIES.add(verification_key)
+            return
+
+    freshness = subprocess.run(
+        ["make", "-q", build_target],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+    )
+    if freshness.returncode == 0 and binary.exists() and os.access(binary, os.X_OK):
+        VERIFIED_SCRATCH_BINARIES.add(verification_key)
         return
 
     subprocess.run(
@@ -11590,6 +11614,7 @@ def ensure_scratch_binary(binary: Path, target: str) -> None:
 
     if not binary.exists():
         raise RuntimeError(f"{target} binary was not created at {binary}")
+    VERIFIED_SCRATCH_BINARIES.add(verification_key)
 
 
 def parse_keyed_output(
@@ -11716,6 +11741,7 @@ def parse_equation_lab_output(output: str) -> dict[str, str]:
             "input": r"^input\s+(.*)$",
             "equation": r"^equation\s+(.*)$",
             "unbound": r"^unbound\s+(.*)$",
+            "function": r"^function\s+(.*)$",
             "tex": r"^tex\s+(.*)$",
             "residual": r"^residual\s+(.*)$",
             "value": r"^value\s+(.*)$",
@@ -11724,7 +11750,7 @@ def parse_equation_lab_output(output: str) -> dict[str, str]:
             "solutions": r"^solutions\s+(.*)$",
             "numeric": r"^numeric\s+(.*)$",
         },
-        {"tex", "solutions_tex", "solutions"},
+        {"function", "tex", "solutions_tex", "solutions", "numeric"},
     )
 
 
@@ -13195,6 +13221,9 @@ def prepare_evaluation_fields(
         fields["integral_value"] = format_number_text_for_precision(
             fields["integral_value"], precision, zero_subprecision=True
         )
+    for key in ("value", "derivative_value", "integral_value"):
+        if key in fields:
+            fields[key] = numeric_value_for_display(fields[key])
 
     precision_limit_result_fields(fields, precision)
     fields["editor_expression"] = editor_expression_from_fields(fields)
@@ -13236,7 +13265,15 @@ def prepare_evaluation_fields(
             fields["integral_svg"] = integral_svg
         elif integral_render_error:
             fields["integral_render_error"] = integral_render_error
-    fields["binding_values"] = mars_binding_values(fields.get("bindings"))
+    symbolic_binding_values = expression_variable_binding_values(
+        str(fields.get("expression") or expression),
+        precision,
+    )
+    fields["binding_values"] = (
+        symbolic_binding_values
+        if symbolic_binding_values
+        else mars_binding_values(fields.get("bindings"))
+    )
     fields["derivative_binding_values"] = mars_binding_values(
         fields.get("derivative_bindings")
     )
@@ -13354,8 +13391,8 @@ def prepare_integrator_fields(fields: dict[str, str], precision: int) -> dict[st
         "antiderivative_tex": antiderivative_tex,
         "symbolic": symbolic_text,
         "symbolic_tex": symbolic_tex,
-        "symbolic_value": str(fields.get("symbolic_value") or "").strip(),
-        "value": str(fields.get("value") or "").strip(),
+        "symbolic_value": numeric_value_for_display(fields.get("symbolic_value")),
+        "value": numeric_value_for_display(fields.get("value")),
         "error": str(fields.get("error") or "").strip(),
         "error": str(fields.get("error") or "").strip(),
         "intervals": str(fields.get("intervals") or "").strip(),
@@ -13433,11 +13470,12 @@ def prepare_equation_fields(fields: dict[str, str], precision: int) -> dict[str,
         "mode": "equation",
         "equation": equation_text,
         "unbound": unbound_text,
+        "function": str(fields.get("function") or "").strip(),
         "tex": "" if render_tex == "(null)" else render_tex,
         "equation_tex": "" if equation_tex == "(null)" else equation_tex,
         "solutions_tex": "" if solutions_tex == "(null)" else solutions_tex,
         "residual": str(fields.get("residual") or "").strip(),
-        "value": str(fields.get("value") or "").strip(),
+        "value": numeric_value_for_display(fields.get("value")),
         "status": str(fields.get("status") or "").strip(),
         "solutions": solutions_text,
         "solution_count": len(solution_lines),
@@ -16008,6 +16046,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
             if fields.get("value"):
                 fields["value"] = format_number_text_for_precision(
                     fields["value"], precision, zero_subprecision=True)
+                fields["value"] = numeric_value_for_display(fields["value"])
             if fields.get("residual"):
                 fields["residual"] = format_number_text_for_precision(
                     fields["residual"], precision, zero_subprecision=True)

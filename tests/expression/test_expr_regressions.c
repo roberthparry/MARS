@@ -3780,9 +3780,7 @@ static void test_sqrt_negative_exact_evaluates_to_i(void)
             "expression expr(void) {\n"
             "    return sqrt(-1);\n"
             "}\n\n"
-            "expression expr_eval() {\n"
-            "    return expr();\n"
-            "}",
+            "output(expr());",
             "\\sqrt{-1}"
         },
         {
@@ -3793,9 +3791,7 @@ static void test_sqrt_negative_exact_evaluates_to_i(void)
             "expression expr(void) {\n"
             "    return sqrt(-4);\n"
             "}\n\n"
-            "expression expr_eval() {\n"
-            "    return expr();\n"
-            "}",
+            "output(expr());",
             "\\sqrt{-4}"
         },
         {
@@ -3806,10 +3802,8 @@ static void test_sqrt_negative_exact_evaluates_to_i(void)
             "expression expr(x) {\n"
             "    return sqrt(x);\n"
             "}\n\n"
-            "expression expr_eval() {\n"
-            "    x = -1;\n"
-            "    return expr(x);\n"
-            "}",
+            "x = -1\n"
+            "output(expr(x));",
             "\\left\\{ \\sqrt{x} \\;\\middle|\\; x = -1 \\right\\}"
         }
     };

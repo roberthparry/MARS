@@ -455,6 +455,61 @@ static number_t equ_quadratic_root(number_t neg_linear,
     return root;
 }
 
+int equ_solve_quadratic_coefficients(const number_t *coeffs,
+                                     const expr_t *wrt,
+                                     equation_solutions_t *solutions)
+{
+    number_t discriminant;
+    number_t sqrt_discriminant;
+    number_t neg_sqrt_discriminant;
+    number_t neg_linear;
+    number_t denominator;
+    number_t root;
+
+    if (!coeffs || !wrt || !solutions || num_is_zero(coeffs[2]))
+        return -1;
+
+    discriminant =
+        equ_quadratic_discriminant(coeffs[0], coeffs[1], coeffs[2]);
+    sqrt_discriminant = num_sqrt(discriminant);
+    neg_linear = num_neg(coeffs[1]);
+    denominator = num_mul_long(coeffs[2], 2L);
+
+    root = equ_quadratic_root(
+        neg_linear, sqrt_discriminant, denominator);
+    if (equ_append_solution_value(wrt, root, solutions) != 0) {
+        num_destroy(&root);
+        goto error;
+    }
+    num_destroy(&root);
+
+    if (!num_is_zero(sqrt_discriminant)) {
+        neg_sqrt_discriminant = num_neg(sqrt_discriminant);
+        root = equ_quadratic_root(
+            neg_linear, neg_sqrt_discriminant, denominator);
+        num_destroy(&neg_sqrt_discriminant);
+        if (equ_append_solution_value(wrt, root, solutions) != 0) {
+            num_destroy(&root);
+            goto error;
+        }
+        num_destroy(&root);
+    }
+
+    num_destroy(&denominator);
+    num_destroy(&neg_linear);
+    num_destroy(&sqrt_discriminant);
+    num_destroy(&discriminant);
+    return 0;
+
+error:
+    equ_solutions_clear(solutions);
+    num_destroy(&denominator);
+    num_destroy(&neg_linear);
+    num_destroy(&sqrt_discriminant);
+    num_destroy(&discriminant);
+    return -1;
+}
+
 static expr_t *equ_symbolic_pi_expr(void)
 {
     number_t pi_value = num_clone(NUM_PI);
@@ -1333,70 +1388,25 @@ static int equ_try_solve_quadratic(const equation_t *equation,
                                         equation_solutions_t *solutions)
 {
     expr_t *residual = equ_residual(equation);
-    number_t constant = num_new();
-    number_t linear = num_new();
-    number_t quadratic = num_new();
-    number_t discriminant;
-    number_t sqrt_discriminant;
-    number_t neg_sqrt_discriminant;
-    number_t neg_linear;
-    number_t denominator;
-    number_t root;
+    number_t coeffs[3] = {num_new(), num_new(), num_new()};
     bool ok;
     int rc = -1;
 
     if (!residual)
         goto cleanup;
 
-    ok = equ_match_quadratic_expr(residual, wrt, &constant, &linear,
-                                       &quadratic);
+    ok = equ_match_quadratic_expr(
+        residual, wrt, &coeffs[0], &coeffs[1], &coeffs[2]);
     if (!ok) {
         rc = equ_try_solve_symbolic_quadratic(residual, wrt, solutions);
         goto cleanup;
     }
 
-    discriminant = equ_quadratic_discriminant(constant, linear, quadratic);
-    sqrt_discriminant = num_sqrt(discriminant);
-    neg_linear = num_neg(linear);
-    denominator = num_mul_long(quadratic, 2L);
-
-    root = equ_quadratic_root(neg_linear, sqrt_discriminant, denominator);
-    if (equ_append_solution_value(wrt, root, solutions) != 0) {
-        num_destroy(&root);
-        num_destroy(&denominator);
-        num_destroy(&neg_linear);
-        num_destroy(&sqrt_discriminant);
-        num_destroy(&discriminant);
-        goto cleanup;
-    }
-    num_destroy(&root);
-
-    if (!num_is_zero(sqrt_discriminant)) {
-        neg_sqrt_discriminant = num_neg(sqrt_discriminant);
-        root = equ_quadratic_root(neg_linear, neg_sqrt_discriminant,
-                                       denominator);
-        num_destroy(&neg_sqrt_discriminant);
-        if (equ_append_solution_value(wrt, root, solutions) != 0) {
-            num_destroy(&root);
-            num_destroy(&denominator);
-            num_destroy(&neg_linear);
-            num_destroy(&sqrt_discriminant);
-            num_destroy(&discriminant);
-            goto cleanup;
-        }
-        num_destroy(&root);
-    }
-
-    num_destroy(&denominator);
-    num_destroy(&neg_linear);
-    num_destroy(&sqrt_discriminant);
-    num_destroy(&discriminant);
-    rc = 0;
+    rc = equ_solve_quadratic_coefficients(coeffs, wrt, solutions);
 
 cleanup:
-    num_destroy(&quadratic);
-    num_destroy(&linear);
-    num_destroy(&constant);
+    for (size_t i = 0u; i < 3u; ++i)
+        num_destroy(&coeffs[i]);
     expr_free(residual);
     return rc;
 }
@@ -1694,6 +1704,9 @@ int equ_solve_for_into(const equation_t *equation,
     int zero_product_rc;
     int quadratic_rc;
     int cubic_rc;
+    int quartic_rc;
+    int quintic_rc;
+    int general_polynomial_rc;
 
     if (!solutions)
         return -1;
@@ -1732,6 +1745,18 @@ int equ_solve_for_into(const equation_t *equation,
     if (affine_rc < 0)
         return -1;
 
+    /*
+     * High-degree products may be internally regrouped into factors with
+     * complex coefficients. Collect the complete polynomial first so
+     * conjugate coefficients cancel before any individual factor is solved.
+     */
+    general_polynomial_rc =
+        equ_try_solve_general_polynomial(equation, wrt, solutions);
+    if (general_polynomial_rc == 0)
+        return 0;
+    if (general_polynomial_rc < 0)
+        return -1;
+
     zero_product_rc = equ_try_solve_zero_product(equation, wrt, solutions);
     if (zero_product_rc == 0)
         return 0;
@@ -1748,6 +1773,18 @@ int equ_solve_for_into(const equation_t *equation,
     if (cubic_rc == 0)
         return 0;
     if (cubic_rc < 0)
+        return -1;
+
+    quartic_rc = equ_try_solve_quartic(equation, wrt, solutions);
+    if (quartic_rc == 0)
+        return 0;
+    if (quartic_rc < 0)
+        return -1;
+
+    quintic_rc = equ_try_solve_quintic(equation, wrt, solutions);
+    if (quintic_rc == 0)
+        return 0;
+    if (quintic_rc < 0)
         return -1;
 
     return 0;

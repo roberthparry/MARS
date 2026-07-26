@@ -426,13 +426,80 @@ static int test_emit_c_arg_list(test_sbuf_t *out,
             free(name);
             return 0;
         }
-        if (!test_sbuf_puts(out, name)) {
+        const char *argument = name;
+
+        if (!typed && test_legacy_arg_is_const(name, bindings, nbindings)) {
+            for (size_t i = 0u; i < nbindings; ++i) {
+                if (strcmp(bindings[i].name, name) == 0 &&
+                    strcmp(bindings[i].value, "NAN") != 0 &&
+                    strcmp(bindings[i].value, "?") != 0) {
+                    argument = bindings[i].value;
+                    break;
+                }
+            }
+        }
+        if (!test_sbuf_puts(out, argument)) {
             free(name);
             return 0;
         }
 
         free(name);
         first = 0;
+        if (pos < len && args[pos] == ',')
+            pos++;
+        while (pos < len && (args[pos] == ' ' || args[pos] == '\t'))
+            pos++;
+    }
+
+    return 1;
+}
+
+static int test_emit_c_variable_bindings(
+    test_sbuf_t *out,
+    const char *args,
+    const test_legacy_binding_t *bindings,
+    size_t nbindings)
+{
+    size_t len = args ? strlen(args) : 0u;
+    size_t pos = 0u;
+
+    while (pos < len) {
+        size_t start = pos;
+        size_t end;
+        char *name;
+        const char *value = "NAN";
+
+        while (pos < len && args[pos] != ',')
+            pos++;
+        end = pos;
+        name = test_trim_copy_range(&args[start], &args[end]);
+        if (!name)
+            return 0;
+
+        if (!test_legacy_arg_is_const(name, bindings, nbindings)) {
+            for (size_t i = 0u; i < nbindings; ++i) {
+                if (strcmp(bindings[i].name, name) == 0) {
+                    value = bindings[i].value;
+                    break;
+                }
+            }
+            if (strcmp(value, "NAN") == 0 || strcmp(value, "?") == 0) {
+                if (!test_sbuf_puts(out, "// ") ||
+                    !test_sbuf_puts(out, name) ||
+                    !test_sbuf_puts(out, " = ?\n")) {
+                    free(name);
+                    return 0;
+                }
+            } else if (!test_sbuf_puts(out, name) ||
+                       !test_sbuf_puts(out, " = ") ||
+                       !test_sbuf_puts(out, value) ||
+                       !test_sbuf_puts(out, "\n")) {
+                free(name);
+                return 0;
+            }
+        }
+
+        free(name);
         if (pos < len && args[pos] == ',')
             pos++;
         while (pos < len && (args[pos] == ' ' || args[pos] == '\t'))
@@ -498,22 +565,11 @@ static char *test_legacy_function_expect_to_c(const char *legacy)
         !test_sbuf_puts(&out, ") {\n") ||
         !test_sbuf_puts(&out, "    return ") ||
         !test_sbuf_puts(&out, body_c) ||
-        !test_sbuf_puts(&out, ";\n}\n\nexpression expr_eval() {\n"))
-        goto fail;
-
-    for (size_t i = 0; i < nbindings; ++i) {
-        if (!test_sbuf_puts(&out, "    ") ||
-            (bindings[i].is_const && !test_sbuf_puts(&out, "const ")) ||
-            !test_sbuf_puts(&out, bindings[i].name) ||
-            !test_sbuf_puts(&out, " = ") ||
-            !test_sbuf_puts(&out, bindings[i].value) ||
-            !test_sbuf_puts(&out, ";\n"))
-            goto fail;
-    }
-
-    if (!test_sbuf_puts(&out, "    return expr(") ||
+        !test_sbuf_puts(&out, ";\n}\n\n") ||
+        !test_emit_c_variable_bindings(&out, args, bindings, nbindings) ||
+        !test_sbuf_puts(&out, "output(expr(") ||
         !test_emit_c_arg_list(&out, args, 0, bindings, nbindings) ||
-        !test_sbuf_puts(&out, ");\n}"))
+        !test_sbuf_puts(&out, "));"))
         goto fail;
 
     for (size_t i = 0; i < nbindings; ++i) {
@@ -562,9 +618,7 @@ static void test_to_string_basic_const_func(void)
                          "    return 3.5;\n"
                          "}\n"
                          "\n"
-                         "expression expr_eval() {\n"
-                         "    return expr();\n"
-                         "}";
+                         "output(expr());";
 
     if (str_eq(got, expect))
         to_string_pass("basic const (FUNC)", got, expect);
@@ -604,23 +658,38 @@ static void test_to_string_basic_var_expr(void)
 static void test_to_string_basic_var_func(void)
 {
     expr_t *x = test_expr_new_named_var_d(42.0, "x");
+    expr_t *unknown = expr_new_named_var(NUM_NAN, "x");
     char *got = expr_to_string(x, style_FUNCTION);
+    char *unknown_got = expr_to_string(unknown, style_FUNCTION);
 
     const char *expect = "expression expr(x) {\n"
                          "    return x;\n"
                          "}\n"
                          "\n"
-                         "expression expr_eval() {\n"
-                         "    x = 42;\n"
-                         "    return expr(x);\n"
-                         "}";
+                         "x = 42\n"
+                         "output(expr(x));";
+    const char *unknown_expect = "expression expr(x) {\n"
+                                 "    return x;\n"
+                                 "}\n"
+                                 "\n"
+                                 "// x = ?\n"
+                                 "output(expr(x));";
 
     if (str_eq(got, expect))
         to_string_pass("basic var (FUNC)", got, expect);
     else
         to_string_fail(__FILE__, __LINE__, 1, "basic var (FUNC)", got, expect);
 
+    if (str_eq(unknown_got, unknown_expect))
+        to_string_pass("unknown basic var (FUNC)",
+                       unknown_got, unknown_expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "unknown basic var (FUNC)",
+                       unknown_got, unknown_expect);
+
+    free(unknown_got);
     free(got);
+    expr_free(unknown);
     expr_free(x);
 }
 
@@ -887,10 +956,8 @@ static void test_to_string_gamma_polygamma_standard_names(void)
         "    return gamma(x) + digamma(x) + trigamma(x) + polygamma(2, x);\n"
         "}\n"
         "\n"
-        "expression expr_eval() {\n"
-        "    x = 3;\n"
-        "    return expr(x);\n"
-        "}";
+        "x = 3\n"
+        "output(expr(x));";
     const char *expect_second_tex =
         "\\left\\{ \\Gamma(x) \\cdot \\left(\\psi^{(1)}(x) + "
         "\\psi^{(0)}(x)^{2}\\right) \\;\\middle|\\; x = 2 \\right\\}";
@@ -954,10 +1021,8 @@ static void test_to_string_non_simple_var_bracketed_func(void)
                          "    return [a0b₀];\n"
                          "}\n"
                          "\n"
-                         "expression expr_eval() {\n"
-                         "    [a0b₀] = 42;\n"
-                         "    return expr([a0b₀]);\n"
-                         "}";
+                         "[a0b₀] = 42\n"
+                         "output(expr([a0b₀]));";
 
     if (str_eq(got, expect))
         to_string_pass("non-simple var bracketed (FUNC)", got, expect);
@@ -1009,11 +1074,9 @@ static void test_to_string_addition_func(void)
                          "    return x + y;\n"
                          "}\n"
                          "\n"
-                         "expression expr_eval() {\n"
-                         "    x = 1;\n"
-                         "    y = 2;\n"
-                         "    return expr(x, y);\n"
-                         "}";
+                         "x = 1\n"
+                         "y = 2\n"
+                         "output(expr(x, y));";
 
     if (str_eq(got, expect))
         to_string_pass("addition (FUNC)", got, expect);
@@ -1226,12 +1289,10 @@ static void test_to_string_nested_mul_add_func(void)
                          "    return z + x * y;\n"
                          "}\n"
                          "\n"
-                         "expression expr_eval() {\n"
-                         "    z = 4;\n"
-                         "    x = 2;\n"
-                         "    y = 3;\n"
-                         "    return expr(z, x, y);\n"
-                         "}";
+                         "z = 4\n"
+                         "x = 2\n"
+                         "y = 3\n"
+                         "output(expr(z, x, y));";
 
     if (str_eq(got, expect))
         to_string_pass("nested mul+add (FUNC)", got, expect);
@@ -1326,11 +1387,9 @@ static void test_to_string_atan2_func(void)
                          "    return atan2(x, y);\n"
                          "}\n"
                          "\n"
-                         "expression expr_eval() {\n"
-                         "    x = 2;\n"
-                         "    y = 3;\n"
-                         "    return expr(x, y);\n"
-                         "}";
+                         "x = 2\n"
+                         "y = 3\n"
+                         "output(expr(x, y));";
 
     if (str_eq(got, expect))
         to_string_pass("atan2 (FUNC)", got, expect);
@@ -1381,10 +1440,8 @@ static void test_to_string_pow_superscript_func(void)
                          "    return x^3;\n"
                          "}\n"
                          "\n"
-                         "expression expr_eval() {\n"
-                         "    x = 2;\n"
-                         "    return expr(x);\n"
-                         "}";
+                         "x = 2\n"
+                         "output(expr(x));";
 
     if (str_eq(got, expect))
         to_string_pass("pow superscript (FUNC)", got, expect);
@@ -1429,9 +1486,7 @@ static void test_to_string_complex_const_pow_func(void)
         "    return (1 + 2i)^6 + 1;\n"
         "}\n"
         "\n"
-        "expression expr_eval() {\n"
-        "    return expr();\n"
-        "}";
+        "output(expr());";
 
     if (str_eq(got, expect))
         to_string_pass("complex const power base (FUNC)", got, expect);
@@ -1608,10 +1663,8 @@ static void test_to_string_unary_sin_func(void)
                          "    return sin(x);\n"
                          "}\n"
                          "\n"
-                         "expression expr_eval() {\n"
-                         "    x = 0.5;\n"
-                         "    return expr(x);\n"
-                         "}";
+                         "x = 0.5\n"
+                         "output(expr(x));";
 
     if (str_eq(got, expect))
         to_string_pass("unary sin (FUNC)", got, expect);
@@ -1655,10 +1708,8 @@ static void test_to_string_unary_sqrt_func(void)
                          "    return sqrt(x);\n"
                          "}\n"
                          "\n"
-                         "expression expr_eval() {\n"
-                         "    x = 4;\n"
-                         "    return expr(x);\n"
-                         "}";
+                         "x = 4\n"
+                         "output(expr(x));";
 
     if (str_eq(got, expect))
         to_string_pass("unary sqrt (FUNC)", got, expect);
@@ -1705,10 +1756,8 @@ static void test_to_string_function_style_func(void)
                          "    return x;\n"
                          "}\n"
                          "\n"
-                         "expression expr_eval() {\n"
-                         "    x = 10;\n"
-                         "    return expr(x);\n"
-                         "}";
+                         "x = 10\n"
+                         "output(expr(x));";
 
     if (str_eq(got, expect))
         to_string_pass("function style identity (FUNC)", got, expect);
@@ -1737,10 +1786,8 @@ static void test_to_string_function_style_signed_sum(void)
                          "    return exp(sin(x)) + 3 * x^2 - 7;\n"
                          "}\n"
                          "\n"
-                         "expression expr_eval() {\n"
-                         "    x = 1;\n"
-                         "    return expr(x);\n"
-                         "}";
+                         "x = 1\n"
+                         "output(expr(x));";
 
     if (str_eq(got, expect))
         to_string_pass("function style signed sum (FUNC)", got, expect);
@@ -1773,11 +1820,9 @@ static void test_to_string_function_style_sub_negative_product(void)
                          "    return E - e * sin(E);\n"
                          "}\n"
                          "\n"
-                         "expression expr_eval() {\n"
-                         "    E = 0.8000000000000000444089209850062616;\n"
-                         "    e = 0.01669999999999999956701302039618894;\n"
-                         "    return expr(E, e);\n"
-                         "}";
+                         "E = 0.8000000000000000444089209850062616\n"
+                         "e = 0.01669999999999999956701302039618894\n"
+                         "output(expr(E, e));";
 
     if (str_eq(got, expect))
         to_string_pass("function style negative product rhs (FUNC)", got, expect);
@@ -1801,12 +1846,9 @@ static void test_to_string_function_style_preserves_math_names(void)
                          "    return tan(c₀ * x * y / 2);\n"
                          "}\n"
                          "\n"
-                         "expression expr_eval() {\n"
-                         "    x = 3.25;\n"
-                         "    y = 4.5;\n"
-                         "    const c₀ = γ;\n"
-                         "    return expr(x, y, c₀);\n"
-                         "}";
+                         "x = 3.25\n"
+                         "y = 4.5\n"
+                         "output(expr(x, y, γ));";
 
     if (str_eq(got, expect))
         to_string_pass("function style preserves mathematical names (FUNC)", got, expect);
@@ -1861,11 +1903,9 @@ static void test_to_string_floor_ceil_func(void)
                          "    return floor(x) + ceil(y);\n"
                          "}\n"
                          "\n"
-                         "expression expr_eval() {\n"
-                         "    x = 1.5;\n"
-                         "    y = -1.5;\n"
-                         "    return expr(x, y);\n"
-                         "}";
+                         "x = 1.5\n"
+                         "y = -1.5\n"
+                         "output(expr(x, y));";
 
     if (str_eq(got, expect))
         to_string_pass("floor/ceil function notation (FUNC)", got, expect);
