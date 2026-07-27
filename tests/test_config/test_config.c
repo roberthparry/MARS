@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <sys/stat.h>
 
+#define MARS_TEST_CONFIG_INTERNAL_ACCESS
 #include "test_config_internal.h"
 
 static json_t *g_root = NULL;

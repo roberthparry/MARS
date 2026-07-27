@@ -1,12 +1,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#define MARS_MATRIX_INTERNAL_ACCESS
 #include "matrix_internal.h"
 #include "matrix_vtable_defs.h"
 #include "number.h"
 #include "qfloat.h"
 #include "qcomplex.h"
 #include "matrix.h"
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
 #include "ustring.h"
 

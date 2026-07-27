@@ -2,8 +2,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MARS_MATRIX_INTERNAL_ACCESS
 #include "matrix_internal.h"
 #include "matrix_vtable_defs.h"
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
 
 static bool mat_uses_sparse_like_storage(const matrix_t *A)

@@ -8,6 +8,7 @@
 
 #define MARS_NUMBER_IMPLEMENTATION
 #include "number.h"
+#define MARS_NUMBER_INTERNAL_ACCESS
 #include "number_internal.h"
 #include "number_scope_alloc.h"
 #include "ustring.h"

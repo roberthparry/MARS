@@ -1,6 +1,8 @@
 #include <stdbool.h>
 
+#define MARS_EQUATION_INTERNAL_ACCESS
 #include "equation_internal.h"
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
 
 bool equ_match_affine_linear_expr(const expr_t *expr,

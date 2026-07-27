@@ -1,9 +1,16 @@
 #ifndef EXPR_INTEGRATE_INTERNAL_H
 #define EXPR_INTEGRATE_INTERNAL_H
 
+#if !defined(MARS_EXPR_INTEGRATE_INTERNAL_ACCESS) && \
+    (!defined(__INTELLISENSE__) || \
+     (defined(__INCLUDE_LEVEL__) && __INCLUDE_LEVEL__ > 0))
+#error "expr_integrate_internal.h is private to the expression integration implementation; include expression.h instead."
+#endif
+
 #include <stdbool.h>
 #include <stddef.h>
 
+#define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
 
 /* Shared ownership, simplification and dispatch helpers. */

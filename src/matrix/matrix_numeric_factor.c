@@ -2,9 +2,11 @@
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
+#define MARS_MATRIX_INTERNAL_ACCESS
 #include "matrix_internal.h"
 #include "number.h"
 #include "matrix.h"
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
 
 enum {

@@ -1,12 +1,19 @@
 #ifndef INTEGRATOR_INTERNAL_H
 #define INTEGRATOR_INTERNAL_H
 
+#if !defined(MARS_INTEGRATOR_INTERNAL_ACCESS) && \
+    (!defined(__INTELLISENSE__) || \
+     (defined(__INCLUDE_LEVEL__) && __INCLUDE_LEVEL__ > 0))
+#error "integrator_internal.h is private to the integrator module; include integrator.h instead."
+#endif
+
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
 
 #include "expression.h"
 #include "integrator.h"
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
 
 struct _integrator_t {

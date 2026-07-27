@@ -7,10 +7,13 @@
 #include <gmp.h>
 
 #include "expr_bindings.h"
+#define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
 #include "expr_stringout.h"
+#define MARS_EXPR_STRINGOUT_INTERNAL_ACCESS
 #include "expr_stringout_internal.h"
 #include "expression.h"
+#define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
 #include "ustring.h"
 

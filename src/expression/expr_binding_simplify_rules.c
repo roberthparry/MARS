@@ -6,7 +6,9 @@
 
 #include "expr_binding_simplify.h"
 #include "expr_stringout.h"
+#define MARS_EXPR_STRINGOUT_INTERNAL_ACCESS
 #include "expr_stringout_internal.h"
+#define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
 #include "ustring.h"
 

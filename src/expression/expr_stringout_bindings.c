@@ -4,6 +4,7 @@
 
 #include "expr_bindings.h"
 #include "expr_stringout.h"
+#define MARS_EXPR_STRINGOUT_INTERNAL_ACCESS
 #include "expr_stringout_internal.h"
 
 static const char subscript_digits[10][4] = {

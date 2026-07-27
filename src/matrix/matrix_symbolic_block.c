@@ -1,3 +1,4 @@
+#define MARS_MATRIX_INTERNAL_ACCESS
 #include "matrix_internal.h"
 
 matrix_t *mat_charpoly(const matrix_t *A)

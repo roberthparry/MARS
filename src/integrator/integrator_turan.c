@@ -1,3 +1,4 @@
+#define MARS_INTEGRATOR_INTERNAL_ACCESS
 #include "integrator_internal.h"
 
 int intg_double_integral(integrator_t *ig, expr_t *expr,

@@ -1,5 +1,6 @@
 #include <stdbool.h>
 
+#define MARS_EXPR_INTEGRATE_INTERNAL_ACCESS
 #include "expr_integrate_internal.h"
 
 bool depends_on_wrt(const expr_t *expr, const expr_t *wrt)

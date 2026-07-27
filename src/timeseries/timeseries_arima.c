@@ -1,3 +1,4 @@
+#define MARS_TIMESERIES_INTERNAL_ACCESS
 #include "timeseries_internal.h"
 
 static size_t ts_arima_max_lag(const ts_arima_spec_t *spec);

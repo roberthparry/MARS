@@ -9,6 +9,7 @@
 
 #include "almanac.h"
 #include "almanac_cartesian.h"
+#define MARS_ALMANAC_INTERNAL_ACCESS
 #include "almanac_internal.h"
 #include "jurisdiction.h"
 #include "sqlite.h"

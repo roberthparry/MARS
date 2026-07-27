@@ -8,9 +8,11 @@
 #include "expression.h"
 #include "expr_binding_simplify.h"
 #include "expr_bindings.h"
+#define MARS_EXPR_STRINGIN_INTERNAL_ACCESS
 #include "expr_stringin_internal.h"
 #include "expr_stringin_scan.h"
 #include "expr_stringout.h"
+#define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
 #include "ustring.h"
 

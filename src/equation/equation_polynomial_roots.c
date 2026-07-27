@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#define MARS_EQUATION_INTERNAL_ACCESS
 #include "equation_internal.h"
 #include "number.h"
 

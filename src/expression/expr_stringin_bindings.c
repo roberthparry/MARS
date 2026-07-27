@@ -3,8 +3,10 @@
 #include <string.h>
 
 #include "qfloat.h"
+#define MARS_EXPR_STRINGIN_INTERNAL_ACCESS
 #include "expr_stringin_internal.h"
 #include "expr_stringout.h"
+#define MARS_EXPR_STRINGOUT_INTERNAL_ACCESS
 #include "expr_stringout_internal.h"
 
 void *fs_xmalloc(size_t n)

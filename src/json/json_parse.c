@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#define MARS_JSON_INTERNAL_ACCESS
 #include "json_internal.h"
 
 typedef struct {

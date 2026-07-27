@@ -1,6 +1,12 @@
 #ifndef JSON_INTERNAL_H
 #define JSON_INTERNAL_H
 
+#if !defined(MARS_JSON_INTERNAL_ACCESS) && \
+    (!defined(__INTELLISENSE__) || \
+     (defined(__INCLUDE_LEVEL__) && __INCLUDE_LEVEL__ > 0))
+#error "json_internal.h is private to the json module; include json.h instead."
+#endif
+
 #include <stdbool.h>
 
 #include "array.h"

@@ -1,4 +1,6 @@
+#define MARS_INTEGRATOR_INTERNAL_ACCESS
 #include "integrator_internal.h"
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
 
 #include <stdio.h>

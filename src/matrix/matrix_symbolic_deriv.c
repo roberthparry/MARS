@@ -1,6 +1,8 @@
 #include <stdlib.h>
 
+#define MARS_MATRIX_INTERNAL_ACCESS
 #include "matrix_internal.h"
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
 
 matrix_t *mat_deriv(const matrix_t *A, expr_t *wrt)

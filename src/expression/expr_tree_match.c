@@ -4,9 +4,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
 #include "expr_bindings.h"
 #include "expression.h"
+#define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
 
 static bool expr_is_op_kind(const expr_t *expr, expr_op_kind_t kind)

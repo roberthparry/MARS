@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MARS_JSON_INTERNAL_ACCESS
 #include "json_internal.h"
 
 typedef bool (*json_write_value_fn)(const json_t *json,

@@ -1,3 +1,4 @@
+#define MARS_TIMESERIES_INTERNAL_ACCESS
 #include "timeseries_internal.h"
 
 int ts_acf(const timeseries_t *series, size_t max_lag, matrix_t **out)

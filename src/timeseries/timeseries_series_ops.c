@@ -1,3 +1,4 @@
+#define MARS_TIMESERIES_INTERNAL_ACCESS
 #include "timeseries_internal.h"
 
 size_t ts_length(const timeseries_t *series) { return series ? series->length : 0u; }

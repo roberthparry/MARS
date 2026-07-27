@@ -3,6 +3,7 @@
 #include <time.h>
 
 #include "number.h"
+#define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
 
 enum {

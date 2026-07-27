@@ -2,8 +2,10 @@
 #include <stddef.h>
 #include <stdlib.h>
 
+#define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
 #include "expression.h"
+#define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
 
 static void expr_zero_number_array(number_t *values, size_t n)

@@ -1,3 +1,4 @@
+#define MARS_TIMESERIES_INTERNAL_ACCESS
 #include "timeseries_internal.h"
 
 timeseries_t *ts_new(const number_t *values, size_t length)

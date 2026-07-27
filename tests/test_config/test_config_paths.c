@@ -1,5 +1,6 @@
 /* test_config_paths.c - test configuration path helpers */
 
+#define MARS_TEST_CONFIG_INTERNAL_ACCESS
 #include "test_config_internal.h"
 
 static string_t *test_config_empty_path(void)

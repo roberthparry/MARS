@@ -1,3 +1,4 @@
+#define MARS_TIMESERIES_INTERNAL_ACCESS
 #include "timeseries_internal.h"
 
 static timeseries_t *ts_unary_map(const timeseries_t *series, number_t (*fn)(const number_t))

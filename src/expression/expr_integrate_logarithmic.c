@@ -1,5 +1,6 @@
 #include <stdbool.h>
 
+#define MARS_EXPR_INTEGRATE_INTERNAL_ACCESS
 #include "expr_integrate_internal.h"
 
 expr_t *integrate_log_over_proportional_affine(const expr_t *expr,

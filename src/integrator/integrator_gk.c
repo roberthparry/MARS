@@ -1,3 +1,4 @@
+#define MARS_INTEGRATOR_INTERNAL_ACCESS
 #include "integrator_internal.h"
 
 /*

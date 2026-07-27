@@ -1,6 +1,7 @@
 #ifndef MATRIX_VTABLE_DEFS_H
 #define MATRIX_VTABLE_DEFS_H
 
+#define MARS_MATRIX_INTERNAL_ACCESS
 #include "matrix_internal.h"
 
 extern const struct store_vtable dense_store;

@@ -1,5 +1,6 @@
 /* test_config_tree.c - hierarchical test configuration tree helpers */
 
+#define MARS_TEST_CONFIG_INTERNAL_ACCESS
 #include "test_config_internal.h"
 
 static bool test_config_ascii_is_alpha_or_underscore(char ch)

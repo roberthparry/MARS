@@ -7,6 +7,7 @@
 #include <sys/stat.h>
 
 #include "almanac.h"
+#define MARS_ALMANAC_INTERNAL_ACCESS
 #include "almanac/almanac_internal.h"
 #include "sqlite.h"
 

@@ -1,6 +1,7 @@
 #include <math.h>
 #include <limits.h>
 
+#define MARS_SHARED_QFLOAT_INTERNAL_ACCESS
 #include "internal/qfloat_internal.h"
 #include "qcomplex.h"
 

@@ -1,7 +1,9 @@
 #ifndef STRING_INTERNAL_H
 #define STRING_INTERNAL_H
 
-#ifndef MARS_STRING_INTERNAL_ACCESS
+#if !defined(MARS_STRING_INTERNAL_ACCESS) && \
+    (!defined(__INTELLISENSE__) || \
+     (defined(__INCLUDE_LEVEL__) && __INCLUDE_LEVEL__ > 0))
 #error "string_internal.h is private to the string module; include ustring.h instead."
 #endif
 

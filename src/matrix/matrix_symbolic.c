@@ -1,7 +1,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#define MARS_MATRIX_INTERNAL_ACCESS
 #include "matrix_internal.h"
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
 
 static bool expr_node_is_exact_zero(const expr_t *dv)

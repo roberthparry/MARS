@@ -1,6 +1,12 @@
 #ifndef EQUATION_INTERNAL_H
 #define EQUATION_INTERNAL_H
 
+#if !defined(MARS_EQUATION_INTERNAL_ACCESS) && \
+    (!defined(__INTELLISENSE__) || \
+     (defined(__INCLUDE_LEVEL__) && __INCLUDE_LEVEL__ > 0))
+#error "equation_internal.h is private to the equation module; include equation.h instead."
+#endif
+
 #include <stdbool.h>
 #include <stddef.h>
 

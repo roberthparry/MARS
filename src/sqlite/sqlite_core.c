@@ -10,6 +10,7 @@
 #include <sqlcipher/sqlite3.h>
 
 #include "sqlite.h"
+#define MARS_SQLITE_INTERNAL_ACCESS
 #include "sqlite_internal.h"
 
 struct _sqlite_t {

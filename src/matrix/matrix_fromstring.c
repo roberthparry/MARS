@@ -4,8 +4,10 @@
 #include <string.h>
 #include <sys/types.h>
 
+#define MARS_MATRIX_INTERNAL_ACCESS
 #include "matrix_internal.h"
 #include "dictionary.h"
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
 
 typedef struct {

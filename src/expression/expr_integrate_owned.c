@@ -1,3 +1,4 @@
+#define MARS_EXPR_INTEGRATE_INTERNAL_ACCESS
 #include "expr_integrate_internal.h"
 
 expr_t *simplify_owned(expr_t *expr)

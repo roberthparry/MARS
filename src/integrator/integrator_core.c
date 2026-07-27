@@ -1,3 +1,4 @@
+#define MARS_INTEGRATOR_INTERNAL_ACCESS
 #include "integrator_internal.h"
 
 static const char integrator_default_tolerance_text[] = "1e-27";
