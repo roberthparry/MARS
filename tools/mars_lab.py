@@ -5712,6 +5712,26 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       return bindingText ? `{ ${body} | ${bindingText} }` : body;
     }
 
+    function bindingsWithAuthoredValues(bindings, sourceExpression) {
+      const discovered = Array.isArray(bindings) ? bindings : [];
+      const authored = compactExpressionForEditor(sourceExpression).bindings || [];
+      const authoredByName = new Map(
+        authored.map((binding) => [String(binding.name || '').trim(), binding])
+      );
+
+      return discovered.map((binding) => {
+        const name = String(binding && binding.name || '').trim();
+        const sourceBinding = authoredByName.get(name);
+        if (!sourceBinding)
+          return binding;
+        return {
+          ...binding,
+          value: sourceBinding.value,
+          display: sourceBinding.display
+        };
+      });
+    }
+
     function replaceBindingValueInExpression(sourceExpression, kind, targetName, valueText) {
       const parts = bindingParts(sourceExpression);
       if (!parts || !targetName)
@@ -5914,12 +5934,13 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       }
     }
 
-    function applyMarsBindingsToEditedExpression(editedBody, data) {
-      const bindings = Array.isArray(data && data.binding_values)
-        ? data.binding_values
-        : [];
+    function applyMarsBindingsToEditedExpression(editedBody, sourceExpression, data) {
+      const bindings = bindingsWithAuthoredValues(
+        data && data.binding_values,
+        sourceExpression
+      );
       fullExpressionText = expressionForEditor(
-        String(data && data.expression || editedBody)
+        expressionWithBindings(editedBody, bindings) || editedBody
       ).trim();
       displayedExpressionText = editedBody;
       expr.dataset.fullExpression = fullExpressionText;
@@ -5955,7 +5976,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           return;
         }
 
-        applyMarsBindingsToEditedExpression(editedBody, data);
+        applyMarsBindingsToEditedExpression(editedBody, sourceExpression, data);
         updateHistoryButtons();
       } catch (err) {
         if (sequence !== expressionBindingRefreshSequence ||
@@ -6007,21 +6028,24 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       const current = currentExpressionText();
 
       if (currentMode() === 'expression') {
-        const {response, data} = await fetchEvaluation(
+        const updatedSource = replaceBindingValueInExpression(
           current,
+          kind,
           name,
-          'binding-edit',
-          '',
-          valueText === '?' ? '' : valueText
+          valueText
         );
-        if (!response.ok || !data.ok)
-          throw new Error(data.error || `MARS could not update ${name}`);
-        setExpressionEditor(
-          data.expression || current,
-          Array.isArray(data.binding_values) ? data.binding_values : [],
-          null,
-          data.evaluation_ready
-        );
+        if (!updatedSource || updatedSource === current)
+          return;
+
+        fullExpressionText = expressionForEditor(updatedSource).trim();
+        expr.dataset.fullExpression = fullExpressionText;
+        expr.dataset.bindingRefreshValid = 'true';
+        input.value = isUnsetBindingValue(valueText) ? '' : valueText;
+        input.title = valueText;
+        if (isUnsetBindingValue(valueText))
+          bindingValueCache.delete(name);
+        else
+          bindingValueCache.set(name, valueText);
         updateHistoryButtons();
         saveCurrentModeEditorState();
         return;
@@ -9138,8 +9162,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         }
         if (data.expression && !data.partial_error)
           setExpressionEditor(
-            data.expression || editorText || text,
-            data.binding_values || null,
+            editorText || text,
+            bindingsWithAuthoredValues(data.binding_values, editorText || text),
             editorBodyText || null,
             data.evaluation_ready
           );
@@ -9161,7 +9185,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         value.textContent = data.value_note
           ? `${data.value || ''}\n${data.value_note}`
           : (data.value || '');
-        lastEvaluationInputText = data.partial_error ? text : (data.expression || text);
+        lastEvaluationInputText = text;
         if (!data.partial_error)
           saveLastExpression(editorText || fullExpressionText || expr.value.trim());
         lastDerivativeExpression = derivativeExpressionFromLine(data.derivative);
