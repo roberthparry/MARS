@@ -102,6 +102,65 @@ class ExpressionResultTests(unittest.TestCase):
     def expression_binary(self) -> Path:
         return ROOT / "build" / "release" / "scratch" / "mars_lab"
 
+    def test_evaluation_preserves_user_authored_expression_input(self) -> None:
+        self.assertIn(
+            "expressionWithBindings(editedBody, bindings) || editedBody",
+            mars_lab.INDEX_HTML,
+        )
+        self.assertIn(
+            "const updatedSource = replaceBindingValueInExpression(\n"
+            "          current,\n"
+            "          kind,\n"
+            "          name,\n"
+            "          valueText\n"
+            "        );\n"
+            "        if (!updatedSource || updatedSource === current)\n"
+            "          return;\n"
+            "\n"
+            "        fullExpressionText = expressionForEditor(updatedSource).trim();",
+            mars_lab.INDEX_HTML,
+        )
+        self.assertIn(
+            "if (data.expression && !data.partial_error)\n"
+            "          setExpressionEditor(\n"
+            "            editorText || text,\n"
+            "            bindingsWithAuthoredValues(data.binding_values, editorText || text),",
+            mars_lab.INDEX_HTML,
+        )
+        self.assertIn("lastEvaluationInputText = text;", mars_lab.INDEX_HTML)
+
+    def test_expression_binding_display_preserves_authored_constants(self) -> None:
+        self.assertIn(
+            "function bindingsWithAuthoredValues(bindings, sourceExpression) {",
+            mars_lab.INDEX_HTML,
+        )
+        self.assertIn(
+            "value: sourceBinding.value,\n"
+            "          display: sourceBinding.display",
+            mars_lab.INDEX_HTML,
+        )
+        self.assertIn(
+            "applyMarsBindingsToEditedExpression(editedBody, sourceExpression, data);",
+            mars_lab.INDEX_HTML,
+        )
+
+    def test_expression_binding_edit_does_not_recalculate_symbolically(self) -> None:
+        binding_commit = mars_lab.INDEX_HTML.split(
+            "async function commitBindingInput(input) {", 1
+        )[1].split(
+            "\n    function commitVisibleBindingInputs()", 1
+        )[0]
+
+        expression_branch = binding_commit.split(
+            "if (currentMode() === 'expression') {", 1
+        )[1].split("\n      }", 1)[0]
+        self.assertNotIn("fetchEvaluation(", expression_branch)
+        self.assertNotIn("'binding-edit'", expression_branch)
+        self.assertIn(
+            "fullExpressionText = expressionForEditor(updatedSource).trim();",
+            expression_branch,
+        )
+
     def test_calculus_errors_clear_stale_result_cards(self) -> None:
         self.assertGreaterEqual(
             mars_lab.INDEX_HTML.count(
