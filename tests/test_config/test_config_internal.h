@@ -1,6 +1,12 @@
 #ifndef TEST_CONFIG_INTERNAL_H
 #define TEST_CONFIG_INTERNAL_H
 
+#if !defined(MARS_TEST_CONFIG_INTERNAL_ACCESS) && \
+    (!defined(__INTELLISENSE__) || \
+     (defined(__INCLUDE_LEVEL__) && __INCLUDE_LEVEL__ > 0))
+#error "test_config_internal.h is private to the test-config implementation; include test_config.h instead."
+#endif
+
 #include <stdbool.h>
 
 #include "json.h"

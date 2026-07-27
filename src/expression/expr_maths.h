@@ -1,6 +1,7 @@
 #ifndef EXPR_MATHS_H
 #define EXPR_MATHS_H
 
+#define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
 
 int expr_number_to_polygamma_order(number_t value, unsigned int *order);

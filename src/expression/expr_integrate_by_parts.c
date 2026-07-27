@@ -1,3 +1,4 @@
+#define MARS_EXPR_INTEGRATE_INTERNAL_ACCESS
 #include "expr_integrate_internal.h"
 
 typedef expr_t *(*inverse_affine_term_builder_fn)(const expr_t *u,

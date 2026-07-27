@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "expr_bindings.h"
+#define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
 #include "ustring.h"
 

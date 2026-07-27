@@ -1,6 +1,12 @@
 #ifndef EXPR_SHARED_INTERNAL_H
 #define EXPR_SHARED_INTERNAL_H
 
+#if !defined(MARS_SHARED_EXPR_INTERNAL_ACCESS) && \
+    (!defined(__INTELLISENSE__) || \
+     (defined(__INCLUDE_LEVEL__) && __INCLUDE_LEVEL__ > 0))
+#error "internal/expr_internal.h is private to the MARS implementation; include expression.h instead."
+#endif
+
 #include <stdbool.h>
 #include <stddef.h>
 

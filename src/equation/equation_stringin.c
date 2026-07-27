@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "equation.h"
+#define MARS_EQUATION_INTERNAL_ACCESS
 #include "equation_internal.h"
 #include "ustring.h"
 

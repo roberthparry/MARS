@@ -1,6 +1,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#define MARS_EXPR_INTEGRATE_INTERNAL_ACCESS
 #include "expr_integrate_internal.h"
 
 typedef struct {

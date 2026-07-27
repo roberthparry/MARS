@@ -2,6 +2,7 @@
 
 #include <math.h>
 
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
 
 static string_t *format_number_at_own_precision(const number_t value)

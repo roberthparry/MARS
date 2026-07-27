@@ -1,5 +1,6 @@
 #include <stdbool.h>
 
+#define MARS_EXPR_INTEGRATE_INTERNAL_ACCESS
 #include "expr_integrate_internal.h"
 
 static bool is_wrt_square_power(const expr_t *expr, const expr_t *wrt);

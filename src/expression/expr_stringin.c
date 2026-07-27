@@ -54,7 +54,9 @@
 
 #include "qfloat.h"
 #include "expr_bindings.h"
+#define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
+#define MARS_EXPR_STRINGIN_INTERNAL_ACCESS
 #include "expr_stringin_internal.h"
 #include "expr_stringin_scan.h"
 #include "expression.h"

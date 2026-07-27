@@ -2,6 +2,7 @@
 
 #include <stdlib.h>
 
+#define MARS_JSON_INTERNAL_ACCESS
 #include "json_internal.h"
 
 typedef bool (*json_clone_value_fn)(json_t *dst, const json_t *src);

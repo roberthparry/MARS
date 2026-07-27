@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "number.h"
+#define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
 #include "expression.h"
 

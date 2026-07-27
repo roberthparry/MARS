@@ -1,6 +1,8 @@
 #include <stdlib.h>
 
+#define MARS_EXPR_STRINGIN_INTERNAL_ACCESS
 #include "expr_stringin_internal.h"
+#define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
 
 #define EXPR_GOAL_DEFAULT_DIGITS 64u

@@ -1,4 +1,5 @@
 #include "number.h"
+#define MARS_NUMBER_INTERNAL_ACCESS
 #include "number_internal.h"
 #include "ustring.h"
 

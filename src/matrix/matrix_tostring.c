@@ -2,7 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MARS_MATRIX_INTERNAL_ACCESS
 #include "matrix_internal.h"
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
 #include "ustring.h"
 

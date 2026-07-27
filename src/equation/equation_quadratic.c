@@ -1,7 +1,9 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#define MARS_EQUATION_INTERNAL_ACCESS
 #include "equation_internal.h"
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
 
 static void equ_init_numbers(number_t *values, size_t count)

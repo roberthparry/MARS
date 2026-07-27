@@ -2,6 +2,7 @@
 
 #include "expr_bindings.h"
 #include "expr_stringout.h"
+#define MARS_EXPR_STRINGOUT_INTERNAL_ACCESS
 #include "expr_stringout_internal.h"
 
 static string_t *expr_text_from_owned_c_string(char *raw)

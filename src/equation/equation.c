@@ -3,8 +3,10 @@
 #include <string.h>
 
 #include "equation.h"
+#define MARS_EQUATION_INTERNAL_ACCESS
 #include "equation_internal.h"
 #include "expression.h"
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
 #include "ustring.h"
 

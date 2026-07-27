@@ -1,3 +1,4 @@
+#define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
 
 static number_t expr_reverse_zero(void)

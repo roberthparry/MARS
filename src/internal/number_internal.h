@@ -1,6 +1,12 @@
 #ifndef NUMBER_SHARED_INTERNAL_H
 #define NUMBER_SHARED_INTERNAL_H
 
+#if !defined(MARS_SHARED_NUMBER_INTERNAL_ACCESS) && \
+    (!defined(__INTELLISENSE__) || \
+     (defined(__INCLUDE_LEVEL__) && __INCLUDE_LEVEL__ > 0))
+#error "internal/number_internal.h is private to the MARS implementation; include number.h instead."
+#endif
+
 #include "number.h"
 
 number_t number_invalid(void);

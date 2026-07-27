@@ -1,5 +1,6 @@
 /* test_config_json.c - JSON helpers for test configuration */
 
+#define MARS_TEST_CONFIG_INTERNAL_ACCESS
 #include "test_config_internal.h"
 
 bool test_config_json_object_set_key(json_t *object,

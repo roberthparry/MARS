@@ -1,6 +1,12 @@
 #ifndef QFLOAT_INTERNAL_H
 #define QFLOAT_INTERNAL_H
 
+#if !defined(MARS_QFLOAT_INTERNAL_ACCESS) && \
+    (!defined(__INTELLISENSE__) || \
+     (defined(__INCLUDE_LEVEL__) && __INCLUDE_LEVEL__ > 0))
+#error "qfloat_internal.h is private to the qfloat module; include qfloat.h instead."
+#endif
+
 #include <math.h>
 
 #include "qfloat.h"

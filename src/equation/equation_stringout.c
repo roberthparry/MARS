@@ -6,6 +6,7 @@
 
 #include "equation.h"
 #include "expression/expr_stringout.h"
+#define MARS_EXPR_STRINGOUT_INTERNAL_ACCESS
 #include "expression/expr_stringout_internal.h"
 
 bool expr_set_number_scientific_local(bool scientific);

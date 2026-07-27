@@ -1,5 +1,6 @@
 #include <stdbool.h>
 
+#define MARS_EXPR_INTEGRATE_INTERNAL_ACCESS
 #include "expr_integrate_internal.h"
 
 expr_t *expr_integrate_build_unsigned_expr_power(const expr_t *base,

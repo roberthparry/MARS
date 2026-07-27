@@ -3,6 +3,7 @@
 
 #include <stddef.h>
 
+#define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
 
 typedef struct {

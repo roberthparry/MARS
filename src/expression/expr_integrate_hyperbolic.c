@@ -1,5 +1,6 @@
 #include <stdbool.h>
 
+#define MARS_EXPR_INTEGRATE_INTERNAL_ACCESS
 #include "expr_integrate_internal.h"
 
 static bool match_hyperbolic_proportional_wrt_coeff(const expr_t *expr,

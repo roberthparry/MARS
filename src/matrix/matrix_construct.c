@@ -1,5 +1,6 @@
 #include <stdlib.h>
 
+#define MARS_MATRIX_INTERNAL_ACCESS
 #include "matrix_internal.h"
 
 /* ============================================================

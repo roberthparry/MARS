@@ -2,7 +2,9 @@
 #include <math.h>
 #include <string.h>
 #include <stdlib.h>
+#define MARS_EXPR_INTEGRATE_INTERNAL_ACCESS
 #include "expr_integrate_internal.h"
+#define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
 
 typedef struct {

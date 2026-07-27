@@ -1,3 +1,4 @@
+#define MARS_QFLOAT_INTERNAL_ACCESS
 #include "qfloat_internal.h"
 
 enum {

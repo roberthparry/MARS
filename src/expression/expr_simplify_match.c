@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "expr_bindings.h"
+#define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
 
 static int const_is_protected_bound_symbol(const expr_t *dv)

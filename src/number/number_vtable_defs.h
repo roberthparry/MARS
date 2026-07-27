@@ -1,6 +1,7 @@
 #ifndef NUMBER_VTABLE_DEFS_H
 #define NUMBER_VTABLE_DEFS_H
 
+#define MARS_NUMBER_INTERNAL_ACCESS
 #include "number_internal.h"
 
 number_t *number_abs_double(const number_t *number);

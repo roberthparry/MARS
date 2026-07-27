@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
 #include "ustring.h"
 

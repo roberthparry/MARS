@@ -1,6 +1,7 @@
 #include <math.h>
 #include <complex.h>
 
+#define MARS_NUMBER_INTERNAL_ACCESS
 #include "number_internal.h"
 
 static number_mpz_t number_zero_mpz_value = { .constant_id = NUMBER_CONST_ZERO, .immortal = true, .initialised = false };

@@ -1,3 +1,4 @@
+#define MARS_TIMESERIES_INTERNAL_ACCESS
 #include "timeseries_internal.h"
 
 static matrix_t *ts_augmented_xreg(const matrix_t *xreg, size_t rows, bool include_intercept,

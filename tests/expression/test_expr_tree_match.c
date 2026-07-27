@@ -1,5 +1,7 @@
 #include "test_expr.h"
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
+#define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
 
 static bool expr_match_unary_affine_kind_qf_local(const expr_t *expr,

@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#define MARS_EQUATION_INTERNAL_ACCESS
 #include "equation_internal.h"
 #include "number.h"
 

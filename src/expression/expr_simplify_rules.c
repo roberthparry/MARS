@@ -1,4 +1,5 @@
 #include "expr_bindings.h"
+#define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
 
 bool expr_simplify_is_plain_real_const(const expr_t *dv)

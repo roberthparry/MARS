@@ -2,6 +2,7 @@
 
 #include "integrator.h"
 #include "test_expr.h"
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
 
 static void print_antiderivative_text(const char *label, const char *text)
