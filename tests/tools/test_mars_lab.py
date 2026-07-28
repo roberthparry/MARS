@@ -19,7 +19,7 @@ class EquationResultTests(unittest.TestCase):
             mars_lab.INDEX_HTML,
         )
         self.assertIn(
-            "if (currentMode() === 'equation')\n"
+            "if (currentMode() === 'equation' || currentMode() === 'diffequation')\n"
             "        setExpressionEditor(resultText);\n"
             "      else if (!await applyMarsBindingExpression(resultText))",
             mars_lab.INDEX_HTML,
@@ -95,6 +95,50 @@ class EquationResultTests(unittest.TestCase):
                 "x = 1 - 2i",
             ],
         )
+
+
+class DiffequationResultTests(unittest.TestCase):
+    def test_tab_uses_its_own_native_endpoint_and_input_state(self) -> None:
+        self.assertIn('data-mode="diffequation"', mars_lab.INDEX_HTML)
+        self.assertIn("fetch('/diffequation-eval'", mars_lab.INDEX_HTML)
+        self.assertIn(
+            "modeEditorText.diffequation = text;",
+            mars_lab.INDEX_HTML,
+        )
+        self.assertIn(
+            "setResultInputText(data.input || text);",
+            mars_lab.INDEX_HTML,
+        )
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
+    def test_native_helper_solves_and_formats_a_separable_ode(self) -> None:
+        completed = subprocess.run(
+            [
+                str(
+                    ROOT
+                    / "build"
+                    / "release"
+                    / "scratch"
+                    / "diffequation_lab"
+                ),
+                "Dx(y) = x*y; y(0) = 1",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
+        payload = mars_lab.prepare_diffequation_fields(fields)
+
+        self.assertEqual(payload["status"], "solved")
+        self.assertEqual(payload["solver"], "separable")
+        self.assertEqual(payload["solutions"], "y = exp(½x²)")
+        self.assertIn(r"\begin{aligned}", payload["solutions_tex"])
+        self.assertIn("y(0) = 1", payload["problem"])
 
 
 class ExpressionResultTests(unittest.TestCase):

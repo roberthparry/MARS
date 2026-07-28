@@ -64,6 +64,14 @@ expr_t *expr_const_zero(void);
 expr_t *expr_const_one(void);
 expr_t *expr_const_long(long value);
 expr_t *expr_retain_expr(const expr_t *expr);
+expr_t *expr_from_expression_text_formal(
+    const string_t *expr,
+    const string_t *const *names,
+    expr_t *const *symbols,
+    size_t nsymbols);
+expr_bindings_t *expr_bindings_clone_internal(
+    const expr_bindings_t *bindings,
+    bool constants_only);
 expr_t *expr_simplify_owned(expr_t *expr);
 expr_t *expr_negate_owned(expr_t *expr);
 expr_t *expr_mul_long(const expr_t *expr, long value);
@@ -74,6 +82,13 @@ expr_t *expr_sub_simplify_owned(const expr_t *left, const expr_t *right);
 expr_t *expr_mul_simplify_owned(const expr_t *left, const expr_t *right);
 expr_t *expr_div_simplify_owned(const expr_t *left, const expr_t *right);
 int expr_struct_eq(const expr_t *u, const expr_t *v);
+bool expr_child_exprs(const expr_t *expr,
+                      const expr_t **left_out,
+                      const expr_t **right_out);
+bool expr_is_formal_derivative(const expr_t *expr);
+const expr_t *expr_formal_derivative_dependent(const expr_t *expr);
+size_t expr_formal_derivative_order(const expr_t *expr);
+const expr_t *expr_formal_derivative_wrt_at(const expr_t *expr, size_t index);
 
 bool expr_match_neg_expr(const expr_t *expr, const expr_t **arg_out);
 bool expr_match_exp_expr(const expr_t *expr, const expr_t **arg_out);
@@ -87,6 +102,9 @@ bool expr_match_pow_const(const expr_t *expr,
 bool expr_match_pow_expr(const expr_t *expr,
                          const expr_t **base_out,
                          const expr_t **exponent_out);
+bool expr_match_integral_expr(const expr_t *expr,
+                              const expr_t **integrand_out,
+                              const expr_t **domain_out);
 void expr_set_binding_pi_linear_family(expr_t *expr,
                                        long denominator,
                                        long n_coeff,
@@ -105,6 +123,9 @@ bool expr_match_add_sub_expr(const expr_t *expr,
                              const expr_t **right_out,
                              bool *is_sub_out);
 bool expr_match_mul_expr(const expr_t *expr,
+                         const expr_t **left_out,
+                         const expr_t **right_out);
+bool expr_match_div_expr(const expr_t *expr,
                          const expr_t **left_out,
                          const expr_t **right_out);
 bool expr_collect_var_usage(const expr_t *expr,

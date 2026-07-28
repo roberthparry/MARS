@@ -941,6 +941,34 @@ static void emit_expr_integral(const expr_t *f, sbuf_t *b, int parent_prec)
         sbuf_putc(b, ')');
 }
 
+static void emit_formal_derivative_expr(const expr_t *f, sbuf_t *b)
+{
+    sbuf_putc(b, 'D');
+    for (size_t i = 0u; i < f->formal_wrt_count; ++i) {
+        const expr_t *wrt = f->formal_wrts[i];
+
+        emit_name(b, (wrt && wrt->name) ? wrt->name : "x");
+    }
+    sbuf_putc(b, '(');
+    emit_expr(f->a, b, PREC_LOWEST);
+    sbuf_putc(b, ')');
+}
+
+static void emit_formal_derivative_tex(const expr_t *f, sbuf_t *b)
+{
+    sbuf_puts(b, "\\operatorname{D}_{");
+    for (size_t i = 0u; i < f->formal_wrt_count; ++i) {
+        const expr_t *wrt = f->formal_wrts[i];
+
+        if (i > 0u)
+            sbuf_putc(b, ' ');
+        emit_tex_name(b, (wrt && wrt->name) ? wrt->name : "x");
+    }
+    sbuf_puts(b, "}\\left(");
+    emit_tex_expr(f->a, b, PREC_LOWEST);
+    sbuf_puts(b, "\\right)");
+}
+
 static void emit_tex_integral(const expr_t *f, sbuf_t *b, int parent_prec)
 {
     int need = PREC_UNARY < parent_prec;
@@ -2318,6 +2346,11 @@ void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec)
         return;
     }
 
+    if (expr_is_formal_derivative(f)) {
+        emit_formal_derivative_tex(f, b);
+        return;
+    }
+
     if (expr_is_const(f) || expr_is_var(f)) {
         emit_tex_atom(f, b);
         return;
@@ -2723,6 +2756,11 @@ void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec)
 void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
 {
     if (!f) { sbuf_puts(b, "0"); return; }
+
+    if (expr_is_formal_derivative(f)) {
+        emit_formal_derivative_expr(f, b);
+        return;
+    }
 
     /* Atoms */
     if (expr_is_const(f) || expr_is_var(f)) {
@@ -3135,6 +3173,11 @@ void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
 void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
 {
     if (!f) { sbuf_puts(b, "0"); return; }
+
+    if (expr_is_formal_derivative(f)) {
+        emit_formal_derivative_expr(f, b);
+        return;
+    }
 
     if (expr_is_const(f)) {
         if (expr_tostring_should_emit_binding_expr(f)) {

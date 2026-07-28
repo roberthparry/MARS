@@ -3674,6 +3674,16 @@ expr_t *expr_simplify_div_operator(const expr_t *dv, expr_t *a, expr_t *b)
     }
 
     if (expr_is_op(b, &ops_const) && expr_const_is_one(b)) { expr_free(b); return a; }
+    if (expr_is_op(a, &ops_exp) && expr_is_op(b, &ops_exp)) {
+        expr_t *difference = expr_sub_simplify_owned(
+            expr_clone(a->a), expr_clone(b->a));
+        expr_t *out = difference ? expr_exp(difference) : NULL;
+
+        expr_free(difference);
+        expr_free(a);
+        expr_free(b);
+        return out;
+    }
     {
         expr_t *poly_quotient = expr_simplify_try_poly_quotient_numerator_local(a, b);
 

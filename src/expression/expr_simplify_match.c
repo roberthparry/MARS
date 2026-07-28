@@ -172,6 +172,15 @@ int expr_struct_eq(const expr_t *u, const expr_t *v)
         return const_struct_eq(u, v);
     if (expr_is_var(u))
         return u->var_id != 0 && u->var_id == v->var_id;
+    if (expr_is_formal_derivative(u)) {
+        if (u->formal_wrt_count != v->formal_wrt_count ||
+            !expr_struct_eq(u->a, v->a))
+            return 0;
+        for (size_t i = 0u; i < u->formal_wrt_count; ++i)
+            if (!expr_struct_eq(u->formal_wrts[i], v->formal_wrts[i]))
+                return 0;
+        return 1;
+    }
     if (expr_is_mul(u))
         return mul_struct_eq(u, v);
     if (expr_is_neg(u))

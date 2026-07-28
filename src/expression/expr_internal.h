@@ -148,6 +148,7 @@ typedef enum {
     EXPR_KIND_INTEGRAL,
     EXPR_KIND_INTEGRAL_META,
     EXPR_KIND_INTEGRAL_BOUNDS,
+    EXPR_KIND_FORMAL_DERIVATIVE,
     EXPR_KIND_COUNT
 } expr_op_kind_t;
 
@@ -289,6 +290,8 @@ struct _expr_t {
     expr_deriv_cache_t *dx_cache;
     char *name;
     expr_binding_expr_t *binding_expr;
+    expr_t **formal_wrts;
+    size_t formal_wrt_count;
     int refcount;
     uint64_t var_id;
 };
@@ -306,6 +309,15 @@ extern const expr_ops_t ops_neg;
 extern const expr_ops_t ops_integral;
 extern const expr_ops_t ops_integral_meta;
 extern const expr_ops_t ops_integral_bounds;
+extern const expr_ops_t ops_formal_derivative;
+
+expr_t *expr_new_formal_derivative(const expr_t *dependent,
+                                   size_t wrt_count,
+                                   expr_t *const *wrts);
+bool expr_is_formal_derivative(const expr_t *expr);
+const expr_t *expr_formal_derivative_dependent(const expr_t *expr);
+size_t expr_formal_derivative_order(const expr_t *expr);
+const expr_t *expr_formal_derivative_wrt_at(const expr_t *expr, size_t index);
 extern const expr_ops_t ops_sin;
 extern const expr_ops_t ops_cos;
 extern const expr_ops_t ops_tan;

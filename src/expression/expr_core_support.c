@@ -1016,6 +1016,9 @@ static void expr_release(expr_t *dv)
         free(dv->name);
     if (dv->binding_expr)
         expr_binding_expr_free(dv->binding_expr);
+    for (size_t i = 0u; i < dv->formal_wrt_count; ++i)
+        expr_release(dv->formal_wrts[i]);
+    free(dv->formal_wrts);
     num_destroy(&dv->c);
     num_destroy(&dv->x);
     free(dv);
@@ -1049,6 +1052,8 @@ expr_t *expr_alloc(const expr_ops_t *ops)
     dv->dx_cache = NULL;
     dv->name = NULL;
     dv->binding_expr = NULL;
+    dv->formal_wrts = NULL;
+    dv->formal_wrt_count = 0u;
     dv->refcount = 1;
     dv->var_id = 0;
 
@@ -1300,6 +1305,17 @@ expr_t *expr_clone(const expr_t *expr)
         out = (expr->name && *expr->name)
                   ? expr_new_named_var(expr->x, expr->name)
                   : expr_new_var(expr->x);
+        expr_clone_copy_metadata(out, expr);
+        return out;
+    }
+
+    if (expr->ops->kind == EXPR_KIND_FORMAL_DERIVATIVE) {
+        left = expr_clone(expr->a);
+        if (!left)
+            return NULL;
+        out = expr_new_formal_derivative(
+            left, expr->formal_wrt_count, expr->formal_wrts);
+        expr_free(left);
         expr_clone_copy_metadata(out, expr);
         return out;
     }

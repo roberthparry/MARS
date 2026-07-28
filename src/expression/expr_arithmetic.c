@@ -26,6 +26,12 @@ static number_t eval_var(expr_t *dv)
     return num_clone(dv->c);
 }
 
+static number_t eval_formal_derivative(expr_t *dv)
+{
+    (void)dv;
+    return num_clone(NUM_NAN);
+}
+
 static number_t eval_add(expr_t *dv)
 {
     return num_add(expr_eval_num_internal(dv->a), expr_eval_num_internal(dv->b));
@@ -375,6 +381,82 @@ static expr_t *deriv_var(expr_t *dv)
                      dv->var_id != 0 && dv->var_id == wrt->var_id);
 
     return expr_new_const(same_var ? NUM_ONE : NUM_ZERO);
+}
+
+static expr_t *deriv_formal_derivative(expr_t *dv)
+{
+    const expr_t *wrt = expr_current_wrt_internal();
+    expr_t **wrts;
+    expr_t *out;
+
+    if (!wrt)
+        return NULL;
+
+    wrts = calloc(dv->formal_wrt_count + 1u, sizeof(*wrts));
+    if (!wrts)
+        return NULL;
+    for (size_t i = 0u; i < dv->formal_wrt_count; ++i)
+        wrts[i] = dv->formal_wrts[i];
+    wrts[dv->formal_wrt_count] = (expr_t *)wrt;
+
+    out = expr_new_formal_derivative(
+        dv->a, dv->formal_wrt_count + 1u, wrts);
+    free(wrts);
+    return out;
+}
+
+expr_t *expr_new_formal_derivative(const expr_t *dependent,
+                                   size_t wrt_count,
+                                   expr_t *const *wrts)
+{
+    expr_t *expr;
+
+    if (!dependent || wrt_count == 0u || !wrts)
+        return NULL;
+    if (wrt_count > SIZE_MAX / sizeof(*expr->formal_wrts))
+        return NULL;
+
+    expr = expr_alloc(&ops_formal_derivative);
+    expr->formal_wrts = calloc(wrt_count, sizeof(*expr->formal_wrts));
+    if (!expr->formal_wrts) {
+        expr_free(expr);
+        return NULL;
+    }
+    expr->formal_wrt_count = wrt_count;
+
+    expr->a = (expr_t *)dependent;
+    expr_retain(expr->a);
+    for (size_t i = 0u; i < wrt_count; ++i) {
+        if (!wrts[i]) {
+            expr_free(expr);
+            return NULL;
+        }
+        expr->formal_wrts[i] = wrts[i];
+        expr_retain(expr->formal_wrts[i]);
+    }
+    return expr;
+}
+
+bool expr_is_formal_derivative(const expr_t *expr)
+{
+    return expr && expr->ops == &ops_formal_derivative;
+}
+
+const expr_t *expr_formal_derivative_dependent(const expr_t *expr)
+{
+    return expr_is_formal_derivative(expr) ? expr->a : NULL;
+}
+
+size_t expr_formal_derivative_order(const expr_t *expr)
+{
+    return expr_is_formal_derivative(expr) ? expr->formal_wrt_count : 0u;
+}
+
+const expr_t *expr_formal_derivative_wrt_at(const expr_t *expr, size_t index)
+{
+    if (!expr_is_formal_derivative(expr) || index >= expr->formal_wrt_count)
+        return NULL;
+    return expr->formal_wrts[index];
 }
 
 static expr_t *deriv_add(expr_t *dv)
@@ -2275,6 +2357,21 @@ const expr_ops_t ops_var = {
     .arity = EXPR_OP_ATOM,
     .name = "var",
     .tex_name = NULL,
+    .apply_unary = NULL,
+    .apply_binary = NULL,
+    .simplify = expr_simplify_passthrough,
+    .fold_const_unary = NULL
+};
+
+const expr_ops_t ops_formal_derivative = {
+    .eval = eval_formal_derivative,
+    .deriv = deriv_formal_derivative,
+    .reverse = expr_reverse_not_differentiable,
+    .kind = EXPR_KIND_FORMAL_DERIVATIVE,
+    .arity = EXPR_OP_UNARY,
+    .diff_kind = EXPR_DIFF_NONE,
+    .name = "D",
+    .tex_name = "\\operatorname{D}",
     .apply_unary = NULL,
     .apply_binary = NULL,
     .simplify = expr_simplify_passthrough,
