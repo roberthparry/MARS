@@ -3,8 +3,8 @@
 
 #include "matrix.h"
 
-#define MARS_EQUATION_INTERNAL_ACCESS
-#include "equation/equation_internal.h"
+#define MARS_SHARED_EQUATION_INTERNAL_ACCESS
+#include "internal/equation_internal.h"
 #define MARS_DIFFEQUATION_SOLVE_INTERNAL_ACCESS
 #include "diffequ_solve_internal.h"
 
@@ -531,6 +531,42 @@ static bool de_condition_data(
     return true;
 }
 
+static bool de_match_e_power_forcing(const expr_t *forcing,
+                                     const expr_t **exponent_out)
+{
+    const expr_t *base = NULL;
+    const expr_t *exponent = NULL;
+    expr_t *e = NULL;
+    bool matches = false;
+
+    if (!expr_match_pow_expr(forcing, &base, &exponent))
+        return false;
+
+    e = expr_new_named_const(NUM_E, "e");
+    matches = e && expr_struct_eq(base, e);
+    expr_free(e);
+    if (matches && exponent_out)
+        *exponent_out = exponent;
+    return matches;
+}
+
+static bool de_match_exponential_forcing(const expr_t *forcing,
+                                         const expr_t **exponent_out)
+{
+    return expr_match_exp_expr(forcing, exponent_out) ||
+           de_match_e_power_forcing(forcing, exponent_out);
+}
+
+static bool de_is_unit_rate_exponential_forcing(
+    const expr_t *forcing,
+    const expr_t *independent)
+{
+    const expr_t *exponent = NULL;
+
+    return de_match_exponential_forcing(forcing, &exponent) &&
+           expr_struct_eq(exponent, independent);
+}
+
 static expr_t *de_exponential_particular_solution(
     const de_constant_linear_form_t *form,
     const expr_t *independent)
@@ -542,7 +578,7 @@ static expr_t *de_exponential_particular_solution(
     expr_t *particular = NULL;
 
     if (!form || !form->forcing || !independent ||
-        !expr_match_exp_expr(form->forcing, &exponent) ||
+        !de_match_exponential_forcing(form->forcing, &exponent) ||
         !equ_match_affine_linear_expr(
             exponent, independent, false, &offset, &rate))
         goto cleanup;
@@ -563,9 +599,14 @@ static expr_t *de_exponential_particular_solution(
     }
     if (characteristic_value &&
         !expr_is_exact_zero(characteristic_value)) {
-        particular = expr_div_simplify_owned(
-            expr_clone(form->forcing), characteristic_value);
+        expr_t *coefficient = expr_div_simplify_owned(
+            expr_const_one(), characteristic_value);
+
         characteristic_value = NULL;
+        particular = coefficient
+            ? expr_mul_simplify_owned(
+                  coefficient, expr_clone(form->forcing))
+            : NULL;
     }
 
 cleanup:
@@ -584,11 +625,16 @@ static expr_t *de_particular_solution(
     matrix_t *forcing = NULL;
     matrix_t *rates = NULL;
     expr_t *particular = NULL;
+    bool use_direct_exponential;
 
     if (expr_is_exact_zero(form->forcing))
         return expr_const_zero();
 
-    particular = form->order > 2u
+    use_direct_exponential =
+        form->order > 2u ||
+        de_is_unit_rate_exponential_forcing(
+            form->forcing, independent);
+    particular = use_direct_exponential
         ? de_exponential_particular_solution(form, independent)
         : NULL;
     if (particular)
@@ -763,9 +809,12 @@ static expr_t *de_general_solution(
     const de_basis_t *basis,
     const expr_t *particular)
 {
-    expr_t *solution = expr_clone(particular);
+    bool separate_particular = !expr_is_exact_zero(particular);
+    expr_t *solution = separate_particular
+        ? expr_clone(particular)
+        : expr_const_zero();
 
-    for (size_t i = 0u; solution && i < basis->count; ++i) {
+    for (size_t i = 0u; i < basis->count; ++i) {
         char name[32];
         expr_t *constant;
         expr_t *term;
@@ -776,9 +825,19 @@ static expr_t *de_general_solution(
             ? expr_mul_simplify_owned(
                   constant, expr_clone(basis->items[i]))
             : NULL;
-        solution = term
-            ? expr_add_simplify_owned(solution, term)
-            : NULL;
+        if (!term) {
+            expr_free(solution);
+            return NULL;
+        }
+        if (!separate_particular) {
+            solution = expr_add_simplify_owned(solution, term);
+        } else {
+            expr_t *sum = expr_add(solution, term);
+
+            expr_free(term);
+            expr_free(solution);
+            solution = sum;
+        }
     }
     return solution;
 }

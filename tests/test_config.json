@@ -189,6 +189,7 @@
     "test_diffequ_linear_solution_retains_formal_integral": true,
     "test_diffequ_linear_solution_uses_special_function": true,
     "test_diffequ_normalizes_variable_coefficient_sturm_liouville": true,
+    "test_diffequ_parses_and_solves_prime_ode_shorthand": true,
     "test_diffequ_parses_linear_ode_and_constant": true,
     "test_diffequ_parses_ode_shorthand": true,
     "test_diffequ_parses_separable_ode": true,

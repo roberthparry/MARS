@@ -2774,6 +2774,19 @@ static expr_t *parse_atom(expr_parse_state_t *p)
 
     expr_t *sym = lookup_symbol_text_normalised(p->syms, name);
     if (!sym) {
+        number_t value;
+
+        if (expr_get_default_constant_num_text(name, &value)) {
+            string_t *canonical =
+                expr_default_constant_canonical_name_text(name);
+            expr_t *constant =
+                expr_new_named_const_text(value, canonical ? canonical : name);
+
+            num_destroy(&value);
+            string_free(canonical);
+            string_free(name);
+            return constant;
+        }
         if (!p->error) {
             p->error = 1;
             if (p->errmsg)

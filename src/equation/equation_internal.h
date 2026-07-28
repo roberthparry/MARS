@@ -13,27 +13,12 @@
 #include "equation.h"
 #include "number.h"
 
-typedef enum equation_solve_status {
-    EQUATION_SOLVE_INVALID,
-    EQUATION_SOLVE_UNSOLVED,
-    EQUATION_SOLVE_SOLVED
-} equation_solve_status_t;
-
-struct equation_solutions {
-    equation_t **solutions;
-    size_t count;
-    equation_solve_status_t status;
-};
+#define MARS_SHARED_EQUATION_INTERNAL_ACCESS
+#include "internal/equation_internal.h"
 
 equation_t *equ_new_with_owned_bindings(const expr_t *lhs,
                                              const expr_t *rhs,
                                              expr_bindings_t *bindings);
-
-bool equ_match_affine_linear_expr(const expr_t *expr,
-                                       const expr_t *wrt,
-                                       bool require_nonzero_coeff,
-                                       number_t *constant_out,
-                                       number_t *coeff_out);
 
 bool equ_match_quadratic_expr(const expr_t *expr,
                                    const expr_t *wrt,
@@ -116,17 +101,11 @@ int equ_try_solve_general_polynomial(const equation_t *equation,
                                           const expr_t *wrt,
                                           equation_solutions_t *solutions);
 
-int equ_solve_for_into(const equation_t *equation,
-                            const expr_t *wrt,
-                            equation_solutions_t *solutions);
-
 int equ_solve_numeric_into(const equation_t *equation,
                                 expr_bindings_t *bindings,
                                 const expr_goal_seek_options_t *options,
                                 equation_solutions_t *solutions);
 
 expr_bindings_t *equ_bindings_borrow(const equation_t *equation);
-
-void equ_solutions_clear(equation_solutions_t *solutions);
 
 #endif
