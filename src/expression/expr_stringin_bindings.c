@@ -322,6 +322,52 @@ expr_bindings_t *expr_bindings_merge_internal(
     return merged;
 }
 
+expr_bindings_t *expr_bindings_clone_internal(
+    const expr_bindings_t *bindings,
+    bool constants_only)
+{
+    expr_bindings_t *copy;
+    size_t count = 0u;
+    size_t out = 0u;
+
+    if (!bindings)
+        return NULL;
+
+    for (size_t i = 0u; i < bindings->count; ++i)
+        if (!constants_only || bindings->entries[i].is_constant)
+            count++;
+
+    copy = bindings_create(count);
+    if (!copy)
+        return NULL;
+
+    for (size_t i = 0u; i < bindings->count; ++i) {
+        const expr_binding_entry_t *source = &bindings->entries[i];
+        expr_binding_entry_t *entry;
+
+        if (constants_only && !source->is_constant)
+            continue;
+
+        entry = &copy->entries[out++];
+        entry->name = string_clone(source->name);
+        entry->expr = source->expr;
+        if (!entry->name || !entry->expr) {
+            bindings_destroy_partial(copy);
+            return NULL;
+        }
+        expr_retain(entry->expr);
+        entry->is_constant = source->is_constant;
+        if (bindings_index_entry(copy, entry) != 0) {
+            bindings_destroy_partial(copy);
+            return NULL;
+        }
+    }
+
+    copy->has_symbolic_derivative = bindings->has_symbolic_derivative;
+    copy->has_symbolic_integral = bindings->has_symbolic_integral;
+    return copy;
+}
+
 expr_bindings_t *symtab_build_bindings(const symtab_t *t)
 {
     expr_bindings_t *bindings;

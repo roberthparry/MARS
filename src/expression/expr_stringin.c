@@ -73,6 +73,7 @@ typedef struct {
     string_t            *errmsg;
     bool                 has_symbolic_derivative;
     bool                 has_symbolic_integral;
+    bool                 preserve_formal_derivatives;
     symtab_t             symbolic_integral_variables;
     bool                 report_errors;
 } expr_parse_state_t;
@@ -109,6 +110,7 @@ static int expr_parse_state_init(expr_parse_state_t *p,
     p->errmsg = string_new();
     p->has_symbolic_derivative = false;
     p->has_symbolic_integral = false;
+    p->preserve_formal_derivatives = false;
     symtab_init(&p->symbolic_integral_variables);
     p->report_errors = true;
 
@@ -213,6 +215,7 @@ static expr_t *parse_expression_view_with_metadata(
     symtab_t *syms,
     const char *context_label,
     int report_errors,
+    bool preserve_formal_derivatives,
     bool *has_symbolic_derivative_out,
     bool *has_symbolic_integral_out,
     expr_bindings_t **symbolic_integral_bindings_out);
@@ -1348,7 +1351,38 @@ static expr_t *parse_derivative_atom(expr_parse_state_t *p,
     cur = arg;
     arg = NULL;
     for (size_t i = 0u; i < wrt_count; ++i) {
-        expr_t *next = expr_create_deriv(cur, wrts[i]);
+        expr_t *next;
+
+        if (p->preserve_formal_derivatives &&
+            (expr_is_formal_derivative(cur) ||
+             (expr_is_var(cur) &&
+              !expr_struct_eq(cur, wrts[i])))) {
+            if (expr_is_formal_derivative(cur)) {
+                size_t order = expr_formal_derivative_order(cur);
+                expr_t **formal_wrts =
+                    calloc(order + 1u, sizeof(*formal_wrts));
+
+                if (!formal_wrts) {
+                    set_error(p, "out of memory");
+                    goto fail;
+                }
+                for (size_t j = 0u; j < order; ++j)
+                    formal_wrts[j] =
+                        (expr_t *)expr_formal_derivative_wrt_at(cur, j);
+                formal_wrts[order] = wrts[i];
+                next = expr_new_formal_derivative(
+                    expr_formal_derivative_dependent(cur),
+                    order + 1u,
+                    formal_wrts);
+                free(formal_wrts);
+            } else {
+                expr_t *formal_wrts[1] = { wrts[i] };
+
+                next = expr_new_formal_derivative(cur, 1u, formal_wrts);
+            }
+        } else {
+            next = expr_create_deriv(cur, wrts[i]);
+        }
 
         expr_free(cur);
         cur = next;
@@ -3373,6 +3407,7 @@ static expr_t *parse_expression_view_with_metadata(
     symtab_t *syms,
     const char *context_label,
     int report_errors,
+    bool preserve_formal_derivatives,
     bool *has_symbolic_derivative_out,
     bool *has_symbolic_integral_out,
     expr_bindings_t **symbolic_integral_bindings_out)
@@ -3394,6 +3429,7 @@ static expr_t *parse_expression_view_with_metadata(
     if (expr_parse_state_init(&ps, text, syms) != 0)
         return NULL;
     ps.report_errors = report_errors != 0;
+    ps.preserve_formal_derivatives = preserve_formal_derivatives;
 
     result = parse_addexpr(&ps);
     if (result && !ps.error) {
@@ -3433,7 +3469,8 @@ static expr_t *parse_expression_view(string_view_t text,
                                      int report_errors)
 {
     return parse_expression_view_with_metadata(
-        text, syms, context_label, report_errors, NULL, NULL, NULL);
+        text, syms, context_label, report_errors, false,
+        NULL, NULL, NULL);
 }
 
 /* ------------------------------------------------------------------ */
@@ -3629,6 +3666,7 @@ static expr_t *expr_from_string_view_impl(string_view_t source,
 
         expr_t *result = parse_expression_view_with_metadata(
             content, NULL, "expr_from_string", 0,
+            false,
             &has_symbolic_derivative,
             &has_symbolic_integral,
             &symbolic_integral_bindings);
@@ -3659,6 +3697,7 @@ static expr_t *expr_from_string_view_impl(string_view_t source,
             if (collect_implicit_symbols(content, &syms) == 0 && syms.count > 0) {
                 result = parse_expression_view_with_metadata(
                     content, &syms, "expr_from_string", 1,
+                    false,
                     &has_symbolic_derivative,
                     &has_symbolic_integral,
                     &symbolic_integral_bindings);
@@ -3749,6 +3788,7 @@ static expr_t *expr_from_string_view_impl(string_view_t source,
 
     expr_t *result = parse_expression_view_with_metadata(
         expr_view, &syms, "expr_from_string", 1,
+        false,
         &has_symbolic_derivative,
         &has_symbolic_integral,
         &symbolic_integral_bindings);
@@ -4077,10 +4117,12 @@ expr_t *expr_from_expression_string(const char *expr,
     return result;
 }
 
-expr_t *expr_from_expression_text(const string_t *expr,
-                                  const string_t *const *names,
-                                  expr_t *const *symbols,
-                                  size_t nsymbols)
+static expr_t *expr_from_expression_text_mode(
+    const string_t *expr,
+    const string_t *const *names,
+    expr_t *const *symbols,
+    size_t nsymbols,
+    bool preserve_formal_derivatives)
 {
     symtab_t syms;
     expr_t *result;
@@ -4119,10 +4161,35 @@ expr_t *expr_from_expression_text(const string_t *expr,
         }
     }
 
-    result = parse_expression_view(string_view_all(expr),
-                                   nsymbols ? &syms : NULL,
-                                   "expr_from_expression_text", 1);
+    result = parse_expression_view_with_metadata(
+        string_view_all(expr),
+        nsymbols ? &syms : NULL,
+        "expr_from_expression_text",
+        1,
+        preserve_formal_derivatives,
+        NULL,
+        NULL,
+        NULL);
     symtab_free(&syms);
     result = simplify_parsed_result(result);
     return result;
+}
+
+expr_t *expr_from_expression_text(const string_t *expr,
+                                  const string_t *const *names,
+                                  expr_t *const *symbols,
+                                  size_t nsymbols)
+{
+    return expr_from_expression_text_mode(
+        expr, names, symbols, nsymbols, false);
+}
+
+expr_t *expr_from_expression_text_formal(
+    const string_t *expr,
+    const string_t *const *names,
+    expr_t *const *symbols,
+    size_t nsymbols)
+{
+    return expr_from_expression_text_mode(
+        expr, names, symbols, nsymbols, true);
 }

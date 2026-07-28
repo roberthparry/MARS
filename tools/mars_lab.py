@@ -580,14 +580,15 @@ LAB_DESCRIPTION = os.environ.get(
 ).strip() or "Explore MARS mathematics with rendered TeX."
 LAB_SUBTITLE = os.environ.get(
     "MARS_LAB_SUBTITLE",
-    "Switch between expression, equation, matrix, integrator, and datetime experiments. Each mode runs through a local MARS scratch binary and shows the result on the right.",
-).strip() or "Switch between expression, equation, matrix, integrator, and datetime experiments. Each mode runs through a local MARS scratch binary and shows the result on the right."
+    "Switch between expression, equation, differential-equation, matrix, integrator, datetime, and almanac experiments. Each mode runs through a local MARS scratch binary and shows the result on the right.",
+).strip() or "Switch between expression, equation, differential-equation, matrix, integrator, datetime, and almanac experiments. Each mode runs through a local MARS scratch binary and shows the result on the right."
 LAB_THEME = os.environ.get("MARS_LAB_THEME", "mars").strip().lower() or "mars"
 DEFAULT_SCRATCH_TARGET = os.environ.get("MARS_LAB_SCRATCH_TARGET", "scratch/mars_lab").strip() or "scratch/mars_lab"
 DEFAULT_BIN = ROOT / os.environ.get("MARS_LAB_BINARY", "build/release/scratch/mars_lab")
 DEFAULT_MATRIX_BIN = ROOT / "build" / "release" / "scratch" / "matrix_lab"
 DEFAULT_INTEGRATOR_BIN = ROOT / "build" / "release" / "scratch" / "integrator_lab"
 DEFAULT_EQUATION_BIN = ROOT / "build" / "release" / "scratch" / "equation_lab"
+DEFAULT_DIFFEQUATION_BIN = ROOT / "build" / "release" / "scratch" / "diffequation_lab"
 DEFAULT_DATETIME_BIN = ROOT / "build" / "release" / "scratch" / "datetime_lab"
 DEFAULT_ALMANAC_BIN = ROOT / "build" / "release" / "scratch" / "almanac_lab"
 DEFAULT_ALMANAC_EVENT_BIN = ROOT / "build" / "release" / "scratch" / "almanac_event_lab"
@@ -605,6 +606,7 @@ LAB_ICON_192_FILE = ROOT / "packaging" / "linux" / "icon-concepts" / "wizard-pri
 LAB_ICON_512_FILE = ROOT / "packaging" / "linux" / "icon-concepts" / "wizard-prism-512.png"
 DEFAULT_EXPRESSION = "{e^(sin(x))|x=pi/2}"
 DEFAULT_EQUATION = "{ x^2 + y^2 = 5 | x = 1, y = 1 }"
+DEFAULT_DIFFEQUATION = "Dx(y) = x*y; y(0) = 1"
 DEFAULT_EQUATION_VARIABLE = "x"
 DEFAULT_MATRIX = "(1, 2; 3, 4)"
 DEFAULT_MATRIX_OPERATION = "inverse"
@@ -3500,6 +3502,7 @@ __THEME_OVERRIDES__
       <div class="lab-tabs" role="tablist" aria-label="__LAB_NAME__ mode selector">
         <button class="mode-tab active" id="modeTabExpression" type="button" role="tab" aria-selected="true" aria-controls="workspacePanel" data-mode="expression">Expression</button>
         <button class="mode-tab" id="modeTabEquation" type="button" role="tab" aria-selected="false" aria-controls="workspacePanel" data-mode="equation">Equation</button>
+        <button class="mode-tab" id="modeTabDiffequation" type="button" role="tab" aria-selected="false" aria-controls="workspacePanel" data-mode="diffequation">Differential Equation</button>
         <button class="mode-tab" id="modeTabMatrix" type="button" role="tab" aria-selected="false" aria-controls="workspacePanel" data-mode="matrix">Matrix</button>
         <button class="mode-tab" id="modeTabIntegrator" type="button" role="tab" aria-selected="false" aria-controls="workspacePanel" data-mode="integrator">Integrator</button>
         <button class="mode-tab" id="modeTabDatetime" type="button" role="tab" aria-selected="false" aria-controls="workspacePanel" data-mode="datetime">Datetime</button>
@@ -3536,6 +3539,9 @@ __THEME_OVERRIDES__
       </div>
       <div class="mode-panel hidden" id="equationControls">
         <p class="mode-hint">Enter an equation such as <code>{ M = E - e*sin(E) | E = 1.5; M = 1.5, e = 0.0167 }</code>. Bindings after <code>|</code> decide which symbols are variables, which are constants, and which starting values numeric fallback should use.</p>
+      </div>
+      <div class="mode-panel hidden" id="diffequationControls">
+        <p class="mode-hint">Enter an ODE such as <code>Dx(y) = x*y; y(0) = 1</code>. Use repeated derivative letters for higher orders, for example <code>Dxxx(y)</code>, and separate initial or boundary conditions with semicolons.</p>
       </div>
       <div class="mode-panel hidden" id="integratorControls">
         <div class="integrator-bound-stack" id="integratorBoundStack"></div>
@@ -3813,16 +3819,27 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         </div>
       </div>
       <div class="help-pane hidden" id="helpPane">
-        <div class="help-card" data-help-modes="expression,equation,matrix,integrator,datetime,almanac">
+        <div class="help-card" data-help-modes="expression,equation,diffequation,matrix,integrator,datetime,almanac">
           <div class="help-kicker">Start Here</div>
           <p>MARS Lab works best when you type the mathematical object itself in the main editor, then use the controls underneath to tell the lab what kind of job you want.</p>
           <ul>
             <li><code>Expression</code>: type a formula, then set any variable values needed for numeric evaluation. Symbolic operations such as <code>Dx(...)</code> can run with their differentiation variables left blank.</li>
             <li><code>Equation</code>: type an equation and choose which variable to solve for.</li>
+            <li><code>Differential Equation</code>: type an ODE followed by optional semicolon-separated initial or boundary conditions.</li>
             <li><code>Matrix</code>: type a matrix expression and pick an operation.</li>
             <li><code>Integrator</code>: type the integrand, then add one row per variable you want to integrate over.</li>
             <li><code>Datetime</code>: choose dates, a year, and a location to calculate calendar and solar facts.</li>
             <li><code>Almanac</code>: choose a GMT moment and observer location to inspect navigational bodies, visibility, and local eclipse/transit events.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="diffequation">
+          <div class="help-kicker">Differential Equations</div>
+          <p>Derivative notation identifies the independent variable. Conditions are optional; without enough conditions, the solution retains arbitrary constants.</p>
+          <ul>
+            <li><code>Dx(y) = x*y; y(0) = 1</code> is a first-order initial-value problem.</li>
+            <li><code>Dxx(y) = y; y(0) = 1; y'(0) = 1</code> uses prime notation in a condition.</li>
+            <li><code>Dxxx(y) + 3*Dxx(y) + 3*Dx(y) + y = x + sin(x)</code> is a forced third-order constant-coefficient ODE.</li>
+            <li>The result cards show the normalized problem, solver family, diagnostic, and symbolic solutions.</li>
           </ul>
         </div>
         <div class="help-card" data-help-modes="datetime">
@@ -4021,7 +4038,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             <li>Beta distribution: <code>beta_pdf(x, a, b)</code>, <code>logbeta_pdf(x, a, b)</code>.</li>
           </ul>
         </div>
-        <div class="help-card" data-help-modes="expression,equation,matrix,integrator">
+        <div class="help-card" data-help-modes="expression,equation,diffequation,matrix,integrator">
           <h3>Shortcuts</h3>
           <ul>
             <li><code>Ctrl+Enter</code> evaluates whenever the <code>Evaluate</code> button is available.</li>
@@ -4046,6 +4063,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     const matrixOperand = document.getElementById('matrixOperand');
     const matrixOperandLabel = document.getElementById('matrixOperandLabel');
     const equationControls = document.getElementById('equationControls');
+    const diffequationControls = document.getElementById('diffequationControls');
     const equationVariable = null;
     const integratorControls = document.getElementById('integratorControls');
     const integratorBoundStack = document.getElementById('integratorBoundStack');
@@ -4188,6 +4206,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       return {
         expression: [],
         equation: [],
+        diffequation: [],
         matrix: [],
         integrator: [],
         datetime: [],
@@ -4200,6 +4219,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     const modeCommittedState = {
       expression: null,
       equation: null,
+      diffequation: null,
       matrix: null,
       integrator: null,
       datetime: null,
@@ -4224,6 +4244,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     const MODE_DEFAULT_PRECISION_BITS = {
       expression: 256,
       equation: 256,
+      diffequation: 256,
       matrix: 256,
       integrator: DOUBLE_PRECISION_BITS,
       datetime: DOUBLE_PRECISION_BITS,
@@ -4232,6 +4253,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     const modePrecisionBits = {
       expression: MODE_DEFAULT_PRECISION_BITS.expression,
       equation: MODE_DEFAULT_PRECISION_BITS.equation,
+      diffequation: MODE_DEFAULT_PRECISION_BITS.diffequation,
       matrix: MODE_DEFAULT_PRECISION_BITS.matrix,
       integrator: MODE_DEFAULT_PRECISION_BITS.integrator,
       datetime: MODE_DEFAULT_PRECISION_BITS.datetime,
@@ -4242,6 +4264,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     const COMPACT_BINDING_VALUE_KEEP = 16;
     const DEFAULT_EXPRESSION_TEXT = __DEFAULT_EXPRESSION__;
     const DEFAULT_EQUATION_TEXT = __DEFAULT_EQUATION__;
+    const DEFAULT_DIFFEQUATION_TEXT = __DEFAULT_DIFFEQUATION__;
     const DEFAULT_EQUATION_VARIABLE_TEXT = __DEFAULT_EQUATION_VARIABLE__;
     const DEFAULT_MATRIX_TEXT = __DEFAULT_MATRIX__;
     const DEFAULT_INTEGRATOR_TEXT = __DEFAULT_INTEGRATOR__;
@@ -4280,6 +4303,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     const modeEditorText = {
       expression: DEFAULT_EXPRESSION_TEXT,
       equation: DEFAULT_EQUATION_TEXT,
+      diffequation: DEFAULT_DIFFEQUATION_TEXT,
       matrix: DEFAULT_MATRIX_TEXT,
       integrator: DEFAULT_INTEGRATOR_TEXT,
       datetime: DEFAULT_DATETIME_TEXT,
@@ -4288,6 +4312,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     const modeResultState = {
       expression: null,
       equation: null,
+      diffequation: null,
       matrix: null,
       integrator: null,
       datetime: null,
@@ -4398,7 +4423,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     }
 
     function setMode(mode, options = {}) {
-      const nextMode = mode === 'equation' || mode === 'matrix' || mode === 'integrator' || mode === 'datetime' || mode === 'almanac'
+      const nextMode = mode === 'equation' || mode === 'diffequation' || mode === 'matrix' || mode === 'integrator' || mode === 'datetime' || mode === 'almanac'
         ? mode
         : 'expression';
       const changed = nextMode !== currentLabMode;
@@ -4418,6 +4443,10 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       else if (mode === 'equation') {
         modeEditorText.equation = currentExpressionText() || expr.value.trim() || modeEditorText.equation;
         saveLastEquationState();
+      }
+      else if (mode === 'diffequation') {
+        modeEditorText.diffequation = currentExpressionText() || expr.value.trim() || modeEditorText.diffequation;
+        saveLastDiffequationState();
       }
       else if (mode === 'matrix') {
         modeEditorText.matrix = currentExpressionText() || expr.value.trim() || modeEditorText.matrix;
@@ -4439,6 +4468,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         setExpressionEditor(modeEditorText.expression || DEFAULT_EXPRESSION_TEXT);
       } else if (mode === 'equation') {
         setExpressionEditor(modeEditorText.equation || DEFAULT_EQUATION_TEXT);
+      } else if (mode === 'diffequation') {
+        setExpressionEditor(modeEditorText.diffequation || DEFAULT_DIFFEQUATION_TEXT);
       } else if (mode === 'matrix') {
         const text = modeEditorText.matrix || DEFAULT_MATRIX_TEXT;
         if (bindingParts(text))
@@ -4605,6 +4636,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       const mode = currentMode();
       const expressionMode = mode === 'expression';
       const equationMode = mode === 'equation';
+      const diffequationMode = mode === 'diffequation';
       const matrixMode = mode === 'matrix';
       const integratorMode = mode === 'integrator';
       const datetimeMode = mode === 'datetime';
@@ -4614,6 +4646,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       document.body.classList.toggle('almanac-mode', almanacMode);
       matrixControls.classList.toggle('hidden', !matrixMode);
       equationControls.classList.toggle('hidden', !equationMode);
+      diffequationControls.classList.toggle('hidden', !diffequationMode);
       integratorControls.classList.toggle('hidden', !integratorMode);
       datetimeControls.classList.toggle('hidden', !datetimeMode);
       almanacControls.classList.toggle('hidden', !almanacMode);
@@ -4625,7 +4658,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
 
       if (expressionMode) {
         leftPaneTitle.textContent = 'Expression';
-        subtitle.textContent = 'Switch between expression, equation, matrix, and integrator experiments. Each mode runs through a local MARS scratch binary and shows the result on the right.';
+        subtitle.textContent = 'Switch between expression, equation, differential-equation, matrix, and integrator experiments. Each mode runs through a local MARS scratch binary and shows the result on the right.';
         setResultTitles('Rendered TeX', 'Expression', 'Function', 'Value');
         setAuxResultCardsVisible(true);
         setValueCardVisible(true);
@@ -4633,6 +4666,12 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         leftPaneTitle.textContent = 'Equation';
         subtitle.textContent = 'Enter an equation on the left. The lab tries symbolic isolation first, then numeric solving for all variable bindings.';
         setResultTitles('Rendered TeX', 'Equation', 'Function', 'Solutions');
+        setAuxResultCardsVisible(true);
+        setValueCardVisible(true);
+      } else if (diffequationMode) {
+        leftPaneTitle.textContent = 'Differential Equation';
+        subtitle.textContent = 'Enter an ordinary differential equation and optional initial or boundary conditions. MARS selects a symbolic solver family and preserves arbitrary constants when conditions are absent.';
+        setResultTitles('Solution', 'Differential Equation', 'Solver', 'Solutions');
         setAuxResultCardsVisible(true);
         setValueCardVisible(true);
       } else if (matrixMode) {
@@ -5894,7 +5933,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     }
 
     function applyUpdatedBindingExpression(updated) {
-      if (currentMode() === 'expression' || currentMode() === 'equation') {
+      if (currentMode() === 'expression' || currentMode() === 'equation' || currentMode() === 'diffequation') {
         setExpressionEditor(updated);
         return;
       }
@@ -6010,6 +6049,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         saveLastExpression(currentExpressionText() || expr.value.trim());
       else if (currentMode() === 'equation')
         saveLastEquationState();
+      else if (currentMode() === 'diffequation')
+        saveLastDiffequationState();
       else if (currentMode() === 'matrix')
         saveLastMatrixState();
       else
@@ -6816,7 +6857,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
 
     function validLabMode(value) {
       const mode = String(value || '').trim();
-      return mode === 'equation' || mode === 'matrix' || mode === 'integrator' || mode === 'datetime' || mode === 'almanac' ? mode : 'expression';
+      return mode === 'equation' || mode === 'diffequation' || mode === 'matrix' || mode === 'integrator' || mode === 'datetime' || mode === 'almanac' ? mode : 'expression';
     }
 
     function applySavedState(data) {
@@ -6833,6 +6874,10 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       const savedEquation = String(data.equation || '').trim();
       if (savedEquation && !savedEquation.includes('...'))
         modeEditorText.equation = expressionWithSortedConstants(savedEquation);
+
+      const savedDiffequation = String(data.diffequation || '').trim();
+      if (savedDiffequation && !savedDiffequation.includes('...'))
+        modeEditorText.diffequation = savedDiffequation;
 
       const savedEquationVariable = String(data.equation_variable || '').trim();
       if (equationVariable)
@@ -6954,6 +6999,9 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         const equationText = localStorage.getItem('mars.exprLab.lastEquation');
         if (equationText && !equationText.includes('...'))
           modeEditorText.equation = expressionWithSortedConstants(equationText);
+        const diffequationText = localStorage.getItem('mars.exprLab.lastDiffequation');
+        if (diffequationText && !diffequationText.includes('...'))
+          modeEditorText.diffequation = diffequationText;
         const equationVariableText = localStorage.getItem('mars.exprLab.lastEquationVariable');
         if (equationVariable && equationVariableText)
           equationVariable.value = equationVariableText;
@@ -7121,6 +7169,24 @@ __HOLIDAY_JURISDICTION_OPTIONS__
 
       saveLabState({
         equation: text,
+        precision_bits: modePrecisionBits
+      });
+    }
+
+    function saveLastDiffequationState() {
+      const text = String(currentExpressionText() || expr.value || '').trim();
+      if (text)
+        modeEditorText.diffequation = text;
+
+      try {
+        if (text)
+          localStorage.setItem('mars.exprLab.lastDiffequation', text);
+      } catch (_) {
+        // The lab still works fine without persistence.
+      }
+
+      saveLabState({
+        diffequation: text,
         precision_bits: modePrecisionBits
       });
     }
@@ -7354,6 +7420,10 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     async function evaluateCurrentMode(options = {}) {
       if (currentMode() === 'equation') {
         await evaluateEquation(options);
+        return;
+      }
+      if (currentMode() === 'diffequation') {
+        await evaluateDiffequation(options);
         return;
       }
       if (currentMode() === 'matrix') {
@@ -7910,6 +7980,21 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
           equation: equationText,
+          precision: requestedValuePrecision()
+        })
+      });
+      const data = await response.json();
+      return {response, data};
+    }
+
+    async function fetchDiffequationEvaluation() {
+      saveLastDiffequationState();
+      const diffequationText = currentExpressionText() || expr.value.trim();
+      const response = await fetch('/diffequation-eval', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          diffequation: diffequationText,
           precision: requestedValuePrecision()
         })
       });
@@ -8594,7 +8679,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
 
       clearGoalSeekRequest();
       hideTargetEntry();
-      if (currentMode() === 'equation')
+      if (currentMode() === 'equation' || currentMode() === 'diffequation')
         setExpressionEditor(resultText);
       else if (!await applyMarsBindingExpression(resultText))
         return;
@@ -9377,6 +9462,75 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       }
     }
 
+    async function evaluateDiffequation(options = {}) {
+      const text = String(currentExpressionText() || expr.value || '').trim();
+      const nextState = historyStateForMode(currentMode(), text);
+      const previousState = !options.skipHistoryUpdate
+        ? previousModeStateForHistory(nextState)
+        : null;
+      if (!text)
+        return;
+      showResults();
+      setBusy(true);
+      setStatus('Solving differential equation...');
+      try {
+        if (previousState)
+          pushExpressionHistory(previousState);
+        const {response, data} = await fetchDiffequationEvaluation();
+        if (!response.ok || !data.ok) {
+          setRenderedError(data.error || 'Differential-equation solving failed');
+          resetMoreDigitsButton(renderedMore, false);
+          clearResultDetails({keepBindings: true});
+          commitModeState();
+          setStatus('Error');
+          return;
+        }
+
+        clearResultDetails({keepBindings: true});
+        clearRenderedError();
+        lastTex = data.solutions_tex || data.problem_tex || '';
+        rendered.dataset.displayTex = lastTex;
+        rendered.dataset.fullTex = lastTex;
+        rendered.dataset.displaySvg = data.svg || '';
+        rendered.dataset.fullSvg = '';
+        rendered.dataset.renderError = data.render_error || '';
+        setRenderedContent(
+          data.svg || '',
+          data.render_error || lastTex || data.diagnostic || 'No symbolic solution available'
+        );
+        resetMoreDigitsButton(renderedMore, false);
+        setExpandableText(parsed, parsedMore, data.problem || text, data.problem || text);
+        setResultInputText(data.input || text);
+        const solverDetails = [
+          data.solver ? `solver: ${data.solver}` : '',
+          data.status ? `status: ${data.status}` : '',
+          data.diagnostic || ''
+        ].filter(Boolean).join('\n');
+        setExpandableText(functionStyle, functionMore, solverDetails, solverDetails);
+        functionStyle.classList.remove('equation-function');
+        value.textContent = data.solutions || data.diagnostic || data.status || '';
+        setValueCardVisible(true);
+        clearVariableValues();
+        modeEditorText.diffequation = text;
+        saveLastDiffequationState();
+        currentVariables = [];
+        currentDifferentiable = false;
+        renderDerivativeButtons(currentVariables);
+        commitModeState();
+        setStatus(data.status === 'solved' ? 'Ready' : 'Not solved');
+      } catch (err) {
+        setRenderedError(String(err));
+        resetMoreDigitsButton(renderedMore, false);
+        clearResultDetails({keepBindings: true});
+        commitModeState();
+        setStatus('Error');
+      } finally {
+        setBusy(false);
+        if (!options.skipHistoryUpdate)
+          updateHistoryButtons();
+      }
+    }
+
     async function evaluateIntegrator(options = {}) {
       commitVisibleBindingInputs();
       const text = currentExpressionText() || expr.value.trim();
@@ -9633,6 +9787,10 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       }
       if (currentMode() === 'equation') {
         evaluateEquation();
+        return;
+      }
+      if (currentMode() === 'diffequation') {
+        evaluateDiffequation();
         return;
       }
       if (currentMode() === 'integrator') {
@@ -9924,6 +10082,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       clearForwardHistory();
       if (currentMode() === 'equation')
         evaluateEquation();
+      else if (currentMode() === 'diffequation')
+        evaluateDiffequation();
       else if (currentMode() === 'matrix')
         evaluateMatrix();
       else if (currentMode() === 'integrator')
@@ -9941,6 +10101,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           evaluateFromKeyboard();
         else if (currentMode() === 'equation')
           evaluateEquation();
+        else if (currentMode() === 'diffequation')
+          evaluateDiffequation();
         else if (currentMode() === 'matrix')
           evaluateMatrix();
         else if (currentMode() === 'integrator')
@@ -9964,6 +10126,14 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           expr.dataset.displayExpression = displayedExpressionText;
         }
         refreshVariableValuesFromEditor();
+        updateHistoryButtons();
+        return;
+      }
+      if (currentMode() === 'diffequation') {
+        fullExpressionText = expr.value.trim();
+        displayedExpressionText = expr.value.trim();
+        expr.dataset.fullExpression = fullExpressionText;
+        expr.dataset.displayExpression = displayedExpressionText;
         updateHistoryButtons();
         return;
       }
@@ -10291,6 +10461,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         }
         else if (currentMode() === 'equation')
           await evaluateEquation();
+        else if (currentMode() === 'diffequation')
+          await evaluateDiffequation();
         else if (currentMode() === 'matrix')
           await evaluateMatrix();
         else
@@ -10320,6 +10492,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         }
         else if (currentMode() === 'equation')
           await evaluateEquation();
+        else if (currentMode() === 'diffequation')
+          await evaluateDiffequation();
         else if (currentMode() === 'matrix')
           await evaluateMatrix();
         else
@@ -10455,6 +10629,7 @@ def default_state() -> dict[str, object]:
     return {
         "expression": DEFAULT_EXPRESSION,
         "equation": DEFAULT_EQUATION,
+        "diffequation": DEFAULT_DIFFEQUATION,
         "equation_variable": DEFAULT_EQUATION_VARIABLE,
         "matrix": DEFAULT_MATRIX,
         "lab_mode": "expression",
@@ -10486,6 +10661,7 @@ def default_state() -> dict[str, object]:
         "precision_bits": {
             "expression": 256,
             "equation": 256,
+            "diffequation": 256,
             "matrix": 256,
             "integrator": 17,
             "datetime": 17,
@@ -10535,7 +10711,7 @@ def load_state_data() -> dict[str, object]:
         state["matrix"] = DEFAULT_MATRIX
 
     lab_mode = str(state.get("lab_mode", "")).strip()
-    if lab_mode not in {"expression", "equation", "matrix", "integrator", "datetime", "almanac"}:
+    if lab_mode not in {"expression", "equation", "diffequation", "matrix", "integrator", "datetime", "almanac"}:
         state["lab_mode"] = "expression"
 
     equation = str(state.get("equation", "")).strip()
@@ -10547,6 +10723,10 @@ def load_state_data() -> dict[str, object]:
     equation_variable = str(state.get("equation_variable", "")).strip()
     if not equation_variable:
         state["equation_variable"] = DEFAULT_EQUATION_VARIABLE
+
+    diffequation = str(state.get("diffequation", "")).strip()
+    if not diffequation or "..." in diffequation:
+        state["diffequation"] = DEFAULT_DIFFEQUATION
 
     matrix_operation = str(state.get("matrix_operation", "")).strip()
     if matrix_operation not in {
@@ -10656,6 +10836,10 @@ def save_state_data(updates: dict[str, object]) -> None:
         normalized["equation"] = expression_with_sorted_constants(
             str(normalized.get("equation") or "").strip()
         )
+    if "diffequation" in normalized:
+        normalized["diffequation"] = str(
+            normalized.get("diffequation") or ""
+        ).strip()
     if "integrator_expression" in normalized:
         normalized["integrator_expression"] = expression_with_sorted_constants(
             str(normalized.get("integrator_expression") or "").strip()
@@ -11783,6 +11967,23 @@ def parse_equation_lab_output(output: str) -> dict[str, str]:
     )
 
 
+def parse_diffequation_lab_output(output: str) -> dict[str, str]:
+    return parse_keyed_output(
+        output,
+        {
+            "input": r"^input\s+(.*)$",
+            "problem": r"^problem\s+(.*)$",
+            "problem_tex": r"^problem_tex\s*(.*)$",
+            "status": r"^status\s+(.*)$",
+            "solver": r"^solver\s+(.*)$",
+            "diagnostic": r"^diagnostic\s*(.*)$",
+            "solutions": r"^solutions\s+(.*)$",
+            "solutions_tex": r"^solutions_tex\s*(.*)$",
+        },
+        {"problem_tex", "solutions", "solutions_tex"},
+    )
+
+
 def parse_datetime_lab_output(output: str) -> dict[str, str]:
     return parse_keyed_output(
         output,
@@ -12758,6 +12959,23 @@ def run_equation_lab_fields(
     return parse_equation_lab_output(raw), raw, completed.returncode
 
 
+def run_diffequation_lab_fields(
+    binary: Path,
+    diffequation_text: str,
+) -> tuple[dict[str, str], str, int]:
+    completed = subprocess.run(
+        [str(binary), diffequation_text],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        timeout=10,
+    )
+    raw = completed.stdout
+    if completed.stderr:
+        raw = raw + ("\n" if raw else "") + completed.stderr
+    return parse_diffequation_lab_output(raw), raw, completed.returncode
+
+
 def run_datetime_lab_fields(
     binary: Path,
     options: dict[str, str],
@@ -13514,6 +13732,34 @@ def prepare_equation_fields(fields: dict[str, str], precision: int) -> dict[str,
         "full_display_tex": render_tex,
         "display_tex": display_tex,
         "binding_values": expression_variable_binding_values(source_equation_text or equation_text, precision),
+    }
+    if svg:
+        payload["svg"] = svg
+    elif render_error:
+        payload["render_error"] = render_error
+    return payload
+
+
+def prepare_diffequation_fields(fields: dict[str, str]) -> dict[str, object]:
+    solutions_tex = str(fields.get("solutions_tex") or "").strip()
+    problem_tex = str(fields.get("problem_tex") or "").strip()
+    render_tex = solutions_tex or problem_tex
+    svg = None
+    render_error = None
+    if render_tex:
+        svg, render_error = render_tex_to_svg(render_tex)
+
+    payload: dict[str, object] = {
+        "ok": True,
+        "mode": "diffequation",
+        "input": str(fields.get("input") or "").strip(),
+        "problem": str(fields.get("problem") or "").strip(),
+        "problem_tex": problem_tex,
+        "solutions": normalize_multiline_display_text(fields.get("solutions") or ""),
+        "solutions_tex": solutions_tex,
+        "status": str(fields.get("status") or "").strip(),
+        "solver": str(fields.get("solver") or "").strip(),
+        "diagnostic": str(fields.get("diagnostic") or "").strip(),
     }
     if svg:
         payload["svg"] = svg
@@ -14898,6 +15144,7 @@ def integrator_tex_for_display(tex: str) -> str:
 class MarsLabHandler(http.server.BaseHTTPRequestHandler):
     binary: Path = DEFAULT_BIN
     equation_binary: Path = DEFAULT_EQUATION_BIN
+    diffequation_binary: Path = DEFAULT_DIFFEQUATION_BIN
     matrix_binary: Path = DEFAULT_MATRIX_BIN
     integrator_binary: Path = DEFAULT_INTEGRATOR_BIN
     datetime_binary: Path = DEFAULT_DATETIME_BIN
@@ -15025,6 +15272,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
             .replace("__MOBILE_TAILSCALE_CLASS__", "" if mobile_details.get("tailscale") else "hidden")
             .replace("__DEFAULT_EXPRESSION__", json.dumps(DEFAULT_EXPRESSION))
             .replace("__DEFAULT_EQUATION__", json.dumps(DEFAULT_EQUATION))
+            .replace("__DEFAULT_DIFFEQUATION__", json.dumps(DEFAULT_DIFFEQUATION))
             .replace("__DEFAULT_EQUATION_VARIABLE__", json.dumps(DEFAULT_EQUATION_VARIABLE))
             .replace("__DEFAULT_MATRIX__", json.dumps(DEFAULT_MATRIX))
             .replace("__DEFAULT_INTEGRATOR__", json.dumps(DEFAULT_INTEGRATOR_EXPRESSION))
@@ -15093,12 +15341,16 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                     updates["matrix"] = matrix
 
                 lab_mode = str(payload.get("lab_mode", "")).strip()
-                if lab_mode in {"expression", "equation", "matrix", "integrator", "datetime", "almanac"}:
+                if lab_mode in {"expression", "equation", "diffequation", "matrix", "integrator", "datetime", "almanac"}:
                     updates["lab_mode"] = lab_mode
 
                 equation = str(payload.get("equation", "")).strip()
                 if equation and "..." not in equation:
                     updates["equation"] = equation
+
+                diffequation = str(payload.get("diffequation", "")).strip()
+                if diffequation and "..." not in diffequation:
+                    updates["diffequation"] = diffequation
 
                 equation_variable = str(payload.get("equation_variable", "")).strip()
                 if equation_variable:
@@ -15242,6 +15494,52 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                 "equation": equation_text,
             })
             self.send_json(200, prepare_equation_fields(fields, precision))
+            return
+
+        if path == "/diffequation-eval":
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                body = self.rfile.read(length)
+                payload = json.loads(body.decode("utf-8"))
+                diffequation_text = str(payload.get("diffequation", "")).strip()
+            except Exception as exc:
+                self.send_json(400, {"ok": False, "error": f"Bad request: {exc}"})
+                return
+
+            if not diffequation_text:
+                self.send_json(
+                    400,
+                    {"ok": False, "error": "Differential-equation input is empty"},
+                )
+                return
+
+            try:
+                ensure_scratch_binary(
+                    self.diffequation_binary,
+                    "scratch/diffequation_lab",
+                )
+                fields, raw, returncode = run_diffequation_lab_fields(
+                    self.diffequation_binary,
+                    diffequation_text,
+                )
+            except Exception as exc:
+                self.send_json(422, {"ok": False, "error": str(exc)})
+                return
+
+            if returncode != 0:
+                self.send_json(
+                    422,
+                    {
+                        "ok": False,
+                        "error": tidy_lab_error_text(
+                            raw or "Differential-equation solving failed"
+                        ),
+                    },
+                )
+                return
+
+            save_state_data({"diffequation": diffequation_text})
+            self.send_json(200, prepare_diffequation_fields(fields))
             return
 
         if path == "/matrix-eval":
@@ -16268,6 +16566,7 @@ def main() -> int:
     parser.add_argument("--browser", default="", help="browser executable to open the lab URL")
     parser.add_argument("--binary", type=Path, default=DEFAULT_BIN, help="path to the scratch lab binary")
     parser.add_argument("--equation-binary", type=Path, default=DEFAULT_EQUATION_BIN, help="path to the equation scratch binary")
+    parser.add_argument("--diffequation-binary", type=Path, default=DEFAULT_DIFFEQUATION_BIN, help="path to the differential-equation scratch binary")
     parser.add_argument("--datetime-binary", type=Path, default=DEFAULT_DATETIME_BIN, help="path to the datetime scratch binary")
     parser.add_argument("--almanac-binary", type=Path, default=DEFAULT_ALMANAC_BIN, help="path to the almanac scratch binary")
     parser.add_argument("--holiday-binary", type=Path, default=DEFAULT_HOLIDAY_BIN, help="path to the holiday scratch binary")
@@ -16275,6 +16574,7 @@ def main() -> int:
 
     binary = args.binary if args.binary.is_absolute() else ROOT / args.binary
     equation_binary = args.equation_binary if args.equation_binary.is_absolute() else ROOT / args.equation_binary
+    diffequation_binary = args.diffequation_binary if args.diffequation_binary.is_absolute() else ROOT / args.diffequation_binary
     datetime_binary = args.datetime_binary if args.datetime_binary.is_absolute() else ROOT / args.datetime_binary
     almanac_binary = args.almanac_binary if args.almanac_binary.is_absolute() else ROOT / args.almanac_binary
     holiday_binary = args.holiday_binary if args.holiday_binary.is_absolute() else ROOT / args.holiday_binary
@@ -16282,6 +16582,7 @@ def main() -> int:
 
     MarsLabHandler.binary = binary
     MarsLabHandler.equation_binary = equation_binary
+    MarsLabHandler.diffequation_binary = diffequation_binary
     MarsLabHandler.datetime_binary = datetime_binary
     MarsLabHandler.almanac_binary = almanac_binary
     MarsLabHandler.holiday_binary = holiday_binary

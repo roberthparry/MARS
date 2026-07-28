@@ -424,6 +424,16 @@ bool expr_match_mul_expr(const expr_t *expr,
     return true;
 }
 
+bool expr_match_div_expr(const expr_t *expr,
+                         const expr_t **left_out,
+                         const expr_t **right_out)
+{
+    if (!expr || !left_out || !right_out)
+        return false;
+    return expr_match_binary_op(
+        expr, EXPR_KIND_DIV, left_out, right_out);
+}
+
 static bool expr_collect_var_usage_impl(const expr_t *expr,
                                       size_t nvars,
                                       expr_t *const *vars,
