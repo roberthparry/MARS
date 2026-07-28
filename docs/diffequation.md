@@ -60,6 +60,24 @@ is normalized to the formal derivative notation used internally:
 y'(0) = 1  →  Dx(y)(0) = 1
 ```
 
+For ordinary differential equations in `x`, prime notation can also be used
+directly in the equation:
+
+```text
+y'' + 4y = e^x
+→ Dxx(y) + 4y = e^x
+→ y = ⅕·exp(x) + C₁·cos(2x) + C₂·sin(2x)
+```
+
+When `x` is the dependent variable, prime notation defaults to differentiation
+with respect to time so that the two variables do not collide:
+
+```text
+x'' + x = 0
+→ Dtt(x) + x = 0
+→ x = C₁·cos(t) + C₂·sin(t)
+```
+
 ## Mars Lab
 
 The **Differential Equation** tab accepts the same shorthand. Evaluation is a

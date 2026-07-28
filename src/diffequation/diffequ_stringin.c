@@ -311,6 +311,129 @@ static char *de_first_independent_name(const string_t *names)
     return de_trimmed_copy(text, length);
 }
 
+static char *de_first_declared_independent(const char *declarations)
+{
+    const char *equals;
+    const char *comma;
+    size_t length;
+
+    if (!declarations)
+        return NULL;
+    equals = strchr(declarations, '=');
+    comma = strchr(declarations, ',');
+    if (!equals || (comma && comma < equals))
+        return NULL;
+    length = (size_t)(equals - declarations);
+    return de_trimmed_copy(declarations, length);
+}
+
+static const char *de_prime_shorthand_independent(const char *equation)
+{
+    size_t i = 0u;
+
+    if (!equation)
+        return "x";
+
+    while (equation[i]) {
+        size_t name_start;
+        size_t name_end;
+
+        if (!(isalpha((unsigned char)equation[i]) ||
+              equation[i] == '_')) {
+            i++;
+            continue;
+        }
+        name_start = i++;
+        while (isalnum((unsigned char)equation[i]) ||
+               equation[i] == '_')
+            i++;
+        name_end = i;
+        if (equation[i] != '\'')
+            continue;
+        if (name_end - name_start == 1u &&
+            equation[name_start] == 'x')
+            return "t";
+        return "x";
+    }
+    return "x";
+}
+
+static char *de_normalize_prime_derivatives(const char *text,
+                                            const char *wrt)
+{
+    string_t *out;
+    char *result;
+    size_t i = 0u;
+
+    if (!text || !wrt || !*wrt)
+        return NULL;
+
+    out = string_new();
+    if (!out)
+        return NULL;
+
+    while (text[i]) {
+        size_t name_start;
+        size_t name_end;
+        size_t order_end;
+
+        if (!(isalpha((unsigned char)text[i]) || text[i] == '_')) {
+            if (string_append_char(out, text[i++]) != 0)
+                goto fail;
+            continue;
+        }
+
+        name_start = i++;
+        while (isalnum((unsigned char)text[i]) || text[i] == '_')
+            i++;
+        name_end = i;
+        while (text[i] == '\'')
+            i++;
+        order_end = i;
+
+        if (order_end == name_end) {
+            if (string_append_chars(
+                    out, text + name_start, name_end - name_start) != 0)
+                goto fail;
+            continue;
+        }
+
+        if (strlen(wrt) == 1u && isalpha((unsigned char)wrt[0])) {
+            if (string_append_char(out, 'D') != 0)
+                goto fail;
+            for (size_t order = name_end; order < order_end; ++order) {
+                if (string_append_char(out, wrt[0]) != 0)
+                    goto fail;
+            }
+        } else {
+            if (string_append_cstr(out, "D[") != 0)
+                goto fail;
+            for (size_t order = name_end; order < order_end; ++order) {
+                if ((order > name_end &&
+                     string_append_char(out, ',') != 0) ||
+                    string_append_cstr(out, wrt) != 0)
+                    goto fail;
+            }
+            if (string_append_char(out, ']') != 0)
+                goto fail;
+        }
+
+        if (string_append_char(out, '(') != 0 ||
+            string_append_chars(
+                out, text + name_start, name_end - name_start) != 0 ||
+            string_append_char(out, ')') != 0)
+            goto fail;
+    }
+
+    result = strdup(string_c_str(out));
+    string_free(out);
+    return result;
+
+fail:
+    string_free(out);
+    return NULL;
+}
+
 static char *de_normalize_prime_condition(const char *condition,
                                           const char *wrt)
 {
@@ -442,6 +565,14 @@ static char *de_expand_shorthand(const char *source)
     equation = de_trimmed_copy(
         trimmed,
         first_separator == SIZE_MAX ? length : first_separator);
+    if (equation) {
+        const char *wrt = de_prime_shorthand_independent(equation);
+        char *normalized =
+            de_normalize_prime_derivatives(equation, wrt);
+
+        free(equation);
+        equation = normalized;
+    }
     names = equation ? de_infer_independent_names(equation) : NULL;
     declarations = string_new();
     conditions = string_new();
@@ -910,6 +1041,8 @@ diffequ_t *de_from_string(const char *text)
 {
     de_parse_parts_t parts;
     char *expanded = NULL;
+    char *first_wrt = NULL;
+    char *normalized_equation = NULL;
     char *masked_lhs = NULL;
     char *masked_rhs = NULL;
     char *probe_text = NULL;
@@ -931,6 +1064,15 @@ diffequ_t *de_from_string(const char *text)
         return NULL;
     }
     free(expanded);
+    first_wrt = de_first_declared_independent(parts.independent);
+    normalized_equation = first_wrt
+        ? de_normalize_prime_derivatives(parts.equation, first_wrt)
+        : NULL;
+    if (!normalized_equation)
+        goto cleanup;
+    free(parts.equation);
+    parts.equation = normalized_equation;
+    normalized_equation = NULL;
     if (!de_split_equation(parts.equation, &base_lhs, &base_rhs))
         goto cleanup;
 
@@ -1004,6 +1146,8 @@ diffequ_t *de_from_string(const char *text)
     }
 
 cleanup:
+    free(normalized_equation);
+    free(first_wrt);
     expr_bindings_free(base_bindings);
     equ_free(base);
     equ_free(probe);

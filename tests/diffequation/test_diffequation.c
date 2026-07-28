@@ -281,6 +281,119 @@ static void test_diffequ_parses_ode_shorthand(void)
     de_free(de);
 }
 
+static void test_diffequ_parses_and_solves_prime_ode_shorthand(void)
+{
+    const char *source = "y'' + 4y = 0";
+    diffequ_t *de = de_from_string(source);
+    diffequ_t *explicit =
+        de_from_string("{ y'' + 4y = 0 | t = ?;; }");
+    diffequ_t *forced = de_from_string("y'' + 4y = e^x");
+    diffequ_t *time_dependent = de_from_string("x'' + x = 0");
+    diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
+    diffequ_solve_result_t *explicit_result =
+        explicit ? de_solve(explicit) : NULL;
+    diffequ_solve_result_t *forced_result =
+        forced ? de_solve(forced) : NULL;
+    diffequ_solve_result_t *time_dependent_result =
+        time_dependent ? de_solve(time_dependent) : NULL;
+    const equation_t *solution =
+        result ? de_solve_result_at(result, 0u) : NULL;
+    const equation_t *explicit_solution = explicit_result
+        ? de_solve_result_at(explicit_result, 0u)
+        : NULL;
+    const equation_t *forced_solution = forced_result
+        ? de_solve_result_at(forced_result, 0u)
+        : NULL;
+    const equation_t *time_dependent_solution = time_dependent_result
+        ? de_solve_result_at(time_dependent_result, 0u)
+        : NULL;
+    string_t *equation_text =
+        de ? equ_to_text(de_equation(de), style_UNBOUND) : NULL;
+    string_t *solution_text =
+        solution ? equ_to_text(solution, style_UNBOUND) : NULL;
+    string_t *explicit_equation_text = explicit
+        ? equ_to_text(de_equation(explicit), style_UNBOUND)
+        : NULL;
+    string_t *explicit_solution_text = explicit_solution
+        ? equ_to_text(explicit_solution, style_UNBOUND)
+        : NULL;
+    string_t *forced_equation_text = forced
+        ? equ_to_text(de_equation(forced), style_UNBOUND)
+        : NULL;
+    string_t *forced_solution_text = forced_solution
+        ? equ_to_text(forced_solution, style_UNBOUND)
+        : NULL;
+    string_t *time_dependent_equation_text = time_dependent
+        ? equ_to_text(de_equation(time_dependent), style_UNBOUND)
+        : NULL;
+    string_t *time_dependent_solution_text = time_dependent_solution
+        ? equ_to_text(time_dependent_solution, style_UNBOUND)
+        : NULL;
+
+    EXPECT_POINTER("parsed prime-notation ODE", de, true);
+    EXPECT_TEXT(
+        "normalized prime-notation ODE",
+        equation_text ? string_c_str(equation_text) : NULL,
+        "Dxx(y) + 4y = 0");
+    EXPECT_LONG(
+        "prime-notation solve status",
+        result ? (long)de_solve_result_status(result) : -1L,
+        (long)DE_SOLVE_STATUS_SOLVED);
+    EXPECT_TEXT(
+        "prime-notation solution",
+        solution_text ? string_c_str(solution_text) : NULL,
+        "y = C₁·cos(2x) + C₂·sin(2x)");
+    EXPECT_TEXT(
+        "prime notation uses the declared independent variable",
+        explicit_equation_text ? string_c_str(explicit_equation_text) : NULL,
+        "Dtt(y) + 4y = 0");
+    EXPECT_TEXT(
+        "declared-variable prime-notation solution",
+        explicit_solution_text ? string_c_str(explicit_solution_text) : NULL,
+        "y = C₁·cos(2t) + C₂·sin(2t)");
+    EXPECT_TEXT(
+        "prime notation accepts the standard constant e",
+        forced_equation_text ? string_c_str(forced_equation_text) : NULL,
+        "Dxx(y) + 4y = exp(x)");
+    EXPECT_LONG(
+        "exponential-forcing solve status",
+        forced_result ? (long)de_solve_result_status(forced_result) : -1L,
+        (long)DE_SOLVE_STATUS_SOLVED);
+    EXPECT_TEXT(
+        "compact exponential-forcing solution",
+        forced_solution_text ? string_c_str(forced_solution_text) : NULL,
+        "y = ⅕·exp(x) + C₁·cos(2x) + C₂·sin(2x)");
+    EXPECT_TEXT(
+        "prime x defaults to differentiation with respect to t",
+        time_dependent_equation_text
+            ? string_c_str(time_dependent_equation_text)
+            : NULL,
+        "Dtt(x) + x = 0");
+    EXPECT_TEXT(
+        "time-dependent prime-notation solution",
+        time_dependent_solution_text
+            ? string_c_str(time_dependent_solution_text)
+            : NULL,
+        "x = C₁·cos(t) + C₂·sin(t)");
+
+    string_free(time_dependent_solution_text);
+    string_free(time_dependent_equation_text);
+    string_free(forced_solution_text);
+    string_free(forced_equation_text);
+    string_free(explicit_solution_text);
+    string_free(explicit_equation_text);
+    string_free(solution_text);
+    string_free(equation_text);
+    de_solve_result_free(time_dependent_result);
+    de_solve_result_free(forced_result);
+    de_solve_result_free(explicit_result);
+    de_solve_result_free(result);
+    de_free(time_dependent);
+    de_free(forced);
+    de_free(explicit);
+    de_free(de);
+}
+
 static void test_diffequ_rejects_noncanonical_text(void)
 {
     diffequ_t *missing_derivative = de_from_string("y = 1");
@@ -1477,23 +1590,23 @@ static void test_diffequ_general_nonhomogeneous_solution(void)
 {
     EXPECT_CONSTANT_LINEAR_SOLUTION(
         "Dxx(y) - y = exp(2*x)",
-        "y = ⅓·(exp(2x) + 3C₁·exp(x) + 3C₂·exp(-x))");
+        "y = ⅓·exp(2x) + C₁·exp(x) + C₂·exp(-x)");
 }
 
 static void test_diffequ_general_trigonometric_forcing_solution(void)
 {
     EXPECT_CONSTANT_LINEAR_SOLUTION(
         "Dxx(y) + y = cos(2*x)",
-        "y = ⅙·(6C₁·cos(x) + 6C₂·sin(x) + "
-        "sin(x)·(sin(3x) - 3·sin(-x)) - "
-        "cos(x)·(3·cos(-x) - cos(3x)))");
+        "y = ⅙·(sin(x)·(sin(3x) - 3·sin(-x)) - "
+        "cos(x)·(3·cos(-x) - cos(3x))) + "
+        "C₁·cos(x) + C₂·sin(x)");
 }
 
 static void test_diffequ_general_third_order_forced_solution(void)
 {
     EXPECT_CONSTANT_LINEAR_SOLUTION(
         "Dxxx(y) - Dx(y) = exp(2*x)",
-        "y = ⅙·(exp(2x) + 6C₂ + 6C₁·exp(x) + 6C₃·exp(-x))");
+        "y = ⅙·exp(2x) + C₁·exp(x) + C₂ + C₃·exp(-x)");
 }
 
 /*
@@ -1542,6 +1655,7 @@ int tests_main(void)
     RUN_TEST_CASE(test_diffequ_parses_linear_ode_and_constant);
     RUN_TEST_CASE(test_diffequ_expression_text_round_trips);
     RUN_TEST_CASE(test_diffequ_parses_ode_shorthand);
+    RUN_TEST_CASE(test_diffequ_parses_and_solves_prime_ode_shorthand);
     RUN_TEST_CASE(test_diffequ_rejects_noncanonical_text);
     RUN_TEST_CASE(test_diffequ_solves_separable_initial_value_problem);
     RUN_TEST_CASE(test_diffequ_solves_linear_initial_value_problem);

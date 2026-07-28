@@ -140,6 +140,62 @@ class DiffequationResultTests(unittest.TestCase):
         self.assertIn(r"\begin{aligned}", payload["solutions_tex"])
         self.assertIn("y(0) = 1", payload["problem"])
 
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
+    def test_native_helper_accepts_prime_ode_notation(self) -> None:
+        completed = subprocess.run(
+            [
+                str(
+                    ROOT
+                    / "build"
+                    / "release"
+                    / "scratch"
+                    / "diffequation_lab"
+                ),
+                "y'' + 4y = e^x",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
+        payload = mars_lab.prepare_diffequation_fields(fields)
+
+        self.assertEqual(payload["status"], "solved")
+        self.assertIn("Dxx(y) + 4y = e^x", payload["problem"])
+        self.assertEqual(
+            payload["solutions"],
+            "y = ⅕·exp(x) + C₁·cos(2x) + C₂·sin(2x)",
+        )
+
+        completed = subprocess.run(
+            [
+                str(
+                    ROOT
+                    / "build"
+                    / "release"
+                    / "scratch"
+                    / "diffequation_lab"
+                ),
+                "x'' + x = 0",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
+        payload = mars_lab.prepare_diffequation_fields(fields)
+
+        self.assertEqual(payload["status"], "solved")
+        self.assertIn("Dtt(x) + x = 0", payload["problem"])
+        self.assertEqual(
+            payload["solutions"],
+            "x = C₁·cos(t) + C₂·sin(t)",
+        )
+
 
 class ExpressionResultTests(unittest.TestCase):
     @property
