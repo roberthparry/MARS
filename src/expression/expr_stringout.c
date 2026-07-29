@@ -482,7 +482,9 @@ static int pow_base_needs_visible_parens(const expr_t *base)
     number_t real;
     int has_real_part;
 
-    if (base && (expr_is_pow_d_expr(base) || expr_is_op(base, &ops_pow)))
+    if (base && (expr_is_formal_derivative(base) ||
+                 expr_is_pow_d_expr(base) ||
+                 expr_is_op(base, &ops_pow)))
         return 1;
 
     if (base && expr_is_const(base) &&
@@ -965,6 +967,22 @@ static void emit_formal_derivative_tex(const expr_t *f, sbuf_t *b)
         emit_tex_name(b, (wrt && wrt->name) ? wrt->name : "x");
     }
     sbuf_puts(b, "}\\left(");
+    emit_tex_expr(f->a, b, PREC_LOWEST);
+    sbuf_puts(b, "\\right)");
+}
+
+static void emit_arbitrary_function_expr(const expr_t *f, sbuf_t *b)
+{
+    emit_name(b, f->name ? f->name : "F");
+    sbuf_putc(b, '(');
+    emit_expr(f->a, b, PREC_LOWEST);
+    sbuf_putc(b, ')');
+}
+
+static void emit_arbitrary_function_tex(const expr_t *f, sbuf_t *b)
+{
+    emit_tex_name(b, f->name ? f->name : "F");
+    sbuf_puts(b, "\\left(");
     emit_tex_expr(f->a, b, PREC_LOWEST);
     sbuf_puts(b, "\\right)");
 }
@@ -2350,6 +2368,10 @@ void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec)
         emit_formal_derivative_tex(f, b);
         return;
     }
+    if (expr_is_arbitrary_function(f)) {
+        emit_arbitrary_function_tex(f, b);
+        return;
+    }
 
     if (expr_is_const(f) || expr_is_var(f)) {
         emit_tex_atom(f, b);
@@ -2468,7 +2490,9 @@ void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec)
 
         const char *unary_name = f->a->ops->arity == EXPR_OP_UNARY
             ? tex_unary_name(f->a) : NULL;
-        if (f->a->ops->arity == EXPR_OP_UNARY && !expr_is_neg(f->a) &&
+        if (f->a->ops->arity == EXPR_OP_UNARY &&
+            !expr_is_formal_derivative(f->a) &&
+            !expr_is_neg(f->a) &&
             !expr_is_sqrt_expr(f->a) &&
             !expr_is_op(f->a, &ops_abs) &&
             !strchr(unary_name ? unary_name : "", '^')) {
@@ -2720,6 +2744,20 @@ void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec)
     }
 
     if (f->ops->arity == EXPR_OP_BINARY) {
+        if (expr_is_op(f, &ops_indexed_symbol)) {
+            emit_tex_expr(f->a, b, 0);
+            sbuf_puts(b, "_{");
+            emit_tex_expr(f->b, b, 0);
+            sbuf_putc(b, '}');
+            return;
+        }
+        if (expr_is_op(f, &ops_summation)) {
+            sbuf_puts(b, "\\sum_{");
+            emit_tex_expr(f->b, b, 0);
+            sbuf_puts(b, "=0}^{\\infty}");
+            emit_tex_expr(f->a, b, PREC_MUL);
+            return;
+        }
         if (expr_has_polygamma_order(f)) {
             emit_tex_polygamma(f, b);
             return;
@@ -2759,6 +2797,10 @@ void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
 
     if (expr_is_formal_derivative(f)) {
         emit_formal_derivative_expr(f, b);
+        return;
+    }
+    if (expr_is_arbitrary_function(f)) {
+        emit_arbitrary_function_expr(f, b);
         return;
     }
 
@@ -2879,7 +2921,9 @@ void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
         /* For unary functions raised to a power, write func²(arg)
          * rather than func(arg)² so the exponent binds to the function name.
          * Floor/ceiling keep their mathematical brackets: ⌊x⌋². */
-        if (f->a->ops->arity == EXPR_OP_UNARY && !expr_is_neg(f->a)) {
+        if (f->a->ops->arity == EXPR_OP_UNARY &&
+            !expr_is_formal_derivative(f->a) &&
+            !expr_is_neg(f->a)) {
             expr_t *inner = f->a;
             if (expr_is_op(inner, &ops_floor) || expr_is_op(inner, &ops_ceil)) {
                 emit_expr(inner, b, PREC_POW);
@@ -3133,6 +3177,20 @@ void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
 
     /* Named binary functions (e.g. atan2) */
     if (f->ops->arity == EXPR_OP_BINARY) {
+        if (expr_is_op(f, &ops_indexed_symbol)) {
+            emit_expr(f->a, b, 0);
+            sbuf_puts(b, "_(");
+            emit_expr(f->b, b, 0);
+            sbuf_putc(b, ')');
+            return;
+        }
+        if (expr_is_op(f, &ops_summation)) {
+            sbuf_puts(b, "Σ_(");
+            emit_expr(f->b, b, 0);
+            sbuf_puts(b, "=0)^∞ ");
+            emit_expr(f->a, b, PREC_MUL);
+            return;
+        }
         if (expr_has_polygamma_order(f)) {
             emit_expr_polygamma(f, b);
             return;
@@ -3176,6 +3234,10 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
 
     if (expr_is_formal_derivative(f)) {
         emit_formal_derivative_expr(f, b);
+        return;
+    }
+    if (expr_is_arbitrary_function(f)) {
+        emit_arbitrary_function_expr(f, b);
         return;
     }
 
@@ -3366,6 +3428,22 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
 
     /* Named binary functions (e.g. atan2) */
     if (f->ops->arity == EXPR_OP_BINARY) {
+        if (expr_is_op(f, &ops_indexed_symbol)) {
+            sbuf_puts(b, "indexed(");
+            emit_func(f->a, b, 0);
+            sbuf_puts(b, ", ");
+            emit_func(f->b, b, 0);
+            sbuf_putc(b, ')');
+            return;
+        }
+        if (expr_is_op(f, &ops_summation)) {
+            sbuf_puts(b, "sum(");
+            emit_func(f->a, b, 0);
+            sbuf_puts(b, ", ");
+            emit_func(f->b, b, 0);
+            sbuf_puts(b, ", 0, @inf)");
+            return;
+        }
         if (expr_has_polygamma_order(f)) {
             emit_func_polygamma(f, b);
             return;

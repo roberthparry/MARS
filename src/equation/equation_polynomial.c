@@ -13,7 +13,7 @@
 static void equ_poly_init(number_t *poly, size_t count)
 {
     for (size_t i = 0u; i < count; ++i)
-        poly[i] = num_new();
+        poly[i] = num_clone(NUM_ZERO);
 }
 
 static void equ_poly_destroy(number_t *poly, size_t count)
@@ -46,7 +46,7 @@ static void equ_poly_zero(number_t *poly, size_t count)
 {
     for (size_t i = 0u; i < count; ++i) {
         num_destroy(&poly[i]);
-        poly[i] = num_new();
+        poly[i] = num_clone(NUM_ZERO);
     }
 }
 

@@ -908,17 +908,21 @@ static bool de_extract_condition_point(const char *lhs,
 static int de_append_condition(diffequ_t *de,
                                equation_t *condition,
                                string_t *text,
-                               expr_t *point)
+                               expr_t **points,
+                               size_t point_count)
 {
     size_t count = de->condition_count + 1u;
     equation_t **conditions = malloc(count * sizeof(*conditions));
     string_t **texts = malloc(count * sizeof(*texts));
-    expr_t **points = malloc(count * sizeof(*points));
+    expr_t ***condition_points =
+        malloc(count * sizeof(*condition_points));
+    size_t *point_counts = malloc(count * sizeof(*point_counts));
 
-    if (!conditions || !texts || !points) {
+    if (!conditions || !texts || !condition_points || !point_counts) {
         free(conditions);
         free(texts);
-        free(points);
+        free(condition_points);
+        free(point_counts);
         return -1;
     }
 
@@ -929,21 +933,104 @@ static int de_append_condition(diffequ_t *de,
         memcpy(texts,
                de->condition_texts,
                de->condition_count * sizeof(*texts));
-        memcpy(points,
+        memcpy(condition_points,
                de->condition_points,
-               de->condition_count * sizeof(*points));
+               de->condition_count * sizeof(*condition_points));
+        memcpy(point_counts,
+               de->condition_point_counts,
+               de->condition_count * sizeof(*point_counts));
     }
     free(de->conditions);
     free(de->condition_texts);
     free(de->condition_points);
+    free(de->condition_point_counts);
     de->conditions = conditions;
     de->condition_texts = texts;
-    de->condition_points = points;
+    de->condition_points = condition_points;
+    de->condition_point_counts = point_counts;
     de->conditions[de->condition_count] = condition;
     de->condition_texts[de->condition_count] = text;
-    de->condition_points[de->condition_count] = point;
+    de->condition_points[de->condition_count] = points;
+    de->condition_point_counts[de->condition_count] = point_count;
     de->condition_count = count;
     return 0;
+}
+
+static void de_free_condition_points(expr_t **points, size_t count)
+{
+    for (size_t i = 0u; i < count; ++i)
+        expr_free(points[i]);
+    free(points);
+}
+
+static bool de_parse_condition_points(
+    const char *text,
+    const string_t *const *names,
+    expr_t *const *symbols,
+    size_t symbol_count,
+    expr_t ***points_out,
+    size_t *count_out)
+{
+    size_t start = 0u;
+    size_t length;
+    int parens = 0;
+    int brackets = 0;
+    expr_t **points = NULL;
+    size_t count = 0u;
+
+    *points_out = NULL;
+    *count_out = 0u;
+    if (!text)
+        return true;
+
+    length = strlen(text);
+    if (length == 0u)
+        return false;
+
+    for (size_t i = 0u; i <= length; ++i) {
+        char ch = i < length ? text[i] : ',';
+
+        if (ch == '(')
+            parens++;
+        else if (ch == ')' && parens > 0)
+            parens--;
+        else if (ch == '[')
+            brackets++;
+        else if (ch == ']' && brackets > 0)
+            brackets--;
+        if (ch != ',' || parens != 0 || brackets != 0)
+            continue;
+        {
+            char *argument =
+                de_trimmed_copy(text + start, i - start);
+            expr_t *point = argument && *argument
+                ? de_parse_expr(
+                      argument, names, symbols, symbol_count)
+                : NULL;
+            expr_t **new_points;
+
+            free(argument);
+            if (!point)
+                goto fail;
+            new_points = realloc(
+                points, (count + 1u) * sizeof(*new_points));
+            if (!new_points) {
+                expr_free(point);
+                goto fail;
+            }
+            points = new_points;
+            points[count++] = point;
+        }
+        start = i + 1u;
+    }
+
+    *points_out = points;
+    *count_out = count;
+    return true;
+
+fail:
+    de_free_condition_points(points, count);
+    return false;
 }
 
 static bool de_parse_one_condition(
@@ -960,7 +1047,8 @@ static bool de_parse_one_condition(
     string_t *canonical = NULL;
     expr_t *left = NULL;
     expr_t *right = NULL;
-    expr_t *point = NULL;
+    expr_t **points = NULL;
+    size_t point_count = 0u;
     equation_t *condition = NULL;
     bool ok = false;
 
@@ -970,25 +1058,37 @@ static bool de_parse_one_condition(
 
     left = de_parse_expr(core, names, symbols, symbol_count);
     right = de_parse_expr(rhs, names, symbols, symbol_count);
-    if (point_text)
-        point = de_parse_expr(point_text, names, symbols, symbol_count);
-    if (!left || !right || (point_text && !point))
+    if (!left ||
+        !right ||
+        !de_parse_condition_points(
+            point_text,
+            names,
+            symbols,
+            symbol_count,
+            &points,
+            &point_count))
         goto cleanup;
 
     condition = equ_new(left, right);
     canonical = string_new_with(text);
     if (!condition || !canonical ||
-        de_append_condition(de, condition, canonical, point) != 0)
+        de_append_condition(
+            de,
+            condition,
+            canonical,
+            points,
+            point_count) != 0)
         goto cleanup;
 
     condition = NULL;
     canonical = NULL;
-    point = NULL;
+    points = NULL;
+    point_count = 0u;
     ok = true;
 
 cleanup:
     equ_free(condition);
-    expr_free(point);
+    de_free_condition_points(points, point_count);
     string_free(canonical);
     expr_free(right);
     expr_free(left);

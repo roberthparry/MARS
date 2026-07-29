@@ -148,7 +148,10 @@ typedef enum {
     EXPR_KIND_INTEGRAL,
     EXPR_KIND_INTEGRAL_META,
     EXPR_KIND_INTEGRAL_BOUNDS,
+    EXPR_KIND_INDEXED_SYMBOL,
+    EXPR_KIND_SUMMATION,
     EXPR_KIND_FORMAL_DERIVATIVE,
+    EXPR_KIND_ARBITRARY_FUNCTION,
     EXPR_KIND_COUNT
 } expr_op_kind_t;
 
@@ -309,7 +312,13 @@ extern const expr_ops_t ops_neg;
 extern const expr_ops_t ops_integral;
 extern const expr_ops_t ops_integral_meta;
 extern const expr_ops_t ops_integral_bounds;
+extern const expr_ops_t ops_indexed_symbol;
+extern const expr_ops_t ops_summation;
 extern const expr_ops_t ops_formal_derivative;
+extern const expr_ops_t ops_arbitrary_function;
+
+expr_t *expr_new_indexed_symbol(const char *name, const expr_t *index);
+expr_t *expr_new_summation(const expr_t *term, const expr_t *index);
 
 expr_t *expr_new_formal_derivative(const expr_t *dependent,
                                    size_t wrt_count,
@@ -318,6 +327,8 @@ bool expr_is_formal_derivative(const expr_t *expr);
 const expr_t *expr_formal_derivative_dependent(const expr_t *expr);
 size_t expr_formal_derivative_order(const expr_t *expr);
 const expr_t *expr_formal_derivative_wrt_at(const expr_t *expr, size_t index);
+expr_t *expr_new_arbitrary_function(const char *name, const expr_t *argument);
+bool expr_is_arbitrary_function(const expr_t *expr);
 extern const expr_ops_t ops_sin;
 extern const expr_ops_t ops_cos;
 extern const expr_ops_t ops_tan;

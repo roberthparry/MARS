@@ -32,6 +32,12 @@ static number_t eval_formal_derivative(expr_t *dv)
     return num_clone(NUM_NAN);
 }
 
+static number_t eval_arbitrary_function(expr_t *dv)
+{
+    (void)dv;
+    return num_clone(NUM_NAN);
+}
+
 static number_t eval_add(expr_t *dv)
 {
     return num_add(expr_eval_num_internal(dv->a), expr_eval_num_internal(dv->b));
@@ -403,6 +409,54 @@ static expr_t *deriv_formal_derivative(expr_t *dv)
         dv->a, dv->formal_wrt_count + 1u, wrts);
     free(wrts);
     return out;
+}
+
+static expr_t *deriv_arbitrary_function(expr_t *dv)
+{
+    expr_t *outer;
+    expr_t *inner;
+    expr_t *out;
+    size_t name_length;
+    char *derivative_name;
+
+    if (!dv || !dv->name || !dv->a)
+        return NULL;
+    name_length = strlen(dv->name);
+    derivative_name = malloc(name_length + 2u);
+    if (!derivative_name)
+        return NULL;
+    memcpy(derivative_name, dv->name, name_length);
+    derivative_name[name_length] = '\'';
+    derivative_name[name_length + 1u] = '\0';
+    outer = expr_new_arbitrary_function(derivative_name, dv->a);
+    free(derivative_name);
+    inner = expr_get_dx_internal(dv->a);
+    out = outer && inner ? expr_mul(outer, inner) : NULL;
+    expr_free(inner);
+    expr_free(outer);
+    return out;
+}
+
+expr_t *expr_new_arbitrary_function(const char *name, const expr_t *argument)
+{
+    expr_t *expr;
+
+    if (!name || !*name || !argument)
+        return NULL;
+    expr = expr_alloc(&ops_arbitrary_function);
+    expr->name = strdup(name);
+    if (!expr->name) {
+        expr_free(expr);
+        return NULL;
+    }
+    expr->a = (expr_t *)argument;
+    expr_retain(expr->a);
+    return expr;
+}
+
+bool expr_is_arbitrary_function(const expr_t *expr)
+{
+    return expr && expr->ops == &ops_arbitrary_function;
 }
 
 expr_t *expr_new_formal_derivative(const expr_t *dependent,
@@ -2372,6 +2426,21 @@ const expr_ops_t ops_formal_derivative = {
     .diff_kind = EXPR_DIFF_NONE,
     .name = "D",
     .tex_name = "\\operatorname{D}",
+    .apply_unary = NULL,
+    .apply_binary = NULL,
+    .simplify = expr_simplify_passthrough,
+    .fold_const_unary = NULL
+};
+
+const expr_ops_t ops_arbitrary_function = {
+    .eval = eval_arbitrary_function,
+    .deriv = deriv_arbitrary_function,
+    .reverse = expr_reverse_not_differentiable,
+    .kind = EXPR_KIND_ARBITRARY_FUNCTION,
+    .arity = EXPR_OP_UNARY,
+    .diff_kind = EXPR_DIFF_SMOOTH,
+    .name = "arbitrary-function",
+    .tex_name = NULL,
     .apply_unary = NULL,
     .apply_binary = NULL,
     .simplify = expr_simplify_passthrough,

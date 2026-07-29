@@ -77,6 +77,9 @@ expr_t *expr_negate_owned(expr_t *expr);
 expr_t *expr_mul_long(const expr_t *expr, long value);
 expr_t *expr_div_long(const expr_t *expr, long value);
 expr_t *expr_pow_long(const expr_t *expr, long exponent);
+expr_t *expr_add_long(const expr_t *expr, long value);
+expr_t *expr_new_indexed_symbol(const char *name, const expr_t *index);
+expr_t *expr_new_summation(const expr_t *term, const expr_t *index);
 expr_t *expr_add_simplify_owned(const expr_t *left, const expr_t *right);
 expr_t *expr_sub_simplify_owned(const expr_t *left, const expr_t *right);
 expr_t *expr_mul_simplify_owned(const expr_t *left, const expr_t *right);
@@ -86,6 +89,11 @@ bool expr_child_exprs(const expr_t *expr,
                       const expr_t **left_out,
                       const expr_t **right_out);
 bool expr_is_formal_derivative(const expr_t *expr);
+expr_t *expr_new_formal_derivative(const expr_t *dependent,
+                                   size_t wrt_count,
+                                   expr_t *const *wrts);
+expr_t *expr_new_arbitrary_function(const char *name, const expr_t *argument);
+bool expr_is_arbitrary_function(const expr_t *expr);
 const expr_t *expr_formal_derivative_dependent(const expr_t *expr);
 size_t expr_formal_derivative_order(const expr_t *expr);
 const expr_t *expr_formal_derivative_wrt_at(const expr_t *expr, size_t index);

@@ -25,6 +25,51 @@ static inline expr_t *expr_math_wrap_binary(const expr_ops_t *ops, const expr_t 
 static expr_t *expr_appell_f1_pack(const expr_t *left, const expr_t *right);
 static expr_t *expr_appell_f1_from_packs(const expr_t *params, const expr_t *vars);
 
+static number_t eval_formal_series_component(expr_t *dv)
+{
+    (void)dv;
+    return num_clone(NUM_NAN);
+}
+
+static expr_t *deriv_indexed_symbol(expr_t *dv)
+{
+    expr_t *index_derivative = expr_get_dx_internal(dv->b);
+    expr_t *out = index_derivative && expr_is_exact_zero(index_derivative)
+        ? expr_new_const(NUM_ZERO)
+        : NULL;
+
+    expr_free(index_derivative);
+    return out;
+}
+
+static expr_t *deriv_summation(expr_t *dv)
+{
+    expr_t *term_derivative = expr_get_dx_internal(dv->a);
+    expr_t *out = term_derivative
+        ? expr_new_summation(term_derivative, dv->b)
+        : NULL;
+
+    expr_free(term_derivative);
+    return out;
+}
+
+static expr_t *integrate_summation(const expr_t *expr, const expr_t *wrt)
+{
+    expr_t *integrated_term;
+    expr_t *out;
+
+    if (!expr || !expr->a || !expr->b || !wrt)
+        return NULL;
+    integrated_term = expr_integrate(expr->a, wrt);
+    if (!integrated_term)
+        integrated_term = expr_integral(expr->a, wrt);
+    out = integrated_term
+        ? expr_new_summation(integrated_term, expr->b)
+        : NULL;
+    expr_free(integrated_term);
+    return out;
+}
+
 static expr_t *expr_inverse_log10_internal(const expr_t *a)
 {
     expr_t *ten = expr_new_const(NUM_TEN);
@@ -55,6 +100,7 @@ const expr_ops_t ops_atan2 = {
     .apply_unary = NULL, .apply_binary = expr_atan2,
     .simplify = expr_simplify_binary_operator, .fold_const_unary = NULL
 };
+
 
 const expr_ops_t ops_sin = {
     .eval = eval_sin, .deriv = deriv_sin, .reverse = expr_reverse_sin,
@@ -706,6 +752,33 @@ const expr_ops_t ops_beta = {
     .apply_unary = NULL, .apply_binary = expr_beta,
     .simplify = expr_simplify_binary_operator, .fold_const_unary = NULL
 };
+const expr_ops_t ops_indexed_symbol = {
+    .eval = eval_formal_series_component,
+    .deriv = deriv_indexed_symbol,
+    .reverse = expr_reverse_not_differentiable,
+    .kind = EXPR_KIND_INDEXED_SYMBOL,
+    .arity = EXPR_OP_BINARY,
+    .name = "indexed",
+    .tex_name = NULL,
+    .apply_unary = NULL,
+    .apply_binary = NULL,
+    .simplify = expr_simplify_binary_operator,
+    .fold_const_unary = NULL
+};
+const expr_ops_t ops_summation = {
+    .eval = eval_formal_series_component,
+    .deriv = deriv_summation,
+    .reverse = expr_reverse_not_differentiable,
+    .kind = EXPR_KIND_SUMMATION,
+    .arity = EXPR_OP_BINARY,
+    .name = "sum",
+    .tex_name = NULL,
+    .apply_unary = NULL,
+    .apply_binary = NULL,
+    .integrate = integrate_summation,
+    .simplify = expr_simplify_binary_operator,
+    .fold_const_unary = NULL
+};
 const expr_ops_t ops_logbeta = {
     .eval = eval_logbeta, .deriv = deriv_logbeta, .reverse = expr_reverse_logbeta,
     .kind = EXPR_KIND_LOGBETA, .arity = EXPR_OP_BINARY, .name = "logbeta",
@@ -1129,6 +1202,21 @@ expr_t *expr_ei(const expr_t *a) { return expr_math_wrap_unary(&ops_ei, a); }
 expr_t *expr_e1(const expr_t *a) { return expr_math_wrap_unary(&ops_e1, a); }
 expr_t *expr_beta(const expr_t *a, const expr_t *b) { return expr_math_wrap_binary(&ops_beta, a, b); }
 expr_t *expr_logbeta(const expr_t *a, const expr_t *b) { return expr_math_wrap_binary(&ops_logbeta, a, b); }
+expr_t *expr_new_indexed_symbol(const char *name, const expr_t *index)
+{
+    expr_t *symbol = expr_new_named_const(NUM_NAN, name);
+    expr_t *out = symbol && index
+        ? expr_math_wrap_binary(&ops_indexed_symbol, symbol, index)
+        : NULL;
+
+    expr_free(symbol);
+    return out;
+}
+
+expr_t *expr_new_summation(const expr_t *term, const expr_t *index)
+{
+    return expr_math_wrap_binary(&ops_summation, term, index);
+}
 expr_t *expr_gammainc_lower(const expr_t *a, const expr_t *b) { return expr_math_wrap_binary(&ops_gammainc_lower, a, b); }
 expr_t *expr_gammainc_upper(const expr_t *a, const expr_t *b) { return expr_math_wrap_binary(&ops_gammainc_upper, a, b); }
 expr_t *expr_gammainc_P(const expr_t *a, const expr_t *b) { return expr_math_wrap_binary(&ops_gammainc_P, a, b); }

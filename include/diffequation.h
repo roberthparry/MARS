@@ -13,10 +13,12 @@
  * A problem consists of a base equation, its independent variables, constant
  * bindings, and optional initial or boundary conditions. The first symbolic
  * solvers cover separable, linear, homogeneous, affine-substitution, linear
- * changes of variables, and quadratic Bernoulli first-order ordinary
- * differential equations, together with arbitrary-order constant-coefficient
- * linear ODEs and second-order equations that can be completed through
- * Sturm-Liouville normalization.
+ * changes of variables, quadratic Bernoulli, and autonomous
+ * derivative-quadratic first-order ordinary differential equations, together
+ * with arbitrary-order constant-coefficient linear ODEs and second-order
+ * equations that can be completed through Sturm-Liouville normalization.
+ * Two-variable constant-coefficient homogeneous transport PDEs are solved
+ * from explicit axis-aligned boundary data.
  */
 
 /**
@@ -47,7 +49,12 @@ typedef enum {
     DE_SOLVER_LINEAR_SUBSTITUTION,
     DE_SOLVER_LINEAR_TRANSFORMATION,
     DE_SOLVER_STURM_LIOUVILLE,
-    DE_SOLVER_CONSTANT_COEFFICIENT_LINEAR
+    DE_SOLVER_CONSTANT_COEFFICIENT_LINEAR,
+    DE_SOLVER_DERIVATIVE_QUADRATIC,
+    DE_SOLVER_EXACT_DERIVATIVE_LINEARIZATION,
+    DE_SOLVER_CONSTANT_COEFFICIENT_TRANSPORT,
+    DE_SOLVER_CHARACTERISTICS,
+    DE_SOLVER_PARAMETER_LINEAR_PDE
 } de_solver_t;
 
 /**
@@ -162,6 +169,34 @@ size_t de_condition_count(const diffequ_t *de);
 const equation_t *de_condition_at(const diffequ_t *de, size_t index);
 
 /**
+ * @brief Get the number of local arguments on a condition.
+ *
+ * For example, `u(x, 0) = f(x)` has two arguments while the ODE condition
+ * `y(0) = 1` has one.
+ *
+ * @param de Problem to inspect.
+ * @param condition_index Zero-based condition index.
+ * @return The argument count, or zero when the condition has no local
+ *         arguments or the indices are invalid.
+ */
+size_t de_condition_argument_count(const diffequ_t *de,
+                                   size_t condition_index);
+
+/**
+ * @brief Access one local condition argument.
+ *
+ * @param de Problem to inspect.
+ * @param condition_index Zero-based condition index.
+ * @param argument_index Zero-based local argument index.
+ * @return A borrowed expression, or `NULL` when either index is invalid.
+ *
+ * The returned expression remains owned by @p de and must not be freed.
+ */
+const expr_t *de_condition_argument_at(const diffequ_t *de,
+                                       size_t condition_index,
+                                       size_t argument_index);
+
+/**
  * @brief Format a differential-equation problem as an MARS string.
  *
  * @param de Problem to format. Must not be `NULL`.
@@ -187,10 +222,12 @@ char *de_to_string(const diffequ_t *de, style_t style);
  * @brief Attempt to solve a differential-equation problem symbolically.
  *
  * The implementation recognises first-order separable, first-order linear,
- * homogeneous, substitution, and quadratic Bernoulli ordinary differential
- * equations. It also normalizes regular second-order linear equations to
- * Sturm-Liouville form and solves arbitrary-order constant-coefficient linear
- * ODEs, including nonhomogeneous forcing.
+ * homogeneous, substitution, quadratic Bernoulli, and autonomous
+ * derivative-quadratic ordinary differential equations. Exact third-order
+ * forms `a*y''' + k*y'*y'' = f(x)` are integrated once and logarithmically
+ * linearized. The solver also normalizes regular second-order linear equations
+ * to Sturm-Liouville form and solves arbitrary-order constant-coefficient
+ * linear ODEs, including nonhomogeneous forcing.
  * First-order linear equations use an integrating factor.
  * Homogeneous equations use the substitution `y = u*x`. Equations depending
  * on an affine combination use `u = a*x + b*y + c`; ratios of two
@@ -199,6 +236,9 @@ char *de_to_string(const diffequ_t *de, style_t style);
  * when they make the transformed equation separable. When symbolic
  * integration has no closed form, an exact unevaluated integral is retained
  * in the solution.
+ * Two-variable equations `a*Dx(u) + b*Dy(u) = 0` are solved by
+ * characteristics when `a` and `b` are nonzero constants and explicit data
+ * is supplied on a constant-`x` or constant-`y` boundary.
  * Unsupported but well-formed problems return a result with
  * ::DE_SOLVE_STATUS_UNSUPPORTED rather than returning `NULL`.
  *

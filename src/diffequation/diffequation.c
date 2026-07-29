@@ -54,10 +54,13 @@ void de_free(diffequ_t *de)
         return;
 
     for (size_t i = 0u; i < de->condition_count; ++i) {
-        expr_free(de->condition_points[i]);
+        for (size_t j = 0u; j < de->condition_point_counts[i]; ++j)
+            expr_free(de->condition_points[i][j]);
+        free(de->condition_points[i]);
         string_free(de->condition_texts[i]);
         equ_free(de->conditions[i]);
     }
+    free(de->condition_point_counts);
     free(de->condition_points);
     free(de->condition_texts);
     free(de->conditions);
@@ -113,4 +116,24 @@ const equation_t *de_condition_at(const diffequ_t *de, size_t index)
     if (!de || index >= de->condition_count)
         return NULL;
     return de->conditions[index];
+}
+
+size_t de_condition_argument_count(const diffequ_t *de,
+                                   size_t condition_index)
+{
+    if (!de || condition_index >= de->condition_count)
+        return 0u;
+    return de->condition_point_counts[condition_index];
+}
+
+const expr_t *de_condition_argument_at(const diffequ_t *de,
+                                       size_t condition_index,
+                                       size_t argument_index)
+{
+    if (!de ||
+        condition_index >= de->condition_count ||
+        argument_index >=
+            de->condition_point_counts[condition_index])
+        return NULL;
+    return de->condition_points[condition_index][argument_index];
 }

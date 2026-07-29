@@ -513,7 +513,6 @@ static const func_entry_t *lookup_func(string_view_t kw)
 
     if (string_view_is_empty(kw))
         return NULL;
-
     bucket = func_bucket_hash(kw);
     slot = (func_slot_hash(kw) + s_func_displacements[bucket]) % FUNC_TABLE_SIZE;
     entry = &s_funcs[slot];

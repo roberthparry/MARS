@@ -110,6 +110,14 @@ static void test_diffequ_lifecycle_null_safety(void)
         "de_condition_count(NULL)", (long)de_condition_count(NULL), 0L);
     EXPECT_POINTER(
         "de_condition_at(NULL, 0)", de_condition_at(NULL, 0u), false);
+    EXPECT_LONG(
+        "de_condition_argument_count(NULL, 0)",
+        (long)de_condition_argument_count(NULL, 0u),
+        0L);
+    EXPECT_POINTER(
+        "de_condition_argument_at(NULL, 0, 0)",
+        de_condition_argument_at(NULL, 0u, 0u),
+        false);
     invalid_result = de_solve(NULL);
     EXPECT_POINTER("de_solve(NULL)", invalid_result, true);
     EXPECT_LONG(
@@ -1151,6 +1159,125 @@ static void test_diffequ_solves_quadratic_bernoulli_problem(void)
     de_free(de);
 }
 
+static void test_diffequ_solves_derivative_quadratic_problem(void)
+{
+    static const char *expected[] = {
+        "x = ½·(√(8y + 1) - "
+        "ln(|½·(√(8y + 1) + 1)|) + 1) + C",
+        "x = ½·(1 - √(8y + 1) - "
+        "ln(|½·(1 - √(8y + 1))|)) + C",
+        "y = 0"
+    };
+    diffequ_t *de =
+        de_from_string("(y')^2 = y' + 2y");
+    diffequ_solve_result_t *result;
+
+    EXPECT_POINTER("parsed derivative-quadratic problem", de, true);
+    if (!de)
+        return;
+
+    result = de_solve(de);
+    EXPECT_POINTER("derivative-quadratic solve result", result, true);
+    if (!result) {
+        de_free(de);
+        return;
+    }
+
+    EXPECT_LONG(
+        "derivative-quadratic solve status",
+        (long)de_solve_result_status(result),
+        (long)DE_SOLVE_STATUS_SOLVED);
+    EXPECT_LONG(
+        "derivative-quadratic selected solver",
+        (long)de_solve_result_solver(result),
+        (long)DE_SOLVER_DERIVATIVE_QUADRATIC);
+    EXPECT_LONG(
+        "derivative-quadratic solution count",
+        (long)de_solve_result_count(result),
+        3L);
+
+    for (size_t i = 0u; i < 3u; ++i) {
+        const equation_t *solution =
+            de_solve_result_at(result, i);
+        string_t *text =
+            solution ? equ_to_text(solution, style_UNBOUND) : NULL;
+
+        EXPECT_POINTER(
+            "derivative-quadratic solution", solution, true);
+        EXPECT_TEXT(
+            "derivative-quadratic solution text",
+            text ? string_c_str(text) : NULL,
+            expected[i]);
+        string_free(text);
+    }
+
+    de_solve_result_free(result);
+    de_free(de);
+}
+
+static void test_diffequ_linearizes_exact_third_order_problem(void)
+{
+    static const char *expected[] = {
+        "y = 2·ln(|Σ_(n=0)^∞ c_(n)·x^n|)",
+        "c_(0) = C₂",
+        "c_(1) = C₃",
+        "c_(-1) = 0",
+        "c_(-2) = 0",
+        "c_(-3) = 0",
+        "c_(n + 2) = (C₁·c_(n) + c_(n - 3))/(2·(n + 2)·(n + 1))"
+    };
+    diffequ_t *de =
+        de_from_string("y''' + y''*y' = 3x^2");
+    diffequ_solve_result_t *result;
+
+    EXPECT_POINTER("parsed exact third-order problem", de, true);
+    if (!de)
+        return;
+
+    result = de_solve(de);
+    EXPECT_POINTER("exact third-order solve result", result, true);
+    if (!result) {
+        de_free(de);
+        return;
+    }
+
+    EXPECT_LONG(
+        "exact third-order solve status",
+        (long)de_solve_result_status(result),
+        (long)DE_SOLVE_STATUS_SOLVED);
+    EXPECT_LONG(
+        "exact third-order selected solver",
+        (long)de_solve_result_solver(result),
+        (long)DE_SOLVER_EXACT_DERIVATIVE_LINEARIZATION);
+    EXPECT_TEXT(
+        "exact third-order solver diagnostic",
+        de_solve_result_diagnostic(result),
+        "linearized exactly, then solved by a convergent "
+        "power-series recurrence");
+    EXPECT_LONG(
+        "exact third-order solution count",
+        (long)de_solve_result_count(result),
+        7L);
+
+    for (size_t i = 0u; i < 7u; ++i) {
+        const equation_t *solution =
+            de_solve_result_at(result, i);
+        string_t *text =
+            solution ? equ_to_text(solution, style_UNBOUND) : NULL;
+
+        EXPECT_POINTER(
+            "exact third-order solution", solution, true);
+        EXPECT_TEXT(
+            "exact third-order solution text",
+            text ? string_c_str(text) : NULL,
+            expected[i]);
+        string_free(text);
+    }
+
+    de_solve_result_free(result);
+    de_free(de);
+}
+
 static void test_diffequ_solves_second_order_sturm_liouville_problem(void)
 {
     diffequ_t *de =
@@ -1194,6 +1321,40 @@ static void test_diffequ_solves_second_order_sturm_liouville_problem(void)
             "y = exp(x)");
 
     string_free(text);
+    de_solve_result_free(result);
+    de_free(de);
+}
+
+static void test_diffequ_does_not_invent_cubic_potential_functions(void)
+{
+    diffequ_t *de = de_from_string(
+        "y'' = 1/2*(x^3+a)*y; y(0) = 1; y'(0) = 0");
+    diffequ_solve_result_t *result;
+
+    EXPECT_POINTER("parsed cubic-potential IVP", de, true);
+    if (!de)
+        return;
+
+    result = de_solve(de);
+    EXPECT_POINTER("cubic-potential solve result", result, true);
+    if (!result) {
+        de_free(de);
+        return;
+    }
+
+    EXPECT_LONG(
+        "cubic-potential solve status",
+        (long)de_solve_result_status(result),
+        (long)DE_SOLVE_STATUS_UNSUPPORTED);
+    EXPECT_LONG(
+        "cubic-potential selected solver",
+        (long)de_solve_result_solver(result),
+        (long)DE_SOLVER_NONE);
+    EXPECT_LONG(
+        "cubic-potential solution count",
+        (long)de_solve_result_count(result),
+        0L);
+
     de_solve_result_free(result);
     de_free(de);
 }
@@ -1591,6 +1752,10 @@ static void test_diffequ_general_nonhomogeneous_solution(void)
     EXPECT_CONSTANT_LINEAR_SOLUTION(
         "Dxx(y) - y = exp(2*x)",
         "y = ⅓·exp(2x) + C₁·exp(x) + C₂·exp(-x)");
+    EXPECT_CONSTANT_LINEAR_SOLUTION(
+        "y'' + 4y = e^x + x^3",
+        "y = ⅕·exp(x) + ¼x³ - ⅜x + "
+        "C₁·cos(2x) + C₂·sin(2x)");
 }
 
 static void test_diffequ_general_trigonometric_forcing_solution(void)
@@ -1607,6 +1772,210 @@ static void test_diffequ_general_third_order_forced_solution(void)
     EXPECT_CONSTANT_LINEAR_SOLUTION(
         "Dxxx(y) - Dx(y) = exp(2*x)",
         "y = ⅙·exp(2x) + C₁·exp(x) + C₂ + C₃·exp(-x)");
+}
+
+static bool test_diffequ_expect_transport_solution(
+    const char *source,
+    const char *expected,
+    de_solver_t expected_solver,
+    const char *file,
+    int line)
+{
+    diffequ_t *de = de_from_string(source);
+    diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
+    const equation_t *solution =
+        result ? de_solve_result_at(result, 0u) : NULL;
+    string_t *text =
+        solution ? equ_to_text(solution, style_UNBOUND) : NULL;
+    const char *actual = text ? string_c_str(text) : NULL;
+    bool valid =
+        de &&
+        result &&
+        de_solve_result_status(result) == DE_SOLVE_STATUS_SOLVED &&
+        de_solve_result_solver(result) == expected_solver &&
+        de_solve_result_count(result) == 1u &&
+        actual &&
+        strcmp(actual, expected) == 0;
+
+    printf("  partial differential equation\n"
+           "    input:    %s\n"
+           "    expected: %s\n"
+           "    actual:   %s\n",
+           source,
+           expected,
+           actual ? actual : "NULL");
+
+    string_free(text);
+    de_solve_result_free(result);
+    de_free(de);
+    return test_assert_true(
+        valid, file, line, "constant-coefficient transport solution");
+}
+
+#define EXPECT_TRANSPORT_SOLUTION(source, expected) \
+    TEST_HARNESS_RETURN_UNLESS( \
+        test_diffequ_expect_transport_solution( \
+            (source), \
+            (expected), \
+            DE_SOLVER_CONSTANT_COEFFICIENT_TRANSPORT, \
+            __FILE__, \
+            __LINE__))
+
+#define EXPECT_CHARACTERISTIC_SOLUTION(source, expected) \
+    TEST_HARNESS_RETURN_UNLESS( \
+        test_diffequ_expect_transport_solution( \
+            (source), \
+            (expected), \
+            DE_SOLVER_CHARACTERISTICS, \
+            __FILE__, \
+            __LINE__))
+
+static void test_diffequ_parses_pde_boundary_arguments(void)
+{
+    const char *source =
+        "{ 2*Dx(u) + Dy(u) = 0 | x = ?, y = ?;; "
+        "u(x, 0) = x^2 }";
+    const char *expected_problem =
+        "{ 2*Dx(u) + Dy(u) = 0 | x = ?, y = ?; ; "
+        "u(x, 0) = x^2 }";
+    diffequ_t *de = de_from_string(source);
+    char *problem = de ? de_to_string(de, style_EXPRESSION) : NULL;
+    const expr_t *first =
+        de ? de_condition_argument_at(de, 0u, 0u) : NULL;
+    const expr_t *second =
+        de ? de_condition_argument_at(de, 0u, 1u) : NULL;
+    number_t second_value = second ? expr_eval(second) : num_new();
+    number_t zero = num_create_from_long(0L);
+
+    EXPECT_POINTER("parsed PDE", de, true);
+    EXPECT_LONG(
+        "PDE independent-variable count",
+        (long)de_independent_count(de),
+        2L);
+    EXPECT_LONG(
+        "PDE boundary-argument count",
+        (long)de_condition_argument_count(de, 0u),
+        2L);
+    EXPECT_TEXT(
+        "PDE first boundary argument shares x",
+        first == de_independent_at(de, 0u) ? "same" : "different",
+        "same");
+    EXPECT_NUMBER("PDE second boundary argument", second_value, zero);
+    EXPECT_TEXT("PDE canonical problem", problem, expected_problem);
+
+    num_destroy(&zero);
+    num_destroy(&second_value);
+    free(problem);
+    de_free(de);
+}
+
+static void test_diffequ_solves_constant_transport_from_y_boundary(void)
+{
+    EXPECT_TRANSPORT_SOLUTION(
+        "{ 2*Dx(u) + Dy(u) = 0 | x = ?, y = ?;; "
+        "u(x, 0) = x^2 }",
+        "u = (x - 2y)²");
+}
+
+static void test_diffequ_solves_constant_transport_from_x_boundary(void)
+{
+    EXPECT_TRANSPORT_SOLUTION(
+        "{ Dx(u) + 3*Dy(u) = 0 | x = ?, y = ?;; "
+        "u(0, y) = exp(y) }",
+        "u = exp(y - 3x)");
+}
+
+static void test_diffequ_solves_unbounded_homogeneous_transport(void)
+{
+    EXPECT_TRANSPORT_SOLUTION(
+        "Dt(u) + c*Dx(u) = 0",
+        "u = F(x - ct)");
+}
+
+static void test_diffequ_solves_unbounded_inhomogeneous_transport(void)
+{
+    EXPECT_TRANSPORT_SOLUTION(
+        "Dt(u) + c*Dx(u) = 1",
+        "u = F(x - ct) + t");
+}
+
+static void test_diffequ_solves_nonlinear_characteristic_pde(void)
+{
+    diffequ_t *de =
+        de_from_string("Dx(z) + Dy(z) = 6*(x+y)^2*z^2");
+    diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
+    const equation_t *general =
+        result ? de_solve_result_at(result, 0u) : NULL;
+    const equation_t *singular =
+        result ? de_solve_result_at(result, 1u) : NULL;
+    string_t *general_text =
+        general ? equ_to_text(general, style_UNBOUND) : NULL;
+    string_t *singular_text =
+        singular ? equ_to_text(singular, style_UNBOUND) : NULL;
+
+    EXPECT_LONG(
+        "nonlinear characteristic status",
+        (long)de_solve_result_status(result),
+        (long)DE_SOLVE_STATUS_SOLVED);
+    EXPECT_LONG(
+        "nonlinear characteristic solution count",
+        (long)de_solve_result_count(result),
+        2L);
+    EXPECT_TEXT(
+        "nonlinear characteristic general solution",
+        general_text ? string_c_str(general_text) : NULL,
+        "z = 1/(F(x - y) - (x + y)³)");
+    EXPECT_TEXT(
+        "nonlinear characteristic singular solution",
+        singular_text ? string_c_str(singular_text) : NULL,
+        "z = 0");
+
+    string_free(singular_text);
+    string_free(general_text);
+    de_solve_result_free(result);
+    de_free(de);
+}
+
+static void test_diffequ_solves_rotating_characteristic_pde(void)
+{
+    EXPECT_CHARACTERISTIC_SOLUTION(
+        "(x+y)*Dx(z) + (y-x)*Dy(z) = 0",
+        "z = F(½·(ln(x² + y²) + 2·atan2(y, x)))");
+}
+
+static void test_diffequ_solves_parameter_linear_pde(void)
+{
+    const char *source = "Dy(z) + 2*y*z = x*y^3";
+    diffequ_t *de = de_from_string(source);
+    diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
+    const equation_t *solution =
+        result ? de_solve_result_at(result, 0u) : NULL;
+    string_t *text =
+        solution ? equ_to_text(solution, style_UNBOUND) : NULL;
+
+    printf("  parameter-dependent linear PDE\n"
+           "    input:    %s\n"
+           "    expected: %s\n"
+           "    actual:   %s\n",
+           source,
+           "z = ½x·(y² - 1) + F(x)·exp(-y²)",
+           text ? string_c_str(text) : "NULL");
+    EXPECT_LONG(
+        "parameter-linear PDE status",
+        (long)de_solve_result_status(result),
+        (long)DE_SOLVE_STATUS_SOLVED);
+    EXPECT_LONG(
+        "parameter-linear PDE solver",
+        (long)de_solve_result_solver(result),
+        (long)DE_SOLVER_PARAMETER_LINEAR_PDE);
+    EXPECT_TEXT(
+        "parameter-linear PDE solution",
+        text ? string_c_str(text) : NULL,
+        "z = ½x·(y² - 1) + F(x)·exp(-y²)");
+
+    string_free(text);
+    de_solve_result_free(result);
+    de_free(de);
 }
 
 /*
@@ -1674,7 +2043,11 @@ int tests_main(void)
     RUN_TEST_CASE(test_diffequ_retains_arbitrary_constant);
     RUN_TEST_CASE(test_diffequ_preserves_zero_singular_solution);
     RUN_TEST_CASE(test_diffequ_solves_quadratic_bernoulli_problem);
+    RUN_TEST_CASE(test_diffequ_solves_derivative_quadratic_problem);
+    RUN_TEST_CASE(test_diffequ_linearizes_exact_third_order_problem);
     RUN_TEST_CASE(test_diffequ_solves_second_order_sturm_liouville_problem);
+    RUN_TEST_CASE(
+        test_diffequ_does_not_invent_cubic_potential_functions);
     RUN_TEST_CASE(test_diffequ_solves_repeated_characteristic_root);
     RUN_TEST_CASE(test_diffequ_solves_oscillatory_sturm_liouville_problem);
     RUN_TEST_CASE(
@@ -1699,6 +2072,18 @@ int tests_main(void)
     RUN_TEST_CASE(test_diffequ_general_nonhomogeneous_solution);
     RUN_TEST_CASE(test_diffequ_general_trigonometric_forcing_solution);
     RUN_TEST_CASE(test_diffequ_general_third_order_forced_solution);
+    RUN_TEST_CASE(test_diffequ_parses_pde_boundary_arguments);
+    RUN_TEST_CASE(
+        test_diffequ_solves_constant_transport_from_y_boundary);
+    RUN_TEST_CASE(
+        test_diffequ_solves_constant_transport_from_x_boundary);
+    RUN_TEST_CASE(
+        test_diffequ_solves_unbounded_homogeneous_transport);
+    RUN_TEST_CASE(
+        test_diffequ_solves_unbounded_inhomogeneous_transport);
+    RUN_TEST_CASE(test_diffequ_solves_nonlinear_characteristic_pde);
+    RUN_TEST_CASE(test_diffequ_solves_rotating_characteristic_pde);
+    RUN_TEST_CASE(test_diffequ_solves_parameter_linear_pde);
 
     TEST_SECTION("README Output Example");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(

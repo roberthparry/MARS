@@ -64,6 +64,23 @@ de_attempt_t de_attempt_bernoulli_square(
     const expr_t *dependent,
     const expr_t *derivative_right,
     equation_t **solution_out);
+de_attempt_t de_attempt_derivative_quadratic(
+    const diffequ_t *de,
+    const expr_t *independent,
+    const expr_t *dependent,
+    const expr_t *first_derivative,
+    const expr_t *residual,
+    equation_t **solutions_out,
+    size_t *solution_count_out);
+de_attempt_t de_attempt_exact_derivative_linearization(
+    const diffequ_t *de,
+    const expr_t *independent,
+    const expr_t *dependent,
+    const expr_t *first_derivative,
+    const expr_t *second_derivative,
+    const expr_t *residual,
+    equation_t **solutions_out,
+    size_t *solution_count_out);
 de_attempt_t de_attempt_homogeneous(const diffequ_t *de,
                                     const expr_t *independent,
                                     const expr_t *dependent,
@@ -89,6 +106,12 @@ de_attempt_t de_attempt_sturm_liouville(
     const expr_t *first_derivative,
     const expr_t *residual,
     equation_t **solution_out);
+int de_sturm_liouville_cubic_basis(
+    const expr_t *independent,
+    const expr_t *parameter,
+    const expr_t *dependent,
+    equation_t **solutions_out,
+    size_t *solution_count_out);
 de_attempt_t de_attempt_constant_coefficient_linear(
     const diffequ_t *de,
     const expr_t *independent,
@@ -96,5 +119,4 @@ de_attempt_t de_attempt_constant_coefficient_linear(
     size_t order,
     const expr_t *residual,
     equation_t **solution_out);
-
 #endif /* DIFFEQU_SOLVE_INTERNAL_H */

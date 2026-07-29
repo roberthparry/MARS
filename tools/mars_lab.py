@@ -9488,6 +9488,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
 
         clearResultDetails({keepBindings: true});
         clearRenderedError();
+        renderedTitle.textContent = data.status === 'solved' ? 'Solution' : 'Reduction';
         lastTex = data.solutions_tex || data.problem_tex || '';
         rendered.dataset.displayTex = lastTex;
         rendered.dataset.fullTex = lastTex;
@@ -13741,8 +13742,12 @@ def prepare_equation_fields(fields: dict[str, str], precision: int) -> dict[str,
 
 
 def prepare_diffequation_fields(fields: dict[str, str]) -> dict[str, object]:
-    solutions_tex = str(fields.get("solutions_tex") or "").strip()
-    problem_tex = str(fields.get("problem_tex") or "").strip()
+    solutions_tex = tex_for_display(
+        str(fields.get("solutions_tex") or "").strip()
+    )
+    problem_tex = tex_for_display(
+        str(fields.get("problem_tex") or "").strip()
+    )
     render_tex = solutions_tex or problem_tex
     svg = None
     render_error = None
@@ -13753,9 +13758,13 @@ def prepare_diffequation_fields(fields: dict[str, str]) -> dict[str, object]:
         "ok": True,
         "mode": "diffequation",
         "input": str(fields.get("input") or "").strip(),
-        "problem": str(fields.get("problem") or "").strip(),
+        "problem": expression_for_display(
+            str(fields.get("problem") or "").strip()
+        ),
         "problem_tex": problem_tex,
-        "solutions": normalize_multiline_display_text(fields.get("solutions") or ""),
+        "solutions": expression_for_display(
+            normalize_multiline_display_text(fields.get("solutions") or "")
+        ),
         "solutions_tex": solutions_tex,
         "status": str(fields.get("status") or "").strip(),
         "solver": str(fields.get("solver") or "").strip(),

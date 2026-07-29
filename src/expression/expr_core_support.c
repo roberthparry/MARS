@@ -1320,6 +1320,16 @@ expr_t *expr_clone(const expr_t *expr)
         return out;
     }
 
+    if (expr_is_arbitrary_function(expr)) {
+        left = expr_clone(expr->a);
+        if (!left)
+            return NULL;
+        out = expr_new_arbitrary_function(expr->name, left);
+        expr_free(left);
+        expr_clone_copy_metadata(out, expr);
+        return out;
+    }
+
     if (expr->ops->kind == EXPR_KIND_POW_D && expr->a) {
         left = expr_clone(expr->a);
         if (!left)

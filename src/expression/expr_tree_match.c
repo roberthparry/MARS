@@ -570,6 +570,15 @@ expr_t *expr_substitute(const expr_t *expr,
         return out;
     }
 
+    if (expr_is_arbitrary_function(expr)) {
+        left = expr_substitute(expr->a, needle, replacement);
+        if (!left)
+            return NULL;
+        out = expr_new_arbitrary_function(expr->name, left);
+        expr_free(left);
+        return out;
+    }
+
     if (expr->ops->arity == EXPR_OP_UNARY && expr->ops->apply_unary) {
         left = expr_substitute(expr->a, needle, replacement);
         if (!left)
