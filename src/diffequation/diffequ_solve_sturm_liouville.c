@@ -1,3 +1,5 @@
+#include <stdlib.h>
+
 #define MARS_DIFFEQUATION_SOLVE_INTERNAL_ACCESS
 #include "diffequ_solve_internal.h"
 
@@ -133,6 +135,150 @@ static bool de_build_self_adjoint_form(
 static expr_t *de_named_constant(const char *name)
 {
     return expr_new_named_const(NUM_NAN, name);
+}
+
+static expr_t *de_sturm_series_coefficient(const expr_t *index)
+{
+    return expr_new_indexed_symbol("c", index);
+}
+
+static equation_t *de_sturm_series_coefficient_value(
+    long index,
+    const expr_t *value)
+{
+    expr_t *index_expr = expr_const_long(index);
+    expr_t *coefficient = index_expr
+        ? de_sturm_series_coefficient(index_expr)
+        : NULL;
+    equation_t *equation = coefficient && value
+        ? equ_new(coefficient, value)
+        : NULL;
+
+    expr_free(coefficient);
+    expr_free(index_expr);
+    return equation;
+}
+
+int de_sturm_liouville_cubic_basis(
+    const expr_t *independent,
+    const expr_t *parameter,
+    const expr_t *dependent,
+    equation_t **solutions_out,
+    size_t *solution_count_out)
+{
+    expr_t *index = expr_new_named_var(NUM_NAN, "n");
+    expr_t *coefficient = index
+        ? de_sturm_series_coefficient(index)
+        : NULL;
+    expr_t *power = index
+        ? expr_pow_xp(independent, index)
+        : NULL;
+    expr_t *term = coefficient && power
+        ? expr_mul_simplify_owned(coefficient, power)
+        : NULL;
+    expr_t *series = term && index
+        ? expr_new_summation(term, index)
+        : NULL;
+    expr_t *next_index = index
+        ? expr_add_long(index, 2L)
+        : NULL;
+    expr_t *previous_index = index
+        ? expr_add_long(index, -3L)
+        : NULL;
+    expr_t *next_coefficient = next_index
+        ? de_sturm_series_coefficient(next_index)
+        : NULL;
+    expr_t *current_coefficient = index
+        ? de_sturm_series_coefficient(index)
+        : NULL;
+    expr_t *previous_coefficient = previous_index
+        ? de_sturm_series_coefficient(previous_index)
+        : NULL;
+    expr_t *parameter_term = parameter && current_coefficient
+        ? expr_mul(parameter, current_coefficient)
+        : NULL;
+    expr_t *numerator = parameter_term && previous_coefficient
+        ? expr_add(parameter_term, previous_coefficient)
+        : NULL;
+    expr_t *index_plus_2 = index ? expr_add_long(index, 2L) : NULL;
+    expr_t *index_plus_1 = index ? expr_add_long(index, 1L) : NULL;
+    expr_t *index_product = index_plus_2 && index_plus_1
+        ? expr_mul(index_plus_2, index_plus_1)
+        : NULL;
+    expr_t *two = expr_const_long(2L);
+    expr_t *denominator = two && index_product
+        ? expr_mul(two, index_product)
+        : NULL;
+    expr_t *recurrence = numerator && denominator
+        ? expr_div(numerator, denominator)
+        : NULL;
+    expr_t *constant_2 = de_named_constant("C₂");
+    expr_t *constant_3 = de_named_constant("C₃");
+    expr_t *zero = expr_new_const(NUM_ZERO);
+    int ok = 0;
+
+    if (term) {
+        coefficient = NULL;
+        power = NULL;
+    }
+    if (!independent || !parameter || !dependent || !solutions_out ||
+        !solution_count_out || !series || !next_coefficient ||
+        !recurrence || !constant_2 || !constant_3 || !zero)
+        goto cleanup;
+    *solution_count_out = 0u;
+
+    solutions_out[0] = equ_new(dependent, series);
+    solutions_out[1] =
+        de_sturm_series_coefficient_value(0L, constant_2);
+    solutions_out[2] =
+        de_sturm_series_coefficient_value(1L, constant_3);
+    solutions_out[3] =
+        de_sturm_series_coefficient_value(-1L, zero);
+    solutions_out[4] =
+        de_sturm_series_coefficient_value(-2L, zero);
+    solutions_out[5] =
+        de_sturm_series_coefficient_value(-3L, zero);
+    solutions_out[6] = equ_new(next_coefficient, recurrence);
+
+    ok = 1;
+    for (size_t i = 0u; i < 7u; ++i) {
+        if (!solutions_out[i]) {
+            ok = 0;
+            break;
+        }
+    }
+    if (ok)
+        *solution_count_out = 7u;
+
+cleanup:
+    if (!ok && solutions_out) {
+        for (size_t i = 0u; i < 7u; ++i) {
+            equ_free(solutions_out[i]);
+            solutions_out[i] = NULL;
+        }
+    }
+    expr_free(zero);
+    expr_free(constant_3);
+    expr_free(constant_2);
+    expr_free(recurrence);
+    expr_free(denominator);
+    expr_free(two);
+    expr_free(index_product);
+    expr_free(index_plus_1);
+    expr_free(index_plus_2);
+    expr_free(numerator);
+    expr_free(parameter_term);
+    expr_free(previous_coefficient);
+    expr_free(current_coefficient);
+    expr_free(next_coefficient);
+    expr_free(previous_index);
+    expr_free(next_index);
+    expr_free(series);
+    expr_free(term);
+    expr_free(power);
+    expr_free(coefficient);
+    expr_free(index);
+    return ok ? 0 : -1;
 }
 
 static expr_t *de_exp_owned(expr_t *argument)

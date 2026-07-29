@@ -20,7 +20,8 @@ struct diffequ_t {
 
     equation_t **conditions;
     string_t **condition_texts;
-    expr_t **condition_points;
+    expr_t ***condition_points;
+    size_t *condition_point_counts;
     size_t condition_count;
 
     string_t *independent_text;

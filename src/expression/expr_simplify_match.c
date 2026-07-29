@@ -181,6 +181,10 @@ int expr_struct_eq(const expr_t *u, const expr_t *v)
                 return 0;
         return 1;
     }
+    if (expr_is_arbitrary_function(u))
+        return u->name && v->name &&
+               strcmp(u->name, v->name) == 0 &&
+               expr_struct_eq(u->a, v->a);
     if (expr_is_mul(u))
         return mul_struct_eq(u, v);
     if (expr_is_neg(u))

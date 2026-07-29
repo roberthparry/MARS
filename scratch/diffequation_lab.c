@@ -42,6 +42,16 @@ static const char *solver_name(de_solver_t solver)
             return "Sturm-Liouville";
         case DE_SOLVER_CONSTANT_COEFFICIENT_LINEAR:
             return "constant-coefficient linear";
+        case DE_SOLVER_DERIVATIVE_QUADRATIC:
+            return "derivative-quadratic";
+        case DE_SOLVER_EXACT_DERIVATIVE_LINEARIZATION:
+            return "exact-derivative linearization";
+        case DE_SOLVER_CONSTANT_COEFFICIENT_TRANSPORT:
+            return "constant-coefficient transport";
+        case DE_SOLVER_CHARACTERISTICS:
+            return "characteristics";
+        case DE_SOLVER_PARAMETER_LINEAR_PDE:
+            return "parameter-dependent linear PDE";
     }
     return "none";
 }

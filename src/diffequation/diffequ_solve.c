@@ -4,6 +4,8 @@
 #include "diffequation.h"
 #define MARS_DIFFEQUATION_SOLVE_INTERNAL_ACCESS
 #include "diffequ_solve_internal.h"
+#define MARS_DIFFEQUATION_PDE_INTERNAL_ACCESS
+#include "diffequ_pde_internal.h"
 
 expr_t *de_simplify_unary_owned(
     expr_t *owned,
@@ -263,9 +265,9 @@ bool de_find_initial_condition(const diffequ_t *de,
         const equation_t *condition = de->conditions[i];
 
         if (condition &&
-            de->condition_points[i] &&
+            de->condition_point_counts[i] == 1u &&
             expr_struct_eq(equ_lhs(condition), dependent)) {
-            *point_out = de->condition_points[i];
+            *point_out = de->condition_points[i][0];
             *value_out = equ_rhs(condition);
             return true;
         }
@@ -285,7 +287,7 @@ bool de_find_derivative_condition(const diffequ_t *de,
         const expr_t *left = condition ? equ_lhs(condition) : NULL;
 
         if (!left ||
-            !de->condition_points[i] ||
+            de->condition_point_counts[i] != 1u ||
             !expr_is_formal_derivative(left) ||
             expr_formal_derivative_order(left) != order ||
             !expr_struct_eq(
@@ -298,7 +300,7 @@ bool de_find_derivative_condition(const diffequ_t *de,
                     independent))
                 goto next_condition;
         }
-        *point_out = de->condition_points[i];
+        *point_out = de->condition_points[i][0];
         *value_out = equ_rhs(condition);
         return true;
 
@@ -337,6 +339,16 @@ diffequ_solve_result_t *de_solve(const diffequ_t *de)
     expr_t *negative_remainder = NULL;
     expr_t *derivative_right = NULL;
     equation_t *solution = NULL;
+    equation_t *derivative_quadratic_solutions[3] = {
+        NULL, NULL, NULL
+    };
+    equation_t *exact_derivative_solutions[7] = {
+        NULL, NULL, NULL, NULL, NULL, NULL, NULL
+    };
+    size_t derivative_quadratic_count = 0u;
+    size_t exact_derivative_count = 0u;
+    de_attempt_t derivative_quadratic;
+    de_attempt_t exact_derivative;
     de_attempt_t separable;
     de_attempt_t linear;
     de_attempt_t bernoulli;
@@ -344,6 +356,7 @@ diffequ_solve_result_t *de_solve(const diffequ_t *de)
     de_attempt_t linear_substitution;
     de_attempt_t linear_transformation;
     de_attempt_t sturm_liouville;
+    de_attempt_t parameter_linear_pde;
     diffequ_solve_result_t *result = NULL;
 
     if (!de)
@@ -351,11 +364,16 @@ diffequ_solve_result_t *de_solve(const diffequ_t *de)
             DE_SOLVE_STATUS_INVALID,
             DE_SOLVER_NONE,
             "differential equation is NULL");
+    if (de->independent_count == 2u) {
+        residual = equ_residual(de->equation);
+        result = de_pde_solve_two_variable(de, residual);
+        goto cleanup;
+    }
     if (de->independent_count != 1u)
         return de_solve_result_new(
             DE_SOLVE_STATUS_UNSUPPORTED,
             DE_SOLVER_NONE,
-            "the initial solver requires exactly one independent variable");
+            "the solver requires one ODE variable or two PDE variables");
 
     independent = de->independent_vars[0];
     residual = equ_residual(de->equation);
@@ -376,6 +394,45 @@ diffequ_solve_result_t *de_solve(const diffequ_t *de)
     }
 
     if (highest_order > 2u) {
+        exact_derivative = highest_order == 3u
+            ? de_attempt_exact_derivative_linearization(
+                  de,
+                  independent,
+                  dependent,
+                  first_derivative,
+                  second_derivative,
+                  residual,
+                  exact_derivative_solutions,
+                  &exact_derivative_count)
+            : DE_ATTEMPT_NOT_MATCHED;
+        if (exact_derivative == DE_ATTEMPT_SOLVED) {
+            result = de_solve_result_new(
+                DE_SOLVE_STATUS_SOLVED,
+                DE_SOLVER_EXACT_DERIVATIVE_LINEARIZATION,
+                "linearized exactly, then solved by a convergent "
+                "power-series recurrence");
+            if (!result)
+                goto cleanup;
+            for (size_t i = 0u; i < exact_derivative_count; ++i) {
+                if (de_solve_result_append(
+                        result,
+                        exact_derivative_solutions[i]) != 0) {
+                    de_solve_result_free(result);
+                    result = NULL;
+                    goto cleanup;
+                }
+                exact_derivative_solutions[i] = NULL;
+            }
+            goto cleanup;
+        }
+        if (exact_derivative == DE_ATTEMPT_FAILED) {
+            result = de_solve_result_new(
+                DE_SOLVE_STATUS_FAILED,
+                DE_SOLVER_NONE,
+                "failed to complete the exact-derivative linearization");
+            goto cleanup;
+        }
+
         sturm_liouville = de_attempt_constant_coefficient_linear(
             de,
             independent,
@@ -445,8 +502,52 @@ diffequ_solve_result_t *de_solve(const diffequ_t *de)
         goto cleanup;
     }
 
-    if (!first_derivative ||
-        !de_linear_decompose(
+    if (!first_derivative) {
+        result = de_solve_result_new(
+            DE_SOLVE_STATUS_UNSUPPORTED,
+            DE_SOLVER_NONE,
+            "the equation has no first derivative");
+        goto cleanup;
+    }
+
+    derivative_quadratic = de_attempt_derivative_quadratic(
+        de,
+        independent,
+        dependent,
+        first_derivative,
+        residual,
+        derivative_quadratic_solutions,
+        &derivative_quadratic_count);
+    if (derivative_quadratic == DE_ATTEMPT_SOLVED) {
+        result = de_solve_result_new(
+            DE_SOLVE_STATUS_SOLVED,
+            DE_SOLVER_DERIVATIVE_QUADRATIC,
+            "solved as an autonomous derivative-quadratic ODE");
+        if (!result)
+            goto cleanup;
+        for (size_t i = 0u;
+             i < derivative_quadratic_count;
+             ++i) {
+            if (de_solve_result_append(
+                    result,
+                    derivative_quadratic_solutions[i]) != 0) {
+                de_solve_result_free(result);
+                result = NULL;
+                goto cleanup;
+            }
+            derivative_quadratic_solutions[i] = NULL;
+        }
+        goto cleanup;
+    }
+    if (derivative_quadratic == DE_ATTEMPT_FAILED) {
+        result = de_solve_result_new(
+            DE_SOLVE_STATUS_FAILED,
+            DE_SOLVER_NONE,
+            "failed to complete the derivative-quadratic solution");
+        goto cleanup;
+    }
+
+    if (!de_linear_decompose(
             residual,
             first_derivative,
             &derivative_coefficient,
@@ -474,6 +575,26 @@ diffequ_solve_result_t *de_solve(const diffequ_t *de)
             DE_SOLVE_STATUS_FAILED,
             DE_SOLVER_NONE,
             "failed to construct the isolated derivative");
+        goto cleanup;
+    }
+
+    parameter_linear_pde = de_pde_attempt_parameter_linear(
+        independent,
+        dependent,
+        derivative_right,
+        &solution);
+    if (parameter_linear_pde == DE_ATTEMPT_SOLVED) {
+        result = de_solve_result_new(
+            DE_SOLVE_STATUS_SOLVED,
+            DE_SOLVER_PARAMETER_LINEAR_PDE,
+            "solved as a parameter-dependent first-order linear PDE");
+        goto append;
+    }
+    if (parameter_linear_pde == DE_ATTEMPT_FAILED) {
+        result = de_solve_result_new(
+            DE_SOLVE_STATUS_FAILED,
+            DE_SOLVER_NONE,
+            "failed to complete the parameter-dependent linear PDE");
         goto cleanup;
     }
 
@@ -584,6 +705,10 @@ append:
     solution = NULL;
 
 cleanup:
+    for (size_t i = 0u; i < 7u; ++i)
+        equ_free(exact_derivative_solutions[i]);
+    for (size_t i = 0u; i < 3u; ++i)
+        equ_free(derivative_quadratic_solutions[i]);
     equ_free(solution);
     expr_free(derivative_right);
     expr_free(negative_remainder);

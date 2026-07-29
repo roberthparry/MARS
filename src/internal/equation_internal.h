@@ -31,6 +31,17 @@ bool equ_match_affine_linear_expr(const expr_t *expr,
                                   number_t *constant_out,
                                   number_t *coeff_out);
 
+bool equ_match_polynomial_alloc(const expr_t *expr,
+                                const expr_t *wrt,
+                                number_t **coeffs_out,
+                                size_t *degree_out);
+
+bool equ_match_symbolic_quadratic_expr(const expr_t *expr,
+                                       const expr_t *wrt,
+                                       expr_t **constant_out,
+                                       expr_t **linear_out,
+                                       expr_t **quadratic_out);
+
 int equ_solve_for_into(const equation_t *equation,
                        const expr_t *wrt,
                        equation_solutions_t *solutions);

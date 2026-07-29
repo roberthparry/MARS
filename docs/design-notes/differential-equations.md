@@ -4,7 +4,11 @@
 > symbolic separable, linear, homogeneous, affine-substitution,
 > linear-coordinate-transformation, quadratic Bernoulli, and
 > arbitrary-order constant-coefficient linear solvers are implemented.
-> General variable-coefficient bases, numerical integration, systems, and PDE
+> The first PDE solver handles constant-coefficient transport equations,
+> arbitrary-function characteristic families, selected nonlinear and
+> variable-coefficient characteristic equations, and parameter-dependent
+> first-order linear PDEs. General
+> variable-coefficient bases, numerical integration, systems, and broader PDE
 > solving remain future work.
 
 Differential-equation support sits above the existing expression/equation
@@ -644,6 +648,42 @@ returns one solution family. That leaves room for later branch-producing
 inversions without changing the public result shape. Each equation borrowed
 from the result is owned by that result.
 
+The first PDE dispatch handles
+
+```text
+a*Dx(u) + b*Dy(u) = q
+```
+
+for two independent variables and nonzero constant `a` and `b`. With boundary
+data `u(x, y0) = g(x)`, characteristics give
+
+```text
+u(x, y) = g(x - (a/b)*(y - y0)).
+```
+
+The corresponding constant-`x` boundary form is handled symmetrically.
+Condition arguments are therefore stored as ordered coordinate arrays rather
+than the earlier ODE-only single point. The public condition-argument
+accessors expose those coordinates without transferring ownership.
+
+Without boundary data, the solver constructs a genuine arbitrary-function
+node and returns `F(y - (b/a)*x)` plus a particular solution when `q` is
+constant. Arbitrary-function nodes retain their argument, render as `F(...)`,
+and differentiate through the chain rule.
+
+The next characteristic dispatch recognizes nonlinear evolution along
+constant vector fields and selected variable-coefficient vector fields. It
+currently covers
+
+```text
+Dx(z) + Dy(z) = 6*(x+y)^2*z^2
+(x+y)*Dx(z) + (y-x)*Dy(z) = 0
+```
+
+including the singular solution `z = 0` in the first family. A
+parameter-dependent linear dispatch distinguishes a passive coordinate from
+an ODE integration constant, so `Dy(z) + 2*y*z = x*y^3` returns `F(x)`.
+
 A well-formed problem outside the implemented mathematical scope reports
 `DE_SOLVE_STATUS_UNSUPPORTED`. Failure after a solver has matched reports
 `DE_SOLVE_STATUS_FAILED`, with a diagnostic. Invalid API input reports
@@ -719,8 +759,13 @@ result, but it is not a sufficient explanation of solver failure.
 9. Generalise Bernoulli reduction to exact non-unit powers while preserving
    all inverse branches.
 10. Complete classification metadata, TeX output, and immutable
-   serialisation.
+    serialisation.
 11. Implement the first non-stiff numerical ODE initial-value solver.
+12. Add multi-coordinate condition storage and constant-coefficient
+    first-order transport PDEs. **Implemented.**
+13. Keep the module layout flat while separating PDE dispatch, transport,
+    characteristic, parameter-linear, and shared-support implementations into
+    `diffequ_pde_*.c` files. **Implemented.**
 
 The module should follow the repository's private-header convention:
 

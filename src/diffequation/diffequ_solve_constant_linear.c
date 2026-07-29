@@ -506,7 +506,9 @@ static bool de_condition_data(
     const equation_t *condition = de->conditions[index];
     const expr_t *left = condition ? equ_lhs(condition) : NULL;
 
-    if (!condition || !left || !de->condition_points[index])
+    if (!condition ||
+        !left ||
+        de->condition_point_counts[index] != 1u)
         return false;
     if (expr_struct_eq(left, dependent)) {
         *order_out = 0u;
@@ -526,7 +528,7 @@ static bool de_condition_data(
         }
         *order_out = order;
     }
-    *point_out = de->condition_points[index];
+    *point_out = de->condition_points[index][0];
     *value_out = equ_rhs(condition);
     return true;
 }
@@ -616,6 +618,228 @@ cleanup:
     return particular;
 }
 
+static number_t *de_number_array_new(size_t count)
+{
+    number_t *values = calloc(count, sizeof(*values));
+
+    if (!values)
+        return NULL;
+    for (size_t i = 0u; i < count; ++i)
+        values[i] = num_new();
+    return values;
+}
+
+static void de_number_array_free(number_t *values, size_t count)
+{
+    if (!values)
+        return;
+    for (size_t i = 0u; i < count; ++i)
+        num_destroy(&values[i]);
+    free(values);
+}
+
+static expr_t *de_add_owned_unsimplified(expr_t *left,
+                                         expr_t *right,
+                                         bool subtract)
+{
+    expr_t *result;
+
+    if (!left || !right) {
+        expr_free(right);
+        expr_free(left);
+        return NULL;
+    }
+    result = subtract ? expr_sub(left, right) : expr_add(left, right);
+    expr_free(right);
+    expr_free(left);
+    return result;
+}
+
+static expr_t *de_append_sum_owned(expr_t *sum,
+                                   expr_t *term,
+                                   bool subtract)
+{
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+    bool inner_subtraction = false;
+
+    if (!term) {
+        expr_free(sum);
+        return NULL;
+    }
+    if (expr_match_add_sub_expr(
+            term, &left, &right, &inner_subtraction)) {
+        expr_t *left_copy = expr_clone(left);
+        expr_t *right_copy = expr_clone(right);
+
+        expr_free(term);
+        sum = de_append_sum_owned(sum, left_copy, subtract);
+        return de_append_sum_owned(
+            sum,
+            right_copy,
+            subtract != inner_subtraction);
+    }
+    if (!sum)
+        return subtract ? expr_negate_owned(term) : term;
+    return de_add_owned_unsimplified(sum, term, subtract);
+}
+
+static expr_t *de_combine_particulars_owned(expr_t *left,
+                                            expr_t *right,
+                                            bool subtract)
+{
+    expr_t *sum = de_append_sum_owned(NULL, left, false);
+
+    return de_append_sum_owned(sum, right, subtract);
+}
+
+static number_t de_derivative_factor(size_t degree, size_t order)
+{
+    number_t factor = num_create_from_long(1L);
+
+    for (size_t i = 0u; i < order; ++i) {
+        number_t next = num_mul_long(factor, (long)(degree - i));
+
+        num_destroy(&factor);
+        factor = next;
+    }
+    return factor;
+}
+
+static expr_t *de_polynomial_from_coefficients(
+    const number_t *coefficients,
+    size_t degree,
+    const expr_t *independent)
+{
+    expr_t *polynomial = NULL;
+
+    for (size_t cursor = degree + 1u; cursor > 0u; --cursor) {
+        size_t i = cursor - 1u;
+        expr_t *term;
+
+        if (num_is_zero(coefficients[i]))
+            continue;
+        term = expr_new_const(coefficients[i]);
+        if (i > 0u) {
+            term = expr_mul_simplify_owned(
+                term,
+                expr_pow_long(independent, (long)i));
+        }
+        if (!term) {
+            expr_free(polynomial);
+            return NULL;
+        }
+        if (!polynomial) {
+            polynomial = term;
+        } else {
+            polynomial = de_add_owned_unsimplified(
+                polynomial, term, false);
+        }
+    }
+    return polynomial ? polynomial : expr_const_zero();
+}
+
+static expr_t *de_polynomial_particular_solution(
+    const de_constant_linear_form_t *form,
+    const expr_t *independent)
+{
+    number_t *forcing = NULL;
+    number_t *operator_coefficients = NULL;
+    number_t *solution = NULL;
+    size_t forcing_degree = 0u;
+    size_t root_multiplicity = 0u;
+    size_t solution_degree;
+    expr_t *particular = NULL;
+
+    if (!equ_match_polynomial_alloc(
+            form->forcing,
+            independent,
+            &forcing,
+            &forcing_degree))
+        return NULL;
+
+    operator_coefficients =
+        de_number_array_new(form->order + 1u);
+    if (!operator_coefficients)
+        goto cleanup;
+    for (size_t i = 0u; i <= form->order; ++i) {
+        number_t value = num_new();
+
+        if (!expr_match_const_value(
+                form->coefficients[i], &value)) {
+            num_destroy(&value);
+            value = expr_eval(form->coefficients[i]);
+        }
+        if (!num_is_finite(value)) {
+            num_destroy(&value);
+            goto cleanup;
+        }
+        num_destroy(&operator_coefficients[i]);
+        operator_coefficients[i] = value;
+    }
+
+    while (root_multiplicity <= form->order &&
+           num_is_zero(operator_coefficients[root_multiplicity]))
+        root_multiplicity++;
+    if (root_multiplicity > form->order ||
+        forcing_degree > SIZE_MAX - root_multiplicity)
+        goto cleanup;
+
+    solution_degree = forcing_degree + root_multiplicity;
+    solution = de_number_array_new(solution_degree + 1u);
+    if (!solution)
+        goto cleanup;
+
+    for (size_t cursor = forcing_degree + 1u; cursor > 0u; --cursor) {
+        size_t degree = cursor - 1u;
+        number_t rhs = num_clone(forcing[degree]);
+
+        for (size_t order = root_multiplicity + 1u;
+             order <= form->order &&
+             degree + order <= solution_degree;
+             ++order) {
+            number_t factor =
+                de_derivative_factor(degree + order, order);
+            number_t scaled =
+                num_mul(operator_coefficients[order], factor);
+            number_t contribution =
+                num_mul(scaled, solution[degree + order]);
+            number_t next = num_sub(rhs, contribution);
+
+            num_destroy(&contribution);
+            num_destroy(&scaled);
+            num_destroy(&factor);
+            num_destroy(&rhs);
+            rhs = next;
+        }
+        {
+            size_t solution_index = degree + root_multiplicity;
+            number_t factor = de_derivative_factor(
+                solution_index, root_multiplicity);
+            number_t denominator = num_mul(
+                operator_coefficients[root_multiplicity], factor);
+            number_t coefficient = num_div(rhs, denominator);
+
+            num_destroy(&denominator);
+            num_destroy(&factor);
+            num_destroy(&rhs);
+            num_destroy(&solution[solution_index]);
+            solution[solution_index] = coefficient;
+        }
+    }
+
+    particular = de_polynomial_from_coefficients(
+        solution, solution_degree, independent);
+
+cleanup:
+    de_number_array_free(solution,
+                         solution ? solution_degree + 1u : 0u);
+    de_number_array_free(
+        operator_coefficients, form->order + 1u);
+    de_number_array_free(forcing, forcing_degree + 1u);
+    return particular;
+}
+
 static expr_t *de_particular_solution(
     const de_constant_linear_form_t *form,
     const expr_t *independent,
@@ -626,9 +850,101 @@ static expr_t *de_particular_solution(
     matrix_t *rates = NULL;
     expr_t *particular = NULL;
     bool use_direct_exponential;
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+    const expr_t *scaled_base = NULL;
+    number_t scale = num_new();
+    bool is_subtraction = false;
 
     if (expr_is_exact_zero(form->forcing))
-        return expr_const_zero();
+        particular = expr_const_zero();
+    if (particular)
+        goto cleanup_scale;
+
+    if (expr_match_scaled_expr(
+            form->forcing, &scale, &scaled_base)) {
+        de_constant_linear_form_t scaled_form = *form;
+        const expr_t *scaled_left = NULL;
+        const expr_t *scaled_right = NULL;
+        bool scaled_subtraction = false;
+
+        if (expr_match_add_sub_expr(
+                scaled_base,
+                &scaled_left,
+                &scaled_right,
+                &scaled_subtraction)) {
+            de_constant_linear_form_t left_form = *form;
+            de_constant_linear_form_t right_form = *form;
+            expr_t *left_forcing = expr_mul_simplify_owned(
+                expr_new_const(scale), expr_clone(scaled_left));
+            expr_t *right_forcing = expr_mul_simplify_owned(
+                expr_new_const(scale), expr_clone(scaled_right));
+            expr_t *left_particular;
+            expr_t *right_particular;
+
+            if (!left_forcing || !right_forcing) {
+                expr_free(right_forcing);
+                expr_free(left_forcing);
+                goto cleanup_scale;
+            }
+            left_form.forcing = left_forcing;
+            right_form.forcing = right_forcing;
+            left_particular = de_particular_solution(
+                &left_form, independent, basis);
+            right_particular = de_particular_solution(
+                &right_form, independent, basis);
+            expr_free(right_forcing);
+            expr_free(left_forcing);
+            particular = de_combine_particulars_owned(
+                left_particular,
+                right_particular,
+                scaled_subtraction);
+            goto cleanup_scale;
+        }
+
+        scaled_form.forcing = (expr_t *)scaled_base;
+        particular = de_particular_solution(
+            &scaled_form, independent, basis);
+        if (particular) {
+            expr_t *expanded;
+
+            particular = expr_mul_simplify_owned(
+                expr_new_const(scale), particular);
+            expanded = particular
+                ? expr_display_expanded(particular)
+                : NULL;
+            if (expanded) {
+                expr_free(particular);
+                particular = expanded;
+            }
+        }
+        goto cleanup_scale;
+    }
+
+    if (expr_match_add_sub_expr(
+            form->forcing, &left, &right, &is_subtraction)) {
+        de_constant_linear_form_t left_form = *form;
+        de_constant_linear_form_t right_form = *form;
+        expr_t *left_particular;
+        expr_t *right_particular;
+
+        left_form.forcing = (expr_t *)left;
+        right_form.forcing = (expr_t *)right;
+        left_particular = de_particular_solution(
+            &left_form, independent, basis);
+        right_particular = de_particular_solution(
+            &right_form, independent, basis);
+        if (!left_particular || !right_particular) {
+            expr_free(right_particular);
+            expr_free(left_particular);
+            goto cleanup_scale;
+        }
+        particular = de_combine_particulars_owned(
+            left_particular,
+            right_particular,
+            is_subtraction);
+        goto cleanup_scale;
+    }
 
     use_direct_exponential =
         form->order > 2u ||
@@ -638,7 +954,12 @@ static expr_t *de_particular_solution(
         ? de_exponential_particular_solution(form, independent)
         : NULL;
     if (particular)
-        return particular;
+        goto cleanup_scale;
+
+    particular = de_polynomial_particular_solution(
+        form, independent);
+    if (particular)
+        goto cleanup_scale;
 
     wronskian = mat_new_expr(form->order, form->order);
     forcing = mat_new_expr(form->order, 1u);
@@ -702,6 +1023,8 @@ cleanup:
     mat_free(rates);
     mat_free(forcing);
     mat_free(wronskian);
+cleanup_scale:
+    num_destroy(&scale);
     return particular;
 }
 

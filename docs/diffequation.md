@@ -14,6 +14,8 @@ linear-coordinate substitutions, and quadratic Bernoulli ODEs. Second-order
 linear equations are normalized to self-adjoint Sturm–Liouville form.
 Constant-coefficient linear ODEs of arbitrary order are solved through their
 characteristic polynomial and variation of parameters.
+The first PDE solver handles two-variable, constant-coefficient homogeneous
+transport equations with explicit axis-aligned boundary data.
 
 ## Ownership
 
@@ -21,8 +23,9 @@ characteristic polynomial and variation of parameters.
   `diffequ_t *` handles.
 - `de_free(...)` releases an owning handle and accepts `NULL`.
 - `de_equation(...)`, `de_independent_at(...)`, `de_constants(...)`,
-  `de_constant(...)`, and `de_condition_at(...)` return borrowed objects owned
-  by the differential equation.
+  `de_constant(...)`, `de_condition_at(...)`, and
+  `de_condition_argument_at(...)` return borrowed objects owned by the
+  differential equation.
 - `de_to_text(...)` returns an owning `string_t *`, released with
   `string_free(...)`.
 - `de_to_string(...)` returns an owning C string, released with `free(...)`.
@@ -69,6 +72,44 @@ y'' + 4y = e^x
 → y = ⅕·exp(x) + C₁·cos(2x) + C₂·sin(2x)
 ```
 
+Additive forcing terms are solved independently and then combined:
+
+```text
+y'' + 4y = e^x + x^3
+→ y = ⅕·exp(x) + ¼x³ - ⅜x + C₁·cos(2x) + C₂·sin(2x)
+```
+
+Autonomous first-order equations that are quadratic in the derivative can
+produce multiple implicit branches and a singular solution:
+
+```text
+(y')^2 = y' + 2y
+→ x = ½·(√(8y + 1) - ln(|½·(√(8y + 1) + 1)|) + 1) + C
+→ x = ½·(1 - √(8y + 1) - ln(|½·(1 - √(8y + 1))|)) + C
+→ y = 0
+```
+
+Exact third-order nonlinear forms can be integrated once and linearized. For
+example,
+
+```text
+y''' + y''*y' = 3x^2
+→ y = 2·ln(|Σ_(n=0)^∞ c_(n)·x^n|)
+  c_(0) = C₂
+  c_(1) = C₃
+  c_(-1) = c_(-2) = c_(-3) = 0
+  c_(n + 2) = (C₁·c_(n) + c_(n - 3))/(2·(n + 2)·(n + 1))
+```
+
+Here the original left side is
+`Dx(y'' + ½(y')²)`. After one integration, the substitution
+`u = exp(y/2)` cancels the quadratic derivative term and gives
+`u'' = ½(x³ + C₁)u`. The displayed recurrence is obtained by substituting
+`u = Σ c_n x^n`; it is a complete convergent power-series solution and does
+not introduce nonstandard special-function names. The independent constants
+`C₁`, `C₂`, and `C₃` provide the three arbitrary constants required by the
+original third-order equation.
+
 When `x` is the dependent variable, prime notation defaults to differentiation
 with respect to time so that the two variables do not collide:
 
@@ -86,6 +127,85 @@ normalized problem, selected solver family, diagnostic, and every symbolic
 solution returned by `de_solve(...)`. **Use as input** restores the original
 problem, including its initial or boundary conditions.
 
+## First-Order Transport PDEs
+
+Ordinary and partial differential equations share the same `diffequ_t`.
+Multiple declared independent variables make the derivative notation partial:
+
+```text
+{
+    2*Dx(u) + Dy(u) = 0
+    | x = ?, y = ?;
+    ;
+    u(x, 0) = x^2
+}
+```
+
+For the constant-coefficient transport equation
+
+```text
+a*Dx(u) + b*Dy(u) = q,
+```
+
+the characteristic invariant is `b*x - a*y`. For `q = 0`, the value of `u`
+is constant along each characteristic. With explicit data on `y = y0`, the
+solver transports the boundary expression along those curves. The example
+above therefore gives:
+
+```text
+u = (x - 2y)²
+```
+
+Boundary data on a constant-`x` line is supported as well:
+
+```text
+{
+    Dx(u) + 3*Dy(u) = 0
+    | x = ?, y = ?;
+    ;
+    u(0, y) = exp(y)
+}
+→ u = exp(y - 3x)
+```
+
+Boundary applications retain each coordinate separately. For `u(x, 0)`,
+`de_condition_argument_count(...)` returns two, and
+`de_condition_argument_at(...)` returns the borrowed `x` and `0` expressions.
+
+Without boundary data, Mars returns the general solution using the ordinary
+arbitrary-function notation `F`:
+
+```text
+Dt(u) + c*Dx(u) = 0
+→ u = F(x - c*t)
+
+Dt(u) + c*Dx(u) = 1
+→ u = t + F(x - c*t)
+```
+
+The characteristic solver also handles these nonlinear and
+variable-coefficient forms:
+
+```text
+Dx(z) + Dy(z) = 6*(x+y)^2*z^2
+→ z = 1/(F(x - y) - (x + y)^3)
+→ z = 0
+
+(x+y)*Dx(z) + (y-x)*Dy(z) = 0
+→ z = F(atan2(y,x) + 1/2*ln(x^2+y^2))
+```
+
+A missing derivative in one coordinate makes that coordinate a parameter:
+
+```text
+Dy(z) + 2*y*z = x*y^3
+→ z = x/2*(y^2 - 1) + F(x)*exp(-y^2)
+```
+
+`F` is a genuine arbitrary-function expression node. It renders in plain and
+TeX output, participates in substitution, and differentiates by the chain
+rule as `F'(g(x))*g'(x)`.
+
 ## Solving
 
 `de_solve(...)` classifies and solves the problem where possible. A
@@ -95,8 +215,8 @@ unsupported mathematics distinct from invalid input or allocation failure.
 
 The current symbolic scope is:
 
-- one independent variable;
-- one first-order dependent function;
+- one-variable ODEs and two-variable transport PDEs;
+- one dependent function;
 - separable equations, including the directly invertible `y`, `ln(y)`, and
   quadratic dependent-factor forms;
 - linear equations `Dx(y) + P(x)*y = Q(x)`, solved with the integrating factor
@@ -110,10 +230,18 @@ The current symbolic scope is:
   `Y = a*x + b*y`, `X = c*x + d*y`; and
 - quadratic Bernoulli equations, reduced with `v = 1/y` and then solved as
   linear equations; and
+- exact third-order forms `a*y''' + k*y'*y'' = f(x)`, integrated once and
+  linearized with `u = exp(k*y/(2a))`; and
 - regular second-order linear equations, normalized to Sturm–Liouville form;
   and
 - arbitrary-order constant-coefficient linear ODEs, including repeated and
-  complex roots and nonhomogeneous forcing.
+  complex roots and nonhomogeneous forcing; and
+- homogeneous and constant-forced constant-coefficient transport PDEs,
+  including arbitrary-function families and explicit axis-aligned boundary
+  data;
+- selected nonlinear and variable-coefficient first-order characteristic
+  PDEs; and
+- parameter-dependent first-order linear PDEs.
 
 An initial condition is used to determine the integration constant. Without
 one, the solution contains the arbitrary constant `C`. The linear solver uses
@@ -263,7 +391,7 @@ and the returned solution is
 ½·(x + y)² = 1 - exp(-(x - y)).
 ```
 
-The solver implementations are separated by ODE family:
+The solver implementations are separated by differential-equation family:
 
 ```text
 diffequ_solve_separable.c
@@ -274,9 +402,17 @@ diffequ_solve_linear_subst.c
 diffequ_solve_linear_transform.c
 diffequ_solve_sturm_liouville.c
 diffequ_solve_constant_linear.c
+diffequ_pde_solve.c
+diffequ_pde_transport.c
+diffequ_pde_characteristics.c
+diffequ_pde_linear.c
+diffequ_pde_support.c
 ```
 
-`diffequ_solve.c` contains the shared classification and dispatch path.
+All files remain directly under `src/diffequation/`. `diffequ_solve.c`
+contains the shared ODE/PDE entry point, while `diffequ_pde_solve.c` owns PDE
+classification and dispatch. `diffequ_pde_internal.h` is the private boundary
+between the shared entry point and the PDE solvers.
 
 ## Second-Order Linear Equations
 

@@ -154,7 +154,7 @@ class DiffequationResultTests(unittest.TestCase):
                     / "scratch"
                     / "diffequation_lab"
                 ),
-                "y'' + 4y = e^x",
+                "y'' + 4y = e^x + x^3",
             ],
             check=True,
             capture_output=True,
@@ -165,10 +165,14 @@ class DiffequationResultTests(unittest.TestCase):
         payload = mars_lab.prepare_diffequation_fields(fields)
 
         self.assertEqual(payload["status"], "solved")
-        self.assertIn("Dxx(y) + 4y = e^x", payload["problem"])
+        self.assertIn(
+            "Dxx(y) + 4y = e^x + x^3",
+            payload["problem"],
+        )
         self.assertEqual(
             payload["solutions"],
-            "y = ⅕·exp(x) + C₁·cos(2x) + C₂·sin(2x)",
+            "y = ⅕·exp(x) + ¼x³ - ⅜x + "
+            "C₁·cos(2x) + C₂·sin(2x)",
         )
 
         completed = subprocess.run(
@@ -194,6 +198,89 @@ class DiffequationResultTests(unittest.TestCase):
         self.assertEqual(
             payload["solutions"],
             "x = C₁·cos(t) + C₂·sin(t)",
+        )
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
+    def test_native_helper_solves_derivative_quadratic_ode(self) -> None:
+        completed = subprocess.run(
+            [
+                str(
+                    ROOT
+                    / "build"
+                    / "release"
+                    / "scratch"
+                    / "diffequation_lab"
+                ),
+                "(y')^2 = y' + 2y",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
+        payload = mars_lab.prepare_diffequation_fields(fields)
+
+        self.assertEqual(payload["status"], "solved")
+        self.assertEqual(payload["solver"], "derivative-quadratic")
+        self.assertIn(r"\operatorname{D}_{x}", payload["problem_tex"])
+        self.assertNotIn(r"\operatorname{D}^{2}", payload["problem_tex"])
+        self.assertIn("y = ?", payload["problem_tex"])
+        self.assertNotIn("NAN", payload["problem_tex"])
+        self.assertEqual(
+            payload["solutions"].splitlines(),
+            [
+                "x = ½·(√(8y + 1) - "
+                "ln(|½·(√(8y + 1) + 1)|) + 1) + C",
+                "x = ½·(1 - √(8y + 1) - "
+                "ln(|½·(1 - √(8y + 1))|)) + C",
+                "y = 0",
+            ],
+        )
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
+    def test_native_helper_linearizes_exact_third_order_ode(self) -> None:
+        completed = subprocess.run(
+            [
+                str(
+                    ROOT
+                    / "build"
+                    / "release"
+                    / "scratch"
+                    / "diffequation_lab"
+                ),
+                "y''' + y''*y' = 3x^2",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
+        payload = mars_lab.prepare_diffequation_fields(fields)
+
+        self.assertEqual(payload["status"], "solved")
+        self.assertEqual(
+            payload["solver"], "exact-derivative linearization"
+        )
+        self.assertEqual(
+            payload["solutions"].splitlines(),
+            [
+                "y = 2·ln(|Σ_(n=0)^∞ c_(n)·x^n|)",
+                "c_(0) = C₂",
+                "c_(1) = C₃",
+                "c_(-1) = 0",
+                "c_(-2) = 0",
+                "c_(-3) = 0",
+                "c_(n + 2) = "
+                "(C₁·c_(n) + c_(n - 3))/(2·(n + 2)·(n + 1))",
+            ],
         )
 
 

@@ -265,6 +265,16 @@ static char *tex_wrapped_body_inner(const expr_t *expr, size_t line_limit)
     return one_line;
 }
 
+static int tex_tree_contains_formal_derivative(const expr_t *expr)
+{
+    if (!expr)
+        return 0;
+    if (expr_is_formal_derivative(expr))
+        return 1;
+    return tex_tree_contains_formal_derivative(expr->a) ||
+           tex_tree_contains_formal_derivative(expr->b);
+}
+
 int expr_to_tex_parts(const expr_t *dv, char **expr_out, char **bindings_out)
 {
     autoname_table_t vnames;
@@ -280,7 +290,14 @@ int expr_to_tex_parts(const expr_t *dv, char **expr_out, char **bindings_out)
     *expr_out = NULL;
     *bindings_out = NULL;
 
-    if (dv && dv->binding_expr && !expr_is_const(dv)) {
+    /*
+     * A binding expression records the user's surface syntax, but its compact
+     * D^n(y) notation cannot distinguish the nth derivative from a power of a
+     * derivative.  Render the expression tree whenever formal derivatives are
+     * present so (Dx(y))^2 remains visibly distinct from Dxx(y).
+     */
+    if (dv && dv->binding_expr && !expr_is_const(dv) &&
+        !tex_tree_contains_formal_derivative(dv)) {
         *expr_out = expr_binding_expr_to_tex(dv->binding_expr);
         *bindings_out = expr_tostring_xstrdup("");
         return (*expr_out && *bindings_out) ? 0 : -1;
