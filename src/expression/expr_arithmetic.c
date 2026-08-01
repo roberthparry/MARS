@@ -38,6 +38,12 @@ static number_t eval_arbitrary_function(expr_t *dv)
     return num_clone(NUM_NAN);
 }
 
+static number_t eval_argument_list(expr_t *dv)
+{
+    (void)dv;
+    return num_clone(NUM_NAN);
+}
+
 static number_t eval_add(expr_t *dv)
 {
     return num_add(expr_eval_num_internal(dv->a), expr_eval_num_internal(dv->b));
@@ -452,6 +458,48 @@ expr_t *expr_new_arbitrary_function(const char *name, const expr_t *argument)
     expr->a = (expr_t *)argument;
     expr_retain(expr->a);
     return expr;
+}
+
+static expr_t *expr_new_argument_list(
+    const expr_t *left,
+    const expr_t *right)
+{
+    expr_t *expr;
+
+    if (!left || !right)
+        return NULL;
+    expr = expr_alloc(&ops_argument_list);
+    expr->a = (expr_t *)left;
+    expr->b = (expr_t *)right;
+    expr_retain(expr->a);
+    expr_retain(expr->b);
+    return expr;
+}
+
+expr_t *expr_new_arbitrary_function_n(
+    const char *name,
+    size_t argument_count,
+    expr_t *const *arguments)
+{
+    expr_t *list;
+
+    if (!name || !*name || argument_count == 0u || !arguments)
+        return NULL;
+    list = expr_clone(arguments[0]);
+    for (size_t i = 1u; list && i < argument_count; ++i) {
+        expr_t *next =
+            expr_new_argument_list(list, arguments[i]);
+
+        expr_free(list);
+        list = next;
+    }
+    if (!list)
+        return NULL;
+
+    expr_t *function = expr_new_arbitrary_function(name, list);
+
+    expr_free(list);
+    return function;
 }
 
 bool expr_is_arbitrary_function(const expr_t *expr)
@@ -2443,6 +2491,21 @@ const expr_ops_t ops_arbitrary_function = {
     .tex_name = NULL,
     .apply_unary = NULL,
     .apply_binary = NULL,
+    .simplify = expr_simplify_passthrough,
+    .fold_const_unary = NULL
+};
+
+const expr_ops_t ops_argument_list = {
+    .eval = eval_argument_list,
+    .deriv = NULL,
+    .reverse = expr_reverse_not_differentiable,
+    .kind = EXPR_KIND_ARGUMENT_LIST,
+    .arity = EXPR_OP_BINARY,
+    .diff_kind = EXPR_DIFF_NONE,
+    .name = "argument-list",
+    .tex_name = NULL,
+    .apply_unary = NULL,
+    .apply_binary = expr_new_argument_list,
     .simplify = expr_simplify_passthrough,
     .fold_const_unary = NULL
 };

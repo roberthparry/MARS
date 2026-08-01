@@ -82,3 +82,43 @@ cleanup:
     equ_free(transport_solution);
     return result;
 }
+
+diffequ_solve_result_t *de_pde_solve_multi_variable(
+    const diffequ_t *de,
+    const expr_t *residual)
+{
+    equation_t *solution = NULL;
+    bool recognized = false;
+    de_attempt_t attempt = residual
+        ? de_pde_attempt_constant_transport_n(
+              de, residual, &solution, &recognized)
+        : DE_ATTEMPT_FAILED;
+    diffequ_solve_result_t *result;
+
+    if (attempt == DE_ATTEMPT_SOLVED) {
+        result = de_solve_result_new(
+            DE_SOLVE_STATUS_SOLVED,
+            DE_SOLVER_CONSTANT_COEFFICIENT_TRANSPORT,
+            "solved by the method of characteristics");
+        if (!result ||
+            de_solve_result_append(result, solution) != 0) {
+            de_solve_result_free(result);
+            equ_free(solution);
+            return NULL;
+        }
+        return result;
+    }
+
+    equ_free(solution);
+    return de_solve_result_new(
+        attempt == DE_ATTEMPT_FAILED
+            ? DE_SOLVE_STATUS_FAILED
+            : DE_SOLVE_STATUS_UNSUPPORTED,
+        DE_SOLVER_NONE,
+        attempt == DE_ATTEMPT_FAILED
+            ? "failed to complete the multidimensional transport solution"
+            : recognized
+                ? "the multidimensional transport data is unsupported"
+                : "no available symbolic multidimensional PDE solver "
+                  "matched the equation");
+}

@@ -73,6 +73,12 @@ static void test_from_string_arithmetic(void)
     check_parse_val("x^2.5 at 4 = 32",
         "{ x^2.5 | x = 4 }",
         32.0, __LINE__);
+    check_parse_expr("power binds before following division",
+        "{ x^2/6 | x = NAN }",
+        "{ x²/6 | x = NAN }", __LINE__);
+    check_parse_expr("parenthesised rational remains an exponent",
+        "{ x^(2/6) | x = NAN }",
+        "{ x^⅓ | x = NAN }", __LINE__);
     check_parse_num("decimal binding stays exact through cancellation-sensitive cube",
         "{ (5x)^3 | x = 128064.000000000120974 }",
         "262537412640768744007706072064702817249456224221302405921303/"

@@ -410,3 +410,27 @@ char *expr_to_tex_body_wrapped(const expr_t *expr, size_t line_limit)
     autoname_restore(&vnames);
     return body;
 }
+
+char *expr_to_tex_body_wrapped_with_partials(
+    const expr_t *expr,
+    size_t line_limit)
+{
+    char *body;
+
+    expr_tex_partial_derivatives_push();
+    body = expr_to_tex_body_wrapped(expr, line_limit);
+    expr_tex_partial_derivatives_pop();
+    return body;
+}
+
+char *expr_to_tex_body_wrapped_with_totals(
+    const expr_t *expr,
+    size_t line_limit)
+{
+    char *body;
+
+    expr_tex_total_derivatives_push();
+    body = expr_to_tex_body_wrapped(expr, line_limit);
+    expr_tex_total_derivatives_pop();
+    return body;
+}

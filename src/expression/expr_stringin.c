@@ -202,6 +202,9 @@ static expr_t *build_ascii_bounded_integral_expr(const expr_t *lower,
                                                  const expr_t *upper,
                                                  const expr_t *display_integrand,
                                                  const expr_t *dummy);
+static expr_t *parse_signed_power_operand_mode(
+    expr_parse_state_t *p,
+    bool allow_ascii_rational_literal);
 static expr_t *parse_signed_power_operand(expr_parse_state_t *p);
 static size_t scan_unicode_fraction_len_view(string_view_t view, size_t pos);
 static size_t scan_special_number_literal_len_view(string_view_t view, size_t pos);
@@ -2308,7 +2311,8 @@ static expr_t *parse_integral_atom(expr_parse_state_t *p)
 /* Atom parser                                                          */
 /* ------------------------------------------------------------------ */
 
-static expr_t *parse_atom(expr_parse_state_t *p)
+static expr_t *parse_atom(expr_parse_state_t *p,
+                          bool allow_ascii_rational_literal)
 {
     NUM_SCOPE(scope);
     size_t pos = expr_parse_pos(p);
@@ -2385,6 +2389,13 @@ static expr_t *parse_atom(expr_parse_state_t *p)
 
         if (len == 0u)
             len = special_len;
+        if (!allow_ascii_rational_literal &&
+            decimal_len > 0u &&
+            len > decimal_len &&
+            expr_parse_view_peek_ascii(
+                text, pos + decimal_len, &b) &&
+            b == '/')
+            len = decimal_len;
         literal_view = string_view_slice(text, pos, len);
         if (len == 0 ||
             !parse_number_view(literal_view, &value)) {
@@ -2805,9 +2816,11 @@ static expr_t *parse_atom(expr_parse_state_t *p)
 /* Power parser                                                         */
 /* ------------------------------------------------------------------ */
 
-static expr_t *parse_power_operand(expr_parse_state_t *p)
+static expr_t *parse_power_operand_mode(
+    expr_parse_state_t *p,
+    bool allow_ascii_rational_literal)
 {
-    expr_t *base = parse_atom(p);
+    expr_t *base = parse_atom(p, allow_ascii_rational_literal);
     if (!base) return NULL;
 
     while (expr_parse_consume_char(p, '!')) {
@@ -2817,6 +2830,11 @@ static expr_t *parse_power_operand(expr_parse_state_t *p)
     }
 
     return base;
+}
+
+static expr_t *parse_power_operand(expr_parse_state_t *p)
+{
+    return parse_power_operand_mode(p, true);
 }
 
 static expr_t *parse_power(expr_parse_state_t *p)
@@ -2852,7 +2870,7 @@ static expr_t *parse_power(expr_parse_state_t *p)
         if (expr_parse_consume_char(p, '(')) {
             exponent = parse_enclosed_addexpr(p, ')', "expected ')' after exponent");
         } else {
-            exponent = parse_signed_power_operand(p);
+            exponent = parse_signed_power_operand_mode(p, false);
         }
 
         if (!exponent) {
@@ -2903,7 +2921,9 @@ static expr_t *parse_signed_power(expr_parse_state_t *p)
     return negate ? apply_unary_preserving_constexpr(&ops_neg, inner, expr_neg) : inner;
 }
 
-static expr_t *parse_signed_power_operand(expr_parse_state_t *p)
+static expr_t *parse_signed_power_operand_mode(
+    expr_parse_state_t *p,
+    bool allow_ascii_rational_literal)
 {
     int negate = 0;
     expr_t *inner;
@@ -2921,9 +2941,14 @@ static expr_t *parse_signed_power_operand(expr_parse_state_t *p)
         expr_parse_skip_spaces(p);
     }
 
-    inner = parse_power_operand(p);
+    inner = parse_power_operand_mode(p, allow_ascii_rational_literal);
     if (!inner) return NULL;
     return negate ? apply_unary_preserving_constexpr(&ops_neg, inner, expr_neg) : inner;
+}
+
+static expr_t *parse_signed_power_operand(expr_parse_state_t *p)
+{
+    return parse_signed_power_operand_mode(p, true);
 }
 
 /* ------------------------------------------------------------------ */

@@ -213,6 +213,34 @@ Dxyz(u)     Dz(Dy(Dx(u)))
 Thus suffixes are read from left to right. The order is retained internally
 and in rendered output.
 
+The differential-equation input layer also accepts conventional subscript
+notation:
+
+```text
+u_x         Dx(u)
+u_y         Dy(u)
+u_xy        Dxy(u) = Dy(Dx(u))
+u_xx        Dxx(u)
+phi_x       Dx(@phi)
+xzz_x       x*z*Dx(z)
+```
+
+For shorthand problems, the suffix letters infer the independent variables.
+For fully specified problem strings, every suffix letter must name a declared
+independent variable. Normalization happens only in the differential-equation
+parser so it does not reinterpret underscore-bearing identifiers in the
+general expression module. When a compact product begins with a declared
+coordinate, the final base letter is the differentiated field and the leading
+letters remain an implicit product. Thus `xzz_x` means `x*z*Dx(z)`, not
+`Dx(xzz)`.
+
+The canonical and unbound text forms retain the `D...(...)` notation so they
+round-trip through the parser. When a differential equation has more than one
+independent variable, its TeX renderer instead emits standard partial
+fractions: `\\partial u/\\partial x`, `\\partial^2u/\\partial x^2`, and
+`\\partial^2u/(\\partial y\\,\\partial x)`. This display choice is scoped to
+the differential-equation renderer and does not alter expression trees.
+
 For an ODE with dependent variable `y(x)`, `Dx(y)` is an ordinary derivative.
 For a multivariable function such as `u(x,y)`, `Dx(u)` and `Dy(u)` are partial
 derivatives.
@@ -226,8 +254,8 @@ y''         Dxx(y)
 y'''        Dxxx(y)
 ```
 
-The explicit `D...(...)` notation remains available and is required when the
-variable of differentiation would otherwise be ambiguous, as in PDEs.
+The explicit `D...(...)` notation remains available when the variable of
+differentiation would otherwise be ambiguous.
 
 For high-order and mixed derivatives, a bracketed derivative-index
 specification provides a compact form:
@@ -671,18 +699,215 @@ node and returns `F(y - (b/a)*x)` plus a particular solution when `q` is
 constant. Arbitrary-function nodes retain their argument, render as `F(...)`,
 and differentiate through the chain rule.
 
+The constant-transport classifier also decomposes a constant linear reaction
+term:
+
+```text
+a*Dx(u) + b*Dy(u) + p*u = q(x,y).
+```
+
+It evolves both arbitrary-function and boundary-data solutions with the
+factor `exp(-(p/a)*x)` and includes the constant particular solution `-q/p`
+when `p` is nonzero and `q` is constant. Without boundary data,
+coordinate-dependent forcing is pulled back to a characteristic and
+integrated with the corresponding one-dimensional integrating factor. For
+example, `Dx(z) + Dy(z) + z = x` gives
+`z = x - 1 + exp(-x)*F(y - x)`.
+
+For zero reaction coefficient, additive forcing `f(x) + g(y)` is handled
+without introducing a characteristic integration parameter: each coordinate
+term is integrated against its corresponding transport coefficient. Thus
+`Dx(φ) - Dy(φ) = sin(x) + cos(y)` gives
+`φ = F(x + y) - cos(x) - sin(y)`.
+
+For polynomial forcing with nonzero reaction coefficient, the solver uses the
+finite inverse of the constant-coefficient operator. Writing
+`D = a*Dx + b*Dy`, the particular solution of
+`(D + p)u = -q` is
+
+```text
+-q/p + Dq/p^2 - D^2q/p^3 + ...
+```
+
+The series terminates exactly because each directional derivative lowers the
+total polynomial degree. It is attempted structurally, with a fixed safety
+limit, and accepted only after the next directional derivative simplifies to
+exact zero. Nonpolynomial forcing continues through characteristic
+integration.
+
+Additive forcing that depends on only one coordinate is also solved directly
+when it belongs to a derivative-closed space. For
+
+```text
+c*P'(v) + p*P(v) = -f(v),    f''(v) = lambda*f(v),
+```
+
+the particular solution is
+
+```text
+P(v) = (c*f'(v) - p*f(v))/(p^2 - c^2*lambda).
+```
+
+This covers sine/cosine, hyperbolic, and exponential forcing whenever the
+denominator is nonzero. Resonant cases continue through the integrating-factor
+path. The rule is structural and coefficient-independent; it is not a table
+of individual PDEs.
+
+Before falling back to characteristic integration, the same derivative-closed
+test is applied to the complete transport derivative `D = a*Dx + b*Dy`. When
+`D^2*f = lambda*f`, Mars constructs the corresponding particular solution
+algebraically and substitutes it into `D(P) + p*P + f`. It accepts the result
+only if the residual simplifies exactly to zero. This covers mixed affine
+phases without introducing the internal characteristic parameter; for
+example,
+
+```text
+Dx(z) + Dy(z) = cos(x+y)
+z = F(y-x) + 1/2*sin(x+y).
+```
+
+The complementary mixed-phase rule handles any unary forcing `f(g(x,y))`
+for which the expression integrator knows an antiderivative and the
+directional phase derivative `D(g)` is a nonzero coordinate-independent
+value. It integrates a dummy unary expression with respect to its phase,
+substitutes the original phase back, divides by `D(g)`, and verifies the
+candidate against the original operator. Thus
+
+```text
+Dx(z) + 2*Dy(z) = tanh(x+y)
+z = F(y-2x) + 1/3*ln(cosh(x+y)).
+```
+
+This is a structural rule rather than a `tanh`-specific template.
+
+Homogeneous and constant-forced constant-coefficient transport is
+dimension-independent. For `n` transport coordinates, the solver selects the
+first nonzero direction as its characteristic parameter and constructs
+`n - 1` invariants
+
+```text
+x_i - (a_i/a_0)*x_0,    i = 1, ..., n - 1.
+```
+
+The complementary solution is an arbitrary function of all these invariants,
+multiplied by `exp(-(p/a_0)*x_0)` when a reaction term is present. Expression
+trees represent the arbitrary function with a true argument list, ensuring
+that a three-variable PDE produces `F(I1, I2)` rather than an incomplete
+one-variable family.
+
+For two-dimensional variable-coefficient transport, the characteristic
+dispatcher also recognizes monomial direction ratios
+
+```text
+b(x,y)/a(x,y) = k*y/x.
+```
+
+It constructs `I = y*x^(-k)` and searches for an exponent `h` satisfying
+`a*h_x + b*h_y = -c`. A candidate obtained by symbolic integration is scaled
+only by a coordinate-independent factor, then substituted back into the
+operator. If the residual is not exactly zero, the candidate is rejected.
+The resulting homogeneous family is `u = exp(h)*F(I)`.
+
+For an inhomogeneous equation
+
+```text
+a*u_x + b*u_y + c*u + f = 0,
+```
+
+the same dispatch searches along each nonzero characteristic direction for a
+symbolically integrable particular candidate. It may rescale that primitive
+only by a value independent of both coordinates and the dependent field.
+The candidate is accepted only after the full operator
+`a*P_x + b*P_y + c*P + f` simplifies exactly to zero. Thus, for example,
+`x*z_x - 7*y*z_y = 5*x^2*y` produces
+`z = F(x^7*y) - x^2*y` from the general rule, not from an equation-specific
+template.
+
+The variable-coefficient dispatcher additionally proposes
+`I = x^2 + y^2` when the transport field `(a,b)` is tangent to circles. It
+accepts this invariant only if `a*I_x + b*I_y` simplifies exactly to zero.
+The same verified reaction and particular-solution machinery then solves, for
+example,
+
+```text
+x*y*z_x - x^2*z_y + y*z = 3*x^2*y
+z = F(x^2 + y^2)/x + x^2.
+```
+
+Derivative operands also provide a contextual symbol declaration. A built-in
+alias such as `@phi` remains the golden ratio in an ordinary expression, but
+inside `Dx(@phi)` or `Dy(@phi)` it is a dependent variable. The parser adds a
+temporary variable binding while constructing the formal derivative graph;
+that binding is not added to the equation's independent-variable list.
+
 The next characteristic dispatch recognizes nonlinear evolution along
 constant vector fields and selected variable-coefficient vector fields. It
 currently covers
 
 ```text
 Dx(z) + Dy(z) = 6*(x+y)^2*z^2
+x^2*Dx(z) + y^2*Dy(z) = z^2
+(x*z)*Dx(z) + (y*z)*Dy(z) + x^2 + y^2 = 0
+z*Dx(z) + z*Dy(z) = y - x
 (x+y)*Dx(z) + (y-x)*Dy(z) = 0
+(y-x)*Dx(z) + (y+x)*Dy(z) = (x^2+y^2)/z
 ```
 
-including the singular solution `z = 0` in the first family. A
+including the singular solution `z = 0` in both reciprocal-quadratic
+families. For a
+separable characteristic field, Mars constructs coordinate potentials whose
+directional derivatives are exactly one. Their difference is the
+characteristic invariant, and reciprocal quadratic evolution is then solved
+algebraically. Each potential is accepted only after exact symbolic
+verification. A
 parameter-dependent linear dispatch distinguishes a passive coordinate from
 an ODE integration constant, so `Dy(z) + 2*y*z = x*y^3` returns `F(x)`.
+
+A separate structural reduction handles
+`z*(a(x,y)*z_x + b(x,y)*z_y) + r(x,y) = 0`. It removes the common dependent
+factor from both derivative coefficients, substitutes `w = z^2`, and solves
+the resulting linear equation
+`a*w_x + b*w_y + 2*r = 0` with the ordinary characteristic machinery. The
+forcing particular is accepted only when applying the complete transformed
+transport operator reproduces `-2*r` exactly. The solver then returns both
+branches `z = ±sqrt(w)`; it does not invent `z = 0` when zero is not a
+solution of the original equation.
+The reciprocal form
+`a(x,y)*z_x + b(x,y)*z_y = r(x,y)/z` uses the same reduction after
+multiplication by `2*z`, producing `a*w_x+b*w_y=2*r`.
+If the transformed forcing has zero directional derivative, it is constant
+on characteristics. Mars then multiplies it by a characteristic parameter
+whose directional derivative is one. When both coordinate potentials exist,
+their average is preferred because it commonly yields the symmetric
+particular solution; `z*z_x + z*z_y = y-x`, for example, reduces to
+`w_x+w_y=2(y-x)` and obtains `w_p=y^2-x^2`.
+
+For a homogeneous trace-zero linear characteristic field
+
+```text
+dx/ds = A*x + B*y
+dy/ds = C*x - A*y,
+```
+
+Mars constructs the exact quadratic invariant
+`C*x^2-2*A*x*y-B*y^2`. Polynomial particular trials are compared by exact
+bivariate coefficients through total degree two, rather than by rendered or
+tree shape. Consequently
+`(y-x)*z_x+(y+x)*z_y=(x^2+y^2)/z` reduces to
+`w=F(x^2+2*x*y-y^2)+2*x*y` and returns both square-root branches.
+
+The same separable-potential construction is used for general linear
+characteristic equations whose transport coefficients split as `a(x)` and
+`b(y)`. Mars constructs `A'(x)=1/a(x)` and `B'(y)=1/b(y)`, verifies both
+derivatives exactly, and uses `B(y)-A(x)` as the invariant. For example,
+
+```text
+sec(x)*phi_x + phi_y = cot(y)
+phi = F(y - sin(x)) + ln(sin(y)).
+```
+
+The particular term is independently substituted into the complete PDE
+operator before the solution is accepted.
 
 A well-formed problem outside the implemented mathematical scope reports
 `DE_SOLVE_STATUS_UNSUPPORTED`. Failure after a solver has matched reports

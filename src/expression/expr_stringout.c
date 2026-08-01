@@ -657,7 +657,8 @@ static int is_atomic_for_mul(const expr_t *f)
         return expr_tostring_is_simple_name(f->name);
 
     if (expr_tostring_is_var_pow_d(f))
-        return expr_tostring_is_simple_name(f->a->name);
+        return num_sign(f->c) > 0 &&
+               expr_tostring_is_simple_name(f->a->name);
 
     return 0;
 }
@@ -956,8 +957,116 @@ static void emit_formal_derivative_expr(const expr_t *f, sbuf_t *b)
     sbuf_putc(b, ')');
 }
 
+static _Thread_local unsigned int expr_tex_partial_derivative_depth;
+static _Thread_local unsigned int expr_tex_total_derivative_depth;
+
+void expr_tex_partial_derivatives_push(void)
+{
+    expr_tex_partial_derivative_depth++;
+}
+
+void expr_tex_partial_derivatives_pop(void)
+{
+    if (expr_tex_partial_derivative_depth > 0u)
+        expr_tex_partial_derivative_depth--;
+}
+
+bool expr_tex_partial_derivatives_enabled(void)
+{
+    return expr_tex_partial_derivative_depth > 0u;
+}
+
+void expr_tex_total_derivatives_push(void)
+{
+    expr_tex_total_derivative_depth++;
+}
+
+void expr_tex_total_derivatives_pop(void)
+{
+    if (expr_tex_total_derivative_depth > 0u)
+        expr_tex_total_derivative_depth--;
+}
+
+bool expr_tex_total_derivatives_enabled(void)
+{
+    return expr_tex_total_derivative_depth > 0u;
+}
+
+static void emit_formal_partial_denominator(const expr_t *f, sbuf_t *b)
+{
+    size_t i = f->formal_wrt_count;
+    bool first = true;
+
+    while (i > 0u) {
+        const expr_t *wrt = f->formal_wrts[i - 1u];
+        size_t multiplicity = 1u;
+
+        while (i > multiplicity &&
+               expr_struct_eq(
+                   f->formal_wrts[i - multiplicity - 1u], wrt)) {
+            multiplicity++;
+        }
+        if (!first)
+            sbuf_puts(b, "\\,");
+        sbuf_puts(b, "\\partial ");
+        emit_tex_name(b, (wrt && wrt->name) ? wrt->name : "x");
+        if (multiplicity > 1u) {
+            char exponent[32];
+
+            snprintf(exponent, sizeof(exponent), "^{%zu}", multiplicity);
+            sbuf_puts(b, exponent);
+        }
+        first = false;
+        i -= multiplicity;
+    }
+}
+
 static void emit_formal_derivative_tex(const expr_t *f, sbuf_t *b)
 {
+    if (expr_tex_partial_derivatives_enabled()) {
+        sbuf_puts(b, "\\frac{\\partial");
+        if (f->formal_wrt_count > 1u) {
+            char order[32];
+
+            snprintf(
+                order, sizeof(order), "^{%zu}", f->formal_wrt_count);
+            sbuf_puts(b, order);
+        }
+        sbuf_putc(b, ' ');
+        emit_tex_expr(f->a, b, PREC_LOWEST);
+        sbuf_puts(b, "}{");
+        emit_formal_partial_denominator(f, b);
+        sbuf_putc(b, '}');
+        return;
+    }
+    if (expr_tex_total_derivatives_enabled()) {
+        const expr_t *wrt = f->formal_wrt_count > 0u
+            ? f->formal_wrts[0]
+            : NULL;
+
+        sbuf_puts(b, "\\frac{d");
+        if (f->formal_wrt_count > 1u) {
+            char order[32];
+
+            snprintf(
+                order, sizeof(order), "^{%zu}", f->formal_wrt_count);
+            sbuf_puts(b, order);
+        }
+        sbuf_putc(b, ' ');
+        emit_tex_expr(f->a, b, PREC_LOWEST);
+        sbuf_puts(b, "}{d ");
+        emit_tex_name(b, (wrt && wrt->name) ? wrt->name : "x");
+        if (f->formal_wrt_count > 1u) {
+            char order[32];
+
+            snprintf(
+                order, sizeof(order), "^{%zu}", f->formal_wrt_count);
+            sbuf_puts(b, order);
+        }
+        sbuf_putc(b, '}');
+        return;
+    }
+
     sbuf_puts(b, "\\operatorname{D}_{");
     for (size_t i = 0u; i < f->formal_wrt_count; ++i) {
         const expr_t *wrt = f->formal_wrts[i];
@@ -979,12 +1088,26 @@ static void emit_arbitrary_function_expr(const expr_t *f, sbuf_t *b)
     sbuf_putc(b, ')');
 }
 
+static void emit_argument_list_expr(const expr_t *f, sbuf_t *b)
+{
+    emit_expr(f->a, b, PREC_LOWEST);
+    sbuf_puts(b, ", ");
+    emit_expr(f->b, b, PREC_LOWEST);
+}
+
 static void emit_arbitrary_function_tex(const expr_t *f, sbuf_t *b)
 {
     emit_tex_name(b, f->name ? f->name : "F");
     sbuf_puts(b, "\\left(");
     emit_tex_expr(f->a, b, PREC_LOWEST);
     sbuf_puts(b, "\\right)");
+}
+
+static void emit_argument_list_tex(const expr_t *f, sbuf_t *b)
+{
+    emit_tex_expr(f->a, b, PREC_LOWEST);
+    sbuf_puts(b, ", ");
+    emit_tex_expr(f->b, b, PREC_LOWEST);
 }
 
 static void emit_tex_integral(const expr_t *f, sbuf_t *b, int parent_prec)
@@ -2372,6 +2495,10 @@ void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec)
         emit_arbitrary_function_tex(f, b);
         return;
     }
+    if (expr_is_op(f, &ops_argument_list)) {
+        emit_argument_list_tex(f, b);
+        return;
+    }
 
     if (expr_is_const(f) || expr_is_var(f)) {
         emit_tex_atom(f, b);
@@ -2801,6 +2928,10 @@ void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
     }
     if (expr_is_arbitrary_function(f)) {
         emit_arbitrary_function_expr(f, b);
+        return;
+    }
+    if (expr_is_op(f, &ops_argument_list)) {
+        emit_argument_list_expr(f, b);
         return;
     }
 
@@ -3238,6 +3369,10 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
     }
     if (expr_is_arbitrary_function(f)) {
         emit_arbitrary_function_expr(f, b);
+        return;
+    }
+    if (expr_is_op(f, &ops_argument_list)) {
+        emit_argument_list_expr(f, b);
         return;
     }
 
