@@ -1473,6 +1473,108 @@ static void test_diffequ_solves_second_order_sturm_liouville_problem(void)
     de_free(de);
 }
 
+static void test_diffequ_solves_affine_factorized_second_order_problem(void)
+{
+    const char *source = "y'' - (x^2+1)*y = 0";
+    diffequ_t *de = de_from_string(source);
+    diffequ_solve_result_t *result;
+    const equation_t *solution;
+    string_t *text;
+
+    printf("  differential equation\n    input:    %s\n", source);
+    EXPECT_POINTER("parsed affine-factorized problem", de, true);
+    if (!de)
+        return;
+
+    result = de_solve(de);
+    EXPECT_POINTER("affine-factorized solve result", result, true);
+    if (!result) {
+        de_free(de);
+        return;
+    }
+
+    EXPECT_LONG(
+        "affine-factorized solve status",
+        (long)de_solve_result_status(result),
+        (long)DE_SOLVE_STATUS_SOLVED);
+    EXPECT_LONG(
+        "affine-factorized selected solver",
+        (long)de_solve_result_solver(result),
+        (long)DE_SOLVER_STURM_LIOUVILLE);
+    EXPECT_LONG(
+        "affine-factorized solution count",
+        (long)de_solve_result_count(result),
+        1L);
+    EXPECT_TEXT(
+        "affine-factorized diagnostic",
+        de_solve_result_diagnostic(result),
+        "solved as a second-order linear Sturm-Liouville equation");
+
+    solution = de_solve_result_at(result, 0u);
+    EXPECT_POINTER("affine-factorized solution", solution, true);
+    text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
+    EXPECT_POINTER("affine-factorized solution text", text, true);
+    if (text) {
+        printf(
+            "    expected: y = exp(½x²)·(C₁ + C₂·erf(x))\n"
+            "    actual:   %s\n",
+            string_c_str(text));
+        EXPECT_TEXT(
+            "affine-factorized solution text",
+            string_c_str(text),
+            "y = exp(½x²)·(C₁ + C₂·erf(x))");
+    }
+
+    string_free(text);
+    de_solve_result_free(result);
+    de_free(de);
+}
+
+static void test_diffequ_applies_affine_factorized_initial_conditions(void)
+{
+    const char *source =
+        "y'' - (x^2+1)*y = 0; y(0) = 1; y'(0) = 0";
+    diffequ_t *de = de_from_string(source);
+    diffequ_solve_result_t *result;
+    const equation_t *solution;
+    string_t *text;
+
+    printf("  differential equation\n    input:    %s\n", source);
+    EXPECT_POINTER("parsed affine-factorized IVP", de, true);
+    if (!de)
+        return;
+
+    result = de_solve(de);
+    EXPECT_POINTER("affine-factorized IVP solve result", result, true);
+    if (!result) {
+        de_free(de);
+        return;
+    }
+
+    EXPECT_LONG(
+        "affine-factorized IVP solve status",
+        (long)de_solve_result_status(result),
+        (long)DE_SOLVE_STATUS_SOLVED);
+    solution = de_solve_result_at(result, 0u);
+    EXPECT_POINTER("affine-factorized IVP solution", solution, true);
+    text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
+    EXPECT_POINTER("affine-factorized IVP solution text", text, true);
+    if (text) {
+        printf(
+            "    expected: y = exp(½x²)\n"
+            "    actual:   %s\n",
+            string_c_str(text));
+        EXPECT_TEXT(
+            "affine-factorized IVP solution text",
+            string_c_str(text),
+            "y = exp(½x²)");
+    }
+
+    string_free(text);
+    de_solve_result_free(result);
+    de_free(de);
+}
+
 static void test_diffequ_does_not_invent_cubic_potential_functions(void)
 {
     diffequ_t *de = de_from_string(
@@ -2694,6 +2796,10 @@ int tests_main(void)
     RUN_TEST_CASE(test_diffequ_solves_derivative_quadratic_problem);
     RUN_TEST_CASE(test_diffequ_linearizes_exact_third_order_problem);
     RUN_TEST_CASE(test_diffequ_solves_second_order_sturm_liouville_problem);
+    RUN_TEST_CASE(
+        test_diffequ_solves_affine_factorized_second_order_problem);
+    RUN_TEST_CASE(
+        test_diffequ_applies_affine_factorized_initial_conditions);
     RUN_TEST_CASE(
         test_diffequ_does_not_invent_cubic_potential_functions);
     RUN_TEST_CASE(test_diffequ_solves_repeated_characteristic_root);

@@ -1,5 +1,7 @@
 #include <stdlib.h>
 
+#define MARS_SHARED_EQUATION_INTERNAL_ACCESS
+#include "internal/equation_internal.h"
 #define MARS_DIFFEQUATION_SOLVE_INTERNAL_ACCESS
 #include "diffequ_solve_internal.h"
 
@@ -620,6 +622,332 @@ cleanup:
     return solution;
 }
 
+static void de_number_coefficients_free(number_t *coefficients,
+                                        size_t count)
+{
+    if (!coefficients)
+        return;
+    for (size_t i = 0u; i < count; ++i)
+        num_destroy(&coefficients[i]);
+    free(coefficients);
+}
+
+static bool de_affine_riccati_basis(
+    const expr_t *potential,
+    const expr_t *independent,
+    expr_t **primary_out,
+    expr_t **second_factor_out)
+{
+    number_t *coefficients = NULL;
+    size_t degree = 0u;
+    number_t slope = num_new();
+    number_t twice_slope = num_new();
+    number_t intercept = num_new();
+    number_t intercept_squared = num_new();
+    number_t expected_constant = num_new();
+    number_t half_slope = num_new();
+    number_t shift = num_new();
+    number_t square_root_slope = num_new();
+    expr_t *independent_squared = NULL;
+    expr_t *quadratic_exponent = NULL;
+    expr_t *linear_exponent = NULL;
+    expr_t *exponent = NULL;
+    expr_t *primary = NULL;
+    expr_t *shifted = NULL;
+    expr_t *error_argument = NULL;
+    expr_t *second_factor = NULL;
+    bool matched = false;
+
+    *primary_out = NULL;
+    *second_factor_out = NULL;
+    if (!equ_match_polynomial_alloc(
+            potential, independent, &coefficients, &degree) ||
+        degree != 2u ||
+        !num_is_real(coefficients[0]) ||
+        !num_is_real(coefficients[1]) ||
+        !num_is_real(coefficients[2]) ||
+        !num_gt(coefficients[2], NUM_ZERO))
+        goto cleanup;
+
+    num_destroy(&slope);
+    slope = num_sqrt(coefficients[2]);
+    if (!num_is_real(slope) || !num_gt(slope, NUM_ZERO))
+        goto cleanup;
+    num_destroy(&twice_slope);
+    twice_slope = num_mul(NUM_TWO, slope);
+    num_destroy(&intercept);
+    intercept = num_div(coefficients[1], twice_slope);
+    num_destroy(&intercept_squared);
+    intercept_squared = num_mul(intercept, intercept);
+    num_destroy(&expected_constant);
+    expected_constant = num_add(intercept_squared, slope);
+    if (!num_eq(expected_constant, coefficients[0]))
+        goto cleanup;
+
+    num_destroy(&half_slope);
+    half_slope = num_div(slope, NUM_TWO);
+    num_destroy(&shift);
+    shift = num_div(intercept, slope);
+    num_destroy(&square_root_slope);
+    square_root_slope = num_sqrt(slope);
+
+    independent_squared = expr_pow_long(independent, 2L);
+    quadratic_exponent = independent_squared
+        ? expr_mul_simplify_owned(
+              expr_new_const(half_slope), independent_squared)
+        : NULL;
+    if (independent_squared)
+        independent_squared = NULL;
+    linear_exponent = expr_mul_simplify_owned(
+        expr_new_const(intercept), expr_clone(independent));
+    exponent = quadratic_exponent && linear_exponent
+        ? expr_add_simplify_owned(
+              quadratic_exponent, linear_exponent)
+        : NULL;
+    if (quadratic_exponent && linear_exponent) {
+        quadratic_exponent = NULL;
+        linear_exponent = NULL;
+    }
+    primary = exponent ? de_exp_owned(exponent) : NULL;
+    if (exponent)
+        exponent = NULL;
+
+    shifted = expr_add_simplify_owned(
+        expr_clone(independent), expr_new_const(shift));
+    error_argument = shifted
+        ? expr_mul_simplify_owned(
+              expr_new_const(square_root_slope), shifted)
+        : NULL;
+    if (shifted)
+        shifted = NULL;
+    second_factor = error_argument
+        ? de_simplify_unary_owned(error_argument, expr_erf)
+        : NULL;
+    if (error_argument)
+        error_argument = NULL;
+    if (!primary || !second_factor)
+        goto cleanup;
+
+    *primary_out = primary;
+    *second_factor_out = second_factor;
+    primary = NULL;
+    second_factor = NULL;
+    matched = true;
+
+cleanup:
+    expr_free(second_factor);
+    expr_free(error_argument);
+    expr_free(shifted);
+    expr_free(primary);
+    expr_free(exponent);
+    expr_free(linear_exponent);
+    expr_free(quadratic_exponent);
+    expr_free(independent_squared);
+    num_destroy(&square_root_slope);
+    num_destroy(&shift);
+    num_destroy(&half_slope);
+    num_destroy(&expected_constant);
+    num_destroy(&intercept_squared);
+    num_destroy(&intercept);
+    num_destroy(&twice_slope);
+    num_destroy(&slope);
+    de_number_coefficients_free(coefficients, degree + 1u);
+    return matched;
+}
+
+static expr_t *de_simplified_at(const expr_t *expression,
+                                const expr_t *independent,
+                                const expr_t *point)
+{
+    expr_t *substituted = expr_substitute(
+        expression, independent, point);
+    expr_t *simplified = substituted
+        ? expr_simplify(substituted)
+        : NULL;
+
+    expr_free(substituted);
+    return simplified;
+}
+
+static expr_t *de_factorized_basis_solution(
+    const diffequ_t *de,
+    const expr_t *independent,
+    const expr_t *dependent,
+    const expr_t *primary,
+    const expr_t *second_factor)
+{
+    const expr_t *value_point = NULL;
+    const expr_t *value = NULL;
+    const expr_t *slope_point = NULL;
+    const expr_t *slope = NULL;
+    expr_t *secondary = NULL;
+    expr_t *primary_derivative = NULL;
+    expr_t *secondary_derivative = NULL;
+    expr_t *primary_at_point = NULL;
+    expr_t *secondary_at_point = NULL;
+    expr_t *primary_derivative_at_point = NULL;
+    expr_t *secondary_derivative_at_point = NULL;
+    expr_t *determinant = NULL;
+    expr_t *first_coefficient = NULL;
+    expr_t *second_coefficient = NULL;
+    expr_t *second_term = NULL;
+    expr_t *combination = NULL;
+    expr_t *solution = NULL;
+    bool has_value = de_find_initial_condition(
+        de, dependent, &value_point, &value);
+    bool has_slope = de_find_derivative_condition(
+        de,
+        dependent,
+        independent,
+        1u,
+        &slope_point,
+        &slope);
+
+    if (has_value != has_slope ||
+        (has_value && !expr_struct_eq(value_point, slope_point)))
+        goto cleanup;
+
+    if (!has_value) {
+        first_coefficient = de_named_constant("C1");
+        second_coefficient = de_named_constant("C2");
+        goto combine;
+    }
+
+    secondary = expr_mul_simplify_owned(
+        expr_clone(primary), expr_clone(second_factor));
+    primary_derivative = expr_create_deriv(primary, independent);
+    secondary_derivative = secondary
+        ? expr_create_deriv(secondary, independent)
+        : NULL;
+    primary_at_point = de_simplified_at(
+        primary, independent, value_point);
+    secondary_at_point = secondary
+        ? de_simplified_at(secondary, independent, value_point)
+        : NULL;
+    primary_derivative_at_point = primary_derivative
+        ? de_simplified_at(
+              primary_derivative, independent, value_point)
+        : NULL;
+    secondary_derivative_at_point = secondary_derivative
+        ? de_simplified_at(
+              secondary_derivative, independent, value_point)
+        : NULL;
+    if (!primary_at_point || !secondary_at_point ||
+        !primary_derivative_at_point ||
+        !secondary_derivative_at_point)
+        goto cleanup;
+
+    determinant = expr_sub_simplify_owned(
+        expr_mul_simplify_owned(
+            expr_clone(primary_at_point),
+            expr_clone(secondary_derivative_at_point)),
+        expr_mul_simplify_owned(
+            expr_clone(secondary_at_point),
+            expr_clone(primary_derivative_at_point)));
+    first_coefficient = determinant
+        ? expr_div_simplify_owned(
+              expr_sub_simplify_owned(
+                  expr_mul_simplify_owned(
+                      expr_clone(value),
+                      expr_clone(secondary_derivative_at_point)),
+                  expr_mul_simplify_owned(
+                      expr_clone(slope),
+                      expr_clone(secondary_at_point))),
+              expr_clone(determinant))
+        : NULL;
+    second_coefficient = determinant
+        ? expr_div_simplify_owned(
+              expr_sub_simplify_owned(
+                  expr_mul_simplify_owned(
+                      expr_clone(slope),
+                      expr_clone(primary_at_point)),
+                  expr_mul_simplify_owned(
+                      expr_clone(value),
+                      expr_clone(primary_derivative_at_point))),
+              determinant)
+        : NULL;
+    if (determinant)
+        determinant = NULL;
+
+combine:
+    second_term = second_coefficient
+        ? expr_mul_simplify_owned(
+              second_coefficient, expr_clone(second_factor))
+        : NULL;
+    if (second_coefficient)
+        second_coefficient = NULL;
+    combination = first_coefficient && second_term
+        ? expr_add_simplify_owned(first_coefficient, second_term)
+        : NULL;
+    if (first_coefficient && second_term) {
+        first_coefficient = NULL;
+        second_term = NULL;
+    }
+    solution = combination
+        ? expr_mul_simplify_owned(
+              combination, expr_clone(primary))
+        : NULL;
+    if (combination)
+        combination = NULL;
+
+cleanup:
+    expr_free(combination);
+    expr_free(second_term);
+    expr_free(second_coefficient);
+    expr_free(first_coefficient);
+    expr_free(determinant);
+    expr_free(secondary_derivative_at_point);
+    expr_free(primary_derivative_at_point);
+    expr_free(secondary_at_point);
+    expr_free(primary_at_point);
+    expr_free(secondary_derivative);
+    expr_free(primary_derivative);
+    expr_free(secondary);
+    return solution;
+}
+
+static expr_t *de_affine_factorized_solution(
+    const diffequ_t *de,
+    const expr_t *independent,
+    const expr_t *dependent,
+    const de_linear_second_order_t *form)
+{
+    expr_t *potential = NULL;
+    expr_t *primary = NULL;
+    expr_t *second_factor = NULL;
+    expr_t *solution = NULL;
+
+    if (!expr_is_exact_zero(form->first) ||
+        !expr_is_exact_zero(form->forcing) ||
+        de_expr_uses(form->leading, independent))
+        return NULL;
+
+    potential = expr_div_simplify_owned(
+        de_simplify_unary_owned(
+            expr_clone(form->dependent), expr_neg),
+        expr_clone(form->leading));
+    if (!potential ||
+        !de_affine_riccati_basis(
+            potential,
+            independent,
+            &primary,
+            &second_factor))
+        goto cleanup;
+
+    solution = de_factorized_basis_solution(
+        de,
+        independent,
+        dependent,
+        primary,
+        second_factor);
+
+cleanup:
+    expr_free(second_factor);
+    expr_free(primary);
+    expr_free(potential);
+    return solution;
+}
+
 de_attempt_t de_attempt_sturm_liouville(
     const diffequ_t *de,
     const expr_t *independent,
@@ -657,6 +985,11 @@ de_attempt_t de_attempt_sturm_liouville(
     attempt = DE_ATTEMPT_FAILED;
     if (!de_build_self_adjoint_form(independent, &form))
         goto cleanup;
+
+    solution = de_affine_factorized_solution(
+        de, independent, dependent, &form);
+    if (solution)
+        goto make_solution;
 
     if (de_expr_uses(form.leading, independent) ||
         de_expr_uses(form.first, independent) ||
@@ -786,6 +1119,7 @@ de_attempt_t de_attempt_sturm_liouville(
         }
     }
 
+make_solution:
     if (!solution)
         goto cleanup;
     *solution_out = equ_new(dependent, solution);

@@ -1,32 +1,3 @@
-<a id="solution-of-differential-equations"></a>
-# Solution of differential equations
-
-<a id="contents"></a>
-## Contents
-
-- [Linearisation of non-linear differential equations](#linearisation-of-non-linear-differential-equations)
-  - [Point transformation](#point-transformation)
-  - [Lie algebra](#lie-algebra)
-  - [How to deal with derivatives](#how-to-deal-with-derivatives)
-    - [Notes](#derivative-notes)
-  - [Symmetries of a second-order ODE](#symmetries-of-a-second-order-ode)
-  - [Relationship between symmetries and first integrals](#symmetries-and-first-integrals)
-  - [What nonlinear differential equations can have $SL(3,\mathbb R)$ symmetry?](#nonlinear-equations-with-sl3-symmetry)
-  - [What second-order ODEs can be linearised?](#linearisable-second-order-odes)
-    - [Classify by extra information](#classify-by-extra-information)
-      - [Existence of one symmetry](#existence-of-one-symmetry)
-      - [Existence of two symmetries](#existence-of-two-symmetries)
-      - [Two commuting symmetries](#two-commuting-symmetries)
-      - [Two non-commuting symmetries](#two-non-commuting-symmetries)
-    - [Proposition](#linearisation-proposition)
-    - [Proof](#linearisation-proposition-proof)
-    - [Can one do better?](#can-one-do-better)
-  - [Type III](#type-iii)
-  - [Linearisation of a system of equations](#linearisation-of-a-system-of-equations)
-    - [Theorem](#system-linearisation-theorem)
-    - [Proof](#system-linearisation-proof)
-- [Index](#index)
-
 <a id="linearisation-of-non-linear-differential-equations"></a>
 ## Linearisation of non-linear differential equations
 
@@ -419,35 +390,35 @@ For linear equations in general:
 
    For the free particle
 
-   $$
-   \begin{aligned}
-   G_1 &= \frac{\partial}{\partial x} &&: B_0,\\
-   G_2 &= x\frac{\partial}{\partial x} &&: B_1,\\
-   G_3 &= x^2\frac{\partial}{\partial x}
-          +xy\frac{\partial}{\partial y} &&: C_1,\\
-   G_4 &= y\frac{\partial}{\partial x} &&: A_0,\\
-   G_5 &= xy\frac{\partial}{\partial x}
-          +y^2\frac{\partial}{\partial y} &&: A_1,\\
-   G_6 &= \frac{\partial}{\partial y} &&: D_0,\\
-   G_7 &= x\frac{\partial}{\partial y} &&: D_1,\\
-   G_8 &= y\frac{\partial}{\partial y} &&: C_0.
-   \end{aligned}
-   $$
-
+<div data-aligned-equations="generator-definitions" style="display: flex; justify-content: flex-start;">
 
 $$
-\begin{array}{ccccccccc}
-    &G_1&G_2&G_3&G_4&G_5&G_6&G_7&G_8\\
-G_1&0&G_1&2G_2+G_8&0&G_4&0&G_6&0\\
-G_2& &0&G_3&-G_4&0&0&G_7&0\\
-G_3& & &0&-G_5&0&-G_6&-G_3&0\\
-G_4& & & &0&0&-G_1&-G_2&-G_4\\
-G_5& & & & &0&-G_2-2G_8&-G_3&-G_5\\
-G_6& & & & & &0&0&G_6\\
-G_7& & & & & & &0&G_7\\
-G_8& & & & & & & &0
-\end{array}
+\begin{aligned}
+G_1&=\frac{\partial}{\partial x} &&: B_0,\\[6pt]
+G_2&=x\frac{\partial}{\partial x} &&: B_1,\\[6pt]
+G_3&=x^2\frac{\partial}{\partial x}
+     +xy\frac{\partial}{\partial y} &&: C_1,\\[6pt]
+G_4&=y\frac{\partial}{\partial x} &&: A_0,\\[6pt]
+G_5&=xy\frac{\partial}{\partial x}
+     +y^2\frac{\partial}{\partial y} &&: A_1,\\[6pt]
+G_6&=\frac{\partial}{\partial y} &&: D_0,\\[6pt]
+G_7&=x\frac{\partial}{\partial y} &&: D_1,\\[6pt]
+G_8&=y\frac{\partial}{\partial y} &&: C_0.
+\end{aligned}
 $$
+
+</div>
+
+| $[G_i,G_j]$ | $G_1$ | $G_2$ | $G_3$ | $G_4$ | $G_5$ | $G_6$ | $G_7$ | $G_8$ |
+|:--|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
+| $G_1$ | $0$ | $G_1$ | $2G_2+G_8$ | $0$ | $G_4$ | $0$ | $G_6$ | $0$ |
+| $G_2$ |  | $0$ | $G_3$ | $-G_4$ | $0$ | $0$ | $G_7$ | $0$ |
+| $G_3$ |  |  | $0$ | $-G_5$ | $0$ | $-G_6$ | $-G_3$ | $0$ |
+| $G_4$ |  |  |  | $0$ | $0$ | $-G_1$ | $-G_2$ | $-G_4$ |
+| $G_5$ |  |  |  |  | $0$ | $-G_2-2G_8$ | $-G_3$ | $-G_5$ |
+| $G_6$ |  |  |  |  |  | $0$ | $0$ | $G_6$ |
+| $G_7$ |  |  |  |  |  |  | $0$ | $G_7$ |
+| $G_8$ |  |  |  |  |  |  |  | $0$ |
 
 $$
 \begin{aligned}
@@ -1145,6 +1116,7 @@ $$
 $$
 
 
+<a id="classical-groups"></a>
 We wish to identify the complete symmetry group for the non-linear system
 (2.22). The generators of (2.22) given in the previous section should have
 commutation relations appropriate to one of the eight-parameter groups
@@ -3143,7 +3115,7 @@ e^{-y-\omega x}\left(
  \frac{\partial G}{\partial x}
  +\omega\frac{\partial G}{\partial y}
 \right)=F.
-\tag{\dagger}
+\tag{\text{†}}
 $$
 
 Substitution in (*) gives
@@ -3152,7 +3124,7 @@ $$
 k'-\omega e^{-y+\omega x}+\omega e^{-y+\omega x}=0,
 $$
 
-so $k'=0$. Equation $(\dagger)$ gives
+so $k'=0$. Equation $\text{(†)}$ gives
 
 $$
 e^{-y-\omega x}m'=k-e^{-y+\omega x},
@@ -3310,6 +3282,7 @@ is linearisable.
 
 Note that the equation
 
+<a id="sl2r-symmetry"></a>
 $$
 xy''=(y')^3-\frac12y'
 $$
@@ -3668,6 +3641,8 @@ The system is obviously linearisable, as the fifteen-element algebra is
 $\mathfrak{sl}(4,\mathbb R)$, the algebra of the two-dimensional free particle
 with equation of motion
 
+<a id="sl4r-symmetry"></a>
+
 $$
 \mathbf r''=0,
 \qquad
@@ -3983,36 +3958,12 @@ $$
 
 which is the general solution since there are four arbitrary constants.
 
-<a id="index"></a>
-## Index
+---
 
-- [Characteristics](#characteristics)
-- [Classification by extra information](#classify-by-extra-information)
-- [Commutation relations](#commutation-table)
-- [Commuting symmetries](#two-commuting-symmetries)
-- [Derivatives and prolongation](#how-to-deal-with-derivatives)
-- [First integrals](#symmetries-and-first-integrals)
-- [Infinitesimal point transformations](#infinitesimal-point-transformations)
-- [Jacobian](#jacobian)
-- [Lie algebra](#lie-algebra)
-- [Lie brackets](#lie-algebra)
-- [Linearisation of non-linear differential equations](#linearisation-of-non-linear-differential-equations)
-- [Linearisation proposition](#linearisation-proposition)
-- [Linearisation of a system of equations](#linearisation-of-a-system-of-equations)
-- [Linearising transformation](#linearising-transformation)
-- [Non-commuting symmetries](#two-non-commuting-symmetries)
-- [One symmetry](#existence-of-one-symmetry)
-- [Point transformation](#point-transformation)
-- [Prolongation](#prolongation)
-- [Riccati equation](#riccati-equation)
-- [$SL(3,\mathbb R)$ symmetry](#nonlinear-equations-with-sl3-symmetry)
-- [Structure constants](#lie-algebra)
-- [Symmetries of a second-order ODE](#symmetries-of-a-second-order-ode)
-- [System linearisation theorem](#system-linearisation-theorem)
-- [Type I](#types-i-and-iv)
-- [Type II](#type-ii)
-- [Type III](#type-iii)
-- [Type IV](#types-i-and-iv)
-- [Two symmetries](#existence-of-two-symmetries)
-
-[CONTENTS](#contents)
+<nav aria-label="Section navigation" style="display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 2em; align-items: start;">
+<div style="display: grid; grid-template-columns: 6em minmax(0, 1fr); row-gap: 0.25em;">
+<span>NEXT:</span><a href="03-lie-theory-of-extended-group.md">Lie Theory of Extended Group</a>
+<span>PREVIOUS:</span><a href="01-contents.md">Contents</a>
+</div>
+<a href="05-index.md" style="justify-self: end; text-align: right;">INDEX</a>
+</nav>
