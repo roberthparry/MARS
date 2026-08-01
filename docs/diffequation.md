@@ -72,6 +72,11 @@ y'' + 4y = e^x
 → y = ⅕·exp(x) + C₁·cos(2x) + C₂·sin(2x)
 ```
 
+The standard forms `dy/dx`, `d²y/dx²`, and `d³y/dx³` are accepted as
+equivalent input aliases. In the Mars Lab, ordinary derivatives are displayed
+this way in both the rendered equation and the differential-equation card.
+The canonical expression form remains `Dx(y)`, `Dxx(y)`, and `Dxxx(y)`.
+
 Additive forcing terms are solved independently and then combined:
 
 ```text
@@ -133,6 +138,31 @@ Ordinary and partial differential equations share the same `diffequ_t`.
 Multiple declared independent variables make the derivative notation partial:
 
 ```text
+u_x       Dx(u)
+u_y       Dy(u)
+u_xy      Dxy(u) = Dy(Dx(u))
+u_xx      Dxx(u)
+phi_x     Dx(@phi)
+xzz_x     x*z*Dx(z)
+```
+
+Subscript suffixes are read from left to right. The shorthand is local to the
+differential-equation parser; ordinary expression identifiers containing an
+underscore are unchanged. In compact PDE products such as `xzz_x`, leading
+coordinate factors remain multiplicative coefficients and the suffix applies
+to the final field: `x*z*z_x`.
+The expression and unbound styles retain `Dx(u)` for round-trip input, while
+TeX output uses standard partial-derivative fractions such as
+`\\frac{\\partial u}{\\partial x}`. Repeated and mixed derivatives render as
+`\\frac{\\partial^2 u}{\\partial x^2}` and
+`\\frac{\\partial^2 u}{\\partial y\\,\\partial x}`.
+The Mars Lab problem card likewise uses the Unicode partial-derivative symbol,
+displaying `∂u/∂x`, `∂²u/∂x²`, and `∂²u/∂y∂x`. These standard Unicode
+forms are also accepted as input aliases, so copying the displayed problem
+back into the editor remains valid. The easily typed `Dx(u)` notation remains
+the canonical expression and unbound output form.
+
+```text
 {
     2*Dx(u) + Dy(u) = 0
     | x = ?, y = ?;
@@ -168,6 +198,18 @@ Boundary data on a constant-`x` line is supported as well:
 → u = exp(y - 3x)
 ```
 
+Affine parameterized boundary curves are supported when they are
+non-characteristic. For example:
+
+```text
+Dx(z) + Dy(z) = 2*z*(x+y); z(x, 1-x) = x^2
+→ z = 1/4*(x-y+1)^2*exp(1/2*((x+y)^2-1))
+```
+
+Here `x+y` changes along each characteristic while `y-x` is invariant. The
+boundary curve `y=1-x` determines the formerly arbitrary function of that
+invariant.
+
 Boundary applications retain each coordinate separately. For `u(x, 0)`,
 `de_condition_argument_count(...)` returns two, and
 `de_condition_argument_at(...)` returns the borrowed `x` and `0` expressions.
@@ -181,19 +223,173 @@ Dt(u) + c*Dx(u) = 0
 
 Dt(u) + c*Dx(u) = 1
 → u = t + F(x - c*t)
+
+Dx(z) + Dy(z) = z
+→ z = exp(x)*F(y - x)
+
+Dx(z) + Dy(z) + z = x
+→ z = x - 1 + exp(-x)*F(y - x)
+
+Dx(@phi) - Dy(@phi) = sin(x) + cos(y)
+→ φ = F(x + y) - cos(x) - sin(y)
+
+Dx(z) + Dy(z) = cos(x+y)
+→ z = F(y - x) + 1/2*sin(x+y)
+
+Dx(z) + 3*Dy(z) - 2*z + 4*y^2 - 22*y + 4*x + 13 = 0
+→ z = exp(2*x)*F(y - 3*x) + 2*x - 5*y + 2*y^2
+
+2*Dx(@phi) + Dy(@phi) + 6*@phi = 37*sin(y)
+→ φ = exp(-3*x)*F(y - x/2) + 6*sin(y) - cos(y)
+
+Dx(@phi) + Dy(@phi) + Dz(@phi) = @phi
+→ φ = exp(x)*F(y - x, z - x)
 ```
+
+More generally, constant transport accepts
+`a*Dx(u) + b*Dy(u) + p*u = q(x,y)`. The reaction coefficient `p` produces
+exponential evolution along each characteristic. Mars substitutes the
+characteristic path into `q` and applies the one-dimensional integrating
+factor along that path. Constant forcing produces the corresponding constant
+particular solution. The same evolution is applied when transporting explicit
+axis-aligned boundary data with constant forcing.
+
+When `p` is nonzero and `q(x,y)` is polynomial, Mars inverts the transport
+operator directly. If `D = a*Dx + b*Dy`, then repeated applications of `D`
+eventually annihilate the polynomial, so
+
+```text
+(p + D)^(-1)q
+```
+
+is evaluated as a finite derivative series. This avoids introducing an
+unevaluated characteristic integral for an elementary polynomial solution.
+For trigonometric, hyperbolic, and exponential forcing, Mars instead
+recognizes a function space closed under the full directional derivative
+`D = a*Dx + b*Dy`. If `D^2*f = lambda*f`, it solves the transport equation
+algebraically and verifies the result against the original operator. This
+works whether the phase uses one coordinate or a mixture such as `x+y`, and
+keeps elementary answers elementary rather than exposing an internal
+characteristic integral.
+
+When the forcing is an integrable unary function of a phase `g(x,y)` and
+`D(g)` is a nonzero coordinate-independent value, Mars instead integrates the
+unary function with respect to its phase and divides by `D(g)`. The candidate
+is again accepted only after substitution into the complete PDE. For example,
+
+```text
+Dx(z) + 2*Dy(z) = tanh(x+y)
+→ z = F(y - 2x) + 1/3*ln(cosh(x+y))
+```
+
+The homogeneous constant-transport and constant-forcing rules extend to any
+number of independent variables. For
+
+```text
+a1*Dx1(u) + ... + an*Dxn(u) + p*u = q,
+```
+
+Mars chooses a nonzero transport direction as the characteristic parameter
+and constructs the other `n - 1` independent invariants. The arbitrary
+function therefore has `n - 1` arguments; it is not collapsed into a
+one-variable approximation.
+
+Aliases for standard constants are contextual in derivative operands.
+Consequently, `@phi` ordinarily denotes the golden ratio, but in
+`Dx(@phi)` or `Dy(@phi)` it denotes the dependent field `φ`. The same rule
+allows familiar mathematical symbols to be used for angles and other
+dependent quantities without changing their ordinary expression meaning.
 
 The characteristic solver also handles these nonlinear and
 variable-coefficient forms:
+
+```text
+x^2*Dx(@psi) - x*y*Dy(@psi) + y*@psi = 0
+→ ψ = exp(y/(2*x))*F(x*y)
+
+x*Dx(z) - 7*y*Dy(z) = 5*x^2*y
+→ z = F(x^7*y) - x^2*y
+
+x*y*Dx(z) - x^2*Dy(z) + y*z = 3*x^2*y
+→ z = F(x^2 + y^2)/x + x^2
+
+Dx(@phi)*sec(x) + Dy(@phi) = cot(y)
+→ φ = F(y - sin(x)) + ln(sin(y))
+
+x*(y-z)*z_x + y*(z-x)*z_y = z*(x-y)
+→ F(x + y + z, x*y*z) = 0
+
+x*(y^2-z^2)*z_x + y*(z^2-x^2)*z_y = z*(x^2-y^2)
+→ F(x^2 + y^2 + z^2, x*y*z) = 0
+```
+
+For a monomial characteristic field with `b/a = k*y/x`, Mars constructs the
+invariant `y*x^(-k)`. For a homogeneous linear reaction term, it then derives
+an exponential multiplier. For an inhomogeneous equation, it symbolically
+integrates a candidate particular solution along a nonzero characteristic
+direction and permits only a coordinate-independent rescaling. Mars
+substitutes every candidate back into the complete transport operator; the
+solution is accepted only when that symbolic verification reduces exactly to
+zero.
+
+Mars also tests the radial invariant `x^2 + y^2` when the characteristic
+field is tangent to its level curves. The invariant, reaction multiplier, and
+particular term are each verified against the original differential
+operator.
+
+For a positive-integer cyclic Lagrange field proportional to
+`(x*(y^n-z^n), y*(z^n-x^n), z*(x^n-y^n))`, Mars finds the two independent
+first integrals `x^n+y^n+z^n` and `x*y*z`. The general integral is therefore
+emitted as the implicit arbitrary relation
+`F(x^n+y^n+z^n, x*y*z) = 0`.
+
+For a separable field `a(x)*u_x + b(y)*u_y`, Mars integrates the coordinate
+potentials `A'(x) = 1/a(x)` and `B'(y) = 1/b(y)`. Their difference `B-A` is a
+characteristic invariant. Each potential, and the resulting particular term,
+is accepted only after differentiation and exact substitution into the
+original PDE. Thus `sec(x)*phi_x + phi_y = cot(y)` uses
+`A(x) = sin(x)`, `B(y) = y`, and the particular integral `ln(sin(y))`.
 
 ```text
 Dx(z) + Dy(z) = 6*(x+y)^2*z^2
 → z = 1/(F(x - y) - (x + y)^3)
 → z = 0
 
+x^2*Dx(z) + y^2*Dy(z) = z^2
+→ z = 1/(F(1/x - 1/y) + 1/x)
+→ z = 0
+
+x*z*Dx(z) + y*z*Dy(z) + x^2 + y^2 = 0
+→ z = √(F(y/x) - x^2 - y^2)
+→ z = -√(F(y/x) - x^2 - y^2)
+
+z*z_x + z*z_y = y - x
+→ z = √(F(y - x) - x^2 + y^2)
+→ z = -√(F(y - x) - x^2 + y^2)
+
+(y-x)*z_x + (y+x)*z_y = (x^2+y^2)/z
+→ z = √(F(x^2 + 2*x*y - y^2) + 2*x*y)
+→ z = -√(F(x^2 + 2*x*y - y^2) + 2*x*y)
+
 (x+y)*Dx(z) + (y-x)*Dy(z) = 0
 → z = F(atan2(y,x) + 1/2*ln(x^2+y^2))
 ```
+
+When both derivative coefficients contain one factor of the dependent field,
+Mars applies the general dependent-square reduction. In
+`z*(a*z_x + b*z_y) + r = 0`, setting `w = z^2` gives the linear
+characteristic equation `a*w_x + b*w_y + 2*r = 0`. Mars solves that equation
+for `w` and returns both square-root branches for `z`.
+When the transformed forcing is itself a characteristic invariant, Mars
+multiplies it by a verified characteristic parameter. For the second example,
+`y-x` is invariant and `(x+y)/2` advances at unit rate, giving the particular
+term `y^2-x^2` in `w`.
+Mars applies the same substitution when a PDE has the reciprocal form
+`a*z_x + b*z_y = r/z`: multiplying by `2*z` gives
+`a*w_x + b*w_y = 2*r`. For a trace-zero linear characteristic field
+`a = A*x+B*y`, `b = C*x-A*y`, the quadratic
+`C*x^2-2*A*x*y-B*y^2` is an invariant. Quadratic particular solutions are
+matched by exact bivariate polynomial coefficients before they are accepted.
 
 A missing derivative in one coordinate makes that coordinate a parameter:
 
@@ -601,6 +797,6 @@ int main(void)
 
 ```text
 input = Dx(y) = x*y; y(0) = 1
-problem = { Dx(y) = x*y | x = ?; ; y(0) = 1 }
+problem = { dy/dx = x*y | x = ?; ; y(0) = 1 }
 solution = y = exp(½x²)
 ```

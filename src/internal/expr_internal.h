@@ -93,17 +93,23 @@ expr_t *expr_new_formal_derivative(const expr_t *dependent,
                                    size_t wrt_count,
                                    expr_t *const *wrts);
 expr_t *expr_new_arbitrary_function(const char *name, const expr_t *argument);
+expr_t *expr_new_arbitrary_function_n(
+    const char *name,
+    size_t argument_count,
+    expr_t *const *arguments);
 bool expr_is_arbitrary_function(const expr_t *expr);
 const expr_t *expr_formal_derivative_dependent(const expr_t *expr);
 size_t expr_formal_derivative_order(const expr_t *expr);
 const expr_t *expr_formal_derivative_wrt_at(const expr_t *expr, size_t index);
 
 bool expr_match_neg_expr(const expr_t *expr, const expr_t **arg_out);
+bool expr_match_unary_expr(const expr_t *expr, const expr_t **arg_out);
 bool expr_match_exp_expr(const expr_t *expr, const expr_t **arg_out);
 bool expr_match_log_expr(const expr_t *expr, const expr_t **arg_out);
 bool expr_match_sin_expr(const expr_t *expr, const expr_t **arg_out);
 bool expr_match_cos_expr(const expr_t *expr, const expr_t **arg_out);
 bool expr_match_tan_expr(const expr_t *expr, const expr_t **arg_out);
+bool expr_match_cot_expr(const expr_t *expr, const expr_t **arg_out);
 bool expr_match_pow_const(const expr_t *expr,
                           const expr_t **base_out,
                           number_t *exponent_out);
@@ -143,6 +149,7 @@ bool expr_collect_var_usage(const expr_t *expr,
 bool expr_has_unbound_parameters(const expr_t *expr,
                                  size_t nvars,
                                  expr_t *const *vars);
+string_t *expr_default_constant_canonical_name_text(const string_t *name);
 expr_t *expr_integrate_iterated(const expr_t *integrand,
                                 size_t ndim,
                                 expr_t *const *vars,
@@ -193,5 +200,11 @@ string_t *expr_normalise_binding_name_text(const string_t *name);
 int expr_is_default_constant_name_text(const string_t *name);
 char *expr_tostring_texify(const char *text);
 int expr_to_tex_parts(const expr_t *dv, char **expr_out, char **bindings_out);
+char *expr_to_tex_body_wrapped_with_partials(
+    const expr_t *expr,
+    size_t line_limit);
+char *expr_to_tex_body_wrapped_with_totals(
+    const expr_t *expr,
+    size_t line_limit);
 
 #endif /* EXPR_SHARED_INTERNAL_H */

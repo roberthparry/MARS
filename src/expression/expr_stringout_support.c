@@ -343,29 +343,40 @@ typedef struct {
     char ascii;
 } expr_tostring_ascii_map_t;
 
-#define EXPR_TEX_HASH_GREEK_SIZE       19u
 #define EXPR_TEX_HASH_FRACTION_SIZE    21u
 #define EXPR_TEX_HASH_SYMBOL_SIZE      9u
 #define EXPR_ASCII_HASH_SUPERSCRIPT_SIZE 28u
 #define EXPR_ASCII_SUBSCRIPT_BASE      0x2080u
 
-static const expr_tostring_tex_map_t expr_tostring_greek_tex_table[EXPR_TEX_HASH_GREEK_SIZE] = {
-    [0]  = {0x03A6, "\\Phi"},
-    [3]  = {0x03A0, "\\Pi"},
-    [4]  = {0x03A3, "\\Sigma"},
-    [5]  = {0x03C4, "\\tau"},
-    [6]  = {0x03BB, "\\lambda"},
-    [7]  = {0x03C6, "\\phi"},
-    [9]  = {0x03B8, "\\theta"},
-    [10] = {0x03C0, "\\pi"},
-    [11] = {0x03C3, "\\sigma"},
-    [12] = {0x03BC, "\\mu"},
-    [13] = {0x03D5, "\\phi"},
-    [14] = {0x03B1, "\\alpha"},
-    [15] = {0x03A9, "\\Omega"},
-    [16] = {0x03B3, "\\gamma"},
-    [17] = {0x03B2, "\\beta"},
-    [18] = {0x03B4, "\\delta"}
+static const expr_tostring_tex_map_t expr_tostring_greek_tex_table[] = {
+    {0x0391, "A"},          {0x0392, "B"},
+    {0x0393, "\\Gamma"},    {0x0394, "\\Delta"},
+    {0x0395, "E"},          {0x0396, "Z"},
+    {0x0397, "H"},          {0x0398, "\\Theta"},
+    {0x0399, "I"},          {0x039A, "K"},
+    {0x039B, "\\Lambda"},   {0x039C, "M"},
+    {0x039D, "N"},          {0x039E, "\\Xi"},
+    {0x039F, "O"},          {0x03A0, "\\Pi"},
+    {0x03A1, "P"},          {0x03A3, "\\Sigma"},
+    {0x03A4, "T"},          {0x03A5, "\\Upsilon"},
+    {0x03A6, "\\Phi"},      {0x03A7, "X"},
+    {0x03A8, "\\Psi"},      {0x03A9, "\\Omega"},
+    {0x03B1, "\\alpha"},    {0x03B2, "\\beta"},
+    {0x03B3, "\\gamma"},    {0x03B4, "\\delta"},
+    {0x03B5, "\\epsilon"},  {0x03B6, "\\zeta"},
+    {0x03B7, "\\eta"},      {0x03B8, "\\theta"},
+    {0x03B9, "\\iota"},     {0x03BA, "\\kappa"},
+    {0x03BB, "\\lambda"},   {0x03BC, "\\mu"},
+    {0x03BD, "\\nu"},       {0x03BE, "\\xi"},
+    {0x03BF, "o"},          {0x03C0, "\\pi"},
+    {0x03C1, "\\rho"},      {0x03C2, "\\varsigma"},
+    {0x03C3, "\\sigma"},    {0x03C4, "\\tau"},
+    {0x03C5, "\\upsilon"},  {0x03C6, "\\phi"},
+    {0x03C7, "\\chi"},      {0x03C8, "\\psi"},
+    {0x03C9, "\\omega"},    {0x03D1, "\\vartheta"},
+    {0x03D5, "\\varphi"},   {0x03D6, "\\varpi"},
+    {0x03F0, "\\varkappa"}, {0x03F1, "\\varrho"},
+    {0x03F5, "\\varepsilon"}
 };
 
 static const expr_tostring_tex_map_t expr_tostring_vulgar_fraction_tex_table[EXPR_TEX_HASH_FRACTION_SIZE] = {
@@ -425,11 +436,6 @@ static const char expr_tostring_subscript_ascii_table[] = {
     '+', '-', '=', '(', ')'
 };
 
-static size_t expr_tostring_greek_hash(unsigned int cp)
-{
-    return (cp ^ (cp >> 2) ^ 37u) % EXPR_TEX_HASH_GREEK_SIZE;
-}
-
 static size_t expr_tostring_fraction_hash(unsigned int cp)
 {
     return cp % EXPR_TEX_HASH_FRACTION_SIZE;
@@ -483,9 +489,14 @@ static char expr_tostring_subscript_ascii(unsigned int c)
 
 static const char *expr_tostring_greek_tex(unsigned int cp)
 {
-    return expr_tostring_tex_lookup(expr_tostring_greek_tex_table,
-                                  expr_tostring_greek_hash(cp),
-                                  cp);
+    for (size_t i = 0u;
+         i < sizeof(expr_tostring_greek_tex_table) /
+                 sizeof(expr_tostring_greek_tex_table[0]);
+         ++i) {
+        if (expr_tostring_greek_tex_table[i].codepoint == cp)
+            return expr_tostring_greek_tex_table[i].text;
+    }
+    return NULL;
 }
 
 static const char *expr_tostring_vulgar_fraction_tex(unsigned int cp)

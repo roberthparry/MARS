@@ -152,6 +152,7 @@ typedef enum {
     EXPR_KIND_SUMMATION,
     EXPR_KIND_FORMAL_DERIVATIVE,
     EXPR_KIND_ARBITRARY_FUNCTION,
+    EXPR_KIND_ARGUMENT_LIST,
     EXPR_KIND_COUNT
 } expr_op_kind_t;
 
@@ -316,6 +317,7 @@ extern const expr_ops_t ops_indexed_symbol;
 extern const expr_ops_t ops_summation;
 extern const expr_ops_t ops_formal_derivative;
 extern const expr_ops_t ops_arbitrary_function;
+extern const expr_ops_t ops_argument_list;
 
 expr_t *expr_new_indexed_symbol(const char *name, const expr_t *index);
 expr_t *expr_new_summation(const expr_t *term, const expr_t *index);
@@ -328,6 +330,10 @@ const expr_t *expr_formal_derivative_dependent(const expr_t *expr);
 size_t expr_formal_derivative_order(const expr_t *expr);
 const expr_t *expr_formal_derivative_wrt_at(const expr_t *expr, size_t index);
 expr_t *expr_new_arbitrary_function(const char *name, const expr_t *argument);
+expr_t *expr_new_arbitrary_function_n(
+    const char *name,
+    size_t argument_count,
+    expr_t *const *arguments);
 bool expr_is_arbitrary_function(const expr_t *expr);
 extern const expr_ops_t ops_sin;
 extern const expr_ops_t ops_cos;
@@ -1149,6 +1155,8 @@ expr_t *expr_div_simplify_owned(const expr_t *left, const expr_t *right);
 bool expr_match_unary_op(const expr_t *expr,
                          expr_op_kind_t kind,
                          const expr_t **arg_out);
+bool expr_match_unary_expr(const expr_t *expr, const expr_t **arg_out);
+bool expr_match_cot_expr(const expr_t *expr, const expr_t **arg_out);
 bool expr_match_binary_op(const expr_t *expr,
                           expr_op_kind_t kind,
                           const expr_t **left_out,

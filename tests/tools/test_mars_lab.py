@@ -98,6 +98,30 @@ class EquationResultTests(unittest.TestCase):
 
 
 class DiffequationResultTests(unittest.TestCase):
+    def test_problem_display_preserves_native_derivative_notation(self) -> None:
+        fields = {
+            "input": "(y-x)z_x + (y+x)z_y = (x^2+y^2)/z",
+            "problem": (
+                "{ (y-x)∂z/∂x + (y+x)∂z/∂y = (x^2+y^2)/z "
+                "| x = ?, y = ?; ;  }"
+            ),
+            "problem_tex": "",
+            "solutions": "",
+            "solutions_tex": "",
+            "status": "unsupported",
+            "solver": "none",
+            "diagnostic": "",
+        }
+
+        payload = mars_lab.prepare_diffequation_fields(fields)
+
+        self.assertEqual(
+            payload["problem"],
+            "{ (y-x)∂z/∂x + (y+x)∂z/∂y = (x^2+y^2)/z "
+            "| x = ?, y = ?; ;  }",
+        )
+        self.assertEqual(payload["input"], fields["input"])
+
     def test_tab_uses_its_own_native_endpoint_and_input_state(self) -> None:
         self.assertIn('data-mode="diffequation"', mars_lab.INDEX_HTML)
         self.assertIn("fetch('/diffequation-eval'", mars_lab.INDEX_HTML)
@@ -144,6 +168,37 @@ class DiffequationResultTests(unittest.TestCase):
         (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
         "release diffequation_lab helper is not built",
     )
+    def test_native_helper_formats_pde_problem_with_partials(self) -> None:
+        completed = subprocess.run(
+            [
+                str(
+                    ROOT
+                    / "build"
+                    / "release"
+                    / "scratch"
+                    / "diffequation_lab"
+                ),
+                "2Dx(z) + 3Dy(z) = z; z(1,y) = y",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
+        payload = mars_lab.prepare_diffequation_fields(fields)
+
+        self.assertEqual(
+            fields["problem"],
+            "{ 2∂z/∂x + 3∂z/∂y = z "
+            "| x = ?, y = ?; ; z(1,y) = y }",
+        )
+        self.assertEqual(payload["problem"], fields["problem"])
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
     def test_native_helper_accepts_prime_ode_notation(self) -> None:
         completed = subprocess.run(
             [
@@ -166,7 +221,7 @@ class DiffequationResultTests(unittest.TestCase):
 
         self.assertEqual(payload["status"], "solved")
         self.assertIn(
-            "Dxx(y) + 4y = e^x + x^3",
+            "d²y/dx² + 4y = e^x + x^3",
             payload["problem"],
         )
         self.assertEqual(
@@ -194,7 +249,7 @@ class DiffequationResultTests(unittest.TestCase):
         payload = mars_lab.prepare_diffequation_fields(fields)
 
         self.assertEqual(payload["status"], "solved")
-        self.assertIn("Dtt(x) + x = 0", payload["problem"])
+        self.assertIn("d²x/dt² + x = 0", payload["problem"])
         self.assertEqual(
             payload["solutions"],
             "x = C₁·cos(t) + C₂·sin(t)",
@@ -226,7 +281,7 @@ class DiffequationResultTests(unittest.TestCase):
 
         self.assertEqual(payload["status"], "solved")
         self.assertEqual(payload["solver"], "derivative-quadratic")
-        self.assertIn(r"\operatorname{D}_{x}", payload["problem_tex"])
+        self.assertIn(r"\frac{d y}{d x}", payload["problem_tex"])
         self.assertNotIn(r"\operatorname{D}^{2}", payload["problem_tex"])
         self.assertIn("y = ?", payload["problem_tex"])
         self.assertNotIn("NAN", payload["problem_tex"])

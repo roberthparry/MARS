@@ -199,7 +199,7 @@ static void test_diffequ_parses_separable_ode(void)
         EXPECT_TEXT(
             "rendered differential-equation text",
             text,
-            "{ Dx(y) = x*y | x = ?; ; y(0) = 1 }");
+            "{ dy/dx = x*y | x = ?; ; y(0) = 1 }");
 
     free(text);
     string_free(base_text);
@@ -283,7 +283,7 @@ static void test_diffequ_parses_ode_shorthand(void)
         EXPECT_TEXT(
             "normalized shorthand",
             text,
-            "{ Dxx(y) = y | x = ?; ; y(0) = 1, Dx(y)(0) = 1 }");
+            "{ d²y/dx² = y | x = ?; ; y(0) = 1, dy/dx(0) = 1 }");
 
     free(text);
     de_free(de);
@@ -297,6 +297,7 @@ static void test_diffequ_parses_and_solves_prime_ode_shorthand(void)
         de_from_string("{ y'' + 4y = 0 | t = ?;; }");
     diffequ_t *forced = de_from_string("y'' + 4y = e^x");
     diffequ_t *time_dependent = de_from_string("x'' + x = 0");
+    diffequ_t *fraction = de_from_string("d²y/dx² + 4y = 0");
     diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
     diffequ_solve_result_t *explicit_result =
         explicit ? de_solve(explicit) : NULL;
@@ -336,6 +337,12 @@ static void test_diffequ_parses_and_solves_prime_ode_shorthand(void)
         : NULL;
     string_t *time_dependent_solution_text = time_dependent_solution
         ? equ_to_text(time_dependent_solution, style_UNBOUND)
+        : NULL;
+    string_t *fraction_equation_text = fraction
+        ? equ_to_text(de_equation(fraction), style_UNBOUND)
+        : NULL;
+    char *fraction_tex = fraction
+        ? de_to_string(fraction, style_TEX)
         : NULL;
 
     EXPECT_POINTER("parsed prime-notation ODE", de, true);
@@ -383,7 +390,19 @@ static void test_diffequ_parses_and_solves_prime_ode_shorthand(void)
             ? string_c_str(time_dependent_solution_text)
             : NULL,
         "x = C₁·cos(t) + C₂·sin(t)");
+    EXPECT_TEXT(
+        "ordinary derivative fraction input",
+        fraction_equation_text
+            ? string_c_str(fraction_equation_text)
+            : NULL,
+        "Dxx(y) + 4y = 0");
+    EXPECT_TEXT(
+        "ordinary derivative fraction TeX",
+        fraction_tex,
+        "\\frac{d^{2} y}{d x^{2}} + 4 y = 0");
 
+    free(fraction_tex);
+    string_free(fraction_equation_text);
     string_free(time_dependent_solution_text);
     string_free(time_dependent_equation_text);
     string_free(forced_solution_text);
@@ -397,9 +416,138 @@ static void test_diffequ_parses_and_solves_prime_ode_shorthand(void)
     de_solve_result_free(explicit_result);
     de_solve_result_free(result);
     de_free(time_dependent);
+    de_free(fraction);
     de_free(forced);
     de_free(explicit);
     de_free(de);
+}
+
+static void test_diffequ_parses_subscript_partial_derivatives(void)
+{
+    const char *first_source = "u_x + u_y = 0";
+    const char *mixed_source = "u_xy = 0";
+    diffequ_t *first = de_from_string(first_source);
+    diffequ_t *mixed = de_from_string(mixed_source);
+    diffequ_t *nested = de_from_string("Dy(Dx(u)) = 0");
+    diffequ_t *greek = de_from_string("phi_x + phi_y = 0");
+    diffequ_t *unicode_first =
+        de_from_string("∂u/∂x + ∂u/∂y = 0");
+    diffequ_t *unicode_mixed =
+        de_from_string("∂²u/∂y∂x = 0");
+    diffequ_t *unicode_repeated =
+        de_from_string("∂²u/∂x² + ∂²u/∂y² = 0");
+    diffequ_t *compact = de_from_string(
+        "x*(y-z)*z_x + y*(z-x)*z_y = z*(x-y)");
+    string_t *first_text = first
+        ? equ_to_text(de_equation(first), style_UNBOUND)
+        : NULL;
+    string_t *mixed_text = mixed
+        ? equ_to_text(de_equation(mixed), style_UNBOUND)
+        : NULL;
+    string_t *nested_text = nested
+        ? equ_to_text(de_equation(nested), style_UNBOUND)
+        : NULL;
+    char *greek_tex = greek
+        ? de_to_string(greek, style_TEX)
+        : NULL;
+    char *mixed_tex = mixed
+        ? de_to_string(mixed, style_TEX)
+        : NULL;
+    string_t *unicode_first_text = unicode_first
+        ? equ_to_text(de_equation(unicode_first), style_UNBOUND)
+        : NULL;
+    string_t *unicode_mixed_text = unicode_mixed
+        ? equ_to_text(de_equation(unicode_mixed), style_UNBOUND)
+        : NULL;
+    string_t *unicode_repeated_text = unicode_repeated
+        ? equ_to_text(de_equation(unicode_repeated), style_UNBOUND)
+        : NULL;
+    char *compact_tex = compact
+        ? de_to_string(compact, style_TEX)
+        : NULL;
+
+    printf("  subscript partial-derivative shorthand\n"
+           "    input:    %s\n"
+           "    expected: %s\n"
+           "    actual:   %s\n"
+           "    input:    %s\n"
+           "    expected: %s\n"
+           "    actual:   %s\n",
+           first_source,
+           "Dx(u) + Dy(u) = 0",
+           first_text ? string_c_str(first_text) : "NULL",
+           mixed_source,
+           "Dxy(u) = 0",
+           mixed_text ? string_c_str(mixed_text) : "NULL");
+    EXPECT_POINTER("parsed first partial derivatives", first, true);
+    EXPECT_LONG(
+        "first-partial independent-variable count",
+        (long)de_independent_count(first),
+        2L);
+    EXPECT_TEXT(
+        "normalized first partial derivatives",
+        first_text ? string_c_str(first_text) : NULL,
+        "Dx(u) + Dy(u) = 0");
+    EXPECT_POINTER("parsed mixed partial derivative", mixed, true);
+    EXPECT_LONG(
+        "mixed-partial independent-variable count",
+        (long)de_independent_count(mixed),
+        2L);
+    EXPECT_TEXT(
+        "normalized mixed partial derivative",
+        mixed_text ? string_c_str(mixed_text) : NULL,
+        "Dxy(u) = 0");
+    EXPECT_TEXT(
+        "u_xy agrees with Dy(Dx(u))",
+        mixed_text ? string_c_str(mixed_text) : NULL,
+        nested_text ? string_c_str(nested_text) : NULL);
+    EXPECT_TEXT(
+        "mixed-partial TeX notation",
+        mixed_tex,
+        "\\frac{\\partial^{2} u}{\\partial y\\,\\partial x} = 0");
+    EXPECT_TEXT(
+        "Greek-name subscript derivative",
+        greek_tex,
+        "\\frac{\\partial \\phi}{\\partial x} + "
+        "\\frac{\\partial \\phi}{\\partial y} = 0");
+    EXPECT_TEXT(
+        "Unicode first partial derivatives",
+        unicode_first_text ? string_c_str(unicode_first_text) : NULL,
+        "Dx(u) + Dy(u) = 0");
+    EXPECT_TEXT(
+        "Unicode mixed partial derivative",
+        unicode_mixed_text ? string_c_str(unicode_mixed_text) : NULL,
+        "Dxy(u) = 0");
+    EXPECT_TEXT(
+        "Unicode repeated partial derivatives",
+        unicode_repeated_text ? string_c_str(unicode_repeated_text) : NULL,
+        "Dxx(u) + Dyy(u) = 0");
+    EXPECT_TEXT(
+        "visually short PDE stays on one line",
+        compact_tex,
+        "x \\cdot \\left(y - z\\right) \\cdot "
+        "\\frac{\\partial z}{\\partial x} + "
+        "y \\cdot \\left(z - x\\right) \\cdot "
+        "\\frac{\\partial z}{\\partial y} = "
+        "z \\cdot \\left(x - y\\right)");
+
+    free(compact_tex);
+    string_free(unicode_repeated_text);
+    string_free(unicode_mixed_text);
+    string_free(unicode_first_text);
+    free(mixed_tex);
+    free(greek_tex);
+    string_free(nested_text);
+    string_free(mixed_text);
+    string_free(first_text);
+    de_free(nested);
+    de_free(greek);
+    de_free(unicode_repeated);
+    de_free(unicode_mixed);
+    de_free(unicode_first);
+    de_free(compact);
+    de_free(mixed);
+    de_free(first);
 }
 
 static void test_diffequ_rejects_noncanonical_text(void)
@@ -1836,7 +1984,7 @@ static void test_diffequ_parses_pde_boundary_arguments(void)
         "{ 2*Dx(u) + Dy(u) = 0 | x = ?, y = ?;; "
         "u(x, 0) = x^2 }";
     const char *expected_problem =
-        "{ 2*Dx(u) + Dy(u) = 0 | x = ?, y = ?; ; "
+        "{ 2*∂u/∂x + ∂u/∂y = 0 | x = ?, y = ?; ; "
         "u(x, 0) = x^2 }";
     diffequ_t *de = de_from_string(source);
     char *problem = de ? de_to_string(de, style_EXPRESSION) : NULL;
@@ -1885,6 +2033,41 @@ static void test_diffequ_solves_constant_transport_from_x_boundary(void)
         "u = exp(y - 3x)");
 }
 
+static void test_diffequ_solves_variable_forcing_from_time_boundary(void)
+{
+    EXPECT_TRANSPORT_SOLUTION(
+        "Dx(z) + 1/2*Dt(z) = cos(x); z(x,0) = 0",
+        "z = sin(x) - sin(x - 2t)");
+}
+
+static void test_diffequ_solves_parametric_characteristic_boundary(void)
+{
+    EXPECT_CHARACTERISTIC_SOLUTION(
+        "∂z/∂x + ∂z/∂y = 2*z*(x+y); z(x,1-x) = x^2",
+        "z = ¼·(x - y + 1)²·exp(½·((x + y)² - 1))");
+}
+
+static void test_diffequ_solves_scaled_coordinate_characteristics(void)
+{
+    EXPECT_CHARACTERISTIC_SOLUTION(
+        "(x^2+1)*Dx(z) + 2*x*y*Dy(z) - x*y = 0",
+        "z = ½·(2·F(y/(x² + 1)) + y)");
+    EXPECT_CHARACTERISTIC_SOLUTION(
+        "(x^2+1)*Dx(z) + 2*x*y*Dy(z) - x*y = 0; "
+        "z(x, 1) = (x^2+1)^2",
+        "z = ½·(y + 2·((x² + 1)/y)² - 1)");
+}
+
+static void test_diffequ_solves_exponential_characteristics(void)
+{
+    EXPECT_CHARACTERISTIC_SOLUTION(
+        "exp(x)*Dx(z) + Dy(z) = 0",
+        "z = F(exp(-x) + y)");
+    EXPECT_CHARACTERISTIC_SOLUTION(
+        "exp(x)*Dx(z) + Dy(z) = 0; z(x, 0) = tanh(x)",
+        "z = -tanh(ln(exp(-x) + y))");
+}
+
 static void test_diffequ_solves_unbounded_homogeneous_transport(void)
 {
     EXPECT_TRANSPORT_SOLUTION(
@@ -1897,6 +2080,118 @@ static void test_diffequ_solves_unbounded_inhomogeneous_transport(void)
     EXPECT_TRANSPORT_SOLUTION(
         "Dt(u) + c*Dx(u) = 1",
         "u = F(x - ct) + t");
+}
+
+static void test_diffequ_solves_transport_with_reaction_term(void)
+{
+    EXPECT_TRANSPORT_SOLUTION(
+        "Dx(z) + Dy(z) = z",
+        "z = exp(x)·F(y - x)");
+}
+
+static void test_diffequ_solves_transport_with_variable_forcing(void)
+{
+    diffequ_t *de =
+        de_from_string("Dx(z) + Dy(z) + z = x");
+    char *tex = de ? de_to_string(de, style_TEX) : NULL;
+
+    EXPECT_TEXT(
+        "variable-forcing PDE TeX",
+        tex,
+        "\\frac{\\partial z}{\\partial x} + "
+        "\\frac{\\partial z}{\\partial y} + z = x");
+    EXPECT_TRANSPORT_SOLUTION(
+        "Dx(z) + Dy(z) + z = x",
+        "z = exp(-x)·F(y - x) + x - 1");
+
+    free(tex);
+    de_free(de);
+}
+
+static void test_diffequ_solves_mixed_phase_trigonometric_forcing(void)
+{
+    EXPECT_TRANSPORT_SOLUTION(
+        "Dx(z) + Dy(z) = cos(x+y)",
+        "z = F(y - x) + ½·sin(x + y)");
+}
+
+static void test_diffequ_solves_mixed_phase_unary_forcing(void)
+{
+    EXPECT_TRANSPORT_SOLUTION(
+        "Dx(z) + 2*Dy(z) = tanh(x+y)",
+        "z = F(y - 2x) + ⅓·ln(cosh(x + y))");
+}
+
+static void test_diffequ_uses_builtin_alias_as_dependent_symbol(void)
+{
+    const char *source =
+        "Dx(@phi) - Dy(@phi) = sin(x) + cos(y)";
+    diffequ_t *de = de_from_string(source);
+    char *tex = de ? de_to_string(de, style_TEX) : NULL;
+
+    EXPECT_TEXT(
+        "contextual dependent-symbol TeX",
+        tex,
+        "\\frac{\\partial \\phi}{\\partial x} - "
+        "\\frac{\\partial \\phi}{\\partial y} = "
+        "\\sin(x) + \\cos(y)");
+    EXPECT_TRANSPORT_SOLUTION(
+        source,
+        "φ = F(x + y) - cos(x) - sin(y)");
+
+    free(tex);
+    de_free(de);
+}
+
+static void test_diffequ_solves_scaled_additive_transport_forcing(void)
+{
+    EXPECT_TRANSPORT_SOLUTION(
+        "2*Dx(u) + 3*Dy(u) = 4*x + 6*y",
+        "u = F(½·(2y - 3x)) + x² + y²");
+}
+
+static void test_diffequ_solves_polynomial_reaction_forcing(void)
+{
+    EXPECT_TRANSPORT_SOLUTION(
+        "Dx(z) + 3*Dy(z) - 2*z + "
+        "4*y^2 - 22*y + 4*x + 13 = 0",
+        "z = exp(2x)·F(y - 3x) + 2x - 5y + 2y²");
+}
+
+static void test_diffequ_solves_mixed_polynomial_reaction_forcing(void)
+{
+    EXPECT_TRANSPORT_SOLUTION(
+        "2*Dx(u) - Dy(u) + 3*u = x*y",
+        "u = exp(-³⁄₂x)·F(½·(x + 2y)) + "
+        "¹⁄₂₇·(9xy + 3x - 6y - 4)");
+}
+
+static void test_diffequ_solves_trigonometric_reaction_forcing(void)
+{
+    EXPECT_TRANSPORT_SOLUTION(
+        "2*Dx(@phi) + Dy(@phi) + 6*@phi = 37*sin(y)",
+        "φ = exp(-3x)·F(½·(2y - x)) + 6·sin(y) - cos(y)");
+}
+
+static void test_diffequ_solves_exponential_reaction_forcing(void)
+{
+    EXPECT_TRANSPORT_SOLUTION(
+        "3*Dx(u) + 2*Dy(u) + 5*u = 11*exp(y)",
+        "u = exp(-⁵⁄₃x)·F(⅓·(3y - 2x)) + ¹¹⁄₇·exp(y)");
+}
+
+static void test_diffequ_solves_three_variable_transport(void)
+{
+    EXPECT_TRANSPORT_SOLUTION(
+        "Dx(@phi) + Dy(@phi) + Dz(@phi) = @phi",
+        "φ = exp(x)·F(y - x, z - x)");
+}
+
+static void test_diffequ_solves_scaled_three_variable_transport(void)
+{
+    EXPECT_TRANSPORT_SOLUTION(
+        "2*Dx(u) - 3*Dy(u) + 4*Dz(u) + 5*u = 10",
+        "u = exp(-⁵⁄₂x)·F(½·(3x + 2y), z - 2x) + 2");
 }
 
 static void test_diffequ_solves_nonlinear_characteristic_pde(void)
@@ -1936,11 +2231,363 @@ static void test_diffequ_solves_nonlinear_characteristic_pde(void)
     de_free(de);
 }
 
+static void test_diffequ_solves_quadratic_characteristic_evolution(void)
+{
+    const char *source =
+        "x^2*Dx(z) + y^2*Dy(z) = z^2";
+    diffequ_t *de = de_from_string(source);
+    diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
+    const equation_t *general =
+        result ? de_solve_result_at(result, 0u) : NULL;
+    const equation_t *singular =
+        result ? de_solve_result_at(result, 1u) : NULL;
+    string_t *general_text =
+        general ? equ_to_text(general, style_UNBOUND) : NULL;
+    string_t *singular_text =
+        singular ? equ_to_text(singular, style_UNBOUND) : NULL;
+
+    printf("  quadratic characteristic evolution\n"
+           "    input: %s\n",
+           source);
+    EXPECT_LONG(
+        "quadratic characteristic status",
+        (long)de_solve_result_status(result),
+        (long)DE_SOLVE_STATUS_SOLVED);
+    EXPECT_LONG(
+        "quadratic characteristic solution count",
+        (long)de_solve_result_count(result),
+        2L);
+    EXPECT_TEXT(
+        "quadratic characteristic general solution",
+        general_text ? string_c_str(general_text) : NULL,
+        "z = 1/(F(1/x - 1/y) + 1/x)");
+    EXPECT_TEXT(
+        "quadratic characteristic singular solution",
+        singular_text ? string_c_str(singular_text) : NULL,
+        "z = 0");
+
+    string_free(singular_text);
+    string_free(general_text);
+    de_solve_result_free(result);
+    de_free(de);
+}
+
+static void test_diffequ_applies_quadratic_characteristic_boundary(void)
+{
+    const char *source =
+        "x^2*Dx(z) + y^2*Dy(z) + z^2 = 0; "
+        "z(x, x/(x-1)) = 1";
+    diffequ_t *de = de_from_string(source);
+    diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
+    const equation_t *solution =
+        result ? de_solve_result_at(result, 0u) : NULL;
+    string_t *solution_text =
+        solution ? equ_to_text(solution, style_UNBOUND) : NULL;
+
+    printf("  quadratic characteristic boundary problem\n"
+           "    input:    %s\n"
+           "    expected: z = 2/(3 - 1/x - 1/y)\n"
+           "    actual:   %s\n",
+           source,
+           solution_text ? string_c_str(solution_text) : "NULL");
+    EXPECT_LONG(
+        "quadratic boundary status",
+        (long)de_solve_result_status(result),
+        (long)DE_SOLVE_STATUS_SOLVED);
+    EXPECT_LONG(
+        "quadratic boundary selected solver",
+        (long)de_solve_result_solver(result),
+        (long)DE_SOLVER_CHARACTERISTICS);
+    EXPECT_LONG(
+        "quadratic boundary solution count",
+        (long)de_solve_result_count(result),
+        1L);
+    EXPECT_TEXT(
+        "quadratic boundary solution",
+        solution_text ? string_c_str(solution_text) : NULL,
+        "z = 2/(3 - 1/x - 1/y)");
+
+    string_free(solution_text);
+    de_solve_result_free(result);
+    de_free(de);
+}
+
+static void test_diffequ_solves_dependent_square_characteristic_pde(void)
+{
+    const char *source =
+        "xzz_x + yzz_y + x^2 + y^2 = 0";
+    diffequ_t *de = de_from_string(source);
+    diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
+    const equation_t *positive =
+        result ? de_solve_result_at(result, 0u) : NULL;
+    const equation_t *negative =
+        result ? de_solve_result_at(result, 1u) : NULL;
+    string_t *positive_text =
+        positive ? equ_to_text(positive, style_UNBOUND) : NULL;
+    string_t *negative_text =
+        negative ? equ_to_text(negative, style_UNBOUND) : NULL;
+
+    printf("  dependent-square characteristic reduction\n"
+           "    input:    %s\n"
+           "    expected: %s\n"
+           "    actual:   %s\n"
+           "    expected: %s\n"
+           "    actual:   %s\n",
+           source,
+           "z = √(F(y/x) - x² - y²)",
+           positive_text ? string_c_str(positive_text) : "NULL",
+           "z = -√(F(y/x) - x² - y²)",
+           negative_text ? string_c_str(negative_text) : "NULL");
+    EXPECT_LONG(
+        "dependent-square characteristic status",
+        (long)de_solve_result_status(result),
+        (long)DE_SOLVE_STATUS_SOLVED);
+    EXPECT_LONG(
+        "dependent-square selected solver",
+        (long)de_solve_result_solver(result),
+        (long)DE_SOLVER_CHARACTERISTICS);
+    EXPECT_LONG(
+        "dependent-square solution count",
+        (long)de_solve_result_count(result),
+        2L);
+    EXPECT_TEXT(
+        "dependent-square positive branch",
+        positive_text ? string_c_str(positive_text) : NULL,
+        "z = √(F(y/x) - x² - y²)");
+    EXPECT_TEXT(
+        "dependent-square negative branch",
+        negative_text ? string_c_str(negative_text) : NULL,
+        "z = -√(F(y/x) - x² - y²)");
+
+    string_free(negative_text);
+    string_free(positive_text);
+    de_solve_result_free(result);
+    de_free(de);
+}
+
+static void test_diffequ_applies_dependent_square_boundary(void)
+{
+    const char *source =
+        "x*z*z_x + y*z*z_y + x*y = 0; z(x, 1/x) = x";
+    diffequ_t *de = de_from_string(source);
+    diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
+    const equation_t *solution =
+        result ? de_solve_result_at(result, 0u) : NULL;
+    string_t *solution_text =
+        solution ? equ_to_text(solution, style_UNBOUND) : NULL;
+
+    printf("  dependent-square characteristic boundary problem\n"
+           "    input:    %s\n"
+           "    expected: z = √(1 - xy + x/y)\n"
+           "    actual:   %s\n",
+           source,
+           solution_text ? string_c_str(solution_text) : "NULL");
+    EXPECT_LONG(
+        "dependent-square boundary status",
+        (long)de_solve_result_status(result),
+        (long)DE_SOLVE_STATUS_SOLVED);
+    EXPECT_LONG(
+        "dependent-square boundary selected solver",
+        (long)de_solve_result_solver(result),
+        (long)DE_SOLVER_CHARACTERISTICS);
+    EXPECT_LONG(
+        "dependent-square boundary solution count",
+        (long)de_solve_result_count(result),
+        1L);
+    EXPECT_TEXT(
+        "dependent-square boundary solution",
+        solution_text ? string_c_str(solution_text) : NULL,
+        "z = √(1 - xy + x/y)");
+
+    string_free(solution_text);
+    de_solve_result_free(result);
+    de_free(de);
+}
+
+static void test_diffequ_applies_signed_dependent_square_boundary(void)
+{
+    EXPECT_CHARACTERISTIC_SOLUTION(
+        "z*z_x - z*z_y = y-x; z(1, y) = y^2",
+        "z = √(2xy - 2x - 2y + 2 + (x + y - 1)⁴)");
+}
+
+static void test_diffequ_solves_invariant_forced_square_pde(void)
+{
+    const char *source = "zz_x + zz_y = y - x";
+    diffequ_t *de = de_from_string(source);
+    diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
+    const equation_t *positive =
+        result ? de_solve_result_at(result, 0u) : NULL;
+    const equation_t *negative =
+        result ? de_solve_result_at(result, 1u) : NULL;
+    string_t *positive_text =
+        positive ? equ_to_text(positive, style_UNBOUND) : NULL;
+    string_t *negative_text =
+        negative ? equ_to_text(negative, style_UNBOUND) : NULL;
+
+    printf("  invariant-forced dependent-square PDE\n"
+           "    input:    %s\n"
+           "    expected: %s\n"
+           "    actual:   %s\n"
+           "    expected: %s\n"
+           "    actual:   %s\n",
+           source,
+           "z = √(F(y - x) - x² + y²)",
+           positive_text ? string_c_str(positive_text) : "NULL",
+           "z = -√(F(y - x) - x² + y²)",
+           negative_text ? string_c_str(negative_text) : "NULL");
+    EXPECT_LONG(
+        "invariant-forced square status",
+        (long)de_solve_result_status(result),
+        (long)DE_SOLVE_STATUS_SOLVED);
+    EXPECT_LONG(
+        "invariant-forced square solver",
+        (long)de_solve_result_solver(result),
+        (long)DE_SOLVER_CHARACTERISTICS);
+    EXPECT_LONG(
+        "invariant-forced square solution count",
+        (long)de_solve_result_count(result),
+        2L);
+    EXPECT_TEXT(
+        "invariant-forced positive branch",
+        positive_text ? string_c_str(positive_text) : NULL,
+        "z = √(F(y - x) - x² + y²)");
+    EXPECT_TEXT(
+        "invariant-forced negative branch",
+        negative_text ? string_c_str(negative_text) : NULL,
+        "z = -√(F(y - x) - x² + y²)");
+
+    string_free(negative_text);
+    string_free(positive_text);
+    de_solve_result_free(result);
+    de_free(de);
+}
+
+static void test_diffequ_solves_reciprocal_forced_square_pde(void)
+{
+    const char *source =
+        "(y-x)∂z/∂x + (y+x)∂z/∂y = (x^2+y^2)/z";
+    diffequ_t *de = de_from_string(source);
+    diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
+    const equation_t *positive =
+        result ? de_solve_result_at(result, 0u) : NULL;
+    const equation_t *negative =
+        result ? de_solve_result_at(result, 1u) : NULL;
+    string_t *positive_text =
+        positive ? equ_to_text(positive, style_UNBOUND) : NULL;
+    string_t *negative_text =
+        negative ? equ_to_text(negative, style_UNBOUND) : NULL;
+
+    printf("  reciprocal-forced dependent-square PDE\n"
+           "    input:    %s\n"
+           "    expected: %s\n"
+           "    actual:   %s\n"
+           "    expected: %s\n"
+           "    actual:   %s\n",
+           source,
+           "z = √(F(x² + 2xy - y²) + 2xy)",
+           positive_text ? string_c_str(positive_text) : "NULL",
+           "z = -√(F(x² + 2xy - y²) + 2xy)",
+           negative_text ? string_c_str(negative_text) : "NULL");
+    EXPECT_LONG(
+        "reciprocal-forced square status",
+        (long)de_solve_result_status(result),
+        (long)DE_SOLVE_STATUS_SOLVED);
+    EXPECT_LONG(
+        "reciprocal-forced square solver",
+        (long)de_solve_result_solver(result),
+        (long)DE_SOLVER_CHARACTERISTICS);
+    EXPECT_LONG(
+        "reciprocal-forced square solution count",
+        (long)de_solve_result_count(result),
+        2L);
+    EXPECT_TEXT(
+        "reciprocal-forced positive branch",
+        positive_text ? string_c_str(positive_text) : NULL,
+        "z = √(F(x² + 2xy - y²) + 2xy)");
+    EXPECT_TEXT(
+        "reciprocal-forced negative branch",
+        negative_text ? string_c_str(negative_text) : NULL,
+        "z = -√(F(x² + 2xy - y²) + 2xy)");
+
+    string_free(negative_text);
+    string_free(positive_text);
+    de_solve_result_free(result);
+    de_free(de);
+}
+
 static void test_diffequ_solves_rotating_characteristic_pde(void)
 {
     EXPECT_CHARACTERISTIC_SOLUTION(
         "(x+y)*Dx(z) + (y-x)*Dy(z) = 0",
         "z = F(½·(ln(x² + y²) + 2·atan2(y, x)))");
+}
+
+static void test_diffequ_solves_cyclic_lagrange_pde(void)
+{
+    EXPECT_CHARACTERISTIC_SOLUTION(
+        "x*(y-z)*z_x + y*(z-x)*z_y = z*(x-y)",
+        "F(x + y + z, xyz) = 0");
+    EXPECT_CHARACTERISTIC_SOLUTION(
+        "x(y^2-z^2)∂z/∂x + y(z^2-x^2)∂z/∂y = "
+        "z(x^2-y^2)",
+        "F(x² + y² + z², xyz) = 0");
+}
+
+static void test_diffequ_solves_monomial_linear_characteristic_pde(void)
+{
+    const char *source =
+        "x^2*Dx(@psi) - x*y*Dy(@psi) + y*@psi = 0";
+    diffequ_t *de = de_from_string(source);
+    char *tex = de ? de_to_string(de, style_TEX) : NULL;
+
+    EXPECT_TEXT(
+        "Greek dependent-symbol TeX",
+        tex,
+        "x^{2} \\cdot \\frac{\\partial \\psi}{\\partial x} - "
+        "x y \\cdot \\frac{\\partial \\psi}{\\partial y} + "
+        "\\psi y = 0");
+    EXPECT_CHARACTERISTIC_SOLUTION(
+        source,
+        "ψ = F(xy)·exp(½·1/x·y)");
+
+    free(tex);
+    de_free(de);
+}
+
+static void test_diffequ_solves_forced_monomial_characteristic_pde(void)
+{
+    EXPECT_CHARACTERISTIC_SOLUTION(
+        "x*Dx(z) - 7*y*Dy(z) = 5*x^2*y",
+        "z = F(x⁷y) - x²y");
+    EXPECT_CHARACTERISTIC_SOLUTION(
+        "x*Dx(u) - 2*y*Dy(u) = 6*x*y",
+        "u = F(x²y) - 6xy");
+}
+
+static void test_diffequ_solves_forced_radial_characteristic_pde(void)
+{
+    EXPECT_CHARACTERISTIC_SOLUTION(
+        "x*y*Dx(z) - x^2*Dy(z) + y*z = 3*x^2*y",
+        "z = F(x² + y²)/x + x²");
+}
+
+static void test_diffequ_solves_separable_trigonometric_characteristic_pde(void)
+{
+    EXPECT_CHARACTERISTIC_SOLUTION(
+        "Dx(@phi)*sec(x) + Dy(@phi) = cot(y)",
+        "φ = F(y - sin(x)) + ln(sin(y))");
+}
+
+static void test_diffequ_solves_cross_coordinate_characteristic_pde(void)
+{
+    EXPECT_CHARACTERISTIC_SOLUTION(
+        "3*y^2*Dx(u) + Dy(u) - x*y^2*u = 0",
+        "u = exp(⅙x²)·F(x - y³)");
+    EXPECT_CHARACTERISTIC_SOLUTION(
+        "3*y^2*Dx(u) + Dy(u) - x*y^2*u = 0; "
+        "u(y+y^3, y) = (y+y^3)*exp((y+y^3)^2/6)",
+        "u = exp(⅙x²)·(x - y³ + (x - y³)³)");
 }
 
 static void test_diffequ_solves_parameter_linear_pde(void)
@@ -1985,7 +2632,7 @@ static void example_diffequation_solving_an_ode(void)
 {
     const char *source = "Dx(y) = x*y; y(0) = 1";
     const char *expected_problem =
-        "{ Dx(y) = x*y | x = ?; ; y(0) = 1 }";
+        "{ dy/dx = x*y | x = ?; ; y(0) = 1 }";
     const char *expected_solution = "y = exp(½x²)";
     diffequ_t *ode = de_from_string(source);
     diffequ_solve_result_t *result = de_solve(ode);
@@ -2025,6 +2672,7 @@ int tests_main(void)
     RUN_TEST_CASE(test_diffequ_expression_text_round_trips);
     RUN_TEST_CASE(test_diffequ_parses_ode_shorthand);
     RUN_TEST_CASE(test_diffequ_parses_and_solves_prime_ode_shorthand);
+    RUN_TEST_CASE(test_diffequ_parses_subscript_partial_derivatives);
     RUN_TEST_CASE(test_diffequ_rejects_noncanonical_text);
     RUN_TEST_CASE(test_diffequ_solves_separable_initial_value_problem);
     RUN_TEST_CASE(test_diffequ_solves_linear_initial_value_problem);
@@ -2078,11 +2726,64 @@ int tests_main(void)
     RUN_TEST_CASE(
         test_diffequ_solves_constant_transport_from_x_boundary);
     RUN_TEST_CASE(
+        test_diffequ_solves_variable_forcing_from_time_boundary);
+    RUN_TEST_CASE(
+        test_diffequ_solves_parametric_characteristic_boundary);
+    RUN_TEST_CASE(
+        test_diffequ_solves_scaled_coordinate_characteristics);
+    RUN_TEST_CASE(
+        test_diffequ_solves_exponential_characteristics);
+    RUN_TEST_CASE(
         test_diffequ_solves_unbounded_homogeneous_transport);
     RUN_TEST_CASE(
         test_diffequ_solves_unbounded_inhomogeneous_transport);
+    RUN_TEST_CASE(test_diffequ_solves_transport_with_reaction_term);
+    RUN_TEST_CASE(test_diffequ_solves_transport_with_variable_forcing);
+    RUN_TEST_CASE(
+        test_diffequ_solves_mixed_phase_trigonometric_forcing);
+    RUN_TEST_CASE(
+        test_diffequ_solves_mixed_phase_unary_forcing);
+    RUN_TEST_CASE(
+        test_diffequ_uses_builtin_alias_as_dependent_symbol);
+    RUN_TEST_CASE(
+        test_diffequ_solves_scaled_additive_transport_forcing);
+    RUN_TEST_CASE(
+        test_diffequ_solves_polynomial_reaction_forcing);
+    RUN_TEST_CASE(
+        test_diffequ_solves_mixed_polynomial_reaction_forcing);
+    RUN_TEST_CASE(
+        test_diffequ_solves_trigonometric_reaction_forcing);
+    RUN_TEST_CASE(
+        test_diffequ_solves_exponential_reaction_forcing);
+    RUN_TEST_CASE(
+        test_diffequ_solves_three_variable_transport);
+    RUN_TEST_CASE(
+        test_diffequ_solves_scaled_three_variable_transport);
     RUN_TEST_CASE(test_diffequ_solves_nonlinear_characteristic_pde);
+    RUN_TEST_CASE(
+        test_diffequ_solves_quadratic_characteristic_evolution);
+    RUN_TEST_CASE(
+        test_diffequ_applies_quadratic_characteristic_boundary);
+    RUN_TEST_CASE(
+        test_diffequ_solves_dependent_square_characteristic_pde);
+    RUN_TEST_CASE(
+        test_diffequ_applies_dependent_square_boundary);
+    RUN_TEST_CASE(
+        test_diffequ_applies_signed_dependent_square_boundary);
+    RUN_TEST_CASE(test_diffequ_solves_invariant_forced_square_pde);
+    RUN_TEST_CASE(test_diffequ_solves_reciprocal_forced_square_pde);
     RUN_TEST_CASE(test_diffequ_solves_rotating_characteristic_pde);
+    RUN_TEST_CASE(test_diffequ_solves_cyclic_lagrange_pde);
+    RUN_TEST_CASE(
+        test_diffequ_solves_monomial_linear_characteristic_pde);
+    RUN_TEST_CASE(
+        test_diffequ_solves_forced_monomial_characteristic_pde);
+    RUN_TEST_CASE(
+        test_diffequ_solves_forced_radial_characteristic_pde);
+    RUN_TEST_CASE(
+        test_diffequ_solves_separable_trigonometric_characteristic_pde);
+    RUN_TEST_CASE(
+        test_diffequ_solves_cross_coordinate_characteristic_pde);
     RUN_TEST_CASE(test_diffequ_solves_parameter_linear_pde);
 
     TEST_SECTION("README Output Example");

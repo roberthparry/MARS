@@ -79,7 +79,9 @@ de_attempt_t de_pde_attempt_parameter_linear(
     right = polynomial_part && homogeneous_part
         ? expr_add(polynomial_part, homogeneous_part)
         : NULL;
-    *solution_out = right ? equ_new(dependent, right) : NULL;
+    *solution_out = right
+        ? de_pde_solution_equation(dependent, right)
+        : NULL;
     attempt = *solution_out
         ? DE_ATTEMPT_SOLVED
         : DE_ATTEMPT_FAILED;

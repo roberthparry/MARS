@@ -199,6 +199,10 @@ const expr_t *de_condition_argument_at(const diffequ_t *de,
 /**
  * @brief Format a differential-equation problem as an MARS string.
  *
+ * `style_EXPRESSION` uses conventional derivative fractions: ordinary
+ * derivatives are written as `dy/dx` and partial derivatives as `∂u/∂x`.
+ * The resulting notation is accepted by de_from_string().
+ *
  * @param de Problem to format. Must not be `NULL`.
  * @param style Output style.
  * @return A newly allocated string, or `NULL` on invalid input, unsupported

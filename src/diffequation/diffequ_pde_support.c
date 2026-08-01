@@ -50,6 +50,62 @@ bool de_pde_find_first_derivatives(
                right, x, y, dependent_out, dx_out, dy_out);
 }
 
+bool de_pde_find_first_derivatives_n(
+    const expr_t *expr,
+    size_t independent_count,
+    expr_t *const *independents,
+    const expr_t **dependent_out,
+    const expr_t **derivatives_out)
+{
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+
+    if (!expr)
+        return true;
+    if (expr_is_formal_derivative(expr)) {
+        const expr_t *dependent;
+        const expr_t *wrt;
+        size_t index = independent_count;
+
+        if (expr_formal_derivative_order(expr) != 1u)
+            return false;
+        dependent = expr_formal_derivative_dependent(expr);
+        wrt = expr_formal_derivative_wrt_at(expr, 0u);
+        if (!dependent || !wrt)
+            return false;
+        for (size_t i = 0u; i < independent_count; ++i) {
+            if (expr_struct_eq(wrt, independents[i])) {
+                index = i;
+                break;
+            }
+        }
+        if (index == independent_count ||
+            (*dependent_out &&
+             !expr_struct_eq(*dependent_out, dependent)) ||
+            (derivatives_out[index] &&
+             !expr_struct_eq(derivatives_out[index], expr)))
+            return false;
+        *dependent_out = dependent;
+        derivatives_out[index] = expr;
+        return true;
+    }
+
+    if (!expr_child_exprs(expr, &left, &right))
+        return true;
+    return de_pde_find_first_derivatives_n(
+               left,
+               independent_count,
+               independents,
+               dependent_out,
+               derivatives_out) &&
+           de_pde_find_first_derivatives_n(
+               right,
+               independent_count,
+               independents,
+               dependent_out,
+               derivatives_out);
+}
+
 const expr_t *de_pde_find_named_coordinate(
     const expr_t *expr,
     const expr_t *independent,
@@ -99,4 +155,19 @@ bool de_pde_same_symbolic_form(
     string_free(right_text);
     string_free(left_text);
     return same;
+}
+
+equation_t *de_pde_solution_equation(
+    const expr_t *dependent,
+    const expr_t *right)
+{
+    const char *name = expr_symbol_name(dependent);
+    expr_t *left = name
+        ? expr_new_named_var(NUM_NAN, name)
+        : expr_clone(dependent);
+    equation_t *solution =
+        left && right ? equ_new(left, right) : NULL;
+
+    expr_free(left);
+    return solution;
 }

@@ -364,16 +364,18 @@ diffequ_solve_result_t *de_solve(const diffequ_t *de)
             DE_SOLVE_STATUS_INVALID,
             DE_SOLVER_NONE,
             "differential equation is NULL");
-    if (de->independent_count == 2u) {
+    if (de->independent_count >= 2u) {
         residual = equ_residual(de->equation);
-        result = de_pde_solve_two_variable(de, residual);
+        result = de->independent_count == 2u
+            ? de_pde_solve_two_variable(de, residual)
+            : de_pde_solve_multi_variable(de, residual);
         goto cleanup;
     }
     if (de->independent_count != 1u)
         return de_solve_result_new(
             DE_SOLVE_STATUS_UNSUPPORTED,
             DE_SOLVER_NONE,
-            "the solver requires one ODE variable or two PDE variables");
+            "the solver requires at least one independent variable");
 
     independent = de->independent_vars[0];
     residual = equ_residual(de->equation);

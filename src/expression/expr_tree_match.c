@@ -122,6 +122,15 @@ bool expr_match_neg_expr(const expr_t *expr, const expr_t **arg_out)
     return expr_match_unary_op(expr, EXPR_KIND_NEG, arg_out);
 }
 
+bool expr_match_unary_expr(const expr_t *expr, const expr_t **arg_out)
+{
+    if (!expr || !expr->ops || expr->ops->arity != EXPR_OP_UNARY || !expr->a)
+        return false;
+    if (arg_out)
+        *arg_out = expr->a;
+    return true;
+}
+
 bool expr_match_exp_expr(const expr_t *expr, const expr_t **arg_out)
 {
     return expr_match_unary_op(expr, EXPR_KIND_EXP, arg_out);
@@ -145,6 +154,11 @@ bool expr_match_cos_expr(const expr_t *expr, const expr_t **arg_out)
 bool expr_match_tan_expr(const expr_t *expr, const expr_t **arg_out)
 {
     return expr_match_unary_op(expr, EXPR_KIND_TAN, arg_out);
+}
+
+bool expr_match_cot_expr(const expr_t *expr, const expr_t **arg_out)
+{
+    return expr_match_unary_op(expr, EXPR_KIND_COT, arg_out);
 }
 
 bool expr_match_add_expr(const expr_t *expr,

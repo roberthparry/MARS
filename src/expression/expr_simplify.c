@@ -2240,6 +2240,23 @@ expr_t *expr_simplify_unary_operator(const expr_t *dv, expr_t *a, expr_t *b)
             return periodic;
     }
 
+    if (expr_is_op(dv, &ops_tanh)) {
+        const expr_t *positive_argument = NULL;
+
+        if (expr_is_neg(a) && a->a) {
+            positive_argument = a->a;
+            expr_t *positive_tanh = expr_tanh(positive_argument);
+            expr_t *out = positive_tanh
+                ? expr_negate_owned(positive_tanh)
+                : NULL;
+
+            if (out) {
+                expr_free(a);
+                return out;
+            }
+        }
+    }
+
     imag_bridge = expr_simplify_try_imag_trig_bridge(dv, a);
     if (imag_bridge)
         return imag_bridge;

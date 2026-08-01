@@ -69,6 +69,12 @@ void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec);
 void emit_func    (const expr_t *f, sbuf_t *b, int parent_prec);
 void emit_func_display(const expr_t *f, sbuf_t *b, int parent_prec);
 void emit_tex_name(sbuf_t *b, const char *name);
+void expr_tex_partial_derivatives_push(void);
+void expr_tex_partial_derivatives_pop(void);
+bool expr_tex_partial_derivatives_enabled(void);
+void expr_tex_total_derivatives_push(void);
+void expr_tex_total_derivatives_pop(void);
+bool expr_tex_total_derivatives_enabled(void);
 
 /* Top-level text builders. */
 string_t * expr_to_text_expr    (const expr_t *f);
