@@ -92,5 +92,5 @@ texput.log
 
 # Local Explanatory Supplement repair/generation workers
 tools/render/
-docs/books/linearisation of non-linear odes/*.jpeg
+docs/books/Applied Differential Equations/img
 docs/books/ESAA/img

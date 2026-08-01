@@ -11,7 +11,9 @@
 The module supports construction, parsing, inspection, formatting, and
 symbolic solvers for first-order separable, linear, homogeneous, affine and
 linear-coordinate substitutions, and quadratic Bernoulli ODEs. Second-order
-linear equations are normalized to self-adjoint Sturm–Liouville form.
+linear equations are normalized to self-adjoint Sturm–Liouville form, with
+closed-form solutions for constant coefficients and affine Riccati
+factorizations.
 Constant-coefficient linear ODEs of arbitrary order are solved through their
 characteristic polynomial and variation of parameters.
 The first PDE solver handles two-variable, constant-coefficient homogeneous
@@ -428,7 +430,8 @@ The current symbolic scope is:
   linear equations; and
 - exact third-order forms `a*y''' + k*y'*y'' = f(x)`, integrated once and
   linearized with `u = exp(k*y/(2a))`; and
-- regular second-order linear equations, normalized to Sturm–Liouville form;
+- regular second-order linear equations, normalized to Sturm–Liouville form,
+  including affine Riccati factorizations with `erf` bases;
   and
 - arbitrary-order constant-coefficient linear ODEs, including repeated and
   complex roots and nonhomogeneous forcing; and
@@ -634,7 +637,38 @@ This Sturm–Liouville normalization is valid on intervals where `A(x) != 0`.
 It is a canonical representation, not a promise that arbitrary coefficient
 functions possess an elementary closed-form basis.
 
-The first completed second-order family is
+For a homogeneous equation in normal form, the solver recognizes the affine
+Riccati factorization
+
+```text
+y'' - (alpha(x)^2 + alpha'(x))*y = 0,
+alpha(x) = a*x + b,  a > 0.
+```
+
+This is
+
+```text
+(D + alpha(x))*(D - alpha(x))*y = 0.
+```
+
+The first basis function is `exp(integral(alpha(x), x))`; reduction of order
+produces the second, which simplifies to an `erf` expression for affine
+`alpha`. For example:
+
+```text
+y'' - (x^2+1)*y = 0
+→ y = exp(½x²)·(C₁ + C₂·erf(x))
+```
+
+With initial conditions, the arbitrary constants are eliminated in the same
+way as for a constant-coefficient problem:
+
+```text
+y'' - (x^2+1)*y = 0; y(0) = 1; y'(0) = 0
+→ y = exp(½x²)
+```
+
+The constant-coefficient second-order family is
 
 ```text
 a*Dxx(y) + b*Dx(y) + c*y = 0,

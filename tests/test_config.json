@@ -172,6 +172,7 @@
       "enabled": true,
       "example_diffequation_solving_an_ode": true
     },
+    "test_diffequ_applies_affine_factorized_initial_conditions": true,
     "test_diffequ_applies_dependent_square_boundary": true,
     "test_diffequ_applies_quadratic_characteristic_boundary": true,
     "test_diffequ_applies_signed_dependent_square_boundary": true,
@@ -204,6 +205,7 @@
     "test_diffequ_rejects_noncanonical_text": true,
     "test_diffequ_retains_arbitrary_constant": true,
     "test_diffequ_solves_affine_combination_substitution": true,
+    "test_diffequ_solves_affine_factorized_second_order_problem": true,
     "test_diffequ_solves_constant_transport_from_x_boundary": true,
     "test_diffequ_solves_constant_transport_from_y_boundary": true,
     "test_diffequ_solves_cross_coordinate_characteristic_pde": true,
