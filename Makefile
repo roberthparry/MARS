@@ -527,6 +527,8 @@ help:
 	@echo "  make to-be-announced-lab              Launch the local To-Be-Announced Lab"
 	@echo "  make install-mars-lab       Install a user desktop launcher for MARS Lab"
 	@echo "  make uninstall-mars-lab     Remove the user desktop launcher for MARS Lab"
+	@echo "  make install-almanac-db     Build and configure the Almanac database only"
+	@echo "  make uninstall-almanac-db   Remove the configured Almanac database"
 	@echo "  make install-jurisdiction-db Build and configure the private jurisdiction database only"
 	@echo "  make uninstall-jurisdiction-db Remove ~/.mars, including the private jurisdiction database"
 	@echo "  make install-to-be-announced-lab      Install a user desktop launcher for To-Be-Announced Lab"
