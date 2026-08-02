@@ -35,6 +35,7 @@ static bool binding_text_to_ulong(const string_t *text, unsigned long *out)
 {
     string_cursor_t *cursor;
     unsigned long parsed = 0ul;
+    unsigned int digit;
     size_t digits = 0u;
     bool ok = false;
 
@@ -45,10 +46,7 @@ static bool binding_text_to_ulong(const string_t *text, unsigned long *out)
     if (!cursor)
         return false;
 
-    while (binding_simplify_cursor_peek_digit(cursor, NULL)) {
-        unsigned int digit;
-
-        (void)binding_simplify_cursor_peek_digit(cursor, &digit);
+    while (binding_simplify_cursor_peek_digit(cursor, &digit)) {
         if (parsed > (ULONG_MAX - digit) / 10ul)
             goto done;
         parsed = parsed * 10ul + digit;
@@ -70,6 +68,7 @@ static bool binding_text_to_long(const string_t *text, long *out)
     string_cursor_t *cursor;
     unsigned long parsed = 0ul;
     unsigned long limit;
+    unsigned int digit;
     size_t digits = 0u;
     bool negative = false;
     bool ok = false;
@@ -88,10 +87,7 @@ static bool binding_text_to_long(const string_t *text, long *out)
     }
 
     limit = negative ? (unsigned long)LONG_MAX + 1ul : (unsigned long)LONG_MAX;
-    while (binding_simplify_cursor_peek_digit(cursor, NULL)) {
-        unsigned int digit;
-
-        (void)binding_simplify_cursor_peek_digit(cursor, &digit);
+    while (binding_simplify_cursor_peek_digit(cursor, &digit)) {
         if (parsed > (limit - digit) / 10ul)
             goto done;
         parsed = parsed * 10ul + digit;
