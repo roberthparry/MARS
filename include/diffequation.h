@@ -54,7 +54,8 @@ typedef enum {
     DE_SOLVER_EXACT_DERIVATIVE_LINEARIZATION,
     DE_SOLVER_CONSTANT_COEFFICIENT_TRANSPORT,
     DE_SOLVER_CHARACTERISTICS,
-    DE_SOLVER_PARAMETER_LINEAR_PDE
+    DE_SOLVER_PARAMETER_LINEAR_PDE,
+    DE_SOLVER_HYDROGEN_MATRIX
 } de_solver_t;
 
 /**
@@ -283,6 +284,30 @@ de_solver_t de_solve_result_solver(const diffequ_solve_result_t *result);
  * @return A borrowed null-terminated message, or `NULL`.
  */
 const char *de_solve_result_diagnostic(
+    const diffequ_solve_result_t *result);
+
+/**
+ * @brief Borrow the mathematical derivation produced by the selected solver.
+ *
+ * The text uses conventional Unicode mathematical notation and is intended
+ * for presentation by thin clients. Not every solver currently supplies a
+ * derivation.
+ *
+ * @param result Result to inspect.
+ * @return Borrowed multiline UTF-8 text, or `NULL` when unavailable.
+ */
+const char *de_solve_result_steps(
+    const diffequ_solve_result_t *result);
+const char *de_solve_result_steps_tex(
+    const diffequ_solve_result_t *result);
+
+/**
+ * @brief Borrow the symmetry group identified by the selected solver.
+ *
+ * @param result Result to inspect.
+ * @return Borrowed UTF-8 group name, or `NULL` when none was identified.
+ */
+const char *de_solve_result_symmetry(
     const diffequ_solve_result_t *result);
 
 /**

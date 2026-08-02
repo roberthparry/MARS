@@ -98,6 +98,35 @@ class EquationResultTests(unittest.TestCase):
 
 
 class DiffequationResultTests(unittest.TestCase):
+    def test_solver_steps_are_preserved_for_display(self) -> None:
+        output = """\
+status solved
+solver linear transformation
+diagnostic linearized by y = u'/u, then solved as u''' = 0
+symmetry SL(3, ℝ)
+steps Linearising substitutions:
+      X = x − 1/y
+      Y = x/y − x²/2
+Transformed ODE:
+      d²Y/dX² = 0
+solutions y = final
+"""
+
+        fields = mars_lab.parse_diffequation_lab_output(output)
+        payload = mars_lab.prepare_diffequation_fields(fields)
+
+        self.assertEqual(payload["symmetry"], "SL(3, ℝ)")
+        self.assertIn("Linearising substitutions:", payload["steps"])
+        self.assertIn("X = x − 1/y", payload["steps"])
+        self.assertIn("Y = x/y − x²/2", payload["steps"])
+        self.assertIn("d²Y/dX² = 0", payload["steps"])
+        self.assertNotIn("solutions y = final", payload["steps"])
+        self.assertIn("function solverTextToTex(text)", mars_lab.INDEX_HTML)
+        self.assertIn(
+            "data.steps_tex || solverTextToTex(solverDetails)",
+            mars_lab.INDEX_HTML,
+        )
+
     def test_problem_display_preserves_native_derivative_notation(self) -> None:
         fields = {
             "input": "(y-x)z_x + (y+x)z_y = (x^2+y^2)/z",
@@ -124,6 +153,11 @@ class DiffequationResultTests(unittest.TestCase):
 
     def test_tab_uses_its_own_native_endpoint_and_input_state(self) -> None:
         self.assertIn('data-mode="diffequation"', mars_lab.INDEX_HTML)
+        self.assertIn('id="functionCard"', mars_lab.INDEX_HTML)
+        self.assertIn(
+            "body.diffequation-mode #functionCard",
+            mars_lab.INDEX_HTML,
+        )
         self.assertIn("fetch('/diffequation-eval'", mars_lab.INDEX_HTML)
         self.assertIn(
             "modeEditorText.diffequation = text;",
@@ -163,6 +197,129 @@ class DiffequationResultTests(unittest.TestCase):
         self.assertEqual(payload["solutions"], "y = exp(½x²)")
         self.assertIn(r"\begin{aligned}", payload["solutions_tex"])
         self.assertIn("y(0) = 1", payload["problem"])
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
+    def test_native_helper_linearizes_the_modified_emden_equation(self) -> None:
+        completed = subprocess.run(
+            [
+                str(
+                    ROOT
+                    / "build"
+                    / "release"
+                    / "scratch"
+                    / "diffequation_lab"
+                ),
+                "y'' + 3yy' + y^3 = 0",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
+        payload = mars_lab.prepare_diffequation_fields(fields)
+
+        self.assertEqual(payload["status"], "solved")
+        self.assertEqual(payload["solver"], "linear transformation")
+        self.assertEqual(
+            payload["solutions"],
+            "y = 2·(x + C₁)/(x² + 2C₁x + 2C₂)",
+        )
+        self.assertEqual(payload["symmetry"], "SL(3, ℝ)")
+        self.assertIn("X = x − 1/y", payload["steps"])
+        self.assertIn("Y = x/y − x²/2", payload["steps"])
+        self.assertNotIn("General solution", payload["steps"])
+        self.assertIn(r"\frac{2 \cdot \left(x + C_{1}\right)}", payload["solutions_tex"])
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
+    def test_native_helper_rejects_quartic_emden_point_linearization(self) -> None:
+        completed = subprocess.run(
+            [
+                str(ROOT / "build" / "release" / "scratch" / "diffequation_lab"),
+                "y'' + 3*y*y' + y^4 = 0",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        payload = mars_lab.prepare_diffequation_fields(
+            mars_lab.parse_diffequation_lab_output(completed.stdout)
+        )
+
+        self.assertEqual(payload["status"], "unsupported")
+        self.assertEqual(payload["solver"], "none")
+        self.assertEqual(
+            payload["diagnostic"],
+            "not point-linearizable: the Lie–Tressé invariant "
+            "36y(1 − 2y) is not identically zero",
+        )
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
+    def test_native_helper_linearizes_scaled_modified_emden_equation(self) -> None:
+        completed = subprocess.run(
+            [
+                str(ROOT / "build" / "release" / "scratch" / "diffequation_lab"),
+                "y'' + 6*y*y' + 4*y^3 = 0",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        payload = mars_lab.prepare_diffequation_fields(
+            mars_lab.parse_diffequation_lab_output(completed.stdout)
+        )
+
+        self.assertEqual(payload["status"], "solved")
+        self.assertEqual(payload["symmetry"], "SL(3, ℝ)")
+        self.assertIn("X = x − 1/(2y)", payload["steps"])
+        self.assertIn("Y = x/(2y) − x²/2", payload["steps"])
+        self.assertIn(r"\mathrm{SL}(3,\mathrm R)", payload["steps_tex"])
+        self.assertIn(r"\frac{d^2Y}{dX^2}=0", payload["steps_tex"])
+        self.assertEqual(
+            payload["solutions"],
+            "y = (x + C₁)/(x² + 2C₁x + 2C₂)",
+        )
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
+    def test_native_helper_solves_hydrogen_ground_state(self) -> None:
+        source = (
+            "i*Dt(@psi) = -1/2*(Dxx(@psi) + Dyy(@psi) + Dzz(@psi)) "
+            "- @psi/sqrt(x^2+y^2+z^2); "
+            "@psi(x,y,z,0) = exp(-sqrt(x^2+y^2+z^2))/sqrt(pi)"
+        )
+        completed = subprocess.run(
+            [str(ROOT / "build" / "release" / "scratch" / "diffequation_lab"), source],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        payload = mars_lab.prepare_diffequation_fields(
+            mars_lab.parse_diffequation_lab_output(completed.stdout)
+        )
+
+        self.assertEqual(payload["status"], "solved")
+        self.assertEqual(payload["solver"], "hydrogen matrix eigenproblem")
+        self.assertIn("u(0) = 0", payload["steps"])
+        self.assertIn("E₁ → −13.6057 eV", payload["steps"])
+        self.assertIn(r"\begin{aligned}", payload["steps_tex"])
+        self.assertIn(r"H_{jj}", payload["steps_tex"])
+        self.assertEqual(
+            payload["solutions"],
+            "ψ = exp(0.5it - √(x² + y² + z²))/√(π)",
+        )
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),

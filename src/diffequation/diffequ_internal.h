@@ -34,6 +34,9 @@ struct diffequ_solve_result_t {
     equation_t **solutions;
     size_t solution_count;
     char *diagnostic;
+    char *steps;
+    char *steps_tex;
+    char *symmetry;
 };
 
 diffequ_t *de_new_owned(equation_t *equation);
@@ -44,5 +47,14 @@ diffequ_solve_result_t *de_solve_result_new(
 int de_solve_result_append(
     diffequ_solve_result_t *result,
     equation_t *solution);
+int de_solve_result_set_steps(
+    diffequ_solve_result_t *result,
+    const char *steps);
+int de_solve_result_set_steps_tex(
+    diffequ_solve_result_t *result,
+    const char *steps_tex);
+int de_solve_result_set_symmetry(
+    diffequ_solve_result_t *result,
+    const char *symmetry);
 
 #endif /* DIFFEQU_INTERNAL_H */

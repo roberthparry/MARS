@@ -117,6 +117,18 @@ not introduce nonstandard special-function names. The independent constants
 `C₁`, `C₂`, and `C₃` provide the three arbitrary constants required by the
 original third-order equation.
 
+The modified Emden equation is linearized by a logarithmic derivative:
+
+```text
+y'' + 3y*y' + y^3 = 0
+→ y = 2·(x + C₁)/(x² + 2C₁x + 2C₂)
+```
+
+Setting `y = u'/u` changes the left side into `u'''/u`. Thus `u''' = 0`,
+so `u` is quadratic and `y` is its logarithmic derivative. Equivalently, the
+point transformation from the linearisation notes,
+`X = -x²/2 + x/y` and `Y = x - 1/y`, reduces the equation to `Y'' = 0`.
+
 When `x` is the dependent variable, prime notation defaults to differentiation
 with respect to time so that the two variables do not collide:
 

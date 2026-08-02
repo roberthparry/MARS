@@ -18,6 +18,10 @@ static void de_linear_second_order_clear(de_linear_second_order_t *form)
     expr_free(form->dependent);
     expr_free(form->first);
     expr_free(form->leading);
+    form->forcing = NULL;
+    form->dependent = NULL;
+    form->first = NULL;
+    form->leading = NULL;
 }
 
 static bool de_decompose_second_order(
