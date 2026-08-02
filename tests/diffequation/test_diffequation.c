@@ -1473,6 +1473,156 @@ static void test_diffequ_solves_second_order_sturm_liouville_problem(void)
     de_free(de);
 }
 
+static void test_diffequ_linearizes_modified_emden_problem(void)
+{
+    const char *source = "y'' + 3yy' + y^3 = 0";
+    diffequ_t *de = de_from_string(source);
+    diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
+    const char *expected =
+        "y = 2·(x + C₁)/(x² + 2C₁x + 2C₂)";
+
+    EXPECT_POINTER("parsed modified-Emden problem", de, true);
+    EXPECT_POINTER("modified-Emden solve result", result, true);
+    EXPECT_LONG(
+        "modified-Emden solve status",
+        (long)de_solve_result_status(result),
+        (long)DE_SOLVE_STATUS_SOLVED);
+    EXPECT_LONG(
+        "modified-Emden selected solver",
+        (long)de_solve_result_solver(result),
+        (long)DE_SOLVER_LINEAR_TRANSFORMATION);
+    EXPECT_TEXT(
+        "modified-Emden diagnostic",
+        de_solve_result_diagnostic(result),
+        "linearized by y = u'/u, then solved as u''' = 0");
+    EXPECT_POINTER(
+        "modified-Emden derivation",
+        de_solve_result_steps(result),
+        true);
+    EXPECT_TEXT(
+        "modified-Emden symmetry",
+        de_solve_result_symmetry(result),
+        "SL(3, ℝ)");
+    if (de_solve_result_steps(result))
+        EXPECT_POINTER(
+            "modified-Emden derivation contains transformed ODE",
+            strstr(de_solve_result_steps(result), "d²Y/dX² = 0"),
+            true);
+    EXPECT_LONG(
+        "modified-Emden solution count",
+        (long)de_solve_result_count(result),
+        1L);
+    {
+        const equation_t *solution = de_solve_result_at(result, 0u);
+        string_t *text = solution
+            ? equ_to_text(solution, style_UNBOUND)
+            : NULL;
+
+        EXPECT_POINTER("modified-Emden solution", solution, true);
+        EXPECT_POINTER("modified-Emden solution text", text, true);
+        if (text)
+            EXPECT_TEXT(
+                "modified-Emden solution text",
+                string_c_str(text),
+                expected);
+        string_free(text);
+    }
+
+    de_solve_result_free(result);
+    de_free(de);
+}
+
+static void test_diffequ_rejects_quartic_emden_point_linearization(void)
+{
+    diffequ_t *de = de_from_string("y'' + 3*y*y' + y^4 = 0");
+    diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
+
+    EXPECT_POINTER("parsed quartic Emden problem", de, true);
+    EXPECT_POINTER("quartic Emden solve result", result, true);
+    EXPECT_LONG(
+        "quartic Emden solve status",
+        (long)de_solve_result_status(result),
+        (long)DE_SOLVE_STATUS_UNSUPPORTED);
+    EXPECT_TEXT(
+        "quartic Emden point-linearization diagnostic",
+        de_solve_result_diagnostic(result),
+        "not point-linearizable: the Lie–Tressé invariant "
+        "36y(1 − 2y) is not identically zero");
+
+    de_solve_result_free(result);
+    de_free(de);
+}
+
+static void test_diffequ_linearizes_scaled_modified_emden_problem(void)
+{
+    diffequ_t *de = de_from_string("y'' + 6*y*y' + 4*y^3 = 0");
+    diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
+    const equation_t *solution = result
+        ? de_solve_result_at(result, 0u)
+        : NULL;
+    string_t *text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
+
+    EXPECT_POINTER("scaled modified-Emden result", result, true);
+    EXPECT_LONG(
+        "scaled modified-Emden status",
+        (long)de_solve_result_status(result),
+        (long)DE_SOLVE_STATUS_SOLVED);
+    EXPECT_TEXT(
+        "scaled modified-Emden symmetry",
+        de_solve_result_symmetry(result),
+        "SL(3, ℝ)");
+    EXPECT_POINTER(
+        "scaled modified-Emden X substitution",
+        strstr(de_solve_result_steps(result), "X = x − 1/(2y)"),
+        true);
+    if (text)
+        EXPECT_TEXT(
+            "scaled modified-Emden solution",
+            string_c_str(text),
+            "y = (x + C₁)/(x² + 2C₁x + 2C₂)");
+
+    string_free(text);
+    de_solve_result_free(result);
+    de_free(de);
+}
+
+static void test_diffequ_solves_hydrogen_ground_state(void)
+{
+    const char *source =
+        "i*Dt(@psi) = -1/2*(Dxx(@psi) + Dyy(@psi) + Dzz(@psi)) "
+        "- @psi/sqrt(x^2+y^2+z^2); "
+        "@psi(x,y,z,0) = exp(-sqrt(x^2+y^2+z^2))/sqrt(pi)";
+    diffequ_t *de = de_from_string(source);
+    diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
+    const equation_t *solution = result
+        ? de_solve_result_at(result, 0u)
+        : NULL;
+    string_t *text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
+
+    EXPECT_POINTER("hydrogen ground-state result", result, true);
+    EXPECT_LONG(
+        "hydrogen ground-state status",
+        (long)de_solve_result_status(result),
+        (long)DE_SOLVE_STATUS_SOLVED);
+    EXPECT_LONG(
+        "hydrogen matrix solver",
+        (long)de_solve_result_solver(result),
+        (long)DE_SOLVER_HYDROGEN_MATRIX);
+    EXPECT_POINTER(
+        "hydrogen boundary steps",
+        strstr(de_solve_result_steps(result), "u(0) = 0"),
+        true);
+    if (text)
+        EXPECT_TEXT(
+            "hydrogen ground-state wavefunction",
+            string_c_str(text),
+            "ψ = exp(0.5it - √(x² + y² + z²))/√(π)");
+
+    string_free(text);
+    de_solve_result_free(result);
+    de_free(de);
+}
+
 static void test_diffequ_solves_affine_factorized_second_order_problem(void)
 {
     const char *source = "y'' - (x^2+1)*y = 0";
@@ -2795,6 +2945,10 @@ int tests_main(void)
     RUN_TEST_CASE(test_diffequ_solves_quadratic_bernoulli_problem);
     RUN_TEST_CASE(test_diffequ_solves_derivative_quadratic_problem);
     RUN_TEST_CASE(test_diffequ_linearizes_exact_third_order_problem);
+    RUN_TEST_CASE(test_diffequ_linearizes_modified_emden_problem);
+    RUN_TEST_CASE(test_diffequ_linearizes_scaled_modified_emden_problem);
+    RUN_TEST_CASE(test_diffequ_solves_hydrogen_ground_state);
+    RUN_TEST_CASE(test_diffequ_rejects_quartic_emden_point_linearization);
     RUN_TEST_CASE(test_diffequ_solves_second_order_sturm_liouville_problem);
     RUN_TEST_CASE(
         test_diffequ_solves_affine_factorized_second_order_problem);

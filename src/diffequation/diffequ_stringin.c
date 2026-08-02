@@ -581,10 +581,43 @@ static const char *de_prime_shorthand_independent(const char *equation)
     return "x";
 }
 
+static char *de_prime_shorthand_dependent(const char *text)
+{
+    const char *best = NULL;
+    size_t best_length = SIZE_MAX;
+    size_t i = 0u;
+
+    if (!text)
+        return NULL;
+
+    while (text[i]) {
+        size_t start;
+        size_t length;
+
+        if (!(isalpha((unsigned char)text[i]) || text[i] == '_')) {
+            i++;
+            continue;
+        }
+        start = i++;
+        while (isalnum((unsigned char)text[i]) || text[i] == '_')
+            i++;
+        length = i - start;
+        if (text[i] == '\'' && length < best_length) {
+            best = text + start;
+            best_length = length;
+        }
+        while (text[i] == '\'')
+            i++;
+    }
+
+    return best ? de_trimmed_copy(best, best_length) : NULL;
+}
+
 static char *de_normalize_prime_derivatives(const char *text,
                                             const char *wrt)
 {
     string_t *out;
+    char *dependent;
     char *result;
     size_t i = 0u;
 
@@ -594,6 +627,7 @@ static char *de_normalize_prime_derivatives(const char *text,
     out = string_new();
     if (!out)
         return NULL;
+    dependent = de_prime_shorthand_dependent(text);
 
     while (text[i]) {
         size_t name_start;
@@ -619,6 +653,25 @@ static char *de_normalize_prime_derivatives(const char *text,
                     out, text + name_start, name_end - name_start) != 0)
                 goto fail;
             continue;
+        }
+
+        if (dependent) {
+            size_t dependent_length = strlen(dependent);
+            size_t name_length = name_end - name_start;
+
+            if (name_length > dependent_length &&
+                strncmp(
+                    text + name_end - dependent_length,
+                    dependent,
+                    dependent_length) == 0) {
+                size_t coefficient_length = name_length - dependent_length;
+
+                if (string_append_chars(
+                        out, text + name_start, coefficient_length) != 0 ||
+                    string_append_char(out, '*') != 0)
+                    goto fail;
+                name_start += coefficient_length;
+            }
         }
 
         if (strlen(wrt) == 1u && isalpha((unsigned char)wrt[0])) {
@@ -650,10 +703,12 @@ static char *de_normalize_prime_derivatives(const char *text,
 
     result = strdup(string_c_str(out));
     string_free(out);
+    free(dependent);
     return result;
 
 fail:
     string_free(out);
+    free(dependent);
     return NULL;
 }
 

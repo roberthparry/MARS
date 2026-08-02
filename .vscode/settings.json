@@ -169,7 +169,8 @@
         "editor.wordWrap": "off"
     },
     "markdown.styles": [
-        "docs/books/ESAA/preview.css"
+        "docs/books/ESAA/preview.css",
+        "docs/books/Applied Differential Equations/preview.css"
     ],
     "makefile.buildLog": "",
     "terminal.integrated.scrollback": 10000,

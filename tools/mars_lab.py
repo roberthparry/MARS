@@ -2911,10 +2911,20 @@ INDEX_HTML = r"""<!doctype html>
     }
 
     #functionStyle.equation-function {
+      --solver-tex-scale: 1.5;
+      padding-top: 0.15rem;
       overflow-x: auto;
       white-space: pre;
       overflow-wrap: normal;
       word-break: normal;
+    }
+
+    #functionStyle.equation-function svg {
+      display: block;
+      max-width: none;
+      height: auto;
+      overflow: visible;
+      filter: brightness(0) saturate(100%) invert(82%) sepia(39%) saturate(540%) hue-rotate(354deg) brightness(98%) contrast(92%) drop-shadow(0 0 0.65rem rgba(113, 198, 180, 0.28));
     }
 
     .matrix-pretty {
@@ -3227,6 +3237,14 @@ INDEX_HTML = r"""<!doctype html>
 
       .mobile-result-extra {
         display: none;
+      }
+
+      body.diffequation-mode #functionCard {
+        display: block;
+      }
+
+      #functionStyle.equation-function {
+        --solver-tex-scale: 1.1;
       }
 
       #resultPane .copy-result {
@@ -3788,7 +3806,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           </div>
           <pre id="parsed"></pre>
         </div>
-        <div class="card result-card mobile-result-extra">
+        <div class="card result-card mobile-result-extra" id="functionCard">
           <div class="card-title expandable-title">
             <span id="functionTitle">Function</span>
             <span class="card-actions digit-actions">
@@ -4644,6 +4662,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
 
       document.body.classList.toggle('datetime-mode', datetimeMode);
       document.body.classList.toggle('almanac-mode', almanacMode);
+      document.body.classList.toggle('diffequation-mode', diffequationMode);
       matrixControls.classList.toggle('hidden', !matrixMode);
       equationControls.classList.toggle('hidden', !equationMode);
       diffequationControls.classList.toggle('hidden', !diffequationMode);
@@ -9095,6 +9114,26 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       return data;
     }
 
+    function solverTextToTex(text) {
+      const escapeTex = value => String(value || '')
+        .replaceAll('\\', String.raw`\textbackslash{}`)
+        .replaceAll('&', String.raw`\&`)
+        .replaceAll('%', String.raw`\%`)
+        .replaceAll('$', String.raw`\$`)
+        .replaceAll('#', String.raw`\#`)
+        .replaceAll('_', String.raw`\_`)
+        .replaceAll('{', String.raw`\{`)
+        .replaceAll('}', String.raw`\}`)
+        .replaceAll('^', String.raw`\textasciicircum{}`)
+        .replaceAll('~', String.raw`\textasciitilde{}`);
+      const rows = String(text || '').split('\n').map(line =>
+        line.trim()
+          ? String.raw`&\text{${escapeTex(line)}}`
+          : String.raw`&\text{\phantom{X}}`
+      );
+      return String.raw`\begin{aligned}[t]${rows.join(String.raw`\\`)}\end{aligned}`;
+    }
+
     function toggleTextDigits(element, button) {
       const expanded = button.dataset.expanded === 'true';
       if (expanded) {
@@ -9502,13 +9541,38 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         resetMoreDigitsButton(renderedMore, false);
         setExpandableText(parsed, parsedMore, data.problem || text, data.problem || text);
         setResultInputText(data.input || text);
-        const solverDetails = [
+        const solverDetails = (data.symmetry || data.steps) ? [
+          data.symmetry ? `Symmetry: ${data.symmetry}` : '',
+          data.steps || ''
+        ].filter(Boolean).join('\n\n') : [
           data.solver ? `solver: ${data.solver}` : '',
           data.status ? `status: ${data.status}` : '',
           data.diagnostic || ''
         ].filter(Boolean).join('\n');
         setExpandableText(functionStyle, functionMore, solverDetails, solverDetails);
         functionStyle.classList.remove('equation-function');
+        const solverTexSource = data.steps_tex || solverTextToTex(solverDetails);
+        if (solverTexSource) {
+          try {
+            const solverTex = await renderTexSvg(solverTexSource);
+            if (solverTex.svg) {
+              const svgStart = solverTex.svg.indexOf('<svg');
+              functionStyle.innerHTML = svgStart >= 0
+                ? solverTex.svg.slice(svgStart)
+                : solverTex.svg;
+              functionStyle.classList.add('equation-function');
+              const solverSvg = functionStyle.querySelector('svg');
+              const solverSvgWidth = solverSvg?.getAttribute('width');
+              if (solverSvg && solverSvgWidth)
+                solverSvg.style.width =
+                  `calc(${solverSvgWidth} * var(--solver-tex-scale))`;
+              functionStyle.dataset.fullText = solverDetails;
+              functionStyle.dataset.displayText = solverDetails;
+            }
+          } catch (_err) {
+            // Keep the plain-text solver derivation as the rendering fallback.
+          }
+        }
         value.textContent = data.solutions || data.diagnostic || data.status || '';
         setValueCardVisible(true);
         clearVariableValues();
@@ -11978,10 +12042,13 @@ def parse_diffequation_lab_output(output: str) -> dict[str, str]:
             "status": r"^status\s+(.*)$",
             "solver": r"^solver\s+(.*)$",
             "diagnostic": r"^diagnostic\s*(.*)$",
+            "symmetry": r"^symmetry\s*(.*)$",
+            "steps_tex": r"^steps_tex\s*(.*)$",
+            "steps": r"^steps\s*(.*)$",
             "solutions": r"^solutions\s+(.*)$",
             "solutions_tex": r"^solutions_tex\s*(.*)$",
         },
-        {"problem_tex", "solutions", "solutions_tex"},
+        {"problem_tex", "steps", "steps_tex", "solutions", "solutions_tex"},
     )
 
 
@@ -13769,6 +13836,11 @@ def prepare_diffequation_fields(fields: dict[str, str]) -> dict[str, object]:
         "status": str(fields.get("status") or "").strip(),
         "solver": str(fields.get("solver") or "").strip(),
         "diagnostic": str(fields.get("diagnostic") or "").strip(),
+        "symmetry": str(fields.get("symmetry") or "").strip(),
+        "steps": str(fields.get("steps") or "").strip(),
+        "steps_tex": tex_for_display(
+            str(fields.get("steps_tex") or "").strip()
+        ),
     }
     if svg:
         payload["svg"] = svg

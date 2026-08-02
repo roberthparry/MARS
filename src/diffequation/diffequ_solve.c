@@ -326,6 +326,246 @@ expr_t *de_arbitrary_constant(void)
     return expr_new_named_const(NUM_NAN, "C");
 }
 
+static const char de_modified_emden_steps[] =
+    "Linearising point transformation:\n"
+    "      X = x − 1/y\n"
+    "      Y = x/y − x²/2\n"
+    "Transformed ODE:\n"
+    "      d²Y/dX² = 0";
+
+static const char de_modified_emden_steps_tex[] =
+    "\\begin{aligned}[t]"
+    "\\text{Symmetry:}\\quad&\\mathrm{SL}(3,\\mathrm R)\\\\"
+    "\\text{Linearising point transformation:}\\quad&"
+    "X=x-\\frac1y\\\\"
+    "&Y=\\frac{x}{y}-\\frac{x^2}{2}\\\\"
+    "\\text{Transformed ODE:}\\quad&\\frac{d^2Y}{dX^2}=0"
+    "\\end{aligned}";
+
+static const char de_scaled_modified_emden_steps[] =
+    "Linearising point transformation:\n"
+    "      X = x − 1/(2y)\n"
+    "      Y = x/(2y) − x²/2\n"
+    "Transformed ODE:\n"
+    "      d²Y/dX² = 0";
+
+static const char de_scaled_modified_emden_steps_tex[] =
+    "\\begin{aligned}[t]"
+    "\\text{Symmetry:}\\quad&\\mathrm{SL}(3,\\mathrm R)\\\\"
+    "\\text{Linearising point transformation:}\\quad&"
+    "X=x-\\frac{1}{2y}\\\\"
+    "&Y=\\frac{x}{2y}-\\frac{x^2}{2}\\\\"
+    "\\text{Transformed ODE:}\\quad&\\frac{d^2Y}{dX^2}=0"
+    "\\end{aligned}";
+
+static bool de_matches_modified_emden_power(
+    const expr_t *dependent,
+    const expr_t *first_derivative,
+    const expr_t *second_derivative,
+    const expr_t *residual,
+    long power)
+{
+    expr_t *leading = NULL;
+    expr_t *remainder = NULL;
+    expr_t *three = NULL;
+    expr_t *three_y = NULL;
+    expr_t *three_y_y_prime = NULL;
+    expr_t *y_power = NULL;
+    expr_t *expected_remainder = NULL;
+    expr_t *scaled_expected = NULL;
+    bool matches = false;
+
+    if (!dependent || !first_derivative || !second_derivative ||
+        !residual || !de_linear_decompose(
+            residual, second_derivative, &leading, &remainder))
+        goto cleanup;
+
+    three = expr_const_long(3L);
+    three_y = three ? expr_mul(three, dependent) : NULL;
+    three_y_y_prime = three_y
+        ? expr_mul(three_y, first_derivative)
+        : NULL;
+    y_power = expr_pow_long(dependent, power);
+    expected_remainder = three_y_y_prime && y_power
+        ? expr_add(three_y_y_prime, y_power)
+        : NULL;
+    scaled_expected = leading && expected_remainder
+        ? expr_mul_simplify_owned(
+              expr_clone(leading), expr_clone(expected_remainder))
+        : NULL;
+    matches = scaled_expected && expr_struct_eq(remainder, scaled_expected);
+
+cleanup:
+    expr_free(scaled_expected);
+    expr_free(expected_remainder);
+    expr_free(y_power);
+    expr_free(three_y_y_prime);
+    expr_free(three_y);
+    expr_free(three);
+    expr_free(remainder);
+    expr_free(leading);
+    return matches;
+}
+
+/*
+ * The modified Emden equation
+ *
+ *     y'' + 3 y y' + y^3 = 0
+ *
+ * is the logarithmic-derivative image of u''' = 0: setting y = u'/u
+ * makes the left hand side u'''/u.  Thus u is quadratic and y is its
+ * logarithmic derivative.  The two essential ratios among the three
+ * coefficients of u are represented below by C₁ and C₂.
+ */
+static de_attempt_t de_attempt_modified_emden_linearization(
+    const diffequ_t *de,
+    const expr_t *independent,
+    const expr_t *dependent,
+    const expr_t *first_derivative,
+    const expr_t *second_derivative,
+    const expr_t *residual,
+    equation_t **solutions_out,
+    size_t *solution_count_out,
+    long *scale_out)
+{
+    expr_t *leading = NULL;
+    expr_t *remainder = NULL;
+    expr_t *three = NULL;
+    expr_t *three_y = NULL;
+    expr_t *three_y_y_prime = NULL;
+    expr_t *y_cubed = NULL;
+    expr_t *expected_remainder = NULL;
+    expr_t *scaled_expected = NULL;
+    expr_t *six_y_y_prime = NULL;
+    expr_t *four_y_cubed = NULL;
+    expr_t *scaled_remainder = NULL;
+    expr_t *scaled_family_expected = NULL;
+    expr_t *constant_1 = NULL;
+    expr_t *constant_2 = NULL;
+    expr_t *two = NULL;
+    expr_t *numerator_sum = NULL;
+    expr_t *numerator = NULL;
+    expr_t *x_squared = NULL;
+    expr_t *constant_1_x = NULL;
+    expr_t *twice_constant_1_x = NULL;
+    expr_t *twice_constant_2 = NULL;
+    expr_t *denominator_sum = NULL;
+    expr_t *denominator = NULL;
+    expr_t *solution_denominator = NULL;
+    expr_t *right = NULL;
+    de_attempt_t attempt = DE_ATTEMPT_NOT_MATCHED;
+
+    if (!de || !solutions_out || !solution_count_out || !scale_out ||
+        de->condition_count != 0u || !first_derivative ||
+        !de_linear_decompose(
+            residual, second_derivative, &leading, &remainder))
+        goto cleanup;
+    *solution_count_out = 0u;
+    *scale_out = 0L;
+
+    three = expr_const_long(3L);
+    three_y = three ? expr_mul(three, dependent) : NULL;
+    three_y_y_prime = three_y
+        ? expr_mul(three_y, first_derivative)
+        : NULL;
+    y_cubed = expr_pow_long(dependent, 3L);
+    expected_remainder = three_y_y_prime && y_cubed
+        ? expr_add(three_y_y_prime, y_cubed)
+        : NULL;
+    scaled_expected = leading && expected_remainder
+        ? expr_mul_simplify_owned(
+              expr_clone(leading), expr_clone(expected_remainder))
+        : NULL;
+    if (scaled_expected && expr_struct_eq(remainder, scaled_expected)) {
+        *scale_out = 1L;
+    } else {
+        six_y_y_prime = expr_mul_long(three_y_y_prime, 2L);
+        four_y_cubed = expr_mul_long(y_cubed, 4L);
+        scaled_remainder = six_y_y_prime && four_y_cubed
+            ? expr_add(six_y_y_prime, four_y_cubed)
+            : NULL;
+        scaled_family_expected = leading && scaled_remainder
+            ? expr_mul_simplify_owned(
+                  expr_clone(leading), expr_clone(scaled_remainder))
+            : NULL;
+        if (!scaled_family_expected ||
+            !expr_struct_eq(remainder, scaled_family_expected))
+            goto cleanup;
+        *scale_out = 2L;
+    }
+
+    attempt = DE_ATTEMPT_FAILED;
+    constant_1 = expr_new_named_const(NUM_NAN, "C1");
+    constant_2 = expr_new_named_const(NUM_NAN, "C2");
+    two = expr_const_long(2L);
+    numerator_sum = constant_1
+        ? expr_add(independent, constant_1)
+        : NULL;
+    numerator = numerator_sum
+        ? (*scale_out == 1L
+              ? expr_mul(two, numerator_sum)
+              : expr_clone(numerator_sum))
+        : NULL;
+    x_squared = expr_pow_long(independent, 2L);
+    constant_1_x = constant_1
+        ? expr_mul(constant_1, independent)
+        : NULL;
+    twice_constant_1_x = two && constant_1_x
+        ? expr_mul(two, constant_1_x)
+        : NULL;
+    twice_constant_2 = two && constant_2
+        ? expr_mul(two, constant_2)
+        : NULL;
+    denominator_sum = x_squared && twice_constant_1_x
+        ? expr_add(x_squared, twice_constant_1_x)
+        : NULL;
+    denominator = denominator_sum && twice_constant_2
+        ? expr_add(denominator_sum, twice_constant_2)
+        : NULL;
+    solution_denominator = denominator ? expr_clone(denominator) : NULL;
+    right = numerator && solution_denominator
+        ? expr_div(numerator, solution_denominator)
+        : NULL;
+    solutions_out[0] = right ? equ_new(dependent, right) : NULL;
+    if (solutions_out[0]) {
+        *solution_count_out = 1u;
+        attempt = DE_ATTEMPT_SOLVED;
+    }
+
+cleanup:
+    if (attempt != DE_ATTEMPT_SOLVED) {
+        equ_free(solutions_out ? solutions_out[0] : NULL);
+        if (solutions_out)
+            solutions_out[0] = NULL;
+    }
+    expr_free(right);
+    expr_free(solution_denominator);
+    expr_free(denominator);
+    expr_free(denominator_sum);
+    expr_free(twice_constant_2);
+    expr_free(twice_constant_1_x);
+    expr_free(constant_1_x);
+    expr_free(x_squared);
+    expr_free(numerator);
+    expr_free(numerator_sum);
+    expr_free(two);
+    expr_free(constant_2);
+    expr_free(constant_1);
+    expr_free(scaled_expected);
+    expr_free(scaled_family_expected);
+    expr_free(scaled_remainder);
+    expr_free(four_y_cubed);
+    expr_free(six_y_y_prime);
+    expr_free(expected_remainder);
+    expr_free(y_cubed);
+    expr_free(three_y_y_prime);
+    expr_free(three_y);
+    expr_free(three);
+    expr_free(remainder);
+    expr_free(leading);
+    return attempt;
+}
+
 diffequ_solve_result_t *de_solve(const diffequ_t *de)
 {
     const expr_t *independent;
@@ -345,8 +585,11 @@ diffequ_solve_result_t *de_solve(const diffequ_t *de)
     equation_t *exact_derivative_solutions[7] = {
         NULL, NULL, NULL, NULL, NULL, NULL, NULL
     };
+    equation_t *modified_emden_solutions[1] = { NULL };
     size_t derivative_quadratic_count = 0u;
     size_t exact_derivative_count = 0u;
+    size_t modified_emden_count = 0u;
+    long modified_emden_scale = 0L;
     de_attempt_t derivative_quadratic;
     de_attempt_t exact_derivative;
     de_attempt_t separable;
@@ -461,6 +704,73 @@ diffequ_solve_result_t *de_solve(const diffequ_t *de)
     }
 
     if (second_derivative) {
+        linear_transformation =
+            de_attempt_modified_emden_linearization(
+                de,
+                independent,
+                dependent,
+                first_derivative,
+                second_derivative,
+                residual,
+                modified_emden_solutions,
+                &modified_emden_count,
+                &modified_emden_scale);
+        if (linear_transformation == DE_ATTEMPT_SOLVED) {
+            result = de_solve_result_new(
+                DE_SOLVE_STATUS_SOLVED,
+                DE_SOLVER_LINEAR_TRANSFORMATION,
+                modified_emden_scale == 2L
+                    ? "linearized by y = u'/(2u), then solved as u''' = 0"
+                    : "linearized by y = u'/u, then solved as u''' = 0");
+            if (!result || de_solve_result_set_steps(
+                    result,
+                    modified_emden_scale == 2L
+                        ? de_scaled_modified_emden_steps
+                        : de_modified_emden_steps) != 0 ||
+                de_solve_result_set_steps_tex(
+                    result,
+                    modified_emden_scale == 2L
+                        ? de_scaled_modified_emden_steps_tex
+                        : de_modified_emden_steps_tex) != 0 ||
+                de_solve_result_set_symmetry(
+                    result, "SL(3, ℝ)") != 0) {
+                de_solve_result_free(result);
+                result = NULL;
+                goto cleanup;
+            }
+            for (size_t i = 0u; i < modified_emden_count; ++i) {
+                if (de_solve_result_append(
+                        result, modified_emden_solutions[i]) != 0) {
+                    de_solve_result_free(result);
+                    result = NULL;
+                    goto cleanup;
+                }
+                modified_emden_solutions[i] = NULL;
+            }
+            goto cleanup;
+        }
+        if (linear_transformation == DE_ATTEMPT_FAILED) {
+            result = de_solve_result_new(
+                DE_SOLVE_STATUS_FAILED,
+                DE_SOLVER_NONE,
+                "failed to complete the modified-Emden linearization");
+            goto cleanup;
+        }
+
+        if (de_matches_modified_emden_power(
+                dependent,
+                first_derivative,
+                second_derivative,
+                residual,
+                4L)) {
+            result = de_solve_result_new(
+                DE_SOLVE_STATUS_UNSUPPORTED,
+                DE_SOLVER_NONE,
+                "not point-linearizable: the Lie–Tressé invariant "
+                "36y(1 − 2y) is not identically zero");
+            goto cleanup;
+        }
+
         sturm_liouville = de_attempt_sturm_liouville(
             de,
             independent,
@@ -707,6 +1017,8 @@ append:
     solution = NULL;
 
 cleanup:
+    for (size_t i = 0u; i < 1u; ++i)
+        equ_free(modified_emden_solutions[i]);
     for (size_t i = 0u; i < 7u; ++i)
         equ_free(exact_derivative_solutions[i]);
     for (size_t i = 0u; i < 3u; ++i)

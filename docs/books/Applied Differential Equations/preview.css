@@ -1,0 +1,51 @@
+/* Keep the free-particle generator equations with their surrounding list item. */
+.markdown-body div[data-aligned-equations="generator-definitions"] {
+    width: max-content;
+    max-width: 100%;
+    margin: 0.75rem 0 1rem;
+}
+
+.markdown-body div[data-aligned-equations="generator-definitions"] .katex-display {
+    margin: 0;
+    text-align: left;
+}
+
+/* The free-particle commutator table is dense, so give its mathematical
+ * structure more contrast without making the grid dominate the entries. */
+.markdown-body p:has(> a#free-particle-commutators) + table {
+    width: 100%;
+    margin: 1rem 0 1.5rem;
+    border-collapse: collapse;
+    font-size: 1rem;
+    line-height: 1.35;
+}
+
+.markdown-body p:has(> a#free-particle-commutators) + table th,
+.markdown-body p:has(> a#free-particle-commutators) + table td {
+    padding: 0.55rem 0.7rem;
+    border-color: color-mix(
+        in srgb,
+        var(--vscode-editor-foreground) 35%,
+        transparent
+    );
+    text-align: center;
+    vertical-align: middle;
+}
+
+.markdown-body p:has(> a#free-particle-commutators) + table thead th,
+.markdown-body p:has(> a#free-particle-commutators) + table tbody td:first-child {
+    background: color-mix(
+        in srgb,
+        var(--vscode-editor-foreground) 10%,
+        transparent
+    );
+    font-weight: 600;
+}
+
+.markdown-body p:has(> a#free-particle-commutators) + table tbody tr:nth-child(even) td:not(:first-child) {
+    background: color-mix(
+        in srgb,
+        var(--vscode-editor-foreground) 4%,
+        transparent
+    );
+}

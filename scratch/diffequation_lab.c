@@ -52,6 +52,8 @@ static const char *solver_name(de_solver_t solver)
             return "characteristics";
         case DE_SOLVER_PARAMETER_LINEAR_PDE:
             return "parameter-dependent linear PDE";
+        case DE_SOLVER_HYDROGEN_MATRIX:
+            return "hydrogen matrix eigenproblem";
     }
     return "none";
 }
@@ -101,6 +103,17 @@ static void print_solution_tex(const diffequ_solve_result_t *result)
     printf("\\end{aligned}\n");
 }
 
+static void print_solver_steps(const diffequ_solve_result_t *result)
+{
+    const char *steps = de_solve_result_steps(result);
+    const char *steps_tex = de_solve_result_steps_tex(result);
+
+    if (steps)
+        printf("steps %s\n", steps);
+    if (steps_tex)
+        printf("steps_tex %s\n", steps_tex);
+}
+
 int main(int argc, char **argv)
 {
     const char *source;
@@ -139,6 +152,9 @@ int main(int argc, char **argv)
     printf("status %s\n", solve_status_name(de_solve_result_status(result)));
     printf("solver %s\n", solver_name(de_solve_result_solver(result)));
     printf("diagnostic %s\n", diagnostic ? diagnostic : "");
+    if (de_solve_result_symmetry(result))
+        printf("symmetry %s\n", de_solve_result_symmetry(result));
+    print_solver_steps(result);
     print_solution_field("solutions", result, style_UNBOUND);
     print_solution_tex(result);
 
