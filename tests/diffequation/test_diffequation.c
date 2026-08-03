@@ -1479,7 +1479,7 @@ static void test_diffequ_linearizes_modified_emden_problem(void)
     diffequ_t *de = de_from_string(source);
     diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
     const char *expected =
-        "y = 2·(x + C₁)/(x² + 2C₁x + 2C₂)";
+        "y = (2x + C₁)/(x² + C₁x + C₂)";
 
     EXPECT_POINTER("parsed modified-Emden problem", de, true);
     EXPECT_POINTER("modified-Emden solve result", result, true);

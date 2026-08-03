@@ -121,7 +121,7 @@ The modified Emden equation is linearized by a logarithmic derivative:
 
 ```text
 y'' + 3y*y' + y^3 = 0
-→ y = 2·(x + C₁)/(x² + 2C₁x + 2C₂)
+→ y = (2x + C₁)/(x² + C₁x + C₂)
 ```
 
 Setting `y = u'/u` changes the left side into `u'''/u`. Thus `u''' = 0`,

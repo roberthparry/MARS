@@ -226,13 +226,13 @@ solutions y = final
         self.assertEqual(payload["solver"], "linear transformation")
         self.assertEqual(
             payload["solutions"],
-            "y = 2·(x + C₁)/(x² + 2C₁x + 2C₂)",
+            "y = (2x + C₁)/(x² + C₁x + C₂)",
         )
         self.assertEqual(payload["symmetry"], "SL(3, ℝ)")
         self.assertIn("X = x − 1/y", payload["steps"])
         self.assertIn("Y = x/y − x²/2", payload["steps"])
         self.assertNotIn("General solution", payload["steps"])
-        self.assertIn(r"\frac{2 \cdot \left(x + C_{1}\right)}", payload["solutions_tex"])
+        self.assertIn(r"\frac{2 x + C_{1}}", payload["solutions_tex"])
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
