@@ -444,6 +444,7 @@ static de_attempt_t de_attempt_modified_emden_linearization(
     expr_t *constant_2 = NULL;
     expr_t *two = NULL;
     expr_t *numerator_sum = NULL;
+    expr_t *two_x = NULL;
     expr_t *numerator = NULL;
     expr_t *x_squared = NULL;
     expr_t *constant_1_x = NULL;
@@ -501,11 +502,10 @@ static de_attempt_t de_attempt_modified_emden_linearization(
     numerator_sum = constant_1
         ? expr_add(independent, constant_1)
         : NULL;
-    numerator = numerator_sum
-        ? (*scale_out == 1L
-              ? expr_mul(two, numerator_sum)
-              : expr_clone(numerator_sum))
-        : NULL;
+    two_x = two ? expr_mul(two, independent) : NULL;
+    numerator = *scale_out == 1L
+        ? (two_x ? expr_add(two_x, constant_1) : NULL)
+        : (numerator_sum ? expr_clone(numerator_sum) : NULL);
     x_squared = expr_pow_long(independent, 2L);
     constant_1_x = constant_1
         ? expr_mul(constant_1, independent)
@@ -516,11 +516,17 @@ static de_attempt_t de_attempt_modified_emden_linearization(
     twice_constant_2 = two && constant_2
         ? expr_mul(two, constant_2)
         : NULL;
-    denominator_sum = x_squared && twice_constant_1_x
-        ? expr_add(x_squared, twice_constant_1_x)
+    denominator_sum = x_squared &&
+        (*scale_out == 1L ? constant_1_x : twice_constant_1_x)
+        ? expr_add(
+              x_squared,
+              *scale_out == 1L ? constant_1_x : twice_constant_1_x)
         : NULL;
-    denominator = denominator_sum && twice_constant_2
-        ? expr_add(denominator_sum, twice_constant_2)
+    denominator = denominator_sum &&
+        (*scale_out == 1L ? constant_2 : twice_constant_2)
+        ? expr_add(
+              denominator_sum,
+              *scale_out == 1L ? constant_2 : twice_constant_2)
         : NULL;
     solution_denominator = denominator ? expr_clone(denominator) : NULL;
     right = numerator && solution_denominator
@@ -547,6 +553,7 @@ cleanup:
     expr_free(constant_1_x);
     expr_free(x_squared);
     expr_free(numerator);
+    expr_free(two_x);
     expr_free(numerator_sum);
     expr_free(two);
     expr_free(constant_2);
