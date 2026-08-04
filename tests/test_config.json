@@ -235,6 +235,7 @@
     "test_diffequ_solves_oscillatory_sturm_liouville_problem": true,
     "test_diffequ_solves_parameter_linear_pde": true,
     "test_diffequ_solves_parametric_characteristic_boundary": true,
+    "test_diffequ_solves_polynomial_homogeneous_initial_value_problem": true,
     "test_diffequ_solves_polynomial_reaction_forcing": true,
     "test_diffequ_solves_quadratic_bernoulli_problem": true,
     "test_diffequ_solves_quadratic_characteristic_evolution": true,

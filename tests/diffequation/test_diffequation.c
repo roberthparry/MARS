@@ -1050,6 +1050,51 @@ static void test_diffequ_homogeneous_solution_retains_constant(void)
     de_free(de);
 }
 
+static void test_diffequ_solves_polynomial_homogeneous_initial_value_problem(
+    void)
+{
+    diffequ_t *de = de_from_string(
+        "x*(x^3-x*y^2+2*y^3)*y' - y*(x^3+2*y^3) = 0; y(1) = 1");
+    diffequ_solve_result_t *result;
+    const equation_t *solution;
+    string_t *text;
+
+    EXPECT_POINTER("parsed polynomial homogeneous ODE", de, true);
+    if (!de)
+        return;
+
+    result = de_solve(de);
+    EXPECT_POINTER("polynomial homogeneous solve result", result, true);
+    if (!result) {
+        de_free(de);
+        return;
+    }
+
+    EXPECT_LONG(
+        "polynomial homogeneous solve status",
+        (long)de_solve_result_status(result),
+        (long)DE_SOLVE_STATUS_SOLVED);
+    EXPECT_LONG(
+        "polynomial homogeneous selected solver",
+        (long)de_solve_result_solver(result),
+        (long)DE_SOLVER_HOMOGENEOUS);
+    solution = de_solve_result_at(result, 0u);
+    EXPECT_POINTER(
+        "polynomial homogeneous solution", solution, true);
+    text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
+    EXPECT_POINTER(
+        "polynomial homogeneous solution text", text, true);
+    if (text)
+        EXPECT_TEXT(
+            "polynomial homogeneous initial-value solution",
+            string_c_str(text),
+            "-½·1/(y/x)² - ln(y/x) + 2·y/x = ln(|x|) + ³⁄₂");
+
+    string_free(text);
+    de_solve_result_free(result);
+    de_free(de);
+}
+
 static void test_diffequ_solves_affine_combination_substitution(void)
 {
     diffequ_t *de =
@@ -2937,6 +2982,8 @@ int tests_main(void)
     RUN_TEST_CASE(test_diffequ_linear_solution_retains_formal_factor);
     RUN_TEST_CASE(test_diffequ_solves_first_order_homogeneous_problem);
     RUN_TEST_CASE(test_diffequ_homogeneous_solution_retains_constant);
+    RUN_TEST_CASE(
+        test_diffequ_solves_polynomial_homogeneous_initial_value_problem);
     RUN_TEST_CASE(test_diffequ_solves_affine_combination_substitution);
     RUN_TEST_CASE(test_diffequ_solves_shifted_homogeneous_substitution);
     RUN_TEST_CASE(test_diffequ_solves_linear_change_of_variables);

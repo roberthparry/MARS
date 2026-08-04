@@ -416,6 +416,38 @@ solutions y = final
         (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
         "release diffequation_lab helper is not built",
     )
+    def test_native_helper_solves_polynomial_homogeneous_ode(self) -> None:
+        completed = subprocess.run(
+            [
+                str(
+                    ROOT
+                    / "build"
+                    / "release"
+                    / "scratch"
+                    / "diffequation_lab"
+                ),
+                "x(x^3-xy^2+2y^3)y' - y(x^3+2y^3) = 0; y(1) = 1",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
+        payload = mars_lab.prepare_diffequation_fields(fields)
+
+        self.assertEqual(payload["status"], "solved")
+        self.assertEqual(payload["solver"], "first-order homogeneous")
+        self.assertNotIn("NAN", payload["solutions"])
+        self.assertEqual(
+            payload["solutions"],
+            "-½·1/(y/x)² - ln(y/x) + 2·y/x = ln(|x|) + ³⁄₂",
+        )
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
     def test_native_helper_solves_derivative_quadratic_ode(self) -> None:
         completed = subprocess.run(
             [
