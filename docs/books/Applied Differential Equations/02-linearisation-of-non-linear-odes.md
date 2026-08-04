@@ -2257,13 +2257,13 @@ Make a point transformation to $X,Y$ so that
 $$
 \overline G_1=\frac{\partial}{\partial Y},
 \qquad
-G_2=F(X,Y)\frac{\partial}{\partial Y}.
+\overline G_2=F(X,Y)\frac{\partial}{\partial Y}.
 $$
 
 Then
 
 $$
-[G_1,G_2]
+[\overline G_1,\overline G_2]
 =\left[\frac{\partial}{\partial Y},
  F\frac{\partial}{\partial Y}\right]
 =\frac{\partial F}{\partial Y}\frac{\partial}{\partial Y}=0,
