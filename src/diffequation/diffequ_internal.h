@@ -1,6 +1,8 @@
 #ifndef DIFFEQU_INTERNAL_H
 #define DIFFEQU_INTERNAL_H
 
+#include <stdbool.h>
+
 #if !defined(MARS_DIFFEQUATION_INTERNAL_ACCESS) && \
     (!defined(__INTELLISENSE__) || \
      (defined(__INCLUDE_LEVEL__) && __INCLUDE_LEVEL__ > 0))
@@ -12,6 +14,8 @@
 struct diffequ_t {
     equation_t *equation;
     string_t *equation_text;
+    string_t *differential_form_text;
+    bool differential_form_input;
 
     expr_t **independent_vars;
     size_t independent_count;
@@ -56,5 +60,9 @@ int de_solve_result_set_steps_tex(
 int de_solve_result_set_symmetry(
     diffequ_solve_result_t *result,
     const char *symmetry);
+bool de_linear_decompose(const expr_t *expr,
+                         const expr_t *needle,
+                         expr_t **coefficient_out,
+                         expr_t **constant_out);
 
 #endif /* DIFFEQU_INTERNAL_H */

@@ -594,12 +594,15 @@ diffequ_solve_result_t *de_solve(const diffequ_t *de)
     };
     equation_t *modified_emden_solutions[1] = { NULL };
     equation_t *homogeneous_solutions[2] = { NULL, NULL };
+    equation_t *exact_first_order_solutions[2] = { NULL, NULL };
     size_t derivative_quadratic_count = 0u;
     size_t exact_derivative_count = 0u;
     size_t modified_emden_count = 0u;
     size_t homogeneous_count = 0u;
+    size_t exact_first_order_count = 0u;
     long modified_emden_scale = 0L;
     de_attempt_t derivative_quadratic;
+    de_attempt_t exact_first_order;
     de_attempt_t exact_derivative;
     de_attempt_t separable;
     de_attempt_t linear;
@@ -868,6 +871,33 @@ diffequ_solve_result_t *de_solve(const diffequ_t *de)
         goto cleanup;
     }
 
+    exact_first_order = de_attempt_exact_first_order(
+        de,
+        independent,
+        dependent,
+        first_derivative,
+        residual,
+        exact_first_order_solutions,
+        &exact_first_order_count);
+    if (exact_first_order == DE_ATTEMPT_SOLVED) {
+        result = de_solve_result_new(
+            DE_SOLVE_STATUS_SOLVED,
+            DE_SOLVER_EXACT_FIRST_ORDER,
+            "solved as an exact first-order differential equation");
+        if (!result)
+            goto cleanup;
+        for (size_t i = 0u; i < exact_first_order_count; ++i) {
+            if (de_solve_result_append(
+                    result, exact_first_order_solutions[i]) != 0) {
+                de_solve_result_free(result);
+                result = NULL;
+                goto cleanup;
+            }
+            exact_first_order_solutions[i] = NULL;
+        }
+        goto cleanup;
+    }
+
     if (!de_linear_decompose(
             residual,
             first_derivative,
@@ -1017,6 +1047,7 @@ diffequ_solve_result_t *de_solve(const diffequ_t *de)
 
     result = de_solve_result_new(
         separable == DE_ATTEMPT_FAILED ||
+            exact_first_order == DE_ATTEMPT_FAILED ||
             linear == DE_ATTEMPT_FAILED ||
             bernoulli == DE_ATTEMPT_FAILED ||
             homogeneous == DE_ATTEMPT_FAILED ||
@@ -1025,7 +1056,11 @@ diffequ_solve_result_t *de_solve(const diffequ_t *de)
             ? DE_SOLVE_STATUS_FAILED
             : DE_SOLVE_STATUS_UNSUPPORTED,
         DE_SOLVER_NONE,
-        "no available symbolic solver completed the equation");
+        de->differential_form_input &&
+            exact_first_order == DE_ATTEMPT_NOT_MATCHED
+            ? "the differential form is not exact and no other symbolic "
+              "solver completed the equation"
+            : "no available symbolic solver completed the equation");
     goto cleanup;
 
 append:
@@ -1038,6 +1073,8 @@ append:
     solution = NULL;
 
 cleanup:
+    for (size_t i = 0u; i < 2u; ++i)
+        equ_free(exact_first_order_solutions[i]);
     for (size_t i = 0u; i < 2u; ++i)
         equ_free(homogeneous_solutions[i]);
     for (size_t i = 0u; i < 1u; ++i)

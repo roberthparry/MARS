@@ -12,7 +12,8 @@
  *
  * A problem consists of a base equation, its independent variables, constant
  * bindings, and optional initial or boundary conditions. The first symbolic
- * solvers cover separable, linear, homogeneous, affine-substitution, linear
+ * solvers cover exact differential forms, separable, linear, homogeneous,
+ * affine-substitution, linear
  * changes of variables, quadratic Bernoulli, and autonomous
  * derivative-quadratic first-order ordinary differential equations, together
  * with arbitrary-order constant-coefficient linear ODEs and second-order
@@ -55,7 +56,8 @@ typedef enum {
     DE_SOLVER_CONSTANT_COEFFICIENT_TRANSPORT,
     DE_SOLVER_CHARACTERISTICS,
     DE_SOLVER_PARAMETER_LINEAR_PDE,
-    DE_SOLVER_HYDROGEN_MATRIX
+    DE_SOLVER_HYDROGEN_MATRIX,
+    DE_SOLVER_EXACT_FIRST_ORDER
 } de_solver_t;
 
 /**

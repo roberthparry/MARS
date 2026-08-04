@@ -1301,6 +1301,7 @@ bool expr_match_affine_poly_deg4_times_unary_affine_kind(
     number_t *coeffs_out);
 char *expr_normalise_name(const char *name);
 string_t *expr_normalise_name_text(const string_t *name);
+string_t *expr_normalise_greek_alias_text(const string_t *alias);
 char *expr_take_string_as_c_string(string_t *text);
 char *expr_normalise_binding_name(const char *name);
 string_t *expr_normalise_binding_name_text(const string_t *name);

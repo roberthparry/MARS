@@ -199,6 +199,7 @@ bool expr_match_affine_poly_deg4_times_unary_affine_kind(
     number_t *coeffs_out);
 
 string_t *expr_normalise_name_text(const string_t *name);
+string_t *expr_normalise_greek_alias_text(const string_t *alias);
 string_t *expr_normalise_binding_name_text(const string_t *name);
 int expr_is_default_constant_name_text(const string_t *name);
 char *expr_tostring_texify(const char *text);

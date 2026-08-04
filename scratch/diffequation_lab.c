@@ -54,6 +54,8 @@ static const char *solver_name(de_solver_t solver)
             return "parameter-dependent linear PDE";
         case DE_SOLVER_HYDROGEN_MATRIX:
             return "hydrogen matrix eigenproblem";
+        case DE_SOLVER_EXACT_FIRST_ORDER:
+            return "exact first-order";
     }
     return "none";
 }

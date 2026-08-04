@@ -202,6 +202,56 @@ solutions y = final
         (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
         "release diffequation_lab helper is not built",
     )
+    def test_native_helper_preserves_and_solves_an_exact_differential_form(
+        self,
+    ) -> None:
+        source = (
+            "(sin(theta)-2r cos^2(theta))dr + "
+            "r cos(theta)(2r sin(theta)+1)dtheta = 0"
+        )
+        completed = subprocess.run(
+            [
+                str(
+                    ROOT
+                    / "build"
+                    / "release"
+                    / "scratch"
+                    / "diffequation_lab"
+                ),
+                source,
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        payload = mars_lab.prepare_diffequation_fields(
+            mars_lab.parse_diffequation_lab_output(completed.stdout)
+        )
+
+        self.assertEqual(payload["status"], "solved")
+        self.assertEqual(payload["solver"], "exact first-order")
+        self.assertEqual(
+            payload["problem"],
+            "{ (sin(θ)-2r cos^2(θ))dr + "
+            "r cos(θ)(2r sin(θ)+1)dθ = 0 | θ = ?; ;  }",
+        )
+        self.assertEqual(
+            payload["solutions"],
+            "r = (sin(θ) - √(sin²(θ) - C·cos²(θ)))/(2·cos²(θ))\n"
+            "r = (sin(θ) + √(sin²(θ) - C·cos²(θ)))/(2·cos²(θ))",
+        )
+        self.assertIn(r"\,dr", payload["problem_tex"])
+        self.assertIn(r"\,d\theta", payload["problem_tex"])
+        self.assertIn(r"\sin \theta", payload["solutions_tex"])
+        self.assertIn(r"\cos^{2} \theta", payload["solutions_tex"])
+        self.assertNotIn(r"\sin(\theta)", payload["solutions_tex"])
+        self.assertNotIn(r"\cos^{2}(\theta)", payload["solutions_tex"])
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
     def test_native_helper_linearizes_the_modified_emden_equation(self) -> None:
         completed = subprocess.run(
             [

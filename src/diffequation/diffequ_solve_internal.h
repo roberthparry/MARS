@@ -53,6 +53,14 @@ de_attempt_t de_attempt_separable(const diffequ_t *de,
                                   const expr_t *dependent,
                                   const expr_t *derivative_right,
                                   equation_t **solution_out);
+de_attempt_t de_attempt_exact_first_order(
+    const diffequ_t *de,
+    const expr_t *independent,
+    const expr_t *dependent,
+    const expr_t *first_derivative,
+    const expr_t *residual,
+    equation_t **solutions_out,
+    size_t *solution_count_out);
 de_attempt_t de_attempt_linear(const diffequ_t *de,
                                const expr_t *independent,
                                const expr_t *dependent,

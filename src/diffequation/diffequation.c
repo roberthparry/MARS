@@ -16,13 +16,16 @@ diffequ_t *de_new_owned(equation_t *equation)
         return NULL;
     de->equation = equation;
     de->equation_text = string_new();
+    de->differential_form_text = string_new();
     de->independent_text = string_new();
     de->constant_text = string_new();
     if (!de->equation_text ||
+        !de->differential_form_text ||
         !de->independent_text ||
         !de->constant_text) {
         string_free(de->constant_text);
         string_free(de->independent_text);
+        string_free(de->differential_form_text);
         string_free(de->equation_text);
         free(de);
         return NULL;
@@ -71,6 +74,7 @@ void de_free(diffequ_t *de)
 
     string_free(de->constant_text);
     string_free(de->independent_text);
+    string_free(de->differential_form_text);
     string_free(de->equation_text);
     expr_bindings_free(de->constants);
     equ_free(de->equation);
