@@ -180,6 +180,9 @@ bool expr_match_affine_poly_deg4(const expr_t *expr,
                                  number_t *poly_coeffs_out,
                                  number_t *constant_out,
                                  number_t *coeffs_out);
+bool expr_collect_poly_deg4(const expr_t *expr,
+                            const expr_t *var,
+                            number_t *coeffs_out);
 bool expr_match_unary_affine_kind(const expr_t *expr,
                                   expr_pattern_unary_affine_kind_t kind,
                                   size_t nvars,

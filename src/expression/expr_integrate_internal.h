@@ -139,6 +139,7 @@ expr_t * integrate_polynomial_times_polynomial_exp      (const expr_t *expr, con
 expr_t * integrate_symbolic_integer_power_times_exp     (const expr_t *expr, const expr_t *wrt);
 expr_t * integrate_symbolic_power_times_exp_gamma       (const expr_t *expr, const expr_t *wrt);
 expr_t * integrate_symbolic_integer_power_times_trig    (const expr_t *expr, const expr_t *wrt);
+expr_t * integrate_sine_cosine_times_secant_power       (const expr_t *expr, const expr_t *wrt);
 expr_t * expr_integrate_build_unsigned_expr_power       (const expr_t *base, unsigned int exponent);
 bool     expr_integrate_number_matches_uint_at_most     (number_t value,
                                                          unsigned int max_value,

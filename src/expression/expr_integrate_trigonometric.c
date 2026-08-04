@@ -3,6 +3,145 @@
 #define MARS_EXPR_INTEGRATE_INTERNAL_ACCESS
 #include "expr_integrate_internal.h"
 
+static bool match_secant_positive_integer_power(
+    const expr_t *expr,
+    const expr_t **argument_out,
+    unsigned int *power_out)
+{
+    const expr_t *base = NULL;
+    number_t exponent = num_new();
+    bool matched = false;
+
+    if (!expr || !argument_out || !power_out)
+        goto cleanup;
+    if (expr_is_op(expr, &ops_sec) && expr->a) {
+        *argument_out = expr->a;
+        *power_out = 1u;
+        matched = true;
+        goto cleanup;
+    }
+    if (expr_match_pow_const(expr, &base, &exponent) &&
+        base && expr_is_op(base, &ops_sec) && base->a &&
+        expr_integrate_number_matches_uint_at_most(
+            exponent, 64u, power_out) && *power_out > 0u) {
+        *argument_out = base->a;
+        matched = true;
+    }
+
+cleanup:
+    num_destroy(&exponent);
+    return matched;
+}
+
+static bool match_sine_or_cosine_times_secant_power(
+    const expr_t *expr,
+    const expr_t **trig_argument_out,
+    bool *is_sine_out,
+    unsigned int *secant_power_out)
+{
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+    const expr_t *trig_argument = NULL;
+    const expr_t *secant_argument = NULL;
+    bool is_sine;
+
+    if (!expr || !trig_argument_out || !is_sine_out ||
+        !secant_power_out ||
+        !expr_match_mul_expr(expr, &left, &right))
+        return false;
+
+    if (expr_is_op(left, &ops_sin) && left->a) {
+        trig_argument = left->a;
+        is_sine = true;
+    } else if (expr_is_op(left, &ops_cos) && left->a) {
+        trig_argument = left->a;
+        is_sine = false;
+    } else {
+        trig_argument = NULL;
+    }
+    if (trig_argument &&
+        match_secant_positive_integer_power(
+            right, &secant_argument, secant_power_out) &&
+        expr_struct_eq(trig_argument, secant_argument)) {
+        *trig_argument_out = trig_argument;
+        *is_sine_out = is_sine;
+        return true;
+    }
+
+    if (expr_is_op(right, &ops_sin) && right->a) {
+        trig_argument = right->a;
+        is_sine = true;
+    } else if (expr_is_op(right, &ops_cos) && right->a) {
+        trig_argument = right->a;
+        is_sine = false;
+    } else {
+        return false;
+    }
+    if (!match_secant_positive_integer_power(
+            left, &secant_argument, secant_power_out) ||
+        !expr_struct_eq(trig_argument, secant_argument))
+        return false;
+
+    *trig_argument_out = trig_argument;
+    *is_sine_out = is_sine;
+    return true;
+}
+
+expr_t *integrate_sine_cosine_times_secant_power(
+    const expr_t *expr,
+    const expr_t *wrt)
+{
+    const expr_t *argument = NULL;
+    expr_t *affine_constant = NULL;
+    expr_t *affine_coefficient = NULL;
+    expr_t *secant = NULL;
+    expr_t *reduced_power = NULL;
+    expr_t *denominator = NULL;
+    expr_t *integral = NULL;
+    unsigned int power = 0u;
+    bool is_sine = false;
+
+    if (!match_sine_or_cosine_times_secant_power(
+            expr, &argument, &is_sine, &power) ||
+        !match_symbolic_affine_constant_and_coeff(
+            argument,
+            wrt,
+            &affine_constant,
+            &affine_coefficient) ||
+        expr_const_is_zero(affine_coefficient))
+        goto cleanup;
+
+    secant = expr_sec(argument);
+    reduced_power = power == 1u
+        ? expr_const_one()
+        : expr_integrate_build_unsigned_expr_power(
+              secant, power - 1u);
+    if (!reduced_power)
+        goto cleanup;
+
+    if (!is_sine) {
+        integral = expr_integrate_dispatch(reduced_power, wrt);
+        goto cleanup;
+    }
+    if (power == 1u)
+        goto cleanup;
+
+    denominator = expr_mul_long(
+        affine_coefficient, (long)(power - 1u));
+    integral = denominator
+        ? expr_div(reduced_power, denominator)
+        : NULL;
+    integral = simplify_owned(integral);
+
+cleanup:
+    expr_free(denominator);
+    expr_free(reduced_power);
+    expr_free(secant);
+    expr_free(affine_coefficient);
+    expr_free(affine_constant);
+    return integral;
+}
+
 bool match_trig_proportional_wrt_coeff(const expr_t *expr,
                                        const expr_t *wrt,
                                        bool *is_sin_out,

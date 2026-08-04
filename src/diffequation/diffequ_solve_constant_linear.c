@@ -840,6 +840,81 @@ cleanup:
     return particular;
 }
 
+static expr_t *de_secant_cubed_particular_solution(
+    const de_constant_linear_form_t *form,
+    const expr_t *independent)
+{
+    const expr_t *secant = NULL;
+    expr_t *variables[1] = { (expr_t *)independent };
+    number_t exponent = num_new();
+    number_t affine_constant = num_new();
+    number_t affine_coefficient = num_new();
+    number_t dependent_coefficient = num_new();
+    number_t first_coefficient = num_new();
+    number_t leading_coefficient = num_new();
+    number_t affine_squared = num_new();
+    number_t expected_dependent = num_new();
+    number_t denominator = num_new();
+    number_t scale = num_new();
+    number_t three = num_create_from_long(3L);
+    expr_t *particular = NULL;
+
+    if (!form || !independent || form->order != 2u ||
+        !expr_match_pow_const(form->forcing, &secant, &exponent) ||
+        !num_eq(exponent, three) ||
+        !expr_match_unary_affine_kind(
+            secant,
+            EXPR_PATTERN_UNARY_SEC,
+            1u,
+            variables,
+            &affine_constant,
+            &affine_coefficient) ||
+        !expr_match_const_value(
+            form->coefficients[0], &dependent_coefficient) ||
+        !expr_match_const_value(
+            form->coefficients[1], &first_coefficient) ||
+        !expr_match_const_value(
+            form->coefficients[2], &leading_coefficient) ||
+        !num_eq(first_coefficient, NUM_ZERO) ||
+        num_eq(dependent_coefficient, NUM_ZERO))
+        goto cleanup;
+
+    num_destroy(&affine_squared);
+    affine_squared = num_mul(
+        affine_coefficient, affine_coefficient);
+    num_destroy(&expected_dependent);
+    expected_dependent = num_mul(
+        leading_coefficient, affine_squared);
+    if (!num_eq(dependent_coefficient, expected_dependent))
+        goto cleanup;
+
+    num_destroy(&denominator);
+    denominator = num_mul(NUM_TWO, dependent_coefficient);
+    num_destroy(&scale);
+    scale = num_div(NUM_ONE, denominator);
+    particular = expr_clone(secant);
+    if (particular) {
+        expr_t *scaled = expr_mul_num(particular, &scale);
+
+        expr_free(particular);
+        particular = scaled ? expr_simplify_owned(scaled) : NULL;
+    }
+
+cleanup:
+    num_destroy(&three);
+    num_destroy(&scale);
+    num_destroy(&denominator);
+    num_destroy(&expected_dependent);
+    num_destroy(&affine_squared);
+    num_destroy(&leading_coefficient);
+    num_destroy(&first_coefficient);
+    num_destroy(&dependent_coefficient);
+    num_destroy(&affine_coefficient);
+    num_destroy(&affine_constant);
+    num_destroy(&exponent);
+    return particular;
+}
+
 static expr_t *de_particular_solution(
     const de_constant_linear_form_t *form,
     const expr_t *independent,
@@ -957,6 +1032,11 @@ static expr_t *de_particular_solution(
         goto cleanup_scale;
 
     particular = de_polynomial_particular_solution(
+        form, independent);
+    if (particular)
+        goto cleanup_scale;
+
+    particular = de_secant_cubed_particular_solution(
         form, independent);
     if (particular)
         goto cleanup_scale;

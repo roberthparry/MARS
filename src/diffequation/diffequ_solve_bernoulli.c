@@ -1,6 +1,37 @@
 #define MARS_DIFFEQUATION_SOLVE_INTERNAL_ACCESS
 #include "diffequ_solve_internal.h"
 
+static expr_t *de_bernoulli_arbitrary_constant(
+    const expr_t *forcing_integral)
+{
+    const expr_t *unscaled = NULL;
+    number_t scale = num_new();
+    number_t magnitude = num_new();
+    expr_t *constant = de_arbitrary_constant();
+
+    if (!constant ||
+        !expr_match_scaled_expr(
+            forcing_integral, &scale, &unscaled) ||
+        !num_is_finite(scale) || num_eq(scale, NUM_ZERO))
+        goto cleanup;
+
+    num_destroy(&magnitude);
+    magnitude = num_abs(scale);
+    if (!num_eq(magnitude, NUM_ONE)) {
+        expr_t *scaled = expr_mul_num(constant, &magnitude);
+
+        if (scaled) {
+            expr_free(constant);
+            constant = expr_simplify_owned(scaled);
+        }
+    }
+
+cleanup:
+    num_destroy(&magnitude);
+    num_destroy(&scale);
+    return constant;
+}
+
 static const expr_t *de_find_dependent_square(
     const expr_t *expr,
     const expr_t *dependent)
@@ -51,7 +82,7 @@ static expr_t *de_bernoulli_constant(
 
     if (!de_find_initial_condition(
             de, dependent, &point, &value))
-        return de_arbitrary_constant();
+        return de_bernoulli_arbitrary_constant(integral);
 
     reciprocal_value = expr_div_simplify_owned(
         expr_const_one(), expr_clone(value));

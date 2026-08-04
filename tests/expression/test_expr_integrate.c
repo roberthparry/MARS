@@ -2283,6 +2283,10 @@ static void test_integrate_trig_power_products(void)
         points, sizeof(points) / sizeof(points[0]));
     assert_string_antiderivative_matches("{ sec(x)^3 }",
                                          points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ sin(x)*sec(x)^3 }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ cos(x)*sec(x)^3 }",
+                                         points, sizeof(points) / sizeof(points[0]));
     assert_string_antiderivative_matches("{ cosec(x)^3 }",
                                          points, sizeof(points) / sizeof(points[0]));
     assert_string_antiderivative_matches("{ sin(x)^2*cos(x) }",

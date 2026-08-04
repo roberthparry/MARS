@@ -2,6 +2,8 @@
 #include <math.h>
 #include <string.h>
 
+#define MARS_SHARED_NUMBER_INTERNAL_ACCESS
+#include "internal/number_internal.h"
 #define MARS_DIFFEQUATION_SOLVE_INTERNAL_ACCESS
 #include "diffequ_solve_internal.h"
 
@@ -287,6 +289,53 @@ static expr_t *de_homogeneous_divide_sum_terms(
     return quotient;
 }
 
+static bool de_homogeneous_match_reciprocal(
+    const expr_t *expr,
+    const expr_t **denominator_out)
+{
+    const expr_t *base = NULL;
+    number_t exponent = num_new();
+    long integer_exponent;
+    bool matches = expr && denominator_out &&
+        expr_match_pow_const(expr, &base, &exponent) &&
+        de_homogeneous_exact_long(exponent, &integer_exponent) &&
+        integer_exponent == -1L;
+
+    if (matches)
+        *denominator_out = base;
+    num_destroy(&exponent);
+    return matches;
+}
+
+static expr_t *de_homogeneous_inverse_product_as_quotient(
+    const expr_t *expr)
+{
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+    const expr_t *denominator = NULL;
+    expr_t *one = NULL;
+    expr_t *quotient = NULL;
+
+    if (!expr)
+        return NULL;
+    if (de_homogeneous_match_reciprocal(
+            expr, &denominator)) {
+        one = expr_const_one();
+        quotient = one ? expr_div(one, denominator) : NULL;
+        expr_free(one);
+        return quotient;
+    }
+    if (!expr_match_mul_expr(expr, &left, &right))
+        return NULL;
+    if (de_homogeneous_match_reciprocal(
+            right, &denominator))
+        return expr_div(left, denominator);
+    if (de_homogeneous_match_reciprocal(
+            left, &denominator))
+        return expr_div(right, denominator);
+    return NULL;
+}
+
 static expr_t *de_homogeneous_integrate_terms(
     const expr_t *integrand,
     const expr_t *wrt)
@@ -296,13 +345,26 @@ static expr_t *de_homogeneous_integrate_terms(
     expr_t *left_integral = NULL;
     expr_t *right_integral = NULL;
     expr_t *integral = NULL;
+    expr_t *quotient = NULL;
     bool is_sub = false;
 
     if (!integrand || !wrt)
         return NULL;
     if (!expr_match_add_sub_expr(
-            integrand, &left, &right, &is_sub))
-        return de_integrate_or_formal(integrand, wrt);
+            integrand, &left, &right, &is_sub)) {
+        integral = expr_integrate(integrand, wrt);
+        if (integral)
+            return integral;
+        quotient = de_homogeneous_inverse_product_as_quotient(
+            integrand);
+        integral = quotient
+            ? expr_integrate(quotient, wrt)
+            : NULL;
+        expr_free(quotient);
+        return integral
+            ? integral
+            : expr_integral(integrand, wrt);
+    }
 
     left_integral = de_homogeneous_integrate_terms(left, wrt);
     right_integral = de_homogeneous_integrate_terms(right, wrt);
@@ -384,6 +446,425 @@ static expr_t *de_log_abs(const expr_t *expr)
     absolute = de_simplify_unary_owned(expr_clone(expr), expr_abs);
 
     return de_simplify_unary_owned(absolute, expr_log);
+}
+
+static unsigned long de_homogeneous_unsigned_magnitude(long value)
+{
+    return value < 0L
+        ? (unsigned long)(-(value + 1L)) + 1u
+        : (unsigned long)value;
+}
+
+static unsigned long de_homogeneous_gcd(
+    unsigned long left,
+    unsigned long right)
+{
+    while (right != 0u) {
+        unsigned long remainder = left % right;
+
+        left = right;
+        right = remainder;
+    }
+    return left;
+}
+
+static bool de_homogeneous_primitive_affine_coefficients(
+    const expr_t *argument,
+    const expr_t *substitution,
+    long coefficients_out[2])
+{
+    number_t coefficients[5];
+    long numerators[2];
+    long denominators[2];
+    unsigned long denominator_gcd;
+    unsigned long coefficient_gcd;
+    long common_denominator;
+    long integer_coefficients[2];
+    bool coefficients_ready = false;
+    bool ok = false;
+
+    if (!coefficients_out)
+        return false;
+
+    for (size_t i = 0u; i < 5u; ++i)
+        coefficients[i] = num_new();
+    coefficients_ready = true;
+    if (!expr_collect_poly_deg4(
+            argument, substitution, coefficients))
+        goto cleanup;
+    if (num_eq(coefficients[1], NUM_ZERO) ||
+        !num_eq(coefficients[2], NUM_ZERO) ||
+        !num_eq(coefficients[3], NUM_ZERO) ||
+        !num_eq(coefficients[4], NUM_ZERO))
+        goto cleanup;
+    for (size_t i = 0u; i < 2u; ++i) {
+        if (!num_get_small_rational(
+                coefficients[i],
+                &numerators[i],
+                &denominators[i]) ||
+            denominators[i] <= 0L)
+            goto cleanup;
+    }
+
+    denominator_gcd = de_homogeneous_gcd(
+        (unsigned long)denominators[0],
+        (unsigned long)denominators[1]);
+    if (denominator_gcd == 0u ||
+        (unsigned long)denominators[0] / denominator_gcd >
+            (unsigned long)LONG_MAX /
+                (unsigned long)denominators[1])
+        goto cleanup;
+    common_denominator =
+        (long)((unsigned long)denominators[0] /
+               denominator_gcd *
+               (unsigned long)denominators[1]);
+    for (size_t i = 0u; i < 2u; ++i) {
+        long scale = common_denominator / denominators[i];
+
+        if (!de_homogeneous_multiply_degrees(
+                numerators[i], scale, &integer_coefficients[i]))
+            goto cleanup;
+    }
+
+    coefficient_gcd = de_homogeneous_gcd(
+        de_homogeneous_unsigned_magnitude(integer_coefficients[0]),
+        de_homogeneous_unsigned_magnitude(integer_coefficients[1]));
+    if (coefficient_gcd == 0u ||
+        coefficient_gcd > (unsigned long)LONG_MAX)
+        goto cleanup;
+    for (size_t i = 0u; i < 2u; ++i)
+        integer_coefficients[i] /= (long)coefficient_gcd;
+    if (integer_coefficients[0] < 0L ||
+        (integer_coefficients[0] == 0L &&
+         integer_coefficients[1] < 0L)) {
+        if (integer_coefficients[0] == LONG_MIN ||
+            integer_coefficients[1] == LONG_MIN)
+            goto cleanup;
+        integer_coefficients[0] = -integer_coefficients[0];
+        integer_coefficients[1] = -integer_coefficients[1];
+    }
+
+    coefficients_out[0] = integer_coefficients[0];
+    coefficients_out[1] = integer_coefficients[1];
+    ok = true;
+
+cleanup:
+    if (coefficients_ready) {
+        for (size_t i = 0u; i < 5u; ++i)
+            num_destroy(&coefficients[i]);
+    }
+    return ok;
+}
+
+static expr_t *de_homogeneous_scaled_power(
+    const expr_t *base,
+    long coefficient,
+    long exponent)
+{
+    expr_t *power;
+
+    if (!base || exponent < 0L)
+        return NULL;
+    power = exponent == 0L
+        ? expr_const_one()
+        : (exponent == 1L
+              ? expr_clone(base)
+              : expr_pow_long(base, exponent));
+    if (coefficient == 1L)
+        return power;
+    return power
+        ? expr_mul_simplify_owned(
+              expr_const_long(coefficient), power)
+        : NULL;
+}
+
+static expr_t *de_homogeneous_scale_expression_exact(
+    const expr_t *expr,
+    long denominator)
+{
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+    const expr_t *rest = expr;
+    number_t factor_value = num_new();
+    number_t value;
+    expr_t *coefficient_expr = NULL;
+    expr_t *scaled = NULL;
+    long numerator = 1L;
+    unsigned long divisor;
+
+    if (!expr || denominator == 0L)
+        goto cleanup;
+    if (expr_match_mul_expr(expr, &left, &right)) {
+        if (expr_match_const_value(left, &factor_value) &&
+            de_homogeneous_exact_long(factor_value, &numerator))
+            rest = right;
+        else if (expr_match_const_value(right, &factor_value) &&
+                 de_homogeneous_exact_long(factor_value, &numerator))
+            rest = left;
+    }
+    divisor = de_homogeneous_gcd(
+        de_homogeneous_unsigned_magnitude(numerator),
+        de_homogeneous_unsigned_magnitude(denominator));
+    if (divisor == 0u || divisor > (unsigned long)LONG_MAX)
+        goto cleanup;
+    numerator /= (long)divisor;
+    denominator /= (long)divisor;
+    if (denominator < 0L) {
+        if (denominator == LONG_MIN || numerator == LONG_MIN)
+            goto cleanup;
+        denominator = -denominator;
+        numerator = -numerator;
+    }
+    if (numerator < 0L) {
+        if (numerator == LONG_MIN)
+            goto cleanup;
+        numerator = -numerator;
+        scaled = de_simplify_unary_owned(
+            expr_clone(rest), expr_neg);
+        rest = scaled;
+    }
+    if (numerator == denominator) {
+        if (!scaled)
+            scaled = expr_clone(rest);
+        goto cleanup;
+    }
+    if (numerator == -denominator) {
+        expr_t *negative = expr_neg(rest);
+
+        expr_free(scaled);
+        scaled = negative;
+        goto cleanup;
+    }
+    value = num_create_from_frac(numerator, denominator);
+    coefficient_expr = expr_new_const(value);
+    num_destroy(&value);
+    if (coefficient_expr) {
+        expr_t *product = expr_mul(coefficient_expr, rest);
+
+        expr_free(scaled);
+        scaled = product;
+    }
+
+cleanup:
+    expr_free(coefficient_expr);
+    num_destroy(&factor_value);
+    return scaled;
+}
+
+static bool de_homogeneous_algebraic_log_solutions(
+    const expr_t *independent,
+    const expr_t *dependent,
+    const expr_t *substitution,
+    const expr_t *integral,
+    equation_t **solutions_out,
+    size_t *solution_count_out)
+{
+    const expr_t *product_left = NULL;
+    const expr_t *product_right = NULL;
+    const expr_t *sum = NULL;
+    const expr_t *first_argument = NULL;
+    const expr_t *second_argument = NULL;
+    expr_t *simplified = NULL;
+    expr_t *constant = NULL;
+    expr_t *quadratic = NULL;
+    expr_t *linear = NULL;
+    expr_t *constant_term = NULL;
+    expr_t *quadratic_constant = NULL;
+    expr_t *constant_denominator = NULL;
+    expr_t *scaled_constant = NULL;
+    expr_t *b_squared = NULL;
+    expr_t *a_times_c = NULL;
+    expr_t *four_a_c = NULL;
+    expr_t *discriminant = NULL;
+    expr_t *root = NULL;
+    expr_t *negative_linear = NULL;
+    expr_t *positive_numerator = NULL;
+    expr_t *negative_numerator = NULL;
+    expr_t *positive_solution = NULL;
+    expr_t *negative_solution = NULL;
+    number_t coefficient = num_new();
+    long first_coefficients[2];
+    long second_coefficients[2];
+    long numerator;
+    long denominator;
+    long reciprocal;
+    long independent_exponent;
+    long quadratic_coefficient;
+    long first_linear_product;
+    long second_linear_product;
+    long linear_coefficient;
+    long constant_coefficient;
+    long denominator_coefficient;
+    bool is_sub = false;
+    bool solved = false;
+
+    if (!solutions_out || !solution_count_out)
+        goto cleanup;
+    *solution_count_out = 0u;
+
+    simplified = integral ? expr_simplify(integral) : NULL;
+    if (!simplified ||
+        !expr_match_mul_expr(
+            simplified, &product_left, &product_right))
+        goto cleanup;
+    if (expr_match_const_value(product_left, &coefficient))
+        sum = product_right;
+    else if (expr_match_const_value(product_right, &coefficient))
+        sum = product_left;
+    else
+        goto cleanup;
+    if (!num_get_small_rational(
+            coefficient, &numerator, &denominator) ||
+        numerator == 0L || denominator <= 0L ||
+        denominator % de_homogeneous_unsigned_magnitude(numerator) != 0u)
+        goto cleanup;
+    reciprocal = numerator < 0L
+        ? -(denominator / (long)de_homogeneous_unsigned_magnitude(numerator))
+        : denominator / numerator;
+    if (!expr_match_add_sub_expr(
+            sum, &product_left, &product_right, &is_sub) ||
+        is_sub ||
+        !expr_match_log_expr(product_left, &first_argument) ||
+        !expr_match_log_expr(product_right, &second_argument))
+        goto cleanup;
+
+    if (!de_homogeneous_primitive_affine_coefficients(
+            first_argument, substitution, first_coefficients) ||
+        !de_homogeneous_primitive_affine_coefficients(
+            second_argument, substitution, second_coefficients) ||
+        reciprocal > -2L)
+        goto cleanup;
+    independent_exponent = -reciprocal - 2L;
+    if (!de_homogeneous_multiply_degrees(
+            first_coefficients[1],
+            second_coefficients[1],
+            &quadratic_coefficient) ||
+        quadratic_coefficient == 0L ||
+        !de_homogeneous_multiply_degrees(
+            first_coefficients[0],
+            second_coefficients[1],
+            &first_linear_product) ||
+        !de_homogeneous_multiply_degrees(
+            first_coefficients[1],
+            second_coefficients[0],
+            &second_linear_product) ||
+        !de_homogeneous_add_degrees(
+            first_linear_product,
+            second_linear_product,
+            false,
+            &linear_coefficient) ||
+        !de_homogeneous_multiply_degrees(
+            first_coefficients[0],
+            second_coefficients[0],
+            &constant_coefficient) ||
+        !de_homogeneous_multiply_degrees(
+            2L, quadratic_coefficient, &denominator_coefficient))
+        goto cleanup;
+
+    quadratic = expr_const_long(quadratic_coefficient);
+    linear = de_homogeneous_scaled_power(
+        independent,
+        linear_coefficient,
+        1L);
+    quadratic_constant = de_homogeneous_scaled_power(
+        independent,
+        constant_coefficient,
+        2L);
+    constant = de_arbitrary_constant();
+    if (!quadratic || !linear || !constant)
+        goto cleanup;
+    constant_denominator = independent_exponent == 0L
+        ? expr_const_one()
+        : expr_pow_long(independent, independent_exponent);
+    scaled_constant = constant_denominator
+        ? expr_div_simplify_owned(constant, constant_denominator)
+        : NULL;
+    constant = NULL;
+    constant_denominator = NULL;
+    constant_term = quadratic_constant
+        ? expr_sub_simplify_owned(
+              quadratic_constant, scaled_constant)
+        : de_simplify_unary_owned(scaled_constant, expr_neg);
+    quadratic_constant = NULL;
+    scaled_constant = NULL;
+    b_squared = expr_pow_long(linear, 2L);
+    a_times_c = constant_term
+        ? expr_mul_simplify_owned(
+              expr_clone(quadratic), expr_clone(constant_term))
+        : NULL;
+    four_a_c = a_times_c
+        ? expr_mul_simplify_owned(expr_const_long(4L), a_times_c)
+        : NULL;
+    a_times_c = NULL;
+    discriminant = b_squared && four_a_c
+        ? expr_sub_simplify_owned(b_squared, four_a_c)
+        : NULL;
+    b_squared = NULL;
+    four_a_c = NULL;
+    root = discriminant
+        ? de_simplify_unary_owned(discriminant, expr_sqrt)
+        : NULL;
+    discriminant = NULL;
+    negative_linear = de_simplify_unary_owned(
+        expr_clone(linear), expr_neg);
+    positive_numerator = negative_linear && root
+        ? expr_add_simplify_owned(
+              expr_clone(negative_linear), expr_clone(root))
+        : NULL;
+    negative_numerator = negative_linear && root
+        ? expr_sub_simplify_owned(negative_linear, root)
+        : NULL;
+    negative_linear = NULL;
+    root = NULL;
+    positive_solution = positive_numerator
+        ? de_homogeneous_scale_expression_exact(
+              positive_numerator, denominator_coefficient)
+        : NULL;
+    expr_free(positive_numerator);
+    positive_numerator = NULL;
+    negative_solution = negative_numerator
+        ? de_homogeneous_scale_expression_exact(
+              negative_numerator, denominator_coefficient)
+        : NULL;
+    expr_free(negative_numerator);
+    negative_numerator = NULL;
+    solutions_out[0] = positive_solution
+        ? equ_new(dependent, positive_solution)
+        : NULL;
+    solutions_out[1] = negative_solution
+        ? equ_new(dependent, negative_solution)
+        : NULL;
+    if (!solutions_out[0] || !solutions_out[1]) {
+        equ_free(solutions_out[1]);
+        equ_free(solutions_out[0]);
+        solutions_out[0] = NULL;
+        solutions_out[1] = NULL;
+        goto cleanup;
+    }
+    *solution_count_out = 2u;
+    solved = true;
+
+cleanup:
+    expr_free(negative_solution);
+    expr_free(positive_solution);
+    expr_free(negative_numerator);
+    expr_free(positive_numerator);
+    expr_free(negative_linear);
+    expr_free(root);
+    expr_free(discriminant);
+    expr_free(four_a_c);
+    expr_free(a_times_c);
+    expr_free(b_squared);
+    expr_free(scaled_constant);
+    expr_free(constant_denominator);
+    expr_free(quadratic_constant);
+    expr_free(constant_term);
+    expr_free(linear);
+    expr_free(quadratic);
+    expr_free(constant);
+    expr_free(simplified);
+    num_destroy(&coefficient);
+    return solved;
 }
 
 static expr_t *de_homogeneous_substitute_simplified(
@@ -580,8 +1061,11 @@ de_attempt_t de_attempt_homogeneous(
     const expr_t *independent,
     const expr_t *dependent,
     const expr_t *derivative_right,
-    equation_t **solution_out)
+    equation_t **solutions_out,
+    size_t *solution_count_out)
 {
+    const expr_t *condition_point = NULL;
+    const expr_t *condition_value = NULL;
     expr_t *substitution = NULL;
     expr_t *transformed = NULL;
     expr_t *reciprocal = NULL;
@@ -592,6 +1076,10 @@ de_attempt_t de_attempt_homogeneous(
     expr_t *constant = NULL;
     expr_t *right = NULL;
     de_attempt_t attempt = DE_ATTEMPT_NOT_MATCHED;
+
+    if (!solutions_out || !solution_count_out)
+        return DE_ATTEMPT_FAILED;
+    *solution_count_out = 0u;
 
     substitution = expr_new_named_var(NUM_NAN, "__de_u");
     transformed = substitution
@@ -614,6 +1102,23 @@ de_attempt_t de_attempt_homogeneous(
         ? de_homogeneous_integrate_terms(
               reciprocal, substitution)
         : NULL;
+    if (integral &&
+        !de_find_initial_condition(
+            de,
+            dependent,
+            &condition_point,
+            &condition_value)) {
+        if (de_homogeneous_algebraic_log_solutions(
+                independent,
+                dependent,
+                substitution,
+                integral,
+                solutions_out,
+                solution_count_out)) {
+            attempt = DE_ATTEMPT_SOLVED;
+            goto cleanup;
+        }
+    }
     ratio = expr_div_simplify_owned(
         expr_clone(dependent), expr_clone(independent));
     left = integral && ratio
@@ -633,9 +1138,11 @@ de_attempt_t de_attempt_homogeneous(
     if (!left || !right)
         goto cleanup;
 
-    *solution_out = equ_new(left, right);
-    if (*solution_out)
+    solutions_out[0] = equ_new(left, right);
+    if (solutions_out[0]) {
+        *solution_count_out = 1u;
         attempt = DE_ATTEMPT_SOLVED;
+    }
 
 cleanup:
     expr_free(right);
