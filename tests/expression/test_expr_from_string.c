@@ -2771,9 +2771,11 @@ static void test_from_string_unevaluated_integral(void)
 
         if (display_text &&
             strstr(display_text, "x²") &&
-            strstr(display_text, "C₀") &&
+            strstr(display_text, "+ C") &&
+            !strstr(display_text, "C₀") &&
             strstr(display_text, "x = NAN") &&
-            strstr(display_text, "C₀ = NAN") &&
+            strstr(display_text, "C = NAN") &&
+            expr_bindings_get(bindings, "C") &&
             expr_bindings_has_symbolic_integral(bindings)) {
             printf(C_BOLD C_GREEN "PASS" C_RESET
                    " @S without an upper substitution returns an indefinite family\n");
@@ -2796,9 +2798,11 @@ static void test_from_string_unevaluated_integral(void)
     text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
     if (text &&
         strstr(text, "⅓x³") &&
-        strstr(text, "C₀") &&
+        strstr(text, "+ C") &&
+        !strstr(text, "C₀") &&
         strstr(text, "x = NAN") &&
-        strstr(text, "C₀ = NAN") &&
+        strstr(text, "C = NAN") &&
+        expr_bindings_get(bindings, "C") &&
         expr_bindings_has_symbolic_integral(bindings)) {
         printf(C_BOLD C_GREEN "PASS" C_RESET
                " parenthesized @S without whitespace returns an indefinite family\n");

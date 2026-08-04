@@ -3158,7 +3158,8 @@ static void test_integrate_unevaluated_integral_display_symbolic_result(void)
     ASSERT_NOT_NULL(indefinite_text);
     ASSERT_TRUE(strstr(indefinite_text,
                        "tan(x)·(ln(tan(x) + cot(x)) - 1)") != NULL);
-    ASSERT_TRUE(strstr(indefinite_text, "C₀") != NULL);
+    ASSERT_TRUE(strstr(indefinite_text, "+ C") != NULL);
+    ASSERT_TRUE(strstr(indefinite_text, "C₀") == NULL);
     ASSERT_TRUE(strstr(indefinite_text, "∫") == NULL);
 
     ASSERT_TRUE(expr_integral_value_note(mismatch,
