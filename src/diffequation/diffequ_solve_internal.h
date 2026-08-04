@@ -85,7 +85,8 @@ de_attempt_t de_attempt_homogeneous(const diffequ_t *de,
                                     const expr_t *independent,
                                     const expr_t *dependent,
                                     const expr_t *derivative_right,
-                                    equation_t **solution_out);
+                                    equation_t **solutions_out,
+                                    size_t *solution_count_out);
 de_attempt_t de_attempt_linear_substitution(
     const diffequ_t *de,
     const expr_t *independent,

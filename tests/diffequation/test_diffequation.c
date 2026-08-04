@@ -1000,7 +1000,7 @@ static void test_diffequ_solves_first_order_homogeneous_problem(void)
         EXPECT_TEXT(
             "homogeneous solution",
             string_c_str(text),
-            "½·(y/x)² = ln(|x|) + 0.5");
+            "½·(y/x)² = ln(|x|) + ½");
 
     string_free(text);
     de_solve_result_free(result);
@@ -1091,6 +1091,72 @@ static void test_diffequ_solves_polynomial_homogeneous_initial_value_problem(
             "-½·1/(y/x)² - ln(y/x) + 2·y/x = ln(|x|) + ³⁄₂");
 
     string_free(text);
+    de_solve_result_free(result);
+    de_free(de);
+}
+
+static void test_diffequ_integrates_rational_homogeneous_problem(void)
+{
+    diffequ_t *de = de_from_string(
+        "y*(8*x-9*y) + 2*x*(x-3*y)*y' = 0");
+    diffequ_solve_result_t *result;
+    const equation_t *first_solution;
+    const equation_t *second_solution;
+    string_t *first_text;
+    string_t *second_text;
+
+    EXPECT_POINTER("parsed rational homogeneous ODE", de, true);
+    if (!de)
+        return;
+
+    result = de_solve(de);
+    EXPECT_POINTER("rational homogeneous solve result", result, true);
+    if (!result) {
+        de_free(de);
+        return;
+    }
+
+    EXPECT_LONG(
+        "rational homogeneous solve status",
+        (long)de_solve_result_status(result),
+        (long)DE_SOLVE_STATUS_SOLVED);
+    EXPECT_LONG(
+        "rational homogeneous selected solver",
+        (long)de_solve_result_solver(result),
+        (long)DE_SOLVER_HOMOGENEOUS);
+    EXPECT_LONG(
+        "rational homogeneous solution count",
+        (long)de_solve_result_count(result),
+        2L);
+    first_solution = de_solve_result_at(result, 0u);
+    second_solution = de_solve_result_at(result, 1u);
+    EXPECT_POINTER(
+        "first rational homogeneous solution", first_solution, true);
+    EXPECT_POINTER(
+        "second rational homogeneous solution", second_solution, true);
+    first_text = first_solution
+        ? equ_to_text(first_solution, style_UNBOUND)
+        : NULL;
+    second_text = second_solution
+        ? equ_to_text(second_solution, style_UNBOUND)
+        : NULL;
+    EXPECT_POINTER(
+        "first rational homogeneous solution text", first_text, true);
+    EXPECT_POINTER(
+        "second rational homogeneous solution text", second_text, true);
+    if (first_text)
+        EXPECT_TEXT(
+            "first explicit rational homogeneous solution",
+            string_c_str(first_text),
+            "y = -⅓·(√(x² - 3C/x³) - x)");
+    if (second_text)
+        EXPECT_TEXT(
+            "second explicit rational homogeneous solution",
+            string_c_str(second_text),
+            "y = ⅓·(√(x² - 3C/x³) + x)");
+
+    string_free(second_text);
+    string_free(first_text);
     de_solve_result_free(result);
     de_free(de);
 }
@@ -1346,6 +1412,48 @@ static void test_diffequ_solves_quadratic_bernoulli_problem(void)
             "Bernoulli solution",
             string_c_str(text),
             "y = 1/(x + 1)");
+
+    string_free(text);
+    de_solve_result_free(result);
+    de_free(de);
+}
+
+static void test_diffequ_normalizes_bernoulli_arbitrary_constant(void)
+{
+    const char *source = "Dx(y) - 2*y = y^2";
+    diffequ_t *de = de_from_string(source);
+    diffequ_solve_result_t *result;
+    const equation_t *solution;
+    string_t *text;
+
+    EXPECT_POINTER("parsed unconditioned Bernoulli problem", de, true);
+    if (!de)
+        return;
+
+    result = de_solve(de);
+    EXPECT_POINTER("unconditioned Bernoulli result", result, true);
+    if (!result) {
+        de_free(de);
+        return;
+    }
+
+    EXPECT_LONG(
+        "unconditioned Bernoulli status",
+        (long)de_solve_result_status(result),
+        (long)DE_SOLVE_STATUS_SOLVED);
+    EXPECT_LONG(
+        "unconditioned Bernoulli selected solver",
+        (long)de_solve_result_solver(result),
+        (long)DE_SOLVER_BERNOULLI);
+    solution = de_solve_result_at(result, 0u);
+    EXPECT_POINTER("unconditioned Bernoulli solution", solution, true);
+    text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
+    EXPECT_POINTER("unconditioned Bernoulli solution text", text, true);
+    if (text)
+        EXPECT_TEXT(
+            "normalized Bernoulli arbitrary constant",
+            string_c_str(text),
+            "y = 2·exp(2x)/(C - exp(2x))");
 
     string_free(text);
     de_solve_result_free(result);
@@ -2037,6 +2145,47 @@ static void test_diffequ_solves_nonhomogeneous_constant_coefficient_problem(
             "nonhomogeneous solution",
             string_c_str(text),
             "y = ⅙·(2·exp(2x) - 3·exp(x) + exp(-x))");
+
+    string_free(text);
+    de_solve_result_free(result);
+    de_free(de);
+}
+
+static void test_diffequ_solves_secant_cubed_forcing(void)
+{
+    const char *source = "Dxx(y) + y = sec(x)^3";
+    diffequ_t *de = de_from_string(source);
+    diffequ_solve_result_t *result;
+    const equation_t *solution;
+    string_t *text;
+
+    printf("  differential equation\n    input:    %s\n", source);
+    EXPECT_POINTER("parsed secant-cubed forcing problem", de, true);
+    if (!de)
+        return;
+    result = de_solve(de);
+    EXPECT_POINTER("secant-cubed forcing result", result, true);
+    if (!result) {
+        de_free(de);
+        return;
+    }
+    EXPECT_LONG(
+        "secant-cubed forcing status",
+        (long)de_solve_result_status(result),
+        (long)DE_SOLVE_STATUS_SOLVED);
+    EXPECT_LONG(
+        "secant-cubed forcing selected solver",
+        (long)de_solve_result_solver(result),
+        (long)DE_SOLVER_CONSTANT_COEFFICIENT_LINEAR);
+    solution = de_solve_result_at(result, 0u);
+    EXPECT_POINTER("secant-cubed forcing solution", solution, true);
+    text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
+    EXPECT_POINTER("secant-cubed forcing solution text", text, true);
+    if (text)
+        EXPECT_TEXT(
+            "secant-cubed forcing solution",
+            string_c_str(text),
+            "y = ½·sec(x) + C₁·cos(x) + C₂·sin(x)");
 
     string_free(text);
     de_solve_result_free(result);
@@ -2984,12 +3133,14 @@ int tests_main(void)
     RUN_TEST_CASE(test_diffequ_homogeneous_solution_retains_constant);
     RUN_TEST_CASE(
         test_diffequ_solves_polynomial_homogeneous_initial_value_problem);
+    RUN_TEST_CASE(test_diffequ_integrates_rational_homogeneous_problem);
     RUN_TEST_CASE(test_diffequ_solves_affine_combination_substitution);
     RUN_TEST_CASE(test_diffequ_solves_shifted_homogeneous_substitution);
     RUN_TEST_CASE(test_diffequ_solves_linear_change_of_variables);
     RUN_TEST_CASE(test_diffequ_retains_arbitrary_constant);
     RUN_TEST_CASE(test_diffequ_preserves_zero_singular_solution);
     RUN_TEST_CASE(test_diffequ_solves_quadratic_bernoulli_problem);
+    RUN_TEST_CASE(test_diffequ_normalizes_bernoulli_arbitrary_constant);
     RUN_TEST_CASE(test_diffequ_solves_derivative_quadratic_problem);
     RUN_TEST_CASE(test_diffequ_linearizes_exact_third_order_problem);
     RUN_TEST_CASE(test_diffequ_linearizes_modified_emden_problem);
@@ -3012,6 +3163,7 @@ int tests_main(void)
     RUN_TEST_CASE(test_diffequ_solves_high_order_repeated_root);
     RUN_TEST_CASE(
         test_diffequ_solves_nonhomogeneous_constant_coefficient_problem);
+    RUN_TEST_CASE(test_diffequ_solves_secant_cubed_forcing);
     RUN_TEST_CASE(test_diffequ_solves_repeated_complex_roots);
     RUN_TEST_CASE(
         test_diffequ_solves_degree_six_characteristic_polynomial);

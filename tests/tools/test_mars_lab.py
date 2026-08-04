@@ -448,6 +448,104 @@ solutions y = final
         (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
         "release diffequation_lab helper is not built",
     )
+    def test_native_helper_integrates_rational_homogeneous_ode(self) -> None:
+        completed = subprocess.run(
+            [
+                str(
+                    ROOT
+                    / "build"
+                    / "release"
+                    / "scratch"
+                    / "diffequation_lab"
+                ),
+                "y(8x-9y) + 2x(x-3y)y' = 0",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
+        payload = mars_lab.prepare_diffequation_fields(fields)
+
+        self.assertEqual(payload["status"], "solved")
+        self.assertEqual(payload["solver"], "first-order homogeneous")
+        self.assertNotIn("∫", payload["solutions"])
+        self.assertEqual(
+            payload["solutions"],
+            "y = -⅓·(√(x² - 3C/x³) - x)\n"
+            "y = ⅓·(√(x² - 3C/x³) + x)",
+        )
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
+    def test_native_helper_solves_secant_cubed_forcing(self) -> None:
+        completed = subprocess.run(
+            [
+                str(
+                    ROOT
+                    / "build"
+                    / "release"
+                    / "scratch"
+                    / "diffequation_lab"
+                ),
+                "y'' + y = sec^3(x)",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
+        payload = mars_lab.prepare_diffequation_fields(fields)
+
+        self.assertEqual(payload["status"], "solved")
+        self.assertEqual(payload["solver"], "constant-coefficient linear")
+        self.assertNotIn("integral_meta", payload["solutions"])
+        self.assertNotIn("∫", payload["solutions"])
+        self.assertEqual(
+            payload["solutions"],
+            "y = ½·sec(x) + C₁·cos(x) + C₂·sin(x)",
+        )
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
+    def test_native_helper_normalizes_bernoulli_constant(self) -> None:
+        completed = subprocess.run(
+            [
+                str(
+                    ROOT
+                    / "build"
+                    / "release"
+                    / "scratch"
+                    / "diffequation_lab"
+                ),
+                "y' - 2y = y^2",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
+        payload = mars_lab.prepare_diffequation_fields(fields)
+
+        self.assertEqual(payload["status"], "solved")
+        self.assertEqual(payload["solver"], "Bernoulli")
+        self.assertNotIn("2C", payload["solutions"])
+        self.assertEqual(
+            payload["solutions"],
+            "y = 2·exp(2x)/(C - exp(2x))",
+        )
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
     def test_native_helper_solves_derivative_quadratic_ode(self) -> None:
         completed = subprocess.run(
             [

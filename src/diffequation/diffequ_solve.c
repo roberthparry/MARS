@@ -593,9 +593,11 @@ diffequ_solve_result_t *de_solve(const diffequ_t *de)
         NULL, NULL, NULL, NULL, NULL, NULL, NULL
     };
     equation_t *modified_emden_solutions[1] = { NULL };
+    equation_t *homogeneous_solutions[2] = { NULL, NULL };
     size_t derivative_quadratic_count = 0u;
     size_t exact_derivative_count = 0u;
     size_t modified_emden_count = 0u;
+    size_t homogeneous_count = 0u;
     long modified_emden_scale = 0L;
     de_attempt_t derivative_quadratic;
     de_attempt_t exact_derivative;
@@ -964,13 +966,25 @@ diffequ_solve_result_t *de_solve(const diffequ_t *de)
         independent,
         dependent,
         derivative_right,
-        &solution);
+        homogeneous_solutions,
+        &homogeneous_count);
     if (homogeneous == DE_ATTEMPT_SOLVED) {
         result = de_solve_result_new(
             DE_SOLVE_STATUS_SOLVED,
             DE_SOLVER_HOMOGENEOUS,
             "solved as a first-order homogeneous ODE");
-        goto append;
+        if (!result)
+            goto cleanup;
+        for (size_t i = 0u; i < homogeneous_count; ++i) {
+            if (de_solve_result_append(
+                    result, homogeneous_solutions[i]) != 0) {
+                de_solve_result_free(result);
+                result = NULL;
+                goto cleanup;
+            }
+            homogeneous_solutions[i] = NULL;
+        }
+        goto cleanup;
     }
 
     linear_substitution = de_attempt_linear_substitution(
@@ -1024,6 +1038,8 @@ append:
     solution = NULL;
 
 cleanup:
+    for (size_t i = 0u; i < 2u; ++i)
+        equ_free(homogeneous_solutions[i]);
     for (size_t i = 0u; i < 1u; ++i)
         equ_free(modified_emden_solutions[i]);
     for (size_t i = 0u; i < 7u; ++i)

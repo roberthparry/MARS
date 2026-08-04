@@ -214,6 +214,7 @@ static const expr_integrate_mul_rule_t integrate_mul_exp_power_rules[] = {
 };
 
 static const expr_integrate_mul_rule_t integrate_mul_trig_power_rules[] = {
+    { .kind = EXPR_INTEGRATE_MUL_RULE_DIRECT, .direct = integrate_sine_cosine_times_secant_power },
     { .kind = EXPR_INTEGRATE_MUL_RULE_DIRECT, .direct = integrate_symbolic_integer_power_times_trig },
     { .kind = EXPR_INTEGRATE_MUL_RULE_END }
 };
