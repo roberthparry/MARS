@@ -2063,6 +2063,45 @@ static const char *tex_unary_name(const expr_t *f)
     return f->ops->tex_name;
 }
 
+static bool tex_unary_arg_is_greek_symbol(const expr_t *arg)
+{
+    const char *name;
+    string_t *name_text;
+    string_t *normalized;
+    string_cursor_t *cursor;
+    uint32_t codepoint = 0u;
+    bool greek = false;
+
+    if (!arg || (!expr_is_var(arg) && !expr_is_const(arg)) ||
+        !arg->name || !*arg->name)
+        return false;
+
+    name = arg->name[0] == '@' ? arg->name + 1 : arg->name;
+    name_text = string_new_with(name);
+    if (!name_text)
+        return false;
+    normalized = expr_normalise_greek_alias_text(name_text);
+    if (normalized) {
+        greek = true;
+        goto cleanup;
+    }
+
+    cursor = string_cursor_new(name_text);
+    if (cursor) {
+        codepoint = rune_value(string_cursor_peek(cursor));
+        string_cursor_next(cursor);
+        greek = string_cursor_done(cursor) &&
+                ((codepoint >= 0x0370u && codepoint <= 0x03ffu) ||
+                 (codepoint >= 0x1f00u && codepoint <= 0x1fffu));
+        string_cursor_free(cursor);
+    }
+
+cleanup:
+    string_free(normalized);
+    string_free(name_text);
+    return greek;
+}
+
 static const char *expr_unary_name(const expr_t *f)
 {
     if (!f || !f->ops)
@@ -2565,9 +2604,14 @@ void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec)
             }
         } else {
             sbuf_puts(b, name ? name : "\\operatorname{f}");
-            sbuf_putc(b, '(');
-            emit_tex_expr(f->a, b, 0);
-            sbuf_putc(b, ')');
+            if (tex_unary_arg_is_greek_symbol(f->a)) {
+                sbuf_putc(b, ' ');
+                emit_tex_expr(f->a, b, PREC_UNARY);
+            } else {
+                sbuf_putc(b, '(');
+                emit_tex_expr(f->a, b, 0);
+                sbuf_putc(b, ')');
+            }
         }
 
         if (need)
@@ -2633,9 +2677,14 @@ void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec)
             } else {
                 emit_tex_const_value(b, f);
             }
-            sbuf_puts(b, "}(");
-            emit_tex_expr(f->a->a, b, 0);
-            sbuf_putc(b, ')');
+            if (tex_unary_arg_is_greek_symbol(f->a->a)) {
+                sbuf_puts(b, "} ");
+                emit_tex_expr(f->a->a, b, PREC_UNARY);
+            } else {
+                sbuf_puts(b, "}(");
+                emit_tex_expr(f->a->a, b, 0);
+                sbuf_putc(b, ')');
+            }
         } else {
             int base_needs_parens = pow_base_needs_visible_parens(f->a);
 

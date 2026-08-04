@@ -289,6 +289,125 @@ static void test_diffequ_parses_ode_shorthand(void)
     de_free(de);
 }
 
+static void test_diffequ_parses_greek_differential_forms(void)
+{
+    const char *alias_source =
+        "(sin(@theta)-2r^2 cos^2(@theta))dr + "
+        "r cos(@theta)(2r sin(@theta)+1)d@theta = 0";
+    const char *plain_source =
+        "(sin(theta)-2r^2 cos^2(theta))dr + "
+        "r cos(theta)(2r sin(theta)+1)dtheta = 0";
+    diffequ_t *alias = de_from_string(alias_source);
+    diffequ_t *plain = de_from_string(plain_source);
+    diffequ_t *alpha = de_from_string(
+        "(alpha+y)dy + y dalpha = 0");
+    char *alias_text = alias
+        ? de_to_string(alias, style_EXPRESSION)
+        : NULL;
+    char *plain_text = plain
+        ? de_to_string(plain, style_EXPRESSION)
+        : NULL;
+    char *alias_tex = alias ? de_to_string(alias, style_TEX) : NULL;
+    char *plain_tex = plain ? de_to_string(plain, style_TEX) : NULL;
+    char *alpha_text = alpha
+        ? de_to_string(alpha, style_EXPRESSION)
+        : NULL;
+    diffequ_t *round_trip = alias_text
+        ? de_from_string(alias_text)
+        : NULL;
+    char *round_trip_tex = round_trip
+        ? de_to_string(round_trip, style_TEX)
+        : NULL;
+
+    EXPECT_POINTER("parsed @theta differential form", alias, true);
+    EXPECT_POINTER("parsed plain theta differential form", plain, true);
+    EXPECT_POINTER("parsed another plain Greek differential", alpha, true);
+    EXPECT_POINTER("Greek derivative text round-trips", round_trip, true);
+    EXPECT_LONG(
+        "@theta differential-form independent count",
+        (long)de_independent_count(alias),
+        1L);
+    EXPECT_LONG(
+        "plain theta differential-form independent count",
+        (long)de_independent_count(plain),
+        1L);
+    EXPECT_TEXT("Greek differential forms agree", plain_tex, alias_tex);
+    EXPECT_TEXT("Greek derivative round-trip agrees", round_trip_tex, alias_tex);
+    EXPECT_POINTER(
+        "@theta differential form displays Greek theta",
+        alias_text ? strstr(alias_text, "dθ") : NULL,
+        true);
+    EXPECT_POINTER(
+        "plain theta differential form displays Greek theta",
+        plain_text ? strstr(plain_text, "dθ") : NULL,
+        true);
+    EXPECT_POINTER(
+        "plain alpha differential form displays Greek alpha",
+        alpha_text ? strstr(alpha_text, "dα") : NULL,
+        true);
+    EXPECT_TEXT("Greek differential-form text agrees", plain_text, alias_text);
+
+    free(alpha_text);
+    free(round_trip_tex);
+    free(plain_tex);
+    free(alias_tex);
+    free(plain_text);
+    free(alias_text);
+    de_free(plain);
+    de_free(alias);
+    de_free(alpha);
+    de_free(round_trip);
+}
+
+static void test_diffequ_solves_exact_differential_form(void)
+{
+    const char *source =
+        "(sin(theta)-2r cos^2(theta))dr + "
+        "r cos(theta)(2r sin(theta)+1)dtheta = 0";
+    diffequ_t *de = de_from_string(source);
+    diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
+    const equation_t *positive_solution = result
+        ? de_solve_result_at(result, 0u)
+        : NULL;
+    const equation_t *negative_solution = result
+        ? de_solve_result_at(result, 1u)
+        : NULL;
+    string_t *positive_text = positive_solution
+        ? equ_to_text(positive_solution, style_UNBOUND)
+        : NULL;
+    string_t *negative_text = negative_solution
+        ? equ_to_text(negative_solution, style_UNBOUND)
+        : NULL;
+
+    EXPECT_POINTER("parsed exact differential form", de, true);
+    EXPECT_POINTER("exact differential-form result", result, true);
+    EXPECT_LONG(
+        "exact differential-form status",
+        result ? (long)de_solve_result_status(result) : -1L,
+        (long)DE_SOLVE_STATUS_SOLVED);
+    EXPECT_LONG(
+        "exact differential-form solver",
+        result ? (long)de_solve_result_solver(result) : -1L,
+        (long)DE_SOLVER_EXACT_FIRST_ORDER);
+    EXPECT_LONG(
+        "exact differential-form solution count",
+        result ? (long)de_solve_result_count(result) : -1L,
+        2L);
+    EXPECT_TEXT(
+        "exact differential-form positive branch",
+        positive_text ? string_c_str(positive_text) : NULL,
+        "r = (sin(θ) - √(sin²(θ) - C·cos²(θ)))/(2·cos²(θ))");
+    EXPECT_TEXT(
+        "exact differential-form negative branch",
+        negative_text ? string_c_str(negative_text) : NULL,
+        "r = (sin(θ) + √(sin²(θ) - C·cos²(θ)))/(2·cos²(θ))");
+
+    string_free(negative_text);
+    string_free(positive_text);
+    de_solve_result_free(result);
+    de_free(de);
+}
+
 static void test_diffequ_parses_and_solves_prime_ode_shorthand(void)
 {
     const char *source = "y'' + 4y = 0";
@@ -3117,6 +3236,8 @@ int tests_main(void)
     RUN_TEST_CASE(test_diffequ_parses_linear_ode_and_constant);
     RUN_TEST_CASE(test_diffequ_expression_text_round_trips);
     RUN_TEST_CASE(test_diffequ_parses_ode_shorthand);
+    RUN_TEST_CASE(test_diffequ_parses_greek_differential_forms);
+    RUN_TEST_CASE(test_diffequ_solves_exact_differential_form);
     RUN_TEST_CASE(test_diffequ_parses_and_solves_prime_ode_shorthand);
     RUN_TEST_CASE(test_diffequ_parses_subscript_partial_derivatives);
     RUN_TEST_CASE(test_diffequ_rejects_noncanonical_text);

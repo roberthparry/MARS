@@ -520,6 +520,17 @@ static int expr_string_all_ascii_upper(const string_t *text)
     return upper;
 }
 
+string_t *expr_normalise_greek_alias_text(const string_t *alias)
+{
+    const greek_entry_t *entry = lookup_greek_name_text(alias);
+
+    if (!entry)
+        return NULL;
+    return string_new_with(expr_string_all_ascii_upper(alias)
+                               ? entry->upper
+                               : entry->lower);
+}
+
 static string_t *expr_remove_at_runes_text(const string_t *text)
 {
     string_t *out;
