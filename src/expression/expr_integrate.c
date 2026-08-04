@@ -417,22 +417,53 @@ static void expr_integral_constant_unicode_name(char *out, size_t out_size,
     }
 }
 
+static bool expr_integration_constant_name_in_use(
+    const expr_t *expr,
+    const expr_t *wrt,
+    const expr_t *anti,
+    const char *name,
+    const char *unicode_name)
+{
+    return expr_tree_has_symbol_name(expr, name) ||
+           (unicode_name &&
+            expr_tree_has_symbol_name(expr, unicode_name)) ||
+           expr_tree_has_symbol_name(wrt, name) ||
+           (unicode_name &&
+            expr_tree_has_symbol_name(wrt, unicode_name)) ||
+           expr_tree_has_symbol_name(anti, name) ||
+           (unicode_name &&
+            expr_tree_has_symbol_name(anti, unicode_name));
+}
+
 expr_t *expr_new_integration_constant_internal(const expr_t *expr,
                                                const expr_t *wrt,
                                                const expr_t *anti)
 {
     char name[32];
     char unicode_name[32];
+    bool plain_in_use;
+    bool indexed_in_use = false;
 
-    for (unsigned int i = 0u; i < 1000u; ++i) {
+    plain_in_use = expr_integration_constant_name_in_use(
+        expr, wrt, anti, "C", NULL);
+    for (unsigned int i = 0u; !indexed_in_use && i < 1000u; ++i) {
+        expr_integral_constant_name(name, sizeof(name), i);
+        expr_integral_constant_unicode_name(
+            unicode_name, sizeof(unicode_name), i);
+        indexed_in_use = expr_integration_constant_name_in_use(
+            expr, wrt, anti, name, unicode_name);
+    }
+
+    if (!plain_in_use && !indexed_in_use)
+        return expr_new_named_const(NUM_NAN, "C");
+
+    for (unsigned int i = plain_in_use ? 1u : 0u;
+         i < 1000u;
+         ++i) {
         expr_integral_constant_name(name, sizeof(name), i);
         expr_integral_constant_unicode_name(unicode_name, sizeof(unicode_name), i);
-        if (!expr_tree_has_symbol_name(expr, name) &&
-            !expr_tree_has_symbol_name(expr, unicode_name) &&
-            !expr_tree_has_symbol_name(wrt, name) &&
-            !expr_tree_has_symbol_name(wrt, unicode_name) &&
-            !expr_tree_has_symbol_name(anti, unicode_name) &&
-            !expr_tree_has_symbol_name(anti, name)) {
+        if (!expr_integration_constant_name_in_use(
+                expr, wrt, anti, name, unicode_name)) {
             return expr_new_named_const(NUM_NAN, name);
         }
     }

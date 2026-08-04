@@ -658,6 +658,30 @@ class ExpressionResultTests(unittest.TestCase):
         )
         self.assertIn("lastEvaluationInputText = text;", mars_lab.INDEX_HTML)
 
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_indefinite_integral_uses_plain_constant(self) -> None:
+        completed = subprocess.run(
+            [
+                str(self.expression_binary),
+                "cos(2*x)/(sin(x)+cos(x))",
+                "x",
+                "72",
+                "integral",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        fields = mars_lab.parse_mars_lab_output(completed.stdout)
+
+        self.assertIn("sin(x) + cos(x) + C", fields["integral"])
+        self.assertNotIn("C₀", fields["integral"])
+        self.assertIn("+ C", fields["integral_tex"])
+        self.assertNotIn("C_{0}", fields["integral_tex"])
+
     def test_expression_binding_display_preserves_authored_constants(self) -> None:
         self.assertIn(
             "function bindingsWithAuthoredValues(bindings, sourceExpression) {",
