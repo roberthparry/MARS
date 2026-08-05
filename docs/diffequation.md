@@ -83,6 +83,32 @@ equivalent input aliases. In the Mars Lab, ordinary derivatives are displayed
 this way in both the rendered equation and the differential-equation card.
 The canonical expression form remains `Dx(y)`, `Dxx(y)`, and `Dxxx(y)`.
 
+Constant-coefficient polynomial differential operators can be applied to a
+dependent variable directly. MARS expands the operator before selecting the
+ordinary constant-coefficient solver. For example:
+
+```text
+input = (Dx^2 + 4Dx + 20)^2(y) = 0
+resolved = Dxxxx(y) + 8*Dxxx(y) + 56*Dxx(y) + 160*Dx(y) + 400*y = 0
+solution = y = exp(-2x)·(C₁·cos(4x) + C₂·sin(4x)
+                         + C₃x·cos(4x) + C₄x·sin(4x))
+```
+
+Here `Dx` denotes the differential operator with respect to `x`, rather than
+the already-applied formal derivative `Dx(y)`. Positive integer powers of a
+numeric polynomial operator are accepted; the independent variable is
+inferred from its operator suffix.
+
+The suffix may be omitted when the usual ODE convention is unambiguous. Bare
+`D` means `Dx` when it operates on `y`, and `Dt` when it operates on `x`:
+
+```text
+(D^2 + 4D + 20)^2(y) = 0  →  (Dx^2 + 4Dx + 20)^2(y) = 0
+(D^2 + 4D + 20)^2(x) = 0  →  (Dt^2 + 4Dt + 20)^2(x) = 0
+```
+
+An explicit suffix always takes precedence.
+
 Additive forcing terms are solved independently and then combined:
 
 ```text

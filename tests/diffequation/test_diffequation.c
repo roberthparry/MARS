@@ -2424,6 +2424,112 @@ static bool test_diffequ_expect_constant_linear_solution(
         test_diffequ_expect_constant_linear_solution( \
             (source), (expected), __FILE__, __LINE__))
 
+static void test_diffequ_resolves_polynomial_differential_operator(void)
+{
+    const char *source = "(Dx^2 + 4Dx + 20)^2(y) = 0";
+    const char *expected_problem =
+        "{ d⁴y/dx⁴ + 8*d³y/dx³ + 56*d²y/dx² + "
+        "160*dy/dx + 400*y = 0 | x = ?; ;  }";
+    const char *expected_solution =
+        "y = exp(-2x)·(C₁·cos(4x) + C₂·sin(4x) + "
+        "C₃x·cos(4x) + C₄x·sin(4x))";
+    diffequ_t *de = de_from_string(source);
+    char *problem = de ? de_to_string(de, style_EXPRESSION) : NULL;
+    diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
+    const equation_t *solution =
+        result ? de_solve_result_at(result, 0u) : NULL;
+    string_t *solution_text =
+        solution ? equ_to_text(solution, style_UNBOUND) : NULL;
+
+    printf("  polynomial differential operator\n"
+           "    input:    %s\n"
+           "    resolves: %s\n"
+           "    solution: %s\n",
+           source,
+           problem ? problem : "NULL",
+           solution_text ? string_c_str(solution_text) : "NULL");
+    EXPECT_TEXT("resolved differential equation", problem, expected_problem);
+    EXPECT_POINTER("operator solve result", result, true);
+    if (result) {
+        EXPECT_LONG(
+            "operator solve status",
+            (long)de_solve_result_status(result),
+            (long)DE_SOLVE_STATUS_SOLVED);
+        EXPECT_LONG(
+            "operator selected solver",
+            (long)de_solve_result_solver(result),
+            (long)DE_SOLVER_CONSTANT_COEFFICIENT_LINEAR);
+    }
+    EXPECT_TEXT(
+        "operator solution",
+        solution_text ? string_c_str(solution_text) : NULL,
+        expected_solution);
+
+    string_free(solution_text);
+    de_solve_result_free(result);
+    free(problem);
+    de_free(de);
+}
+
+static void test_diffequ_defaults_bare_differential_operator(void)
+{
+    static const struct {
+        const char *source;
+        const char *problem;
+        const char *solution;
+    } cases[] = {
+        {
+            "(D^2 + 4D + 20)^2(y) = 0",
+            "{ d⁴y/dx⁴ + 8*d³y/dx³ + 56*d²y/dx² + "
+            "160*dy/dx + 400*y = 0 | x = ?; ;  }",
+            "y = exp(-2x)·(C₁·cos(4x) + C₂·sin(4x) + "
+            "C₃x·cos(4x) + C₄x·sin(4x))",
+        },
+        {
+            "(D^2 + 4D + 20)^2(x) = 0",
+            "{ d⁴x/dt⁴ + 8*d³x/dt³ + 56*d²x/dt² + "
+            "160*dx/dt + 400*x = 0 | t = ?; ;  }",
+            "x = exp(-2t)·(C₁·cos(4t) + C₂·sin(4t) + "
+            "C₃t·cos(4t) + C₄t·sin(4t))",
+        },
+    };
+    bool valid = true;
+
+    for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+        diffequ_t *de = de_from_string(cases[i].source);
+        char *problem = de ? de_to_string(de, style_EXPRESSION) : NULL;
+        diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
+        const equation_t *solution =
+            result ? de_solve_result_at(result, 0u) : NULL;
+        string_t *solution_text =
+            solution ? equ_to_text(solution, style_UNBOUND) : NULL;
+        const char *actual_solution = solution_text
+            ? string_c_str(solution_text)
+            : NULL;
+        bool case_valid =
+            de && problem && strcmp(problem, cases[i].problem) == 0 &&
+            result &&
+            de_solve_result_status(result) == DE_SOLVE_STATUS_SOLVED &&
+            actual_solution &&
+            strcmp(actual_solution, cases[i].solution) == 0;
+
+        printf("  bare differential operator\n"
+               "    input:    %s\n"
+               "    resolves: %s\n"
+               "    solution: %s\n",
+               cases[i].source,
+               problem ? problem : "NULL",
+               actual_solution ? actual_solution : "NULL");
+        valid = valid && case_valid;
+
+        string_free(solution_text);
+        de_solve_result_free(result);
+        free(problem);
+        de_free(de);
+    }
+    ASSERT_TRUE(valid);
+}
+
 static void test_diffequ_general_solution_with_distinct_real_roots(void)
 {
     EXPECT_CONSTANT_LINEAR_SOLUTION(
@@ -3339,6 +3445,10 @@ int tests_main(void)
     RUN_TEST_CASE(test_diffequ_solves_repeated_complex_roots);
     RUN_TEST_CASE(
         test_diffequ_solves_degree_six_characteristic_polynomial);
+    RUN_TEST_CASE(
+        test_diffequ_resolves_polynomial_differential_operator);
+    RUN_TEST_CASE(
+        test_diffequ_defaults_bare_differential_operator);
     RUN_TEST_CASE(
         test_diffequ_general_solution_with_distinct_real_roots);
     RUN_TEST_CASE(
