@@ -3,8 +3,8 @@
 
 #include "matrix.h"
 
-#define MARS_SHARED_EQUATION_INTERNAL_ACCESS
-#include "internal/equation_internal.h"
+#define MARS_EQUATION_INTERNAL_ACCESS
+#include "equation/equation_internal.h"
 #define MARS_DIFFEQUATION_SOLVE_INTERNAL_ACCESS
 #include "diffequ_solve_internal.h"
 
@@ -416,13 +416,64 @@ cleanup:
     return rc;
 }
 
+static void de_characteristic_coefficients_free(number_t *coefficients,
+                                                size_t degree)
+{
+    if (!coefficients)
+        return;
+    for (size_t i = 0u; i <= degree; ++i)
+        num_destroy(&coefficients[i]);
+    free(coefficients);
+}
+
+static int de_solve_characteristic(
+    const equation_t *characteristic,
+    const expr_t *polynomial,
+    const expr_t *root_variable,
+    equation_solutions_t *roots)
+{
+    number_t *coefficients = NULL;
+    size_t degree = 0u;
+    int rc;
+
+    if (!characteristic || !polynomial || !root_variable || !roots ||
+        !equ_match_polynomial_alloc(
+            polynomial, root_variable, &coefficients, &degree))
+        return -1;
+
+    switch (degree) {
+        case 2u:
+            rc = equ_solve_quadratic_coefficients(
+                coefficients, root_variable, roots);
+            break;
+
+        case 3u:
+            rc = equ_solve_cubic_coefficients(
+                coefficients, root_variable, roots);
+            break;
+
+        case 4u:
+            rc = equ_solve_quartic_coefficients(
+                coefficients, root_variable, roots);
+            break;
+
+        default:
+            rc = equ_solve_for_into(
+                characteristic, root_variable, roots);
+            break;
+    }
+
+    de_characteristic_coefficients_free(coefficients, degree);
+    return rc;
+}
+
 static int de_construct_basis(
     const de_constant_linear_form_t *form,
     const expr_t *independent,
     de_basis_t *basis)
 {
     expr_t *root_variable =
-        expr_new_named_var(NUM_ZERO, "r");
+        expr_new_named_var(NUM_NAN, "r");
     expr_t *polynomial = root_variable
         ? de_characteristic_polynomial(form, root_variable)
         : NULL;
@@ -436,8 +487,8 @@ static int de_construct_basis(
     int rc = -1;
 
     if (!roots ||
-        equ_solve_for_into(
-            characteristic, root_variable, roots) != 0 ||
+        de_solve_characteristic(
+            characteristic, polynomial, root_variable, roots) != 0 ||
         equ_solutions_count(roots) == 0u)
         goto cleanup;
 

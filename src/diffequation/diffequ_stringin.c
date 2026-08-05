@@ -682,6 +682,361 @@ static bool de_derivative_prefix(const char *text,
 }
 
 static size_t de_matching_paren(const char *text, size_t open);
+static void de_skip_ascii_space(const char *text, size_t *position);
+
+static bool de_operator_coordinate(const char *text,
+                                   size_t position,
+                                   size_t limit,
+                                   size_t *end_out,
+                                   char **coordinate_out)
+{
+    size_t coordinate_start;
+    size_t coordinate_length;
+    size_t end;
+
+    if (!text || position >= limit || text[position] != 'D')
+        return false;
+    if (position > 0u &&
+        (isalpha((unsigned char)text[position - 1u]) ||
+         text[position - 1u] == '_' ||
+         (unsigned char)text[position - 1u] >= 0x80u))
+        return false;
+
+    coordinate_start = position + 1u;
+    if (coordinate_start >= limit)
+        return false;
+    if (islower((unsigned char)text[coordinate_start]))
+        coordinate_length = 1u;
+    else if ((unsigned char)text[coordinate_start] >= 0x80u)
+        coordinate_length = de_utf8_character_length(
+            text + coordinate_start);
+    else
+        return false;
+    if (coordinate_length == 0u ||
+        coordinate_start + coordinate_length > limit)
+        return false;
+
+    end = coordinate_start + coordinate_length;
+    if (end < limit &&
+        (isalnum((unsigned char)text[end]) || text[end] == '_' ||
+         (unsigned char)text[end] >= 0x80u))
+        return false;
+
+    if (end_out)
+        *end_out = end;
+    if (coordinate_out) {
+        *coordinate_out = de_trimmed_copy(
+            text + coordinate_start, coordinate_length);
+        if (!*coordinate_out)
+            return false;
+    }
+    return true;
+}
+
+static bool de_bare_operator_token(const char *text,
+                                   size_t position,
+                                   size_t limit)
+{
+    size_t end = position + 1u;
+
+    if (!text || position >= limit || text[position] != 'D')
+        return false;
+    if (position > 0u &&
+        (isalpha((unsigned char)text[position - 1u]) ||
+         text[position - 1u] == '_' ||
+         (unsigned char)text[position - 1u] >= 0x80u))
+        return false;
+    return end == limit ||
+        !(isalnum((unsigned char)text[end]) || text[end] == '_' ||
+          (unsigned char)text[end] >= 0x80u);
+}
+
+static char *de_operator_polynomial_text(const char *text,
+                                         size_t length,
+                                         char **coordinate_out)
+{
+    string_t *out = string_new();
+    char *coordinate = NULL;
+    char *result = NULL;
+    size_t cursor = 0u;
+    bool found = false;
+
+    if (!out)
+        return NULL;
+    while (cursor < length) {
+        size_t end;
+        char *candidate = NULL;
+
+        if (text[cursor] == 'D' &&
+            de_operator_coordinate(
+                text, cursor, length, &end, &candidate)) {
+            if (coordinate && strcmp(coordinate, candidate) != 0) {
+                free(candidate);
+                goto cleanup;
+            }
+            if (!coordinate) {
+                coordinate = candidate;
+                candidate = NULL;
+            }
+            free(candidate);
+            if (string_append_cstr(out, "[operator]") != 0)
+                goto cleanup;
+            cursor = end;
+            found = true;
+            continue;
+        }
+        if (de_bare_operator_token(text, cursor, length)) {
+            if (string_append_cstr(out, "[operator]") != 0)
+                goto cleanup;
+            cursor++;
+            found = true;
+            continue;
+        }
+        if (de_append_next_utf8_character(out, text, &cursor) != 0)
+            goto cleanup;
+    }
+    if (found)
+        result = strdup(string_c_str(out));
+    if (result && coordinate_out) {
+        *coordinate_out = coordinate;
+        coordinate = NULL;
+    }
+
+cleanup:
+    free(coordinate);
+    string_free(out);
+    return result;
+}
+
+static void de_operator_coefficients_free(number_t *coefficients,
+                                          size_t degree)
+{
+    if (!coefficients)
+        return;
+    for (size_t i = 0u; i <= degree; ++i)
+        num_destroy(&coefficients[i]);
+    free(coefficients);
+}
+
+static char *de_operator_expansion_text(const number_t *coefficients,
+                                        size_t degree,
+                                        const char *coordinate,
+                                        const char *dependent)
+{
+    string_t *out = string_new();
+    bool first = true;
+    char *result = NULL;
+
+    if (!out || !coefficients || !coordinate || !dependent)
+        goto cleanup;
+    for (size_t order = degree + 1u; order > 0u; --order) {
+        size_t derivative_order = order - 1u;
+        int sign = num_sign(coefficients[derivative_order]);
+        number_t magnitude;
+        string_t *coefficient_text;
+        bool unit;
+
+        if (sign == 0)
+            continue;
+        magnitude = num_abs(coefficients[derivative_order]);
+        coefficient_text = num_to_string(magnitude);
+        unit = num_eq(magnitude, NUM_ONE);
+        num_destroy(&magnitude);
+        if (!coefficient_text)
+            goto cleanup;
+
+        if (first) {
+            if (sign < 0 && string_append_char(out, '-') != 0) {
+                string_free(coefficient_text);
+                goto cleanup;
+            }
+        } else if (string_append_cstr(
+                       out, sign < 0 ? " - " : " + ") != 0) {
+            string_free(coefficient_text);
+            goto cleanup;
+        }
+
+        if (derivative_order == 0u) {
+            if ((!unit &&
+                 (string_append_cstr(out, string_c_str(coefficient_text)) != 0 ||
+                  string_append_char(out, '*') != 0)) ||
+                string_append_cstr(out, dependent) != 0) {
+                string_free(coefficient_text);
+                goto cleanup;
+            }
+        } else {
+            if (!unit &&
+                (string_append_cstr(out, string_c_str(coefficient_text)) != 0 ||
+                 string_append_char(out, '*') != 0)) {
+                string_free(coefficient_text);
+                goto cleanup;
+            }
+            if (string_append_char(out, 'D') != 0) {
+                string_free(coefficient_text);
+                goto cleanup;
+            }
+            for (size_t i = 0u; i < derivative_order; ++i) {
+                if (string_append_cstr(out, coordinate) != 0) {
+                    string_free(coefficient_text);
+                    goto cleanup;
+                }
+            }
+            if (string_append_char(out, '(') != 0 ||
+                string_append_cstr(out, dependent) != 0 ||
+                string_append_char(out, ')') != 0) {
+                string_free(coefficient_text);
+                goto cleanup;
+            }
+        }
+        string_free(coefficient_text);
+        first = false;
+    }
+    if (first && string_append_char(out, '0') != 0)
+        goto cleanup;
+    result = strdup(string_c_str(out));
+
+cleanup:
+    string_free(out);
+    return result;
+}
+
+static char *de_try_polynomial_differential_operator(
+    const char *text,
+    size_t open,
+    size_t *end_out)
+{
+    size_t operator_close;
+    size_t cursor;
+    size_t exponent = 1u;
+    size_t application_close;
+    char *operator_text = NULL;
+    char *coordinate = NULL;
+    char *dependent = NULL;
+    string_t *powered_text = NULL;
+    expr_bindings_t *bindings = NULL;
+    expr_t *polynomial = NULL;
+    expr_t *operator_variable;
+    number_t *coefficients = NULL;
+    size_t degree = 0u;
+    char *result = NULL;
+
+    operator_close = de_matching_paren(text, open);
+    if (operator_close == SIZE_MAX)
+        return NULL;
+    operator_text = de_operator_polynomial_text(
+        text + open + 1u,
+        operator_close - open - 1u,
+        &coordinate);
+    if (!operator_text)
+        goto cleanup;
+
+    cursor = operator_close + 1u;
+    de_skip_ascii_space(text, &cursor);
+    if (text[cursor] == '^') {
+        size_t value = 0u;
+        bool found = false;
+
+        cursor++;
+        de_skip_ascii_space(text, &cursor);
+        while (isdigit((unsigned char)text[cursor])) {
+            unsigned int digit = (unsigned int)(text[cursor] - '0');
+
+            if (value > (SIZE_MAX - digit) / 10u)
+                goto cleanup;
+            value = value * 10u + digit;
+            cursor++;
+            found = true;
+        }
+        if (!found || value == 0u || value > 64u)
+            goto cleanup;
+        exponent = value;
+        de_skip_ascii_space(text, &cursor);
+    }
+    if (text[cursor] != '(')
+        goto cleanup;
+    application_close = de_matching_paren(text, cursor);
+    if (application_close == SIZE_MAX)
+        goto cleanup;
+    dependent = de_trimmed_copy(
+        text + cursor + 1u, application_close - cursor - 1u);
+    if (!dependent || !*dependent)
+        goto cleanup;
+    if (!coordinate) {
+        coordinate = strdup(strcmp(dependent, "x") == 0 ? "t" : "x");
+        if (!coordinate)
+            goto cleanup;
+    }
+
+    powered_text = string_sprintf("(%s)^%zu", operator_text, exponent);
+    polynomial = powered_text
+        ? expr_from_string(string_c_str(powered_text), &bindings)
+        : NULL;
+    operator_variable = bindings
+        ? expr_bindings_get(bindings, "operator")
+        : NULL;
+    if (!polynomial || !operator_variable ||
+        expr_bindings_count(bindings) != 1u ||
+        !equ_match_polynomial_alloc(
+            polynomial, operator_variable, &coefficients, &degree) ||
+        !equ_polynomial_coefficients_real(coefficients, degree) ||
+        degree > 128u)
+        goto cleanup;
+
+    result = de_operator_expansion_text(
+        coefficients, degree, coordinate, dependent);
+    if (result && end_out)
+        *end_out = application_close + 1u;
+
+cleanup:
+    de_operator_coefficients_free(coefficients, degree);
+    expr_free(polynomial);
+    expr_bindings_free(bindings);
+    string_free(powered_text);
+    free(dependent);
+    free(coordinate);
+    free(operator_text);
+    return result;
+}
+
+static char *de_normalize_polynomial_differential_operators(
+    const char *text)
+{
+    string_t *out;
+    size_t cursor = 0u;
+    char *result;
+
+    if (!text)
+        return NULL;
+    out = string_new();
+    if (!out)
+        return NULL;
+    while (text[cursor]) {
+        size_t end = cursor;
+        char *expanded = text[cursor] == '('
+            ? de_try_polynomial_differential_operator(
+                  text, cursor, &end)
+            : NULL;
+
+        if (expanded) {
+            if (string_append_cstr(out, expanded) != 0) {
+                free(expanded);
+                goto fail;
+            }
+            free(expanded);
+            cursor = end;
+            continue;
+        }
+        if (de_append_next_utf8_character(out, text, &cursor) != 0)
+            goto fail;
+    }
+    result = strdup(string_c_str(out));
+    string_free(out);
+    return result;
+
+fail:
+    string_free(out);
+    return NULL;
+}
 
 static bool de_name_list_contains(const string_t *names,
                                   const char *name,
@@ -2438,6 +2793,7 @@ diffequ_t *de_from_string(const char *text)
     char *normalized_form = NULL;
     char *normalized_totals = NULL;
     char *normalized_partials = NULL;
+    char *normalized_operators = NULL;
     char *expanded = NULL;
     char *first_wrt = NULL;
     char *normalized_subscripts = NULL;
@@ -2477,9 +2833,14 @@ diffequ_t *de_from_string(const char *text)
         de_normalize_unicode_partial_derivatives(normalized_totals);
     free(normalized_totals);
     normalized_totals = NULL;
-    expanded = de_expand_shorthand(normalized_partials);
+    normalized_operators =
+        de_normalize_polynomial_differential_operators(
+            normalized_partials);
     free(normalized_partials);
     normalized_partials = NULL;
+    expanded = de_expand_shorthand(normalized_operators);
+    free(normalized_operators);
+    normalized_operators = NULL;
     if (!expanded) {
         free(source_form_equation);
         return NULL;
@@ -2607,6 +2968,7 @@ diffequ_t *de_from_string(const char *text)
 
 cleanup:
     free(source_form_equation);
+    free(normalized_operators);
     free(normalized_conditions);
     free(normalized_subscripts);
     free(normalized_equation);

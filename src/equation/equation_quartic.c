@@ -16,7 +16,7 @@ enum {
     EQU_QUARTIC_DEGREE = 4u,
     EQU_QUARTIC_COEFF_COUNT = EQU_QUARTIC_DEGREE + 1u,
     EQU_QUARTIC_NEWTON_SEEDS = 37u,
-    EQU_QUARTIC_NEWTON_ITERATIONS = 256u
+    EQU_QUARTIC_NEWTON_ITERATIONS = 1024u
 };
 
 static void equ_quartic_init_numbers(number_t *values, size_t count)
