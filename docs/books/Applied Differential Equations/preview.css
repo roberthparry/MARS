@@ -1,3 +1,23 @@
+/* Keep the book's displayed mathematics aligned with the surrounding prose.
+ * The stylesheet is loaded for every Markdown preview, so scope the rule to
+ * the identifying anchors in this book rather than changing other documents. */
+.markdown-body:is(
+    :has(a#linearisation-of-non-linear-differential-equations),
+    :has(a#lie-theory-of-extended-group),
+    :has(a#linear-second-order-odes)
+) .katex-display {
+    padding-left: 1.5rem;
+    text-align: left;
+}
+
+.markdown-body:is(
+    :has(a#linearisation-of-non-linear-differential-equations),
+    :has(a#lie-theory-of-extended-group),
+    :has(a#linear-second-order-odes)
+) .katex-display > .katex {
+    text-align: left;
+}
+
 /* Keep the free-particle generator equations with their surrounding list item. */
 .markdown-body div[data-aligned-equations="generator-definitions"] {
     width: max-content;
