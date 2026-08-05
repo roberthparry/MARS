@@ -11,9 +11,10 @@
 The module supports construction, parsing, inspection, formatting, and
 symbolic solvers for first-order separable, linear, homogeneous, affine and
 linear-coordinate substitutions, and quadratic Bernoulli ODEs. Second-order
-linear equations are normalized to self-adjoint Sturm–Liouville form, with
+linear equations are normalised to self-adjoint Sturm–Liouville form, with
 closed-form solutions for constant coefficients and affine Riccati
-factorizations.
+factorisations. Selected modified-Emden equations are point-linearised and
+reported with their identified `SL(3, ℝ)` symmetry group.
 Constant-coefficient linear ODEs of arbitrary order are solved through their
 characteristic polynomial and variation of parameters.
 The first PDE solver handles two-variable, constant-coefficient homogeneous
@@ -35,6 +36,9 @@ transport equations with explicit axis-aligned boundary data.
   `de_solve_result_free(...)`.
 - Equations returned by `de_solve_result_at(...)` are borrowed from the solve
   result.
+- Text returned by `de_solve_result_diagnostic(...)`,
+  `de_solve_result_steps(...)`, `de_solve_result_steps_tex(...)`, and
+  `de_solve_result_symmetry(...)` is borrowed from the solve result.
 
 The public declarations are in:
 
@@ -59,7 +63,7 @@ Dxx(y) = y; y(0) = 1; y'(0) = 1
 
 Here `Dxx(y)` identifies `x` as the independent variable. The remaining
 semicolon-separated equations are conditions. Prime notation in a condition
-is normalized to the formal derivative notation used internally:
+is normalised to the formal derivative notation used internally:
 
 ```text
 y'(0) = 1  →  Dx(y)(0) = 1
@@ -96,7 +100,7 @@ produce multiple implicit branches and a singular solution:
 → y = 0
 ```
 
-Exact third-order nonlinear forms can be integrated once and linearized. For
+Exact third-order nonlinear forms can be integrated once and linearised. For
 example,
 
 ```text
@@ -117,17 +121,58 @@ not introduce nonstandard special-function names. The independent constants
 `C₁`, `C₂`, and `C₃` provide the three arbitrary constants required by the
 original third-order equation.
 
-The modified Emden equation is linearized by a logarithmic derivative:
+The modified Emden equation is linearised by a logarithmic derivative. This
+example keeps the original input alongside the reported solver, symmetry, and
+solution:
 
 ```text
-y'' + 3y*y' + y^3 = 0
-→ y = (2x + C₁)/(x² + C₁x + C₂)
+input = y'' + 3y*y' + y^3 = 0
+solver = linear transformation
+symmetry = SL(3, ℝ)
+solution = y = (2x + C₁)/(x² + C₁x + C₂)
 ```
 
 Setting `y = u'/u` changes the left side into `u'''/u`. Thus `u''' = 0`,
 so `u` is quadratic and `y` is its logarithmic derivative. Equivalently, the
 point transformation from the linearisation notes,
-`X = -x²/2 + x/y` and `Y = x - 1/y`, reduces the equation to `Y'' = 0`.
+`X = x - 1/y` and `Y = x/y - x²/2`, reduces the equation to
+`d²Y/dX² = 0`.
+
+The scaled family is recognised separately:
+
+```text
+input = y'' + 6*y*y' + 4*y^3 = 0
+solver = linear transformation
+symmetry = SL(3, ℝ)
+solution = y = (x + C₁)/(x² + 2C₁x + 2C₂)
+```
+
+## Lie-Symmetry Metadata
+
+`de_solve_result_symmetry(...)` returns the borrowed UTF-8 name of a symmetry
+group identified by the selected solver. It currently returns `SL(3, ℝ)`
+for the two modified-Emden inputs shown above and `NULL` when the solver has
+not identified a group. The TeX derivation available through
+`de_solve_result_steps_tex(...)` renders the same group as
+`\mathrm{SL}(3,\mathrm R)`.
+
+This metadata is deliberately narrower than a general Lie-symmetry solver.
+The current implementation recognises these equation families and their known
+point transformations; it does not yet derive infinitesimal generators,
+prolongations, determining PDEs, Lie brackets, or structure constants for an
+arbitrary differential equation.
+
+A related rejected form retains its input and reports the applicable
+Lie–Tressé diagnostic:
+
+```text
+input = y'' + 3*y*y' + y^4 = 0
+status = unsupported
+reason = the Lie–Tressé invariant 36y(1 − 2y) is not identically zero
+```
+
+This is a recognised diagnostic for that specific family, not a general
+symbolic computation of Lie–Tressé invariants.
 
 When `x` is the dependent variable, prime notation defaults to differentiation
 with respect to time so that the two variables do not collide:
@@ -142,7 +187,7 @@ x'' + x = 0
 
 The **Differential Equation** tab accepts the same shorthand. Evaluation is a
 thin-client call to the native `diffequation` module: the Lab displays the
-normalized problem, selected solver family, diagnostic, and every symbolic
+normalised problem, selected solver family, diagnostic, and every symbolic
 solution returned by `de_solve(...)`. **Use as input** restores the original
 problem, including its initial or boundary conditions.
 
@@ -279,7 +324,7 @@ eventually annihilate the polynomial, so
 is evaluated as a finite derivative series. This avoids introducing an
 unevaluated characteristic integral for an elementary polynomial solution.
 For trigonometric, hyperbolic, and exponential forcing, Mars instead
-recognizes a function space closed under the full directional derivative
+recognises a function space closed under the full directional derivative
 `D = a*Dx + b*Dy`. If `D^2*f = lambda*f`, it solves the transport equation
 algebraically and verifies the result against the original operator. This
 works whether the phase uses one coordinate or a mixture such as `x+y`, and
@@ -441,9 +486,11 @@ The current symbolic scope is:
 - quadratic Bernoulli equations, reduced with `v = 1/y` and then solved as
   linear equations; and
 - exact third-order forms `a*y''' + k*y'*y'' = f(x)`, integrated once and
-  linearized with `u = exp(k*y/(2a))`; and
-- regular second-order linear equations, normalized to Sturm–Liouville form,
-  including affine Riccati factorizations with `erf` bases;
+  linearised with `u = exp(k*y/(2a))`; and
+- selected modified-Emden equations, point-linearised to the free-particle
+  equation and annotated with `SL(3, ℝ)` symmetry metadata; and
+- regular second-order linear equations, normalised to Sturm–Liouville form,
+  including affine Riccati factorisations with `erf` bases;
   and
 - arbitrary-order constant-coefficient linear ODEs, including repeated and
   complex roots and nonhomogeneous forcing; and
@@ -645,12 +692,12 @@ With `p = μ*A`, the equation becomes the self-adjoint relation
 (p(x)*Dx(y))' + μ(x)*C(x)*y = μ(x)*R(x).
 ```
 
-This Sturm–Liouville normalization is valid on intervals where `A(x) != 0`.
+This Sturm–Liouville normalisation is valid on intervals where `A(x) != 0`.
 It is a canonical representation, not a promise that arbitrary coefficient
 functions possess an elementary closed-form basis.
 
-For a homogeneous equation in normal form, the solver recognizes the affine
-Riccati factorization
+For a homogeneous equation in normal form, the solver recognises the affine
+Riccati factorisation
 
 ```text
 y'' - (alpha(x)^2 + alpha'(x))*y = 0,
@@ -709,11 +756,11 @@ Dxx(y) + y = 0; y(0) = 0; y'(0) = 1
 → y = sin(x)
 ```
 
-If a variable-coefficient equation is successfully normalized but the
+If a variable-coefficient equation is successfully normalised but the
 module cannot yet construct its fundamental solution basis, `de_solve(...)`
 returns `DE_SOLVE_STATUS_UNSUPPORTED`. Boundary-value spectra,
 nonhomogeneous variation of parameters, and special-function bases are the
-next layers rather than being guessed from the normalized form.
+next layers rather than being guessed from the normalised form.
 
 ## Arbitrary-Order Constant-Coefficient Equations
 
@@ -845,4 +892,50 @@ int main(void)
 input = Dx(y) = x*y; y(0) = 1
 problem = { dy/dx = x*y | x = ?; ; y(0) = 1 }
 solution = y = exp(½x²)
+```
+
+## Example: Linearising a Lie-Symmetric ODE
+
+This example keeps the original input visible while exercising the recognised
+modified-Emden path. MARS identifies the `SL(3, ℝ)` symmetry, reports the
+known point transformation, and solves the equivalent free-particle
+linearisation.
+
+```c
+#include <stdio.h>
+
+#include "diffequation.h"
+
+int main(void)
+{
+    const char *source = "y'' + 3*y*y' + y^3 = 0";
+    diffequ_t *ode = de_from_string(source);
+    diffequ_solve_result_t *result = de_solve(ode);
+    const equation_t *solution = de_solve_result_at(result, 0);
+    const char *symmetry = de_solve_result_symmetry(result);
+    const char *steps = de_solve_result_steps(result);
+    string_t *solution_text = equ_to_text(solution, style_UNBOUND);
+
+    printf("input = %s\n", source);
+    printf("symmetry = %s\n", symmetry);
+    printf("linearisation:\n%s\n", steps);
+    printf("solution = %s\n", string_c_str(solution_text));
+
+    string_free(solution_text);
+    de_solve_result_free(result);
+    de_free(ode);
+    return 0;
+}
+```
+
+```text
+input = y'' + 3*y*y' + y^3 = 0
+symmetry = SL(3, ℝ)
+linearisation:
+Linearising point transformation:
+      X = x − 1/y
+      Y = x/y − x²/2
+Transformed ODE:
+      d²Y/dX² = 0
+solution = y = (2x + C₁)/(x² + C₁x + C₂)
 ```

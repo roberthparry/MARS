@@ -3191,7 +3191,7 @@ static void test_diffequ_solves_parameter_linear_pde(void)
 }
 
 /*
- * Keep this example synchronized with docs/diffequation.md.
+ * Keep this example synchronised with docs/diffequation.md.
  */
 static void example_diffequation_solving_an_ode(void)
 {
@@ -3223,6 +3223,57 @@ static void example_diffequation_solving_an_ode(void)
 
     string_free(solution_text);
     free(problem_text);
+    de_solve_result_free(result);
+    de_free(ode);
+    ASSERT_TRUE(valid);
+}
+
+/*
+ * Keep this example synchronised with docs/diffequation.md.
+ */
+static void example_diffequation_linearising_a_lie_symmetric_ode(void)
+{
+    const char *source = "y'' + 3*y*y' + y^3 = 0";
+    const char *expected_symmetry = "SL(3, ℝ)";
+    const char *expected_steps =
+        "Linearising point transformation:\n"
+        "      X = x − 1/y\n"
+        "      Y = x/y − x²/2\n"
+        "Transformed ODE:\n"
+        "      d²Y/dX² = 0";
+    const char *expected_solution =
+        "y = (2x + C₁)/(x² + C₁x + C₂)";
+    diffequ_t *ode = de_from_string(source);
+    diffequ_solve_result_t *result = ode ? de_solve(ode) : NULL;
+    const equation_t *solution =
+        result ? de_solve_result_at(result, 0u) : NULL;
+    const char *symmetry =
+        result ? de_solve_result_symmetry(result) : NULL;
+    const char *steps = result ? de_solve_result_steps(result) : NULL;
+    string_t *solution_text =
+        solution ? equ_to_text(solution, style_UNBOUND) : NULL;
+    bool valid =
+        ode &&
+        result &&
+        de_solve_result_status(result) == DE_SOLVE_STATUS_SOLVED &&
+        de_solve_result_solver(result) ==
+            DE_SOLVER_LINEAR_TRANSFORMATION &&
+        de_solve_result_count(result) == 1u &&
+        symmetry &&
+        strcmp(symmetry, expected_symmetry) == 0 &&
+        steps &&
+        strcmp(steps, expected_steps) == 0 &&
+        solution_text &&
+        strcmp(string_c_str(solution_text), expected_solution) == 0;
+
+    printf("input = %s\n", source);
+    printf("symmetry = %s\n", symmetry ? symmetry : "NULL");
+    printf("linearisation:\n%s\n", steps ? steps : "NULL");
+    printf(
+        "solution = %s\n",
+        solution_text ? string_c_str(solution_text) : "NULL");
+
+    string_free(solution_text);
     de_solve_result_free(result);
     de_free(ode);
     ASSERT_TRUE(valid);
@@ -3371,6 +3422,10 @@ int tests_main(void)
         example_diffequation_solving_an_ode,
         readme_examples,
         "diffequation,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(
+        example_diffequation_linearising_a_lie_symmetric_ode,
+        readme_examples,
+        "diffequation,readme,output,lie-symmetry");
 
     return TESTS_EXIT_CODE();
 }

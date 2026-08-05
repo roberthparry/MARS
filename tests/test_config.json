@@ -170,6 +170,7 @@
   "tests/diffequation/test_diffequation.c": {
     "readme_examples": {
       "enabled": true,
+      "example_diffequation_linearising_a_lie_symmetric_ode": true,
       "example_diffequation_solving_an_ode": true
     },
     "test_diffequ_applies_affine_factorized_initial_conditions": true,
