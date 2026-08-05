@@ -11,6 +11,25 @@ sys.path.insert(0, str(ROOT / "tools"))
 import mars_lab
 
 
+class MobileAccessTests(unittest.TestCase):
+    def test_wildcard_listener_prefers_private_tailscale_url(self) -> None:
+        with (
+            mock.patch.object(mars_lab, "tailscale_funnel_enabled", return_value=False),
+            mock.patch.object(mars_lab, "tailscale_ipv4", return_value="100.64.0.7"),
+            mock.patch.object(
+                mars_lab,
+                "tailscale_https_host",
+                return_value="ophelia.example.ts.net",
+            ),
+            mock.patch.object(mars_lab, "local_mdns_host", return_value="ophelia.local"),
+        ):
+            details = mars_lab.mobile_access_details("::", 8765)
+
+        self.assertEqual(details["url"], "https://ophelia.example.ts.net/")
+        self.assertEqual(details["title"], "Tailscale access")
+        self.assertTrue(details["tailscale"])
+
+
 class EquationResultTests(unittest.TestCase):
     def test_use_as_input_reads_the_equation_card(self) -> None:
         self.assertIn(

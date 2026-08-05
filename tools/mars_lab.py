@@ -11388,6 +11388,21 @@ def mobile_access_details(bind_host: str, port: int, host_header: str = "",
 
     bind_host = bind_host.strip()
     if bind_host in ("0.0.0.0", "::", "::0"):
+        tailscale_ip = tailscale_ipv4()
+        if tailscale_ip:
+            tailscale_host = tailscale_https_host()
+            scheme = "https" if tailscale_host else "http"
+            tailscale_host = tailscale_host or tailscale_magicdns_host() or tailscale_ip
+            url_port = "" if scheme == "https" else f":{port}"
+            return {
+                "url": f"{scheme}://{tailscale_host}{url_port}/",
+                "title": "Tailscale access",
+                "hint": "Scan from a device connected to Tailscale.",
+                "funnel": funnel,
+                "tailscale": True,
+                "control": control_allowed,
+            }
+
         lan_host = local_mdns_host() or local_lan_ipv4()
         if lan_host:
             return {
@@ -11397,20 +11412,6 @@ def mobile_access_details(bind_host: str, port: int, host_header: str = "",
                 "funnel": False,
                 "tailscale": False,
                 "control": False,
-            }
-        bind_host = tailscale_ipv4()
-        if bind_host:
-            tailscale_host = tailscale_https_host()
-            scheme = "https" if tailscale_host else "http"
-            tailscale_host = tailscale_host or tailscale_magicdns_host() or bind_host
-            url_port = "" if scheme == "https" else f":{port}"
-            return {
-                "url": f"{scheme}://{tailscale_host}{url_port}/",
-                "title": "Tailscale access",
-                "hint": "Scan from a device connected to Tailscale.",
-                "funnel": funnel,
-                "tailscale": True,
-                "control": control_allowed,
             }
 
     if _is_loopback_or_wildcard_host(bind_host):

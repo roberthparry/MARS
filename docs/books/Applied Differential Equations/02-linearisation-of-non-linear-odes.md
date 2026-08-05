@@ -67,7 +67,7 @@ $$
 [G_i,G_j]=C_{ijk}G_k
 $$
 
-where the Cᵢⱼₖ are constants (called structure constants)
+where the $C_{ijk}$ are constants (called structure constants)
 and $[\ ,\ ]$ is a skew symmetric operator
 
 $$
