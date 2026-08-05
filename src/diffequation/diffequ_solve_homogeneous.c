@@ -1013,7 +1013,7 @@ static expr_t *de_homogeneous_constant(
     expr_t *integral_at_point = NULL;
     expr_t *log_point = NULL;
     expr_t *constant = NULL;
-    number_t ratio_value = num_new();
+    number_t ratio_value;
 
     if (!de_find_initial_condition(
             de, dependent, &point, &value))
@@ -1021,6 +1021,7 @@ static expr_t *de_homogeneous_constant(
     if (expr_is_exact_zero(point))
         return NULL;
 
+    ratio_value = num_new();
     ratio_at_point = expr_div_simplify_owned(
         expr_clone(value), expr_clone(point));
     if (ratio_at_point &&

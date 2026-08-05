@@ -74,11 +74,11 @@ int mat_qr_factor(const matrix_t *A, mat_qr_factor_t *out)
     }
 
     for (size_t i = 0; i < z_count; ++i)
-        Z[i] = num_new();
+        Z[i] = NUM_ZERO;
     for (size_t i = 0; i < q_count; ++i)
-        Qn[i] = num_new();
+        Qn[i] = NUM_ZERO;
     for (size_t i = 0; i < r_count; ++i)
-        Rn[i] = num_new();
+        Rn[i] = NUM_ZERO;
 
     for (size_t i = 0; i < m; ++i)
         for (size_t j = 0; j < n; ++j)
@@ -101,12 +101,12 @@ int mat_qr_factor(const matrix_t *A, mat_qr_factor_t *out)
         }
 
         for (size_t r = 0; r < m; ++r)
-            v[r] = num_new();
+            v[r] = NUM_ZERO;
         for (size_t r = 0; r < m; r++)
             v[r] = num_clone(Z[r * n + j]);
 
         for (size_t i = 0; i < imax; i++) {
-            number_t rij = num_new();
+            number_t rij = NUM_ZERO;
             for (size_t r = 0; r < m; r++) {
                 NUM_SCOPE(iter_scope);
                 number_t qri_conj = num_conj(Qn[r * kdim + i]);
@@ -128,7 +128,7 @@ int mat_qr_factor(const matrix_t *A, mat_qr_factor_t *out)
         }
 
         if (j < kdim) {
-            number_t norm2 = num_new();
+            number_t norm2 = NUM_ZERO;
             for (size_t r = 0; r < m; r++) {
                 NUM_SCOPE(iter_scope);
                 number_t abs_vr = num_abs(v[r]);
@@ -141,10 +141,10 @@ int mat_qr_factor(const matrix_t *A, mat_qr_factor_t *out)
             double norm2_d = num_to_double(norm2);
             if (norm2_d < 1e-300) {
                 num_destroy(&Rn[j * n + j]);
-                Rn[j * n + j] = num_new();
+                Rn[j * n + j] = NUM_ZERO;
                 for (size_t r = 0; r < m; r++) {
                     num_destroy(&Qn[r * kdim + j]);
-                    Qn[r * kdim + j] = num_new();
+                    Qn[r * kdim + j] = NUM_ZERO;
                 }
             } else {
                 number_t rjj = num_sqrt(norm2);
@@ -232,8 +232,8 @@ int mat_cholesky(const matrix_t *A, mat_cholesky_t *out)
     }
 
     for (size_t i = 0; i < count; ++i) {
-        Z[i] = num_new();
-        Ln[i] = num_new();
+        Z[i] = NUM_ZERO;
+        Ln[i] = NUM_ZERO;
     }
 
     for (size_t i = 0; i < n; ++i)
@@ -391,8 +391,8 @@ static int mat_norm_diagonal_exact(const matrix_t *A, mat_norm_type_t type, numb
 {
     NUM_SCOPE(scope);
     size_t kdim;
-    number_t best = num_new();
-    number_t sumsq = num_new();
+    number_t best = NUM_ZERO;
+    number_t sumsq = NUM_ZERO;
     bool have_best = false;
 
     if (!A || !out)
@@ -907,10 +907,10 @@ int mat_condition_number(const matrix_t *A, mat_norm_type_t type, number_t *out)
 
     kdim = (A->rows < A->cols) ? A->rows : A->cols;
     if (mat_numeric_is_diagonal(A)) {
-        number_t sigma_max = num_new();
-        number_t sigma_min = num_new();
-        number_t sumsq = num_new();
-        number_t inv_sumsq = num_new();
+        number_t sigma_max = NUM_ZERO;
+        number_t sigma_min = NUM_ZERO;
+        number_t sumsq = NUM_ZERO;
+        number_t inv_sumsq = NUM_ZERO;
         bool have_sigma = false;
         bool need_fro = (type == MAT_NORM_FRO);
 
@@ -1007,8 +1007,8 @@ int mat_condition_number(const matrix_t *A, mat_norm_type_t type, number_t *out)
 
     if (mat_norm_function_for(type) == mat_norm_via_svd) {
         mat_svd_factor_t svd = {0};
-        number_t sigma_max = num_new();
-        number_t sigma_min = num_new();
+        number_t sigma_max = NUM_ZERO;
+        number_t sigma_min = NUM_ZERO;
         bool have_sigma = false;
         if (mat_svd_factor(A, &svd) != 0)
             return -2;
@@ -1170,7 +1170,7 @@ matrix_t *mat_pseudoinverse(const matrix_t *A)
             inv_sig = num_inv(sig);
             mat_set_num_owned(Sp, i, i, &inv_sig);
         } else {
-            number_t zero = num_new();
+            number_t zero = NUM_ZERO;
             mat_set_num_owned(Sp, i, i, &zero);
         }
         num_destroy(&abs_sig);
@@ -1849,7 +1849,8 @@ static void jacobi_apply(number_t *A, number_t *V, size_t n, size_t p, size_t q)
     number_t t = num_div(sign, denom);
     number_t t2 = num_mul(t, t);
     number_t one_plus_t2 = num_add(one, t2);
-    number_t c = num_div(one, num_sqrt(one_plus_t2));
+    number_t root_t = num_sqrt(one_plus_t2);
+    number_t c = num_div(one, root_t);
     number_t s = num_mul(t, c);
     number_t ns = num_neg(s);
     number_t inv_b = num_inv(b);
@@ -1921,6 +1922,7 @@ static void jacobi_apply(number_t *A, number_t *V, size_t n, size_t p, size_t q)
     num_destroy(&ns);
     num_destroy(&s);
     num_destroy(&c);
+    num_destroy(&root_t);
     num_destroy(&one_plus_t2);
     num_destroy(&t2);
     num_destroy(&t);
@@ -1963,8 +1965,8 @@ static int hermitian_jacobi_ws_init(hermitian_jacobi_ws_t *ws, const matrix_t *A
     }
 
     for (size_t i = 0; i < count; i++) {
-        ws->W[i] = num_new();
-        ws->V[i] = num_new();
+        ws->W[i] = NUM_ZERO;
+        ws->V[i] = NUM_ZERO;
     }
 
     for (size_t i = 0; i < n; i++) {
@@ -2054,7 +2056,7 @@ static int schur_workspace_init_from_matrix(schur_workspace_t *ws, const matrix_
         }
     }
     for (size_t i = 0; i < count; ++i)
-        ws->Q[i] = num_new();
+        ws->Q[i] = NUM_ZERO;
     for (size_t i = 0; i < ws->n; ++i) {
         num_destroy(&ws->Q[i * ws->n + i]);
         ws->Q[i * ws->n + i] = num_clone(NUM_ONE);
@@ -2484,7 +2486,7 @@ static int hessenberg_reduce(number_t *Hn, number_t *Qn, size_t n)
             return -1;
 
         for (size_t i = 0; i < m; ++i)
-            v[i] = num_new();
+            v[i] = NUM_ZERO;
 
         {
             number_t x0 = num_clone(NCM(Hn, k + 1, k, n));
@@ -3080,7 +3082,7 @@ static int mat_eigendecompose_general(const matrix_t *A, number_t *eigenvalues,
         number_t *Y = (number_t *)calloc(n * n, sizeof(number_t));
         if (!Y) { schur_workspace_free(&ws); return -3; }
         for (size_t i = 0; i < n * n; ++i)
-            Y[i] = num_new();
+            Y[i] = NUM_ZERO;
 
         for (size_t k = 0; k < n; k++)
             backsub_eigenvec(ws.H, Y, n, k, eps);

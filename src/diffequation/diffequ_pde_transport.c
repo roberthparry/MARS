@@ -1020,13 +1020,12 @@ static expr_t *de_transport_polynomial_reaction_solution(
         expr_t *y_part = dy
             ? expr_mul(second_coefficient, dy)
             : NULL;
-        expr_t *directional = x_part && y_part
-            ? expr_add_simplify_owned(x_part, y_part)
-            : NULL;
+        expr_t *directional = NULL;
         expr_t *negative_directional;
         expr_t *next;
 
-        if (directional) {
+        if (x_part && y_part) {
+            directional = expr_add_simplify_owned(x_part, y_part);
             x_part = NULL;
             y_part = NULL;
         }

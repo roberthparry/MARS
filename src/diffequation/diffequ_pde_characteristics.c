@@ -22,14 +22,16 @@ static equation_t *de_pde_dependent_square_boundary_solution(
 
 static bool de_pde_exact_long(const expr_t *expr, long *value_out)
 {
-    number_t value;
+    number_t value = num_new();
     number_t exact;
     double approximate;
     long candidate;
     bool matches;
 
-    if (!value_out || !expr_match_const_value(expr, &value))
+    if (!value_out || !expr_match_const_value(expr, &value)) {
+        num_destroy(&value);
         return false;
+    }
     if (!num_is_real(value) || !num_is_integer(value)) {
         num_destroy(&value);
         return false;
@@ -701,7 +703,7 @@ static expr_t *de_pde_apply_characteristic_factor(
     const expr_t *numerator = NULL;
     const expr_t *denominator = NULL;
     const expr_t *power_base = NULL;
-    number_t value;
+    number_t value = num_new();
     number_t exponent;
     bool reciprocal = false;
     expr_t *raw;
@@ -710,8 +712,8 @@ static expr_t *de_pde_apply_characteristic_factor(
     if (expr_match_div_expr(factor, &numerator, &denominator) &&
         expr_match_const_value(numerator, &value)) {
         reciprocal = num_eq(value, NUM_ONE);
-        num_destroy(&value);
     }
+    num_destroy(&value);
     exponent = num_new();
     if (!reciprocal &&
         expr_match_pow_const(factor, &power_base, &exponent) &&

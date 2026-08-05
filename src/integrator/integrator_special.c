@@ -104,8 +104,8 @@ static bool intg_match_affine_term_local(const expr_t *expr,
     const expr_t *left = NULL;
     const expr_t *right = NULL;
     const expr_t *base = NULL;
-    number_t value = num_new();
-    number_t inner_scale = num_new();
+    number_t value = NUM_ZERO;
+    number_t inner_scale = NUM_ZERO;
     bool is_sub = false;
     size_t index;
 
@@ -158,9 +158,9 @@ static bool intg_match_scaled_affine_power_deg5_local(const expr_t *expr,
     NUM_SCOPE(scope);
     const expr_t *base = NULL;
     const expr_t *pow_base = NULL;
-    number_t inner_scale = num_new();
+    number_t inner_scale = NUM_ZERO;
     number_t degree = num_create_from_long(5);
-    number_t pow_degree = num_new();
+    number_t pow_degree = NUM_ZERO;
     number_t constant = num_clone(NUM_ZERO);
 
     if (!expr || !scale_out || !constant_out || (ndim > 0u && (!vars || !coeffs_out)))
@@ -219,15 +219,19 @@ static bool intg_collect_monomial_powers_local(const expr_t *expr,
     const expr_t *left = NULL;
     const expr_t *right = NULL;
     const expr_t *base = NULL;
-    number_t value = num_new();
-    number_t inner_scale = num_new();
-    number_t exponent = num_new();
-    number_t degree_one = num_create_from_long(1);
-    number_t degree_two = num_create_from_long(2);
+    number_t value = NUM_ZERO;
+    number_t inner_scale = NUM_ZERO;
+    number_t exponent = NUM_ZERO;
+    number_t degree_one = NUM_ZERO;
+    number_t degree_two = NUM_ZERO;
     size_t index;
+    bool matched = false;
 
     if (!expr || !scale_io || !powers_out || ndim == 0u || !vars)
         return false;
+
+    degree_one = num_create_from_long(1);
+    degree_two = num_create_from_long(2);
 
     if (expr_match_const_value(expr, &value) &&
         num_is_real(value) && num_is_finite(value)) {
@@ -235,19 +239,22 @@ static bool intg_collect_monomial_powers_local(const expr_t *expr,
 
         num_destroy(scale_io);
         *scale_io = next;
-        return true;
+        matched = true;
+        goto cleanup;
     }
 
     if (expr_match_var_expr(expr, ndim, vars, &index)) {
         powers_out[index] += 1u;
-        return true;
+        matched = true;
+        goto cleanup;
     }
 
     if (expr_match_pow_const(expr, &base, &exponent) &&
         expr_match_var_expr(base, ndim, vars, &index) &&
         (num_eq(exponent, degree_one) || num_eq(exponent, degree_two))) {
         powers_out[index] += num_eq(exponent, degree_two) ? 2u : 1u;
-        return true;
+        matched = true;
+        goto cleanup;
     }
 
     if (expr_match_scaled_expr(expr, &inner_scale, &base) &&
@@ -258,17 +265,24 @@ static bool intg_collect_monomial_powers_local(const expr_t *expr,
 
         num_destroy(scale_io);
         *scale_io = next;
-        return intg_collect_monomial_powers_local(base, ndim, vars, scale_io,
-                                                  powers_out);
+        matched = intg_collect_monomial_powers_local(base, ndim, vars, scale_io,
+                                                     powers_out);
+        goto cleanup;
     }
 
     if (expr_match_mul_expr(expr, &left, &right))
-        return intg_collect_monomial_powers_local(left, ndim, vars, scale_io,
-                                                  powers_out) &&
-               intg_collect_monomial_powers_local(right, ndim, vars, scale_io,
-                                                  powers_out);
+        matched = intg_collect_monomial_powers_local(left, ndim, vars, scale_io,
+                                                     powers_out) &&
+                  intg_collect_monomial_powers_local(right, ndim, vars, scale_io,
+                                                     powers_out);
 
-    return false;
+cleanup:
+    num_destroy(&degree_two);
+    num_destroy(&degree_one);
+    num_destroy(&exponent);
+    num_destroy(&inner_scale);
+    num_destroy(&value);
+    return matched;
 }
 
 static char *intg_dup_number_text_local(number_t value)
@@ -370,8 +384,7 @@ static int intg_eval_unit_box_exp_square_product(const expr_t *expr,
     }
 
     {
-        NUM_SCOPE(scope);
-        number_t a = num_scope_detach(num_neg(scale));
+        number_t a = num_neg(scale);
 
         num_destroy(&scale);
         if (!num_is_real(a) || !num_is_finite(a) || !num_gt(a, NUM_ZERO)) {
@@ -381,7 +394,8 @@ static int intg_eval_unit_box_exp_square_product(const expr_t *expr,
 
         {
             number_t sqrt_a = num_sqrt(a);
-            number_t exp_neg_a = num_exp(num_neg(a));
+            number_t neg_a = num_neg(a);
+            number_t exp_neg_a = num_exp(neg_a);
             number_t erf_sqrt_a = num_erf(sqrt_a);
             number_t sqrt_pi = num_sqrt(NUM_PI);
             number_t two = num_create_from_long(2L);
@@ -392,16 +406,38 @@ static int intg_eval_unit_box_exp_square_product(const expr_t *expr,
             number_t e1_term = num_e1(a);
             number_t log_term = num_log(a);
             number_t sum = num_add(two_exp, erf_term);
+            number_t next;
             number_t out;
 
-            sum = num_sub(sum, two);
-            sum = num_sub(sum, NUM_EULER_MASCHERONI);
-            sum = num_sub(sum, log_term);
-            sum = num_sub(sum, e1_term);
+            next = num_sub(sum, two);
+            num_destroy(&sum);
+            sum = next;
+            next = num_sub(sum, NUM_EULER_MASCHERONI);
+            num_destroy(&sum);
+            sum = next;
+            next = num_sub(sum, log_term);
+            num_destroy(&sum);
+            sum = next;
+            next = num_sub(sum, e1_term);
+            num_destroy(&sum);
+            sum = next;
             out = num_div(sum, a);
 
             num_destroy(result);
-            *result = num_scope_detach(out);
+            *result = out;
+            num_destroy(&sum);
+            num_destroy(&log_term);
+            num_destroy(&e1_term);
+            num_destroy(&erf_term);
+            num_destroy(&two_sqrt_pi_sqrt_a);
+            num_destroy(&two_sqrt_pi);
+            num_destroy(&two_exp);
+            num_destroy(&two);
+            num_destroy(&sqrt_pi);
+            num_destroy(&erf_sqrt_a);
+            num_destroy(&exp_neg_a);
+            num_destroy(&neg_a);
+            num_destroy(&sqrt_a);
         }
         if (exact_result_out)
             *exact_result_out = intg_build_unit_box_exp_square_product_exact_expr(a);
@@ -425,7 +461,7 @@ static int intg_match_affine_form(const expr_t *expr, size_t ndim,
         return 0;
 
     constant = num_clone(NUM_ZERO);
-    scale = num_new();
+    scale = NUM_ZERO;
     intg_number_array_zero(coeffs, 4u);
     intg_number_array_zero(poly, IG_POLY_COEFF_COUNT);
 
@@ -534,10 +570,12 @@ static number_t intg_poly_eval(const number_t *coeffs, size_t count, number_t x)
     number_t acc = num_clone(NUM_ZERO);
 
     for (size_t i = count; i-- > 0u;) {
-        number_t next = num_add(num_mul(acc, x), coeffs[i]);
+        number_t product = num_mul(acc, x);
+        number_t next = num_add(product, coeffs[i]);
 
         num_destroy(&acc);
         acc = next;
+        num_destroy(&product);
     }
     return acc;
 }
@@ -685,7 +723,12 @@ static number_t intg_eval_special_antiderivative(const intg_affine_form_t *form,
             }
         }
         poly = intg_poly_eval(current, IG_POLY_COEFF_COUNT, x);
-        value = num_mul(poly, num_exp(x));
+        {
+            number_t exponential = num_exp(x);
+
+            value = num_mul(poly, exponential);
+            num_destroy(&exponential);
+        }
         num_destroy(&poly);
         intg_number_array_clear(current, IG_POLY_COEFF_COUNT);
         intg_number_array_clear(next, IG_POLY_COEFF_COUNT);
@@ -910,7 +953,7 @@ static int intg_collect_separable_term(const expr_t *expr,
                                      expr_t *const *vars,
                                      intg_separable_term_t *term)
 {
-    number_t scale = num_new();
+    number_t scale = NUM_ZERO;
     const expr_t *base = NULL;
     const expr_t *left = NULL;
     const expr_t *right = NULL;
@@ -972,7 +1015,7 @@ static int intg_eval_separable_term(integrator_t *ig,
                                   number_t *result)
 {
     intg_separable_term_t term;
-    number_t value = num_new();
+    number_t value = NUM_ZERO;
 
     intg_separable_term_init(&term);
     if (!intg_collect_separable_term(expr, ndim, vars, &term)) {
@@ -982,7 +1025,7 @@ static int intg_eval_separable_term(integrator_t *ig,
 
     value = num_clone(term.scale);
     for (size_t i = 0; i < ndim; ++i) {
-        number_t factor_value = num_new();
+        number_t factor_value = NUM_ZERO;
         int status;
 
         if (term.factors[i]) {
@@ -1035,8 +1078,8 @@ static int intg_eval_separable_expr(integrator_t *ig,
         return affine_status;
 
     if (expr_match_add_sub_expr(expr, &left, &right, &is_sub)) {
-        number_t lhs = num_new();
-        number_t rhs = num_new();
+        number_t lhs = NUM_ZERO;
+        number_t rhs = NUM_ZERO;
         number_t out;
         int s_left = intg_eval_separable_expr(ig, left, ndim, vars, lo, hi, &lhs);
         int s_right = intg_eval_separable_expr(ig, right, ndim, vars, lo, hi, &rhs);
@@ -1063,7 +1106,7 @@ int try_integral_multi_special_affine(integrator_t *ig, expr_t *expr,
 {
     intg_affine_form_t form;
     int matched;
-    number_t value = num_new();
+    number_t value = NUM_ZERO;
     expr_t *exact_result = NULL;
 
     (void)ig;

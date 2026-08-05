@@ -2765,7 +2765,8 @@ struct matrix_t *mat_mul(const struct matrix_t *A, const struct matrix_t *B) {
                 mat_get(B, k, j, y_raw);
                 op->mul(prod, x_raw, y_raw);
                 re->add(next_sum, sum, prod);
-                elem_simplify_value(re, next_sum);
+                if (re != &expr_elem)
+                    elem_simplify_value(re, next_sum);
                 elem_destroy_value(re, sum);
                 memcpy(sum, next_sum, re->size);
                 elem_init_zero_value(re, next_sum);
@@ -2826,12 +2827,15 @@ matrix_t *mat_neg(const matrix_t *A)
 static number_t mat_eval_number_scalar_number(void (*scalar_f)(void *out, const void *in),
                                               const number_t *input)
 {
-    NUM_SCOPE(scope);
     number_t safe_input = input ? num_clone(*input) : num_clone(NUM_ZERO);
     number_t output = number_invalid();
+    number_t result;
 
     scalar_f(&output, &safe_input);
-    return num_scope_detach(output);
+    result = num_clone(output);
+    num_destroy(&output);
+    num_destroy(&safe_input);
+    return result;
 }
 
 static void mat_eval_number_scalar_elem(const struct elem_vtable *elem,
@@ -3311,6 +3315,7 @@ static int num_divided_difference_confluent(number_t *out,
             fp_scaled = num_mul(fp, a_minus_b);
             numer = num_sub(fp_scaled, fa_minus_fb);
             *out = num_scope_detach(num_div(numer, denom));
+            num_destroy(&fp);
             return 0;
         }
 
@@ -3326,6 +3331,7 @@ static int num_divided_difference_confluent(number_t *out,
             num_fun_coeffs_up_to_second(NULL, &fp, NULL, scalar_f, &nodes[0]);
             numer = num_sub(first_dd, fp);
             *out = num_scope_detach(num_div(numer, b_minus_a));
+            num_destroy(&fp);
             return 0;
         }
 
@@ -3341,6 +3347,7 @@ static int num_divided_difference_confluent(number_t *out,
             num_fun_coeffs_up_to_second(NULL, &fp, NULL, scalar_f, &nodes[1]);
             numer = num_sub(fp, first_dd);
             *out = num_scope_detach(num_div(numer, b_minus_a));
+            num_destroy(&fp);
             return 0;
         }
     }

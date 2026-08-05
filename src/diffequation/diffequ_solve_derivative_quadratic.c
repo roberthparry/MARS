@@ -70,10 +70,17 @@ static expr_t *de_derivative_quadratic_root(
         ? expr_add_simplify_owned(negative_linear, root)
         : expr_sub_simplify_owned(negative_linear, root);
     expr_t *denominator = expr_mul_long(quadratic, 2L);
+    expr_t *quotient = NULL;
 
-    return numerator && denominator
-        ? expr_div_simplify_owned(numerator, denominator)
-        : NULL;
+    expr_free(discriminant);
+    if (numerator && denominator) {
+        quotient = expr_div_simplify_owned(numerator, denominator);
+        numerator = NULL;
+        denominator = NULL;
+    }
+    expr_free(denominator);
+    expr_free(numerator);
+    return quotient;
 }
 
 static expr_t *de_derivative_quadratic_implicit_rhs(
@@ -89,10 +96,16 @@ static expr_t *de_derivative_quadratic_implicit_rhs(
         ? expr_mul_simplify_owned(
               expr_clone(linear), logarithm)
         : NULL;
-    expr_t *rhs = linear_root && log_term
-        ? expr_add_simplify_owned(linear_root, log_term)
-        : NULL;
+    expr_t *rhs = NULL;
 
+    expr_free(absolute);
+    if (linear_root && log_term) {
+        rhs = expr_add_simplify_owned(linear_root, log_term);
+        linear_root = NULL;
+        log_term = NULL;
+    }
+    expr_free(log_term);
+    expr_free(linear_root);
     if (rhs) {
         expr_t *constant = de_arbitrary_constant();
         expr_t *sum = constant ? expr_add(rhs, constant) : NULL;

@@ -136,41 +136,53 @@ static int mp_interval_init_eval(mp_eval_fn eval, void *ctx,
         "0.204432940075298892414161999234649",
         "0.209482141084727828012999174891714"
     };
-    number_t center = num_new();
-    number_t half = num_new();
-    number_t half_abs = num_new();
+    number_t center = NUM_ZERO;
+    number_t half = NUM_ZERO;
+    number_t half_abs = NUM_ZERO;
     number_t kronrod_sum = num_clone(NUM_ZERO);
     number_t gauss_sum = num_clone(NUM_ZERO);
-    number_t f_center = num_new();
-    number_t center_weight = num_new();
-    number_t center_gauss_weight = num_new();
-    number_t center_term = num_new();
-    number_t center_gauss_term = num_new();
-    number_t diff = num_new();
-    number_t result = num_new();
-    number_t error = num_new();
+    number_t f_center = NUM_ZERO;
+    number_t center_weight = NUM_ZERO;
+    number_t center_gauss_weight = NUM_ZERO;
+    number_t center_term = NUM_ZERO;
+    number_t center_gauss_term = NUM_ZERO;
+    number_t diff = NUM_ZERO;
+    number_t result = NUM_ZERO;
+    number_t error = NUM_ZERO;
     int rc = -1;
 
     if (!eval || !out)
-        return -1;
+        goto cleanup;
 
+    num_destroy(&center);
     center = mp_midpoint(a, b);
-    half = num_mul(num_sub(b, a), NUM_HALF);
+    {
+        number_t width = num_sub(b, a);
+
+        num_destroy(&half);
+        half = num_mul(width, NUM_HALF);
+        num_destroy(&width);
+    }
+    num_destroy(&half_abs);
     half_abs = num_abs(half);
 
     if (eval(ctx, center, &f_center) != 0)
         goto cleanup;
 
+    num_destroy(&center_weight);
     center_weight = mp_num_from_decimal(wgk_text[7]);
+    num_destroy(&center_gauss_weight);
     center_gauss_weight = mp_num_from_decimal(wg_text[3]);
+    num_destroy(&center_term);
     center_term = num_mul(center_weight, f_center);
+    num_destroy(&center_gauss_term);
     center_gauss_term = num_mul(center_gauss_weight, f_center);
     num_destroy(&kronrod_sum);
     kronrod_sum = center_term;
-    center_term = num_new();
+    center_term = NUM_ZERO;
     num_destroy(&gauss_sum);
     gauss_sum = center_gauss_term;
-    center_gauss_term = num_new();
+    center_gauss_term = NUM_ZERO;
 
     for (size_t i = 0u; i < 7u; ++i) {
         number_t node = mp_num_from_decimal(xgk_text[i]);
@@ -178,10 +190,10 @@ static int mp_interval_init_eval(mp_eval_fn eval, void *ctx,
         number_t offset = num_mul(half, node);
         number_t x_left = num_sub(center, offset);
         number_t x_right = num_add(center, offset);
-        number_t f_left = num_new();
-        number_t f_right = num_new();
-        number_t f_sum = num_new();
-        number_t k_term = num_new();
+        number_t f_left = NUM_ZERO;
+        number_t f_right = NUM_ZERO;
+        number_t f_sum = NUM_ZERO;
+        number_t k_term = NUM_ZERO;
 
         if (eval(ctx, x_left, &f_left) != 0 ||
             eval(ctx, x_right, &f_right) != 0) {
@@ -197,7 +209,9 @@ static int mp_interval_init_eval(mp_eval_fn eval, void *ctx,
             goto cleanup;
         }
 
+        num_destroy(&f_sum);
         f_sum = num_add(f_left, f_right);
+        num_destroy(&k_term);
         k_term = num_mul(wk, f_sum);
         {
             number_t next_k = num_add(kronrod_sum, k_term);
@@ -230,16 +244,25 @@ static int mp_interval_init_eval(mp_eval_fn eval, void *ctx,
         num_destroy(&node);
     }
 
+    num_destroy(&result);
     result = num_mul(kronrod_sum, half);
+    num_destroy(&diff);
     diff = num_sub(kronrod_sum, gauss_sum);
-    error = num_mul(num_abs(diff), half_abs);
+    {
+        number_t abs_diff = num_abs(diff);
 
+        num_destroy(&error);
+        error = num_mul(abs_diff, half_abs);
+        num_destroy(&abs_diff);
+    }
+
+    mp_subinterval_clear(out);
     out->a = num_clone(a);
     out->b = num_clone(b);
     out->result = result;
     out->error = error;
-    result = num_new();
-    error = num_new();
+    result = NUM_ZERO;
+    error = NUM_ZERO;
     rc = 0;
 
 cleanup:
@@ -264,12 +287,13 @@ static int mp_interval_split_eval(mp_eval_fn eval, void *ctx,
                              mp_subinterval_t *left,
                              mp_subinterval_t *right)
 {
-    number_t m = num_new();
+    number_t m = NUM_ZERO;
     int rc = -1;
 
     if (!eval || !src || !left || !right)
-        return -1;
+        goto cleanup;
 
+    num_destroy(&m);
     m = mp_midpoint(src->a, src->b);
     if (mp_interval_init_eval(eval, ctx, src->a, m, left) != 0 ||
         mp_interval_init_eval(eval, ctx, m, src->b, right) != 0) {
@@ -295,7 +319,7 @@ static number_t mp_tolerance_threshold(number_t abs_tol, number_t rel_tol,
     if (num_gt(relative, threshold)) {
         num_destroy(&threshold);
         threshold = relative;
-        relative = num_new();
+        relative = NUM_ZERO;
     }
 
     num_destroy(&relative);
@@ -320,8 +344,11 @@ static int mp_tanh_sinh_sum_for_h(mp_eval_fn eval, void *ctx,
     size_t used_steps = 0u;
     int quiet_count = 0;
 
-    if (!eval || !sum_out || !last_term_out)
+    if (!eval || !sum_out || !last_term_out) {
+        num_destroy(&last_term);
+        num_destroy(&sum);
         return -1;
+    }
 
     for (int k = 0; k <= max_steps; ++k) {
         number_t k_num = num_create_from_long((long)k);
@@ -339,10 +366,10 @@ static int mp_tanh_sinh_sum_for_h(mp_eval_fn eval, void *ctx,
         number_t x_offset = num_mul(half_width, u);
         number_t x_pos = num_add(center, x_offset);
         number_t x_neg = num_sub(center, x_offset);
-        number_t f_pos = num_new();
-        number_t f_neg = num_new();
-        number_t contrib = num_new();
-        number_t term_mag = num_new();
+        number_t f_pos = NUM_ZERO;
+        number_t f_neg = NUM_ZERO;
+        number_t contrib = NUM_ZERO;
+        number_t term_mag = NUM_ZERO;
         int eval_ok;
 
         eval_ok = eval(ctx, x_pos, &f_pos) == 0;
@@ -474,12 +501,12 @@ static int mp_tanh_sinh_integral(mp_eval_fn eval, void *ctx,
     number_t h = num_clone(NUM_ONE);
     number_t term_scale = num_create_from_string("1e-4");
     number_t term_tolerance = num_mul(abs_tol, term_scale);
-    number_t sum = num_new();
-    number_t previous_sum = num_new();
+    number_t sum = NUM_ZERO;
+    number_t previous_sum = NUM_ZERO;
     number_t last_term = num_clone(NUM_ZERO);
-    number_t error = num_new();
-    number_t best_sum = num_new();
-    number_t best_error = num_new();
+    number_t error = NUM_ZERO;
+    number_t best_sum = NUM_ZERO;
+    number_t best_error = NUM_ZERO;
     bool have_best = false;
     size_t used_steps = 0u;
     int max_steps = 256;
@@ -521,9 +548,9 @@ static int mp_tanh_sinh_integral(mp_eval_fn eval, void *ctx,
         refine_limit = 4;
 
     for (int level = 0; level < refine_limit; ++level) {
-        number_t level_sum = num_new();
-        number_t level_last_term = num_new();
-        number_t threshold = num_new();
+        number_t level_sum = NUM_ZERO;
+        number_t level_last_term = NUM_ZERO;
+        number_t threshold = NUM_ZERO;
         size_t level_steps = 0u;
         size_t remaining_steps = used_steps < max_intervals ? max_intervals - used_steps : 0u;
         int level_max_steps;
@@ -674,12 +701,12 @@ static int mp_adaptive_integral(mp_eval_fn eval, void *ctx,
                                 number_t *result, number_t *error_est)
 {
     mp_subinterval_t *intervals = NULL;
-    number_t total = num_new();
-    number_t total_err = num_new();
-    number_t abs_tol = num_new();
-    number_t rel_tol = num_new();
-    number_t a_work = num_new();
-    number_t b_work = num_new();
+    number_t total = NUM_ZERO;
+    number_t total_err = NUM_ZERO;
+    number_t abs_tol = NUM_ZERO;
+    number_t rel_tol = NUM_ZERO;
+    number_t a_work = NUM_ZERO;
+    number_t b_work = NUM_ZERO;
     size_t capacity = 64u;
     size_t count = 0u;
     int status = 0;
@@ -687,39 +714,58 @@ static int mp_adaptive_integral(mp_eval_fn eval, void *ctx,
     size_t guard_bits;
     size_t user_digits;
 
-    if (!eval || !ig || !result)
-        return -1;
-    if (!num_is_real(a) || !num_is_real(b))
-        return -1;
-
-    user_bits = num_get_default_prec_bits();
-    user_digits = num_get_default_prec_digits();
-    abs_tol = mp_configured_tolerance(ig->abs_tol);
-    rel_tol = mp_configured_tolerance(ig->rel_tol);
-    guard_bits = mp_guard_precision_bits(user_bits);
-    if (guard_bits > user_bits && num_set_default_prec_bits(guard_bits) != 0) {
+    if (!eval || !ig || !result ||
+        !num_is_real(a) || !num_is_real(b)) {
+        num_destroy(&b_work);
+        num_destroy(&a_work);
         num_destroy(&rel_tol);
         num_destroy(&abs_tol);
+        num_destroy(&total_err);
+        num_destroy(&total);
         return -1;
     }
 
+    user_bits = num_get_default_prec_bits();
+    user_digits = num_get_default_prec_digits();
+    num_destroy(&abs_tol);
+    abs_tol = mp_configured_tolerance(ig->abs_tol);
+    num_destroy(&rel_tol);
+    rel_tol = mp_configured_tolerance(ig->rel_tol);
+    guard_bits = mp_guard_precision_bits(user_bits);
+    if (guard_bits > user_bits && num_set_default_prec_bits(guard_bits) != 0) {
+        num_destroy(&b_work);
+        num_destroy(&a_work);
+        num_destroy(&rel_tol);
+        num_destroy(&abs_tol);
+        num_destroy(&total_err);
+        num_destroy(&total);
+        return -1;
+    }
+
+    num_destroy(&a_work);
     a_work = num_as_inexact_real_prec(a, guard_bits);
+    num_destroy(&b_work);
     b_work = num_as_inexact_real_prec(b, guard_bits);
 
     if (num_eq(a_work, b_work)) {
         *result = num_clone(NUM_ZERO);
-        if (error_est)
+        if (error_est) {
             *error_est = num_clone(NUM_ZERO);
+        }
         ig->last_intervals = 1u;
         num_set_default_prec_bits(user_bits);
         num_destroy(&b_work);
         num_destroy(&a_work);
+        num_destroy(&rel_tol);
+        num_destroy(&abs_tol);
+        num_destroy(&total_err);
+        num_destroy(&total);
         return 0;
     }
 
     {
-        number_t ts_result = num_new();
-        number_t ts_error = num_new();
+        number_t ts_result = NUM_ZERO;
+        number_t ts_error = NUM_ZERO;
         size_t ts_steps = 0u;
         int ts_status = mp_tanh_sinh_integral(eval, ctx, a_work, b_work,
                                               abs_tol, rel_tol,
@@ -730,7 +776,7 @@ static int mp_adaptive_integral(mp_eval_fn eval, void *ctx,
         if (ts_status == 0 || (ts_status > 0 && user_digits >= 80u &&
                                num_is_finite(ts_error) && !num_is_nan(ts_error))) {
             *result = ts_result;
-            ts_result = num_new();
+            ts_result = NUM_ZERO;
             if (num_set_prec_bits(result, user_bits) != 0) {
                 num_destroy(&ts_error);
                 num_destroy(&ts_result);
@@ -738,7 +784,7 @@ static int mp_adaptive_integral(mp_eval_fn eval, void *ctx,
             }
             if (error_est) {
                 *error_est = ts_error;
-                ts_error = num_new();
+                ts_error = NUM_ZERO;
                 if (num_set_prec_bits(error_est, user_bits) != 0) {
                     num_destroy(&ts_error);
                     num_destroy(&ts_result);
@@ -765,7 +811,9 @@ static int mp_adaptive_integral(mp_eval_fn eval, void *ctx,
         goto fail;
 
     count = 1u;
+    num_destroy(&total);
     total = num_clone(intervals[0].result);
+    num_destroy(&total_err);
     total_err = num_clone(intervals[0].error);
 
     while (1) {
@@ -803,12 +851,12 @@ static int mp_adaptive_integral(mp_eval_fn eval, void *ctx,
             mp_subinterval_t right = {0};
             number_t old_result = num_clone(intervals[worst].result);
             number_t old_error = num_clone(intervals[worst].error);
-            number_t split_result = num_new();
-            number_t split_error = num_new();
-            number_t total_minus_old = num_new();
-            number_t err_minus_old = num_new();
-            number_t next_total = num_new();
-            number_t next_total_err = num_new();
+            number_t split_result = NUM_ZERO;
+            number_t split_error = NUM_ZERO;
+            number_t total_minus_old = NUM_ZERO;
+            number_t err_minus_old = NUM_ZERO;
+            number_t next_total = NUM_ZERO;
+            number_t next_total_err = NUM_ZERO;
 
             if (mp_interval_split_eval(eval, ctx, &intervals[worst], &left, &right) != 0) {
                 num_destroy(&next_total_err);
@@ -822,19 +870,25 @@ static int mp_adaptive_integral(mp_eval_fn eval, void *ctx,
                 goto fail;
             }
 
+            num_destroy(&split_result);
             split_result = num_add(left.result, right.result);
+            num_destroy(&split_error);
             split_error = num_add(left.error, right.error);
+            num_destroy(&total_minus_old);
             total_minus_old = num_sub(total, old_result);
+            num_destroy(&err_minus_old);
             err_minus_old = num_sub(total_err, old_error);
+            num_destroy(&next_total);
             next_total = num_add(total_minus_old, split_result);
+            num_destroy(&next_total_err);
             next_total_err = num_add(err_minus_old, split_error);
 
             num_destroy(&total);
             num_destroy(&total_err);
             total = next_total;
             total_err = next_total_err;
-            next_total = num_new();
-            next_total_err = num_new();
+            next_total = NUM_ZERO;
+            next_total_err = NUM_ZERO;
 
             mp_subinterval_clear(&intervals[worst]);
             intervals[worst] = left;
@@ -853,7 +907,7 @@ static int mp_adaptive_integral(mp_eval_fn eval, void *ctx,
     }
 
     *result = total;
-    total = num_new();
+    total = NUM_ZERO;
     if (num_set_prec_bits(result, user_bits) != 0)
         goto fail;
     if (error_est) {

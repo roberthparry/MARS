@@ -83,8 +83,10 @@ static void mf_bindings_destroy_partial(mat_bindings_t *bindings)
         return;
     dictionary_destroy(bindings->index);
     if (bindings->entries) {
-        for (size_t i = 0; i < bindings->count; ++i)
+        for (size_t i = 0; i < bindings->count; ++i) {
+            expr_free(bindings->entries[i].expr);
             string_free(bindings->entries[i].name);
+        }
     }
     free(bindings->entries);
     free(bindings);

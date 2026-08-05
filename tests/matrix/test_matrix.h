@@ -205,14 +205,9 @@ static inline void test_mat_get_complex(const matrix_t *A, size_t i, size_t j, q
 
 static inline void test_mat_get_expr_slot(const matrix_t *A, size_t i, size_t j, expr_t **out)
 {
-    expr_t *borrowed = NULL;
-
     if (!out)
         return;
-    mat_get(A, i, j, &borrowed);
-    *out = borrowed;
-    if (*out)
-        expr_retain(*out);
+    mat_get(A, i, j, out);
 }
 
 static inline void test_mat_set_data_num_slot(matrix_t *A, const number_t *data)
