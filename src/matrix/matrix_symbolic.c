@@ -1685,7 +1685,7 @@ matrix_t *mat_charpoly_numeric(const matrix_t *A)
             goto fail;
 
         {
-            number_t trace_num = num_new();
+            number_t trace_num = NUM_ZERO;
 
             if (mat_trace(Bnew, &trace_num) != 0) {
                 num_destroy(&trace_num);
@@ -2393,7 +2393,7 @@ matrix_t *mat_adjugate_exact(const matrix_t *A)
                 mat_set(Adj, i, j, &entry);
                 expr_free(entry);
             } else {
-                number_t det_num = num_new();
+                number_t det_num = NUM_ZERO;
 
                 if (mat_det(Minor, &det_num) != 0) {
                     num_destroy(&det_num);

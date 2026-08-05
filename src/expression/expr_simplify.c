@@ -3828,7 +3828,6 @@ expr_t *expr_simplify_div_operator(const expr_t *dv, expr_t *a, expr_t *b)
         expr_t *simp;
 
         expr_retain(a->a);
-        expr_retain(b);
         inner = a->a;
         quot = expr_div(inner, b);
         expr_free(inner);

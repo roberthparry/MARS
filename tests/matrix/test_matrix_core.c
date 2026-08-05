@@ -59,7 +59,7 @@ static void test_reading(void)
             NUM_ZERO, num_create_from_string("1.25"),
             num_create_from_string("-2.5"), NUM_ZERO};
         matrix_t *B = mat_create(2, 2, vals);
-        number_t out[4] = { num_new(), num_new(), num_new(), num_new() };
+        number_t out[4] = { NUM_ZERO, NUM_ZERO, NUM_ZERO, NUM_ZERO };
 
         print_mnum("B", B);
 
@@ -83,7 +83,7 @@ static void test_reading(void)
             num_clone(z1), NUM_ZERO,
             NUM_ZERO, num_clone(z2)};
         matrix_t *C = mat_create(2, 2, vals);
-        number_t out[4] = { num_new(), num_new(), num_new(), num_new() };
+        number_t out[4] = { NUM_ZERO, NUM_ZERO, NUM_ZERO, NUM_ZERO };
 
         print_mnum("C", C);
 
@@ -127,7 +127,7 @@ static void test_writing(void)
     {
         matrix_t *B = mat_new(2, 2);
         number_t x = num_create_from_string("7.75");
-        number_t vals[4] = { num_new(), num_new(), num_new(), num_new() };
+        number_t vals[4] = { NUM_ZERO, NUM_ZERO, NUM_ZERO, NUM_ZERO };
         mat_set(B, 0, 1, &x);
 
         print_mnum("B after write", B);
@@ -145,7 +145,7 @@ static void test_writing(void)
     {
         matrix_t *C = mat_new(2, 2);
         number_t z = num_create_from_string("1 - 3i");
-        number_t vals[4] = { num_new(), num_new(), num_new(), num_new() };
+        number_t vals[4] = { NUM_ZERO, NUM_ZERO, NUM_ZERO, NUM_ZERO };
         mat_set(C, 1, 1, &z);
 
         print_mnum("C after write", C);
@@ -513,7 +513,7 @@ static void test_number_det_and_inverse(void)
         diag[0] = num_create_from_long(2);
         diag[1] = num_create_from_string("3/2");
         A = mat_create_diagonal_num(2, diag);
-        det = num_new();
+        det = NUM_ZERO;
         check_bool("mat_create_diagonal_num(exact) non-null", A != NULL);
         check_bool("mat_det(number exact diagonal) rc = 0", A && mat_det(A, &det) == 0);
         expected = num_create_from_long(3);
@@ -546,7 +546,7 @@ static void test_number_det_and_inverse(void)
 
     {
         number_t diag[2];
-        number_t det = num_new();
+        number_t det = NUM_ZERO;
         number_t expected;
         number_t got;
         matrix_t *A;
@@ -675,7 +675,7 @@ static void test_mixed_number_backend_matrices(void)
 
     {
         number_t diag[4];
-        number_t det = num_new();
+        number_t det = NUM_ZERO;
         number_t expected;
         number_t got;
         matrix_t *A;
@@ -694,7 +694,14 @@ static void test_mixed_number_backend_matrices(void)
         check_bool("mixed diagonal create non-null", A != NULL);
 
         check_bool("mixed diagonal det rc = 0", A && mat_det(A, &det) == 0);
-        expected = num_mul(num_mul(diag[0], diag[1]), num_mul(diag[2], diag[3]));
+        {
+            number_t left = num_mul(diag[0], diag[1]);
+            number_t right = num_mul(diag[2], diag[3]);
+
+            expected = num_mul(left, right);
+            num_destroy(&left);
+            num_destroy(&right);
+        }
         check_bool("mixed diagonal det matches", num_eq(det, expected));
         check_bool("mixed diagonal det precision does not shrink",
                    num_get_prec_bits(det) >= num_get_prec_bits(diag[2]) &&
@@ -1839,7 +1846,7 @@ static void test_add_sub_num_real(void)
     matrix_t *C = mat_add(A, B);
     print_mnum("A+B", C);
 
-    number_t c_vals[6] = { num_new(), num_new(), num_new(), num_new(), num_new(), num_new() };
+    number_t c_vals[6] = { NUM_ZERO, NUM_ZERO, NUM_ZERO, NUM_ZERO, NUM_ZERO, NUM_ZERO };
     mat_get_data_num(C, c_vals);
 
     for (size_t k = 0; k < 6; k++)
@@ -1854,7 +1861,7 @@ static void test_add_sub_num_real(void)
     matrix_t *D = mat_sub(A, B);
     print_mnum("A-B", D);
 
-    number_t d_vals[6] = { num_new(), num_new(), num_new(), num_new(), num_new(), num_new() };
+    number_t d_vals[6] = { NUM_ZERO, NUM_ZERO, NUM_ZERO, NUM_ZERO, NUM_ZERO, NUM_ZERO };
     mat_get_data_num(D, d_vals);
 
     for (size_t k = 0; k < 6; k++)
@@ -1901,7 +1908,7 @@ static void test_add_sub_num_complex(void)
     matrix_t *C = mat_add(A, B);
     print_mnum("A+B", C);
 
-    number_t C_vals[3] = { num_new(), num_new(), num_new() };
+    number_t C_vals[3] = { NUM_ZERO, NUM_ZERO, NUM_ZERO };
     mat_get_data_num(C, C_vals);
     for (size_t j = 0; j < 3; j++)
     {
@@ -1915,7 +1922,7 @@ static void test_add_sub_num_complex(void)
     matrix_t *D = mat_sub(A, B);
     print_mnum("A-B", D);
 
-    number_t D_vals[3] = { num_new(), num_new(), num_new() };
+    number_t D_vals[3] = { NUM_ZERO, NUM_ZERO, NUM_ZERO };
     mat_get_data_num(D, D_vals);
     for (size_t j = 0; j < 3; j++)
     {
@@ -1962,7 +1969,7 @@ static void test_multiply_num_real(void)
     matrix_t *C = mat_mul(A, B);
     print_mnum("A*B", C);
 
-    number_t C_vals[4] = { num_new(), num_new(), num_new(), num_new() };
+    number_t C_vals[4] = { NUM_ZERO, NUM_ZERO, NUM_ZERO, NUM_ZERO };
     mat_get_data_num(C, C_vals);
 
     for (size_t k = 0; k < 4; k++)
@@ -2018,9 +2025,9 @@ static void test_multiply_num_complex(void)
     print_mnum("A*B", C);
 
     number_t C_vals[12] = {
-        num_new(), num_new(), num_new(), num_new(),
-        num_new(), num_new(), num_new(), num_new(),
-        num_new(), num_new(), num_new(), num_new()
+        NUM_ZERO, NUM_ZERO, NUM_ZERO, NUM_ZERO,
+        NUM_ZERO, NUM_ZERO, NUM_ZERO, NUM_ZERO,
+        NUM_ZERO, NUM_ZERO, NUM_ZERO, NUM_ZERO
     };
     mat_get_data_num(C, C_vals);
 
@@ -2068,7 +2075,7 @@ static void test_add_mixed_num_real(void)
     matrix_t *C = mat_add(A, B);
     print_mnum("A + B", C);
 
-    number_t C_vals[4] = { num_new(), num_new(), num_new(), num_new() };
+    number_t C_vals[4] = { NUM_ZERO, NUM_ZERO, NUM_ZERO, NUM_ZERO };
     mat_get_data_num(C, C_vals);
 
     for (size_t k = 0; k < 4; k++)
@@ -2112,7 +2119,7 @@ static void test_add_mixed_num_complex(void)
     matrix_t *C = mat_add(A, B);
     print_mnum("A + B", C);
 
-    number_t C_vals[3] = { num_new(), num_new(), num_new() };
+    number_t C_vals[3] = { NUM_ZERO, NUM_ZERO, NUM_ZERO };
     mat_get_data_num(C, C_vals);
 
     for (size_t j = 0; j < 3; j++)
@@ -2154,7 +2161,7 @@ static void test_add_mixed_num_num_complex(void)
     matrix_t *C = mat_add(A, B);
     print_mnum("A + B", C);
 
-    number_t C_vals[2] = { num_new(), num_new() };
+    number_t C_vals[2] = { NUM_ZERO, NUM_ZERO };
     mat_get_data_num(C, C_vals);
 
     for (size_t i = 0; i < 2; i++)
@@ -2198,7 +2205,7 @@ static void test_sub_mixed_num_real(void)
     matrix_t *C = mat_sub(A, B);
     print_mnum("A - B", C);
 
-    number_t C_vals[4] = { num_new(), num_new(), num_new(), num_new() };
+    number_t C_vals[4] = { NUM_ZERO, NUM_ZERO, NUM_ZERO, NUM_ZERO };
     mat_get_data_num(C, C_vals);
 
     for (size_t k = 0; k < 4; k++)
@@ -2242,7 +2249,7 @@ static void test_sub_mixed_num_complex(void)
     matrix_t *C = mat_sub(A, B);
     print_mnum("A - B", C);
 
-    number_t C_vals[3] = { num_new(), num_new(), num_new() };
+    number_t C_vals[3] = { NUM_ZERO, NUM_ZERO, NUM_ZERO };
     mat_get_data_num(C, C_vals);
 
     for (size_t j = 0; j < 3; j++)
@@ -2287,7 +2294,7 @@ static void test_sub_mixed_num_num_complex(void)
     matrix_t *C = mat_sub(A, B);
     print_mnum("A - B", C);
 
-    number_t C_vals[2] = { num_new(), num_new() };
+    number_t C_vals[2] = { NUM_ZERO, NUM_ZERO };
     mat_get_data_num(C, C_vals);
 
     for (size_t i = 0; i < 2; i++)
@@ -2332,7 +2339,7 @@ static void test_multiply_mixed_num_real(void)
     matrix_t *C = mat_mul(A, B);
     print_mnum("A * B", C);
 
-    number_t C_vals[4] = { num_new(), num_new(), num_new(), num_new() };
+    number_t C_vals[4] = { NUM_ZERO, NUM_ZERO, NUM_ZERO, NUM_ZERO };
     mat_get_data_num(C, C_vals);
 
     for (size_t i = 0; i < 2; i++)
@@ -2392,7 +2399,7 @@ static void test_multiply_mixed_num_complex(void)
     matrix_t *C = mat_mul(A, B);
     print_mnum("A * B", C);
 
-    number_t C_vals[2] = { num_new(), num_new() };
+    number_t C_vals[2] = { NUM_ZERO, NUM_ZERO };
     mat_get_data_num(C, C_vals);
 
     for (size_t j = 0; j < 2; j++)
@@ -2448,8 +2455,8 @@ static void test_multiply_mixed_num_num_complex(void)
     print_mnum("A * B", C);
 
     number_t C_vals[6] = {
-        num_new(), num_new(), num_new(),
-        num_new(), num_new(), num_new()};
+        NUM_ZERO, NUM_ZERO, NUM_ZERO,
+        NUM_ZERO, NUM_ZERO, NUM_ZERO};
     mat_get_data_num(C, C_vals);
 
     for (size_t i = 0; i < 2; i++)
@@ -2490,7 +2497,7 @@ static void test_scalar_mul_d_d(void)
     print_md("A", A);
 
     matrix_t *B = mat_scalar_mul(A, &alpha_num);
-    number_t B_vals[4];
+    number_t B_vals[4] = {NUM_ZERO};
     print_mnum("alpha * A", B);
     mat_get_data_num(B, B_vals);
 
@@ -2524,7 +2531,7 @@ static void test_scalar_mul_num_real(void)
     print_mnum("A", A);
 
     matrix_t *B = mat_scalar_mul(A, &alpha_num);
-    number_t B_vals[4] = { num_new(), num_new(), num_new(), num_new() };
+    number_t B_vals[4] = { NUM_ZERO, NUM_ZERO, NUM_ZERO, NUM_ZERO };
     print_mnum("alpha * A", B);
     mat_get_data_num(B, B_vals);
 
@@ -2560,7 +2567,7 @@ static void test_scalar_mul_num_complex(void)
     print_mnum("A", A);
 
     matrix_t *B = mat_scalar_mul(A, &alpha_num);
-    number_t B_vals[3] = { num_new(), num_new(), num_new() };
+    number_t B_vals[3] = { NUM_ZERO, NUM_ZERO, NUM_ZERO };
     print_mnum("alpha * A", B);
     mat_get_data_num(B, B_vals);
 
@@ -2596,8 +2603,8 @@ static void test_scalar_mul_decimal_num(void)
 
     matrix_t *B = mat_scalar_mul(A, &alpha_num);
     number_t B_vals[6] = {
-        num_new(), num_new(), num_new(),
-        num_new(), num_new(), num_new()};
+        NUM_ZERO, NUM_ZERO, NUM_ZERO,
+        NUM_ZERO, NUM_ZERO, NUM_ZERO};
     print_mnum("alpha * A", B);
     mat_get_data_num(B, B_vals);
 
@@ -2634,7 +2641,7 @@ static void test_scalar_mul_complex_complex(void)
     print_mnum("A", A);
 
     matrix_t *B = mat_scalar_mul(A, &alpha_num);
-    number_t B_vals[4] = { num_new(), num_new(), num_new(), num_new() };
+    number_t B_vals[4] = { NUM_ZERO, NUM_ZERO, NUM_ZERO, NUM_ZERO };
     print_mnum("alpha * A", B);
     mat_get_data_num(B, B_vals);
 
@@ -2757,10 +2764,10 @@ static void test_identity_arith_num_real(void)
     print_mnum("A * I", A_times_I);
     print_mnum("I * A", I_times_A);
 
-    number_t got_add[4] = { num_new(), num_new(), num_new(), num_new() };
-    number_t got_sub[4] = { num_new(), num_new(), num_new(), num_new() };
-    number_t got_ai[4] = { num_new(), num_new(), num_new(), num_new() };
-    number_t got_ia[4] = { num_new(), num_new(), num_new(), num_new() };
+    number_t got_add[4] = { NUM_ZERO, NUM_ZERO, NUM_ZERO, NUM_ZERO };
+    number_t got_sub[4] = { NUM_ZERO, NUM_ZERO, NUM_ZERO, NUM_ZERO };
+    number_t got_ai[4] = { NUM_ZERO, NUM_ZERO, NUM_ZERO, NUM_ZERO };
+    number_t got_ia[4] = { NUM_ZERO, NUM_ZERO, NUM_ZERO, NUM_ZERO };
     mat_get_data_num(ApI, got_add);
     mat_get_data_num(AmI, got_sub);
     mat_get_data_num(A_times_I, got_ai);
@@ -2825,10 +2832,10 @@ static void test_identity_arith_num_complex(void)
     print_mnum("A * I", A_times_I);
     print_mnum("I * A", I_times_A);
 
-    number_t got_add[4] = { num_new(), num_new(), num_new(), num_new() };
-    number_t got_sub[4] = { num_new(), num_new(), num_new(), num_new() };
-    number_t got_ai[4] = { num_new(), num_new(), num_new(), num_new() };
-    number_t got_ia[4] = { num_new(), num_new(), num_new(), num_new() };
+    number_t got_add[4] = { NUM_ZERO, NUM_ZERO, NUM_ZERO, NUM_ZERO };
+    number_t got_sub[4] = { NUM_ZERO, NUM_ZERO, NUM_ZERO, NUM_ZERO };
+    number_t got_ai[4] = { NUM_ZERO, NUM_ZERO, NUM_ZERO, NUM_ZERO };
+    number_t got_ia[4] = { NUM_ZERO, NUM_ZERO, NUM_ZERO, NUM_ZERO };
     mat_get_data_num(ApI, got_add);
     mat_get_data_num(AmI, got_sub);
     mat_get_data_num(A_times_I, got_ai);
@@ -2882,7 +2889,7 @@ static void test_scalar_div_d_d(void)
     print_md("A", A);
 
     matrix_t *B = mat_scalar_div(A, &alpha_num);
-    number_t B_vals[4];
+    number_t B_vals[4] = {NUM_ZERO};
     print_mnum("A / alpha", B);
     mat_get_data_num(B, B_vals);
 
@@ -2916,7 +2923,7 @@ static void test_scalar_div_num_real(void)
     print_mnum("A", A);
 
     matrix_t *B = mat_scalar_div(A, &alpha_num);
-    number_t B_vals[4] = { num_new(), num_new(), num_new(), num_new() };
+    number_t B_vals[4] = { NUM_ZERO, NUM_ZERO, NUM_ZERO, NUM_ZERO };
     print_mnum("A / alpha", B);
     mat_get_data_num(B, B_vals);
 
@@ -2952,7 +2959,7 @@ static void test_scalar_div_num_complex(void)
     print_mnum("A", A);
 
     matrix_t *B = mat_scalar_div(A, &alpha_num);
-    number_t B_vals[3] = { num_new(), num_new(), num_new() };
+    number_t B_vals[3] = { NUM_ZERO, NUM_ZERO, NUM_ZERO };
     print_mnum("A / alpha", B);
     mat_get_data_num(B, B_vals);
 
@@ -2990,7 +2997,7 @@ static void test_scalar_div_numeric_real(void)
     print_mnum("A", A);
 
     matrix_t *B = mat_scalar_div(A, &alpha_num);
-    number_t B_vals[4] = { num_new(), num_new(), num_new(), num_new() };
+    number_t B_vals[4] = { NUM_ZERO, NUM_ZERO, NUM_ZERO, NUM_ZERO };
     print_mnum("A / alpha", B);
     mat_get_data_num(B, B_vals);
 
@@ -3026,8 +3033,8 @@ static void test_scalar_div_real_numeric(void)
 
     matrix_t *B = mat_scalar_div(A, &alpha_num);
     number_t B_vals[6] = {
-        num_new(), num_new(), num_new(),
-        num_new(), num_new(), num_new()};
+        NUM_ZERO, NUM_ZERO, NUM_ZERO,
+        NUM_ZERO, NUM_ZERO, NUM_ZERO};
     print_mnum("A / alpha", B);
     mat_get_data_num(B, B_vals);
 
@@ -3143,7 +3150,7 @@ static void test_det_qfloat(void)
     matrix_t *A = mat_create_num(2, 2, vals);
     print_mnum("A (number 2x2)", A);
 
-    number_t det = num_new();
+    number_t det = NUM_ZERO;
     check_bool("mat_det(number real 2x2) rc = 0", mat_det(A, &det) == 0);
 
     number_t lhs = num_mul(vals[0], vals[3]);
@@ -3176,7 +3183,7 @@ static void test_det_qcomplex(void)
     matrix_t *A = mat_create_num(2, 2, vals);
     print_mnum("A (complex number 2x2)", A);
 
-    number_t det = num_new();
+    number_t det = NUM_ZERO;
     check_bool("mat_det(number complex 2x2) rc = 0", mat_det(A, &det) == 0);
 
     number_t lhs = num_mul(vals[0], vals[3]);
@@ -3781,13 +3788,10 @@ static void test_deriv_block_solve(void)
             mat_get(dX, 0, 0, &v);
             check_d("d(block solve)[0,0] = -7/81", expr_eval_d(v), -0.08641975308641975, 1e-12);
             check_expr_text_contains("d(block solve)[0,0] contains x", v, "x");
-            expr_free(v);
             mat_get(dX, 1, 0, &v);
             check_d("d(block solve)[1,0] = 11/81", expr_eval_d(v), 0.1358024691358025, 1e-12);
-            expr_free(v);
             mat_get(dX, 2, 0, &v);
             check_d("d(block solve)[2,0] = -1/27", expr_eval_d(v), -0.03703703703703703, 1e-12);
-            expr_free(v);
         }
 
         dA = mat_deriv(A, x);
@@ -3808,13 +3812,10 @@ static void test_deriv_block_solve(void)
         if (Residual) {
             mat_get(Residual, 0, 0, &v);
             check_d("block solve derivative residual[0,0] = 0", expr_eval_d(v), 0.0, 1e-12);
-            expr_free(v);
             mat_get(Residual, 1, 0, &v);
             check_d("block solve derivative residual[1,0] = 0", expr_eval_d(v), 0.0, 1e-12);
-            expr_free(v);
             mat_get(Residual, 2, 0, &v);
             check_d("block solve derivative residual[2,0] = 0", expr_eval_d(v), 0.0, 1e-12);
-            expr_free(v);
         }
 
         test_expr_set_val_d(x, 5.0);
@@ -3822,13 +3823,10 @@ static void test_deriv_block_solve(void)
         if (dX) {
             mat_get(dX, 0, 0, &v);
             check_d("updated d(block solve)[0,0] = -0.001814028486965869", expr_eval_d(v), -0.001814028486965869, 1e-12);
-            expr_free(v);
             mat_get(dX, 1, 0, &v);
             check_d("updated d(block solve)[1,0] = 0.0007390486428379468", expr_eval_d(v), 0.0007390486428379468, 1e-12);
-            expr_free(v);
             mat_get(dX, 2, 0, &v);
             check_d("updated d(block solve)[2,0] = 6.718624025799516e-05", expr_eval_d(v), 6.718624025799516e-05, 1e-12);
-            expr_free(v);
         }
 
         mat_free(Residual);
@@ -4470,7 +4468,7 @@ static void test_inverse_qfloat(void)
     matrix_t *P = mat_mul(A, Ai);
     print_mnum("A * A^{-1}", P);
 
-    number_t got[4] = { num_new(), num_new(), num_new(), num_new() };
+    number_t got[4] = { NUM_ZERO, NUM_ZERO, NUM_ZERO, NUM_ZERO };
     mat_get_data_num(P, got);
     check_matrix_core_num_value("prod[0,0] = 1", got[0], NUM_ONE, 1e-17);
     check_matrix_core_num_value("prod[1,1] = 1", got[3], NUM_ONE, 1e-17);
@@ -4567,25 +4565,19 @@ static void test_inverse_expr_2x2(void)
 
             mat_get(P, 0, 0, &v);
             check_d("expr prod[0,0] = 1", expr_eval_d(v), 1.0, 1e-12);
-            expr_free(v);
             mat_get(P, 0, 1, &v);
             check_d("expr prod[0,1] = 0", expr_eval_d(v), 0.0, 1e-12);
-            expr_free(v);
             mat_get(P, 1, 0, &v);
             check_d("expr prod[1,0] = 0", expr_eval_d(v), 0.0, 1e-12);
-            expr_free(v);
             mat_get(P, 1, 1, &v);
             check_d("expr prod[1,1] = 1", expr_eval_d(v), 1.0, 1e-12);
-            expr_free(v);
 
             test_expr_set_val_d(x, 5.0);
             test_expr_set_val_d(y, 6.0);
             mat_get(P, 0, 0, &v);
             check_d("expr inverse product tracks x,y on [0,0]", expr_eval_d(v), 1.0, 1e-12);
-            expr_free(v);
             mat_get(P, 1, 1, &v);
             check_d("expr inverse product tracks x,y on [1,1]", expr_eval_d(v), 1.0, 1e-12);
-            expr_free(v);
         }
 
         free(ai_text);
@@ -4656,7 +4648,6 @@ static void test_inverse_expr_upper_triangular(void)
                         mat_get(P, i, j, &v);
                         snprintf(label, sizeof(label), "upper expr prod[%zu,%zu]", i, j);
                         check_d(label, expr_eval_d(v), i == j ? 1.0 : 0.0, 1e-12);
-                        expr_free(v);
                     }
                 }
             }
@@ -4703,7 +4694,6 @@ static void test_inverse_expr_lower_triangular(void)
                         mat_get(P, i, j, &v);
                         snprintf(label, sizeof(label), "lower expr prod[%zu,%zu]", i, j);
                         check_d(label, expr_eval_d(v), i == j ? 1.0 : 0.0, 1e-12);
-                        expr_free(v);
                     }
                 }
             }
@@ -4750,7 +4740,6 @@ static void test_inverse_expr_dense_3x3(void)
                         mat_get(P, i, j, &v);
                         snprintf(label, sizeof(label), "dense 3x3 expr prod[%zu,%zu]", i, j);
                         check_d(label, expr_eval_d(v), i == j ? 1.0 : 0.0, 1e-10);
-                        expr_free(v);
                     }
                 }
             }
@@ -4801,7 +4790,6 @@ static void test_inverse_expr_dense_4x4(void)
                         snprintf(label, sizeof(label), "dense 4x4 expr prod[%zu,%zu]", i, j);
                         check_d(label, expr_eval_d(entry),
                                 i == j ? 1.0 : 0.0, 5e-2);
-                        expr_free(entry);
                     }
                 }
             }
@@ -4857,7 +4845,6 @@ static void test_inverse_expr_dense_6x6(void)
                         snprintf(label, sizeof(label), "dense 6x6 expr prod[%zu,%zu]", i, j);
                         check_d(label, expr_eval_d(entry),
                                 i == j ? 1.0 : 0.0, 5e-2);
-                        expr_free(entry);
                     }
                 }
             }
@@ -7601,31 +7588,38 @@ static void test_norms_and_condition(void)
             0.0, 4.0
         };
         matrix_t *A = test_mat_create_d(2, 2, A_vals);
-        number_t out = num_new();
+        number_t out = NUM_ZERO;
 
         print_md("A", A);
 
         check_bool("mat_norm(A,1)=0", mat_norm(A, MAT_NORM_1, &out) == 0);
         check_matrix_core_num_value_double("||A||_1 = 4", out, 4.0, 1e-30);
 
+        num_destroy(&out);
         check_bool("mat_norm(A,inf)=0", mat_norm(A, MAT_NORM_INF, &out) == 0);
         check_matrix_core_num_value_double("||A||_inf = 4", out, 4.0, 1e-30);
 
+        num_destroy(&out);
         check_bool("mat_norm(A,F)=0", mat_norm(A, MAT_NORM_FRO, &out) == 0);
         check_matrix_core_num_value_double("||A||_F = 5", out, 5.0, 1e-30);
 
+        num_destroy(&out);
         check_bool("mat_norm(A,2)=0", mat_norm(A, MAT_NORM_2, &out) == 0);
         check_matrix_core_num_value_double("||A||_2 = 4", out, 4.0, 1e-30);
 
+        num_destroy(&out);
         check_bool("mat_condition_number(A,1)=0", mat_condition_number(A, MAT_NORM_1, &out) == 0);
         check_matrix_core_num_value_double("cond_1(A) = 4/3", out, 4.0 / 3.0, 1e-15);
 
+        num_destroy(&out);
         check_bool("mat_condition_number(A,inf)=0", mat_condition_number(A, MAT_NORM_INF, &out) == 0);
         check_matrix_core_num_value_double("cond_inf(A) = 4/3", out, 4.0 / 3.0, 1e-15);
 
+        num_destroy(&out);
         check_bool("mat_condition_number(A,2)=0", mat_condition_number(A, MAT_NORM_2, &out) == 0);
         check_matrix_core_num_value_double("cond_2(A) = 4/3", out, 4.0 / 3.0, 1e-15);
 
+        num_destroy(&out);
         check_bool("mat_condition_number(A,F)=0", mat_condition_number(A, MAT_NORM_FRO, &out) == 0);
         check_matrix_core_num_value_double("cond_F(A) = 25/12", out, 25.0 / 12.0, 1e-15);
 
@@ -7641,19 +7635,22 @@ static void test_norms_and_condition(void)
             NUM_ZERO
         };
         matrix_t *A = mat_create_num(2, 2, A_vals);
-        number_t out = num_new();
+        number_t out = NUM_ZERO;
 
         print_mnum("A", A);
 
         check_bool("mat_norm(complex number A,1)=0", mat_norm(A, MAT_NORM_1, &out) == 0);
         check_matrix_core_num_value_double("||A||_1 (complex number) = 5", out, 5.0, 1e-28);
 
+        num_destroy(&out);
         check_bool("mat_norm(complex number A,inf)=0", mat_norm(A, MAT_NORM_INF, &out) == 0);
         check_matrix_core_num_value_double("||A||_inf (complex number) = 5", out, 5.0, 1e-28);
 
+        num_destroy(&out);
         check_bool("mat_norm(complex number A,F)=0", mat_norm(A, MAT_NORM_FRO, &out) == 0);
         check_matrix_core_num_value_double("||A||_F (complex number) = 5", out, 5.0, 1e-28);
 
+        num_destroy(&out);
         check_bool("mat_norm(complex number A,2)=0", mat_norm(A, MAT_NORM_2, &out) == 0);
         check_matrix_core_num_value_double("||A||_2 (complex number) = 5", out, 5.0, 1e-28);
 
@@ -7668,7 +7665,7 @@ static void test_norms_and_condition(void)
             2.0, 4.0
         };
         matrix_t *A = test_mat_create_d(2, 2, A_vals);
-        number_t out = num_new();
+        number_t out = NUM_ZERO;
 
         print_md("A", A);
         check_bool("mat_condition_number(singular A,2)=0", mat_condition_number(A, MAT_NORM_2, &out) == 0);
@@ -7687,7 +7684,7 @@ static void test_norms_and_condition(void)
         };
         matrix_t *A = NULL;
         number_t a00;
-        number_t out = num_new();
+        number_t out = NUM_ZERO;
         number_t three = num_create_from_string("3");
         number_t cond = num_create_from_string("3626777458843887524118528");
 
@@ -7710,12 +7707,15 @@ static void test_norms_and_condition(void)
         check_bool("mat_norm(high-precision A,1)=0", A && mat_norm(A, MAT_NORM_1, &out) == 0);
         check_matrix_core_num_value("||A||_1 (high-precision) = 3", out, three, 1e-28);
 
+        num_destroy(&out);
         check_bool("mat_norm(high-precision A,inf)=0", A && mat_norm(A, MAT_NORM_INF, &out) == 0);
         check_matrix_core_num_value("||A||_inf (high-precision) = 3", out, three, 1e-28);
 
+        num_destroy(&out);
         check_bool("mat_norm(high-precision A,2)=0", A && mat_norm(A, MAT_NORM_2, &out) == 0);
         check_matrix_core_num_value("||A||_2 (high-precision) = 3", out, three, 1e-28);
 
+        num_destroy(&out);
         check_bool("mat_condition_number(high-precision A,2)=0",
                    A && mat_condition_number(A, MAT_NORM_2, &out) == 0);
         check_bool("cond_2(high-precision A) is finite or inf under current backend",
@@ -7777,28 +7777,28 @@ static void test_hermitian_op(void)
         matrix_t *H = mat_hermitian(A);
         print_mnum("A^† (complex number)", H);
 
-        number_t got = num_new();
+        number_t got = NUM_ZERO;
         number_t expected = num_conj(z11);
         mat_get(H, 0, 0, &got);
         check_bool("H[0,0] = conj(1+2i)", num_eq(got, expected));
         num_destroy(&got);
         num_destroy(&expected);
 
-        got = num_new();
+        got = NUM_ZERO;
         expected = num_conj(z22);
         mat_get(H, 1, 1, &got);
         check_bool("H[1,1] = conj(-2)", num_eq(got, expected));
         num_destroy(&got);
         num_destroy(&expected);
 
-        got = num_new();
+        got = NUM_ZERO;
         expected = num_conj(z12);
         mat_get(H, 1, 0, &got);
         check_bool("H[1,0] = conj(A[0,1])", num_eq(got, expected));
         num_destroy(&got);
         num_destroy(&expected);
 
-        got = num_new();
+        got = NUM_ZERO;
         expected = num_conj(z21);
         mat_get(H, 0, 1, &got);
         check_bool("H[0,1] = conj(A[1,0])", num_eq(got, expected));

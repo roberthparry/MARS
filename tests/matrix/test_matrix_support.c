@@ -892,7 +892,6 @@ static void print_mexpr_raw(const char *label, matrix_t *A)
             if (visible_string_width(buf) > w[j])
                 w[j] = visible_string_width(buf);
             free(binding_text);
-            expr_free(v);
         }
 
     if (!ok) {

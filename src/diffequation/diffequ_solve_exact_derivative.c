@@ -39,21 +39,25 @@ static bool de_exact_contains_formal_derivative(const expr_t *expr)
 
 static bool de_exact_is_numeric_constant(const expr_t *expr)
 {
-    number_t value;
+    number_t value = num_new();
 
-    if (!expr_match_const_value(expr, &value))
+    if (!expr_match_const_value(expr, &value)) {
+        num_destroy(&value);
         return false;
+    }
     num_destroy(&value);
     return true;
 }
 
 static bool de_exact_is_numeric_one(const expr_t *expr)
 {
-    number_t value;
+    number_t value = num_new();
     bool is_one;
 
-    if (!expr_match_const_value(expr, &value))
+    if (!expr_match_const_value(expr, &value)) {
+        num_destroy(&value);
         return false;
+    }
     is_one = num_eq(value, NUM_ONE);
     num_destroy(&value);
     return is_one;

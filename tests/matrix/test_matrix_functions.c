@@ -34,7 +34,7 @@ static void test_eigen_d(void)
     print_md("A", A);
 
     /* eigenvalues only */
-    number_t ev[2] = {num_new(), num_new()};
+    number_t ev[2] = {NUM_ZERO, NUM_ZERO};
     mat_eigenvalues(A, ev);
     num_printf("    eigenvalue[0] (mat_eigenvalues): %N\n", ev[0]);
     num_printf("    eigenvalue[1] (mat_eigenvalues): %N\n", ev[1]);
@@ -45,7 +45,7 @@ static void test_eigen_d(void)
     check_d("eigenvalue max = 9", lmax, 9.0, 1e-10);
 
     /* full decomposition */
-    number_t ev2[2] = {num_new(), num_new()};
+    number_t ev2[2] = {NUM_ZERO, NUM_ZERO};
     matrix_t *V = NULL;
     mat_eigendecompose(A, ev2, &V);
 
@@ -112,7 +112,7 @@ static void test_eigen_mp_real(void)
     print_mnum("A", A);
 
     /* eigenvalues only */
-    number_t ev[2] = {num_new(), num_new()};
+    number_t ev[2] = {NUM_ZERO, NUM_ZERO};
     mat_eigenvalues(A, ev);
     num_printf("    eigenvalue[0]: %N\n", ev[0]);
     num_printf("    eigenvalue[1]: %N\n", ev[1]);
@@ -130,7 +130,7 @@ static void test_eigen_mp_real(void)
     }
 
     /* full decomposition */
-    number_t ev2[2] = {num_new(), num_new()};
+    number_t ev2[2] = {NUM_ZERO, NUM_ZERO};
     matrix_t *V = NULL;
     mat_eigendecompose(A, ev2, &V);
 
@@ -200,7 +200,7 @@ static void test_eigen_complex(void)
     print_mnum("A", A);
 
     /* eigenvalues only */
-    number_t ev[2] = {num_new(), num_new()};
+    number_t ev[2] = {NUM_ZERO, NUM_ZERO};
     mat_eigenvalues(A, ev);
     num_printf("    eigenvalue[0]: %N\n", ev[0]);
     num_printf("    eigenvalue[1]: %N\n", ev[1]);
@@ -218,7 +218,7 @@ static void test_eigen_complex(void)
     }
 
     /* full decomposition */
-    number_t ev2[2] = {num_new(), num_new()};
+    number_t ev2[2] = {NUM_ZERO, NUM_ZERO};
     matrix_t *V = NULL;
     mat_eigendecompose(A, ev2, &V);
     print_mnum("eigenvectors V (columns)", V);
@@ -281,8 +281,8 @@ static void test_eigen_num_hermitian(void)
         num_create_from_string("1 - i"),
         num_create_from_long(3)};
     matrix_t *A = mat_create_num(2, 2, A_vals);
-    number_t ev[2] = {num_new(), num_new()};
-    number_t ev2[2] = {num_new(), num_new()};
+    number_t ev[2] = {NUM_ZERO, NUM_ZERO};
+    number_t ev2[2] = {NUM_ZERO, NUM_ZERO};
     matrix_t *V = NULL;
     matrix_t *V2 = NULL;
 
@@ -372,8 +372,8 @@ static void test_eigen_num_hermitian_high_precision(void)
         num_create_from_string("1.0 - 1.0i"),
         num_create_from_string("3.0")};
     matrix_t *A = NULL;
-    number_t ev[2] = {num_new(), num_new()};
-    number_t ev2[2] = {num_new(), num_new()};
+    number_t ev[2] = {NUM_ZERO, NUM_ZERO};
+    number_t ev2[2] = {NUM_ZERO, NUM_ZERO};
     matrix_t *V = NULL;
 
     for (size_t i = 0; i < 4; ++i)
@@ -2636,7 +2636,7 @@ static void test_eigen_general_d(void)
     mat_set(A, 1, 1, &a11);
     print_md("A", A);
 
-    number_t eigenvalues[2] = {num_new(), num_new()};
+    number_t eigenvalues[2] = {NUM_ZERO, NUM_ZERO};
     matrix_t *V = NULL;
     int rc = mat_eigendecompose(A, eigenvalues, &V);
     check_bool("mat_eigendecompose_general: rc = 0", rc == 0);
@@ -2680,7 +2680,7 @@ static void test_eigen_general_d(void)
     {
         double avals[4] = {4.0, -1.0, 2.0, 1.0};
         matrix_t *B = test_mat_create_d(2, 2, avals);
-        number_t evals[2] = {num_new(), num_new()};
+        number_t evals[2] = {NUM_ZERO, NUM_ZERO};
         matrix_t *W = NULL;
 
         check_bool("dense non-Hermitian B allocated", B != NULL);
@@ -2745,7 +2745,7 @@ static void test_eigen_general_mp_real(void)
     matrix_t *A = mat_create_num(2, 2, vals);
     print_mnum("A", A);
 
-    number_t eigenvalues[2] = {num_new(), num_new()};
+    number_t eigenvalues[2] = {NUM_ZERO, NUM_ZERO};
     matrix_t *V = NULL;
     int rc = mat_eigendecompose(A, eigenvalues, &V);
     check_bool("qf eigendecompose_general: rc = 0", rc == 0);
@@ -2788,7 +2788,7 @@ static void test_eigen_general_mp_real(void)
             num_create_from_double(4.0), num_create_from_double(-1.0),
             num_create_from_double(2.0), num_create_from_double(1.0)};
         matrix_t *B = mat_create_num(2, 2, avals);
-        number_t evals[2] = {num_new(), num_new()};
+        number_t evals[2] = {NUM_ZERO, NUM_ZERO};
         matrix_t *W = NULL;
         for (size_t i = 0; i < 4u; ++i)
             num_destroy(&avals[i]);
@@ -2864,7 +2864,7 @@ static void test_eigen_general_num_high_precision(void)
         num_create_from_string("1.2"),
         num_create_from_string("1.4")};
     matrix_t *A = NULL;
-    number_t eigenvalues[2] = {num_new(), num_new()};
+    number_t eigenvalues[2] = {NUM_ZERO, NUM_ZERO};
     matrix_t *V = NULL;
 
     for (size_t i = 0; i < 4; ++i)
@@ -2946,7 +2946,7 @@ static void test_eigen_general_num_high_precision(void)
             num_create_from_string("0.0"), num_create_from_string("3.0"),  num_create_from_string("-0.6"),
             num_create_from_string("0.0"), num_create_from_string("0.0"),  num_create_from_string("2.0")};
         matrix_t *B = NULL;
-        number_t evals3[3] = {num_new(), num_new(), num_new()};
+        number_t evals3[3] = {NUM_ZERO, NUM_ZERO, NUM_ZERO};
         matrix_t *W = NULL;
 
         for (size_t i = 0; i < 9; ++i)
@@ -4940,7 +4940,7 @@ static void check_number_upper_jordan_from_expr(const char *label,
     check_bool(label, R != NULL && mat_typeof(R) == MAT_TYPE_NUMBER);
 
     lambda = num_clone(jordan_data[0]);
-    x = expr_new_named_var(num_clone(lambda), "x");
+    x = expr_new_named_var(lambda, "x");
     expr = x ? build_expr(x) : NULL;
     deriv = expr ? expr_create_deriv(expr, x) : NULL;
     check_bool("number upper Jordan expr helper expr allocated",
@@ -5601,8 +5601,11 @@ static void test_number_matrix_functions(void)
         number_t lambda = num_clone(jordan_asin_data[0]);
         number_t lambda_sq = num_mul(lambda, lambda);
         number_t inside = num_sub(NUM_ONE, lambda_sq);
-        number_t deriv_expected = num_inv(num_sqrt(inside));
+        number_t root = num_sqrt(inside);
+        number_t deriv_expected = num_inv(root);
         number_t err;
+
+        num_destroy(&root);
 
         expected = num_asin(lambda);
         got = mat_get_num(ASN, 0, 0);
@@ -5665,8 +5668,13 @@ static void test_number_matrix_functions(void)
         number_t lambda = num_clone(jordan_acos_data[0]);
         number_t lambda_sq = num_mul(lambda, lambda);
         number_t inside = num_sub(NUM_ONE, lambda_sq);
-        number_t deriv_expected = num_neg(num_inv(num_sqrt(inside)));
+        number_t root = num_sqrt(inside);
+        number_t inverse = num_inv(root);
+        number_t deriv_expected = num_neg(inverse);
         number_t err;
+
+        num_destroy(&inverse);
+        num_destroy(&root);
 
         expected = num_acos(lambda);
         got = mat_get_num(ACS, 0, 0);
@@ -5728,8 +5736,11 @@ static void test_number_matrix_functions(void)
         number_t lambda = num_clone(jordan_asinh_data[0]);
         number_t lambda_sq = num_mul(lambda, lambda);
         number_t inside = num_add(lambda_sq, NUM_ONE);
-        number_t deriv_expected = num_inv(num_sqrt(inside));
+        number_t root = num_sqrt(inside);
+        number_t deriv_expected = num_inv(root);
         number_t err;
+
+        num_destroy(&root);
 
         expected = num_asinh(lambda);
         got = mat_get_num(ASH, 0, 0);
@@ -5779,8 +5790,15 @@ static void test_number_matrix_functions(void)
         number_t lambda = num_clone(jordan_acosh_data[0]);
         number_t lm1 = num_sub(lambda, NUM_ONE);
         number_t lp1 = num_add(lambda, NUM_ONE);
-        number_t deriv_expected = num_inv(num_mul(num_sqrt(lm1), num_sqrt(lp1)));
+        number_t left_root = num_sqrt(lm1);
+        number_t right_root = num_sqrt(lp1);
+        number_t root_product = num_mul(left_root, right_root);
+        number_t deriv_expected = num_inv(root_product);
         number_t err;
+
+        num_destroy(&root_product);
+        num_destroy(&right_root);
+        num_destroy(&left_root);
 
         expected = num_acosh(lambda);
         got = mat_get_num(ACH, 0, 0);

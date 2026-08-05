@@ -2244,16 +2244,11 @@ static void test_binding_edit_preserves_symbolic_value(void)
     char *fraction_func_text = fraction
         ? expr_to_string(fraction, style_FUNCTION)
         : NULL;
-
-    TEST_ASSERT_TRUE(expr_text && strstr(expr_text, "x = π"),
-                     "binding edit preserves pi in expression output");
-    TEST_ASSERT_TRUE(func_text &&
-                         strstr(func_text, "x = @pi\noutput(expr(x));"),
-                     "binding edit preserves pi in function output");
-    TEST_ASSERT_TRUE(fraction_func_text &&
-                         strstr(fraction_func_text,
-                                "x = ½\noutput(expr(x));"),
-                     "function output preserves a Unicode fraction binding");
+    bool expression_preserved = expr_text && strstr(expr_text, "x = π");
+    bool function_preserved = func_text &&
+        strstr(func_text, "x = @pi\noutput(expr(x));");
+    bool fraction_preserved = fraction_func_text &&
+        strstr(fraction_func_text, "x = ½\noutput(expr(x));");
 
     free(fraction_func_text);
     free(func_text);
@@ -2264,6 +2259,13 @@ static void test_binding_edit_preserves_symbolic_value(void)
     expr_free(edited);
     expr_bindings_free(bindings);
     expr_free(expr);
+
+    TEST_ASSERT_TRUE(expression_preserved,
+                     "binding edit preserves pi in expression output");
+    TEST_ASSERT_TRUE(function_preserved,
+                     "binding edit preserves pi in function output");
+    TEST_ASSERT_TRUE(fraction_preserved,
+                     "function output preserves a Unicode fraction binding");
 }
 
 static void test_from_string_unevaluated_integral(void)

@@ -38,6 +38,52 @@ static number_t test_num_mul_double(const number_t number, double value);
 static number_t test_num_make_complex(const number_t real, const number_t imag);
 TEST_SUITE_SETUP(test_integrator_suite_setup);
 
+static void test_number_auto_destroy(number_t *value)
+{
+    num_destroy(value);
+}
+
+static void test_number_array_1_auto_destroy(number_t (*values)[1])
+{
+    num_destroy(&(*values)[0]);
+}
+
+static void test_number_array_2_auto_destroy(number_t (*values)[2])
+{
+    for (size_t i = 0; i < 2u; ++i)
+        num_destroy(&(*values)[i]);
+}
+
+static void test_number_array_3_auto_destroy(number_t (*values)[3])
+{
+    for (size_t i = 0; i < 3u; ++i)
+        num_destroy(&(*values)[i]);
+}
+
+static void test_number_array_4_auto_destroy(number_t (*values)[4])
+{
+    for (size_t i = 0; i < 4u; ++i)
+        num_destroy(&(*values)[i]);
+}
+
+#define TEST_NUMBER_AUTO(name) \
+    __attribute__((cleanup(test_number_auto_destroy))) number_t name = NUM_ZERO
+
+#define TEST_NUMBER_AUTO_VALUE(name, ...) \
+    __attribute__((cleanup(test_number_auto_destroy))) number_t name = ({ \
+        NUM_SCOPE(test_value_scope); \
+        num_scope_detach((__VA_ARGS__)); \
+    })
+
+#define TEST_NUMBER_ARRAY_AUTO_1(name) \
+    __attribute__((cleanup(test_number_array_1_auto_destroy))) number_t name[1]
+#define TEST_NUMBER_ARRAY_AUTO_2(name) \
+    __attribute__((cleanup(test_number_array_2_auto_destroy))) number_t name[2]
+#define TEST_NUMBER_ARRAY_AUTO_3(name) \
+    __attribute__((cleanup(test_number_array_3_auto_destroy))) number_t name[3]
+#define TEST_NUMBER_ARRAY_AUTO_4(name) \
+    __attribute__((cleanup(test_number_array_4_auto_destroy))) number_t name[4]
+
 static int test_display_sig_digits_override = -1;
 static const size_t test_exact_display_sig_digits = 18u;
 static const char *test_pending_result_fmt = NULL;
@@ -289,7 +335,7 @@ static int test_parse_size_digits(const string_t *text, size_t *out)
 
 static size_t test_precision_expectation_digits(number_t result, number_t err, bool *exact_out)
 {
-    number_t abs_err = num_new();
+    TEST_NUMBER_AUTO(abs_err);
     size_t digits = 0u;
 
     if (exact_out)
@@ -306,19 +352,24 @@ static size_t test_precision_expectation_digits(number_t result, number_t err, b
     }
 
     {
-        number_t abs_result = num_new();
-        number_t scale = num_new();
-        number_t metric = num_new();
-        number_t neg_log10 = num_new();
-        number_t digits_num = num_new();
+        TEST_NUMBER_AUTO(abs_result);
+        TEST_NUMBER_AUTO(scale);
+        TEST_NUMBER_AUTO(metric);
+        TEST_NUMBER_AUTO(neg_log10);
+        TEST_NUMBER_AUTO(digits_num);
         string_t *digits_text = NULL;
 
         abs_result = num_abs(result);
-        scale = num_is_zero(abs_result) ? num_clone(NUM_ONE) : abs_result;
+        scale = num_is_zero(abs_result)
+            ? num_clone(NUM_ONE)
+            : num_clone(abs_result);
         metric = num_div(abs_err, scale);
 
         if (num_is_real(metric) && num_is_finite(metric) && num_lt(metric, NUM_ONE)) {
-            neg_log10 = num_neg(num_log10(metric));
+            TEST_NUMBER_AUTO(log10_metric);
+
+            log10_metric = num_log10(metric);
+            neg_log10 = num_neg(log10_metric);
             digits_num = num_floor(neg_log10);
             digits_text = num_to_string(digits_num);
             (void)test_parse_size_digits(digits_text, &digits);
@@ -450,6 +501,16 @@ static number_t test_num_make_complex(const number_t real, const number_t imag)
     return out;
 }
 
+static void test_intg_set_tolerance_text(integrator_t *ig, const char *text)
+{
+    number_t abs_tol = num_create_from_string(text);
+    number_t rel_tol = num_create_from_string(text);
+
+    intg_set_tolerance(ig, abs_tol, rel_tol);
+    num_destroy(&rel_tol);
+    num_destroy(&abs_tol);
+}
+
 static expr_t *test_expr_new_const_d(double x)
 {
     number_t n = test_num_from_double(x);
@@ -461,10 +522,9 @@ static expr_t *test_expr_new_const_d(double x)
 
 static expr_t *test_expr_new_var_num(number_t x)
 {
-    number_t n = num_clone(x);
-    expr_t *dv = expr_new_var(n);
+    expr_t *dv = expr_new_var(x);
 
-    num_destroy(&n);
+    num_destroy(&x);
     return dv;
 }
 
@@ -526,11 +586,13 @@ void test_polynomial(void) {
     expr_t *x    = test_expr_new_var_num(test_num_from_double(0.0));
     expr_t *expr = expr_mul(x, x);
 
-    number_t result, err;
+    TEST_NUMBER_AUTO(result);
+
+    TEST_NUMBER_AUTO(err);
     int s = intg_integral(ig, expr, x,
                                test_num_from_double(0.0), test_num_from_double(1.0),
                                &result, &err);
-    number_t expected = num_create_from_string("0.33333333333333333333333333333333333333");
+    TEST_NUMBER_AUTO_VALUE(expected, num_create_from_string("0.33333333333333333333333333333333333333"));
     printf("  ∫₀¹ x² dx\n");
     test_num_printf_compat("  result   = %q\n", result);
     test_num_printf_compat("  expected = %q\n", expected);
@@ -548,12 +610,12 @@ void test_single_integral_num_high_precision_log(void) {
     integrator_t *ig = intg_new();
     expr_t *x = NULL;
     expr_t *expr = NULL;
-    number_t one = num_new();
-    number_t two = num_new();
-    number_t result = num_new();
-    number_t err = num_new();
-    number_t log_two = num_new();
-    number_t expected = num_new();
+    TEST_NUMBER_AUTO(one);
+    TEST_NUMBER_AUTO(two);
+    TEST_NUMBER_AUTO(result);
+    TEST_NUMBER_AUTO(err);
+    TEST_NUMBER_AUTO(log_two);
+    TEST_NUMBER_AUTO(expected);
     int s = -1;
 
     ASSERT_TRUE(ig);
@@ -564,7 +626,7 @@ void test_single_integral_num_high_precision_log(void) {
 
     one = num_create_from_long(1);
     two = num_create_from_long(2);
-    x = expr_new_named_var(num_clone(one), "x");
+    x = expr_new_named_var(one, "x");
     expr = expr_log(x);
     if (!x || !expr) {
         test_mark_failure(__FILE__, __LINE__, "could not build log(x) expression");
@@ -580,7 +642,8 @@ void test_single_integral_num_high_precision_log(void) {
     }
 
     log_two = num_log(two);
-    expected = num_sub(num_mul_long(log_two, 2L), NUM_ONE);
+    TEST_NUMBER_AUTO_VALUE(twice_log_two, num_mul_long(log_two, 2L));
+    expected = num_sub(twice_log_two, NUM_ONE);
 
     printf("  ∫₁² log(x) dx  [multiprecision]\n");
     test_print_number_line("result", result);
@@ -610,12 +673,13 @@ void test_sin(void) {
     integrator_t *ig = intg_new();
     expr_t *x = test_expr_new_var_num(test_num_from_double(0.0));
     expr_t *expr = expr_sin(x);
-    intg_set_tolerance(ig, num_create_from_string("1e-21"), num_create_from_string("1e-21"));
-    number_t result, err;
+    test_intg_set_tolerance_text(ig, "1e-21");
+    TEST_NUMBER_AUTO(result);
+    TEST_NUMBER_AUTO(err);
     int s = intg_integral(ig, expr, x,
                         test_num_from_double(0.0), NUM_PI,
                         &result, &err);
-    number_t expected = test_num_from_double(2.0);
+    TEST_NUMBER_AUTO_VALUE(expected, test_num_from_double(2.0));
     printf("  ∫₀^π sin(x) dx\n");
     test_num_printf_compat("  result   = %q\n", result);
     test_num_printf_compat("  expected = %q\n", expected);
@@ -633,12 +697,13 @@ void test_exp(void) {
     integrator_t *ig = intg_new();
     expr_t *x = test_expr_new_var_num(test_num_from_double(0.0));
     expr_t *expr = expr_exp(x);
-    intg_set_tolerance(ig, num_create_from_string("1e-21"), num_create_from_string("1e-21"));
-    number_t result, err;
+    test_intg_set_tolerance_text(ig, "1e-21");
+    TEST_NUMBER_AUTO(result);
+    TEST_NUMBER_AUTO(err);
     int s = intg_integral(ig, expr, x,
                         test_num_from_double(0.0), test_num_from_double(1.0),
                         &result, &err);
-    number_t expected = num_sub(NUM_E, test_num_from_double(1.0));
+    TEST_NUMBER_AUTO_VALUE(expected, num_sub(NUM_E, test_num_from_double(1.0)));
     printf("  ∫₀¹ exp(x) dx\n");
     test_num_printf_compat("  result   = %q\n", result);
     test_num_printf_compat("  expected = %q\n", expected);
@@ -659,8 +724,9 @@ void test_arctan(void) {
     expr_t *x2 = expr_mul(x, x);
     expr_t *denom = expr_add(one, x2);
     expr_t *expr = expr_div(one, denom);
-    intg_set_tolerance(ig, num_create_from_string("1e-21"), num_create_from_string("1e-21"));
-    number_t result, err;
+    test_intg_set_tolerance_text(ig, "1e-21");
+    TEST_NUMBER_AUTO(result);
+    TEST_NUMBER_AUTO(err);
     int s = intg_integral(ig, expr, x,
                         test_num_from_double(-1.0), test_num_from_double(1.0),
                         &result, &err);
@@ -684,12 +750,13 @@ void test_log(void) {
     integrator_t *ig = intg_new();
     expr_t *x = test_expr_new_var_num(test_num_from_double(1.0));
     expr_t *expr = expr_log(x);
-    intg_set_tolerance(ig, num_create_from_string("1e-21"), num_create_from_string("1e-21"));
-    number_t result, err;
+    test_intg_set_tolerance_text(ig, "1e-21");
+    TEST_NUMBER_AUTO(result);
+    TEST_NUMBER_AUTO(err);
     int s = intg_integral(ig, expr, x,
                         test_num_from_double(1.0), NUM_E,
                         &result, &err);
-    number_t expected = test_num_from_double(1.0);
+    TEST_NUMBER_AUTO_VALUE(expected, test_num_from_double(1.0));
     printf("  ∫₁^e ln(x) dx\n");
     test_num_printf_compat("  result   = %q\n", result);
     test_num_printf_compat("  expected = %q\n", expected);
@@ -708,11 +775,14 @@ void test_constant(void) {
     expr_t *x    = test_expr_new_var_num(test_num_from_double(0.0));
     expr_t *expr = test_expr_new_const_d(1.0);
 
-    number_t result, err;
+    TEST_NUMBER_AUTO(result);
+
+    TEST_NUMBER_AUTO(err);
+    TEST_NUMBER_AUTO_VALUE(upper, test_num_from_double(5.0));
     int s = intg_integral(ig, expr, x,
-                               test_num_from_double(0.0), test_num_from_double(5.0),
+                               test_num_from_double(0.0), upper,
                                &result, &err);
-    number_t expected = test_num_from_double(5.0);
+    TEST_NUMBER_AUTO_VALUE(expected, test_num_from_double(5.0));
     printf("  ∫₀^5 1 dx  (rectangle — exact special path)\n");
     test_num_printf_compat("  result   = %q\n", result);
     test_num_printf_compat("  expected = %q\n", expected);
@@ -730,11 +800,14 @@ void test_linear(void) {
     integrator_t *ig = intg_new();
     expr_t *x    = test_expr_new_var_num(test_num_from_double(0.0));
 
-    number_t result, err;
+    TEST_NUMBER_AUTO(result);
+
+    TEST_NUMBER_AUTO(err);
+    TEST_NUMBER_AUTO_VALUE(upper, test_num_from_double(5.0));
     int s = intg_integral(ig, x, x,
-                               test_num_from_double(0.0), test_num_from_double(5.0),
+                               test_num_from_double(0.0), upper,
                                &result, &err);
-    number_t expected = num_create_from_string("12.5");
+    TEST_NUMBER_AUTO_VALUE(expected, num_create_from_string("12.5"));
     printf("  ∫₀^5 x dx  (triangle — exact special path)\n");
     test_num_printf_compat("  result   = %q\n", result);
     test_num_printf_compat("  expected = %q\n", expected);
@@ -750,10 +823,12 @@ void test_set_tol(void) {
     integrator_t *ig = intg_new();
     expr_t *x = test_expr_new_var_num(test_num_from_double(0.0));
     expr_t *expr = expr_sin(x);
-    number_t loose = num_create_from_string("1e-10");
+    TEST_NUMBER_AUTO_VALUE(loose, num_create_from_string("1e-10"));
     intg_set_tolerance(ig, loose, loose);
 
-    number_t result, err;
+    TEST_NUMBER_AUTO(result);
+
+    TEST_NUMBER_AUTO(err);
     int s = intg_integral(ig, expr, x,
                         test_num_from_double(0.0), NUM_PI,
                         &result, &err);
@@ -762,7 +837,8 @@ void test_set_tol(void) {
     test_num_printf_compat("  err      = %q  (limit 1e-8)\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     /* Error estimate should be at or below the loose tolerance */
-    ASSERT_TRUE(num_le(err, num_create_from_string("1e-8")));
+    TEST_NUMBER_AUTO_VALUE(error_limit, num_create_from_string("1e-8"));
+    ASSERT_TRUE(num_le(err, error_limit));
     expr_free(expr);
     expr_free(x);
     intg_free(ig);
@@ -775,7 +851,9 @@ void test_max_intervals(void) {
     expr_t *expr = expr_sin(x);
     intg_set_interval_count_max(ig, 1);
 
-    number_t result, err;
+    TEST_NUMBER_AUTO(result);
+
+    TEST_NUMBER_AUTO(err);
     int s = intg_integral(ig, expr, x,
                         test_num_from_double(0.0), NUM_PI,
                         &result, &err);
@@ -799,7 +877,8 @@ void test_last_intervals(void) {
     integrator_t *ig = intg_new();
     expr_t *x = test_expr_new_var_num(test_num_from_double(0.0));
     expr_t *expr = expr_exp(x);
-    number_t result, err;
+    TEST_NUMBER_AUTO(result);
+    TEST_NUMBER_AUTO(err);
     int s = intg_integral(ig, expr, x,
                         test_num_from_double(0.0), test_num_from_double(1.0),
                         &result, &err);
@@ -818,7 +897,7 @@ void test_null_safety(void) {
     integrator_t *ig = intg_new();
     expr_t *x = test_expr_new_var_num(test_num_from_double(0.0));
     expr_t *expr = expr_exp(x);
-    number_t result;
+    TEST_NUMBER_AUTO(result);
     /* NULL expr */
     int s = intg_integral(ig, NULL, x,
                         test_num_from_double(0.0), test_num_from_double(1.0),
@@ -840,11 +919,13 @@ void test_reversed_limits(void) {
     expr_t *x    = test_expr_new_var_num(test_num_from_double(0.0));
     expr_t *expr = expr_mul(x, x);
 
-    number_t result, err;
+    TEST_NUMBER_AUTO(result);
+
+    TEST_NUMBER_AUTO(err);
     int s = intg_integral(ig, expr, x,
                                test_num_from_double(1.0), test_num_from_double(0.0),
                                &result, &err);
-    number_t expected = num_create_from_string("-0.33333333333333333333333333333333333333");
+    TEST_NUMBER_AUTO_VALUE(expected, num_create_from_string("-0.33333333333333333333333333333333333333"));
     printf("  ∫₁⁰ x² dx  (reversed limits)\n");
     test_num_printf_compat("  result   = %q\n", result);
     test_num_printf_compat("  expected = %q\n", expected);
@@ -867,11 +948,13 @@ void test_expr_sin(void) {
     expr_t *x    = test_expr_new_var_num(test_num_from_double(0.0));
     expr_t *expr = expr_sin(x);
 
-    number_t result, err;
+    TEST_NUMBER_AUTO(result);
+
+    TEST_NUMBER_AUTO(err);
     int s = intg_integral(ig, expr, x,
                                test_num_from_double(0.0), NUM_PI,
                                &result, &err);
-    number_t expected = test_num_from_double(2.0);
+    TEST_NUMBER_AUTO_VALUE(expected, test_num_from_double(2.0));
     printf("  ∫₀^π sin(x) dx  [Turán T15/T4]\n");
     test_num_printf_compat("  result   = %q\n", result);
     test_num_printf_compat("  expected = %q\n", expected);
@@ -891,11 +974,13 @@ void test_expr_exp(void) {
     expr_t *x    = test_expr_new_var_num(test_num_from_double(0.0));
     expr_t *expr = expr_exp(x);
 
-    number_t result, err;
+    TEST_NUMBER_AUTO(result);
+
+    TEST_NUMBER_AUTO(err);
     int s = intg_integral(ig, expr, x,
                                test_num_from_double(0.0), test_num_from_double(1.0),
                                &result, &err);
-    number_t expected = num_sub(NUM_E, test_num_from_double(1.0));
+    TEST_NUMBER_AUTO_VALUE(expected, num_sub(NUM_E, test_num_from_double(1.0)));
     printf("  ∫₀¹ exp(x) dx  [Turán T15/T4]\n");
     test_num_printf_compat("  result   = %q\n", result);
     test_num_printf_compat("  expected = %q\n", expected);
@@ -918,7 +1003,9 @@ void test_expr_arctan(void) {
     expr_t *denom = expr_add(one, x2);
     expr_t *expr = expr_div(one, denom);
 
-    number_t result, err;
+    TEST_NUMBER_AUTO(result);
+
+    TEST_NUMBER_AUTO(err);
     int s = intg_integral(ig, expr, x,
                                test_num_from_double(-1.0), test_num_from_double(1.0),
                                &result, &err);
@@ -942,7 +1029,7 @@ void test_expr_null_safety(void) {
     integrator_t *ig = intg_new();
     expr_t *x    = test_expr_new_var_num(test_num_from_double(0.0));
     expr_t *expr = expr_exp(x);
-    number_t result;
+    TEST_NUMBER_AUTO(result);
 
     /* NULL integrator */
     int s = intg_integral(NULL, expr, x,
@@ -978,12 +1065,14 @@ void test_double_polynomial(void) {
     expr_t *y    = test_expr_new_var_num(test_num_from_double(0.0));
     expr_t *expr = expr_mul(x, y);
 
-    number_t result, err;
+    TEST_NUMBER_AUTO(result);
+
+    TEST_NUMBER_AUTO(err);
     int s = intg_double_integral(ig, expr,
                                x, test_num_from_double(0.0), test_num_from_double(1.0),
                                y, test_num_from_double(0.0), test_num_from_double(1.0),
                                &result, &err);
-    number_t expected = test_num_from_double(0.25);
+    TEST_NUMBER_AUTO_VALUE(expected, test_num_from_double(0.25));
     printf("  ∫₀¹∫₀¹ x·y dx dy\n");
     test_num_printf_compat("  result   = %q\n", result);
     test_num_printf_compat("  expected = %q\n", expected);
@@ -1005,13 +1094,15 @@ void test_double_exp(void) {
     expr_t *sum  = expr_add(x, y);           // store intermediate
     expr_t *expr = expr_exp(sum);
 
-    number_t result, err;
+    TEST_NUMBER_AUTO(result);
+
+    TEST_NUMBER_AUTO(err);
     int s = intg_double_integral(ig, expr,
                                x, test_num_from_double(0.0), test_num_from_double(1.0),
                                y, test_num_from_double(0.0), test_num_from_double(1.0),
                                &result, &err);
-    number_t em1      = num_sub(NUM_E, test_num_from_double(1.0));
-    number_t expected = num_mul(em1, em1);
+    TEST_NUMBER_AUTO_VALUE(em1, num_sub(NUM_E, test_num_from_double(1.0)));
+    TEST_NUMBER_AUTO_VALUE(expected, num_mul(em1, em1));
     printf("  ∫₀¹∫₀¹ exp(x+y) dx dy  [(e−1)²]\n");
     test_num_printf_compat("  result   = %q\n", result);
     test_num_printf_compat("  expected = %q\n", expected);
@@ -1033,12 +1124,16 @@ void test_double_nonunit_bounds(void) {
     expr_t *y    = test_expr_new_var_num(test_num_from_double(0.0));
     expr_t *expr = expr_mul(x, y);
 
-    number_t result, err;
+    TEST_NUMBER_AUTO(result);
+
+    TEST_NUMBER_AUTO(err);
+    TEST_NUMBER_AUTO_VALUE(x_upper, test_num_from_double(2.0));
+    TEST_NUMBER_AUTO_VALUE(y_upper, test_num_from_double(3.0));
     int s = intg_double_integral(ig, expr,
-                               x, test_num_from_double(0.0), test_num_from_double(2.0),
-                               y, test_num_from_double(0.0), test_num_from_double(3.0),
+                               x, test_num_from_double(0.0), x_upper,
+                               y, test_num_from_double(0.0), y_upper,
                                &result, &err);
-    number_t expected = test_num_from_double(9.0);
+    TEST_NUMBER_AUTO_VALUE(expected, test_num_from_double(9.0));
     printf("  ∫₀²∫₀³ x·y dx dy\n");
     test_num_printf_compat("  result   = %q\n", result);
     test_num_printf_compat("  expected = %q\n", expected);
@@ -1057,8 +1152,9 @@ void test_double_null_safety(void) {
     expr_t *x    = test_expr_new_var_num(test_num_from_double(0.0));
     expr_t *y    = test_expr_new_var_num(test_num_from_double(0.0));
     expr_t *expr = expr_mul(x, y);
-    number_t result;
-    number_t z = test_num_from_double(0.0), o = test_num_from_double(1.0);
+    TEST_NUMBER_AUTO(result);
+    TEST_NUMBER_AUTO_VALUE(z, test_num_from_double(0.0));
+    TEST_NUMBER_AUTO_VALUE(o, test_num_from_double(1.0));
 
     ASSERT_TRUE(intg_double_integral(NULL, expr, x, z, o, y, z, o, &result, NULL) == -1);
     ASSERT_TRUE(intg_double_integral(ig, NULL, x, z, o, y, z, o, &result, NULL) == -1);
@@ -1082,13 +1178,15 @@ void test_triple_polynomial(void) {
     expr_t *xy   = expr_mul(x, y);           // store intermediate
     expr_t *expr = expr_mul(xy, z);
 
-    number_t result, err;
+    TEST_NUMBER_AUTO(result);
+
+    TEST_NUMBER_AUTO(err);
     int s = intg_triple_integral(ig, expr,
                                x, test_num_from_double(0.0), test_num_from_double(1.0),
                                y, test_num_from_double(0.0), test_num_from_double(1.0),
                                z, test_num_from_double(0.0), test_num_from_double(1.0),
                                &result, &err);
-    number_t expected = test_num_from_double(0.125);
+    TEST_NUMBER_AUTO_VALUE(expected, test_num_from_double(0.125));
     printf("  ∫₀¹∫₀¹∫₀¹ x·y·z dx dy dz\n");
     test_num_printf_compat("  result   = %q\n", result);
     test_num_printf_compat("  expected = %q\n", expected);
@@ -1114,14 +1212,16 @@ void test_triple_exp(void) {
     expr_t *xyz  = expr_add(xy, z);          // store intermediate
     expr_t *expr = expr_exp(xyz);
 
-    number_t result, err;
+    TEST_NUMBER_AUTO(result);
+
+    TEST_NUMBER_AUTO(err);
     int s = intg_triple_integral(ig, expr,
                                x, test_num_from_double(0.0), test_num_from_double(1.0),
                                y, test_num_from_double(0.0), test_num_from_double(1.0),
                                z, test_num_from_double(0.0), test_num_from_double(1.0),
                                &result, &err);
-    number_t em1      = num_sub(NUM_E, test_num_from_double(1.0));
-    number_t expected = num_mul(num_mul(em1, em1), em1);
+    TEST_NUMBER_AUTO_VALUE(em1, num_sub(NUM_E, test_num_from_double(1.0)));
+    TEST_NUMBER_AUTO_VALUE(expected, num_mul(num_mul(em1, em1), em1));
     printf("  ∫₀¹∫₀¹∫₀¹ exp(x+y+z) dx dy dz  [(e−1)³]\n");
     test_num_printf_compat("  result   = %q\n", result);
     test_num_printf_compat("  expected = %q\n", expected);
@@ -1145,8 +1245,9 @@ void test_triple_null_safety(void) {
     expr_t *z    = test_expr_new_var_num(test_num_from_double(0.0));
     expr_t *xy   = expr_mul(x, y);           // store intermediate
     expr_t *expr = expr_mul(xy, z);
-    number_t result;
-    number_t lo = test_num_from_double(0.0), hi = test_num_from_double(1.0);
+    TEST_NUMBER_AUTO(result);
+    TEST_NUMBER_AUTO_VALUE(lo, test_num_from_double(0.0));
+    TEST_NUMBER_AUTO_VALUE(hi, test_num_from_double(1.0));
 
     ASSERT_TRUE(intg_triple_integral(NULL, expr, x, lo, hi, y, lo, hi, z, lo, hi, &result, NULL) == -1);
     ASSERT_TRUE(intg_triple_integral(ig, NULL, x, lo, hi, y, lo, hi, z, lo, hi, &result, NULL) == -1);
@@ -1172,12 +1273,14 @@ void test_multi_2d(void) {
     expr_t *expr = expr_add(x, y);
 
     expr_t *vars[2] = { x, y };
-    number_t lo[2]  = { test_num_from_double(0.0), test_num_from_double(0.0) };
-    number_t hi[2]  = { test_num_from_double(1.0), test_num_from_double(1.0) };
+    TEST_NUMBER_ARRAY_AUTO_2(lo)  = { test_num_from_double(0.0), test_num_from_double(0.0) };
+    TEST_NUMBER_ARRAY_AUTO_2(hi)  = { test_num_from_double(1.0), test_num_from_double(1.0) };
 
-    number_t result, err;
+    TEST_NUMBER_AUTO(result);
+
+    TEST_NUMBER_AUTO(err);
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
-    number_t expected = test_num_from_double(1.0);
+    TEST_NUMBER_AUTO_VALUE(expected, test_num_from_double(1.0));
     printf("  ∫₀¹∫₀¹ (x+y) dx dy  [double integral]\n");
     test_num_printf_compat("  result   = %q\n", result);
     test_num_printf_compat("  expected = %q\n", expected);
@@ -1202,12 +1305,14 @@ void test_multi_3d(void) {
     expr_t *expr = expr_add(xy, z);
 
     expr_t *vars[3] = { x, y, z };
-    number_t lo[3]  = { test_num_from_double(0.0), test_num_from_double(0.0), test_num_from_double(0.0) };
-    number_t hi[3]  = { test_num_from_double(1.0), test_num_from_double(1.0), test_num_from_double(1.0) };
+    TEST_NUMBER_ARRAY_AUTO_3(lo)  = { test_num_from_double(0.0), test_num_from_double(0.0), test_num_from_double(0.0) };
+    TEST_NUMBER_ARRAY_AUTO_3(hi)  = { test_num_from_double(1.0), test_num_from_double(1.0), test_num_from_double(1.0) };
 
-    number_t result, err;
+    TEST_NUMBER_AUTO(result);
+
+    TEST_NUMBER_AUTO(err);
     int s = intg_integral_multi(ig, expr, 3, vars, lo, hi, &result, &err);
-    number_t expected = num_create_from_string("1.5");
+    TEST_NUMBER_AUTO_VALUE(expected, num_create_from_string("1.5"));
     printf("  ∫₀¹∫₀¹∫₀¹ (x+y+z) dx dy dz  [triple integral]\n");
     test_num_printf_compat("  result   = %q\n", result);
     test_num_printf_compat("  expected = %q\n", expected);
@@ -1235,14 +1340,16 @@ void test_multi_3d_affine_quintic(void) {
     expr_t *expr = expr_pow_d(sum, 5.0);
 
     expr_t *vars[3] = { x, y, z };
-    number_t lo[3] = { test_num_from_double(0.0), test_num_from_double(0.0),
+    TEST_NUMBER_ARRAY_AUTO_3(lo) = { test_num_from_double(0.0), test_num_from_double(0.0),
                        test_num_from_double(0.0) };
-    number_t hi[3] = { test_num_from_double(1.0), test_num_from_double(1.0),
+    TEST_NUMBER_ARRAY_AUTO_3(hi) = { test_num_from_double(1.0), test_num_from_double(1.0),
                        test_num_from_double(1.0) };
 
-    number_t result, err;
+    TEST_NUMBER_AUTO(result);
+
+    TEST_NUMBER_AUTO(err);
     int s = intg_integral_multi(ig, expr, 3, vars, lo, hi, &result, &err);
-    number_t expected = num_create_from_string("17.25");
+    TEST_NUMBER_AUTO_VALUE(expected, num_create_from_string("17.25"));
 
     printf("  ∫₀¹∫₀¹∫₀¹ (x+y+z)^5 dx dy dz  [affine quintic]\n");
     test_num_printf_compat("  result   = %q\n", result);
@@ -1274,22 +1381,21 @@ void test_multi_3d_exp_square_product(void) {
     expr_t *expr = expr_exp(neg_prod);
 
     expr_t *vars[3] = { x, y, z };
-    number_t lo[3] = { test_num_from_double(0.0), test_num_from_double(0.0),
+    TEST_NUMBER_ARRAY_AUTO_3(lo) = { test_num_from_double(0.0), test_num_from_double(0.0),
                        test_num_from_double(0.0) };
-    number_t hi[3] = { test_num_from_double(1.0), test_num_from_double(1.0),
+    TEST_NUMBER_ARRAY_AUTO_3(hi) = { test_num_from_double(1.0), test_num_from_double(1.0),
                        test_num_from_double(1.0) };
-    number_t result;
-    number_t err;
-    number_t expected = num_new();
-    number_t term_exp = test_num_mul_double(num_exp(test_num_from_double(-1.0)), 2.0);
-    number_t term_erf = num_mul(test_num_mul_double(num_sqrt(NUM_PI), 2.0), num_erf(NUM_ONE));
-    number_t term_e1 = num_e1(NUM_ONE);
-    number_t sum = num_add(term_exp, term_erf);
-
-    sum = num_sub(sum, test_num_from_double(2.0));
-    sum = num_sub(sum, NUM_EULER_MASCHERONI);
-    sum = num_sub(sum, term_e1);
-    expected = sum;
+    TEST_NUMBER_AUTO(result);
+    TEST_NUMBER_AUTO(err);
+    TEST_NUMBER_AUTO_VALUE(term_exp, test_num_mul_double(num_exp(test_num_from_double(-1.0)), 2.0));
+    TEST_NUMBER_AUTO_VALUE(term_erf, num_mul(test_num_mul_double(num_sqrt(NUM_PI), 2.0), num_erf(NUM_ONE)));
+    TEST_NUMBER_AUTO_VALUE(term_e1, num_e1(NUM_ONE));
+    TEST_NUMBER_AUTO_VALUE(expected,
+        num_sub(
+            num_sub(
+                num_sub(num_add(term_exp, term_erf), test_num_from_double(2.0)),
+                NUM_EULER_MASCHERONI),
+            term_e1));
 
     {
         int s = intg_integral_multi(ig, expr, 3, vars, lo, hi, &result, &err);
@@ -1305,7 +1411,7 @@ void test_multi_3d_exp_square_product(void) {
         ASSERT_TRUE(exact != NULL);
         ASSERT_TRUE(exact_text != NULL);
         ASSERT_TRUE(strcmp(string_c_str(exact_text),
-                           "2·exp(-1) - 2 + 2·√(π)·erf(1) - γ - E1(1)") == 0);
+                           "2erf(1)·√(π) - γ + (2·exp(-1) - 2) - E1(1)") == 0);
         TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-27");
         string_free(exact_text);
     }
@@ -1330,9 +1436,9 @@ void test_multi_null_safety(void) {
     expr_t *x    = test_expr_new_var_num(test_num_from_double(0.0));
     expr_t *expr = expr_exp(x);
     expr_t *vars[1] = { x };
-    number_t lo[1] = { test_num_from_double(0.0) };
-    number_t hi[1] = { test_num_from_double(1.0) };
-    number_t result;
+    TEST_NUMBER_ARRAY_AUTO_1(lo) = { test_num_from_double(0.0) };
+    TEST_NUMBER_ARRAY_AUTO_1(hi) = { test_num_from_double(1.0) };
+    TEST_NUMBER_AUTO(result);
 
     ASSERT_TRUE(intg_integral_multi(NULL, expr, 1, vars, lo, hi, &result, NULL) == -1);
     ASSERT_TRUE(intg_integral_multi(ig, NULL, 1, vars, lo, hi, &result, NULL) == -1);
@@ -1350,12 +1456,14 @@ void test_multi_nd1(void) {
     expr_t *x    = test_expr_new_var_num(test_num_from_double(0.0));
     expr_t *expr = expr_exp(x);
     expr_t *vars[1] = { x };
-    number_t lo[1]  = { test_num_from_double(0.0) };
-    number_t hi[1]  = { test_num_from_double(1.0) };
+    TEST_NUMBER_ARRAY_AUTO_1(lo)  = { test_num_from_double(0.0) };
+    TEST_NUMBER_ARRAY_AUTO_1(hi)  = { test_num_from_double(1.0) };
 
-    number_t result, err;
+    TEST_NUMBER_AUTO(result);
+
+    TEST_NUMBER_AUTO(err);
     int s = intg_integral_multi(ig, expr, 1, vars, lo, hi, &result, &err);
-    number_t expected = num_sub(NUM_E, test_num_from_double(1.0));
+    TEST_NUMBER_AUTO_VALUE(expected, num_sub(NUM_E, test_num_from_double(1.0)));
     printf("  ∫₀¹ exp(x) dx  [multi ndim=1]\n");
     test_num_printf_compat("  result   = %q\n", result);
     test_num_printf_compat("  expected = %q\n", expected);
@@ -1380,14 +1488,16 @@ void test_multi_4d(void) {
     expr_t *expr = expr_add(xy, zw);
 
     expr_t *vars[4] = { x, y, z, w };
-    number_t lo[4]  = { test_num_from_double(0.0), test_num_from_double(0.0),
+    TEST_NUMBER_ARRAY_AUTO_4(lo)  = { test_num_from_double(0.0), test_num_from_double(0.0),
                         test_num_from_double(0.0), test_num_from_double(0.0) };
-    number_t hi[4]  = { test_num_from_double(1.0), test_num_from_double(1.0),
+    TEST_NUMBER_ARRAY_AUTO_4(hi)  = { test_num_from_double(1.0), test_num_from_double(1.0),
                         test_num_from_double(1.0), test_num_from_double(1.0) };
 
-    number_t result, err;
+    TEST_NUMBER_AUTO(result);
+
+    TEST_NUMBER_AUTO(err);
     int s = intg_integral_multi(ig, expr, 4, vars, lo, hi, &result, &err);
-    number_t expected = test_num_from_double(2.0);
+    TEST_NUMBER_AUTO_VALUE(expected, test_num_from_double(2.0));
     printf("  ∫₀¹∫₀¹∫₀¹∫₀¹ (x+y+z+w) dx dy dz dw  [quadruple integral]\n");
     test_num_printf_compat("  result   = %q\n", result);
     test_num_printf_compat("  expected = %q\n", expected);
@@ -1418,16 +1528,18 @@ void test_multi_4d_exp(void) {
     expr_t *expr = expr_exp(sum);
 
     expr_t *vars[4] = { x, y, z, w };
-    number_t lo[4]  = { test_num_from_double(0.0), test_num_from_double(0.0),
+    TEST_NUMBER_ARRAY_AUTO_4(lo)  = { test_num_from_double(0.0), test_num_from_double(0.0),
                         test_num_from_double(0.0), test_num_from_double(0.0) };
-    number_t hi[4]  = { test_num_from_double(1.0), test_num_from_double(1.0),
+    TEST_NUMBER_ARRAY_AUTO_4(hi)  = { test_num_from_double(1.0), test_num_from_double(1.0),
                         test_num_from_double(1.0), test_num_from_double(1.0) };
 
-    number_t result, err;
+    TEST_NUMBER_AUTO(result);
+
+    TEST_NUMBER_AUTO(err);
     int s = intg_integral_multi(ig, expr, 4, vars, lo, hi, &result, &err);
-    number_t em1      = num_sub(NUM_E, test_num_from_double(1.0));
-    number_t em1sq    = num_mul(em1, em1);
-    number_t expected = num_mul(em1sq, em1sq);
+    TEST_NUMBER_AUTO_VALUE(em1, num_sub(NUM_E, test_num_from_double(1.0)));
+    TEST_NUMBER_AUTO_VALUE(em1sq, num_mul(em1, em1));
+    TEST_NUMBER_AUTO_VALUE(expected, num_mul(em1sq, em1sq));
     printf("  ∫₀¹∫₀¹∫₀¹∫₀¹ exp(x+y+z+w) dx dy dz dw  [(e - 1)⁴]\n");
     test_num_printf_compat("  result   = %q\n", result);
     test_num_printf_compat("  expected = %q\n", expected);
@@ -1464,20 +1576,22 @@ void test_multi_4d_exp_affine(void) {
     expr_t *expr = expr_exp(affine);
 
     expr_t *vars[4] = { x, y, z, w };
-    number_t lo[4]  = { test_num_from_double(0.0), test_num_from_double(0.0),
+    TEST_NUMBER_ARRAY_AUTO_4(lo)  = { test_num_from_double(0.0), test_num_from_double(0.0),
                         test_num_from_double(0.0), test_num_from_double(0.0) };
-    number_t hi[4]  = { test_num_from_double(1.0), test_num_from_double(1.0),
+    TEST_NUMBER_ARRAY_AUTO_4(hi)  = { test_num_from_double(1.0), test_num_from_double(1.0),
                         test_num_from_double(1.0), test_num_from_double(1.0) };
 
-    number_t result, err;
+    TEST_NUMBER_AUTO(result);
+
+    TEST_NUMBER_AUTO(err);
     int s = intg_integral_multi(ig, expr, 4, vars, lo, hi, &result, &err);
 
-    number_t ex = test_num_mul_double(num_sub(num_exp(test_num_from_double(2.0)), NUM_ONE), 0.5);
-    number_t ey = num_sub(NUM_ONE, num_div(NUM_ONE, NUM_E));
-    number_t ez = test_num_mul_double(num_sub(num_exp(test_num_from_double(0.5)), NUM_ONE), 2.0);
-    number_t ew = num_div(num_sub(num_exp(test_num_from_double(3.0)), NUM_ONE),
-                         test_num_from_double(3.0));
-    number_t expected = num_mul(NUM_E, num_mul(num_mul(ex, ey), num_mul(ez, ew)));
+    TEST_NUMBER_AUTO_VALUE(ex, test_num_mul_double(num_sub(num_exp(test_num_from_double(2.0)), NUM_ONE), 0.5));
+    TEST_NUMBER_AUTO_VALUE(ey, num_sub(NUM_ONE, num_div(NUM_ONE, NUM_E)));
+    TEST_NUMBER_AUTO_VALUE(ez, test_num_mul_double(num_sub(num_exp(test_num_from_double(0.5)), NUM_ONE), 2.0));
+    TEST_NUMBER_AUTO_VALUE(ew, num_div(num_sub(num_exp(test_num_from_double(3.0)), NUM_ONE),
+                         test_num_from_double(3.0)));
+    TEST_NUMBER_AUTO_VALUE(expected, num_mul(NUM_E, num_mul(num_mul(ex, ey), num_mul(ez, ew))));
 
     printf("  ∫₀¹∫₀¹∫₀¹∫₀¹ exp(2x-y+0.5z+3w+1) dx dy dz dw  [affine exp]\n");
     test_num_printf_compat("  result   = %q\n", result);
@@ -1517,22 +1631,24 @@ void test_multi_3d_sinh_affine(void) {
     expr_t *expr = expr_sinh(affine);
 
     expr_t *vars[3] = { x, y, z };
-    number_t lo[3] = { test_num_from_double(0.0), test_num_from_double(0.0), test_num_from_double(0.0) };
-    number_t hi[3] = { test_num_from_double(1.0), test_num_from_double(1.0), test_num_from_double(1.0) };
+    TEST_NUMBER_ARRAY_AUTO_3(lo) = { test_num_from_double(0.0), test_num_from_double(0.0), test_num_from_double(0.0) };
+    TEST_NUMBER_ARRAY_AUTO_3(hi) = { test_num_from_double(1.0), test_num_from_double(1.0), test_num_from_double(1.0) };
 
-    number_t result, err;
+    TEST_NUMBER_AUTO(result);
+
+    TEST_NUMBER_AUTO(err);
     int s = intg_integral_multi(ig, expr, 3, vars, lo, hi, &result, &err);
 
-    number_t ix_p = num_sub(NUM_E, NUM_ONE);
-    number_t iy_p = test_num_mul_double(num_sub(NUM_ONE, num_exp(test_num_from_double(-2.0))), 0.5);
-    number_t iz_p = test_num_mul_double(num_sub(num_exp(test_num_from_double(0.5)), NUM_ONE), 2.0);
-    number_t i_pos = num_mul(NUM_E, num_mul(ix_p, num_mul(iy_p, iz_p)));
+    TEST_NUMBER_AUTO_VALUE(ix_p, num_sub(NUM_E, NUM_ONE));
+    TEST_NUMBER_AUTO_VALUE(iy_p, test_num_mul_double(num_sub(NUM_ONE, num_exp(test_num_from_double(-2.0))), 0.5));
+    TEST_NUMBER_AUTO_VALUE(iz_p, test_num_mul_double(num_sub(num_exp(test_num_from_double(0.5)), NUM_ONE), 2.0));
+    TEST_NUMBER_AUTO_VALUE(i_pos, num_mul(NUM_E, num_mul(ix_p, num_mul(iy_p, iz_p))));
 
-    number_t ix_n = num_sub(NUM_ONE, num_div(NUM_ONE, NUM_E));
-    number_t iy_n = test_num_mul_double(num_sub(num_exp(test_num_from_double(2.0)), NUM_ONE), 0.5);
-    number_t iz_n = test_num_mul_double(num_sub(NUM_ONE, num_exp(test_num_from_double(-0.5))), 2.0);
-    number_t i_neg = num_mul(num_div(NUM_ONE, NUM_E), num_mul(ix_n, num_mul(iy_n, iz_n)));
-    number_t expected = test_num_mul_double(num_sub(i_pos, i_neg), 0.5);
+    TEST_NUMBER_AUTO_VALUE(ix_n, num_sub(NUM_ONE, num_div(NUM_ONE, NUM_E)));
+    TEST_NUMBER_AUTO_VALUE(iy_n, test_num_mul_double(num_sub(num_exp(test_num_from_double(2.0)), NUM_ONE), 0.5));
+    TEST_NUMBER_AUTO_VALUE(iz_n, test_num_mul_double(num_sub(NUM_ONE, num_exp(test_num_from_double(-0.5))), 2.0));
+    TEST_NUMBER_AUTO_VALUE(i_neg, num_mul(num_div(NUM_ONE, NUM_E), num_mul(ix_n, num_mul(iy_n, iz_n))));
+    TEST_NUMBER_AUTO_VALUE(expected, test_num_mul_double(num_sub(i_pos, i_neg), 0.5));
 
     printf("  ∫₀¹∫₀¹∫₀¹ sinh(x-2y+0.5z+1) dx dy dz  [affine sinh]\n");
     test_num_printf_compat("  result   = %q\n", result);
@@ -1568,24 +1684,26 @@ void test_multi_3d_cosh_affine(void) {
     expr_t *expr = expr_cosh(affine);
 
     expr_t *vars[3] = { x, y, z };
-    number_t lo[3] = { test_num_from_double(0.0), test_num_from_double(0.0), test_num_from_double(0.0) };
-    number_t hi[3] = { test_num_from_double(1.0), test_num_from_double(1.0), test_num_from_double(1.0) };
+    TEST_NUMBER_ARRAY_AUTO_3(lo) = { test_num_from_double(0.0), test_num_from_double(0.0), test_num_from_double(0.0) };
+    TEST_NUMBER_ARRAY_AUTO_3(hi) = { test_num_from_double(1.0), test_num_from_double(1.0), test_num_from_double(1.0) };
 
-    number_t result, err;
+    TEST_NUMBER_AUTO(result);
+
+    TEST_NUMBER_AUTO(err);
     int s = intg_integral_multi(ig, expr, 3, vars, lo, hi, &result, &err);
 
-    number_t ix_p = num_div(num_sub(num_exp(test_num_from_double(1.5)), NUM_ONE),
-                           test_num_from_double(1.5));
-    number_t iy_p = num_sub(NUM_E, NUM_ONE);
-    number_t iz_p = num_sub(NUM_ONE, num_div(NUM_ONE, NUM_E));
-    number_t i_pos = num_mul(num_exp(test_num_from_double(0.25)), num_mul(ix_p, num_mul(iy_p, iz_p)));
+    TEST_NUMBER_AUTO_VALUE(ix_p, num_div(num_sub(num_exp(test_num_from_double(1.5)), NUM_ONE),
+                           test_num_from_double(1.5)));
+    TEST_NUMBER_AUTO_VALUE(iy_p, num_sub(NUM_E, NUM_ONE));
+    TEST_NUMBER_AUTO_VALUE(iz_p, num_sub(NUM_ONE, num_div(NUM_ONE, NUM_E)));
+    TEST_NUMBER_AUTO_VALUE(i_pos, num_mul(num_exp(test_num_from_double(0.25)), num_mul(ix_p, num_mul(iy_p, iz_p))));
 
-    number_t ix_n = num_div(num_sub(NUM_ONE, num_exp(test_num_from_double(-1.5))),
-                           test_num_from_double(1.5));
-    number_t iy_n = num_sub(NUM_ONE, num_div(NUM_ONE, NUM_E));
-    number_t iz_n = num_sub(NUM_E, NUM_ONE);
-    number_t i_neg = num_mul(num_exp(test_num_from_double(-0.25)), num_mul(ix_n, num_mul(iy_n, iz_n)));
-    number_t expected = test_num_mul_double(num_add(i_pos, i_neg), 0.5);
+    TEST_NUMBER_AUTO_VALUE(ix_n, num_div(num_sub(NUM_ONE, num_exp(test_num_from_double(-1.5))),
+                           test_num_from_double(1.5)));
+    TEST_NUMBER_AUTO_VALUE(iy_n, num_sub(NUM_ONE, num_div(NUM_ONE, NUM_E)));
+    TEST_NUMBER_AUTO_VALUE(iz_n, num_sub(NUM_E, NUM_ONE));
+    TEST_NUMBER_AUTO_VALUE(i_neg, num_mul(num_exp(test_num_from_double(-0.25)), num_mul(ix_n, num_mul(iy_n, iz_n))));
+    TEST_NUMBER_AUTO_VALUE(expected, test_num_mul_double(num_add(i_pos, i_neg), 0.5));
 
     printf("  ∫₀¹∫₀¹∫₀¹ cosh(1.5x+y-z+0.25) dx dy dz  [affine cosh]\n");
     test_num_printf_compat("  result   = %q\n", result);
@@ -1621,20 +1739,22 @@ void test_multi_3d_sin_affine(void) {
     expr_t *expr = expr_sin(affine);
 
     expr_t *vars[3] = { x, y, z };
-    number_t lo[3] = { test_num_from_double(0.0), test_num_from_double(0.0), test_num_from_double(0.0) };
-    number_t hi[3] = { test_num_from_double(1.0), test_num_from_double(1.0), test_num_from_double(1.0) };
+    TEST_NUMBER_ARRAY_AUTO_3(lo) = { test_num_from_double(0.0), test_num_from_double(0.0), test_num_from_double(0.0) };
+    TEST_NUMBER_ARRAY_AUTO_3(hi) = { test_num_from_double(1.0), test_num_from_double(1.0), test_num_from_double(1.0) };
 
-    number_t result, err;
+    TEST_NUMBER_AUTO(result);
+
+    TEST_NUMBER_AUTO(err);
     int s = intg_integral_multi(ig, expr, 3, vars, lo, hi, &result, &err);
 
-    number_t expected_z = num_mul(num_exp(test_num_make_complex(NUM_ZERO, test_num_from_double(0.3))),
+    TEST_NUMBER_AUTO_VALUE(expected_z, num_mul(num_exp(test_num_make_complex(NUM_ZERO, test_num_from_double(0.3))),
                                    num_mul(num_div(num_sub(num_exp(test_num_make_complex(NUM_ZERO, test_num_from_double(1.0))), NUM_ONE),
                                                  test_num_make_complex(NUM_ZERO, test_num_from_double(1.0))),
                                           num_mul(num_div(num_sub(num_exp(test_num_make_complex(NUM_ZERO, test_num_from_double(2.0))), NUM_ONE),
                                                         test_num_make_complex(NUM_ZERO, test_num_from_double(2.0))),
                                                  num_div(num_sub(num_exp(test_num_make_complex(NUM_ZERO, test_num_from_double(-1.0))), NUM_ONE),
-                                                        test_num_make_complex(NUM_ZERO, test_num_from_double(-1.0))))));
-    number_t expected = num_imag_part(expected_z);
+                                                        test_num_make_complex(NUM_ZERO, test_num_from_double(-1.0)))))));
+    TEST_NUMBER_AUTO_VALUE(expected, num_imag_part(expected_z));
 
     printf("  ∫₀¹∫₀¹∫₀¹ sin(x+2y-z+0.3) dx dy dz  [affine sin]\n");
     test_num_printf_compat("  result   = %q\n", result);
@@ -1671,20 +1791,22 @@ void test_multi_3d_cos_affine(void) {
     expr_t *expr = expr_cos(affine);
 
     expr_t *vars[3] = { x, y, z };
-    number_t lo[3] = { test_num_from_double(0.0), test_num_from_double(0.0), test_num_from_double(0.0) };
-    number_t hi[3] = { test_num_from_double(1.0), test_num_from_double(1.0), test_num_from_double(1.0) };
+    TEST_NUMBER_ARRAY_AUTO_3(lo) = { test_num_from_double(0.0), test_num_from_double(0.0), test_num_from_double(0.0) };
+    TEST_NUMBER_ARRAY_AUTO_3(hi) = { test_num_from_double(1.0), test_num_from_double(1.0), test_num_from_double(1.0) };
 
-    number_t result, err;
+    TEST_NUMBER_AUTO(result);
+
+    TEST_NUMBER_AUTO(err);
     int s = intg_integral_multi(ig, expr, 3, vars, lo, hi, &result, &err);
 
-    number_t expected_z = num_mul(num_exp(test_num_make_complex(NUM_ZERO, test_num_from_double(-0.2))),
+    TEST_NUMBER_AUTO_VALUE(expected_z, num_mul(num_exp(test_num_make_complex(NUM_ZERO, test_num_from_double(-0.2))),
                                    num_mul(num_div(num_sub(num_exp(test_num_make_complex(NUM_ZERO, test_num_from_double(0.5))), NUM_ONE),
                                                  test_num_make_complex(NUM_ZERO, test_num_from_double(0.5))),
                                           num_mul(num_div(num_sub(num_exp(test_num_make_complex(NUM_ZERO, test_num_from_double(-1.0))), NUM_ONE),
                                                         test_num_make_complex(NUM_ZERO, test_num_from_double(-1.0))),
                                                  num_div(num_sub(num_exp(test_num_make_complex(NUM_ZERO, test_num_from_double(1.5))), NUM_ONE),
-                                                        test_num_make_complex(NUM_ZERO, test_num_from_double(1.5))))));
-    number_t expected = num_real_part(expected_z);
+                                                        test_num_make_complex(NUM_ZERO, test_num_from_double(1.5)))))));
+    TEST_NUMBER_AUTO_VALUE(expected, num_real_part(expected_z));
 
     printf("  ∫₀¹∫₀¹∫₀¹ cos(0.5x-y+1.5z-0.2) dx dy dz  [affine cos]\n");
     test_num_printf_compat("  result   = %q\n", result);
@@ -1723,17 +1845,19 @@ void test_multi_3d_scaled_sum_specials(void) {
     expr_t *expr = expr_add_d(partial, 4.0);
 
     expr_t *vars[3] = { x, y, z };
-    number_t lo[3] = { test_num_from_double(0.0), test_num_from_double(0.0), test_num_from_double(0.0) };
-    number_t hi[3] = { test_num_from_double(1.0), test_num_from_double(1.0), test_num_from_double(1.0) };
+    TEST_NUMBER_ARRAY_AUTO_3(lo) = { test_num_from_double(0.0), test_num_from_double(0.0), test_num_from_double(0.0) };
+    TEST_NUMBER_ARRAY_AUTO_3(hi) = { test_num_from_double(1.0), test_num_from_double(1.0), test_num_from_double(1.0) };
 
-    number_t result, err;
+    TEST_NUMBER_AUTO(result);
+
+    TEST_NUMBER_AUTO(err);
     int s = intg_integral_multi(ig, expr, 3, vars, lo, hi, &result, &err);
 
-    number_t em1 = num_sub(NUM_E, NUM_ONE);
-    number_t term1_expected = test_num_mul_double(num_mul(em1, em1), 2.0);
-    number_t term2_expected = test_num_mul_double(num_sub(num_sinh(test_num_from_double(1.5)),
-                                                   num_sinh(test_num_from_double(0.5))), 3.0);
-    number_t expected = num_add(num_sub(term1_expected, term2_expected), test_num_from_double(4.0));
+    TEST_NUMBER_AUTO_VALUE(em1, num_sub(NUM_E, NUM_ONE));
+    TEST_NUMBER_AUTO_VALUE(term1_expected, test_num_mul_double(num_mul(em1, em1), 2.0));
+    TEST_NUMBER_AUTO_VALUE(term2_expected, test_num_mul_double(num_sub(num_sinh(test_num_from_double(1.5)),
+                                                   num_sinh(test_num_from_double(0.5))), 3.0));
+    TEST_NUMBER_AUTO_VALUE(expected, num_add(num_sub(term1_expected, term2_expected), test_num_from_double(4.0)));
 
     printf("  ∫ (2exp(x+y)-3cosh(z+0.5)+4) dV  [scaled sum specials]\n");
     test_num_printf_compat("  result   = %q\n", result);
@@ -1773,23 +1897,25 @@ void test_multi_2d_sum_of_specials(void) {
     expr_t *expr = expr_add(sum1, exp_term);
 
     expr_t *vars[2] = { x, y };
-    number_t lo[2] = { test_num_from_double(0.0), test_num_from_double(0.0) };
-    number_t hi[2] = { test_num_from_double(1.0), test_num_from_double(1.0) };
+    TEST_NUMBER_ARRAY_AUTO_2(lo) = { test_num_from_double(0.0), test_num_from_double(0.0) };
+    TEST_NUMBER_ARRAY_AUTO_2(hi) = { test_num_from_double(1.0), test_num_from_double(1.0) };
 
-    number_t result, err;
+    TEST_NUMBER_AUTO(result);
+
+    TEST_NUMBER_AUTO(err);
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
-    number_t sin_expected_z = num_mul(num_exp(test_num_make_complex(NUM_ZERO, test_num_from_double(0.2))),
+    TEST_NUMBER_AUTO_VALUE(sin_expected_z, num_mul(num_exp(test_num_make_complex(NUM_ZERO, test_num_from_double(0.2))),
                                        num_div(num_sub(num_exp(test_num_make_complex(NUM_ZERO, test_num_from_double(1.0))), NUM_ONE),
-                                              test_num_make_complex(NUM_ZERO, test_num_from_double(1.0))));
-    number_t sin_expected = num_imag_part(sin_expected_z);
-    number_t cos_expected_z = num_mul(num_exp(test_num_make_complex(NUM_ZERO, test_num_from_double(-0.1))),
+                                              test_num_make_complex(NUM_ZERO, test_num_from_double(1.0)))));
+    TEST_NUMBER_AUTO_VALUE(sin_expected, num_imag_part(sin_expected_z));
+    TEST_NUMBER_AUTO_VALUE(cos_expected_z, num_mul(num_exp(test_num_make_complex(NUM_ZERO, test_num_from_double(-0.1))),
                                        num_div(num_sub(num_exp(test_num_make_complex(NUM_ZERO, test_num_from_double(2.0))), NUM_ONE),
-                                              test_num_make_complex(NUM_ZERO, test_num_from_double(2.0))));
-    number_t cos_expected = num_real_part(cos_expected_z);
-    number_t exp_expected = num_mul(num_sub(NUM_E, NUM_ONE),
-                                   num_sub(NUM_ONE, num_div(NUM_ONE, NUM_E)));
-    number_t expected = num_add(num_add(sin_expected, cos_expected), exp_expected);
+                                              test_num_make_complex(NUM_ZERO, test_num_from_double(2.0)))));
+    TEST_NUMBER_AUTO_VALUE(cos_expected, num_real_part(cos_expected_z));
+    TEST_NUMBER_AUTO_VALUE(exp_expected, num_mul(num_sub(NUM_E, NUM_ONE),
+                                   num_sub(NUM_ONE, num_div(NUM_ONE, NUM_E))));
+    TEST_NUMBER_AUTO_VALUE(expected, num_add(num_add(sin_expected, cos_expected), exp_expected));
 
     printf("  ∫∫ [sin(x+0.2)+cos(2y-0.1)+exp(x-y)] dA  [sum specials]\n");
     test_num_printf_compat("  result   = %q\n", result);
@@ -1829,19 +1955,21 @@ void test_multi_3d_separable_product(void) {
     expr_t *expr = expr_mul(prod_xy, sinh_z);
 
     expr_t *vars[3] = { x, y, z };
-    number_t lo[3] = { test_num_from_double(0.0), test_num_from_double(0.0), test_num_from_double(0.0) };
-    number_t hi[3] = { test_num_from_double(1.0), test_num_from_double(1.0), test_num_from_double(1.0) };
+    TEST_NUMBER_ARRAY_AUTO_3(lo) = { test_num_from_double(0.0), test_num_from_double(0.0), test_num_from_double(0.0) };
+    TEST_NUMBER_ARRAY_AUTO_3(hi) = { test_num_from_double(1.0), test_num_from_double(1.0), test_num_from_double(1.0) };
 
-    number_t result, err;
+    TEST_NUMBER_AUTO(result);
+
+    TEST_NUMBER_AUTO(err);
     int s = intg_integral_multi(ig, expr, 3, vars, lo, hi, &result, &err);
 
-    number_t exp1_minus_1 = num_sub(num_exp(test_num_from_double(1.0)), NUM_ONE);
-    number_t cos_part = test_num_mul_double(num_sub(num_sin(test_num_from_double(1.9)),
-                                             num_sin(test_num_from_double(-0.1))), 0.5);
-    number_t sinh_part = num_sub(num_cosh(test_num_from_double(1.2)),
-                                num_cosh(test_num_from_double(0.2)));
-    number_t left_part = num_mul(exp1_minus_1, cos_part);
-    number_t expected = num_mul(left_part, sinh_part);
+    TEST_NUMBER_AUTO_VALUE(exp1_minus_1, num_sub(num_exp(test_num_from_double(1.0)), NUM_ONE));
+    TEST_NUMBER_AUTO_VALUE(cos_part, test_num_mul_double(num_sub(num_sin(test_num_from_double(1.9)),
+                                             num_sin(test_num_from_double(-0.1))), 0.5));
+    TEST_NUMBER_AUTO_VALUE(sinh_part, num_sub(num_cosh(test_num_from_double(1.2)),
+                                num_cosh(test_num_from_double(0.2))));
+    TEST_NUMBER_AUTO_VALUE(left_part, num_mul(exp1_minus_1, cos_part));
+    TEST_NUMBER_AUTO_VALUE(expected, num_mul(left_part, sinh_part));
 
     printf("  ∫ exp(x)cos(2y-0.1)sinh(z+0.2) dV  [separable product]\n");
     test_num_printf_compat("  result   = %q\n", result);
@@ -1878,15 +2006,17 @@ void test_multi_3d_regrouped_separable_product(void) {
     expr_t *expr = expr_mul(left, right);
 
     expr_t *vars[3] = { x, y, z };
-    number_t lo[3] = { test_num_from_double(0.0), test_num_from_double(0.0), test_num_from_double(0.0) };
-    number_t hi[3] = { test_num_from_double(1.0), test_num_from_double(1.0), test_num_from_double(1.0) };
+    TEST_NUMBER_ARRAY_AUTO_3(lo) = { test_num_from_double(0.0), test_num_from_double(0.0), test_num_from_double(0.0) };
+    TEST_NUMBER_ARRAY_AUTO_3(hi) = { test_num_from_double(1.0), test_num_from_double(1.0), test_num_from_double(1.0) };
 
-    number_t result, err;
+    TEST_NUMBER_AUTO(result);
+
+    TEST_NUMBER_AUTO(err);
     int s = intg_integral_multi(ig, expr, 3, vars, lo, hi, &result, &err);
 
-    number_t expected = num_mul(num_div(test_num_from_double(1.0), test_num_from_double(3.0)),
+    TEST_NUMBER_AUTO_VALUE(expected, num_mul(num_div(test_num_from_double(1.0), test_num_from_double(3.0)),
                                num_mul(num_sin(test_num_from_double(1.0)),
-                                      num_sub(num_exp(test_num_from_double(1.0)), NUM_ONE)));
+                                      num_sub(num_exp(test_num_from_double(1.0)), NUM_ONE))));
 
     printf("  ∫ (x*cos(y))*(x*exp(z)) dV  [regrouped separable product]\n");
     test_num_printf_compat("  result   = %q\n", result);
@@ -1923,18 +2053,20 @@ void test_multi_2d_sum_of_separable_products(void) {
     expr_t *expr = expr_add(term1, term2);
 
     expr_t *vars[2] = { x, y };
-    number_t lo[2] = { test_num_from_double(0.0), test_num_from_double(0.0) };
-    number_t hi[2] = { test_num_from_double(1.0), test_num_from_double(1.0) };
+    TEST_NUMBER_ARRAY_AUTO_2(lo) = { test_num_from_double(0.0), test_num_from_double(0.0) };
+    TEST_NUMBER_ARRAY_AUTO_2(hi) = { test_num_from_double(1.0), test_num_from_double(1.0) };
 
-    number_t result, err;
+    TEST_NUMBER_AUTO(result);
+
+    TEST_NUMBER_AUTO(err);
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
-    number_t exp1_minus_1 = num_sub(num_exp(test_num_from_double(1.0)), NUM_ONE);
-    number_t term1_expected = num_mul(exp1_minus_1, num_sin(test_num_from_double(1.0)));
-    number_t term2_expected = num_mul(num_sub(num_cosh(test_num_from_double(1.1)),
+    TEST_NUMBER_AUTO_VALUE(exp1_minus_1, num_sub(num_exp(test_num_from_double(1.0)), NUM_ONE));
+    TEST_NUMBER_AUTO_VALUE(term1_expected, num_mul(exp1_minus_1, num_sin(test_num_from_double(1.0))));
+    TEST_NUMBER_AUTO_VALUE(term2_expected, num_mul(num_sub(num_cosh(test_num_from_double(1.1)),
                                             num_cosh(test_num_from_double(0.1))),
-                                     exp1_minus_1);
-    number_t expected = num_add(term1_expected, term2_expected);
+                                     exp1_minus_1));
+    TEST_NUMBER_AUTO_VALUE(expected, num_add(term1_expected, term2_expected));
 
     printf("  ∫∫ [exp(x)cos(y)+sinh(x+0.1)exp(y)] dA  [sum separable products]\n");
     test_num_printf_compat("  result   = %q\n", result);
@@ -1968,10 +2100,11 @@ void test_multi_2d_affine_square(void) {
     expr_t *expr = expr_mul(affine, affine);
 
     expr_t *vars[2] = { x, y };
-    number_t lo[2] = { test_num_from_double(0.0), test_num_from_double(0.0) };
-    number_t hi[2] = { test_num_from_double(1.0), test_num_from_double(1.0) };
-    number_t result, err;
-    number_t expected = num_div(test_num_from_double(62.0), test_num_from_double(3.0));
+    TEST_NUMBER_ARRAY_AUTO_2(lo) = { test_num_from_double(0.0), test_num_from_double(0.0) };
+    TEST_NUMBER_ARRAY_AUTO_2(hi) = { test_num_from_double(1.0), test_num_from_double(1.0) };
+    TEST_NUMBER_AUTO(result);
+    TEST_NUMBER_AUTO(err);
+    TEST_NUMBER_AUTO_VALUE(expected, num_div(test_num_from_double(62.0), test_num_from_double(3.0)));
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ (x+2y+3)^2 dA  [affine square]\n");
@@ -2004,10 +2137,11 @@ void test_multi_2d_affine_cube(void) {
     expr_t *expr = expr_mul(square, affine);
 
     expr_t *vars[2] = { x, y };
-    number_t lo[2] = { test_num_from_double(0.0), test_num_from_double(0.0) };
-    number_t hi[2] = { test_num_from_double(1.0), test_num_from_double(1.0) };
-    number_t result, err;
-    number_t expected = num_div(test_num_from_double(387.0), test_num_from_double(4.0));
+    TEST_NUMBER_ARRAY_AUTO_2(lo) = { test_num_from_double(0.0), test_num_from_double(0.0) };
+    TEST_NUMBER_ARRAY_AUTO_2(hi) = { test_num_from_double(1.0), test_num_from_double(1.0) };
+    TEST_NUMBER_AUTO(result);
+    TEST_NUMBER_AUTO(err);
+    TEST_NUMBER_AUTO_VALUE(expected, num_div(test_num_from_double(387.0), test_num_from_double(4.0)));
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ (x+2y+3)^3 dA  [affine cube]\n");
@@ -2042,10 +2176,11 @@ void test_multi_2d_affine_quartic(void) {
     expr_t *expr = expr_mul(lhs, rhs);
 
     expr_t *vars[2] = { x, y };
-    number_t lo[2] = { test_num_from_double(0.0), test_num_from_double(0.0) };
-    number_t hi[2] = { test_num_from_double(1.0), test_num_from_double(1.0) };
-    number_t result, err;
-    number_t expected = num_div(test_num_from_double(6916.0), test_num_from_double(15.0));
+    TEST_NUMBER_ARRAY_AUTO_2(lo) = { test_num_from_double(0.0), test_num_from_double(0.0) };
+    TEST_NUMBER_ARRAY_AUTO_2(hi) = { test_num_from_double(1.0), test_num_from_double(1.0) };
+    TEST_NUMBER_AUTO(result);
+    TEST_NUMBER_AUTO(err);
+    TEST_NUMBER_AUTO_VALUE(expected, num_div(test_num_from_double(6916.0), test_num_from_double(15.0)));
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ (x+2y+3)^4 dA  [affine quartic]\n");
@@ -2086,10 +2221,11 @@ void test_multi_2d_affine_poly_deg4(void) {
     expr_t *poly = expr_add(poly_core, affine_plus_seven);
 
     expr_t *vars[2] = { x, y };
-    number_t lo[2] = { test_num_from_double(0.0), test_num_from_double(0.0) };
-    number_t hi[2] = { test_num_from_double(1.0), test_num_from_double(1.0) };
-    number_t result, err;
-    number_t expected = num_div(test_num_from_double(40601.0), test_num_from_double(30.0));
+    TEST_NUMBER_ARRAY_AUTO_2(lo) = { test_num_from_double(0.0), test_num_from_double(0.0) };
+    TEST_NUMBER_ARRAY_AUTO_2(hi) = { test_num_from_double(1.0), test_num_from_double(1.0) };
+    TEST_NUMBER_AUTO(result);
+    TEST_NUMBER_AUTO(err);
+    TEST_NUMBER_AUTO_VALUE(expected, num_div(test_num_from_double(40601.0), test_num_from_double(30.0)));
     int s = intg_integral_multi(ig, poly, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ [3a^4-2a^2+a+7] dA  [affine poly]\n");
@@ -2129,15 +2265,16 @@ void test_multi_2d_affine_times_exp_affine(void) {
     expr_t *expr = expr_mul(affine, exp_affine);
 
     expr_t *vars[2] = { x, y };
-    number_t lo[2] = { test_num_from_double(0.0), test_num_from_double(0.0) };
-    number_t hi[2] = { test_num_from_double(1.0), test_num_from_double(1.0) };
-    number_t result, err;
-    number_t e3 = num_exp(test_num_from_double(3.0));
-    number_t e4 = num_exp(test_num_from_double(4.0));
-    number_t e5 = num_exp(test_num_from_double(5.0));
-    number_t e6 = num_exp(test_num_from_double(6.0));
-    number_t expected = num_add(num_sub(test_num_mul_double(e6, 2.0), e4),
-                               num_sub(test_num_mul_double(e3, 0.5), test_num_mul_double(e5, 1.5)));
+    TEST_NUMBER_ARRAY_AUTO_2(lo) = { test_num_from_double(0.0), test_num_from_double(0.0) };
+    TEST_NUMBER_ARRAY_AUTO_2(hi) = { test_num_from_double(1.0), test_num_from_double(1.0) };
+    TEST_NUMBER_AUTO(result);
+    TEST_NUMBER_AUTO(err);
+    TEST_NUMBER_AUTO_VALUE(e3, num_exp(test_num_from_double(3.0)));
+    TEST_NUMBER_AUTO_VALUE(e4, num_exp(test_num_from_double(4.0)));
+    TEST_NUMBER_AUTO_VALUE(e5, num_exp(test_num_from_double(5.0)));
+    TEST_NUMBER_AUTO_VALUE(e6, num_exp(test_num_from_double(6.0)));
+    TEST_NUMBER_AUTO_VALUE(expected, num_add(num_sub(test_num_mul_double(e6, 2.0), e4),
+                               num_sub(test_num_mul_double(e3, 0.5), test_num_mul_double(e5, 1.5))));
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ (x+2y+3)exp(x+2y+3) dA  [affine*exp(affine)]\n");
@@ -2172,17 +2309,18 @@ void test_multi_2d_square_affine_times_exp_affine(void) {
     expr_t *expr = expr_mul(square, exp_affine);
 
     expr_t *vars[2] = { x, y };
-    number_t lo[2] = { test_num_from_double(0.0), test_num_from_double(0.0) };
-    number_t hi[2] = { test_num_from_double(1.0), test_num_from_double(1.0) };
-    number_t result, err;
-    number_t e3 = num_exp(test_num_from_double(3.0));
-    number_t e4 = num_exp(test_num_from_double(4.0));
-    number_t e5 = num_exp(test_num_from_double(5.0));
-    number_t e6 = num_exp(test_num_from_double(6.0));
-    number_t expected = test_num_mul_double(
+    TEST_NUMBER_ARRAY_AUTO_2(lo) = { test_num_from_double(0.0), test_num_from_double(0.0) };
+    TEST_NUMBER_ARRAY_AUTO_2(hi) = { test_num_from_double(1.0), test_num_from_double(1.0) };
+    TEST_NUMBER_AUTO(result);
+    TEST_NUMBER_AUTO(err);
+    TEST_NUMBER_AUTO_VALUE(e3, num_exp(test_num_from_double(3.0)));
+    TEST_NUMBER_AUTO_VALUE(e4, num_exp(test_num_from_double(4.0)));
+    TEST_NUMBER_AUTO_VALUE(e5, num_exp(test_num_from_double(5.0)));
+    TEST_NUMBER_AUTO_VALUE(e6, num_exp(test_num_from_double(6.0)));
+    TEST_NUMBER_AUTO_VALUE(expected, test_num_mul_double(
         num_add(num_sub(test_num_mul_double(e6, 18.0), test_num_mul_double(e5, 11.0)),
                num_sub(test_num_mul_double(e3, 3.0), test_num_mul_double(e4, 6.0))),
-        0.5);
+        0.5));
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ (x+2y+3)^2exp(x+2y+3) dA  [affine^2*exp(affine)]\n");
@@ -2217,18 +2355,19 @@ void test_multi_2d_affine_times_sin_affine(void) {
     expr_t *expr = expr_mul(affine, sin_affine);
 
     expr_t *vars[2] = { x, y };
-    number_t lo[2] = { test_num_from_double(0.0), test_num_from_double(0.0) };
-    number_t hi[2] = { test_num_from_double(1.0), test_num_from_double(1.0) };
-    number_t result, err;
-    number_t u3 = test_num_from_double(3.0);
-    number_t u4 = test_num_from_double(4.0);
-    number_t u5 = test_num_from_double(5.0);
-    number_t u6 = test_num_from_double(6.0);
-    number_t f3 = num_sub(num_neg(num_mul(u3, num_sin(u3))), test_num_mul_double(num_cos(u3), 2.0));
-    number_t f4 = num_sub(num_neg(num_mul(u4, num_sin(u4))), test_num_mul_double(num_cos(u4), 2.0));
-    number_t f5 = num_sub(num_neg(num_mul(u5, num_sin(u5))), test_num_mul_double(num_cos(u5), 2.0));
-    number_t f6 = num_sub(num_neg(num_mul(u6, num_sin(u6))), test_num_mul_double(num_cos(u6), 2.0));
-    number_t expected = test_num_mul_double(num_sub(num_sub(f6, f4), num_sub(f5, f3)), 0.5);
+    TEST_NUMBER_ARRAY_AUTO_2(lo) = { test_num_from_double(0.0), test_num_from_double(0.0) };
+    TEST_NUMBER_ARRAY_AUTO_2(hi) = { test_num_from_double(1.0), test_num_from_double(1.0) };
+    TEST_NUMBER_AUTO(result);
+    TEST_NUMBER_AUTO(err);
+    TEST_NUMBER_AUTO_VALUE(u3, test_num_from_double(3.0));
+    TEST_NUMBER_AUTO_VALUE(u4, test_num_from_double(4.0));
+    TEST_NUMBER_AUTO_VALUE(u5, test_num_from_double(5.0));
+    TEST_NUMBER_AUTO_VALUE(u6, test_num_from_double(6.0));
+    TEST_NUMBER_AUTO_VALUE(f3, num_sub(num_neg(num_mul(u3, num_sin(u3))), test_num_mul_double(num_cos(u3), 2.0)));
+    TEST_NUMBER_AUTO_VALUE(f4, num_sub(num_neg(num_mul(u4, num_sin(u4))), test_num_mul_double(num_cos(u4), 2.0)));
+    TEST_NUMBER_AUTO_VALUE(f5, num_sub(num_neg(num_mul(u5, num_sin(u5))), test_num_mul_double(num_cos(u5), 2.0)));
+    TEST_NUMBER_AUTO_VALUE(f6, num_sub(num_neg(num_mul(u6, num_sin(u6))), test_num_mul_double(num_cos(u6), 2.0)));
+    TEST_NUMBER_AUTO_VALUE(expected, test_num_mul_double(num_sub(num_sub(f6, f4), num_sub(f5, f3)), 0.5));
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ (x+2y+3)sin(x+2y+3) dA  [affine*sin(affine)]\n");
@@ -2263,26 +2402,27 @@ void test_multi_2d_square_affine_times_sin_affine(void) {
     expr_t *expr = expr_mul(square, sin_affine);
 
     expr_t *vars[2] = { x, y };
-    number_t lo[2] = { test_num_from_double(0.0), test_num_from_double(0.0) };
-    number_t hi[2] = { test_num_from_double(1.0), test_num_from_double(1.0) };
-    number_t result, err;
-    number_t u3 = test_num_from_double(3.0);
-    number_t u4 = test_num_from_double(4.0);
-    number_t u5 = test_num_from_double(5.0);
-    number_t u6 = test_num_from_double(6.0);
-    number_t f3 = num_add(num_neg(num_mul(num_mul(u3, u3), num_sin(u3))),
+    TEST_NUMBER_ARRAY_AUTO_2(lo) = { test_num_from_double(0.0), test_num_from_double(0.0) };
+    TEST_NUMBER_ARRAY_AUTO_2(hi) = { test_num_from_double(1.0), test_num_from_double(1.0) };
+    TEST_NUMBER_AUTO(result);
+    TEST_NUMBER_AUTO(err);
+    TEST_NUMBER_AUTO_VALUE(u3, test_num_from_double(3.0));
+    TEST_NUMBER_AUTO_VALUE(u4, test_num_from_double(4.0));
+    TEST_NUMBER_AUTO_VALUE(u5, test_num_from_double(5.0));
+    TEST_NUMBER_AUTO_VALUE(u6, test_num_from_double(6.0));
+    TEST_NUMBER_AUTO_VALUE(f3, num_add(num_neg(num_mul(num_mul(u3, u3), num_sin(u3))),
                          num_add(test_num_mul_double(num_mul(u3, num_cos(u3)), -4.0),
-                                test_num_mul_double(num_sin(u3), 6.0)));
-    number_t f4 = num_add(num_neg(num_mul(num_mul(u4, u4), num_sin(u4))),
+                                test_num_mul_double(num_sin(u3), 6.0))));
+    TEST_NUMBER_AUTO_VALUE(f4, num_add(num_neg(num_mul(num_mul(u4, u4), num_sin(u4))),
                          num_add(test_num_mul_double(num_mul(u4, num_cos(u4)), -4.0),
-                                test_num_mul_double(num_sin(u4), 6.0)));
-    number_t f5 = num_add(num_neg(num_mul(num_mul(u5, u5), num_sin(u5))),
+                                test_num_mul_double(num_sin(u4), 6.0))));
+    TEST_NUMBER_AUTO_VALUE(f5, num_add(num_neg(num_mul(num_mul(u5, u5), num_sin(u5))),
                          num_add(test_num_mul_double(num_mul(u5, num_cos(u5)), -4.0),
-                                test_num_mul_double(num_sin(u5), 6.0)));
-    number_t f6 = num_add(num_neg(num_mul(num_mul(u6, u6), num_sin(u6))),
+                                test_num_mul_double(num_sin(u5), 6.0))));
+    TEST_NUMBER_AUTO_VALUE(f6, num_add(num_neg(num_mul(num_mul(u6, u6), num_sin(u6))),
                          num_add(test_num_mul_double(num_mul(u6, num_cos(u6)), -4.0),
-                                test_num_mul_double(num_sin(u6), 6.0)));
-    number_t expected = test_num_mul_double(num_sub(num_sub(f6, f4), num_sub(f5, f3)), 0.5);
+                                test_num_mul_double(num_sin(u6), 6.0))));
+    TEST_NUMBER_AUTO_VALUE(expected, test_num_mul_double(num_sub(num_sub(f6, f4), num_sub(f5, f3)), 0.5));
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ (x+2y+3)^2sin(x+2y+3) dA  [affine^2*sin(affine)]\n");
@@ -2317,18 +2457,19 @@ void test_multi_2d_affine_times_cos_affine(void) {
     expr_t *expr = expr_mul(cos_affine, affine);
 
     expr_t *vars[2] = { x, y };
-    number_t lo[2] = { test_num_from_double(0.0), test_num_from_double(0.0) };
-    number_t hi[2] = { test_num_from_double(1.0), test_num_from_double(1.0) };
-    number_t result, err;
-    number_t u3 = test_num_from_double(3.0);
-    number_t u4 = test_num_from_double(4.0);
-    number_t u5 = test_num_from_double(5.0);
-    number_t u6 = test_num_from_double(6.0);
-    number_t g3 = num_add(num_neg(num_mul(u3, num_cos(u3))), test_num_mul_double(num_sin(u3), 2.0));
-    number_t g4 = num_add(num_neg(num_mul(u4, num_cos(u4))), test_num_mul_double(num_sin(u4), 2.0));
-    number_t g5 = num_add(num_neg(num_mul(u5, num_cos(u5))), test_num_mul_double(num_sin(u5), 2.0));
-    number_t g6 = num_add(num_neg(num_mul(u6, num_cos(u6))), test_num_mul_double(num_sin(u6), 2.0));
-    number_t expected = test_num_mul_double(num_sub(num_sub(g6, g4), num_sub(g5, g3)), 0.5);
+    TEST_NUMBER_ARRAY_AUTO_2(lo) = { test_num_from_double(0.0), test_num_from_double(0.0) };
+    TEST_NUMBER_ARRAY_AUTO_2(hi) = { test_num_from_double(1.0), test_num_from_double(1.0) };
+    TEST_NUMBER_AUTO(result);
+    TEST_NUMBER_AUTO(err);
+    TEST_NUMBER_AUTO_VALUE(u3, test_num_from_double(3.0));
+    TEST_NUMBER_AUTO_VALUE(u4, test_num_from_double(4.0));
+    TEST_NUMBER_AUTO_VALUE(u5, test_num_from_double(5.0));
+    TEST_NUMBER_AUTO_VALUE(u6, test_num_from_double(6.0));
+    TEST_NUMBER_AUTO_VALUE(g3, num_add(num_neg(num_mul(u3, num_cos(u3))), test_num_mul_double(num_sin(u3), 2.0)));
+    TEST_NUMBER_AUTO_VALUE(g4, num_add(num_neg(num_mul(u4, num_cos(u4))), test_num_mul_double(num_sin(u4), 2.0)));
+    TEST_NUMBER_AUTO_VALUE(g5, num_add(num_neg(num_mul(u5, num_cos(u5))), test_num_mul_double(num_sin(u5), 2.0)));
+    TEST_NUMBER_AUTO_VALUE(g6, num_add(num_neg(num_mul(u6, num_cos(u6))), test_num_mul_double(num_sin(u6), 2.0)));
+    TEST_NUMBER_AUTO_VALUE(expected, test_num_mul_double(num_sub(num_sub(g6, g4), num_sub(g5, g3)), 0.5));
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ (x+2y+3)cos(x+2y+3) dA  [affine*cos(affine)]\n");
@@ -2363,26 +2504,27 @@ void test_multi_2d_square_affine_times_cos_affine(void) {
     expr_t *expr = expr_mul(cos_affine, square);
 
     expr_t *vars[2] = { x, y };
-    number_t lo[2] = { test_num_from_double(0.0), test_num_from_double(0.0) };
-    number_t hi[2] = { test_num_from_double(1.0), test_num_from_double(1.0) };
-    number_t result, err;
-    number_t u3 = test_num_from_double(3.0);
-    number_t u4 = test_num_from_double(4.0);
-    number_t u5 = test_num_from_double(5.0);
-    number_t u6 = test_num_from_double(6.0);
-    number_t g3 = num_add(num_neg(num_mul(num_mul(u3, u3), num_cos(u3))),
+    TEST_NUMBER_ARRAY_AUTO_2(lo) = { test_num_from_double(0.0), test_num_from_double(0.0) };
+    TEST_NUMBER_ARRAY_AUTO_2(hi) = { test_num_from_double(1.0), test_num_from_double(1.0) };
+    TEST_NUMBER_AUTO(result);
+    TEST_NUMBER_AUTO(err);
+    TEST_NUMBER_AUTO_VALUE(u3, test_num_from_double(3.0));
+    TEST_NUMBER_AUTO_VALUE(u4, test_num_from_double(4.0));
+    TEST_NUMBER_AUTO_VALUE(u5, test_num_from_double(5.0));
+    TEST_NUMBER_AUTO_VALUE(u6, test_num_from_double(6.0));
+    TEST_NUMBER_AUTO_VALUE(g3, num_add(num_neg(num_mul(num_mul(u3, u3), num_cos(u3))),
                          num_add(test_num_mul_double(num_mul(u3, num_sin(u3)), 4.0),
-                                test_num_mul_double(num_cos(u3), 6.0)));
-    number_t g4 = num_add(num_neg(num_mul(num_mul(u4, u4), num_cos(u4))),
+                                test_num_mul_double(num_cos(u3), 6.0))));
+    TEST_NUMBER_AUTO_VALUE(g4, num_add(num_neg(num_mul(num_mul(u4, u4), num_cos(u4))),
                          num_add(test_num_mul_double(num_mul(u4, num_sin(u4)), 4.0),
-                                test_num_mul_double(num_cos(u4), 6.0)));
-    number_t g5 = num_add(num_neg(num_mul(num_mul(u5, u5), num_cos(u5))),
+                                test_num_mul_double(num_cos(u4), 6.0))));
+    TEST_NUMBER_AUTO_VALUE(g5, num_add(num_neg(num_mul(num_mul(u5, u5), num_cos(u5))),
                          num_add(test_num_mul_double(num_mul(u5, num_sin(u5)), 4.0),
-                                test_num_mul_double(num_cos(u5), 6.0)));
-    number_t g6 = num_add(num_neg(num_mul(num_mul(u6, u6), num_cos(u6))),
+                                test_num_mul_double(num_cos(u5), 6.0))));
+    TEST_NUMBER_AUTO_VALUE(g6, num_add(num_neg(num_mul(num_mul(u6, u6), num_cos(u6))),
                          num_add(test_num_mul_double(num_mul(u6, num_sin(u6)), 4.0),
-                                test_num_mul_double(num_cos(u6), 6.0)));
-    number_t expected = test_num_mul_double(num_sub(num_sub(g6, g4), num_sub(g5, g3)), 0.5);
+                                test_num_mul_double(num_cos(u6), 6.0))));
+    TEST_NUMBER_AUTO_VALUE(expected, test_num_mul_double(num_sub(num_sub(g6, g4), num_sub(g5, g3)), 0.5));
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ (x+2y+3)^2cos(x+2y+3) dA  [affine^2*cos(affine)]\n");
@@ -2417,22 +2559,23 @@ void test_multi_2d_affine_times_sinh_affine(void) {
     expr_t *expr = expr_mul(affine, sinh_affine);
 
     expr_t *vars[2] = { x, y };
-    number_t lo[2] = { test_num_from_double(0.0), test_num_from_double(0.0) };
-    number_t hi[2] = { test_num_from_double(1.0), test_num_from_double(1.0) };
-    number_t result, err;
-    number_t e3 = num_exp(test_num_from_double(3.0));
-    number_t e4 = num_exp(test_num_from_double(4.0));
-    number_t e5 = num_exp(test_num_from_double(5.0));
-    number_t e6 = num_exp(test_num_from_double(6.0));
-    number_t em3 = num_exp(test_num_from_double(-3.0));
-    number_t em4 = num_exp(test_num_from_double(-4.0));
-    number_t em5 = num_exp(test_num_from_double(-5.0));
-    number_t em6 = num_exp(test_num_from_double(-6.0));
-    number_t pos = num_add(num_sub(test_num_mul_double(e6, 2.0), e4),
-                          num_sub(test_num_mul_double(e3, 0.5), test_num_mul_double(e5, 1.5)));
-    number_t minus = num_add(num_sub(test_num_mul_double(em6, 4.0), test_num_mul_double(em4, 3.0)),
-                            num_sub(test_num_mul_double(em3, 2.5), test_num_mul_double(em5, 3.5)));
-    number_t expected = test_num_mul_double(num_sub(pos, minus), 0.5);
+    TEST_NUMBER_ARRAY_AUTO_2(lo) = { test_num_from_double(0.0), test_num_from_double(0.0) };
+    TEST_NUMBER_ARRAY_AUTO_2(hi) = { test_num_from_double(1.0), test_num_from_double(1.0) };
+    TEST_NUMBER_AUTO(result);
+    TEST_NUMBER_AUTO(err);
+    TEST_NUMBER_AUTO_VALUE(e3, num_exp(test_num_from_double(3.0)));
+    TEST_NUMBER_AUTO_VALUE(e4, num_exp(test_num_from_double(4.0)));
+    TEST_NUMBER_AUTO_VALUE(e5, num_exp(test_num_from_double(5.0)));
+    TEST_NUMBER_AUTO_VALUE(e6, num_exp(test_num_from_double(6.0)));
+    TEST_NUMBER_AUTO_VALUE(em3, num_exp(test_num_from_double(-3.0)));
+    TEST_NUMBER_AUTO_VALUE(em4, num_exp(test_num_from_double(-4.0)));
+    TEST_NUMBER_AUTO_VALUE(em5, num_exp(test_num_from_double(-5.0)));
+    TEST_NUMBER_AUTO_VALUE(em6, num_exp(test_num_from_double(-6.0)));
+    TEST_NUMBER_AUTO_VALUE(pos, num_add(num_sub(test_num_mul_double(e6, 2.0), e4),
+                          num_sub(test_num_mul_double(e3, 0.5), test_num_mul_double(e5, 1.5))));
+    TEST_NUMBER_AUTO_VALUE(minus, num_add(num_sub(test_num_mul_double(em6, 4.0), test_num_mul_double(em4, 3.0)),
+                            num_sub(test_num_mul_double(em3, 2.5), test_num_mul_double(em5, 3.5))));
+    TEST_NUMBER_AUTO_VALUE(expected, test_num_mul_double(num_sub(pos, minus), 0.5));
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ (x+2y+3)sinh(x+2y+3) dA  [affine*sinh(affine)]\n");
@@ -2467,26 +2610,27 @@ void test_multi_2d_square_affine_times_sinh_affine(void) {
     expr_t *expr = expr_mul(square, sinh_affine);
 
     expr_t *vars[2] = { x, y };
-    number_t lo[2] = { test_num_from_double(0.0), test_num_from_double(0.0) };
-    number_t hi[2] = { test_num_from_double(1.0), test_num_from_double(1.0) };
-    number_t result, err;
-    number_t e3 = num_exp(test_num_from_double(3.0));
-    number_t e4 = num_exp(test_num_from_double(4.0));
-    number_t e5 = num_exp(test_num_from_double(5.0));
-    number_t e6 = num_exp(test_num_from_double(6.0));
-    number_t em3 = num_exp(test_num_from_double(-3.0));
-    number_t em4 = num_exp(test_num_from_double(-4.0));
-    number_t em5 = num_exp(test_num_from_double(-5.0));
-    number_t em6 = num_exp(test_num_from_double(-6.0));
-    number_t pos = test_num_mul_double(
+    TEST_NUMBER_ARRAY_AUTO_2(lo) = { test_num_from_double(0.0), test_num_from_double(0.0) };
+    TEST_NUMBER_ARRAY_AUTO_2(hi) = { test_num_from_double(1.0), test_num_from_double(1.0) };
+    TEST_NUMBER_AUTO(result);
+    TEST_NUMBER_AUTO(err);
+    TEST_NUMBER_AUTO_VALUE(e3, num_exp(test_num_from_double(3.0)));
+    TEST_NUMBER_AUTO_VALUE(e4, num_exp(test_num_from_double(4.0)));
+    TEST_NUMBER_AUTO_VALUE(e5, num_exp(test_num_from_double(5.0)));
+    TEST_NUMBER_AUTO_VALUE(e6, num_exp(test_num_from_double(6.0)));
+    TEST_NUMBER_AUTO_VALUE(em3, num_exp(test_num_from_double(-3.0)));
+    TEST_NUMBER_AUTO_VALUE(em4, num_exp(test_num_from_double(-4.0)));
+    TEST_NUMBER_AUTO_VALUE(em5, num_exp(test_num_from_double(-5.0)));
+    TEST_NUMBER_AUTO_VALUE(em6, num_exp(test_num_from_double(-6.0)));
+    TEST_NUMBER_AUTO_VALUE(pos, test_num_mul_double(
         num_add(num_sub(test_num_mul_double(e6, 18.0), test_num_mul_double(e5, 11.0)),
                num_sub(test_num_mul_double(e3, 3.0), test_num_mul_double(e4, 6.0))),
-        0.5);
-    number_t neg = test_num_mul_double(
+        0.5));
+    TEST_NUMBER_AUTO_VALUE(neg, test_num_mul_double(
         num_add(num_sub(test_num_mul_double(em6, 66.0), test_num_mul_double(em5, 51.0)),
                num_sub(test_num_mul_double(em3, 27.0), test_num_mul_double(em4, 38.0))),
-        0.5);
-    number_t expected = test_num_mul_double(num_sub(pos, neg), 0.5);
+        0.5));
+    TEST_NUMBER_AUTO_VALUE(expected, test_num_mul_double(num_sub(pos, neg), 0.5));
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ (x+2y+3)^2sinh(x+2y+3) dA  [affine^2*sinh(affine)]\n");
@@ -2521,22 +2665,23 @@ void test_multi_2d_affine_times_cosh_affine(void) {
     expr_t *expr = expr_mul(cosh_affine, affine);
 
     expr_t *vars[2] = { x, y };
-    number_t lo[2] = { test_num_from_double(0.0), test_num_from_double(0.0) };
-    number_t hi[2] = { test_num_from_double(1.0), test_num_from_double(1.0) };
-    number_t result, err;
-    number_t e3 = num_exp(test_num_from_double(3.0));
-    number_t e4 = num_exp(test_num_from_double(4.0));
-    number_t e5 = num_exp(test_num_from_double(5.0));
-    number_t e6 = num_exp(test_num_from_double(6.0));
-    number_t em3 = num_exp(test_num_from_double(-3.0));
-    number_t em4 = num_exp(test_num_from_double(-4.0));
-    number_t em5 = num_exp(test_num_from_double(-5.0));
-    number_t em6 = num_exp(test_num_from_double(-6.0));
-    number_t pos = num_add(num_sub(test_num_mul_double(e6, 2.0), e4),
-                          num_sub(test_num_mul_double(e3, 0.5), test_num_mul_double(e5, 1.5)));
-    number_t minus = num_add(num_sub(test_num_mul_double(em6, 4.0), test_num_mul_double(em4, 3.0)),
-                            num_sub(test_num_mul_double(em3, 2.5), test_num_mul_double(em5, 3.5)));
-    number_t expected = test_num_mul_double(num_add(pos, minus), 0.5);
+    TEST_NUMBER_ARRAY_AUTO_2(lo) = { test_num_from_double(0.0), test_num_from_double(0.0) };
+    TEST_NUMBER_ARRAY_AUTO_2(hi) = { test_num_from_double(1.0), test_num_from_double(1.0) };
+    TEST_NUMBER_AUTO(result);
+    TEST_NUMBER_AUTO(err);
+    TEST_NUMBER_AUTO_VALUE(e3, num_exp(test_num_from_double(3.0)));
+    TEST_NUMBER_AUTO_VALUE(e4, num_exp(test_num_from_double(4.0)));
+    TEST_NUMBER_AUTO_VALUE(e5, num_exp(test_num_from_double(5.0)));
+    TEST_NUMBER_AUTO_VALUE(e6, num_exp(test_num_from_double(6.0)));
+    TEST_NUMBER_AUTO_VALUE(em3, num_exp(test_num_from_double(-3.0)));
+    TEST_NUMBER_AUTO_VALUE(em4, num_exp(test_num_from_double(-4.0)));
+    TEST_NUMBER_AUTO_VALUE(em5, num_exp(test_num_from_double(-5.0)));
+    TEST_NUMBER_AUTO_VALUE(em6, num_exp(test_num_from_double(-6.0)));
+    TEST_NUMBER_AUTO_VALUE(pos, num_add(num_sub(test_num_mul_double(e6, 2.0), e4),
+                          num_sub(test_num_mul_double(e3, 0.5), test_num_mul_double(e5, 1.5))));
+    TEST_NUMBER_AUTO_VALUE(minus, num_add(num_sub(test_num_mul_double(em6, 4.0), test_num_mul_double(em4, 3.0)),
+                            num_sub(test_num_mul_double(em3, 2.5), test_num_mul_double(em5, 3.5))));
+    TEST_NUMBER_AUTO_VALUE(expected, test_num_mul_double(num_add(pos, minus), 0.5));
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ (x+2y+3)cosh(x+2y+3) dA  [affine*cosh(affine)]\n");
@@ -2571,26 +2716,27 @@ void test_multi_2d_square_affine_times_cosh_affine(void) {
     expr_t *expr = expr_mul(cosh_affine, square);
 
     expr_t *vars[2] = { x, y };
-    number_t lo[2] = { test_num_from_double(0.0), test_num_from_double(0.0) };
-    number_t hi[2] = { test_num_from_double(1.0), test_num_from_double(1.0) };
-    number_t result, err;
-    number_t e3 = num_exp(test_num_from_double(3.0));
-    number_t e4 = num_exp(test_num_from_double(4.0));
-    number_t e5 = num_exp(test_num_from_double(5.0));
-    number_t e6 = num_exp(test_num_from_double(6.0));
-    number_t em3 = num_exp(test_num_from_double(-3.0));
-    number_t em4 = num_exp(test_num_from_double(-4.0));
-    number_t em5 = num_exp(test_num_from_double(-5.0));
-    number_t em6 = num_exp(test_num_from_double(-6.0));
-    number_t pos = test_num_mul_double(
+    TEST_NUMBER_ARRAY_AUTO_2(lo) = { test_num_from_double(0.0), test_num_from_double(0.0) };
+    TEST_NUMBER_ARRAY_AUTO_2(hi) = { test_num_from_double(1.0), test_num_from_double(1.0) };
+    TEST_NUMBER_AUTO(result);
+    TEST_NUMBER_AUTO(err);
+    TEST_NUMBER_AUTO_VALUE(e3, num_exp(test_num_from_double(3.0)));
+    TEST_NUMBER_AUTO_VALUE(e4, num_exp(test_num_from_double(4.0)));
+    TEST_NUMBER_AUTO_VALUE(e5, num_exp(test_num_from_double(5.0)));
+    TEST_NUMBER_AUTO_VALUE(e6, num_exp(test_num_from_double(6.0)));
+    TEST_NUMBER_AUTO_VALUE(em3, num_exp(test_num_from_double(-3.0)));
+    TEST_NUMBER_AUTO_VALUE(em4, num_exp(test_num_from_double(-4.0)));
+    TEST_NUMBER_AUTO_VALUE(em5, num_exp(test_num_from_double(-5.0)));
+    TEST_NUMBER_AUTO_VALUE(em6, num_exp(test_num_from_double(-6.0)));
+    TEST_NUMBER_AUTO_VALUE(pos, test_num_mul_double(
         num_add(num_sub(test_num_mul_double(e6, 18.0), test_num_mul_double(e5, 11.0)),
                num_sub(test_num_mul_double(e3, 3.0), test_num_mul_double(e4, 6.0))),
-        0.5);
-    number_t neg = test_num_mul_double(
+        0.5));
+    TEST_NUMBER_AUTO_VALUE(neg, test_num_mul_double(
         num_add(num_sub(test_num_mul_double(em6, 66.0), test_num_mul_double(em5, 51.0)),
                num_sub(test_num_mul_double(em3, 27.0), test_num_mul_double(em4, 38.0))),
-        0.5);
-    number_t expected = test_num_mul_double(num_add(pos, neg), 0.5);
+        0.5));
+    TEST_NUMBER_AUTO_VALUE(expected, test_num_mul_double(num_add(pos, neg), 0.5));
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ (x+2y+3)^2cosh(x+2y+3) dA  [affine^2*cosh(affine)]\n");
@@ -2626,17 +2772,18 @@ void test_multi_2d_cube_affine_times_exp_affine(void) {
     expr_t *expr = expr_mul(cube, exp_affine);
 
     expr_t *vars[2] = { x, y };
-    number_t lo[2] = { test_num_from_double(0.0), test_num_from_double(0.0) };
-    number_t hi[2] = { test_num_from_double(1.0), test_num_from_double(1.0) };
-    number_t result, err;
-    number_t e3 = num_exp(test_num_from_double(3.0));
-    number_t e4 = num_exp(test_num_from_double(4.0));
-    number_t e5 = num_exp(test_num_from_double(5.0));
-    number_t e6 = num_exp(test_num_from_double(6.0));
-    number_t expected = test_num_mul_double(
+    TEST_NUMBER_ARRAY_AUTO_2(lo) = { test_num_from_double(0.0), test_num_from_double(0.0) };
+    TEST_NUMBER_ARRAY_AUTO_2(hi) = { test_num_from_double(1.0), test_num_from_double(1.0) };
+    TEST_NUMBER_AUTO(result);
+    TEST_NUMBER_AUTO(err);
+    TEST_NUMBER_AUTO_VALUE(e3, num_exp(test_num_from_double(3.0)));
+    TEST_NUMBER_AUTO_VALUE(e4, num_exp(test_num_from_double(4.0)));
+    TEST_NUMBER_AUTO_VALUE(e5, num_exp(test_num_from_double(5.0)));
+    TEST_NUMBER_AUTO_VALUE(e6, num_exp(test_num_from_double(6.0)));
+    TEST_NUMBER_AUTO_VALUE(expected, test_num_mul_double(
         num_add(num_sub(test_num_mul_double(e6, 84.0), test_num_mul_double(e5, 41.0)),
                num_sub(test_num_mul_double(e3, 3.0), test_num_mul_double(e4, 16.0))),
-        0.5);
+        0.5));
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ (x+2y+3)^3exp(x+2y+3) dA  [affine^3*exp(affine)]\n");
@@ -2673,30 +2820,31 @@ void test_multi_2d_cube_affine_times_sin_affine(void) {
     expr_t *expr = expr_mul(cube, sin_affine);
 
     expr_t *vars[2] = { x, y };
-    number_t lo[2] = { test_num_from_double(0.0), test_num_from_double(0.0) };
-    number_t hi[2] = { test_num_from_double(1.0), test_num_from_double(1.0) };
-    number_t result, err;
-    number_t u3 = test_num_from_double(3.0);
-    number_t u4 = test_num_from_double(4.0);
-    number_t u5 = test_num_from_double(5.0);
-    number_t u6 = test_num_from_double(6.0);
-    number_t f3 = num_add(num_mul(num_add(num_neg(num_mul(u3, num_mul(u3, u3))),
+    TEST_NUMBER_ARRAY_AUTO_2(lo) = { test_num_from_double(0.0), test_num_from_double(0.0) };
+    TEST_NUMBER_ARRAY_AUTO_2(hi) = { test_num_from_double(1.0), test_num_from_double(1.0) };
+    TEST_NUMBER_AUTO(result);
+    TEST_NUMBER_AUTO(err);
+    TEST_NUMBER_AUTO_VALUE(u3, test_num_from_double(3.0));
+    TEST_NUMBER_AUTO_VALUE(u4, test_num_from_double(4.0));
+    TEST_NUMBER_AUTO_VALUE(u5, test_num_from_double(5.0));
+    TEST_NUMBER_AUTO_VALUE(u6, test_num_from_double(6.0));
+    TEST_NUMBER_AUTO_VALUE(f3, num_add(num_mul(num_add(num_neg(num_mul(u3, num_mul(u3, u3))),
                                        test_num_mul_double(u3, 18.0)), num_sin(u3)),
                          num_mul(num_add(test_num_mul_double(num_mul(u3, u3), -6.0),
-                                       test_num_from_double(24.0)), num_cos(u3)));
-    number_t f4 = num_add(num_mul(num_add(num_neg(num_mul(u4, num_mul(u4, u4))),
+                                       test_num_from_double(24.0)), num_cos(u3))));
+    TEST_NUMBER_AUTO_VALUE(f4, num_add(num_mul(num_add(num_neg(num_mul(u4, num_mul(u4, u4))),
                                        test_num_mul_double(u4, 18.0)), num_sin(u4)),
                          num_mul(num_add(test_num_mul_double(num_mul(u4, u4), -6.0),
-                                       test_num_from_double(24.0)), num_cos(u4)));
-    number_t f5 = num_add(num_mul(num_add(num_neg(num_mul(u5, num_mul(u5, u5))),
+                                       test_num_from_double(24.0)), num_cos(u4))));
+    TEST_NUMBER_AUTO_VALUE(f5, num_add(num_mul(num_add(num_neg(num_mul(u5, num_mul(u5, u5))),
                                        test_num_mul_double(u5, 18.0)), num_sin(u5)),
                          num_mul(num_add(test_num_mul_double(num_mul(u5, u5), -6.0),
-                                       test_num_from_double(24.0)), num_cos(u5)));
-    number_t f6 = num_add(num_mul(num_add(num_neg(num_mul(u6, num_mul(u6, u6))),
+                                       test_num_from_double(24.0)), num_cos(u5))));
+    TEST_NUMBER_AUTO_VALUE(f6, num_add(num_mul(num_add(num_neg(num_mul(u6, num_mul(u6, u6))),
                                        test_num_mul_double(u6, 18.0)), num_sin(u6)),
                          num_mul(num_add(test_num_mul_double(num_mul(u6, u6), -6.0),
-                                       test_num_from_double(24.0)), num_cos(u6)));
-    number_t expected = test_num_mul_double(num_sub(num_sub(f6, f4), num_sub(f5, f3)), 0.5);
+                                       test_num_from_double(24.0)), num_cos(u6))));
+    TEST_NUMBER_AUTO_VALUE(expected, test_num_mul_double(num_sub(num_sub(f6, f4), num_sub(f5, f3)), 0.5));
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ (x+2y+3)^3sin(x+2y+3) dA  [affine^3*sin(affine)]\n");
@@ -2733,30 +2881,31 @@ void test_multi_2d_cube_affine_times_cos_affine(void) {
     expr_t *expr = expr_mul(cos_affine, cube);
 
     expr_t *vars[2] = { x, y };
-    number_t lo[2] = { test_num_from_double(0.0), test_num_from_double(0.0) };
-    number_t hi[2] = { test_num_from_double(1.0), test_num_from_double(1.0) };
-    number_t result, err;
-    number_t u3 = test_num_from_double(3.0);
-    number_t u4 = test_num_from_double(4.0);
-    number_t u5 = test_num_from_double(5.0);
-    number_t u6 = test_num_from_double(6.0);
-    number_t g3 = num_add(num_mul(num_add(num_neg(num_mul(u3, num_mul(u3, u3))),
+    TEST_NUMBER_ARRAY_AUTO_2(lo) = { test_num_from_double(0.0), test_num_from_double(0.0) };
+    TEST_NUMBER_ARRAY_AUTO_2(hi) = { test_num_from_double(1.0), test_num_from_double(1.0) };
+    TEST_NUMBER_AUTO(result);
+    TEST_NUMBER_AUTO(err);
+    TEST_NUMBER_AUTO_VALUE(u3, test_num_from_double(3.0));
+    TEST_NUMBER_AUTO_VALUE(u4, test_num_from_double(4.0));
+    TEST_NUMBER_AUTO_VALUE(u5, test_num_from_double(5.0));
+    TEST_NUMBER_AUTO_VALUE(u6, test_num_from_double(6.0));
+    TEST_NUMBER_AUTO_VALUE(g3, num_add(num_mul(num_add(num_neg(num_mul(u3, num_mul(u3, u3))),
                                        test_num_mul_double(u3, 18.0)), num_cos(u3)),
                          num_mul(num_add(test_num_mul_double(num_mul(u3, u3), 6.0),
-                                       test_num_from_double(-24.0)), num_sin(u3)));
-    number_t g4 = num_add(num_mul(num_add(num_neg(num_mul(u4, num_mul(u4, u4))),
+                                       test_num_from_double(-24.0)), num_sin(u3))));
+    TEST_NUMBER_AUTO_VALUE(g4, num_add(num_mul(num_add(num_neg(num_mul(u4, num_mul(u4, u4))),
                                        test_num_mul_double(u4, 18.0)), num_cos(u4)),
                          num_mul(num_add(test_num_mul_double(num_mul(u4, u4), 6.0),
-                                       test_num_from_double(-24.0)), num_sin(u4)));
-    number_t g5 = num_add(num_mul(num_add(num_neg(num_mul(u5, num_mul(u5, u5))),
+                                       test_num_from_double(-24.0)), num_sin(u4))));
+    TEST_NUMBER_AUTO_VALUE(g5, num_add(num_mul(num_add(num_neg(num_mul(u5, num_mul(u5, u5))),
                                        test_num_mul_double(u5, 18.0)), num_cos(u5)),
                          num_mul(num_add(test_num_mul_double(num_mul(u5, u5), 6.0),
-                                       test_num_from_double(-24.0)), num_sin(u5)));
-    number_t g6 = num_add(num_mul(num_add(num_neg(num_mul(u6, num_mul(u6, u6))),
+                                       test_num_from_double(-24.0)), num_sin(u5))));
+    TEST_NUMBER_AUTO_VALUE(g6, num_add(num_mul(num_add(num_neg(num_mul(u6, num_mul(u6, u6))),
                                        test_num_mul_double(u6, 18.0)), num_cos(u6)),
                          num_mul(num_add(test_num_mul_double(num_mul(u6, u6), 6.0),
-                                       test_num_from_double(-24.0)), num_sin(u6)));
-    number_t expected = test_num_mul_double(num_sub(num_sub(g6, g4), num_sub(g5, g3)), 0.5);
+                                       test_num_from_double(-24.0)), num_sin(u6))));
+    TEST_NUMBER_AUTO_VALUE(expected, test_num_mul_double(num_sub(num_sub(g6, g4), num_sub(g5, g3)), 0.5));
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ (x+2y+3)^3cos(x+2y+3) dA  [affine^3*cos(affine)]\n");
@@ -2792,26 +2941,27 @@ void test_multi_2d_cube_affine_times_sinh_affine(void) {
     expr_t *expr = expr_mul(cube, sinh_affine);
 
     expr_t *vars[2] = { x, y };
-    number_t lo[2] = { test_num_from_double(0.0), test_num_from_double(0.0) };
-    number_t hi[2] = { test_num_from_double(1.0), test_num_from_double(1.0) };
-    number_t result, err;
-    number_t e3 = num_exp(test_num_from_double(3.0));
-    number_t e4 = num_exp(test_num_from_double(4.0));
-    number_t e5 = num_exp(test_num_from_double(5.0));
-    number_t e6 = num_exp(test_num_from_double(6.0));
-    number_t em3 = num_exp(test_num_from_double(-3.0));
-    number_t em4 = num_exp(test_num_from_double(-4.0));
-    number_t em5 = num_exp(test_num_from_double(-5.0));
-    number_t em6 = num_exp(test_num_from_double(-6.0));
-    number_t pos = test_num_mul_double(
+    TEST_NUMBER_ARRAY_AUTO_2(lo) = { test_num_from_double(0.0), test_num_from_double(0.0) };
+    TEST_NUMBER_ARRAY_AUTO_2(hi) = { test_num_from_double(1.0), test_num_from_double(1.0) };
+    TEST_NUMBER_AUTO(result);
+    TEST_NUMBER_AUTO(err);
+    TEST_NUMBER_AUTO_VALUE(e3, num_exp(test_num_from_double(3.0)));
+    TEST_NUMBER_AUTO_VALUE(e4, num_exp(test_num_from_double(4.0)));
+    TEST_NUMBER_AUTO_VALUE(e5, num_exp(test_num_from_double(5.0)));
+    TEST_NUMBER_AUTO_VALUE(e6, num_exp(test_num_from_double(6.0)));
+    TEST_NUMBER_AUTO_VALUE(em3, num_exp(test_num_from_double(-3.0)));
+    TEST_NUMBER_AUTO_VALUE(em4, num_exp(test_num_from_double(-4.0)));
+    TEST_NUMBER_AUTO_VALUE(em5, num_exp(test_num_from_double(-5.0)));
+    TEST_NUMBER_AUTO_VALUE(em6, num_exp(test_num_from_double(-6.0)));
+    TEST_NUMBER_AUTO_VALUE(pos, test_num_mul_double(
         num_add(num_sub(test_num_mul_double(e6, 84.0), test_num_mul_double(e5, 41.0)),
                num_sub(test_num_mul_double(e3, 3.0), test_num_mul_double(e4, 16.0))),
-        0.5);
-    number_t neg = test_num_mul_double(
+        0.5));
+    TEST_NUMBER_AUTO_VALUE(neg, test_num_mul_double(
         num_add(num_sub(test_num_mul_double(em6, 564.0), test_num_mul_double(em5, 389.0)),
                num_sub(test_num_mul_double(em3, 159.0), test_num_mul_double(em4, 256.0))),
-        0.5);
-    number_t expected = test_num_mul_double(num_sub(pos, neg), 0.5);
+        0.5));
+    TEST_NUMBER_AUTO_VALUE(expected, test_num_mul_double(num_sub(pos, neg), 0.5));
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ (x+2y+3)^3sinh(x+2y+3) dA  [affine^3*sinh(affine)]\n");
@@ -2848,26 +2998,27 @@ void test_multi_2d_cube_affine_times_cosh_affine(void) {
     expr_t *expr = expr_mul(cosh_affine, cube);
 
     expr_t *vars[2] = { x, y };
-    number_t lo[2] = { test_num_from_double(0.0), test_num_from_double(0.0) };
-    number_t hi[2] = { test_num_from_double(1.0), test_num_from_double(1.0) };
-    number_t result, err;
-    number_t e3 = num_exp(test_num_from_double(3.0));
-    number_t e4 = num_exp(test_num_from_double(4.0));
-    number_t e5 = num_exp(test_num_from_double(5.0));
-    number_t e6 = num_exp(test_num_from_double(6.0));
-    number_t em3 = num_exp(test_num_from_double(-3.0));
-    number_t em4 = num_exp(test_num_from_double(-4.0));
-    number_t em5 = num_exp(test_num_from_double(-5.0));
-    number_t em6 = num_exp(test_num_from_double(-6.0));
-    number_t pos = test_num_mul_double(
+    TEST_NUMBER_ARRAY_AUTO_2(lo) = { test_num_from_double(0.0), test_num_from_double(0.0) };
+    TEST_NUMBER_ARRAY_AUTO_2(hi) = { test_num_from_double(1.0), test_num_from_double(1.0) };
+    TEST_NUMBER_AUTO(result);
+    TEST_NUMBER_AUTO(err);
+    TEST_NUMBER_AUTO_VALUE(e3, num_exp(test_num_from_double(3.0)));
+    TEST_NUMBER_AUTO_VALUE(e4, num_exp(test_num_from_double(4.0)));
+    TEST_NUMBER_AUTO_VALUE(e5, num_exp(test_num_from_double(5.0)));
+    TEST_NUMBER_AUTO_VALUE(e6, num_exp(test_num_from_double(6.0)));
+    TEST_NUMBER_AUTO_VALUE(em3, num_exp(test_num_from_double(-3.0)));
+    TEST_NUMBER_AUTO_VALUE(em4, num_exp(test_num_from_double(-4.0)));
+    TEST_NUMBER_AUTO_VALUE(em5, num_exp(test_num_from_double(-5.0)));
+    TEST_NUMBER_AUTO_VALUE(em6, num_exp(test_num_from_double(-6.0)));
+    TEST_NUMBER_AUTO_VALUE(pos, test_num_mul_double(
         num_add(num_sub(test_num_mul_double(e6, 84.0), test_num_mul_double(e5, 41.0)),
                num_sub(test_num_mul_double(e3, 3.0), test_num_mul_double(e4, 16.0))),
-        0.5);
-    number_t neg = test_num_mul_double(
+        0.5));
+    TEST_NUMBER_AUTO_VALUE(neg, test_num_mul_double(
         num_add(num_sub(test_num_mul_double(em6, 564.0), test_num_mul_double(em5, 389.0)),
                num_sub(test_num_mul_double(em3, 159.0), test_num_mul_double(em4, 256.0))),
-        0.5);
-    number_t expected = test_num_mul_double(num_add(pos, neg), 0.5);
+        0.5));
+    TEST_NUMBER_AUTO_VALUE(expected, test_num_mul_double(num_add(pos, neg), 0.5));
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ (x+2y+3)^3cosh(x+2y+3) dA  [affine^3*cosh(affine)]\n");
@@ -2904,11 +3055,11 @@ void test_multi_2d_quartic_affine_times_exp_affine(void) {
     expr_t *expr = expr_mul(quartic, exp_affine);
 
     expr_t *vars[2] = { x, y };
-    number_t lo[2] = { test_num_from_double(0.0), test_num_from_double(0.0) };
-    number_t hi[2] = { test_num_from_double(1.0), test_num_from_double(1.0) };
-    number_t result, err;
-    number_t expected =
-        num_create_from_string("68737.53818332082704696161172519864941330607887958296538908503087525293084452735250637289");
+    TEST_NUMBER_ARRAY_AUTO_2(lo) = { test_num_from_double(0.0), test_num_from_double(0.0) };
+    TEST_NUMBER_ARRAY_AUTO_2(hi) = { test_num_from_double(1.0), test_num_from_double(1.0) };
+    TEST_NUMBER_AUTO(result);
+    TEST_NUMBER_AUTO(err);
+    TEST_NUMBER_AUTO_VALUE(expected, num_create_from_string("68737.53818332082704696161172519864941330607887958296538908503087525293084452735250637289"));
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ (x+2y+3)^4exp(x+2y+3) dA  [affine^4*exp(affine)]\n");
@@ -2946,11 +3097,11 @@ void test_multi_2d_quartic_affine_times_sin_affine(void) {
     expr_t *expr = expr_mul(quartic, sin_affine);
 
     expr_t *vars[2] = { x, y };
-    number_t lo[2] = { test_num_from_double(0.0), test_num_from_double(0.0) };
-    number_t hi[2] = { test_num_from_double(1.0), test_num_from_double(1.0) };
-    number_t result, err;
-    number_t expected =
-        num_create_from_string("-381.33814729825575506728041524097607853401008090198");
+    TEST_NUMBER_ARRAY_AUTO_2(lo) = { test_num_from_double(0.0), test_num_from_double(0.0) };
+    TEST_NUMBER_ARRAY_AUTO_2(hi) = { test_num_from_double(1.0), test_num_from_double(1.0) };
+    TEST_NUMBER_AUTO(result);
+    TEST_NUMBER_AUTO(err);
+    TEST_NUMBER_AUTO_VALUE(expected, num_create_from_string("-381.33814729825575506728041524097607853401008090198"));
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ (x+2y+3)^4sin(x+2y+3) dA  [affine^4*sin(affine)]\n");
@@ -2988,11 +3139,11 @@ void test_multi_2d_quartic_affine_times_cos_affine(void) {
     expr_t *expr = expr_mul(cos_affine, quartic);
 
     expr_t *vars[2] = { x, y };
-    number_t lo[2] = { test_num_from_double(0.0), test_num_from_double(0.0) };
-    number_t hi[2] = { test_num_from_double(1.0), test_num_from_double(1.0) };
-    number_t result, err;
-    number_t expected =
-        num_create_from_string("56.617810832398686377797715265898455798291870430519");
+    TEST_NUMBER_ARRAY_AUTO_2(lo) = { test_num_from_double(0.0), test_num_from_double(0.0) };
+    TEST_NUMBER_ARRAY_AUTO_2(hi) = { test_num_from_double(1.0), test_num_from_double(1.0) };
+    TEST_NUMBER_AUTO(result);
+    TEST_NUMBER_AUTO(err);
+    TEST_NUMBER_AUTO_VALUE(expected, num_create_from_string("56.617810832398686377797715265898455798291870430519"));
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ (x+2y+3)^4cos(x+2y+3) dA  [affine^4*cos(affine)]\n");
@@ -3028,11 +3179,11 @@ void test_multi_2d_quartic_affine_times_sinh_affine(void) {
     expr_t *expr = expr_mul(quartic, sinh_affine);
 
     expr_t *vars[2] = { x, y };
-    number_t lo[2] = { test_num_from_double(0.0), test_num_from_double(0.0) };
-    number_t hi[2] = { test_num_from_double(1.0), test_num_from_double(1.0) };
-    number_t result, err;
-    number_t expected =
-        num_create_from_string("34366.578859352871623151816024873924373424902707813");
+    TEST_NUMBER_ARRAY_AUTO_2(lo) = { test_num_from_double(0.0), test_num_from_double(0.0) };
+    TEST_NUMBER_ARRAY_AUTO_2(hi) = { test_num_from_double(1.0), test_num_from_double(1.0) };
+    TEST_NUMBER_AUTO(result);
+    TEST_NUMBER_AUTO(err);
+    TEST_NUMBER_AUTO_VALUE(expected, num_create_from_string("34366.578859352871623151816024873924373424902707813"));
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ (x+2y+3)^4sinh(x+2y+3) dA  [affine^4*sinh(affine)]\n");
@@ -3070,11 +3221,11 @@ void test_multi_2d_quartic_affine_times_cosh_affine(void) {
     expr_t *expr = expr_mul(cosh_affine, quartic);
 
     expr_t *vars[2] = { x, y };
-    number_t lo[2] = { test_num_from_double(0.0), test_num_from_double(0.0) };
-    number_t hi[2] = { test_num_from_double(1.0), test_num_from_double(1.0) };
-    number_t result, err;
-    number_t expected =
-        num_create_from_string("34370.95932396795542380979570032394");
+    TEST_NUMBER_ARRAY_AUTO_2(lo) = { test_num_from_double(0.0), test_num_from_double(0.0) };
+    TEST_NUMBER_ARRAY_AUTO_2(hi) = { test_num_from_double(1.0), test_num_from_double(1.0) };
+    TEST_NUMBER_AUTO(result);
+    TEST_NUMBER_AUTO(err);
+    TEST_NUMBER_AUTO_VALUE(expected, num_create_from_string("34370.95932396795542380979570032394"));
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ (x+2y+3)^4cosh(x+2y+3) dA  [affine^4*cosh(affine)]\n");
@@ -3119,13 +3270,14 @@ void test_multi_2d_affine_poly_times_exp_affine_combination(void) {
     expr_t *expr = expr_add(sum, affine_term);
 
     expr_t *vars[2] = { x, y };
-    number_t lo[2] = { test_num_from_double(0.0), test_num_from_double(0.0) };
-    number_t hi[2] = { test_num_from_double(1.0), test_num_from_double(1.0) };
-    number_t result, err;
-    number_t expected = num_add(
+    TEST_NUMBER_ARRAY_AUTO_2(lo) = { test_num_from_double(0.0), test_num_from_double(0.0) };
+    TEST_NUMBER_ARRAY_AUTO_2(hi) = { test_num_from_double(1.0), test_num_from_double(1.0) };
+    TEST_NUMBER_AUTO(result);
+    TEST_NUMBER_AUTO(err);
+    TEST_NUMBER_AUTO_VALUE(expected, num_add(
         num_add(test_num_mul_double(num_create_from_string("68737.53818332082704696161172519695"), 3.0),
                test_num_mul_double(num_create_from_string("2680.920621655793569036410945540741"), -2.0)),
-        num_create_from_string("539.6824667600549348774549946503721"));
+        num_create_from_string("539.6824667600549348774549946503721")));
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ (3a^4-2a^2+a)exp(a) dA  [affine poly * exp(affine)]\n");
@@ -3175,13 +3327,14 @@ void test_multi_2d_affine_poly_times_sin_affine_combination(void) {
     expr_t *expr = expr_add(sum, scaled_affine);
 
     expr_t *vars[2] = { x, y };
-    number_t lo[2] = { test_num_from_double(0.0), test_num_from_double(0.0) };
-    number_t hi[2] = { test_num_from_double(1.0), test_num_from_double(1.0) };
-    number_t result, err;
-    number_t expected = num_add(
+    TEST_NUMBER_ARRAY_AUTO_2(lo) = { test_num_from_double(0.0), test_num_from_double(0.0) };
+    TEST_NUMBER_ARRAY_AUTO_2(hi) = { test_num_from_double(1.0), test_num_from_double(1.0) };
+    TEST_NUMBER_AUTO(result);
+    TEST_NUMBER_AUTO(err);
+    TEST_NUMBER_AUTO_VALUE(expected, num_add(
         num_add(test_num_mul_double(num_create_from_string("-381.3381472982557550672804152409705"), 2.0),
                num_create_from_string("-16.88885619742372162769129239240872")),
-        test_num_mul_double(num_create_from_string("-3.624508420217032103141223583565993"), -3.0));
+        test_num_mul_double(num_create_from_string("-3.624508420217032103141223583565993"), -3.0)));
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ (2a^4+a^2-3a)sin(a) dA  [affine poly * sin(affine)]\n");
@@ -3217,11 +3370,11 @@ static void test_nested_unevaluated_integral_integrand(void)
     expr_bindings_t *bindings = NULL;
     expr_t *expr = expr_from_string("{ integral(x, t^2, t) }", &bindings);
     expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
-    number_t lo = num_create_from_long(0);
-    number_t hi = num_create_from_long(1);
-    number_t expected = num_create_from_string("1/12");
-    number_t result = num_new();
-    number_t err = num_new();
+    TEST_NUMBER_AUTO_VALUE(lo, num_create_from_long(0));
+    TEST_NUMBER_AUTO_VALUE(hi, num_create_from_long(1));
+    TEST_NUMBER_AUTO_VALUE(expected, num_create_from_string("1/12"));
+    TEST_NUMBER_AUTO(result);
+    TEST_NUMBER_AUTO(err);
     int s;
 
     ASSERT_NOT_NULL(ig);
@@ -3256,15 +3409,15 @@ static void test_nested_unevaluated_integral_integrand(void)
 static void example_integrator(void) {
     /* ∫₋₃³ exp(-x²) dx ≈ √π * erf(3) */
     integrator_t *ig = intg_new();
-    number_t x0 = num_create_from_long(0);
-    number_t lo = num_create_from_long(-3);
-    number_t hi = num_create_from_long(3);
+    TEST_NUMBER_AUTO_VALUE(x0, num_create_from_long(0));
+    TEST_NUMBER_AUTO_VALUE(lo, num_create_from_long(-3));
+    TEST_NUMBER_AUTO_VALUE(hi, num_create_from_long(3));
     expr_t *x = expr_new_named_var(x0, "x");
     expr_t *x2 = expr_mul(x, x);
     expr_t *negx2 = expr_neg(x2);
     expr_t *expr = expr_exp(negx2);
-    number_t result = num_new();
-    number_t err = num_new();
+    TEST_NUMBER_AUTO(result);
+    TEST_NUMBER_AUTO(err);
 
     intg_integral(ig, expr, x, lo, hi, &result, &err);
 
@@ -3287,13 +3440,13 @@ static void example_integrator(void) {
 static void example_expression_backed_integration(void) {
     /* ∫₀¹ exp(x) dx = e - 1, at default 1e-27 tolerance */
     integrator_t *ig = intg_new();
-    number_t x0 = num_create_from_long(0);
-    number_t lo = num_create_from_long(0);
-    number_t hi = num_create_from_long(1);
+    TEST_NUMBER_AUTO_VALUE(x0, num_create_from_long(0));
+    TEST_NUMBER_AUTO_VALUE(lo, num_create_from_long(0));
+    TEST_NUMBER_AUTO_VALUE(hi, num_create_from_long(1));
     expr_t *x = expr_new_var(x0);
     expr_t *expr = expr_exp(x);
-    number_t result = num_new();
-    number_t err = num_new();
+    TEST_NUMBER_AUTO(result);
+    TEST_NUMBER_AUTO(err);
 
     intg_integral(ig, expr, x, lo, hi, &result, &err);
 
@@ -3313,10 +3466,10 @@ static void example_expression_backed_integration(void) {
 
 static void example_symbolic_fast_path(void) {
     integrator_t *ig = intg_new();
-    number_t x0 = num_create_from_long(0);
-    number_t y0 = num_create_from_long(0);
-    number_t two = num_create_from_long(2);
-    number_t three = num_create_from_long(3);
+    TEST_NUMBER_AUTO_VALUE(x0, num_create_from_long(0));
+    TEST_NUMBER_AUTO_VALUE(y0, num_create_from_long(0));
+    TEST_NUMBER_AUTO_VALUE(two, num_create_from_long(2));
+    TEST_NUMBER_AUTO_VALUE(three, num_create_from_long(3));
     expr_t *x = expr_new_var(x0);
     expr_t *y = expr_new_var(y0);
     expr_t *two_y = expr_mul_num(y, &two);
@@ -3325,10 +3478,10 @@ static void example_symbolic_fast_path(void) {
     expr_t *exp_affine = expr_exp(affine);
     expr_t *expr = expr_mul(affine, exp_affine);
     expr_t *vars[2] = { x, y };
-    number_t lo[2] = { num_create_from_long(0), num_create_from_long(0) };
-    number_t hi[2] = { num_create_from_long(1), num_create_from_long(1) };
-    number_t result = num_new();
-    number_t err = num_new();
+    TEST_NUMBER_ARRAY_AUTO_2(lo) = { num_create_from_long(0), num_create_from_long(0) };
+    TEST_NUMBER_ARRAY_AUTO_2(hi) = { num_create_from_long(1), num_create_from_long(1) };
+    TEST_NUMBER_AUTO(result);
+    TEST_NUMBER_AUTO(err);
 
     intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
@@ -3358,14 +3511,14 @@ static void example_symbolic_fast_path(void) {
 static void example_ctx(void) {
     /* ∫₀¹ x^2.5 dx = 1 / 3.5 */
     integrator_t *ig = intg_new();
-    number_t x0 = num_create_from_long(0);
-    number_t lo = num_create_from_long(0);
-    number_t hi = num_create_from_long(1);
-    number_t exponent = num_create_from_string("2.5");
+    TEST_NUMBER_AUTO_VALUE(x0, num_create_from_long(0));
+    TEST_NUMBER_AUTO_VALUE(lo, num_create_from_long(0));
+    TEST_NUMBER_AUTO_VALUE(hi, num_create_from_long(1));
+    TEST_NUMBER_AUTO_VALUE(exponent, num_create_from_string("2.5"));
     expr_t *x = expr_new_named_var(x0, "x");
     expr_t *expr = expr_pow(x, &exponent);
-    number_t result = num_new();
-    number_t err = num_new();
+    TEST_NUMBER_AUTO(result);
+    TEST_NUMBER_AUTO(err);
 
     intg_integral(ig, expr, x, lo, hi, &result, &err);
 

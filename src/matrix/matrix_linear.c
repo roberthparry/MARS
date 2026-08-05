@@ -161,10 +161,11 @@ static bool mat_elem_abs2_below(const struct elem_vtable *elem,
                                 const void *raw,
                                 const number_t *threshold)
 {
-    NUM_SCOPE(scope);
     number_t abs2 = mat_elem_abs2_num(elem, raw);
+    bool below = num_cmp(abs2, *threshold) < 0;
 
-    return num_cmp(abs2, *threshold) < 0;
+    num_destroy(&abs2);
+    return below;
 }
 
 static size_t mat_find_pivot_row(const matrix_t *A, size_t col, size_t start)

@@ -135,6 +135,18 @@ static void matrix_tex_preview_emit_case(const char *source_file,
     free(path);
 }
 
+static void matrix_tex_preview_cleanup(void)
+{
+    for (size_t i = 0u; i < g_matrix_tex_preview_count; ++i) {
+        free(g_matrix_tex_preview_entries[i].label);
+        free(g_matrix_tex_preview_entries[i].tex);
+    }
+    free(g_matrix_tex_preview_entries);
+    g_matrix_tex_preview_entries = NULL;
+    g_matrix_tex_preview_count = 0u;
+    g_matrix_tex_preview_cap = 0u;
+}
+
 static void check_matrix_tostring_expr_double(const char *label,
                                             const expr_t *dv,
                                             double expected,
@@ -595,4 +607,5 @@ void run_matrix_tostring_tests(void)
     TEST_RUN_CASE(test_mat_to_string_symbolic_all_nan_tex_elides_wrapper, NULL);
     TEST_RUN_CASE(test_mat_to_string_symbolic_roundtrip, NULL);
     TEST_RUN_CASE(test_mat_to_string_symbolic_derivative_roundtrip, NULL);
+    matrix_tex_preview_cleanup();
 }

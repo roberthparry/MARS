@@ -452,7 +452,7 @@ static string_t *mt_join_bindings(string_t **var_bindings,
             for (size_t i = 0; i < nconst_bindings; ++i) {
                 mt_binding_token_t token = {0};
                 string_t *value_text = NULL;
-                number_t value = num_new();
+                number_t value = NUM_ZERO;
 
                 if (mt_parse_binding_token(const_bindings[i], &token) != 0) {
                     num_destroy(&value);

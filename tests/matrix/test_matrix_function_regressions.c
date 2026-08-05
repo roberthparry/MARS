@@ -705,7 +705,7 @@ static void test_mat_error_handling(void)
 
     /* mat_eigenvalues */
     {
-        number_t ev[4] = {num_new(), num_new(), num_new(), num_new()};
+        number_t ev[4] = {NUM_ZERO, NUM_ZERO, NUM_ZERO, NUM_ZERO};
         check_bool("mat_eigenvalues(NULL) < 0", mat_eigenvalues(NULL, ev) < 0);
         matrix_t *rect = test_mat_dense_d(2, 3);
         check_bool("mat_eigenvalues(2×3) < 0", mat_eigenvalues(rect, ev) < 0);
@@ -716,7 +716,7 @@ static void test_mat_error_handling(void)
 
     /* mat_eigendecompose */
     {
-        number_t ev[4] = {num_new(), num_new(), num_new(), num_new()};
+        number_t ev[4] = {NUM_ZERO, NUM_ZERO, NUM_ZERO, NUM_ZERO};
         matrix_t *evecs = NULL;
         check_bool("mat_eigendecompose(NULL) < 0",
                    mat_eigendecompose(NULL, ev, &evecs) < 0);

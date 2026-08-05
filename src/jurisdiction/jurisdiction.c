@@ -358,22 +358,25 @@ static char *jurisdiction_db_path_from_env(void)
     return NULL;
 }
 
-static const char *jurisdiction_db_key_from_env(void)
+static char *jurisdiction_db_key_from_env(void)
 {
     const char *env_key;
-    static char *config_key;
+    char *config_key;
 
     env_key = getenv("MARS_JURISDICTION_DB_KEY");
     if (env_key && *env_key)
-        return env_key;
+        return dup_c_string(env_key);
     env_key = getenv("MARS_HOLIDAY_DB_KEY");
     if (env_key && *env_key)
-        return env_key;
-    if (!config_key)
-        config_key = jurisdiction_config_lookup("MARS_JURISDICTION_DB_KEY");
+        return dup_c_string(env_key);
+    config_key = jurisdiction_config_lookup("MARS_JURISDICTION_DB_KEY");
     if (!config_key)
         config_key = legacy_holiday_config_lookup("MARS_HOLIDAY_DB_KEY");
-    return (config_key && *config_key) ? config_key : NULL;
+    if (config_key && !*config_key) {
+        free(config_key);
+        return NULL;
+    }
+    return config_key;
 }
 
 static void map_country_code_to_jurisdiction(const char *country_code, char out[32])
@@ -2214,23 +2217,26 @@ static void apply_observances(pointer_vec_t *events,
 jurisdiction_t *jurisdict_open(const char *jurisdiction_code)
 {
     jurisdiction_t *jurisdiction;
-    const char *resolved_key = jurisdiction_db_key_from_env();
+    char *resolved_key = jurisdiction_db_key_from_env();
     string_t *path = NULL;
     string_t *key = NULL;
     const char *resolved_path = jurisdiction_db_path_from_env();
 
     if (!resolved_path || !*resolved_path || !resolved_key || !*resolved_key) {
         free((char *)resolved_path);
+        free(resolved_key);
         return NULL;
     }
     jurisdiction = calloc(1u, sizeof(*jurisdiction));
     if (!jurisdiction) {
         free((char *)resolved_path);
+        free(resolved_key);
         return NULL;
     }
     jurisdiction->error = string_new();
     if (!jurisdiction->error) {
         free((char *)resolved_path);
+        free(resolved_key);
         free(jurisdiction);
         return NULL;
     }
@@ -2250,6 +2256,7 @@ jurisdiction_t *jurisdict_open(const char *jurisdiction_code)
     string_free(key);
     string_free(path);
     free((char *)resolved_path);
+    free(resolved_key);
     if (!jurisdiction->db) {
         string_free(jurisdiction->error);
         free(jurisdiction);

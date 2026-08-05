@@ -24,12 +24,15 @@ static mat_fun_cache_entry_t *mat_fun_cache_head = NULL;
 static number_t mat_eval_number_scalar_number_local(void (*scalar_f)(void *out, const void *in),
                                                     const number_t *input)
 {
-    NUM_SCOPE(scope);
     number_t output = number_invalid();
     number_t safe_input = input ? num_clone(*input) : num_clone(NUM_ZERO);
+    number_t result;
 
     scalar_f(&output, &safe_input);
-    return num_scope_detach(output);
+    result = num_clone(output);
+    num_destroy(&output);
+    num_destroy(&safe_input);
+    return result;
 }
 
 static void mat_fun_number_array_invalidate(number_t *values, size_t count)
@@ -575,7 +578,7 @@ static matrix_t *mat_number_unary_taylor_from_expr_upper(
         return mat_copy_preserving_store(A);
 
     lambda = mat_get_num(A, 0, 0);
-    x = expr_new_named_var(num_clone(lambda), "x");
+    x = expr_new_named_var(lambda, "x");
     if (!x) {
         num_destroy(&lambda);
         return NULL;
