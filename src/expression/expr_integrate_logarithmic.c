@@ -60,7 +60,10 @@ expr_t *integrate_log_rule(const expr_t *expr, const expr_t *wrt)
         raw = integrate_log_of_symbolic_affine(expr, wrt);
         if (raw)
             return raw;
-        return integrate_log_of_symbolic_quadratic(expr, wrt);
+        raw = integrate_log_of_symbolic_quadratic(expr, wrt);
+        if (raw)
+            return raw;
+        return integrate_poly_times_rational_unary_by_parts(expr, wrt);
     }
 
     x_log_x = expr_mul(expr->a, expr);

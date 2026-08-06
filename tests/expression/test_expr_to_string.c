@@ -751,6 +751,23 @@ static void test_to_string_nested_transcendental_tex(void)
     expr_free(y);
 }
 
+static void test_to_string_atan_tex(void)
+{
+    expr_t *x = test_expr_new_named_var_d(1.0, "x");
+    expr_t *f = expr_atan(x);
+    char *got = expr_to_tex_body(f);
+    const char *expect = "\\arctan(x)";
+
+    if (str_eq(got, expect))
+        to_string_pass("arctan (TEX)", got, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "arctan (TEX)", got, expect);
+
+    free(got);
+    expr_free(f);
+    expr_free(x);
+}
+
 static void test_to_string_nested_quotient_pow_tex(void)
 {
     expr_t *x = test_expr_new_named_var_d(2.0, "x0");
@@ -2028,6 +2045,7 @@ void test_to_string_all(void)
     TEST_RUN_SUBTEST(test_to_string_basic_var, NULL);
     TEST_RUN_SUBTEST(test_to_string_basic_var_tex, NULL);
     TEST_RUN_SUBTEST(test_to_string_nested_transcendental_tex, NULL);
+    TEST_RUN_SUBTEST(test_to_string_atan_tex, NULL);
     TEST_RUN_SUBTEST(test_to_string_nested_quotient_pow_tex, NULL);
     TEST_RUN_SUBTEST(test_to_string_log10_tex, NULL);
     TEST_RUN_SUBTEST(test_to_string_exp_unit_fraction_root_tex, NULL);

@@ -175,7 +175,7 @@ expr_t *integrate_atan_rule(const expr_t *expr, const expr_t *wrt)
         expr_const_is_zero(coeff)) {
         expr_free(coeff);
         expr_free(constant);
-        return NULL;
+        return integrate_poly_times_rational_unary_by_parts(expr, wrt);
     }
 
     u_atan_u = expr_mul(expr->a, expr);

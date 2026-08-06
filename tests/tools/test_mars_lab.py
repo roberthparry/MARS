@@ -856,6 +856,40 @@ class ExpressionResultTests(unittest.TestCase):
         )
         self.assertIn("lastEvaluationInputText = text;", mars_lab.INDEX_HTML)
 
+    def test_long_integral_tex_wraps_between_outer_addends(self) -> None:
+        tex = (
+            r"\begin{aligned}[t]"
+            "\n"
+            r"&\frac{1}{8} \cdot \left(4 x - 2 x \cdot "
+            r"\ln(x^{4} - x^{2} + 1) - 4 \sqrt{3} x \cdot "
+            r"\arctan(\frac{2 x^{2} - 1}{\sqrt{3}}) + "
+            r"2 \cdot \left(2 x^{2} + 1\right) \cdot "
+            r"\arctan(\frac{x}{1 - x^{2}})\right) \\"
+            "\n"
+            r"&{} + C"
+            "\n"
+            r"\end{aligned}"
+        )
+
+        wrapped = mars_lab.wrap_rendered_tex_additive_lines(tex)
+
+        self.assertGreater(wrapped.count(r"\\"), tex.count(r"\\"))
+        self.assertIn(r"\ln(x^{4} - x^{2} + 1)", wrapped)
+        self.assertIn(r"\frac{2 x^{2} - 1}{\sqrt{3}}", wrapped)
+        self.assertIn(r"&\qquad {} - 2 x", wrapped)
+        self.assertNotIn(r"\left", wrapped)
+        self.assertIn(r"\bigl", wrapped)
+
+    def test_integral_tex_uses_width_selected_vertical_layout(self) -> None:
+        html = mars_lab.INDEX_HTML
+
+        self.assertIn("const integralWrappedTex = data.integral_wrapped_tex", html)
+        self.assertIn("const integralWrappedSvg = data.integral_wrapped_svg", html)
+        self.assertIn("/integral\\s+result$/i.test", html)
+        self.assertIn("vertically-wrapped-tex", html)
+        self.assertIn("overflow-x: hidden", html)
+        self.assertIn("overflow-y: auto", html)
+
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
         "release mars_lab helper is not built",
@@ -894,6 +928,42 @@ class ExpressionResultTests(unittest.TestCase):
             "applyMarsBindingsToEditedExpression(editedBody, sourceExpression, data);",
             mars_lab.INDEX_HTML,
         )
+        self.assertIn(
+            "bindingsWithAuthoredValues(\n"
+            "            Array.isArray(data.binding_values) ? data.binding_values : [],\n"
+            "            data.expression || updated\n"
+            "          )",
+            mars_lab.INDEX_HTML,
+        )
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_symbolic_pi_binding_value_is_preserved(self) -> None:
+        expression = "{ atan(x/(1-x^2)) + C | x = pi/2 }"
+        completed = subprocess.run(
+            [str(self.expression_binary), expression, "x", "64", "bindings"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        fields = mars_lab.parse_mars_lab_output(completed.stdout)
+        payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary,
+            fields,
+            expression,
+            64,
+            False,
+        )
+
+        self.assertIn("x = π/2", fields["expression"])
+        self.assertIn("; C = NAN", fields["expression"])
+        self.assertEqual(payload["binding_values"][0]["name"], "x")
+        self.assertEqual(payload["binding_values"][0]["value"], "π/2")
+        self.assertEqual(payload["binding_values"][0]["display"], "π/2")
+        self.assertEqual(payload["binding_values"][1]["name"], "C")
+        self.assertEqual(payload["binding_values"][1]["kind"], "constant")
 
     def test_expression_binding_edit_does_not_recalculate_symbolically(self) -> None:
         binding_commit = mars_lab.INDEX_HTML.split(

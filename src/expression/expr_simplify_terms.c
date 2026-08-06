@@ -6,6 +6,8 @@
 #include "expr_bindings.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
+#define MARS_SHARED_NUMBER_INTERNAL_ACCESS
+#include "internal/number_internal.h"
 #include "ustring.h"
 
 extern expr_t *expr_simplify(const expr_t *dv);
@@ -135,6 +137,8 @@ static void *expr_terms_xrealloc(void *ptr, size_t size)
     abort();
 }
 
+static expr_t *expr_sqrt_radicand_owned_local(const expr_t *expr);
+
 static int term_coeff(const expr_t *term, const expr_t **base, number_t *coeff_out)
 {
     if (expr_simplify_is_plain_real_const(term)) {
@@ -166,6 +170,10 @@ static int term_coeff(const expr_t *term, const expr_t **base, number_t *coeff_o
 
 static int addend_bases_equal(const expr_t *lhs, const expr_t *rhs)
 {
+    expr_t *left_radicand;
+    expr_t *right_radicand;
+    int equal;
+
     if (expr_struct_eq(lhs, rhs))
         return 1;
 
@@ -174,6 +182,15 @@ static int addend_bases_equal(const expr_t *lhs, const expr_t *rhs)
         num_eq(lhs->c, rhs->c)) {
         return 1;
     }
+
+    left_radicand = expr_sqrt_radicand_owned_local(lhs);
+    right_radicand = expr_sqrt_radicand_owned_local(rhs);
+    equal = left_radicand && right_radicand &&
+            expr_struct_eq(left_radicand, right_radicand);
+    expr_free(right_radicand);
+    expr_free(left_radicand);
+    if (equal)
+        return 1;
 
     return 0;
 }
@@ -1372,25 +1389,127 @@ void expr_combine_exp_terms(expr_t **terms, size_t nterms)
     }
 }
 
+static expr_t *expr_sqrt_radicand_owned_local(const expr_t *expr)
+{
+    if (expr_is_sqrt_expr(expr) && expr->a) {
+        expr_retain(expr->a);
+        return expr->a;
+    }
+
+    if (expr_is_unnamed_const(expr) && expr->binding_expr &&
+        expr->binding_expr->kind == EXPR_BINDING_EXPR_UNARY_OP &&
+        expr->binding_expr->u.unary_op.ops == &ops_sqrt) {
+        return expr_binding_expr_eval_expr(
+            expr->binding_expr->u.unary_op.child);
+    }
+
+    return NULL;
+}
+
+static bool expr_small_rational_value_local(number_t value,
+                                            number_t *rational_out)
+{
+    enum { MAX_NUMERATOR = 64, MAX_DENOMINATOR = 16 };
+    long numerator;
+    long denominator;
+
+    if (!rational_out || !num_is_real(value))
+        return false;
+    if (num_get_small_rational(value, &numerator, &denominator)) {
+        *rational_out = num_create_from_frac(numerator, denominator);
+        return true;
+    }
+
+    for (denominator = 1L; denominator <= MAX_DENOMINATOR; ++denominator) {
+        for (numerator = -MAX_NUMERATOR;
+             numerator <= MAX_NUMERATOR;
+             ++numerator) {
+            number_t candidate = num_create_from_frac(numerator, denominator);
+            bool equal = num_eq(value, candidate);
+
+            if (equal) {
+                *rational_out = candidate;
+                return true;
+            }
+            num_destroy(&candidate);
+        }
+    }
+    return false;
+}
+
+/*
+ * Numeric coefficient accumulation must not hide an exact radical pair.
+ * For example, differentiating a product can temporarily turn 2*sqrt(3)
+ * into an inexact numeric coefficient.  When that coefficient subsequently
+ * meets another sqrt(3), recover the rational multiple and use
+ * sqrt(r)*sqrt(r) = r.  Restricting the recovered multiplier to a small exact
+ * rational prevents arbitrary decimal coefficients from being rewritten.
+ */
+void expr_merge_coefficient_sqrt_terms(number_t *coefficient,
+                                       expr_t **terms,
+                                       size_t nterms)
+{
+    if (!coefficient || !terms || !num_is_real(*coefficient))
+        return;
+
+    for (size_t i = 0u; i < nterms; ++i) {
+        expr_t *radicand = expr_sqrt_radicand_owned_local(terms[i]);
+        number_t root;
+        number_t ratio;
+        number_t rational = num_new();
+        number_t folded;
+
+        if (!radicand || !expr_is_unnamed_const(radicand) ||
+            !num_is_real(radicand->c) ||
+            !num_gt(radicand->c, NUM_ZERO)) {
+            expr_free(radicand);
+            num_destroy(&rational);
+            continue;
+        }
+
+        root = num_sqrt(radicand->c);
+        ratio = num_div(*coefficient, root);
+        if (!expr_small_rational_value_local(ratio, &rational)) {
+            num_destroy(&ratio);
+            num_destroy(&root);
+            expr_free(radicand);
+            num_destroy(&rational);
+            continue;
+        }
+
+        folded = num_mul(rational, radicand->c);
+        num_destroy(coefficient);
+        *coefficient = folded;
+        expr_free(terms[i]);
+        terms[i] = NULL;
+
+        num_destroy(&ratio);
+        num_destroy(&root);
+        expr_free(radicand);
+        num_destroy(&rational);
+    }
+}
+
 void expr_merge_sqrt_terms(expr_t **terms, size_t nterms)
 {
     for (size_t i = 0; i < nterms; ++i) {
-        if (!expr_is_sqrt_expr(terms[i]))
+        expr_t *left_radicand = expr_sqrt_radicand_owned_local(terms[i]);
+
+        if (!left_radicand)
             continue;
 
         for (size_t j = i + 1; j < nterms; ++j) {
+            expr_t *right_radicand =
+                expr_sqrt_radicand_owned_local(terms[j]);
             expr_t *prod;
             expr_t *simp_arg;
             expr_t *raw;
 
-            if (!expr_is_sqrt_expr(terms[j]))
+            if (!right_radicand)
                 continue;
 
-            expr_retain(terms[i]->a);
-            expr_retain(terms[j]->a);
-            prod = expr_mul(terms[i]->a, terms[j]->a);
-            expr_free(terms[i]->a);
-            expr_free(terms[j]->a);
+            prod = expr_mul(left_radicand, right_radicand);
+            expr_free(right_radicand);
             simp_arg = expr_simplify(prod);
             expr_free(prod);
             raw = expr_sqrt(simp_arg);
@@ -1402,6 +1521,7 @@ void expr_merge_sqrt_terms(expr_t **terms, size_t nterms)
             expr_free(raw);
             break;
         }
+        expr_free(left_radicand);
     }
 }
 

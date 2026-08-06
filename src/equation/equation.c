@@ -387,6 +387,9 @@ static int equ_try_solve_unary_periodic(const equation_t *equation,
 static int equ_try_solve_unary_inverse(const equation_t *equation,
                                             const expr_t *wrt,
                                             equation_solutions_t *solutions);
+static int equ_try_solve_atan_sum(const equation_t *equation,
+                                  const expr_t *wrt,
+                                  equation_solutions_t *solutions);
 static int equ_try_solve_self_power(const equation_t *equation,
                                          const expr_t *wrt,
                                          equation_solutions_t *solutions);
@@ -998,10 +1001,10 @@ static expr_t *equ_self_power_lambert_family_root(const expr_t *rhs)
     return out;
 }
 
-static bool equ_self_power_candidate_valid(const expr_t *lhs,
-                                           const expr_t *rhs,
-                                           const expr_t *wrt,
-                                           const expr_t *candidate)
+static bool equ_candidate_satisfies_equation(const expr_t *lhs,
+                                             const expr_t *rhs,
+                                             const expr_t *wrt,
+                                             const expr_t *candidate)
 {
     expr_t *lhs_at = NULL;
     expr_t *rhs_at = NULL;
@@ -1074,7 +1077,7 @@ static int equ_append_self_power_root_if_valid(
     if (!root)
         return -1;
 
-    if (equ_self_power_candidate_valid(lhs, rhs, wrt, root)) {
+    if (equ_candidate_satisfies_equation(lhs, rhs, wrt, root)) {
         if (equ_append_solution_expr(wrt, root, solutions) != 0)
             rc = -1;
         else if (appended_out)
@@ -1413,6 +1416,143 @@ cleanup:
     return rc;
 }
 
+static bool equ_expr_is_pi_over_four(const expr_t *expr)
+{
+    number_t value = expr ? expr_eval(expr) : num_new();
+    number_t four = num_create_from_long(4L);
+    number_t expected = num_div(NUM_PI, four);
+    bool matches = num_is_finite(value) && num_eq(value, expected);
+
+    num_destroy(&expected);
+    num_destroy(&four);
+    num_destroy(&value);
+    return matches;
+}
+
+static int equ_try_solve_atan_sum_side(const expr_t *lhs,
+                                       const expr_t *rhs,
+                                       const expr_t *wrt,
+                                       equation_solutions_t *solutions)
+{
+    const expr_t *first = NULL;
+    const expr_t *second = NULL;
+    expr_t *vars[1] = { (expr_t *)wrt };
+    number_t first_constant = num_new();
+    number_t second_constant = num_new();
+    number_t first_coefficient = num_new();
+    number_t second_coefficient = num_new();
+    number_t quadratic = num_new();
+    number_t linear = num_new();
+    expr_t *wrt_squared = NULL;
+    expr_t *quadratic_term = NULL;
+    expr_t *linear_term = NULL;
+    expr_t *sum = NULL;
+    expr_t *one = NULL;
+    expr_t *raw_residual = NULL;
+    expr_t *residual = NULL;
+    equation_solutions_t candidates;
+    bool is_sub = false;
+    int solve_rc;
+    int rc = 1;
+
+    equ_solutions_reset(&candidates);
+
+    if (!lhs || !rhs || !wrt || !solutions) {
+        rc = -1;
+        goto cleanup;
+    }
+    if (!equ_expr_is_pi_over_four(rhs) ||
+        !expr_match_add_sub_expr(lhs, &first, &second, &is_sub) || is_sub)
+        goto cleanup;
+    if (!expr_match_unary_affine_kind(
+            first, EXPR_PATTERN_UNARY_ATAN, 1u, vars,
+            &first_constant, &first_coefficient) ||
+        !expr_match_unary_affine_kind(
+            second, EXPR_PATTERN_UNARY_ATAN, 1u, vars,
+            &second_constant, &second_coefficient) ||
+        !num_is_zero(first_constant) ||
+        !num_is_zero(second_constant) ||
+        num_is_zero(first_coefficient) ||
+        num_is_zero(second_coefficient))
+        goto cleanup;
+
+    num_destroy(&quadratic);
+    quadratic = num_mul(first_coefficient, second_coefficient);
+    num_destroy(&linear);
+    linear = num_add(first_coefficient, second_coefficient);
+
+    wrt_squared = expr_pow(wrt, &NUM_TWO);
+    quadratic_term = wrt_squared
+        ? expr_mul_num(wrt_squared, &quadratic)
+        : NULL;
+    linear_term = expr_mul_num(wrt, &linear);
+    sum = (quadratic_term && linear_term)
+        ? expr_add(quadratic_term, linear_term)
+        : NULL;
+    one = expr_const_one();
+    raw_residual = (sum && one) ? expr_sub(sum, one) : NULL;
+    residual = raw_residual ? expr_simplify_owned(raw_residual) : NULL;
+    raw_residual = NULL;
+    if (!residual) {
+        rc = -1;
+        goto cleanup;
+    }
+
+    solve_rc = equ_try_solve_symbolic_quadratic(
+        residual, wrt, &candidates);
+    if (solve_rc != 0) {
+        rc = solve_rc;
+        goto cleanup;
+    }
+
+    for (size_t i = 0u; i < candidates.count; ++i) {
+        const equation_t *candidate = candidates.solutions[i];
+        const expr_t *root = candidate ? equ_rhs(candidate) : NULL;
+
+        if (!root || !equ_candidate_satisfies_equation(lhs, rhs, wrt, root))
+            continue;
+        if (equ_append_solution_expr(wrt, root, solutions) != 0) {
+            rc = -1;
+            goto cleanup;
+        }
+    }
+    rc = 0;
+
+cleanup:
+    equ_solutions_clear(&candidates);
+    expr_free(residual);
+    expr_free(raw_residual);
+    expr_free(one);
+    expr_free(sum);
+    expr_free(linear_term);
+    expr_free(quadratic_term);
+    expr_free(wrt_squared);
+    num_destroy(&linear);
+    num_destroy(&quadratic);
+    num_destroy(&second_coefficient);
+    num_destroy(&first_coefficient);
+    num_destroy(&second_constant);
+    num_destroy(&first_constant);
+    return rc;
+}
+
+static int equ_try_solve_atan_sum(const equation_t *equation,
+                                  const expr_t *wrt,
+                                  equation_solutions_t *solutions)
+{
+    int rc;
+
+    if (!equation || !wrt || !solutions)
+        return -1;
+
+    rc = equ_try_solve_atan_sum_side(
+        equation->lhs, equation->rhs, wrt, solutions);
+    if (rc != 1)
+        return rc;
+    return equ_try_solve_atan_sum_side(
+        equation->rhs, equation->lhs, wrt, solutions);
+}
+
 static int equ_try_solve_zero_product_factor(const expr_t *factor,
                                                   const expr_t *wrt,
                                                   const expr_t *zero,
@@ -1701,6 +1841,7 @@ int equ_solve_for_into(const equation_t *equation,
 {
     int unary_inverse_rc;
     int unary_periodic_rc;
+    int atan_sum_rc;
     int self_power_rc;
     int affine_rc;
     int zero_product_rc;
@@ -1733,6 +1874,12 @@ int equ_solve_for_into(const equation_t *equation,
     if (unary_periodic_rc == 0)
         return 0;
     if (unary_periodic_rc < 0)
+        return -1;
+
+    atan_sum_rc = equ_try_solve_atan_sum(equation, wrt, solutions);
+    if (atan_sum_rc == 0)
+        return 0;
+    if (atan_sum_rc < 0)
         return -1;
 
     self_power_rc = equ_try_solve_self_power(equation, wrt, solutions);

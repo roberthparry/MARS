@@ -682,6 +682,18 @@ static expr_t *expr_display_expanded_product(const expr_t *left,
     if (!left || !right)
         return NULL;
 
+    if (expr_is_op(left, &ops_neg) && left->a) {
+        expr_t *inner = expr_display_expanded_product(
+            left->a, right, expand_sum_products);
+        expr_t *negated = inner ? expr_neg(inner) : NULL;
+
+        expr_free(inner);
+        return negated;
+    }
+    if (expr_is_op(right, &ops_neg) && right->a)
+        return expr_display_expanded_product(
+            right, left, expand_sum_products);
+
     if (!expand_sum_products &&
         expr_match_add_sub_expr(left, &child_left, &child_right, &is_sub) &&
         expr_match_add_sub_expr(right, &child_left, &child_right, &is_sub)) {
@@ -747,7 +759,13 @@ static expr_t *expr_display_expanded_product(const expr_t *left,
         return NULL;
     }
 
-    out = expr_mul(left_expr, right_expr);
+    if (expand_sum_products &&
+        (expr_is_addsub(left_expr) || expr_is_addsub(right_expr))) {
+        out = expr_display_expanded_product(
+            left_expr, right_expr, expand_sum_products);
+    } else {
+        out = expr_mul(left_expr, right_expr);
+    }
     expr_free(left_expr);
     expr_free(right_expr);
     return out;
@@ -761,9 +779,28 @@ static expr_t *expr_display_expanded_expr_mode(const expr_t *expr,
     expr_t *out;
     const expr_t *child_left = NULL;
     const expr_t *child_right = NULL;
+    const expr_t *scaled_base = NULL;
+    number_t scale = num_new();
 
-    if (!expr)
+    if (!expr) {
+        num_destroy(&scale);
         return NULL;
+    }
+
+    if (expand_sum_products &&
+        expr_match_scaled_expr(expr, &scale, &scaled_base) &&
+        scaled_base && scaled_base != expr && expr_is_addsub(scaled_base)) {
+        expr_t *scale_expr = expr_new_const(scale);
+
+        out = scale_expr
+            ? expr_display_expanded_product(
+                  scale_expr, scaled_base, expand_sum_products)
+            : NULL;
+        expr_free(scale_expr);
+        num_destroy(&scale);
+        return out;
+    }
+    num_destroy(&scale);
 
     if (expr_match_add_expr(expr, &child_left, &child_right)) {
         left = expr_display_expanded_expr_mode(
@@ -797,11 +834,20 @@ static expr_t *expr_display_expanded_expr_mode(const expr_t *expr,
         return out;
     }
 
+    if (expr_is_op(expr, &ops_neg) && expr->a) {
+        left = expr_display_expanded_expr_mode(
+            expr->a, expand_sum_products);
+        out = left ? expr_neg(left) : NULL;
+        expr_free(left);
+        return out;
+    }
+
     if (expr_match_mul_expr(expr, &child_left, &child_right))
         return expr_display_expanded_product(
             child_left, child_right, expand_sum_products);
 
-    return expr_clone(expr);
+    expr_retain(expr);
+    return (expr_t *)expr;
 }
 
 static bool expr_display_integral_is_indefinite(const expr_t *upper,
@@ -966,9 +1012,63 @@ expr_t *expr_display_simplified(const expr_t *expr)
     return simplified;
 }
 
+static expr_t *expr_display_simplify_expanded_terms_local(const expr_t *expr)
+{
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+    expr_t *left_display;
+    expr_t *right_display;
+    expr_t *out;
+
+    if (!expr)
+        return NULL;
+
+    if (!expr_match_add_expr(expr, &left, &right) &&
+        !expr_match_sub_expr(expr, &left, &right))
+        return expr_simplify(expr);
+
+    left_display = expr_display_simplify_expanded_terms_local(left);
+    right_display = expr_display_simplify_expanded_terms_local(right);
+    if (!left_display || !right_display) {
+        expr_free(right_display);
+        expr_free(left_display);
+        return NULL;
+    }
+
+    out = expr_is_op(expr, &ops_sub)
+        ? expr_sub(left_display, right_display)
+        : expr_add(left_display, right_display);
+    expr_free(right_display);
+    expr_free(left_display);
+    return out;
+}
+
+static bool expr_display_is_proper_fraction_scaled_sum_local(
+    const expr_t *expr)
+{
+    number_t scale = num_new();
+    number_t magnitude;
+    const expr_t *base = NULL;
+    bool matched;
+
+    matched = expr_match_scaled_expr(expr, &scale, &base) &&
+              base && base != expr && expr_is_addsub(base);
+    if (!matched) {
+        num_destroy(&scale);
+        return false;
+    }
+
+    magnitude = num_abs(scale);
+    matched = num_gt(magnitude, NUM_ZERO) && num_lt(magnitude, NUM_ONE);
+    num_destroy(&magnitude);
+    num_destroy(&scale);
+    return matched;
+}
+
 expr_t *expr_display_expanded(const expr_t *expr)
 {
     expr_t *expanded;
+    expr_t *termwise;
     expr_t *simplified;
 
     if (!expr)
@@ -978,12 +1078,88 @@ expr_t *expr_display_expanded(const expr_t *expr)
     if (!expanded)
         return expr_simplify(expr);
 
+    termwise = expr_display_simplify_expanded_terms_local(expanded);
     simplified = expr_simplify(expanded);
+    if (termwise && expr_is_addsub(termwise) && simplified &&
+        expr_display_is_proper_fraction_scaled_sum_local(simplified)) {
+        expr_free(simplified);
+        expr_free(expanded);
+        return termwise;
+    }
+    expr_free(termwise);
     if (!simplified)
         return expanded;
 
     expr_free(expanded);
     return simplified;
+}
+
+expr_t *expr_expand_products_internal(const expr_t *expr)
+{
+    return expr_display_expanded_expr_mode(expr, true);
+}
+
+expr_t *expr_canonicalize_known_radicals_internal(const expr_t *expr)
+{
+    expr_t *left;
+    expr_t *right;
+    expr_t *out;
+
+    if (!expr)
+        return NULL;
+
+    if (expr_is_op(expr, &ops_const) &&
+        (!expr->name || !*expr->name)) {
+        if (num_eq(expr->c, NUM_SQRT2))
+            return expr_new_const(NUM_SQRT2);
+        if (num_eq(expr->c, NUM_SQRT3))
+            return expr_new_const(NUM_SQRT3);
+        if (num_eq(expr->c, NUM_SQRT_HALF))
+            return expr_new_const(NUM_SQRT_HALF);
+        if (num_eq(expr->c, NUM_SQRT2_OVER_TWO))
+            return expr_new_const(NUM_SQRT2_OVER_TWO);
+        if (num_eq(expr->c, NUM_SQRT3_OVER_TWO))
+            return expr_new_const(NUM_SQRT3_OVER_TWO);
+    }
+
+    if (expr_is_op(expr, &ops_sqrt) && expr->a &&
+        expr_is_op(expr->a, &ops_const) &&
+        (!expr->a->name || !*expr->a->name)) {
+        number_t three = num_create_from_long(3L);
+
+        if (num_eq(expr->a->c, NUM_TWO)) {
+            num_destroy(&three);
+            return expr_new_const(NUM_SQRT2);
+        }
+        if (num_eq(expr->a->c, three)) {
+            num_destroy(&three);
+            return expr_new_const(NUM_SQRT3);
+        }
+        num_destroy(&three);
+        if (num_eq(expr->a->c, NUM_HALF))
+            return expr_new_const(NUM_SQRT_HALF);
+    }
+
+    if (expr->ops && expr->ops->arity == EXPR_OP_UNARY &&
+        expr->ops->apply_unary && expr->a) {
+        left = expr_canonicalize_known_radicals_internal(expr->a);
+        out = left ? expr->ops->apply_unary(left) : NULL;
+        expr_free(left);
+        return out;
+    }
+
+    if (expr->ops && expr->ops->arity == EXPR_OP_BINARY &&
+        expr->ops->apply_binary && expr->a && expr->b) {
+        left = expr_canonicalize_known_radicals_internal(expr->a);
+        right = expr_canonicalize_known_radicals_internal(expr->b);
+        out = (left && right) ? expr->ops->apply_binary(left, right) : NULL;
+        expr_free(right);
+        expr_free(left);
+        return out;
+    }
+
+    expr_retain(expr);
+    return (expr_t *)expr;
 }
 
 static char *expr_note_text_dup(const expr_t *expr, style_t style)

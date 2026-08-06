@@ -2162,7 +2162,8 @@ static const binding_func_entry_t *parse_binding_function_head(binding_parser_t 
     return NULL;
 }
 
-static expr_binding_expr_t *parse_binding_atom(binding_parser_t *p)
+static expr_binding_expr_t *parse_binding_atom_mode(binding_parser_t *p,
+                                                     bool allow_ascii_rational_literal)
 {
     NUM_SCOPE(scope);
     unsigned char c;
@@ -2207,11 +2208,17 @@ static expr_binding_expr_t *parse_binding_atom(binding_parser_t *p)
 
         if (binding_peek_value(p, &cp, &cp_len) && cp == 0x221A) {
             expr_binding_expr_t *arg;
+            unsigned char next;
 
             binding_skip(p, cp_len);
-            if (!parse_binding_required_char(p, '(', "expected '(' after √"))
-                return NULL;
-            arg = parse_binding_enclosed_expr(p, ')', "expected ')' after √ argument");
+            binding_skip_spaces(p);
+            if (binding_peek_ascii(p, &next) && next == '(') {
+                binding_skip(p, 1u);
+                arg = parse_binding_enclosed_expr(p, ')',
+                                                  "expected ')' after √ argument");
+            } else {
+                arg = parse_binding_atom_mode(p, false);
+            }
             return arg ? expr_binding_expr_new_unary_op(&ops_sqrt, arg) : NULL;
         }
 
@@ -2245,9 +2252,20 @@ static expr_binding_expr_t *parse_binding_atom(binding_parser_t *p)
         scan_unicode_fraction_len_view(binding_text(p), binding_pos(p)) > 0u) {
         size_t pos = binding_pos(p);
         size_t len = scan_number_atom_len_view(binding_text(p), pos);
+        size_t decimal_len = expr_parse_scan_decimal_len(binding_text(p), pos);
         string_view_t literal_view;
         string_t *text;
         number_t value;
+        unsigned char slash;
+
+        if (!allow_ascii_rational_literal &&
+            decimal_len > 0u &&
+            len > decimal_len &&
+            expr_parse_view_peek_ascii(binding_text(p),
+                                       pos + decimal_len,
+                                       &slash) &&
+            slash == '/')
+            len = decimal_len;
 
         literal_view = string_cursor_view_between(pos, pos + len, p->cursor);
         if (len == 0u ||
@@ -2313,6 +2331,11 @@ static expr_binding_expr_t *parse_binding_atom(binding_parser_t *p)
         string_free(name);
         return expr_binding_expr_new_const(const_id);
     }
+}
+
+static expr_binding_expr_t *parse_binding_atom(binding_parser_t *p)
+{
+    return parse_binding_atom_mode(p, true);
 }
 
 static expr_binding_expr_t *parse_binding_power_operand(binding_parser_t *p)

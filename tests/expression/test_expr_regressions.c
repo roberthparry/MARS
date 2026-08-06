@@ -2140,6 +2140,60 @@ static void test_to_string_does_not_simplify_plain_expressions(void)
     expr_free(x);
 }
 
+static void test_atan_quotient_derivative_simplifies_to_quartic(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = expr_from_string(
+        "{ atan(x/(1-x^2)) + C | x = pi/2 }", &bindings);
+    expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    expr_t *derivative = (expr && x) ? expr_create_deriv(expr, x) : NULL;
+    char *text = derivative
+        ? expr_to_string(derivative, style_EXPRESSION)
+        : NULL;
+    const char *expect = "{ (x² + 1)/(x⁴ - x² + 1) | x = π/2 }";
+
+    if (text && str_eq(text, expect))
+        to_string_pass("atan quotient derivative simplifies to quartic",
+                       text, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "atan quotient derivative simplifies to quartic",
+                       text ? text : "(null)", expect);
+
+    free(text);
+    expr_free(derivative);
+    expr_free(expr);
+    expr_bindings_free(bindings);
+}
+
+static void test_compound_antiderivative_derivative_cancels_rational_terms(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = expr_from_string(
+        "{ -1/4*(ln(x^4-x^2+1)-4*x*atan(x/(1-x^2))"
+        "+2*sqrt(3)*atan((2*x^2-1)/sqrt(3))) | x=pi/2 }",
+        &bindings);
+    expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    expr_t *derivative = (expr && x) ? expr_create_deriv(expr, x) : NULL;
+    char *text = derivative
+        ? expr_to_string(derivative, style_EXPRESSION)
+        : NULL;
+    const char *expect = "{ atan(x/(1 - x²)) | x = π/2 }";
+
+    if (text && str_eq(text, expect))
+        to_string_pass("compound antiderivative derivative cancels rational terms",
+                       text, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "compound antiderivative derivative cancels rational terms",
+                       text ? text : "(null)", expect);
+
+    free(text);
+    expr_free(derivative);
+    expr_free(expr);
+    expr_bindings_free(bindings);
+}
+
 static void test_simplify_reuses_clean_nodes_and_dirty_mutations(void)
 {
     expr_t *x = test_expr_new_named_var_d(3.0, "x");
@@ -4063,6 +4117,9 @@ void test_runtime_regressions(void)
     TEST_RUN_SUBTEST(test_set_val_num_named_constant, NULL);
     TEST_RUN_SUBTEST(test_to_string_unbound_omits_binding_wrapper, NULL);
     TEST_RUN_SUBTEST(test_to_string_does_not_simplify_plain_expressions, NULL);
+    TEST_RUN_SUBTEST(test_atan_quotient_derivative_simplifies_to_quartic, NULL);
+    TEST_RUN_SUBTEST(
+        test_compound_antiderivative_derivative_cancels_rational_terms, NULL);
     TEST_RUN_SUBTEST(test_simplify_reuses_clean_nodes_and_dirty_mutations, NULL);
     TEST_RUN_SUBTEST(test_gamma_successor_product_simplifies, NULL);
     TEST_RUN_SUBTEST(test_lgamma_successor_sum_simplifies, NULL);

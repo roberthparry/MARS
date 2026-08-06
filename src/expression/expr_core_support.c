@@ -887,8 +887,6 @@ int expr_is_default_constant_name_text(const string_t *name)
 
     string_cursor_next(cursor);
     if (string_cursor_done(cursor)) {
-        if (uppercase_integral_constant)
-            goto done;
         ok = 1;
         goto done;
     }
