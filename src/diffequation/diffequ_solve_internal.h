@@ -128,4 +128,11 @@ de_attempt_t de_attempt_constant_coefficient_linear(
     size_t order,
     const expr_t *residual,
     equation_t **solution_out);
+de_attempt_t de_attempt_repeated_quadratic_operator(
+    const diffequ_t *de,
+    const expr_t *independent,
+    const expr_t *dependent,
+    const expr_t *signed_square,
+    size_t multiplicity,
+    equation_t **solution_out);
 #endif /* DIFFEQU_SOLVE_INTERNAL_H */

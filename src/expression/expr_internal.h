@@ -321,6 +321,9 @@ extern const expr_ops_t ops_argument_list;
 
 expr_t *expr_new_indexed_symbol(const char *name, const expr_t *index);
 expr_t *expr_new_summation(const expr_t *term, const expr_t *index);
+expr_t *expr_new_finite_summation(const expr_t *term,
+                                  const expr_t *index,
+                                  const expr_t *upper);
 
 expr_t *expr_new_formal_derivative(const expr_t *dependent,
                                    size_t wrt_count,

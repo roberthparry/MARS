@@ -2492,6 +2492,98 @@ static void test_diffequ_defaults_bare_differential_operator(void)
             "x = exp(-2t)·(C₁·cos(4t) + C₂·sin(4t) + "
             "C₃t·cos(4t) + C₄t·sin(4t))",
         },
+        {
+            "D(y) = y",
+            "{ dy/dx = y | x = ?; ;  }",
+            "y = C·exp(x)",
+        },
+        {
+            "D(x) = x",
+            "{ dx/dt = x | t = ?; ;  }",
+            "x = C·exp(t)",
+        },
+        {
+            "D(z) = z",
+            "{ dz/dx = z | x = ?; ;  }",
+            "z = C·exp(x)",
+        },
+        {
+            "D(q) = q",
+            "{ dq/dx = q | x = ?; ;  }",
+            "q = C·exp(x)",
+        },
+        {
+            "D^2(y) + y = 0",
+            "{ d²y/dx² + y = 0 | x = ?; ;  }",
+            "y = C₁·cos(x) + C₂·sin(x)",
+        },
+        {
+            "D^2(x) + x = 0",
+            "{ d²x/dt² + x = 0 | t = ?; ;  }",
+            "x = C₁·cos(t) + C₂·sin(t)",
+        },
+        {
+            "(D^2 + @omega^2)x = 0",
+            "{ d²x/dt² + ω²*x = 0 | t = ?; ;  }",
+            "x = C₁·cos(ωt) + C₂·sin(ωt)",
+        },
+        {
+            "(D^2 - @omega^2)x = 0",
+            "{ d²x/dt² - ω²*x = 0 | t = ?; ;  }",
+            "x = C₁·exp(ωt) + C₂·exp(-ωt)",
+        },
+        {
+            "(D^2 - @omega^2)^2(x) = 0",
+            "{ d⁴x/dt⁴ - 2ω²*d²x/dt² + ω⁴*x = 0 | t = ?; ;  }",
+            "x = (C₁ + C₂t)·exp(ωt) + (C₃ + C₄t)·exp(-ωt)",
+        },
+        {
+            "(D^2 + @omega^2)^2(x) = 0",
+            "{ d⁴x/dt⁴ + 2ω²*d²x/dt² + ω⁴*x = 0 | t = ?; ;  }",
+            "x = (C₁ + C₂t)·cos(ωt) + (C₃ + C₄t)·sin(ωt)",
+        },
+        {
+            "(D^2 + @omega^2)^3x = 0",
+            "{ d⁶x/dt⁶ + 3ω²*d⁴x/dt⁴ + 3ω⁴*d²x/dt² + "
+            "ω⁶*x = 0 | t = ?; ;  }",
+            "x = (C₁ + C₂t + C₃t²)·cos(ωt) + "
+            "(C₄ + C₅t + C₆t²)·sin(ωt)",
+        },
+        {
+            "(D^2 - @omega^2)^3x = 0",
+            "{ d⁶x/dt⁶ - 3ω²*d⁴x/dt⁴ + 3ω⁴*d²x/dt² - "
+            "ω⁶*x = 0 | t = ?; ;  }",
+            "x = (C₁ + C₂t + C₃t²)·exp(ωt) + "
+            "(C₄ + C₅t + C₆t²)·exp(-ωt)",
+        },
+        {
+            "(D^2 + @omega^2)^4x = 0",
+            "{ d⁸x/dt⁸ + 4ω²*d⁶x/dt⁶ + 6ω⁴*d⁴x/dt⁴ + "
+            "4ω⁶*d²x/dt² + ω⁸*x = 0 | t = ?; ;  }",
+            "x = (Σ_(k=0)^3 C_(k + 1)·t^k)·cos(ωt) + "
+            "(Σ_(k=0)^3 C_(k + 5)·t^k)·sin(ωt)",
+        },
+        {
+            "(D^2 + @omega^2)^4phi = 0",
+            "{ d⁸φ/dx⁸ + 4ω²*d⁶φ/dx⁶ + 6ω⁴*d⁴φ/dx⁴ + "
+            "4ω⁶*d²φ/dx² + ω⁸*φ = 0 | x = ?; ;  }",
+            "φ = (Σ_(k=0)^3 C_(k + 1)·x^k)·cos(ωx) + "
+            "(Σ_(k=0)^3 C_(k + 5)·x^k)·sin(ωx)",
+        },
+        {
+            "(D^2 + @omega^2)^4@phi = 0",
+            "{ d⁸φ/dx⁸ + 4ω²*d⁶φ/dx⁶ + 6ω⁴*d⁴φ/dx⁴ + "
+            "4ω⁶*d²φ/dx² + ω⁸*φ = 0 | x = ?; ;  }",
+            "φ = (Σ_(k=0)^3 C_(k + 1)·x^k)·cos(ωx) + "
+            "(Σ_(k=0)^3 C_(k + 5)·x^k)·sin(ωx)",
+        },
+        {
+            "(D^2 + @omega^2)^4φ = 0",
+            "{ d⁸φ/dx⁸ + 4ω²*d⁶φ/dx⁶ + 6ω⁴*d⁴φ/dx⁴ + "
+            "4ω⁶*d²φ/dx² + ω⁸*φ = 0 | x = ?; ;  }",
+            "φ = (Σ_(k=0)^3 C_(k + 1)·x^k)·cos(ωx) + "
+            "(Σ_(k=0)^3 C_(k + 5)·x^k)·sin(ωx)",
+        },
     };
     bool valid = true;
 
@@ -2530,6 +2622,30 @@ static void test_diffequ_defaults_bare_differential_operator(void)
     ASSERT_TRUE(valid);
 }
 
+static void test_diffequ_solves_maximum_repeated_quadratic_power(void)
+{
+    diffequ_t *de = de_from_string(
+        "(D^2 + @omega^2)^64x = 0");
+    diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
+    const equation_t *solution = result
+        ? de_solve_result_at(result, 0u)
+        : NULL;
+    string_t *text = solution
+        ? equ_to_text(solution, style_UNBOUND)
+        : NULL;
+    bool valid = result &&
+        de_solve_result_status(result) == DE_SOLVE_STATUS_SOLVED &&
+        text && strcmp(
+            string_c_str(text),
+            "x = (Σ_(k=0)^63 C_(k + 1)·t^k)·cos(ωt) + "
+            "(Σ_(k=0)^63 C_(k + 65)·t^k)·sin(ωt)") == 0;
+
+    string_free(text);
+    de_solve_result_free(result);
+    de_free(de);
+    ASSERT_TRUE(valid);
+}
+
 static void test_diffequ_general_solution_with_distinct_real_roots(void)
 {
     EXPECT_CONSTANT_LINEAR_SOLUTION(
@@ -2541,7 +2657,7 @@ static void test_diffequ_general_solution_with_repeated_real_root(void)
 {
     EXPECT_CONSTANT_LINEAR_SOLUTION(
         "Dxxx(y) - 3*Dxx(y) + 3*Dx(y) - y = 0",
-        "y = exp(x)·(C₃x² + C₂x + C₁)");
+        "y = (C₁ + C₂x + C₃x²)·exp(x)");
 }
 
 static void test_diffequ_general_solution_with_real_and_complex_roots(void)
@@ -2555,7 +2671,7 @@ static void test_diffequ_general_solution_with_repeated_complex_roots(void)
 {
     EXPECT_CONSTANT_LINEAR_SOLUTION(
         "Dxxxx(y) + 2*Dxx(y) + y = 0",
-        "y = C₁·cos(x) + C₂·sin(x) + C₃x·cos(x) + C₄x·sin(x)");
+        "y = (C₁ + C₂x)·cos(x) + (C₃ + C₄x)·sin(x)");
 }
 
 static void test_diffequ_general_sixth_order_solution(void)
@@ -3449,6 +3565,8 @@ int tests_main(void)
         test_diffequ_resolves_polynomial_differential_operator);
     RUN_TEST_CASE(
         test_diffequ_defaults_bare_differential_operator);
+    RUN_TEST_CASE(
+        test_diffequ_solves_maximum_repeated_quadratic_power);
     RUN_TEST_CASE(
         test_diffequ_general_solution_with_distinct_real_roots);
     RUN_TEST_CASE(

@@ -117,6 +117,135 @@ class EquationResultTests(unittest.TestCase):
 
 
 class DiffequationResultTests(unittest.TestCase):
+    def test_help_documents_native_differential_equation_syntax(self) -> None:
+        help_html = mars_lab.INDEX_HTML
+
+        self.assertIn("Bare D And Operator Polynomials", help_html)
+        self.assertIn("(D^2 - @omega^2)^2(x) = 0", help_html)
+        self.assertIn("(D^2 + @omega^2)^3x = 0", help_html)
+        self.assertIn("positive integer powers up to 64", help_html)
+        self.assertIn("(Dx^2 + 4Dx + 20)^2(y) = 0", help_html)
+        self.assertIn("Greek Symbols And Differential Forms", help_html)
+        self.assertIn("d@theta", help_html)
+        self.assertIn("phi</code>, <code>@phi</code>, and <code>φ", help_html)
+        self.assertIn("Dx(u) + Dy(u) = 0", help_html)
+        self.assertIn("every symbolic solution returned by native MARSlib", help_html)
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
+    def test_compact_fourth_order_solution_tex_stays_on_one_line(self) -> None:
+        completed = subprocess.run(
+            [
+                str(
+                    ROOT
+                    / "build"
+                    / "release"
+                    / "scratch"
+                    / "diffequation_lab"
+                ),
+                "(D^2 - @omega^2)^2(x) = 0",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
+        solution_tex = fields["solutions_tex"]
+        wrapped_tex = fields["solutions_wrapped_tex"]
+
+        self.assertEqual(solution_tex.count(r"\begin{aligned}[t]"), 1)
+        self.assertIn(
+            r"\left(C_{1} + C_{2} t\right) \cdot e^{\omega t}",
+            solution_tex,
+        )
+        self.assertIn(
+            r"\left(C_{3} + C_{4} t\right) \cdot e^{-\omega t}",
+            solution_tex,
+        )
+        self.assertGreater(wrapped_tex.count(r"\begin{aligned}[t]"), 1)
+
+        payload = mars_lab.prepare_diffequation_fields(fields)
+        self.assertTrue(payload.get("svg"))
+        self.assertTrue(payload.get("wrapped_svg"))
+
+    def test_solution_wrapping_uses_the_available_card_width(self) -> None:
+        html = mars_lab.INDEX_HTML
+
+        self.assertIn("function fitDiffequationSolutionToCard()", html)
+        self.assertIn("compactWidth > renderedContentWidth() + 1", html)
+        self.assertIn("new ResizeObserver", html)
+        self.assertIn("data.solutions_wrapped_tex || lastTex", html)
+        self.assertIn("data.wrapped_svg || ''", html)
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
+    def test_repeated_quadratic_power_selects_explicit_or_sum_form(self) -> None:
+        completed = subprocess.run(
+            [
+                str(
+                    ROOT
+                    / "build"
+                    / "release"
+                    / "scratch"
+                    / "diffequation_lab"
+                ),
+                "(D^2 + @omega^2)^3x = 0",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
+        solution_tex = fields["solutions_tex"]
+
+        self.assertIn(r"\frac{d^{6} x}{d t^{6}}", fields["problem_tex"])
+        self.assertIn(r"\omega^{6} \cdot x", fields["problem_tex"])
+        self.assertNotIn(r"\sum", solution_tex)
+        self.assertIn(
+            r"\left(C_{1} + C_{2} t + C_{3} t^{2}\right)",
+            solution_tex,
+        )
+        self.assertIn(
+            r"\left(C_{4} + C_{5} t + C_{6} t^{2}\right)",
+            solution_tex,
+        )
+        self.assertIn(r"\cos(\omega t)", solution_tex)
+        self.assertIn(r"\sin(\omega t)", solution_tex)
+
+        completed = subprocess.run(
+            [
+                str(
+                    ROOT
+                    / "build"
+                    / "release"
+                    / "scratch"
+                    / "diffequation_lab"
+                ),
+                "(D^2 + @omega^2)^4phi = 0",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
+        solution_tex = fields["solutions_tex"]
+        self.assertIn(r"\frac{d^{8} \phi}{d x^{8}}", fields["problem_tex"])
+        self.assertNotIn(r"\left[phi\right]", fields["problem_tex"])
+        self.assertIn(r"\phi &=", solution_tex)
+        self.assertIn(r"\sum_{k=0}^{3}C_{k + 1} \cdot x^{k}", solution_tex)
+        self.assertIn(r"\sum_{k=0}^{3}C_{k + 5} \cdot x^{k}", solution_tex)
+        self.assertIn(r"\cos(\omega x)", solution_tex)
+        self.assertIn(r"\sin(\omega x)", solution_tex)
+
+        payload = mars_lab.prepare_diffequation_fields(fields)
+        self.assertTrue(payload.get("svg"))
+
     def test_solver_steps_are_preserved_for_display(self) -> None:
         output = """\
 status solved

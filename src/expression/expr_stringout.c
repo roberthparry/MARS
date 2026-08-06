@@ -511,6 +511,9 @@ static int mul_factor_needs_visible_parens(const expr_t *factor)
     number_t real;
     int has_real_part;
 
+    if (factor && expr_is_op(factor, &ops_summation))
+        return 1;
+
     if (factor && expr_is_const(factor) &&
         expr_tostring_should_emit_binding_expr(factor) && factor->binding_expr) {
         if (factor->binding_expr->kind == EXPR_BINDING_EXPR_ADD ||
@@ -708,7 +711,7 @@ static int expr_tostring_is_primary_variable_name(const char *name)
         goto done;
 
     if (!rune_to_ascii(string_cursor_peek(cursor), &first) ||
-        (first != 'x' && first != 'y' && first != 'z'))
+        (first != 't' && first != 'x' && first != 'y' && first != 'z'))
         goto done;
 
     if (string_cursor_next(cursor) != 0)
@@ -775,6 +778,57 @@ static int expr_tostring_is_coefficient_var_pow_d(const expr_t *f)
            expr_tostring_is_coefficient_var(f->a);
 }
 
+static bool display_poly_contains_indexed_arbitrary_constant(
+    const expr_t *expr);
+static bool display_poly_is_indexed_arbitrary_constant(const expr_t *expr);
+
+static bool expr_tostring_is_indexed_constant_times_variable_power(
+    const expr_t *expr)
+{
+    const expr_t *variable_power;
+
+    if (!expr_is_mul(expr))
+        return false;
+    if (display_poly_is_indexed_arbitrary_constant(expr->a))
+        variable_power = expr->b;
+    else if (display_poly_is_indexed_arbitrary_constant(expr->b))
+        variable_power = expr->a;
+    else
+        return false;
+    if (expr_is_var(variable_power))
+        return variable_power->name &&
+            expr_tostring_is_primary_variable_name(variable_power->name);
+    return expr_is_pow_d_expr(variable_power) &&
+        variable_power->a && expr_is_var(variable_power->a) &&
+        variable_power->a->name &&
+        expr_tostring_is_primary_variable_name(variable_power->a->name);
+}
+
+static bool expr_tostring_is_explicit_arbitrary_amplitude_terms(
+    const expr_t *expr)
+{
+    if (!expr)
+        return false;
+    if (expr_is_addsub(expr))
+        return expr_tostring_is_explicit_arbitrary_amplitude_terms(expr->a) &&
+            expr_tostring_is_explicit_arbitrary_amplitude_terms(expr->b);
+    return display_poly_is_indexed_arbitrary_constant(expr) ||
+        expr_tostring_is_indexed_constant_times_variable_power(expr);
+}
+
+static bool expr_tostring_is_explicit_arbitrary_amplitude(
+    const expr_t *expr)
+{
+    const expr_t *first = expr;
+
+    if (!expr || !expr_is_addsub(expr))
+        return false;
+    while (first && expr_is_addsub(first))
+        first = first->a;
+    return display_poly_is_indexed_arbitrary_constant(first) &&
+        expr_tostring_is_explicit_arbitrary_amplitude_terms(expr);
+}
+
 /* Sort group for multiplication factors:
  *   0 = unnamed numeric constant       (e.g. 6)
  *   1 = Greek immortal named constant  (e.g. π)
@@ -787,6 +841,13 @@ static int expr_tostring_is_coefficient_var_pow_d(const expr_t *f)
 static int factor_group(const expr_t *f)
 {
     if (expr_is_neg(f)) f = f->a;
+
+    if (expr_is_op(f, &ops_indexed_symbol))
+        return 3;
+    if (expr_is_op(f, &ops_summation))
+        return 4;
+    if (expr_tostring_is_explicit_arbitrary_amplitude(f))
+        return 4;
 
     if (expr_is_const(f)) {
         if (expr_is_preserved_ln10_const_local(f))
@@ -1590,32 +1651,104 @@ static bool display_poly_collect_add_terms(const expr_t *expr,
 
 static int display_poly_compare_terms(const display_poly_term_t *left,
                                       const display_poly_term_t *right,
-                                      size_t var_count)
+                                      size_t var_count,
+                                      bool ascending)
 {
     for (size_t i = 0u; i < var_count; ++i) {
         if (left->degree[i] > right->degree[i])
-            return -1;
+            return ascending ? 1 : -1;
         if (left->degree[i] < right->degree[i])
-            return 1;
+            return ascending ? -1 : 1;
     }
     return 0;
 }
 
 static void display_poly_sort_terms(display_poly_term_t *terms,
                                     size_t count,
-                                    size_t var_count)
+                                    size_t var_count,
+                                    bool ascending)
 {
     for (size_t i = 1u; i < count; ++i) {
         display_poly_term_t key = terms[i];
         size_t j = i;
 
         while (j > 0u &&
-               display_poly_compare_terms(&key, &terms[j - 1u], var_count) < 0) {
+               display_poly_compare_terms(
+                   &key, &terms[j - 1u], var_count, ascending) < 0) {
             terms[j] = terms[j - 1u];
             --j;
         }
         terms[j] = key;
     }
+}
+
+static bool display_poly_is_indexed_arbitrary_constant(const expr_t *expr)
+{
+    const unsigned char *name;
+
+    if (!expr || !expr_is_const(expr) || !expr->name || expr->name[0] != 'C')
+        return false;
+
+    name = (const unsigned char *)expr->name + 1u;
+    if (!isdigit(*name) &&
+        !(strlen((const char *)name) >= 3u &&
+          name[0] == 0xe2u && name[1] == 0x82u &&
+          name[2] >= 0x80u && name[2] <= 0x89u))
+        return false;
+    while (*name) {
+        if (isdigit(*name)) {
+            ++name;
+            continue;
+        }
+        if (strlen((const char *)name) >= 3u &&
+            name[0] == 0xe2u && name[1] == 0x82u &&
+            name[2] >= 0x80u && name[2] <= 0x89u) {
+            name += 3u;
+            continue;
+        }
+        return false;
+    }
+    return *name == '\0';
+}
+
+static bool display_poly_contains_indexed_arbitrary_constant(const expr_t *expr)
+{
+    if (!expr)
+        return false;
+    if (display_poly_is_indexed_arbitrary_constant(expr))
+        return true;
+    return display_poly_contains_indexed_arbitrary_constant(expr->a) ||
+           display_poly_contains_indexed_arbitrary_constant(expr->b);
+}
+
+static bool display_poly_is_explicit_arbitrary_amplitude(
+    const display_poly_term_t *terms,
+    size_t count,
+    size_t var_count)
+{
+    bool degrees[96] = { false };
+
+    if (count < 2u || count > sizeof(degrees) / sizeof(degrees[0]))
+        return false;
+
+    for (size_t i = 0u; i < count; ++i) {
+        long total_degree = 0;
+
+        for (size_t j = 0u; j < var_count; ++j)
+            total_degree += terms[i].degree[j];
+
+        if (total_degree < 0 || (size_t)total_degree != i ||
+            (size_t)total_degree >= count || degrees[total_degree] ||
+            !display_poly_contains_indexed_arbitrary_constant(
+                terms[i].expr))
+            return false;
+        degrees[total_degree] = true;
+    }
+    for (size_t i = 0u; i < count; ++i) {
+        if (!degrees[i])
+            return false;
+    }
+    return true;
 }
 
 static bool display_poly_prepare_terms(const expr_t *expr,
@@ -1653,7 +1786,12 @@ static bool display_poly_prepare_terms(const expr_t *expr,
     if (!has_variable_term)
         return false;
 
-    display_poly_sort_terms(terms, *count, vars.count);
+    display_poly_sort_terms(
+        terms,
+        *count,
+        vars.count,
+        display_poly_is_explicit_arbitrary_amplitude(
+            terms, *count, vars.count));
     if (terms[0].subtract != (expr_renders_negative(terms[0].expr) ? true : false))
         return false;
     return true;
@@ -2928,9 +3066,21 @@ void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec)
             return;
         }
         if (expr_is_op(f, &ops_summation)) {
+            const expr_t *index = f->b;
+            const expr_t *upper = NULL;
+
+            if (expr_is_op(f->b, &ops_argument_list)) {
+                index = f->b->a;
+                upper = f->b->b;
+            }
             sbuf_puts(b, "\\sum_{");
-            emit_tex_expr(f->b, b, 0);
-            sbuf_puts(b, "=0}^{\\infty}");
+            emit_tex_expr(index, b, 0);
+            sbuf_puts(b, "=0}^{");
+            if (upper)
+                emit_tex_expr(upper, b, 0);
+            else
+                sbuf_puts(b, "\\infty");
+            sbuf_putc(b, '}');
             emit_tex_expr(f->a, b, PREC_MUL);
             return;
         }
@@ -3365,9 +3515,21 @@ void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
             return;
         }
         if (expr_is_op(f, &ops_summation)) {
+            const expr_t *index = f->b;
+            const expr_t *upper = NULL;
+
+            if (expr_is_op(f->b, &ops_argument_list)) {
+                index = f->b->a;
+                upper = f->b->b;
+            }
             sbuf_puts(b, "Σ_(");
-            emit_expr(f->b, b, 0);
-            sbuf_puts(b, "=0)^∞ ");
+            emit_expr(index, b, 0);
+            sbuf_puts(b, "=0)^");
+            if (upper)
+                emit_expr(upper, b, 0);
+            else
+                sbuf_puts(b, "∞");
+            sbuf_putc(b, ' ');
             emit_expr(f->a, b, PREC_MUL);
             return;
         }
@@ -3621,11 +3783,23 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
             return;
         }
         if (expr_is_op(f, &ops_summation)) {
+            const expr_t *index = f->b;
+            const expr_t *upper = NULL;
+
+            if (expr_is_op(f->b, &ops_argument_list)) {
+                index = f->b->a;
+                upper = f->b->b;
+            }
             sbuf_puts(b, "sum(");
             emit_func(f->a, b, 0);
             sbuf_puts(b, ", ");
-            emit_func(f->b, b, 0);
-            sbuf_puts(b, ", 0, @inf)");
+            emit_func(index, b, 0);
+            sbuf_puts(b, ", 0, ");
+            if (upper)
+                emit_func(upper, b, 0);
+            else
+                sbuf_puts(b, "@inf");
+            sbuf_putc(b, ')');
             return;
         }
         if (expr_has_polygamma_order(f)) {

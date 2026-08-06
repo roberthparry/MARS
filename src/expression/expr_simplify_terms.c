@@ -53,7 +53,7 @@ static int product_factor_is_primary_variable_name(const char *name)
         goto done;
 
     if (!rune_to_ascii(string_cursor_peek(cursor), &first) ||
-        (first != 'x' && first != 'y' && first != 'z'))
+        (first != 't' && first != 'x' && first != 'y' && first != 'z'))
         goto done;
 
     if (string_cursor_next(cursor) != 0)

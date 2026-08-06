@@ -77,10 +77,14 @@ diffequ_t *de_new(const equation_t *equation);
  * @brief Parse a differential-equation problem from canonical text.
  *
  * In addition to applied derivatives such as `Dx(y)` and `Dxx(y)`, the parser
- * accepts positive integer powers of numeric polynomial differential
- * operators, for example `(Dx^2 + 4Dx + 20)^2(y) = 0`, and expands them before
- * constructing the problem. A bare `D` defaults to `Dx` for dependent `y`
- * and to `Dt` for dependent `x`; an explicit suffix takes precedence.
+ * accepts polynomial differential operators, for example
+ * `(Dx^2 + 4Dx + 20)^2(y) = 0` and `(D^2 + @omega^2)x = 0`, and expands them
+ * before constructing the problem. Literal positive integer powers through
+ * 64 are supported, including repeated quadratic factors such as
+ * `(D^2 + @omega^2)^3x = 0`. A bare `D` consistently defaults to `Dt`
+ * only for dependent `x`, and to `Dx` for every other dependent variable,
+ * including in direct forms such as `D^2(y)` and `D^2(x)`. An explicit suffix
+ * takes precedence.
  *
  * @param text Null-terminated input text. Must not be `NULL`.
  * @return A newly allocated differential-equation problem, or `NULL` when the

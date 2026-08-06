@@ -14,10 +14,18 @@ typedef struct {
     size_t order;
 } de_constant_linear_form_t;
 
+typedef enum {
+    DE_BASIS_GROUP_NONE = 0,
+    DE_BASIS_GROUP_REPEATED_REAL,
+    DE_BASIS_GROUP_REPEATED_OSCILLATORY
+} de_basis_group_t;
+
 typedef struct {
     expr_t **items;
     size_t count;
     size_t capacity;
+    de_basis_group_t group;
+    size_t multiplicity;
 } de_basis_t;
 
 static void de_constant_linear_form_clear(
@@ -43,6 +51,11 @@ static void de_basis_clear(de_basis_t *basis)
     for (size_t i = 0u; i < basis->count; ++i)
         expr_free(basis->items[i]);
     free(basis->items);
+    basis->items = NULL;
+    basis->count = 0u;
+    basis->capacity = 0u;
+    basis->group = DE_BASIS_GROUP_NONE;
+    basis->multiplicity = 0u;
 }
 
 static int de_basis_append(de_basis_t *basis, expr_t *item)
@@ -349,6 +362,211 @@ static expr_t *de_oscillatory_basis(
     return basis;
 }
 
+static expr_t *de_binomial_coefficient_expr(size_t n, size_t k)
+{
+    number_t n_value = num_create_from_long((long)n);
+    number_t k_value = num_create_from_long((long)k);
+    number_t coefficient = num_binomial(n_value, k_value);
+    expr_t *expr = num_is_finite(coefficient)
+        ? expr_new_const(coefficient)
+        : NULL;
+
+    num_destroy(&coefficient);
+    num_destroy(&k_value);
+    num_destroy(&n_value);
+    return expr;
+}
+
+static bool de_repeated_quadratic_coefficients_match(
+    const de_constant_linear_form_t *form,
+    const expr_t *square,
+    bool negative_square,
+    size_t multiplicity)
+{
+    if (!form || !square || multiplicity == 0u ||
+        form->order != 2u * multiplicity)
+        return false;
+
+    for (size_t order = 1u; order < form->order; order += 2u) {
+        if (!expr_is_exact_zero(form->coefficients[order]))
+            return false;
+    }
+
+    for (size_t j = 0u; j <= multiplicity; ++j) {
+        expr_t *binomial =
+            de_binomial_coefficient_expr(multiplicity, j);
+        expr_t *square_power = expr_pow_long(
+            square, (long)(multiplicity - j));
+        expr_t *factor = binomial && square_power
+            ? expr_mul(binomial, square_power)
+            : NULL;
+        if (factor && negative_square &&
+            ((multiplicity - j) & 1u) != 0u) {
+            expr_t *negative = expr_neg(factor);
+
+            expr_free(factor);
+            factor = negative;
+        }
+        expr_t *expected = factor
+            ? expr_mul(form->coefficients[form->order], factor)
+            : NULL;
+        expr_t *expected_display = expected
+            ? expr_display_simplified(expected)
+            : NULL;
+        bool matches = expected_display && expr_struct_eq(
+            form->coefficients[2u * j], expected_display);
+        expr_t *difference = !matches && expected_display
+            ? expr_sub(form->coefficients[2u * j], expected_display)
+            : NULL;
+        expr_t *check = difference
+            ? expr_display_simplified(difference)
+            : NULL;
+
+        if (!matches)
+            matches = check && expr_is_exact_zero(check);
+
+        expr_free(check);
+        expr_free(difference);
+        expr_free(expected_display);
+        expr_free(expected);
+        expr_free(factor);
+        expr_free(square_power);
+        expr_free(binomial);
+        if (!matches)
+            return false;
+    }
+    return true;
+}
+
+static int de_append_symbolic_repeated_quadratic_basis(
+    const de_constant_linear_form_t *form,
+    const expr_t *independent,
+    de_basis_t *basis)
+{
+    const expr_t *frequency = NULL;
+    const expr_t *square = NULL;
+    number_t exponent = num_new();
+    expr_t *denominator = NULL;
+    expr_t *signed_square = NULL;
+    expr_t *display_square = NULL;
+    expr_t *frequency_expr = NULL;
+    expr_t *frequency_display = NULL;
+    expr_t *negative_frequency = NULL;
+    size_t multiplicity;
+    size_t basis_start = 0u;
+    de_basis_group_t group_start = DE_BASIS_GROUP_NONE;
+    size_t multiplicity_start = 0u;
+    bool real_roots;
+    int rc = -1;
+
+    if (!form || !independent || !basis || form->order < 4u ||
+        (form->order & 1u) != 0u)
+        goto cleanup;
+    multiplicity = form->order / 2u;
+    basis_start = basis->count;
+    group_start = basis->group;
+    multiplicity_start = basis->multiplicity;
+
+    denominator = expr_mul_simplify_owned(
+        expr_const_long((long)multiplicity),
+        expr_clone(form->coefficients[form->order]));
+    signed_square = denominator
+        ? expr_div_simplify_owned(
+              expr_clone(form->coefficients[form->order - 2u]),
+              denominator)
+        : NULL;
+    if (denominator)
+        denominator = NULL;
+    display_square = signed_square
+        ? expr_display_simplified(signed_square)
+        : NULL;
+    square = display_square;
+    real_roots = display_square &&
+        expr_match_neg_expr(display_square, &square);
+    if (!display_square || expr_is_exact_zero(display_square) ||
+        !de_repeated_quadratic_coefficients_match(
+            form, square, real_roots, multiplicity))
+        goto cleanup;
+
+    if (expr_match_pow_const(square, &frequency, &exponent) &&
+        num_eq(exponent, NUM_TWO)) {
+        frequency_display = expr_clone(frequency);
+    } else {
+        frequency_expr = expr_sqrt(square);
+        frequency_display = frequency_expr
+            ? expr_display_simplified(frequency_expr)
+            : NULL;
+    }
+    if (!frequency_display)
+        goto cleanup;
+
+    if (real_roots) {
+        negative_frequency = expr_neg(frequency_display);
+        for (size_t family = 0u; negative_frequency && family < 2u;
+             ++family) {
+            const expr_t *rate = family == 0u
+                ? frequency_display
+                : negative_frequency;
+
+            for (size_t power = 0u; power < multiplicity; ++power) {
+                expr_t *item = de_polynomial_exponential_basis(
+                    independent, rate, power);
+
+                if (!item || de_basis_append(basis, item) != 0) {
+                    expr_free(item);
+                    goto cleanup;
+                }
+            }
+        }
+    } else {
+        expr_t *zero = expr_const_zero();
+
+        for (size_t family = 0u; zero && family < 2u; ++family) {
+            for (size_t power = 0u; power < multiplicity; ++power) {
+                expr_t *item = de_oscillatory_basis(
+                    independent,
+                    zero,
+                    frequency_display,
+                    power,
+                    family != 0u);
+
+                if (!item || de_basis_append(basis, item) != 0) {
+                    expr_free(item);
+                    expr_free(zero);
+                    goto cleanup;
+                }
+            }
+        }
+        expr_free(zero);
+    }
+    rc = basis->count == basis_start + 2u * multiplicity ? 0 : -1;
+    if (rc == 0) {
+        basis->group = real_roots
+            ? DE_BASIS_GROUP_REPEATED_REAL
+            : DE_BASIS_GROUP_REPEATED_OSCILLATORY;
+        basis->multiplicity = multiplicity;
+    }
+
+cleanup:
+    if (rc != 0 && basis) {
+        while (basis->count > basis_start) {
+            --basis->count;
+            expr_free(basis->items[basis->count]);
+            basis->items[basis->count] = NULL;
+        }
+        basis->group = group_start;
+        basis->multiplicity = multiplicity_start;
+    }
+    expr_free(negative_frequency);
+    expr_free(frequency_display);
+    expr_free(frequency_expr);
+    expr_free(display_square);
+    expr_free(signed_square);
+    expr_free(denominator);
+    num_destroy(&exponent);
+    return rc;
+}
+
 static int de_append_root_basis(
     de_basis_t *basis,
     const expr_t *independent,
@@ -485,6 +703,12 @@ static int de_construct_basis(
         ? &roots_storage
         : NULL;
     int rc = -1;
+
+    if (de_append_symbolic_repeated_quadratic_basis(
+            form, independent, basis) == 0) {
+        rc = 0;
+        goto cleanup;
+    }
 
     if (!roots ||
         de_solve_characteristic(
@@ -1259,14 +1483,163 @@ cleanup:
     return solution;
 }
 
+static expr_t *de_indexed_arbitrary_constant(size_t index)
+{
+    char name[32];
+
+    snprintf(name, sizeof(name), "C%zu", index);
+    return expr_new_named_const(NUM_NAN, name);
+}
+
+static expr_t *de_explicit_amplitude(const expr_t *independent,
+                                     size_t multiplicity,
+                                     size_t first_constant)
+{
+    expr_t *amplitude = NULL;
+
+    if (!independent || multiplicity == 0u)
+        return NULL;
+    for (size_t power = 0u; power < multiplicity; ++power) {
+        expr_t *constant = de_indexed_arbitrary_constant(
+            first_constant + power);
+        expr_t *independent_power = power == 1u
+            ? expr_clone(independent)
+            : power > 1u
+            ? expr_pow_long(independent, (long)power)
+            : NULL;
+        expr_t *term = power == 0u
+            ? expr_clone(constant)
+            : constant && independent_power
+            ? expr_mul(constant, independent_power)
+            : NULL;
+        expr_t *sum = amplitude && term
+            ? expr_add(amplitude, term)
+            : term
+            ? expr_clone(term)
+            : NULL;
+
+        expr_free(term);
+        expr_free(independent_power);
+        expr_free(constant);
+        expr_free(amplitude);
+        amplitude = sum;
+        if (!amplitude)
+            return NULL;
+    }
+    return amplitude;
+}
+
+static expr_t *de_summed_amplitude(const expr_t *independent,
+                                   size_t multiplicity,
+                                   size_t first_constant)
+{
+    expr_t *index = expr_new_named_var(NUM_NAN, "k");
+    expr_t *constant_index = index
+        ? expr_add_long(index, (long)first_constant)
+        : NULL;
+    expr_t *constant = constant_index
+        ? expr_new_indexed_symbol("C", constant_index)
+        : NULL;
+    expr_t *power = index && independent
+        ? expr_pow_xp(independent, index)
+        : NULL;
+    expr_t *term = constant && power
+        ? expr_mul(constant, power)
+        : NULL;
+    expr_t *upper = multiplicity > 0u
+        ? expr_const_long((long)(multiplicity - 1u))
+        : NULL;
+    expr_t *amplitude = term && index && upper
+        ? expr_new_finite_summation(term, index, upper)
+        : NULL;
+
+    expr_free(upper);
+    expr_free(term);
+    expr_free(power);
+    expr_free(constant);
+    expr_free(constant_index);
+    expr_free(index);
+    return amplitude;
+}
+
+static expr_t *de_grouped_repeated_quadratic_solution(
+    const de_basis_t *basis,
+    const expr_t *independent,
+    const expr_t *particular)
+{
+    expr_t *first_amplitude = NULL;
+    expr_t *second_amplitude = NULL;
+    expr_t *first_term = NULL;
+    expr_t *second_term = NULL;
+    expr_t *homogeneous = NULL;
+    expr_t *solution = NULL;
+
+    if (!basis || !independent || !particular ||
+        basis->multiplicity < 2u ||
+        basis->count != 2u * basis->multiplicity ||
+        basis->group == DE_BASIS_GROUP_NONE)
+        return NULL;
+
+    if (basis->multiplicity < 4u) {
+        first_amplitude = de_explicit_amplitude(
+            independent, basis->multiplicity, 1u);
+        second_amplitude = de_explicit_amplitude(
+            independent,
+            basis->multiplicity,
+            basis->multiplicity + 1u);
+    } else {
+        first_amplitude = de_summed_amplitude(
+            independent, basis->multiplicity, 1u);
+        second_amplitude = de_summed_amplitude(
+            independent,
+            basis->multiplicity,
+            basis->multiplicity + 1u);
+    }
+    first_term = first_amplitude
+        ? expr_mul(first_amplitude, basis->items[0])
+        : NULL;
+    second_term = second_amplitude
+        ? expr_mul(
+              second_amplitude,
+              basis->items[basis->multiplicity])
+        : NULL;
+    homogeneous = first_term && second_term
+        ? expr_add(first_term, second_term)
+        : NULL;
+    if (!homogeneous)
+        goto cleanup;
+
+    if (expr_is_exact_zero(particular)) {
+        solution = homogeneous;
+        homogeneous = NULL;
+    } else {
+        solution = expr_add(particular, homogeneous);
+    }
+
+cleanup:
+    expr_free(homogeneous);
+    expr_free(second_term);
+    expr_free(first_term);
+    expr_free(second_amplitude);
+    expr_free(first_amplitude);
+    return solution;
+}
+
 static expr_t *de_general_solution(
     const de_basis_t *basis,
+    const expr_t *independent,
     const expr_t *particular)
 {
     bool separate_particular = !expr_is_exact_zero(particular);
     expr_t *solution = separate_particular
         ? expr_clone(particular)
         : expr_const_zero();
+
+    if (basis && basis->group != DE_BASIS_GROUP_NONE) {
+        expr_free(solution);
+        return de_grouped_repeated_quadratic_solution(
+            basis, independent, particular);
+    }
 
     for (size_t i = 0u; i < basis->count; ++i) {
         char name[32];
@@ -1327,7 +1700,8 @@ de_attempt_t de_attempt_constant_coefficient_linear(
         goto cleanup;
 
     if (de->condition_count == 0u)
-        solution = de_general_solution(&basis, particular);
+        solution = de_general_solution(
+            &basis, independent, particular);
     else
         solution = de_apply_conditions(
             de,
@@ -1343,6 +1717,176 @@ de_attempt_t de_attempt_constant_coefficient_linear(
         attempt = DE_ATTEMPT_SOLVED;
 
 cleanup:
+    expr_free(solution);
+    expr_free(particular);
+    de_basis_clear(&basis);
+    de_constant_linear_form_clear(&form);
+    return attempt;
+}
+
+de_attempt_t de_attempt_repeated_quadratic_operator(
+    const diffequ_t *de,
+    const expr_t *independent,
+    const expr_t *dependent,
+    const expr_t *signed_square,
+    size_t multiplicity,
+    equation_t **solution_out)
+{
+    const expr_t *square = signed_square;
+    const expr_t *frequency = NULL;
+    de_constant_linear_form_t form = { 0 };
+    de_basis_t basis = { 0 };
+    number_t exponent = num_new();
+    expr_t *frequency_expr = NULL;
+    expr_t *frequency_display = NULL;
+    expr_t *negative_frequency = NULL;
+    expr_t *first_basis = NULL;
+    expr_t *second_basis = NULL;
+    expr_t *first_amplitude = NULL;
+    expr_t *second_amplitude = NULL;
+    expr_t *first_term = NULL;
+    expr_t *second_term = NULL;
+    expr_t *particular = NULL;
+    expr_t *solution = NULL;
+    bool real_roots;
+    de_attempt_t attempt = DE_ATTEMPT_FAILED;
+
+    if (!de || !independent || !dependent || !signed_square ||
+        multiplicity < 2u || multiplicity > SIZE_MAX / 2u ||
+        !solution_out)
+        return DE_ATTEMPT_NOT_MATCHED;
+
+    real_roots = expr_match_neg_expr(signed_square, &square);
+    if (!square || expr_is_exact_zero(square))
+        goto cleanup;
+    if (expr_match_pow_const(square, &frequency, &exponent) &&
+        num_eq(exponent, NUM_TWO)) {
+        frequency_display = expr_clone(frequency);
+    } else {
+        frequency_expr = expr_sqrt(square);
+        frequency_display = frequency_expr
+            ? expr_display_simplified(frequency_expr)
+            : NULL;
+    }
+    if (!frequency_display)
+        goto cleanup;
+
+    if (de->condition_count == 0u) {
+        if (real_roots) {
+            negative_frequency = expr_neg(frequency_display);
+            first_basis = de_polynomial_exponential_basis(
+                independent, frequency_display, 0u);
+            second_basis = negative_frequency
+                ? de_polynomial_exponential_basis(
+                      independent, negative_frequency, 0u)
+                : NULL;
+        } else {
+            expr_t *zero = expr_const_zero();
+
+            first_basis = zero
+                ? de_oscillatory_basis(
+                      independent,
+                      zero,
+                      frequency_display,
+                      0u,
+                      false)
+                : NULL;
+            second_basis = zero
+                ? de_oscillatory_basis(
+                      independent,
+                      zero,
+                      frequency_display,
+                      0u,
+                      true)
+                : NULL;
+            expr_free(zero);
+        }
+        first_amplitude = multiplicity < 4u
+            ? de_explicit_amplitude(independent, multiplicity, 1u)
+            : de_summed_amplitude(independent, multiplicity, 1u);
+        second_amplitude = multiplicity < 4u
+            ? de_explicit_amplitude(
+                  independent, multiplicity, multiplicity + 1u)
+            : de_summed_amplitude(
+                  independent, multiplicity, multiplicity + 1u);
+        first_term = first_amplitude && first_basis
+            ? expr_mul(first_amplitude, first_basis)
+            : NULL;
+        second_term = second_amplitude && second_basis
+            ? expr_mul(second_amplitude, second_basis)
+            : NULL;
+        solution = first_term && second_term
+            ? expr_add(first_term, second_term)
+            : NULL;
+        if (!solution)
+            goto cleanup;
+        *solution_out = equ_new(dependent, solution);
+        if (*solution_out)
+            attempt = DE_ATTEMPT_SOLVED;
+        goto cleanup;
+    }
+
+    form.order = 2u * multiplicity;
+    form.coefficients =
+        calloc(form.order + 1u, sizeof(*form.coefficients));
+    if (!form.coefficients)
+        goto cleanup;
+
+    for (size_t j = 0u; j <= multiplicity; ++j) {
+        expr_t *binomial =
+            de_binomial_coefficient_expr(multiplicity, j);
+        expr_t *power = expr_pow_long(
+            signed_square, (long)(multiplicity - j));
+        expr_t *coefficient = binomial && power
+            ? expr_mul(binomial, power)
+            : NULL;
+
+        form.coefficients[2u * j] = coefficient
+            ? expr_display_simplified(coefficient)
+            : NULL;
+        expr_free(coefficient);
+        expr_free(power);
+        expr_free(binomial);
+        if (!form.coefficients[2u * j])
+            goto cleanup;
+        if (j < multiplicity) {
+            form.coefficients[2u * j + 1u] = expr_const_zero();
+            if (!form.coefficients[2u * j + 1u])
+                goto cleanup;
+        }
+    }
+
+    if (de_construct_basis(&form, independent, &basis) != 0)
+        goto cleanup;
+    particular = expr_const_zero();
+    if (!particular)
+        goto cleanup;
+    solution = de->condition_count == 0u
+        ? de_general_solution(&basis, independent, particular)
+        : de_apply_conditions(
+              de,
+              independent,
+              dependent,
+              &basis,
+              particular);
+    if (!solution)
+        goto cleanup;
+
+    *solution_out = equ_new(dependent, solution);
+    if (*solution_out)
+        attempt = DE_ATTEMPT_SOLVED;
+
+cleanup:
+    expr_free(second_term);
+    expr_free(first_term);
+    expr_free(second_amplitude);
+    expr_free(first_amplitude);
+    expr_free(second_basis);
+    expr_free(first_basis);
+    expr_free(negative_frequency);
+    expr_free(frequency_display);
+    expr_free(frequency_expr);
+    num_destroy(&exponent);
     expr_free(solution);
     expr_free(particular);
     de_basis_clear(&basis);

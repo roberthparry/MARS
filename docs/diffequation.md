@@ -84,8 +84,9 @@ this way in both the rendered equation and the differential-equation card.
 The canonical expression form remains `Dx(y)`, `Dxx(y)`, and `Dxxx(y)`.
 
 Constant-coefficient polynomial differential operators can be applied to a
-dependent variable directly. MARS expands the operator before selecting the
-ordinary constant-coefficient solver. For example:
+dependent variable directly, with or without parentheses around that
+variable. Coefficients may be numeric or symbolic. MARS expands the operator
+before selecting the ordinary constant-coefficient solver. For example:
 
 ```text
 input = (Dx^2 + 4Dx + 20)^2(y) = 0
@@ -95,17 +96,53 @@ solution = y = exp(-2x)·(C₁·cos(4x) + C₂·sin(4x)
 ```
 
 Here `Dx` denotes the differential operator with respect to `x`, rather than
-the already-applied formal derivative `Dx(y)`. Positive integer powers of a
-numeric polynomial operator are accepted; the independent variable is
-inferred from its operator suffix.
+the already-applied formal derivative `Dx(y)`. Literal positive integer powers
+through 64 are accepted for numeric or symbolic polynomial operators; the
+independent variable is inferred from the operator suffix.
 
-The suffix may be omitted when the usual ODE convention is unambiguous. Bare
-`D` means `Dx` when it operates on `y`, and `Dt` when it operates on `x`:
+The suffix may be omitted. This is a general parser rule: bare `D` means `Dt`
+only when it operates on dependent `x`; for `y`, `z`, or any other dependent
+variable it means `Dx`. The operator changes the differentiation coordinate,
+never the dependent variable. The rule applies both to individual derivatives
+and to polynomial operators:
 
 ```text
+D(y) = y                       →  Dx(y) = y
+D(z) = z                       →  Dx(z) = z
+D(q) = q                       →  Dx(q) = q
+D^2(y) + y = 0                 →  Dxx(y) + y = 0
+D(x) = x                       →  Dt(x) = x
+D^2(x) + x = 0                 →  Dtt(x) + x = 0
 (D^2 + 4D + 20)^2(y) = 0  →  (Dx^2 + 4Dx + 20)^2(y) = 0
 (D^2 + 4D + 20)^2(x) = 0  →  (Dt^2 + 4Dt + 20)^2(x) = 0
+(D^2 + @omega^2)x = 0     →  Dtt(x) + ω^2*x = 0
+                              →  x = C₁·cos(ωt) + C₂·sin(ωt)
+(D^2 - @omega^2)x = 0     →  Dtt(x) - ω^2*x = 0
+                              →  x = C₁·exp(ωt) + C₂·exp(-ωt)
+(D^2 - @omega^2)^2(x) = 0 →  Dtttt(x) - 2ω^2*Dtt(x) + ω^4*x = 0
+                              →  x = (C₁ + C₂t)·exp(ωt)
+                                   + (C₃ + C₄t)·exp(-ωt)
+(D^2 + @omega^2)^2(x) = 0 →  Dtttt(x) + 2ω^2*Dtt(x) + ω^4*x = 0
+                              →  x = (C₁ + C₂t)·cos(ωt)
+                                   + (C₃ + C₄t)·sin(ωt)
+(D^2 + @omega^2)^3x = 0   →  Dtttttt(x) + 3ω^2*Dtttt(x)
+                                  + 3ω^4*Dtt(x) + ω^6*x = 0
+                              →  x = (C₁ + C₂t + C₃t²)·cos(ωt)
+                                   + (C₄ + C₅t + C₆t²)·sin(ωt)
 ```
+
+More generally, for any literal positive integer `n` up to 64,
+
+```text
+(D^2 + @omega^2)^n x = 0
+→ x = (Σ_(k=0)^(n-1) C_(k+1)t^k)·cos(ωt)
+      + (Σ_(k=0)^(n-1) C_(n+k+1)t^k)·sin(ωt)
+```
+
+Here `n` describes the general family; an entered operator power must be a
+literal integer so MARS can construct the corresponding order `2n` equation.
+For `n < 4`, MARS writes every term explicitly; finite-sum notation begins at
+`n = 4`.
 
 An explicit suffix always takes precedence.
 
@@ -384,6 +421,10 @@ Consequently, `@phi` ordinarily denotes the golden ratio, but in
 `Dx(@phi)` or `Dy(@phi)` it denotes the dependent field `φ`. The same rule
 allows familiar mathematical symbols to be used for angles and other
 dependent quantities without changing their ordinary expression meaning.
+Plain, prefixed, and symbolic spellings of a Greek dependent variable are
+canonicalised identically: `phi`, `@phi`, and `φ` all render as `φ` throughout
+the normalised differential equation and its solution. This also applies when
+the dependent variable follows a polynomial differential operator directly.
 
 The characteristic solver also handles these nonlinear and
 variable-coefficient forms:

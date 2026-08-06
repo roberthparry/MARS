@@ -535,8 +535,10 @@ static expr_t *de_oscillatory_solution(
     expr_t *oscillation = NULL;
     expr_t *envelope = NULL;
     expr_t *solution = NULL;
+    number_t beta_value = num_new();
     bool has_value;
     bool has_slope;
+    bool numeric_beta;
 
     has_value = de_find_initial_condition(
         de, dependent, &value_point, &value);
@@ -553,9 +555,12 @@ static expr_t *de_oscillatory_solution(
 
     shift = de_shifted_independent(
         independent, has_value ? value_point : NULL);
+    numeric_beta = expr_match_const_value(beta, &beta_value);
     phase = shift
-        ? expr_mul_simplify_owned(
-              expr_clone(beta), expr_clone(shift))
+        ? (numeric_beta
+              ? expr_mul_simplify_owned(
+                    expr_clone(beta), expr_clone(shift))
+              : expr_mul(beta, shift))
         : NULL;
     cosine = phase ? expr_cos(phase) : NULL;
     sine = phase ? expr_sin(phase) : NULL;
@@ -623,6 +628,57 @@ cleanup:
     expr_free(shift);
     expr_free(beta);
     expr_free(alpha);
+    num_destroy(&beta_value);
+    return solution;
+}
+
+static expr_t *de_symbolic_square_solution(
+    const diffequ_t *de,
+    const expr_t *independent,
+    const expr_t *dependent,
+    const de_linear_second_order_t *form)
+{
+    const expr_t *frequency = NULL;
+    const expr_t *square = NULL;
+    number_t exponent = num_new();
+    expr_t *ratio = NULL;
+    expr_t *simplified = NULL;
+    expr_t *solution = NULL;
+    bool exponential;
+
+    if (!de || !independent || !dependent || !form ||
+        !expr_is_exact_zero(form->first) ||
+        expr_is_exact_zero(form->leading))
+        goto cleanup;
+    ratio = expr_div_simplify_owned(
+        expr_clone(form->dependent), expr_clone(form->leading));
+    simplified = ratio ? expr_display_simplified(ratio) : NULL;
+    square = simplified;
+    exponential = simplified && expr_match_neg_expr(simplified, &square);
+    if (!simplified ||
+        !expr_match_pow_const(square, &frequency, &exponent) ||
+        !num_eq(exponent, NUM_TWO))
+        goto cleanup;
+    if (exponential) {
+        solution = de_distinct_root_solution(
+            de,
+            independent,
+            dependent,
+            expr_clone(frequency),
+            expr_neg(frequency));
+    } else {
+        solution = de_oscillatory_solution(
+            de,
+            independent,
+            dependent,
+            expr_const_zero(),
+            expr_clone(frequency));
+    }
+
+cleanup:
+    expr_free(simplified);
+    expr_free(ratio);
+    num_destroy(&exponent);
     return solution;
 }
 
@@ -1003,6 +1059,11 @@ de_attempt_t de_attempt_sturm_liouville(
         attempt = DE_ATTEMPT_NOT_MATCHED;
         goto cleanup;
     }
+
+    solution = de_symbolic_square_solution(
+        de, independent, dependent, &form);
+    if (solution)
+        goto make_solution;
 
     first_squared = expr_pow_long(form.first, 2L);
     leading_dependent = expr_mul_simplify_owned(

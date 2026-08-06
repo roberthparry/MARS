@@ -25,6 +25,51 @@ typedef struct {
     char *name;
 } de_differential_marker_t;
 
+typedef struct {
+    size_t power;
+    expr_t *signed_square;
+    char *dependent;
+} de_repeated_quadratic_operator_t;
+
+static void de_repeated_quadratic_operator_clear(
+    de_repeated_quadratic_operator_t *operator)
+{
+    if (!operator)
+        return;
+    expr_free(operator->signed_square);
+    free(operator->dependent);
+    operator->power = 0u;
+    operator->signed_square = NULL;
+    operator->dependent = NULL;
+}
+
+static char *de_repeated_quadratic_base_equation(
+    const de_repeated_quadratic_operator_t *operator)
+{
+    const char *coordinate;
+    char *square = NULL;
+    char *equation = NULL;
+
+    if (!operator || !operator->signed_square ||
+        !operator->dependent)
+        return NULL;
+    coordinate = strcmp(operator->dependent, "x") == 0
+        ? "t"
+        : "x";
+    square = expr_to_string(operator->signed_square, style_UNBOUND);
+    if (square &&
+        asprintf(&equation,
+                 "D%s%s(%s) + (%s)*%s = 0",
+                 coordinate,
+                 coordinate,
+                 operator->dependent,
+                 square,
+                 operator->dependent) < 0)
+        equation = NULL;
+    free(square);
+    return equation;
+}
+
 static int de_append_next_utf8_character(string_t *out,
                                          const char *text,
                                          size_t *position);
@@ -89,6 +134,29 @@ static char *de_normalise_greek_alias(const char *text, size_t length)
     result = strdup(string_c_str(normalised));
     string_free(normalised);
     return result;
+}
+
+static char *de_normalise_dependent_name_owned(char *name)
+{
+    const char *alias;
+    size_t length;
+    char *normalised;
+
+    if (!name || !*name)
+        return name;
+    alias = name[0] == '@' ? name + 1u : name;
+    length = strlen(alias);
+    if (length == 0u)
+        return name;
+    for (size_t i = 0u; i < length; ++i) {
+        if (!isalpha((unsigned char)alias[i]))
+            return name;
+    }
+    normalised = de_normalise_greek_alias(alias, length);
+    if (!normalised)
+        return name;
+    free(name);
+    return normalised;
 }
 
 static bool de_differential_name(const char *text,
@@ -900,15 +968,273 @@ cleanup:
     return result;
 }
 
+static void de_operator_symbolic_coefficients_free(
+    expr_t **coefficients,
+    size_t degree)
+{
+    if (!coefficients)
+        return;
+    for (size_t i = 0u; i <= degree; ++i)
+        expr_free(coefficients[i]);
+    free(coefficients);
+}
+
+static char *de_operator_symbolic_expansion_text(
+    expr_t *const *coefficients,
+    size_t degree,
+    const char *coordinate,
+    const char *dependent)
+{
+    string_t *out = string_new();
+    bool first = true;
+    char *result = NULL;
+
+    if (!out || !coefficients || !coordinate || !dependent)
+        goto cleanup;
+    for (size_t order = degree + 1u; order > 0u; --order) {
+        size_t derivative_order = order - 1u;
+        const expr_t *coefficient = coefficients[derivative_order];
+        const char *coefficient_body;
+        bool subtract;
+        bool unit;
+        bool additive;
+        char *coefficient_text = NULL;
+
+        if (!coefficient || expr_is_exact_zero(coefficient))
+            continue;
+        coefficient_text = expr_to_string(coefficient, style_UNBOUND);
+        if (!coefficient_text)
+            goto term_fail;
+        subtract = coefficient_text[0] == '-';
+        coefficient_body = coefficient_text + (subtract ? 1u : 0u);
+        while (*coefficient_body == ' ')
+            coefficient_body++;
+        unit = strcmp(coefficient_body, "1") == 0;
+        additive = strstr(coefficient_body, " + ") != NULL ||
+                   strstr(coefficient_body, " - ") != NULL;
+
+        if (first) {
+            if (subtract && string_append_char(out, '-') != 0) {
+                free(coefficient_text);
+                goto term_fail;
+            }
+        } else if (string_append_cstr(
+                       out, subtract ? " - " : " + ") != 0) {
+            free(coefficient_text);
+            goto term_fail;
+        }
+
+        if (!unit) {
+            if (additive && string_append_char(out, '(') != 0) {
+                free(coefficient_text);
+                goto term_fail;
+            }
+            if (string_append_cstr(out, coefficient_body) != 0 ||
+                (additive && string_append_char(out, ')') != 0) ||
+                string_append_char(out, '*') != 0) {
+                free(coefficient_text);
+                goto term_fail;
+            }
+        }
+        free(coefficient_text);
+
+        if (derivative_order > 0u) {
+            if (string_append_char(out, 'D') != 0)
+                goto term_fail;
+            for (size_t i = 0u; i < derivative_order; ++i) {
+                if (string_append_cstr(out, coordinate) != 0)
+                    goto term_fail;
+            }
+            if (string_append_char(out, '(') != 0 ||
+                string_append_cstr(out, dependent) != 0 ||
+                string_append_char(out, ')') != 0)
+                goto term_fail;
+        } else if (string_append_cstr(out, dependent) != 0) {
+            goto term_fail;
+        }
+        first = false;
+        continue;
+
+term_fail:
+        goto cleanup;
+    }
+    if (first && string_append_char(out, '0') != 0)
+        goto cleanup;
+    result = strdup(string_c_str(out));
+
+cleanup:
+    string_free(out);
+    return result;
+}
+
+static char *de_operator_symbolic_expansion(
+    const expr_t *polynomial,
+    const expr_t *operator_variable,
+    const char *coordinate,
+    const char *dependent)
+{
+    expr_t **coefficients = NULL;
+    size_t degree = 0u;
+    char *result = NULL;
+
+    if (!equ_match_symbolic_polynomial_alloc(
+            polynomial,
+            operator_variable,
+            &coefficients,
+            &degree))
+        goto cleanup;
+    result = de_operator_symbolic_expansion_text(
+        coefficients, degree, coordinate, dependent);
+
+cleanup:
+    de_operator_symbolic_coefficients_free(coefficients, degree);
+    return result;
+}
+
+static expr_t *de_operator_binomial_coefficient(size_t n, size_t k)
+{
+    number_t n_value = num_create_from_long((long)n);
+    number_t k_value = num_create_from_long((long)k);
+    number_t value = num_binomial(n_value, k_value);
+    expr_t *coefficient = num_is_finite(value)
+        ? expr_new_const(value)
+        : NULL;
+
+    num_destroy(&value);
+    num_destroy(&k_value);
+    num_destroy(&n_value);
+    return coefficient;
+}
+
+static char *de_operator_even_quadratic_power_expansion(
+    const expr_t *polynomial,
+    const expr_t *operator_variable,
+    size_t exponent,
+    const char *coordinate,
+    const char *dependent,
+    expr_t **signed_square_out)
+{
+    expr_t *constant = NULL;
+    expr_t *linear = NULL;
+    expr_t *quadratic = NULL;
+    expr_t **coefficients = NULL;
+    size_t degree;
+    char *result = NULL;
+
+    if (!polynomial || !operator_variable || exponent == 0u ||
+        exponent > 64u || exponent > SIZE_MAX / 2u ||
+        !equ_match_symbolic_quadratic_expr(
+            polynomial,
+            operator_variable,
+            &constant,
+            &linear,
+            &quadratic) ||
+        !expr_is_exact_zero(linear))
+        goto cleanup;
+
+    if (signed_square_out) {
+        expr_t *ratio = expr_div(constant, quadratic);
+
+        *signed_square_out = ratio
+            ? expr_display_simplified(ratio)
+            : NULL;
+        expr_free(ratio);
+        if (!*signed_square_out)
+            goto cleanup;
+    }
+
+    degree = 2u * exponent;
+    coefficients = calloc(degree + 1u, sizeof(*coefficients));
+    if (!coefficients)
+        goto cleanup;
+
+    for (size_t j = 0u; j <= exponent; ++j) {
+        const expr_t *constant_base = constant;
+        bool negative_constant =
+            expr_match_neg_expr(constant, &constant_base);
+        expr_t *choose = de_operator_binomial_coefficient(exponent, j);
+        expr_t *constant_power = expr_pow_long(
+            constant_base, (long)(exponent - j));
+        expr_t *quadratic_power = expr_pow_long(quadratic, (long)j);
+        expr_t *first_product = choose && constant_power
+            ? expr_mul(choose, constant_power)
+            : NULL;
+        expr_t *coefficient = first_product && quadratic_power
+            ? expr_mul(first_product, quadratic_power)
+            : NULL;
+
+        if (coefficient && negative_constant &&
+            ((exponent - j) & 1u) != 0u) {
+            expr_t *negative = expr_neg(coefficient);
+
+            expr_free(coefficient);
+            coefficient = negative;
+        }
+
+        coefficients[2u * j] = coefficient
+            ? expr_display_simplified(coefficient)
+            : NULL;
+        expr_free(coefficient);
+        expr_free(first_product);
+        expr_free(quadratic_power);
+        expr_free(constant_power);
+        expr_free(choose);
+        if (!coefficients[2u * j])
+            goto cleanup;
+    }
+
+    result = de_operator_symbolic_expansion_text(
+        coefficients, degree, coordinate, dependent);
+
+cleanup:
+    de_operator_symbolic_coefficients_free(
+        coefficients,
+        coefficients ? 2u * exponent : 0u);
+    expr_free(quadratic);
+    expr_free(linear);
+    expr_free(constant);
+    return result;
+}
+
+static bool de_operator_is_whole_zero_equation(
+    const char *text,
+    size_t operator_start,
+    size_t application_end)
+{
+    size_t before = operator_start;
+    size_t after = application_end;
+
+    if (!text)
+        return false;
+    while (before > 0u &&
+           isspace((unsigned char)text[before - 1u]))
+        before--;
+    if (before > 0u && text[before - 1u] != '{')
+        return false;
+
+    de_skip_ascii_space(text, &after);
+    if (text[after] != '=')
+        return false;
+    after++;
+    de_skip_ascii_space(text, &after);
+    if (text[after] != '0')
+        return false;
+    after++;
+    de_skip_ascii_space(text, &after);
+    return text[after] == '\0' || text[after] == '|' ||
+           text[after] == ';' || text[after] == '}';
+}
+
 static char *de_try_polynomial_differential_operator(
     const char *text,
     size_t open,
-    size_t *end_out)
+    size_t *end_out,
+    de_repeated_quadratic_operator_t *repeated)
 {
     size_t operator_close;
     size_t cursor;
     size_t exponent = 1u;
-    size_t application_close;
+    size_t application_end;
     char *operator_text = NULL;
     char *coordinate = NULL;
     char *dependent = NULL;
@@ -916,6 +1242,7 @@ static char *de_try_polynomial_differential_operator(
     expr_bindings_t *bindings = NULL;
     expr_t *polynomial = NULL;
     expr_t *operator_variable;
+    expr_t *signed_square = NULL;
     number_t *coefficients = NULL;
     size_t degree = 0u;
     char *result = NULL;
@@ -952,20 +1279,69 @@ static char *de_try_polynomial_differential_operator(
         exponent = value;
         de_skip_ascii_space(text, &cursor);
     }
-    if (text[cursor] != '(')
-        goto cleanup;
-    application_close = de_matching_paren(text, cursor);
-    if (application_close == SIZE_MAX)
-        goto cleanup;
-    dependent = de_trimmed_copy(
-        text + cursor + 1u, application_close - cursor - 1u);
+    if (text[cursor] == '(') {
+        size_t application_close = de_matching_paren(text, cursor);
+
+        if (application_close == SIZE_MAX)
+            goto cleanup;
+        dependent = de_trimmed_copy(
+            text + cursor + 1u, application_close - cursor - 1u);
+        application_end = application_close + 1u;
+    } else {
+        size_t dependent_start;
+
+        if (text[cursor] == '*') {
+            cursor++;
+            de_skip_ascii_space(text, &cursor);
+        }
+        dependent_start = cursor;
+        if (text[cursor] == '@')
+            cursor++;
+        if (isalpha((unsigned char)text[cursor]) ||
+            text[cursor] == '_') {
+            cursor++;
+            while (isalnum((unsigned char)text[cursor]) ||
+                   text[cursor] == '_')
+                cursor++;
+        } else if ((unsigned char)text[cursor] >= 0x80u) {
+            size_t length = de_utf8_character_length(text + cursor);
+
+            if (length == 0u)
+                goto cleanup;
+            cursor += length;
+        } else {
+            goto cleanup;
+        }
+        dependent = de_trimmed_copy(
+            text + dependent_start, cursor - dependent_start);
+        application_end = cursor;
+    }
     if (!dependent || !*dependent)
         goto cleanup;
+    dependent = de_normalise_dependent_name_owned(dependent);
     if (!coordinate) {
         coordinate = strdup(strcmp(dependent, "x") == 0 ? "t" : "x");
         if (!coordinate)
             goto cleanup;
     }
+
+    polynomial = expr_from_string(operator_text, &bindings);
+    operator_variable = bindings
+        ? expr_bindings_get(bindings, "operator")
+        : NULL;
+    result = de_operator_even_quadratic_power_expansion(
+        polynomial,
+        operator_variable,
+        exponent,
+        coordinate,
+        dependent,
+        &signed_square);
+    expr_free(polynomial);
+    polynomial = NULL;
+    expr_bindings_free(bindings);
+    bindings = NULL;
+    if (result)
+        goto success;
 
     powered_text = string_sprintf("(%s)^%zu", operator_text, exponent);
     polynomial = powered_text
@@ -974,20 +1350,37 @@ static char *de_try_polynomial_differential_operator(
     operator_variable = bindings
         ? expr_bindings_get(bindings, "operator")
         : NULL;
-    if (!polynomial || !operator_variable ||
-        expr_bindings_count(bindings) != 1u ||
-        !equ_match_polynomial_alloc(
-            polynomial, operator_variable, &coefficients, &degree) ||
-        !equ_polynomial_coefficients_real(coefficients, degree) ||
-        degree > 128u)
+    if (!polynomial || !operator_variable)
         goto cleanup;
-
-    result = de_operator_expansion_text(
-        coefficients, degree, coordinate, dependent);
-    if (result && end_out)
-        *end_out = application_close + 1u;
+    if (equ_match_polynomial_alloc(
+            polynomial, operator_variable, &coefficients, &degree) &&
+        equ_polynomial_coefficients_real(coefficients, degree) &&
+        degree <= 128u) {
+        result = de_operator_expansion_text(
+            coefficients, degree, coordinate, dependent);
+    } else {
+        result = de_operator_symbolic_expansion(
+            polynomial, operator_variable, coordinate, dependent);
+    }
+success:
+    if (result) {
+        if (end_out)
+            *end_out = application_end;
+        if (repeated && repeated->power == 0u && exponent >= 2u &&
+            signed_square &&
+            de_operator_is_whole_zero_equation(
+                text, open, application_end)) {
+            repeated->power = exponent;
+            repeated->signed_square = signed_square;
+            signed_square = NULL;
+            repeated->dependent = strdup(dependent);
+            if (!repeated->dependent)
+                de_repeated_quadratic_operator_clear(repeated);
+        }
+    }
 
 cleanup:
+    expr_free(signed_square);
     de_operator_coefficients_free(coefficients, degree);
     expr_free(polynomial);
     expr_bindings_free(bindings);
@@ -999,7 +1392,8 @@ cleanup:
 }
 
 static char *de_normalize_polynomial_differential_operators(
-    const char *text)
+    const char *text,
+    de_repeated_quadratic_operator_t *repeated)
 {
     string_t *out;
     size_t cursor = 0u;
@@ -1014,7 +1408,145 @@ static char *de_normalize_polynomial_differential_operators(
         size_t end = cursor;
         char *expanded = text[cursor] == '('
             ? de_try_polynomial_differential_operator(
-                  text, cursor, &end)
+                  text, cursor, &end, repeated)
+            : NULL;
+
+        if (expanded) {
+            if (string_append_cstr(out, expanded) != 0) {
+                free(expanded);
+                goto fail;
+            }
+            free(expanded);
+            cursor = end;
+            continue;
+        }
+        if (de_append_next_utf8_character(out, text, &cursor) != 0)
+            goto fail;
+    }
+    result = strdup(string_c_str(out));
+    string_free(out);
+    return result;
+
+fail:
+    string_free(out);
+    return NULL;
+}
+
+static char *de_try_bare_derivative_operator(const char *text,
+                                             size_t start,
+                                             size_t *end_out)
+{
+    size_t cursor = start;
+    size_t order = 1u;
+    size_t dependent_start;
+    size_t dependent_end;
+    char *dependent = NULL;
+    const char *coordinate;
+    string_t *out = NULL;
+    char *result = NULL;
+
+    if (!text || text[cursor] != 'D' ||
+        (cursor > 0u &&
+         (isalnum((unsigned char)text[cursor - 1u]) ||
+          text[cursor - 1u] == '_' ||
+          (unsigned char)text[cursor - 1u] >= 0x80u)))
+        return NULL;
+    cursor++;
+    if (text[cursor] != '^' && text[cursor] != '(' &&
+        !isspace((unsigned char)text[cursor]))
+        return NULL;
+    if (text[cursor] == '^') {
+        size_t value = 0u;
+        bool found = false;
+
+        cursor++;
+        de_skip_ascii_space(text, &cursor);
+        while (isdigit((unsigned char)text[cursor])) {
+            unsigned int digit = (unsigned int)(text[cursor] - '0');
+
+            if (value > (SIZE_MAX - digit) / 10u)
+                return NULL;
+            value = value * 10u + digit;
+            cursor++;
+            found = true;
+        }
+        if (!found || value == 0u || value > 128u)
+            return NULL;
+        order = value;
+    }
+    de_skip_ascii_space(text, &cursor);
+    if (text[cursor] == '(') {
+        size_t close = de_matching_paren(text, cursor);
+
+        if (close == SIZE_MAX)
+            return NULL;
+        dependent = de_trimmed_copy(
+            text + cursor + 1u, close - cursor - 1u);
+        dependent_end = close + 1u;
+    } else {
+        dependent_start = cursor;
+        if (text[cursor] == '@')
+            cursor++;
+        if (isalpha((unsigned char)text[cursor]) ||
+            text[cursor] == '_') {
+            cursor++;
+            while (isalnum((unsigned char)text[cursor]) ||
+                   text[cursor] == '_')
+                cursor++;
+        } else if ((unsigned char)text[cursor] >= 0x80u) {
+            size_t length = de_utf8_character_length(text + cursor);
+
+            if (length == 0u)
+                return NULL;
+            cursor += length;
+        } else {
+            return NULL;
+        }
+        dependent = de_trimmed_copy(
+            text + dependent_start, cursor - dependent_start);
+        dependent_end = cursor;
+    }
+    if (!dependent || !*dependent)
+        goto cleanup;
+    dependent = de_normalise_dependent_name_owned(dependent);
+
+    coordinate = strcmp(dependent, "x") == 0 ? "t" : "x";
+    out = string_new();
+    if (!out || string_append_char(out, 'D') != 0)
+        goto cleanup;
+    for (size_t i = 0u; i < order; ++i) {
+        if (string_append_cstr(out, coordinate) != 0)
+            goto cleanup;
+    }
+    if (string_append_char(out, '(') != 0 ||
+        string_append_cstr(out, dependent) != 0 ||
+        string_append_char(out, ')') != 0)
+        goto cleanup;
+    result = strdup(string_c_str(out));
+    if (result && end_out)
+        *end_out = dependent_end;
+
+cleanup:
+    string_free(out);
+    free(dependent);
+    return result;
+}
+
+static char *de_normalize_bare_derivative_operators(const char *text)
+{
+    string_t *out;
+    size_t cursor = 0u;
+    char *result;
+
+    if (!text)
+        return NULL;
+    out = string_new();
+    if (!out)
+        return NULL;
+    while (text[cursor]) {
+        size_t end = cursor;
+        char *expanded = text[cursor] == 'D'
+            ? de_try_bare_derivative_operator(text, cursor, &end)
             : NULL;
 
         if (expanded) {
@@ -2790,10 +3322,12 @@ static bool de_parse_conditions(
 diffequ_t *de_from_string(const char *text)
 {
     de_parse_parts_t parts;
+    de_repeated_quadratic_operator_t repeated_operator = { 0 };
     char *normalized_form = NULL;
     char *normalized_totals = NULL;
     char *normalized_partials = NULL;
     char *normalized_operators = NULL;
+    char *normalized_bare_operators = NULL;
     char *expanded = NULL;
     char *first_wrt = NULL;
     char *normalized_subscripts = NULL;
@@ -2814,6 +3348,7 @@ diffequ_t *de_from_string(const char *text)
     size_t source_equation_start = 0u;
     size_t source_equation_end = 0u;
     char *source_form_equation = NULL;
+    char *operator_display_equation = NULL;
     bool differential_form_input = false;
     diffequ_t *de = NULL;
 
@@ -2835,22 +3370,42 @@ diffequ_t *de_from_string(const char *text)
     normalized_totals = NULL;
     normalized_operators =
         de_normalize_polynomial_differential_operators(
-            normalized_partials);
+            normalized_partials, &repeated_operator);
     free(normalized_partials);
     normalized_partials = NULL;
-    expanded = de_expand_shorthand(normalized_operators);
+    normalized_bare_operators =
+        de_normalize_bare_derivative_operators(normalized_operators);
     free(normalized_operators);
     normalized_operators = NULL;
+    expanded = de_expand_shorthand(normalized_bare_operators);
+    free(normalized_bare_operators);
+    normalized_bare_operators = NULL;
     if (!expanded) {
+        de_repeated_quadratic_operator_clear(&repeated_operator);
         free(source_form_equation);
         return NULL;
     }
     if (!de_parse_parts(expanded, &parts)) {
+        de_repeated_quadratic_operator_clear(&repeated_operator);
         free(expanded);
         free(source_form_equation);
         return NULL;
     }
     free(expanded);
+    if (repeated_operator.power >= 2u) {
+        char *base_equation =
+            de_repeated_quadratic_base_equation(&repeated_operator);
+
+        operator_display_equation = base_equation
+            ? strdup(parts.equation)
+            : NULL;
+        if (!base_equation || !operator_display_equation) {
+            free(base_equation);
+            goto cleanup;
+        }
+        free(parts.equation);
+        parts.equation = base_equation;
+    }
     normalized_subscripts = de_normalize_subscript_derivatives(
         parts.equation, parts.independent);
     normalized_conditions = de_normalize_subscript_derivatives(
@@ -2942,7 +3497,10 @@ diffequ_t *de_from_string(const char *text)
     string_free(de->equation_text);
     string_free(de->independent_text);
     string_free(de->constant_text);
-    de->equation_text = string_new_with(parts.equation);
+    de->equation_text = string_new_with(
+        operator_display_equation
+            ? operator_display_equation
+            : parts.equation);
     if (differential_form_input) {
         string_free(de->differential_form_text);
         de->differential_form_text = string_new_with(source_form_equation);
@@ -2965,9 +3523,24 @@ diffequ_t *de_from_string(const char *text)
         de = NULL;
         goto cleanup;
     }
+    if (repeated_operator.power > 0u &&
+        repeated_operator.signed_square &&
+        repeated_operator.dependent) {
+        de->repeated_quadratic_power = repeated_operator.power;
+        de->repeated_quadratic_square =
+            repeated_operator.signed_square;
+        de->repeated_quadratic_dependent =
+            repeated_operator.dependent;
+        repeated_operator.power = 0u;
+        repeated_operator.signed_square = NULL;
+        repeated_operator.dependent = NULL;
+    }
 
 cleanup:
+    de_repeated_quadratic_operator_clear(&repeated_operator);
+    free(operator_display_equation);
     free(source_form_equation);
+    free(normalized_bare_operators);
     free(normalized_operators);
     free(normalized_conditions);
     free(normalized_subscripts);

@@ -30,6 +30,10 @@ struct diffequ_t {
 
     string_t *independent_text;
     string_t *constant_text;
+
+    size_t repeated_quadratic_power;
+    expr_t *repeated_quadratic_square;
+    char *repeated_quadratic_dependent;
 };
 
 struct diffequ_solve_result_t {

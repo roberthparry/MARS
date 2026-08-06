@@ -1217,6 +1217,19 @@ expr_t *expr_new_summation(const expr_t *term, const expr_t *index)
 {
     return expr_math_wrap_binary(&ops_summation, term, index);
 }
+expr_t *expr_new_finite_summation(const expr_t *term,
+                                  const expr_t *index,
+                                  const expr_t *upper)
+{
+    expr_t *bounds = expr_math_wrap_binary(
+        &ops_argument_list, index, upper);
+    expr_t *out = bounds
+        ? expr_math_wrap_binary(&ops_summation, term, bounds)
+        : NULL;
+
+    expr_free(bounds);
+    return out;
+}
 expr_t *expr_gammainc_lower(const expr_t *a, const expr_t *b) { return expr_math_wrap_binary(&ops_gammainc_lower, a, b); }
 expr_t *expr_gammainc_upper(const expr_t *a, const expr_t *b) { return expr_math_wrap_binary(&ops_gammainc_upper, a, b); }
 expr_t *expr_gammainc_P(const expr_t *a, const expr_t *b) { return expr_math_wrap_binary(&ops_gammainc_P, a, b); }

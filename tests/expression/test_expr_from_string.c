@@ -754,15 +754,15 @@ static void test_from_string_implicit_symbolic_bindings(void)
 
     if (integral_family && integral_family_s &&
         str_eq(integral_family_s,
-               "{ C₀x + C₁ + cos(x)·exp(sin(x)) | x = NAN; C₀ = NAN, C₁ = NAN }")) {
+               "{ C₁ + C₀x + cos(x)·exp(sin(x)) | x = NAN; C₀ = NAN, C₁ = NAN }")) {
         to_string_pass("implicit integration constants stay constant",
                        integral_family_s,
-                       "{ C₀x + C₁ + cos(x)·exp(sin(x)) | x = NAN; C₀ = NAN, C₁ = NAN }");
+                       "{ C₁ + C₀x + cos(x)·exp(sin(x)) | x = NAN; C₀ = NAN, C₁ = NAN }");
     } else {
         to_string_fail(__FILE__, __LINE__, 1,
                        "implicit integration constants stay constant",
                        integral_family_s ? integral_family_s : "(null)",
-                       "{ C₀x + C₁ + cos(x)·exp(sin(x)) | x = NAN; C₀ = NAN, C₁ = NAN }");
+                       "{ C₁ + C₀x + cos(x)·exp(sin(x)) | x = NAN; C₀ = NAN, C₁ = NAN }");
     }
 
     if (x && qf_isnan(expr_eval_qf(x))) {
@@ -2544,7 +2544,7 @@ static void test_from_string_unevaluated_integral(void)
         " | x = NAN, a = NAN, b = NAN; c = NAN, d = NAN }",
         NULL);
     text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
-    if (text && strstr(text, "∫^x a·exp(cosh(b + at))·dt")) {
+    if (text && strstr(text, "∫^x a·exp(cosh(at + b))·dt")) {
         printf(C_BOLD C_GREEN "PASS" C_RESET
                " partial antiderivative with unevaluated integral parses\n");
         printf(C_BOLD "  expr   " C_RESET "%s\n\n", text);
@@ -2563,7 +2563,7 @@ static void test_from_string_unevaluated_integral(void)
         " | x = NAN, a = NAN, b = NAN; c = NAN, d = NAN }",
         NULL);
     text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
-    if (text && strstr(text, "∫^x a·exp(cosh(b + at))·dt")) {
+    if (text && strstr(text, "∫^x a·exp(cosh(at + b))·dt")) {
         printf(C_BOLD C_GREEN "PASS" C_RESET
                " partial antiderivative with compact differential parses\n");
         printf(C_BOLD "  expr   " C_RESET "%s\n\n", text);

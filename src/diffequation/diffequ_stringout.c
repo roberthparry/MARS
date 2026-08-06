@@ -423,6 +423,148 @@ static char *de_expr_to_unbound_tex(
               expr, de_tex_line_limit);
 }
 
+static expr_t *de_tex_binomial_coefficient(size_t n, size_t k)
+{
+    number_t n_value = num_create_from_long((long)n);
+    number_t k_value = num_create_from_long((long)k);
+    number_t value = num_binomial(n_value, k_value);
+    expr_t *coefficient = num_is_finite(value)
+        ? expr_new_const(value)
+        : NULL;
+
+    num_destroy(&value);
+    num_destroy(&k_value);
+    num_destroy(&n_value);
+    return coefficient;
+}
+
+static string_t *de_repeated_quadratic_to_tex(const diffequ_t *de)
+{
+    const expr_t *square_base = de
+        ? de->repeated_quadratic_square
+        : NULL;
+    expr_t *dependent = NULL;
+    char *dependent_tex = NULL;
+    char *independent_tex = NULL;
+    string_t *out = NULL;
+    bool negative_square;
+    bool first = true;
+
+    if (!de || de->repeated_quadratic_power < 2u ||
+        !square_base || !de->repeated_quadratic_dependent ||
+        de->independent_count != 1u)
+        return NULL;
+    negative_square = expr_match_neg_expr(
+        de->repeated_quadratic_square, &square_base);
+    dependent = expr_new_named_var(
+        NUM_NAN, de->repeated_quadratic_dependent);
+    dependent_tex = dependent
+        ? de_expr_to_unbound_tex(dependent, false)
+        : NULL;
+    independent_tex = de_expr_to_unbound_tex(
+        de->independent_vars[0], false);
+    out = dependent_tex && independent_tex ? string_new() : NULL;
+    if (!out)
+        goto fail;
+
+    for (size_t j = de->repeated_quadratic_power + 1u;
+         j > 0u;
+         --j) {
+        size_t derivative_power = j - 1u;
+        size_t square_power =
+            de->repeated_quadratic_power - derivative_power;
+        expr_t *binomial = de_tex_binomial_coefficient(
+            de->repeated_quadratic_power, derivative_power);
+        expr_t *power = expr_pow_long(
+            square_base, (long)square_power);
+        expr_t *coefficient = binomial && power
+            ? expr_mul(binomial, power)
+            : NULL;
+        expr_t *display = NULL;
+        const expr_t *magnitude;
+        bool subtract;
+        bool unit;
+        number_t value = num_new();
+        char *coefficient_tex = NULL;
+        size_t order = 2u * derivative_power;
+
+        if (coefficient && negative_square &&
+            (square_power & 1u) != 0u) {
+            expr_t *negative = expr_neg(coefficient);
+
+            expr_free(coefficient);
+            coefficient = negative;
+        }
+        display = coefficient
+            ? expr_display_simplified(coefficient)
+            : NULL;
+        expr_free(coefficient);
+        expr_free(power);
+        expr_free(binomial);
+        if (!display)
+            goto fail;
+
+        magnitude = display;
+        subtract = expr_match_neg_expr(display, &magnitude);
+        unit = expr_match_const_value(magnitude, &value) &&
+            num_eq(value, NUM_ONE);
+        num_destroy(&value);
+        coefficient_tex = unit
+            ? NULL
+            : de_expr_to_unbound_tex(magnitude, false);
+        if (!unit && !coefficient_tex) {
+            expr_free(display);
+            goto fail;
+        }
+
+        if (first) {
+            if (subtract && string_append_char(out, '-') != 0)
+                goto term_fail;
+        } else if (string_append_cstr(
+                       out, subtract ? " - " : " + ") != 0) {
+            goto term_fail;
+        }
+        if (!unit &&
+            (string_append_cstr(out, coefficient_tex) != 0 ||
+             string_append_cstr(out, " \\cdot ") != 0))
+            goto term_fail;
+        if (order == 0u) {
+            if (string_append_cstr(out, dependent_tex) != 0)
+                goto term_fail;
+        } else if (string_append_format(
+                       out,
+                       "\\frac{d^{%zu} %s}{d %s^{%zu}}",
+                       order,
+                       dependent_tex,
+                       independent_tex,
+                       order) < 0) {
+            goto term_fail;
+        }
+        free(coefficient_tex);
+        expr_free(display);
+        first = false;
+        continue;
+
+term_fail:
+        free(coefficient_tex);
+        expr_free(display);
+        goto fail;
+    }
+    if (string_append_cstr(out, " = 0") != 0)
+        goto fail;
+    free(independent_tex);
+    free(dependent_tex);
+    expr_free(dependent);
+    return out;
+
+fail:
+    string_free(out);
+    free(independent_tex);
+    free(dependent_tex);
+    expr_free(dependent);
+    return NULL;
+}
+
 static const expr_t *de_first_formal_derivative(const expr_t *expr)
 {
     const expr_t *left = NULL;
@@ -449,7 +591,7 @@ static int de_append_differential_term(string_t *out,
     const expr_t *left = NULL;
     const expr_t *right = NULL;
     bool is_sub = false;
-    number_t value;
+    number_t value = num_new();
     bool subtract = expr_match_neg_expr(coefficient, &negative);
     bool unit;
     bool additive;
@@ -461,6 +603,7 @@ static int de_append_differential_term(string_t *out,
         display = negative;
     unit = expr_match_const_value(display, &value) &&
            num_eq(value, NUM_ONE);
+    num_destroy(&value);
     additive = expr_match_add_sub_expr(
         display, &left, &right, &is_sub);
     if (!unit)
@@ -549,6 +692,12 @@ static string_t *de_to_tex(const diffequ_t *de)
 
     if (!de || !de->equation)
         return string_new_with("NULL");
+
+    if (de->repeated_quadratic_power >= 2u) {
+        out = de_repeated_quadratic_to_tex(de);
+        if (out)
+            return out;
+    }
 
     if (de->differential_form_input) {
         out = de_differential_form_to_tex(de);
