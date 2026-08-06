@@ -51,8 +51,16 @@ static expr_t *display_polynomial_simplified(const expr_t *expr,
     zero = expr_new_const(NUM_ZERO);
     polynomial = zero ? equ_new(expr, zero) : NULL;
     expanded = polynomial ? equ_display_expanded(polynomial, wrt) : NULL;
-    if (expanded)
+    if (expanded) {
+        expr_t *rebound;
+
         display = expr_clone(equ_lhs(expanded));
+        rebound = display ? expr_substitute(display, wrt, wrt) : NULL;
+        if (rebound) {
+            expr_free(display);
+            display = rebound;
+        }
+    }
 
     equ_free(expanded);
     equ_free(polynomial);

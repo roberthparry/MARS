@@ -2688,6 +2688,7 @@ static void test_integrate_more_by_parts(void)
 {
     static const double points[] = { 0.25, 0.8, 1.5, 3.0 };
     static const double outer_points[] = { 1.3, 1.8, 2.4, 3.5 };
+    static const double rational_atan_points[] = { -2.0, -0.5, 0.25, 2.0 };
     expr_t *x = test_expr_new_named_var_d(0.0, "x");
     expr_t *x_sq = test_expr_pow_d(x, 2.0);
     expr_t *atan_x = expr_atan(x);
@@ -2701,6 +2702,46 @@ static void test_integrate_more_by_parts(void)
     assert_antiderivative_matches("integral derivative of x^2*acot(x)",
                                   x_sq_acot_x, x, outer_points,
                                   sizeof(outer_points) / sizeof(outer_points[0]));
+    assert_string_antiderivative_matches(
+        "{ atan(x/(1-x^2)) }",
+        rational_atan_points,
+        sizeof(rational_atan_points) / sizeof(rational_atan_points[0]));
+    assert_string_antiderivative_contains("{ atan(x/(1-x^2)) + C }",
+                                          "ln(x⁴ - x² + 1)");
+    assert_string_antiderivative_not_contains("{ atan(x/(1-x^2)) + C }",
+                                              "∫");
+    assert_string_antiderivative_matches(
+        "{ 1/4*(-ln(x^4-x^2+1)+4*x*atan(x/(1-x^2))"
+        "-2*sqrt(3)*atan((2*x^2-1)/sqrt(3))) }",
+        rational_atan_points,
+        sizeof(rational_atan_points) / sizeof(rational_atan_points[0]));
+    assert_string_antiderivative_not_contains(
+        "{ 1/4*(-ln(x^4-x^2+1)+4*x*atan(x/(1-x^2))"
+        "-2*sqrt(3)*atan((2*x^2-1)/sqrt(3))) }",
+        "∫");
+    assert_string_antiderivative_not_contains(
+        "{ 1/4*(-ln(x^4-x^2+1)+4*x*atan(x/(1-x^2))"
+        "-2*sqrt(3)*atan((2*x^2-1)/sqrt(3))) }",
+        "atanh");
+    assert_string_antiderivative_matches(
+        "{ -1/4*(ln(x^4-x^2+1)-4*x*atan(x/(1-x^2))"
+        "+2*sqrt(3)*atan((2*x^2-1)/sqrt(3))) }",
+        rational_atan_points,
+        sizeof(rational_atan_points) / sizeof(rational_atan_points[0]));
+    assert_string_antiderivative_not_contains(
+        "{ -1/4*(ln(x^4-x^2+1)-4*x*atan(x/(1-x^2))"
+        "+2*sqrt(3)*atan((2*x^2-1)/sqrt(3))) }",
+        "∫");
+    assert_string_antiderivative_matches(
+        "{ ln(x^4+x^2+1) }",
+        rational_atan_points,
+        sizeof(rational_atan_points) / sizeof(rational_atan_points[0]));
+    assert_string_antiderivative_not_contains("{ ln(x^4+x^2+1) }", "∫");
+    assert_string_antiderivative_matches(
+        "{ (2*x+1)*ln(x^2+1) }",
+        rational_atan_points,
+        sizeof(rational_atan_points) / sizeof(rational_atan_points[0]));
+    assert_string_antiderivative_not_contains("{ (2*x+1)*ln(x^2+1) }", "∫");
 
     expr_free(x_sq_acot_x);
     expr_free(x_sq_atan_x);
@@ -2714,6 +2755,7 @@ static void test_integrate_partial_fractions(void)
 {
     static const double points[] = { -2.5, -0.5, 0.5, 1.5 };
     static const double positive_points[] = { 0.25, 0.75, 1.5, 2.5 };
+    static const double quartic_points[] = { -2.0, -0.5, 0.0, 0.75, 2.0 };
     number_t three_num = num_create_from_long(3);
     expr_t *x = test_expr_new_named_var_d(0.0, "x");
     expr_t *x_plus_one_a = expr_add_num(x, &NUM_ONE);
@@ -2750,6 +2792,18 @@ static void test_integrate_partial_fractions(void)
     assert_string_antiderivative_contains("{ 1/((x+1)(x+2)(x+3)(x+4)) }", "⅙·(");
     assert_string_antiderivative_not_contains("{ 1/((x+1)(x+2)(x+3)(x+4)) }",
                                               "0.166666");
+    assert_string_antiderivative_matches(
+        "{ (x^2+1)/(x^4-x^2+1) }",
+        quartic_points,
+        sizeof(quartic_points) / sizeof(quartic_points[0]));
+    assert_string_antiderivative_contains(
+        "{ (x^2+1)/(x^4-x^2+1) }", "atan(x/(1 - x²))");
+    assert_string_antiderivative_matches(
+        "{ (2*x^3+3*x^2+5*x+7)/(x^4+x^2+1) }",
+        quartic_points,
+        sizeof(quartic_points) / sizeof(quartic_points[0]));
+    assert_string_antiderivative_not_contains(
+        "{ (2*x^3+3*x^2+5*x+7)/(x^4+x^2+1) }", "∫");
 
     expr_free(quadratic_recip);
     expr_free(x_sq_minus_one);
@@ -3487,6 +3541,59 @@ static void test_integrate_scaled_symbolic_sum_before_product_search(void)
     expr_free(expr);
 }
 
+static void test_integrate_collects_repeated_inverse_and_log_terms(void)
+{
+    static const double points[] = { -0.7, 0.2, 1.3 };
+    const char *input =
+        "1/4*(-ln(x^4-x^2+1)+4*x*atan(x/(1-x^2))"
+        "-2*sqrt(3)*atan((2*x^2-1)/sqrt(3)))";
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = expr_from_string(input, &bindings);
+    expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    expr_t *anti = (expr && x) ? expr_integrate(expr, x) : NULL;
+    expr_t *deriv = (anti && x) ? expr_create_deriv(anti, x) : NULL;
+    expr_t *display_deriv = deriv ? expr_display_expanded(deriv) : NULL;
+    char *text = anti ? expr_to_string(anti, style_UNBOUND) : NULL;
+    char *deriv_text = display_deriv
+        ? expr_to_string(display_deriv, style_UNBOUND)
+        : NULL;
+
+    ASSERT_NOT_NULL(anti);
+    ASSERT_NOT_NULL(deriv);
+    ASSERT_NOT_NULL(text);
+    ASSERT_NOT_NULL(deriv_text);
+    ASSERT_TRUE(strstr(text, "2·(2x² + 1)·atan(x/(1 - x²))") != NULL);
+    ASSERT_TRUE(strstr(text, "+ √3·ln(") != NULL);
+    ASSERT_TRUE(strstr(text, "(2√3 - √3)") == NULL);
+    ASSERT_TRUE(strstr(deriv_text, "3.464101") == NULL);
+    ASSERT_TRUE(strstr(deriv_text, "/(x⁴ - x² + 1)") == NULL);
+    ASSERT_TRUE(strstr(deriv_text, "¼·(") == NULL);
+    ASSERT_TRUE(strstr(deriv_text,
+                       "x·atan(x/(1 - x²)) - ¼·ln(x⁴ - x² + 1)") != NULL);
+    ASSERT_TRUE(strstr(deriv_text,
+                       "- ½√3·atan((2x² - 1)/√3)") != NULL);
+    ASSERT_TRUE(strstr(deriv_text, "ln(x⁴ - x² + 1)") != NULL);
+    ASSERT_TRUE(strstr(deriv_text, "atan((2x² - 1)/√3)") != NULL);
+
+    for (size_t i = 0u; i < sizeof(points) / sizeof(points[0]); ++i) {
+        char label[160];
+
+        test_expr_set_val_d(x, points[i]);
+        snprintf(label, sizeof(label),
+                 "collected inverse/log antiderivative at x=%g", points[i]);
+        check_q_at(__FILE__, __LINE__, 1, label,
+                   expr_eval_qf(deriv), expr_eval_qf(expr));
+    }
+
+    free(deriv_text);
+    free(text);
+    expr_free(display_deriv);
+    expr_free(deriv);
+    expr_free(anti);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+}
+
 void test_symbolic_integration(void)
 {
     TEST_RUN_SUBTEST(test_integrate_polynomial_sum, NULL);
@@ -3536,5 +3643,6 @@ void test_symbolic_integration(void)
     TEST_RUN_SUBTEST(test_integrate_sec_double_angle_log_tan_cot, NULL);
     TEST_RUN_SUBTEST(test_integrate_exact_symbolic_atan_affine_scale, NULL);
     TEST_RUN_SUBTEST(test_integrate_scaled_symbolic_sum_before_product_search, NULL);
+    TEST_RUN_SUBTEST(test_integrate_collects_repeated_inverse_and_log_terms, NULL);
     TEST_RUN_SUBTEST(test_integrate_unsupported_product_returns_null, NULL);
 }

@@ -315,7 +315,7 @@ const expr_ops_t ops_acos = {
 const expr_ops_t ops_atan = {
     .eval = eval_atan, .deriv = deriv_atan, .reverse = expr_reverse_atan,
     .kind = EXPR_KIND_ATAN, .arity = EXPR_OP_UNARY, .name = "atan",
-    .tex_name = "\\tan^{-1}",
+    .tex_name = "\\arctan",
     .inverse_unary = expr_tan,
     .apply_unary = expr_atan, .apply_binary = NULL,
     .integrate = expr_integrate_dispatch_primitive,

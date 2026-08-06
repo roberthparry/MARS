@@ -20,6 +20,7 @@ bool     expr_equal_exact_local        (const expr_t *a, const expr_t *b);
 bool     is_wrt                        (const expr_t *expr, const expr_t *wrt);
 expr_t * expr_integrate_dispatch       (const expr_t *expr, const expr_t *wrt);
 expr_t * expr_integrate_as_constant    (const expr_t *expr, const expr_t *wrt);
+expr_t * expr_integrate_normalize_radical_products(const expr_t *expr);
 
 /* Polynomial and affine matching helpers. */
 bool     match_nonconstant_affine_linear_expr            (const expr_t *expr,
@@ -160,6 +161,7 @@ expr_t * integrate_symbolic_hyperbolic_product          (const expr_t *expr, con
 expr_t * integrate_symbolic_trig_times_hyperbolic       (const expr_t *expr, const expr_t *wrt);
 expr_t * integrate_symbolic_squared_hyperbolic          (const expr_t *expr, const expr_t *wrt);
 expr_t * integrate_exact_substitution_product           (const expr_t *expr, const expr_t *wrt);
+expr_t * integrate_poly_times_rational_unary_by_parts   (const expr_t *expr, const expr_t *wrt);
 
 /* Exact products and distribution-specific helpers. */
 expr_t * integrate_wrt_exp_times_trig_exact              (const expr_t *expr, const expr_t *wrt);

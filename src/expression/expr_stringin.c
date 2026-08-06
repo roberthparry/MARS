@@ -255,7 +255,7 @@ static int can_start_factor(const expr_parse_state_t *p)
     if (scan_special_number_literal_len_view(text, pos) > 0u) return 1;
     if (expr_parse_peek_value(p, &uc, &len) &&
         (fs_is_letter(uc) || uc == 0x230A || uc == 0x2308 ||
-         uc == INTEGRAL_SIGN_CODEPOINT))
+         uc == 0x221A || uc == INTEGRAL_SIGN_CODEPOINT))
         return 1;
     if (!expr_parse_peek_ascii(p, &c))
         return 0;
@@ -2459,15 +2459,16 @@ static expr_t *parse_atom(expr_parse_state_t *p,
 
     if (cp_len > 0 && cp == 0x221A) {
         int sup;
+        expr_t *arg;
+        expr_t *result;
 
         expr_parse_skip(p, cp_len);
         sup = read_optional_display_exponent(p);
 
-        if (!parse_required_char(p, '(', "expected '(' after √"))
-            return NULL;
-
-        expr_t *arg = parse_enclosed_addexpr(p, ')', "expected ')' after √ argument");
-        expr_t *result;
+        if (expr_parse_consume_char(p, '('))
+            arg = parse_enclosed_addexpr(p, ')', "expected ')' after √ argument");
+        else
+            arg = parse_atom(p, false);
         if (!arg)
             return NULL;
         result = apply_unary_preserving_constexpr(&ops_sqrt, arg, expr_sqrt);
@@ -4013,6 +4014,7 @@ expr_t *expr_edit_binding(const expr_t *expr,
     expr_t *simplified = NULL;
     expr_t *canonical = NULL;
     string_t *text = NULL;
+    expr_binding_expr_t *authored_binding_expr = NULL;
     number_t value = NUM_NAN;
     bool empty;
 
@@ -4043,12 +4045,21 @@ expr_t *expr_edit_binding(const expr_t *expr,
         if (!empty) {
             char *value_copy = strndup(
                 value_start, (size_t)(value_end - value_start));
+            string_t *value_source;
 
             if (!value_copy)
                 goto cleanup;
+            value_source = string_new_with(value_copy);
+            if (value_source) {
+                authored_binding_expr = expr_binding_expr_parse_view(
+                    string_view_all(value_source), NULL);
+                authored_binding_expr =
+                    expr_binding_expr_simplify(authored_binding_expr);
+            }
+            string_free(value_source);
             value_expr = expr_from_string(value_copy, NULL);
             free(value_copy);
-            if (!value_expr)
+            if (!value_expr || !authored_binding_expr)
                 goto cleanup;
             value = expr_eval(value_expr);
         }
@@ -4081,8 +4092,18 @@ expr_t *expr_edit_binding(const expr_t *expr,
     if (!text)
         goto cleanup;
     canonical = expr_from_text(text, bindings_out);
+    if (canonical && bindings_out && *bindings_out && authored_binding_expr) {
+        expr_t *canonical_binding = expr_bindings_get(*bindings_out, name);
+
+        if (canonical_binding) {
+            expr_binding_expr_free(canonical_binding->binding_expr);
+            canonical_binding->binding_expr =
+                expr_binding_expr_clone(authored_binding_expr);
+        }
+    }
 
 cleanup:
+    expr_binding_expr_free(authored_binding_expr);
     string_free(name_text);
     string_free(text);
     expr_free(simplified);

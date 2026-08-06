@@ -756,6 +756,9 @@ void     expr_cancel_common_powers              (expr_t **terms,
                                                  size_t nden_terms);
 void     expr_combine_exp_terms                 (expr_t **terms, size_t nterms);
 void     expr_merge_sqrt_terms                  (expr_t **terms, size_t nterms);
+void     expr_merge_coefficient_sqrt_terms      (number_t *coefficient,
+                                                 expr_t **terms,
+                                                 size_t nterms);
 void     expr_merge_sqrt_quotient_terms         (expr_t **terms,
                                                  size_t nterms,
                                                  expr_t **den_terms,
@@ -1373,5 +1376,7 @@ bool expr_binding_expr_eval_if_precision_increased(expr_binding_expr_t *expr, nu
  * Input node is borrowed.
  */
 expr_t * expr_simplify(const expr_t *dv);
+expr_t * expr_expand_products_internal(const expr_t *expr);
+expr_t * expr_canonicalize_known_radicals_internal(const expr_t *expr);
 
 #endif /* EXPR_INTERNAL_H */

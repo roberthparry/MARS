@@ -36,6 +36,20 @@
 expr_t *expr_simplify(const expr_t *dv);
 static expr_t *expr_simplify_mark_current(expr_t *dv);
 static expr_t *expr_simplify_try_const_over_e_local(expr_t *a, expr_t *b);
+static number_t *expr_simplify_number_array_alloc_local(size_t n);
+static void expr_simplify_number_array_free_local(number_t *values, size_t n);
+static bool expr_simplify_collect_poly_local(const expr_t *expr,
+                                             const expr_t *var,
+                                             number_t *out,
+                                             size_t n);
+static expr_t *expr_simplify_build_flat_poly_local(const expr_t *var,
+                                                    const number_t *coeffs,
+                                                    size_t n);
+static int expr_simplify_exact_sqrt_radicand_local(const expr_t *expr,
+                                                   number_t *radicand_out);
+static expr_t *expr_simplify_try_rational_atan_denominator_local(
+    const expr_t *numerator,
+    const expr_t *denominator);
 
 static void *expr_xrealloc(void *ptr, size_t size)
 {
@@ -2146,6 +2160,7 @@ static expr_t *expr_simplify_flat_quotient_local(expr_t *a, expr_t *b)
     expr_combine_exp_terms(terms, nterms);
     expr_merge_sqrt_terms(terms, nterms);
     expr_merge_sqrt_terms(den_terms, nden_terms);
+    expr_merge_coefficient_sqrt_terms(&c_acc, terms, nterms);
     expr_merge_sqrt_quotient_terms(terms, nterms, den_terms, nden_terms);
 
     expr_simplify_split_small_rational_quotient_coeff_local(
@@ -2162,6 +2177,13 @@ static expr_t *expr_simplify_flat_quotient_local(expr_t *a, expr_t *b)
     denominator = expr_rebuild_division_chain(den_terms, nden_terms);
     if (!denominator)
         return numerator;
+    out = expr_simplify_try_rational_atan_denominator_local(
+        numerator, denominator);
+    if (out) {
+        expr_free(numerator);
+        expr_free(denominator);
+        return out;
+    }
     out = expr_div(numerator, denominator);
     expr_free(numerator);
     expr_free(denominator);
@@ -2906,6 +2928,82 @@ expr_t *expr_simplify_add_sub_operator(const expr_t *dv, expr_t *a, expr_t *b)
 
 /* --- */
 
+static bool expr_simplify_match_square_local(const expr_t *expr,
+                                             const expr_t **base_out)
+{
+    if (!expr || !base_out)
+        return false;
+
+    if (expr_is_pow_d_expr(expr) && expr->a && num_eq(expr->c, NUM_TWO)) {
+        *base_out = expr->a;
+        return true;
+    }
+
+    if (expr_is_op(expr, &ops_pow) && expr->a && expr->b &&
+        expr_simplify_is_plain_real_const(expr->b) &&
+        num_eq(expr->b->c, NUM_TWO)) {
+        *base_out = expr->a;
+        return true;
+    }
+
+    return false;
+}
+
+/* v²((u/v)² + 1) = u² + v².  This form occurs naturally when
+ * differentiating atan(u/v); expanding the right-hand side also exposes
+ * the polynomial simplifications needed for a compact final derivative. */
+static expr_t *expr_simplify_try_squared_quotient_sum_product_local(
+    const expr_t *square_factor,
+    const expr_t *sum_factor)
+{
+    const expr_t *denominator = NULL;
+    const expr_t *quotient_square = NULL;
+    const expr_t *quotient = NULL;
+    const expr_t *var = NULL;
+    number_t *polynomial = NULL;
+    expr_t *numerator_squared = NULL;
+    expr_t *denominator_squared = NULL;
+    expr_t *sum = NULL;
+    expr_t *expanded = NULL;
+
+    if (!expr_simplify_match_square_local(square_factor, &denominator) ||
+        !expr_is_op(sum_factor, &ops_add))
+        return NULL;
+
+    if (expr_simplify_is_simplifiable_const(sum_factor->a) &&
+        expr_const_is_one(sum_factor->a)) {
+        quotient_square = sum_factor->b;
+    } else if (expr_simplify_is_simplifiable_const(sum_factor->b) &&
+               expr_const_is_one(sum_factor->b)) {
+        quotient_square = sum_factor->a;
+    } else {
+        return NULL;
+    }
+
+    if (!expr_simplify_match_square_local(quotient_square, &quotient) ||
+        !expr_is_div(quotient) ||
+        !expr_struct_eq(quotient->b, denominator))
+        return NULL;
+
+    numerator_squared = expr_mul(quotient->a, quotient->a);
+    denominator_squared = expr_mul(denominator, denominator);
+    sum = (numerator_squared && denominator_squared)
+        ? expr_add(numerator_squared, denominator_squared)
+        : NULL;
+    if (sum && expr_collect_single_var(sum, &var) && var) {
+        polynomial = expr_simplify_number_array_alloc_local(9u);
+        if (polynomial &&
+            expr_simplify_collect_poly_local(sum, var, polynomial, 9u))
+            expanded = expr_simplify_build_flat_poly_local(var, polynomial, 9u);
+    }
+
+    expr_simplify_number_array_free_local(polynomial, 9u);
+    expr_free(sum);
+    expr_free(denominator_squared);
+    expr_free(numerator_squared);
+    return expanded;
+}
+
 expr_t *expr_simplify_mul_operator(const expr_t *dv, expr_t *a, expr_t *b)
 {
     NUM_SCOPE(scope);
@@ -2957,6 +3055,20 @@ expr_t *expr_simplify_mul_operator(const expr_t *dv, expr_t *a, expr_t *b)
         expr_free(a);
         expr_free(b);
         return out;
+    }
+
+    {
+        expr_t *quotient_sum =
+            expr_simplify_try_squared_quotient_sum_product_local(a, b);
+
+        if (!quotient_sum)
+            quotient_sum =
+                expr_simplify_try_squared_quotient_sum_product_local(b, a);
+        if (quotient_sum) {
+            expr_free(a);
+            expr_free(b);
+            return quotient_sum;
+        }
     }
 
     {
@@ -3053,6 +3165,7 @@ expr_t *expr_simplify_mul_operator(const expr_t *dv, expr_t *a, expr_t *b)
     expr_combine_exp_terms(terms, nterms);
     expr_merge_sqrt_terms(terms, nterms);
     expr_merge_sqrt_terms(den_terms, nden_terms);
+    expr_merge_coefficient_sqrt_terms(&c_acc, terms, nterms);
     expr_merge_sqrt_quotient_terms(terms, nterms, den_terms, nden_terms);
 
     expanded = expr_try_expand_shallow_product(c_acc, terms, nterms,
@@ -3597,8 +3710,9 @@ static expr_t *expr_simplify_build_flat_poly_local(
     return sum ? expr_simplify_owned(sum) : expr_new_const(NUM_ZERO);
 }
 
-static bool expr_simplify_denominator_is_quadratic_poly_local(const expr_t *expr,
-                                                              const expr_t *var)
+static bool expr_simplify_denominator_is_quadratic_poly_local(
+    const expr_t *expr,
+    const expr_t *var)
 {
     const expr_t *base = NULL;
     number_t exponent = num_new();
@@ -3617,11 +3731,10 @@ static bool expr_simplify_denominator_is_quadratic_poly_local(const expr_t *expr
         base = expr;
     }
 
-    if (!expr_simplify_collect_poly_local(base, var, poly, count))
+    if (!expr_simplify_collect_poly_local(base, var, poly, count) ||
+        num_is_zero(poly[2])) {
         goto cleanup;
-
-    if (num_is_zero(poly[2]))
-        goto cleanup;
+    }
 
     ok = true;
 
@@ -3630,6 +3743,78 @@ cleanup:
 cleanup_exponent:
     num_destroy(&exponent);
     return ok;
+}
+
+static expr_t *expr_simplify_try_exact_poly_quotient_local(const expr_t *a,
+                                                            const expr_t *b)
+{
+    enum { MAX_EXACT_QUOTIENT_DEGREE = 12 };
+    const expr_t *var = NULL;
+    number_t *numerator = NULL;
+    number_t *denominator = NULL;
+    number_t *remainder = NULL;
+    number_t *quotient = NULL;
+    size_t numerator_degree = 0u;
+    size_t denominator_degree = 0u;
+    size_t count = 0u;
+    expr_t *out = NULL;
+
+    if (!a || !b || !expr_collect_single_var(a, &var) || !var ||
+        !expr_simplify_poly_degree_local(
+            a, var, MAX_EXACT_QUOTIENT_DEGREE, &numerator_degree) ||
+        !expr_simplify_poly_degree_local(
+            b, var, MAX_EXACT_QUOTIENT_DEGREE, &denominator_degree) ||
+        denominator_degree == 0u ||
+        numerator_degree < denominator_degree) {
+        return NULL;
+    }
+
+    count = numerator_degree + 1u;
+    numerator = expr_simplify_number_array_alloc_local(count);
+    denominator = expr_simplify_number_array_alloc_local(count);
+    remainder = expr_simplify_number_array_alloc_local(count);
+    quotient = expr_simplify_number_array_alloc_local(count);
+    if (!numerator || !denominator || !remainder || !quotient ||
+        !expr_simplify_collect_poly_local(a, var, numerator, count) ||
+        !expr_simplify_collect_poly_local(b, var, denominator, count) ||
+        num_is_zero(denominator[denominator_degree])) {
+        goto cleanup;
+    }
+
+    expr_simplify_copy_number_array_local(remainder, numerator, count);
+    for (size_t degree = numerator_degree + 1u;
+         degree-- > denominator_degree;) {
+        size_t quotient_degree = degree - denominator_degree;
+        number_t factor = num_div(
+            remainder[degree], denominator[denominator_degree]);
+
+        num_destroy(&quotient[quotient_degree]);
+        quotient[quotient_degree] = num_clone(factor);
+        for (size_t i = 0u; i <= denominator_degree; ++i) {
+            size_t index = quotient_degree + i;
+            number_t product = num_mul(factor, denominator[i]);
+            number_t difference = num_sub(remainder[index], product);
+
+            num_destroy(&remainder[index]);
+            remainder[index] = difference;
+            num_destroy(&product);
+        }
+        num_destroy(&factor);
+    }
+
+    for (size_t i = 0u; i < denominator_degree; ++i) {
+        if (!num_is_zero(remainder[i]))
+            goto cleanup;
+    }
+    out = expr_simplify_build_flat_poly_local(
+        var, quotient, numerator_degree - denominator_degree + 1u);
+
+cleanup:
+    expr_simplify_number_array_free_local(quotient, count);
+    expr_simplify_number_array_free_local(remainder, count);
+    expr_simplify_number_array_free_local(denominator, count);
+    expr_simplify_number_array_free_local(numerator, count);
+    return out;
 }
 
 static expr_t *expr_simplify_try_poly_quotient_numerator_local(expr_t *a,
@@ -3657,8 +3842,7 @@ static expr_t *expr_simplify_try_poly_quotient_numerator_local(expr_t *a,
     if (count < 2u)
         count = 2u;
     poly = expr_simplify_number_array_alloc_local(count);
-    if (!poly ||
-        !expr_simplify_collect_poly_local(a, var, poly, count))
+    if (!poly || !expr_simplify_collect_poly_local(a, var, poly, count))
         goto cleanup;
 
     rewritten_a = expr_simplify_build_flat_poly_local(var, poly, count);
@@ -3673,6 +3857,144 @@ cleanup:
     expr_free(quotient);
     expr_free(rewritten_a);
     expr_simplify_number_array_free_local(poly, count);
+    return out;
+}
+
+static bool expr_simplify_contains_sqrt_local(const expr_t *expr)
+{
+    if (!expr)
+        return false;
+    if (expr_is_sqrt_expr(expr))
+        return true;
+    if (expr_is_unnamed_const(expr) && expr->binding_expr &&
+        expr->binding_expr->kind == EXPR_BINDING_EXPR_UNARY_OP &&
+        expr->binding_expr->u.unary_op.ops == &ops_sqrt) {
+        return true;
+    }
+    return expr_simplify_contains_sqrt_local(expr->a) ||
+           expr_simplify_contains_sqrt_local(expr->b);
+}
+
+/* Put N/(1 + (u/v)^2) over the polynomial denominator u^2 + v^2 after
+ * quotient flattening has cancelled any radical factors in N. */
+static expr_t *expr_simplify_try_rational_atan_denominator_local(
+    const expr_t *numerator,
+    const expr_t *denominator)
+{
+    enum { MAX_ATAN_POLYNOMIAL_DEGREE = 8 };
+    const expr_t *quotient_square = NULL;
+    const expr_t *quotient = NULL;
+    const expr_t *var = NULL;
+    number_t *numerator_poly = NULL;
+    number_t *denominator_poly = NULL;
+    size_t numerator_degree = 0u;
+    size_t denominator_degree = 0u;
+    size_t numerator_count = 0u;
+    size_t denominator_count = 0u;
+    expr_t *v_squared = NULL;
+    expr_t *scaled_raw = NULL;
+    expr_t *scaled = NULL;
+    expr_t *normal_denominator = NULL;
+    expr_t *normal_numerator = NULL;
+    expr_t *monic_denominator = NULL;
+    expr_t *raw = NULL;
+    expr_t *out = NULL;
+
+    if (!numerator || !denominator ||
+        expr_simplify_contains_sqrt_local(numerator) ||
+        !expr_is_op(denominator, &ops_add)) {
+        return NULL;
+    }
+    if (expr_simplify_is_simplifiable_const(denominator->a) &&
+        expr_const_is_one(denominator->a)) {
+        quotient_square = denominator->b;
+    } else if (expr_simplify_is_simplifiable_const(denominator->b) &&
+               expr_const_is_one(denominator->b)) {
+        quotient_square = denominator->a;
+    } else {
+        return NULL;
+    }
+    if (!expr_simplify_match_square_local(quotient_square, &quotient) ||
+        !expr_is_div(quotient) || !quotient->a || !quotient->b) {
+        return NULL;
+    }
+
+    {
+        number_t two = num_clone(NUM_TWO);
+
+        v_squared = expr_pow(quotient->b, &two);
+        num_destroy(&two);
+    }
+    normal_denominator = v_squared
+        ? expr_simplify_try_squared_quotient_sum_product_local(
+              v_squared, denominator)
+        : NULL;
+    scaled_raw = v_squared ? expr_mul(numerator, v_squared) : NULL;
+    scaled = scaled_raw ? expr_simplify(scaled_raw) : NULL;
+    if (!scaled || !normal_denominator ||
+        (!expr_collect_single_var(scaled, &var) &&
+         !expr_collect_single_var(normal_denominator, &var)) ||
+        !var ||
+        !expr_simplify_poly_degree_local(
+            scaled, var, MAX_ATAN_POLYNOMIAL_DEGREE, &numerator_degree) ||
+        !expr_simplify_poly_degree_local(
+            normal_denominator, var, MAX_ATAN_POLYNOMIAL_DEGREE,
+            &denominator_degree)) {
+        goto cleanup;
+    }
+
+    numerator_count = numerator_degree + 1u;
+    denominator_count = denominator_degree + 1u;
+    numerator_poly = expr_simplify_number_array_alloc_local(numerator_count);
+    denominator_poly =
+        expr_simplify_number_array_alloc_local(denominator_count);
+    if (!numerator_poly || !denominator_poly ||
+        !expr_simplify_collect_poly_local(
+            scaled, var, numerator_poly, numerator_count) ||
+        !expr_simplify_collect_poly_local(
+            normal_denominator, var, denominator_poly, denominator_count) ||
+        num_is_zero(denominator_poly[denominator_degree])) {
+        goto cleanup;
+    }
+
+    {
+        number_t leading = num_clone(denominator_poly[denominator_degree]);
+
+        for (size_t i = 0u; i < numerator_count; ++i) {
+            number_t normalised = num_div(numerator_poly[i], leading);
+
+            num_destroy(&numerator_poly[i]);
+            numerator_poly[i] = normalised;
+        }
+        for (size_t i = 0u; i < denominator_count; ++i) {
+            number_t normalised = num_div(denominator_poly[i], leading);
+
+            num_destroy(&denominator_poly[i]);
+            denominator_poly[i] = normalised;
+        }
+        num_destroy(&leading);
+    }
+
+    normal_numerator = expr_simplify_build_flat_poly_local(
+        var, numerator_poly, numerator_count);
+    monic_denominator = expr_simplify_build_flat_poly_local(
+        var, denominator_poly, denominator_count);
+    raw = (normal_numerator && monic_denominator)
+        ? expr_div(normal_numerator, monic_denominator)
+        : NULL;
+    out = raw ? expr_simplify(raw) : NULL;
+
+cleanup:
+    expr_free(raw);
+    expr_free(monic_denominator);
+    expr_free(normal_numerator);
+    expr_free(scaled);
+    expr_free(scaled_raw);
+    expr_free(normal_denominator);
+    expr_free(v_squared);
+    expr_simplify_number_array_free_local(
+        denominator_poly, denominator_count);
+    expr_simplify_number_array_free_local(numerator_poly, numerator_count);
     return out;
 }
 
@@ -3700,6 +4022,16 @@ expr_t *expr_simplify_div_operator(const expr_t *dv, expr_t *a, expr_t *b)
         expr_free(a);
         expr_free(b);
         return out;
+    }
+    {
+        expr_t *exact_poly_quotient =
+            expr_simplify_try_exact_poly_quotient_local(a, b);
+
+        if (exact_poly_quotient) {
+            expr_free(a);
+            expr_free(b);
+            return exact_poly_quotient;
+        }
     }
     {
         expr_t *poly_quotient = expr_simplify_try_poly_quotient_numerator_local(a, b);

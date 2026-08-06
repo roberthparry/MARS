@@ -152,6 +152,8 @@ bool expr_collect_var_usage(const expr_t *expr,
 bool expr_has_unbound_parameters(const expr_t *expr,
                                  size_t nvars,
                                  expr_t *const *vars);
+expr_t *expr_expand_products_internal(const expr_t *expr);
+expr_t *expr_canonicalize_known_radicals_internal(const expr_t *expr);
 string_t *expr_default_constant_canonical_name_text(const string_t *name);
 expr_t *expr_integrate_iterated(const expr_t *integrand,
                                 size_t ndim,

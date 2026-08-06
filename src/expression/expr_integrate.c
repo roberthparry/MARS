@@ -342,10 +342,440 @@ expr_t *expr_integrate_dispatch(const expr_t *expr, const expr_t *wrt)
     return NULL;
 }
 
+static bool expr_integrate_short_sum_local(const expr_t *expr,
+                                           size_t *term_count)
+{
+    if (!expr || !term_count || *term_count > 8u)
+        return false;
+
+    if (expr_is_op(expr, &ops_add) || expr_is_op(expr, &ops_sub)) {
+        return expr_integrate_short_sum_local(expr->a, term_count) &&
+               expr_integrate_short_sum_local(expr->b, term_count);
+    }
+
+    ++*term_count;
+    return *term_count <= 8u;
+}
+
+static expr_t *expr_integrate_distribute_factor_local(const expr_t *factor,
+                                                       const expr_t *sum)
+{
+    expr_t *left;
+    expr_t *right;
+    expr_t *out;
+
+    if (expr_is_op(sum, &ops_add) || expr_is_op(sum, &ops_sub)) {
+        left = expr_integrate_distribute_factor_local(factor, sum->a);
+        right = expr_integrate_distribute_factor_local(factor, sum->b);
+        out = (left && right)
+            ? (expr_is_op(sum, &ops_add) ? expr_add(left, right)
+                                         : expr_sub(left, right))
+            : NULL;
+        expr_free(right);
+        expr_free(left);
+        return out;
+    }
+
+    return expr_mul(factor, sum);
+}
+
+static bool expr_integrate_plain_rational_local(const expr_t *expr)
+{
+    long numerator = 0L;
+    long denominator = 0L;
+
+    return expr_is_unnamed_const(expr) && !expr->binding_expr &&
+           num_get_small_rational(expr->c, &numerator, &denominator);
+}
+
+/*
+ * Antiderivatives assembled by several independent rules can contain a short
+ * sum multiplied by an exact symbolic constant, for example sqrt(3).  Expand
+ * only those bounded products before the final simplification pass so that
+ * like terms from the separate rules can be collected.  This is deliberately
+ * integration-result normalisation rather than unrestricted product
+ * expansion, which would make many otherwise compact expressions larger.
+ */
+static expr_t *expr_integrate_expand_constant_sums_local(const expr_t *expr,
+                                                          const expr_t *wrt)
+{
+    expr_t *left;
+    expr_t *right;
+    expr_t *out;
+
+    if (!expr)
+        return NULL;
+
+    if (expr_is_op(expr, &ops_add) || expr_is_op(expr, &ops_sub)) {
+        left = expr_integrate_expand_constant_sums_local(expr->a, wrt);
+        right = expr_integrate_expand_constant_sums_local(expr->b, wrt);
+        out = (left && right)
+            ? (expr_is_op(expr, &ops_add) ? expr_add(left, right)
+                                          : expr_sub(left, right))
+            : NULL;
+        expr_free(right);
+        expr_free(left);
+        return out;
+    }
+
+    if (expr_is_op(expr, &ops_neg)) {
+        left = expr_integrate_expand_constant_sums_local(expr->a, wrt);
+        out = left ? expr_neg(left) : NULL;
+        expr_free(left);
+        return out;
+    }
+
+    if (expr_is_op(expr, &ops_mul)) {
+        const expr_t *factor = NULL;
+        const expr_t *sum = NULL;
+        size_t term_count = 0u;
+
+        left = expr_integrate_expand_constant_sums_local(expr->a, wrt);
+        right = expr_integrate_expand_constant_sums_local(expr->b, wrt);
+        if (!left || !right) {
+            expr_free(right);
+            expr_free(left);
+            return NULL;
+        }
+
+        if (!depends_on_wrt(left, wrt) && expr_is_addsub(right) &&
+            !expr_integrate_plain_rational_local(left)) {
+            factor = left;
+            sum = right;
+        } else if (!depends_on_wrt(right, wrt) && expr_is_addsub(left) &&
+                   !expr_integrate_plain_rational_local(right)) {
+            factor = right;
+            sum = left;
+        }
+
+        if (factor && expr_integrate_short_sum_local(sum, &term_count)) {
+            out = expr_integrate_distribute_factor_local(factor, sum);
+            expr_free(right);
+            expr_free(left);
+            return out;
+        }
+
+        out = expr_mul(left, right);
+        expr_free(right);
+        expr_free(left);
+        return out;
+    }
+
+    return expr_retain_expr(expr);
+}
+
+typedef struct expr_integrate_addend_local {
+    const expr_t *term;
+    int sign;
+    bool consumed;
+} expr_integrate_addend_local_t;
+
+static bool expr_integrate_collect_addends_local(
+    const expr_t *expr,
+    int sign,
+    expr_integrate_addend_local_t *addends,
+    size_t *count,
+    size_t capacity)
+{
+    if (!expr || !addends || !count || *count >= capacity)
+        return false;
+
+    if (expr_is_op(expr, &ops_add)) {
+        return expr_integrate_collect_addends_local(
+                   expr->a, sign, addends, count, capacity) &&
+               expr_integrate_collect_addends_local(
+                   expr->b, sign, addends, count, capacity);
+    }
+    if (expr_is_op(expr, &ops_sub)) {
+        return expr_integrate_collect_addends_local(
+                   expr->a, sign, addends, count, capacity) &&
+               expr_integrate_collect_addends_local(
+                   expr->b, -sign, addends, count, capacity);
+    }
+    if (expr_is_op(expr, &ops_neg))
+        return expr_integrate_collect_addends_local(
+            expr->a, -sign, addends, count, capacity);
+
+    addends[*count].term = expr;
+    addends[*count].sign = sign;
+    addends[*count].consumed = false;
+    ++*count;
+    return true;
+}
+
+static bool expr_integrate_collectable_function_local(const expr_t *expr)
+{
+    if (!expr || !expr->ops)
+        return false;
+
+    switch (expr->ops->kind) {
+        case EXPR_KIND_LOG:
+        case EXPR_KIND_LOG10:
+        case EXPR_KIND_ASIN:
+        case EXPR_KIND_ACOS:
+        case EXPR_KIND_ATAN:
+        case EXPR_KIND_ASEC:
+        case EXPR_KIND_ACOSEC:
+        case EXPR_KIND_ACOT:
+        case EXPR_KIND_ASINH:
+        case EXPR_KIND_ACOSH:
+        case EXPR_KIND_ATANH:
+        case EXPR_KIND_ASECH:
+        case EXPR_KIND_ACOSECH:
+        case EXPR_KIND_ACOTH:
+            return true;
+
+        default:
+            return false;
+    }
+}
+
+static const expr_t *expr_integrate_function_factor_local(const expr_t *expr)
+{
+    const expr_t *factor;
+
+    if (!expr)
+        return NULL;
+    if (expr_integrate_collectable_function_local(expr))
+        return expr;
+    if (!expr_is_op(expr, &ops_mul))
+        return NULL;
+
+    factor = expr_integrate_function_factor_local(expr->a);
+    return factor ? factor : expr_integrate_function_factor_local(expr->b);
+}
+
+static const expr_t *expr_integrate_radical_factor_local(const expr_t *expr)
+{
+    const expr_t *factor;
+
+    if (!expr)
+        return NULL;
+    if (expr_is_unnamed_const(expr) &&
+        (num_eq(expr->c, NUM_SQRT2) || num_eq(expr->c, NUM_SQRT3)))
+        return expr;
+    if (expr_is_sqrt_expr(expr))
+        return expr;
+    factor = expr_integrate_radical_factor_local(expr->a);
+    return factor ? factor : expr_integrate_radical_factor_local(expr->b);
+}
+
+static expr_t *expr_integrate_collect_common_radical_local(expr_t *coefficient)
+{
+    const expr_t *factor = expr_integrate_radical_factor_local(coefficient);
+    expr_t *quotient;
+    expr_t *simplified;
+    expr_t *out;
+
+    if (!factor)
+        return coefficient;
+    quotient = expr_simplify_extract_common_factor_quotient(
+        coefficient, factor);
+    if (!quotient)
+        return coefficient;
+    simplified = simplify_owned(quotient);
+    out = simplified ? expr_mul(simplified, factor) : NULL;
+    expr_free(simplified);
+    if (!out)
+        return coefficient;
+    expr_free(coefficient);
+    return out;
+}
+
+static expr_t *expr_integrate_fold_known_radical_local(expr_t *coefficient)
+{
+    number_t value;
+    expr_t *out = NULL;
+
+    if (!coefficient)
+        return NULL;
+    value = expr_eval_num_internal(coefficient);
+    if (num_eq(value, NUM_SQRT2))
+        out = expr_new_const(NUM_SQRT2);
+    else if (num_eq(value, NUM_SQRT3))
+        out = expr_new_const(NUM_SQRT3);
+    else if (num_eq(value, NUM_SQRT_HALF))
+        out = expr_new_const(NUM_SQRT_HALF);
+    else if (num_eq(value, NUM_SQRT2_OVER_TWO))
+        out = expr_new_const(NUM_SQRT2_OVER_TWO);
+    else if (num_eq(value, NUM_SQRT3_OVER_TWO))
+        out = expr_new_const(NUM_SQRT3_OVER_TWO);
+    if (!out)
+        return coefficient;
+    expr_free(coefficient);
+    return out;
+}
+
+static expr_t *expr_integrate_signed_term_local(expr_t *term, int sign)
+{
+    expr_t *out;
+
+    if (!term || sign >= 0)
+        return term;
+    out = expr_neg(term);
+    expr_free(term);
+    return out;
+}
+
+static expr_t *expr_integrate_append_sum_local(expr_t *sum, expr_t *term)
+{
+    expr_t *out;
+
+    if (!term)
+        return sum;
+    if (!sum)
+        return term;
+    out = expr_add(sum, term);
+    expr_free(term);
+    expr_free(sum);
+    return out;
+}
+
+/* Collect algebraic coefficients of repeated logarithmic and inverse-function
+ * factors.  For example, a*f(x) + b*f(x) becomes (a+b)*f(x), with a and b
+ * simplified by the ordinary algebra engine. */
+static expr_t *expr_integrate_combine_function_terms_local(const expr_t *sum)
+{
+    enum { MAX_ADDENDS = 64 };
+    expr_integrate_addend_local_t addends[MAX_ADDENDS];
+    size_t count = 0u;
+    expr_t *out = NULL;
+
+    if (!expr_integrate_collect_addends_local(
+            sum, 1, addends, &count, MAX_ADDENDS))
+        return expr_retain_expr(sum);
+
+    for (size_t i = 0u; i < count; ++i) {
+        const expr_t *factor;
+        expr_t *coefficient_sum = NULL;
+        size_t matches = 0u;
+
+        if (addends[i].consumed)
+            continue;
+        factor = expr_integrate_function_factor_local(addends[i].term);
+        if (!factor)
+            continue;
+
+        for (size_t j = i; j < count; ++j) {
+            expr_t *quotient;
+
+            if (addends[j].consumed)
+                continue;
+            quotient = expr_simplify_extract_common_factor_quotient(
+                addends[j].term, factor);
+            if (!quotient)
+                continue;
+            quotient = expr_integrate_signed_term_local(
+                quotient, addends[j].sign);
+            coefficient_sum = expr_integrate_append_sum_local(
+                coefficient_sum, quotient);
+            addends[j].consumed = true;
+            ++matches;
+        }
+
+        if (matches > 1u) {
+            expr_t *coefficient = simplify_owned(coefficient_sum);
+            expr_t *radical_coefficient;
+            expr_t *term;
+
+            radical_coefficient =
+                expr_integrate_normalize_radical_products(coefficient);
+            expr_free(coefficient);
+            coefficient = simplify_owned(radical_coefficient);
+            coefficient =
+                expr_integrate_collect_common_radical_local(coefficient);
+            coefficient =
+                expr_integrate_fold_known_radical_local(coefficient);
+            term = coefficient ? expr_mul(coefficient, factor) : NULL;
+            expr_free(coefficient);
+            out = expr_integrate_append_sum_local(out, term);
+        } else {
+            expr_free(coefficient_sum);
+            addends[i].consumed = false;
+        }
+    }
+
+    for (size_t i = 0u; i < count; ++i) {
+        expr_t *term;
+
+        if (addends[i].consumed)
+            continue;
+        term = expr_retain_expr(addends[i].term);
+        term = expr_integrate_signed_term_local(term, addends[i].sign);
+        out = expr_integrate_append_sum_local(out, term);
+    }
+    return out ? out : expr_new_const(NUM_ZERO);
+}
+
+static expr_t *expr_integrate_collect_function_sums_local(const expr_t *expr)
+{
+    expr_t *left;
+    expr_t *right;
+    expr_t *out;
+
+    if (!expr)
+        return NULL;
+    if (expr_is_addsub(expr))
+        return expr_integrate_combine_function_terms_local(expr);
+    if (expr_is_op(expr, &ops_neg)) {
+        left = expr_integrate_collect_function_sums_local(expr->a);
+        out = left ? expr_neg(left) : NULL;
+        expr_free(left);
+        return out;
+    }
+    if (expr_is_op(expr, &ops_mul) || expr_is_div(expr)) {
+        left = expr_integrate_collect_function_sums_local(expr->a);
+        right = expr_integrate_collect_function_sums_local(expr->b);
+        out = (left && right)
+            ? (expr_is_op(expr, &ops_mul) ? expr_mul(left, right)
+                                          : expr_div(left, right))
+            : NULL;
+        expr_free(right);
+        expr_free(left);
+        return out;
+    }
+    return expr_retain_expr(expr);
+}
+
+static bool expr_integrate_has_repeated_function_local(const expr_t *expr,
+                                                        const expr_t **seen,
+                                                        size_t *count,
+                                                        size_t capacity)
+{
+    if (!expr || !seen || !count)
+        return false;
+    if (expr_integrate_collectable_function_local(expr)) {
+        for (size_t i = 0u; i < *count; ++i) {
+            if (expr_simplify_same_factor(seen[i], expr))
+                return true;
+        }
+        if (*count < capacity)
+            seen[(*count)++] = expr;
+    }
+    return expr_integrate_has_repeated_function_local(
+               expr->a, seen, count, capacity) ||
+           expr_integrate_has_repeated_function_local(
+               expr->b, seen, count, capacity);
+}
+
+static bool expr_integrate_needs_function_collection_local(const expr_t *expr)
+{
+    enum { MAX_FUNCTIONS = 64 };
+    const expr_t *seen[MAX_FUNCTIONS];
+    size_t count = 0u;
+
+    return expr_integrate_has_repeated_function_local(
+        expr, seen, &count, MAX_FUNCTIONS);
+}
+
 expr_t *expr_integrate(const expr_t *expr, const expr_t *wrt)
 {
     expr_t *simplified;
     expr_t *raw;
+    expr_t *canonical;
+    expr_t *normalised;
+    expr_t *expanded;
+    expr_t *collected;
     expr_t *result;
 
     if (!expr || !wrt || !expr_is_var(wrt))
@@ -361,6 +791,19 @@ expr_t *expr_integrate(const expr_t *expr, const expr_t *wrt)
         return raw;
 
     result = simplify_owned(raw);
+    if (!expr_integrate_needs_function_collection_local(result)) {
+        expr_integrate_normalize_small_rationals_local(result);
+        return result;
+    }
+    canonical = expr_canonicalize_known_radicals_internal(result);
+    expr_free(result);
+    normalised = expr_integrate_expand_constant_sums_local(canonical, wrt);
+    expr_free(canonical);
+    expanded = expr_integrate_normalize_radical_products(normalised);
+    expr_free(normalised);
+    collected = expr_integrate_collect_function_sums_local(expanded);
+    expr_free(expanded);
+    result = simplify_owned(collected);
     expr_integrate_normalize_small_rationals_local(result);
     return result;
 }

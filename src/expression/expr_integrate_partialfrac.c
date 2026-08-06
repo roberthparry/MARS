@@ -1219,6 +1219,310 @@ static expr_t *build_partial_fraction_antiderivative(const partial_fraction_fact
     return simplify_owned(sum);
 }
 
+static bool add_integral_term_owned(expr_t **sum, expr_t *term)
+{
+    expr_t *next;
+
+    if (!sum || !term) {
+        expr_free(term);
+        return false;
+    }
+    if (!*sum) {
+        *sum = term;
+        return true;
+    }
+
+    next = expr_add(*sum, term);
+    expr_free(term);
+    expr_free(*sum);
+    *sum = next;
+    return next != NULL;
+}
+
+static expr_t *build_exact_radical_scale(number_t rational_scale,
+                                         number_t radical)
+{
+    number_t combined = num_mul(rational_scale, radical);
+    number_t normalised = partial_fraction_normalize_small_rational(combined);
+    long numerator;
+    long denominator;
+    expr_t *out;
+
+    if (num_get_small_rational(normalised, &numerator, &denominator)) {
+        out = expr_new_const(normalised);
+    } else {
+        expr_t *radical_expr = expr_new_const(radical);
+
+        out = radical_expr
+            ? expr_mul_num(radical_expr, &rational_scale)
+            : NULL;
+        expr_free(radical_expr);
+    }
+
+    num_destroy(&normalised);
+    num_destroy(&combined);
+    return out;
+}
+
+static expr_t *integrate_general_palindromic_quartic(const expr_t *expr,
+                                                      const expr_t *wrt)
+{
+    number_t numerator[5];
+    number_t denominator[5];
+    number_t two = num_create_from_long(2L);
+    number_t four = num_create_from_long(4L);
+    number_t middle = num_new();
+    number_t quotient = num_new();
+    number_t n0 = num_new();
+    number_t n1 = num_new();
+    number_t n2 = num_new();
+    number_t n3 = num_new();
+    number_t quotient_middle = num_new();
+    number_t even_sum = num_new();
+    number_t even_difference = num_new();
+    number_t even_atan_scale = num_new();
+    number_t even_log_scale = num_new();
+    number_t odd_log_scale = num_new();
+    number_t odd_remainder = num_new();
+    number_t half_middle_n3 = num_new();
+    number_t atan_width_squared = num_new();
+    number_t factor_width_squared = num_new();
+    number_t atan_width = num_new();
+    number_t factor_width = num_new();
+    number_t odd_width = num_new();
+    size_t numerator_degree = 0u;
+    size_t denominator_degree = 0u;
+    expr_t *x_squared = NULL;
+    expr_t *one = NULL;
+    expr_t *term = NULL;
+    expr_t *sum = NULL;
+    bool numerator_ready = false;
+    bool denominator_ready = false;
+
+    if (!expr || !expr->a || !expr->b || !wrt)
+        goto cleanup;
+
+    numerator_ready = poly_match_direct_deg4(
+        expr->a, wrt, numerator, &numerator_degree);
+    denominator_ready = poly_match_direct_deg4(
+        expr->b, wrt, denominator, &denominator_degree);
+    if (!numerator_ready || !denominator_ready ||
+        numerator_degree > 4u || denominator_degree != 4u ||
+        num_eq(denominator[4], NUM_ZERO) ||
+        !num_eq(denominator[0], denominator[4]) ||
+        !num_eq(denominator[1], NUM_ZERO) ||
+        !num_eq(denominator[3], NUM_ZERO))
+        goto cleanup;
+
+    num_destroy(&middle);
+    middle = num_div(denominator[2], denominator[4]);
+    num_destroy(&quotient);
+    quotient = num_div(numerator[4], denominator[4]);
+    num_destroy(&quotient_middle);
+    quotient_middle = num_mul(quotient, middle);
+
+    num_destroy(&n0);
+    n0 = num_div(numerator[0], denominator[4]);
+    {
+        number_t next = num_sub(n0, quotient);
+
+        num_destroy(&n0);
+        n0 = next;
+    }
+    num_destroy(&n1);
+    n1 = num_div(numerator[1], denominator[4]);
+    num_destroy(&n2);
+    n2 = num_div(numerator[2], denominator[4]);
+    {
+        number_t next = num_sub(n2, quotient_middle);
+
+        num_destroy(&n2);
+        n2 = next;
+    }
+    num_destroy(&n3);
+    n3 = num_div(numerator[3], denominator[4]);
+
+    num_destroy(&atan_width_squared);
+    atan_width_squared = num_add(two, middle);
+    num_destroy(&factor_width_squared);
+    factor_width_squared = num_sub(two, middle);
+    if (!num_is_real(atan_width_squared) ||
+        !num_is_real(factor_width_squared) ||
+        num_get_sign(atan_width_squared) <= 0 ||
+        num_get_sign(factor_width_squared) <= 0)
+        goto cleanup;
+
+    num_destroy(&atan_width);
+    atan_width = num_sqrt(atan_width_squared);
+    num_destroy(&factor_width);
+    factor_width = num_sqrt(factor_width_squared);
+    num_destroy(&odd_width);
+    odd_width = num_mul(atan_width, factor_width);
+    num_destroy(&even_sum);
+    even_sum = num_add(n2, n0);
+    num_destroy(&even_difference);
+    even_difference = num_sub(n2, n0);
+    num_destroy(&even_atan_scale);
+    even_atan_scale = num_div(even_sum, two);
+    num_destroy(&even_log_scale);
+    {
+        number_t denominator_scale = num_mul(four, factor_width_squared);
+
+        even_log_scale = num_div(even_difference, denominator_scale);
+        num_destroy(&denominator_scale);
+    }
+    num_destroy(&odd_log_scale);
+    odd_log_scale = num_div(n3, four);
+    num_destroy(&half_middle_n3);
+    half_middle_n3 = num_mul(middle, n3);
+    {
+        number_t next = num_div(half_middle_n3, two);
+
+        num_destroy(&half_middle_n3);
+        half_middle_n3 = next;
+    }
+    num_destroy(&odd_remainder);
+    odd_remainder = num_sub(n1, half_middle_n3);
+
+    x_squared = expr_pow(wrt, &NUM_TWO);
+    one = expr_new_const(NUM_ONE);
+    if (!num_eq(quotient, NUM_ZERO)) {
+        term = expr_mul_num(wrt, &quotient);
+        if (!add_integral_term_owned(&sum, term))
+            goto cleanup;
+        term = NULL;
+    }
+
+    if (!num_eq(even_atan_scale, NUM_ZERO)) {
+        expr_t *width_expr = expr_new_const(atan_width);
+        expr_t *width_x = width_expr ? expr_mul(width_expr, wrt) : NULL;
+        expr_t *denom = (one && x_squared) ? expr_sub(one, x_squared) : NULL;
+        expr_t *argument = (width_x && denom) ? expr_div(width_x, denom) : NULL;
+        expr_t *angle = argument ? expr_atan(argument) : NULL;
+        number_t rational_scale = num_div(even_atan_scale,
+                                          atan_width_squared);
+        expr_t *exact_scale = build_exact_radical_scale(rational_scale,
+                                                        atan_width);
+
+        term = (angle && exact_scale) ? expr_mul(exact_scale, angle) : NULL;
+        expr_free(exact_scale);
+        num_destroy(&rational_scale);
+        expr_free(angle);
+        expr_free(argument);
+        expr_free(denom);
+        expr_free(width_x);
+        expr_free(width_expr);
+        if (!add_integral_term_owned(&sum, term))
+            goto cleanup;
+        term = NULL;
+    }
+
+    if (!num_eq(even_log_scale, NUM_ZERO)) {
+        expr_t *factor_expr = expr_new_const(factor_width);
+        expr_t *factor_x = factor_expr ? expr_mul(factor_expr, wrt) : NULL;
+        expr_t *minus = (x_squared && factor_x) ? expr_sub(x_squared, factor_x) : NULL;
+        expr_t *plus = (x_squared && factor_x) ? expr_add(x_squared, factor_x) : NULL;
+        expr_t *minus_one = minus ? expr_add_num(minus, &NUM_ONE) : NULL;
+        expr_t *plus_one = plus ? expr_add_num(plus, &NUM_ONE) : NULL;
+        expr_t *ratio = (minus_one && plus_one) ? expr_div(minus_one, plus_one) : NULL;
+        expr_t *log_ratio = ratio ? expr_log(ratio) : NULL;
+
+        expr_t *exact_scale = build_exact_radical_scale(even_log_scale,
+                                                        factor_width);
+
+        term = (log_ratio && exact_scale) ? expr_mul(exact_scale, log_ratio)
+                                          : NULL;
+        expr_free(exact_scale);
+        expr_free(log_ratio);
+        expr_free(ratio);
+        expr_free(plus_one);
+        expr_free(minus_one);
+        expr_free(plus);
+        expr_free(minus);
+        expr_free(factor_x);
+        expr_free(factor_expr);
+        if (!add_integral_term_owned(&sum, term))
+            goto cleanup;
+        term = NULL;
+    }
+
+    if (!num_eq(odd_log_scale, NUM_ZERO)) {
+        expr_t *log_denominator = expr_log(expr->b);
+
+        term = log_denominator
+            ? expr_mul_num(log_denominator, &odd_log_scale)
+            : NULL;
+        expr_free(log_denominator);
+        if (!add_integral_term_owned(&sum, term))
+            goto cleanup;
+        term = NULL;
+    }
+
+    if (!num_eq(odd_remainder, NUM_ZERO)) {
+        expr_t *twice_x_squared = x_squared
+            ? expr_mul_num(x_squared, &two)
+            : NULL;
+        expr_t *numerator_expr = twice_x_squared
+            ? expr_add_num(twice_x_squared, &middle)
+            : NULL;
+        expr_t *width_expr = expr_new_const(odd_width);
+        expr_t *argument = (numerator_expr && width_expr)
+            ? expr_div(numerator_expr, width_expr)
+            : NULL;
+        expr_t *angle = argument ? expr_atan(argument) : NULL;
+        number_t width_squared = num_mul(atan_width_squared,
+                                        factor_width_squared);
+        number_t odd_scale = num_div(odd_remainder, width_squared);
+        expr_t *exact_scale = build_exact_radical_scale(odd_scale, odd_width);
+
+        term = (angle && exact_scale) ? expr_mul(exact_scale, angle) : NULL;
+        expr_free(exact_scale);
+        num_destroy(&width_squared);
+        num_destroy(&odd_scale);
+        expr_free(angle);
+        expr_free(argument);
+        expr_free(width_expr);
+        expr_free(numerator_expr);
+        expr_free(twice_x_squared);
+        if (!add_integral_term_owned(&sum, term))
+            goto cleanup;
+        term = NULL;
+    }
+
+    sum = simplify_owned(sum);
+
+cleanup:
+    expr_free(term);
+    expr_free(one);
+    expr_free(x_squared);
+    num_destroy(&odd_width);
+    num_destroy(&factor_width);
+    num_destroy(&atan_width);
+    num_destroy(&factor_width_squared);
+    num_destroy(&atan_width_squared);
+    num_destroy(&half_middle_n3);
+    num_destroy(&odd_remainder);
+    num_destroy(&odd_log_scale);
+    num_destroy(&even_log_scale);
+    num_destroy(&even_atan_scale);
+    num_destroy(&even_difference);
+    num_destroy(&even_sum);
+    num_destroy(&quotient_middle);
+    num_destroy(&n3);
+    num_destroy(&n2);
+    num_destroy(&n1);
+    num_destroy(&n0);
+    num_destroy(&quotient);
+    num_destroy(&middle);
+    num_destroy(&four);
+    num_destroy(&two);
+    if (denominator_ready)
+        number_array_clear_local(denominator, 5u);
+    if (numerator_ready)
+        number_array_clear_local(numerator, 5u);
+    return sum;
+}
+
 expr_t *integrate_rational_partial_fractions(const expr_t *expr, const expr_t *wrt)
 {
     partial_fraction_factorization_t factors;
@@ -1244,6 +1548,9 @@ expr_t *integrate_rational_partial_fractions(const expr_t *expr, const expr_t *w
     if (!expr || !expr->a || !expr->b)
         return NULL;
 
+    sum = integrate_general_palindromic_quartic(expr, wrt);
+    if (sum)
+        return sum;
     partial_fraction_factorization_init(&factors);
     partial_fraction_array_zero(rhs, 4);
     partial_fraction_array_zero(solution, 4);

@@ -304,6 +304,7 @@
         "test_equation_real_polynomial_returns_exact_conjugate_pairs": true,
         "test_equation_rejects_rhs_containing_solve_variable": true,
         "test_equation_solves_affine_variable_from_rhs": true,
+        "test_equation_solves_atan_sum_as_branch_valid_surd": true,
         "test_equation_solves_cubic_complex_pair": true,
         "test_equation_solves_cubic_repeated_root_once": true,
         "test_equation_solves_cubic_three_real_roots": true,
@@ -493,6 +494,7 @@
         "test_integrate_affine_powers_and_remaining_inverse_families": true,
         "test_integrate_affine_tangent": true,
         "test_integrate_centered_quadratic_roots": true,
+        "test_integrate_collects_repeated_inverse_and_log_terms": true,
         "test_integrate_definite_quadratic_combines_exact_constants": true,
         "test_integrate_definite_quadratic_compact_exact_result": true,
         "test_integrate_definite_symbolic_bounds": true,
@@ -559,6 +561,7 @@
       "enabled": true,
       "test_runtime_regressions": {
         "enabled": true,
+        "test_atan_quotient_derivative_simplifies_to_quartic": true,
         "test_binary_constants_preserve_user_literals_in_derivatives": true,
         "test_binding_direct_inverse_numeric_expression_simplifies": true,
         "test_binding_exact_core_trig_values_simplify": true,
@@ -570,6 +573,7 @@
         "test_bound_euler_symbol_survives_derivative_simplify": true,
         "test_cmp_qfloat_precision": true,
         "test_complex_coefficient_stays_grouped": true,
+        "test_compound_antiderivative_derivative_cancels_rational_terms": true,
         "test_default_constants_preserve_builtin_precision": true,
         "test_eval_expression_preserves_complex_precision": true,
         "test_eval_expression_preserves_mpfr_precision": true,
@@ -744,6 +748,7 @@
             "test_to_string_atan2_expr": true,
             "test_to_string_atan2_func": true
           },
+          "test_to_string_atan_tex": true,
           "test_to_string_basic_const": {
             "enabled": true,
             "test_to_string_basic_const_expr": true,

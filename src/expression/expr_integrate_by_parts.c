@@ -1,3 +1,5 @@
+#include <stdlib.h>
+
 #define MARS_EXPR_INTEGRATE_INTERNAL_ACCESS
 #include "expr_integrate_internal.h"
 
@@ -13,6 +15,226 @@ typedef struct {
     inverse_affine_term_builder_fn build_linear_term;
     inverse_affine_term_builder_fn build_quadratic_term;
 } inverse_affine_rule_t;
+
+typedef struct {
+    expr_t **factors;
+    size_t count;
+    size_t capacity;
+    number_t coefficient;
+    unsigned sqrt_two_count;
+    unsigned sqrt_three_count;
+} radical_product_t;
+
+expr_t *expr_integrate_normalize_radical_products(const expr_t *expr);
+
+static bool radical_product_append(radical_product_t *product, expr_t *factor)
+{
+    expr_t **grown;
+    size_t capacity;
+
+    if (!product || !factor)
+        return false;
+    if (product->count == product->capacity) {
+        capacity = product->capacity ? product->capacity * 2u : 4u;
+        grown = realloc(product->factors, capacity * sizeof(*grown));
+        if (!grown)
+            return false;
+        product->factors = grown;
+        product->capacity = capacity;
+    }
+    product->factors[product->count++] = factor;
+    return true;
+}
+
+static bool radical_product_known_constant(const expr_t *expr,
+                                            unsigned *sqrt_two_count,
+                                            unsigned *sqrt_three_count,
+                                            number_t *scale)
+{
+    if (!expr || !sqrt_two_count || !sqrt_three_count || !scale ||
+        !expr_is_unnamed_const(expr))
+        return false;
+
+    if (num_eq(expr->c, NUM_SQRT2)) {
+        *sqrt_two_count = 1u;
+        num_destroy(scale);
+        *scale = num_clone(NUM_ONE);
+        return true;
+    }
+    if (num_eq(expr->c, NUM_SQRT3)) {
+        *sqrt_three_count = 1u;
+        num_destroy(scale);
+        *scale = num_clone(NUM_ONE);
+        return true;
+    }
+    if (num_eq(expr->c, NUM_SQRT_HALF) ||
+        num_eq(expr->c, NUM_SQRT2_OVER_TWO)) {
+        *sqrt_two_count = 1u;
+        num_destroy(scale);
+        *scale = num_clone(NUM_HALF);
+        return true;
+    }
+    if (num_eq(expr->c, NUM_SQRT3_OVER_TWO)) {
+        *sqrt_three_count = 1u;
+        num_destroy(scale);
+        *scale = num_clone(NUM_HALF);
+        return true;
+    }
+    return false;
+}
+
+static bool radical_product_collect(const expr_t *expr,
+                                    radical_product_t *product)
+{
+    expr_t *factor;
+
+    if (!expr || !product)
+        return false;
+    if (expr_is_op(expr, &ops_mul))
+        return radical_product_collect(expr->a, product) &&
+               radical_product_collect(expr->b, product);
+
+    if (expr_is_unnamed_const(expr)) {
+        unsigned sqrt_two_count = 0u;
+        unsigned sqrt_three_count = 0u;
+        number_t scale = num_new();
+
+        if (radical_product_known_constant(expr, &sqrt_two_count,
+                                           &sqrt_three_count, &scale)) {
+            number_t coefficient = num_mul(product->coefficient, scale);
+
+            num_destroy(&product->coefficient);
+            product->coefficient = coefficient;
+            product->sqrt_two_count += sqrt_two_count;
+            product->sqrt_three_count += sqrt_three_count;
+            num_destroy(&scale);
+            return true;
+        }
+        num_destroy(&scale);
+        {
+            number_t coefficient = num_mul(product->coefficient, expr->c);
+
+            num_destroy(&product->coefficient);
+            product->coefficient = coefficient;
+        }
+        return true;
+    }
+
+    factor = expr_integrate_normalize_radical_products(expr);
+    if (!factor || !radical_product_append(product, factor)) {
+        expr_free(factor);
+        return false;
+    }
+    return true;
+}
+
+static expr_t *radical_product_build(radical_product_t *product)
+{
+    expr_t *out = NULL;
+    expr_t *factor = NULL;
+    number_t two = num_create_from_long(2L);
+    number_t three = num_create_from_long(3L);
+
+    while (product->sqrt_two_count >= 2u) {
+        number_t coefficient = num_mul(product->coefficient, two);
+
+        num_destroy(&product->coefficient);
+        product->coefficient = coefficient;
+        product->sqrt_two_count -= 2u;
+    }
+    while (product->sqrt_three_count >= 2u) {
+        number_t coefficient = num_mul(product->coefficient, three);
+
+        num_destroy(&product->coefficient);
+        product->coefficient = coefficient;
+        product->sqrt_three_count -= 2u;
+    }
+    num_destroy(&three);
+    num_destroy(&two);
+
+    if (!num_eq(product->coefficient, NUM_ONE) ||
+        (product->count == 0u && product->sqrt_two_count == 0u &&
+         product->sqrt_three_count == 0u))
+        out = expr_new_const(product->coefficient);
+
+    if (product->sqrt_two_count)
+        factor = expr_new_const(NUM_SQRT2);
+    else if (product->sqrt_three_count)
+        factor = expr_new_const(NUM_SQRT3);
+    if (factor) {
+        expr_t *combined = out ? expr_mul(out, factor) : expr_retain_expr(factor);
+
+        expr_free(out);
+        expr_free(factor);
+        out = combined;
+    }
+    if (product->sqrt_two_count && product->sqrt_three_count) {
+        factor = expr_new_const(NUM_SQRT3);
+        if (factor) {
+            expr_t *combined = out ? expr_mul(out, factor)
+                                   : expr_retain_expr(factor);
+
+            expr_free(out);
+            expr_free(factor);
+            out = combined;
+        }
+    }
+
+    for (size_t i = 0u; i < product->count; ++i) {
+        expr_t *combined = out ? expr_mul(out, product->factors[i])
+                               : expr_retain_expr(product->factors[i]);
+
+        expr_free(out);
+        out = combined;
+    }
+    return out;
+}
+
+expr_t *expr_integrate_normalize_radical_products(const expr_t *expr)
+{
+    expr_t *left;
+    expr_t *right;
+    expr_t *out;
+
+    if (!expr)
+        return NULL;
+    if (expr_is_op(expr, &ops_mul)) {
+        radical_product_t product = {
+            .factors = NULL,
+            .count = 0u,
+            .capacity = 0u,
+            .coefficient = num_clone(NUM_ONE),
+            .sqrt_two_count = 0u,
+            .sqrt_three_count = 0u
+        };
+        bool ok = radical_product_collect(expr, &product);
+
+        out = ok ? radical_product_build(&product) : NULL;
+        for (size_t i = 0u; i < product.count; ++i)
+            expr_free(product.factors[i]);
+        free(product.factors);
+        num_destroy(&product.coefficient);
+        return out;
+    }
+    if (expr->ops && expr->ops->arity == EXPR_OP_UNARY &&
+        expr->ops->apply_unary && expr->a) {
+        left = expr_integrate_normalize_radical_products(expr->a);
+        out = left ? expr->ops->apply_unary(left) : NULL;
+        expr_free(left);
+        return out;
+    }
+    if (expr->ops && expr->ops->arity == EXPR_OP_BINARY &&
+        expr->ops->apply_binary && expr->a && expr->b) {
+        left = expr_integrate_normalize_radical_products(expr->a);
+        right = expr_integrate_normalize_radical_products(expr->b);
+        out = (left && right) ? expr->ops->apply_binary(left, right) : NULL;
+        expr_free(right);
+        expr_free(left);
+        return out;
+    }
+    expr_retain(expr);
+    return (expr_t *)expr;
+}
 
 static expr_t *combine_binary_owned(expr_t *left, expr_t *right, bool is_add)
 {
@@ -799,4 +1021,122 @@ expr_t *integrate_linear_poly_times_normal_logpdf_affine(const expr_t *expr,
     num_destroy(&neg_one_sixth);
     num_destroy(&constant);
     return div_number_owned_consuming(sum, &coeff);
+}
+
+static bool is_rational_by_parts_unary(const expr_t *expr)
+{
+    return expr_is_op(expr, &ops_atan) || expr_is_op(expr, &ops_log);
+}
+
+expr_t *integrate_poly_times_rational_unary_by_parts(const expr_t *expr,
+                                                      const expr_t *wrt)
+{
+    const expr_t *poly = NULL;
+    const expr_t *unary = NULL;
+    expr_t *one = NULL;
+    expr_t *vars[1];
+    number_t coefficients[5];
+    number_t basis_constant = num_new();
+    number_t basis_coefficient[1];
+    expr_t *v = NULL;
+    expr_t *canonical_unary = NULL;
+    expr_t *du_raw = NULL;
+    expr_t *du = NULL;
+    expr_t *remainder_raw = NULL;
+    expr_t *remainder = NULL;
+    expr_t *remainder_antiderivative = NULL;
+    expr_t *leading = NULL;
+    expr_t *raw = NULL;
+    expr_t *out = NULL;
+    expr_t *canonical = NULL;
+    expr_t *expanded = NULL;
+    expr_t *radical_normalized = NULL;
+    expr_t *reexpanded = NULL;
+    expr_t *renormalized = NULL;
+    bool coefficients_ready = false;
+
+    basis_coefficient[0] = num_new();
+    vars[0] = (expr_t *)wrt;
+
+    if (is_rational_by_parts_unary(expr)) {
+        one = expr_new_const(NUM_ONE);
+        poly = one;
+        unary = expr;
+    } else if (expr_is_op(expr, &ops_mul) && expr->a && expr->b) {
+        if (is_rational_by_parts_unary(expr->a)) {
+            unary = expr->a;
+            poly = expr->b;
+        } else if (is_rational_by_parts_unary(expr->b)) {
+            unary = expr->b;
+            poly = expr->a;
+        }
+    }
+
+    number_array_zero_local(coefficients, 5u);
+    coefficients_ready = true;
+    if (!poly || !unary || !unary->a ||
+        !expr_match_affine_poly_deg4(poly, 1u, vars, coefficients,
+                                     &basis_constant, basis_coefficient))
+        goto cleanup;
+
+    v = expr_integrate_dispatch(poly, wrt);
+    canonical_unary = expr_canonicalize_known_radicals_internal(unary);
+    du_raw = canonical_unary ? expr_create_deriv(canonical_unary, wrt) : NULL;
+    du = du_raw ? expr_simplify(du_raw) : NULL;
+    remainder_raw = (v && du) ? expr_mul(v, du) : NULL;
+    remainder = simplify_owned(remainder_raw);
+    remainder_antiderivative = remainder
+        ? expr_integrate_dispatch(remainder, wrt)
+        : NULL;
+    if (!v || !remainder_antiderivative)
+        goto cleanup;
+
+    leading = expr_mul(v, canonical_unary);
+    raw = leading ? expr_sub(leading, remainder_antiderivative) : NULL;
+    canonical = raw ? expr_canonicalize_known_radicals_internal(raw) : NULL;
+    expanded = canonical ? expr_expand_products_internal(canonical) : NULL;
+    radical_normalized = expanded
+        ? expr_integrate_normalize_radical_products(expanded)
+        : NULL;
+    if (radical_normalized) {
+        out = simplify_owned(radical_normalized);
+        radical_normalized = NULL;
+    } else {
+        out = simplify_owned(raw);
+        raw = NULL;
+    }
+    reexpanded = out ? expr_expand_products_internal(out) : NULL;
+    renormalized = reexpanded
+        ? expr_integrate_normalize_radical_products(reexpanded)
+        : NULL;
+    if (renormalized) {
+        expr_t *resimplified = simplify_owned(renormalized);
+
+        renormalized = NULL;
+        if (resimplified) {
+            expr_free(out);
+            out = resimplified;
+        }
+    }
+
+cleanup:
+    expr_free(renormalized);
+    expr_free(reexpanded);
+    expr_free(radical_normalized);
+    expr_free(expanded);
+    expr_free(canonical);
+    expr_free(raw);
+    expr_free(leading);
+    expr_free(remainder_antiderivative);
+    expr_free(remainder);
+    expr_free(du);
+    expr_free(du_raw);
+    expr_free(canonical_unary);
+    expr_free(v);
+    expr_free(one);
+    if (coefficients_ready)
+        number_array_clear_local(coefficients, 5u);
+    num_destroy(&basis_coefficient[0]);
+    num_destroy(&basis_constant);
+    return out;
 }

@@ -101,6 +101,8 @@ static expr_t *integrate_inverse_symbolic_square_sum(const expr_t *expr,
                                                      const expr_t *wrt);
 static expr_t *integrate_mul_rule_by_distribution(const expr_t *expr,
                                                   const expr_t *wrt);
+static expr_t *integrate_scale_antiderivative_sum(const expr_t *factor,
+                                                  const expr_t *antiderivative);
 static bool integrate_rule_kind_bit(expr_op_kind_t kind,
                                     expr_op_kind_t min_kind,
                                     expr_op_kind_t max_kind,
@@ -199,6 +201,7 @@ static bool match_positive_integer_power_of_expr(const expr_t *expr,
 
 static const expr_integrate_mul_rule_t integrate_mul_always_rules[] = {
     { .kind = EXPR_INTEGRATE_MUL_RULE_DIRECT, .direct = integrate_scaled_rule },
+    { .kind = EXPR_INTEGRATE_MUL_RULE_DIRECT, .direct = integrate_poly_times_rational_unary_by_parts },
     { .kind = EXPR_INTEGRATE_MUL_RULE_DIRECT, .direct = integrate_poly_times_affine_power },
     { .kind = EXPR_INTEGRATE_MUL_RULE_DIRECT, .direct = integrate_linear_poly_times_centered_quadratic_root },
     { .kind = EXPR_INTEGRATE_MUL_RULE_DIRECT, .direct = integrate_symbolic_monomial_times_affine_power },
@@ -668,11 +671,16 @@ expr_t *integrate_sub_rule(const expr_t *expr, const expr_t *wrt)
 expr_t *integrate_neg_rule(const expr_t *expr, const expr_t *wrt)
 {
     expr_t *inner = expr_integrate_dispatch(expr->a, wrt);
+    expr_t *minus_one = expr_new_const(NUM_NEG_ONE);
     expr_t *negated;
 
-    if (!inner)
+    if (!inner || !minus_one) {
+        expr_free(minus_one);
+        expr_free(inner);
         return NULL;
-    negated = expr_neg(inner);
+    }
+    negated = integrate_scale_antiderivative_sum(minus_one, inner);
+    expr_free(minus_one);
     expr_free(inner);
     return simplify_owned(negated);
 }
@@ -1001,10 +1009,14 @@ expr_t *integrate_mul_rule(const expr_t *expr, const expr_t *wrt)
     if (left_depends != right_depends) {
         if (!left_depends) {
             inner = expr_integrate_dispatch(expr->b, wrt);
-            product = inner ? expr_mul(expr->a, inner) : NULL;
+            product = inner
+                ? integrate_scale_antiderivative_sum(expr->a, inner)
+                : NULL;
         } else {
             inner = expr_integrate_dispatch(expr->a, wrt);
-            product = inner ? expr_mul(inner, expr->b) : NULL;
+            product = inner
+                ? integrate_scale_antiderivative_sum(expr->b, inner)
+                : NULL;
         }
         expr_free(inner);
         if (product)
@@ -1029,13 +1041,85 @@ expr_t *integrate_mul_rule(const expr_t *expr, const expr_t *wrt)
 
     if (!left_depends) {
         inner = expr_integrate_dispatch(expr->b, wrt);
-        product = inner ? expr_mul(expr->a, inner) : NULL;
+        product = inner
+            ? integrate_scale_antiderivative_sum(expr->a, inner)
+            : NULL;
     } else {
         inner = expr_integrate_dispatch(expr->a, wrt);
-        product = inner ? expr_mul(inner, expr->b) : NULL;
+        product = inner
+            ? integrate_scale_antiderivative_sum(expr->b, inner)
+            : NULL;
     }
     expr_free(inner);
     return simplify_owned(product);
+}
+
+static expr_t *integrate_scale_antiderivative_sum(const expr_t *factor,
+                                                  const expr_t *antiderivative)
+{
+    number_t scale = num_new();
+    const expr_t *scaled_base = NULL;
+    expr_t *left;
+    expr_t *right;
+    expr_t *out;
+
+    if (!factor || !antiderivative) {
+        num_destroy(&scale);
+        return NULL;
+    }
+    if (expr_is_op(antiderivative, &ops_mul) &&
+        antiderivative->a && antiderivative->b &&
+        (expr_is_addsub(antiderivative->a) ||
+         expr_is_addsub(antiderivative->b))) {
+        const expr_t *sum = expr_is_addsub(antiderivative->a)
+            ? antiderivative->a
+            : antiderivative->b;
+        const expr_t *other = sum == antiderivative->a
+            ? antiderivative->b
+            : antiderivative->a;
+        expr_t *combined_raw = expr_mul(factor, other);
+        expr_t *combined = simplify_owned(combined_raw);
+
+        out = combined ? integrate_scale_antiderivative_sum(combined, sum) : NULL;
+        expr_free(combined);
+        num_destroy(&scale);
+        return out;
+    }
+    if (expr_match_scaled_expr(antiderivative, &scale, &scaled_base) &&
+        scaled_base && scaled_base != antiderivative &&
+        expr_is_addsub(scaled_base)) {
+        expr_t *scale_expr = expr_new_const(scale);
+        expr_t *combined_raw = scale_expr ? expr_mul(factor, scale_expr) : NULL;
+        expr_t *combined = simplify_owned(combined_raw);
+
+        out = combined
+            ? integrate_scale_antiderivative_sum(combined, scaled_base)
+            : NULL;
+        expr_free(combined);
+        expr_free(scale_expr);
+        num_destroy(&scale);
+        return out;
+    }
+    num_destroy(&scale);
+    if (expr_is_op(antiderivative, &ops_add) ||
+        expr_is_op(antiderivative, &ops_sub)) {
+        left = integrate_scale_antiderivative_sum(factor, antiderivative->a);
+        right = integrate_scale_antiderivative_sum(factor, antiderivative->b);
+        out = (left && right)
+            ? (expr_is_op(antiderivative, &ops_add) ? expr_add(left, right)
+                                                    : expr_sub(left, right))
+            : NULL;
+        expr_free(right);
+        expr_free(left);
+        return out;
+    }
+    if (expr_is_op(antiderivative, &ops_neg) && antiderivative->a) {
+        left = integrate_scale_antiderivative_sum(factor, antiderivative->a);
+        out = left ? expr_neg(left) : NULL;
+        expr_free(left);
+        return out;
+    }
+    return expr_mul(factor, antiderivative);
 }
 
 static expr_t *integrate_mul_rule_by_distribution(const expr_t *expr,

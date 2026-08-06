@@ -2980,6 +2980,11 @@ INDEX_HTML = r"""<!doctype html>
       font-size: var(--render-font-size);
     }
 
+    .rendered.vertically-wrapped-tex {
+      overflow-x: hidden;
+      overflow-y: auto;
+    }
+
     .rendered-zoom-frame {
       position: relative;
       display: inline-block;
@@ -5899,7 +5904,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     }
 
     function isIntegrationConstantName(name) {
-      return /^C(?:_\d+|[₀₁₂₃₄₅₆₇₈₉]+)$/.test(String(name || '').trim());
+      return /^C(?:_\d+|[₀₁₂₃₄₅₆₇₈₉]+)?$/.test(String(name || '').trim());
     }
 
     function splitTopLevelAddSubTerms(text) {
@@ -6007,7 +6012,10 @@ __HOLIDAY_JURISDICTION_OPTIONS__
 
         setExpressionEditor(
           data.expression || updated,
-          Array.isArray(data.binding_values) ? data.binding_values : [],
+          bindingsWithAuthoredValues(
+            Array.isArray(data.binding_values) ? data.binding_values : [],
+            data.expression || updated
+          ),
           null,
           data.evaluation_ready
         );
@@ -8964,7 +8972,10 @@ __HOLIDAY_JURISDICTION_OPTIONS__
 
     function fitDiffequationSolutionToCard() {
       diffequationFitFrame = 0;
-      if (currentMode() !== 'diffequation')
+      const fittingDiffequation = currentMode() === 'diffequation';
+      const fittingIntegral = currentMode() === 'expression' &&
+        /integral\s+result$/i.test(rightPaneTitle.textContent || '');
+      if (!fittingDiffequation && !fittingIntegral)
         return;
 
       const compactSvg = rendered.dataset.compactSvg || '';
@@ -8978,6 +8989,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       const useWrapped = !!wrappedSvg &&
         compactWidth > renderedContentWidth() + 1;
       const variant = useWrapped ? 'wrapped' : 'compact';
+      rendered.classList.toggle('vertically-wrapped-tex', useWrapped);
       if (rendered.dataset.responsiveVariant === variant)
         return;
 
@@ -9010,6 +9022,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
 
     function clearRenderedError() {
       rendered.classList.remove('error');
+      rendered.classList.remove('vertically-wrapped-tex');
       rendered.style.color = '';
       rendered.style.background = '';
       rendered.style.borderColor = '';
@@ -10206,6 +10219,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         const integralExpression = integralExpressionFromLine(data.integral);
         const integralTex = data.integral_tex || '';
         const integralSvg = data.integral_svg || '';
+        const integralWrappedTex = data.integral_wrapped_tex || integralTex;
+        const integralWrappedSvg = data.integral_wrapped_svg || '';
         const integralFunction = data.display_integral_function || data.integral_function || integralExpression || '';
         const fullIntegralFunction = data.full_display_integral_function || data.integral_function || integralExpression || '';
 
@@ -10247,10 +10262,18 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           rendered.dataset.displaySvg = integralSvg;
           rendered.dataset.fullSvg = '';
           rendered.dataset.renderError = data.integral_render_error || '';
+          rendered.dataset.compactTex = integralTex;
+          rendered.dataset.wrappedTex = integralWrappedTex;
+          rendered.dataset.compactSvg = integralSvg;
+          rendered.dataset.wrappedSvg = integralWrappedSvg;
+          rendered.dataset.responsiveFallback =
+            data.integral_render_error || integralTex;
+          delete rendered.dataset.responsiveVariant;
           setRenderedContent(
             integralSvg,
             data.integral_render_error || integralTex
           );
+          scheduleDiffequationSolutionFit();
           resetMoreDigitsButton(renderedMore, false);
         } else {
           setRenderedContent('', integralExpression);
@@ -11069,6 +11092,97 @@ def function_for_display(function: str) -> str:
 
 def tex_for_display(tex: str) -> str:
     return re.sub(r"(=\s*)NAN\b", r"\1?", str(tex or ""))
+
+
+def _tex_additive_break_positions(row: str) -> list[int]:
+    positions: list[tuple[int, int]] = []
+    brace_depth = 0
+    delimiter_depth = 0
+    parenthesis_depth = 0
+    index = 0
+
+    while index < len(row):
+        if row.startswith(r"\left", index):
+            delimiter_depth += 1
+            index += len(r"\left")
+            if index < len(row) and row[index] in "([{":
+                index += 1
+            continue
+        if row.startswith(r"\right", index):
+            delimiter_depth = max(0, delimiter_depth - 1)
+            index += len(r"\right")
+            if index < len(row) and row[index] in ")]}":
+                index += 1
+            continue
+
+        char = row[index]
+        if char == "{":
+            brace_depth += 1
+        elif char == "}":
+            brace_depth = max(0, brace_depth - 1)
+        elif char == "(":
+            parenthesis_depth += 1
+        elif char == ")":
+            parenthesis_depth = max(0, parenthesis_depth - 1)
+        elif (
+            brace_depth == 0
+            and char in "+-"
+            and index > 0
+            and row[index - 1].isspace()
+            and index + 1 < len(row)
+            and row[index + 1].isspace()
+        ):
+            positions.append((index, delimiter_depth + parenthesis_depth))
+        index += 1
+
+    if not positions:
+        return []
+    shallowest = min(depth for _, depth in positions)
+    return [position for position, depth in positions if depth == shallowest]
+
+
+def wrap_rendered_tex_additive_lines(tex: str, threshold: int = 120) -> str:
+    source = str(tex or "").strip()
+    begin = r"\begin{aligned}[t]"
+    end = r"\end{aligned}"
+    if not source.startswith(begin) or not source.endswith(end):
+        return source
+
+    body = source[len(begin):-len(end)].strip()
+    rows = [row.strip() for row in body.split(r"\\") if row.strip()]
+    wrapped_rows: list[str] = []
+    changed = False
+
+    for row in rows:
+        positions = _tex_additive_break_positions(row)
+        if len(row) <= threshold or not positions:
+            wrapped_rows.append(row)
+            continue
+
+        segments: list[str] = []
+        start = 0
+        for position in positions:
+            segments.append(row[start:position].rstrip())
+            start = position
+        segments.append(row[start:].strip())
+        if len(segments) < 2:
+            wrapped_rows.append(row)
+            continue
+
+        changed = True
+        segments = [
+            segment.replace(r"\left", r"\bigl").replace(r"\right", r"\bigr")
+            for segment in segments
+        ]
+        wrapped_rows.append(segments[0])
+        wrapped_rows.extend(
+            rf"&\qquad {{}} {segment.strip()}"
+            for segment in segments[1:]
+        )
+
+    if not changed:
+        return source
+    return begin + "\n" + " \\\\\n".join(wrapped_rows) + "\n" + end
 
 
 def numeric_value_for_display(value: object) -> str:
@@ -13713,11 +13827,17 @@ def prepare_evaluation_fields(
     integral_tex = tex_for_display(str(fields.get("integral_tex") or ""))
     fields["integral_tex"] = integral_tex
     if integral_tex:
+        integral_wrapped_tex = wrap_rendered_tex_additive_lines(integral_tex)
+        fields["integral_wrapped_tex"] = integral_wrapped_tex
         integral_svg, integral_render_error = render_tex_to_svg(integral_tex)
         if integral_svg:
             fields["integral_svg"] = integral_svg
         elif integral_render_error:
             fields["integral_render_error"] = integral_render_error
+        if integral_wrapped_tex != integral_tex:
+            integral_wrapped_svg, _ = render_tex_to_svg(integral_wrapped_tex)
+            if integral_wrapped_svg:
+                fields["integral_wrapped_svg"] = integral_wrapped_svg
     symbolic_binding_values = expression_variable_binding_values(
         str(fields.get("expression") or expression),
         precision,
@@ -16723,11 +16843,19 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
             return
 
         if action == "bindings":
+            symbolic_bindings = expression_variable_binding_values(
+                str(fields.get("expression") or expression),
+                precision,
+            )
             self.send_json(200, {
                 "ok": True,
                 "expression": fields.get("expression", "") or expression,
                 "bindings": fields.get("bindings", ""),
-                "binding_values": mars_binding_values(fields.get("bindings")),
+                "binding_values": (
+                    symbolic_bindings
+                    if symbolic_bindings
+                    else mars_binding_values(fields.get("bindings"))
+                ),
                 "differentiable": fields.get("differentiable", "yes"),
                 "evaluation_ready": fields.get("evaluation_ready", "no"),
             })

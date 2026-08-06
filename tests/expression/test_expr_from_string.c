@@ -636,6 +636,7 @@ static void test_from_string_implicit_symbolic_bindings(void)
     expr_t *gamma_alias = expr_from_string("{ @gamma }", NULL);
     expr_t *tau_alias = expr_from_string("{ @tau }", NULL);
     expr_t *f = expr_from_string("{ [radius]^2 + c_1 + π + e }", NULL);
+    expr_t *plain_integral_constant = expr_from_string("{ x + C }", NULL);
     expr_t *integral_family = expr_from_string(
         "{ C_0*x + C₁ + cos(x)*exp(sin(x)) }", NULL);
     char *xs = x ? expr_to_string(x, style_EXPRESSION) : NULL;
@@ -651,6 +652,9 @@ static void test_from_string_implicit_symbolic_bindings(void)
     char *gamma_as = gamma_alias ? expr_to_string(gamma_alias, style_EXPRESSION) : NULL;
     char *tau_as = tau_alias ? expr_to_string(tau_alias, style_EXPRESSION) : NULL;
     char *fs = f ? expr_to_string(f, style_EXPRESSION) : NULL;
+    char *plain_integral_constant_s = plain_integral_constant
+        ? expr_to_string(plain_integral_constant, style_EXPRESSION)
+        : NULL;
     char *integral_family_s = integral_family
         ? expr_to_string(integral_family, style_EXPRESSION)
         : NULL;
@@ -763,6 +767,21 @@ static void test_from_string_implicit_symbolic_bindings(void)
                        "implicit integration constants stay constant",
                        integral_family_s ? integral_family_s : "(null)",
                        "{ C₁ + C₀x + cos(x)·exp(sin(x)) | x = NAN; C₀ = NAN, C₁ = NAN }");
+    }
+
+    if (plain_integral_constant && plain_integral_constant_s &&
+        str_eq(plain_integral_constant_s,
+               "{ x + C | x = NAN; C = NAN }")) {
+        to_string_pass("implicit plain integration constant stays constant",
+                       plain_integral_constant_s,
+                       "{ x + C | x = NAN; C = NAN }");
+    } else {
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "implicit plain integration constant stays constant",
+                       plain_integral_constant_s
+                           ? plain_integral_constant_s
+                           : "(null)",
+                       "{ x + C | x = NAN; C = NAN }");
     }
 
     if (x && qf_isnan(expr_eval_qf(x))) {
@@ -887,6 +906,7 @@ static void test_from_string_implicit_symbolic_bindings(void)
     }
 
     free(fs);
+    free(plain_integral_constant_s);
     free(integral_family_s);
     free(tau_as);
     free(gamma_as);
@@ -901,6 +921,7 @@ static void test_from_string_implicit_symbolic_bindings(void)
     free(x_pow_ns);
     free(xs);
     expr_free(integral_family);
+    expr_free(plain_integral_constant);
     expr_free(f);
     expr_free(tau_alias);
     expr_free(gamma_alias);
@@ -1363,6 +1384,14 @@ static void test_from_string_number_literals(void)
     check_parse_expr("stacked unicode rational atom simplifies display",
                      "{ ²³¹⁄₂₃₁₀ }",
                      "⅒",
+                     __LINE__);
+    check_parse_expr("unparenthesised radical constant round-trips",
+                     "{ √3/2 }",
+                     "√(3)/2",
+                     __LINE__);
+    check_parse_expr("unparenthesised radical supports implicit multiplication",
+                     "{ 4√3/2 }",
+                     "2·√(3)",
                      __LINE__);
     check_parse_tex("stacked unicode rational atom renders TeX",
                     "{ ²³¹⁄₂₃₁₀ }",
