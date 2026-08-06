@@ -76,6 +76,8 @@ void de_free(diffequ_t *de)
     string_free(de->independent_text);
     string_free(de->differential_form_text);
     string_free(de->equation_text);
+    free(de->repeated_quadratic_dependent);
+    expr_free(de->repeated_quadratic_square);
     expr_bindings_free(de->constants);
     equ_free(de->equation);
     free(de);

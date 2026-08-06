@@ -3559,7 +3559,7 @@ __THEME_OVERRIDES__
         <p class="mode-hint">Enter an equation such as <code>{ M = E - e*sin(E) | E = 1.5; M = 1.5, e = 0.0167 }</code>. Bindings after <code>|</code> decide which symbols are variables, which are constants, and which starting values numeric fallback should use.</p>
       </div>
       <div class="mode-panel hidden" id="diffequationControls">
-        <p class="mode-hint">Enter an ODE such as <code>Dx(y) = x*y; y(0) = 1</code>. Use repeated derivative letters for higher orders, for example <code>Dxxx(y)</code>, and separate initial or boundary conditions with semicolons.</p>
+        <p class="mode-hint">Enter an ODE such as <code>Dx(y) = x*y; y(0) = 1</code>. Derivatives, polynomial differential operators, differential forms, and optional conditions are supported; choose <code>Help</code> for the accepted notation and examples.</p>
       </div>
       <div class="mode-panel hidden" id="integratorControls">
         <div class="integrator-bound-stack" id="integratorBoundStack"></div>
@@ -3852,12 +3852,41 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         </div>
         <div class="help-card" data-help-modes="diffequation">
           <div class="help-kicker">Differential Equations</div>
-          <p>Derivative notation identifies the independent variable. Conditions are optional; without enough conditions, the solution retains arbitrary constants.</p>
+          <p>Type the equation itself, followed by any initial or boundary conditions separated by semicolons. The notation identifies the dependent and independent variables; without enough conditions, the solution retains arbitrary constants.</p>
           <ul>
             <li><code>Dx(y) = x*y; y(0) = 1</code> is a first-order initial-value problem.</li>
-            <li><code>Dxx(y) = y; y(0) = 1; y'(0) = 1</code> uses prime notation in a condition.</li>
+            <li><code>Dxx(y) = y; y(0) = 1; y'(0) = 1</code> is a second-order problem and uses prime notation in a condition.</li>
             <li><code>Dxxx(y) + 3*Dxx(y) + 3*Dx(y) + y = x + sin(x)</code> is a forced third-order constant-coefficient ODE.</li>
-            <li>The result cards show the normalized problem, solver family, diagnostic, and symbolic solutions.</li>
+            <li><code>y'' + 4y = exp(x)</code>, <code>d²y/dx² + 4y = exp(x)</code>, and <code>Dxx(y) + 4y = exp(x)</code> are equivalent forms.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="diffequation">
+          <div class="help-kicker">Bare D And Operator Polynomials</div>
+          <p><code>D</code> is a differential operator. When it acts on <code>x</code>, MARS differentiates with respect to <code>t</code>; when it acts on any other dependent variable, MARS differentiates with respect to <code>x</code>.</p>
+          <ul>
+            <li><code>D(y) = y</code> means <code>Dx(y) = y</code>, while <code>D(x) = x</code> means <code>Dt(x) = x</code>.</li>
+            <li><code>D^2(z) + z = 0</code> means <code>Dxx(z) + z = 0</code>.</li>
+            <li><code>(D^2 - @omega^2)^2(x) = 0</code> expands the squared operator, treats <code>omega</code> as a constant, and solves for <code>x(t)</code>.</li>
+            <li><code>(D^2 + @omega^2)^3x = 0</code> is also accepted. Literal positive integer powers up to 64 are expanded; solutions show every term for powers below 4 and use compact finite sums from power 4 onwards.</li>
+            <li><code>(Dx^2 + 4Dx + 20)^2(y) = 0</code> explicitly selects <code>x</code> as the differentiation variable.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="diffequation">
+          <div class="help-kicker">Greek Symbols And Differential Forms</div>
+          <p>Prefix a Greek name with <code>@</code> to enter its symbol unambiguously. Common plain Greek names are also recognised. Differential forms may be entered as coefficients followed by differentials.</p>
+          <ul>
+            <li><code>@omega</code>, <code>@theta</code>, and <code>@phi</code> display as <code>ω</code>, <code>θ</code>, and <code>φ</code>.</li>
+            <li>When it is a dependent variable, <code>phi</code>, <code>@phi</code>, and <code>φ</code> are identical and render as <code>φ</code> everywhere; for example, <code>(D^2 + @omega^2)^4phi = 0</code>.</li>
+            <li><code>(sin(theta)-2r cos^2(theta))dr + r cos(theta)(2r sin(theta)+1)dtheta = 0</code> is accepted as a differential form.</li>
+            <li>The same form may use <code>@theta</code> and <code>d@theta</code>; MARSlib performs the parsing and solving.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="diffequation">
+          <div class="help-kicker">Partial Differential Equations And Results</div>
+          <ul>
+            <li><code>Dx(u) + Dy(u) = 0</code> is a first-order PDE; <code>u_x + u_y = 0</code> is equivalent shorthand.</li>
+            <li>Use the explicit form <code>{ Dx(y) + a*y = x | x = ?; a = 2; y(0) = 1 }</code> when you need to declare variables, constants, and conditions separately.</li>
+            <li>The result cards show the normalised problem, selected solver family, diagnostic, and every symbolic solution returned by native MARSlib.</li>
           </ul>
         </div>
         <div class="help-card" data-help-modes="datetime">
@@ -4216,6 +4245,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     const RESULT_ZOOM_LEVELS = [0.5, 0.67, 0.8, 1, 1.25, 1.5, 2, 3, 4, 6, 8];
     const RESULT_ZOOM_DEFAULT_INDEX = 3;
     let lastTex = '';
+    let diffequationFitFrame = 0;
     let lastDerivativeExpression = '';
     let currentVariables = [];
     let currentBindingKinds = new Map();
@@ -4641,6 +4671,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       currentVariables = Array.isArray(state.currentVariables) ? [...state.currentVariables] : [];
       currentDifferentiable = state.currentDifferentiable !== false;
       renderDerivativeButtons(currentVariables);
+      scheduleDiffequationSolutionFit();
     }
 
     function syncMatrixControls() {
@@ -8846,6 +8877,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         return;
       card.dataset.zoomIndex = String(Math.max(0, Math.min(RESULT_ZOOM_LEVELS.length - 1, index)));
       applyResultZoom(card);
+      scheduleDiffequationSolutionFit();
     }
 
     function stepResultZoom(card, direction) {
@@ -8891,6 +8923,89 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       }
       if (card)
         requestAnimationFrame(() => applyResultZoom(card));
+    }
+
+    function svgMarkupIntrinsicWidth(svgMarkup) {
+      const container = document.createElement('div');
+      container.innerHTML = String(svgMarkup || '');
+      const svg = container.querySelector('svg');
+      if (!svg)
+        return 0;
+
+      const attributeWidth = svgLengthPixels(svg.getAttribute('width'));
+      if (attributeWidth > 0)
+        return attributeWidth;
+
+      const viewBox = String(svg.getAttribute('viewBox') || '')
+        .trim()
+        .split(/[\s,]+/)
+        .map((value) => Number.parseFloat(value));
+      return viewBox.length === 4 && Number.isFinite(viewBox[2])
+        ? Math.max(0, viewBox[2])
+        : 0;
+    }
+
+    function renderedContentWidth() {
+      const style = getComputedStyle(rendered);
+      const paddingLeft = Number.parseFloat(style.paddingLeft) || 0;
+      const paddingRight = Number.parseFloat(style.paddingRight) || 0;
+      return Math.max(0, rendered.clientWidth - paddingLeft - paddingRight);
+    }
+
+    function renderedSolutionScale(card) {
+      if (!card)
+        return 1;
+      const style = getComputedStyle(card);
+      const base = Number.parseFloat(
+        style.getPropertyValue('--render-base-scale')
+      ) || 2;
+      return base * RESULT_ZOOM_LEVELS[resultZoomIndex(card)];
+    }
+
+    function fitDiffequationSolutionToCard() {
+      diffequationFitFrame = 0;
+      if (currentMode() !== 'diffequation')
+        return;
+
+      const compactSvg = rendered.dataset.compactSvg || '';
+      const wrappedSvg = rendered.dataset.wrappedSvg || '';
+      if (!compactSvg)
+        return;
+
+      const card = rendered.closest('.result-card');
+      const compactWidth = svgMarkupIntrinsicWidth(compactSvg) *
+        renderedSolutionScale(card);
+      const useWrapped = !!wrappedSvg &&
+        compactWidth > renderedContentWidth() + 1;
+      const variant = useWrapped ? 'wrapped' : 'compact';
+      if (rendered.dataset.responsiveVariant === variant)
+        return;
+
+      rendered.dataset.responsiveVariant = variant;
+      rendered.dataset.displayTex = useWrapped
+        ? (rendered.dataset.wrappedTex || rendered.dataset.compactTex || '')
+        : (rendered.dataset.compactTex || '');
+      setRenderedContent(
+        useWrapped ? wrappedSvg : compactSvg,
+        rendered.dataset.responsiveFallback || 'No symbolic solution available'
+      );
+    }
+
+    function scheduleDiffequationSolutionFit() {
+      if (diffequationFitFrame)
+        cancelAnimationFrame(diffequationFitFrame);
+      diffequationFitFrame = requestAnimationFrame(
+        fitDiffequationSolutionToCard
+      );
+    }
+
+    if (typeof ResizeObserver === 'function') {
+      const diffequationResizeObserver = new ResizeObserver(
+        scheduleDiffequationSolutionFit
+      );
+      diffequationResizeObserver.observe(rendered);
+    } else {
+      window.addEventListener('resize', scheduleDiffequationSolutionFit);
     }
 
     function clearRenderedError() {
@@ -9237,6 +9352,12 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       delete parsed.dataset.displayText;
       delete functionStyle.dataset.fullText;
       delete functionStyle.dataset.displayText;
+      delete rendered.dataset.compactTex;
+      delete rendered.dataset.wrappedTex;
+      delete rendered.dataset.compactSvg;
+      delete rendered.dataset.wrappedSvg;
+      delete rendered.dataset.responsiveFallback;
+      delete rendered.dataset.responsiveVariant;
       setResultInputText('');
       value.textContent = '';
       lastTex = '';
@@ -9534,10 +9655,18 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         rendered.dataset.displaySvg = data.svg || '';
         rendered.dataset.fullSvg = '';
         rendered.dataset.renderError = data.render_error || '';
+        rendered.dataset.compactTex = lastTex;
+        rendered.dataset.wrappedTex = data.solutions_wrapped_tex || lastTex;
+        rendered.dataset.compactSvg = data.svg || '';
+        rendered.dataset.wrappedSvg = data.wrapped_svg || '';
+        rendered.dataset.responsiveFallback =
+          data.render_error || lastTex || data.diagnostic || 'No symbolic solution available';
+        delete rendered.dataset.responsiveVariant;
         setRenderedContent(
           data.svg || '',
           data.render_error || lastTex || data.diagnostic || 'No symbolic solution available'
         );
+        scheduleDiffequationSolutionFit();
         resetMoreDigitsButton(renderedMore, false);
         setExpandableText(parsed, parsedMore, data.problem || text, data.problem || text);
         setResultInputText(data.input || text);
@@ -12048,8 +12177,16 @@ def parse_diffequation_lab_output(output: str) -> dict[str, str]:
             "steps": r"^steps\s*(.*)$",
             "solutions": r"^solutions\s+(.*)$",
             "solutions_tex": r"^solutions_tex\s*(.*)$",
+            "solutions_wrapped_tex": r"^solutions_wrapped_tex\s*(.*)$",
         },
-        {"problem_tex", "steps", "steps_tex", "solutions", "solutions_tex"},
+        {
+            "problem_tex",
+            "steps",
+            "steps_tex",
+            "solutions",
+            "solutions_tex",
+            "solutions_wrapped_tex",
+        },
     )
 
 
@@ -13813,14 +13950,20 @@ def prepare_diffequation_fields(fields: dict[str, str]) -> dict[str, object]:
     solutions_tex = tex_for_display(
         str(fields.get("solutions_tex") or "").strip()
     )
+    solutions_wrapped_tex = tex_for_display(
+        str(fields.get("solutions_wrapped_tex") or "").strip()
+    )
     problem_tex = tex_for_display(
         str(fields.get("problem_tex") or "").strip()
     )
     render_tex = solutions_tex or problem_tex
     svg = None
+    wrapped_svg = None
     render_error = None
     if render_tex:
         svg, render_error = render_tex_to_svg(render_tex)
+    if solutions_wrapped_tex and solutions_wrapped_tex != solutions_tex:
+        wrapped_svg, _ = render_tex_to_svg(solutions_wrapped_tex)
 
     payload: dict[str, object] = {
         "ok": True,
@@ -13834,6 +13977,7 @@ def prepare_diffequation_fields(fields: dict[str, str]) -> dict[str, object]:
             normalize_multiline_display_text(fields.get("solutions") or "")
         ),
         "solutions_tex": solutions_tex,
+        "solutions_wrapped_tex": solutions_wrapped_tex,
         "status": str(fields.get("status") or "").strip(),
         "solver": str(fields.get("solver") or "").strip(),
         "diagnostic": str(fields.get("diagnostic") or "").strip(),
@@ -13847,6 +13991,8 @@ def prepare_diffequation_fields(fields: dict[str, str]) -> dict[str, object]:
         payload["svg"] = svg
     elif render_error:
         payload["render_error"] = render_error
+    if wrapped_svg:
+        payload["wrapped_svg"] = wrapped_svg
     return payload
 
 

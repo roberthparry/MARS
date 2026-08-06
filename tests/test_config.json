@@ -233,6 +233,7 @@
     "test_diffequ_solves_invariant_forced_square_pde": true,
     "test_diffequ_solves_linear_change_of_variables": true,
     "test_diffequ_solves_linear_initial_value_problem": true,
+    "test_diffequ_solves_maximum_repeated_quadratic_power": true,
     "test_diffequ_solves_mixed_phase_trigonometric_forcing": true,
     "test_diffequ_solves_mixed_phase_unary_forcing": true,
     "test_diffequ_solves_mixed_polynomial_reaction_forcing": true,

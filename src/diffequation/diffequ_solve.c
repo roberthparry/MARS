@@ -579,6 +579,7 @@ diffequ_solve_result_t *de_solve(const diffequ_t *de)
     const expr_t *first_derivative = NULL;
     const expr_t *second_derivative = NULL;
     const expr_t *dependent = NULL;
+    expr_t *operator_dependent = NULL;
     size_t highest_order = 0u;
     expr_t *residual = NULL;
     expr_t *derivative_coefficient = NULL;
@@ -633,6 +634,37 @@ diffequ_solve_result_t *de_solve(const diffequ_t *de)
             "the solver requires at least one independent variable");
 
     independent = de->independent_vars[0];
+    if (de->repeated_quadratic_power >= 2u &&
+        de->repeated_quadratic_square &&
+        de->repeated_quadratic_dependent) {
+        operator_dependent = expr_new_named_var(
+            NUM_NAN, de->repeated_quadratic_dependent);
+        sturm_liouville = operator_dependent
+            ? de_attempt_repeated_quadratic_operator(
+                  de,
+                  independent,
+                  operator_dependent,
+                  de->repeated_quadratic_square,
+                  de->repeated_quadratic_power,
+                  &solution)
+            : DE_ATTEMPT_FAILED;
+        if (sturm_liouville == DE_ATTEMPT_SOLVED) {
+            result = de_solve_result_new(
+                DE_SOLVE_STATUS_SOLVED,
+                DE_SOLVER_CONSTANT_COEFFICIENT_LINEAR,
+                "solved as a repeated quadratic constant-coefficient "
+                "linear ODE");
+            goto append;
+        }
+        if (sturm_liouville == DE_ATTEMPT_FAILED) {
+            result = de_solve_result_new(
+                DE_SOLVE_STATUS_FAILED,
+                DE_SOLVER_NONE,
+                "failed to complete the repeated quadratic "
+                "constant-coefficient solution");
+            goto cleanup;
+        }
+    }
     residual = equ_residual(de->equation);
     if (!residual ||
         !de_find_derivatives(
@@ -1084,6 +1116,7 @@ cleanup:
     for (size_t i = 0u; i < 3u; ++i)
         equ_free(derivative_quadratic_solutions[i]);
     equ_free(solution);
+    expr_free(operator_dependent);
     expr_free(derivative_right);
     expr_free(negative_remainder);
     expr_free(remainder);

@@ -80,6 +80,9 @@ expr_t *expr_pow_long(const expr_t *expr, long exponent);
 expr_t *expr_add_long(const expr_t *expr, long value);
 expr_t *expr_new_indexed_symbol(const char *name, const expr_t *index);
 expr_t *expr_new_summation(const expr_t *term, const expr_t *index);
+expr_t *expr_new_finite_summation(const expr_t *term,
+                                  const expr_t *index,
+                                  const expr_t *upper);
 expr_t *expr_add_simplify_owned(const expr_t *left, const expr_t *right);
 expr_t *expr_sub_simplify_owned(const expr_t *left, const expr_t *right);
 expr_t *expr_mul_simplify_owned(const expr_t *left, const expr_t *right);

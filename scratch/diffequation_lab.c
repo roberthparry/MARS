@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 
 #include "diffequation.h"
@@ -78,21 +79,23 @@ static void print_solution_field(
     }
 }
 
-static void print_solution_tex(const diffequ_solve_result_t *result)
+static void print_solution_tex(const char *key,
+                               const diffequ_solve_result_t *result,
+                               size_t line_limit)
 {
     size_t count = de_solve_result_count(result);
 
-    if (count == 0u)
+    if (!key || count == 0u)
         return;
 
-    printf("solutions_tex \\begin{aligned}[t]\n");
+    printf("%s \\begin{aligned}[t]\n", key);
     for (size_t i = 0u; i < count; ++i) {
         const equation_t *solution = de_solve_result_at(result, i);
         char *lhs = solution
-            ? expr_to_tex_body_wrapped(equ_lhs(solution), 110u)
+            ? expr_to_tex_body_wrapped(equ_lhs(solution), line_limit)
             : NULL;
         char *rhs = solution
-            ? expr_to_tex_body_wrapped(equ_rhs(solution), 110u)
+            ? expr_to_tex_body_wrapped(equ_rhs(solution), line_limit)
             : NULL;
 
         printf("%s &= %s%s\n",
@@ -158,7 +161,8 @@ int main(int argc, char **argv)
         printf("symmetry %s\n", de_solve_result_symmetry(result));
     print_solver_steps(result);
     print_solution_field("solutions", result, style_UNBOUND);
-    print_solution_tex(result);
+    print_solution_tex("solutions_tex", result, SIZE_MAX);
+    print_solution_tex("solutions_wrapped_tex", result, 1u);
 
     free(problem_tex);
     free(problem);

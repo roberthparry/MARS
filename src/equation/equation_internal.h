@@ -38,6 +38,19 @@ bool equ_match_symbolic_cubic_expr(const expr_t *expr,
                                         expr_t **quadratic_out,
                                         expr_t **cubic_out);
 
+bool equ_match_symbolic_quartic_expr(const expr_t *expr,
+                                     const expr_t *wrt,
+                                     expr_t **constant_out,
+                                     expr_t **linear_out,
+                                     expr_t **quadratic_out,
+                                     expr_t **cubic_out,
+                                     expr_t **quartic_out);
+
+bool equ_match_symbolic_polynomial_alloc(const expr_t *expr,
+                                         const expr_t *wrt,
+                                         expr_t ***coefficients_out,
+                                         size_t *degree_out);
+
 bool equ_match_polynomial_expr(const expr_t *expr,
                                     const expr_t *wrt,
                                     size_t max_degree,
