@@ -53,10 +53,12 @@ static const char *solver_name(de_solver_t solver)
             return "characteristics";
         case DE_SOLVER_PARAMETER_LINEAR_PDE:
             return "parameter-dependent linear PDE";
-        case DE_SOLVER_HYDROGEN_MATRIX:
-            return "hydrogen matrix eigenproblem";
+        case DE_SOLVER_STATIONARY_EIGENFUNCTION:
+            return "stationary eigenfunction";
         case DE_SOLVER_EXACT_FIRST_ORDER:
             return "exact first-order";
+        case DE_SOLVER_LAPLACE:
+            return "Laplace";
     }
     return "none";
 }
@@ -140,7 +142,7 @@ int main(int argc, char **argv)
         return 2;
     }
 
-    result = de_solve(de);
+    result = de_solve_with_options(de, DE_SOLVE_OPTION_STEPS);
     if (!result) {
         de_free(de);
         fprintf(stderr, "error could not allocate differential-equation result\n");

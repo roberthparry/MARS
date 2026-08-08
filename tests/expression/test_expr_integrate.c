@@ -2826,6 +2826,9 @@ static void test_integrate_partial_fractions(void)
 static void test_integrate_quotient_rule_derivative(void)
 {
     static const double points[] = { -0.1, 0.25, 1.0, 2.0 };
+    const char *quartic_power_input =
+        "{ 24*x*(16*x^6-x^10-6*x^8+2*x^4-9*x^2+1)"
+        "/(x^4-x^2+1)^4 }";
 
     assert_nth_derivative_integrates_back(
         "{ (3*x^2 + 4*x + 5)/(x^3 + 2*x^2 + 5*x + 1) }",
@@ -2863,6 +2866,18 @@ static void test_integrate_quotient_rule_derivative(void)
     assert_string_antiderivative_contains(
         "{ (-4*x^3 - 14*x^2 - 22*x - 15)/(x^2 + 3*x + 5)^2 }",
         "(-2x - 5)/(x² + 3x + 5)");
+    assert_string_antiderivative_matches(
+        quartic_power_input,
+        points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_contains(
+        quartic_power_input,
+        "(6x⁸ + 22x⁶ - 42x⁴ + 4)/(x⁴ - x² + 1)³");
+    assert_string_antiderivative_matches(
+        "{ (-4*x^4-6*x^2+2*x-2)/(x^3+x+1)^3 }",
+        points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_contains(
+        "{ (-4*x^4-6*x^2+2*x-2)/(x^3+x+1)^3 }",
+        "(x² + 1)/(x³ + x + 1)²");
 }
 
 static void test_integrate_unevaluated_integral_derivative(void)
@@ -3594,6 +3609,46 @@ static void test_integrate_collects_repeated_inverse_and_log_terms(void)
     expr_free(expr);
 }
 
+static void test_integrate_polynomial_exponential_with_symbolic_rate(void)
+{
+    static const double x_points[] = { 0.5, 1.25, 3.0 };
+    static const double y_points[] = { -0.7, 0.2, 1.1 };
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = expr_from_string(
+        "{ y^3*exp(2*x*y) | x = NAN, y = NAN }", &bindings);
+    expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    expr_t *y = bindings ? expr_bindings_get(bindings, "y") : NULL;
+    expr_t *anti = (expr && y) ? expr_integrate(expr, y) : NULL;
+    expr_t *deriv = (anti && y) ? expr_create_deriv(anti, y) : NULL;
+    char *text = anti ? expr_to_string(anti, style_UNBOUND) : NULL;
+
+    ASSERT_NOT_NULL(anti);
+    ASSERT_NOT_NULL(deriv);
+    ASSERT_NOT_NULL(text);
+    ASSERT_TRUE(strstr(text, "4y³·exp(2xy)/x") != NULL);
+    ASSERT_TRUE(strstr(text, "6y·exp(2xy)/x³") != NULL);
+    ASSERT_TRUE(strstr(text, "(2x)³") == NULL);
+    ASSERT_TRUE(strstr(text, "(2x)⁴") == NULL);
+
+    for (size_t i = 0u; i < sizeof(x_points) / sizeof(x_points[0]); ++i) {
+        char label[160];
+
+        test_expr_set_val_d(x, x_points[i]);
+        test_expr_set_val_d(y, y_points[i]);
+        snprintf(label, sizeof(label),
+                 "symbolic exponential rate at x=%g, y=%g",
+                 x_points[i], y_points[i]);
+        check_q_at(__FILE__, __LINE__, 1, label,
+                   expr_eval_qf(deriv), expr_eval_qf(expr));
+    }
+
+    free(text);
+    expr_free(deriv);
+    expr_free(anti);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+}
+
 void test_symbolic_integration(void)
 {
     TEST_RUN_SUBTEST(test_integrate_polynomial_sum, NULL);
@@ -3644,5 +3699,7 @@ void test_symbolic_integration(void)
     TEST_RUN_SUBTEST(test_integrate_exact_symbolic_atan_affine_scale, NULL);
     TEST_RUN_SUBTEST(test_integrate_scaled_symbolic_sum_before_product_search, NULL);
     TEST_RUN_SUBTEST(test_integrate_collects_repeated_inverse_and_log_terms, NULL);
+    TEST_RUN_SUBTEST(
+        test_integrate_polynomial_exponential_with_symbolic_rate, NULL);
     TEST_RUN_SUBTEST(test_integrate_unsupported_product_returns_null, NULL);
 }

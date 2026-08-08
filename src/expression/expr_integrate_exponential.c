@@ -524,7 +524,32 @@ static expr_t *build_symbolic_integer_power_exp_integral(unsigned int degree,
             x_power = mul_number_owned(x_power, scale);
             num_destroy(&scale);
         }
-        coeff_power = expr_integrate_build_unsigned_expr_power(coeff, k + 1u);
+        {
+            number_t scale = num_new();
+            const expr_t *base = NULL;
+
+            if (expr_match_scaled_expr(coeff, &scale, &base) && base &&
+                base != coeff) {
+                number_t scale_power =
+                    num_pow_int(scale, (int)(k + 1u));
+                expr_t *scale_expr = expr_new_const(scale_power);
+                expr_t *base_power =
+                    expr_integrate_build_unsigned_expr_power(
+                        base, k + 1u);
+
+                coeff_power = scale_expr && base_power
+                    ? expr_mul(scale_expr, base_power)
+                    : NULL;
+                coeff_power = simplify_owned(coeff_power);
+                expr_free(base_power);
+                expr_free(scale_expr);
+                num_destroy(&scale_power);
+            } else {
+                coeff_power = expr_integrate_build_unsigned_expr_power(
+                    coeff, k + 1u);
+            }
+            num_destroy(&scale);
+        }
         term = (x_power && coeff_power) ? expr_div(x_power, coeff_power) : NULL;
         term = simplify_owned(term);
         expr_retain(exp_expr);

@@ -365,7 +365,8 @@ static string_t *de_to_expression_text(const diffequ_t *de)
     if (!de || !de->equation)
         return string_new_with("NULL");
 
-    partial_derivatives = de->independent_count > 1u;
+    partial_derivatives = de->independent_count > 1u ||
+        de->partial_derivative_input;
     canonical_equation = de->differential_form_input &&
         string_length(de->differential_form_text) > 0u
         ? string_new_with(string_c_str(de->differential_form_text))
@@ -706,9 +707,11 @@ static string_t *de_to_tex(const diffequ_t *de)
     }
 
     lhs = de_expr_to_unbound_tex(
-        equ_lhs(de->equation), de->independent_count > 1u);
+        equ_lhs(de->equation),
+        de->independent_count > 1u || de->partial_derivative_input);
     rhs = de_expr_to_unbound_tex(
-        equ_rhs(de->equation), de->independent_count > 1u);
+        equ_rhs(de->equation),
+        de->independent_count > 1u || de->partial_derivative_input);
     out = lhs && rhs ? string_sprintf("%s = %s", lhs, rhs) : NULL;
     free(rhs);
     free(lhs);

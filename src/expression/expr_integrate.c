@@ -216,8 +216,8 @@ static bool expr_integrate_raw_poly_quotient_is_final_local(const expr_t *expr,
         denominator_power == 0u)
         goto cleanup;
 
-    ok = expr_integrate_poly_degree_local(expr->a, wrt, 9u, &degree) &&
-         expr_integrate_poly_degree_local(denominator_base, wrt, 2u, &degree);
+    ok = expr_integrate_poly_degree_local(expr->a, wrt, 16u, &degree) &&
+         expr_integrate_poly_degree_local(denominator_base, wrt, 16u, &degree);
 
 cleanup:
     num_destroy(&exponent);

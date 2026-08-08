@@ -129,7 +129,259 @@ class DiffequationResultTests(unittest.TestCase):
         self.assertIn("d@theta", help_html)
         self.assertIn("phi</code>, <code>@phi</code>, and <code>φ", help_html)
         self.assertIn("Dx(u) + Dy(u) = 0", help_html)
+        self.assertIn("phi_xx + phi_yy = 0", help_html)
+        self.assertIn("1/r^2 phi_thetatheta", help_html)
         self.assertIn("every symbolic solution returned by native MARSlib", help_html)
+
+    def test_solver_tex_uses_width_selected_left_aligned_layout(self) -> None:
+        tex = (
+            r"\begin{aligned}[t]"
+            r"\mu z&=\frac{1}{8}x\left("
+            r"\frac{4y^3e^{2xy}}{x} + \frac{6ye^{2xy}}{x^3} "
+            r"- \frac{6y^2e^{2xy}}{x^2} - \frac{3e^{2xy}}{x^4}"
+            r"\right)+F(x)"
+            r"\end{aligned}"
+        )
+
+        wrapped = mars_lab.wrap_solver_tex_lines(tex, threshold=60)
+
+        self.assertGreater(wrapped.count(r"\\"), tex.count(r"\\"))
+        self.assertIn(r"&\displaystyle \mu z=", wrapped)
+        self.assertIn(r"&\displaystyle \qquad {}+", wrapped)
+        self.assertNotIn(r"\left", wrapped)
+        self.assertIn(r"\bigl", wrapped)
+        self.assertIn("data.steps_wrapped_tex || solverTexSource", mars_lab.INDEX_HTML)
+        self.assertIn("compactWidth > solverTexContentWidth()", mars_lab.INDEX_HTML)
+        self.assertIn("overflow-x: hidden", mars_lab.INDEX_HTML)
+        self.assertIn("overflow-y: auto", mars_lab.INDEX_HTML)
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
+    def test_native_helper_solves_two_dimensional_laplace_equation(self) -> None:
+        completed = subprocess.run(
+            [
+                str(
+                    ROOT
+                    / "build"
+                    / "release"
+                    / "scratch"
+                    / "diffequation_lab"
+                ),
+                "phi_xx + phi_yy = 0",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
+        self.assertEqual(fields["status"], "solved")
+        self.assertEqual(fields["solver"], "Laplace")
+        self.assertIn(
+            r"\frac{\partial^{2} \phi}{\partial x^{2}}",
+            fields["problem_tex"],
+        )
+        self.assertIn(
+            r"\phi &= F\left(x + i y\right) + G\left(x - i y\right)",
+            fields["solutions_tex"],
+        )
+        self.assertIn(
+            r"\frac{\partial^2 \phi}{\partial x^2}",
+            fields["steps_tex"],
+        )
+        self.assertIn(
+            r"\frac{\partial^2 \phi}{\partial y^2}",
+            fields["steps_tex"],
+        )
+        self.assertIn(r"\Delta \phi", fields["steps_tex"])
+        self.assertNotIn(
+            r"\text{Quod Erat Demonstrandum}",
+            fields["steps_tex"],
+        )
+
+        payload = mars_lab.prepare_diffequation_fields(fields)
+        self.assertTrue(payload.get("svg"))
+        cartesian_steps_svg, cartesian_steps_error = (
+            mars_lab.render_tex_to_svg(
+                mars_lab.tex_for_display(fields["steps_tex"])
+            )
+        )
+        self.assertIsNone(cartesian_steps_error)
+        self.assertTrue(cartesian_steps_svg)
+
+        renamed_completed = subprocess.run(
+            [
+                str(
+                    ROOT
+                    / "build"
+                    / "release"
+                    / "scratch"
+                    / "diffequation_lab"
+                ),
+                "u_ss + u_tt = 0",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        renamed_fields = mars_lab.parse_diffequation_lab_output(
+            renamed_completed.stdout
+        )
+        self.assertEqual(renamed_fields["status"], "solved")
+        self.assertIn(
+            r"u &= F\left(i t + s\right) + G\left(s - i t\right)",
+            renamed_fields["solutions_tex"],
+        )
+        self.assertIn(
+            r"\frac{\partial^2 u}{\partial s^2}",
+            renamed_fields["steps_tex"],
+        )
+        self.assertIn(
+            r"\frac{\partial^2 u}{\partial t^2}",
+            renamed_fields["steps_tex"],
+        )
+        self.assertNotIn(r"\partial x", renamed_fields["steps_tex"])
+        self.assertNotIn(r"\partial y", renamed_fields["steps_tex"])
+
+        polar_completed = subprocess.run(
+            [
+                str(
+                    ROOT
+                    / "build"
+                    / "release"
+                    / "scratch"
+                    / "diffequation_lab"
+                ),
+                "phi_rr + 1/r phi_r + 1/r^2 phi_thetatheta = 0",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        polar_fields = mars_lab.parse_diffequation_lab_output(
+            polar_completed.stdout
+        )
+        self.assertEqual(polar_fields["status"], "solved")
+        self.assertEqual(polar_fields["solver"], "Laplace")
+        self.assertIn(
+            r"\frac{\partial^{2} \phi}{\partial \theta^{2}}",
+            polar_fields["problem_tex"],
+        )
+        self.assertIn(
+            r"F\left(r \cdot e^{i \theta}\right)",
+            polar_fields["solutions_tex"],
+        )
+        self.assertIn(r"z_{\theta\theta}=-z", polar_fields["steps_tex"])
+        self.assertIn(r"u_{\theta\theta}", polar_fields["steps_tex"])
+        self.assertIn(r"\Delta u", polar_fields["steps_tex"])
+        self.assertIn(
+            r"\text{Therefore,}\quad u(r,\theta)",
+            polar_fields["steps_tex"],
+        )
+        steps_svg, steps_error = mars_lab.render_tex_to_svg(
+            mars_lab.tex_for_display(polar_fields["steps_tex"])
+        )
+        self.assertIsNone(steps_error)
+        self.assertTrue(steps_svg)
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
+    def test_parameter_linear_pde_shows_integrating_factor_steps(self) -> None:
+        completed = subprocess.run(
+            [
+                str(
+                    ROOT
+                    / "build"
+                    / "release"
+                    / "scratch"
+                    / "diffequation_lab"
+                ),
+                "z_y + 2*y*z = x*y^3",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
+        self.assertEqual(fields["status"], "solved")
+        self.assertEqual(fields["solver"], "parameter-dependent linear PDE")
+        self.assertIn(
+            r"z &= \frac{1}{2} x \cdot \left(y^{2} - 1\right)",
+            fields["solutions_tex"],
+        )
+        self.assertIn(
+            r"\mu&=e^{\int\left(2 y\right)\,dy}=e^{y^{2}}",
+            fields["steps_tex"],
+        )
+        self.assertIn(
+            r"\frac{\partial\mu}{\partial y}"
+            r"&=\left(2 y\right)\mu",
+            fields["steps_tex"],
+        )
+        self.assertIn(
+            r"\mu\frac{\partial z}{\partial y}"
+            r"+\frac{\partial\mu}{\partial y}z",
+            fields["steps_tex"],
+        )
+        self.assertIn(r"=\mu x y^{3}", fields["steps_tex"])
+        self.assertNotIn(r"\mu\cdot x y^{3}", fields["steps_tex"])
+        self.assertNotIn(r"\mu\left(x y^{3}\right)", fields["steps_tex"])
+        self.assertIn(
+            r"\mu z&=\frac{1}{2} x \cdot \left(y^{2} - 1\right)",
+            fields["steps_tex"],
+        )
+        self.assertIn(r"F\left(x\right)", fields["steps_tex"])
+        self.assertNotIn(
+            r"\text{Quod Erat Demonstrandum}",
+            fields["steps_tex"],
+        )
+
+        steps_svg, steps_error = mars_lab.render_tex_to_svg(
+            mars_lab.tex_for_display(fields["steps_tex"])
+        )
+        self.assertIsNone(steps_error)
+        self.assertTrue(steps_svg)
+
+        parameter_rate_completed = subprocess.run(
+            [
+                str(
+                    ROOT
+                    / "build"
+                    / "release"
+                    / "scratch"
+                    / "diffequation_lab"
+                ),
+                "z_y + 2*x*z = x*y^3",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        parameter_rate_fields = mars_lab.parse_diffequation_lab_output(
+            parameter_rate_completed.stdout
+        )
+        self.assertEqual(parameter_rate_fields["status"], "solved")
+        self.assertEqual(
+            parameter_rate_fields["solver"],
+            "parameter-dependent linear PDE",
+        )
+        self.assertIn(
+            r"\frac{1}{2} y^{3}",
+            parameter_rate_fields["solutions_tex"],
+        )
+        self.assertIn(
+            r"F\left(x\right) \cdot e^{-2 x y}",
+            parameter_rate_fields["solutions_tex"],
+        )
+        self.assertIn(
+            r"\mu&=e^{\int\left(2 x\right)\,dy}=e^{2 x y}",
+            parameter_rate_fields["steps_tex"],
+        )
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
@@ -271,9 +523,10 @@ solutions y = final
         self.assertNotIn("solutions y = final", payload["steps"])
         self.assertIn("function solverTextToTex(text)", mars_lab.INDEX_HTML)
         self.assertIn(
-            "data.steps_tex || solverTextToTex(solverDetails)",
+            "data.steps_left_tex || data.steps_tex ||",
             mars_lab.INDEX_HTML,
         )
+        self.assertIn("solverTextToTex(solverDetails)", mars_lab.INDEX_HTML)
 
     def test_problem_display_preserves_native_derivative_notation(self) -> None:
         fields = {
@@ -481,11 +734,11 @@ solutions y = final
         self.assertEqual(payload["symmetry"], "SL(3, ℝ)")
         self.assertIn("X = x − 1/(2y)", payload["steps"])
         self.assertIn("Y = x/(2y) − x²/2", payload["steps"])
-        self.assertIn(r"\mathrm{SL}(3,\mathrm R)", payload["steps_tex"])
+        self.assertIn(r"\text{Recognise the rule:}", payload["steps_tex"])
         self.assertIn(r"\frac{d^2Y}{dX^2}=0", payload["steps_tex"])
         self.assertEqual(
             payload["solutions"],
-            "y = (x + C₁)/(x² + 2C₁x + 2C₂)",
+            "y = (2x + C₁)/(2·(x² + C₁x + C₂))",
         )
 
     @unittest.skipUnless(
@@ -509,11 +762,11 @@ solutions y = final
         )
 
         self.assertEqual(payload["status"], "solved")
-        self.assertEqual(payload["solver"], "hydrogen matrix eigenproblem")
-        self.assertIn("u(0) = 0", payload["steps"])
-        self.assertIn("E₁ → −13.6057 eV", payload["steps"])
+        self.assertEqual(payload["solver"], "stationary eigenfunction")
+        self.assertIn("derived constant rate", payload["steps"])
+        self.assertIn("λ = −H[ψ₀]/(Aψ₀) = 0.5i", payload["steps"])
         self.assertIn(r"\begin{aligned}", payload["steps_tex"])
-        self.assertIn(r"H_{jj}", payload["steps_tex"])
+        self.assertIn(r"\lambda&=-\frac{H[", payload["steps_tex"])
         self.assertEqual(
             payload["solutions"],
             "ψ = exp(0.5it - √(x² + y² + z²))/√(π)",
@@ -549,6 +802,34 @@ solutions y = final
             "| x = ?, y = ?; ; z(1,y) = y }",
         )
         self.assertEqual(payload["problem"], fields["problem"])
+
+        single_completed = subprocess.run(
+            [
+                str(
+                    ROOT
+                    / "build"
+                    / "release"
+                    / "scratch"
+                    / "diffequation_lab"
+                ),
+                "z_y + 2yz = xy^3",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        single_fields = mars_lab.parse_diffequation_lab_output(
+            single_completed.stdout
+        )
+        self.assertEqual(single_fields["status"], "solved")
+        self.assertEqual(
+            single_fields["problem"],
+            "{ ∂z/∂y + 2yz = xy^3 | y = ?; ;  }",
+        )
+        self.assertIn(
+            r"\frac{\partial z}{\partial y}",
+            single_fields["problem_tex"],
+        )
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
@@ -768,7 +1049,7 @@ solutions y = final
         self.assertEqual(payload["solver"], "derivative-quadratic")
         self.assertIn(r"\frac{d y}{d x}", payload["problem_tex"])
         self.assertNotIn(r"\operatorname{D}^{2}", payload["problem_tex"])
-        self.assertIn("y = ?", payload["problem_tex"])
+        self.assertIn("x = ?", fields["problem"])
         self.assertNotIn("NAN", payload["problem_tex"])
         self.assertEqual(
             payload["solutions"].splitlines(),

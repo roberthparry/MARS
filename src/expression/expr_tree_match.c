@@ -555,6 +555,27 @@ expr_t *expr_substitute(const expr_t *expr,
         return (expr_t *)replacement;
     }
 
+    if (expr_is_formal_derivative(expr)) {
+        const expr_t *dependent = expr_formal_derivative_dependent(expr);
+
+        if (dependent == needle ||
+            expr_is_same_named_leaf_for_substitution(dependent, needle)) {
+            expr_t *value = expr_clone(replacement);
+
+            for (size_t i = 0u;
+                 value && i < expr_formal_derivative_order(expr);
+                 ++i) {
+                expr_t *next = expr_create_deriv(
+                    value, expr_formal_derivative_wrt_at(expr, i));
+
+                expr_free(value);
+                value = next;
+            }
+            return value;
+        }
+        return expr_clone(expr);
+    }
+
     if (expr_has_composite_preserved_binding_leaf(expr)) {
         expr_t *expanded = expr_binding_expr_eval_expr(expr->binding_expr);
 

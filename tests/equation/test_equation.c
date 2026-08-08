@@ -1214,6 +1214,59 @@ static void test_equation_solves_degree_twelve_complex_roots(void)
     equ_free(equation);
 }
 
+static void test_equation_solves_geometric_sum_with_exact_roots(void)
+{
+    equation_t *equation =
+        equ_from_string("x^7 + x^6 + x^5 + x^4 + x^3 + x^2 + x + 1 = 0");
+    expr_t *x;
+    ASSERT_NEW_RESULT(result);
+
+    ASSERT_NOT_NULL(equation);
+    x = equ_binding(equation, "x");
+    ASSERT_NOT_NULL(x);
+
+    ASSERT_EQ_INT(equ_solve_for(equation, x, result), 0);
+    ASSERT_TRUE(RESULT_IS_SOLVED(result));
+    ASSERT_EQ_INT((int)RESULT_COUNT(result), 7);
+    ASSERT_TRUE(test_equation_result_has_rhs_string(result, "-1"));
+    ASSERT_TRUE(test_equation_result_has_rhs_string(result, "i"));
+    ASSERT_TRUE(test_equation_result_has_rhs_string(result, "-i"));
+    ASSERT_TRUE(test_equation_result_has_rhs_string(
+        result, "(-1 + i)·√(2)/2"));
+    ASSERT_TRUE(test_equation_result_has_rhs_string(
+        result, "(-1 - i)·√(2)/2"));
+    ASSERT_TRUE(test_equation_result_has_rhs_string(
+        result, "(1 + i)·√(2)/2"));
+    ASSERT_TRUE(test_equation_result_has_rhs_string(
+        result, "(1 - i)·√(2)/2"));
+    ASSERT_TRUE(test_equation_all_solutions_satisfy(
+        equation, x, result, "1e-40"));
+
+    equ_solve_result_free(result);
+    equ_free(equation);
+}
+
+static void test_equation_geometric_sum_uses_degree_and_scale_rule(void)
+{
+    equation_t *equation =
+        equ_from_string("3*x^4 + 3*x^3 + 3*x^2 + 3*x + 3 = 0");
+    expr_t *x;
+    ASSERT_NEW_RESULT(result);
+
+    ASSERT_NOT_NULL(equation);
+    x = equ_binding(equation, "x");
+    ASSERT_NOT_NULL(x);
+
+    ASSERT_EQ_INT(equ_solve_for(equation, x, result), 0);
+    ASSERT_TRUE(RESULT_IS_SOLVED(result));
+    ASSERT_EQ_INT((int)RESULT_COUNT(result), 4);
+    ASSERT_TRUE(test_equation_all_solutions_satisfy(
+        equation, x, result, "1e-40"));
+
+    equ_solve_result_free(result);
+    equ_free(equation);
+}
+
 static void test_equation_general_polynomial_roots_satisfy_original(void)
 {
     equation_t *equation = equ_from_string("x^6 + x + 1 = 0");
@@ -1576,6 +1629,10 @@ static void test_equation_basics(void)
     TEST_RUN_SUBTEST(test_equation_quintic_roots_satisfy_original_polynomial, NULL);
     TEST_RUN_SUBTEST(test_equation_solves_sextic_six_real_roots, NULL);
     TEST_RUN_SUBTEST(test_equation_solves_degree_twelve_complex_roots, NULL);
+    TEST_RUN_SUBTEST(
+        test_equation_solves_geometric_sum_with_exact_roots, NULL);
+    TEST_RUN_SUBTEST(
+        test_equation_geometric_sum_uses_degree_and_scale_rule, NULL);
     TEST_RUN_SUBTEST(
         test_equation_general_polynomial_roots_satisfy_original, NULL);
     TEST_RUN_SUBTEST(

@@ -1115,6 +1115,184 @@ cleanup:
     return particular;
 }
 
+/*
+ * For an affine phase theta = a*x + b, split the characteristic polynomial
+ * at i*a into its real and imaginary parts,
+ *
+ *     P(i*a) = E + i*O.
+ *
+ * Then P(D)(A*cos(theta) + B*sin(theta)) has cosine coefficient
+ * E*A + O*B and sine coefficient E*B - O*A.  Solving that two-by-two
+ * system gives a particular solution for every non-resonant affine sine or
+ * cosine forcing; no frequency or operator coefficients are prescribed.
+ */
+static expr_t *de_trigonometric_particular_solution(
+    const de_constant_linear_form_t *form,
+    const expr_t *independent)
+{
+    expr_t *variables[1] = { (expr_t *)independent };
+    const expr_t *argument = NULL;
+    number_t phase_constant = num_new();
+    number_t phase_rate = num_new();
+    number_t even_value = num_new();
+    number_t odd_value = num_new();
+    expr_t *even = NULL;
+    expr_t *odd = NULL;
+    expr_t *denominator = NULL;
+    expr_t *cosine_coefficient = NULL;
+    expr_t *sine_coefficient = NULL;
+    expr_t *cosine = NULL;
+    expr_t *sine = NULL;
+    expr_t *cosine_term = NULL;
+    expr_t *sine_term = NULL;
+    expr_t *particular = NULL;
+    bool cosine_forcing = false;
+    bool sine_forcing = false;
+
+    if (!form || !form->forcing || !independent)
+        goto cleanup;
+    cosine_forcing = expr_match_unary_affine_kind(
+        form->forcing,
+        EXPR_PATTERN_UNARY_COS,
+        1u,
+        variables,
+        &phase_constant,
+        &phase_rate);
+    sine_forcing = !cosine_forcing && expr_match_unary_affine_kind(
+        form->forcing,
+        EXPR_PATTERN_UNARY_SIN,
+        1u,
+        variables,
+        &phase_constant,
+        &phase_rate);
+    if ((!cosine_forcing && !sine_forcing) ||
+        !expr_match_unary_expr(form->forcing, &argument))
+        goto cleanup;
+
+    even = expr_const_zero();
+    odd = expr_const_zero();
+    for (size_t order = 0u;
+         even && odd && order <= form->order;
+         ++order) {
+        number_t rate_power = num_pow_int(phase_rate, (int)order);
+        expr_t *term = expr_mul_simplify_owned(
+            expr_clone(form->coefficients[order]),
+            expr_new_const(rate_power));
+
+        num_destroy(&rate_power);
+        if (!term)
+            goto cleanup;
+        if (term && ((order / 2u) % 2u) != 0u)
+            term = expr_negate_owned(term);
+        if (!term)
+            goto cleanup;
+        if ((order % 2u) == 0u)
+            even = expr_add_simplify_owned(even, term);
+        else
+            odd = expr_add_simplify_owned(odd, term);
+    }
+    if (even && odd &&
+        expr_match_const_value(even, &even_value) &&
+        expr_match_const_value(odd, &odd_value)) {
+        number_t even_squared = num_mul(even_value, even_value);
+        number_t odd_squared = num_mul(odd_value, odd_value);
+        number_t denominator_value = num_add(even_squared, odd_squared);
+        number_t cosine_value = num_new();
+        number_t sine_value = num_new();
+
+        if (!num_eq(denominator_value, NUM_ZERO)) {
+            if (cosine_forcing) {
+                num_destroy(&cosine_value);
+                cosine_value = num_div(even_value, denominator_value);
+                num_destroy(&sine_value);
+                sine_value = num_div(odd_value, denominator_value);
+            } else {
+                number_t odd_ratio = num_div(
+                    odd_value, denominator_value);
+
+                num_destroy(&cosine_value);
+                cosine_value = num_neg(odd_ratio);
+                num_destroy(&odd_ratio);
+                num_destroy(&sine_value);
+                sine_value = num_div(even_value, denominator_value);
+            }
+            denominator = expr_new_const(denominator_value);
+            cosine_coefficient = expr_new_const(cosine_value);
+            sine_coefficient = expr_new_const(sine_value);
+            if (!denominator || !cosine_coefficient ||
+                !sine_coefficient) {
+                expr_free(sine_coefficient);
+                expr_free(cosine_coefficient);
+                expr_free(denominator);
+                sine_coefficient = NULL;
+                cosine_coefficient = NULL;
+                denominator = NULL;
+            }
+        }
+        num_destroy(&sine_value);
+        num_destroy(&cosine_value);
+        num_destroy(&denominator_value);
+        num_destroy(&odd_squared);
+        num_destroy(&even_squared);
+    } else {
+        denominator = even && odd
+            ? expr_add_simplify_owned(
+                  expr_pow_long(even, 2L),
+                  expr_pow_long(odd, 2L))
+            : NULL;
+    }
+    if (!denominator || expr_is_exact_zero(denominator))
+        goto cleanup;
+
+    if (cosine_coefficient && sine_coefficient) {
+        /* Exact numeric coefficients were obtained above. */
+    } else if (cosine_forcing) {
+        cosine_coefficient = expr_div_simplify_owned(
+            expr_clone(even), expr_clone(denominator));
+        sine_coefficient = expr_div_simplify_owned(
+            expr_clone(odd), expr_clone(denominator));
+    } else {
+        cosine_coefficient = expr_negate_owned(
+            expr_div_simplify_owned(
+                expr_clone(odd), expr_clone(denominator)));
+        sine_coefficient = expr_div_simplify_owned(
+            expr_clone(even), expr_clone(denominator));
+    }
+    cosine = argument ? expr_cos(argument) : NULL;
+    sine = argument ? expr_sin(argument) : NULL;
+    cosine_term = cosine_coefficient && cosine
+        ? expr_mul_simplify_owned(cosine_coefficient, cosine)
+        : NULL;
+    cosine_coefficient = NULL;
+    cosine = NULL;
+    sine_term = sine_coefficient && sine
+        ? expr_mul_simplify_owned(sine_coefficient, sine)
+        : NULL;
+    sine_coefficient = NULL;
+    sine = NULL;
+    particular = cosine_term && sine_term
+        ? expr_add_simplify_owned(cosine_term, sine_term)
+        : NULL;
+    cosine_term = NULL;
+    sine_term = NULL;
+
+cleanup:
+    expr_free(sine_term);
+    expr_free(cosine_term);
+    expr_free(sine);
+    expr_free(cosine);
+    expr_free(sine_coefficient);
+    expr_free(cosine_coefficient);
+    expr_free(denominator);
+    expr_free(odd);
+    expr_free(even);
+    num_destroy(&odd_value);
+    num_destroy(&even_value);
+    num_destroy(&phase_rate);
+    num_destroy(&phase_constant);
+    return particular;
+}
+
 static expr_t *de_secant_cubed_particular_solution(
     const de_constant_linear_form_t *form,
     const expr_t *independent)
@@ -1307,6 +1485,11 @@ static expr_t *de_particular_solution(
         goto cleanup_scale;
 
     particular = de_polynomial_particular_solution(
+        form, independent);
+    if (particular)
+        goto cleanup_scale;
+
+    particular = de_trigonometric_particular_solution(
         form, independent);
     if (particular)
         goto cleanup_scale;
