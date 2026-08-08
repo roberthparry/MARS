@@ -22,7 +22,9 @@ typedef struct {
 
 enum {
     partial_fraction_poly_coeff_count = 5u,
-    laurent_poly_coeff_count = 9u
+    laurent_poly_coeff_count = 9u,
+    rational_power_poly_coeff_count = 17u,
+    rational_power_system_size = 32u
 };
 
 static void partial_fraction_array_zero(number_t *values, size_t count)
@@ -300,14 +302,14 @@ static bool poly_match_direct_limited_rec(const expr_t *expr,
 {
     number_t constant = num_new();
     number_t exponent = num_new();
-    number_t lhs[laurent_poly_coeff_count];
-    number_t rhs[laurent_poly_coeff_count];
+    number_t lhs[rational_power_poly_coeff_count];
+    number_t rhs[rational_power_poly_coeff_count];
     bool coeffs_ready = false;
     bool lhs_ready = false;
     bool rhs_ready = false;
     bool ok = false;
 
-    if (count == 0u || count > laurent_poly_coeff_count)
+    if (count == 0u || count > rational_power_poly_coeff_count)
         goto cleanup;
 
     partial_fraction_array_zero(coeffs, count);
@@ -421,7 +423,7 @@ static bool poly_match_direct_limited_rec(const expr_t *expr,
         num_destroy(&coeffs[0]);
         coeffs[0] = num_clone(NUM_ONE);
         for (size_t iter = 0; iter < power; ++iter) {
-            number_t next[laurent_poly_coeff_count];
+            number_t next[rational_power_poly_coeff_count];
 
             if (poly_degree_local(coeffs, count) + poly_degree_local(lhs, count) >= count)
                 goto cleanup;
@@ -457,7 +459,7 @@ static bool poly_match_direct_limited_rec(const expr_t *expr,
         num_destroy(&coeffs[0]);
         coeffs[0] = num_clone(NUM_ONE);
         for (size_t iter = 0; iter < power; ++iter) {
-            number_t next[laurent_poly_coeff_count];
+            number_t next[rational_power_poly_coeff_count];
 
             if (poly_degree_local(coeffs, count) + poly_degree_local(lhs, count) >= count)
                 goto cleanup;
@@ -962,6 +964,353 @@ static bool poly_match_direct_deg8(const expr_t *expr,
 fail:
     number_array_clear_local(coeffs, laurent_poly_coeff_count);
     return false;
+}
+
+static bool poly_match_direct_deg16(const expr_t *expr,
+                                    const expr_t *wrt,
+                                    number_t *coeffs,
+                                    size_t *degree_out)
+{
+    if (!poly_match_direct_limited_rec(expr, wrt, coeffs,
+                                       rational_power_poly_coeff_count))
+        return false;
+
+    if (!poly_is_exact_real_local(coeffs,
+                                  rational_power_poly_coeff_count - 1u))
+        goto fail;
+
+    if (degree_out)
+        *degree_out = poly_degree_local(coeffs,
+                                        rational_power_poly_coeff_count);
+    return true;
+
+fail:
+    number_array_clear_local(coeffs, rational_power_poly_coeff_count);
+    return false;
+}
+
+static bool match_positive_polynomial_power_local(const expr_t *expr,
+                                                  const expr_t **base_out,
+                                                  size_t *power_out)
+{
+    number_t exponent = num_new();
+    size_t power = 0u;
+    bool ok = false;
+
+    if (!expr || !base_out || !power_out)
+        goto cleanup;
+
+    if (expr->ops && expr->ops->kind == EXPR_KIND_POW_D && expr->a &&
+        small_positive_int_from_number(expr->c, &power)) {
+        *base_out = expr->a;
+        *power_out = power;
+        ok = true;
+        goto cleanup;
+    }
+
+    if (expr->ops && expr->ops->kind == EXPR_KIND_POW &&
+        expr->a && expr->b &&
+        expr_match_const_value(expr->b, &exponent) &&
+        small_positive_int_from_number(exponent, &power)) {
+        *base_out = expr->a;
+        *power_out = power;
+        ok = true;
+    }
+
+cleanup:
+    num_destroy(&exponent);
+    return ok;
+}
+
+static bool solve_rectangular_system_local(
+    size_t row_count,
+    size_t column_count,
+    number_t matrix[rational_power_system_size]
+                   [rational_power_system_size + 1u],
+    number_t *solution)
+{
+    size_t pivot_columns[rational_power_system_size];
+    size_t pivot_row = 0u;
+
+    if (row_count == 0u || column_count == 0u ||
+        row_count > rational_power_system_size ||
+        column_count > rational_power_system_size)
+        return false;
+
+    for (size_t column = 0u;
+         column < column_count && pivot_row < row_count;
+         ++column) {
+        size_t pivot = pivot_row;
+
+        while (pivot < row_count &&
+               num_eq(matrix[pivot][column], NUM_ZERO))
+            ++pivot;
+        if (pivot == row_count)
+            continue;
+
+        if (pivot != pivot_row) {
+            for (size_t j = 0u; j <= column_count; ++j) {
+                number_t tmp = matrix[pivot_row][j];
+
+                matrix[pivot_row][j] = matrix[pivot][j];
+                matrix[pivot][j] = tmp;
+            }
+        }
+
+        {
+            number_t pivot_value = num_clone(matrix[pivot_row][column]);
+
+            for (size_t j = column; j <= column_count; ++j) {
+                number_t next = num_div(matrix[pivot_row][j], pivot_value);
+
+                num_destroy(&matrix[pivot_row][j]);
+                matrix[pivot_row][j] = next;
+            }
+            num_destroy(&pivot_value);
+        }
+
+        for (size_t row = 0u; row < row_count; ++row) {
+            number_t factor;
+
+            if (row == pivot_row ||
+                num_eq(matrix[row][column], NUM_ZERO))
+                continue;
+
+            factor = num_clone(matrix[row][column]);
+            for (size_t j = column; j <= column_count; ++j) {
+                number_t scaled = num_mul(factor, matrix[pivot_row][j]);
+                number_t next = num_sub(matrix[row][j], scaled);
+
+                num_destroy(&matrix[row][j]);
+                matrix[row][j] = next;
+                num_destroy(&scaled);
+            }
+            num_destroy(&factor);
+        }
+
+        pivot_columns[pivot_row] = column;
+        ++pivot_row;
+    }
+
+    for (size_t row = pivot_row; row < row_count; ++row) {
+        bool all_zero = true;
+
+        for (size_t column = 0u; column < column_count; ++column) {
+            if (!num_eq(matrix[row][column], NUM_ZERO)) {
+                all_zero = false;
+                break;
+            }
+        }
+        if (all_zero && !num_eq(matrix[row][column_count], NUM_ZERO))
+            return false;
+    }
+
+    if (pivot_row != column_count)
+        return false;
+
+    for (size_t row = 0u; row < pivot_row; ++row) {
+        size_t column = pivot_columns[row];
+
+        num_destroy(&solution[column]);
+        solution[column] = num_clone(matrix[row][column_count]);
+    }
+    return true;
+}
+
+static void rational_power_matrix_add_scaled_local(number_t *cell,
+                                                   number_t coefficient,
+                                                   long scale)
+{
+    number_t factor = num_create_from_long(scale);
+    number_t scaled = num_mul(coefficient, factor);
+    number_t next = num_add(*cell, scaled);
+
+    num_destroy(cell);
+    *cell = next;
+    num_destroy(&scaled);
+    num_destroy(&factor);
+}
+
+static expr_t *build_expanded_polynomial_local(const expr_t *wrt,
+                                               const number_t *coefficients,
+                                               size_t count)
+{
+    expr_t *sum = NULL;
+
+    if (!wrt || !coefficients)
+        return NULL;
+
+    for (size_t power = count; power-- > 0u;) {
+        expr_t *base = NULL;
+        expr_t *term = NULL;
+
+        if (num_eq(coefficients[power], NUM_ZERO))
+            continue;
+        if (power == 0u) {
+            term = expr_new_const(coefficients[power]);
+        } else {
+            number_t exponent = num_create_from_long((long)power);
+
+            base = power == 1u
+                ? expr_retain_expr(wrt)
+                : expr_pow(wrt, &exponent);
+            if (base && num_eq(coefficients[power], NUM_ONE))
+                term = expr_retain_expr(base);
+            else if (base && num_eq(coefficients[power], NUM_NEG_ONE))
+                term = expr_neg(base);
+            else
+                term = base
+                    ? expr_mul_num(base, &coefficients[power])
+                    : NULL;
+            num_destroy(&exponent);
+        }
+        expr_free(base);
+        if (!term) {
+            expr_free(sum);
+            return NULL;
+        }
+        sum = expr_add_owned(sum, term);
+        if (!sum)
+            return NULL;
+    }
+
+    return sum ? sum : expr_new_const(NUM_ZERO);
+}
+
+/*
+ * Recognise exact derivatives in Q-adic rational form.  For polynomial A and
+ * Q,
+ *
+ *   d/dx (A / Q^(m-1))
+ *       = (A'Q - (m-1)AQ') / Q^m.
+ *
+ * The coefficients of A are found by exact Gaussian elimination.  This is a
+ * general rational-integration rule; no coefficients from a particular
+ * integrand are embedded here.
+ */
+static expr_t *integrate_rational_power_exact_derivative(
+    const expr_t *expr,
+    const expr_t *wrt)
+{
+    number_t numerator[rational_power_poly_coeff_count];
+    number_t denominator[rational_power_poly_coeff_count];
+    number_t solution[rational_power_poly_coeff_count];
+    number_t matrix[rational_power_system_size]
+                   [rational_power_system_size + 1u];
+    const expr_t *denominator_base = NULL;
+    size_t denominator_power = 0u;
+    size_t numerator_degree = 0u;
+    size_t denominator_degree = 0u;
+    size_t antiderivative_degree = 0u;
+    size_t row_count = 0u;
+    size_t column_count = 0u;
+    expr_t *numerator_expr = NULL;
+    expr_t *denominator_expr = NULL;
+    expr_t *out = NULL;
+    bool numerator_ready = false;
+    bool denominator_ready = false;
+    bool solution_ready = false;
+    bool matrix_ready = false;
+
+    if (!expr || !wrt || !expr->a || !expr->b ||
+        !match_positive_polynomial_power_local(
+            expr->b, &denominator_base, &denominator_power) ||
+        denominator_power < 2u)
+        goto cleanup;
+
+    numerator_ready = poly_match_direct_deg16(
+        expr->a, wrt, numerator, &numerator_degree);
+    denominator_ready = poly_match_direct_deg16(
+        denominator_base, wrt, denominator, &denominator_degree);
+    if (!numerator_ready || !denominator_ready ||
+        denominator_degree < 3u ||
+        denominator_power > SIZE_MAX / denominator_degree ||
+        numerator_degree >= denominator_power * denominator_degree)
+        goto cleanup;
+
+    antiderivative_degree =
+        (denominator_power - 1u) * denominator_degree - 1u;
+    column_count = antiderivative_degree + 1u;
+    row_count = antiderivative_degree + denominator_degree;
+    if (column_count > rational_power_poly_coeff_count ||
+        row_count > rational_power_system_size)
+        goto cleanup;
+
+    partial_fraction_array_zero(solution, column_count);
+    solution_ready = true;
+    for (size_t row = 0u; row < row_count; ++row)
+        partial_fraction_array_zero(matrix[row], column_count + 1u);
+    matrix_ready = true;
+
+    for (size_t a_power = 0u;
+         a_power <= antiderivative_degree;
+         ++a_power) {
+        if (a_power > 0u) {
+            for (size_t q_power = 0u;
+                 q_power <= denominator_degree;
+                 ++q_power) {
+                size_t row = a_power - 1u + q_power;
+
+                rational_power_matrix_add_scaled_local(
+                    &matrix[row][a_power], denominator[q_power],
+                    (long)a_power);
+            }
+        }
+
+        for (size_t q_power = 1u;
+             q_power <= denominator_degree;
+             ++q_power) {
+            size_t row = a_power + q_power - 1u;
+            long scale = -(long)(denominator_power - 1u) *
+                         (long)q_power;
+
+            rational_power_matrix_add_scaled_local(
+                &matrix[row][a_power], denominator[q_power], scale);
+        }
+    }
+
+    for (size_t row = 0u; row < row_count; ++row) {
+        num_destroy(&matrix[row][column_count]);
+        matrix[row][column_count] = row <= numerator_degree
+            ? num_clone(numerator[row])
+            : num_clone(NUM_ZERO);
+    }
+
+    if (!solve_rectangular_system_local(row_count, column_count,
+                                        matrix, solution))
+        goto cleanup;
+
+    numerator_expr = build_expanded_polynomial_local(
+        wrt, solution, column_count);
+    if (denominator_power == 2u) {
+        denominator_expr = expr_retain_expr(denominator_base);
+    } else {
+        number_t exponent = num_create_from_long(
+            (long)(denominator_power - 1u));
+
+        denominator_expr = expr_pow(denominator_base, &exponent);
+        num_destroy(&exponent);
+    }
+    out = (numerator_expr && denominator_expr)
+        ? expr_div(numerator_expr, denominator_expr)
+        : NULL;
+
+cleanup:
+    expr_free(denominator_expr);
+    expr_free(numerator_expr);
+    if (matrix_ready) {
+        for (size_t row = 0u; row < row_count; ++row)
+            number_array_clear_local(matrix[row], column_count + 1u);
+    }
+    if (solution_ready)
+        number_array_clear_local(solution, column_count);
+    if (denominator_ready)
+        number_array_clear_local(denominator,
+                                 rational_power_poly_coeff_count);
+    if (numerator_ready)
+        number_array_clear_local(numerator,
+                                 rational_power_poly_coeff_count);
+    return out;
 }
 
 static bool match_monomial_wrt_power_denominator_rec(const expr_t *expr,
@@ -1548,6 +1897,9 @@ expr_t *integrate_rational_partial_fractions(const expr_t *expr, const expr_t *w
     if (!expr || !expr->a || !expr->b)
         return NULL;
 
+    sum = integrate_rational_power_exact_derivative(expr, wrt);
+    if (sum)
+        return sum;
     sum = integrate_general_palindromic_quartic(expr, wrt);
     if (sum)
         return sum;

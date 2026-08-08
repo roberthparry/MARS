@@ -1,3 +1,4 @@
+#include <limits.h>
 #include <math.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -40,6 +41,311 @@ static number_t *equ_general_new_numbers(size_t count)
     for (size_t i = 0u; i < count; ++i)
         values[i] = num_new();
     return values;
+}
+
+static bool equ_general_is_geometric_sum(const number_t *coeffs,
+                                         size_t degree)
+{
+    if (!coeffs || degree == 0u || num_is_zero(coeffs[0]))
+        return false;
+
+    for (size_t i = 1u; i <= degree; ++i) {
+        if (!num_eq(coeffs[i], coeffs[0]))
+            return false;
+    }
+    return true;
+}
+
+typedef enum {
+    EQU_STANDARD_TRIG_ZERO,
+    EQU_STANDARD_TRIG_ONE,
+    EQU_STANDARD_TRIG_HALF,
+    EQU_STANDARD_TRIG_SQRT2_HALF,
+    EQU_STANDARD_TRIG_SQRT3_HALF
+} equ_standard_trig_magnitude_t;
+
+typedef struct {
+    int sign;
+    equ_standard_trig_magnitude_t magnitude;
+} equ_standard_trig_component_t;
+
+static bool equ_general_standard_trig_component(
+    size_t index,
+    size_t order,
+    bool cosine,
+    equ_standard_trig_component_t *component)
+{
+    size_t twelfths;
+
+    if (!component || order == 0u || index > SIZE_MAX / 24u)
+        return false;
+    twelfths = index * 24u;
+    if (twelfths % order != 0u)
+        return false;
+    twelfths = (twelfths / order) % 24u;
+    component->sign = 1;
+
+    if (cosine) {
+        if (twelfths > 12u)
+            twelfths = 24u - twelfths;
+        if (twelfths > 6u) {
+            twelfths = 12u - twelfths;
+            component->sign = -1;
+        }
+    } else {
+        if (twelfths > 12u) {
+            twelfths = 24u - twelfths;
+            component->sign = -1;
+        }
+        if (twelfths > 6u)
+            twelfths = 12u - twelfths;
+    }
+
+    switch (twelfths) {
+        case 0u:
+            component->magnitude = cosine ? EQU_STANDARD_TRIG_ONE
+                                          : EQU_STANDARD_TRIG_ZERO;
+            return true;
+
+        case 2u:
+            component->magnitude = cosine ? EQU_STANDARD_TRIG_SQRT3_HALF
+                                          : EQU_STANDARD_TRIG_HALF;
+            return true;
+
+        case 3u:
+            component->magnitude = EQU_STANDARD_TRIG_SQRT2_HALF;
+            return true;
+
+        case 4u:
+            component->magnitude = cosine ? EQU_STANDARD_TRIG_HALF
+                                          : EQU_STANDARD_TRIG_SQRT3_HALF;
+            return true;
+
+        case 6u:
+            component->magnitude = cosine ? EQU_STANDARD_TRIG_ZERO
+                                          : EQU_STANDARD_TRIG_ONE;
+            return true;
+
+        default:
+            return false;
+    }
+}
+
+static expr_t *equ_general_standard_magnitude_expr(
+    equ_standard_trig_magnitude_t magnitude)
+{
+    unsigned long radicand = 0u;
+    expr_t *numerator = NULL;
+    expr_t *denominator = NULL;
+    expr_t *out = NULL;
+
+    switch (magnitude) {
+        case EQU_STANDARD_TRIG_ZERO:
+            return expr_new_const(NUM_ZERO);
+
+        case EQU_STANDARD_TRIG_ONE:
+            return expr_new_const(NUM_ONE);
+
+        case EQU_STANDARD_TRIG_HALF:
+            numerator = expr_new_const(NUM_ONE);
+            break;
+
+        case EQU_STANDARD_TRIG_SQRT2_HALF:
+            radicand = 2u;
+            break;
+
+        case EQU_STANDARD_TRIG_SQRT3_HALF:
+            radicand = 3u;
+            break;
+    }
+
+    if (radicand != 0u) {
+        number_t radicand_value = num_create_from_long((long)radicand);
+        expr_t *radicand_expr = expr_new_const(radicand_value);
+
+        num_destroy(&radicand_value);
+        numerator = radicand_expr ? expr_sqrt(radicand_expr) : NULL;
+        expr_free(radicand_expr);
+    }
+    denominator = expr_new_const(NUM_TWO);
+    out = (numerator && denominator) ? expr_div(numerator, denominator) : NULL;
+    expr_free(denominator);
+    expr_free(numerator);
+    return out;
+}
+
+static expr_t *equ_general_signed_component_expr(
+    equ_standard_trig_component_t component)
+{
+    expr_t *magnitude =
+        equ_general_standard_magnitude_expr(component.magnitude);
+    expr_t *out;
+
+    if (!magnitude || component.sign >= 0)
+        return magnitude;
+    out = expr_neg(magnitude);
+    expr_free(magnitude);
+    return out;
+}
+
+static expr_t *equ_general_standard_root_of_unity(size_t index, size_t order)
+{
+    equ_standard_trig_component_t real_component;
+    equ_standard_trig_component_t imaginary_component;
+    expr_t *i = NULL;
+    expr_t *real = NULL;
+    expr_t *imaginary = NULL;
+    expr_t *imaginary_term = NULL;
+    expr_t *raw = NULL;
+    expr_t *root = NULL;
+
+    if (!equ_general_standard_trig_component(
+            index, order, true, &real_component) ||
+        !equ_general_standard_trig_component(
+            index, order, false, &imaginary_component))
+        return NULL;
+
+    if (imaginary_component.magnitude == EQU_STANDARD_TRIG_ZERO)
+        return equ_general_signed_component_expr(real_component);
+
+    i = expr_new_named_const(NUM_I, "i");
+    if (real_component.magnitude == EQU_STANDARD_TRIG_ZERO) {
+        if (imaginary_component.sign > 0)
+            return i;
+        root = i ? expr_neg(i) : NULL;
+        expr_free(i);
+        return root;
+    }
+
+    if (real_component.magnitude == imaginary_component.magnitude) {
+        expr_t *real_unit = expr_new_const(
+            real_component.sign > 0 ? NUM_ONE : NUM_NEG_ONE);
+        expr_t *imaginary_unit = imaginary_component.sign > 0
+            ? i
+            : (i ? expr_neg(i) : NULL);
+        expr_t *factor = equ_general_standard_magnitude_expr(
+            real_component.magnitude);
+
+        if (imaginary_unit != i)
+            expr_free(i);
+        raw = (real_unit && imaginary_unit)
+            ? expr_add(real_unit, imaginary_unit)
+            : NULL;
+        imaginary_term = (raw && factor) ? expr_mul(raw, factor) : NULL;
+        root = imaginary_term;
+        imaginary_term = NULL;
+        expr_free(factor);
+        expr_free(raw);
+        expr_free(imaginary_unit);
+        expr_free(real_unit);
+        return root;
+    }
+
+    real = equ_general_signed_component_expr(real_component);
+    imaginary = equ_general_signed_component_expr(imaginary_component);
+    imaginary_term = (i && imaginary) ? expr_mul(i, imaginary) : NULL;
+    raw = (real && imaginary_term) ? expr_add(real, imaginary_term) : NULL;
+    root = raw ? expr_simplify(raw) : NULL;
+
+    expr_free(raw);
+    expr_free(imaginary_term);
+    expr_free(imaginary);
+    expr_free(real);
+    expr_free(i);
+    return root;
+}
+
+static expr_t *equ_general_root_of_unity(size_t index, size_t order)
+{
+    number_t numerator_value;
+    number_t denominator_value;
+    number_t ratio_value;
+    expr_t *ratio = NULL;
+    expr_t *pi = NULL;
+    expr_t *raw_angle = NULL;
+    expr_t *angle = NULL;
+    expr_t *raw_real = NULL;
+    expr_t *real = NULL;
+    expr_t *raw_imaginary = NULL;
+    expr_t *imaginary = NULL;
+    expr_t *i = NULL;
+    expr_t *imaginary_term = NULL;
+    expr_t *raw_root = NULL;
+    expr_t *root = NULL;
+
+    if (index == 0u || order < 2u || index >= order ||
+        index > (size_t)LONG_MAX / 2u || order > (size_t)LONG_MAX)
+        return NULL;
+
+    root = equ_general_standard_root_of_unity(index, order);
+    if (root)
+        return root;
+
+    numerator_value = num_create_from_long((long)(2u * index));
+    denominator_value = num_create_from_long((long)order);
+    ratio_value = num_div(numerator_value, denominator_value);
+    ratio = expr_new_const(ratio_value);
+    pi = expr_new_named_const(NUM_PI, "@pi");
+    raw_angle = (ratio && pi) ? expr_mul(ratio, pi) : NULL;
+    angle = raw_angle ? expr_simplify(raw_angle) : NULL;
+    raw_real = angle ? expr_cos(angle) : NULL;
+    real = raw_real ? expr_simplify(raw_real) : NULL;
+    raw_imaginary = angle ? expr_sin(angle) : NULL;
+    imaginary = raw_imaginary ? expr_simplify(raw_imaginary) : NULL;
+    i = expr_new_named_const(NUM_I, "i");
+    imaginary_term = (i && imaginary) ? expr_mul(i, imaginary) : NULL;
+    raw_root = (real && imaginary_term) ? expr_add(real, imaginary_term) : NULL;
+    root = raw_root ? expr_simplify(raw_root) : NULL;
+
+    expr_free(raw_root);
+    expr_free(imaginary_term);
+    expr_free(i);
+    expr_free(imaginary);
+    expr_free(raw_imaginary);
+    expr_free(real);
+    expr_free(raw_real);
+    expr_free(angle);
+    expr_free(raw_angle);
+    expr_free(pi);
+    expr_free(ratio);
+    num_destroy(&ratio_value);
+    num_destroy(&denominator_value);
+    num_destroy(&numerator_value);
+    return root;
+}
+
+static int equ_general_try_solve_geometric_sum(
+    const number_t *coeffs,
+    size_t degree,
+    const expr_t *wrt,
+    equation_solutions_t *solutions)
+{
+    size_t order;
+
+    if (!equ_general_is_geometric_sum(coeffs, degree))
+        return 1;
+    if (degree == SIZE_MAX)
+        return -1;
+
+    /*
+     * a(1 + x + ... + x^(n - 1)) = a(x^n - 1)/(x - 1).
+     * Therefore its roots are all nth roots of unity except x = 1, which
+     * was introduced by the denominator.  Each root is generated as
+     * cos(2pi*k/n) + i*sin(2pi*k/n); standard reference angles reduce to
+     * exact radicals, while other orders remain exact symbolic trig forms.
+     */
+    order = degree + 1u;
+    for (size_t index = 1u; index < order; ++index) {
+        expr_t *root = equ_general_root_of_unity(index, order);
+
+        if (!root || equ_append_solution_expr(wrt, root, solutions) != 0) {
+            expr_free(root);
+            equ_solutions_clear(solutions);
+            return -1;
+        }
+        expr_free(root);
+    }
+    return 0;
 }
 
 static void equ_general_eval(const number_t *coeffs,
@@ -585,6 +891,11 @@ int equ_try_solve_general_polynomial(const equation_t *equation,
         rc = 1;
         goto cleanup;
     }
+
+    rc = equ_general_try_solve_geometric_sum(
+        original_coeffs, original_degree, wrt, solutions);
+    if (rc <= 0)
+        goto cleanup;
 
     active_coeffs = equ_general_new_numbers(original_degree + 1u);
     roots = equ_general_new_numbers(original_degree);

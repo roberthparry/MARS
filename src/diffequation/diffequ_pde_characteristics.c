@@ -385,6 +385,107 @@ cleanup:
     return invariant;
 }
 
+static expr_t *de_pde_spiral_linear_invariant(
+    const expr_t *x,
+    const expr_t *y,
+    const expr_t *dependent,
+    const expr_t *x_field,
+    const expr_t *y_field)
+{
+    expr_t *a = NULL;
+    expr_t *b = NULL;
+    expr_t *c = NULL;
+    expr_t *d = NULL;
+    expr_t *d_minus_a = NULL;
+    expr_t *c_plus_b = NULL;
+    expr_t *angle = NULL;
+    expr_t *x_squared = NULL;
+    expr_t *y_squared = NULL;
+    expr_t *radius_squared = NULL;
+    expr_t *log_radius_squared = NULL;
+    expr_t *log_radius = NULL;
+    expr_t *ratio = NULL;
+    expr_t *scaled_log = NULL;
+    expr_t *candidate = NULL;
+    expr_t *candidate_x = NULL;
+    expr_t *candidate_y = NULL;
+    expr_t *along_x = NULL;
+    expr_t *along_y = NULL;
+    expr_t *check_raw = NULL;
+    expr_t *check = NULL;
+    expr_t *invariant = NULL;
+
+    if (!de_pde_linear_field_coefficients(
+            x_field, x, y, dependent, &a, &b) ||
+        !de_pde_linear_field_coefficients(
+            y_field, x, y, dependent, &c, &d))
+        goto cleanup;
+    d_minus_a = expr_sub_simplify_owned(expr_clone(d), expr_clone(a));
+    c_plus_b = expr_add_simplify_owned(expr_clone(c), expr_clone(b));
+    if (!d_minus_a || !c_plus_b ||
+        !expr_is_exact_zero(d_minus_a) ||
+        !expr_is_exact_zero(c_plus_b) || expr_is_exact_zero(a))
+        goto cleanup;
+
+    angle = expr_atan2(y, x);
+    x_squared = expr_pow_long(x, 2L);
+    y_squared = expr_pow_long(y, 2L);
+    radius_squared = x_squared && y_squared
+        ? expr_add_simplify_owned(x_squared, y_squared)
+        : NULL;
+    x_squared = NULL;
+    y_squared = NULL;
+    log_radius_squared = radius_squared
+        ? expr_log(radius_squared)
+        : NULL;
+    log_radius = log_radius_squared
+        ? expr_div_long(log_radius_squared, 2L)
+        : NULL;
+    ratio = expr_div_simplify_owned(expr_clone(b), expr_clone(a));
+    scaled_log = ratio && log_radius
+        ? expr_mul_simplify_owned(ratio, expr_clone(log_radius))
+        : NULL;
+    ratio = NULL;
+    candidate = angle && scaled_log
+        ? expr_add_simplify_owned(expr_clone(angle), scaled_log)
+        : NULL;
+    scaled_log = NULL;
+    candidate_x = candidate ? expr_create_deriv(candidate, x) : NULL;
+    candidate_y = candidate ? expr_create_deriv(candidate, y) : NULL;
+    along_x = candidate_x ? expr_mul(x_field, candidate_x) : NULL;
+    along_y = candidate_y ? expr_mul(y_field, candidate_y) : NULL;
+    check_raw = along_x && along_y ? expr_add(along_x, along_y) : NULL;
+    check = check_raw ? expr_simplify(check_raw) : NULL;
+    if (check && expr_is_exact_zero(check)) {
+        invariant = candidate;
+        candidate = NULL;
+    }
+
+cleanup:
+    expr_free(check);
+    expr_free(check_raw);
+    expr_free(along_y);
+    expr_free(along_x);
+    expr_free(candidate_y);
+    expr_free(candidate_x);
+    expr_free(candidate);
+    expr_free(scaled_log);
+    expr_free(ratio);
+    expr_free(log_radius);
+    expr_free(log_radius_squared);
+    expr_free(radius_squared);
+    expr_free(y_squared);
+    expr_free(x_squared);
+    expr_free(angle);
+    expr_free(c_plus_b);
+    expr_free(d_minus_a);
+    expr_free(d);
+    expr_free(c);
+    expr_free(b);
+    expr_free(a);
+    return invariant;
+}
+
 static expr_t *de_pde_unit_characteristic_potential(
     const expr_t *x,
     const expr_t *y,
@@ -519,6 +620,13 @@ static expr_t *de_pde_linear_characteristic_invariant(
         x_coefficient,
         y_coefficient);
 
+    if (!invariant)
+        invariant = de_pde_spiral_linear_invariant(
+            x,
+            y,
+            dependent,
+            x_coefficient,
+            y_coefficient);
     if (!invariant)
         invariant = de_pde_trace_zero_linear_invariant(
             x,
@@ -3092,123 +3200,179 @@ static equation_t *de_pde_cyclic_first_integral_solution(
     return solution;
 }
 
-static expr_t *de_pde_expected_nonlinear_remainder(
-    const expr_t *x,
-    const expr_t *y,
-    const expr_t *dependent)
+static bool de_pde_extract_dependent_power(
+    const expr_t *expression,
+    const expr_t *dependent,
+    long *power_out,
+    expr_t **coefficient_out)
 {
-    expr_t *sum = expr_add_simplify_owned(expr_clone(x), expr_clone(y));
-    expr_t *sum_squared = sum ? expr_pow_long(sum, 2) : NULL;
-    expr_t *dependent_squared = expr_pow_long(dependent, 2);
-    expr_t *product = sum_squared && dependent_squared
-        ? expr_mul_simplify_owned(sum_squared, dependent_squared)
-        : NULL;
-    expr_t *scaled;
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+    const expr_t *base = NULL;
+    number_t exponent = num_new();
+    expr_t *exponent_expr = NULL;
+    expr_t *coefficient = NULL;
+    long power = 0L;
+    bool matches = false;
 
-    if (product) {
-        sum_squared = NULL;
-        dependent_squared = NULL;
+    if (!expression || !dependent || !power_out || !coefficient_out)
+        goto cleanup;
+    if (expr_match_pow_const(expression, &base, &exponent) &&
+        expr_struct_eq(base, dependent)) {
+        exponent_expr = expr_new_const(exponent);
+        if (!exponent_expr ||
+            !de_pde_exact_long(exponent_expr, &power) || power == 0L)
+            goto cleanup;
+        coefficient = expr_const_one();
+    } else if (expr_match_neg_expr(expression, &left)) {
+        if (!de_pde_extract_dependent_power(
+                left, dependent, &power, &coefficient))
+            goto cleanup;
+        coefficient = expr_negate_owned(coefficient);
+    } else if (expr_match_mul_expr(expression, &left, &right)) {
+        const expr_t *power_factor = NULL;
+        const expr_t *other_factor = NULL;
+
+        if (de_expr_uses(left, dependent) &&
+            !de_expr_uses(right, dependent)) {
+            power_factor = left;
+            other_factor = right;
+        } else if (de_expr_uses(right, dependent) &&
+                   !de_expr_uses(left, dependent)) {
+            power_factor = right;
+            other_factor = left;
+        } else {
+            goto cleanup;
+        }
+        if (!de_pde_extract_dependent_power(
+                power_factor, dependent, &power, &coefficient))
+            goto cleanup;
+        coefficient = expr_mul_simplify_owned(
+            coefficient, expr_clone(other_factor));
     }
-    scaled = product ? expr_mul_long(product, -6) : NULL;
-    expr_free(product);
-    expr_free(dependent_squared);
-    expr_free(sum_squared);
-    expr_free(sum);
-    return scaled ? expr_simplify_owned(scaled) : NULL;
+    if (!coefficient || de_expr_uses(coefficient, dependent))
+        goto cleanup;
+    *power_out = power;
+    *coefficient_out = coefficient;
+    coefficient = NULL;
+    matches = true;
+
+cleanup:
+    expr_free(coefficient);
+    expr_free(exponent_expr);
+    num_destroy(&exponent);
+    return matches;
 }
 
-static equation_t *de_pde_nonlinear_solution(
+static bool de_pde_power_characteristic_solutions(
     const expr_t *x,
     const expr_t *y,
-    const expr_t *dependent)
+    const expr_t *dependent,
+    const expr_t *x_coefficient,
+    const expr_t *y_coefficient,
+    const expr_t *remainder,
+    equation_t **solutions_out,
+    size_t *solution_count_out)
 {
-    expr_t *difference =
-        expr_sub_simplify_owned(expr_clone(x), expr_clone(y));
-    expr_t *arbitrary = difference
-        ? expr_new_arbitrary_function("F", difference)
-        : NULL;
-    expr_t *sum =
-        expr_add_simplify_owned(expr_clone(x), expr_clone(y));
-    expr_t *cube = sum ? expr_pow_long(sum, 3) : NULL;
-    expr_t *denominator = arbitrary && cube
-        ? expr_sub_simplify_owned(arbitrary, cube)
-        : NULL;
-    expr_t *one;
-    expr_t *right;
-    equation_t *solution;
+    long power = 0L;
+    expr_t *power_coefficient = NULL;
+    expr_t *invariant = NULL;
+    expr_t *arbitrary = NULL;
+    expr_t *power_minus_one = NULL;
+    expr_t *transformed_forcing = NULL;
+    expr_t *zero = NULL;
+    expr_t *particular = NULL;
+    expr_t *transformed = NULL;
+    expr_t *one_minus_power = NULL;
+    expr_t *inverse_exponent = NULL;
+    expr_t *right_raw = NULL;
+    expr_t *right = NULL;
+    expr_t *singular = NULL;
+    bool solved = false;
 
-    if (denominator) {
-        arbitrary = NULL;
-        cube = NULL;
-    }
-    one = expr_const_one();
-    right = denominator
-        ? expr_div_simplify_owned(one, denominator)
-        : NULL;
-    if (right) {
-        one = NULL;
-        denominator = NULL;
-    }
-    solution = right
-        ? de_pde_solution_equation(dependent, right)
-        : NULL;
-    expr_free(right);
-    expr_free(one);
-    expr_free(denominator);
-    expr_free(cube);
-    expr_free(sum);
-    expr_free(arbitrary);
-    expr_free(difference);
-    return solution;
-}
-
-static equation_t *de_pde_rotating_solution(
-    const expr_t *x,
-    const expr_t *y,
-    const expr_t *dependent)
-{
-    expr_t *angle = expr_atan2(y, x);
-    expr_t *x_squared = expr_pow_long(x, 2);
-    expr_t *y_squared = expr_pow_long(y, 2);
-    expr_t *radius_squared = x_squared && y_squared
-        ? expr_add_simplify_owned(x_squared, y_squared)
-        : NULL;
-    expr_t *log_radius_squared;
-    expr_t *log_radius;
-    expr_t *invariant;
-    expr_t *right;
-    equation_t *solution;
-
-    if (radius_squared) {
-        x_squared = NULL;
-        y_squared = NULL;
-    }
-    log_radius_squared =
-        radius_squared ? expr_log(radius_squared) : NULL;
-    log_radius =
-        log_radius_squared ? expr_div_long(log_radius_squared, 2) : NULL;
-    invariant = angle && log_radius
-        ? expr_add_simplify_owned(angle, log_radius)
-        : NULL;
-    if (invariant) {
-        angle = NULL;
-        log_radius = NULL;
-    }
-    right = invariant
+    if (!de_pde_extract_dependent_power(
+            remainder,
+            dependent,
+            &power,
+            &power_coefficient) ||
+        power == 0L || power == 1L)
+        goto cleanup;
+    invariant = de_pde_linear_characteristic_invariant(
+        x, y, dependent, x_coefficient, y_coefficient);
+    arbitrary = invariant
         ? expr_new_arbitrary_function("F", invariant)
         : NULL;
-    solution = right
-        ? de_pde_solution_equation(dependent, right)
+    power_minus_one = expr_const_long(power - 1L);
+    transformed_forcing = power_minus_one
+        ? expr_negate_owned(expr_mul_simplify_owned(
+              power_minus_one, expr_clone(power_coefficient)))
         : NULL;
+    power_minus_one = NULL;
+    zero = expr_const_zero();
+    particular = arbitrary && transformed_forcing && zero
+        ? de_pde_characteristic_particular(
+              x,
+              y,
+              dependent,
+              x_coefficient,
+              y_coefficient,
+              zero,
+              transformed_forcing)
+        : NULL;
+    transformed = arbitrary && particular
+        ? expr_add_simplify_owned(expr_clone(arbitrary), particular)
+        : NULL;
+    particular = NULL;
+    one_minus_power = expr_const_long(1L - power);
+    inverse_exponent = one_minus_power
+        ? expr_div_simplify_owned(expr_const_one(), one_minus_power)
+        : NULL;
+    one_minus_power = NULL;
+    right_raw = power == 2L && transformed
+        ? expr_div_simplify_owned(expr_const_one(), expr_clone(transformed))
+        : (transformed && inverse_exponent
+              ? expr_pow_xp(transformed, inverse_exponent)
+              : NULL);
+    right = right_raw ? expr_simplify(right_raw) : NULL;
+    if (!right)
+        goto cleanup;
+    solutions_out[0] = de_pde_solution_equation(dependent, right);
+    if (!solutions_out[0])
+        goto cleanup;
+    *solution_count_out = 1u;
+    if (power > 1L) {
+        singular = expr_const_zero();
+        solutions_out[1] = singular
+            ? de_pde_solution_equation(dependent, singular)
+            : NULL;
+        if (!solutions_out[1])
+            goto cleanup;
+        *solution_count_out = 2u;
+    }
+    solved = true;
+
+cleanup:
+    if (!solved) {
+        equ_free(solutions_out[0]);
+        equ_free(solutions_out[1]);
+        solutions_out[0] = NULL;
+        solutions_out[1] = NULL;
+        *solution_count_out = 0u;
+    }
+    expr_free(singular);
     expr_free(right);
+    expr_free(right_raw);
+    expr_free(inverse_exponent);
+    expr_free(one_minus_power);
+    expr_free(transformed);
+    expr_free(particular);
+    expr_free(zero);
+    expr_free(transformed_forcing);
+    expr_free(power_minus_one);
+    expr_free(arbitrary);
     expr_free(invariant);
-    expr_free(log_radius);
-    expr_free(log_radius_squared);
-    expr_free(radius_squared);
-    expr_free(y_squared);
-    expr_free(x_squared);
-    expr_free(angle);
-    return solution;
+    expr_free(power_coefficient);
+    return solved;
 }
 
 de_attempt_t de_pde_attempt_characteristics(
@@ -3228,11 +3392,6 @@ de_attempt_t de_pde_attempt_characteristics(
     expr_t *remainder = NULL;
     expr_t *reaction_coefficient = NULL;
     expr_t *forcing = NULL;
-    expr_t *expected = NULL;
-    expr_t *expected_x_coefficient = NULL;
-    expr_t *expected_y_coefficient = NULL;
-    expr_t *one = NULL;
-    expr_t *zero = NULL;
     de_attempt_t attempt = DE_ATTEMPT_NOT_MATCHED;
 
     *solution_count_out = 0u;
@@ -3315,45 +3474,17 @@ de_attempt_t de_pde_attempt_characteristics(
         goto cleanup;
     }
 
-    expected = de_pde_expected_nonlinear_remainder(x, y, dependent);
-    one = expr_const_one();
-    if (expected &&
-        one &&
-        expr_struct_eq(x_coefficient, one) &&
-        expr_struct_eq(y_coefficient, one) &&
-        expr_struct_eq(remainder, expected)) {
-        solutions_out[0] =
-            de_pde_nonlinear_solution(x, y, dependent);
-        zero = expr_const_zero();
-        solutions_out[1] = zero
-            ? de_pde_solution_equation(dependent, zero)
-            : NULL;
-        if (!solutions_out[0] || !solutions_out[1]) {
-            attempt = DE_ATTEMPT_FAILED;
-            goto cleanup;
-        }
-        *solution_count_out = 2u;
+    if (de_pde_power_characteristic_solutions(
+            x,
+            y,
+            dependent,
+            x_coefficient,
+            y_coefficient,
+            remainder,
+            solutions_out,
+            solution_count_out)) {
         attempt = DE_ATTEMPT_SOLVED;
         goto cleanup;
-    }
-
-    expected_x_coefficient =
-        expr_add_simplify_owned(expr_clone(x), expr_clone(y));
-    expected_y_coefficient =
-        expr_sub_simplify_owned(expr_clone(y), expr_clone(x));
-    if (expected_x_coefficient &&
-        expected_y_coefficient &&
-        expr_struct_eq(x_coefficient, expected_x_coefficient) &&
-        expr_struct_eq(y_coefficient, expected_y_coefficient) &&
-        expr_is_exact_zero(remainder)) {
-        solutions_out[0] =
-            de_pde_rotating_solution(x, y, dependent);
-        if (!solutions_out[0]) {
-            attempt = DE_ATTEMPT_FAILED;
-            goto cleanup;
-        }
-        *solution_count_out = 1u;
-        attempt = DE_ATTEMPT_SOLVED;
     }
 
 cleanup:
@@ -3363,11 +3494,6 @@ cleanup:
         solutions_out[0] = NULL;
         solutions_out[1] = NULL;
     }
-    expr_free(expected_y_coefficient);
-    expr_free(expected_x_coefficient);
-    expr_free(zero);
-    expr_free(one);
-    expr_free(expected);
     expr_free(forcing);
     expr_free(reaction_coefficient);
     expr_free(remainder);

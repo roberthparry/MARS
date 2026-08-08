@@ -602,8 +602,8 @@ void           expr_store_value_num              (expr_t *dv, number_t value);
 number_t       expr_eval_num_internal            (const expr_t *dv);
 expr_t *       expr_get_dx_internal              (const expr_t *dv);
 const expr_t * expr_current_wrt_internal         (void);
-expr_t *       expr_deriv_rational_over_quadratic_power(const expr_t *expr,
-                                                        const expr_t *wrt);
+expr_t *       expr_deriv_rational_over_polynomial_power(const expr_t *expr,
+                                                         const expr_t *wrt);
 expr_t *       expr_new_unary_internal           (const expr_ops_t *ops, const expr_t *a);
 expr_t *       expr_new_binary_internal          (const expr_ops_t *ops,
                                                   const expr_t *a,

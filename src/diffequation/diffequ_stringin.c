@@ -2071,27 +2071,56 @@ fail:
     return NULL;
 }
 
-static bool de_subscript_derivative_suffix(
+static char *de_normalise_subscript_derivative_suffix(
     const char *suffix,
     size_t length,
     const char *independent_declarations)
 {
-    if (!suffix || length == 0u)
-        return false;
-    for (size_t i = 0u; i < length; ++i) {
-        char coordinate[2];
+    string_t *out;
+    size_t cursor = 0u;
+    char *result;
 
-        if (!islower((unsigned char)suffix[i]))
-            return false;
-        if (!independent_declarations)
-            continue;
-        coordinate[0] = suffix[i];
-        coordinate[1] = '\0';
-        if (!de_declarations_contain_name(
-                independent_declarations, coordinate))
-            return false;
+    if (!suffix || length == 0u)
+        return NULL;
+    out = string_new();
+    if (!out)
+        return NULL;
+    while (cursor < length) {
+        char *coordinate = NULL;
+        size_t coordinate_length = 1u;
+
+        if (!islower((unsigned char)suffix[cursor]))
+            goto fail;
+        for (size_t candidate = length - cursor;
+             candidate >= 2u;
+             --candidate) {
+            coordinate = de_normalise_greek_alias(
+                suffix + cursor, candidate);
+            if (coordinate) {
+                coordinate_length = candidate;
+                break;
+            }
+        }
+        if (!coordinate)
+            coordinate = de_trimmed_copy(suffix + cursor, 1u);
+        if (!coordinate ||
+            (independent_declarations &&
+             !de_declarations_contain_name(
+                 independent_declarations, coordinate)) ||
+            string_append_cstr(out, coordinate) != 0) {
+            free(coordinate);
+            goto fail;
+        }
+        free(coordinate);
+        cursor += coordinate_length;
     }
-    return true;
+    result = strdup(string_c_str(out));
+    string_free(out);
+    return result;
+
+fail:
+    string_free(out);
+    return NULL;
 }
 
 static bool de_subscript_coefficient_prefix(
@@ -2114,6 +2143,26 @@ static bool de_subscript_coefficient_prefix(
     coordinate[1] = '\0';
     return de_declarations_contain_name(
         independent_declarations, coordinate);
+}
+
+static bool de_subscript_needs_implicit_product(
+    const char *text,
+    size_t token_start)
+{
+    size_t previous = token_start;
+    unsigned char ch;
+
+    if (!text || token_start == 0u ||
+        !isspace((unsigned char)text[token_start - 1u]))
+        return false;
+    while (previous > 0u &&
+           isspace((unsigned char)text[previous - 1u]))
+        previous--;
+    if (previous == 0u)
+        return false;
+    ch = (unsigned char)text[previous - 1u];
+    return isalnum(ch) || ch == '_' || ch == ')' || ch == ']' ||
+        ch >= 0x80u;
 }
 
 static int de_append_subscript_dependent(
@@ -2517,6 +2566,7 @@ static char *de_normalize_subscript_derivatives(
         size_t name_end;
         size_t underscore = SIZE_MAX;
         size_t dependent_start;
+        char *derivative_suffix = NULL;
         bool alias = false;
 
         if (text[i] == '[') {
@@ -2560,12 +2610,13 @@ static char *de_normalize_subscript_derivatives(
             underscore = p;
         }
 
-        if (underscore == SIZE_MAX ||
-            underscore == name_start ||
-            !de_subscript_derivative_suffix(
-                text + underscore + 1u,
-                name_end - underscore - 1u,
-                independent_declarations)) {
+        if (underscore != SIZE_MAX && underscore != name_start)
+            derivative_suffix =
+                de_normalise_subscript_derivative_suffix(
+                    text + underscore + 1u,
+                    name_end - underscore - 1u,
+                    independent_declarations);
+        if (!derivative_suffix) {
             if (string_append_chars(
                     out, text + token_start, name_end - token_start) != 0)
                 goto fail;
@@ -2584,19 +2635,21 @@ static char *de_normalize_subscript_derivatives(
                     dependent_start - name_start) != 0)
                 goto fail;
         }
-        if (string_append_char(out, 'D') != 0 ||
-            string_append_chars(
-                out,
-                text + underscore + 1u,
-                name_end - underscore - 1u) != 0 ||
+        if ((de_subscript_needs_implicit_product(text, token_start) &&
+             string_append_char(out, '*') != 0) ||
+            string_append_char(out, 'D') != 0 ||
+            string_append_cstr(out, derivative_suffix) != 0 ||
             string_append_char(out, '(') != 0 ||
             de_append_subscript_dependent(
                 out,
                 text + dependent_start,
                 underscore - dependent_start,
                 alias) != 0 ||
-            string_append_char(out, ')') != 0)
+            string_append_char(out, ')') != 0) {
+            free(derivative_suffix);
             goto fail;
+        }
+        free(derivative_suffix);
     }
 
     result = strdup(string_c_str(out));
@@ -2606,6 +2659,21 @@ static char *de_normalize_subscript_derivatives(
 fail:
     string_free(out);
     return NULL;
+}
+
+static bool de_uses_explicit_partial_derivative(const char *text)
+{
+    char *normalised;
+    bool partial;
+
+    if (!text)
+        return false;
+    if (strstr(text, "∂") != NULL)
+        return true;
+    normalised = de_normalize_subscript_derivatives(text, NULL);
+    partial = normalised && strcmp(normalised, text) != 0;
+    free(normalised);
+    return partial;
 }
 
 static char *de_normalize_prime_condition(const char *condition,
@@ -3350,6 +3418,7 @@ diffequ_t *de_from_string(const char *text)
     char *source_form_equation = NULL;
     char *operator_display_equation = NULL;
     bool differential_form_input = false;
+    bool partial_derivative_input = false;
     diffequ_t *de = NULL;
 
     if (!text)
@@ -3358,6 +3427,8 @@ diffequ_t *de_from_string(const char *text)
     source_form_equation = de_trimmed_copy(
         text + source_equation_start,
         source_equation_end - source_equation_start);
+    partial_derivative_input =
+        de_uses_explicit_partial_derivative(source_form_equation);
     normalized_form = de_normalize_differential_form(
         text, &differential_form_input);
     normalized_totals =
@@ -3501,6 +3572,7 @@ diffequ_t *de_from_string(const char *text)
         operator_display_equation
             ? operator_display_equation
             : parts.equation);
+    de->partial_derivative_input = partial_derivative_input;
     if (differential_form_input) {
         string_free(de->differential_form_text);
         de->differential_form_text = string_new_with(source_form_equation);

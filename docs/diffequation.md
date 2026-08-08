@@ -32,8 +32,8 @@ transport equations with explicit axis-aligned boundary data.
 - `de_to_text(...)` returns an owning `string_t *`, released with
   `string_free(...)`.
 - `de_to_string(...)` returns an owning C string, released with `free(...)`.
-- `de_solve(...)` returns an owning `diffequ_solve_result_t *`, released with
-  `de_solve_result_free(...)`.
+- `de_solve(...)` and `de_solve_with_options(...)` return an owning
+  `diffequ_solve_result_t *`, released with `de_solve_result_free(...)`.
 - Equations returned by `de_solve_result_at(...)` are borrowed from the solve
   result.
 - Text returned by `de_solve_result_diagnostic(...)`,
@@ -45,6 +45,32 @@ The public declarations are in:
 ```c
 #include "diffequation.h"
 ```
+
+## Rule-Based Solving and Derivations
+
+MARSlib does not select a result by comparing the input with a catalogue of
+complete example equations. Each successful solver first extracts a
+parameterised mathematical structure from the parsed expression tree: for
+example separability, a Bernoulli exponent, a characteristic vector field, an
+exact differential, a constant-coefficient characteristic polynomial, a
+Laplace operator, or an eigenfunction of a spatial evolution operator. The
+coefficients, coordinates, powers, invariants, integrating factors, roots and
+initial data used in the answer come from that extraction.
+
+Derivations are deliberately opt-in because most library callers need only the
+solution. `de_solve(...)` therefore performs no derivation formatting. A
+presenting client can call
+`de_solve_with_options(de, DE_SOLVE_OPTION_STEPS)` to request plain-text and
+TeX derivations through `de_solve_result_steps(...)` and
+`de_solve_result_steps_tex(...)`. A specialised solver may expose its detailed
+intermediate expressions directly. Otherwise the common derivation layer
+states the selected family rule, the actual parsed equation and every derived
+solution branch. MARS Lab requests and displays these strings; other clients
+do not pay their construction cost unless they explicitly opt in.
+
+Regression coverage includes coefficient and exponent variants which differ
+from the motivating examples. This guards against accidentally replacing a
+family recogniser with a literal one-case match.
 
 ## Input Forms
 
@@ -257,7 +283,9 @@ problem, including its initial or boundary conditions.
 ## First-Order Transport PDEs
 
 Ordinary and partial differential equations share the same `diffequ_t`.
-Multiple declared independent variables make the derivative notation partial:
+Subscript derivative notation explicitly denotes a partial derivative, even
+when only one differentiation coordinate is inferred. Multiple declared
+independent variables likewise make derivative notation partial:
 
 ```text
 u_x       Dx(u)
@@ -265,6 +293,7 @@ u_y       Dy(u)
 u_xy      Dxy(u) = Dy(Dx(u))
 u_xx      Dxx(u)
 phi_x     Dx(@phi)
+z_y       Dy(z)
 xzz_x     x*z*Dx(z)
 ```
 
@@ -278,8 +307,8 @@ TeX output uses standard partial-derivative fractions such as
 `\\frac{\\partial u}{\\partial x}`. Repeated and mixed derivatives render as
 `\\frac{\\partial^2 u}{\\partial x^2}` and
 `\\frac{\\partial^2 u}{\\partial y\\,\\partial x}`.
-The Mars Lab problem card likewise uses the Unicode partial-derivative symbol,
-displaying `∂u/∂x`, `∂²u/∂x²`, and `∂²u/∂y∂x`. These standard Unicode
+The Mars Lab problem card likewise preserves the Unicode partial-derivative
+symbol, displaying `∂u/∂x`, `∂²u/∂x²`, and `∂²u/∂y∂x`. These standard Unicode
 forms are also accepted as input aliases, so copying the displayed problem
 back into the editor remains valid. The easily typed `Dx(u)` notation remains
 the canonical expression and unbound output form.
@@ -336,8 +365,38 @@ Boundary applications retain each coordinate separately. For `u(x, 0)`,
 `de_condition_argument_count(...)` returns two, and
 `de_condition_argument_at(...)` returns the borrowed `x` and `0` expressions.
 
-Without boundary data, Mars returns the general solution using the ordinary
-arbitrary-function notation `F`:
+For the two-dimensional Laplace equation without boundary data, Mars returns
+the general solution using arbitrary analytic functions `F` and `G`:
+
+```text
+phi_xx + phi_yy = 0
+→ φ = F(x + i*y) + G(x - i*y)
+```
+
+This is the general local complex-variable family for the two-dimensional
+Laplace equation. The solver recognises the equation from its derivative
+structure and equal non-zero numeric coefficients, so a common numeric scale
+and a different term order do not affect the result. For a real-valued field,
+the two analytic functions are related so that their sum is real. Boundary
+data are deliberately left to a separate boundary-value solver.
+
+The equivalent polar form is recognised structurally as well:
+
+```text
+phi_rr + 1/r phi_r + 1/r^2 phi_thetatheta = 0
+→ φ = F(r*exp(i*θ)) + G(r*exp(-i*θ))
+```
+
+Here `phi_thetatheta` uses the same Greek-name table as `@theta` and is
+normalised to the second partial derivative with respect to `θ`. A space
+between a coefficient and a derivative term implies multiplication. The solver
+checks the polar coefficients against `1`, `1/r`, and `1/r^2`, allowing a
+common non-zero numeric scale and any term order. It then verifies the complex
+coordinates `r*exp(i*θ)` and `r*exp(-i*θ)` symbolically before returning the
+arbitrary-function family.
+
+Without boundary data, first-order transport equations likewise return their
+general solution using arbitrary-function notation:
 
 ```text
 Dt(u) + c*Dx(u) = 0
@@ -564,6 +623,8 @@ The current symbolic scope is:
 - homogeneous and constant-forced constant-coefficient transport PDEs,
   including arbitrary-function families and explicit axis-aligned boundary
   data;
+- the two-dimensional Laplace equation in Cartesian or polar coordinates
+  without boundary data, returned as a general harmonic family;
 - selected nonlinear and variable-coefficient first-order characteristic
   PDEs; and
 - parameter-dependent first-order linear PDEs.
@@ -728,6 +789,7 @@ diffequ_solve_linear_transform.c
 diffequ_solve_sturm_liouville.c
 diffequ_solve_constant_linear.c
 diffequ_pde_solve.c
+diffequ_pde_laplace.c
 diffequ_pde_transport.c
 diffequ_pde_characteristics.c
 diffequ_pde_linear.c
@@ -938,7 +1000,8 @@ int main(void)
 {
     const char *source = "Dx(y) = x*y; y(0) = 1";
     diffequ_t *ode = de_from_string(source);
-    diffequ_solve_result_t *result = de_solve(ode);
+    diffequ_solve_result_t *result = de_solve_with_options(
+        ode, DE_SOLVE_OPTION_STEPS);
     const equation_t *solution = de_solve_result_at(result, 0);
     char *problem_text = de_to_string(ode, style_EXPRESSION);
     string_t *solution_text = equ_to_text(solution, style_UNBOUND);
@@ -999,10 +1062,14 @@ int main(void)
 input = y'' + 3*y*y' + y^3 = 0
 symmetry = SL(3, ℝ)
 linearisation:
-Linearising point transformation:
+Recognise the modified-Emden rule
+      y″ + 3(1)yy′ + (1)²y³ = 0
+Set y = u′/u. Then
+      y″ + 3(1)yy′ + (1)²y³ = u‴/u
+so u‴ = 0 and u is quadratic.
+Equivalently, the point transformation is
       X = x − 1/y
       Y = x/y − x²/2
-Transformed ODE:
-      d²Y/dX² = 0
+and d²Y/dX² = 0.
 solution = y = (2x + C₁)/(x² + C₁x + C₂)
 ```

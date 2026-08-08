@@ -1,5 +1,6 @@
 #include <stdbool.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "diffequation.h"
 #define MARS_DIFFEQUATION_SOLVE_INTERNAL_ACCESS
@@ -326,37 +327,130 @@ expr_t *de_arbitrary_constant(void)
     return expr_new_named_const(NUM_NAN, "C");
 }
 
-static const char de_modified_emden_steps[] =
-    "Linearising point transformation:\n"
-    "      X = x − 1/y\n"
-    "      Y = x/y − x²/2\n"
-    "Transformed ODE:\n"
-    "      d²Y/dX² = 0";
+static bool de_modified_emden_steps(
+    const expr_t *independent,
+    const expr_t *dependent,
+    const expr_t *scale,
+    char **steps_out,
+    char **steps_tex_out)
+{
+    const char *x_name = expr_symbol_name(independent);
+    char *x = x_name ? strdup(x_name) : NULL;
+    char *y = expr_to_string(dependent, style_UNBOUND);
+    char *a = expr_to_string(scale, style_UNBOUND);
+    char *x_tex = x_name ? strdup(x_name) : NULL;
+    char *y_tex = expr_to_string(dependent, style_TEX);
+    char *a_tex = expr_to_string(scale, style_TEX);
+    char *ay = NULL;
+    char *au = NULL;
+    char *ay_den = NULL;
+    char *au_den = NULL;
+    char *ay_tex = NULL;
+    char *au_tex = NULL;
+    string_t *steps = string_new();
+    string_t *steps_tex = string_new();
+    if (a && strcmp(a, "1") == 0) {
+        ay = y ? strdup(y) : NULL;
+        au = strdup("u");
+        ay_tex = y_tex ? strdup(y_tex) : NULL;
+        au_tex = strdup("u");
+        ay_den = y ? strdup(y) : NULL;
+        au_den = strdup("u");
+    } else {
+        int ay_length = a && y ? asprintf(&ay, "%s%s", a, y) : -1;
+        int au_length = a ? asprintf(&au, "%su", a) : -1;
+        int ay_tex_length = a_tex && y_tex
+            ? asprintf(&ay_tex, "%s%s", a_tex, y_tex)
+            : -1;
+        int au_tex_length = a_tex
+            ? asprintf(&au_tex, "%su", a_tex)
+            : -1;
 
-static const char de_modified_emden_steps_tex[] =
-    "\\begin{aligned}[t]"
-    "\\text{Symmetry:}\\quad&\\mathrm{SL}(3,\\mathrm R)\\\\"
-    "\\text{Linearising point transformation:}\\quad&"
-    "X=x-\\frac1y\\\\"
-    "&Y=\\frac{x}{y}-\\frac{x^2}{2}\\\\"
-    "\\text{Transformed ODE:}\\quad&\\frac{d^2Y}{dX^2}=0"
-    "\\end{aligned}";
+        if (ay_length < 0 || au_length < 0 ||
+            ay_tex_length < 0 || au_tex_length < 0) {
+            free(ay);
+            free(au);
+            free(ay_tex);
+            free(au_tex);
+            ay = NULL;
+            au = NULL;
+            ay_tex = NULL;
+            au_tex = NULL;
+        }
+        if (ay && au) {
+            if (asprintf(&ay_den, "(%s)", ay) < 0)
+                ay_den = NULL;
+            if (asprintf(&au_den, "(%s)", au) < 0)
+                au_den = NULL;
+        }
+    }
+    bool success = x && y && a && x_tex && y_tex && a_tex &&
+        ay && au && ay_den && au_den && ay_tex && au_tex &&
+        steps && steps_tex &&
+        string_append_format(
+            steps,
+            "Recognise the modified-Emden rule\n"
+            "      %s″ + 3(%s)%s%s′ + (%s)²%s³ = 0\n"
+            "Set %s = u′/%s. Then\n"
+            "      %s″ + 3(%s)%s%s′ + (%s)²%s³ = "
+            "u‴/%s\n"
+            "so u‴ = 0 and u is quadratic.\n"
+            "Equivalently, the point transformation is\n"
+            "      X = %s − 1/%s\n"
+            "      Y = %s/%s − %s²/2\n"
+            "and d²Y/dX² = 0.",
+            y, a, y, y, a, y,
+            y, au_den,
+            y, a, y, y, a, y, au_den,
+            x, ay_den,
+            x, ay_den, x) >= 0 &&
+        string_append_format(
+            steps_tex,
+            "\\begin{aligned}[t]"
+            "\\text{Recognise the rule:}\\quad&%s''+3(%s)%s%s'"
+            "+(%s)^2%s^3=0\\\\"
+            "\\text{Set}\\quad&%s=\\frac{u'}{%s}\\\\"
+            "&%s''+3(%s)%s%s'+(%s)^2%s^3="
+            "\\frac{u'''}{%s}\\\\"
+            "&u'''=0\\\\"
+            "\\text{Point transformation:}\\quad&"
+            "X=%s-\\frac{1}{%s}\\\\"
+            "&Y=\\frac{%s}{%s}-\\frac{%s^2}{2}\\\\"
+            "&\\frac{d^2Y}{dX^2}=0"
+            "\\end{aligned}",
+            y_tex, a_tex, y_tex, y_tex, a_tex, y_tex,
+            y_tex, au_tex,
+            y_tex, a_tex, y_tex, y_tex, a_tex, y_tex, au_tex,
+            x_tex, ay_tex,
+            x_tex, ay_tex, x_tex) >= 0;
 
-static const char de_scaled_modified_emden_steps[] =
-    "Linearising point transformation:\n"
-    "      X = x − 1/(2y)\n"
-    "      Y = x/(2y) − x²/2\n"
-    "Transformed ODE:\n"
-    "      d²Y/dX² = 0";
-
-static const char de_scaled_modified_emden_steps_tex[] =
-    "\\begin{aligned}[t]"
-    "\\text{Symmetry:}\\quad&\\mathrm{SL}(3,\\mathrm R)\\\\"
-    "\\text{Linearising point transformation:}\\quad&"
-    "X=x-\\frac{1}{2y}\\\\"
-    "&Y=\\frac{x}{2y}-\\frac{x^2}{2}\\\\"
-    "\\text{Transformed ODE:}\\quad&\\frac{d^2Y}{dX^2}=0"
-    "\\end{aligned}";
+    if (success) {
+        *steps_out = strdup(string_c_str(steps));
+        *steps_tex_out = strdup(string_c_str(steps_tex));
+        success = *steps_out && *steps_tex_out;
+    }
+    if (!success) {
+        free(*steps_out);
+        free(*steps_tex_out);
+        *steps_out = NULL;
+        *steps_tex_out = NULL;
+    }
+    string_free(steps_tex);
+    string_free(steps);
+    free(au_tex);
+    free(ay_tex);
+    free(au_den);
+    free(ay_den);
+    free(au);
+    free(ay);
+    free(a_tex);
+    free(y_tex);
+    free(x_tex);
+    free(a);
+    free(y);
+    free(x);
+    return success;
+}
 
 static bool de_matches_modified_emden_power(
     const expr_t *dependent,
@@ -426,32 +520,32 @@ static de_attempt_t de_attempt_modified_emden_linearization(
     const expr_t *residual,
     equation_t **solutions_out,
     size_t *solution_count_out,
-    long *scale_out)
+    expr_t **scale_out)
 {
     expr_t *leading = NULL;
     expr_t *remainder = NULL;
+    expr_t *mixed_monomial = NULL;
+    expr_t *mixed_coefficient = NULL;
+    expr_t *after_mixed = NULL;
+    expr_t *cubic_coefficient = NULL;
+    expr_t *constant_remainder = NULL;
     expr_t *three = NULL;
-    expr_t *three_y = NULL;
-    expr_t *three_y_y_prime = NULL;
     expr_t *y_cubed = NULL;
-    expr_t *expected_remainder = NULL;
-    expr_t *scaled_expected = NULL;
-    expr_t *six_y_y_prime = NULL;
-    expr_t *four_y_cubed = NULL;
-    expr_t *scaled_remainder = NULL;
-    expr_t *scaled_family_expected = NULL;
+    expr_t *three_leading = NULL;
+    expr_t *scale = NULL;
+    expr_t *scale_squared = NULL;
+    expr_t *expected_cubic = NULL;
+    expr_t *coefficient_difference = NULL;
     expr_t *constant_1 = NULL;
     expr_t *constant_2 = NULL;
     expr_t *two = NULL;
-    expr_t *numerator_sum = NULL;
     expr_t *two_x = NULL;
     expr_t *numerator = NULL;
     expr_t *x_squared = NULL;
     expr_t *constant_1_x = NULL;
-    expr_t *twice_constant_1_x = NULL;
-    expr_t *twice_constant_2 = NULL;
     expr_t *denominator_sum = NULL;
     expr_t *denominator = NULL;
+    expr_t *scaled_denominator = NULL;
     expr_t *solution_denominator = NULL;
     expr_t *right = NULL;
     de_attempt_t attempt = DE_ATTEMPT_NOT_MATCHED;
@@ -462,79 +556,81 @@ static de_attempt_t de_attempt_modified_emden_linearization(
             residual, second_derivative, &leading, &remainder))
         goto cleanup;
     *solution_count_out = 0u;
-    *scale_out = 0L;
+    *scale_out = NULL;
+
+    mixed_monomial = expr_mul(dependent, first_derivative);
+    y_cubed = expr_pow_long(dependent, 3L);
+    if (!mixed_monomial || !y_cubed ||
+        !de_linear_decompose(
+            remainder,
+            mixed_monomial,
+            &mixed_coefficient,
+            &after_mixed) ||
+        !de_linear_decompose(
+            after_mixed,
+            y_cubed,
+            &cubic_coefficient,
+            &constant_remainder) ||
+        !expr_is_exact_zero(constant_remainder) ||
+        expr_is_exact_zero(leading))
+        goto cleanup;
 
     three = expr_const_long(3L);
-    three_y = three ? expr_mul(three, dependent) : NULL;
-    three_y_y_prime = three_y
-        ? expr_mul(three_y, first_derivative)
+    three_leading = three
+        ? expr_mul_simplify_owned(expr_clone(three), expr_clone(leading))
         : NULL;
-    y_cubed = expr_pow_long(dependent, 3L);
-    expected_remainder = three_y_y_prime && y_cubed
-        ? expr_add(three_y_y_prime, y_cubed)
+    scale = three_leading
+        ? expr_div_simplify_owned(
+              expr_clone(mixed_coefficient), three_leading)
         : NULL;
-    scaled_expected = leading && expected_remainder
-        ? expr_mul_simplify_owned(
-              expr_clone(leading), expr_clone(expected_remainder))
+    three_leading = NULL;
+    scale_squared = scale ? expr_pow_long(scale, 2L) : NULL;
+    expected_cubic = scale_squared
+        ? expr_mul_simplify_owned(scale_squared, expr_clone(leading))
         : NULL;
-    if (scaled_expected && expr_struct_eq(remainder, scaled_expected)) {
-        *scale_out = 1L;
-    } else {
-        six_y_y_prime = expr_mul_long(three_y_y_prime, 2L);
-        four_y_cubed = expr_mul_long(y_cubed, 4L);
-        scaled_remainder = six_y_y_prime && four_y_cubed
-            ? expr_add(six_y_y_prime, four_y_cubed)
-            : NULL;
-        scaled_family_expected = leading && scaled_remainder
-            ? expr_mul_simplify_owned(
-                  expr_clone(leading), expr_clone(scaled_remainder))
-            : NULL;
-        if (!scaled_family_expected ||
-            !expr_struct_eq(remainder, scaled_family_expected))
-            goto cleanup;
-        *scale_out = 2L;
-    }
+    scale_squared = NULL;
+    coefficient_difference = expected_cubic
+        ? expr_sub_simplify_owned(
+              expr_clone(cubic_coefficient), expected_cubic)
+        : NULL;
+    expected_cubic = NULL;
+    if (!scale || expr_is_exact_zero(scale) ||
+        de_expr_uses(scale, independent) ||
+        de_expr_uses(scale, dependent) ||
+        !coefficient_difference ||
+        !expr_is_exact_zero(coefficient_difference))
+        goto cleanup;
 
     attempt = DE_ATTEMPT_FAILED;
     constant_1 = expr_new_named_const(NUM_NAN, "C1");
     constant_2 = expr_new_named_const(NUM_NAN, "C2");
     two = expr_const_long(2L);
-    numerator_sum = constant_1
-        ? expr_add(independent, constant_1)
-        : NULL;
     two_x = two ? expr_mul(two, independent) : NULL;
-    numerator = *scale_out == 1L
-        ? (two_x ? expr_add(two_x, constant_1) : NULL)
-        : (numerator_sum ? expr_clone(numerator_sum) : NULL);
+    numerator = two_x ? expr_add(two_x, constant_1) : NULL;
     x_squared = expr_pow_long(independent, 2L);
     constant_1_x = constant_1
         ? expr_mul(constant_1, independent)
         : NULL;
-    twice_constant_1_x = two && constant_1_x
-        ? expr_mul(two, constant_1_x)
+    denominator_sum = x_squared && constant_1_x
+        ? expr_add(x_squared, constant_1_x)
         : NULL;
-    twice_constant_2 = two && constant_2
-        ? expr_mul(two, constant_2)
+    denominator = denominator_sum && constant_2
+        ? expr_add(denominator_sum, constant_2)
         : NULL;
-    denominator_sum = x_squared &&
-        (*scale_out == 1L ? constant_1_x : twice_constant_1_x)
-        ? expr_add(
-              x_squared,
-              *scale_out == 1L ? constant_1_x : twice_constant_1_x)
+    scaled_denominator = denominator
+        ? expr_mul_simplify_owned(expr_clone(scale), denominator)
         : NULL;
-    denominator = denominator_sum &&
-        (*scale_out == 1L ? constant_2 : twice_constant_2)
-        ? expr_add(
-              denominator_sum,
-              *scale_out == 1L ? constant_2 : twice_constant_2)
+    denominator = NULL;
+    solution_denominator = scaled_denominator
+        ? expr_clone(scaled_denominator)
         : NULL;
-    solution_denominator = denominator ? expr_clone(denominator) : NULL;
     right = numerator && solution_denominator
         ? expr_div(numerator, solution_denominator)
         : NULL;
     solutions_out[0] = right ? equ_new(dependent, right) : NULL;
     if (solutions_out[0]) {
         *solution_count_out = 1u;
+        *scale_out = expr_clone(scale);
         attempt = DE_ATTEMPT_SOLVED;
     }
 
@@ -546,35 +642,39 @@ cleanup:
     }
     expr_free(right);
     expr_free(solution_denominator);
+    expr_free(scaled_denominator);
     expr_free(denominator);
     expr_free(denominator_sum);
-    expr_free(twice_constant_2);
-    expr_free(twice_constant_1_x);
     expr_free(constant_1_x);
     expr_free(x_squared);
     expr_free(numerator);
     expr_free(two_x);
-    expr_free(numerator_sum);
     expr_free(two);
     expr_free(constant_2);
     expr_free(constant_1);
-    expr_free(scaled_expected);
-    expr_free(scaled_family_expected);
-    expr_free(scaled_remainder);
-    expr_free(four_y_cubed);
-    expr_free(six_y_y_prime);
-    expr_free(expected_remainder);
+    expr_free(coefficient_difference);
+    expr_free(expected_cubic);
+    expr_free(scale_squared);
+    expr_free(scale);
+    expr_free(three_leading);
     expr_free(y_cubed);
-    expr_free(three_y_y_prime);
-    expr_free(three_y);
     expr_free(three);
+    expr_free(constant_remainder);
+    expr_free(cubic_coefficient);
+    expr_free(after_mixed);
+    expr_free(mixed_coefficient);
+    expr_free(mixed_monomial);
     expr_free(remainder);
     expr_free(leading);
     return attempt;
 }
 
-diffequ_solve_result_t *de_solve(const diffequ_t *de)
+diffequ_solve_result_t *de_solve_with_options(
+    const diffequ_t *de,
+    unsigned int options)
 {
+    const bool include_steps =
+        (options & DE_SOLVE_OPTION_STEPS) != 0u;
     const expr_t *independent;
     const expr_t *first_derivative = NULL;
     const expr_t *second_derivative = NULL;
@@ -586,6 +686,8 @@ diffequ_solve_result_t *de_solve(const diffequ_t *de)
     expr_t *remainder = NULL;
     expr_t *negative_remainder = NULL;
     expr_t *derivative_right = NULL;
+    char *solution_steps = NULL;
+    char *solution_steps_tex = NULL;
     equation_t *solution = NULL;
     equation_t *derivative_quadratic_solutions[3] = {
         NULL, NULL, NULL
@@ -601,7 +703,7 @@ diffequ_solve_result_t *de_solve(const diffequ_t *de)
     size_t modified_emden_count = 0u;
     size_t homogeneous_count = 0u;
     size_t exact_first_order_count = 0u;
-    long modified_emden_scale = 0L;
+    expr_t *modified_emden_scale = NULL;
     de_attempt_t derivative_quadratic;
     de_attempt_t exact_first_order;
     de_attempt_t exact_derivative;
@@ -623,8 +725,8 @@ diffequ_solve_result_t *de_solve(const diffequ_t *de)
     if (de->independent_count >= 2u) {
         residual = equ_residual(de->equation);
         result = de->independent_count == 2u
-            ? de_pde_solve_two_variable(de, residual)
-            : de_pde_solve_multi_variable(de, residual);
+            ? de_pde_solve_two_variable(de, residual, include_steps)
+            : de_pde_solve_multi_variable(de, residual, include_steps);
         goto cleanup;
     }
     if (de->independent_count != 1u)
@@ -760,28 +862,56 @@ diffequ_solve_result_t *de_solve(const diffequ_t *de)
                 &modified_emden_count,
                 &modified_emden_scale);
         if (linear_transformation == DE_ATTEMPT_SOLVED) {
+            char *modified_emden_steps = NULL;
+            char *modified_emden_steps_tex = NULL;
+            char *scale_text = expr_to_string(
+                modified_emden_scale, style_UNBOUND);
+            string_t *diagnostic = string_new();
+
+            if (!scale_text || !diagnostic ||
+                string_append_format(
+                    diagnostic,
+                    strcmp(scale_text, "1") == 0
+                        ? "linearized by y = u'/u, then solved as u''' = 0"
+                        : "linearized by y = u'/(%su), then solved as "
+                    "u''' = 0",
+                    scale_text) < 0 ||
+                (include_steps && !de_modified_emden_steps(
+                    independent,
+                    dependent,
+                    modified_emden_scale,
+                    &modified_emden_steps,
+                    &modified_emden_steps_tex))) {
+                free(scale_text);
+                string_free(diagnostic);
+                free(modified_emden_steps_tex);
+                free(modified_emden_steps);
+                goto cleanup;
+            }
             result = de_solve_result_new(
                 DE_SOLVE_STATUS_SOLVED,
                 DE_SOLVER_LINEAR_TRANSFORMATION,
-                modified_emden_scale == 2L
-                    ? "linearized by y = u'/(2u), then solved as u''' = 0"
-                    : "linearized by y = u'/u, then solved as u''' = 0");
-            if (!result || de_solve_result_set_steps(
+                string_c_str(diagnostic));
+            if (!result || (include_steps && de_solve_result_set_steps(
                     result,
-                    modified_emden_scale == 2L
-                        ? de_scaled_modified_emden_steps
-                        : de_modified_emden_steps) != 0 ||
-                de_solve_result_set_steps_tex(
+                    modified_emden_steps) != 0) ||
+                (include_steps && de_solve_result_set_steps_tex(
                     result,
-                    modified_emden_scale == 2L
-                        ? de_scaled_modified_emden_steps_tex
-                        : de_modified_emden_steps_tex) != 0 ||
+                    modified_emden_steps_tex) != 0) ||
                 de_solve_result_set_symmetry(
                     result, "SL(3, ℝ)") != 0) {
                 de_solve_result_free(result);
                 result = NULL;
+                free(scale_text);
+                string_free(diagnostic);
+                free(modified_emden_steps_tex);
+                free(modified_emden_steps);
                 goto cleanup;
             }
+            free(scale_text);
+            string_free(diagnostic);
+            free(modified_emden_steps_tex);
+            free(modified_emden_steps);
             for (size_t i = 0u; i < modified_emden_count; ++i) {
                 if (de_solve_result_append(
                         result, modified_emden_solutions[i]) != 0) {
@@ -962,15 +1092,28 @@ diffequ_solve_result_t *de_solve(const diffequ_t *de)
     }
 
     parameter_linear_pde = de_pde_attempt_parameter_linear(
+        de,
         independent,
         dependent,
         derivative_right,
-        &solution);
+        include_steps,
+        &solution,
+        &solution_steps,
+        &solution_steps_tex);
     if (parameter_linear_pde == DE_ATTEMPT_SOLVED) {
         result = de_solve_result_new(
             DE_SOLVE_STATUS_SOLVED,
             DE_SOLVER_PARAMETER_LINEAR_PDE,
             "solved as a parameter-dependent first-order linear PDE");
+        if (!result ||
+            (include_steps &&
+             de_solve_result_set_steps(result, solution_steps) != 0) ||
+            (include_steps && de_solve_result_set_steps_tex(
+                result, solution_steps_tex) != 0)) {
+            de_solve_result_free(result);
+            result = NULL;
+            goto cleanup;
+        }
         goto append;
     }
     if (parameter_linear_pde == DE_ATTEMPT_FAILED) {
@@ -1105,6 +1248,8 @@ append:
     solution = NULL;
 
 cleanup:
+    free(solution_steps_tex);
+    free(solution_steps);
     for (size_t i = 0u; i < 2u; ++i)
         equ_free(exact_first_order_solutions[i]);
     for (size_t i = 0u; i < 2u; ++i)
@@ -1117,10 +1262,21 @@ cleanup:
         equ_free(derivative_quadratic_solutions[i]);
     equ_free(solution);
     expr_free(operator_dependent);
+    expr_free(modified_emden_scale);
     expr_free(derivative_right);
     expr_free(negative_remainder);
     expr_free(remainder);
     expr_free(derivative_coefficient);
     expr_free(residual);
+    if (include_steps && result &&
+        de_solve_result_ensure_rule_steps(de, result) != 0) {
+        de_solve_result_free(result);
+        result = NULL;
+    }
     return result;
+}
+
+diffequ_solve_result_t *de_solve(const diffequ_t *de)
+{
+    return de_solve_with_options(de, DE_SOLVE_OPTION_NONE);
 }

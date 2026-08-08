@@ -2913,8 +2913,9 @@ INDEX_HTML = r"""<!doctype html>
     #functionStyle.equation-function {
       --solver-tex-scale: 1.5;
       padding-top: 0.15rem;
-      overflow-x: auto;
-      white-space: pre;
+      overflow-x: hidden;
+      overflow-y: auto;
+      white-space: normal;
       overflow-wrap: normal;
       word-break: normal;
     }
@@ -2924,6 +2925,7 @@ INDEX_HTML = r"""<!doctype html>
       max-width: none;
       height: auto;
       overflow: visible;
+      transform-origin: left top;
       filter: brightness(0) saturate(100%) invert(82%) sepia(39%) saturate(540%) hue-rotate(354deg) brightness(98%) contrast(92%) drop-shadow(0 0 0.65rem rgba(113, 198, 180, 0.28));
     }
 
@@ -3890,6 +3892,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           <div class="help-kicker">Partial Differential Equations And Results</div>
           <ul>
             <li><code>Dx(u) + Dy(u) = 0</code> is a first-order PDE; <code>u_x + u_y = 0</code> is equivalent shorthand.</li>
+            <li><code>phi_xx + phi_yy = 0</code> is the two-dimensional Laplace equation. Without boundary data, MARSlib returns its general harmonic family <code>φ = F(x + i*y) + G(x - i*y)</code>.</li>
+            <li><code>phi_rr + 1/r phi_r + 1/r^2 phi_thetatheta = 0</code> is the polar form. Spaces between coefficients and derivative terms imply multiplication, Greek derivative suffixes are recognised, and MARSlib returns <code>φ = F(r*exp(i*θ)) + G(r*exp(-i*θ))</code>.</li>
             <li>Use the explicit form <code>{ Dx(y) + a*y = x | x = ?; a = 2; y(0) = 1 }</code> when you need to declare variables, constants, and conditions separately.</li>
             <li>The result cards show the normalised problem, selected solver family, diagnostic, and every symbolic solution returned by native MARSlib.</li>
           </ul>
@@ -4251,6 +4255,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     const RESULT_ZOOM_DEFAULT_INDEX = 3;
     let lastTex = '';
     let diffequationFitFrame = 0;
+    let solverFitFrame = 0;
+    let solverWrapRenderPending = false;
     let lastDerivativeExpression = '';
     let currentVariables = [];
     let currentBindingKinds = new Map();
@@ -9011,13 +9017,98 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       );
     }
 
+    function solverTexScale() {
+      const value = Number.parseFloat(
+        getComputedStyle(functionStyle).getPropertyValue('--solver-tex-scale')
+      );
+      return Number.isFinite(value) && value > 0 ? value : 1.5;
+    }
+
+    function solverTexContentWidth() {
+      const style = getComputedStyle(functionStyle);
+      const paddingLeft = Number.parseFloat(style.paddingLeft) || 0;
+      const paddingRight = Number.parseFloat(style.paddingRight) || 0;
+      return Math.max(
+        0,
+        functionStyle.clientWidth - paddingLeft - paddingRight
+      );
+    }
+
+    function installSolverTexSvg(svgMarkup, variant) {
+      if (!svgMarkup || functionStyle.dataset.solverVariant === variant)
+        return;
+
+      const svgStart = svgMarkup.indexOf('<svg');
+      functionStyle.innerHTML = svgStart >= 0
+        ? svgMarkup.slice(svgStart)
+        : svgMarkup;
+      functionStyle.classList.add('equation-function');
+      const solverSvg = functionStyle.querySelector('svg');
+      const solverSvgWidth = solverSvg?.getAttribute('width');
+      if (solverSvg && solverSvgWidth) {
+        solverSvg.style.width =
+          `calc(${solverSvgWidth} * var(--solver-tex-scale))`;
+        solverSvg.style.maxWidth = '100%';
+        solverSvg.style.height = 'auto';
+      }
+      functionStyle.dataset.solverVariant = variant;
+    }
+
+    async function fitSolverTexToCard() {
+      solverFitFrame = 0;
+      if (currentMode() !== 'diffequation' ||
+          !functionStyle.classList.contains('equation-function'))
+        return;
+
+      const compactSvg = functionStyle.dataset.solverCompactSvg || '';
+      const wrappedTex = functionStyle.dataset.solverWrappedTex || '';
+      let wrappedSvg = functionStyle.dataset.solverWrappedSvg || '';
+      if (!compactSvg)
+        return;
+
+      const compactWidth = svgMarkupIntrinsicWidth(compactSvg) *
+        solverTexScale();
+      const useWrapped = !!wrappedTex &&
+        wrappedTex !== functionStyle.dataset.solverCompactTex &&
+        compactWidth > solverTexContentWidth() + 1;
+
+      if (useWrapped && !wrappedSvg && !solverWrapRenderPending) {
+        solverWrapRenderPending = true;
+        try {
+          const renderedWrapped = await renderTexSvg(wrappedTex);
+          wrappedSvg = renderedWrapped.svg || '';
+          functionStyle.dataset.solverWrappedSvg = wrappedSvg;
+        } catch (_err) {
+          wrappedSvg = '';
+        } finally {
+          solverWrapRenderPending = false;
+        }
+      }
+
+      installSolverTexSvg(
+        useWrapped && wrappedSvg ? wrappedSvg : compactSvg,
+        useWrapped && wrappedSvg ? 'wrapped' : 'compact'
+      );
+    }
+
+    function scheduleSolverTexFit() {
+      if (solverFitFrame)
+        cancelAnimationFrame(solverFitFrame);
+      solverFitFrame = requestAnimationFrame(() => {
+        void fitSolverTexToCard();
+      });
+    }
+
     if (typeof ResizeObserver === 'function') {
       const diffequationResizeObserver = new ResizeObserver(
         scheduleDiffequationSolutionFit
       );
       diffequationResizeObserver.observe(rendered);
+      const solverResizeObserver = new ResizeObserver(scheduleSolverTexFit);
+      solverResizeObserver.observe(functionStyle);
     } else {
       window.addEventListener('resize', scheduleDiffequationSolutionFit);
+      window.addEventListener('resize', scheduleSolverTexFit);
     }
 
     function clearRenderedError() {
@@ -9693,21 +9784,21 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         ].filter(Boolean).join('\n');
         setExpandableText(functionStyle, functionMore, solverDetails, solverDetails);
         functionStyle.classList.remove('equation-function');
-        const solverTexSource = data.steps_tex || solverTextToTex(solverDetails);
+        const solverTexSource = data.steps_left_tex || data.steps_tex ||
+          solverTextToTex(solverDetails);
         if (solverTexSource) {
           try {
             const solverTex = await renderTexSvg(solverTexSource);
             if (solverTex.svg) {
-              const svgStart = solverTex.svg.indexOf('<svg');
-              functionStyle.innerHTML = svgStart >= 0
-                ? solverTex.svg.slice(svgStart)
-                : solverTex.svg;
               functionStyle.classList.add('equation-function');
-              const solverSvg = functionStyle.querySelector('svg');
-              const solverSvgWidth = solverSvg?.getAttribute('width');
-              if (solverSvg && solverSvgWidth)
-                solverSvg.style.width =
-                  `calc(${solverSvgWidth} * var(--solver-tex-scale))`;
+              functionStyle.dataset.solverCompactTex = solverTexSource;
+              functionStyle.dataset.solverWrappedTex =
+                data.steps_wrapped_tex || solverTexSource;
+              functionStyle.dataset.solverCompactSvg = solverTex.svg;
+              functionStyle.dataset.solverWrappedSvg = '';
+              delete functionStyle.dataset.solverVariant;
+              installSolverTexSvg(solverTex.svg, 'compact');
+              scheduleSolverTexFit();
               functionStyle.dataset.fullText = solverDetails;
               functionStyle.dataset.displayText = solverDetails;
             }
@@ -11181,6 +11272,82 @@ def wrap_rendered_tex_additive_lines(tex: str, threshold: int = 120) -> str:
         )
 
     if not changed:
+        return source
+    return begin + "\n" + " \\\\\n".join(wrapped_rows) + "\n" + end
+
+
+def wrap_solver_tex_lines(
+    tex: str,
+    threshold: int | None = 160,
+) -> str:
+    """Return a left-aligned, vertically wrapped solver derivation."""
+    source = str(tex or "").strip()
+    begin = r"\begin{aligned}[t]"
+    end = r"\end{aligned}"
+    if not source.startswith(begin) or not source.endswith(end):
+        return source
+
+    body = source[len(begin):-len(end)].strip()
+    rows = [
+        row.strip()
+        for row in re.split(r"\\\\(?:\[[^\]]*\])?", body)
+        if row.strip()
+    ]
+    wrapped_rows: list[str] = []
+
+    for source_row in rows:
+        row = re.sub(r"(?<!\\)&", "", source_row).strip()
+        segments = [row]
+        positions = _tex_additive_break_positions(row)
+        row_is_long = threshold is not None and len(row) > threshold
+
+        if row_is_long and positions:
+            segments = []
+            start = 0
+            for position in positions:
+                segments.append(row[start:position].rstrip())
+                start = position
+            segments.append(row[start:].strip())
+            segments = [
+                segment.replace(r"\left", r"\bigl").replace(
+                    r"\right", r"\bigr"
+                )
+                for segment in segments
+                if segment
+            ]
+            grouped_segments = [segments[0]]
+            for segment in segments[1:]:
+                candidate = grouped_segments[-1] + " " + segment
+                if len(candidate) <= threshold:
+                    grouped_segments[-1] = candidate
+                else:
+                    grouped_segments.append(segment)
+            segments = grouped_segments
+        elif row_is_long:
+            for marker in (r",\qquad", r",\quad"):
+                position = row.find(marker)
+                if position > 0:
+                    segments = [
+                        row[:position + 1].rstrip(),
+                        row[position + len(marker):].strip(),
+                    ]
+                    break
+
+        if len(segments) == 1 and row_is_long:
+            position = row.find("=")
+            if 0 < position < len(row) - 1:
+                segments = [
+                    row[:position + 1].rstrip(),
+                    row[position + 1:].strip(),
+                ]
+
+        wrapped_rows.append(r"&\displaystyle " + segments[0])
+        wrapped_rows.extend(
+            r"&\displaystyle \qquad {}" + segment
+            for segment in segments[1:]
+        )
+
+    if not wrapped_rows:
         return source
     return begin + "\n" + " \\\\\n".join(wrapped_rows) + "\n" + end
 
@@ -14076,6 +14243,11 @@ def prepare_diffequation_fields(fields: dict[str, str]) -> dict[str, object]:
     problem_tex = tex_for_display(
         str(fields.get("problem_tex") or "").strip()
     )
+    steps_tex = tex_for_display(
+        str(fields.get("steps_tex") or "").strip()
+    )
+    steps_left_tex = wrap_solver_tex_lines(steps_tex, threshold=None)
+    steps_wrapped_tex = wrap_solver_tex_lines(steps_tex)
     render_tex = solutions_tex or problem_tex
     svg = None
     wrapped_svg = None
@@ -14103,9 +14275,9 @@ def prepare_diffequation_fields(fields: dict[str, str]) -> dict[str, object]:
         "diagnostic": str(fields.get("diagnostic") or "").strip(),
         "symmetry": str(fields.get("symmetry") or "").strip(),
         "steps": str(fields.get("steps") or "").strip(),
-        "steps_tex": tex_for_display(
-            str(fields.get("steps_tex") or "").strip()
-        ),
+        "steps_tex": steps_tex,
+        "steps_left_tex": steps_left_tex,
+        "steps_wrapped_tex": steps_wrapped_tex,
     }
     if svg:
         payload["svg"] = svg

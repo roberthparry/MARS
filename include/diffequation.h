@@ -19,7 +19,9 @@
  * with arbitrary-order constant-coefficient linear ODEs and second-order
  * equations that can be completed through Sturm-Liouville normalization.
  * Two-variable constant-coefficient homogeneous transport PDEs are solved
- * from explicit axis-aligned boundary data.
+ * from explicit axis-aligned boundary data. The two-dimensional Laplace
+ * equation is solved in Cartesian and polar coordinates as a general
+ * harmonic family when no boundary data are supplied.
  */
 
 /**
@@ -27,6 +29,18 @@
  */
 typedef struct diffequ_t diffequ_t;
 typedef struct diffequ_solve_result_t diffequ_solve_result_t;
+
+/**
+ * @brief Optional work requested from a differential-equation solve.
+ *
+ * Options may be combined with bitwise OR and passed to
+ * de_solve_with_options().
+ */
+typedef enum de_solve_option_t {
+    DE_SOLVE_OPTION_NONE = 0u,
+    /** Construct plain-text and TeX derivations for presentation. */
+    DE_SOLVE_OPTION_STEPS = 1u << 0
+} de_solve_option_t;
 
 /**
  * @brief Outcome of a differential-equation solve attempt.
@@ -56,8 +70,11 @@ typedef enum {
     DE_SOLVER_CONSTANT_COEFFICIENT_TRANSPORT,
     DE_SOLVER_CHARACTERISTICS,
     DE_SOLVER_PARAMETER_LINEAR_PDE,
-    DE_SOLVER_HYDROGEN_MATRIX,
-    DE_SOLVER_EXACT_FIRST_ORDER
+    DE_SOLVER_STATIONARY_EIGENFUNCTION,
+    /* Backwards-compatible name retained for existing callers. */
+    DE_SOLVER_HYDROGEN_MATRIX = DE_SOLVER_STATIONARY_EIGENFUNCTION,
+    DE_SOLVER_EXACT_FIRST_ORDER,
+    DE_SOLVER_LAPLACE
 } de_solver_t;
 
 /**
@@ -258,12 +275,31 @@ char *de_to_string(const diffequ_t *de, style_t style);
  * is supplied on a constant-`x` or constant-`y` boundary.
  * Unsupported but well-formed problems return a result with
  * ::DE_SOLVE_STATUS_UNSUPPORTED rather than returning `NULL`.
+ * This default entry point does not construct presentation derivations; use
+ * de_solve_with_options() with ::DE_SOLVE_OPTION_STEPS when they are needed.
  *
  * @param de Differential-equation problem to solve.
  * @return An owning solve result, or `NULL` only when the result object itself
  *         cannot be allocated. Release it with de_solve_result_free().
  */
 diffequ_solve_result_t *de_solve(const diffequ_t *de);
+
+/**
+ * @brief Attempt to solve a differential equation with optional output.
+ *
+ * This performs the same symbolic solve as de_solve(). Pass
+ * ::DE_SOLVE_OPTION_STEPS when a presenting client also needs the derivation
+ * returned by de_solve_result_steps() and de_solve_result_steps_tex().
+ * Omitting that option avoids constructing the derivation.
+ *
+ * @param de Differential-equation problem to solve.
+ * @param options Bitwise OR of ::de_solve_option_t values.
+ * @return An owning solve result, or `NULL` only when the result object itself
+ *         cannot be allocated. Release it with de_solve_result_free().
+ */
+diffequ_solve_result_t *de_solve_with_options(
+    const diffequ_t *de,
+    unsigned int options);
 
 /**
  * @brief Destroy a differential-equation solve result.
@@ -302,11 +338,14 @@ const char *de_solve_result_diagnostic(
  * @brief Borrow the mathematical derivation produced by the selected solver.
  *
  * The text uses conventional Unicode mathematical notation and is intended
- * for presentation by thin clients. Not every solver currently supplies a
- * derivation.
+ * for presentation by thin clients. It is constructed only when the solve
+ * was requested with ::DE_SOLVE_OPTION_STEPS. The derivation names the
+ * parameterised rule selected from the parsed expression tree; it is not a
+ * stored explanation for one literal input equation.
  *
  * @param result Result to inspect.
- * @return Borrowed multiline UTF-8 text, or `NULL` when unavailable.
+ * @return Borrowed multiline UTF-8 text, or `NULL` when derivations were not
+ *         requested or the result was not solved.
  */
 const char *de_solve_result_steps(
     const diffequ_solve_result_t *result);

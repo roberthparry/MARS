@@ -1143,7 +1143,27 @@ static void emit_formal_derivative_tex(const expr_t *f, sbuf_t *b)
 
 static void emit_arbitrary_function_expr(const expr_t *f, sbuf_t *b)
 {
-    emit_name(b, f->name ? f->name : "F");
+    const char *name = f->name ? f->name : "F";
+    size_t length = strlen(name);
+    size_t prime_count = 0u;
+
+    while (prime_count < length &&
+           name[length - prime_count - 1u] == '\'')
+        ++prime_count;
+    if (prime_count > 0u && prime_count < length) {
+        char *base_name = strndup(name, length - prime_count);
+
+        if (base_name) {
+            emit_name(b, base_name);
+            free(base_name);
+            for (size_t i = 0u; i < prime_count; ++i)
+                sbuf_putc(b, '\'');
+        } else {
+            emit_name(b, name);
+        }
+    } else {
+        emit_name(b, name);
+    }
     sbuf_putc(b, '(');
     emit_expr(f->a, b, PREC_LOWEST);
     sbuf_putc(b, ')');
@@ -1158,7 +1178,27 @@ static void emit_argument_list_expr(const expr_t *f, sbuf_t *b)
 
 static void emit_arbitrary_function_tex(const expr_t *f, sbuf_t *b)
 {
-    emit_tex_name(b, f->name ? f->name : "F");
+    const char *name = f->name ? f->name : "F";
+    size_t length = strlen(name);
+    size_t prime_count = 0u;
+
+    while (prime_count < length &&
+           name[length - prime_count - 1u] == '\'')
+        ++prime_count;
+    if (prime_count > 0u && prime_count < length) {
+        char *base_name = strndup(name, length - prime_count);
+
+        if (base_name) {
+            emit_tex_name(b, base_name);
+            free(base_name);
+            for (size_t i = 0u; i < prime_count; ++i)
+                sbuf_putc(b, '\'');
+        } else {
+            emit_tex_name(b, name);
+        }
+    } else {
+        emit_tex_name(b, name);
+    }
     sbuf_puts(b, "\\left(");
     emit_tex_expr(f->a, b, PREC_LOWEST);
     sbuf_puts(b, "\\right)");

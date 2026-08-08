@@ -952,9 +952,9 @@ static bool deriv_poly_divide_integer_local(const number_t *src,
     return true;
 }
 
-static expr_t *deriv_build_poly_local(const expr_t *var,
-                                      const number_t *coeffs,
-                                      size_t n)
+static expr_t *deriv_build_flat_poly_local(const expr_t *var,
+                                           const number_t *coeffs,
+                                           size_t n)
 {
     expr_t *sum = NULL;
 
@@ -996,6 +996,43 @@ static expr_t *deriv_build_poly_local(const expr_t *var,
     }
 
     return sum ? sum : expr_new_const(NUM_ZERO);
+}
+
+static expr_t *deriv_build_poly_local(const expr_t *var,
+                                      const number_t *coeffs,
+                                      size_t n)
+{
+    size_t common_power = 0u;
+    expr_t *inner_raw = NULL;
+    expr_t *inner = NULL;
+    expr_t *factor = NULL;
+    expr_t *out = NULL;
+
+    if (!var || !coeffs || n == 0u)
+        return NULL;
+
+    while (common_power < n && num_is_zero(coeffs[common_power]))
+        ++common_power;
+    if (common_power == 0u || common_power == n)
+        return deriv_build_flat_poly_local(var, coeffs, n);
+
+    inner_raw = deriv_build_flat_poly_local(
+        var, coeffs + common_power, n - common_power);
+    inner = inner_raw ? expr_simplify(inner_raw) : NULL;
+    if (common_power == 1u) {
+        factor = expr_retain_expr(var);
+    } else {
+        number_t exponent = num_create_from_long((long)common_power);
+
+        factor = expr_pow(var, &exponent);
+        num_destroy(&exponent);
+    }
+    out = (factor && inner) ? expr_mul(factor, inner) : NULL;
+
+    expr_free(factor);
+    expr_free(inner);
+    expr_free(inner_raw);
+    return out;
 }
 
 static uint64_t deriv_subtree_epoch_local(const expr_t *expr)
@@ -1054,11 +1091,15 @@ cleanup:
     return ok;
 }
 
-expr_t *expr_deriv_rational_over_quadratic_power(const expr_t *expr,
-                                                 const expr_t *wrt)
+expr_t *expr_deriv_rational_over_polynomial_power(const expr_t *expr,
+                                                  const expr_t *wrt)
 {
+    enum {
+        MAX_RATIONAL_POLYNOMIAL_DEGREE = 16,
+        MAX_RATIONAL_DENOMINATOR_POWER = 16
+    };
     const expr_t *denom_base = NULL;
-    unsigned int denom_power = 0u;
+    unsigned int denom_power = 1u;
     number_t *p = NULL;
     number_t *q = NULL;
     number_t *dp = NULL;
@@ -1073,17 +1114,30 @@ expr_t *expr_deriv_rational_over_quadratic_power(const expr_t *expr,
     expr_t *denom_expr = NULL;
     expr_t *out = NULL;
     size_t numerator_degree = 0u;
+    size_t denominator_degree = 0u;
     size_t coefficient_count = 0u;
     long content = 0L;
 
-    if (!expr || !expr->a || !expr->b || !wrt ||
-        !deriv_match_positive_power_local(expr->b, &denom_base, &denom_power) ||
-        denom_power == 0u || !denom_base ||
-        !deriv_poly_expr_degree_local(expr->a, wrt, &numerator_degree) ||
-        numerator_degree > SIZE_MAX - 2u)
+    if (!expr || !expr_is_div(expr) || !expr->a || !expr->b || !wrt)
         goto cleanup;
 
-    coefficient_count = numerator_degree + 2u;
+    if (!deriv_match_positive_power_local(
+            expr->b, &denom_base, &denom_power)) {
+        denom_base = expr->b;
+        denom_power = 1u;
+    }
+    if (denom_power == 0u ||
+        denom_power > MAX_RATIONAL_DENOMINATOR_POWER || !denom_base ||
+        !deriv_poly_expr_degree_local(expr->a, wrt, &numerator_degree) ||
+        !deriv_poly_expr_degree_local(
+            denom_base, wrt, &denominator_degree) ||
+        numerator_degree > MAX_RATIONAL_POLYNOMIAL_DEGREE ||
+        denominator_degree == 0u ||
+        denominator_degree > MAX_RATIONAL_POLYNOMIAL_DEGREE ||
+        numerator_degree > SIZE_MAX - denominator_degree - 1u)
+        goto cleanup;
+
+    coefficient_count = numerator_degree + denominator_degree + 1u;
     if (coefficient_count < 3u)
         coefficient_count = 3u;
 
@@ -1097,7 +1151,7 @@ expr_t *expr_deriv_rational_over_quadratic_power(const expr_t *expr,
     if (!p || !q || !dp || !dq || !left || !right || !numer ||
         !deriv_collect_poly_local(expr->a, wrt, p, coefficient_count) ||
         !deriv_collect_poly_local(denom_base, wrt, q, coefficient_count) ||
-        deriv_poly_degree_local(q, coefficient_count) != 2u)
+        deriv_poly_degree_local(q, coefficient_count) != denominator_degree)
         goto cleanup;
 
     for (size_t i = 1u; i < coefficient_count; ++i) {
@@ -1175,10 +1229,10 @@ cleanup:
     return out;
 }
 
-static expr_t *deriv_rational_over_quadratic_power(expr_t *dv)
+static expr_t *deriv_rational_over_polynomial_power(expr_t *dv)
 {
-    return expr_deriv_rational_over_quadratic_power(dv,
-                                                    expr_current_wrt_internal());
+    return expr_deriv_rational_over_polynomial_power(
+        dv, expr_current_wrt_internal());
 }
 
 static int expr_has_composite_preserved_binding_expr_node(const expr_t *dv)
@@ -2144,7 +2198,7 @@ static expr_t *deriv_div(expr_t *dv)
     special = deriv_atan_over_scaled_sqrt(dv);
     if (special)
         return special;
-    special = deriv_rational_over_quadratic_power(dv);
+    special = deriv_rational_over_polynomial_power(dv);
     if (special)
         return special;
 

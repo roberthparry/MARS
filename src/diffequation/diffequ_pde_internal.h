@@ -35,6 +35,14 @@ equation_t *de_pde_solution_equation(
     const expr_t *dependent,
     const expr_t *right);
 
+de_attempt_t de_pde_attempt_laplace(
+    const diffequ_t *de,
+    const expr_t *residual,
+    equation_t **solution_out);
+de_attempt_t de_pde_attempt_polar_laplace(
+    const diffequ_t *de,
+    const expr_t *residual,
+    equation_t **solution_out);
 de_attempt_t de_pde_attempt_constant_transport(
     const diffequ_t *de,
     const expr_t *residual,
@@ -51,16 +59,22 @@ de_attempt_t de_pde_attempt_characteristics(
     equation_t **solutions_out,
     size_t *solution_count_out);
 de_attempt_t de_pde_attempt_parameter_linear(
+    const diffequ_t *de,
     const expr_t *independent,
     const expr_t *dependent,
     const expr_t *derivative_right,
-    equation_t **solution_out);
+    bool include_steps,
+    equation_t **solution_out,
+    char **steps_out,
+    char **steps_tex_out);
 
 diffequ_solve_result_t *de_pde_solve_two_variable(
     const diffequ_t *de,
-    const expr_t *residual);
+    const expr_t *residual,
+    bool include_steps);
 diffequ_solve_result_t *de_pde_solve_multi_variable(
     const diffequ_t *de,
-    const expr_t *residual);
+    const expr_t *residual,
+    bool include_steps);
 
 #endif
