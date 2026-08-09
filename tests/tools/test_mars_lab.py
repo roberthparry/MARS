@@ -168,7 +168,7 @@ class MatrixResultTests(unittest.TestCase):
             matrix_binary, "sin(1 2; 4 5)", "inverse", 64
         )
         selected_fields, selected_raw, selected_returncode = mars_lab.run_matrix_lab_fields(
-            matrix_binary, "(1, 2; 4, 5)", "sin", 64
+            matrix_binary, "(1 2; 4 5)", "sin", 64
         )
 
         self.assertEqual(direct_returncode, 0, direct_raw)
@@ -176,6 +176,25 @@ class MatrixResultTests(unittest.TestCase):
         self.assertEqual(direct_fields["operation"], "sin")
         self.assertEqual(direct_fields["result"], selected_fields["result"])
         self.assertEqual(direct_fields["tex"], selected_fields["tex"])
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "matrix_lab").is_file(),
+        "release matrix_lab helper is not built",
+    )
+    def test_native_helper_accepts_compact_matrix_operation_operands(self) -> None:
+        matrix_binary = ROOT / "build" / "release" / "scratch" / "matrix_lab"
+        fields, raw, returncode = mars_lab.run_matrix_lab_fields(
+            matrix_binary,
+            "(1 2; 3 4)",
+            "multiply",
+            64,
+            "(5 6; 7 8)",
+        )
+
+        self.assertEqual(returncode, 0, raw)
+        self.assertEqual(fields["rows"], "2")
+        self.assertEqual(fields["cols"], "2")
+        self.assertEqual(fields["result"], "(19, 22; 43, 50)")
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "matrix_lab").is_file(),
@@ -1801,8 +1820,8 @@ class ZZMarsLabReadmeExamples(unittest.TestCase):
 
         matrix, raw, returncode = mars_lab.run_matrix_lab_fields(
             scratch / "matrix_lab",
-            "sin(1 2; 4 5)",
-            "eval",
+            "(1 2; 4 5)",
+            "sin",
             53,
         )
         self.assertEqual(returncode, 0, raw)
