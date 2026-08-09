@@ -379,7 +379,7 @@ Current sample cases covered there include:
   - `near_miss_sin`
   - `near_miss_sinh`
 
-Sample timings from [`docs/benchmarks.md`](benchmarks.md) are:
+Sample timings from [`docs/benchmarks.md`](./benchmarks.md) are:
 
 | Case | Intervals | Avg ms |
 |---|---:|---:|
@@ -390,4 +390,4 @@ Sample timings from [`docs/benchmarks.md`](benchmarks.md) are:
 | `near_miss_exp` | `2` | `15.189` |
 
 For the full integrator benchmark discussion and fuller sample output, see
-[`docs/benchmarks.md`](benchmarks.md).
+[`docs/benchmarks.md`](./benchmarks.md).

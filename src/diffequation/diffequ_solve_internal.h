@@ -114,7 +114,8 @@ de_attempt_t de_attempt_sturm_liouville(
     const expr_t *second_derivative,
     const expr_t *first_derivative,
     const expr_t *residual,
-    equation_t **solution_out);
+    equation_t **solution_out,
+    de_solver_t *solver_out);
 int de_sturm_liouville_cubic_basis(
     const expr_t *independent,
     const expr_t *parameter,

@@ -57,6 +57,7 @@ void test_gamma_erf_erfc_erfinv_erfcinv_digamma(void);
 void test_lambert_w(void);
 void test_beta_logbeta_binomial_beta_pdf_logbeta_pdf_normal_pdf_cdf_logpdf(void);
 void test_gammainc_ei_e1(void);
+void test_bessel_functions(void);
 void test_readme_examples(void);
 void test_qf_productlog_all(void);
 void test_qf_trigamma(void);

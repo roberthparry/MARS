@@ -305,4 +305,4 @@ Results:
 | `qc_logbeta(1.5+0.5i, 2-0.3i)` | `37.4 µs` |
 
 For a broader benchmark overview, see
-[`docs/benchmarks.md`](benchmarks.md).
+[`docs/benchmarks.md`](./benchmarks.md).

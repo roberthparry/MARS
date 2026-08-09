@@ -507,6 +507,8 @@ expr_t *expr_pow_xp(const expr_t *expr1, const expr_t *expr2);
  *                    expr_gammainc_upper, expr_gammainc_P, expr_gammainc_Q
  * Polylogarithms:    expr_dilog (Li₂), expr_polylog (Liₙ),
  *                    expr_legendre_chi (χₙ), expr_appell_f1 (F₁)
+ * Bessel functions:  expr_bessel_j (Jᵥ), expr_bessel_y (Yᵥ)
+ * Lommel function:    expr_lommel_s (s_(μ,ν))
  * Lambert W:         expr_lambert_w0 (principal branch), expr_lambert_wm1 (k=-1),
  *                    expr_lambert_wn (integer branch n)
  * Beta/binomial:     expr_beta (B), expr_logbeta (log B), expr_beta_pdf,
@@ -531,6 +533,10 @@ expr_t *expr_polygamma(unsigned int order, const expr_t *expr);
 expr_t *expr_dilog(const expr_t *expr);
 expr_t *expr_polylog(unsigned int order, const expr_t *expr);
 expr_t *expr_legendre_chi(unsigned int order, const expr_t *expr);
+expr_t *expr_bessel_j(const expr_t *order, const expr_t *argument);
+expr_t *expr_bessel_y(const expr_t *order, const expr_t *argument);
+expr_t *expr_lommel_s(const expr_t *mu, const expr_t *nu,
+                      const expr_t *argument);
 expr_t *expr_appell_f1(const expr_t *a, const expr_t *b1,
                        const expr_t *b2, const expr_t *c,
                        const expr_t *x, const expr_t *y);

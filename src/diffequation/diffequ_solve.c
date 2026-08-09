@@ -339,8 +339,8 @@ static bool de_modified_emden_steps(
     char *y = expr_to_string(dependent, style_UNBOUND);
     char *a = expr_to_string(scale, style_UNBOUND);
     char *x_tex = x_name ? strdup(x_name) : NULL;
-    char *y_tex = expr_to_string(dependent, style_TEX);
-    char *a_tex = expr_to_string(scale, style_TEX);
+    char *y_tex = expr_to_tex_body(dependent);
+    char *a_tex = expr_to_tex_body(scale);
     char *ay = NULL;
     char *au = NULL;
     char *ay_den = NULL;
@@ -715,6 +715,7 @@ diffequ_solve_result_t *de_solve_with_options(
     de_attempt_t linear_transformation;
     de_attempt_t sturm_liouville;
     de_attempt_t parameter_linear_pde;
+    de_solver_t second_order_solver = DE_SOLVER_STURM_LIOUVILLE;
     diffequ_solve_result_t *result = NULL;
 
     if (!de)
@@ -952,12 +953,15 @@ diffequ_solve_result_t *de_solve_with_options(
             second_derivative,
             first_derivative,
             residual,
-            &solution);
+            &solution,
+            &second_order_solver);
         if (sturm_liouville == DE_ATTEMPT_SOLVED) {
             result = de_solve_result_new(
                 DE_SOLVE_STATUS_SOLVED,
-                DE_SOLVER_STURM_LIOUVILLE,
-                "solved as a second-order linear Sturm-Liouville equation");
+                second_order_solver,
+                second_order_solver == DE_SOLVER_POWER_LAW_BESSEL
+                    ? "solved by a power-law reduction to Bessel's equation"
+                    : "solved as a second-order linear Sturm-Liouville equation");
             goto append;
         }
         if (sturm_liouville == DE_ATTEMPT_NOT_MATCHED) {

@@ -736,10 +736,38 @@ solutions y = final
         self.assertIn("Y = x/(2y) − x²/2", payload["steps"])
         self.assertIn(r"\text{Recognise the rule:}", payload["steps_tex"])
         self.assertIn(r"\frac{d^2Y}{dX^2}=0", payload["steps_tex"])
+        self.assertNotIn(r"\middle|", payload["steps_tex"])
+        self.assertNotIn("NAN", payload["steps_tex"])
         self.assertEqual(
             payload["solutions"],
             "y = (2x + C₁)/(2·(x² + C₁x + C₂))",
         )
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
+    def test_native_helper_solves_power_law_bessel_equation(self) -> None:
+        completed = subprocess.run(
+            [
+                str(ROOT / "build" / "release" / "scratch" / "diffequation_lab"),
+                "y'' + x^2*y = 0",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        payload = mars_lab.prepare_diffequation_fields(
+            mars_lab.parse_diffequation_lab_output(completed.stdout)
+        )
+
+        self.assertEqual(payload["status"], "solved")
+        self.assertEqual(payload["solver"], "power-law Bessel")
+        self.assertIn("BesselJ(-¼, ½·x^2)", payload["solutions"])
+        self.assertIn(r"J_{-\frac{1}{4}}", payload["solutions_tex"])
+        self.assertIn("y = sqrt(x)*u(z)", payload["steps"])
+        self.assertNotIn(r"\middle|", payload["steps_tex"])
+        self.assertNotIn("NAN", payload["steps_tex"])
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),

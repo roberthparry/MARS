@@ -159,7 +159,7 @@ make bench_number_scope
 ```
 
 These benchmark targets track the numeric and symbolic hot paths we are
-actively optimising. See [`benchmarks.md`](benchmarks.md) for benchmark-
+actively optimising. See [`benchmarks.md`](./benchmarks.md) for benchmark-
 specific notes and sample results.
 
 ---

@@ -2753,6 +2753,16 @@ expr_t *expr_simplify_add_sub_operator(const expr_t *dv, expr_t *a, expr_t *b)
     }
 
     if (expr_is_op(dv, &ops_add)) {
+        expr_t *trig_weighted_sum =
+            expr_simplify_try_trig_weighted_sum(a, b);
+
+        if (trig_weighted_sum) {
+            expr_free(a);
+            expr_free(b);
+            num_destroy(&c_const);
+            num_destroy(&common_coeff);
+            return trig_weighted_sum;
+        }
         expr_t *basic_sum = expr_simplify_try_basic_sum(a, b);
 
         if (basic_sum) {
@@ -2817,6 +2827,7 @@ expr_t *expr_simplify_add_sub_operator(const expr_t *dv, expr_t *a, expr_t *b)
         expr_combine_atan_difference_addends_local(terms, n);
     expr_combine_log_difference_addends_local(terms, n);
     expr_combine_common_denominator_addends(terms, n);
+    expr_combine_trig_pythagorean_addends(terms, n);
     expr_sort_addends(terms, n);
     expr_extract_common_addend_coeff(terms, n, c_const, &common_coeff);
     if (num_is_one(common_coeff) && !combined_atan_difference &&

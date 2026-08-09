@@ -355,6 +355,7 @@ void test_digamma(void);
 void test_trigamma(void);
 void test_polygamma(void);
 void test_dilog_polylog(void);
+void test_bessel(void);
 void test_lambert_w0(void);
 void test_lambert_wm1(void);
 void test_normal_pdf(void);

@@ -27,6 +27,152 @@ typedef struct {
 
 expr_t *expr_integrate_normalize_radical_products(const expr_t *expr);
 
+static expr_t *build_named_special_function(const char *name,
+                                            const expr_t *argument)
+{
+    return expr_new_arbitrary_function(name, argument);
+}
+
+/*
+ * Integration by parts for log(x) times a trigonometric function of an
+ * affine argument.  This is a family rule, not an ODE-specific shortcut:
+ *
+ *   integral log(x) sin(ax+b) dx
+ *   integral log(x) cos(ax+b) dx
+ *
+ * The remaining 1/x integrals are the standard sine and cosine integrals.
+ */
+expr_t *integrate_log_times_trig_by_parts(const expr_t *expr,
+                                          const expr_t *wrt)
+{
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+    const expr_t *log_expr = NULL;
+    const expr_t *trig_expr = NULL;
+    const expr_t *log_argument = NULL;
+    number_t phase = num_new();
+    number_t rate = num_new();
+    expr_t *rate_argument = NULL;
+    expr_t *si = NULL;
+    expr_t *ci = NULL;
+    expr_t *phase_expr = NULL;
+    expr_t *sin_phase = NULL;
+    expr_t *cos_phase = NULL;
+    expr_t *paired_trig = NULL;
+    expr_t *log_trig = NULL;
+    expr_t *cos_ci = NULL;
+    expr_t *sin_si = NULL;
+    expr_t *cos_si = NULL;
+    expr_t *sin_ci = NULL;
+    expr_t *numerator = NULL;
+    expr_t *out = NULL;
+    bool is_sine = false;
+
+    if (!expr_match_mul_expr(expr, &left, &right))
+        goto cleanup;
+    if (expr_is_op(left, &ops_log)) {
+        log_argument = left->a;
+        log_expr = left;
+        trig_expr = right;
+    } else if (expr_is_op(right, &ops_log)) {
+        log_argument = right->a;
+        log_expr = right;
+        trig_expr = left;
+    } else {
+        goto cleanup;
+    }
+    if (!expr_struct_eq(log_argument, wrt))
+        goto cleanup;
+
+    if (match_affine_unary_data(trig_expr, wrt,
+                                EXPR_PATTERN_UNARY_SIN,
+                                &phase, &rate)) {
+        is_sine = true;
+    } else if (!match_affine_unary_data(trig_expr, wrt,
+                                        EXPR_PATTERN_UNARY_COS,
+                                        &phase, &rate)) {
+        goto cleanup;
+    }
+    if (num_eq(rate, NUM_ZERO))
+        goto cleanup;
+
+    rate_argument = build_affine_from_match(wrt, NUM_ZERO, rate);
+    si = rate_argument
+        ? build_named_special_function("Si", rate_argument)
+        : NULL;
+    ci = rate_argument
+        ? build_named_special_function("Ci", rate_argument)
+        : NULL;
+    phase_expr = expr_new_const(phase);
+    sin_phase = phase_expr ? expr_sin(phase_expr) : NULL;
+    cos_phase = phase_expr ? expr_cos(phase_expr) : NULL;
+    paired_trig = trig_expr
+        ? (is_sine ? expr_cos(trig_expr->a) : expr_sin(trig_expr->a))
+        : NULL;
+    log_trig = (log_expr && paired_trig)
+        ? expr_mul(log_expr, paired_trig)
+        : NULL;
+    expr_free(paired_trig);
+    paired_trig = NULL;
+    cos_ci = (cos_phase && ci)
+        ? expr_mul(cos_phase, ci)
+        : NULL;
+    sin_si = (sin_phase && si)
+        ? expr_mul(sin_phase, si)
+        : NULL;
+    cos_si = (cos_phase && si)
+        ? expr_mul(cos_phase, si)
+        : NULL;
+    sin_ci = (sin_phase && ci)
+        ? expr_mul(sin_phase, ci)
+        : NULL;
+
+    if (is_sine) {
+        expr_t *negative_log_trig = expr_negate_owned(log_trig);
+        expr_t *first = (negative_log_trig && cos_ci)
+            ? expr_add_simplify_owned(negative_log_trig, cos_ci)
+            : NULL;
+
+        log_trig = NULL;
+        cos_ci = NULL;
+        numerator = (first && sin_si)
+            ? expr_sub_simplify_owned(first, sin_si)
+            : NULL;
+        sin_si = NULL;
+    } else {
+        expr_t *first = (log_trig && cos_si)
+            ? expr_sub_simplify_owned(log_trig, cos_si)
+            : NULL;
+
+        log_trig = NULL;
+        cos_si = NULL;
+        numerator = (first && sin_ci)
+            ? expr_sub_simplify_owned(first, sin_ci)
+            : NULL;
+        sin_ci = NULL;
+    }
+    out = numerator ? div_number_owned(numerator, rate) : NULL;
+    numerator = NULL;
+
+cleanup:
+    expr_free(numerator);
+    expr_free(sin_ci);
+    expr_free(cos_si);
+    expr_free(sin_si);
+    expr_free(cos_ci);
+    expr_free(log_trig);
+    expr_free(paired_trig);
+    expr_free(cos_phase);
+    expr_free(sin_phase);
+    expr_free(phase_expr);
+    expr_free(ci);
+    expr_free(si);
+    expr_free(rate_argument);
+    num_destroy(&rate);
+    num_destroy(&phase);
+    return out;
+}
+
 static bool radical_product_append(radical_product_t *product, expr_t *factor)
 {
     expr_t **grown;

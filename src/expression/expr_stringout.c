@@ -1147,6 +1147,30 @@ static void emit_arbitrary_function_expr(const expr_t *f, sbuf_t *b)
     size_t length = strlen(name);
     size_t prime_count = 0u;
 
+    if (strcmp(name, "BesselJ") == 0 && f->a &&
+        f->a->ops == &ops_argument_list) {
+        sbuf_puts(b, "BesselJ(");
+        emit_expr(f->a, b, PREC_LOWEST);
+        sbuf_putc(b, ')');
+        return;
+    }
+
+    if (strcmp(name, "LommelS") == 0 && f->a &&
+        f->a->ops == &ops_argument_list) {
+        sbuf_puts(b, "LommelS(");
+        emit_expr(f->a, b, PREC_LOWEST);
+        sbuf_putc(b, ')');
+        return;
+    }
+
+    if (strcmp(name, "Si") == 0 || strcmp(name, "Ci") == 0) {
+        sbuf_puts(b, name);
+        sbuf_putc(b, '(');
+        emit_expr(f->a, b, PREC_LOWEST);
+        sbuf_putc(b, ')');
+        return;
+    }
+
     while (prime_count < length &&
            name[length - prime_count - 1u] == '\'')
         ++prime_count;
@@ -1181,6 +1205,38 @@ static void emit_arbitrary_function_tex(const expr_t *f, sbuf_t *b)
     const char *name = f->name ? f->name : "F";
     size_t length = strlen(name);
     size_t prime_count = 0u;
+
+    if (strcmp(name, "BesselJ") == 0 && f->a &&
+        f->a->ops == &ops_argument_list) {
+        sbuf_puts(b, "J_{");
+        emit_tex_expr(f->a->a, b, PREC_LOWEST);
+        sbuf_puts(b, "}\\left(");
+        emit_tex_expr(f->a->b, b, PREC_LOWEST);
+        sbuf_puts(b, "\\right)");
+        return;
+    }
+
+    if (strcmp(name, "LommelS") == 0 && f->a &&
+        f->a->ops == &ops_argument_list && f->a->a &&
+        f->a->a->ops == &ops_argument_list) {
+        sbuf_puts(b, "s_{");
+        emit_tex_expr(f->a->a->a, b, PREC_LOWEST);
+        sbuf_puts(b, ",");
+        emit_tex_expr(f->a->a->b, b, PREC_LOWEST);
+        sbuf_puts(b, "}\\left(");
+        emit_tex_expr(f->a->b, b, PREC_LOWEST);
+        sbuf_puts(b, "\\right)");
+        return;
+    }
+
+    if (strcmp(name, "Si") == 0 || strcmp(name, "Ci") == 0) {
+        sbuf_puts(b, "\\operatorname{");
+        sbuf_puts(b, name);
+        sbuf_puts(b, "}\\left(");
+        emit_tex_expr(f->a, b, PREC_LOWEST);
+        sbuf_puts(b, "\\right)");
+        return;
+    }
 
     while (prime_count < length &&
            name[length - prime_count - 1u] == '\'')
@@ -2408,6 +2464,24 @@ static void emit_expr_appell_f1(const expr_t *f, sbuf_t *b)
     sbuf_putc(b, ')');
 }
 
+static void emit_expr_lommel_s(const expr_t *f, sbuf_t *b)
+{
+    const expr_t *mu = NULL;
+    const expr_t *nu = NULL;
+    const expr_t *argument = NULL;
+
+    if (!expr_lommel_s_unpack(f, &mu, &nu, &argument))
+        return;
+    sbuf_puts(b, expr_is_op(f, &ops_lommel_s_derivative)
+              ? "LommelSPrime(" : "LommelS(");
+    emit_expr(mu, b, 0);
+    sbuf_puts(b, ", ");
+    emit_expr(nu, b, 0);
+    sbuf_puts(b, ", ");
+    emit_expr(argument, b, 0);
+    sbuf_putc(b, ')');
+}
+
 static void emit_tex_polygamma(const expr_t *f, sbuf_t *b)
 {
     long order;
@@ -2479,6 +2553,24 @@ static void emit_tex_appell_f1(const expr_t *f, sbuf_t *b)
     sbuf_puts(b, "\\right)");
 }
 
+static void emit_tex_lommel_s(const expr_t *f, sbuf_t *b)
+{
+    const expr_t *mu = NULL;
+    const expr_t *nu = NULL;
+    const expr_t *argument = NULL;
+
+    if (!expr_lommel_s_unpack(f, &mu, &nu, &argument))
+        return;
+    sbuf_puts(b, expr_is_op(f, &ops_lommel_s_derivative)
+              ? "s'_{" : "s_{");
+    emit_tex_expr(mu, b, 0);
+    sbuf_puts(b, ",");
+    emit_tex_expr(nu, b, 0);
+    sbuf_puts(b, "}\\left(");
+    emit_tex_expr(argument, b, 0);
+    sbuf_puts(b, "\\right)");
+}
+
 static void emit_tex_lambert_wn(const expr_t *f, sbuf_t *b)
 {
     sbuf_puts(b, "W_{");
@@ -2526,6 +2618,24 @@ static void emit_func_appell_f1(const expr_t *f, sbuf_t *b)
     emit_func(x, b, 0);
     sbuf_puts(b, ", ");
     emit_func(y, b, 0);
+    sbuf_putc(b, ')');
+}
+
+static void emit_func_lommel_s(const expr_t *f, sbuf_t *b)
+{
+    const expr_t *mu = NULL;
+    const expr_t *nu = NULL;
+    const expr_t *argument = NULL;
+
+    if (!expr_lommel_s_unpack(f, &mu, &nu, &argument))
+        return;
+    sbuf_puts(b, expr_is_op(f, &ops_lommel_s_derivative)
+              ? "lommel_s_derivative(" : "lommel_s(");
+    emit_func(mu, b, 0);
+    sbuf_puts(b, ", ");
+    emit_func(nu, b, 0);
+    sbuf_puts(b, ", ");
+    emit_func(argument, b, 0);
     sbuf_putc(b, ')');
 }
 
@@ -3136,6 +3246,21 @@ void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec)
             emit_tex_legendre_chi(f, b);
             return;
         }
+        if (expr_is_op(f, &ops_bessel_j) ||
+            expr_is_op(f, &ops_bessel_y)) {
+            sbuf_puts(b, f->ops->tex_name);
+            sbuf_puts(b, "_{");
+            emit_tex_expr(f->a, b, PREC_LOWEST);
+            sbuf_puts(b, "}\\left(");
+            emit_tex_expr(f->b, b, PREC_LOWEST);
+            sbuf_puts(b, "\\right)");
+            return;
+        }
+        if (expr_is_op(f, &ops_lommel_s) ||
+            expr_is_op(f, &ops_lommel_s_derivative)) {
+            emit_tex_lommel_s(f, b);
+            return;
+        }
         if (expr_is_op(f, &ops_lambert_wn)) {
             emit_tex_lambert_wn(f, b);
             return;
@@ -3589,6 +3714,11 @@ void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
             emit_expr_lambert_wn(f, b);
             return;
         }
+        if (expr_is_op(f, &ops_lommel_s) ||
+            expr_is_op(f, &ops_lommel_s_derivative)) {
+            emit_expr_lommel_s(f, b);
+            return;
+        }
         if (expr_is_op(f, &ops_appell_f1)) {
             emit_expr_appell_f1(f, b);
             return;
@@ -3844,6 +3974,11 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
         }
         if (expr_has_polygamma_order(f)) {
             emit_func_polygamma(f, b);
+            return;
+        }
+        if (expr_is_op(f, &ops_lommel_s) ||
+            expr_is_op(f, &ops_lommel_s_derivative)) {
+            emit_func_lommel_s(f, b);
             return;
         }
         if (expr_is_op(f, &ops_appell_f1)) {

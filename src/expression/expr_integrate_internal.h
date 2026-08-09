@@ -162,6 +162,7 @@ expr_t * integrate_symbolic_trig_times_hyperbolic       (const expr_t *expr, con
 expr_t * integrate_symbolic_squared_hyperbolic          (const expr_t *expr, const expr_t *wrt);
 expr_t * integrate_exact_substitution_product           (const expr_t *expr, const expr_t *wrt);
 expr_t * integrate_poly_times_rational_unary_by_parts   (const expr_t *expr, const expr_t *wrt);
+expr_t * integrate_log_times_trig_by_parts              (const expr_t *expr, const expr_t *wrt);
 
 /* Exact products and distribution-specific helpers. */
 expr_t * integrate_wrt_exp_times_trig_exact              (const expr_t *expr, const expr_t *wrt);

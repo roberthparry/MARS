@@ -705,6 +705,9 @@ All functions return owning handles.
 - `expr_t *expr_dilog(const expr_t *expr)` — principal dilogarithm Li₂(x)
 - `expr_t *expr_polylog(unsigned int order, const expr_t *expr)` — polylogarithm Liₙ(x) for non-negative integer orders currently supported by the implementation
 - `expr_t *expr_legendre_chi(unsigned int order, const expr_t *expr)` — Legendre chi χₙ(x) for non-negative integer orders currently supported by the implementation
+- `expr_t *expr_bessel_j(const expr_t *order, const expr_t *argument)` — Bessel function of the first kind J_order(argument), with a symbolic real order
+- `expr_t *expr_bessel_y(const expr_t *order, const expr_t *argument)` — Bessel function of the second kind Y_order(argument), with a symbolic real order
+- `expr_t *expr_lommel_s(const expr_t *mu, const expr_t *nu, const expr_t *argument)` — lower-case Lommel function s_mu,nu(argument); differentiation with respect to the argument is supported
 - `expr_t *expr_appell_f1(const expr_t *a, const expr_t *b1, const expr_t *b2, const expr_t *c, const expr_t *x, const expr_t *y)` — Appell hypergeometric function F₁(a; b₁, b₂; c; x, y)
 
 ### Value-Only Functions (owning)
@@ -816,6 +819,9 @@ output(expr(x, y, γ));
   - `digamma(x)`, `trigamma(x)`, and `polygamma(n, x)` for ψ⁽⁰⁾, ψ⁽¹⁾, and ψ⁽ⁿ⁾
   - `dilog(x)`, `Li2(x)`, and `polylog(n, x)` for Li₂(x) and Liₙ(x)
   - `chi(n, x)` and `legendre_chi(n, x)` for the Legendre chi function χₙ(x)
+  - `BesselJ(order, x)` or `bessel_j(order, x)` for J_order(x)
+  - `BesselY(order, x)` or `bessel_y(order, x)` for Y_order(x)
+  - `LommelS(mu, nu, x)` or `lommel_s(mu, nu, x)` for s_mu,nu(x)
   - `appell_f1(a, b1, b2, c, x, y)`, `F1(a, b1, b2, c, x, y)`,
     `F_1(a, b1, b2, c, x, y)`, and `F₁(a, b1, b2, c, x, y)` for
     Appell's hypergeometric function F₁(a; b₁, b₂; c; x, y)

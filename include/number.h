@@ -898,6 +898,12 @@ number_t num_appell_f1    (const number_t a, const number_t b1,
                            const number_t b2, const number_t c,
                            const number_t x, const number_t y);
 number_t num_legendre_chi (const number_t order, const number_t number);
+number_t num_bessel_j     (const number_t order, const number_t argument);
+number_t num_bessel_y     (const number_t order, const number_t argument);
+number_t num_lommel_s     (const number_t mu, const number_t nu,
+                           const number_t argument);
+number_t num_lommel_s_derivative(const number_t mu, const number_t nu,
+                                 const number_t argument);
 number_t num_gammainv     (const number_t number);
 number_t num_erf          (const number_t number);
 number_t num_erfc         (const number_t number);

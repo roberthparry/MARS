@@ -74,7 +74,8 @@ typedef enum {
     /* Backwards-compatible name retained for existing callers. */
     DE_SOLVER_HYDROGEN_MATRIX = DE_SOLVER_STATIONARY_EIGENFUNCTION,
     DE_SOLVER_EXACT_FIRST_ORDER,
-    DE_SOLVER_LAPLACE
+    DE_SOLVER_LAPLACE,
+    DE_SOLVER_POWER_LAW_BESSEL
 } de_solver_t;
 
 /**

@@ -1834,6 +1834,20 @@ static void test_diffequ_linearizes_modified_emden_problem(void)
             "modified-Emden derivation contains transformed ODE",
             strstr(de_solve_result_steps(result), "d²Y/dX² = 0"),
             true);
+    if (de_solve_result_steps_tex(result)) {
+        EXPECT_POINTER(
+            "modified-Emden TeX uses the dependent symbol directly",
+            strstr(de_solve_result_steps_tex(result), "y''+3(1)yy'"),
+            true);
+        EXPECT_POINTER(
+            "modified-Emden TeX omits binding wrappers",
+            strstr(de_solve_result_steps_tex(result), "\\middle|"),
+            false);
+        EXPECT_POINTER(
+            "modified-Emden TeX omits unbound sentinel values",
+            strstr(de_solve_result_steps_tex(result), "NAN"),
+            false);
+    }
     EXPECT_LONG(
         "modified-Emden solution count",
         (long)de_solve_result_count(result),
@@ -2269,6 +2283,153 @@ static void test_diffequ_normalizes_variable_coefficient_sturm_liouville(void)
     de_free(de);
 }
 
+static void test_diffequ_solves_power_law_bessel_family(void)
+{
+    const char *sources[] = {
+        "y'' + x^2*y = 0",
+        "y'' + 9*x^4*y = 0"
+    };
+    const char *orders[] = { "¼", "⅙" };
+    const char *arguments[] = { "½·x^2", "x^3" };
+
+    for (size_t i = 0u; i < 2u; ++i) {
+        diffequ_t *de = de_from_string(sources[i]);
+        diffequ_solve_result_t *result;
+        const equation_t *solution;
+        string_t *text;
+
+        EXPECT_POINTER("parsed power-law Bessel problem", de, true);
+        if (!de)
+            continue;
+
+        result = de_solve_with_options(de, DE_SOLVE_OPTION_STEPS);
+        EXPECT_POINTER("power-law Bessel solve result", result, true);
+        if (!result) {
+            de_free(de);
+            continue;
+        }
+
+        EXPECT_LONG(
+            "power-law Bessel solve status",
+            (long)de_solve_result_status(result),
+            (long)DE_SOLVE_STATUS_SOLVED);
+        EXPECT_LONG(
+            "power-law Bessel selected solver",
+            (long)de_solve_result_solver(result),
+            (long)DE_SOLVER_POWER_LAW_BESSEL);
+        EXPECT_TEXT(
+            "power-law Bessel diagnostic",
+            de_solve_result_diagnostic(result),
+            "solved by a power-law reduction to Bessel's equation");
+        solution = de_solve_result_at(result, 0u);
+        EXPECT_POINTER("power-law Bessel solution", solution, true);
+        text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
+        EXPECT_POINTER("power-law Bessel solution text", text, true);
+        if (text) {
+            EXPECT_POINTER(
+                "power-law Bessel solution has negative-order basis",
+                strstr(string_c_str(text), "BesselJ(-"),
+                true);
+            EXPECT_POINTER(
+                "power-law Bessel solution has positive-order basis",
+                strstr(string_c_str(text), orders[i]),
+                true);
+            EXPECT_POINTER(
+                "power-law Bessel solution has derived argument",
+                strstr(string_c_str(text), arguments[i]),
+                true);
+        }
+        EXPECT_POINTER(
+            "power-law Bessel derivation names its substitution",
+            strstr(de_solve_result_steps(result), "y = sqrt(x)*u(z)"),
+            true);
+        EXPECT_POINTER(
+            "power-law Bessel TeX uses conventional Bessel notation",
+            strstr(de_solve_result_steps_tex(result), "J_{-\\frac"),
+            true);
+        EXPECT_POINTER(
+            "power-law Bessel TeX omits binding wrappers",
+            strstr(de_solve_result_steps_tex(result), "\\middle|"),
+            false);
+        EXPECT_POINTER(
+            "power-law Bessel TeX omits unbound sentinel values",
+            strstr(de_solve_result_steps_tex(result), "NAN"),
+            false);
+
+        string_free(text);
+        de_solve_result_free(result);
+        de_free(de);
+    }
+}
+
+static void test_diffequ_solves_forced_power_law_lommel_family(void)
+{
+    const char *sources[] = {
+        "y'' + x^3*y = x",
+        "y'' + 9*x*y = 6"
+    };
+    const char *orders[] = { "⅕", "⅓" };
+    const char *arguments[] = { "⅖·x^⁵⁄₂", "2·x^³⁄₂" };
+    const char *scales[] = { "⅖·LommelS(0, ⅕", "⁴⁄₃·LommelS(0, ⅓" };
+
+    for (size_t i = 0u; i < 2u; ++i) {
+        diffequ_t *de = de_from_string(sources[i]);
+        diffequ_solve_result_t *result;
+        const equation_t *solution;
+        string_t *text;
+
+        EXPECT_POINTER("parsed forced power-law problem", de, true);
+        if (!de)
+            continue;
+
+        result = de_solve_with_options(de, DE_SOLVE_OPTION_STEPS);
+        EXPECT_POINTER("forced power-law solve result", result, true);
+        if (!result) {
+            de_free(de);
+            continue;
+        }
+
+        EXPECT_LONG(
+            "forced power-law solve status",
+            (long)de_solve_result_status(result),
+            (long)DE_SOLVE_STATUS_SOLVED);
+        EXPECT_LONG(
+            "forced power-law selected solver",
+            (long)de_solve_result_solver(result),
+            (long)DE_SOLVER_POWER_LAW_BESSEL);
+        solution = de_solve_result_at(result, 0u);
+        EXPECT_POINTER("forced power-law solution", solution, true);
+        text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
+        EXPECT_POINTER("forced power-law solution text", text, true);
+        if (text) {
+            EXPECT_POINTER(
+                "forced power-law solution has homogeneous order",
+                strstr(string_c_str(text), orders[i]),
+                true);
+            EXPECT_POINTER(
+                "forced power-law solution has derived argument",
+                strstr(string_c_str(text), arguments[i]),
+                true);
+            EXPECT_POINTER(
+                "forced power-law solution has Lommel particular",
+                strstr(string_c_str(text), scales[i]),
+                true);
+        }
+        EXPECT_POINTER(
+            "forced power-law derivation names monomial forcing",
+            strstr(de_solve_result_steps(result), "monomial forcing"),
+            true);
+        EXPECT_POINTER(
+            "forced power-law TeX uses Lommel notation",
+            strstr(de_solve_result_steps_tex(result), "s_{0,"),
+            true);
+
+        string_free(text);
+        de_solve_result_free(result);
+        de_free(de);
+    }
+}
+
 static void test_diffequ_solves_third_order_constant_coefficient_problem(void)
 {
     const char *source =
@@ -2547,6 +2708,14 @@ static bool test_diffequ_expect_constant_linear_solution(
     TEST_HARNESS_RETURN_UNLESS( \
         test_diffequ_expect_constant_linear_solution( \
             (source), (expected), __FILE__, __LINE__))
+
+static void test_diffequ_solves_logarithmic_forcing(void)
+{
+    EXPECT_CONSTANT_LINEAR_SOLUTION(
+        "y'' + y = ln(x)",
+        "y = ln(x) - cos(x)·Ci(x) - sin(x)·Si(x) + "
+        "C₁·cos(x) + C₂·sin(x)");
+}
 
 static void test_diffequ_resolves_polynomial_differential_operator(void)
 {
@@ -3926,12 +4095,15 @@ int tests_main(void)
     RUN_TEST_CASE(test_diffequ_solves_oscillatory_sturm_liouville_problem);
     RUN_TEST_CASE(
         test_diffequ_normalizes_variable_coefficient_sturm_liouville);
+    RUN_TEST_CASE(test_diffequ_solves_power_law_bessel_family);
+    RUN_TEST_CASE(test_diffequ_solves_forced_power_law_lommel_family);
     RUN_TEST_CASE(
         test_diffequ_solves_third_order_constant_coefficient_problem);
     RUN_TEST_CASE(test_diffequ_solves_high_order_repeated_root);
     RUN_TEST_CASE(
         test_diffequ_solves_nonhomogeneous_constant_coefficient_problem);
     RUN_TEST_CASE(test_diffequ_solves_secant_cubed_forcing);
+    RUN_TEST_CASE(test_diffequ_solves_logarithmic_forcing);
     RUN_TEST_CASE(test_diffequ_solves_repeated_complex_roots);
     RUN_TEST_CASE(
         test_diffequ_solves_degree_six_characteristic_polynomial);

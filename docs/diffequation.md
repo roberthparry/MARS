@@ -856,6 +856,73 @@ y'' - (x^2+1)*y = 0; y(0) = 1; y'(0) = 0
 → y = exp(½x²)
 ```
 
+For a homogeneous positive power-law potential,
+
+```text
+y'' + a*x^m*y = 0,  a > 0,  m = 1, 2, ...
+```
+
+the solver derives
+
+```text
+ν = 1/(m+2),
+z = 2ν*sqrt(a)*x^(1/(2ν)),
+y = sqrt(x)*u(z),
+```
+
+which reduces the equation to Bessel's equation
+
+```text
+z²u'' + zu' + (z² - ν²)u = 0.
+```
+
+It therefore returns the rule-generated basis
+
+```text
+y = sqrt(x)*(C₁*BesselJ(-ν, z) + C₂*BesselJ(ν, z)).
+```
+
+For example:
+
+```text
+y'' + x²*y = 0
+→ y = sqrt(x)*(C₁*BesselJ(-¼, ½x²) + C₂*BesselJ(¼, ½x²))
+```
+
+The same derived substitution handles monomial forcing rather than rejecting
+the equation at the homogeneous boundary. For
+
+```text
+y'' + a*x^m*y = b*x^n,
+```
+
+put
+
+```text
+p = (m+2)/2,
+μ = (2n-m+1)/(m+2),
+K = b*(p/sqrt(a))^(μ+1)/p².
+```
+
+The transformed equation is the inhomogeneous Bessel equation
+
+```text
+z²*u'' + z*u' + (z²-ν²)*u = K*z^(μ+1),
+```
+
+so the rule adds the Lommel particular solution `K*LommelS(μ,ν,z)`. For
+example:
+
+```text
+y'' + x³*y = x
+→ y = sqrt(x)*(C₁*BesselJ(-⅕, ⅖*x^(5/2))
+             + C₂*BesselJ(⅕, ⅖*x^(5/2))
+             + ⅖*LommelS(0, ⅕, ⅖*x^(5/2)))
+```
+
+Initial or boundary conditions on this special-function family are not yet
+eliminated symbolically.
+
 The constant-coefficient second-order family is
 
 ```text

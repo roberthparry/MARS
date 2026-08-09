@@ -102,6 +102,11 @@ typedef enum {
     EXPR_KIND_DILOG,
     EXPR_KIND_POLYLOG,
     EXPR_KIND_LEGENDRE_CHI,
+    EXPR_KIND_BESSEL_J,
+    EXPR_KIND_BESSEL_Y,
+    EXPR_KIND_LOMMEL_S,
+    EXPR_KIND_LOMMEL_S_DERIVATIVE,
+    EXPR_KIND_LOMMEL_S_PACK,
     EXPR_KIND_APPELL_F1,
     EXPR_KIND_APPELL_F1_PACK,
     EXPR_KIND_VERSIN,
@@ -397,6 +402,11 @@ extern const expr_ops_t ops_trigamma;
 extern const expr_ops_t ops_dilog;
 extern const expr_ops_t ops_polylog;
 extern const expr_ops_t ops_legendre_chi;
+extern const expr_ops_t ops_bessel_j;
+extern const expr_ops_t ops_bessel_y;
+extern const expr_ops_t ops_lommel_s;
+extern const expr_ops_t ops_lommel_s_derivative;
+extern const expr_ops_t ops_lommel_s_pack;
 extern const expr_ops_t ops_appell_f1;
 extern const expr_ops_t ops_appell_f1_pack;
 extern const expr_ops_t ops_gammainv;
@@ -620,6 +630,10 @@ expr_t *       expr_polygamma_xp                 (const expr_t *order, const exp
 expr_t *       expr_polylog_xp                   (const expr_t *order, const expr_t *arg);
 expr_t *       expr_legendre_chi_xp              (const expr_t *order, const expr_t *arg);
 expr_t *       expr_lambert_wn_xp                (const expr_t *branch, const expr_t *arg);
+bool           expr_lommel_s_unpack              (const expr_t *expr,
+                                                  const expr_t **mu,
+                                                  const expr_t **nu,
+                                                  const expr_t **argument);
 bool           expr_appell_f1_unpack             (const expr_t *expr,
                                                   const expr_t **a,
                                                   const expr_t **b1,
@@ -701,6 +715,8 @@ expr_t * expr_simplify_try_vtable_inverse_argument(const expr_t *outer, const ex
 expr_t * expr_simplify_try_basic_sum              (expr_t *a, expr_t *b);
 expr_t * expr_simplify_try_basic_product          (expr_t *a, expr_t *b);
 expr_t * expr_simplify_try_trig_product           (expr_t *a, expr_t *b);
+expr_t * expr_simplify_try_trig_weighted_sum      (const expr_t *a,
+                                                   const expr_t *b);
 expr_t * expr_simplify_try_lambert_exp            (expr_t *arg);
 expr_t * expr_simplify_try_lambert_product        (expr_t *a, expr_t *b);
 expr_t * expr_simplify_try_i_unit_product         (expr_t *a, expr_t *b);
@@ -711,6 +727,8 @@ expr_t * expr_try_trig_pythagorean_identity       (const addend_t *terms,
                                                    size_t n,
                                                    number_t c_const,
                                                    number_t common_coeff);
+bool     expr_combine_trig_pythagorean_addends    (addend_t *terms,
+                                                   size_t n);
 
 /* Term collection and product rebuilding helpers. */
 int      expr_struct_eq                         (const expr_t *u, const expr_t *v);

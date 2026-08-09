@@ -386,6 +386,10 @@ The generic layer exposes:
   - `num_dilog`
   - `num_polylog`
   - `num_legendre_chi`
+  - `num_bessel_j`
+  - `num_bessel_y`
+  - `num_lommel_s`
+  - `num_lommel_s_derivative`
   - `num_appell_f1`
 - exact integer and number-theory helpers:
   - `num_factorial`
@@ -646,4 +650,4 @@ Results (microseconds per call):
 | `num_ei(5)` | `184.5 µs` | `304.5 µs` | `420.3 µs` | `542.4 µs` | `1.082 ms` | `1.282 ms` |
 | `num_e1(5)` | `386.5 µs` | `630.2 µs` | `880.3 µs` | `1.124 ms` | `1.081 ms` | `1.481 ms` |
 
-For broader benchmark notes, see [`docs/benchmarks.md`](benchmarks.md).
+For broader benchmark notes, see [`docs/benchmarks.md`](./benchmarks.md).

@@ -1248,6 +1248,24 @@ qfloat_t qf_appell_f1(qfloat_t a, qfloat_t b1, qfloat_t b2,
  */
 qfloat_t qf_legendre_chi(qfloat_t s, qfloat_t x);
 
+/** @brief Bessel function of the first kind J_order(argument), for real order. */
+qfloat_t qf_bessel_j(qfloat_t order, qfloat_t argument);
+
+/** @brief Bessel function of the second kind Y_order(argument), for real order. */
+qfloat_t qf_bessel_y(qfloat_t order, qfloat_t argument);
+
+/**
+ * @brief Lower-case Lommel function s_(mu,nu)(argument), for real parameters.
+ *
+ * This evaluates the convergent defining series. Singular parameter pairs and
+ * real-domain violations return NaN.
+ */
+qfloat_t qf_lommel_s(qfloat_t mu, qfloat_t nu, qfloat_t argument);
+
+/** @brief Derivative of s_(mu,nu)(argument) with respect to its argument. */
+qfloat_t qf_lommel_s_derivative(qfloat_t mu, qfloat_t nu,
+                                qfloat_t argument);
+
 /**
  * @brief Compute the main branch of the inverse of the gamma function.
  *

@@ -569,6 +569,134 @@ void test_dilog_polylog(void)
     }
 }
 
+void test_bessel(void)
+{
+    expr_t *order = test_expr_new_const_d(0.5);
+    expr_t *x = test_expr_new_named_var_d(1.25, "x");
+    expr_t *j = expr_bessel_j(order, x);
+    expr_t *y = expr_bessel_y(order, x);
+    const expr_t *dj = expr_get_deriv(j, x);
+    qfloat_t argument = qf_from_string("1.25");
+    qfloat_t scale = qf_sqrt(qf_div(qf_from_double(2.0),
+                                    qf_mul(QF_PI, argument)));
+    qfloat_t expected_j = qf_mul(scale, qf_sin(argument));
+    qfloat_t expected_y = qf_neg(qf_mul(scale, qf_cos(argument)));
+    qfloat_t expected_dj = qf_mul(qf_from_double(0.5),
+        qf_sub(qf_bessel_j(qf_from_double(-0.5), argument),
+               qf_bessel_j(qf_from_double(1.5), argument)));
+    char *tex = expr_to_tex_body(j);
+
+    ASSERT_NOT_NULL(j);
+    ASSERT_NOT_NULL(y);
+    ASSERT_NOT_NULL(dj);
+    ASSERT_NOT_NULL(tex);
+    check_q_at(__FILE__, __LINE__, 1, "J_(1/2) half-order identity",
+               expr_eval_qf(j), expected_j);
+    check_q_at(__FILE__, __LINE__, 1, "Y_(1/2) half-order identity",
+               expr_eval_qf(y), expected_y);
+    {
+        static const char *const spellings[] = {
+            "BesselJ", "BesselY", "bessel_j", "bessel_y"
+        };
+
+        for (size_t i = 0u; i < sizeof(spellings) / sizeof(spellings[0]); ++i) {
+            char input[96];
+            char binding[96];
+            char description[96];
+            expr_t *parsed;
+            expr_t *bound;
+            qfloat_t expected = (i & 1u) ? expected_y : expected_j;
+
+            snprintf(input, sizeof(input), "{ %s(1/2, x) | x = 1.25 }",
+                     spellings[i]);
+            snprintf(binding, sizeof(binding),
+                     "{ x | x = %s(1/2, 1.25) }", spellings[i]);
+            parsed = expr_from_string(input, NULL);
+            bound = expr_from_string(binding, NULL);
+
+            ASSERT_NOT_NULL(parsed);
+            ASSERT_NOT_NULL(bound);
+            snprintf(description, sizeof(description), "%s parses",
+                     spellings[i]);
+            check_q_at(__FILE__, __LINE__, 1, description,
+                       expr_eval_qf(parsed), expected);
+            snprintf(description, sizeof(description), "%s works in a binding",
+                     spellings[i]);
+            check_q_at(__FILE__, __LINE__, 1, description,
+                       expr_eval_qf(bound), expected);
+
+            expr_free(bound);
+            expr_free(parsed);
+        }
+    }
+    check_q_at(__FILE__, __LINE__, 1, "BesselJ argument derivative recurrence",
+               expr_eval_qf(dj), expected_dj);
+    ASSERT_NOT_NULL(strstr(tex, "J_{"));
+
+    {
+        expr_t *mu = test_expr_new_const_d(1.0);
+        expr_t *nu = test_expr_new_const_d(0.0);
+        expr_t *lommel = expr_lommel_s(mu, nu, x);
+        const expr_t *dlommel = expr_get_deriv(lommel, x);
+        qfloat_t expected_lommel = qf_sub(
+            QF_ONE, qf_bessel_j(QF_ZERO, argument));
+        qfloat_t expected_derivative = qf_bessel_j(QF_ONE, argument);
+        char *lommel_tex = expr_to_tex_body(lommel);
+
+        ASSERT_NOT_NULL(lommel);
+        ASSERT_NOT_NULL(dlommel);
+        ASSERT_NOT_NULL(lommel_tex);
+        check_q_at(__FILE__, __LINE__, 1, "Lommel s_(1,0) = 1 - J0",
+                   expr_eval_qf(lommel), expected_lommel);
+        check_q_at(__FILE__, __LINE__, 1,
+                   "Lommel argument derivative recurrence",
+                   expr_eval_qf(dlommel), expected_derivative);
+        ASSERT_NOT_NULL(strstr(lommel_tex, "s_{"));
+
+        {
+            static const char *const spellings[] = {
+                "LommelS", "lommel_s"
+            };
+
+            for (size_t i = 0u;
+                 i < sizeof(spellings) / sizeof(spellings[0]); ++i) {
+                char input[96];
+                char binding[96];
+                expr_t *parsed;
+                expr_t *bound;
+
+                snprintf(input, sizeof(input),
+                         "{ %s(1, 0, x) | x = 1.25 }", spellings[i]);
+                snprintf(binding, sizeof(binding),
+                         "{ x | x = %s(1, 0, 1.25) }", spellings[i]);
+                parsed = expr_from_string(input, NULL);
+                bound = expr_from_string(binding, NULL);
+                ASSERT_NOT_NULL(parsed);
+                ASSERT_NOT_NULL(bound);
+                check_q_at(__FILE__, __LINE__, 1,
+                           "Lommel spelling parses",
+                           expr_eval_qf(parsed), expected_lommel);
+                check_q_at(__FILE__, __LINE__, 1,
+                           "Lommel spelling works in a binding",
+                           expr_eval_qf(bound), expected_lommel);
+                expr_free(bound);
+                expr_free(parsed);
+            }
+        }
+
+        free(lommel_tex);
+        expr_free(lommel);
+        expr_free(nu);
+        expr_free(mu);
+    }
+
+    free(tex);
+    expr_free(y);
+    expr_free(j);
+    expr_free(x);
+    expr_free(order);
+}
+
 void test_gammainv(void)
 {
     /* gammainv(gamma(2.5)) = 2.5 */
