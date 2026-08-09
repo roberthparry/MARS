@@ -380,6 +380,7 @@ See [`docs/building.md`](./docs/building.md) for benchmark and build details.
 ## Documentation
 
 - [Documentation index](./docs/README.md)
+- [MARS Lab](./docs/mars-lab.md)
 - [Building](./docs/building.md)
 - [Testing](./docs/testing.md)
 - [Benchmarks](./docs/benchmarks.md)
