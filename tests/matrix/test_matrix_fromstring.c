@@ -107,6 +107,25 @@ static void test_mat_from_string_numeric_num_complex(void)
     mat_free(A);
 }
 
+static void test_mat_from_string_compact_columns(void)
+{
+    matrix_t *A = mat_from_string("(1 2; 4 5)");
+    number_t expected = num_create_from_string("4");
+    number_t got = NUM_ZERO;
+
+    check_bool("mat_from_string compact matrix non-null", A != NULL);
+    check_bool("mat_from_string compact matrix rows", A && mat_get_row_count(A) == 2u);
+    check_bool("mat_from_string compact matrix columns", A && mat_get_col_count(A) == 2u);
+    if (A) {
+        got = mat_get_num(A, 1u, 0u);
+        check_bool("mat_from_string compact matrix A[1,0]", num_eq(got, expected));
+    }
+
+    num_destroy(&got);
+    num_destroy(&expected);
+    mat_free(A);
+}
+
 static void test_mat_from_text_constructors(void)
 {
     string_t *numeric_text = string_new_with("(1/3, 2; 3, 4)");
@@ -690,6 +709,7 @@ void run_matrix_fromstring_tests(void)
 {
     TEST_RUN_CASE(test_mat_from_string_numeric_num_real, NULL);
     TEST_RUN_CASE(test_mat_from_string_numeric_num_complex, NULL);
+    TEST_RUN_CASE(test_mat_from_string_compact_columns, NULL);
     TEST_RUN_CASE(test_mat_from_text_constructors, NULL);
     TEST_RUN_CASE(test_mat_from_string_symbolic_numeric_fallback, NULL);
     TEST_RUN_CASE(test_mat_from_string_symbolic_insufficient_bindings, NULL);

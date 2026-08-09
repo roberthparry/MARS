@@ -1050,9 +1050,11 @@ matrix.
 `MAT_TYPE_EXPR` matrix for symbolic input and optionally returns bindings
 through `bnd_out`.
 
-Rows are separated by semicolons and columns by commas. The outer `{ ... | ... }`
-wrapper, when present, still carries one binding section for the entire matrix.
-Bindings are not attached per element.
+Rows are separated by semicolons. Columns may be separated by commas or by
+unambiguous top-level whitespace, so `(1 2; 4 5)` and `(1, 2; 4, 5)` both
+produce `(1, 2; 4, 5)`. Whitespace around a scalar operator remains within the
+entry. The outer `{ ... | ... }` wrapper, when present, still carries one
+binding section for the entire matrix. Bindings are not attached per element.
 
 For symbolic entries, the matrix parser delegates each cell expression to
 `expr_from_expression_string(...)` after a small amount of matrix-specific

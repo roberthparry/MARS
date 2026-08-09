@@ -76,17 +76,15 @@ has no conditions.
 
 ## Matrix mode
 
-Matrix mode accepts numeric and symbolic matrices. Spaces separate columns and
-semicolons separate rows in compact input; comma-separated entries are also
-accepted. The operation selector includes evaluation, inverse, multiplication,
-solve, determinant, trace, rank, eigensystems and genuine whole-matrix
-functions. Functions such as the inverse, logarithm and trigonometric families
-require a square matrix.
+Matrix mode accepts complete numeric and symbolic matrix expressions. Spaces
+separate columns and semicolons separate rows in compact input; comma-separated
+entries are also accepted. Enter the operation as part of the expression and
+press **Evaluate**. Functions such as the inverse, logarithm and trigonometric
+families require a square matrix.
 
-The captured input is `(1 2; 4 5)` with **Sine** selected. The equivalent
-direct form `sin(1 2; 4 5)` is also accepted. MARS returns the sine of the
-complete `2 x 2` matrix, rather than applying scalar sine separately to its
-four entries. At normal display precision the output is approximately
+The captured input is `sin(1 2; 4 5)`. MARS returns the sine of the complete
+`2 x 2` matrix, rather than applying scalar sine separately to its four
+entries. At normal display precision the output is approximately
 `(-0.3150025731, 0.1811582616; 0.3623165233, 0.0473139502)`.
 
 [![MARS Lab matrix mode calculating the sine of a complete matrix](images/mars-lab/matrix.png)](images/mars-lab/matrix.png)

@@ -125,14 +125,16 @@ class EquationResultTests(unittest.TestCase):
 
 
 class MatrixResultTests(unittest.TestCase):
-    def test_matrix_function_operations_are_exposed_by_the_client(self) -> None:
+    def test_matrix_functions_use_direct_expression_syntax(self) -> None:
         representative_operations = {
             "exp", "log", "sqrt", "sin", "cos", "tan", "sinh", "cosh", "tanh", "erf", "gamma", "lambert_w0",
         }
 
         self.assertTrue(representative_operations.issubset(mars_lab.MATRIX_OPERATIONS))
         for operation in representative_operations:
-            self.assertIn(f'value="{operation}"', mars_lab.INDEX_HTML)
+            self.assertNotIn(f'value="{operation}"', mars_lab.INDEX_HTML)
+        self.assertNotIn('id="matrixOperationLabel"', mars_lab.INDEX_HTML)
+        self.assertIn('<option value="eval" selected>Evaluate</option>', mars_lab.INDEX_HTML)
         self.assertIn("genuine matrix functions calculated by MARSlib", mars_lab.INDEX_HTML)
         self.assertIn("sin(1 2; 4 5)", mars_lab.INDEX_HTML)
 
@@ -165,17 +167,13 @@ class MatrixResultTests(unittest.TestCase):
     def test_native_helper_accepts_direct_compact_matrix_function_syntax(self) -> None:
         matrix_binary = ROOT / "build" / "release" / "scratch" / "matrix_lab"
         direct_fields, direct_raw, direct_returncode = mars_lab.run_matrix_lab_fields(
-            matrix_binary, "sin(1 2; 4 5)", "inverse", 64
-        )
-        selected_fields, selected_raw, selected_returncode = mars_lab.run_matrix_lab_fields(
-            matrix_binary, "(1 2; 4 5)", "sin", 64
+            matrix_binary, "sin(1 2; 4 5)", "eval", 64
         )
 
         self.assertEqual(direct_returncode, 0, direct_raw)
-        self.assertEqual(selected_returncode, 0, selected_raw)
         self.assertEqual(direct_fields["operation"], "sin")
-        self.assertEqual(direct_fields["result"], selected_fields["result"])
-        self.assertEqual(direct_fields["tex"], selected_fields["tex"])
+        self.assertEqual((direct_fields["rows"], direct_fields["cols"]), ("2", "2"))
+        self.assertTrue(direct_fields["result"].startswith("(-0.315002573091184"))
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "matrix_lab").is_file(),
@@ -1820,8 +1818,8 @@ class ZZMarsLabReadmeExamples(unittest.TestCase):
 
         matrix, raw, returncode = mars_lab.run_matrix_lab_fields(
             scratch / "matrix_lab",
-            "(1 2; 4 5)",
-            "sin",
+            "sin(1 2; 4 5)",
+            "eval",
             53,
         )
         self.assertEqual(returncode, 0, raw)
