@@ -111,6 +111,8 @@ static const char *de_solver_rule_name(de_solver_t solver)
             return "linear change-of-variables rule";
         case DE_SOLVER_STURM_LIOUVILLE:
             return "Sturm–Liouville reduction rule";
+        case DE_SOLVER_POWER_LAW_BESSEL:
+            return "power-law Bessel reduction rule";
         case DE_SOLVER_CONSTANT_COEFFICIENT_LINEAR:
             return "constant-coefficient characteristic-polynomial rule";
         case DE_SOLVER_DERIVATIVE_QUADRATIC:
@@ -163,6 +165,14 @@ static const char *de_solver_rule_plain(de_solver_t solver)
             return "Normalise the second-order linear equation, construct its "
                 "self-adjoint or factorised basis, and determine constants from "
                 "the supplied conditions.";
+        case DE_SOLVER_POWER_LAW_BESSEL:
+            return "For y″ + a*x^m*y = b*x^n, set ν = 1/(m+2), "
+                "p = (m+2)/2, z = sqrt(a)*x^p/p, and y = sqrt(x)*u(z). "
+                "For monomial forcing b != 0, set "
+                "μ = (2n-m+1)/(m+2) and "
+                "K = b*(p/sqrt(a))^(μ+1)/p^2. The transformed equation "
+                "z^2*u″ + z*u′ + (z^2-ν^2)*u = K*z^(μ+1) has the "
+                "Lommel particular K*s_(μ,ν)(z).";
         case DE_SOLVER_CONSTANT_COEFFICIENT_LINEAR:
             return "Form the characteristic polynomial P(m), generate one "
                 "basis term for each root and multiplicity, then add a verified "
@@ -217,6 +227,16 @@ static const char *de_solver_rule_tex(de_solver_t solver)
             return "(X,Y)=(ax+by,cx+dy),\\quad ad-bc\\ne0";
         case DE_SOLVER_STURM_LIOUVILLE:
             return "(p(x)y')'+q(x)y=w(x)f(x)";
+        case DE_SOLVER_POWER_LAW_BESSEL:
+            return "y''+ax^m y=bx^n,\\quad "
+                "\\nu=\\frac1{m+2},\\quad "
+                "p=\\frac{m+2}{2},\\quad "
+                "z=\\frac{\\sqrt{a}}{p}x^p,\\quad "
+                "y=\\sqrt{x}\\,u(z),\\quad "
+                "\\mu=\\frac{2n-m+1}{m+2},\\quad "
+                "K=\\frac{b}{p^2}"
+                "\\left(\\frac{p}{\\sqrt{a}}\\right)^{\\mu+1},\\quad "
+                "z^2u''+zu'+(z^2-\\nu^2)u=Kz^{\\mu+1}";
         case DE_SOLVER_CONSTANT_COEFFICIENT_LINEAR:
             return "P(D)y=f(x),\\quad P(m)=0";
         case DE_SOLVER_DERIVATIVE_QUADRATIC:
@@ -287,8 +307,15 @@ int de_solve_result_ensure_rule_steps(
     for (size_t i = 0u; i < result->solution_count; ++i) {
         string_t *solution = equ_to_text(
             result->solutions[i], style_UNBOUND);
-        string_t *solution_tex = equ_to_text(
-            result->solutions[i], style_TEX);
+        char *solution_lhs_tex = expr_to_tex_body(
+            equ_lhs(result->solutions[i]));
+        char *solution_rhs_tex = expr_to_tex_body(
+            equ_rhs(result->solutions[i]));
+        string_t *solution_tex =
+            solution_lhs_tex && solution_rhs_tex
+                ? string_sprintf(
+                      "%s = %s", solution_lhs_tex, solution_rhs_tex)
+                : NULL;
 
         if (!solution || !solution_tex ||
             string_append_format(
@@ -301,10 +328,14 @@ int de_solve_result_ensure_rule_steps(
                 "\\\\\\text{Solution%s:}\\quad&%s",
                 result->solution_count == 1u ? "" : " branch",
                 string_c_str(solution_tex)) < 0) {
+            free(solution_rhs_tex);
+            free(solution_lhs_tex);
             string_free(solution_tex);
             string_free(solution);
             goto cleanup;
         }
+        free(solution_rhs_tex);
+        free(solution_lhs_tex);
         string_free(solution_tex);
         string_free(solution);
     }

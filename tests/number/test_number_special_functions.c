@@ -305,6 +305,90 @@ void run_number_special_function_tests(void)
 
     {
         size_t saved_precision = num_get_default_prec_bits();
+        number_t order = num_create_from_string("0.5");
+        number_t argument = num_create_from_string("1.25");
+        number_t two;
+        number_t pi;
+        number_t pi_x;
+        number_t quotient;
+        number_t scale;
+        number_t sine;
+        number_t cosine;
+        number_t scaled_cosine;
+        number_t expected_j;
+        number_t expected_y;
+        number_t got_j;
+        number_t got_y;
+        number_t zero;
+        number_t one;
+        number_t lommel;
+        number_t lommel_derivative;
+        number_t j0;
+        number_t j1;
+        number_t expected_lommel;
+
+        ASSERT_EQ_INT(num_set_default_prec_bits(384u), 0);
+        ASSERT_EQ_INT(num_set_prec_bits(&order, 384u), 0);
+        ASSERT_EQ_INT(num_set_prec_bits(&argument, 384u), 0);
+        two = num_create_from_long(2);
+        pi = num_const_prec(NUM_PI, 384u);
+        pi_x = num_mul(pi, argument);
+        quotient = num_div(two, pi_x);
+        scale = num_sqrt(quotient);
+        sine = num_sin(argument);
+        cosine = num_cos(argument);
+        expected_j = num_mul(scale, sine);
+        scaled_cosine = num_mul(scale, cosine);
+        expected_y = num_neg(scaled_cosine);
+        got_j = num_bessel_j(order, argument);
+        got_y = num_bessel_y(order, argument);
+        zero = num_create_from_long(0);
+        one = num_create_from_long(1);
+        lommel = num_lommel_s(one, zero, argument);
+        lommel_derivative = num_lommel_s_derivative(one, zero, argument);
+        j0 = num_bessel_j(zero, argument);
+        j1 = num_bessel_j(one, argument);
+        expected_lommel = num_sub(one, j0);
+
+        assert_number_close_number(
+            "high-precision num_bessel_j(1/2, x) half-order identity",
+            got_j, expected_j, "1e-100");
+        assert_number_close_number(
+            "high-precision num_bessel_y(1/2, x) half-order identity",
+            got_y, expected_y, "1e-100");
+        assert_number_close_number(
+            "high-precision num_lommel_s(1, 0, x) = 1 - J0(x)",
+            lommel, expected_lommel, "1e-100");
+        assert_number_close_number(
+            "high-precision Lommel argument derivative equals J1(x)",
+            lommel_derivative, j1, "1e-100");
+
+        num_destroy(&expected_lommel);
+        num_destroy(&j1);
+        num_destroy(&j0);
+        num_destroy(&lommel_derivative);
+        num_destroy(&lommel);
+        num_destroy(&one);
+        num_destroy(&zero);
+        num_destroy(&got_y);
+        num_destroy(&got_j);
+        num_destroy(&expected_y);
+        num_destroy(&expected_j);
+        num_destroy(&scaled_cosine);
+        num_destroy(&cosine);
+        num_destroy(&sine);
+        num_destroy(&scale);
+        num_destroy(&quotient);
+        num_destroy(&pi_x);
+        num_destroy(&pi);
+        num_destroy(&two);
+        num_destroy(&argument);
+        num_destroy(&order);
+        ASSERT_EQ_INT(num_set_default_prec_bits(saved_precision), 0);
+    }
+
+    {
+        size_t saved_precision = num_get_default_prec_bits();
         number_t one;
         number_t two;
         number_t half;

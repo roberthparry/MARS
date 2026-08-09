@@ -280,6 +280,7 @@ static const expr_integrate_mul_rule_t integrate_mul_poly_hyperbolic_rules[] = {
 };
 
 static const expr_integrate_mul_rule_t integrate_mul_log_rules[] = {
+    { .kind = EXPR_INTEGRATE_MUL_RULE_DIRECT, .direct = integrate_log_times_trig_by_parts },
     { .kind = EXPR_INTEGRATE_MUL_RULE_DIRECT, .direct = integrate_sec_squared_log_tan_cot },
     { .kind = EXPR_INTEGRATE_MUL_RULE_DIRECT, .direct = integrate_sec_double_angle_log_tan_cot },
     { .kind = EXPR_INTEGRATE_MUL_RULE_DIRECT, .direct = integrate_poly_times_log_affine },

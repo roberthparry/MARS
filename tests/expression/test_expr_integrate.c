@@ -3649,6 +3649,46 @@ static void test_integrate_polynomial_exponential_with_symbolic_rate(void)
     expr_free(expr);
 }
 
+static void test_integrate_log_times_affine_trigonometric_family(void)
+{
+    static const char *const inputs[] = {
+        "ln(x)*sin(x)",
+        "ln(x)*cos(x)",
+        "ln(x)*sin(2*x+1)",
+        "ln(x)*cos(3*x-2)"
+    };
+
+    for (size_t i = 0u; i < sizeof(inputs) / sizeof(inputs[0]); ++i) {
+        expr_bindings_t *bindings = NULL;
+        expr_t *expr = expr_from_string(inputs[i], &bindings);
+        expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+        expr_t *anti = (expr && x) ? expr_integrate(expr, x) : NULL;
+        expr_t *deriv = (anti && x) ? expr_create_deriv(anti, x) : NULL;
+        char *anti_text = anti ? expr_to_string(anti, style_UNBOUND) : NULL;
+
+        ASSERT_NOT_NULL(anti);
+        ASSERT_NOT_NULL(deriv);
+        ASSERT_NOT_NULL(anti_text);
+        ASSERT_TRUE(strstr(anti_text, "integral_meta") == NULL);
+        ASSERT_TRUE(strstr(anti_text, "Si(") != NULL ||
+                    strstr(anti_text, "Ci(") != NULL);
+
+        for (size_t point = 0u; point < 3u; ++point) {
+            static const double values[] = { 0.25, 1.3, 2.5 };
+
+            test_expr_set_val_d(x, values[point]);
+            check_q_at(__FILE__, __LINE__, 1, inputs[i],
+                       expr_eval_qf(deriv), expr_eval_qf(expr));
+        }
+
+        free(anti_text);
+        expr_free(deriv);
+        expr_free(anti);
+        expr_free(expr);
+        expr_bindings_free(bindings);
+    }
+}
+
 void test_symbolic_integration(void)
 {
     TEST_RUN_SUBTEST(test_integrate_polynomial_sum, NULL);
@@ -3701,5 +3741,7 @@ void test_symbolic_integration(void)
     TEST_RUN_SUBTEST(test_integrate_collects_repeated_inverse_and_log_terms, NULL);
     TEST_RUN_SUBTEST(
         test_integrate_polynomial_exponential_with_symbolic_rate, NULL);
+    TEST_RUN_SUBTEST(
+        test_integrate_log_times_affine_trigonometric_family, NULL);
     TEST_RUN_SUBTEST(test_integrate_unsupported_product_returns_null, NULL);
 }

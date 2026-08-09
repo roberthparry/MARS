@@ -925,3 +925,53 @@ void test_gammainc_ei_e1(void) {
     TEST_RUN_SUBTEST(test_qf_gammainc_all, NULL);
     TEST_RUN_SUBTEST(test_qf_ei_e1_all, NULL);
 }
+
+static void test_qf_bessel_half_order_identities(void)
+{
+    qfloat_t half = qf_from_double(0.5);
+    qfloat_t negative_half = qf_neg(half);
+    qfloat_t x = qf_from_string("1.25");
+    qfloat_t scale = qf_sqrt(qf_div(qf_from_double(2.0), qf_mul(QF_PI, x)));
+    qfloat_t expected_j_half = qf_mul(scale, qf_sin(x));
+    qfloat_t expected_j_negative_half = qf_mul(scale, qf_cos(x));
+    qfloat_t expected_y_half = qf_neg(expected_j_negative_half);
+
+    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_bessel_j(half, x),
+                                 expected_j_half, 1e-28);
+    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_bessel_j(negative_half, x),
+                                 expected_j_negative_half, 1e-28);
+    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_bessel_y(half, x),
+                                 expected_y_half, 1e-28);
+}
+
+static void test_qf_bessel_order_recurrence(void)
+{
+    qfloat_t order = qf_from_string("1.375");
+    qfloat_t argument = qf_from_string("2.25");
+    qfloat_t lower = qf_bessel_j(qf_sub(order, QF_ONE), argument);
+    qfloat_t upper = qf_bessel_j(qf_add(order, QF_ONE), argument);
+    qfloat_t expected = qf_mul(qf_div(qf_mul(qf_from_double(2.0), order),
+                                     argument),
+                               qf_bessel_j(order, argument));
+
+    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_add(lower, upper), expected, 1e-27);
+}
+
+void test_bessel_functions(void)
+{
+    TEST_RUN_SUBTEST(test_qf_bessel_half_order_identities, NULL);
+    TEST_RUN_SUBTEST(test_qf_bessel_order_recurrence, NULL);
+
+    {
+        qfloat_t argument = qf_from_double(1.25);
+        qfloat_t got = qf_lommel_s(QF_ONE, QF_ZERO, argument);
+        qfloat_t got_derivative = qf_lommel_s_derivative(
+            QF_ONE, QF_ZERO, argument);
+        qfloat_t expected = qf_sub(
+            QF_ONE, qf_bessel_j(QF_ZERO, argument));
+
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(got, expected, 1e-28);
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(
+            got_derivative, qf_bessel_j(QF_ONE, argument), 1e-28);
+    }
+}

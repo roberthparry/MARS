@@ -163,7 +163,7 @@ Run the symbolic `expr` matrix benchmark:
 make bench_matrix_expr
 ```
 
-See [`benchmarks.md`](benchmarks.md) for notes on output units and current
+See [`benchmarks.md`](./benchmarks.md) for notes on output units and current
 sample results.
 
 Show the target summary:

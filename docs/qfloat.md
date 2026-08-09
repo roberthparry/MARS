@@ -272,6 +272,19 @@ All declarations are in `include/qfloat.h`.
 - `qfloat_t qf_erfinv(qfloat_t x)` — inverse error function
 - `qfloat_t qf_erfcinv(qfloat_t x)` — inverse complementary error function
 
+**Bessel functions**
+
+- `qfloat_t qf_bessel_j(qfloat_t order, qfloat_t argument)` — Bessel function of the first kind J_order(argument), for real order and argument
+- `qfloat_t qf_bessel_y(qfloat_t order, qfloat_t argument)` — Bessel function of the second kind Y_order(argument), for real order and argument
+
+Integer orders use MPFR's native Bessel operations. Non-integer real orders
+are evaluated by the defining series and the standard J/Y connection formula.
+
+**Lommel function**
+
+- `qfloat_t qf_lommel_s(qfloat_t mu, qfloat_t nu, qfloat_t argument)` — lower-case Lommel function s_mu,nu(argument), evaluated from its convergent series
+- `qfloat_t qf_lommel_s_derivative(qfloat_t mu, qfloat_t nu, qfloat_t argument)` — derivative with respect to the argument, evaluated by differentiating the same general series
+
 **Lambert W**
 
 - `qfloat_t qf_lambert_w0(qfloat_t x)` — principal branch W₀(x)
@@ -375,4 +388,4 @@ Results:
 | `qf_logbeta(2.3, 4.5)` | `26.6 µs` |
 
 For a broader benchmark overview, see
-[`docs/benchmarks.md`](benchmarks.md).
+[`docs/benchmarks.md`](./benchmarks.md).

@@ -76,7 +76,7 @@ Recent sample benchmarks on this tree show:
   `3.503 µs`
 - `qcomplex_t` `gammainv(qc_gamma(2.5+0.3i))` at about `145.943 µs`
 
-See [`docs/benchmarks.md`](docs/benchmarks.md) for commands, units, and fuller
+See [`docs/benchmarks.md`](./docs/benchmarks.md) for commands, units, and fuller
 sample output.
 
 ## Quick Examples
@@ -168,7 +168,7 @@ int main(void) {
 For temporary-heavy internal code, `number_t` also supports optional lifetime
 scopes. The intended fast pattern is to keep short-lived intermediates inside
 the active scope while keeping rolling or returned values as ordinary owned
-`number_t` results. See [`docs/number.md`](docs/number.md) for the scope
+`number_t` results. See [`docs/number.md`](./docs/number.md) for the scope
 semantics and the `bench_number_scope` benchmark notes.
 
 **Automatic differentiation with `expr_t`:**
@@ -285,24 +285,24 @@ int main(void) {
 
 | Module | Description | Docs |
 |---|---|---|
-| `datetime_t` | Civil and astronomical date/time utilities | [`docs/datetime.md`](docs/datetime.md) |
-| `timeseries_t` | Datetime-indexed forecasting and time-series analysis | [`docs/timeseries.md`](docs/timeseries.md) |
-| `json_t` | Opaque JSON value tree with string-backed parsing and serialisation | [`docs/json.md`](docs/json.md) |
-| `string_t` | UTF-8-aware dynamic strings | [`docs/string.md`](docs/string.md) |
-| `dictionary_t` | Generic key/value storage with copy/cleanup callbacks | [`docs/dictionary.md`](docs/dictionary.md) |
-| `set_t` | Generic set storage with copy/cleanup callbacks | [`docs/set.md`](docs/set.md) |
-| `array_t` | Generic array storage with copy/cleanup callbacks | [`docs/array.md`](docs/array.md) |
-| `bitset_t` | Dynamic thread-safe bitset | [`docs/bitset.md`](docs/bitset.md) |
-| `number_t` | Generic numeric value cluster over exact, fixed-precision, and multiprecision backends | [`docs/number.md`](docs/number.md) |
-| `qfloat_t` | Double-double arithmetic, circular function families, and special functions | [`docs/qfloat.md`](docs/qfloat.md) |
-| `qcomplex_t` | Double-double complex arithmetic, circular function families, and special functions | [`docs/qcomplex.md`](docs/qcomplex.md) |
-| `matrix_t` | Generic high-precision matrix with numeric and symbolic element types | [`docs/matrix.md`](docs/matrix.md) |
-| `equation_t` | Parsed equations with symbolic isolation and numeric fallback | [`docs/equation.md`](docs/equation.md) |
-| `expr_t` | Differentiable expression DAGs with symbolic differentiation and conservative symbolic antiderivatives | [`docs/expression.md`](docs/expression.md) |
-| `almanac_t` | Ephemeris-backed SHA and declination lookups and snapshot queries | [`docs/almanac.md`](docs/almanac.md) |
-| `jurisdiction_t` | Jurisdiction-aware holiday and working-day queries | [`docs/jurisdiction.md`](docs/jurisdiction.md) |
-| `sqlite_t` | Opaque SQLCipher-backed SQLite storage for encrypted object persistence | [`docs/sqlite.md`](docs/sqlite.md) |
-| `integrator_t` | Adaptive G7K15 numerical integrator | [`docs/integrator.md`](docs/integrator.md) |
+| `datetime_t` | Civil and astronomical date/time utilities | [`docs/datetime.md`](./docs/datetime.md) |
+| `timeseries_t` | Datetime-indexed forecasting and time-series analysis | [`docs/timeseries.md`](./docs/timeseries.md) |
+| `json_t` | Opaque JSON value tree with string-backed parsing and serialisation | [`docs/json.md`](./docs/json.md) |
+| `string_t` | UTF-8-aware dynamic strings | [`docs/string.md`](./docs/string.md) |
+| `dictionary_t` | Generic key/value storage with copy/cleanup callbacks | [`docs/dictionary.md`](./docs/dictionary.md) |
+| `set_t` | Generic set storage with copy/cleanup callbacks | [`docs/set.md`](./docs/set.md) |
+| `array_t` | Generic array storage with copy/cleanup callbacks | [`docs/array.md`](./docs/array.md) |
+| `bitset_t` | Dynamic thread-safe bitset | [`docs/bitset.md`](./docs/bitset.md) |
+| `number_t` | Generic numeric value cluster over exact, fixed-precision, and multiprecision backends | [`docs/number.md`](./docs/number.md) |
+| `qfloat_t` | Double-double arithmetic, circular function families, and special functions | [`docs/qfloat.md`](./docs/qfloat.md) |
+| `qcomplex_t` | Double-double complex arithmetic, circular function families, and special functions | [`docs/qcomplex.md`](./docs/qcomplex.md) |
+| `matrix_t` | Generic high-precision matrix with numeric and symbolic element types | [`docs/matrix.md`](./docs/matrix.md) |
+| `equation_t` | Parsed equations with symbolic isolation and numeric fallback | [`docs/equation.md`](./docs/equation.md) |
+| `expr_t` | Differentiable expression DAGs with symbolic differentiation and conservative symbolic antiderivatives | [`docs/expression.md`](./docs/expression.md) |
+| `almanac_t` | Ephemeris-backed SHA and declination lookups and snapshot queries | [`docs/almanac.md`](./docs/almanac.md) |
+| `jurisdiction_t` | Jurisdiction-aware holiday and working-day queries | [`docs/jurisdiction.md`](./docs/jurisdiction.md) |
+| `sqlite_t` | Opaque SQLCipher-backed SQLite storage for encrypted object persistence | [`docs/sqlite.md`](./docs/sqlite.md) |
+| `integrator_t` | Adaptive G7K15 numerical integrator | [`docs/integrator.md`](./docs/integrator.md) |
 
 ## Build
 
@@ -310,7 +310,7 @@ int main(void) {
 make
 ```
 
-See [`docs/building.md`](docs/building.md) for configuration options.
+See [`docs/building.md`](./docs/building.md) for configuration options.
 
 ## Install
 
@@ -352,7 +352,7 @@ preserving `weather.env`.
 make test
 ```
 
-See [`docs/testing.md`](docs/testing.md) for details on individual test suites.
+See [`docs/testing.md`](./docs/testing.md) for details on individual test suites.
 
 ## Run Benchmarks
 
@@ -365,14 +365,14 @@ make bench_qfloat_gamma_maths
 make bench_qcomplex_maths
 ```
 
-See [`docs/building.md`](docs/building.md) for benchmark and build details.
+See [`docs/building.md`](./docs/building.md) for benchmark and build details.
 
 ## Documentation
 
-- [Documentation index](docs/README.md)
-- [Building](docs/building.md)
-- [Testing](docs/testing.md)
-- [Benchmarks](docs/benchmarks.md)
+- [Documentation index](./docs/README.md)
+- [Building](./docs/building.md)
+- [Testing](./docs/testing.md)
+- [Benchmarks](./docs/benchmarks.md)
 
 ## Directory Layout
 

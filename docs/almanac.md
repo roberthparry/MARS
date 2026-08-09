@@ -11,9 +11,9 @@ and observational work.
 
 Event-search algorithms in this module draw on the *Explanatory Supplement to
 the Astronomical Almanac*
-([ESAA](books/ESAA/00-contents.md#explanatory-supplement-to-the-astronomical-almanac)).
+([ESAA](./books/ESAA/00-contents.md#explanatory-supplement-to-the-astronomical-almanac)).
 Subsequent references in this document use
-[ESAA](books/ESAA/00-contents.md#explanatory-supplement-to-the-astronomical-almanac).
+[ESAA](./books/ESAA/00-contents.md#explanatory-supplement-to-the-astronomical-almanac).
 
 ## Capabilities
 
@@ -198,7 +198,7 @@ Use `almanac_event_time_datetime()` when you want to present an
 `almanac_event_time_t` as a local civil `datetime_t`.
 
 The event searches use the short periodic estimates described in
-[ESAA](books/ESAA/00-contents.md#explanatory-supplement-to-the-astronomical-almanac)
+[ESAA](./books/ESAA/00-contents.md#explanatory-supplement-to-the-astronomical-almanac)
 to select candidate lunations or inferior conjunctions, reject eclipse
 candidates far from a lunar node, and then refine the surviving candidates
 against the packaged almanac ephemeris:
@@ -206,7 +206,7 @@ against the packaged almanac ephemeris:
 - exact Moon phases start from a mean lunation estimate and are refined from the almanac geometry
 - solar eclipses are detected with observer-local topocentric geometry
 - solar eclipse `totality_percent` is the approximate percentage of the Sun's apparent disc covered by the Moon at greatest eclipse
-- lunar eclipse contacts, greatest eclipse, and magnitudes use [ESAA](books/ESAA/00-contents.md#explanatory-supplement-to-the-astronomical-almanac) geocentric shadow-cone geometry; the observer is used only to decide local visibility
+- lunar eclipse contacts, greatest eclipse, and magnitudes use [ESAA](./books/ESAA/00-contents.md#explanatory-supplement-to-the-astronomical-almanac) geocentric shadow-cone geometry; the observer is used only to decide local visibility
 - lunar eclipse `totality_percent` is the approximate percentage of the Moon's apparent disc inside Earth's umbra
 - solar transits use the Mercury or Venus synodic cycle to estimate inferior conjunctions before ephemeris refinement
 - contact times use bracketed inverse interpolation and greatest-event times use parabolic interpolation of squared separation

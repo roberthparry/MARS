@@ -1,3 +1,4 @@
+#include <limits.h>
 #include <stdlib.h>
 
 #define MARS_SHARED_EQUATION_INTERNAL_ACCESS
@@ -1008,6 +1009,261 @@ cleanup:
     return solution;
 }
 
+static expr_t *de_power_law_bessel_solution(
+    const diffequ_t *de,
+    const expr_t *independent,
+    const expr_t *dependent,
+    const de_linear_second_order_t *form)
+{
+    number_t *coefficients = NULL;
+    number_t *forcing_coefficients = NULL;
+    size_t degree = 0u;
+    size_t forcing_degree = 0u;
+    expr_t *potential = NULL;
+    expr_t *normalized_forcing = NULL;
+    expr_t *order = NULL;
+    expr_t *negative_order = NULL;
+    expr_t *argument_power = NULL;
+    expr_t *independent_power = NULL;
+    expr_t *coefficient_root = NULL;
+    expr_t *argument_factor = NULL;
+    expr_t *argument = NULL;
+    expr_t *first_bessel = NULL;
+    expr_t *second_bessel = NULL;
+    expr_t *first_term = NULL;
+    expr_t *second_term = NULL;
+    expr_t *combination = NULL;
+    expr_t *lommel_order = NULL;
+    expr_t *lommel_power = NULL;
+    expr_t *half_degree = NULL;
+    expr_t *half_degree_squared = NULL;
+    expr_t *forcing_root = NULL;
+    expr_t *lommel_base = NULL;
+    expr_t *lommel_scale_power = NULL;
+    expr_t *lommel_scale = NULL;
+    expr_t *lommel = NULL;
+    expr_t *lommel_term = NULL;
+    expr_t *independent_root = NULL;
+    expr_t *solution = NULL;
+    long degree_plus_two;
+    long forcing_numerator;
+
+    if (!de || !independent || !dependent || !form ||
+        de->condition_count != 0u ||
+        !expr_is_exact_zero(form->first) ||
+        de_expr_uses(form->leading, independent))
+        goto cleanup;
+
+    potential = expr_div_simplify_owned(
+        expr_clone(form->dependent), expr_clone(form->leading));
+    if (!potential ||
+        !equ_match_polynomial_alloc(
+            potential, independent, &coefficients, &degree) ||
+        degree == 0u || degree > (size_t)(LONG_MAX - 2L) ||
+        !num_is_real(coefficients[degree]) ||
+        !num_gt(coefficients[degree], NUM_ZERO))
+        goto cleanup;
+    for (size_t i = 0u; i < degree; ++i) {
+        if (!num_is_zero(coefficients[i]))
+            goto cleanup;
+    }
+
+    if (!expr_is_exact_zero(form->forcing)) {
+        normalized_forcing = expr_div_simplify_owned(
+            expr_clone(form->forcing), expr_clone(form->leading));
+        if (!normalized_forcing ||
+            !equ_match_polynomial_alloc(
+                normalized_forcing,
+                independent,
+                &forcing_coefficients,
+                &forcing_degree) ||
+            forcing_degree > (size_t)((LONG_MAX - 3L) / 2L) ||
+            !num_is_real(forcing_coefficients[forcing_degree]) ||
+            num_is_zero(forcing_coefficients[forcing_degree]))
+            goto cleanup;
+        for (size_t i = 0u; i < forcing_degree; ++i) {
+            if (!num_is_zero(forcing_coefficients[i]))
+                goto cleanup;
+        }
+    }
+
+    degree_plus_two = (long)degree + 2L;
+    order = expr_div_simplify_owned(
+        expr_const_one(), expr_const_long(degree_plus_two));
+    negative_order = order
+        ? de_simplify_unary_owned(expr_clone(order), expr_neg)
+        : NULL;
+    argument_power = expr_div_simplify_owned(
+        expr_const_long(degree_plus_two), expr_const_long(2L));
+    independent_power = argument_power
+        ? expr_pow_xp(independent, argument_power)
+        : NULL;
+    coefficient_root = de_simplify_unary_owned(
+        expr_new_const(coefficients[degree]), expr_sqrt);
+    argument_factor = coefficient_root
+        ? expr_div_simplify_owned(
+              expr_mul_simplify_owned(
+                  expr_const_long(2L), coefficient_root),
+              expr_const_long(degree_plus_two))
+        : NULL;
+    if (coefficient_root)
+        coefficient_root = NULL;
+    argument = argument_factor && independent_power
+        ? expr_mul_simplify_owned(argument_factor, independent_power)
+        : NULL;
+    if (argument_factor && independent_power) {
+        argument_factor = NULL;
+        independent_power = NULL;
+    }
+    if (negative_order && argument) {
+        expr_t *arguments[2] = { negative_order, argument };
+
+        first_bessel = expr_bessel_j(arguments[0], arguments[1]);
+    }
+    if (order && argument) {
+        expr_t *arguments[2] = { order, argument };
+
+        second_bessel = expr_bessel_j(arguments[0], arguments[1]);
+    }
+    first_term = first_bessel
+        ? expr_mul_simplify_owned(
+              de_named_constant("C1"), first_bessel)
+        : NULL;
+    if (first_bessel)
+        first_bessel = NULL;
+    second_term = second_bessel
+        ? expr_mul_simplify_owned(
+              de_named_constant("C2"), second_bessel)
+        : NULL;
+    if (second_bessel)
+        second_bessel = NULL;
+    combination = first_term && second_term
+        ? expr_add_simplify_owned(first_term, second_term)
+        : NULL;
+    if (first_term && second_term) {
+        first_term = NULL;
+        second_term = NULL;
+    }
+
+    if (combination && forcing_coefficients) {
+        long forcing_degree_long = (long)forcing_degree;
+        number_t lommel_power_value = num_new();
+        bool lommel_power_is_one;
+
+        forcing_numerator = 2L * forcing_degree_long - (long)degree + 1L;
+        lommel_order = expr_div_simplify_owned(
+            expr_const_long(forcing_numerator),
+            expr_const_long(degree_plus_two));
+        lommel_power = expr_div_simplify_owned(
+            expr_const_long(2L * forcing_degree_long + 3L),
+            expr_const_long(degree_plus_two));
+        half_degree = expr_div_simplify_owned(
+            expr_const_long(degree_plus_two), expr_const_long(2L));
+        half_degree_squared = half_degree
+            ? expr_pow_long(half_degree, 2L)
+            : NULL;
+        forcing_root = num_eq(coefficients[degree], NUM_ONE)
+            ? expr_const_one()
+            : de_simplify_unary_owned(
+                  expr_new_const(coefficients[degree]), expr_sqrt);
+        lommel_base = half_degree && forcing_root
+            ? expr_div_simplify_owned(
+                  expr_clone(half_degree), expr_clone(forcing_root))
+            : NULL;
+        lommel_power_is_one = lommel_power &&
+            expr_match_const_value(lommel_power, &lommel_power_value) &&
+            num_eq(lommel_power_value, NUM_ONE);
+        lommel_scale_power = lommel_base && lommel_power
+            ? (lommel_power_is_one
+                ? expr_clone(lommel_base)
+                : expr_pow_xp(lommel_base, lommel_power))
+            : NULL;
+        num_destroy(&lommel_power_value);
+        if (lommel_power_is_one && half_degree && forcing_root) {
+            expr_t *denominator = expr_mul_simplify_owned(
+                expr_clone(half_degree), expr_clone(forcing_root));
+
+            lommel_scale = denominator
+                ? expr_div_simplify_owned(
+                      expr_new_const(
+                          forcing_coefficients[forcing_degree]),
+                      denominator)
+                : NULL;
+        } else {
+            lommel_scale = lommel_scale_power && half_degree_squared
+                ? expr_div_simplify_owned(
+                      expr_mul_simplify_owned(
+                          expr_new_const(
+                              forcing_coefficients[forcing_degree]),
+                          lommel_scale_power),
+                      half_degree_squared)
+                : NULL;
+            if (lommel_scale_power && half_degree_squared) {
+                lommel_scale_power = NULL;
+                half_degree_squared = NULL;
+            }
+        }
+        if (lommel_order && order && argument)
+            lommel = expr_lommel_s(lommel_order, order, argument);
+        lommel_term = lommel_scale && lommel
+            ? expr_mul_simplify_owned(lommel_scale, lommel)
+            : NULL;
+        if (lommel_scale && lommel) {
+            lommel_scale = NULL;
+            lommel = NULL;
+        }
+        if (!lommel_term)
+            goto cleanup;
+        {
+            expr_t *forced_combination = expr_add(combination, lommel_term);
+
+            expr_free(combination);
+            combination = forced_combination;
+        }
+        expr_free(lommel_term);
+        lommel_term = NULL;
+        if (!combination)
+            goto cleanup;
+    }
+
+    independent_root = de_simplify_unary_owned(
+        expr_clone(independent), expr_sqrt);
+    solution = combination && independent_root
+        ? expr_mul(independent_root, combination)
+        : NULL;
+
+cleanup:
+    expr_free(independent_root);
+    expr_free(lommel_term);
+    expr_free(lommel);
+    expr_free(lommel_scale);
+    expr_free(lommel_scale_power);
+    expr_free(lommel_base);
+    expr_free(forcing_root);
+    expr_free(half_degree_squared);
+    expr_free(half_degree);
+    expr_free(lommel_power);
+    expr_free(lommel_order);
+    expr_free(combination);
+    expr_free(second_term);
+    expr_free(first_term);
+    expr_free(second_bessel);
+    expr_free(first_bessel);
+    expr_free(argument);
+    expr_free(argument_factor);
+    expr_free(coefficient_root);
+    expr_free(independent_power);
+    expr_free(argument_power);
+    expr_free(negative_order);
+    expr_free(order);
+    expr_free(normalized_forcing);
+    expr_free(potential);
+    de_number_coefficients_free(
+        forcing_coefficients, forcing_degree + 1u);
+    de_number_coefficients_free(coefficients, degree + 1u);
+    return solution;
+}
+
 de_attempt_t de_attempt_sturm_liouville(
     const diffequ_t *de,
     const expr_t *independent,
@@ -1015,7 +1271,8 @@ de_attempt_t de_attempt_sturm_liouville(
     const expr_t *second_derivative,
     const expr_t *first_derivative,
     const expr_t *residual,
-    equation_t **solution_out)
+    equation_t **solution_out,
+    de_solver_t *solver_out)
 {
     de_linear_second_order_t form = { 0 };
     expr_t *first_squared = NULL;
@@ -1028,7 +1285,7 @@ de_attempt_t de_attempt_sturm_liouville(
     expr_t *solution = NULL;
     de_attempt_t attempt = DE_ATTEMPT_NOT_MATCHED;
 
-    if (!de_decompose_second_order(
+    if (!solver_out || !de_decompose_second_order(
             residual,
             second_derivative,
             first_derivative,
@@ -1050,6 +1307,13 @@ de_attempt_t de_attempt_sturm_liouville(
         de, independent, dependent, &form);
     if (solution)
         goto make_solution;
+
+    solution = de_power_law_bessel_solution(
+        de, independent, dependent, &form);
+    if (solution) {
+        *solver_out = DE_SOLVER_POWER_LAW_BESSEL;
+        goto make_solution;
+    }
 
     if (de_expr_uses(form.leading, independent) ||
         de_expr_uses(form.first, independent) ||

@@ -6,6 +6,8 @@
 #include "number.h"
 #define MARS_NUMBER_INTERNAL_ACCESS
 #include "number_internal.h"
+#include "internal/bessel_mpfr.h"
+#include "internal/lommel_mpfr.h"
 #include "ustring.h"
 
 enum {
@@ -249,6 +251,55 @@ NUMBER_MPFR_BINARY(number_mpfr_atan2_mut, mpfr_atan2)
 NUMBER_MPFR_BINARY(number_mpfr_pow_mut, mpfr_pow)
 NUMBER_MPFR_BINARY(number_mpfr_hypot_mut, mpfr_hypot)
 NUMBER_MPFR_BINARY(number_mpfr_beta_mut, mpfr_beta)
+
+static int number_mpfr_bessel_j_mut(mpfr_t order, const mpfr_t argument)
+{
+    return mars_mpfr_bessel_j(order, order, argument, MPFR_RNDN);
+}
+
+static int number_mpfr_bessel_y_mut(mpfr_t order, const mpfr_t argument)
+{
+    return mars_mpfr_bessel_y(order, order, argument, MPFR_RNDN);
+}
+
+static double number_double_bessel_j(double order, double argument)
+{
+    return qf_to_double(qf_bessel_j(qf_from_double(order),
+                                    qf_from_double(argument)));
+}
+
+static double number_double_bessel_y(double order, double argument)
+{
+    return qf_to_double(qf_bessel_y(qf_from_double(order),
+                                    qf_from_double(argument)));
+}
+
+static int number_mpfr_lommel_s_mut(mpfr_t mu, const mpfr_t nu,
+                                    const mpfr_t argument)
+{
+    return mars_mpfr_lommel_s(mu, mu, nu, argument, MPFR_RNDN);
+}
+
+static int number_mpfr_lommel_s_derivative_mut(mpfr_t mu, const mpfr_t nu,
+                                               const mpfr_t argument)
+{
+    return mars_mpfr_lommel_s_derivative(mu, mu, nu, argument, MPFR_RNDN);
+}
+
+static double number_double_lommel_s(double mu, double nu, double argument)
+{
+    return qf_to_double(qf_lommel_s(qf_from_double(mu),
+                                    qf_from_double(nu),
+                                    qf_from_double(argument)));
+}
+
+static double number_double_lommel_s_derivative(double mu, double nu,
+                                                double argument)
+{
+    return qf_to_double(qf_lommel_s_derivative(qf_from_double(mu),
+                                               qf_from_double(nu),
+                                               qf_from_double(argument)));
+}
 
 static int number_mpfr_recip_after_unary(mpfr_t value,
                                          int (*op)(mpfr_ptr, mpfr_srcptr,
@@ -5132,6 +5183,37 @@ number_t num_beta(const number_t a, const number_t b)
 {
     return number_apply_binary_math_with_double(a, b, number_double_beta,
         qf_beta, qc_beta, number_mpfr_beta_mut, NULL);
+}
+
+number_t num_bessel_j(const number_t order, const number_t argument)
+{
+    return number_apply_binary_math_with_double(
+        order, argument, number_double_bessel_j, qf_bessel_j, NULL,
+        number_mpfr_bessel_j_mut, NULL);
+}
+
+number_t num_bessel_y(const number_t order, const number_t argument)
+{
+    return number_apply_binary_math_with_double(
+        order, argument, number_double_bessel_y, qf_bessel_y, NULL,
+        number_mpfr_bessel_y_mut, NULL);
+}
+
+number_t num_lommel_s(const number_t mu, const number_t nu,
+                      const number_t argument)
+{
+    return number_apply_ternary_math_with_double(
+        mu, nu, argument, number_double_lommel_s, qf_lommel_s, NULL,
+        number_mpfr_lommel_s_mut, NULL);
+}
+
+number_t num_lommel_s_derivative(const number_t mu, const number_t nu,
+                                 const number_t argument)
+{
+    return number_apply_ternary_math_with_double(
+        mu, nu, argument, number_double_lommel_s_derivative,
+        qf_lommel_s_derivative, NULL,
+        number_mpfr_lommel_s_derivative_mut, NULL);
 }
 
 number_t num_logbeta(const number_t a, const number_t b)

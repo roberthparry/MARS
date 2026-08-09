@@ -704,6 +704,204 @@ expr_t *expr_try_trig_pythagorean_identity(const addend_t *terms, size_t n,
     return NULL;
 }
 
+static const expr_t *expr_find_trig_square_factor_local(
+    const expr_t *expr,
+    const expr_ops_t *op,
+    const expr_t *argument)
+{
+    const expr_t *found_argument = NULL;
+    const expr_t *found;
+
+    if (!expr)
+        return NULL;
+    if (expr_is_trig_square_of(expr, op, &found_argument) &&
+        (!argument || expr_struct_eq(found_argument, argument)))
+        return expr;
+    if (!expr_is_op(expr, &ops_mul))
+        return NULL;
+    found = expr_find_trig_square_factor_local(expr->a, op, argument);
+    return found
+        ? found
+        : expr_find_trig_square_factor_local(expr->b, op, argument);
+}
+
+bool expr_combine_trig_pythagorean_addends(addend_t *terms, size_t n)
+{
+    bool combined = false;
+
+    if (!terms)
+        return false;
+
+    for (size_t i = 0u; i < n; ++i) {
+        const expr_t *sin_argument = NULL;
+        const expr_t *sin_square;
+        bool matched = false;
+
+        if (!terms[i].base || num_is_zero(terms[i].coeff))
+            continue;
+        sin_square = expr_find_trig_square_factor_local(
+            terms[i].base, &ops_sin, NULL);
+        if (!sin_square ||
+            !expr_is_trig_square_of(
+                sin_square, &ops_sin, &sin_argument))
+            continue;
+
+        for (size_t j = 0u; j < n; ++j) {
+            const expr_t *cos_square;
+            expr_t *sin_quotient;
+            expr_t *cos_quotient;
+
+            if (i == j || !terms[j].base ||
+                num_is_zero(terms[j].coeff) ||
+                !num_eq(terms[i].coeff, terms[j].coeff))
+                continue;
+            cos_square = expr_find_trig_square_factor_local(
+                terms[j].base, &ops_cos, sin_argument);
+            if (!cos_square)
+                continue;
+
+            sin_quotient = expr_simplify_extract_exact_factor_quotient(
+                terms[i].base, sin_square);
+            cos_quotient = expr_simplify_extract_exact_factor_quotient(
+                terms[j].base, cos_square);
+            if (sin_quotient && cos_quotient &&
+                expr_struct_eq(sin_quotient, cos_quotient)) {
+                expr_free(terms[i].base);
+                terms[i].base = sin_quotient;
+                sin_quotient = NULL;
+                num_destroy(&terms[j].coeff);
+                terms[j].coeff = num_clone(NUM_ZERO);
+                combined = true;
+                matched = true;
+            }
+            expr_free(cos_quotient);
+            expr_free(sin_quotient);
+            if (matched)
+                break;
+        }
+    }
+    return combined;
+}
+
+static bool expr_match_trig_weighted_term_local(
+    const expr_t *expr,
+    const expr_ops_t **trig_op_out,
+    const expr_t **trig_out,
+    const expr_t **argument_out,
+    expr_t **common_out,
+    expr_t **remainder_out)
+{
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+    const expr_t *trig = NULL;
+    const expr_t *sum = NULL;
+    const expr_t *first = NULL;
+    const expr_t *second = NULL;
+    bool is_subtraction = false;
+    expr_t *common = NULL;
+    expr_t *remainder = NULL;
+
+    *trig_op_out = NULL;
+    *trig_out = NULL;
+    *argument_out = NULL;
+    *common_out = NULL;
+    *remainder_out = NULL;
+
+    if (!expr_match_mul_expr(expr, &left, &right))
+        return false;
+    if (expr_is_op(left, &ops_sin) || expr_is_op(left, &ops_cos)) {
+        trig = left;
+        sum = right;
+    } else if (expr_is_op(right, &ops_sin) ||
+               expr_is_op(right, &ops_cos)) {
+        trig = right;
+        sum = left;
+    } else {
+        return false;
+    }
+    if (!expr_match_add_sub_expr(
+            sum, &first, &second, &is_subtraction))
+        return false;
+
+    common = expr_simplify_extract_common_factor_quotient(first, trig);
+    if (common) {
+        remainder = is_subtraction
+            ? expr_negate_owned(expr_clone(second))
+            : expr_clone(second);
+    } else if (!is_subtraction) {
+        common = expr_simplify_extract_common_factor_quotient(second, trig);
+        remainder = common ? expr_clone(first) : NULL;
+    }
+    if (!common || !remainder) {
+        expr_free(remainder);
+        expr_free(common);
+        return false;
+    }
+
+    *trig_op_out = trig->ops;
+    *trig_out = trig;
+    *argument_out = trig->a;
+    *common_out = common;
+    *remainder_out = remainder;
+    return true;
+}
+
+expr_t *expr_simplify_try_trig_weighted_sum(const expr_t *a,
+                                            const expr_t *b)
+{
+    const expr_ops_t *first_op = NULL;
+    const expr_ops_t *second_op = NULL;
+    const expr_t *first_trig = NULL;
+    const expr_t *second_trig = NULL;
+    const expr_t *first_argument = NULL;
+    const expr_t *second_argument = NULL;
+    expr_t *first_common = NULL;
+    expr_t *second_common = NULL;
+    expr_t *first_remainder = NULL;
+    expr_t *second_remainder = NULL;
+    expr_t *first_tail = NULL;
+    expr_t *second_tail = NULL;
+    expr_t *out = NULL;
+
+    if (!expr_match_trig_weighted_term_local(
+            a, &first_op, &first_trig, &first_argument,
+            &first_common, &first_remainder) ||
+        !expr_match_trig_weighted_term_local(
+            b, &second_op, &second_trig, &second_argument,
+            &second_common, &second_remainder) ||
+        first_op == second_op ||
+        !((first_op == &ops_sin && second_op == &ops_cos) ||
+          (first_op == &ops_cos && second_op == &ops_sin)) ||
+        !expr_struct_eq(first_argument, second_argument) ||
+        !expr_struct_eq(first_common, second_common))
+        goto cleanup;
+
+    first_tail = expr_mul_simplify_owned(
+        expr_clone(first_trig), first_remainder);
+    first_remainder = NULL;
+    second_tail = expr_mul_simplify_owned(
+        expr_clone(second_trig), second_remainder);
+    second_remainder = NULL;
+    out = (first_tail && second_tail)
+        ? expr_add_simplify_owned(first_tail, second_tail)
+        : NULL;
+    first_tail = NULL;
+    second_tail = NULL;
+    out = out
+        ? expr_add_simplify_owned(first_common, out)
+        : NULL;
+    first_common = NULL;
+
+cleanup:
+    expr_free(second_tail);
+    expr_free(first_tail);
+    expr_free(second_remainder);
+    expr_free(first_remainder);
+    expr_free(second_common);
+    expr_free(first_common);
+    return out;
+}
+
 static expr_t *expr_simplify_try_double_angle_product(expr_t *a,
                                                     expr_t *b,
                                                     const expr_ops_t *left_op,

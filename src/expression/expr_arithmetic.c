@@ -427,6 +427,19 @@ static expr_t *deriv_arbitrary_function(expr_t *dv)
 
     if (!dv || !dv->name || !dv->a)
         return NULL;
+    if (strcmp(dv->name, "Si") == 0 || strcmp(dv->name, "Ci") == 0) {
+        expr_t *numerator = strcmp(dv->name, "Si") == 0
+            ? expr_sin(dv->a)
+            : expr_cos(dv->a);
+        expr_t *ratio = numerator ? expr_div(numerator, dv->a) : NULL;
+
+        expr_free(numerator);
+        inner = expr_get_dx_internal(dv->a);
+        out = (ratio && inner) ? expr_mul(ratio, inner) : NULL;
+        expr_free(inner);
+        expr_free(ratio);
+        return expr_simplify_owned(out);
+    }
     name_length = strlen(dv->name);
     derivative_name = malloc(name_length + 2u);
     if (!derivative_name)

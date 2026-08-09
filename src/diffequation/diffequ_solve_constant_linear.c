@@ -1556,6 +1556,14 @@ static expr_t *de_particular_solution(
             ? expr_add_simplify_owned(particular, term)
             : NULL;
     }
+    if (particular) {
+        expr_t *expanded = expr_display_expanded(particular);
+
+        if (expanded) {
+            expr_free(particular);
+            particular = expanded;
+        }
+    }
 
 cleanup:
     mat_free(rates);

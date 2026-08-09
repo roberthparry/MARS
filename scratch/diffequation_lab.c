@@ -41,6 +41,8 @@ static const char *solver_name(de_solver_t solver)
             return "linear transformation";
         case DE_SOLVER_STURM_LIOUVILLE:
             return "Sturm-Liouville";
+        case DE_SOLVER_POWER_LAW_BESSEL:
+            return "power-law Bessel";
         case DE_SOLVER_CONSTANT_COEFFICIENT_LINEAR:
             return "constant-coefficient linear";
         case DE_SOLVER_DERIVATIVE_QUADRATIC:

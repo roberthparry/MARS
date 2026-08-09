@@ -1985,6 +1985,18 @@ void test_to_string_special_functions(void)
         check_roundtrip("to_string: logbeta(x,y)", f, __LINE__);
     }
     {
+        expr_t *order = test_expr_new_named_const_d(0.5, "nu");
+        expr_t *x = test_expr_new_named_var_d(2.0, "x");
+        expr_t *f = expr_bessel_j(order, x); expr_free(order); expr_free(x);
+        check_roundtrip("to_string: BesselJ(nu,x)", f, __LINE__);
+    }
+    {
+        expr_t *order = test_expr_new_named_const_d(0.5, "nu");
+        expr_t *x = test_expr_new_named_var_d(2.0, "x");
+        expr_t *f = expr_bessel_y(order, x); expr_free(order); expr_free(x);
+        check_roundtrip("to_string: BesselY(nu,x)", f, __LINE__);
+    }
+    {
         expr_t *x = test_expr_new_named_var_d(3.0, "x");
         expr_t *y = test_expr_new_named_var_d(4.0, "y");
         expr_t *f = expr_hypot(x, y);   expr_free(x); expr_free(y);

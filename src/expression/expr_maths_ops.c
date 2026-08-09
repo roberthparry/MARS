@@ -24,6 +24,11 @@ static inline expr_t *expr_math_wrap_binary(const expr_ops_t *ops, const expr_t 
 
 static expr_t *expr_appell_f1_pack(const expr_t *left, const expr_t *right);
 static expr_t *expr_appell_f1_from_packs(const expr_t *params, const expr_t *vars);
+static expr_t *expr_lommel_s_pack(const expr_t *mu, const expr_t *nu);
+static expr_t *expr_lommel_s_from_pack(const expr_t *parameters,
+                                       const expr_t *argument);
+static expr_t *expr_lommel_s_derivative_from_pack(
+    const expr_t *parameters, const expr_t *argument);
 
 static number_t eval_formal_series_component(expr_t *dv)
 {
@@ -627,6 +632,48 @@ const expr_ops_t ops_legendre_chi = {
     .apply_unary = NULL, .apply_binary = expr_legendre_chi_xp,
     .simplify = expr_simplify_binary_operator, .fold_const_unary = NULL
 };
+const expr_ops_t ops_bessel_j = {
+    .eval = eval_bessel_j, .deriv = deriv_bessel_j, .reverse = NULL,
+    .kind = EXPR_KIND_BESSEL_J, .arity = EXPR_OP_BINARY,
+    .name = "BesselJ", .tex_name = "J",
+    .apply_unary = NULL, .apply_binary = expr_bessel_j,
+    .simplify = expr_simplify_binary_operator, .fold_const_unary = NULL
+};
+const expr_ops_t ops_bessel_y = {
+    .eval = eval_bessel_y, .deriv = deriv_bessel_y, .reverse = NULL,
+    .kind = EXPR_KIND_BESSEL_Y, .arity = EXPR_OP_BINARY,
+    .name = "BesselY", .tex_name = "Y",
+    .apply_unary = NULL, .apply_binary = expr_bessel_y,
+    .simplify = expr_simplify_binary_operator, .fold_const_unary = NULL
+};
+const expr_ops_t ops_lommel_s = {
+    .eval = eval_lommel_s, .deriv = deriv_lommel_s, .reverse = NULL,
+    .kind = EXPR_KIND_LOMMEL_S, .arity = EXPR_OP_BINARY,
+    .name = "LommelS", .tex_name = "s",
+    .apply_unary = NULL, .apply_binary = expr_lommel_s_from_pack,
+    .simplify = expr_simplify_rebuild_binary_operator, .fold_const_unary = NULL
+};
+const expr_ops_t ops_lommel_s_derivative = {
+    .eval = eval_lommel_s_derivative,
+    .deriv = deriv_lommel_s_derivative,
+    .reverse = NULL,
+    .kind = EXPR_KIND_LOMMEL_S_DERIVATIVE,
+    .arity = EXPR_OP_BINARY,
+    .name = "LommelSPrime",
+    .tex_name = "s'",
+    .apply_unary = NULL,
+    .apply_binary = expr_lommel_s_derivative_from_pack,
+    .simplify = expr_simplify_rebuild_binary_operator,
+    .fold_const_unary = NULL
+};
+const expr_ops_t ops_lommel_s_pack = {
+    .eval = eval_lommel_s_pack, .deriv = deriv_lommel_s_pack, .reverse = NULL,
+    .kind = EXPR_KIND_LOMMEL_S_PACK, .arity = EXPR_OP_BINARY,
+    .diff_kind = EXPR_DIFF_NONE,
+    .name = "lommel_s_pack", .tex_name = "\\operatorname{pack}",
+    .apply_unary = NULL, .apply_binary = expr_lommel_s_pack,
+    .simplify = expr_simplify_rebuild_binary_operator, .fold_const_unary = NULL
+};
 const expr_ops_t ops_appell_f1 = {
     .eval = eval_appell_f1, .deriv = deriv_appell_f1, .reverse = NULL,
     .kind = EXPR_KIND_APPELL_F1, .arity = EXPR_OP_BINARY,
@@ -1139,6 +1186,56 @@ expr_t *expr_legendre_chi(unsigned int order, const expr_t *a)
 
     expr_free(order_xp);
     return out;
+}
+expr_t *expr_bessel_j(const expr_t *order, const expr_t *argument)
+{
+    return expr_math_wrap_binary(&ops_bessel_j, order, argument);
+}
+expr_t *expr_bessel_y(const expr_t *order, const expr_t *argument)
+{
+    return expr_math_wrap_binary(&ops_bessel_y, order, argument);
+}
+
+expr_t *expr_lommel_s(const expr_t *mu, const expr_t *nu,
+                      const expr_t *argument)
+{
+    expr_t *parameters = expr_lommel_s_pack(mu, nu);
+    expr_t *out = parameters
+        ? expr_math_wrap_binary(&ops_lommel_s, parameters, argument) : NULL;
+
+    expr_free(parameters);
+    return out;
+}
+
+expr_t *expr_lommel_s_derivative_internal(const expr_t *mu,
+                                          const expr_t *nu,
+                                          const expr_t *argument)
+{
+    expr_t *parameters = expr_lommel_s_pack(mu, nu);
+    expr_t *out = parameters
+        ? expr_math_wrap_binary(&ops_lommel_s_derivative,
+                                parameters, argument) : NULL;
+
+    expr_free(parameters);
+    return out;
+}
+
+static expr_t *expr_lommel_s_pack(const expr_t *mu, const expr_t *nu)
+{
+    return expr_math_wrap_binary(&ops_lommel_s_pack, mu, nu);
+}
+
+static expr_t *expr_lommel_s_from_pack(const expr_t *parameters,
+                                       const expr_t *argument)
+{
+    return expr_math_wrap_binary(&ops_lommel_s, parameters, argument);
+}
+
+static expr_t *expr_lommel_s_derivative_from_pack(
+    const expr_t *parameters, const expr_t *argument)
+{
+    return expr_math_wrap_binary(&ops_lommel_s_derivative,
+                                 parameters, argument);
 }
 
 static expr_t *expr_appell_f1_pack(const expr_t *left, const expr_t *right)

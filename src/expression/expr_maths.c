@@ -344,6 +344,70 @@ number_t eval_legendre_chi(expr_t *dv)
 {
     return expr_eval_binary_num(dv, num_legendre_chi);
 }
+number_t eval_bessel_j(expr_t *dv)
+{
+    return expr_eval_binary_num(dv, num_bessel_j);
+}
+number_t eval_bessel_y(expr_t *dv)
+{
+    return expr_eval_binary_num(dv, num_bessel_y);
+}
+number_t eval_lommel_s_pack(expr_t *dv)
+{
+    (void)dv;
+    return NUM_NAN;
+}
+bool expr_lommel_s_unpack(const expr_t *expr,
+                          const expr_t **mu,
+                          const expr_t **nu,
+                          const expr_t **argument)
+{
+    const expr_t *parameters;
+
+    if (mu) *mu = NULL;
+    if (nu) *nu = NULL;
+    if (argument) *argument = NULL;
+    if (!expr ||
+        (!expr_is_op(expr, &ops_lommel_s) &&
+         !expr_is_op(expr, &ops_lommel_s_derivative)) ||
+        !expr->a || !expr->b)
+        return false;
+
+    parameters = expr->a;
+    if (!expr_is_op(parameters, &ops_lommel_s_pack) ||
+        !parameters->a || !parameters->b)
+        return false;
+
+    if (mu) *mu = parameters->a;
+    if (nu) *nu = parameters->b;
+    if (argument) *argument = expr->b;
+    return true;
+}
+number_t eval_lommel_s(expr_t *dv)
+{
+    const expr_t *mu = NULL;
+    const expr_t *nu = NULL;
+    const expr_t *argument = NULL;
+
+    if (!expr_lommel_s_unpack(dv, &mu, &nu, &argument))
+        return NUM_NAN;
+    return num_lommel_s(expr_eval_num_internal((expr_t *)mu),
+                        expr_eval_num_internal((expr_t *)nu),
+                        expr_eval_num_internal((expr_t *)argument));
+}
+
+number_t eval_lommel_s_derivative(expr_t *dv)
+{
+    const expr_t *mu = NULL;
+    const expr_t *nu = NULL;
+    const expr_t *argument = NULL;
+
+    if (!expr_lommel_s_unpack(dv, &mu, &nu, &argument))
+        return NUM_NAN;
+    return num_lommel_s_derivative(expr_eval_num_internal(mu),
+                                   expr_eval_num_internal(nu),
+                                   expr_eval_num_internal(argument));
+}
 number_t eval_appell_f1_pack(expr_t *dv)
 {
     (void)dv;
@@ -1267,6 +1331,153 @@ static bool expr_derivative_is_zero_local(const expr_t *expr)
     expr_free(simplified);
     expr_free(dx);
     return zero;
+}
+
+static expr_t *deriv_bessel_argument(
+    expr_t *dv,
+    expr_t *(*builder)(const expr_t *, const expr_t *))
+{
+    expr_t *one = NULL;
+    expr_t *half = NULL;
+    expr_t *lower_order = NULL;
+    expr_t *upper_order = NULL;
+    expr_t *lower = NULL;
+    expr_t *upper = NULL;
+    expr_t *difference = NULL;
+    expr_t *factor = NULL;
+    expr_t *argument_derivative = NULL;
+    expr_t *out = NULL;
+
+    if (!dv || !dv->a || !dv->b || !builder ||
+        !expr_derivative_is_zero_local(dv->a))
+        return expr_new_const(NUM_NAN);
+
+    one = expr_new_const(NUM_ONE);
+    half = expr_new_const(NUM_HALF);
+    lower_order = expr_sub(dv->a, one);
+    upper_order = expr_add(dv->a, one);
+    lower = builder(lower_order, dv->b);
+    upper = builder(upper_order, dv->b);
+    difference = lower && upper ? expr_sub(lower, upper) : NULL;
+    factor = difference ? expr_mul(half, difference) : NULL;
+    argument_derivative = expr_get_dx_internal(dv->b);
+    out = factor && argument_derivative
+        ? expr_mul(factor, argument_derivative) : NULL;
+
+    expr_free(argument_derivative);
+    expr_free(factor);
+    expr_free(difference);
+    expr_free(upper);
+    expr_free(lower);
+    expr_free(upper_order);
+    expr_free(lower_order);
+    expr_free(half);
+    expr_free(one);
+    return out ? out : expr_new_const(NUM_NAN);
+}
+
+expr_t *deriv_bessel_j(expr_t *dv)
+{
+    return deriv_bessel_argument(dv, expr_bessel_j);
+}
+
+expr_t *deriv_bessel_y(expr_t *dv)
+{
+    return deriv_bessel_argument(dv, expr_bessel_y);
+}
+
+expr_t *deriv_lommel_s_pack(expr_t *dv)
+{
+    (void)dv;
+    return expr_new_const(NUM_NAN);
+}
+
+expr_t *deriv_lommel_s(expr_t *dv)
+{
+    const expr_t *mu = NULL;
+    const expr_t *nu = NULL;
+    const expr_t *argument = NULL;
+    expr_t *factor = NULL;
+    expr_t *argument_derivative = NULL;
+    expr_t *out = NULL;
+
+    if (!expr_lommel_s_unpack(dv, &mu, &nu, &argument) ||
+        !expr_derivative_is_zero_local(mu) ||
+        !expr_derivative_is_zero_local(nu))
+        return expr_new_const(NUM_NAN);
+
+    factor = expr_lommel_s_derivative_internal(mu, nu, argument);
+    argument_derivative = expr_get_dx_internal(argument);
+    out = factor && argument_derivative
+        ? expr_mul(factor, argument_derivative) : NULL;
+
+    expr_free(argument_derivative);
+    expr_free(factor);
+    return out ? out : expr_new_const(NUM_NAN);
+}
+
+expr_t *deriv_lommel_s_derivative(expr_t *dv)
+{
+    const expr_t *mu = NULL;
+    const expr_t *nu = NULL;
+    const expr_t *argument = NULL;
+    expr_t *mu_minus_one = NULL;
+    expr_t *forcing = NULL;
+    expr_t *prime = NULL;
+    expr_t *prime_over_argument = NULL;
+    expr_t *nu_squared = NULL;
+    expr_t *argument_squared = NULL;
+    expr_t *ratio = NULL;
+    expr_t *one = NULL;
+    expr_t *coefficient = NULL;
+    expr_t *original = NULL;
+    expr_t *homogeneous_term = NULL;
+    expr_t *without_prime = NULL;
+    expr_t *second_derivative = NULL;
+    expr_t *argument_derivative = NULL;
+    expr_t *out = NULL;
+
+    if (!expr_lommel_s_unpack(dv, &mu, &nu, &argument) ||
+        !expr_derivative_is_zero_local(mu) ||
+        !expr_derivative_is_zero_local(nu))
+        return expr_new_const(NUM_NAN);
+
+    mu_minus_one = expr_add_long(mu, -1);
+    forcing = mu_minus_one ? expr_pow_xp(argument, mu_minus_one) : NULL;
+    prime = expr_lommel_s_derivative_internal(mu, nu, argument);
+    prime_over_argument = prime ? expr_div(prime, argument) : NULL;
+    nu_squared = expr_pow_long(nu, 2);
+    argument_squared = expr_pow_long(argument, 2);
+    ratio = nu_squared && argument_squared
+        ? expr_div(nu_squared, argument_squared) : NULL;
+    one = expr_new_const(NUM_ONE);
+    coefficient = one && ratio ? expr_sub(one, ratio) : NULL;
+    original = expr_lommel_s(mu, nu, argument);
+    homogeneous_term = coefficient && original
+        ? expr_mul(coefficient, original) : NULL;
+    without_prime = forcing && prime_over_argument
+        ? expr_sub(forcing, prime_over_argument) : NULL;
+    second_derivative = without_prime && homogeneous_term
+        ? expr_sub(without_prime, homogeneous_term) : NULL;
+    argument_derivative = expr_get_dx_internal(argument);
+    out = second_derivative && argument_derivative
+        ? expr_mul(second_derivative, argument_derivative) : NULL;
+
+    expr_free(argument_derivative);
+    expr_free(second_derivative);
+    expr_free(without_prime);
+    expr_free(homogeneous_term);
+    expr_free(original);
+    expr_free(coefficient);
+    expr_free(one);
+    expr_free(ratio);
+    expr_free(argument_squared);
+    expr_free(nu_squared);
+    expr_free(prime_over_argument);
+    expr_free(prime);
+    expr_free(forcing);
+    expr_free(mu_minus_one);
+    return out ? out : expr_new_const(NUM_NAN);
 }
 
 expr_t *deriv_appell_f1(expr_t *dv)
