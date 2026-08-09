@@ -17,10 +17,10 @@ static void emit_assignment_value(sbuf_t *b, char *value)
         const char *symbol;
         const char *alias;
     } aliases[] = {
-        { "π", "@pi" },
-        { "φ", "@phi" },
-        { "γ", "@gamma" },
-        { "τ", "@tau" },
+        {"π", "@pi"},
+        {"φ", "@phi"},
+        {"γ", "@gamma"},
+        {"τ", "@tau"},
     };
     char *cursor = value;
 
@@ -54,9 +54,7 @@ static void emit_assignment_value(sbuf_t *b, char *value)
     }
 }
 
-static void emit_function_output_arg_list(sbuf_t *b,
-                                          const varlist_t *vl,
-                                          const varlist_t *cl)
+static void emit_function_output_arg_list(sbuf_t *b, const varlist_t *vl, const varlist_t *cl)
 {
     for (size_t i = 0u; i < vl->count; ++i) {
         if (i > 0u)

@@ -59,9 +59,7 @@ static qfloat_t qfloat_from_mpq_value(const number_mpq_t *value)
     return out;
 }
 
-number_kind_t number_common_kind(const number_t *a,
-                                 const number_t *b,
-                                 number_binary_op_t op)
+number_kind_t number_common_kind(const number_t *a, const number_t *b, number_binary_op_t op)
 {
     number_kind_t ak;
     number_kind_t bk;
@@ -77,8 +75,7 @@ number_kind_t number_common_kind(const number_t *a,
     if (ak == NUMBER_COMPLEX || bk == NUMBER_COMPLEX)
         return NUMBER_COMPLEX;
     if (ak == NUMBER_QCOMPLEX || bk == NUMBER_QCOMPLEX)
-        return (number_kind_is_mpfr_family(ak) || number_kind_is_mpfr_family(bk))
-            ? NUMBER_COMPLEX : NUMBER_QCOMPLEX;
+        return (number_kind_is_mpfr_family(ak) || number_kind_is_mpfr_family(bk)) ? NUMBER_COMPLEX : NUMBER_QCOMPLEX;
     if (ak == NUMBER_CDOUBLE || bk == NUMBER_CDOUBLE) {
         if (ak == NUMBER_MPFR || bk == NUMBER_MPFR)
             return NUMBER_COMPLEX;
@@ -94,8 +91,7 @@ number_kind_t number_common_kind(const number_t *a,
         return NUMBER_DOUBLE;
     if (op == NUMBER_OP_DIV)
         return NUMBER_MPQ;
-    return ak == NUMBER_MPQ || bk == NUMBER_MPQ
-        ? NUMBER_MPQ : NUMBER_MPZ;
+    return ak == NUMBER_MPQ || bk == NUMBER_MPQ ? NUMBER_MPQ : NUMBER_MPZ;
 }
 
 static number_t *number_create_complex_from_number(const number_t *real)
@@ -138,9 +134,7 @@ static number_t *number_coerce_double_to_qfloat(const number_t *number)
 
 static number_t *number_coerce_double_to_qcomplex(const number_t *number)
 {
-    return number ? number_wrap_qcomplex(
-                        qc_make(qf_from_double(number_impl_const(number)->value.d), QF_ZERO))
-                  : NULL;
+    return number ? number_wrap_qcomplex(qc_make(qf_from_double(number_impl_const(number)->value.d), QF_ZERO)) : NULL;
 }
 
 static number_t *number_coerce_double_to_cdouble(const number_t *number)
@@ -154,8 +148,7 @@ static number_t *number_coerce_double_to_mpfr(const number_t *number)
 
     if (!number)
         return NULL;
-    out = number_mpfr_from_double(number_impl_const(number)->value.d,
-                                  number_default_precision_bits);
+    out = number_mpfr_from_double(number_impl_const(number)->value.d, number_default_precision_bits);
     return out ? number_wrap_mpfr(out) : NULL;
 }
 
@@ -180,8 +173,7 @@ static number_t *number_coerce_qfloat_to_mpfr(const number_t *number)
 
     if (!number)
         return NULL;
-    out = number_mpfr_from_qfloat(number_impl_const(number)->value.qf,
-                                  number_default_precision_bits);
+    out = number_mpfr_from_qfloat(number_impl_const(number)->value.qf, number_default_precision_bits);
     return out ? number_wrap_mpfr(out) : NULL;
 }
 
@@ -214,8 +206,7 @@ static number_t *number_coerce_cdouble_to_qcomplex(const number_t *number)
     if (!number)
         return NULL;
     value = number_impl_const(number)->value.cd.value;
-    return number_wrap_qcomplex(qc_make(qf_from_double(creal(value)),
-                                        qf_from_double(cimag(value))));
+    return number_wrap_qcomplex(qc_make(qf_from_double(creal(value)), qf_from_double(cimag(value))));
 }
 
 static number_t *number_coerce_cdouble_to_complex(const number_t *number)
@@ -231,8 +222,8 @@ static number_t *number_coerce_cdouble_to_complex(const number_t *number)
 
 static number_t *number_coerce_qcomplex_to_complex(const number_t *number)
 {
-    return number ? number_wrap_complex(number_complex_create_from_qcomplex(
-                        number_impl_const(number)->value.qc, 106u)) : NULL;
+    return number ? number_wrap_complex(number_complex_create_from_qcomplex(number_impl_const(number)->value.qc, 106u))
+                  : NULL;
 }
 
 static number_t *number_coerce_clone_mpz(const number_t *number)
@@ -270,9 +261,8 @@ static number_t *number_coerce_mpz_to_double(const number_t *number)
 
     if (!number)
         return NULL;
-    value = number_const_id_from_immortal(number, &id)
-        ? number_const_qfloat(id)
-        : qfloat_from_mpz_value(number_impl_const(number)->value.mpz);
+    value = number_const_id_from_immortal(number, &id) ? number_const_qfloat(id)
+                                                       : qfloat_from_mpz_value(number_impl_const(number)->value.mpz);
     return qf_isnan(value) ? NULL : number_wrap_double(qf_to_double(value));
 }
 
@@ -283,9 +273,8 @@ static number_t *number_coerce_mpz_to_qfloat(const number_t *number)
 
     if (!number)
         return NULL;
-    value = number_const_id_from_immortal(number, &id)
-        ? number_const_qfloat(id)
-        : qfloat_from_mpz_value(number_impl_const(number)->value.mpz);
+    value = number_const_id_from_immortal(number, &id) ? number_const_qfloat(id)
+                                                       : qfloat_from_mpz_value(number_impl_const(number)->value.mpz);
     return qf_isnan(value) ? NULL : number_wrap_qfloat(value);
 }
 
@@ -296,9 +285,8 @@ static number_t *number_coerce_mpz_to_cdouble(const number_t *number)
 
     if (!number)
         return NULL;
-    value = number_const_id_from_immortal(number, &id)
-        ? number_const_qfloat(id)
-        : qfloat_from_mpz_value(number_impl_const(number)->value.mpz);
+    value = number_const_id_from_immortal(number, &id) ? number_const_qfloat(id)
+                                                       : qfloat_from_mpz_value(number_impl_const(number)->value.mpz);
     return qf_isnan(value) ? NULL : number_wrap_cdouble(qf_to_double(value));
 }
 
@@ -311,8 +299,7 @@ static number_t *number_coerce_mpz_to_mpfr(const number_t *number)
     out = number_mpfr_new_prec(number_default_precision_bits);
     if (!out)
         return NULL;
-    (void)mpfr_set_z(out->value, number_mpz_value(number_impl_const(number)->value.mpz),
-                     MPFR_RNDN);
+    (void)mpfr_set_z(out->value, number_mpz_value(number_impl_const(number)->value.mpz), MPFR_RNDN);
     return number_wrap_mpfr(out);
 }
 
@@ -338,9 +325,8 @@ static number_t *number_coerce_mpq_to_double(const number_t *number)
 
     if (!number)
         return NULL;
-    value = number_const_id_from_immortal(number, &id)
-        ? number_const_qfloat(id)
-        : qfloat_from_mpq_value(number_impl_const(number)->value.mpq);
+    value = number_const_id_from_immortal(number, &id) ? number_const_qfloat(id)
+                                                       : qfloat_from_mpq_value(number_impl_const(number)->value.mpq);
     return qf_isnan(value) ? NULL : number_wrap_double(qf_to_double(value));
 }
 
@@ -351,9 +337,8 @@ static number_t *number_coerce_mpq_to_qfloat(const number_t *number)
 
     if (!number)
         return NULL;
-    value = number_const_id_from_immortal(number, &id)
-        ? number_const_qfloat(id)
-        : qfloat_from_mpq_value(number_impl_const(number)->value.mpq);
+    value = number_const_id_from_immortal(number, &id) ? number_const_qfloat(id)
+                                                       : qfloat_from_mpq_value(number_impl_const(number)->value.mpq);
     return qf_isnan(value) ? NULL : number_wrap_qfloat(value);
 }
 
@@ -364,9 +349,8 @@ static number_t *number_coerce_mpq_to_cdouble(const number_t *number)
 
     if (!number)
         return NULL;
-    value = number_const_id_from_immortal(number, &id)
-        ? number_const_qfloat(id)
-        : qfloat_from_mpq_value(number_impl_const(number)->value.mpq);
+    value = number_const_id_from_immortal(number, &id) ? number_const_qfloat(id)
+                                                       : qfloat_from_mpq_value(number_impl_const(number)->value.mpq);
     return qf_isnan(value) ? NULL : number_wrap_cdouble(qf_to_double(value));
 }
 
@@ -383,8 +367,7 @@ static number_t *number_coerce_mpq_to_mpfr(const number_t *number)
         number_mpfr_free(out);
         return NULL;
     }
-    (void)mpfr_set_q(out->value, number_impl_const(number)->value.mpq->value,
-                     MPFR_RNDN);
+    (void)mpfr_set_q(out->value, number_impl_const(number)->value.mpq->value, MPFR_RNDN);
     return number_wrap_mpfr(out);
 }
 
@@ -419,65 +402,45 @@ static number_t *number_coerce_clone_complex(const number_t *number)
 }
 
 static const number_coerce_fn number_coerce_dispatch[][NUMBER_COMPLEX + 1] = {
-    [NUMBER_INVALID] = {
-        [NUMBER_INVALID] = number_coerce_invalid,
-        [NUMBER_DOUBLE] = number_coerce_invalid,
-        [NUMBER_QFLOAT] = number_coerce_invalid,
-        [NUMBER_QCOMPLEX] = number_coerce_invalid,
-        [NUMBER_MPZ] = number_coerce_invalid,
-        [NUMBER_MPQ] = number_coerce_invalid,
-        [NUMBER_MPFR] = number_coerce_invalid,
-        [NUMBER_CDOUBLE] = number_coerce_invalid,
-        [NUMBER_COMPLEX] = number_coerce_invalid
-    },
-    [NUMBER_DOUBLE] = {
-        [NUMBER_DOUBLE] = number_coerce_clone_double,
-        [NUMBER_QFLOAT] = number_coerce_double_to_qfloat,
-        [NUMBER_QCOMPLEX] = number_coerce_double_to_qcomplex,
-        [NUMBER_MPFR] = number_coerce_double_to_mpfr,
-        [NUMBER_CDOUBLE] = number_coerce_double_to_cdouble,
-        [NUMBER_COMPLEX] = number_coerce_double_to_complex
-    },
-    [NUMBER_QFLOAT] = {
-        [NUMBER_QFLOAT] = number_coerce_clone_qfloat,
-        [NUMBER_QCOMPLEX] = number_coerce_qfloat_to_qcomplex,
-        [NUMBER_MPFR] = number_coerce_qfloat_to_mpfr,
-        [NUMBER_COMPLEX] = number_coerce_qfloat_to_complex
-    },
-    [NUMBER_QCOMPLEX] = {
-        [NUMBER_QCOMPLEX] = number_coerce_clone_qcomplex,
-        [NUMBER_COMPLEX] = number_coerce_qcomplex_to_complex
-    },
-    [NUMBER_CDOUBLE] = {
-        [NUMBER_QCOMPLEX] = number_coerce_cdouble_to_qcomplex,
-        [NUMBER_CDOUBLE] = number_coerce_clone_cdouble,
-        [NUMBER_COMPLEX] = number_coerce_cdouble_to_complex
-    },
-    [NUMBER_MPZ] = {
-        [NUMBER_DOUBLE] = number_coerce_mpz_to_double,
-        [NUMBER_QFLOAT] = number_coerce_mpz_to_qfloat,
-        [NUMBER_CDOUBLE] = number_coerce_mpz_to_cdouble,
-        [NUMBER_MPZ] = number_coerce_clone_mpz,
-        [NUMBER_MPQ] = number_coerce_mpz_to_mpq,
-        [NUMBER_MPFR] = number_coerce_mpz_to_mpfr,
-        [NUMBER_COMPLEX] = number_coerce_mpz_to_complex
-    },
-    [NUMBER_MPQ] = {
-        [NUMBER_DOUBLE] = number_coerce_mpq_to_double,
-        [NUMBER_QFLOAT] = number_coerce_mpq_to_qfloat,
-        [NUMBER_CDOUBLE] = number_coerce_mpq_to_cdouble,
-        [NUMBER_MPQ] = number_coerce_clone_mpq,
-        [NUMBER_MPFR] = number_coerce_mpq_to_mpfr,
-        [NUMBER_COMPLEX] = number_coerce_mpq_to_complex
-    },
-    [NUMBER_MPFR] = {
-        [NUMBER_MPFR] = number_coerce_clone_mpfr,
-        [NUMBER_COMPLEX] = number_coerce_mpfr_to_complex
-    },
-    [NUMBER_COMPLEX] = {
-        [NUMBER_COMPLEX] = number_coerce_clone_complex
-    }
-};
+    [NUMBER_INVALID] = {[NUMBER_INVALID] = number_coerce_invalid,
+                        [NUMBER_DOUBLE] = number_coerce_invalid,
+                        [NUMBER_QFLOAT] = number_coerce_invalid,
+                        [NUMBER_QCOMPLEX] = number_coerce_invalid,
+                        [NUMBER_MPZ] = number_coerce_invalid,
+                        [NUMBER_MPQ] = number_coerce_invalid,
+                        [NUMBER_MPFR] = number_coerce_invalid,
+                        [NUMBER_CDOUBLE] = number_coerce_invalid,
+                        [NUMBER_COMPLEX] = number_coerce_invalid},
+    [NUMBER_DOUBLE] = {[NUMBER_DOUBLE] = number_coerce_clone_double,
+                       [NUMBER_QFLOAT] = number_coerce_double_to_qfloat,
+                       [NUMBER_QCOMPLEX] = number_coerce_double_to_qcomplex,
+                       [NUMBER_MPFR] = number_coerce_double_to_mpfr,
+                       [NUMBER_CDOUBLE] = number_coerce_double_to_cdouble,
+                       [NUMBER_COMPLEX] = number_coerce_double_to_complex},
+    [NUMBER_QFLOAT] = {[NUMBER_QFLOAT] = number_coerce_clone_qfloat,
+                       [NUMBER_QCOMPLEX] = number_coerce_qfloat_to_qcomplex,
+                       [NUMBER_MPFR] = number_coerce_qfloat_to_mpfr,
+                       [NUMBER_COMPLEX] = number_coerce_qfloat_to_complex},
+    [NUMBER_QCOMPLEX] =
+        {[NUMBER_QCOMPLEX] = number_coerce_clone_qcomplex, [NUMBER_COMPLEX] = number_coerce_qcomplex_to_complex},
+    [NUMBER_CDOUBLE] = {[NUMBER_QCOMPLEX] = number_coerce_cdouble_to_qcomplex,
+                        [NUMBER_CDOUBLE] = number_coerce_clone_cdouble,
+                        [NUMBER_COMPLEX] = number_coerce_cdouble_to_complex},
+    [NUMBER_MPZ] = {[NUMBER_DOUBLE] = number_coerce_mpz_to_double,
+                    [NUMBER_QFLOAT] = number_coerce_mpz_to_qfloat,
+                    [NUMBER_CDOUBLE] = number_coerce_mpz_to_cdouble,
+                    [NUMBER_MPZ] = number_coerce_clone_mpz,
+                    [NUMBER_MPQ] = number_coerce_mpz_to_mpq,
+                    [NUMBER_MPFR] = number_coerce_mpz_to_mpfr,
+                    [NUMBER_COMPLEX] = number_coerce_mpz_to_complex},
+    [NUMBER_MPQ] = {[NUMBER_DOUBLE] = number_coerce_mpq_to_double,
+                    [NUMBER_QFLOAT] = number_coerce_mpq_to_qfloat,
+                    [NUMBER_CDOUBLE] = number_coerce_mpq_to_cdouble,
+                    [NUMBER_MPQ] = number_coerce_clone_mpq,
+                    [NUMBER_MPFR] = number_coerce_mpq_to_mpfr,
+                    [NUMBER_COMPLEX] = number_coerce_mpq_to_complex},
+    [NUMBER_MPFR] = {[NUMBER_MPFR] = number_coerce_clone_mpfr, [NUMBER_COMPLEX] = number_coerce_mpfr_to_complex},
+    [NUMBER_COMPLEX] = {[NUMBER_COMPLEX] = number_coerce_clone_complex}};
 
 number_t *number_coerce(const number_t *number, number_kind_t target_kind)
 {

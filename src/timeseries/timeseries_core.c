@@ -20,9 +20,7 @@ timeseries_t *ts_new(const number_t *values, size_t length)
     return series;
 }
 
-timeseries_t *ts_new_regular(const number_t *values, size_t length,
-                             const datetime_t *start,
-                             ts_frequency_t frequency,
+timeseries_t *ts_new_regular(const number_t *values, size_t length, const datetime_t *start, ts_frequency_t frequency,
                              ts_year_type_t year_type)
 {
     timeseries_t *series;
@@ -62,9 +60,8 @@ timeseries_t *ts_new_regular(const number_t *values, size_t length,
     return series;
 }
 
-timeseries_t *ts_new_indexed(const number_t *values, const datetime_t *const *index,
-                             size_t length, ts_frequency_t frequency,
-                             ts_year_type_t year_type)
+timeseries_t *ts_new_indexed(const number_t *values, const datetime_t *const *index, size_t length,
+                             ts_frequency_t frequency, ts_year_type_t year_type)
 {
     timeseries_t *series = ts_new(values, length);
 
@@ -99,10 +96,8 @@ timeseries_t *ts_new_from_doubles(const double *values, size_t length)
     return series;
 }
 
-timeseries_t *ts_new_regular_from_doubles(const double *values, size_t length,
-                                          const datetime_t *start,
-                                          ts_frequency_t frequency,
-                                          ts_year_type_t year_type)
+timeseries_t *ts_new_regular_from_doubles(const double *values, size_t length, const datetime_t *start,
+                                          ts_frequency_t frequency, ts_year_type_t year_type)
 {
     timeseries_t *series;
     number_t *numbers;
@@ -126,11 +121,8 @@ timeseries_t *ts_new_regular_from_doubles(const double *values, size_t length,
     return series;
 }
 
-timeseries_t *ts_new_indexed_from_doubles(const double *values,
-                                          const datetime_t *const *index,
-                                          size_t length,
-                                          ts_frequency_t frequency,
-                                          ts_year_type_t year_type)
+timeseries_t *ts_new_indexed_from_doubles(const double *values, const datetime_t *const *index, size_t length,
+                                          ts_frequency_t frequency, ts_year_type_t year_type)
 {
     timeseries_t *series;
     number_t *numbers;
@@ -229,8 +221,7 @@ static int ts_builder_reserve(ts_builder_t *builder, size_t needed)
     return 0;
 }
 
-ts_builder_t *ts_builder_new(ts_frequency_t frequency,
-                             ts_year_type_t year_type)
+ts_builder_t *ts_builder_new(ts_frequency_t frequency, ts_year_type_t year_type)
 {
     ts_builder_t *builder = calloc(1u, sizeof(*builder));
 
@@ -241,9 +232,7 @@ ts_builder_t *ts_builder_new(ts_frequency_t frequency,
     return builder;
 }
 
-int ts_builder_append(ts_builder_t *builder,
-                      const datetime_t *datetime,
-                      const number_t *value)
+int ts_builder_append(ts_builder_t *builder, const datetime_t *datetime, const number_t *value)
 {
     bool row_has_index;
     number_t copy;
@@ -273,9 +262,7 @@ int ts_builder_append(ts_builder_t *builder,
     return 0;
 }
 
-int ts_builder_append_double(ts_builder_t *builder,
-                             const datetime_t *datetime,
-                             double value)
+int ts_builder_append_double(ts_builder_t *builder, const datetime_t *datetime, double value)
 {
     number_t number = num_create_from_double(value);
     int rc = ts_builder_append(builder, datetime, &number);
@@ -284,9 +271,7 @@ int ts_builder_append_double(ts_builder_t *builder,
     return rc;
 }
 
-int ts_builder_append_date_text_double(ts_builder_t *builder,
-                                       const string_t *date_text,
-                                       double value)
+int ts_builder_append_date_text_double(ts_builder_t *builder, const string_t *date_text, double value)
 {
     datetime_t *datetime = NULL;
     int rc;
@@ -302,9 +287,7 @@ int ts_builder_append_date_text_double(ts_builder_t *builder,
     return rc;
 }
 
-int ts_builder_append_date_string_double(ts_builder_t *builder,
-                                         const char *date_text,
-                                         double value)
+int ts_builder_append_date_string_double(ts_builder_t *builder, const char *date_text, double value)
 {
     string_t *date_string;
     int rc;
@@ -328,11 +311,8 @@ timeseries_t *ts_builder_build(const ts_builder_t *builder)
     if (!builder)
         return NULL;
     if (builder->has_index) {
-        series = ts_new_indexed(builder->values,
-                                (const datetime_t *const *)builder->index,
-                                builder->length,
-                                builder->frequency,
-                                builder->year_type);
+        series = ts_new_indexed(builder->values, (const datetime_t *const *)builder->index, builder->length,
+                                builder->frequency, builder->year_type);
     } else {
         series = ts_new(builder->values, builder->length);
         if (series) {
@@ -421,10 +401,7 @@ static string_t *ts_csv_field(string_t **fields, size_t count, int index)
     return fields[(size_t)index];
 }
 
-static bool ts_grow_csv_series_storage(number_t **values,
-                                       datetime_t ***index,
-                                       bool **missing,
-                                       size_t old_capacity,
+static bool ts_grow_csv_series_storage(number_t **values, datetime_t ***index, bool **missing, size_t old_capacity,
                                        size_t new_capacity)
 {
     number_t *new_values;
@@ -456,12 +433,8 @@ static bool ts_grow_csv_series_storage(number_t **values,
     return true;
 }
 
-timeseries_t *ts_from_csv_text(const string_t *path,
-                               const string_t *date_column,
-                               const string_t *value_column,
-                               ts_frequency_t frequency,
-                               ts_year_type_t year_type,
-                               ts_missing_policy_t missing_policy)
+timeseries_t *ts_from_csv_text(const string_t *path, const string_t *date_column, const string_t *value_column,
+                               ts_frequency_t frequency, ts_year_type_t year_type, ts_missing_policy_t missing_policy)
 {
     FILE *f;
     char *line = NULL;
@@ -537,11 +510,7 @@ timeseries_t *ts_from_csv_text(const string_t *path,
             if (len == cap) {
                 size_t new_cap = cap * 2u;
 
-                if (!ts_grow_csv_series_storage(&values,
-                                                &index,
-                                                &missing,
-                                                cap,
-                                                new_cap)) {
+                if (!ts_grow_csv_series_storage(&values, &index, &missing, cap, new_cap)) {
                     string_split_free(fields, field_count);
                     break;
                 }
@@ -606,12 +575,8 @@ timeseries_t *ts_from_csv_text(const string_t *path,
     return series;
 }
 
-timeseries_t *ts_from_csv(const char *path,
-                          const char *date_column,
-                          const char *value_column,
-                          ts_frequency_t frequency,
-                          ts_year_type_t year_type,
-                          ts_missing_policy_t missing_policy)
+timeseries_t *ts_from_csv(const char *path, const char *date_column, const char *value_column, ts_frequency_t frequency,
+                          ts_year_type_t year_type, ts_missing_policy_t missing_policy)
 {
     string_t *path_text = NULL;
     string_t *date_column_text = NULL;
@@ -625,12 +590,7 @@ timeseries_t *ts_from_csv(const char *path,
     date_column_text = string_new_with(date_column);
     value_column_text = string_new_with(value_column);
     if (path_text && date_column_text && value_column_text) {
-        series = ts_from_csv_text(path_text,
-                                  date_column_text,
-                                  value_column_text,
-                                  frequency,
-                                  year_type,
-                                  missing_policy);
+        series = ts_from_csv_text(path_text, date_column_text, value_column_text, frequency, year_type, missing_policy);
     }
     string_free(path_text);
     string_free(date_column_text);
@@ -638,12 +598,9 @@ timeseries_t *ts_from_csv(const char *path,
     return series;
 }
 
-matrix_t *ts_matrix_from_csv_text(const string_t *path,
-                                  const string_t *date_column,
-                                  const string_t *const *value_columns,
-                                  size_t value_column_count,
-                                  ts_frequency_t frequency,
-                                  ts_missing_policy_t missing_policy)
+matrix_t *ts_matrix_from_csv_text(const string_t *path, const string_t *date_column,
+                                  const string_t *const *value_columns, size_t value_column_count,
+                                  ts_frequency_t frequency, ts_missing_policy_t missing_policy)
 {
     FILE *f;
     char *line = NULL;
@@ -767,12 +724,8 @@ fail_before_open:
     return NULL;
 }
 
-matrix_t *ts_matrix_from_csv(const char *path,
-                             const char *date_column,
-                             const char *const *value_columns,
-                             size_t value_column_count,
-                             ts_frequency_t frequency,
-                             ts_missing_policy_t missing_policy)
+matrix_t *ts_matrix_from_csv(const char *path, const char *date_column, const char *const *value_columns,
+                             size_t value_column_count, ts_frequency_t frequency, ts_missing_policy_t missing_policy)
 {
     string_t *path_text = NULL;
     string_t *date_column_text = NULL;
@@ -795,12 +748,8 @@ matrix_t *ts_matrix_from_csv(const char *path,
             goto done;
     }
 
-    matrix = ts_matrix_from_csv_text(path_text,
-                                     date_column_text,
-                                     (const string_t *const *)value_column_texts,
-                                     value_column_count,
-                                     frequency,
-                                     missing_policy);
+    matrix = ts_matrix_from_csv_text(path_text, date_column_text, (const string_t *const *)value_column_texts,
+                                     value_column_count, frequency, missing_policy);
 
 done:
     if (value_column_texts) {

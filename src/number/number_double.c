@@ -84,8 +84,8 @@ bool number_is_integer_double(const number_t *number)
 
 size_t number_get_mantissa_bits_double(const number_t *number)
 {
-    return number && isfinite(number_impl_const(number)->value.d) &&
-            number_impl_const(number)->value.d != 0.0 ? 53u : 0u;
+    return number && isfinite(number_impl_const(number)->value.d) && number_impl_const(number)->value.d != 0.0 ? 53u
+                                                                                                               : 0u;
 }
 
 int number_sign_double(const number_t *number)

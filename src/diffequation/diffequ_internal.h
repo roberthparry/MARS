@@ -3,9 +3,8 @@
 
 #include <stdbool.h>
 
-#if !defined(MARS_DIFFEQUATION_INTERNAL_ACCESS) && \
-    (!defined(__INTELLISENSE__) || \
-     (defined(__INCLUDE_LEVEL__) && __INCLUDE_LEVEL__ > 0))
+#if !defined(MARS_DIFFEQUATION_INTERNAL_ACCESS) &&                                                                     \
+    (!defined(__INTELLISENSE__) || (defined(__INCLUDE_LEVEL__) && __INCLUDE_LEVEL__ > 0))
 #error "diffequ_internal.h is private to the diffequation module; include diffequation.h instead."
 #endif
 
@@ -49,28 +48,12 @@ struct diffequ_solve_result_t {
 };
 
 diffequ_t *de_new_owned(equation_t *equation);
-diffequ_solve_result_t *de_solve_result_new(
-    de_solve_status_t status,
-    de_solver_t solver,
-    const char *diagnostic);
-int de_solve_result_append(
-    diffequ_solve_result_t *result,
-    equation_t *solution);
-int de_solve_result_set_steps(
-    diffequ_solve_result_t *result,
-    const char *steps);
-int de_solve_result_set_steps_tex(
-    diffequ_solve_result_t *result,
-    const char *steps_tex);
-int de_solve_result_set_symmetry(
-    diffequ_solve_result_t *result,
-    const char *symmetry);
-int de_solve_result_ensure_rule_steps(
-    const diffequ_t *de,
-    diffequ_solve_result_t *result);
-bool de_linear_decompose(const expr_t *expr,
-                         const expr_t *needle,
-                         expr_t **coefficient_out,
-                         expr_t **constant_out);
+diffequ_solve_result_t *de_solve_result_new(de_solve_status_t status, de_solver_t solver, const char *diagnostic);
+int de_solve_result_append(diffequ_solve_result_t *result, equation_t *solution);
+int de_solve_result_set_steps(diffequ_solve_result_t *result, const char *steps);
+int de_solve_result_set_steps_tex(diffequ_solve_result_t *result, const char *steps_tex);
+int de_solve_result_set_symmetry(diffequ_solve_result_t *result, const char *symmetry);
+int de_solve_result_ensure_rule_steps(const diffequ_t *de, diffequ_solve_result_t *result);
+bool de_linear_decompose(const expr_t *expr, const expr_t *needle, expr_t **coefficient_out, expr_t **constant_out);
 
 #endif /* DIFFEQU_INTERNAL_H */

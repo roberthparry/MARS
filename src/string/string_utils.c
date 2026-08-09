@@ -18,8 +18,8 @@
  */
 
 #ifdef HAVE_UNISTRING
-    #include <unistr.h>
-    #include <uninorm.h>
+#include <uninorm.h>
+#include <unistr.h>
 #endif
 
 #include <ctype.h>
@@ -104,9 +104,7 @@ int string_view_equals_view(string_view_t a, string_view_t b)
 {
     return string_view_length(a) == string_view_length(b) &&
            (string_view_length(a) == 0u ||
-            memcmp(string_view_data(a),
-                   string_view_data(b),
-                   string_view_length(a)) == 0);
+            memcmp(string_view_data(a), string_view_data(b), string_view_length(a)) == 0);
 }
 
 string_view_t string_view_empty(void)
@@ -114,8 +112,7 @@ string_view_t string_view_empty(void)
     return string_view_make(NULL, 0u);
 }
 
-static bool string_view_peek_storage(string_view_t view, size_t pos,
-                                     unsigned char *out)
+static bool string_view_peek_storage(string_view_t view, size_t pos, unsigned char *out)
 {
     const char *data = string_view_data(view);
 
@@ -126,9 +123,7 @@ static bool string_view_peek_storage(string_view_t view, size_t pos,
     return true;
 }
 
-bool string_view_peek_ascii(string_view_t view,
-                            string_pos_t pos,
-                            unsigned char *out)
+bool string_view_peek_ascii(string_view_t view, string_pos_t pos, unsigned char *out)
 {
     unsigned char c = 0u;
 
@@ -139,10 +134,7 @@ bool string_view_peek_ascii(string_view_t view,
     return true;
 }
 
-bool string_view_peek_rune_value(string_view_t view,
-                                 string_pos_t pos,
-                                 uint32_t *out,
-                                 string_pos_t *next_pos_out)
+bool string_view_peek_rune_value(string_view_t view, string_pos_t pos, uint32_t *out, string_pos_t *next_pos_out)
 {
     const char *data = string_view_data(view);
     size_t width = 0u;
@@ -164,16 +156,8 @@ bool string_view_peek_rune_value(string_view_t view,
 
 static bool string_rune_value_is_space(uint32_t cp)
 {
-    return (cp >= 0x09u && cp <= 0x0du) ||
-           cp == 0x20u ||
-           cp == 0x85u ||
-           cp == 0xa0u ||
-           cp == 0x1680u ||
-           (cp >= 0x2000u && cp <= 0x200au) ||
-           cp == 0x2028u ||
-           cp == 0x2029u ||
-           cp == 0x202fu ||
-           cp == 0x205fu ||
+    return (cp >= 0x09u && cp <= 0x0du) || cp == 0x20u || cp == 0x85u || cp == 0xa0u || cp == 0x1680u ||
+           (cp >= 0x2000u && cp <= 0x200au) || cp == 0x2028u || cp == 0x2029u || cp == 0x202fu || cp == 0x205fu ||
            cp == 0x3000u;
 }
 
@@ -184,9 +168,7 @@ string_view_t string_view_trim(string_view_t view)
     uint32_t cp = 0u;
     string_pos_t next = 0u;
 
-    while (start < end &&
-           string_view_peek_rune_value(view, start, &cp, &next) &&
-           string_rune_value_is_space(cp)) {
+    while (start < end && string_view_peek_rune_value(view, start, &cp, &next) && string_rune_value_is_space(cp)) {
         start = next;
     }
 
@@ -194,15 +176,11 @@ string_view_t string_view_trim(string_view_t view)
         size_t prev = end;
         size_t scan = start;
 
-        while (scan < end &&
-               string_view_peek_rune_value(view, scan, &cp, &next) &&
-               next <= end) {
+        while (scan < end && string_view_peek_rune_value(view, scan, &cp, &next) && next <= end) {
             prev = scan;
             scan = next;
         }
-        if (prev >= end ||
-            !string_view_peek_rune_value(view, prev, &cp, &next) ||
-            !string_rune_value_is_space(cp)) {
+        if (prev >= end || !string_view_peek_rune_value(view, prev, &cp, &next) || !string_rune_value_is_space(cp)) {
             break;
         }
         end = prev;
@@ -219,14 +197,10 @@ bool string_view_equals_literal(string_view_t view, const char *literal)
         return false;
 
     len = strlen(literal);
-    return string_view_length(view) == len &&
-           (len == 0u ||
-            memcmp(string_view_data(view), literal, len) == 0);
+    return string_view_length(view) == len && (len == 0u || memcmp(string_view_data(view), literal, len) == 0);
 }
 
-bool string_view_starts_with_view(string_view_t view,
-                                  string_view_t literal,
-                                  bool case_insensitive)
+bool string_view_starts_with_view(string_view_t view, string_view_t literal, bool case_insensitive)
 {
     size_t i = 0u;
     size_t literal_len = string_view_length(literal);
@@ -237,8 +211,7 @@ bool string_view_starts_with_view(string_view_t view,
         return false;
 
     while (i < literal_len) {
-        if (!string_view_peek_storage(view, i, &got) ||
-            !string_view_peek_storage(literal, i, &want))
+        if (!string_view_peek_storage(view, i, &got) || !string_view_peek_storage(literal, i, &want))
             return false;
         if (case_insensitive) {
             got = (unsigned char)tolower(got);
@@ -252,14 +225,9 @@ bool string_view_starts_with_view(string_view_t view,
     return true;
 }
 
-bool string_view_starts_with(string_view_t view,
-                             const string_t *literal,
-                             bool case_insensitive)
+bool string_view_starts_with(string_view_t view, const string_t *literal, bool case_insensitive)
 {
-    return literal &&
-           string_view_starts_with_view(view,
-                                        string_view_all(literal),
-                                        case_insensitive);
+    return literal && string_view_starts_with_view(view, string_view_all(literal), case_insensitive);
 }
 
 string_view_t string_view(const string_t *s, size_t pos, size_t len)
@@ -268,7 +236,8 @@ string_view_t string_view(const string_t *s, size_t pos, size_t len)
         return string_view_from_chars(NULL, 0u);
 
     size_t max = s->len - pos;
-    if (len > max) len = max;
+    if (len > max)
+        len = max;
 
     return string_view_from_chars(s->data + pos, len);
 }
@@ -282,16 +251,14 @@ string_view_t string_view_all(const string_t *s)
 
 static rune_t string_cursor_rune_empty(void)
 {
-    rune_t rune = { { 0u, 0u, 0u } };
+    rune_t rune = {{0u, 0u, 0u}};
 
     return rune;
 }
 
-static rune_t string_cursor_rune_from_range(const string_t *s,
-                                            size_t offset,
-                                            size_t length)
+static rune_t string_cursor_rune_from_range(const string_t *s, size_t offset, size_t length)
 {
-    rune_t rune = { { (uintptr_t)s, (uintptr_t)offset, (uintptr_t)length } };
+    rune_t rune = {{(uintptr_t)s, (uintptr_t)offset, (uintptr_t)length}};
 
     return rune;
 }
@@ -346,8 +313,7 @@ string_cursor_t *string_cursor_clone(const string_cursor_t *cursor)
     }
 
     clone = string_cursor_new(owned_clone ? owned_clone : cursor->source);
-    if (!clone)
-    {
+    if (!clone) {
         string_free(owned_clone);
         return NULL;
     }
@@ -395,15 +361,11 @@ rune_t string_cursor_peek(const string_cursor_t *cursor)
     if (string_cursor_done(cursor))
         return string_cursor_rune_empty();
 
-    end = string_grapheme_next(cursor->source->data,
-                               cursor->source->len,
-                               cursor->pos);
+    end = string_grapheme_next(cursor->source->data, cursor->source->len, cursor->pos);
     if (end <= cursor->pos)
         return string_cursor_rune_empty();
 
-    return string_cursor_rune_from_range(cursor->source,
-                                         cursor->pos,
-                                         end - cursor->pos);
+    return string_cursor_rune_from_range(cursor->source, cursor->pos, end - cursor->pos);
 }
 
 int string_cursor_next(string_cursor_t *cursor)
@@ -418,9 +380,7 @@ int string_cursor_next(string_cursor_t *cursor)
         return 0;
     }
 
-    next = string_grapheme_next(cursor->source->data,
-                                cursor->source->len,
-                                cursor->pos);
+    next = string_grapheme_next(cursor->source->data, cursor->source->len, cursor->pos);
     if (next <= cursor->pos || next > cursor->source->len)
         return -1;
 
@@ -473,9 +433,7 @@ bool string_cursor_peek_ascii(const string_cursor_t *cursor, unsigned char *out)
     return true;
 }
 
-bool string_cursor_peek_ascii_at(const string_cursor_t *cursor,
-                                 string_pos_t pos,
-                                 unsigned char *out)
+bool string_cursor_peek_ascii_at(const string_cursor_t *cursor, string_pos_t pos, unsigned char *out)
 {
     char c = '\0';
 
@@ -496,8 +454,7 @@ bool string_cursor_peek_ascii_at(const string_cursor_t *cursor,
 
 bool string_cursor_skip(string_cursor_t *cursor, string_pos_t span)
 {
-    if (!cursor || !cursor->source ||
-        span > cursor->source->len - cursor->pos)
+    if (!cursor || !cursor->source || span > cursor->source->len - cursor->pos)
         return false;
 
     cursor->pos += span;
@@ -519,14 +476,11 @@ void string_cursor_skip_spaces(string_cursor_t *cursor)
     }
 }
 
-string_t *string_cursor_slice_between(string_pos_t start,
-                                      string_pos_t end,
-                                      const string_cursor_t *cursor)
+string_t *string_cursor_slice_between(string_pos_t start, string_pos_t end, const string_cursor_t *cursor)
 {
     string_t *out;
 
-    if (!cursor || !cursor->source ||
-        start > end || end > cursor->source->len)
+    if (!cursor || !cursor->source || start > end || end > cursor->source->len)
         return NULL;
 
     out = string_new();
@@ -545,16 +499,12 @@ string_t *string_cursor_slice_between(string_pos_t start,
     return out;
 }
 
-string_t *string_cursor_extract(string_pos_t start,
-                                const string_cursor_t *cursor)
+string_t *string_cursor_extract(string_pos_t start, const string_cursor_t *cursor)
 {
-    return cursor ? string_cursor_slice_between(start, cursor->pos, cursor)
-                  : NULL;
+    return cursor ? string_cursor_slice_between(start, cursor->pos, cursor) : NULL;
 }
 
-int string_cursor_append_slice_between(string_t *out,
-                                       string_pos_t start,
-                                       string_pos_t end,
+int string_cursor_append_slice_between(string_t *out, string_pos_t start, string_pos_t end,
                                        const string_cursor_t *cursor)
 {
     string_t *copy;
@@ -572,26 +522,20 @@ int string_cursor_append_slice_between(string_t *out,
     return rc;
 }
 
-string_view_t string_cursor_view_between(string_pos_t start,
-                                         string_pos_t end,
-                                         const string_cursor_t *cursor)
+string_view_t string_cursor_view_between(string_pos_t start, string_pos_t end, const string_cursor_t *cursor)
 {
-    if (!cursor || !cursor->source ||
-        start > end || end > cursor->source->len)
+    if (!cursor || !cursor->source || start > end || end > cursor->source->len)
         return string_view_empty();
 
     return string_view(cursor->source, start, end - start);
 }
 
-string_view_t string_cursor_view_extract(string_pos_t start,
-                                         const string_cursor_t *cursor)
+string_view_t string_cursor_view_extract(string_pos_t start, const string_cursor_t *cursor)
 {
-    return cursor ? string_cursor_view_between(start, cursor->pos, cursor)
-                  : string_view_empty();
+    return cursor ? string_cursor_view_between(start, cursor->pos, cursor) : string_view_empty();
 }
 
-rune_t string_cursor_peek_at(const string_cursor_t *cursor,
-                             string_pos_t pos)
+rune_t string_cursor_peek_at(const string_cursor_t *cursor, string_pos_t pos)
 {
     string_cursor_t tmp;
 
@@ -604,9 +548,7 @@ rune_t string_cursor_peek_at(const string_cursor_t *cursor,
     return string_cursor_peek(&tmp);
 }
 
-bool string_cursor_match_at(const string_cursor_t *cursor,
-                            string_pos_t pos,
-                            const char *literal)
+bool string_cursor_match_at(const string_cursor_t *cursor, string_pos_t pos, const char *literal)
 {
     string_cursor_t tmp;
 
@@ -623,7 +565,8 @@ string_t *string_from_view(const string_view_t *v)
 {
     const char *data;
     size_t len;
-    if (!v) return NULL;
+    if (!v)
+        return NULL;
 
     data = string_view_data(*v);
     len = string_view_length(*v);
@@ -631,7 +574,8 @@ string_t *string_from_view(const string_view_t *v)
         return NULL;
 
     string_t *s = string_new();
-    if (!s) return NULL;
+    if (!s)
+        return NULL;
 
     if (string_reserve(s, len + 1u) != 0) {
         string_free(s);
@@ -652,18 +596,18 @@ static int views_grow(string_view_t **views, size_t *cap)
 {
     size_t new_cap = *cap * 2;
     string_view_t *tmp = realloc(*views, new_cap * sizeof(string_view_t));
-    if (!tmp) { free(*views); *views = NULL; return -1; }
+    if (!tmp) {
+        free(*views);
+        *views = NULL;
+        return -1;
+    }
     *views = tmp;
     *cap = new_cap;
     return 0;
 }
 
-static bool string_utils_find_bytes_index(const char *haystack,
-                                          size_t haystack_len,
-                                          const char *needle,
-                                          size_t needle_len,
-                                          size_t start,
-                                          size_t *index_out)
+static bool string_utils_find_bytes_index(const char *haystack, size_t haystack_len, const char *needle,
+                                          size_t needle_len, size_t start, size_t *index_out)
 {
     if (!haystack || !needle || needle_len == 0u || needle_len > haystack_len)
         return false;
@@ -680,9 +624,7 @@ static bool string_utils_find_bytes_index(const char *haystack,
     return false;
 }
 
-string_view_t *string_split_view_by_view(const string_t *s,
-                                         string_view_t delim,
-                                         size_t *out_count)
+string_view_t *string_split_view_by_view(const string_t *s, string_view_t delim, size_t *out_count)
 {
     const char *delim_data = string_view_data(delim);
     size_t delim_len = string_view_length(delim);
@@ -694,7 +636,8 @@ string_view_t *string_split_view_by_view(const string_t *s,
     size_t count = 0;
 
     string_view_t *views = malloc(cap * sizeof(string_view_t));
-    if (!views) return NULL;
+    if (!views)
+        return NULL;
 
     if (!s || !out_count || !delim_data || delim_len == 0u) {
         free(views);
@@ -702,19 +645,16 @@ string_view_t *string_split_view_by_view(const string_t *s,
     }
 
     source = string_view_all(s);
-    while (string_utils_find_bytes_index(s->data,
-                                         s->len,
-                                         delim_data,
-                                         delim_len,
-                                         start,
-                                         &match)) {
-        if (count == cap && views_grow(&views, &cap) != 0) return NULL;
+    while (string_utils_find_bytes_index(s->data, s->len, delim_data, delim_len, start, &match)) {
+        if (count == cap && views_grow(&views, &cap) != 0)
+            return NULL;
         views[count] = string_view_slice(source, start, match - start);
         count++;
         start = match + delim_len;
     }
 
-    if (count == cap && views_grow(&views, &cap) != 0) return NULL;
+    if (count == cap && views_grow(&views, &cap) != 0)
+        return NULL;
     views[count] = string_view_slice(source, start, s->len - start);
     count++;
 
@@ -865,26 +805,23 @@ int string_builder_format(string_builder_t *b, const char *fmt, ...)
 
 /* Normalisation hook (stub) */
 
-static int utf8_normalise_external(const char *in, size_t in_len,
-                                   char **out, size_t *out_len,
-                                   string_norm_form_t form)
+static int utf8_normalise_external(const char *in, size_t in_len, char **out, size_t *out_len, string_norm_form_t form)
 {
 #ifndef HAVE_UNISTRING
     // Fallback: no-op normalisation
     char *copy = malloc(in_len + 1);
-    if (!copy) return -1;
+    if (!copy)
+        return -1;
     memcpy(copy, in, in_len);
     copy[in_len] = '\0';
     *out = copy;
     *out_len = in_len;
     return 0;
 #else
-    static const uninorm_t normal_forms[STRING_NORM_COUNT] = {
-        [STRING_NORM_NFC] = UNINORM_NFC,
-        [STRING_NORM_NFD] = UNINORM_NFD,
-        [STRING_NORM_NFKC] = UNINORM_NFKC,
-        [STRING_NORM_NFKD] = UNINORM_NFKD
-    };
+    static const uninorm_t normal_forms[STRING_NORM_COUNT] = {[STRING_NORM_NFC] = UNINORM_NFC,
+                                                              [STRING_NORM_NFD] = UNINORM_NFD,
+                                                              [STRING_NORM_NFKC] = UNINORM_NFKC,
+                                                              [STRING_NORM_NFKD] = UNINORM_NFKD};
 
     if ((size_t)form >= STRING_NORM_COUNT)
         return -1;
@@ -902,12 +839,12 @@ static int utf8_normalise_external(const char *in, size_t in_len,
 #endif
 }
 
-
 /* Normalise s in place to the given Unicode normalisation form.
    Returns 0 on success, -1 on error or unsupported form. */
 int string_normalise(string_t *s, string_norm_form_t form)
 {
-    if (!s) return -1;
+    if (!s)
+        return -1;
 
     char *norm = NULL;
     size_t norm_len = 0;

@@ -29,8 +29,7 @@ void run_number_parse_tests(void)
         assert_number_string("num_create_from_string(\"42\")", integer, "42");
         assert_number_string("num_create_from_string(\"5/6\")", fraction, "⅚");
         assert_number_string("num_create_from_string(\"⅚\")", unicode_fraction, "⅚");
-        assert_number_string("num_create_from_string(\"³⁵⁵⁄₁₁₃\")",
-            stacked_fraction, "³⁵⁵⁄₁₁₃");
+        assert_number_string("num_create_from_string(\"³⁵⁵⁄₁₁₃\")", stacked_fraction, "³⁵⁵⁄₁₁₃");
 
         text = num_to_string(decimal);
         ASSERT_NOT_NULL(text);
@@ -43,8 +42,7 @@ void run_number_parse_tests(void)
 
         ASSERT_TRUE(!num_is_real(complex_value));
         assert_number_string("num_create_from_string(\"1 + i\")", unit_imag, "1 + i");
-        assert_number_string("num_create_from_string(\"1/2 - 3/2i\")",
-            rational_complex, "½ - ³⁄₂i");
+        assert_number_string("num_create_from_string(\"1/2 - 3/2i\")", rational_complex, "½ - ³⁄₂i");
         ASSERT_NUMBER_EQ(paren_imag, plain_imag);
         ASSERT_EQ_INT(num_set_from_string(&set_value, "1 - i"), 0);
         assert_number_string("num_set_from_string(\"1 - i\")", set_value, "1 - i");
@@ -57,8 +55,7 @@ void run_number_parse_tests(void)
         ASSERT_TRUE(strcmp(string_c_str(text), "1.25") == 0);
         string_free(text);
 
-        assert_number_string("num_create_from_text(\"  355/113  \")",
-            from_text, "³⁵⁵⁄₁₁₃");
+        assert_number_string("num_create_from_text(\"  355/113  \")", from_text, "³⁵⁵⁄₁₁₃");
 
         num_destroy(&integer);
         num_destroy(&fraction);

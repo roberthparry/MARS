@@ -14,10 +14,7 @@ void expr_reverse_atom(const expr_t *dv, const number_t *out_bar, number_t *a_ba
     *b_bar = expr_reverse_zero();
 }
 
-void expr_reverse_not_differentiable(const expr_t *dv,
-                                   const number_t *out_bar,
-                                   number_t *a_bar,
-                                   number_t *b_bar)
+void expr_reverse_not_differentiable(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
     (void)out_bar;
     *a_bar = dv && dv->ops->arity != EXPR_OP_ATOM ? NUM_NAN : expr_reverse_zero();

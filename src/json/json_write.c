@@ -8,10 +8,7 @@
 #define MARS_JSON_INTERNAL_ACCESS
 #include "json_internal.h"
 
-typedef bool (*json_write_value_fn)(const json_t *json,
-                                    string_t *out,
-                                    int indent_size,
-                                    int depth);
+typedef bool (*json_write_value_fn)(const json_t *json, string_t *out, int indent_size, int depth);
 
 static bool json_write_null(const json_t *json, string_t *out, int indent_size, int depth);
 static bool json_write_bool(const json_t *json, string_t *out, int indent_size, int depth);
@@ -21,13 +18,8 @@ static bool json_write_array(const json_t *json, string_t *out, int indent_size,
 static bool json_write_object(const json_t *json, string_t *out, int indent_size, int depth);
 
 static const json_write_value_fn json_write_ops[JSON_OBJECT + 1u] = {
-    [JSON_NULL] = json_write_null,
-    [JSON_BOOL] = json_write_bool,
-    [JSON_NUMBER] = json_write_number,
-    [JSON_STRING] = json_write_string_value,
-    [JSON_ARRAY] = json_write_array,
-    [JSON_OBJECT] = json_write_object
-};
+    [JSON_NULL] = json_write_null,           [JSON_BOOL] = json_write_bool,   [JSON_NUMBER] = json_write_number,
+    [JSON_STRING] = json_write_string_value, [JSON_ARRAY] = json_write_array, [JSON_OBJECT] = json_write_object};
 
 static bool json_append_indent(string_t *out, int spaces)
 {
@@ -82,8 +74,7 @@ static bool json_append_escaped_string(string_t *out, const string_t *text)
     while (!string_cursor_done(cursor)) {
         rune_t rune = string_cursor_peek(cursor);
 
-        if (!json_append_escaped_rune(out, rune) ||
-            string_cursor_next(cursor) != 0) {
+        if (!json_append_escaped_rune(out, rune) || string_cursor_next(cursor) != 0) {
             string_cursor_free(cursor);
             return false;
         }
@@ -112,10 +103,8 @@ static bool json_append_escaped_literal(string_t *out, const char *literal)
 
 static bool json_write_extended_number(const json_t *json, string_t *out)
 {
-    return string_append_char(out, '{') == 0 &&
-           json_append_escaped_literal(out, "$mars.number") &&
-           string_append_char(out, ':') == 0 &&
-           json_append_escaped_string(out, json->u.number.text) &&
+    return string_append_char(out, '{') == 0 && json_append_escaped_literal(out, "$mars.number") &&
+           string_append_char(out, ':') == 0 && json_append_escaped_string(out, json->u.number.text) &&
            string_append_char(out, '}') == 0;
 }
 
@@ -148,20 +137,14 @@ static bool json_write_number(const json_t *json, string_t *out, int indent_size
     return json_write_extended_number(json, out);
 }
 
-static bool json_write_string_value(const json_t *json,
-                                    string_t *out,
-                                    int indent_size,
-                                    int depth)
+static bool json_write_string_value(const json_t *json, string_t *out, int indent_size, int depth)
 {
     (void)indent_size;
     (void)depth;
     return json_append_escaped_string(out, json->u.text);
 }
 
-static bool json_write_value(const json_t *json,
-                             string_t *out,
-                             int indent_size,
-                             int depth)
+static bool json_write_value(const json_t *json, string_t *out, int indent_size, int depth)
 {
     if (!json || !json_type_valid(json->type))
         return false;
@@ -187,8 +170,7 @@ static bool json_write_array(const json_t *json, string_t *out, int indent_size,
             return false;
 
         if (indent_size > 0) {
-            if (string_append_char(out, '\n') != 0 ||
-                !json_append_indent(out, (depth + 1) * indent_size))
+            if (string_append_char(out, '\n') != 0 || !json_append_indent(out, (depth + 1) * indent_size))
                 return false;
         }
 
@@ -197,8 +179,7 @@ static bool json_write_array(const json_t *json, string_t *out, int indent_size,
     }
 
     if (indent_size > 0) {
-        if (string_append_char(out, '\n') != 0 ||
-            !json_append_indent(out, depth * indent_size))
+        if (string_append_char(out, '\n') != 0 || !json_append_indent(out, depth * indent_size))
             return false;
     }
 
@@ -220,11 +201,7 @@ static bool json_write_object(const json_t *json, string_t *out, int indent_size
         const void *value_ptr;
         string_t *key;
 
-        if (!dictionary_get_entry_sorted(json->u.object,
-                                         i,
-                                         DICTIONARY_SORT_BY_KEY,
-                                         &entry) ||
-            !entry)
+        if (!dictionary_get_entry_sorted(json->u.object, i, DICTIONARY_SORT_BY_KEY, &entry) || !entry)
             return false;
 
         key_ptr = dictionary_entry_key(entry);
@@ -235,12 +212,11 @@ static bool json_write_object(const json_t *json, string_t *out, int indent_size
             return false;
 
         if (indent_size > 0) {
-            if (string_append_char(out, '\n') != 0 ||
-                !json_append_indent(out, (depth + 1) * indent_size))
+            if (string_append_char(out, '\n') != 0 || !json_append_indent(out, (depth + 1) * indent_size))
                 return false;
         }
 
-        key = *(string_t * const *)key_ptr;
+        key = *(string_t *const *)key_ptr;
         if (!json_append_escaped_string(out, key))
             return false;
         if (indent_size > 0) {
@@ -250,13 +226,12 @@ static bool json_write_object(const json_t *json, string_t *out, int indent_size
             return false;
         }
 
-        if (!json_write_value(*(json_t * const *)value_ptr, out, indent_size, depth + 1))
+        if (!json_write_value(*(json_t *const *)value_ptr, out, indent_size, depth + 1))
             return false;
     }
 
     if (indent_size > 0) {
-        if (string_append_char(out, '\n') != 0 ||
-            !json_append_indent(out, depth * indent_size))
+        if (string_append_char(out, '\n') != 0 || !json_append_indent(out, depth * indent_size))
             return false;
     }
 
@@ -341,11 +316,7 @@ int json_to_file_pretty(const json_t *json, const string_t *path, int indent_siz
     return rc;
 }
 
-bool json_serialize(const json_t *json,
-                    string_t **out_type,
-                    string_t **out_encoding,
-                    void **out_data,
-                    size_t *out_len)
+bool json_serialize(const json_t *json, string_t **out_type, string_t **out_encoding, void **out_data, size_t *out_len)
 {
     string_t *type = NULL;
     string_t *encoding = NULL;
@@ -384,18 +355,14 @@ bool json_serialize(const json_t *json,
     return true;
 }
 
-json_t *json_deserialise(const void *data,
-                         size_t len,
-                         const string_t *type,
-                         const string_t *encoding)
+json_t *json_deserialise(const void *data, size_t len, const string_t *type, const string_t *encoding)
 {
     string_t *text;
     json_t *json;
 
     if (!data || !type || !encoding)
         return NULL;
-    if (strcmp(string_c_str(type), "json_t") != 0 ||
-        strcmp(string_c_str(encoding), "application/json") != 0)
+    if (strcmp(string_c_str(type), "json_t") != 0 || strcmp(string_c_str(encoding), "application/json") != 0)
         return NULL;
 
     text = string_new();

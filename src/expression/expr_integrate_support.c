@@ -6,7 +6,7 @@
 bool depends_on_wrt(const expr_t *expr, const expr_t *wrt)
 {
     expr_t *vars[1];
-    bool used[1] = { false };
+    bool used[1] = {false};
 
     vars[0] = (expr_t *)wrt;
     return expr_collect_var_usage(expr, 1u, vars, used) && used[0];
@@ -35,15 +35,11 @@ bool expr_equal_exact_local(const expr_t *a, const expr_t *b)
 bool is_wrt(const expr_t *expr, const expr_t *wrt)
 {
     return expr && wrt && expr_is_var(expr) && expr_is_var(wrt) &&
-           (expr == wrt ||
-            (expr->var_id != 0 && expr->var_id == wrt->var_id));
+           (expr == wrt || (expr->var_id != 0 && expr->var_id == wrt->var_id));
 }
 
-static bool match_affine_linear_expr(const expr_t *expr,
-                                     const expr_t *wrt,
-                                     bool require_nonzero_coeff,
-                                     number_t *constant_out,
-                                     number_t *coeff_out)
+static bool match_affine_linear_expr(const expr_t *expr, const expr_t *wrt, bool require_nonzero_coeff,
+                                     number_t *constant_out, number_t *coeff_out)
 {
     expr_t *vars[1];
     number_t poly[5];
@@ -57,13 +53,9 @@ static bool match_affine_linear_expr(const expr_t *expr,
     for (size_t i = 0; i < 5; ++i)
         poly[i] = num_new();
     basis_coeffs[0] = num_new();
-    ok = expr_match_affine_poly_deg4(expr, 1u, vars, poly, &basis_constant,
-                                     basis_coeffs) &&
-         num_is_zero(poly[2]) &&
-         num_is_zero(poly[3]) &&
-         num_is_zero(poly[4]) &&
-         (!require_nonzero_coeff ||
-          (!num_is_zero(poly[1]) && !num_is_zero(basis_coeffs[0])));
+    ok = expr_match_affine_poly_deg4(expr, 1u, vars, poly, &basis_constant, basis_coeffs) && num_is_zero(poly[2]) &&
+         num_is_zero(poly[3]) && num_is_zero(poly[4]) &&
+         (!require_nonzero_coeff || (!num_is_zero(poly[1]) && !num_is_zero(basis_coeffs[0])));
     if (!ok) {
         for (size_t i = 0; i < 5; ++i)
             num_destroy(&poly[i]);
@@ -92,9 +84,7 @@ static bool match_affine_linear_expr(const expr_t *expr,
     return true;
 }
 
-bool match_nonconstant_affine_linear_expr(const expr_t *expr,
-                                          const expr_t *wrt,
-                                          number_t *constant_out,
+bool match_nonconstant_affine_linear_expr(const expr_t *expr, const expr_t *wrt, number_t *constant_out,
                                           number_t *coeff_out)
 {
     return match_affine_linear_expr(expr, wrt, true, constant_out, coeff_out);
@@ -120,9 +110,7 @@ void number_array_reset_zero_local(number_t *values, size_t count)
     }
 }
 
-expr_t *build_affine_from_match(const expr_t *wrt,
-                                number_t constant,
-                                number_t coeff)
+expr_t *build_affine_from_match(const expr_t *wrt, number_t constant, number_t coeff)
 {
     expr_t *scaled;
     expr_t *shifted;
@@ -141,9 +129,7 @@ expr_t *build_affine_from_match(const expr_t *wrt,
     return simplify_owned(shifted);
 }
 
-expr_t *build_polynomial_expr(const expr_t *var,
-                              const number_t *coeffs,
-                              size_t count)
+expr_t *build_polynomial_expr(const expr_t *var, const number_t *coeffs, size_t count)
 {
     expr_t *acc = NULL;
 
@@ -175,18 +161,12 @@ expr_t *build_polynomial_expr(const expr_t *var,
     return simplify_owned(acc);
 }
 
-bool affine_linear_match_eq(number_t constant_a,
-                            number_t coeff_a,
-                            number_t constant_b,
-                            number_t coeff_b)
+bool affine_linear_match_eq(number_t constant_a, number_t coeff_a, number_t constant_b, number_t coeff_b)
 {
     return num_eq(constant_a, constant_b) && num_eq(coeff_a, coeff_b);
 }
 
-static bool match_affine_square_expr(const expr_t *expr,
-                                     const expr_t *wrt,
-                                     number_t *constant_out,
-                                     number_t *coeff_out)
+static bool match_affine_square_expr(const expr_t *expr, const expr_t *wrt, number_t *constant_out, number_t *coeff_out)
 {
     number_t exponent = num_new();
     bool ok = false;
@@ -198,8 +178,7 @@ static bool match_affine_square_expr(const expr_t *expr,
 
     if (expr->ops && expr->ops->kind == EXPR_KIND_POW_D && num_eq(expr->c, NUM_TWO)) {
         ok = match_nonconstant_affine_linear_expr(expr->a, wrt, constant_out, coeff_out);
-    } else if (expr->ops && expr->ops->kind == EXPR_KIND_POW &&
-               expr->b && expr_match_const_value(expr->b, &exponent) &&
+    } else if (expr->ops && expr->ops->kind == EXPR_KIND_POW && expr->b && expr_match_const_value(expr->b, &exponent) &&
                num_eq(exponent, NUM_TWO)) {
         ok = match_nonconstant_affine_linear_expr(expr->a, wrt, constant_out, coeff_out);
     }
@@ -208,11 +187,8 @@ static bool match_affine_square_expr(const expr_t *expr,
     return ok;
 }
 
-bool match_one_plus_minus_affine_square(const expr_t *expr,
-                                        const expr_t *wrt,
-                                        bool *is_plus_out,
-                                        number_t *constant_out,
-                                        number_t *coeff_out)
+bool match_one_plus_minus_affine_square(const expr_t *expr, const expr_t *wrt, bool *is_plus_out,
+                                        number_t *constant_out, number_t *coeff_out)
 {
     const expr_t *left = NULL;
     const expr_t *right = NULL;
@@ -233,21 +209,16 @@ bool match_one_plus_minus_affine_square(const expr_t *expr,
         match_affine_square_expr(right, wrt, constant_out, coeff_out)) {
         *is_plus_out = !is_sub;
         ok = true;
-    } else if (!is_sub &&
-               expr_match_const_value(left, &one) && num_eq(one, NUM_ONE) &&
-               right && right->ops && right->ops->kind == EXPR_KIND_NEG &&
-               match_affine_square_expr(right->a, wrt, constant_out, coeff_out)) {
+    } else if (!is_sub && expr_match_const_value(left, &one) && num_eq(one, NUM_ONE) && right && right->ops &&
+               right->ops->kind == EXPR_KIND_NEG && match_affine_square_expr(right->a, wrt, constant_out, coeff_out)) {
         *is_plus_out = false;
         ok = true;
-    } else if (!is_sub &&
-               expr_match_const_value(right, &one) && num_eq(one, NUM_ONE) &&
+    } else if (!is_sub && expr_match_const_value(right, &one) && num_eq(one, NUM_ONE) &&
                match_affine_square_expr(left, wrt, constant_out, coeff_out)) {
         *is_plus_out = true;
         ok = true;
-    } else if (!is_sub &&
-               expr_match_const_value(right, &one) && num_eq(one, NUM_ONE) &&
-               left && left->ops && left->ops->kind == EXPR_KIND_NEG &&
-               match_affine_square_expr(left->a, wrt, constant_out, coeff_out)) {
+    } else if (!is_sub && expr_match_const_value(right, &one) && num_eq(one, NUM_ONE) && left && left->ops &&
+               left->ops->kind == EXPR_KIND_NEG && match_affine_square_expr(left->a, wrt, constant_out, coeff_out)) {
         *is_plus_out = false;
         ok = true;
     }
@@ -256,11 +227,8 @@ bool match_one_plus_minus_affine_square(const expr_t *expr,
     return ok;
 }
 
-bool match_affine_unary_data(const expr_t *expr,
-                             const expr_t *wrt,
-                             expr_pattern_unary_affine_kind_t kind,
-                             number_t *constant_out,
-                             number_t *coeff_out)
+bool match_affine_unary_data(const expr_t *expr, const expr_t *wrt, expr_pattern_unary_affine_kind_t kind,
+                             number_t *constant_out, number_t *coeff_out)
 {
     expr_t *vars[1];
     number_t coeffs[1];
@@ -268,8 +236,7 @@ bool match_affine_unary_data(const expr_t *expr,
 
     vars[0] = (expr_t *)wrt;
     coeffs[0] = num_new();
-    ok = expr_match_unary_affine_kind(expr, kind, 1u, vars, constant_out, coeffs) &&
-         !num_eq(coeffs[0], NUM_ZERO);
+    ok = expr_match_unary_affine_kind(expr, kind, 1u, vars, constant_out, coeffs) && !num_eq(coeffs[0], NUM_ZERO);
     if (ok) {
         num_destroy(coeff_out);
         *coeff_out = coeffs[0];
@@ -279,20 +246,14 @@ bool match_affine_unary_data(const expr_t *expr,
     return ok;
 }
 
-bool match_affine_unary(const expr_t *expr,
-                        const expr_t *wrt,
-                        expr_pattern_unary_affine_kind_t kind,
-                        number_t *constant_out,
-                        number_t *coeff_out)
+bool match_affine_unary(const expr_t *expr, const expr_t *wrt, expr_pattern_unary_affine_kind_t kind,
+                        number_t *constant_out, number_t *coeff_out)
 {
     return match_affine_unary_data(expr, wrt, kind, constant_out, coeff_out);
 }
 
-expr_t *integrate_affine_unary_kind(const expr_t *expr,
-                                    const expr_t *wrt,
-                                    expr_pattern_unary_affine_kind_t kind,
-                                    expr_apply_unary_fn antiderivative_fn,
-                                    number_t sign)
+expr_t *integrate_affine_unary_kind(const expr_t *expr, const expr_t *wrt, expr_pattern_unary_affine_kind_t kind,
+                                    expr_apply_unary_fn antiderivative_fn, number_t sign)
 {
     expr_t *vars[1];
     number_t constant = num_new();
@@ -302,8 +263,7 @@ expr_t *integrate_affine_unary_kind(const expr_t *expr,
 
     vars[0] = (expr_t *)wrt;
     coeffs[0] = num_new();
-    if (!expr_match_unary_affine_kind(expr, kind, 1u, vars, &constant, coeffs) ||
-        num_eq(coeffs[0], NUM_ZERO)) {
+    if (!expr_match_unary_affine_kind(expr, kind, 1u, vars, &constant, coeffs) || num_eq(coeffs[0], NUM_ZERO)) {
         num_destroy(&coeffs[0]);
         num_destroy(&constant);
         return NULL;
@@ -343,10 +303,7 @@ void exp_antiderivative_once_local(const number_t *src, size_t count, number_t *
     }
 }
 
-void trig_antiderivative_once_local(const number_t *a_src,
-                                    const number_t *b_src,
-                                    size_t count,
-                                    number_t *a_dst,
+void trig_antiderivative_once_local(const number_t *a_src, const number_t *b_src, size_t count, number_t *a_dst,
                                     number_t *b_dst)
 {
     number_array_zero_local(a_dst, count);
@@ -376,10 +333,7 @@ void trig_antiderivative_once_local(const number_t *a_src,
     }
 }
 
-void hyperbolic_antiderivative_once_local(const number_t *a_src,
-                                          const number_t *b_src,
-                                          size_t count,
-                                          number_t *a_dst,
+void hyperbolic_antiderivative_once_local(const number_t *a_src, const number_t *b_src, size_t count, number_t *a_dst,
                                           number_t *b_dst)
 {
     number_array_zero_local(a_dst, count);

@@ -1,9 +1,8 @@
 #ifndef QFLOAT_INTERNAL_H
 #define QFLOAT_INTERNAL_H
 
-#if !defined(MARS_QFLOAT_INTERNAL_ACCESS) && \
-    (!defined(__INTELLISENSE__) || \
-     (defined(__INCLUDE_LEVEL__) && __INCLUDE_LEVEL__ > 0))
+#if !defined(MARS_QFLOAT_INTERNAL_ACCESS) &&                                                                           \
+    (!defined(__INTELLISENSE__) || (defined(__INCLUDE_LEVEL__) && __INCLUDE_LEVEL__ > 0))
 #error "qfloat_internal.h is private to the qfloat module; include qfloat.h instead."
 #endif
 
@@ -47,6 +46,7 @@ static inline int qf_to_int(qfloat_t x)
 
 qfloat_t qf_renorm(double hi, double lo);
 string_t *qf_decimal_digits_text(qfloat_t x, int ndigits, int *out_exp10);
+qfloat_t qf_lommel_s_derivative_internal(qfloat_t mu, qfloat_t nu, qfloat_t argument);
 
 typedef struct qfloat_bernoulli_even_term_t {
     double num;

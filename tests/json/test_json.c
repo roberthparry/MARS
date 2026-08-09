@@ -25,9 +25,7 @@ static bool json_number_equals(const json_t *json, number_t expected)
 {
     number_t actual = NUM_NAN;
     bool ok = json_number_value(json, &actual);
-    bool equal = ok && (num_is_nan(expected)
-        ? num_is_nan(actual)
-        : num_eq(actual, expected));
+    bool equal = ok && (num_is_nan(expected) ? num_is_nan(actual) : num_eq(actual, expected));
 
     if (ok)
         num_destroy(&actual);
@@ -62,12 +60,9 @@ static void test_parse_object_array_and_escapes(void)
     TEST_ASSERT_NOT_NULL(array);
     TEST_ASSERT_TRUE(json_type(array) == JSON_ARRAY, "array member is an array");
     TEST_ASSERT_INT_EQ((int)json_array_size(array), 5);
-    TEST_ASSERT_TRUE(json_bool_value(json_array_get(array, 0), &b) && b,
-                     "true value parses");
-    TEST_ASSERT_TRUE(json_bool_value(json_array_get(array, 1), &b) && !b,
-                     "false value parses");
-    TEST_ASSERT_TRUE(json_type(json_array_get(array, 2)) == JSON_NULL,
-                     "null value parses");
+    TEST_ASSERT_TRUE(json_bool_value(json_array_get(array, 0), &b) && b, "true value parses");
+    TEST_ASSERT_TRUE(json_bool_value(json_array_get(array, 1), &b) && !b, "false value parses");
+    TEST_ASSERT_TRUE(json_type(json_array_get(array, 2)) == JSON_NULL, "null value parses");
 
     number = json_array_get(array, 4);
     TEST_ASSERT_NOT_NULL(number);
@@ -89,8 +84,7 @@ static void test_parse_object_array_and_escapes(void)
 
     nul = object_get_literal(json, "nul");
     TEST_ASSERT_NOT_NULL(nul);
-    TEST_ASSERT_TRUE(string_length(json_string_value(nul)) == 1u,
-                     "escaped NUL is stored as real string content");
+    TEST_ASSERT_TRUE(string_length(json_string_value(nul)) == 1u, "escaped NUL is stored as real string content");
     TEST_ASSERT_TRUE(rune_value(string_at(json_string_value(nul), 0u)) == 0u,
                      "escaped NUL round-trips as a zero-valued rune");
 
@@ -133,26 +127,20 @@ static void test_number_t_extension_round_trip(void)
     TEST_ASSERT_NOT_NULL(complex_json);
     rational_spelling = json_number_text(rational_json);
     TEST_ASSERT_NOT_NULL(rational_spelling);
-    TEST_ASSERT_TRUE(json_array_append(array, rational_json),
-                     "append rational number");
-    TEST_ASSERT_TRUE(json_array_append(array, complex_json),
-                     "append complex number");
+    TEST_ASSERT_TRUE(json_array_append(array, rational_json), "append rational number");
+    TEST_ASSERT_TRUE(json_array_append(array, complex_json), "append complex number");
 
     serialised = json_to_string(array);
     TEST_ASSERT_NOT_NULL(serialised);
-    TEST_ASSERT_TRUE(string_find(serialised, "$mars.number") >= 0,
-                     "extended number envelope is used");
-    TEST_ASSERT_TRUE(string_find_string(serialised, rational_spelling) >= 0,
-                     "rational spelling is preserved");
+    TEST_ASSERT_TRUE(string_find(serialised, "$mars.number") >= 0, "extended number envelope is used");
+    TEST_ASSERT_TRUE(string_find_string(serialised, rational_spelling) >= 0, "rational spelling is preserved");
 
     round_trip = json_from_text(serialised);
     TEST_ASSERT_NOT_NULL(round_trip);
-    TEST_ASSERT_TRUE(json_type(json_array_get(round_trip, 0)) == JSON_NUMBER,
-                     "rational round-trips as a JSON number");
+    TEST_ASSERT_TRUE(json_type(json_array_get(round_trip, 0)) == JSON_NUMBER, "rational round-trips as a JSON number");
     TEST_ASSERT_TRUE(json_number_equals(json_array_get(round_trip, 0), rational),
                      "rational number_t value round-trips");
-    TEST_ASSERT_TRUE(json_type(json_array_get(round_trip, 1)) == JSON_NUMBER,
-                     "complex round-trips as a JSON number");
+    TEST_ASSERT_TRUE(json_type(json_array_get(round_trip, 1)) == JSON_NUMBER, "complex round-trips as a JSON number");
     TEST_ASSERT_TRUE(json_number_equals(json_array_get(round_trip, 1), complex_value),
                      "complex number_t value round-trips");
 
@@ -177,28 +165,21 @@ static void test_number_t_constants_use_math_spelling(void)
     TEST_ASSERT_NOT_NULL(pi);
     serialised = json_to_string(pi);
     TEST_ASSERT_NOT_NULL(serialised);
-    TEST_ASSERT_TRUE(string_find(serialised, "π") >= 0,
-                     "pi serialises using the Greek symbol");
-    TEST_ASSERT_TRUE(string_find(serialised, "NUM_PI") < 0,
-                     "pi does not leak the C identifier");
+    TEST_ASSERT_TRUE(string_find(serialised, "π") >= 0, "pi serialises using the Greek symbol");
+    TEST_ASSERT_TRUE(string_find(serialised, "NUM_PI") < 0, "pi does not leak the C identifier");
 
     round_trip = json_from_text(serialised);
     TEST_ASSERT_NOT_NULL(round_trip);
-    TEST_ASSERT_TRUE(json_type(round_trip) == JSON_NUMBER,
-                     "pi extension parses as a JSON number");
-    TEST_ASSERT_TRUE(json_number_equals(round_trip, NUM_PI),
-                     "pi number_t value round-trips");
+    TEST_ASSERT_TRUE(json_type(round_trip) == JSON_NUMBER, "pi extension parses as a JSON number");
+    TEST_ASSERT_TRUE(json_number_equals(round_trip, NUM_PI), "pi number_t value round-trips");
 
     fallback = json_from_text(fallback_text);
     TEST_ASSERT_NOT_NULL(fallback);
-    TEST_ASSERT_TRUE(json_number_equals(fallback, NUM_PI),
-                     "@pi fallback parses as pi");
+    TEST_ASSERT_TRUE(json_number_equals(fallback, NUM_PI), "@pi fallback parses as pi");
     fallback_serialised = json_to_string(fallback);
     TEST_ASSERT_NOT_NULL(fallback_serialised);
-    TEST_ASSERT_TRUE(string_find(fallback_serialised, "π") >= 0,
-                     "@pi canonicalises back to π");
-    TEST_ASSERT_TRUE(string_find(fallback_serialised, "NUM_PI") < 0,
-                     "@pi fallback does not produce NUM_PI");
+    TEST_ASSERT_TRUE(string_find(fallback_serialised, "π") >= 0, "@pi canonicalises back to π");
+    TEST_ASSERT_TRUE(string_find(fallback_serialised, "NUM_PI") < 0, "@pi fallback does not produce NUM_PI");
 
     string_free(fallback_serialised);
     json_free(fallback);
@@ -229,15 +210,13 @@ static void test_serialise_round_trip(void)
     TEST_ASSERT_TRUE(json_array_append(array, true_value), "append true");
     TEST_ASSERT_TRUE(json_array_append(array, null_value), "append null");
     TEST_ASSERT_TRUE(json_object_set(object, name, text_value), "set string");
-    TEST_ASSERT_TRUE(json_object_set(object, items, array),
-                     "set array");
+    TEST_ASSERT_TRUE(json_object_set(object, items, array), "set array");
 
     serialised = json_to_string_pretty(object, 2);
     TEST_ASSERT_NOT_NULL(serialised);
     round_trip = json_from_text(serialised);
     TEST_ASSERT_NOT_NULL(round_trip);
-    TEST_ASSERT_TRUE(json_type(object_get_literal(round_trip, "items")) == JSON_ARRAY,
-                     "round-tripped array exists");
+    TEST_ASSERT_TRUE(json_type(object_get_literal(round_trip, "items")) == JSON_ARRAY, "round-tripped array exists");
 
     json_free(round_trip);
     string_free(serialised);
@@ -269,8 +248,7 @@ static void test_file_round_trip(void)
 
     loaded = json_from_file(path);
     TEST_ASSERT_NOT_NULL(loaded);
-    TEST_ASSERT_TRUE(json_bool_value(object_get_literal(loaded, "enabled"), &enabled) &&
-                     enabled,
+    TEST_ASSERT_TRUE(json_bool_value(object_get_literal(loaded, "enabled"), &enabled) && enabled,
                      "file round trip preserves boolean");
 
     json_free(loaded);
@@ -379,18 +357,10 @@ int tests_main(void)
     TEST_RUN_IN_GROUP(test_file_round_trip, tests, NULL);
 
     TEST_SECTION("README Output Examples");
-    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_json_parse_and_inspect,
-                                  readme_examples,
-                                  "json,readme,output");
-    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_json_build_and_serialise,
-                                  readme_examples,
-                                  "json,readme,output");
-    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_json_number_fidelity,
-                                  readme_examples,
-                                  "json,readme,output");
-    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_json_file_round_trip,
-                                  readme_examples,
-                                  "json,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_json_parse_and_inspect, readme_examples, "json,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_json_build_and_serialise, readme_examples, "json,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_json_number_fidelity, readme_examples, "json,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_json_file_round_trip, readme_examples, "json,readme,output");
 
     return TEST_EXIT_CODE();
 }

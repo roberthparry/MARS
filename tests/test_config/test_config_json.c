@@ -3,9 +3,7 @@
 #define MARS_TEST_CONFIG_INTERNAL_ACCESS
 #include "test_config_internal.h"
 
-bool test_config_json_object_set_key(json_t *object,
-                                     const string_t *key,
-                                     const json_t *value)
+bool test_config_json_object_set_key(json_t *object, const string_t *key, const json_t *value)
 {
     if (!object || !key || !value)
         return false;
@@ -13,9 +11,7 @@ bool test_config_json_object_set_key(json_t *object,
     return json_object_set(object, key, value);
 }
 
-bool test_config_json_object_set_literal(json_t *object,
-                                         const char *key_text,
-                                         const json_t *value)
+bool test_config_json_object_set_literal(json_t *object, const char *key_text, const json_t *value)
 {
     string_t *key;
     bool ok;
@@ -32,8 +28,7 @@ bool test_config_json_object_set_literal(json_t *object,
     return ok;
 }
 
-const json_t *test_config_json_object_get_literal(const json_t *object,
-                                                  const char *key_text)
+const json_t *test_config_json_object_get_literal(const json_t *object, const char *key_text)
 {
     string_t *key;
     const json_t *value;
@@ -88,16 +83,14 @@ static bool test_config_json_shape_is_supported(const json_t *json, bool file_le
 
         if (!key || !value)
             return false;
-        if (!file_level &&
-            string_view_equals_literal(string_view_all(key), "enabled")) {
+        if (!file_level && string_view_equals_literal(string_view_all(key), "enabled")) {
             if (json_type(value) != JSON_BOOL)
                 return false;
             continue;
         }
         if (json_type(value) == JSON_BOOL)
             continue;
-        if (json_type(value) == JSON_OBJECT &&
-            test_config_json_shape_is_supported(value, false))
+        if (json_type(value) == JSON_OBJECT && test_config_json_shape_is_supported(value, false))
             continue;
         return false;
     }
@@ -105,8 +98,7 @@ static bool test_config_json_shape_is_supported(const json_t *json, bool file_le
     return true;
 }
 
-bool test_config_root_shape_is_supported(const json_t *root,
-                                         test_config_mode_t mode)
+bool test_config_root_shape_is_supported(const json_t *root, test_config_mode_t mode)
 {
     if (!root || json_type(root) != JSON_OBJECT)
         return false;
@@ -126,9 +118,7 @@ bool test_config_root_shape_is_supported(const json_t *root,
     return true;
 }
 
-json_t *test_config_create_pruned_json_object(const json_t *actual,
-                                              const json_t *seen,
-                                              bool file_level)
+json_t *test_config_create_pruned_json_object(const json_t *actual, const json_t *seen, bool file_level)
 {
     json_t *pruned;
 
@@ -158,27 +148,18 @@ json_t *test_config_create_pruned_json_object(const json_t *actual,
         const json_t *actual_value;
         json_t *preserved;
 
-        if (!key || !seen_value ||
-            string_view_equals_literal(string_view_all(key), "enabled"))
+        if (!key || !seen_value || string_view_equals_literal(string_view_all(key), "enabled"))
             continue;
 
-        actual_value = actual && json_type(actual) == JSON_OBJECT
-            ? json_object_get(actual, key)
-            : NULL;
+        actual_value = actual && json_type(actual) == JSON_OBJECT ? json_object_get(actual, key) : NULL;
 
         if (json_type(seen_value) == JSON_OBJECT) {
             preserved = test_config_create_pruned_json_object(
-                (actual_value && json_type(actual_value) == JSON_OBJECT)
-                    ? actual_value
-                    : NULL,
-                seen_value,
-                false);
+                (actual_value && json_type(actual_value) == JSON_OBJECT) ? actual_value : NULL, seen_value, false);
         } else {
-            bool enabled = actual_value
-                ? test_config_value_enabled(
-                    actual_value,
-                    test_config_json_bool_or_default(seen_value, true))
-                : test_config_json_bool_or_default(seen_value, true);
+            bool enabled = actual_value ? test_config_value_enabled(actual_value,
+                                                                    test_config_json_bool_or_default(seen_value, true))
+                                        : test_config_json_bool_or_default(seen_value, true);
 
             preserved = json_new_bool(enabled);
         }

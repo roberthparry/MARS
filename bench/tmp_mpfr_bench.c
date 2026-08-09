@@ -10,7 +10,7 @@ static uint64_t now_ns(void)
     struct timespec ts;
 
     clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (uint64_t) ts.tv_sec * 1000000000ull + (uint64_t) ts.tv_nsec;
+    return (uint64_t)ts.tv_sec * 1000000000ull + (uint64_t)ts.tv_nsec;
 }
 
 static void bench_digamma(mpfr_prec_t prec, int iters)
@@ -38,12 +38,9 @@ static void bench_digamma(mpfr_prec_t prec, int iters)
     }
     end = now_ns();
 
-    avg_ms = ((double) (end - start) / (double) iters) / 1000000.0;
+    avg_ms = ((double)(end - start) / (double)iters) / 1000000.0;
     avg_us = avg_ms * 1000.0;
-    printf("mpfr_digamma(2) bits=%-4lu avg_us=%10.3f avg_ms=%10.3f\n",
-           (unsigned long) prec,
-           avg_us,
-           avg_ms);
+    printf("mpfr_digamma(2) bits=%-4lu avg_us=%10.3f avg_ms=%10.3f\n", (unsigned long)prec, avg_us, avg_ms);
 
     mpfr_clear(src);
     mpfr_clear(value);
@@ -74,13 +71,9 @@ static void bench_ei_value(const char *label, unsigned long input, mpfr_prec_t p
     }
     end = now_ns();
 
-    avg_ms = ((double) (end - start) / (double) iters) / 1000000.0;
+    avg_ms = ((double)(end - start) / (double)iters) / 1000000.0;
     avg_us = avg_ms * 1000.0;
-    printf("%-16s bits=%-4lu avg_us=%10.3f avg_ms=%10.3f\n",
-           label,
-           (unsigned long) prec,
-           avg_us,
-           avg_ms);
+    printf("%-16s bits=%-4lu avg_us=%10.3f avg_ms=%10.3f\n", label, (unsigned long)prec, avg_us, avg_ms);
 
     mpfr_clear(src);
     mpfr_clear(value);
@@ -111,24 +104,16 @@ static void bench_exp_value(const char *label, const char *input, mpfr_prec_t pr
     }
     end = now_ns();
 
-    avg_ms = ((double) (end - start) / (double) iters) / 1000000.0;
+    avg_ms = ((double)(end - start) / (double)iters) / 1000000.0;
     avg_us = avg_ms * 1000.0;
-    printf("%-18s bits=%-4lu avg_us=%10.3f avg_ms=%10.3f\n",
-           label,
-           (unsigned long) prec,
-           avg_us,
-           avg_ms);
+    printf("%-18s bits=%-4lu avg_us=%10.3f avg_ms=%10.3f\n", label, (unsigned long)prec, avg_us, avg_ms);
 
     mpfr_clear(src);
     mpfr_clear(value);
 }
 
-static void bench_binary_value(const char *label,
-                               const char *lhs_text,
-                               const char *rhs_text,
-                               mpfr_prec_t prec,
-                               int iters,
-                               int (*fn)(mpfr_ptr, mpfr_srcptr, mpfr_srcptr, mpfr_rnd_t))
+static void bench_binary_value(const char *label, const char *lhs_text, const char *rhs_text, mpfr_prec_t prec,
+                               int iters, int (*fn)(mpfr_ptr, mpfr_srcptr, mpfr_srcptr, mpfr_rnd_t))
 {
     mpfr_t lhs_src;
     mpfr_t rhs;
@@ -156,13 +141,9 @@ static void bench_binary_value(const char *label,
     }
     end = now_ns();
 
-    avg_ms = ((double) (end - start) / (double) iters) / 1000000.0;
+    avg_ms = ((double)(end - start) / (double)iters) / 1000000.0;
     avg_us = avg_ms * 1000.0;
-    printf("%-22s bits=%-4lu avg_us=%10.3f avg_ms=%10.3f\n",
-           label,
-           (unsigned long) prec,
-           avg_us,
-           avg_ms);
+    printf("%-22s bits=%-4lu avg_us=%10.3f avg_ms=%10.3f\n", label, (unsigned long)prec, avg_us, avg_ms);
 
     mpfr_clear(lhs_src);
     mpfr_clear(rhs);

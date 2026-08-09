@@ -3,8 +3,7 @@
 #define MARS_EXPR_INTEGRATE_INTERNAL_ACCESS
 #include "expr_integrate_internal.h"
 
-expr_t *expr_integrate_build_unsigned_expr_power(const expr_t *base,
-                                                 unsigned int exponent)
+expr_t *expr_integrate_build_unsigned_expr_power(const expr_t *base, unsigned int exponent)
 {
     number_t n;
     expr_t *out;
@@ -24,9 +23,7 @@ expr_t *expr_integrate_build_unsigned_expr_power(const expr_t *base,
     return out;
 }
 
-bool expr_integrate_number_matches_uint_at_most(number_t value,
-                                                unsigned int max_value,
-                                                unsigned int *out)
+bool expr_integrate_number_matches_uint_at_most(number_t value, unsigned int max_value, unsigned int *out)
 {
     for (unsigned int i = 0u; i <= max_value; ++i) {
         number_t candidate = num_create_from_long((long)i);
@@ -43,16 +40,13 @@ bool expr_integrate_number_matches_uint_at_most(number_t value,
     return false;
 }
 
-bool match_exp_proportional_wrt_coeff(const expr_t *expr,
-                                      const expr_t *wrt,
-                                      expr_t **coeff_out)
+bool match_exp_proportional_wrt_coeff(const expr_t *expr, const expr_t *wrt, expr_t **coeff_out)
 {
     expr_t *constant = NULL;
     expr_t *coeff = NULL;
     bool ok = false;
 
-    if (!expr || !wrt || !coeff_out ||
-        !expr->ops || expr->ops->kind != EXPR_KIND_EXP || !expr->a)
+    if (!expr || !wrt || !coeff_out || !expr->ops || expr->ops->kind != EXPR_KIND_EXP || !expr->a)
         return false;
 
     if (!match_symbolic_affine_constant_and_coeff(expr->a, wrt, &constant, &coeff))
@@ -70,9 +64,7 @@ cleanup:
     return ok;
 }
 
-bool expr_integrate_match_wrt_power_factor_exponent(const expr_t *expr,
-                                                    const expr_t *wrt,
-                                                    expr_t **exponent_out)
+bool expr_integrate_match_wrt_power_factor_exponent(const expr_t *expr, const expr_t *wrt, expr_t **exponent_out)
 {
     if (!expr || !wrt || !exponent_out)
         return false;
@@ -82,20 +74,17 @@ bool expr_integrate_match_wrt_power_factor_exponent(const expr_t *expr,
         return *exponent_out != NULL;
     }
 
-    if (expr->ops && expr->ops->kind == EXPR_KIND_SQRT &&
-        expr->a && is_wrt(expr->a, wrt)) {
+    if (expr->ops && expr->ops->kind == EXPR_KIND_SQRT && expr->a && is_wrt(expr->a, wrt)) {
         *exponent_out = expr_new_const(NUM_HALF);
         return *exponent_out != NULL;
     }
 
-    if (expr->ops && expr->ops->kind == EXPR_KIND_POW_D &&
-        expr->a && is_wrt(expr->a, wrt)) {
+    if (expr->ops && expr->ops->kind == EXPR_KIND_POW_D && expr->a && is_wrt(expr->a, wrt)) {
         *exponent_out = expr_new_const(expr->c);
         return *exponent_out != NULL;
     }
 
-    if (expr->ops && expr->ops->kind == EXPR_KIND_POW &&
-        expr->a && expr->b && is_wrt(expr->a, wrt) &&
+    if (expr->ops && expr->ops->kind == EXPR_KIND_POW && expr->a && expr->b && is_wrt(expr->a, wrt) &&
         !depends_on_wrt(expr->b, wrt)) {
         *exponent_out = expr_clone(expr->b);
         return *exponent_out != NULL;
@@ -104,9 +93,7 @@ bool expr_integrate_match_wrt_power_factor_exponent(const expr_t *expr,
     return false;
 }
 
-static bool match_power_exp_product(const expr_t *expr,
-                                    const expr_t *wrt,
-                                    const expr_t **power_out,
+static bool match_power_exp_product(const expr_t *expr, const expr_t *wrt, const expr_t **power_out,
                                     const expr_t **exp_out)
 {
     const expr_t *left = NULL;
@@ -114,8 +101,7 @@ static bool match_power_exp_product(const expr_t *expr,
     expr_t *exponent = NULL;
     expr_t *coeff = NULL;
 
-    if (!expr || !wrt || !power_out || !exp_out ||
-        !expr_match_mul_expr(expr, &left, &right))
+    if (!expr || !wrt || !power_out || !exp_out || !expr_match_mul_expr(expr, &left, &right))
         return false;
 
     if (expr_integrate_match_wrt_power_factor_exponent(left, wrt, &exponent) &&
@@ -145,15 +131,10 @@ static bool match_power_exp_product(const expr_t *expr,
     return false;
 }
 
-enum {
-    polynomial_exp_coeff_count = 5u,
-    polynomial_exp_equation_count =
-        (polynomial_exp_coeff_count - 1u) * 2u
-};
+enum { polynomial_exp_coeff_count = 5u, polynomial_exp_equation_count = (polynomial_exp_coeff_count - 1u) * 2u };
 
-static void polynomial_exp_matrix_zero(
-    number_t matrix[polynomial_exp_equation_count][polynomial_exp_coeff_count],
-    number_t *rhs)
+static void polynomial_exp_matrix_zero(number_t matrix[polynomial_exp_equation_count][polynomial_exp_coeff_count],
+                                       number_t *rhs)
 {
     for (size_t row = 0u; row < polynomial_exp_equation_count; ++row) {
         for (size_t col = 0u; col < polynomial_exp_coeff_count; ++col)
@@ -162,9 +143,8 @@ static void polynomial_exp_matrix_zero(
     }
 }
 
-static void polynomial_exp_matrix_clear(
-    number_t matrix[polynomial_exp_equation_count][polynomial_exp_coeff_count],
-    number_t *rhs)
+static void polynomial_exp_matrix_clear(number_t matrix[polynomial_exp_equation_count][polynomial_exp_coeff_count],
+                                        number_t *rhs)
 {
     for (size_t row = 0u; row < polynomial_exp_equation_count; ++row) {
         for (size_t col = 0u; col < polynomial_exp_coeff_count; ++col)
@@ -181,11 +161,8 @@ static void polynomial_exp_swap_numbers(number_t *left, number_t *right)
     *right = tmp;
 }
 
-static void polynomial_exp_matrix_swap_rows(
-    number_t matrix[polynomial_exp_equation_count][polynomial_exp_coeff_count],
-    number_t *rhs,
-    size_t left,
-    size_t right)
+static void polynomial_exp_matrix_swap_rows(number_t matrix[polynomial_exp_equation_count][polynomial_exp_coeff_count],
+                                            number_t *rhs, size_t left, size_t right)
 {
     if (left == right)
         return;
@@ -203,10 +180,9 @@ static void polynomial_exp_matrix_add_to(number_t *target, number_t value)
     *target = next;
 }
 
-static bool polynomial_exp_solve_linear_system(
-    number_t matrix[polynomial_exp_equation_count][polynomial_exp_coeff_count],
-    number_t *rhs,
-    number_t *solution)
+static bool
+polynomial_exp_solve_linear_system(number_t matrix[polynomial_exp_equation_count][polynomial_exp_coeff_count],
+                                   number_t *rhs, number_t *solution)
 {
     size_t pivot_rows[polynomial_exp_coeff_count];
     bool has_pivot[polynomial_exp_coeff_count];
@@ -217,10 +193,7 @@ static bool polynomial_exp_solve_linear_system(
         has_pivot[col] = false;
     }
 
-    for (size_t col = 0u;
-         col < polynomial_exp_coeff_count &&
-         pivot_row < polynomial_exp_equation_count;
-         ++col) {
+    for (size_t col = 0u; col < polynomial_exp_coeff_count && pivot_row < polynomial_exp_equation_count; ++col) {
         size_t selected = polynomial_exp_equation_count;
 
         for (size_t row = pivot_row; row < polynomial_exp_equation_count; ++row) {
@@ -297,16 +270,13 @@ static bool polynomial_exp_solve_linear_system(
 
     for (size_t col = 0u; col < polynomial_exp_coeff_count; ++col) {
         num_destroy(&solution[col]);
-        solution[col] = has_pivot[col]
-                            ? num_clone(rhs[pivot_rows[col]])
-                            : num_clone(NUM_ZERO);
+        solution[col] = has_pivot[col] ? num_clone(rhs[pivot_rows[col]]) : num_clone(NUM_ZERO);
     }
 
     return true;
 }
 
-static bool polynomial_exp_solve_antiderivative_coeffs(const number_t *integrand,
-                                                       const number_t *exponent,
+static bool polynomial_exp_solve_antiderivative_coeffs(const number_t *integrand, const number_t *exponent,
                                                        number_t *anti)
 {
     number_t matrix[polynomial_exp_equation_count][polynomial_exp_coeff_count];
@@ -321,33 +291,25 @@ static bool polynomial_exp_solve_antiderivative_coeffs(const number_t *integrand
         }
 
         if (row + 1u < polynomial_exp_coeff_count) {
-            number_t derivative_scale =
-                num_create_from_long((long)(row + 1u));
+            number_t derivative_scale = num_create_from_long((long)(row + 1u));
 
-            polynomial_exp_matrix_add_to(&matrix[row][row + 1u],
-                                         derivative_scale);
+            polynomial_exp_matrix_add_to(&matrix[row][row + 1u], derivative_scale);
             num_destroy(&derivative_scale);
         }
 
-        for (size_t exponent_degree = 1u;
-             exponent_degree < polynomial_exp_coeff_count;
-             ++exponent_degree) {
+        for (size_t exponent_degree = 1u; exponent_degree < polynomial_exp_coeff_count; ++exponent_degree) {
             size_t derivative_degree = exponent_degree - 1u;
 
-            if (row < derivative_degree ||
-                row - derivative_degree >= polynomial_exp_coeff_count ||
+            if (row < derivative_degree || row - derivative_degree >= polynomial_exp_coeff_count ||
                 num_is_zero(exponent[exponent_degree])) {
                 continue;
             }
 
             size_t anti_degree = row - derivative_degree;
-            number_t degree_scale =
-                num_create_from_long((long)exponent_degree);
-            number_t derivative_coeff =
-                num_mul(exponent[exponent_degree], degree_scale);
+            number_t degree_scale = num_create_from_long((long)exponent_degree);
+            number_t derivative_coeff = num_mul(exponent[exponent_degree], degree_scale);
 
-            polynomial_exp_matrix_add_to(&matrix[row][anti_degree],
-                                         derivative_coeff);
+            polynomial_exp_matrix_add_to(&matrix[row][anti_degree], derivative_coeff);
             num_destroy(&derivative_coeff);
             num_destroy(&degree_scale);
         }
@@ -378,8 +340,7 @@ static expr_t *polynomial_exp_combine_factors(expr_t *left, expr_t *right)
     return simplify_owned(combined);
 }
 
-static expr_t *polynomial_exp_extract_factor(const expr_t *expr,
-                                             const expr_t **exp_out)
+static expr_t *polynomial_exp_extract_factor(const expr_t *expr, const expr_t **exp_out)
 {
     const expr_t *left = NULL;
     const expr_t *right = NULL;
@@ -413,8 +374,7 @@ static expr_t *polynomial_exp_extract_factor(const expr_t *expr,
     return NULL;
 }
 
-expr_t *integrate_polynomial_times_polynomial_exp(const expr_t *expr,
-                                                  const expr_t *wrt)
+expr_t *integrate_polynomial_times_polynomial_exp(const expr_t *expr, const expr_t *wrt)
 {
     expr_t *poly_expr = NULL;
     const expr_t *exp_expr = NULL;
@@ -442,14 +402,11 @@ expr_t *integrate_polynomial_times_polynomial_exp(const expr_t *expr,
         goto cleanup;
 
     vars[0] = (expr_t *)wrt;
-    if (!expr_match_affine_poly_deg4(exp_expr->a, 1u, vars, exponent,
-                                     &exponent_constant, exponent_coeffs) ||
+    if (!expr_match_affine_poly_deg4(exp_expr->a, 1u, vars, exponent, &exponent_constant, exponent_coeffs) ||
         num_is_zero(exponent_coeffs[0]) ||
-        !expr_match_affine_poly_deg4(poly_expr, 1u, vars, poly,
-                                     &poly_constant, poly_coeffs) ||
-        !expr_integrate_rewrite_poly_deg4_to_affine_basis(
-            poly, poly_constant, poly_coeffs[0],
-            exponent_constant, exponent_coeffs[0])) {
+        !expr_match_affine_poly_deg4(poly_expr, 1u, vars, poly, &poly_constant, poly_coeffs) ||
+        !expr_integrate_rewrite_poly_deg4_to_affine_basis(poly, poly_constant, poly_coeffs[0], exponent_constant,
+                                                          exponent_coeffs[0])) {
         goto cleanup;
     }
 
@@ -464,9 +421,7 @@ expr_t *integrate_polynomial_times_polynomial_exp(const expr_t *expr,
         goto cleanup;
 
     basis = build_affine_from_match(wrt, exponent_constant, exponent_coeffs[0]);
-    anti_poly = basis ? build_polynomial_expr(basis, anti,
-                                              polynomial_exp_coeff_count)
-                      : NULL;
+    anti_poly = basis ? build_polynomial_expr(basis, anti, polynomial_exp_coeff_count) : NULL;
     expr_retain(exp_expr);
     exp_clone = (expr_t *)exp_expr;
     out = (anti_poly && exp_clone) ? expr_mul(anti_poly, exp_clone) : NULL;
@@ -487,10 +442,8 @@ cleanup:
     return out;
 }
 
-static expr_t *build_symbolic_integer_power_exp_integral(unsigned int degree,
-                                                         const expr_t *exp_expr,
-                                                         const expr_t *coeff,
-                                                         const expr_t *wrt)
+static expr_t *build_symbolic_integer_power_exp_integral(unsigned int degree, const expr_t *exp_expr,
+                                                         const expr_t *coeff, const expr_t *wrt)
 {
     expr_t *sum = NULL;
     long falling = 1L;
@@ -528,25 +481,18 @@ static expr_t *build_symbolic_integer_power_exp_integral(unsigned int degree,
             number_t scale = num_new();
             const expr_t *base = NULL;
 
-            if (expr_match_scaled_expr(coeff, &scale, &base) && base &&
-                base != coeff) {
-                number_t scale_power =
-                    num_pow_int(scale, (int)(k + 1u));
+            if (expr_match_scaled_expr(coeff, &scale, &base) && base && base != coeff) {
+                number_t scale_power = num_pow_int(scale, (int)(k + 1u));
                 expr_t *scale_expr = expr_new_const(scale_power);
-                expr_t *base_power =
-                    expr_integrate_build_unsigned_expr_power(
-                        base, k + 1u);
+                expr_t *base_power = expr_integrate_build_unsigned_expr_power(base, k + 1u);
 
-                coeff_power = scale_expr && base_power
-                    ? expr_mul(scale_expr, base_power)
-                    : NULL;
+                coeff_power = scale_expr && base_power ? expr_mul(scale_expr, base_power) : NULL;
                 coeff_power = simplify_owned(coeff_power);
                 expr_free(base_power);
                 expr_free(scale_expr);
                 num_destroy(&scale_power);
             } else {
-                coeff_power = expr_integrate_build_unsigned_expr_power(
-                    coeff, k + 1u);
+                coeff_power = expr_integrate_build_unsigned_expr_power(coeff, k + 1u);
             }
             num_destroy(&scale);
         }
@@ -572,8 +518,7 @@ static expr_t *build_symbolic_integer_power_exp_integral(unsigned int degree,
     return simplify_owned(sum);
 }
 
-expr_t *integrate_symbolic_integer_power_times_exp(const expr_t *expr,
-                                                          const expr_t *wrt)
+expr_t *integrate_symbolic_integer_power_times_exp(const expr_t *expr, const expr_t *wrt)
 {
     const expr_t *power_expr = NULL;
     const expr_t *exp_expr = NULL;
@@ -600,8 +545,7 @@ cleanup:
     return out;
 }
 
-expr_t *integrate_symbolic_power_times_exp_gamma(const expr_t *expr,
-                                                        const expr_t *wrt)
+expr_t *integrate_symbolic_power_times_exp_gamma(const expr_t *expr, const expr_t *wrt)
 {
     const expr_t *power_expr = NULL;
     const expr_t *exp_expr = NULL;
@@ -620,8 +564,7 @@ expr_t *integrate_symbolic_power_times_exp_gamma(const expr_t *expr,
 
     if (!match_power_exp_product(expr, wrt, &power_expr, &exp_expr) ||
         !expr_integrate_match_wrt_power_factor_exponent(power_expr, wrt, &exponent) ||
-        !expr_match_const_value(exponent, &exponent_value) ||
-        !match_exp_proportional_wrt_coeff(exp_expr, wrt, &coeff))
+        !expr_match_const_value(exponent, &exponent_value) || !match_exp_proportional_wrt_coeff(exp_expr, wrt, &coeff))
         goto cleanup;
 
     next_exponent = expr_add_num(exponent, &NUM_ONE);
@@ -629,9 +572,7 @@ expr_t *integrate_symbolic_power_times_exp_gamma(const expr_t *expr,
     arg = (neg_coeff && wrt) ? expr_mul(neg_coeff, wrt) : NULL;
     gamma = (next_exponent && arg) ? expr_gammainc_lower(next_exponent, arg) : NULL;
     log_neg_coeff = neg_coeff ? expr_log(neg_coeff) : NULL;
-    denom_exponent = (next_exponent && log_neg_coeff)
-        ? expr_mul(next_exponent, log_neg_coeff)
-        : NULL;
+    denom_exponent = (next_exponent && log_neg_coeff) ? expr_mul(next_exponent, log_neg_coeff) : NULL;
     denominator = denom_exponent ? expr_exp(denom_exponent) : NULL;
     quotient = (gamma && denominator) ? expr_div(gamma, denominator) : NULL;
     out = simplify_owned(quotient);

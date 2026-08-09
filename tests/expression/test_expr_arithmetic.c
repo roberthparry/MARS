@@ -17,8 +17,8 @@ void test_add(void)
 void test_sub(void)
 {
     expr_t *x0 = test_expr_new_var_d(10);
-    expr_t *c0  = test_expr_new_const_d(4);
-    expr_t *f   = expr_sub(x0, c0);
+    expr_t *c0 = test_expr_new_const_d(4);
+    expr_t *f = expr_sub(x0, c0);
 
     check_q_at(__FILE__, __LINE__, 1, "10-4", expr_eval_qf(f), qf_from_double(6));
     print_expr_of(f);
@@ -32,7 +32,7 @@ void test_mul(void)
 {
     expr_t *c7 = test_expr_new_var_d(7);
     expr_t *c6 = test_expr_new_const_d(6);
-    expr_t *f  = expr_mul(c7, c6);
+    expr_t *f = expr_mul(c7, c6);
 
     check_q_at(__FILE__, __LINE__, 1, "7*6", expr_eval_qf(f), qf_from_double(42));
     print_expr_of(f);
@@ -44,9 +44,9 @@ void test_mul(void)
 
 void test_div(void)
 {
-    expr_t *c7  = test_expr_new_var_d(7);
+    expr_t *c7 = test_expr_new_var_d(7);
     expr_t *c22 = test_expr_new_const_d(22);
-    expr_t *f   = expr_div(c22, c7);
+    expr_t *f = expr_div(c22, c7);
 
     check_q_at(__FILE__, __LINE__, 1, "22/7", expr_eval_qf(f), qf_div(qf_from_double(22), qf_from_double(7)));
     print_expr_of(f);
@@ -58,10 +58,10 @@ void test_div(void)
 
 void test_mixed(void)
 {
-    expr_t *two   = test_expr_new_var_d(2);
+    expr_t *two = test_expr_new_var_d(2);
     expr_t *three = test_expr_new_var_d(3);
-    expr_t *ten   = test_expr_new_var_d(10);
-    expr_t *four  = test_expr_new_var_d(4);
+    expr_t *ten = test_expr_new_var_d(10);
+    expr_t *four = test_expr_new_var_d(4);
 
     expr_t *add_2_3 = expr_add(two, three);
     expr_t *sub_10_4 = expr_sub(ten, four);
@@ -89,7 +89,7 @@ void test_add_num(void)
 {
     number_t scalar = num_create_from_double(2.5);
     expr_t *ten = test_expr_new_const_d(10);
-    expr_t *f   = expr_add_num(ten, &scalar);
+    expr_t *f = expr_add_num(ten, &scalar);
 
     check_q_at(__FILE__, __LINE__, 1, "10+2.5", expr_eval_qf(f), qf_from_double(12.5));
     print_expr_of(f);
@@ -103,7 +103,7 @@ void test_mul_num(void)
 {
     number_t scalar = num_create_from_long(4);
     expr_t *three = test_expr_new_const_d(3);
-    expr_t *f     = expr_mul_num(three, &scalar);
+    expr_t *f = expr_mul_num(three, &scalar);
 
     check_q_at(__FILE__, __LINE__, 1, "3*4", expr_eval_qf(f), qf_from_double(12));
     print_expr_of(f);
@@ -117,7 +117,7 @@ void test_div_num(void)
 {
     number_t scalar = num_create_from_long(3);
     expr_t *nine = test_expr_new_const_d(9);
-    expr_t *f    = expr_div_num(nine, &scalar);
+    expr_t *f = expr_div_num(nine, &scalar);
 
     check_q_at(__FILE__, __LINE__, 1, "9/3", expr_eval_qf(f), qf_from_double(3));
     print_expr_of(f);

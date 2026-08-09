@@ -44,8 +44,7 @@ matrix_t *mat_deriv(const matrix_t *A, expr_t *wrt)
     return D;
 }
 
-expr_t *mat_deriv_trace_by_name(const matrix_t *A, mat_bindings_t *bindings,
-                                const char *name)
+expr_t *mat_deriv_trace_by_name(const matrix_t *A, mat_bindings_t *bindings, const char *name)
 {
     expr_t *binding;
 
@@ -59,8 +58,7 @@ expr_t *mat_deriv_trace_by_name(const matrix_t *A, mat_bindings_t *bindings,
     return mat_deriv_trace(A, binding);
 }
 
-matrix_t *mat_deriv_by_name(const matrix_t *A, mat_bindings_t *bindings,
-                            const char *name)
+matrix_t *mat_deriv_by_name(const matrix_t *A, mat_bindings_t *bindings, const char *name)
 {
     expr_t *binding;
 
@@ -114,8 +112,7 @@ expr_t *mat_deriv_det(const matrix_t *A, expr_t *wrt)
     return deriv;
 }
 
-expr_t *mat_deriv_det_by_name(const matrix_t *A, mat_bindings_t *bindings,
-                              const char *name)
+expr_t *mat_deriv_det_by_name(const matrix_t *A, mat_bindings_t *bindings, const char *name)
 {
     expr_t *binding;
 
@@ -173,8 +170,7 @@ cleanup:
     return out;
 }
 
-matrix_t *mat_deriv_inverse_by_name(const matrix_t *A, mat_bindings_t *bindings,
-                                    const char *name)
+matrix_t *mat_deriv_inverse_by_name(const matrix_t *A, mat_bindings_t *bindings, const char *name)
 {
     expr_t *binding;
 
@@ -234,9 +230,7 @@ cleanup:
     return out;
 }
 
-matrix_t *mat_deriv_block_inverse_by_name(const matrix_t *A, size_t split,
-                                          mat_bindings_t *bindings,
-                                          const char *name)
+matrix_t *mat_deriv_block_inverse_by_name(const matrix_t *A, size_t split, mat_bindings_t *bindings, const char *name)
 {
     expr_t *binding;
 
@@ -297,8 +291,7 @@ matrix_t *mat_jacobian(const matrix_t *A, expr_t *const *vars, size_t nvars)
     return J;
 }
 
-matrix_t *mat_jacobian_by_names(const matrix_t *A, mat_bindings_t *bindings,
-                                const char *const *names, size_t nnames)
+matrix_t *mat_jacobian_by_names(const matrix_t *A, mat_bindings_t *bindings, const char *const *names, size_t nnames)
 {
     expr_t **vars = NULL;
     matrix_t *J = NULL;
@@ -383,8 +376,7 @@ cleanup:
     return dX;
 }
 
-matrix_t *mat_deriv_block_solve_by_name(const matrix_t *A, const matrix_t *B, size_t split,
-                                        mat_bindings_t *bindings,
+matrix_t *mat_deriv_block_solve_by_name(const matrix_t *A, const matrix_t *B, size_t split, mat_bindings_t *bindings,
                                         const char *name)
 {
     expr_t *binding;
@@ -448,9 +440,7 @@ cleanup:
     return dX;
 }
 
-matrix_t *mat_deriv_solve_by_name(const matrix_t *A, const matrix_t *B,
-                                  mat_bindings_t *bindings,
-                                  const char *name)
+matrix_t *mat_deriv_solve_by_name(const matrix_t *A, const matrix_t *B, mat_bindings_t *bindings, const char *name)
 {
     expr_t *binding;
 

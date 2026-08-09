@@ -6,12 +6,9 @@ TEST_SUITE_SETUP(test_matrix_suite_setup);
 
 static bool test_matrix_suite_setup(void)
 {
-    test_register_validity_checker("matrix-double-default",
-                                   matrix_validity_contract_double_default());
-    test_register_validity_checker("matrix-mp-real-default",
-                                   matrix_validity_contract_mp_real_default());
-    test_register_validity_checker("matrix-complex-default",
-                                   matrix_validity_contract_complex_default());
+    test_register_validity_checker("matrix-double-default", matrix_validity_contract_double_default());
+    test_register_validity_checker("matrix-mp-real-default", matrix_validity_contract_mp_real_default());
+    test_register_validity_checker("matrix-complex-default", matrix_validity_contract_complex_default());
     return TEST_REQUIRE_VALIDITY_CHECKER("matrix-double-default") &&
            TEST_REQUIRE_VALIDITY_CHECKER("matrix-mp-real-default") &&
            TEST_REQUIRE_VALIDITY_CHECKER("matrix-complex-default");
@@ -19,19 +16,14 @@ static bool test_matrix_suite_setup(void)
 
 static int run_readme_example(void)
 {
-    number_t A_vals[4] = {
-        num_create_from_long(2),
-        num_create_from_string("1 + i"),
-        num_create_from_string("1 - i"),
-        num_create_from_long(3)
-    };
+    number_t A_vals[4] = {num_create_from_long(2), num_create_from_string("1 + i"), num_create_from_string("1 - i"),
+                          num_create_from_long(3)};
     matrix_t *A = mat_create(2, 2, A_vals);
 
     number_t eigenvalues[2] = {NUM_ZERO, NUM_ZERO};
     matrix_t *evecs = NULL;
 
-    if (!A)
-    {
+    if (!A) {
         for (size_t i = 0; i < 4; ++i)
             num_destroy(&A_vals[i]);
         num_destroy(&eigenvalues[0]);
@@ -39,8 +31,7 @@ static int run_readme_example(void)
         return 1;
     }
 
-    if (mat_eigendecompose(A, eigenvalues, &evecs) != 0 || !evecs)
-    {
+    if (mat_eigendecompose(A, eigenvalues, &evecs) != 0 || !evecs) {
         for (size_t i = 0; i < 4; ++i)
             num_destroy(&A_vals[i]);
         num_destroy(&eigenvalues[0]);
@@ -67,9 +58,7 @@ static int run_readme_string_quantum_example(void)
     mat_bindings_t *bindings = NULL;
     number_t delta = num_create_from_double(1.5);
     number_t omega = num_create_from_double(0.25);
-    matrix_t *H = mat_from_string_expr(
-        "(@DELTA, @OMEGA; @OMEGA, -@DELTA)",
-        &bindings);
+    matrix_t *H = mat_from_string_expr("(@DELTA, @OMEGA; @OMEGA, -@DELTA)", &bindings);
     matrix_t *H2 = NULL;
     matrix_t *P = NULL;
     expr_t *evals[2] = {NULL, NULL};
@@ -83,8 +72,7 @@ static int run_readme_string_quantum_example(void)
     if (!H)
         return 1;
 
-    if (!mat_bindings_get(bindings, "@DELTA") ||
-        !mat_bindings_get(bindings, "@OMEGA")) {
+    if (!mat_bindings_get(bindings, "@DELTA") || !mat_bindings_get(bindings, "@OMEGA")) {
         num_destroy(&omega);
         num_destroy(&delta);
         mat_bindings_free(bindings);
@@ -208,12 +196,9 @@ int tests_main(void)
     TEST_RUN_IN_GROUP(run_matrix_output_tests, tests, NULL);
 
     TEST_SECTION("README");
-    TEST_RUN_OUTPUT_IN_GROUP_TAGS(test_readme_example_hermitian_eigendecomposition,
-                                  readme_examples,
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(test_readme_example_hermitian_eigendecomposition, readme_examples,
                                   "matrix,readme,output");
-    TEST_RUN_OUTPUT_IN_GROUP_TAGS(test_readme_example_string_quantum,
-                                  readme_examples,
-                                  "matrix,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(test_readme_example_string_quantum, readme_examples, "matrix,readme,output");
 
     clear_matrix_input_context();
     return TESTS_EXIT_CODE();

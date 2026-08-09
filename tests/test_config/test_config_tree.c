@@ -5,19 +5,15 @@
 
 static bool test_config_ascii_is_alpha_or_underscore(char ch)
 {
-    return (ch >= 'A' && ch <= 'Z') ||
-           (ch >= 'a' && ch <= 'z') ||
-           ch == '_';
+    return (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') || ch == '_';
 }
 
 static bool test_config_ascii_is_name_char(char ch)
 {
-    return test_config_ascii_is_alpha_or_underscore(ch) ||
-           (ch >= '0' && ch <= '9');
+    return test_config_ascii_is_alpha_or_underscore(ch) || (ch >= '0' && ch <= '9');
 }
 
-static bool test_config_cursor_peek_ascii(const string_cursor_t *cursor,
-                                          char *out)
+static bool test_config_cursor_peek_ascii(const string_cursor_t *cursor, char *out)
 {
     unsigned char ch = 0u;
 
@@ -132,9 +128,7 @@ json_t *test_config_ensure_group_path(json_t *object, const string_t *path)
     return current;
 }
 
-bool test_config_find_group_with_effective_enabled(json_t *object,
-                                                   const string_t *path,
-                                                   json_t **out_group,
+bool test_config_find_group_with_effective_enabled(json_t *object, const string_t *path, json_t **out_group,
                                                    bool *out_enabled)
 {
     string_cursor_t *cursor;

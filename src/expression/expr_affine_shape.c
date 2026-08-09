@@ -57,12 +57,8 @@ static void expr_copy_number_array(number_t *dst, const number_t *src, size_t n)
     }
 }
 
-static bool expr_match_affine_term(const expr_t *dv,
-                                 size_t nvars,
-                                 expr_t *const *vars,
-                                 number_t scale,
-                                 number_t *constant_io,
-                                 number_t *coeffs_io)
+static bool expr_match_affine_term(const expr_t *dv, size_t nvars, expr_t *const *vars, number_t scale,
+                                   number_t *constant_io, number_t *coeffs_io)
 {
     NUM_SCOPE(scope);
     number_t constant = num_new();
@@ -173,45 +169,16 @@ static bool expr_match_affine_term(const expr_t *dv,
     return false;
 }
 
-static bool expr_affine_unary_kind_to_op(expr_pattern_unary_affine_kind_t kind,
-                                       expr_op_kind_t *op_kind_out)
+static bool expr_affine_unary_kind_to_op(expr_pattern_unary_affine_kind_t kind, expr_op_kind_t *op_kind_out)
 {
     static const expr_op_kind_t unary_op_table[] = {
-        EXPR_KIND_EXP,
-        EXPR_KIND_LOG,
-        EXPR_KIND_LOG10,
-        EXPR_KIND_SIN,
-        EXPR_KIND_COS,
-        EXPR_KIND_TAN,
-        EXPR_KIND_SEC,
-        EXPR_KIND_COSEC,
-        EXPR_KIND_COT,
-        EXPR_KIND_SINH,
-        EXPR_KIND_COSH,
-        EXPR_KIND_COSECH,
-        EXPR_KIND_TANH,
-        EXPR_KIND_SECH,
-        EXPR_KIND_COTH,
-        EXPR_KIND_ASIN,
-        EXPR_KIND_ACOS,
-        EXPR_KIND_ATAN,
-        EXPR_KIND_ASEC,
-        EXPR_KIND_ACOSEC,
-        EXPR_KIND_ACOT,
-        EXPR_KIND_ASINH,
-        EXPR_KIND_ACOSH,
-        EXPR_KIND_ATANH,
-        EXPR_KIND_ASECH,
-        EXPR_KIND_ACOSECH,
-        EXPR_KIND_ACOTH,
-        EXPR_KIND_ERF,
-        EXPR_KIND_ERFC,
-        EXPR_KIND_NORMAL_PDF,
-        EXPR_KIND_NORMAL_CDF,
-        EXPR_KIND_NORMAL_LOGPDF,
-        EXPR_KIND_EI,
-        EXPR_KIND_E1
-    };
+        EXPR_KIND_EXP,        EXPR_KIND_LOG,           EXPR_KIND_LOG10, EXPR_KIND_SIN,   EXPR_KIND_COS,
+        EXPR_KIND_TAN,        EXPR_KIND_SEC,           EXPR_KIND_COSEC, EXPR_KIND_COT,   EXPR_KIND_SINH,
+        EXPR_KIND_COSH,       EXPR_KIND_COSECH,        EXPR_KIND_TANH,  EXPR_KIND_SECH,  EXPR_KIND_COTH,
+        EXPR_KIND_ASIN,       EXPR_KIND_ACOS,          EXPR_KIND_ATAN,  EXPR_KIND_ASEC,  EXPR_KIND_ACOSEC,
+        EXPR_KIND_ACOT,       EXPR_KIND_ASINH,         EXPR_KIND_ACOSH, EXPR_KIND_ATANH, EXPR_KIND_ASECH,
+        EXPR_KIND_ACOSECH,    EXPR_KIND_ACOTH,         EXPR_KIND_ERF,   EXPR_KIND_ERFC,  EXPR_KIND_NORMAL_PDF,
+        EXPR_KIND_NORMAL_CDF, EXPR_KIND_NORMAL_LOGPDF, EXPR_KIND_EI,    EXPR_KIND_E1};
 
     if (!op_kind_out)
         return false;
@@ -223,12 +190,8 @@ static bool expr_affine_unary_kind_to_op(expr_pattern_unary_affine_kind_t kind,
     return true;
 }
 
-static bool expr_match_unary_affine_op(const expr_t *expr,
-                                     expr_op_kind_t op_kind,
-                                     size_t nvars,
-                                     expr_t *const *vars,
-                                     number_t *constant_out,
-                                     number_t *coeffs_out)
+static bool expr_match_unary_affine_op(const expr_t *expr, expr_op_kind_t op_kind, size_t nvars, expr_t *const *vars,
+                                       number_t *constant_out, number_t *coeffs_out)
 {
     NUM_SCOPE(scope);
     number_t constant = num_clone(NUM_ZERO);
@@ -255,12 +218,9 @@ static bool expr_match_unary_affine_op(const expr_t *expr,
     return true;
 }
 
-static bool expr_match_unary_affine_kind_num_local(const expr_t *expr,
-                                                 expr_pattern_unary_affine_kind_t kind,
-                                                 size_t nvars,
-                                                 expr_t *const *vars,
-                                                 number_t *constant_out,
-                                                 number_t *coeffs_out)
+static bool expr_match_unary_affine_kind_num_local(const expr_t *expr, expr_pattern_unary_affine_kind_t kind,
+                                                   size_t nvars, expr_t *const *vars, number_t *constant_out,
+                                                   number_t *coeffs_out)
 {
     expr_op_kind_t op_kind;
 
@@ -270,12 +230,8 @@ static bool expr_match_unary_affine_kind_num_local(const expr_t *expr,
     return expr_match_unary_affine_op(expr, op_kind, nvars, vars, constant_out, coeffs_out);
 }
 
-bool expr_match_unary_affine_kind(const expr_t *expr,
-                                expr_pattern_unary_affine_kind_t kind,
-                                size_t nvars,
-                                expr_t *const *vars,
-                                number_t *constant_out,
-                                number_t *coeffs_out)
+bool expr_match_unary_affine_kind(const expr_t *expr, expr_pattern_unary_affine_kind_t kind, size_t nvars,
+                                  expr_t *const *vars, number_t *constant_out, number_t *coeffs_out)
 {
     if (!constant_out)
         return false;
@@ -305,15 +261,13 @@ static bool expr_match_affine_power_mul_deg3(const expr_t *expr, const expr_t **
 
     if (expr_match_binary_op(expr, EXPR_KIND_MUL, &left, &right) &&
         expr_match_binary_op(left, EXPR_KIND_MUL, &inner_left, &inner_right) &&
-        expr_struct_eq(inner_left, inner_right) &&
-        expr_struct_eq(inner_left, right)) {
+        expr_struct_eq(inner_left, inner_right) && expr_struct_eq(inner_left, right)) {
         *base_out = inner_left;
         return true;
     }
 
     if (expr_match_binary_op(expr, EXPR_KIND_MUL, &left, &right) &&
-        expr_match_binary_op(right, EXPR_KIND_MUL, &inner_left, &inner_right) &&
-        expr_struct_eq(left, inner_left) &&
+        expr_match_binary_op(right, EXPR_KIND_MUL, &inner_left, &inner_right) && expr_struct_eq(left, inner_left) &&
         expr_struct_eq(left, inner_right)) {
         *base_out = left;
         return true;
@@ -332,24 +286,17 @@ static bool expr_match_affine_power_mul_deg4(const expr_t *expr, const expr_t **
     const expr_t *rr = NULL;
 
     if (!expr_match_binary_op(expr, EXPR_KIND_MUL, &left, &right) ||
-        !expr_match_binary_op(left, EXPR_KIND_MUL, &ll, &lr) ||
-        !expr_match_binary_op(right, EXPR_KIND_MUL, &rl, &rr))
+        !expr_match_binary_op(left, EXPR_KIND_MUL, &ll, &lr) || !expr_match_binary_op(right, EXPR_KIND_MUL, &rl, &rr))
         return false;
-    if (!expr_struct_eq(ll, lr) ||
-        !expr_struct_eq(ll, rl) ||
-        !expr_struct_eq(ll, rr))
+    if (!expr_struct_eq(ll, lr) || !expr_struct_eq(ll, rl) || !expr_struct_eq(ll, rr))
         return false;
 
     *base_out = ll;
     return true;
 }
 
-static bool expr_match_affine_power_exact(const expr_t *expr,
-                                        size_t nvars,
-                                        expr_t *const *vars,
-                                        size_t degree,
-                                        number_t *constant_out,
-                                        number_t *coeffs_out)
+static bool expr_match_affine_power_exact(const expr_t *expr, size_t nvars, expr_t *const *vars, size_t degree,
+                                          number_t *constant_out, number_t *coeffs_out)
 {
     NUM_SCOPE(scope);
     const expr_t *arg = NULL;
@@ -357,19 +304,14 @@ static bool expr_match_affine_power_exact(const expr_t *expr,
     number_t constant = num_clone(NUM_ZERO);
     number_t degree_num = num_create_from_long((long)degree);
     typedef bool (*expr_affine_power_mul_match_fn)(const expr_t *, const expr_t **);
-    static const expr_affine_power_mul_match_fn mul_matchers[] = {
-        NULL,
-        NULL,
-        expr_match_affine_power_mul_deg2,
-        expr_match_affine_power_mul_deg3,
-        expr_match_affine_power_mul_deg4
-    };
+    static const expr_affine_power_mul_match_fn mul_matchers[] = {NULL, NULL, expr_match_affine_power_mul_deg2,
+                                                                  expr_match_affine_power_mul_deg3,
+                                                                  expr_match_affine_power_mul_deg4};
 
     if (!expr || !constant_out || !coeffs_out || (nvars > 0 && !vars))
         return false;
 
-    if (expr_match_unary_op(expr, EXPR_KIND_POW_D, &arg) &&
-        num_eq(expr->c, degree_num)) {
+    if (expr_match_unary_op(expr, EXPR_KIND_POW_D, &arg) && num_eq(expr->c, degree_num)) {
         expr_reset_number_array(coeffs_out, nvars);
         if (!expr_match_affine_term(arg, nvars, vars, NUM_ONE, &constant, coeffs_out)) {
             num_destroy(&constant);
@@ -380,8 +322,7 @@ static bool expr_match_affine_power_exact(const expr_t *expr,
         return true;
     }
 
-    if (degree < (sizeof(mul_matchers) / sizeof(mul_matchers[0])) &&
-        mul_matchers[degree] &&
+    if (degree < (sizeof(mul_matchers) / sizeof(mul_matchers[0])) && mul_matchers[degree] &&
         mul_matchers[degree](expr, &mul_base)) {
         expr_reset_number_array(coeffs_out, nvars);
         if (!expr_match_affine_term(mul_base, nvars, vars, NUM_ONE, &constant, coeffs_out)) {
@@ -396,11 +337,8 @@ static bool expr_match_affine_power_exact(const expr_t *expr,
     return false;
 }
 
-static bool expr_affine_equal(size_t nvars,
-                            number_t constant_a,
-                            const number_t *coeffs_a,
-                            number_t constant_b,
-                            const number_t *coeffs_b)
+static bool expr_affine_equal(size_t nvars, number_t constant_a, const number_t *coeffs_a, number_t constant_b,
+                              const number_t *coeffs_b)
 {
     if (!num_eq(constant_a, constant_b))
         return false;
@@ -410,12 +348,8 @@ static bool expr_affine_equal(size_t nvars,
     return true;
 }
 
-static bool expr_match_affine_power_deg4(const expr_t *expr,
-                                       size_t nvars,
-                                       expr_t *const *vars,
-                                       size_t *degree_out,
-                                       number_t *constant_out,
-                                       number_t *coeffs_out)
+static bool expr_match_affine_power_deg4(const expr_t *expr, size_t nvars, expr_t *const *vars, size_t *degree_out,
+                                         number_t *constant_out, number_t *coeffs_out)
 {
     NUM_SCOPE(scope);
     number_t constant = num_clone(NUM_ZERO);
@@ -459,13 +393,9 @@ static bool expr_match_affine_power_deg4(const expr_t *expr,
     return false;
 }
 
-static bool expr_match_scaled_affine_power_deg4(const expr_t *expr,
-                                              size_t nvars,
-                                              expr_t *const *vars,
-                                              number_t *scale_out,
-                                              size_t *degree_out,
-                                              number_t *constant_out,
-                                              number_t *coeffs_out)
+static bool expr_match_scaled_affine_power_deg4(const expr_t *expr, size_t nvars, expr_t *const *vars,
+                                                number_t *scale_out, size_t *degree_out, number_t *constant_out,
+                                                number_t *coeffs_out)
 {
     NUM_SCOPE(scope);
     number_t inner_scale = num_new();
@@ -493,8 +423,7 @@ static bool expr_match_scaled_affine_power_deg4(const expr_t *expr,
         return true;
     }
 
-    if (expr_match_scaled_expr(expr, &inner_scale, &base) &&
-        num_is_real(inner_scale) &&
+    if (expr_match_scaled_expr(expr, &inner_scale, &base) && num_is_real(inner_scale) &&
         expr_match_affine_power_deg4(base, nvars, vars, degree_out, constant_out, coeffs_out)) {
         num_destroy(scale_out);
         *scale_out = num_scope_detach(inner_scale);
@@ -515,13 +444,9 @@ static bool expr_affine_is_zero(size_t nvars, number_t constant, const number_t 
     return true;
 }
 
-static bool expr_match_affine_poly_deg4_rec(const expr_t *expr,
-                                          size_t nvars,
-                                          expr_t *const *vars,
-                                          number_t *poly_coeffs_out,
-                                          number_t *constant_io,
-                                          number_t *coeffs_io,
-                                          bool *have_basis_io)
+static bool expr_match_affine_poly_deg4_rec(const expr_t *expr, size_t nvars, expr_t *const *vars,
+                                            number_t *poly_coeffs_out, number_t *constant_io, number_t *coeffs_io,
+                                            bool *have_basis_io)
 {
     NUM_SCOPE(scope);
     number_t subtree_scale = num_new();
@@ -557,8 +482,7 @@ static bool expr_match_affine_poly_deg4_rec(const expr_t *expr,
     expr_zero_number_array(poly_left, 5);
     expr_zero_number_array(poly_right, 5);
 
-    ok = expr_match_scaled_affine_power_deg4(expr, nvars, vars, &scale, &degree,
-                                           &term_constant, term_coeffs);
+    ok = expr_match_scaled_affine_power_deg4(expr, nvars, vars, &scale, &degree, &term_constant, term_coeffs);
     if (ok) {
         expr_reset_number_array(poly_coeffs_out, 5);
         if (!num_is_real(scale)) {
@@ -577,8 +501,7 @@ static bool expr_match_affine_poly_deg4_rec(const expr_t *expr,
         poly_coeffs_out[degree] = num_scope_detach(num_clone(scale));
 
         if (degree > 0) {
-            if (*have_basis_io &&
-                !expr_affine_equal(nvars, *constant_io, coeffs_io, term_constant, term_coeffs)) {
+            if (*have_basis_io && !expr_affine_equal(nvars, *constant_io, coeffs_io, term_constant, term_coeffs)) {
                 expr_destroy_number_array(term_coeffs, nvars);
                 term_coeffs = NULL;
                 expr_clear_number_array(poly_left, 5);
@@ -611,10 +534,8 @@ static bool expr_match_affine_poly_deg4_rec(const expr_t *expr,
     expr_destroy_number_array(term_coeffs, nvars);
     term_coeffs = NULL;
 
-    if (expr_match_scaled_expr(expr, &subtree_scale, &scaled_base) &&
-        num_is_real(subtree_scale) &&
-        expr_match_affine_poly_deg4_rec(scaled_base, nvars, vars, poly_left,
-                                      constant_io, coeffs_io, have_basis_io)) {
+    if (expr_match_scaled_expr(expr, &subtree_scale, &scaled_base) && num_is_real(subtree_scale) &&
+        expr_match_affine_poly_deg4_rec(scaled_base, nvars, vars, poly_left, constant_io, coeffs_io, have_basis_io)) {
         for (size_t i = 0; i < 5; ++i) {
             num_destroy(&poly_coeffs_out[i]);
             poly_coeffs_out[i] = num_scope_detach(num_mul(subtree_scale, poly_left[i]));
@@ -644,10 +565,9 @@ static bool expr_match_affine_poly_deg4_rec(const expr_t *expr,
             num_destroy(&right_constant);
             return false;
         }
-        if (!expr_match_affine_poly_deg4_rec(left, nvars, vars, poly_left,
-                                           &left_constant, left_coeffs, &have_left) ||
-            !expr_match_affine_poly_deg4_rec(right, nvars, vars, poly_right,
-                                           &right_constant, right_coeffs, &have_right)) {
+        if (!expr_match_affine_poly_deg4_rec(left, nvars, vars, poly_left, &left_constant, left_coeffs, &have_left) ||
+            !expr_match_affine_poly_deg4_rec(right, nvars, vars, poly_right, &right_constant, right_coeffs,
+                                             &have_right)) {
             expr_destroy_number_array(left_coeffs, nvars);
             expr_destroy_number_array(right_coeffs, nvars);
             expr_clear_number_array(poly_left, 5);
@@ -676,9 +596,8 @@ static bool expr_match_affine_poly_deg4_rec(const expr_t *expr,
 
         for (size_t i = 0; i < 5; ++i) {
             num_destroy(&poly_coeffs_out[i]);
-            poly_coeffs_out[i] = num_scope_detach(
-                is_sub ? num_sub(poly_left[i], poly_right[i])
-                       : num_add(poly_left[i], poly_right[i]));
+            poly_coeffs_out[i] =
+                num_scope_detach(is_sub ? num_sub(poly_left[i], poly_right[i]) : num_add(poly_left[i], poly_right[i]));
         }
 
         if (have_left) {
@@ -720,12 +639,9 @@ static bool expr_match_affine_poly_deg4_rec(const expr_t *expr,
     return false;
 }
 
-static bool expr_match_affine_poly_deg4_num_local(const expr_t *expr,
-                                                size_t nvars,
-                                                expr_t *const *vars,
-                                                number_t *poly_coeffs_out,
-                                                number_t *constant_out,
-                                                number_t *coeffs_out)
+static bool expr_match_affine_poly_deg4_num_local(const expr_t *expr, size_t nvars, expr_t *const *vars,
+                                                  number_t *poly_coeffs_out, number_t *constant_out,
+                                                  number_t *coeffs_out)
 {
     NUM_SCOPE(scope);
     bool have_basis = false;
@@ -737,8 +653,7 @@ static bool expr_match_affine_poly_deg4_num_local(const expr_t *expr,
     expr_reset_number_array(coeffs_out, nvars);
     expr_reset_number_array(poly_coeffs_out, 5);
 
-    if (!expr_match_affine_poly_deg4_rec(expr, nvars, vars, poly_coeffs_out,
-                                       &constant, coeffs_out, &have_basis)) {
+    if (!expr_match_affine_poly_deg4_rec(expr, nvars, vars, poly_coeffs_out, &constant, coeffs_out, &have_basis)) {
         expr_clear_number_array(poly_coeffs_out, 5);
         expr_clear_number_array(coeffs_out, nvars);
         expr_zero_number_array(poly_coeffs_out, 5);
@@ -748,22 +663,16 @@ static bool expr_match_affine_poly_deg4_num_local(const expr_t *expr,
     }
 
     num_destroy(constant_out);
-    *constant_out = have_basis ? num_scope_detach(constant)
-                               : num_scope_detach(num_clone(NUM_ZERO));
+    *constant_out = have_basis ? num_scope_detach(constant) : num_scope_detach(num_clone(NUM_ZERO));
     return true;
 }
 
-bool expr_match_affine_poly_deg4(const expr_t *expr,
-                               size_t nvars,
-                               expr_t *const *vars,
-                               number_t *poly_coeffs_out,
-                               number_t *constant_out,
-                               number_t *coeffs_out)
+bool expr_match_affine_poly_deg4(const expr_t *expr, size_t nvars, expr_t *const *vars, number_t *poly_coeffs_out,
+                                 number_t *constant_out, number_t *coeffs_out)
 {
     if (!constant_out)
         return false;
-    return expr_match_affine_poly_deg4_num_local(expr, nvars, vars,
-                                               poly_coeffs_out, constant_out, coeffs_out);
+    return expr_match_affine_poly_deg4_num_local(expr, nvars, vars, poly_coeffs_out, constant_out, coeffs_out);
 }
 
 static number_t expr_pow_small_number(number_t base, size_t exponent)
@@ -779,20 +688,11 @@ static number_t expr_pow_small_number(number_t base, size_t exponent)
     return out;
 }
 
-static bool expr_rewrite_poly_deg4_basis(number_t *poly_coeffs,
-                                       size_t nvars,
-                                       number_t from_constant,
-                                       const number_t *from_coeffs,
-                                       number_t to_constant,
-                                       const number_t *to_coeffs)
+static bool expr_rewrite_poly_deg4_basis(number_t *poly_coeffs, size_t nvars, number_t from_constant,
+                                         const number_t *from_coeffs, number_t to_constant, const number_t *to_coeffs)
 {
     static const long binomial[5][5] = {
-        { 1, 0, 0, 0, 0 },
-        { 1, 1, 0, 0, 0 },
-        { 1, 2, 1, 0, 0 },
-        { 1, 3, 3, 1, 0 },
-        { 1, 4, 6, 4, 1 }
-    };
+        {1, 0, 0, 0, 0}, {1, 1, 0, 0, 0}, {1, 2, 1, 0, 0}, {1, 3, 3, 1, 0}, {1, 4, 6, 4, 1}};
     number_t alpha;
     number_t scaled_to_constant;
     number_t beta;
@@ -850,14 +750,10 @@ static bool expr_same_var_local(const expr_t *left, const expr_t *right)
 {
     if (!left || !right || !expr_is_var(left) || !expr_is_var(right))
         return false;
-    return left == right ||
-           (left->var_id != 0u &&
-            right->var_id != 0u &&
-            left->var_id == right->var_id);
+    return left == right || (left->var_id != 0u && right->var_id != 0u && left->var_id == right->var_id);
 }
 
-static bool expr_collect_single_var_local(const expr_t *expr,
-                                          const expr_t **var_io)
+static bool expr_collect_single_var_local(const expr_t *expr, const expr_t **var_io)
 {
     if (!expr)
         return true;
@@ -868,13 +764,10 @@ static bool expr_collect_single_var_local(const expr_t *expr,
         }
         return expr_same_var_local(*var_io, expr);
     }
-    return expr_collect_single_var_local(expr->a, var_io) &&
-           expr_collect_single_var_local(expr->b, var_io);
+    return expr_collect_single_var_local(expr->a, var_io) && expr_collect_single_var_local(expr->b, var_io);
 }
 
-static bool expr_poly_deg4_multiply_local(const number_t *left,
-                                          const number_t *right,
-                                          number_t *out)
+static bool expr_poly_deg4_multiply_local(const number_t *left, const number_t *right, number_t *out)
 {
     number_t product[9];
     bool fits = true;
@@ -923,9 +816,7 @@ static long expr_poly_deg4_exponent_local(number_t value)
     return -1L;
 }
 
-static bool expr_collect_poly_deg4_local(const expr_t *expr,
-                                         const expr_t *var,
-                                         number_t *out)
+static bool expr_collect_poly_deg4_local(const expr_t *expr, const expr_t *var, number_t *out)
 {
     number_t value = num_new();
     const expr_t *left = NULL;
@@ -958,12 +849,10 @@ static bool expr_collect_poly_deg4_local(const expr_t *expr,
 
         expr_zero_number_array(left_poly, 5);
         expr_zero_number_array(right_poly, 5);
-        ok = expr_collect_poly_deg4_local(left, var, left_poly) &&
-             expr_collect_poly_deg4_local(right, var, right_poly);
+        ok = expr_collect_poly_deg4_local(left, var, left_poly) && expr_collect_poly_deg4_local(right, var, right_poly);
         if (ok) {
             for (size_t i = 0; i < 5u; ++i) {
-                number_t sum = is_sub ? num_sub(left_poly[i], right_poly[i])
-                                      : num_add(left_poly[i], right_poly[i]);
+                number_t sum = is_sub ? num_sub(left_poly[i], right_poly[i]) : num_add(left_poly[i], right_poly[i]);
 
                 num_destroy(&out[i]);
                 out[i] = sum;
@@ -1064,15 +953,12 @@ bool expr_collect_single_var(const expr_t *expr, const expr_t **var_out)
     return expr_collect_single_var_local(expr, var_out);
 }
 
-bool expr_collect_poly_deg4(const expr_t *expr,
-                            const expr_t *var,
-                            number_t *coeffs_out)
+bool expr_collect_poly_deg4(const expr_t *expr, const expr_t *var, number_t *coeffs_out)
 {
     return expr_collect_poly_deg4_local(expr, var, coeffs_out);
 }
 
-bool expr_polynomials_equal_deg4(const expr_t *left,
-                                 const expr_t *right)
+bool expr_polynomials_equal_deg4(const expr_t *left, const expr_t *right)
 {
     const expr_t *var = NULL;
     number_t left_poly[5];
@@ -1082,14 +968,11 @@ bool expr_polynomials_equal_deg4(const expr_t *left,
     expr_zero_number_array(left_poly, 5);
     expr_zero_number_array(right_poly, 5);
 
-    if (!left || !right ||
-        !expr_collect_single_var_local(left, &var) ||
-        !expr_collect_single_var_local(right, &var) ||
+    if (!left || !right || !expr_collect_single_var_local(left, &var) || !expr_collect_single_var_local(right, &var) ||
         !var)
         goto cleanup;
 
-    if (!expr_collect_poly_deg4_local(left, var, left_poly) ||
-        !expr_collect_poly_deg4_local(right, var, right_poly))
+    if (!expr_collect_poly_deg4_local(left, var, left_poly) || !expr_collect_poly_deg4_local(right, var, right_poly))
         goto cleanup;
 
     equal = true;
@@ -1113,8 +996,7 @@ bool expr_polynomial_is_zero_deg4(const expr_t *expr)
     bool is_zero = false;
 
     expr_zero_number_array(poly, 5);
-    if (!expr || !expr_collect_single_var_local(expr, &var) || !var ||
-        !expr_collect_poly_deg4_local(expr, var, poly))
+    if (!expr || !expr_collect_single_var_local(expr, &var) || !var || !expr_collect_poly_deg4_local(expr, var, poly))
         goto cleanup;
 
     is_zero = true;
@@ -1130,13 +1012,9 @@ cleanup:
     return is_zero;
 }
 
-static bool expr_match_affine_poly_deg4_times_unary_affine_op(const expr_t *expr,
-                                                            expr_op_kind_t kind,
-                                                            size_t nvars,
-                                                            expr_t *const *vars,
-                                                            number_t *poly_coeffs_out,
-                                                            number_t *constant_out,
-                                                            number_t *coeffs_out)
+static bool expr_match_affine_poly_deg4_times_unary_affine_op(const expr_t *expr, expr_op_kind_t kind, size_t nvars,
+                                                              expr_t *const *vars, number_t *poly_coeffs_out,
+                                                              number_t *constant_out, number_t *coeffs_out)
 {
     NUM_SCOPE(scope);
     const expr_t *left = NULL;
@@ -1168,16 +1046,13 @@ static bool expr_match_affine_poly_deg4_times_unary_affine_op(const expr_t *expr
 
     if (expr_match_unary_affine_op(right, kind, nvars, vars, &unary_constant, unary_coeffs) &&
         expr_match_affine_poly_deg4_num_local(left, nvars, vars, poly_terms, &poly_constant, poly_coeffs) &&
-        expr_rewrite_poly_deg4_basis(poly_terms, nvars, poly_constant, poly_coeffs,
-                                     unary_constant, unary_coeffs)) {
+        expr_rewrite_poly_deg4_basis(poly_terms, nvars, poly_constant, poly_coeffs, unary_constant, unary_coeffs)) {
         matched = true;
     }
 
-    if (!matched &&
-        expr_match_unary_affine_op(left, kind, nvars, vars, &unary_constant, unary_coeffs) &&
+    if (!matched && expr_match_unary_affine_op(left, kind, nvars, vars, &unary_constant, unary_coeffs) &&
         expr_match_affine_poly_deg4_num_local(right, nvars, vars, poly_terms, &poly_constant, poly_coeffs) &&
-        expr_rewrite_poly_deg4_basis(poly_terms, nvars, poly_constant, poly_coeffs,
-                                     unary_constant, unary_coeffs)) {
+        expr_rewrite_poly_deg4_basis(poly_terms, nvars, poly_constant, poly_coeffs, unary_constant, unary_coeffs)) {
         matched = true;
     }
 
@@ -1197,33 +1072,26 @@ static bool expr_match_affine_poly_deg4_times_unary_affine_op(const expr_t *expr
 }
 
 static bool expr_match_affine_poly_deg4_times_unary_affine_kind_num_local(const expr_t *expr,
-                                                                        expr_pattern_unary_affine_kind_t kind,
-                                                                        size_t nvars,
-                                                                        expr_t *const *vars,
-                                                                        number_t *poly_coeffs_out,
-                                                                        number_t *constant_out,
-                                                                        number_t *coeffs_out)
+                                                                          expr_pattern_unary_affine_kind_t kind,
+                                                                          size_t nvars, expr_t *const *vars,
+                                                                          number_t *poly_coeffs_out,
+                                                                          number_t *constant_out, number_t *coeffs_out)
 {
     expr_op_kind_t op_kind;
 
     if (!expr_affine_unary_kind_to_op(kind, &op_kind))
         return false;
 
-    return expr_match_affine_poly_deg4_times_unary_affine_op(expr, op_kind, nvars, vars,
-                                                           poly_coeffs_out, constant_out,
-                                                           coeffs_out);
+    return expr_match_affine_poly_deg4_times_unary_affine_op(expr, op_kind, nvars, vars, poly_coeffs_out, constant_out,
+                                                             coeffs_out);
 }
 
-bool expr_match_affine_poly_deg4_times_unary_affine_kind(const expr_t *expr,
-                                                       expr_pattern_unary_affine_kind_t kind,
-                                                       size_t nvars,
-                                                       expr_t *const *vars,
-                                                       number_t *poly_coeffs_out,
-                                                       number_t *constant_out,
-                                                       number_t *coeffs_out)
+bool expr_match_affine_poly_deg4_times_unary_affine_kind(const expr_t *expr, expr_pattern_unary_affine_kind_t kind,
+                                                         size_t nvars, expr_t *const *vars, number_t *poly_coeffs_out,
+                                                         number_t *constant_out, number_t *coeffs_out)
 {
     if (!constant_out)
         return false;
-    return expr_match_affine_poly_deg4_times_unary_affine_kind_num_local(
-        expr, kind, nvars, vars, poly_coeffs_out, constant_out, coeffs_out);
+    return expr_match_affine_poly_deg4_times_unary_affine_kind_num_local(expr, kind, nvars, vars, poly_coeffs_out,
+                                                                         constant_out, coeffs_out);
 }

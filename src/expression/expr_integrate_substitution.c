@@ -18,10 +18,7 @@ typedef struct {
     long value;
 } substitution_poly_term_spec_t;
 
-enum {
-    substitution_poly_coeffs = 65u,
-    substitution_poly_term_spec_capacity = 2u
-};
+enum { substitution_poly_coeffs = 65u, substitution_poly_term_spec_capacity = 2u };
 
 typedef struct {
     number_t constant[substitution_poly_coeffs];
@@ -48,10 +45,7 @@ typedef struct {
     substitution_poly_term_spec_t companion_square[substitution_poly_term_spec_capacity];
 } exp_unary_substitution_rule_spec_t;
 
-typedef enum {
-    EXP_UNARY_PAIR_CONSTANT,
-    EXP_UNARY_PAIR_COMPANION
-} exp_unary_pair_slot_t;
+typedef enum { EXP_UNARY_PAIR_CONSTANT, EXP_UNARY_PAIR_COMPANION } exp_unary_pair_slot_t;
 
 typedef struct {
     expr_op_kind_t squared_kind;
@@ -89,8 +83,7 @@ typedef struct {
 enum {
     exp_unary_rule_kind_first = EXPR_KIND_SIN,
     exp_unary_rule_kind_last = EXPR_KIND_COTH,
-    exp_unary_rule_kind_count =
-        exp_unary_rule_kind_last - exp_unary_rule_kind_first + 1,
+    exp_unary_rule_kind_count = exp_unary_rule_kind_last - exp_unary_rule_kind_first + 1,
     exp_unary_double_angle_trig_kind_first = EXPR_KIND_SIN,
     exp_unary_double_angle_trig_kind_last = EXPR_KIND_COS,
     exp_unary_double_angle_hyperbolic_kind_first = EXPR_KIND_SINH,
@@ -98,205 +91,79 @@ enum {
 };
 
 static const exp_unary_rule_entry_t exp_unary_rule_entries[] = {
-    {
-        .substitution = {
-            true, EXPR_KIND_COS,
-            1u, { { 0u, 1 } },
-            1u, { { 1u, -1 } },
-            2u, { { 0u, 1 }, { 2u, -1 } }
-        },
-        .double_angle = {
-            .entries = {
-                [EXP_UNARY_DOUBLE_ANGLE_OUTER_SIN] = {
-                    true, EXP_UNARY_PAIR_COMPANION, 1u, { { 1u, 2 } }
-                },
-                [EXP_UNARY_DOUBLE_ANGLE_OUTER_COS] = {
-                    true, EXP_UNARY_PAIR_CONSTANT, 2u, { { 0u, 1 }, { 2u, -2 } }
-                }
-            }
-        }
-    },
-    {
-        .substitution = {
-            true, EXPR_KIND_SIN,
-            1u, { { 0u, -1 } },
-            1u, { { 1u, 1 } },
-            2u, { { 0u, 1 }, { 2u, -1 } }
-        },
-        .double_angle = {
-            .entries = {
-                [EXP_UNARY_DOUBLE_ANGLE_OUTER_SIN] = {
-                    true, EXP_UNARY_PAIR_COMPANION, 1u, { { 1u, 2 } }
-                },
-                [EXP_UNARY_DOUBLE_ANGLE_OUTER_COS] = {
-                    true, EXP_UNARY_PAIR_CONSTANT, 2u, { { 0u, -1 }, { 2u, 2 } }
-                }
-            }
-        }
-    },
-    {
-        .substitution = {
-            false, EXPR_KIND_CONST,
-            2u, { { 0u, 1 }, { 2u, 1 } },
-            0u, { { 0u, 0 } },
-            0u, { { 0u, 0 } }
-        },
-        .has_square_relation = true,
-        .square_relation = { EXPR_KIND_SEC, 2u, { { 0u, 1 }, { 2u, 1 } } }
-    },
-    {
-        .substitution = {
-            true, EXPR_KIND_TAN,
-            1u, { { 1u, 1 } },
-            1u, { { 2u, 1 } },
-            2u, { { 0u, -1 }, { 2u, 1 } }
-        }
-    },
-    {
-        .substitution = {
-            true, EXPR_KIND_COT,
-            1u, { { 1u, -1 } },
-            1u, { { 2u, -1 } },
-            2u, { { 0u, -1 }, { 2u, 1 } }
-        }
-    },
-    {
-        .substitution = {
-            false, EXPR_KIND_CONST,
-            2u, { { 0u, -1 }, { 2u, -1 } },
-            0u, { { 0u, 0 } },
-            0u, { { 0u, 0 } }
-        },
-        .has_square_relation = true,
-        .square_relation = { EXPR_KIND_COSEC, 2u, { { 0u, 1 }, { 2u, 1 } } }
-    },
-    {
-        .substitution = {
-            true, EXPR_KIND_COSH,
-            1u, { { 0u, 1 } },
-            1u, { { 1u, 1 } },
-            2u, { { 0u, 1 }, { 2u, 1 } }
-        },
-        .double_angle = {
-            .entries = {
-                [EXP_UNARY_DOUBLE_ANGLE_OUTER_SINH] = {
-                    true, EXP_UNARY_PAIR_COMPANION, 1u, { { 1u, 2 } }
-                },
-                [EXP_UNARY_DOUBLE_ANGLE_OUTER_COSH] = {
-                    true, EXP_UNARY_PAIR_CONSTANT, 2u, { { 0u, 1 }, { 2u, 2 } }
-                }
-            }
-        }
-    },
-    {
-        .substitution = {
-            true, EXPR_KIND_SINH,
-            1u, { { 0u, 1 } },
-            1u, { { 1u, 1 } },
-            2u, { { 0u, -1 }, { 2u, 1 } }
-        },
-        .double_angle = {
-            .entries = {
-                [EXP_UNARY_DOUBLE_ANGLE_OUTER_SINH] = {
-                    true, EXP_UNARY_PAIR_COMPANION, 1u, { { 1u, 2 } }
-                },
-                [EXP_UNARY_DOUBLE_ANGLE_OUTER_COSH] = {
-                    true, EXP_UNARY_PAIR_CONSTANT, 2u, { { 0u, -1 }, { 2u, 2 } }
-                }
-            }
-        }
-    },
-    {
-        .substitution = {
-            false, EXPR_KIND_CONST,
-            2u, { { 0u, 1 }, { 2u, -1 } },
-            0u, { { 0u, 0 } },
-            0u, { { 0u, 0 } }
-        },
-        .has_square_relation = true,
-        .square_relation = { EXPR_KIND_SECH, 2u, { { 0u, 1 }, { 2u, -1 } } }
-    },
-    {
-        .substitution = {
-            true, EXPR_KIND_TANH,
-            1u, { { 1u, -1 } },
-            1u, { { 2u, 1 } },
-            2u, { { 0u, 1 }, { 2u, -1 } }
-        }
-    },
-    {
-        .substitution = {
-            true, EXPR_KIND_COTH,
-            1u, { { 1u, -1 } },
-            1u, { { 2u, -1 } },
-            2u, { { 0u, 1 }, { 2u, 1 } }
-        }
-    },
-    {
-        .substitution = {
-            false, EXPR_KIND_CONST,
-            2u, { { 0u, 1 }, { 2u, -1 } },
-            0u, { { 0u, 0 } },
-            0u, { { 0u, 0 } }
-        },
-        .has_square_relation = true,
-        .square_relation = { EXPR_KIND_COSECH, 2u, { { 0u, -1 }, { 2u, 1 } } }
-    }
-};
+    {.substitution = {true, EXPR_KIND_COS, 1u, {{0u, 1}}, 1u, {{1u, -1}}, 2u, {{0u, 1}, {2u, -1}}},
+     .double_angle =
+         {.entries = {[EXP_UNARY_DOUBLE_ANGLE_OUTER_SIN] = {true, EXP_UNARY_PAIR_COMPANION, 1u, {{1u, 2}}},
+                      [EXP_UNARY_DOUBLE_ANGLE_OUTER_COS] = {true, EXP_UNARY_PAIR_CONSTANT, 2u, {{0u, 1}, {2u, -2}}}}}},
+    {.substitution = {true, EXPR_KIND_SIN, 1u, {{0u, -1}}, 1u, {{1u, 1}}, 2u, {{0u, 1}, {2u, -1}}},
+     .double_angle = {.entries = {[EXP_UNARY_DOUBLE_ANGLE_OUTER_SIN] = {true, EXP_UNARY_PAIR_COMPANION, 1u, {{1u, 2}}},
+                                  [EXP_UNARY_DOUBLE_ANGLE_OUTER_COS] =
+                                      {true, EXP_UNARY_PAIR_CONSTANT, 2u, {{0u, -1}, {2u, 2}}}}}},
+    {.substitution = {false, EXPR_KIND_CONST, 2u, {{0u, 1}, {2u, 1}}, 0u, {{0u, 0}}, 0u, {{0u, 0}}},
+     .has_square_relation = true,
+     .square_relation = {EXPR_KIND_SEC, 2u, {{0u, 1}, {2u, 1}}}},
+    {.substitution = {true, EXPR_KIND_TAN, 1u, {{1u, 1}}, 1u, {{2u, 1}}, 2u, {{0u, -1}, {2u, 1}}}},
+    {.substitution = {true, EXPR_KIND_COT, 1u, {{1u, -1}}, 1u, {{2u, -1}}, 2u, {{0u, -1}, {2u, 1}}}},
+    {.substitution = {false, EXPR_KIND_CONST, 2u, {{0u, -1}, {2u, -1}}, 0u, {{0u, 0}}, 0u, {{0u, 0}}},
+     .has_square_relation = true,
+     .square_relation = {EXPR_KIND_COSEC, 2u, {{0u, 1}, {2u, 1}}}},
+    {.substitution = {true, EXPR_KIND_COSH, 1u, {{0u, 1}}, 1u, {{1u, 1}}, 2u, {{0u, 1}, {2u, 1}}},
+     .double_angle = {.entries = {[EXP_UNARY_DOUBLE_ANGLE_OUTER_SINH] = {true, EXP_UNARY_PAIR_COMPANION, 1u, {{1u, 2}}},
+                                  [EXP_UNARY_DOUBLE_ANGLE_OUTER_COSH] =
+                                      {true, EXP_UNARY_PAIR_CONSTANT, 2u, {{0u, 1}, {2u, 2}}}}}},
+    {.substitution = {true, EXPR_KIND_SINH, 1u, {{0u, 1}}, 1u, {{1u, 1}}, 2u, {{0u, -1}, {2u, 1}}},
+     .double_angle = {.entries = {[EXP_UNARY_DOUBLE_ANGLE_OUTER_SINH] = {true, EXP_UNARY_PAIR_COMPANION, 1u, {{1u, 2}}},
+                                  [EXP_UNARY_DOUBLE_ANGLE_OUTER_COSH] =
+                                      {true, EXP_UNARY_PAIR_CONSTANT, 2u, {{0u, -1}, {2u, 2}}}}}},
+    {.substitution = {false, EXPR_KIND_CONST, 2u, {{0u, 1}, {2u, -1}}, 0u, {{0u, 0}}, 0u, {{0u, 0}}},
+     .has_square_relation = true,
+     .square_relation = {EXPR_KIND_SECH, 2u, {{0u, 1}, {2u, -1}}}},
+    {.substitution = {true, EXPR_KIND_TANH, 1u, {{1u, -1}}, 1u, {{2u, 1}}, 2u, {{0u, 1}, {2u, -1}}}},
+    {.substitution = {true, EXPR_KIND_COTH, 1u, {{1u, -1}}, 1u, {{2u, -1}}, 2u, {{0u, 1}, {2u, 1}}}},
+    {.substitution = {false, EXPR_KIND_CONST, 2u, {{0u, 1}, {2u, -1}}, 0u, {{0u, 0}}, 0u, {{0u, 0}}},
+     .has_square_relation = true,
+     .square_relation = {EXPR_KIND_COSECH, 2u, {{0u, -1}, {2u, 1}}}}};
 
-_Static_assert(sizeof(exp_unary_rule_entries) / sizeof(exp_unary_rule_entries[0]) ==
-                   exp_unary_rule_kind_count,
+_Static_assert(sizeof(exp_unary_rule_entries) / sizeof(exp_unary_rule_entries[0]) == exp_unary_rule_kind_count,
                "exp_unary_rule_entries must follow EXPR_KIND_SIN..EXPR_KIND_COTH");
 
-static const exp_unary_rule_entry_t *
-exp_unary_rule_entry_for_kind(expr_op_kind_t kind)
+static const exp_unary_rule_entry_t *exp_unary_rule_entry_for_kind(expr_op_kind_t kind)
 {
     unsigned int index = 0u;
 
-    if ((unsigned)kind < (unsigned)exp_unary_rule_kind_first ||
-        (unsigned)kind > (unsigned)exp_unary_rule_kind_last) {
+    if ((unsigned)kind < (unsigned)exp_unary_rule_kind_first || (unsigned)kind > (unsigned)exp_unary_rule_kind_last) {
         return NULL;
     }
 
     index = (unsigned)kind - (unsigned)exp_unary_rule_kind_first;
-    if (index >= sizeof(exp_unary_rule_entries) /
-                 sizeof(exp_unary_rule_entries[0])) {
+    if (index >= sizeof(exp_unary_rule_entries) / sizeof(exp_unary_rule_entries[0])) {
         return NULL;
     }
 
     return &exp_unary_rule_entries[index];
 }
 
-static exp_unary_double_angle_outer_slot_t
-exp_unary_double_angle_outer_slot_for_kind(expr_op_kind_t kind)
+static exp_unary_double_angle_outer_slot_t exp_unary_double_angle_outer_slot_for_kind(expr_op_kind_t kind)
 {
     if ((unsigned)kind >= (unsigned)exp_unary_double_angle_trig_kind_first &&
         (unsigned)kind <= (unsigned)exp_unary_double_angle_trig_kind_last) {
-        return (exp_unary_double_angle_outer_slot_t)
-            (EXP_UNARY_DOUBLE_ANGLE_OUTER_SIN +
-             ((unsigned)kind -
-              (unsigned)exp_unary_double_angle_trig_kind_first));
+        return (
+            exp_unary_double_angle_outer_slot_t)(EXP_UNARY_DOUBLE_ANGLE_OUTER_SIN +
+                                                 ((unsigned)kind - (unsigned)exp_unary_double_angle_trig_kind_first));
     }
 
-    if ((unsigned)kind >=
-            (unsigned)exp_unary_double_angle_hyperbolic_kind_first &&
-        (unsigned)kind <=
-            (unsigned)exp_unary_double_angle_hyperbolic_kind_last) {
-        return (exp_unary_double_angle_outer_slot_t)
-            (EXP_UNARY_DOUBLE_ANGLE_OUTER_SINH +
-             ((unsigned)kind -
-              (unsigned)exp_unary_double_angle_hyperbolic_kind_first));
+    if ((unsigned)kind >= (unsigned)exp_unary_double_angle_hyperbolic_kind_first &&
+        (unsigned)kind <= (unsigned)exp_unary_double_angle_hyperbolic_kind_last) {
+        return (exp_unary_double_angle_outer_slot_t)(EXP_UNARY_DOUBLE_ANGLE_OUTER_SINH +
+                                                     ((unsigned)kind -
+                                                      (unsigned)exp_unary_double_angle_hyperbolic_kind_first));
     }
 
     return EXP_UNARY_DOUBLE_ANGLE_OUTER_INVALID;
 }
 
-static bool collect_substitution_candidates(const expr_t *expr,
-                                            const expr_t *root,
-                                            const expr_t *wrt,
-                                            const expr_t **candidates,
-                                            size_t *count,
-                                            size_t capacity)
+static bool collect_substitution_candidates(const expr_t *expr, const expr_t *root, const expr_t *wrt,
+                                            const expr_t **candidates, size_t *count, size_t capacity)
 {
     substitution_candidate_frame_t *stack = NULL;
     size_t stack_count = 0u;
@@ -310,7 +177,7 @@ static bool collect_substitution_candidates(const expr_t *expr,
     stack = malloc(stack_capacity * sizeof(*stack));
     if (!stack)
         return false;
-    stack[stack_count++] = (substitution_candidate_frame_t){ expr, false };
+    stack[stack_count++] = (substitution_candidate_frame_t){expr, false};
 
     while (stack_count > 0u && *count < capacity) {
         substitution_candidate_frame_t frame = stack[--stack_count];
@@ -325,8 +192,7 @@ static bool collect_substitution_candidates(const expr_t *expr,
 
                 while (stack_count + 3u > next_capacity)
                     next_capacity *= 2u;
-                substitution_candidate_frame_t *grown =
-                    realloc(stack, next_capacity * sizeof(*stack));
+                substitution_candidate_frame_t *grown = realloc(stack, next_capacity * sizeof(*stack));
 
                 if (!grown) {
                     ok = false;
@@ -335,16 +201,15 @@ static bool collect_substitution_candidates(const expr_t *expr,
                 stack = grown;
                 stack_capacity = next_capacity;
             }
-            stack[stack_count++] = (substitution_candidate_frame_t){ node, true };
+            stack[stack_count++] = (substitution_candidate_frame_t){node, true};
             if (node->b)
-                stack[stack_count++] = (substitution_candidate_frame_t){ node->b, false };
+                stack[stack_count++] = (substitution_candidate_frame_t){node->b, false};
             if (node->a)
-                stack[stack_count++] = (substitution_candidate_frame_t){ node->a, false };
+                stack[stack_count++] = (substitution_candidate_frame_t){node->a, false};
             continue;
         }
 
-        if (node == root || node == wrt || node->ops->arity == EXPR_OP_ATOM ||
-            !depends_on_wrt(node, wrt)) {
+        if (node == root || node == wrt || node->ops->arity == EXPR_OP_ATOM || !depends_on_wrt(node, wrt)) {
             continue;
         }
 
@@ -356,8 +221,7 @@ static bool collect_substitution_candidates(const expr_t *expr,
         candidates[*count] = node;
         ++(*count);
 
-next_node:
-        ;
+    next_node:;
     }
 
 cleanup:
@@ -365,14 +229,10 @@ cleanup:
     return ok;
 }
 
-static bool expr_matches_unary_arg(const expr_t *expr,
-                                   expr_op_kind_t kind,
-                                   const expr_t *arg);
+static bool expr_matches_unary_arg(const expr_t *expr, expr_op_kind_t kind, const expr_t *arg);
 
-static expr_t *substitution_build_replacement_poly_from_specs(
-    const expr_t *replacement,
-    const substitution_poly_term_spec_t *terms,
-    size_t count)
+static expr_t *substitution_build_replacement_poly_from_specs(const expr_t *replacement,
+                                                              const substitution_poly_term_spec_t *terms, size_t count)
 {
     expr_t *sum = NULL;
 
@@ -410,8 +270,7 @@ static expr_t *substitution_build_replacement_poly_from_specs(
     return simplify_owned(sum);
 }
 
-static expr_t *substitute_candidate_square_relation(const expr_t *expr,
-                                                    const expr_t *candidate,
+static expr_t *substitute_candidate_square_relation(const expr_t *expr, const expr_t *candidate,
                                                     const expr_t *replacement)
 {
     const exp_unary_rule_entry_t *entry = NULL;
@@ -422,23 +281,18 @@ static expr_t *substitute_candidate_square_relation(const expr_t *expr,
     number_t exponent = num_new();
     expr_t *out = NULL;
 
-    if (!expr || !candidate || !replacement ||
-        !candidate->ops || !candidate->a) {
+    if (!expr || !candidate || !replacement || !candidate->ops || !candidate->a) {
         goto cleanup;
     }
 
-    if (expr->ops && expr->ops->kind == EXPR_KIND_POW_D &&
-        expr->a && num_eq(expr->c, NUM_TWO)) {
+    if (expr->ops && expr->ops->kind == EXPR_KIND_POW_D && expr->a && num_eq(expr->c, NUM_TWO)) {
         base = expr->a;
-    } else if (expr->ops && expr->ops->kind == EXPR_KIND_POW &&
-               expr->a && expr->b &&
-               expr_match_const_value(expr->b, &exponent) &&
-               num_eq(exponent, NUM_TWO)) {
+    } else if (expr->ops && expr->ops->kind == EXPR_KIND_POW && expr->a && expr->b &&
+               expr_match_const_value(expr->b, &exponent) && num_eq(exponent, NUM_TWO)) {
         base = expr->a;
     }
 
-    if (!base || !base->ops || !base->a ||
-        !expr_simplify_same_factor(base->a, candidate->a)) {
+    if (!base || !base->ops || !base->a || !expr_simplify_same_factor(base->a, candidate->a)) {
         goto cleanup;
     }
 
@@ -450,24 +304,16 @@ static expr_t *substitute_candidate_square_relation(const expr_t *expr,
 
     entry = exp_unary_rule_entry_for_kind(candidate->ops->kind);
     substitution = entry ? &entry->substitution : NULL;
-    if (substitution &&
-        substitution->has_companion &&
-        base_kind == substitution->companion_kind) {
-        out = substitution_build_replacement_poly_from_specs(
-            replacement,
-            substitution->companion_square,
-            substitution->companion_square_count);
+    if (substitution && substitution->has_companion && base_kind == substitution->companion_kind) {
+        out = substitution_build_replacement_poly_from_specs(replacement, substitution->companion_square,
+                                                             substitution->companion_square_count);
         goto cleanup;
     }
 
-    square_relation = (entry && entry->has_square_relation)
-                          ? &entry->square_relation
-                          : NULL;
+    square_relation = (entry && entry->has_square_relation) ? &entry->square_relation : NULL;
     if (square_relation && base_kind == square_relation->squared_kind) {
-        out = substitution_build_replacement_poly_from_specs(
-            replacement,
-            square_relation->terms,
-            square_relation->term_count);
+        out = substitution_build_replacement_poly_from_specs(replacement, square_relation->terms,
+                                                             square_relation->term_count);
         goto cleanup;
     }
 
@@ -476,9 +322,7 @@ cleanup:
     return out;
 }
 
-static expr_t *substitute_candidate_with_powers(const expr_t *expr,
-                                                const expr_t *candidate,
-                                                const expr_t *replacement)
+static expr_t *substitute_candidate_with_powers(const expr_t *expr, const expr_t *candidate, const expr_t *replacement)
 {
     expr_t *left = NULL;
     expr_t *right = NULL;
@@ -493,8 +337,7 @@ static expr_t *substitute_candidate_with_powers(const expr_t *expr,
         return (expr_t *)replacement;
     }
 
-    if (expr->ops && expr->ops->kind == EXPR_KIND_POW_D && expr->a &&
-        expr_equal_exact_local(expr->a, candidate)) {
+    if (expr->ops && expr->ops->kind == EXPR_KIND_POW_D && expr->a && expr_equal_exact_local(expr->a, candidate)) {
         return expr_pow(replacement, &expr->c);
     }
 
@@ -517,8 +360,7 @@ static expr_t *substitute_candidate_with_powers(const expr_t *expr,
 
     if (candidate && candidate->ops && candidate->a)
         reciprocal_ops = expr_ops_reciprocal_unary(candidate->ops);
-    if (reciprocal_ops && expr_matches_unary_arg(expr, reciprocal_ops->kind,
-                                                candidate->a)) {
+    if (reciprocal_ops && expr_matches_unary_arg(expr, reciprocal_ops->kind, candidate->a)) {
         number_t exponent = num_neg(NUM_ONE);
 
         out = expr_pow(replacement, &exponent);
@@ -526,8 +368,7 @@ static expr_t *substitute_candidate_with_powers(const expr_t *expr,
         return out;
     }
 
-    if (reciprocal_ops && expr->ops && expr->a &&
-        expr_matches_unary_arg(expr->a, reciprocal_ops->kind, candidate->a) &&
+    if (reciprocal_ops && expr->ops && expr->a && expr_matches_unary_arg(expr->a, reciprocal_ops->kind, candidate->a) &&
         expr->ops->kind == EXPR_KIND_POW_D) {
         number_t exponent = num_neg(expr->c);
 
@@ -537,8 +378,7 @@ static expr_t *substitute_candidate_with_powers(const expr_t *expr,
     }
 
     if (reciprocal_ops && expr->ops && expr->a && expr->b &&
-        expr_matches_unary_arg(expr->a, reciprocal_ops->kind, candidate->a) &&
-        expr->ops->kind == EXPR_KIND_POW) {
+        expr_matches_unary_arg(expr->a, reciprocal_ops->kind, candidate->a) && expr->ops->kind == EXPR_KIND_POW) {
         number_t exponent = num_new();
         bool matched = expr_match_const_value(expr->b, &exponent);
 
@@ -609,14 +449,12 @@ static bool expr_contains_division_or_inverse_power(const expr_t *expr)
         goto cleanup;
     }
 
-    if (expr->ops->kind == EXPR_KIND_POW_D &&
-        num_is_real(expr->c) && num_lt(expr->c, NUM_ZERO)) {
+    if (expr->ops->kind == EXPR_KIND_POW_D && num_is_real(expr->c) && num_lt(expr->c, NUM_ZERO)) {
         found = true;
         goto cleanup;
     }
 
-    if (expr->ops->kind == EXPR_KIND_POW && expr->b &&
-        expr_match_const_value(expr->b, &exponent) &&
+    if (expr->ops->kind == EXPR_KIND_POW && expr->b && expr_match_const_value(expr->b, &exponent) &&
         num_is_real(exponent) && num_lt(exponent, NUM_ZERO)) {
         found = true;
         goto cleanup;
@@ -625,8 +463,7 @@ static bool expr_contains_division_or_inverse_power(const expr_t *expr)
     if (expr->ops->arity == EXPR_OP_UNARY) {
         found = expr_contains_division_or_inverse_power(expr->a);
     } else if (expr->ops->arity == EXPR_OP_BINARY) {
-        found = expr_contains_division_or_inverse_power(expr->a) ||
-                expr_contains_division_or_inverse_power(expr->b);
+        found = expr_contains_division_or_inverse_power(expr->a) || expr_contains_division_or_inverse_power(expr->b);
     }
 
 cleanup:
@@ -634,12 +471,9 @@ cleanup:
     return found;
 }
 
-static bool expr_matches_unary_arg(const expr_t *expr,
-                                   expr_op_kind_t kind,
-                                   const expr_t *arg)
+static bool expr_matches_unary_arg(const expr_t *expr, expr_op_kind_t kind, const expr_t *arg)
 {
-    return expr && expr->ops && expr->ops->kind == kind &&
-           expr->a && arg && expr_simplify_same_factor(expr->a, arg);
+    return expr && expr->ops && expr->ops->kind == kind && expr->a && arg && expr_simplify_same_factor(expr->a, arg);
 }
 
 static expr_t *expr_build_square(const expr_t *expr)
@@ -656,9 +490,7 @@ static expr_t *mul_long_owned_local(expr_t *expr, long factor)
     return out;
 }
 
-static expr_t *expr_build_scaled_square_plus_const(const expr_t *expr,
-                                                   long square_coeff,
-                                                   long const_coeff)
+static expr_t *expr_build_scaled_square_plus_const(const expr_t *expr, long square_coeff, long const_coeff)
 {
     expr_t *square_term = NULL;
     expr_t *const_term = NULL;
@@ -730,27 +562,17 @@ static expr_t *expr_build_two_square_minus_one(const expr_t *expr)
     return expr_build_scaled_square_plus_const(expr, 2L, -1L);
 }
 
-static expr_t *rewrite_trig_candidate_relations(const expr_t *expr,
-                                                const expr_t *wrt,
-                                                const expr_t *candidate,
+static expr_t *rewrite_trig_candidate_relations(const expr_t *expr, const expr_t *wrt, const expr_t *candidate,
                                                 const expr_t *replacement);
 
-static expr_t *rewrite_trig_divided_by_candidate_derivative(
-    const expr_t *expr,
-    const expr_t *wrt,
-    const expr_t *candidate,
-    const expr_t *replacement);
+static expr_t *rewrite_trig_divided_by_candidate_derivative(const expr_t *expr, const expr_t *wrt,
+                                                            const expr_t *candidate, const expr_t *replacement);
 
-typedef expr_t *(*trig_rewrite_fn_t)(const expr_t *expr,
-                                     const expr_t *wrt,
-                                     const expr_t *candidate,
+typedef expr_t *(*trig_rewrite_fn_t)(const expr_t *expr, const expr_t *wrt, const expr_t *candidate,
                                      const expr_t *replacement);
 
-static expr_t *rewrite_trig_add_sub_children(const expr_t *expr,
-                                             const expr_t *wrt,
-                                             const expr_t *candidate,
-                                             const expr_t *replacement,
-                                             trig_rewrite_fn_t rewrite)
+static expr_t *rewrite_trig_add_sub_children(const expr_t *expr, const expr_t *wrt, const expr_t *candidate,
+                                             const expr_t *replacement, trig_rewrite_fn_t rewrite)
 {
     const expr_t *left_node = NULL;
     const expr_t *right_node = NULL;
@@ -775,13 +597,9 @@ cleanup:
     return out;
 }
 
-static expr_t *rewrite_trig_divided_add_sub_children(
-    const expr_t *expr,
-    const expr_t *denominator,
-    const expr_t *wrt,
-    const expr_t *candidate,
-    const expr_t *replacement,
-    trig_rewrite_fn_t rewrite)
+static expr_t *rewrite_trig_divided_add_sub_children(const expr_t *expr, const expr_t *denominator, const expr_t *wrt,
+                                                     const expr_t *candidate, const expr_t *replacement,
+                                                     trig_rewrite_fn_t rewrite)
 {
     const expr_t *left_node = NULL;
     const expr_t *right_node = NULL;
@@ -812,9 +630,7 @@ cleanup:
     return out;
 }
 
-static expr_t *rewrite_trig_candidate_relations(const expr_t *expr,
-                                                const expr_t *wrt,
-                                                const expr_t *candidate,
+static expr_t *rewrite_trig_candidate_relations(const expr_t *expr, const expr_t *wrt, const expr_t *candidate,
                                                 const expr_t *replacement)
 {
     const expr_t *arg = NULL;
@@ -835,25 +651,20 @@ static expr_t *rewrite_trig_candidate_relations(const expr_t *expr,
         arg = candidate->a;
         denominator_kind = EXPR_KIND_COS;
 
-        if (expr->ops && expr->ops->kind == EXPR_KIND_COS &&
-            expr_match_double_argument(expr->a, arg)) {
+        if (expr->ops && expr->ops->kind == EXPR_KIND_COS && expr_match_double_argument(expr->a, arg)) {
             return expr_build_one_minus_two_square(replacement);
         }
 
-        if (expr->ops && expr->ops->kind == EXPR_KIND_SIN &&
-            expr_match_double_argument(expr->a, arg)) {
+        if (expr->ops && expr->ops->kind == EXPR_KIND_SIN && expr_match_double_argument(expr->a, arg)) {
             expr_t *other = expr_cos(arg);
-            expr_t *scaled = other ? mul_number_owned(expr_clone(replacement),
-                                                      NUM_TWO)
-                                   : NULL;
+            expr_t *scaled = other ? mul_number_owned(expr_clone(replacement), NUM_TWO) : NULL;
             out = (scaled && other) ? expr_mul(scaled, other) : NULL;
             expr_free(scaled);
             expr_free(other);
             return out;
         }
 
-        if (expr->ops && expr->ops->kind == EXPR_KIND_POW_D &&
-            num_eq(expr->c, NUM_TWO) &&
+        if (expr->ops && expr->ops->kind == EXPR_KIND_POW_D && num_eq(expr->c, NUM_TWO) &&
             expr_matches_unary_arg(expr->a, EXPR_KIND_COS, arg)) {
             return expr_build_one_minus_square(replacement);
         }
@@ -884,25 +695,20 @@ static expr_t *rewrite_trig_candidate_relations(const expr_t *expr,
         arg = candidate->a;
         denominator_kind = EXPR_KIND_SIN;
 
-        if (expr->ops && expr->ops->kind == EXPR_KIND_COS &&
-            expr_match_double_argument(expr->a, arg)) {
+        if (expr->ops && expr->ops->kind == EXPR_KIND_COS && expr_match_double_argument(expr->a, arg)) {
             return expr_build_two_square_minus_one(replacement);
         }
 
-        if (expr->ops && expr->ops->kind == EXPR_KIND_SIN &&
-            expr_match_double_argument(expr->a, arg)) {
+        if (expr->ops && expr->ops->kind == EXPR_KIND_SIN && expr_match_double_argument(expr->a, arg)) {
             expr_t *other = expr_sin(arg);
-            expr_t *scaled = other ? mul_number_owned(expr_clone(replacement),
-                                                      NUM_TWO)
-                                   : NULL;
+            expr_t *scaled = other ? mul_number_owned(expr_clone(replacement), NUM_TWO) : NULL;
             out = (scaled && other) ? expr_mul(scaled, other) : NULL;
             expr_free(scaled);
             expr_free(other);
             return out;
         }
 
-        if (expr->ops && expr->ops->kind == EXPR_KIND_POW_D &&
-            num_eq(expr->c, NUM_TWO) &&
+        if (expr->ops && expr->ops->kind == EXPR_KIND_POW_D && num_eq(expr->c, NUM_TWO) &&
             expr_matches_unary_arg(expr->a, EXPR_KIND_SIN, arg)) {
             return expr_build_one_minus_square(replacement);
         }
@@ -944,15 +750,10 @@ static expr_t *rewrite_trig_candidate_relations(const expr_t *expr,
 
         if (companion && other) {
             expr_t *other_div = expr_div((expr_t *)other, (expr_t *)companion);
-            expr_t *other_rewritten = rewrite_trig_candidate_relations(
-                other_div, wrt, candidate, replacement);
-            expr_t *companion_sq = other_rewritten
-                                       ? expr_build_one_minus_square(replacement)
-                                       : NULL;
+            expr_t *other_rewritten = rewrite_trig_candidate_relations(other_div, wrt, candidate, replacement);
+            expr_t *companion_sq = other_rewritten ? expr_build_one_minus_square(replacement) : NULL;
 
-            out = (companion_sq && other_rewritten)
-                      ? expr_mul(companion_sq, other_rewritten)
-                      : NULL;
+            out = (companion_sq && other_rewritten) ? expr_mul(companion_sq, other_rewritten) : NULL;
             expr_free(companion_sq);
             expr_free(other_rewritten);
             expr_free(other_div);
@@ -961,19 +762,17 @@ static expr_t *rewrite_trig_candidate_relations(const expr_t *expr,
         }
     }
 
-    if (arg && (denominator_kind == EXPR_KIND_COS || denominator_kind == EXPR_KIND_SIN) &&
-        expr && expr->ops && expr->ops->kind == EXPR_KIND_DIV && expr->a && expr->b &&
+    if (arg && (denominator_kind == EXPR_KIND_COS || denominator_kind == EXPR_KIND_SIN) && expr && expr->ops &&
+        expr->ops->kind == EXPR_KIND_DIV && expr->a && expr->b &&
         expr_matches_unary_arg(expr->b, denominator_kind, arg)) {
         if (expr_simplify_same_factor(expr->a, expr->b))
             return expr_new_const(NUM_ONE);
 
         {
-            expr_t *factored = expr_simplify_extract_exact_factor_quotient(
-                expr->a, expr->b);
+            expr_t *factored = expr_simplify_extract_exact_factor_quotient(expr->a, expr->b);
 
             if (factored) {
-                expr_t *rewritten_factored = rewrite_trig_candidate_relations(
-                    factored, wrt, candidate, replacement);
+                expr_t *rewritten_factored = rewrite_trig_candidate_relations(factored, wrt, candidate, replacement);
 
                 expr_free(factored);
                 if (rewritten_factored)
@@ -981,11 +780,9 @@ static expr_t *rewrite_trig_candidate_relations(const expr_t *expr,
             }
         }
 
-        if (expr->a->ops && expr->a->ops->kind == EXPR_KIND_NEG &&
-            expr->a->a) {
+        if (expr->a->ops && expr->a->ops->kind == EXPR_KIND_NEG && expr->a->a) {
             expr_t *inner_div = expr_div((expr_t *)expr->a->a, (expr_t *)expr->b);
-            expr_t *inner = rewrite_trig_candidate_relations(inner_div, wrt,
-                                                             candidate, replacement);
+            expr_t *inner = rewrite_trig_candidate_relations(inner_div, wrt, candidate, replacement);
 
             expr_free(inner_div);
             return expr_negate_owned(inner);
@@ -995,14 +792,10 @@ static expr_t *rewrite_trig_candidate_relations(const expr_t *expr,
             number_t numer_scale = num_new();
             const expr_t *numer_base = NULL;
 
-            if (expr_match_scaled_expr(expr->a, &numer_scale, &numer_base) &&
-                numer_base && numer_base != expr->a) {
+            if (expr_match_scaled_expr(expr->a, &numer_scale, &numer_base) && numer_base && numer_base != expr->a) {
                 expr_t *base_div = expr_div((expr_t *)numer_base, (expr_t *)expr->b);
-                expr_t *base_rewritten = rewrite_trig_candidate_relations(
-                    base_div, wrt, candidate, replacement);
-                expr_t *scaled = base_rewritten ? mul_number_owned(base_rewritten,
-                                                                   numer_scale)
-                                                : NULL;
+                expr_t *base_rewritten = rewrite_trig_candidate_relations(base_div, wrt, candidate, replacement);
+                expr_t *scaled = base_rewritten ? mul_number_owned(base_rewritten, numer_scale) : NULL;
 
                 expr_free(base_div);
                 num_destroy(&numer_scale);
@@ -1011,13 +804,10 @@ static expr_t *rewrite_trig_candidate_relations(const expr_t *expr,
             num_destroy(&numer_scale);
         }
 
-        if (expr->a->ops &&
-            (expr->a->ops->kind == EXPR_KIND_ADD ||
-             expr->a->ops->kind == EXPR_KIND_SUB) &&
+        if (expr->a->ops && (expr->a->ops->kind == EXPR_KIND_ADD || expr->a->ops->kind == EXPR_KIND_SUB) &&
             expr->a->a && expr->a->b) {
-            return rewrite_trig_divided_add_sub_children(
-                expr->a, expr->b, wrt, candidate, replacement,
-                rewrite_trig_candidate_relations);
+            return rewrite_trig_divided_add_sub_children(expr->a, expr->b, wrt, candidate, replacement,
+                                                         rewrite_trig_candidate_relations);
         }
 
         if (expr_match_mul_expr(expr->a, &left_node, &right_node)) {
@@ -1028,8 +818,7 @@ static expr_t *rewrite_trig_candidate_relations(const expr_t *expr,
 
             {
                 expr_t *left_div = expr_div((expr_t *)left_node, (expr_t *)expr->b);
-                expr_t *right_rewritten = rewrite_trig_candidate_relations(
-                    right_node, wrt, candidate, replacement);
+                expr_t *right_rewritten = rewrite_trig_candidate_relations(right_node, wrt, candidate, replacement);
 
                 left = rewrite_trig_candidate_relations(left_div, wrt, candidate, replacement);
                 expr_free(left_div);
@@ -1043,8 +832,7 @@ static expr_t *rewrite_trig_candidate_relations(const expr_t *expr,
                 expr_free(left);
 
                 expr_t *right_div = expr_div((expr_t *)right_node, (expr_t *)expr->b);
-                expr_t *left_rewritten = rewrite_trig_candidate_relations(
-                    left_node, wrt, candidate, replacement);
+                expr_t *left_rewritten = rewrite_trig_candidate_relations(left_node, wrt, candidate, replacement);
 
                 right = rewrite_trig_candidate_relations(right_div, wrt, candidate, replacement);
                 expr_free(right_div);
@@ -1103,11 +891,8 @@ static expr_t *rewrite_trig_candidate_relations(const expr_t *expr,
     return NULL;
 }
 
-static expr_t *rewrite_trig_divided_by_candidate_derivative(
-    const expr_t *expr,
-    const expr_t *wrt,
-    const expr_t *candidate,
-    const expr_t *replacement)
+static expr_t *rewrite_trig_divided_by_candidate_derivative(const expr_t *expr, const expr_t *wrt,
+                                                            const expr_t *candidate, const expr_t *replacement)
 {
     const expr_t *arg = NULL;
     expr_op_kind_t denominator_kind = EXPR_KIND_CONST;
@@ -1134,16 +919,13 @@ static expr_t *rewrite_trig_divided_by_candidate_derivative(
     if (expr_matches_unary_arg(expr, denominator_kind, arg))
         return expr_new_const(NUM_ONE);
 
-    if (denominator_kind == EXPR_KIND_COS &&
-        expr && expr->ops && expr->ops->kind == EXPR_KIND_SUB &&
-        expr_matches_unary_arg(expr->b, EXPR_KIND_COS, arg) &&
-        expr->a && expr->a->ops && expr->a->ops->kind == EXPR_KIND_SUB &&
-        expr->a->a && expr->a->b &&
-        expr->a->a->ops && expr->a->a->ops->kind == EXPR_KIND_MUL &&
-        expr_matches_unary_arg(expr->a->a->a, EXPR_KIND_COS, arg) &&
+    if (denominator_kind == EXPR_KIND_COS && expr && expr->ops && expr->ops->kind == EXPR_KIND_SUB &&
+        expr_matches_unary_arg(expr->b, EXPR_KIND_COS, arg) && expr->a && expr->a->ops &&
+        expr->a->ops->kind == EXPR_KIND_SUB && expr->a->a && expr->a->b && expr->a->a->ops &&
+        expr->a->a->ops->kind == EXPR_KIND_MUL && expr_matches_unary_arg(expr->a->a->a, EXPR_KIND_COS, arg) &&
         expr_matches_unary_arg(expr->a->b, EXPR_KIND_SIN, expr->a->b->a) &&
-        expr_match_double_argument(expr->a->b->a, arg) &&
-        expr->a->a->b && expr->a->a->b->ops && expr->a->a->b->ops->kind == EXPR_KIND_SUB) {
+        expr_match_double_argument(expr->a->b->a, arg) && expr->a->a->b && expr->a->a->b->ops &&
+        expr->a->a->b->ops->kind == EXPR_KIND_SUB) {
         expr_t *u_sq = expr_build_square(replacement);
         expr_t *three_u = mul_long_owned_local(expr_clone(replacement), 3L);
         expr_t *sum = (u_sq && three_u) ? expr_add(u_sq, three_u) : NULL;
@@ -1153,15 +935,13 @@ static expr_t *rewrite_trig_divided_by_candidate_derivative(
         return sum ? expr_negate_owned(sum) : NULL;
     }
 
-    if (expr->ops && expr->ops->kind == EXPR_KIND_SIN &&
-        expr_match_double_argument(expr->a, arg)) {
+    if (expr->ops && expr->ops->kind == EXPR_KIND_SIN && expr_match_double_argument(expr->a, arg)) {
         return mul_number_owned(expr_clone(replacement), NUM_TWO);
     }
 
     if (expr_match_add_sub_expr(expr, &left_node, &right_node, &is_sub))
-        return rewrite_trig_add_sub_children(
-            expr, wrt, candidate, replacement,
-            rewrite_trig_divided_by_candidate_derivative);
+        return rewrite_trig_add_sub_children(expr, wrt, candidate, replacement,
+                                             rewrite_trig_divided_by_candidate_derivative);
 
     if (expr_match_mul_expr(expr, &left_node, &right_node)) {
         if (expr_matches_unary_arg(left_node, denominator_kind, arg))
@@ -1199,9 +979,7 @@ static expr_t *rewrite_trig_divided_by_candidate_derivative(
     return NULL;
 }
 
-static expr_t *extract_wrt_independent_scale(const expr_t *expr,
-                                             const expr_t *factor,
-                                             const expr_t *wrt)
+static expr_t *extract_wrt_independent_scale(const expr_t *expr, const expr_t *factor, const expr_t *wrt)
 {
     expr_t *scale = NULL;
 
@@ -1220,10 +998,7 @@ static expr_t *extract_wrt_independent_scale(const expr_t *expr,
     return scale;
 }
 
-static expr_t *integrate_exp_chain_successor_candidate(
-    const expr_t *expr,
-    const expr_t *wrt,
-    const expr_t *exp_factor)
+static expr_t *integrate_exp_chain_successor_candidate(const expr_t *expr, const expr_t *wrt, const expr_t *exp_factor)
 {
     expr_t *quotient = NULL;
     expr_t *first_deriv = NULL;
@@ -1239,9 +1014,8 @@ static expr_t *integrate_exp_chain_successor_candidate(
     expr_t *scaled = NULL;
     expr_t *out = NULL;
 
-    if (!expr || !wrt || !exp_factor ||
-        !exp_factor->ops || exp_factor->ops->kind != EXPR_KIND_EXP ||
-        !exp_factor->a || !depends_on_wrt(exp_factor->a, wrt)) {
+    if (!expr || !wrt || !exp_factor || !exp_factor->ops || exp_factor->ops->kind != EXPR_KIND_EXP || !exp_factor->a ||
+        !depends_on_wrt(exp_factor->a, wrt)) {
         return NULL;
     }
 
@@ -1258,9 +1032,7 @@ static expr_t *integrate_exp_chain_successor_candidate(
     second_deriv = expr_create_deriv(first_deriv, wrt);
     second_deriv = simplify_owned(second_deriv);
     first_deriv_squared = expr_pow(first_deriv, &NUM_TWO);
-    expected = (first_deriv_squared && second_deriv)
-                   ? expr_add(first_deriv_squared, second_deriv)
-                   : NULL;
+    expected = (first_deriv_squared && second_deriv) ? expr_add(first_deriv_squared, second_deriv) : NULL;
     expected = simplify_owned(expected);
     if (!expected)
         goto cleanup;
@@ -1298,9 +1070,7 @@ static expr_t *integrate_exp_chain_successor_candidate(
     expected_deriv = expr_create_deriv(expected, wrt);
     expected_deriv = simplify_owned(expected_deriv);
     first_times_expected = expr_mul(first_deriv, expected);
-    third_expected = (first_times_expected && expected_deriv)
-                         ? expr_add(first_times_expected, expected_deriv)
-                         : NULL;
+    third_expected = (first_times_expected && expected_deriv) ? expr_add(first_times_expected, expected_deriv) : NULL;
     third_expected = simplify_owned(third_expected);
     if (!third_expected)
         goto cleanup;
@@ -1330,10 +1100,7 @@ cleanup:
     return out;
 }
 
-static bool exp_factor_stack_push(const expr_t ***stack,
-                                  size_t *count,
-                                  size_t *capacity,
-                                  const expr_t *expr)
+static bool exp_factor_stack_push(const expr_t ***stack, size_t *count, size_t *capacity, const expr_t *expr)
 {
     const expr_t **grown = NULL;
     size_t next_capacity = 0u;
@@ -1354,11 +1121,8 @@ static bool exp_factor_stack_push(const expr_t ***stack,
     return true;
 }
 
-static bool collect_exp_factor_candidates(const expr_t *expr,
-                                          const expr_t *wrt,
-                                          const expr_t **candidates,
-                                          size_t *count,
-                                          size_t capacity)
+static bool collect_exp_factor_candidates(const expr_t *expr, const expr_t *wrt, const expr_t **candidates,
+                                          size_t *count, size_t capacity)
 {
     const expr_t **stack = NULL;
     size_t stack_count = 0u;
@@ -1377,13 +1141,11 @@ static bool collect_exp_factor_candidates(const expr_t *expr,
         if (!node || !node->ops)
             continue;
 
-        if (node->ops->kind == EXPR_KIND_EXP && node->a &&
-            depends_on_wrt(node->a, wrt)) {
+        if (node->ops->kind == EXPR_KIND_EXP && node->a && depends_on_wrt(node->a, wrt)) {
             bool seen = false;
 
             for (size_t i = 0u; i < *count; ++i) {
-                if (candidates[i] == node ||
-                    expr_simplify_same_factor(candidates[i], node)) {
+                if (candidates[i] == node || expr_simplify_same_factor(candidates[i], node)) {
                     seen = true;
                     break;
                 }
@@ -1392,13 +1154,11 @@ static bool collect_exp_factor_candidates(const expr_t *expr,
                 candidates[(*count)++] = node;
         }
 
-        if (!exp_factor_stack_push(&stack, &stack_count, &stack_capacity,
-                                   node->b)) {
+        if (!exp_factor_stack_push(&stack, &stack_count, &stack_capacity, node->b)) {
             ok = false;
             goto cleanup;
         }
-        if (!exp_factor_stack_push(&stack, &stack_count, &stack_capacity,
-                                   node->a)) {
+        if (!exp_factor_stack_push(&stack, &stack_count, &stack_capacity, node->a)) {
             ok = false;
             goto cleanup;
         }
@@ -1409,24 +1169,20 @@ cleanup:
     return ok;
 }
 
-static expr_t *integrate_exp_chain_successor_product(const expr_t *expr,
-                                                     const expr_t *wrt)
+static expr_t *integrate_exp_chain_successor_product(const expr_t *expr, const expr_t *wrt)
 {
     const expr_t *candidates[32];
     size_t count = 0u;
 
     if (!expr || !wrt)
         return NULL;
-    if (!collect_exp_factor_candidates(expr, wrt, candidates, &count,
-                                       sizeof(candidates) / sizeof(candidates[0]))) {
+    if (!collect_exp_factor_candidates(expr, wrt, candidates, &count, sizeof(candidates) / sizeof(candidates[0]))) {
         return NULL;
     }
 
     for (size_t i = 0u; i < count; ++i) {
-        if (candidates[i] && candidates[i]->ops &&
-            candidates[i]->ops->kind == EXPR_KIND_EXP) {
-            expr_t *out = integrate_exp_chain_successor_candidate(
-                expr, wrt, candidates[i]);
+        if (candidates[i] && candidates[i]->ops && candidates[i]->ops->kind == EXPR_KIND_EXP) {
+            expr_t *out = integrate_exp_chain_successor_candidate(expr, wrt, candidates[i]);
 
             if (out)
                 return out;
@@ -1436,8 +1192,7 @@ static expr_t *integrate_exp_chain_successor_product(const expr_t *expr,
     return NULL;
 }
 
-static expr_t *integrate_poly_times_exp_relaxed(const expr_t *expr,
-                                                const expr_t *wrt)
+static expr_t *integrate_poly_times_exp_relaxed(const expr_t *expr, const expr_t *wrt)
 {
     const expr_t *target = expr;
     const expr_t *left = NULL;
@@ -1494,8 +1249,7 @@ static expr_t *integrate_poly_times_exp_relaxed(const expr_t *expr,
 
     vars[0] = (expr_t *)wrt;
     if (!expr_match_affine_poly_deg4(poly_expr, 1u, vars, poly, &poly_constant, poly_coeffs) ||
-        !num_eq(poly_constant, NUM_ZERO) ||
-        !num_eq(poly_coeffs[0], NUM_ONE)) {
+        !num_eq(poly_constant, NUM_ZERO) || !num_eq(poly_coeffs[0], NUM_ONE)) {
         goto cleanup;
     }
 
@@ -1523,10 +1277,7 @@ cleanup:
     return out;
 }
 
-static void substitution_poly_set_long(number_t *poly,
-                                       size_t count,
-                                       size_t index,
-                                       long value)
+static void substitution_poly_set_long(number_t *poly, size_t count, size_t index, long value)
 {
     if (!poly || index >= count)
         return;
@@ -1535,11 +1286,8 @@ static void substitution_poly_set_long(number_t *poly,
     poly[index] = num_create_from_long(value);
 }
 
-static void substitution_poly_apply_term_specs(
-    number_t *poly,
-    size_t count,
-    const substitution_poly_term_spec_t *terms,
-    size_t term_count)
+static void substitution_poly_apply_term_specs(number_t *poly, size_t count, const substitution_poly_term_spec_t *terms,
+                                               size_t term_count)
 {
     if (!poly || !terms)
         return;
@@ -1571,10 +1319,8 @@ static size_t substitution_poly_used_count(const number_t *poly, size_t count)
 
 static size_t exp_unary_poly_pair_used_count(const exp_unary_poly_pair_t *pair)
 {
-    size_t constant_count = substitution_poly_used_count(pair->constant,
-                                                         substitution_poly_coeffs);
-    size_t companion_count = substitution_poly_used_count(pair->companion,
-                                                          substitution_poly_coeffs);
+    size_t constant_count = substitution_poly_used_count(pair->constant, substitution_poly_coeffs);
+    size_t companion_count = substitution_poly_used_count(pair->companion, substitution_poly_coeffs);
     size_t used = constant_count > companion_count ? constant_count : companion_count;
 
     /*
@@ -1590,9 +1336,7 @@ static size_t exp_unary_poly_pair_used_count(const exp_unary_poly_pair_t *pair)
     return used;
 }
 
-static bool substitution_poly_eq(const number_t *left,
-                                 const number_t *right,
-                                 size_t count)
+static bool substitution_poly_eq(const number_t *left, const number_t *right, size_t count)
 {
     for (size_t i = 0; i < count; ++i) {
         if (!num_eq(left[i], right[i]))
@@ -1601,9 +1345,7 @@ static bool substitution_poly_eq(const number_t *left,
     return true;
 }
 
-static void substitution_poly_copy(number_t *dst,
-                                   const number_t *src,
-                                   size_t count)
+static void substitution_poly_copy(number_t *dst, const number_t *src, size_t count)
 {
     for (size_t i = 0; i < count; ++i) {
         num_destroy(&dst[i]);
@@ -1611,10 +1353,7 @@ static void substitution_poly_copy(number_t *dst,
     }
 }
 
-static bool substitution_poly_accumulate_number(number_t *poly,
-                                                size_t count,
-                                                size_t index,
-                                                number_t value)
+static bool substitution_poly_accumulate_number(number_t *poly, size_t count, size_t index, number_t value)
 {
     number_t next;
 
@@ -1629,10 +1368,7 @@ static bool substitution_poly_accumulate_number(number_t *poly,
     return true;
 }
 
-static bool substitution_poly_accumulate_scaled_long(number_t *poly,
-                                                     size_t count,
-                                                     size_t index,
-                                                     number_t value,
+static bool substitution_poly_accumulate_scaled_long(number_t *poly, size_t count, size_t index, number_t value,
                                                      long scale)
 {
     number_t scale_num;
@@ -1650,10 +1386,7 @@ static bool substitution_poly_accumulate_scaled_long(number_t *poly,
     return ok;
 }
 
-static bool substitution_poly_add_scaled(number_t *dst,
-                                         const number_t *src,
-                                         size_t count,
-                                         long scale)
+static bool substitution_poly_add_scaled(number_t *dst, const number_t *src, size_t count, long scale)
 {
     for (size_t i = 0; i < count; ++i) {
         if (!substitution_poly_accumulate_scaled_long(dst, count, i, src[i], scale))
@@ -1662,18 +1395,14 @@ static bool substitution_poly_add_scaled(number_t *dst,
     return true;
 }
 
-static bool substitution_poly_mul(const number_t *left,
-                                  const number_t *right,
-                                  number_t *out,
-                                  size_t count)
+static bool substitution_poly_mul(const number_t *left, const number_t *right, number_t *out, size_t count)
 {
     number_array_reset_zero_local(out, count);
 
     for (size_t i = 0; i < count; ++i) {
         for (size_t j = 0; j < count; ++j) {
             number_t term = num_mul(left[i], right[j]);
-            bool ok = substitution_poly_accumulate_number(out, count, i + j,
-                                                          term);
+            bool ok = substitution_poly_accumulate_number(out, count, i + j, term);
 
             num_destroy(&term);
             if (!ok)
@@ -1701,29 +1430,20 @@ static void exp_unary_poly_pair_reset(exp_unary_poly_pair_t *pair)
     number_array_reset_zero_local(pair->companion, substitution_poly_coeffs);
 }
 
-static void exp_unary_poly_pair_copy(exp_unary_poly_pair_t *dst,
-                                     const exp_unary_poly_pair_t *src)
+static void exp_unary_poly_pair_copy(exp_unary_poly_pair_t *dst, const exp_unary_poly_pair_t *src)
 {
-    substitution_poly_copy(dst->constant, src->constant,
-                           substitution_poly_coeffs);
-    substitution_poly_copy(dst->companion, src->companion,
-                           substitution_poly_coeffs);
+    substitution_poly_copy(dst->constant, src->constant, substitution_poly_coeffs);
+    substitution_poly_copy(dst->companion, src->companion, substitution_poly_coeffs);
 }
 
-static bool exp_unary_poly_pair_add_scaled(exp_unary_poly_pair_t *dst,
-                                           const exp_unary_poly_pair_t *src,
-                                           long scale)
+static bool exp_unary_poly_pair_add_scaled(exp_unary_poly_pair_t *dst, const exp_unary_poly_pair_t *src, long scale)
 {
-    return substitution_poly_add_scaled(dst->constant, src->constant,
-                                        substitution_poly_coeffs, scale) &&
-           substitution_poly_add_scaled(dst->companion, src->companion,
-                                        substitution_poly_coeffs, scale);
+    return substitution_poly_add_scaled(dst->constant, src->constant, substitution_poly_coeffs, scale) &&
+           substitution_poly_add_scaled(dst->companion, src->companion, substitution_poly_coeffs, scale);
 }
 
-static bool exp_unary_poly_pair_mul(const exp_unary_poly_pair_t *left,
-                                    const exp_unary_poly_pair_t *right,
-                                    const exp_unary_substitution_rule_t *rule,
-                                    exp_unary_poly_pair_t *out)
+static bool exp_unary_poly_pair_mul(const exp_unary_poly_pair_t *left, const exp_unary_poly_pair_t *right,
+                                    const exp_unary_substitution_rule_t *rule, exp_unary_poly_pair_t *out)
 {
     number_t pure[substitution_poly_coeffs];
     number_t companion_square_product[substitution_poly_coeffs];
@@ -1739,29 +1459,19 @@ static bool exp_unary_poly_pair_mul(const exp_unary_poly_pair_t *left,
     number_array_zero_local(right_companion, substitution_poly_coeffs);
     exp_unary_poly_pair_reset(out);
 
-    if (!substitution_poly_mul(left->constant, right->constant, pure,
+    if (!substitution_poly_mul(left->constant, right->constant, pure, substitution_poly_coeffs) ||
+        !substitution_poly_mul(left->companion, right->companion, companion_square_product, substitution_poly_coeffs) ||
+        !substitution_poly_mul(companion_square_product, rule->companion_square, companion_square_reduced,
                                substitution_poly_coeffs) ||
-        !substitution_poly_mul(left->companion, right->companion,
-                               companion_square_product,
-                               substitution_poly_coeffs) ||
-        !substitution_poly_mul(companion_square_product,
-                               rule->companion_square,
-                               companion_square_reduced,
-                               substitution_poly_coeffs) ||
-        !substitution_poly_mul(left->constant, right->companion,
-                               left_companion, substitution_poly_coeffs) ||
-        !substitution_poly_mul(left->companion, right->constant,
-                               right_companion, substitution_poly_coeffs)) {
+        !substitution_poly_mul(left->constant, right->companion, left_companion, substitution_poly_coeffs) ||
+        !substitution_poly_mul(left->companion, right->constant, right_companion, substitution_poly_coeffs)) {
         goto cleanup;
     }
 
     substitution_poly_copy(out->constant, pure, substitution_poly_coeffs);
-    if (!substitution_poly_add_scaled(out->constant, companion_square_reduced,
-                                      substitution_poly_coeffs, 1) ||
-        !substitution_poly_add_scaled(out->companion, left_companion,
-                                      substitution_poly_coeffs, 1) ||
-        !substitution_poly_add_scaled(out->companion, right_companion,
-                                      substitution_poly_coeffs, 1)) {
+    if (!substitution_poly_add_scaled(out->constant, companion_square_reduced, substitution_poly_coeffs, 1) ||
+        !substitution_poly_add_scaled(out->companion, left_companion, substitution_poly_coeffs, 1) ||
+        !substitution_poly_add_scaled(out->companion, right_companion, substitution_poly_coeffs, 1)) {
         goto cleanup;
     }
     ok = true;
@@ -1775,10 +1485,8 @@ cleanup:
     return ok;
 }
 
-static bool exp_unary_poly_pair_pow(const exp_unary_poly_pair_t *base,
-                                    unsigned int exponent,
-                                    const exp_unary_substitution_rule_t *rule,
-                                    exp_unary_poly_pair_t *out)
+static bool exp_unary_poly_pair_pow(const exp_unary_poly_pair_t *base, unsigned int exponent,
+                                    const exp_unary_substitution_rule_t *rule, exp_unary_poly_pair_t *out)
 {
     exp_unary_poly_pair_t acc;
     exp_unary_poly_pair_t next;
@@ -1823,8 +1531,7 @@ static void exp_unary_rule_clear(exp_unary_substitution_rule_t *rule)
     number_array_clear_local(rule->candidate_deriv, substitution_poly_coeffs);
 }
 
-static bool exp_unary_rule_init(exp_unary_substitution_rule_t *rule,
-                                expr_op_kind_t kind)
+static bool exp_unary_rule_init(exp_unary_substitution_rule_t *rule, expr_op_kind_t kind)
 {
     const exp_unary_rule_entry_t *entry = NULL;
     const exp_unary_substitution_rule_spec_t *spec = NULL;
@@ -1841,66 +1548,47 @@ static bool exp_unary_rule_init(exp_unary_substitution_rule_t *rule,
     rule->candidate_kind = kind;
     rule->companion_kind = spec->companion_kind;
     rule->has_companion = spec->has_companion;
-    substitution_poly_apply_term_specs(rule->candidate_deriv,
-                                       substitution_poly_coeffs,
-                                       spec->candidate_deriv,
+    substitution_poly_apply_term_specs(rule->candidate_deriv, substitution_poly_coeffs, spec->candidate_deriv,
                                        spec->candidate_deriv_count);
-    substitution_poly_apply_term_specs(rule->companion_deriv,
-                                       substitution_poly_coeffs,
-                                       spec->companion_deriv,
+    substitution_poly_apply_term_specs(rule->companion_deriv, substitution_poly_coeffs, spec->companion_deriv,
                                        spec->companion_deriv_count);
-    substitution_poly_apply_term_specs(rule->companion_square,
-                                       substitution_poly_coeffs,
-                                       spec->companion_square,
+    substitution_poly_apply_term_specs(rule->companion_square, substitution_poly_coeffs, spec->companion_square,
                                        spec->companion_square_count);
     return true;
 }
 
-static bool exp_unary_square_relation_for_kind(expr_op_kind_t squared_kind,
-                                               const exp_unary_substitution_rule_t *rule,
+static bool exp_unary_square_relation_for_kind(expr_op_kind_t squared_kind, const exp_unary_substitution_rule_t *rule,
                                                exp_unary_poly_pair_t *out)
 {
     exp_unary_poly_pair_reset(out);
 
     if (squared_kind == rule->candidate_kind) {
-        substitution_poly_set_long(out->constant, substitution_poly_coeffs,
-                                   2u, 1);
+        substitution_poly_set_long(out->constant, substitution_poly_coeffs, 2u, 1);
         return true;
     }
 
     if (rule->has_companion && squared_kind == rule->companion_kind) {
-        substitution_poly_copy(out->constant, rule->companion_square,
-                               substitution_poly_coeffs);
+        substitution_poly_copy(out->constant, rule->companion_square, substitution_poly_coeffs);
         return true;
     }
 
-    const exp_unary_rule_entry_t *entry =
-        exp_unary_rule_entry_for_kind(rule->candidate_kind);
+    const exp_unary_rule_entry_t *entry = exp_unary_rule_entry_for_kind(rule->candidate_kind);
     const exp_unary_square_relation_spec_t *spec =
         (entry && entry->has_square_relation) ? &entry->square_relation : NULL;
 
     if (spec && spec->squared_kind == squared_kind) {
-        substitution_poly_apply_term_specs(out->constant,
-                                           substitution_poly_coeffs,
-                                           spec->terms,
-                                           spec->term_count);
+        substitution_poly_apply_term_specs(out->constant, substitution_poly_coeffs, spec->terms, spec->term_count);
         return true;
     }
 
     return false;
 }
 
-static bool exp_unary_pair_from_expr(const expr_t *expr,
-                                     const expr_t *wrt,
-                                     const expr_t *candidate,
-                                     const exp_unary_substitution_rule_t *rule,
-                                     exp_unary_poly_pair_t *out);
+static bool exp_unary_pair_from_expr(const expr_t *expr, const expr_t *wrt, const expr_t *candidate,
+                                     const exp_unary_substitution_rule_t *rule, exp_unary_poly_pair_t *out);
 
-static bool exp_unary_pair_from_power(const expr_t *base,
-                                      unsigned int exponent,
-                                      const expr_t *wrt,
-                                      const expr_t *candidate,
-                                      const exp_unary_substitution_rule_t *rule,
+static bool exp_unary_pair_from_power(const expr_t *base, unsigned int exponent, const expr_t *wrt,
+                                      const expr_t *candidate, const exp_unary_substitution_rule_t *rule,
                                       exp_unary_poly_pair_t *out)
 {
     exp_unary_poly_pair_t base_pair;
@@ -1908,10 +1596,8 @@ static bool exp_unary_pair_from_power(const expr_t *base,
 
     exp_unary_poly_pair_zero(&base_pair);
 
-    if (base && base->ops &&
-        expr_matches_unary_arg(base, base->ops->kind, candidate->a) &&
-        exp_unary_square_relation_for_kind(base->ops->kind, rule, out) &&
-        exponent == 2u) {
+    if (base && base->ops && expr_matches_unary_arg(base, base->ops->kind, candidate->a) &&
+        exp_unary_square_relation_for_kind(base->ops->kind, rule, out) && exponent == 2u) {
         ok = true;
         goto cleanup;
     }
@@ -1925,40 +1611,27 @@ cleanup:
     return ok;
 }
 
-static bool exp_unary_pair_from_double_angle(const expr_t *expr,
-                                             const expr_t *arg,
-                                             const exp_unary_substitution_rule_t *rule,
-                                             exp_unary_poly_pair_t *out)
+static bool exp_unary_pair_from_double_angle(const expr_t *expr, const expr_t *arg,
+                                             const exp_unary_substitution_rule_t *rule, exp_unary_poly_pair_t *out)
 {
-    if (!expr || !arg || !expr->ops || !expr->a ||
-        !expr_match_double_argument(expr->a, arg)) {
+    if (!expr || !arg || !expr->ops || !expr->a || !expr_match_double_argument(expr->a, arg)) {
         return false;
     }
 
     exp_unary_poly_pair_reset(out);
 
-    const exp_unary_rule_entry_t *entry =
-        exp_unary_rule_entry_for_kind(rule->candidate_kind);
-    const exp_unary_double_angle_rule_set_t *rule_set =
-        entry ? &entry->double_angle : NULL;
-    exp_unary_double_angle_outer_slot_t outer_slot =
-        exp_unary_double_angle_outer_slot_for_kind(expr->ops->kind);
+    const exp_unary_rule_entry_t *entry = exp_unary_rule_entry_for_kind(rule->candidate_kind);
+    const exp_unary_double_angle_rule_set_t *rule_set = entry ? &entry->double_angle : NULL;
+    exp_unary_double_angle_outer_slot_t outer_slot = exp_unary_double_angle_outer_slot_for_kind(expr->ops->kind);
 
-    if (rule_set &&
-        outer_slot != EXP_UNARY_DOUBLE_ANGLE_OUTER_INVALID &&
+    if (rule_set && outer_slot != EXP_UNARY_DOUBLE_ANGLE_OUTER_INVALID &&
         outer_slot < EXP_UNARY_DOUBLE_ANGLE_OUTER_COUNT) {
-        const exp_unary_double_angle_spec_t *spec =
-            &rule_set->entries[outer_slot];
+        const exp_unary_double_angle_spec_t *spec = &rule_set->entries[outer_slot];
 
         if (spec->supported) {
-            number_t *target = spec->slot == EXP_UNARY_PAIR_COMPANION
-                                   ? out->companion
-                                   : out->constant;
+            number_t *target = spec->slot == EXP_UNARY_PAIR_COMPANION ? out->companion : out->constant;
 
-            substitution_poly_apply_term_specs(target,
-                                               substitution_poly_coeffs,
-                                               spec->terms,
-                                               spec->term_count);
+            substitution_poly_apply_term_specs(target, substitution_poly_coeffs, spec->terms, spec->term_count);
             return true;
         }
     }
@@ -1966,11 +1639,8 @@ static bool exp_unary_pair_from_double_angle(const expr_t *expr,
     return false;
 }
 
-static bool exp_unary_pair_from_expr(const expr_t *expr,
-                                     const expr_t *wrt,
-                                     const expr_t *candidate,
-                                     const exp_unary_substitution_rule_t *rule,
-                                     exp_unary_poly_pair_t *out)
+static bool exp_unary_pair_from_expr(const expr_t *expr, const expr_t *wrt, const expr_t *candidate,
+                                     const exp_unary_substitution_rule_t *rule, exp_unary_poly_pair_t *out)
 {
     const expr_t *left_node = NULL;
     const expr_t *right_node = NULL;
@@ -1991,16 +1661,13 @@ static bool exp_unary_pair_from_expr(const expr_t *expr,
         goto cleanup;
 
     if (expr == candidate || expr_simplify_same_factor(expr, candidate)) {
-        substitution_poly_set_long(out->constant, substitution_poly_coeffs,
-                                   1u, 1);
+        substitution_poly_set_long(out->constant, substitution_poly_coeffs, 1u, 1);
         ok = true;
         goto cleanup;
     }
 
-    if (rule->has_companion &&
-        expr_matches_unary_arg(expr, rule->companion_kind, candidate->a)) {
-        substitution_poly_set_long(out->companion, substitution_poly_coeffs,
-                                   0u, 1);
+    if (rule->has_companion && expr_matches_unary_arg(expr, rule->companion_kind, candidate->a)) {
+        substitution_poly_set_long(out->companion, substitution_poly_coeffs, 0u, 1);
         ok = true;
         goto cleanup;
     }
@@ -2056,8 +1723,7 @@ static bool exp_unary_pair_from_expr(const expr_t *expr,
         if (!exp_unary_pair_from_expr(expr->a, wrt, candidate, rule, &left))
             goto cleanup;
 
-        if (!depends_on_wrt(expr->b, wrt) &&
-            expr_match_const_value(expr->b, &const_value) &&
+        if (!depends_on_wrt(expr->b, wrt) && expr_match_const_value(expr->b, &const_value) &&
             !num_eq(const_value, NUM_ZERO)) {
             for (size_t i = 0; i < substitution_poly_coeffs; ++i) {
                 num_destroy(&out->constant[i]);
@@ -2073,12 +1739,10 @@ static bool exp_unary_pair_from_expr(const expr_t *expr,
     if (expr->ops && expr->ops->kind == EXPR_KIND_POW_D && expr->a) {
         unsigned int exponent = 0u;
 
-        if (!expr_integrate_number_matches_uint_at_most(
-                expr->c, substitution_poly_coeffs - 1u, &exponent)) {
+        if (!expr_integrate_number_matches_uint_at_most(expr->c, substitution_poly_coeffs - 1u, &exponent)) {
             goto cleanup;
         }
-        ok = exp_unary_pair_from_power(expr->a, exponent, wrt, candidate,
-                                       rule, out);
+        ok = exp_unary_pair_from_power(expr->a, exponent, wrt, candidate, rule, out);
         goto cleanup;
     }
 
@@ -2086,12 +1750,10 @@ static bool exp_unary_pair_from_expr(const expr_t *expr,
         expr_match_const_value(expr->b, &exponent_value)) {
         unsigned int exponent = 0u;
 
-        if (!expr_integrate_number_matches_uint_at_most(
-                exponent_value, substitution_poly_coeffs - 1u, &exponent)) {
+        if (!expr_integrate_number_matches_uint_at_most(exponent_value, substitution_poly_coeffs - 1u, &exponent)) {
             goto cleanup;
         }
-        ok = exp_unary_pair_from_power(expr->a, exponent, wrt, candidate,
-                                       rule, out);
+        ok = exp_unary_pair_from_power(expr->a, exponent, wrt, candidate, rule, out);
         goto cleanup;
     }
 
@@ -2104,10 +1766,7 @@ cleanup:
     return ok;
 }
 
-static bool substitution_poly_apply_differential(const number_t *m,
-                                                 const number_t *n,
-                                                 const number_t *p,
-                                                 number_t *out,
+static bool substitution_poly_apply_differential(const number_t *m, const number_t *n, const number_t *p, number_t *out,
                                                  size_t count)
 {
     number_array_reset_zero_local(out, count);
@@ -2118,9 +1777,7 @@ static bool substitution_poly_apply_differential(const number_t *m,
                 number_t scale = num_create_from_long((long)i);
                 number_t scaled = num_mul(p[i], scale);
                 number_t term = num_mul(scaled, m[j]);
-                bool ok = substitution_poly_accumulate_number(out, count,
-                                                              i - 1u + j,
-                                                              term);
+                bool ok = substitution_poly_accumulate_number(out, count, i - 1u + j, term);
 
                 num_destroy(&term);
                 num_destroy(&scaled);
@@ -2132,8 +1789,7 @@ static bool substitution_poly_apply_differential(const number_t *m,
 
         for (size_t j = 0; j < count; ++j) {
             number_t term = num_mul(p[i], n[j]);
-            bool ok = substitution_poly_accumulate_number(out, count,
-                                                          i + j, term);
+            bool ok = substitution_poly_accumulate_number(out, count, i + j, term);
 
             num_destroy(&term);
             if (!ok)
@@ -2143,11 +1799,8 @@ static bool substitution_poly_apply_differential(const number_t *m,
     return true;
 }
 
-static bool substitution_solve_polynomial_differential(const number_t *m,
-                                                       const number_t *n,
-                                                       const number_t *q,
-                                                       number_t *out,
-                                                       size_t count)
+static bool substitution_solve_polynomial_differential(const number_t *m, const number_t *n, const number_t *q,
+                                                       number_t *out, size_t count)
 {
     number_t matrix[substitution_poly_coeffs][substitution_poly_coeffs + 1u];
     number_t check[substitution_poly_coeffs];
@@ -2171,16 +1824,14 @@ static bool substitution_solve_polynomial_differential(const number_t *m,
                 number_t scale = num_create_from_long((long)col);
                 number_t scaled = num_mul(m[j], scale);
 
-                substitution_poly_accumulate_number(&matrix[col - 1u + j][col],
-                                                    1u, 0u, scaled);
+                substitution_poly_accumulate_number(&matrix[col - 1u + j][col], 1u, 0u, scaled);
                 num_destroy(&scaled);
                 num_destroy(&scale);
             }
         }
 
         for (size_t j = 0; j < count && col + j < count; ++j) {
-            substitution_poly_accumulate_number(&matrix[col + j][col],
-                                                1u, 0u, n[j]);
+            substitution_poly_accumulate_number(&matrix[col + j][col], 1u, 0u, n[j]);
         }
     }
 
@@ -2249,8 +1900,7 @@ static bool substitution_solve_polynomial_differential(const number_t *m,
         out[pivot_col] = value;
     }
 
-    if (!substitution_poly_apply_differential(m, n, out, check, count) ||
-        !substitution_poly_eq(check, q, count)) {
+    if (!substitution_poly_apply_differential(m, n, out, check, count) || !substitution_poly_eq(check, q, count)) {
         goto cleanup;
     }
 
@@ -2265,10 +1915,7 @@ cleanup:
     return ok;
 }
 
-static bool exp_unary_build_constant_operator(
-    const exp_unary_substitution_rule_t *rule,
-    number_t *m,
-    number_t *n)
+static bool exp_unary_build_constant_operator(const exp_unary_substitution_rule_t *rule, number_t *m, number_t *n)
 {
     number_t ca[substitution_poly_coeffs];
     bool ok = false;
@@ -2277,15 +1924,13 @@ static bool exp_unary_build_constant_operator(
     number_array_reset_zero_local(m, substitution_poly_coeffs);
     number_array_reset_zero_local(n, substitution_poly_coeffs);
 
-    if (!substitution_poly_mul(rule->companion_square, rule->candidate_deriv,
-                               ca, substitution_poly_coeffs)) {
+    if (!substitution_poly_mul(rule->companion_square, rule->candidate_deriv, ca, substitution_poly_coeffs)) {
         goto cleanup;
     }
 
     substitution_poly_copy(m, ca, substitution_poly_coeffs);
     substitution_poly_copy(n, ca, substitution_poly_coeffs);
-    if (!substitution_poly_add_scaled(n, rule->companion_deriv,
-                                      substitution_poly_coeffs, 1)) {
+    if (!substitution_poly_add_scaled(n, rule->companion_deriv, substitution_poly_coeffs, 1)) {
         goto cleanup;
     }
     ok = true;
@@ -2295,12 +1940,9 @@ cleanup:
     return ok;
 }
 
-static expr_t *build_exp_unary_pair_expr(const expr_t *candidate,
-                                         const expr_t *arg,
-                                         const exp_unary_substitution_rule_t *rule,
-                                         const number_t *pure,
-                                         const number_t *companion_poly,
-                                         size_t coeff_count)
+static expr_t *build_exp_unary_pair_expr(const expr_t *candidate, const expr_t *arg,
+                                         const exp_unary_substitution_rule_t *rule, const number_t *pure,
+                                         const number_t *companion_poly, size_t coeff_count)
 {
     expr_t *pure_expr = NULL;
     expr_t *companion_expr = NULL;
@@ -2312,14 +1954,10 @@ static expr_t *build_exp_unary_pair_expr(const expr_t *candidate,
     if (!pure_expr)
         goto cleanup;
 
-    if (rule->has_companion &&
-        !substitution_poly_is_zero(companion_poly, coeff_count)) {
+    if (rule->has_companion && !substitution_poly_is_zero(companion_poly, coeff_count)) {
         companion_expr = expr_apply_unary_kind(rule->companion_kind, arg);
-        companion_poly_expr = build_polynomial_expr(candidate, companion_poly,
-                                                    coeff_count);
-        companion_term = (companion_expr && companion_poly_expr)
-                             ? expr_mul(companion_expr, companion_poly_expr)
-                             : NULL;
+        companion_poly_expr = build_polynomial_expr(candidate, companion_poly, coeff_count);
+        companion_term = (companion_expr && companion_poly_expr) ? expr_mul(companion_expr, companion_poly_expr) : NULL;
         if (!companion_term)
             goto cleanup;
         sum = expr_add(pure_expr, companion_term);
@@ -2335,9 +1973,7 @@ cleanup:
     return simplify_owned(sum);
 }
 
-static expr_t *integrate_exp_unary_substitution_product(const expr_t *expr,
-                                                        const expr_t *wrt,
-                                                        const expr_t *candidate)
+static expr_t *integrate_exp_unary_substitution_product(const expr_t *expr, const expr_t *wrt, const expr_t *candidate)
 {
     exp_unary_substitution_rule_t rule;
     exp_unary_poly_pair_t quotient_pair;
@@ -2369,47 +2005,38 @@ static expr_t *integrate_exp_unary_substitution_product(const expr_t *expr,
     if (!rule_ready)
         goto cleanup;
 
-    if (!match_nonconstant_affine_linear_expr(candidate->a, wrt, &arg_constant,
-                                              &arg_coeff) ||
+    if (!match_nonconstant_affine_linear_expr(candidate->a, wrt, &arg_constant, &arg_coeff) ||
         num_eq(arg_coeff, NUM_ZERO)) {
         goto cleanup;
     }
 
     exp_candidate = expr_exp(candidate);
-    quotient = exp_candidate
-                   ? expr_simplify_extract_common_factor_quotient(expr, exp_candidate)
-                   : NULL;
+    quotient = exp_candidate ? expr_simplify_extract_common_factor_quotient(expr, exp_candidate) : NULL;
     if (!quotient)
         goto cleanup;
 
-    if (!exp_unary_pair_from_expr(quotient, wrt, candidate, &rule,
-                                  &quotient_pair)) {
+    if (!exp_unary_pair_from_expr(quotient, wrt, candidate, &rule, &quotient_pair)) {
         goto cleanup;
     }
     solve_count = exp_unary_poly_pair_used_count(&quotient_pair);
 
     if (rule.has_companion) {
-        if (!substitution_solve_polynomial_differential(
-                rule.candidate_deriv, rule.candidate_deriv,
-                quotient_pair.companion, pure, solve_count) ||
+        if (!substitution_solve_polynomial_differential(rule.candidate_deriv, rule.candidate_deriv,
+                                                        quotient_pair.companion, pure, solve_count) ||
             !exp_unary_build_constant_operator(&rule, constant_m, constant_n) ||
-            !substitution_solve_polynomial_differential(
-                constant_m, constant_n, quotient_pair.constant, companion,
-                solve_count)) {
+            !substitution_solve_polynomial_differential(constant_m, constant_n, quotient_pair.constant, companion,
+                                                        solve_count)) {
             goto cleanup;
         }
     } else {
-        if (!substitution_poly_is_zero(quotient_pair.companion,
-                                       solve_count) ||
-            !substitution_solve_polynomial_differential(
-                rule.candidate_deriv, rule.candidate_deriv,
-                quotient_pair.constant, pure, solve_count)) {
+        if (!substitution_poly_is_zero(quotient_pair.companion, solve_count) ||
+            !substitution_solve_polynomial_differential(rule.candidate_deriv, rule.candidate_deriv,
+                                                        quotient_pair.constant, pure, solve_count)) {
             goto cleanup;
         }
     }
 
-    factor = build_exp_unary_pair_expr(candidate, candidate->a, &rule, pure,
-                                       companion, solve_count);
+    factor = build_exp_unary_pair_expr(candidate, candidate->a, &rule, pure, companion, solve_count);
     exp_clone = expr_exp(candidate);
     raw = (exp_clone && factor) ? expr_mul(exp_clone, factor) : NULL;
     out = div_number_owned(raw, arg_coeff);
@@ -2434,10 +2061,7 @@ cleanup:
     return out;
 }
 
-static expr_t *integrate_exact_substitution_candidate(
-    const expr_t *expr,
-    const expr_t *wrt,
-    const expr_t *candidate)
+static expr_t *integrate_exact_substitution_candidate(const expr_t *expr, const expr_t *wrt, const expr_t *candidate)
 {
     expr_t *du = NULL;
     expr_t *ratio = NULL;
@@ -2448,7 +2072,7 @@ static expr_t *integrate_exact_substitution_candidate(
     expr_t *back = NULL;
     expr_t *out = NULL;
     expr_t *vars[2];
-    bool used[2] = { false, false };
+    bool used[2] = {false, false};
     bool used_relation_rewrite = false;
     bool derivative_contains_inverse = false;
     bool trusted_antiderivative = false;
@@ -2481,13 +2105,10 @@ static expr_t *integrate_exact_substitution_candidate(
         expr_t *direct = NULL;
 
         if (expr_match_mul_expr(expr, &product_left, &product_right)) {
-            expr_t *left_rewritten = rewrite_trig_candidate_relations(
-                product_left, wrt, candidate, u);
-            expr_t *right_divided = rewrite_trig_divided_by_candidate_derivative(
-                product_right, wrt, candidate, u);
+            expr_t *left_rewritten = rewrite_trig_candidate_relations(product_left, wrt, candidate, u);
+            expr_t *right_divided = rewrite_trig_divided_by_candidate_derivative(product_right, wrt, candidate, u);
 
-            if (left_rewritten && right_divided &&
-                !depends_on_wrt(left_rewritten, wrt) &&
+            if (left_rewritten && right_divided && !depends_on_wrt(left_rewritten, wrt) &&
                 !depends_on_wrt(right_divided, wrt)) {
                 direct = expr_mul(left_rewritten, right_divided);
             }
@@ -2495,13 +2116,10 @@ static expr_t *integrate_exact_substitution_candidate(
             expr_free(left_rewritten);
 
             if (!direct) {
-                expr_t *right_rewritten = rewrite_trig_candidate_relations(
-                    product_right, wrt, candidate, u);
-                expr_t *left_divided = rewrite_trig_divided_by_candidate_derivative(
-                    product_left, wrt, candidate, u);
+                expr_t *right_rewritten = rewrite_trig_candidate_relations(product_right, wrt, candidate, u);
+                expr_t *left_divided = rewrite_trig_divided_by_candidate_derivative(product_left, wrt, candidate, u);
 
-                if (right_rewritten && left_divided &&
-                    !depends_on_wrt(right_rewritten, wrt) &&
+                if (right_rewritten && left_divided && !depends_on_wrt(right_rewritten, wrt) &&
                     !depends_on_wrt(left_divided, wrt)) {
                     direct = expr_mul(left_divided, right_rewritten);
                 }
@@ -2511,8 +2129,7 @@ static expr_t *integrate_exact_substitution_candidate(
         }
 
         if (!direct) {
-            direct = rewrite_trig_divided_by_candidate_derivative(
-                expr, wrt, candidate, u);
+            direct = rewrite_trig_divided_by_candidate_derivative(expr, wrt, candidate, u);
         }
 
         direct = simplify_owned(direct);
@@ -2532,8 +2149,7 @@ static expr_t *integrate_exact_substitution_candidate(
         }
     }
     if (transformed) {
-        expr_t *normalized =
-            expr_simplify_normalize_negated_mul_factor(transformed);
+        expr_t *normalized = expr_simplify_normalize_negated_mul_factor(transformed);
 
         if (normalized) {
             expr_free(transformed);
@@ -2574,9 +2190,8 @@ static expr_t *integrate_exact_substitution_candidate(
             difference = NULL;
         }
 
-        if (!deriv_simplified ||
-            (!expr_equal_exact_local(deriv_simplified, expr) &&
-             (!difference_simplified || !expr_is_exact_zero(difference_simplified)))) {
+        if (!deriv_simplified || (!expr_equal_exact_local(deriv_simplified, expr) &&
+                                  (!difference_simplified || !expr_is_exact_zero(difference_simplified)))) {
             expr_free(difference_simplified);
             expr_free(deriv_simplified);
             expr_free(out);
@@ -2598,8 +2213,7 @@ cleanup:
     return out;
 }
 
-expr_t *integrate_exact_substitution_product(const expr_t *expr,
-                                             const expr_t *wrt)
+expr_t *integrate_exact_substitution_product(const expr_t *expr, const expr_t *wrt)
 {
     const expr_t *candidates[32];
     size_t count = 0u;
@@ -2621,8 +2235,7 @@ expr_t *integrate_exact_substitution_product(const expr_t *expr,
     }
 
     for (size_t i = 0; i < count; ++i) {
-        expr_t *out = integrate_exp_unary_substitution_product(expr, wrt,
-                                                               candidates[i]);
+        expr_t *out = integrate_exp_unary_substitution_product(expr, wrt, candidates[i]);
 
         if (out) {
             num_destroy(&four);
@@ -2638,14 +2251,10 @@ expr_t *integrate_exact_substitution_product(const expr_t *expr,
 
         if (candidates[i]) {
             number_t exponent = num_new();
-            bool fourth_power =
-                (candidates[i]->ops->kind == EXPR_KIND_POW_D &&
-                 num_is_real(candidates[i]->c) &&
-                 num_eq(candidates[i]->c, four)) ||
-                (candidates[i]->ops->kind == EXPR_KIND_POW &&
-                 candidates[i]->b &&
-                 expr_match_const_value(candidates[i]->b, &exponent) &&
-                 num_eq(exponent, four));
+            bool fourth_power = (candidates[i]->ops->kind == EXPR_KIND_POW_D && num_is_real(candidates[i]->c) &&
+                                 num_eq(candidates[i]->c, four)) ||
+                                (candidates[i]->ops->kind == EXPR_KIND_POW && candidates[i]->b &&
+                                 expr_match_const_value(candidates[i]->b, &exponent) && num_eq(exponent, four));
 
             if (fourth_power) {
                 expr_t *half_power = expr_pow(candidates[i]->a, &NUM_TWO);

@@ -17,10 +17,11 @@ qfloat_t qf_renorm(double hi, double lo)
 
 qfloat_t qf_from_double(double x)
 {
-    return (qfloat_t) { x, 0.0 };
+    return (qfloat_t){x, 0.0};
 }
 
-double qf_to_double(qfloat_t x) {
+double qf_to_double(qfloat_t x)
+{
     return x.hi + x.lo;
 }
 
@@ -31,7 +32,7 @@ qfloat_t qf_floor(qfloat_t x)
 
     double t1 = x.hi - fh;
     double t2 = x.lo - fl;
-    double t3 = t1 + t2;   /* fractional part of (hi+lo) */
+    double t3 = t1 + t2; /* fractional part of (hi+lo) */
 
     int t = (int)floor(t3);
 
@@ -65,7 +66,6 @@ qfloat_t qf_rint(qfloat_t x)
     return qf_floor(t);
 }
 
-
 qfloat_t qf_abs(qfloat_t x)
 {
     if (x.hi < 0.0 || (x.hi == 0.0 && x.lo < 0.0)) {
@@ -77,8 +77,9 @@ qfloat_t qf_abs(qfloat_t x)
     return x;
 }
 
-qfloat_t qf_neg(qfloat_t x) {
-    qfloat_t r = { -x.hi, -x.lo };
+qfloat_t qf_neg(qfloat_t x)
+{
+    qfloat_t r = {-x.hi, -x.lo};
     return r;
 }
 
@@ -89,35 +90,46 @@ bool qf_eq(qfloat_t a, qfloat_t b)
 
 bool qf_lt(qfloat_t a, qfloat_t b)
 {
-    if (a.hi < b.hi) return 1;
-    if (a.hi > b.hi) return 0;
+    if (a.hi < b.hi)
+        return 1;
+    if (a.hi > b.hi)
+        return 0;
     return a.lo < b.lo;
 }
 
 bool qf_le(qfloat_t a, qfloat_t b)
 {
-    if (a.hi < b.hi) return 1;
-    if (a.hi > b.hi) return 0;
+    if (a.hi < b.hi)
+        return 1;
+    if (a.hi > b.hi)
+        return 0;
     return a.lo <= b.lo;
 }
 
 bool qf_gt(qfloat_t a, qfloat_t b)
 {
-    if (a.hi > b.hi) return 1;
-    if (a.hi < b.hi) return 0;
+    if (a.hi > b.hi)
+        return 1;
+    if (a.hi < b.hi)
+        return 0;
     return a.lo > b.lo;
 }
 
 bool qf_ge(qfloat_t a, qfloat_t b)
 {
-    if (a.hi > b.hi) return 1;
-    if (a.hi < b.hi) return 0;
+    if (a.hi > b.hi)
+        return 1;
+    if (a.hi < b.hi)
+        return 0;
     return a.lo >= b.lo;
 }
 
-int qf_cmp(qfloat_t a, qfloat_t b) {
-    if (qf_eq(a, b)) return 0;
-    if (qf_lt(a, b)) return -1;
+int qf_cmp(qfloat_t a, qfloat_t b)
+{
+    if (qf_eq(a, b))
+        return 0;
+    if (qf_lt(a, b))
+        return -1;
     return 1;
 }
 

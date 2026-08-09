@@ -465,6 +465,7 @@
         "test_from_string_deriv": true,
         "test_from_string_errors": true,
         "test_from_string_exact_value_functions": true,
+        "test_from_string_function_hash": true,
         "test_from_string_functions": true,
         "test_from_string_implicit_symbolic_bindings": true,
         "test_from_string_name_normalisation": true,
@@ -514,6 +515,7 @@
         "test_integrate_exact_symbolic_atan_affine_scale": true,
         "test_integrate_frequency_product_families": true,
         "test_integrate_hyperbolic_table_tail": true,
+        "test_integrate_hypergeometric_pFq_monomial_rule": true,
         "test_integrate_inverse_one_plus_unit_circle_root": true,
         "test_integrate_inverse_quartic_appell_f1": true,
         "test_integrate_inverse_sqrt_sin_cos_sin3_cos": true,
@@ -531,6 +533,9 @@
         "test_integrate_poly_times_affine_power": true,
         "test_integrate_polynomial_exponential_with_symbolic_rate": true,
         "test_integrate_polynomial_sum": true,
+        "test_integrate_power_composed_bessel_j_family": true,
+        "test_integrate_power_composed_bessel_y_family": true,
+        "test_integrate_power_composed_lommel_s_family": true,
         "test_integrate_quotient_rule_derivative": true,
         "test_integrate_reciprocal_and_log": true,
         "test_integrate_scaled_symbolic_sum_before_product_search": true,
@@ -667,12 +672,16 @@
       "enabled": true,
       "test_reverse_mode": {
         "enabled": true,
+        "test_reverse_appell_variables": true,
         "test_reverse_gradient_complex_number_t": true,
         "test_reverse_gradient_missing_variable": true,
         "test_reverse_gradient_polynomial": true,
         "test_reverse_gradient_polynomial_num": true,
         "test_reverse_gradient_shared_subexpression": true,
-        "test_reverse_matches_forward_composite": true
+        "test_reverse_hypergeometric_argument": true,
+        "test_reverse_lauricella_variables": true,
+        "test_reverse_matches_forward_composite": true,
+        "test_reverse_special_function_arguments": true
       }
     }
   },
@@ -1562,6 +1571,7 @@
       "test_bessel_functions": {
         "enabled": true,
         "test_qf_bessel_half_order_identities": true,
+        "test_qf_bessel_integer_order_values": true,
         "test_qf_bessel_order_recurrence": true
       },
       "test_gammainc_ei_e1": {

@@ -8,9 +8,7 @@
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
 
-expr_t *integrate_power_of_wrt(const expr_t *base,
-                               number_t exponent,
-                               const expr_t *wrt)
+expr_t *integrate_power_of_wrt(const expr_t *base, number_t exponent, const expr_t *wrt)
 {
     number_t next_exponent;
     expr_t *power;
@@ -33,9 +31,7 @@ expr_t *integrate_power_of_wrt(const expr_t *base,
     return out;
 }
 
-static expr_t *integrate_power_of_affine(const expr_t *base,
-                                         number_t exponent,
-                                         const expr_t *wrt)
+static expr_t *integrate_power_of_affine(const expr_t *base, number_t exponent, const expr_t *wrt)
 {
     number_t constant = num_new();
     number_t coeff = num_new();
@@ -76,25 +72,16 @@ bool is_wrt_symbolic_affine_leaf(const expr_t *expr, const expr_t *wrt)
 {
     if (is_wrt(expr, wrt))
         return true;
-    return expr &&
-           wrt &&
-           expr_is_var(expr) &&
-           expr_is_var(wrt) &&
-           expr->name &&
-           wrt->name &&
+    return expr && wrt && expr_is_var(expr) && expr_is_var(wrt) && expr->name && wrt->name &&
            strcmp(expr->name, wrt->name) == 0;
 }
 
 bool is_negated_wrt_symbolic_affine_leaf(const expr_t *expr, const expr_t *wrt)
 {
-    return expr &&
-           expr_is_neg(expr) &&
-           is_wrt_symbolic_affine_leaf(expr->a, wrt);
+    return expr && expr_is_neg(expr) && is_wrt_symbolic_affine_leaf(expr->a, wrt);
 }
 
-static bool match_symbolic_unit_affine_base(const expr_t *base,
-                                            const expr_t *wrt,
-                                            number_t *coeff_out)
+static bool match_symbolic_unit_affine_base(const expr_t *base, const expr_t *wrt, number_t *coeff_out)
 {
     number_t coeff;
 
@@ -106,27 +93,21 @@ static bool match_symbolic_unit_affine_base(const expr_t *base,
     } else if (is_negated_wrt_symbolic_affine_leaf(base, wrt)) {
         coeff = num_clone(NUM_NEG_ONE);
     } else if (expr_is_op(base, &ops_add)) {
-        if (is_wrt_symbolic_affine_leaf(base->a, wrt) &&
-            !depends_on_wrt(base->b, wrt)) {
+        if (is_wrt_symbolic_affine_leaf(base->a, wrt) && !depends_on_wrt(base->b, wrt)) {
             coeff = num_clone(NUM_ONE);
-        } else if (is_wrt_symbolic_affine_leaf(base->b, wrt) &&
-                   !depends_on_wrt(base->a, wrt)) {
+        } else if (is_wrt_symbolic_affine_leaf(base->b, wrt) && !depends_on_wrt(base->a, wrt)) {
             coeff = num_clone(NUM_ONE);
-        } else if (is_negated_wrt_symbolic_affine_leaf(base->a, wrt) &&
-                   !depends_on_wrt(base->b, wrt)) {
+        } else if (is_negated_wrt_symbolic_affine_leaf(base->a, wrt) && !depends_on_wrt(base->b, wrt)) {
             coeff = num_clone(NUM_NEG_ONE);
-        } else if (is_negated_wrt_symbolic_affine_leaf(base->b, wrt) &&
-                   !depends_on_wrt(base->a, wrt)) {
+        } else if (is_negated_wrt_symbolic_affine_leaf(base->b, wrt) && !depends_on_wrt(base->a, wrt)) {
             coeff = num_clone(NUM_NEG_ONE);
         } else {
             return false;
         }
     } else if (expr_is_op(base, &ops_sub)) {
-        if (is_wrt_symbolic_affine_leaf(base->a, wrt) &&
-            !depends_on_wrt(base->b, wrt)) {
+        if (is_wrt_symbolic_affine_leaf(base->a, wrt) && !depends_on_wrt(base->b, wrt)) {
             coeff = num_clone(NUM_ONE);
-        } else if (is_wrt_symbolic_affine_leaf(base->b, wrt) &&
-                   !depends_on_wrt(base->a, wrt)) {
+        } else if (is_wrt_symbolic_affine_leaf(base->b, wrt) && !depends_on_wrt(base->a, wrt)) {
             coeff = num_clone(NUM_NEG_ONE);
         } else {
             return false;
@@ -140,8 +121,7 @@ static bool match_symbolic_unit_affine_base(const expr_t *base,
     return true;
 }
 
-expr_t *match_symbolic_wrt_factor_coeff(const expr_t *expr,
-                                        const expr_t *wrt)
+expr_t *match_symbolic_wrt_factor_coeff(const expr_t *expr, const expr_t *wrt)
 {
     const expr_t *left = NULL;
     const expr_t *right = NULL;
@@ -158,22 +138,17 @@ expr_t *match_symbolic_wrt_factor_coeff(const expr_t *expr,
         return expr_negate_owned(match_symbolic_wrt_factor_coeff(expr->a, wrt));
 
     if (expr_match_mul_expr(expr, &left, &right)) {
-        if (is_wrt_symbolic_affine_leaf(left, wrt) &&
-            !depends_on_wrt(right, wrt))
+        if (is_wrt_symbolic_affine_leaf(left, wrt) && !depends_on_wrt(right, wrt))
             return expr_clone(right);
-        if (is_wrt_symbolic_affine_leaf(right, wrt) &&
-            !depends_on_wrt(left, wrt))
+        if (is_wrt_symbolic_affine_leaf(right, wrt) && !depends_on_wrt(left, wrt))
             return expr_clone(left);
-        if (is_negated_wrt_symbolic_affine_leaf(left, wrt) &&
-            !depends_on_wrt(right, wrt))
+        if (is_negated_wrt_symbolic_affine_leaf(left, wrt) && !depends_on_wrt(right, wrt))
             return expr_negate_owned(expr_clone(right));
-        if (is_negated_wrt_symbolic_affine_leaf(right, wrt) &&
-            !depends_on_wrt(left, wrt))
+        if (is_negated_wrt_symbolic_affine_leaf(right, wrt) && !depends_on_wrt(left, wrt))
             return expr_negate_owned(expr_clone(left));
     }
 
-    if (expr_is_op(expr, &ops_div) && expr->a && expr->b &&
-        !depends_on_wrt(expr->b, wrt)) {
+    if (expr_is_op(expr, &ops_div) && expr->a && expr->b && !depends_on_wrt(expr->b, wrt)) {
         expr_t *numer_coeff = match_symbolic_wrt_factor_coeff(expr->a, wrt);
         expr_t *denom = expr_clone(expr->b);
         expr_t *quotient = (numer_coeff && denom) ? expr_div(numer_coeff, denom) : NULL;
@@ -186,8 +161,7 @@ expr_t *match_symbolic_wrt_factor_coeff(const expr_t *expr,
     return NULL;
 }
 
-static expr_t *match_symbolic_affine_base_coeff(const expr_t *base,
-                                                const expr_t *wrt)
+static expr_t *match_symbolic_affine_base_coeff(const expr_t *base, const expr_t *wrt)
 {
     const expr_t *left = NULL;
     const expr_t *right = NULL;
@@ -218,9 +192,7 @@ static expr_t *match_symbolic_affine_base_coeff(const expr_t *base,
     return NULL;
 }
 
-static expr_t *integrate_power_of_symbolic_affine(const expr_t *base,
-                                                  number_t exponent,
-                                                  const expr_t *wrt)
+static expr_t *integrate_power_of_symbolic_affine(const expr_t *base, number_t exponent, const expr_t *wrt)
 {
     expr_t *coeff_expr = match_symbolic_affine_base_coeff(base, wrt);
     number_t next_exponent;
@@ -247,9 +219,7 @@ static expr_t *integrate_power_of_symbolic_affine(const expr_t *base,
 
     {
         expr_t *next_exponent_expr = expr_new_const(next_exponent);
-        expr_t *denominator = (coeff_expr && next_exponent_expr)
-                                  ? expr_mul(coeff_expr, next_exponent_expr)
-                                  : NULL;
+        expr_t *denominator = (coeff_expr && next_exponent_expr) ? expr_mul(coeff_expr, next_exponent_expr) : NULL;
         expr_t *power = expr_pow(base, &next_exponent);
         expr_t *quotient = (power && denominator) ? expr_div(power, denominator) : NULL;
 
@@ -264,9 +234,7 @@ static expr_t *integrate_power_of_symbolic_affine(const expr_t *base,
     return out;
 }
 
-static expr_t *integrate_power_of_symbolic_unit_affine(const expr_t *base,
-                                                       number_t exponent,
-                                                       const expr_t *wrt)
+static expr_t *integrate_power_of_symbolic_unit_affine(const expr_t *base, number_t exponent, const expr_t *wrt)
 {
     number_t coeff = num_new();
     number_t next_exponent;
@@ -298,9 +266,7 @@ static expr_t *integrate_power_of_symbolic_unit_affine(const expr_t *base,
     return out;
 }
 
-static expr_t *integrate_power_of_wrt_symbolic_exponent(const expr_t *base,
-                                                        const expr_t *exponent,
-                                                        const expr_t *wrt)
+static expr_t *integrate_power_of_wrt_symbolic_exponent(const expr_t *base, const expr_t *exponent, const expr_t *wrt)
 {
     expr_t *next_exponent;
     expr_t *power;
@@ -321,8 +287,7 @@ static expr_t *integrate_power_of_wrt_symbolic_exponent(const expr_t *base,
     return out;
 }
 
-static expr_t *integrate_power_of_affine_symbolic_exponent(const expr_t *base,
-                                                           const expr_t *exponent,
+static expr_t *integrate_power_of_affine_symbolic_exponent(const expr_t *base, const expr_t *exponent,
                                                            const expr_t *wrt)
 {
     number_t constant = num_new();
@@ -373,9 +338,7 @@ static bool number_is_supported_sqrt_power_lift_exponent_local(number_t value)
     long numerator = 0;
     long denominator = 0;
 
-    return num_get_small_rational(value, &numerator, &denominator) &&
-           denominator == 1 &&
-           numerator > 0 &&
+    return num_get_small_rational(value, &numerator, &denominator) && denominator == 1 && numerator > 0 &&
            ((numerator % 2) != 0 || (numerator % 4) == 0);
 }
 
@@ -435,9 +398,7 @@ expr_t *integrate_pow_rule(const expr_t *expr, const expr_t *wrt)
     return out;
 }
 
-expr_t *integrate_constant_over_power_denominator(const expr_t *numerator,
-                                                  const expr_t *denominator,
-                                                  const expr_t *wrt)
+expr_t *integrate_constant_over_power_denominator(const expr_t *numerator, const expr_t *denominator, const expr_t *wrt)
 {
     const expr_t *base = NULL;
     number_t exponent = num_new();
@@ -455,25 +416,20 @@ expr_t *integrate_constant_over_power_denominator(const expr_t *numerator,
         base = denominator->a;
         num_destroy(&exponent);
         exponent = num_clone(denominator->c);
-    } else if (denominator->ops && denominator->ops->kind == EXPR_KIND_POW &&
-               denominator->b &&
+    } else if (denominator->ops && denominator->ops->kind == EXPR_KIND_POW && denominator->b &&
                expr_match_const_value(denominator->b, &exponent)) {
         base = denominator->a;
-    } else if (denominator->ops && denominator->ops->kind == EXPR_KIND_SQRT &&
-               denominator->a) {
+    } else if (denominator->ops && denominator->ops->kind == EXPR_KIND_SQRT && denominator->a) {
         const expr_t *sqrt_arg = denominator->a;
         number_t inner_exponent = num_new();
         bool lifted_power = false;
 
-        if (expr_is_pow_d_expr(sqrt_arg) &&
-            number_is_supported_sqrt_power_lift_exponent_local(sqrt_arg->c)) {
+        if (expr_is_pow_d_expr(sqrt_arg) && number_is_supported_sqrt_power_lift_exponent_local(sqrt_arg->c)) {
             base = sqrt_arg->a;
             num_destroy(&exponent);
             exponent = num_mul(sqrt_arg->c, NUM_HALF);
             lifted_power = true;
-        } else if (sqrt_arg->ops &&
-                   sqrt_arg->ops->kind == EXPR_KIND_POW &&
-                   sqrt_arg->b &&
+        } else if (sqrt_arg->ops && sqrt_arg->ops->kind == EXPR_KIND_POW && sqrt_arg->b &&
                    expr_match_const_value(sqrt_arg->b, &inner_exponent) &&
                    number_is_supported_sqrt_power_lift_exponent_local(inner_exponent)) {
             base = sqrt_arg->a;
@@ -547,8 +503,7 @@ expr_t *integrate_pow_d_rule(const expr_t *expr, const expr_t *wrt)
 
 expr_t *integrate_sqrt_rule(const expr_t *expr, const expr_t *wrt)
 {
-    expr_t *out = expr && expr->a ? integrate_sqrt_one_plus_minus_affine_square(expr->a, wrt)
-                                  : NULL;
+    expr_t *out = expr && expr->a ? integrate_sqrt_one_plus_minus_affine_square(expr->a, wrt) : NULL;
 
     if (out)
         return out;

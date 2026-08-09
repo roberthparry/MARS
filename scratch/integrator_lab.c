@@ -1,7 +1,7 @@
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <ctype.h>
 
 #include "expression.h"
 #include "integrator.h"
@@ -62,8 +62,7 @@ static int text_is_ci_literal(const char *text, const char *literal)
     size_t i = 0u;
 
     while (text[i] && literal[i]) {
-        if (tolower((unsigned char)text[i]) !=
-            tolower((unsigned char)literal[i]))
+        if (tolower((unsigned char)text[i]) != tolower((unsigned char)literal[i]))
             return 0;
         i++;
     }
@@ -153,8 +152,7 @@ static int parse_infinity_bound(const char *text, number_t *out)
         pos++;
     }
 
-    ok = text_is_ci_literal(&trimmed[pos], "inf") ||
-         text_is_ci_literal(&trimmed[pos], "infinity") ||
+    ok = text_is_ci_literal(&trimmed[pos], "inf") || text_is_ci_literal(&trimmed[pos], "infinity") ||
          strcmp(&trimmed[pos], "∞") == 0;
     if (ok)
         *out = num_clone(sign < 0 ? NUM_NINF : NUM_INF);
@@ -219,10 +217,7 @@ cleanup:
     return simplified;
 }
 
-static expr_t *binding_or_shadowing_var(expr_t **expr_io,
-                                        expr_bindings_t *bindings,
-                                        const char *name,
-                                        int *owned)
+static expr_t *binding_or_shadowing_var(expr_t **expr_io, expr_bindings_t *bindings, const char *name, int *owned)
 {
     expr_t *bound = bindings ? expr_bindings_get(bindings, name) : NULL;
     expr_t *needle = NULL;
@@ -271,8 +266,7 @@ static expr_t *binding_or_shadowing_var(expr_t **expr_io,
     return shadow;
 }
 
-static expr_t *make_unevaluated_antiderivative(const expr_t *integrand,
-                                               const expr_t *wrt)
+static expr_t *make_unevaluated_antiderivative(const expr_t *integrand, const expr_t *wrt)
 {
     expr_t *simplified = NULL;
     expr_t *out = NULL;
@@ -404,8 +398,7 @@ static char *expr_tex_body_display(const expr_t *expr)
     return expr_tex_body(expr);
 }
 
-static char *combine_aligned_equation_tex(const char *lhs, const char *rhs,
-                                          int add_constant);
+static char *combine_aligned_equation_tex(const char *lhs, const char *rhs, int add_constant);
 
 static char *combine_equation_tex(const char *lhs, const char *rhs)
 {
@@ -427,8 +420,7 @@ static char *combine_equation_tex(const char *lhs, const char *rhs)
     return out;
 }
 
-static char *combine_aligned_equation_tex(const char *lhs, const char *rhs,
-                                          int add_constant)
+static char *combine_aligned_equation_tex(const char *lhs, const char *rhs, int add_constant)
 {
     static const char prefix[] = "\\begin{aligned}[t]\n";
     static const char suffix[] = "\n\\end{aligned}";
@@ -445,36 +437,25 @@ static char *combine_aligned_equation_tex(const char *lhs, const char *rhs,
     if (strncmp(rhs, prefix, strlen(prefix)) != 0)
         return NULL;
     end = rhs + strlen(rhs);
-    if ((size_t)(end - rhs) < suffix_n ||
-        strcmp(end - suffix_n, suffix) != 0)
+    if ((size_t)(end - rhs) < suffix_n || strcmp(end - suffix_n, suffix) != 0)
         return NULL;
 
     body = rhs + strlen(prefix);
     if (*body == '&')
         body++;
     end -= suffix_n;
-    while (end > body && (end[-1] == ' ' || end[-1] == '\n' || end[-1] == '\r' ||
-                          end[-1] == '\t'))
+    while (end > body && (end[-1] == ' ' || end[-1] == '\n' || end[-1] == '\r' || end[-1] == '\t'))
         end--;
 
     lhs_n = strlen(lhs);
     body_n = (size_t)(end - body);
     extra_n = add_constant ? strlen(" \\\\\n&{} + C") : 0u;
-    out = malloc(strlen(prefix) + lhs_n + strlen(" ={}& ") + body_n +
-                 extra_n + suffix_n + 1u);
+    out = malloc(strlen(prefix) + lhs_n + strlen(" ={}& ") + body_n + extra_n + suffix_n + 1u);
     if (!out)
         return NULL;
 
-    snprintf(out,
-             strlen(prefix) + lhs_n + strlen(" ={}& ") + body_n +
-                 extra_n + suffix_n + 1u,
-             "%s%s ={}& %.*s%s%s",
-             prefix,
-             lhs,
-             (int)body_n,
-             body,
-             add_constant ? " \\\\\n&{} + C" : "",
-             suffix);
+    snprintf(out, strlen(prefix) + lhs_n + strlen(" ={}& ") + body_n + extra_n + suffix_n + 1u, "%s%s ={}& %.*s%s%s",
+             prefix, lhs, (int)body_n, body, add_constant ? " \\\\\n&{} + C" : "", suffix);
     return out;
 }
 
@@ -498,30 +479,21 @@ static char *combine_antiderivative_tex(const char *lhs, const char *rhs)
     return out;
 }
 
-static void print_integrator_context(const char *input,
-                                     const char *expr_text,
-                                     const char *binding_expr_text,
-                                     size_t ndim,
-                                     const bound_kind_t *bound_kinds,
-                                     const char *const *var_names,
-                                     char *const *lo_display_inputs,
-                                     char *const *hi_display_inputs,
-                                     const char *const *lo_inputs,
-                                     const char *const *hi_inputs)
+static void print_integrator_context(const char *input, const char *expr_text, const char *binding_expr_text,
+                                     size_t ndim, const bound_kind_t *bound_kinds, const char *const *var_names,
+                                     char *const *lo_display_inputs, char *const *hi_display_inputs,
+                                     const char *const *lo_inputs, const char *const *hi_inputs)
 {
     printf("input       %s\n", input ? input : "");
     printf("expression  %s\n", expr_text ? expr_text : "(null)");
-    printf("binding_expression  %s\n",
-           binding_expr_text ? binding_expr_text : "");
+    printf("binding_expression  %s\n", binding_expr_text ? binding_expr_text : "");
     printf("dimensions  %zu\n", ndim);
     for (size_t i = 0; i < ndim; ++i) {
         const char *name = var_names && var_names[i] ? var_names[i] : "";
-        const char *lo = lo_display_inputs && lo_display_inputs[i]
-            ? lo_display_inputs[i]
-            : (lo_inputs && lo_inputs[i] ? lo_inputs[i] : "");
-        const char *hi = hi_display_inputs && hi_display_inputs[i]
-            ? hi_display_inputs[i]
-            : (hi_inputs && hi_inputs[i] ? hi_inputs[i] : "");
+        const char *lo = lo_display_inputs && lo_display_inputs[i] ? lo_display_inputs[i]
+                                                                   : (lo_inputs && lo_inputs[i] ? lo_inputs[i] : "");
+        const char *hi = hi_display_inputs && hi_display_inputs[i] ? hi_display_inputs[i]
+                                                                   : (hi_inputs && hi_inputs[i] ? hi_inputs[i] : "");
 
         if (bound_kinds && bound_kinds[i] == INTG_BOUND_DEFINITE)
             printf("bound       %s in [%s, %s]\n", name, lo, hi);
@@ -546,10 +518,7 @@ static int all_bounds_indefinite(size_t ndim, const bound_kind_t *kinds)
     return 1;
 }
 
-static int should_try_symbolic_first(const expr_t *expr,
-                                     size_t ndim,
-                                     expr_t *const *vars,
-                                     int all_bounds_numeric)
+static int should_try_symbolic_first(const expr_t *expr, size_t ndim, expr_t *const *vars, int all_bounds_numeric)
 {
     if (!expr || !vars || ndim == 0u)
         return 0;
@@ -563,12 +532,8 @@ static int should_try_symbolic_first(const expr_t *expr,
     return intg_integrand_has_unbound_parameters(expr, ndim, vars);
 }
 
-static char *integral_tex(const char *body,
-                          size_t ndim,
-                          const bound_kind_t *kinds,
-                          const char *const *var_names,
-                          const char *const *lo,
-                          const char *const *hi)
+static char *integral_tex(const char *body, size_t ndim, const bound_kind_t *kinds, const char *const *var_names,
+                          const char *const *lo, const char *const *hi)
 {
     char *result = NULL;
     size_t cap;
@@ -597,11 +562,9 @@ static char *integral_tex(const char *body,
         }
 
         if (kinds[i] == INTG_BOUND_DEFINITE) {
-            wrote = snprintf(result + len, cap - len,
-                             "\\int_{%s}^{%s} ", lo[i], hi[i]);
+            wrote = snprintf(result + len, cap - len, "\\int_{%s}^{%s} ", lo[i], hi[i]);
         } else if (kinds[i] == INTG_BOUND_UPPER_ONLY) {
-            wrote = snprintf(result + len, cap - len,
-                             "\\int^{%s} ", hi[i]);
+            wrote = snprintf(result + len, cap - len, "\\int^{%s} ", hi[i]);
         } else {
             wrote = snprintf(result + len, cap - len, "\\int ");
         }
@@ -705,8 +668,7 @@ int main(int argc, char **argv)
                 fprintf(stderr, "--max-intervals needs a value\n");
                 return 1;
             }
-            if (parse_size_text(argv[argi + 1], &parsed) != 0 ||
-                parsed == 0u) {
+            if (parse_size_text(argv[argi + 1], &parsed) != 0 || parsed == 0u) {
                 fprintf(stderr, "Bad --max-intervals value\n");
                 return 1;
             }
@@ -760,9 +722,8 @@ int main(int argc, char **argv)
     hi_display_inputs = calloc(ndim, sizeof(*hi_display_inputs));
     lo_tex_inputs = calloc(ndim, sizeof(*lo_tex_inputs));
     hi_tex_inputs = calloc(ndim, sizeof(*hi_tex_inputs));
-    if (!vars || !owned_vars || !var_names || !lo_inputs || !hi_inputs || !bound_kinds ||
-        !lo_num || !hi_num || !lo_expr || !hi_expr ||
-        !remaining_numeric_vars || !remaining_lo_num || !remaining_hi_num ||
+    if (!vars || !owned_vars || !var_names || !lo_inputs || !hi_inputs || !bound_kinds || !lo_num || !hi_num ||
+        !lo_expr || !hi_expr || !remaining_numeric_vars || !remaining_lo_num || !remaining_hi_num ||
         !lo_display_inputs || !hi_display_inputs || !lo_tex_inputs || !hi_tex_inputs)
         goto cleanup;
 
@@ -873,9 +834,8 @@ int main(int argc, char **argv)
 
     has_unbound_params = intg_integrand_has_unbound_parameters(expr, ndim, vars);
     if (should_try_symbolic_first(expr, ndim, vars, all_bounds_numeric)) {
-        symbolic_result = intg_integrate_iterated_symbolic(
-            expr, ndim, vars, bound_kinds, lo_expr, hi_expr,
-            ndim, NULL, &first_antiderivative);
+        symbolic_result = intg_integrate_iterated_symbolic(expr, ndim, vars, bound_kinds, lo_expr, hi_expr, ndim, NULL,
+                                                           &first_antiderivative);
         if (!symbolic_result && !first_antiderivative && ndim == 1u)
             first_antiderivative = make_unevaluated_antiderivative(expr, vars[0]);
         if (first_antiderivative) {
@@ -896,20 +856,16 @@ int main(int argc, char **argv)
         intg_rc = 0;
     } else if (symbolic_result) {
         intg_rc = 0;
-    } else if (first_antiderivative && ndim == 1u &&
-               (!all_bounds_numeric || has_unbound_params)) {
+    } else if (first_antiderivative && ndim == 1u && (!all_bounds_numeric || has_unbound_params)) {
         used_unevaluated_antiderivative_fallback = 1;
         intg_rc = 0;
     } else if (all_bounds_numeric && ndim == 1u) {
-        intg_rc = intg_integral(ig, expr, vars[0], lo_num[0], hi_num[0],
-                                   &value_num, &error_num);
+        intg_rc = intg_integral(ig, expr, vars[0], lo_num[0], hi_num[0], &value_num, &error_num);
         ran_numeric_integrator = 1;
     } else if (all_bounds_numeric) {
         partially_symbolic_result = intg_integrate_iterated_symbolic_best_effort(
-            expr, ndim, vars, bound_kinds, lo_expr, hi_expr,
-            &partial_symbolic_steps, &remaining_numeric_ndim,
-            remaining_numeric_vars, remaining_lo_num, remaining_hi_num,
-            lo_num, hi_num);
+            expr, ndim, vars, bound_kinds, lo_expr, hi_expr, &partial_symbolic_steps, &remaining_numeric_ndim,
+            remaining_numeric_vars, remaining_lo_num, remaining_hi_num, lo_num, hi_num);
 
         if (partially_symbolic_result && remaining_numeric_ndim == 0u) {
             symbolic_result = partially_symbolic_result;
@@ -917,30 +873,22 @@ int main(int argc, char **argv)
             symbolic_text = expr_text_dup(symbolic_result, style_UNBOUND);
             symbolic_tex = expr_tex_body_display(symbolic_result);
             symbolic_num = expr_eval(symbolic_result);
-            if (!num_is_nan(symbolic_num) && num_is_finite(symbolic_num) &&
-                num_is_real(symbolic_num)) {
+            if (!num_is_nan(symbolic_num) && num_is_finite(symbolic_num) && num_is_real(symbolic_num)) {
                 symbolic_value_text = number_text(symbolic_num);
             }
             if (symbolic_value_text)
                 used_symbolic_numeric_result = 1;
             used_partial_symbolic_numeric = 1;
             intg_rc = 0;
-        } else if (partially_symbolic_result && partial_symbolic_steps > 0u &&
-                   remaining_numeric_ndim == 1u) {
-            intg_rc = intg_integral(ig, partially_symbolic_result,
-                                    remaining_numeric_vars[0],
-                                    remaining_lo_num[0], remaining_hi_num[0],
-                                    &value_num, &error_num);
+        } else if (partially_symbolic_result && partial_symbolic_steps > 0u && remaining_numeric_ndim == 1u) {
+            intg_rc = intg_integral(ig, partially_symbolic_result, remaining_numeric_vars[0], remaining_lo_num[0],
+                                    remaining_hi_num[0], &value_num, &error_num);
             ran_numeric_integrator = 1;
             used_partial_symbolic_numeric = 1;
-        } else if (partially_symbolic_result && partial_symbolic_steps > 0u &&
-                   remaining_numeric_ndim > 1u &&
+        } else if (partially_symbolic_result && partial_symbolic_steps > 0u && remaining_numeric_ndim > 1u &&
                    remaining_numeric_ndim < ndim) {
-            intg_rc = intg_integral_multi(ig, partially_symbolic_result,
-                                          remaining_numeric_ndim,
-                                          remaining_numeric_vars,
-                                          remaining_lo_num, remaining_hi_num,
-                                          &value_num, &error_num);
+            intg_rc = intg_integral_multi(ig, partially_symbolic_result, remaining_numeric_ndim, remaining_numeric_vars,
+                                          remaining_lo_num, remaining_hi_num, &value_num, &error_num);
             ran_numeric_integrator = 1;
             used_partial_symbolic_numeric = 1;
         } else {
@@ -948,13 +896,11 @@ int main(int argc, char **argv)
             partially_symbolic_result = NULL;
             partial_symbolic_steps = 0u;
             remaining_numeric_ndim = 0u;
-            intg_rc = intg_integral_multi(ig, expr, ndim, vars, lo_num, hi_num,
-                                          &value_num, &error_num);
+            intg_rc = intg_integral_multi(ig, expr, ndim, vars, lo_num, hi_num, &value_num, &error_num);
             ran_numeric_integrator = 1;
         }
     } else {
-        print_integrator_context(input, expr_text, binding_expr_text, ndim,
-                                 bound_kinds, var_names, lo_display_inputs,
+        print_integrator_context(input, expr_text, binding_expr_text, ndim, bound_kinds, var_names, lo_display_inputs,
                                  hi_display_inputs, lo_inputs, hi_inputs);
         fprintf(stderr, "Symbolic bounds need an integrand with a supported symbolic antiderivative\n");
         goto cleanup;
@@ -966,23 +912,20 @@ int main(int argc, char **argv)
             num_destroy(&error_num);
             value_num = num_new();
             error_num = num_new();
-            intg_rc = intg_integral_multi(ig, expr, ndim, vars, lo_num, hi_num,
-                                          &value_num, &error_num);
+            intg_rc = intg_integral_multi(ig, expr, ndim, vars, lo_num, hi_num, &value_num, &error_num);
             if (intg_rc >= 0)
                 used_partial_symbolic_numeric = 0;
         }
     }
 
     if (ran_numeric_integrator && intg_rc < 0) {
-        print_integrator_context(input, expr_text, binding_expr_text, ndim,
-                                 bound_kinds, var_names, lo_display_inputs,
+        print_integrator_context(input, expr_text, binding_expr_text, ndim, bound_kinds, var_names, lo_display_inputs,
                                  hi_display_inputs, lo_inputs, hi_inputs);
         fprintf(stderr, "Integration failed\n");
         goto cleanup;
     }
 
-    if (ran_numeric_integrator && intg_rc >= 0 &&
-        !symbolic_result && !symbolic_text && !symbolic_tex) {
+    if (ran_numeric_integrator && intg_rc >= 0 && !symbolic_result && !symbolic_text && !symbolic_tex) {
         symbolic_result = (expr_t *)intg_get_exact_result(ig);
         if (symbolic_result)
             expr_retain(symbolic_result);
@@ -991,8 +934,7 @@ int main(int argc, char **argv)
             symbolic_text = expr_text_dup(symbolic_result, style_UNBOUND);
             symbolic_tex = expr_tex_body_display(symbolic_result);
             symbolic_num = expr_eval(symbolic_result);
-            if (!num_is_nan(symbolic_num) && num_is_finite(symbolic_num) &&
-                num_is_real(symbolic_num)) {
+            if (!num_is_nan(symbolic_num) && num_is_finite(symbolic_num) && num_is_real(symbolic_num)) {
                 symbolic_value_text = number_text(symbolic_num);
             }
         }
@@ -1006,10 +948,9 @@ int main(int argc, char **argv)
         error_text = dup_string("");
     }
 
-    base_tex_text = integrand_tex ? integral_tex(integrand_tex, ndim, bound_kinds,
-                                                var_names,
-                                                (const char *const *)lo_tex_inputs,
-                                                (const char *const *)hi_tex_inputs) : NULL;
+    base_tex_text = integrand_tex ? integral_tex(integrand_tex, ndim, bound_kinds, var_names,
+                                                 (const char *const *)lo_tex_inputs, (const char *const *)hi_tex_inputs)
+                                  : NULL;
     if (used_unevaluated_antiderivative_fallback)
         tex_text = dup_string(antiderivative_tex ? antiderivative_tex : "");
     else if (symbolic_tex && all_bounds_indefinite(ndim, bound_kinds))
@@ -1019,8 +960,7 @@ int main(int argc, char **argv)
     if (!tex_text)
         tex_text = dup_string(base_tex_text ? base_tex_text : "");
 
-    print_integrator_context(input, expr_text, binding_expr_text, ndim,
-                             bound_kinds, var_names, lo_display_inputs,
+    print_integrator_context(input, expr_text, binding_expr_text, ndim, bound_kinds, var_names, lo_display_inputs,
                              hi_display_inputs, lo_inputs, hi_inputs);
     printf("tex         %s\n", tex_text ? tex_text : "(null)");
     printf("antiderivative %s\n", antiderivative_text ? antiderivative_text : "");
@@ -1037,9 +977,7 @@ int main(int argc, char **argv)
     if (!ran_numeric_integrator) {
         if (used_symbolic_numeric_result)
             printf("status      %s\n",
-                   used_partial_symbolic_numeric ?
-                       "symbolic reduction exact result" :
-                       "symbolic exact result");
+                   used_partial_symbolic_numeric ? "symbolic reduction exact result" : "symbolic exact result");
         else if (used_unevaluated_antiderivative_fallback)
             printf("status      symbolic antiderivative fallback\n");
         else if (ndim == 1u && bound_kinds[0] == INTG_BOUND_INDEFINITE)
@@ -1049,14 +987,10 @@ int main(int argc, char **argv)
         else
             printf("status      symbolic result\n");
     } else if (intg_rc == 0) {
-        printf("status      %s\n",
-               used_core_exact_result ?
-                   "closed-form fast path" :
-               used_partial_symbolic_numeric ?
-                   "symbolic reduction + converged" :
-                   "converged");
-    } else if (intg_get_interval_count_used(ig) >=
-               (has_max_intervals ? max_intervals : 5000u)) {
+        printf("status      %s\n", used_core_exact_result          ? "closed-form fast path"
+                                   : used_partial_symbolic_numeric ? "symbolic reduction + converged"
+                                                                   : "converged");
+    } else if (intg_get_interval_count_used(ig) >= (has_max_intervals ? max_intervals : 5000u)) {
         printf("status      max intervals reached\n");
     } else {
         printf("status      precision limit reached\n");

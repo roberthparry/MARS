@@ -4,8 +4,8 @@
 #include "ustring.h"
 
 #include <limits.h>
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 bool number_eq_same_tol_complex(const number_t *a, const number_t *b);
 
@@ -58,8 +58,7 @@ bool number_eq_same_complex(const number_t *a, const number_t *b)
 
     if (!av || !bv)
         return false;
-    if (num_is_exact(av->real) && num_is_exact(av->imag) &&
-        num_is_exact(bv->real) && num_is_exact(bv->imag))
+    if (num_is_exact(av->real) && num_is_exact(av->imag) && num_is_exact(bv->real) && num_is_exact(bv->imag))
         return num_eq(av->real, bv->real) && num_eq(av->imag, bv->imag);
     return number_eq_same_tol_complex(a, b);
 }
@@ -127,8 +126,7 @@ int number_set_precision_complex(number_t *number, size_t precision_bits)
     value->constant_id = constant_id;
     value->precision_bits = precision_bits;
     if (had_cache) {
-        (void)number_complex_set_mpc_cache_from_mpc(value, cache_copy,
-            precision_bits);
+        (void)number_complex_set_mpc_cache_from_mpc(value, cache_copy, precision_bits);
         mpc_clear(cache_copy);
     }
     return 0;
@@ -210,10 +208,7 @@ string_t *number_to_text_complex(const number_t *number)
     if (string_view_equals_literal(string_view_all(imag), "1"))
         string_clear(imag);
 
-    formatted = string_sprintf("%S %c %Si",
-                               real,
-                               imag_negative ? '-' : '+',
-                               imag);
+    formatted = string_sprintf("%S %c %Si", real, imag_negative ? '-' : '+', imag);
 
 done:
     string_free(real);
@@ -398,13 +393,9 @@ number_t *number_ldexp_complex(const number_t *number, int exponent2)
     return number_wrap_complex_parts(real, imag);
 }
 
-typedef int (*number_complex_mpc_binary_fn)(mpc_ptr,
-                                            mpc_srcptr,
-                                            mpc_srcptr,
-                                            mpc_rnd_t);
+typedef int (*number_complex_mpc_binary_fn)(mpc_ptr, mpc_srcptr, mpc_srcptr, mpc_rnd_t);
 
-static size_t number_complex_binary_precision(const complex_t *av,
-                                              const complex_t *bv)
+static size_t number_complex_binary_precision(const complex_t *av, const complex_t *bv)
 {
     size_t precision_bits = number_default_precision_bits;
     size_t candidate;
@@ -444,14 +435,11 @@ static bool number_complex_component_blocks_mpc_fast_path(number_t value)
 
 static bool number_complex_blocks_mpc_fast_path(const complex_t *value)
 {
-    return value &&
-           (number_complex_component_blocks_mpc_fast_path(value->real) ||
-            number_complex_component_blocks_mpc_fast_path(value->imag));
+    return value && (number_complex_component_blocks_mpc_fast_path(value->real) ||
+                     number_complex_component_blocks_mpc_fast_path(value->imag));
 }
 
-static number_t *number_complex_binary_mpc(const complex_t *av,
-                                           const complex_t *bv,
-                                           number_complex_mpc_binary_fn fn)
+static number_t *number_complex_binary_mpc(const complex_t *av, const complex_t *bv, number_complex_mpc_binary_fn fn)
 {
     size_t precision_bits;
     mpc_t a_mpc;
@@ -459,11 +447,8 @@ static number_t *number_complex_binary_mpc(const complex_t *av,
     mpc_t out_mpc;
     number_t *out = NULL;
 
-    if (!av || !bv || !fn ||
-        number_complex_blocks_mpc_fast_path(av) ||
-        number_complex_blocks_mpc_fast_path(bv) ||
-        (!number_complex_has_inexact_component(av) &&
-         !number_complex_has_inexact_component(bv)))
+    if (!av || !bv || !fn || number_complex_blocks_mpc_fast_path(av) || number_complex_blocks_mpc_fast_path(bv) ||
+        (!number_complex_has_inexact_component(av) && !number_complex_has_inexact_component(bv)))
         return NULL;
 
     precision_bits = number_complex_binary_precision(av, bv);
@@ -510,8 +495,7 @@ static long number_long_gcd(long a, long b)
     return a == 0 ? 1 : a;
 }
 
-static bool number_small_fraction_from_number(const number_t *value,
-                                              number_small_fraction_t *out)
+static bool number_small_fraction_from_number(const number_t *value, number_small_fraction_t *out)
 {
     long n;
     long d;
@@ -533,16 +517,13 @@ static bool number_small_fraction_from_number(const number_t *value,
     return true;
 }
 
-static bool number_small_fraction_normalise(__int128 n,
-                                            __int128 d,
-                                            number_small_fraction_t *out)
+static bool number_small_fraction_normalise(__int128 n, __int128 d, number_small_fraction_t *out)
 {
     long ln;
     long ld;
     long gcd;
 
-    if (!out || d == 0 || n < LONG_MIN || n > LONG_MAX ||
-        d < LONG_MIN || d > LONG_MAX)
+    if (!out || d == 0 || n < LONG_MIN || n > LONG_MAX || d < LONG_MIN || d > LONG_MAX)
         return false;
     ln = (long)n;
     ld = (long)d;
@@ -558,44 +539,28 @@ static bool number_small_fraction_normalise(__int128 n,
     return true;
 }
 
-static bool number_small_fraction_add(number_small_fraction_t a,
-                                      number_small_fraction_t b,
+static bool number_small_fraction_add(number_small_fraction_t a, number_small_fraction_t b,
                                       number_small_fraction_t *out)
 {
-    return number_small_fraction_normalise(
-        (__int128)a.n * b.d + (__int128)b.n * a.d,
-        (__int128)a.d * b.d,
-        out);
+    return number_small_fraction_normalise((__int128)a.n * b.d + (__int128)b.n * a.d, (__int128)a.d * b.d, out);
 }
 
-static bool number_small_fraction_sub(number_small_fraction_t a,
-                                      number_small_fraction_t b,
+static bool number_small_fraction_sub(number_small_fraction_t a, number_small_fraction_t b,
                                       number_small_fraction_t *out)
 {
-    return number_small_fraction_normalise(
-        (__int128)a.n * b.d - (__int128)b.n * a.d,
-        (__int128)a.d * b.d,
-        out);
+    return number_small_fraction_normalise((__int128)a.n * b.d - (__int128)b.n * a.d, (__int128)a.d * b.d, out);
 }
 
-static bool number_small_fraction_mul(number_small_fraction_t a,
-                                      number_small_fraction_t b,
+static bool number_small_fraction_mul(number_small_fraction_t a, number_small_fraction_t b,
                                       number_small_fraction_t *out)
 {
-    return number_small_fraction_normalise(
-        (__int128)a.n * b.n,
-        (__int128)a.d * b.d,
-        out);
+    return number_small_fraction_normalise((__int128)a.n * b.n, (__int128)a.d * b.d, out);
 }
 
-static bool number_small_fraction_div(number_small_fraction_t a,
-                                      number_small_fraction_t b,
+static bool number_small_fraction_div(number_small_fraction_t a, number_small_fraction_t b,
                                       number_small_fraction_t *out)
 {
-    return number_small_fraction_normalise(
-        (__int128)a.n * b.d,
-        (__int128)a.d * b.n,
-        out);
+    return number_small_fraction_normalise((__int128)a.n * b.d, (__int128)a.d * b.n, out);
 }
 
 static number_t *number_wrap_small_fraction(number_small_fraction_t value)
@@ -605,9 +570,7 @@ static number_t *number_wrap_small_fraction(number_small_fraction_t value)
     return number_wrap_mpq(number_mpq_from_frac_long(value.n, value.d));
 }
 
-static number_t *number_wrap_complex_small_fraction_parts(
-    number_small_fraction_t real,
-    number_small_fraction_t imag)
+static number_t *number_wrap_complex_small_fraction_parts(number_small_fraction_t real, number_small_fraction_t imag)
 {
     number_t *real_box;
     number_t *imag_box;
@@ -636,26 +599,17 @@ static number_t *number_wrap_complex_small_fraction_parts(
     return out;
 }
 
-static bool number_complex_small_fraction_components(
-    const complex_t *av,
-    const complex_t *bv,
-    number_small_fraction_t *ar,
-    number_small_fraction_t *ai,
-    number_small_fraction_t *br,
-    number_small_fraction_t *bi)
+static bool number_complex_small_fraction_components(const complex_t *av, const complex_t *bv,
+                                                     number_small_fraction_t *ar, number_small_fraction_t *ai,
+                                                     number_small_fraction_t *br, number_small_fraction_t *bi)
 {
-    return av && bv &&
-           number_small_fraction_from_number(&av->real, ar) &&
-           number_small_fraction_from_number(&av->imag, ai) &&
-           number_small_fraction_from_number(&bv->real, br) &&
+    return av && bv && number_small_fraction_from_number(&av->real, ar) &&
+           number_small_fraction_from_number(&av->imag, ai) && number_small_fraction_from_number(&bv->real, br) &&
            number_small_fraction_from_number(&bv->imag, bi);
 }
 
-static bool number_small_fraction_components_are_integers(
-    number_small_fraction_t ar,
-    number_small_fraction_t ai,
-    number_small_fraction_t br,
-    number_small_fraction_t bi)
+static bool number_small_fraction_components_are_integers(number_small_fraction_t ar, number_small_fraction_t ai,
+                                                          number_small_fraction_t br, number_small_fraction_t bi)
 {
     return ar.d == 1 && ai.d == 1 && br.d == 1 && bi.d == 1;
 }
@@ -667,108 +621,63 @@ static bool number_small_integer_from_number(const number_t *value, long *out)
     return number_mpz_get_long(number_impl_const(value)->value.mpz, out);
 }
 
-static bool number_complex_small_integer_components(const complex_t *av,
-                                                    const complex_t *bv,
-                                                    long *ar,
-                                                    long *ai,
-                                                    long *br,
-                                                    long *bi)
+static bool number_complex_small_integer_components(const complex_t *av, const complex_t *bv, long *ar, long *ai,
+                                                    long *br, long *bi)
 {
-    return av && bv &&
-           number_small_integer_from_number(&av->real, ar) &&
-           number_small_integer_from_number(&av->imag, ai) &&
-           number_small_integer_from_number(&bv->real, br) &&
+    return av && bv && number_small_integer_from_number(&av->real, ar) &&
+           number_small_integer_from_number(&av->imag, ai) && number_small_integer_from_number(&bv->real, br) &&
            number_small_integer_from_number(&bv->imag, bi);
 }
 
-static number_t *number_mul_same_complex_small_integer_values(
-    long ar,
-    long ai,
-    long br,
-    long bi)
+static number_t *number_mul_same_complex_small_integer_values(long ar, long ai, long br, long bi)
 {
     number_small_fraction_t real;
     number_small_fraction_t imag;
 
-    if (!number_small_fraction_normalise(
-            (__int128)ar * br - (__int128)ai * bi,
-            1,
-            &real) ||
-        !number_small_fraction_normalise(
-            (__int128)ar * bi + (__int128)ai * br,
-            1,
-            &imag))
+    if (!number_small_fraction_normalise((__int128)ar * br - (__int128)ai * bi, 1, &real) ||
+        !number_small_fraction_normalise((__int128)ar * bi + (__int128)ai * br, 1, &imag))
         return NULL;
     return number_wrap_complex_small_fraction_parts(real, imag);
 }
 
-static number_t *number_div_same_complex_small_integer_values(
-    long ar,
-    long ai,
-    long br,
-    long bi)
+static number_t *number_div_same_complex_small_integer_values(long ar, long ai, long br, long bi)
 {
     __int128 denom = (__int128)br * br + (__int128)bi * bi;
     number_small_fraction_t real;
     number_small_fraction_t imag;
 
-    if (!number_small_fraction_normalise(
-            (__int128)ar * br + (__int128)ai * bi,
-            denom,
-            &real) ||
-        !number_small_fraction_normalise(
-            (__int128)ai * br - (__int128)ar * bi,
-            denom,
-            &imag))
+    if (!number_small_fraction_normalise((__int128)ar * br + (__int128)ai * bi, denom, &real) ||
+        !number_small_fraction_normalise((__int128)ai * br - (__int128)ar * bi, denom, &imag))
         return NULL;
     return number_wrap_complex_small_fraction_parts(real, imag);
 }
 
-static number_t *number_mul_same_complex_small_integer_parts(
-    number_small_fraction_t ar,
-    number_small_fraction_t ai,
-    number_small_fraction_t br,
-    number_small_fraction_t bi)
+static number_t *number_mul_same_complex_small_integer_parts(number_small_fraction_t ar, number_small_fraction_t ai,
+                                                             number_small_fraction_t br, number_small_fraction_t bi)
 {
     number_small_fraction_t real;
     number_small_fraction_t imag;
 
-    if (!number_small_fraction_normalise(
-            (__int128)ar.n * br.n - (__int128)ai.n * bi.n,
-            1,
-            &real) ||
-        !number_small_fraction_normalise(
-            (__int128)ar.n * bi.n + (__int128)ai.n * br.n,
-            1,
-            &imag))
+    if (!number_small_fraction_normalise((__int128)ar.n * br.n - (__int128)ai.n * bi.n, 1, &real) ||
+        !number_small_fraction_normalise((__int128)ar.n * bi.n + (__int128)ai.n * br.n, 1, &imag))
         return NULL;
     return number_wrap_complex_small_fraction_parts(real, imag);
 }
 
-static number_t *number_div_same_complex_small_integer_parts(
-    number_small_fraction_t ar,
-    number_small_fraction_t ai,
-    number_small_fraction_t br,
-    number_small_fraction_t bi)
+static number_t *number_div_same_complex_small_integer_parts(number_small_fraction_t ar, number_small_fraction_t ai,
+                                                             number_small_fraction_t br, number_small_fraction_t bi)
 {
     __int128 denom = (__int128)br.n * br.n + (__int128)bi.n * bi.n;
     number_small_fraction_t real;
     number_small_fraction_t imag;
 
-    if (!number_small_fraction_normalise(
-            (__int128)ar.n * br.n + (__int128)ai.n * bi.n,
-            denom,
-            &real) ||
-        !number_small_fraction_normalise(
-            (__int128)ai.n * br.n - (__int128)ar.n * bi.n,
-            denom,
-            &imag))
+    if (!number_small_fraction_normalise((__int128)ar.n * br.n + (__int128)ai.n * bi.n, denom, &real) ||
+        !number_small_fraction_normalise((__int128)ai.n * br.n - (__int128)ar.n * bi.n, denom, &imag))
         return NULL;
     return number_wrap_complex_small_fraction_parts(real, imag);
 }
 
-static number_t *number_mul_same_complex_small_fraction(const complex_t *av,
-                                                        const complex_t *bv)
+static number_t *number_mul_same_complex_small_fraction(const complex_t *av, const complex_t *bv)
 {
     number_small_fraction_t ar, ai, br, bi;
     number_small_fraction_t ac, bd, ad, bc;
@@ -781,18 +690,14 @@ static number_t *number_mul_same_complex_small_fraction(const complex_t *av,
         return NULL;
     if (number_small_fraction_components_are_integers(ar, ai, br, bi))
         return number_mul_same_complex_small_integer_parts(ar, ai, br, bi);
-    if (!number_small_fraction_mul(ar, br, &ac) ||
-        !number_small_fraction_mul(ai, bi, &bd) ||
-        !number_small_fraction_mul(ar, bi, &ad) ||
-        !number_small_fraction_mul(ai, br, &bc) ||
-        !number_small_fraction_sub(ac, bd, &real) ||
-        !number_small_fraction_add(ad, bc, &imag))
+    if (!number_small_fraction_mul(ar, br, &ac) || !number_small_fraction_mul(ai, bi, &bd) ||
+        !number_small_fraction_mul(ar, bi, &ad) || !number_small_fraction_mul(ai, br, &bc) ||
+        !number_small_fraction_sub(ac, bd, &real) || !number_small_fraction_add(ad, bc, &imag))
         return NULL;
     return number_wrap_complex_small_fraction_parts(real, imag);
 }
 
-static number_t *number_div_same_complex_small_fraction(const complex_t *av,
-                                                        const complex_t *bv)
+static number_t *number_div_same_complex_small_fraction(const complex_t *av, const complex_t *bv)
 {
     number_small_fraction_t ar, ai, br, bi;
     number_small_fraction_t c2, d2, denom;
@@ -807,16 +712,11 @@ static number_t *number_div_same_complex_small_fraction(const complex_t *av,
         return NULL;
     if (number_small_fraction_components_are_integers(ar, ai, br, bi))
         return number_div_same_complex_small_integer_parts(ar, ai, br, bi);
-    if (!number_small_fraction_mul(br, br, &c2) ||
-        !number_small_fraction_mul(bi, bi, &d2) ||
-        !number_small_fraction_add(c2, d2, &denom) ||
-        !number_small_fraction_mul(ar, br, &ac) ||
-        !number_small_fraction_mul(ai, bi, &bd) ||
-        !number_small_fraction_mul(ai, br, &bc) ||
-        !number_small_fraction_mul(ar, bi, &ad) ||
-        !number_small_fraction_add(ac, bd, &real_num) ||
-        !number_small_fraction_sub(bc, ad, &imag_num) ||
-        !number_small_fraction_div(real_num, denom, &real) ||
+    if (!number_small_fraction_mul(br, br, &c2) || !number_small_fraction_mul(bi, bi, &d2) ||
+        !number_small_fraction_add(c2, d2, &denom) || !number_small_fraction_mul(ar, br, &ac) ||
+        !number_small_fraction_mul(ai, bi, &bd) || !number_small_fraction_mul(ai, br, &bc) ||
+        !number_small_fraction_mul(ar, bi, &ad) || !number_small_fraction_add(ac, bd, &real_num) ||
+        !number_small_fraction_sub(bc, ad, &imag_num) || !number_small_fraction_div(real_num, denom, &real) ||
         !number_small_fraction_div(imag_num, denom, &imag))
         return NULL;
     return number_wrap_complex_small_fraction_parts(real, imag);
@@ -854,8 +754,7 @@ static number_t *number_complex_wrap_imag_scaled(number_t magnitude, int sign)
     return number_wrap_complex_parts(real, imag);
 }
 
-static number_t *number_mul_same_complex_imag_unit(const complex_t *av,
-                                                   const complex_t *bv)
+static number_t *number_mul_same_complex_imag_unit(const complex_t *av, const complex_t *bv)
 {
     int sign;
 
@@ -986,8 +885,7 @@ number_t *number_div_same_complex(const number_t *a, const number_t *b)
     return number_wrap_complex_parts(real, imag);
 }
 
-static number_t *number_apply_complex_mpc_unary(const number_t *number,
-                                                int (*fn)(mpc_ptr, mpc_srcptr, mpc_rnd_t))
+static number_t *number_apply_complex_mpc_unary(const number_t *number, int (*fn)(mpc_ptr, mpc_srcptr, mpc_rnd_t))
 {
     const complex_t *value = number_complex_value(number);
     size_t precision_bits;

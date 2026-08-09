@@ -1,11 +1,11 @@
 #ifndef USTRING_H
 #define USTRING_H
 
-#include <stddef.h>
 #include <stdarg.h>
-#include <stdio.h>
-#include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdio.h>
 #include <wchar.h>
 
 /**
@@ -412,9 +412,7 @@ int string_append_rune(string_t *s, rune_t rune);
  * Return 0 to continue iteration, or non-zero to stop. The @p rune is a
  * stack value valid for the duration of the callback.
  */
-typedef int (*string_each_fn)(rune_t rune,
-                              size_t index,
-                              void *user);
+typedef int (*string_each_fn)(rune_t rune, size_t index, void *user);
 
 /**
  * @brief Iterate over user-visible characters in order.
@@ -530,10 +528,7 @@ bool string_view_peek_ascii(string_view_t view, string_pos_t pos, unsigned char 
  * @param next_pos_out  Optional position immediately after the rune value.
  * @return              @c true when a rune value was read, @c false otherwise.
  */
-bool string_view_peek_rune_value(string_view_t view,
-                                 string_pos_t pos,
-                                 uint32_t *out,
-                                 string_pos_t *next_pos_out);
+bool string_view_peek_rune_value(string_view_t view, string_pos_t pos, uint32_t *out, string_pos_t *next_pos_out);
 
 /**
  * @brief Trim whitespace from both ends of a borrowed view.
@@ -563,9 +558,7 @@ bool string_view_equals_literal(string_view_t view, const char *literal);
  * @return                  @c true when @p literal matches at the start of
  *                          @p view.
  */
-bool string_view_starts_with(string_view_t view,
-                             const string_t *literal,
-                             bool case_insensitive);
+bool string_view_starts_with(string_view_t view, const string_t *literal, bool case_insensitive);
 
 /**
  * @brief Test whether a view starts with another view.
@@ -576,9 +569,7 @@ bool string_view_starts_with(string_view_t view,
  * @return                  @c true when @p literal matches at the start of
  *                          @p view.
  */
-bool string_view_starts_with_view(string_view_t view,
-                                  string_view_t literal,
-                                  bool case_insensitive);
+bool string_view_starts_with_view(string_view_t view, string_view_t literal, bool case_insensitive);
 
 /* =========================================================================
    Cursor reading
@@ -714,9 +705,7 @@ bool string_cursor_peek_ascii(const string_cursor_t *cursor, unsigned char *out)
  * @param out     Optional output character.
  * @return        @c true when the rune at @p pos is one ASCII character.
  */
-bool string_cursor_peek_ascii_at(const string_cursor_t *cursor,
-                                 string_pos_t pos,
-                                 unsigned char *out);
+bool string_cursor_peek_ascii_at(const string_cursor_t *cursor, string_pos_t pos, unsigned char *out);
 
 /**
  * @brief Advance over a known matched span.
@@ -748,9 +737,7 @@ void string_cursor_skip_spaces(string_cursor_t *cursor);
  * @param cursor  Cursor whose source text owns the positions.
  * @return        New string, or @c NULL on invalid positions/allocation failure.
  */
-string_t *string_cursor_slice_between(string_pos_t start,
-                                      string_pos_t end,
-                                      const string_cursor_t *cursor);
+string_t *string_cursor_slice_between(string_pos_t start, string_pos_t end, const string_cursor_t *cursor);
 
 /**
  * @brief Copy text from a saved position to the cursor's current position.
@@ -762,8 +749,7 @@ string_t *string_cursor_slice_between(string_pos_t start,
  * @param cursor  Cursor whose source text owns the position.
  * @return        New string, or @c NULL on invalid positions/allocation failure.
  */
-string_t *string_cursor_extract(string_pos_t start,
-                                const string_cursor_t *cursor);
+string_t *string_cursor_extract(string_pos_t start, const string_cursor_t *cursor);
 
 /**
  * @brief Append text between two cursor positions to an existing string.
@@ -774,9 +760,7 @@ string_t *string_cursor_extract(string_pos_t start,
  * @param cursor  Cursor whose source text owns the positions.
  * @return        0 on success, non-zero on error.
  */
-int string_cursor_append_slice_between(string_t *out,
-                                       string_pos_t start,
-                                       string_pos_t end,
+int string_cursor_append_slice_between(string_t *out, string_pos_t start, string_pos_t end,
                                        const string_cursor_t *cursor);
 
 /**
@@ -790,9 +774,7 @@ int string_cursor_append_slice_between(string_t *out,
  * @param cursor  Cursor whose source text owns the positions.
  * @return        Borrowed view, or an empty view for invalid positions.
  */
-string_view_t string_cursor_view_between(string_pos_t start,
-                                         string_pos_t end,
-                                         const string_cursor_t *cursor);
+string_view_t string_cursor_view_between(string_pos_t start, string_pos_t end, const string_cursor_t *cursor);
 
 /**
  * @brief Borrow a view from a saved position to the cursor's current position.
@@ -803,8 +785,7 @@ string_view_t string_cursor_view_between(string_pos_t start,
  * @param cursor  Cursor whose source text owns the position.
  * @return        Borrowed view, or an empty view for invalid positions.
  */
-string_view_t string_cursor_view_extract(string_pos_t start,
-                                         const string_cursor_t *cursor);
+string_view_t string_cursor_view_extract(string_pos_t start, const string_cursor_t *cursor);
 
 /**
  * @brief Peek at a rune at a saved cursor position without moving the cursor.
@@ -813,8 +794,7 @@ string_view_t string_cursor_view_extract(string_pos_t start,
  * @param pos     Position to inspect.
  * @return        Rune at @p pos, or a none rune for invalid/end positions.
  */
-rune_t string_cursor_peek_at(const string_cursor_t *cursor,
-                             string_pos_t pos);
+rune_t string_cursor_peek_at(const string_cursor_t *cursor, string_pos_t pos);
 
 /**
  * @brief Test whether literal text matches at a saved cursor position.
@@ -824,9 +804,7 @@ rune_t string_cursor_peek_at(const string_cursor_t *cursor,
  * @param literal  Null-terminated UTF-8 literal. Must not be @c NULL.
  * @return         @c true if @p literal matches at @p pos.
  */
-bool string_cursor_match_at(const string_cursor_t *cursor,
-                            string_pos_t pos,
-                            const char *literal);
+bool string_cursor_match_at(const string_cursor_t *cursor, string_pos_t pos, const char *literal);
 
 /**
  * @brief Trim whitespace from both ends of the string in place.
@@ -857,8 +835,8 @@ typedef struct {
     bool flag_space;              /**< space flag. */
     bool flag_alternate;          /**< '#' flag. */
     bool flag_zero;               /**< '0' flag. */
-    int  width;                   /**< Literal width, or 0 when absent / from argument. */
-    int  precision;               /**< Literal precision, or -1 when absent / from argument. */
+    int width;                    /**< Literal width, or 0 when absent / from argument. */
+    int precision;                /**< Literal precision, or -1 when absent / from argument. */
     bool width_from_argument;     /**< Width was written as '*'. */
     bool precision_from_argument; /**< Precision was written as '*'. */
     char length[3];               /**< Length modifier: "", "h", "hh", "l", "ll", etc. */
@@ -868,11 +846,11 @@ typedef struct {
  * @brief Result returned by an extension formatter callback.
  */
 typedef enum {
-    STRING_FORMAT_ERROR = -1,     /**< Formatting failed. */
-    STRING_FORMAT_UNHANDLED = 0,  /**< Callback does not own this conversion. */
-    STRING_FORMAT_HANDLED = 1,    /**< Callback handled and appended output. */
+    STRING_FORMAT_ERROR = -1,    /**< Formatting failed. */
+    STRING_FORMAT_UNHANDLED = 0, /**< Callback does not own this conversion. */
+    STRING_FORMAT_HANDLED = 1,   /**< Callback handled and appended output. */
     STRING_FORMAT_HANDLED_WITH_TRAILING_MODIFIER = 2
-                                  /**< Callback also consumed trailing modifier. */
+    /**< Callback also consumed trailing modifier. */
 } string_format_result_t;
 
 /**
@@ -885,11 +863,8 @@ typedef enum {
  * STRING_FORMAT_HANDLED_WITH_TRAILING_MODIFIER. If it returns
  * STRING_FORMAT_UNHANDLED, it must not consume any arguments.
  */
-typedef string_format_result_t (*string_format_callback_t)(
-    string_t *out,
-    const string_format_spec_t *spec,
-    va_list ap,
-    void *user);
+typedef string_format_result_t (*string_format_callback_t)(string_t *out, const string_format_spec_t *spec, va_list ap,
+                                                           void *user);
 
 /**
  * @brief Append formatted text using a @c va_list.
@@ -918,10 +893,7 @@ int string_append_vformat(string_t *s, const char *fmt, va_list ap);
  * @param user      Caller data passed through to @p callback.
  * @return          Number of bytes appended, or negative on error.
  */
-int string_append_vformat_with_callback(string_t *s,
-                                        const char *fmt,
-                                        va_list ap,
-                                        string_format_callback_t callback,
+int string_append_vformat_with_callback(string_t *s, const char *fmt, va_list ap, string_format_callback_t callback,
                                         void *user);
 
 /**
@@ -966,10 +938,7 @@ string_t *string_vsprintf(const char *fmt, va_list ap);
  * @param user      Caller data passed through to @p callback.
  * @return          Newly allocated formatted string, or @c NULL on error.
  */
-string_t *string_vsprintf_with_callback(const char *fmt,
-                                        va_list ap,
-                                        string_format_callback_t callback,
-                                        void *user);
+string_t *string_vsprintf_with_callback(const char *fmt, va_list ap, string_format_callback_t callback, void *user);
 
 /**
  * @brief Create a new formatted string.
@@ -1142,9 +1111,7 @@ int string_replace(string_t *s, const char *search, const char *replace);
  * @param replace  Replacement string. Must not be @c NULL.
  * @return         Number of replacements made, or negative on allocation failure.
  */
-int string_replace_string(string_t *s,
-                          const string_t *search,
-                          const string_t *replace);
+int string_replace_string(string_t *s, const string_t *search, const string_t *replace);
 
 /* =========================================================================
    Split and join
@@ -1177,9 +1144,7 @@ string_t **string_split(const string_t *s, const char *delim, size_t *out_count)
  * @param out_count  Output: number of elements in the returned array.
  * @return           Array of newly allocated strings, or @c NULL on failure.
  */
-string_t **string_split_string(const string_t *s,
-                               const string_t *delim,
-                               size_t *out_count);
+string_t **string_split_string(const string_t *s, const string_t *delim, size_t *out_count);
 
 /**
  * @brief Free an array returned by string_split().
@@ -1213,9 +1178,7 @@ string_t *string_join(string_t **arr, size_t count, const char *sep);
  * @param sep    Separator string. Must not be @c NULL.
  * @return       Newly allocated joined string, or @c NULL on failure.
  */
-string_t *string_join_string(string_t **arr,
-                             size_t count,
-                             const string_t *sep);
+string_t *string_join_string(string_t **arr, size_t count, const string_t *sep);
 
 /* =========================================================================
    Case conversion

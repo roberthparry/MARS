@@ -1,8 +1,8 @@
 #define MARS_TIMESERIES_INTERNAL_ACCESS
 #include "timeseries_internal.h"
 
-static matrix_t *ts_augmented_xreg(const matrix_t *xreg, size_t rows, bool include_intercept,
-                                   bool include_trend, size_t trend_start)
+static matrix_t *ts_augmented_xreg(const matrix_t *xreg, size_t rows, bool include_intercept, bool include_trend,
+                                   size_t trend_start)
 {
     size_t base_cols = xreg ? mat_get_col_count(xreg) : 0u;
     size_t cols = base_cols + (include_intercept ? 1u : 0u) + (include_trend ? 1u : 0u);
@@ -31,12 +31,8 @@ static matrix_t *ts_augmented_xreg(const matrix_t *xreg, size_t rows, bool inclu
     return X;
 }
 
-int ts_regression_fit_internal(const timeseries_t *y,
-                               const matrix_t *xreg,
-                               bool include_intercept,
-                               bool include_trend,
-                               const ts_fit_options_t *options,
-                               ts_regression_result_t *out)
+int ts_regression_fit_internal(const timeseries_t *y, const matrix_t *xreg, bool include_intercept, bool include_trend,
+                               const ts_fit_options_t *options, ts_regression_result_t *out)
 {
     matrix_t *Y = NULL, *X = NULL, *beta = NULL, *fit = NULL, *resid_col = NULL;
     matrix_t *Xt = NULL, *XtX = NULL, *XtX_inv = NULL;
@@ -90,22 +86,27 @@ int ts_regression_fit_internal(const timeseries_t *y,
         double diff = yd - mean;
         sst += diff * diff;
     }
-    out->coefficients = beta; beta = NULL;
-    out->fitted = fitted; fitted = NULL;
-    out->residuals = residuals; residuals = NULL;
+    out->coefficients = beta;
+    beta = NULL;
+    out->fitted = fitted;
+    fitted = NULL;
+    out->residuals = residuals;
+    residuals = NULL;
     out->sse = num_create_from_double(sse);
     out->mse = num_create_from_double(sse / (double)n);
     out->rmse = num_create_from_double(sqrt(sse / (double)n));
     out->r2 = num_create_from_double(sst == 0.0 ? 1.0 : 1.0 - sse / sst);
     k = out->coefficients ? mat_get_row_count(out->coefficients) : 1u;
-    out->adj_r2 = num_create_from_double((n > k + 1u && sst != 0.0)
-        ? 1.0 - ((sse / (double)(n - k)) / (sst / (double)(n - 1u))) : num_to_double(out->r2));
+    out->adj_r2 =
+        num_create_from_double((n > k + 1u && sst != 0.0) ? 1.0 - ((sse / (double)(n - k)) / (sst / (double)(n - 1u)))
+                                                          : num_to_double(out->r2));
     out->summary.sigma2 = num_create_from_double(n > k ? sse / (double)(n - k) : sse);
-    out->summary.loglik = num_create_from_double(-0.5 * (double)n * (log(2.0 * M_PI) + 1.0 + log(sse / (double)n + 1e-12)));
+    out->summary.loglik =
+        num_create_from_double(-0.5 * (double)n * (log(2.0 * M_PI) + 1.0 + log(sse / (double)n + 1e-12)));
     out->summary.aic = num_create_from_double(2.0 * (double)k - 2.0 * num_to_double(out->summary.loglik));
-    out->summary.aicc = num_create_from_double(num_to_double(out->summary.aic) +
-                                               (2.0 * (double)k * ((double)k + 1.0)) /
-                                               ((double)n - (double)k - 1.0 + 1e-12));
+    out->summary.aicc =
+        num_create_from_double(num_to_double(out->summary.aic) +
+                               (2.0 * (double)k * ((double)k + 1.0)) / ((double)n - (double)k - 1.0 + 1e-12));
     out->summary.bic = num_create_from_double(log((double)n) * (double)k - 2.0 * num_to_double(out->summary.loglik));
     if (XtX_inv) {
         matrix_t *stderr = mat_new(k, 1u);
@@ -114,7 +115,9 @@ int ts_regression_fit_internal(const timeseries_t *y,
         number_t sigma2 = out->summary.sigma2;
 
         if (!stderr || !t_stat || !p_val) {
-            mat_free(stderr); mat_free(t_stat); mat_free(p_val);
+            mat_free(stderr);
+            mat_free(t_stat);
+            mat_free(p_val);
         } else {
             for (i = 0u; i < k; ++i) {
                 number_t v = mat_get_num(XtX_inv, i, i);
@@ -130,8 +133,14 @@ int ts_regression_fit_internal(const timeseries_t *y,
                 mat_set(stderr, i, 0u, &se);
                 mat_set(t_stat, i, 0u, &t);
                 mat_set(p_val, i, 0u, &p);
-                num_destroy(&v); num_destroy(&vv); num_destroy(&se); num_destroy(&b);
-                num_destroy(&t); num_destroy(&abs_t); num_destroy(&cdf); num_destroy(&p);
+                num_destroy(&v);
+                num_destroy(&vv);
+                num_destroy(&se);
+                num_destroy(&b);
+                num_destroy(&t);
+                num_destroy(&abs_t);
+                num_destroy(&cdf);
+                num_destroy(&p);
             }
             out->stderr = stderr;
             out->t_stat = t_stat;
@@ -140,30 +149,38 @@ int ts_regression_fit_internal(const timeseries_t *y,
             XtX_inv = NULL;
         }
     }
-    mat_free(Y); mat_free(X); mat_free(fit); mat_free(resid_col); mat_free(Xt); mat_free(XtX); mat_free(XtX_inv);
+    mat_free(Y);
+    mat_free(X);
+    mat_free(fit);
+    mat_free(resid_col);
+    mat_free(Xt);
+    mat_free(XtX);
+    mat_free(XtX_inv);
     return 0;
 
 fail:
-    mat_free(Y); mat_free(X); mat_free(beta); mat_free(fit); mat_free(resid_col); mat_free(Xt); mat_free(XtX); mat_free(XtX_inv);
-    ts_free(fitted); ts_free(residuals);
+    mat_free(Y);
+    mat_free(X);
+    mat_free(beta);
+    mat_free(fit);
+    mat_free(resid_col);
+    mat_free(Xt);
+    mat_free(XtX);
+    mat_free(XtX_inv);
+    ts_free(fitted);
+    ts_free(residuals);
     return -1;
 }
 
-int ts_regression_fit(const timeseries_t *y,
-                      const matrix_t *xreg,
-                      const ts_fit_options_t *options,
+int ts_regression_fit(const timeseries_t *y, const matrix_t *xreg, const ts_fit_options_t *options,
                       ts_regression_result_t *out)
 {
     return ts_regression_fit_internal(y, xreg, true, false, options, out);
 }
 
-int ts_regression_forecast(const ts_regression_result_t *model,
-                           const matrix_t *future_xreg,
-                           const timeseries_t *history,
-                           ts_frequency_t frequency,
-                           ts_year_type_t year_type,
-                           number_t level,
-                           ts_forecast_t *out)
+int ts_regression_forecast(const ts_regression_result_t *model, const matrix_t *future_xreg,
+                           const timeseries_t *history, ts_frequency_t frequency, ts_year_type_t year_type,
+                           number_t level, ts_forecast_t *out)
 {
     size_t rows, cols, i;
     number_t z = num_create_from_double(1.96);
@@ -225,7 +242,10 @@ int ts_regression_forecast(const ts_regression_result_t *model,
 
 fail:
     datetime_dealloc(start);
-    ts_free(mean); ts_free(stderr); ts_free(lower); ts_free(upper);
+    ts_free(mean);
+    ts_free(stderr);
+    ts_free(lower);
+    ts_free(upper);
     num_destroy(&z);
     return -1;
 }

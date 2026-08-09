@@ -9,9 +9,7 @@ static number_t expr_reverse_zero(void)
     return NUM_ZERO;
 }
 
-static int reverse_find_node(const expr_t *const *nodes,
-                             size_t count,
-                             const expr_t *target)
+static int reverse_find_node(const expr_t *const *nodes, size_t count, const expr_t *target)
 {
     for (size_t i = 0; i < count; ++i)
         if (nodes[i] == target)
@@ -19,10 +17,7 @@ static int reverse_find_node(const expr_t *const *nodes,
     return -1;
 }
 
-static int reverse_append_node(const expr_t ***nodes,
-                               size_t *count,
-                               size_t *capacity,
-                               const expr_t *node)
+static int reverse_append_node(const expr_t ***nodes, size_t *count, size_t *capacity, const expr_t *node)
 {
     const expr_t **grown;
     size_t new_capacity;
@@ -42,20 +37,15 @@ static int reverse_append_node(const expr_t ***nodes,
     return 0;
 }
 
-static int reverse_collect_postorder(const expr_t *node,
-                                     const expr_t ***nodes,
-                                     size_t *count,
-                                     size_t *capacity)
+static int reverse_collect_postorder(const expr_t *node, const expr_t ***nodes, size_t *count, size_t *capacity)
 {
     if (!node)
         return 0;
     if (reverse_find_node(*nodes, *count, node) >= 0)
         return 0;
-    if (node->ops->arity != EXPR_OP_ATOM &&
-        reverse_collect_postorder(node->a, nodes, count, capacity) != 0)
+    if (node->ops->arity != EXPR_OP_ATOM && reverse_collect_postorder(node->a, nodes, count, capacity) != 0)
         return -1;
-    if (node->ops->arity == EXPR_OP_BINARY &&
-        reverse_collect_postorder(node->b, nodes, count, capacity) != 0)
+    if (node->ops->arity == EXPR_OP_BINARY && reverse_collect_postorder(node->b, nodes, count, capacity) != 0)
         return -1;
     return reverse_append_node(nodes, count, capacity, node);
 }
@@ -68,11 +58,31 @@ static void reverse_destroy_numbers(number_t *values, size_t count)
         num_destroy(&values[i]);
 }
 
-int expr_eval_derivatives(const expr_t *expr,
-                        size_t nvars,
-                        const expr_t *const *vars,
-                        number_t *value_out,
-                        number_t *derivs_out)
+typedef struct reverse_accumulator {
+    const expr_t *const *nodes;
+    size_t node_count;
+    number_t *bars;
+} reverse_accumulator_t;
+
+static int reverse_accumulate_child(void *context, const expr_t *child, const number_t *child_bar)
+{
+    reverse_accumulator_t *accumulator = context;
+    number_t sum;
+    int index;
+
+    if (!accumulator || !child || !child_bar)
+        return -1;
+    index = reverse_find_node(accumulator->nodes, accumulator->node_count, child);
+    if (index < 0)
+        return -1;
+    sum = num_add(accumulator->bars[index], *child_bar);
+    num_destroy(&accumulator->bars[index]);
+    accumulator->bars[index] = num_scope_detach(sum);
+    return 0;
+}
+
+int expr_eval_derivatives(const expr_t *expr, size_t nvars, const expr_t *const *vars, number_t *value_out,
+                          number_t *derivs_out)
 {
     const expr_t **nodes = NULL;
     size_t node_count = 0u;
@@ -111,6 +121,26 @@ int expr_eval_derivatives(const expr_t *expr,
         NUM_SCOPE(scope);
         number_t a_bar = (number_t){0};
         number_t b_bar = (number_t){0};
+
+        if (node->ops->reverse_many) {
+            reverse_accumulator_t accumulator = {.nodes = nodes, .node_count = node_count, .bars = bars};
+
+            if (node->ops->reverse_many(node, &bars[i], reverse_accumulate_child, &accumulator) != 0) {
+                reverse_destroy_numbers(bars, node_count);
+                free(bars);
+                free(nodes);
+                num_destroy(&value);
+                return -1;
+            }
+            continue;
+        }
+        if (!node->ops->reverse) {
+            reverse_destroy_numbers(bars, node_count);
+            free(bars);
+            free(nodes);
+            num_destroy(&value);
+            return -1;
+        }
         node->ops->reverse(node, &bars[i], &a_bar, &b_bar);
 
         if (node->ops->arity != EXPR_OP_ATOM) {

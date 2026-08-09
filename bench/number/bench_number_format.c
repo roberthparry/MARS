@@ -7,10 +7,7 @@
 #include "number.h"
 #include "ustring.h"
 
-typedef enum bench_format_op_t {
-    BENCH_OP_TO_STRING,
-    BENCH_OP_SPRINTF
-} bench_format_op_t;
+typedef enum bench_format_op_t { BENCH_OP_TO_STRING, BENCH_OP_SPRINTF } bench_format_op_t;
 
 typedef struct bench_case_t {
     const char *label;
@@ -89,11 +86,8 @@ static size_t bench_consume_string_text(string_t *text)
     return len;
 }
 
-#define bench_consume_num_text(expr) \
-    _Generic((expr), \
-        char *: bench_consume_char_text, \
-        string_t *: bench_consume_string_text \
-    )(expr)
+#define bench_consume_num_text(expr)                                                                                   \
+    _Generic((expr), char *: bench_consume_char_text, string_t *: bench_consume_string_text)(expr)
 
 static void bench_run_to_string(const number_t *value, int iters)
 {
@@ -121,12 +115,12 @@ static double bench_sample_case(const bench_case_t *bench_case)
 
     start = bench_now_seconds();
     switch (bench_case->op) {
-    case BENCH_OP_TO_STRING:
-        bench_run_to_string(bench_case->value, iters);
-        break;
-    case BENCH_OP_SPRINTF:
-        bench_run_sprintf(bench_case->value, iters);
-        break;
+        case BENCH_OP_TO_STRING:
+            bench_run_to_string(bench_case->value, iters);
+            break;
+        case BENCH_OP_SPRINTF:
+            bench_run_sprintf(bench_case->value, iters);
+            break;
     }
     elapsed = bench_now_seconds() - start;
     return (elapsed * 1000000.0) / (double)iters;
@@ -169,10 +163,7 @@ static void bench_run_case(const bench_case_t *bench_case)
     }
     mad = bench_median(deviations, repeats);
 
-    printf("%-24s median_us=%9.3f mad_us=%8.3f\n",
-           bench_case->label,
-           median,
-           mad);
+    printf("%-24s median_us=%9.3f mad_us=%8.3f\n", bench_case->label, median, mad);
 
     free(samples);
     free(median_samples);
@@ -183,8 +174,7 @@ int main(void)
 {
     size_t saved_precision = num_get_default_prec_bits();
     number_t small_integer = num_create_from_long(123456789L);
-    number_t large_integer =
-        num_create_from_string("123456789012345678901234567890123456789");
+    number_t large_integer = num_create_from_string("123456789012345678901234567890123456789");
     number_t rational = num_create_from_string("355/113");
     number_t decimal;
     number_t complex_value;
@@ -193,40 +183,19 @@ int main(void)
 
     num_set_default_prec_bits(256u);
     decimal = num_create_from_string("1.2345678901234567890123456789");
-    complex_value =
-        num_create_from_string("1.234567890123456789 + 2.34567890123456789i");
+    complex_value = num_create_from_string("1.234567890123456789 + 2.34567890123456789i");
 
-    cases[count++] = (bench_case_t){
-        "to_string_small_int", &small_integer, BENCH_OP_TO_STRING, 50000
-    };
-    cases[count++] = (bench_case_t){
-        "to_string_big_int", &large_integer, BENCH_OP_TO_STRING, 20000
-    };
-    cases[count++] = (bench_case_t){
-        "to_string_rational", &rational, BENCH_OP_TO_STRING, 20000
-    };
-    cases[count++] = (bench_case_t){
-        "to_string_decimal", &decimal, BENCH_OP_TO_STRING, 10000
-    };
-    cases[count++] = (bench_case_t){
-        "to_string_complex", &complex_value, BENCH_OP_TO_STRING, 5000
-    };
+    cases[count++] = (bench_case_t){"to_string_small_int", &small_integer, BENCH_OP_TO_STRING, 50000};
+    cases[count++] = (bench_case_t){"to_string_big_int", &large_integer, BENCH_OP_TO_STRING, 20000};
+    cases[count++] = (bench_case_t){"to_string_rational", &rational, BENCH_OP_TO_STRING, 20000};
+    cases[count++] = (bench_case_t){"to_string_decimal", &decimal, BENCH_OP_TO_STRING, 10000};
+    cases[count++] = (bench_case_t){"to_string_complex", &complex_value, BENCH_OP_TO_STRING, 5000};
 
-    cases[count++] = (bench_case_t){
-        "sprintf_small_int", &small_integer, BENCH_OP_SPRINTF, 50000
-    };
-    cases[count++] = (bench_case_t){
-        "sprintf_big_int", &large_integer, BENCH_OP_SPRINTF, 20000
-    };
-    cases[count++] = (bench_case_t){
-        "sprintf_rational", &rational, BENCH_OP_SPRINTF, 20000
-    };
-    cases[count++] = (bench_case_t){
-        "sprintf_decimal", &decimal, BENCH_OP_SPRINTF, 10000
-    };
-    cases[count++] = (bench_case_t){
-        "sprintf_complex", &complex_value, BENCH_OP_SPRINTF, 5000
-    };
+    cases[count++] = (bench_case_t){"sprintf_small_int", &small_integer, BENCH_OP_SPRINTF, 50000};
+    cases[count++] = (bench_case_t){"sprintf_big_int", &large_integer, BENCH_OP_SPRINTF, 20000};
+    cases[count++] = (bench_case_t){"sprintf_rational", &rational, BENCH_OP_SPRINTF, 20000};
+    cases[count++] = (bench_case_t){"sprintf_decimal", &decimal, BENCH_OP_SPRINTF, 10000};
+    cases[count++] = (bench_case_t){"sprintf_complex", &complex_value, BENCH_OP_SPRINTF, 5000};
 
     puts("== number formatting bench ==");
     puts("Reports median microseconds per format+release call.");

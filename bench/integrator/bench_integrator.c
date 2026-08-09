@@ -368,9 +368,9 @@ static void run_case(const char *label, build_fn builder, int iters)
     expr_t *x = NULL;
     expr_t *y = NULL;
     expr_t *expr = builder(&x, &y);
-    expr_t *vars[2] = { x, y };
-    number_t lo[2] = { num_create_from_double(0.0), num_create_from_double(0.0) };
-    number_t hi[2] = { num_create_from_double(1.0), num_create_from_double(1.0) };
+    expr_t *vars[2] = {x, y};
+    number_t lo[2] = {num_create_from_double(0.0), num_create_from_double(0.0)};
+    number_t hi[2] = {num_create_from_double(1.0), num_create_from_double(1.0)};
     number_t abs_tol = num_create_from_string("1e-21");
     number_t rel_tol = num_create_from_string("1e-21");
     number_t result;
@@ -411,11 +411,7 @@ static void run_case(const char *label, build_fn builder, int iters)
     end = now_ns();
     avg_us = ((double)(end - start) / (double)iters) / 1000.0;
 
-    printf("%-22s intervals=%-4zu avg_µs=%10.3f avg_ms=%10.3f\n",
-           label,
-           first_intervals,
-           avg_us,
-           avg_us / 1000.0);
+    printf("%-22s intervals=%-4zu avg_µs=%10.3f avg_ms=%10.3f\n", label, first_intervals, avg_us, avg_us / 1000.0);
     fflush(stdout);
 
     num_destroy(&hi[1]);

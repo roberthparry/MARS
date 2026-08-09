@@ -17,8 +17,7 @@ bool number_is_one_qfloat(const number_t *number)
 
 bool number_eq_same_qfloat(const number_t *a, const number_t *b)
 {
-    return a && b &&
-        qf_eq(number_impl_const(a)->value.qf, number_impl_const(b)->value.qf);
+    return a && b && qf_eq(number_impl_const(a)->value.qf, number_impl_const(b)->value.qf);
 }
 
 bool number_eq_same_tol_qfloat(const number_t *a, const number_t *b)
@@ -28,8 +27,7 @@ bool number_eq_same_tol_qfloat(const number_t *a, const number_t *b)
 
 bool number_is_finite_qfloat(const number_t *number)
 {
-    return number && !qf_isnan(number_impl_const(number)->value.qf) &&
-        !qf_isinf(number_impl_const(number)->value.qf);
+    return number && !qf_isnan(number_impl_const(number)->value.qf) && !qf_isinf(number_impl_const(number)->value.qf);
 }
 
 bool number_is_nan_qfloat(const number_t *number)
@@ -44,8 +42,7 @@ bool number_is_inf_qfloat(const number_t *number)
 
 int number_cmp_same_qfloat(const number_t *a, const number_t *b)
 {
-    return (a && b) ? qf_cmp(number_impl_const(a)->value.qf,
-                             number_impl_const(b)->value.qf) : 0;
+    return (a && b) ? qf_cmp(number_impl_const(a)->value.qf, number_impl_const(b)->value.qf) : 0;
 }
 
 long number_get_exponent2_qfloat(const number_t *number)
@@ -67,16 +64,15 @@ qfloat_t number_to_qfloat_qfloat(const number_t *number)
 
 bool number_is_integer_qfloat(const number_t *number)
 {
-    return number && qf_eq(qf_floor(number_impl_const(number)->value.qf),
-                           number_impl_const(number)->value.qf);
+    return number && qf_eq(qf_floor(number_impl_const(number)->value.qf), number_impl_const(number)->value.qf);
 }
 
 size_t number_get_mantissa_bits_qfloat(const number_t *number)
 {
-    return number &&
-            !qf_isnan(number_impl_const(number)->value.qf) &&
-            !qf_isinf(number_impl_const(number)->value.qf) &&
-            !qf_eq(number_impl_const(number)->value.qf, QF_ZERO) ? 106u : 0u;
+    return number && !qf_isnan(number_impl_const(number)->value.qf) && !qf_isinf(number_impl_const(number)->value.qf) &&
+                   !qf_eq(number_impl_const(number)->value.qf, QF_ZERO)
+               ? 106u
+               : 0u;
 }
 
 int number_sign_qfloat(const number_t *number)

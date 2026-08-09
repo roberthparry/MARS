@@ -142,9 +142,7 @@ const char *almanac_body_display_name(almanac_body_id_t body_id);
  * @param moment civil moment to evaluate.
  * @return newly allocated entry, or @c NULL on failure.
  */
-almanac_entry_t *almanac_new_body_entry(almanac_t *almanac,
-                                        almanac_body_id_t body_id,
-                                        const datetime_t *moment);
+almanac_entry_t *almanac_new_body_entry(almanac_t *almanac, almanac_body_id_t body_id, const datetime_t *moment);
 
 /**
  * @brief Create a populated almanac entry for one catalogued body by legacy code.
@@ -157,9 +155,7 @@ almanac_entry_t *almanac_new_body_entry(almanac_t *almanac,
  * @param moment civil moment to evaluate.
  * @return newly allocated entry, or @c NULL on failure.
  */
-almanac_entry_t *almanac_new_entry(almanac_t *almanac,
-                                   const char *body_code,
-                                   const datetime_t *moment);
+almanac_entry_t *almanac_new_entry(almanac_t *almanac, const char *body_code, const datetime_t *moment);
 
 /**
  * @brief Free an almanac entry object allocated by an entry constructor.
@@ -267,8 +263,7 @@ typedef struct _almanac_event_time_t {
  * @param out preallocated datetime to initialise.
  * @return @c true on success, otherwise @c false.
  */
-bool almanac_event_time_datetime(const almanac_event_time_t *event_time,
-                                 datetime_t *out);
+bool almanac_event_time_datetime(const almanac_event_time_t *event_time, datetime_t *out);
 
 /**
  * @brief One exact Moon phase event.
@@ -408,9 +403,7 @@ const char *almanac_last_error(const almanac_t *almanac);
  * @param gha_aries_degrees output pointer for GHA Aries in degrees [0, 360).
  * @return @c true on success, otherwise @c false.
  */
-bool almanac_gha_aries(almanac_t *almanac,
-                       const datetime_t *moment,
-                       double *gha_aries_degrees);
+bool almanac_gha_aries(almanac_t *almanac, const datetime_t *moment, double *gha_aries_degrees);
 
 /**
  * @brief Derive observer-relative observables from one computed almanac entry.
@@ -426,9 +419,7 @@ bool almanac_gha_aries(almanac_t *almanac,
  * @param out output observables to fill.
  * @return @c true on success, otherwise @c false.
  */
-bool almanac_observables(almanac_t *almanac,
-                         const almanac_entry_t *body,
-                         const almanac_observer_t *observer,
+bool almanac_observables(almanac_t *almanac, const almanac_entry_t *body, const almanac_observer_t *observer,
                          almanac_observables_t *out);
 
 /**
@@ -442,8 +433,7 @@ bool almanac_observables(almanac_t *almanac,
  * @param out output geographical position to fill.
  * @return @c true on success, otherwise @c false.
  */
-bool almanac_body_geographical_position(const almanac_entry_t *body,
-                                        almanac_geographical_position_t *out);
+bool almanac_body_geographical_position(const almanac_entry_t *body, almanac_geographical_position_t *out);
 
 /**
  * @brief Find accurate local rise and set for one supported body and day.
@@ -461,12 +451,8 @@ bool almanac_body_geographical_position(const almanac_entry_t *body,
  * @param out output rise and set circumstances.
  * @return @c true when the day was evaluated, otherwise @c false.
  */
-bool almanac_body_rise_set(almanac_t *almanac,
-                           jurisdiction_t *jurisdiction,
-                           almanac_body_id_t body_id,
-                           const datetime_t *date,
-                           const almanac_observer_t *observer,
-                           almanac_rise_set_t *out);
+bool almanac_body_rise_set(almanac_t *almanac, jurisdiction_t *jurisdiction, almanac_body_id_t body_id,
+                           const datetime_t *date, const almanac_observer_t *observer, almanac_rise_set_t *out);
 
 /**
  * @brief Find accurate local sunrise and sunset for one observer and day.
@@ -483,11 +469,8 @@ bool almanac_body_rise_set(almanac_t *almanac,
  * @param out output sunrise and sunset circumstances.
  * @return @c true when the day was evaluated, otherwise @c false.
  */
-bool almanac_sunrise_sunset(almanac_t *almanac,
-                            jurisdiction_t *jurisdiction,
-                            const datetime_t *date,
-                            const almanac_observer_t *observer,
-                            almanac_sun_times_t *out);
+bool almanac_sunrise_sunset(almanac_t *almanac, jurisdiction_t *jurisdiction, const datetime_t *date,
+                            const almanac_observer_t *observer, almanac_sun_times_t *out);
 
 /**
  * @brief Find accurate local moonrise and moonset for one observer and day.
@@ -504,11 +487,8 @@ bool almanac_sunrise_sunset(almanac_t *almanac,
  * @param out output moonrise and moonset circumstances.
  * @return @c true when the day was evaluated, otherwise @c false.
  */
-bool almanac_moonrise_moonset(almanac_t *almanac,
-                              jurisdiction_t *jurisdiction,
-                              const datetime_t *date,
-                              const almanac_observer_t *observer,
-                              almanac_moon_times_t *out);
+bool almanac_moonrise_moonset(almanac_t *almanac, jurisdiction_t *jurisdiction, const datetime_t *date,
+                              const almanac_observer_t *observer, almanac_moon_times_t *out);
 
 /**
  * @brief Derive illuminated fraction and phase classification for a body entry.
@@ -517,8 +497,7 @@ bool almanac_moonrise_moonset(almanac_t *almanac,
  * @param out output phase details to fill.
  * @return @c true on success, otherwise @c false.
  */
-bool almanac_phase_details(const almanac_entry_t *body,
-                           almanac_phase_details_t *out);
+bool almanac_phase_details(const almanac_entry_t *body, almanac_phase_details_t *out);
 
 /**
  * @brief Find the next exact Moon phase after a civil moment.
@@ -531,9 +510,7 @@ bool almanac_phase_details(const almanac_entry_t *body,
  * @param out output event to fill.
  * @return @c true on success, otherwise @c false.
  */
-bool almanac_next_moon_phase_exact(almanac_t *almanac,
-                                   const datetime_t *after,
-                                   almanac_moon_phase_kind_t kind,
+bool almanac_next_moon_phase_exact(almanac_t *almanac, const datetime_t *after, almanac_moon_phase_kind_t kind,
                                    almanac_moon_phase_event_t *out);
 
 /**
@@ -549,9 +526,7 @@ bool almanac_next_moon_phase_exact(almanac_t *almanac,
  * @return newly allocated array of @c almanac_solar_eclipse_t values, or
  *         @c NULL on failure.
  */
-array_t *almanac_find_solar_eclipses(almanac_t *almanac,
-                                     const almanac_observer_t *observer,
-                                     const datetime_t *start,
+array_t *almanac_find_solar_eclipses(almanac_t *almanac, const almanac_observer_t *observer, const datetime_t *start,
                                      const datetime_t *end);
 
 /**
@@ -565,8 +540,7 @@ almanac_solar_eclipse_kind_t almanac_solar_eclipse_kind(const almanac_solar_ecli
  * Valid time kinds are first contact, second contact, greatest, third contact,
  * and fourth contact.
  */
-bool almanac_solar_eclipse_time(const almanac_solar_eclipse_t *event,
-                                almanac_event_time_kind_t time_kind,
+bool almanac_solar_eclipse_time(const almanac_solar_eclipse_t *event, almanac_event_time_kind_t time_kind,
                                 almanac_event_time_t *out);
 
 double almanac_solar_eclipse_separation_degrees(const almanac_solar_eclipse_t *event);
@@ -589,8 +563,7 @@ bool almanac_solar_eclipse_is_central(const almanac_solar_eclipse_t *event);
  * @return @c true when the Sun is above the apparent horizon and the lunar
  *         and solar discs overlap for the observer.
  */
-bool almanac_solar_eclipse_in_progress(almanac_t *almanac,
-                                       const almanac_observer_t *observer,
+bool almanac_solar_eclipse_in_progress(almanac_t *almanac, const almanac_observer_t *observer,
                                        const datetime_t *moment);
 
 /**
@@ -606,9 +579,7 @@ bool almanac_solar_eclipse_in_progress(almanac_t *almanac,
  * @return newly allocated array of @c almanac_lunar_eclipse_t values, or
  *         @c NULL on failure.
  */
-array_t *almanac_find_lunar_eclipses(almanac_t *almanac,
-                                     const almanac_observer_t *observer,
-                                     const datetime_t *start,
+array_t *almanac_find_lunar_eclipses(almanac_t *almanac, const almanac_observer_t *observer, const datetime_t *start,
                                      const datetime_t *end);
 
 /**
@@ -621,8 +592,7 @@ almanac_lunar_eclipse_kind_t almanac_lunar_eclipse_kind(const almanac_lunar_ecli
  *
  * Valid time kinds are P1, U1, U2, greatest, U3, U4, and P4.
  */
-bool almanac_lunar_eclipse_time(const almanac_lunar_eclipse_t *event,
-                                almanac_event_time_kind_t time_kind,
+bool almanac_lunar_eclipse_time(const almanac_lunar_eclipse_t *event, almanac_event_time_kind_t time_kind,
                                 almanac_event_time_t *out);
 
 double almanac_lunar_eclipse_opposition_error_degrees(const almanac_lunar_eclipse_t *event);
@@ -648,10 +618,8 @@ double almanac_lunar_eclipse_moon_semi_diameter_degrees(const almanac_lunar_ecli
  * @return newly allocated array of @c almanac_solar_transit_t values, or
  *         @c NULL on failure.
  */
-array_t *almanac_find_solar_transits_for_body(almanac_t *almanac,
-                                              almanac_body_id_t body_id,
-                                              const almanac_observer_t *observer,
-                                              const datetime_t *start,
+array_t *almanac_find_solar_transits_for_body(almanac_t *almanac, almanac_body_id_t body_id,
+                                              const almanac_observer_t *observer, const datetime_t *start,
                                               const datetime_t *end);
 
 /**
@@ -665,8 +633,7 @@ almanac_body_id_t almanac_solar_transit_body_id(const almanac_solar_transit_t *e
  * Valid time kinds are first contact, second contact, greatest, third contact,
  * and fourth contact.
  */
-bool almanac_solar_transit_time(const almanac_solar_transit_t *event,
-                                almanac_event_time_kind_t time_kind,
+bool almanac_solar_transit_time(const almanac_solar_transit_t *event, almanac_event_time_kind_t time_kind,
                                 almanac_event_time_t *out);
 
 double almanac_solar_transit_separation_degrees(const almanac_solar_transit_t *event);
@@ -690,11 +657,8 @@ bool almanac_solar_transit_is_interior(const almanac_solar_transit_t *event);
  * @return newly allocated array of @c almanac_solar_transit_t values, or
  *         @c NULL on failure.
  */
-array_t *almanac_find_solar_transits(almanac_t *almanac,
-                                     const char *body_code,
-                                     const almanac_observer_t *observer,
-                                     const datetime_t *start,
-                                     const datetime_t *end);
+array_t *almanac_find_solar_transits(almanac_t *almanac, const char *body_code, const almanac_observer_t *observer,
+                                     const datetime_t *start, const datetime_t *end);
 
 /**
  * @brief Compute SHA and declination for every enabled catalogued body.
@@ -726,10 +690,7 @@ array_t *almanac_snapshot(almanac_t *almanac, const datetime_t *moment);
  * @param out_len Receives the payload length in bytes.
  * @return @c true on success, otherwise @c false.
  */
-bool almanac_serialize(const almanac_t *almanac,
-                       string_t **out_type,
-                       string_t **out_encoding,
-                       void **out_data,
+bool almanac_serialize(const almanac_t *almanac, string_t **out_type, string_t **out_encoding, void **out_data,
                        size_t *out_len);
 
 /**
@@ -741,9 +702,6 @@ bool almanac_serialize(const almanac_t *almanac,
  * @param encoding Stored encoding label.
  * @return Newly allocated almanac engine on success, otherwise @c NULL.
  */
-almanac_t *almanac_deserialise(const void *data,
-                               size_t len,
-                               const string_t *type,
-                               const string_t *encoding);
+almanac_t *almanac_deserialise(const void *data, size_t len, const string_t *type, const string_t *encoding);
 
 #endif /* MARS_ALMANAC_H */

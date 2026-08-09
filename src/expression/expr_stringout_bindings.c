@@ -8,9 +8,8 @@
 #include "expr_stringout_internal.h"
 
 static const char subscript_digits[10][4] = {
-    "\xE2\x82\x80", "\xE2\x82\x81", "\xE2\x82\x82", "\xE2\x82\x83",
-    "\xE2\x82\x84", "\xE2\x82\x85", "\xE2\x82\x86", "\xE2\x82\x87",
-    "\xE2\x82\x88", "\xE2\x82\x89",
+    "\xE2\x82\x80", "\xE2\x82\x81", "\xE2\x82\x82", "\xE2\x82\x83", "\xE2\x82\x84",
+    "\xE2\x82\x85", "\xE2\x82\x86", "\xE2\x82\x87", "\xE2\x82\x88", "\xE2\x82\x89",
 };
 
 static char *make_subscript_name(char prefix, int idx)
@@ -110,21 +109,16 @@ static int varlist_contains_equiv(const varlist_t *vl, const expr_t *v)
 
         if (existing == v)
             return 1;
-        if (expr_is_var(existing) && expr_is_var(v) &&
-            existing->var_id != 0 && existing->var_id == v->var_id)
+        if (expr_is_var(existing) && expr_is_var(v) && existing->var_id != 0 && existing->var_id == v->var_id)
             return 1;
-        if (existing->name && *existing->name &&
-            v->name && *v->name &&
-            strcmp(existing->name, v->name) == 0)
+        if (existing->name && *existing->name && v->name && *v->name && strcmp(existing->name, v->name) == 0)
             return 1;
     }
 
     return 0;
 }
 
-static void find_vars_dfs_impl(const expr_t *expr,
-                               varlist_t *vars,
-                               varlist_t *bound_vars)
+static void find_vars_dfs_impl(const expr_t *expr, varlist_t *vars, varlist_t *bound_vars)
 {
     const expr_t *dummy;
     const expr_t *lower;
@@ -168,12 +162,9 @@ static void varlist_add(varlist_t *vl, expr_t *v)
 
         if (existing == v)
             return;
-        if (expr_is_var(existing) && expr_is_var(v) &&
-            existing->var_id != 0 && existing->var_id == v->var_id)
+        if (expr_is_var(existing) && expr_is_var(v) && existing->var_id != 0 && existing->var_id == v->var_id)
             return;
-        if (existing->name && *existing->name &&
-            v->name && *v->name &&
-            strcmp(existing->name, v->name) == 0)
+        if (existing->name && *existing->name && v->name && *v->name && strcmp(existing->name, v->name) == 0)
             return;
     }
 
@@ -223,8 +214,7 @@ void find_explicit_named_consts_dfs(const expr_t *f, varlist_t *cl)
         return;
 
     if (expr_is_const(f)) {
-        if (f->name && *f->name && f->binding_expr &&
-            !expr_is_immortal_default_const_local(f))
+        if (f->name && *f->name && f->binding_expr && !expr_is_immortal_default_const_local(f))
             varlist_add(cl, (expr_t *)f);
         return;
     }

@@ -12,6 +12,14 @@ import mars_lab
 
 
 class MobileAccessTests(unittest.TestCase):
+    def test_almanac_time_uses_styled_mobile_input_with_automatic_separators(self) -> None:
+        self.assertIn(
+            'id="almanacTime" type="text" inputmode="decimal"',
+            mars_lab.INDEX_HTML,
+        )
+        self.assertIn("function formatAlmanacTimeInput(value)", mars_lab.INDEX_HTML)
+        self.assertIn("almanacTime.addEventListener('input'", mars_lab.INDEX_HTML)
+
     def test_wildcard_listener_prefers_private_tailscale_url(self) -> None:
         with (
             mock.patch.object(mars_lab, "tailscale_funnel_enabled", return_value=False),

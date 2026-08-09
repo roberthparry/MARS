@@ -28,14 +28,7 @@
 
 typedef struct _json_t json_t;
 
-typedef enum {
-    JSON_NULL,
-    JSON_BOOL,
-    JSON_NUMBER,
-    JSON_STRING,
-    JSON_ARRAY,
-    JSON_OBJECT
-} json_type_t;
+typedef enum { JSON_NULL, JSON_BOOL, JSON_NUMBER, JSON_STRING, JSON_ARRAY, JSON_OBJECT } json_type_t;
 
 json_t *json_new_null(void);
 json_t *json_new_bool(bool value);
@@ -102,11 +95,7 @@ bool json_object_set(json_t *json, const string_t *key, const json_t *value);
  * @param out_len Receives the payload length in bytes.
  * @return @c true on success, otherwise @c false.
  */
-bool json_serialize(const json_t *json,
-                    string_t **out_type,
-                    string_t **out_encoding,
-                    void **out_data,
-                    size_t *out_len);
+bool json_serialize(const json_t *json, string_t **out_type, string_t **out_encoding, void **out_data, size_t *out_len);
 
 /**
  * @brief Reconstruct a JSON tree from a serialised payload.
@@ -117,9 +106,6 @@ bool json_serialize(const json_t *json,
  * @param encoding Stored encoding label.
  * @return Newly allocated JSON tree on success, otherwise @c NULL.
  */
-json_t *json_deserialise(const void *data,
-                         size_t len,
-                         const string_t *type,
-                         const string_t *encoding);
+json_t *json_deserialise(const void *data, size_t len, const string_t *type, const string_t *encoding);
 
 #endif /* JSON_H */

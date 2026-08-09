@@ -100,7 +100,11 @@ u-substitutions, integration-by-parts families such as `x * sin(x)`,
 `x * exp(x)`, `x * log(x)`, and `x * atan(x)`, plus a focused partial-fraction
 layer for rational functions whose denominator factors into supported affine
 linear terms. Affine `exp`, `sin`, `cos`, `tan`, `sinh`, `cosh`, and `tanh`
-terms such as `sin(3*x - 1)` are part of that fast path.
+terms such as `sin(3*x - 1)` are part of that fast path. The special-function
+rules also cover supported power-composed Bessel J, Bessel Y and lower-case
+Lommel functions, together with monomial compositions of the generalised
+hypergeometric pFq family. These are structural rules rather than matches for
+one memorised input.
 
 For additive expressions, supported terms may still be integrated even when
 other terms are not. In that case the unsupported additive pieces are left as
@@ -157,6 +161,17 @@ points. Unsupported expressions deliberately return `NULL` rather than an
 unsafe symbolic guess, unless they appear as additive subterms inside a larger
 expression that can safely return a partial antiderivative with unevaluated
 integral nodes.
+
+For example, the parser input and the corresponding symbolic output remain
+together here:
+
+```text
+Input:  pFq(0, 0, x)
+Output: x*pFq(1, 1, 1, 2, x)
+```
+
+Differentiating the output reconstructs `pFq(0, 0, x)`. The same round trip is
+tested for non-linear monomial arguments, Bessel J, Bessel Y and Lommel s.
 
 ## Example: Constructing an Expression
 
@@ -532,6 +547,11 @@ integral nodes therefore remain symbolically differentiable through
 `expr_create_deriv(...)`, but they are not expected to participate in
 reverse-mode evaluation of a numeric primal.
 
+The special-function reverse hooks include Bessel J, Bessel Y, Lommel s,
+generalised hypergeometric pFq, Appell F₁ and Lauricella F_D. For the
+multivariate families, adjoints are accumulated for every variable argument;
+the parameter arguments are treated as constants by the current rules.
+
 ### Ownership and Reference Counting
 
 Every owning handle has reference count ≥ 1. Arithmetic and function builders
@@ -709,6 +729,8 @@ All functions return owning handles.
 - `expr_t *expr_bessel_y(const expr_t *order, const expr_t *argument)` — Bessel function of the second kind Y_order(argument), with a symbolic real order
 - `expr_t *expr_lommel_s(const expr_t *mu, const expr_t *nu, const expr_t *argument)` — lower-case Lommel function s_mu,nu(argument); differentiation with respect to the argument is supported
 - `expr_t *expr_appell_f1(const expr_t *a, const expr_t *b1, const expr_t *b2, const expr_t *c, const expr_t *x, const expr_t *y)` — Appell hypergeometric function F₁(a; b₁, b₂; c; x, y)
+- `expr_t *expr_lauricella_f(const expr_t *a, size_t variable_count, const expr_t *const *b, const expr_t *c, const expr_t *const *x)` — Lauricella F_D in `variable_count` variables; Appell F₁ is the two-variable member of this family
+- `expr_t *expr_hypergeometric_pFq(size_t upper_count, const expr_t *const *upper, size_t lower_count, const expr_t *const *lower, const expr_t *argument)` — generalised hypergeometric pFq with explicit upper and lower parameter arrays
 
 ### Value-Only Functions (owning)
 
@@ -822,6 +844,11 @@ output(expr(x, y, γ));
   - `BesselJ(order, x)` or `bessel_j(order, x)` for J_order(x)
   - `BesselY(order, x)` or `bessel_y(order, x)` for Y_order(x)
   - `LommelS(mu, nu, x)` or `lommel_s(mu, nu, x)` for s_mu,nu(x)
+  - `pFq(p, q, a1, ..., ap, b1, ..., bq, x)`,
+    `HypergeometricpFq(...)`, or `hypergeometric_pFq(...)` for the generalised
+    hypergeometric function with `p` upper and `q` lower parameters
+  - `LauricellaF(n, a, b1, ..., bn, c, x1, ..., xn)` or
+    `lauricella_f(...)` for Lauricella F_D in `n` variables
   - `appell_f1(a, b1, b2, c, x, y)`, `F1(a, b1, b2, c, x, y)`,
     `F_1(a, b1, b2, c, x, y)`, and `F₁(a, b1, b2, c, x, y)` for
     Appell's hypergeometric function F₁(a; b₁, b₂; c; x, y)

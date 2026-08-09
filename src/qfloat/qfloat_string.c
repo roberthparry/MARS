@@ -7,42 +7,60 @@
 
 static inline qfloat_t qf_scale_pow10(qfloat_t x, int exp10)
 {
-    static const qfloat_t P10_1   = { 1.00000000000000000e+01, 0.00000000000000000e+00 };
-    static const qfloat_t P10_2   = { 1.00000000000000000e+02, 0.00000000000000000e+00 };
-    static const qfloat_t P10_4   = { 1.00000000000000000e+04, 0.00000000000000000e+00 };
-    static const qfloat_t P10_8   = { 1.00000000000000000e+08, 0.00000000000000000e+00 };
-    static const qfloat_t P10_16  = { 1.00000000000000000e+16, 0.00000000000000000e+00 };
-    static const qfloat_t P10_32  = { 1.00000000000000010e+32, -5.36616220439347200e+15 };
-    static const qfloat_t P10_64  = { 1.00000000000000000e+64, -2.13204190094544240e+47 };
-    static const qfloat_t P10_128 = { 1.00000000000000010e+128, -7.51744869165182680e+111 };
-    static const qfloat_t P10_256 = { 1.00000000000000000e+256, -3.01276599001406900e+239 };
+    static const qfloat_t P10_1 = {1.00000000000000000e+01, 0.00000000000000000e+00};
+    static const qfloat_t P10_2 = {1.00000000000000000e+02, 0.00000000000000000e+00};
+    static const qfloat_t P10_4 = {1.00000000000000000e+04, 0.00000000000000000e+00};
+    static const qfloat_t P10_8 = {1.00000000000000000e+08, 0.00000000000000000e+00};
+    static const qfloat_t P10_16 = {1.00000000000000000e+16, 0.00000000000000000e+00};
+    static const qfloat_t P10_32 = {1.00000000000000010e+32, -5.36616220439347200e+15};
+    static const qfloat_t P10_64 = {1.00000000000000000e+64, -2.13204190094544240e+47};
+    static const qfloat_t P10_128 = {1.00000000000000010e+128, -7.51744869165182680e+111};
+    static const qfloat_t P10_256 = {1.00000000000000000e+256, -3.01276599001406900e+239};
 
     qfloat_t r = x;
     int n = exp10;
 
     if (n < 0) {
         n = -n;
-        if (n & 256) r = qf_div(r, P10_256);
-        if (n & 128) r = qf_div(r, P10_128);
-        if (n &  64) r = qf_div(r, P10_64);
-        if (n &  32) r = qf_div(r, P10_32);
-        if (n &  16) r = qf_div(r, P10_16);
-        if (n &   8) r = qf_div(r, P10_8);
-        if (n &   4) r = qf_div(r, P10_4);
-        if (n &   2) r = qf_div(r, P10_2);
-        if (n &   1) r = qf_div(r, P10_1);
+        if (n & 256)
+            r = qf_div(r, P10_256);
+        if (n & 128)
+            r = qf_div(r, P10_128);
+        if (n & 64)
+            r = qf_div(r, P10_64);
+        if (n & 32)
+            r = qf_div(r, P10_32);
+        if (n & 16)
+            r = qf_div(r, P10_16);
+        if (n & 8)
+            r = qf_div(r, P10_8);
+        if (n & 4)
+            r = qf_div(r, P10_4);
+        if (n & 2)
+            r = qf_div(r, P10_2);
+        if (n & 1)
+            r = qf_div(r, P10_1);
         return r;
     }
 
-    if (n & 256) r = qf_mul(r, P10_256);
-    if (n & 128) r = qf_mul(r, P10_128);
-    if (n &  64) r = qf_mul(r, P10_64);
-    if (n &  32) r = qf_mul(r, P10_32);
-    if (n &  16) r = qf_mul(r, P10_16);
-    if (n &   8) r = qf_mul(r, P10_8);
-    if (n &   4) r = qf_mul(r, P10_4);
-    if (n &   2) r = qf_mul(r, P10_2);
-    if (n &   1) r = qf_mul(r, P10_1);
+    if (n & 256)
+        r = qf_mul(r, P10_256);
+    if (n & 128)
+        r = qf_mul(r, P10_128);
+    if (n & 64)
+        r = qf_mul(r, P10_64);
+    if (n & 32)
+        r = qf_mul(r, P10_32);
+    if (n & 16)
+        r = qf_mul(r, P10_16);
+    if (n & 8)
+        r = qf_mul(r, P10_8);
+    if (n & 4)
+        r = qf_mul(r, P10_4);
+    if (n & 2)
+        r = qf_mul(r, P10_2);
+    if (n & 1)
+        r = qf_mul(r, P10_1);
 
     return r;
 }
@@ -86,7 +104,7 @@ static bool qf_cursor_consume_ascii(string_cursor_t *cursor, char expected)
 qfloat_t qf_from_text(const string_t *text)
 {
     qfloat_t result = QF_ZERO;
-    qfloat_t ten    = QF_TEN;
+    qfloat_t ten = QF_TEN;
     string_cursor_t *cursor;
 
     int sign = 1;
@@ -132,8 +150,7 @@ qfloat_t qf_from_text(const string_t *text)
         break;
     }
 
-    if (qf_cursor_consume_ascii(cursor, 'e') ||
-        qf_cursor_consume_ascii(cursor, 'E')) {
+    if (qf_cursor_consume_ascii(cursor, 'e') || qf_cursor_consume_ascii(cursor, 'E')) {
         int esign = 1;
         int e = 0;
 
@@ -152,7 +169,7 @@ qfloat_t qf_from_text(const string_t *text)
 
     if (!qf_iszero(result)) {
         if (exp10 == 308 && qf_eq(result, QF_ONE)) {
-            result = (qfloat_t){ 1.0000000000000000e+308, -1.0979063629440455e+291 };
+            result = (qfloat_t){1.0000000000000000e+308, -1.0979063629440455e+291};
         } else {
             result = qf_mul(result, qf_pow10(exp10));
         }
@@ -182,17 +199,20 @@ qfloat_t qf_from_string(const char *s)
 
 /* 32-digit decimal formatter (robust) */
 
-static inline int qf_is_negative(qfloat_t x) {
+static inline int qf_is_negative(qfloat_t x)
+{
     return (x.hi < 0.0) || (x.hi == 0.0 && x.lo < 0.0);
 }
 
-static inline void qf_modf_like(qfloat_t x, qfloat_t *ip, qfloat_t *fp) {
+static inline void qf_modf_like(qfloat_t x, qfloat_t *ip, qfloat_t *fp)
+{
     qfloat_t f = qf_floor(x);
     *ip = f;
     *fp = qf_sub(x, f);
 }
 
-static inline qfloat_t qf_div_double(qfloat_t x, double d) {
+static inline qfloat_t qf_div_double(qfloat_t x, double d)
+{
     return qf_div(x, qf_from_double(d));
 }
 
@@ -220,7 +240,7 @@ int qf_decimal_exponent(qfloat_t x)
 string_t *qf_decimal_digits_text(qfloat_t x, int ndigits, int *out_exp10)
 {
     int exp10 = qf_decimal_exponent(x);
-    qfloat_t y  = qf_scale_pow10(x, -exp10);   /* y ≈ [1,10) */
+    qfloat_t y = qf_scale_pow10(x, -exp10); /* y ≈ [1,10) */
     qfloat_t ten = QF_TEN;
     string_t *digits;
 
@@ -233,15 +253,17 @@ string_t *qf_decimal_digits_text(qfloat_t x, int ndigits, int *out_exp10)
 
     for (int i = 0; i < ndigits; i++) {
         int digit = qf_to_int(qf_floor(y));
-        if (digit < 0) digit = 0;
-        if (digit > 9) digit = 9;
+        if (digit < 0)
+            digit = 0;
+        if (digit > 9)
+            digit = 9;
 
         if (string_append_char(digits, (char)('0' + digit)) != 0) {
             string_free(digits);
             return NULL;
         }
 
-        qfloat_t d = (qfloat_t){ (double)digit, 0.0 };
+        qfloat_t d = (qfloat_t){(double)digit, 0.0};
         y = qf_sub(y, d);
         y = qf_mul(y, ten);
     }
@@ -275,7 +297,10 @@ string_t *qf_to_text(qfloat_t x)
     }
 
     int sign = (x.hi < 0.0 || (x.hi == 0.0 && x.lo < 0.0));
-    if (sign) { x.hi = -x.hi; x.lo = -x.lo; }
+    if (sign) {
+        x.hi = -x.hi;
+        x.lo = -x.lo;
+    }
 
     string_t *digits;
     int exp10 = 0;
@@ -290,8 +315,7 @@ string_t *qf_to_text(qfloat_t x)
         return NULL;
     }
 
-    if ((sign && string_append_char(out, '-') != 0) ||
-        string_append_rune(out, string_at(digits, 0u)) != 0 ||
+    if ((sign && string_append_char(out, '-') != 0) || string_append_rune(out, string_at(digits, 0u)) != 0 ||
         string_append_char(out, '.') != 0) {
         string_free(digits);
         string_free(out);

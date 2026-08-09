@@ -91,9 +91,12 @@ int main(void)
     one = expr_new_const(NUM_ONE);
 
     printf("bindings x=%p y=%p z=%p\n", (void *)bx, (void *)by, (void *)bz);
-    if (bx) dump_step(expr, bx, zero, one);
-    if (by) dump_step(expr, by, zero, one);
-    if (bz) dump_step(expr, bz, zero, one);
+    if (bx)
+        dump_step(expr, bx, zero, one);
+    if (by)
+        dump_step(expr, by, zero, one);
+    if (bz)
+        dump_step(expr, bz, zero, one);
     if (bz && by) {
         expr_t *after_z = step_expr(expr, bz, zero, one);
         char *after_z_text = after_z ? expr_to_string(after_z, style_UNBOUND) : NULL;

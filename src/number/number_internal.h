@@ -1,9 +1,8 @@
 #ifndef MARS_NUMBER_INTERNAL_H
 #define MARS_NUMBER_INTERNAL_H
 
-#if !defined(MARS_NUMBER_INTERNAL_ACCESS) && \
-    (!defined(__INTELLISENSE__) || \
-     (defined(__INCLUDE_LEVEL__) && __INCLUDE_LEVEL__ > 0))
+#if !defined(MARS_NUMBER_INTERNAL_ACCESS) &&                                                                           \
+    (!defined(__INTELLISENSE__) || (defined(__INCLUDE_LEVEL__) && __INCLUDE_LEVEL__ > 0))
 #error "number_internal.h is private to the number module; include number.h instead."
 #endif
 
@@ -35,6 +34,12 @@ typedef enum number_math_family_t {
 
 typedef enum number_const_id_t number_const_id_t;
 
+/*
+ * Representation vtable: payload lifetime, conversion, predicates and the
+ * primitive same-backend operations needed throughout the number module.
+ * Higher mathematical functions are dispatched by number_maths.c according
+ * to math_family; they are deliberately not repeated in every backend vtable.
+ */
 typedef struct number_vtable_t {
     number_kind_t kind;
     number_math_family_t math_family;
@@ -59,9 +64,7 @@ typedef struct number_vtable_t {
     int (*cmp_same)(const number_t *a, const number_t *b);
     number_t (*const_like)(const number_t *like, number_const_id_t id);
     number_t (*imag_const_like)(const number_t *like, number_const_id_t id);
-    string_t *(*format_inexact_text)(const number_t *number,
-                                     bool scientific,
-                                     int precision);
+    string_t *(*format_inexact_text)(const number_t *number, bool scientific, int precision);
     int (*set_precision)(number_t *number, size_t precision_bits);
     size_t (*get_precision)(const number_t *number);
     size_t (*get_effective_precision)(const number_t *number);
@@ -129,12 +132,7 @@ typedef struct complex_t {
     mpc_t mpc_cache;
 } complex_t;
 
-typedef enum number_binary_op_t {
-    NUMBER_OP_ADD,
-    NUMBER_OP_SUB,
-    NUMBER_OP_MUL,
-    NUMBER_OP_DIV
-} number_binary_op_t;
+typedef enum number_binary_op_t { NUMBER_OP_ADD, NUMBER_OP_SUB, NUMBER_OP_MUL, NUMBER_OP_DIV } number_binary_op_t;
 
 typedef enum number_const_id_t {
     NUMBER_CONST_ZERO,
@@ -231,12 +229,10 @@ number_t *number_wrap_complex(complex_t *value);
 number_t number_take_mpz(number_mpz_t *value);
 number_t number_take_mpq(number_mpq_t *value);
 number_t number_take_mpfr(number_mpfr_t *value);
-number_t number_complex_component_from_number(const number_t *value,
-                                              size_t precision_bits);
+number_t number_complex_component_from_number(const number_t *value, size_t precision_bits);
 complex_t *number_complex_create(number_t real, number_t imag);
 complex_t *number_complex_clone(const complex_t *value);
-complex_t *number_complex_create_from_qcomplex(qcomplex_t value,
-                                               size_t precision_bits);
+complex_t *number_complex_create_from_qcomplex(qcomplex_t value, size_t precision_bits);
 const number_t *number_complex_real_ref(const complex_t *value);
 const number_t *number_complex_imag_ref(const complex_t *value);
 number_const_id_t number_complex_const_id(const complex_t *value);
@@ -263,16 +259,14 @@ static inline const number_vtable_t *number_vt(const number_t *number)
     if (!number)
         return NULL;
     kind = (size_t)number_impl_const(number)->kind;
-    return kind < number_dispatch_count
-        ? number_dispatch[kind] : NULL;
+    return kind < number_dispatch_count ? number_dispatch[kind] : NULL;
 }
 
 static inline number_kind_t number_kind_value(const number_t *number)
 {
     const number_vtable_t *vt = number ? number_vt(number) : NULL;
 
-    return number && number_is_valid_value(number) && vt
-        ? vt->kind : NUMBER_INVALID;
+    return number && number_is_valid_value(number) && vt ? vt->kind : NUMBER_INVALID;
 }
 
 static inline bool number_same_kind_value(const number_t *a, const number_t *b)
@@ -287,22 +281,19 @@ static inline number_math_family_t number_math_family_value(const number_t *numb
 {
     const number_vtable_t *vt = number ? number_vt(number) : NULL;
 
-    return number && number_is_valid_value(number) && vt
-        ? vt->math_family : NUMBER_MATH_INVALID;
+    return number && number_is_valid_value(number) && vt ? vt->math_family : NUMBER_MATH_INVALID;
 }
 
-static inline number_math_family_t number_math_family_binary(number_math_family_t a,
-                                                             number_math_family_t b)
+static inline number_math_family_t number_math_family_binary(number_math_family_t a, number_math_family_t b)
 {
-    return (unsigned)a <= NUMBER_MATH_COMPLEX &&
-        (unsigned)b <= NUMBER_MATH_COMPLEX
-        ? number_math_family_binary_table[a][b] : NUMBER_MATH_INVALID;
+    return (unsigned)a <= NUMBER_MATH_COMPLEX && (unsigned)b <= NUMBER_MATH_COMPLEX
+               ? number_math_family_binary_table[a][b]
+               : NUMBER_MATH_INVALID;
 }
 
 static inline number_kind_t number_math_family_target_kind(number_math_family_t family)
 {
-    return (unsigned)family <= NUMBER_MATH_COMPLEX
-        ? number_math_family_target_kind_table[family] : NUMBER_INVALID;
+    return (unsigned)family <= NUMBER_MATH_COMPLEX ? number_math_family_target_kind_table[family] : NUMBER_INVALID;
 }
 
 static inline qfloat_t number_value_to_qfloat(const number_t *number)
@@ -329,8 +320,7 @@ static inline qcomplex_t number_value_to_qcomplex(const number_t *number)
     }
     if (number_kind_value(number) == NUMBER_COMPLEX) {
         cx = number_impl_const(number)->value.cx;
-        return cx ? qc_make(number_value_to_qfloat(&cx->real),
-                            number_value_to_qfloat(&cx->imag)) : QC_NAN;
+        return cx ? qc_make(number_value_to_qfloat(&cx->real), number_value_to_qfloat(&cx->imag)) : QC_NAN;
     }
     return qc_make(number_value_to_qfloat(number), QF_ZERO);
 }
@@ -352,7 +342,7 @@ num_scope_t *number_scope_suspend(void);
 void number_scope_resume(num_scope_t *scope);
 void num_scope_resume_cleanup(num_scope_t **scope);
 
-#define NUM_SCOPE_SUSPEND(name) \
+#define NUM_SCOPE_SUSPEND(name)                                                                                        \
     __attribute__((cleanup(num_scope_resume_cleanup))) num_scope_t *(name) = number_scope_suspend()
 
 string_t *number_format_double_text(const number_t *number, bool scientific, int precision);
@@ -395,17 +385,14 @@ void number_mpq_free(number_mpq_t *value);
 int number_mpq_ensure(const number_mpq_t *value);
 mpq_srcptr number_mpq_value(const number_mpq_t *value);
 string_t *number_mpq_to_text(const number_mpq_t *value);
-bool number_mpq_get_small_fraction(const number_mpq_t *value,
-                                   long *numerator,
-                                   long *denominator);
+bool number_mpq_get_small_fraction(const number_mpq_t *value, long *numerator, long *denominator);
 int number_mpq_cmp(const number_mpq_t *a, const number_mpq_t *b);
 bool number_mpq_is_zero(const number_mpq_t *value);
 bool number_mpq_is_one(const number_mpq_t *value);
 bool number_mpq_is_integer(const number_mpq_t *value);
 bool number_mpq_is_negative(const number_mpq_t *value);
 number_mpfr_t *number_mpfr_new_prec(size_t precision_bits);
-number_mpfr_t *number_mpfr_from_const_id(number_const_id_t id,
-                                         size_t precision_bits);
+number_mpfr_t *number_mpfr_from_const_id(number_const_id_t id, size_t precision_bits);
 number_mpfr_t *number_mpfr_from_double(double value, size_t precision_bits);
 number_mpfr_t *number_mpfr_from_qfloat(qfloat_t value, size_t precision_bits);
 number_mpfr_t *number_mpfr_from_mpfr(mpfr_srcptr value, size_t precision_bits);
@@ -415,23 +402,15 @@ void number_mpfr_free(number_mpfr_t *value);
 int number_mpfr_ensure(const number_mpfr_t *value, size_t precision_bits);
 mpfr_srcptr number_mpfr_value(const number_mpfr_t *value);
 const complex_t *number_complex_value(const number_t *number);
-int number_complex_get_mpc(mpc_t out,
-                           const complex_t *value,
-                           size_t precision_bits);
+int number_complex_get_mpc(mpc_t out, const complex_t *value, size_t precision_bits);
 number_t *number_wrap_complex_mpc(mpc_srcptr value, size_t precision_bits);
 void number_complex_clear_mpc_cache(complex_t *value);
-int number_complex_set_mpc_cache_from_mpc(complex_t *value,
-                                          mpc_srcptr source,
-                                          size_t precision_bits);
-bool number_eq_same_tol_with_precision(const number_t *a,
-                                       const number_t *b,
-                                       size_t precision_bits);
-number_kind_t number_common_kind(const number_t *a, const number_t *b,
-                                 number_binary_op_t op);
+int number_complex_set_mpc_cache_from_mpc(complex_t *value, mpc_srcptr source, size_t precision_bits);
+bool number_eq_same_tol_with_precision(const number_t *a, const number_t *b, size_t precision_bits);
+number_kind_t number_common_kind(const number_t *a, const number_t *b, number_binary_op_t op);
 number_t *number_coerce(const number_t *number, number_kind_t target_kind);
 bool number_matches_value(const number_t *reference, const number_t *target);
-bool number_const_id_from_immortal(const number_t *number,
-                                   number_const_id_t *id_out);
+bool number_const_id_from_immortal(const number_t *number, number_const_id_t *id_out);
 qfloat_t number_const_qfloat(number_const_id_t id);
 qcomplex_t number_const_qcomplex(number_const_id_t id);
 number_t number_const_mpfr_exact(number_const_id_t id);
@@ -443,12 +422,11 @@ bool number_const_has_ldexp(number_const_id_t id);
 int number_const_ldexp_value(number_const_id_t id);
 void number_constants_shutdown(void);
 number_t number_create_exact_mpfr_long_prec(long value, size_t precision_bits);
-number_t number_create_exact_mpfr_dyadic_prec(long numerator,
-                                                int exponent2,
-                                                size_t precision_bits);
+number_t number_create_exact_mpfr_dyadic_prec(long numerator, int exponent2, size_t precision_bits);
 number_t number_const_return_like(const number_t *like, number_const_id_t id);
 number_t number_neg_const_return_like(const number_t *like, number_const_id_t id);
 number_t number_imag_const_return_like(const number_t *like, number_const_id_t id);
 number_t number_const_like(const number_t *like, number_const_id_t id);
+number_t num_lommel_s_derivative_internal(const number_t mu, const number_t nu, const number_t argument);
 
 #endif

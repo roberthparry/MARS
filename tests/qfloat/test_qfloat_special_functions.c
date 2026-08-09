@@ -13,9 +13,9 @@ static void test_qf_productlog_definition(void)
 {
     printf(C_CYAN "TEST: qf_productlog definition  W(x)*exp(W(x)) = x\n" C_RESET);
 
-    double xs[] = { -0.3, -0.1, 0.0, 0.1, 1.0, 2.0, 5.0 };
+    double xs[] = {-0.3, -0.1, 0.0, 0.1, 1.0, 2.0, 5.0};
 
-    for (int i = 0; i < (int)(sizeof(xs)/sizeof(xs[0])); ++i) {
+    for (int i = 0; i < (int)(sizeof(xs) / sizeof(xs[0])); ++i) {
 
         qfloat_t x = qf_from_double(xs[i]);
         qfloat_t w = qf_productlog(x);
@@ -36,9 +36,9 @@ static void test_qf_productlog_consistency(void)
 {
     printf(C_CYAN "TEST: qf_productlog consistency with qf_lambert_w0\n" C_RESET);
 
-    double xs[] = { -0.2, -0.05, 0.0, 0.2, 1.0, 3.0 };
+    double xs[] = {-0.2, -0.05, 0.0, 0.2, 1.0, 3.0};
 
-    for (int i = 0; i < (int)(sizeof(xs)/sizeof(xs[0])); ++i) {
+    for (int i = 0; i < (int)(sizeof(xs) / sizeof(xs[0])); ++i) {
 
         qfloat_t x = qf_from_double(xs[i]);
 
@@ -60,7 +60,7 @@ static void test_qf_productlog_special(void)
     printf(C_CYAN "TEST: qf_productlog special values\n" C_RESET);
 
     qfloat_t zero = qf_from_double(0.0);
-    qfloat_t one  = qf_from_double(1.0);
+    qfloat_t one = qf_from_double(1.0);
 
     /* W(0) = 0 */
     qfloat_t w0 = qf_productlog(zero);
@@ -86,17 +86,17 @@ static void test_qf_productlog_monotonicity(void)
 {
     printf(C_CYAN "TEST: qf_productlog monotonicity\n" C_RESET);
 
-    double xs[] = { -0.3, -0.1, 0.0, 0.2, 1.0, 3.0 };
+    double xs[] = {-0.3, -0.1, 0.0, 0.2, 1.0, 3.0};
 
     qfloat_t prev = qf_productlog(qf_from_double(xs[0]));
 
-    for (int i = 1; i < (int)(sizeof(xs)/sizeof(xs[0])); ++i) {
+    for (int i = 1; i < (int)(sizeof(xs) / sizeof(xs[0])); ++i) {
 
         qfloat_t x = qf_from_double(xs[i]);
         qfloat_t w = qf_productlog(x);
 
         if (qf_lt(w, prev)) {
-            printf(C_RED "  FAIL: W(%g) < W(%g)  [%s:%d]\n" C_RESET, xs[i], xs[i-1], __FILE__, __LINE__);
+            printf(C_RED "  FAIL: W(%g) < W(%g)  [%s:%d]\n" C_RESET, xs[i], xs[i - 1], __FILE__, __LINE__);
             print_q("W(prev)", prev);
             print_q("W(curr)", w);
             TEST_FAIL();
@@ -128,11 +128,11 @@ static void test_qf_gammainc_PQ_identity(void)
 {
     printf(C_CYAN "TEST: qf_gammainc_P / qf_gammainc_Q  (P + Q = 1)\n" C_RESET);
 
-    double ss[] = { 0.5, 1.0, 2.5, 5.0 };
-    double xs[] = { 0.1, 1.0, 2.0, 5.0, 10.0 };
+    double ss[] = {0.5, 1.0, 2.5, 5.0};
+    double xs[] = {0.1, 1.0, 2.0, 5.0, 10.0};
 
-    for (int i = 0; i < (int)(sizeof(ss)/sizeof(ss[0])); ++i) {
-        for (int j = 0; j < (int)(sizeof(xs)/sizeof(xs[0])); ++j) {
+    for (int i = 0; i < (int)(sizeof(ss) / sizeof(ss[0])); ++i) {
+        for (int j = 0; j < (int)(sizeof(xs) / sizeof(xs[0])); ++j) {
 
             qfloat_t s = qf_from_double(ss[i]);
             qfloat_t x = qf_from_double(xs[j]);
@@ -142,8 +142,7 @@ static void test_qf_gammainc_PQ_identity(void)
             qfloat_t sum = qf_add(P, Q);
 
             TEST_ASSERT_QFLOAT_CLOSE(sum, qf_from_double(1.0));
-            printf(C_GREEN "  OK: P(%g,%g) + Q(%g,%g)\n" C_RESET,
-                   ss[i], xs[j], ss[i], xs[j]);
+            printf(C_GREEN "  OK: P(%g,%g) + Q(%g,%g)\n" C_RESET, ss[i], xs[j], ss[i], xs[j]);
         }
     }
 
@@ -157,11 +156,11 @@ static void test_qf_gammainc_lower_upper_identity(void)
 {
     printf(C_CYAN "TEST: qf_gammainc_lower / qf_gammainc_upper  (γ + Γ = Γ(s))\n" C_RESET);
 
-    double ss[] = { 0.5, 1.0, 2.5, 5.0 };
-    double xs[] = { 0.1, 1.0, 2.0, 5.0, 10.0 };
+    double ss[] = {0.5, 1.0, 2.5, 5.0};
+    double xs[] = {0.1, 1.0, 2.0, 5.0, 10.0};
 
-    for (int i = 0; i < (int)(sizeof(ss)/sizeof(ss[0])); ++i) {
-        for (int j = 0; j < (int)(sizeof(xs)/sizeof(xs[0])); ++j) {
+    for (int i = 0; i < (int)(sizeof(ss) / sizeof(ss[0])); ++i) {
+        for (int j = 0; j < (int)(sizeof(xs) / sizeof(xs[0])); ++j) {
 
             qfloat_t s = qf_from_double(ss[i]);
             qfloat_t x = qf_from_double(xs[j]);
@@ -173,8 +172,7 @@ static void test_qf_gammainc_lower_upper_identity(void)
             qfloat_t gs = qf_gamma(s);
 
             TEST_ASSERT_QFLOAT_CLOSE(sum, gs);
-            printf(C_GREEN "  OK: γ(%g,%g) + Γ(%g,%g)\n" C_RESET,
-                   ss[i], xs[j], ss[i], xs[j]);
+            printf(C_GREEN "  OK: γ(%g,%g) + Γ(%g,%g)\n" C_RESET, ss[i], xs[j], ss[i], xs[j]);
         }
     }
 
@@ -192,9 +190,9 @@ static void test_qf_gammainc_special_s1(void)
 {
     printf(C_CYAN "TEST: incomplete gamma special case s = 1\n" C_RESET);
 
-    double xs[] = { 0.1, 0.5, 1.0, 2.0, 5.0 };
+    double xs[] = {0.1, 0.5, 1.0, 2.0, 5.0};
 
-    for (int j = 0; j < (int)(sizeof(xs)/sizeof(xs[0])); ++j) {
+    for (int j = 0; j < (int)(sizeof(xs) / sizeof(xs[0])); ++j) {
 
         qfloat_t x = qf_from_double(xs[j]);
         qfloat_t s = qf_from_double(1.0);
@@ -276,14 +274,14 @@ static void test_qf_ei_deriv(void)
 {
     printf(C_CYAN "TEST: qf_ei (derivative residual)\n" C_RESET);
 
-    double xs[] = { 0.1, 0.5, 1.0, 2.0, 5.0 };
+    double xs[] = {0.1, 0.5, 1.0, 2.0, 5.0};
     int n = (int)(sizeof(xs) / sizeof(xs[0]));
 
     for (int i = 0; i < n; ++i) {
-        qfloat_t x   = qf_from_double(xs[i]);
+        qfloat_t x = qf_from_double(xs[i]);
         qfloat_t dEi = qf_deriv_sym(qf_ei, x, 1e-8);
 
-        qfloat_t ex  = qf_exp(x);
+        qfloat_t ex = qf_exp(x);
         qfloat_t rhs = qf_div(ex, x); /* e^x / x */
 
         if (qf_close_rel(dEi, rhs, 1.02e-22)) {
@@ -301,17 +299,17 @@ static void test_qf_e1_deriv(void)
 {
     printf(C_CYAN "TEST: qf_e1 (derivative residual)\n" C_RESET);
 
-    double xs[] = { 0.1, 0.5, 1.0, 2.0, 5.0 };
+    double xs[] = {0.1, 0.5, 1.0, 2.0, 5.0};
     int n = (int)(sizeof(xs) / sizeof(xs[0]));
 
     for (int i = 0; i < n; ++i) {
-        qfloat_t x    = qf_from_double(xs[i]);
-        qfloat_t dE1  = qf_deriv_sym(qf_e1, x, 1e-8);
+        qfloat_t x = qf_from_double(xs[i]);
+        qfloat_t dE1 = qf_deriv_sym(qf_e1, x, 1e-8);
 
-        qfloat_t nx   = qf_neg(x);
-        qfloat_t emx  = qf_exp(nx);          /* e^{-x} */
-        qfloat_t rhs  = qf_div(emx, x);      /* e^{-x} / x */
-        rhs         = qf_neg(rhs);         /* -e^{-x} / x */
+        qfloat_t nx = qf_neg(x);
+        qfloat_t emx = qf_exp(nx);     /* e^{-x} */
+        qfloat_t rhs = qf_div(emx, x); /* e^{-x} / x */
+        rhs = qf_neg(rhs);             /* -e^{-x} / x */
 
         if (qf_close_rel(dE1, rhs, 1e-20)) {
             printf(C_GREEN "  OK: E1'(%g)\n" C_RESET, xs[i]);
@@ -328,15 +326,15 @@ static void test_qf_ei_e1_identity(void)
 {
     printf(C_CYAN "TEST: qf_ei / qf_e1 identity  E1(x) = -Ei(-x)\n" C_RESET);
 
-    double xs[] = { 0.1, 0.5, 1.0, 2.0, 5.0, 10.0 };
+    double xs[] = {0.1, 0.5, 1.0, 2.0, 5.0, 10.0};
     int n = (int)(sizeof(xs) / sizeof(xs[0]));
 
     for (int i = 0; i < n; ++i) {
-        qfloat_t x   = qf_from_double(xs[i]);
-        qfloat_t nx  = qf_neg(x);
+        qfloat_t x = qf_from_double(xs[i]);
+        qfloat_t nx = qf_neg(x);
 
-        qfloat_t e1  = qf_e1(x);
-        qfloat_t ei  = qf_ei(nx);
+        qfloat_t e1 = qf_e1(x);
+        qfloat_t ei = qf_ei(nx);
 
         qfloat_t sum = qf_add(e1, ei); /* should be ~0 */
 
@@ -356,33 +354,32 @@ static void test_ei_values(void)
     printf("TEST: qf_ei (full‑precision value tests)\n");
 
     struct {
-        const char *x_str;     /* x as full‑precision string */
-        const char *ref_str;   /* Ei(x) reference value */
-        double tolerance;      /* relative tolerance */
+        const char *x_str;   /* x as full‑precision string */
+        const char *ref_str; /* Ei(x) reference value */
+        double tolerance;    /* relative tolerance */
     } cases[] = {
 
         /* small x */
-        { "0.1",  "-1.6228128139692766749656829992274752542", 1e-30 },
-        { "0.5",  "0.4542199048631735799205238126628023652814", 1e-30 },
-        { "1.0",  "1.8951178163559367554665209343316342694e+0", 1e-30 },
+        {"0.1", "-1.6228128139692766749656829992274752542", 1e-30},
+        {"0.5", "0.4542199048631735799205238126628023652814", 1e-30},
+        {"1.0", "1.8951178163559367554665209343316342694e+0", 1e-30},
 
         /* moderate x */
-        { "2.0",  "4.95423435600189016337950513022703527552", 1e-30 },
-        { "5.0",  "40.18527535580317745509142179379586709542", 1e-30 },
+        {"2.0", "4.95423435600189016337950513022703527552", 1e-30},
+        {"5.0", "40.18527535580317745509142179379586709542", 1e-30},
 
         /* large x */
-        { "10.0", "2492.22897624187775913844014399852484899", 1e-30 },
+        {"10.0", "2492.22897624187775913844014399852484899", 1e-30},
 
         /* negative x */
-        { "-0.1", "-1.822923958419390666080913658291830939119", 1e-30 },
-        { "-0.5", "-0.5597735947761608117467959393150852352268", 1e-30 },
-        { "-1.0", "-0.2193839343955202736771637754601216490310", 1e-30 },
-        { "-2.0", "-4.8900510708061119567239835228449969723e-2", 1e-30 },
-        { "-5.0", "-1.1482955912753257973305619701930277775e-3", 1e-30 },
-        { "-10.0","-4.156968929685324277402859810278180384346e-6", 1e-30 }
-    };
+        {"-0.1", "-1.822923958419390666080913658291830939119", 1e-30},
+        {"-0.5", "-0.5597735947761608117467959393150852352268", 1e-30},
+        {"-1.0", "-0.2193839343955202736771637754601216490310", 1e-30},
+        {"-2.0", "-4.8900510708061119567239835228449969723e-2", 1e-30},
+        {"-5.0", "-1.1482955912753257973305619701930277775e-3", 1e-30},
+        {"-10.0", "-4.156968929685324277402859810278180384346e-6", 1e-30}};
 
-    int n = sizeof(cases)/sizeof(cases[0]);
+    int n = sizeof(cases) / sizeof(cases[0]);
 
     char buf_x[128];
     char buf_ref[128];
@@ -391,12 +388,12 @@ static void test_ei_values(void)
 
     for (int i = 0; i < n; ++i) {
 
-        qfloat_t x   = qf_from_string(cases[i].x_str);
+        qfloat_t x = qf_from_string(cases[i].x_str);
         qfloat_t ref = qf_from_string(cases[i].ref_str);
         qfloat_t got = qf_ei(x);
 
         qfloat_t diff = qf_sub(got, ref);
-        qfloat_t ad   = qf_abs(diff);
+        qfloat_t ad = qf_abs(diff);
 
         /* qfloat_t-level tolerance */
         int pass = qf_close_value(got, ref, cases[i].tolerance);
@@ -409,7 +406,7 @@ static void test_ei_values(void)
         }
 
         /* full-precision printing using qf_sprintf */
-        qf_sprintf(buf_x,   sizeof(buf_x),   "%.40Q", x);
+        qf_sprintf(buf_x, sizeof(buf_x), "%.40Q", x);
         qf_sprintf(buf_ref, sizeof(buf_ref), "%.40Q", ref);
         qf_sprintf(buf_got, sizeof(buf_got), "%.40Q", got);
         qf_sprintf(buf_err, sizeof(buf_err), "%.40Q", ad);
@@ -431,21 +428,21 @@ static void test_qf_ei_e1_all(void)
     TEST_RUN_SUBTEST(test_ei_values, NULL);
 }
 
-static void test_qf_add_double(void) {
+static void test_qf_add_double(void)
+{
     printf(C_CYAN "TEST: qf_add_double\n" C_RESET);
     char buf[256], buf_exp[256];
 
-    struct { const char *xs; double y; const char *expected; } tests[] = {
-        { "1",                   0.5,   "1.5"                              },
-        { "0",                   1.0,   "1"                                },
-        { "-3",                  3.0,   "0"                                },
-        { "1.23456789012345678", 1e-15, "1.23456789012345778"              },
-        { "0",                   0.0,   "0"                                },
-        { NULL, 0.0, NULL }
-    };
+    struct {
+        const char *xs;
+        double y;
+        const char *expected;
+    } tests[] = {{"1", 0.5, "1.5"}, {"0", 1.0, "1"},
+                 {"-3", 3.0, "0"},  {"1.23456789012345678", 1e-15, "1.23456789012345778"},
+                 {"0", 0.0, "0"},   {NULL, 0.0, NULL}};
 
     for (int i = 0; tests[i].xs != NULL; i++) {
-        qfloat_t x   = qf_from_string(tests[i].xs);
+        qfloat_t x = qf_from_string(tests[i].xs);
         qfloat_t got = qf_add_double(x, tests[i].y);
         qfloat_t exp = qf_from_string(tests[i].expected);
         test_qf_to_buffer(got, buf, sizeof(buf));
@@ -453,7 +450,8 @@ static void test_qf_add_double(void) {
         if (qf_close_value(got, exp, 1e-30)) {
             printf("%s  OK: add_double(%s, %.17g)%s\n", C_GREEN, tests[i].xs, tests[i].y, C_RESET);
         } else {
-            printf("%s  FAIL: add_double(%s, %.17g)%s  [%s:%d]\n", C_RED, tests[i].xs, tests[i].y, C_RESET, __FILE__, __LINE__);
+            printf("%s  FAIL: add_double(%s, %.17g)%s  [%s:%d]\n", C_RED, tests[i].xs, tests[i].y, C_RESET, __FILE__,
+                   __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
             TEST_FAIL();
@@ -462,21 +460,20 @@ static void test_qf_add_double(void) {
     printf("\n");
 }
 
-static void test_qf_mul_double(void) {
+static void test_qf_mul_double(void)
+{
     printf(C_CYAN "TEST: qf_mul_double\n" C_RESET);
     char buf[256], buf_exp[256];
 
-    struct { const char *xs; double y; const char *expected; } tests[] = {
-        { "2",   3.0,   "6"   },
-        { "0",   5.0,   "0"   },
-        { "-1",  4.0,  "-4"   },
-        { "1",   0.5,   "0.5" },
-        { "3",  -2.0,  "-6"   },
-        { NULL, 0.0, NULL }
-    };
+    struct {
+        const char *xs;
+        double y;
+        const char *expected;
+    } tests[] = {{"2", 3.0, "6"},   {"0", 5.0, "0"},   {"-1", 4.0, "-4"},
+                 {"1", 0.5, "0.5"}, {"3", -2.0, "-6"}, {NULL, 0.0, NULL}};
 
     for (int i = 0; tests[i].xs != NULL; i++) {
-        qfloat_t x   = qf_from_string(tests[i].xs);
+        qfloat_t x = qf_from_string(tests[i].xs);
         qfloat_t got = qf_mul_double(x, tests[i].y);
         qfloat_t exp = qf_from_string(tests[i].expected);
         test_qf_to_buffer(got, buf, sizeof(buf));
@@ -484,7 +481,8 @@ static void test_qf_mul_double(void) {
         if (qf_close_value(got, exp, 1e-30)) {
             printf("%s  OK: mul_double(%s, %.17g)%s\n", C_GREEN, tests[i].xs, tests[i].y, C_RESET);
         } else {
-            printf("%s  FAIL: mul_double(%s, %.17g)%s  [%s:%d]\n", C_RED, tests[i].xs, tests[i].y, C_RESET, __FILE__, __LINE__);
+            printf("%s  FAIL: mul_double(%s, %.17g)%s  [%s:%d]\n", C_RED, tests[i].xs, tests[i].y, C_RESET, __FILE__,
+                   __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
             TEST_FAIL();
@@ -493,56 +491,49 @@ static void test_qf_mul_double(void) {
     printf("\n");
 }
 
-static void test_qf_cmp(void) {
+static void test_qf_cmp(void)
+{
     printf(C_CYAN "TEST: qf_cmp / qf_lt / qf_le / qf_gt / qf_ge\n" C_RESET);
 
-    struct { const char *as; const char *bs; int want_cmp; } tests[] = {
-        { "1",  "2",  -1 },
-        { "2",  "1",   1 },
-        { "3",  "3",   0 },
-        { "-1", "0",  -1 },
-        { "0",  "-1",  1 },
-        { NULL, NULL,  0 }
-    };
+    struct {
+        const char *as;
+        const char *bs;
+        int want_cmp;
+    } tests[] = {{"1", "2", -1}, {"2", "1", 1}, {"3", "3", 0}, {"-1", "0", -1}, {"0", "-1", 1}, {NULL, NULL, 0}};
 
     for (int i = 0; tests[i].as != NULL; i++) {
         qfloat_t a = qf_from_string(tests[i].as);
         qfloat_t b = qf_from_string(tests[i].bs);
         int c = qf_cmp(a, b);
 
-        int ok = (c == tests[i].want_cmp)
-              && (qf_lt(a, b) == (tests[i].want_cmp < 0))
-              && (qf_le(a, b) == (tests[i].want_cmp <= 0))
-              && (qf_gt(a, b) == (tests[i].want_cmp > 0))
-              && (qf_ge(a, b) == (tests[i].want_cmp >= 0));
+        int ok = (c == tests[i].want_cmp) && (qf_lt(a, b) == (tests[i].want_cmp < 0)) &&
+                 (qf_le(a, b) == (tests[i].want_cmp <= 0)) && (qf_gt(a, b) == (tests[i].want_cmp > 0)) &&
+                 (qf_ge(a, b) == (tests[i].want_cmp >= 0));
 
         if (ok) {
             printf("%s  OK: cmp(%s, %s) = %d%s\n", C_GREEN, tests[i].as, tests[i].bs, c, C_RESET);
         } else {
-            printf("%s  FAIL: cmp(%s, %s): got %d want %d%s  [%s:%d]\n",
-                   C_RED, tests[i].as, tests[i].bs, c, tests[i].want_cmp, C_RESET, __FILE__, __LINE__);
+            printf("%s  FAIL: cmp(%s, %s): got %d want %d%s  [%s:%d]\n", C_RED, tests[i].as, tests[i].bs, c,
+                   tests[i].want_cmp, C_RESET, __FILE__, __LINE__);
             TEST_FAIL();
         }
     }
     printf("\n");
 }
 
-static void test_qf_floor(void) {
+static void test_qf_floor(void)
+{
     printf(C_CYAN "TEST: qf_floor\n" C_RESET);
     char buf[256], buf_exp[256];
 
-    struct { const char *xs; const char *expected; } tests[] = {
-        { "2.9",  "2"  },
-        { "2.0",  "2"  },
-        { "-2.1", "-3" },
-        { "-2.0", "-2" },
-        { "0.5",  "0"  },
-        { "-0.5", "-1" },
-        { NULL, NULL }
-    };
+    struct {
+        const char *xs;
+        const char *expected;
+    } tests[] = {{"2.9", "2"}, {"2.0", "2"},   {"-2.1", "-3"}, {"-2.0", "-2"},
+                 {"0.5", "0"}, {"-0.5", "-1"}, {NULL, NULL}};
 
     for (int i = 0; tests[i].xs != NULL; i++) {
-        qfloat_t x   = qf_from_string(tests[i].xs);
+        qfloat_t x = qf_from_string(tests[i].xs);
         qfloat_t got = qf_floor(x);
         qfloat_t exp = qf_from_string(tests[i].expected);
         test_qf_to_buffer(got, buf, sizeof(buf));
@@ -559,21 +550,19 @@ static void test_qf_floor(void) {
     printf("\n");
 }
 
-static void test_qf_ldexp(void) {
+static void test_qf_ldexp(void)
+{
     printf(C_CYAN "TEST: qf_ldexp\n" C_RESET);
     char buf[256], buf_exp[256];
 
-    struct { const char *xs; int k; const char *expected; } tests[] = {
-        { "1",   3,   "8"    },
-        { "1",  -1,   "0.5"  },
-        { "3",   2,   "12"   },
-        { "1",   0,   "1"    },
-        { "-5",  1,  "-10"   },
-        { NULL,  0,   NULL   }
-    };
+    struct {
+        const char *xs;
+        int k;
+        const char *expected;
+    } tests[] = {{"1", 3, "8"}, {"1", -1, "0.5"}, {"3", 2, "12"}, {"1", 0, "1"}, {"-5", 1, "-10"}, {NULL, 0, NULL}};
 
     for (int i = 0; tests[i].xs != NULL; i++) {
-        qfloat_t x   = qf_from_string(tests[i].xs);
+        qfloat_t x = qf_from_string(tests[i].xs);
         qfloat_t got = qf_ldexp(x, tests[i].k);
         qfloat_t exp = qf_from_string(tests[i].expected);
         test_qf_to_buffer(got, buf, sizeof(buf));
@@ -590,21 +579,18 @@ static void test_qf_ldexp(void) {
     printf("\n");
 }
 
-static void test_qf_sqr(void) {
+static void test_qf_sqr(void)
+{
     printf(C_CYAN "TEST: qf_sqr\n" C_RESET);
     char buf[256], buf_exp[256];
 
-    struct { const char *xs; const char *expected; } tests[] = {
-        { "3",    "9"   },
-        { "-4",   "16"  },
-        { "0.5",  "0.25" },
-        { "0",    "0"   },
-        { "1",    "1"   },
-        { NULL, NULL }
-    };
+    struct {
+        const char *xs;
+        const char *expected;
+    } tests[] = {{"3", "9"}, {"-4", "16"}, {"0.5", "0.25"}, {"0", "0"}, {"1", "1"}, {NULL, NULL}};
 
     for (int i = 0; tests[i].xs != NULL; i++) {
-        qfloat_t x   = qf_from_string(tests[i].xs);
+        qfloat_t x = qf_from_string(tests[i].xs);
         qfloat_t got = qf_sqr(x);
         qfloat_t exp = qf_from_string(tests[i].expected);
         qfloat_t ref = qf_mul(x, x);
@@ -622,21 +608,21 @@ static void test_qf_sqr(void) {
     printf("\n");
 }
 
-static void test_qf_mul_pow10(void) {
+static void test_qf_mul_pow10(void)
+{
     printf(C_CYAN "TEST: qf_mul_pow10\n" C_RESET);
     char buf[256], buf_exp[256];
 
-    struct { const char *xs; int k; const char *expected; double tol; } tests[] = {
-        { "1",    3,  "1000",  1e-30 },
-        { "1",   -3,  "0.001", 1e-15 },  /* non-exact binary fraction */
-        { "2.5",  2,  "250",   1e-30 },
-        { "3",    0,  "3",     1e-30 },
-        { "-7",   1,  "-70",   1e-30 },
-        { NULL,   0,  NULL,    0.0   }
-    };
+    struct {
+        const char *xs;
+        int k;
+        const char *expected;
+        double tol;
+    } tests[] = {{"1", 3, "1000", 1e-30},  {"1", -3, "0.001", 1e-15}, /* non-exact binary fraction */
+                 {"2.5", 2, "250", 1e-30}, {"3", 0, "3", 1e-30},      {"-7", 1, "-70", 1e-30}, {NULL, 0, NULL, 0.0}};
 
     for (int i = 0; tests[i].xs != NULL; i++) {
-        qfloat_t x   = qf_from_string(tests[i].xs);
+        qfloat_t x = qf_from_string(tests[i].xs);
         qfloat_t got = qf_mul_pow10(x, tests[i].k);
         qfloat_t exp = qf_from_string(tests[i].expected);
         test_qf_to_buffer(got, buf, sizeof(buf));
@@ -644,7 +630,8 @@ static void test_qf_mul_pow10(void) {
         if (qf_close_value(got, exp, tests[i].tol)) {
             printf("%s  OK: mul_pow10(%s, %d) = %s%s\n", C_GREEN, tests[i].xs, tests[i].k, buf, C_RESET);
         } else {
-            printf("%s  FAIL: mul_pow10(%s, %d)%s  [%s:%d]\n", C_RED, tests[i].xs, tests[i].k, C_RESET, __FILE__, __LINE__);
+            printf("%s  FAIL: mul_pow10(%s, %d)%s  [%s:%d]\n", C_RED, tests[i].xs, tests[i].k, C_RESET, __FILE__,
+                   __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
             TEST_FAIL();
@@ -653,45 +640,47 @@ static void test_qf_mul_pow10(void) {
     printf("\n");
 }
 
-static void test_qf_signbit(void) {
+static void test_qf_signbit(void)
+{
     printf(C_CYAN "TEST: qf_signbit\n" C_RESET);
 
-    struct { const char *xs; int expected; } tests[] = {
-        { "1",    0 },
-        { "-1",   1 },
-        { "0",    0 },
-        { "1e30", 0 },
-        { "-1e30",1 },
-        { NULL,   0 }
-    };
+    struct {
+        const char *xs;
+        int expected;
+    } tests[] = {{"1", 0}, {"-1", 1}, {"0", 0}, {"1e30", 0}, {"-1e30", 1}, {NULL, 0}};
 
     for (int i = 0; tests[i].xs != NULL; i++) {
         qfloat_t x = qf_from_string(tests[i].xs);
-        int got    = qf_signbit(x);
+        int got = qf_signbit(x);
         if (got == tests[i].expected) {
             printf("%s  OK: signbit(%s) = %d%s\n", C_GREEN, tests[i].xs, got, C_RESET);
         } else {
-            printf("%s  FAIL: signbit(%s): got %d want %d%s  [%s:%d]\n",
-                   C_RED, tests[i].xs, got, tests[i].expected, C_RESET, __FILE__, __LINE__);
+            printf("%s  FAIL: signbit(%s): got %d want %d%s  [%s:%d]\n", C_RED, tests[i].xs, got, tests[i].expected,
+                   C_RESET, __FILE__, __LINE__);
             TEST_FAIL();
         }
     }
     printf("\n");
 }
 
-static void test_qf_isinf(void) {
+static void test_qf_isinf(void)
+{
     printf(C_CYAN "TEST: qf_isinf\n" C_RESET);
 
     qfloat_t pos_inf = qf_from_double(1.0 / 0.0);
     qfloat_t neg_inf = qf_from_double(-1.0 / 0.0);
-    qfloat_t normal  = qf_from_string("1");
+    qfloat_t normal = qf_from_string("1");
     qfloat_t nan_val = qf_from_double(0.0 / 0.0);
 
-    struct { const char *label; qfloat_t x; bool expected; } tests[] = {
-        { "+INF",   pos_inf, true  },
-        { "-INF",   neg_inf, true  },
-        { "1",      normal,  false },
-        { "NaN",    nan_val, false },
+    struct {
+        const char *label;
+        qfloat_t x;
+        bool expected;
+    } tests[] = {
+        {"+INF", pos_inf, true},
+        {"-INF", neg_inf, true},
+        {"1", normal, false},
+        {"NaN", nan_val, false},
     };
 
     int n = (int)(sizeof(tests) / sizeof(tests[0]));
@@ -700,8 +689,7 @@ static void test_qf_isinf(void) {
         if (got == tests[i].expected) {
             printf("%s  OK: isinf(%s) = %s%s\n", C_GREEN, tests[i].label, got ? "true" : "false", C_RESET);
         } else {
-            printf("%s  FAIL: isinf(%s): got %s want %s%s  [%s:%d]\n",
-                   C_RED, tests[i].label, got ? "true" : "false",
+            printf("%s  FAIL: isinf(%s): got %s want %s%s  [%s:%d]\n", C_RED, tests[i].label, got ? "true" : "false",
                    tests[i].expected ? "true" : "false", C_RESET, __FILE__, __LINE__);
             TEST_FAIL();
         }
@@ -709,7 +697,8 @@ static void test_qf_isinf(void) {
     printf("\n");
 }
 
-static void test_qf_vsprintf(void) {
+static void test_qf_vsprintf(void)
+{
     printf(C_CYAN "TEST: qf_vsprintf\n" C_RESET);
 
     /* qf_sprintf is the public wrapper around qf_vsprintf; test via it */
@@ -756,25 +745,28 @@ static void test_qf_vsprintf(void) {
     printf("\n");
 }
 
-void test_qf_trigamma(void) {
+void test_qf_trigamma(void)
+{
     printf(C_CYAN "TEST: qf_trigamma\n" C_RESET);
     char buf[256], buf_exp[256];
 
     /* ψ₁(n) = π²/6 - sum_{k=1}^{n-1} 1/k²; ψ₁(1/2) = π²/2 */
-    struct { const char *xs; const char *expected; double tol; } tests[] = {
-        /* ψ₁(1) = π²/6 */
-        { "1",   "1.6449340668482264364724151666460251892189499012068", 1e-30 },
-        /* ψ₁(2) = ψ₁(1) - 1 */
-        { "2",   "0.6449340668482264364724151666460251892189499012068", 1e-30 },
-        /* ψ₁(1/2) = π²/2 = 4.9348022005446793094172454999380755676568... */
-        { "0.5", "4.9348022005446793094172454999380755676568497036204", 1e-30 },
-        /* ψ₁(3) = ψ₁(1) - 1 - 1/4 */
-        { "3",   "0.3949340668482264364724151666460251892189499012068", 1e-30 },
-        { NULL, NULL, 0.0 }
-    };
+    struct {
+        const char *xs;
+        const char *expected;
+        double tol;
+    } tests[] = {/* ψ₁(1) = π²/6 */
+                 {"1", "1.6449340668482264364724151666460251892189499012068", 1e-30},
+                 /* ψ₁(2) = ψ₁(1) - 1 */
+                 {"2", "0.6449340668482264364724151666460251892189499012068", 1e-30},
+                 /* ψ₁(1/2) = π²/2 = 4.9348022005446793094172454999380755676568... */
+                 {"0.5", "4.9348022005446793094172454999380755676568497036204", 1e-30},
+                 /* ψ₁(3) = ψ₁(1) - 1 - 1/4 */
+                 {"3", "0.3949340668482264364724151666460251892189499012068", 1e-30},
+                 {NULL, NULL, 0.0}};
 
     for (int i = 0; tests[i].xs != NULL; i++) {
-        qfloat_t x   = qf_from_string(tests[i].xs);
+        qfloat_t x = qf_from_string(tests[i].xs);
         qfloat_t got = qf_trigamma(x);
         qfloat_t exp = qf_from_string(tests[i].expected);
         test_qf_to_buffer(got, buf, sizeof(buf));
@@ -793,24 +785,27 @@ void test_qf_trigamma(void) {
     printf("\n");
 }
 
-void test_qf_tetragamma(void) {
+void test_qf_tetragamma(void)
+{
     printf(C_CYAN "TEST: qf_tetragamma\n" C_RESET);
     char buf[256], buf_exp[256];
 
     /* ψ''(x); recurrence ψ''(x+1) = ψ''(x) + 2/x³
        ψ''(1) = -2ζ(3) = -2 * 1.2020569031595942853997... = -2.4041138063191885707994... */
-    struct { const char *xs; const char *expected; double tol; } tests[] = {
-        /* ψ''(1) = -2ζ(3) */
-        { "1",  "-2.4041138063191885707994763230228999815299725846810", 1e-30 },
-        /* ψ''(2) = ψ''(1) + 2 */
-        { "2",  "-0.4041138063191885707994763230228999815299725846810", 1e-30 },
-        /* ψ''(3) = ψ''(2) + 2/8 */
-        { "3",  "-0.1541138063191885707994763230228999815299725846810", 1e-30 },
-        { NULL, NULL, 0.0 }
-    };
+    struct {
+        const char *xs;
+        const char *expected;
+        double tol;
+    } tests[] = {/* ψ''(1) = -2ζ(3) */
+                 {"1", "-2.4041138063191885707994763230228999815299725846810", 1e-30},
+                 /* ψ''(2) = ψ''(1) + 2 */
+                 {"2", "-0.4041138063191885707994763230228999815299725846810", 1e-30},
+                 /* ψ''(3) = ψ''(2) + 2/8 */
+                 {"3", "-0.1541138063191885707994763230228999815299725846810", 1e-30},
+                 {NULL, NULL, 0.0}};
 
     for (int i = 0; tests[i].xs != NULL; i++) {
-        qfloat_t x   = qf_from_string(tests[i].xs);
+        qfloat_t x = qf_from_string(tests[i].xs);
         qfloat_t got = qf_tetragamma(x);
         qfloat_t exp = qf_from_string(tests[i].expected);
         test_qf_to_buffer(got, buf, sizeof(buf));
@@ -829,7 +824,8 @@ void test_qf_tetragamma(void) {
     printf("\n");
 }
 
-void test_qf_polygamma(void) {
+void test_qf_polygamma(void)
+{
     printf(C_CYAN "TEST: qf_polygamma\n" C_RESET);
 
     {
@@ -849,8 +845,7 @@ void test_qf_polygamma(void) {
 
     {
         qfloat_t psi3_2 = qf_polygamma(3, qf_from_double(2.0));
-        qfloat_t expect = qf_sub(qf_div(qf_pow_int(QF_PI, 4), qf_from_double(15.0)),
-                                 qf_from_double(6.0));
+        qfloat_t expect = qf_sub(qf_div(qf_pow_int(QF_PI, 4), qf_from_double(15.0)), qf_from_double(6.0));
 
         TEST_ASSERT_QFLOAT_CLOSE_TOL(psi3_2, expect, 1e-23);
     }
@@ -862,50 +857,78 @@ void test_qf_polygamma(void) {
         TEST_ASSERT_QFLOAT_CLOSE_TOL(psi3_neg_half, expect, 1e-22);
     }
 
-    printf("%s  OK: qf_polygamma aliases and ψ⁽³⁾ identities%s\n\n",
-           C_GREEN, C_RESET);
+    printf("%s  OK: qf_polygamma aliases and ψ⁽³⁾ identities%s\n\n", C_GREEN, C_RESET);
 }
 
-void test_qf_polylog(void) {
+void test_qf_polylog(void)
+{
     printf(C_CYAN "TEST: qf_dilog/qf_polylog\n" C_RESET);
 
     {
         qfloat_t half = qf_from_double(0.5);
         qfloat_t log2 = qf_log(qf_from_double(2.0));
-        qfloat_t expect = qf_sub(qf_div(qf_sqr(QF_PI), qf_from_double(12.0)),
-                                 qf_div(qf_sqr(log2), qf_from_double(2.0)));
+        qfloat_t expect =
+            qf_sub(qf_div(qf_sqr(QF_PI), qf_from_double(12.0)), qf_div(qf_sqr(log2), qf_from_double(2.0)));
 
         TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_dilog(half), expect, 1e-27);
-        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_polylog(qf_from_double(2.0), half),
-                                     expect, 1e-27);
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_polylog(qf_from_double(2.0), half), expect, 1e-27);
     }
 
     {
         qfloat_t x = qf_from_double(0.25);
         qfloat_t one_minus_x = qf_sub(QF_ONE, x);
 
-        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_polylog(QF_ONE, x),
-                                     qf_neg(qf_log(one_minus_x)), 1e-28);
-        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_polylog(QF_ZERO, x),
-                                     qf_div(x, one_minus_x), 1e-28);
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_polylog(QF_ONE, x), qf_neg(qf_log(one_minus_x)), 1e-28);
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_polylog(QF_ZERO, x), qf_div(x, one_minus_x), 1e-28);
     }
 
     {
-        qfloat_t got = qf_appell_f1(QF_ONE, QF_ONE, QF_ONE,
-                                    qf_from_double(2.0),
-                                    qf_from_string("0.1"),
-                                    qf_from_string("0.2"));
+        qfloat_t got =
+            qf_appell_f1(QF_ONE, QF_ONE, QF_ONE, qf_from_double(2.0), qf_from_string("0.1"), qf_from_string("0.2"));
         qfloat_t expect =
             qf_from_string("1.1778303565638345453879410947052170506848071256473314110734863879480772052813379");
 
         TEST_ASSERT_QFLOAT_CLOSE_TOL(got, expect, 1e-28);
     }
 
-    printf("%s  OK: qf_dilog, qf_polylog, and qf_appell_f1 identities%s\n\n",
-           C_GREEN, C_RESET);
+    {
+        qfloat_t z = qf_from_string("0.2");
+        qfloat_t upper = qf_from_double(2.0);
+
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_hypergeometric_pFq(NULL, 0u, NULL, 0u, z), qf_exp(z), 1e-28);
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_hypergeometric_pFq(&upper, 1u, NULL, 0u, z),
+                                     qf_pow(qf_sub(QF_ONE, z), qf_neg(upper)), 1e-28);
+    }
+
+    {
+        qfloat_t a = qf_from_string("1.25");
+        qfloat_t c = a;
+        qfloat_t b[] = {qf_from_string("0.5"), qf_from_string("1.5"), qf_from_string("2.0")};
+        qfloat_t variables[] = {qf_from_string("0.1"), qf_from_string("0.2"), qf_from_string("0.15")};
+        qfloat_t expected = QF_ONE;
+
+        for (size_t i = 0u; i < 3u; ++i) {
+            expected = qf_mul(expected, qf_pow(qf_sub(QF_ONE, variables[i]), qf_neg(b[i])));
+        }
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_lauricella_f(a, b, c, variables, 3u), expected, 1e-27);
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_lauricella_f(a, b, c, variables, 2u),
+                                     qf_appell_f1(a, b[0], b[1], c, variables[0], variables[1]), 1e-29);
+    }
+
+    {
+        qfloat_t a = qf_from_string("1.25");
+        qfloat_t b = qf_from_string("0.5");
+        qfloat_t variable = qf_from_string("0.96");
+        qfloat_t expected = qf_pow(qf_sub(QF_ONE, variable), qf_neg(b));
+
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_lauricella_f(a, &b, a, &variable, 1u), expected, 1e-27);
+    }
+
+    printf("%s  OK: polylogarithmic and hypergeometric identities%s\n\n", C_GREEN, C_RESET);
 }
 
-void test_arithmetic_extensions(void) {
+void test_arithmetic_extensions(void)
+{
     TEST_RUN_SUBTEST(test_qf_add_double, NULL);
     TEST_RUN_SUBTEST(test_qf_mul_double, NULL);
     TEST_RUN_SUBTEST(test_qf_sqr, NULL);
@@ -917,11 +940,13 @@ void test_arithmetic_extensions(void) {
     TEST_RUN_SUBTEST(test_qf_isinf, NULL);
 }
 
-void test_vsprintf(void) {
+void test_vsprintf(void)
+{
     TEST_RUN_SUBTEST(test_qf_vsprintf, NULL);
 }
 
-void test_gammainc_ei_e1(void) {
+void test_gammainc_ei_e1(void)
+{
     TEST_RUN_SUBTEST(test_qf_gammainc_all, NULL);
     TEST_RUN_SUBTEST(test_qf_ei_e1_all, NULL);
 }
@@ -936,12 +961,9 @@ static void test_qf_bessel_half_order_identities(void)
     qfloat_t expected_j_negative_half = qf_mul(scale, qf_cos(x));
     qfloat_t expected_y_half = qf_neg(expected_j_negative_half);
 
-    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_bessel_j(half, x),
-                                 expected_j_half, 1e-28);
-    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_bessel_j(negative_half, x),
-                                 expected_j_negative_half, 1e-28);
-    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_bessel_y(half, x),
-                                 expected_y_half, 1e-28);
+    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_bessel_j(half, x), expected_j_half, 1e-28);
+    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_bessel_j(negative_half, x), expected_j_negative_half, 1e-28);
+    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_bessel_y(half, x), expected_y_half, 1e-28);
 }
 
 static void test_qf_bessel_order_recurrence(void)
@@ -950,28 +972,36 @@ static void test_qf_bessel_order_recurrence(void)
     qfloat_t argument = qf_from_string("2.25");
     qfloat_t lower = qf_bessel_j(qf_sub(order, QF_ONE), argument);
     qfloat_t upper = qf_bessel_j(qf_add(order, QF_ONE), argument);
-    qfloat_t expected = qf_mul(qf_div(qf_mul(qf_from_double(2.0), order),
-                                     argument),
-                               qf_bessel_j(order, argument));
+    qfloat_t expected = qf_mul(qf_div(qf_mul(qf_from_double(2.0), order), argument), qf_bessel_j(order, argument));
 
     TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_add(lower, upper), expected, 1e-27);
+}
+
+static void test_qf_bessel_integer_order_values(void)
+{
+    qfloat_t argument = QF_ONE;
+
+    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_bessel_j(QF_ZERO, argument), qf_from_string("0.7651976865579665514497175261026632"),
+                                 1e-28);
+    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_bessel_j(QF_ONE, argument), qf_from_string("0.4400505857449335159596822037189149"),
+                                 1e-28);
+    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_bessel_y(QF_ZERO, argument),
+                                 qf_from_string("0.08825696421567695798292676602351516"), 1e-28);
+    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_bessel_y(QF_ONE, argument), qf_from_string("-0.7812128213002887165471500000479648"),
+                                 1e-28);
 }
 
 void test_bessel_functions(void)
 {
     TEST_RUN_SUBTEST(test_qf_bessel_half_order_identities, NULL);
     TEST_RUN_SUBTEST(test_qf_bessel_order_recurrence, NULL);
+    TEST_RUN_SUBTEST(test_qf_bessel_integer_order_values, NULL);
 
     {
         qfloat_t argument = qf_from_double(1.25);
         qfloat_t got = qf_lommel_s(QF_ONE, QF_ZERO, argument);
-        qfloat_t got_derivative = qf_lommel_s_derivative(
-            QF_ONE, QF_ZERO, argument);
-        qfloat_t expected = qf_sub(
-            QF_ONE, qf_bessel_j(QF_ZERO, argument));
+        qfloat_t expected = qf_sub(QF_ONE, qf_bessel_j(QF_ZERO, argument));
 
         TEST_ASSERT_QFLOAT_CLOSE_TOL(got, expected, 1e-28);
-        TEST_ASSERT_QFLOAT_CLOSE_TOL(
-            got_derivative, qf_bessel_j(QF_ONE, argument), 1e-28);
     }
 }

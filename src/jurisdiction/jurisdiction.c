@@ -1,6 +1,6 @@
-#include <stdbool.h>
 #include <float.h>
 #include <math.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -250,8 +250,7 @@ static void trim_ascii_whitespace(char *text)
     if (start != text)
         memmove(text, start, strlen(start) + 1u);
     end = text + strlen(text);
-    while (end > text &&
-           (end[-1] == ' ' || end[-1] == '\t' || end[-1] == '\r' || end[-1] == '\n')) {
+    while (end > text && (end[-1] == ' ' || end[-1] == '\t' || end[-1] == '\r' || end[-1] == '\n')) {
         end--;
     }
     *end = '\0';
@@ -269,9 +268,7 @@ static char *unquote_shell_value(const char *raw_value)
         return NULL;
     trim_ascii_whitespace(value);
     len = strlen(value);
-    if (len >= 2u &&
-        ((value[0] == '\'' && value[len - 1u] == '\'') ||
-         (value[0] == '"' && value[len - 1u] == '"'))) {
+    if (len >= 2u && ((value[0] == '\'' && value[len - 1u] == '\'') || (value[0] == '"' && value[len - 1u] == '"'))) {
         memmove(value, value + 1, len - 2u);
         value[len - 2u] = '\0';
     }
@@ -407,8 +404,7 @@ static void extract_locale_country_code(const char *locale_value, char out[32])
     if (!out)
         return;
     out[0] = '\0';
-    if (!locale_value || !*locale_value || strcmp(locale_value, "C") == 0 ||
-        strcmp(locale_value, "POSIX") == 0)
+    if (!locale_value || !*locale_value || strcmp(locale_value, "C") == 0 || strcmp(locale_value, "POSIX") == 0)
         return;
 
     underscore = strchr(locale_value, '_');
@@ -727,14 +723,22 @@ static char *date_text_from_datetime(const datetime_t *dttm)
 static int iso_weekday_from_datetime_weekday(int weekday)
 {
     switch (weekday) {
-    case DT_Monday: return 1;
-    case DT_Tuesday: return 2;
-    case DT_Wednesday: return 3;
-    case DT_Thursday: return 4;
-    case DT_Friday: return 5;
-    case DT_Saturday: return 6;
-    case DT_Sunday: return 7;
-    default: return 0;
+        case DT_Monday:
+            return 1;
+        case DT_Tuesday:
+            return 2;
+        case DT_Wednesday:
+            return 3;
+        case DT_Thursday:
+            return 4;
+        case DT_Friday:
+            return 5;
+        case DT_Saturday:
+            return 6;
+        case DT_Sunday:
+            return 7;
+        default:
+            return 0;
     }
 }
 
@@ -789,9 +793,8 @@ static char *date_text_from_ymd(short year, month_t month, uint8_t day)
 
 static char *easter_related_text(int year, int offset_days, bool orthodox)
 {
-    datetime_t *dttm = orthodox
-        ? datetime_init_orthodox_easter(datetime_alloc(), year)
-        : datetime_init_easter(datetime_alloc(), year);
+    datetime_t *dttm =
+        orthodox ? datetime_init_orthodox_easter(datetime_alloc(), year) : datetime_init_easter(datetime_alloc(), year);
     char *out;
 
     if (!dttm)
@@ -958,11 +961,8 @@ static bool date_is_occupied(const holiday_event_row_t *events, size_t count, co
     return false;
 }
 
-static char *next_observed_date(const char *base_date,
-                                const char *weekend_mask,
-                                const holiday_event_row_t *occupied_events,
-                                size_t occupied_count,
-                                bool avoid_occupied,
+static char *next_observed_date(const char *base_date, const char *weekend_mask,
+                                const holiday_event_row_t *occupied_events, size_t occupied_count, bool avoid_occupied,
                                 bool force_monday)
 {
     long delta;
@@ -972,9 +972,8 @@ static char *next_observed_date(const char *base_date,
         int weekday = candidate ? iso_weekday_from_date_text(candidate) : 0;
         bool is_weekend = weekend_mask_contains(weekend_mask, weekday);
         bool is_monday = weekday == 1;
-        bool occupied = candidate && avoid_occupied
-            ? date_is_occupied(occupied_events, occupied_count, candidate)
-            : false;
+        bool occupied =
+            candidate && avoid_occupied ? date_is_occupied(occupied_events, occupied_count, candidate) : false;
 
         if (candidate && !is_weekend && (!force_monday || is_monday) && !occupied)
             return candidate;
@@ -983,10 +982,8 @@ static char *next_observed_date(const char *base_date,
     return NULL;
 }
 
-static char *previous_observed_date(const char *base_date,
-                                    const char *weekend_mask,
-                                    const holiday_event_row_t *occupied_events,
-                                    size_t occupied_count,
+static char *previous_observed_date(const char *base_date, const char *weekend_mask,
+                                    const holiday_event_row_t *occupied_events, size_t occupied_count,
                                     bool avoid_occupied)
 {
     long delta;
@@ -995,9 +992,8 @@ static char *previous_observed_date(const char *base_date,
         char *candidate = date_text_add_days(base_date, -delta);
         int weekday = candidate ? iso_weekday_from_date_text(candidate) : 0;
         bool is_weekend = weekend_mask_contains(weekend_mask, weekday);
-        bool occupied = candidate && avoid_occupied
-            ? date_is_occupied(occupied_events, occupied_count, candidate)
-            : false;
+        bool occupied =
+            candidate && avoid_occupied ? date_is_occupied(occupied_events, occupied_count, candidate) : false;
 
         if (candidate && !is_weekend && !occupied)
             return candidate;
@@ -1006,10 +1002,7 @@ static char *previous_observed_date(const char *base_date,
     return NULL;
 }
 
-static char *evaluate_sql_rule_date(sqlite_t *db,
-                                    const holiday_rule_row_t *rule,
-                                    int year,
-                                    const char *jurisdiction)
+static char *evaluate_sql_rule_date(sqlite_t *db, const holiday_rule_row_t *rule, int year, const char *jurisdiction)
 {
     sqlite_stmt_t *stmt = NULL;
     char *sql = NULL;
@@ -1037,10 +1030,8 @@ static char *evaluate_sql_rule_date(sqlite_t *db,
     free(sql);
     if (!stmt)
         return NULL;
-    if (!sqlite_stmt_bind_int(stmt, 1, year) ||
-        !sqlite_stmt_bind_text(stmt, 2, jurisdiction) ||
-        !sqlite_stmt_bind_int(stmt, 3, rule->holiday_id) ||
-        !sqlite_stmt_bind_int(stmt, 4, rule->rule_id)) {
+    if (!sqlite_stmt_bind_int(stmt, 1, year) || !sqlite_stmt_bind_text(stmt, 2, jurisdiction) ||
+        !sqlite_stmt_bind_int(stmt, 3, rule->holiday_id) || !sqlite_stmt_bind_int(stmt, 4, rule->rule_id)) {
         sqlite_stmt_finalize(stmt);
         return NULL;
     }
@@ -1057,16 +1048,15 @@ static char *evaluate_sql_rule_date(sqlite_t *db,
 
 static bool load_lineage(sqlite_t *db, const char *jurisdiction, pointer_vec_t *lineage_rows)
 {
-    static const char sql[] =
-        "with recursive lineage(jurisdiction_id, depth) as ("
-        "  select ?1, 0 "
-        "  union all "
-        "  select j.parent_jurisdiction_id, lineage.depth + 1 "
-        "  from jurisdiction j "
-        "  join lineage on j.jurisdiction_id = lineage.jurisdiction_id "
-        "  where j.parent_jurisdiction_id is not null"
-        ") "
-        "select jurisdiction_id, depth from lineage order by depth;";
+    static const char sql[] = "with recursive lineage(jurisdiction_id, depth) as ("
+                              "  select ?1, 0 "
+                              "  union all "
+                              "  select j.parent_jurisdiction_id, lineage.depth + 1 "
+                              "  from jurisdiction j "
+                              "  join lineage on j.jurisdiction_id = lineage.jurisdiction_id "
+                              "  where j.parent_jurisdiction_id is not null"
+                              ") "
+                              "select jurisdiction_id, depth from lineage order by depth;";
     sqlite_stmt_t *stmt = sqlite_stmt_prepare(db, sql);
     sqlite_step_result_t rc;
 
@@ -1098,10 +1088,9 @@ fail:
 
 static bool load_weekend_rules(sqlite_t *db, const pointer_vec_t *lineage_rows, pointer_vec_t *weekend_rules)
 {
-    static const char sql[] =
-        "select jurisdiction_id, weekend_mask, valid_from_year, valid_to_year "
-        "from jurisdiction_weekend_rule where jurisdiction_id = ?1 "
-        "order by coalesce(valid_from_year, -999999), coalesce(valid_to_year, 999999);";
+    static const char sql[] = "select jurisdiction_id, weekend_mask, valid_from_year, valid_to_year "
+                              "from jurisdiction_weekend_rule where jurisdiction_id = ?1 "
+                              "order by coalesce(valid_from_year, -999999), coalesce(valid_to_year, 999999);";
     sqlite_stmt_t *stmt = NULL;
     const lineage_row_t *lineage = lineage_rows ? lineage_rows->items : NULL;
     size_t i;
@@ -1143,19 +1132,15 @@ fail:
     return false;
 }
 
-static bool load_default_location(sqlite_t *db,
-                                  const pointer_vec_t *lineage_rows,
-                                  double *latitude,
-                                  double *longitude)
+static bool load_default_location(sqlite_t *db, const pointer_vec_t *lineage_rows, double *latitude, double *longitude)
 {
-    static const char sql[] =
-        "select lat.latitude, lon.longitude "
-        "from jurisdiction_location_default as loc "
-        "join jurisdiction_location_default_latitude as lat "
-        "  on lat.jurisdiction_id = loc.jurisdiction_id "
-        "join jurisdiction_location_default_longitude as lon "
-        "  on lon.jurisdiction_id = loc.jurisdiction_id "
-        "where loc.jurisdiction_id = ?1;";
+    static const char sql[] = "select lat.latitude, lon.longitude "
+                              "from jurisdiction_location_default as loc "
+                              "join jurisdiction_location_default_latitude as lat "
+                              "  on lat.jurisdiction_id = loc.jurisdiction_id "
+                              "join jurisdiction_location_default_longitude as lon "
+                              "  on lon.jurisdiction_id = loc.jurisdiction_id "
+                              "where loc.jurisdiction_id = ?1;";
     sqlite_stmt_t *stmt = NULL;
     const lineage_row_t *lineage = lineage_rows ? lineage_rows->items : NULL;
     size_t i;
@@ -1183,8 +1168,7 @@ static bool load_default_location(sqlite_t *db,
             continue;
         lat_text = sqlite_stmt_column_text(stmt, 0);
         lon_text = sqlite_stmt_column_text(stmt, 1);
-        if (!parse_double_text(lat_text, &parsed_latitude) ||
-            !parse_double_text(lon_text, &parsed_longitude)) {
+        if (!parse_double_text(lat_text, &parsed_latitude) || !parse_double_text(lon_text, &parsed_longitude)) {
             goto done;
         }
         *latitude = parsed_latitude;
@@ -1198,19 +1182,16 @@ done:
     return found;
 }
 
-static bool load_default_timezone_name(sqlite_t *db,
-                                       const pointer_vec_t *lineage_rows,
-                                       char *timezone_name,
+static bool load_default_timezone_name(sqlite_t *db, const pointer_vec_t *lineage_rows, char *timezone_name,
                                        size_t timezone_name_size)
 {
-    static const char sql[] =
-        "select code.timezone_name "
-        "from jurisdiction_location_default as loc "
-        "join jurisdiction_location_default_timezone as tz "
-        "  on tz.jurisdiction_id = loc.jurisdiction_id "
-        "join timezone_code as code "
-        "  on code.timezone_code = tz.timezone_code "
-        "where loc.jurisdiction_id = ?1;";
+    static const char sql[] = "select code.timezone_name "
+                              "from jurisdiction_location_default as loc "
+                              "join jurisdiction_location_default_timezone as tz "
+                              "  on tz.jurisdiction_id = loc.jurisdiction_id "
+                              "join timezone_code as code "
+                              "  on code.timezone_code = tz.timezone_code "
+                              "where loc.jurisdiction_id = ?1;";
     sqlite_stmt_t *stmt = NULL;
     const lineage_row_t *lineage = lineage_rows ? lineage_rows->items : NULL;
     size_t i;
@@ -1247,18 +1228,14 @@ done:
     return found;
 }
 
-static bool load_timezone_eras(sqlite_t *db,
-                               const char *timezone_name,
-                               pointer_vec_t *rows)
+static bool load_timezone_eras(sqlite_t *db, const char *timezone_name, pointer_vec_t *rows)
 {
-    static const char canonical_sql[] =
-        "select canonical_timezone_name "
-        "from timezone_canonical where timezone_name = ?1;";
-    static const char sql[] =
-        "select sequence_no, gmtoff_minutes, rules_kind, fixed_save_minutes, rule_name, "
-        "       until_year, until_month, until_day_kind, until_day_value, "
-        "       until_weekday, until_seconds, until_suffix "
-        "from timezone_era where timezone_name = ?1 order by sequence_no;";
+    static const char canonical_sql[] = "select canonical_timezone_name "
+                                        "from timezone_canonical where timezone_name = ?1;";
+    static const char sql[] = "select sequence_no, gmtoff_minutes, rules_kind, fixed_save_minutes, rule_name, "
+                              "       until_year, until_month, until_day_kind, until_day_value, "
+                              "       until_weekday, until_seconds, until_suffix "
+                              "from timezone_era where timezone_name = ?1 order by sequence_no;";
     sqlite_stmt_t *stmt = NULL;
     sqlite_stmt_t *canonical_stmt = NULL;
     const char *query_timezone_name = timezone_name;
@@ -1292,9 +1269,7 @@ retry:
         row.until_day_value = sqlite_stmt_column_is_null(stmt, 8) ? 0 : sqlite_stmt_column_int(stmt, 8);
         row.until_weekday = sqlite_stmt_column_is_null(stmt, 9) ? 0 : sqlite_stmt_column_int(stmt, 9);
         row.until_seconds = sqlite_stmt_column_is_null(stmt, 10) ? 0 : sqlite_stmt_column_int(stmt, 10);
-        row.until_suffix = sqlite_stmt_column_is_null(stmt, 11)
-            ? '\0'
-            : sqlite_stmt_column_text(stmt, 11)[0];
+        row.until_suffix = sqlite_stmt_column_is_null(stmt, 11) ? '\0' : sqlite_stmt_column_text(stmt, 11)[0];
         if (!row.rules_kind || !vec_push(rows, &row)) {
             free(row.rules_kind);
             free(row.rule_name);
@@ -1315,10 +1290,7 @@ retry:
             const char *canonical_text = sqlite_stmt_column_text(canonical_stmt, 0);
 
             if (canonical_text && *canonical_text) {
-                snprintf(canonical_timezone_name,
-                         sizeof(canonical_timezone_name),
-                         "%s",
-                         canonical_text);
+                snprintf(canonical_timezone_name, sizeof(canonical_timezone_name), "%s", canonical_text);
                 if (strcmp(canonical_timezone_name, timezone_name) != 0) {
                     query_timezone_name = canonical_timezone_name;
                     retried_with_canonical = true;
@@ -1338,15 +1310,12 @@ fail:
     return false;
 }
 
-static bool load_timezone_transition_rules(sqlite_t *db,
-                                           const char *rule_name,
-                                           pointer_vec_t *rows)
+static bool load_timezone_transition_rules(sqlite_t *db, const char *rule_name, pointer_vec_t *rows)
 {
-    static const char sql[] =
-        "select rule_name, from_year, to_year, in_month, on_kind, on_day, on_weekday, "
-        "       at_seconds, at_suffix, save_minutes "
-        "from timezone_transition_rule where rule_name = ?1 "
-        "order by coalesce(from_year, -999999), coalesce(to_year, 999999), in_month, on_day;";
+    static const char sql[] = "select rule_name, from_year, to_year, in_month, on_kind, on_day, on_weekday, "
+                              "       at_seconds, at_suffix, save_minutes "
+                              "from timezone_transition_rule where rule_name = ?1 "
+                              "order by coalesce(from_year, -999999), coalesce(to_year, 999999), in_month, on_day;";
     sqlite_stmt_t *stmt = NULL;
     sqlite_step_result_t rc;
 
@@ -1370,9 +1339,7 @@ static bool load_timezone_transition_rules(sqlite_t *db,
         row.on_day = sqlite_stmt_column_int(stmt, 5);
         row.on_weekday = sqlite_stmt_column_is_null(stmt, 6) ? 0 : sqlite_stmt_column_int(stmt, 6);
         row.at_seconds = sqlite_stmt_column_int(stmt, 7);
-        row.at_suffix = sqlite_stmt_column_is_null(stmt, 8)
-            ? 'w'
-            : sqlite_stmt_column_text(stmt, 8)[0];
+        row.at_suffix = sqlite_stmt_column_is_null(stmt, 8) ? 'w' : sqlite_stmt_column_text(stmt, 8)[0];
         row.save_minutes = sqlite_stmt_column_int(stmt, 9);
         if (!row.rule_name || !row.on_kind || !vec_push(rows, &row)) {
             free(row.rule_name);
@@ -1389,11 +1356,7 @@ fail:
     return false;
 }
 
-static bool resolve_month_day(short year,
-                              month_t month,
-                              const char *day_kind,
-                              int day_value,
-                              int weekday,
+static bool resolve_month_day(short year, month_t month, const char *day_kind, int day_value, int weekday,
                               uint8_t *resolved_day)
 {
     datetime_t *probe = NULL;
@@ -1445,10 +1408,7 @@ done:
     return ok;
 }
 
-static bool normalise_day_time(short *year,
-                               month_t *month,
-                               uint8_t *day,
-                               int *seconds)
+static bool normalise_day_time(short *year, month_t *month, uint8_t *day, int *seconds)
 {
     datetime_t *date = NULL;
     long shift_days = 0;
@@ -1482,11 +1442,8 @@ done:
     return ok;
 }
 
-static int compare_local_noon_to_boundary(const datetime_t *date,
-                                          short boundary_year,
-                                          month_t boundary_month,
-                                          uint8_t boundary_day,
-                                          int boundary_seconds)
+static int compare_local_noon_to_boundary(const datetime_t *date, short boundary_year, month_t boundary_month,
+                                          uint8_t boundary_day, int boundary_seconds)
 {
     datetime_t *boundary = NULL;
     int cmp;
@@ -1507,8 +1464,7 @@ static int compare_local_noon_to_boundary(const datetime_t *date,
     return 0;
 }
 
-static const timezone_era_row_t *select_timezone_era_for_date(const pointer_vec_t *eras,
-                                                              const datetime_t *date)
+static const timezone_era_row_t *select_timezone_era_for_date(const pointer_vec_t *eras, const datetime_t *date)
 {
     const timezone_era_row_t *items = eras ? eras->items : NULL;
     size_t i;
@@ -1525,30 +1481,19 @@ static const timezone_era_row_t *select_timezone_era_for_date(const pointer_vec_
             return &items[i];
         boundary_year = (short)items[i].until_year;
         boundary_month = (month_t)(items[i].until_month ? items[i].until_month : 1);
-        if (!resolve_month_day(boundary_year,
-                               boundary_month,
-                               items[i].until_day_kind ? items[i].until_day_kind : "day_of_month",
-                               items[i].until_day_value ? items[i].until_day_value : 1,
-                               items[i].until_weekday,
-                               &boundary_day))
+        if (!resolve_month_day(
+                boundary_year, boundary_month, items[i].until_day_kind ? items[i].until_day_kind : "day_of_month",
+                items[i].until_day_value ? items[i].until_day_value : 1, items[i].until_weekday, &boundary_day))
             return NULL;
-        cmp = compare_local_noon_to_boundary(date,
-                                             boundary_year,
-                                             boundary_month,
-                                             boundary_day,
-                                             items[i].until_seconds);
+        cmp = compare_local_noon_to_boundary(date, boundary_year, boundary_month, boundary_day, items[i].until_seconds);
         if (cmp < 0)
             return &items[i];
     }
     return eras->count ? &items[eras->count - 1u] : NULL;
 }
 
-static bool compute_transition_occurrence(const timezone_transition_rule_row_t *rule,
-                                          int year,
-                                          short *out_year,
-                                          month_t *out_month,
-                                          uint8_t *out_day,
-                                          int *out_seconds)
+static bool compute_transition_occurrence(const timezone_transition_rule_row_t *rule, int year, short *out_year,
+                                          month_t *out_month, uint8_t *out_day, int *out_seconds)
 {
     uint8_t day;
     short rule_year;
@@ -1562,12 +1507,8 @@ static bool compute_transition_occurrence(const timezone_transition_rule_row_t *
 
     rule_year = (short)year;
     rule_month = (month_t)rule->in_month;
-    if (!resolve_month_day(rule_year,
-                           rule_month,
-                           rule->on_kind ? rule->on_kind : "day_of_month",
-                           rule->on_day,
-                           rule->on_weekday,
-                           &day))
+    if (!resolve_month_day(rule_year, rule_month, rule->on_kind ? rule->on_kind : "day_of_month", rule->on_day,
+                           rule->on_weekday, &day))
         return false;
 
     rule_seconds = rule->at_seconds;
@@ -1581,14 +1522,8 @@ static bool compute_transition_occurrence(const timezone_transition_rule_row_t *
     return true;
 }
 
-static int compare_boundary_to_boundary(short left_year,
-                                        month_t left_month,
-                                        uint8_t left_day,
-                                        int left_seconds,
-                                        short right_year,
-                                        month_t right_month,
-                                        uint8_t right_day,
-                                        int right_seconds)
+static int compare_boundary_to_boundary(short left_year, month_t left_month, uint8_t left_day, int left_seconds,
+                                        short right_year, month_t right_month, uint8_t right_day, int right_seconds)
 {
     datetime_t *left = NULL;
     datetime_t *right = NULL;
@@ -1618,19 +1553,12 @@ static int transition_occurrence_compare(const void *lhs, const void *rhs)
     const timezone_transition_occurrence_t *left = lhs;
     const timezone_transition_occurrence_t *right = rhs;
 
-    return compare_boundary_to_boundary(left->year,
-                                        left->month,
-                                        left->day,
-                                        left->seconds,
-                                        right->year,
-                                        right->month,
-                                        right->day,
-                                        right->seconds);
+    return compare_boundary_to_boundary(left->year, left->month, left->day, left->seconds, right->year, right->month,
+                                        right->day, right->seconds);
 }
 
 static bool materialise_transition_display_datetime(const timezone_transition_occurrence_t *occurrence,
-                                                    double previous_offset_hours,
-                                                    datetime_t **out)
+                                                    double previous_offset_hours, datetime_t **out)
 {
     short year;
     month_t month;
@@ -1652,34 +1580,27 @@ static bool materialise_transition_display_datetime(const timezone_transition_oc
     previous_save_hours = previous_offset_hours - standard_offset_hours;
 
     switch (occurrence->at_suffix) {
-    case 'u':
-    case 'g':
-    case 'z':
-        seconds += (int)lround(previous_offset_hours * 3600.0);
-        break;
-    case 's':
-        seconds += (int)lround(previous_save_hours * 3600.0);
-        break;
-    case 'w':
-    default:
-        break;
+        case 'u':
+        case 'g':
+        case 'z':
+            seconds += (int)lround(previous_offset_hours * 3600.0);
+            break;
+        case 's':
+            seconds += (int)lround(previous_save_hours * 3600.0);
+            break;
+        case 'w':
+        default:
+            break;
     }
 
     if (!normalise_day_time(&year, &month, &day, &seconds))
         return false;
-    *out = datetime_init_ymdt(datetime_alloc(),
-                              year,
-                              month,
-                              day,
-                              (uint8_t)(seconds / 3600),
-                              (uint8_t)((seconds % 3600) / 60),
-                              (double)(seconds % 60));
+    *out = datetime_init_ymdt(datetime_alloc(), year, month, day, (uint8_t)(seconds / 3600),
+                              (uint8_t)((seconds % 3600) / 60), (double)(seconds % 60));
     return *out != NULL;
 }
 
-static bool resolve_named_rule_save_minutes(sqlite_t *db,
-                                            const char *rule_name,
-                                            const datetime_t *date,
+static bool resolve_named_rule_save_minutes(sqlite_t *db, const char *rule_name, const datetime_t *date,
                                             int *save_minutes)
 {
     pointer_vec_t rule_rows = {0};
@@ -1713,31 +1634,18 @@ static bool resolve_named_rule_save_minutes(sqlite_t *db,
             int occurrence_seconds;
             int candidate_cmp;
 
-            if (!compute_transition_occurrence(&items[i],
-                                               probe_years[year_index],
-                                               &occurrence_year,
-                                               &occurrence_month,
-                                               &occurrence_day,
-                                               &occurrence_seconds))
+            if (!compute_transition_occurrence(&items[i], probe_years[year_index], &occurrence_year, &occurrence_month,
+                                               &occurrence_day, &occurrence_seconds))
                 continue;
 
-            candidate_cmp = compare_local_noon_to_boundary(date,
-                                                           occurrence_year,
-                                                           occurrence_month,
-                                                           occurrence_day,
+            candidate_cmp = compare_local_noon_to_boundary(date, occurrence_year, occurrence_month, occurrence_day,
                                                            occurrence_seconds);
             if (candidate_cmp < 0)
                 continue;
 
             if (!found ||
-                compare_boundary_to_boundary(occurrence_year,
-                                            occurrence_month,
-                                            occurrence_day,
-                                            occurrence_seconds,
-                                            best_year,
-                                            best_month,
-                                            best_day,
-                                            best_seconds) > 0) {
+                compare_boundary_to_boundary(occurrence_year, occurrence_month, occurrence_day, occurrence_seconds,
+                                             best_year, best_month, best_day, best_seconds) > 0) {
                 found = true;
                 best_year = occurrence_year;
                 best_month = occurrence_month;
@@ -1753,9 +1661,7 @@ static bool resolve_named_rule_save_minutes(sqlite_t *db,
     return true;
 }
 
-static bool timezone_offset_for_name_on_date(sqlite_t *db,
-                                             const char *timezone_name,
-                                             const datetime_t *date,
+static bool timezone_offset_for_name_on_date(sqlite_t *db, const char *timezone_name, const datetime_t *date,
                                              double *offset_hours)
 {
     pointer_vec_t era_rows = {0};
@@ -1790,25 +1696,21 @@ static bool timezone_offset_for_name_on_date(sqlite_t *db,
     return true;
 }
 
-static bool load_holiday_rules(sqlite_t *db,
-                               const pointer_vec_t *lineage_rows,
-                               int start_year,
-                               int end_year,
+static bool load_holiday_rules(sqlite_t *db, const pointer_vec_t *lineage_rows, int start_year, int end_year,
                                pointer_vec_t *rules)
 {
-    static const char sql[] =
-        "select hd.holiday_id, hr.holiday_rule_id, hd.jurisdiction_id, "
-        "       coalesce(hn.localized_name, hd.default_name), hd.holiday_class, "
-        "       hr.rule_kind, hr.month, hr.day, hr.weekday, hr.ordinal, hr.offset_days, "
-        "       hr.holiday_date, hr.expression_language, hr.expression_text, "
-        "       hr.valid_from_year, hr.valid_to_year "
-        "from holiday_definition hd "
-        "join holiday_rule hr on hr.holiday_id = hd.holiday_id "
-        "left join holiday_name hn on hn.holiday_id = hd.holiday_id and hn.is_primary = 'Y' "
-        "where hd.jurisdiction_id = ?1 "
-        "  and (hr.valid_from_year is null or hr.valid_from_year <= ?2) "
-        "  and (hr.valid_to_year is null or hr.valid_to_year >= ?3) "
-        "order by hd.holiday_id, hr.priority, hr.sequence_no;";
+    static const char sql[] = "select hd.holiday_id, hr.holiday_rule_id, hd.jurisdiction_id, "
+                              "       coalesce(hn.localized_name, hd.default_name), hd.holiday_class, "
+                              "       hr.rule_kind, hr.month, hr.day, hr.weekday, hr.ordinal, hr.offset_days, "
+                              "       hr.holiday_date, hr.expression_language, hr.expression_text, "
+                              "       hr.valid_from_year, hr.valid_to_year "
+                              "from holiday_definition hd "
+                              "join holiday_rule hr on hr.holiday_id = hd.holiday_id "
+                              "left join holiday_name hn on hn.holiday_id = hd.holiday_id and hn.is_primary = 'Y' "
+                              "where hd.jurisdiction_id = ?1 "
+                              "  and (hr.valid_from_year is null or hr.valid_from_year <= ?2) "
+                              "  and (hr.valid_to_year is null or hr.valid_to_year >= ?3) "
+                              "order by hd.holiday_id, hr.priority, hr.sequence_no;";
     sqlite_stmt_t *stmt = NULL;
     const lineage_row_t *lineage = lineage_rows ? lineage_rows->items : NULL;
     size_t i;
@@ -1824,8 +1726,7 @@ static bool load_holiday_rules(sqlite_t *db,
 
         sqlite_stmt_reset(stmt);
         sqlite_stmt_clear_bindings(stmt);
-        if (!sqlite_stmt_bind_text(stmt, 1, lineage[i].jurisdiction_id) ||
-            !sqlite_stmt_bind_int(stmt, 2, end_year) ||
+        if (!sqlite_stmt_bind_text(stmt, 1, lineage[i].jurisdiction_id) || !sqlite_stmt_bind_int(stmt, 2, end_year) ||
             !sqlite_stmt_bind_int(stmt, 3, start_year))
             goto fail;
         while ((rc = sqlite_stmt_step(stmt)) == SQLITE_STEP_ROW) {
@@ -1865,13 +1766,12 @@ fail:
 
 static bool load_observance_rules(sqlite_t *db, const pointer_vec_t *lineage_rows, pointer_vec_t *observances)
 {
-    static const char sql[] =
-        "select hor.holiday_id, hor.holiday_rule_id, hor.observed_rule_kind, hor.observed_name, "
-        "       hor.weekend_mask, hor.suppress_original, hor.valid_from_year, hor.valid_to_year "
-        "from holiday_observance_rule hor "
-        "join holiday_definition hd on hd.holiday_id = hor.holiday_id "
-        "where hd.jurisdiction_id = ?1 "
-        "order by hor.holiday_id, hor.priority;";
+    static const char sql[] = "select hor.holiday_id, hor.holiday_rule_id, hor.observed_rule_kind, hor.observed_name, "
+                              "       hor.weekend_mask, hor.suppress_original, hor.valid_from_year, hor.valid_to_year "
+                              "from holiday_observance_rule hor "
+                              "join holiday_definition hd on hd.holiday_id = hor.holiday_id "
+                              "where hd.jurisdiction_id = ?1 "
+                              "order by hor.holiday_id, hor.priority;";
     sqlite_stmt_t *stmt = NULL;
     const lineage_row_t *lineage = lineage_rows ? lineage_rows->items : NULL;
     size_t i;
@@ -1964,10 +1864,7 @@ fail:
     return false;
 }
 
-static char *evaluate_rule_date(sqlite_t *db,
-                                const holiday_rule_row_t *rule,
-                                int year,
-                                const char *jurisdiction)
+static char *evaluate_rule_date(sqlite_t *db, const holiday_rule_row_t *rule, int year, const char *jurisdiction)
 {
     if (!rule || !rule->rule_kind || !year_in_range(year, rule->valid_from_year, rule->valid_to_year))
         return NULL;
@@ -1997,14 +1894,8 @@ static char *evaluate_rule_date(sqlite_t *db,
     return NULL;
 }
 
-static bool add_event(pointer_vec_t *events,
-                      int holiday_id,
-                      int rule_id,
-                      int event_year,
-                      const char *holiday_date,
-                      const char *holiday_name,
-                      const char *holiday_class,
-                      bool derived_from_observance)
+static bool add_event(pointer_vec_t *events, int holiday_id, int rule_id, int event_year, const char *holiday_date,
+                      const char *holiday_name, const char *holiday_class, bool derived_from_observance)
 {
     holiday_event_row_t event;
 
@@ -2026,9 +1917,7 @@ static bool add_event(pointer_vec_t *events,
     return true;
 }
 
-static void filter_events_to_range(pointer_vec_t *events,
-                                   const char *start_text,
-                                   const char *end_text)
+static void filter_events_to_range(pointer_vec_t *events, const char *start_text, const char *end_text)
 {
     holiday_event_row_t *items = events ? events->items : NULL;
     size_t i;
@@ -2039,14 +1928,12 @@ static void filter_events_to_range(pointer_vec_t *events,
     for (i = 0u; i < events->count; ++i) {
         if (items[i].removed || !items[i].holiday_date)
             continue;
-        if (strcmp(items[i].holiday_date, start_text) < 0 ||
-            strcmp(items[i].holiday_date, end_text) > 0)
+        if (strcmp(items[i].holiday_date, start_text) < 0 || strcmp(items[i].holiday_date, end_text) > 0)
             items[i].removed = true;
     }
 }
 
-static bool holiday_events_equivalent(const holiday_event_row_t *lhs,
-                                      const holiday_event_row_t *rhs)
+static bool holiday_events_equivalent(const holiday_event_row_t *lhs, const holiday_event_row_t *rhs)
 {
     if (!lhs || !rhs)
         return false;
@@ -2109,26 +1996,23 @@ static void apply_exceptions(pointer_vec_t *events, const pointer_vec_t *excepti
                 for (j = 0; j < events->count; ++j) {
                     if (event_items[j].removed || event_items[j].event_year != exception_year)
                         continue;
-                    if ((exception_items[i].target_rule_id != 0 && event_items[j].rule_id == exception_items[i].target_rule_id) ||
-                        (exception_items[i].target_rule_id == 0 && event_items[j].holiday_id == exception_items[i].holiday_id))
+                    if ((exception_items[i].target_rule_id != 0 &&
+                         event_items[j].rule_id == exception_items[i].target_rule_id) ||
+                        (exception_items[i].target_rule_id == 0 &&
+                         event_items[j].holiday_id == exception_items[i].holiday_id))
                         event_items[j].removed = true;
                 }
             }
-            add_event(events,
-                      exception_items[i].holiday_id,
-                      exception_items[i].target_rule_id,
-                      exception_year,
-                      exception_items[i].holiday_date,
-                      name ? name : "Holiday",
-                      holiday_class,
-                      false);
+            add_event(events, exception_items[i].holiday_id, exception_items[i].target_rule_id, exception_year,
+                      exception_items[i].holiday_date, name ? name : "Holiday", holiday_class, false);
             event_items = events->items;
         } else if (strcmp(exception_items[i].action, "suppress") == 0) {
             for (j = 0; j < events->count; ++j) {
                 if (event_items[j].removed)
                     continue;
                 if (strcmp(event_items[j].holiday_date, exception_items[i].holiday_date) == 0 &&
-                    (exception_items[i].target_rule_id == 0 || event_items[j].rule_id == exception_items[i].target_rule_id) &&
+                    (exception_items[i].target_rule_id == 0 ||
+                     event_items[j].rule_id == exception_items[i].target_rule_id) &&
                     (exception_items[i].holiday_id == 0 || event_items[j].holiday_id == exception_items[i].holiday_id))
                     event_items[j].removed = true;
             }
@@ -2137,8 +2021,10 @@ static void apply_exceptions(pointer_vec_t *events, const pointer_vec_t *excepti
                 if (event_items[j].removed)
                     continue;
                 if (strcmp(event_items[j].holiday_date, exception_items[i].holiday_date) == 0 &&
-                    (exception_items[i].target_rule_id == 0 || event_items[j].rule_id == exception_items[i].target_rule_id) &&
-                    (exception_items[i].holiday_id == 0 || event_items[j].holiday_id == exception_items[i].holiday_id)) {
+                    (exception_items[i].target_rule_id == 0 ||
+                     event_items[j].rule_id == exception_items[i].target_rule_id) &&
+                    (exception_items[i].holiday_id == 0 ||
+                     event_items[j].holiday_id == exception_items[i].holiday_id)) {
                     free(event_items[j].holiday_name);
                     event_items[j].holiday_name = dup_c_string(exception_items[i].name);
                 }
@@ -2147,10 +2033,8 @@ static void apply_exceptions(pointer_vec_t *events, const pointer_vec_t *excepti
     }
 }
 
-static void apply_observances(pointer_vec_t *events,
-                              const pointer_vec_t *observances,
-                              const weekend_rule_t *weekend_rules,
-                              size_t weekend_rule_count)
+static void apply_observances(pointer_vec_t *events, const pointer_vec_t *observances,
+                              const weekend_rule_t *weekend_rules, size_t weekend_rule_count)
 {
     holiday_event_row_t *event_items = events ? events->items : NULL;
     const observance_rule_row_t *observance_items = observances ? observances->items : NULL;
@@ -2173,41 +2057,42 @@ static void apply_observances(pointer_vec_t *events,
             if (observance_items[i].applies_to_rule_id != 0 &&
                 event_items[j].rule_id != observance_items[i].applies_to_rule_id)
                 continue;
-            if (!year_in_range(event_items[j].event_year,
-                               observance_items[i].valid_from_year,
+            if (!year_in_range(event_items[j].event_year, observance_items[i].valid_from_year,
                                observance_items[i].valid_to_year))
                 continue;
 
-            weekend_mask = observance_items[i].weekend_mask && *observance_items[i].weekend_mask
-                ? observance_items[i].weekend_mask
-                : effective_weekend_mask_for_year(weekend_rules, weekend_rule_count, event_items[j].event_year);
+            weekend_mask =
+                observance_items[i].weekend_mask && *observance_items[i].weekend_mask
+                    ? observance_items[i].weekend_mask
+                    : effective_weekend_mask_for_year(weekend_rules, weekend_rule_count, event_items[j].event_year);
             weekday = iso_weekday_from_date_text(event_items[j].holiday_date);
             if (!weekend_mask_contains(weekend_mask, weekday))
                 continue;
 
             if (strcmp(observance_items[i].observed_rule_kind, "next_weekday") == 0)
-                observed_date = next_observed_date(event_items[j].holiday_date, weekend_mask, event_items, events->count, false, false);
+                observed_date = next_observed_date(event_items[j].holiday_date, weekend_mask, event_items,
+                                                   events->count, false, false);
             else if (strcmp(observance_items[i].observed_rule_kind, "next_monday") == 0)
-                observed_date = next_observed_date(event_items[j].holiday_date, weekend_mask, event_items, events->count, false, true);
+                observed_date = next_observed_date(event_items[j].holiday_date, weekend_mask, event_items,
+                                                   events->count, false, true);
             else if (strcmp(observance_items[i].observed_rule_kind, "next_non_holiday") == 0)
-                observed_date = next_observed_date(event_items[j].holiday_date, weekend_mask, event_items, events->count, true, false);
+                observed_date = next_observed_date(event_items[j].holiday_date, weekend_mask, event_items,
+                                                   events->count, true, false);
             else if (strcmp(observance_items[i].observed_rule_kind, "previous_weekday") == 0)
-                observed_date = previous_observed_date(event_items[j].holiday_date, weekend_mask, event_items, events->count, false);
+                observed_date = previous_observed_date(event_items[j].holiday_date, weekend_mask, event_items,
+                                                       events->count, false);
             else if (strcmp(observance_items[i].observed_rule_kind, "christmas_pair") == 0)
-                observed_date = next_observed_date(event_items[j].holiday_date, weekend_mask, event_items, events->count, true, false);
+                observed_date = next_observed_date(event_items[j].holiday_date, weekend_mask, event_items,
+                                                   events->count, true, false);
 
             if (!observed_date)
                 continue;
             if (observance_items[i].suppress_original)
                 event_items[j].removed = true;
-            add_event(events,
-                      event_items[j].holiday_id,
-                      event_items[j].rule_id,
-                      event_items[j].event_year,
-                      observed_date,
-                      observance_items[i].observed_name ? observance_items[i].observed_name : event_items[j].holiday_name,
-                      event_items[j].holiday_class,
-                      true);
+            add_event(
+                events, event_items[j].holiday_id, event_items[j].rule_id, event_items[j].event_year, observed_date,
+                observance_items[i].observed_name ? observance_items[i].observed_name : event_items[j].holiday_name,
+                event_items[j].holiday_class, true);
             free(observed_date);
             event_items = events->items;
         }
@@ -2279,9 +2164,7 @@ const char *jurisdict_last_error(const jurisdiction_t *jurisdiction)
     return (jurisdiction && jurisdiction->error) ? string_c_str(jurisdiction->error) : NULL;
 }
 
-bool jurisdict_default_location(jurisdiction_t *holiday,
-                              double *latitude,
-                              double *longitude)
+bool jurisdict_default_location(jurisdiction_t *holiday, double *latitude, double *longitude)
 {
     sqlite_t *db = holiday ? holiday->db : NULL;
     const char *jurisdiction = holiday ? holiday->jurisdiction : NULL;
@@ -2306,9 +2189,7 @@ bool jurisdict_default_location(jurisdiction_t *holiday,
     return ok;
 }
 
-bool jurisdict_default_gmt_offset(jurisdiction_t *holiday,
-                                const datetime_t *date,
-                                double *offset_hours)
+bool jurisdict_default_gmt_offset(jurisdiction_t *holiday, const datetime_t *date, double *offset_hours)
 {
     sqlite_t *db = holiday ? holiday->db : NULL;
     const char *jurisdiction = holiday ? holiday->jurisdiction : NULL;
@@ -2340,9 +2221,7 @@ bool jurisdict_default_gmt_offset(jurisdiction_t *holiday,
     return true;
 }
 
-static bool timezone_load_named_rule_names_for_year(sqlite_t *db,
-                                                    const char *timezone_name,
-                                                    int year,
+static bool timezone_load_named_rule_names_for_year(sqlite_t *db, const char *timezone_name, int year,
                                                     pointer_vec_t *rule_names)
 {
     pointer_vec_t era_rows = {0};
@@ -2367,9 +2246,8 @@ static bool timezone_load_named_rule_names_for_year(sqlite_t *db,
     jan_era = select_timezone_era_for_date(&era_rows, jan1);
     dec_era = select_timezone_era_for_date(&era_rows, dec31);
 
-    if (jan_era && jan_era->rules_kind &&
-        strcmp(jan_era->rules_kind, "named") == 0 &&
-        jan_era->rule_name && *jan_era->rule_name) {
+    if (jan_era && jan_era->rules_kind && strcmp(jan_era->rules_kind, "named") == 0 && jan_era->rule_name &&
+        *jan_era->rule_name) {
         memset(&ref, 0, sizeof(ref));
         ref.rule_name = dup_c_string(jan_era->rule_name);
         ref.gmtoff_minutes = jan_era->gmtoff_minutes;
@@ -2379,9 +2257,8 @@ static bool timezone_load_named_rule_names_for_year(sqlite_t *db,
         }
     }
 
-    if (dec_era && dec_era->rules_kind &&
-        strcmp(dec_era->rules_kind, "named") == 0 &&
-        dec_era->rule_name && *dec_era->rule_name) {
+    if (dec_era && dec_era->rules_kind && strcmp(dec_era->rules_kind, "named") == 0 && dec_era->rule_name &&
+        *dec_era->rule_name) {
         bool seen = false;
         const timezone_named_rule_ref_t *names = rule_names->items;
 
@@ -2411,9 +2288,7 @@ done:
     return ok;
 }
 
-static bool timezone_collect_transition_occurrences(sqlite_t *db,
-                                                    const timezone_named_rule_ref_t *rule_ref,
-                                                    int year,
+static bool timezone_collect_transition_occurrences(sqlite_t *db, const timezone_named_rule_ref_t *rule_ref, int year,
                                                     pointer_vec_t *occurrences)
 {
     pointer_vec_t rule_rows = {0};
@@ -2433,11 +2308,7 @@ static bool timezone_collect_transition_occurrences(sqlite_t *db,
         timezone_transition_occurrence_t occurrence;
 
         memset(&occurrence, 0, sizeof(occurrence));
-        if (!compute_transition_occurrence(&items[i],
-                                           year,
-                                           &occurrence.year,
-                                           &occurrence.month,
-                                           &occurrence.day,
+        if (!compute_transition_occurrence(&items[i], year, &occurrence.year, &occurrence.month, &occurrence.day,
                                            &occurrence.seconds))
             continue;
         occurrence.at_suffix = items[i].at_suffix;
@@ -2453,13 +2324,9 @@ done:
     return ok;
 }
 
-bool jurisdict_dst_transition_details(jurisdiction_t *holiday,
-                                      int year,
-                                      datetime_t **clocks_forward,
-                                      double *forward_from_offset_hours,
-                                      double *forward_to_offset_hours,
-                                      datetime_t **clocks_back,
-                                      double *back_from_offset_hours,
+bool jurisdict_dst_transition_details(jurisdiction_t *holiday, int year, datetime_t **clocks_forward,
+                                      double *forward_from_offset_hours, double *forward_to_offset_hours,
+                                      datetime_t **clocks_back, double *back_from_offset_hours,
                                       double *back_to_offset_hours)
 {
     sqlite_t *db = holiday ? holiday->db : NULL;
@@ -2527,13 +2394,9 @@ bool jurisdict_dst_transition_details(jurisdiction_t *holiday,
         double current_offset = 0.0;
         double delta;
 
-        previous_date = datetime_init_ymd(datetime_alloc(),
-                                          occurrence_items[i].year,
-                                          occurrence_items[i].month,
+        previous_date = datetime_init_ymd(datetime_alloc(), occurrence_items[i].year, occurrence_items[i].month,
                                           occurrence_items[i].day);
-        transition_probe = datetime_init_ymd(datetime_alloc(),
-                                             occurrence_items[i].year,
-                                             occurrence_items[i].month,
+        transition_probe = datetime_init_ymd(datetime_alloc(), occurrence_items[i].year, occurrence_items[i].month,
                                              occurrence_items[i].day);
         if (!previous_date || !transition_probe) {
             datetime_dealloc(transition_probe);
@@ -2554,9 +2417,7 @@ bool jurisdict_dst_transition_details(jurisdiction_t *holiday,
         datetime_dealloc(previous_date);
         previous_date = NULL;
 
-        if (!materialise_transition_display_datetime(&occurrence_items[i],
-                                                     previous_offset,
-                                                     &transition_date)) {
+        if (!materialise_transition_display_datetime(&occurrence_items[i], previous_offset, &transition_date)) {
             jurisdiction_set_error(holiday, "failed to materialise daylight-saving transition time");
             goto done;
         }
@@ -2612,19 +2473,10 @@ done:
     return ok;
 }
 
-bool jurisdict_dst_transition_datetimes(jurisdiction_t *holiday,
-                                        int year,
-                                        datetime_t **clocks_forward,
+bool jurisdict_dst_transition_datetimes(jurisdiction_t *holiday, int year, datetime_t **clocks_forward,
                                         datetime_t **clocks_back)
 {
-    return jurisdict_dst_transition_details(holiday,
-                                            year,
-                                            clocks_forward,
-                                            NULL,
-                                            NULL,
-                                            clocks_back,
-                                            NULL,
-                                            NULL);
+    return jurisdict_dst_transition_details(holiday, year, clocks_forward, NULL, NULL, clocks_back, NULL, NULL);
 }
 
 static void holiday_event_destroy_owned(holiday_event_t *event)
@@ -2653,26 +2505,20 @@ static bool holiday_collect_event(const holiday_event_t *event, void *ctx)
     owned.holiday_id = event->holiday_id;
     owned.rule_id = event->rule_id;
     owned.event_year = event->event_year;
-    owned.holiday_date = event->holiday_date
-        ? datetime_init_copy(datetime_alloc(), event->holiday_date)
-        : NULL;
+    owned.holiday_date = event->holiday_date ? datetime_init_copy(datetime_alloc(), event->holiday_date) : NULL;
     owned.holiday_name = event->holiday_name ? dup_c_string(event->holiday_name) : NULL;
     owned.holiday_class = event->holiday_class ? dup_c_string(event->holiday_class) : NULL;
     owned.derived_from_observance = event->derived_from_observance;
 
-    if ((event->holiday_date && !owned.holiday_date) ||
-        (event->holiday_name && !owned.holiday_name) ||
-        (event->holiday_class && !owned.holiday_class) ||
-        !array_add(collect_ctx->events, &owned)) {
+    if ((event->holiday_date && !owned.holiday_date) || (event->holiday_name && !owned.holiday_name) ||
+        (event->holiday_class && !owned.holiday_class) || !array_add(collect_ctx->events, &owned)) {
         holiday_event_destroy_owned(&owned);
         return false;
     }
     return true;
 }
 
-array_t *jurisdict_holidays_between(jurisdiction_t *holiday,
-                         const datetime_t *start,
-                         const datetime_t *end)
+array_t *jurisdict_holidays_between(jurisdiction_t *holiday, const datetime_t *start, const datetime_t *end)
 {
     holiday_collect_ctx_t ctx;
     array_t *events;
@@ -2745,8 +2591,7 @@ bool jurisdict_is_weekend(jurisdiction_t *holiday, const datetime_t *date)
         jurisdiction_set_error(holiday, "invalid holiday query");
         return false;
     }
-    if (!load_lineage(db, jurisdiction, &lineage_rows) ||
-        !load_weekend_rules(db, &lineage_rows, &weekend_rules)) {
+    if (!load_lineage(db, jurisdiction, &lineage_rows) || !load_weekend_rules(db, &lineage_rows, &weekend_rules)) {
         jurisdiction_set_error(holiday, "failed to load weekend rules");
         goto done;
     }
@@ -2762,9 +2607,7 @@ done:
     return is_weekend;
 }
 
-long jurisdict_working_days_between(jurisdiction_t *holiday,
-                                  const datetime_t *start,
-                                  const datetime_t *end)
+long jurisdict_working_days_between(jurisdiction_t *holiday, const datetime_t *start, const datetime_t *end)
 {
     array_t *events;
     datetime_t *cursor = NULL;
@@ -2787,8 +2630,7 @@ long jurisdict_working_days_between(jurisdiction_t *holiday,
     }
 
     while (datetime_compare(cursor, end) <= 0) {
-        if (!jurisdict_is_weekend(holiday, cursor) &&
-            !holiday_has_event_on_date(events, cursor)) {
+        if (!jurisdict_is_weekend(holiday, cursor) && !holiday_has_event_on_date(events, cursor)) {
             working_days++;
         }
         if (!datetime_add_days(cursor, 1)) {
@@ -2803,11 +2645,8 @@ long jurisdict_working_days_between(jurisdiction_t *holiday,
     return working_days;
 }
 
-bool jurisdict_each_holiday_between(jurisdiction_t *holiday,
-                                    const datetime_t *start,
-                                    const datetime_t *end,
-                                    jurisdict_visit_fn visitor,
-                                    void *ctx)
+bool jurisdict_each_holiday_between(jurisdiction_t *holiday, const datetime_t *start, const datetime_t *end,
+                                    jurisdict_visit_fn visitor, void *ctx)
 {
     sqlite_t *db = holiday ? holiday->db : NULL;
     const char *jurisdiction = holiday ? holiday->jurisdiction : NULL;
@@ -2845,11 +2684,9 @@ bool jurisdict_each_holiday_between(jurisdiction_t *holiday,
         goto done;
     }
 
-    if (!load_lineage(db, jurisdiction, &lineage_rows) ||
-        !load_weekend_rules(db, &lineage_rows, &weekend_rules) ||
+    if (!load_lineage(db, jurisdiction, &lineage_rows) || !load_weekend_rules(db, &lineage_rows, &weekend_rules) ||
         !load_holiday_rules(db, &lineage_rows, datetime_year(start), datetime_year(end), &rules) ||
-        !load_observance_rules(db, &lineage_rows, &observances) ||
-        !load_exceptions(db, &lineage_rows, &exceptions)) {
+        !load_observance_rules(db, &lineage_rows, &observances) || !load_exceptions(db, &lineage_rows, &exceptions)) {
         jurisdiction_set_error(holiday, "failed to load holiday rules");
         goto done;
     }
@@ -2864,14 +2701,8 @@ bool jurisdict_each_holiday_between(jurisdiction_t *holiday,
             if (!holiday_date)
                 continue;
             if (strcmp(holiday_date, start_text) >= 0 && strcmp(holiday_date, end_text) <= 0) {
-                if (!add_event(&events,
-                               rule_items[i].holiday_id,
-                               rule_items[i].rule_id,
-                               year,
-                               holiday_date,
-                               rule_items[i].holiday_name,
-                               rule_items[i].holiday_class,
-                               false)) {
+                if (!add_event(&events, rule_items[i].holiday_id, rule_items[i].rule_id, year, holiday_date,
+                               rule_items[i].holiday_name, rule_items[i].holiday_class, false)) {
                     free(holiday_date);
                     jurisdiction_set_error(holiday, "failed to collect holiday event");
                     goto done;
@@ -2936,11 +2767,8 @@ done:
     return ok;
 }
 
-bool jurisdict_serialize(const jurisdiction_t *jurisdiction,
-                         string_t **out_type,
-                         string_t **out_encoding,
-                         void **out_data,
-                         size_t *out_len)
+bool jurisdict_serialize(const jurisdiction_t *jurisdiction, string_t **out_type, string_t **out_encoding,
+                         void **out_data, size_t *out_len)
 {
     string_t *type = NULL;
     string_t *encoding = NULL;
@@ -2972,10 +2800,7 @@ bool jurisdict_serialize(const jurisdiction_t *jurisdiction,
     return true;
 }
 
-jurisdiction_t *jurisdict_deserialise(const void *data,
-                                      size_t len,
-                                      const string_t *type,
-                                      const string_t *encoding)
+jurisdiction_t *jurisdict_deserialise(const void *data, size_t len, const string_t *type, const string_t *encoding)
 {
     char code[32];
 

@@ -15,8 +15,8 @@
 #ifndef INTEGRATOR_H
 #define INTEGRATOR_H
 
-#include <stddef.h>
 #include "expression.h"
+#include <stddef.h>
 
 /** Opaque integrator handle. */
 typedef struct _integrator_t integrator_t;
@@ -94,9 +94,8 @@ void intg_set_interval_count_max(integrator_t *ig, size_t max_intervals);
  * @return  1  Maximum subintervals reached before convergence.
  * @return -1  Null argument or internal allocation failure.
  */
-int intg_integral(integrator_t *ig, expr_t *expr, expr_t *x_var,
-                       number_t a, number_t b,
-                       number_t *result, number_t *error_est);
+int intg_integral(integrator_t *ig, expr_t *expr, expr_t *x_var, number_t a, number_t b, number_t *result,
+                  number_t *error_est);
 
 /**
  * @brief Number of subintervals used in the most recent integration call.
@@ -115,9 +114,7 @@ const expr_t *intg_get_exact_result(const integrator_t *ig);
 /**
  * @brief Return true when @p integrand contains symbols other than @p vars.
  */
-bool intg_integrand_has_unbound_parameters(const expr_t *integrand,
-                                           size_t ndim,
-                                           expr_t *const *vars);
+bool intg_integrand_has_unbound_parameters(const expr_t *integrand, size_t ndim, expr_t *const *vars);
 
 /**
  * @brief Try symbolic iterated integration for a stack of integral rows.
@@ -126,34 +123,20 @@ bool intg_integrand_has_unbound_parameters(const expr_t *integrand,
  * evaluated. @p first_antiderivative_out, when non-NULL, receives the first
  * owning antiderivative found for UI display.
  */
-expr_t *intg_integrate_iterated_symbolic(
-    const expr_t *integrand,
-    size_t ndim,
-    expr_t *const *vars,
-    const intg_bound_kind_t *kinds,
-    expr_t *const *lo,
-    expr_t *const *hi,
-    size_t max_steps,
-    size_t *completed_steps_out,
-    expr_t **first_antiderivative_out);
+expr_t *intg_integrate_iterated_symbolic(const expr_t *integrand, size_t ndim, expr_t *const *vars,
+                                         const intg_bound_kind_t *kinds, expr_t *const *lo, expr_t *const *hi,
+                                         size_t max_steps, size_t *completed_steps_out,
+                                         expr_t **first_antiderivative_out);
 
 /**
  * @brief Symbolically reduce as many leading integral rows as possible.
  */
-expr_t *intg_integrate_iterated_symbolic_best_effort(
-    const expr_t *integrand,
-    size_t ndim,
-    expr_t *const *vars,
-    const intg_bound_kind_t *kinds,
-    expr_t *const *lo,
-    expr_t *const *hi,
-    size_t *completed_steps_out,
-    size_t *remaining_ndim_out,
-    expr_t **remaining_vars_out,
-    number_t *remaining_lo_num_out,
-    number_t *remaining_hi_num_out,
-    const number_t *lo_num,
-    const number_t *hi_num);
+expr_t *intg_integrate_iterated_symbolic_best_effort(const expr_t *integrand, size_t ndim, expr_t *const *vars,
+                                                     const intg_bound_kind_t *kinds, expr_t *const *lo,
+                                                     expr_t *const *hi, size_t *completed_steps_out,
+                                                     size_t *remaining_ndim_out, expr_t **remaining_vars_out,
+                                                     number_t *remaining_lo_num_out, number_t *remaining_hi_num_out,
+                                                     const number_t *lo_num, const number_t *hi_num);
 
 /**
  * @brief Integrate an expr_t expression over [ax,bx] × [ay,by].
@@ -177,10 +160,8 @@ expr_t *intg_integrate_iterated_symbolic_best_effort(
  * @return  1  Maximum subintervals reached before convergence.
  * @return -1  Null argument or internal allocation failure.
  */
-int intg_double_integral(integrator_t *ig, expr_t *expr,
-                       expr_t *x_var, number_t ax, number_t bx,
-                       expr_t *y_var, number_t ay, number_t by,
-                       number_t *result, number_t *error_est);
+int intg_double_integral(integrator_t *ig, expr_t *expr, expr_t *x_var, number_t ax, number_t bx, expr_t *y_var,
+                         number_t ay, number_t by, number_t *result, number_t *error_est);
 
 /**
  * @brief Integrate an expr_t expression over [ax,bx] × [ay,by] × [az,bz].
@@ -206,11 +187,9 @@ int intg_double_integral(integrator_t *ig, expr_t *expr,
  * @return  1  Maximum subintervals reached before convergence.
  * @return -1  Null argument or internal allocation failure.
  */
-int intg_triple_integral(integrator_t *ig, expr_t *expr,
-                       expr_t *x_var, number_t ax, number_t bx,
-                       expr_t *y_var, number_t ay, number_t by,
-                       expr_t *z_var, number_t az, number_t bz,
-                       number_t *result, number_t *error_est);
+int intg_triple_integral(integrator_t *ig, expr_t *expr, expr_t *x_var, number_t ax, number_t bx, expr_t *y_var,
+                         number_t ay, number_t by, expr_t *z_var, number_t az, number_t bz, number_t *result,
+                         number_t *error_est);
 
 /**
  * @brief Integrate a expr_t expression over an N-dimensional rectangular domain.
@@ -257,9 +236,7 @@ int intg_triple_integral(integrator_t *ig, expr_t *expr,
  * @return  1  Maximum subintervals reached before convergence.
  * @return -1  Null argument, ndim == 0, or internal allocation failure.
  */
-int intg_integral_multi(integrator_t *ig, expr_t *expr,
-                      size_t ndim, expr_t * const *vars,
-                      const number_t *lo, const number_t *hi,
-                      number_t *result, number_t *error_est);
+int intg_integral_multi(integrator_t *ig, expr_t *expr, size_t ndim, expr_t *const *vars, const number_t *lo,
+                        const number_t *hi, number_t *result, number_t *error_est);
 
 #endif /* INTEGRATOR_H */

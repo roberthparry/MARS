@@ -10,13 +10,17 @@ This directory contains the longer module documentation for MARS.
 
 ## Modules
 
-- [`number_t`](./number.md) — generic numeric value cluster over exact, fixed-precision, and multiprecision backends
-- [`qfloat_t`](./qfloat.md) — double-double arithmetic and special functions
-- [`qcomplex_t`](./qcomplex.md) — double-double complex arithmetic and special functions
+- [`number_t`](./number.md) — generic numeric value cluster over exact,
+  fixed-precision and multiprecision backends
+- [`qfloat_t`](./qfloat.md) — independent double-double arithmetic and real
+  special functions
+- [`qcomplex_t`](./qcomplex.md) — independent double-double complex arithmetic
+  and complex special functions
 - [`matrix_t`](./matrix.md) — generic high-precision matrix with pluggable element types and storage kinds
 - [`equation_t`](./equation.md) — parsed equations with symbolic isolation and numeric fallback
 - [`diffequ_t`](./diffequation.md) — ODE/PDE parsing and symbolic solving, including selected linearisations and symmetry metadata
-- [`expr_t`](./expression.md) — differentiable expression DAGs and symbolic helper APIs
+- [`expr_t`](./expression.md) — differentiable expression DAGs, reverse-mode
+  derivatives, symbolic integration and helper APIs
 - [`almanac_t`](./almanac.md) — ephemeris-backed SHA/declination lookups and snapshot queries
 - [`datetime_t`](./datetime.md) — civil and astronomical date/time utilities
 - [`jurisdiction_t`](./jurisdiction.md) — jurisdiction-aware holiday and working-day queries

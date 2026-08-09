@@ -1,6 +1,6 @@
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdbool.h>
 #define MARS_MATRIX_INTERNAL_ACCESS
 #include "matrix_internal.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
@@ -221,7 +221,7 @@ static int mat_eigenvalues_expr_symbolic(const matrix_t *A, expr_t **eigenvalues
 
         return 0;
 
-fail_2x2:
+    fail_2x2:
         expr_free((expr_t *)a);
         expr_free((expr_t *)b);
         expr_free((expr_t *)c);
@@ -623,12 +623,8 @@ fail:
     return NULL;
 }
 
-static expr_t *expr_bareiss_update_simplify(const expr_t *left_a,
-                                            const expr_t *left_b,
-                                            const expr_t *right_a,
-                                            const expr_t *right_b,
-                                            const expr_t *divisor,
-                                            bool divide)
+static expr_t *expr_bareiss_update_simplify(const expr_t *left_a, const expr_t *left_b, const expr_t *right_a,
+                                            const expr_t *right_b, const expr_t *divisor, bool divide)
 {
     expr_t *lhs = NULL;
     expr_t *rhs = NULL;
@@ -666,9 +662,7 @@ static expr_t *expr_bareiss_update_simplify(const expr_t *left_a,
     return out;
 }
 
-static int mat_fraction_free_eliminate_expr(matrix_t *M,
-                                            matrix_t *RHS,
-                                            bool *negate_out)
+static int mat_fraction_free_eliminate_expr(matrix_t *M, matrix_t *RHS, bool *negate_out)
 {
     size_t n;
     const expr_t *prev_pivot = EXPR_ONE;
@@ -721,10 +715,7 @@ static int mat_fraction_free_eliminate_expr(matrix_t *M,
             for (size_t j = k + 1; j < n; ++j) {
                 const expr_t *aij = mat_get_expr_or_zero(M, i, j);
                 const expr_t *akj = mat_get_expr_or_zero(M, k, j);
-                expr_t *next = expr_bareiss_update_simplify(aij, pivot,
-                                                            aik, akj,
-                                                            prev_pivot,
-                                                            k > 0);
+                expr_t *next = expr_bareiss_update_simplify(aij, pivot, aik, akj, prev_pivot, k > 0);
 
                 if (!next)
                     return -1;
@@ -736,10 +727,7 @@ static int mat_fraction_free_eliminate_expr(matrix_t *M,
                 for (size_t j = 0; j < RHS->cols; ++j) {
                     const expr_t *bij = mat_get_expr_or_zero(RHS, i, j);
                     const expr_t *bkj = mat_get_expr_or_zero(RHS, k, j);
-                    expr_t *next = expr_bareiss_update_simplify(bij, pivot,
-                                                                aik, bkj,
-                                                                prev_pivot,
-                                                                k > 0);
+                    expr_t *next = expr_bareiss_update_simplify(bij, pivot, aik, bkj, prev_pivot, k > 0);
 
                     if (!next)
                         return -1;
@@ -762,8 +750,7 @@ static int mat_fraction_free_eliminate_expr(matrix_t *M,
     return 0;
 }
 
-static matrix_t *mat_forward_substitute_expr_exact(const matrix_t *L,
-                                                   const matrix_t *B)
+static matrix_t *mat_forward_substitute_expr_exact(const matrix_t *L, const matrix_t *B)
 {
     matrix_t *X;
 
@@ -822,8 +809,7 @@ fail:
     return NULL;
 }
 
-static matrix_t *mat_backward_substitute_expr_exact(const matrix_t *U,
-                                                    const matrix_t *B)
+static matrix_t *mat_backward_substitute_expr_exact(const matrix_t *U, const matrix_t *B)
 {
     matrix_t *X;
 
@@ -978,8 +964,7 @@ static matrix_t *mat_solve_expr_2x2_exact(const matrix_t *A, const matrix_t *B)
     c = mat_get_expr_or_zero(A, 1, 0);
     d = mat_get_expr_or_zero(A, 1, 1);
 
-    det = expr_det2_simplify((expr_t *)a, (expr_t *)b,
-                             (expr_t *)c, (expr_t *)d);
+    det = expr_det2_simplify((expr_t *)a, (expr_t *)b, (expr_t *)c, (expr_t *)d);
     if (!det || expr_node_is_exact_zero(det))
         goto fail;
 
@@ -1071,7 +1056,7 @@ static matrix_t *mat_inverse_expr_upper_exact(const matrix_t *A)
     if (!I)
         return NULL;
 
-    for (size_t ii = n; ii-- > 0; ) {
+    for (size_t ii = n; ii-- > 0;) {
         expr_t *uii = NULL;
         expr_t *xii = NULL;
 
@@ -1391,7 +1376,6 @@ matrix_t *mat_inverse_expr_exact(const matrix_t *A)
     if (!A || A->rows != A->cols)
         return NULL;
 
-
     if (A->rows == 1) {
         expr_t *v = NULL;
         expr_t *inv_raw = NULL;
@@ -1513,8 +1497,7 @@ fail:
     return NULL;
 }
 
-matrix_t *mat_create_zero_with_elem(size_t rows, size_t cols,
-                                    const struct elem_vtable *elem)
+matrix_t *mat_create_zero_with_elem(size_t rows, size_t cols, const struct elem_vtable *elem)
 {
     matrix_t *M;
 
@@ -1571,9 +1554,7 @@ static matrix_t *mat_minor_matrix(const matrix_t *A, size_t skip_row, size_t ski
     return M;
 }
 
-matrix_t *mat_extract_block(const matrix_t *A,
-                            size_t row0, size_t rows,
-                            size_t col0, size_t cols)
+matrix_t *mat_extract_block(const matrix_t *A, size_t row0, size_t rows, size_t col0, size_t cols)
 {
     matrix_t *M;
 
@@ -1613,8 +1594,7 @@ bool mat_insert_block(matrix_t *A, size_t row0, size_t col0, const matrix_t *B)
     return true;
 }
 
-matrix_t *mat_build_block_2x2(const matrix_t *B11, const matrix_t *B12,
-                              const matrix_t *B21, const matrix_t *B22)
+matrix_t *mat_build_block_2x2(const matrix_t *B11, const matrix_t *B12, const matrix_t *B21, const matrix_t *B22)
 {
     matrix_t *M = NULL;
 
@@ -1631,10 +1611,8 @@ matrix_t *mat_build_block_2x2(const matrix_t *B11, const matrix_t *B12,
     if (!M)
         return NULL;
 
-    if (!mat_insert_block(M, 0, 0, B11) ||
-        !mat_insert_block(M, 0, B11->cols, B12) ||
-        !mat_insert_block(M, B11->rows, 0, B21) ||
-        !mat_insert_block(M, B11->rows, B11->cols, B22)) {
+    if (!mat_insert_block(M, 0, 0, B11) || !mat_insert_block(M, 0, B11->cols, B12) ||
+        !mat_insert_block(M, B11->rows, 0, B21) || !mat_insert_block(M, B11->rows, B11->cols, B22)) {
         mat_free(M);
         return NULL;
     }
@@ -1885,9 +1863,7 @@ static matrix_t *expr_poly_matrix_from_coeffs(expr_t **coeffs, size_t degree)
     return P;
 }
 
-matrix_t *mat_const_identity_with_elem(size_t n,
-                                       const struct elem_vtable *elem,
-                                       const void *scalar)
+matrix_t *mat_const_identity_with_elem(size_t n, const struct elem_vtable *elem, const void *scalar)
 {
     matrix_t *I = NULL;
 
@@ -1954,9 +1930,7 @@ static int mat_expr_nullity_exact(const matrix_t *A)
     return nullity;
 }
 
-static size_t mat_expr_triangular_root_exponent(const matrix_t *A,
-                                                const expr_t *lambda,
-                                                size_t multiplicity)
+static size_t mat_expr_triangular_root_exponent(const matrix_t *A, const expr_t *lambda, size_t multiplicity)
 {
     matrix_t *Shifted = NULL;
     matrix_t *Power = NULL;
@@ -2133,9 +2107,7 @@ fail:
     return -2;
 }
 
-static matrix_t *mat_expr_extract_columns(const matrix_t *A,
-                                          const size_t *cols,
-                                          size_t ncols)
+static matrix_t *mat_expr_extract_columns(const matrix_t *A, const size_t *cols, size_t ncols)
 {
     matrix_t *C = NULL;
 
@@ -2158,8 +2130,7 @@ static matrix_t *mat_expr_extract_columns(const matrix_t *A,
     return C;
 }
 
-static matrix_t *mat_expr_build_pivot_factor(const matrix_t *A,
-                                             const expr_rref_info_t *info)
+static matrix_t *mat_expr_build_pivot_factor(const matrix_t *A, const expr_rref_info_t *info)
 {
     matrix_t *F = NULL;
 
@@ -2240,9 +2211,7 @@ matrix_t *mat_minpoly_expr(const matrix_t *A)
                         ++multiplicity;
                 }
 
-                exponent = mat_is_diagonal(A)
-                    ? 1
-                    : mat_expr_triangular_root_exponent(A, diag, multiplicity);
+                exponent = mat_is_diagonal(A) ? 1 : mat_expr_triangular_root_exponent(A, diag, multiplicity);
                 if (exponent == 0)
                     goto fail;
 

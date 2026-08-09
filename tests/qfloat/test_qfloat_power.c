@@ -9,32 +9,23 @@ static void test_qf_pow_int()
         int n;
         const char *expected;
     } cases[] = {
-        { "2",   0,  "1" },
-        { "2",   1,  "2" },
-        { "2",   2,  "4" },
-        { "2",   3,  "8" },
-        { "2",  10,  "1024" },
-        { "10", -1,  "0.1" },
-        { "10", -2,  "0.01" },
-        { "5",   3,  "125" },
-        { "0",   5,  "0" },
-        { "1", 123,  "1" },
+        {"2", 0, "1"},     {"2", 1, "2"},      {"2", 2, "4"},   {"2", 3, "8"}, {"2", 10, "1024"},
+        {"10", -1, "0.1"}, {"10", -2, "0.01"}, {"5", 3, "125"}, {"0", 5, "0"}, {"1", 123, "1"},
     };
 
     char buf[256];
 
-    for (size_t i = 0; i < sizeof(cases)/sizeof(cases[0]); i++) {
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
 
-        qfloat_t x        = qf_from_string(cases[i].x);
-        qfloat_t r        = qf_pow_int(x, cases[i].n);
+        qfloat_t x = qf_from_string(cases[i].x);
+        qfloat_t r = qf_pow_int(x, cases[i].n);
         qfloat_t expected = qf_from_string(cases[i].expected);
 
         /* THIS LINE WAS MISSING */
         test_qf_to_buffer(r, buf, sizeof(buf));
 
         TEST_ASSERT_QFLOAT_CLOSE(r, expected);
-        printf("%s  OK: %s^%d = %s%s\n",
-               C_GREEN, cases[i].x, cases[i].n, buf, C_RESET);
+        printf("%s  OK: %s^%d = %s%s\n", C_GREEN, cases[i].x, cases[i].n, buf, C_RESET);
     }
 }
 
@@ -125,26 +116,22 @@ static void test_qf_pow10(void)
         int n;
         const char *expected;
     } cases[] = {
-        {  0,  "1"    },
-        {  1,  "10"   },
-        {  2,  "100"  },
-        { -1,  "0.1"  },
-        { -2,  "0.01" },
+        {0, "1"}, {1, "10"}, {2, "100"}, {-1, "0.1"}, {-2, "0.01"},
     };
 
-    for (size_t i = 0; i < sizeof(cases)/sizeof(cases[0]); i++) {
-        qfloat_t r        = qf_pow10(cases[i].n);
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        qfloat_t r = qf_pow10(cases[i].n);
         qfloat_t expected = qf_from_string(cases[i].expected);
 
         test_qf_to_buffer(r, buf, sizeof(buf));
 
         TEST_ASSERT_QFLOAT_CLOSE(r, expected);
-        printf("%s  OK: 10^%d = %s%s\n",
-               C_GREEN, cases[i].n, buf, C_RESET);
+        printf("%s  OK: 10^%d = %s%s\n", C_GREEN, cases[i].n, buf, C_RESET);
     }
 }
 
-void test_power(void) {
+void test_power(void)
+{
     TEST_RUN_SUBTEST(test_qf_pow_int, NULL);
     TEST_RUN_SUBTEST(test_qf_pow, NULL);
     TEST_RUN_SUBTEST(test_qf_pow10, NULL);

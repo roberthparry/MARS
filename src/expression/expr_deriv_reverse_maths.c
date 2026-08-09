@@ -1,6 +1,9 @@
 #include <limits.h>
+#include <stdlib.h>
 
 #include "expr_maths.h"
+#define MARS_NUMBER_INTERNAL_ACCESS
+#include "number/number_internal.h"
 
 static inline void expr_reverse_unary(number_t value, number_t *a_bar, number_t *b_bar)
 {
@@ -8,8 +11,7 @@ static inline void expr_reverse_unary(number_t value, number_t *a_bar, number_t 
     *b_bar = NUM_ZERO;
 }
 
-static inline void expr_reverse_binary(number_t a_value, number_t b_value,
-                                     number_t *a_bar, number_t *b_bar)
+static inline void expr_reverse_binary(number_t a_value, number_t b_value, number_t *a_bar, number_t *b_bar)
 {
     *a_bar = a_value;
     *b_bar = b_value;
@@ -79,10 +81,7 @@ void expr_reverse_cot(const expr_t *dv, const number_t *out_bar, number_t *a_bar
     expr_reverse_unary(expr_reverse_num_neg(product), a_bar, b_bar);
 }
 
-static void expr_reverse_unary_factor(const number_t *out_bar,
-                                      number_t factor,
-                                      number_t *a_bar,
-                                      number_t *b_bar)
+static void expr_reverse_unary_factor(const number_t *out_bar, number_t factor, number_t *a_bar, number_t *b_bar)
 {
     number_t product = expr_reverse_num_mul(*out_bar, factor);
 
@@ -240,8 +239,7 @@ void expr_reverse_atan(const expr_t *dv, const number_t *out_bar, number_t *a_ba
     expr_reverse_unary(expr_reverse_num_div(*out_bar, denom), a_bar, b_bar);
 }
 
-static number_t expr_reverse_inverse_reciprocal_factor(const expr_t *dv,
-                                                     number_t (*inner_factor)(const expr_t *))
+static number_t expr_reverse_inverse_reciprocal_factor(const expr_t *dv, number_t (*inner_factor)(const expr_t *))
 {
     number_t x = expr_eval_num_internal(dv->a);
     number_t x_sq = expr_reverse_num_sq(x);
@@ -301,10 +299,7 @@ void expr_reverse_acot(const expr_t *dv, const number_t *out_bar, number_t *a_ba
     expr_reverse_unary(expr_reverse_num_mul(*out_bar, factor), a_bar, b_bar);
 }
 
-static number_t expr_reverse_haversine_inverse_factor(const expr_t *dv,
-                                                      int scale,
-                                                      int offset_sign,
-                                                      int coeff)
+static number_t expr_reverse_haversine_inverse_factor(const expr_t *dv, int scale, int offset_sign, int coeff)
 {
     number_t x = expr_eval_num_internal(dv->a);
     number_t scaled = scale == 2 ? num_mul(NUM_TWO, x) : num_clone(x);
@@ -494,9 +489,15 @@ void expr_reverse_abs(const expr_t *dv, const number_t *out_bar, number_t *a_bar
         return;
     }
     switch (num_cmp(expr_eval_num_internal(dv->a), NUM_ZERO)) {
-        case  1: *a_bar = expr_reverse_num_clone(*out_bar); break;
-        case -1: *a_bar = expr_reverse_num_neg  (*out_bar); break;
-        default: *a_bar = NUM_ZERO;                        break;
+        case 1:
+            *a_bar = expr_reverse_num_clone(*out_bar);
+            break;
+        case -1:
+            *a_bar = expr_reverse_num_neg(*out_bar);
+            break;
+        default:
+            *a_bar = NUM_ZERO;
+            break;
     }
     *b_bar = NUM_ZERO;
 }
@@ -593,8 +594,7 @@ void expr_reverse_polygamma(const expr_t *dv, const number_t *out_bar, number_t 
     number_t factor;
     unsigned int order;
 
-    if (!expr_number_to_polygamma_order(order_value, &order) ||
-        order == UINT_MAX) {
+    if (!expr_number_to_polygamma_order(order_value, &order) || order == UINT_MAX) {
         expr_reverse_binary(NUM_ZERO, NUM_ZERO, a_bar, b_bar);
         return;
     }
@@ -672,6 +672,255 @@ void expr_reverse_legendre_chi(const expr_t *dv, const number_t *out_bar, number
 
     scaled = num_mul(*out_bar, factor);
     expr_reverse_binary(NUM_ZERO, expr_reverse_num_clone(scaled), a_bar, b_bar);
+}
+
+static void expr_reverse_bessel(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar,
+                                number_t (*function)(number_t, number_t))
+{
+    number_t order = expr_eval_num_internal(dv->a);
+    number_t argument = expr_eval_num_internal(dv->b);
+    number_t lower_order = num_sub(order, NUM_ONE);
+    number_t upper_order = num_add(order, NUM_ONE);
+    number_t lower = function(lower_order, argument);
+    number_t upper = function(upper_order, argument);
+    number_t factor = num_mul(NUM_HALF, num_sub(lower, upper));
+
+    expr_reverse_binary(NUM_NAN, num_mul(*out_bar, factor), a_bar, b_bar);
+}
+
+void expr_reverse_bessel_j(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
+{
+    expr_reverse_bessel(dv, out_bar, a_bar, b_bar, num_bessel_j);
+}
+
+void expr_reverse_bessel_y(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
+{
+    expr_reverse_bessel(dv, out_bar, a_bar, b_bar, num_bessel_y);
+}
+
+void expr_reverse_parameter_pack(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
+{
+    (void)dv;
+    expr_reverse_binary(num_clone(*out_bar), num_clone(*out_bar), a_bar, b_bar);
+}
+
+void expr_reverse_lommel_s(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
+{
+    const expr_t *mu = NULL;
+    const expr_t *nu = NULL;
+    const expr_t *argument = NULL;
+    number_t factor;
+
+    if (!expr_lommel_s_unpack(dv, &mu, &nu, &argument)) {
+        expr_reverse_binary(NUM_NAN, NUM_NAN, a_bar, b_bar);
+        return;
+    }
+    factor = num_lommel_s_derivative_internal(expr_eval_num_internal(mu), expr_eval_num_internal(nu),
+                                              expr_eval_num_internal(argument));
+    expr_reverse_binary(NUM_NAN, num_mul(*out_bar, factor), a_bar, b_bar);
+}
+
+void expr_reverse_lommel_s_derivative(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
+{
+    const expr_t *mu = NULL;
+    const expr_t *nu = NULL;
+    const expr_t *argument_expr = NULL;
+    number_t mu_value;
+    number_t nu_value;
+    number_t argument;
+    number_t forcing;
+    number_t prime;
+    number_t original;
+    number_t nu_squared;
+    number_t argument_squared;
+    number_t coefficient;
+    number_t second_derivative;
+
+    if (!expr_lommel_s_unpack(dv, &mu, &nu, &argument_expr)) {
+        expr_reverse_binary(NUM_NAN, NUM_NAN, a_bar, b_bar);
+        return;
+    }
+    mu_value = expr_eval_num_internal(mu);
+    nu_value = expr_eval_num_internal(nu);
+    argument = expr_eval_num_internal(argument_expr);
+    forcing = num_pow(argument, num_sub(mu_value, NUM_ONE));
+    prime = num_lommel_s_derivative_internal(mu_value, nu_value, argument);
+    original = num_lommel_s(mu_value, nu_value, argument);
+    nu_squared = num_sqr(nu_value);
+    argument_squared = num_sqr(argument);
+    coefficient = num_sub(NUM_ONE, num_div(nu_squared, argument_squared));
+    second_derivative = num_sub(num_sub(forcing, num_div(prime, argument)), num_mul(coefficient, original));
+    expr_reverse_binary(NUM_NAN, num_mul(*out_bar, second_derivative), a_bar, b_bar);
+}
+
+void expr_reverse_hypergeometric_pFq(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
+{
+    const expr_t **upper = NULL;
+    const expr_t **lower = NULL;
+    const expr_t *argument_expr = NULL;
+    number_t *upper_shifted = NULL;
+    number_t *lower_shifted = NULL;
+    number_t numerator = NUM_ONE;
+    number_t denominator = NUM_ONE;
+    number_t shifted;
+    number_t factor;
+    size_t p = 0u;
+    size_t q = 0u;
+
+    if (!expr_hypergeometric_pFq_unpack(dv, &upper, &p, &lower, &q, &argument_expr))
+        goto failure;
+    if (p > 0u) {
+        upper_shifted = calloc(p, sizeof(*upper_shifted));
+        if (!upper_shifted)
+            goto failure;
+    }
+    if (q > 0u) {
+        lower_shifted = calloc(q, sizeof(*lower_shifted));
+        if (!lower_shifted)
+            goto failure;
+    }
+    for (size_t i = 0u; i < p; ++i) {
+        number_t value = expr_eval_num_internal(upper[i]);
+
+        numerator = num_mul(numerator, value);
+        upper_shifted[i] = num_add(value, NUM_ONE);
+    }
+    for (size_t i = 0u; i < q; ++i) {
+        number_t value = expr_eval_num_internal(lower[i]);
+
+        denominator = num_mul(denominator, value);
+        lower_shifted[i] = num_add(value, NUM_ONE);
+    }
+    shifted = num_hypergeometric_pFq(upper_shifted, p, lower_shifted, q, expr_eval_num_internal(argument_expr));
+    factor = num_mul(num_div(numerator, denominator), shifted);
+    expr_reverse_binary(NUM_NAN, num_mul(*out_bar, factor), a_bar, b_bar);
+    free(lower_shifted);
+    free(upper_shifted);
+    free(lower);
+    free(upper);
+    return;
+
+failure:
+    free(lower_shifted);
+    free(upper_shifted);
+    free(lower);
+    free(upper);
+    expr_reverse_binary(NUM_NAN, NUM_NAN, a_bar, b_bar);
+}
+
+static int expr_reverse_emit(const number_t *out_bar, number_t factor, expr_reverse_accumulate_fn accumulate,
+                             void *context, const expr_t *child)
+{
+    number_t contribution = num_mul(*out_bar, factor);
+
+    return accumulate(context, child, &contribution);
+}
+
+static int expr_reverse_emit_nan(expr_reverse_accumulate_fn accumulate, void *context, const expr_t *child)
+{
+    number_t contribution = NUM_NAN;
+
+    return accumulate(context, child, &contribution);
+}
+
+int expr_reverse_appell_f1_many(const expr_t *dv, const number_t *out_bar, expr_reverse_accumulate_fn accumulate,
+                                void *context)
+{
+    const expr_t *a = NULL;
+    const expr_t *b1 = NULL;
+    const expr_t *b2 = NULL;
+    const expr_t *c = NULL;
+    const expr_t *x = NULL;
+    const expr_t *y = NULL;
+    number_t av;
+    number_t b1v;
+    number_t b2v;
+    number_t cv;
+    number_t xv;
+    number_t yv;
+    number_t a1;
+    number_t c1;
+    number_t x_factor;
+    number_t y_factor;
+
+    if (!expr_appell_f1_unpack(dv, &a, &b1, &b2, &c, &x, &y))
+        return -1;
+    if (expr_reverse_emit_nan(accumulate, context, a) != 0 || expr_reverse_emit_nan(accumulate, context, b1) != 0 ||
+        expr_reverse_emit_nan(accumulate, context, b2) != 0 || expr_reverse_emit_nan(accumulate, context, c) != 0)
+        return -1;
+
+    av = expr_eval_num_internal(a);
+    b1v = expr_eval_num_internal(b1);
+    b2v = expr_eval_num_internal(b2);
+    cv = expr_eval_num_internal(c);
+    xv = expr_eval_num_internal(x);
+    yv = expr_eval_num_internal(y);
+    a1 = num_add(av, NUM_ONE);
+    c1 = num_add(cv, NUM_ONE);
+    x_factor = num_mul(num_div(num_mul(av, b1v), cv), num_appell_f1(a1, num_add(b1v, NUM_ONE), b2v, c1, xv, yv));
+    y_factor = num_mul(num_div(num_mul(av, b2v), cv), num_appell_f1(a1, b1v, num_add(b2v, NUM_ONE), c1, xv, yv));
+    return expr_reverse_emit(out_bar, x_factor, accumulate, context, x) == 0 &&
+                   expr_reverse_emit(out_bar, y_factor, accumulate, context, y) == 0
+               ? 0
+               : -1;
+}
+
+int expr_reverse_lauricella_f_many(const expr_t *dv, const number_t *out_bar, expr_reverse_accumulate_fn accumulate,
+                                   void *context)
+{
+    const expr_t *a = NULL;
+    const expr_t **b = NULL;
+    const expr_t *c = NULL;
+    const expr_t **x = NULL;
+    number_t *b_values = NULL;
+    number_t *x_values = NULL;
+    number_t *shifted_b = NULL;
+    number_t av;
+    number_t cv;
+    number_t a1;
+    number_t c1;
+    size_t count = 0u;
+    int status = -1;
+
+    if (!expr_lauricella_f_unpack(dv, &a, &b, &c, &x, &count) || expr_reverse_emit_nan(accumulate, context, a) != 0 ||
+        expr_reverse_emit_nan(accumulate, context, c) != 0)
+        goto cleanup;
+    if (count > 0u) {
+        b_values = calloc(count, sizeof(*b_values));
+        x_values = calloc(count, sizeof(*x_values));
+        shifted_b = calloc(count, sizeof(*shifted_b));
+        if (!b_values || !x_values || !shifted_b)
+            goto cleanup;
+    }
+    for (size_t i = 0u; i < count; ++i) {
+        if (expr_reverse_emit_nan(accumulate, context, b[i]) != 0)
+            goto cleanup;
+        b_values[i] = expr_eval_num_internal(b[i]);
+        x_values[i] = expr_eval_num_internal(x[i]);
+        shifted_b[i] = b_values[i];
+    }
+    av = expr_eval_num_internal(a);
+    cv = expr_eval_num_internal(c);
+    a1 = num_add(av, NUM_ONE);
+    c1 = num_add(cv, NUM_ONE);
+    for (size_t i = 0u; i < count; ++i) {
+        number_t factor;
+
+        shifted_b[i] = num_add(b_values[i], NUM_ONE);
+        factor = num_mul(num_div(num_mul(av, b_values[i]), cv), num_lauricella_f(a1, shifted_b, c1, x_values, count));
+        if (expr_reverse_emit(out_bar, factor, accumulate, context, x[i]) != 0)
+            goto cleanup;
+        shifted_b[i] = b_values[i];
+    }
+    status = 0;
+
+cleanup:
+    free(shifted_b);
+    free(x_values);
+    free(b_values);
+    free(x);
+    free(b);
+    return status;
 }
 
 void expr_reverse_gammainv(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
@@ -803,12 +1052,8 @@ static number_t gammainc_x_density_num(const expr_t *dv)
     return num_mul(x_pow, exp_neg_x);
 }
 
-static void expr_reverse_gammainc_x_only(const expr_t *dv,
-                                       const number_t *out_bar,
-                                       number_t *a_bar,
-                                       number_t *b_bar,
-                                       int sign,
-                                       int regularised)
+static void expr_reverse_gammainc_x_only(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar,
+                                         int sign, int regularised)
 {
     number_t factor = gammainc_x_density_num(dv);
 

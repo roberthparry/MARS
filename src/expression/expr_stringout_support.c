@@ -9,13 +9,8 @@ char *expr_tostring_texify(const char *text);
 
 static int expr_tostring_text_needs_parse_for_tex_local(const char *text)
 {
-    return text &&
-        (strchr(text, '/') != NULL ||
-         strchr(text, '^') != NULL ||
-         strchr(text, '(') != NULL ||
-         strchr(text, ')') != NULL ||
-         strstr(text, "√") != NULL ||
-         strstr(text, "·") != NULL);
+    return text && (strchr(text, '/') != NULL || strchr(text, '^') != NULL || strchr(text, '(') != NULL ||
+                    strchr(text, ')') != NULL || strstr(text, "√") != NULL || strstr(text, "·") != NULL);
 }
 
 static const char *expr_tostring_known_text_tex_local(const char *text)
@@ -290,9 +285,7 @@ int expr_tostring_is_safe_func_name(const char *name)
     while (!string_cursor_done(cursor)) {
         unsigned int sc = rune_value(string_cursor_peek(cursor));
 
-        if (!expr_tostring_is_unicode_letter(sc) &&
-            !(sc >= '0' && sc <= '9') &&
-            !(sc >= 0x2080 && sc <= 0x2089))
+        if (!expr_tostring_is_unicode_letter(sc) && !(sc >= '0' && sc <= '9') && !(sc >= 0x2080 && sc <= 0x2089))
             goto done;
         if (string_cursor_next(cursor) != 0)
             goto done;
@@ -323,14 +316,13 @@ void emit_name_func(sbuf_t *b, const char *name)
 
 static int expr_tostring_is_superscript_cp(unsigned int c)
 {
-    return (c >= 0x2070 && c <= 0x2079) || c == 0x00B9 || c == 0x00B2 || c == 0x00B3 ||
-           c == 0x207A || c == 0x207B || c == 0x207C || c == 0x207D || c == 0x207E;
+    return (c >= 0x2070 && c <= 0x2079) || c == 0x00B9 || c == 0x00B2 || c == 0x00B3 || c == 0x207A || c == 0x207B ||
+           c == 0x207C || c == 0x207D || c == 0x207E;
 }
 
 static int expr_tostring_is_subscript_cp(unsigned int c)
 {
-    return (c >= 0x2080 && c <= 0x2089) ||
-           c == 0x208A || c == 0x208B || c == 0x208C || c == 0x208D || c == 0x208E;
+    return (c >= 0x2080 && c <= 0x2089) || c == 0x208A || c == 0x208B || c == 0x208C || c == 0x208D || c == 0x208E;
 }
 
 typedef struct {
@@ -343,98 +335,46 @@ typedef struct {
     char ascii;
 } expr_tostring_ascii_map_t;
 
-#define EXPR_TEX_HASH_FRACTION_SIZE    21u
-#define EXPR_TEX_HASH_SYMBOL_SIZE      9u
+#define EXPR_TEX_HASH_FRACTION_SIZE 21u
+#define EXPR_TEX_HASH_SYMBOL_SIZE 9u
 #define EXPR_ASCII_HASH_SUPERSCRIPT_SIZE 28u
-#define EXPR_ASCII_SUBSCRIPT_BASE      0x2080u
+#define EXPR_ASCII_SUBSCRIPT_BASE 0x2080u
 
 static const expr_tostring_tex_map_t expr_tostring_greek_tex_table[] = {
-    {0x0391, "A"},          {0x0392, "B"},
-    {0x0393, "\\Gamma"},    {0x0394, "\\Delta"},
-    {0x0395, "E"},          {0x0396, "Z"},
-    {0x0397, "H"},          {0x0398, "\\Theta"},
-    {0x0399, "I"},          {0x039A, "K"},
-    {0x039B, "\\Lambda"},   {0x039C, "M"},
-    {0x039D, "N"},          {0x039E, "\\Xi"},
-    {0x039F, "O"},          {0x03A0, "\\Pi"},
-    {0x03A1, "P"},          {0x03A3, "\\Sigma"},
-    {0x03A4, "T"},          {0x03A5, "\\Upsilon"},
-    {0x03A6, "\\Phi"},      {0x03A7, "X"},
-    {0x03A8, "\\Psi"},      {0x03A9, "\\Omega"},
-    {0x03B1, "\\alpha"},    {0x03B2, "\\beta"},
-    {0x03B3, "\\gamma"},    {0x03B4, "\\delta"},
-    {0x03B5, "\\epsilon"},  {0x03B6, "\\zeta"},
-    {0x03B7, "\\eta"},      {0x03B8, "\\theta"},
-    {0x03B9, "\\iota"},     {0x03BA, "\\kappa"},
-    {0x03BB, "\\lambda"},   {0x03BC, "\\mu"},
-    {0x03BD, "\\nu"},       {0x03BE, "\\xi"},
-    {0x03BF, "o"},          {0x03C0, "\\pi"},
-    {0x03C1, "\\rho"},      {0x03C2, "\\varsigma"},
-    {0x03C3, "\\sigma"},    {0x03C4, "\\tau"},
-    {0x03C5, "\\upsilon"},  {0x03C6, "\\phi"},
-    {0x03C7, "\\chi"},      {0x03C8, "\\psi"},
-    {0x03C9, "\\omega"},    {0x03D1, "\\vartheta"},
-    {0x03D5, "\\varphi"},   {0x03D6, "\\varpi"},
-    {0x03F0, "\\varkappa"}, {0x03F1, "\\varrho"},
-    {0x03F5, "\\varepsilon"}
-};
+    {0x0391, "A"},          {0x0392, "B"},          {0x0393, "\\Gamma"},     {0x0394, "\\Delta"},
+    {0x0395, "E"},          {0x0396, "Z"},          {0x0397, "H"},           {0x0398, "\\Theta"},
+    {0x0399, "I"},          {0x039A, "K"},          {0x039B, "\\Lambda"},    {0x039C, "M"},
+    {0x039D, "N"},          {0x039E, "\\Xi"},       {0x039F, "O"},           {0x03A0, "\\Pi"},
+    {0x03A1, "P"},          {0x03A3, "\\Sigma"},    {0x03A4, "T"},           {0x03A5, "\\Upsilon"},
+    {0x03A6, "\\Phi"},      {0x03A7, "X"},          {0x03A8, "\\Psi"},       {0x03A9, "\\Omega"},
+    {0x03B1, "\\alpha"},    {0x03B2, "\\beta"},     {0x03B3, "\\gamma"},     {0x03B4, "\\delta"},
+    {0x03B5, "\\epsilon"},  {0x03B6, "\\zeta"},     {0x03B7, "\\eta"},       {0x03B8, "\\theta"},
+    {0x03B9, "\\iota"},     {0x03BA, "\\kappa"},    {0x03BB, "\\lambda"},    {0x03BC, "\\mu"},
+    {0x03BD, "\\nu"},       {0x03BE, "\\xi"},       {0x03BF, "o"},           {0x03C0, "\\pi"},
+    {0x03C1, "\\rho"},      {0x03C2, "\\varsigma"}, {0x03C3, "\\sigma"},     {0x03C4, "\\tau"},
+    {0x03C5, "\\upsilon"},  {0x03C6, "\\phi"},      {0x03C7, "\\chi"},       {0x03C8, "\\psi"},
+    {0x03C9, "\\omega"},    {0x03D1, "\\vartheta"}, {0x03D5, "\\varphi"},    {0x03D6, "\\varpi"},
+    {0x03F0, "\\varkappa"}, {0x03F1, "\\varrho"},   {0x03F5, "\\varepsilon"}};
 
 static const expr_tostring_tex_map_t expr_tostring_vulgar_fraction_tex_table[EXPR_TEX_HASH_FRACTION_SIZE] = {
-    [0]  = {0x00BD, "\\frac{1}{2}"},
-    [1]  = {0x00BE, "\\frac{3}{4}"},
-    [2]  = {0x2150, "\\frac{1}{7}"},
-    [3]  = {0x2151, "\\frac{1}{9}"},
-    [4]  = {0x2152, "\\frac{1}{10}"},
-    [5]  = {0x2153, "\\frac{1}{3}"},
-    [6]  = {0x2154, "\\frac{2}{3}"},
-    [7]  = {0x2155, "\\frac{1}{5}"},
-    [8]  = {0x2156, "\\frac{2}{5}"},
-    [9]  = {0x2157, "\\frac{3}{5}"},
-    [10] = {0x2158, "\\frac{4}{5}"},
-    [11] = {0x2159, "\\frac{1}{6}"},
-    [12] = {0x215A, "\\frac{5}{6}"},
-    [13] = {0x215B, "\\frac{1}{8}"},
-    [14] = {0x215C, "\\frac{3}{8}"},
-    [15] = {0x215D, "\\frac{5}{8}"},
-    [16] = {0x215E, "\\frac{7}{8}"},
-    [20] = {0x00BC, "\\frac{1}{4}"}
-};
+    [0] = {0x00BD, "\\frac{1}{2}"},  [1] = {0x00BE, "\\frac{3}{4}"},  [2] = {0x2150, "\\frac{1}{7}"},
+    [3] = {0x2151, "\\frac{1}{9}"},  [4] = {0x2152, "\\frac{1}{10}"}, [5] = {0x2153, "\\frac{1}{3}"},
+    [6] = {0x2154, "\\frac{2}{3}"},  [7] = {0x2155, "\\frac{1}{5}"},  [8] = {0x2156, "\\frac{2}{5}"},
+    [9] = {0x2157, "\\frac{3}{5}"},  [10] = {0x2158, "\\frac{4}{5}"}, [11] = {0x2159, "\\frac{1}{6}"},
+    [12] = {0x215A, "\\frac{5}{6}"}, [13] = {0x215B, "\\frac{1}{8}"}, [14] = {0x215C, "\\frac{3}{8}"},
+    [15] = {0x215D, "\\frac{5}{8}"}, [16] = {0x215E, "\\frac{7}{8}"}, [20] = {0x00BC, "\\frac{1}{4}"}};
 
 static const expr_tostring_tex_map_t expr_tostring_symbol_tex_table[EXPR_TEX_HASH_SYMBOL_SIZE] = {
-    [0]  = {0x2260, "\\neq"},
-    [1]  = {0x2202, "\\partial"},
-    [2]  = {0x221E, "\\infty"},
-    [3]  = {0x00B7, " \\cdot "},
-    [4]  = {0x2264, "\\leq"},
-    [5]  = {0x2265, "\\geq"},
-    [7]  = {0x221A, "\\sqrt{}"},
-    [8]  = {0x00D7, " \\times "}
-};
+    [0] = {0x2260, "\\neq"}, [1] = {0x2202, "\\partial"}, [2] = {0x221E, "\\infty"},  [3] = {0x00B7, " \\cdot "},
+    [4] = {0x2264, "\\leq"}, [5] = {0x2265, "\\geq"},     [7] = {0x221A, "\\sqrt{}"}, [8] = {0x00D7, " \\times "}};
 
-static const expr_tostring_ascii_map_t
-expr_tostring_superscript_ascii_table[EXPR_ASCII_HASH_SUPERSCRIPT_SIZE] = {
-    [0]  = {0x207C, '='},
-    [1]  = {0x207D, '('},
-    [2]  = {0x207E, ')'},
-    [10] = {0x00B2, '2'},
-    [11] = {0x00B3, '3'},
-    [16] = {0x2070, '0'},
-    [17] = {0x00B9, '1'},
-    [20] = {0x2074, '4'},
-    [21] = {0x2075, '5'},
-    [22] = {0x2076, '6'},
-    [23] = {0x2077, '7'},
-    [24] = {0x2078, '8'},
-    [25] = {0x2079, '9'},
-    [26] = {0x207A, '+'},
-    [27] = {0x207B, '-'}
-};
+static const expr_tostring_ascii_map_t expr_tostring_superscript_ascii_table[EXPR_ASCII_HASH_SUPERSCRIPT_SIZE] = {
+    [0] = {0x207C, '='},  [1] = {0x207D, '('},  [2] = {0x207E, ')'},  [10] = {0x00B2, '2'}, [11] = {0x00B3, '3'},
+    [16] = {0x2070, '0'}, [17] = {0x00B9, '1'}, [20] = {0x2074, '4'}, [21] = {0x2075, '5'}, [22] = {0x2076, '6'},
+    [23] = {0x2077, '7'}, [24] = {0x2078, '8'}, [25] = {0x2079, '9'}, [26] = {0x207A, '+'}, [27] = {0x207B, '-'}};
 
-static const char expr_tostring_subscript_ascii_table[] = {
-    '0', '1', '2', '3', '4',
-    '5', '6', '7', '8', '9',
-    '+', '-', '=', '(', ')'
-};
+static const char expr_tostring_subscript_ascii_table[] = {'0', '1', '2', '3', '4', '5', '6', '7',
+                                                           '8', '9', '+', '-', '=', '(', ')'};
 
 static size_t expr_tostring_fraction_hash(unsigned int cp)
 {
@@ -451,26 +391,20 @@ static size_t expr_tostring_superscript_ascii_hash(unsigned int cp)
     return cp % EXPR_ASCII_HASH_SUPERSCRIPT_SIZE;
 }
 
-static const char *expr_tostring_tex_lookup(const expr_tostring_tex_map_t *table,
-                                          size_t idx,
-                                          unsigned int cp)
+static const char *expr_tostring_tex_lookup(const expr_tostring_tex_map_t *table, size_t idx, unsigned int cp)
 {
     return table[idx].codepoint == cp ? table[idx].text : NULL;
 }
 
-static char expr_tostring_ascii_lookup(const expr_tostring_ascii_map_t *table,
-                                     size_t idx,
-                                     unsigned int cp)
+static char expr_tostring_ascii_lookup(const expr_tostring_ascii_map_t *table, size_t idx, unsigned int cp)
 {
     return table[idx].codepoint == cp ? table[idx].ascii : '\0';
 }
 
 static char expr_tostring_superscript_ascii(unsigned int c)
 {
-    return expr_tostring_ascii_lookup(
-        expr_tostring_superscript_ascii_table,
-        expr_tostring_superscript_ascii_hash(c),
-        c);
+    return expr_tostring_ascii_lookup(expr_tostring_superscript_ascii_table, expr_tostring_superscript_ascii_hash(c),
+                                      c);
 }
 
 static char expr_tostring_subscript_ascii(unsigned int c)
@@ -489,10 +423,7 @@ static char expr_tostring_subscript_ascii(unsigned int c)
 
 static const char *expr_tostring_greek_tex(unsigned int cp)
 {
-    for (size_t i = 0u;
-         i < sizeof(expr_tostring_greek_tex_table) /
-                 sizeof(expr_tostring_greek_tex_table[0]);
-         ++i) {
+    for (size_t i = 0u; i < sizeof(expr_tostring_greek_tex_table) / sizeof(expr_tostring_greek_tex_table[0]); ++i) {
         if (expr_tostring_greek_tex_table[i].codepoint == cp)
             return expr_tostring_greek_tex_table[i].text;
     }
@@ -501,16 +432,12 @@ static const char *expr_tostring_greek_tex(unsigned int cp)
 
 static const char *expr_tostring_vulgar_fraction_tex(unsigned int cp)
 {
-    return expr_tostring_tex_lookup(expr_tostring_vulgar_fraction_tex_table,
-                                  expr_tostring_fraction_hash(cp),
-                                  cp);
+    return expr_tostring_tex_lookup(expr_tostring_vulgar_fraction_tex_table, expr_tostring_fraction_hash(cp), cp);
 }
 
 static const char *expr_tostring_symbol_tex(unsigned int cp)
 {
-    return expr_tostring_tex_lookup(expr_tostring_symbol_tex_table,
-                                  expr_tostring_symbol_hash(cp),
-                                  cp);
+    return expr_tostring_tex_lookup(expr_tostring_symbol_tex_table, expr_tostring_symbol_hash(cp), cp);
 }
 
 static int expr_tostring_is_ascii_letter(char c)
@@ -518,8 +445,7 @@ static int expr_tostring_is_ascii_letter(char c)
     return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
 }
 
-static void expr_tostring_collect_superscript(string_cursor_t *cursor,
-                                              sbuf_t *tmp)
+static void expr_tostring_collect_superscript(string_cursor_t *cursor, sbuf_t *tmp)
 {
     while (!string_cursor_done(cursor)) {
         unsigned int cp = rune_value(string_cursor_peek(cursor));
@@ -538,8 +464,7 @@ static void expr_tostring_collect_superscript(string_cursor_t *cursor,
     }
 }
 
-static void expr_tostring_collect_subscript(string_cursor_t *cursor,
-                                            sbuf_t *tmp)
+static void expr_tostring_collect_subscript(string_cursor_t *cursor, sbuf_t *tmp)
 {
     while (!string_cursor_done(cursor)) {
         unsigned int cp = rune_value(string_cursor_peek(cursor));
@@ -632,8 +557,7 @@ char *expr_tostring_texify(const char *text)
 
             sbuf_puts(&out, mapped);
             string_cursor_next(cursor);
-            if (string_cursor_peek_ascii(cursor, &next_ascii) &&
-                expr_tostring_is_ascii_letter((char)next_ascii))
+            if (string_cursor_peek_ascii(cursor, &next_ascii) && expr_tostring_is_ascii_letter((char)next_ascii))
                 sbuf_puts(&out, "{}");
             continue;
         }

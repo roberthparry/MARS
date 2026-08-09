@@ -1,9 +1,8 @@
 #ifndef MATRIX_INTERNAL_H
 #define MATRIX_INTERNAL_H
 
-#if !defined(MARS_MATRIX_INTERNAL_ACCESS) && \
-    (!defined(__INTELLISENSE__) || \
-     (defined(__INCLUDE_LEVEL__) && __INCLUDE_LEVEL__ > 0))
+#if !defined(MARS_MATRIX_INTERNAL_ACCESS) &&                                                                           \
+    (!defined(__INTELLISENSE__) || (defined(__INCLUDE_LEVEL__) && __INCLUDE_LEVEL__ > 0))
 #error "matrix_internal.h is private to the matrix module; include matrix.h instead."
 #endif
 
@@ -21,11 +20,7 @@
 
 #define MATRIX_SCALAR_STORAGE_BYTES 64u
 
-typedef enum {
-    ELEM_NUMBER = 0,
-    ELEM_EXPR = 1,
-    ELEM_MAX
-} elem_kind;
+typedef enum { ELEM_NUMBER = 0, ELEM_EXPR = 1, ELEM_MAX } elem_kind;
 
 /* ============================================================
    Scalar function vtable (per element type)
@@ -119,8 +114,7 @@ struct elem_vtable {
    ============================================================ */
 
 struct store_vtable {
-    struct matrix_t *(*create)(size_t rows, size_t cols,
-                               const struct elem_vtable *elem);
+    struct matrix_t *(*create)(size_t rows, size_t cols, const struct elem_vtable *elem);
 
     bool (*alloc)(struct matrix_t *A);
     void (*free)(struct matrix_t *A);
@@ -128,8 +122,8 @@ struct store_vtable {
     void (*get)(const struct matrix_t *A, size_t i, size_t j, void *out);
     void (*set)(struct matrix_t *A, size_t i, size_t j, const void *val);
     void (*swap_rows)(struct matrix_t *A, size_t r1, size_t r2);
-    void (*row_eliminate_from)(struct matrix_t *A, size_t dst_row, size_t src_row,
-                               size_t col_start, const void *factor);
+    void (*row_eliminate_from)(struct matrix_t *A, size_t dst_row, size_t src_row, size_t col_start,
+                               const void *factor);
 
     void (*materialise)(struct matrix_t *A);
     bool (*is_sparse_storage)(const struct matrix_t *A);
@@ -160,10 +154,10 @@ struct matrix_t {
     size_t nnz;
     matrix_meta_t meta;
 
-    const struct elem_vtable  *elem;
+    const struct elem_vtable *elem;
     const struct store_vtable *store;
 
-    void **data;   /* row pointers for dense/sparse; NULL for identity */
+    void **data; /* row pointers for dense/sparse; NULL for identity */
 };
 
 /* ============================================================
@@ -187,44 +181,29 @@ int mat_simplify_symbolic_inplace(matrix_t *A);
    Matrix construction helpers (internal)
    ============================================================ */
 
-struct matrix_t *mat_create_dense_with_elem(size_t rows, size_t cols,
-                                            const struct elem_vtable *elem);
-struct matrix_t *mat_create_with_store(size_t rows, size_t cols,
-                                       const struct elem_vtable *elem,
+struct matrix_t *mat_create_dense_with_elem(size_t rows, size_t cols, const struct elem_vtable *elem);
+struct matrix_t *mat_create_with_store(size_t rows, size_t cols, const struct elem_vtable *elem,
                                        const struct store_vtable *store);
-struct matrix_t *mat_create_zero_with_elem(size_t rows, size_t cols,
-                                           const struct elem_vtable *elem);
-struct matrix_t *mat_create_sparse_with_elem(size_t rows, size_t cols,
-                                             const struct elem_vtable *elem);
-struct matrix_t *mat_create_identity_with_elem(size_t n,
-                                               const struct elem_vtable *elem);
-struct matrix_t *mat_create_diagonal_with_elem(size_t n,
-                                               const struct elem_vtable *elem);
-struct matrix_t *mat_create_upper_triangular_with_elem(size_t rows, size_t cols,
-                                                       const struct elem_vtable *elem);
-struct matrix_t *mat_create_lower_triangular_with_elem(size_t rows, size_t cols,
-                                                       const struct elem_vtable *elem);
-struct matrix_t *mat_create_elementwise_unary_result(size_t rows, size_t cols,
-                                                     const struct elem_vtable *elem,
+struct matrix_t *mat_create_zero_with_elem(size_t rows, size_t cols, const struct elem_vtable *elem);
+struct matrix_t *mat_create_sparse_with_elem(size_t rows, size_t cols, const struct elem_vtable *elem);
+struct matrix_t *mat_create_identity_with_elem(size_t n, const struct elem_vtable *elem);
+struct matrix_t *mat_create_diagonal_with_elem(size_t n, const struct elem_vtable *elem);
+struct matrix_t *mat_create_upper_triangular_with_elem(size_t rows, size_t cols, const struct elem_vtable *elem);
+struct matrix_t *mat_create_lower_triangular_with_elem(size_t rows, size_t cols, const struct elem_vtable *elem);
+struct matrix_t *mat_create_elementwise_unary_result(size_t rows, size_t cols, const struct elem_vtable *elem,
                                                      const struct matrix_t *layout_src);
-struct matrix_t *mat_create_transpose_result(size_t rows, size_t cols,
-                                             const struct elem_vtable *elem,
+struct matrix_t *mat_create_transpose_result(size_t rows, size_t cols, const struct elem_vtable *elem,
                                              const struct matrix_t *layout_src);
-struct matrix_t *mat_copy_with_store(const struct matrix_t *A,
-                                     const struct store_vtable *store);
+struct matrix_t *mat_copy_with_store(const struct matrix_t *A, const struct store_vtable *store);
 struct matrix_t *mat_copy_preserving_store(const struct matrix_t *A);
 struct matrix_t *mat_copy_as_dense(const struct matrix_t *A);
-struct matrix_t *mat_convert_dense(const struct matrix_t *A,
-                                   const struct elem_vtable *target);
+struct matrix_t *mat_convert_dense(const struct matrix_t *A, const struct elem_vtable *target);
 bool mat_has_diagonal_structure(const struct matrix_t *A);
 bool mat_has_upper_triangular_structure(const struct matrix_t *A);
 bool mat_has_lower_triangular_structure(const struct matrix_t *A);
-const struct elem_vtable *mat_binary_result_elem(const struct matrix_t *A,
-                                                 const struct matrix_t *B);
-struct matrix_t *mat_convert_preserving_store(const struct matrix_t *A,
-                                              const struct elem_vtable *target);
-struct matrix_t *mat_convert_with_store(const struct matrix_t *A,
-                                        const struct elem_vtable *target,
+const struct elem_vtable *mat_binary_result_elem(const struct matrix_t *A, const struct matrix_t *B);
+struct matrix_t *mat_convert_preserving_store(const struct matrix_t *A, const struct elem_vtable *target);
+struct matrix_t *mat_convert_with_store(const struct matrix_t *A, const struct elem_vtable *target,
                                         const struct store_vtable *store);
 const struct store_vtable *mat_sparse_factor_store(const struct matrix_t *A,
                                                    const struct store_vtable *structured_store);
@@ -232,37 +211,24 @@ void mat_get_owned(const struct matrix_t *A, size_t i, size_t j, void *out);
 void mat_value_init_zero(const struct matrix_t *A, void *slot);
 void mat_value_destroy(const struct matrix_t *A, void *slot);
 number_t mat_raw_value_to_number(const struct elem_vtable *elem, const void *value);
-void mat_raw_value_from_number(const struct elem_vtable *elem, void *out,
-                               const number_t *value);
+void mat_raw_value_from_number(const struct elem_vtable *elem, void *out, const number_t *value);
 void mat_set_num_owned(struct matrix_t *A, size_t i, size_t j, number_t *value);
 
-static inline void mat_set_num_clone(struct matrix_t *A, size_t i, size_t j,
-                                     const number_t *value)
+static inline void mat_set_num_clone(struct matrix_t *A, size_t i, size_t j, const number_t *value)
 {
     number_t copy = num_is_immortal(*value) ? *value : num_clone(*value);
     mat_set_num_owned(A, i, j, &copy);
 }
 size_t mat_cached_numeric_precision_bits(const struct matrix_t *A);
-void mat_numeric_precision_note_set(struct matrix_t *A,
-                                    const void *old_val,
-                                    const void *new_val);
+void mat_numeric_precision_note_set(struct matrix_t *A, const void *old_val, const void *new_val);
 void mat_numeric_precision_release(struct matrix_t *A);
 void dense_swap_rows(struct matrix_t *A, size_t r1, size_t r2);
-struct matrix_t *mat_extract_block(const struct matrix_t *A,
-                                   size_t row0, size_t rows,
-                                   size_t col0, size_t cols);
-bool mat_insert_block(struct matrix_t *A, size_t row0, size_t col0,
-                      const struct matrix_t *B);
-struct matrix_t *mat_build_block_2x2(const struct matrix_t *B11,
-                                     const struct matrix_t *B12,
-                                     const struct matrix_t *B21,
+struct matrix_t *mat_extract_block(const struct matrix_t *A, size_t row0, size_t rows, size_t col0, size_t cols);
+bool mat_insert_block(struct matrix_t *A, size_t row0, size_t col0, const struct matrix_t *B);
+struct matrix_t *mat_build_block_2x2(const struct matrix_t *B11, const struct matrix_t *B12, const struct matrix_t *B21,
                                      const struct matrix_t *B22);
-struct matrix_t *mat_const_identity_with_elem(size_t n,
-                                              const struct elem_vtable *elem,
-                                              const void *scalar);
-matrix_t *mat_create_direct_solve_result(const matrix_t *A,
-                                         const matrix_t *B,
-                                         const struct elem_vtable *elem);
+struct matrix_t *mat_const_identity_with_elem(size_t n, const struct elem_vtable *elem, const void *scalar);
+matrix_t *mat_create_direct_solve_result(const matrix_t *A, const matrix_t *B, const struct elem_vtable *elem);
 
 /* Shared structured store used outside matrix_core.c (defined in matrix_vtables.c). */
 extern const struct store_vtable dense_store;
@@ -276,7 +242,8 @@ extern const struct store_vtable lower_triangular_store;
    Convenience accessor
    ============================================================ */
 
-static inline const struct elem_vtable *elem_of(const struct matrix_t *A) {
+static inline const struct elem_vtable *elem_of(const struct matrix_t *A)
+{
     return A ? A->elem : NULL;
 }
 
@@ -314,8 +281,7 @@ void mat_schur_factor_free(mat_schur_factor_t *S);
 matrix_t *mat_nullspace_expr_exact(const matrix_t *A);
 int mat_rank_expr_exact(const matrix_t *A);
 matrix_t *mat_pseudoinverse_expr_exact(const matrix_t *A);
-int mat_eigendecompose_expr(const matrix_t *A, expr_t **eigenvalues,
-                            matrix_t **eigenvectors);
+int mat_eigendecompose_expr(const matrix_t *A, expr_t **eigenvalues, matrix_t **eigenvectors);
 matrix_t *mat_solve_expr_exact(const matrix_t *A, const matrix_t *B);
 int mat_det_expr_exact(const matrix_t *A, expr_t **determinant);
 matrix_t *mat_inverse_expr_exact(const matrix_t *A);
@@ -329,18 +295,15 @@ matrix_t *mat_adjugate_exact(const matrix_t *A);
    ============================================================ */
 
 /* Apply scalar function f to an upper triangular matrix T. */
-matrix_t *mat_fun_triangular(const matrix_t *T,
-                             void (*scalar_f)(void *out, const void *in));
+matrix_t *mat_fun_triangular(const matrix_t *T, void (*scalar_f)(void *out, const void *in));
 
 /* High-level Schur-based matrix function engine. */
-matrix_t *mat_fun_schur(const matrix_t *A,
-                        void (*scalar_f)(void *out, const void *in));
+matrix_t *mat_fun_schur(const matrix_t *A, void (*scalar_f)(void *out, const void *in));
 
 /* Internal Hermitian detector used to select stable fast paths. */
 bool mat_is_hermitian(const matrix_t *A);
 
 /* Drop any internal matrix-function cache associated with A. */
 void mat_fun_cache_forget(const matrix_t *A);
-
 
 #endif /* MATRIX_INTERNAL_H */

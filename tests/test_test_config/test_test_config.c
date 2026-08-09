@@ -15,10 +15,7 @@ static bool test_fixture_setup_impl(void);
 static bool test_fixture_teardown_impl(void);
 
 static const test_validity_contract_t int_contract =
-    TEST_VALIDITY_CONTRACT("int-equality",
-                           int_validity_equal,
-                           int_validity_format,
-                           NULL);
+    TEST_VALIDITY_CONTRACT("int-equality", int_validity_equal, int_validity_format, NULL);
 
 static int fixture_setup_calls = 0;
 static int fixture_teardown_calls = 0;
@@ -179,16 +176,13 @@ static bool test_fixture_teardown_impl(void)
 
 static void test_top_level_default_true(void)
 {
-    TEST_ASSERT_TRUE(TEST_ENABLED(NULL),
-                     "top-level tests default to true");
-    TEST_ASSERT_TRUE(TEST_CONFIG_HAS_KEY(NULL),
-                     "top-level tests are materialized for regeneration");
+    TEST_ASSERT_TRUE(TEST_ENABLED(NULL), "top-level tests default to true");
+    TEST_ASSERT_TRUE(TEST_CONFIG_HAS_KEY(NULL), "top-level tests are materialized for regeneration");
 }
 
 static void test_subtest_default_true(void)
 {
-    TEST_ASSERT_TRUE(TEST_ENABLED("test_top_level_default_true"),
-                     "subtests default to true");
+    TEST_ASSERT_TRUE(TEST_ENABLED("test_top_level_default_true"), "subtests default to true");
     TEST_ASSERT_TRUE(TEST_CONFIG_HAS_KEY("test_top_level_default_true"),
                      "subtests are materialized under their parent");
 }
@@ -199,22 +193,19 @@ static void test_repeat_lookup_same_value(void)
     bool b = TEST_ENABLED(NULL);
 
     TEST_ASSERT_TRUE(a == b, "repeat lookups return the same value");
-    TEST_ASSERT_TRUE(TEST_CONFIG_HAS_KEY(NULL),
-                     "top-level repeat lookup is materialized");
+    TEST_ASSERT_TRUE(TEST_CONFIG_HAS_KEY(NULL), "top-level repeat lookup is materialized");
 }
 
 static void test_fixture_is_active_for_case(void)
 {
     TEST_ASSERT_INT_EQ(fixture_cookie, 0x51A7);
     TEST_ASSERT_INT_EQ(fixture_setup_calls, fixture_teardown_calls + fixture_balance);
-    TEST_ASSERT_TRUE(fixture_balance >= 1,
-                     "fixture setup should have run before each test case");
+    TEST_ASSERT_TRUE(fixture_balance >= 1, "fixture setup should have run before each test case");
 }
 
 static void test_subtest_grouping(void)
 {
-    TEST_ASSERT_TRUE(TEST_ENABLED("test_parent_group"),
-                     "grouped subtests are enabled");
+    TEST_ASSERT_TRUE(TEST_ENABLED("test_parent_group"), "grouped subtests are enabled");
     TEST_RUN_SUBTEST(test_sub_sub_function, NULL);
 }
 
@@ -234,18 +225,17 @@ static void test_sub_sub_sub_function(void)
 
 static void test_sub_sub_sub_sub_function(void)
 {
-    TEST_ASSERT_TRUE(TEST_ENABLED("test_parent_group.test_subtest_grouping.test_sub_sub_function.test_sub_sub_sub_function"),
-                     "deepest nested path is accepted");
+    TEST_ASSERT_TRUE(
+        TEST_ENABLED("test_parent_group.test_subtest_grouping.test_sub_sub_function.test_sub_sub_sub_function"),
+        "deepest nested path is accepted");
 }
 
 static void test_missing_nested_path_is_materialized(void)
 {
     const char *parent = "missing_parent_group";
 
-    TEST_ASSERT_TRUE(TEST_ENABLED(parent),
-                     "missing nested paths regenerate as enabled");
-    TEST_ASSERT_TRUE(TEST_CONFIG_HAS_KEY(parent),
-                     "missing nested paths are materialized");
+    TEST_ASSERT_TRUE(TEST_ENABLED(parent), "missing nested paths regenerate as enabled");
+    TEST_ASSERT_TRUE(TEST_CONFIG_HAS_KEY(parent), "missing nested paths are materialized");
 }
 
 static void test_fixture_balance_after_nested_group(void)
@@ -278,14 +268,10 @@ static void test_temp_resources_are_available_in_case(void)
 
 static void test_temp_resources_are_cleaned_after_case(void)
 {
-    TEST_ASSERT_TRUE(last_temp_dir[0] != '\0',
-                     "previous temp dir path should have been captured");
-    TEST_ASSERT_TRUE(last_temp_file[0] != '\0',
-                     "previous temp file path should have been captured");
-    TEST_ASSERT_TRUE(access(last_temp_file, F_OK) != 0,
-                     "temp file should be removed after its case finishes");
-    TEST_ASSERT_TRUE(access(last_temp_dir, F_OK) != 0,
-                     "temp directory should be removed after its case finishes");
+    TEST_ASSERT_TRUE(last_temp_dir[0] != '\0', "previous temp dir path should have been captured");
+    TEST_ASSERT_TRUE(last_temp_file[0] != '\0', "previous temp file path should have been captured");
+    TEST_ASSERT_TRUE(access(last_temp_file, F_OK) != 0, "temp file should be removed after its case finishes");
+    TEST_ASSERT_TRUE(access(last_temp_dir, F_OK) != 0, "temp directory should be removed after its case finishes");
 }
 
 static void test_stdout_capture_is_available_in_case(void)
@@ -296,15 +282,13 @@ static void test_stdout_capture_is_available_in_case(void)
     char *line;
     int saved_stdout = test_case_begin_stdout_capture("stdout-capture.txt", &path);
 
-    TEST_ASSERT_TRUE(saved_stdout >= 0,
-                     "stdout capture should start successfully");
+    TEST_ASSERT_TRUE(saved_stdout >= 0, "stdout capture should start successfully");
     TEST_ASSERT_NOT_NULL(path);
 
     snprintf(last_stdout_capture_file, sizeof(last_stdout_capture_file), "%s", path);
 
     string_printf("captured-line\n");
-    TEST_ASSERT_TRUE(test_case_end_stdout_capture(saved_stdout),
-                     "stdout capture should restore stdout successfully");
+    TEST_ASSERT_TRUE(test_case_end_stdout_capture(saved_stdout), "stdout capture should restore stdout successfully");
 
     f = fopen(path, "r");
     TEST_ASSERT_NOT_NULL(f);
@@ -317,8 +301,7 @@ static void test_stdout_capture_is_available_in_case(void)
 
 static void test_stdout_capture_file_is_cleaned_after_case(void)
 {
-    TEST_ASSERT_TRUE(last_stdout_capture_file[0] != '\0',
-                     "stdout capture path should have been recorded");
+    TEST_ASSERT_TRUE(last_stdout_capture_file[0] != '\0', "stdout capture path should have been recorded");
     TEST_ASSERT_TRUE(access(last_stdout_capture_file, F_OK) != 0,
                      "captured stdout file should be removed after its case finishes");
 }
@@ -331,15 +314,13 @@ static void test_stderr_capture_is_available_in_case(void)
     char *line;
     int saved_stderr = test_case_begin_stderr_capture("stderr-capture.txt", &path);
 
-    TEST_ASSERT_TRUE(saved_stderr >= 0,
-                     "stderr capture should start successfully");
+    TEST_ASSERT_TRUE(saved_stderr >= 0, "stderr capture should start successfully");
     TEST_ASSERT_NOT_NULL(path);
 
     snprintf(last_stderr_capture_file, sizeof(last_stderr_capture_file), "%s", path);
 
     fprintf(stderr, "captured-error\n");
-    TEST_ASSERT_TRUE(test_case_end_stderr_capture(saved_stderr),
-                     "stderr capture should restore stderr successfully");
+    TEST_ASSERT_TRUE(test_case_end_stderr_capture(saved_stderr), "stderr capture should restore stderr successfully");
 
     f = fopen(path, "r");
     TEST_ASSERT_NOT_NULL(f);
@@ -352,18 +333,15 @@ static void test_stderr_capture_is_available_in_case(void)
 
 static void test_stderr_capture_file_is_cleaned_after_case(void)
 {
-    TEST_ASSERT_TRUE(last_stderr_capture_file[0] != '\0',
-                     "stderr capture path should have been recorded");
+    TEST_ASSERT_TRUE(last_stderr_capture_file[0] != '\0', "stderr capture path should have been recorded");
     TEST_ASSERT_TRUE(access(last_stderr_capture_file, F_OK) != 0,
                      "captured stderr file should be removed after its case finishes");
 }
 
 static void test_output_example_runs(void)
 {
-    TEST_ASSERT_TRUE(TEST_ENABLED(NULL),
-                     "output examples default to enabled");
-    TEST_ASSERT_TRUE(TEST_CONFIG_HAS_KEY(NULL),
-                     "output examples are materialized for regeneration");
+    TEST_ASSERT_TRUE(TEST_ENABLED(NULL), "output examples default to enabled");
+    TEST_ASSERT_TRUE(TEST_CONFIG_HAS_KEY(NULL), "output examples are materialized for regeneration");
     output_example_ran = 1;
 }
 
@@ -374,8 +352,7 @@ static void test_output_example_disabled(void)
 
 static void test_invalid_parent_name_is_rejected(void)
 {
-    TEST_ASSERT_FALSE(TEST_ENABLED("missing..deep.parent.path"),
-                      "invalid parent paths must be rejected");
+    TEST_ASSERT_FALSE(TEST_ENABLED("missing..deep.parent.path"), "invalid parent paths must be rejected");
     TEST_ASSERT_FALSE(TEST_CONFIG_HAS_KEY("missing..deep.parent.path"),
                       "invalid parent paths must not be materialized");
 }
@@ -426,28 +403,21 @@ static void test_json_string_escapes_are_written(void)
 {
     const char *name = "json_escape_\"quote\\slash\nline\t tab🙂";
     const char *reader_name = "json_reader_\"quote\\slash\nline\t tab🙂";
-    const char *expected_json_key =
-        "\"json_escape_\\\"quote\\\\slash\\nline\\t tab🙂\"";
+    const char *expected_json_key = "\"json_escape_\\\"quote\\\\slash\\nline\\t tab🙂\"";
     const char *expected_nul_key = "\"json_nul_\\u0000_key\"";
     string_t *file_text = string_new_with(__FILE__);
     string_t *name_text = string_new_with(name);
     string_t *reader_name_text = string_new_with(reader_name);
     bool have_inputs = file_text && name_text && reader_name_text;
-    bool enabled = have_inputs
-        ? test_config_is_enabled(file_text, name_text, NULL)
-        : false;
-    bool reader_disabled = have_inputs
-        ? !test_config_is_enabled(file_text, reader_name_text, NULL)
-        : false;
+    bool enabled = have_inputs ? test_config_is_enabled(file_text, name_text, NULL) : false;
+    bool reader_disabled = have_inputs ? !test_config_is_enabled(file_text, reader_name_text, NULL) : false;
 
     string_free(file_text);
     string_free(name_text);
     string_free(reader_name_text);
     TEST_ASSERT_TRUE(have_inputs, "string inputs should be allocated");
-    TEST_ASSERT_TRUE(enabled,
-                     "special JSON string key should be materialised");
-    TEST_ASSERT_TRUE(reader_disabled,
-                     "JSON reader should decode escaped keys before lookup");
+    TEST_ASSERT_TRUE(enabled, "special JSON string key should be materialised");
+    TEST_ASSERT_TRUE(reader_disabled, "JSON reader should decode escaped keys before lookup");
 
     test_config_set_prune_enabled(false);
     test_config_save();
@@ -476,9 +446,7 @@ int tests_main(void)
     TEST_SECTION("Configuration");
 
     TEST_RUN_CASE(test_top_level_default_true, "config,defaults");
-    TEST_RUN_IN_GROUP(test_subtest_default_true,
-                      test_top_level_default_true,
-                      "config,defaults,group");
+    TEST_RUN_IN_GROUP(test_subtest_default_true, test_top_level_default_true, "config,defaults,group");
     TEST_RUN_CASE(test_repeat_lookup_same_value, "config,regeneration");
     TEST_RUN_CASE(test_fixture_is_active_for_case, "config,fixture");
     TEST_RUN_CASE(test_parent_group, "config,nesting");

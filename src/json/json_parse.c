@@ -14,9 +14,7 @@ static void json_skip_ws(json_parser_t *parser)
 {
     unsigned char ch;
 
-    while (parser &&
-           parser->cursor &&
-           string_cursor_peek_ascii(parser->cursor, &ch) &&
+    while (parser && parser->cursor && string_cursor_peek_ascii(parser->cursor, &ch) &&
            (ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r')) {
         if (string_cursor_next(parser->cursor) != 0)
             return;
@@ -86,17 +84,13 @@ static bool json_parse_unicode_escape(json_parser_t *parser, string_t *out)
     if (scalar >= 0xD800u && scalar <= 0xDBFFu) {
         uint32_t low;
 
-        if (!json_consume_ascii(parser, '\\') ||
-            !json_consume_ascii(parser, 'u') ||
-            !json_parse_hex4(parser, &low))
+        if (!json_consume_ascii(parser, '\\') || !json_consume_ascii(parser, 'u') || !json_parse_hex4(parser, &low))
             return false;
 
         if (low < 0xDC00u || low > 0xDFFFu)
             return false;
 
-        scalar = 0x10000u +
-                 ((scalar - 0xD800u) << 10u) +
-                 (low - 0xDC00u);
+        scalar = 0x10000u + ((scalar - 0xD800u) << 10u) + (low - 0xDC00u);
     } else if (scalar >= 0xDC00u && scalar <= 0xDFFFu) {
         return false;
     }
@@ -125,8 +119,7 @@ static string_t *json_parse_string_text(json_parser_t *parser)
             goto fail;
 
         if (!string_cursor_peek_ascii(parser->cursor, &ascii)) {
-            if (string_append_rune(text, rune) != 0 ||
-                string_cursor_next(parser->cursor) != 0)
+            if (string_append_rune(text, rune) != 0 || string_cursor_next(parser->cursor) != 0)
                 goto fail;
             continue;
         }
@@ -186,8 +179,7 @@ static string_t *json_parse_string_text(json_parser_t *parser)
         if (ascii < 0x20u)
             goto fail;
 
-        if (string_append_char(text, (char)ascii) != 0 ||
-            string_cursor_next(parser->cursor) != 0)
+        if (string_append_char(text, (char)ascii) != 0 || string_cursor_next(parser->cursor) != 0)
             goto fail;
     }
 
@@ -240,8 +232,7 @@ static bool json_parse_number_scan(json_parser_t *parser, string_pos_t *start_ou
     } else if (ch >= '1' && ch <= '9') {
         do {
             (void)string_cursor_next(cursor);
-        } while (string_cursor_peek_ascii(cursor, &ch) &&
-                 ch >= '0' && ch <= '9');
+        } while (string_cursor_peek_ascii(cursor, &ch) && ch >= '0' && ch <= '9');
     } else {
         goto done;
     }
@@ -252,8 +243,7 @@ static bool json_parse_number_scan(json_parser_t *parser, string_pos_t *start_ou
             goto done;
         do {
             (void)string_cursor_next(cursor);
-        } while (string_cursor_peek_ascii(cursor, &ch) &&
-                 ch >= '0' && ch <= '9');
+        } while (string_cursor_peek_ascii(cursor, &ch) && ch >= '0' && ch <= '9');
     }
 
     if (string_cursor_peek_ascii(cursor, &ch) && (ch == 'e' || ch == 'E')) {
@@ -264,8 +254,7 @@ static bool json_parse_number_scan(json_parser_t *parser, string_pos_t *start_ou
             goto done;
         do {
             (void)string_cursor_next(cursor);
-        } while (string_cursor_peek_ascii(cursor, &ch) &&
-                 ch >= '0' && ch <= '9');
+        } while (string_cursor_peek_ascii(cursor, &ch) && ch >= '0' && ch <= '9');
     }
 
     ok = true;
@@ -305,14 +294,11 @@ static json_t *json_maybe_unwrap_extended_number(json_t *object)
     json_t *number_json;
     number_t number_value;
 
-    if (!object ||
-        object->type != JSON_OBJECT ||
-        json_object_size(object) != 1u)
+    if (!object || object->type != JSON_OBJECT || json_object_size(object) != 1u)
         return object;
 
     key = json_object_key_at(object, 0u);
-    if (!key ||
-        !string_view_equals_literal(string_view_all(key), "$mars.number"))
+    if (!key || !string_view_equals_literal(string_view_all(key), "$mars.number"))
         return object;
 
     value = json_object_value_at(object, 0u);

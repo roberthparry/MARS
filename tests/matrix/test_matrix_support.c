@@ -8,14 +8,13 @@ static matrix_t *clone_matrix_snapshot(const matrix_t *A)
     if (!A)
         return NULL;
 
-    switch (mat_typeof(A))
-    {
-    case MAT_TYPE_NUMBER:
-        /* Numeric tests already print concrete matrices inline; avoid
-         * retaining extra numeric snapshots in the harness. */
-        return NULL;
-    case MAT_TYPE_EXPR:
-        return mat_to_dense(A);
+    switch (mat_typeof(A)) {
+        case MAT_TYPE_NUMBER:
+            /* Numeric tests already print concrete matrices inline; avoid
+             * retaining extra numeric snapshots in the harness. */
+            return NULL;
+        case MAT_TYPE_EXPR:
+            return mat_to_dense(A);
     }
 
     return NULL;
@@ -167,8 +166,7 @@ static void format_compact_number(number_t z, char *buf, size_t buf_size)
         double im = num_to_double(abs_zi);
         const char *sign = (num_get_sign(zi) < 0) ? "-" : "+";
 
-        snprintf(buf, buf_size, "%.16g %s %.16gi%s",
-                 re, sign, im, ellipsis ? "..." : "");
+        snprintf(buf, buf_size, "%.16g %s %.16gi%s", re, sign, im, ellipsis ? "..." : "");
         num_destroy(&abs_zi);
     }
 
@@ -252,11 +250,10 @@ static void print_mnum_raw(const char *label, matrix_t *A)
 
 static int is_primary_matrix_label(const char *label)
 {
-    static const char *derived_prefixes[] = {
-        "exp(", "sin(", "cos(", "tan(", "sinh(", "cosh(", "tanh(",
-        "sqrt(", "log(", "asin(", "acos(", "atan(", "asinh(",
-        "acosh(", "atanh(", "erf(", "erfc(", "transpose(", "conj(",
-        "eigenvectors", "V ", NULL};
+    static const char *derived_prefixes[] = {"exp(",   "sin(",         "cos(",   "tan(",  "sinh(", "cosh(",
+                                             "tanh(",  "sqrt(",        "log(",   "asin(", "acos(", "atan(",
+                                             "asinh(", "acosh(",       "atanh(", "erf(",  "erfc(", "transpose(",
+                                             "conj(",  "eigenvectors", "V ",     NULL};
 
     if (!label || !label[0])
         return 0;
@@ -269,8 +266,7 @@ static int is_primary_matrix_label(const char *label)
 
     size_t token_len = 0;
     while ((label[token_len] >= 'A' && label[token_len] <= 'Z') ||
-           (label[token_len] >= 'a' && label[token_len] <= 'z') ||
-           (label[token_len] >= '0' && label[token_len] <= '9'))
+           (label[token_len] >= 'a' && label[token_len] <= 'z') || (label[token_len] >= '0' && label[token_len] <= '9'))
         token_len++;
 
     if (token_len == 0)
@@ -282,8 +278,7 @@ static int is_primary_matrix_label(const char *label)
     if (label[token_len] == '\0' || label[token_len] == '(')
         return 1;
 
-    if ((label[token_len] >= 'A' && label[token_len] <= 'Z') ||
-        (label[token_len] >= 'a' && label[token_len] <= 'z'))
+    if ((label[token_len] >= 'A' && label[token_len] <= 'Z') || (label[token_len] >= 'a' && label[token_len] <= 'z'))
         return 1;
 
     if (label[0] == 'I' && label[token_len] == '+' && label[token_len + 1] != '\0')
@@ -351,9 +346,7 @@ void qc_to_coloured_string(qcomplex_t z, char *out, size_t out_size)
     qf_sprintf(re, sizeof(re), "%q", qc_real(z));
     qf_sprintf(im, sizeof(im), "%q", qf_abs(qc_imag(z)));
     const char *sign = (qc_imag(z).hi >= 0.0) ? "+" : "-";
-    snprintf(out, out_size,
-             C_GREEN "%s" C_RESET " " C_WHITE "%s" C_RESET " " C_MAGENTA "%si" C_RESET,
-             re, sign, im);
+    snprintf(out, out_size, C_GREEN "%s" C_RESET " " C_WHITE "%s" C_RESET " " C_MAGENTA "%si" C_RESET, re, sign, im);
 }
 
 void print_complex(const char *label, qcomplex_t z)
@@ -420,10 +413,7 @@ static int binding_contains(char **bindings, size_t nb, const char *token)
     return 0;
 }
 
-static void append_binding(char ***bindings,
-                           size_t *nbindings,
-                           size_t *capbindings,
-                           char *token)
+static void append_binding(char ***bindings, size_t *nbindings, size_t *capbindings, char *token)
 {
     if (!token || !*token) {
         free(token);
@@ -449,12 +439,8 @@ static void append_binding(char ***bindings,
     (*bindings)[(*nbindings)++] = token;
 }
 
-static void collect_bindings(char ***var_bindings,
-                             size_t *nvar_bindings,
-                             size_t *capvar_bindings,
-                             char ***const_bindings,
-                             size_t *nconst_bindings,
-                             size_t *capconst_bindings,
+static void collect_bindings(char ***var_bindings, size_t *nvar_bindings, size_t *capvar_bindings,
+                             char ***const_bindings, size_t *nconst_bindings, size_t *capconst_bindings,
                              const char *binding_text)
 {
     size_t pos = 0u;
@@ -462,10 +448,7 @@ static void collect_bindings(char ***var_bindings,
     int in_constants = 0;
 
     while (pos < len) {
-        while (pos < len &&
-               (binding_text[pos] == ' ' ||
-                binding_text[pos] == '\t' ||
-                binding_text[pos] == ','))
+        while (pos < len && (binding_text[pos] == ' ' || binding_text[pos] == '\t' || binding_text[pos] == ','))
             pos++;
         if (pos < len && binding_text[pos] == ';') {
             in_constants = 1;
@@ -487,24 +470,17 @@ static void collect_bindings(char ***var_bindings,
     }
 }
 
-static void collect_expr_bindings(const expr_t *dv,
-                                  char ***var_bindings,
-                                  size_t *nvar_bindings,
-                                  size_t *capvar_bindings,
-                                  char ***const_bindings,
-                                  size_t *nconst_bindings,
-                                  size_t *capconst_bindings,
-                                  const char *binding_text)
+static void collect_expr_bindings(const expr_t *dv, char ***var_bindings, size_t *nvar_bindings,
+                                  size_t *capvar_bindings, char ***const_bindings, size_t *nconst_bindings,
+                                  size_t *capconst_bindings, const char *binding_text)
 {
-    if (dv && expr_symbol_name(dv) && !expr_is_variable(dv) &&
-        binding_text && *binding_text && !strchr(binding_text, ';')) {
-        append_binding(const_bindings, nconst_bindings, capconst_bindings,
-                       strdup(binding_text));
+    if (dv && expr_symbol_name(dv) && !expr_is_variable(dv) && binding_text && *binding_text &&
+        !strchr(binding_text, ';')) {
+        append_binding(const_bindings, nconst_bindings, capconst_bindings, strdup(binding_text));
         return;
     }
 
-    collect_bindings(var_bindings, nvar_bindings, capvar_bindings,
-                     const_bindings, nconst_bindings, capconst_bindings,
+    collect_bindings(var_bindings, nvar_bindings, capvar_bindings, const_bindings, nconst_bindings, capconst_bindings,
                      binding_text);
 }
 
@@ -594,10 +570,7 @@ static int has_long_binding(char **bindings, size_t nbindings, size_t threshold)
     return 0;
 }
 
-static char *join_bindings(char **var_bindings,
-                           size_t nvar_bindings,
-                           char **const_bindings,
-                           size_t nconst_bindings)
+static char *join_bindings(char **var_bindings, size_t nvar_bindings, char **const_bindings, size_t nconst_bindings)
 {
     if (nvar_bindings == 0) {
         if (!has_long_binding(const_bindings, nconst_bindings, 16))
@@ -660,8 +633,7 @@ static int split_expr_repr(const expr_t *dv, char **expr_out, char **bindings_ou
 
     body = tmp;
     len = strlen(tmp);
-    if (len >= 4 && tmp[0] == '{' && tmp[1] == ' ' &&
-        tmp[len - 2] == ' ' && tmp[len - 1] == '}') {
+    if (len >= 4 && tmp[0] == '{' && tmp[1] == ' ' && tmp[len - 2] == ' ' && tmp[len - 1] == '}') {
         body = tmp + 2;
         tmp[len - 2] = '\0';
     }
@@ -680,9 +652,7 @@ static int split_expr_repr(const expr_t *dv, char **expr_out, char **bindings_ou
     return *expr_out && *bindings_out ? 0 : -1;
 }
 
-static void pretty_expr_expr(char **expr_io,
-                             char **const_bindings,
-                             size_t nconst_bindings)
+static void pretty_expr_expr(char **expr_io, char **const_bindings, size_t nconst_bindings)
 {
     char *expr;
 
@@ -722,8 +692,7 @@ static void print_md_raw(const char *label, matrix_t *A)
     size_t *w = calloc(cols, sizeof(size_t));
 
     for (size_t i = 0; i < rows; i++)
-        for (size_t j = 0; j < cols; j++)
-        {
+        for (size_t j = 0; j < cols; j++) {
             double v;
             char buf[256];
             mat_get(A, i, j, &v);
@@ -733,11 +702,9 @@ static void print_md_raw(const char *label, matrix_t *A)
                 w[j] = len;
         }
 
-    for (size_t i = 0; i < rows; i++)
-    {
+    for (size_t i = 0; i < rows; i++) {
         printf("      ");
-        for (size_t j = 0; j < cols; j++)
-        {
+        for (size_t j = 0; j < cols; j++) {
             double v;
             char buf[256];
             mat_get(A, i, j, &v);
@@ -768,8 +735,7 @@ static void print_mqf_raw(const char *label, matrix_t *A)
     size_t *w = calloc(cols, sizeof(size_t));
 
     for (size_t i = 0; i < rows; i++)
-        for (size_t j = 0; j < cols; j++)
-        {
+        for (size_t j = 0; j < cols; j++) {
             qfloat_t v;
             char buf[512];
             mat_get(A, i, j, &v);
@@ -779,11 +745,9 @@ static void print_mqf_raw(const char *label, matrix_t *A)
                 w[j] = len;
         }
 
-    for (size_t i = 0; i < rows; i++)
-    {
+    for (size_t i = 0; i < rows; i++) {
         printf("      ");
-        for (size_t j = 0; j < cols; j++)
-        {
+        for (size_t j = 0; j < cols; j++) {
             qfloat_t v;
             char buf[512];
             mat_get(A, i, j, &v);
@@ -814,8 +778,7 @@ static void print_mqc_raw(const char *label, matrix_t *A)
     size_t *w = calloc(cols, sizeof(size_t));
 
     for (size_t i = 0; i < rows; i++)
-        for (size_t j = 0; j < cols; j++)
-        {
+        for (size_t j = 0; j < cols; j++) {
             qcomplex_t v;
             char buf[512];
             mat_get(A, i, j, &v);
@@ -825,11 +788,9 @@ static void print_mqc_raw(const char *label, matrix_t *A)
                 w[j] = len;
         }
 
-    for (size_t i = 0; i < rows; i++)
-    {
+    for (size_t i = 0; i < rows; i++) {
         printf("      ");
-        for (size_t j = 0; j < cols; j++)
-        {
+        for (size_t j = 0; j < cols; j++) {
             qcomplex_t v;
             char buf[512];
             mat_get(A, i, j, &v);
@@ -866,8 +827,7 @@ static void print_mexpr_raw(const char *label, matrix_t *A)
     int ok = exprs && w;
 
     for (size_t i = 0; ok && i < rows; i++)
-        for (size_t j = 0; j < cols; j++)
-        {
+        for (size_t j = 0; j < cols; j++) {
             expr_t *v;
             char *expr = NULL;
             char *binding_text = NULL;
@@ -883,10 +843,8 @@ static void print_mexpr_raw(const char *label, matrix_t *A)
             }
 
             exprs[idx] = expr;
-            collect_expr_bindings(v,
-                                  &var_bindings, &nvar_bindings, &capvar_bindings,
-                                  &const_bindings, &nconst_bindings, &capconst_bindings,
-                                  binding_text);
+            collect_expr_bindings(v, &var_bindings, &nvar_bindings, &capvar_bindings, &const_bindings, &nconst_bindings,
+                                  &capconst_bindings, binding_text);
             pretty_expr_expr(&exprs[idx], const_bindings, nconst_bindings);
             snprintf(buf, sizeof(buf), C_WHITE "%s" C_RESET, exprs[idx]);
             if (visible_string_width(buf) > w[j])
@@ -898,13 +856,10 @@ static void print_mexpr_raw(const char *label, matrix_t *A)
         printf("      " C_WHITE "<expr matrix>" C_RESET "\n");
         printf("    " C_CYAN "] }" C_RESET "\n");
     } else {
-        char *joined = join_bindings(var_bindings, nvar_bindings,
-                                     const_bindings, nconst_bindings);
-        for (size_t i = 0; i < rows; i++)
-        {
+        char *joined = join_bindings(var_bindings, nvar_bindings, const_bindings, nconst_bindings);
+        for (size_t i = 0; i < rows; i++) {
             printf("      ");
-            for (size_t j = 0; j < cols; j++)
-            {
+            for (size_t j = 0; j < cols; j++) {
                 char buf[2048];
                 size_t idx = i * cols + j;
                 snprintf(buf, sizeof(buf), C_WHITE "%s" C_RESET, exprs[idx] ? exprs[idx] : "");
@@ -994,16 +949,15 @@ void print_current_input_matrix(void)
     if (!current_matrix_input || current_matrix_input_label[0] == '\0')
         return;
 
-    switch (mat_typeof(current_matrix_input))
-    {
-    case MAT_TYPE_NUMBER:
-        print_mnum_raw("input matrix", current_matrix_input);
-        break;
-    case MAT_TYPE_EXPR:
-        print_mexpr_raw("input matrix", current_matrix_input);
-        break;
-    default:
-        break;
+    switch (mat_typeof(current_matrix_input)) {
+        case MAT_TYPE_NUMBER:
+            print_mnum_raw("input matrix", current_matrix_input);
+            break;
+        case MAT_TYPE_EXPR:
+            print_mexpr_raw("input matrix", current_matrix_input);
+            break;
+        default:
+            break;
     }
 }
 
@@ -1015,9 +969,7 @@ void check_d(const char *label, double got, double expected, double tol)
     if (!ok)
         test_mark_failure(__FILE__, __LINE__, label ? label : "check_d failure");
 
-    printf(ok ? C_BOLD C_GREEN "  OK: %s\n" C_RESET
-              : C_BOLD C_RED "  FAIL: %s\n" C_RESET,
-           label);
+    printf(ok ? C_BOLD C_GREEN "  OK: %s\n" C_RESET : C_BOLD C_RED "  FAIL: %s\n" C_RESET, label);
 
     char gbuf[256], ebuf[256];
     d_to_coloured_string(got, gbuf, sizeof(gbuf));
@@ -1037,9 +989,7 @@ void check_qf_val(const char *label, qfloat_t got, qfloat_t expected, double tol
     if (!ok)
         test_mark_failure(__FILE__, __LINE__, label ? label : "check_qf_val failure");
 
-    printf(ok ? C_BOLD C_GREEN "  OK: %s\n" C_RESET
-              : C_BOLD C_RED "  FAIL: %s\n" C_RESET,
-           label);
+    printf(ok ? C_BOLD C_GREEN "  OK: %s\n" C_RESET : C_BOLD C_RED "  FAIL: %s\n" C_RESET, label);
 
     print_mp_real("got      ", got);
     print_mp_real("expected ", expected);
@@ -1059,9 +1009,7 @@ void check_qc_val(const char *label, qcomplex_t got, qcomplex_t expected, double
     if (!ok)
         test_mark_failure(__FILE__, __LINE__, label ? label : "check_qc_val failure");
 
-    printf(ok ? C_BOLD C_GREEN "  OK: %s\n" C_RESET
-              : C_BOLD C_RED "  FAIL: %s\n" C_RESET,
-           label);
+    printf(ok ? C_BOLD C_GREEN "  OK: %s\n" C_RESET : C_BOLD C_RED "  FAIL: %s\n" C_RESET, label);
 
     print_complex("got      ", got);
     print_complex("expected ", expected);
@@ -1073,7 +1021,5 @@ void check_bool(const char *label, int cond)
     if (!cond)
         test_mark_failure(__FILE__, __LINE__, label ? label : "check_bool failure");
 
-    printf(cond ? C_BOLD C_GREEN "  OK: %s\n" C_RESET
-                : C_BOLD C_RED "  FAIL: %s\n" C_RESET,
-           label);
+    printf(cond ? C_BOLD C_GREEN "  OK: %s\n" C_RESET : C_BOLD C_RED "  FAIL: %s\n" C_RESET, label);
 }

@@ -17,31 +17,22 @@ int approx_equal(qfloat_t a, double b, double tol);
 int qf_close(qfloat_t a, qfloat_t b, double rel);
 int qf_close_rel(qfloat_t a, qfloat_t b, double rel);
 const test_validity_contract_t *qfloat_validity_contract_close(void);
-bool test_assert_qfloat_close_tol(qfloat_t actual,
-                                  qfloat_t expected,
-                                  double rel_tol,
-                                  const char *file,
-                                  int line);
+bool test_assert_qfloat_close_tol(qfloat_t actual, qfloat_t expected, double rel_tol, const char *file, int line);
 
-#define TEST_ASSERT_QFLOAT_CLOSE(actual_value, expected_value) \
-    do { \
-        qfloat_t test_qfloat_actual__ = (actual_value); \
-        qfloat_t test_qfloat_expected__ = (expected_value); \
-        TEST_ASSERT_VALID_NAMED("qfloat-close", \
-                                &test_qfloat_actual__, \
-                                &test_qfloat_expected__); \
+#define TEST_ASSERT_QFLOAT_CLOSE(actual_value, expected_value)                                                         \
+    do {                                                                                                               \
+        qfloat_t test_qfloat_actual__ = (actual_value);                                                                \
+        qfloat_t test_qfloat_expected__ = (expected_value);                                                            \
+        TEST_ASSERT_VALID_NAMED("qfloat-close", &test_qfloat_actual__, &test_qfloat_expected__);                       \
     } while (0)
 
-#define TEST_ASSERT_QFLOAT_CLOSE_TOL(actual_value, expected_value, rel_tol_value) \
-    do { \
-        qfloat_t test_qfloat_actual__ = (actual_value); \
-        qfloat_t test_qfloat_expected__ = (expected_value); \
-        if (!test_assert_qfloat_close_tol(test_qfloat_actual__, \
-                                          test_qfloat_expected__, \
-                                          (rel_tol_value), \
-                                          __FILE__, \
-                                          __LINE__)) \
-            return; \
+#define TEST_ASSERT_QFLOAT_CLOSE_TOL(actual_value, expected_value, rel_tol_value)                                      \
+    do {                                                                                                               \
+        qfloat_t test_qfloat_actual__ = (actual_value);                                                                \
+        qfloat_t test_qfloat_expected__ = (expected_value);                                                            \
+        if (!test_assert_qfloat_close_tol(test_qfloat_actual__, test_qfloat_expected__, (rel_tol_value), __FILE__,     \
+                                          __LINE__))                                                                   \
+            return;                                                                                                    \
     } while (0)
 
 void test_arithmetic(void);

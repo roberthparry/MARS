@@ -69,11 +69,7 @@ static bool sqlite_set_error_code(sqlite_t *db, int rc)
 
 static int sqlite_bind_text_value(sqlite3_stmt *stmt, int index, const string_t *value)
 {
-    return sqlite3_bind_text(stmt,
-                             index,
-                             string_c_str(value),
-                             (int)string_byte_length(value),
-                             SQLITE_TRANSIENT);
+    return sqlite3_bind_text(stmt, index, string_c_str(value), (int)string_byte_length(value), SQLITE_TRANSIENT);
 }
 
 static string_t *sqlite_column_string(sqlite3_stmt *stmt, int column)
@@ -152,10 +148,7 @@ sqlite_t *sqlite_open_encrypted(const string_t *path, const string_t *key)
         return NULL;
     }
 
-    rc = sqlite3_open_v2(string_c_str(path),
-                         &db->handle,
-                         SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE,
-                         NULL);
+    rc = sqlite3_open_v2(string_c_str(path), &db->handle, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, NULL);
     if (rc != SQLITE_OK) {
         sqlite_set_error_code(db, rc);
         sqlite_close(db);
@@ -170,8 +163,7 @@ sqlite_t *sqlite_open_encrypted(const string_t *path, const string_t *key)
     }
 
     if (!sqlite_exec_cstr(db, "pragma cipher_memory_security = on") ||
-        !sqlite_exec_cstr(db, "pragma foreign_keys = on") ||
-        !sqlite_verify_key(db)) {
+        !sqlite_exec_cstr(db, "pragma foreign_keys = on") || !sqlite_verify_key(db)) {
         sqlite_close(db);
         return NULL;
     }
@@ -224,23 +216,18 @@ bool sqlite_exec_cstr(sqlite_t *db, const char *sql)
 
 bool sqlite_init_object_store(sqlite_t *db)
 {
-    return sqlite_exec_cstr(db,
-        "create table if not exists mars_object ("
-        "name text primary key not null,"
-        "type text not null,"
-        "encoding text not null,"
-        "value blob not null,"
-        "created_at text not null default current_timestamp,"
-        "updated_at text not null default current_timestamp"
-        ")");
+    return sqlite_exec_cstr(db, "create table if not exists mars_object ("
+                                "name text primary key not null,"
+                                "type text not null,"
+                                "encoding text not null,"
+                                "value blob not null,"
+                                "created_at text not null default current_timestamp,"
+                                "updated_at text not null default current_timestamp"
+                                ")");
 }
 
-bool sqlite_store_object(sqlite_t *db,
-                         const string_t *name,
-                         const string_t *type,
-                         const string_t *encoding,
-                         const void *data,
-                         size_t data_len)
+bool sqlite_store_object(sqlite_t *db, const string_t *name, const string_t *type, const string_t *encoding,
+                         const void *data, size_t data_len)
 {
     sqlite3_stmt *stmt = NULL;
     bool ok = false;
@@ -250,19 +237,18 @@ bool sqlite_store_object(sqlite_t *db,
         return false;
     }
     if (!sqlite_prepare(db,
-            "insert into mars_object(name, type, encoding, value) "
-            "values(?1, ?2, ?3, ?4) "
-            "on conflict(name) do update set "
-            "type = excluded.type, "
-            "encoding = excluded.encoding, "
-            "value = excluded.value, "
-            "updated_at = current_timestamp",
-            &stmt)) {
+                        "insert into mars_object(name, type, encoding, value) "
+                        "values(?1, ?2, ?3, ?4) "
+                        "on conflict(name) do update set "
+                        "type = excluded.type, "
+                        "encoding = excluded.encoding, "
+                        "value = excluded.value, "
+                        "updated_at = current_timestamp",
+                        &stmt)) {
         return false;
     }
 
-    if (sqlite_bind_text_value(stmt, 1, name) != SQLITE_OK ||
-        sqlite_bind_text_value(stmt, 2, type) != SQLITE_OK ||
+    if (sqlite_bind_text_value(stmt, 1, name) != SQLITE_OK || sqlite_bind_text_value(stmt, 2, type) != SQLITE_OK ||
         sqlite_bind_text_value(stmt, 3, encoding) != SQLITE_OK ||
         sqlite3_bind_blob(stmt, 4, data, (int)data_len, SQLITE_TRANSIENT) != SQLITE_OK) {
         sqlite_set_error(db, sqlite3_errmsg(db->handle));
@@ -276,12 +262,8 @@ done:
     return ok;
 }
 
-bool sqlite_load_object(sqlite_t *db,
-                        const string_t *name,
-                        string_t **out_type,
-                        string_t **out_encoding,
-                        void **out_data,
-                        size_t *out_data_len)
+bool sqlite_load_object(sqlite_t *db, const string_t *name, string_t **out_type, string_t **out_encoding,
+                        void **out_data, size_t *out_data_len)
 {
     sqlite3_stmt *stmt = NULL;
     string_t *type = NULL;
@@ -304,9 +286,7 @@ bool sqlite_load_object(sqlite_t *db,
         sqlite_set_error(db, "invalid object load argument");
         return false;
     }
-    if (!sqlite_prepare(db,
-            "select type, encoding, value from mars_object where name = ?1",
-            &stmt)) {
+    if (!sqlite_prepare(db, "select type, encoding, value from mars_object where name = ?1", &stmt)) {
         return false;
     }
     if (sqlite_bind_text_value(stmt, 1, name) != SQLITE_OK) {
@@ -365,9 +345,7 @@ void sqlite_free_object_data(void *data)
     free(data);
 }
 
-bool sqlite_store_string(sqlite_t *db,
-                         const string_t *name,
-                         const string_t *value)
+bool sqlite_store_string(sqlite_t *db, const string_t *name, const string_t *value)
 {
     string_t *type = string_new_with("string_t");
     string_t *encoding = string_new_with("utf-8");
@@ -379,12 +357,7 @@ bool sqlite_store_string(sqlite_t *db,
     }
 
     ok = type && encoding &&
-        sqlite_store_object(db,
-                            name,
-                            type,
-                            encoding,
-                            string_c_str(value),
-                            string_byte_length(value));
+         sqlite_store_object(db, name, type, encoding, string_c_str(value), string_byte_length(value));
 
 done:
     string_free(encoding);
@@ -392,9 +365,7 @@ done:
     return ok;
 }
 
-bool sqlite_load_string(sqlite_t *db,
-                        const string_t *name,
-                        string_t **out_value)
+bool sqlite_load_string(sqlite_t *db, const string_t *name, string_t **out_value)
 {
     string_t *type = NULL;
     string_t *encoding = NULL;
@@ -411,8 +382,7 @@ bool sqlite_load_string(sqlite_t *db,
     if (!sqlite_load_object(db, name, &type, &encoding, &data, &data_len))
         goto done;
 
-    if (strcmp(string_c_str(type), "string_t") != 0 ||
-        strcmp(string_c_str(encoding), "utf-8") != 0) {
+    if (strcmp(string_c_str(type), "string_t") != 0 || strcmp(string_c_str(encoding), "utf-8") != 0) {
         sqlite_set_error(db, "stored object is not a utf-8 string_t");
         goto done;
     }

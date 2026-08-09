@@ -1,9 +1,8 @@
 #ifndef STRING_INTERNAL_H
 #define STRING_INTERNAL_H
 
-#if !defined(MARS_STRING_INTERNAL_ACCESS) && \
-    (!defined(__INTELLISENSE__) || \
-     (defined(__INCLUDE_LEVEL__) && __INCLUDE_LEVEL__ > 0))
+#if !defined(MARS_STRING_INTERNAL_ACCESS) &&                                                                           \
+    (!defined(__INTELLISENSE__) || (defined(__INCLUDE_LEVEL__) && __INCLUDE_LEVEL__ > 0))
 #error "string_internal.h is private to the string module; include ustring.h instead."
 #endif
 
@@ -14,13 +13,13 @@
  * Not for public use. External code should include only ustring.h.
  */
 
+#include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
-#include <stdint.h>
 
-#include "ustring.h"
 #include "string_view.h"
+#include "ustring.h"
 
 /**
  * @brief Full internal definition of a dynamic UTF-8 string.
@@ -39,10 +38,10 @@
  *   scratch_cap — number of bytes allocated for scratch.
  */
 struct _string_t {
-    char  *data;
+    char *data;
     size_t len;
     size_t cap;
-    char  *scratch;
+    char *scratch;
     size_t scratch_cap;
 };
 
@@ -61,8 +60,8 @@ struct _string_t {
  */
 struct _string_cursor_t {
     const string_t *source;
-    string_t       *owned_source;
-    size_t          pos;
+    string_t *owned_source;
+    size_t pos;
 };
 
 /**

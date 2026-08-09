@@ -5,8 +5,8 @@
 #include <string.h>
 
 #define MARS_EXPR_INTERNAL_ACCESS
-#include "expr_internal.h"
 #include "expr_bindings.h"
+#include "expr_internal.h"
 #include "expression.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
@@ -18,9 +18,7 @@ static bool expr_is_op_kind(const expr_t *expr, expr_op_kind_t kind)
 
 bool expr_is_exact_zero(const expr_t *dv)
 {
-    return expr_is_op_kind(dv, EXPR_KIND_CONST) &&
-           !dv->name &&
-           num_eq(dv->c, NUM_ZERO);
+    return expr_is_op_kind(dv, EXPR_KIND_CONST) && !dv->name && num_eq(dv->c, NUM_ZERO);
 }
 
 bool expr_is_named_const(const expr_t *dv)
@@ -56,31 +54,19 @@ static bool expr_match_var_leaf(const expr_t *expr, number_t *value_out, const c
 
 static bool expr_is_named_leaf(const expr_t *expr)
 {
-    return expr &&
-           (expr_is_var(expr) || expr_is_const(expr)) &&
-           expr->name &&
-           *expr->name;
+    return expr && (expr_is_var(expr) || expr_is_const(expr)) && expr->name && *expr->name;
 }
 
 static bool expr_has_composite_preserved_binding_leaf(const expr_t *expr)
 {
-    return expr_is_const(expr) &&
-           expr->binding_expr &&
-           expr->binding_expr->kind != EXPR_BINDING_EXPR_NUMBER &&
+    return expr_is_const(expr) && expr->binding_expr && expr->binding_expr->kind != EXPR_BINDING_EXPR_NUMBER &&
            expr->binding_expr->kind != EXPR_BINDING_EXPR_CONST;
 }
 
-static bool expr_is_same_named_leaf_for_substitution(const expr_t *expr,
-                                                     const expr_t *needle)
+static bool expr_is_same_named_leaf_for_substitution(const expr_t *expr, const expr_t *needle)
 {
-    return expr &&
-           needle &&
-           expr != needle &&
-           expr_is_var(needle) &&
-           expr_is_named_leaf(expr) &&
-           needle->name &&
-           *needle->name &&
-           strcmp(expr->name, needle->name) == 0;
+    return expr && needle && expr != needle && expr_is_var(needle) && expr_is_named_leaf(expr) && needle->name &&
+           *needle->name && strcmp(expr->name, needle->name) == 0;
 }
 
 static bool expr_match_unnamed_const_leaf(const expr_t *expr, number_t *value_out)
@@ -103,10 +89,7 @@ bool expr_match_unary_op(const expr_t *expr, expr_op_kind_t kind, const expr_t *
     return true;
 }
 
-bool expr_match_binary_op(const expr_t *expr,
-                        expr_op_kind_t kind,
-                        const expr_t **left_out,
-                        const expr_t **right_out)
+bool expr_match_binary_op(const expr_t *expr, expr_op_kind_t kind, const expr_t **left_out, const expr_t **right_out)
 {
     if (!expr_is_op_kind(expr, kind) || !expr->a || !expr->b)
         return false;
@@ -161,23 +144,17 @@ bool expr_match_cot_expr(const expr_t *expr, const expr_t **arg_out)
     return expr_match_unary_op(expr, EXPR_KIND_COT, arg_out);
 }
 
-bool expr_match_add_expr(const expr_t *expr,
-                         const expr_t **left_out,
-                         const expr_t **right_out)
+bool expr_match_add_expr(const expr_t *expr, const expr_t **left_out, const expr_t **right_out)
 {
     return expr_match_binary_op(expr, EXPR_KIND_ADD, left_out, right_out);
 }
 
-bool expr_match_sub_expr(const expr_t *expr,
-                         const expr_t **left_out,
-                         const expr_t **right_out)
+bool expr_match_sub_expr(const expr_t *expr, const expr_t **left_out, const expr_t **right_out)
 {
     return expr_match_binary_op(expr, EXPR_KIND_SUB, left_out, right_out);
 }
 
-bool expr_match_pow_const(const expr_t *expr,
-                          const expr_t **base_out,
-                          number_t *exponent_out)
+bool expr_match_pow_const(const expr_t *expr, const expr_t **base_out, number_t *exponent_out)
 {
     if (!expr_is_op_kind(expr, EXPR_KIND_POW_D) || !expr->a)
         return false;
@@ -190,9 +167,7 @@ bool expr_match_pow_const(const expr_t *expr,
     return true;
 }
 
-bool expr_match_pow_expr(const expr_t *expr,
-                         const expr_t **base_out,
-                         const expr_t **exponent_out)
+bool expr_match_pow_expr(const expr_t *expr, const expr_t **base_out, const expr_t **exponent_out)
 {
     if (!expr_is_op_kind(expr, EXPR_KIND_POW) || !expr->a || !expr->b)
         return false;
@@ -203,9 +178,7 @@ bool expr_match_pow_expr(const expr_t *expr,
     return true;
 }
 
-bool expr_match_integral_expr(const expr_t *expr,
-                              const expr_t **integrand_out,
-                              const expr_t **domain_out)
+bool expr_match_integral_expr(const expr_t *expr, const expr_t **integrand_out, const expr_t **domain_out)
 {
     if (!expr_is_op_kind(expr, EXPR_KIND_INTEGRAL) || !expr->a || !expr->b)
         return false;
@@ -216,9 +189,7 @@ bool expr_match_integral_expr(const expr_t *expr,
     return true;
 }
 
-bool expr_child_exprs(const expr_t *expr,
-                      const expr_t **left_out,
-                      const expr_t **right_out)
+bool expr_child_exprs(const expr_t *expr, const expr_t **left_out, const expr_t **right_out)
 {
     if (!expr)
         return false;
@@ -274,8 +245,7 @@ bool expr_contains_integral_operation(const expr_t *expr)
         return false;
     if (expr_is_op(expr, &ops_integral))
         return true;
-    return expr_contains_integral_operation(expr->a) ||
-           expr_contains_integral_operation(expr->b);
+    return expr_contains_integral_operation(expr->a) || expr_contains_integral_operation(expr->b);
 }
 
 const char *expr_symbol_name(const expr_t *expr)
@@ -288,10 +258,8 @@ bool expr_is_variable(const expr_t *expr)
     return expr_is_var(expr);
 }
 
-static bool expr_match_scaled_inner(const expr_t *factor,
-                                  const expr_t *other,
-                                  number_t *scale_out,
-                                  const expr_t **base_out)
+static bool expr_match_scaled_inner(const expr_t *factor, const expr_t *other, number_t *scale_out,
+                                    const expr_t **base_out)
 {
     NUM_SCOPE(scope);
     number_t factor_value = num_new();
@@ -319,16 +287,12 @@ static int expr_match_var_index(size_t nvars, expr_t *const *vars, const expr_t 
 {
     for (size_t i = 0; i < nvars; ++i)
         if (vars[i] == dv ||
-            (expr_is_var(vars[i]) && expr_is_var(dv) &&
-             vars[i]->var_id != 0 && vars[i]->var_id == dv->var_id))
+            (expr_is_var(vars[i]) && expr_is_var(dv) && vars[i]->var_id != 0 && vars[i]->var_id == dv->var_id))
             return (int)i;
     return -1;
 }
 
-bool expr_match_var_expr(const expr_t *expr,
-                       size_t nvars,
-                       expr_t *const *vars,
-                       size_t *index_out)
+bool expr_match_var_expr(const expr_t *expr, size_t nvars, expr_t *const *vars, size_t *index_out)
 {
     int idx;
 
@@ -348,9 +312,7 @@ bool expr_match_const_value(const expr_t *expr, number_t *value_out)
     return expr_match_unnamed_const_leaf(expr, value_out);
 }
 
-bool expr_match_scaled_expr(const expr_t *expr,
-                          number_t *scale_out,
-                          const expr_t **base_out)
+bool expr_match_scaled_expr(const expr_t *expr, number_t *scale_out, const expr_t **base_out)
 {
     NUM_SCOPE(scope);
     number_t inner_scale;
@@ -409,10 +371,7 @@ bool expr_match_scaled_expr(const expr_t *expr,
     return false;
 }
 
-bool expr_match_add_sub_expr(const expr_t *expr,
-                           const expr_t **left_out,
-                           const expr_t **right_out,
-                           bool *is_sub_out)
+bool expr_match_add_sub_expr(const expr_t *expr, const expr_t **left_out, const expr_t **right_out, bool *is_sub_out)
 {
     if (!expr || !left_out || !right_out || !is_sub_out)
         return false;
@@ -427,9 +386,7 @@ bool expr_match_add_sub_expr(const expr_t *expr,
     return false;
 }
 
-bool expr_match_mul_expr(const expr_t *expr,
-                       const expr_t **left_out,
-                       const expr_t **right_out)
+bool expr_match_mul_expr(const expr_t *expr, const expr_t **left_out, const expr_t **right_out)
 {
     if (!expr || !left_out || !right_out)
         return false;
@@ -438,20 +395,14 @@ bool expr_match_mul_expr(const expr_t *expr,
     return true;
 }
 
-bool expr_match_div_expr(const expr_t *expr,
-                         const expr_t **left_out,
-                         const expr_t **right_out)
+bool expr_match_div_expr(const expr_t *expr, const expr_t **left_out, const expr_t **right_out)
 {
     if (!expr || !left_out || !right_out)
         return false;
-    return expr_match_binary_op(
-        expr, EXPR_KIND_DIV, left_out, right_out);
+    return expr_match_binary_op(expr, EXPR_KIND_DIV, left_out, right_out);
 }
 
-static bool expr_collect_var_usage_impl(const expr_t *expr,
-                                      size_t nvars,
-                                      expr_t *const *vars,
-                                      bool *used_out)
+static bool expr_collect_var_usage_impl(const expr_t *expr, size_t nvars, expr_t *const *vars, bool *used_out)
 {
     size_t idx;
 
@@ -481,26 +432,19 @@ static bool expr_collect_var_usage_impl(const expr_t *expr,
                 expr_t *stack_vars[16];
                 expr_t **filtered_storage = NULL;
 
-                filtered_storage = (nvars <= 16u)
-                    ? stack_vars
-                    : calloc(nvars, sizeof(*filtered_storage));
+                filtered_storage = (nvars <= 16u) ? stack_vars : calloc(nvars, sizeof(*filtered_storage));
                 if (!filtered_storage)
                     return false;
                 filtered_vars = filtered_storage;
 
                 for (size_t i = 0; i < nvars; ++i) {
-                    int same_dummy = vars[i] == dummy ||
-                        (expr_is_var(vars[i]) && expr_is_var(dummy) &&
-                         vars[i]->var_id != 0 &&
-                         vars[i]->var_id == dummy->var_id);
+                    int same_dummy = vars[i] == dummy || (expr_is_var(vars[i]) && expr_is_var(dummy) &&
+                                                          vars[i]->var_id != 0 && vars[i]->var_id == dummy->var_id);
                     if (!same_dummy)
                         filtered_storage[out++] = vars[i];
                 }
                 filtered_nvars = out;
-                if (!expr_collect_var_usage_impl(expr->a,
-                                                 filtered_nvars,
-                                                 filtered_vars,
-                                                 used_out)) {
+                if (!expr_collect_var_usage_impl(expr->a, filtered_nvars, filtered_vars, used_out)) {
                     if (filtered_storage != stack_vars)
                         free(filtered_storage);
                     return false;
@@ -510,10 +454,7 @@ static bool expr_collect_var_usage_impl(const expr_t *expr,
                 return true;
             }
 
-            return expr_collect_var_usage_impl(expr->a,
-                                               filtered_nvars,
-                                               filtered_vars,
-                                               used_out);
+            return expr_collect_var_usage_impl(expr->a, filtered_nvars, filtered_vars, used_out);
         }
         return true;
     }
@@ -525,10 +466,7 @@ static bool expr_collect_var_usage_impl(const expr_t *expr,
     return true;
 }
 
-bool expr_collect_var_usage(const expr_t *expr,
-                          size_t nvars,
-                          expr_t *const *vars,
-                          bool *used_out)
+bool expr_collect_var_usage(const expr_t *expr, size_t nvars, expr_t *const *vars, bool *used_out)
 {
     if (!used_out || (nvars > 0 && !vars))
         return false;
@@ -537,9 +475,7 @@ bool expr_collect_var_usage(const expr_t *expr,
     return expr_collect_var_usage_impl(expr, nvars, vars, used_out);
 }
 
-expr_t *expr_substitute(const expr_t *expr,
-                      const expr_t *needle,
-                      const expr_t *replacement)
+expr_t *expr_substitute(const expr_t *expr, const expr_t *needle, const expr_t *replacement)
 {
     expr_t *left;
     expr_t *right;
@@ -558,15 +494,11 @@ expr_t *expr_substitute(const expr_t *expr,
     if (expr_is_formal_derivative(expr)) {
         const expr_t *dependent = expr_formal_derivative_dependent(expr);
 
-        if (dependent == needle ||
-            expr_is_same_named_leaf_for_substitution(dependent, needle)) {
+        if (dependent == needle || expr_is_same_named_leaf_for_substitution(dependent, needle)) {
             expr_t *value = expr_clone(replacement);
 
-            for (size_t i = 0u;
-                 value && i < expr_formal_derivative_order(expr);
-                 ++i) {
-                expr_t *next = expr_create_deriv(
-                    value, expr_formal_derivative_wrt_at(expr, i));
+            for (size_t i = 0u; value && i < expr_formal_derivative_order(expr); ++i) {
+                expr_t *next = expr_create_deriv(value, expr_formal_derivative_wrt_at(expr, i));
 
                 expr_free(value);
                 value = next;
@@ -630,15 +562,13 @@ expr_t *expr_substitute(const expr_t *expr,
         bool shadowed = false;
 
         if (dummy) {
-            shadowed = dummy == needle ||
-                       (expr_is_var(dummy) && expr_is_var(needle) &&
-                        dummy->var_id != 0 &&
-                        dummy->var_id == needle->var_id) ||
-                       expr_is_same_named_leaf_for_substitution(dummy, needle);
+            shadowed =
+                dummy == needle ||
+                (expr_is_var(dummy) && expr_is_var(needle) && dummy->var_id != 0 && dummy->var_id == needle->var_id) ||
+                expr_is_same_named_leaf_for_substitution(dummy, needle);
         }
 
-        left = shadowed ? expr_clone(expr->a)
-                        : expr_substitute(expr->a, needle, replacement);
+        left = shadowed ? expr_clone(expr->a) : expr_substitute(expr->a, needle, replacement);
         right = upper ? expr_substitute(upper, needle, replacement) : NULL;
         if (!left || !right) {
             expr_free(right);
@@ -654,14 +584,12 @@ expr_t *expr_substitute(const expr_t *expr,
                 expr_free(left);
                 return NULL;
             }
-            out = dummy
-                ? expr_integral_with_bounds_internal(left, lower_copy, right, dummy)
-                : expr_integral_with_bounds_internal(left, lower_copy, right, right);
+            out = dummy ? expr_integral_with_bounds_internal(left, lower_copy, right, dummy)
+                        : expr_integral_with_bounds_internal(left, lower_copy, right, right);
             expr_free(lower_copy);
         } else {
-            out = dummy
-                ? expr_integral_with_dummy_internal(left, right, dummy)
-                : expr_integral_with_dummy_internal(left, right, right);
+            out = dummy ? expr_integral_with_dummy_internal(left, right, dummy)
+                        : expr_integral_with_dummy_internal(left, right, right);
         }
 
         expr_free(right);
@@ -686,12 +614,9 @@ expr_t *expr_substitute(const expr_t *expr,
     return NULL;
 }
 
-static expr_t *expr_display_expanded_expr_mode(const expr_t *expr,
-                                               bool expand_sum_products);
+static expr_t *expr_display_expanded_expr_mode(const expr_t *expr, bool expand_sum_products);
 
-static expr_t *expr_display_expanded_product(const expr_t *left,
-                                             const expr_t *right,
-                                             bool expand_sum_products)
+static expr_t *expr_display_expanded_product(const expr_t *left, const expr_t *right, bool expand_sum_products)
 {
     expr_t *left_expr;
     expr_t *right_expr;
@@ -704,19 +629,16 @@ static expr_t *expr_display_expanded_product(const expr_t *left,
         return NULL;
 
     if (expr_is_op(left, &ops_neg) && left->a) {
-        expr_t *inner = expr_display_expanded_product(
-            left->a, right, expand_sum_products);
+        expr_t *inner = expr_display_expanded_product(left->a, right, expand_sum_products);
         expr_t *negated = inner ? expr_neg(inner) : NULL;
 
         expr_free(inner);
         return negated;
     }
     if (expr_is_op(right, &ops_neg) && right->a)
-        return expr_display_expanded_product(
-            right, left, expand_sum_products);
+        return expr_display_expanded_product(right, left, expand_sum_products);
 
-    if (!expand_sum_products &&
-        expr_match_add_sub_expr(left, &child_left, &child_right, &is_sub) &&
+    if (!expand_sum_products && expr_match_add_sub_expr(left, &child_left, &child_right, &is_sub) &&
         expr_match_add_sub_expr(right, &child_left, &child_right, &is_sub)) {
         left_expr = expr_display_expanded_expr_mode(left, false);
         right_expr = expr_display_expanded_expr_mode(right, false);
@@ -733,10 +655,8 @@ static expr_t *expr_display_expanded_product(const expr_t *left,
     }
 
     if (expr_match_add_expr(left, &child_left, &child_right)) {
-        expr_t *first = expr_display_expanded_product(
-            child_left, right, expand_sum_products);
-        expr_t *second = expr_display_expanded_product(
-            child_right, right, expand_sum_products);
+        expr_t *first = expr_display_expanded_product(child_left, right, expand_sum_products);
+        expr_t *second = expr_display_expanded_product(child_right, right, expand_sum_products);
 
         if (!first || !second) {
             expr_free(first);
@@ -751,10 +671,8 @@ static expr_t *expr_display_expanded_product(const expr_t *left,
     }
 
     if (expr_match_sub_expr(left, &child_left, &child_right)) {
-        expr_t *first = expr_display_expanded_product(
-            child_left, right, expand_sum_products);
-        expr_t *second = expr_display_expanded_product(
-            child_right, right, expand_sum_products);
+        expr_t *first = expr_display_expanded_product(child_left, right, expand_sum_products);
+        expr_t *second = expr_display_expanded_product(child_right, right, expand_sum_products);
 
         if (!first || !second) {
             expr_free(first);
@@ -769,8 +687,7 @@ static expr_t *expr_display_expanded_product(const expr_t *left,
     }
 
     if (expr_match_add_sub_expr(right, &child_left, &child_right, &is_sub))
-        return expr_display_expanded_product(
-            right, left, expand_sum_products);
+        return expr_display_expanded_product(right, left, expand_sum_products);
 
     left_expr = expr_display_expanded_expr_mode(left, expand_sum_products);
     right_expr = expr_display_expanded_expr_mode(right, expand_sum_products);
@@ -780,10 +697,8 @@ static expr_t *expr_display_expanded_product(const expr_t *left,
         return NULL;
     }
 
-    if (expand_sum_products &&
-        (expr_is_addsub(left_expr) || expr_is_addsub(right_expr))) {
-        out = expr_display_expanded_product(
-            left_expr, right_expr, expand_sum_products);
+    if (expand_sum_products && (expr_is_addsub(left_expr) || expr_is_addsub(right_expr))) {
+        out = expr_display_expanded_product(left_expr, right_expr, expand_sum_products);
     } else {
         out = expr_mul(left_expr, right_expr);
     }
@@ -792,8 +707,7 @@ static expr_t *expr_display_expanded_product(const expr_t *left,
     return out;
 }
 
-static expr_t *expr_display_expanded_expr_mode(const expr_t *expr,
-                                               bool expand_sum_products)
+static expr_t *expr_display_expanded_expr_mode(const expr_t *expr, bool expand_sum_products)
 {
     expr_t *left;
     expr_t *right;
@@ -808,15 +722,11 @@ static expr_t *expr_display_expanded_expr_mode(const expr_t *expr,
         return NULL;
     }
 
-    if (expand_sum_products &&
-        expr_match_scaled_expr(expr, &scale, &scaled_base) &&
-        scaled_base && scaled_base != expr && expr_is_addsub(scaled_base)) {
+    if (expand_sum_products && expr_match_scaled_expr(expr, &scale, &scaled_base) && scaled_base &&
+        scaled_base != expr && expr_is_addsub(scaled_base)) {
         expr_t *scale_expr = expr_new_const(scale);
 
-        out = scale_expr
-            ? expr_display_expanded_product(
-                  scale_expr, scaled_base, expand_sum_products)
-            : NULL;
+        out = scale_expr ? expr_display_expanded_product(scale_expr, scaled_base, expand_sum_products) : NULL;
         expr_free(scale_expr);
         num_destroy(&scale);
         return out;
@@ -824,10 +734,8 @@ static expr_t *expr_display_expanded_expr_mode(const expr_t *expr,
     num_destroy(&scale);
 
     if (expr_match_add_expr(expr, &child_left, &child_right)) {
-        left = expr_display_expanded_expr_mode(
-            child_left, expand_sum_products);
-        right = expr_display_expanded_expr_mode(
-            child_right, expand_sum_products);
+        left = expr_display_expanded_expr_mode(child_left, expand_sum_products);
+        right = expr_display_expanded_expr_mode(child_right, expand_sum_products);
         if (!left || !right) {
             expr_free(left);
             expr_free(right);
@@ -840,10 +748,8 @@ static expr_t *expr_display_expanded_expr_mode(const expr_t *expr,
     }
 
     if (expr_match_sub_expr(expr, &child_left, &child_right)) {
-        left = expr_display_expanded_expr_mode(
-            child_left, expand_sum_products);
-        right = expr_display_expanded_expr_mode(
-            child_right, expand_sum_products);
+        left = expr_display_expanded_expr_mode(child_left, expand_sum_products);
+        right = expr_display_expanded_expr_mode(child_right, expand_sum_products);
         if (!left || !right) {
             expr_free(left);
             expr_free(right);
@@ -856,32 +762,23 @@ static expr_t *expr_display_expanded_expr_mode(const expr_t *expr,
     }
 
     if (expr_is_op(expr, &ops_neg) && expr->a) {
-        left = expr_display_expanded_expr_mode(
-            expr->a, expand_sum_products);
+        left = expr_display_expanded_expr_mode(expr->a, expand_sum_products);
         out = left ? expr_neg(left) : NULL;
         expr_free(left);
         return out;
     }
 
     if (expr_match_mul_expr(expr, &child_left, &child_right))
-        return expr_display_expanded_product(
-            child_left, child_right, expand_sum_products);
+        return expr_display_expanded_product(child_left, child_right, expand_sum_products);
 
     expr_retain(expr);
     return (expr_t *)expr;
 }
 
-static bool expr_display_integral_is_indefinite(const expr_t *upper,
-                                                const expr_t *dummy)
+static bool expr_display_integral_is_indefinite(const expr_t *upper, const expr_t *dummy)
 {
-    return upper &&
-           dummy &&
-           expr_is_var(upper) &&
-           expr_is_var(dummy) &&
-           (upper == dummy ||
-            (upper->var_id != 0 &&
-             dummy->var_id != 0 &&
-             upper->var_id == dummy->var_id));
+    return upper && dummy && expr_is_var(upper) && expr_is_var(dummy) &&
+           (upper == dummy || (upper->var_id != 0 && dummy->var_id != 0 && upper->var_id == dummy->var_id));
 }
 
 static expr_t *expr_display_add_integration_constant(expr_t *anti)
@@ -937,12 +834,9 @@ static expr_t *expr_display_simplified_integral(const expr_t *expr)
         goto cleanup;
 
     if (indefinite) {
-        family_var = expr_new_named_var(
-            NUM_NAN,
-            expr_symbol_name(dummy) ? expr_symbol_name(dummy) : "x");
+        family_var = expr_new_named_var(NUM_NAN, expr_symbol_name(dummy) ? expr_symbol_name(dummy) : "x");
     }
-    upper_eval = expr_substitute(
-        anti, local_var, family_var ? family_var : upper);
+    upper_eval = expr_substitute(anti, local_var, family_var ? family_var : upper);
     if (!upper_eval)
         goto cleanup;
 
@@ -1002,9 +896,8 @@ static expr_t *expr_display_clone_integral(const expr_t *expr)
     if (!dummy || !upper)
         return NULL;
 
-    return lower
-        ? expr_integral_with_bounds_internal(expr->a, lower, upper, dummy)
-        : expr_integral_with_dummy_internal(expr->a, upper, dummy);
+    return lower ? expr_integral_with_bounds_internal(expr->a, lower, upper, dummy)
+                 : expr_integral_with_dummy_internal(expr->a, upper, dummy);
 }
 
 expr_t *expr_display_simplified(const expr_t *expr)
@@ -1044,8 +937,7 @@ static expr_t *expr_display_simplify_expanded_terms_local(const expr_t *expr)
     if (!expr)
         return NULL;
 
-    if (!expr_match_add_expr(expr, &left, &right) &&
-        !expr_match_sub_expr(expr, &left, &right))
+    if (!expr_match_add_expr(expr, &left, &right) && !expr_match_sub_expr(expr, &left, &right))
         return expr_simplify(expr);
 
     left_display = expr_display_simplify_expanded_terms_local(left);
@@ -1056,24 +948,20 @@ static expr_t *expr_display_simplify_expanded_terms_local(const expr_t *expr)
         return NULL;
     }
 
-    out = expr_is_op(expr, &ops_sub)
-        ? expr_sub(left_display, right_display)
-        : expr_add(left_display, right_display);
+    out = expr_is_op(expr, &ops_sub) ? expr_sub(left_display, right_display) : expr_add(left_display, right_display);
     expr_free(right_display);
     expr_free(left_display);
     return out;
 }
 
-static bool expr_display_is_proper_fraction_scaled_sum_local(
-    const expr_t *expr)
+static bool expr_display_is_proper_fraction_scaled_sum_local(const expr_t *expr)
 {
     number_t scale = num_new();
     number_t magnitude;
     const expr_t *base = NULL;
     bool matched;
 
-    matched = expr_match_scaled_expr(expr, &scale, &base) &&
-              base && base != expr && expr_is_addsub(base);
+    matched = expr_match_scaled_expr(expr, &scale, &base) && base && base != expr && expr_is_addsub(base);
     if (!matched) {
         num_destroy(&scale);
         return false;
@@ -1129,8 +1017,7 @@ expr_t *expr_canonicalize_known_radicals_internal(const expr_t *expr)
     if (!expr)
         return NULL;
 
-    if (expr_is_op(expr, &ops_const) &&
-        (!expr->name || !*expr->name)) {
+    if (expr_is_op(expr, &ops_const) && (!expr->name || !*expr->name)) {
         if (num_eq(expr->c, NUM_SQRT2))
             return expr_new_const(NUM_SQRT2);
         if (num_eq(expr->c, NUM_SQRT3))
@@ -1143,8 +1030,7 @@ expr_t *expr_canonicalize_known_radicals_internal(const expr_t *expr)
             return expr_new_const(NUM_SQRT3_OVER_TWO);
     }
 
-    if (expr_is_op(expr, &ops_sqrt) && expr->a &&
-        expr_is_op(expr->a, &ops_const) &&
+    if (expr_is_op(expr, &ops_sqrt) && expr->a && expr_is_op(expr->a, &ops_const) &&
         (!expr->a->name || !*expr->a->name)) {
         number_t three = num_create_from_long(3L);
 
@@ -1161,16 +1047,14 @@ expr_t *expr_canonicalize_known_radicals_internal(const expr_t *expr)
             return expr_new_const(NUM_SQRT_HALF);
     }
 
-    if (expr->ops && expr->ops->arity == EXPR_OP_UNARY &&
-        expr->ops->apply_unary && expr->a) {
+    if (expr->ops && expr->ops->arity == EXPR_OP_UNARY && expr->ops->apply_unary && expr->a) {
         left = expr_canonicalize_known_radicals_internal(expr->a);
         out = left ? expr->ops->apply_unary(left) : NULL;
         expr_free(left);
         return out;
     }
 
-    if (expr->ops && expr->ops->arity == EXPR_OP_BINARY &&
-        expr->ops->apply_binary && expr->a && expr->b) {
+    if (expr->ops && expr->ops->arity == EXPR_OP_BINARY && expr->ops->apply_binary && expr->a && expr->b) {
         left = expr_canonicalize_known_radicals_internal(expr->a);
         right = expr_canonicalize_known_radicals_internal(expr->b);
         out = (left && right) ? expr->ops->apply_binary(left, right) : NULL;
@@ -1192,9 +1076,7 @@ static char *expr_note_text_dup(const expr_t *expr, style_t style)
     return copy;
 }
 
-static bool expr_note_value_is_defined_at(const expr_t *integrand,
-                                          const expr_t *var,
-                                          number_t point)
+static bool expr_note_value_is_defined_at(const expr_t *integrand, const expr_t *var, number_t point)
 {
     expr_t *point_const;
     expr_t *eval_expr;
@@ -1220,11 +1102,10 @@ static bool expr_note_value_is_defined_at(const expr_t *integrand,
     return ok;
 }
 
-static bool expr_note_integrand_uses_dummy(const expr_t *integrand,
-                                           const expr_t *dummy)
+static bool expr_note_integrand_uses_dummy(const expr_t *integrand, const expr_t *dummy)
 {
     expr_t *vars[1];
-    bool used[1] = { false };
+    bool used[1] = {false};
 
     if (!integrand || !dummy)
         return false;
@@ -1232,8 +1113,7 @@ static bool expr_note_integrand_uses_dummy(const expr_t *integrand,
     return expr_collect_var_usage(integrand, 1u, vars, used) && used[0];
 }
 
-static const expr_t *expr_note_first_free_var_other_than(const expr_t *expr,
-                                                         const expr_t *dummy)
+static const expr_t *expr_note_first_free_var_other_than(const expr_t *expr, const expr_t *dummy)
 {
     const expr_t *nested_dummy;
     const expr_t *left;
@@ -1249,12 +1129,10 @@ static const expr_t *expr_note_first_free_var_other_than(const expr_t *expr,
 
     if (expr_is_op(expr, &ops_integral)) {
         nested_dummy = expr_integral_dummy_expr(expr);
-        left = expr_note_first_free_var_other_than(
-            expr_integral_lower_bound_expr(expr), dummy);
+        left = expr_note_first_free_var_other_than(expr_integral_lower_bound_expr(expr), dummy);
         if (left)
             return left;
-        left = expr_note_first_free_var_other_than(
-            expr_integral_upper_bound_expr(expr), dummy);
+        left = expr_note_first_free_var_other_than(expr_integral_upper_bound_expr(expr), dummy);
         if (left)
             return left;
         return expr_note_first_free_var_other_than(expr->a, nested_dummy);
@@ -1314,17 +1192,14 @@ bool expr_integral_value_note(const expr_t *expr, char *out, size_t out_size)
         dummy_expr = expr_integral_dummy_expr(expr);
         dummy_name = expr_symbol_name(dummy_expr);
 
-        if (dummy_expr &&
-            !expr_note_integrand_uses_dummy(integrand, dummy_expr)) {
+        if (dummy_expr && !expr_note_integrand_uses_dummy(integrand, dummy_expr)) {
             parameter_var = expr_note_first_free_var_other_than(integrand, dummy_expr);
             parameter_name = expr_symbol_name(parameter_var);
             if (parameter_name) {
                 snprintf(out, out_size,
-                         "The differential is d%s, so %s is treated as a parameter. Use d%s if you intended to integrate with respect to %s.",
-                         dummy_name ? dummy_name : "t",
-                         parameter_name,
-                         parameter_name,
-                         parameter_name);
+                         "The differential is d%s, so %s is treated as a parameter. Use d%s if you intended to "
+                         "integrate with respect to %s.",
+                         dummy_name ? dummy_name : "t", parameter_name, parameter_name, parameter_name);
                 found = true;
             }
         }
@@ -1333,46 +1208,36 @@ bool expr_integral_value_note(const expr_t *expr, char *out, size_t out_size)
         upper = upper_expr ? expr_eval(upper_expr) : num_clone(NUM_NAN);
         num_destroy(&lower);
         lower = lower_expr ? expr_eval(lower_expr) : num_clone(NUM_ZERO);
-        if (!found &&
-            upper_expr && dummy_expr &&
-            num_is_real(lower) && num_is_finite(lower) &&
-            num_is_real(upper) && num_is_finite(upper) &&
-            !expr_note_symbolic_integral_value_is_finite(expr)) {
+        if (!found && upper_expr && dummy_expr && num_is_real(lower) && num_is_finite(lower) && num_is_real(upper) &&
+            num_is_finite(upper) && !expr_note_symbolic_integral_value_is_finite(expr)) {
             upper_const = expr_new_const(upper);
             lower_const = expr_new_const(lower);
-            upper_integrand = upper_const
-                ? expr_substitute(integrand, dummy_expr, upper_const)
-                : NULL;
-            lower_integrand = lower_const
-                ? expr_substitute(integrand, dummy_expr, lower_const)
-                : NULL;
-            if (upper_const && lower_const &&
-                upper_integrand && lower_integrand) {
+            upper_integrand = upper_const ? expr_substitute(integrand, dummy_expr, upper_const) : NULL;
+            lower_integrand = lower_const ? expr_substitute(integrand, dummy_expr, lower_const) : NULL;
+            if (upper_const && lower_const && upper_integrand && lower_integrand) {
                 upper_text = expr_note_text_dup(upper_expr, style_UNBOUND);
                 lower_text = lower_expr ? expr_note_text_dup(lower_expr, style_UNBOUND) : NULL;
                 integrand_text = expr_note_text_dup(integrand, style_UNBOUND);
 
-                if (!lower_expr &&
-                    !expr_note_value_is_defined_at(integrand, dummy_expr, NUM_ZERO)) {
+                if (!lower_expr && !expr_note_value_is_defined_at(integrand, dummy_expr, NUM_ZERO)) {
                     snprintf(out, out_size,
-                             "Here ∫^%s means ∫₀^%s. The integrand %s is not finite at %s = 0, so that definite integral is undefined.",
-                             upper_text ? upper_text : "?",
-                             upper_text ? upper_text : "?",
-                             integrand_text ? integrand_text : "f(t)",
-                             dummy_name ? dummy_name : "t");
+                             "Here ∫^%s means ∫₀^%s. The integrand %s is not finite at %s = 0, so that definite "
+                             "integral is undefined.",
+                             upper_text ? upper_text : "?", upper_text ? upper_text : "?",
+                             integrand_text ? integrand_text : "f(t)", dummy_name ? dummy_name : "t");
                     found = true;
                 } else if (!expr_note_value_is_defined_at(integrand, dummy_expr, lower)) {
                     snprintf(out, out_size,
-                             "The integrand %s is not finite at %s = %s, so that the lower bound makes this definite integral undefined.",
-                             integrand_text ? integrand_text : "f(t)",
-                             dummy_name ? dummy_name : "t",
+                             "The integrand %s is not finite at %s = %s, so that the lower bound makes this definite "
+                             "integral undefined.",
+                             integrand_text ? integrand_text : "f(t)", dummy_name ? dummy_name : "t",
                              lower_text ? lower_text : "0");
                     found = true;
                 } else if (!expr_note_value_is_defined_at(integrand, dummy_expr, upper)) {
                     snprintf(out, out_size,
-                             "The integrand %s is not finite at %s = %s, so that the upper bound makes this definite integral undefined.",
-                             integrand_text ? integrand_text : "f(t)",
-                             dummy_name ? dummy_name : "t",
+                             "The integrand %s is not finite at %s = %s, so that the upper bound makes this definite "
+                             "integral undefined.",
+                             integrand_text ? integrand_text : "f(t)", dummy_name ? dummy_name : "t",
                              upper_text ? upper_text : "?");
                     found = true;
                 }
@@ -1395,6 +1260,5 @@ bool expr_integral_value_note(const expr_t *expr, char *out, size_t out_size)
 
     if (!expr_child_exprs(expr, &child_left, &child_right))
         return false;
-    return expr_integral_value_note(child_left, out, out_size) ||
-           expr_integral_value_note(child_right, out, out_size);
+    return expr_integral_value_note(child_left, out, out_size) || expr_integral_value_note(child_right, out, out_size);
 }

@@ -8,9 +8,9 @@
 
 typedef struct {
     const expr_t **exprs;
-    int          *signs;
-    size_t        count;
-    size_t        cap;
+    int *signs;
+    size_t count;
+    size_t cap;
 } tex_add_terms_t;
 
 static void tex_add_terms_free(tex_add_terms_t *terms)
@@ -58,15 +58,13 @@ static int tex_collect_add_terms(const expr_t *expr, int sign, tex_add_terms_t *
     if (expr_is_neg(expr))
         return tex_collect_add_terms(expr->a, -sign, terms);
     if (expr_is_op(expr, &ops_add))
-        return tex_collect_add_terms(expr->a, sign, terms) == 0 &&
-               tex_collect_add_terms(expr->b, sign, terms) == 0
-            ? 0
-            : -1;
+        return tex_collect_add_terms(expr->a, sign, terms) == 0 && tex_collect_add_terms(expr->b, sign, terms) == 0
+                   ? 0
+                   : -1;
     if (expr_is_op(expr, &ops_sub))
-        return tex_collect_add_terms(expr->a, sign, terms) == 0 &&
-               tex_collect_add_terms(expr->b, -sign, terms) == 0
-            ? 0
-            : -1;
+        return tex_collect_add_terms(expr->a, sign, terms) == 0 && tex_collect_add_terms(expr->b, -sign, terms) == 0
+                   ? 0
+                   : -1;
     return tex_add_terms_push(terms, expr, sign);
 }
 
@@ -97,17 +95,14 @@ static char *tex_body_for_node(const expr_t *expr, int parent_prec)
     return out;
 }
 
-static char *tex_aligned_add_terms(const expr_t *expr, size_t line_limit,
-                                   int wrap_in_parens)
+static char *tex_aligned_add_terms(const expr_t *expr, size_t line_limit, int wrap_in_parens)
 {
     tex_add_terms_t terms = {0};
     sbuf_t b;
     char *one_line = NULL;
     char *out = NULL;
 
-    if (!expr_is_addsub(expr) ||
-        tex_collect_add_terms(expr, 1, &terms) != 0 ||
-        terms.count < 2u)
+    if (!expr_is_addsub(expr) || tex_collect_add_terms(expr, 1, &terms) != 0 || terms.count < 2u)
         goto cleanup;
 
     one_line = tex_body_for_node(expr, PREC_LOWEST);
@@ -155,9 +150,7 @@ cleanup:
     return out;
 }
 
-static char *tex_aligned_scaled_add_terms(const expr_t *sum,
-                                          const expr_t *factor,
-                                          size_t line_limit)
+static char *tex_aligned_scaled_add_terms(const expr_t *sum, const expr_t *factor, size_t line_limit)
 {
     tex_add_terms_t terms = {0};
     sbuf_t b;
@@ -167,9 +160,7 @@ static char *tex_aligned_scaled_add_terms(const expr_t *sum,
     char *out = NULL;
     int factor_sign = 1;
 
-    if (!sum || !factor || !expr_is_addsub(sum) ||
-        tex_collect_add_terms(sum, 1, &terms) != 0 ||
-        terms.count < 2u)
+    if (!sum || !factor || !expr_is_addsub(sum) || tex_collect_add_terms(sum, 1, &terms) != 0 || terms.count < 2u)
         goto cleanup;
 
     one_line = tex_body_for_node(sum, PREC_LOWEST);
@@ -219,8 +210,7 @@ cleanup:
     return out;
 }
 
-static char *tex_wrapped_mul_with_additive_factor(const expr_t *expr,
-                                                  size_t line_limit)
+static char *tex_wrapped_mul_with_additive_factor(const expr_t *expr, size_t line_limit)
 {
     const expr_t *factor = NULL;
     const expr_t *sum = NULL;
@@ -271,8 +261,7 @@ static int tex_tree_contains_formal_derivative(const expr_t *expr)
         return 0;
     if (expr_is_formal_derivative(expr))
         return 1;
-    return tex_tree_contains_formal_derivative(expr->a) ||
-           tex_tree_contains_formal_derivative(expr->b);
+    return tex_tree_contains_formal_derivative(expr->a) || tex_tree_contains_formal_derivative(expr->b);
 }
 
 int expr_to_tex_parts(const expr_t *dv, char **expr_out, char **bindings_out)
@@ -296,8 +285,7 @@ int expr_to_tex_parts(const expr_t *dv, char **expr_out, char **bindings_out)
      * derivative.  Render the expression tree whenever formal derivatives are
      * present so (Dx(y))^2 remains visibly distinct from Dxx(y).
      */
-    if (dv && dv->binding_expr && !expr_is_const(dv) &&
-        !tex_tree_contains_formal_derivative(dv)) {
+    if (dv && dv->binding_expr && !expr_is_const(dv) && !tex_tree_contains_formal_derivative(dv)) {
         *expr_out = expr_binding_expr_to_tex(dv->binding_expr);
         *bindings_out = expr_tostring_xstrdup("");
         return (*expr_out && *bindings_out) ? 0 : -1;
@@ -411,9 +399,7 @@ char *expr_to_tex_body_wrapped(const expr_t *expr, size_t line_limit)
     return body;
 }
 
-char *expr_to_tex_body_wrapped_with_partials(
-    const expr_t *expr,
-    size_t line_limit)
+char *expr_to_tex_body_wrapped_with_partials(const expr_t *expr, size_t line_limit)
 {
     char *body;
 
@@ -423,9 +409,7 @@ char *expr_to_tex_body_wrapped_with_partials(
     return body;
 }
 
-char *expr_to_tex_body_wrapped_with_totals(
-    const expr_t *expr,
-    size_t line_limit)
+char *expr_to_tex_body_wrapped_with_totals(const expr_t *expr, size_t line_limit)
 {
     char *body;
 

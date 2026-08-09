@@ -4,9 +4,7 @@
 
 #include "test_number.h"
 
-static void assert_number_close_text(const char *label,
-                                     number_t got,
-                                     const char *expected_text,
+static void assert_number_close_text(const char *label, number_t got, const char *expected_text,
                                      const char *tolerance_text)
 {
     number_t expected = num_create_from_string(expected_text);
@@ -18,8 +16,7 @@ static void assert_number_close_text(const char *label,
     printf(C_WHITE C_BOLD "%s" C_RESET "\n", label ? label : "<unspecified>");
     printf("    expected = %s\n", expected_text);
     printf("    tolerance = %s\n", tolerance_text);
-    printf("    error    = %s\n\n",
-           error_text ? string_c_str(error_text) : "(num_to_string failed)");
+    printf("    error    = %s\n\n", error_text ? string_c_str(error_text) : "(num_to_string failed)");
     ASSERT_TRUE(num_lt(error, tolerance));
 
     string_free(error_text);
@@ -29,10 +26,7 @@ static void assert_number_close_text(const char *label,
     num_destroy(&expected);
 }
 
-static void assert_number_close_number(const char *label,
-                                       number_t got,
-                                       number_t expected,
-                                       const char *tolerance_text)
+static void assert_number_close_number(const char *label, number_t got, number_t expected, const char *tolerance_text)
 {
     number_t diff = num_sub(got, expected);
     number_t error = num_abs(diff);
@@ -41,11 +35,9 @@ static void assert_number_close_number(const char *label,
     string_t *error_text = num_to_string(error);
 
     printf(C_WHITE C_BOLD "%s" C_RESET "\n", label ? label : "<unspecified>");
-    printf("    expected = %s\n",
-           expected_text ? string_c_str(expected_text) : "(num_to_string failed)");
+    printf("    expected = %s\n", expected_text ? string_c_str(expected_text) : "(num_to_string failed)");
     printf("    tolerance = %s\n", tolerance_text);
-    printf("    error    = %s\n\n",
-           error_text ? string_c_str(error_text) : "(num_to_string failed)");
+    printf("    error    = %s\n\n", error_text ? string_c_str(error_text) : "(num_to_string failed)");
     ASSERT_TRUE(num_lt(error, tolerance));
 
     string_free(error_text);
@@ -132,95 +124,54 @@ void run_number_special_function_tests(void)
         number_t archacoversin_quarter = num_archacoversin(one_quarter);
         number_t archacovercos_three_quarters = num_archacovercos(three_quarters);
 
-        assert_number_string_prefix("num_lgamma(5)", lgamma5,
-                                    "3.178053830347945619646941601297");
-        assert_number_string_prefix("num_digamma(1)", digamma1,
-                                    "-0.577215664901532860606512090082");
-        assert_number_string_prefix("num_trigamma(1)", trigamma1,
-                                    "1.644934066848226436472415166646");
-        assert_number_close_text("num_polygamma(0, 1) = num_digamma(1)",
-                                 polygamma0_1,
-                                 "-0.577215664901532860606512090082",
-                                 "1e-30");
-        assert_number_close_text("num_polygamma(1, 1) = num_trigamma(1)",
-                                 polygamma1_1,
-                                 "1.644934066848226436472415166646",
-                                 "1e-30");
-        assert_number_close_number("num_polygamma(3, 2) = pi^4/15 - 6",
-                                   polygamma3_2, polygamma3_2_expect,
-                                   "1e-25");
-        assert_number_close_number("num_polygamma(3, -1/2) = pi^4 + 96",
-                                   polygamma3_neg_half,
-                                   polygamma3_neg_half_expect,
-                                   "1e-25");
-        assert_number_string_prefix("num_erf(1)", erf1,
-                                    "0.842700792949714869341220635082");
-        assert_number_string_prefix("num_erfc(1)", erfc1,
-                                    "0.157299207050285130658779364917");
-        assert_number_string_prefix("num_lambert_w0(1)", w0_1,
-                                    "0.567143290409783872999968662210");
+        assert_number_string_prefix("num_lgamma(5)", lgamma5, "3.178053830347945619646941601297");
+        assert_number_string_prefix("num_digamma(1)", digamma1, "-0.577215664901532860606512090082");
+        assert_number_string_prefix("num_trigamma(1)", trigamma1, "1.644934066848226436472415166646");
+        assert_number_close_text("num_polygamma(0, 1) = num_digamma(1)", polygamma0_1,
+                                 "-0.577215664901532860606512090082", "1e-30");
+        assert_number_close_text("num_polygamma(1, 1) = num_trigamma(1)", polygamma1_1,
+                                 "1.644934066848226436472415166646", "1e-30");
+        assert_number_close_number("num_polygamma(3, 2) = pi^4/15 - 6", polygamma3_2, polygamma3_2_expect, "1e-25");
+        assert_number_close_number("num_polygamma(3, -1/2) = pi^4 + 96", polygamma3_neg_half,
+                                   polygamma3_neg_half_expect, "1e-25");
+        assert_number_string_prefix("num_erf(1)", erf1, "0.842700792949714869341220635082");
+        assert_number_string_prefix("num_erfc(1)", erfc1, "0.157299207050285130658779364917");
+        assert_number_string_prefix("num_lambert_w0(1)", w0_1, "0.567143290409783872999968662210");
         ASSERT_TRUE(num_eq(neg_inv_e, NUM_NEG_INV_E));
         assert_number_string("num_lambert_w0(-1/e)", w0_branch, "-1");
         assert_number_string("num_lambert_wm1(-1/e)", wm1_branch, "-1");
         assert_number_string("num_productlog(-1/e)", productlog_branch, "-1");
         ASSERT_TRUE(!num_is_real(productlog_neg_two));
-        assert_number_close_text("num_productlog(-2) satisfies w*exp(w) = -2",
-                                 productlog_check, "-2", "1e-25");
-        assert_number_close_text("num_lambert_wn(2, -2) satisfies w*exp(w) = -2",
-                                 lambert_wn_two_check, "-2", "1e-25");
-        assert_number_close_text("num_productlog((i/13)*exp(i/13)) = i/13",
-                                 productlog_inverse, "1/13i", "1e-30");
-        assert_number_string_prefix("num_beta(2, 2)", beta22,
-                                    "0.166666666666666666666666666666");
-        assert_number_string_prefix("num_logbeta(2, 2)", logbeta22,
-                                    "-1.791759469228055000812477358380");
+        assert_number_close_text("num_productlog(-2) satisfies w*exp(w) = -2", productlog_check, "-2", "1e-25");
+        assert_number_close_text("num_lambert_wn(2, -2) satisfies w*exp(w) = -2", lambert_wn_two_check, "-2", "1e-25");
+        assert_number_close_text("num_productlog((i/13)*exp(i/13)) = i/13", productlog_inverse, "1/13i", "1e-30");
+        assert_number_string_prefix("num_beta(2, 2)", beta22, "0.166666666666666666666666666666");
+        assert_number_string_prefix("num_logbeta(2, 2)", logbeta22, "-1.791759469228055000812477358380");
         assert_number_string("num_binomial(52, 5)", binom, "2598960");
-        assert_number_string_prefix("num_normal_pdf(0)", normal_pdf0,
-                                    "0.398942280401432677939946059934");
+        assert_number_string_prefix("num_normal_pdf(0)", normal_pdf0, "0.398942280401432677939946059934");
         assert_number_string("num_normal_cdf(0)", normal_cdf0, "0.5");
-        assert_number_string_prefix("num_e1(1)", e1_1,
-                                    "0.219383934395520273677163775460");
-        assert_number_close_text("num_dilog(1/2) = pi^2/12 - log(2)^2/2",
-                                 dilog_half,
-                                 "0.58224052646501250590265632015968",
-                                 "1e-30");
-        assert_number_close_text("num_polylog(2, 1/2) = num_dilog(1/2)",
-                                 polylog2_half,
-                                 "0.58224052646501250590265632015968",
-                                 "1e-30");
+        assert_number_string_prefix("num_e1(1)", e1_1, "0.219383934395520273677163775460");
+        assert_number_close_text("num_dilog(1/2) = pi^2/12 - log(2)^2/2", dilog_half,
+                                 "0.58224052646501250590265632015968", "1e-30");
+        assert_number_close_text("num_polylog(2, 1/2) = num_dilog(1/2)", polylog2_half,
+                                 "0.58224052646501250590265632015968", "1e-30");
         ASSERT_TRUE(!num_is_real(dilog_two));
-        assert_number_close_number("num_versin(pi/3) = 1/2",
-                                   versin_pi3, one_half, "1e-30");
-        assert_number_close_number("num_vercos(pi/3) = 3/2",
-                                   vercos_pi3, three_halves, "1e-30");
-        assert_number_close_number("num_coversin(pi/6) = 1/2",
-                                   coversin_pi6, one_half, "1e-30");
-        assert_number_close_number("num_covercos(pi/6) = 3/2",
-                                   covercos_pi6, three_halves, "1e-30");
-        assert_number_close_number("num_haversin(pi/3) = 1/4",
-                                   haversin_pi3, one_quarter, "1e-30");
-        assert_number_close_number("num_havercos(pi/3) = 3/4",
-                                   havercos_pi3, three_quarters, "1e-30");
-        assert_number_close_number("num_hacoversin(pi/6) = 1/4",
-                                   hacoversin_pi6, one_quarter, "1e-30");
-        assert_number_close_number("num_hacovercos(pi/6) = 3/4",
-                                   hacovercos_pi6, three_quarters, "1e-30");
-        assert_number_close_number("num_arcversin(1/2) = pi/3",
-                                   arcversin_half, pi_over_three, "1e-30");
-        assert_number_close_number("num_arcvercos(3/2) = pi/3",
-                                   arcvercos_three_halves, pi_over_three, "1e-30");
-        assert_number_close_number("num_arccoversin(1/2) = pi/6",
-                                   arccoversin_half, pi_over_six, "1e-30");
-        assert_number_close_number("num_arccovercos(3/2) = pi/6",
-                                   arccovercos_three_halves, pi_over_six, "1e-30");
-        assert_number_close_number("num_archaversin(1/4) = pi/3",
-                                   archaversin_quarter, pi_over_three, "1e-30");
-        assert_number_close_number("num_archavercos(3/4) = pi/3",
-                                   archavercos_three_quarters, pi_over_three, "1e-30");
-        assert_number_close_number("num_archacoversin(1/4) = pi/6",
-                                   archacoversin_quarter, pi_over_six, "1e-30");
-        assert_number_close_number("num_archacovercos(3/4) = pi/6",
-                                   archacovercos_three_quarters, pi_over_six, "1e-30");
+        assert_number_close_number("num_versin(pi/3) = 1/2", versin_pi3, one_half, "1e-30");
+        assert_number_close_number("num_vercos(pi/3) = 3/2", vercos_pi3, three_halves, "1e-30");
+        assert_number_close_number("num_coversin(pi/6) = 1/2", coversin_pi6, one_half, "1e-30");
+        assert_number_close_number("num_covercos(pi/6) = 3/2", covercos_pi6, three_halves, "1e-30");
+        assert_number_close_number("num_haversin(pi/3) = 1/4", haversin_pi3, one_quarter, "1e-30");
+        assert_number_close_number("num_havercos(pi/3) = 3/4", havercos_pi3, three_quarters, "1e-30");
+        assert_number_close_number("num_hacoversin(pi/6) = 1/4", hacoversin_pi6, one_quarter, "1e-30");
+        assert_number_close_number("num_hacovercos(pi/6) = 3/4", hacovercos_pi6, three_quarters, "1e-30");
+        assert_number_close_number("num_arcversin(1/2) = pi/3", arcversin_half, pi_over_three, "1e-30");
+        assert_number_close_number("num_arcvercos(3/2) = pi/3", arcvercos_three_halves, pi_over_three, "1e-30");
+        assert_number_close_number("num_arccoversin(1/2) = pi/6", arccoversin_half, pi_over_six, "1e-30");
+        assert_number_close_number("num_arccovercos(3/2) = pi/6", arccovercos_three_halves, pi_over_six, "1e-30");
+        assert_number_close_number("num_archaversin(1/4) = pi/3", archaversin_quarter, pi_over_three, "1e-30");
+        assert_number_close_number("num_archavercos(3/4) = pi/3", archavercos_three_quarters, pi_over_three, "1e-30");
+        assert_number_close_number("num_archacoversin(1/4) = pi/6", archacoversin_quarter, pi_over_six, "1e-30");
+        assert_number_close_number("num_archacovercos(3/4) = pi/6", archacovercos_three_quarters, pi_over_six, "1e-30");
 
         ASSERT_TRUE(num_is_real(lgamma5));
         ASSERT_TRUE(num_is_real(digamma1));
@@ -322,9 +273,7 @@ void run_number_special_function_tests(void)
         number_t zero;
         number_t one;
         number_t lommel;
-        number_t lommel_derivative;
         number_t j0;
-        number_t j1;
         number_t expected_lommel;
 
         ASSERT_EQ_INT(num_set_default_prec_bits(384u), 0);
@@ -345,28 +294,17 @@ void run_number_special_function_tests(void)
         zero = num_create_from_long(0);
         one = num_create_from_long(1);
         lommel = num_lommel_s(one, zero, argument);
-        lommel_derivative = num_lommel_s_derivative(one, zero, argument);
         j0 = num_bessel_j(zero, argument);
-        j1 = num_bessel_j(one, argument);
         expected_lommel = num_sub(one, j0);
 
-        assert_number_close_number(
-            "high-precision num_bessel_j(1/2, x) half-order identity",
-            got_j, expected_j, "1e-100");
-        assert_number_close_number(
-            "high-precision num_bessel_y(1/2, x) half-order identity",
-            got_y, expected_y, "1e-100");
-        assert_number_close_number(
-            "high-precision num_lommel_s(1, 0, x) = 1 - J0(x)",
-            lommel, expected_lommel, "1e-100");
-        assert_number_close_number(
-            "high-precision Lommel argument derivative equals J1(x)",
-            lommel_derivative, j1, "1e-100");
-
+        assert_number_close_number("high-precision num_bessel_j(1/2, x) half-order identity", got_j, expected_j,
+                                   "1e-100");
+        assert_number_close_number("high-precision num_bessel_y(1/2, x) half-order identity", got_y, expected_y,
+                                   "1e-100");
+        assert_number_close_number("high-precision num_lommel_s(1, 0, x) = 1 - J0(x)", lommel, expected_lommel,
+                                   "1e-100");
         num_destroy(&expected_lommel);
-        num_destroy(&j1);
         num_destroy(&j0);
-        num_destroy(&lommel_derivative);
         num_destroy(&lommel);
         num_destroy(&one);
         num_destroy(&zero);
@@ -432,17 +370,11 @@ void run_number_special_function_tests(void)
         pi_log2 = num_mul(pi, log2);
         neg_pi_log2 = num_neg(pi_log2);
 
-        assert_number_close_number("high-precision num_dilog(1/2)",
-                                   dilog_half, dilog_half_expected,
-                                   "1e-180");
-        assert_number_close_number("high-precision num_polylog(2, 1/2)",
-                                   polylog2_half, dilog_half_expected,
-                                   "1e-180");
+        assert_number_close_number("high-precision num_dilog(1/2)", dilog_half, dilog_half_expected, "1e-180");
+        assert_number_close_number("high-precision num_polylog(2, 1/2)", polylog2_half, dilog_half_expected, "1e-180");
         ASSERT_TRUE(!num_is_real(dilog_two));
-        assert_number_close_number("high-precision Re num_dilog(2) = pi^2/4",
-                                   dilog_two_real, pi2_over_4, "1e-180");
-        assert_number_close_number("high-precision Im num_dilog(2) = -pi ln 2",
-                                   dilog_two_imag, neg_pi_log2, "1e-180");
+        assert_number_close_number("high-precision Re num_dilog(2) = pi^2/4", dilog_two_real, pi2_over_4, "1e-180");
+        assert_number_close_number("high-precision Im num_dilog(2) = -pi ln 2", dilog_two_imag, neg_pi_log2, "1e-180");
 
         num_destroy(&neg_pi_log2);
         num_destroy(&pi_log2);
@@ -489,12 +421,9 @@ void run_number_special_function_tests(void)
         tolerance = num_pow10(-193);
         residual_text = num_to_string(residual_mag);
 
-        printf(C_WHITE C_BOLD
-               "lgamma(gammainv(5)) - ln(5) at 193 displayed digits"
-               C_RESET "\n");
+        printf(C_WHITE C_BOLD "lgamma(gammainv(5)) - ln(5) at 193 displayed digits" C_RESET "\n");
         printf("    tolerance = 1e-193\n");
-        printf("    residual  = %s\n\n",
-               residual_text ? string_c_str(residual_text) : "(num_to_string failed)");
+        printf("    residual  = %s\n\n", residual_text ? string_c_str(residual_text) : "(num_to_string failed)");
         within_tolerance = num_lt(residual_mag, tolerance);
 
         string_free(residual_text);
@@ -548,14 +477,10 @@ void run_number_special_function_tests(void)
         tolerance = num_pow10(-180);
         residual_text = num_to_string(residual_mag);
 
-        assert_number_close_number("high-precision num_polygamma(3, 1) = pi^4/15",
-                                   psi3_1, pi4_over_15, "1e-180");
-        printf(C_WHITE C_BOLD
-               "high-precision complex recurrence: ψ⁽³⁾(z)-ψ⁽³⁾(z+1)=6/z^4"
-               C_RESET "\n");
+        assert_number_close_number("high-precision num_polygamma(3, 1) = pi^4/15", psi3_1, pi4_over_15, "1e-180");
+        printf(C_WHITE C_BOLD "high-precision complex recurrence: ψ⁽³⁾(z)-ψ⁽³⁾(z+1)=6/z^4" C_RESET "\n");
         printf("    tolerance = 1e-180\n");
-        printf("    residual  = %s\n\n",
-               residual_text ? string_c_str(residual_text) : "(num_to_string failed)");
+        printf("    residual  = %s\n\n", residual_text ? string_c_str(residual_text) : "(num_to_string failed)");
         within_tolerance = num_lt(residual_mag, tolerance);
 
         string_free(residual_text);
@@ -578,5 +503,47 @@ void run_number_special_function_tests(void)
         num_destroy(&one);
         ASSERT_EQ_INT(num_set_default_prec_bits(saved_precision), 0);
         ASSERT_TRUE(within_tolerance);
+    }
+
+    {
+        number_t z = num_create_from_string("0.2 + 0.1i");
+        number_t hypergeometric = num_hypergeometric_pFq(NULL, 0u, NULL, 0u, z);
+        number_t expected_hypergeometric = num_exp(z);
+        number_t a = num_create_from_string("1.25");
+        number_t b[] = {num_create_from_string("0.5"), num_create_from_string("1.5"), num_create_from_string("2")};
+        number_t c = num_clone(a);
+        number_t variables[] = {num_create_from_string("0.1"), num_create_from_string("0.2"),
+                                num_create_from_string("0.15")};
+        number_t lauricella = num_lauricella_f(a, b, c, variables, 3u);
+        number_t expected_lauricella = num_create_from_long(1);
+
+        for (size_t i = 0u; i < 3u; ++i) {
+            number_t one_minus = num_sub(NUM_ONE, variables[i]);
+            number_t negative_b = num_neg(b[i]);
+            number_t factor = num_pow(one_minus, negative_b);
+            number_t next = num_mul(expected_lauricella, factor);
+
+            num_destroy(&expected_lauricella);
+            expected_lauricella = next;
+            num_destroy(&factor);
+            num_destroy(&negative_b);
+            num_destroy(&one_minus);
+        }
+
+        assert_number_close_number("num 0F0(z) = exp(z)", hypergeometric, expected_hypergeometric, "1e-27");
+        assert_number_close_number("general num Lauricella FD product identity", lauricella, expected_lauricella,
+                                   "1e-26");
+
+        num_destroy(&expected_lauricella);
+        num_destroy(&lauricella);
+        for (size_t i = 0u; i < 3u; ++i) {
+            num_destroy(&variables[i]);
+            num_destroy(&b[i]);
+        }
+        num_destroy(&c);
+        num_destroy(&a);
+        num_destroy(&expected_hypergeometric);
+        num_destroy(&hypergeometric);
+        num_destroy(&z);
     }
 }

@@ -1,10 +1,10 @@
 // test_array.c — tests for the generic array_t container using the new test harness
 
+#include <pthread.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdbool.h>
-#include <pthread.h>
 
 #include "test_harness.h"
 
@@ -15,17 +15,20 @@ TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 /* -------------------------------------------------------------
  * strdup replacement for strict C99
  * ------------------------------------------------------------- */
-static char *strclone(const char *s) {
+static char *strclone(const char *s)
+{
     size_t n = strlen(s) + 1;
     char *p = malloc(n);
-    if (p) memcpy(p, s, n);
+    if (p)
+        memcpy(p, s, n);
     return p;
 }
 
 /* -------------------------------------------------------------
  * Comparison for int
  * ------------------------------------------------------------- */
-static int int_cmp(const void *a, const void *b) {
+static int int_cmp(const void *a, const void *b)
+{
     int x, y;
     memcpy(&x, a, sizeof(int));
     memcpy(&y, b, sizeof(int));
@@ -35,20 +38,23 @@ static int int_cmp(const void *a, const void *b) {
 /* -------------------------------------------------------------
  * Comparison for char*
  * ------------------------------------------------------------- */
-static int str_cmp(const void *a, const void *b) {
-    const char *sa = *(const char * const *)a;
-    const char *sb = *(const char * const *)b;
+static int str_cmp(const void *a, const void *b)
+{
+    const char *sa = *(const char *const *)a;
+    const char *sb = *(const char *const *)b;
     return strcmp(sa, sb);
 }
 
 /* Clone/destroy for char* */
-static void str_clone(void *dst, const void *src) {
-    const char *s = *(const char * const *)src;
+static void str_clone(void *dst, const void *src)
+{
+    const char *s = *(const char *const *)src;
     char *copy = strclone(s);
     memcpy(dst, &copy, sizeof(char *));
 }
 
-static void str_destroy(void *elem) {
+static void str_destroy(void *elem)
+{
     char *s = *(char **)elem;
     free(s);
 }
@@ -62,7 +68,8 @@ struct deep {
     int value;
 };
 
-static void deep_clone(void *dst, const void *src) {
+static void deep_clone(void *dst, const void *src)
+{
     const struct deep *s = src;
     struct deep *d = dst;
     d->value = s->value;
@@ -70,7 +77,8 @@ static void deep_clone(void *dst, const void *src) {
     strcpy(d->name, s->name);
 }
 
-static void deep_destroy(void *elem) {
+static void deep_destroy(void *elem)
+{
     struct deep *d = elem;
     free(d->name);
 }
@@ -79,7 +87,8 @@ static void deep_destroy(void *elem) {
  * Tests
  * ------------------------------------------------------------- */
 
-void test_ints(void) {
+void test_ints(void)
+{
     array_t *arr = array_create(sizeof(int), NULL, NULL);
     ASSERT_TRUE(arr);
 
@@ -89,20 +98,20 @@ void test_ints(void) {
 
     ASSERT_EQ_INT(array_size(arr), 4);
     for (size_t i = 0; i < 4; ++i)
-        ASSERT_EQ_INT(*(int*)array_get(arr, i), vals[i]);
+        ASSERT_EQ_INT(*(int *)array_get(arr, i), vals[i]);
 
     // Test append_carray
     int more[] = {7, 8};
     ASSERT_TRUE(array_append_carray(arr, more, 2));
     ASSERT_EQ_INT(array_size(arr), 6);
-    ASSERT_EQ_INT(*(int*)array_get(arr, 4), 7);
-    ASSERT_EQ_INT(*(int*)array_get(arr, 5), 8);
+    ASSERT_EQ_INT(*(int *)array_get(arr, 4), 7);
+    ASSERT_EQ_INT(*(int *)array_get(arr, 5), 8);
 
     // Test sort
     array_sort(arr, int_cmp);
     int sorted[] = {1, 2, 5, 7, 8, 9};
     for (size_t i = 0; i < 6; ++i)
-        ASSERT_EQ_INT(*(int*)array_get(arr, i), sorted[i]);
+        ASSERT_EQ_INT(*(int *)array_get(arr, i), sorted[i]);
 
     // Test append_array
     array_t *arr2 = array_create(sizeof(int), NULL, NULL);
@@ -110,8 +119,8 @@ void test_ints(void) {
     ASSERT_TRUE(array_append_carray(arr2, extra, 2));
     ASSERT_TRUE(array_append_array(arr, arr2));
     ASSERT_EQ_INT(array_size(arr), 8);
-    ASSERT_EQ_INT(*(int*)array_get(arr, 6), 42);
-    ASSERT_EQ_INT(*(int*)array_get(arr, 7), 99);
+    ASSERT_EQ_INT(*(int *)array_get(arr, 6), 42);
+    ASSERT_EQ_INT(*(int *)array_get(arr, 7), 99);
 
     // Test clear
     array_clear(arr);
@@ -121,7 +130,8 @@ void test_ints(void) {
     array_destroy(arr);
 }
 
-void test_strings(void) {
+void test_strings(void)
+{
     array_t *arr = array_create(sizeof(char *), str_clone, str_destroy);
     ASSERT_TRUE(arr);
 
@@ -150,7 +160,8 @@ void test_strings(void) {
     array_destroy(arr);
 }
 
-void test_append_array(void) {
+void test_append_array(void)
+{
     array_t *a1 = array_create(sizeof(int), NULL, NULL);
     array_t *a2 = array_create(sizeof(int), NULL, NULL);
 
@@ -163,30 +174,32 @@ void test_append_array(void) {
 
     ASSERT_EQ_INT(array_size(a1), 5);
     for (int i = 0; i < 5; ++i)
-        ASSERT_EQ_INT(*(int*)array_get(a1, i), i + 1);
+        ASSERT_EQ_INT(*(int *)array_get(a1, i), i + 1);
 
     array_destroy(a1);
     array_destroy(a2);
 }
 
-void test_readme_examples(void) {
+void test_readme_examples(void)
+{
     array_t *arr = array_create(sizeof(int), NULL, NULL);
     int vals[] = {10, 20, 30};
     for (int i = 0; i < 3; ++i)
         array_add(arr, &vals[i]);
     ASSERT_EQ_INT(array_size(arr), 3);
     for (size_t i = 0; i < 3; ++i)
-        ASSERT_EQ_INT(*(int*)array_get(arr, i), vals[i]);
+        ASSERT_EQ_INT(*(int *)array_get(arr, i), vals[i]);
     array_destroy(arr);
 }
 
-void test_readme_deep_struct(void) {
+void test_readme_deep_struct(void)
+{
     array_t *arr = array_create(sizeof(struct deep), deep_clone, deep_destroy);
     ASSERT_TRUE(arr);
 
-    struct deep a = { strclone("alpha"), 1 };
-    struct deep b = { strclone("beta"),  2 };
-    struct deep c = { strclone("gamma"), 3 };
+    struct deep a = {strclone("alpha"), 1};
+    struct deep b = {strclone("beta"), 2};
+    struct deep c = {strclone("gamma"), 3};
 
     ASSERT_TRUE(array_add(arr, &a));
     ASSERT_TRUE(array_add(arr, &b));
@@ -209,7 +222,8 @@ void test_readme_deep_struct(void) {
     array_destroy(arr);
 }
 
-void example_array_primitive(void) {
+void example_array_primitive(void)
+{
     array_t *arr = array_create(sizeof(int), NULL, NULL);
 
     int vals[] = {5, 2, 9, 1};
@@ -219,18 +233,19 @@ void example_array_primitive(void) {
     array_sort(arr, int_cmp);
 
     for (size_t i = 0; i < array_size(arr); ++i)
-        printf("%d ", *(int*)array_get(arr, i));
+        printf("%d ", *(int *)array_get(arr, i));
     printf("\n");
 
     array_destroy(arr);
 }
 
-void example_array_deep_struct(void) {
+void example_array_deep_struct(void)
+{
     array_t *arr = array_create(sizeof(struct deep), deep_clone, deep_destroy);
 
-    struct deep a = { strclone("alpha"), 1 };
-    struct deep b = { strclone("beta"),  2 };
-    struct deep c = { strclone("gamma"), 3 };
+    struct deep a = {strclone("alpha"), 1};
+    struct deep b = {strclone("beta"), 2};
+    struct deep c = {strclone("gamma"), 3};
 
     array_add(arr, &a);
     array_add(arr, &b);
@@ -249,7 +264,8 @@ void example_array_deep_struct(void) {
     array_destroy(arr);
 }
 
-void test_swap_rotate(void) {
+void test_swap_rotate(void)
+{
     array_t *arr = array_create(sizeof(int), NULL, NULL);
     int vals[] = {1, 2, 3, 4, 5};
     for (int i = 0; i < 5; ++i)
@@ -257,29 +273,29 @@ void test_swap_rotate(void) {
 
     // Test swap
     ASSERT_TRUE(array_swap(arr, 1, 3)); // swap 2 and 4
-    ASSERT_EQ_INT(*(int*)array_get(arr, 0), 1);
-    ASSERT_EQ_INT(*(int*)array_get(arr, 1), 4);
-    ASSERT_EQ_INT(*(int*)array_get(arr, 2), 3);
-    ASSERT_EQ_INT(*(int*)array_get(arr, 3), 2);
-    ASSERT_EQ_INT(*(int*)array_get(arr, 4), 5);
+    ASSERT_EQ_INT(*(int *)array_get(arr, 0), 1);
+    ASSERT_EQ_INT(*(int *)array_get(arr, 1), 4);
+    ASSERT_EQ_INT(*(int *)array_get(arr, 2), 3);
+    ASSERT_EQ_INT(*(int *)array_get(arr, 3), 2);
+    ASSERT_EQ_INT(*(int *)array_get(arr, 4), 5);
 
     // Test rotate left
     ASSERT_TRUE(array_rotate_left(arr));
     // Now: 4 3 2 5 1
-    ASSERT_EQ_INT(*(int*)array_get(arr, 0), 4);
-    ASSERT_EQ_INT(*(int*)array_get(arr, 1), 3);
-    ASSERT_EQ_INT(*(int*)array_get(arr, 2), 2);
-    ASSERT_EQ_INT(*(int*)array_get(arr, 3), 5);
-    ASSERT_EQ_INT(*(int*)array_get(arr, 4), 1);
+    ASSERT_EQ_INT(*(int *)array_get(arr, 0), 4);
+    ASSERT_EQ_INT(*(int *)array_get(arr, 1), 3);
+    ASSERT_EQ_INT(*(int *)array_get(arr, 2), 2);
+    ASSERT_EQ_INT(*(int *)array_get(arr, 3), 5);
+    ASSERT_EQ_INT(*(int *)array_get(arr, 4), 1);
 
     // Test rotate right
     ASSERT_TRUE(array_rotate_right(arr));
     // Now: 1 4 3 2 5
-    ASSERT_EQ_INT(*(int*)array_get(arr, 0), 1);
-    ASSERT_EQ_INT(*(int*)array_get(arr, 1), 4);
-    ASSERT_EQ_INT(*(int*)array_get(arr, 2), 3);
-    ASSERT_EQ_INT(*(int*)array_get(arr, 3), 2);
-    ASSERT_EQ_INT(*(int*)array_get(arr, 4), 5);
+    ASSERT_EQ_INT(*(int *)array_get(arr, 0), 1);
+    ASSERT_EQ_INT(*(int *)array_get(arr, 1), 4);
+    ASSERT_EQ_INT(*(int *)array_get(arr, 2), 3);
+    ASSERT_EQ_INT(*(int *)array_get(arr, 3), 2);
+    ASSERT_EQ_INT(*(int *)array_get(arr, 4), 5);
 
     // Edge cases
     ASSERT_TRUE(!array_swap(arr, 0, 5)); // out of bounds
@@ -306,7 +322,8 @@ struct thread_args {
     int base;
 };
 
-static void *thread_append(void *arg) {
+static void *thread_append(void *arg)
+{
     struct thread_args *args = arg;
     for (int i = 0; i < PER_THREAD; ++i) {
         int val = args->base + i;
@@ -315,7 +332,8 @@ static void *thread_append(void *arg) {
     return NULL;
 }
 
-void test_thread_safety_append(void) {
+void test_thread_safety_append(void)
+{
     array_t *arr = array_create(sizeof(int), NULL, NULL);
 
     pthread_t threads[THREAD_COUNT];
@@ -335,7 +353,7 @@ void test_thread_safety_append(void) {
     // Check for all expected values (order not guaranteed)
     int *seen = calloc(THREAD_COUNT * PER_THREAD, sizeof(int));
     for (size_t i = 0; i < array_size(arr); ++i) {
-        int v = *(int*)array_get(arr, i);
+        int v = *(int *)array_get(arr, i);
         ASSERT_TRUE(v >= 0 && v < THREAD_COUNT * PER_THREAD);
         seen[v]++;
     }
@@ -346,7 +364,8 @@ void test_thread_safety_append(void) {
     array_destroy(arr);
 }
 
-void test_remove_and_remove_elements(void) {
+void test_remove_and_remove_elements(void)
+{
     array_t *arr = array_create(sizeof(int), NULL, NULL);
     int vals[] = {10, 20, 30, 40, 50};
     for (int i = 0; i < 5; ++i)
@@ -355,21 +374,21 @@ void test_remove_and_remove_elements(void) {
     // Remove middle element (30)
     ASSERT_TRUE(array_remove(arr, 2));
     ASSERT_EQ_INT(array_size(arr), 4);
-    ASSERT_EQ_INT(*(int*)array_get(arr, 0), 10);
-    ASSERT_EQ_INT(*(int*)array_get(arr, 1), 20);
-    ASSERT_EQ_INT(*(int*)array_get(arr, 2), 40);
-    ASSERT_EQ_INT(*(int*)array_get(arr, 3), 50);
+    ASSERT_EQ_INT(*(int *)array_get(arr, 0), 10);
+    ASSERT_EQ_INT(*(int *)array_get(arr, 1), 20);
+    ASSERT_EQ_INT(*(int *)array_get(arr, 2), 40);
+    ASSERT_EQ_INT(*(int *)array_get(arr, 3), 50);
 
     // Remove first two elements (10, 20)
     ASSERT_TRUE(array_remove_elements(arr, 0, 2));
     ASSERT_EQ_INT(array_size(arr), 2);
-    ASSERT_EQ_INT(*(int*)array_get(arr, 0), 40);
-    ASSERT_EQ_INT(*(int*)array_get(arr, 1), 50);
+    ASSERT_EQ_INT(*(int *)array_get(arr, 0), 40);
+    ASSERT_EQ_INT(*(int *)array_get(arr, 1), 50);
 
     // Remove last element (50)
     ASSERT_TRUE(array_remove(arr, 1));
     ASSERT_EQ_INT(array_size(arr), 1);
-    ASSERT_EQ_INT(*(int*)array_get(arr, 0), 40);
+    ASSERT_EQ_INT(*(int *)array_get(arr, 0), 40);
 
     // Remove out of bounds
     ASSERT_TRUE(!array_remove(arr, 5));
@@ -378,7 +397,8 @@ void test_remove_and_remove_elements(void) {
     array_destroy(arr);
 }
 
-void test_insert_and_insert_carray(void) {
+void test_insert_and_insert_carray(void)
+{
     array_t *arr = array_create(sizeof(int), NULL, NULL);
     int vals[] = {1, 2, 3};
     for (int i = 0; i < 3; ++i)
@@ -388,31 +408,32 @@ void test_insert_and_insert_carray(void) {
     int v0 = 0;
     ASSERT_TRUE(array_insert(arr, 0, &v0));
     ASSERT_EQ_INT(array_size(arr), 4);
-    ASSERT_EQ_INT(*(int*)array_get(arr, 0), 0);
+    ASSERT_EQ_INT(*(int *)array_get(arr, 0), 0);
 
     // Insert at end
     int v4 = 4;
     ASSERT_TRUE(array_insert(arr, 4, &v4));
     ASSERT_EQ_INT(array_size(arr), 5);
-    ASSERT_EQ_INT(*(int*)array_get(arr, 4), 4);
+    ASSERT_EQ_INT(*(int *)array_get(arr, 4), 4);
 
     // Insert in the middle
     int v99 = 99;
     ASSERT_TRUE(array_insert(arr, 2, &v99));
     ASSERT_EQ_INT(array_size(arr), 6);
-    ASSERT_EQ_INT(*(int*)array_get(arr, 2), 99);
+    ASSERT_EQ_INT(*(int *)array_get(arr, 2), 99);
 
     // Insert C array in the middle
     int mid[] = {7, 8};
     ASSERT_TRUE(array_insert_carray(arr, 3, mid, 2));
     ASSERT_EQ_INT(array_size(arr), 8);
-    ASSERT_EQ_INT(*(int*)array_get(arr, 3), 7);
-    ASSERT_EQ_INT(*(int*)array_get(arr, 4), 8);
+    ASSERT_EQ_INT(*(int *)array_get(arr, 3), 7);
+    ASSERT_EQ_INT(*(int *)array_get(arr, 4), 8);
 
     array_destroy(arr);
 }
 
-void test_insert_array(void) {
+void test_insert_array(void)
+{
     array_t *a1 = array_create(sizeof(int), NULL, NULL);
     array_t *a2 = array_create(sizeof(int), NULL, NULL);
 
@@ -425,18 +446,19 @@ void test_insert_array(void) {
     // Insert a2 into a1 at position 2
     ASSERT_TRUE(array_insert_array(a1, 2, a2));
     ASSERT_EQ_INT(array_size(a1), 6);
-    ASSERT_EQ_INT(*(int*)array_get(a1, 0), 1);
-    ASSERT_EQ_INT(*(int*)array_get(a1, 1), 2);
-    ASSERT_EQ_INT(*(int*)array_get(a1, 2), 100);
-    ASSERT_EQ_INT(*(int*)array_get(a1, 3), 200);
-    ASSERT_EQ_INT(*(int*)array_get(a1, 4), 3);
-    ASSERT_EQ_INT(*(int*)array_get(a1, 5), 4);
+    ASSERT_EQ_INT(*(int *)array_get(a1, 0), 1);
+    ASSERT_EQ_INT(*(int *)array_get(a1, 1), 2);
+    ASSERT_EQ_INT(*(int *)array_get(a1, 2), 100);
+    ASSERT_EQ_INT(*(int *)array_get(a1, 3), 200);
+    ASSERT_EQ_INT(*(int *)array_get(a1, 4), 3);
+    ASSERT_EQ_INT(*(int *)array_get(a1, 5), 4);
 
     array_destroy(a1);
     array_destroy(a2);
 }
 
-void test_slice_and_from_slice(void) {
+void test_slice_and_from_slice(void)
+{
     // Create an array of ints
     array_t *arr = array_create(sizeof(int), NULL, NULL);
     int vals[] = {10, 20, 30, 40, 50};
@@ -448,16 +470,16 @@ void test_slice_and_from_slice(void) {
     ASSERT_TRUE(slice);
     ASSERT_EQ_INT(array_slice_size(slice), 3);
     ASSERT_EQ_INT(array_slice_elem_size(slice), sizeof(int));
-    ASSERT_EQ_INT(*(int*)array_slice_get(slice, 0), 20);
-    ASSERT_EQ_INT(*(int*)array_slice_get(slice, 1), 30);
-    ASSERT_EQ_INT(*(int*)array_slice_get(slice, 2), 40);
+    ASSERT_EQ_INT(*(int *)array_slice_get(slice, 0), 20);
+    ASSERT_EQ_INT(*(int *)array_slice_get(slice, 1), 30);
+    ASSERT_EQ_INT(*(int *)array_slice_get(slice, 2), 40);
     ASSERT_TRUE(array_slice_get(slice, 3) == NULL);
 
     // Subslice [1, 2) => {30}
     array_slice_t *sub = array_slice_subslice(slice, 1, 1);
     ASSERT_TRUE(sub);
     ASSERT_EQ_INT(array_slice_size(sub), 1);
-    ASSERT_EQ_INT(*(int*)array_slice_get(sub, 0), 30);
+    ASSERT_EQ_INT(*(int *)array_slice_get(sub, 0), 30);
 
     // Subslice out of bounds returns NULL
     ASSERT_TRUE(array_slice_subslice(slice, 5, 1) == NULL);
@@ -466,9 +488,9 @@ void test_slice_and_from_slice(void) {
     array_t *arr2 = array_from_slice(slice, NULL, NULL);
     ASSERT_TRUE(arr2);
     ASSERT_EQ_INT(array_size(arr2), 3);
-    ASSERT_EQ_INT(*(int*)array_get(arr2, 0), 20);
-    ASSERT_EQ_INT(*(int*)array_get(arr2, 1), 30);
-    ASSERT_EQ_INT(*(int*)array_get(arr2, 2), 40);
+    ASSERT_EQ_INT(*(int *)array_get(arr2, 0), 20);
+    ASSERT_EQ_INT(*(int *)array_get(arr2, 1), 30);
+    ASSERT_EQ_INT(*(int *)array_get(arr2, 2), 40);
 
     array_slice_destroy(sub);
     array_slice_destroy(slice);
@@ -476,7 +498,8 @@ void test_slice_and_from_slice(void) {
     array_destroy(arr);
 }
 
-void test_slice_view_ops(void) {
+void test_slice_view_ops(void)
+{
     array_t *arr = array_create(sizeof(int), NULL, NULL);
     int vals[] = {5, 2, 9, 1, 7};
     for (int i = 0; i < 5; ++i)
@@ -488,31 +511,31 @@ void test_slice_view_ops(void) {
 
     // Sort the slice (should be {1, 2, 9} in the slice view, but underlying array unchanged)
     array_slice_sort(slice, int_cmp);
-    ASSERT_EQ_INT(*(int*)array_slice_get(slice, 0), 1);
-    ASSERT_EQ_INT(*(int*)array_slice_get(slice, 1), 2);
-    ASSERT_EQ_INT(*(int*)array_slice_get(slice, 2), 9);
+    ASSERT_EQ_INT(*(int *)array_slice_get(slice, 0), 1);
+    ASSERT_EQ_INT(*(int *)array_slice_get(slice, 1), 2);
+    ASSERT_EQ_INT(*(int *)array_slice_get(slice, 2), 9);
 
     // Underlying array is unchanged
-    ASSERT_EQ_INT(*(int*)array_get(arr, 1), 2);
-    ASSERT_EQ_INT(*(int*)array_get(arr, 2), 9);
-    ASSERT_EQ_INT(*(int*)array_get(arr, 3), 1);
+    ASSERT_EQ_INT(*(int *)array_get(arr, 1), 2);
+    ASSERT_EQ_INT(*(int *)array_get(arr, 2), 9);
+    ASSERT_EQ_INT(*(int *)array_get(arr, 3), 1);
 
     // Swap first and last in the slice view
     ASSERT_TRUE(array_slice_swap(slice, 0, 2));
-    ASSERT_EQ_INT(*(int*)array_slice_get(slice, 0), 9);
-    ASSERT_EQ_INT(*(int*)array_slice_get(slice, 2), 1);
+    ASSERT_EQ_INT(*(int *)array_slice_get(slice, 0), 9);
+    ASSERT_EQ_INT(*(int *)array_slice_get(slice, 2), 1);
 
     // Rotate left: {9, 2, 1} -> {2, 1, 9}
     ASSERT_TRUE(array_slice_rotate_left(slice));
-    ASSERT_EQ_INT(*(int*)array_slice_get(slice, 0), 2);
-    ASSERT_EQ_INT(*(int*)array_slice_get(slice, 1), 1);
-    ASSERT_EQ_INT(*(int*)array_slice_get(slice, 2), 9);
+    ASSERT_EQ_INT(*(int *)array_slice_get(slice, 0), 2);
+    ASSERT_EQ_INT(*(int *)array_slice_get(slice, 1), 1);
+    ASSERT_EQ_INT(*(int *)array_slice_get(slice, 2), 9);
 
     // Rotate right: {2, 1, 9} -> {9, 2, 1}
     ASSERT_TRUE(array_slice_rotate_right(slice));
-    ASSERT_EQ_INT(*(int*)array_slice_get(slice, 0), 9);
-    ASSERT_EQ_INT(*(int*)array_slice_get(slice, 1), 2);
-    ASSERT_EQ_INT(*(int*)array_slice_get(slice, 2), 1);
+    ASSERT_EQ_INT(*(int *)array_slice_get(slice, 0), 9);
+    ASSERT_EQ_INT(*(int *)array_slice_get(slice, 1), 2);
+    ASSERT_EQ_INT(*(int *)array_slice_get(slice, 2), 1);
 
     // Edge cases
     ASSERT_TRUE(!array_slice_swap(slice, 0, 3)); // out of bounds
@@ -530,7 +553,8 @@ void test_slice_view_ops(void) {
     array_destroy(arr);
 }
 
-void test_stack_ints(void) {
+void test_stack_ints(void)
+{
     stack_t *s = stack_create(sizeof(int), NULL, NULL);
     ASSERT_TRUE(s);
 
@@ -553,7 +577,8 @@ void test_stack_ints(void) {
     stack_destroy(s);
 }
 
-void test_stack_strings(void) {
+void test_stack_strings(void)
+{
     stack_t *s = stack_create(sizeof(char *), str_clone, str_destroy);
     ASSERT_TRUE(s);
 
@@ -575,7 +600,8 @@ void test_stack_strings(void) {
     stack_destroy(s);
 }
 
-void example_slice_subrange(void) {
+void example_slice_subrange(void)
+{
     array_t *arr = array_create(sizeof(int), NULL, NULL);
 
     for (int i = 0; i < 8; ++i)
@@ -584,14 +610,15 @@ void example_slice_subrange(void) {
     array_slice_t *slice = array_slice(arr, 2, 4);
 
     for (size_t i = 0; i < array_slice_size(slice); ++i)
-        printf("%d ", *(int*)array_slice_get(slice, i));
+        printf("%d ", *(int *)array_slice_get(slice, i));
     printf("\n");
 
     array_slice_destroy(slice);
     array_destroy(arr);
 }
 
-void example_slice_sort(void) {
+void example_slice_sort(void)
+{
     array_t *arr = array_create(sizeof(int), NULL, NULL);
 
     int vals[] = {7, 3, 9, 1, 5};
@@ -603,19 +630,20 @@ void example_slice_sort(void) {
 
     printf("slice (sorted): ");
     for (size_t i = 0; i < array_slice_size(slice); ++i)
-        printf("%d ", *(int*)array_slice_get(slice, i));
+        printf("%d ", *(int *)array_slice_get(slice, i));
     printf("\n");
 
     printf("array (unchanged): ");
     for (size_t i = 0; i < array_size(arr); ++i)
-        printf("%d ", *(int*)array_get(arr, i));
+        printf("%d ", *(int *)array_get(arr, i));
     printf("\n");
 
     array_slice_destroy(slice);
     array_destroy(arr);
 }
 
-void example_slice_materialise(void) {
+void example_slice_materialise(void)
+{
     array_t *arr = array_create(sizeof(int), NULL, NULL);
 
     for (int i = 0; i < 6; ++i)
@@ -628,13 +656,14 @@ void example_slice_materialise(void) {
     array_destroy(arr);
 
     for (size_t i = 0; i < array_size(copy); ++i)
-        printf("%d ", *(int*)array_get(copy, i));
+        printf("%d ", *(int *)array_get(copy, i));
     printf("\n");
 
     array_destroy(copy);
 }
 
-void example_stack_basic(void) {
+void example_stack_basic(void)
+{
     stack_t *s = stack_create(sizeof(int), NULL, NULL);
 
     int vals[] = {10, 20, 30};
@@ -650,7 +679,8 @@ void example_stack_basic(void) {
     stack_destroy(s);
 }
 
-void example_stack_deep(void) {
+void example_stack_deep(void)
+{
     stack_t *s = stack_create(sizeof(char *), str_clone, str_destroy);
 
     const char *words[] = {"first", "second", "third"};
@@ -667,7 +697,8 @@ void example_stack_deep(void) {
     stack_destroy(s);
 }
 
-int tests_main(void) {
+int tests_main(void)
+{
     TEST_SECTION("Integer Array Tests");
     TEST_RUN_IN_GROUP(test_ints, tests, NULL);
 

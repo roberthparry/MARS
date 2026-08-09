@@ -1,10 +1,10 @@
+#include "expr_bindings.h"
+#include "integrator.h"
 #include <limits.h>
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include "integrator.h"
-#include "expr_bindings.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
@@ -86,10 +86,7 @@ static bool expr_same_var_local(const expr_t *left, const expr_t *right)
 {
     if (!left || !right || !expr_is_var(left) || !expr_is_var(right))
         return false;
-    return left == right ||
-           (left->var_id != 0u &&
-            right->var_id != 0u &&
-            left->var_id == right->var_id);
+    return left == right || (left->var_id != 0u && right->var_id != 0u && left->var_id == right->var_id);
 }
 
 static bool expr_find_single_var_local(const expr_t *expr, const expr_t **var_io)
@@ -103,8 +100,7 @@ static bool expr_find_single_var_local(const expr_t *expr, const expr_t **var_io
         }
         return expr_same_var_local(*var_io, expr);
     }
-    return expr_find_single_var_local(expr->a, var_io) &&
-           expr_find_single_var_local(expr->b, var_io);
+    return expr_find_single_var_local(expr->a, var_io) && expr_find_single_var_local(expr->b, var_io);
 }
 
 static number_t eval_div_removable_singularity(expr_t *dv)
@@ -172,11 +168,8 @@ static number_t eval_integral_meta(expr_t *dv)
     return num_clone(NUM_NAN);
 }
 
-static bool eval_integral_antiderivative_difference(const expr_t *antiderivative,
-                                                    const expr_t *local_var,
-                                                    const expr_t *upper_expr,
-                                                    const expr_t *lower_expr,
-                                                    number_t *out)
+static bool eval_integral_antiderivative_difference(const expr_t *antiderivative, const expr_t *local_var,
+                                                    const expr_t *upper_expr, const expr_t *lower_expr, number_t *out)
 {
     expr_t *zero_lower = NULL;
     expr_t *upper_eval_expr = NULL;
@@ -197,12 +190,8 @@ static bool eval_integral_antiderivative_difference(const expr_t *antiderivative
     }
 
     upper_eval_expr = expr_substitute(antiderivative, local_var, upper_expr);
-    lower_eval_expr = effective_lower
-        ? expr_substitute(antiderivative, local_var, effective_lower)
-        : NULL;
-    diff_expr = (upper_eval_expr && lower_eval_expr)
-        ? expr_sub(upper_eval_expr, lower_eval_expr)
-        : NULL;
+    lower_eval_expr = effective_lower ? expr_substitute(antiderivative, local_var, effective_lower) : NULL;
+    diff_expr = (upper_eval_expr && lower_eval_expr) ? expr_sub(upper_eval_expr, lower_eval_expr) : NULL;
     simplified_diff = diff_expr ? expr_simplify(diff_expr) : NULL;
     value_expr = simplified_diff ? simplified_diff : diff_expr;
     value = value_expr ? expr_eval(value_expr) : num_clone(NUM_NAN);
@@ -311,10 +300,7 @@ static number_t eval_integral(expr_t *dv)
     if (antiderivative) {
         number_t symbolic_value;
 
-        if (eval_integral_antiderivative_difference(antiderivative,
-                                                    local_var,
-                                                    upper_expr,
-                                                    lower_expr,
+        if (eval_integral_antiderivative_difference(antiderivative, local_var, upper_expr, lower_expr,
                                                     &symbolic_value)) {
             num_destroy(&result);
             result = symbolic_value;
@@ -323,12 +309,8 @@ static number_t eval_integral(expr_t *dv)
         } else {
             expr_t *upper_const = expr_new_const(upper);
             expr_t *lower_const = expr_new_const(lower);
-            expr_t *upper_eval_expr = upper_const
-                ? expr_substitute(antiderivative, local_var, upper_const)
-                : NULL;
-            expr_t *lower_eval_expr = lower_const
-                ? expr_substitute(antiderivative, local_var, lower_const)
-                : NULL;
+            expr_t *upper_eval_expr = upper_const ? expr_substitute(antiderivative, local_var, upper_const) : NULL;
+            expr_t *lower_eval_expr = lower_const ? expr_substitute(antiderivative, local_var, lower_const) : NULL;
 
             if (!upper_const || !lower_const || !upper_eval_expr || !lower_eval_expr) {
                 expr_free(lower_eval_expr);
@@ -357,8 +339,7 @@ static number_t eval_integral(expr_t *dv)
         size_t interval_budget = eval_integral_interval_budget();
 
         intg_set_interval_count_max(ig, interval_budget);
-        status = intg_integral(ig, local_integrand, local_var, lower, upper,
-                               &result, NULL);
+        status = intg_integral(ig, local_integrand, local_var, lower, upper, &result, NULL);
     }
 
     expr_free(local_integrand);
@@ -388,9 +369,8 @@ static expr_t *deriv_const(expr_t *dv)
 static expr_t *deriv_var(expr_t *dv)
 {
     const expr_t *wrt = expr_current_wrt_internal();
-    bool same_var = wrt == NULL || dv == wrt ||
-                    (wrt && expr_is_var(wrt) &&
-                     dv->var_id != 0 && dv->var_id == wrt->var_id);
+    bool same_var =
+        wrt == NULL || dv == wrt || (wrt && expr_is_var(wrt) && dv->var_id != 0 && dv->var_id == wrt->var_id);
 
     return expr_new_const(same_var ? NUM_ONE : NUM_ZERO);
 }
@@ -411,8 +391,7 @@ static expr_t *deriv_formal_derivative(expr_t *dv)
         wrts[i] = dv->formal_wrts[i];
     wrts[dv->formal_wrt_count] = (expr_t *)wrt;
 
-    out = expr_new_formal_derivative(
-        dv->a, dv->formal_wrt_count + 1u, wrts);
+    out = expr_new_formal_derivative(dv->a, dv->formal_wrt_count + 1u, wrts);
     free(wrts);
     return out;
 }
@@ -428,9 +407,7 @@ static expr_t *deriv_arbitrary_function(expr_t *dv)
     if (!dv || !dv->name || !dv->a)
         return NULL;
     if (strcmp(dv->name, "Si") == 0 || strcmp(dv->name, "Ci") == 0) {
-        expr_t *numerator = strcmp(dv->name, "Si") == 0
-            ? expr_sin(dv->a)
-            : expr_cos(dv->a);
+        expr_t *numerator = strcmp(dv->name, "Si") == 0 ? expr_sin(dv->a) : expr_cos(dv->a);
         expr_t *ratio = numerator ? expr_div(numerator, dv->a) : NULL;
 
         expr_free(numerator);
@@ -473,9 +450,7 @@ expr_t *expr_new_arbitrary_function(const char *name, const expr_t *argument)
     return expr;
 }
 
-static expr_t *expr_new_argument_list(
-    const expr_t *left,
-    const expr_t *right)
+static expr_t *expr_new_argument_list(const expr_t *left, const expr_t *right)
 {
     expr_t *expr;
 
@@ -489,10 +464,7 @@ static expr_t *expr_new_argument_list(
     return expr;
 }
 
-expr_t *expr_new_arbitrary_function_n(
-    const char *name,
-    size_t argument_count,
-    expr_t *const *arguments)
+expr_t *expr_new_arbitrary_function_n(const char *name, size_t argument_count, expr_t *const *arguments)
 {
     expr_t *list;
 
@@ -500,8 +472,7 @@ expr_t *expr_new_arbitrary_function_n(
         return NULL;
     list = expr_clone(arguments[0]);
     for (size_t i = 1u; list && i < argument_count; ++i) {
-        expr_t *next =
-            expr_new_argument_list(list, arguments[i]);
+        expr_t *next = expr_new_argument_list(list, arguments[i]);
 
         expr_free(list);
         list = next;
@@ -520,9 +491,7 @@ bool expr_is_arbitrary_function(const expr_t *expr)
     return expr && expr->ops == &ops_arbitrary_function;
 }
 
-expr_t *expr_new_formal_derivative(const expr_t *dependent,
-                                   size_t wrt_count,
-                                   expr_t *const *wrts)
+expr_t *expr_new_formal_derivative(const expr_t *dependent, size_t wrt_count, expr_t *const *wrts)
 {
     expr_t *expr;
 
@@ -576,8 +545,8 @@ const expr_t *expr_formal_derivative_wrt_at(const expr_t *expr, size_t index)
 
 static expr_t *deriv_add(expr_t *dv)
 {
-    expr_t *da  = expr_get_dx_internal(dv->a);
-    expr_t *db  = expr_get_dx_internal(dv->b);
+    expr_t *da = expr_get_dx_internal(dv->a);
+    expr_t *db = expr_get_dx_internal(dv->b);
     expr_t *out = expr_add(da, db);
     expr_free(da);
     expr_free(db);
@@ -586,8 +555,8 @@ static expr_t *deriv_add(expr_t *dv)
 
 static expr_t *deriv_sub(expr_t *dv)
 {
-    expr_t *da  = expr_get_dx_internal(dv->a);
-    expr_t *db  = expr_get_dx_internal(dv->b);
+    expr_t *da = expr_get_dx_internal(dv->a);
+    expr_t *db = expr_get_dx_internal(dv->b);
     expr_t *out = expr_sub(da, db);
     expr_free(da);
     expr_free(db);
@@ -608,10 +577,10 @@ static expr_t *deriv_mul(expr_t *dv)
     if (special)
         return special;
 
-    expr_t *da  = expr_get_dx_internal(dv->a);
-    expr_t *db  = expr_get_dx_internal(dv->b);
-    expr_t *t1  = expr_mul(da, dv->b);
-    expr_t *t2  = expr_mul(dv->a, db);
+    expr_t *da = expr_get_dx_internal(dv->a);
+    expr_t *db = expr_get_dx_internal(dv->b);
+    expr_t *t1 = expr_mul(da, dv->b);
+    expr_t *t2 = expr_mul(dv->a, db);
     expr_t *out = expr_add(t1, t2);
     expr_free(da);
     expr_free(db);
@@ -660,9 +629,7 @@ static void deriv_free_number_array_local(number_t *values, size_t n)
     free(values);
 }
 
-static void deriv_copy_number_array_local(number_t *dst,
-                                          const number_t *src,
-                                          size_t n)
+static void deriv_copy_number_array_local(number_t *dst, const number_t *src, size_t n)
 {
     for (size_t i = 0u; i < n; ++i) {
         num_destroy(&dst[i]);
@@ -670,10 +637,7 @@ static void deriv_copy_number_array_local(number_t *dst,
     }
 }
 
-static bool deriv_poly_mul_local(const number_t *left,
-                                 const number_t *right,
-                                 number_t *out,
-                                 size_t n)
+static bool deriv_poly_mul_local(const number_t *left, const number_t *right, number_t *out, size_t n)
 {
     size_t product_count = 2u * n - 1u;
     number_t *product = NULL;
@@ -708,10 +672,7 @@ static bool deriv_poly_mul_local(const number_t *left,
     return fits;
 }
 
-static bool deriv_poly_scale_local(const number_t *src,
-                                   number_t scale,
-                                   number_t *out,
-                                   size_t n)
+static bool deriv_poly_scale_local(const number_t *src, number_t scale, number_t *out, size_t n)
 {
     if (!num_is_real(scale))
         return false;
@@ -741,9 +702,7 @@ static long deriv_poly_exponent_local(number_t value, size_t n)
     return -1L;
 }
 
-static bool deriv_poly_expr_degree_local(const expr_t *expr,
-                                         const expr_t *wrt,
-                                         size_t *degree_out)
+static bool deriv_poly_expr_degree_local(const expr_t *expr, const expr_t *wrt, size_t *degree_out)
 {
     expr_t *vars[1];
     size_t var_index = 0u;
@@ -771,30 +730,23 @@ static bool deriv_poly_expr_degree_local(const expr_t *expr,
         ok = true;
     } else if (expr_match_unary_op(expr, EXPR_KIND_NEG, &base)) {
         ok = deriv_poly_expr_degree_local(base, wrt, degree_out);
-    } else if (expr_match_scaled_expr(expr, &scale, &base) && base &&
-               base != expr) {
-        ok = num_is_real(scale) &&
-             deriv_poly_expr_degree_local(base, wrt, degree_out);
+    } else if (expr_match_scaled_expr(expr, &scale, &base) && base && base != expr) {
+        ok = num_is_real(scale) && deriv_poly_expr_degree_local(base, wrt, degree_out);
     } else if (expr_match_add_sub_expr(expr, &left, &right, &is_sub)) {
         (void)is_sub;
         ok = deriv_poly_expr_degree_local(left, wrt, &left_degree) &&
              deriv_poly_expr_degree_local(right, wrt, &right_degree);
         if (ok)
-            *degree_out = left_degree > right_degree
-                              ? left_degree
-                              : right_degree;
+            *degree_out = left_degree > right_degree ? left_degree : right_degree;
     } else if (expr_match_mul_expr(expr, &left, &right)) {
         ok = deriv_poly_expr_degree_local(left, wrt, &left_degree) &&
-             deriv_poly_expr_degree_local(right, wrt, &right_degree) &&
-             left_degree <= SIZE_MAX - right_degree;
+             deriv_poly_expr_degree_local(right, wrt, &right_degree) && left_degree <= SIZE_MAX - right_degree;
         if (ok)
             *degree_out = left_degree + right_degree;
-    } else if (expr_match_pow_const(expr, &base, &value) &&
-               num_get_small_rational(value, &numerator, &denominator) &&
+    } else if (expr_match_pow_const(expr, &base, &value) && num_get_small_rational(value, &numerator, &denominator) &&
                denominator == 1L && numerator >= 0L) {
         ok = deriv_poly_expr_degree_local(base, wrt, &left_degree) &&
-             (numerator == 0L ||
-              left_degree <= SIZE_MAX / (size_t)numerator);
+             (numerator == 0L || left_degree <= SIZE_MAX / (size_t)numerator);
         if (ok)
             *degree_out = left_degree * (size_t)numerator;
     }
@@ -805,10 +757,7 @@ cleanup:
     return ok;
 }
 
-static bool deriv_collect_poly_local(const expr_t *expr,
-                                     const expr_t *wrt,
-                                     number_t *out,
-                                     size_t n)
+static bool deriv_collect_poly_local(const expr_t *expr, const expr_t *wrt, number_t *out, size_t n)
 {
     expr_t *vars[1];
     size_t var_index = 0u;
@@ -848,34 +797,27 @@ static bool deriv_collect_poly_local(const expr_t *expr,
         goto cleanup_arrays;
 
     if (expr_match_unary_op(expr, EXPR_KIND_NEG, &base)) {
-        ok = deriv_collect_poly_local(base, wrt, out, n) &&
-             deriv_poly_scale_local(out, NUM_NEG_ONE, out, n);
-    } else if (expr_match_scaled_expr(expr, &scale, &base) && base &&
-               base != expr) {
-        ok = deriv_collect_poly_local(base, wrt, left_poly, n) &&
-             deriv_poly_scale_local(left_poly, scale, out, n);
+        ok = deriv_collect_poly_local(base, wrt, out, n) && deriv_poly_scale_local(out, NUM_NEG_ONE, out, n);
+    } else if (expr_match_scaled_expr(expr, &scale, &base) && base && base != expr) {
+        ok = deriv_collect_poly_local(base, wrt, left_poly, n) && deriv_poly_scale_local(left_poly, scale, out, n);
     } else if (expr_match_add_sub_expr(expr, &left, &right, &is_sub)) {
-        ok = deriv_collect_poly_local(left, wrt, left_poly, n) &&
-             deriv_collect_poly_local(right, wrt, right_poly, n);
+        ok = deriv_collect_poly_local(left, wrt, left_poly, n) && deriv_collect_poly_local(right, wrt, right_poly, n);
         if (ok) {
             for (size_t i = 0u; i < n; ++i) {
-                number_t sum = is_sub ? num_sub(left_poly[i], right_poly[i])
-                                      : num_add(left_poly[i], right_poly[i]);
+                number_t sum = is_sub ? num_sub(left_poly[i], right_poly[i]) : num_add(left_poly[i], right_poly[i]);
 
                 num_destroy(&out[i]);
                 out[i] = sum;
             }
         }
     } else if (expr_match_mul_expr(expr, &left, &right)) {
-        ok = deriv_collect_poly_local(left, wrt, left_poly, n) &&
-             deriv_collect_poly_local(right, wrt, right_poly, n) &&
+        ok = deriv_collect_poly_local(left, wrt, left_poly, n) && deriv_collect_poly_local(right, wrt, right_poly, n) &&
              deriv_poly_mul_local(left_poly, right_poly, out, n);
     } else if (expr_match_pow_const(expr, &base, &value)) {
         long exponent = deriv_poly_exponent_local(value, n);
         number_t *result = deriv_alloc_number_array_local(n);
 
-        ok = result && exponent >= 0L &&
-             deriv_collect_poly_local(base, wrt, left_poly, n);
+        ok = result && exponent >= 0L && deriv_collect_poly_local(base, wrt, left_poly, n);
         if (result) {
             num_destroy(&result[0]);
             result[0] = num_clone(NUM_ONE);
@@ -932,21 +874,15 @@ static long deriv_poly_integer_content_local(const number_t *coeffs, size_t n)
 
         if (num_is_zero(coeffs[i]))
             continue;
-        if (!num_get_small_rational(coeffs[i], &numerator, &denominator) ||
-            denominator != 1L) {
+        if (!num_get_small_rational(coeffs[i], &numerator, &denominator) || denominator != 1L) {
             return 0L;
         }
-        content = content == 0L
-                      ? labs(numerator)
-                      : deriv_long_gcd_local(content, numerator);
+        content = content == 0L ? labs(numerator) : deriv_long_gcd_local(content, numerator);
     }
     return content > 1L ? content : 0L;
 }
 
-static bool deriv_poly_divide_integer_local(const number_t *src,
-                                            long divisor,
-                                            number_t *out,
-                                            size_t n)
+static bool deriv_poly_divide_integer_local(const number_t *src, long divisor, number_t *out, size_t n)
 {
     number_t d = num_create_from_long(divisor);
 
@@ -965,9 +901,7 @@ static bool deriv_poly_divide_integer_local(const number_t *src,
     return true;
 }
 
-static expr_t *deriv_build_flat_poly_local(const expr_t *var,
-                                           const number_t *coeffs,
-                                           size_t n)
+static expr_t *deriv_build_flat_poly_local(const expr_t *var, const number_t *coeffs, size_t n)
 {
     expr_t *sum = NULL;
 
@@ -1011,9 +945,7 @@ static expr_t *deriv_build_flat_poly_local(const expr_t *var,
     return sum ? sum : expr_new_const(NUM_ZERO);
 }
 
-static expr_t *deriv_build_poly_local(const expr_t *var,
-                                      const number_t *coeffs,
-                                      size_t n)
+static expr_t *deriv_build_poly_local(const expr_t *var, const number_t *coeffs, size_t n)
 {
     size_t common_power = 0u;
     expr_t *inner_raw = NULL;
@@ -1029,8 +961,7 @@ static expr_t *deriv_build_poly_local(const expr_t *var,
     if (common_power == 0u || common_power == n)
         return deriv_build_flat_poly_local(var, coeffs, n);
 
-    inner_raw = deriv_build_flat_poly_local(
-        var, coeffs + common_power, n - common_power);
+    inner_raw = deriv_build_flat_poly_local(var, coeffs + common_power, n - common_power);
     inner = inner_raw ? expr_simplify(inner_raw) : NULL;
     if (common_power == 1u) {
         factor = expr_retain_expr(var);
@@ -1075,9 +1006,7 @@ static expr_t *deriv_mark_simplified_local(expr_t *expr)
     return expr;
 }
 
-static bool deriv_match_positive_power_local(const expr_t *expr,
-                                             const expr_t **base_out,
-                                             unsigned int *exponent_out)
+static bool deriv_match_positive_power_local(const expr_t *expr, const expr_t **base_out, unsigned int *exponent_out)
 {
     const expr_t *base = NULL;
     number_t exponent = num_new();
@@ -1088,10 +1017,8 @@ static bool deriv_match_positive_power_local(const expr_t *expr,
     if (!expr || !base_out || !exponent_out)
         goto cleanup;
 
-    if (!expr_match_pow_const(expr, &base, &exponent) ||
-        !num_get_small_rational(exponent, &numerator, &denominator) ||
-        denominator != 1L ||
-        numerator <= 0L) {
+    if (!expr_match_pow_const(expr, &base, &exponent) || !num_get_small_rational(exponent, &numerator, &denominator) ||
+        denominator != 1L || numerator <= 0L) {
         goto cleanup;
     }
 
@@ -1104,13 +1031,9 @@ cleanup:
     return ok;
 }
 
-expr_t *expr_deriv_rational_over_polynomial_power(const expr_t *expr,
-                                                  const expr_t *wrt)
+expr_t *expr_deriv_rational_over_polynomial_power(const expr_t *expr, const expr_t *wrt)
 {
-    enum {
-        MAX_RATIONAL_POLYNOMIAL_DEGREE = 16,
-        MAX_RATIONAL_DENOMINATOR_POWER = 16
-    };
+    enum { MAX_RATIONAL_POLYNOMIAL_DEGREE = 16, MAX_RATIONAL_DENOMINATOR_POWER = 16 };
     const expr_t *denom_base = NULL;
     unsigned int denom_power = 1u;
     number_t *p = NULL;
@@ -1134,20 +1057,15 @@ expr_t *expr_deriv_rational_over_polynomial_power(const expr_t *expr,
     if (!expr || !expr_is_div(expr) || !expr->a || !expr->b || !wrt)
         goto cleanup;
 
-    if (!deriv_match_positive_power_local(
-            expr->b, &denom_base, &denom_power)) {
+    if (!deriv_match_positive_power_local(expr->b, &denom_base, &denom_power)) {
         denom_base = expr->b;
         denom_power = 1u;
     }
-    if (denom_power == 0u ||
-        denom_power > MAX_RATIONAL_DENOMINATOR_POWER || !denom_base ||
+    if (denom_power == 0u || denom_power > MAX_RATIONAL_DENOMINATOR_POWER || !denom_base ||
         !deriv_poly_expr_degree_local(expr->a, wrt, &numerator_degree) ||
-        !deriv_poly_expr_degree_local(
-            denom_base, wrt, &denominator_degree) ||
-        numerator_degree > MAX_RATIONAL_POLYNOMIAL_DEGREE ||
-        denominator_degree == 0u ||
-        denominator_degree > MAX_RATIONAL_POLYNOMIAL_DEGREE ||
-        numerator_degree > SIZE_MAX - denominator_degree - 1u)
+        !deriv_poly_expr_degree_local(denom_base, wrt, &denominator_degree) ||
+        numerator_degree > MAX_RATIONAL_POLYNOMIAL_DEGREE || denominator_degree == 0u ||
+        denominator_degree > MAX_RATIONAL_POLYNOMIAL_DEGREE || numerator_degree > SIZE_MAX - denominator_degree - 1u)
         goto cleanup;
 
     coefficient_count = numerator_degree + denominator_degree + 1u;
@@ -1179,8 +1097,7 @@ expr_t *expr_deriv_rational_over_polynomial_power(const expr_t *expr,
         num_destroy(&factor);
     }
 
-    if (!deriv_poly_mul_local(dp, q, left, coefficient_count) ||
-        !deriv_poly_mul_local(p, dq, right, coefficient_count))
+    if (!deriv_poly_mul_local(dp, q, left, coefficient_count) || !deriv_poly_mul_local(p, dq, right, coefficient_count))
         goto cleanup;
 
     num_destroy(&scale);
@@ -1201,15 +1118,10 @@ expr_t *expr_deriv_rational_over_polynomial_power(const expr_t *expr,
         number_t content_num = num_create_from_long(content);
         expr_t *content_expr = NULL;
 
-        if (reduced &&
-            deriv_poly_divide_integer_local(numer, content, reduced,
-                                             coefficient_count)) {
-            numer_expr = deriv_build_poly_local(wrt, reduced,
-                                                coefficient_count);
+        if (reduced && deriv_poly_divide_integer_local(numer, content, reduced, coefficient_count)) {
+            numer_expr = deriv_build_poly_local(wrt, reduced, coefficient_count);
             content_expr = expr_new_const(content_num);
-            scaled_numer_expr = (content_expr && numer_expr)
-                                    ? expr_mul(content_expr, numer_expr)
-                                    : NULL;
+            scaled_numer_expr = (content_expr && numer_expr) ? expr_mul(content_expr, numer_expr) : NULL;
         }
         expr_free(content_expr);
         deriv_free_number_array_local(reduced, coefficient_count);
@@ -1221,8 +1133,7 @@ expr_t *expr_deriv_rational_over_polynomial_power(const expr_t *expr,
     exponent = num_create_from_long((long)denom_power + 1L);
     denom_expr = expr_pow(denom_base, &exponent);
     out = ((scaled_numer_expr ? scaled_numer_expr : numer_expr) && denom_expr)
-              ? expr_div(scaled_numer_expr ? scaled_numer_expr : numer_expr,
-                         denom_expr)
+              ? expr_div(scaled_numer_expr ? scaled_numer_expr : numer_expr, denom_expr)
               : NULL;
     deriv_mark_simplified_local(out);
 
@@ -1244,21 +1155,17 @@ cleanup:
 
 static expr_t *deriv_rational_over_polynomial_power(expr_t *dv)
 {
-    return expr_deriv_rational_over_polynomial_power(
-        dv, expr_current_wrt_internal());
+    return expr_deriv_rational_over_polynomial_power(dv, expr_current_wrt_internal());
 }
 
 static int expr_has_composite_preserved_binding_expr_node(const expr_t *dv)
 {
-    return expr_is_const(dv) && dv->binding_expr &&
-        dv->binding_expr->kind != EXPR_BINDING_EXPR_NUMBER &&
-        dv->binding_expr->kind != EXPR_BINDING_EXPR_CONST;
+    return expr_is_const(dv) && dv->binding_expr && dv->binding_expr->kind != EXPR_BINDING_EXPR_NUMBER &&
+           dv->binding_expr->kind != EXPR_BINDING_EXPR_CONST;
 }
 
-static int expr_binding_aware_search(const expr_t *dv,
-                                   const expr_t *needle,
-                                   int null_needle_matches_any,
-                                   int match_composite_binding)
+static int expr_binding_aware_search(const expr_t *dv, const expr_t *needle, int null_needle_matches_any,
+                                     int match_composite_binding)
 {
     expr_t *expanded;
     int depends;
@@ -1266,8 +1173,7 @@ static int expr_binding_aware_search(const expr_t *dv,
     if (!dv)
         return 0;
 
-    if (match_composite_binding &&
-        expr_has_composite_preserved_binding_expr_node(dv))
+    if (match_composite_binding && expr_has_composite_preserved_binding_expr_node(dv))
         return 1;
 
     if (!needle) {
@@ -1280,21 +1186,15 @@ static int expr_binding_aware_search(const expr_t *dv,
     if (expr_has_composite_preserved_binding_expr_node(dv)) {
         expanded = expr_binding_expr_eval_expr(dv->binding_expr);
         depends = expanded
-            ? expr_binding_aware_search(expanded, needle,
-                                      null_needle_matches_any,
-                                      match_composite_binding)
-            : 0;
+                      ? expr_binding_aware_search(expanded, needle, null_needle_matches_any, match_composite_binding)
+                      : 0;
         if (expanded)
             expr_free(expanded);
         return depends;
     }
 
-    return expr_binding_aware_search(dv->a, needle,
-                                   null_needle_matches_any,
-                                   match_composite_binding) ||
-           expr_binding_aware_search(dv->b, needle,
-                                   null_needle_matches_any,
-                                   match_composite_binding);
+    return expr_binding_aware_search(dv->a, needle, null_needle_matches_any, match_composite_binding) ||
+           expr_binding_aware_search(dv->b, needle, null_needle_matches_any, match_composite_binding);
 }
 
 static int expr_depends_on_current_wrt(const expr_t *dv)
@@ -1316,15 +1216,13 @@ static int expr_has_composite_preserved_binding_expr(const expr_t *dv)
 
 static int expr_is_deriv_foldable_real_const(const expr_t *dv)
 {
-    return expr_is_unnamed_const(dv) &&
-           (!dv->binding_expr || dv->binding_expr->kind == EXPR_BINDING_EXPR_NUMBER) &&
+    return expr_is_unnamed_const(dv) && (!dv->binding_expr || dv->binding_expr->kind == EXPR_BINDING_EXPR_NUMBER) &&
            num_is_real(dv->c);
 }
 
 static int expr_is_sqrt_like_expr(const expr_t *dv)
 {
-    return expr_is_sqrt_expr(dv) ||
-           (expr_is_pow_d_expr(dv) && num_eq(dv->c, NUM_HALF));
+    return expr_is_sqrt_expr(dv) || (expr_is_pow_d_expr(dv) && num_eq(dv->c, NUM_HALF));
 }
 
 static const expr_t *expr_sqrt_like_arg(const expr_t *dv)
@@ -1332,9 +1230,7 @@ static const expr_t *expr_sqrt_like_arg(const expr_t *dv)
     return dv->a;
 }
 
-static int split_scaled_sqrt_denominator(const expr_t *dv,
-                                         number_t *scale_out,
-                                         const expr_t **sqrt_out)
+static int split_scaled_sqrt_denominator(const expr_t *dv, number_t *scale_out, const expr_t **sqrt_out)
 {
     if (expr_is_sqrt_like_expr(dv)) {
         num_destroy(scale_out);
@@ -1363,9 +1259,7 @@ static int split_scaled_sqrt_denominator(const expr_t *dv,
     return 0;
 }
 
-static int split_exp_numerator(const expr_t *dv,
-                               const expr_t **factor_out,
-                               const expr_t **exp_out)
+static int split_exp_numerator(const expr_t *dv, const expr_t **factor_out, const expr_t **exp_out)
 {
     if (expr_is_exp_expr(dv)) {
         *factor_out = NULL;
@@ -1404,13 +1298,11 @@ static int exp_arg_is_scaled_sqrt(const expr_t *arg, const expr_t *sqrt_node)
         return 0;
 
     if (((expr_struct_eq(arg->a, sqrt_node)) ||
-         (expr_is_sqrt_like_expr(arg->a) &&
-          expr_struct_eq(expr_sqrt_like_arg(arg->a), sqrt_arg))) &&
+         (expr_is_sqrt_like_expr(arg->a) && expr_struct_eq(expr_sqrt_like_arg(arg->a), sqrt_arg))) &&
         !expr_depends_on_current_wrt(arg->b))
         return 1;
     if (((expr_struct_eq(arg->b, sqrt_node)) ||
-         (expr_is_sqrt_like_expr(arg->b) &&
-          expr_struct_eq(expr_sqrt_like_arg(arg->b), sqrt_arg))) &&
+         (expr_is_sqrt_like_expr(arg->b) && expr_struct_eq(expr_sqrt_like_arg(arg->b), sqrt_arg))) &&
         !expr_depends_on_current_wrt(arg->a))
         return 1;
 
@@ -1490,9 +1382,7 @@ static expr_t *deriv_exp_over_scaled_sqrt(expr_t *dv)
     return out;
 }
 
-static int split_inverse_scaled_sqrt(const expr_t *dv,
-                                     number_t *num_scale_out,
-                                     number_t *den_scale_out,
+static int split_inverse_scaled_sqrt(const expr_t *dv, number_t *num_scale_out, number_t *den_scale_out,
                                      const expr_t **sqrt_out)
 {
     if (!expr_is_div(dv))
@@ -1507,9 +1397,7 @@ static int split_inverse_scaled_sqrt(const expr_t *dv,
     return 1;
 }
 
-static int split_symbolic_inverse_scaled_sqrt(const expr_t *dv,
-                                              number_t *den_scale_out,
-                                              const expr_t **factor_out,
+static int split_symbolic_inverse_scaled_sqrt(const expr_t *dv, number_t *den_scale_out, const expr_t **factor_out,
                                               const expr_t **sqrt_out)
 {
     if (!expr_is_div(dv))
@@ -1525,9 +1413,7 @@ static int split_symbolic_inverse_scaled_sqrt(const expr_t *dv,
     return 1;
 }
 
-static int split_power_like(const expr_t *dv,
-                            const expr_t **base_out,
-                            number_t *exponent_out)
+static int split_power_like(const expr_t *dv, const expr_t **base_out, number_t *exponent_out)
 {
     if (expr_is_sqrt_like_expr(dv)) {
         *base_out = expr_sqrt_like_arg(dv);
@@ -1544,14 +1430,11 @@ static int split_power_like(const expr_t *dv,
     return 0;
 }
 
-static int split_scaled_sqrt_factor_owned(const expr_t *term,
-                                          const expr_t *base,
-                                          expr_t **factor_out)
+static int split_scaled_sqrt_factor_owned(const expr_t *term, const expr_t *base, expr_t **factor_out)
 {
     if (!term || !base)
         return 0;
-    if (expr_is_sqrt_like_expr(term) &&
-        expr_struct_eq(expr_sqrt_like_arg(term), base)) {
+    if (expr_is_sqrt_like_expr(term) && expr_struct_eq(expr_sqrt_like_arg(term), base)) {
         *factor_out = expr_new_const(NUM_ONE);
         return 1;
     }
@@ -1565,15 +1448,13 @@ static int split_scaled_sqrt_factor_owned(const expr_t *term,
         return 1;
     }
     if (expr_is_mul(term)) {
-        if (expr_is_sqrt_like_expr(term->a) &&
-            expr_struct_eq(expr_sqrt_like_arg(term->a), base) &&
+        if (expr_is_sqrt_like_expr(term->a) && expr_struct_eq(expr_sqrt_like_arg(term->a), base) &&
             !expr_depends_on_structural_node(term->b, base)) {
             expr_retain(term->b);
             *factor_out = term->b;
             return 1;
         }
-        if (expr_is_sqrt_like_expr(term->b) &&
-            expr_struct_eq(expr_sqrt_like_arg(term->b), base) &&
+        if (expr_is_sqrt_like_expr(term->b) && expr_struct_eq(expr_sqrt_like_arg(term->b), base) &&
             !expr_depends_on_structural_node(term->a, base)) {
             expr_retain(term->a);
             *factor_out = term->a;
@@ -1583,9 +1464,7 @@ static int split_scaled_sqrt_factor_owned(const expr_t *term,
     return 0;
 }
 
-static int split_sqrt_affine_numerator_owned(const expr_t *num,
-                                             const expr_t *base,
-                                             expr_t **factor_out,
+static int split_sqrt_affine_numerator_owned(const expr_t *num, const expr_t *base, expr_t **factor_out,
                                              expr_t **constant_out)
 {
     expr_t *factor = NULL;
@@ -1599,8 +1478,7 @@ static int split_sqrt_affine_numerator_owned(const expr_t *num,
     if (!expr_is_addsub(num))
         return 0;
 
-    if (split_scaled_sqrt_factor_owned(num->a, base, &factor) &&
-        !expr_depends_on_structural_node(num->b, base)) {
+    if (split_scaled_sqrt_factor_owned(num->a, base, &factor) && !expr_depends_on_structural_node(num->b, base)) {
         *factor_out = factor;
         if (expr_is_op(num, &ops_sub)) {
             expr_t *neg_const;
@@ -1618,8 +1496,7 @@ static int split_sqrt_affine_numerator_owned(const expr_t *num,
     expr_free(factor);
     factor = NULL;
 
-    if (expr_is_op(num, &ops_add) &&
-        split_scaled_sqrt_factor_owned(num->b, base, &factor) &&
+    if (expr_is_op(num, &ops_add) && split_scaled_sqrt_factor_owned(num->b, base, &factor) &&
         !expr_depends_on_structural_node(num->a, base)) {
         expr_retain(num->a);
         *factor_out = factor;
@@ -1627,8 +1504,7 @@ static int split_sqrt_affine_numerator_owned(const expr_t *num,
         return 1;
     }
 
-    if (expr_is_op(num, &ops_sub) &&
-        split_scaled_sqrt_factor_owned(num->b, base, &factor) &&
+    if (expr_is_op(num, &ops_sub) && split_scaled_sqrt_factor_owned(num->b, base, &factor) &&
         !expr_depends_on_structural_node(num->a, base)) {
         expr_t *neg_factor = expr_neg(factor);
 
@@ -1716,11 +1592,9 @@ static expr_t *deriv_power_inverse_scaled_sqrt_product(expr_t *dv)
     int matched;
 
     matched = (split_power_like(dv->a, &base, &exponent) &&
-               split_symbolic_inverse_scaled_sqrt(dv->b, &den_scale,
-                                                  &factor, &sqrt_den)) ||
+               split_symbolic_inverse_scaled_sqrt(dv->b, &den_scale, &factor, &sqrt_den)) ||
               (split_power_like(dv->b, &base, &exponent) &&
-               split_symbolic_inverse_scaled_sqrt(dv->a, &den_scale,
-                                                  &factor, &sqrt_den));
+               split_symbolic_inverse_scaled_sqrt(dv->a, &den_scale, &factor, &sqrt_den));
     if (!matched)
         goto cleanup;
     if (!expr_struct_eq(base, expr_sqrt_like_arg(sqrt_den)))
@@ -1840,9 +1714,7 @@ static expr_t *deriv_exp_inverse_scaled_sqrt_product(expr_t *dv)
     return out;
 }
 
-static int split_scaled_atan(const expr_t *dv,
-                             number_t *scale_out,
-                             const expr_t **atan_out)
+static int split_scaled_atan(const expr_t *dv, number_t *scale_out, const expr_t **atan_out)
 {
     if (expr_is_op(dv, &ops_atan)) {
         num_destroy(scale_out);
@@ -1854,16 +1726,14 @@ static int split_scaled_atan(const expr_t *dv,
     if (!expr_is_op(dv, &ops_mul))
         return 0;
 
-    if (expr_is_deriv_foldable_real_const(dv->a) &&
-        expr_is_op(dv->b, &ops_atan)) {
+    if (expr_is_deriv_foldable_real_const(dv->a) && expr_is_op(dv->b, &ops_atan)) {
         num_destroy(scale_out);
         *scale_out = num_clone(dv->a->c);
         *atan_out = dv->b;
         return 1;
     }
 
-    if (expr_is_deriv_foldable_real_const(dv->b) &&
-        expr_is_op(dv->a, &ops_atan)) {
+    if (expr_is_deriv_foldable_real_const(dv->b) && expr_is_op(dv->a, &ops_atan)) {
         num_destroy(scale_out);
         *scale_out = num_clone(dv->b->c);
         *atan_out = dv->a;
@@ -1876,9 +1746,7 @@ static int split_scaled_atan(const expr_t *dv,
 static int expr_has_sqrt_like_factor(const expr_t *dv)
 {
     return expr_is_sqrt_like_expr(dv) ||
-           (expr_is_op(dv, &ops_mul) &&
-            (expr_is_sqrt_like_expr(dv->a) ||
-             expr_is_sqrt_like_expr(dv->b)));
+           (expr_is_op(dv, &ops_mul) && (expr_is_sqrt_like_expr(dv->a) || expr_is_sqrt_like_expr(dv->b)));
 }
 
 static void replace_deriv_number(number_t *target, number_t value)
@@ -1887,9 +1755,7 @@ static void replace_deriv_number(number_t *target, number_t value)
     *target = value;
 }
 
-static int split_numeric_affine_in_current_wrt(const expr_t *dv,
-                                               number_t *linear_out,
-                                               number_t *constant_out)
+static int split_numeric_affine_in_current_wrt(const expr_t *dv, number_t *linear_out, number_t *constant_out)
 {
     const expr_t *wrt = expr_current_wrt_internal();
 
@@ -1929,24 +1795,15 @@ static int split_numeric_affine_in_current_wrt(const expr_t *dv,
         number_t left_constant = num_new();
         number_t right_linear = num_new();
         number_t right_constant = num_new();
-        int matched =
-            split_numeric_affine_in_current_wrt(dv->a,
-                                                &left_linear,
-                                                &left_constant) &&
-            split_numeric_affine_in_current_wrt(dv->b,
-                                                &right_linear,
-                                                &right_constant);
+        int matched = split_numeric_affine_in_current_wrt(dv->a, &left_linear, &left_constant) &&
+                      split_numeric_affine_in_current_wrt(dv->b, &right_linear, &right_constant);
 
         if (matched && expr_is_op(dv, &ops_sub)) {
-            replace_deriv_number(linear_out,
-                                 num_sub(left_linear, right_linear));
-            replace_deriv_number(constant_out,
-                                 num_sub(left_constant, right_constant));
+            replace_deriv_number(linear_out, num_sub(left_linear, right_linear));
+            replace_deriv_number(constant_out, num_sub(left_constant, right_constant));
         } else if (matched) {
-            replace_deriv_number(linear_out,
-                                 num_add(left_linear, right_linear));
-            replace_deriv_number(constant_out,
-                                 num_add(left_constant, right_constant));
+            replace_deriv_number(linear_out, num_add(left_linear, right_linear));
+            replace_deriv_number(constant_out, num_add(left_constant, right_constant));
         }
 
         num_destroy(&right_constant);
@@ -1971,8 +1828,7 @@ static int split_numeric_affine_in_current_wrt(const expr_t *dv,
             affine = dv->a;
         }
 
-        if (factor &&
-            split_numeric_affine_in_current_wrt(affine, &linear, &constant)) {
+        if (factor && split_numeric_affine_in_current_wrt(affine, &linear, &constant)) {
             replace_deriv_number(linear_out, num_mul(factor->c, linear));
             replace_deriv_number(constant_out, num_mul(factor->c, constant));
             matched = 1;
@@ -1986,26 +1842,20 @@ static int split_numeric_affine_in_current_wrt(const expr_t *dv,
     return 0;
 }
 
-static int split_numeric_scaled_sqrt_denominator(const expr_t *dv,
-                                                 number_t *scale_out,
-                                                 number_t *radicand_out)
+static int split_numeric_scaled_sqrt_denominator(const expr_t *dv, number_t *scale_out, number_t *radicand_out)
 {
     if (!dv)
         return 0;
 
-    if (expr_is_sqrt_like_expr(dv) &&
-        expr_is_deriv_foldable_real_const(expr_sqrt_like_arg(dv))) {
+    if (expr_is_sqrt_like_expr(dv) && expr_is_deriv_foldable_real_const(expr_sqrt_like_arg(dv))) {
         replace_deriv_number(scale_out, num_clone(NUM_ONE));
-        replace_deriv_number(radicand_out,
-                             num_clone(expr_sqrt_like_arg(dv)->c));
+        replace_deriv_number(radicand_out, num_clone(expr_sqrt_like_arg(dv)->c));
         return 1;
     }
 
-    if (expr_is_unnamed_const(dv) && dv->binding_expr &&
-        dv->binding_expr->kind == EXPR_BINDING_EXPR_UNARY_OP &&
+    if (expr_is_unnamed_const(dv) && dv->binding_expr && dv->binding_expr->kind == EXPR_BINDING_EXPR_UNARY_OP &&
         dv->binding_expr->u.unary_op.ops == &ops_sqrt) {
-        expr_t *radicand = expr_binding_expr_eval_expr(
-            dv->binding_expr->u.unary_op.child);
+        expr_t *radicand = expr_binding_expr_eval_expr(dv->binding_expr->u.unary_op.child);
         int matched = expr_is_deriv_foldable_real_const(radicand);
 
         if (matched) {
@@ -2031,11 +1881,8 @@ static int split_numeric_scaled_sqrt_denominator(const expr_t *dv,
             root = dv->a;
         }
 
-        if (factor && split_numeric_scaled_sqrt_denominator(root,
-                                                            &inner_scale,
-                                                            &radicand)) {
-            replace_deriv_number(scale_out,
-                                 num_mul(factor->c, inner_scale));
+        if (factor && split_numeric_scaled_sqrt_denominator(root, &inner_scale, &radicand)) {
+            replace_deriv_number(scale_out, num_mul(factor->c, inner_scale));
             replace_deriv_number(radicand_out, num_clone(radicand));
             matched = 1;
         }
@@ -2047,9 +1894,7 @@ static int split_numeric_scaled_sqrt_denominator(const expr_t *dv,
     return 0;
 }
 
-static expr_t *deriv_atan_over_matching_sqrt(expr_t *dv,
-                                             number_t atan_scale,
-                                             const expr_t *atan_node)
+static expr_t *deriv_atan_over_matching_sqrt(expr_t *dv, number_t atan_scale, const expr_t *atan_node)
 {
     NUM_SCOPE(scope);
     const expr_t *arg = atan_node ? atan_node->a : NULL;
@@ -2081,36 +1926,25 @@ static expr_t *deriv_atan_over_matching_sqrt(expr_t *dv,
 
     if (!arg || !expr_is_div(arg) || !wrt)
         goto cleanup;
-    if (!split_numeric_scaled_sqrt_denominator(arg->b,
-                                               &arg_den_scale,
-                                               &arg_radicand) ||
-        !split_numeric_scaled_sqrt_denominator(dv->b,
-                                               &outer_den_scale,
-                                               &outer_radicand))
+    if (!split_numeric_scaled_sqrt_denominator(arg->b, &arg_den_scale, &arg_radicand) ||
+        !split_numeric_scaled_sqrt_denominator(dv->b, &outer_den_scale, &outer_radicand))
         goto cleanup;
     if (!num_eq(arg_radicand, outer_radicand))
         goto cleanup;
 
-    if (!num_gt(arg_radicand, NUM_ZERO) ||
-        !split_numeric_affine_in_current_wrt(arg->a, &linear, &constant) ||
+    if (!num_gt(arg_radicand, NUM_ZERO) || !split_numeric_affine_in_current_wrt(arg->a, &linear, &constant) ||
         num_is_zero(linear))
         goto cleanup;
 
     replace_deriv_number(&delta, num_clone(arg_radicand));
     replace_deriv_number(&linear_sq, num_mul(linear, linear));
-    replace_deriv_number(&linear_term_coeff,
-                         num_mul(NUM_TWO, num_mul(linear, constant)));
+    replace_deriv_number(&linear_term_coeff, num_mul(NUM_TWO, num_mul(linear, constant)));
     replace_deriv_number(&constant_sq, num_mul(constant, constant));
-    replace_deriv_number(&arg_den_scale_sq,
-                         num_mul(arg_den_scale, arg_den_scale));
-    replace_deriv_number(&scaled_delta,
-                         num_mul(arg_den_scale_sq, delta));
-    replace_deriv_number(&denominator_constant,
-                         num_add(constant_sq, scaled_delta));
+    replace_deriv_number(&arg_den_scale_sq, num_mul(arg_den_scale, arg_den_scale));
+    replace_deriv_number(&scaled_delta, num_mul(arg_den_scale_sq, delta));
+    replace_deriv_number(&denominator_constant, num_add(constant_sq, scaled_delta));
     replace_deriv_number(&numerator_coeff,
-                         num_div(num_mul(num_mul(atan_scale, linear),
-                                         arg_den_scale),
-                                 outer_den_scale));
+                         num_div(num_mul(num_mul(atan_scale, linear), arg_den_scale), outer_den_scale));
 
     x = expr_retain_expr(wrt);
     x_sq = x ? expr_mul(x, x) : NULL;
@@ -2122,12 +1956,8 @@ static expr_t *deriv_atan_over_matching_sqrt(expr_t *dv,
     linear_term = x ? expr_make_scaled(linear_term_coeff, x) : NULL;
     x = NULL;
     constant_term = expr_new_const(denominator_constant);
-    partial_denominator = (quadratic_term && linear_term)
-        ? expr_add(quadratic_term, linear_term)
-        : NULL;
-    denominator = (partial_denominator && constant_term)
-        ? expr_add(partial_denominator, constant_term)
-        : NULL;
+    partial_denominator = (quadratic_term && linear_term) ? expr_add(quadratic_term, linear_term) : NULL;
+    denominator = (partial_denominator && constant_term) ? expr_add(partial_denominator, constant_term) : NULL;
     numerator = expr_new_const(numerator_coeff);
     quotient = (numerator && denominator) ? expr_div(numerator, denominator) : NULL;
     out = quotient ? expr_simplify(quotient) : NULL;
@@ -2215,14 +2045,14 @@ static expr_t *deriv_div(expr_t *dv)
     if (special)
         return special;
 
-    expr_t *da   = expr_get_dx_internal(dv->a);
-    expr_t *db   = expr_get_dx_internal(dv->b);
+    expr_t *da = expr_get_dx_internal(dv->a);
+    expr_t *db = expr_get_dx_internal(dv->b);
     expr_t *num1 = expr_mul(da, dv->b);
     expr_t *num2 = expr_mul(dv->a, db);
-    expr_t *num  = expr_sub(num1, num2);
+    expr_t *num = expr_sub(num1, num2);
     number_t two = num_create_from_long(2);
-    expr_t *den  = expr_pow(dv->b, &two);
-    expr_t *out  = expr_div(num, den);
+    expr_t *den = expr_pow(dv->b, &two);
+    expr_t *out = expr_div(num, den);
     expr_free(da);
     expr_free(db);
     expr_free(num1);
@@ -2234,25 +2064,22 @@ static expr_t *deriv_div(expr_t *dv)
 
 static expr_t *deriv_neg(expr_t *dv)
 {
-    expr_t *da  = expr_get_dx_internal(dv->a);
+    expr_t *da = expr_get_dx_internal(dv->a);
     expr_t *out = expr_neg(da);
     expr_free(da);
     return out;
 }
 
-static expr_t *expr_unary_constexpr_from_preserved_arg(const expr_ops_t *ops,
-                                                     const expr_t *arg)
+static expr_t *expr_unary_constexpr_from_preserved_arg(const expr_ops_t *ops, const expr_t *arg)
 {
     expr_binding_expr_t *expr;
     number_t value;
     expr_t *node;
 
-    if (!arg || !expr_is_const(arg) || !arg->binding_expr ||
-        (arg->name && *arg->name))
+    if (!arg || !expr_is_const(arg) || !arg->binding_expr || (arg->name && *arg->name))
         return NULL;
 
-    expr = expr_binding_expr_new_unary_op(ops,
-                                        expr_binding_expr_clone(arg->binding_expr));
+    expr = expr_binding_expr_new_unary_op(ops, expr_binding_expr_clone(arg->binding_expr));
     expr = expr_binding_expr_simplify(expr);
     value = expr_binding_expr_eval(expr);
     node = expr_new_const(value);
@@ -2270,18 +2097,18 @@ static expr_t *expr_log_preserving_constexpr(const expr_t *arg)
 
 static expr_t *deriv_pow(expr_t *dv)
 {
-    expr_t *a  = dv->a;
-    expr_t *b  = dv->b;
+    expr_t *a = dv->a;
+    expr_t *b = dv->b;
     expr_t *da = expr_get_dx_internal(a);
     expr_t *db = expr_get_dx_internal(b);
 
-    expr_t *loga    = expr_log_preserving_constexpr(a);
+    expr_t *loga = expr_log_preserving_constexpr(a);
     expr_t *da_on_a = expr_div(da, a);
-    expr_t *term1   = expr_mul(db, loga);
-    expr_t *term2   = expr_mul(b, da_on_a);
-    expr_t *sum     = expr_add(term1, term2);
-    expr_t *powab   = expr_pow_xp(a, b);
-    expr_t *out     = expr_mul(sum, powab);
+    expr_t *term1 = expr_mul(db, loga);
+    expr_t *term2 = expr_mul(b, da_on_a);
+    expr_t *sum = expr_add(term1, term2);
+    expr_t *powab = expr_pow_xp(a, b);
+    expr_t *out = expr_mul(sum, powab);
 
     expr_free(da);
     expr_free(db);
@@ -2300,11 +2127,11 @@ static expr_t *deriv_pow_d(expr_t *dv)
     NUM_SCOPE(scope);
     number_t exponent = num_clone(dv->c);
     number_t exponent_minus_one = num_sub(exponent, NUM_ONE);
-    expr_t *da   = expr_get_dx_internal(dv->a);
-    expr_t *p    = expr_pow(dv->a, &exponent_minus_one);
+    expr_t *da = expr_get_dx_internal(dv->a);
+    expr_t *p = expr_pow(dv->a, &exponent_minus_one);
     expr_t *coef = expr_new_const(exponent);
-    expr_t *cp   = expr_mul(coef, p);
-    expr_t *out  = expr_mul(cp, da);
+    expr_t *cp = expr_mul(coef, p);
+    expr_t *out = expr_mul(cp, da);
     expr_free(da);
     expr_free(p);
     expr_free(coef);
@@ -2354,9 +2181,8 @@ static expr_t *deriv_integral(expr_t *dv)
     if (!integrand_deriv)
         return expr_new_const(NUM_NAN);
     if (!expr_is_exact_zero(integrand_deriv)) {
-        integrand_term = lower
-            ? expr_integral_with_bounds_internal(integrand_deriv, lower, upper, dummy)
-            : expr_integral_with_dummy_internal(integrand_deriv, upper, dummy);
+        integrand_term = lower ? expr_integral_with_bounds_internal(integrand_deriv, lower, upper, dummy)
+                               : expr_integral_with_dummy_internal(integrand_deriv, upper, dummy);
         if (!integrand_term) {
             expr_free(integrand_deriv);
             return expr_new_const(NUM_NAN);
@@ -2419,8 +2245,7 @@ fail:
     return expr_new_const(NUM_NAN);
 }
 
-static expr_t *expr_integral_meta_apply(const expr_t *domain,
-                                        const expr_t *dummy)
+static expr_t *expr_integral_meta_apply(const expr_t *domain, const expr_t *dummy)
 {
     if (!domain || !dummy)
         return NULL;
@@ -2429,8 +2254,7 @@ static expr_t *expr_integral_meta_apply(const expr_t *domain,
     return expr_new_binary_internal(&ops_integral_meta, domain, dummy);
 }
 
-static expr_t *expr_integral_bounds_apply(const expr_t *lower,
-                                          const expr_t *upper)
+static expr_t *expr_integral_bounds_apply(const expr_t *lower, const expr_t *upper)
 {
     if (!lower || !upper)
         return NULL;
@@ -2439,9 +2263,7 @@ static expr_t *expr_integral_bounds_apply(const expr_t *lower,
     return expr_new_binary_internal(&ops_integral_bounds, lower, upper);
 }
 
-static bool expr_contains_free_var_named_impl(const expr_t *expr,
-                                              const char *name,
-                                              const expr_t *bound_dummy)
+static bool expr_contains_free_var_named_impl(const expr_t *expr, const char *name, const expr_t *bound_dummy)
 {
     const expr_t *dummy;
     const expr_t *lower;
@@ -2451,10 +2273,8 @@ static bool expr_contains_free_var_named_impl(const expr_t *expr,
         return false;
 
     if (expr_is_var(expr)) {
-        bool shadowed = bound_dummy == expr ||
-            (bound_dummy && bound_dummy->var_id != 0 &&
-             expr->var_id != 0 &&
-             bound_dummy->var_id == expr->var_id);
+        bool shadowed = bound_dummy == expr || (bound_dummy && bound_dummy->var_id != 0 && expr->var_id != 0 &&
+                                                bound_dummy->var_id == expr->var_id);
 
         return !shadowed && expr->name && strcmp(expr->name, name) == 0;
     }
@@ -2478,12 +2298,9 @@ static bool expr_contains_free_var_named(const expr_t *expr, const char *name)
     return expr_contains_free_var_named_impl(expr, name, NULL);
 }
 
-static const char *expr_choose_integral_dummy_name(const expr_t *integrand,
-                                                   const expr_t *wrt)
+static const char *expr_choose_integral_dummy_name(const expr_t *integrand, const expr_t *wrt)
 {
-    static const char *const candidates[] = {
-        "t", "u", "v", "w", "s", "r", "q", "p"
-    };
+    static const char *const candidates[] = {"t", "u", "v", "w", "s", "r", "q", "p"};
 
     if (!integrand || !expr_is_var(wrt))
         return wrt && wrt->name ? wrt->name : "t";
@@ -2504,223 +2321,193 @@ static const char *expr_choose_integral_dummy_name(const expr_t *integrand,
 /* Operator vtable instances                                                 */
 /* ------------------------------------------------------------------------- */
 
-const expr_ops_t ops_const = {
-    .eval = eval_const,
-    .deriv = deriv_const,
-    .reverse = expr_reverse_atom,
-    .kind = EXPR_KIND_CONST,
-    .arity = EXPR_OP_ATOM,
-    .name = "const",
-    .tex_name = NULL,
-    .apply_unary = NULL,
-    .apply_binary = NULL,
-    .simplify = expr_simplify_passthrough,
-    .fold_const_unary = NULL
-};
+const expr_ops_t ops_const = {.eval = eval_const,
+                              .deriv = deriv_const,
+                              .reverse = expr_reverse_atom,
+                              .kind = EXPR_KIND_CONST,
+                              .arity = EXPR_OP_ATOM,
+                              .name = "const",
+                              .tex_name = NULL,
+                              .apply_unary = NULL,
+                              .apply_binary = NULL,
+                              .simplify = expr_simplify_passthrough,
+                              .fold_const_unary = NULL};
 
-const expr_ops_t ops_var = {
-    .eval = eval_var,
-    .deriv = deriv_var,
-    .reverse = expr_reverse_atom,
-    .kind = EXPR_KIND_VAR,
-    .arity = EXPR_OP_ATOM,
-    .name = "var",
-    .tex_name = NULL,
-    .apply_unary = NULL,
-    .apply_binary = NULL,
-    .simplify = expr_simplify_passthrough,
-    .fold_const_unary = NULL
-};
+const expr_ops_t ops_var = {.eval = eval_var,
+                            .deriv = deriv_var,
+                            .reverse = expr_reverse_atom,
+                            .kind = EXPR_KIND_VAR,
+                            .arity = EXPR_OP_ATOM,
+                            .name = "var",
+                            .tex_name = NULL,
+                            .apply_unary = NULL,
+                            .apply_binary = NULL,
+                            .simplify = expr_simplify_passthrough,
+                            .fold_const_unary = NULL};
 
-const expr_ops_t ops_formal_derivative = {
-    .eval = eval_formal_derivative,
-    .deriv = deriv_formal_derivative,
-    .reverse = expr_reverse_not_differentiable,
-    .kind = EXPR_KIND_FORMAL_DERIVATIVE,
-    .arity = EXPR_OP_UNARY,
-    .diff_kind = EXPR_DIFF_NONE,
-    .name = "D",
-    .tex_name = "\\operatorname{D}",
-    .apply_unary = NULL,
-    .apply_binary = NULL,
-    .simplify = expr_simplify_passthrough,
-    .fold_const_unary = NULL
-};
+const expr_ops_t ops_formal_derivative = {.eval = eval_formal_derivative,
+                                          .deriv = deriv_formal_derivative,
+                                          .reverse = expr_reverse_not_differentiable,
+                                          .kind = EXPR_KIND_FORMAL_DERIVATIVE,
+                                          .arity = EXPR_OP_UNARY,
+                                          .diff_kind = EXPR_DIFF_NONE,
+                                          .name = "D",
+                                          .tex_name = "\\operatorname{D}",
+                                          .apply_unary = NULL,
+                                          .apply_binary = NULL,
+                                          .simplify = expr_simplify_passthrough,
+                                          .fold_const_unary = NULL};
 
-const expr_ops_t ops_arbitrary_function = {
-    .eval = eval_arbitrary_function,
-    .deriv = deriv_arbitrary_function,
-    .reverse = expr_reverse_not_differentiable,
-    .kind = EXPR_KIND_ARBITRARY_FUNCTION,
-    .arity = EXPR_OP_UNARY,
-    .diff_kind = EXPR_DIFF_SMOOTH,
-    .name = "arbitrary-function",
-    .tex_name = NULL,
-    .apply_unary = NULL,
-    .apply_binary = NULL,
-    .simplify = expr_simplify_passthrough,
-    .fold_const_unary = NULL
-};
+const expr_ops_t ops_arbitrary_function = {.eval = eval_arbitrary_function,
+                                           .deriv = deriv_arbitrary_function,
+                                           .reverse = expr_reverse_not_differentiable,
+                                           .kind = EXPR_KIND_ARBITRARY_FUNCTION,
+                                           .arity = EXPR_OP_UNARY,
+                                           .diff_kind = EXPR_DIFF_SMOOTH,
+                                           .name = "arbitrary-function",
+                                           .tex_name = NULL,
+                                           .apply_unary = NULL,
+                                           .apply_binary = NULL,
+                                           .simplify = expr_simplify_passthrough,
+                                           .fold_const_unary = NULL};
 
-const expr_ops_t ops_argument_list = {
-    .eval = eval_argument_list,
-    .deriv = NULL,
-    .reverse = expr_reverse_not_differentiable,
-    .kind = EXPR_KIND_ARGUMENT_LIST,
-    .arity = EXPR_OP_BINARY,
-    .diff_kind = EXPR_DIFF_NONE,
-    .name = "argument-list",
-    .tex_name = NULL,
-    .apply_unary = NULL,
-    .apply_binary = expr_new_argument_list,
-    .simplify = expr_simplify_passthrough,
-    .fold_const_unary = NULL
-};
+const expr_ops_t ops_argument_list = {.eval = eval_argument_list,
+                                      .deriv = NULL,
+                                      .reverse = expr_reverse_not_differentiable,
+                                      .kind = EXPR_KIND_ARGUMENT_LIST,
+                                      .arity = EXPR_OP_BINARY,
+                                      .diff_kind = EXPR_DIFF_NONE,
+                                      .name = "argument-list",
+                                      .tex_name = NULL,
+                                      .apply_unary = NULL,
+                                      .apply_binary = expr_new_argument_list,
+                                      .simplify = expr_simplify_passthrough,
+                                      .fold_const_unary = NULL};
 
-const expr_ops_t ops_add = {
-    .eval = eval_add,
-    .deriv = deriv_add,
-    .reverse = expr_reverse_add,
-    .kind = EXPR_KIND_ADD,
-    .arity = EXPR_OP_BINARY,
-    .name = "+",
-    .tex_name = "+",
-    .apply_unary = NULL,
-    .apply_binary = expr_add,
-    .simplify = expr_simplify_add_sub_operator,
-    .fold_const_unary = NULL
-};
+const expr_ops_t ops_add = {.eval = eval_add,
+                            .deriv = deriv_add,
+                            .reverse = expr_reverse_add,
+                            .kind = EXPR_KIND_ADD,
+                            .arity = EXPR_OP_BINARY,
+                            .name = "+",
+                            .tex_name = "+",
+                            .apply_unary = NULL,
+                            .apply_binary = expr_add,
+                            .simplify = expr_simplify_add_sub_operator,
+                            .fold_const_unary = NULL};
 
-const expr_ops_t ops_sub = {
-    .eval = eval_sub,
-    .deriv = deriv_sub,
-    .reverse = expr_reverse_sub,
-    .kind = EXPR_KIND_SUB,
-    .arity = EXPR_OP_BINARY,
-    .name = "-",
-    .tex_name = "-",
-    .apply_unary = NULL,
-    .apply_binary = expr_sub,
-    .simplify = expr_simplify_add_sub_operator,
-    .fold_const_unary = NULL
-};
+const expr_ops_t ops_sub = {.eval = eval_sub,
+                            .deriv = deriv_sub,
+                            .reverse = expr_reverse_sub,
+                            .kind = EXPR_KIND_SUB,
+                            .arity = EXPR_OP_BINARY,
+                            .name = "-",
+                            .tex_name = "-",
+                            .apply_unary = NULL,
+                            .apply_binary = expr_sub,
+                            .simplify = expr_simplify_add_sub_operator,
+                            .fold_const_unary = NULL};
 
-const expr_ops_t ops_mul = {
-    .eval = eval_mul,
-    .deriv = deriv_mul,
-    .reverse = expr_reverse_mul,
-    .kind = EXPR_KIND_MUL,
-    .arity = EXPR_OP_BINARY,
-    .name = "*",
-    .tex_name = "\\cdot",
-    .apply_unary = NULL,
-    .apply_binary = expr_mul,
-    .simplify = expr_simplify_mul_operator,
-    .fold_const_unary = NULL
-};
+const expr_ops_t ops_mul = {.eval = eval_mul,
+                            .deriv = deriv_mul,
+                            .reverse = expr_reverse_mul,
+                            .kind = EXPR_KIND_MUL,
+                            .arity = EXPR_OP_BINARY,
+                            .name = "*",
+                            .tex_name = "\\cdot",
+                            .apply_unary = NULL,
+                            .apply_binary = expr_mul,
+                            .simplify = expr_simplify_mul_operator,
+                            .fold_const_unary = NULL};
 
-const expr_ops_t ops_div = {
-    .eval = eval_div,
-    .deriv = deriv_div,
-    .reverse = expr_reverse_div,
-    .kind = EXPR_KIND_DIV,
-    .arity = EXPR_OP_BINARY,
-    .name = "/",
-    .tex_name = "/",
-    .apply_unary = NULL,
-    .apply_binary = expr_div,
-    .simplify = expr_simplify_div_operator,
-    .fold_const_unary = NULL
-};
+const expr_ops_t ops_div = {.eval = eval_div,
+                            .deriv = deriv_div,
+                            .reverse = expr_reverse_div,
+                            .kind = EXPR_KIND_DIV,
+                            .arity = EXPR_OP_BINARY,
+                            .name = "/",
+                            .tex_name = "/",
+                            .apply_unary = NULL,
+                            .apply_binary = expr_div,
+                            .simplify = expr_simplify_div_operator,
+                            .fold_const_unary = NULL};
 
-const expr_ops_t ops_pow = {
-    .eval = eval_pow,
-    .deriv = deriv_pow,
-    .reverse = expr_reverse_pow,
-    .kind = EXPR_KIND_POW,
-    .arity = EXPR_OP_BINARY,
-    .name = "^",
-    .tex_name = "^",
-    .apply_unary = NULL,
-    .apply_binary = expr_pow_xp,
-    .simplify = expr_simplify_pow_operator,
-    .fold_const_unary = NULL
-};
+const expr_ops_t ops_pow = {.eval = eval_pow,
+                            .deriv = deriv_pow,
+                            .reverse = expr_reverse_pow,
+                            .kind = EXPR_KIND_POW,
+                            .arity = EXPR_OP_BINARY,
+                            .name = "^",
+                            .tex_name = "^",
+                            .apply_unary = NULL,
+                            .apply_binary = expr_pow_xp,
+                            .simplify = expr_simplify_pow_operator,
+                            .fold_const_unary = NULL};
 
-const expr_ops_t ops_pow_d = {
-    .eval = eval_pow_d,
-    .deriv = deriv_pow_d,
-    .reverse = expr_reverse_pow_d,
-    .kind = EXPR_KIND_POW_D,
-    .arity = EXPR_OP_BINARY,
-    .name = "^",
-    .tex_name = "^",
-    .apply_unary = NULL,
-    .apply_binary = NULL,
-    .simplify = expr_simplify_pow_d_operator,
-    .fold_const_unary = NULL
-};
+const expr_ops_t ops_pow_d = {.eval = eval_pow_d,
+                              .deriv = deriv_pow_d,
+                              .reverse = expr_reverse_pow_d,
+                              .kind = EXPR_KIND_POW_D,
+                              .arity = EXPR_OP_BINARY,
+                              .name = "^",
+                              .tex_name = "^",
+                              .apply_unary = NULL,
+                              .apply_binary = NULL,
+                              .simplify = expr_simplify_pow_d_operator,
+                              .fold_const_unary = NULL};
 
-const expr_ops_t ops_integral = {
-    .eval = eval_integral,
-    .deriv = deriv_integral,
-    /* Unevaluated integrals support symbolic d/dx via the fundamental theorem,
-     * but they are not part of the numeric reverse-mode AD pipeline. */
-    .reverse = expr_reverse_not_differentiable,
-    .kind = EXPR_KIND_INTEGRAL,
-    .arity = EXPR_OP_BINARY,
-    .diff_kind = EXPR_DIFF_SMOOTH,
-    .name = "integral",
-    .tex_name = "\\int",
-    .apply_unary = NULL,
-    .apply_binary = expr_integral,
-    .simplify = expr_simplify_rebuild_binary_operator,
-    .fold_const_unary = NULL
-};
+const expr_ops_t ops_integral = {.eval = eval_integral,
+                                 .deriv = deriv_integral,
+                                 /* Unevaluated integrals support symbolic d/dx via the fundamental theorem,
+                                  * but they are not part of the numeric reverse-mode AD pipeline. */
+                                 .reverse = expr_reverse_not_differentiable,
+                                 .kind = EXPR_KIND_INTEGRAL,
+                                 .arity = EXPR_OP_BINARY,
+                                 .diff_kind = EXPR_DIFF_SMOOTH,
+                                 .name = "integral",
+                                 .tex_name = "\\int",
+                                 .apply_unary = NULL,
+                                 .apply_binary = expr_integral,
+                                 .simplify = expr_simplify_rebuild_binary_operator,
+                                 .fold_const_unary = NULL};
 
-const expr_ops_t ops_integral_meta = {
-    .eval = eval_integral_meta,
-    .deriv = deriv_integral_meta,
-    .reverse = expr_reverse_not_differentiable,
-    .kind = EXPR_KIND_INTEGRAL_META,
-    .arity = EXPR_OP_BINARY,
-    .diff_kind = EXPR_DIFF_SMOOTH,
-    .name = "integral_meta",
-    .tex_name = NULL,
-    .apply_unary = NULL,
-    .apply_binary = expr_integral_meta_apply,
-    .simplify = expr_simplify_rebuild_binary_operator,
-    .fold_const_unary = NULL
-};
+const expr_ops_t ops_integral_meta = {.eval = eval_integral_meta,
+                                      .deriv = deriv_integral_meta,
+                                      .reverse = expr_reverse_not_differentiable,
+                                      .kind = EXPR_KIND_INTEGRAL_META,
+                                      .arity = EXPR_OP_BINARY,
+                                      .diff_kind = EXPR_DIFF_SMOOTH,
+                                      .name = "integral_meta",
+                                      .tex_name = NULL,
+                                      .apply_unary = NULL,
+                                      .apply_binary = expr_integral_meta_apply,
+                                      .simplify = expr_simplify_rebuild_binary_operator,
+                                      .fold_const_unary = NULL};
 
-const expr_ops_t ops_integral_bounds = {
-    .eval = eval_integral_bounds,
-    .deriv = deriv_integral_bounds,
-    .reverse = expr_reverse_not_differentiable,
-    .kind = EXPR_KIND_INTEGRAL_BOUNDS,
-    .arity = EXPR_OP_BINARY,
-    .diff_kind = EXPR_DIFF_SMOOTH,
-    .name = "integral_bounds",
-    .tex_name = NULL,
-    .apply_unary = NULL,
-    .apply_binary = expr_integral_bounds_apply,
-    .simplify = expr_simplify_rebuild_binary_operator,
-    .fold_const_unary = NULL
-};
+const expr_ops_t ops_integral_bounds = {.eval = eval_integral_bounds,
+                                        .deriv = deriv_integral_bounds,
+                                        .reverse = expr_reverse_not_differentiable,
+                                        .kind = EXPR_KIND_INTEGRAL_BOUNDS,
+                                        .arity = EXPR_OP_BINARY,
+                                        .diff_kind = EXPR_DIFF_SMOOTH,
+                                        .name = "integral_bounds",
+                                        .tex_name = NULL,
+                                        .apply_unary = NULL,
+                                        .apply_binary = expr_integral_bounds_apply,
+                                        .simplify = expr_simplify_rebuild_binary_operator,
+                                        .fold_const_unary = NULL};
 
-const expr_ops_t ops_neg = {
-    .eval = eval_neg,
-    .deriv = deriv_neg,
-    .reverse = expr_reverse_neg,
-    .kind = EXPR_KIND_NEG,
-    .arity = EXPR_OP_UNARY,
-    .name = "-",
-    .tex_name = "-",
-    .apply_unary = expr_neg,
-    .apply_binary = NULL,
-    .simplify = expr_simplify_neg_operator,
-    .fold_const_unary = NULL
-};
+const expr_ops_t ops_neg = {.eval = eval_neg,
+                            .deriv = deriv_neg,
+                            .reverse = expr_reverse_neg,
+                            .kind = EXPR_KIND_NEG,
+                            .arity = EXPR_OP_UNARY,
+                            .name = "-",
+                            .tex_name = "-",
+                            .apply_unary = expr_neg,
+                            .apply_binary = NULL,
+                            .simplify = expr_simplify_neg_operator,
+                            .fold_const_unary = NULL};
 
 /* ------------------------------------------------------------------------- */
 /* Arithmetic constructors (retain children)                                 */
@@ -2808,9 +2595,7 @@ expr_t *expr_integral(const expr_t *integrand, const expr_t *wrt)
     return integral;
 }
 
-expr_t *expr_integral_with_dummy_internal(const expr_t *integrand,
-                                          const expr_t *upper,
-                                          const expr_t *dummy)
+expr_t *expr_integral_with_dummy_internal(const expr_t *integrand, const expr_t *upper, const expr_t *dummy)
 {
     expr_t *meta;
     expr_t *integral;
@@ -2836,9 +2621,7 @@ expr_t *expr_integral_with_dummy_internal(const expr_t *integrand,
     return integral;
 }
 
-expr_t *expr_integral_with_bounds_internal(const expr_t *integrand,
-                                           const expr_t *lower,
-                                           const expr_t *upper,
+expr_t *expr_integral_with_bounds_internal(const expr_t *integrand, const expr_t *lower, const expr_t *upper,
                                            const expr_t *dummy)
 {
     expr_t *bounds;

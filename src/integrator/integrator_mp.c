@@ -26,7 +26,7 @@ typedef struct {
     integrator_t *ig;
     expr_t *expr;
     size_t ndim;
-    expr_t * const *vars;
+    expr_t *const *vars;
     const number_t *lo;
     const number_t *hi;
 } mp_multi_ctx_t;
@@ -80,11 +80,16 @@ static number_t mp_num_from_decimal(const char *text)
 static int mp_gk_pair_index(size_t kronrod_index)
 {
     switch (kronrod_index) {
-        case 1u: return 0;
-        case 3u: return 1;
-        case 5u: return 2;
-        case 7u: return 3;
-        default: return -1;
+        case 1u:
+            return 0;
+        case 3u:
+            return 1;
+        case 5u:
+            return 2;
+        case 7u:
+            return 3;
+        default:
+            return -1;
     }
 }
 
@@ -106,36 +111,18 @@ static int mp_eval_expr_ctx(void *ctx, const number_t x, number_t *out)
     return mp_eval_at(expr_ctx->expr, expr_ctx->x_var, x, out);
 }
 
-static int mp_interval_init_eval(mp_eval_fn eval, void *ctx,
-                                 const number_t a, const number_t b,
-                                 mp_subinterval_t *out)
+static int mp_interval_init_eval(mp_eval_fn eval, void *ctx, const number_t a, const number_t b, mp_subinterval_t *out)
 {
-    static const char *xgk_text[8] = {
-        "0.991455371120812639206854697526329",
-        "0.949107912342758524526189684047851",
-        "0.864864423359769072789712788640926",
-        "0.741531185599394439863864773280788",
-        "0.586087235467691130294144838258730",
-        "0.405845151377397166906606412076961",
-        "0.207784955007898467600689403773245",
-        "0"
-    };
-    static const char *wg_text[4] = {
-        "0.129484966168869693270611432679082",
-        "0.279705391489276667901467771423780",
-        "0.381830050505118944950369775488975",
-        "0.417959183673469387755102040816327"
-    };
-    static const char *wgk_text[8] = {
-        "0.022935322010529224963732008058970",
-        "0.063092092629978553290700663189204",
-        "0.104790010322250183839876322541518",
-        "0.140653259715525918745189590510238",
-        "0.169004726639267902826583426598550",
-        "0.190350578064785409913256402421014",
-        "0.204432940075298892414161999234649",
-        "0.209482141084727828012999174891714"
-    };
+    static const char *xgk_text[8] = {"0.991455371120812639206854697526329", "0.949107912342758524526189684047851",
+                                      "0.864864423359769072789712788640926", "0.741531185599394439863864773280788",
+                                      "0.586087235467691130294144838258730", "0.405845151377397166906606412076961",
+                                      "0.207784955007898467600689403773245", "0"};
+    static const char *wg_text[4] = {"0.129484966168869693270611432679082", "0.279705391489276667901467771423780",
+                                     "0.381830050505118944950369775488975", "0.417959183673469387755102040816327"};
+    static const char *wgk_text[8] = {"0.022935322010529224963732008058970", "0.063092092629978553290700663189204",
+                                      "0.104790010322250183839876322541518", "0.140653259715525918745189590510238",
+                                      "0.169004726639267902826583426598550", "0.190350578064785409913256402421014",
+                                      "0.204432940075298892414161999234649", "0.209482141084727828012999174891714"};
     number_t center = NUM_ZERO;
     number_t half = NUM_ZERO;
     number_t half_abs = NUM_ZERO;
@@ -195,8 +182,7 @@ static int mp_interval_init_eval(mp_eval_fn eval, void *ctx,
         number_t f_sum = NUM_ZERO;
         number_t k_term = NUM_ZERO;
 
-        if (eval(ctx, x_left, &f_left) != 0 ||
-            eval(ctx, x_right, &f_right) != 0) {
+        if (eval(ctx, x_left, &f_left) != 0 || eval(ctx, x_right, &f_right) != 0) {
             num_destroy(&k_term);
             num_destroy(&f_sum);
             num_destroy(&f_right);
@@ -282,10 +268,8 @@ cleanup:
     return rc;
 }
 
-static int mp_interval_split_eval(mp_eval_fn eval, void *ctx,
-                             const mp_subinterval_t *src,
-                             mp_subinterval_t *left,
-                             mp_subinterval_t *right)
+static int mp_interval_split_eval(mp_eval_fn eval, void *ctx, const mp_subinterval_t *src, mp_subinterval_t *left,
+                                  mp_subinterval_t *right)
 {
     number_t m = NUM_ZERO;
     int rc = -1;
@@ -309,8 +293,7 @@ cleanup:
     return rc;
 }
 
-static number_t mp_tolerance_threshold(number_t abs_tol, number_t rel_tol,
-                                       const number_t value)
+static number_t mp_tolerance_threshold(number_t abs_tol, number_t rel_tol, const number_t value)
 {
     number_t threshold = num_clone(abs_tol);
     number_t abs_value = num_abs(value);
@@ -327,16 +310,9 @@ static number_t mp_tolerance_threshold(number_t abs_tol, number_t rel_tol,
     return threshold;
 }
 
-static int mp_tanh_sinh_sum_for_h(mp_eval_fn eval, void *ctx,
-                                  const number_t center,
-                                  const number_t half_width,
-                                  const number_t pi_over_two,
-                                  const number_t h,
-                                  const number_t term_tolerance,
-                                  size_t min_steps,
-                                  int max_steps,
-                                  number_t *sum_out,
-                                  number_t *last_term_out,
+static int mp_tanh_sinh_sum_for_h(mp_eval_fn eval, void *ctx, const number_t center, const number_t half_width,
+                                  const number_t pi_over_two, const number_t h, const number_t term_tolerance,
+                                  size_t min_steps, int max_steps, number_t *sum_out, number_t *last_term_out,
                                   size_t *used_steps_out)
 {
     number_t sum = num_clone(NUM_ZERO);
@@ -484,20 +460,14 @@ static int mp_tanh_sinh_sum_for_h(mp_eval_fn eval, void *ctx,
     return 1;
 }
 
-static int mp_tanh_sinh_integral(mp_eval_fn eval, void *ctx,
-                                 number_t a, number_t b,
-                                 number_t abs_tol, number_t rel_tol,
-                                 size_t max_intervals,
-                                 number_t *result_out,
-                                 number_t *error_out,
-                                 size_t *steps_out)
+static int mp_tanh_sinh_integral(mp_eval_fn eval, void *ctx, number_t a, number_t b, number_t abs_tol, number_t rel_tol,
+                                 size_t max_intervals, number_t *result_out, number_t *error_out, size_t *steps_out)
 {
     number_t ab_sum = num_add(a, b);
     number_t width = num_sub(b, a);
     number_t half_width = num_mul(width, NUM_HALF);
     number_t center = num_mul(ab_sum, NUM_HALF);
-    number_t pi_over_two = num_const_prec_digits(NUM_PI_2,
-        num_get_default_prec_digits() + 16u);
+    number_t pi_over_two = num_const_prec_digits(NUM_PI_2, num_get_default_prec_digits() + 16u);
     number_t h = num_clone(NUM_ONE);
     number_t term_scale = num_create_from_string("1e-4");
     number_t term_tolerance = num_mul(abs_tol, term_scale);
@@ -534,8 +504,7 @@ static int mp_tanh_sinh_integral(mp_eval_fn eval, void *ctx,
         while (max_steps <= INT_MAX / 2) {
             size_t next_steps = (size_t)max_steps * 2u;
 
-            if (next_steps > (SIZE_MAX - 1u) / 8u ||
-                (next_steps + 1u) * 8u > max_intervals)
+            if (next_steps > (SIZE_MAX - 1u) / 8u || (next_steps + 1u) * 8u > max_intervals)
                 break;
             max_steps *= 2;
         }
@@ -554,9 +523,8 @@ static int mp_tanh_sinh_integral(mp_eval_fn eval, void *ctx,
         size_t level_steps = 0u;
         size_t remaining_steps = used_steps < max_intervals ? max_intervals - used_steps : 0u;
         int level_max_steps;
-        size_t level_min_steps = remaining_steps < ((size_t)max_steps + 1u)
-            ? remaining_steps
-            : ((size_t)max_steps + 1u);
+        size_t level_min_steps =
+            remaining_steps < ((size_t)max_steps + 1u) ? remaining_steps : ((size_t)max_steps + 1u);
         if (remaining_steps == 0u) {
             num_destroy(&threshold);
             num_destroy(&level_last_term);
@@ -566,12 +534,9 @@ static int mp_tanh_sinh_integral(mp_eval_fn eval, void *ctx,
         level_max_steps = max_steps;
         if (remaining_steps <= (size_t)level_max_steps)
             level_max_steps = (int)remaining_steps - 1;
-        int sum_status = mp_tanh_sinh_sum_for_h(eval, ctx, center, half_width,
-                                                pi_over_two, h,
-                                                term_tolerance, level_min_steps,
-                                                level_max_steps,
-                                                &level_sum, &level_last_term,
-                                                &level_steps);
+        int sum_status =
+            mp_tanh_sinh_sum_for_h(eval, ctx, center, half_width, pi_over_two, h, term_tolerance, level_min_steps,
+                                   level_max_steps, &level_sum, &level_last_term, &level_steps);
 
         if (sum_status < 0) {
             num_destroy(&threshold);
@@ -695,10 +660,8 @@ static size_t mp_guard_precision_bits(size_t user_bits)
     return user_bits + extra;
 }
 
-static int mp_adaptive_integral(mp_eval_fn eval, void *ctx,
-                                integrator_t *ig,
-                                number_t a, number_t b,
-                                number_t *result, number_t *error_est)
+static int mp_adaptive_integral(mp_eval_fn eval, void *ctx, integrator_t *ig, number_t a, number_t b, number_t *result,
+                                number_t *error_est)
 {
     mp_subinterval_t *intervals = NULL;
     number_t total = NUM_ZERO;
@@ -714,8 +677,7 @@ static int mp_adaptive_integral(mp_eval_fn eval, void *ctx,
     size_t guard_bits;
     size_t user_digits;
 
-    if (!eval || !ig || !result ||
-        !num_is_real(a) || !num_is_real(b)) {
+    if (!eval || !ig || !result || !num_is_real(a) || !num_is_real(b)) {
         num_destroy(&b_work);
         num_destroy(&a_work);
         num_destroy(&rel_tol);
@@ -767,14 +729,11 @@ static int mp_adaptive_integral(mp_eval_fn eval, void *ctx,
         number_t ts_result = NUM_ZERO;
         number_t ts_error = NUM_ZERO;
         size_t ts_steps = 0u;
-        int ts_status = mp_tanh_sinh_integral(eval, ctx, a_work, b_work,
-                                              abs_tol, rel_tol,
-                                              ig->max_intervals,
-                                              &ts_result, &ts_error,
-                                              &ts_steps);
+        int ts_status = mp_tanh_sinh_integral(eval, ctx, a_work, b_work, abs_tol, rel_tol, ig->max_intervals,
+                                              &ts_result, &ts_error, &ts_steps);
 
-        if (ts_status == 0 || (ts_status > 0 && user_digits >= 80u &&
-                               num_is_finite(ts_error) && !num_is_nan(ts_error))) {
+        if (ts_status == 0 ||
+            (ts_status > 0 && user_digits >= 80u && num_is_finite(ts_error) && !num_is_nan(ts_error))) {
             *result = ts_result;
             ts_result = NUM_ZERO;
             if (num_set_prec_bits(result, user_bits) != 0) {
@@ -937,9 +896,8 @@ cleanup:
 
 static int mp_eval_multi_outer(void *ctx, const number_t x, number_t *out);
 
-int intg_integral(integrator_t *ig, expr_t *expr, expr_t *x_var,
-                       number_t a, number_t b,
-                       number_t *result, number_t *error_est)
+int intg_integral(integrator_t *ig, expr_t *expr, expr_t *x_var, number_t a, number_t b, number_t *result,
+                  number_t *error_est)
 {
     mp_expr_ctx_t expr_ctx;
     expr_t *vars[1];
@@ -954,8 +912,7 @@ int intg_integral(integrator_t *ig, expr_t *expr, expr_t *x_var,
     vars[0] = x_var;
     lo[0] = a;
     hi[0] = b;
-    fast_status = try_integral_multi_special_affine(ig, expr, 1u, vars, lo, hi,
-                                                    result, error_est);
+    fast_status = try_integral_multi_special_affine(ig, expr, 1u, vars, lo, hi, result, error_est);
     if (fast_status != 0)
         return fast_status > 0 ? 0 : -1;
 
@@ -983,8 +940,8 @@ static int mp_eval_multi_outer(void *ctx, const number_t x, number_t *out)
     saved_last_intervals = multi->ig->last_intervals;
     saved_exact_result = expr_retain_expr(intg_get_exact_result(multi->ig));
     {
-        int status = intg_integral_multi_num(multi->ig, multi->expr, outer, multi->vars,
-                                           multi->lo, multi->hi, out, NULL);
+        int status =
+            intg_integral_multi_num(multi->ig, multi->expr, outer, multi->vars, multi->lo, multi->hi, out, NULL);
 
         if (status < 0) {
             multi->ig->last_intervals = saved_last_intervals;
@@ -997,10 +954,8 @@ static int mp_eval_multi_outer(void *ctx, const number_t x, number_t *out)
     return 0;
 }
 
-int intg_integral_multi_num(integrator_t *ig, expr_t *expr,
-                          size_t ndim, expr_t * const *vars,
-                          const number_t *lo, const number_t *hi,
-                          number_t *result, number_t *error_est)
+int intg_integral_multi_num(integrator_t *ig, expr_t *expr, size_t ndim, expr_t *const *vars, const number_t *lo,
+                            const number_t *hi, number_t *result, number_t *error_est)
 {
     mp_multi_ctx_t multi;
     int fast_status;
@@ -1008,8 +963,7 @@ int intg_integral_multi_num(integrator_t *ig, expr_t *expr,
     if (!ig || !expr || !vars || !lo || !hi || !result || ndim == 0)
         return -1;
 
-    fast_status = try_integral_multi_special_affine(ig, expr, ndim, vars, lo, hi,
-                                                    result, error_est);
+    fast_status = try_integral_multi_special_affine(ig, expr, ndim, vars, lo, hi, result, error_est);
     if (fast_status != 0)
         return fast_status > 0 ? 0 : -1;
 
@@ -1020,7 +974,5 @@ int intg_integral_multi_num(integrator_t *ig, expr_t *expr,
     multi.lo = lo;
     multi.hi = hi;
 
-    return mp_adaptive_integral(mp_eval_multi_outer, &multi, ig,
-                                lo[ndim - 1u], hi[ndim - 1u],
-                                result, error_est);
+    return mp_adaptive_integral(mp_eval_multi_outer, &multi, ig, lo[ndim - 1u], hi[ndim - 1u], result, error_est);
 }

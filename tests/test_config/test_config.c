@@ -66,9 +66,7 @@ static json_t *ensure_file_object(const string_t *file)
     }
 
     file_object = json_new_object();
-    if (file_object && test_config_json_object_set_key(g_root,
-                                                       normalised_key,
-                                                       file_object)) {
+    if (file_object && test_config_json_object_set_key(g_root, normalised_key, file_object)) {
         json_free(file_object);
         file_object = json_object_get_mutable(g_root, normalised_key);
     } else {
@@ -107,9 +105,7 @@ static json_t *ensure_seen_file_object(const string_t *file)
     }
 
     file_object = json_new_object();
-    if (file_object && test_config_json_object_set_key(g_seen_root,
-                                                       key,
-                                                       file_object)) {
+    if (file_object && test_config_json_object_set_key(g_seen_root, key, file_object)) {
         json_free(file_object);
         file_object = json_object_get_mutable(g_seen_root, key);
     } else {
@@ -121,9 +117,7 @@ static json_t *ensure_seen_file_object(const string_t *file)
     return file_object;
 }
 
-static void mark_seen_path(const string_t *file,
-                           const string_t *func,
-                           const string_t *parent)
+static void mark_seen_path(const string_t *file, const string_t *func, const string_t *parent)
 {
     json_t *file_object;
     json_t *parent_object;
@@ -160,9 +154,8 @@ static void load_json_if_needed(void)
         return;
 
     g_loaded = true;
-    path = (g_mode == TEST_CONFIG_GLOBAL)
-        ? test_config_compute_global_path()
-        : test_config_compute_local_path(g_local_filename);
+    path = (g_mode == TEST_CONFIG_GLOBAL) ? test_config_compute_global_path()
+                                          : test_config_compute_local_path(g_local_filename);
 
     if (!path)
         return;
@@ -176,16 +169,14 @@ static void load_json_if_needed(void)
     string_free(path);
 
     if (!json) {
-        string_fprintf(stderr,
-                       "test_config: failed to parse configuration JSON; ignoring loaded state\n");
+        string_fprintf(stderr, "test_config: failed to parse configuration JSON; ignoring loaded state\n");
         json_free(g_root);
         g_root = NULL;
         return;
     }
 
     if (!test_config_root_shape_is_supported(json, (test_config_mode_t)g_mode)) {
-        string_fprintf(stderr,
-                       "test_config: unsupported configuration JSON shape; ignoring loaded state\n");
+        string_fprintf(stderr, "test_config: unsupported configuration JSON shape; ignoring loaded state\n");
         json_free(json);
         json_free(g_root);
         g_root = NULL;
@@ -196,9 +187,7 @@ static void load_json_if_needed(void)
     g_root = json;
 }
 
-bool test_config_is_enabled(const string_t *file,
-                            const string_t *func,
-                            const string_t *parent)
+bool test_config_is_enabled(const string_t *file, const string_t *func, const string_t *parent)
 {
     bool has_parent = parent && string_length(parent) > 0u;
     json_t *file_object;
@@ -229,9 +218,9 @@ bool test_config_is_enabled(const string_t *file,
 
     if (!test_config_is_valid_group_name(parent)) {
         string_fprintf(stderr,
-                       "test_config: invalid parent group path '%S' for test '%S'; use identifiers joined by '.' via test_run_subtest() or test_run_in_group()\n",
-                       parent,
-                       func);
+                       "test_config: invalid parent group path '%S' for test '%S'; use identifiers joined by '.' via "
+                       "test_run_subtest() or test_run_in_group()\n",
+                       parent, func);
         return false;
     }
 
@@ -242,10 +231,7 @@ bool test_config_is_enabled(const string_t *file,
         bool parent_enabled = true;
         const json_t *child;
 
-        if (test_config_find_group_with_effective_enabled(file_object,
-                                                          parent,
-                                                          &parent_object,
-                                                          &parent_enabled) &&
+        if (test_config_find_group_with_effective_enabled(file_object, parent, &parent_object, &parent_enabled) &&
             !parent_enabled)
             return false;
 
@@ -263,9 +249,7 @@ bool test_config_is_enabled(const string_t *file,
     }
 }
 
-bool test_config_has_key_for(const string_t *file,
-                             const string_t *func,
-                             const string_t *parent)
+bool test_config_has_key_for(const string_t *file, const string_t *func, const string_t *parent)
 {
     bool has_parent = parent && string_length(parent) > 0u;
     json_t *file_object;
@@ -291,11 +275,7 @@ bool test_config_has_key_for(const string_t *file,
     {
         json_t *parent_object = NULL;
 
-        if (!test_config_find_group_with_effective_enabled(file_object,
-                                                           parent,
-                                                           &parent_object,
-                                                           NULL) ||
-            !parent_object)
+        if (!test_config_find_group_with_effective_enabled(file_object, parent, &parent_object, NULL) || !parent_object)
             return false;
 
         return json_object_get(parent_object, func) != NULL;
@@ -308,9 +288,7 @@ static void prune_unseen_entries(void)
         return;
 
     if (g_mode == TEST_CONFIG_LOCAL) {
-        json_t *pruned = test_config_create_pruned_json_object(g_root,
-                                                               g_seen_root,
-                                                               true);
+        json_t *pruned = test_config_create_pruned_json_object(g_root, g_seen_root, true);
 
         if (pruned) {
             json_free(g_root);
@@ -348,9 +326,8 @@ void test_config_save(void)
 
     prune_unseen_entries();
 
-    path = (g_mode == TEST_CONFIG_GLOBAL)
-        ? test_config_compute_global_path()
-        : test_config_compute_local_path(g_local_filename);
+    path = (g_mode == TEST_CONFIG_GLOBAL) ? test_config_compute_global_path()
+                                          : test_config_compute_local_path(g_local_filename);
     tmp = path ? string_new_with(string_c_str(path)) : NULL;
 
     if (!tmp || string_append_cstr(tmp, ".tmp") != 0) {

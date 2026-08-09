@@ -79,9 +79,7 @@ string_t *test_config_normalise_file_path(const string_t *file)
             return NULL;
         }
 
-        if (string_cursor_append_slice_between(path,
-                                               (string_pos_t)tests_pos,
-                                               string_cursor_end_position(cursor),
+        if (string_cursor_append_slice_between(path, (string_pos_t)tests_pos, string_cursor_end_position(cursor),
                                                cursor) != 0) {
             string_cursor_free(cursor);
             string_free(path);

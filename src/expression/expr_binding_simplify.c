@@ -8,11 +8,8 @@ typedef struct {
     binding_simplify_rule_fn apply;
 } binding_simplify_rule_t;
 
-static expr_binding_expr_t *binding_apply_kind_rules(
-    expr_binding_expr_t *expr,
-    expr_binding_expr_kind_t kind,
-    const binding_simplify_rule_t *rules,
-    size_t n)
+static expr_binding_expr_t *binding_apply_kind_rules(expr_binding_expr_t *expr, expr_binding_expr_kind_t kind,
+                                                     const binding_simplify_rule_t *rules, size_t n)
 {
     size_t i;
 
@@ -28,21 +25,17 @@ static expr_binding_expr_t *binding_apply_kind_rules(
     return expr;
 }
 
-static expr_binding_expr_t *binding_apply_addsub_rules(
-    expr_binding_expr_t *expr,
-    const binding_simplify_rule_t *rules,
-    size_t n)
+static expr_binding_expr_t *binding_apply_addsub_rules(expr_binding_expr_t *expr, const binding_simplify_rule_t *rules,
+                                                       size_t n)
 {
     size_t i;
 
-    if (!expr || (expr->kind != EXPR_BINDING_EXPR_ADD &&
-                  expr->kind != EXPR_BINDING_EXPR_SUB))
+    if (!expr || (expr->kind != EXPR_BINDING_EXPR_ADD && expr->kind != EXPR_BINDING_EXPR_SUB))
         return expr;
 
     for (i = 0u; i < n; ++i) {
         expr = rules[i].apply(expr);
-        if (!expr || (expr->kind != EXPR_BINDING_EXPR_ADD &&
-                      expr->kind != EXPR_BINDING_EXPR_SUB))
+        if (!expr || (expr->kind != EXPR_BINDING_EXPR_ADD && expr->kind != EXPR_BINDING_EXPR_SUB))
             return expr;
     }
 
@@ -66,65 +59,45 @@ static void binding_simplify_binary_op_children(expr_binding_expr_t *expr)
 }
 
 static const binding_simplify_rule_t s_binding_addsub_rules[] = {
-    { binding_expr_try_fold_exact_complex_owned },
-    { binding_expr_try_fold_number_owned },
-    { binding_expr_try_simplify_scaled_const_addsub },
-    { binding_expr_try_simplify_log_difference },
-    { binding_expr_try_simplify_basic_sum },
-    { binding_expr_try_simplify_trig_sum }
-};
+    {binding_expr_try_fold_exact_complex_owned},     {binding_expr_try_fold_number_owned},
+    {binding_expr_try_simplify_scaled_const_addsub}, {binding_expr_try_simplify_log_difference},
+    {binding_expr_try_simplify_basic_sum},           {binding_expr_try_simplify_trig_sum}};
 
-static const binding_simplify_rule_t s_binding_neg_rules[] = {
-    { binding_expr_try_preserve_negated_decimal_owned },
-    { binding_expr_try_fold_number_owned },
-    { binding_expr_try_fold_neg_leading_number }
-};
+static const binding_simplify_rule_t s_binding_neg_rules[] = {{binding_expr_try_preserve_negated_decimal_owned},
+                                                              {binding_expr_try_fold_number_owned},
+                                                              {binding_expr_try_fold_neg_leading_number}};
 
 static const binding_simplify_rule_t s_binding_mul_rules[] = {
-    { binding_expr_try_fold_exact_complex_owned },
-    { binding_expr_try_fold_number_owned },
-    { binding_expr_try_fold_mul_leading_numbers },
-    { binding_expr_try_simplify_basic_product },
-    { binding_expr_try_simplify_i_unit_product },
-    { binding_expr_try_simplify_exp_product },
-    { binding_expr_try_simplify_lambert_product },
-    { binding_expr_try_simplify_trig_product },
-    { binding_expr_try_combine_mul_powers }
-};
+    {binding_expr_try_fold_exact_complex_owned}, {binding_expr_try_fold_number_owned},
+    {binding_expr_try_fold_mul_leading_numbers}, {binding_expr_try_simplify_basic_product},
+    {binding_expr_try_simplify_i_unit_product},  {binding_expr_try_simplify_exp_product},
+    {binding_expr_try_simplify_lambert_product}, {binding_expr_try_simplify_trig_product},
+    {binding_expr_try_combine_mul_powers}};
 
-static const binding_simplify_rule_t s_binding_div_rules[] = {
-    { binding_expr_try_fold_exact_complex_owned },
-    { binding_expr_try_fold_number_owned },
-    { binding_expr_try_simplify_basic_quotient },
-    { binding_expr_try_simplify_reciprocal_unary },
-    { binding_expr_try_fold_div_leading_number }
-};
+static const binding_simplify_rule_t s_binding_div_rules[] = {{binding_expr_try_fold_exact_complex_owned},
+                                                              {binding_expr_try_fold_number_owned},
+                                                              {binding_expr_try_simplify_basic_quotient},
+                                                              {binding_expr_try_simplify_reciprocal_unary},
+                                                              {binding_expr_try_fold_div_leading_number}};
 
-static const binding_simplify_rule_t s_binding_unary_exact_rules[] = {
-    { binding_expr_try_simplify_direct_inverse },
-    { binding_expr_try_simplify_lambert_exp },
-    { binding_expr_try_simplify_lambert_inverse },
-    { binding_expr_try_simplify_complex_floor_ceil },
-    { binding_expr_try_simplify_log_e },
-    { binding_expr_try_simplify_log10_power },
-    { binding_expr_try_simplify_imag_trig_bridge },
-    { binding_expr_try_simplify_asin_exact },
-    { binding_expr_try_simplify_trig_exact }
-};
+static const binding_simplify_rule_t s_binding_unary_exact_rules[] = {{binding_expr_try_simplify_direct_inverse},
+                                                                      {binding_expr_try_simplify_lambert_exp},
+                                                                      {binding_expr_try_simplify_lambert_inverse},
+                                                                      {binding_expr_try_simplify_complex_floor_ceil},
+                                                                      {binding_expr_try_simplify_log_e},
+                                                                      {binding_expr_try_simplify_log10_power},
+                                                                      {binding_expr_try_simplify_imag_trig_bridge},
+                                                                      {binding_expr_try_simplify_asin_exact},
+                                                                      {binding_expr_try_simplify_trig_exact}};
 
-static const binding_simplify_rule_t s_binding_binary_op_rules[] = {
-    { binding_expr_try_simplify_sqrt_square },
-    { binding_expr_try_simplify_e_power },
-    { binding_expr_try_simplify_logbeta_integers }
-};
+static const binding_simplify_rule_t s_binding_binary_op_rules[] = {{binding_expr_try_simplify_sqrt_square},
+                                                                    {binding_expr_try_simplify_e_power},
+                                                                    {binding_expr_try_simplify_logbeta_integers}};
 
 static expr_binding_expr_t *binding_try_simplify_unary_exact(expr_binding_expr_t *expr)
 {
-    return binding_apply_kind_rules(
-        expr,
-        EXPR_BINDING_EXPR_UNARY_OP,
-        s_binding_unary_exact_rules,
-        sizeof(s_binding_unary_exact_rules) / sizeof(s_binding_unary_exact_rules[0]));
+    return binding_apply_kind_rules(expr, EXPR_BINDING_EXPR_UNARY_OP, s_binding_unary_exact_rules,
+                                    sizeof(s_binding_unary_exact_rules) / sizeof(s_binding_unary_exact_rules[0]));
 }
 
 expr_binding_expr_t *expr_binding_simplify_atom(expr_binding_expr_t *expr)
@@ -138,20 +111,15 @@ expr_binding_expr_t *expr_binding_simplify_neg(expr_binding_expr_t *expr)
         return NULL;
 
     expr->u.unary.child = expr_binding_expr_simplify(expr->u.unary.child);
-    return binding_apply_kind_rules(
-        expr,
-        EXPR_BINDING_EXPR_NEG,
-        s_binding_neg_rules,
-        sizeof(s_binding_neg_rules) / sizeof(s_binding_neg_rules[0]));
+    return binding_apply_kind_rules(expr, EXPR_BINDING_EXPR_NEG, s_binding_neg_rules,
+                                    sizeof(s_binding_neg_rules) / sizeof(s_binding_neg_rules[0]));
 }
 
 expr_binding_expr_t *expr_binding_simplify_addsub(expr_binding_expr_t *expr)
 {
     binding_simplify_binary_children(expr);
-    return binding_apply_addsub_rules(
-        expr,
-        s_binding_addsub_rules,
-        sizeof(s_binding_addsub_rules) / sizeof(s_binding_addsub_rules[0]));
+    return binding_apply_addsub_rules(expr, s_binding_addsub_rules,
+                                      sizeof(s_binding_addsub_rules) / sizeof(s_binding_addsub_rules[0]));
 }
 
 expr_binding_expr_t *expr_binding_simplify_mul(expr_binding_expr_t *expr)
@@ -160,11 +128,8 @@ expr_binding_expr_t *expr_binding_simplify_mul(expr_binding_expr_t *expr)
         return NULL;
 
     binding_simplify_binary_children(expr);
-    return binding_apply_kind_rules(
-        expr,
-        EXPR_BINDING_EXPR_MUL,
-        s_binding_mul_rules,
-        sizeof(s_binding_mul_rules) / sizeof(s_binding_mul_rules[0]));
+    return binding_apply_kind_rules(expr, EXPR_BINDING_EXPR_MUL, s_binding_mul_rules,
+                                    sizeof(s_binding_mul_rules) / sizeof(s_binding_mul_rules[0]));
 }
 
 expr_binding_expr_t *expr_binding_simplify_div(expr_binding_expr_t *expr)
@@ -173,11 +138,8 @@ expr_binding_expr_t *expr_binding_simplify_div(expr_binding_expr_t *expr)
         return NULL;
 
     binding_simplify_binary_children(expr);
-    return binding_apply_kind_rules(
-        expr,
-        EXPR_BINDING_EXPR_DIV,
-        s_binding_div_rules,
-        sizeof(s_binding_div_rules) / sizeof(s_binding_div_rules[0]));
+    return binding_apply_kind_rules(expr, EXPR_BINDING_EXPR_DIV, s_binding_div_rules,
+                                    sizeof(s_binding_div_rules) / sizeof(s_binding_div_rules[0]));
 }
 
 expr_binding_expr_t *expr_binding_simplify_powi(expr_binding_expr_t *expr)
@@ -195,8 +157,7 @@ expr_binding_expr_t *expr_binding_simplify_powi(expr_binding_expr_t *expr)
         expr_binding_expr_free(expr);
         return base;
     }
-    if (expr->u.powi.exponent == 2 &&
-        binding_expr_is_const_id(expr->u.powi.base, EXPR_BINDING_CONST_I))
+    if (expr->u.powi.exponent == 2 && binding_expr_is_const_id(expr->u.powi.base, EXPR_BINDING_CONST_I))
         return binding_expr_fold_to_number_owned(expr, num_clone(NUM_NEG_ONE));
     expr = binding_expr_try_simplify_nested_power(expr);
     if (!expr || expr->kind != EXPR_BINDING_EXPR_POWI)
@@ -228,9 +189,6 @@ expr_binding_expr_t *expr_binding_simplify_unary_op(expr_binding_expr_t *expr)
 expr_binding_expr_t *expr_binding_simplify_binary_op(expr_binding_expr_t *expr)
 {
     binding_simplify_binary_op_children(expr);
-    return binding_apply_kind_rules(
-        expr,
-        EXPR_BINDING_EXPR_BINARY_OP,
-        s_binding_binary_op_rules,
-        sizeof(s_binding_binary_op_rules) / sizeof(s_binding_binary_op_rules[0]));
+    return binding_apply_kind_rules(expr, EXPR_BINDING_EXPR_BINARY_OP, s_binding_binary_op_rules,
+                                    sizeof(s_binding_binary_op_rules) / sizeof(s_binding_binary_op_rules[0]));
 }

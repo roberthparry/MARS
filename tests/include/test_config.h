@@ -76,9 +76,9 @@
  * configuration, while GLOBAL mode is ideal for centralised control.
  */
 typedef enum {
-    TEST_CONFIG_NONE,    /**< Disable config file reads/writes entirely */
-    TEST_CONFIG_GLOBAL,  /**< Use tests/test_config.json */
-    TEST_CONFIG_LOCAL    /**< Use tests/<basename>.json */
+    TEST_CONFIG_NONE,   /**< Disable config file reads/writes entirely */
+    TEST_CONFIG_GLOBAL, /**< Use tests/test_config.json */
+    TEST_CONFIG_LOCAL   /**< Use tests/<basename>.json */
 } test_config_mode_t;
 
 /**
@@ -111,7 +111,7 @@ void test_config_set_prune_enabled(bool enabled);
  *
  * This function destroys the global configuration dictionary and frees any
  * associated dynamically allocated state, including the cached local filename.
- * 
+ *
  * It is intended to be called once at program shutdown to ensure that all
  * memory owned by the test configuration subsystem is released.  After this
  * call, the test configuration API must not be used again.
@@ -149,9 +149,7 @@ void test_config_shutdown(void);
  *
  * @return true if enabled, false if disabled.
  */
-bool test_config_is_enabled(const string_t *file,
-                            const string_t *func,
-                            const string_t *parent);
+bool test_config_is_enabled(const string_t *file, const string_t *func, const string_t *parent);
 
 /**
  * @brief Check whether a configuration key exists using string_t inputs.
@@ -166,9 +164,7 @@ bool test_config_is_enabled(const string_t *file,
  *
  * @return true if the key exists, false otherwise.
  */
-bool test_config_has_key_for(const string_t *file,
-                             const string_t *func,
-                             const string_t *parent);
+bool test_config_has_key_for(const string_t *file, const string_t *func, const string_t *parent);
 
 /**
  * @brief Persist the in-memory configuration to disk.
@@ -185,6 +181,5 @@ bool test_config_has_key_for(const string_t *file,
  * and groups.
  */
 void test_config_save(void);
-
 
 #endif /* TEST_CONFIG_H */

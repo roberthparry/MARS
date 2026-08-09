@@ -3,10 +3,8 @@
 #define MARS_EXPR_INTEGRATE_INTERNAL_ACCESS
 #include "expr_integrate_internal.h"
 
-static bool match_secant_positive_integer_power(
-    const expr_t *expr,
-    const expr_t **argument_out,
-    unsigned int *power_out)
+static bool match_secant_positive_integer_power(const expr_t *expr, const expr_t **argument_out,
+                                                unsigned int *power_out)
 {
     const expr_t *base = NULL;
     number_t exponent = num_new();
@@ -20,10 +18,8 @@ static bool match_secant_positive_integer_power(
         matched = true;
         goto cleanup;
     }
-    if (expr_match_pow_const(expr, &base, &exponent) &&
-        base && expr_is_op(base, &ops_sec) && base->a &&
-        expr_integrate_number_matches_uint_at_most(
-            exponent, 64u, power_out) && *power_out > 0u) {
+    if (expr_match_pow_const(expr, &base, &exponent) && base && expr_is_op(base, &ops_sec) && base->a &&
+        expr_integrate_number_matches_uint_at_most(exponent, 64u, power_out) && *power_out > 0u) {
         *argument_out = base->a;
         matched = true;
     }
@@ -33,11 +29,8 @@ cleanup:
     return matched;
 }
 
-static bool match_sine_or_cosine_times_secant_power(
-    const expr_t *expr,
-    const expr_t **trig_argument_out,
-    bool *is_sine_out,
-    unsigned int *secant_power_out)
+static bool match_sine_or_cosine_times_secant_power(const expr_t *expr, const expr_t **trig_argument_out,
+                                                    bool *is_sine_out, unsigned int *secant_power_out)
 {
     const expr_t *left = NULL;
     const expr_t *right = NULL;
@@ -45,9 +38,7 @@ static bool match_sine_or_cosine_times_secant_power(
     const expr_t *secant_argument = NULL;
     bool is_sine;
 
-    if (!expr || !trig_argument_out || !is_sine_out ||
-        !secant_power_out ||
-        !expr_match_mul_expr(expr, &left, &right))
+    if (!expr || !trig_argument_out || !is_sine_out || !secant_power_out || !expr_match_mul_expr(expr, &left, &right))
         return false;
 
     if (expr_is_op(left, &ops_sin) && left->a) {
@@ -59,9 +50,7 @@ static bool match_sine_or_cosine_times_secant_power(
     } else {
         trig_argument = NULL;
     }
-    if (trig_argument &&
-        match_secant_positive_integer_power(
-            right, &secant_argument, secant_power_out) &&
+    if (trig_argument && match_secant_positive_integer_power(right, &secant_argument, secant_power_out) &&
         expr_struct_eq(trig_argument, secant_argument)) {
         *trig_argument_out = trig_argument;
         *is_sine_out = is_sine;
@@ -77,8 +66,7 @@ static bool match_sine_or_cosine_times_secant_power(
     } else {
         return false;
     }
-    if (!match_secant_positive_integer_power(
-            left, &secant_argument, secant_power_out) ||
+    if (!match_secant_positive_integer_power(left, &secant_argument, secant_power_out) ||
         !expr_struct_eq(trig_argument, secant_argument))
         return false;
 
@@ -87,9 +75,7 @@ static bool match_sine_or_cosine_times_secant_power(
     return true;
 }
 
-expr_t *integrate_sine_cosine_times_secant_power(
-    const expr_t *expr,
-    const expr_t *wrt)
+expr_t *integrate_sine_cosine_times_secant_power(const expr_t *expr, const expr_t *wrt)
 {
     const expr_t *argument = NULL;
     expr_t *affine_constant = NULL;
@@ -101,21 +87,13 @@ expr_t *integrate_sine_cosine_times_secant_power(
     unsigned int power = 0u;
     bool is_sine = false;
 
-    if (!match_sine_or_cosine_times_secant_power(
-            expr, &argument, &is_sine, &power) ||
-        !match_symbolic_affine_constant_and_coeff(
-            argument,
-            wrt,
-            &affine_constant,
-            &affine_coefficient) ||
+    if (!match_sine_or_cosine_times_secant_power(expr, &argument, &is_sine, &power) ||
+        !match_symbolic_affine_constant_and_coeff(argument, wrt, &affine_constant, &affine_coefficient) ||
         expr_const_is_zero(affine_coefficient))
         goto cleanup;
 
     secant = expr_sec(argument);
-    reduced_power = power == 1u
-        ? expr_const_one()
-        : expr_integrate_build_unsigned_expr_power(
-              secant, power - 1u);
+    reduced_power = power == 1u ? expr_const_one() : expr_integrate_build_unsigned_expr_power(secant, power - 1u);
     if (!reduced_power)
         goto cleanup;
 
@@ -126,11 +104,8 @@ expr_t *integrate_sine_cosine_times_secant_power(
     if (power == 1u)
         goto cleanup;
 
-    denominator = expr_mul_long(
-        affine_coefficient, (long)(power - 1u));
-    integral = denominator
-        ? expr_div(reduced_power, denominator)
-        : NULL;
+    denominator = expr_mul_long(affine_coefficient, (long)(power - 1u));
+    integral = denominator ? expr_div(reduced_power, denominator) : NULL;
     integral = simplify_owned(integral);
 
 cleanup:
@@ -142,10 +117,7 @@ cleanup:
     return integral;
 }
 
-bool match_trig_proportional_wrt_coeff(const expr_t *expr,
-                                       const expr_t *wrt,
-                                       bool *is_sin_out,
-                                       expr_t **coeff_out)
+bool match_trig_proportional_wrt_coeff(const expr_t *expr, const expr_t *wrt, bool *is_sin_out, expr_t **coeff_out)
 {
     expr_t *constant = NULL;
     expr_t *coeff = NULL;
@@ -176,19 +148,15 @@ cleanup:
     return ok;
 }
 
-static bool match_power_trig_product(const expr_t *expr,
-                                     const expr_t *wrt,
-                                     const expr_t **power_out,
-                                     const expr_t **trig_out,
-                                     bool *is_sin_out)
+static bool match_power_trig_product(const expr_t *expr, const expr_t *wrt, const expr_t **power_out,
+                                     const expr_t **trig_out, bool *is_sin_out)
 {
     const expr_t *left = NULL;
     const expr_t *right = NULL;
     expr_t *exponent = NULL;
     expr_t *coeff = NULL;
 
-    if (!expr || !wrt || !power_out || !trig_out || !is_sin_out ||
-        !expr_match_mul_expr(expr, &left, &right))
+    if (!expr || !wrt || !power_out || !trig_out || !is_sin_out || !expr_match_mul_expr(expr, &left, &right))
         return false;
 
     if (expr_integrate_match_wrt_power_factor_exponent(left, wrt, &exponent) &&
@@ -218,9 +186,7 @@ static bool match_power_trig_product(const expr_t *expr,
     return false;
 }
 
-static expr_t *divide_expr_by_expr_power_owned(expr_t *numer,
-                                               const expr_t *base,
-                                               unsigned int power)
+static expr_t *divide_expr_by_expr_power_owned(expr_t *numer, const expr_t *base, unsigned int power)
 {
     expr_t *denom = NULL;
     expr_t *out = NULL;
@@ -237,11 +203,8 @@ static expr_t *divide_expr_by_expr_power_owned(expr_t *numer,
     return out;
 }
 
-static expr_t *build_symbolic_quadratic_power_trig_integral(
-    bool integrand_is_sin,
-    const expr_t *trig_expr,
-    const expr_t *coeff,
-    const expr_t *wrt)
+static expr_t *build_symbolic_quadratic_power_trig_integral(bool integrand_is_sin, const expr_t *trig_expr,
+                                                            const expr_t *coeff, const expr_t *wrt)
 {
     expr_t *sin_v = NULL;
     expr_t *cos_v = NULL;
@@ -259,17 +222,13 @@ static expr_t *build_symbolic_quadratic_power_trig_integral(
     sin_v = expr_sin(trig_expr->a);
     cos_v = expr_cos(trig_expr->a);
     x_sq = expr_integrate_build_unsigned_expr_power(wrt, 2u);
-    x_trig = (x_sq && (integrand_is_sin ? cos_v : sin_v))
-        ? expr_mul(x_sq, integrand_is_sin ? cos_v : sin_v)
-        : NULL;
+    x_trig = (x_sq && (integrand_is_sin ? cos_v : sin_v)) ? expr_mul(x_sq, integrand_is_sin ? cos_v : sin_v) : NULL;
     term1 = divide_expr_by_expr_power_owned(x_trig, coeff, 1u);
     x_trig = NULL;
     if (integrand_is_sin)
         term1 = expr_negate_owned(term1);
 
-    x_trig = (wrt && (integrand_is_sin ? sin_v : cos_v))
-        ? expr_mul(wrt, integrand_is_sin ? sin_v : cos_v)
-        : NULL;
+    x_trig = (wrt && (integrand_is_sin ? sin_v : cos_v)) ? expr_mul(wrt, integrand_is_sin ? sin_v : cos_v) : NULL;
     if (x_trig) {
         term2 = expr_mul_num(x_trig, &NUM_TWO);
         expr_free(x_trig);
@@ -277,8 +236,7 @@ static expr_t *build_symbolic_quadratic_power_trig_integral(
     }
     term2 = divide_expr_by_expr_power_owned(term2, coeff, 2u);
 
-    tail_trig = integrand_is_sin ? expr_retain_expr(cos_v)
-                                 : expr_retain_expr(sin_v);
+    tail_trig = integrand_is_sin ? expr_retain_expr(cos_v) : expr_retain_expr(sin_v);
     if (tail_trig) {
         term3 = expr_mul_num(tail_trig, &NUM_TWO);
         expr_free(tail_trig);
@@ -305,11 +263,8 @@ static expr_t *build_symbolic_quadratic_power_trig_integral(
     return simplify_owned(sum);
 }
 
-static expr_t *build_symbolic_linear_power_trig_integral(
-    bool integrand_is_sin,
-    const expr_t *trig_expr,
-    const expr_t *coeff,
-    const expr_t *wrt)
+static expr_t *build_symbolic_linear_power_trig_integral(bool integrand_is_sin, const expr_t *trig_expr,
+                                                         const expr_t *coeff, const expr_t *wrt)
 {
     expr_t *first_trig = NULL;
     expr_t *x_trig = NULL;
@@ -329,9 +284,7 @@ static expr_t *build_symbolic_linear_power_trig_integral(
         first = expr_negate_owned(first);
 
     second_trig = integrand_is_sin ? expr_sin(trig_expr->a) : expr_cos(trig_expr->a);
-    second = divide_expr_by_expr_power_owned(second_trig ? expr_retain_expr(second_trig) : NULL,
-                                             coeff,
-                                             2u);
+    second = divide_expr_by_expr_power_owned(second_trig ? expr_retain_expr(second_trig) : NULL, coeff, 2u);
 
     sum = expr_add_owned(first, second);
     first = NULL;
@@ -345,10 +298,8 @@ static expr_t *build_symbolic_linear_power_trig_integral(
     return simplify_owned(sum);
 }
 
-static expr_t *build_symbolic_integer_power_trig_integral(unsigned int degree,
-                                                          bool integrand_is_sin,
-                                                          const expr_t *trig_expr,
-                                                          const expr_t *coeff,
+static expr_t *build_symbolic_integer_power_trig_integral(unsigned int degree, bool integrand_is_sin,
+                                                          const expr_t *trig_expr, const expr_t *coeff,
                                                           const expr_t *wrt)
 {
     expr_t *x_power = NULL;
@@ -365,20 +316,14 @@ static expr_t *build_symbolic_integer_power_trig_integral(unsigned int degree,
         return NULL;
 
     if (degree == 1u) {
-        expr_t *linear = build_symbolic_linear_power_trig_integral(integrand_is_sin,
-                                                                   trig_expr,
-                                                                   coeff,
-                                                                   wrt);
+        expr_t *linear = build_symbolic_linear_power_trig_integral(integrand_is_sin, trig_expr, coeff, wrt);
 
         if (linear)
             return linear;
     }
 
     if (degree == 2u) {
-        expr_t *quadratic = build_symbolic_quadratic_power_trig_integral(integrand_is_sin,
-                                                                         trig_expr,
-                                                                         coeff,
-                                                                         wrt);
+        expr_t *quadratic = build_symbolic_quadratic_power_trig_integral(integrand_is_sin, trig_expr, coeff, wrt);
 
         if (quadratic)
             return quadratic;
@@ -406,11 +351,7 @@ static expr_t *build_symbolic_integer_power_trig_integral(unsigned int degree,
         return term1;
     }
 
-    inner = build_symbolic_integer_power_trig_integral(degree - 1u,
-                                                       !integrand_is_sin,
-                                                       trig_expr,
-                                                       coeff,
-                                                       wrt);
+    inner = build_symbolic_integer_power_trig_integral(degree - 1u, !integrand_is_sin, trig_expr, coeff, wrt);
     if (inner) {
         number_t scale = num_create_from_long((long)degree);
 
@@ -443,8 +384,7 @@ static expr_t *build_symbolic_integer_power_trig_integral(unsigned int degree,
     return simplify_owned(sum);
 }
 
-expr_t *integrate_symbolic_integer_power_times_trig(const expr_t *expr,
-                                                           const expr_t *wrt)
+expr_t *integrate_symbolic_integer_power_times_trig(const expr_t *expr, const expr_t *wrt)
 {
     const expr_t *power_expr = NULL;
     const expr_t *trig_expr = NULL;
@@ -472,12 +412,8 @@ cleanup:
     return out;
 }
 
-static bool match_exp_trig_product(const expr_t *expr,
-                                   const expr_t *wrt,
-                                   const expr_t **exp_out,
-                                   const expr_t **trig_out,
-                                   bool *is_sin_out,
-                                   expr_t **exp_coeff_out,
+static bool match_exp_trig_product(const expr_t *expr, const expr_t *wrt, const expr_t **exp_out,
+                                   const expr_t **trig_out, bool *is_sin_out, expr_t **exp_coeff_out,
                                    expr_t **trig_coeff_out)
 {
     const expr_t *left = NULL;
@@ -485,8 +421,7 @@ static bool match_exp_trig_product(const expr_t *expr,
     expr_t *exp_coeff = NULL;
     expr_t *trig_coeff = NULL;
 
-    if (!expr || !wrt || !exp_out || !trig_out || !is_sin_out ||
-        !exp_coeff_out || !trig_coeff_out ||
+    if (!expr || !wrt || !exp_out || !trig_out || !is_sin_out || !exp_coeff_out || !trig_coeff_out ||
         !expr_match_mul_expr(expr, &left, &right))
         return false;
 
@@ -536,8 +471,7 @@ expr_t *integrate_symbolic_exp_times_trig(const expr_t *expr, const expr_t *wrt)
     expr_t *out = NULL;
     bool is_sin = false;
 
-    if (!match_exp_trig_product(expr, wrt, &exp_expr, &trig_expr, &is_sin,
-                                &exp_coeff, &trig_coeff))
+    if (!match_exp_trig_product(expr, wrt, &exp_expr, &trig_expr, &is_sin, &exp_coeff, &trig_coeff))
         goto cleanup;
 
     sin_v = trig_expr && trig_expr->a ? expr_sin(trig_expr->a) : NULL;
@@ -583,9 +517,7 @@ typedef struct {
     bool trig_is_sin;
 } exact_wrt_exp_trig_match_t;
 
-static bool match_wrt_exp_trig_exact_rec(const expr_t *expr,
-                                         const expr_t *wrt,
-                                         exact_wrt_exp_trig_match_t *match)
+static bool match_wrt_exp_trig_exact_rec(const expr_t *expr, const expr_t *wrt, exact_wrt_exp_trig_match_t *match)
 {
     const expr_t *left = NULL;
     const expr_t *right = NULL;
@@ -594,8 +526,7 @@ static bool match_wrt_exp_trig_exact_rec(const expr_t *expr,
         return false;
 
     if (expr_match_mul_expr(expr, &left, &right))
-        return match_wrt_exp_trig_exact_rec(left, wrt, match) &&
-               match_wrt_exp_trig_exact_rec(right, wrt, match);
+        return match_wrt_exp_trig_exact_rec(left, wrt, match) && match_wrt_exp_trig_exact_rec(right, wrt, match);
 
     if (is_wrt(expr, wrt)) {
         if (match->has_wrt)
@@ -611,8 +542,7 @@ static bool match_wrt_exp_trig_exact_rec(const expr_t *expr,
         return true;
     }
 
-    if ((expr_is_op(expr, &ops_sin) || expr_is_op(expr, &ops_cos)) &&
-        expr->a && is_wrt(expr->a, wrt)) {
+    if ((expr_is_op(expr, &ops_sin) || expr_is_op(expr, &ops_cos)) && expr->a && is_wrt(expr->a, wrt)) {
         if (match->has_trig)
             return false;
         match->has_trig = true;
@@ -625,7 +555,7 @@ static bool match_wrt_exp_trig_exact_rec(const expr_t *expr,
 
 expr_t *integrate_wrt_exp_times_trig_exact(const expr_t *expr, const expr_t *wrt)
 {
-    exact_wrt_exp_trig_match_t match = { false, false, false, false };
+    exact_wrt_exp_trig_match_t match = {false, false, false, false};
     expr_t *exp_x = NULL;
     expr_t *sin_x = NULL;
     expr_t *cos_x = NULL;
@@ -636,8 +566,7 @@ expr_t *integrate_wrt_exp_times_trig_exact(const expr_t *expr, const expr_t *wrt
     expr_t *product = NULL;
     expr_t *out = NULL;
 
-    if (!match_wrt_exp_trig_exact_rec(expr, wrt, &match) ||
-        !match.has_wrt || !match.has_exp || !match.has_trig)
+    if (!match_wrt_exp_trig_exact_rec(expr, wrt, &match) || !match.has_wrt || !match.has_exp || !match.has_trig)
         goto cleanup;
 
     exp_x = expr_exp(wrt);

@@ -1,5 +1,5 @@
-#include <stdarg.h>
 #include <limits.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -22,9 +22,7 @@ static int mo_append_padding(string_t *out, int count)
     return 0;
 }
 
-static string_format_result_t mo_format_callback(string_t *out,
-                                                 const string_format_spec_t *spec,
-                                                 va_list ap,
+static string_format_result_t mo_format_callback(string_t *out, const string_format_spec_t *spec, va_list ap,
                                                  void *user)
 {
     bool scientific;
@@ -55,8 +53,7 @@ static string_format_result_t mo_format_callback(string_t *out,
         (void)va_arg(ap, int);
 
     scientific = spec->conversion == 'M';
-    layout = spec->trailing_modifier == 'l' ||
-             spec->trailing_modifier == 'L';
+    layout = spec->trailing_modifier == 'l' || spec->trailing_modifier == 'L';
     if (layout)
         result = STRING_FORMAT_HANDLED_WITH_TRAILING_MODIFIER;
 

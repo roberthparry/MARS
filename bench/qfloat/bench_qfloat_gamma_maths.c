@@ -12,10 +12,7 @@ typedef struct bench_result_t {
     double avg_us;
 } bench_result_t;
 
-typedef enum bench_case_kind_t {
-    BENCH_CASE_UNARY = 0,
-    BENCH_CASE_BINARY
-} bench_case_kind_t;
+typedef enum bench_case_kind_t { BENCH_CASE_UNARY = 0, BENCH_CASE_BINARY } bench_case_kind_t;
 
 typedef struct bench_case_t {
     const char *label;
@@ -38,21 +35,25 @@ typedef struct bench_stats_t {
     int samples;
 } bench_stats_t;
 
-static void run_unary_case(const char *label,
-                           const char *text,
-                           qfloat_t (*fn)(qfloat_t),
-                           int iters);
-static void run_binary_case(const char *label,
-                            const char *lhs_text,
-                            const char *rhs_text,
-                            qfloat_t (*fn)(qfloat_t, qfloat_t),
-                            int iters);
+static void run_unary_case(const char *label, const char *text, qfloat_t (*fn)(qfloat_t), int iters);
+static void run_binary_case(const char *label, const char *lhs_text, const char *rhs_text,
+                            qfloat_t (*fn)(qfloat_t, qfloat_t), int iters);
 
-#define BENCH_UNARY_CASE(label, display, text, iters, fn) \
-    { label, display, BENCH_CASE_UNARY, text, NULL, iters, {.unary = fn} }
+#define BENCH_UNARY_CASE(label, display, text, iters, fn)                                                              \
+    {                                                                                                                  \
+        label, display, BENCH_CASE_UNARY, text, NULL, iters,                                                           \
+        {                                                                                                              \
+            .unary = fn                                                                                                \
+        }                                                                                                              \
+    }
 
-#define BENCH_BINARY_CASE(label, display, lhs_text, rhs_text, iters, fn) \
-    { label, display, BENCH_CASE_BINARY, lhs_text, rhs_text, iters, {.binary = fn} }
+#define BENCH_BINARY_CASE(label, display, lhs_text, rhs_text, iters, fn)                                               \
+    {                                                                                                                  \
+        label, display, BENCH_CASE_BINARY, lhs_text, rhs_text, iters,                                                  \
+        {                                                                                                              \
+            .binary = fn                                                                                               \
+        }                                                                                                              \
+    }
 
 static bench_result_t bench_results[64];
 static size_t bench_result_count = 0u;
@@ -71,14 +72,14 @@ static const bench_case_t bench_cases[] = {
     BENCH_UNARY_CASE("digamma_2_3", "qf_digamma(2.3)", "2.3", 1000, qf_digamma),
     BENCH_UNARY_CASE("trigamma_2_3", "qf_trigamma(2.3)", "2.3", 500, qf_trigamma),
     BENCH_UNARY_CASE("tetragamma_2_3", "qf_tetragamma(2.3)", "2.3", 500, qf_tetragamma),
-    BENCH_UNARY_CASE("gammainv_9_5", "qf_gammainv(119292.4619946090070787515047110059)", "119292.4619946090070787515047110059", 200, qf_gammainv),
+    BENCH_UNARY_CASE("gammainv_9_5", "qf_gammainv(119292.4619946090070787515047110059)",
+                     "119292.4619946090070787515047110059", 200, qf_gammainv),
     BENCH_UNARY_CASE("lambert_w0_1", "qf_lambert_w0(1)", "1", 2000, qf_lambert_w0),
     BENCH_UNARY_CASE("lambert_wm1_-0_1", "qf_lambert_wm1(-0.1)", "-0.1", 1000, qf_lambert_wm1),
     BENCH_UNARY_CASE("ei_1", "qf_ei(1)", "1", 1000, qf_ei),
     BENCH_UNARY_CASE("e1_1", "qf_e1(1)", "1", 1000, qf_e1),
     BENCH_BINARY_CASE("beta_2_3_4_5", "qf_beta(2.3, 4.5)", "2.3", "4.5", 500, qf_beta),
-    BENCH_BINARY_CASE("logbeta_2_3_4_5", "qf_logbeta(2.3, 4.5)", "2.3", "4.5", 500, qf_logbeta)
-};
+    BENCH_BINARY_CASE("logbeta_2_3_4_5", "qf_logbeta(2.3, 4.5)", "2.3", "4.5", 500, qf_logbeta)};
 
 static uint64_t now_ns(void)
 {
@@ -275,9 +276,7 @@ static void bench_print_us(const char *label, bench_stats_t stats)
 {
     if (bench_markdown_enabled()) {
         if (bench_result_count < sizeof(bench_results) / sizeof(bench_results[0])) {
-            snprintf(bench_results[bench_result_count].label,
-                     sizeof(bench_results[bench_result_count].label),
-                     "%s",
+            snprintf(bench_results[bench_result_count].label, sizeof(bench_results[bench_result_count].label), "%s",
                      label);
             bench_results[bench_result_count].avg_us = stats.estimate;
             ++bench_result_count;
@@ -285,13 +284,8 @@ static void bench_print_us(const char *label, bench_stats_t stats)
         return;
     }
 
-    printf("%-28s med_µs=%10.3f mad_µs=%9.3f ci95=[%9.3f,%9.3f] n=%d\n",
-           label,
-           stats.estimate,
-           stats.mad,
-           stats.ci_low,
-           stats.ci_high,
-           stats.samples);
+    printf("%-28s med_µs=%10.3f mad_µs=%9.3f ci95=[%9.3f,%9.3f] n=%d\n", label, stats.estimate, stats.mad, stats.ci_low,
+           stats.ci_high, stats.samples);
 }
 
 static double *bench_samples_alloc(int repeats, const char *label)
@@ -344,24 +338,14 @@ static void run_case(const bench_case_t *bench_case)
     int iters = bench_scaled_iters(bench_case->base_iters);
 
     if (bench_case->kind == BENCH_CASE_UNARY) {
-        run_unary_case(bench_case->label,
-                       bench_case->lhs_text,
-                       bench_case->fn.unary,
-                       iters);
+        run_unary_case(bench_case->label, bench_case->lhs_text, bench_case->fn.unary, iters);
         return;
     }
 
-    run_binary_case(bench_case->label,
-                    bench_case->lhs_text,
-                    bench_case->rhs_text,
-                    bench_case->fn.binary,
-                    iters);
+    run_binary_case(bench_case->label, bench_case->lhs_text, bench_case->rhs_text, bench_case->fn.binary, iters);
 }
 
-static void run_unary_case(const char *label,
-                           const char *text,
-                           qfloat_t (*fn)(qfloat_t),
-                           int iters)
+static void run_unary_case(const char *label, const char *text, qfloat_t (*fn)(qfloat_t), int iters)
 {
     qfloat_t src;
     qfloat_t warm;
@@ -398,11 +382,8 @@ static void run_unary_case(const char *label,
     free(samples);
 }
 
-static void run_binary_case(const char *label,
-                            const char *lhs_text,
-                            const char *rhs_text,
-                            qfloat_t (*fn)(qfloat_t, qfloat_t),
-                            int iters)
+static void run_binary_case(const char *label, const char *lhs_text, const char *rhs_text,
+                            qfloat_t (*fn)(qfloat_t, qfloat_t), int iters)
 {
     qfloat_t lhs;
     qfloat_t rhs;

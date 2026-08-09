@@ -1,6 +1,6 @@
-#include <stdbool.h>
 #include <float.h>
 #include <math.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -180,22 +180,14 @@ static string_t *cache_key_for_options(const almanac_event_lab_options_t *option
 
     if (!options)
         return NULL;
-    kind = options->kind == ALMANAC_EVENT_LAB_KIND_SOLAR
-        ? "solar"
-        : options->kind == ALMANAC_EVENT_LAB_KIND_LUNAR ? "lunar" : "all";
-    if (snprintf(key,
-                 sizeof(key),
+    kind = options->kind == ALMANAC_EVENT_LAB_KIND_SOLAR   ? "solar"
+           : options->kind == ALMANAC_EVENT_LAB_KIND_LUNAR ? "lunar"
+                                                           : "all";
+    if (snprintf(key, sizeof(key),
                  "mars_lab/%s/start=%04d-%02d-%02d/end=%04d-%02d-%02d/lat=%.9f/lon=%.9f/totality=%s/kind=%s",
-                 ALMANAC_EVENT_LAB_CACHE_SCHEMA,
-                 options->start_year,
-                 (int)options->start_month,
-                 (int)options->start_day,
-                 options->end_year,
-                 (int)options->end_month,
-                 (int)options->end_day,
-                 options->latitude,
-                 options->longitude,
-                 options->totality_land ? "land" : "none",
+                 ALMANAC_EVENT_LAB_CACHE_SCHEMA, options->start_year, (int)options->start_month,
+                 (int)options->start_day, options->end_year, (int)options->end_month, (int)options->end_day,
+                 options->latitude, options->longitude, options->totality_land ? "land" : "none",
                  kind) >= (int)sizeof(key)) {
         return NULL;
     }
@@ -299,8 +291,8 @@ static bool parse_options(int argc, char **argv, almanac_event_lab_options_t *op
             return false;
         }
     }
-    return options->latitude >= -90.0 && options->latitude <= 90.0 &&
-           options->longitude >= -180.0 && options->longitude <= 180.0;
+    return options->latitude >= -90.0 && options->latitude <= 90.0 && options->longitude >= -180.0 &&
+           options->longitude <= 180.0;
 }
 
 static const char *solar_kind_text(almanac_solar_eclipse_kind_t kind)
@@ -308,8 +300,7 @@ static const char *solar_kind_text(almanac_solar_eclipse_kind_t kind)
     static const char *const text_by_kind[ALMANAC_SOLAR_ECLIPSE_TOTAL + 1] = {
         [ALMANAC_SOLAR_ECLIPSE_PARTIAL] = "partial",
         [ALMANAC_SOLAR_ECLIPSE_ANNULAR] = "annular",
-        [ALMANAC_SOLAR_ECLIPSE_TOTAL] = "total"
-    };
+        [ALMANAC_SOLAR_ECLIPSE_TOTAL] = "total"};
 
     if (kind < ALMANAC_SOLAR_ECLIPSE_PARTIAL || kind > ALMANAC_SOLAR_ECLIPSE_TOTAL)
         return "solar";
@@ -321,8 +312,7 @@ static const char *lunar_kind_text(almanac_lunar_eclipse_kind_t kind)
     static const char *const text_by_kind[ALMANAC_LUNAR_ECLIPSE_TOTAL + 1] = {
         [ALMANAC_LUNAR_ECLIPSE_PENUMBRAL] = "penumbral",
         [ALMANAC_LUNAR_ECLIPSE_PARTIAL] = "partial",
-        [ALMANAC_LUNAR_ECLIPSE_TOTAL] = "total"
-    };
+        [ALMANAC_LUNAR_ECLIPSE_TOTAL] = "total"};
 
     if (kind < ALMANAC_LUNAR_ECLIPSE_PENUMBRAL || kind > ALMANAC_LUNAR_ECLIPSE_TOTAL)
         return "lunar";
@@ -400,33 +390,18 @@ static int totality_town_seed_priority_fallback(const char *jurisdiction_id, con
         const char *jurisdiction_id;
         const char *town_name;
         int seed_priority;
-    } seeds[] = {
-        {"ES", "Oviedo", 0},
-        {"ES", "Madrid", 1},
-        {"ES", "Santander", 2},
-        {"ES", "Bilbao", 3},
-        {"ES", "Burgos", 4},
-        {"ES", "Zaragoza", 5},
-        {"ES", "Valencia", 6},
-        {"GI", "Gibraltar", 7},
-        {"MA", "Tangier", 8},
-        {"MA", "Rabat", 9},
-        {"TN", "Tunis", 10},
-        {"LY", "Tripoli", 11},
-        {"EG", "Alexandria", 12},
-        {"EG", "Cairo", 13},
-        {"IS", "Reykjav\303\255k", 14},
-        {"GL", "Nuuk", 15},
-        {"PT", "Lisbon", 16},
-        {"FR", "Paris", 17}
-    };
+    } seeds[] = {{"ES", "Oviedo", 0},      {"ES", "Madrid", 1},    {"ES", "Santander", 2},
+                 {"ES", "Bilbao", 3},      {"ES", "Burgos", 4},    {"ES", "Zaragoza", 5},
+                 {"ES", "Valencia", 6},    {"GI", "Gibraltar", 7}, {"MA", "Tangier", 8},
+                 {"MA", "Rabat", 9},       {"TN", "Tunis", 10},    {"LY", "Tripoli", 11},
+                 {"EG", "Alexandria", 12}, {"EG", "Cairo", 13},    {"IS", "Reykjav\303\255k", 14},
+                 {"GL", "Nuuk", 15},       {"PT", "Lisbon", 16},   {"FR", "Paris", 17}};
     size_t i;
 
     if (!jurisdiction_id || !town_name)
         return TOTALITY_TOWN_DEFAULT_SEED_PRIORITY;
     for (i = 0u; i < sizeof(seeds) / sizeof(seeds[0]); ++i) {
-        if (strcmp(jurisdiction_id, seeds[i].jurisdiction_id) == 0 &&
-            strcmp(town_name, seeds[i].town_name) == 0) {
+        if (strcmp(jurisdiction_id, seeds[i].jurisdiction_id) == 0 && strcmp(town_name, seeds[i].town_name) == 0) {
             return seeds[i].seed_priority;
         }
     }
@@ -440,9 +415,7 @@ static void copy_text_field(char *dst, size_t dst_size, const char *src)
     snprintf(dst, dst_size, "%s", src ? src : "");
 }
 
-static bool append_totality_town(almanac_totality_town_t **towns,
-                                 size_t *count,
-                                 size_t *capacity,
+static bool append_totality_town(almanac_totality_town_t **towns, size_t *count, size_t *capacity,
                                  const almanac_totality_town_t *town)
 {
     almanac_totality_town_t *next;
@@ -556,12 +529,9 @@ static almanac_totality_town_t *load_totality_towns(const almanac_observer_t *ob
 
         if (!jurisdiction_id || !town_name || !latitude_text || !longitude_text)
             continue;
-        if (!parse_double_text(latitude_text, &latitude) ||
-            !parse_double_text(longitude_text, &longitude) ||
-            (elevation_text && !parse_double_text(elevation_text, &elevation)) ||
-            latitude < -90.0 || latitude > 90.0 ||
-            longitude < -180.0 || longitude > 180.0 ||
-            elevation < -500.0 || elevation > 9000.0) {
+        if (!parse_double_text(latitude_text, &latitude) || !parse_double_text(longitude_text, &longitude) ||
+            (elevation_text && !parse_double_text(elevation_text, &elevation)) || latitude < -90.0 || latitude > 90.0 ||
+            longitude < -180.0 || longitude > 180.0 || elevation < -500.0 || elevation > 9000.0) {
             continue;
         }
         memset(&town, 0, sizeof(town));
@@ -576,15 +546,11 @@ static almanac_totality_town_t *load_totality_towns(const almanac_observer_t *ob
         town.seed_priority = seed_priority;
         town.seed_score_degrees = NAN;
         town.seed_score_valid = false;
-        town.distance_km = surface_distance_km(observer->latitude_degrees,
-                                               observer->longitude_degrees,
-                                               latitude,
-                                               longitude);
+        town.distance_km =
+            surface_distance_km(observer->latitude_degrees, observer->longitude_degrees, latitude, longitude);
         if (path_reference && path_reference->found) {
             town.path_distance_km = surface_distance_km(path_reference->latitude_degrees,
-                                                        path_reference->longitude_degrees,
-                                                        latitude,
-                                                        longitude);
+                                                        path_reference->longitude_degrees, latitude, longitude);
         } else {
             town.path_distance_km = town.distance_km;
         }
@@ -600,10 +566,8 @@ done:
     return towns;
 }
 
-static bool town_seeds_total_solar_eclipse(almanac_t *almanac,
-                                           const almanac_observer_t *origin,
-                                           const almanac_solar_eclipse_t *seed,
-                                           const almanac_totality_town_t *town,
+static bool town_seeds_total_solar_eclipse(almanac_t *almanac, const almanac_observer_t *origin,
+                                           const almanac_solar_eclipse_t *seed, const almanac_totality_town_t *town,
                                            almanac_solar_totality_location_t *out)
 {
     almanac_observer_t observer;
@@ -616,11 +580,8 @@ static bool town_seeds_total_solar_eclipse(almanac_t *almanac,
     return almanac_solar_eclipse_totality_from_seed(almanac, origin, &observer, seed, 1.0, out);
 }
 
-static bool nearest_totality_town_text(char *out,
-                                       size_t out_size,
-                                       almanac_t *almanac,
-                                       const almanac_observer_t *observer,
-                                       const almanac_solar_eclipse_t *event,
+static bool nearest_totality_town_text(char *out, size_t out_size, almanac_t *almanac,
+                                       const almanac_observer_t *observer, const almanac_solar_eclipse_t *event,
                                        const almanac_solar_totality_location_t *path_reference)
 {
     almanac_totality_town_t *towns = NULL;
@@ -649,12 +610,8 @@ static bool nearest_totality_town_text(char *out,
         town_observer.longitude_degrees = towns[i].longitude_degrees;
         town_observer.elevation_metres = towns[i].elevation_metres;
         towns[i].seed_score_valid =
-            almanac_solar_eclipse_totality_seed_score(almanac,
-                                                      &town_observer,
-                                                      event,
-                                                      &score_degrees) &&
-            score_degrees == score_degrees &&
-            score_degrees <= 1.0;
+            almanac_solar_eclipse_totality_seed_score(almanac, &town_observer, event, &score_degrees) &&
+            score_degrees == score_degrees && score_degrees <= 1.0;
         towns[i].seed_score_degrees = score_degrees;
     }
     qsort(towns, score_limit, sizeof(*towns), totality_town_seed_score_compare);
@@ -678,27 +635,17 @@ static bool nearest_totality_town_text(char *out,
         }
     }
     if (found && best_town) {
-        snprintf(out,
-                 out_size,
-                 "town\t%s\t%s\t%s\t%.6f\t%.6f\t%.9f\t%.1f\t%.0f",
-                 best_town->town_name,
-                 best_town->jurisdiction_id,
-                 best_town->timezone_name,
-                 best_location.latitude_degrees,
-                 best_location.longitude_degrees,
-                 best_location.greatest_eclipse.jd,
-                 best_location.distance_km,
+        snprintf(out, out_size, "town\t%s\t%s\t%s\t%.6f\t%.6f\t%.9f\t%.1f\t%.0f", best_town->town_name,
+                 best_town->jurisdiction_id, best_town->timezone_name, best_location.latitude_degrees,
+                 best_location.longitude_degrees, best_location.greatest_eclipse.jd, best_location.distance_km,
                  best_town->elevation_metres);
     }
     free(towns);
     return found;
 }
 
-static void append_solar_events(string_t *out,
-                                almanac_t *almanac,
-                                const almanac_observer_t *observer,
-                                bool totality_land,
-                                const array_t *events)
+static void append_solar_events(string_t *out, almanac_t *almanac, const almanac_observer_t *observer,
+                                bool totality_land, const array_t *events)
 {
     size_t i;
 
@@ -719,25 +666,16 @@ static void append_solar_events(string_t *out,
         (void)almanac_solar_eclipse_time(event, ALMANAC_EVENT_TIME_FOURTH_CONTACT, &fourth);
         nearest_totality_text[0] = '\0';
         if (totality_land) {
-            have_named_totality = nearest_totality_town_text(nearest_totality_text,
-                                                             sizeof(nearest_totality_text),
-                                                             almanac,
-                                                             observer,
-                                                             event,
-                                                             NULL);
+            have_named_totality = nearest_totality_town_text(nearest_totality_text, sizeof(nearest_totality_text),
+                                                             almanac, observer, event, NULL);
         }
         if (totality_land && have_named_totality) {
             /* The town search emits an already named land location. */
         }
-        (void)string_append_format(out,
-                                   "event Solar|Solar eclipse|%s|%.9f|%.9f|%.9f|%.6f|%.3f|%s\n",
-                                   solar_kind_text(almanac_solar_eclipse_kind(event)),
-                                   greatest.jd,
-                                   first.jd,
-                                   fourth.jd,
+        (void)string_append_format(out, "event Solar|Solar eclipse|%s|%.9f|%.9f|%.9f|%.6f|%.3f|%s\n",
+                                   solar_kind_text(almanac_solar_eclipse_kind(event)), greatest.jd, first.jd, fourth.jd,
                                    almanac_solar_eclipse_magnitude(event),
-                                   almanac_solar_eclipse_totality_percent(event),
-                                   nearest_totality_text);
+                                   almanac_solar_eclipse_totality_percent(event), nearest_totality_text);
     }
 }
 
@@ -758,12 +696,8 @@ static void append_lunar_events(string_t *out, const array_t *events)
         (void)almanac_lunar_eclipse_time(event, ALMANAC_EVENT_TIME_GREATEST, &greatest);
         (void)almanac_lunar_eclipse_time(event, ALMANAC_EVENT_TIME_P1_CONTACT, &p1);
         (void)almanac_lunar_eclipse_time(event, ALMANAC_EVENT_TIME_P4_CONTACT, &p4);
-        (void)string_append_format(out,
-                                   "event Lunar|Lunar eclipse|%s|%.9f|%.9f|%.9f|%.6f|%.3f\n",
-                                   lunar_kind_text(almanac_lunar_eclipse_kind(event)),
-                                   greatest.jd,
-                                   p1.jd,
-                                   p4.jd,
+        (void)string_append_format(out, "event Lunar|Lunar eclipse|%s|%.9f|%.9f|%.9f|%.6f|%.3f\n",
+                                   lunar_kind_text(almanac_lunar_eclipse_kind(event)), greatest.jd, p1.jd, p4.jd,
                                    almanac_lunar_eclipse_umbral_magnitude(event),
                                    almanac_lunar_eclipse_totality_percent(event));
     }
@@ -783,8 +717,7 @@ int main(int argc, char **argv)
     int status = 1;
 
     if (!parse_options(argc, argv, &options)) {
-        fprintf(stderr,
-                "usage: %s start=YYYY-MM-DD end=YYYY-MM-DD lat=52.7073 lon=-2.7540 kind=all|solar|lunar\n",
+        fprintf(stderr, "usage: %s start=YYYY-MM-DD end=YYYY-MM-DD lat=52.7073 lon=-2.7540 kind=all|solar|lunar\n",
                 argc > 0 ? argv[0] : "almanac_event_lab");
         return 2;
     }

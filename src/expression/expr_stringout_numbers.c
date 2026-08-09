@@ -1,10 +1,10 @@
-#include <stdbool.h>
 #include <ctype.h>
+#include <gmp.h>
 #include <limits.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <gmp.h>
 
 #include "expr_bindings.h"
 #define MARS_EXPR_INTERNAL_ACCESS
@@ -20,8 +20,7 @@
 static bool expr_number_scientific_local = false;
 static int expr_number_precision_local = -1;
 
-static string_t *expr_trim_decimal_display_artifacts_text_local(
-    const string_t *text);
+static string_t *expr_trim_decimal_display_artifacts_text_local(const string_t *text);
 
 bool expr_set_number_scientific_local(bool scientific)
 {
@@ -41,16 +40,13 @@ int expr_set_number_precision_local(int precision)
 
 static char *expr_take_text_object_as_c_string_local(string_t *text_obj)
 {
-    char *text = text_obj
-        ? expr_tostring_xstrdup(string_c_str(text_obj))
-        : NULL;
+    char *text = text_obj ? expr_tostring_xstrdup(string_c_str(text_obj)) : NULL;
 
     string_free(text_obj);
     return text;
 }
 
-static char *expr_take_clean_decimal_text_object_as_c_string_local(
-    string_t *text_obj)
+static char *expr_take_clean_decimal_text_object_as_c_string_local(string_t *text_obj)
 {
     string_t *cleaned;
 
@@ -106,9 +102,7 @@ static char *expr_decimal_from_scaled_integer(mpz_t scaled, size_t scale)
 
     len = string_length(digits);
     negative = len > 0u && rune_is_equal(string_at(digits, 0u), '-');
-    mag = negative
-        ? string_substring(digits, 1u, len - 1u)
-        : string_clone(digits);
+    mag = negative ? string_substring(digits, 1u, len - 1u) : string_clone(digits);
     string_free(digits);
     if (!mag)
         return NULL;
@@ -130,9 +124,7 @@ static char *expr_decimal_from_scaled_integer(mpz_t scaled, size_t scale)
             string_t *intpart = string_substring(mag, 0u, int_len);
             string_t *fracpart = string_substring(mag, int_len, scale);
 
-            if (!intpart || !fracpart ||
-                string_append_string(out, intpart) != 0 ||
-                string_append_char(out, '.') != 0 ||
+            if (!intpart || !fracpart || string_append_string(out, intpart) != 0 || string_append_char(out, '.') != 0 ||
                 string_append_string(out, fracpart) != 0) {
                 string_free(intpart);
                 string_free(fracpart);
@@ -194,9 +186,7 @@ static int expr_unicode_digit_value_local(rune_t rune, bool *subscript_out)
     return -1;
 }
 
-static string_t *expr_ascii_rational_part_local(const string_t *text,
-                                                string_pos_t start,
-                                                string_pos_t end,
+static string_t *expr_ascii_rational_part_local(const string_t *text, string_pos_t start, string_pos_t end,
                                                 bool want_subscript)
 {
     string_cursor_t *cursor;
@@ -223,12 +213,10 @@ static string_t *expr_ascii_rational_part_local(const string_t *text,
         bool is_subscript = false;
         int digit;
 
-        if (string_cursor_peek_ascii(cursor, &ascii) &&
-            ascii >= '0' && ascii <= '9') {
+        if (string_cursor_peek_ascii(cursor, &ascii) && ascii >= '0' && ascii <= '9') {
             if (want_subscript)
                 goto fail;
-            if (string_append_char(out, (char)ascii) != 0 ||
-                string_cursor_next(cursor) != 0 ||
+            if (string_append_char(out, (char)ascii) != 0 || string_cursor_next(cursor) != 0 ||
                 string_cursor_position(cursor) > end)
                 goto fail;
             continue;
@@ -237,10 +225,8 @@ static string_t *expr_ascii_rational_part_local(const string_t *text,
         digit = expr_unicode_digit_value_local(rune, &is_subscript);
         if (digit < 0 || is_subscript != want_subscript)
             goto fail;
-        if (string_append_char(out, (char)('0' + digit)) != 0 ||
-            string_cursor_next(cursor) != 0 ||
-            string_cursor_position(cursor) > end ||
-            string_cursor_position(cursor) == before)
+        if (string_append_char(out, (char)('0' + digit)) != 0 || string_cursor_next(cursor) != 0 ||
+            string_cursor_position(cursor) > end || string_cursor_position(cursor) == before)
             goto fail;
     }
 
@@ -253,9 +239,7 @@ fail:
     return NULL;
 }
 
-static bool expr_split_rational_text_local(const string_t *text,
-                                           string_t **numer_out,
-                                           string_t **denom_out)
+static bool expr_split_rational_text_local(const string_t *text, string_t **numer_out, string_t **denom_out)
 {
     string_cursor_t *cursor;
     string_pos_t numer_start = 0u;
@@ -311,10 +295,7 @@ static bool expr_split_rational_text_local(const string_t *text,
         return false;
 
     numer = expr_ascii_rational_part_local(text, numer_start, slash_pos, false);
-    *denom_out = expr_ascii_rational_part_local(text,
-                                                slash_end,
-                                                end,
-                                                unicode_slash);
+    *denom_out = expr_ascii_rational_part_local(text, slash_end, end, unicode_slash);
     if (!numer || !*denom_out) {
         string_free(numer);
         string_free(*denom_out);
@@ -324,8 +305,7 @@ static bool expr_split_rational_text_local(const string_t *text,
 
     if (negative) {
         *numer_out = string_new_with("-");
-        if (!*numer_out ||
-            string_append_string(*numer_out, numer) != 0) {
+        if (!*numer_out || string_append_string(*numer_out, numer) != 0) {
             string_free(*numer_out);
             *numer_out = NULL;
         }
@@ -360,8 +340,7 @@ static char *expr_decimal_string_from_rational_text_local(const string_t *text)
     mpz_init(den);
     mpz_init(scaled);
     mpz_ready = true;
-    if (mpz_set_str(den, string_c_str(denom_text), 10) != 0 ||
-        mpz_set_str(scaled, string_c_str(numer_text), 10) != 0 ||
+    if (mpz_set_str(den, string_c_str(denom_text), 10) != 0 || mpz_set_str(scaled, string_c_str(numer_text), 10) != 0 ||
         mpz_sgn(den) == 0)
         goto done;
     if (mpz_sgn(den) < 0) {
@@ -369,8 +348,7 @@ static char *expr_decimal_string_from_rational_text_local(const string_t *text)
         mpz_neg(scaled, scaled);
     }
 
-    if (!expr_mpz_factor_out_ulong(den, 2u, &twos) ||
-        !expr_mpz_factor_out_ulong(den, 5u, &fives) ||
+    if (!expr_mpz_factor_out_ulong(den, 2u, &twos) || !expr_mpz_factor_out_ulong(den, 5u, &fives) ||
         mpz_cmp_ui(den, 1u) != 0)
         goto done;
 
@@ -429,9 +407,8 @@ char *expr_number_to_string_local(number_t value)
         return expr_tostring_xstrdup(constant_name);
     }
 
-    if (!scientific &&
-        ((!num_is_inexact_real_backend(value) && !num_is_complex_backend(value)) ||
-         num_is_exact(value) || !num_is_finite(value))) {
+    if (!scientific && ((!num_is_inexact_real_backend(value) && !num_is_complex_backend(value)) ||
+                        num_is_exact(value) || !num_is_finite(value))) {
         text_obj = num_to_string(value);
         if (num_is_exact(value)) {
             char *decimal = expr_decimal_string_from_rational_text_local(text_obj);
@@ -467,16 +444,13 @@ char *expr_number_to_string_local(number_t value)
 
     snprintf(fmt, sizeof(fmt), scientific ? "%%.%dN" : "%%.%dn", (int)digits);
     text_obj = num_sprintf_text(fmt, value);
-    text = expr_take_clean_decimal_text_object_as_c_string_local(
-        text_obj ? text_obj : num_to_string(value));
+    text = expr_take_clean_decimal_text_object_as_c_string_local(text_obj ? text_obj : num_to_string(value));
 
     num_destroy(&value);
     return text;
 }
 
-static bool expr_append_decimal_text_slice_local(string_t *out,
-                                                 const string_cursor_t *cursor,
-                                                 string_pos_t start,
+static bool expr_append_decimal_text_slice_local(string_t *out, const string_cursor_t *cursor, string_pos_t start,
                                                  string_pos_t end)
 {
     string_t *slice;
@@ -494,8 +468,7 @@ static bool expr_append_decimal_text_slice_local(string_t *out,
     return ok;
 }
 
-static string_t *expr_trim_decimal_display_artifacts_text_local(
-    const string_t *text)
+static string_t *expr_trim_decimal_display_artifacts_text_local(const string_t *text)
 {
     string_cursor_t *cursor;
     string_t *out;
@@ -558,8 +531,7 @@ static string_t *expr_trim_decimal_display_artifacts_text_local(
                 last_nonzero_end = string_cursor_position(cursor);
             if (zero_run >= 24u) {
                 long_zero_run = true;
-                while (string_cursor_peek_ascii(cursor, &ch) &&
-                       isdigit(ch)) {
+                while (string_cursor_peek_ascii(cursor, &ch) && isdigit(ch)) {
                     if (string_cursor_next(cursor) != 0)
                         goto fail;
                 }
@@ -569,39 +541,27 @@ static string_t *expr_trim_decimal_display_artifacts_text_local(
 
         frac_end = string_cursor_position(cursor);
         if (long_zero_run) {
-            if (!expr_append_decimal_text_slice_local(out,
-                                                      cursor,
-                                                      segment_start,
-                                                      zero_start))
+            if (!expr_append_decimal_text_slice_local(out, cursor, segment_start, zero_start))
                 goto fail;
             segment_start = frac_end;
             continue;
         }
 
         if (!seen_nonzero) {
-            if (!expr_append_decimal_text_slice_local(out,
-                                                      cursor,
-                                                      segment_start,
-                                                      dot_pos))
+            if (!expr_append_decimal_text_slice_local(out, cursor, segment_start, dot_pos))
                 goto fail;
             segment_start = frac_end;
             continue;
         }
 
         if (last_nonzero_end < frac_end) {
-            if (!expr_append_decimal_text_slice_local(out,
-                                                      cursor,
-                                                      segment_start,
-                                                      last_nonzero_end))
+            if (!expr_append_decimal_text_slice_local(out, cursor, segment_start, last_nonzero_end))
                 goto fail;
             segment_start = frac_end;
         }
     }
 
-    if (!expr_append_decimal_text_slice_local(out,
-                                              cursor,
-                                              segment_start,
-                                              string_cursor_end_position(cursor)))
+    if (!expr_append_decimal_text_slice_local(out, cursor, segment_start, string_cursor_end_position(cursor)))
         goto fail;
 
     string_cursor_free(cursor);
@@ -643,8 +603,7 @@ bool expr_is_immortal_default_const_local(const expr_t *dv)
 
     match = num_eq(dv->c, builtin);
     if (!match || num_get_prec_bits(dv->c) != num_get_prec_bits(builtin)) {
-        number_t builtin_at_prec = num_const_prec(builtin,
-                                                  num_get_prec_bits(dv->c));
+        number_t builtin_at_prec = num_const_prec(builtin, num_get_prec_bits(dv->c));
 
         precise_match = num_eq(dv->c, builtin_at_prec);
         num_destroy(&builtin_at_prec);

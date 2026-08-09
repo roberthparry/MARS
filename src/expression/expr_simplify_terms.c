@@ -14,11 +14,8 @@ extern expr_t *expr_simplify(const expr_t *dv);
 
 static int expr_is_i_squared_term(const expr_t *dv)
 {
-    return expr_is_pow_d_expr(dv) &&
-           expr_is_op(dv->a, &ops_const) &&
-           !dv->a->binding_expr &&
-           (num_eq(dv->a->c, NUM_I) || num_eq(dv->a->c, NUM_NEG_I)) &&
-           num_eq(dv->c, NUM_TWO);
+    return expr_is_pow_d_expr(dv) && expr_is_op(dv->a, &ops_const) && !dv->a->binding_expr &&
+           (num_eq(dv->a->c, NUM_I) || num_eq(dv->a->c, NUM_NEG_I)) && num_eq(dv->c, NUM_TWO);
 }
 
 static const expr_t *product_factor_base(const expr_t *dv)
@@ -94,10 +91,8 @@ static int product_factor_group(const expr_t *dv)
 
     if (!base)
         return 3;
-    if ((expr_is_op(base, &ops_const) || expr_is_op(base, &ops_var)) &&
-        base->name && *base->name) {
-        if (expr_is_op(base, &ops_var) &&
-            product_factor_is_primary_variable_name(base->name))
+    if ((expr_is_op(base, &ops_const) || expr_is_op(base, &ops_var)) && base->name && *base->name) {
+        if (expr_is_op(base, &ops_var) && product_factor_is_primary_variable_name(base->name))
             return 1;
         return 0;
     }
@@ -147,8 +142,7 @@ static int term_coeff(const expr_t *term, const expr_t **base, number_t *coeff_o
         return 1;
     }
     if (expr_is_op(term, &ops_neg)) {
-        if (expr_is_op(term->a, &ops_mul) &&
-            expr_simplify_is_plain_real_const(term->a->a)) {
+        if (expr_is_op(term->a, &ops_mul) && expr_simplify_is_plain_real_const(term->a->a)) {
             *base = term->a->b;
             *coeff_out = num_neg(term->a->a->c);
             return 1;
@@ -157,8 +151,7 @@ static int term_coeff(const expr_t *term, const expr_t **base, number_t *coeff_o
         *coeff_out = num_clone(NUM_NEG_ONE);
         return 1;
     }
-    if (expr_is_op(term, &ops_mul) &&
-        expr_simplify_is_plain_real_const(term->a)) {
+    if (expr_is_op(term, &ops_mul) && expr_simplify_is_plain_real_const(term->a)) {
         *base = term->b;
         *coeff_out = num_clone(term->a->c);
         return 1;
@@ -177,16 +170,14 @@ static int addend_bases_equal(const expr_t *lhs, const expr_t *rhs)
     if (expr_struct_eq(lhs, rhs))
         return 1;
 
-    if (expr_is_const(lhs) && expr_is_const(rhs) &&
-        num_is_real(lhs->c) && num_is_real(rhs->c) &&
+    if (expr_is_const(lhs) && expr_is_const(rhs) && num_is_real(lhs->c) && num_is_real(rhs->c) &&
         num_eq(lhs->c, rhs->c)) {
         return 1;
     }
 
     left_radicand = expr_sqrt_radicand_owned_local(lhs);
     right_radicand = expr_sqrt_radicand_owned_local(rhs);
-    equal = left_radicand && right_radicand &&
-            expr_struct_eq(left_radicand, right_radicand);
+    equal = left_radicand && right_radicand && expr_struct_eq(left_radicand, right_radicand);
     expr_free(right_radicand);
     expr_free(left_radicand);
     if (equal)
@@ -195,9 +186,7 @@ static int addend_bases_equal(const expr_t *lhs, const expr_t *rhs)
     return 0;
 }
 
-static int split_leading_real_scalar(const expr_t *term,
-                                     number_t *scalar_out,
-                                     const expr_t **rest_out)
+static int split_leading_real_scalar(const expr_t *term, number_t *scalar_out, const expr_t **rest_out)
 {
     if (expr_simplify_is_plain_real_const(term)) {
         *scalar_out = num_clone(term->c);
@@ -205,8 +194,7 @@ static int split_leading_real_scalar(const expr_t *term,
         return 1;
     }
 
-    if (expr_is_op(term, &ops_mul) &&
-        expr_simplify_is_plain_real_const(term->a)) {
+    if (expr_is_op(term, &ops_mul) && expr_simplify_is_plain_real_const(term->a)) {
         *scalar_out = num_clone(term->a->c);
         *rest_out = term->b;
         return 1;
@@ -217,8 +205,7 @@ static int split_leading_real_scalar(const expr_t *term,
     return 0;
 }
 
-static expr_t *make_normalised_division_addend(const expr_t *num,
-                                               const expr_t *den)
+static expr_t *make_normalised_division_addend(const expr_t *num, const expr_t *den)
 {
     expr_t *one;
     expr_t *out;
@@ -327,8 +314,7 @@ static int expr_term_has_foldable_exact_scalar_local(const expr_t *dv)
         return !num_eq(dv->c, NUM_ONE) && !num_eq(dv->c, NUM_NEG_ONE);
 
     if (expr_is_op(dv, &ops_mul))
-        return expr_simplify_is_plain_real_const(dv->a) ||
-               expr_simplify_is_plain_real_const(dv->b);
+        return expr_simplify_is_plain_real_const(dv->a) || expr_simplify_is_plain_real_const(dv->b);
 
     return 0;
 }
@@ -341,21 +327,17 @@ static int expr_term_has_sqrt2_scalar_local(const expr_t *dv)
     if (expr_is_op(dv, &ops_neg))
         return expr_term_has_sqrt2_scalar_local(dv->a);
 
-    if (expr_is_unnamed_const(dv) &&
-        (num_eq(dv->c, NUM_SQRT2) || num_eq(dv->c, NUM_SQRT2_OVER_TWO))) {
+    if (expr_is_unnamed_const(dv) && (num_eq(dv->c, NUM_SQRT2) || num_eq(dv->c, NUM_SQRT2_OVER_TWO))) {
         return 1;
     }
 
     if (expr_is_op(dv, &ops_mul))
-        return expr_term_has_sqrt2_scalar_local(dv->a) ||
-               expr_term_has_sqrt2_scalar_local(dv->b);
+        return expr_term_has_sqrt2_scalar_local(dv->a) || expr_term_has_sqrt2_scalar_local(dv->b);
 
     return 0;
 }
 
-static int expr_addsub_term_count_limited_local(const expr_t *dv,
-                                                size_t limit,
-                                                size_t *count)
+static int expr_addsub_term_count_limited_local(const expr_t *dv, size_t limit, size_t *count)
 {
     if (!dv || !count || *count > limit)
         return 0;
@@ -373,16 +355,14 @@ static int expr_addsub_term_count_limited_local(const expr_t *dv,
 static int expr_sum_has_foldable_exact_scalar_local(const expr_t *dv)
 {
     if (expr_is_addsub(dv))
-        return expr_sum_has_foldable_exact_scalar_local(dv->a) ||
-               expr_sum_has_foldable_exact_scalar_local(dv->b);
+        return expr_sum_has_foldable_exact_scalar_local(dv->a) || expr_sum_has_foldable_exact_scalar_local(dv->b);
     return expr_term_has_foldable_exact_scalar_local(dv);
 }
 
 static int expr_sum_has_sqrt2_scalar_local(const expr_t *dv)
 {
     if (expr_is_addsub(dv))
-        return expr_sum_has_sqrt2_scalar_local(dv->a) ||
-               expr_sum_has_sqrt2_scalar_local(dv->b);
+        return expr_sum_has_sqrt2_scalar_local(dv->a) || expr_sum_has_sqrt2_scalar_local(dv->b);
     return expr_term_has_sqrt2_scalar_local(dv);
 }
 
@@ -392,12 +372,10 @@ static int expr_sum_scaling_can_distribute_local(const expr_t *dv)
 
     if (!expr_addsub_term_count_limited_local(dv, 8u, &count))
         return 0;
-    return expr_sum_has_foldable_exact_scalar_local(dv) &&
-           expr_sum_has_sqrt2_scalar_local(dv);
+    return expr_sum_has_foldable_exact_scalar_local(dv) && expr_sum_has_sqrt2_scalar_local(dv);
 }
 
-static expr_t *expr_distribute_scale_over_sum_forced_local(number_t coeff,
-                                                           expr_t *base)
+static expr_t *expr_distribute_scale_over_sum_forced_local(number_t coeff, expr_t *base)
 {
     if (expr_is_op(base, &ops_add)) {
         expr_t *left;
@@ -456,8 +434,12 @@ static expr_t *expr_distribute_scale_over_sum_forced_local(number_t coeff,
 expr_t *expr_make_scaled(number_t coeff, expr_t *base)
 {
     NUM_SCOPE(scope);
-    if (num_is_zero(coeff)) { expr_free(base); return expr_new_const(NUM_ZERO); }
-    if (num_eq(coeff, NUM_ONE))  return base;
+    if (num_is_zero(coeff)) {
+        expr_free(base);
+        return expr_new_const(NUM_ZERO);
+    }
+    if (num_eq(coeff, NUM_ONE))
+        return base;
     if (num_eq(coeff, NUM_NEG_ONE)) {
         expr_t *positive = expr_simplify_positive_part_if_negative(base);
 
@@ -469,16 +451,14 @@ expr_t *expr_make_scaled(number_t coeff, expr_t *base)
         expr_free(base);
         return r;
     }
-    if (num_is_exact(coeff) && num_is_real(coeff) &&
-        expr_is_addsub(base) && expr_sum_scaling_can_distribute_local(base))
+    if (num_is_exact(coeff) && num_is_real(coeff) && expr_is_addsub(base) &&
+        expr_sum_scaling_can_distribute_local(base))
         return expr_distribute_scale_over_sum_forced_local(coeff, base);
     if (expr_is_unnamed_const(base) && base->binding_expr && num_is_real(base->c)) {
         number_t leading_coeff;
         expr_binding_expr_t *rest_expr = NULL;
 
-        if (expr_binding_expr_split_leading_number(base->binding_expr,
-                                                &leading_coeff,
-                                                &rest_expr)) {
+        if (expr_binding_expr_split_leading_number(base->binding_expr, &leading_coeff, &rest_expr)) {
             if (rest_expr) {
                 number_t folded = num_mul(coeff, leading_coeff);
                 expr_t *rest = expr_binding_expr_eval_expr(rest_expr);
@@ -503,10 +483,8 @@ expr_t *expr_make_scaled(number_t coeff, expr_t *base)
         }
         string_t *coeff_text = num_to_string(coeff);
         expr_binding_expr_t *coeff_expr =
-            expr_binding_expr_new_number_text(coeff_text
-                ? string_c_str(coeff_text) : "NAN");
-        expr_binding_expr_t *expr =
-            expr_binding_expr_new_mul(coeff_expr, expr_binding_expr_clone(base->binding_expr));
+            expr_binding_expr_new_number_text(coeff_text ? string_c_str(coeff_text) : "NAN");
+        expr_binding_expr_t *expr = expr_binding_expr_new_mul(coeff_expr, expr_binding_expr_clone(base->binding_expr));
         number_t scaled = num_mul(coeff, base->c);
         expr_t *out = expr_new_const(scaled);
 
@@ -539,11 +517,9 @@ expr_t *expr_make_scaled(number_t coeff, expr_t *base)
         if (folded_product)
             return folded_product;
     }
-    if (expr_is_op(base, &ops_mul) &&
-        expr_is_unnamed_const(base->a) &&
+    if (expr_is_op(base, &ops_mul) && expr_is_unnamed_const(base->a) &&
         (num_is_exact(base->a->c) || !num_constant_name(base->a->c)) &&
-        (!base->a->binding_expr ||
-         base->a->binding_expr->kind == EXPR_BINDING_EXPR_NUMBER) &&
+        (!base->a->binding_expr || base->a->binding_expr->kind == EXPR_BINDING_EXPR_NUMBER) &&
         num_is_real(base->a->c)) {
         number_t folded = num_mul(coeff, base->a->c);
         expr_retain(base->b);
@@ -553,12 +529,9 @@ expr_t *expr_make_scaled(number_t coeff, expr_t *base)
 
         return out;
     }
-    if (expr_is_op(base, &ops_mul) &&
-        expr_is_op(base->a, &ops_mul) &&
-        expr_is_unnamed_const(base->a->a) &&
+    if (expr_is_op(base, &ops_mul) && expr_is_op(base->a, &ops_mul) && expr_is_unnamed_const(base->a->a) &&
         (num_is_exact(base->a->a->c) || !num_constant_name(base->a->a->c)) &&
-        (!base->a->a->binding_expr ||
-         base->a->a->binding_expr->kind == EXPR_BINDING_EXPR_NUMBER) &&
+        (!base->a->a->binding_expr || base->a->a->binding_expr->kind == EXPR_BINDING_EXPR_NUMBER) &&
         num_is_real(base->a->a->c)) {
         number_t folded = num_mul(coeff, base->a->a->c);
         expr_retain(base->a->b);
@@ -583,9 +556,12 @@ expr_t *expr_make_scaled(number_t coeff, expr_t *base)
 
 static int addend_group(const expr_t *dv)
 {
-    if (dv->ops->arity == EXPR_OP_UNARY)                  return 0;
-    if (expr_is_op(dv, &ops_var))                            return 1;
-    if (expr_is_op(dv, &ops_const) && dv->name && *dv->name) return 2;
+    if (dv->ops->arity == EXPR_OP_UNARY)
+        return 0;
+    if (expr_is_op(dv, &ops_var))
+        return 1;
+    if (expr_is_op(dv, &ops_const) && dv->name && *dv->name)
+        return 2;
     return 3;
 }
 
@@ -634,9 +610,7 @@ static void addend_consider_leaf_key(const expr_t *dv, addend_sort_key_t *key)
     else
         group = 3;
 
-    if (group < key->group ||
-        (group == key->group && key->name && *key->name &&
-         strcmp(dv->name, key->name) < 0)) {
+    if (group < key->group || (group == key->group && key->name && *key->name && strcmp(dv->name, key->name) < 0)) {
         key->group = group;
         key->name = dv->name;
     }
@@ -700,8 +674,7 @@ void expr_combine_common_denominator_addends(addend_t *terms, size_t n)
 
             if (!expr_is_div(jbase))
                 continue;
-            if (!expr_struct_eq(ibase->b, jbase->b) &&
-                !expr_polynomials_equal_deg4(ibase->b, jbase->b))
+            if (!expr_struct_eq(ibase->b, jbase->b) && !expr_polynomials_equal_deg4(ibase->b, jbase->b))
                 continue;
 
             if (!merged_any) {
@@ -805,12 +778,10 @@ static int expr_contains_addsub_normalised(const expr_t *dv)
         return 0;
     if (expr_is_addsub(dv))
         return 1;
-    return expr_contains_addsub_normalised(dv->a) ||
-           expr_contains_addsub_normalised(dv->b);
+    return expr_contains_addsub_normalised(dv->a) || expr_contains_addsub_normalised(dv->b);
 }
 
-void expr_collect_addends(expr_t *dv, number_t scale, number_t *c_const,
-                        addend_t **terms, size_t *n, size_t *cap)
+void expr_collect_addends(expr_t *dv, number_t scale, number_t *c_const, addend_t **terms, size_t *n, size_t *cap)
 {
     NUM_SCOPE(scope);
     if (!dv)
@@ -834,9 +805,7 @@ void expr_collect_addends(expr_t *dv, number_t scale, number_t *c_const,
             expr_collect_addends(dv->a, neg_scale, c_const, terms, n, cap);
             return;
         }
-        if (expr_is_op(dv->a, &ops_mul) &&
-            expr_is_unnamed_const(dv->a->a) &&
-            expr_is_addsub(dv->a->b)) {
+        if (expr_is_op(dv->a, &ops_mul) && expr_is_unnamed_const(dv->a->a) && expr_is_addsub(dv->a->b)) {
             number_t ns;
             number_t coeff_num = num_new();
             number_t neg_scale = num_neg(scale);
@@ -848,9 +817,7 @@ void expr_collect_addends(expr_t *dv, number_t scale, number_t *c_const,
             }
         }
     }
-    if (expr_is_op(dv, &ops_mul) &&
-        expr_is_unnamed_const(dv->a) &&
-        expr_is_addsub(dv->b)) {
+    if (expr_is_op(dv, &ops_mul) && expr_is_unnamed_const(dv->a) && expr_is_addsub(dv->b)) {
         number_t ns;
         number_t coeff_num = num_new();
 
@@ -860,9 +827,7 @@ void expr_collect_addends(expr_t *dv, number_t scale, number_t *c_const,
             return;
         }
     }
-    if (expr_is_op(dv, &ops_mul) &&
-        expr_is_op(dv->a, &ops_mul) &&
-        expr_is_unnamed_const(dv->a->a)) {
+    if (expr_is_op(dv, &ops_mul) && expr_is_op(dv->a, &ops_mul) && expr_is_unnamed_const(dv->a->a)) {
         number_t ns;
         number_t coeff_num = num_new();
         expr_t *raw;
@@ -902,8 +867,7 @@ void expr_collect_addends(expr_t *dv, number_t scale, number_t *c_const,
             ns = num_div(ns, den_scalar);
             normalised = make_normalised_division_addend(num_rest, den_rest);
             if (normalised) {
-                if ((!num_rest && den_rest) ||
-                    !expr_contains_addsub_normalised(normalised) ||
+                if ((!num_rest && den_rest) || !expr_contains_addsub_normalised(normalised) ||
                     expr_struct_eq(normalised, dv)) {
                     size_t i;
 
@@ -941,9 +905,7 @@ void expr_collect_addends(expr_t *dv, number_t scale, number_t *c_const,
         number_t leading_coeff;
         expr_binding_expr_t *rest_expr = NULL;
 
-        if (expr_binding_expr_split_leading_number(dv->binding_expr,
-                                                   &leading_coeff,
-                                                   &rest_expr)) {
+        if (expr_binding_expr_split_leading_number(dv->binding_expr, &leading_coeff, &rest_expr)) {
             number_t ns = num_mul(scale, leading_coeff);
 
             if (rest_expr) {
@@ -951,8 +913,7 @@ void expr_collect_addends(expr_t *dv, number_t scale, number_t *c_const,
                 expr_t *simp = rest ? expr_simplify(rest) : NULL;
 
                 expr_binding_expr_free(rest_expr);
-                expr_collect_addends(simp ? simp : rest, ns, c_const,
-                                     terms, n, cap);
+                expr_collect_addends(simp ? simp : rest, ns, c_const, terms, n, cap);
                 expr_free(simp);
                 expr_free(rest);
             } else {
@@ -1003,8 +964,7 @@ void expr_collect_addends(expr_t *dv, number_t scale, number_t *c_const,
     (*n)++;
 }
 
-int expr_extract_common_addend_coeff(const addend_t *terms, size_t n,
-                                   number_t c_const, number_t *common_out)
+int expr_extract_common_addend_coeff(const addend_t *terms, size_t n, number_t c_const, number_t *common_out)
 {
     NUM_SCOPE(scope);
     number_t common = num_new();
@@ -1026,8 +986,7 @@ int expr_extract_common_addend_coeff(const addend_t *terms, size_t n,
         nonzero_terms++;
     }
 
-    if (!have_common || nonzero_terms < 2 ||
-        num_is_one(common) || num_eq(common, NUM_NEG_ONE)) {
+    if (!have_common || nonzero_terms < 2 || num_is_one(common) || num_eq(common, NUM_NEG_ONE)) {
         return 0;
     }
 
@@ -1127,9 +1086,7 @@ expr_t *expr_make_pow_like(expr_t *base, number_t exponent)
     }
     if (num_eq(exponent, NUM_ONE))
         return base;
-    if (num_eq(exponent, NUM_TWO) &&
-        expr_is_op(base, &ops_const) &&
-        !base->binding_expr &&
+    if (num_eq(exponent, NUM_TWO) && expr_is_op(base, &ops_const) && !base->binding_expr &&
         (num_eq(base->c, NUM_I) || num_eq(base->c, NUM_NEG_I))) {
         expr_free(base);
         return expr_new_const(NUM_NEG_ONE);
@@ -1140,11 +1097,8 @@ expr_t *expr_make_pow_like(expr_t *base, number_t exponent)
     return pow;
 }
 
-static void expr_append_denominator_factor(number_t *c_acc, int *is_zero,
-                                         expr_t ***den_terms,
-                                         size_t *nden_terms,
-                                         size_t *den_cap,
-                                         expr_t *den)
+static void expr_append_denominator_factor(number_t *c_acc, int *is_zero, expr_t ***den_terms, size_t *nden_terms,
+                                           size_t *den_cap, expr_t *den)
 {
     if (*is_zero) {
         expr_free(den);
@@ -1158,17 +1112,13 @@ static void expr_append_denominator_factor(number_t *c_acc, int *is_zero,
         expr_retain(left);
         expr_retain(right);
         expr_free(den);
-        expr_append_denominator_factor(c_acc, is_zero, den_terms,
-                                     nden_terms, den_cap, left);
-        expr_append_denominator_factor(c_acc, is_zero, den_terms,
-                                     nden_terms, den_cap, right);
+        expr_append_denominator_factor(c_acc, is_zero, den_terms, nden_terms, den_cap, left);
+        expr_append_denominator_factor(c_acc, is_zero, den_terms, nden_terms, den_cap, right);
         return;
     }
 
-    if (expr_is_unnamed_const(den) &&
-        (num_is_exact(den->c) || !num_constant_name(den->c)) &&
-        (!den->binding_expr || den->binding_expr->kind == EXPR_BINDING_EXPR_NUMBER) &&
-        num_is_real(den->c)) {
+    if (expr_is_unnamed_const(den) && (num_is_exact(den->c) || !num_constant_name(den->c)) &&
+        (!den->binding_expr || den->binding_expr->kind == EXPR_BINDING_EXPR_NUMBER) && num_is_real(den->c)) {
         number_t quotient = num_div(*c_acc, den->c);
 
         num_destroy(c_acc);
@@ -1180,10 +1130,8 @@ static void expr_append_denominator_factor(number_t *c_acc, int *is_zero,
     expr_append_node(den_terms, nden_terms, den_cap, den);
 }
 
-void expr_split_division_terms(number_t *c_acc, int *is_zero,
-                             expr_t **terms, size_t nterms,
-                             expr_t ***den_terms, size_t *nden_terms,
-                             size_t *den_cap)
+void expr_split_division_terms(number_t *c_acc, int *is_zero, expr_t **terms, size_t nterms, expr_t ***den_terms,
+                               size_t *nden_terms, size_t *den_cap)
 {
     NUM_SCOPE(scope);
     for (size_t i = 0; i < nterms; ++i) {
@@ -1201,10 +1149,8 @@ void expr_split_division_terms(number_t *c_acc, int *is_zero,
         expr_free(term);
         terms[i] = NULL;
 
-        if (expr_is_unnamed_const(num) &&
-            (num_is_exact(num->c) || !num_constant_name(num->c)) &&
-            (!num->binding_expr || num->binding_expr->kind == EXPR_BINDING_EXPR_NUMBER) &&
-            num_is_real(num->c)) {
+        if (expr_is_unnamed_const(num) && (num_is_exact(num->c) || !num_constant_name(num->c)) &&
+            (!num->binding_expr || num->binding_expr->kind == EXPR_BINDING_EXPR_NUMBER) && num_is_real(num->c)) {
             if (num_is_zero(num->c))
                 *is_zero = 1;
             else {
@@ -1223,8 +1169,7 @@ void expr_split_division_terms(number_t *c_acc, int *is_zero,
             continue;
         }
 
-        expr_append_denominator_factor(c_acc, is_zero, den_terms, nden_terms,
-                                     den_cap, den);
+        expr_append_denominator_factor(c_acc, is_zero, den_terms, nden_terms, den_cap, den);
     }
 }
 
@@ -1279,8 +1224,7 @@ void expr_combine_like_powers(expr_t **terms, size_t nterms)
     }
 }
 
-void expr_cancel_common_powers(expr_t **terms, size_t nterms,
-                             expr_t **den_terms, size_t nden_terms)
+void expr_cancel_common_powers(expr_t **terms, size_t nterms, expr_t **den_terms, size_t nden_terms)
 {
     NUM_SCOPE(scope);
 
@@ -1361,8 +1305,7 @@ void expr_combine_exp_terms(expr_t **terms, size_t nterms)
 
                 while (t >= 0) {
                     int tg = addend_group(addends[t]);
-                    int cmp = (tg != kg) ? (tg - kg)
-                                         : compare_addend_bases(addends[t], key);
+                    int cmp = (tg != kg) ? (tg - kg) : compare_addend_bases(addends[t], key);
                     if (cmp <= 0)
                         break;
                     addends[t + 1] = addends[t];
@@ -1396,18 +1339,15 @@ static expr_t *expr_sqrt_radicand_owned_local(const expr_t *expr)
         return expr->a;
     }
 
-    if (expr_is_unnamed_const(expr) && expr->binding_expr &&
-        expr->binding_expr->kind == EXPR_BINDING_EXPR_UNARY_OP &&
+    if (expr_is_unnamed_const(expr) && expr->binding_expr && expr->binding_expr->kind == EXPR_BINDING_EXPR_UNARY_OP &&
         expr->binding_expr->u.unary_op.ops == &ops_sqrt) {
-        return expr_binding_expr_eval_expr(
-            expr->binding_expr->u.unary_op.child);
+        return expr_binding_expr_eval_expr(expr->binding_expr->u.unary_op.child);
     }
 
     return NULL;
 }
 
-static bool expr_small_rational_value_local(number_t value,
-                                            number_t *rational_out)
+static bool expr_small_rational_value_local(number_t value, number_t *rational_out)
 {
     enum { MAX_NUMERATOR = 64, MAX_DENOMINATOR = 16 };
     long numerator;
@@ -1421,9 +1361,7 @@ static bool expr_small_rational_value_local(number_t value,
     }
 
     for (denominator = 1L; denominator <= MAX_DENOMINATOR; ++denominator) {
-        for (numerator = -MAX_NUMERATOR;
-             numerator <= MAX_NUMERATOR;
-             ++numerator) {
+        for (numerator = -MAX_NUMERATOR; numerator <= MAX_NUMERATOR; ++numerator) {
             number_t candidate = num_create_from_frac(numerator, denominator);
             bool equal = num_eq(value, candidate);
 
@@ -1445,9 +1383,7 @@ static bool expr_small_rational_value_local(number_t value,
  * sqrt(r)*sqrt(r) = r.  Restricting the recovered multiplier to a small exact
  * rational prevents arbitrary decimal coefficients from being rewritten.
  */
-void expr_merge_coefficient_sqrt_terms(number_t *coefficient,
-                                       expr_t **terms,
-                                       size_t nterms)
+void expr_merge_coefficient_sqrt_terms(number_t *coefficient, expr_t **terms, size_t nterms)
 {
     if (!coefficient || !terms || !num_is_real(*coefficient))
         return;
@@ -1459,8 +1395,7 @@ void expr_merge_coefficient_sqrt_terms(number_t *coefficient,
         number_t rational = num_new();
         number_t folded;
 
-        if (!radicand || !expr_is_unnamed_const(radicand) ||
-            !num_is_real(radicand->c) ||
+        if (!radicand || !expr_is_unnamed_const(radicand) || !num_is_real(radicand->c) ||
             !num_gt(radicand->c, NUM_ZERO)) {
             expr_free(radicand);
             num_destroy(&rational);
@@ -1499,8 +1434,7 @@ void expr_merge_sqrt_terms(expr_t **terms, size_t nterms)
             continue;
 
         for (size_t j = i + 1; j < nterms; ++j) {
-            expr_t *right_radicand =
-                expr_sqrt_radicand_owned_local(terms[j]);
+            expr_t *right_radicand = expr_sqrt_radicand_owned_local(terms[j]);
             expr_t *prod;
             expr_t *simp_arg;
             expr_t *raw;
@@ -1525,8 +1459,7 @@ void expr_merge_sqrt_terms(expr_t **terms, size_t nterms)
     }
 }
 
-void expr_merge_sqrt_quotient_terms(expr_t **terms, size_t nterms,
-                                  expr_t **den_terms, size_t nden_terms)
+void expr_merge_sqrt_quotient_terms(expr_t **terms, size_t nterms, expr_t **den_terms, size_t nden_terms)
 {
     for (size_t i = 0; i < nterms; ++i) {
         if (!expr_is_sqrt_expr(terms[i]) || !terms[i]->a)
@@ -1537,10 +1470,8 @@ void expr_merge_sqrt_quotient_terms(expr_t **terms, size_t nterms,
             expr_t *simp_arg;
             expr_t *raw;
 
-            if (!expr_is_sqrt_expr(den_terms[j]) || !den_terms[j]->a ||
-                !expr_is_const(den_terms[j]->a) ||
-                !num_is_real(den_terms[j]->a->c) ||
-                !num_gt(den_terms[j]->a->c, NUM_ZERO))
+            if (!expr_is_sqrt_expr(den_terms[j]) || !den_terms[j]->a || !expr_is_const(den_terms[j]->a) ||
+                !num_is_real(den_terms[j]->a->c) || !num_gt(den_terms[j]->a->c, NUM_ZERO))
                 continue;
 
             quotient = expr_div(terms[i]->a, den_terms[j]->a);
@@ -1560,9 +1491,8 @@ void expr_merge_sqrt_quotient_terms(expr_t **terms, size_t nterms,
     }
 }
 
-expr_t *expr_try_expand_shallow_product(number_t c_acc,
-                                      expr_t **terms, size_t nterms,
-                                      expr_t **den_terms, size_t nden_terms)
+expr_t *expr_try_expand_shallow_product(number_t c_acc, expr_t **terms, size_t nterms, expr_t **den_terms,
+                                        size_t nden_terms)
 {
     size_t first = nterms;
     size_t second = nterms;
@@ -1593,8 +1523,8 @@ expr_t *expr_try_expand_shallow_product(number_t c_acc,
         return NULL;
 
     int share = 0;
-    const expr_t *t0c[2] = { t0->a, t0->b };
-    const expr_t *t1c[2] = { t1->a, t1->b };
+    const expr_t *t0c[2] = {t0->a, t0->b};
+    const expr_t *t1c[2] = {t1->a, t1->b};
 
     for (int p = 0; p < 2 && !share; ++p) {
         for (int q = 0; q < 2 && !share; ++q) {
@@ -1608,9 +1538,7 @@ expr_t *expr_try_expand_shallow_product(number_t c_acc,
         }
     }
 
-    if (!share ||
-        expr_is_addsub(t0->a) || expr_is_addsub(t0->b) ||
-        expr_is_addsub(t1->a) || expr_is_addsub(t1->b))
+    if (!share || expr_is_addsub(t0->a) || expr_is_addsub(t0->b) || expr_is_addsub(t1->a) || expr_is_addsub(t1->b))
         return NULL;
 
     expr_t *expanded = expand_product(t0, t1);

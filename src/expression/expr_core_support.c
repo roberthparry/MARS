@@ -1,8 +1,8 @@
 #include <ctype.h>
 #include <limits.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
 #include <string.h>
 
 #include "number.h"
@@ -21,20 +21,10 @@ enum {
     EXPR_DEFAULT_ALIAS_HASH_MUL = 2654435761u
 };
 
-static const expr_default_constant_alias_t
-s_default_constant_aliases[EXPR_DEFAULT_ALIAS_HASH_SIZE] = {
-    [0]  = { "π",      "@pi"    },
-    [2]  = { "@gamma", "@gamma" },
-    [3]  = { "@phi",   "@phi"   },
-    [4]  = { "τ",      "@tau"   },
-    [5]  = { "pi",     "@pi"    },
-    [6]  = { "φ",      "@phi"   },
-    [7]  = { "@tau",   "@tau"   },
-    [8]  = { "@pi",    "@pi"    },
-    [9]  = { "i",      "i"      },
-    [10] = { "phi",    "@phi"   },
-    [11] = { "gamma",  "@gamma" },
-    [12] = { "γ",      "@gamma" },
+static const expr_default_constant_alias_t s_default_constant_aliases[EXPR_DEFAULT_ALIAS_HASH_SIZE] = {
+    [0] = {"π", "@pi"},  [2] = {"@gamma", "@gamma"}, [3] = {"@phi", "@phi"},     [4] = {"τ", "@tau"},
+    [5] = {"pi", "@pi"}, [6] = {"φ", "@phi"},        [7] = {"@tau", "@tau"},     [8] = {"@pi", "@pi"},
+    [9] = {"i", "i"},    [10] = {"phi", "@phi"},     [11] = {"gamma", "@gamma"}, [12] = {"γ", "@gamma"},
 };
 
 static size_t expr_default_constant_alias_hash(const string_t *name)
@@ -67,8 +57,7 @@ static const char *expr_default_constant_alias_literal(const string_t *name)
     if (!name)
         return NULL;
 
-    entry = &s_default_constant_aliases[
-        expr_default_constant_alias_hash(name)];
+    entry = &s_default_constant_aliases[expr_default_constant_alias_hash(name)];
     if (!entry->key)
         return NULL;
 
@@ -108,10 +97,7 @@ void expr_store_value_num(expr_t *dv, number_t value)
 
 bool expr_ops_is_lambert(const expr_ops_t *ops)
 {
-    return ops == &ops_lambert_w ||
-           ops == &ops_lambert_wn ||
-           ops == &ops_lambert_w0 ||
-           ops == &ops_lambert_wm1;
+    return ops == &ops_lambert_w || ops == &ops_lambert_wn || ops == &ops_lambert_w0 || ops == &ops_lambert_wm1;
 }
 
 const expr_t *expr_lambert_arg(const expr_t *expr)
@@ -126,8 +112,7 @@ bool expr_ops_is_floor_or_ceil(const expr_ops_t *ops)
     return ops == &ops_floor || ops == &ops_ceil;
 }
 
-bool expr_ops_are_direct_inverse_pair(const expr_ops_t *outer,
-                                    const expr_ops_t *inner)
+bool expr_ops_are_direct_inverse_pair(const expr_ops_t *outer, const expr_ops_t *inner)
 {
     return outer && inner && outer->direct_inverse == inner;
 }
@@ -135,19 +120,10 @@ bool expr_ops_are_direct_inverse_pair(const expr_ops_t *outer,
 const expr_ops_t *expr_ops_reciprocal_unary(const expr_ops_t *ops)
 {
     static const expr_ops_t *reciprocal_unary_ops[EXPR_KIND_COUNT] = {
-        [EXPR_KIND_COS] = &ops_sec,
-        [EXPR_KIND_SIN] = &ops_cosec,
-        [EXPR_KIND_TAN] = &ops_cot,
-        [EXPR_KIND_SEC] = &ops_cos,
-        [EXPR_KIND_COSEC] = &ops_sin,
-        [EXPR_KIND_COT] = &ops_tan,
-        [EXPR_KIND_COSH] = &ops_sech,
-        [EXPR_KIND_SINH] = &ops_cosech,
-        [EXPR_KIND_TANH] = &ops_coth,
-        [EXPR_KIND_SECH] = &ops_cosh,
-        [EXPR_KIND_COSECH] = &ops_sinh,
-        [EXPR_KIND_COTH] = &ops_tanh
-    };
+        [EXPR_KIND_COS] = &ops_sec,   [EXPR_KIND_SIN] = &ops_cosec,   [EXPR_KIND_TAN] = &ops_cot,
+        [EXPR_KIND_SEC] = &ops_cos,   [EXPR_KIND_COSEC] = &ops_sin,   [EXPR_KIND_COT] = &ops_tan,
+        [EXPR_KIND_COSH] = &ops_sech, [EXPR_KIND_SINH] = &ops_cosech, [EXPR_KIND_TANH] = &ops_coth,
+        [EXPR_KIND_SECH] = &ops_cosh, [EXPR_KIND_COSECH] = &ops_sinh, [EXPR_KIND_COTH] = &ops_tanh};
 
     if (!ops || (unsigned)ops->kind >= (unsigned)EXPR_KIND_COUNT)
         return NULL;
@@ -184,35 +160,28 @@ static bool expr_lambert_w_candidate_ok(number_t value)
 
 static bool expr_lambert_w0_candidate_ok(number_t value)
 {
-    return num_is_finite(value) &&
-           num_is_real(value) &&
-           num_ge(value, NUM_NEG_ONE);
+    return num_is_finite(value) && num_is_real(value) && num_ge(value, NUM_NEG_ONE);
 }
 
 static bool expr_lambert_wm1_candidate_ok(number_t value)
 {
-    return num_is_finite(value) &&
-           num_is_real(value) &&
-           num_le(value, NUM_NEG_ONE);
+    return num_is_finite(value) && num_is_real(value) && num_le(value, NUM_NEG_ONE);
 }
 
 static const expr_inverse_unary_rule_t s_inverse_unary_rules[EXPR_KIND_COUNT] = {
-    [EXPR_KIND_LAMBERT_W] = { true, expr_lambert_w_candidate_ok },
-    [EXPR_KIND_LAMBERT_W0] = { true, expr_lambert_w0_candidate_ok },
-    [EXPR_KIND_LAMBERT_WM1] = { true, expr_lambert_wm1_candidate_ok },
-    [EXPR_KIND_LOG10] = { true, NULL },
+    [EXPR_KIND_LAMBERT_W] = {true, expr_lambert_w_candidate_ok},
+    [EXPR_KIND_LAMBERT_W0] = {true, expr_lambert_w0_candidate_ok},
+    [EXPR_KIND_LAMBERT_WM1] = {true, expr_lambert_wm1_candidate_ok},
+    [EXPR_KIND_LOG10] = {true, NULL},
 };
 
-static const expr_inverse_unary_rule_t *
-expr_inverse_unary_rule_for(const expr_ops_t *ops)
+static const expr_inverse_unary_rule_t *expr_inverse_unary_rule_for(const expr_ops_t *ops)
 {
     if (!ops)
         return NULL;
     if ((unsigned)ops->kind >= (unsigned)EXPR_KIND_COUNT)
         return NULL;
-    return s_inverse_unary_rules[ops->kind].supported
-               ? &s_inverse_unary_rules[ops->kind]
-               : NULL;
+    return s_inverse_unary_rules[ops->kind].supported ? &s_inverse_unary_rules[ops->kind] : NULL;
 }
 
 bool expr_ops_has_inverse_unary_simplify_rule(const expr_ops_t *ops)
@@ -220,8 +189,7 @@ bool expr_ops_has_inverse_unary_simplify_rule(const expr_ops_t *ops)
     return expr_inverse_unary_rule_for(ops) != NULL;
 }
 
-bool expr_inverse_unary_candidate_value_ok(const expr_ops_t *ops,
-                                         number_t value)
+bool expr_inverse_unary_candidate_value_ok(const expr_ops_t *ops, number_t value)
 {
     const expr_inverse_unary_rule_t *rule = expr_inverse_unary_rule_for(ops);
 
@@ -237,51 +205,45 @@ bool expr_inverse_unary_candidate_value_ok(const expr_ops_t *ops,
 /* Canonical singleton leaves                                                */
 /* ------------------------------------------------------------------------- */
 
-static struct _expr_t _EXPR_ZERO_NODE = {
-    .ops = &ops_const,
-    .a = NULL,
-    .b = NULL,
-    .c = { { 0, 0, 0, 0, 0 } },
-    .x = { { 0, 0, 0, 0, 0 } },
-    .x_valid = 1,
-    .epoch = 0,
-    .dx_cache = NULL,
-    .name = NULL,
-    .refcount = INT_MAX,
-    .var_id = 0
-};
+static struct _expr_t _EXPR_ZERO_NODE = {.ops = &ops_const,
+                                         .a = NULL,
+                                         .b = NULL,
+                                         .c = {{0, 0, 0, 0, 0}},
+                                         .x = {{0, 0, 0, 0, 0}},
+                                         .x_valid = 1,
+                                         .epoch = 0,
+                                         .dx_cache = NULL,
+                                         .name = NULL,
+                                         .refcount = INT_MAX,
+                                         .var_id = 0};
 
-static struct _expr_t _EXPR_ONE_NODE = {
-    .ops = &ops_const,
-    .a = NULL,
-    .b = NULL,
-    .c = { { 0, 0, 0, 0, 0 } },
-    .x = { { 0, 0, 0, 0, 0 } },
-    .x_valid = 1,
-    .epoch = 0,
-    .dx_cache = NULL,
-    .name = NULL,
-    .refcount = INT_MAX,
-    .var_id = 0
-};
+static struct _expr_t _EXPR_ONE_NODE = {.ops = &ops_const,
+                                        .a = NULL,
+                                        .b = NULL,
+                                        .c = {{0, 0, 0, 0, 0}},
+                                        .x = {{0, 0, 0, 0, 0}},
+                                        .x_valid = 1,
+                                        .epoch = 0,
+                                        .dx_cache = NULL,
+                                        .name = NULL,
+                                        .refcount = INT_MAX,
+                                        .var_id = 0};
 
-static struct _expr_t _EXPR_LN10_NODE = {
-    .ops = &ops_const,
-    .a = NULL,
-    .b = NULL,
-    .c = { { 0, 0, 0, 0, 0 } },
-    .x = { { 0, 0, 0, 0, 0 } },
-    .x_valid = 1,
-    .epoch = 0,
-    .dx_cache = NULL,
-    .name = "ln10",
-    .refcount = INT_MAX,
-    .var_id = 0
-};
+static struct _expr_t _EXPR_LN10_NODE = {.ops = &ops_const,
+                                         .a = NULL,
+                                         .b = NULL,
+                                         .c = {{0, 0, 0, 0, 0}},
+                                         .x = {{0, 0, 0, 0, 0}},
+                                         .x_valid = 1,
+                                         .epoch = 0,
+                                         .dx_cache = NULL,
+                                         .name = "ln10",
+                                         .refcount = INT_MAX,
+                                         .var_id = 0};
 
-const expr_t * const EXPR_ZERO = &_EXPR_ZERO_NODE;
-const expr_t * const EXPR_ONE = &_EXPR_ONE_NODE;
-const expr_t * const EXPR_LN10 = &_EXPR_LN10_NODE;
+const expr_t *const EXPR_ZERO = &_EXPR_ZERO_NODE;
+const expr_t *const EXPR_ONE = &_EXPR_ONE_NODE;
+const expr_t *const EXPR_LN10 = &_EXPR_LN10_NODE;
 
 static uint64_t next_var_id = 1;
 static int expr_singletons_ready = 0;
@@ -341,31 +303,14 @@ typedef struct {
 enum { GREEK_HT_SIZE = 30 };
 
 static const greek_entry_t s_greek_names[GREEK_HT_SIZE] = {
-    [0]  = { "theta",   5, "θ", "Θ" },
-    [1]  = { "psi",     3, "ψ", "Ψ" },
-    [2]  = { "chi",     3, "χ", "Χ" },
-    [4]  = { "lambda",  6, "λ", "Λ" },
-    [5]  = { "delta",   5, "δ", "Δ" },
-    [6]  = { "omicron", 8, "ο", "Ο" },
-    [8]  = { "iota",    4, "ι", "Ι" },
-    [10] = { "mu",      2, "μ", "Μ" },
-    [11] = { "pi",      2, "π", "Π" },
-    [12] = { "phi",     3, "φ", "Φ" },
-    [13] = { "alpha",   5, "α", "Α" },
-    [14] = { "zeta",    4, "ζ", "Ζ" },
-    [15] = { "tau",     3, "τ", "Τ" },
-    [16] = { "rho",     3, "ρ", "Ρ" },
-    [17] = { "beta",    4, "β", "Β" },
-    [19] = { "nu",      2, "ν", "Ν" },
-    [20] = { "kappa",   5, "κ", "Κ" },
-    [22] = { "sigma",   5, "σ", "Σ" },
-    [23] = { "xi",      2, "ξ", "Ξ" },
-    [24] = { "eta",     3, "η", "Η" },
-    [25] = { "epsilon", 7, "ε", "Ε" },
-    [26] = { "gamma",   5, "γ", "Γ" },
-    [27] = { "upsilon", 7, "υ", "Υ" },
-    [29] = { "omega",   5, "ω", "Ω" }
-};
+    [0] = {"theta", 5, "θ", "Θ"},  [1] = {"psi", 3, "ψ", "Ψ"},      [2] = {"chi", 3, "χ", "Χ"},
+    [4] = {"lambda", 6, "λ", "Λ"}, [5] = {"delta", 5, "δ", "Δ"},    [6] = {"omicron", 8, "ο", "Ο"},
+    [8] = {"iota", 4, "ι", "Ι"},   [10] = {"mu", 2, "μ", "Μ"},      [11] = {"pi", 2, "π", "Π"},
+    [12] = {"phi", 3, "φ", "Φ"},   [13] = {"alpha", 5, "α", "Α"},   [14] = {"zeta", 4, "ζ", "Ζ"},
+    [15] = {"tau", 3, "τ", "Τ"},   [16] = {"rho", 3, "ρ", "Ρ"},     [17] = {"beta", 4, "β", "Β"},
+    [19] = {"nu", 2, "ν", "Ν"},    [20] = {"kappa", 5, "κ", "Κ"},   [22] = {"sigma", 5, "σ", "Σ"},
+    [23] = {"xi", 2, "ξ", "Ξ"},    [24] = {"eta", 3, "η", "Η"},     [25] = {"epsilon", 7, "ε", "Ε"},
+    [26] = {"gamma", 5, "γ", "Γ"}, [27] = {"upsilon", 7, "υ", "Υ"}, [29] = {"omega", 5, "ω", "Ω"}};
 
 char *expr_take_string_as_c_string(string_t *text)
 {
@@ -398,13 +343,10 @@ static int expr_rune_ascii_alpha(rune_t rune, char *out)
 
 static int expr_append_subscript_digit_text(string_t *out, char digit)
 {
-    return string_append_rune(out,
-                              rune_from_value(0x2080u +
-                                              (uint32_t)(digit - '0')));
+    return string_append_rune(out, rune_from_value(0x2080u + (uint32_t)(digit - '0')));
 }
 
-static int expr_string_equals_ascii_ci(const string_t *text,
-                                       const char *literal)
+static int expr_string_equals_ascii_ci(const string_t *text, const char *literal)
 {
     string_t *literal_text;
     string_view_t text_view;
@@ -471,8 +413,7 @@ static const greek_entry_t *lookup_greek_name_text(const string_t *name)
     return NULL;
 }
 
-size_t expr_match_leading_greek_alias_len(const string_cursor_t *cursor,
-                                          string_pos_t pos)
+size_t expr_match_leading_greek_alias_len(const string_cursor_t *cursor, string_pos_t pos)
 {
     size_t best = 0u;
 
@@ -484,8 +425,7 @@ size_t expr_match_leading_greek_alias_len(const string_cursor_t *cursor,
 
         if (!entry->ascii)
             continue;
-        if (entry->klen > best &&
-            string_cursor_match_at(cursor, pos, entry->ascii)) {
+        if (entry->klen > best && string_cursor_match_at(cursor, pos, entry->ascii)) {
             best = entry->klen;
         }
     }
@@ -508,8 +448,7 @@ static int expr_string_all_ascii_upper(const string_t *text)
     while (!string_cursor_done(cursor)) {
         char ch;
 
-        if (!rune_to_ascii(string_cursor_peek(cursor), &ch) ||
-            !isupper((unsigned char)ch)) {
+        if (!rune_to_ascii(string_cursor_peek(cursor), &ch) || !isupper((unsigned char)ch)) {
             upper = 0;
             break;
         }
@@ -526,9 +465,7 @@ string_t *expr_normalise_greek_alias_text(const string_t *alias)
 
     if (!entry)
         return NULL;
-    return string_new_with(expr_string_all_ascii_upper(alias)
-                               ? entry->upper
-                               : entry->lower);
+    return string_new_with(expr_string_all_ascii_upper(alias) ? entry->upper : entry->lower);
 }
 
 static string_t *expr_remove_at_runes_text(const string_t *text)
@@ -547,8 +484,7 @@ static string_t *expr_remove_at_runes_text(const string_t *text)
     while (!string_cursor_done(cursor)) {
         rune_t rune = string_cursor_peek(cursor);
 
-        if (!rune_is_equal(rune, '@') &&
-            string_append_rune(out, rune) != 0) {
+        if (!rune_is_equal(rune, '@') && string_append_rune(out, rune) != 0) {
             string_free(out);
             string_cursor_free(cursor);
             return NULL;
@@ -579,8 +515,7 @@ static string_t *expr_expand_leading_greek_alias_text(const string_t *text)
 
     string_cursor_next(cursor);
     alias_start = string_cursor_position(cursor);
-    while (!string_cursor_done(cursor) &&
-           expr_rune_ascii_alpha(string_cursor_peek(cursor), NULL))
+    while (!string_cursor_done(cursor) && expr_rune_ascii_alpha(string_cursor_peek(cursor), NULL))
         string_cursor_next(cursor);
 
     alias = string_cursor_extract(alias_start, cursor);
@@ -592,9 +527,7 @@ static string_t *expr_expand_leading_greek_alias_text(const string_t *text)
 
     entry = alias ? lookup_greek_name_text(alias) : NULL;
     if (entry) {
-        out = string_new_with(expr_string_all_ascii_upper(alias)
-                                  ? entry->upper
-                                  : entry->lower);
+        out = string_new_with(expr_string_all_ascii_upper(alias) ? entry->upper : entry->lower);
         if (out && rest && string_append_string(out, rest) != 0) {
             string_free(out);
             out = NULL;
@@ -632,8 +565,7 @@ static string_t *expr_subscript_underscore_digits_text(const string_t *text)
                     char digit;
 
                     rune = string_cursor_peek(cursor);
-                    if (!rune_is_digit(rune) ||
-                        !rune_to_ascii(rune, &digit))
+                    if (!rune_is_digit(rune) || !rune_to_ascii(rune, &digit))
                         break;
                     if (expr_append_subscript_digit_text(out, digit) != 0) {
                         string_free(out);
@@ -713,8 +645,7 @@ static string_t *expr_subscript_trailing_digits_text(const string_t *text)
         if (pos >= run_start) {
             char digit;
 
-            if (!rune_to_ascii(rune, &digit) ||
-                expr_append_subscript_digit_text(out, digit) != 0) {
+            if (!rune_to_ascii(rune, &digit) || expr_append_subscript_digit_text(out, digit) != 0) {
                 string_free(out);
                 string_cursor_free(cursor);
                 return NULL;
@@ -812,8 +743,7 @@ string_t *expr_normalise_binding_name_text(const string_t *name)
     if (!trimmed)
         return NULL;
 
-    if (string_starts_with(trimmed, "[") &&
-        string_ends_with(trimmed, "]")) {
+    if (string_starts_with(trimmed, "[") && string_ends_with(trimmed, "]")) {
         string_cursor_t *cursor = string_cursor_new(trimmed);
         string_pos_t start;
         string_pos_t end = 0;
@@ -880,8 +810,7 @@ int expr_is_default_constant_name_text(const string_t *name)
     if (!rune_to_ascii(rune, &ch))
         goto done;
     uppercase_integral_constant = ch == 'C';
-    if (ch != 'a' && ch != 'b' && ch != 'c' && ch != 'd' &&
-        ch != 'j' && ch != 'k' && ch != 'l' && ch != 'm' &&
+    if (ch != 'a' && ch != 'b' && ch != 'c' && ch != 'd' && ch != 'j' && ch != 'k' && ch != 'l' && ch != 'm' &&
         ch != 'n' && !uppercase_integral_constant)
         goto done;
 
@@ -939,8 +868,7 @@ int expr_get_default_constant_num(const char *name, number_t *value_out)
     return ok;
 }
 
-int expr_get_default_constant_num_text(const string_t *name,
-                                       number_t *value_out)
+int expr_get_default_constant_num_text(const string_t *name, number_t *value_out)
 {
     string_t *canon;
     string_view_t view;
@@ -1116,9 +1044,7 @@ static expr_t *expr_attach_name(expr_t *dv, const char *name)
 
 static expr_t *expr_attach_name_text(expr_t *dv, const string_t *name)
 {
-    dv->name = name
-        ? expr_take_string_as_c_string(expr_normalise_name_text(name))
-        : NULL;
+    dv->name = name ? expr_take_string_as_c_string(expr_normalise_name_text(name)) : NULL;
     return dv;
 }
 
@@ -1206,9 +1132,7 @@ expr_t *expr_add_owned(expr_t *left, expr_t *right)
     return sum;
 }
 
-static expr_t *expr_binary_simplify_owned(const expr_t *left,
-                                          const expr_t *right,
-                                          expr_apply_binary_fn apply)
+static expr_t *expr_binary_simplify_owned(const expr_t *left, const expr_t *right, expr_apply_binary_fn apply)
 {
     expr_t *raw;
 
@@ -1303,17 +1227,13 @@ expr_t *expr_clone(const expr_t *expr)
         return NULL;
 
     if (expr->ops->kind == EXPR_KIND_CONST) {
-        out = (expr->name && *expr->name)
-                  ? expr_new_named_const(expr->c, expr->name)
-                  : expr_new_const(expr->c);
+        out = (expr->name && *expr->name) ? expr_new_named_const(expr->c, expr->name) : expr_new_const(expr->c);
         expr_clone_copy_metadata(out, expr);
         return out;
     }
 
     if (expr->ops->kind == EXPR_KIND_VAR) {
-        out = (expr->name && *expr->name)
-                  ? expr_new_named_var(expr->x, expr->name)
-                  : expr_new_var(expr->x);
+        out = (expr->name && *expr->name) ? expr_new_named_var(expr->x, expr->name) : expr_new_var(expr->x);
         expr_clone_copy_metadata(out, expr);
         return out;
     }
@@ -1322,8 +1242,7 @@ expr_t *expr_clone(const expr_t *expr)
         left = expr_clone(expr->a);
         if (!left)
             return NULL;
-        out = expr_new_formal_derivative(
-            left, expr->formal_wrt_count, expr->formal_wrts);
+        out = expr_new_formal_derivative(left, expr->formal_wrt_count, expr->formal_wrts);
         expr_free(left);
         expr_clone_copy_metadata(out, expr);
         return out;

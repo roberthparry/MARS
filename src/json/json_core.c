@@ -26,13 +26,9 @@ static void json_destroy_array(json_t *json);
 static void json_destroy_object(json_t *json);
 
 static const json_type_ops_t json_ops[JSON_OBJECT + 1u] = {
-    [JSON_NULL] = { json_clone_null, json_destroy_noop },
-    [JSON_BOOL] = { json_clone_bool, json_destroy_noop },
-    [JSON_NUMBER] = { json_clone_number, json_destroy_number },
-    [JSON_STRING] = { json_clone_text, json_destroy_text },
-    [JSON_ARRAY] = { json_clone_array, json_destroy_array },
-    [JSON_OBJECT] = { json_clone_object, json_destroy_object }
-};
+    [JSON_NULL] = {json_clone_null, json_destroy_noop},       [JSON_BOOL] = {json_clone_bool, json_destroy_noop},
+    [JSON_NUMBER] = {json_clone_number, json_destroy_number}, [JSON_STRING] = {json_clone_text, json_destroy_text},
+    [JSON_ARRAY] = {json_clone_array, json_destroy_array},    [JSON_OBJECT] = {json_clone_object, json_destroy_object}};
 
 bool json_type_valid(json_type_t type)
 {
@@ -49,22 +45,22 @@ static void json_ptr_destroy(void *elem)
 
 static size_t json_string_key_hash(const void *key)
 {
-    string_t *text = *(string_t * const *)key;
+    string_t *text = *(string_t *const *)key;
 
     return (size_t)string_hash(text);
 }
 
 static int json_string_key_cmp(const void *a, const void *b)
 {
-    string_t *left = *(string_t * const *)a;
-    string_t *right = *(string_t * const *)b;
+    string_t *left = *(string_t *const *)a;
+    string_t *right = *(string_t *const *)b;
 
     return string_compare(left, right);
 }
 
 static void json_string_key_clone(void *dst, const void *src)
 {
-    string_t *text = *(string_t * const *)src;
+    string_t *text = *(string_t *const *)src;
 
     *(string_t **)dst = string_clone(text);
 }
@@ -76,15 +72,8 @@ static void json_string_key_destroy(void *elem)
 
 static dictionary_t *json_object_storage_new(void)
 {
-    return dictionary_create(sizeof(string_t *),
-                             sizeof(json_t *),
-                             json_string_key_hash,
-                             json_string_key_cmp,
-                             json_string_key_clone,
-                             json_string_key_destroy,
-                             NULL,
-                             NULL,
-                             json_ptr_destroy);
+    return dictionary_create(sizeof(string_t *), sizeof(json_t *), json_string_key_hash, json_string_key_cmp,
+                             json_string_key_clone, json_string_key_destroy, NULL, NULL, json_ptr_destroy);
 }
 
 static array_t *json_array_storage_new(void)
@@ -145,8 +134,7 @@ bool json_number_scan(const string_t *number_text, bool require_end)
     } else if (ch >= '1' && ch <= '9') {
         do {
             (void)string_cursor_next(cursor);
-        } while (string_cursor_peek_ascii(cursor, &ch) &&
-                 ch >= '0' && ch <= '9');
+        } while (string_cursor_peek_ascii(cursor, &ch) && ch >= '0' && ch <= '9');
     } else {
         goto done;
     }
@@ -157,8 +145,7 @@ bool json_number_scan(const string_t *number_text, bool require_end)
             goto done;
         do {
             (void)string_cursor_next(cursor);
-        } while (string_cursor_peek_ascii(cursor, &ch) &&
-                 ch >= '0' && ch <= '9');
+        } while (string_cursor_peek_ascii(cursor, &ch) && ch >= '0' && ch <= '9');
     }
 
     if (string_cursor_peek_ascii(cursor, &ch) && (ch == 'e' || ch == 'E')) {
@@ -169,8 +156,7 @@ bool json_number_scan(const string_t *number_text, bool require_end)
             goto done;
         do {
             (void)string_cursor_next(cursor);
-        } while (string_cursor_peek_ascii(cursor, &ch) &&
-                 ch >= '0' && ch <= '9');
+        } while (string_cursor_peek_ascii(cursor, &ch) && ch >= '0' && ch <= '9');
     }
 
     ok = !require_end || string_cursor_done(cursor);
@@ -407,8 +393,8 @@ static bool json_clone_object(json_t *dst, const json_t *src)
         if (!key_ptr || !value_ptr)
             return false;
 
-        key = *(string_t * const *)key_ptr;
-        if (!json_object_set(dst, key, *(json_t * const *)value_ptr))
+        key = *(string_t *const *)key_ptr;
+        if (!json_object_set(dst, key, *(json_t *const *)value_ptr))
             return false;
     }
 
@@ -515,9 +501,7 @@ bool json_array_append(json_t *json, const json_t *value)
 
 size_t json_object_size(const json_t *json)
 {
-    return (json && json->type == JSON_OBJECT)
-        ? dictionary_size(json->u.object)
-        : 0u;
+    return (json && json->type == JSON_OBJECT) ? dictionary_size(json->u.object) : 0u;
 }
 
 const json_t *json_object_get(const json_t *json, const string_t *key)
@@ -550,7 +534,7 @@ const string_t *json_object_key_at(const json_t *json, size_t index)
         return NULL;
 
     key_ptr = dictionary_get_key(json->u.object, index);
-    return key_ptr ? *(string_t * const *)key_ptr : NULL;
+    return key_ptr ? *(string_t *const *)key_ptr : NULL;
 }
 
 const json_t *json_object_value_at(const json_t *json, size_t index)
@@ -561,7 +545,7 @@ const json_t *json_object_value_at(const json_t *json, size_t index)
         return NULL;
 
     value_ptr = dictionary_get_value(json->u.object, index);
-    return value_ptr ? *(json_t * const *)value_ptr : NULL;
+    return value_ptr ? *(json_t *const *)value_ptr : NULL;
 }
 
 bool json_object_set(json_t *json, const string_t *key, const json_t *value)

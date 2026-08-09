@@ -7,10 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-enum {
-    IG_POLY_COEFF_COUNT = 6,
-    IG_POLY_WORK_COUNT = 11
-};
+enum { IG_POLY_COEFF_COUNT = 6, IG_POLY_WORK_COUNT = 11 };
 
 typedef enum {
     IG_SPECIAL_POLY = 0,
@@ -93,12 +90,8 @@ static bool intg_number_array_copy(number_t *dst, const number_t *src, size_t co
     return true;
 }
 
-static bool intg_match_affine_term_local(const expr_t *expr,
-                                         size_t ndim,
-                                         expr_t *const *vars,
-                                         number_t scale,
-                                         number_t *constant_io,
-                                         number_t *coeffs_io)
+static bool intg_match_affine_term_local(const expr_t *expr, size_t ndim, expr_t *const *vars, number_t scale,
+                                         number_t *constant_io, number_t *coeffs_io)
 {
     NUM_SCOPE(scope);
     const expr_t *left = NULL;
@@ -131,29 +124,21 @@ static bool intg_match_affine_term_local(const expr_t *expr,
     if (expr_match_add_sub_expr(expr, &left, &right, &is_sub)) {
         number_t right_scale = is_sub ? num_neg(scale) : num_clone(scale);
 
-        return intg_match_affine_term_local(left, ndim, vars, scale,
-                                            constant_io, coeffs_io) &&
-               intg_match_affine_term_local(right, ndim, vars, right_scale,
-                                            constant_io, coeffs_io);
+        return intg_match_affine_term_local(left, ndim, vars, scale, constant_io, coeffs_io) &&
+               intg_match_affine_term_local(right, ndim, vars, right_scale, constant_io, coeffs_io);
     }
 
-    if (expr_match_scaled_expr(expr, &inner_scale, &base) &&
-        num_is_real(inner_scale)) {
+    if (expr_match_scaled_expr(expr, &inner_scale, &base) && num_is_real(inner_scale)) {
         number_t product = num_mul(scale, inner_scale);
 
-        return intg_match_affine_term_local(base, ndim, vars, product,
-                                            constant_io, coeffs_io);
+        return intg_match_affine_term_local(base, ndim, vars, product, constant_io, coeffs_io);
     }
 
     return false;
 }
 
-static bool intg_match_scaled_affine_power_deg5_local(const expr_t *expr,
-                                                      size_t ndim,
-                                                      expr_t *const *vars,
-                                                      number_t *scale_out,
-                                                      number_t *constant_out,
-                                                      number_t *coeffs_out)
+static bool intg_match_scaled_affine_power_deg5_local(const expr_t *expr, size_t ndim, expr_t *const *vars,
+                                                      number_t *scale_out, number_t *constant_out, number_t *coeffs_out)
 {
     NUM_SCOPE(scope);
     const expr_t *base = NULL;
@@ -168,8 +153,7 @@ static bool intg_match_scaled_affine_power_deg5_local(const expr_t *expr,
 
     intg_number_array_zero(coeffs_out, ndim);
 
-    if (expr_match_pow_const(expr, &pow_base, &pow_degree) &&
-        num_eq(pow_degree, degree) &&
+    if (expr_match_pow_const(expr, &pow_base, &pow_degree) && num_eq(pow_degree, degree) &&
         intg_match_affine_term_local(pow_base, ndim, vars, NUM_ONE, &constant, coeffs_out)) {
         num_destroy(scale_out);
         *scale_out = num_scope_detach(num_clone(NUM_ONE));
@@ -181,10 +165,8 @@ static bool intg_match_scaled_affine_power_deg5_local(const expr_t *expr,
 
     intg_number_array_zero(coeffs_out, ndim);
     constant = num_clone(NUM_ZERO);
-    if (expr_match_scaled_expr(expr, &inner_scale, &base) &&
-        num_is_real(inner_scale) &&
-        expr_match_pow_const(base, &pow_base, &pow_degree) &&
-        num_eq(pow_degree, degree) &&
+    if (expr_match_scaled_expr(expr, &inner_scale, &base) && num_is_real(inner_scale) &&
+        expr_match_pow_const(base, &pow_base, &pow_degree) && num_eq(pow_degree, degree) &&
         intg_match_affine_term_local(pow_base, ndim, vars, NUM_ONE, &constant, coeffs_out)) {
         num_destroy(scale_out);
         *scale_out = num_scope_detach(inner_scale);
@@ -197,9 +179,7 @@ static bool intg_match_scaled_affine_power_deg5_local(const expr_t *expr,
     return false;
 }
 
-static bool intg_bounds_are_unit_box(size_t ndim,
-                                     const number_t *lo,
-                                     const number_t *hi)
+static bool intg_bounds_are_unit_box(size_t ndim, const number_t *lo, const number_t *hi)
 {
     if (!lo || !hi)
         return false;
@@ -210,10 +190,7 @@ static bool intg_bounds_are_unit_box(size_t ndim,
     return true;
 }
 
-static bool intg_collect_monomial_powers_local(const expr_t *expr,
-                                               size_t ndim,
-                                               expr_t *const *vars,
-                                               number_t *scale_io,
+static bool intg_collect_monomial_powers_local(const expr_t *expr, size_t ndim, expr_t *const *vars, number_t *scale_io,
                                                unsigned int *powers_out)
 {
     const expr_t *left = NULL;
@@ -233,8 +210,7 @@ static bool intg_collect_monomial_powers_local(const expr_t *expr,
     degree_one = num_create_from_long(1);
     degree_two = num_create_from_long(2);
 
-    if (expr_match_const_value(expr, &value) &&
-        num_is_real(value) && num_is_finite(value)) {
+    if (expr_match_const_value(expr, &value) && num_is_real(value) && num_is_finite(value)) {
         number_t next = num_mul(*scale_io, value);
 
         num_destroy(scale_io);
@@ -249,32 +225,26 @@ static bool intg_collect_monomial_powers_local(const expr_t *expr,
         goto cleanup;
     }
 
-    if (expr_match_pow_const(expr, &base, &exponent) &&
-        expr_match_var_expr(base, ndim, vars, &index) &&
+    if (expr_match_pow_const(expr, &base, &exponent) && expr_match_var_expr(base, ndim, vars, &index) &&
         (num_eq(exponent, degree_one) || num_eq(exponent, degree_two))) {
         powers_out[index] += num_eq(exponent, degree_two) ? 2u : 1u;
         matched = true;
         goto cleanup;
     }
 
-    if (expr_match_scaled_expr(expr, &inner_scale, &base) &&
-        base != expr &&
-        num_is_real(inner_scale) &&
+    if (expr_match_scaled_expr(expr, &inner_scale, &base) && base != expr && num_is_real(inner_scale) &&
         num_is_finite(inner_scale)) {
         number_t next = num_mul(*scale_io, inner_scale);
 
         num_destroy(scale_io);
         *scale_io = next;
-        matched = intg_collect_monomial_powers_local(base, ndim, vars, scale_io,
-                                                     powers_out);
+        matched = intg_collect_monomial_powers_local(base, ndim, vars, scale_io, powers_out);
         goto cleanup;
     }
 
     if (expr_match_mul_expr(expr, &left, &right))
-        matched = intg_collect_monomial_powers_local(left, ndim, vars, scale_io,
-                                                     powers_out) &&
-                  intg_collect_monomial_powers_local(right, ndim, vars, scale_io,
-                                                     powers_out);
+        matched = intg_collect_monomial_powers_local(left, ndim, vars, scale_io, powers_out) &&
+                  intg_collect_monomial_powers_local(right, ndim, vars, scale_io, powers_out);
 
 cleanup:
     num_destroy(&degree_two);
@@ -337,17 +307,13 @@ static expr_t *intg_build_unit_box_exp_square_product_exact_expr(number_t a)
     return result;
 }
 
-static int intg_eval_unit_box_exp_square_product(const expr_t *expr,
-                                                 size_t ndim,
-                                                 expr_t *const *vars,
-                                                 const number_t *lo,
-                                                 const number_t *hi,
-                                                 number_t *result,
+static int intg_eval_unit_box_exp_square_product(const expr_t *expr, size_t ndim, expr_t *const *vars,
+                                                 const number_t *lo, const number_t *hi, number_t *result,
                                                  expr_t **exact_result_out)
 {
     const expr_t *arg = NULL;
     number_t scale = num_clone(NUM_ONE);
-    unsigned int powers[4] = { 0u, 0u, 0u, 0u };
+    unsigned int powers[4] = {0u, 0u, 0u, 0u};
     size_t squared_count = 0u;
     size_t linear_count = 0u;
 
@@ -447,8 +413,7 @@ static int intg_eval_unit_box_exp_square_product(const expr_t *expr,
     return 1;
 }
 
-static int intg_match_affine_form(const expr_t *expr, size_t ndim,
-                                expr_t *const *vars, intg_affine_form_t *form)
+static int intg_match_affine_form(const expr_t *expr, size_t ndim, expr_t *const *vars, intg_affine_form_t *form)
 {
     number_t constant;
     number_t coeffs[4];
@@ -494,60 +459,54 @@ static int intg_match_affine_form(const expr_t *expr, size_t ndim,
     if (expr_match_affine_poly_deg4(expr, ndim, vars, poly, &constant, coeffs)) {
         form->kind = IG_SPECIAL_POLY;
         matched = true;
-    } else if (intg_match_scaled_affine_power_deg5_local(expr, ndim, vars,
-                                                         &scale, &constant, coeffs)) {
+    } else if (intg_match_scaled_affine_power_deg5_local(expr, ndim, vars, &scale, &constant, coeffs)) {
         form->kind = IG_SPECIAL_POLY;
         num_destroy(&poly[5]);
         poly[5] = num_clone(scale);
         matched = true;
-    } else if (expr_match_unary_affine_kind(expr, EXPR_PATTERN_UNARY_EXP, ndim, vars,
-                                            &constant, coeffs)) {
+    } else if (expr_match_unary_affine_kind(expr, EXPR_PATTERN_UNARY_EXP, ndim, vars, &constant, coeffs)) {
         form->kind = IG_SPECIAL_EXP;
         num_destroy(&poly[0]);
         poly[0] = num_clone(NUM_ONE);
         matched = true;
-    } else if (expr_match_unary_affine_kind(expr, EXPR_PATTERN_UNARY_SIN, ndim, vars,
-                                            &constant, coeffs)) {
+    } else if (expr_match_unary_affine_kind(expr, EXPR_PATTERN_UNARY_SIN, ndim, vars, &constant, coeffs)) {
         form->kind = IG_SPECIAL_SIN;
         num_destroy(&poly[0]);
         poly[0] = num_clone(NUM_ONE);
         matched = true;
-    } else if (expr_match_unary_affine_kind(expr, EXPR_PATTERN_UNARY_COS, ndim, vars,
-                                            &constant, coeffs)) {
+    } else if (expr_match_unary_affine_kind(expr, EXPR_PATTERN_UNARY_COS, ndim, vars, &constant, coeffs)) {
         form->kind = IG_SPECIAL_COS;
         num_destroy(&poly[0]);
         poly[0] = num_clone(NUM_ONE);
         matched = true;
-    } else if (expr_match_unary_affine_kind(expr, EXPR_PATTERN_UNARY_SINH, ndim, vars,
-                                            &constant, coeffs)) {
+    } else if (expr_match_unary_affine_kind(expr, EXPR_PATTERN_UNARY_SINH, ndim, vars, &constant, coeffs)) {
         form->kind = IG_SPECIAL_SINH;
         num_destroy(&poly[0]);
         poly[0] = num_clone(NUM_ONE);
         matched = true;
-    } else if (expr_match_unary_affine_kind(expr, EXPR_PATTERN_UNARY_COSH, ndim, vars,
-                                            &constant, coeffs)) {
+    } else if (expr_match_unary_affine_kind(expr, EXPR_PATTERN_UNARY_COSH, ndim, vars, &constant, coeffs)) {
         form->kind = IG_SPECIAL_COSH;
         num_destroy(&poly[0]);
         poly[0] = num_clone(NUM_ONE);
         matched = true;
-    } else if (expr_match_affine_poly_deg4_times_unary_affine_kind(
-                   expr, EXPR_PATTERN_UNARY_EXP, ndim, vars, poly, &constant, coeffs)) {
+    } else if (expr_match_affine_poly_deg4_times_unary_affine_kind(expr, EXPR_PATTERN_UNARY_EXP, ndim, vars, poly,
+                                                                   &constant, coeffs)) {
         form->kind = IG_SPECIAL_EXP;
         matched = true;
-    } else if (expr_match_affine_poly_deg4_times_unary_affine_kind(
-                   expr, EXPR_PATTERN_UNARY_SIN, ndim, vars, poly, &constant, coeffs)) {
+    } else if (expr_match_affine_poly_deg4_times_unary_affine_kind(expr, EXPR_PATTERN_UNARY_SIN, ndim, vars, poly,
+                                                                   &constant, coeffs)) {
         form->kind = IG_SPECIAL_SIN;
         matched = true;
-    } else if (expr_match_affine_poly_deg4_times_unary_affine_kind(
-                   expr, EXPR_PATTERN_UNARY_COS, ndim, vars, poly, &constant, coeffs)) {
+    } else if (expr_match_affine_poly_deg4_times_unary_affine_kind(expr, EXPR_PATTERN_UNARY_COS, ndim, vars, poly,
+                                                                   &constant, coeffs)) {
         form->kind = IG_SPECIAL_COS;
         matched = true;
-    } else if (expr_match_affine_poly_deg4_times_unary_affine_kind(
-                   expr, EXPR_PATTERN_UNARY_SINH, ndim, vars, poly, &constant, coeffs)) {
+    } else if (expr_match_affine_poly_deg4_times_unary_affine_kind(expr, EXPR_PATTERN_UNARY_SINH, ndim, vars, poly,
+                                                                   &constant, coeffs)) {
         form->kind = IG_SPECIAL_SINH;
         matched = true;
-    } else if (expr_match_affine_poly_deg4_times_unary_affine_kind(
-                   expr, EXPR_PATTERN_UNARY_COSH, ndim, vars, poly, &constant, coeffs)) {
+    } else if (expr_match_affine_poly_deg4_times_unary_affine_kind(expr, EXPR_PATTERN_UNARY_COSH, ndim, vars, poly,
+                                                                   &constant, coeffs)) {
         form->kind = IG_SPECIAL_COSH;
         matched = true;
     }
@@ -580,8 +539,7 @@ static number_t intg_poly_eval(const number_t *coeffs, size_t count, number_t x)
     return acc;
 }
 
-static void intg_poly_antiderivative_once(const number_t *src, size_t src_count,
-                                        number_t *dst, size_t dst_count)
+static void intg_poly_antiderivative_once(const number_t *src, size_t src_count, number_t *dst, size_t dst_count)
 {
     intg_number_array_zero(dst, dst_count);
     for (size_t i = 0; i < src_count && (i + 1u) < dst_count; ++i) {
@@ -614,8 +572,8 @@ static void intg_exp_antiderivative_once(const number_t *src, size_t count, numb
     }
 }
 
-static void intg_trig_antiderivative_once(const number_t *a_src, const number_t *b_src,
-                                        size_t count, number_t *a_dst, number_t *b_dst)
+static void intg_trig_antiderivative_once(const number_t *a_src, const number_t *b_src, size_t count, number_t *a_dst,
+                                          number_t *b_dst)
 {
     intg_number_array_zero(a_dst, count);
     intg_number_array_zero(b_dst, count);
@@ -644,8 +602,8 @@ static void intg_trig_antiderivative_once(const number_t *a_src, const number_t 
     }
 }
 
-static void intg_hyperbolic_antiderivative_once(const number_t *a_src, const number_t *b_src,
-                                              size_t count, number_t *a_dst, number_t *b_dst)
+static void intg_hyperbolic_antiderivative_once(const number_t *a_src, const number_t *b_src, size_t count,
+                                                number_t *a_dst, number_t *b_dst)
 {
     intg_number_array_zero(a_dst, count);
     intg_number_array_zero(b_dst, count);
@@ -674,8 +632,7 @@ static void intg_hyperbolic_antiderivative_once(const number_t *a_src, const num
     }
 }
 
-static number_t intg_eval_special_antiderivative(const intg_affine_form_t *form,
-                                               size_t order, number_t x)
+static number_t intg_eval_special_antiderivative(const intg_affine_form_t *form, size_t order, number_t x)
 {
     if (form->kind == IG_SPECIAL_POLY) {
         number_t current[IG_POLY_WORK_COUNT];
@@ -813,9 +770,8 @@ static number_t intg_eval_special_antiderivative(const intg_affine_form_t *form,
     }
 }
 
-static int intg_affine_integral_box(const intg_affine_form_t *form,
-                                  const number_t *lo, const number_t *hi,
-                                  number_t *result)
+static int intg_affine_integral_box(const intg_affine_form_t *form, const number_t *lo, const number_t *hi,
+                                    number_t *result)
 {
     size_t active[4];
     size_t active_count = 0u;
@@ -901,12 +857,8 @@ static int intg_affine_integral_box(const intg_affine_form_t *form,
     return 1;
 }
 
-static int intg_eval_affine_expr(const expr_t *expr,
-                               size_t ndim,
-                               expr_t *const *vars,
-                               const number_t *lo,
-                               const number_t *hi,
-                               number_t *result)
+static int intg_eval_affine_expr(const expr_t *expr, size_t ndim, expr_t *const *vars, const number_t *lo,
+                                 const number_t *hi, number_t *result)
 {
     intg_affine_form_t form;
     int matched;
@@ -927,8 +879,7 @@ static int intg_eval_affine_expr(const expr_t *expr,
     return 1;
 }
 
-static int intg_term_attach_factor(intg_separable_term_t *term,
-                                 size_t axis, const expr_t *factor)
+static int intg_term_attach_factor(intg_separable_term_t *term, size_t axis, const expr_t *factor)
 {
     expr_t *combined;
 
@@ -948,16 +899,14 @@ static int intg_term_attach_factor(intg_separable_term_t *term,
     return 1;
 }
 
-static int intg_collect_separable_term(const expr_t *expr,
-                                     size_t ndim,
-                                     expr_t *const *vars,
-                                     intg_separable_term_t *term)
+static int intg_collect_separable_term(const expr_t *expr, size_t ndim, expr_t *const *vars,
+                                       intg_separable_term_t *term)
 {
     number_t scale = NUM_ZERO;
     const expr_t *base = NULL;
     const expr_t *left = NULL;
     const expr_t *right = NULL;
-    bool used[4] = { false, false, false, false };
+    bool used[4] = {false, false, false, false};
     size_t used_count = 0u;
 
     if (!expr || !term || ndim > 4u)
@@ -1006,13 +955,8 @@ static int intg_collect_separable_term(const expr_t *expr,
     return 0;
 }
 
-static int intg_eval_separable_term(integrator_t *ig,
-                                  const expr_t *expr,
-                                  size_t ndim,
-                                  expr_t *const *vars,
-                                  const number_t *lo,
-                                  const number_t *hi,
-                                  number_t *result)
+static int intg_eval_separable_term(integrator_t *ig, const expr_t *expr, size_t ndim, expr_t *const *vars,
+                                    const number_t *lo, const number_t *hi, number_t *result)
 {
     intg_separable_term_t term;
     number_t value = NUM_ZERO;
@@ -1032,11 +976,9 @@ static int intg_eval_separable_term(integrator_t *ig,
             expr_t *one_var[1];
 
             one_var[0] = vars[i];
-            status = intg_eval_affine_expr(term.factors[i], 1u, one_var,
-                                         &lo[i], &hi[i], &factor_value);
+            status = intg_eval_affine_expr(term.factors[i], 1u, one_var, &lo[i], &hi[i], &factor_value);
             if (status == 0)
-                status = intg_integral(ig, term.factors[i], vars[i],
-                                            lo[i], hi[i], &factor_value, NULL);
+                status = intg_integral(ig, term.factors[i], vars[i], lo[i], hi[i], &factor_value, NULL);
             if (status < 0) {
                 intg_separable_term_clear(&term);
                 num_destroy(&value);
@@ -1060,13 +1002,8 @@ static int intg_eval_separable_term(integrator_t *ig,
     return 1;
 }
 
-static int intg_eval_separable_expr(integrator_t *ig,
-                                  const expr_t *expr,
-                                  size_t ndim,
-                                  expr_t *const *vars,
-                                  const number_t *lo,
-                                  const number_t *hi,
-                                  number_t *result)
+static int intg_eval_separable_expr(integrator_t *ig, const expr_t *expr, size_t ndim, expr_t *const *vars,
+                                    const number_t *lo, const number_t *hi, number_t *result)
 {
     const expr_t *left = NULL;
     const expr_t *right = NULL;
@@ -1099,10 +1036,8 @@ static int intg_eval_separable_expr(integrator_t *ig,
     return intg_eval_separable_term(ig, expr, ndim, vars, lo, hi, result);
 }
 
-int try_integral_multi_special_affine(integrator_t *ig, expr_t *expr,
-                                      size_t ndim, expr_t *const *vars,
-                                      const number_t *lo, const number_t *hi,
-                                      number_t *result, number_t *error_est)
+int try_integral_multi_special_affine(integrator_t *ig, expr_t *expr, size_t ndim, expr_t *const *vars,
+                                      const number_t *lo, const number_t *hi, number_t *result, number_t *error_est)
 {
     intg_affine_form_t form;
     int matched;
@@ -1114,8 +1049,7 @@ int try_integral_multi_special_affine(integrator_t *ig, expr_t *expr,
     if (!expr || !vars || !lo || !hi || !result || ndim == 0u || ndim > 4u)
         return 0;
 
-    matched = intg_eval_unit_box_exp_square_product(expr, ndim, vars, lo, hi, &value,
-                                                    &exact_result);
+    matched = intg_eval_unit_box_exp_square_product(expr, ndim, vars, lo, hi, &value, &exact_result);
     if (matched > 0) {
         *result = value;
         if (error_est)

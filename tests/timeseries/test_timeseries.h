@@ -9,8 +9,8 @@
 #include "datetime.h"
 #include "matrix.h"
 #include "number.h"
-#include "timeseries.h"
 #include "test_harness.h"
+#include "timeseries.h"
 
 void run_timeseries_core_tests(void);
 void run_timeseries_output_tests(void);

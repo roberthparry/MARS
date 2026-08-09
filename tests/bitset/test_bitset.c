@@ -1,10 +1,10 @@
 // test_bitset.c — tests for the dynamic bitset_t container
 
+#include <pthread.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdbool.h>
-#include <pthread.h>
 
 #include "test_harness.h"
 
@@ -16,7 +16,8 @@ TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
  * Tests
  * ------------------------------------------------------------- */
 
-void test_create_and_destroy(void) {
+void test_create_and_destroy(void)
+{
     bitset_t *bs = bitset_create(0);
     ASSERT_TRUE(bs);
     bitset_destroy(bs);
@@ -29,7 +30,8 @@ void test_create_and_destroy(void) {
     bitset_destroy(NULL); /* must not crash */
 }
 
-void test_set_and_test(void) {
+void test_set_and_test(void)
+{
     bitset_t *bs = bitset_create(0);
     ASSERT_TRUE(bs);
 
@@ -56,7 +58,8 @@ void test_set_and_test(void) {
     bitset_destroy(bs);
 }
 
-void test_unset(void) {
+void test_unset(void)
+{
     bitset_t *bs = bitset_create(64);
     ASSERT_TRUE(bs);
 
@@ -75,7 +78,8 @@ void test_unset(void) {
     bitset_destroy(bs);
 }
 
-void test_toggle(void) {
+void test_toggle(void)
+{
     bitset_t *bs = bitset_create(64);
     ASSERT_TRUE(bs);
 
@@ -88,7 +92,8 @@ void test_toggle(void) {
     bitset_destroy(bs);
 }
 
-void test_clear(void) {
+void test_clear(void)
+{
     bitset_t *bs = bitset_create(64);
     ASSERT_TRUE(bs);
 
@@ -105,7 +110,8 @@ void test_clear(void) {
     bitset_destroy(bs);
 }
 
-void test_set_range(void) {
+void test_set_range(void)
+{
     bitset_t *bs = bitset_create(128);
     ASSERT_TRUE(bs);
 
@@ -128,7 +134,8 @@ void test_set_range(void) {
     bitset_destroy(bs);
 }
 
-void test_unset_range(void) {
+void test_unset_range(void)
+{
     bitset_t *bs = bitset_create(128);
     ASSERT_TRUE(bs);
 
@@ -145,7 +152,8 @@ void test_unset_range(void) {
     bitset_destroy(bs);
 }
 
-void test_popcount(void) {
+void test_popcount(void)
+{
     bitset_t *bs = bitset_create(64);
     ASSERT_TRUE(bs);
 
@@ -162,7 +170,8 @@ void test_popcount(void) {
     bitset_destroy(bs);
 }
 
-void test_any_none(void) {
+void test_any_none(void)
+{
     bitset_t *bs = bitset_create(64);
     ASSERT_TRUE(bs);
 
@@ -177,7 +186,8 @@ void test_any_none(void) {
     bitset_destroy(bs);
 }
 
-void test_next_set(void) {
+void test_next_set(void)
+{
     bitset_t *bs = bitset_create(128);
     ASSERT_TRUE(bs);
 
@@ -188,15 +198,16 @@ void test_next_set(void) {
     bitset_set(bs, 10);
     bitset_set(bs, 70);
 
-    ASSERT_EQ_INT((int)bitset_next_set(bs, 0),  5);
-    ASSERT_EQ_INT((int)bitset_next_set(bs, 6),  10);
+    ASSERT_EQ_INT((int)bitset_next_set(bs, 0), 5);
+    ASSERT_EQ_INT((int)bitset_next_set(bs, 6), 10);
     ASSERT_EQ_INT((int)bitset_next_set(bs, 11), 70);
     ASSERT_EQ_INT((int)bitset_next_set(bs, 71), (int)BITSET_NPOS);
 
     bitset_destroy(bs);
 }
 
-void test_clone(void) {
+void test_clone(void)
+{
     bitset_t *bs = bitset_create(64);
     ASSERT_TRUE(bs);
 
@@ -218,7 +229,8 @@ void test_clone(void) {
     bitset_destroy(copy);
 }
 
-void test_bitwise_and(void) {
+void test_bitwise_and(void)
+{
     bitset_t *a = bitset_create(64);
     bitset_t *b = bitset_create(64);
     ASSERT_TRUE(a && b);
@@ -242,7 +254,8 @@ void test_bitwise_and(void) {
     bitset_destroy(b);
 }
 
-void test_bitwise_or(void) {
+void test_bitwise_or(void)
+{
     bitset_t *a = bitset_create(64);
     bitset_t *b = bitset_create(64);
     ASSERT_TRUE(a && b);
@@ -260,7 +273,8 @@ void test_bitwise_or(void) {
     bitset_destroy(b);
 }
 
-void test_bitwise_xor(void) {
+void test_bitwise_xor(void)
+{
     bitset_t *a = bitset_create(64);
     bitset_t *b = bitset_create(64);
     ASSERT_TRUE(a && b);
@@ -280,7 +294,8 @@ void test_bitwise_xor(void) {
     bitset_destroy(b);
 }
 
-void test_bitwise_not(void) {
+void test_bitwise_not(void)
+{
     bitset_t *bs = bitset_create(64);
     ASSERT_TRUE(bs);
 
@@ -297,7 +312,8 @@ void test_bitwise_not(void) {
     bitset_destroy(bs);
 }
 
-void test_growth(void) {
+void test_growth(void)
+{
     bitset_t *bs = bitset_create(0);
     ASSERT_TRUE(bs);
 
@@ -322,14 +338,16 @@ struct bs_thread_args {
     size_t base;
 };
 
-static void *thread_set_bits(void *arg) {
+static void *thread_set_bits(void *arg)
+{
     struct bs_thread_args *a = arg;
     for (size_t i = 0; i < BITS_PER_THREAD; i++)
         bitset_set(a->bs, a->base + i);
     return NULL;
 }
 
-void test_thread_safety(void) {
+void test_thread_safety(void)
+{
     bitset_t *bs = bitset_create(0);
     ASSERT_TRUE(bs);
 
@@ -337,7 +355,7 @@ void test_thread_safety(void) {
     struct bs_thread_args args[THREAD_COUNT];
 
     for (int t = 0; t < THREAD_COUNT; t++) {
-        args[t].bs   = bs;
+        args[t].bs = bs;
         args[t].base = (size_t)t * BITS_PER_THREAD;
         pthread_create(&threads[t], NULL, thread_set_bits, &args[t]);
     }
@@ -357,7 +375,8 @@ void test_thread_safety(void) {
  * README example functions
  * ------------------------------------------------------------- */
 
-void example_bitset_basic(void) {
+void example_bitset_basic(void)
+{
     bitset_t *bs = bitset_create(0);
 
     bitset_set(bs, 0);
@@ -367,15 +386,14 @@ void example_bitset_basic(void) {
 
     printf("popcount: %zu\n", bitset_popcount(bs));
 
-    for (size_t i = bitset_next_set(bs, 0);
-         i != BITSET_NPOS;
-         i = bitset_next_set(bs, i + 1))
+    for (size_t i = bitset_next_set(bs, 0); i != BITSET_NPOS; i = bitset_next_set(bs, i + 1))
         printf("  bit %zu is set\n", i);
 
     bitset_destroy(bs);
 }
 
-void example_bitset_ops(void) {
+void example_bitset_ops(void)
+{
     bitset_t *a = bitset_create(64);
     bitset_t *b = bitset_create(64);
 
@@ -393,7 +411,8 @@ void example_bitset_ops(void) {
     bitset_destroy(b);
 }
 
-int tests_main(void) {
+int tests_main(void)
+{
     TEST_SECTION("Lifecycle Tests");
     TEST_RUN_IN_GROUP(test_create_and_destroy, tests, NULL);
 

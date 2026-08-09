@@ -83,14 +83,10 @@ void run_number_multiprecision_tests(void)
         ASSERT_NUMBER_EQ(default_real, clone_real);
         ASSERT_TRUE(num_is_real(log_real));
         ASSERT_TRUE(!num_is_real(sqrt_complex));
-        assert_number_string_prefix("num_const_prec(QF_PI, 640)",
-                                    qfloat_pi_prec,
-                                    "3.1415926535897932384626433832795");
+        assert_number_string_prefix("num_const_prec(QF_PI, 640)", qfloat_pi_prec, "3.1415926535897932384626433832795");
         ASSERT_NOT_NULL(qcomplex_pi_e_text);
-        ASSERT_TRUE(strstr(string_c_str(qcomplex_pi_e_text),
-                           "3.1415926535897932384626433832795") != NULL);
-        ASSERT_TRUE(strstr(string_c_str(qcomplex_pi_e_text),
-                           "2.7182818284590452353602874713526") != NULL);
+        ASSERT_TRUE(strstr(string_c_str(qcomplex_pi_e_text), "3.1415926535897932384626433832795") != NULL);
+        ASSERT_TRUE(strstr(string_c_str(qcomplex_pi_e_text), "2.7182818284590452353602874713526") != NULL);
 
         ASSERT_EQ_INT(num_set_prec_bits(&clone_real, 256u), 0);
         ASSERT_EQ_INT((int)num_get_prec_bits(default_real), 1024);
@@ -119,9 +115,7 @@ void run_number_multiprecision_tests(void)
         ASSERT_NOT_NULL(set_qfloat_complex_text);
         ASSERT_TRUE(strcmp(string_c_str(set_qfloat_complex_text), "3.25") == 0);
 
-        ASSERT_EQ_INT(num_set_qcomplex(
-            &bits_complex,
-            qc_make(qf_from_double(1.5), qf_from_double(0.25))), 0);
+        ASSERT_EQ_INT(num_set_qcomplex(&bits_complex, qc_make(qf_from_double(1.5), qf_from_double(0.25))), 0);
         ASSERT_EQ_INT((int)num_get_prec_bits(bits_complex), 384);
         set_qcomplex_text = num_to_string(bits_complex);
         ASSERT_NOT_NULL(set_qcomplex_text);
@@ -155,12 +149,7 @@ void run_number_multiprecision_tests(void)
     }
 
     {
-        enum {
-            MATH_PRECISION_BITS = 256,
-            MATH_PRECISION_DIGITS = 78,
-            PI_2048_BITS = 2048,
-            PI_2048_DIGITS = 617
-        };
+        enum { MATH_PRECISION_BITS = 256, MATH_PRECISION_DIGITS = 78, PI_2048_BITS = 2048, PI_2048_DIGITS = 617 };
         static const struct {
             const char *x;
             const char *prefix;
@@ -211,47 +200,36 @@ void run_number_multiprecision_tests(void)
         ASSERT_EQ_INT((int)num_get_prec_bits(sqrt_x), MATH_PRECISION_BITS);
         ASSERT_EQ_INT((int)num_get_prec_bits(pi_2048), PI_2048_BITS);
 
-        assert_number_string_prefix("num_const_prec(NUM_PI, 256)",
-                                    pi_256,
+        assert_number_string_prefix("num_const_prec(NUM_PI, 256)", pi_256,
                                     "3.14159265358979323846264338327950288419716939937510");
-        assert_number_string_prefix("num_const_prec(NUM_PI, 256) / 7",
-                                    x,
+        assert_number_string_prefix("num_const_prec(NUM_PI, 256) / 7", x,
                                     "0.44879895051282760549466334046850041202816705705358");
-        assert_number_string_prefix("num_sin(NUM_PI / 7) at 256 bits",
-                                    sin_x,
+        assert_number_string_prefix("num_sin(NUM_PI / 7) at 256 bits", sin_x,
                                     "0.43388373911755812047576833284835875460999072778745");
-        assert_number_string_prefix("num_cos(NUM_PI / 7) at 256 bits",
-                                    cos_x,
+        assert_number_string_prefix("num_cos(NUM_PI / 7) at 256 bits", cos_x,
                                     "0.90096886790241912623610231950744505116591916213185");
-        assert_number_string_prefix("num_tan(NUM_PI / 7) at 256 bits",
-                                    tan_x,
+        assert_number_string_prefix("num_tan(NUM_PI / 7) at 256 bits", tan_x,
                                     "0.481574618807528644332162353056970575219078891");
 
         ASSERT_NUMBER_EQ(trig_identity, NUM_ONE);
         ASSERT_NUMBER_EQ(tan_x, tan_identity);
         ASSERT_NUMBER_EQ(sqrt_identity, x);
-        assert_number_string_prefix("num_log(num_exp(NUM_PI / 7)) at 256 bits",
-                                    log_exp_x,
+        assert_number_string_prefix("num_log(num_exp(NUM_PI / 7)) at 256 bits", log_exp_x,
                                     "0.448798950512827605494663340468500412028167057");
 
         written = num_sprintf(buf, sizeof(buf), "%.78n", exp_x);
         ASSERT_TRUE(written > 0);
         printf(C_WHITE C_BOLD "num_exp(NUM_PI / 7) at 256 bits" C_RESET "\n");
         printf("    %.78s\n\n", buf);
-        ASSERT_TRUE(strstr(buf,
-                           "1.5664296956520810256736029896701996511763171681836")
-                    == buf);
+        ASSERT_TRUE(strstr(buf, "1.5664296956520810256736029896701996511763171681836") == buf);
 
-        for (size_t i = 0u;
-             i < sizeof(heegner_cases) / sizeof(heegner_cases[0]);
-             ++i) {
+        for (size_t i = 0u; i < sizeof(heegner_cases) / sizeof(heegner_cases[0]); ++i) {
             number_t heegner_x = num_create_from_string(heegner_cases[i].x);
             number_t heegner_sqrt;
             number_t heegner_arg;
             number_t heegner_exp;
 
-            ASSERT_EQ_INT(num_set_prec_bits(&heegner_x, MATH_PRECISION_BITS),
-                          0);
+            ASSERT_EQ_INT(num_set_prec_bits(&heegner_x, MATH_PRECISION_BITS), 0);
             heegner_sqrt = num_sqrt(heegner_x);
             heegner_arg = num_mul(pi_256, heegner_sqrt);
             heegner_exp = num_exp(heegner_arg);
@@ -262,8 +240,7 @@ void run_number_multiprecision_tests(void)
 
             written = num_sprintf(buf, sizeof(buf), "%.78n", heegner_exp);
             ASSERT_TRUE(written > 0);
-            printf(C_WHITE C_BOLD "num_exp(NUM_PI * num_sqrt(%s)) at 256 bits" C_RESET "\n",
-                   heegner_cases[i].x);
+            printf(C_WHITE C_BOLD "num_exp(NUM_PI * num_sqrt(%s)) at 256 bits" C_RESET "\n", heegner_cases[i].x);
             printf("    %s\n\n", buf);
             ASSERT_TRUE(strstr(buf, heegner_cases[i].prefix) == buf);
         }
@@ -273,9 +250,7 @@ void run_number_multiprecision_tests(void)
         printf(C_WHITE C_BOLD "num_const_prec(NUM_PI, 2048)" C_RESET "\n");
         printf("    precision = %d bits (~%d digits)\n", PI_2048_BITS, PI_2048_DIGITS);
         printf("    %s\n\n", buf);
-        ASSERT_TRUE(strstr(buf,
-                           "3.14159265358979323846264338327950288419716939937510")
-                    == buf);
+        ASSERT_TRUE(strstr(buf, "3.14159265358979323846264338327950288419716939937510") == buf);
     }
 
     {

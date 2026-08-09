@@ -100,8 +100,7 @@ static inline expr_t *test_expr_new_named_var_d(double x, const char *name)
     return dv;
 }
 
-static inline expr_t *test_expr_new_named_var_s(const char *text,
-                                              const char *name)
+static inline expr_t *test_expr_new_named_var_s(const char *text, const char *name)
 {
     number_t n = num_create_from_string(text);
     expr_t *dv = expr_new_named_var(n, name);
@@ -279,52 +278,44 @@ static inline qcomplex_t test_expr_get_val_qc(const expr_t *dv)
 
 int str_eq(const char *a, const char *b);
 void to_string_pass(const char *msg, const char *got, const char *expected);
-void to_string_fail(const char *file, int line, int col, const char *msg,
-                    const char *got, const char *expected);
+void to_string_fail(const char *file, int line, int col, const char *msg, const char *got, const char *expected);
 
-#define expr_eval_d      test_expr_eval_d
-#define expr_eval_qf     test_expr_eval_qf
-#define expr_eval_qc     test_expr_eval_qc
-#define expr_get_val_qf  test_expr_get_val_qf
-#define expr_get_val_qc  test_expr_get_val_qc
-#define expr_add_d       test_expr_add_d
-#define expr_sub_d       test_expr_sub_d
-#define expr_d_sub       test_expr_d_sub
-#define expr_mul_d       test_expr_mul_d
-#define expr_div_d       test_expr_div_d
-#define expr_d_div       test_expr_d_div
-#define expr_pow_d       test_expr_pow_d
-#define expr_pow_qc      test_expr_pow_qc
+#define expr_eval_d test_expr_eval_d
+#define expr_eval_qf test_expr_eval_qf
+#define expr_eval_qc test_expr_eval_qc
+#define expr_get_val_qf test_expr_get_val_qf
+#define expr_get_val_qc test_expr_get_val_qc
+#define expr_add_d test_expr_add_d
+#define expr_sub_d test_expr_sub_d
+#define expr_d_sub test_expr_d_sub
+#define expr_mul_d test_expr_mul_d
+#define expr_div_d test_expr_div_d
+#define expr_d_div test_expr_d_div
+#define expr_pow_d test_expr_pow_d
+#define expr_pow_qc test_expr_pow_qc
 
-void check_q_at(const char *file, int line, int col,
-                const char *label, qfloat_t got, qfloat_t expect);
+void check_q_at(const char *file, int line, int col, const char *label, qfloat_t got, qfloat_t expect);
 void print_expr_of(const expr_t *f);
 const test_validity_contract_t *expr_validity_contract_number_exact(void);
 const test_validity_contract_t *expr_validity_contract_number_close(void);
 
-#define TEST_ASSERT_EXPR_NUMBER_EQ(actual, expected) \
-    do { \
-        number_t test_expr_actual__ = (actual); \
-        number_t test_expr_expected__ = (expected); \
-        TEST_ASSERT_VALID_NAMED("expr-number-exact", \
-                                &test_expr_actual__, \
-                                &test_expr_expected__); \
+#define TEST_ASSERT_EXPR_NUMBER_EQ(actual, expected)                                                                   \
+    do {                                                                                                               \
+        number_t test_expr_actual__ = (actual);                                                                        \
+        number_t test_expr_expected__ = (expected);                                                                    \
+        TEST_ASSERT_VALID_NAMED("expr-number-exact", &test_expr_actual__, &test_expr_expected__);                      \
     } while (0)
 
-#define TEST_ASSERT_EXPR_NUMBER_CLOSE(actual, expected) \
-    do { \
-        number_t test_expr_actual__ = (actual); \
-        number_t test_expr_expected__ = (expected); \
-        TEST_ASSERT_VALID_NAMED("expr-number-close", \
-                                &test_expr_actual__, \
-                                &test_expr_expected__); \
+#define TEST_ASSERT_EXPR_NUMBER_CLOSE(actual, expected)                                                                \
+    do {                                                                                                               \
+        number_t test_expr_actual__ = (actual);                                                                        \
+        number_t test_expr_expected__ = (expected);                                                                    \
+        TEST_ASSERT_VALID_NAMED("expr-number-close", &test_expr_actual__, &test_expr_expected__);                      \
     } while (0)
 
-#define ASSERT_EXPR_NUMBER_EQ(actual, expected) \
-    TEST_ASSERT_EXPR_NUMBER_EQ((actual), (expected))
+#define ASSERT_EXPR_NUMBER_EQ(actual, expected) TEST_ASSERT_EXPR_NUMBER_EQ((actual), (expected))
 
-#define ASSERT_EXPR_NUMBER_CLOSE(actual, expected) \
-    TEST_ASSERT_EXPR_NUMBER_CLOSE((actual), (expected))
+#define ASSERT_EXPR_NUMBER_CLOSE(actual, expected) TEST_ASSERT_EXPR_NUMBER_CLOSE((actual), (expected))
 
 void test_arithmetic(void);
 void test_d_variants(void);
@@ -373,13 +364,9 @@ void test_deriv_trigamma(void);
 void test_second_deriv_digamma(void);
 
 void check_roundtrip(const char *label, expr_t *f, int line);
-void check_parse_val(const char *label, const char *s,
-                     double expect_d, int line);
+void check_parse_val(const char *label, const char *s, double expect_d, int line);
 void check_parse_null(const char *label, const char *s, int line);
-void check_parse_null_stderr_contains(const char *label,
-                                      const char *s,
-                                      const char *expected_substring,
-                                      int line);
+void check_parse_null_stderr_contains(const char *label, const char *s, const char *expected_substring, int line);
 
 expr_t *make_expr_u01(void);
 expr_t *make_expr_u02(void);

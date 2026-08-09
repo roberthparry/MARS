@@ -5,8 +5,8 @@
 #include <sys/types.h>
 
 #define MARS_MATRIX_INTERNAL_ACCESS
-#include "matrix_internal.h"
 #include "dictionary.h"
+#include "matrix_internal.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
 
@@ -45,15 +45,15 @@ typedef struct {
 
 static size_t mf_binding_name_hash(const void *key)
 {
-    const string_t *name = *(string_t * const *)key;
+    const string_t *name = *(string_t *const *)key;
 
     return name ? (size_t)string_hash(name) : 0u;
 }
 
 static int mf_binding_name_cmp(const void *a, const void *b)
 {
-    const string_t *ka = *(string_t * const *)a;
-    const string_t *kb = *(string_t * const *)b;
+    const string_t *ka = *(string_t *const *)a;
+    const string_t *kb = *(string_t *const *)b;
 
     if (!ka && !kb)
         return 0;
@@ -66,15 +66,8 @@ static int mf_binding_name_cmp(const void *a, const void *b)
 
 static dictionary_t *mf_binding_index_create(void)
 {
-    return dictionary_create(sizeof(string_t *),
-                             sizeof(mat_binding_entry_t *),
-                             mf_binding_name_hash,
-                             mf_binding_name_cmp,
-                             NULL,
-                             NULL,
-                             NULL,
-                             NULL,
-                             NULL);
+    return dictionary_create(sizeof(string_t *), sizeof(mat_binding_entry_t *), mf_binding_name_hash,
+                             mf_binding_name_cmp, NULL, NULL, NULL, NULL, NULL);
 }
 
 static void mf_bindings_destroy_partial(mat_bindings_t *bindings)
@@ -110,8 +103,7 @@ static mat_bindings_t *mf_bindings_create(size_t count)
     return bindings;
 }
 
-static int mf_bindings_index_entry(mat_bindings_t *bindings,
-                                   mat_binding_entry_t *entry)
+static int mf_bindings_index_entry(mat_bindings_t *bindings, mat_binding_entry_t *entry)
 {
     return dictionary_set(bindings->index, &entry->name, &entry) ? 0 : -1;
 }
@@ -156,25 +148,14 @@ static bool mf_rune_is_subscript_digit(rune_t rune)
 
 static bool mf_rune_is_name_continuation(rune_t rune)
 {
-    return rune_is_alpha_numeric(rune) ||
-           rune_is_equal(rune, '_') ||
-           mf_rune_is_subscript_digit(rune);
+    return rune_is_alpha_numeric(rune) || rune_is_equal(rune, '_') || mf_rune_is_subscript_digit(rune);
 }
 
 static int mf_append_subscript_digit(string_t *out, unsigned char digit)
 {
-    static const char *const subscript_digits[] = {
-        "\xe2\x82\x80",
-        "\xe2\x82\x81",
-        "\xe2\x82\x82",
-        "\xe2\x82\x83",
-        "\xe2\x82\x84",
-        "\xe2\x82\x85",
-        "\xe2\x82\x86",
-        "\xe2\x82\x87",
-        "\xe2\x82\x88",
-        "\xe2\x82\x89"
-    };
+    static const char *const subscript_digits[] = {"\xe2\x82\x80", "\xe2\x82\x81", "\xe2\x82\x82", "\xe2\x82\x83",
+                                                   "\xe2\x82\x84", "\xe2\x82\x85", "\xe2\x82\x86", "\xe2\x82\x87",
+                                                   "\xe2\x82\x88", "\xe2\x82\x89"};
 
     if (digit < '0' || digit > '9')
         return -1;
@@ -190,8 +171,7 @@ static string_t *mf_read_bracketed_name_cursor(string_cursor_t *cursor)
         return NULL;
 
     start = string_cursor_position(cursor);
-    while (!string_cursor_done(cursor) &&
-           !rune_is_equal(string_cursor_peek(cursor), ']')) {
+    while (!string_cursor_done(cursor) && !rune_is_equal(string_cursor_peek(cursor), ']')) {
         if (string_cursor_next(cursor) != 0)
             return NULL;
     }
@@ -211,8 +191,7 @@ static string_t *mf_read_simple_name_cursor(string_cursor_t *cursor)
     if (string_cursor_match(cursor, "pi")) {
         rune_t after = string_cursor_peek_at(cursor, start + 2u);
 
-        if (rune_is_none(after) ||
-            (!rune_is_alpha_numeric(after) && !rune_is_equal(after, '_'))) {
+        if (rune_is_none(after) || (!rune_is_alpha_numeric(after) && !rune_is_equal(after, '_'))) {
             string_cursor_consume(cursor, "pi");
             return string_new_with("\xcf\x80");
         }
@@ -244,8 +223,7 @@ static string_t *mf_read_simple_name_cursor(string_cursor_t *cursor)
     if (!name)
         return NULL;
 
-    if (string_append_rune(name, string_cursor_peek(cursor)) != 0 ||
-        string_cursor_next(cursor) != 0)
+    if (string_append_rune(name, string_cursor_peek(cursor)) != 0 || string_cursor_next(cursor) != 0)
         goto cleanup;
 
     while (!string_cursor_done(cursor)) {
@@ -253,16 +231,14 @@ static string_t *mf_read_simple_name_cursor(string_cursor_t *cursor)
         unsigned char ascii = 0u;
 
         if (mf_rune_is_subscript_digit(rune)) {
-            if (string_append_rune(name, rune) != 0 ||
-                string_cursor_next(cursor) != 0)
+            if (string_append_rune(name, rune) != 0 || string_cursor_next(cursor) != 0)
                 goto cleanup;
             continue;
         }
 
         if (string_cursor_peek_ascii(cursor, &ascii)) {
             if (ascii >= '0' && ascii <= '9') {
-                if (mf_append_subscript_digit(name, ascii) != 0 ||
-                    string_cursor_next(cursor) != 0)
+                if (mf_append_subscript_digit(name, ascii) != 0 || string_cursor_next(cursor) != 0)
                     goto cleanup;
                 continue;
             }
@@ -271,15 +247,13 @@ static string_t *mf_read_simple_name_cursor(string_cursor_t *cursor)
                 string_pos_t underscore = string_cursor_position(cursor);
                 unsigned char digit = 0u;
 
-                if (string_cursor_next(cursor) != 0 ||
-                    !string_cursor_peek_ascii(cursor, &digit) ||
-                    digit < '0' || digit > '9') {
+                if (string_cursor_next(cursor) != 0 || !string_cursor_peek_ascii(cursor, &digit) || digit < '0' ||
+                    digit > '9') {
                     if (string_cursor_seek(cursor, underscore) != 0)
                         goto cleanup;
                     break;
                 }
-                if (mf_append_subscript_digit(name, digit) != 0 ||
-                    string_cursor_next(cursor) != 0)
+                if (mf_append_subscript_digit(name, digit) != 0 || string_cursor_next(cursor) != 0)
                     goto cleanup;
                 continue;
             }
@@ -342,11 +316,7 @@ static ssize_t symbol_vec_find(const symbol_vec_t *v, const string_t *name)
     return -1;
 }
 
-static int symbol_vec_add(symbol_vec_t *v,
-                          string_t *name,
-                          bool is_constant,
-                          bool has_value,
-                          number_t value)
+static int symbol_vec_add(symbol_vec_t *v, string_t *name, bool is_constant, bool has_value, number_t value)
 {
     matrix_symbol_t *grown;
 
@@ -388,8 +358,7 @@ static void symbol_vec_free(symbol_vec_t *v)
     v->cap = 0;
 }
 
-static bool mf_cursor_matches_pi_name(const string_cursor_t *cursor,
-                                      bool prev_is_name)
+static bool mf_cursor_matches_pi_name(const string_cursor_t *cursor, bool prev_is_name)
 {
     string_pos_t start = string_cursor_position(cursor);
     rune_t after;
@@ -398,8 +367,7 @@ static bool mf_cursor_matches_pi_name(const string_cursor_t *cursor,
         return false;
 
     after = string_cursor_peek_at(cursor, start + 2u);
-    return rune_is_none(after) ||
-           (!rune_is_alpha_numeric(after) && !rune_is_equal(after, '_'));
+    return rune_is_none(after) || (!rune_is_alpha_numeric(after) && !rune_is_equal(after, '_'));
 }
 
 static string_t *mf_try_read_normalised_alias(string_cursor_t *cursor)
@@ -443,8 +411,7 @@ static string_t *mf_normalise_expression_subscripts_text(const string_t *expr)
         string_t *alias;
 
         if (mf_cursor_matches_pi_name(cursor, prev_is_name)) {
-            if (!string_cursor_consume(cursor, "pi") ||
-                string_append_cstr(out, "\xcf\x80") != 0)
+            if (!string_cursor_consume(cursor, "pi") || string_append_cstr(out, "\xcf\x80") != 0)
                 goto fail;
             prev_is_name = true;
             continue;
@@ -464,18 +431,15 @@ static string_t *mf_normalise_expression_subscripts_text(const string_t *expr)
         if (!prev_is_name && mf_rune_is_letter(rune)) {
             bool converted_digits = false;
 
-            if (string_append_rune(out, rune) != 0 ||
-                string_cursor_next(cursor) != 0)
+            if (string_append_rune(out, rune) != 0 || string_cursor_next(cursor) != 0)
                 goto fail;
 
             while (!string_cursor_done(cursor)) {
                 unsigned char digit = 0u;
 
-                if (!string_cursor_peek_ascii(cursor, &digit) ||
-                    digit < '0' || digit > '9')
+                if (!string_cursor_peek_ascii(cursor, &digit) || digit < '0' || digit > '9')
                     break;
-                if (mf_append_subscript_digit(out, digit) != 0 ||
-                    string_cursor_next(cursor) != 0)
+                if (mf_append_subscript_digit(out, digit) != 0 || string_cursor_next(cursor) != 0)
                     goto fail;
                 converted_digits = true;
             }
@@ -561,9 +525,7 @@ static int mf_parse_number_literal_text(const string_t *text, number_t *out)
         unsigned char ascii = 0u;
 
         if (string_cursor_peek_ascii(cursor, &ascii)) {
-            if ((ascii == '+' || ascii == '-') &&
-                pos != content_start &&
-                prev_non_space != 'e' &&
+            if ((ascii == '+' || ascii == '-') && pos != content_start && prev_non_space != 'e' &&
                 prev_non_space != 'E') {
                 split = pos;
                 op = (char)ascii;
@@ -593,14 +555,11 @@ static int mf_parse_number_literal_text(const string_t *text, number_t *out)
             string_trim(left);
             string_trim(right);
 
-            if (string_length(left) > 0u &&
-                string_length(right) > 0u &&
-                (mf_text_has_ascii(left, 'i') || mf_text_has_ascii(left, 'j')) &&
-                !mf_text_has_ascii(right, 'i') &&
+            if (string_length(left) > 0u && string_length(right) > 0u &&
+                (mf_text_has_ascii(left, 'i') || mf_text_has_ascii(left, 'j')) && !mf_text_has_ascii(right, 'i') &&
                 !mf_text_has_ascii(right, 'j')) {
-                rewritten = op == '+'
-                          ? string_sprintf("%S + %S", right, left)
-                          : string_sprintf("-%S + %S", right, left);
+                rewritten =
+                    op == '+' ? string_sprintf("%S + %S", right, left) : string_sprintf("-%S + %S", right, left);
             }
 
             if (rewritten) {
@@ -639,8 +598,7 @@ static bool mf_cursor_at_function_name(const string_cursor_t *cursor)
     return result;
 }
 
-static int mf_collect_expression_names_text(const string_t *expr,
-                                            symbol_vec_t *symbols)
+static int mf_collect_expression_names_text(const string_t *expr, symbol_vec_t *symbols)
 {
     string_cursor_t *cursor;
     int result = -1;
@@ -665,16 +623,11 @@ static int mf_collect_expression_names_text(const string_t *expr,
         if (!mf_cursor_at_function_name(cursor)) {
             ssize_t found = symbol_vec_find(symbols, name);
             number_t default_number = NUM_ZERO;
-            bool has_default_value =
-                expr_get_default_constant_num_text(name, &default_number);
+            bool has_default_value = expr_get_default_constant_num_text(name, &default_number);
 
             if (found < 0) {
-                if (symbol_vec_add(symbols,
-                                   name,
-                                   has_default_value ||
-                                       expr_is_default_constant_name_text(name),
-                                   has_default_value,
-                                   default_number) != 0) {
+                if (symbol_vec_add(symbols, name, has_default_value || expr_is_default_constant_name_text(name),
+                                   has_default_value, default_number) != 0) {
                     string_free(name);
                     num_destroy(&default_number);
                     goto cleanup;
@@ -712,21 +665,14 @@ static bool mf_rune_is_space(rune_t rune)
 {
     uint32_t cp = rune_value(rune);
 
-    return cp == ' ' || cp == '\t' || cp == '\n' || cp == '\r' ||
-           cp == '\f' || cp == '\v' || cp == 0x0085u ||
-           cp == 0x00A0u || cp == 0x1680u || cp == 0x2000u ||
-           cp == 0x2001u || cp == 0x2002u || cp == 0x2003u ||
-           cp == 0x2004u || cp == 0x2005u || cp == 0x2006u ||
-           cp == 0x2007u || cp == 0x2008u || cp == 0x2009u ||
-           cp == 0x200Au || cp == 0x2028u || cp == 0x2029u ||
-           cp == 0x202Fu || cp == 0x205Fu || cp == 0x3000u;
+    return cp == ' ' || cp == '\t' || cp == '\n' || cp == '\r' || cp == '\f' || cp == '\v' || cp == 0x0085u ||
+           cp == 0x00A0u || cp == 0x1680u || cp == 0x2000u || cp == 0x2001u || cp == 0x2002u || cp == 0x2003u ||
+           cp == 0x2004u || cp == 0x2005u || cp == 0x2006u || cp == 0x2007u || cp == 0x2008u || cp == 0x2009u ||
+           cp == 0x200Au || cp == 0x2028u || cp == 0x2029u || cp == 0x202Fu || cp == 0x205Fu || cp == 0x3000u;
 }
 
-static int mf_push_trimmed_text_token(text_vec_t *cells,
-                                      const string_cursor_t *cursor,
-                                      string_pos_t start,
-                                      string_pos_t end,
-                                      bool required)
+static int mf_push_trimmed_text_token(text_vec_t *cells, const string_cursor_t *cursor, string_pos_t start,
+                                      string_pos_t end, bool required)
 {
     string_t *token = string_cursor_slice_between(start, end, cursor);
 
@@ -746,9 +692,7 @@ static int mf_push_trimmed_text_token(text_vec_t *cells,
     return 0;
 }
 
-static int mf_finish_paren_text_field(text_vec_t *entries,
-                                      string_cursor_t *cursor,
-                                      string_pos_t *token_start,
+static int mf_finish_paren_text_field(text_vec_t *entries, string_cursor_t *cursor, string_pos_t *token_start,
                                       size_t *current_cols)
 {
     string_pos_t end = string_cursor_position(cursor);
@@ -815,10 +759,7 @@ static int mf_parse_row_text(string_cursor_t *cursor, text_vec_t *cells)
     return -1;
 }
 
-static int mf_parse_matrix_body_text(const string_t *body,
-                                     string_t ***entries_out,
-                                     size_t *rows_out,
-                                     size_t *cols_out)
+static int mf_parse_matrix_body_text(const string_t *body, string_t ***entries_out, size_t *rows_out, size_t *cols_out)
 {
     string_cursor_t *cursor;
     rune_t first;
@@ -876,10 +817,7 @@ static int mf_parse_matrix_body_text(const string_t *body,
                             goto fail_paren;
                         continue;
                     }
-                    if (mf_finish_paren_text_field(&entries,
-                                                   cursor,
-                                                   &token_start,
-                                                   &current_cols) != 0)
+                    if (mf_finish_paren_text_field(&entries, cursor, &token_start, &current_cols) != 0)
                         goto fail_paren;
                     if (mf_commit_paren_row(&rows, &cols, current_cols) != 0)
                         goto fail_paren;
@@ -894,18 +832,12 @@ static int mf_parse_matrix_body_text(const string_t *body,
                     return 0;
                 }
                 if (paren_depth == 0 && rune_is_equal(rune, ',')) {
-                    if (mf_finish_paren_text_field(&entries,
-                                                   cursor,
-                                                   &token_start,
-                                                   &current_cols) != 0)
+                    if (mf_finish_paren_text_field(&entries, cursor, &token_start, &current_cols) != 0)
                         goto fail_paren;
                     continue;
                 }
                 if (paren_depth == 0 && rune_is_equal(rune, ';')) {
-                    if (mf_finish_paren_text_field(&entries,
-                                                   cursor,
-                                                   &token_start,
-                                                   &current_cols) != 0)
+                    if (mf_finish_paren_text_field(&entries, cursor, &token_start, &current_cols) != 0)
                         goto fail_paren;
                     if (mf_commit_paren_row(&rows, &cols, current_cols) != 0)
                         goto fail_paren;
@@ -918,7 +850,7 @@ static int mf_parse_matrix_body_text(const string_t *body,
                 goto fail_paren;
         }
 
-fail_paren:
+    fail_paren:
         string_cursor_free(cursor);
         text_vec_free(&entries);
         return -1;
@@ -930,8 +862,7 @@ fail_paren:
         text_vec_t entries = {0};
         text_vec_t row = {0};
 
-        if (!string_cursor_consume(cursor, "[") ||
-            !rune_is_equal(string_cursor_peek(cursor), '['))
+        if (!string_cursor_consume(cursor, "[") || !rune_is_equal(string_cursor_peek(cursor), '['))
             goto fail;
 
         for (;;) {
@@ -980,9 +911,9 @@ fail_paren:
         *cols_out = cols;
         return 0;
 
-fail_row:
+    fail_row:
         text_vec_free(&row);
-fail:
+    fail:
         string_cursor_free(cursor);
         text_vec_free(&entries);
         return -1;
@@ -1043,17 +974,14 @@ static int mf_parse_binding_section_text(const string_t *text, symbol_vec_t *sym
                 paren_depth++;
             else if (rune_is_equal(rune, ')') && paren_depth > 0)
                 paren_depth--;
-            else if (paren_depth == 0 &&
-                     (rune_is_equal(rune, ',') || rune_is_equal(rune, ';')))
+            else if (paren_depth == 0 && (rune_is_equal(rune, ',') || rune_is_equal(rune, ';')))
                 break;
             if (string_cursor_next(cursor) != 0)
                 break;
         }
 
         value_end = string_cursor_position(cursor);
-        value_text = string_cursor_slice_between(value_start,
-                                                 value_end,
-                                                 cursor);
+        value_text = string_cursor_slice_between(value_start, value_end, cursor);
         if (!value_text) {
             string_free(name);
             goto cleanup;
@@ -1108,10 +1036,7 @@ cleanup:
     return result;
 }
 
-static int mf_try_parse_numeric_matrix(string_t **entries,
-                                       size_t rows,
-                                       size_t cols,
-                                       matrix_t **A_out)
+static int mf_try_parse_numeric_matrix(string_t **entries, size_t rows, size_t cols, matrix_t **A_out)
 {
     size_t n = rows * cols;
     number_t *vals = mf_xmalloc(n * sizeof(*vals));
@@ -1135,12 +1060,8 @@ static int mf_try_parse_numeric_matrix(string_t **entries,
     return A ? 0 : -1;
 }
 
-static int mf_build_symbolic_matrix(string_t **entries,
-                                    size_t rows,
-                                    size_t cols,
-                                    symbol_vec_t *symbols,
-                                    mat_bindings_t **bindings_out,
-                                    matrix_t **A_out)
+static int mf_build_symbolic_matrix(string_t **entries, size_t rows, size_t cols, symbol_vec_t *symbols,
+                                    mat_bindings_t **bindings_out, matrix_t **A_out)
 {
     size_t n = rows * cols;
     size_t active_count = 0;
@@ -1166,16 +1087,12 @@ static int mf_build_symbolic_matrix(string_t **entries,
         if (!symbols->items[i].used_in_expr)
             continue;
 
-        init = symbols->items[i].has_value
-             ? symbols->items[i].value
-             : NUM_NAN;
+        init = symbols->items[i].has_value ? symbols->items[i].value : NUM_NAN;
 
         if (!symbols->items[i].symbol) {
             symbols->items[i].symbol = symbols->items[i].is_constant
-                                     ? expr_new_named_const_text(init,
-                                                                 symbols->items[i].name)
-                                     : expr_new_named_var_text(init,
-                                                               symbols->items[i].name);
+                                           ? expr_new_named_const_text(init, symbols->items[i].name)
+                                           : expr_new_named_var_text(init, symbols->items[i].name);
             symbols->items[i].owns_symbol = true;
         } else if (symbols->items[i].has_value) {
             expr_set_val(symbols->items[i].symbol, init);
@@ -1198,11 +1115,7 @@ static int mf_build_symbolic_matrix(string_t **entries,
             ok = 0;
             continue;
         }
-        nodes[i] = expr_from_expression_text(
-            normalised,
-            (const string_t *const *)names,
-            refs,
-            active_count);
+        nodes[i] = expr_from_expression_text(normalised, (const string_t *const *)names, refs, active_count);
         string_free(normalised);
         if (!nodes[i])
             ok = 0;
@@ -1270,8 +1183,7 @@ static int mf_build_symbolic_matrix(string_t **entries,
     return 0;
 }
 
-static matrix_t *mf_parse_matrix_text(const string_t *text,
-                                      mat_bindings_t **bindings_out)
+static matrix_t *mf_parse_matrix_text(const string_t *text, mat_bindings_t **bindings_out)
 {
     string_cursor_t *cursor = NULL;
     string_t *body = NULL;
@@ -1338,9 +1250,7 @@ static matrix_t *mf_parse_matrix_text(const string_t *text,
             return NULL;
         }
 
-        body = string_cursor_slice_between(body_start,
-                                           has_pipe ? pipe : close,
-                                           cursor);
+        body = string_cursor_slice_between(body_start, has_pipe ? pipe : close, cursor);
         if (has_pipe)
             bindings = string_cursor_slice_between(after_pipe, close, cursor);
     } else {
@@ -1379,8 +1289,7 @@ static matrix_t *mf_parse_matrix_text(const string_t *text,
         }
     }
 
-    if (mf_build_symbolic_matrix(entries, rows, cols, &symbols,
-                                 bindings_out, &A) != 0) {
+    if (mf_build_symbolic_matrix(entries, rows, cols, &symbols, bindings_out, &A) != 0) {
         error_msg = "invalid symbolic expression";
         goto cleanup;
     }

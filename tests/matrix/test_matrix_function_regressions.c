@@ -6,22 +6,15 @@ static void test_mat_fun_3x3(void)
 
     /* 3×3 symmetric positive definite — all off-diagonal entries nonzero, */
     /* exercises the full Q·f(T)·Q* round-trip in mat_fun_schur.            */
-    double avals[9] = {
-        4.0, 2.0, 1.0,
-        2.0, 3.0, 1.5,
-        1.0, 1.5, 2.0};
-    double negavals[9] = {
-        -4.0, -2.0, -1.0,
-        -2.0, -3.0, -1.5,
-        -1.0, -1.5, -2.0};
+    double avals[9] = {4.0, 2.0, 1.0, 2.0, 3.0, 1.5, 1.0, 1.5, 2.0};
+    double negavals[9] = {-4.0, -2.0, -1.0, -2.0, -3.0, -1.5, -1.0, -1.5, -2.0};
 
     matrix_t *A = test_mat_create_d(3, 3, avals);
     matrix_t *negA = test_mat_create_d(3, 3, negavals);
 
     check_bool("A 3×3 allocated", A != NULL);
     check_bool("negA 3×3 allocated", negA != NULL);
-    if (!A || !negA)
-    {
+    if (!A || !negA) {
         mat_free(A);
         mat_free(negA);
         return;
@@ -35,15 +28,12 @@ static void test_mat_fun_3x3(void)
         matrix_t *En = mat_exp(negA);
         check_bool("exp(A) not NULL", E != NULL);
         check_bool("exp(-A) not NULL", En != NULL);
-        if (E && En)
-        {
+        if (E && En) {
             print_md("exp(A)", E);
             print_md("exp(-A)", En);
             matrix_t *I = mat_mul(E, En);
-            if (I)
-            {
-                bool ok = test_assert_matrix_d_identity(I, 3, 1e-10,
-                                                        __FILE__, __LINE__);
+            if (I) {
+                bool ok = test_assert_matrix_d_identity(I, 3, 1e-10, __FILE__, __LINE__);
                 mat_free(I);
                 if (!ok)
                     return;
@@ -59,19 +49,15 @@ static void test_mat_fun_3x3(void)
         matrix_t *C = mat_cos(A);
         check_bool("sin(A) 3×3 not NULL", S != NULL);
         check_bool("cos(A) 3×3 not NULL", C != NULL);
-        if (S && C)
-        {
+        if (S && C) {
             print_md("sin(A)", S);
             print_md("cos(A)", C);
             matrix_t *S2 = mat_mul(S, S);
             matrix_t *C2 = mat_mul(C, C);
-            if (S2 && C2)
-            {
+            if (S2 && C2) {
                 matrix_t *I = mat_add(S2, C2);
-                if (I)
-                {
-                    bool ok = test_assert_matrix_d_identity(I, 3, 1e-10,
-                                                            __FILE__, __LINE__);
+                if (I) {
+                    bool ok = test_assert_matrix_d_identity(I, 3, 1e-10, __FILE__, __LINE__);
                     mat_free(I);
                     if (!ok)
                         return;
@@ -90,19 +76,15 @@ static void test_mat_fun_3x3(void)
         matrix_t *SH = mat_sinh(A);
         check_bool("cosh(A) 3×3 not NULL", CH != NULL);
         check_bool("sinh(A) 3×3 not NULL", SH != NULL);
-        if (CH && SH)
-        {
+        if (CH && SH) {
             print_md("cosh(A)", CH);
             print_md("sinh(A)", SH);
             matrix_t *CH2 = mat_mul(CH, CH);
             matrix_t *SH2 = mat_mul(SH, SH);
-            if (CH2 && SH2)
-            {
+            if (CH2 && SH2) {
                 matrix_t *I = mat_sub(CH2, SH2);
-                if (I)
-                {
-                    bool ok = test_assert_matrix_d_identity(I, 3, 1e-10,
-                                                            __FILE__, __LINE__);
+                if (I) {
+                    bool ok = test_assert_matrix_d_identity(I, 3, 1e-10, __FILE__, __LINE__);
                     mat_free(I);
                     if (!ok)
                         return;
@@ -119,15 +101,12 @@ static void test_mat_fun_3x3(void)
     {
         matrix_t *L = mat_log(A);
         check_bool("log(A) 3×3 not NULL", L != NULL);
-        if (L)
-        {
+        if (L) {
             print_md("log(A)", L);
             matrix_t *R = mat_exp(L);
             check_bool("exp(log(A)) 3×3 not NULL", R != NULL);
-            if (R)
-            {
-                bool ok = test_assert_matrix_d_close(R, A, 1e-10,
-                                                     __FILE__, __LINE__);
+            if (R) {
+                bool ok = test_assert_matrix_d_close(R, A, 1e-10, __FILE__, __LINE__);
                 mat_free(R);
                 if (!ok)
                     return;
@@ -153,24 +132,16 @@ static void test_mat_fun_4x4(void)
 
     /* 4×4 symmetric positive definite — diagonally dominant ensures SPD,   */
     /* dense off-diagonal entries exercise the full Q·f(T)·Q* round-trip.   */
-    double avals[16] = {
-        5.0, 1.0, 0.5, 0.2,
-        1.0, 4.0, 1.0, 0.5,
-        0.5, 1.0, 3.0, 1.0,
-        0.2, 0.5, 1.0, 2.0};
-    double negavals[16] = {
-        -5.0, -1.0, -0.5, -0.2,
-        -1.0, -4.0, -1.0, -0.5,
-        -0.5, -1.0, -3.0, -1.0,
-        -0.2, -0.5, -1.0, -2.0};
+    double avals[16] = {5.0, 1.0, 0.5, 0.2, 1.0, 4.0, 1.0, 0.5, 0.5, 1.0, 3.0, 1.0, 0.2, 0.5, 1.0, 2.0};
+    double negavals[16] = {-5.0, -1.0, -0.5, -0.2, -1.0, -4.0, -1.0, -0.5,
+                           -0.5, -1.0, -3.0, -1.0, -0.2, -0.5, -1.0, -2.0};
 
     matrix_t *A = test_mat_create_d(4, 4, avals);
     matrix_t *negA = test_mat_create_d(4, 4, negavals);
 
     check_bool("A 4×4 allocated", A != NULL);
     check_bool("negA 4×4 allocated", negA != NULL);
-    if (!A || !negA)
-    {
+    if (!A || !negA) {
         mat_free(A);
         mat_free(negA);
         return;
@@ -184,15 +155,12 @@ static void test_mat_fun_4x4(void)
         matrix_t *En = mat_exp(negA);
         check_bool("exp(A) 4×4 not NULL", E != NULL);
         check_bool("exp(-A) 4×4 not NULL", En != NULL);
-        if (E && En)
-        {
+        if (E && En) {
             print_md("exp(A)", E);
             print_md("exp(-A)", En);
             matrix_t *I = mat_mul(E, En);
-            if (I)
-            {
-                bool ok = test_assert_matrix_d_identity(I, 4, 1e-8,
-                                                        __FILE__, __LINE__);
+            if (I) {
+                bool ok = test_assert_matrix_d_identity(I, 4, 1e-8, __FILE__, __LINE__);
                 mat_free(I);
                 if (!ok)
                     return;
@@ -208,19 +176,15 @@ static void test_mat_fun_4x4(void)
         matrix_t *C = mat_cos(A);
         check_bool("sin(A) 4×4 not NULL", S != NULL);
         check_bool("cos(A) 4×4 not NULL", C != NULL);
-        if (S && C)
-        {
+        if (S && C) {
             print_md("sin(A)", S);
             print_md("cos(A)", C);
             matrix_t *S2 = mat_mul(S, S);
             matrix_t *C2 = mat_mul(C, C);
-            if (S2 && C2)
-            {
+            if (S2 && C2) {
                 matrix_t *I = mat_add(S2, C2);
-                if (I)
-                {
-                    bool ok = test_assert_matrix_d_identity(I, 4, 1e-8,
-                                                            __FILE__, __LINE__);
+                if (I) {
+                    bool ok = test_assert_matrix_d_identity(I, 4, 1e-8, __FILE__, __LINE__);
                     mat_free(I);
                     if (!ok)
                         return;
@@ -239,19 +203,15 @@ static void test_mat_fun_4x4(void)
         matrix_t *SH = mat_sinh(A);
         check_bool("cosh(A) 4×4 not NULL", CH != NULL);
         check_bool("sinh(A) 4×4 not NULL", SH != NULL);
-        if (CH && SH)
-        {
+        if (CH && SH) {
             print_md("cosh(A)", CH);
             print_md("sinh(A)", SH);
             matrix_t *CH2 = mat_mul(CH, CH);
             matrix_t *SH2 = mat_mul(SH, SH);
-            if (CH2 && SH2)
-            {
+            if (CH2 && SH2) {
                 matrix_t *I = mat_sub(CH2, SH2);
-                if (I)
-                {
-                    bool ok = test_assert_matrix_d_identity(I, 4, 1e-8,
-                                                            __FILE__, __LINE__);
+                if (I) {
+                    bool ok = test_assert_matrix_d_identity(I, 4, 1e-8, __FILE__, __LINE__);
                     mat_free(I);
                     if (!ok)
                         return;
@@ -268,15 +228,12 @@ static void test_mat_fun_4x4(void)
     {
         matrix_t *L = mat_log(A);
         check_bool("log(A) 4×4 not NULL", L != NULL);
-        if (L)
-        {
+        if (L) {
             print_md("log(A)", L);
             matrix_t *R = mat_exp(L);
             check_bool("exp(log(A)) 4×4 not NULL", R != NULL);
-            if (R)
-            {
-                bool ok = test_assert_matrix_d_close(R, A, 1e-8,
-                                                     __FILE__, __LINE__);
+            if (R) {
+                bool ok = test_assert_matrix_d_close(R, A, 1e-8, __FILE__, __LINE__);
                 mat_free(R);
                 if (!ok)
                     return;
@@ -289,15 +246,12 @@ static void test_mat_fun_4x4(void)
     {
         matrix_t *Sq = mat_sqrt(A);
         check_bool("sqrt(A) 4×4 not NULL", Sq != NULL);
-        if (Sq)
-        {
+        if (Sq) {
             print_md("sqrt(A)", Sq);
             matrix_t *R = mat_mul(Sq, Sq);
             check_bool("sqrt(A)² 4×4 not NULL", R != NULL);
-            if (R)
-            {
-                bool ok = test_assert_matrix_d_close(R, A, 1e-8,
-                                                     __FILE__, __LINE__);
+            if (R) {
+                bool ok = test_assert_matrix_d_close(R, A, 1e-8, __FILE__, __LINE__);
                 mat_free(R);
                 if (!ok)
                     return;
@@ -312,15 +266,12 @@ static void test_mat_fun_4x4(void)
         matrix_t *EC = mat_erfc(A);
         check_bool("erf(A) 4×4 not NULL", E != NULL);
         check_bool("erfc(A) 4×4 not NULL", EC != NULL);
-        if (E && EC)
-        {
+        if (E && EC) {
             print_md("erf(A)", E);
             print_md("erfc(A)", EC);
             matrix_t *I = mat_add(E, EC);
-            if (I)
-            {
-                bool ok = test_assert_matrix_d_identity(I, 4, 1e-8,
-                                                        __FILE__, __LINE__);
+            if (I) {
+                bool ok = test_assert_matrix_d_identity(I, 4, 1e-8, __FILE__, __LINE__);
                 mat_free(I);
                 if (!ok)
                     return;
@@ -342,12 +293,8 @@ static void test_mat_fun_3x3_mp_real(void)
 
     number_t avals[9];
     number_t negavals[9];
-    const double ainit[9] = {4.0, 2.0, 1.0,
-                             2.0, 3.0, 1.5,
-                             1.0, 1.5, 2.0};
-    const double neginit[9] = {-4.0, -2.0, -1.0,
-                               -2.0, -3.0, -1.5,
-                               -1.0, -1.5, -2.0};
+    const double ainit[9] = {4.0, 2.0, 1.0, 2.0, 3.0, 1.5, 1.0, 1.5, 2.0};
+    const double neginit[9] = {-4.0, -2.0, -1.0, -2.0, -3.0, -1.5, -1.0, -1.5, -2.0};
     matrix_t *A;
     matrix_t *negA;
 
@@ -365,7 +312,11 @@ static void test_mat_fun_3x3_mp_real(void)
 
     check_bool("num A 3×3 allocated", A != NULL);
     check_bool("num negA 3×3 allocated", negA != NULL);
-    if (!A || !negA) { mat_free(A); mat_free(negA); return; }
+    if (!A || !negA) {
+        mat_free(A);
+        mat_free(negA);
+        return;
+    }
 
     print_mnum("A (3×3 SPD number)", A);
 
@@ -375,15 +326,12 @@ static void test_mat_fun_3x3_mp_real(void)
         matrix_t *En = mat_exp(negA);
         check_bool("num exp(A) 3×3 not NULL", E != NULL);
         check_bool("num exp(-A) 3×3 not NULL", En != NULL);
-        if (E && En)
-        {
+        if (E && En) {
             print_mnum("exp(A)", E);
             print_mnum("exp(-A)", En);
             matrix_t *I = mat_mul(E, En);
-            if (I)
-            {
-                bool ok = test_assert_matrix_d_identity(I, 3, 1e-12,
-                                                        __FILE__, __LINE__);
+            if (I) {
+                bool ok = test_assert_matrix_d_identity(I, 3, 1e-12, __FILE__, __LINE__);
                 mat_free(I);
                 if (!ok)
                     return;
@@ -399,19 +347,15 @@ static void test_mat_fun_3x3_mp_real(void)
         matrix_t *C = mat_cos(A);
         check_bool("num sin(A) 3×3 not NULL", S != NULL);
         check_bool("num cos(A) 3×3 not NULL", C != NULL);
-        if (S && C)
-        {
+        if (S && C) {
             print_mnum("sin(A)", S);
             print_mnum("cos(A)", C);
             matrix_t *S2 = mat_mul(S, S);
             matrix_t *C2 = mat_mul(C, C);
-            if (S2 && C2)
-            {
+            if (S2 && C2) {
                 matrix_t *I = mat_add(S2, C2);
-                if (I)
-                {
-                    bool ok = test_assert_matrix_d_identity(I, 3, 1e-12,
-                                                            __FILE__, __LINE__);
+                if (I) {
+                    bool ok = test_assert_matrix_d_identity(I, 3, 1e-12, __FILE__, __LINE__);
                     mat_free(I);
                     if (!ok)
                         return;
@@ -430,19 +374,15 @@ static void test_mat_fun_3x3_mp_real(void)
         matrix_t *SH = mat_sinh(A);
         check_bool("num cosh(A) 3×3 not NULL", CH != NULL);
         check_bool("num sinh(A) 3×3 not NULL", SH != NULL);
-        if (CH && SH)
-        {
+        if (CH && SH) {
             print_mnum("cosh(A)", CH);
             print_mnum("sinh(A)", SH);
             matrix_t *CH2 = mat_mul(CH, CH);
             matrix_t *SH2 = mat_mul(SH, SH);
-            if (CH2 && SH2)
-            {
+            if (CH2 && SH2) {
                 matrix_t *I = mat_sub(CH2, SH2);
-                if (I)
-                {
-                    bool ok = test_assert_matrix_d_identity(I, 3, 1e-10,
-                                                            __FILE__, __LINE__);
+                if (I) {
+                    bool ok = test_assert_matrix_d_identity(I, 3, 1e-10, __FILE__, __LINE__);
                     mat_free(I);
                     if (!ok)
                         return;
@@ -459,15 +399,12 @@ static void test_mat_fun_3x3_mp_real(void)
     {
         matrix_t *L = mat_log(A);
         check_bool("num log(A) 3×3 not NULL", L != NULL);
-        if (L)
-        {
+        if (L) {
             print_mnum("log(A)", L);
             matrix_t *R = mat_exp(L);
             check_bool("num exp(log(A)) 3×3 not NULL", R != NULL);
-            if (R)
-            {
-                bool ok = test_assert_matrix_d_close(R, A, 1e-12,
-                                                     __FILE__, __LINE__);
+            if (R) {
+                bool ok = test_assert_matrix_d_close(R, A, 1e-12, __FILE__, __LINE__);
                 mat_free(R);
                 if (!ok)
                     return;
@@ -487,33 +424,35 @@ static void test_mat_fun_3x3_complex(void)
     printf(C_CYAN "TEST: 3×3 qcomplex matrix functions — Hermitian positive definite\n" C_RESET);
 
     /* Hermitian positive definite — diagonally dominant with Hermitian off-diagonal */
-    qcomplex_t avals[9] = {
-        qc_make(qf_from_double(4.0), QF_ZERO),
-        qc_make(qf_from_double(1.0), qf_from_double( 0.5)),
-        qc_make(qf_from_double(0.5), qf_from_double(-0.3)),
-        qc_make(qf_from_double(1.0), qf_from_double(-0.5)),
-        qc_make(qf_from_double(3.0), QF_ZERO),
-        qc_make(qf_from_double(0.8), qf_from_double( 0.2)),
-        qc_make(qf_from_double(0.5), qf_from_double( 0.3)),
-        qc_make(qf_from_double(0.8), qf_from_double(-0.2)),
-        qc_make(qf_from_double(2.0), QF_ZERO)};
-    qcomplex_t negavals[9] = {
-        qc_make(qf_from_double(-4.0), QF_ZERO),
-        qc_make(qf_from_double(-1.0), qf_from_double(-0.5)),
-        qc_make(qf_from_double(-0.5), qf_from_double( 0.3)),
-        qc_make(qf_from_double(-1.0), qf_from_double( 0.5)),
-        qc_make(qf_from_double(-3.0), QF_ZERO),
-        qc_make(qf_from_double(-0.8), qf_from_double(-0.2)),
-        qc_make(qf_from_double(-0.5), qf_from_double(-0.3)),
-        qc_make(qf_from_double(-0.8), qf_from_double( 0.2)),
-        qc_make(qf_from_double(-2.0), QF_ZERO)};
+    qcomplex_t avals[9] = {qc_make(qf_from_double(4.0), QF_ZERO),
+                           qc_make(qf_from_double(1.0), qf_from_double(0.5)),
+                           qc_make(qf_from_double(0.5), qf_from_double(-0.3)),
+                           qc_make(qf_from_double(1.0), qf_from_double(-0.5)),
+                           qc_make(qf_from_double(3.0), QF_ZERO),
+                           qc_make(qf_from_double(0.8), qf_from_double(0.2)),
+                           qc_make(qf_from_double(0.5), qf_from_double(0.3)),
+                           qc_make(qf_from_double(0.8), qf_from_double(-0.2)),
+                           qc_make(qf_from_double(2.0), QF_ZERO)};
+    qcomplex_t negavals[9] = {qc_make(qf_from_double(-4.0), QF_ZERO),
+                              qc_make(qf_from_double(-1.0), qf_from_double(-0.5)),
+                              qc_make(qf_from_double(-0.5), qf_from_double(0.3)),
+                              qc_make(qf_from_double(-1.0), qf_from_double(0.5)),
+                              qc_make(qf_from_double(-3.0), QF_ZERO),
+                              qc_make(qf_from_double(-0.8), qf_from_double(-0.2)),
+                              qc_make(qf_from_double(-0.5), qf_from_double(-0.3)),
+                              qc_make(qf_from_double(-0.8), qf_from_double(0.2)),
+                              qc_make(qf_from_double(-2.0), QF_ZERO)};
 
-    matrix_t *A    = test_mat_create_complex(3, 3, avals);
+    matrix_t *A = test_mat_create_complex(3, 3, avals);
     matrix_t *negA = test_mat_create_complex(3, 3, negavals);
 
     check_bool("qc A 3×3 allocated", A != NULL);
     check_bool("qc negA 3×3 allocated", negA != NULL);
-    if (!A || !negA) { mat_free(A); mat_free(negA); return; }
+    if (!A || !negA) {
+        mat_free(A);
+        mat_free(negA);
+        return;
+    }
 
     print_mqc("A (3×3 HPD qcomplex)", A);
 
@@ -523,15 +462,12 @@ static void test_mat_fun_3x3_complex(void)
         matrix_t *En = mat_exp(negA);
         check_bool("qc exp(A) 3×3 not NULL", E != NULL);
         check_bool("qc exp(-A) 3×3 not NULL", En != NULL);
-        if (E && En)
-        {
+        if (E && En) {
             print_mqc("exp(A)", E);
             print_mqc("exp(-A)", En);
             matrix_t *I = mat_mul(E, En);
-            if (I)
-            {
-                bool ok = test_assert_matrix_complex_identity(I, 3, 1e-25,
-                                                              __FILE__, __LINE__);
+            if (I) {
+                bool ok = test_assert_matrix_complex_identity(I, 3, 1e-25, __FILE__, __LINE__);
                 mat_free(I);
                 if (!ok)
                     return;
@@ -547,19 +483,15 @@ static void test_mat_fun_3x3_complex(void)
         matrix_t *C = mat_cos(A);
         check_bool("qc sin(A) 3×3 not NULL", S != NULL);
         check_bool("qc cos(A) 3×3 not NULL", C != NULL);
-        if (S && C)
-        {
+        if (S && C) {
             print_mqc("sin(A)", S);
             print_mqc("cos(A)", C);
             matrix_t *S2 = mat_mul(S, S);
             matrix_t *C2 = mat_mul(C, C);
-            if (S2 && C2)
-            {
+            if (S2 && C2) {
                 matrix_t *I = mat_add(S2, C2);
-                if (I)
-                {
-                    bool ok = test_assert_matrix_complex_identity(I, 3, 1e-25,
-                                                                  __FILE__, __LINE__);
+                if (I) {
+                    bool ok = test_assert_matrix_complex_identity(I, 3, 1e-25, __FILE__, __LINE__);
                     mat_free(I);
                     if (!ok)
                         return;
@@ -578,19 +510,15 @@ static void test_mat_fun_3x3_complex(void)
         matrix_t *SH = mat_sinh(A);
         check_bool("qc cosh(A) 3×3 not NULL", CH != NULL);
         check_bool("qc sinh(A) 3×3 not NULL", SH != NULL);
-        if (CH && SH)
-        {
+        if (CH && SH) {
             print_mqc("cosh(A)", CH);
             print_mqc("sinh(A)", SH);
             matrix_t *CH2 = mat_mul(CH, CH);
             matrix_t *SH2 = mat_mul(SH, SH);
-            if (CH2 && SH2)
-            {
+            if (CH2 && SH2) {
                 matrix_t *I = mat_sub(CH2, SH2);
-                if (I)
-                {
-                    bool ok = test_assert_matrix_complex_identity(I, 3, 1e-25,
-                                                                  __FILE__, __LINE__);
+                if (I) {
+                    bool ok = test_assert_matrix_complex_identity(I, 3, 1e-25, __FILE__, __LINE__);
                     mat_free(I);
                     if (!ok)
                         return;
@@ -607,15 +535,12 @@ static void test_mat_fun_3x3_complex(void)
     {
         matrix_t *L = mat_log(A);
         check_bool("qc log(A) 3×3 not NULL", L != NULL);
-        if (L)
-        {
+        if (L) {
             print_mqc("log(A)", L);
             matrix_t *R = mat_exp(L);
             check_bool("qc exp(log(A)) 3×3 not NULL", R != NULL);
-            if (R)
-            {
-                bool ok = test_assert_matrix_complex_close(R, A, 1e-25,
-                                                           __FILE__, __LINE__);
+            if (R) {
+                bool ok = test_assert_matrix_complex_close(R, A, 1e-25, __FILE__, __LINE__);
                 mat_free(R);
                 if (!ok)
                     return;
@@ -718,11 +643,9 @@ static void test_mat_error_handling(void)
     {
         number_t ev[4] = {NUM_ZERO, NUM_ZERO, NUM_ZERO, NUM_ZERO};
         matrix_t *evecs = NULL;
-        check_bool("mat_eigendecompose(NULL) < 0",
-                   mat_eigendecompose(NULL, ev, &evecs) < 0);
+        check_bool("mat_eigendecompose(NULL) < 0", mat_eigendecompose(NULL, ev, &evecs) < 0);
         matrix_t *rect = test_mat_dense_d(2, 3);
-        check_bool("mat_eigendecompose(2×3) < 0",
-                   mat_eigendecompose(rect, ev, &evecs) < 0);
+        check_bool("mat_eigendecompose(2×3) < 0", mat_eigendecompose(rect, ev, &evecs) < 0);
         for (size_t i = 0; i < 4; ++i)
             num_destroy(&ev[i]);
         mat_free(rect);
@@ -777,13 +700,10 @@ static void test_mat_fun_mp_real_complex(void)
         matrix_t *S = mat_sin(A_num);
         matrix_t *C = mat_cos(A_num);
         check_bool("num tan(A) not NULL", T != NULL);
-        if (T && S && C)
-        {
+        if (T && S && C) {
             matrix_t *CT = mat_mul(C, T);
-            if (CT)
-            {
-                bool ok = test_assert_matrix_d_close(CT, S, 1e-12,
-                                                     __FILE__, __LINE__);
+            if (CT) {
+                bool ok = test_assert_matrix_d_close(CT, S, 1e-12, __FILE__, __LINE__);
                 mat_free(CT);
                 if (!ok)
                     return;
@@ -800,17 +720,13 @@ static void test_mat_fun_mp_real_complex(void)
         matrix_t *SH = mat_sinh(A_num);
         check_bool("num cosh(A) not NULL", CH != NULL);
         check_bool("num sinh(A) not NULL", SH != NULL);
-        if (CH && SH)
-        {
+        if (CH && SH) {
             matrix_t *CH2 = mat_mul(CH, CH);
             matrix_t *SH2 = mat_mul(SH, SH);
-            if (CH2 && SH2)
-            {
+            if (CH2 && SH2) {
                 matrix_t *I = mat_sub(CH2, SH2);
-                if (I)
-                {
-                    bool ok = test_assert_matrix_d_identity(I, 2, 1e-12,
-                                                            __FILE__, __LINE__);
+                if (I) {
+                    bool ok = test_assert_matrix_d_identity(I, 2, 1e-12, __FILE__, __LINE__);
                     mat_free(I);
                     if (!ok)
                         return;
@@ -829,13 +745,10 @@ static void test_mat_fun_mp_real_complex(void)
         matrix_t *CH = mat_cosh(A_num);
         matrix_t *SH = mat_sinh(A_num);
         check_bool("num tanh(A) not NULL", TH != NULL);
-        if (TH && CH && SH)
-        {
+        if (TH && CH && SH) {
             matrix_t *CT = mat_mul(CH, TH);
-            if (CT)
-            {
-                bool ok = test_assert_matrix_d_close(CT, SH, 1e-12,
-                                                     __FILE__, __LINE__);
+            if (CT) {
+                bool ok = test_assert_matrix_d_close(CT, SH, 1e-12, __FILE__, __LINE__);
                 mat_free(CT);
                 if (!ok)
                     return;
@@ -860,14 +773,11 @@ static void test_mat_fun_mp_real_complex(void)
             num_destroy(&pexprs[i]);
         L = mat_log(PD);
         check_bool("num log(PD) not NULL", L != NULL);
-        if (L)
-        {
+        if (L) {
             matrix_t *R = mat_exp(L);
             check_bool("num exp(log(PD)) not NULL", R != NULL);
-            if (R)
-            {
-                bool ok = test_assert_matrix_d_close(R, PD, 1e-12,
-                                                     __FILE__, __LINE__);
+            if (R) {
+                bool ok = test_assert_matrix_d_close(R, PD, 1e-12, __FILE__, __LINE__);
                 mat_free(R);
                 if (!ok)
                     return;
@@ -883,13 +793,10 @@ static void test_mat_fun_mp_real_complex(void)
         matrix_t *EC = mat_erfc(A_num);
         check_bool("num erf(A) not NULL", E != NULL);
         check_bool("num erfc(A) not NULL", EC != NULL);
-        if (E && EC)
-        {
+        if (E && EC) {
             matrix_t *I = mat_add(E, EC);
-            if (I)
-            {
-                bool ok = test_assert_matrix_d_identity(I, 2, 1e-12,
-                                                        __FILE__, __LINE__);
+            if (I) {
+                bool ok = test_assert_matrix_d_identity(I, 2, 1e-12, __FILE__, __LINE__);
                 mat_free(I);
                 if (!ok)
                     return;
@@ -914,8 +821,7 @@ static void test_mat_fun_mp_real_complex(void)
         num_destroy(&exprs[3]);
         R = mat_pow_int(D, 3);
         check_bool("num pow_int(diag(2,3),3) not NULL", R != NULL);
-        if (R)
-        {
+        if (R) {
             mat_get(R, 0, 0, &r00);
             mat_get(R, 1, 1, &r11);
             mat_get(R, 0, 1, &r01);
@@ -956,13 +862,10 @@ static void test_mat_fun_mp_real_complex(void)
         En = mat_exp(negA_exp);
         check_bool("num exp(A) not NULL", E != NULL);
         check_bool("num exp(-A) not NULL", En != NULL);
-        if (E && En)
-        {
+        if (E && En) {
             matrix_t *I = mat_mul(E, En);
-            if (I)
-            {
-                bool ok = test_assert_matrix_d_identity(I, 2, 1e-12,
-                                                        __FILE__, __LINE__);
+            if (I) {
+                bool ok = test_assert_matrix_d_identity(I, 2, 1e-12, __FILE__, __LINE__);
                 mat_free(I);
                 if (!ok)
                     return;

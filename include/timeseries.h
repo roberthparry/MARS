@@ -1,9 +1,9 @@
 #ifndef TIMESERIES_H
 #define TIMESERIES_H
 
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stddef.h>
-#include <stdarg.h>
 
 #include "datetime.h"
 #include "matrix.h"
@@ -49,10 +49,7 @@ typedef enum {
  * `TS_YEAR_FISCAL_UK_APR` uses the UK-style fiscal year starting on 1 April
  * and ending on 31 March of the following calendar year.
  */
-typedef enum {
-    TS_YEAR_CALENDAR = 0,
-    TS_YEAR_FISCAL_UK_APR
-} ts_year_type_t;
+typedef enum { TS_YEAR_CALENDAR = 0, TS_YEAR_FISCAL_UK_APR } ts_year_type_t;
 
 /**
  * @brief Missing-data handling policy.
@@ -69,40 +66,22 @@ typedef enum {
 /**
  * @brief Join policy for aligned series operations.
  */
-typedef enum {
-    TS_JOIN_INNER = 0,
-    TS_JOIN_LEFT,
-    TS_JOIN_RIGHT,
-    TS_JOIN_OUTER
-} ts_join_type_t;
+typedef enum { TS_JOIN_INNER = 0, TS_JOIN_LEFT, TS_JOIN_RIGHT, TS_JOIN_OUTER } ts_join_type_t;
 
 /**
  * @brief Estimation strategy for ARIMA-family models.
  */
-typedef enum {
-    TS_EST_CSS = 0,
-    TS_EST_MLE,
-    TS_EST_CSS_MLE
-} ts_estimation_t;
+typedef enum { TS_EST_CSS = 0, TS_EST_MLE, TS_EST_CSS_MLE } ts_estimation_t;
 
 /**
  * @brief Information criterion selector for model search helpers.
  */
-typedef enum {
-    TS_IC_NONE = 0,
-    TS_IC_AIC,
-    TS_IC_AICC,
-    TS_IC_BIC
-} ts_information_criterion_t;
+typedef enum { TS_IC_NONE = 0, TS_IC_AIC, TS_IC_AICC, TS_IC_BIC } ts_information_criterion_t;
 
 /**
  * @brief Text rendering style for series and summary output.
  */
-typedef enum {
-    TS_STRING_INLINE = 0,
-    TS_STRING_PRETTY,
-    TS_STRING_CSV
-} ts_string_style_t;
+typedef enum { TS_STRING_INLINE = 0, TS_STRING_PRETTY, TS_STRING_CSV } ts_string_style_t;
 
 /**
  * @brief Result of probing series index metadata.
@@ -240,14 +219,11 @@ typedef struct {
 
 timeseries_t *ts_new(const number_t *values, size_t length);
 
-timeseries_t *ts_new_regular(const number_t *values, size_t length,
-                             const datetime_t *start,
-                             ts_frequency_t frequency,
+timeseries_t *ts_new_regular(const number_t *values, size_t length, const datetime_t *start, ts_frequency_t frequency,
                              ts_year_type_t year_type);
 
-timeseries_t *ts_new_indexed(const number_t *values, const datetime_t *const *index,
-                             size_t length, ts_frequency_t frequency,
-                             ts_year_type_t year_type);
+timeseries_t *ts_new_indexed(const number_t *values, const datetime_t *const *index, size_t length,
+                             ts_frequency_t frequency, ts_year_type_t year_type);
 
 /**
  * @brief Convenience constructor from ordinary C doubles.
@@ -262,22 +238,17 @@ timeseries_t *ts_new_from_doubles(const double *values, size_t length);
  *
  * The datetime index is generated from @p start and @p frequency.
  */
-timeseries_t *ts_new_regular_from_doubles(const double *values, size_t length,
-                                          const datetime_t *start,
-                                          ts_frequency_t frequency,
-                                          ts_year_type_t year_type);
+timeseries_t *ts_new_regular_from_doubles(const double *values, size_t length, const datetime_t *start,
+                                          ts_frequency_t frequency, ts_year_type_t year_type);
 
 /**
  * @brief Convenience constructor for an explicitly dated series from C doubles.
  */
-timeseries_t *ts_new_indexed_from_doubles(const double *values,
-                                          const datetime_t *const *index,
-                                          size_t length,
-                                          ts_frequency_t frequency,
-                                          ts_year_type_t year_type);
+timeseries_t *ts_new_indexed_from_doubles(const double *values, const datetime_t *const *index, size_t length,
+                                          ts_frequency_t frequency, ts_year_type_t year_type);
 
 timeseries_t *ts_clone(const timeseries_t *series);
-void          ts_free(timeseries_t *series);
+void ts_free(timeseries_t *series);
 
 /**
  * @brief Create a row-at-a-time timeseries builder.
@@ -286,27 +257,18 @@ void          ts_free(timeseries_t *series);
  * data arriving from a UI, database cursor, or parser. Appended datetimes are
  * cloned, and appended values are copied into the builder.
  */
-ts_builder_t *ts_builder_new(ts_frequency_t frequency,
-                             ts_year_type_t year_type);
+ts_builder_t *ts_builder_new(ts_frequency_t frequency, ts_year_type_t year_type);
 
-int ts_builder_append(ts_builder_t *builder,
-                      const datetime_t *datetime,
-                      const number_t *value);
+int ts_builder_append(ts_builder_t *builder, const datetime_t *datetime, const number_t *value);
 
-int ts_builder_append_double(ts_builder_t *builder,
-                             const datetime_t *datetime,
-                             double value);
+int ts_builder_append_double(ts_builder_t *builder, const datetime_t *datetime, double value);
 
-int ts_builder_append_date_text_double(ts_builder_t *builder,
-                                       const string_t *date_text,
-                                       double value);
+int ts_builder_append_date_text_double(ts_builder_t *builder, const string_t *date_text, double value);
 
-int ts_builder_append_date_string_double(ts_builder_t *builder,
-                                         const char *date_text,
-                                         double value);
+int ts_builder_append_date_string_double(ts_builder_t *builder, const char *date_text, double value);
 
 timeseries_t *ts_builder_build(const ts_builder_t *builder);
-void          ts_builder_destroy(ts_builder_t *builder);
+void ts_builder_destroy(ts_builder_t *builder);
 
 /* -------------------------------------------------------------------------
    CSV loading
@@ -320,22 +282,14 @@ void          ts_builder_destroy(ts_builder_t *builder);
  * Sample forecasting inputs this is expected to support forms such as
  * `31/05/2020`.
  */
-timeseries_t *ts_from_csv_text(const string_t *path,
-                               const string_t *date_column,
-                               const string_t *value_column,
-                               ts_frequency_t frequency,
-                               ts_year_type_t year_type,
-                               ts_missing_policy_t missing_policy);
+timeseries_t *ts_from_csv_text(const string_t *path, const string_t *date_column, const string_t *value_column,
+                               ts_frequency_t frequency, ts_year_type_t year_type, ts_missing_policy_t missing_policy);
 
 /**
  * @brief Convenience wrapper for ts_from_csv_text().
  */
-timeseries_t *ts_from_csv(const char *path,
-                          const char *date_column,
-                          const char *value_column,
-                          ts_frequency_t frequency,
-                          ts_year_type_t year_type,
-                          ts_missing_policy_t missing_policy);
+timeseries_t *ts_from_csv(const char *path, const char *date_column, const char *value_column, ts_frequency_t frequency,
+                          ts_year_type_t year_type, ts_missing_policy_t missing_policy);
 
 /**
  * @brief Load a dated CSV file into a design matrix of selected numeric columns.
@@ -344,41 +298,34 @@ timeseries_t *ts_from_csv(const char *path,
  * and is intended for exogenous regressors in regression and ARIMAX/SARIMAX
  * workflows.
  */
-matrix_t *ts_matrix_from_csv_text(const string_t *path,
-                                  const string_t *date_column,
-                                  const string_t *const *value_columns,
-                                  size_t value_column_count,
-                                  ts_frequency_t frequency,
-                                  ts_missing_policy_t missing_policy);
+matrix_t *ts_matrix_from_csv_text(const string_t *path, const string_t *date_column,
+                                  const string_t *const *value_columns, size_t value_column_count,
+                                  ts_frequency_t frequency, ts_missing_policy_t missing_policy);
 
 /**
  * @brief Convenience wrapper for ts_matrix_from_csv_text().
  */
-matrix_t *ts_matrix_from_csv(const char *path,
-                             const char *date_column,
-                             const char *const *value_columns,
-                             size_t value_column_count,
-                             ts_frequency_t frequency,
-                             ts_missing_policy_t missing_policy);
+matrix_t *ts_matrix_from_csv(const char *path, const char *date_column, const char *const *value_columns,
+                             size_t value_column_count, ts_frequency_t frequency, ts_missing_policy_t missing_policy);
 
 /* -------------------------------------------------------------------------
    Formatting / file output
    ------------------------------------------------------------------------- */
 
 string_t *ts_to_text(const timeseries_t *series, ts_string_style_t style);
-char     *ts_to_string(const timeseries_t *series, ts_string_style_t style);
+char *ts_to_string(const timeseries_t *series, ts_string_style_t style);
 string_t *ts_vsprintf_text(const char *fmt, va_list ap);
 string_t *ts_sprintf_text(const char *fmt, ...);
-int   ts_sprintf(char *out, size_t out_size, const char *fmt, ...);
-int   ts_printf(const char *fmt, ...);
-void  ts_print(const timeseries_t *series);
+int ts_sprintf(char *out, size_t out_size, const char *fmt, ...);
+int ts_printf(const char *fmt, ...);
+void ts_print(const timeseries_t *series);
 
 string_t *ts_forecast_to_text(const ts_forecast_t *forecast, ts_string_style_t style);
-char     *ts_forecast_to_string(const ts_forecast_t *forecast, ts_string_style_t style);
+char *ts_forecast_to_string(const ts_forecast_t *forecast, ts_string_style_t style);
 string_t *ts_regression_summary_to_text(const ts_regression_result_t *result);
-char     *ts_regression_summary_to_string(const ts_regression_result_t *result);
+char *ts_regression_summary_to_string(const ts_regression_result_t *result);
 string_t *ts_arima_summary_to_text(const ts_arima_result_t *result);
-char     *ts_arima_summary_to_string(const ts_arima_result_t *result);
+char *ts_arima_summary_to_string(const ts_arima_result_t *result);
 
 /**
  * @brief Write a series to a text or CSV file.
@@ -389,9 +336,7 @@ char     *ts_arima_summary_to_string(const ts_arima_result_t *result);
  *
  * @return 0 on success, nonzero on error.
  */
-int ts_write_file(const char *path,
-                  const timeseries_t *series,
-                  ts_string_style_t style);
+int ts_write_file(const char *path, const timeseries_t *series, ts_string_style_t style);
 
 /**
  * @brief Write forecast output to a text or CSV file.
@@ -401,9 +346,7 @@ int ts_write_file(const char *path,
  *
  * @return 0 on success, nonzero on error.
  */
-int ts_forecast_write_file(const char *path,
-                           const ts_forecast_t *forecast,
-                           ts_string_style_t style);
+int ts_forecast_write_file(const char *path, const ts_forecast_t *forecast, ts_string_style_t style);
 
 /**
  * @brief Write a regression summary to a text or CSV file.
@@ -414,18 +357,14 @@ int ts_forecast_write_file(const char *path,
  *
  * @return 0 on success, nonzero on error.
  */
-int ts_regression_summary_write_file(const char *path,
-                                     const ts_regression_result_t *result,
-                                     ts_string_style_t style);
+int ts_regression_summary_write_file(const char *path, const ts_regression_result_t *result, ts_string_style_t style);
 
 /**
  * @brief Write an ARIMA-family summary to a text or CSV file.
  *
  * @return 0 on success, nonzero on error.
  */
-int ts_arima_summary_write_file(const char *path,
-                                const ts_arima_result_t *result,
-                                ts_string_style_t style);
+int ts_arima_summary_write_file(const char *path, const ts_arima_result_t *result, ts_string_style_t style);
 
 /**
  * @brief Serialise a timeseries into a SQLite-ready payload.
@@ -442,10 +381,7 @@ int ts_arima_summary_write_file(const char *path,
  * @param out_len Receives the payload length in bytes.
  * @return @c true on success, otherwise @c false.
  */
-bool ts_serialize(const timeseries_t *series,
-                  string_t **out_type,
-                  string_t **out_encoding,
-                  void **out_data,
+bool ts_serialize(const timeseries_t *series, string_t **out_type, string_t **out_encoding, void **out_data,
                   size_t *out_len);
 
 /**
@@ -457,21 +393,18 @@ bool ts_serialize(const timeseries_t *series,
  * @param encoding Stored encoding label.
  * @return Newly allocated timeseries on success, otherwise @c NULL.
  */
-timeseries_t *ts_deserialise(const void *data,
-                             size_t len,
-                             const string_t *type,
-                             const string_t *encoding);
+timeseries_t *ts_deserialise(const void *data, size_t len, const string_t *type, const string_t *encoding);
 
 /* -------------------------------------------------------------------------
    Basic inspection
    ------------------------------------------------------------------------- */
 
-size_t          ts_length(const timeseries_t *series);
+size_t ts_length(const timeseries_t *series);
 ts_index_info_t ts_index_info(const timeseries_t *series);
-ts_frequency_t  ts_frequency(const timeseries_t *series);
-ts_year_type_t  ts_year_type(const timeseries_t *series);
-bool            ts_is_regular(const timeseries_t *series);
-bool            ts_has_missing(const timeseries_t *series);
+ts_frequency_t ts_frequency(const timeseries_t *series);
+ts_year_type_t ts_year_type(const timeseries_t *series);
+bool ts_is_regular(const timeseries_t *series);
+bool ts_has_missing(const timeseries_t *series);
 
 int ts_get_value(const timeseries_t *series, size_t index, number_t *out);
 int ts_get_datetime(const timeseries_t *series, size_t index, datetime_t *out);
@@ -484,9 +417,7 @@ datetime_t *ts_end_datetime(const timeseries_t *series);
    ------------------------------------------------------------------------- */
 
 timeseries_t *ts_slice(const timeseries_t *series, size_t start, size_t length);
-timeseries_t *ts_slice_date(const timeseries_t *series,
-                            const datetime_t *start,
-                            const datetime_t *end);
+timeseries_t *ts_slice_date(const timeseries_t *series, const datetime_t *start, const datetime_t *end);
 timeseries_t *ts_head(const timeseries_t *series, size_t n);
 timeseries_t *ts_tail(const timeseries_t *series, size_t n);
 
@@ -501,8 +432,7 @@ timeseries_t *ts_drop_missing(const timeseries_t *series);
  *
  * @return 0 on success, nonzero on error.
  */
-int ts_align_pair(const timeseries_t *left, const timeseries_t *right,
-                  ts_join_type_t join_type,
+int ts_align_pair(const timeseries_t *left, const timeseries_t *right, ts_join_type_t join_type,
                   timeseries_t **left_out, timeseries_t **right_out);
 
 /* -------------------------------------------------------------------------
@@ -512,8 +442,7 @@ int ts_align_pair(const timeseries_t *left, const timeseries_t *right,
 timeseries_t *ts_lag(const timeseries_t *series, size_t lag);
 timeseries_t *ts_lead(const timeseries_t *series, size_t lead);
 timeseries_t *ts_diff(const timeseries_t *series, size_t differences);
-timeseries_t *ts_seasonal_diff(const timeseries_t *series,
-                               size_t differences, size_t season_period);
+timeseries_t *ts_seasonal_diff(const timeseries_t *series, size_t differences, size_t season_period);
 timeseries_t *ts_cumsum(const timeseries_t *series);
 timeseries_t *ts_log(const timeseries_t *series);
 timeseries_t *ts_exp(const timeseries_t *series);
@@ -531,45 +460,29 @@ timeseries_t *ts_roll_sum(const timeseries_t *series, size_t window);
 matrix_t *ts_to_column_matrix(const timeseries_t *series);
 matrix_t *ts_to_row_matrix(const timeseries_t *series);
 
-matrix_t *ts_design_matrix_lags(const timeseries_t *series, size_t max_lag,
-                                bool include_intercept);
-matrix_t *ts_design_matrix_trend(const timeseries_t *series,
-                                 bool include_intercept,
-                                 bool include_linear,
+matrix_t *ts_design_matrix_lags(const timeseries_t *series, size_t max_lag, bool include_intercept);
+matrix_t *ts_design_matrix_trend(const timeseries_t *series, bool include_intercept, bool include_linear,
                                  bool include_quadratic);
-matrix_t *ts_design_matrix_seasonal_dummies(const timeseries_t *series,
-                                            size_t season_period,
-                                            bool drop_first);
+matrix_t *ts_design_matrix_seasonal_dummies(const timeseries_t *series, size_t season_period, bool drop_first);
 
 /**
  * @brief Build a date-aligned exogenous matrix from several series.
  *
  * Each input series becomes one numeric column in the result.
  */
-matrix_t *ts_bind_columns(timeseries_t *const *series,
-                          size_t count,
-                          ts_join_type_t join_type);
+matrix_t *ts_bind_columns(timeseries_t *const *series, size_t count, ts_join_type_t join_type);
 
 /* -------------------------------------------------------------------------
    Calendar aggregation / reporting
    ------------------------------------------------------------------------- */
 
-timeseries_t *ts_as_frequency(const timeseries_t *series,
-                              ts_frequency_t target_frequency,
+timeseries_t *ts_as_frequency(const timeseries_t *series, ts_frequency_t target_frequency,
                               ts_missing_policy_t missing_policy);
 
-timeseries_t *ts_aggregate_sum(const timeseries_t *series,
-                               ts_frequency_t target_frequency,
-                               ts_year_type_t year_type);
-timeseries_t *ts_aggregate_mean(const timeseries_t *series,
-                                ts_frequency_t target_frequency,
-                                ts_year_type_t year_type);
-timeseries_t *ts_aggregate_min(const timeseries_t *series,
-                               ts_frequency_t target_frequency,
-                               ts_year_type_t year_type);
-timeseries_t *ts_aggregate_max(const timeseries_t *series,
-                               ts_frequency_t target_frequency,
-                               ts_year_type_t year_type);
+timeseries_t *ts_aggregate_sum(const timeseries_t *series, ts_frequency_t target_frequency, ts_year_type_t year_type);
+timeseries_t *ts_aggregate_mean(const timeseries_t *series, ts_frequency_t target_frequency, ts_year_type_t year_type);
+timeseries_t *ts_aggregate_min(const timeseries_t *series, ts_frequency_t target_frequency, ts_year_type_t year_type);
+timeseries_t *ts_aggregate_max(const timeseries_t *series, ts_frequency_t target_frequency, ts_year_type_t year_type);
 
 /* -------------------------------------------------------------------------
    Diagnostics / identification
@@ -579,29 +492,20 @@ int ts_acf(const timeseries_t *series, size_t max_lag, matrix_t **out);
 int ts_pacf(const timeseries_t *series, size_t max_lag, matrix_t **out);
 int ts_ccf(const timeseries_t *x, const timeseries_t *y, size_t max_lag, matrix_t **out);
 
-int ts_ljung_box(const timeseries_t *series, size_t max_lag,
-                 number_t *statistic, number_t *p_value);
-int ts_adf(const timeseries_t *series,
-           number_t *statistic, number_t *p_value);
-int ts_kpss(const timeseries_t *series,
-            number_t *statistic, number_t *p_value);
+int ts_ljung_box(const timeseries_t *series, size_t max_lag, number_t *statistic, number_t *p_value);
+int ts_adf(const timeseries_t *series, number_t *statistic, number_t *p_value);
+int ts_kpss(const timeseries_t *series, number_t *statistic, number_t *p_value);
 
 /* -------------------------------------------------------------------------
    Regression
    ------------------------------------------------------------------------- */
 
-int ts_regression_fit(const timeseries_t *y,
-                      const matrix_t *xreg,
-                      const ts_fit_options_t *options,
+int ts_regression_fit(const timeseries_t *y, const matrix_t *xreg, const ts_fit_options_t *options,
                       ts_regression_result_t *out);
 
-int ts_regression_forecast(const ts_regression_result_t *model,
-                           const matrix_t *future_xreg,
-                           const timeseries_t *history,
-                           ts_frequency_t frequency,
-                           ts_year_type_t year_type,
-                           number_t level,
-                           ts_forecast_t *out);
+int ts_regression_forecast(const ts_regression_result_t *model, const matrix_t *future_xreg,
+                           const timeseries_t *history, ts_frequency_t frequency, ts_year_type_t year_type,
+                           number_t level, ts_forecast_t *out);
 
 void ts_regression_result_clear(ts_regression_result_t *out);
 
@@ -609,37 +513,21 @@ void ts_regression_result_clear(ts_regression_result_t *out);
    ARIMA family
    ------------------------------------------------------------------------- */
 
-int ts_arima_fit(const timeseries_t *y,
-                 const matrix_t *xreg,
-                 const ts_arima_spec_t *spec,
-                 const ts_fit_options_t *options,
-                 ts_arima_result_t *out);
+int ts_arima_fit(const timeseries_t *y, const matrix_t *xreg, const ts_arima_spec_t *spec,
+                 const ts_fit_options_t *options, ts_arima_result_t *out);
 
-int ts_auto_arima(const timeseries_t *y,
-                  const matrix_t *xreg,
-                  size_t max_p, size_t max_d, size_t max_q,
-                  size_t max_P, size_t max_D, size_t max_Q,
-                  size_t season_period,
-                  ts_information_criterion_t criterion,
-                  const ts_fit_options_t *options,
-                  ts_arima_spec_t *best_spec,
-                  ts_arima_result_t *best_fit);
+int ts_auto_arima(const timeseries_t *y, const matrix_t *xreg, size_t max_p, size_t max_d, size_t max_q, size_t max_P,
+                  size_t max_D, size_t max_Q, size_t season_period, ts_information_criterion_t criterion,
+                  const ts_fit_options_t *options, ts_arima_spec_t *best_spec, ts_arima_result_t *best_fit);
 
 bool ts_arima_is_stationary(const ts_arima_result_t *model);
 bool ts_arima_is_invertible(const ts_arima_result_t *model);
 
-int ts_arima_residual_acf(const ts_arima_result_t *model,
-                          size_t max_lag, matrix_t **out);
-int ts_arima_ljung_box(const ts_arima_result_t *model,
-                       size_t max_lag,
-                       number_t *statistic, number_t *p_value);
+int ts_arima_residual_acf(const ts_arima_result_t *model, size_t max_lag, matrix_t **out);
+int ts_arima_ljung_box(const ts_arima_result_t *model, size_t max_lag, number_t *statistic, number_t *p_value);
 
-int ts_arima_forecast(const ts_arima_result_t *model,
-                      const timeseries_t *history,
-                      const matrix_t *future_xreg,
-                      size_t horizon,
-                      number_t level,
-                      ts_forecast_t *out);
+int ts_arima_forecast(const ts_arima_result_t *model, const timeseries_t *history, const matrix_t *future_xreg,
+                      size_t horizon, number_t level, ts_forecast_t *out);
 
 void ts_arima_result_clear(ts_arima_result_t *out);
 
@@ -647,22 +535,13 @@ void ts_arima_result_clear(ts_arima_result_t *out);
    Evaluation / backtesting
    ------------------------------------------------------------------------- */
 
-int ts_accuracy(const timeseries_t *actual,
-                const timeseries_t *predicted,
-                ts_accuracy_t *out);
+int ts_accuracy(const timeseries_t *actual, const timeseries_t *predicted, ts_accuracy_t *out);
 
-int ts_backtest_regression(const timeseries_t *y,
-                           const matrix_t *xreg,
-                           const ts_fit_options_t *options,
-                           const ts_backtest_spec_t *spec,
-                           ts_accuracy_t *out);
+int ts_backtest_regression(const timeseries_t *y, const matrix_t *xreg, const ts_fit_options_t *options,
+                           const ts_backtest_spec_t *spec, ts_accuracy_t *out);
 
-int ts_backtest_arima(const timeseries_t *y,
-                      const matrix_t *xreg,
-                      const ts_arima_spec_t *model_spec,
-                      const ts_fit_options_t *options,
-                      const ts_backtest_spec_t *spec,
-                      ts_accuracy_t *out);
+int ts_backtest_arima(const timeseries_t *y, const matrix_t *xreg, const ts_arima_spec_t *model_spec,
+                      const ts_fit_options_t *options, const ts_backtest_spec_t *spec, ts_accuracy_t *out);
 
 void ts_forecast_clear(ts_forecast_t *out);
 

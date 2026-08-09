@@ -5,9 +5,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "expression.h"
 #include "expr_binding_simplify.h"
 #include "expr_bindings.h"
+#include "expression.h"
 #define MARS_EXPR_STRINGIN_INTERNAL_ACCESS
 #include "expr_stringin_internal.h"
 #include "expr_stringin_scan.h"
@@ -17,18 +17,18 @@
 #include "ustring.h"
 
 typedef struct {
-    string_cursor_t     *cursor;
-    int                  error;
-    string_t            *errmsg;
+    string_cursor_t *cursor;
+    int error;
+    string_t *errmsg;
 } binding_parser_t;
 
 typedef enum {
     BIND_PREC_LOWEST = 0,
-    BIND_PREC_ADD    = 1,
-    BIND_PREC_MUL    = 2,
-    BIND_PREC_POW    = 3,
-    BIND_PREC_UNARY  = 4,
-    BIND_PREC_ATOM   = 5
+    BIND_PREC_ADD = 1,
+    BIND_PREC_MUL = 2,
+    BIND_PREC_POW = 3,
+    BIND_PREC_UNARY = 4,
+    BIND_PREC_ATOM = 5
 } binding_prec_t;
 
 #define BINDING_CONST_COUNT 5u
@@ -36,54 +36,46 @@ typedef enum {
 
 typedef struct {
     expr_binding_const_id_t id;
-    const char           *canonical_name;
-    const char           *expr_name;
-    const char           *tex_name;
-    const number_t       *value;
+    const char *canonical_name;
+    const char *expr_name;
+    const char *tex_name;
+    const number_t *value;
 } binding_const_meta_t;
 
 typedef struct {
-    int     precedence;
-    bool    atomic;
-    void  (*free_payload)(expr_binding_expr_t *expr);
+    int precedence;
+    bool atomic;
+    void (*free_payload)(expr_binding_expr_t *expr);
     expr_binding_expr_t *(*clone)(const expr_binding_expr_t *expr);
     expr_t *(*eval_expr)(const expr_binding_expr_t *expr);
-    bool  (*number_value)(const expr_binding_expr_t *expr, number_t *out);
+    bool (*number_value)(const expr_binding_expr_t *expr, number_t *out);
     expr_binding_expr_t *(*simplify)(expr_binding_expr_t *expr);
-    bool  (*struct_eq)(const expr_binding_expr_t *left,
-                       const expr_binding_expr_t *right);
-    bool  (*numeric_literal)(const expr_binding_expr_t *expr);
-    bool  (*exact_complex)(const expr_binding_expr_t *expr,
-                           binding_exact_complex_t *out);
-    bool  (*explicit_mul_separator)(const expr_binding_expr_t *expr);
-    void  (*emit_expr)(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
-    void  (*emit_func)(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
-    void  (*emit_tex)(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
+    bool (*struct_eq)(const expr_binding_expr_t *left, const expr_binding_expr_t *right);
+    bool (*numeric_literal)(const expr_binding_expr_t *expr);
+    bool (*exact_complex)(const expr_binding_expr_t *expr, binding_exact_complex_t *out);
+    bool (*explicit_mul_separator)(const expr_binding_expr_t *expr);
+    void (*emit_expr)(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
+    void (*emit_func)(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
+    void (*emit_tex)(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
 } binding_expr_ops_t;
 
 typedef number_t (*binding_number_unary_fn)(number_t);
 typedef number_t (*binding_number_binary_fn)(number_t, number_t);
 
-static const char *s_binding_sup_digits[10] = {
-    "⁰","¹","²","³","⁴","⁵","⁶","⁷","⁸","⁹"
-};
+static const char *s_binding_sup_digits[10] = {"⁰", "¹", "²", "³", "⁴", "⁵", "⁶", "⁷", "⁸", "⁹"};
 
-static const char *s_binding_sub_digits[10] = {
-    "₀","₁","₂","₃","₄","₅","₆","₇","₈","₉"
-};
+static const char *s_binding_sub_digits[10] = {"₀", "₁", "₂", "₃", "₄", "₅", "₆", "₇", "₈", "₉"};
 
 static const binding_const_meta_t s_binding_consts[BINDING_CONST_COUNT] = {
-    [EXPR_BINDING_CONST_E]     = { EXPR_BINDING_CONST_E,     "e",      "e", "e",       &NUM_E },
-    [EXPR_BINDING_CONST_I]     = { EXPR_BINDING_CONST_I,     "i",      "i", "i",       &NUM_I },
-    [EXPR_BINDING_CONST_PI]    = { EXPR_BINDING_CONST_PI,    "@pi",    "π", "\\pi",    &NUM_PI },
-    [EXPR_BINDING_CONST_PHI]   = { EXPR_BINDING_CONST_PHI,   "@phi",   "φ", "\\phi",   &NUM_PHI },
-    [EXPR_BINDING_CONST_GAMMA] = { EXPR_BINDING_CONST_GAMMA, "@gamma", "γ", "\\gamma", &NUM_EULER_MASCHERONI }
-};
+    [EXPR_BINDING_CONST_E] = {EXPR_BINDING_CONST_E, "e", "e", "e", &NUM_E},
+    [EXPR_BINDING_CONST_I] = {EXPR_BINDING_CONST_I, "i", "i", "i", &NUM_I},
+    [EXPR_BINDING_CONST_PI] = {EXPR_BINDING_CONST_PI, "@pi", "π", "\\pi", &NUM_PI},
+    [EXPR_BINDING_CONST_PHI] = {EXPR_BINDING_CONST_PHI, "@phi", "φ", "\\phi", &NUM_PHI},
+    [EXPR_BINDING_CONST_GAMMA] = {EXPR_BINDING_CONST_GAMMA, "@gamma", "γ", "\\gamma", &NUM_EULER_MASCHERONI}};
 
 static const binding_const_meta_t *binding_const_meta(expr_binding_const_id_t const_id)
 {
-    if ((unsigned)const_id >= BINDING_CONST_COUNT ||
-        s_binding_consts[const_id].value == NULL)
+    if ((unsigned)const_id >= BINDING_CONST_COUNT || s_binding_consts[const_id].value == NULL)
         return NULL;
     return &s_binding_consts[const_id];
 }
@@ -132,37 +124,22 @@ static expr_t *binding_eval_powi(const expr_binding_expr_t *expr);
 static expr_t *binding_eval_unary_op(const expr_binding_expr_t *expr);
 static expr_t *binding_eval_binary_op(const expr_binding_expr_t *expr);
 
-static bool binding_number_value_number(const expr_binding_expr_t *expr,
-                                        number_t *out);
-static bool binding_number_value_false(const expr_binding_expr_t *expr,
-                                       number_t *out);
-static bool binding_number_value_neg(const expr_binding_expr_t *expr,
-                                     number_t *out);
-static bool binding_number_value_add(const expr_binding_expr_t *expr,
-                                     number_t *out);
-static bool binding_number_value_sub(const expr_binding_expr_t *expr,
-                                     number_t *out);
-static bool binding_number_value_mul(const expr_binding_expr_t *expr,
-                                     number_t *out);
-static bool binding_number_value_div(const expr_binding_expr_t *expr,
-                                     number_t *out);
-static bool binding_number_value_powi(const expr_binding_expr_t *expr,
-                                      number_t *out);
+static bool binding_number_value_number(const expr_binding_expr_t *expr, number_t *out);
+static bool binding_number_value_false(const expr_binding_expr_t *expr, number_t *out);
+static bool binding_number_value_neg(const expr_binding_expr_t *expr, number_t *out);
+static bool binding_number_value_add(const expr_binding_expr_t *expr, number_t *out);
+static bool binding_number_value_sub(const expr_binding_expr_t *expr, number_t *out);
+static bool binding_number_value_mul(const expr_binding_expr_t *expr, number_t *out);
+static bool binding_number_value_div(const expr_binding_expr_t *expr, number_t *out);
+static bool binding_number_value_powi(const expr_binding_expr_t *expr, number_t *out);
 
-static bool binding_struct_eq_number(const expr_binding_expr_t *left,
-                                     const expr_binding_expr_t *right);
-static bool binding_struct_eq_const(const expr_binding_expr_t *left,
-                                    const expr_binding_expr_t *right);
-static bool binding_struct_eq_unary(const expr_binding_expr_t *left,
-                                    const expr_binding_expr_t *right);
-static bool binding_struct_eq_binary(const expr_binding_expr_t *left,
-                                     const expr_binding_expr_t *right);
-static bool binding_struct_eq_powi(const expr_binding_expr_t *left,
-                                   const expr_binding_expr_t *right);
-static bool binding_struct_eq_unary_op(const expr_binding_expr_t *left,
-                                       const expr_binding_expr_t *right);
-static bool binding_struct_eq_binary_op(const expr_binding_expr_t *left,
-                                        const expr_binding_expr_t *right);
+static bool binding_struct_eq_number(const expr_binding_expr_t *left, const expr_binding_expr_t *right);
+static bool binding_struct_eq_const(const expr_binding_expr_t *left, const expr_binding_expr_t *right);
+static bool binding_struct_eq_unary(const expr_binding_expr_t *left, const expr_binding_expr_t *right);
+static bool binding_struct_eq_binary(const expr_binding_expr_t *left, const expr_binding_expr_t *right);
+static bool binding_struct_eq_powi(const expr_binding_expr_t *left, const expr_binding_expr_t *right);
+static bool binding_struct_eq_unary_op(const expr_binding_expr_t *left, const expr_binding_expr_t *right);
+static bool binding_struct_eq_binary_op(const expr_binding_expr_t *left, const expr_binding_expr_t *right);
 
 static bool binding_numeric_literal_true(const expr_binding_expr_t *expr);
 static bool binding_numeric_literal_const(const expr_binding_expr_t *expr);
@@ -171,20 +148,13 @@ static bool binding_numeric_literal_binary(const expr_binding_expr_t *expr);
 static bool binding_numeric_literal_powi(const expr_binding_expr_t *expr);
 static bool binding_numeric_literal_false(const expr_binding_expr_t *expr);
 
-static bool binding_exact_complex_number(const expr_binding_expr_t *expr,
-                                         binding_exact_complex_t *out);
-static bool binding_exact_complex_const(const expr_binding_expr_t *expr,
-                                        binding_exact_complex_t *out);
-static bool binding_exact_complex_unary(const expr_binding_expr_t *expr,
-                                        binding_exact_complex_t *out);
-static bool binding_exact_complex_addsub(const expr_binding_expr_t *expr,
-                                         binding_exact_complex_t *out);
-static bool binding_exact_complex_mul(const expr_binding_expr_t *expr,
-                                      binding_exact_complex_t *out);
-static bool binding_exact_complex_div(const expr_binding_expr_t *expr,
-                                      binding_exact_complex_t *out);
-static bool binding_exact_complex_powi(const expr_binding_expr_t *expr,
-                                       binding_exact_complex_t *out);
+static bool binding_exact_complex_number(const expr_binding_expr_t *expr, binding_exact_complex_t *out);
+static bool binding_exact_complex_const(const expr_binding_expr_t *expr, binding_exact_complex_t *out);
+static bool binding_exact_complex_unary(const expr_binding_expr_t *expr, binding_exact_complex_t *out);
+static bool binding_exact_complex_addsub(const expr_binding_expr_t *expr, binding_exact_complex_t *out);
+static bool binding_exact_complex_mul(const expr_binding_expr_t *expr, binding_exact_complex_t *out);
+static bool binding_exact_complex_div(const expr_binding_expr_t *expr, binding_exact_complex_t *out);
+static bool binding_exact_complex_powi(const expr_binding_expr_t *expr, binding_exact_complex_t *out);
 
 static bool binding_explicit_mul_separator_false(const expr_binding_expr_t *expr);
 static bool binding_explicit_mul_separator_true(const expr_binding_expr_t *expr);
@@ -225,172 +195,150 @@ static void emit_binding_tex_powi(const expr_binding_expr_t *expr, sbuf_t *b, in
 static void emit_binding_tex_unary_op(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
 static void emit_binding_tex_binary_op(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
 static const binding_expr_ops_t s_binding_expr_ops[BINDING_EXPR_KIND_COUNT] = {
-    [EXPR_BINDING_EXPR_NUMBER] = {
-        .precedence              = BIND_PREC_ATOM,
-        .atomic                  = true,
-        .free_payload            = binding_free_number,
-        .clone                   = binding_clone_number,
-        .eval_expr               = binding_eval_number,
-        .number_value            = binding_number_value_number,
-        .simplify                = expr_binding_simplify_atom,
-        .struct_eq               = binding_struct_eq_number,
-        .numeric_literal         = binding_numeric_literal_true,
-        .exact_complex           = binding_exact_complex_number,
-        .explicit_mul_separator  = binding_explicit_mul_separator_false,
-        .emit_expr               = emit_binding_expr_number,
-        .emit_func               = emit_binding_func_number,
-        .emit_tex                = emit_binding_tex_number
-    },
-    [EXPR_BINDING_EXPR_CONST] = {
-        .precedence              = BIND_PREC_ATOM,
-        .atomic                  = true,
-        .free_payload            = binding_free_none,
-        .clone                   = binding_clone_const,
-        .eval_expr               = binding_eval_const,
-        .number_value            = binding_number_value_false,
-        .simplify                = expr_binding_simplify_atom,
-        .struct_eq               = binding_struct_eq_const,
-        .numeric_literal         = binding_numeric_literal_const,
-        .exact_complex           = binding_exact_complex_const,
-        .explicit_mul_separator  = binding_explicit_mul_separator_false,
-        .emit_expr               = emit_binding_expr_const,
-        .emit_func               = emit_binding_func_const,
-        .emit_tex                = emit_binding_tex_const
-    },
-    [EXPR_BINDING_EXPR_NEG] = {
-        .precedence              = BIND_PREC_UNARY,
-        .atomic                  = false,
-        .free_payload            = binding_free_unary,
-        .clone                   = binding_clone_neg,
-        .eval_expr               = binding_eval_neg,
-        .number_value            = binding_number_value_neg,
-        .simplify                = expr_binding_simplify_neg,
-        .struct_eq               = binding_struct_eq_unary,
-        .numeric_literal         = binding_numeric_literal_unary,
-        .exact_complex           = binding_exact_complex_unary,
-        .explicit_mul_separator  = binding_explicit_mul_separator_unary,
-        .emit_expr               = emit_binding_expr_neg,
-        .emit_func               = emit_binding_func_neg,
-        .emit_tex                = emit_binding_tex_neg
-    },
-    [EXPR_BINDING_EXPR_ADD] = {
-        .precedence              = BIND_PREC_ADD,
-        .atomic                  = false,
-        .free_payload            = binding_free_binary,
-        .clone                   = binding_clone_add,
-        .eval_expr               = binding_eval_add,
-        .number_value            = binding_number_value_add,
-        .simplify                = expr_binding_simplify_addsub,
-        .struct_eq               = binding_struct_eq_binary,
-        .numeric_literal         = binding_numeric_literal_binary,
-        .exact_complex           = binding_exact_complex_addsub,
-        .explicit_mul_separator  = binding_explicit_mul_separator_false,
-        .emit_expr               = emit_binding_expr_add,
-        .emit_func               = emit_binding_func_add,
-        .emit_tex                = emit_binding_tex_add
-    },
-    [EXPR_BINDING_EXPR_SUB] = {
-        .precedence              = BIND_PREC_ADD,
-        .atomic                  = false,
-        .free_payload            = binding_free_binary,
-        .clone                   = binding_clone_sub,
-        .eval_expr               = binding_eval_sub,
-        .number_value            = binding_number_value_sub,
-        .simplify                = expr_binding_simplify_addsub,
-        .struct_eq               = binding_struct_eq_binary,
-        .numeric_literal         = binding_numeric_literal_binary,
-        .exact_complex           = binding_exact_complex_addsub,
-        .explicit_mul_separator  = binding_explicit_mul_separator_false,
-        .emit_expr               = emit_binding_expr_sub,
-        .emit_func               = emit_binding_func_sub,
-        .emit_tex                = emit_binding_tex_sub
-    },
-    [EXPR_BINDING_EXPR_MUL] = {
-        .precedence              = BIND_PREC_MUL,
-        .atomic                  = false,
-        .free_payload            = binding_free_binary,
-        .clone                   = binding_clone_mul,
-        .eval_expr               = binding_eval_mul,
-        .number_value            = binding_number_value_mul,
-        .simplify                = expr_binding_simplify_mul,
-        .struct_eq               = binding_struct_eq_binary,
-        .numeric_literal         = binding_numeric_literal_binary,
-        .exact_complex           = binding_exact_complex_mul,
-        .explicit_mul_separator  = binding_explicit_mul_separator_mul,
-        .emit_expr               = emit_binding_expr_mul_node,
-        .emit_func               = emit_binding_func_mul_node,
-        .emit_tex                = emit_binding_tex_mul_node
-    },
-    [EXPR_BINDING_EXPR_DIV] = {
-        .precedence              = BIND_PREC_MUL,
-        .atomic                  = false,
-        .free_payload            = binding_free_binary,
-        .clone                   = binding_clone_div,
-        .eval_expr               = binding_eval_div,
-        .number_value            = binding_number_value_div,
-        .simplify                = expr_binding_simplify_div,
-        .struct_eq               = binding_struct_eq_binary,
-        .numeric_literal         = binding_numeric_literal_binary,
-        .exact_complex           = binding_exact_complex_div,
-        .explicit_mul_separator  = binding_explicit_mul_separator_true,
-        .emit_expr               = emit_binding_expr_div,
-        .emit_func               = emit_binding_func_div,
-        .emit_tex                = emit_binding_tex_div
-    },
-    [EXPR_BINDING_EXPR_POWI] = {
-        .precedence              = BIND_PREC_POW,
-        .atomic                  = true,
-        .free_payload            = binding_free_powi,
-        .clone                   = binding_clone_powi,
-        .eval_expr               = binding_eval_powi,
-        .number_value            = binding_number_value_powi,
-        .simplify                = expr_binding_simplify_powi,
-        .struct_eq               = binding_struct_eq_powi,
-        .numeric_literal         = binding_numeric_literal_powi,
-        .exact_complex           = binding_exact_complex_powi,
-        .explicit_mul_separator  = binding_explicit_mul_separator_powi,
-        .emit_expr               = emit_binding_expr_powi,
-        .emit_func               = emit_binding_func_powi,
-        .emit_tex                = emit_binding_tex_powi
-    },
-    [EXPR_BINDING_EXPR_UNARY_OP] = {
-        .precedence              = BIND_PREC_UNARY,
-        .atomic                  = false,
-        .free_payload            = binding_free_unary_op,
-        .clone                   = binding_clone_unary_op,
-        .eval_expr               = binding_eval_unary_op,
-        .number_value            = binding_number_value_false,
-        .simplify                = expr_binding_simplify_unary_op,
-        .struct_eq               = binding_struct_eq_unary_op,
-        .numeric_literal         = binding_numeric_literal_false,
-        .exact_complex           = NULL,
-        .explicit_mul_separator  = binding_explicit_mul_separator_false,
-        .emit_expr               = emit_binding_expr_unary_op,
-        .emit_func               = emit_binding_func_unary_op,
-        .emit_tex                = emit_binding_tex_unary_op
-    },
-    [EXPR_BINDING_EXPR_BINARY_OP] = {
-        .precedence              = BIND_PREC_POW,
-        .atomic                  = false,
-        .free_payload            = binding_free_binary_op,
-        .clone                   = binding_clone_binary_op,
-        .eval_expr               = binding_eval_binary_op,
-        .number_value            = binding_number_value_false,
-        .simplify                = expr_binding_simplify_binary_op,
-        .struct_eq               = binding_struct_eq_binary_op,
-        .numeric_literal         = binding_numeric_literal_false,
-        .exact_complex           = NULL,
-        .explicit_mul_separator  = binding_explicit_mul_separator_false,
-        .emit_expr               = emit_binding_expr_binary_op,
-        .emit_func               = emit_binding_func_binary_op,
-        .emit_tex                = emit_binding_tex_binary_op
-    }
-};
+    [EXPR_BINDING_EXPR_NUMBER] = {.precedence = BIND_PREC_ATOM,
+                                  .atomic = true,
+                                  .free_payload = binding_free_number,
+                                  .clone = binding_clone_number,
+                                  .eval_expr = binding_eval_number,
+                                  .number_value = binding_number_value_number,
+                                  .simplify = expr_binding_simplify_atom,
+                                  .struct_eq = binding_struct_eq_number,
+                                  .numeric_literal = binding_numeric_literal_true,
+                                  .exact_complex = binding_exact_complex_number,
+                                  .explicit_mul_separator = binding_explicit_mul_separator_false,
+                                  .emit_expr = emit_binding_expr_number,
+                                  .emit_func = emit_binding_func_number,
+                                  .emit_tex = emit_binding_tex_number},
+    [EXPR_BINDING_EXPR_CONST] = {.precedence = BIND_PREC_ATOM,
+                                 .atomic = true,
+                                 .free_payload = binding_free_none,
+                                 .clone = binding_clone_const,
+                                 .eval_expr = binding_eval_const,
+                                 .number_value = binding_number_value_false,
+                                 .simplify = expr_binding_simplify_atom,
+                                 .struct_eq = binding_struct_eq_const,
+                                 .numeric_literal = binding_numeric_literal_const,
+                                 .exact_complex = binding_exact_complex_const,
+                                 .explicit_mul_separator = binding_explicit_mul_separator_false,
+                                 .emit_expr = emit_binding_expr_const,
+                                 .emit_func = emit_binding_func_const,
+                                 .emit_tex = emit_binding_tex_const},
+    [EXPR_BINDING_EXPR_NEG] = {.precedence = BIND_PREC_UNARY,
+                               .atomic = false,
+                               .free_payload = binding_free_unary,
+                               .clone = binding_clone_neg,
+                               .eval_expr = binding_eval_neg,
+                               .number_value = binding_number_value_neg,
+                               .simplify = expr_binding_simplify_neg,
+                               .struct_eq = binding_struct_eq_unary,
+                               .numeric_literal = binding_numeric_literal_unary,
+                               .exact_complex = binding_exact_complex_unary,
+                               .explicit_mul_separator = binding_explicit_mul_separator_unary,
+                               .emit_expr = emit_binding_expr_neg,
+                               .emit_func = emit_binding_func_neg,
+                               .emit_tex = emit_binding_tex_neg},
+    [EXPR_BINDING_EXPR_ADD] = {.precedence = BIND_PREC_ADD,
+                               .atomic = false,
+                               .free_payload = binding_free_binary,
+                               .clone = binding_clone_add,
+                               .eval_expr = binding_eval_add,
+                               .number_value = binding_number_value_add,
+                               .simplify = expr_binding_simplify_addsub,
+                               .struct_eq = binding_struct_eq_binary,
+                               .numeric_literal = binding_numeric_literal_binary,
+                               .exact_complex = binding_exact_complex_addsub,
+                               .explicit_mul_separator = binding_explicit_mul_separator_false,
+                               .emit_expr = emit_binding_expr_add,
+                               .emit_func = emit_binding_func_add,
+                               .emit_tex = emit_binding_tex_add},
+    [EXPR_BINDING_EXPR_SUB] = {.precedence = BIND_PREC_ADD,
+                               .atomic = false,
+                               .free_payload = binding_free_binary,
+                               .clone = binding_clone_sub,
+                               .eval_expr = binding_eval_sub,
+                               .number_value = binding_number_value_sub,
+                               .simplify = expr_binding_simplify_addsub,
+                               .struct_eq = binding_struct_eq_binary,
+                               .numeric_literal = binding_numeric_literal_binary,
+                               .exact_complex = binding_exact_complex_addsub,
+                               .explicit_mul_separator = binding_explicit_mul_separator_false,
+                               .emit_expr = emit_binding_expr_sub,
+                               .emit_func = emit_binding_func_sub,
+                               .emit_tex = emit_binding_tex_sub},
+    [EXPR_BINDING_EXPR_MUL] = {.precedence = BIND_PREC_MUL,
+                               .atomic = false,
+                               .free_payload = binding_free_binary,
+                               .clone = binding_clone_mul,
+                               .eval_expr = binding_eval_mul,
+                               .number_value = binding_number_value_mul,
+                               .simplify = expr_binding_simplify_mul,
+                               .struct_eq = binding_struct_eq_binary,
+                               .numeric_literal = binding_numeric_literal_binary,
+                               .exact_complex = binding_exact_complex_mul,
+                               .explicit_mul_separator = binding_explicit_mul_separator_mul,
+                               .emit_expr = emit_binding_expr_mul_node,
+                               .emit_func = emit_binding_func_mul_node,
+                               .emit_tex = emit_binding_tex_mul_node},
+    [EXPR_BINDING_EXPR_DIV] = {.precedence = BIND_PREC_MUL,
+                               .atomic = false,
+                               .free_payload = binding_free_binary,
+                               .clone = binding_clone_div,
+                               .eval_expr = binding_eval_div,
+                               .number_value = binding_number_value_div,
+                               .simplify = expr_binding_simplify_div,
+                               .struct_eq = binding_struct_eq_binary,
+                               .numeric_literal = binding_numeric_literal_binary,
+                               .exact_complex = binding_exact_complex_div,
+                               .explicit_mul_separator = binding_explicit_mul_separator_true,
+                               .emit_expr = emit_binding_expr_div,
+                               .emit_func = emit_binding_func_div,
+                               .emit_tex = emit_binding_tex_div},
+    [EXPR_BINDING_EXPR_POWI] = {.precedence = BIND_PREC_POW,
+                                .atomic = true,
+                                .free_payload = binding_free_powi,
+                                .clone = binding_clone_powi,
+                                .eval_expr = binding_eval_powi,
+                                .number_value = binding_number_value_powi,
+                                .simplify = expr_binding_simplify_powi,
+                                .struct_eq = binding_struct_eq_powi,
+                                .numeric_literal = binding_numeric_literal_powi,
+                                .exact_complex = binding_exact_complex_powi,
+                                .explicit_mul_separator = binding_explicit_mul_separator_powi,
+                                .emit_expr = emit_binding_expr_powi,
+                                .emit_func = emit_binding_func_powi,
+                                .emit_tex = emit_binding_tex_powi},
+    [EXPR_BINDING_EXPR_UNARY_OP] = {.precedence = BIND_PREC_UNARY,
+                                    .atomic = false,
+                                    .free_payload = binding_free_unary_op,
+                                    .clone = binding_clone_unary_op,
+                                    .eval_expr = binding_eval_unary_op,
+                                    .number_value = binding_number_value_false,
+                                    .simplify = expr_binding_simplify_unary_op,
+                                    .struct_eq = binding_struct_eq_unary_op,
+                                    .numeric_literal = binding_numeric_literal_false,
+                                    .exact_complex = NULL,
+                                    .explicit_mul_separator = binding_explicit_mul_separator_false,
+                                    .emit_expr = emit_binding_expr_unary_op,
+                                    .emit_func = emit_binding_func_unary_op,
+                                    .emit_tex = emit_binding_tex_unary_op},
+    [EXPR_BINDING_EXPR_BINARY_OP] = {.precedence = BIND_PREC_POW,
+                                     .atomic = false,
+                                     .free_payload = binding_free_binary_op,
+                                     .clone = binding_clone_binary_op,
+                                     .eval_expr = binding_eval_binary_op,
+                                     .number_value = binding_number_value_false,
+                                     .simplify = expr_binding_simplify_binary_op,
+                                     .struct_eq = binding_struct_eq_binary_op,
+                                     .numeric_literal = binding_numeric_literal_false,
+                                     .exact_complex = NULL,
+                                     .explicit_mul_separator = binding_explicit_mul_separator_false,
+                                     .emit_expr = emit_binding_expr_binary_op,
+                                     .emit_func = emit_binding_func_binary_op,
+                                     .emit_tex = emit_binding_tex_binary_op}};
 
 static const binding_expr_ops_t *binding_expr_ops_for_kind(expr_binding_expr_kind_t kind)
 {
-    if ((unsigned)kind >= BINDING_EXPR_KIND_COUNT ||
-        s_binding_expr_ops[kind].eval_expr == NULL)
+    if ((unsigned)kind >= BINDING_EXPR_KIND_COUNT || s_binding_expr_ops[kind].eval_expr == NULL)
         return NULL;
     return &s_binding_expr_ops[kind];
 }
@@ -484,9 +432,8 @@ expr_binding_expr_t *expr_binding_expr_new_unary_op(const expr_ops_t *ops, expr_
     return expr;
 }
 
-expr_binding_expr_t *expr_binding_expr_new_binary_op(const expr_ops_t *ops,
-                                                 expr_binding_expr_t *left,
-                                                 expr_binding_expr_t *right)
+expr_binding_expr_t *expr_binding_expr_new_binary_op(const expr_ops_t *ops, expr_binding_expr_t *left,
+                                                     expr_binding_expr_t *right)
 {
     expr_binding_expr_t *expr = binding_expr_alloc(EXPR_BINDING_EXPR_BINARY_OP);
 
@@ -556,11 +503,10 @@ static void binding_free_binary_op(expr_binding_expr_t *expr)
 }
 
 static expr_binding_expr_t *binding_clone_binary_plain(const expr_binding_expr_t *expr,
-                                                     expr_binding_expr_t *(*ctor)(expr_binding_expr_t *,
-                                                                               expr_binding_expr_t *))
+                                                       expr_binding_expr_t *(*ctor)(expr_binding_expr_t *,
+                                                                                    expr_binding_expr_t *))
 {
-    return ctor(expr_binding_expr_clone(expr->u.binary.left),
-                expr_binding_expr_clone(expr->u.binary.right));
+    return ctor(expr_binding_expr_clone(expr->u.binary.left), expr_binding_expr_clone(expr->u.binary.right));
 }
 
 static expr_binding_expr_t *binding_clone_number(const expr_binding_expr_t *expr)
@@ -600,21 +546,18 @@ static expr_binding_expr_t *binding_clone_div(const expr_binding_expr_t *expr)
 
 static expr_binding_expr_t *binding_clone_powi(const expr_binding_expr_t *expr)
 {
-    return expr_binding_expr_new_powi(expr_binding_expr_clone(expr->u.powi.base),
-                                    expr->u.powi.exponent);
+    return expr_binding_expr_new_powi(expr_binding_expr_clone(expr->u.powi.base), expr->u.powi.exponent);
 }
 
 static expr_binding_expr_t *binding_clone_unary_op(const expr_binding_expr_t *expr)
 {
-    return expr_binding_expr_new_unary_op(expr->u.unary_op.ops,
-                                        expr_binding_expr_clone(expr->u.unary_op.child));
+    return expr_binding_expr_new_unary_op(expr->u.unary_op.ops, expr_binding_expr_clone(expr->u.unary_op.child));
 }
 
 static expr_binding_expr_t *binding_clone_binary_op(const expr_binding_expr_t *expr)
 {
-    return expr_binding_expr_new_binary_op(expr->u.binary_op.ops,
-                                         expr_binding_expr_clone(expr->u.binary_op.left),
-                                         expr_binding_expr_clone(expr->u.binary_op.right));
+    return expr_binding_expr_new_binary_op(expr->u.binary_op.ops, expr_binding_expr_clone(expr->u.binary_op.left),
+                                           expr_binding_expr_clone(expr->u.binary_op.right));
 }
 
 expr_binding_expr_t *expr_binding_expr_clone(const expr_binding_expr_t *expr)
@@ -628,13 +571,11 @@ expr_binding_expr_t *expr_binding_expr_clone(const expr_binding_expr_t *expr)
     return (ops && ops->clone) ? ops->clone(expr) : NULL;
 }
 
-static bool binding_cursor_peek_ascii_digit(const string_cursor_t *cursor,
-                                            char *out)
+static bool binding_cursor_peek_ascii_digit(const string_cursor_t *cursor, char *out)
 {
     char ch = '\0';
 
-    if (!rune_to_ascii(string_cursor_peek(cursor), &ch) ||
-        ch < '0' || ch > '9')
+    if (!rune_to_ascii(string_cursor_peek(cursor), &ch) || ch < '0' || ch > '9')
         return false;
 
     if (out)
@@ -654,10 +595,7 @@ static bool binding_ascii_is_alpha(unsigned char ch)
 
 static bool binding_ascii_is_function_name_char(unsigned char ch)
 {
-    return binding_ascii_is_alpha(ch) ||
-           binding_ascii_is_digit(ch) ||
-           ch == '_' ||
-           ch == '-';
+    return binding_ascii_is_alpha(ch) || binding_ascii_is_digit(ch) || ch == '_' || ch == '-';
 }
 
 static bool binding_cursor_consume_ascii(string_cursor_t *cursor, char ch)
@@ -681,8 +619,7 @@ static bool binding_number_string_is_exact_decimal(const string_t *text)
     if (!cursor)
         return false;
 
-    if (rune_is_equal(string_cursor_peek(cursor), '+') ||
-        rune_is_equal(string_cursor_peek(cursor), '-'))
+    if (rune_is_equal(string_cursor_peek(cursor), '+') || rune_is_equal(string_cursor_peek(cursor), '-'))
         (void)string_cursor_next(cursor);
 
     while (binding_cursor_peek_ascii_digit(cursor, NULL)) {
@@ -698,12 +635,10 @@ static bool binding_number_string_is_exact_decimal(const string_t *text)
         }
     }
 
-    if (rune_is_equal(string_cursor_peek(cursor), 'e') ||
-        rune_is_equal(string_cursor_peek(cursor), 'E')) {
+    if (rune_is_equal(string_cursor_peek(cursor), 'e') || rune_is_equal(string_cursor_peek(cursor), 'E')) {
         have_decimal_marker = true;
         (void)string_cursor_next(cursor);
-        if (rune_is_equal(string_cursor_peek(cursor), '+') ||
-            rune_is_equal(string_cursor_peek(cursor), '-'))
+        if (rune_is_equal(string_cursor_peek(cursor), '+') || rune_is_equal(string_cursor_peek(cursor), '-'))
             (void)string_cursor_next(cursor);
         while (binding_cursor_peek_ascii_digit(cursor, NULL)) {
             exp_digits++;
@@ -715,8 +650,7 @@ static bool binding_number_string_is_exact_decimal(const string_t *text)
         }
     }
 
-    have_digit = have_digit && have_decimal_marker &&
-                 string_cursor_done(cursor);
+    have_digit = have_digit && have_decimal_marker && string_cursor_done(cursor);
     string_cursor_free(cursor);
     return have_digit;
 }
@@ -745,8 +679,7 @@ static number_t binding_number_from_exact_decimal_string(const string_t *text)
         return num_clone(NUM_NAN);
     }
 
-    if (rune_is_equal(string_cursor_peek(cursor), '+') ||
-        rune_is_equal(string_cursor_peek(cursor), '-')) {
+    if (rune_is_equal(string_cursor_peek(cursor), '+') || rune_is_equal(string_cursor_peek(cursor), '-')) {
         negative = rune_is_equal(string_cursor_peek(cursor), '-');
         (void)string_cursor_next(cursor);
     }
@@ -772,13 +705,11 @@ static number_t binding_number_from_exact_decimal_string(const string_t *text)
         }
     }
 
-    if (rune_is_equal(string_cursor_peek(cursor), 'e') ||
-        rune_is_equal(string_cursor_peek(cursor), 'E')) {
+    if (rune_is_equal(string_cursor_peek(cursor), 'e') || rune_is_equal(string_cursor_peek(cursor), 'E')) {
         bool exp_negative = false;
 
         (void)string_cursor_next(cursor);
-        if (rune_is_equal(string_cursor_peek(cursor), '+') ||
-            rune_is_equal(string_cursor_peek(cursor), '-')) {
+        if (rune_is_equal(string_cursor_peek(cursor), '+') || rune_is_equal(string_cursor_peek(cursor), '-')) {
             exp_negative = rune_is_equal(string_cursor_peek(cursor), '-');
             (void)string_cursor_next(cursor);
         }
@@ -878,8 +809,7 @@ static expr_t *binding_eval_number(const expr_binding_expr_t *expr)
 static expr_t *binding_eval_const(const expr_binding_expr_t *expr)
 {
     number_t value = binding_const_number(expr->u.const_id);
-    expr_t *node = expr_new_named_const(value,
-                                      binding_const_expr_name(expr->u.const_id));
+    expr_t *node = expr_new_named_const(value, binding_const_expr_name(expr->u.const_id));
 
     num_destroy(&value);
     return node;
@@ -894,8 +824,7 @@ static expr_t *binding_eval_neg(const expr_binding_expr_t *expr)
     return node;
 }
 
-static expr_t *binding_eval_binary(const expr_binding_expr_t *expr,
-                                   expr_t *(*op)(const expr_t *, const expr_t *))
+static expr_t *binding_eval_binary(const expr_binding_expr_t *expr, expr_t *(*op)(const expr_t *, const expr_t *))
 {
     expr_t *left = expr_binding_expr_eval_expr(expr->u.binary.left);
     expr_t *right = expr_binding_expr_eval_expr(expr->u.binary.right);
@@ -921,17 +850,12 @@ static expr_t *binding_eval_mul(const expr_binding_expr_t *expr)
     return binding_eval_binary(expr, expr_mul);
 }
 
-bool binding_expr_is_const_id(const expr_binding_expr_t *expr,
-                              expr_binding_const_id_t const_id)
+bool binding_expr_is_const_id(const expr_binding_expr_t *expr, expr_binding_const_id_t const_id)
 {
-    return expr &&
-           expr->kind == EXPR_BINDING_EXPR_CONST &&
-           expr->u.const_id == const_id;
+    return expr && expr->kind == EXPR_BINDING_EXPR_CONST && expr->u.const_id == const_id;
 }
 
-
-bool expr_binding_expr_struct_eq(const expr_binding_expr_t *left,
-                               const expr_binding_expr_t *right)
+bool expr_binding_expr_struct_eq(const expr_binding_expr_t *left, const expr_binding_expr_t *right)
 {
     const binding_expr_ops_t *ops;
 
@@ -944,60 +868,46 @@ bool expr_binding_expr_struct_eq(const expr_binding_expr_t *left,
     return ops && ops->struct_eq ? ops->struct_eq(left, right) : false;
 }
 
-static bool binding_struct_eq_number(const expr_binding_expr_t *left,
-                                     const expr_binding_expr_t *right)
+static bool binding_struct_eq_number(const expr_binding_expr_t *left, const expr_binding_expr_t *right)
 {
     if (!left->u.text || !right->u.text)
         return left->u.text == right->u.text;
     return strcmp(left->u.text, right->u.text) == 0;
 }
 
-static bool binding_struct_eq_const(const expr_binding_expr_t *left,
-                                    const expr_binding_expr_t *right)
+static bool binding_struct_eq_const(const expr_binding_expr_t *left, const expr_binding_expr_t *right)
 {
     return left->u.const_id == right->u.const_id;
 }
 
-static bool binding_struct_eq_unary(const expr_binding_expr_t *left,
-                                    const expr_binding_expr_t *right)
+static bool binding_struct_eq_unary(const expr_binding_expr_t *left, const expr_binding_expr_t *right)
 {
-    return expr_binding_expr_struct_eq(left->u.unary.child,
-                                     right->u.unary.child);
+    return expr_binding_expr_struct_eq(left->u.unary.child, right->u.unary.child);
 }
 
-static bool binding_struct_eq_binary(const expr_binding_expr_t *left,
-                                     const expr_binding_expr_t *right)
+static bool binding_struct_eq_binary(const expr_binding_expr_t *left, const expr_binding_expr_t *right)
 {
-    return expr_binding_expr_struct_eq(left->u.binary.left,
-                                     right->u.binary.left) &&
-           expr_binding_expr_struct_eq(left->u.binary.right,
-                                     right->u.binary.right);
+    return expr_binding_expr_struct_eq(left->u.binary.left, right->u.binary.left) &&
+           expr_binding_expr_struct_eq(left->u.binary.right, right->u.binary.right);
 }
 
-static bool binding_struct_eq_powi(const expr_binding_expr_t *left,
-                                   const expr_binding_expr_t *right)
+static bool binding_struct_eq_powi(const expr_binding_expr_t *left, const expr_binding_expr_t *right)
 {
     return left->u.powi.exponent == right->u.powi.exponent &&
-           expr_binding_expr_struct_eq(left->u.powi.base,
-                                     right->u.powi.base);
+           expr_binding_expr_struct_eq(left->u.powi.base, right->u.powi.base);
 }
 
-static bool binding_struct_eq_unary_op(const expr_binding_expr_t *left,
-                                       const expr_binding_expr_t *right)
+static bool binding_struct_eq_unary_op(const expr_binding_expr_t *left, const expr_binding_expr_t *right)
 {
     return left->u.unary_op.ops == right->u.unary_op.ops &&
-           expr_binding_expr_struct_eq(left->u.unary_op.child,
-                                     right->u.unary_op.child);
+           expr_binding_expr_struct_eq(left->u.unary_op.child, right->u.unary_op.child);
 }
 
-static bool binding_struct_eq_binary_op(const expr_binding_expr_t *left,
-                                        const expr_binding_expr_t *right)
+static bool binding_struct_eq_binary_op(const expr_binding_expr_t *left, const expr_binding_expr_t *right)
 {
     return left->u.binary_op.ops == right->u.binary_op.ops &&
-           expr_binding_expr_struct_eq(left->u.binary_op.left,
-                                     right->u.binary_op.left) &&
-           expr_binding_expr_struct_eq(left->u.binary_op.right,
-                                     right->u.binary_op.right);
+           expr_binding_expr_struct_eq(left->u.binary_op.left, right->u.binary_op.left) &&
+           expr_binding_expr_struct_eq(left->u.binary_op.right, right->u.binary_op.right);
 }
 
 static bool binding_numeric_literal_true(const expr_binding_expr_t *expr)
@@ -1052,20 +962,17 @@ static bool binding_explicit_mul_separator_true(const expr_binding_expr_t *expr)
 
 static bool binding_explicit_mul_separator_unary(const expr_binding_expr_t *expr)
 {
-    return expr &&
-           expr_binding_expr_needs_explicit_mul_separator(expr->u.unary.child);
+    return expr && expr_binding_expr_needs_explicit_mul_separator(expr->u.unary.child);
 }
 
 static bool binding_explicit_mul_separator_mul(const expr_binding_expr_t *expr)
 {
-    return expr &&
-           expr_binding_expr_needs_explicit_mul_separator(expr->u.binary.left);
+    return expr && expr_binding_expr_needs_explicit_mul_separator(expr->u.binary.left);
 }
 
 static bool binding_explicit_mul_separator_powi(const expr_binding_expr_t *expr)
 {
-    return expr &&
-           expr_binding_expr_needs_explicit_mul_separator(expr->u.powi.base);
+    return expr && expr_binding_expr_needs_explicit_mul_separator(expr->u.powi.base);
 }
 
 bool expr_binding_expr_is_numeric_literal(const expr_binding_expr_t *expr)
@@ -1087,9 +994,7 @@ bool expr_binding_expr_needs_explicit_mul_separator(const expr_binding_expr_t *e
         return false;
 
     ops = binding_expr_ops_for_kind(expr->kind);
-    return ops && ops->explicit_mul_separator
-               ? ops->explicit_mul_separator(expr)
-               : false;
+    return ops && ops->explicit_mul_separator ? ops->explicit_mul_separator(expr) : false;
 }
 
 void expr_binding_exact_complex_clear(binding_exact_complex_t *value)
@@ -1100,9 +1005,7 @@ void expr_binding_exact_complex_clear(binding_exact_complex_t *value)
     num_destroy(&value->real);
 }
 
-static void binding_exact_complex_set(binding_exact_complex_t *out,
-                                      number_t real,
-                                      number_t imag)
+static void binding_exact_complex_set(binding_exact_complex_t *out, number_t real, number_t imag)
 {
     out->real = num_scope_detach(real);
     out->imag = num_scope_detach(imag);
@@ -1116,8 +1019,7 @@ static void binding_num_destroy_detached(number_t *value)
     num_destroy(value);
 }
 
-bool expr_binding_expr_exact_complex(const expr_binding_expr_t *expr,
-                                   binding_exact_complex_t *out)
+bool expr_binding_expr_exact_complex(const expr_binding_expr_t *expr, binding_exact_complex_t *out)
 {
     const binding_expr_ops_t *ops;
 
@@ -1130,12 +1032,10 @@ bool expr_binding_expr_exact_complex(const expr_binding_expr_t *expr,
 
 static bool binding_string_is_single_ascii(const string_t *text, char ch)
 {
-    return text && string_length(text) == 1u &&
-           rune_is_equal(string_at(text, 0u), ch);
+    return text && string_length(text) == 1u && rune_is_equal(string_at(text, 0u), ch);
 }
 
-static bool binding_number_string_exact_complex(const string_t *text,
-                                                binding_exact_complex_t *out)
+static bool binding_number_string_exact_complex(const string_t *text, binding_exact_complex_t *out)
 {
     string_cursor_t *cursor;
     string_pos_t last_pos = 0u;
@@ -1159,8 +1059,7 @@ static bool binding_number_string_exact_complex(const string_t *text,
             break;
     }
 
-    if (have_rune &&
-        (rune_is_equal(last, 'i') || rune_is_equal(last, 'I'))) {
+    if (have_rune && (rune_is_equal(last, 'i') || rune_is_equal(last, 'I'))) {
         if (last_pos == 0u) {
             value = num_clone(NUM_ONE);
         } else {
@@ -1199,8 +1098,7 @@ static bool binding_number_string_exact_complex(const string_t *text,
     return true;
 }
 
-static bool binding_number_text_exact_complex(const char *text,
-                                              binding_exact_complex_t *out)
+static bool binding_number_text_exact_complex(const char *text, binding_exact_complex_t *out)
 {
     string_t *string = text ? string_new_with(text) : NULL;
     bool ok;
@@ -1213,14 +1111,12 @@ static bool binding_number_text_exact_complex(const char *text,
     return ok;
 }
 
-static bool binding_exact_complex_number(const expr_binding_expr_t *expr,
-                                         binding_exact_complex_t *out)
+static bool binding_exact_complex_number(const expr_binding_expr_t *expr, binding_exact_complex_t *out)
 {
     return binding_number_text_exact_complex(expr->u.text, out);
 }
 
-static bool binding_exact_complex_const(const expr_binding_expr_t *expr,
-                                        binding_exact_complex_t *out)
+static bool binding_exact_complex_const(const expr_binding_expr_t *expr, binding_exact_complex_t *out)
 {
     if (expr->u.const_id != EXPR_BINDING_CONST_I)
         return false;
@@ -1228,8 +1124,7 @@ static bool binding_exact_complex_const(const expr_binding_expr_t *expr,
     return true;
 }
 
-static bool binding_exact_complex_unary(const expr_binding_expr_t *expr,
-                                        binding_exact_complex_t *out)
+static bool binding_exact_complex_unary(const expr_binding_expr_t *expr, binding_exact_complex_t *out)
 {
     binding_exact_complex_t child;
 
@@ -1241,8 +1136,7 @@ static bool binding_exact_complex_unary(const expr_binding_expr_t *expr,
     return true;
 }
 
-static bool binding_exact_complex_addsub(const expr_binding_expr_t *expr,
-                                         binding_exact_complex_t *out)
+static bool binding_exact_complex_addsub(const expr_binding_expr_t *expr, binding_exact_complex_t *out)
 {
     binding_exact_complex_t left;
     binding_exact_complex_t right;
@@ -1255,18 +1149,14 @@ static bool binding_exact_complex_addsub(const expr_binding_expr_t *expr,
         return false;
     }
 
-    binding_exact_complex_set(out,
-                              subtract ? num_sub(left.real, right.real)
-                                       : num_add(left.real, right.real),
-                              subtract ? num_sub(left.imag, right.imag)
-                                       : num_add(left.imag, right.imag));
+    binding_exact_complex_set(out, subtract ? num_sub(left.real, right.real) : num_add(left.real, right.real),
+                              subtract ? num_sub(left.imag, right.imag) : num_add(left.imag, right.imag));
     expr_binding_exact_complex_clear(&right);
     expr_binding_exact_complex_clear(&left);
     return true;
 }
 
-static bool binding_exact_complex_mul(const expr_binding_expr_t *expr,
-                                      binding_exact_complex_t *out)
+static bool binding_exact_complex_mul(const expr_binding_expr_t *expr, binding_exact_complex_t *out)
 {
     NUM_SCOPE(scope);
     binding_exact_complex_t left;
@@ -1279,16 +1169,14 @@ static bool binding_exact_complex_mul(const expr_binding_expr_t *expr,
         return false;
     }
 
-    binding_exact_complex_set(out,
-        num_sub(num_mul(left.real, right.real), num_mul(left.imag, right.imag)),
-        num_add(num_mul(left.real, right.imag), num_mul(left.imag, right.real)));
+    binding_exact_complex_set(out, num_sub(num_mul(left.real, right.real), num_mul(left.imag, right.imag)),
+                              num_add(num_mul(left.real, right.imag), num_mul(left.imag, right.real)));
     expr_binding_exact_complex_clear(&right);
     expr_binding_exact_complex_clear(&left);
     return true;
 }
 
-static bool binding_exact_complex_div(const expr_binding_expr_t *expr,
-                                      binding_exact_complex_t *out)
+static bool binding_exact_complex_div(const expr_binding_expr_t *expr, binding_exact_complex_t *out)
 {
     NUM_SCOPE(scope);
     binding_exact_complex_t left;
@@ -1302,8 +1190,7 @@ static bool binding_exact_complex_div(const expr_binding_expr_t *expr,
         return false;
     }
 
-    denom = num_add(num_mul(right.real, right.real),
-                    num_mul(right.imag, right.imag));
+    denom = num_add(num_mul(right.real, right.real), num_mul(right.imag, right.imag));
     if (num_is_zero(denom)) {
         expr_binding_exact_complex_clear(&right);
         expr_binding_exact_complex_clear(&left);
@@ -1311,23 +1198,19 @@ static bool binding_exact_complex_div(const expr_binding_expr_t *expr,
     }
 
     binding_exact_complex_set(out,
-        num_div(num_add(num_mul(left.real, right.real),
-                        num_mul(left.imag, right.imag)), denom),
-        num_div(num_sub(num_mul(left.imag, right.real),
-                        num_mul(left.real, right.imag)), denom));
+                              num_div(num_add(num_mul(left.real, right.real), num_mul(left.imag, right.imag)), denom),
+                              num_div(num_sub(num_mul(left.imag, right.real), num_mul(left.real, right.imag)), denom));
     expr_binding_exact_complex_clear(&right);
     expr_binding_exact_complex_clear(&left);
     return true;
 }
 
-static bool binding_exact_complex_powi(const expr_binding_expr_t *expr,
-                                       binding_exact_complex_t *out)
+static bool binding_exact_complex_powi(const expr_binding_expr_t *expr, binding_exact_complex_t *out)
 {
     binding_exact_complex_t result;
     binding_exact_complex_t base;
 
-    if (expr->u.powi.exponent < 0 ||
-        !expr_binding_expr_exact_complex(expr->u.powi.base, &base))
+    if (expr->u.powi.exponent < 0 || !expr_binding_expr_exact_complex(expr->u.powi.base, &base))
         return false;
 
     binding_exact_complex_set(&result, num_clone(NUM_ONE), num_clone(NUM_ZERO));
@@ -1335,11 +1218,8 @@ static bool binding_exact_complex_powi(const expr_binding_expr_t *expr,
         NUM_SCOPE(scope);
         binding_exact_complex_t next;
 
-        binding_exact_complex_set(&next,
-            num_sub(num_mul(result.real, base.real),
-                    num_mul(result.imag, base.imag)),
-            num_add(num_mul(result.real, base.imag),
-                    num_mul(result.imag, base.real)));
+        binding_exact_complex_set(&next, num_sub(num_mul(result.real, base.real), num_mul(result.imag, base.imag)),
+                                  num_add(num_mul(result.real, base.imag), num_mul(result.imag, base.real)));
         expr_binding_exact_complex_clear(&result);
         result = next;
     }
@@ -1364,21 +1244,17 @@ long binding_gcd_long(long a, long b)
     return a;
 }
 
-bool binding_expr_scaled_const_ratio(const expr_binding_expr_t *expr,
-                                     long *numer_out,
-                                     long *denom_out,
+bool binding_expr_scaled_const_ratio(const expr_binding_expr_t *expr, long *numer_out, long *denom_out,
                                      expr_binding_const_id_t *const_id_out);
 
-static bool binding_expr_scaled_const(const expr_binding_expr_t *expr,
-                                      long *factor_out,
+static bool binding_expr_scaled_const(const expr_binding_expr_t *expr, long *factor_out,
                                       expr_binding_const_id_t *const_id_out)
 {
     long numer;
     long denom;
     expr_binding_const_id_t const_id;
 
-    if (!binding_expr_scaled_const_ratio(expr, &numer, &denom, &const_id) ||
-        denom != 1L)
+    if (!binding_expr_scaled_const_ratio(expr, &numer, &denom, &const_id) || denom != 1L)
         return false;
 
     *factor_out = numer;
@@ -1386,9 +1262,7 @@ static bool binding_expr_scaled_const(const expr_binding_expr_t *expr,
     return true;
 }
 
-bool binding_expr_scaled_const_ratio(const expr_binding_expr_t *expr,
-                                     long *numer_out,
-                                     long *denom_out,
+bool binding_expr_scaled_const_ratio(const expr_binding_expr_t *expr, long *numer_out, long *denom_out,
                                      expr_binding_const_id_t *const_id_out)
 {
     long factor_numer;
@@ -1409,10 +1283,7 @@ bool binding_expr_scaled_const_ratio(const expr_binding_expr_t *expr,
     }
 
     if (expr->kind == EXPR_BINDING_EXPR_NEG &&
-        binding_expr_scaled_const_ratio(expr->u.unary.child,
-                                        &nested_numer,
-                                        &nested_denom,
-                                        &const_id)) {
+        binding_expr_scaled_const_ratio(expr->u.unary.child, &nested_numer, &nested_denom, &const_id)) {
         *numer_out = -nested_numer;
         *denom_out = nested_denom;
         *const_id_out = const_id;
@@ -1422,20 +1293,10 @@ bool binding_expr_scaled_const_ratio(const expr_binding_expr_t *expr,
     if (expr->kind != EXPR_BINDING_EXPR_MUL)
         return false;
 
-    if (!binding_number_text_to_small_rational(expr->u.binary.left,
-                                               &factor_numer,
-                                               &factor_denom) ||
-        !binding_expr_scaled_const_ratio(expr->u.binary.right,
-                                         &nested_numer,
-                                         &nested_denom,
-                                         &const_id)) {
-        if (!binding_number_text_to_small_rational(expr->u.binary.right,
-                                                   &factor_numer,
-                                                   &factor_denom) ||
-            !binding_expr_scaled_const_ratio(expr->u.binary.left,
-                                             &nested_numer,
-                                             &nested_denom,
-                                             &const_id))
+    if (!binding_number_text_to_small_rational(expr->u.binary.left, &factor_numer, &factor_denom) ||
+        !binding_expr_scaled_const_ratio(expr->u.binary.right, &nested_numer, &nested_denom, &const_id)) {
+        if (!binding_number_text_to_small_rational(expr->u.binary.right, &factor_numer, &factor_denom) ||
+            !binding_expr_scaled_const_ratio(expr->u.binary.left, &nested_numer, &nested_denom, &const_id))
             return false;
     }
 
@@ -1456,19 +1317,15 @@ bool binding_expr_scaled_const_ratio(const expr_binding_expr_t *expr,
     return true;
 }
 
-bool binding_const_ratio_parts(const expr_binding_expr_t *numer_expr,
-                               const expr_binding_expr_t *denom_expr,
-                               long *numer_out,
-                               long *denom_out,
-                               expr_binding_const_id_t *const_id_out)
+bool binding_const_ratio_parts(const expr_binding_expr_t *numer_expr, const expr_binding_expr_t *denom_expr,
+                               long *numer_out, long *denom_out, expr_binding_const_id_t *const_id_out)
 {
     long numer;
     long denom;
     long gcd;
     expr_binding_const_id_t const_id;
 
-    if (!binding_expr_scaled_const(numer_expr, &numer, &const_id) ||
-        !binding_number_text_to_long(denom_expr, &denom) ||
+    if (!binding_expr_scaled_const(numer_expr, &numer, &const_id) || !binding_number_text_to_long(denom_expr, &denom) ||
         denom == 0L || numer == 0L)
         return false;
 
@@ -1487,8 +1344,7 @@ bool binding_const_ratio_parts(const expr_binding_expr_t *numer_expr,
     return true;
 }
 
-static expr_t *binding_eval_known_pi_ratio(const expr_binding_expr_t *numer,
-                                           const expr_binding_expr_t *denom)
+static expr_t *binding_eval_known_pi_ratio(const expr_binding_expr_t *numer, const expr_binding_expr_t *denom)
 {
     expr_t *node = NULL;
 
@@ -1509,8 +1365,7 @@ static expr_t *binding_eval_known_pi_ratio(const expr_binding_expr_t *numer,
 
 static expr_t *binding_eval_div(const expr_binding_expr_t *expr)
 {
-    expr_t *known = binding_eval_known_pi_ratio(expr->u.binary.left,
-                                                expr->u.binary.right);
+    expr_t *known = binding_eval_known_pi_ratio(expr->u.binary.left, expr->u.binary.right);
 
     if (known)
         return known;
@@ -1562,9 +1417,7 @@ static expr_t *binding_eval_binary_op(const expr_binding_expr_t *expr)
     return node ? node : expr_new_const(NUM_NAN);
 }
 
-static void binding_expr_store_cached_value(expr_binding_expr_t *expr,
-                                            number_t value,
-                                            size_t precision_bits)
+static void binding_expr_store_cached_value(expr_binding_expr_t *expr, number_t value, size_t precision_bits)
 {
     if (expr->cached_value_valid)
         num_destroy(&expr->cached_value);
@@ -1595,19 +1448,16 @@ number_t expr_binding_expr_eval(const expr_binding_expr_t *expr)
     if (!mutable_expr)
         return num_clone(NUM_NAN);
 
-    if (mutable_expr->cached_value_valid &&
-        mutable_expr->cached_precision_bits >= num_get_default_prec_bits()) {
+    if (mutable_expr->cached_value_valid && mutable_expr->cached_precision_bits >= num_get_default_prec_bits()) {
         return num_clone(mutable_expr->cached_value);
     }
 
     value = binding_expr_compute_value(mutable_expr);
-    binding_expr_store_cached_value(mutable_expr, value,
-                                    num_get_default_prec_bits());
+    binding_expr_store_cached_value(mutable_expr, value, num_get_default_prec_bits());
     return value;
 }
 
-bool expr_binding_expr_eval_if_precision_increased(expr_binding_expr_t *expr,
-                                                 number_t *value_out)
+bool expr_binding_expr_eval_if_precision_increased(expr_binding_expr_t *expr, number_t *value_out)
 {
     number_t value;
     size_t precision_bits;
@@ -1616,8 +1466,7 @@ bool expr_binding_expr_eval_if_precision_increased(expr_binding_expr_t *expr,
         return false;
 
     precision_bits = num_get_default_prec_bits();
-    if (expr->cached_value_valid &&
-        expr->cached_precision_bits >= precision_bits) {
+    if (expr->cached_value_valid && expr->cached_precision_bits >= precision_bits) {
         return false;
     }
 
@@ -1651,13 +1500,9 @@ static int binding_peek_ascii(const binding_parser_t *p, unsigned char *out)
     return string_cursor_peek_ascii(p->cursor, out);
 }
 
-static int binding_peek_value(const binding_parser_t *p,
-                              uint32_t *out,
-                              size_t *width_out)
+static int binding_peek_value(const binding_parser_t *p, uint32_t *out, size_t *width_out)
 {
-    return expr_parse_cursor_peek_value(p ? p->cursor : NULL,
-                                        out,
-                                        width_out);
+    return expr_parse_cursor_peek_value(p ? p->cursor : NULL, out, width_out);
 }
 
 static int binding_skip(binding_parser_t *p, size_t count)
@@ -1686,165 +1531,152 @@ static size_t scan_unicode_fraction_len_view(string_view_t view, size_t pos)
 }
 
 typedef struct {
-    const char       *kw;
-    bool              is_binary;
-    bool              is_ternary;
+    const char *kw;
+    bool is_binary;
+    bool is_ternary;
     const expr_ops_t *ops;
 } binding_func_entry_t;
 
 #define BINDING_FUNC_TABLE_SIZE 167u
 
 static const unsigned char s_binding_func_displacements[BINDING_FUNC_TABLE_SIZE] = {
-      0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-      0,   0,   0,   3,   0,   4,   0,   0,   0,   0,
-      0,   0,   0,   0,   0,   3,   0,   1,   0,   1,
-      0,   0,   0,   7,   2,   0,   2,   0,   0,   0,
-      0,   0,   2,   1,   0,   0,   2,   0,   0,   0,
-      0,   0,  13,   0,   0,   0,   1,   0,   0,   0,
-      2,   1,   0,   1,   0,   1,   0,   0,   0,   0,
-      0,   0,   0,   3,   0,   0,   0,   0,   0,   0,
-      0,   0,   1,   0,   0,   0,   4,   0,   0,   0,
-      0,   0,   0,  10,   2,   2,   0,   0,   0,   0,
-      0,   0,   0,   1,   0,   5,   0,   0,   1,   0,
-      0,   1,   2,   0,   0,  13,   2,   0,   0,   0,
-      0,   0,   0,   1,   2,   1,   0,   0,   0,   3,
-      0,   0,   0,   1,   0,   0,   0,   0,   0,   0,
-      0,   0,   2,   1,   0,   1,   1,   0,   0,   0,
-      0,   0,   0,   3,   0,   0,   0,   0,   4,   0,
-      0,   0,   0,   0,   0,   0,   0
-};
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3,  0, 4, 0, 0, 0,  0, 0, 0, 0, 0, 0, 3,  0, 1, 0, 1, 0, 0, 0, 7,
+    2, 0, 2, 0, 0, 0, 0, 0, 2, 1, 0, 0, 2, 0,  0, 0, 0, 0, 13, 0, 0, 0, 1, 0, 0, 0,  2, 1, 0, 1, 0, 1, 0, 0,
+    0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0,  1, 0, 0, 0, 4,  0, 0, 0, 0, 0, 0, 10, 2, 2, 0, 0, 0, 0, 0, 0,
+    0, 1, 0, 5, 0, 0, 1, 0, 0, 1, 2, 0, 0, 13, 2, 0, 0, 0, 0,  0, 0, 1, 2, 1, 0, 0,  0, 3, 0, 0, 0, 1, 0, 0,
+    0, 0, 0, 0, 0, 0, 2, 1, 0, 1, 1, 0, 0, 0,  0, 0, 0, 3, 0,  0, 0, 0, 4, 0, 0, 0,  0, 0, 0, 0, 0};
 
 static const binding_func_entry_t s_binding_funcs[BINDING_FUNC_TABLE_SIZE] = {
-    [  2] = { .kw = "sin",            .is_binary = false, .ops = &ops_sin },
-    [  3] = { .kw = "versin",         .is_binary = false, .ops = &ops_versin },
-    [  8] = { .kw = "atan2",          .is_binary = true,  .ops = &ops_atan2 },
-    [ 11] = { .kw = "acsc",           .is_binary = false, .ops = &ops_acosec },
-    [ 12] = { .kw = "gammainc_Q",     .is_binary = true,  .ops = &ops_gammainc_Q },
-    [ 13] = { .kw = "AND",            .is_binary = true,  .ops = &ops_bit_and },
-    [ 14] = { .kw = "acosec",         .is_binary = false, .ops = &ops_acosec },
-    [ 15] = { .kw = "gammainc_upper", .is_binary = true,  .ops = &ops_gammainc_upper },
-    [ 16] = { .kw = "acsch",          .is_binary = false, .ops = &ops_acosech },
-    [ 17] = { .kw = "SHL",            .is_binary = true,  .ops = &ops_shl },
-    [ 18] = { .kw = "coth",           .is_binary = false, .ops = &ops_coth },
-    [ 19] = { .kw = "abs",            .is_binary = false, .ops = &ops_abs },
-    [ 20] = { .kw = "lg",             .is_binary = false, .ops = &ops_log10 },
-    [ 21] = { .kw = "cosech",         .is_binary = false, .ops = &ops_cosech },
-    [ 23] = { .kw = "cos",            .is_binary = false, .ops = &ops_cos },
-    [ 25] = { .kw = "asec",           .is_binary = false, .ops = &ops_asec },
-    [ 26] = { .kw = "archavercos",    .is_binary = false, .ops = &ops_archavercos },
-    [ 27] = { .kw = "W0",             .is_binary = false, .ops = &ops_lambert_w0 },
-    [ 28] = { .kw = "Li2",            .is_binary = false, .ops = &ops_dilog },
-    [ 29] = { .kw = "cosec",          .is_binary = false, .ops = &ops_cosec },
-    [ 30] = { .kw = "erfcinv",        .is_binary = false, .ops = &ops_erfcinv },
-    [ 31] = { .kw = "W₀",             .is_binary = false, .ops = &ops_lambert_w0 },
-    [ 32] = { .kw = "pdf",            .is_binary = false, .ops = &ops_pdf },
-    [ 33] = { .kw = "lgamma",         .is_binary = false, .ops = &ops_lgamma },
-    [ 34] = { .kw = "lambert_wm1",    .is_binary = false, .ops = &ops_lambert_wm1 },
-    [ 35] = { .kw = "csch",           .is_binary = false, .ops = &ops_cosech },
-    [ 36] = { .kw = "tanh",           .is_binary = false, .ops = &ops_tanh },
-    [ 37] = { .kw = "acot",           .is_binary = false, .ops = &ops_acot },
-    [ 38] = { .kw = "asinh",          .is_binary = false, .ops = &ops_asinh },
-    [ 39] = { .kw = "hacoversin",     .is_binary = false, .ops = &ops_hacoversin },
-    [ 40] = { .kw = "next_prime",     .is_binary = false, .ops = &ops_next_prime },
-    [ 41] = { .kw = "normal_pdf",     .is_binary = false, .ops = &ops_normal_pdf },
-    [ 42] = { .kw = "asin",           .is_binary = false, .ops = &ops_asin },
-    [ 44] = { .kw = "OR",             .is_binary = true,  .ops = &ops_bit_or },
-    [ 45] = { .kw = "lcm",            .is_binary = true,  .ops = &ops_lcm },
-    [ 46] = { .kw = "cot",            .is_binary = false, .ops = &ops_cot },
-    [ 47] = { .kw = "arccoversin",    .is_binary = false, .ops = &ops_arccoversin },
-    [ 48] = { .kw = "W₋₁",            .is_binary = false, .ops = &ops_lambert_wm1 },
-    [ 49] = { .kw = "is_prime",       .is_binary = false, .ops = &ops_is_prime },
-    [ 50] = { .kw = "W-1",            .is_binary = false, .ops = &ops_lambert_wm1 },
-    [ 51] = { .kw = "arcsch",         .is_binary = false, .ops = &ops_acosech },
-    [ 52] = { .kw = "tan",            .is_binary = false, .ops = &ops_tan },
-    [ 53] = { .kw = "acoth",          .is_binary = false, .ops = &ops_acoth },
-    [ 54] = { .kw = "factors",        .is_binary = false, .ops = &ops_factors },
-    [ 55] = { .kw = "Ei",             .is_binary = false, .ops = &ops_ei },
-    [ 56] = { .kw = "haversin",       .is_binary = false, .ops = &ops_haversin },
-    [ 57] = { .kw = "bessel_j",        .is_binary = true,  .ops = &ops_bessel_j },
-    [ 58] = { .kw = "sech",           .is_binary = false, .ops = &ops_sech },
-    [ 59] = { .kw = "sinh",           .is_binary = false, .ops = &ops_sinh },
-    [ 60] = { .kw = "lommel_s",       .is_ternary = true,  .ops = &ops_lommel_s },
-    [ 62] = { .kw = "BesselJ",         .is_binary = true,  .ops = &ops_bessel_j },
-    [ 63] = { .kw = "W_n",            .is_binary = true,  .ops = &ops_lambert_wn },
-    [ 64] = { .kw = "arccsc",         .is_binary = false, .ops = &ops_acosec },
-    [ 65] = { .kw = "NOT",            .is_binary = false, .ops = &ops_bit_not },
-    [ 66] = { .kw = "pow",            .is_binary = true,  .ops = &ops_pow },
-    [ 68] = { .kw = "ceil",           .is_binary = false, .ops = &ops_ceil },
-    [ 69] = { .kw = "lambert_wn",     .is_binary = true,  .ops = &ops_lambert_wn },
-    [ 70] = { .kw = "mod",            .is_binary = true,  .ops = &ops_mod },
-    [ 71] = { .kw = "arcosech",       .is_binary = false, .ops = &ops_acosech },
-    [ 72] = { .kw = "modinv",         .is_binary = true,  .ops = &ops_modinv },
-    [ 73] = { .kw = "isqrt",          .is_binary = false, .ops = &ops_isqrt },
-    [ 74] = { .kw = "arcvercos",      .is_binary = false, .ops = &ops_arcvercos },
-    [ 75] = { .kw = "digamma",        .is_binary = false, .ops = &ops_digamma },
-    [ 77] = { .kw = "erf",            .is_binary = false, .ops = &ops_erf },
-    [ 78] = { .kw = "gamma",          .is_binary = false, .ops = &ops_gamma },
-    [ 79] = { .kw = "dilog",          .is_binary = false, .ops = &ops_dilog },
-    [ 80] = { .kw = "E1",             .is_binary = false, .ops = &ops_e1 },
-    [ 81] = { .kw = "erfc",           .is_binary = false, .ops = &ops_erfc },
-    [ 84] = { .kw = "acos",           .is_binary = false, .ops = &ops_acos },
-    [ 85] = { .kw = "atanh",          .is_binary = false, .ops = &ops_atanh },
-    [ 88] = { .kw = "chi",            .is_binary = true,  .ops = &ops_legendre_chi },
-    [ 90] = { .kw = "BesselY",         .is_binary = true,  .ops = &ops_bessel_y },
-    [ 92] = { .kw = "arsech",         .is_binary = false, .ops = &ops_asech },
-    [ 93] = { .kw = "normal_logpdf",  .is_binary = false, .ops = &ops_normal_logpdf },
-    [ 94] = { .kw = "ln",             .is_binary = false, .ops = &ops_log },
-    [ 96] = { .kw = "havercos",       .is_binary = false, .ops = &ops_havercos },
-    [ 97] = { .kw = "gammainc_lower", .is_binary = true,  .ops = &ops_gammainc_lower },
-    [ 99] = { .kw = "arcversin",      .is_binary = false, .ops = &ops_arcversin },
-    [100] = { .kw = "arcsec",         .is_binary = false, .ops = &ops_asec },
-    [102] = { .kw = "csc",            .is_binary = false, .ops = &ops_cosec },
-    [103] = { .kw = "beta",           .is_binary = true,  .ops = &ops_beta },
-    [105] = { .kw = "gcd",            .is_binary = true,  .ops = &ops_gcd },
-    [107] = { .kw = "hacovercos",     .is_binary = false, .ops = &ops_hacovercos },
-    [108] = { .kw = "W_-1",           .is_binary = false, .ops = &ops_lambert_wm1 },
-    [109] = { .kw = "gammainc_P",     .is_binary = true,  .ops = &ops_gammainc_P },
-    [110] = { .kw = "atan",           .is_binary = false, .ops = &ops_atan },
-    [112] = { .kw = "polylog",        .is_binary = true,  .ops = &ops_polylog },
-    [113] = { .kw = "W_0",            .is_binary = false, .ops = &ops_lambert_w0 },
-    [114] = { .kw = "floor",          .is_binary = false, .ops = &ops_floor },
-    [115] = { .kw = "exp",            .is_binary = false, .ops = &ops_exp },
-    [116] = { .kw = "prev_prime",     .is_binary = false, .ops = &ops_prev_prime },
-    [117] = { .kw = "vercos",         .is_binary = false, .ops = &ops_vercos },
-    [121] = { .kw = "arccot",         .is_binary = false, .ops = &ops_acot },
-    [122] = { .kw = "coversin",       .is_binary = false, .ops = &ops_coversin },
-    [123] = { .kw = "archacovercos",  .is_binary = false, .ops = &ops_archacovercos },
-    [125] = { .kw = "acosh",          .is_binary = false, .ops = &ops_acosh },
-    [126] = { .kw = "sec",            .is_binary = false, .ops = &ops_sec },
-    [127] = { .kw = "log10",          .is_binary = false, .ops = &ops_log10 },
-    [130] = { .kw = "trigamma",       .is_binary = false, .ops = &ops_trigamma },
-    [131] = { .kw = "erfinv",         .is_binary = false, .ops = &ops_erfinv },
-    [132] = { .kw = "SHR",            .is_binary = true,  .ops = &ops_shr },
-    [133] = { .kw = "factorial",      .is_binary = false, .ops = &ops_factorial },
-    [134] = { .kw = "cosh",           .is_binary = false, .ops = &ops_cosh },
-    [135] = { .kw = "lambert_w0",     .is_binary = false, .ops = &ops_lambert_w0 },
-    [136] = { .kw = "arccovercos",    .is_binary = false, .ops = &ops_arccovercos },
-    [137] = { .kw = "Wn",             .is_binary = true,  .ops = &ops_lambert_wn },
-    [138] = { .kw = "LommelS",        .is_ternary = true,  .ops = &ops_lommel_s },
-    [139] = { .kw = "arcoth",         .is_binary = false, .ops = &ops_acoth },
-    [140] = { .kw = "cdf",            .is_binary = false, .ops = &ops_cdf },
-    [141] = { .kw = "W",              .is_binary = false, .ops = &ops_lambert_w },
-    [142] = { .kw = "fibonacci",      .is_binary = false, .ops = &ops_fibonacci },
-    [143] = { .kw = "arccosec",       .is_binary = false, .ops = &ops_acosec },
-    [144] = { .kw = "hypot",          .is_binary = true,  .ops = &ops_hypot },
-    [145] = { .kw = "archacoversin",  .is_binary = false, .ops = &ops_archacoversin },
-    [146] = { .kw = "gammainv",       .is_binary = false, .ops = &ops_gammainv },
-    [147] = { .kw = "archaversin",    .is_binary = false, .ops = &ops_archaversin },
-    [149] = { .kw = "legendre_chi",   .is_binary = true,  .ops = &ops_legendre_chi },
-    [150] = { .kw = "logpdf",         .is_binary = false, .ops = &ops_logpdf },
-    [151] = { .kw = "XOR",            .is_binary = true,  .ops = &ops_bit_xor },
-    [152] = { .kw = "logbeta",        .is_binary = true,  .ops = &ops_logbeta },
-    [153] = { .kw = "log",            .is_binary = false, .ops = &ops_log10 },
-    [154] = { .kw = "sqrt",           .is_binary = false, .ops = &ops_sqrt },
-    [155] = { .kw = "covercos",       .is_binary = false, .ops = &ops_covercos },
-    [156] = { .kw = "bessel_y",        .is_binary = true,  .ops = &ops_bessel_y },
-    [158] = { .kw = "asech",          .is_binary = false, .ops = &ops_asech },
-    [159] = { .kw = "partition",      .is_binary = false, .ops = &ops_partition },
-    [160] = { .kw = "Wₙ",             .is_binary = true,  .ops = &ops_lambert_wn },
-    [162] = { .kw = "productlog",     .is_binary = false, .ops = &ops_lambert_w },
-    [163] = { .kw = "normal_cdf",     .is_binary = false, .ops = &ops_normal_cdf },
-    [164] = { .kw = "acosech",        .is_binary = false, .ops = &ops_acosech },
+    [2] = {.kw = "sin", .is_binary = false, .ops = &ops_sin},
+    [3] = {.kw = "versin", .is_binary = false, .ops = &ops_versin},
+    [8] = {.kw = "atan2", .is_binary = true, .ops = &ops_atan2},
+    [11] = {.kw = "acsc", .is_binary = false, .ops = &ops_acosec},
+    [12] = {.kw = "gammainc_Q", .is_binary = true, .ops = &ops_gammainc_Q},
+    [13] = {.kw = "AND", .is_binary = true, .ops = &ops_bit_and},
+    [14] = {.kw = "acosec", .is_binary = false, .ops = &ops_acosec},
+    [15] = {.kw = "gammainc_upper", .is_binary = true, .ops = &ops_gammainc_upper},
+    [16] = {.kw = "acsch", .is_binary = false, .ops = &ops_acosech},
+    [17] = {.kw = "SHL", .is_binary = true, .ops = &ops_shl},
+    [18] = {.kw = "coth", .is_binary = false, .ops = &ops_coth},
+    [19] = {.kw = "abs", .is_binary = false, .ops = &ops_abs},
+    [20] = {.kw = "lg", .is_binary = false, .ops = &ops_log10},
+    [21] = {.kw = "cosech", .is_binary = false, .ops = &ops_cosech},
+    [23] = {.kw = "cos", .is_binary = false, .ops = &ops_cos},
+    [25] = {.kw = "asec", .is_binary = false, .ops = &ops_asec},
+    [26] = {.kw = "archavercos", .is_binary = false, .ops = &ops_archavercos},
+    [27] = {.kw = "W0", .is_binary = false, .ops = &ops_lambert_w0},
+    [28] = {.kw = "Li2", .is_binary = false, .ops = &ops_dilog},
+    [29] = {.kw = "cosec", .is_binary = false, .ops = &ops_cosec},
+    [30] = {.kw = "erfcinv", .is_binary = false, .ops = &ops_erfcinv},
+    [31] = {.kw = "W₀", .is_binary = false, .ops = &ops_lambert_w0},
+    [32] = {.kw = "pdf", .is_binary = false, .ops = &ops_pdf},
+    [33] = {.kw = "lgamma", .is_binary = false, .ops = &ops_lgamma},
+    [34] = {.kw = "lambert_wm1", .is_binary = false, .ops = &ops_lambert_wm1},
+    [35] = {.kw = "csch", .is_binary = false, .ops = &ops_cosech},
+    [36] = {.kw = "tanh", .is_binary = false, .ops = &ops_tanh},
+    [37] = {.kw = "acot", .is_binary = false, .ops = &ops_acot},
+    [38] = {.kw = "asinh", .is_binary = false, .ops = &ops_asinh},
+    [39] = {.kw = "hacoversin", .is_binary = false, .ops = &ops_hacoversin},
+    [40] = {.kw = "next_prime", .is_binary = false, .ops = &ops_next_prime},
+    [41] = {.kw = "normal_pdf", .is_binary = false, .ops = &ops_normal_pdf},
+    [42] = {.kw = "asin", .is_binary = false, .ops = &ops_asin},
+    [44] = {.kw = "OR", .is_binary = true, .ops = &ops_bit_or},
+    [45] = {.kw = "lcm", .is_binary = true, .ops = &ops_lcm},
+    [46] = {.kw = "cot", .is_binary = false, .ops = &ops_cot},
+    [47] = {.kw = "arccoversin", .is_binary = false, .ops = &ops_arccoversin},
+    [48] = {.kw = "W₋₁", .is_binary = false, .ops = &ops_lambert_wm1},
+    [49] = {.kw = "is_prime", .is_binary = false, .ops = &ops_is_prime},
+    [50] = {.kw = "W-1", .is_binary = false, .ops = &ops_lambert_wm1},
+    [51] = {.kw = "arcsch", .is_binary = false, .ops = &ops_acosech},
+    [52] = {.kw = "tan", .is_binary = false, .ops = &ops_tan},
+    [53] = {.kw = "acoth", .is_binary = false, .ops = &ops_acoth},
+    [54] = {.kw = "factors", .is_binary = false, .ops = &ops_factors},
+    [55] = {.kw = "Ei", .is_binary = false, .ops = &ops_ei},
+    [56] = {.kw = "haversin", .is_binary = false, .ops = &ops_haversin},
+    [57] = {.kw = "bessel_j", .is_binary = true, .ops = &ops_bessel_j},
+    [58] = {.kw = "sech", .is_binary = false, .ops = &ops_sech},
+    [59] = {.kw = "sinh", .is_binary = false, .ops = &ops_sinh},
+    [60] = {.kw = "lommel_s", .is_ternary = true, .ops = &ops_lommel_s},
+    [62] = {.kw = "BesselJ", .is_binary = true, .ops = &ops_bessel_j},
+    [63] = {.kw = "W_n", .is_binary = true, .ops = &ops_lambert_wn},
+    [64] = {.kw = "arccsc", .is_binary = false, .ops = &ops_acosec},
+    [65] = {.kw = "NOT", .is_binary = false, .ops = &ops_bit_not},
+    [66] = {.kw = "pow", .is_binary = true, .ops = &ops_pow},
+    [68] = {.kw = "ceil", .is_binary = false, .ops = &ops_ceil},
+    [69] = {.kw = "lambert_wn", .is_binary = true, .ops = &ops_lambert_wn},
+    [70] = {.kw = "mod", .is_binary = true, .ops = &ops_mod},
+    [71] = {.kw = "arcosech", .is_binary = false, .ops = &ops_acosech},
+    [72] = {.kw = "modinv", .is_binary = true, .ops = &ops_modinv},
+    [73] = {.kw = "isqrt", .is_binary = false, .ops = &ops_isqrt},
+    [74] = {.kw = "arcvercos", .is_binary = false, .ops = &ops_arcvercos},
+    [75] = {.kw = "digamma", .is_binary = false, .ops = &ops_digamma},
+    [77] = {.kw = "erf", .is_binary = false, .ops = &ops_erf},
+    [78] = {.kw = "gamma", .is_binary = false, .ops = &ops_gamma},
+    [79] = {.kw = "dilog", .is_binary = false, .ops = &ops_dilog},
+    [80] = {.kw = "E1", .is_binary = false, .ops = &ops_e1},
+    [81] = {.kw = "erfc", .is_binary = false, .ops = &ops_erfc},
+    [84] = {.kw = "acos", .is_binary = false, .ops = &ops_acos},
+    [85] = {.kw = "atanh", .is_binary = false, .ops = &ops_atanh},
+    [88] = {.kw = "chi", .is_binary = true, .ops = &ops_legendre_chi},
+    [90] = {.kw = "BesselY", .is_binary = true, .ops = &ops_bessel_y},
+    [92] = {.kw = "arsech", .is_binary = false, .ops = &ops_asech},
+    [93] = {.kw = "normal_logpdf", .is_binary = false, .ops = &ops_normal_logpdf},
+    [94] = {.kw = "ln", .is_binary = false, .ops = &ops_log},
+    [96] = {.kw = "havercos", .is_binary = false, .ops = &ops_havercos},
+    [97] = {.kw = "gammainc_lower", .is_binary = true, .ops = &ops_gammainc_lower},
+    [99] = {.kw = "arcversin", .is_binary = false, .ops = &ops_arcversin},
+    [100] = {.kw = "arcsec", .is_binary = false, .ops = &ops_asec},
+    [102] = {.kw = "csc", .is_binary = false, .ops = &ops_cosec},
+    [103] = {.kw = "beta", .is_binary = true, .ops = &ops_beta},
+    [105] = {.kw = "gcd", .is_binary = true, .ops = &ops_gcd},
+    [107] = {.kw = "hacovercos", .is_binary = false, .ops = &ops_hacovercos},
+    [108] = {.kw = "W_-1", .is_binary = false, .ops = &ops_lambert_wm1},
+    [109] = {.kw = "gammainc_P", .is_binary = true, .ops = &ops_gammainc_P},
+    [110] = {.kw = "atan", .is_binary = false, .ops = &ops_atan},
+    [112] = {.kw = "polylog", .is_binary = true, .ops = &ops_polylog},
+    [113] = {.kw = "W_0", .is_binary = false, .ops = &ops_lambert_w0},
+    [114] = {.kw = "floor", .is_binary = false, .ops = &ops_floor},
+    [115] = {.kw = "exp", .is_binary = false, .ops = &ops_exp},
+    [116] = {.kw = "prev_prime", .is_binary = false, .ops = &ops_prev_prime},
+    [117] = {.kw = "vercos", .is_binary = false, .ops = &ops_vercos},
+    [121] = {.kw = "arccot", .is_binary = false, .ops = &ops_acot},
+    [122] = {.kw = "coversin", .is_binary = false, .ops = &ops_coversin},
+    [123] = {.kw = "archacovercos", .is_binary = false, .ops = &ops_archacovercos},
+    [125] = {.kw = "acosh", .is_binary = false, .ops = &ops_acosh},
+    [126] = {.kw = "sec", .is_binary = false, .ops = &ops_sec},
+    [127] = {.kw = "log10", .is_binary = false, .ops = &ops_log10},
+    [130] = {.kw = "trigamma", .is_binary = false, .ops = &ops_trigamma},
+    [131] = {.kw = "erfinv", .is_binary = false, .ops = &ops_erfinv},
+    [132] = {.kw = "SHR", .is_binary = true, .ops = &ops_shr},
+    [133] = {.kw = "factorial", .is_binary = false, .ops = &ops_factorial},
+    [134] = {.kw = "cosh", .is_binary = false, .ops = &ops_cosh},
+    [135] = {.kw = "lambert_w0", .is_binary = false, .ops = &ops_lambert_w0},
+    [136] = {.kw = "arccovercos", .is_binary = false, .ops = &ops_arccovercos},
+    [137] = {.kw = "Wn", .is_binary = true, .ops = &ops_lambert_wn},
+    [138] = {.kw = "LommelS", .is_ternary = true, .ops = &ops_lommel_s},
+    [139] = {.kw = "arcoth", .is_binary = false, .ops = &ops_acoth},
+    [140] = {.kw = "cdf", .is_binary = false, .ops = &ops_cdf},
+    [141] = {.kw = "W", .is_binary = false, .ops = &ops_lambert_w},
+    [142] = {.kw = "fibonacci", .is_binary = false, .ops = &ops_fibonacci},
+    [143] = {.kw = "arccosec", .is_binary = false, .ops = &ops_acosec},
+    [144] = {.kw = "hypot", .is_binary = true, .ops = &ops_hypot},
+    [145] = {.kw = "archacoversin", .is_binary = false, .ops = &ops_archacoversin},
+    [146] = {.kw = "gammainv", .is_binary = false, .ops = &ops_gammainv},
+    [147] = {.kw = "archaversin", .is_binary = false, .ops = &ops_archaversin},
+    [149] = {.kw = "legendre_chi", .is_binary = true, .ops = &ops_legendre_chi},
+    [150] = {.kw = "logpdf", .is_binary = false, .ops = &ops_logpdf},
+    [151] = {.kw = "XOR", .is_binary = true, .ops = &ops_bit_xor},
+    [152] = {.kw = "logbeta", .is_binary = true, .ops = &ops_logbeta},
+    [153] = {.kw = "log", .is_binary = false, .ops = &ops_log10},
+    [154] = {.kw = "sqrt", .is_binary = false, .ops = &ops_sqrt},
+    [155] = {.kw = "covercos", .is_binary = false, .ops = &ops_covercos},
+    [156] = {.kw = "bessel_y", .is_binary = true, .ops = &ops_bessel_y},
+    [158] = {.kw = "asech", .is_binary = false, .ops = &ops_asech},
+    [159] = {.kw = "partition", .is_binary = false, .ops = &ops_partition},
+    [160] = {.kw = "Wₙ", .is_binary = true, .ops = &ops_lambert_wn},
+    [162] = {.kw = "productlog", .is_binary = false, .ops = &ops_lambert_w},
+    [163] = {.kw = "normal_cdf", .is_binary = false, .ops = &ops_normal_cdf},
+    [164] = {.kw = "acosech", .is_binary = false, .ops = &ops_acosech},
 };
 
 static unsigned binding_func_hash_values(string_view_t kw, unsigned seed)
@@ -1864,9 +1696,7 @@ static unsigned binding_func_hash_values(string_view_t kw, unsigned seed)
         if (!expr_parse_view_peek_value(kw, pos, &value, &width) || width == 0u)
             break;
 
-        h ^= (unsigned)value +
-             0x9e3779b9u +
-             index * 0x85ebca6bu;
+        h ^= (unsigned)value + 0x9e3779b9u + index * 0x85ebca6bu;
         h *= 16777619u;
         h ^= h >> 13u;
         pos += width;
@@ -1886,8 +1716,7 @@ static unsigned binding_func_slot_hash(string_view_t kw)
     return binding_func_hash_values(kw, 0x85ebca6bu);
 }
 
-static bool binding_func_entry_matches(const binding_func_entry_t *entry,
-                                       string_view_t kw)
+static bool binding_func_entry_matches(const binding_func_entry_t *entry, string_view_t kw)
 {
     return string_view_equals_literal(kw, entry->kw);
 }
@@ -1902,8 +1731,7 @@ static const binding_func_entry_t *binding_func_lookup(string_view_t kw)
         return NULL;
 
     bucket = binding_func_bucket_hash(kw);
-    slot = (binding_func_slot_hash(kw) +
-            s_binding_func_displacements[bucket]) % BINDING_FUNC_TABLE_SIZE;
+    slot = (binding_func_slot_hash(kw) + s_binding_func_displacements[bucket]) % BINDING_FUNC_TABLE_SIZE;
     entry = &s_binding_funcs[slot];
 
     if (binding_func_entry_matches(entry, kw))
@@ -1940,8 +1768,7 @@ static int parse_number_view(string_view_t text, number_t *out)
     if (atom_len != len)
         return 0;
 
-    if (expr_parse_view_peek_value(text, 0u, &value, NULL) &&
-        value == 0x221Eu) {
+    if (expr_parse_view_peek_value(text, 0u, &value, NULL) && value == 0x221Eu) {
         *out = num_clone(NUM_INF);
         return 1;
     }
@@ -1965,9 +1792,7 @@ static int parse_number_view(string_view_t text, number_t *out)
 
 static string_view_t binding_text(const binding_parser_t *p)
 {
-    return string_cursor_view_between(0u,
-                                      string_cursor_end_position(p->cursor),
-                                      p->cursor);
+    return string_cursor_view_between(0u, string_cursor_end_position(p->cursor), p->cursor);
 }
 
 static string_t *binding_read_any_name_cursor(string_cursor_t *cursor)
@@ -1989,8 +1814,7 @@ static int binding_can_start_atom(const binding_parser_t *p)
     if (scan_unicode_fraction_len_view(text, binding_pos(p)) > 0u)
         return 1;
 
-    if (binding_peek_value(p, &cp, &len) &&
-        (cp == 0x221A || cp == 0x230A || cp == 0x2308))
+    if (binding_peek_value(p, &cp, &len) && (cp == 0x221A || cp == 0x230A || cp == 0x2308))
         return 1;
 
     {
@@ -2020,12 +1844,10 @@ static int binding_at_middle_dot(const binding_parser_t *p)
 {
     uint32_t cp = 0u;
 
-    return expr_parse_cursor_peek_value_at(p->cursor, binding_pos(p), &cp, NULL) &&
-           cp == 0x00B7u;
+    return expr_parse_cursor_peek_value_at(p->cursor, binding_pos(p), &cp, NULL) && cp == 0x00B7u;
 }
 
-static int binding_const_id_from_name(const char *name,
-                                      expr_binding_const_id_t *const_id_out)
+static int binding_const_id_from_name(const char *name, expr_binding_const_id_t *const_id_out)
 {
     const char *canon = expr_default_constant_canonical_name(name);
 
@@ -2056,9 +1878,7 @@ static int parse_binding_required_char(binding_parser_t *p, char expected, const
     return 1;
 }
 
-static expr_binding_expr_t *parse_binding_enclosed_expr(binding_parser_t *p,
-                                                      char closing,
-                                                      const char *errmsg)
+static expr_binding_expr_t *parse_binding_enclosed_expr(binding_parser_t *p, char closing, const char *errmsg)
 {
     expr_binding_expr_t *inner = parse_binding_addexpr(p);
 
@@ -2072,9 +1892,7 @@ static expr_binding_expr_t *parse_binding_enclosed_expr(binding_parser_t *p,
     return inner;
 }
 
-static int parse_binding_two_args(binding_parser_t *p,
-                                  expr_binding_expr_t **a_out,
-                                  expr_binding_expr_t **b_out)
+static int parse_binding_two_args(binding_parser_t *p, expr_binding_expr_t **a_out, expr_binding_expr_t **b_out)
 {
     expr_binding_expr_t *a = parse_binding_addexpr(p);
     expr_binding_expr_t *b;
@@ -2096,9 +1914,7 @@ static int parse_binding_two_args(binding_parser_t *p,
     return 1;
 }
 
-static int parse_binding_three_args(binding_parser_t *p,
-                                    expr_binding_expr_t **a_out,
-                                    expr_binding_expr_t **b_out,
+static int parse_binding_three_args(binding_parser_t *p, expr_binding_expr_t **a_out, expr_binding_expr_t **b_out,
                                     expr_binding_expr_t **c_out)
 {
     expr_binding_expr_t *a = NULL;
@@ -2107,8 +1923,7 @@ static int parse_binding_three_args(binding_parser_t *p,
 
     if (!parse_binding_two_args(p, &a, &b))
         return 0;
-    if (!parse_binding_required_char(p, ',',
-                                     "expected ',' in ternary function")) {
+    if (!parse_binding_required_char(p, ',', "expected ',' in ternary function")) {
         expr_binding_expr_free(a);
         expr_binding_expr_free(b);
         return 0;
@@ -2126,8 +1941,7 @@ static int parse_binding_three_args(binding_parser_t *p,
     return 1;
 }
 
-static const binding_func_entry_t *parse_binding_function_head(binding_parser_t *p,
-                                                               size_t *paren_pos_out)
+static const binding_func_entry_t *parse_binding_function_head(binding_parser_t *p, size_t *paren_pos_out)
 {
     string_cursor_t *scan = string_cursor_clone(p->cursor);
     size_t id_start = binding_pos(p);
@@ -2139,16 +1953,14 @@ static const binding_func_entry_t *parse_binding_function_head(binding_parser_t 
         return NULL;
     }
 
-    while (string_cursor_peek_ascii(scan, &b) &&
-           binding_ascii_is_function_name_char(b)) {
+    while (string_cursor_peek_ascii(scan, &b) && binding_ascii_is_function_name_char(b)) {
         string_cursor_skip(scan, 1u);
         id_end = string_cursor_position(scan);
     }
 
     if (id_end > id_start) {
         string_view_t id = string_cursor_view_between(id_start, id_end, p->cursor);
-        const binding_func_entry_t *entry =
-            binding_func_lookup(id);
+        const binding_func_entry_t *entry = binding_func_lookup(id);
 
         if (entry) {
             string_cursor_seek(scan, id_end);
@@ -2164,25 +1976,18 @@ static const binding_func_entry_t *parse_binding_function_head(binding_parser_t 
     {
         static const struct {
             const char *text;
-            size_t      len;
-        } unicode_aliases[] = {
-            { "W₀",  sizeof("W₀")  - 1u },
-            { "W₋₁", sizeof("W₋₁") - 1u }
-        };
+            size_t len;
+        } unicode_aliases[] = {{"W₀", sizeof("W₀") - 1u}, {"W₋₁", sizeof("W₋₁") - 1u}};
 
         for (size_t i = 0u; i < sizeof(unicode_aliases) / sizeof(unicode_aliases[0]); ++i) {
             size_t len = unicode_aliases[i].len;
             string_view_t alias_span;
             const binding_func_entry_t *entry;
 
-            if (!string_cursor_match_at(p->cursor,
-                                                     binding_pos(p),
-                                                     unicode_aliases[i].text))
+            if (!string_cursor_match_at(p->cursor, binding_pos(p), unicode_aliases[i].text))
                 continue;
 
-            alias_span = string_cursor_view_between(binding_pos(p),
-                                                    binding_pos(p) + len,
-                                                    p->cursor);
+            alias_span = string_cursor_view_between(binding_pos(p), binding_pos(p) + len, p->cursor);
 
             entry = binding_func_lookup(alias_span);
             string_cursor_seek(scan, binding_pos(p));
@@ -2202,8 +2007,7 @@ static const binding_func_entry_t *parse_binding_function_head(binding_parser_t 
     return NULL;
 }
 
-static expr_binding_expr_t *parse_binding_atom_mode(binding_parser_t *p,
-                                                     bool allow_ascii_rational_literal)
+static expr_binding_expr_t *parse_binding_atom_mode(binding_parser_t *p, bool allow_ascii_rational_literal)
 {
     NUM_SCOPE(scope);
     unsigned char c;
@@ -2254,16 +2058,14 @@ static expr_binding_expr_t *parse_binding_atom_mode(binding_parser_t *p,
             binding_skip_spaces(p);
             if (binding_peek_ascii(p, &next) && next == '(') {
                 binding_skip(p, 1u);
-                arg = parse_binding_enclosed_expr(p, ')',
-                                                  "expected ')' after √ argument");
+                arg = parse_binding_enclosed_expr(p, ')', "expected ')' after √ argument");
             } else {
                 arg = parse_binding_atom_mode(p, false);
             }
             return arg ? expr_binding_expr_new_unary_op(&ops_sqrt, arg) : NULL;
         }
 
-        if (binding_peek_value(p, &cp, &cp_len) &&
-            (cp == 0x230A || cp == 0x2308)) {
+        if (binding_peek_value(p, &cp, &cp_len) && (cp == 0x230A || cp == 0x2308)) {
             const expr_ops_t *ops = (cp == 0x230A) ? &ops_floor : &ops_ceil;
             uint32_t close_cp = 0;
             const uint32_t closing = (cp == 0x230A) ? 0x230B : 0x2309;
@@ -2276,8 +2078,7 @@ static expr_binding_expr_t *parse_binding_atom_mode(binding_parser_t *p,
             if (!inner)
                 return NULL;
             binding_skip_spaces(p);
-            if (!binding_peek_value(p, &close_cp, &close_len) ||
-                close_cp != closing) {
+            if (!binding_peek_value(p, &close_cp, &close_len) || close_cp != closing) {
                 expr_binding_expr_free(inner);
                 binding_set_error(p, errmsg);
                 return NULL;
@@ -2298,18 +2099,12 @@ static expr_binding_expr_t *parse_binding_atom_mode(binding_parser_t *p,
         number_t value;
         unsigned char slash;
 
-        if (!allow_ascii_rational_literal &&
-            decimal_len > 0u &&
-            len > decimal_len &&
-            expr_parse_view_peek_ascii(binding_text(p),
-                                       pos + decimal_len,
-                                       &slash) &&
-            slash == '/')
+        if (!allow_ascii_rational_literal && decimal_len > 0u && len > decimal_len &&
+            expr_parse_view_peek_ascii(binding_text(p), pos + decimal_len, &slash) && slash == '/')
             len = decimal_len;
 
         literal_view = string_cursor_view_between(pos, pos + len, p->cursor);
-        if (len == 0u ||
-            !parse_number_view(literal_view, &value)) {
+        if (len == 0u || !parse_number_view(literal_view, &value)) {
             binding_set_error(p, "expected numeric literal");
             return NULL;
         }
@@ -2321,8 +2116,7 @@ static expr_binding_expr_t *parse_binding_atom_mode(binding_parser_t *p,
         }
         binding_skip(p, len);
         {
-            expr_binding_expr_t *expr =
-                expr_binding_expr_new_number_text(string_c_str(text));
+            expr_binding_expr_t *expr = expr_binding_expr_new_number_text(string_c_str(text));
             string_free(text);
             return expr;
         }
@@ -2342,17 +2136,14 @@ static expr_binding_expr_t *parse_binding_atom_mode(binding_parser_t *p,
 
                 if (!parse_binding_three_args(p, &a, &b, &c))
                     return NULL;
-                if (!parse_binding_required_char(
-                        p, ')', "expected ')' after ternary function")) {
+                if (!parse_binding_required_char(p, ')', "expected ')' after ternary function")) {
                     expr_binding_expr_free(a);
                     expr_binding_expr_free(b);
                     expr_binding_expr_free(c);
                     return NULL;
                 }
-                parameters = expr_binding_expr_new_binary_op(
-                    &ops_lommel_s_pack, a, b);
-                return expr_binding_expr_new_binary_op(
-                    func->ops, parameters, c);
+                parameters = expr_binding_expr_new_binary_op(&ops_lommel_s_pack, a, b);
+                return expr_binding_expr_new_binary_op(func->ops, parameters, c);
             } else if (func->is_binary) {
                 expr_binding_expr_t *a = NULL;
                 expr_binding_expr_t *b = NULL;
@@ -2366,8 +2157,7 @@ static expr_binding_expr_t *parse_binding_atom_mode(binding_parser_t *p,
                 }
                 return expr_binding_expr_new_binary_op(func->ops, a, b);
             } else {
-                expr_binding_expr_t *arg =
-                    parse_binding_enclosed_expr(p, ')', "expected ')' after function argument");
+                expr_binding_expr_t *arg = parse_binding_enclosed_expr(p, ')', "expected ')' after function argument");
 
                 return arg ? expr_binding_expr_new_unary_op(func->ops, arg) : NULL;
             }
@@ -2423,8 +2213,7 @@ static expr_binding_expr_t *parse_binding_power(binding_parser_t *p)
 
         if (binding_peek_ascii(p, &c) && c == '(') {
             binding_skip(p, 1u);
-            exponent = parse_binding_enclosed_expr(p, ')',
-                                                   "expected ')' after exponent");
+            exponent = parse_binding_enclosed_expr(p, ')', "expected ')' after exponent");
         } else {
             exponent = parse_binding_signed_operand(p);
         }
@@ -2573,16 +2362,13 @@ static expr_binding_expr_t *parse_binding_addexpr(binding_parser_t *p)
             return NULL;
         }
 
-        lhs = (op == '+')
-            ? expr_binding_expr_new_add(lhs, rhs)
-            : expr_binding_expr_new_sub(lhs, rhs);
+        lhs = (op == '+') ? expr_binding_expr_new_add(lhs, rhs) : expr_binding_expr_new_sub(lhs, rhs);
     }
 
     return lhs;
 }
 
-expr_binding_expr_t *expr_binding_expr_parse_view(string_view_t text,
-                                                  string_t *errmsg)
+expr_binding_expr_t *expr_binding_expr_parse_view(string_view_t text, string_t *errmsg)
 {
     binding_parser_t ps;
     expr_binding_expr_t *result;
@@ -2649,8 +2435,7 @@ static bool binding_expr_is_atomic(const expr_binding_expr_t *expr)
 
     if (expr->kind == EXPR_BINDING_EXPR_NUMBER) {
         number_t value = num_create_from_string(expr->u.text);
-        bool atomic = !num_is_nan(value) &&
-                      (num_is_real(value) || num_eq(value, NUM_I));
+        bool atomic = !num_is_nan(value) && (num_is_real(value) || num_eq(value, NUM_I));
 
         num_destroy(&value);
         return atomic;
@@ -2700,7 +2485,7 @@ static void emit_binding_superscript_int(sbuf_t *b, long n)
 }
 
 typedef struct {
-    bool      negative;
+    bool negative;
     string_t *numer;
     string_t *denom;
 } binding_simple_rational_t;
@@ -2716,8 +2501,7 @@ static void binding_simple_rational_clear(binding_simple_rational_t *rational)
     rational->denom = NULL;
 }
 
-static bool binding_string_is_simple_rational(const string_t *text,
-                                              binding_simple_rational_t *out)
+static bool binding_string_is_simple_rational(const string_t *text, binding_simple_rational_t *out)
 {
     string_cursor_t *cursor;
     string_pos_t numer_start;
@@ -2738,8 +2522,7 @@ static bool binding_string_is_simple_rational(const string_t *text,
     if (!cursor)
         return false;
 
-    if (rune_is_equal(string_cursor_peek(cursor), '+') ||
-        rune_is_equal(string_cursor_peek(cursor), '-')) {
+    if (rune_is_equal(string_cursor_peek(cursor), '+') || rune_is_equal(string_cursor_peek(cursor), '-')) {
         out->negative = rune_is_equal(string_cursor_peek(cursor), '-');
         (void)string_cursor_next(cursor);
     }
@@ -2774,8 +2557,7 @@ done:
     return ok;
 }
 
-static bool binding_text_is_simple_rational(const char *text,
-                                            binding_simple_rational_t *out)
+static bool binding_text_is_simple_rational(const char *text, binding_simple_rational_t *out)
 {
     string_t *string = text ? string_new_with(text) : NULL;
     bool ok;
@@ -2805,9 +2587,7 @@ static void emit_binding_digits(sbuf_t *b, const string_t *digits)
     string_cursor_free(cursor);
 }
 
-static void emit_binding_unicode_digits(sbuf_t *b,
-                                        const string_t *digits,
-                                        const char *const table[10])
+static void emit_binding_unicode_digits(sbuf_t *b, const string_t *digits, const char *const table[10])
 {
     string_cursor_t *cursor = string_cursor_new(digits);
 
@@ -2917,7 +2697,7 @@ fail:
 static void emit_binding_number_text(const char *text, sbuf_t *b)
 {
     string_t *clean;
-    binding_simple_rational_t rational = { false, NULL, NULL };
+    binding_simple_rational_t rational = {false, NULL, NULL};
 
     if (binding_text_is_simple_rational(text, &rational)) {
         if (rational.negative)
@@ -2944,9 +2724,7 @@ static void emit_binding_number_text(const char *text, sbuf_t *b)
 static void emit_binding_expr(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
 static void emit_binding_tex_expr(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
 
-static bool binding_number_value_unary(const expr_binding_expr_t *expr,
-                                       binding_number_unary_fn op,
-                                       number_t *out)
+static bool binding_number_value_unary(const expr_binding_expr_t *expr, binding_number_unary_fn op, number_t *out)
 {
     number_t child;
 
@@ -2957,9 +2735,7 @@ static bool binding_number_value_unary(const expr_binding_expr_t *expr,
     return true;
 }
 
-static bool binding_number_value_binary(const expr_binding_expr_t *expr,
-                                        binding_number_binary_fn op,
-                                        number_t *out)
+static bool binding_number_value_binary(const expr_binding_expr_t *expr, binding_number_binary_fn op, number_t *out)
 {
     number_t left;
     number_t right;
@@ -2976,53 +2752,45 @@ static bool binding_number_value_binary(const expr_binding_expr_t *expr,
     return true;
 }
 
-static bool binding_number_value_number(const expr_binding_expr_t *expr,
-                                        number_t *out)
+static bool binding_number_value_number(const expr_binding_expr_t *expr, number_t *out)
 {
     *out = num_scope_detach(binding_number_from_text(expr->u.text));
     return true;
 }
 
-static bool binding_number_value_false(const expr_binding_expr_t *expr,
-                                       number_t *out)
+static bool binding_number_value_false(const expr_binding_expr_t *expr, number_t *out)
 {
     (void)expr;
     (void)out;
     return false;
 }
 
-static bool binding_number_value_neg(const expr_binding_expr_t *expr,
-                                     number_t *out)
+static bool binding_number_value_neg(const expr_binding_expr_t *expr, number_t *out)
 {
     return binding_number_value_unary(expr, num_neg, out);
 }
 
-static bool binding_number_value_add(const expr_binding_expr_t *expr,
-                                     number_t *out)
+static bool binding_number_value_add(const expr_binding_expr_t *expr, number_t *out)
 {
     return binding_number_value_binary(expr, num_add, out);
 }
 
-static bool binding_number_value_sub(const expr_binding_expr_t *expr,
-                                     number_t *out)
+static bool binding_number_value_sub(const expr_binding_expr_t *expr, number_t *out)
 {
     return binding_number_value_binary(expr, num_sub, out);
 }
 
-static bool binding_number_value_mul(const expr_binding_expr_t *expr,
-                                     number_t *out)
+static bool binding_number_value_mul(const expr_binding_expr_t *expr, number_t *out)
 {
     return binding_number_value_binary(expr, num_mul, out);
 }
 
-static bool binding_number_value_div(const expr_binding_expr_t *expr,
-                                     number_t *out)
+static bool binding_number_value_div(const expr_binding_expr_t *expr, number_t *out)
 {
     return binding_number_value_binary(expr, num_div, out);
 }
 
-static bool binding_number_value_powi(const expr_binding_expr_t *expr,
-                                      number_t *out)
+static bool binding_number_value_powi(const expr_binding_expr_t *expr, number_t *out)
 {
     number_t base;
 
@@ -3044,8 +2812,7 @@ bool expr_binding_expr_number_value(const expr_binding_expr_t *expr, number_t *o
     return ops && ops->number_value ? ops->number_value(expr, out) : false;
 }
 
-static bool binding_expr_leading_number(const expr_binding_expr_t *expr,
-                                        number_t *coeff_out,
+static bool binding_expr_leading_number(const expr_binding_expr_t *expr, number_t *coeff_out,
                                         const expr_binding_expr_t **rest_out)
 {
     if (expr_binding_expr_number_value(expr, coeff_out)) {
@@ -3053,8 +2820,7 @@ static bool binding_expr_leading_number(const expr_binding_expr_t *expr,
         return true;
     }
 
-    if (expr && expr->kind == EXPR_BINDING_EXPR_MUL &&
-        expr_binding_expr_number_value(expr->u.binary.left, coeff_out)) {
+    if (expr && expr->kind == EXPR_BINDING_EXPR_MUL && expr_binding_expr_number_value(expr->u.binary.left, coeff_out)) {
         *rest_out = expr->u.binary.right;
         return true;
     }
@@ -3062,9 +2828,8 @@ static bool binding_expr_leading_number(const expr_binding_expr_t *expr,
     return false;
 }
 
-bool expr_binding_expr_split_leading_number(const expr_binding_expr_t *expr,
-                                          number_t *coeff_out,
-                                          expr_binding_expr_t **rest_out)
+bool expr_binding_expr_split_leading_number(const expr_binding_expr_t *expr, number_t *coeff_out,
+                                            expr_binding_expr_t **rest_out)
 {
     number_t coeff;
     number_t right_coeff;
@@ -3096,8 +2861,7 @@ bool expr_binding_expr_split_leading_number(const expr_binding_expr_t *expr,
         }
     }
 
-    if (expr->kind == EXPR_BINDING_EXPR_DIV &&
-        expr_binding_expr_number_value(expr->u.binary.right, &right_coeff)) {
+    if (expr->kind == EXPR_BINDING_EXPR_DIV && expr_binding_expr_number_value(expr->u.binary.right, &right_coeff)) {
         if (expr_binding_expr_split_leading_number(expr->u.binary.left, &coeff, rest_out)) {
             folded = num_scope_detach(num_div(coeff, right_coeff));
             num_destroy(&coeff);
@@ -3109,11 +2873,7 @@ bool expr_binding_expr_split_leading_number(const expr_binding_expr_t *expr,
     }
 
     if (expr->kind == EXPR_BINDING_EXPR_DIV &&
-        binding_const_ratio_parts(expr->u.binary.left,
-                                  expr->u.binary.right,
-                                  &numer,
-                                  &denom,
-                                  &const_id)) {
+        binding_const_ratio_parts(expr->u.binary.left, expr->u.binary.right, &numer, &denom, &const_id)) {
         number_t numer_value = num_create_from_long(numer);
         number_t denom_value = num_create_from_long(denom);
 
@@ -3133,7 +2893,6 @@ bool expr_binding_expr_split_leading_number(const expr_binding_expr_t *expr,
     return false;
 }
 
-
 expr_binding_expr_t *expr_binding_expr_simplify(expr_binding_expr_t *expr)
 {
     const binding_expr_ops_t *ops;
@@ -3145,20 +2904,16 @@ expr_binding_expr_t *expr_binding_expr_simplify(expr_binding_expr_t *expr)
     return ops && ops->simplify ? ops->simplify(expr) : expr;
 }
 
-static void emit_binding_expr_mul_separator(const expr_binding_expr_t *left,
-                                            const expr_binding_expr_t *right,
+static void emit_binding_expr_mul_separator(const expr_binding_expr_t *left, const expr_binding_expr_t *right,
                                             sbuf_t *b)
 {
     if (!(binding_expr_is_atomic(left) && binding_expr_is_atomic(right)))
         sbuf_puts(b, "·");
 }
 
-static void emit_binding_tex_mul_separator(const expr_binding_expr_t *left,
-                                           const expr_binding_expr_t *right,
-                                           sbuf_t *b)
+static void emit_binding_tex_mul_separator(const expr_binding_expr_t *left, const expr_binding_expr_t *right, sbuf_t *b)
 {
-    if (left && left->kind == EXPR_BINDING_EXPR_NUMBER &&
-        binding_expr_is_const_id(right, EXPR_BINDING_CONST_I))
+    if (left && left->kind == EXPR_BINDING_EXPR_NUMBER && binding_expr_is_const_id(right, EXPR_BINDING_CONST_I))
         return;
     if (binding_expr_is_atomic(left) && binding_expr_is_atomic(right))
         sbuf_putc(b, ' ');
@@ -3166,9 +2921,7 @@ static void emit_binding_tex_mul_separator(const expr_binding_expr_t *left,
         sbuf_puts(b, " \\cdot ");
 }
 
-static void emit_binding_expr_mul(const expr_binding_expr_t *left,
-                                  const expr_binding_expr_t *right,
-                                  sbuf_t *b,
+static void emit_binding_expr_mul(const expr_binding_expr_t *left, const expr_binding_expr_t *right, sbuf_t *b,
                                   int parent_prec)
 {
     bool need = BIND_PREC_MUL < parent_prec;
@@ -3182,9 +2935,7 @@ static void emit_binding_expr_mul(const expr_binding_expr_t *left,
         sbuf_putc(b, ')');
 }
 
-static void emit_binding_tex_mul(const expr_binding_expr_t *left,
-                                 const expr_binding_expr_t *right,
-                                 sbuf_t *b,
+static void emit_binding_tex_mul(const expr_binding_expr_t *left, const expr_binding_expr_t *right, sbuf_t *b,
                                  int parent_prec)
 {
     bool need = BIND_PREC_MUL < parent_prec;
@@ -3222,10 +2973,7 @@ static void emit_binding_expr_neg(const expr_binding_expr_t *expr, sbuf_t *b, in
         sbuf_putc(b, ')');
 }
 
-static void emit_binding_expr_addsub(const expr_binding_expr_t *expr,
-                                     sbuf_t *b,
-                                     int parent_prec,
-                                     const char *op,
+static void emit_binding_expr_addsub(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec, const char *op,
                                      int right_prec)
 {
     bool need = BIND_PREC_ADD < parent_prec;
@@ -3254,10 +3002,7 @@ static void emit_binding_expr_mul_node(const expr_binding_expr_t *expr, sbuf_t *
     emit_binding_expr_mul(expr->u.binary.left, expr->u.binary.right, b, parent_prec);
 }
 
-static void emit_binding_expr_const_ratio_value(expr_binding_const_id_t const_id,
-                                                long numer,
-                                                long denom,
-                                                sbuf_t *b)
+static void emit_binding_expr_const_ratio_value(expr_binding_const_id_t const_id, long numer, long denom, sbuf_t *b)
 {
     long abs_numer = numer < 0L ? -numer : numer;
 
@@ -3288,8 +3033,7 @@ static void emit_binding_expr_div(const expr_binding_expr_t *expr, sbuf_t *b, in
 
     if (need)
         sbuf_putc(b, '(');
-    if (binding_const_ratio_parts(expr->u.binary.left, expr->u.binary.right,
-                                  &numer, &denom, &const_id)) {
+    if (binding_const_ratio_parts(expr->u.binary.left, expr->u.binary.right, &numer, &denom, &const_id)) {
         emit_binding_expr_const_ratio_value(const_id, numer, denom, b);
         if (need)
             sbuf_putc(b, ')');
@@ -3318,8 +3062,7 @@ static void emit_binding_expr_powi(const expr_binding_expr_t *expr, sbuf_t *b, i
         } else {
             if (base_need)
                 sbuf_putc(b, '(');
-            emit_binding_expr(expr->u.powi.base, b,
-                              base_need ? BIND_PREC_LOWEST : BIND_PREC_POW);
+            emit_binding_expr(expr->u.powi.base, b, base_need ? BIND_PREC_LOWEST : BIND_PREC_POW);
             if (base_need)
                 sbuf_putc(b, ')');
             emit_binding_superscript_int(b, positive_exponent);
@@ -3332,8 +3075,7 @@ static void emit_binding_expr_powi(const expr_binding_expr_t *expr, sbuf_t *b, i
     (void)parent_prec;
     if (base_need)
         sbuf_putc(b, '(');
-    emit_binding_expr(expr->u.powi.base, b,
-                      base_need ? BIND_PREC_LOWEST : BIND_PREC_POW);
+    emit_binding_expr(expr->u.powi.base, b, base_need ? BIND_PREC_LOWEST : BIND_PREC_POW);
     if (base_need)
         sbuf_putc(b, ')');
     emit_binding_superscript_int(b, expr->u.powi.exponent);
@@ -3343,7 +3085,7 @@ static void emit_binding_tex_number(const expr_binding_expr_t *expr, sbuf_t *b, 
 {
     string_t *clean;
     char *tex;
-    binding_simple_rational_t rational = { false, NULL, NULL };
+    binding_simple_rational_t rational = {false, NULL, NULL};
 
     (void)parent_prec;
     if (expr->u.text && strcmp(expr->u.text, "∞") == 0) {
@@ -3393,10 +3135,7 @@ static void emit_binding_tex_neg(const expr_binding_expr_t *expr, sbuf_t *b, int
         sbuf_putc(b, ')');
 }
 
-static void emit_binding_tex_addsub(const expr_binding_expr_t *expr,
-                                    sbuf_t *b,
-                                    int parent_prec,
-                                    const char *op,
+static void emit_binding_tex_addsub(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec, const char *op,
                                     int right_prec)
 {
     bool need = BIND_PREC_ADD < parent_prec;
@@ -3425,9 +3164,7 @@ static void emit_binding_tex_mul_node(const expr_binding_expr_t *expr, sbuf_t *b
     emit_binding_tex_mul(expr->u.binary.left, expr->u.binary.right, b, parent_prec);
 }
 
-static void emit_binding_tex_const_ratio_numer(expr_binding_const_id_t const_id,
-                                               long numer,
-                                               sbuf_t *b)
+static void emit_binding_tex_const_ratio_numer(expr_binding_const_id_t const_id, long numer, sbuf_t *b)
 {
     long abs_numer = numer < 0L ? -numer : numer;
 
@@ -3442,10 +3179,7 @@ static void emit_binding_tex_const_ratio_numer(expr_binding_const_id_t const_id,
     sbuf_puts(b, binding_const_tex_name(const_id));
 }
 
-static void emit_binding_tex_const_ratio_value(expr_binding_const_id_t const_id,
-                                               long numer,
-                                               long denom,
-                                               sbuf_t *b)
+static void emit_binding_tex_const_ratio_value(expr_binding_const_id_t const_id, long numer, long denom, sbuf_t *b)
 {
     if (denom == 1L) {
         emit_binding_tex_const_ratio_numer(const_id, numer, b);
@@ -3470,8 +3204,7 @@ static void emit_binding_tex_div(const expr_binding_expr_t *expr, sbuf_t *b, int
     expr_binding_const_id_t const_id;
 
     (void)parent_prec;
-    if (binding_const_ratio_parts(expr->u.binary.left, expr->u.binary.right,
-                                  &numer, &denom, &const_id)) {
+    if (binding_const_ratio_parts(expr->u.binary.left, expr->u.binary.right, &numer, &denom, &const_id)) {
         emit_binding_tex_const_ratio_value(const_id, numer, denom, b);
         return;
     }
@@ -3497,8 +3230,7 @@ static void emit_binding_tex_powi(const expr_binding_expr_t *expr, sbuf_t *b, in
         } else {
             if (base_need)
                 sbuf_puts(b, "\\left(");
-            emit_binding_tex_expr(expr->u.powi.base, b,
-                                  base_need ? BIND_PREC_LOWEST : BIND_PREC_POW);
+            emit_binding_tex_expr(expr->u.powi.base, b, base_need ? BIND_PREC_LOWEST : BIND_PREC_POW);
             if (base_need)
                 sbuf_puts(b, "\\right)");
             snprintf(expbuf, sizeof(expbuf), "%ld", positive_exponent);
@@ -3512,8 +3244,7 @@ static void emit_binding_tex_powi(const expr_binding_expr_t *expr, sbuf_t *b, in
 
     if (base_need)
         sbuf_puts(b, "\\left(");
-    emit_binding_tex_expr(expr->u.powi.base, b,
-                          base_need ? BIND_PREC_LOWEST : BIND_PREC_POW);
+    emit_binding_tex_expr(expr->u.powi.base, b, base_need ? BIND_PREC_LOWEST : BIND_PREC_POW);
     if (base_need)
         sbuf_puts(b, "\\right)");
     snprintf(expbuf, sizeof(expbuf), "%ld", expr->u.powi.exponent);
@@ -3522,9 +3253,7 @@ static void emit_binding_tex_powi(const expr_binding_expr_t *expr, sbuf_t *b, in
     sbuf_putc(b, '}');
 }
 
-static void emit_binding_expr_unary_call(const expr_ops_t *ops,
-                                         const expr_binding_expr_t *child,
-                                         sbuf_t *b)
+static void emit_binding_expr_unary_call(const expr_ops_t *ops, const expr_binding_expr_t *child, sbuf_t *b)
 {
     if (ops == &ops_gamma)
         sbuf_puts(b, "Γ");
@@ -3539,9 +3268,7 @@ static void emit_binding_expr_unary_call(const expr_ops_t *ops,
     sbuf_putc(b, ')');
 }
 
-static void emit_binding_tex_unary_call(const expr_ops_t *ops,
-                                        const expr_binding_expr_t *child,
-                                        sbuf_t *b)
+static void emit_binding_tex_unary_call(const expr_ops_t *ops, const expr_binding_expr_t *child, sbuf_t *b)
 {
     const char *name = (ops && ops->tex_name) ? ops->tex_name : NULL;
 
@@ -3557,9 +3284,7 @@ static void emit_binding_tex_unary_call(const expr_ops_t *ops,
     sbuf_putc(b, ')');
 }
 
-static void emit_binding_expr_unary_sqrt(const expr_ops_t *ops,
-                                         const expr_binding_expr_t *child,
-                                         sbuf_t *b)
+static void emit_binding_expr_unary_sqrt(const expr_ops_t *ops, const expr_binding_expr_t *child, sbuf_t *b)
 {
     (void)ops;
     sbuf_puts(b, "√(");
@@ -3567,9 +3292,7 @@ static void emit_binding_expr_unary_sqrt(const expr_ops_t *ops,
     sbuf_putc(b, ')');
 }
 
-static void emit_binding_tex_unary_sqrt(const expr_ops_t *ops,
-                                        const expr_binding_expr_t *child,
-                                        sbuf_t *b)
+static void emit_binding_tex_unary_sqrt(const expr_ops_t *ops, const expr_binding_expr_t *child, sbuf_t *b)
 {
     (void)ops;
     sbuf_puts(b, "\\sqrt{");
@@ -3577,9 +3300,7 @@ static void emit_binding_tex_unary_sqrt(const expr_ops_t *ops,
     sbuf_putc(b, '}');
 }
 
-static void emit_binding_expr_unary_abs(const expr_ops_t *ops,
-                                        const expr_binding_expr_t *child,
-                                        sbuf_t *b)
+static void emit_binding_expr_unary_abs(const expr_ops_t *ops, const expr_binding_expr_t *child, sbuf_t *b)
 {
     (void)ops;
     sbuf_putc(b, '|');
@@ -3587,9 +3308,7 @@ static void emit_binding_expr_unary_abs(const expr_ops_t *ops,
     sbuf_putc(b, '|');
 }
 
-static void emit_binding_tex_unary_abs(const expr_ops_t *ops,
-                                       const expr_binding_expr_t *child,
-                                       sbuf_t *b)
+static void emit_binding_tex_unary_abs(const expr_ops_t *ops, const expr_binding_expr_t *child, sbuf_t *b)
 {
     (void)ops;
     sbuf_puts(b, "\\left|");
@@ -3597,9 +3316,7 @@ static void emit_binding_tex_unary_abs(const expr_ops_t *ops,
     sbuf_puts(b, "\\right|");
 }
 
-static void emit_binding_expr_unary_floor(const expr_ops_t *ops,
-                                          const expr_binding_expr_t *child,
-                                          sbuf_t *b)
+static void emit_binding_expr_unary_floor(const expr_ops_t *ops, const expr_binding_expr_t *child, sbuf_t *b)
 {
     (void)ops;
     sbuf_puts(b, "⌊");
@@ -3607,9 +3324,7 @@ static void emit_binding_expr_unary_floor(const expr_ops_t *ops,
     sbuf_puts(b, "⌋");
 }
 
-static void emit_binding_tex_unary_floor(const expr_ops_t *ops,
-                                         const expr_binding_expr_t *child,
-                                         sbuf_t *b)
+static void emit_binding_tex_unary_floor(const expr_ops_t *ops, const expr_binding_expr_t *child, sbuf_t *b)
 {
     (void)ops;
     sbuf_puts(b, "\\left\\lfloor ");
@@ -3617,9 +3332,7 @@ static void emit_binding_tex_unary_floor(const expr_ops_t *ops,
     sbuf_puts(b, " \\right\\rfloor");
 }
 
-static void emit_binding_expr_unary_ceil(const expr_ops_t *ops,
-                                         const expr_binding_expr_t *child,
-                                         sbuf_t *b)
+static void emit_binding_expr_unary_ceil(const expr_ops_t *ops, const expr_binding_expr_t *child, sbuf_t *b)
 {
     (void)ops;
     sbuf_puts(b, "⌈");
@@ -3627,9 +3340,7 @@ static void emit_binding_expr_unary_ceil(const expr_ops_t *ops,
     sbuf_puts(b, "⌉");
 }
 
-static void emit_binding_tex_unary_ceil(const expr_ops_t *ops,
-                                        const expr_binding_expr_t *child,
-                                        sbuf_t *b)
+static void emit_binding_tex_unary_ceil(const expr_ops_t *ops, const expr_binding_expr_t *child, sbuf_t *b)
 {
     (void)ops;
     sbuf_puts(b, "\\left\\lceil ");
@@ -3637,8 +3348,7 @@ static void emit_binding_tex_unary_ceil(const expr_ops_t *ops,
     sbuf_puts(b, " \\right\\rceil");
 }
 
-static bool emit_binding_tex_exp_unit_fraction_root(
-    const expr_binding_expr_t *child, sbuf_t *b)
+static bool emit_binding_tex_exp_unit_fraction_root(const expr_binding_expr_t *child, sbuf_t *b)
 {
     number_t value;
     long numerator;
@@ -3647,9 +3357,7 @@ static bool emit_binding_tex_exp_unit_fraction_root(
     if (!expr_binding_expr_number_value(child, &value))
         return false;
 
-    if (!num_get_small_rational(value, &numerator, &denominator) ||
-        numerator != 1L ||
-        denominator <= 1L) {
+    if (!num_get_small_rational(value, &numerator, &denominator) || numerator != 1L || denominator <= 1L) {
         num_destroy(&value);
         return false;
     }
@@ -3668,9 +3376,7 @@ static bool emit_binding_tex_exp_unit_fraction_root(
     return true;
 }
 
-static void emit_binding_tex_unary_exp(const expr_ops_t *ops,
-                                       const expr_binding_expr_t *child,
-                                       sbuf_t *b)
+static void emit_binding_tex_unary_exp(const expr_ops_t *ops, const expr_binding_expr_t *child, sbuf_t *b)
 {
     (void)ops;
     if (emit_binding_tex_exp_unit_fraction_root(child, b))
@@ -3681,41 +3387,34 @@ static void emit_binding_tex_unary_exp(const expr_ops_t *ops,
     sbuf_putc(b, '}');
 }
 
-static void emit_binding_expr_unary_neg_op(const expr_ops_t *ops,
-                                           const expr_binding_expr_t *child,
-                                           sbuf_t *b)
+static void emit_binding_expr_unary_neg_op(const expr_ops_t *ops, const expr_binding_expr_t *child, sbuf_t *b)
 {
     (void)ops;
     sbuf_putc(b, '-');
     emit_binding_expr(child, b, BIND_PREC_UNARY);
 }
 
-static void emit_binding_tex_unary_neg_op(const expr_ops_t *ops,
-                                          const expr_binding_expr_t *child,
-                                          sbuf_t *b)
+static void emit_binding_tex_unary_neg_op(const expr_ops_t *ops, const expr_binding_expr_t *child, sbuf_t *b)
 {
     (void)ops;
     sbuf_putc(b, '-');
     emit_binding_tex_expr(child, b, BIND_PREC_UNARY);
 }
 
-typedef void (*binding_unary_emit_fn)(const expr_ops_t *ops,
-                                      const expr_binding_expr_t *child,
-                                      sbuf_t *b);
+typedef void (*binding_unary_emit_fn)(const expr_ops_t *ops, const expr_binding_expr_t *child, sbuf_t *b);
 
 typedef struct {
-    binding_unary_emit_fn   emit_expr;
-    binding_unary_emit_fn   emit_tex;
+    binding_unary_emit_fn emit_expr;
+    binding_unary_emit_fn emit_tex;
 } binding_unary_render_t;
 
 static const binding_unary_render_t s_binding_unary_renderers[EXPR_KIND_COUNT] = {
-    [EXPR_KIND_NEG] = { emit_binding_expr_unary_neg_op, emit_binding_tex_unary_neg_op },
-    [EXPR_KIND_SQRT] = { emit_binding_expr_unary_sqrt, emit_binding_tex_unary_sqrt },
-    [EXPR_KIND_ABS] = { emit_binding_expr_unary_abs, emit_binding_tex_unary_abs },
-    [EXPR_KIND_FLOOR] = { emit_binding_expr_unary_floor, emit_binding_tex_unary_floor },
-    [EXPR_KIND_CEIL] = { emit_binding_expr_unary_ceil, emit_binding_tex_unary_ceil },
-    [EXPR_KIND_EXP] = { emit_binding_expr_unary_call, emit_binding_tex_unary_exp }
-};
+    [EXPR_KIND_NEG] = {emit_binding_expr_unary_neg_op, emit_binding_tex_unary_neg_op},
+    [EXPR_KIND_SQRT] = {emit_binding_expr_unary_sqrt, emit_binding_tex_unary_sqrt},
+    [EXPR_KIND_ABS] = {emit_binding_expr_unary_abs, emit_binding_tex_unary_abs},
+    [EXPR_KIND_FLOOR] = {emit_binding_expr_unary_floor, emit_binding_tex_unary_floor},
+    [EXPR_KIND_CEIL] = {emit_binding_expr_unary_ceil, emit_binding_tex_unary_ceil},
+    [EXPR_KIND_EXP] = {emit_binding_expr_unary_call, emit_binding_tex_unary_exp}};
 
 static const binding_unary_render_t *binding_unary_renderer_for_ops(const expr_ops_t *ops)
 {
@@ -3821,10 +3520,7 @@ static void emit_binding_func_neg(const expr_binding_expr_t *expr, sbuf_t *b, in
         sbuf_putc(b, ')');
 }
 
-static void emit_binding_func_addsub(const expr_binding_expr_t *expr,
-                                     sbuf_t *b,
-                                     int parent_prec,
-                                     const char *op,
+static void emit_binding_func_addsub(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec, const char *op,
                                      int right_prec)
 {
     bool need = BIND_PREC_ADD < parent_prec;
@@ -3892,8 +3588,7 @@ static void emit_binding_func_powi(const expr_binding_expr_t *expr, sbuf_t *b, i
         } else {
             if (base_need)
                 sbuf_putc(b, '(');
-            emit_binding_func_expr(expr->u.powi.base, b,
-                                   base_need ? BIND_PREC_LOWEST : BIND_PREC_POW);
+            emit_binding_func_expr(expr->u.powi.base, b, base_need ? BIND_PREC_LOWEST : BIND_PREC_POW);
             if (base_need)
                 sbuf_putc(b, ')');
             snprintf(expbuf, sizeof(expbuf), "%ld", positive_exponent);
@@ -4100,10 +3795,7 @@ char *expr_binding_expr_to_tex(const expr_binding_expr_t *expr)
     }
 }
 
-void expr_set_binding_pi_linear_family(expr_t *expr,
-                                       long denominator,
-                                       long n_coeff,
-                                       long offset)
+void expr_set_binding_pi_linear_family(expr_t *expr, long denominator, long n_coeff, long offset)
 {
     char n_term[64];
     char offset_text[64];
@@ -4118,14 +3810,11 @@ void expr_set_binding_pi_linear_family(expr_t *expr,
     snprintf(denominator_text, sizeof(denominator_text), "%ld", denominator);
 
     binding_expr = expr_binding_expr_new_mul(
-        expr_binding_expr_new_div(
-            expr_binding_expr_new_number_text("1"),
-            expr_binding_expr_new_number_text(denominator_text)),
-        expr_binding_expr_new_mul(
-            expr_binding_expr_new_const(EXPR_BINDING_CONST_PI),
-            expr_binding_expr_new_add(
-                expr_binding_expr_new_number_text(n_term),
-                expr_binding_expr_new_number_text(offset_text))));
+        expr_binding_expr_new_div(expr_binding_expr_new_number_text("1"),
+                                  expr_binding_expr_new_number_text(denominator_text)),
+        expr_binding_expr_new_mul(expr_binding_expr_new_const(EXPR_BINDING_CONST_PI),
+                                  expr_binding_expr_new_add(expr_binding_expr_new_number_text(n_term),
+                                                            expr_binding_expr_new_number_text(offset_text))));
     if (!binding_expr)
         return;
 

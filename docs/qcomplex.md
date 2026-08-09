@@ -26,7 +26,9 @@ currently remains a transparent by-value struct.
 - magnitude and argument
 - elementary functions: exp, log, pow, sqrt
 - trigonometric, versine/haversine, and hyperbolic functions (and their inverses)
-- special functions: erf, gamma, polygamma, beta, Lambert W, incomplete gamma, exponential integrals, polylogarithms, Appell F₁, normal distribution
+- special functions: erf, gamma, polygamma, beta, Lambert W, incomplete gamma,
+  exponential integrals, polylogarithms, generalised hypergeometric pFq,
+  Lauricella F_D, Appell F₁ and the normal distribution
 - polar form conversion
 - parsing from string
 - printf-style formatting and printing
@@ -198,7 +200,9 @@ All declarations are in `include/qcomplex.h`.
 | `qc_dilog(z)` | principal dilogarithm Li₂(z) |
 | `qc_polylog(s, z)` | polylogarithm Li_s(z) for integer real orders currently supported by the implementation |
 | `qc_legendre_chi(s, z)` | Legendre chi χ_s(z) for integer real orders currently supported by the implementation |
-| `qc_appell_f1(a, b1, b2, c, x, y)` | Appell hypergeometric function F₁(a; b₁, b₂; c; x, y), within the currently implemented convergence region |
+| `qc_hypergeometric_pFq(upper, upper_count, lower, lower_count, argument)` | generalised hypergeometric pFq; either parameter array may be `NULL` when its count is zero |
+| `qc_lauricella_f(a, b, c, x, variable_count)` | Lauricella F_D in `variable_count` variables within the implemented convergence polydisc |
+| `qc_appell_f1(a, b1, b2, c, x, y)` | Appell F₁, implemented as the two-variable Lauricella F_D member |
 
 ### Utility
 
@@ -251,9 +255,10 @@ All declarations are in `include/qcomplex.h`.
 - **Precision:** All arithmetic and elementary functions operate at full `qfloat_t` precision (~31–32 decimal digits, ~106 bits), both for real and complex arguments, unless otherwise noted.
 - **Special functions:** For real arguments where `qc_imag(z) == 0`, all special functions use the corresponding `qf_` implementation, preserving full precision. For complex arguments, algorithms are chosen to maximise accuracy and stability, but some special functions may have slightly reduced precision due to the complexity of analytic continuation or series evaluation in the complex plane.
 - **Gamma and polygamma:** Implemented using high-precision algorithms (e.g., Lanczos, asymptotic expansions) to maintain as much precision as possible for both real and complex arguments.
-- **Lambert W, incomplete gamma, exponential integrals, polylogarithms, and Appell F₁:** Use iterative or series/continued-fraction methods adapted for complex arguments, with careful attention to branch cuts and principal values.
+- **Lambert W, incomplete gamma, exponential integrals, polylogarithms and the hypergeometric families:** Use iterative or dynamically converged series/continued-fraction methods adapted for complex arguments, with careful attention to branch cuts and principal values. Appell F₁ delegates to the two-variable Lauricella F_D implementation.
 - **Parsing and formatting:** Parsing from string and printf-style formatting are supported for all complex numbers, with full control over decimal/scientific notation and alignment.
 - **Fast paths:** For all functions, if the imaginary part is zero, the real-valued `qf_` implementation is used for maximum speed and accuracy.
+- **Numeric boundary:** `qcomplex_t` is implemented in terms of `qfloat_t` and does not include, call or link against MPFR or MPC. Multiprecision promotion belongs to `number_t`.
 
 If you need details about the implementation of a specific function or want to know about accuracy in a particular region of the complex plane, see the source code or contact the maintainers.
 

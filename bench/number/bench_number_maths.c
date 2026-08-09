@@ -1,9 +1,9 @@
+#include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <math.h>
 
 #include "number.h"
 
@@ -34,42 +34,49 @@ typedef struct bench_stats_t {
     int samples;
 } bench_stats_t;
 
-static const bench_md_row_t bench_md_rows[] = {
-    { "exp", "num_exp(1.23456789)" },
-    { "log", "num_log(2.345678)" },
-    { "sqrt", "num_sqrt(1.23456789)" },
-    { "sin", "num_sin(0.567)" },
-    { "cos", "num_cos(0.7)" },
-    { "sincos", "num_sincos(0.7)" },
-    { "tan", "num_tan(0.7)" },
-    { "atan", "num_atan(0.7)" },
-    { "asin_general", "num_asin(0.7)" },
-    { "acos_general", "num_acos(0.7)" },
-    { "atan2_general", "num_atan2(0.5,-0.75)" },
-    { "sinh", "num_sinh(0.7)" },
-    { "cosh", "num_cosh(0.7)" },
-    { "sinhcosh", "num_sinhcosh(0.7)" },
-    { "tanh", "num_tanh(0.7)" },
-    { "asinh", "num_asinh(0.5)" },
-    { "acosh", "num_acosh(2)" },
-    { "atanh", "num_atanh(0.5)" },
-    { "lambert_w0", "num_lambert_w0(0.7)" },
-    { "lambert_wm1", "num_lambert_wm1(-0.2)" },
-    { "gamma", "num_gamma(2.345)" },
-    { "lgamma", "num_lgamma(2.345)" },
-    { "digamma", "num_digamma(2.345)" },
-    { "trigamma", "num_trigamma(2.345)" },
-    { "tetragamma", "num_tetragamma(2.345)" },
-    { "ei_5", "num_ei(5)" },
-    { "e1_5", "num_e1(5)" }
-};
+static const bench_md_row_t bench_md_rows[] = {{"exp", "num_exp(1.23456789)"},
+                                               {"log", "num_log(2.345678)"},
+                                               {"sqrt", "num_sqrt(1.23456789)"},
+                                               {"sin", "num_sin(0.567)"},
+                                               {"cos", "num_cos(0.7)"},
+                                               {"sincos", "num_sincos(0.7)"},
+                                               {"tan", "num_tan(0.7)"},
+                                               {"atan", "num_atan(0.7)"},
+                                               {"asin_general", "num_asin(0.7)"},
+                                               {"acos_general", "num_acos(0.7)"},
+                                               {"atan2_general", "num_atan2(0.5,-0.75)"},
+                                               {"sinh", "num_sinh(0.7)"},
+                                               {"cosh", "num_cosh(0.7)"},
+                                               {"sinhcosh", "num_sinhcosh(0.7)"},
+                                               {"tanh", "num_tanh(0.7)"},
+                                               {"asinh", "num_asinh(0.5)"},
+                                               {"acosh", "num_acosh(2)"},
+                                               {"atanh", "num_atanh(0.5)"},
+                                               {"lambert_w0", "num_lambert_w0(0.7)"},
+                                               {"lambert_wm1", "num_lambert_wm1(-0.2)"},
+                                               {"gamma", "num_gamma(2.345)"},
+                                               {"lgamma", "num_lgamma(2.345)"},
+                                               {"digamma", "num_digamma(2.345)"},
+                                               {"trigamma", "num_trigamma(2.345)"},
+                                               {"tetragamma", "num_tetragamma(2.345)"},
+                                               {"ei_5", "num_ei(5)"},
+                                               {"e1_5", "num_e1(5)"}};
 
 static int bench_markdown_enabled(void);
 static int bench_doc_iters(int base_iters);
 
-static number_t bench_num_pi(void) { return num_clone(NUM_PI); }
-static number_t bench_num_e(void) { return num_clone(NUM_E); }
-static number_t bench_num_euler_mascheroni(void) { return num_clone(NUM_EULER_MASCHERONI); }
+static number_t bench_num_pi(void)
+{
+    return num_clone(NUM_PI);
+}
+static number_t bench_num_e(void)
+{
+    return num_clone(NUM_E);
+}
+static number_t bench_num_euler_mascheroni(void)
+{
+    return num_clone(NUM_EULER_MASCHERONI);
+}
 
 static uint64_t now_ns(void)
 {
@@ -268,9 +275,7 @@ static void bench_print_us(const char *label, size_t precision, bench_stats_t st
 
     if (format && strcmp(format, "md") == 0) {
         if (bench_result_count < sizeof(bench_results) / sizeof(bench_results[0])) {
-            snprintf(bench_results[bench_result_count].label,
-                     sizeof(bench_results[bench_result_count].label),
-                     "%s",
+            snprintf(bench_results[bench_result_count].label, sizeof(bench_results[bench_result_count].label), "%s",
                      label);
             bench_results[bench_result_count].precision = precision;
             bench_results[bench_result_count].avg_us = stats.estimate;
@@ -279,14 +284,8 @@ static void bench_print_us(const char *label, size_t precision, bench_stats_t st
         return;
     }
 
-    printf("%-28s bits=%-4zu med_µs=%10.3f mad_µs=%9.3f ci95=[%9.3f,%9.3f] n=%d\n",
-           label,
-           precision,
-           stats.estimate,
-           stats.mad,
-           stats.ci_low,
-           stats.ci_high,
-           stats.samples);
+    printf("%-28s bits=%-4zu med_µs=%10.3f mad_µs=%9.3f ci95=[%9.3f,%9.3f] n=%d\n", label, precision, stats.estimate,
+           stats.mad, stats.ci_low, stats.ci_high, stats.samples);
 }
 
 static int bench_find_result(const char *base_label, size_t precision, double *avg_us)
@@ -317,7 +316,7 @@ static void bench_format_markdown_duration_us(double value_us, char *buffer, siz
 
 static void bench_print_markdown_table(void)
 {
-    static const size_t precisions[] = { 256u, 512u, 768u, 1024u, 2048u, 4096u };
+    static const size_t precisions[] = {256u, 512u, 768u, 1024u, 2048u, 4096u};
 
     if (!bench_markdown_enabled())
         return;
@@ -333,8 +332,7 @@ static void bench_print_markdown_table(void)
             if (bench_find_result(bench_md_rows[row].base_label, precisions[col], &avg_us)) {
                 bench_format_markdown_duration_us(avg_us, formatted, sizeof(formatted));
                 printf(" `%s` |", formatted);
-            }
-            else
+            } else
                 printf(" - |");
         }
         putchar('\n');
@@ -350,11 +348,7 @@ static void bench_destroy_number_array(number_t *values, int count)
     free(values);
 }
 
-static void run_unary_case(const char *label,
-                           const char *text,
-                           size_t precision,
-                           number_unary_fn fn,
-                           int iters)
+static void run_unary_case(const char *label, const char *text, size_t precision, number_unary_fn fn, int iters)
 {
     size_t old_prec;
     double *samples = NULL;
@@ -412,12 +406,8 @@ static void run_unary_case(const char *label,
     (void)num_set_default_prec_bits(old_prec);
 }
 
-static void run_binary_case(const char *label,
-                            const char *lhs_text,
-                            const char *rhs_text,
-                            size_t precision,
-                            number_binary_fn fn,
-                            int iters)
+static void run_binary_case(const char *label, const char *lhs_text, const char *rhs_text, size_t precision,
+                            number_binary_fn fn, int iters)
 {
     size_t old_prec;
     double *samples = NULL;
@@ -634,13 +624,8 @@ static void run_sinhcosh_case(const char *label, const char *text, size_t precis
     (void)num_set_default_prec_bits(old_prec);
 }
 
-static void run_ternary_case(const char *label,
-                             const char *x_text,
-                             const char *a_text,
-                             const char *b_text,
-                             size_t precision,
-                             number_ternary_fn fn,
-                             int iters)
+static void run_ternary_case(const char *label, const char *x_text, const char *a_text, const char *b_text,
+                             size_t precision, number_ternary_fn fn, int iters)
 {
     size_t old_prec;
     double *samples = NULL;
@@ -708,10 +693,7 @@ static void run_ternary_case(const char *label,
     (void)num_set_default_prec_bits(old_prec);
 }
 
-static void run_const_case(const char *label,
-                           size_t precision,
-                           number_const_fn fn,
-                           int iters)
+static void run_const_case(const char *label, size_t precision, number_const_fn fn, int iters)
 {
     size_t old_prec;
     double *samples = NULL;
@@ -764,41 +746,41 @@ static void run_const_case(const char *label,
     (void)num_set_default_prec_bits(old_prec);
 }
 
-#define RUN_NUMBER_SELECTED_ONES(PREC) \
-    run_unary_case("exp_" #PREC, "1.23456789", PREC##u, num_exp, bench_scaled_iters(1)); \
-    run_unary_case("log_" #PREC, "2.345678", PREC##u, num_log, bench_scaled_iters(1)); \
-    run_unary_case("sqrt_" #PREC, "1.23456789", PREC##u, num_sqrt, bench_scaled_iters(1)); \
-    run_unary_case("sin_" #PREC, "0.567", PREC##u, num_sin, bench_scaled_iters(1)); \
-    run_unary_case("cos_" #PREC, "0.7", PREC##u, num_cos, bench_scaled_iters(1)); \
-    run_sincos_case("sincos_" #PREC, "0.7", PREC##u, bench_scaled_iters(1)); \
-    run_unary_case("tan_" #PREC, "0.7", PREC##u, num_tan, bench_scaled_iters(1)); \
-    run_unary_case("atan_" #PREC, "0.7", PREC##u, num_atan, bench_scaled_iters(1)); \
-    run_unary_case("asin_" #PREC, "0.5", PREC##u, num_asin, bench_scaled_iters(1)); \
-    run_unary_case("asin_general_" #PREC, "0.7", PREC##u, num_asin, bench_scaled_iters(1)); \
-    run_unary_case("acos_" #PREC, "0.5", PREC##u, num_acos, bench_scaled_iters(1)); \
-    run_unary_case("acos_general_" #PREC, "0.7", PREC##u, num_acos, bench_scaled_iters(1)); \
-    run_binary_case("atan2_" #PREC, "1", "-1", PREC##u, num_atan2, bench_scaled_iters(1)); \
-    run_binary_case("atan2_general_" #PREC, "0.5", "-0.75", PREC##u, num_atan2, bench_scaled_iters(1)); \
-    run_unary_case("sinh_" #PREC, "0.7", PREC##u, num_sinh, bench_scaled_iters(1)); \
-    run_unary_case("cosh_" #PREC, "0.7", PREC##u, num_cosh, bench_scaled_iters(1)); \
-    run_sinhcosh_case("sinhcosh_" #PREC, "0.7", PREC##u, bench_scaled_iters(1)); \
-    run_unary_case("tanh_" #PREC, "0.7", PREC##u, num_tanh, bench_scaled_iters(1)); \
-    run_unary_case("asinh_" #PREC, "0.5", PREC##u, num_asinh, bench_scaled_iters(1)); \
-    run_unary_case("acosh_" #PREC, "2.0", PREC##u, num_acosh, bench_scaled_iters(1)); \
-    run_unary_case("atanh_" #PREC, "0.5", PREC##u, num_atanh, bench_scaled_iters(1)); \
-    run_unary_case("erf_" #PREC, "0.567", PREC##u, num_erf, bench_scaled_iters(1)); \
-    run_unary_case("gamma_" #PREC, "2.345", PREC##u, num_gamma, bench_scaled_iters(1)); \
-    run_unary_case("lgamma_" #PREC, "2.345", PREC##u, num_lgamma, bench_scaled_iters(1)); \
-    run_unary_case("digamma_" #PREC, "2.345", PREC##u, num_digamma, bench_scaled_iters(1)); \
-    run_unary_case("trigamma_" #PREC, "2.345", PREC##u, num_trigamma, bench_scaled_iters(1)); \
-    run_unary_case("tetragamma_" #PREC, "2.345", PREC##u, num_tetragamma, bench_scaled_iters(1)); \
-    run_unary_case("lambert_w0_" #PREC, "0.7", PREC##u, num_lambert_w0, bench_scaled_iters(1)); \
-    run_unary_case("lambert_wm1_" #PREC, "-0.2", PREC##u, num_lambert_wm1, bench_scaled_iters(1)); \
-    run_binary_case("pow_" #PREC, "1.23456789", "3.5", PREC##u, num_pow, bench_scaled_iters(1)); \
-    run_binary_case("logbeta_" #PREC, "2.5", "3.5", PREC##u, num_logbeta, bench_scaled_iters(1)); \
-    run_ternary_case("beta_pdf_" #PREC, "0.5", "2.5", "3.5", PREC##u, num_beta_pdf, bench_scaled_iters(1)); \
-    run_unary_case("normal_pdf_" #PREC, "0.5", PREC##u, num_normal_pdf, bench_scaled_iters(1)); \
-    run_unary_case("ei_5_" #PREC, "5", PREC##u, num_ei, bench_scaled_iters(1)); \
+#define RUN_NUMBER_SELECTED_ONES(PREC)                                                                                 \
+    run_unary_case("exp_" #PREC, "1.23456789", PREC##u, num_exp, bench_scaled_iters(1));                               \
+    run_unary_case("log_" #PREC, "2.345678", PREC##u, num_log, bench_scaled_iters(1));                                 \
+    run_unary_case("sqrt_" #PREC, "1.23456789", PREC##u, num_sqrt, bench_scaled_iters(1));                             \
+    run_unary_case("sin_" #PREC, "0.567", PREC##u, num_sin, bench_scaled_iters(1));                                    \
+    run_unary_case("cos_" #PREC, "0.7", PREC##u, num_cos, bench_scaled_iters(1));                                      \
+    run_sincos_case("sincos_" #PREC, "0.7", PREC##u, bench_scaled_iters(1));                                           \
+    run_unary_case("tan_" #PREC, "0.7", PREC##u, num_tan, bench_scaled_iters(1));                                      \
+    run_unary_case("atan_" #PREC, "0.7", PREC##u, num_atan, bench_scaled_iters(1));                                    \
+    run_unary_case("asin_" #PREC, "0.5", PREC##u, num_asin, bench_scaled_iters(1));                                    \
+    run_unary_case("asin_general_" #PREC, "0.7", PREC##u, num_asin, bench_scaled_iters(1));                            \
+    run_unary_case("acos_" #PREC, "0.5", PREC##u, num_acos, bench_scaled_iters(1));                                    \
+    run_unary_case("acos_general_" #PREC, "0.7", PREC##u, num_acos, bench_scaled_iters(1));                            \
+    run_binary_case("atan2_" #PREC, "1", "-1", PREC##u, num_atan2, bench_scaled_iters(1));                             \
+    run_binary_case("atan2_general_" #PREC, "0.5", "-0.75", PREC##u, num_atan2, bench_scaled_iters(1));                \
+    run_unary_case("sinh_" #PREC, "0.7", PREC##u, num_sinh, bench_scaled_iters(1));                                    \
+    run_unary_case("cosh_" #PREC, "0.7", PREC##u, num_cosh, bench_scaled_iters(1));                                    \
+    run_sinhcosh_case("sinhcosh_" #PREC, "0.7", PREC##u, bench_scaled_iters(1));                                       \
+    run_unary_case("tanh_" #PREC, "0.7", PREC##u, num_tanh, bench_scaled_iters(1));                                    \
+    run_unary_case("asinh_" #PREC, "0.5", PREC##u, num_asinh, bench_scaled_iters(1));                                  \
+    run_unary_case("acosh_" #PREC, "2.0", PREC##u, num_acosh, bench_scaled_iters(1));                                  \
+    run_unary_case("atanh_" #PREC, "0.5", PREC##u, num_atanh, bench_scaled_iters(1));                                  \
+    run_unary_case("erf_" #PREC, "0.567", PREC##u, num_erf, bench_scaled_iters(1));                                    \
+    run_unary_case("gamma_" #PREC, "2.345", PREC##u, num_gamma, bench_scaled_iters(1));                                \
+    run_unary_case("lgamma_" #PREC, "2.345", PREC##u, num_lgamma, bench_scaled_iters(1));                              \
+    run_unary_case("digamma_" #PREC, "2.345", PREC##u, num_digamma, bench_scaled_iters(1));                            \
+    run_unary_case("trigamma_" #PREC, "2.345", PREC##u, num_trigamma, bench_scaled_iters(1));                          \
+    run_unary_case("tetragamma_" #PREC, "2.345", PREC##u, num_tetragamma, bench_scaled_iters(1));                      \
+    run_unary_case("lambert_w0_" #PREC, "0.7", PREC##u, num_lambert_w0, bench_scaled_iters(1));                        \
+    run_unary_case("lambert_wm1_" #PREC, "-0.2", PREC##u, num_lambert_wm1, bench_scaled_iters(1));                     \
+    run_binary_case("pow_" #PREC, "1.23456789", "3.5", PREC##u, num_pow, bench_scaled_iters(1));                       \
+    run_binary_case("logbeta_" #PREC, "2.5", "3.5", PREC##u, num_logbeta, bench_scaled_iters(1));                      \
+    run_ternary_case("beta_pdf_" #PREC, "0.5", "2.5", "3.5", PREC##u, num_beta_pdf, bench_scaled_iters(1));            \
+    run_unary_case("normal_pdf_" #PREC, "0.5", PREC##u, num_normal_pdf, bench_scaled_iters(1));                        \
+    run_unary_case("ei_5_" #PREC, "5", PREC##u, num_ei, bench_scaled_iters(1));                                        \
     run_unary_case("e1_5_" #PREC, "5", PREC##u, num_e1, bench_scaled_iters(1))
 
 int main(void)
@@ -808,7 +790,9 @@ int main(void)
         puts("Scale iterations with MARS_BENCH_SCALE=<n> if you want longer runs.");
         puts("Tune repeats with MARS_BENCH_REPEATS=<n> and bootstrap resamples with MARS_BENCH_BOOTSTRAP=<n>.");
         puts("Reported timings use the sample median with MAD and a bootstrap 95% CI.");
-        puts("Limit to one section with MARS_BENCH_SECTION=constants|exp|log|elem256|triage256|special256|selected512|selected768|selected1024|selected2048|selected4096.");
+        puts("Limit to one section with "
+             "MARS_BENCH_SECTION=constants|exp|log|elem256|triage256|special256|selected512|selected768|selected1024|"
+             "selected2048|selected4096.");
         puts("Filter individual cases with MARS_BENCH_FILTER=<substring>.");
     }
 

@@ -31,10 +31,7 @@ static void equ_quartic_destroy_numbers(number_t *values, size_t count)
         num_destroy(&values[i]);
 }
 
-static void equ_quartic_eval(const number_t *coeffs,
-                             number_t z,
-                             number_t *value_out,
-                             number_t *derivative_out)
+static void equ_quartic_eval(const number_t *coeffs, number_t z, number_t *value_out, number_t *derivative_out)
 {
     /* Simultaneous Horner evaluation of p(z) and p'(z). */
     number_t value = num_clone(coeffs[EQU_QUARTIC_DEGREE]);
@@ -136,9 +133,7 @@ static number_t equ_quartic_seed(size_t index, double bound)
     {
         const size_t circle_count = EQU_QUARTIC_NEWTON_SEEDS - 5u;
         const size_t circle_index = index - 5u;
-        const double angle =
-            2.0 * acos(-1.0) * ((double)circle_index + 0.5) /
-            (double)circle_count;
+        const double angle = 2.0 * acos(-1.0) * ((double)circle_index + 0.5) / (double)circle_count;
         number_t real = num_create_from_double(bound * cos(angle));
         number_t imag = num_create_from_double(bound * sin(angle));
         number_t imag_term = num_mul(NUM_I, imag);
@@ -151,19 +146,14 @@ static number_t equ_quartic_seed(size_t index, double bound)
     }
 }
 
-static bool equ_quartic_newton_from(const number_t *coeffs,
-                                    number_t start,
-                                    number_t tolerance,
-                                    number_t *root_out)
+static bool equ_quartic_newton_from(const number_t *coeffs, number_t start, number_t tolerance, number_t *root_out)
 {
     number_t z = num_clone(start);
     number_t value = num_new();
     number_t derivative = num_new();
     bool converged = false;
 
-    for (size_t iteration = 0u;
-         iteration < EQU_QUARTIC_NEWTON_ITERATIONS;
-         ++iteration) {
+    for (size_t iteration = 0u; iteration < EQU_QUARTIC_NEWTON_ITERATIONS; ++iteration) {
         number_t step;
         number_t next;
 
@@ -172,8 +162,7 @@ static bool equ_quartic_newton_from(const number_t *coeffs,
             converged = true;
             break;
         }
-        if (!num_is_finite(derivative) ||
-            equ_quartic_magnitude_le(derivative, tolerance))
+        if (!num_is_finite(derivative) || equ_quartic_magnitude_le(derivative, tolerance))
             break;
 
         step = num_div(value, derivative);
@@ -202,9 +191,7 @@ static bool equ_quartic_newton_from(const number_t *coeffs,
     return converged;
 }
 
-static bool equ_quartic_find_root(const number_t *coeffs,
-                                  number_t tolerance,
-                                  number_t *root_out)
+static bool equ_quartic_find_root(const number_t *coeffs, number_t tolerance, number_t *root_out)
 {
     const double bound = equ_quartic_root_bound(coeffs);
 
@@ -219,9 +206,7 @@ static bool equ_quartic_find_root(const number_t *coeffs,
     return false;
 }
 
-static void equ_quartic_synthetic_divide(const number_t *coeffs,
-                                         number_t root,
-                                         number_t *cubic)
+static void equ_quartic_synthetic_divide(const number_t *coeffs, number_t root, number_t *cubic)
 {
     /* Descending synthetic division by (x - root). */
     num_destroy(&cubic[3]);
@@ -237,9 +222,7 @@ static void equ_quartic_synthetic_divide(const number_t *coeffs,
     }
 }
 
-static number_t equ_quartic_polish_root(const number_t *coeffs,
-                                        number_t root,
-                                        number_t tolerance)
+static number_t equ_quartic_polish_root(const number_t *coeffs, number_t root, number_t tolerance)
 {
     number_t polished = num_new();
 
@@ -249,22 +232,18 @@ static number_t equ_quartic_polish_root(const number_t *coeffs,
     return num_clone(root);
 }
 
-static number_t equ_quartic_snap_gaussian_integer(const number_t *coeffs,
-                                                  number_t root)
+static number_t equ_quartic_snap_gaussian_integer(const number_t *coeffs, number_t root)
 {
     number_t real = num_real_part(root);
     number_t imag = num_imag_part(root);
     double real_d = num_to_double(real);
     double imag_d = num_to_double(imag);
-    bool bounded = isfinite(real_d) && isfinite(imag_d) &&
-                   fabs(real_d) < 1000000.0 && fabs(imag_d) < 1000000.0;
+    bool bounded = isfinite(real_d) && isfinite(imag_d) && fabs(real_d) < 1000000.0 && fabs(imag_d) < 1000000.0;
     long real_i = bounded ? lround(real_d) : 0L;
     long imag_i = bounded ? lround(imag_d) : 0L;
     number_t candidate = num_new();
     number_t value = num_new();
-    bool in_range = bounded &&
-                    fabs(real_d - (double)real_i) < 1e-6 &&
-                    fabs(imag_d - (double)imag_i) < 1e-6;
+    bool in_range = bounded && fabs(real_d - (double)real_i) < 1e-6 && fabs(imag_d - (double)imag_i) < 1e-6;
 
     if (in_range) {
         number_t real_part = num_create_from_long(real_i);
@@ -272,8 +251,7 @@ static number_t equ_quartic_snap_gaussian_integer(const number_t *coeffs,
         number_t imag_term = num_mul(NUM_I, imag_part);
 
         num_destroy(&candidate);
-        candidate = imag_i == 0L ? num_clone(real_part)
-                                 : num_add(real_part, imag_term);
+        candidate = imag_i == 0L ? num_clone(real_part) : num_add(real_part, imag_term);
         equ_quartic_eval(coeffs, candidate, &value, NULL);
         num_destroy(&imag_term);
         num_destroy(&imag_part);
@@ -293,9 +271,7 @@ static number_t equ_quartic_snap_gaussian_integer(const number_t *coeffs,
     return num_clone(root);
 }
 
-static bool equ_quartic_roots_close(number_t left,
-                                    number_t right,
-                                    number_t tolerance)
+static bool equ_quartic_roots_close(number_t left, number_t right, number_t tolerance)
 {
     number_t difference = num_sub(left, right);
     bool close = equ_quartic_magnitude_le(difference, tolerance);
@@ -304,17 +280,11 @@ static bool equ_quartic_roots_close(number_t left,
     return close;
 }
 
-static int equ_quartic_append_distinct(const number_t *coeffs,
-                                       const expr_t *wrt,
-                                       number_t candidate,
-                                       number_t newton_tolerance,
-                                       number_t distinct_tolerance,
-                                       number_t *seen,
-                                       size_t *seen_count,
-                                       equation_solutions_t *solutions)
+static int equ_quartic_append_distinct(const number_t *coeffs, const expr_t *wrt, number_t candidate,
+                                       number_t newton_tolerance, number_t distinct_tolerance, number_t *seen,
+                                       size_t *seen_count, equation_solutions_t *solutions)
 {
-    number_t polished =
-        equ_quartic_polish_root(coeffs, candidate, newton_tolerance);
+    number_t polished = equ_quartic_polish_root(coeffs, candidate, newton_tolerance);
     number_t clean = equ_quartic_snap_gaussian_integer(coeffs, polished);
 
     for (size_t i = 0u; i < *seen_count; ++i) {
@@ -337,17 +307,14 @@ static int equ_quartic_append_distinct(const number_t *coeffs,
     return 0;
 }
 
-int equ_solve_quartic_coefficients(const number_t *coeffs,
-                                   const expr_t *wrt,
-                                   equation_solutions_t *solutions)
+int equ_solve_quartic_coefficients(const number_t *coeffs, const expr_t *wrt, equation_solutions_t *solutions)
 {
     number_t cubic[4];
     number_t quadratic[3];
     number_t first_root = num_new();
     number_t conjugate_root = num_new();
     number_t newton_tolerance = equ_quartic_newton_tolerance();
-    number_t distinct_tolerance =
-        equ_quartic_distinct_tolerance(newton_tolerance);
+    number_t distinct_tolerance = equ_quartic_distinct_tolerance(newton_tolerance);
     number_t seen[EQU_QUARTIC_DEGREE];
     size_t seen_count = 0u;
     equation_solutions_t reduced_solutions = {0};
@@ -356,8 +323,7 @@ int equ_solve_quartic_coefficients(const number_t *coeffs,
 
     equ_quartic_init_numbers(cubic, 4u);
     equ_quartic_init_numbers(quadratic, 3u);
-    if (!coeffs || !wrt || !solutions ||
-        num_is_zero(coeffs[EQU_QUARTIC_DEGREE]))
+    if (!coeffs || !wrt || !solutions || num_is_zero(coeffs[EQU_QUARTIC_DEGREE]))
         goto cleanup;
     if (!equ_quartic_find_root(coeffs, newton_tolerance, &first_root)) {
         rc = 1;
@@ -365,54 +331,42 @@ int equ_solve_quartic_coefficients(const number_t *coeffs,
     }
 
     {
-        number_t snapped =
-            equ_quartic_snap_gaussian_integer(coeffs, first_root);
+        number_t snapped = equ_quartic_snap_gaussian_integer(coeffs, first_root);
 
         num_destroy(&first_root);
         first_root = snapped;
     }
     if (equ_polynomial_coefficients_real(coeffs, EQU_QUARTIC_DEGREE) &&
-        equ_polynomial_root_effectively_real(
-            first_root, newton_tolerance)) {
+        equ_polynomial_root_effectively_real(first_root, newton_tolerance)) {
         number_t real_root = num_real_part(first_root);
 
         num_destroy(&first_root);
         first_root = real_root;
     }
-    use_conjugate_pair =
-        equ_polynomial_coefficients_real(coeffs, EQU_QUARTIC_DEGREE) &&
-        !num_is_real(first_root);
+    use_conjugate_pair = equ_polynomial_coefficients_real(coeffs, EQU_QUARTIC_DEGREE) && !num_is_real(first_root);
 
     if (use_conjugate_pair) {
         num_destroy(&conjugate_root);
         conjugate_root = num_conj(first_root);
-        equ_polynomial_deflate_conjugate_pair(
-            coeffs, EQU_QUARTIC_DEGREE, first_root, quadratic);
-        if (equ_solve_quadratic_coefficients(
-                quadratic, wrt, &reduced_solutions) != 0)
+        equ_polynomial_deflate_conjugate_pair(coeffs, EQU_QUARTIC_DEGREE, first_root, quadratic);
+        if (equ_solve_quadratic_coefficients(quadratic, wrt, &reduced_solutions) != 0)
             goto cleanup;
     } else {
         equ_quartic_synthetic_divide(coeffs, first_root, cubic);
-        if (equ_solve_cubic_coefficients(
-                cubic, wrt, &reduced_solutions) != 0)
+        if (equ_solve_cubic_coefficients(cubic, wrt, &reduced_solutions) != 0)
             goto cleanup;
     }
-    if (equ_quartic_append_distinct(
-            coeffs, wrt, first_root, newton_tolerance, distinct_tolerance,
-            seen, &seen_count, solutions) != 0)
+    if (equ_quartic_append_distinct(coeffs, wrt, first_root, newton_tolerance, distinct_tolerance, seen, &seen_count,
+                                    solutions) != 0)
         goto cleanup;
-    if (use_conjugate_pair &&
-        equ_quartic_append_distinct(
-            coeffs, wrt, conjugate_root, newton_tolerance,
-            distinct_tolerance, seen, &seen_count, solutions) != 0)
+    if (use_conjugate_pair && equ_quartic_append_distinct(coeffs, wrt, conjugate_root, newton_tolerance,
+                                                          distinct_tolerance, seen, &seen_count, solutions) != 0)
         goto cleanup;
 
     for (size_t i = 0u; i < reduced_solutions.count; ++i) {
-        number_t root =
-            expr_eval(equ_rhs(reduced_solutions.solutions[i]));
-        int append_rc = equ_quartic_append_distinct(
-            coeffs, wrt, root, newton_tolerance, distinct_tolerance,
-            seen, &seen_count, solutions);
+        number_t root = expr_eval(equ_rhs(reduced_solutions.solutions[i]));
+        int append_rc = equ_quartic_append_distinct(coeffs, wrt, root, newton_tolerance, distinct_tolerance, seen,
+                                                    &seen_count, solutions);
 
         num_destroy(&root);
         if (append_rc != 0)
@@ -433,9 +387,7 @@ cleanup:
     return rc;
 }
 
-int equ_try_solve_quartic(const equation_t *equation,
-                          const expr_t *wrt,
-                          equation_solutions_t *solutions)
+int equ_try_solve_quartic(const equation_t *equation, const expr_t *wrt, equation_solutions_t *solutions)
 {
     expr_t *residual = equ_residual(equation);
     number_t coeffs[EQU_QUARTIC_COEFF_COUNT];

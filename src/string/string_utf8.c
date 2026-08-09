@@ -24,22 +24,28 @@
 
 static size_t utf8_char_len(unsigned char c)
 {
-    if (c < 0x80) return 1;
-    if ((c >> 5) == 0x6) return 2;
-    if ((c >> 4) == 0xE) return 3;
-    if ((c >> 3) == 0x1E) return 4;
+    if (c < 0x80)
+        return 1;
+    if ((c >> 5) == 0x6)
+        return 2;
+    if ((c >> 4) == 0xE)
+        return 3;
+    if ((c >> 3) == 0x1E)
+        return 4;
     return 1;
 }
 
 size_t utf8_next(const char *s, size_t len, size_t i)
 {
-    if (i >= len) return len;
+    if (i >= len)
+        return len;
     return i + utf8_char_len((unsigned char)s[i]);
 }
 
 size_t string_utf8_prev(const char *s, size_t len, size_t i)
 {
-    if (i == 0 || i > len) return 0;
+    if (i == 0 || i > len)
+        return 0;
 
     size_t j = i - 1;
     while (j > 0 && ((unsigned char)s[j] >> 6) == 0x2)
@@ -50,7 +56,8 @@ size_t string_utf8_prev(const char *s, size_t len, size_t i)
 
 size_t string_utf8_length(const string_t *s)
 {
-    if (!s) return 0;
+    if (!s)
+        return 0;
 
     size_t count = 0;
     size_t i = 0;
@@ -65,17 +72,19 @@ size_t string_utf8_length(const string_t *s)
 
 void string_utf8_reverse(string_t *s)
 {
-    if (!s || s->len <= 1) return;
+    if (!s || s->len <= 1)
+        return;
 
     char *tmp = malloc(s->len);
-    if (!tmp) return;
+    if (!tmp)
+        return;
 
     size_t out = 0;
     size_t i = s->len;
 
     while (i > 0) {
         size_t start = string_utf8_prev(s->data, s->len, i);
-        size_t clen  = i - start;
+        size_t clen = i - start;
 
         memcpy(tmp + out, s->data + start, clen);
         out += clen;
@@ -99,18 +108,28 @@ void string_utf8_to_lower(string_t *s)
 
 uint32_t utf8_decode(const char *s, size_t len, size_t *adv)
 {
-    if (len == 0) { *adv = 0; return 0; }
+    if (len == 0) {
+        *adv = 0;
+        return 0;
+    }
 
     unsigned char c = s[0];
     size_t clen = utf8_char_len(c);
 
-    if (clen > len) { *adv = 1; return c; }
+    if (clen > len) {
+        *adv = 1;
+        return c;
+    }
 
     *adv = clen;
     switch (clen) {
-        case 2: return ((c & 0x1F) << 6)  |  (s[1] & 0x3F);
-        case 3: return ((c & 0x0F) << 12) | ((s[1] & 0x3F) << 6)  |  (s[2] & 0x3F);
-        case 4: return ((c & 0x07) << 18) | ((s[1] & 0x3F) << 12) | ((s[2] & 0x3F) << 6) | (s[3] & 0x3F);
-        default: return c;
+        case 2:
+            return ((c & 0x1F) << 6) | (s[1] & 0x3F);
+        case 3:
+            return ((c & 0x0F) << 12) | ((s[1] & 0x3F) << 6) | (s[2] & 0x3F);
+        case 4:
+            return ((c & 0x07) << 18) | ((s[1] & 0x3F) << 12) | ((s[2] & 0x3F) << 6) | (s[3] & 0x3F);
+        default:
+            return c;
     }
 }

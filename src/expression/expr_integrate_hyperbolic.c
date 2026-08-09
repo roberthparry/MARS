@@ -3,9 +3,7 @@
 #define MARS_EXPR_INTEGRATE_INTERNAL_ACCESS
 #include "expr_integrate_internal.h"
 
-static bool match_hyperbolic_proportional_wrt_coeff(const expr_t *expr,
-                                                    const expr_t *wrt,
-                                                    bool *is_sinh_out,
+static bool match_hyperbolic_proportional_wrt_coeff(const expr_t *expr, const expr_t *wrt, bool *is_sinh_out,
                                                     expr_t **coeff_out)
 {
     expr_t *constant = NULL;
@@ -38,12 +36,8 @@ cleanup:
     return ok;
 }
 
-static bool match_exp_hyperbolic_product(const expr_t *expr,
-                                         const expr_t *wrt,
-                                         const expr_t **exp_out,
-                                         const expr_t **hyper_out,
-                                         bool *is_sinh_out,
-                                         expr_t **exp_coeff_out,
+static bool match_exp_hyperbolic_product(const expr_t *expr, const expr_t *wrt, const expr_t **exp_out,
+                                         const expr_t **hyper_out, bool *is_sinh_out, expr_t **exp_coeff_out,
                                          expr_t **hyper_coeff_out)
 {
     const expr_t *left = NULL;
@@ -51,14 +45,12 @@ static bool match_exp_hyperbolic_product(const expr_t *expr,
     expr_t *exp_coeff = NULL;
     expr_t *hyper_coeff = NULL;
 
-    if (!expr || !wrt || !exp_out || !hyper_out || !is_sinh_out ||
-        !exp_coeff_out || !hyper_coeff_out ||
+    if (!expr || !wrt || !exp_out || !hyper_out || !is_sinh_out || !exp_coeff_out || !hyper_coeff_out ||
         !expr_match_mul_expr(expr, &left, &right))
         return false;
 
     if (match_exp_proportional_wrt_coeff(left, wrt, &exp_coeff) &&
-        match_hyperbolic_proportional_wrt_coeff(right, wrt, is_sinh_out,
-                                                &hyper_coeff)) {
+        match_hyperbolic_proportional_wrt_coeff(right, wrt, is_sinh_out, &hyper_coeff)) {
         *exp_out = left;
         *hyper_out = right;
         *exp_coeff_out = exp_coeff;
@@ -71,8 +63,7 @@ static bool match_exp_hyperbolic_product(const expr_t *expr,
     hyper_coeff = NULL;
 
     if (match_exp_proportional_wrt_coeff(right, wrt, &exp_coeff) &&
-        match_hyperbolic_proportional_wrt_coeff(left, wrt, is_sinh_out,
-                                                &hyper_coeff)) {
+        match_hyperbolic_proportional_wrt_coeff(left, wrt, is_sinh_out, &hyper_coeff)) {
         *exp_out = right;
         *hyper_out = left;
         *exp_coeff_out = exp_coeff;
@@ -85,8 +76,7 @@ static bool match_exp_hyperbolic_product(const expr_t *expr,
     return false;
 }
 
-expr_t *integrate_symbolic_exp_times_hyperbolic(const expr_t *expr,
-                                                       const expr_t *wrt)
+expr_t *integrate_symbolic_exp_times_hyperbolic(const expr_t *expr, const expr_t *wrt)
 {
     const expr_t *exp_expr = NULL;
     const expr_t *hyper_expr = NULL;
@@ -105,8 +95,7 @@ expr_t *integrate_symbolic_exp_times_hyperbolic(const expr_t *expr,
     expr_t *out = NULL;
     bool is_sinh = false;
 
-    if (!match_exp_hyperbolic_product(expr, wrt, &exp_expr, &hyper_expr,
-                                      &is_sinh, &exp_coeff, &hyper_coeff))
+    if (!match_exp_hyperbolic_product(expr, wrt, &exp_expr, &hyper_expr, &is_sinh, &exp_coeff, &hyper_coeff))
         goto cleanup;
 
     sinh_v = hyper_expr && hyper_expr->a ? expr_sinh(hyper_expr->a) : NULL;
@@ -146,32 +135,21 @@ cleanup:
     return out;
 }
 
-static bool match_hyperbolic_product(const expr_t *expr,
-                                     const expr_t *wrt,
-                                     const expr_t **first_out,
-                                     const expr_t **second_out,
-                                     bool *first_is_sinh_out,
-                                     bool *second_is_sinh_out,
-                                     expr_t **first_coeff_out,
-                                     expr_t **second_coeff_out)
+static bool match_hyperbolic_product(const expr_t *expr, const expr_t *wrt, const expr_t **first_out,
+                                     const expr_t **second_out, bool *first_is_sinh_out, bool *second_is_sinh_out,
+                                     expr_t **first_coeff_out, expr_t **second_coeff_out)
 {
     const expr_t *left = NULL;
     const expr_t *right = NULL;
     expr_t *first_coeff = NULL;
     expr_t *second_coeff = NULL;
 
-    if (!expr || !wrt || !first_out || !second_out ||
-        !first_is_sinh_out || !second_is_sinh_out ||
-        !first_coeff_out || !second_coeff_out ||
-        !expr_match_mul_expr(expr, &left, &right))
+    if (!expr || !wrt || !first_out || !second_out || !first_is_sinh_out || !second_is_sinh_out || !first_coeff_out ||
+        !second_coeff_out || !expr_match_mul_expr(expr, &left, &right))
         return false;
 
-    if (match_hyperbolic_proportional_wrt_coeff(left, wrt,
-                                                first_is_sinh_out,
-                                                &first_coeff) &&
-        match_hyperbolic_proportional_wrt_coeff(right, wrt,
-                                                second_is_sinh_out,
-                                                &second_coeff)) {
+    if (match_hyperbolic_proportional_wrt_coeff(left, wrt, first_is_sinh_out, &first_coeff) &&
+        match_hyperbolic_proportional_wrt_coeff(right, wrt, second_is_sinh_out, &second_coeff)) {
         *first_out = left;
         *second_out = right;
         *first_coeff_out = first_coeff;
@@ -184,10 +162,8 @@ static bool match_hyperbolic_product(const expr_t *expr,
     return false;
 }
 
-static expr_t *build_symbolic_same_hyperbolic_product_integral(const expr_t *arg,
-                                                               const expr_t *coeff,
-                                                               bool is_sinh_square,
-                                                               bool is_cosh_square,
+static expr_t *build_symbolic_same_hyperbolic_product_integral(const expr_t *arg, const expr_t *coeff,
+                                                               bool is_sinh_square, bool is_cosh_square,
                                                                bool is_sinh_cosh)
 {
     expr_t *two_arg = NULL;
@@ -245,8 +221,7 @@ cleanup:
     return out;
 }
 
-expr_t *integrate_symbolic_hyperbolic_product(const expr_t *expr,
-                                                     const expr_t *wrt)
+expr_t *integrate_symbolic_hyperbolic_product(const expr_t *expr, const expr_t *wrt)
 {
     const expr_t *first_expr = NULL;
     const expr_t *second_expr = NULL;
@@ -273,17 +248,13 @@ expr_t *integrate_symbolic_hyperbolic_product(const expr_t *expr,
     bool first_is_sinh = false;
     bool second_is_sinh = false;
 
-    if (!match_hyperbolic_product(expr, wrt, &first_expr, &second_expr,
-                                  &first_is_sinh, &second_is_sinh,
-                                  &first_coeff, &second_coeff))
+    if (!match_hyperbolic_product(expr, wrt, &first_expr, &second_expr, &first_is_sinh, &second_is_sinh, &first_coeff,
+                                  &second_coeff))
         goto cleanup;
 
     if (expr_equal_exact_local(first_expr->a, second_expr->a)) {
         out = build_symbolic_same_hyperbolic_product_integral(
-            first_expr->a,
-            first_coeff,
-            first_is_sinh && second_is_sinh,
-            !first_is_sinh && !second_is_sinh,
+            first_expr->a, first_coeff, first_is_sinh && second_is_sinh, !first_is_sinh && !second_is_sinh,
             first_is_sinh != second_is_sinh);
         goto cleanup;
     }
@@ -357,31 +328,21 @@ cleanup:
     return out;
 }
 
-static bool match_trig_hyperbolic_product(const expr_t *expr,
-                                          const expr_t *wrt,
-                                          const expr_t **trig_out,
-                                          const expr_t **hyper_out,
-                                          bool *trig_is_sin_out,
-                                          bool *hyper_is_sinh_out,
-                                          expr_t **trig_coeff_out,
-                                          expr_t **hyper_coeff_out)
+static bool match_trig_hyperbolic_product(const expr_t *expr, const expr_t *wrt, const expr_t **trig_out,
+                                          const expr_t **hyper_out, bool *trig_is_sin_out, bool *hyper_is_sinh_out,
+                                          expr_t **trig_coeff_out, expr_t **hyper_coeff_out)
 {
     const expr_t *left = NULL;
     const expr_t *right = NULL;
     expr_t *trig_coeff = NULL;
     expr_t *hyper_coeff = NULL;
 
-    if (!expr || !wrt || !trig_out || !hyper_out ||
-        !trig_is_sin_out || !hyper_is_sinh_out ||
-        !trig_coeff_out || !hyper_coeff_out ||
-        !expr_match_mul_expr(expr, &left, &right))
+    if (!expr || !wrt || !trig_out || !hyper_out || !trig_is_sin_out || !hyper_is_sinh_out || !trig_coeff_out ||
+        !hyper_coeff_out || !expr_match_mul_expr(expr, &left, &right))
         return false;
 
-    if (match_trig_proportional_wrt_coeff(left, wrt, trig_is_sin_out,
-                                          &trig_coeff) &&
-        match_hyperbolic_proportional_wrt_coeff(right, wrt,
-                                                hyper_is_sinh_out,
-                                                &hyper_coeff)) {
+    if (match_trig_proportional_wrt_coeff(left, wrt, trig_is_sin_out, &trig_coeff) &&
+        match_hyperbolic_proportional_wrt_coeff(right, wrt, hyper_is_sinh_out, &hyper_coeff)) {
         *trig_out = left;
         *hyper_out = right;
         *trig_coeff_out = trig_coeff;
@@ -393,11 +354,8 @@ static bool match_trig_hyperbolic_product(const expr_t *expr,
     trig_coeff = NULL;
     hyper_coeff = NULL;
 
-    if (match_trig_proportional_wrt_coeff(right, wrt, trig_is_sin_out,
-                                          &trig_coeff) &&
-        match_hyperbolic_proportional_wrt_coeff(left, wrt,
-                                                hyper_is_sinh_out,
-                                                &hyper_coeff)) {
+    if (match_trig_proportional_wrt_coeff(right, wrt, trig_is_sin_out, &trig_coeff) &&
+        match_hyperbolic_proportional_wrt_coeff(left, wrt, hyper_is_sinh_out, &hyper_coeff)) {
         *trig_out = right;
         *hyper_out = left;
         *trig_coeff_out = trig_coeff;
@@ -410,8 +368,7 @@ static bool match_trig_hyperbolic_product(const expr_t *expr,
     return false;
 }
 
-expr_t *integrate_symbolic_trig_times_hyperbolic(const expr_t *expr,
-                                                        const expr_t *wrt)
+expr_t *integrate_symbolic_trig_times_hyperbolic(const expr_t *expr, const expr_t *wrt)
 {
     const expr_t *trig_expr = NULL;
     const expr_t *hyper_expr = NULL;
@@ -435,9 +392,8 @@ expr_t *integrate_symbolic_trig_times_hyperbolic(const expr_t *expr,
     bool hyper_is_sinh = false;
     bool subtract = false;
 
-    if (!match_trig_hyperbolic_product(expr, wrt, &trig_expr, &hyper_expr,
-                                       &trig_is_sin, &hyper_is_sinh,
-                                       &trig_coeff, &hyper_coeff))
+    if (!match_trig_hyperbolic_product(expr, wrt, &trig_expr, &hyper_expr, &trig_is_sin, &hyper_is_sinh, &trig_coeff,
+                                       &hyper_coeff))
         goto cleanup;
 
     sin_u = trig_expr && trig_expr->a ? expr_sin(trig_expr->a) : NULL;
@@ -469,8 +425,7 @@ expr_t *integrate_symbolic_trig_times_hyperbolic(const expr_t *expr,
         subtract = true;
     }
 
-    bracket = (left && right) ? (subtract ? expr_sub(left, right) : expr_add(left, right))
-                              : NULL;
+    bracket = (left && right) ? (subtract ? expr_sub(left, right) : expr_add(left, right)) : NULL;
     trig_coeff_sq = trig_coeff ? expr_pow(trig_coeff, &NUM_TWO) : NULL;
     hyper_coeff_sq = hyper_coeff ? expr_pow(hyper_coeff, &NUM_TWO) : NULL;
     denom = (trig_coeff_sq && hyper_coeff_sq) ? expr_add(trig_coeff_sq, hyper_coeff_sq) : NULL;
@@ -497,8 +452,7 @@ cleanup:
     return out;
 }
 
-expr_t *integrate_symbolic_squared_hyperbolic(const expr_t *expr,
-                                                     const expr_t *wrt)
+expr_t *integrate_symbolic_squared_hyperbolic(const expr_t *expr, const expr_t *wrt)
 {
     expr_t *coeff = NULL;
     expr_t *two_arg = NULL;
@@ -519,8 +473,7 @@ expr_t *integrate_symbolic_squared_hyperbolic(const expr_t *expr,
         base = expr->a;
         num_destroy(&exponent);
         exponent = num_clone(expr->c);
-    } else if (expr->ops && expr->ops->kind == EXPR_KIND_POW &&
-               expr->a && expr->b) {
+    } else if (expr->ops && expr->ops->kind == EXPR_KIND_POW && expr->a && expr->b) {
         base = expr->a;
         if (!expr_match_const_value(expr->b, &exponent))
             goto cleanup;
@@ -528,9 +481,7 @@ expr_t *integrate_symbolic_squared_hyperbolic(const expr_t *expr,
         goto cleanup;
     }
 
-    if (!base ||
-        !num_eq(exponent, NUM_TWO) ||
-        !match_hyperbolic_proportional_wrt_coeff(base, wrt, &is_sinh, &coeff))
+    if (!base || !num_eq(exponent, NUM_TWO) || !match_hyperbolic_proportional_wrt_coeff(base, wrt, &is_sinh, &coeff))
         goto cleanup;
 
     two_arg = expr_mul_num(base->a, &NUM_TWO);
@@ -566,12 +517,12 @@ expr_t *integrate_exp_tanh_exact(const expr_t *expr, const expr_t *wrt)
     if (!expr || !wrt || !expr_match_mul_expr(expr, &left, &right))
         return NULL;
 
-    if (expr_is_op(left, &ops_exp) && left->a && is_wrt(left->a, wrt) &&
-        expr_is_op(right, &ops_tanh) && right->a && is_wrt(right->a, wrt)) {
+    if (expr_is_op(left, &ops_exp) && left->a && is_wrt(left->a, wrt) && expr_is_op(right, &ops_tanh) && right->a &&
+        is_wrt(right->a, wrt)) {
         exp_expr = left;
         tanh_expr = right;
-    } else if (expr_is_op(right, &ops_exp) && right->a && is_wrt(right->a, wrt) &&
-               expr_is_op(left, &ops_tanh) && left->a && is_wrt(left->a, wrt)) {
+    } else if (expr_is_op(right, &ops_exp) && right->a && is_wrt(right->a, wrt) && expr_is_op(left, &ops_tanh) &&
+               left->a && is_wrt(left->a, wrt)) {
         exp_expr = right;
         tanh_expr = left;
     }

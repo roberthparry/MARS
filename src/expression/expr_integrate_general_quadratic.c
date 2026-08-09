@@ -3,9 +3,7 @@
 #define MARS_EXPR_INTEGRATE_INTERNAL_ACCESS
 #include "expr_integrate_internal.h"
 
-static bool match_symbolic_affine_or_constant(const expr_t *expr,
-                                              const expr_t *wrt,
-                                              expr_t **constant_out,
+static bool match_symbolic_affine_or_constant(const expr_t *expr, const expr_t *wrt, expr_t **constant_out,
                                               expr_t **coeff_out)
 {
     if (!expr || !wrt || !constant_out || !coeff_out)
@@ -27,10 +25,8 @@ static bool match_symbolic_affine_or_constant(const expr_t *expr,
     return match_symbolic_affine_constant_and_coeff(expr, wrt, constant_out, coeff_out);
 }
 
-static expr_t *build_symbolic_general_quadratic_log(const expr_t *quadratic,
-                                                    const expr_t *wrt,
-                                                    const expr_t *quad_coeff,
-                                                    const expr_t *linear_coeff)
+static expr_t *build_symbolic_general_quadratic_log(const expr_t *quadratic, const expr_t *wrt,
+                                                    const expr_t *quad_coeff, const expr_t *linear_coeff)
 {
     expr_t *sqrt_a = NULL;
     expr_t *sqrt_q = NULL;
@@ -68,8 +64,7 @@ cleanup:
     return out;
 }
 
-static expr_t *build_symbolic_general_quadratic_inverse_root_integral(const expr_t *quadratic,
-                                                                      const expr_t *wrt,
+static expr_t *build_symbolic_general_quadratic_inverse_root_integral(const expr_t *quadratic, const expr_t *wrt,
                                                                       const expr_t *quad_coeff,
                                                                       const expr_t *linear_coeff)
 {
@@ -81,8 +76,7 @@ static expr_t *build_symbolic_general_quadratic_inverse_root_integral(const expr
         goto cleanup;
 
     sqrt_a = expr_sqrt(quad_coeff);
-    log_term = build_symbolic_general_quadratic_log(quadratic, wrt,
-                                                    quad_coeff, linear_coeff);
+    log_term = build_symbolic_general_quadratic_log(quadratic, wrt, quad_coeff, linear_coeff);
     out = (log_term && sqrt_a) ? expr_div(log_term, sqrt_a) : NULL;
     out = simplify_owned(out);
 
@@ -92,8 +86,7 @@ cleanup:
     return out;
 }
 
-expr_t *integrate_symbolic_general_quadratic_root(const expr_t *quadratic,
-                                                         const expr_t *wrt)
+expr_t *integrate_symbolic_general_quadratic_root(const expr_t *quadratic, const expr_t *wrt)
 {
     expr_t *quad_coeff = NULL;
     expr_t *linear_coeff = NULL;
@@ -118,8 +111,7 @@ expr_t *integrate_symbolic_general_quadratic_root(const expr_t *quadratic,
     number_t eight = num_create_from_long(8);
 
     if (!quadratic || !wrt ||
-        !match_symbolic_quadratic_coeffs(quadratic, wrt,
-                                         &quad_coeff, &linear_coeff, &constant_coeff))
+        !match_symbolic_quadratic_coeffs(quadratic, wrt, &quad_coeff, &linear_coeff, &constant_coeff))
         goto cleanup;
 
     sqrt_q = expr_sqrt(quadratic);
@@ -135,11 +127,8 @@ expr_t *integrate_symbolic_general_quadratic_root(const expr_t *quadratic,
     linear_sq = expr_pow(linear_coeff, &NUM_TWO);
     delta = (four_ac && linear_sq) ? expr_sub(four_ac, linear_sq) : NULL;
     inverse_root_integral =
-        build_symbolic_general_quadratic_inverse_root_integral(quadratic, wrt,
-                                                               quad_coeff, linear_coeff);
-    delta_inverse = (delta && inverse_root_integral)
-                        ? expr_mul(delta, inverse_root_integral)
-                        : NULL;
+        build_symbolic_general_quadratic_inverse_root_integral(quadratic, wrt, quad_coeff, linear_coeff);
+    delta_inverse = (delta && inverse_root_integral) ? expr_mul(delta, inverse_root_integral) : NULL;
     eight_a = expr_mul_num(quad_coeff, &eight);
     second = (delta_inverse && eight_a) ? expr_div(delta_inverse, eight_a) : NULL;
 
@@ -171,8 +160,7 @@ cleanup:
     return out;
 }
 
-expr_t *integrate_symbolic_general_quadratic_linear_over_root(const expr_t *expr,
-                                                                     const expr_t *wrt)
+expr_t *integrate_symbolic_general_quadratic_linear_over_root(const expr_t *expr, const expr_t *wrt)
 {
     expr_t *numer_constant = NULL;
     expr_t *numer_linear = NULL;
@@ -190,27 +178,21 @@ expr_t *integrate_symbolic_general_quadratic_linear_over_root(const expr_t *expr
     expr_t *linear_part = NULL;
     expr_t *out = NULL;
 
-    if (!expr || !wrt || !expr->a || !expr->b ||
-        !expr->b->ops || expr->b->ops->kind != EXPR_KIND_SQRT || !expr->b->a ||
+    if (!expr || !wrt || !expr->a || !expr->b || !expr->b->ops || expr->b->ops->kind != EXPR_KIND_SQRT || !expr->b->a ||
         !match_symbolic_affine_or_constant(expr->a, wrt, &numer_constant, &numer_linear) ||
-        !match_symbolic_quadratic_coeffs(expr->b->a, wrt,
-                                         &quad_coeff, &linear_coeff, &constant_coeff))
+        !match_symbolic_quadratic_coeffs(expr->b->a, wrt, &quad_coeff, &linear_coeff, &constant_coeff))
         goto cleanup;
 
     inverse_root_integral =
-        build_symbolic_general_quadratic_inverse_root_integral(expr->b->a, wrt,
-                                                               quad_coeff, linear_coeff);
+        build_symbolic_general_quadratic_inverse_root_integral(expr->b->a, wrt, quad_coeff, linear_coeff);
 
     sqrt_q = expr_sqrt(expr->b->a);
     root_over_quad = sqrt_q ? expr_div(sqrt_q, quad_coeff) : NULL;
     two_quad = expr_mul_num(quad_coeff, &NUM_TWO);
     linear_over_two_quad = two_quad ? expr_div(linear_coeff, two_quad) : NULL;
-    linear_correction = (linear_over_two_quad && inverse_root_integral)
-                            ? expr_mul(linear_over_two_quad, inverse_root_integral)
-                            : NULL;
-    wrt_over_root_integral = (root_over_quad && linear_correction)
-                                 ? expr_sub(root_over_quad, linear_correction)
-                                 : NULL;
+    linear_correction =
+        (linear_over_two_quad && inverse_root_integral) ? expr_mul(linear_over_two_quad, inverse_root_integral) : NULL;
+    wrt_over_root_integral = (root_over_quad && linear_correction) ? expr_sub(root_over_quad, linear_correction) : NULL;
 
     if (inverse_root_integral && !expr_is_exact_zero(numer_constant))
         constant_part = expr_mul(numer_constant, inverse_root_integral);
@@ -239,8 +221,7 @@ cleanup:
     return out;
 }
 
-expr_t *integrate_symbolic_general_quadratic_times_root(const expr_t *expr,
-                                                               const expr_t *wrt)
+expr_t *integrate_symbolic_general_quadratic_times_root(const expr_t *expr, const expr_t *wrt)
 {
     const expr_t *poly_expr = NULL;
     const expr_t *sqrt_expr = NULL;
@@ -272,8 +253,7 @@ expr_t *integrate_symbolic_general_quadratic_times_root(const expr_t *expr,
     }
 
     if (!is_wrt_symbolic_affine_leaf(poly_expr, wrt) || !sqrt_expr->a ||
-        !match_symbolic_quadratic_coeffs(sqrt_expr->a, wrt,
-                                         &quad_coeff, &linear_coeff, &constant_coeff))
+        !match_symbolic_quadratic_coeffs(sqrt_expr->a, wrt, &quad_coeff, &linear_coeff, &constant_coeff))
         goto cleanup;
 
     power = expr_pow(sqrt_expr->a, &three_halves);
@@ -283,9 +263,7 @@ expr_t *integrate_symbolic_general_quadratic_times_root(const expr_t *expr,
     root_integral = integrate_symbolic_general_quadratic_root(sqrt_expr->a, wrt);
     two_a = expr_mul_num(quad_coeff, &NUM_TWO);
     linear_over_two_a = two_a ? expr_div(linear_coeff, two_a) : NULL;
-    correction = (linear_over_two_a && root_integral)
-                     ? expr_mul(linear_over_two_a, root_integral)
-                     : NULL;
+    correction = (linear_over_two_a && root_integral) ? expr_mul(linear_over_two_a, root_integral) : NULL;
     out = (first && correction) ? expr_sub(first, correction) : NULL;
     out = simplify_owned(out);
 

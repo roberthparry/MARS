@@ -33,9 +33,7 @@ static number_t equ_cubic_shifted_root(number_t term, number_t shift)
     return num_sub(term, shift);
 }
 
-static number_t equ_cubic_sum_root(number_t first,
-                                        number_t second,
-                                        number_t shift)
+static number_t equ_cubic_sum_root(number_t first, number_t second, number_t shift)
 {
     number_t sum = num_add(first, second);
     number_t root = equ_cubic_shifted_root(sum, shift);
@@ -75,11 +73,8 @@ static number_t equ_cubic_omega(bool conjugate)
     return omega;
 }
 
-static int equ_append_distinct_root(const expr_t *wrt,
-                                         number_t root,
-                                         number_t *seen,
-                                         size_t *seen_count,
-                                         equation_solutions_t *solutions)
+static int equ_append_distinct_root(const expr_t *wrt, number_t root, number_t *seen, size_t *seen_count,
+                                    equation_solutions_t *solutions)
 {
     for (size_t i = 0u; i < *seen_count; ++i) {
         if (num_eq(root, seen[i]))
@@ -94,10 +89,7 @@ static int equ_append_distinct_root(const expr_t *wrt,
     return 0;
 }
 
-static void equ_cubic_reduce(const number_t *coeffs,
-                                  number_t *p_out,
-                                  number_t *q_out,
-                                  number_t *shift_out)
+static void equ_cubic_reduce(const number_t *coeffs, number_t *p_out, number_t *q_out, number_t *shift_out)
 {
     number_t a = coeffs[3];
     number_t b = coeffs[2];
@@ -153,13 +145,8 @@ static number_t equ_cubic_discriminant(number_t p, number_t q)
     return discriminant;
 }
 
-static int equ_append_cubic_zero_discriminant_roots(const expr_t *wrt,
-                                                         number_t p,
-                                                         number_t q,
-                                                         number_t shift,
-                                                         number_t *seen,
-                                                         size_t *seen_count,
-                                                         equation_solutions_t *solutions)
+static int equ_append_cubic_zero_discriminant_roots(const expr_t *wrt, number_t p, number_t q, number_t shift,
+                                                    number_t *seen, size_t *seen_count, equation_solutions_t *solutions)
 {
     number_t root;
     int rc = 0;
@@ -187,8 +174,7 @@ static int equ_append_cubic_zero_discriminant_roots(const expr_t *wrt,
 
         if (rc == 0) {
             root = equ_cubic_shifted_root(second_term, shift);
-            rc = equ_append_distinct_root(wrt, root, seen, seen_count,
-                                               solutions);
+            rc = equ_append_distinct_root(wrt, root, seen, seen_count, solutions);
             num_destroy(&root);
         }
 
@@ -201,13 +187,8 @@ static int equ_append_cubic_zero_discriminant_roots(const expr_t *wrt,
     return rc;
 }
 
-static int equ_append_cubic_trig_roots(const expr_t *wrt,
-                                            number_t p,
-                                            number_t q,
-                                            number_t shift,
-                                            number_t *seen,
-                                            size_t *seen_count,
-                                            equation_solutions_t *solutions)
+static int equ_append_cubic_trig_roots(const expr_t *wrt, number_t p, number_t q, number_t shift, number_t *seen,
+                                       size_t *seen_count, equation_solutions_t *solutions)
 {
     number_t neg_p = num_neg(p);
     number_t neg_p_third = equ_div_long(neg_p, 3L);
@@ -260,14 +241,9 @@ static int equ_append_cubic_trig_roots(const expr_t *wrt,
     return rc;
 }
 
-static int equ_append_cubic_cardano_roots(const expr_t *wrt,
-                                               number_t p,
-                                               number_t q,
-                                               number_t shift,
-                                               number_t discriminant,
-                                               number_t *seen,
-                                               size_t *seen_count,
-                                               equation_solutions_t *solutions)
+static int equ_append_cubic_cardano_roots(const expr_t *wrt, number_t p, number_t q, number_t shift,
+                                          number_t discriminant, number_t *seen, size_t *seen_count,
+                                          equation_solutions_t *solutions)
 {
     number_t q_half = equ_div_long(q, 2L);
     number_t neg_q_half = num_neg(q_half);
@@ -340,9 +316,7 @@ static expr_t *equ_cubic_expr_cuberoot(const expr_t *expr)
     return out;
 }
 
-static expr_t *equ_cubic_symbolic_p(const expr_t *a,
-                                         const expr_t *b,
-                                         const expr_t *c)
+static expr_t *equ_cubic_symbolic_p(const expr_t *a, const expr_t *b, const expr_t *c)
 {
     expr_t *a_sq = expr_pow_long(a, 2L);
     expr_t *ac = expr_mul(a, c);
@@ -350,9 +324,7 @@ static expr_t *equ_cubic_symbolic_p(const expr_t *a,
     expr_t *b_sq = expr_pow_long(b, 2L);
     expr_t *numerator = (three_ac && b_sq) ? expr_sub(three_ac, b_sq) : NULL;
     expr_t *denominator = expr_mul_long(a_sq, 3L);
-    expr_t *quotient = (numerator && denominator)
-        ? expr_div(numerator, denominator)
-        : NULL;
+    expr_t *quotient = (numerator && denominator) ? expr_div(numerator, denominator) : NULL;
     expr_t *out = expr_simplify_owned(quotient);
 
     expr_free(denominator);
@@ -364,10 +336,7 @@ static expr_t *equ_cubic_symbolic_p(const expr_t *a,
     return out;
 }
 
-static expr_t *equ_cubic_symbolic_q(const expr_t *a,
-                                         const expr_t *b,
-                                         const expr_t *c,
-                                         const expr_t *d)
+static expr_t *equ_cubic_symbolic_q(const expr_t *a, const expr_t *b, const expr_t *c, const expr_t *d)
 {
     expr_t *a_sq = expr_pow_long(a, 2L);
     expr_t *a_cu = expr_pow_long(a, 3L);
@@ -381,9 +350,7 @@ static expr_t *equ_cubic_symbolic_q(const expr_t *a,
     expr_t *first_diff = (first && second) ? expr_sub(first, second) : NULL;
     expr_t *numerator = (first_diff && third) ? expr_add(first_diff, third) : NULL;
     expr_t *denominator = expr_mul_long(a_cu, 27L);
-    expr_t *quotient = (numerator && denominator)
-        ? expr_div(numerator, denominator)
-        : NULL;
+    expr_t *quotient = (numerator && denominator) ? expr_div(numerator, denominator) : NULL;
     expr_t *out = expr_simplify_owned(quotient);
 
     expr_free(denominator);
@@ -401,8 +368,7 @@ static expr_t *equ_cubic_symbolic_q(const expr_t *a,
     return out;
 }
 
-static expr_t *equ_cubic_symbolic_shift(const expr_t *a,
-                                             const expr_t *b)
+static expr_t *equ_cubic_symbolic_shift(const expr_t *a, const expr_t *b)
 {
     expr_t *denominator = expr_mul_long(a, 3L);
     expr_t *quotient = denominator ? expr_div(b, denominator) : NULL;
@@ -412,16 +378,13 @@ static expr_t *equ_cubic_symbolic_shift(const expr_t *a,
     return out;
 }
 
-static expr_t *equ_cubic_symbolic_discriminant(const expr_t *p,
-                                                    const expr_t *q)
+static expr_t *equ_cubic_symbolic_discriminant(const expr_t *p, const expr_t *q)
 {
     expr_t *q_half = expr_div_long(q, 2L);
     expr_t *p_third = expr_div_long(p, 3L);
     expr_t *q_half_sq = expr_pow_long(q_half, 2L);
     expr_t *p_third_cu = expr_pow_long(p_third, 3L);
-    expr_t *sum = (q_half_sq && p_third_cu)
-        ? expr_add(q_half_sq, p_third_cu)
-        : NULL;
+    expr_t *sum = (q_half_sq && p_third_cu) ? expr_add(q_half_sq, p_third_cu) : NULL;
     expr_t *out = expr_simplify_owned(sum);
 
     expr_free(p_third_cu);
@@ -431,20 +394,13 @@ static expr_t *equ_cubic_symbolic_discriminant(const expr_t *p,
     return out;
 }
 
-static bool equ_cubic_symbolic_uv(const expr_t *q,
-                                       const expr_t *discriminant,
-                                       expr_t **u_out,
-                                       expr_t **v_out)
+static bool equ_cubic_symbolic_uv(const expr_t *q, const expr_t *discriminant, expr_t **u_out, expr_t **v_out)
 {
     expr_t *q_half = expr_div_long(q, 2L);
     expr_t *neg_q_half = q_half ? expr_neg(q_half) : NULL;
     expr_t *sqrt_discriminant = discriminant ? expr_sqrt(discriminant) : NULL;
-    expr_t *u_arg = (neg_q_half && sqrt_discriminant)
-        ? expr_add(neg_q_half, sqrt_discriminant)
-        : NULL;
-    expr_t *v_arg = (neg_q_half && sqrt_discriminant)
-        ? expr_sub(neg_q_half, sqrt_discriminant)
-        : NULL;
+    expr_t *u_arg = (neg_q_half && sqrt_discriminant) ? expr_add(neg_q_half, sqrt_discriminant) : NULL;
+    expr_t *v_arg = (neg_q_half && sqrt_discriminant) ? expr_sub(neg_q_half, sqrt_discriminant) : NULL;
     bool ok = false;
 
     *u_out = equ_cubic_expr_cuberoot(u_arg);
@@ -465,12 +421,8 @@ static expr_t *equ_cubic_omega_expr(bool conjugate)
     expr_t *three = expr_const_long(3L);
     expr_t *sqrt_three = three ? expr_sqrt(three) : NULL;
     expr_t *imag_unit = expr_new_const(NUM_I);
-    expr_t *imag = (imag_unit && sqrt_three)
-        ? expr_mul(imag_unit, sqrt_three)
-        : NULL;
-    expr_t *numerator = (neg_one && imag)
-        ? (conjugate ? expr_sub(neg_one, imag) : expr_add(neg_one, imag))
-        : NULL;
+    expr_t *imag = (imag_unit && sqrt_three) ? expr_mul(imag_unit, sqrt_three) : NULL;
+    expr_t *numerator = (neg_one && imag) ? (conjugate ? expr_sub(neg_one, imag) : expr_add(neg_one, imag)) : NULL;
     expr_t *out = expr_div_long(numerator, 2L);
 
     expr_free(numerator);
@@ -482,16 +434,11 @@ static expr_t *equ_cubic_omega_expr(bool conjugate)
     return out;
 }
 
-static expr_t *equ_cubic_symbolic_root(const expr_t *u,
-                                            const expr_t *v,
-                                            const expr_t *shift,
-                                            const expr_t *u_factor,
-                                            const expr_t *v_factor)
+static expr_t *equ_cubic_symbolic_root(const expr_t *u, const expr_t *v, const expr_t *shift, const expr_t *u_factor,
+                                       const expr_t *v_factor)
 {
-    expr_t *u_term = u_factor ? expr_mul(u_factor, u)
-                              : expr_retain_expr(u);
-    expr_t *v_term = v_factor ? expr_mul(v_factor, v)
-                              : expr_retain_expr(v);
+    expr_t *u_term = u_factor ? expr_mul(u_factor, u) : expr_retain_expr(u);
+    expr_t *v_term = v_factor ? expr_mul(v_factor, v) : expr_retain_expr(v);
     expr_t *sum = (u_term && v_term) ? expr_add(u_term, v_term) : NULL;
     expr_t *raw_root = (sum && shift) ? expr_sub(sum, shift) : NULL;
     expr_t *root = expr_simplify_owned(raw_root);
@@ -502,9 +449,7 @@ static expr_t *equ_cubic_symbolic_root(const expr_t *u,
     return root;
 }
 
-static int equ_try_solve_symbolic_cubic(const expr_t *residual,
-                                             const expr_t *wrt,
-                                             equation_solutions_t *solutions)
+static int equ_try_solve_symbolic_cubic(const expr_t *residual, const expr_t *wrt, equation_solutions_t *solutions)
 {
     expr_t *constant = NULL;
     expr_t *linear = NULL;
@@ -521,8 +466,7 @@ static int equ_try_solve_symbolic_cubic(const expr_t *residual,
     expr_t *root = NULL;
     int rc = -1;
 
-    if (!equ_match_symbolic_cubic_expr(residual, wrt, &constant,
-                                            &linear, &quadratic, &cubic)) {
+    if (!equ_match_symbolic_cubic_expr(residual, wrt, &constant, &linear, &quadratic, &cubic)) {
         rc = 1;
         goto cleanup;
     }
@@ -531,8 +475,7 @@ static int equ_try_solve_symbolic_cubic(const expr_t *residual,
     q = equ_cubic_symbolic_q(cubic, quadratic, linear, constant);
     shift = equ_cubic_symbolic_shift(cubic, quadratic);
     discriminant = (p && q) ? equ_cubic_symbolic_discriminant(p, q) : NULL;
-    if (!p || !q || !shift || !discriminant ||
-        !equ_cubic_symbolic_uv(q, discriminant, &u, &v))
+    if (!p || !q || !shift || !discriminant || !equ_cubic_symbolic_uv(q, discriminant, &u, &v))
         goto cleanup;
 
     root = equ_cubic_symbolic_root(u, v, shift, NULL, NULL);
@@ -576,9 +519,7 @@ cleanup:
     return rc;
 }
 
-int equ_solve_cubic_coefficients(const number_t *coeffs,
-                                 const expr_t *wrt,
-                                 equation_solutions_t *solutions)
+int equ_solve_cubic_coefficients(const number_t *coeffs, const expr_t *wrt, equation_solutions_t *solutions)
 {
     number_t p = num_new();
     number_t q = num_new();
@@ -596,16 +537,11 @@ int equ_solve_cubic_coefficients(const number_t *coeffs,
     discriminant = equ_cubic_discriminant(p, q);
 
     if (num_is_real(discriminant) && num_lt(discriminant, NUM_ZERO)) {
-        rc = equ_append_cubic_trig_roots(wrt, p, q, shift, seen,
-                                              &seen_count, solutions);
+        rc = equ_append_cubic_trig_roots(wrt, p, q, shift, seen, &seen_count, solutions);
     } else if (num_is_zero(discriminant)) {
-        rc = equ_append_cubic_zero_discriminant_roots(wrt, p, q, shift,
-                                                           seen, &seen_count,
-                                                           solutions);
+        rc = equ_append_cubic_zero_discriminant_roots(wrt, p, q, shift, seen, &seen_count, solutions);
     } else {
-        rc = equ_append_cubic_cardano_roots(wrt, p, q, shift,
-                                                 discriminant, seen,
-                                                 &seen_count, solutions);
+        rc = equ_append_cubic_cardano_roots(wrt, p, q, shift, discriminant, seen, &seen_count, solutions);
     }
 
 cleanup:
@@ -618,9 +554,7 @@ cleanup:
     return rc;
 }
 
-int equ_try_solve_cubic(const equation_t *equation,
-                        const expr_t *wrt,
-                        equation_solutions_t *solutions)
+int equ_try_solve_cubic(const equation_t *equation, const expr_t *wrt, equation_solutions_t *solutions)
 {
     expr_t *residual = equ_residual(equation);
     number_t coeffs[4];
@@ -631,8 +565,7 @@ int equ_try_solve_cubic(const equation_t *equation,
     if (!residual)
         goto cleanup;
 
-    ok = equ_match_polynomial_expr(residual, wrt, 3u, coeffs) &&
-         !num_is_zero(coeffs[3]);
+    ok = equ_match_polynomial_expr(residual, wrt, 3u, coeffs) && !num_is_zero(coeffs[3]);
     if (ok)
         rc = equ_solve_cubic_coefficients(coeffs, wrt, solutions);
     else

@@ -101,9 +101,7 @@ static int ts_append_padding(string_t *out, int count)
     return 0;
 }
 
-static string_format_result_t ts_format_callback(string_t *out,
-                                                 const string_format_spec_t *spec,
-                                                 va_list ap,
+static string_format_result_t ts_format_callback(string_t *out, const string_format_spec_t *spec, va_list ap,
                                                  void *user)
 {
     timeseries_t *series;
@@ -118,9 +116,7 @@ static string_format_result_t ts_format_callback(string_t *out,
 
     if (!out || !spec)
         return STRING_FORMAT_ERROR;
-    if (spec->conversion != 't' &&
-        spec->conversion != 'T' &&
-        spec->conversion != 'C')
+    if (spec->conversion != 't' && spec->conversion != 'T' && spec->conversion != 'C')
         return STRING_FORMAT_UNHANDLED;
     if (spec->length[0] != '\0')
         return STRING_FORMAT_ERROR;
@@ -134,9 +130,7 @@ static string_format_result_t ts_format_callback(string_t *out,
         width = -width;
     }
 
-    style = spec->conversion == 'T'
-        ? TS_STRING_PRETTY
-        : (spec->conversion == 'C' ? TS_STRING_CSV : TS_STRING_INLINE);
+    style = spec->conversion == 'T' ? TS_STRING_PRETTY : (spec->conversion == 'C' ? TS_STRING_CSV : TS_STRING_INLINE);
     series = va_arg(ap, timeseries_t *);
     text = ts_to_text(series, style);
     if (!text)
@@ -245,7 +239,8 @@ string_t *ts_forecast_to_text(const ts_forecast_t *forecast, ts_string_style_t s
         if (dt)
             datetime_dealloc(dt);
         date_text = (forecast->mean->has_index && forecast->mean->index[i])
-            ? ts_format_date_text(forecast->mean->index[i]) : NULL;
+                        ? ts_format_date_text(forecast->mean->index[i])
+                        : NULL;
         value = mat_get_num(ts_to_column_matrix(forecast->mean), i, 0);
         stderr_v = forecast->stderr ? forecast->stderr->values[i] : num_clone(NUM_NAN);
         lower_v = forecast->lower ? forecast->lower->values[i] : num_clone(NUM_NAN);
@@ -275,9 +270,12 @@ string_t *ts_forecast_to_text(const ts_forecast_t *forecast, ts_string_style_t s
         }
         string_free(date_text);
         num_destroy(&value);
-        if (!forecast->stderr) num_destroy(&stderr_v);
-        if (!forecast->lower) num_destroy(&lower_v);
-        if (!forecast->upper) num_destroy(&upper_v);
+        if (!forecast->stderr)
+            num_destroy(&stderr_v);
+        if (!forecast->lower)
+            num_destroy(&lower_v);
+        if (!forecast->upper)
+            num_destroy(&upper_v);
     }
     return ts_builder_detach_text(&sb);
 }
@@ -323,10 +321,7 @@ static double ts_mean_abs_series_value(const timeseries_t *series)
     return count ? total / (double)count : NAN;
 }
 
-static void ts_append_relative_error_rating(ts_string_builder_t *sb,
-                                            const char *label,
-                                            number_t value,
-                                            double baseline)
+static void ts_append_relative_error_rating(ts_string_builder_t *sb, const char *label, number_t value, double baseline)
 {
     double ratio;
 
@@ -348,7 +343,8 @@ static void ts_append_relative_error_rating(ts_string_builder_t *sb,
     else if (ratio < 0.40)
         ts_appendf(sb, " (mediocre; good is usually below about 25%% of the usual monthly level)");
     else
-        ts_appendf(sb, " (poor; good is usually below about 25%% of the usual monthly level, and very good below about 15%%)");
+        ts_appendf(
+            sb, " (poor; good is usually below about 25%% of the usual monthly level, and very good below about 15%%)");
     (void)label;
 }
 
@@ -381,7 +377,9 @@ static void ts_append_sigma2_rating(ts_string_builder_t *sb, number_t sigma2, do
     else if (ratio < 0.16)
         ts_appendf(sb, " (mediocre; good is usually much smaller relative to the scale of the series)");
     else
-        ts_appendf(sb, " (poor; good is usually much smaller relative to the scale of the series, and very good smaller still)");
+        ts_appendf(
+            sb,
+            " (poor; good is usually much smaller relative to the scale of the series, and very good smaller still)");
 }
 
 typedef enum {
@@ -397,12 +395,18 @@ typedef enum {
 static const char *ts_band_label(ts_rating_band_t band)
 {
     switch (band) {
-        case TS_BAND_EXCEPTIONAL: return "exceptional";
-        case TS_BAND_EXCELLENT: return "excellent";
-        case TS_BAND_VERY_GOOD: return "very good";
-        case TS_BAND_GOOD: return "good";
-        case TS_BAND_OK: return "ok";
-        case TS_BAND_POOR: return "poor";
+        case TS_BAND_EXCEPTIONAL:
+            return "exceptional";
+        case TS_BAND_EXCELLENT:
+            return "excellent";
+        case TS_BAND_VERY_GOOD:
+            return "very good";
+        case TS_BAND_GOOD:
+            return "good";
+        case TS_BAND_OK:
+            return "ok";
+        case TS_BAND_POOR:
+            return "poor";
         case TS_BAND_COMPARISON:
         default:
             return "comparison";
@@ -466,9 +470,7 @@ static ts_rating_band_t ts_sigma2_band(number_t sigma2, double baseline)
     return TS_BAND_POOR;
 }
 
-static void ts_append_overall_assessment(ts_string_builder_t *sb,
-                                         ts_rating_band_t band,
-                                         bool comparison_only)
+static void ts_append_overall_assessment(ts_string_builder_t *sb, ts_rating_band_t band, bool comparison_only)
 {
     const char *label = ts_band_label(band);
 
@@ -476,20 +478,34 @@ static void ts_append_overall_assessment(ts_string_builder_t *sb,
         return;
     if (comparison_only) {
         ts_appendf(sb,
-                   "Overall assessment: You've chosen a %s model so far. Proceed, but compare it with another candidate before deciding. To improve it in this app, run the forecast again with one simpler set of settings and one more seasonal set of settings, then keep the version with the lower comparison score on the same data.\n",
+                   "Overall assessment: You've chosen a %s model so far. Proceed, but compare it with another "
+                   "candidate before deciding. To improve it in this app, run the forecast again with one simpler set "
+                   "of settings and one more seasonal set of settings, then keep the version with the lower comparison "
+                   "score on the same data.\n",
                    label);
         return;
     }
     if (band >= TS_BAND_GOOD) {
         ts_appendf(sb,
-                   "Overall assessment: You've chosen a %s model. Proceed. If you want to improve it further, try two extra runs in this app: first, make the model simpler by lowering one of p, q, P, or Q; second, if the data is monthly, try a seasonal version with season period 12 and P or D set to 1. Keep the version that gives lower error and still looks realistic.\n",
+                   "Overall assessment: You've chosen a %s model. Proceed. If you want to improve it further, try two "
+                   "extra runs in this app: first, make the model simpler by lowering one of p, q, P, or Q; second, if "
+                   "the data is monthly, try a seasonal version with season period 12 and P or D set to 1. Keep the "
+                   "version that gives lower error and still looks realistic.\n",
                    label);
     } else if (band == TS_BAND_OK) {
         ts_appendf(sb,
-                   "Overall assessment: You've chosen an ok model. Proceed with caution, and revisit it if the forecast looks unrealistic. To get a better result, first check that the target dates and exogenous dates line up properly. Then run it again with a seasonal model if the data is monthly, or try a different model type such as SARIMAX instead of regression alone. After that, compare the typical forecast error and keep the version that is lower and still believable.\n");
+                   "Overall assessment: You've chosen an ok model. Proceed with caution, and revisit it if the "
+                   "forecast looks unrealistic. To get a better result, first check that the target dates and "
+                   "exogenous dates line up properly. Then run it again with a seasonal model if the data is monthly, "
+                   "or try a different model type such as SARIMAX instead of regression alone. After that, compare the "
+                   "typical forecast error and keep the version that is lower and still believable.\n");
     } else {
         ts_appendf(sb,
-                   "Overall assessment: You've chosen a poor model. Revisit the settings, the data, or both before relying on this forecast. To improve it, work through these steps: check for missing or misaligned dates, use a longer clean history if available, try a seasonal model for monthly data with season period 12, reduce over-complicated settings by lowering p, q, P, or Q, and test whether the exogenous inputs are actually helping by running the model with and without them.\n");
+                   "Overall assessment: You've chosen a poor model. Revisit the settings, the data, or both before "
+                   "relying on this forecast. To improve it, work through these steps: check for missing or misaligned "
+                   "dates, use a longer clean history if available, try a seasonal model for monthly data with season "
+                   "period 12, reduce over-complicated settings by lowering p, q, P, or Q, and test whether the "
+                   "exogenous inputs are actually helping by running the model with and without them.\n");
     }
 }
 
@@ -571,10 +587,8 @@ string_t *ts_arima_summary_to_text(const ts_arima_result_t *result)
     ts_appendf(&sb, "ARIMA summary\n");
     ts_append_overall_assessment(&sb, sigma_band, sigma_band == TS_BAND_COMPARISON);
     if (meta) {
-        ts_appendf(&sb, "Model: (%zu,%zu,%zu)x(%zu,%zu,%zu)[%zu]\n",
-                   meta->spec.p, meta->spec.d, meta->spec.q,
-                   meta->spec.P, meta->spec.D, meta->spec.Q,
-                   meta->spec.season_period);
+        ts_appendf(&sb, "Model: (%zu,%zu,%zu)x(%zu,%zu,%zu)[%zu]\n", meta->spec.p, meta->spec.d, meta->spec.q,
+                   meta->spec.P, meta->spec.D, meta->spec.Q, meta->spec.season_period);
     }
     ts_appendf(&sb, "Model comparison score (AIC): ");
     ts_append_number_fixed(&sb, result->summary.aic, 2);
@@ -721,24 +735,17 @@ static int ts_write_owned_text_to_path(const char *path, string_t *text)
     return rc;
 }
 
-int ts_write_file(const char *path,
-                  const timeseries_t *series,
-                  ts_string_style_t style)
+int ts_write_file(const char *path, const timeseries_t *series, ts_string_style_t style)
 {
     return ts_write_owned_text_to_path(path, ts_to_text(series, style));
 }
 
-int ts_forecast_write_file(const char *path,
-                           const ts_forecast_t *forecast,
-                           ts_string_style_t style)
+int ts_forecast_write_file(const char *path, const ts_forecast_t *forecast, ts_string_style_t style)
 {
-    return ts_write_owned_text_to_path(path,
-                                       ts_forecast_to_text(forecast, style));
+    return ts_write_owned_text_to_path(path, ts_forecast_to_text(forecast, style));
 }
 
-int ts_regression_summary_write_file(const char *path,
-                                     const ts_regression_result_t *result,
-                                     ts_string_style_t style)
+int ts_regression_summary_write_file(const char *path, const ts_regression_result_t *result, ts_string_style_t style)
 {
     string_t *text;
 
@@ -774,9 +781,7 @@ int ts_regression_summary_write_file(const char *path,
     return ts_write_owned_text_to_path(path, text);
 }
 
-int ts_arima_summary_write_file(const char *path,
-                                const ts_arima_result_t *result,
-                                ts_string_style_t style)
+int ts_arima_summary_write_file(const char *path, const ts_arima_result_t *result, ts_string_style_t style)
 {
     string_t *text;
 
@@ -803,11 +808,16 @@ int ts_arima_summary_write_file(const char *path,
 static const char *ts_frequency_name(ts_frequency_t frequency)
 {
     switch (frequency) {
-        case TS_FREQ_DAILY: return "daily";
-        case TS_FREQ_MONTHLY: return "monthly";
-        case TS_FREQ_QUARTERLY: return "quarterly";
-        case TS_FREQ_YEARLY: return "yearly";
-        case TS_FREQ_IRREGULAR: return "irregular";
+        case TS_FREQ_DAILY:
+            return "daily";
+        case TS_FREQ_MONTHLY:
+            return "monthly";
+        case TS_FREQ_QUARTERLY:
+            return "quarterly";
+        case TS_FREQ_YEARLY:
+            return "yearly";
+        case TS_FREQ_IRREGULAR:
+            return "irregular";
         case TS_FREQ_UNKNOWN:
         default:
             return "unknown";
@@ -816,19 +826,26 @@ static const char *ts_frequency_name(ts_frequency_t frequency)
 
 static ts_frequency_t ts_frequency_from_name(const char *name)
 {
-    if (!name) return TS_FREQ_UNKNOWN;
-    if (strcmp(name, "daily") == 0) return TS_FREQ_DAILY;
-    if (strcmp(name, "monthly") == 0) return TS_FREQ_MONTHLY;
-    if (strcmp(name, "quarterly") == 0) return TS_FREQ_QUARTERLY;
-    if (strcmp(name, "yearly") == 0) return TS_FREQ_YEARLY;
-    if (strcmp(name, "irregular") == 0) return TS_FREQ_IRREGULAR;
+    if (!name)
+        return TS_FREQ_UNKNOWN;
+    if (strcmp(name, "daily") == 0)
+        return TS_FREQ_DAILY;
+    if (strcmp(name, "monthly") == 0)
+        return TS_FREQ_MONTHLY;
+    if (strcmp(name, "quarterly") == 0)
+        return TS_FREQ_QUARTERLY;
+    if (strcmp(name, "yearly") == 0)
+        return TS_FREQ_YEARLY;
+    if (strcmp(name, "irregular") == 0)
+        return TS_FREQ_IRREGULAR;
     return TS_FREQ_UNKNOWN;
 }
 
 static const char *ts_year_type_name(ts_year_type_t year_type)
 {
     switch (year_type) {
-        case TS_YEAR_FISCAL_UK_APR: return "fiscal-uk-apr";
+        case TS_YEAR_FISCAL_UK_APR:
+            return "fiscal-uk-apr";
         case TS_YEAR_CALENDAR:
         default:
             return "calendar";
@@ -842,10 +859,7 @@ static ts_year_type_t ts_year_type_from_name(const char *name)
     return TS_YEAR_CALENDAR;
 }
 
-bool ts_serialize(const timeseries_t *series,
-                  string_t **out_type,
-                  string_t **out_encoding,
-                  void **out_data,
+bool ts_serialize(const timeseries_t *series, string_t **out_type, string_t **out_encoding, void **out_data,
                   size_t *out_len)
 {
     string_t *type = NULL;
@@ -867,8 +881,7 @@ bool ts_serialize(const timeseries_t *series,
     }
     memcpy(payload, string_c_str(text), string_byte_length(text));
 
-    encoding = ts_sprintf_text("text/csv;frequency=%s;year_type=%s",
-                               ts_frequency_name(ts_frequency(series)),
+    encoding = ts_sprintf_text("text/csv;frequency=%s;year_type=%s", ts_frequency_name(ts_frequency(series)),
                                ts_year_type_name(ts_year_type(series)));
     type = string_new_with("timeseries_t");
     if (!type || !encoding) {
@@ -887,10 +900,7 @@ bool ts_serialize(const timeseries_t *series,
     return true;
 }
 
-timeseries_t *ts_deserialise(const void *data,
-                             size_t len,
-                             const string_t *type,
-                             const string_t *encoding)
+timeseries_t *ts_deserialise(const void *data, size_t len, const string_t *type, const string_t *encoding)
 {
     char *buffer;
     char *saveptr = NULL;
@@ -949,9 +959,7 @@ timeseries_t *ts_deserialise(const void *data,
         return NULL;
     }
 
-    for (line = strtok_r(buffer, "\n", &saveptr);
-         line != NULL;
-         line = strtok_r(NULL, "\n", &saveptr)) {
+    for (line = strtok_r(buffer, "\n", &saveptr); line != NULL; line = strtok_r(NULL, "\n", &saveptr)) {
         char *comma;
         double value;
         char *end = NULL;

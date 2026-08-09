@@ -41,14 +41,14 @@
  * creation simplifies derivatives in the DAG before they are rendered.
  */
 
-#include <stdbool.h>
-#include <stdarg.h>
-#include <limits.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
 #include <ctype.h>
 #include <gmp.h>
+#include <limits.h>
+#include <stdarg.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "expr_bindings.h"
 #define MARS_EXPR_INTERNAL_ACCESS
@@ -69,13 +69,9 @@
 /* Precedence and superscripts                                               */
 /* ------------------------------------------------------------------------- */
 
-static const char *sup_digits[10] = {
-    "⁰","¹","²","³","⁴","⁵","⁶","⁷","⁸","⁹"
-};
+static const char *sup_digits[10] = {"⁰", "¹", "²", "³", "⁴", "⁵", "⁶", "⁷", "⁸", "⁹"};
 
-static const char *sub_digits[10] = {
-    "₀","₁","₂","₃","₄","₅","₆","₇","₈","₉"
-};
+static const char *sub_digits[10] = {"₀", "₁", "₂", "₃", "₄", "₅", "₆", "₇", "₈", "₉"};
 
 static int expr_append_padding(string_t *out, int count)
 {
@@ -86,8 +82,7 @@ static int expr_append_padding(string_t *out, int count)
     return 0;
 }
 
-static style_t expr_format_style(const string_format_spec_t *spec,
-                                 string_format_result_t *result)
+static style_t expr_format_style(const string_format_spec_t *spec, string_format_result_t *result)
 {
     if (!spec || !result)
         return style_EXPRESSION;
@@ -110,9 +105,7 @@ static style_t expr_format_style(const string_format_spec_t *spec,
     }
 }
 
-static string_format_result_t expr_format_callback(string_t *out,
-                                                   const string_format_spec_t *spec,
-                                                   va_list ap,
+static string_format_result_t expr_format_callback(string_t *out, const string_format_spec_t *spec, va_list ap,
                                                    void *user)
 {
     bool left;
@@ -189,7 +182,7 @@ static void emit_superscript_int(sbuf_t *b, long n)
         return;
     }
     char tmp[32];
-    int  len = 0;
+    int len = 0;
     while (n > 0 && len < (int)sizeof(tmp)) {
         tmp[len++] = (char)('0' + (n % 10));
         n /= 10;
@@ -211,7 +204,7 @@ static void emit_subscript_int(sbuf_t *b, long n)
         return;
     }
     char tmp[32];
-    int  len = 0;
+    int len = 0;
     while (n > 0 && len < (int)sizeof(tmp)) {
         tmp[len++] = (char)('0' + (n % 10));
         n /= 10;
@@ -267,9 +260,7 @@ static bool expr_tostring_text_to_long_local(const string_t *text, long *out)
     if (!saw_digit)
         return false;
 
-    *out = negative && value == (unsigned long)LONG_MAX + 1u
-        ? LONG_MIN
-        : (negative ? -(long)value : (long)value);
+    *out = negative && value == (unsigned long)LONG_MAX + 1u ? LONG_MIN : (negative ? -(long)value : (long)value);
     return true;
 }
 
@@ -352,9 +343,7 @@ static void emit_atom(expr_t *f, sbuf_t *b)
     }
 }
 
-static bool emit_negative_const_binding_expr_abs(const expr_t *f,
-                                                 sbuf_t *b,
-                                                 bool tex)
+static bool emit_negative_const_binding_expr_abs(const expr_t *f, sbuf_t *b, bool tex)
 {
     char *raw;
     string_t *text;
@@ -369,9 +358,7 @@ static bool emit_negative_const_binding_expr_abs(const expr_t *f,
     if (!f || !f->binding_expr)
         return false;
 
-    raw = tex
-        ? expr_binding_expr_to_tex(f->binding_expr)
-        : expr_binding_expr_to_string(f->binding_expr);
+    raw = tex ? expr_binding_expr_to_tex(f->binding_expr) : expr_binding_expr_to_string(f->binding_expr);
     if (!raw)
         return false;
 
@@ -401,18 +388,14 @@ static bool emit_negative_const_binding_expr_abs(const expr_t *f,
 
     if (digits_end > digits_start) {
         if (tex && string_cursor_consume(cursor, " \\cdot \\pi")) {
-            slice = string_cursor_slice_between(digits_start,
-                                                digits_end,
-                                                cursor);
+            slice = string_cursor_slice_between(digits_start, digits_end, cursor);
             if (slice) {
                 sbuf_puts(b, string_c_str(slice));
                 string_free(slice);
             }
             sbuf_puts(b, "\\pi");
-            slice = string_cursor_slice_between(
-                string_cursor_position(cursor),
-                string_cursor_end_position(cursor),
-                cursor);
+            slice =
+                string_cursor_slice_between(string_cursor_position(cursor), string_cursor_end_position(cursor), cursor);
             if (slice) {
                 sbuf_puts(b, string_c_str(slice));
                 string_free(slice);
@@ -421,18 +404,14 @@ static bool emit_negative_const_binding_expr_abs(const expr_t *f,
             goto done;
         }
         if (!tex && string_cursor_consume(cursor, "·π")) {
-            slice = string_cursor_slice_between(digits_start,
-                                                digits_end,
-                                                cursor);
+            slice = string_cursor_slice_between(digits_start, digits_end, cursor);
             if (slice) {
                 sbuf_puts(b, string_c_str(slice));
                 string_free(slice);
             }
             sbuf_puts(b, "π");
-            slice = string_cursor_slice_between(
-                string_cursor_position(cursor),
-                string_cursor_end_position(cursor),
-                cursor);
+            slice =
+                string_cursor_slice_between(string_cursor_position(cursor), string_cursor_end_position(cursor), cursor);
             if (slice) {
                 sbuf_puts(b, string_c_str(slice));
                 string_free(slice);
@@ -442,9 +421,7 @@ static bool emit_negative_const_binding_expr_abs(const expr_t *f,
         }
     }
 
-    slice = string_cursor_slice_between(rest_start,
-                                        string_cursor_end_position(cursor),
-                                        cursor);
+    slice = string_cursor_slice_between(rest_start, string_cursor_end_position(cursor), cursor);
     if (slice) {
         sbuf_puts(b, string_c_str(slice));
         string_free(slice);
@@ -464,16 +441,21 @@ done:
    ------------------------------------------------------------- */
 static int pow_exp_needs_parens(const expr_t *e)
 {
-    if (!e) return 0;
+    if (!e)
+        return 0;
     if (expr_is_const(e) && !num_is_real(e->c) && !num_eq(e->c, NUM_I))
         return 1;
-    if (e->ops->arity == EXPR_OP_ATOM)  return 0;  /* var, const */
-    if (expr_is_neg(e))                  return 1;
-    if (expr_is_pow_d_expr(e))           return 1;  /* e.g. y² is ambiguous as exponent */
-    if (e->ops->arity == EXPR_OP_UNARY)  return 0;  /* sin(…), exp(…), etc. */
+    if (e->ops->arity == EXPR_OP_ATOM)
+        return 0; /* var, const */
+    if (expr_is_neg(e))
+        return 1;
+    if (expr_is_pow_d_expr(e))
+        return 1; /* e.g. y² is ambiguous as exponent */
+    if (e->ops->arity == EXPR_OP_UNARY)
+        return 0; /* sin(…), exp(…), etc. */
     /* EXPR_OP_BINARY: arithmetic/pow need parens; named functions (atan2 …) don't */
-    if (expr_is_addsub(e) || expr_is_mul(e) ||
-        expr_is_op(e, &ops_div) || expr_is_op(e, &ops_pow)) return 1;
+    if (expr_is_addsub(e) || expr_is_mul(e) || expr_is_op(e, &ops_div) || expr_is_op(e, &ops_pow))
+        return 1;
     return 0;
 }
 
@@ -482,15 +464,11 @@ static int pow_base_needs_visible_parens(const expr_t *base)
     number_t real;
     int has_real_part;
 
-    if (base && (expr_is_formal_derivative(base) ||
-                 expr_is_pow_d_expr(base) ||
-                 expr_is_op(base, &ops_pow)))
+    if (base && (expr_is_formal_derivative(base) || expr_is_pow_d_expr(base) || expr_is_op(base, &ops_pow)))
         return 1;
 
-    if (base && expr_is_const(base) &&
-        expr_tostring_should_emit_binding_expr(base) && base->binding_expr) {
-        if (base->binding_expr->kind == EXPR_BINDING_EXPR_ADD ||
-            base->binding_expr->kind == EXPR_BINDING_EXPR_SUB)
+    if (base && expr_is_const(base) && expr_tostring_should_emit_binding_expr(base) && base->binding_expr) {
+        if (base->binding_expr->kind == EXPR_BINDING_EXPR_ADD || base->binding_expr->kind == EXPR_BINDING_EXPR_SUB)
             return 1;
         if (base->binding_expr->kind == EXPR_BINDING_EXPR_UNARY_OP ||
             base->binding_expr->kind == EXPR_BINDING_EXPR_BINARY_OP ||
@@ -514,10 +492,8 @@ static int mul_factor_needs_visible_parens(const expr_t *factor)
     if (factor && expr_is_op(factor, &ops_summation))
         return 1;
 
-    if (factor && expr_is_const(factor) &&
-        expr_tostring_should_emit_binding_expr(factor) && factor->binding_expr) {
-        if (factor->binding_expr->kind == EXPR_BINDING_EXPR_ADD ||
-            factor->binding_expr->kind == EXPR_BINDING_EXPR_SUB)
+    if (factor && expr_is_const(factor) && expr_tostring_should_emit_binding_expr(factor) && factor->binding_expr) {
+        if (factor->binding_expr->kind == EXPR_BINDING_EXPR_ADD || factor->binding_expr->kind == EXPR_BINDING_EXPR_SUB)
             return 1;
         if (factor->binding_expr->kind == EXPR_BINDING_EXPR_UNARY_OP ||
             factor->binding_expr->kind == EXPR_BINDING_EXPR_BINARY_OP ||
@@ -537,25 +513,20 @@ static int mul_factor_needs_visible_parens(const expr_t *factor)
 static int add_rhs_needs_visible_parens(const expr_t *rhs)
 {
     if ((rhs && expr_is_const(rhs) && mul_factor_needs_visible_parens(rhs)) ||
-        (expr_is_neg(rhs) && rhs->a &&
-         expr_is_const(rhs->a) && mul_factor_needs_visible_parens(rhs->a)))
+        (expr_is_neg(rhs) && rhs->a && expr_is_const(rhs->a) && mul_factor_needs_visible_parens(rhs->a)))
         return 1;
 
-    if (rhs && expr_is_const(rhs) &&
-        expr_tostring_should_emit_binding_expr(rhs) && rhs->binding_expr) {
-        if (rhs->binding_expr->kind == EXPR_BINDING_EXPR_ADD ||
-            rhs->binding_expr->kind == EXPR_BINDING_EXPR_SUB)
+    if (rhs && expr_is_const(rhs) && expr_tostring_should_emit_binding_expr(rhs) && rhs->binding_expr) {
+        if (rhs->binding_expr->kind == EXPR_BINDING_EXPR_ADD || rhs->binding_expr->kind == EXPR_BINDING_EXPR_SUB)
             return 1;
         if (rhs->binding_expr->kind == EXPR_BINDING_EXPR_UNARY_OP ||
-            rhs->binding_expr->kind == EXPR_BINDING_EXPR_BINARY_OP ||
-            rhs->binding_expr->kind == EXPR_BINDING_EXPR_POWI)
+            rhs->binding_expr->kind == EXPR_BINDING_EXPR_BINARY_OP || rhs->binding_expr->kind == EXPR_BINDING_EXPR_POWI)
             return 0;
     }
 
-    if (expr_is_neg(rhs) && rhs->a && expr_is_const(rhs->a) &&
-        expr_tostring_should_emit_binding_expr(rhs->a) && rhs->a->binding_expr) {
-        if (rhs->a->binding_expr->kind == EXPR_BINDING_EXPR_ADD ||
-            rhs->a->binding_expr->kind == EXPR_BINDING_EXPR_SUB)
+    if (expr_is_neg(rhs) && rhs->a && expr_is_const(rhs->a) && expr_tostring_should_emit_binding_expr(rhs->a) &&
+        rhs->a->binding_expr) {
+        if (rhs->a->binding_expr->kind == EXPR_BINDING_EXPR_ADD || rhs->a->binding_expr->kind == EXPR_BINDING_EXPR_SUB)
             return 1;
         if (rhs->a->binding_expr->kind == EXPR_BINDING_EXPR_UNARY_OP ||
             rhs->a->binding_expr->kind == EXPR_BINDING_EXPR_BINARY_OP ||
@@ -566,11 +537,9 @@ static int add_rhs_needs_visible_parens(const expr_t *rhs)
     return expr_is_addsub(rhs);
 }
 
-static bool expr_binding_expr_is_number_text_local(const expr_binding_expr_t *expr,
-                                                 const char *text)
+static bool expr_binding_expr_is_number_text_local(const expr_binding_expr_t *expr, const char *text)
 {
-    return expr && expr->kind == EXPR_BINDING_EXPR_NUMBER &&
-           expr->u.text && strcmp(expr->u.text, text) == 0;
+    return expr && expr->kind == EXPR_BINDING_EXPR_NUMBER && expr->u.text && strcmp(expr->u.text, text) == 0;
 }
 
 static bool expr_is_preserved_ln10_const_local(const expr_t *f)
@@ -581,8 +550,7 @@ static bool expr_is_preserved_ln10_const_local(const expr_t *f)
         return false;
 
     expr = f->binding_expr;
-    return expr->kind == EXPR_BINDING_EXPR_UNARY_OP &&
-           expr->u.unary_op.ops == &ops_log &&
+    return expr->kind == EXPR_BINDING_EXPR_UNARY_OP && expr->u.unary_op.ops == &ops_log &&
            expr_binding_expr_is_number_text_local(expr->u.unary_op.child, "10");
 }
 
@@ -607,23 +575,17 @@ static bool expr_is_const_neg_half_local(const expr_t *f)
 
 static bool expr_const_half_can_render_as_sqrt_local(const expr_t *f)
 {
-    return expr_is_const_half_local(f) &&
-           (!f->name || !*f->name) &&
-           !f->binding_expr;
+    return expr_is_const_half_local(f) && (!f->name || !*f->name) && !f->binding_expr;
 }
 
 static bool expr_const_neg_half_can_render_as_sqrt_local(const expr_t *f)
 {
-    return expr_is_const_neg_half_local(f) &&
-           (!f->name || !*f->name) &&
-           !f->binding_expr;
+    return expr_is_const_neg_half_local(f) && (!f->name || !*f->name) && !f->binding_expr;
 }
 
 static int is_atomic_for_mul(const expr_t *f);
 
-static void emit_expr_mul_separator_local(const expr_t *left,
-                                          const expr_t *right,
-                                          sbuf_t *b)
+static void emit_expr_mul_separator_local(const expr_t *left, const expr_t *right, sbuf_t *b)
 {
     int left_atomic;
     int right_atomic;
@@ -639,7 +601,8 @@ static void emit_expr_mul_separator_local(const expr_t *left,
    ------------------------------------------------------------- */
 static int is_atomic_for_mul(const expr_t *f)
 {
-    if (!f) return 0;
+    if (!f)
+        return 0;
 
     if (expr_is_const(f)) {
         /* Unnamed numeric constants are always atomic (e.g. the leading "6" in 6x²).
@@ -649,10 +612,10 @@ static int is_atomic_for_mul(const expr_t *f)
          * bracketed terms: [pi]·[radius]² instead of [pi][radius]². */
         if (expr_is_preserved_ln10_const_local(f))
             return 0;
-        if (f->binding_expr &&
-            expr_binding_expr_needs_explicit_mul_separator(f->binding_expr))
+        if (f->binding_expr && expr_binding_expr_needs_explicit_mul_separator(f->binding_expr))
             return 0;
-        if (!f->name || !*f->name) return 1;
+        if (!f->name || !*f->name)
+            return 1;
         return expr_tostring_is_simple_name(f->name);
     }
 
@@ -660,8 +623,7 @@ static int is_atomic_for_mul(const expr_t *f)
         return expr_tostring_is_simple_name(f->name);
 
     if (expr_tostring_is_var_pow_d(f))
-        return num_sign(f->c) > 0 &&
-               expr_tostring_is_simple_name(f->a->name);
+        return num_sign(f->c) > 0 && expr_tostring_is_simple_name(f->a->name);
 
     return 0;
 }
@@ -672,7 +634,8 @@ static int is_atomic_for_mul(const expr_t *f)
 
 static void flatten_mul(expr_t *f, expr_t **buf, int *count, int max)
 {
-    if (!f || *count >= max) return;
+    if (!f || *count >= max)
+        return;
 
     if (expr_is_mul(f)) {
         flatten_mul(f->a, buf, count, max);
@@ -684,8 +647,7 @@ static void flatten_mul(expr_t *f, expr_t **buf, int *count, int max)
 
 static int expr_tostring_is_named_const_pow_d(const expr_t *f)
 {
-    return expr_is_pow_d_expr(f) && expr_is_const(f->a) &&
-           f->a->name && *f->a->name;
+    return expr_is_pow_d_expr(f) && expr_is_const(f->a) && f->a->name && *f->a->name;
 }
 
 static int expr_tostring_rune_is_digit_suffix(rune_t rune)
@@ -768,22 +730,18 @@ done:
 
 static int expr_tostring_is_coefficient_var(const expr_t *f)
 {
-    return expr_is_var(f) && f->name && *f->name &&
-           !expr_tostring_is_primary_variable_name(f->name);
+    return expr_is_var(f) && f->name && *f->name && !expr_tostring_is_primary_variable_name(f->name);
 }
 
 static int expr_tostring_is_coefficient_var_pow_d(const expr_t *f)
 {
-    return expr_is_pow_d_expr(f) && f->a &&
-           expr_tostring_is_coefficient_var(f->a);
+    return expr_is_pow_d_expr(f) && f->a && expr_tostring_is_coefficient_var(f->a);
 }
 
-static bool display_poly_contains_indexed_arbitrary_constant(
-    const expr_t *expr);
+static bool display_poly_contains_indexed_arbitrary_constant(const expr_t *expr);
 static bool display_poly_is_indexed_arbitrary_constant(const expr_t *expr);
 
-static bool expr_tostring_is_indexed_constant_times_variable_power(
-    const expr_t *expr)
+static bool expr_tostring_is_indexed_constant_times_variable_power(const expr_t *expr)
 {
     const expr_t *variable_power;
 
@@ -796,28 +754,23 @@ static bool expr_tostring_is_indexed_constant_times_variable_power(
     else
         return false;
     if (expr_is_var(variable_power))
-        return variable_power->name &&
-            expr_tostring_is_primary_variable_name(variable_power->name);
-    return expr_is_pow_d_expr(variable_power) &&
-        variable_power->a && expr_is_var(variable_power->a) &&
-        variable_power->a->name &&
-        expr_tostring_is_primary_variable_name(variable_power->a->name);
+        return variable_power->name && expr_tostring_is_primary_variable_name(variable_power->name);
+    return expr_is_pow_d_expr(variable_power) && variable_power->a && expr_is_var(variable_power->a) &&
+           variable_power->a->name && expr_tostring_is_primary_variable_name(variable_power->a->name);
 }
 
-static bool expr_tostring_is_explicit_arbitrary_amplitude_terms(
-    const expr_t *expr)
+static bool expr_tostring_is_explicit_arbitrary_amplitude_terms(const expr_t *expr)
 {
     if (!expr)
         return false;
     if (expr_is_addsub(expr))
         return expr_tostring_is_explicit_arbitrary_amplitude_terms(expr->a) &&
-            expr_tostring_is_explicit_arbitrary_amplitude_terms(expr->b);
+               expr_tostring_is_explicit_arbitrary_amplitude_terms(expr->b);
     return display_poly_is_indexed_arbitrary_constant(expr) ||
-        expr_tostring_is_indexed_constant_times_variable_power(expr);
+           expr_tostring_is_indexed_constant_times_variable_power(expr);
 }
 
-static bool expr_tostring_is_explicit_arbitrary_amplitude(
-    const expr_t *expr)
+static bool expr_tostring_is_explicit_arbitrary_amplitude(const expr_t *expr)
 {
     const expr_t *first = expr;
 
@@ -826,7 +779,7 @@ static bool expr_tostring_is_explicit_arbitrary_amplitude(
     while (first && expr_is_addsub(first))
         first = first->a;
     return display_poly_is_indexed_arbitrary_constant(first) &&
-        expr_tostring_is_explicit_arbitrary_amplitude_terms(expr);
+           expr_tostring_is_explicit_arbitrary_amplitude_terms(expr);
 }
 
 /* Sort group for multiplication factors:
@@ -840,7 +793,8 @@ static bool expr_tostring_is_explicit_arbitrary_amplitude(
  */
 static int factor_group(const expr_t *f)
 {
-    if (expr_is_neg(f)) f = f->a;
+    if (expr_is_neg(f))
+        f = f->a;
 
     if (expr_is_op(f, &ops_indexed_symbol))
         return 3;
@@ -852,7 +806,8 @@ static int factor_group(const expr_t *f)
     if (expr_is_const(f)) {
         if (expr_is_preserved_ln10_const_local(f))
             return 5;
-        if (!f->name || !*f->name) return 0;
+        if (!f->name || !*f->name)
+            return 0;
         if (f->binding_expr && !expr_is_immortal_default_const_local(f))
             return 3;
         return expr_tostring_name_starts_non_ascii(f->name) ? 1 : 2;
@@ -879,10 +834,13 @@ static int factor_group(const expr_t *f)
 /* DFS to find the name of the first variable in an expression. */
 static const char *first_var_name(const expr_t *f)
 {
-    if (!f) return "";
-    if (expr_is_var(f)) return f->name ? f->name : "";
+    if (!f)
+        return "";
+    if (expr_is_var(f))
+        return f->name ? f->name : "";
     const char *a = first_var_name(f->a);
-    if (*a) return a;
+    if (*a)
+        return a;
     return first_var_name(f->b);
 }
 
@@ -891,9 +849,12 @@ static const char *first_var_name(const expr_t *f)
  * This makes cos²(x) (depth 1) sort before exp(sin(x)) (depth 2). */
 static int factor_depth(const expr_t *f)
 {
-    if (!f || expr_is_const(f) || expr_is_var(f)) return 0;
-    if (expr_is_neg(f) || expr_is_pow_d_expr(f)) return factor_depth(f->a);
-    if (f->ops->arity == EXPR_OP_UNARY) return 1 + factor_depth(f->a);
+    if (!f || expr_is_const(f) || expr_is_var(f))
+        return 0;
+    if (expr_is_neg(f) || expr_is_pow_d_expr(f))
+        return factor_depth(f->a);
+    if (f->ops->arity == EXPR_OP_UNARY)
+        return 1 + factor_depth(f->a);
     if (f->ops->arity == EXPR_OP_BINARY) {
         int da = factor_depth(f->a), db = factor_depth(f->b);
         return 1 + (da > db ? da : db);
@@ -903,7 +864,8 @@ static int factor_depth(const expr_t *f)
 
 static const char *factor_sort_name(const expr_t *f)
 {
-    if (expr_is_neg(f)) f = f->a;
+    if (expr_is_neg(f))
+        f = f->a;
 
     if (expr_is_const(f))
         return (f->name && *f->name) ? f->name : "";
@@ -946,7 +908,8 @@ static void sort_factors(expr_t **fac, int n)
             } else {
                 cmp = strcmp(factor_sort_name(fac[t]), kn);
             }
-            if (cmp <= 0) break;
+            if (cmp <= 0)
+                break;
             fac[t + 1] = fac[t];
             t--;
         }
@@ -1062,9 +1025,7 @@ static void emit_formal_partial_denominator(const expr_t *f, sbuf_t *b)
         const expr_t *wrt = f->formal_wrts[i - 1u];
         size_t multiplicity = 1u;
 
-        while (i > multiplicity &&
-               expr_struct_eq(
-                   f->formal_wrts[i - multiplicity - 1u], wrt)) {
+        while (i > multiplicity && expr_struct_eq(f->formal_wrts[i - multiplicity - 1u], wrt)) {
             multiplicity++;
         }
         if (!first)
@@ -1089,8 +1050,7 @@ static void emit_formal_derivative_tex(const expr_t *f, sbuf_t *b)
         if (f->formal_wrt_count > 1u) {
             char order[32];
 
-            snprintf(
-                order, sizeof(order), "^{%zu}", f->formal_wrt_count);
+            snprintf(order, sizeof(order), "^{%zu}", f->formal_wrt_count);
             sbuf_puts(b, order);
         }
         sbuf_putc(b, ' ');
@@ -1101,16 +1061,13 @@ static void emit_formal_derivative_tex(const expr_t *f, sbuf_t *b)
         return;
     }
     if (expr_tex_total_derivatives_enabled()) {
-        const expr_t *wrt = f->formal_wrt_count > 0u
-            ? f->formal_wrts[0]
-            : NULL;
+        const expr_t *wrt = f->formal_wrt_count > 0u ? f->formal_wrts[0] : NULL;
 
         sbuf_puts(b, "\\frac{d");
         if (f->formal_wrt_count > 1u) {
             char order[32];
 
-            snprintf(
-                order, sizeof(order), "^{%zu}", f->formal_wrt_count);
+            snprintf(order, sizeof(order), "^{%zu}", f->formal_wrt_count);
             sbuf_puts(b, order);
         }
         sbuf_putc(b, ' ');
@@ -1120,8 +1077,7 @@ static void emit_formal_derivative_tex(const expr_t *f, sbuf_t *b)
         if (f->formal_wrt_count > 1u) {
             char order[32];
 
-            snprintf(
-                order, sizeof(order), "^{%zu}", f->formal_wrt_count);
+            snprintf(order, sizeof(order), "^{%zu}", f->formal_wrt_count);
             sbuf_puts(b, order);
         }
         sbuf_putc(b, '}');
@@ -1147,16 +1103,14 @@ static void emit_arbitrary_function_expr(const expr_t *f, sbuf_t *b)
     size_t length = strlen(name);
     size_t prime_count = 0u;
 
-    if (strcmp(name, "BesselJ") == 0 && f->a &&
-        f->a->ops == &ops_argument_list) {
+    if (strcmp(name, "BesselJ") == 0 && f->a && f->a->ops == &ops_argument_list) {
         sbuf_puts(b, "BesselJ(");
         emit_expr(f->a, b, PREC_LOWEST);
         sbuf_putc(b, ')');
         return;
     }
 
-    if (strcmp(name, "LommelS") == 0 && f->a &&
-        f->a->ops == &ops_argument_list) {
+    if (strcmp(name, "LommelS") == 0 && f->a && f->a->ops == &ops_argument_list) {
         sbuf_puts(b, "LommelS(");
         emit_expr(f->a, b, PREC_LOWEST);
         sbuf_putc(b, ')');
@@ -1171,8 +1125,7 @@ static void emit_arbitrary_function_expr(const expr_t *f, sbuf_t *b)
         return;
     }
 
-    while (prime_count < length &&
-           name[length - prime_count - 1u] == '\'')
+    while (prime_count < length && name[length - prime_count - 1u] == '\'')
         ++prime_count;
     if (prime_count > 0u && prime_count < length) {
         char *base_name = strndup(name, length - prime_count);
@@ -1206,8 +1159,7 @@ static void emit_arbitrary_function_tex(const expr_t *f, sbuf_t *b)
     size_t length = strlen(name);
     size_t prime_count = 0u;
 
-    if (strcmp(name, "BesselJ") == 0 && f->a &&
-        f->a->ops == &ops_argument_list) {
+    if (strcmp(name, "BesselJ") == 0 && f->a && f->a->ops == &ops_argument_list) {
         sbuf_puts(b, "J_{");
         emit_tex_expr(f->a->a, b, PREC_LOWEST);
         sbuf_puts(b, "}\\left(");
@@ -1216,8 +1168,7 @@ static void emit_arbitrary_function_tex(const expr_t *f, sbuf_t *b)
         return;
     }
 
-    if (strcmp(name, "LommelS") == 0 && f->a &&
-        f->a->ops == &ops_argument_list && f->a->a &&
+    if (strcmp(name, "LommelS") == 0 && f->a && f->a->ops == &ops_argument_list && f->a->a &&
         f->a->a->ops == &ops_argument_list) {
         sbuf_puts(b, "s_{");
         emit_tex_expr(f->a->a->a, b, PREC_LOWEST);
@@ -1238,8 +1189,7 @@ static void emit_arbitrary_function_tex(const expr_t *f, sbuf_t *b)
         return;
     }
 
-    while (prime_count < length &&
-           name[length - prime_count - 1u] == '\'')
+    while (prime_count < length && name[length - prime_count - 1u] == '\'')
         ++prime_count;
     if (prime_count > 0u && prime_count < length) {
         char *base_name = strndup(name, length - prime_count);
@@ -1327,10 +1277,7 @@ static void emit_func_integral(const expr_t *f, sbuf_t *b)
     emit_func(display_dummy, b, PREC_LOWEST);
 }
 
-static void emit_tex_sqrt_power(const expr_t *base,
-                                sbuf_t *b,
-                                int parent_prec,
-                                bool reciprocal)
+static void emit_tex_sqrt_power(const expr_t *base, sbuf_t *b, int parent_prec, bool reciprocal)
 {
     if (reciprocal) {
         int need = PREC_MUL < parent_prec;
@@ -1358,10 +1305,7 @@ static void emit_tex_sqrt_power(const expr_t *base,
     }
 }
 
-static void emit_expr_sqrt_power(const expr_t *base,
-                                 sbuf_t *b,
-                                 int parent_prec,
-                                 bool reciprocal)
+static void emit_expr_sqrt_power(const expr_t *base, sbuf_t *b, int parent_prec, bool reciprocal)
 {
     if (reciprocal) {
         int need = PREC_MUL < parent_prec;
@@ -1389,19 +1333,11 @@ static void emit_expr_sqrt_power(const expr_t *base,
     }
 }
 
-static bool match_atan_over_argument_denominator(const expr_t *expr,
-                                                 const expr_t **atan_expr_out,
+static bool match_atan_over_argument_denominator(const expr_t *expr, const expr_t **atan_expr_out,
                                                  const expr_t **denominator_out)
 {
-    if (!expr ||
-        !expr_is_op(expr, &ops_div) ||
-        !expr->a ||
-        !expr->b ||
-        !expr_is_op(expr->a, &ops_atan) ||
-        !expr->a->a ||
-        !expr_is_op(expr->a->a, &ops_div) ||
-        !expr->a->a->a ||
-        !expr->a->a->b ||
+    if (!expr || !expr_is_op(expr, &ops_div) || !expr->a || !expr->b || !expr_is_op(expr->a, &ops_atan) ||
+        !expr->a->a || !expr_is_op(expr->a->a, &ops_div) || !expr->a->a->a || !expr->a->a->b ||
         !expr_struct_eq(expr->a->a->b, expr->b))
         return false;
 
@@ -1448,8 +1384,7 @@ static int expr_renders_negative(const expr_t *f)
 
     sbuf_init(&b);
     emit_expr(f, &b, 0);
-    neg = (sbuf_len(&b) > 0u &&
-           rune_is_equal(string_at(b.text, 0u), '-'));
+    neg = (sbuf_len(&b) > 0u && rune_is_equal(string_at(b.text, 0u), '-'));
     sbuf_free(&b);
     return neg;
 }
@@ -1496,8 +1431,7 @@ static bool display_poly_vars_add(display_poly_var_list_t *vars, const char *nam
     return true;
 }
 
-static bool display_poly_collect_vars(const expr_t *expr,
-                                      display_poly_var_list_t *vars)
+static bool display_poly_collect_vars(const expr_t *expr, display_poly_var_list_t *vars)
 {
     if (!expr || !vars)
         return true;
@@ -1505,12 +1439,10 @@ static bool display_poly_collect_vars(const expr_t *expr,
     if (expr_is_var(expr) && expr->name)
         return display_poly_vars_add(vars, expr->name);
 
-    return display_poly_collect_vars(expr->a, vars) &&
-           display_poly_collect_vars(expr->b, vars);
+    return display_poly_collect_vars(expr->a, vars) && display_poly_collect_vars(expr->b, vars);
 }
 
-static int display_poly_var_index(const display_poly_var_list_t *vars,
-                                  const char *name)
+static int display_poly_var_index(const display_poly_var_list_t *vars, const char *name)
 {
     if (!vars || !name)
         return -1;
@@ -1521,16 +1453,13 @@ static int display_poly_var_index(const display_poly_var_list_t *vars,
     return -1;
 }
 
-static bool display_poly_expr_contains_any_var(const expr_t *expr,
-                                               const display_poly_var_list_t *vars)
+static bool display_poly_expr_contains_any_var(const expr_t *expr, const display_poly_var_list_t *vars)
 {
     if (!expr || !vars)
         return false;
-    if (expr_is_var(expr) && expr->name &&
-        display_poly_var_index(vars, expr->name) >= 0)
+    if (expr_is_var(expr) && expr->name && display_poly_var_index(vars, expr->name) >= 0)
         return true;
-    return display_poly_expr_contains_any_var(expr->a, vars) ||
-           display_poly_expr_contains_any_var(expr->b, vars);
+    return display_poly_expr_contains_any_var(expr->a, vars) || display_poly_expr_contains_any_var(expr->b, vars);
 }
 
 static bool display_poly_expr_contains_imaginary_unit(const expr_t *expr)
@@ -1539,8 +1468,7 @@ static bool display_poly_expr_contains_imaginary_unit(const expr_t *expr)
         return false;
     if (expr_is_const(expr) && expr->name && strcmp(expr->name, "i") == 0)
         return true;
-    return display_poly_expr_contains_imaginary_unit(expr->a) ||
-           display_poly_expr_contains_imaginary_unit(expr->b);
+    return display_poly_expr_contains_imaginary_unit(expr->a) || display_poly_expr_contains_imaginary_unit(expr->b);
 }
 
 static bool display_poly_is_pure_imag_const(const expr_t *expr)
@@ -1564,8 +1492,7 @@ static bool display_poly_is_real_const(const expr_t *expr)
 
 static bool display_poly_is_i_const(const expr_t *expr)
 {
-    return expr && expr_is_const(expr) &&
-           (num_eq(expr->c, NUM_I) || num_eq(expr->c, NUM_NEG_I));
+    return expr && expr_is_const(expr) && (num_eq(expr->c, NUM_I) || num_eq(expr->c, NUM_NEG_I));
 }
 
 static bool display_poly_is_imaginary_term(const expr_t *expr)
@@ -1574,9 +1501,8 @@ static bool display_poly_is_imaginary_term(const expr_t *expr)
         return false;
     if (display_poly_is_i_const(expr) || display_poly_is_pure_imag_const(expr))
         return true;
-    return expr_is_mul(expr) &&
-           ((display_poly_is_real_const(expr->a) && display_poly_is_i_const(expr->b)) ||
-            (display_poly_is_i_const(expr->a) && display_poly_is_real_const(expr->b)));
+    return expr_is_mul(expr) && ((display_poly_is_real_const(expr->a) && display_poly_is_i_const(expr->b)) ||
+                                 (display_poly_is_i_const(expr->a) && display_poly_is_real_const(expr->b)));
 }
 
 static bool display_poly_is_negative_real_complex_const(const expr_t *expr)
@@ -1593,14 +1519,9 @@ static bool display_poly_is_negative_real_complex_const(const expr_t *expr)
     return negative_real;
 }
 
-static bool match_add_negative_complex_rhs(const expr_t *expr,
-                                           const expr_t **base_out,
-                                           const expr_t **complex_out)
+static bool match_add_negative_complex_rhs(const expr_t *expr, const expr_t **base_out, const expr_t **complex_out)
 {
-    if (!expr ||
-        !expr_is_op(expr, &ops_add) ||
-        !expr->a ||
-        !display_poly_is_negative_real_complex_const(expr->b))
+    if (!expr || !expr_is_op(expr, &ops_add) || !expr->a || !display_poly_is_negative_real_complex_const(expr->b))
         return false;
 
     if (base_out)
@@ -1610,20 +1531,11 @@ static bool match_add_negative_complex_rhs(const expr_t *expr,
     return true;
 }
 
-static bool match_additive_complex_shift(const expr_t *expr,
-                                         const expr_t **base_out,
-                                         const expr_t **real_out,
+static bool match_additive_complex_shift(const expr_t *expr, const expr_t **base_out, const expr_t **real_out,
                                          const expr_t **imag_out)
 {
-    if (!expr ||
-        !expr_is_op(expr, &ops_add) ||
-        !expr->a ||
-        !expr->b ||
-        !expr_is_op(expr->a, &ops_sub) ||
-        !expr->a->a ||
-        !expr->a->b ||
-        !display_poly_is_real_const(expr->a->b) ||
-        !display_poly_is_imaginary_term(expr->b))
+    if (!expr || !expr_is_op(expr, &ops_add) || !expr->a || !expr->b || !expr_is_op(expr->a, &ops_sub) || !expr->a->a ||
+        !expr->a->b || !display_poly_is_real_const(expr->a->b) || !display_poly_is_imaginary_term(expr->b))
         return false;
 
     if (base_out)
@@ -1643,9 +1555,7 @@ static bool display_poly_add_degree(long *degree, long add)
     return true;
 }
 
-static bool display_poly_term_degrees(const expr_t *expr,
-                                      const display_poly_var_list_t *vars,
-                                      long *degree)
+static bool display_poly_term_degrees(const expr_t *expr, const display_poly_var_list_t *vars, long *degree)
 {
     number_t exponent = num_new();
     long power = 0;
@@ -1672,24 +1582,19 @@ static bool display_poly_term_degrees(const expr_t *expr,
     }
 
     if (expr_is_mul(expr)) {
-        ok = display_poly_term_degrees(expr->a, vars, degree) &&
-             display_poly_term_degrees(expr->b, vars, degree);
+        ok = display_poly_term_degrees(expr->a, vars, degree) && display_poly_term_degrees(expr->b, vars, degree);
         goto cleanup;
     }
 
     if (expr_is_op(expr, &ops_div)) {
-        ok = !display_poly_expr_contains_any_var(expr->b, vars) &&
-             display_poly_term_degrees(expr->a, vars, degree);
+        ok = !display_poly_expr_contains_any_var(expr->b, vars) && display_poly_term_degrees(expr->a, vars, degree);
         goto cleanup;
     }
 
     if (expr_is_pow_d_expr(expr)) {
-        index = (expr->a && expr_is_var(expr->a) && expr->a->name)
-                    ? display_poly_var_index(vars, expr->a->name)
-                    : -1;
+        index = (expr->a && expr_is_var(expr->a) && expr->a->name) ? display_poly_var_index(vars, expr->a->name) : -1;
         if (index >= 0) {
-            ok = expr_try_get_small_integer_exponent(expr->c, &power) &&
-                 display_poly_add_degree(&degree[index], power);
+            ok = expr_try_get_small_integer_exponent(expr->c, &power) && display_poly_add_degree(&degree[index], power);
         } else {
             ok = !display_poly_expr_contains_any_var(expr->a, vars);
         }
@@ -1697,12 +1602,9 @@ static bool display_poly_term_degrees(const expr_t *expr,
     }
 
     if (expr_is_op(expr, &ops_pow)) {
-        index = (expr->a && expr_is_var(expr->a) && expr->a->name)
-                    ? display_poly_var_index(vars, expr->a->name)
-                    : -1;
+        index = (expr->a && expr_is_var(expr->a) && expr->a->name) ? display_poly_var_index(vars, expr->a->name) : -1;
         if (index >= 0) {
-            ok = expr_match_const_value(expr->b, &exponent) &&
-                 expr_try_get_small_integer_exponent(exponent, &power) &&
+            ok = expr_match_const_value(expr->b, &exponent) && expr_try_get_small_integer_exponent(exponent, &power) &&
                  display_poly_add_degree(&degree[index], power);
         } else {
             ok = !display_poly_expr_contains_any_var(expr, vars);
@@ -1717,12 +1619,8 @@ cleanup:
     return ok;
 }
 
-static bool display_poly_collect_add_terms(const expr_t *expr,
-                                           bool subtract,
-                                           const display_poly_var_list_t *vars,
-                                           display_poly_term_t *terms,
-                                           size_t *count,
-                                           size_t max_terms)
+static bool display_poly_collect_add_terms(const expr_t *expr, bool subtract, const display_poly_var_list_t *vars,
+                                           display_poly_term_t *terms, size_t *count, size_t max_terms)
 {
     if (!expr || !vars || !terms || !count)
         return false;
@@ -1745,10 +1643,8 @@ static bool display_poly_collect_add_terms(const expr_t *expr,
     return true;
 }
 
-static int display_poly_compare_terms(const display_poly_term_t *left,
-                                      const display_poly_term_t *right,
-                                      size_t var_count,
-                                      bool ascending)
+static int display_poly_compare_terms(const display_poly_term_t *left, const display_poly_term_t *right,
+                                      size_t var_count, bool ascending)
 {
     for (size_t i = 0u; i < var_count; ++i) {
         if (left->degree[i] > right->degree[i])
@@ -1759,18 +1655,13 @@ static int display_poly_compare_terms(const display_poly_term_t *left,
     return 0;
 }
 
-static void display_poly_sort_terms(display_poly_term_t *terms,
-                                    size_t count,
-                                    size_t var_count,
-                                    bool ascending)
+static void display_poly_sort_terms(display_poly_term_t *terms, size_t count, size_t var_count, bool ascending)
 {
     for (size_t i = 1u; i < count; ++i) {
         display_poly_term_t key = terms[i];
         size_t j = i;
 
-        while (j > 0u &&
-               display_poly_compare_terms(
-                   &key, &terms[j - 1u], var_count, ascending) < 0) {
+        while (j > 0u && display_poly_compare_terms(&key, &terms[j - 1u], var_count, ascending) < 0) {
             terms[j] = terms[j - 1u];
             --j;
         }
@@ -1786,19 +1677,16 @@ static bool display_poly_is_indexed_arbitrary_constant(const expr_t *expr)
         return false;
 
     name = (const unsigned char *)expr->name + 1u;
-    if (!isdigit(*name) &&
-        !(strlen((const char *)name) >= 3u &&
-          name[0] == 0xe2u && name[1] == 0x82u &&
-          name[2] >= 0x80u && name[2] <= 0x89u))
+    if (!isdigit(*name) && !(strlen((const char *)name) >= 3u && name[0] == 0xe2u && name[1] == 0x82u &&
+                             name[2] >= 0x80u && name[2] <= 0x89u))
         return false;
     while (*name) {
         if (isdigit(*name)) {
             ++name;
             continue;
         }
-        if (strlen((const char *)name) >= 3u &&
-            name[0] == 0xe2u && name[1] == 0x82u &&
-            name[2] >= 0x80u && name[2] <= 0x89u) {
+        if (strlen((const char *)name) >= 3u && name[0] == 0xe2u && name[1] == 0x82u && name[2] >= 0x80u &&
+            name[2] <= 0x89u) {
             name += 3u;
             continue;
         }
@@ -1817,12 +1705,10 @@ static bool display_poly_contains_indexed_arbitrary_constant(const expr_t *expr)
            display_poly_contains_indexed_arbitrary_constant(expr->b);
 }
 
-static bool display_poly_is_explicit_arbitrary_amplitude(
-    const display_poly_term_t *terms,
-    size_t count,
-    size_t var_count)
+static bool display_poly_is_explicit_arbitrary_amplitude(const display_poly_term_t *terms, size_t count,
+                                                         size_t var_count)
 {
-    bool degrees[96] = { false };
+    bool degrees[96] = {false};
 
     if (count < 2u || count > sizeof(degrees) / sizeof(degrees[0]))
         return false;
@@ -1833,10 +1719,8 @@ static bool display_poly_is_explicit_arbitrary_amplitude(
         for (size_t j = 0u; j < var_count; ++j)
             total_degree += terms[i].degree[j];
 
-        if (total_degree < 0 || (size_t)total_degree != i ||
-            (size_t)total_degree >= count || degrees[total_degree] ||
-            !display_poly_contains_indexed_arbitrary_constant(
-                terms[i].expr))
+        if (total_degree < 0 || (size_t)total_degree != i || (size_t)total_degree >= count || degrees[total_degree] ||
+            !display_poly_contains_indexed_arbitrary_constant(terms[i].expr))
             return false;
         degrees[total_degree] = true;
     }
@@ -1847,25 +1731,19 @@ static bool display_poly_is_explicit_arbitrary_amplitude(
     return true;
 }
 
-static bool display_poly_prepare_terms(const expr_t *expr,
-                                       display_poly_term_t *terms,
-                                       size_t *count,
-                                       size_t max_terms)
+static bool display_poly_prepare_terms(const expr_t *expr, display_poly_term_t *terms, size_t *count, size_t max_terms)
 {
-    display_poly_var_list_t vars = { 0 };
+    display_poly_var_list_t vars = {0};
     bool has_variable_term = false;
 
     if (!expr || !terms || !count || !expr_is_addsub(expr))
         return false;
 
-    if (display_poly_expr_contains_imaginary_unit(expr) ||
-        !display_poly_collect_vars(expr, &vars) ||
-        vars.count == 0u)
+    if (display_poly_expr_contains_imaginary_unit(expr) || !display_poly_collect_vars(expr, &vars) || vars.count == 0u)
         return false;
 
     *count = 0u;
-    if (!display_poly_collect_add_terms(expr, false, &vars, terms, count, max_terms) ||
-        *count < 2u)
+    if (!display_poly_collect_add_terms(expr, false, &vars, terms, count, max_terms) || *count < 2u)
         return false;
 
     for (size_t i = 0u; i < *count; ++i) {
@@ -1882,27 +1760,20 @@ static bool display_poly_prepare_terms(const expr_t *expr,
     if (!has_variable_term)
         return false;
 
-    display_poly_sort_terms(
-        terms,
-        *count,
-        vars.count,
-        display_poly_is_explicit_arbitrary_amplitude(
-            terms, *count, vars.count));
+    display_poly_sort_terms(terms, *count, vars.count,
+                            display_poly_is_explicit_arbitrary_amplitude(terms, *count, vars.count));
     if (terms[0].subtract != (expr_renders_negative(terms[0].expr) ? true : false))
         return false;
     return true;
 }
 
-static bool emit_expr_display_polynomial_sum(const expr_t *expr,
-                                             sbuf_t *b,
-                                             int parent_prec)
+static bool emit_expr_display_polynomial_sum(const expr_t *expr, sbuf_t *b, int parent_prec)
 {
     display_poly_term_t terms[96];
     size_t count = 0u;
     int need = PREC_ADD < parent_prec;
 
-    if (!display_poly_prepare_terms(expr, terms, &count,
-                                    sizeof(terms) / sizeof(terms[0])))
+    if (!display_poly_prepare_terms(expr, terms, &count, sizeof(terms) / sizeof(terms[0])))
         return false;
 
     if (need)
@@ -1935,16 +1806,13 @@ static bool emit_expr_display_polynomial_sum(const expr_t *expr,
     return true;
 }
 
-static bool emit_tex_display_polynomial_sum(const expr_t *expr,
-                                            sbuf_t *b,
-                                            int parent_prec)
+static bool emit_tex_display_polynomial_sum(const expr_t *expr, sbuf_t *b, int parent_prec)
 {
     display_poly_term_t terms[96];
     size_t count = 0u;
     int need = PREC_ADD < parent_prec;
 
-    if (!display_poly_prepare_terms(expr, terms, &count,
-                                    sizeof(terms) / sizeof(terms[0])))
+    if (!display_poly_prepare_terms(expr, terms, &count, sizeof(terms) / sizeof(terms[0])))
         return false;
 
     if (need)
@@ -1977,16 +1845,13 @@ static bool emit_tex_display_polynomial_sum(const expr_t *expr,
     return true;
 }
 
-static bool emit_func_display_polynomial_sum(const expr_t *expr,
-                                             sbuf_t *b,
-                                             int parent_prec)
+static bool emit_func_display_polynomial_sum(const expr_t *expr, sbuf_t *b, int parent_prec)
 {
     display_poly_term_t terms[96];
     size_t count = 0u;
     int need = PREC_ADD < parent_prec;
 
-    if (!display_poly_prepare_terms(expr, terms, &count,
-                                    sizeof(terms) / sizeof(terms[0])))
+    if (!display_poly_prepare_terms(expr, terms, &count, sizeof(terms) / sizeof(terms[0])))
         return false;
 
     if (need)
@@ -2021,8 +1886,7 @@ static bool emit_func_display_polynomial_sum(const expr_t *expr,
 
 void emit_func_display(const expr_t *f, sbuf_t *b, int parent_prec)
 {
-    if (f && expr_is_addsub(f) &&
-        emit_func_display_polynomial_sum(f, b, parent_prec))
+    if (f && expr_is_addsub(f) && emit_func_display_polynomial_sum(f, b, parent_prec))
         return;
     emit_func(f, b, parent_prec);
 }
@@ -2104,11 +1968,13 @@ static void emit_expr_abs(const expr_t *f, sbuf_t *b, int parent_prec)
 
     if (expr_is_op(f, &ops_div) && expr_is_negative(f->a)) {
         int need = PREC_MUL < parent_prec;
-        if (need) sbuf_putc(b, '(');
+        if (need)
+            sbuf_putc(b, '(');
         emit_expr_abs(f->a, b, PREC_MUL);
         sbuf_putc(b, '/');
         emit_expr(f->b, b, PREC_POW);
-        if (need) sbuf_putc(b, ')');
+        if (need)
+            sbuf_putc(b, ')');
         return;
     }
 
@@ -2241,9 +2107,7 @@ static bool emit_tex_exp_unit_fraction_root(const expr_t *arg, sbuf_t *b)
     long numerator;
     long denominator;
 
-    if (!expr_is_const(arg) ||
-        !num_get_small_rational(arg->c, &numerator, &denominator) ||
-        numerator != 1L ||
+    if (!expr_is_const(arg) || !num_get_small_rational(arg->c, &numerator, &denominator) || numerator != 1L ||
         denominator <= 1L)
         return false;
 
@@ -2306,8 +2170,7 @@ static bool tex_unary_arg_is_greek_symbol(const expr_t *arg)
     uint32_t codepoint = 0u;
     bool greek = false;
 
-    if (!arg || (!expr_is_var(arg) && !expr_is_const(arg)) ||
-        !arg->name || !*arg->name)
+    if (!arg || (!expr_is_var(arg) && !expr_is_const(arg)) || !arg->name || !*arg->name)
         return false;
 
     name = arg->name[0] == '@' ? arg->name + 1 : arg->name;
@@ -2325,8 +2188,7 @@ static bool tex_unary_arg_is_greek_symbol(const expr_t *arg)
         codepoint = rune_value(string_cursor_peek(cursor));
         string_cursor_next(cursor);
         greek = string_cursor_done(cursor) &&
-                ((codepoint >= 0x0370u && codepoint <= 0x03ffu) ||
-                 (codepoint >= 0x1f00u && codepoint <= 0x1fffu));
+                ((codepoint >= 0x0370u && codepoint <= 0x03ffu) || (codepoint >= 0x1f00u && codepoint <= 0x1fffu));
         string_cursor_free(cursor);
     }
 
@@ -2378,8 +2240,7 @@ static int expr_has_polylog_order(const expr_t *f)
 
 static int expr_legendre_chi_order(const expr_t *f, long *order)
 {
-    return f && expr_is_op(f, &ops_legendre_chi) && f->a &&
-           expr_is_const(f->a) &&
+    return f && expr_is_op(f, &ops_legendre_chi) && f->a && expr_is_const(f->a) &&
            expr_try_get_small_integer_exponent(f->a->c, order) && *order >= 0;
 }
 
@@ -2464,6 +2325,63 @@ static void emit_expr_appell_f1(const expr_t *f, sbuf_t *b)
     sbuf_putc(b, ')');
 }
 
+static void emit_expr_lauricella_f(const expr_t *f, sbuf_t *out)
+{
+    const expr_t *a = NULL;
+    const expr_t **parameters = NULL;
+    const expr_t *c = NULL;
+    const expr_t **variables = NULL;
+    size_t count = 0u;
+    char prefix[64];
+
+    if (!expr_lauricella_f_unpack(f, &a, &parameters, &c, &variables, &count))
+        return;
+    snprintf(prefix, sizeof(prefix), "LauricellaF(%zu, ", count);
+    sbuf_puts(out, prefix);
+    emit_expr(a, out, 0);
+    for (size_t i = 0u; i < count; ++i) {
+        sbuf_puts(out, ", ");
+        emit_expr(parameters[i], out, 0);
+    }
+    sbuf_puts(out, ", ");
+    emit_expr(c, out, 0);
+    for (size_t i = 0u; i < count; ++i) {
+        sbuf_puts(out, ", ");
+        emit_expr(variables[i], out, 0);
+    }
+    sbuf_putc(out, ')');
+    free(variables);
+    free(parameters);
+}
+
+static void emit_expr_hypergeometric_pFq(const expr_t *f, sbuf_t *b)
+{
+    const expr_t **upper = NULL;
+    const expr_t **lower = NULL;
+    const expr_t *argument = NULL;
+    size_t p = 0u;
+    size_t q = 0u;
+    char counts[64];
+
+    if (!expr_hypergeometric_pFq_unpack(f, &upper, &p, &lower, &q, &argument))
+        return;
+    snprintf(counts, sizeof(counts), "HypergeometricpFq(%zu, %zu", p, q);
+    sbuf_puts(b, counts);
+    for (size_t i = 0u; i < p; ++i) {
+        sbuf_puts(b, ", ");
+        emit_expr(upper[i], b, 0);
+    }
+    for (size_t i = 0u; i < q; ++i) {
+        sbuf_puts(b, ", ");
+        emit_expr(lower[i], b, 0);
+    }
+    sbuf_puts(b, ", ");
+    emit_expr(argument, b, 0);
+    sbuf_putc(b, ')');
+    free(lower);
+    free(upper);
+}
+
 static void emit_expr_lommel_s(const expr_t *f, sbuf_t *b)
 {
     const expr_t *mu = NULL;
@@ -2472,8 +2390,7 @@ static void emit_expr_lommel_s(const expr_t *f, sbuf_t *b)
 
     if (!expr_lommel_s_unpack(f, &mu, &nu, &argument))
         return;
-    sbuf_puts(b, expr_is_op(f, &ops_lommel_s_derivative)
-              ? "LommelSPrime(" : "LommelS(");
+    sbuf_puts(b, expr_is_op(f, &ops_lommel_s_derivative) ? "LommelSPrime(" : "LommelS(");
     emit_expr(mu, b, 0);
     sbuf_puts(b, ", ");
     emit_expr(nu, b, 0);
@@ -2553,6 +2470,74 @@ static void emit_tex_appell_f1(const expr_t *f, sbuf_t *b)
     sbuf_puts(b, "\\right)");
 }
 
+static void emit_tex_lauricella_f(const expr_t *f, sbuf_t *out)
+{
+    const expr_t *a = NULL;
+    const expr_t **parameters = NULL;
+    const expr_t *c = NULL;
+    const expr_t **variables = NULL;
+    size_t count = 0u;
+    char prefix[64];
+
+    if (!expr_lauricella_f_unpack(f, &a, &parameters, &c, &variables, &count))
+        return;
+    snprintf(prefix, sizeof(prefix), "F_D^{(%zu)}\\left(", count);
+    sbuf_puts(out, prefix);
+    emit_tex_expr(a, out, 0);
+    sbuf_puts(out, "; ");
+    for (size_t i = 0u; i < count; ++i) {
+        if (i > 0u)
+            sbuf_puts(out, ", ");
+        emit_tex_expr(parameters[i], out, 0);
+    }
+    sbuf_puts(out, "; ");
+    emit_tex_expr(c, out, 0);
+    sbuf_puts(out, "; ");
+    for (size_t i = 0u; i < count; ++i) {
+        if (i > 0u)
+            sbuf_puts(out, ", ");
+        emit_tex_expr(variables[i], out, 0);
+    }
+    sbuf_puts(out, "\\right)");
+    free(variables);
+    free(parameters);
+}
+
+static void emit_tex_hypergeometric_pFq(const expr_t *f, sbuf_t *b)
+{
+    const expr_t **upper = NULL;
+    const expr_t **lower = NULL;
+    const expr_t *argument = NULL;
+    size_t p = 0u;
+    size_t q = 0u;
+    char order[64];
+
+    if (!expr_hypergeometric_pFq_unpack(f, &upper, &p, &lower, &q, &argument))
+        return;
+    snprintf(order, sizeof(order), "{}_{%zu}F_{%zu}\\left(\\begin{matrix}", p, q);
+    sbuf_puts(b, order);
+    if (p == 0u)
+        sbuf_puts(b, "-");
+    for (size_t i = 0u; i < p; ++i) {
+        if (i > 0u)
+            sbuf_puts(b, ", ");
+        emit_tex_expr(upper[i], b, 0);
+    }
+    sbuf_puts(b, "\\\\");
+    if (q == 0u)
+        sbuf_puts(b, "-");
+    for (size_t i = 0u; i < q; ++i) {
+        if (i > 0u)
+            sbuf_puts(b, ", ");
+        emit_tex_expr(lower[i], b, 0);
+    }
+    sbuf_puts(b, "\\end{matrix}; ");
+    emit_tex_expr(argument, b, 0);
+    sbuf_puts(b, "\\right)");
+    free(lower);
+    free(upper);
+}
+
 static void emit_tex_lommel_s(const expr_t *f, sbuf_t *b)
 {
     const expr_t *mu = NULL;
@@ -2561,8 +2546,7 @@ static void emit_tex_lommel_s(const expr_t *f, sbuf_t *b)
 
     if (!expr_lommel_s_unpack(f, &mu, &nu, &argument))
         return;
-    sbuf_puts(b, expr_is_op(f, &ops_lommel_s_derivative)
-              ? "s'_{" : "s_{");
+    sbuf_puts(b, expr_is_op(f, &ops_lommel_s_derivative) ? "s'_{" : "s_{");
     emit_tex_expr(mu, b, 0);
     sbuf_puts(b, ",");
     emit_tex_expr(nu, b, 0);
@@ -2621,6 +2605,63 @@ static void emit_func_appell_f1(const expr_t *f, sbuf_t *b)
     sbuf_putc(b, ')');
 }
 
+static void emit_func_lauricella_f(const expr_t *f, sbuf_t *out)
+{
+    const expr_t *a = NULL;
+    const expr_t **parameters = NULL;
+    const expr_t *c = NULL;
+    const expr_t **variables = NULL;
+    size_t count = 0u;
+    char prefix[64];
+
+    if (!expr_lauricella_f_unpack(f, &a, &parameters, &c, &variables, &count))
+        return;
+    snprintf(prefix, sizeof(prefix), "lauricella_f(%zu, ", count);
+    sbuf_puts(out, prefix);
+    emit_func(a, out, 0);
+    for (size_t i = 0u; i < count; ++i) {
+        sbuf_puts(out, ", ");
+        emit_func(parameters[i], out, 0);
+    }
+    sbuf_puts(out, ", ");
+    emit_func(c, out, 0);
+    for (size_t i = 0u; i < count; ++i) {
+        sbuf_puts(out, ", ");
+        emit_func(variables[i], out, 0);
+    }
+    sbuf_putc(out, ')');
+    free(variables);
+    free(parameters);
+}
+
+static void emit_func_hypergeometric_pFq(const expr_t *f, sbuf_t *b)
+{
+    const expr_t **upper = NULL;
+    const expr_t **lower = NULL;
+    const expr_t *argument = NULL;
+    size_t p = 0u;
+    size_t q = 0u;
+    char counts[64];
+
+    if (!expr_hypergeometric_pFq_unpack(f, &upper, &p, &lower, &q, &argument))
+        return;
+    snprintf(counts, sizeof(counts), "hypergeometric_pFq(%zu, %zu", p, q);
+    sbuf_puts(b, counts);
+    for (size_t i = 0u; i < p; ++i) {
+        sbuf_puts(b, ", ");
+        emit_func(upper[i], b, 0);
+    }
+    for (size_t i = 0u; i < q; ++i) {
+        sbuf_puts(b, ", ");
+        emit_func(lower[i], b, 0);
+    }
+    sbuf_puts(b, ", ");
+    emit_func(argument, b, 0);
+    sbuf_putc(b, ')');
+    free(lower);
+    free(upper);
+}
+
 static void emit_func_lommel_s(const expr_t *f, sbuf_t *b)
 {
     const expr_t *mu = NULL;
@@ -2629,8 +2670,7 @@ static void emit_func_lommel_s(const expr_t *f, sbuf_t *b)
 
     if (!expr_lommel_s_unpack(f, &mu, &nu, &argument))
         return;
-    sbuf_puts(b, expr_is_op(f, &ops_lommel_s_derivative)
-              ? "lommel_s_derivative(" : "lommel_s(");
+    sbuf_puts(b, expr_is_op(f, &ops_lommel_s_derivative) ? "lommel_s_derivative(" : "lommel_s(");
     emit_func(mu, b, 0);
     sbuf_puts(b, ", ");
     emit_func(nu, b, 0);
@@ -2763,8 +2803,7 @@ static bool emit_expr_abs_needs_visible_add_parens(const expr_t *expr)
 {
     const expr_t *constant = expr_is_neg(expr) ? expr->a : expr;
 
-    return constant && expr_is_const(constant) &&
-           mul_factor_needs_visible_parens(constant);
+    return constant && expr_is_const(constant) && mul_factor_needs_visible_parens(constant);
 }
 
 static bool emit_tex_expr_abs_needs_visible_add_parens(const expr_t *expr)
@@ -2793,8 +2832,7 @@ static void emit_func_abs(const expr_t *f, sbuf_t *b, int parent_prec)
 
     sbuf_init(&tmp);
     emit_func(f, &tmp, parent_prec);
-    if (sbuf_len(&tmp) > 0u &&
-        rune_is_equal(string_at(tmp.text, 0u), '-')) {
+    if (sbuf_len(&tmp) > 0u && rune_is_equal(string_at(tmp.text, 0u), '-')) {
         string_t *tail = string_substr(tmp.text, 1u, sbuf_len(&tmp) - 1u);
 
         if (tail) {
@@ -2947,14 +2985,9 @@ void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec)
         if (need)
             sbuf_puts(b, "\\left(");
 
-        const char *unary_name = f->a->ops->arity == EXPR_OP_UNARY
-            ? tex_unary_name(f->a) : NULL;
-        if (f->a->ops->arity == EXPR_OP_UNARY &&
-            !expr_is_formal_derivative(f->a) &&
-            !expr_is_neg(f->a) &&
-            !expr_is_sqrt_expr(f->a) &&
-            !expr_is_op(f->a, &ops_abs) &&
-            !strchr(unary_name ? unary_name : "", '^')) {
+        const char *unary_name = f->a->ops->arity == EXPR_OP_UNARY ? tex_unary_name(f->a) : NULL;
+        if (f->a->ops->arity == EXPR_OP_UNARY && !expr_is_formal_derivative(f->a) && !expr_is_neg(f->a) &&
+            !expr_is_sqrt_expr(f->a) && !expr_is_op(f->a, &ops_abs) && !strchr(unary_name ? unary_name : "", '^')) {
             const char *name = unary_name;
             sbuf_puts(b, name ? name : "\\operatorname{f}");
             sbuf_puts(b, "^{");
@@ -3068,9 +3101,7 @@ void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec)
         const expr_t *complex_shift_real = NULL;
         const expr_t *complex_shift_imag = NULL;
 
-        if (match_add_negative_complex_rhs(f,
-                                           &negative_complex_base,
-                                           &negative_complex_rhs)) {
+        if (match_add_negative_complex_rhs(f, &negative_complex_base, &negative_complex_rhs)) {
             if (need)
                 sbuf_puts(b, "\\left(");
             emit_tex_expr(negative_complex_base, b, PREC_ADD);
@@ -3082,10 +3113,7 @@ void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec)
             return;
         }
 
-        if (match_additive_complex_shift(f,
-                                         &complex_shift_base,
-                                         &complex_shift_real,
-                                         &complex_shift_imag)) {
+        if (match_additive_complex_shift(f, &complex_shift_base, &complex_shift_real, &complex_shift_imag)) {
             bool imag_neg = expr_renders_negative(complex_shift_imag);
 
             if (need)
@@ -3140,8 +3168,7 @@ void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec)
         const expr_t *atan_expr = NULL;
         const expr_t *denominator = NULL;
 
-        if (match_atan_over_argument_denominator(f, &atan_expr, &denominator) &&
-            !expr_is_negative(denominator)) {
+        if (match_atan_over_argument_denominator(f, &atan_expr, &denominator) && !expr_is_negative(denominator)) {
             if (need)
                 sbuf_puts(b, "\\left(");
             sbuf_puts(b, "\\frac{1}{");
@@ -3246,8 +3273,7 @@ void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec)
             emit_tex_legendre_chi(f, b);
             return;
         }
-        if (expr_is_op(f, &ops_bessel_j) ||
-            expr_is_op(f, &ops_bessel_y)) {
+        if (expr_is_op(f, &ops_bessel_j) || expr_is_op(f, &ops_bessel_y)) {
             sbuf_puts(b, f->ops->tex_name);
             sbuf_puts(b, "_{");
             emit_tex_expr(f->a, b, PREC_LOWEST);
@@ -3256,8 +3282,7 @@ void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec)
             sbuf_puts(b, "\\right)");
             return;
         }
-        if (expr_is_op(f, &ops_lommel_s) ||
-            expr_is_op(f, &ops_lommel_s_derivative)) {
+        if (expr_is_op(f, &ops_lommel_s) || expr_is_op(f, &ops_lommel_s_derivative)) {
             emit_tex_lommel_s(f, b);
             return;
         }
@@ -3267,6 +3292,14 @@ void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec)
         }
         if (expr_is_op(f, &ops_appell_f1)) {
             emit_tex_appell_f1(f, b);
+            return;
+        }
+        if (expr_is_op(f, &ops_lauricella_f)) {
+            emit_tex_lauricella_f(f, b);
+            return;
+        }
+        if (expr_is_op(f, &ops_hypergeometric_pFq)) {
+            emit_tex_hypergeometric_pFq(f, b);
             return;
         }
         sbuf_puts(b, "\\operatorname{");
@@ -3284,7 +3317,10 @@ void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec)
 
 void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
 {
-    if (!f) { sbuf_puts(b, "0"); return; }
+    if (!f) {
+        sbuf_puts(b, "0");
+        return;
+    }
 
     if (expr_is_formal_derivative(f)) {
         emit_formal_derivative_expr(f, b);
@@ -3313,51 +3349,61 @@ void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
     /* Negation: -a  — only parenthesise when the child is an add/sub */
     if (expr_is_neg(f)) {
         int need = PREC_UNARY < parent_prec;
-        if (need) sbuf_putc(b, '(');
+        if (need)
+            sbuf_putc(b, '(');
 
         const expr_t *a = f->a;
         if (expr_is_neg(a)) {
             emit_expr(a->a, b, 0);
-            if (need) sbuf_putc(b, ')');
+            if (need)
+                sbuf_putc(b, ')');
             return;
         }
         if (expr_is_negative(a)) {
             emit_expr_abs(a, b, 0);
-            if (need) sbuf_putc(b, ')');
+            if (need)
+                sbuf_putc(b, ')');
             return;
         }
         int child_needs_paren = expr_is_addsub(a);
         sbuf_putc(b, '-');
-        if (child_needs_paren) sbuf_putc(b, '(');
+        if (child_needs_paren)
+            sbuf_putc(b, '(');
         emit_expr(a, b, 0);
-        if (child_needs_paren) sbuf_putc(b, ')');
+        if (child_needs_paren)
+            sbuf_putc(b, ')');
 
-        if (need) sbuf_putc(b, ')');
+        if (need)
+            sbuf_putc(b, ')');
         return;
     }
 
     /* Unary ops */
     if (f->ops->arity == EXPR_OP_UNARY) {
         int need = PREC_UNARY < parent_prec;
-        if (need) sbuf_putc(b, '(');
+        if (need)
+            sbuf_putc(b, '(');
 
         if (expr_is_op(f, &ops_abs)) {
             emit_expr_abs_bars(f->a, b);
-            if (need) sbuf_putc(b, ')');
+            if (need)
+                sbuf_putc(b, ')');
             return;
         }
         if (expr_is_op(f, &ops_floor)) {
             sbuf_puts(b, "⌊");
             emit_expr(f->a, b, 0);
             sbuf_puts(b, "⌋");
-            if (need) sbuf_putc(b, ')');
+            if (need)
+                sbuf_putc(b, ')');
             return;
         }
         if (expr_is_op(f, &ops_ceil)) {
             sbuf_puts(b, "⌈");
             emit_expr(f->a, b, 0);
             sbuf_puts(b, "⌉");
-            if (need) sbuf_putc(b, ')');
+            if (need)
+                sbuf_putc(b, ')');
             return;
         }
         if (expr_is_sqrt_expr(f))
@@ -3368,7 +3414,8 @@ void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
         emit_expr(f->a, b, 0);
         sbuf_putc(b, ')');
 
-        if (need) sbuf_putc(b, ')');
+        if (need)
+            sbuf_putc(b, ')');
         return;
     }
 
@@ -3411,14 +3458,13 @@ void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
             return;
         }
 
-        if (need) sbuf_putc(b, '(');
+        if (need)
+            sbuf_putc(b, '(');
 
         /* For unary functions raised to a power, write func²(arg)
          * rather than func(arg)² so the exponent binds to the function name.
          * Floor/ceiling keep their mathematical brackets: ⌊x⌋². */
-        if (f->a->ops->arity == EXPR_OP_UNARY &&
-            !expr_is_formal_derivative(f->a) &&
-            !expr_is_neg(f->a)) {
+        if (f->a->ops->arity == EXPR_OP_UNARY && !expr_is_formal_derivative(f->a) && !expr_is_neg(f->a)) {
             expr_t *inner = f->a;
             if (expr_is_op(inner, &ops_floor) || expr_is_op(inner, &ops_ceil)) {
                 emit_expr(inner, b, PREC_POW);
@@ -3446,16 +3492,19 @@ void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
                 sbuf_putc(b, ')');
             }
 
-            if (need) sbuf_putc(b, ')');
+            if (need)
+                sbuf_putc(b, ')');
             return;
         }
 
         {
             int base_needs_parens = pow_base_needs_visible_parens(f->a);
 
-            if (base_needs_parens) sbuf_putc(b, '(');
+            if (base_needs_parens)
+                sbuf_putc(b, '(');
             emit_expr(f->a, b, base_needs_parens ? PREC_LOWEST : PREC_POW);
-            if (base_needs_parens) sbuf_putc(b, ')');
+            if (base_needs_parens)
+                sbuf_putc(b, ')');
         }
 
         if (exponent_has_small_int)
@@ -3469,7 +3518,8 @@ void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
             }
         }
 
-        if (need) sbuf_putc(b, ')');
+        if (need)
+            sbuf_putc(b, ')');
         return;
     }
 
@@ -3479,7 +3529,8 @@ void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
         expr_t *fac[64];
         int n = 0;
 
-        if (need) sbuf_putc(b, '(');
+        if (need)
+            sbuf_putc(b, '(');
 
         flatten_mul((expr_t *)f, fac, &n, 64);
         sort_factors(fac, n);
@@ -3523,7 +3574,8 @@ void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
                 sbuf_putc(b, ')');
         }
 
-        if (need) sbuf_putc(b, ')');
+        if (need)
+            sbuf_putc(b, ')');
         return;
     }
 
@@ -3536,9 +3588,7 @@ void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
         const expr_t *complex_shift_real = NULL;
         const expr_t *complex_shift_imag = NULL;
 
-        if (match_add_negative_complex_rhs(f,
-                                           &negative_complex_base,
-                                           &negative_complex_rhs)) {
+        if (match_add_negative_complex_rhs(f, &negative_complex_base, &negative_complex_rhs)) {
             if (need)
                 sbuf_putc(b, '(');
             emit_expr(negative_complex_base, b, PREC_ADD);
@@ -3550,10 +3600,7 @@ void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
             return;
         }
 
-        if (match_additive_complex_shift(f,
-                                         &complex_shift_base,
-                                         &complex_shift_real,
-                                         &complex_shift_imag)) {
+        if (match_additive_complex_shift(f, &complex_shift_base, &complex_shift_real, &complex_shift_imag)) {
             bool imag_neg = expr_renders_negative(complex_shift_imag);
 
             if (need)
@@ -3575,7 +3622,8 @@ void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
         if (emit_expr_display_polynomial_sum(f, b, parent_prec))
             return;
 
-        if (need) sbuf_putc(b, '(');
+        if (need)
+            sbuf_putc(b, '(');
 
         emit_expr(f->a, b, PREC_ADD);
 
@@ -3601,7 +3649,8 @@ void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
         if (rhs_parens)
             sbuf_putc(b, ')');
 
-        if (need) sbuf_putc(b, ')');
+        if (need)
+            sbuf_putc(b, ')');
         return;
     }
 
@@ -3614,29 +3663,37 @@ void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
         const expr_t *atan_expr = NULL;
         const expr_t *denominator = NULL;
 
-        if (match_atan_over_argument_denominator(f, &atan_expr, &denominator) &&
-            !expr_is_negative(denominator)) {
-            if (need) sbuf_putc(b, '(');
+        if (match_atan_over_argument_denominator(f, &atan_expr, &denominator) && !expr_is_negative(denominator)) {
+            if (need)
+                sbuf_putc(b, '(');
             sbuf_puts(b, "1/");
             emit_expr(denominator, b, PREC_POW);
             sbuf_puts(b, "·");
             emit_expr(atan_expr, b, PREC_MUL);
-            if (need) sbuf_putc(b, ')');
+            if (need)
+                sbuf_putc(b, ')');
             return;
         }
 
-        if (need) sbuf_putc(b, '(');
-        if (neg) sbuf_putc(b, '-');
+        if (need)
+            sbuf_putc(b, '(');
+        if (neg)
+            sbuf_putc(b, '-');
 
-        if (neg_num) emit_expr_abs(f->a, b, PREC_MUL);
-        else         emit_expr(f->a, b, PREC_MUL);
+        if (neg_num)
+            emit_expr_abs(f->a, b, PREC_MUL);
+        else
+            emit_expr(f->a, b, PREC_MUL);
 
         sbuf_putc(b, '/');
 
-        if (neg_den) emit_expr_abs(f->b, b, PREC_POW);
-        else         emit_expr(f->b, b, PREC_POW);
+        if (neg_den)
+            emit_expr_abs(f->b, b, PREC_POW);
+        else
+            emit_expr(f->b, b, PREC_POW);
 
-        if (need) sbuf_putc(b, ')');
+        if (need)
+            sbuf_putc(b, ')');
         return;
     }
 
@@ -3655,18 +3712,24 @@ void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
             return;
         }
 
-        if (need) sbuf_putc(b, '(');
+        if (need)
+            sbuf_putc(b, '(');
 
-        if (base_needs_parens) sbuf_putc(b, '(');
+        if (base_needs_parens)
+            sbuf_putc(b, '(');
         emit_expr(f->a, b, base_needs_parens ? PREC_LOWEST : PREC_POW);
-        if (base_needs_parens) sbuf_putc(b, ')');
+        if (base_needs_parens)
+            sbuf_putc(b, ')');
         sbuf_putc(b, '^');
         int ep = pow_exp_needs_parens(f->b);
-        if (ep) sbuf_putc(b, '(');
+        if (ep)
+            sbuf_putc(b, '(');
         emit_expr(f->b, b, 0);
-        if (ep) sbuf_putc(b, ')');
+        if (ep)
+            sbuf_putc(b, ')');
 
-        if (need) sbuf_putc(b, ')');
+        if (need)
+            sbuf_putc(b, ')');
         return;
     }
 
@@ -3714,13 +3777,20 @@ void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
             emit_expr_lambert_wn(f, b);
             return;
         }
-        if (expr_is_op(f, &ops_lommel_s) ||
-            expr_is_op(f, &ops_lommel_s_derivative)) {
+        if (expr_is_op(f, &ops_lommel_s) || expr_is_op(f, &ops_lommel_s_derivative)) {
             emit_expr_lommel_s(f, b);
             return;
         }
         if (expr_is_op(f, &ops_appell_f1)) {
             emit_expr_appell_f1(f, b);
+            return;
+        }
+        if (expr_is_op(f, &ops_lauricella_f)) {
+            emit_expr_lauricella_f(f, b);
+            return;
+        }
+        if (expr_is_op(f, &ops_hypergeometric_pFq)) {
+            emit_expr_hypergeometric_pFq(f, b);
             return;
         }
         sbuf_puts(b, f->ops->name);
@@ -3742,7 +3812,10 @@ void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
 
 void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
 {
-    if (!f) { sbuf_puts(b, "0"); return; }
+    if (!f) {
+        sbuf_puts(b, "0");
+        return;
+    }
 
     if (expr_is_formal_derivative(f)) {
         emit_formal_derivative_expr(f, b);
@@ -3789,14 +3862,16 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
 
     if (f->ops->arity == EXPR_OP_UNARY) {
         int need = PREC_UNARY < parent_prec;
-        if (need) sbuf_putc(b, '(');
+        if (need)
+            sbuf_putc(b, '(');
 
         sbuf_puts(b, f->ops->name);
         sbuf_putc(b, '(');
         emit_func(f->a, b, 0);
         sbuf_putc(b, ')');
 
-        if (need) sbuf_putc(b, ')');
+        if (need)
+            sbuf_putc(b, ')');
         return;
     }
 
@@ -3831,11 +3906,14 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
             return;
         }
 
-        if (need) sbuf_putc(b, '(');
+        if (need)
+            sbuf_putc(b, '(');
 
-        if (base_needs_parens) sbuf_putc(b, '(');
+        if (base_needs_parens)
+            sbuf_putc(b, '(');
         emit_func(f->a, b, base_needs_parens ? PREC_LOWEST : PREC_POW);
-        if (base_needs_parens) sbuf_putc(b, ')');
+        if (base_needs_parens)
+            sbuf_putc(b, ')');
 
         sbuf_putc(b, '^');
         char *text = expr_const_to_string_local(f);
@@ -3844,7 +3922,8 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
             free(text);
         }
 
-        if (need) sbuf_putc(b, ')');
+        if (need)
+            sbuf_putc(b, ')');
         return;
     }
 
@@ -3853,7 +3932,8 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
         bool leading_half_as_divisor = false;
         bool emitted = false;
 
-        if (need) sbuf_putc(b, '(');
+        if (need)
+            sbuf_putc(b, '(');
 
         expr_t *fac[64];
         int n = 0;
@@ -3878,7 +3958,8 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
         if (leading_half_as_divisor)
             sbuf_puts(b, " / 2");
 
-        if (need) sbuf_putc(b, ')');
+        if (need)
+            sbuf_putc(b, ')');
         return;
     }
 
@@ -3886,7 +3967,8 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
         int need = PREC_ADD < parent_prec;
         int neg;
 
-        if (need) sbuf_putc(b, '(');
+        if (need)
+            sbuf_putc(b, '(');
 
         emit_func(f->a, b, PREC_ADD);
         neg = expr_renders_negative(f->b);
@@ -3906,20 +3988,23 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
         if (rhs_parens)
             sbuf_putc(b, ')');
 
-        if (need) sbuf_putc(b, ')');
+        if (need)
+            sbuf_putc(b, ')');
         return;
     }
 
     /* Division: a/b */
     if (expr_is_op(f, &ops_div)) {
         int need = PREC_MUL < parent_prec;
-        if (need) sbuf_putc(b, '(');
+        if (need)
+            sbuf_putc(b, '(');
 
         emit_func(f->a, b, PREC_MUL);
         sbuf_puts(b, " / ");
         emit_func(f->b, b, PREC_POW);
 
-        if (need) sbuf_putc(b, ')');
+        if (need)
+            sbuf_putc(b, ')');
         return;
     }
 
@@ -3927,18 +4012,24 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
     if (expr_is_op(f, &ops_pow)) {
         int need = PREC_POW < parent_prec;
         int base_needs_parens = pow_base_needs_visible_parens(f->a);
-        if (need) sbuf_putc(b, '(');
+        if (need)
+            sbuf_putc(b, '(');
 
-        if (base_needs_parens) sbuf_putc(b, '(');
+        if (base_needs_parens)
+            sbuf_putc(b, '(');
         emit_func(f->a, b, base_needs_parens ? PREC_LOWEST : PREC_POW);
-        if (base_needs_parens) sbuf_putc(b, ')');
+        if (base_needs_parens)
+            sbuf_putc(b, ')');
         sbuf_puts(b, " ^ ");
         int ep = pow_exp_needs_parens(f->b);
-        if (ep) sbuf_putc(b, '(');
+        if (ep)
+            sbuf_putc(b, '(');
         emit_func(f->b, b, 0);
-        if (ep) sbuf_putc(b, ')');
+        if (ep)
+            sbuf_putc(b, ')');
 
-        if (need) sbuf_putc(b, ')');
+        if (need)
+            sbuf_putc(b, ')');
         return;
     }
 
@@ -3976,13 +4067,20 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
             emit_func_polygamma(f, b);
             return;
         }
-        if (expr_is_op(f, &ops_lommel_s) ||
-            expr_is_op(f, &ops_lommel_s_derivative)) {
+        if (expr_is_op(f, &ops_lommel_s) || expr_is_op(f, &ops_lommel_s_derivative)) {
             emit_func_lommel_s(f, b);
             return;
         }
         if (expr_is_op(f, &ops_appell_f1)) {
             emit_func_appell_f1(f, b);
+            return;
+        }
+        if (expr_is_op(f, &ops_lauricella_f)) {
+            emit_func_lauricella_f(f, b);
+            return;
+        }
+        if (expr_is_op(f, &ops_hypergeometric_pFq)) {
+            emit_func_hypergeometric_pFq(f, b);
             return;
         }
         if (expr_is_op(f, &ops_lambert_wn)) {
@@ -4035,9 +4133,7 @@ static string_t *expr_to_tex_text(const expr_t *dv)
 
 static bool expr_is_trailing_display_space(rune_t rune)
 {
-    return rune_is_equal(rune, '\n') ||
-           rune_is_equal(rune, '\r') ||
-           rune_is_equal(rune, ' ') ||
+    return rune_is_equal(rune, '\n') || rune_is_equal(rune, '\r') || rune_is_equal(rune, ' ') ||
            rune_is_equal(rune, '\t');
 }
 
@@ -4050,8 +4146,7 @@ static string_t *expr_trim_trailing_display_space(string_t *text)
         return NULL;
 
     len = string_length(text);
-    while (len > 0u &&
-           expr_is_trailing_display_space(string_at(text, len - 1u)))
+    while (len > 0u && expr_is_trailing_display_space(string_at(text, len - 1u)))
         len--;
 
     if (len == string_length(text))
@@ -4166,11 +4261,7 @@ void expr_print(const expr_t *dv)
         string_printf("NULL\n");
 }
 
-bool expr_serialize(const expr_t *expr,
-                    string_t **out_type,
-                    string_t **out_encoding,
-                    void **out_data,
-                    size_t *out_len)
+bool expr_serialize(const expr_t *expr, string_t **out_type, string_t **out_encoding, void **out_data, size_t *out_len)
 {
     string_t *type = NULL;
     string_t *encoding = NULL;
@@ -4209,18 +4300,14 @@ bool expr_serialize(const expr_t *expr,
     return true;
 }
 
-expr_t *expr_deserialise(const void *data,
-                         size_t len,
-                         const string_t *type,
-                         const string_t *encoding)
+expr_t *expr_deserialise(const void *data, size_t len, const string_t *type, const string_t *encoding)
 {
     string_t *text;
     expr_t *expr;
 
     if (!data || !type || !encoding)
         return NULL;
-    if (strcmp(string_c_str(type), "expr_t") != 0 ||
-        strcmp(string_c_str(encoding), "mars/expression") != 0)
+    if (strcmp(string_c_str(type), "expr_t") != 0 || strcmp(string_c_str(encoding), "mars/expression") != 0)
         return NULL;
 
     text = string_new();
