@@ -83,10 +83,10 @@ solve, determinant, trace, rank, eigensystems and genuine whole-matrix
 functions. Functions such as the inverse, logarithm and trigonometric families
 require a square matrix.
 
-The captured input is `sin(1 2; 4 5)`. MARS recognises the direct compact
-function syntax and returns the sine of the complete `2 x 2` matrix, rather
-than applying scalar sine separately to its four entries. At normal display
-precision the output is approximately
+The captured input is `(1 2; 4 5)` with **Sine** selected. The equivalent
+direct form `sin(1 2; 4 5)` is also accepted. MARS returns the sine of the
+complete `2 x 2` matrix, rather than applying scalar sine separately to its
+four entries. At normal display precision the output is approximately
 `(-0.3150025731, 0.1811582616; 0.3623165233, 0.0473139502)`.
 
 [![MARS Lab matrix mode calculating the sine of a complete matrix](images/mars-lab/matrix.png)](images/mars-lab/matrix.png)

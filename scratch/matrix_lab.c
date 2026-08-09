@@ -262,14 +262,14 @@ static const char *matrix_expression_product_operator(const char *start, const c
     return product;
 }
 
-static matrix_t *parse_compact_matrix_span(const char *start, const char *end)
+static matrix_t *parse_compact_matrix_span(const char *start, const char *end, mat_bindings_t **bindings)
 {
     char *matrix_text = compact_matrix_literal(start, end);
     matrix_t *matrix;
 
     if (!matrix_text)
         return NULL;
-    matrix = mat_from_string_expr(matrix_text, NULL);
+    matrix = mat_from_string_expr(matrix_text, bindings);
     free(matrix_text);
     return matrix;
 }
@@ -400,7 +400,7 @@ static matrix_t *evaluate_matrix_expression_span(const char *start, const char *
     }
 
     if (allow_literal)
-        return parse_compact_matrix_span(start, end);
+        return parse_compact_matrix_span(start, end, NULL);
     return NULL;
 
 cleanup:
@@ -1054,7 +1054,7 @@ int main(int argc, char **argv)
         goto result_ready;
     }
 
-    matrix = mat_from_string_expr(matrix_input, &bindings);
+    matrix = parse_compact_matrix_span(matrix_input, matrix_input + strlen(matrix_input), &bindings);
     if (!matrix) {
         fprintf(stderr, "Could not parse matrix input\n");
         goto cleanup;
@@ -1089,7 +1089,7 @@ int main(int argc, char **argv)
             fprintf(stderr, "%s needs a right-hand-side matrix\n", strcmp(operation, "solve") == 0 ? "Solve" : "Multiply");
             goto cleanup;
         }
-        other = mat_from_string_expr(operand_input, NULL);
+        other = parse_compact_matrix_span(operand_input, operand_input + strlen(operand_input), NULL);
         if (!other) {
             fprintf(stderr, "Could not parse %s operand\n", operation);
             goto cleanup;
