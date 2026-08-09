@@ -9,18 +9,13 @@
 #define EXPR_GOAL_DEFAULT_ITERATIONS 120u
 
 static void goal_set_var(expr_t *var, number_t value, size_t digits);
-static int goal_eval_residual(expr_t *expr,
-                              number_t target,
-                              number_t *value_out,
-                              number_t *residual_out);
+static int goal_eval_residual(expr_t *expr, number_t target, number_t *value_out, number_t *residual_out);
 
 static size_t goal_iterations_for_digits(size_t digits)
 {
     size_t scaled = digits > 0u ? digits * 4u : EXPR_GOAL_DEFAULT_ITERATIONS;
 
-    return scaled > EXPR_GOAL_DEFAULT_ITERATIONS
-         ? scaled
-         : EXPR_GOAL_DEFAULT_ITERATIONS;
+    return scaled > EXPR_GOAL_DEFAULT_ITERATIONS ? scaled : EXPR_GOAL_DEFAULT_ITERATIONS;
 }
 
 static size_t goal_precision_digits(const expr_goal_seek_options_t *options)
@@ -80,9 +75,7 @@ static number_t goal_default_tolerance(number_t target, size_t digits)
 
     eps = num_pow10(-(int)(digits > 0u ? digits : 1u));
     target_mag = num_abs(target);
-    scale = num_is_finite(target_mag) && num_gt(target_mag, NUM_ONE)
-          ? num_clone(target_mag)
-          : num_clone(NUM_ONE);
+    scale = num_is_finite(target_mag) && num_gt(target_mag, NUM_ONE) ? num_clone(target_mag) : num_clone(NUM_ONE);
     tolerance = num_mul(eps, scale);
 
     num_destroy(&scale);
@@ -91,11 +84,9 @@ static number_t goal_default_tolerance(number_t target, size_t digits)
     return tolerance;
 }
 
-static number_t goal_tolerance(number_t target,
-                               const expr_goal_seek_options_t *options)
+static number_t goal_tolerance(number_t target, const expr_goal_seek_options_t *options)
 {
-    if (options && num_is_finite(options->tolerance) &&
-        !num_is_zero(options->tolerance)) {
+    if (options && num_is_finite(options->tolerance) && !num_is_zero(options->tolerance)) {
         return num_abs(options->tolerance);
     }
     return goal_default_tolerance(target, goal_precision_digits(options));
@@ -134,9 +125,7 @@ static number_t goal_cleanup_tolerance(number_t tolerance, size_t digits)
     return out;
 }
 
-static number_t goal_clean_negligible_complex_parts(number_t value,
-                                                    number_t component_tolerance,
-                                                    size_t digits)
+static number_t goal_clean_negligible_complex_parts(number_t value, number_t component_tolerance, size_t digits)
 {
     number_t real;
     number_t imag;
@@ -169,11 +158,8 @@ static number_t goal_clean_negligible_complex_parts(number_t value,
     if (imag_zero) {
         out = real_zero ? num_clone(NUM_ZERO) : num_clone(real);
     } else {
-        number_t clean_imag = imag_unit
-                                  ? (num_lt(imag, NUM_ZERO)
-                                         ? num_clone(NUM_NEG_ONE)
-                                         : num_clone(NUM_ONE))
-                                  : num_clone(imag);
+        number_t clean_imag =
+            imag_unit ? (num_lt(imag, NUM_ZERO) ? num_clone(NUM_NEG_ONE) : num_clone(NUM_ONE)) : num_clone(imag);
         number_t imag_part = num_mul(NUM_I, clean_imag);
 
         out = real_zero ? num_clone(imag_part) : num_add(real, imag_part);
@@ -188,12 +174,8 @@ static number_t goal_clean_negligible_complex_parts(number_t value,
     return out;
 }
 
-static bool goal_candidate_residual_close(expr_t *expr,
-                                          expr_t *var,
-                                          number_t candidate,
-                                          number_t target,
-                                          number_t tolerance,
-                                          size_t digits)
+static bool goal_candidate_residual_close(expr_t *expr, expr_t *var, number_t candidate, number_t target,
+                                          number_t tolerance, size_t digits)
 {
     number_t value;
     number_t residual;
@@ -208,25 +190,18 @@ static bool goal_candidate_residual_close(expr_t *expr,
     return ok;
 }
 
-static number_t goal_simplify_complex_solution(expr_t *expr,
-                                               expr_t *var,
-                                               number_t value,
-                                               number_t target,
-                                               number_t tolerance,
-                                               size_t digits)
+static number_t goal_simplify_complex_solution(expr_t *expr, expr_t *var, number_t value, number_t target,
+                                               number_t tolerance, size_t digits)
 {
     number_t component_tolerance = goal_cleanup_tolerance(tolerance, digits);
-    number_t clean = goal_clean_negligible_complex_parts(value,
-                                                         component_tolerance,
-                                                         digits);
+    number_t clean = goal_clean_negligible_complex_parts(value, component_tolerance, digits);
 
     num_destroy(&component_tolerance);
     if (!num_is_real(clean)) {
         number_t real = num_real_part(clean);
         number_t imag = num_imag_part(clean);
 
-        if (!num_is_zero(imag) &&
-            goal_candidate_residual_close(expr, var, real, target, tolerance, digits)) {
+        if (!num_is_zero(imag) && goal_candidate_residual_close(expr, var, real, target, tolerance, digits)) {
             num_destroy(&clean);
             num_destroy(&imag);
             return real;
@@ -235,8 +210,7 @@ static number_t goal_simplify_complex_solution(expr_t *expr,
         if (!num_is_zero(real)) {
             number_t imag_part = num_mul(NUM_I, imag);
 
-            if (goal_candidate_residual_close(expr, var, imag_part,
-                                              target, tolerance, digits)) {
+            if (goal_candidate_residual_close(expr, var, imag_part, target, tolerance, digits)) {
                 num_destroy(&clean);
                 num_destroy(&real);
                 num_destroy(&imag);
@@ -265,9 +239,7 @@ static number_t goal_work_value(number_t value, size_t digits)
         return num_clone(value);
 
     bits = (size_t)((double)digits * 3.3219280948873623 + 1.0);
-    rounded = num_is_real(value)
-            ? num_as_inexact_real_prec(value, bits)
-            : num_as_complex_prec(value, bits);
+    rounded = num_is_real(value) ? num_as_inexact_real_prec(value, bits) : num_as_complex_prec(value, bits);
 
     if (!num_is_finite(rounded) && num_is_finite(value)) {
         num_destroy(&rounded);
@@ -299,10 +271,7 @@ static void goal_set_var(expr_t *var, number_t value, size_t digits)
     num_destroy(&copy);
 }
 
-static int goal_eval_residual(expr_t *expr,
-                              number_t target,
-                              number_t *value_out,
-                              number_t *residual_out)
+static int goal_eval_residual(expr_t *expr, number_t target, number_t *value_out, number_t *residual_out)
 {
     number_t value;
     number_t residual;
@@ -317,12 +286,8 @@ static int goal_eval_residual(expr_t *expr,
     return 0;
 }
 
-static int goal_eval_derivative_residual(expr_t *expr,
-                                         expr_t *var,
-                                         number_t target,
-                                         number_t *value_out,
-                                         number_t *residual_out,
-                                         number_t *derivative_out)
+static int goal_eval_derivative_residual(expr_t *expr, expr_t *var, number_t target, number_t *value_out,
+                                         number_t *residual_out, number_t *derivative_out)
 {
     const expr_t *vars[1];
     number_t value = (number_t){0};
@@ -341,13 +306,8 @@ static int goal_eval_derivative_residual(expr_t *expr,
     return 0;
 }
 
-static int goal_finish(expr_t *expr,
-                       expr_bindings_t *bindings,
-                       number_t target,
-                       number_t tolerance,
-                       const expr_goal_seek_options_t *options,
-                       bool used_complex,
-                       size_t iterations,
+static int goal_finish(expr_t *expr, expr_bindings_t *bindings, number_t target, number_t tolerance,
+                       const expr_goal_seek_options_t *options, bool used_complex, size_t iterations,
                        expr_goal_seek_result_t *result)
 {
     number_t value;
@@ -406,13 +366,8 @@ static int goal_collect_variables(expr_bindings_t *bindings, expr_t ***vars_out)
     return (int)count;
 }
 
-static int goal_solve_real_one(expr_t *expr,
-                               expr_t *var,
-                               number_t target,
-                               number_t tolerance,
-                               size_t digits,
-                               size_t max_iterations,
-                               size_t *iterations_out)
+static int goal_solve_real_one(expr_t *expr, expr_t *var, number_t target, number_t tolerance, size_t digits,
+                               size_t max_iterations, size_t *iterations_out)
 {
     number_t x0 = goal_start_value(var, digits);
     number_t value = (number_t){0};
@@ -427,8 +382,7 @@ static int goal_solve_real_one(expr_t *expr,
     int rc = -1;
 
     goal_set_var(var, x0, digits);
-    if (goal_eval_residual(expr, target, &value, &f0) != 0 ||
-        !goal_residual_real(f0))
+    if (goal_eval_residual(expr, target, &value, &f0) != 0 || !goal_residual_real(f0))
         goto cleanup;
     num_destroy(&value);
     value = (number_t){0};
@@ -533,8 +487,7 @@ static int goal_solve_real_one(expr_t *expr,
         iterations++;
         num_destroy(&sum);
         goal_set_var(var, mid, digits);
-        if (goal_eval_residual(expr, target, &value, &fmid) != 0 ||
-            !goal_residual_real(fmid)) {
+        if (goal_eval_residual(expr, target, &value, &fmid) != 0 || !goal_residual_real(fmid)) {
             num_destroy(&value);
             value = (number_t){0};
             num_destroy(&fmid);
@@ -553,9 +506,7 @@ static int goal_solve_real_one(expr_t *expr,
             goto cleanup;
         }
 
-        if (num_get_sign(flo) != 0 &&
-            num_get_sign(fmid) != 0 &&
-            num_get_sign(flo) != num_get_sign(fmid)) {
+        if (num_get_sign(flo) != 0 && num_get_sign(fmid) != 0 && num_get_sign(flo) != num_get_sign(fmid)) {
             num_destroy(&hi);
             num_destroy(&fhi);
             hi = mid;
@@ -593,14 +544,8 @@ cleanup:
     return rc;
 }
 
-static int goal_complex_newton_from(expr_t *expr,
-                                    expr_t *var,
-                                    number_t target,
-                                    number_t tolerance,
-                                    number_t start,
-                                    size_t digits,
-                                    size_t max_iterations,
-                                    size_t *iterations_out)
+static int goal_complex_newton_from(expr_t *expr, expr_t *var, number_t target, number_t tolerance, number_t start,
+                                    size_t digits, size_t max_iterations, size_t *iterations_out)
 {
     number_t x = goal_work_value(start, digits);
     number_t best_x = num_clone(x);
@@ -622,8 +567,7 @@ static int goal_complex_newton_from(expr_t *expr,
         number_t trial_norm;
 
         iterations++;
-        if (goal_eval_derivative_residual(expr, var, target,
-                                          &value, &residual, &derivative) != 0)
+        if (goal_eval_derivative_residual(expr, var, target, &value, &residual, &derivative) != 0)
             goto loop_cleanup;
         num_destroy(&value);
 
@@ -681,7 +625,7 @@ static int goal_complex_newton_from(expr_t *expr,
         num_destroy(&residual);
         continue;
 
-loop_cleanup:
+    loop_cleanup:
         num_destroy(&derivative);
         num_destroy(&trial_value);
         num_destroy(&trial_residual);
@@ -693,8 +637,7 @@ loop_cleanup:
         rc = 0;
 
     if (rc == 0) {
-        number_t clean_x = goal_simplify_complex_solution(expr, var, best_x,
-                                                          target, tolerance, digits);
+        number_t clean_x = goal_simplify_complex_solution(expr, var, best_x, target, tolerance, digits);
         goal_set_var(var, clean_x, digits);
         num_destroy(&clean_x);
     } else {
@@ -714,9 +657,7 @@ static size_t goal_complex_probe_iteration_limit(size_t max_iterations)
     return max_iterations < 8u ? max_iterations : 8u;
 }
 
-static number_t goal_complex_offset_seed(number_t base,
-                                         number_t imag_offset,
-                                         size_t digits)
+static number_t goal_complex_offset_seed(number_t base, number_t imag_offset, size_t digits)
 {
     number_t imag = goal_work_value(imag_offset, digits);
     number_t seed = num_add(base, imag);
@@ -725,13 +666,8 @@ static number_t goal_complex_offset_seed(number_t base,
     return seed;
 }
 
-static int goal_solve_complex_one(expr_t *expr,
-                                  expr_t *var,
-                                  number_t target,
-                                  number_t tolerance,
-                                  size_t digits,
-                                  size_t max_iterations,
-                                  size_t *iterations_out)
+static int goal_solve_complex_one(expr_t *expr, expr_t *var, number_t target, number_t tolerance, size_t digits,
+                                  size_t max_iterations, size_t *iterations_out)
 {
     number_t base = goal_start_value(var, digits);
     size_t iterations = 0u;
@@ -751,8 +687,7 @@ static int goal_solve_complex_one(expr_t *expr,
             size_t attempt_iterations = 0u;
             size_t attempt_limit = i < 2u ? probe_limit : max_iterations;
 
-            rc = goal_complex_newton_from(expr, var, target, tolerance,
-                                          seeds[i], digits, attempt_limit,
+            rc = goal_complex_newton_from(expr, var, target, tolerance, seeds[i], digits, attempt_limit,
                                           &attempt_iterations);
             iterations += attempt_iterations;
             if (rc == 0)
@@ -762,9 +697,7 @@ static int goal_solve_complex_one(expr_t *expr,
         for (size_t i = 0u; i < seed_count; ++i)
             num_destroy(&seeds[i]);
     } else {
-        rc = goal_complex_newton_from(expr, var, target, tolerance,
-                                      base, digits, max_iterations,
-                                      &iterations);
+        rc = goal_complex_newton_from(expr, var, target, tolerance, base, digits, max_iterations, &iterations);
     }
 
     if (iterations_out)
@@ -773,10 +706,7 @@ static int goal_solve_complex_one(expr_t *expr,
     return rc;
 }
 
-static void goal_set_vars(expr_t **vars,
-                          number_t *values,
-                          size_t nvars,
-                          size_t digits)
+static void goal_set_vars(expr_t **vars, number_t *values, size_t nvars, size_t digits)
 {
     for (size_t i = 0u; i < nvars; ++i)
         goal_set_var(vars[i], values[i], digits);
@@ -790,11 +720,7 @@ static void goal_destroy_numbers(number_t *values, size_t count)
         num_destroy(&values[i]);
 }
 
-static int goal_eval_real_gradient(expr_t *expr,
-                                   expr_t **vars,
-                                   size_t nvars,
-                                   number_t target,
-                                   number_t *residual_out,
+static int goal_eval_real_gradient(expr_t *expr, expr_t **vars, size_t nvars, number_t target, number_t *residual_out,
                                    number_t *derivs_out)
 {
     const expr_t **var_refs = calloc(nvars, sizeof(*var_refs));
@@ -835,18 +761,10 @@ cleanup:
     return rc;
 }
 
-static int goal_solve_real_multi(expr_t *expr,
-                                 expr_t **vars,
-                                 size_t nvars,
-                                 number_t target,
-                                 number_t tolerance,
-                                 size_t digits,
-                                 size_t max_iterations,
-                                 size_t *iterations_out)
+static int goal_solve_real_multi(expr_t *expr, expr_t **vars, size_t nvars, number_t target, number_t tolerance,
+                                 size_t digits, size_t max_iterations, size_t *iterations_out)
 {
-    static const char *const alphas[] = {
-        "1", "0.5", "0.25", "0.125", "0.0625", "0.03125"
-    };
+    static const char *const alphas[] = {"1", "0.5", "0.25", "0.125", "0.0625", "0.03125"};
     number_t *values = calloc(nvars, sizeof(*values));
     number_t best_residual = num_new();
     number_t best_mag = num_clone(NUM_INF);
@@ -870,9 +788,7 @@ static int goal_solve_real_multi(expr_t *expr,
         bool improved = false;
 
         iterations++;
-        if (!derivs ||
-            goal_eval_real_gradient(expr, vars, nvars, target,
-                                    &residual, derivs) != 0) {
+        if (!derivs || goal_eval_real_gradient(expr, vars, nvars, target, &residual, derivs) != 0) {
             free(derivs);
             num_destroy(&residual);
             num_destroy(&norm2);
@@ -943,8 +859,7 @@ static int goal_solve_real_multi(expr_t *expr,
             }
 
             goal_set_vars(vars, trial, nvars, digits);
-            if (goal_eval_residual(expr, target,
-                                   &trial_value, &trial_residual) != 0 ||
+            if (goal_eval_residual(expr, target, &trial_value, &trial_residual) != 0 ||
                 !goal_residual_real(trial_residual)) {
                 num_destroy(&trial_value);
                 num_destroy(&trial_residual);
@@ -1011,11 +926,8 @@ cleanup:
     return rc;
 }
 
-int expr_goal_seek(expr_t *expr,
-                 expr_bindings_t *bindings,
-                 number_t target,
-                 const expr_goal_seek_options_t *options,
-                 expr_goal_seek_result_t *result)
+int expr_goal_seek(expr_t *expr, expr_bindings_t *bindings, number_t target, const expr_goal_seek_options_t *options,
+                   expr_goal_seek_result_t *result)
 {
     expr_t **vars = NULL;
     int nvars;
@@ -1040,27 +952,20 @@ int expr_goal_seek(expr_t *expr,
     tolerance = goal_tolerance(target, options);
 
     if (nvars == 1 &&
-        goal_solve_real_one(expr, vars[0], target, tolerance,
-                            work_digits, max_iterations, &iterations) == 0) {
-        rc = goal_finish(expr, bindings, target, tolerance, options, false,
-                         iterations, result);
+        goal_solve_real_one(expr, vars[0], target, tolerance, work_digits, max_iterations, &iterations) == 0) {
+        rc = goal_finish(expr, bindings, target, tolerance, options, false, iterations, result);
         goto cleanup;
     }
 
-    if (nvars > 1 &&
-        goal_solve_real_multi(expr, vars, (size_t)nvars, target, tolerance,
-                              work_digits, max_iterations, &iterations) == 0) {
-        rc = goal_finish(expr, bindings, target, tolerance, options, false,
-                         iterations, result);
+    if (nvars > 1 && goal_solve_real_multi(expr, vars, (size_t)nvars, target, tolerance, work_digits, max_iterations,
+                                           &iterations) == 0) {
+        rc = goal_finish(expr, bindings, target, tolerance, options, false, iterations, result);
         goto cleanup;
     }
 
-    if (options && options->allow_complex &&
-        nvars == 1 &&
-        goal_solve_complex_one(expr, vars[0], target, tolerance,
-                               work_digits, max_iterations, &iterations) == 0) {
-        rc = goal_finish(expr, bindings, target, tolerance, options, true,
-                         iterations, result);
+    if (options && options->allow_complex && nvars == 1 &&
+        goal_solve_complex_one(expr, vars[0], target, tolerance, work_digits, max_iterations, &iterations) == 0) {
+        rc = goal_finish(expr, bindings, target, tolerance, options, true, iterations, result);
     }
 
 cleanup:

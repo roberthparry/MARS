@@ -15,9 +15,16 @@ some GNU C extensions, so MSVC/Windows builds are not currently guaranteed.
 - **`number_t`** — generic numeric value cluster spanning exact integer/rational,
   fixed-precision, and multiprecision real/complex backends behind one by-value
   public handle
-- **`qfloat_t`** — double-double arithmetic, circular function families, and special functions (~31-32 decimal digits of precision)
+- **`qfloat_t`** — independent double-double arithmetic, circular function
+  families and special functions, including Bessel, Lommel, generalised
+  hypergeometric and Lauricella families (~31–32 decimal digits of precision)
+- **`qcomplex_t`** — double-double complex arithmetic and complex
+  special-function families without an MPFR or MPC dependency
 - **`matrix_t`** — generic high-precision matrix over numeric `number_t` values or symbolic `expr_t *` entries, with string-based matrix parsing and formatting, symbolic linear algebra support including Schur complements, block inverse/solve, Jordan helpers, entrywise matrix derivatives, Jacobian helpers, first matrix-calculus helpers for trace, determinant, inverse, block inverse, solve, and block solve, and high-precision eigendecomposition and matrix functions through the numeric `number_t` layer
-- **`expr_t`** — differentiable expression DAGs with first/second derivatives, symbolic antiderivatives for conservative rule families, symbolic matrix integration, and structural matcher helpers for higher-level symbolic code
+- **`expr_t`** — differentiable expression DAGs with symbolic and reverse-mode
+  derivatives, symbolic antiderivatives for conservative rule families,
+  symbolic matrix integration and structural matcher helpers for higher-level
+  symbolic code
 - **`datetime_t`** — civil and astronomical date/time helpers
 - **`timeseries_t`** — datetime-indexed forecasting and time-series analysis for regression and ARIMA-family models
 - **`json_t`** — opaque JSON value tree with string-backed parsing, serialisation, file round-tripping, and `number_t` extension support

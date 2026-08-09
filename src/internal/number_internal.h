@@ -1,9 +1,8 @@
 #ifndef NUMBER_SHARED_INTERNAL_H
 #define NUMBER_SHARED_INTERNAL_H
 
-#if !defined(MARS_SHARED_NUMBER_INTERNAL_ACCESS) && \
-    (!defined(__INTELLISENSE__) || \
-     (defined(__INCLUDE_LEVEL__) && __INCLUDE_LEVEL__ > 0))
+#if !defined(MARS_SHARED_NUMBER_INTERNAL_ACCESS) &&                                                                    \
+    (!defined(__INTELLISENSE__) || (defined(__INCLUDE_LEVEL__) && __INCLUDE_LEVEL__ > 0))
 #error "internal/number_internal.h is private to the MARS implementation; include number.h instead."
 #endif
 
@@ -20,7 +19,7 @@ num_scope_t *number_scope_suspend(void);
 void number_scope_resume(num_scope_t *scope);
 void num_scope_resume_cleanup(num_scope_t **scope);
 
-#define NUM_SCOPE_SUSPEND(name) \
+#define NUM_SCOPE_SUSPEND(name)                                                                                        \
     __attribute__((cleanup(num_scope_resume_cleanup))) num_scope_t *(name) = number_scope_suspend()
 
 #endif

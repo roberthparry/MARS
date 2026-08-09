@@ -18,19 +18,11 @@ static number_t pow_small_number(number_t base, size_t exponent)
     return out;
 }
 
-bool expr_integrate_rewrite_poly_deg4_to_affine_basis(number_t *poly,
-                                                      number_t from_constant,
-                                                      number_t from_coeff,
-                                                      number_t to_constant,
-                                                      number_t to_coeff)
+bool expr_integrate_rewrite_poly_deg4_to_affine_basis(number_t *poly, number_t from_constant, number_t from_coeff,
+                                                      number_t to_constant, number_t to_coeff)
 {
     static const long binomial[5][5] = {
-        { 1, 0, 0, 0, 0 },
-        { 1, 1, 0, 0, 0 },
-        { 1, 2, 1, 0, 0 },
-        { 1, 3, 3, 1, 0 },
-        { 1, 4, 6, 4, 1 }
-    };
+        {1, 0, 0, 0, 0}, {1, 1, 0, 0, 0}, {1, 2, 1, 0, 0}, {1, 3, 3, 1, 0}, {1, 4, 6, 4, 1}};
     number_t alpha;
     number_t scaled_to_constant;
     number_t beta;
@@ -124,13 +116,9 @@ static bool integrate_exact_small_rational_sqrt(number_t value, number_t *root_o
     number_t numerator_expr;
     number_t denominator_expr;
 
-    if (!root_out ||
-        !num_get_small_rational(value, &numerator, &denominator) ||
-        numerator < 0L ||
-        denominator <= 0L ||
+    if (!root_out || !num_get_small_rational(value, &numerator, &denominator) || numerator < 0L || denominator <= 0L ||
         !integrate_long_perfect_square_root(numerator, &root_numerator) ||
-        !integrate_long_perfect_square_root(denominator, &root_denominator) ||
-        root_denominator == 0L) {
+        !integrate_long_perfect_square_root(denominator, &root_denominator) || root_denominator == 0L) {
         return false;
     }
 
@@ -143,11 +131,8 @@ static bool integrate_exact_small_rational_sqrt(number_t value, number_t *root_o
     return true;
 }
 
-static bool match_affine_power_factor(const expr_t *expr,
-                                      const expr_t *wrt,
-                                      number_t *constant_out,
-                                      number_t *coeff_out,
-                                      number_t *exponent_out)
+static bool match_affine_power_factor(const expr_t *expr, const expr_t *wrt, number_t *constant_out,
+                                      number_t *coeff_out, number_t *exponent_out)
 {
     number_t exponent = num_new();
     bool ok = false;
@@ -158,31 +143,26 @@ static bool match_affine_power_factor(const expr_t *expr,
     }
 
     if (expr->ops && expr->ops->kind == EXPR_KIND_SQRT && expr->a) {
-        ok = match_nonconstant_affine_linear_expr(expr->a, wrt, constant_out,
-                                                  coeff_out);
+        ok = match_nonconstant_affine_linear_expr(expr->a, wrt, constant_out, coeff_out);
         if (ok) {
             num_destroy(exponent_out);
             *exponent_out = num_clone(NUM_HALF);
         }
     } else if (expr->ops && expr->ops->kind == EXPR_KIND_POW_D && expr->a) {
-        ok = match_nonconstant_affine_linear_expr(expr->a, wrt, constant_out,
-                                                  coeff_out);
+        ok = match_nonconstant_affine_linear_expr(expr->a, wrt, constant_out, coeff_out);
         if (ok) {
             num_destroy(exponent_out);
             *exponent_out = num_clone(expr->c);
         }
-    } else if (expr->ops && expr->ops->kind == EXPR_KIND_POW &&
-               expr->a && expr->b &&
+    } else if (expr->ops && expr->ops->kind == EXPR_KIND_POW && expr->a && expr->b &&
                expr_match_const_value(expr->b, &exponent)) {
-        ok = match_nonconstant_affine_linear_expr(expr->a, wrt, constant_out,
-                                                  coeff_out);
+        ok = match_nonconstant_affine_linear_expr(expr->a, wrt, constant_out, coeff_out);
         if (ok) {
             num_destroy(exponent_out);
             *exponent_out = num_clone(exponent);
         }
     } else {
-        ok = match_nonconstant_affine_linear_expr(expr, wrt, constant_out,
-                                                  coeff_out);
+        ok = match_nonconstant_affine_linear_expr(expr, wrt, constant_out, coeff_out);
         if (ok) {
             num_destroy(exponent_out);
             *exponent_out = num_clone(NUM_ONE);
@@ -193,11 +173,8 @@ static bool match_affine_power_factor(const expr_t *expr,
     return ok;
 }
 
-static expr_t *build_integrated_poly_affine_power(const number_t *poly,
-                                                  number_t power_constant,
-                                                  number_t power_coeff,
-                                                  number_t exponent,
-                                                  const expr_t *wrt)
+static expr_t *build_integrated_poly_affine_power(const number_t *poly, number_t power_constant, number_t power_coeff,
+                                                  number_t exponent, const expr_t *wrt)
 {
     expr_t *u = build_affine_from_match(wrt, power_constant, power_coeff);
     expr_t *sum = NULL;
@@ -247,12 +224,8 @@ static expr_t *build_integrated_poly_affine_power(const number_t *poly,
     return simplify_owned(sum);
 }
 
-static bool match_poly_and_affine_power_product(const expr_t *poly_expr,
-                                                const expr_t *power_expr,
-                                                const expr_t *wrt,
-                                                number_t *poly,
-                                                number_t *power_constant,
-                                                number_t *power_coeff,
+static bool match_poly_and_affine_power_product(const expr_t *poly_expr, const expr_t *power_expr, const expr_t *wrt,
+                                                number_t *poly, number_t *power_constant, number_t *power_coeff,
                                                 number_t *exponent)
 {
     expr_t *vars[1];
@@ -262,14 +235,9 @@ static bool match_poly_and_affine_power_product(const expr_t *poly_expr,
 
     vars[0] = (expr_t *)wrt;
     poly_coeffs[0] = num_new();
-    ok = expr_match_affine_poly_deg4(poly_expr, 1u, vars, poly,
-                                     &poly_constant, poly_coeffs) &&
-         match_affine_power_factor(power_expr, wrt, power_constant, power_coeff,
-                                   exponent) &&
-         expr_integrate_rewrite_poly_deg4_to_affine_basis(poly,
-                                                          poly_constant,
-                                                          poly_coeffs[0],
-                                                          *power_constant,
+    ok = expr_match_affine_poly_deg4(poly_expr, 1u, vars, poly, &poly_constant, poly_coeffs) &&
+         match_affine_power_factor(power_expr, wrt, power_constant, power_coeff, exponent) &&
+         expr_integrate_rewrite_poly_deg4_to_affine_basis(poly, poly_constant, poly_coeffs[0], *power_constant,
                                                           *power_coeff);
 
     num_destroy(&poly_coeffs[0]);
@@ -292,20 +260,14 @@ expr_t *integrate_poly_times_affine_power(const expr_t *expr, const expr_t *wrt)
 
     number_array_zero_local(poly, 5);
     if (expr_match_mul_expr(expr, &left, &right)) {
-        if (!match_poly_and_affine_power_product(left, right, wrt, poly,
-                                                 &power_constant, &power_coeff,
-                                                 &exponent)) {
+        if (!match_poly_and_affine_power_product(left, right, wrt, poly, &power_constant, &power_coeff, &exponent)) {
             number_array_clear_local(poly, 5);
             number_array_zero_local(poly, 5);
-            if (!match_poly_and_affine_power_product(right, left, wrt, poly,
-                                                     &power_constant, &power_coeff,
-                                                     &exponent))
+            if (!match_poly_and_affine_power_product(right, left, wrt, poly, &power_constant, &power_coeff, &exponent))
                 goto cleanup;
         }
     } else if (expr->ops && expr->ops->kind == EXPR_KIND_DIV && expr->a && expr->b) {
-        if (!match_poly_and_affine_power_product(expr->a, expr->b, wrt, poly,
-                                                 &power_constant, &power_coeff,
-                                                 &exponent))
+        if (!match_poly_and_affine_power_product(expr->a, expr->b, wrt, poly, &power_constant, &power_coeff, &exponent))
             goto cleanup;
         number_t neg_exponent = num_neg(exponent);
 
@@ -315,8 +277,7 @@ expr_t *integrate_poly_times_affine_power(const expr_t *expr, const expr_t *wrt)
         goto cleanup;
     }
 
-    out = build_integrated_poly_affine_power(poly, power_constant, power_coeff,
-                                             exponent, wrt);
+    out = build_integrated_poly_affine_power(poly, power_constant, power_coeff, exponent, wrt);
 
 cleanup:
     number_array_clear_local(poly, 5);
@@ -326,8 +287,7 @@ cleanup:
     return out;
 }
 
-expr_t *integrate_poly_times_unary_affine_kind(const expr_t *expr,
-                                               const expr_t *wrt,
+expr_t *integrate_poly_times_unary_affine_kind(const expr_t *expr, const expr_t *wrt,
                                                expr_pattern_unary_affine_kind_t kind)
 {
     number_t poly[5];
@@ -339,8 +299,7 @@ expr_t *integrate_poly_times_unary_affine_kind(const expr_t *expr,
 
     vars[0] = (expr_t *)wrt;
     number_array_zero_local(poly, 5);
-    if (!expr_match_affine_poly_deg4_times_unary_affine_kind(expr, kind, 1u, vars,
-                                                              poly, &constant, &coeff) ||
+    if (!expr_match_affine_poly_deg4_times_unary_affine_kind(expr, kind, 1u, vars, poly, &constant, &coeff) ||
         num_eq(coeff, NUM_ZERO)) {
         number_array_clear_local(poly, 5);
         num_destroy(&coeff);
@@ -448,8 +407,8 @@ expr_t *integrate_poly_times_log_affine(const expr_t *expr, const expr_t *wrt)
     number_array_zero_local(poly, 5);
     number_array_zero_local(q, 6);
     number_array_zero_local(t, 6);
-    if (!expr_match_affine_poly_deg4_times_unary_affine_kind(expr, EXPR_PATTERN_UNARY_LOG,
-                                                              1u, vars, poly, &constant, &coeff) ||
+    if (!expr_match_affine_poly_deg4_times_unary_affine_kind(expr, EXPR_PATTERN_UNARY_LOG, 1u, vars, poly, &constant,
+                                                             &coeff) ||
         num_eq(coeff, NUM_ZERO)) {
         number_array_clear_local(t, 6);
         number_array_clear_local(q, 6);
@@ -586,19 +545,12 @@ expr_t *integrate_poly_over_centered_quadratic(const expr_t *expr, const expr_t 
     vars[0] = (expr_t *)wrt;
     number_array_zero_local(numer, 5);
     number_array_zero_local(denom, 5);
-    if (!expr_match_affine_poly_deg4(expr->a, 1u, vars, numer, &numer_constant,
-                                     &numer_coeff) ||
-        !expr_match_affine_poly_deg4(expr->b, 1u, vars, denom, &denom_constant,
-                                     &denom_coeff) ||
+    if (!expr_match_affine_poly_deg4(expr->a, 1u, vars, numer, &numer_constant, &numer_coeff) ||
+        !expr_match_affine_poly_deg4(expr->b, 1u, vars, denom, &denom_constant, &denom_coeff) ||
         !((num_eq(numer_constant, NUM_ZERO) && num_eq(numer_coeff, NUM_ONE)) ||
           (num_is_zero(numer_constant) && num_is_zero(numer_coeff))) ||
-        !num_eq(denom_constant, NUM_ZERO) ||
-        !num_eq(denom_coeff, NUM_ONE) ||
-        !num_is_zero(denom[1]) ||
-        !num_is_zero(denom[3]) ||
-        !num_is_zero(denom[4]) ||
-        num_is_zero(denom[0]) ||
-        num_is_zero(denom[2])) {
+        !num_eq(denom_constant, NUM_ZERO) || !num_eq(denom_coeff, NUM_ONE) || !num_is_zero(denom[1]) ||
+        !num_is_zero(denom[3]) || !num_is_zero(denom[4]) || num_is_zero(denom[0]) || num_is_zero(denom[2])) {
         goto cleanup;
     }
 
@@ -641,32 +593,23 @@ expr_t *integrate_poly_over_centered_quadratic(const expr_t *expr, const expr_t 
     if (!num_is_zero(r0)) {
         number_t k_over_c = num_div(denom[2], denom[0]);
         bool use_atanh = num_lt(k_over_c, NUM_ZERO);
-        number_t abs_c = num_lt(denom[0], NUM_ZERO) ? num_neg(denom[0])
-                                                    : num_clone(denom[0]);
-        number_t abs_k = num_lt(denom[2], NUM_ZERO) ? num_neg(denom[2])
-                                                    : num_clone(denom[2]);
+        number_t abs_c = num_lt(denom[0], NUM_ZERO) ? num_neg(denom[0]) : num_clone(denom[0]);
+        number_t abs_k = num_lt(denom[2], NUM_ZERO) ? num_neg(denom[2]) : num_clone(denom[2]);
         number_t scale_base = num_div(abs_c, abs_k);
         number_t numeric_scale = num_new();
-        bool exact_numeric_scale = integrate_exact_small_rational_sqrt(scale_base,
-                                                                       &numeric_scale);
-        number_t denom_coeff = use_atanh
-                                 ? (num_lt(denom[0], NUM_ZERO) ? num_neg(abs_k)
-                                                               : num_clone(abs_k))
-                                 : num_clone(denom[2]);
+        bool exact_numeric_scale = integrate_exact_small_rational_sqrt(scale_base, &numeric_scale);
+        number_t denom_coeff =
+            use_atanh ? (num_lt(denom[0], NUM_ZERO) ? num_neg(abs_k) : num_clone(abs_k)) : num_clone(denom[2]);
 
         expr_t *scale_base_expr = exact_numeric_scale ? NULL : expr_new_const(scale_base);
         expr_t *scale_raw = scale_base_expr ? expr_sqrt(scale_base_expr) : NULL;
-        expr_t *scale = exact_numeric_scale ? expr_new_const(numeric_scale)
-                                            : simplify_owned(scale_raw);
+        expr_t *scale = exact_numeric_scale ? expr_new_const(numeric_scale) : simplify_owned(scale_raw);
         expr_t *arg = scale ? expr_div(wrt, scale) : NULL;
-        expr_t *inverse_arg = arg ? (use_atanh ? expr_atanh(arg)
-                                               : expr_atan(arg))
-                                  : NULL;
+        expr_t *inverse_arg = arg ? (use_atanh ? expr_atanh(arg) : expr_atan(arg)) : NULL;
         expr_t *scaled_inverse = inverse_arg ? expr_mul_num(inverse_arg, &r0) : NULL;
         expr_t *denom_expr = scale ? expr_mul_num(scale, &denom_coeff) : NULL;
 
-        atan_part = (scaled_inverse && denom_expr) ? expr_div(scaled_inverse, denom_expr)
-                                                   : NULL;
+        atan_part = (scaled_inverse && denom_expr) ? expr_div(scaled_inverse, denom_expr) : NULL;
         atan_part = simplify_owned(atan_part);
         expr_free(denom_expr);
         expr_free(scaled_inverse);

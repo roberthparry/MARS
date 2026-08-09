@@ -92,6 +92,8 @@ endif
 # ------------------------------------------------------------
 SRCS    := $(shell find src -name '*.c' | sort)
 OBJS    := $(SRCS:src/%.c=$(BUILD_DIR)/%.o)
+QFLOAT_OBJS   := $(patsubst src/%.c,$(BUILD_DIR)/%.o,$(wildcard src/qfloat/*.c))
+QCOMPLEX_OBJS := $(patsubst src/%.c,$(BUILD_DIR)/%.o,$(wildcard src/qcomplex/*.c))
 
 TEST_ALL_SRCS     := $(shell find tests -name 'test_*.c' ! -path 'tests/test_config/*' | sort)
 TEST_SRCS         := $(shell find tests -name 'test_*.c' ! -path 'tests/test_config/*' | while read -r f; do d=$$(basename "$$(dirname "$$f")"); b=$$(basename "$$f"); if [ "$$b" = "test_$$d.c" ] || [ "$$b" = "$$d.c" ]; then printf '%s\n' "$$f"; fi; done | sort)
@@ -123,15 +125,29 @@ TEST_BINS  := $(patsubst tests/%.c,$(TEST_BUILD_DIR)/%,$(TEST_SRCS))
 # ------------------------------------------------------------
 # Default target
 # ------------------------------------------------------------
-.PHONY: all clean test memtest debug release check-deps check-jurisdiction-db-deps check-lab-deps install uninstall mars-lab to-be-announced-lab install-almanac-db uninstall-almanac-db install-jurisdiction-db uninstall-jurisdiction-db install-mars-lab uninstall-mars-lab help
+.PHONY: all clean test memtest debug release check-deps check-native-numeric-boundaries check-jurisdiction-db-deps check-lab-deps install uninstall mars-lab to-be-announced-lab install-almanac-db uninstall-almanac-db install-jurisdiction-db uninstall-jurisdiction-db install-mars-lab uninstall-mars-lab help
 
-all: $(STATIC_LIB) $(SHARED_LIB) $(TEST_BINS) $(BENCH_BINS) $(SCRATCH_BINS)
+all: check-native-numeric-boundaries $(STATIC_LIB) $(SHARED_LIB) $(TEST_BINS) $(BENCH_BINS) $(SCRATCH_BINS)
 
 debug:
 	$(MAKE) DEBUG=1 all
 
 release:
 	$(MAKE) DEBUG=0 all
+
+# qfloat and qcomplex are native double-double modules.  MPFR and MPC belong
+# to the number backend and must not leak across this module boundary.
+check-native-numeric-boundaries: $(QFLOAT_OBJS) $(QCOMPLEX_OBJS)
+	@if grep -ERn '#include[[:space:]]*[<"](mpfr|mpc)\.h|(^|[^[:alnum:]_])(mpfr_|mpc_)' \
+		include/qfloat.h include/qcomplex.h src/qfloat src/qcomplex; then \
+		echo "qfloat/qcomplex must not use MPFR or MPC."; \
+		exit 1; \
+	fi
+	@if nm -u $(QFLOAT_OBJS) $(QCOMPLEX_OBJS) \
+		| grep -Eq '[[:space:]](mpfr_|mpc_)'; then \
+		echo "qfloat/qcomplex objects contain MPFR or MPC references."; \
+		exit 1; \
+	fi
 
 # ------------------------------------------------------------
 # Dependency checks

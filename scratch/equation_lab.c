@@ -77,9 +77,7 @@ static char *expr_tex_body_dup(const expr_t *expr)
     return body ? body : expr_text_dup(expr, style_TEX);
 }
 
-static bool tex_wrapped_aligned_body(const char *tex,
-                                     const char **body_out,
-                                     size_t *body_len_out)
+static bool tex_wrapped_aligned_body(const char *tex, const char **body_out, size_t *body_len_out)
 {
     static const char prefix[] = "\\begin{aligned}[t]\n";
     static const char suffix[] = "\n\\end{aligned}";
@@ -95,16 +93,14 @@ static bool tex_wrapped_aligned_body(const char *tex,
         return false;
 
     end = tex + strlen(tex);
-    if ((size_t)(end - tex) < suffix_len ||
-        strcmp(end - suffix_len, suffix) != 0)
+    if ((size_t)(end - tex) < suffix_len || strcmp(end - suffix_len, suffix) != 0)
         return false;
 
     body = tex + strlen(prefix);
     if (*body == '&')
         body++;
     end -= suffix_len;
-    while (end > body && (end[-1] == ' ' || end[-1] == '\n' || end[-1] == '\r' ||
-                          end[-1] == '\t'))
+    while (end > body && (end[-1] == ' ' || end[-1] == '\n' || end[-1] == '\r' || end[-1] == '\t'))
         end--;
 
     if (body_out)
@@ -147,13 +143,10 @@ static char *equation_display_tex_dup(const equation_t *equation)
         goto cleanup;
 
     if (tex_wrapped_aligned_body(rhs, &rhs_body, &rhs_body_len)) {
-        needed = snprintf(NULL, 0,
-                          "\\begin{aligned}[t]\n%s ={}& %.*s\n\\end{aligned}",
-                          lhs, (int)rhs_body_len, rhs_body);
+        needed =
+            snprintf(NULL, 0, "\\begin{aligned}[t]\n%s ={}& %.*s\n\\end{aligned}", lhs, (int)rhs_body_len, rhs_body);
     } else {
-        needed = snprintf(NULL, 0,
-                          "\\begin{aligned}[t]\n%s &= %s\n\\end{aligned}",
-                          lhs, rhs);
+        needed = snprintf(NULL, 0, "\\begin{aligned}[t]\n%s &= %s\n\\end{aligned}", lhs, rhs);
     }
     if (needed < 0)
         goto cleanup;
@@ -162,13 +155,10 @@ static char *equation_display_tex_dup(const equation_t *equation)
     if (!out)
         goto cleanup;
     if (tex_wrapped_aligned_body(rhs, &rhs_body, &rhs_body_len)) {
-        snprintf(out, (size_t)needed + 1u,
-                 "\\begin{aligned}[t]\n%s ={}& %.*s\n\\end{aligned}",
-                 lhs, (int)rhs_body_len, rhs_body);
+        snprintf(out, (size_t)needed + 1u, "\\begin{aligned}[t]\n%s ={}& %.*s\n\\end{aligned}", lhs, (int)rhs_body_len,
+                 rhs_body);
     } else {
-        snprintf(out, (size_t)needed + 1u,
-                 "\\begin{aligned}[t]\n%s &= %s\n\\end{aligned}",
-                 lhs, rhs);
+        snprintf(out, (size_t)needed + 1u, "\\begin{aligned}[t]\n%s &= %s\n\\end{aligned}", lhs, rhs);
     }
 
 cleanup:
@@ -196,8 +186,7 @@ static equation_t *display_expanded_equation(const equation_t *equation)
     return equ_display_expanded(equation, wrt);
 }
 
-static expr_t *substitute_bound_constants(const expr_t *expr,
-                                          expr_bindings_t *bindings)
+static expr_t *substitute_bound_constants(const expr_t *expr, expr_bindings_t *bindings)
 {
     expr_t *current;
     bool have_constant_bindings = false;
@@ -273,8 +262,7 @@ static expr_t *substitute_bound_constants(const expr_t *expr,
     return current;
 }
 
-static equation_t *solution_with_bound_constants(const equation_t *solution,
-                                                 expr_bindings_t *bindings)
+static equation_t *solution_with_bound_constants(const equation_t *solution, expr_bindings_t *bindings)
 {
     expr_t *lhs;
     expr_t *rhs;
@@ -297,8 +285,7 @@ static equation_t *solution_with_bound_constants(const equation_t *solution,
     return out;
 }
 
-static const char *solution_binding_name(expr_bindings_t *bindings,
-                                         const equation_t *solution)
+static const char *solution_binding_name(expr_bindings_t *bindings, const equation_t *solution)
 {
     const expr_t *lhs = equ_lhs(solution);
 
@@ -317,8 +304,7 @@ static const char *solution_binding_name(expr_bindings_t *bindings,
     return NULL;
 }
 
-static size_t solution_binding_order(expr_bindings_t *bindings,
-                                     const equation_t *solution)
+static size_t solution_binding_order(expr_bindings_t *bindings, const equation_t *solution)
 {
     const expr_t *lhs = equ_lhs(solution);
     size_t count = bindings ? expr_bindings_count(bindings) : 0u;
@@ -373,8 +359,7 @@ static int compare_solution_values(number_t a, number_t b)
         number_t a_magnitude_squared = num_real_part(a_product);
         number_t b_magnitude_squared = num_real_part(b_product);
 
-        comparison = compare_real_numbers(a_magnitude_squared,
-                                          b_magnitude_squared);
+        comparison = compare_real_numbers(a_magnitude_squared, b_magnitude_squared);
         num_destroy(&b_magnitude_squared);
         num_destroy(&a_magnitude_squared);
         num_destroy(&b_product);
@@ -396,8 +381,7 @@ static int compare_solution_values(number_t a, number_t b)
         number_t a_imaginary_part = num_imag_part(a);
         number_t b_imaginary_part = num_imag_part(b);
 
-        comparison = -compare_real_numbers(a_imaginary_part,
-                                           b_imaginary_part);
+        comparison = -compare_real_numbers(a_imaginary_part, b_imaginary_part);
         num_destroy(&b_imaginary_part);
         num_destroy(&a_imaginary_part);
     }
@@ -405,9 +389,7 @@ static int compare_solution_values(number_t a, number_t b)
     return comparison;
 }
 
-static int compare_solution_indices(const equation_solutions_t *solutions,
-                                    expr_bindings_t *bindings,
-                                    size_t a_index,
+static int compare_solution_indices(const equation_solutions_t *solutions, expr_bindings_t *bindings, size_t a_index,
                                     size_t b_index)
 {
     const equation_t *a_solution = equ_solutions_at(solutions, a_index);
@@ -432,8 +414,7 @@ static int compare_solution_indices(const equation_solutions_t *solutions,
     return a_index < b_index ? -1 : a_index > b_index;
 }
 
-static size_t *ordered_solution_indices(const equation_solutions_t *solutions,
-                                        expr_bindings_t *bindings)
+static size_t *ordered_solution_indices(const equation_solutions_t *solutions, expr_bindings_t *bindings)
 {
     size_t count = equ_solutions_count(solutions);
     size_t *indices = malloc(count * sizeof(*indices));
@@ -448,9 +429,7 @@ static size_t *ordered_solution_indices(const equation_solutions_t *solutions,
         size_t current = indices[i];
         size_t j = i;
 
-        while (j > 0u &&
-               compare_solution_indices(solutions, bindings,
-                                        current, indices[j - 1u]) < 0) {
+        while (j > 0u && compare_solution_indices(solutions, bindings, current, indices[j - 1u]) < 0) {
             indices[j] = indices[j - 1u];
             j--;
         }
@@ -460,17 +439,12 @@ static size_t *ordered_solution_indices(const equation_solutions_t *solutions,
     return indices;
 }
 
-static const equation_t *ordered_solution_at(
-    const equation_solutions_t *solutions,
-    const size_t *order,
-    size_t index)
+static const equation_t *ordered_solution_at(const equation_solutions_t *solutions, const size_t *order, size_t index)
 {
     return equ_solutions_at(solutions, order ? order[index] : index);
 }
 
-static void print_solutions(const equation_solutions_t *solutions,
-                            expr_bindings_t *bindings,
-                            const size_t *order)
+static void print_solutions(const equation_solutions_t *solutions, expr_bindings_t *bindings, const size_t *order)
 {
     size_t count = equ_solutions_count(solutions);
 
@@ -488,20 +462,16 @@ static void print_solutions(const equation_solutions_t *solutions,
         char *text = equ_text_dup(shown, style_UNBOUND);
 
         if (name && rhs_text)
-            printf("%s%s = %s\n", i == 0u ? "solutions   " : "            ",
-                   name, rhs_text);
+            printf("%s%s = %s\n", i == 0u ? "solutions   " : "            ", name, rhs_text);
         else
-            printf("%s%s\n", i == 0u ? "solutions   " : "            ",
-                   text ? text : "(null)");
+            printf("%s%s\n", i == 0u ? "solutions   " : "            ", text ? text : "(null)");
         equ_free(display);
         free(text);
         free(rhs_text);
     }
 }
 
-static void print_solutions_tex(const equation_solutions_t *solutions,
-                                expr_bindings_t *bindings,
-                                const size_t *order)
+static void print_solutions_tex(const equation_solutions_t *solutions, expr_bindings_t *bindings, const size_t *order)
 {
     size_t count = equ_solutions_count(solutions);
 
@@ -522,8 +492,7 @@ static void print_solutions_tex(const equation_solutions_t *solutions,
         if (name && rhs_tex) {
             printf("%s", i == 0u ? " " : " \\\\\n");
             print_aligned_equation_fragment(name, rhs_tex);
-        }
-        else
+        } else
             printf("%s%s", i == 0u ? " " : " \\\\\n", tex ? tex : "\\text{null}");
         equ_free(display);
         free(tex);
@@ -579,9 +548,7 @@ static const char *sample_note(bool sampled_k, bool sampled_n)
     return "";
 }
 
-static number_t eval_solution_rhs_with_sampled_indices(const expr_t *rhs,
-                                                       bool *sampled_k_out,
-                                                       bool *sampled_n_out)
+static number_t eval_solution_rhs_with_sampled_indices(const expr_t *rhs, bool *sampled_k_out, bool *sampled_n_out)
 {
     number_t value;
 
@@ -632,10 +599,8 @@ static number_t eval_solution_rhs_with_sampled_indices(const expr_t *rhs,
     return value;
 }
 
-static void print_solution_numerics(const equation_solutions_t *solutions,
-                                    expr_bindings_t *bindings,
-                                    const size_t *order,
-                                    int precision)
+static void print_solution_numerics(const equation_solutions_t *solutions, expr_bindings_t *bindings,
+                                    const size_t *order, int precision)
 {
     size_t count = equ_solutions_count(solutions);
 
@@ -651,19 +616,14 @@ static void print_solution_numerics(const equation_solutions_t *solutions,
         const equation_t *shown = display ? display : solution;
         bool sampled_k = false;
         bool sampled_n = false;
-        number_t value = eval_solution_rhs_with_sampled_indices(equ_rhs(shown),
-                                                                &sampled_k,
-                                                                &sampled_n);
+        number_t value = eval_solution_rhs_with_sampled_indices(equ_rhs(shown), &sampled_k, &sampled_n);
         char *value_text = number_precision_text_dup(value, precision);
         const char *note = sample_note(sampled_k, sampled_n);
 
         if (name && value_text)
-            printf("%s%s ≈ %s%s\n", i == 0u ? "numeric     " : "            ",
-                   name, value_text, note);
+            printf("%s%s ≈ %s%s\n", i == 0u ? "numeric     " : "            ", name, value_text, note);
         else
-            printf("%s%s%s\n", i == 0u ? "numeric     " : "            ",
-                   value_text ? value_text : "(null)",
-                   note);
+            printf("%s%s%s\n", i == 0u ? "numeric     " : "            ", value_text ? value_text : "(null)", note);
 
         free(value_text);
         num_destroy(&value);
@@ -671,12 +631,8 @@ static void print_solution_numerics(const equation_solutions_t *solutions,
     }
 }
 
-static void print_equation_fields(const equation_t *equation,
-                                  const equation_solutions_t *solutions,
-                                  expr_bindings_t *bindings,
-                                  const char *input,
-                                  const char *status,
-                                  int precision)
+static void print_equation_fields(const equation_t *equation, const equation_solutions_t *solutions,
+                                  expr_bindings_t *bindings, const char *input, const char *status, int precision)
 {
     expr_t *residual = equ_residual(equation);
     expr_t *display_residual = residual ? expr_display_simplified(residual) : NULL;
@@ -741,8 +697,7 @@ int main(int argc, char **argv)
         status = "solved";
 
     if (rc == 0)
-        print_equation_fields(equation, solutions, equ_bindings(equation),
-                              input, status, precision);
+        print_equation_fields(equation, solutions, equ_bindings(equation), input, status, precision);
     else
         fprintf(stderr, "could not solve equation\n");
 

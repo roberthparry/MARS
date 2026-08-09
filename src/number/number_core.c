@@ -25,7 +25,7 @@ typedef struct number_scope_record_t {
 #define NUMBER_SCOPE_ARENA_BLOCK_BYTES 16384u
 #define NUMBER_SCOPE_ALLOC_MAGIC 0x4e53434fu
 #define NUMBER_SCOPE_ALLOC_DESTROYED 0x1u
-#define NUMBER_SCOPE_ALLOC_TRACKED   0x2u
+#define NUMBER_SCOPE_ALLOC_TRACKED 0x2u
 
 typedef struct number_scope_block_t {
     struct number_scope_block_t *next;
@@ -68,57 +68,44 @@ static bool number_value_is_immortal(const number_t *number);
 void number_destroy_none(number_t *number);
 
 const number_math_family_t number_math_family_binary_table[][NUMBER_MATH_COMPLEX + 1] = {
-    [NUMBER_MATH_INVALID] = {
-        [NUMBER_MATH_INVALID] = NUMBER_MATH_INVALID,
-        [NUMBER_MATH_QREAL] = NUMBER_MATH_INVALID,
-        [NUMBER_MATH_QCOMPLEX] = NUMBER_MATH_INVALID,
-        [NUMBER_MATH_MPFR] = NUMBER_MATH_INVALID,
-        [NUMBER_MATH_COMPLEX] = NUMBER_MATH_INVALID
-    },
-    [NUMBER_MATH_QREAL] = {
-        [NUMBER_MATH_INVALID] = NUMBER_MATH_INVALID,
-        [NUMBER_MATH_QREAL] = NUMBER_MATH_QREAL,
-        [NUMBER_MATH_QCOMPLEX] = NUMBER_MATH_QCOMPLEX,
-        [NUMBER_MATH_MPFR] = NUMBER_MATH_MPFR,
-        [NUMBER_MATH_COMPLEX] = NUMBER_MATH_COMPLEX
-    },
-    [NUMBER_MATH_QCOMPLEX] = {
-        [NUMBER_MATH_INVALID] = NUMBER_MATH_INVALID,
-        [NUMBER_MATH_QREAL] = NUMBER_MATH_QCOMPLEX,
-        [NUMBER_MATH_QCOMPLEX] = NUMBER_MATH_QCOMPLEX,
-        [NUMBER_MATH_MPFR] = NUMBER_MATH_COMPLEX,
-        [NUMBER_MATH_COMPLEX] = NUMBER_MATH_COMPLEX
-    },
-    [NUMBER_MATH_MPFR] = {
-        [NUMBER_MATH_INVALID] = NUMBER_MATH_INVALID,
-        [NUMBER_MATH_QREAL] = NUMBER_MATH_MPFR,
-        [NUMBER_MATH_QCOMPLEX] = NUMBER_MATH_COMPLEX,
-        [NUMBER_MATH_MPFR] = NUMBER_MATH_MPFR,
-        [NUMBER_MATH_COMPLEX] = NUMBER_MATH_COMPLEX
-    },
-    [NUMBER_MATH_COMPLEX] = {
-        [NUMBER_MATH_INVALID] = NUMBER_MATH_INVALID,
-        [NUMBER_MATH_QREAL] = NUMBER_MATH_COMPLEX,
-        [NUMBER_MATH_QCOMPLEX] = NUMBER_MATH_COMPLEX,
-        [NUMBER_MATH_MPFR] = NUMBER_MATH_COMPLEX,
-        [NUMBER_MATH_COMPLEX] = NUMBER_MATH_COMPLEX
-    }
-};
+    [NUMBER_MATH_INVALID] = {[NUMBER_MATH_INVALID] = NUMBER_MATH_INVALID,
+                             [NUMBER_MATH_QREAL] = NUMBER_MATH_INVALID,
+                             [NUMBER_MATH_QCOMPLEX] = NUMBER_MATH_INVALID,
+                             [NUMBER_MATH_MPFR] = NUMBER_MATH_INVALID,
+                             [NUMBER_MATH_COMPLEX] = NUMBER_MATH_INVALID},
+    [NUMBER_MATH_QREAL] = {[NUMBER_MATH_INVALID] = NUMBER_MATH_INVALID,
+                           [NUMBER_MATH_QREAL] = NUMBER_MATH_QREAL,
+                           [NUMBER_MATH_QCOMPLEX] = NUMBER_MATH_QCOMPLEX,
+                           [NUMBER_MATH_MPFR] = NUMBER_MATH_MPFR,
+                           [NUMBER_MATH_COMPLEX] = NUMBER_MATH_COMPLEX},
+    [NUMBER_MATH_QCOMPLEX] = {[NUMBER_MATH_INVALID] = NUMBER_MATH_INVALID,
+                              [NUMBER_MATH_QREAL] = NUMBER_MATH_QCOMPLEX,
+                              [NUMBER_MATH_QCOMPLEX] = NUMBER_MATH_QCOMPLEX,
+                              [NUMBER_MATH_MPFR] = NUMBER_MATH_COMPLEX,
+                              [NUMBER_MATH_COMPLEX] = NUMBER_MATH_COMPLEX},
+    [NUMBER_MATH_MPFR] = {[NUMBER_MATH_INVALID] = NUMBER_MATH_INVALID,
+                          [NUMBER_MATH_QREAL] = NUMBER_MATH_MPFR,
+                          [NUMBER_MATH_QCOMPLEX] = NUMBER_MATH_COMPLEX,
+                          [NUMBER_MATH_MPFR] = NUMBER_MATH_MPFR,
+                          [NUMBER_MATH_COMPLEX] = NUMBER_MATH_COMPLEX},
+    [NUMBER_MATH_COMPLEX] = {[NUMBER_MATH_INVALID] = NUMBER_MATH_INVALID,
+                             [NUMBER_MATH_QREAL] = NUMBER_MATH_COMPLEX,
+                             [NUMBER_MATH_QCOMPLEX] = NUMBER_MATH_COMPLEX,
+                             [NUMBER_MATH_MPFR] = NUMBER_MATH_COMPLEX,
+                             [NUMBER_MATH_COMPLEX] = NUMBER_MATH_COMPLEX}};
 
-const number_kind_t number_math_family_target_kind_table[] = {
-    [NUMBER_MATH_INVALID] = NUMBER_INVALID,
-    [NUMBER_MATH_QREAL] = NUMBER_QFLOAT,
-    [NUMBER_MATH_QCOMPLEX] = NUMBER_QCOMPLEX,
-    [NUMBER_MATH_MPFR] = NUMBER_MPFR,
-    [NUMBER_MATH_COMPLEX] = NUMBER_COMPLEX
-};
+const number_kind_t number_math_family_target_kind_table[] = {[NUMBER_MATH_INVALID] = NUMBER_INVALID,
+                                                              [NUMBER_MATH_QREAL] = NUMBER_QFLOAT,
+                                                              [NUMBER_MATH_QCOMPLEX] = NUMBER_QCOMPLEX,
+                                                              [NUMBER_MATH_MPFR] = NUMBER_MPFR,
+                                                              [NUMBER_MATH_COMPLEX] = NUMBER_COMPLEX};
 
 size_t number_default_precision_bits = 1024u;
 
 _Static_assert(sizeof(number_private_t) <= sizeof(number_t),
-    "number_t public storage is too small for internal representation");
+               "number_t public storage is too small for internal representation");
 _Static_assert(_Alignof(number_private_t) <= _Alignof(number_t),
-    "number_t public storage alignment is too small for internal representation");
+               "number_t public storage alignment is too small for internal representation");
 
 typedef struct {
     const char *name;
@@ -135,155 +122,148 @@ enum {
 };
 
 static const unsigned char number_constant_hash_g[NUMBER_CONSTANT_HASH_VERTEX_COUNT] = {
-      9,  35,  81,  30,  34,  22,  81,  37,  70, 105,   0,  32, 116,   0,  12,  20,
-     63,  86,   0,  97,  46,  74,  99,   0,  67,  37,  44,  52,   0,  48,  33,  34,
-     11,  48,  56,   1, 123, 120,  45,  67,   1,   0, 101,   0,   2, 125, 102,   0,
-     94,  72,   8,  23,   0,  34, 111,  29,  24,  48,   0,  11,   0,  48,   0,  67,
-      0,  89,  88,  16,   0,  18,  60,  95, 103,   6,  34,  31,  56,  62,  68,  95,
-     84,   2, 126,   0,  21,  39,   0, 113, 118,  12,  74, 102,  87,   0,  16, 123,
-     92,  63,   4,  61,  29,   4,  76,  66,  78,  38, 127,  80, 111,   0,  64,  74,
-    108, 124,  66, 106,  71,  19, 112,  90,  27,  81,   0,  23,   0,  83,  13,  19,
-     98,   2,  46,  31,  69,  94, 109,  94,  97, 100,  81,  14,   6,  18,  66, 110,
-    110,  53,  78,   0, 106
-};
+    9,  35, 81, 30, 34,  22, 81,  37,  70,  105, 0,  32,  116, 0,   12, 20,  63,  86,  0,   97,  46,  74,  99,  0,  67,
+    37, 44, 52, 0,  48,  33, 34,  11,  48,  56,  1,  123, 120, 45,  67, 1,   0,   101, 0,   2,   125, 102, 0,   94, 72,
+    8,  23, 0,  34, 111, 29, 24,  48,  0,   11,  0,  48,  0,   67,  0,  89,  88,  16,  0,   18,  60,  95,  103, 6,  34,
+    31, 56, 62, 68, 95,  84, 2,   126, 0,   21,  39, 0,   113, 118, 12, 74,  102, 87,  0,   16,  123, 92,  63,  4,  61,
+    29, 4,  76, 66, 78,  38, 127, 80,  111, 0,   64, 74,  108, 124, 66, 106, 71,  19,  112, 90,  27,  81,  0,   23, 0,
+    83, 13, 19, 98, 2,   46, 31,  69,  94,  109, 94, 97,  100, 81,  14, 6,   18,  66,  110, 110, 53,  78,  0,   106};
 
 static const number_constant_name_t number_constant_names[NUMBER_CONSTANT_NAME_COUNT] = {
-    [  0] = { "1/e", &NUM_INV_E, true },
-    [  1] = { "1/ln(2)", &NUM_INVLN2, true },
-    [  2] = { "2*pi", &NUM_2PI, false },
-    [  3] = { "log(sqrt(2@pi))", &NUM_LOG_SQRT_2PI, false },
-    [  4] = { "-pi/2", &NUM_NEG_PI_2, false },
-    [  5] = { "π²", &NUM_PI_SQUARED, true },
-    [  6] = { "ln(2*pi)", &NUM_LN_2PI, false },
-    [  7] = { "(2pi)^3", &NUM_2PI_CUBED, false },
-    [  8] = { "sqrt(@pi)", &NUM_SQRT_PI, false },
-    [  9] = { "-π/2", &NUM_NEG_PI_2, true },
-    [ 10] = { "∞", &NUM_INF, true },
-    [ 11] = { "1/sqrt(pi)", &NUM_SQRT1ONPI, false },
-    [ 12] = { "10", &NUM_TEN, true },
-    [ 13] = { "2/sqrt(pi)", &NUM_2_SQRTPI, false },
-    [ 14] = { "π/2", &NUM_PI_2, true },
-    [ 15] = { "π/3", &NUM_PI_3, true },
-    [ 16] = { "π/6", &NUM_PI_6, true },
-    [ 17] = { "π/4", &NUM_PI_4, true },
-    [ 18] = { "pi", &NUM_PI, false },
-    [ 19] = { "1/√(2π)", &NUM_INV_SQRT_2PI, true },
-    [ 20] = { "sqrt(2)/2", &NUM_SQRT2_OVER_TWO, false },
-    [ 21] = { "pi^2", &NUM_PI_SQUARED, false },
-    [ 22] = { "2/@pi", &NUM_2_PI, false },
-    [ 23] = { "0", &NUM_ZERO, true },
-    [ 24] = { "1", &NUM_ONE, true },
-    [ 25] = { "2", &NUM_TWO, true },
-    [ 26] = { "sqrt2/2", &NUM_SQRT2_OVER_TWO, false },
-    [ 27] = { "√2", &NUM_SQRT2, true },
-    [ 28] = { "√3", &NUM_SQRT3, true },
-    [ 29] = { "log(sqrt(2*pi))", &NUM_LOG_SQRT_2PI, false },
-    [ 30] = { "-1", &NUM_NEG_ONE, true },
-    [ 31] = { "-@pi/2", &NUM_NEG_PI_2, false },
-    [ 32] = { "ln10", &NUM_LN10, false },
-    [ 33] = { "sqrt_pi_over_two", &NUM_SQRT_PI_OVER_TWO, false },
-    [ 34] = { "@pi^2", &NUM_PI_SQUARED, false },
-    [ 35] = { "sqrt(@pi/2)", &NUM_SQRT_PI_OVER_TWO, false },
-    [ 36] = { "3π/4", &NUM_3PI_4, true },
-    [ 37] = { "i", &NUM_I, true },
-    [ 38] = { "1/ln2", &NUM_INVLN2, false },
-    [ 39] = { "3*pi/4", &NUM_3PI_4, false },
-    [ 40] = { "e", &NUM_E, true },
-    [ 41] = { "-i", &NUM_NEG_I, true },
-    [ 42] = { "sqrt(2@pi)", &NUM_SQRT_2PI, false },
-    [ 43] = { "√π", &NUM_SQRT_PI, true },
-    [ 44] = { "-2/√π", &NUM_NEG_TWO_OVER_SQRT_PI, true },
-    [ 45] = { "-2/sqrt(@pi)", &NUM_NEG_TWO_OVER_SQRT_PI, false },
-    [ 46] = { "1/sqrt(@pi)", &NUM_SQRT1ONPI, false },
-    [ 47] = { "2π", &NUM_2PI, true },
-    [ 48] = { "inf", &NUM_INF, false },
-    [ 49] = { "(2@pi)^3", &NUM_2PI_CUBED, false },
-    [ 50] = { "(2*pi)^3", &NUM_2PI_CUBED, false },
-    [ 51] = { "1/sqrt_pi", &NUM_SQRT1ONPI, false },
-    [ 52] = { "phi", &NUM_PHI, false },
-    [ 53] = { "sqrt(3)/2", &NUM_SQRT3_OVER_TWO, false },
-    [ 54] = { "NaN", &NUM_NAN, true },
-    [ 55] = { "@pi/6", &NUM_PI_6, false },
-    [ 56] = { "@pi/4", &NUM_PI_4, false },
-    [ 57] = { "-1/e", &NUM_NEG_INV_E, true },
-    [ 58] = { "@pi/2", &NUM_PI_2, false },
-    [ 59] = { "@pi/3", &NUM_PI_3, false },
-    [ 60] = { "√(2π)", &NUM_SQRT_2PI, true },
-    [ 61] = { "log(√(2π))", &NUM_LOG_SQRT_2PI, true },
-    [ 62] = { "nan", &NUM_NAN, false },
-    [ 63] = { "1/sqrt(2*pi)", &NUM_INV_SQRT_2PI, false },
-    [ 64] = { "2pi", &NUM_2PI, false },
-    [ 65] = { "sqrt3/2", &NUM_SQRT3_OVER_TWO, false },
-    [ 66] = { "3/2", &NUM_ONE_AND_HALF, true },
-    [ 67] = { "ln(2π)", &NUM_LN_2PI, true },
-    [ 68] = { "sqrt_pi", &NUM_SQRT_PI, false },
-    [ 69] = { "2/pi", &NUM_2_PI, false },
-    [ 70] = { "-infinity", &NUM_NINF, false },
-    [ 71] = { "gamma", &NUM_EULER_MASCHERONI, false },
-    [ 72] = { "1/sqrt(2@pi)", &NUM_INV_SQRT_2PI, false },
-    [ 73] = { "√3/2", &NUM_SQRT3_OVER_TWO, true },
-    [ 74] = { "-2/sqrt(pi)", &NUM_NEG_TWO_OVER_SQRT_PI, false },
-    [ 75] = { "√2/2", &NUM_SQRT2_OVER_TWO, true },
-    [ 76] = { "2/sqrt(@pi)", &NUM_2_SQRTPI, false },
-    [ 77] = { "(2π)³", &NUM_2PI_CUBED, true },
-    [ 78] = { "2/π", &NUM_2_PI, true },
-    [ 79] = { "@phi", &NUM_PHI, false },
-    [ 80] = { "ln2", &NUM_LN2, false },
-    [ 81] = { "2/sqrt_pi", &NUM_2_SQRTPI, false },
-    [ 82] = { "ln(2pi)", &NUM_LN_2PI, false },
-    [ 83] = { "-2/sqrt_pi", &NUM_NEG_TWO_OVER_SQRT_PI, false },
-    [ 84] = { "ln(2)", &NUM_LN2, true },
-    [ 85] = { "3@pi/4", &NUM_3PI_4, false },
-    [ 86] = { "@pi", &NUM_PI, false },
-    [ 87] = { "√(π/2)", &NUM_SQRT_PI_OVER_TWO, true },
-    [ 88] = { "sqrt(2pi)", &NUM_SQRT_2PI, false },
-    [ 89] = { "-∞", &NUM_NINF, true },
-    [ 90] = { "@gamma", &NUM_EULER_MASCHERONI, false },
-    [ 91] = { "sqrt(1/2)", &NUM_SQRT_HALF, false },
-    [ 92] = { "1/√π", &NUM_SQRT1ONPI, true },
-    [ 93] = { "ln(2@pi)", &NUM_LN_2PI, false },
-    [ 94] = { "1/10", &NUM_ONE_TENTH, true },
-    [ 95] = { "log(sqrt_2pi)", &NUM_LOG_SQRT_2PI, false },
-    [ 96] = { "3pi/4", &NUM_3PI_4, false },
-    [ 97] = { "invln2", &NUM_INVLN2, false },
-    [ 98] = { "sqrt_2pi", &NUM_SQRT_2PI, false },
-    [ 99] = { "sqrt(2*pi)", &NUM_SQRT_2PI, false },
-    [100] = { "sqrt(pi/2)", &NUM_SQRT_PI_OVER_TWO, false },
-    [101] = { "2@pi", &NUM_2PI, false },
-    [102] = { "sqrt(2)", &NUM_SQRT2, false },
-    [103] = { "sqrt(pi)", &NUM_SQRT_PI, false },
-    [104] = { "2/√π", &NUM_2_SQRTPI, true },
-    [105] = { "infinity", &NUM_INF, false },
-    [106] = { "ln(10)", &NUM_LN10, true },
-    [107] = { "1/sqrt_2pi", &NUM_INV_SQRT_2PI, false },
-    [108] = { "sqrt(3)", &NUM_SQRT3, false },
-    [109] = { "log(sqrt(2pi))", &NUM_LOG_SQRT_2PI, false },
-    [110] = { "1/3", &NUM_ONE_THIRD, true },
-    [111] = { "1/2", &NUM_HALF, true },
-    [112] = { "1/4", &NUM_QUARTER, true },
-    [113] = { "1/6", &NUM_ONE_SIXTH, true },
-    [114] = { "1/8", &NUM_ONE_EIGHTH, true },
-    [115] = { "sqrt2", &NUM_SQRT2, false },
-    [116] = { "sqrt3", &NUM_SQRT3, false },
-    [117] = { "pi/4", &NUM_PI_4, false },
-    [118] = { "pi/6", &NUM_PI_6, false },
-    [119] = { "pi/2", &NUM_PI_2, false },
-    [120] = { "pi/3", &NUM_PI_3, false },
-    [121] = { "sqrt_half", &NUM_SQRT_HALF, false },
-    [122] = { "1/sqrt(2pi)", &NUM_INV_SQRT_2PI, false },
-    [123] = { "φ", &NUM_PHI, true },
-    [124] = { "π", &NUM_PI, true },
-    [125] = { "-inf", &NUM_NINF, false },
-    [126] = { "γ", &NUM_EULER_MASCHERONI, true },
-    [127] = { "√(1/2)", &NUM_SQRT_HALF, true },
+    [0] = {"1/e", &NUM_INV_E, true},
+    [1] = {"1/ln(2)", &NUM_INVLN2, true},
+    [2] = {"2*pi", &NUM_2PI, false},
+    [3] = {"log(sqrt(2@pi))", &NUM_LOG_SQRT_2PI, false},
+    [4] = {"-pi/2", &NUM_NEG_PI_2, false},
+    [5] = {"π²", &NUM_PI_SQUARED, true},
+    [6] = {"ln(2*pi)", &NUM_LN_2PI, false},
+    [7] = {"(2pi)^3", &NUM_2PI_CUBED, false},
+    [8] = {"sqrt(@pi)", &NUM_SQRT_PI, false},
+    [9] = {"-π/2", &NUM_NEG_PI_2, true},
+    [10] = {"∞", &NUM_INF, true},
+    [11] = {"1/sqrt(pi)", &NUM_SQRT1ONPI, false},
+    [12] = {"10", &NUM_TEN, true},
+    [13] = {"2/sqrt(pi)", &NUM_2_SQRTPI, false},
+    [14] = {"π/2", &NUM_PI_2, true},
+    [15] = {"π/3", &NUM_PI_3, true},
+    [16] = {"π/6", &NUM_PI_6, true},
+    [17] = {"π/4", &NUM_PI_4, true},
+    [18] = {"pi", &NUM_PI, false},
+    [19] = {"1/√(2π)", &NUM_INV_SQRT_2PI, true},
+    [20] = {"sqrt(2)/2", &NUM_SQRT2_OVER_TWO, false},
+    [21] = {"pi^2", &NUM_PI_SQUARED, false},
+    [22] = {"2/@pi", &NUM_2_PI, false},
+    [23] = {"0", &NUM_ZERO, true},
+    [24] = {"1", &NUM_ONE, true},
+    [25] = {"2", &NUM_TWO, true},
+    [26] = {"sqrt2/2", &NUM_SQRT2_OVER_TWO, false},
+    [27] = {"√2", &NUM_SQRT2, true},
+    [28] = {"√3", &NUM_SQRT3, true},
+    [29] = {"log(sqrt(2*pi))", &NUM_LOG_SQRT_2PI, false},
+    [30] = {"-1", &NUM_NEG_ONE, true},
+    [31] = {"-@pi/2", &NUM_NEG_PI_2, false},
+    [32] = {"ln10", &NUM_LN10, false},
+    [33] = {"sqrt_pi_over_two", &NUM_SQRT_PI_OVER_TWO, false},
+    [34] = {"@pi^2", &NUM_PI_SQUARED, false},
+    [35] = {"sqrt(@pi/2)", &NUM_SQRT_PI_OVER_TWO, false},
+    [36] = {"3π/4", &NUM_3PI_4, true},
+    [37] = {"i", &NUM_I, true},
+    [38] = {"1/ln2", &NUM_INVLN2, false},
+    [39] = {"3*pi/4", &NUM_3PI_4, false},
+    [40] = {"e", &NUM_E, true},
+    [41] = {"-i", &NUM_NEG_I, true},
+    [42] = {"sqrt(2@pi)", &NUM_SQRT_2PI, false},
+    [43] = {"√π", &NUM_SQRT_PI, true},
+    [44] = {"-2/√π", &NUM_NEG_TWO_OVER_SQRT_PI, true},
+    [45] = {"-2/sqrt(@pi)", &NUM_NEG_TWO_OVER_SQRT_PI, false},
+    [46] = {"1/sqrt(@pi)", &NUM_SQRT1ONPI, false},
+    [47] = {"2π", &NUM_2PI, true},
+    [48] = {"inf", &NUM_INF, false},
+    [49] = {"(2@pi)^3", &NUM_2PI_CUBED, false},
+    [50] = {"(2*pi)^3", &NUM_2PI_CUBED, false},
+    [51] = {"1/sqrt_pi", &NUM_SQRT1ONPI, false},
+    [52] = {"phi", &NUM_PHI, false},
+    [53] = {"sqrt(3)/2", &NUM_SQRT3_OVER_TWO, false},
+    [54] = {"NaN", &NUM_NAN, true},
+    [55] = {"@pi/6", &NUM_PI_6, false},
+    [56] = {"@pi/4", &NUM_PI_4, false},
+    [57] = {"-1/e", &NUM_NEG_INV_E, true},
+    [58] = {"@pi/2", &NUM_PI_2, false},
+    [59] = {"@pi/3", &NUM_PI_3, false},
+    [60] = {"√(2π)", &NUM_SQRT_2PI, true},
+    [61] = {"log(√(2π))", &NUM_LOG_SQRT_2PI, true},
+    [62] = {"nan", &NUM_NAN, false},
+    [63] = {"1/sqrt(2*pi)", &NUM_INV_SQRT_2PI, false},
+    [64] = {"2pi", &NUM_2PI, false},
+    [65] = {"sqrt3/2", &NUM_SQRT3_OVER_TWO, false},
+    [66] = {"3/2", &NUM_ONE_AND_HALF, true},
+    [67] = {"ln(2π)", &NUM_LN_2PI, true},
+    [68] = {"sqrt_pi", &NUM_SQRT_PI, false},
+    [69] = {"2/pi", &NUM_2_PI, false},
+    [70] = {"-infinity", &NUM_NINF, false},
+    [71] = {"gamma", &NUM_EULER_MASCHERONI, false},
+    [72] = {"1/sqrt(2@pi)", &NUM_INV_SQRT_2PI, false},
+    [73] = {"√3/2", &NUM_SQRT3_OVER_TWO, true},
+    [74] = {"-2/sqrt(pi)", &NUM_NEG_TWO_OVER_SQRT_PI, false},
+    [75] = {"√2/2", &NUM_SQRT2_OVER_TWO, true},
+    [76] = {"2/sqrt(@pi)", &NUM_2_SQRTPI, false},
+    [77] = {"(2π)³", &NUM_2PI_CUBED, true},
+    [78] = {"2/π", &NUM_2_PI, true},
+    [79] = {"@phi", &NUM_PHI, false},
+    [80] = {"ln2", &NUM_LN2, false},
+    [81] = {"2/sqrt_pi", &NUM_2_SQRTPI, false},
+    [82] = {"ln(2pi)", &NUM_LN_2PI, false},
+    [83] = {"-2/sqrt_pi", &NUM_NEG_TWO_OVER_SQRT_PI, false},
+    [84] = {"ln(2)", &NUM_LN2, true},
+    [85] = {"3@pi/4", &NUM_3PI_4, false},
+    [86] = {"@pi", &NUM_PI, false},
+    [87] = {"√(π/2)", &NUM_SQRT_PI_OVER_TWO, true},
+    [88] = {"sqrt(2pi)", &NUM_SQRT_2PI, false},
+    [89] = {"-∞", &NUM_NINF, true},
+    [90] = {"@gamma", &NUM_EULER_MASCHERONI, false},
+    [91] = {"sqrt(1/2)", &NUM_SQRT_HALF, false},
+    [92] = {"1/√π", &NUM_SQRT1ONPI, true},
+    [93] = {"ln(2@pi)", &NUM_LN_2PI, false},
+    [94] = {"1/10", &NUM_ONE_TENTH, true},
+    [95] = {"log(sqrt_2pi)", &NUM_LOG_SQRT_2PI, false},
+    [96] = {"3pi/4", &NUM_3PI_4, false},
+    [97] = {"invln2", &NUM_INVLN2, false},
+    [98] = {"sqrt_2pi", &NUM_SQRT_2PI, false},
+    [99] = {"sqrt(2*pi)", &NUM_SQRT_2PI, false},
+    [100] = {"sqrt(pi/2)", &NUM_SQRT_PI_OVER_TWO, false},
+    [101] = {"2@pi", &NUM_2PI, false},
+    [102] = {"sqrt(2)", &NUM_SQRT2, false},
+    [103] = {"sqrt(pi)", &NUM_SQRT_PI, false},
+    [104] = {"2/√π", &NUM_2_SQRTPI, true},
+    [105] = {"infinity", &NUM_INF, false},
+    [106] = {"ln(10)", &NUM_LN10, true},
+    [107] = {"1/sqrt_2pi", &NUM_INV_SQRT_2PI, false},
+    [108] = {"sqrt(3)", &NUM_SQRT3, false},
+    [109] = {"log(sqrt(2pi))", &NUM_LOG_SQRT_2PI, false},
+    [110] = {"1/3", &NUM_ONE_THIRD, true},
+    [111] = {"1/2", &NUM_HALF, true},
+    [112] = {"1/4", &NUM_QUARTER, true},
+    [113] = {"1/6", &NUM_ONE_SIXTH, true},
+    [114] = {"1/8", &NUM_ONE_EIGHTH, true},
+    [115] = {"sqrt2", &NUM_SQRT2, false},
+    [116] = {"sqrt3", &NUM_SQRT3, false},
+    [117] = {"pi/4", &NUM_PI_4, false},
+    [118] = {"pi/6", &NUM_PI_6, false},
+    [119] = {"pi/2", &NUM_PI_2, false},
+    [120] = {"pi/3", &NUM_PI_3, false},
+    [121] = {"sqrt_half", &NUM_SQRT_HALF, false},
+    [122] = {"1/sqrt(2pi)", &NUM_INV_SQRT_2PI, false},
+    [123] = {"φ", &NUM_PHI, true},
+    [124] = {"π", &NUM_PI, true},
+    [125] = {"-inf", &NUM_NINF, false},
+    [126] = {"γ", &NUM_EULER_MASCHERONI, true},
+    [127] = {"√(1/2)", &NUM_SQRT_HALF, true},
 };
 
-_Static_assert(NUMBER_CONSTANT_NAME_COUNT ==
-               sizeof(number_constant_names) / sizeof(number_constant_names[0]),
-    "number constant name count mismatch");
-_Static_assert(NUMBER_CONSTANT_HASH_VERTEX_COUNT ==
-               sizeof(number_constant_hash_g) / sizeof(number_constant_hash_g[0]),
-    "number constant hash vertex count mismatch");
+_Static_assert(NUMBER_CONSTANT_NAME_COUNT == sizeof(number_constant_names) / sizeof(number_constant_names[0]),
+               "number constant name count mismatch");
+_Static_assert(NUMBER_CONSTANT_HASH_VERTEX_COUNT == sizeof(number_constant_hash_g) / sizeof(number_constant_hash_g[0]),
+               "number constant hash vertex count mismatch");
 
 static size_t number_constant_name_count(void)
 {
@@ -300,28 +280,19 @@ static uint32_t number_constant_hash_feed_rune(uint32_t hash, uint32_t rune)
     if (rune <= 0x7fu)
         return number_constant_hash_feed_byte(hash, (unsigned char)rune);
     if (rune <= 0x7ffu) {
-        hash = number_constant_hash_feed_byte(hash,
-            (unsigned char)(0xc0u | (rune >> 6)));
-        return number_constant_hash_feed_byte(hash,
-            (unsigned char)(0x80u | (rune & 0x3fu)));
+        hash = number_constant_hash_feed_byte(hash, (unsigned char)(0xc0u | (rune >> 6)));
+        return number_constant_hash_feed_byte(hash, (unsigned char)(0x80u | (rune & 0x3fu)));
     }
     if (rune <= 0xffffu) {
-        hash = number_constant_hash_feed_byte(hash,
-            (unsigned char)(0xe0u | (rune >> 12)));
-        hash = number_constant_hash_feed_byte(hash,
-            (unsigned char)(0x80u | ((rune >> 6) & 0x3fu)));
-        return number_constant_hash_feed_byte(hash,
-            (unsigned char)(0x80u | (rune & 0x3fu)));
+        hash = number_constant_hash_feed_byte(hash, (unsigned char)(0xe0u | (rune >> 12)));
+        hash = number_constant_hash_feed_byte(hash, (unsigned char)(0x80u | ((rune >> 6) & 0x3fu)));
+        return number_constant_hash_feed_byte(hash, (unsigned char)(0x80u | (rune & 0x3fu)));
     }
 
-    hash = number_constant_hash_feed_byte(hash,
-        (unsigned char)(0xf0u | (rune >> 18)));
-    hash = number_constant_hash_feed_byte(hash,
-        (unsigned char)(0x80u | ((rune >> 12) & 0x3fu)));
-    hash = number_constant_hash_feed_byte(hash,
-        (unsigned char)(0x80u | ((rune >> 6) & 0x3fu)));
-    return number_constant_hash_feed_byte(hash,
-        (unsigned char)(0x80u | (rune & 0x3fu)));
+    hash = number_constant_hash_feed_byte(hash, (unsigned char)(0xf0u | (rune >> 18)));
+    hash = number_constant_hash_feed_byte(hash, (unsigned char)(0x80u | ((rune >> 12) & 0x3fu)));
+    hash = number_constant_hash_feed_byte(hash, (unsigned char)(0x80u | ((rune >> 6) & 0x3fu)));
+    return number_constant_hash_feed_byte(hash, (unsigned char)(0x80u | (rune & 0x3fu)));
 }
 
 static uint32_t number_constant_hash_view(string_view_t view, uint32_t seed)
@@ -334,8 +305,7 @@ static uint32_t number_constant_hash_view(string_view_t view, uint32_t seed)
         uint32_t rune = 0u;
         string_pos_t next = 0u;
 
-        if (!string_view_peek_rune_value(view, pos, &rune, &next) ||
-            next <= pos) {
+        if (!string_view_peek_rune_value(view, pos, &rune, &next) || next <= pos) {
             break;
         }
 
@@ -356,15 +326,11 @@ static size_t number_constant_hash_index(string_view_t view)
     size_t vertex1;
     size_t vertex2;
 
-    vertex0 = number_constant_hash_view(view, NUMBER_CONSTANT_HASH_SEED0) %
-              NUMBER_CONSTANT_HASH_VERTEX_COUNT;
-    vertex1 = number_constant_hash_view(view, NUMBER_CONSTANT_HASH_SEED1) %
-              NUMBER_CONSTANT_HASH_VERTEX_COUNT;
-    vertex2 = number_constant_hash_view(view, NUMBER_CONSTANT_HASH_SEED2) %
-              NUMBER_CONSTANT_HASH_VERTEX_COUNT;
+    vertex0 = number_constant_hash_view(view, NUMBER_CONSTANT_HASH_SEED0) % NUMBER_CONSTANT_HASH_VERTEX_COUNT;
+    vertex1 = number_constant_hash_view(view, NUMBER_CONSTANT_HASH_SEED1) % NUMBER_CONSTANT_HASH_VERTEX_COUNT;
+    vertex2 = number_constant_hash_view(view, NUMBER_CONSTANT_HASH_SEED2) % NUMBER_CONSTANT_HASH_VERTEX_COUNT;
 
-    return ((size_t)number_constant_hash_g[vertex0] +
-            (size_t)number_constant_hash_g[vertex1] +
+    return ((size_t)number_constant_hash_g[vertex0] + (size_t)number_constant_hash_g[vertex1] +
             (size_t)number_constant_hash_g[vertex2]) %
            NUMBER_CONSTANT_NAME_COUNT;
 }
@@ -427,8 +393,7 @@ const char *num_constant_name(number_t value)
     if (number_const_id_from_immortal(&value, &constant_id)) {
         for (size_t i = 0u; i < number_constant_name_count(); ++i) {
             if (number_constant_names[i].canonical &&
-                number_const_id_from_immortal(number_constant_names[i].value,
-                                              &candidate_id) &&
+                number_const_id_from_immortal(number_constant_names[i].value, &candidate_id) &&
                 candidate_id == constant_id)
                 return number_constant_names[i].name;
         }
@@ -448,12 +413,10 @@ const char *num_constant_name(number_t value)
         number_t candidate;
         bool match;
 
-        if (!number_constant_names[i].canonical ||
-            num_is_exact(*number_constant_names[i].value))
+        if (!number_constant_names[i].canonical || num_is_exact(*number_constant_names[i].value))
             continue;
 
-        candidate = num_const_prec(*number_constant_names[i].value,
-                                   precision_bits);
+        candidate = num_const_prec(*number_constant_names[i].value, precision_bits);
         match = num_eq(value, candidate);
         num_destroy(&candidate);
         if (match)
@@ -540,13 +503,10 @@ static number_scope_alloc_header_t *number_scope_alloc_header_from_ptr(const voi
     if (!ptr)
         return NULL;
     header = (const number_scope_alloc_header_t *)((const unsigned char *)ptr - sizeof(*header));
-    return header->magic == NUMBER_SCOPE_ALLOC_MAGIC
-        ? (number_scope_alloc_header_t *)header : NULL;
+    return header->magic == NUMBER_SCOPE_ALLOC_MAGIC ? (number_scope_alloc_header_t *)header : NULL;
 }
 
-static void *number_scope_arena_alloc_from_scope(num_scope_t *scope,
-                                                 size_t size,
-                                                 size_t align)
+static void *number_scope_arena_alloc_from_scope(num_scope_t *scope, size_t size, size_t align)
 {
     number_scope_state_t *state;
     number_scope_arena_block_t *block;
@@ -629,8 +589,7 @@ static bool number_scope_trackable_value(const number_t *number)
     const number_vtable_t *vt;
     void *payload;
 
-    if (!number_scope_current || number_scope_suspend_depth > 0u ||
-        !number || !number_is_valid_value(number))
+    if (!number_scope_current || number_scope_suspend_depth > 0u || !number || !number_is_valid_value(number))
         return false;
     vt = number_vt(number);
     if (!vt || !vt->destroy_payload || vt->destroy_payload == number_destroy_none)
@@ -649,8 +608,7 @@ static void number_scope_destroy_record(const number_scope_record_t *record)
 
     if (!record)
         return;
-    vt = (unsigned)record->kind < number_dispatch_count
-        ? number_dispatch[record->kind] : NULL;
+    vt = (unsigned)record->kind < number_dispatch_count ? number_dispatch[record->kind] : NULL;
     if (!vt || !vt->destroy_scope_payload)
         return;
     vt->destroy_scope_payload(record->payload);
@@ -660,8 +618,7 @@ static void number_scope_trim_block(number_scope_block_t *block)
 {
     if (!block)
         return;
-    while (block->used > 0u &&
-           block->records[block->used - 1u].payload == NULL)
+    while (block->used > 0u && block->records[block->used - 1u].payload == NULL)
         block->used--;
 }
 
@@ -683,15 +640,13 @@ void number_scope_register_value(const number_t *number)
      * again would leave a second owner behind after num_scope_detach(). */
     for (scope = number_scope_current; scope; scope = scope->previous) {
         number_scope_state_t *existing_state = number_scope_state_get(scope);
-        number_scope_block_t *existing_block = existing_state
-            ? existing_state->records : NULL;
+        number_scope_block_t *existing_block = existing_state ? existing_state->records : NULL;
 
         while (existing_block) {
             size_t i = existing_block->used;
 
             while (i-- > 0u) {
-                const number_scope_record_t *existing =
-                    &existing_block->records[i];
+                const number_scope_record_t *existing = &existing_block->records[i];
 
                 if (existing->kind == kind && existing->payload == payload)
                     return;
@@ -741,8 +696,7 @@ int number_scope_unregister_value(const number_t *number)
 
                 if (record->payload == NULL)
                     continue;
-                if (record->kind == kind && record->payload == payload)
-                {
+                if (record->kind == kind && record->payload == payload) {
                     record->kind = NUMBER_INVALID;
                     record->payload = NULL;
                     number_scope_trim_block(block);
@@ -760,8 +714,8 @@ void *number_scope_mem_alloc(size_t size, size_t align)
     if (size == 0u)
         return NULL;
     return (number_scope_current && number_scope_suspend_depth == 0u)
-        ? number_scope_arena_alloc_from_scope(number_scope_current, size, align)
-        : number_scope_mem_alloc_heap(size, align);
+               ? number_scope_arena_alloc_from_scope(number_scope_current, size, align)
+               : number_scope_mem_alloc_heap(size, align);
 }
 
 void *number_scope_mem_calloc(size_t count, size_t size, size_t align)
@@ -828,24 +782,20 @@ void *number_scope_mem_realloc(void *ptr, size_t size, size_t align)
             size_t old_end = payload_offset + header->size;
             number_scope_arena_block_t *block = header->arena_block;
 
-            if (block->used == old_end &&
-                payload_offset + size <= block->capacity)
-            {
+            if (block->used == old_end && payload_offset + size <= block->capacity) {
                 block->used = payload_offset + size;
                 header->size = size;
                 return ptr;
             }
         }
-        void *grown = header->scope
-            ? number_scope_arena_alloc_from_scope(header->scope, size, align)
-            : number_scope_mem_alloc_heap(size, align);
+        void *grown = header->scope ? number_scope_arena_alloc_from_scope(header->scope, size, align)
+                                    : number_scope_mem_alloc_heap(size, align);
 
         if (!grown)
             return NULL;
         memcpy(grown, ptr, header->size);
         if (header->record) {
-            number_scope_alloc_header_t *grown_header =
-                number_scope_alloc_header_from_ptr(grown);
+            number_scope_alloc_header_t *grown_header = number_scope_alloc_header_from_ptr(grown);
 
             if (grown_header) {
                 grown_header->record = header->record;
@@ -866,8 +816,7 @@ void number_scope_mem_free(void *ptr)
     if (!ptr)
         return;
     header = number_scope_alloc_header_from_ptr(ptr);
-    if (!header)
-    {
+    if (!header) {
         free(ptr);
         return;
     }
@@ -971,8 +920,7 @@ static bool number_mpq_exceeds_working_precision_budget(const number_mpq_t *valu
     numerator_bits = mpz_sizeinbase(mpq_numref(q), 2);
     denominator_bits = mpz_sizeinbase(mpq_denref(q), 2);
 
-    return denominator_bits > precision_bits ||
-           numerator_bits + denominator_bits > 2u * precision_bits;
+    return denominator_bits > precision_bits || numerator_bits + denominator_bits > 2u * precision_bits;
 }
 
 static number_t number_take_mpq_budgeted(number_t number)
@@ -1052,8 +1000,7 @@ static bool number_text_has_ascii(const string_t *text, char needle)
         return false;
 
     while (!string_cursor_done(cursor)) {
-        if (string_cursor_peek_ascii(cursor, &ch) &&
-            ch == (unsigned char)needle) {
+        if (string_cursor_peek_ascii(cursor, &ch) && ch == (unsigned char)needle) {
             string_cursor_free(cursor);
             return true;
         }
@@ -1079,8 +1026,7 @@ static bool number_text_has_ascii_ci(const string_t *text, char needle)
         return false;
 
     while (!string_cursor_done(cursor)) {
-        if (string_cursor_peek_ascii(cursor, &ch) &&
-            number_ascii_lower(ch) == want) {
+        if (string_cursor_peek_ascii(cursor, &ch) && number_ascii_lower(ch) == want) {
             string_cursor_free(cursor);
             return true;
         }
@@ -1118,11 +1064,8 @@ static bool number_text_has_unicode_fraction(const string_t *text)
 
 static bool number_text_is_decimal(const string_t *text)
 {
-    return text &&
-           (number_text_has_ascii(text, '.') ||
-            number_text_has_ascii_ci(text, 'e') ||
-            number_text_has_ascii_ci(text, 'n') ||
-            number_text_has_ascii_ci(text, 'f'));
+    return text && (number_text_has_ascii(text, '.') || number_text_has_ascii_ci(text, 'e') ||
+                    number_text_has_ascii_ci(text, 'n') || number_text_has_ascii_ci(text, 'f'));
 }
 
 static bool number_kind_is_complex_component(number_kind_t kind)
@@ -1132,9 +1075,7 @@ static bool number_kind_is_complex_component(number_kind_t kind)
 
 static bool number_is_mpfr_complex_components(const complex_t *value)
 {
-    return value &&
-           number_kind_value(&value->real) == NUMBER_MPFR &&
-           number_kind_value(&value->imag) == NUMBER_MPFR;
+    return value && number_kind_value(&value->real) == NUMBER_MPFR && number_kind_value(&value->imag) == NUMBER_MPFR;
 }
 
 void number_complex_clear_mpc_cache(complex_t *value)
@@ -1145,10 +1086,8 @@ void number_complex_clear_mpc_cache(complex_t *value)
     value->mpc_cache_valid = false;
 }
 
-static int number_complex_set_mpc_cache_from_parts(complex_t *value,
-                                                   const number_mpfr_t *real,
-                                                   const number_mpfr_t *imag,
-                                                   size_t precision_bits)
+static int number_complex_set_mpc_cache_from_parts(complex_t *value, const number_mpfr_t *real,
+                                                   const number_mpfr_t *imag, size_t precision_bits)
 {
     if (!value || !real || !imag)
         return -1;
@@ -1156,8 +1095,7 @@ static int number_complex_set_mpc_cache_from_parts(complex_t *value,
     number_complex_clear_mpc_cache(value);
     mpc_init2(value->mpc_cache, (mpfr_prec_t)precision_bits);
     value->mpc_cache_valid = true;
-    if (number_mpfr_ensure(real, precision_bits) != 0 ||
-        number_mpfr_ensure(imag, precision_bits) != 0) {
+    if (number_mpfr_ensure(real, precision_bits) != 0 || number_mpfr_ensure(imag, precision_bits) != 0) {
         number_complex_clear_mpc_cache(value);
         return -1;
     }
@@ -1166,9 +1104,7 @@ static int number_complex_set_mpc_cache_from_parts(complex_t *value,
     return 0;
 }
 
-int number_complex_set_mpc_cache_from_mpc(complex_t *value,
-                                          mpc_srcptr source,
-                                          size_t precision_bits)
+int number_complex_set_mpc_cache_from_mpc(complex_t *value, mpc_srcptr source, size_t precision_bits)
 {
     if (!value || !source)
         return -1;
@@ -1186,14 +1122,11 @@ static void number_complex_refresh_mpc_cache(complex_t *value)
     if (!number_is_mpfr_complex_components(value))
         return;
     (void)number_complex_set_mpc_cache_from_parts(
-        value,
-        number_impl_const(&value->real)->value.mpfr,
-        number_impl_const(&value->imag)->value.mpfr,
+        value, number_impl_const(&value->real)->value.mpfr, number_impl_const(&value->imag)->value.mpfr,
         value->precision_bits ? value->precision_bits : num_get_prec_bits(value->real));
 }
 
-number_t number_complex_component_from_number(const number_t *value,
-                                              size_t precision_bits)
+number_t number_complex_component_from_number(const number_t *value, size_t precision_bits)
 {
     typedef enum {
         NUMBER_COMPONENT_REJECT = 0,
@@ -1201,16 +1134,11 @@ number_t number_complex_component_from_number(const number_t *value,
         NUMBER_COMPONENT_INEXACT_REAL
     } number_component_action_t;
     static const unsigned char action_table[] = {
-        [NUMBER_INVALID] = NUMBER_COMPONENT_REJECT,
-        [NUMBER_DOUBLE] = NUMBER_COMPONENT_INEXACT_REAL,
-        [NUMBER_QFLOAT] = NUMBER_COMPONENT_INEXACT_REAL,
-        [NUMBER_QCOMPLEX] = NUMBER_COMPONENT_REJECT,
-        [NUMBER_MPZ] = NUMBER_COMPONENT_CLONE,
-        [NUMBER_MPQ] = NUMBER_COMPONENT_CLONE,
-        [NUMBER_MPFR] = NUMBER_COMPONENT_CLONE,
-        [NUMBER_CDOUBLE] = NUMBER_COMPONENT_REJECT,
-        [NUMBER_COMPLEX] = NUMBER_COMPONENT_REJECT
-    };
+        [NUMBER_INVALID] = NUMBER_COMPONENT_REJECT,      [NUMBER_DOUBLE] = NUMBER_COMPONENT_INEXACT_REAL,
+        [NUMBER_QFLOAT] = NUMBER_COMPONENT_INEXACT_REAL, [NUMBER_QCOMPLEX] = NUMBER_COMPONENT_REJECT,
+        [NUMBER_MPZ] = NUMBER_COMPONENT_CLONE,           [NUMBER_MPQ] = NUMBER_COMPONENT_CLONE,
+        [NUMBER_MPFR] = NUMBER_COMPONENT_CLONE,          [NUMBER_CDOUBLE] = NUMBER_COMPONENT_REJECT,
+        [NUMBER_COMPLEX] = NUMBER_COMPONENT_REJECT};
     number_t out = number_invalid();
     number_kind_t kind;
     number_component_action_t action;
@@ -1218,20 +1146,16 @@ number_t number_complex_component_from_number(const number_t *value,
     if (!value || !number_is_valid_value(value))
         return out;
     kind = number_kind_value(value);
-    action = (kind >= 0 && (size_t)kind < sizeof(action_table))
-        ? (number_component_action_t)action_table[kind]
-        : NUMBER_COMPONENT_REJECT;
+    action = (kind >= 0 && (size_t)kind < sizeof(action_table)) ? (number_component_action_t)action_table[kind]
+                                                                : NUMBER_COMPONENT_REJECT;
     if (action == NUMBER_COMPONENT_CLONE)
         return num_clone(*value);
     if (action == NUMBER_COMPONENT_INEXACT_REAL)
-        return num_as_inexact_real_prec(
-            *value,
-            precision_bits ? precision_bits : number_default_precision_bits);
+        return num_as_inexact_real_prec(*value, precision_bits ? precision_bits : number_default_precision_bits);
     return out;
 }
 
-static number_t number_complex_component_from_qfloat(qfloat_t value,
-                                                     size_t precision_bits)
+static number_t number_complex_component_from_qfloat(qfloat_t value, size_t precision_bits)
 {
     number_mpfr_t *mpfr_value;
 
@@ -1297,8 +1221,7 @@ complex_t *number_complex_clone(const complex_t *value)
     out->constant_id = value->constant_id;
     out->precision_bits = value->precision_bits;
     if (value->mpc_cache_valid)
-        (void)number_complex_set_mpc_cache_from_mpc(out, value->mpc_cache,
-            value->precision_bits);
+        (void)number_complex_set_mpc_cache_from_mpc(out, value->mpc_cache, value->precision_bits);
     return out;
 }
 
@@ -1317,8 +1240,7 @@ number_const_id_t number_complex_const_id(const complex_t *value)
     return value ? value->constant_id : NUMBER_CONST_COUNT;
 }
 
-complex_t *number_complex_create_from_qcomplex(qcomplex_t value,
-                                               size_t precision_bits)
+complex_t *number_complex_create_from_qcomplex(qcomplex_t value, size_t precision_bits)
 {
     number_t real = number_complex_component_from_qfloat(qc_real(value), precision_bits);
     number_t imag = number_complex_component_from_qfloat(qc_imag(value), precision_bits);
@@ -1327,16 +1249,14 @@ complex_t *number_complex_create_from_qcomplex(qcomplex_t value,
     if (!out) {
         num_destroy(&real);
         num_destroy(&imag);
-    }
-    else {
+    } else {
         out->precision_bits = precision_bits;
         number_complex_refresh_mpc_cache(out);
     }
     return out;
 }
 
-static number_t number_complex_component_as_mpfr(const number_t *value,
-                                                   size_t precision_bits)
+static number_t number_complex_component_as_mpfr(const number_t *value, size_t precision_bits)
 {
     const number_private_t *impl;
     number_mpfr_t *copy;
@@ -1352,9 +1272,7 @@ static number_t number_complex_component_as_mpfr(const number_t *value,
     return copy ? number_take(number_wrap_mpfr(copy)) : number_invalid();
 }
 
-int number_complex_get_mpc(mpc_t out,
-                           const complex_t *value,
-                           size_t precision_bits)
+int number_complex_get_mpc(mpc_t out, const complex_t *value, size_t precision_bits)
 {
     number_t real;
     number_t imag;
@@ -1370,19 +1288,17 @@ int number_complex_get_mpc(mpc_t out,
 
     real = number_complex_component_as_mpfr(&value->real, precision_bits);
     imag = number_complex_component_as_mpfr(&value->imag, precision_bits);
-    if (!num_is_inexact_real_backend(real) ||
-        !num_is_inexact_real_backend(imag)) {
+    if (!num_is_inexact_real_backend(real) || !num_is_inexact_real_backend(imag)) {
         num_destroy(&real);
         num_destroy(&imag);
         return -1;
     }
     rc = (number_mpfr_ensure(number_impl_const(&real)->value.mpfr, precision_bits) != 0 ||
           number_mpfr_ensure(number_impl_const(&imag)->value.mpfr, precision_bits) != 0)
-        ? -1 : 0;
+             ? -1
+             : 0;
     if (rc == 0)
-        mpc_set_fr_fr(out,
-                      number_impl_const(&real)->value.mpfr->value,
-                      number_impl_const(&imag)->value.mpfr->value,
+        mpc_set_fr_fr(out, number_impl_const(&real)->value.mpfr->value, number_impl_const(&imag)->value.mpfr->value,
                       MPC_RNDNN);
     num_destroy(&real);
     num_destroy(&imag);
@@ -1454,9 +1370,7 @@ static string_t *number_complex_compact_text(const string_t *text)
             continue;
 
         rune = string_cursor_peek(cursor);
-        if (rune_is_none(rune) ||
-            string_append_rune(out, rune) != 0 ||
-            string_cursor_next(cursor) != 0) {
+        if (rune_is_none(rune) || string_append_rune(out, rune) != 0 || string_cursor_next(cursor) != 0) {
             string_cursor_free(cursor);
             string_free(out);
             return NULL;
@@ -1467,9 +1381,7 @@ static string_t *number_complex_compact_text(const string_t *text)
     return out;
 }
 
-static bool number_text_last_ascii_pos(const string_t *text,
-                                       string_pos_t *pos_out,
-                                       unsigned char *ascii_out)
+static bool number_text_last_ascii_pos(const string_t *text, string_pos_t *pos_out, unsigned char *ascii_out)
 {
     string_cursor_t *cursor;
     string_pos_t last_pos = 0u;
@@ -1524,8 +1436,7 @@ static string_t *number_complex_strip_outer_parens_text(const string_t *text)
     if (!cursor)
         return NULL;
 
-    if (string_cursor_peek_ascii(cursor, &ascii) &&
-        (ascii == '+' || ascii == '-')) {
+    if (string_cursor_peek_ascii(cursor, &ascii) && (ascii == '+' || ascii == '-')) {
         sign = (char)ascii;
         if (string_cursor_next(cursor) != 0) {
             string_cursor_free(cursor);
@@ -1544,9 +1455,7 @@ static string_t *number_complex_strip_outer_parens_text(const string_t *text)
     }
     content_start = string_cursor_position(cursor);
 
-    if (!number_text_last_ascii_pos(text, &last_pos, &last_ascii) ||
-        last_ascii != ')' ||
-        last_pos < content_start) {
+    if (!number_text_last_ascii_pos(text, &last_pos, &last_ascii) || last_ascii != ')' || last_pos < content_start) {
         string_cursor_free(cursor);
         return string_clone(text);
     }
@@ -1571,9 +1480,7 @@ static string_t *number_complex_strip_outer_parens_text(const string_t *text)
     return out;
 }
 
-static bool number_complex_split_text(const string_t *text,
-                                      string_t **real_out,
-                                      string_t **imag_out)
+static bool number_complex_split_text(const string_t *text, string_t **real_out, string_t **imag_out)
 {
     string_t *compact;
     string_t *real = NULL;
@@ -1616,12 +1523,8 @@ static bool number_complex_split_text(const string_t *text,
         if (is_ascii && ascii == 'i') {
             have_i = true;
             i_pos = pos;
-        }
-        else if (is_ascii &&
-                 (ascii == '+' || ascii == '-') &&
-                 pos != start &&
-                 !(prev_was_ascii &&
-                   (prev_ascii == 'e' || prev_ascii == 'E'))) {
+        } else if (is_ascii && (ascii == '+' || ascii == '-') && pos != start &&
+                   !(prev_was_ascii && (prev_ascii == 'e' || prev_ascii == 'E'))) {
             have_split = true;
             split_pos = pos;
         }
@@ -1649,8 +1552,7 @@ static bool number_complex_split_text(const string_t *text,
     if (have_split && split_pos != start) {
         real = string_cursor_slice_between(start, split_pos, cursor);
         imag = string_cursor_slice_between(split_pos, i_pos, cursor);
-    }
-    else {
+    } else {
         real = string_new_with("0");
         imag = string_cursor_slice_between(start, i_pos, cursor);
     }
@@ -1678,8 +1580,7 @@ static bool number_complex_split_text(const string_t *text,
     if (string_length(imag) == 0u || number_text_equals_literal(imag, "+")) {
         string_free(imag);
         imag = string_new_with("1");
-    }
-    else if (number_text_equals_literal(imag, "-")) {
+    } else if (number_text_equals_literal(imag, "-")) {
         string_free(imag);
         imag = string_new_with("-1");
     }
@@ -1694,8 +1595,7 @@ static bool number_complex_split_text(const string_t *text,
     return true;
 }
 
-static complex_t *number_complex_create_from_text(const string_t *text,
-                                                  size_t precision_bits)
+static complex_t *number_complex_create_from_text(const string_t *text, size_t precision_bits)
 {
     string_t *real_text = NULL;
     string_t *imag_text = NULL;
@@ -1719,33 +1619,32 @@ static complex_t *number_complex_create_from_text(const string_t *text,
     if (!out) {
         num_destroy(&real_component);
         num_destroy(&imag_component);
-    }
-    else {
+    } else {
         out->precision_bits = precision_bits;
         number_complex_refresh_mpc_cache(out);
     }
     return out;
 }
 
- int number_set_precision_noop(number_t *number, size_t precision_bits)
+int number_set_precision_noop(number_t *number, size_t precision_bits)
 {
     (void)number;
     return precision_bits == 0u ? -1 : 0;
 }
 
- size_t number_precision_fixed53(const number_t *number)
+size_t number_precision_fixed53(const number_t *number)
 {
     (void)number;
     return 53u;
 }
 
- size_t number_precision_fixed106(const number_t *number)
+size_t number_precision_fixed106(const number_t *number)
 {
     (void)number;
     return 106u;
 }
 
- size_t number_precision_zero(const number_t *number)
+size_t number_precision_zero(const number_t *number)
 {
     (void)number;
     return 0u;
@@ -1826,30 +1725,30 @@ void number_destroy_scope_complex(void *payload)
     number_complex_free((complex_t *)payload);
 }
 
- number_t number_const_like_double(const number_t *like, number_const_id_t id);
- number_t number_const_like_cdouble(const number_t *like, number_const_id_t id);
- number_t number_const_like_qfloat(const number_t *like, number_const_id_t id);
- number_t number_const_like_qcomplex(const number_t *like, number_const_id_t id);
- number_t number_const_like_mexact(const number_t *like, number_const_id_t id);
- number_t number_const_like_mpfr(const number_t *like, number_const_id_t id);
- bool number_is_real_default(const number_t *number)
+number_t number_const_like_double(const number_t *like, number_const_id_t id);
+number_t number_const_like_cdouble(const number_t *like, number_const_id_t id);
+number_t number_const_like_qfloat(const number_t *like, number_const_id_t id);
+number_t number_const_like_qcomplex(const number_t *like, number_const_id_t id);
+number_t number_const_like_mexact(const number_t *like, number_const_id_t id);
+number_t number_const_like_mpfr(const number_t *like, number_const_id_t id);
+bool number_is_real_default(const number_t *number)
 {
     return number != NULL;
 }
 
- bool number_value_is_immortal_double(const number_t *number)
+bool number_value_is_immortal_double(const number_t *number)
 {
     (void)number;
     return false;
 }
 
- bool number_value_is_immortal_qfloat(const number_t *number)
+bool number_value_is_immortal_qfloat(const number_t *number)
 {
     (void)number;
     return false;
 }
 
- bool number_value_is_immortal_qcomplex(const number_t *number)
+bool number_value_is_immortal_qcomplex(const number_t *number)
 {
     (void)number;
     return false;
@@ -1866,8 +1765,7 @@ static bool number_value_is_immortal(const number_t *number)
 
 #define NUMBER_ARRAY_LEN(array) (sizeof(array) / sizeof((array)[0]))
 
-bool number_immortal_id_mpfr(const number_t *number,
-                               number_const_id_t *id_out)
+bool number_immortal_id_mpfr(const number_t *number, number_const_id_t *id_out)
 {
     const number_mpfr_t *value = number ? number_impl_const(number)->value.mpfr : NULL;
 
@@ -1877,8 +1775,7 @@ bool number_immortal_id_mpfr(const number_t *number,
     return true;
 }
 
-bool number_immortal_id_mpz(const number_t *number,
-                             number_const_id_t *id_out)
+bool number_immortal_id_mpz(const number_t *number, number_const_id_t *id_out)
 {
     const number_mpz_t *value = number ? number_impl_const(number)->value.mpz : NULL;
 
@@ -1888,8 +1785,7 @@ bool number_immortal_id_mpz(const number_t *number,
     return true;
 }
 
-bool number_immortal_id_mpq(const number_t *number,
-                                  number_const_id_t *id_out)
+bool number_immortal_id_mpq(const number_t *number, number_const_id_t *id_out)
 {
     const number_mpq_t *value = number ? number_impl_const(number)->value.mpq : NULL;
 
@@ -1899,8 +1795,7 @@ bool number_immortal_id_mpq(const number_t *number,
     return true;
 }
 
-bool number_const_id_from_immortal(const number_t *number,
-                                   number_const_id_t *id_out)
+bool number_const_id_from_immortal(const number_t *number, number_const_id_t *id_out)
 {
     const number_vtable_t *vt = number ? number_vt(number) : NULL;
 
@@ -1911,32 +1806,28 @@ bool number_const_id_from_immortal(const number_t *number,
     return vt->immortal_id(number, id_out);
 }
 
- bool number_value_is_immortal_mpz(const number_t *number)
+bool number_value_is_immortal_mpz(const number_t *number)
 {
     const number_mpz_t *value = number ? number_impl_const(number)->value.mpz : NULL;
 
-    return value && value->immortal &&
-        value->constant_id != NUMBER_CONST_COUNT;
+    return value && value->immortal && value->constant_id != NUMBER_CONST_COUNT;
 }
 
- bool number_value_is_immortal_mpq(const number_t *number)
+bool number_value_is_immortal_mpq(const number_t *number)
 {
     const number_mpq_t *value = number ? number_impl_const(number)->value.mpq : NULL;
 
-    return value && value->immortal &&
-        value->constant_id != NUMBER_CONST_COUNT;
+    return value && value->immortal && value->constant_id != NUMBER_CONST_COUNT;
 }
 
- bool number_value_is_immortal_mpfr(const number_t *number)
+bool number_value_is_immortal_mpfr(const number_t *number)
 {
     const number_mpfr_t *value = number ? number_impl_const(number)->value.mpfr : NULL;
 
-    return value && value->immortal &&
-        value->constant_id != NUMBER_CONST_COUNT;
+    return value && value->immortal && value->constant_id != NUMBER_CONST_COUNT;
 }
 
-bool number_immortal_id_complex(const number_t *number,
-                                number_const_id_t *id_out)
+bool number_immortal_id_complex(const number_t *number, number_const_id_t *id_out)
 {
     const complex_t *value = number ? number_impl_const(number)->value.cx : NULL;
 
@@ -1962,13 +1853,10 @@ bool number_value_is_immortal_complex(const number_t *number)
 
 const complex_t *number_complex_value(const number_t *number)
 {
-    return number && number_kind_value(number) == NUMBER_COMPLEX
-        ? number_impl_const(number)->value.cx : NULL;
+    return number && number_kind_value(number) == NUMBER_COMPLEX ? number_impl_const(number)->value.cx : NULL;
 }
 
-bool number_eq_same_tol_with_precision(const number_t *a,
-                                       const number_t *b,
-                                       size_t precision_bits);
+bool number_eq_same_tol_with_precision(const number_t *a, const number_t *b, size_t precision_bits);
 
 bool number_is_zero_mpz(const number_t *number)
 {
@@ -1982,8 +1870,8 @@ bool number_is_zero_mpq(const number_t *number)
 
 bool number_is_one_mpz(const number_t *number)
 {
-    mpz_srcptr value = number && number_impl_const(number)->value.mpz
-        ? number_mpz_value(number_impl_const(number)->value.mpz) : NULL;
+    mpz_srcptr value =
+        number && number_impl_const(number)->value.mpz ? number_mpz_value(number_impl_const(number)->value.mpz) : NULL;
 
     return value && mpz_cmp_si(value, 1L) == 0;
 }
@@ -1995,21 +1883,15 @@ bool number_is_one_mpq(const number_t *number)
 
 bool number_eq_same_mpz(const number_t *a, const number_t *b)
 {
-    return a && b &&
-        number_mpz_cmp(number_impl_const(a)->value.mpz,
-                       number_impl_const(b)->value.mpz) == 0;
+    return a && b && number_mpz_cmp(number_impl_const(a)->value.mpz, number_impl_const(b)->value.mpz) == 0;
 }
 
 bool number_eq_same_mpq(const number_t *a, const number_t *b)
 {
-    return a && b &&
-        number_mpq_cmp(number_impl_const(a)->value.mpq,
-                       number_impl_const(b)->value.mpq) == 0;
+    return a && b && number_mpq_cmp(number_impl_const(a)->value.mpq, number_impl_const(b)->value.mpq) == 0;
 }
 
-bool number_eq_same_tol_with_precision(const number_t *a,
-                                       const number_t *b,
-                                       size_t precision_bits)
+bool number_eq_same_tol_with_precision(const number_t *a, const number_t *b, size_t precision_bits)
 {
     number_t delta;
     number_t diff;
@@ -2029,8 +1911,7 @@ bool number_eq_same_tol_with_precision(const number_t *a,
     diff = num_abs(delta);
     one = number_create_exact_mpfr_long_prec(1, precision_bits);
     tolerance = num_ldexp(one, 4 - (int)precision_bits);
-    rc = number_is_valid_value(&diff) && number_is_valid_value(&tolerance) &&
-        num_cmp(diff, tolerance) <= 0;
+    rc = number_is_valid_value(&diff) && number_is_valid_value(&tolerance) && num_cmp(diff, tolerance) <= 0;
     num_destroy(&tolerance);
     num_destroy(&one);
     num_destroy(&diff);
@@ -2067,14 +1948,12 @@ bool number_is_inf_exact(const number_t *number)
 
 int number_cmp_same_mpz(const number_t *a, const number_t *b)
 {
-    return (a && b) ? number_mpz_cmp(number_impl_const(a)->value.mpz,
-                                     number_impl_const(b)->value.mpz) : 0;
+    return (a && b) ? number_mpz_cmp(number_impl_const(a)->value.mpz, number_impl_const(b)->value.mpz) : 0;
 }
 
 int number_cmp_same_mpq(const number_t *a, const number_t *b)
 {
-    return (a && b) ? number_mpq_cmp(number_impl_const(a)->value.mpq,
-                                     number_impl_const(b)->value.mpq) : 0;
+    return (a && b) ? number_mpq_cmp(number_impl_const(a)->value.mpq, number_impl_const(b)->value.mpq) : 0;
 }
 
 long number_get_exponent2_zero(const number_t *number)
@@ -2115,8 +1994,7 @@ long number_get_exponent2_mpq(const number_t *number)
         if (mpz_cmp(num, scaled_den) < 0)
             --exp2;
         mpz_clear(scaled_den);
-    }
-    else {
+    } else {
         long shift = -exp2;
         mpz_t scaled_num;
         mpz_init_set(scaled_num, num);
@@ -2202,41 +2080,31 @@ number_t *number_clone_mpq(const number_t *number)
 typedef void (*number_mpz_binary_core_fn)(mpz_ptr, mpz_srcptr, mpz_srcptr);
 typedef void (*number_mpq_binary_core_fn)(mpq_ptr, mpq_srcptr, mpq_srcptr);
 
-static number_t number_make_mpz_binary(const number_t *a,
-                                       const number_t *b,
-                                       number_mpz_binary_core_fn op)
+static number_t number_make_mpz_binary(const number_t *a, const number_t *b, number_mpz_binary_core_fn op)
 {
     number_mpz_t *out;
 
-    if (!a || !b || !op ||
-        number_mpz_ensure(number_impl_const(a)->value.mpz) != 0 ||
+    if (!a || !b || !op || number_mpz_ensure(number_impl_const(a)->value.mpz) != 0 ||
         number_mpz_ensure(number_impl_const(b)->value.mpz) != 0)
         return number_invalid();
     out = number_mpz_new();
     if (!out)
         return number_invalid();
-    op(out->value,
-       number_impl_const(a)->value.mpz->value,
-       number_impl_const(b)->value.mpz->value);
+    op(out->value, number_impl_const(a)->value.mpz->value, number_impl_const(b)->value.mpz->value);
     return number_take_mpz(out);
 }
 
-static number_t number_make_mpq_binary(const number_t *a,
-                                       const number_t *b,
-                                       number_mpq_binary_core_fn op)
+static number_t number_make_mpq_binary(const number_t *a, const number_t *b, number_mpq_binary_core_fn op)
 {
     number_mpq_t *out;
 
-    if (!a || !b || !op ||
-        number_mpq_ensure(number_impl_const(a)->value.mpq) != 0 ||
+    if (!a || !b || !op || number_mpq_ensure(number_impl_const(a)->value.mpq) != 0 ||
         number_mpq_ensure(number_impl_const(b)->value.mpq) != 0)
         return number_invalid();
     out = number_mpq_new();
     if (!out)
         return number_invalid();
-    op(out->value,
-       number_impl_const(a)->value.mpq->value,
-       number_impl_const(b)->value.mpq->value);
+    op(out->value, number_impl_const(a)->value.mpq->value, number_impl_const(b)->value.mpq->value);
     return number_take_mpq(out);
 }
 
@@ -2335,15 +2203,12 @@ number_t *number_pow_int_mpz(const number_t *number, int exponent)
 {
     number_mpz_t *out;
 
-    if (!number || exponent < 0 ||
-        number_mpz_ensure(number_impl_const(number)->value.mpz) != 0)
+    if (!number || exponent < 0 || number_mpz_ensure(number_impl_const(number)->value.mpz) != 0)
         return NULL;
     out = number_mpz_new();
     if (!out)
         return NULL;
-    mpz_pow_ui(out->value,
-               number_impl_const(number)->value.mpz->value,
-               (unsigned long)exponent);
+    mpz_pow_ui(out->value, number_impl_const(number)->value.mpz->value, (unsigned long)exponent);
     return number_box_value(number_take_mpz(out));
 }
 
@@ -2539,48 +2404,34 @@ number_t *number_wrap_complex(complex_t *value)
     return number;
 }
 
-typedef number_t *(*number_binary_dispatch_fn)(const number_vtable_t *vt,
-                                               const number_t *a,
-                                               const number_t *b);
+typedef number_t *(*number_binary_dispatch_fn)(const number_vtable_t *vt, const number_t *a, const number_t *b);
 
-static number_t *number_apply_add_same_kind(const number_vtable_t *vt,
-                                            const number_t *a,
-                                            const number_t *b)
+static number_t *number_apply_add_same_kind(const number_vtable_t *vt, const number_t *a, const number_t *b)
 {
     return vt && vt->add_same ? vt->add_same(a, b) : NULL;
 }
 
-static number_t *number_apply_sub_same_kind(const number_vtable_t *vt,
-                                            const number_t *a,
-                                            const number_t *b)
+static number_t *number_apply_sub_same_kind(const number_vtable_t *vt, const number_t *a, const number_t *b)
 {
     return vt && vt->sub_same ? vt->sub_same(a, b) : NULL;
 }
 
-static number_t *number_apply_mul_same_kind(const number_vtable_t *vt,
-                                            const number_t *a,
-                                            const number_t *b)
+static number_t *number_apply_mul_same_kind(const number_vtable_t *vt, const number_t *a, const number_t *b)
 {
     return vt && vt->mul_same ? vt->mul_same(a, b) : NULL;
 }
 
-static number_t *number_apply_div_same_kind(const number_vtable_t *vt,
-                                            const number_t *a,
-                                            const number_t *b)
+static number_t *number_apply_div_same_kind(const number_vtable_t *vt, const number_t *a, const number_t *b)
 {
     return vt && vt->div_same ? vt->div_same(a, b) : NULL;
 }
 
-static const number_binary_dispatch_fn number_binary_dispatch[] = {
-    [NUMBER_OP_ADD] = number_apply_add_same_kind,
-    [NUMBER_OP_SUB] = number_apply_sub_same_kind,
-    [NUMBER_OP_MUL] = number_apply_mul_same_kind,
-    [NUMBER_OP_DIV] = number_apply_div_same_kind
-};
+static const number_binary_dispatch_fn number_binary_dispatch[] = {[NUMBER_OP_ADD] = number_apply_add_same_kind,
+                                                                   [NUMBER_OP_SUB] = number_apply_sub_same_kind,
+                                                                   [NUMBER_OP_MUL] = number_apply_mul_same_kind,
+                                                                   [NUMBER_OP_DIV] = number_apply_div_same_kind};
 
-static number_t *number_apply_binary_same_kind(const number_t *a,
-                                               const number_t *b,
-                                               number_binary_op_t op)
+static number_t *number_apply_binary_same_kind(const number_t *a, const number_t *b, number_binary_op_t op)
 {
     const number_vtable_t *vt;
     number_binary_dispatch_fn fn;
@@ -2592,9 +2443,7 @@ static number_t *number_apply_binary_same_kind(const number_t *a,
     return fn ? fn(vt, a, b) : NULL;
 }
 
-static number_t *number_apply_binary_generic(const number_t *a,
-                                             const number_t *b,
-                                             number_binary_op_t op)
+static number_t *number_apply_binary_generic(const number_t *a, const number_t *b, number_binary_op_t op)
 {
     number_kind_t kind;
     size_t precision_bits = 0u;
@@ -2605,8 +2454,7 @@ static number_t *number_apply_binary_generic(const number_t *a,
     if (!a || !b)
         return NULL;
     kind = number_common_kind(a, b, op);
-    if (number_kind_value(a) == kind && number_kind_value(b) == kind &&
-        num_get_prec_bits(*a) == num_get_prec_bits(*b))
+    if (number_kind_value(a) == kind && number_kind_value(b) == kind && num_get_prec_bits(*a) == num_get_prec_bits(*b))
         return number_apply_binary_same_kind(a, b, op);
     lhs = number_coerce(a, kind);
     rhs = number_coerce(b, kind);
@@ -2621,8 +2469,7 @@ static number_t *number_apply_binary_generic(const number_t *a,
             if (rhs)
                 num_set_prec_bits(rhs, precision_bits);
         }
-    }
-    else if (kind == NUMBER_MPFR) {
+    } else if (kind == NUMBER_MPFR) {
         size_t a_bits = num_get_prec_bits(*a);
         size_t b_bits = num_get_prec_bits(*b);
 
@@ -2685,18 +2532,13 @@ number_t num_create_from_text(const string_t *text)
     if (num_constant_value_text(trimmed, &constant))
         out = constant;
     else if (number_text_has_ascii_ci(trimmed, 'i'))
-        out = number_take(number_wrap_complex(
-            number_complex_create_from_text(trimmed, number_default_precision_bits)));
-    else if (number_text_has_ascii(trimmed, '/') ||
-             number_text_has_unicode_fraction(trimmed))
-        out = number_take(number_wrap_mpq(
-            number_mpq_from_text(trimmed)));
+        out = number_take(number_wrap_complex(number_complex_create_from_text(trimmed, number_default_precision_bits)));
+    else if (number_text_has_ascii(trimmed, '/') || number_text_has_unicode_fraction(trimmed))
+        out = number_take(number_wrap_mpq(number_mpq_from_text(trimmed)));
     else if (number_text_is_decimal(trimmed))
-        out = number_take(number_wrap_mpfr(
-            number_mpfr_from_text(trimmed, number_default_precision_bits)));
+        out = number_take(number_wrap_mpfr(number_mpfr_from_text(trimmed, number_default_precision_bits)));
     else
-        out = number_take(number_wrap_mpz(
-            number_mpz_from_text(trimmed)));
+        out = number_take(number_wrap_mpz(number_mpz_from_text(trimmed)));
 
     string_free(trimmed);
     return out;
@@ -2717,8 +2559,7 @@ number_t num_create_from_string(const char *text)
 
 number_t num_create_from_frac(long numerator, long denominator)
 {
-    return number_take(number_wrap_mpq(
-        number_mpq_from_frac_long(numerator, denominator)));
+    return number_take(number_wrap_mpq(number_mpq_from_frac_long(numerator, denominator)));
 }
 
 number_t *number_const_prec_double(const number_t *number, size_t precision_bits)
@@ -2727,8 +2568,7 @@ number_t *number_const_prec_double(const number_t *number, size_t precision_bits
 
     if (!number)
         return NULL;
-    mpfr_value = number_mpfr_from_double(number_impl_const(number)->value.d,
-                                         precision_bits);
+    mpfr_value = number_mpfr_from_double(number_impl_const(number)->value.d, precision_bits);
     return mpfr_value ? number_wrap_mpfr(mpfr_value) : NULL;
 }
 
@@ -2738,15 +2578,15 @@ number_t *number_const_prec_qfloat(const number_t *number, size_t precision_bits
 
     if (!number)
         return NULL;
-    out = number_mpfr_from_qfloat(number_impl_const(number)->value.qf,
-                                  precision_bits);
+    out = number_mpfr_from_qfloat(number_impl_const(number)->value.qf, precision_bits);
     return out ? number_wrap_mpfr(out) : NULL;
 }
 
 number_t *number_const_prec_qcomplex(const number_t *number, size_t precision_bits)
 {
-    return number ? number_wrap_complex(number_complex_create_from_qcomplex(
-        number_impl_const(number)->value.qc, precision_bits)) : NULL;
+    return number ? number_wrap_complex(
+                        number_complex_create_from_qcomplex(number_impl_const(number)->value.qc, precision_bits))
+                  : NULL;
 }
 
 number_t *number_const_prec_mpz(const number_t *number, size_t precision_bits)
@@ -2781,8 +2621,7 @@ number_t *number_const_prec_complex(const number_t *number, size_t precision_bit
     out->constant_id = value->constant_id;
     out->precision_bits = precision_bits;
     if (value->mpc_cache_valid)
-        (void)number_complex_set_mpc_cache_from_mpc(out, value->mpc_cache,
-            precision_bits);
+        (void)number_complex_set_mpc_cache_from_mpc(out, value->mpc_cache, precision_bits);
     return number_wrap_complex(out);
 }
 
@@ -2804,9 +2643,8 @@ number_t num_const_prec_digits(number_t constant, size_t significant_digits)
 {
     size_t precision_bits;
 
-    precision_bits = significant_digits == 0u
-        ? number_default_precision_bits
-        : (size_t)ceil((double)significant_digits * 3.3219280948873626);
+    precision_bits = significant_digits == 0u ? number_default_precision_bits
+                                              : (size_t)ceil((double)significant_digits * 3.3219280948873626);
     return num_const_prec(constant, precision_bits);
 }
 
@@ -2842,8 +2680,7 @@ void num_destroy_slow(number_t *number)
     if (!number)
         return;
     kind = number_impl_const(number)->kind;
-    if (kind == NUMBER_INVALID || kind == NUMBER_DOUBLE ||
-        kind == NUMBER_CDOUBLE || kind == NUMBER_QFLOAT ||
+    if (kind == NUMBER_INVALID || kind == NUMBER_DOUBLE || kind == NUMBER_CDOUBLE || kind == NUMBER_QFLOAT ||
         kind == NUMBER_QCOMPLEX) {
         return;
     }
@@ -2970,8 +2807,7 @@ long num_get_exponent2(const number_t number)
 {
     const number_vtable_t *vt = number_vt(&number);
 
-    if (!number_is_valid_value(&number) || num_is_zero(number) ||
-        !num_is_finite(number) || !num_is_real(number))
+    if (!number_is_valid_value(&number) || num_is_zero(number) || !num_is_finite(number) || !num_is_real(number))
         return 0l;
     return vt && vt->get_exponent2 ? vt->get_exponent2(&number) : 0l;
 }
@@ -2994,8 +2830,7 @@ size_t num_get_effective_prec_bits(const number_t number)
 {
     const number_vtable_t *vt = number_vt(&number);
 
-    return vt && vt->get_effective_precision
-        ? vt->get_effective_precision(&number) : 0u;
+    return vt && vt->get_effective_precision ? vt->get_effective_precision(&number) : 0u;
 }
 
 bool num_is_inexact_real_backend(number_t number)
@@ -3164,8 +2999,7 @@ number_t num_inv(const number_t number)
     if (kind == NUMBER_QFLOAT)
         return number_make_qfloat(qf_div(QF_ONE, number_impl_const(&number)->value.qf));
     if (kind == NUMBER_QCOMPLEX)
-        return number_make_qcomplex(qc_div(qc_make(QF_ONE, QF_ZERO),
-            number_impl_const(&number)->value.qc));
+        return number_make_qcomplex(qc_div(qc_make(QF_ONE, QF_ZERO), number_impl_const(&number)->value.qc));
     if (kind == NUMBER_MPQ)
         return number_make_inv_mpq(&number);
     vt = number_vt(&number);
@@ -3191,15 +3025,9 @@ number_t num_inv(const number_t number)
     return number_invalid();
 }
 
-static bool number_try_exact_immortal_binary(const number_t *a,
-                                             const number_t *b,
-                                             number_binary_op_t op,
-                                             number_t *out)
+static bool number_try_exact_immortal_binary(const number_t *a, const number_t *b, number_binary_op_t op, number_t *out)
 {
-    typedef enum {
-        NUMBER_EXACT_RESULT_CONST,
-        NUMBER_EXACT_RESULT_NEG_CONST
-    } number_exact_result_kind_t;
+    typedef enum { NUMBER_EXACT_RESULT_CONST, NUMBER_EXACT_RESULT_NEG_CONST } number_exact_result_kind_t;
     typedef struct {
         number_binary_op_t op;
         number_const_id_t left;
@@ -3209,34 +3037,29 @@ static bool number_try_exact_immortal_binary(const number_t *a,
         bool commutative;
     } number_exact_binary_rule_t;
     static const number_exact_binary_rule_t rules[] = {
-        { NUMBER_OP_MUL, NUMBER_CONST_PI,       NUMBER_CONST_TWO,  NUMBER_CONST_2PI,  NUMBER_EXACT_RESULT_CONST,     true  },
-        { NUMBER_OP_MUL, NUMBER_CONST_PI,       NUMBER_CONST_HALF, NUMBER_CONST_PI_2, NUMBER_EXACT_RESULT_CONST,     true  },
-        { NUMBER_OP_MUL, NUMBER_CONST_PI_2,     NUMBER_CONST_TWO,  NUMBER_CONST_PI,   NUMBER_EXACT_RESULT_CONST,     true  },
-        { NUMBER_OP_MUL, NUMBER_CONST_NEG_PI_2, NUMBER_CONST_TWO,  NUMBER_CONST_PI,   NUMBER_EXACT_RESULT_NEG_CONST, true  },
-        { NUMBER_OP_DIV, NUMBER_CONST_PI,       NUMBER_CONST_TWO,  NUMBER_CONST_PI_2, NUMBER_EXACT_RESULT_CONST,     false },
-        { NUMBER_OP_DIV, NUMBER_CONST_2PI,      NUMBER_CONST_TWO,  NUMBER_CONST_PI,   NUMBER_EXACT_RESULT_CONST,     false },
-        { NUMBER_OP_DIV, NUMBER_CONST_PI,       NUMBER_CONST_PI,   NUMBER_CONST_ONE,  NUMBER_EXACT_RESULT_CONST,     false }
-    };
+        {NUMBER_OP_MUL, NUMBER_CONST_PI, NUMBER_CONST_TWO, NUMBER_CONST_2PI, NUMBER_EXACT_RESULT_CONST, true},
+        {NUMBER_OP_MUL, NUMBER_CONST_PI, NUMBER_CONST_HALF, NUMBER_CONST_PI_2, NUMBER_EXACT_RESULT_CONST, true},
+        {NUMBER_OP_MUL, NUMBER_CONST_PI_2, NUMBER_CONST_TWO, NUMBER_CONST_PI, NUMBER_EXACT_RESULT_CONST, true},
+        {NUMBER_OP_MUL, NUMBER_CONST_NEG_PI_2, NUMBER_CONST_TWO, NUMBER_CONST_PI, NUMBER_EXACT_RESULT_NEG_CONST, true},
+        {NUMBER_OP_DIV, NUMBER_CONST_PI, NUMBER_CONST_TWO, NUMBER_CONST_PI_2, NUMBER_EXACT_RESULT_CONST, false},
+        {NUMBER_OP_DIV, NUMBER_CONST_2PI, NUMBER_CONST_TWO, NUMBER_CONST_PI, NUMBER_EXACT_RESULT_CONST, false},
+        {NUMBER_OP_DIV, NUMBER_CONST_PI, NUMBER_CONST_PI, NUMBER_CONST_ONE, NUMBER_EXACT_RESULT_CONST, false}};
     number_const_id_t aid;
     number_const_id_t bid;
     size_t i;
 
-    if (!a || !b || !out ||
-        !number_const_id_from_immortal(a, &aid) ||
-        !number_const_id_from_immortal(b, &bid))
+    if (!a || !b || !out || !number_const_id_from_immortal(a, &aid) || !number_const_id_from_immortal(b, &bid))
         return false;
 
     for (i = 0u; i < NUMBER_ARRAY_LEN(rules); ++i) {
         bool direct = rules[i].left == aid && rules[i].right == bid;
-        bool swapped = rules[i].commutative &&
-                       rules[i].left == bid && rules[i].right == aid;
+        bool swapped = rules[i].commutative && rules[i].left == bid && rules[i].right == aid;
 
         if (rules[i].op != op || (!direct && !swapped))
             continue;
 
-        *out = rules[i].result_kind == NUMBER_EXACT_RESULT_NEG_CONST
-            ? number_neg_const_return_like(a, rules[i].result)
-            : number_const_return_like(a, rules[i].result);
+        *out = rules[i].result_kind == NUMBER_EXACT_RESULT_NEG_CONST ? number_neg_const_return_like(a, rules[i].result)
+                                                                     : number_const_return_like(a, rules[i].result);
         return true;
     }
 
@@ -3248,20 +3071,16 @@ number_t num_add(const number_t a, const number_t b)
     return num_add_slow(a, b);
 }
 
-typedef int (*number_mpfr_binary_core_fn)(mpfr_ptr, mpfr_srcptr, mpfr_srcptr,
-                                          mpfr_rnd_t);
+typedef int (*number_mpfr_binary_core_fn)(mpfr_ptr, mpfr_srcptr, mpfr_srcptr, mpfr_rnd_t);
 
-static number_t number_apply_binary_mpfr_value(const number_t *a,
-                                               const number_t *b,
-                                               number_mpfr_binary_core_fn op)
+static number_t number_apply_binary_mpfr_value(const number_t *a, const number_t *b, number_mpfr_binary_core_fn op)
 {
     number_mpfr_t *copy;
 
     if (!a || !b || !op)
         return number_invalid();
     copy = number_mpfr_clone(number_impl_const(a)->value.mpfr);
-    if (!copy || number_mpfr_ensure(number_impl_const(b)->value.mpfr,
-                                    (size_t)mpfr_get_prec(copy->value)) != 0) {
+    if (!copy || number_mpfr_ensure(number_impl_const(b)->value.mpfr, (size_t)mpfr_get_prec(copy->value)) != 0) {
         number_mpfr_free(copy);
         return number_invalid();
     }
@@ -3275,17 +3094,13 @@ number_t num_add_slow(const number_t a, const number_t b)
 
     if (kind == number_impl_const(&b)->kind) {
         if (kind == NUMBER_DOUBLE)
-            return number_make_double(number_impl_const(&a)->value.d +
-                number_impl_const(&b)->value.d);
+            return number_make_double(number_impl_const(&a)->value.d + number_impl_const(&b)->value.d);
         if (kind == NUMBER_CDOUBLE)
-            return number_make_cdouble(number_impl_const(&a)->value.cd.value +
-                number_impl_const(&b)->value.cd.value);
+            return number_make_cdouble(number_impl_const(&a)->value.cd.value + number_impl_const(&b)->value.cd.value);
         if (kind == NUMBER_QFLOAT)
-            return number_make_qfloat(qf_add(number_impl_const(&a)->value.qf,
-                number_impl_const(&b)->value.qf));
+            return number_make_qfloat(qf_add(number_impl_const(&a)->value.qf, number_impl_const(&b)->value.qf));
         if (kind == NUMBER_QCOMPLEX)
-            return number_make_qcomplex(qc_add(number_impl_const(&a)->value.qc,
-                number_impl_const(&b)->value.qc));
+            return number_make_qcomplex(qc_add(number_impl_const(&a)->value.qc, number_impl_const(&b)->value.qc));
         if (kind == NUMBER_MPFR)
             return number_apply_binary_mpfr_value(&a, &b, mpfr_add);
         if (kind == NUMBER_MPZ)
@@ -3307,17 +3122,13 @@ number_t num_sub_slow(const number_t a, const number_t b)
 
     if (kind == number_impl_const(&b)->kind) {
         if (kind == NUMBER_DOUBLE)
-            return number_make_double(number_impl_const(&a)->value.d -
-                number_impl_const(&b)->value.d);
+            return number_make_double(number_impl_const(&a)->value.d - number_impl_const(&b)->value.d);
         if (kind == NUMBER_CDOUBLE)
-            return number_make_cdouble(number_impl_const(&a)->value.cd.value -
-                number_impl_const(&b)->value.cd.value);
+            return number_make_cdouble(number_impl_const(&a)->value.cd.value - number_impl_const(&b)->value.cd.value);
         if (kind == NUMBER_QFLOAT)
-            return number_make_qfloat(qf_sub(number_impl_const(&a)->value.qf,
-                number_impl_const(&b)->value.qf));
+            return number_make_qfloat(qf_sub(number_impl_const(&a)->value.qf, number_impl_const(&b)->value.qf));
         if (kind == NUMBER_QCOMPLEX)
-            return number_make_qcomplex(qc_sub(number_impl_const(&a)->value.qc,
-                number_impl_const(&b)->value.qc));
+            return number_make_qcomplex(qc_sub(number_impl_const(&a)->value.qc, number_impl_const(&b)->value.qc));
         if (kind == NUMBER_MPFR)
             return number_apply_binary_mpfr_value(&a, &b, mpfr_sub);
         if (kind == NUMBER_MPZ)
@@ -3340,17 +3151,13 @@ number_t num_mul_slow(const number_t a, const number_t b)
 
     if (kind == number_impl_const(&b)->kind) {
         if (kind == NUMBER_DOUBLE)
-            return number_make_double(number_impl_const(&a)->value.d *
-                number_impl_const(&b)->value.d);
+            return number_make_double(number_impl_const(&a)->value.d * number_impl_const(&b)->value.d);
         if (kind == NUMBER_CDOUBLE)
-            return number_make_cdouble(number_impl_const(&a)->value.cd.value *
-                number_impl_const(&b)->value.cd.value);
+            return number_make_cdouble(number_impl_const(&a)->value.cd.value * number_impl_const(&b)->value.cd.value);
         if (kind == NUMBER_QFLOAT)
-            return number_make_qfloat(qf_mul(number_impl_const(&a)->value.qf,
-                number_impl_const(&b)->value.qf));
+            return number_make_qfloat(qf_mul(number_impl_const(&a)->value.qf, number_impl_const(&b)->value.qf));
         if (kind == NUMBER_QCOMPLEX)
-            return number_make_qcomplex(qc_mul(number_impl_const(&a)->value.qc,
-                number_impl_const(&b)->value.qc));
+            return number_make_qcomplex(qc_mul(number_impl_const(&a)->value.qc, number_impl_const(&b)->value.qc));
         if (kind == NUMBER_MPFR)
             return number_apply_binary_mpfr_value(&a, &b, mpfr_mul);
         if (kind == NUMBER_MPZ)
@@ -3375,17 +3182,13 @@ number_t num_div_slow(const number_t a, const number_t b)
 
     if (kind == number_impl_const(&b)->kind) {
         if (kind == NUMBER_DOUBLE)
-            return number_make_double(number_impl_const(&a)->value.d /
-                number_impl_const(&b)->value.d);
+            return number_make_double(number_impl_const(&a)->value.d / number_impl_const(&b)->value.d);
         if (kind == NUMBER_CDOUBLE)
-            return number_make_cdouble(number_impl_const(&a)->value.cd.value /
-                number_impl_const(&b)->value.cd.value);
+            return number_make_cdouble(number_impl_const(&a)->value.cd.value / number_impl_const(&b)->value.cd.value);
         if (kind == NUMBER_QFLOAT)
-            return number_make_qfloat(qf_div(number_impl_const(&a)->value.qf,
-                number_impl_const(&b)->value.qf));
+            return number_make_qfloat(qf_div(number_impl_const(&a)->value.qf, number_impl_const(&b)->value.qf));
         if (kind == NUMBER_QCOMPLEX)
-            return number_make_qcomplex(qc_div(number_impl_const(&a)->value.qc,
-                number_impl_const(&b)->value.qc));
+            return number_make_qcomplex(qc_div(number_impl_const(&a)->value.qc, number_impl_const(&b)->value.qc));
         if (kind == NUMBER_MPFR)
             return number_apply_binary_mpfr_value(&a, &b, mpfr_div);
         if (kind == NUMBER_MPQ) {
@@ -3428,24 +3231,21 @@ static inline bool number_is_finite_value(const number_t *number)
 {
     const number_vtable_t *vt = number ? number_vt(number) : NULL;
 
-    return number && number_is_valid_value(number) &&
-        vt && vt->is_finite && vt->is_finite(number);
+    return number && number_is_valid_value(number) && vt && vt->is_finite && vt->is_finite(number);
 }
 
 static inline bool number_is_nan_value(const number_t *number)
 {
     const number_vtable_t *vt = number ? number_vt(number) : NULL;
 
-    return !number || !number_is_valid_value(number) ||
-        (vt && vt->is_nan && vt->is_nan(number));
+    return !number || !number_is_valid_value(number) || (vt && vt->is_nan && vt->is_nan(number));
 }
 
 static inline bool number_is_inf_value(const number_t *number)
 {
     const number_vtable_t *vt = number ? number_vt(number) : NULL;
 
-    return number && number_is_valid_value(number) &&
-        vt && vt->is_inf && vt->is_inf(number);
+    return number && number_is_valid_value(number) && vt && vt->is_inf && vt->is_inf(number);
 }
 
 static inline int number_cmp_same_kind(const number_t *a, const number_t *b)
@@ -3470,8 +3270,7 @@ bool number_matches_value(const number_t *reference, const number_t *target)
     size_t precision_bits;
     bool matches;
 
-    if (!reference || !target || !number_is_valid_value(reference) ||
-        !number_is_valid_value(target))
+    if (!reference || !target || !number_is_valid_value(reference) || !number_is_valid_value(target))
         return false;
     reference_vt = number_vt(reference);
     if (!reference_vt)
@@ -3480,14 +3279,11 @@ bool number_matches_value(const number_t *reference, const number_t *target)
     if (!coerced_target)
         return false;
     target_vt = number_vt(coerced_target);
-    precision_bits = reference_vt->get_precision
-        ? reference_vt->get_precision(reference)
-        : 0u;
+    precision_bits = reference_vt->get_precision ? reference_vt->get_precision(reference) : 0u;
     if (precision_bits != 0u && target_vt && target_vt->set_precision)
         target_vt->set_precision(coerced_target, precision_bits);
-    matches = reference_vt->eq_same_tol
-        ? reference_vt->eq_same_tol(reference, coerced_target)
-        : number_eq_same_kind(reference, coerced_target);
+    matches = reference_vt->eq_same_tol ? reference_vt->eq_same_tol(reference, coerced_target)
+                                        : number_eq_same_kind(reference, coerced_target);
     number_box_free(coerced_target);
     return matches;
 }
@@ -3499,8 +3295,7 @@ static number_t number_const_mpfr_special(number_const_id_t id, size_t precision
     if (id == NUMBER_CONST_NEG_ONE)
         return number_create_exact_mpfr_long_prec(-1, precision_bits);
     if (number_const_has_ldexp(id))
-        return number_create_exact_mpfr_dyadic_prec(
-            1, number_const_ldexp_value(id), precision_bits);
+        return number_create_exact_mpfr_dyadic_prec(1, number_const_ldexp_value(id), precision_bits);
     mpfr = number_mpfr_from_const_id(id, precision_bits);
     return mpfr ? number_take(number_wrap_mpfr(mpfr)) : number_invalid();
 }
@@ -3523,8 +3318,7 @@ static number_t number_make_complex_from_real(number_t real, size_t precision_bi
     return number_take(number_wrap_complex(complex_value));
 }
 
-static number_t number_make_complex_imag_unit(number_const_id_t id,
-                                              size_t precision_bits)
+static number_t number_make_complex_imag_unit(number_const_id_t id, size_t precision_bits)
 {
     number_t real;
     number_t imag;
@@ -3545,7 +3339,7 @@ static number_t number_make_complex_imag_unit(number_const_id_t id,
     return number_take(number_wrap_complex(out));
 }
 
- number_t number_const_like_double(const number_t *like, number_const_id_t id)
+number_t number_const_like_double(const number_t *like, number_const_id_t id)
 {
     (void)like;
     if (number_const_has_double(id))
@@ -3553,19 +3347,19 @@ static number_t number_make_complex_imag_unit(number_const_id_t id,
     return number_invalid();
 }
 
- number_t number_const_like_qfloat(const number_t *like, number_const_id_t id)
+number_t number_const_like_qfloat(const number_t *like, number_const_id_t id)
 {
     (void)like;
     return num_create_from_qfloat(number_const_qfloat(id));
 }
 
- number_t number_const_like_qcomplex(const number_t *like, number_const_id_t id)
+number_t number_const_like_qcomplex(const number_t *like, number_const_id_t id)
 {
     (void)like;
     return num_create_from_qcomplex(number_const_qcomplex(id));
 }
 
- number_t number_const_like_mexact(const number_t *like, number_const_id_t id)
+number_t number_const_like_mexact(const number_t *like, number_const_id_t id)
 {
     size_t precision_bits;
     number_t exact;
@@ -3580,7 +3374,7 @@ static number_t number_make_complex_imag_unit(number_const_id_t id,
     return number_const_mpfr_special(id, precision_bits);
 }
 
- number_t number_const_like_mpfr(const number_t *like, number_const_id_t id)
+number_t number_const_like_mpfr(const number_t *like, number_const_id_t id)
 {
     const number_vtable_t *vt = number_vt(like);
     size_t precision_bits = vt && vt->get_precision ? vt->get_precision(like) : 0u;
@@ -3626,14 +3420,13 @@ number_t number_const_like(const number_t *like, number_const_id_t id)
 
 number_t num_new(void)
 {
-    return number_take(number_wrap_mpfr(
-        number_mpfr_new_prec(number_default_precision_bits)));
+    return number_take(number_wrap_mpfr(number_mpfr_new_prec(number_default_precision_bits)));
 }
 
 number_t num_new_with_prec_bits(size_t precision_bits)
 {
-    return precision_bits == 0u ? number_invalid() :
-        number_take(number_wrap_mpfr(number_mpfr_new_prec(precision_bits)));
+    return precision_bits == 0u ? number_invalid()
+                                : number_take(number_wrap_mpfr(number_mpfr_new_prec(precision_bits)));
 }
 
 number_t num_create_from_long(long value)
@@ -3692,30 +3485,23 @@ int num_set_frac(number_t *number, long numerator, long denominator)
     return number_is_valid_value(number) ? 0 : -1;
 }
 
-static number_t number_create_mpfr_from_double_prec(double value,
-                                                    size_t precision_bits)
+static number_t number_create_mpfr_from_double_prec(double value, size_t precision_bits)
 {
-    number_mpfr_t *mpfr_value = number_mpfr_from_double(
-        value,
-        precision_bits ? precision_bits : number_default_precision_bits);
+    number_mpfr_t *mpfr_value =
+        number_mpfr_from_double(value, precision_bits ? precision_bits : number_default_precision_bits);
 
-    return mpfr_value ? number_take(number_wrap_mpfr(mpfr_value))
-                      : number_invalid();
+    return mpfr_value ? number_take(number_wrap_mpfr(mpfr_value)) : number_invalid();
 }
 
-static number_t number_create_mpfr_from_qfloat_prec(qfloat_t value,
-                                                    size_t precision_bits)
+static number_t number_create_mpfr_from_qfloat_prec(qfloat_t value, size_t precision_bits)
 {
-    number_mpfr_t *mpfr_value = number_mpfr_from_qfloat(
-        value,
-        precision_bits ? precision_bits : number_default_precision_bits);
+    number_mpfr_t *mpfr_value =
+        number_mpfr_from_qfloat(value, precision_bits ? precision_bits : number_default_precision_bits);
 
-    return mpfr_value ? number_take(number_wrap_mpfr(mpfr_value))
-                      : number_invalid();
+    return mpfr_value ? number_take(number_wrap_mpfr(mpfr_value)) : number_invalid();
 }
 
-static number_t number_create_complex_from_double_prec(double value,
-                                                       size_t precision_bits)
+static number_t number_create_complex_from_double_prec(double value, size_t precision_bits)
 {
     number_t real;
     number_t imag;
@@ -3733,8 +3519,7 @@ static number_t number_create_complex_from_double_prec(double value,
     return boxed ? number_take(boxed) : number_invalid();
 }
 
-static number_t number_create_complex_from_cdouble_prec(double _Complex value,
-                                                        size_t precision_bits)
+static number_t number_create_complex_from_cdouble_prec(double _Complex value, size_t precision_bits)
 {
     number_t real;
     number_t imag;
@@ -3752,8 +3537,7 @@ static number_t number_create_complex_from_cdouble_prec(double _Complex value,
     return boxed ? number_take(boxed) : number_invalid();
 }
 
-static number_t number_create_complex_from_qfloat_prec(qfloat_t value,
-                                                       size_t precision_bits)
+static number_t number_create_complex_from_qfloat_prec(qfloat_t value, size_t precision_bits)
 {
     number_t real;
     number_t imag;
@@ -3771,15 +3555,12 @@ static number_t number_create_complex_from_qfloat_prec(qfloat_t value,
     return boxed ? number_take(boxed) : number_invalid();
 }
 
-static number_t number_create_complex_from_qcomplex_prec(qcomplex_t value,
-                                                         size_t precision_bits)
+static number_t number_create_complex_from_qcomplex_prec(qcomplex_t value, size_t precision_bits)
 {
-    complex_t *complex_value = number_complex_create_from_qcomplex(
-        value,
-        precision_bits ? precision_bits : number_default_precision_bits);
+    complex_t *complex_value =
+        number_complex_create_from_qcomplex(value, precision_bits ? precision_bits : number_default_precision_bits);
 
-    return complex_value ? number_take(number_wrap_complex(complex_value))
-                         : number_invalid();
+    return complex_value ? number_take(number_wrap_complex(complex_value)) : number_invalid();
 }
 
 int num_set_double(number_t *number, double value)
@@ -3802,8 +3583,7 @@ int num_set_double(number_t *number, double value)
     } else if (kind == NUMBER_QFLOAT) {
         replacement = num_create_from_qfloat(qf_from_double(value));
     } else if (kind == NUMBER_QCOMPLEX) {
-        replacement = num_create_from_qcomplex(
-            qc_make(qf_from_double(value), QF_ZERO));
+        replacement = num_create_from_qcomplex(qc_make(qf_from_double(value), QF_ZERO));
     } else {
         replacement = num_create_from_double(value);
     }
@@ -3824,24 +3604,18 @@ int num_set_cdouble(number_t *number, double _Complex value)
     kind = number_kind_value(number);
     precision_bits = num_get_prec_bits(*number);
     if (kind == NUMBER_COMPLEX) {
-        replacement = number_create_complex_from_cdouble_prec(value,
-                                                              precision_bits);
+        replacement = number_create_complex_from_cdouble_prec(value, precision_bits);
     } else if (kind == NUMBER_QCOMPLEX) {
-        replacement = num_create_from_qcomplex(qc_make(
-            qf_from_double(creal(value)),
-            qf_from_double(cimag(value))));
+        replacement = num_create_from_qcomplex(qc_make(qf_from_double(creal(value)), qf_from_double(cimag(value))));
     } else if (kind == NUMBER_QFLOAT) {
-        replacement = cimag(value) == 0.0
-            ? num_create_from_qfloat(qf_from_double(creal(value)))
-            : num_create_from_qcomplex(qc_make(
-                qf_from_double(creal(value)),
-                qf_from_double(cimag(value))));
+        replacement =
+            cimag(value) == 0.0
+                ? num_create_from_qfloat(qf_from_double(creal(value)))
+                : num_create_from_qcomplex(qc_make(qf_from_double(creal(value)), qf_from_double(cimag(value))));
     } else if (kind == NUMBER_MPFR && cimag(value) == 0.0) {
-        replacement = number_create_mpfr_from_double_prec(creal(value),
-                                                          precision_bits);
+        replacement = number_create_mpfr_from_double_prec(creal(value), precision_bits);
     } else if (kind == NUMBER_MPFR) {
-        replacement = number_create_complex_from_cdouble_prec(value,
-                                                              precision_bits);
+        replacement = number_create_complex_from_cdouble_prec(value, precision_bits);
     } else {
         replacement = num_create_from_cdouble(value);
     }
@@ -3891,11 +3665,9 @@ int num_set_qcomplex(number_t *number, qcomplex_t value)
     kind = number_kind_value(number);
     precision_bits = num_get_prec_bits(*number);
     if (kind == NUMBER_COMPLEX) {
-        replacement = number_create_complex_from_qcomplex_prec(value,
-                                                               precision_bits);
+        replacement = number_create_complex_from_qcomplex_prec(value, precision_bits);
     } else if (kind == NUMBER_CDOUBLE) {
-        replacement = num_create_from_cdouble(
-            qf_to_double(qc_real(value)) + qf_to_double(qc_imag(value)) * I);
+        replacement = num_create_from_cdouble(qf_to_double(qc_real(value)) + qf_to_double(qc_imag(value)) * I);
     } else {
         replacement = num_create_from_qcomplex(value);
     }
@@ -3984,16 +3756,15 @@ size_t num_get_mantissa_bits(const number_t number)
 {
     const number_vtable_t *vt = number_vt(&number);
 
-    return number_is_valid_value(&number) && vt && vt->get_mantissa_bits
-        ? vt->get_mantissa_bits(&number) : 0u;
+    return number_is_valid_value(&number) && vt && vt->get_mantissa_bits ? vt->get_mantissa_bits(&number) : 0u;
 }
 
 bool num_get_mantissa_u64(const number_t number, uint64_t *out)
 {
     const number_vtable_t *vt = number_vt(&number);
 
-    return out && number_is_valid_value(&number) && vt && vt->get_mantissa_u64
-        ? vt->get_mantissa_u64(&number, out) : false;
+    return out && number_is_valid_value(&number) && vt && vt->get_mantissa_u64 ? vt->get_mantissa_u64(&number, out)
+                                                                               : false;
 }
 
 int num_sign(const number_t number)
@@ -4041,13 +3812,11 @@ int num_cmp(const number_t a, const number_t b)
     number_t *rhs = NULL;
     int rc = 0;
 
-    if (!number_is_valid_value(&a) || !number_is_valid_value(&b) ||
-        !num_is_real(a) || !num_is_real(b))
+    if (!number_is_valid_value(&a) || !number_is_valid_value(&b) || !num_is_real(a) || !num_is_real(b))
         return 0;
     if (number_same_kind_value(&a, &b))
         return number_cmp_same_kind(&a, &b);
-    family = number_math_family_binary(number_math_family_value(&a),
-        number_math_family_value(&b));
+    family = number_math_family_binary(number_math_family_value(&a), number_math_family_value(&b));
     kind = number_math_family_target_kind(family);
     if (kind == NUMBER_INVALID || family == NUMBER_MATH_MPFR)
         kind = number_common_kind(&a, &b, NUMBER_OP_ADD);
@@ -4121,8 +3890,8 @@ number_t num_arg(const number_t number)
         return number_invalid();
     if (vt && vt->arg_value)
         return number_take(vt->arg_value(&number));
-    number_t zero = number_create_exact_mpfr_long_prec(
-        0, num_get_prec_bits(number) ? num_get_prec_bits(number) : number_default_precision_bits);
+    number_t zero = number_create_exact_mpfr_long_prec(0, num_get_prec_bits(number) ? num_get_prec_bits(number)
+                                                                                    : number_default_precision_bits);
     number_t real = vt && vt->is_complex ? num_real_part(number) : num_clone(number);
     number_t result = num_atan2(zero, real);
     return num_scope_detach(result);

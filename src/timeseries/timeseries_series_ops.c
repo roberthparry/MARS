@@ -1,10 +1,13 @@
 #define MARS_TIMESERIES_INTERNAL_ACCESS
 #include "timeseries_internal.h"
 
-size_t ts_length(const timeseries_t *series) { return series ? series->length : 0u; }
+size_t ts_length(const timeseries_t *series)
+{
+    return series ? series->length : 0u;
+}
 ts_index_info_t ts_index_info(const timeseries_t *series)
 {
-    ts_index_info_t info = { TS_FREQ_UNKNOWN, TS_YEAR_CALENDAR, false, false, 0u };
+    ts_index_info_t info = {TS_FREQ_UNKNOWN, TS_YEAR_CALENDAR, false, false, 0u};
 
     if (!series)
         return info;
@@ -15,9 +18,18 @@ ts_index_info_t ts_index_info(const timeseries_t *series)
     info.season_period = series->season_period;
     return info;
 }
-ts_frequency_t ts_frequency(const timeseries_t *series) { return series ? series->frequency : TS_FREQ_UNKNOWN; }
-ts_year_type_t ts_year_type(const timeseries_t *series) { return series ? series->year_type : TS_YEAR_CALENDAR; }
-bool ts_is_regular(const timeseries_t *series) { return series && series->is_regular; }
+ts_frequency_t ts_frequency(const timeseries_t *series)
+{
+    return series ? series->frequency : TS_FREQ_UNKNOWN;
+}
+ts_year_type_t ts_year_type(const timeseries_t *series)
+{
+    return series ? series->year_type : TS_YEAR_CALENDAR;
+}
+bool ts_is_regular(const timeseries_t *series)
+{
+    return series && series->is_regular;
+}
 bool ts_has_missing(const timeseries_t *series)
 {
     size_t i;
@@ -103,9 +115,7 @@ timeseries_t *ts_slice(const timeseries_t *series, size_t start, size_t length)
     return out;
 }
 
-timeseries_t *ts_slice_date(const timeseries_t *series,
-                            const datetime_t *start,
-                            const datetime_t *end)
+timeseries_t *ts_slice_date(const timeseries_t *series, const datetime_t *start, const datetime_t *end)
 {
     size_t i, first = 0u, last = 0u;
     bool found = false;
@@ -115,8 +125,7 @@ timeseries_t *ts_slice_date(const timeseries_t *series,
     for (i = 0u; i < series->length; ++i) {
         if (!series->index[i])
             continue;
-        if (datetime_compare(series->index[i], start) >= 0 &&
-            datetime_compare(series->index[i], end) <= 0) {
+        if (datetime_compare(series->index[i], start) >= 0 && datetime_compare(series->index[i], end) <= 0) {
             if (!found)
                 first = i;
             last = i;
@@ -155,14 +164,12 @@ timeseries_t *ts_fill_missing(const timeseries_t *series, ts_missing_policy_t po
             num_destroy(&out->values[i]);
             out->values[i] = num_clone(out->values[i - 1u]);
             out->missing[i] = false;
-        } else if (policy == TS_MISSING_BACKWARD_FILL && i + 1u < out->length &&
-                   !out->missing[i + 1u]) {
+        } else if (policy == TS_MISSING_BACKWARD_FILL && i + 1u < out->length && !out->missing[i + 1u]) {
             num_destroy(&out->values[i]);
             out->values[i] = num_clone(out->values[i + 1u]);
             out->missing[i] = false;
-        } else if (policy == TS_MISSING_INTERPOLATE_LINEAR &&
-                   i > 0u && i + 1u < out->length &&
-                   !out->missing[i - 1u] && !out->missing[i + 1u]) {
+        } else if (policy == TS_MISSING_INTERPOLATE_LINEAR && i > 0u && i + 1u < out->length && !out->missing[i - 1u] &&
+                   !out->missing[i + 1u]) {
             number_t sum = num_add(out->values[i - 1u], out->values[i + 1u]);
             number_t avg = num_div(sum, NUM_TWO);
 
@@ -211,8 +218,7 @@ timeseries_t *ts_drop_missing(const timeseries_t *series)
     return out;
 }
 
-int ts_align_pair(const timeseries_t *left, const timeseries_t *right,
-                  ts_join_type_t join_type,
+int ts_align_pair(const timeseries_t *left, const timeseries_t *right, ts_join_type_t join_type,
                   timeseries_t **left_out, timeseries_t **right_out)
 {
     size_t i = 0u, j = 0u, cap = 16u, len = 0u;
@@ -223,9 +229,8 @@ int ts_align_pair(const timeseries_t *left, const timeseries_t *right,
     bool *rmiss = calloc(cap, sizeof(*rmiss));
     timeseries_t *L = NULL, *R = NULL;
 
-    if (!left || !right || !left_out || !right_out ||
-        !left->has_index || !right->has_index ||
-        !lvals || !rvals || !index || !lmiss || !rmiss)
+    if (!left || !right || !left_out || !right_out || !left->has_index || !right->has_index || !lvals || !rvals ||
+        !index || !lmiss || !rmiss)
         goto fail;
     while (i < left->length || j < right->length) {
         int cmp;
@@ -266,10 +271,18 @@ int ts_align_pair(const timeseries_t *left, const timeseries_t *right,
                 bool *nrm = realloc(rmiss, new_cap * sizeof(*nrm));
 
                 if (!nl || !nr || !ni || !nlm || !nrm) {
-                    free(nl); free(nr); free(ni); free(nlm); free(nrm);
+                    free(nl);
+                    free(nr);
+                    free(ni);
+                    free(nlm);
+                    free(nrm);
                     goto fail;
                 }
-                lvals = nl; rvals = nr; index = ni; lmiss = nlm; rmiss = nrm;
+                lvals = nl;
+                rvals = nr;
+                index = ni;
+                lmiss = nlm;
+                rmiss = nrm;
                 cap = new_cap;
             }
             if (take_both) {
@@ -278,7 +291,8 @@ int ts_align_pair(const timeseries_t *left, const timeseries_t *right,
                 lmiss[len] = left->missing[i];
                 rmiss[len] = right->missing[j];
                 index[len] = ts_datetime_clone(left_dt);
-                ++i; ++j;
+                ++i;
+                ++j;
             } else if (take_left_only) {
                 lvals[len] = num_clone(left->values[i]);
                 rvals[len] = num_clone(NUM_NAN);
@@ -298,8 +312,10 @@ int ts_align_pair(const timeseries_t *left, const timeseries_t *right,
                 goto fail;
             ++len;
         } else {
-            if (cmp < 0) ++i;
-            else if (cmp > 0) ++j;
+            if (cmp < 0)
+                ++i;
+            else if (cmp > 0)
+                ++j;
         }
     }
 
@@ -307,34 +323,51 @@ int ts_align_pair(const timeseries_t *left, const timeseries_t *right,
     R = ts_alloc_empty(len);
     if (!L || !R)
         goto fail;
-    free(L->values); L->values = lvals; lvals = NULL;
-    free(R->values); R->values = rvals; rvals = NULL;
-    free(L->missing); L->missing = lmiss; lmiss = NULL;
-    free(R->missing); R->missing = rmiss; rmiss = NULL;
-    L->index = index; R->index = calloc(len ? len : 1u, sizeof(*R->index));
+    free(L->values);
+    L->values = lvals;
+    lvals = NULL;
+    free(R->values);
+    R->values = rvals;
+    rvals = NULL;
+    free(L->missing);
+    L->missing = lmiss;
+    lmiss = NULL;
+    free(R->missing);
+    R->missing = rmiss;
+    rmiss = NULL;
+    L->index = index;
+    R->index = calloc(len ? len : 1u, sizeof(*R->index));
     if (!R->index)
         goto fail;
     for (i = 0u; i < len; ++i)
         R->index[i] = ts_datetime_clone(index[i]);
     L->has_index = R->has_index = true;
-    L->frequency = left->frequency; R->frequency = right->frequency;
-    L->year_type = left->year_type; R->year_type = right->year_type;
+    L->frequency = left->frequency;
+    R->frequency = right->frequency;
+    L->year_type = left->year_type;
+    R->year_type = right->year_type;
     *left_out = L;
     *right_out = R;
-    free(lvals); free(rvals); free(lmiss); free(rmiss);
+    free(lvals);
+    free(rvals);
+    free(lmiss);
+    free(rmiss);
     return 0;
 
 fail:
     if (lvals) {
-        for (i = 0u; i < len; ++i) num_destroy(&lvals[i]);
+        for (i = 0u; i < len; ++i)
+            num_destroy(&lvals[i]);
         free(lvals);
     }
     if (rvals) {
-        for (i = 0u; i < len; ++i) num_destroy(&rvals[i]);
+        for (i = 0u; i < len; ++i)
+            num_destroy(&rvals[i]);
         free(rvals);
     }
     if (index) {
-        for (i = 0u; i < len; ++i) datetime_dealloc(index[i]);
+        for (i = 0u; i < len; ++i)
+            datetime_dealloc(index[i]);
         free(index);
     }
     free(lmiss);

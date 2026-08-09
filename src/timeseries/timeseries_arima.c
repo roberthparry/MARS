@@ -2,11 +2,8 @@
 #include "timeseries_internal.h"
 
 static size_t ts_arima_max_lag(const ts_arima_spec_t *spec);
-static void ts_arima_build_lag_maps(const ts_arima_result_t *model,
-                                    const ts_arima_spec_t *spec,
-                                    double *phi_lags,
-                                    double *theta_lags,
-                                    size_t max_lag);
+static void ts_arima_build_lag_maps(const ts_arima_result_t *model, const ts_arima_spec_t *spec, double *phi_lags,
+                                    double *theta_lags, size_t max_lag);
 
 static timeseries_t *ts_build_arima_response(const timeseries_t *y, const ts_arima_spec_t *spec)
 {
@@ -53,8 +50,7 @@ static bool ts_arima_spec_differences_xreg(const ts_arima_spec_t *spec)
     return spec && (spec->d > 0u || (spec->D > 0u && spec->season_period > 0u));
 }
 
-static void ts_apply_arima_differences_to_array(double *values, size_t length,
-                                                const ts_arima_spec_t *spec)
+static void ts_apply_arima_differences_to_array(double *values, size_t length, const ts_arima_spec_t *spec)
 {
     size_t pass, i;
 
@@ -79,8 +75,7 @@ static void ts_apply_arima_differences_to_array(double *values, size_t length,
     }
 }
 
-static matrix_t *ts_arima_transform_xreg_history(const matrix_t *xreg,
-                                                 const ts_arima_spec_t *spec)
+static matrix_t *ts_arima_transform_xreg_history(const matrix_t *xreg, const ts_arima_spec_t *spec)
 {
     matrix_t *out = NULL;
     double *values = NULL;
@@ -118,8 +113,7 @@ fail:
     return NULL;
 }
 
-static matrix_t *ts_arima_transform_xreg_future(const matrix_t *history_xreg,
-                                                const matrix_t *future_xreg,
+static matrix_t *ts_arima_transform_xreg_future(const matrix_t *history_xreg, const matrix_t *future_xreg,
                                                 const ts_arima_spec_t *spec)
 {
     matrix_t *out = NULL;
@@ -169,12 +163,8 @@ fail:
     return NULL;
 }
 
-static int ts_arima_reintegrate_forecast_path(const double *history,
-                                              size_t history_length,
-                                              const ts_arima_spec_t *spec,
-                                              const double *transformed_forecast,
-                                              size_t horizon,
-                                              double *out_levels)
+static int ts_arima_reintegrate_forecast_path(const double *history, size_t history_length, const ts_arima_spec_t *spec,
+                                              const double *transformed_forecast, size_t horizon, double *out_levels)
 {
     double **ord_stages = NULL;
     double **season_stages = NULL;
@@ -299,12 +289,8 @@ static int ts_series_all_nonnegative(const timeseries_t *series)
     return 1;
 }
 
-static int ts_arima_level_stderr(const ts_arima_result_t *model,
-                                 const double *history,
-                                 size_t history_length,
-                                 size_t horizon,
-                                 double sigma,
-                                 double *out_stderr)
+static int ts_arima_level_stderr(const ts_arima_result_t *model, const double *history, size_t history_length,
+                                 size_t horizon, double sigma, double *out_stderr)
 {
     ts_arima_meta_t *meta;
     double *psi = NULL;
@@ -359,8 +345,8 @@ static int ts_arima_level_stderr(const ts_arima_result_t *model,
             free(psi);
             return -1;
         }
-        if (ts_arima_reintegrate_forecast_path(history, history_length, &meta->spec,
-                                               zero_diff, horizon, base_levels) != 0) {
+        if (ts_arima_reintegrate_forecast_path(history, history_length, &meta->spec, zero_diff, horizon, base_levels) !=
+            0) {
             free(zero_diff);
             free(base_levels);
             free(resp_diff);
@@ -374,8 +360,8 @@ static int ts_arima_level_stderr(const ts_arima_result_t *model,
             memset(resp_diff, 0, horizon * sizeof(*resp_diff));
             for (i = j; i < horizon; ++i)
                 resp_diff[i] = psi[i - j];
-            if (ts_arima_reintegrate_forecast_path(history, history_length, &meta->spec,
-                                                   resp_diff, horizon, resp_levels) != 0) {
+            if (ts_arima_reintegrate_forecast_path(history, history_length, &meta->spec, resp_diff, horizon,
+                                                   resp_levels) != 0) {
                 free(zero_diff);
                 free(base_levels);
                 free(resp_diff);
@@ -417,10 +403,8 @@ static size_t ts_first_nonmissing_index(const timeseries_t *series)
     return series->length;
 }
 
-static timeseries_t *ts_arima_reconstruct_fitted_levels(const timeseries_t *history,
-                                                        const ts_arima_spec_t *spec,
-                                                        const timeseries_t *fitted_transformed,
-                                                        size_t start_index)
+static timeseries_t *ts_arima_reconstruct_fitted_levels(const timeseries_t *history, const ts_arima_spec_t *spec,
+                                                        const timeseries_t *fitted_transformed, size_t start_index)
 {
     double **ord_stages = NULL;
     double **season_stages = NULL;
@@ -540,17 +524,13 @@ static size_t ts_arima_max_lag(const ts_arima_spec_t *spec)
     return max_lag;
 }
 
-static matrix_t *ts_arima_dynamic_design_matrix(const timeseries_t *response,
-                                                const matrix_t *xreg_trimmed,
-                                                const ts_arima_spec_t *spec,
-                                                size_t trim,
+static matrix_t *ts_arima_dynamic_design_matrix(const timeseries_t *response, const matrix_t *xreg_trimmed,
+                                                const ts_arima_spec_t *spec, size_t trim,
                                                 const double *residual_history)
 {
     matrix_t *X;
-    size_t seasonal_p = ts_arima_effective_seasonal_count(spec ? spec->P : 0u,
-                                                          spec ? spec->season_period : 0u);
-    size_t seasonal_q = ts_arima_effective_seasonal_count(spec ? spec->Q : 0u,
-                                                          spec ? spec->season_period : 0u);
+    size_t seasonal_p = ts_arima_effective_seasonal_count(spec ? spec->P : 0u, spec ? spec->season_period : 0u);
+    size_t seasonal_q = ts_arima_effective_seasonal_count(spec ? spec->Q : 0u, spec ? spec->season_period : 0u);
     size_t xcols = xreg_trimmed ? mat_get_col_count(xreg_trimmed) : 0u;
     size_t rows = response && response->length > trim ? response->length - trim : 0u;
     size_t cols = (spec ? spec->p + seasonal_p + spec->q + seasonal_q : 0u) + xcols;
@@ -598,9 +578,7 @@ static matrix_t *ts_arima_dynamic_design_matrix(const timeseries_t *response,
     return X;
 }
 
-static void ts_arima_extract_residual_history(const timeseries_t *residuals,
-                                              size_t response_length,
-                                              size_t trim,
+static void ts_arima_extract_residual_history(const timeseries_t *residuals, size_t response_length, size_t trim,
                                               double *out_history)
 {
     size_t i;
@@ -616,22 +594,15 @@ static void ts_arima_extract_residual_history(const timeseries_t *residuals,
     }
 }
 
-static int ts_arima_extract_param_blocks(const matrix_t *coefficients,
-                                         bool has_intercept,
-                                         bool has_drift,
-                                         const ts_arima_spec_t *spec,
-                                         size_t xreg_cols,
-                                         matrix_t **ar_params,
-                                         matrix_t **seasonal_ar_params,
-                                         matrix_t **ma_params,
+static int ts_arima_extract_param_blocks(const matrix_t *coefficients, bool has_intercept, bool has_drift,
+                                         const ts_arima_spec_t *spec, size_t xreg_cols, matrix_t **ar_params,
+                                         matrix_t **seasonal_ar_params, matrix_t **ma_params,
                                          matrix_t **seasonal_ma_params)
 {
     size_t offset = has_intercept ? 1u : 0u;
     size_t i;
-    size_t seasonal_p = ts_arima_effective_seasonal_count(spec ? spec->P : 0u,
-                                                          spec ? spec->season_period : 0u);
-    size_t seasonal_q = ts_arima_effective_seasonal_count(spec ? spec->Q : 0u,
-                                                          spec ? spec->season_period : 0u);
+    size_t seasonal_p = ts_arima_effective_seasonal_count(spec ? spec->P : 0u, spec ? spec->season_period : 0u);
+    size_t seasonal_q = ts_arima_effective_seasonal_count(spec ? spec->Q : 0u, spec ? spec->season_period : 0u);
 
     (void)xreg_cols;
     if (!coefficients || !spec)
@@ -684,17 +655,12 @@ static int ts_arima_extract_param_blocks(const matrix_t *coefficients,
     return 0;
 }
 
-static void ts_arima_build_lag_maps(const ts_arima_result_t *model,
-                                    const ts_arima_spec_t *spec,
-                                    double *phi_lags,
-                                    double *theta_lags,
-                                    size_t max_lag)
+static void ts_arima_build_lag_maps(const ts_arima_result_t *model, const ts_arima_spec_t *spec, double *phi_lags,
+                                    double *theta_lags, size_t max_lag)
 {
     size_t i;
-    size_t seasonal_p = ts_arima_effective_seasonal_count(spec ? spec->P : 0u,
-                                                          spec ? spec->season_period : 0u);
-    size_t seasonal_q = ts_arima_effective_seasonal_count(spec ? spec->Q : 0u,
-                                                          spec ? spec->season_period : 0u);
+    size_t seasonal_p = ts_arima_effective_seasonal_count(spec ? spec->P : 0u, spec ? spec->season_period : 0u);
+    size_t seasonal_q = ts_arima_effective_seasonal_count(spec ? spec->Q : 0u, spec ? spec->season_period : 0u);
 
     if (!phi_lags || !theta_lags || !spec || max_lag == 0u)
         return;
@@ -740,11 +706,8 @@ static void ts_arima_build_lag_maps(const ts_arima_result_t *model,
     }
 }
 
-int ts_arima_fit(const timeseries_t *y,
-                 const matrix_t *xreg,
-                 const ts_arima_spec_t *spec,
-                 const ts_fit_options_t *options,
-                 ts_arima_result_t *out)
+int ts_arima_fit(const timeseries_t *y, const matrix_t *xreg, const ts_arima_spec_t *spec,
+                 const ts_fit_options_t *options, ts_arima_result_t *out)
 {
     timeseries_t *dy = NULL, *dy_clean = NULL, *y_trim = NULL;
     matrix_t *x_work = NULL, *x_trim = NULL, *X = NULL;
@@ -814,8 +777,7 @@ int ts_arima_fit(const timeseries_t *y,
         if (!X)
             goto fail;
         ts_regression_result_clear(&reg);
-        if (ts_regression_fit_internal(y_trim, X, include_intercept, spec->include_drift,
-                                       options, &reg) != 0)
+        if (ts_regression_fit_internal(y_trim, X, include_intercept, spec->include_drift, options, &reg) != 0)
             goto fail;
         ts_arima_extract_residual_history(reg.residuals, dy_clean->length, trim, residual_history);
         beta_len = reg.coefficients ? mat_get_row_count(reg.coefficients) : 0u;
@@ -853,14 +815,8 @@ int ts_arima_fit(const timeseries_t *y,
 
     if (!latest.coefficients)
         goto fail;
-    if (ts_arima_extract_param_blocks(latest.coefficients,
-                                      include_intercept,
-                                      spec->include_drift,
-                                      spec,
-                                      x_trim_cols,
-                                      &out->ar_params,
-                                      &out->seasonal_ar_params,
-                                      &out->ma_params,
+    if (ts_arima_extract_param_blocks(latest.coefficients, include_intercept, spec->include_drift, spec, x_trim_cols,
+                                      &out->ar_params, &out->seasonal_ar_params, &out->ma_params,
                                       &out->seasonal_ma_params) != 0)
         goto fail;
     out->xreg_params = latest.coefficients;
@@ -888,8 +844,8 @@ int ts_arima_fit(const timeseries_t *y,
             intercept_value = mat_get_num(out->xreg_params, 0u, 0u);
             intercept_ptr = &intercept_value;
         }
-        if (ts_arima_meta_store(out, spec, include_intercept, spec->include_drift,
-                                trim, rows, intercept_ptr, xreg) != 0) {
+        if (ts_arima_meta_store(out, spec, include_intercept, spec->include_drift, trim, rows, intercept_ptr, xreg) !=
+            0) {
             if (intercept_ptr)
                 num_destroy(intercept_ptr);
             goto fail;
@@ -908,8 +864,11 @@ int ts_arima_fit(const timeseries_t *y,
     ts_regression_result_clear(&reg);
     ts_regression_result_clear(&latest);
     ts_free(y_trim);
-    ts_free(dy); ts_free(dy_clean);
-    mat_free(x_work); mat_free(x_trim); mat_free(X);
+    ts_free(dy);
+    ts_free(dy_clean);
+    mat_free(x_work);
+    mat_free(x_trim);
+    mat_free(X);
     free(residual_history);
     free(prev_coeff);
     return 0;
@@ -919,23 +878,20 @@ fail:
     ts_regression_result_clear(&latest);
     ts_free(display_fitted);
     ts_free(y_trim);
-    ts_free(dy); ts_free(dy_clean);
-    mat_free(x_work); mat_free(x_trim); mat_free(X);
+    ts_free(dy);
+    ts_free(dy_clean);
+    mat_free(x_work);
+    mat_free(x_trim);
+    mat_free(X);
     free(residual_history);
     free(prev_coeff);
     ts_arima_result_clear(out);
     return -1;
 }
 
-int ts_auto_arima(const timeseries_t *y,
-                  const matrix_t *xreg,
-                  size_t max_p, size_t max_d, size_t max_q,
-                  size_t max_P, size_t max_D, size_t max_Q,
-                  size_t season_period,
-                  ts_information_criterion_t criterion,
-                  const ts_fit_options_t *options,
-                  ts_arima_spec_t *best_spec,
-                  ts_arima_result_t *best_fit)
+int ts_auto_arima(const timeseries_t *y, const matrix_t *xreg, size_t max_p, size_t max_d, size_t max_q, size_t max_P,
+                  size_t max_D, size_t max_Q, size_t season_period, ts_information_criterion_t criterion,
+                  const ts_fit_options_t *options, ts_arima_spec_t *best_spec, ts_arima_result_t *best_fit)
 {
     double best_score = HUGE_VAL;
     ts_arima_result_t candidate;
@@ -954,8 +910,12 @@ int ts_auto_arima(const timeseries_t *y,
                             double score;
 
                             memset(&candidate, 0, sizeof(candidate));
-                            spec.p = p; spec.d = d; spec.q = q;
-                            spec.P = P; spec.D = D; spec.Q = Q;
+                            spec.p = p;
+                            spec.d = d;
+                            spec.q = q;
+                            spec.P = P;
+                            spec.D = D;
+                            spec.Q = Q;
                             spec.season_period = season_period;
                             spec.include_intercept = true;
                             spec.include_mean = true;
@@ -1023,25 +983,18 @@ bool ts_arima_is_invertible(const ts_arima_result_t *model)
     return true;
 }
 
-int ts_arima_residual_acf(const ts_arima_result_t *model,
-                          size_t max_lag, matrix_t **out)
+int ts_arima_residual_acf(const ts_arima_result_t *model, size_t max_lag, matrix_t **out)
 {
     return model ? ts_acf(model->residuals, max_lag, out) : -1;
 }
 
-int ts_arima_ljung_box(const ts_arima_result_t *model,
-                       size_t max_lag,
-                       number_t *statistic, number_t *p_value)
+int ts_arima_ljung_box(const ts_arima_result_t *model, size_t max_lag, number_t *statistic, number_t *p_value)
 {
     return model ? ts_ljung_box(model->residuals, max_lag, statistic, p_value) : -1;
 }
 
-int ts_arima_forecast(const ts_arima_result_t *model,
-                      const timeseries_t *history,
-                      const matrix_t *future_xreg,
-                      size_t horizon,
-                      number_t level,
-                      ts_forecast_t *out)
+int ts_arima_forecast(const ts_arima_result_t *model, const timeseries_t *history, const matrix_t *future_xreg,
+                      size_t horizon, number_t level, ts_forecast_t *out)
 {
     ts_arima_meta_t *meta;
     timeseries_t *mean = NULL, *stderr = NULL, *lower = NULL, *upper = NULL;
@@ -1073,9 +1026,7 @@ int ts_arima_forecast(const ts_arima_result_t *model,
     if (future_xreg && mat_get_row_count(future_xreg) < horizon)
         goto fail;
     if (future_xreg && meta && ts_arima_spec_differences_xreg(&meta->spec)) {
-        future_xreg_work = ts_arima_transform_xreg_future(meta->xreg_history,
-                                                          future_xreg,
-                                                          &meta->spec);
+        future_xreg_work = ts_arima_transform_xreg_future(meta->xreg_history, future_xreg, &meta->spec);
         if (!future_xreg_work)
             goto fail;
         xreg_for_forecast = future_xreg_work;
@@ -1146,13 +1097,11 @@ int ts_arima_forecast(const ts_arima_result_t *model,
             }
         }
         if (xreg_for_forecast && model->xreg_params) {
-            size_t offset = (meta && meta->has_intercept ? 1u : 0u) +
-                            (meta && meta->has_drift ? 1u : 0u) +
-                            (meta ? meta->spec.p +
-                                    ts_arima_effective_seasonal_count(meta->spec.P, meta->spec.season_period) +
-                                    meta->spec.q +
-                                    ts_arima_effective_seasonal_count(meta->spec.Q, meta->spec.season_period)
-                                  : 0u);
+            size_t offset =
+                (meta && meta->has_intercept ? 1u : 0u) + (meta && meta->has_drift ? 1u : 0u) +
+                (meta ? meta->spec.p + ts_arima_effective_seasonal_count(meta->spec.P, meta->spec.season_period) +
+                            meta->spec.q + ts_arima_effective_seasonal_count(meta->spec.Q, meta->spec.season_period)
+                      : 0u);
 
             for (j = 0u; j < xcols; ++j) {
                 number_t beta = mat_get_num(model->xreg_params, offset + j, 0);
@@ -1218,7 +1167,10 @@ fail:
     free(theta_lags);
     mat_free(future_xreg_work);
     datetime_dealloc(start);
-    ts_free(mean); ts_free(stderr); ts_free(lower); ts_free(upper);
+    ts_free(mean);
+    ts_free(stderr);
+    ts_free(lower);
+    ts_free(upper);
     num_destroy(&z);
     return -1;
 }

@@ -206,19 +206,19 @@ static void test_qf_atan(void)
         qfloat_t expected;
     } atan_tests[] = {
         /* exact */
-        { { 0.0, 0.0 }, "atan(0)",     { 0.0, 0.0 } },
+        {{0.0, 0.0}, "atan(0)", {0.0, 0.0}},
 
         /* exact: atan(1) = pi/4 */
-        { { 1.0, 0.0 }, "atan(1)",     QF_PI_4 },
+        {{1.0, 0.0}, "atan(1)", QF_PI_4},
 
         /* exact: atan(-1) = -pi/4 */
-        { { -1.0, 0.0 }, "atan(-1)",   qf_neg(QF_PI_4) },
+        {{-1.0, 0.0}, "atan(-1)", qf_neg(QF_PI_4)},
 
         /* numeric: atan(0.5) = 0.46364760900080611621425623146121 */
-        { { 0.5, 0.0 }, "atan(0.5)", qf_from_string("0.46364760900080611621425623146121") },
+        {{0.5, 0.0}, "atan(0.5)", qf_from_string("0.46364760900080611621425623146121")},
 
         /* numeric: atan(2) = 1.1071487177940905030170654601785 */
-        { { 2.0, 0.0 }, "atan(2)", qf_from_string("1.1071487177940905030170654601785") },
+        {{2.0, 0.0}, "atan(2)", qf_from_string("1.1071487177940905030170654601785")},
     };
 
     int N_ATAN_TESTS = sizeof(atan_tests) / sizeof(atan_tests[0]);
@@ -245,11 +245,9 @@ static void test_qf_atan(void)
     }
 }
 
-
 /* ============================================================
  *  asin tests
  * ============================================================ */
-
 
 static void test_qf_asin(void)
 {
@@ -258,16 +256,16 @@ static void test_qf_asin(void)
         const char *name;
         qfloat_t expected;
     } asin_tests[] = {
-        { { 0.0, 0.0 }, "asin(0)",   { 0.0, 0.0 } },
+        {{0.0, 0.0}, "asin(0)", {0.0, 0.0}},
 
         /* exact: asin(0.5) = pi/6 */
-        { { 0.5, 0.0 }, "asin(0.5)", QF_PI_6 },
+        {{0.5, 0.0}, "asin(0.5)", QF_PI_6},
 
         /* exact: asin(1) = pi/2 */
-        { { 1.0, 0.0 }, "asin(1)",   QF_PI_2 },
+        {{1.0, 0.0}, "asin(1)", QF_PI_2},
 
         /* exact: asin(-1) = -pi/2 */
-        { { -1.0, 0.0 }, "asin(-1)", qf_neg(QF_PI_2) },
+        {{-1.0, 0.0}, "asin(-1)", qf_neg(QF_PI_2)},
     };
 
     int N_ASIN_TESTS = sizeof(asin_tests) / sizeof(asin_tests[0]);
@@ -305,7 +303,6 @@ static void test_qf_asin(void)
     }
 }
 
-
 /* ============================================================
  *  acos tests
  * ============================================================ */
@@ -318,16 +315,16 @@ static void test_qf_acos(void)
         qfloat_t expected;
     } acos_tests[] = {
         /* exact */
-        { { 1.0, 0.0 }, "acos(1)",   { 0.0, 0.0 } },
+        {{1.0, 0.0}, "acos(1)", {0.0, 0.0}},
 
         /* exact: acos(0) = pi/2 */
-        { { 0.0, 0.0 }, "acos(0)",   QF_PI_2 },
+        {{0.0, 0.0}, "acos(0)", QF_PI_2},
 
         /* exact: acos(-1) = pi */
-        { { -1.0, 0.0 }, "acos(-1)", QF_PI },
+        {{-1.0, 0.0}, "acos(-1)", QF_PI},
 
         /* exact: acos(0.5) = pi/3 */
-        { { 0.5, 0.0 }, "acos(0.5)", QF_PI_3 },
+        {{0.5, 0.0}, "acos(0.5)", QF_PI_3},
     };
 
     int N_ACOS_TESTS = sizeof(acos_tests) / sizeof(acos_tests[0]);
@@ -365,7 +362,6 @@ static void test_qf_acos(void)
     }
 }
 
-
 /* ============================================================
  *  atan2 tests
  * ============================================================ */
@@ -378,18 +374,18 @@ static void test_qf_atan2(void)
         qfloat_t expected;
     } atan2_tests[] = {
         /* exact */
-        { {0.0,0.0}, {1.0,0.0}, "atan2(0,1)",   {0.0,0.0} },
+        {{0.0, 0.0}, {1.0, 0.0}, "atan2(0,1)", {0.0, 0.0}},
 
-        { {1.0,0.0}, {0.0,0.0}, "atan2(1,0)",   QF_PI_2 },
-        { {-1.0,0.0},{0.0,0.0}, "atan2(-1,0)",  qf_neg(QF_PI_2) },
+        {{1.0, 0.0}, {0.0, 0.0}, "atan2(1,0)", QF_PI_2},
+        {{-1.0, 0.0}, {0.0, 0.0}, "atan2(-1,0)", qf_neg(QF_PI_2)},
 
-        { {1.0,0.0}, {1.0,0.0}, "atan2(1,1)",   QF_PI_4 },
+        {{1.0, 0.0}, {1.0, 0.0}, "atan2(1,1)", QF_PI_4},
 
         /* atan2(-1,-1) = -3π/4 */
-        { {-1.0,0.0},{-1.0,0.0},"atan2(-1,-1)", qf_neg(qf_sub(QF_PI, QF_PI_4)) },
+        {{-1.0, 0.0}, {-1.0, 0.0}, "atan2(-1,-1)", qf_neg(qf_sub(QF_PI, QF_PI_4))},
 
         /* atan2(1,-1) = 3π/4 */
-        { {1.0,0.0}, {-1.0,0.0},"atan2(1,-1)",  qf_sub(QF_PI, QF_PI_4) },
+        {{1.0, 0.0}, {-1.0, 0.0}, "atan2(1,-1)", qf_sub(QF_PI, QF_PI_4)},
     };
 
     int N_ATAN2_TESTS = sizeof(atan2_tests) / sizeof(atan2_tests[0]);
@@ -420,7 +416,8 @@ static void test_qf_atan2(void)
     }
 }
 
-void test_trigonometric(void) {
+void test_trigonometric(void)
+{
     TEST_RUN_SUBTEST(test_qf_trig, NULL);
     TEST_RUN_SUBTEST(test_qf_reciprocal_trig, NULL);
     TEST_RUN_SUBTEST(test_qf_haversine_family, NULL);

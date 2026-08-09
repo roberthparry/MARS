@@ -48,17 +48,14 @@ static bool symbolic_poly2_add_const(symbolic_poly2_t *poly, size_t degree, long
 
 static bool symbolic_poly2_collect(const expr_t *expr, const expr_t *wrt, symbolic_poly2_t *poly);
 
-static bool symbolic_poly2_collect_mul(const expr_t *left,
-                                       const expr_t *right,
-                                       const expr_t *wrt,
+static bool symbolic_poly2_collect_mul(const expr_t *left, const expr_t *right, const expr_t *wrt,
                                        symbolic_poly2_t *poly)
 {
-    symbolic_poly2_t left_poly = { 0 };
-    symbolic_poly2_t right_poly = { 0 };
+    symbolic_poly2_t left_poly = {0};
+    symbolic_poly2_t right_poly = {0};
     bool ok = false;
 
-    if (!symbolic_poly2_collect(left, wrt, &left_poly) ||
-        !symbolic_poly2_collect(right, wrt, &right_poly))
+    if (!symbolic_poly2_collect(left, wrt, &left_poly) || !symbolic_poly2_collect(right, wrt, &right_poly))
         goto cleanup;
 
     for (size_t i = 0; i < 3u; ++i) {
@@ -105,7 +102,7 @@ static bool symbolic_poly2_collect(const expr_t *expr, const expr_t *wrt, symbol
     }
 
     if (expr_is_op(expr, &ops_neg) && expr->a) {
-        symbolic_poly2_t inner = { 0 };
+        symbolic_poly2_t inner = {0};
 
         if (!symbolic_poly2_collect(expr->a, wrt, &inner)) {
             symbolic_poly2_clear(&inner);
@@ -128,16 +125,14 @@ static bool symbolic_poly2_collect(const expr_t *expr, const expr_t *wrt, symbol
     }
 
     if (expr_is_op(expr, &ops_add) && expr->a && expr->b) {
-        ok = symbolic_poly2_collect(expr->a, wrt, poly) &&
-             symbolic_poly2_collect(expr->b, wrt, poly);
+        ok = symbolic_poly2_collect(expr->a, wrt, poly) && symbolic_poly2_collect(expr->b, wrt, poly);
         goto cleanup;
     }
 
     if (expr_is_op(expr, &ops_sub) && expr->a && expr->b) {
-        symbolic_poly2_t right_poly = { 0 };
+        symbolic_poly2_t right_poly = {0};
 
-        if (!symbolic_poly2_collect(expr->a, wrt, poly) ||
-            !symbolic_poly2_collect(expr->b, wrt, &right_poly)) {
+        if (!symbolic_poly2_collect(expr->a, wrt, poly) || !symbolic_poly2_collect(expr->b, wrt, &right_poly)) {
             symbolic_poly2_clear(&right_poly);
             goto cleanup;
         }
@@ -162,17 +157,13 @@ static bool symbolic_poly2_collect(const expr_t *expr, const expr_t *wrt, symbol
         goto cleanup;
     }
 
-    if (expr_is_pow_d_expr(expr) && is_wrt(expr->a, wrt) &&
-        num_eq(expr->c, NUM_TWO)) {
+    if (expr_is_pow_d_expr(expr) && is_wrt(expr->a, wrt) && num_eq(expr->c, NUM_TWO)) {
         ok = symbolic_poly2_add_const(poly, 2u, 1L);
         goto cleanup;
     }
 
-    if (expr->ops && expr->ops->kind == EXPR_KIND_POW &&
-        expr->a && expr->b &&
-        is_wrt(expr->a, wrt) &&
-        expr_match_const_value(expr->b, &exponent) &&
-        num_eq(exponent, NUM_TWO)) {
+    if (expr->ops && expr->ops->kind == EXPR_KIND_POW && expr->a && expr->b && is_wrt(expr->a, wrt) &&
+        expr_match_const_value(expr->b, &exponent) && num_eq(exponent, NUM_TWO)) {
         ok = symbolic_poly2_add_const(poly, 2u, 1L);
         goto cleanup;
     }
@@ -212,8 +203,7 @@ static bool symbolic_poly2_all_coeffs_numeric(const symbolic_poly2_t *poly)
     return all_numeric;
 }
 
-static bool symbolic_poly2_has_positive_numeric_discriminant(
-    const symbolic_poly2_t *poly)
+static bool symbolic_poly2_has_positive_numeric_discriminant(const symbolic_poly2_t *poly)
 {
     number_t a = num_new();
     number_t b = num_new();
@@ -225,8 +215,7 @@ static bool symbolic_poly2_has_positive_numeric_discriminant(
     number_t discriminant = num_new();
     bool positive = false;
 
-    if (!poly || !poly->coeff[2] ||
-        !expr_match_const_value(poly->coeff[2], &a) ||
+    if (!poly || !poly->coeff[2] || !expr_match_const_value(poly->coeff[2], &a) ||
         (poly->coeff[1] && !expr_match_const_value(poly->coeff[1], &b)) ||
         (poly->coeff[0] && !expr_match_const_value(poly->coeff[0], &c))) {
         goto cleanup;
@@ -254,8 +243,7 @@ cleanup:
     return positive;
 }
 
-static bool symbolic_poly2_write_numeric_deg4(const symbolic_poly2_t *source,
-                                              number_t *target)
+static bool symbolic_poly2_write_numeric_deg4(const symbolic_poly2_t *source, number_t *target)
 {
     number_t value = num_new();
     bool ok = false;
@@ -266,8 +254,7 @@ static bool symbolic_poly2_write_numeric_deg4(const symbolic_poly2_t *source,
     for (size_t i = 0; i < 3u; ++i) {
         if (!source->coeff[i])
             continue;
-        if (!expr_match_const_value(source->coeff[i], &value) ||
-            !num_is_real(value))
+        if (!expr_match_const_value(source->coeff[i], &value) || !num_is_real(value))
             goto cleanup;
         num_destroy(&target[i]);
         target[i] = num_clone(value);
@@ -280,9 +267,7 @@ cleanup:
     return ok;
 }
 
-static expr_t *symbolic_general_quadratic_inverse_integral(const expr_t *wrt,
-                                                           const expr_t *a,
-                                                           const expr_t *b,
+static expr_t *symbolic_general_quadratic_inverse_integral(const expr_t *wrt, const expr_t *a, const expr_t *b,
                                                            const expr_t *c)
 {
     expr_t *four = expr_const_long(4L);
@@ -322,13 +307,9 @@ static expr_t *symbolic_general_quadratic_inverse_integral(const expr_t *wrt,
     two_a = (two_for_arg && a) ? expr_mul(two_for_arg, a) : NULL;
     two_ax = (two_a && wrt) ? expr_mul(two_a, wrt) : NULL;
     arg_num = (two_ax && b) ? expr_add(two_ax, b) : NULL;
-    arg = (arg_num && sqrt_delta_for_arg)
-              ? expr_div(arg_num, sqrt_delta_for_arg)
-              : NULL;
+    arg = (arg_num && sqrt_delta_for_arg) ? expr_div(arg_num, sqrt_delta_for_arg) : NULL;
     atan_arg = arg ? expr_atan(arg) : NULL;
-    scale = (two_for_scale && sqrt_delta_for_scale)
-                ? expr_div(two_for_scale, sqrt_delta_for_scale)
-                : NULL;
+    scale = (two_for_scale && sqrt_delta_for_scale) ? expr_div(two_for_scale, sqrt_delta_for_scale) : NULL;
     out = (scale && atan_arg) ? expr_mul(scale, atan_arg) : NULL;
 
     expr_free(scale);
@@ -366,26 +347,21 @@ static expr_t *add_symbolic_parts_owned(expr_t *left, expr_t *right)
     return sum;
 }
 
-static bool match_negative_quadratic_exponent(const expr_t *exponent,
-                                              const expr_t *wrt,
-                                              number_t *poly,
-                                              number_t *basis_constant,
-                                              number_t *basis_coeff)
+static bool match_negative_quadratic_exponent(const expr_t *exponent, const expr_t *wrt, number_t *poly,
+                                              number_t *basis_constant, number_t *basis_coeff)
 {
     expr_t *vars[1];
-    symbolic_poly2_t direct_poly = { 0 };
+    symbolic_poly2_t direct_poly = {0};
     bool ok = false;
 
     if (!exponent || !wrt || !poly || !basis_constant || !basis_coeff)
         return false;
 
     vars[0] = (expr_t *)wrt;
-    if (expr_match_affine_poly_deg4(exponent, 1u, vars, poly,
-                                    basis_constant, basis_coeff))
+    if (expr_match_affine_poly_deg4(exponent, 1u, vars, poly, basis_constant, basis_coeff))
         return true;
 
-    if (!symbolic_poly2_collect(exponent, wrt, &direct_poly) ||
-        !symbolic_poly2_write_numeric_deg4(&direct_poly, poly))
+    if (!symbolic_poly2_collect(exponent, wrt, &direct_poly) || !symbolic_poly2_write_numeric_deg4(&direct_poly, poly))
         goto cleanup;
 
     num_destroy(basis_constant);
@@ -436,15 +412,9 @@ expr_t *integrate_exp_of_negative_quadratic(const expr_t *expr, const expr_t *wr
 
     number_array_zero_local(poly, 5u);
     if (!expr || !wrt || !expr->a || !expr_is_op(expr, &ops_exp) ||
-        !match_negative_quadratic_exponent(expr->a, wrt, poly,
-                                           &basis_constant, &basis_coeff) ||
-        !num_is_real(poly[0]) ||
-        !num_is_real(poly[1]) ||
-        !num_is_real(poly[2]) ||
-        !num_is_zero(poly[3]) ||
-        !num_is_zero(poly[4]) ||
-        !num_lt(poly[2], NUM_ZERO) ||
-        num_is_zero(basis_coeff))
+        !match_negative_quadratic_exponent(expr->a, wrt, poly, &basis_constant, &basis_coeff) ||
+        !num_is_real(poly[0]) || !num_is_real(poly[1]) || !num_is_real(poly[2]) || !num_is_zero(poly[3]) ||
+        !num_is_zero(poly[4]) || !num_lt(poly[2], NUM_ZERO) || num_is_zero(basis_coeff))
         goto cleanup;
 
     num_destroy(&neg_a);
@@ -490,9 +460,7 @@ expr_t *integrate_exp_of_negative_quadratic(const expr_t *expr, const expr_t *wr
     two_const = expr_const_long(2L);
     basis_coeff_const = expr_new_const(basis_coeff);
     two_root_expr = (two_const && root_expr) ? expr_mul(two_const, root_expr) : NULL;
-    denom_expr = (two_root_expr && basis_coeff_const)
-        ? expr_mul(two_root_expr, basis_coeff_const)
-        : NULL;
+    denom_expr = (two_root_expr && basis_coeff_const) ? expr_mul(two_root_expr, basis_coeff_const) : NULL;
     quotient = (numer && denom_expr) ? expr_div(numer, denom_expr) : NULL;
     out = simplify_owned(quotient);
     quotient = NULL;
@@ -534,8 +502,8 @@ cleanup:
 
 expr_t *integrate_linear_over_symbolic_quadratic(const expr_t *expr, const expr_t *wrt)
 {
-    symbolic_poly2_t numer = { 0 };
-    symbolic_poly2_t denom = { 0 };
+    symbolic_poly2_t numer = {0};
+    symbolic_poly2_t denom = {0};
     expr_t *a = NULL;
     expr_t *b = NULL;
     expr_t *c = NULL;
@@ -556,12 +524,9 @@ expr_t *integrate_linear_over_symbolic_quadratic(const expr_t *expr, const expr_
     if (!expr || !expr->a || !expr->b)
         return NULL;
 
-    if (!symbolic_poly2_collect(expr->a, wrt, &numer) ||
-        !symbolic_poly2_collect(expr->b, wrt, &denom) ||
-        numer.coeff[2] ||
-        !denom.coeff[2] ||
-        (symbolic_poly2_all_coeffs_numeric(&numer) &&
-         symbolic_poly2_all_coeffs_numeric(&denom) &&
+    if (!symbolic_poly2_collect(expr->a, wrt, &numer) || !symbolic_poly2_collect(expr->b, wrt, &denom) ||
+        numer.coeff[2] || !denom.coeff[2] ||
+        (symbolic_poly2_all_coeffs_numeric(&numer) && symbolic_poly2_all_coeffs_numeric(&denom) &&
          (!denom.coeff[1] || expr_is_exact_zero(denom.coeff[1]) ||
           !symbolic_poly2_has_positive_numeric_discriminant(&denom))))
         goto cleanup;
@@ -582,9 +547,7 @@ expr_t *integrate_linear_over_symbolic_quadratic(const expr_t *expr, const expr_
     remainder = (n && alpha_b) ? expr_sub(n, alpha_b) : NULL;
     remainder = simplify_owned(remainder);
     inverse_integral = symbolic_general_quadratic_inverse_integral(wrt, a, b, c);
-    remainder_part = (remainder && inverse_integral)
-                         ? expr_mul(remainder, inverse_integral)
-                         : NULL;
+    remainder_part = (remainder && inverse_integral) ? expr_mul(remainder, inverse_integral) : NULL;
     sum = add_symbolic_parts_owned(log_part, remainder_part);
     log_part = NULL;
     remainder_part = NULL;
@@ -612,7 +575,7 @@ cleanup:
 
 expr_t *integrate_log_of_symbolic_quadratic(const expr_t *expr, const expr_t *wrt)
 {
-    symbolic_poly2_t poly = { 0 };
+    symbolic_poly2_t poly = {0};
     expr_t *a = NULL;
     expr_t *b = NULL;
     expr_t *c = NULL;
@@ -634,11 +597,8 @@ expr_t *integrate_log_of_symbolic_quadratic(const expr_t *expr, const expr_t *wr
     expr_t *rational_part = NULL;
     expr_t *sum = NULL;
 
-    if (!expr || !wrt || !expr->a ||
-        !expr_is_op(expr, &ops_log) ||
-        !symbolic_poly2_collect(expr->a, wrt, &poly) ||
-        !poly.coeff[2] ||
-        expr_is_exact_zero(poly.coeff[2])) {
+    if (!expr || !wrt || !expr->a || !expr_is_op(expr, &ops_log) || !symbolic_poly2_collect(expr->a, wrt, &poly) ||
+        !poly.coeff[2] || expr_is_exact_zero(poly.coeff[2])) {
         symbolic_poly2_clear(&poly);
         return NULL;
     }
@@ -664,9 +624,7 @@ expr_t *integrate_log_of_symbolic_quadratic(const expr_t *expr, const expr_t *wr
     remainder = (two_c && alpha_b) ? expr_sub(two_c, alpha_b) : NULL;
     remainder = simplify_owned(remainder);
     inverse_integral = symbolic_general_quadratic_inverse_integral(wrt, a, b, c);
-    remainder_part = (remainder && inverse_integral)
-                         ? expr_mul(remainder, inverse_integral)
-                         : NULL;
+    remainder_part = (remainder && inverse_integral) ? expr_mul(remainder, inverse_integral) : NULL;
     rational_part = add_symbolic_parts_owned(log_part, remainder_part);
     log_part = NULL;
     remainder_part = NULL;

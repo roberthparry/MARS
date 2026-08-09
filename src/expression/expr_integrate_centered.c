@@ -3,9 +3,7 @@
 #define MARS_EXPR_INTEGRATE_INTERNAL_ACCESS
 #include "expr_integrate_internal.h"
 
-static bool match_linear_poly_in_wrt(const expr_t *expr,
-                                     const expr_t *wrt,
-                                     number_t *poly)
+static bool match_linear_poly_in_wrt(const expr_t *expr, const expr_t *wrt, number_t *poly)
 {
     number_t basis_constant = num_new();
     number_t basis_coeff = num_new();
@@ -13,25 +11,16 @@ static bool match_linear_poly_in_wrt(const expr_t *expr,
     bool ok;
 
     vars[0] = (expr_t *)wrt;
-    ok = expr_match_affine_poly_deg4(expr, 1u, vars, poly, &basis_constant,
-                                     &basis_coeff) &&
-         expr_integrate_rewrite_poly_deg4_to_affine_basis(poly,
-                                                          basis_constant,
-                                                          basis_coeff,
-                                                          NUM_ZERO,
-                                                          NUM_ONE) &&
-         num_is_zero(poly[2]) &&
-         num_is_zero(poly[3]) &&
-         num_is_zero(poly[4]);
+    ok = expr_match_affine_poly_deg4(expr, 1u, vars, poly, &basis_constant, &basis_coeff) &&
+         expr_integrate_rewrite_poly_deg4_to_affine_basis(poly, basis_constant, basis_coeff, NUM_ZERO, NUM_ONE) &&
+         num_is_zero(poly[2]) && num_is_zero(poly[3]) && num_is_zero(poly[4]);
 
     num_destroy(&basis_coeff);
     num_destroy(&basis_constant);
     return ok;
 }
 
-static bool match_centered_quadratic_expr(const expr_t *expr,
-                                          const expr_t *wrt,
-                                          number_t *constant_out,
+static bool match_centered_quadratic_expr(const expr_t *expr, const expr_t *wrt, number_t *constant_out,
                                           number_t *quad_coeff_out)
 {
     number_t poly[5];
@@ -42,20 +31,10 @@ static bool match_centered_quadratic_expr(const expr_t *expr,
 
     vars[0] = (expr_t *)wrt;
     number_array_zero_local(poly, 5);
-    ok = expr_match_affine_poly_deg4(expr, 1u, vars, poly, &basis_constant,
-                                     &basis_coeff) &&
-         expr_integrate_rewrite_poly_deg4_to_affine_basis(poly,
-                                                          basis_constant,
-                                                          basis_coeff,
-                                                          NUM_ZERO,
-                                                          NUM_ONE) &&
-         num_is_zero(poly[1]) &&
-         num_is_zero(poly[3]) &&
-         num_is_zero(poly[4]) &&
-         !num_is_zero(poly[0]) &&
-         !num_is_zero(poly[2]) &&
-         num_is_real(poly[0]) &&
-         num_is_real(poly[2]);
+    ok = expr_match_affine_poly_deg4(expr, 1u, vars, poly, &basis_constant, &basis_coeff) &&
+         expr_integrate_rewrite_poly_deg4_to_affine_basis(poly, basis_constant, basis_coeff, NUM_ZERO, NUM_ONE) &&
+         num_is_zero(poly[1]) && num_is_zero(poly[3]) && num_is_zero(poly[4]) && !num_is_zero(poly[0]) &&
+         !num_is_zero(poly[2]) && num_is_real(poly[0]) && num_is_real(poly[2]);
     if (ok) {
         num_destroy(constant_out);
         *constant_out = num_clone(poly[0]);
@@ -69,17 +48,14 @@ static bool match_centered_quadratic_expr(const expr_t *expr,
     return ok;
 }
 
-expr_t *integrate_sqrt_one_plus_minus_affine_square(const expr_t *quadratic,
-                                                     const expr_t *wrt)
+expr_t *integrate_sqrt_one_plus_minus_affine_square(const expr_t *quadratic, const expr_t *wrt)
 {
     number_t constant = num_new();
     number_t coeff = num_new();
     bool is_plus_square = false;
     expr_t *out = NULL;
 
-    if (quadratic &&
-        match_one_plus_minus_affine_square(quadratic, wrt, &is_plus_square,
-                                           &constant, &coeff) &&
+    if (quadratic && match_one_plus_minus_affine_square(quadratic, wrt, &is_plus_square, &constant, &coeff) &&
         !num_eq(coeff, NUM_ZERO)) {
         expr_t *u = build_affine_from_match(wrt, constant, coeff);
         expr_t *root = expr_sqrt(quadratic);
@@ -98,8 +74,7 @@ expr_t *integrate_sqrt_one_plus_minus_affine_square(const expr_t *quadratic,
     return out;
 }
 
-static expr_t *integrate_centered_quadratic_inverse_root(const expr_t *quadratic,
-                                                         const expr_t *wrt)
+static expr_t *integrate_centered_quadratic_inverse_root(const expr_t *quadratic, const expr_t *wrt)
 {
     number_t constant = num_new();
     number_t quad = num_new();
@@ -242,8 +217,7 @@ cleanup:
     return out;
 }
 
-expr_t *integrate_linear_poly_over_centered_quadratic_root(const expr_t *expr,
-                                                           const expr_t *wrt)
+expr_t *integrate_linear_poly_over_centered_quadratic_root(const expr_t *expr, const expr_t *wrt)
 {
     number_t poly[5];
     number_t constant = num_new();
@@ -253,10 +227,7 @@ expr_t *integrate_linear_poly_over_centered_quadratic_root(const expr_t *expr,
     expr_t *out = NULL;
 
     number_array_zero_local(poly, 5);
-    if (!expr || !expr->a || !expr->b ||
-        !expr->b->ops ||
-        expr->b->ops->kind != EXPR_KIND_SQRT ||
-        !expr->b->a ||
+    if (!expr || !expr->a || !expr->b || !expr->b->ops || expr->b->ops->kind != EXPR_KIND_SQRT || !expr->b->a ||
         !match_linear_poly_in_wrt(expr->a, wrt, poly) ||
         !match_centered_quadratic_expr(expr->b->a, wrt, &constant, &quad))
         goto cleanup;
@@ -286,8 +257,7 @@ cleanup:
     return out;
 }
 
-expr_t *integrate_linear_poly_times_centered_quadratic_root(const expr_t *expr,
-                                                            const expr_t *wrt)
+expr_t *integrate_linear_poly_times_centered_quadratic_root(const expr_t *expr, const expr_t *wrt)
 {
     const expr_t *poly_expr = NULL;
     const expr_t *sqrt_expr = NULL;
@@ -312,8 +282,7 @@ expr_t *integrate_linear_poly_times_centered_quadratic_root(const expr_t *expr,
         goto cleanup;
     }
 
-    if (!sqrt_expr->a ||
-        !match_linear_poly_in_wrt(poly_expr, wrt, poly) ||
+    if (!sqrt_expr->a || !match_linear_poly_in_wrt(poly_expr, wrt, poly) ||
         !match_centered_quadratic_expr(sqrt_expr->a, wrt, &constant, &quad))
         goto cleanup;
 

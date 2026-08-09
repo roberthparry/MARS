@@ -55,22 +55,14 @@ void run_number_constant_tests(void)
         number_t i_value = NUM_I;
         number_t neg_i = NUM_NEG_I;
 
-        assert_number_string_prefix("NUM_PI", pi,
-                                    "3.141592653589793238462643383279");
-        assert_number_string_prefix("NUM_E", e,
-                                    "2.718281828459045235360287471352");
-        assert_number_string_prefix("NUM_EULER_MASCHERONI", gamma,
-                                    "0.577215664901532860606512090082");
-        assert_number_string_prefix("NUM_PHI", phi,
-                                    "1.618033988749894848204586834365");
-        assert_number_string_prefix("NUM_SQRT3", sqrt3,
-                                    "1.732050807568877293527446341505");
-        assert_number_string_prefix("NUM_SQRT2_OVER_TWO", half_sqrt2,
-                                    "0.707106781186547524400844362104");
-        assert_number_string_prefix("NUM_SQRT3_OVER_TWO", half_sqrt3,
-                                    "0.866025403784438646763723170752");
-        assert_number_string_prefix("NUM_NEG_PI_2", NUM_NEG_PI_2,
-                                    "-1.570796326794896619231321691639");
+        assert_number_string_prefix("NUM_PI", pi, "3.141592653589793238462643383279");
+        assert_number_string_prefix("NUM_E", e, "2.718281828459045235360287471352");
+        assert_number_string_prefix("NUM_EULER_MASCHERONI", gamma, "0.577215664901532860606512090082");
+        assert_number_string_prefix("NUM_PHI", phi, "1.618033988749894848204586834365");
+        assert_number_string_prefix("NUM_SQRT3", sqrt3, "1.732050807568877293527446341505");
+        assert_number_string_prefix("NUM_SQRT2_OVER_TWO", half_sqrt2, "0.707106781186547524400844362104");
+        assert_number_string_prefix("NUM_SQRT3_OVER_TWO", half_sqrt3, "0.866025403784438646763723170752");
+        assert_number_string_prefix("NUM_NEG_PI_2", NUM_NEG_PI_2, "-1.570796326794896619231321691639");
         assert_number_string("NUM_I", i, "i");
         assert_number_string("NUM_NEG_I", neg_i, "-i");
         assert_number_string("num_pow10(6)", million, "1000000");

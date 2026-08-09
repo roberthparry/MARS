@@ -99,9 +99,7 @@ const char *jurisdict_last_error(const jurisdiction_t *jurisdiction);
  * @param longitude output longitude pointer.
  * @return @c true when a default location is available, otherwise @c false.
  */
-bool jurisdict_default_location(jurisdiction_t *jurisdiction,
-                                double *latitude,
-                                double *longitude);
+bool jurisdict_default_location(jurisdiction_t *jurisdiction, double *latitude, double *longitude);
 
 /**
  * @brief Return the jurisdiction-local GMT offset for a date.
@@ -115,9 +113,7 @@ bool jurisdict_default_location(jurisdiction_t *jurisdiction,
  * @param offset_hours output offset pointer, in hours east of GMT.
  * @return @c true when the offset is available, otherwise @c false.
  */
-bool jurisdict_default_gmt_offset(jurisdiction_t *jurisdiction,
-                                  const datetime_t *date,
-                                  double *offset_hours);
+bool jurisdict_default_gmt_offset(jurisdiction_t *jurisdiction, const datetime_t *date, double *offset_hours);
 
 /**
  * @brief Return the daylight-saving transition moments for a jurisdiction year.
@@ -139,9 +135,7 @@ bool jurisdict_default_gmt_offset(jurisdiction_t *jurisdiction,
  * @param clocks_back optional output for the local moment clocks move back.
  * @return @c true when the query succeeds, otherwise @c false.
  */
-bool jurisdict_dst_transition_datetimes(jurisdiction_t *jurisdiction,
-                                        int year,
-                                        datetime_t **clocks_forward,
+bool jurisdict_dst_transition_datetimes(jurisdiction_t *jurisdiction, int year, datetime_t **clocks_forward,
                                         datetime_t **clocks_back);
 
 /**
@@ -168,13 +162,9 @@ bool jurisdict_dst_transition_datetimes(jurisdiction_t *jurisdiction,
  *        backward transition.
  * @return @c true when the query succeeds, otherwise @c false.
  */
-bool jurisdict_dst_transition_details(jurisdiction_t *jurisdiction,
-                                      int year,
-                                      datetime_t **clocks_forward,
-                                      double *forward_from_offset_hours,
-                                      double *forward_to_offset_hours,
-                                      datetime_t **clocks_back,
-                                      double *back_from_offset_hours,
+bool jurisdict_dst_transition_details(jurisdiction_t *jurisdiction, int year, datetime_t **clocks_forward,
+                                      double *forward_from_offset_hours, double *forward_to_offset_hours,
+                                      datetime_t **clocks_back, double *back_from_offset_hours,
                                       double *back_to_offset_hours);
 
 /**
@@ -189,9 +179,7 @@ bool jurisdict_dst_transition_details(jurisdiction_t *jurisdiction,
  * @return newly allocated array of @c holiday_event_t values, or @c NULL on
  *         failure.
  */
-array_t *jurisdict_holidays_between(jurisdiction_t *jurisdiction,
-                                    const datetime_t *start,
-                                    const datetime_t *end);
+array_t *jurisdict_holidays_between(jurisdiction_t *jurisdiction, const datetime_t *start, const datetime_t *end);
 
 /**
  * @brief Return whether @p date falls on a weekend in this jurisdiction.
@@ -200,8 +188,7 @@ array_t *jurisdict_holidays_between(jurisdiction_t *jurisdiction,
  * @param date date to test.
  * @return @c true when @p date is a weekend day, otherwise @c false.
  */
-bool jurisdict_is_weekend(jurisdiction_t *jurisdiction,
-                          const datetime_t *date);
+bool jurisdict_is_weekend(jurisdiction_t *jurisdiction, const datetime_t *date);
 
 /**
  * @brief Return whether @p date is a national holiday in this jurisdiction.
@@ -210,8 +197,7 @@ bool jurisdict_is_weekend(jurisdiction_t *jurisdiction,
  * @param date date to test.
  * @return @c true when @p date is a national holiday, otherwise @c false.
  */
-bool jurisdict_is_national_holiday(jurisdiction_t *jurisdiction,
-                                   const datetime_t *date);
+bool jurisdict_is_national_holiday(jurisdiction_t *jurisdiction, const datetime_t *date);
 
 /**
  * @brief Count working days in the inclusive range [@p start, @p end].
@@ -224,9 +210,7 @@ bool jurisdict_is_national_holiday(jurisdiction_t *jurisdiction,
  * @param end inclusive end date.
  * @return number of working days, or -1 on failure.
  */
-long jurisdict_working_days_between(jurisdiction_t *jurisdiction,
-                                    const datetime_t *start,
-                                    const datetime_t *end);
+long jurisdict_working_days_between(jurisdiction_t *jurisdiction, const datetime_t *start, const datetime_t *end);
 
 /**
  * @brief Enumerate holidays in the inclusive range [@p start, @p end].
@@ -239,11 +223,8 @@ long jurisdict_working_days_between(jurisdiction_t *jurisdiction,
  * @param ctx caller-owned context pointer passed to @p visitor.
  * @return @c true on success, or @c false if rule loading/evaluation failed.
  */
-bool jurisdict_each_holiday_between(jurisdiction_t *jurisdiction,
-                                    const datetime_t *start,
-                                    const datetime_t *end,
-                                    jurisdict_visit_fn visitor,
-                                    void *ctx);
+bool jurisdict_each_holiday_between(jurisdiction_t *jurisdiction, const datetime_t *start, const datetime_t *end,
+                                    jurisdict_visit_fn visitor, void *ctx);
 
 /**
  * @brief Serialise a jurisdiction engine into a SQLite-ready payload.
@@ -260,11 +241,8 @@ bool jurisdict_each_holiday_between(jurisdiction_t *jurisdiction,
  * @param out_len Receives the payload length in bytes.
  * @return @c true on success, otherwise @c false.
  */
-bool jurisdict_serialize(const jurisdiction_t *jurisdiction,
-                         string_t **out_type,
-                         string_t **out_encoding,
-                         void **out_data,
-                         size_t *out_len);
+bool jurisdict_serialize(const jurisdiction_t *jurisdiction, string_t **out_type, string_t **out_encoding,
+                         void **out_data, size_t *out_len);
 
 /**
  * @brief Reconstruct a jurisdiction engine from a serialised payload.
@@ -275,9 +253,6 @@ bool jurisdict_serialize(const jurisdiction_t *jurisdiction,
  * @param encoding Stored encoding label.
  * @return Newly allocated jurisdiction engine on success, otherwise @c NULL.
  */
-jurisdiction_t *jurisdict_deserialise(const void *data,
-                                      size_t len,
-                                      const string_t *type,
-                                      const string_t *encoding);
+jurisdiction_t *jurisdict_deserialise(const void *data, size_t len, const string_t *type, const string_t *encoding);
 
 #endif /* MARS_JURISDICTION_H */

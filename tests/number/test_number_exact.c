@@ -28,9 +28,7 @@ static void run_number_exact_integer_construction_tests(void)
     ASSERT_EQ_INT((int)num_get_prec_bits(wide), 0);
 
     ASSERT_EQ_INT(num_set_long(&set_target, 123456789L), 0);
-    assert_number_string("num_set_long changes storage to exact integer",
-                         set_target,
-                         "123456789");
+    assert_number_string("num_set_long changes storage to exact integer", set_target, "123456789");
     ASSERT_TRUE(num_is_exact(set_target));
     ASSERT_EQ_INT((int)num_get_prec_bits(set_target), 0);
 
@@ -57,15 +55,9 @@ static void run_number_exact_rational_construction_tests(void)
     assert_number_string("num_create_from_frac(0, 7)", zero, "0");
     assert_number_string("num_create_from_frac(-84, 2)", whole, "-42");
     assert_number_string("num_create_from_frac(6, -8)", frac, "-¾");
-    assert_number_string("num_create_from_string(\"  -10/20  \")",
-                         parsed,
-                         "-½");
-    assert_number_string("num_create_from_string(\"355/113\")",
-                         parsed_general,
-                         "³⁵⁵⁄₁₁₃");
-    assert_number_string("num_create_from_string(\"³⁵⁵⁄₁₁₃\")",
-                         parsed_unicode,
-                         "³⁵⁵⁄₁₁₃");
+    assert_number_string("num_create_from_string(\"  -10/20  \")", parsed, "-½");
+    assert_number_string("num_create_from_string(\"355/113\")", parsed_general, "³⁵⁵⁄₁₁₃");
+    assert_number_string("num_create_from_string(\"³⁵⁵⁄₁₁₃\")", parsed_unicode, "³⁵⁵⁄₁₁₃");
 
     ASSERT_TRUE(num_is_exact(frac));
     ASSERT_TRUE(!num_is_integer(frac));
@@ -73,9 +65,7 @@ static void run_number_exact_rational_construction_tests(void)
     ASSERT_TRUE(num_eq(frac, expected_neg_three_quarters));
 
     ASSERT_EQ_INT(num_set_frac(&set_target, 14, 21), 0);
-    assert_number_string("num_set_frac changes storage to exact rational",
-                         set_target,
-                         "⅔");
+    assert_number_string("num_set_frac changes storage to exact rational", set_target, "⅔");
     ASSERT_TRUE(num_is_exact(set_target));
     ASSERT_EQ_INT((int)num_get_prec_bits(set_target), 0);
     ASSERT_TRUE(num_eq(set_target, expected_two_thirds));
@@ -117,12 +107,8 @@ static void run_number_exact_arithmetic_tests(void)
     assert_number_string("num_abs(-1/2)", abs_value, "½");
     assert_number_string("num_inv(1/2)", inv, "2");
     ASSERT_TRUE(num_is_nan(inv_zero));
-    assert_number_string("large rational product",
-                         big_prod,
-                         "⁹²²³³⁷²⁰³⁶⁸⁵⁴⁷⁷⁵⁸⁰⁸⁰⁄₂₁");
-    assert_number_string("large rational division roundtrip",
-                         big_roundtrip,
-                         "¹⁸⁴⁴⁶⁷⁴⁴⁰⁷³⁷⁰⁹⁵⁵¹⁶¹⁶⁄₃");
+    assert_number_string("large rational product", big_prod, "⁹²²³³⁷²⁰³⁶⁸⁵⁴⁷⁷⁵⁸⁰⁸⁰⁄₂₁");
+    assert_number_string("large rational division roundtrip", big_roundtrip, "¹⁸⁴⁴⁶⁷⁴⁴⁰⁷³⁷⁰⁹⁵⁵¹⁶¹⁶⁄₃");
 
     ASSERT_TRUE(num_lt(third, half));
     ASSERT_TRUE(num_le(third, half));
@@ -177,9 +163,7 @@ static void run_number_exact_integer_math_tests(void)
     sqrt_fifty = num_sqrt(fifty);
     sqrt_floor = num_floor(sqrt_fifty);
 
-    assert_number_string("num_pow_int(2, 65)",
-                         pow,
-                         "36893488147419103232");
+    assert_number_string("num_pow_int(2, 65)", pow, "36893488147419103232");
     assert_number_string("num_pow10(3)", pow10, "1000");
     assert_number_string("num_ldexp(3, 10)", shifted, "3072");
     assert_number_string("num_sqrt(2^64)", sqrt_perfect, "4294967296");
@@ -220,8 +204,7 @@ static void run_number_exact_integer_math_tests(void)
     num_destroy(&bin_large);
 }
 
-static void assert_number_factor(const number_factor_t *factor,
-                                 const char *expected_prime,
+static void assert_number_factor(const number_factor_t *factor, const char *expected_prime,
                                  unsigned long expected_exponent)
 {
     ASSERT_NOT_NULL(factor);
@@ -253,8 +236,7 @@ static void run_number_exact_number_theory_tests(void)
     number_t d = num_create_from_long(6);
     number_t lcm = num_lcm(c, d);
     number_t inv = num_modinv(num_create_from_long(3), num_create_from_long(11));
-    number_t check = num_mod(num_mul(num_create_from_long(3), inv),
-                             num_create_from_long(11));
+    number_t check = num_mod(num_mul(num_create_from_long(3), inv), num_create_from_long(11));
     number_t div_q = num_new();
     number_t div_r = num_new();
     number_t ext_g = num_new();
@@ -290,10 +272,7 @@ static void run_number_exact_number_theory_tests(void)
     assert_number_string("num_modinv(3, 11)", inv, "4");
     assert_number_string("3 * inv mod 11", check, "1");
 
-    ASSERT_EQ_INT(num_divmod(num_create_from_long(123),
-                             num_create_from_long(10),
-                             &div_q,
-                             &div_r), 0);
+    ASSERT_EQ_INT(num_divmod(num_create_from_long(123), num_create_from_long(10), &div_q, &div_r), 0);
     assert_number_string("num_divmod(123, 10).quotient", div_q, "12");
     assert_number_string("num_divmod(123, 10).remainder", div_r, "3");
 
@@ -308,10 +287,8 @@ static void run_number_exact_number_theory_tests(void)
     ASSERT_TRUE(!num_is_prime(num_create_from_long(221)));
     ASSERT_TRUE(num_is_prime(num_create_from_long(999983)));
     ASSERT_TRUE(!num_is_prime(num_create_from_long(999985)));
-    ASSERT_EQ_INT(num_prove_prime(num_create_from_long(97)),
-                  NUMBER_PRIMALITY_PRIME);
-    ASSERT_EQ_INT(num_prove_prime(num_create_from_long(221)),
-                  NUMBER_PRIMALITY_COMPOSITE);
+    ASSERT_EQ_INT(num_prove_prime(num_create_from_long(97)), NUMBER_PRIMALITY_PRIME);
+    ASSERT_EQ_INT(num_prove_prime(num_create_from_long(221)), NUMBER_PRIMALITY_COMPOSITE);
     assert_number_string("num_next_prime(14)", next_from_14, "17");
     assert_number_string("num_next_prime(-10)", next_from_neg, "2");
     assert_number_string("num_prev_prime(14)", prev_from_14, "13");
@@ -382,8 +359,7 @@ static void run_number_exact_bit_tests(void)
     number_t bit4_and_0 = num_set_bit(bit4, 0u);
     number_t cleared = num_clear_bit(bit4_and_0, 4u);
     number_t shifted_left = num_shl(num_create_from_long(3), 65);
-    number_t shifted_right = num_shr(num_create_from_string("18446744073709551616"),
-                                     64);
+    number_t shifted_right = num_shr(num_create_from_string("18446744073709551616"), 64);
     number_t shifted_neg = num_shr(num_create_from_long(-9), 1);
     number_t sqrt_144 = num_isqrt(num_create_from_long(144));
     number_t sqrt_200 = num_isqrt(num_create_from_long(200));
@@ -402,8 +378,7 @@ static void run_number_exact_bit_tests(void)
     assert_number_string("num_isqrt(200)", sqrt_200, "14");
 
     ASSERT_EQ_LONG((long)num_bit_length(num_create_from_long(0)), 0);
-    ASSERT_EQ_LONG((long)num_bit_length(num_create_from_string("18446744073709551616")),
-                   65);
+    ASSERT_EQ_LONG((long)num_bit_length(num_create_from_string("18446744073709551616")), 65);
     ASSERT_TRUE(num_test_bit(num_create_from_string("18446744073709551616"), 64u));
     ASSERT_TRUE(!num_test_bit(num_create_from_string("18446744073709551616"), 63u));
 

@@ -43,22 +43,15 @@ static datetime_t *datetime_from_event_time(const almanac_event_time_t *event_ti
     return dttm;
 }
 
-static void print_oracle_axis(const char *label,
-                              double expected,
-                              double got,
-                              double error_degrees,
+static void print_oracle_axis(const char *label, double expected, double got, double error_degrees,
                               long rounded_arcseconds)
 {
     const char *grade = (rounded_arcseconds <= NAVIGATION_GRADE_ARCSECONDS) ? "PASS" : "FAIL";
 
     printf("    %-8s expected = % .9f\n", label, expected);
     printf("    %-8s got      = % .9f\n", label, got);
-    printf("    %-8s error    = %.2f arcsec (rounded %ld, navigation grade %s <= %ld)\n",
-           label,
-           error_degrees / ARC_SECOND_DEGREES,
-           rounded_arcseconds,
-           grade,
-           NAVIGATION_GRADE_ARCSECONDS);
+    printf("    %-8s error    = %.2f arcsec (rounded %ld, navigation grade %s <= %ld)\n", label,
+           error_degrees / ARC_SECOND_DEGREES, rounded_arcseconds, grade, NAVIGATION_GRADE_ARCSECONDS);
 }
 
 static bool configured_almanac_is_usable(void)
@@ -90,9 +83,8 @@ static bool test_almanac_suite_setup(void)
     if (configured_almanac_is_usable())
         return true;
 
-    fprintf(stderr,
-            "Almanac tests require a configured almanac database.\n"
-            "Install it with `make install-almanac-db`.\n");
+    fprintf(stderr, "Almanac tests require a configured almanac database.\n"
+                    "Install it with `make install-almanac-db`.\n");
     return false;
 }
 
@@ -201,7 +193,7 @@ static void assert_moon_case(void)
     TEST_ASSERT_TRUE(almanac_entry_geocentric_distance_au(entry) > 0.0, "Moon geocentric distance is reported");
     TEST_ASSERT_TRUE(almanac_entry_heliocentric_distance_au(entry) > 0.0, "Moon heliocentric distance is reported");
     TEST_ASSERT_TRUE(almanac_entry_phase_angle_degrees(entry) >= 0.0 &&
-                     almanac_entry_phase_angle_degrees(entry) <= 180.0,
+                         almanac_entry_phase_angle_degrees(entry) <= 180.0,
                      "Moon phase angle is in range");
     TEST_ASSERT_TRUE(almanac_entry_visual_magnitude(entry) == almanac_entry_visual_magnitude(entry),
                      "Moon visual magnitude is finite");
@@ -252,7 +244,7 @@ static void assert_observables_case(void)
     almanac_entry_t *sun;
     almanac_entry_t *moon;
     almanac_entry_t *sirius;
-    almanac_observer_t observer = { 52.7073, -2.7540, 0.0 };
+    almanac_observer_t observer = {52.7073, -2.7540, 0.0};
     almanac_observables_t sun_obs;
     almanac_observables_t moon_obs;
     almanac_observables_t sirius_obs;
@@ -274,32 +266,23 @@ static void assert_observables_case(void)
     TEST_ASSERT_TRUE(almanac_observables(almanac, moon, &observer, &moon_obs), almanac_last_error(almanac));
     TEST_ASSERT_TRUE(almanac_observables(almanac, sirius, &observer, &sirius_obs), almanac_last_error(almanac));
 
-    TEST_ASSERT_TRUE(sun_obs.altitude_degrees >= -90.0 && sun_obs.altitude_degrees <= 90.0,
-                     "Sun altitude is in range");
-    TEST_ASSERT_TRUE(sun_obs.azimuth_degrees >= 0.0 && sun_obs.azimuth_degrees < 360.0,
-                     "Sun azimuth is in range");
-    TEST_ASSERT_TRUE(sun_obs.semi_diameter_degrees > 0.0,
-                     "Sun semi-diameter is finite and positive");
-    TEST_ASSERT_TRUE(sun_obs.visible,
-                     "Sun is visible from Shrewsbury at the eclipse moment");
+    TEST_ASSERT_TRUE(sun_obs.altitude_degrees >= -90.0 && sun_obs.altitude_degrees <= 90.0, "Sun altitude is in range");
+    TEST_ASSERT_TRUE(sun_obs.azimuth_degrees >= 0.0 && sun_obs.azimuth_degrees < 360.0, "Sun azimuth is in range");
+    TEST_ASSERT_TRUE(sun_obs.semi_diameter_degrees > 0.0, "Sun semi-diameter is finite and positive");
+    TEST_ASSERT_TRUE(sun_obs.visible, "Sun is visible from Shrewsbury at the eclipse moment");
 
     TEST_ASSERT_TRUE(moon_obs.altitude_degrees >= -90.0 && moon_obs.altitude_degrees <= 90.0,
                      "Moon altitude is in range");
-    TEST_ASSERT_TRUE(moon_obs.azimuth_degrees >= 0.0 && moon_obs.azimuth_degrees < 360.0,
-                     "Moon azimuth is in range");
-    TEST_ASSERT_TRUE(moon_obs.semi_diameter_degrees > 0.0,
-                     "Moon semi-diameter is finite and positive");
-    TEST_ASSERT_TRUE(moon_obs.visible,
-                     "Moon is visible from Shrewsbury at the eclipse moment");
+    TEST_ASSERT_TRUE(moon_obs.azimuth_degrees >= 0.0 && moon_obs.azimuth_degrees < 360.0, "Moon azimuth is in range");
+    TEST_ASSERT_TRUE(moon_obs.semi_diameter_degrees > 0.0, "Moon semi-diameter is finite and positive");
+    TEST_ASSERT_TRUE(moon_obs.visible, "Moon is visible from Shrewsbury at the eclipse moment");
 
     TEST_ASSERT_TRUE(sirius_obs.altitude_degrees >= -90.0 && sirius_obs.altitude_degrees <= 90.0,
                      "Sirius altitude is in range");
     TEST_ASSERT_TRUE(sirius_obs.azimuth_degrees >= 0.0 && sirius_obs.azimuth_degrees < 360.0,
                      "Sirius azimuth is in range");
-    TEST_ASSERT_TRUE(isnan(sirius_obs.semi_diameter_degrees),
-                     "Stars do not report a finite semi-diameter");
-    TEST_ASSERT_TRUE(!sirius_obs.visible,
-                     "Sirius is not above the horizon at the eclipse moment");
+    TEST_ASSERT_TRUE(isnan(sirius_obs.semi_diameter_degrees), "Stars do not report a finite semi-diameter");
+    TEST_ASSERT_TRUE(!sirius_obs.visible, "Sirius is not above the horizon at the eclipse moment");
 
     almanac_close(almanac);
     almanac_entry_dealloc(sirius);
@@ -318,7 +301,7 @@ static void assert_observables_validation_case(void)
     datetime_t *moment;
     almanac_t *almanac;
     almanac_entry_t *sun;
-    almanac_observer_t invalid_observer = { 123.0, 0.0, 0.0 };
+    almanac_observer_t invalid_observer = {123.0, 0.0, 0.0};
     almanac_observables_t observables;
 
     moment = datetime_alloc();
@@ -360,8 +343,7 @@ static void assert_geographical_position_case(void)
     TEST_ASSERT_NOT_NULL(almanac);
     sun = almanac_new_body_entry(almanac, ALMANAC_BODY_ID_SUN, moment);
     TEST_ASSERT_TRUE(sun != NULL, almanac_last_error(almanac));
-    TEST_ASSERT_TRUE(almanac_body_geographical_position(sun, &gp),
-                     "Sun geographical position is available");
+    TEST_ASSERT_TRUE(almanac_body_geographical_position(sun, &gp), "Sun geographical position is available");
 
     body_gha = almanac_entry_gha_aries_degrees(sun) + almanac_entry_sha_degrees(sun);
     TEST_ASSERT_TRUE(fabs(gp.latitude_degrees - almanac_entry_declination_degrees(sun)) < 1.0e-12,
@@ -405,12 +387,11 @@ static void assert_phase_details_case(void)
 
     TEST_ASSERT_TRUE(venus_phase.illuminated_fraction >= 0.0 && venus_phase.illuminated_fraction <= 1.0,
                      "Venus illuminated fraction is in range");
-    TEST_ASSERT_TRUE(venus_phase.phase_class != ALMANAC_PHASE_UNKNOWN,
-                     "Venus phase class is known");
+    TEST_ASSERT_TRUE(venus_phase.phase_class != ALMANAC_PHASE_UNKNOWN, "Venus phase class is known");
     TEST_ASSERT_TRUE(jupiter_phase.illuminated_fraction >= 0.0 && jupiter_phase.illuminated_fraction <= 1.0,
                      "Jupiter illuminated fraction is in range");
     TEST_ASSERT_TRUE(jupiter_phase.phase_class == ALMANAC_PHASE_GIBBOUS ||
-                     jupiter_phase.phase_class == ALMANAC_PHASE_FULL,
+                         jupiter_phase.phase_class == ALMANAC_PHASE_FULL,
                      "Jupiter phase class is near full as expected for an outer planet");
 
     almanac_close(almanac);
@@ -436,19 +417,13 @@ static void assert_exact_moon_phase_case(void)
 
     almanac = almanac_open();
     TEST_ASSERT_NOT_NULL(almanac);
-    TEST_ASSERT_TRUE(almanac_next_moon_phase_exact(almanac,
-                                                   after,
-                                                   ALMANAC_MOON_PHASE_NEW,
-                                                   &phase_event),
+    TEST_ASSERT_TRUE(almanac_next_moon_phase_exact(almanac, after, ALMANAC_MOON_PHASE_NEW, &phase_event),
                      almanac_last_error(almanac));
     TEST_ASSERT_TRUE(phase_event.time.valid, "next new Moon event time is valid");
-    TEST_ASSERT_TRUE(phase_event.time.jd > datetime_jd(after),
-                     "next new Moon occurs after the starting date");
-    TEST_ASSERT_TRUE(phase_event.time.jd > 2461264.0 &&
-                     phase_event.time.jd < 2461266.5,
+    TEST_ASSERT_TRUE(phase_event.time.jd > datetime_jd(after), "next new Moon occurs after the starting date");
+    TEST_ASSERT_TRUE(phase_event.time.jd > 2461264.0 && phase_event.time.jd < 2461266.5,
                      "next new Moon lands near the August 2026 eclipse date");
-    TEST_ASSERT_TRUE(phase_event.illuminated_fraction < 0.01,
-                     "exact new Moon is nearly unilluminated");
+    TEST_ASSERT_TRUE(phase_event.illuminated_fraction < 0.01, "exact new Moon is nearly unilluminated");
 
     almanac_close(almanac);
     datetime_dealloc(after);
@@ -472,21 +447,13 @@ static void test_almanac_next_moon_phase_exact_advances_past_previous_phase(void
 
     almanac = almanac_open();
     TEST_ASSERT_NOT_NULL(almanac);
-    TEST_ASSERT_TRUE(almanac_next_moon_phase_exact(almanac,
-                                                   after,
-                                                   ALMANAC_MOON_PHASE_FULL,
-                                                   &first),
+    TEST_ASSERT_TRUE(almanac_next_moon_phase_exact(almanac, after, ALMANAC_MOON_PHASE_FULL, &first),
                      almanac_last_error(almanac));
     TEST_ASSERT_NOT_NULL(datetime_init_jd(after, first.time.jd + 0.5));
-    TEST_ASSERT_TRUE(almanac_next_moon_phase_exact(almanac,
-                                                   after,
-                                                   ALMANAC_MOON_PHASE_FULL,
-                                                   &next),
+    TEST_ASSERT_TRUE(almanac_next_moon_phase_exact(almanac, after, ALMANAC_MOON_PHASE_FULL, &next),
                      almanac_last_error(almanac));
-    TEST_ASSERT_TRUE(next.time.jd > datetime_jd(after),
-                     "next full Moon advances beyond the requested instant");
-    TEST_ASSERT_TRUE(next.time.jd > first.time.jd + 25.0,
-                     "successive full Moons are distinct lunations");
+    TEST_ASSERT_TRUE(next.time.jd > datetime_jd(after), "next full Moon advances beyond the requested instant");
+    TEST_ASSERT_TRUE(next.time.jd > first.time.jd + 25.0, "successive full Moons are distinct lunations");
 
     almanac_close(almanac);
     datetime_dealloc(after);
@@ -511,19 +478,11 @@ static void assert_sunrise_sunset_case(void)
     jurisdiction = jurisdict_open("GB-ENG");
     TEST_ASSERT_NOT_NULL(almanac);
     TEST_ASSERT_NOT_NULL(jurisdiction);
-    TEST_ASSERT_TRUE(almanac_sunrise_sunset(almanac,
-                                            jurisdiction,
-                                            date,
-                                            &observer,
-                                            &sun_times),
+    TEST_ASSERT_TRUE(almanac_sunrise_sunset(almanac, jurisdiction, date, &observer, &sun_times),
                      almanac_last_error(almanac));
-    TEST_ASSERT_TRUE(almanac_body_rise_set(almanac,
-                                           jurisdiction,
-                                           ALMANAC_BODY_ID_SUN,
-                                           date,
-                                           &observer,
-                                           &generic_sun_times),
-                     almanac_last_error(almanac));
+    TEST_ASSERT_TRUE(
+        almanac_body_rise_set(almanac, jurisdiction, ALMANAC_BODY_ID_SUN, date, &observer, &generic_sun_times),
+        almanac_last_error(almanac));
     TEST_ASSERT_TRUE(fabs(generic_sun_times.rise.time.jd - sun_times.rise.time.jd) < 1e-10,
                      "generic Sun rise matches sunrise wrapper");
     TEST_ASSERT_TRUE(fabs(generic_sun_times.set.time.jd - sun_times.set.time.jd) < 1e-10,
@@ -533,40 +492,28 @@ static void assert_sunrise_sunset_case(void)
     TEST_ASSERT_NOT_NULL(sunrise_time);
     TEST_ASSERT_NOT_NULL(sunset_time);
 
-    printf("    Shrewsbury 2026-08-12 sunrise %02u:%02u:%04.1f local, azimuth %.1f deg\n",
-           datetime_hour(sunrise_time),
-           datetime_minute(sunrise_time),
-           datetime_second(sunrise_time),
-           sun_times.rise.azimuth_degrees);
-    printf("    Shrewsbury 2026-08-12 sunset  %02u:%02u:%04.1f local, azimuth %.1f deg\n",
-           datetime_hour(sunset_time),
-           datetime_minute(sunset_time),
-           datetime_second(sunset_time),
-           sun_times.set.azimuth_degrees);
+    printf("    Shrewsbury 2026-08-12 sunrise %02u:%02u:%04.1f local, azimuth %.1f deg\n", datetime_hour(sunrise_time),
+           datetime_minute(sunrise_time), datetime_second(sunrise_time), sun_times.rise.azimuth_degrees);
+    printf("    Shrewsbury 2026-08-12 sunset  %02u:%02u:%04.1f local, azimuth %.1f deg\n", datetime_hour(sunset_time),
+           datetime_minute(sunset_time), datetime_second(sunset_time), sun_times.set.azimuth_degrees);
 
     TEST_ASSERT_TRUE(sun_times.rise.status == ALMANAC_RISE_SET_OK, "sunrise occurs locally");
     TEST_ASSERT_TRUE(sun_times.set.status == ALMANAC_RISE_SET_OK, "sunset occurs locally");
     TEST_ASSERT_TRUE(sun_times.rise.time.valid, "sunrise local time is valid");
     TEST_ASSERT_TRUE(sun_times.set.time.valid, "sunset local time is valid");
-    TEST_ASSERT_TRUE(datetime_year(sunrise_time) == 2026 &&
-                     datetime_month(sunrise_time) == DT_August &&
-                     datetime_day(sunrise_time) == 12,
+    TEST_ASSERT_TRUE(datetime_year(sunrise_time) == 2026 && datetime_month(sunrise_time) == DT_August &&
+                         datetime_day(sunrise_time) == 12,
                      "sunrise is returned on the requested local date");
-    TEST_ASSERT_TRUE(datetime_year(sunset_time) == 2026 &&
-                     datetime_month(sunset_time) == DT_August &&
-                     datetime_day(sunset_time) == 12,
+    TEST_ASSERT_TRUE(datetime_year(sunset_time) == 2026 && datetime_month(sunset_time) == DT_August &&
+                         datetime_day(sunset_time) == 12,
                      "sunset is returned on the requested local date");
-    TEST_ASSERT_TRUE(datetime_hour(sunrise_time) >= 5 &&
-                     datetime_hour(sunrise_time) <= 7,
+    TEST_ASSERT_TRUE(datetime_hour(sunrise_time) >= 5 && datetime_hour(sunrise_time) <= 7,
                      "sunrise local hour is plausible for Shrewsbury in August");
-    TEST_ASSERT_TRUE(datetime_hour(sunset_time) >= 20 &&
-                     datetime_hour(sunset_time) <= 21,
+    TEST_ASSERT_TRUE(datetime_hour(sunset_time) >= 20 && datetime_hour(sunset_time) <= 21,
                      "sunset local hour is plausible for Shrewsbury in August");
-    TEST_ASSERT_TRUE(sun_times.rise.azimuth_degrees >= 45.0 &&
-                     sun_times.rise.azimuth_degrees <= 90.0,
+    TEST_ASSERT_TRUE(sun_times.rise.azimuth_degrees >= 45.0 && sun_times.rise.azimuth_degrees <= 90.0,
                      "sunrise azimuth is north-east/east in August");
-    TEST_ASSERT_TRUE(sun_times.set.azimuth_degrees >= 270.0 &&
-                     sun_times.set.azimuth_degrees <= 315.0,
+    TEST_ASSERT_TRUE(sun_times.set.azimuth_degrees >= 270.0 && sun_times.set.azimuth_degrees <= 315.0,
                      "sunset azimuth is west/north-west in August");
 
     jurisdict_close(jurisdiction);
@@ -599,11 +546,7 @@ static void assert_moonrise_moonset_case(void)
     jurisdiction = jurisdict_open("GB-ENG");
     TEST_ASSERT_NOT_NULL(almanac);
     TEST_ASSERT_NOT_NULL(jurisdiction);
-    TEST_ASSERT_TRUE(almanac_moonrise_moonset(almanac,
-                                              jurisdiction,
-                                              date,
-                                              &observer,
-                                              &moon_times),
+    TEST_ASSERT_TRUE(almanac_moonrise_moonset(almanac, jurisdiction, date, &observer, &moon_times),
                      almanac_last_error(almanac));
     moonrise_time = datetime_from_event_time(&moon_times.rise.time);
     moonset_time = datetime_from_event_time(&moon_times.set.time);
@@ -611,35 +554,26 @@ static void assert_moonrise_moonset_case(void)
     TEST_ASSERT_NOT_NULL(moonset_time);
 
     printf("    Shrewsbury 2026-08-12 moonrise %02u:%02u:%04.1f local, azimuth %.1f deg\n",
-           datetime_hour(moonrise_time),
-           datetime_minute(moonrise_time),
-           datetime_second(moonrise_time),
+           datetime_hour(moonrise_time), datetime_minute(moonrise_time), datetime_second(moonrise_time),
            moon_times.rise.azimuth_degrees);
-    printf("    Shrewsbury 2026-08-12 moonset  %02u:%02u:%04.1f local, azimuth %.1f deg\n",
-           datetime_hour(moonset_time),
-           datetime_minute(moonset_time),
-           datetime_second(moonset_time),
-           moon_times.set.azimuth_degrees);
+    printf("    Shrewsbury 2026-08-12 moonset  %02u:%02u:%04.1f local, azimuth %.1f deg\n", datetime_hour(moonset_time),
+           datetime_minute(moonset_time), datetime_second(moonset_time), moon_times.set.azimuth_degrees);
 
     TEST_ASSERT_TRUE(moon_times.rise.status == ALMANAC_RISE_SET_OK, "moonrise occurs locally");
     TEST_ASSERT_TRUE(moon_times.set.status == ALMANAC_RISE_SET_OK, "moonset occurs locally");
     TEST_ASSERT_TRUE(moon_times.rise.time.valid, "moonrise local time is valid");
     TEST_ASSERT_TRUE(moon_times.set.time.valid, "moonset local time is valid");
-    TEST_ASSERT_TRUE(datetime_year(moonrise_time) == 2026 &&
-                     datetime_month(moonrise_time) == DT_August &&
-                     datetime_day(moonrise_time) == 12,
+    TEST_ASSERT_TRUE(datetime_year(moonrise_time) == 2026 && datetime_month(moonrise_time) == DT_August &&
+                         datetime_day(moonrise_time) == 12,
                      "moonrise is returned on the requested local date");
-    TEST_ASSERT_TRUE(datetime_year(moonset_time) == 2026 &&
-                     datetime_month(moonset_time) == DT_August &&
-                     datetime_day(moonset_time) == 12,
+    TEST_ASSERT_TRUE(datetime_year(moonset_time) == 2026 && datetime_month(moonset_time) == DT_August &&
+                         datetime_day(moonset_time) == 12,
                      "moonset is returned on the requested local date");
     TEST_ASSERT_TRUE(moon_times.rise.time.jd < moon_times.set.time.jd,
                      "moonrise precedes moonset near the August 2026 new Moon");
-    TEST_ASSERT_TRUE(moon_times.rise.azimuth_degrees >= 45.0 &&
-                     moon_times.rise.azimuth_degrees <= 120.0,
+    TEST_ASSERT_TRUE(moon_times.rise.azimuth_degrees >= 45.0 && moon_times.rise.azimuth_degrees <= 120.0,
                      "moonrise azimuth is plausible near new Moon");
-    TEST_ASSERT_TRUE(moon_times.set.azimuth_degrees >= 240.0 &&
-                     moon_times.set.azimuth_degrees <= 315.0,
+    TEST_ASSERT_TRUE(moon_times.set.azimuth_degrees >= 240.0 && moon_times.set.azimuth_degrees <= 315.0,
                      "moonset azimuth is plausible near new Moon");
 
     jurisdict_close(jurisdiction);
@@ -690,34 +624,28 @@ static void assert_solar_eclipse_search_case(void)
                      "solar eclipse greatest local time is valid");
     TEST_ASSERT_TRUE(almanac_solar_eclipse_time(event, ALMANAC_EVENT_TIME_FOURTH_CONTACT, &fourth_contact),
                      "solar eclipse fourth contact local time is valid");
-    TEST_ASSERT_TRUE(kind == ALMANAC_SOLAR_ECLIPSE_TOTAL ||
-                     kind == ALMANAC_SOLAR_ECLIPSE_ANNULAR ||
-                     kind == ALMANAC_SOLAR_ECLIPSE_PARTIAL,
+    TEST_ASSERT_TRUE(kind == ALMANAC_SOLAR_ECLIPSE_TOTAL || kind == ALMANAC_SOLAR_ECLIPSE_ANNULAR ||
+                         kind == ALMANAC_SOLAR_ECLIPSE_PARTIAL,
                      "solar eclipse kind is classified");
     TEST_ASSERT_TRUE(almanac_solar_eclipse_magnitude(event) > 0.0, "solar eclipse magnitude is positive");
     TEST_ASSERT_TRUE(almanac_solar_eclipse_totality_percent(event) > 0.0 &&
-                     almanac_solar_eclipse_totality_percent(event) <= 100.0,
+                         almanac_solar_eclipse_totality_percent(event) <= 100.0,
                      "solar eclipse totality percentage is bounded");
-    TEST_ASSERT_TRUE(first_contact.jd == first_contact.jd &&
-                     first_contact.jd < greatest_eclipse.jd,
+    TEST_ASSERT_TRUE(first_contact.jd == first_contact.jd && first_contact.jd < greatest_eclipse.jd,
                      "solar eclipse first contact precedes greatest eclipse");
-    TEST_ASSERT_TRUE(fourth_contact.jd == fourth_contact.jd &&
-                     fourth_contact.jd > greatest_eclipse.jd,
+    TEST_ASSERT_TRUE(fourth_contact.jd == fourth_contact.jd && fourth_contact.jd > greatest_eclipse.jd,
                      "solar eclipse fourth contact follows greatest eclipse");
     TEST_ASSERT_TRUE(first_contact.valid, "solar eclipse first contact local time is valid");
     TEST_ASSERT_TRUE(greatest_eclipse.valid, "solar eclipse greatest local time is valid");
     TEST_ASSERT_TRUE(fourth_contact.valid, "solar eclipse fourth contact local time is valid");
-    if (kind == ALMANAC_SOLAR_ECLIPSE_TOTAL ||
-        kind == ALMANAC_SOLAR_ECLIPSE_ANNULAR) {
+    if (kind == ALMANAC_SOLAR_ECLIPSE_TOTAL || kind == ALMANAC_SOLAR_ECLIPSE_ANNULAR) {
         TEST_ASSERT_TRUE(almanac_solar_eclipse_time(event, ALMANAC_EVENT_TIME_SECOND_CONTACT, &second_contact),
                          "solar eclipse second contact local time is valid");
         TEST_ASSERT_TRUE(almanac_solar_eclipse_time(event, ALMANAC_EVENT_TIME_THIRD_CONTACT, &third_contact),
                          "solar eclipse third contact local time is valid");
-        TEST_ASSERT_TRUE(second_contact.jd == second_contact.jd &&
-                         second_contact.jd < greatest_eclipse.jd,
+        TEST_ASSERT_TRUE(second_contact.jd == second_contact.jd && second_contact.jd < greatest_eclipse.jd,
                          "solar eclipse second contact precedes greatest eclipse");
-        TEST_ASSERT_TRUE(third_contact.jd == third_contact.jd &&
-                         third_contact.jd > greatest_eclipse.jd,
+        TEST_ASSERT_TRUE(third_contact.jd == third_contact.jd && third_contact.jd > greatest_eclipse.jd,
                          "solar eclipse third contact follows greatest eclipse");
         TEST_ASSERT_TRUE(second_contact.valid, "solar eclipse second contact local time is valid");
         TEST_ASSERT_TRUE(third_contact.valid, "solar eclipse third contact local time is valid");
@@ -773,28 +701,23 @@ static void assert_lunar_eclipse_search_case(void)
     TEST_ASSERT_TRUE(almanac_lunar_eclipse_penumbral_magnitude(event) > 0.0,
                      "lunar eclipse penumbral magnitude is positive");
     TEST_ASSERT_TRUE(almanac_lunar_eclipse_totality_percent(event) >= 0.0 &&
-                     almanac_lunar_eclipse_totality_percent(event) <= 100.0,
+                         almanac_lunar_eclipse_totality_percent(event) <= 100.0,
                      "lunar eclipse totality percentage is bounded");
-    TEST_ASSERT_TRUE(p1_contact.jd == p1_contact.jd &&
-                     p1_contact.jd < greatest_eclipse.jd,
+    TEST_ASSERT_TRUE(p1_contact.jd == p1_contact.jd && p1_contact.jd < greatest_eclipse.jd,
                      "lunar eclipse P1 contact precedes greatest eclipse");
-    TEST_ASSERT_TRUE(p4_contact.jd == p4_contact.jd &&
-                     p4_contact.jd > greatest_eclipse.jd,
+    TEST_ASSERT_TRUE(p4_contact.jd == p4_contact.jd && p4_contact.jd > greatest_eclipse.jd,
                      "lunar eclipse P4 contact follows greatest eclipse");
     TEST_ASSERT_TRUE(p1_contact.valid, "lunar eclipse P1 local time is valid");
     TEST_ASSERT_TRUE(greatest_eclipse.valid, "lunar eclipse greatest local time is valid");
     TEST_ASSERT_TRUE(p4_contact.valid, "lunar eclipse P4 local time is valid");
-    if (kind == ALMANAC_LUNAR_ECLIPSE_PARTIAL ||
-        kind == ALMANAC_LUNAR_ECLIPSE_TOTAL) {
+    if (kind == ALMANAC_LUNAR_ECLIPSE_PARTIAL || kind == ALMANAC_LUNAR_ECLIPSE_TOTAL) {
         TEST_ASSERT_TRUE(almanac_lunar_eclipse_time(event, ALMANAC_EVENT_TIME_U1_CONTACT, &u1_contact),
                          "lunar eclipse U1 local time is valid");
         TEST_ASSERT_TRUE(almanac_lunar_eclipse_time(event, ALMANAC_EVENT_TIME_U4_CONTACT, &u4_contact),
                          "lunar eclipse U4 local time is valid");
-        TEST_ASSERT_TRUE(u1_contact.jd == u1_contact.jd &&
-                         u1_contact.jd < greatest_eclipse.jd,
+        TEST_ASSERT_TRUE(u1_contact.jd == u1_contact.jd && u1_contact.jd < greatest_eclipse.jd,
                          "lunar eclipse U1 contact precedes greatest eclipse");
-        TEST_ASSERT_TRUE(u4_contact.jd == u4_contact.jd &&
-                         u4_contact.jd > greatest_eclipse.jd,
+        TEST_ASSERT_TRUE(u4_contact.jd == u4_contact.jd && u4_contact.jd > greatest_eclipse.jd,
                          "lunar eclipse U4 contact follows greatest eclipse");
         TEST_ASSERT_TRUE(u1_contact.valid, "lunar eclipse U1 local time is valid");
         TEST_ASSERT_TRUE(u4_contact.valid, "lunar eclipse U4 local time is valid");
@@ -837,11 +760,10 @@ static void test_almanac_find_lunar_eclipses_matches_july_2028_partial_event(voi
                      "July 2028 lunar eclipse is partial");
     TEST_ASSERT_TRUE(almanac_lunar_eclipse_time(event, ALMANAC_EVENT_TIME_GREATEST, &greatest),
                      "July 2028 greatest eclipse is available");
-    TEST_ASSERT_TRUE(greatest.jd > 2461959.263 &&
-                     greatest.jd < 2461959.265,
+    TEST_ASSERT_TRUE(greatest.jd > 2461959.263 && greatest.jd < 2461959.265,
                      "July 2028 greatest eclipse is near 18:20 GMT");
     TEST_ASSERT_TRUE(almanac_lunar_eclipse_umbral_magnitude(event) > 0.35 &&
-                     almanac_lunar_eclipse_umbral_magnitude(event) < 0.45,
+                         almanac_lunar_eclipse_umbral_magnitude(event) < 0.45,
                      "July 2028 umbral magnitude is approximately 0.39");
 
     array_destroy(events);
@@ -890,20 +812,16 @@ static void assert_solar_transit_search_case(void)
                      "solar transit fourth contact local time is valid");
     TEST_ASSERT_TRUE(almanac_solar_transit_body_id(event) == ALMANAC_BODY_ID_MERCURY, "Transit body id is Mercury");
     TEST_ASSERT_TRUE(almanac_solar_transit_separation_degrees(event) <
-                     almanac_solar_transit_solar_semi_diameter_degrees(event) +
-                     almanac_solar_transit_planet_semi_diameter_degrees(event),
+                         almanac_solar_transit_solar_semi_diameter_degrees(event) +
+                             almanac_solar_transit_planet_semi_diameter_degrees(event),
                      "Mercury transit occurs on the solar disc");
-    TEST_ASSERT_TRUE(first_contact.jd == first_contact.jd &&
-                     first_contact.jd < greatest_transit.jd,
+    TEST_ASSERT_TRUE(first_contact.jd == first_contact.jd && first_contact.jd < greatest_transit.jd,
                      "solar transit first contact precedes greatest transit");
-    TEST_ASSERT_TRUE(second_contact.jd == second_contact.jd &&
-                     second_contact.jd < greatest_transit.jd,
+    TEST_ASSERT_TRUE(second_contact.jd == second_contact.jd && second_contact.jd < greatest_transit.jd,
                      "solar transit second contact precedes greatest transit");
-    TEST_ASSERT_TRUE(third_contact.jd == third_contact.jd &&
-                     third_contact.jd > greatest_transit.jd,
+    TEST_ASSERT_TRUE(third_contact.jd == third_contact.jd && third_contact.jd > greatest_transit.jd,
                      "solar transit third contact follows greatest transit");
-    TEST_ASSERT_TRUE(fourth_contact.jd == fourth_contact.jd &&
-                     fourth_contact.jd > greatest_transit.jd,
+    TEST_ASSERT_TRUE(fourth_contact.jd == fourth_contact.jd && fourth_contact.jd > greatest_transit.jd,
                      "solar transit fourth contact follows greatest transit");
     TEST_ASSERT_TRUE(first_contact.valid, "solar transit first contact local time is valid");
     TEST_ASSERT_TRUE(second_contact.valid, "solar transit second contact local time is valid");
@@ -941,11 +859,7 @@ static void test_almanac_find_solar_transits_returns_venus_event(void)
 
     almanac = almanac_open();
     TEST_ASSERT_NOT_NULL(almanac);
-    events = almanac_find_solar_transits_for_body(almanac,
-                                                  ALMANAC_BODY_ID_VENUS,
-                                                  &observer,
-                                                  start,
-                                                  end);
+    events = almanac_find_solar_transits_for_body(almanac, ALMANAC_BODY_ID_VENUS, &observer, start, end);
     TEST_ASSERT_NOT_NULL(events);
     TEST_ASSERT_TRUE(array_size(events) == 1u, "June 2012 includes one Venus transit");
     event = array_get(events, 0u);
@@ -982,13 +896,9 @@ static void assert_spice_oracle_cases(void)
 
         moment = datetime_alloc();
         TEST_ASSERT_NOT_NULL(moment);
-        TEST_ASSERT_NOT_NULL(datetime_init_ymdt(moment,
-                                                (short)expected->year,
-                                                (month_t)expected->month,
-                                                (uint8_t)expected->day,
-                                                (uint8_t)expected->hour,
-                                                (uint8_t)expected->minute,
-                                                expected->second));
+        TEST_ASSERT_NOT_NULL(datetime_init_ymdt(moment, (short)expected->year, (month_t)expected->month,
+                                                (uint8_t)expected->day, (uint8_t)expected->hour,
+                                                (uint8_t)expected->minute, expected->second));
         entry = almanac_new_body_entry(almanac, expected->body_id, moment);
         TEST_ASSERT_TRUE(entry != NULL, almanac_last_error(almanac));
 
@@ -996,51 +906,31 @@ static void assert_spice_oracle_cases(void)
         dec_error = fabs(almanac_entry_declination_degrees(entry) - expected->declination_degrees);
         sha_error_rounded = rounded_arcsecond_error(sha_error);
         dec_error_rounded = rounded_arcsecond_error(dec_error);
-        navigation_grade = (sha_error_rounded <= NAVIGATION_GRADE_ARCSECONDS &&
-                            dec_error_rounded <= NAVIGATION_GRADE_ARCSECONDS);
-        printf("ORACLE %-7s %04d-%02d-%02d %02d:%02d:%05.2f local [%s]\n",
-               expected->body_code,
-               expected->year,
-               expected->month,
-               expected->day,
-               expected->hour,
-               expected->minute,
-               expected->second,
+        navigation_grade =
+            (sha_error_rounded <= NAVIGATION_GRADE_ARCSECONDS && dec_error_rounded <= NAVIGATION_GRADE_ARCSECONDS);
+        printf("ORACLE %-7s %04d-%02d-%02d %02d:%02d:%05.2f local [%s]\n", expected->body_code, expected->year,
+               expected->month, expected->day, expected->hour, expected->minute, expected->second,
                navigation_grade ? "PASS" : "FAIL");
         print_oracle_axis("SHA", expected->sha_degrees, almanac_entry_sha_degrees(entry), sha_error, sha_error_rounded);
-        print_oracle_axis("Dec",
-                          expected->declination_degrees,
-                          almanac_entry_declination_degrees(entry),
-                          dec_error,
+        print_oracle_axis("Dec", expected->declination_degrees, almanac_entry_declination_degrees(entry), dec_error,
                           dec_error_rounded);
         printf("    distance expected = %.12f AU\n", expected->geocentric_distance_au);
         printf("    distance got      = %.12f AU\n", almanac_entry_geocentric_distance_au(entry));
         printf("    navigation grade  = %s\n", navigation_grade ? "PASS" : "FAIL");
-        snprintf(message,
-                 sizeof(message),
-                 "%s %04d-%02d-%02d SHA error %.2f arcsec rounds to %ld arcsec, above navigation-grade limit %ld arcsec",
-                 expected->body_code,
-                 expected->year,
-                 expected->month,
-                 expected->day,
-                 sha_error / ARC_SECOND_DEGREES,
-                 sha_error_rounded,
-                 NAVIGATION_GRADE_ARCSECONDS);
+        snprintf(
+            message, sizeof(message),
+            "%s %04d-%02d-%02d SHA error %.2f arcsec rounds to %ld arcsec, above navigation-grade limit %ld arcsec",
+            expected->body_code, expected->year, expected->month, expected->day, sha_error / ARC_SECOND_DEGREES,
+            sha_error_rounded, NAVIGATION_GRADE_ARCSECONDS);
         TEST_ASSERT_TRUE(sha_error_rounded <= NAVIGATION_GRADE_ARCSECONDS, message);
-        snprintf(message,
-                 sizeof(message),
-                 "%s %04d-%02d-%02d declination error %.2f arcsec rounds to %ld arcsec, above navigation-grade limit %ld arcsec",
-                 expected->body_code,
-                 expected->year,
-                 expected->month,
-                 expected->day,
-                 dec_error / ARC_SECOND_DEGREES,
-                 dec_error_rounded,
-                 NAVIGATION_GRADE_ARCSECONDS);
+        snprintf(message, sizeof(message),
+                 "%s %04d-%02d-%02d declination error %.2f arcsec rounds to %ld arcsec, above navigation-grade limit "
+                 "%ld arcsec",
+                 expected->body_code, expected->year, expected->month, expected->day, dec_error / ARC_SECOND_DEGREES,
+                 dec_error_rounded, NAVIGATION_GRADE_ARCSECONDS);
         TEST_ASSERT_TRUE(dec_error_rounded <= NAVIGATION_GRADE_ARCSECONDS, message);
 
-        TEST_ASSERT_TRUE(fabs(almanac_entry_geocentric_distance_au(entry) -
-                              expected->geocentric_distance_au) < 0.02,
+        TEST_ASSERT_TRUE(fabs(almanac_entry_geocentric_distance_au(entry) - expected->geocentric_distance_au) < 0.02,
                          "geocentric distance is broadly consistent with SPICE");
         almanac_entry_dealloc(entry);
         datetime_dealloc(moment);
@@ -1108,34 +998,22 @@ static void example_almanac_shrewsbury_eclipse_watch(void)
     TEST_ASSERT_NOT_NULL(first_time);
     TEST_ASSERT_NOT_NULL(fourth_time);
     event_kind = almanac_solar_eclipse_kind(event);
-    kind = event_kind == ALMANAC_SOLAR_ECLIPSE_TOTAL ? "total" :
-           event_kind == ALMANAC_SOLAR_ECLIPSE_ANNULAR ? "annular" :
-           "partial";
+    kind = event_kind == ALMANAC_SOLAR_ECLIPSE_TOTAL     ? "total"
+           : event_kind == ALMANAC_SOLAR_ECLIPSE_ANNULAR ? "annular"
+                                                         : "partial";
     printf("Local solar eclipse found in August 2026.\n");
-    printf("Greatest local circumstance: %04d-%02d-%02d %02u:%02u:%04.1f local time\n",
-           datetime_year(greatest_time),
-           (int)datetime_month(greatest_time),
-           datetime_day(greatest_time),
-           datetime_hour(greatest_time),
-           datetime_minute(greatest_time),
-           datetime_second(greatest_time));
+    printf("Greatest local circumstance: %04d-%02d-%02d %02u:%02u:%04.1f local time\n", datetime_year(greatest_time),
+           (int)datetime_month(greatest_time), datetime_day(greatest_time), datetime_hour(greatest_time),
+           datetime_minute(greatest_time), datetime_second(greatest_time));
     printf("Kind: %s\n", kind);
     printf("Magnitude: %.3f\n", almanac_solar_eclipse_magnitude(event));
     printf("Obscuration: %.1f%%\n", almanac_solar_eclipse_totality_percent(event));
-    printf("First contact: %04d-%02d-%02d %02u:%02u:%04.1f local time\n",
-           datetime_year(first_time),
-           (int)datetime_month(first_time),
-           datetime_day(first_time),
-           datetime_hour(first_time),
-           datetime_minute(first_time),
-           datetime_second(first_time));
-    printf("Fourth contact: %04d-%02d-%02d %02u:%02u:%04.1f local time\n",
-           datetime_year(fourth_time),
-           (int)datetime_month(fourth_time),
-           datetime_day(fourth_time),
-           datetime_hour(fourth_time),
-           datetime_minute(fourth_time),
-           datetime_second(fourth_time));
+    printf("First contact: %04d-%02d-%02d %02u:%02u:%04.1f local time\n", datetime_year(first_time),
+           (int)datetime_month(first_time), datetime_day(first_time), datetime_hour(first_time),
+           datetime_minute(first_time), datetime_second(first_time));
+    printf("Fourth contact: %04d-%02d-%02d %02u:%02u:%04.1f local time\n", datetime_year(fourth_time),
+           (int)datetime_month(fourth_time), datetime_day(fourth_time), datetime_hour(fourth_time),
+           datetime_minute(fourth_time), datetime_second(fourth_time));
 
     datetime_dealloc(fourth_time);
     datetime_dealloc(first_time);
@@ -1170,8 +1048,6 @@ int tests_main(void)
     TEST_RUN_IN_GROUP(test_almanac_snapshot_returns_catalogue_order, tests, NULL);
     TEST_SECTION("README Output Examples");
     printf(C_BOLD C_YELLOW "Running README examples...\n" C_RESET);
-    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_almanac_shrewsbury_eclipse_watch,
-                                  readme_examples,
-                                  "almanac,readme");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_almanac_shrewsbury_eclipse_watch, readme_examples, "almanac,readme");
     return TEST_EXIT_CODE();
 }

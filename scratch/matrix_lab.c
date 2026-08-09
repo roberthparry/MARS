@@ -206,9 +206,7 @@ static void print_expr_eigenvalues_tex(expr_t **values, size_t count)
     printf("\\end{aligned}\n");
 }
 
-static void print_expr_eigenvector_column(const char *prefix,
-                                          const matrix_t *eigenvectors,
-                                          size_t column)
+static void print_expr_eigenvector_column(const char *prefix, const matrix_t *eigenvectors, size_t column)
 {
     size_t rows = mat_get_row_count(eigenvectors);
 
@@ -225,8 +223,7 @@ static void print_expr_eigenvector_column(const char *prefix,
     printf(")\n");
 }
 
-static void print_expr_eigenvector_column_tex(const matrix_t *eigenvectors,
-                                              size_t column)
+static void print_expr_eigenvector_column_tex(const matrix_t *eigenvectors, size_t column)
 {
     size_t rows = mat_get_row_count(eigenvectors);
 
@@ -243,9 +240,7 @@ static void print_expr_eigenvector_column_tex(const matrix_t *eigenvectors,
     printf("\\right)^{T}");
 }
 
-static void print_number_eigenvector_column(const char *prefix,
-                                            const matrix_t *eigenvectors,
-                                            size_t column)
+static void print_number_eigenvector_column(const char *prefix, const matrix_t *eigenvectors, size_t column)
 {
     size_t rows = mat_get_row_count(eigenvectors);
 
@@ -263,8 +258,7 @@ static void print_number_eigenvector_column(const char *prefix,
     printf(")\n");
 }
 
-static void print_number_eigenvector_column_tex(const matrix_t *eigenvectors,
-                                                size_t column)
+static void print_number_eigenvector_column_tex(const matrix_t *eigenvectors, size_t column)
 {
     size_t rows = mat_get_row_count(eigenvectors);
 
@@ -282,9 +276,7 @@ static void print_number_eigenvector_column_tex(const matrix_t *eigenvectors,
     printf("\\right)^{T}");
 }
 
-static void print_eigendecomposition_expr_fields(expr_t **eigenvalues,
-                                                 size_t count,
-                                                 const matrix_t *eigenvectors)
+static void print_eigendecomposition_expr_fields(expr_t **eigenvalues, size_t count, const matrix_t *eigenvectors)
 {
     char *inline_text = mat_to_string(eigenvectors, MAT_STRING_INLINE_PRETTY);
     char *pretty_text = mat_to_string(eigenvectors, MAT_STRING_LAYOUT_PRETTY);
@@ -342,9 +334,7 @@ static void print_eigendecomposition_expr_fields(expr_t **eigenvalues,
     free(inline_text);
 }
 
-static void print_eigendecomposition_number_fields(number_t *eigenvalues,
-                                                   size_t count,
-                                                   const matrix_t *eigenvectors)
+static void print_eigendecomposition_number_fields(number_t *eigenvalues, size_t count, const matrix_t *eigenvectors)
 {
     char *inline_text = mat_to_string(eigenvectors, MAT_STRING_INLINE_PRETTY);
     char *pretty_text = mat_to_string(eigenvectors, MAT_STRING_LAYOUT_PRETTY);
@@ -402,8 +392,7 @@ static void print_eigendecomposition_number_fields(number_t *eigenvalues,
     free(inline_text);
 }
 
-static void print_expr_scalar_field(const matrix_t *matrix, const char *operation,
-                                    const char *label, expr_t *expr)
+static void print_expr_scalar_field(const matrix_t *matrix, const char *operation, const char *label, expr_t *expr)
 {
     char *text = expr ? expr_text_dup(expr, style_EXPRESSION) : NULL;
     char *tex = expr ? expr_text_dup(expr, style_TEX) : NULL;
@@ -421,8 +410,7 @@ static void print_expr_scalar_field(const matrix_t *matrix, const char *operatio
     expr_free(expr);
 }
 
-static void print_number_scalar_field(const matrix_t *matrix, const char *operation,
-                                      const char *label, number_t value)
+static void print_number_scalar_field(const matrix_t *matrix, const char *operation, const char *label, number_t value)
 {
     char *text = number_text_dup(value);
     char *tex = number_tex_dup(value);
@@ -633,9 +621,7 @@ int main(int argc, char **argv)
         }
         printf("operand     %s\n", operand);
         result = mat_solve(matrix, other);
-    } else if (strcmp(operation, "trace") == 0 ||
-               strcmp(operation, "det") == 0 ||
-               strcmp(operation, "rank") == 0) {
+    } else if (strcmp(operation, "trace") == 0 || strcmp(operation, "det") == 0 || strcmp(operation, "rank") == 0) {
         rc = run_scalar_operation(matrix, operation);
         goto cleanup;
     } else if (strcmp(operation, "eigenvalues") == 0) {

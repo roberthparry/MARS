@@ -1,10 +1,10 @@
 /* test_dictionary.c - tests for arena-backed dictionary_t */
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <stdbool.h>
 
 #include "dictionary.h"
 #include "test_harness.h"
@@ -15,14 +15,16 @@ TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
  * Colour helpers
  * ------------------------------------------------------------- */
 
-#define BLUE    "\x1b[34m"
-#define RESET   "\x1b[0m"
+#define BLUE "\x1b[34m"
+#define RESET "\x1b[0m"
 
-static void pass(const char *msg) {
+static void pass(const char *msg)
+{
     printf(C_GREEN "PASS" RESET " %s\n", msg);
 }
 
-static void fail(const char *msg) {
+static void fail(const char *msg)
+{
     printf(C_RED "FAIL" RESET " %s\n", msg);
     test_mark_failure(__FILE__, __LINE__, msg ? msg : "dictionary failure");
 }
@@ -31,10 +33,12 @@ static void fail(const char *msg) {
  * strdup replacement (C99)
  * ------------------------------------------------------------- */
 
-static char *strclone(const char *s) {
+static char *strclone(const char *s)
+{
     size_t n = strlen(s) + 1;
     char *p = malloc(n);
-    if (p) memcpy(p, s, n);
+    if (p)
+        memcpy(p, s, n);
     return p;
 }
 
@@ -42,13 +46,15 @@ static char *strclone(const char *s) {
  * Shallow int key/value
  * ------------------------------------------------------------- */
 
-static size_t int_hash(const void *p) {
+static size_t int_hash(const void *p)
+{
     int v;
     memcpy(&v, p, sizeof(int));
     return (size_t)v * 2654435761u;
 }
 
-static int int_cmp(const void *a, const void *b) {
+static int int_cmp(const void *a, const void *b)
+{
     int x, y;
     memcpy(&x, a, sizeof(int));
     memcpy(&y, b, sizeof(int));
@@ -59,27 +65,31 @@ static int int_cmp(const void *a, const void *b) {
  * Deep string key/value
  * ------------------------------------------------------------- */
 
-static size_t str_hash(const void *p) {
-    const char *s = *(const char * const *)p;
+static size_t str_hash(const void *p)
+{
+    const char *s = *(const char *const *)p;
     size_t h = 146527;
     for (size_t i = 0u; s[i] != '\0'; ++i)
         h = (h * 33) ^ (unsigned char)s[i];
     return h;
 }
 
-static int str_cmp(const void *a, const void *b) {
-    const char *sa = *(const char * const *)a;
-    const char *sb = *(const char * const *)b;
+static int str_cmp(const void *a, const void *b)
+{
+    const char *sa = *(const char *const *)a;
+    const char *sb = *(const char *const *)b;
     return strcmp(sa, sb);
 }
 
-static void str_clone(void *dst, const void *src) {
-    const char *s = *(const char * const *)src;
+static void str_clone(void *dst, const void *src)
+{
+    const char *s = *(const char *const *)src;
     char *copy = strclone(s);
     memcpy(dst, &copy, sizeof(char *));
 }
 
-static void str_destroy(void *elem) {
+static void str_destroy(void *elem)
+{
     char *s = *(char **)elem;
     free(s);
 }
@@ -93,7 +103,8 @@ struct deep {
     int value;
 };
 
-static size_t deep_hash(const void *p) {
+static size_t deep_hash(const void *p)
+{
     const struct deep *d = p;
     size_t h = 146527;
     const char *s = d->name;
@@ -102,22 +113,26 @@ static size_t deep_hash(const void *p) {
     return h ^ (size_t)d->value;
 }
 
-static int deep_cmp(const void *a, const void *b) {
+static int deep_cmp(const void *a, const void *b)
+{
     const struct deep *da = a;
     const struct deep *db = b;
     int c = strcmp(da->name, db->name);
-    if (c != 0) return c;
+    if (c != 0)
+        return c;
     return (da->value > db->value) - (da->value < db->value);
 }
 
-static void deep_clone(void *dst, const void *src) {
+static void deep_clone(void *dst, const void *src)
+{
     const struct deep *s = src;
     struct deep *d = dst;
     d->value = s->value;
     d->name = strclone(s->name);
 }
 
-static void deep_destroy(void *elem) {
+static void deep_destroy(void *elem)
+{
     struct deep *d = elem;
     free(d->name);
 }
@@ -126,15 +141,11 @@ static void deep_destroy(void *elem) {
  * Test: shallow int → shallow int
  * ------------------------------------------------------------- */
 
-static void test_int_int(void) {
+static void test_int_int(void)
+{
     printf(C_YELLOW "test_int_int\n" RESET);
 
-    dictionary_t *d = dictionary_create(
-        sizeof(int), sizeof(int),
-        int_hash, int_cmp,
-        NULL, NULL,
-        int_cmp, NULL, NULL
-    );
+    dictionary_t *d = dictionary_create(sizeof(int), sizeof(int), int_hash, int_cmp, NULL, NULL, int_cmp, NULL, NULL);
 
     int k1 = 1, v1 = 10;
     int k2 = 2, v2 = 20;
@@ -143,11 +154,15 @@ static void test_int_int(void) {
     dictionary_set(d, &k1, &v1);
     dictionary_set(d, &k2, &v2);
 
-    if (!dictionary_get(d, &k1, &out) || out != 10) fail("int-int get k1");
-    else pass("int-int get k1");
+    if (!dictionary_get(d, &k1, &out) || out != 10)
+        fail("int-int get k1");
+    else
+        pass("int-int get k1");
 
-    if (!dictionary_get(d, &k2, &out) || out != 20) fail("int-int get k2");
-    else pass("int-int get k2");
+    if (!dictionary_get(d, &k2, &out) || out != 20)
+        fail("int-int get k2");
+    else
+        pass("int-int get k2");
 
     dictionary_destroy(d);
 }
@@ -156,15 +171,12 @@ static void test_int_int(void) {
  * Test: deep string key → shallow int value
  * ------------------------------------------------------------- */
 
-static void test_str_int(void) {
+static void test_str_int(void)
+{
     printf(C_YELLOW "test_str_int\n" RESET);
 
-    dictionary_t *d = dictionary_create(
-        sizeof(char *), sizeof(int),
-        str_hash, str_cmp,
-        str_clone, str_destroy,
-        int_cmp, NULL, NULL
-    );
+    dictionary_t *d =
+        dictionary_create(sizeof(char *), sizeof(int), str_hash, str_cmp, str_clone, str_destroy, int_cmp, NULL, NULL);
 
     const char *k1 = "alpha";
     const char *k2 = "beta";
@@ -174,11 +186,15 @@ static void test_str_int(void) {
     dictionary_set(d, &k1, &v1);
     dictionary_set(d, &k2, &v2);
 
-    if (!dictionary_get(d, &k1, &out) || out != 111) fail("str-int get alpha");
-    else pass("str-int get alpha");
+    if (!dictionary_get(d, &k1, &out) || out != 111)
+        fail("str-int get alpha");
+    else
+        pass("str-int get alpha");
 
-    if (!dictionary_get(d, &k2, &out) || out != 222) fail("str-int get beta");
-    else pass("str-int get beta");
+    if (!dictionary_get(d, &k2, &out) || out != 222)
+        fail("str-int get beta");
+    else
+        pass("str-int get beta");
 
     dictionary_destroy(d);
 }
@@ -187,15 +203,12 @@ static void test_str_int(void) {
  * Test: shallow int key → deep string value
  * ------------------------------------------------------------- */
 
-static void test_int_str(void) {
+static void test_int_str(void)
+{
     printf(C_YELLOW "test_int_str\n" RESET);
 
-    dictionary_t *d = dictionary_create(
-        sizeof(int), sizeof(char *),
-        int_hash, int_cmp,
-        NULL, NULL,
-        str_cmp, str_clone, str_destroy
-    );
+    dictionary_t *d =
+        dictionary_create(sizeof(int), sizeof(char *), int_hash, int_cmp, NULL, NULL, str_cmp, str_clone, str_destroy);
 
     int k1 = 5, k2 = 6;
     const char *v1 = "hello";
@@ -210,14 +223,14 @@ static void test_int_str(void) {
     } else {
         pass("int-str get 5");
     }
-    free(out);  /* we own this clone */
+    free(out); /* we own this clone */
 
     if (!dictionary_get(d, &k2, &out) || strcmp(out, "world") != 0) {
         fail("int-str get 6");
     } else {
         pass("int-str get 6");
     }
-    free(out);  /* we own this clone */
+    free(out); /* we own this clone */
 
     dictionary_destroy(d);
 }
@@ -226,23 +239,20 @@ static void test_int_str(void) {
  * Test: deep struct key → deep struct value
  * ------------------------------------------------------------- */
 
-static void test_deep_deep(void) {
+static void test_deep_deep(void)
+{
     printf(C_YELLOW "test_deep_deep\n" RESET);
 
-    dictionary_t *d = dictionary_create(
-        sizeof(struct deep), sizeof(struct deep),
-        deep_hash, deep_cmp,
-        deep_clone, deep_destroy,
-        deep_cmp, deep_clone, deep_destroy
-    );
+    dictionary_t *d = dictionary_create(sizeof(struct deep), sizeof(struct deep), deep_hash, deep_cmp, deep_clone,
+                                        deep_destroy, deep_cmp, deep_clone, deep_destroy);
 
     /* 1. Inputs: no heap ownership here, just literals.
        The dictionary will deep_clone these into its arenas. */
-    struct deep k1 = { "k1", 1 };
-    struct deep v1 = { "v1", 10 };
+    struct deep k1 = {"k1", 1};
+    struct deep v1 = {"v1", 10};
 
-    struct deep k2 = { "k2", 2 };
-    struct deep v2 = { "v2", 20 };
+    struct deep k2 = {"k2", 2};
+    struct deep v2 = {"v2", 20};
 
     dictionary_set(d, &k1, &v1);
     dictionary_set(d, &k2, &v2);
@@ -278,18 +288,14 @@ static void test_deep_deep(void) {
  * Test: sorted keys and values
  * ------------------------------------------------------------- */
 
-static void test_sorted(void) {
+static void test_sorted(void)
+{
     printf(C_YELLOW "test_sorted\n" RESET);
 
-    dictionary_t *d = dictionary_create(
-        sizeof(int), sizeof(int),
-        int_hash, int_cmp,
-        NULL, NULL,
-        int_cmp, NULL, NULL
-    );
+    dictionary_t *d = dictionary_create(sizeof(int), sizeof(int), int_hash, int_cmp, NULL, NULL, int_cmp, NULL, NULL);
 
-    int keys[] = { 5, 1, 4, 3, 2 };
-    int vals[] = { 50, 10, 40, 30, 20 };
+    int keys[] = {5, 1, 4, 3, 2};
+    int vals[] = {50, 10, 40, 30, 20};
 
     for (int i = 0; i < 5; ++i)
         dictionary_set(d, &keys[i], &vals[i]);
@@ -298,20 +304,26 @@ static void test_sorted(void) {
 
     for (size_t i = 0; i < 5; ++i) {
         const int *k = dictionary_get_key_sorted(d, i);
-        if (*k != (int)(i + 1)) ok = false;
+        if (*k != (int)(i + 1))
+            ok = false;
     }
 
-    if (!ok) fail("sorted keys");
-    else pass("sorted keys");
+    if (!ok)
+        fail("sorted keys");
+    else
+        pass("sorted keys");
 
     ok = true;
     for (size_t i = 0; i < 5; ++i) {
         const int *v = dictionary_get_value_sorted(d, i);
-        if (*v != (int)((i + 1) * 10)) ok = false;
+        if (*v != (int)((i + 1) * 10))
+            ok = false;
     }
 
-    if (!ok) fail("sorted values");
-    else pass("sorted values");
+    if (!ok)
+        fail("sorted values");
+    else
+        pass("sorted values");
 
     dictionary_destroy(d);
 }
@@ -320,15 +332,11 @@ static void test_sorted(void) {
  * Test: entry-based API
  * ------------------------------------------------------------- */
 
-static void test_entries(void) {
+static void test_entries(void)
+{
     printf(C_YELLOW "test_entries\n" RESET);
 
-    dictionary_t *d = dictionary_create(
-        sizeof(int), sizeof(int),
-        int_hash, int_cmp,
-        NULL, NULL,
-        int_cmp, NULL, NULL
-    );
+    dictionary_t *d = dictionary_create(sizeof(int), sizeof(int), int_hash, int_cmp, NULL, NULL, int_cmp, NULL, NULL);
 
     int k1 = 7, v1 = 70;
     int k2 = 8, v2 = 80;
@@ -339,19 +347,24 @@ static void test_entries(void) {
     dictionary_entry_t *e;
     int out;
 
-    if (!dictionary_get_entry(d, &k1, &e)) fail("entry get k1");
+    if (!dictionary_get_entry(d, &k1, &e))
+        fail("entry get k1");
     else {
         const int *kp = dictionary_entry_key(e);
         const int *vp = dictionary_entry_value(e);
-        if (*kp != 7 || *vp != 70) fail("entry key/value mismatch");
-        else pass("entry get k1");
+        if (*kp != 7 || *vp != 70)
+            fail("entry key/value mismatch");
+        else
+            pass("entry get k1");
     }
 
     int newv = 700;
     dictionary_set_entry(d, e, &newv);
 
-    if (!dictionary_get(d, &k1, &out) || out != 700) fail("entry set k1");
-    else pass("entry set k1");
+    if (!dictionary_get(d, &k1, &out) || out != 700)
+        fail("entry set k1");
+    else
+        pass("entry set k1");
 
     dictionary_destroy(d);
 }
@@ -360,21 +373,18 @@ static void test_entries(void) {
  * Test: foreach
  * ------------------------------------------------------------- */
 
-static void foreach_cb(const dictionary_entry_t *e, void *ud) {
+static void foreach_cb(const dictionary_entry_t *e, void *ud)
+{
     int *sum = ud;
     const int *v = dictionary_entry_value(e);
     *sum += *v;
 }
 
-static void test_foreach(void) {
+static void test_foreach(void)
+{
     printf(C_YELLOW "test_foreach\n" RESET);
 
-    dictionary_t *d = dictionary_create(
-        sizeof(int), sizeof(int),
-        int_hash, int_cmp,
-        NULL, NULL,
-        int_cmp, NULL, NULL
-    );
+    dictionary_t *d = dictionary_create(sizeof(int), sizeof(int), int_hash, int_cmp, NULL, NULL, int_cmp, NULL, NULL);
 
     int k1 = 1, v1 = 10;
     int k2 = 2, v2 = 20;
@@ -387,8 +397,10 @@ static void test_foreach(void) {
     int sum = 0;
     dictionary_foreach(d, foreach_cb, &sum);
 
-    if (sum != 60) fail("foreach sum");
-    else pass("foreach sum");
+    if (sum != 60)
+        fail("foreach sum");
+    else
+        pass("foreach sum");
 
     dictionary_destroy(d);
 }
@@ -397,15 +409,11 @@ static void test_foreach(void) {
  * Test: fuzz
  * ------------------------------------------------------------- */
 
-static void test_fuzz(void) {
+static void test_fuzz(void)
+{
     printf(C_YELLOW "test_fuzz\n" RESET);
 
-    dictionary_t *d = dictionary_create(
-        sizeof(int), sizeof(int),
-        int_hash, int_cmp,
-        NULL, NULL,
-        int_cmp, NULL, NULL
-    );
+    dictionary_t *d = dictionary_create(sizeof(int), sizeof(int), int_hash, int_cmp, NULL, NULL, int_cmp, NULL, NULL);
 
     srand((unsigned)time(NULL));
 
@@ -427,32 +435,32 @@ static void test_fuzz(void) {
         }
     }
 
-    if (!ok) fail("fuzz test");
-    else pass("fuzz test");
+    if (!ok)
+        fail("fuzz test");
+    else
+        pass("fuzz test");
 
     dictionary_destroy(d);
 }
 
 /* C99-compatible foreach callback */
-static void fuzz_foreach_cb(const dictionary_entry_t *e, void *ud) {
-    (void)e;  /* unused */
+static void fuzz_foreach_cb(const dictionary_entry_t *e, void *ud)
+{
+    (void)e; /* unused */
     int *count = (int *)ud;
     (*count)++;
 }
 
-static void test_sorted_fuzz(void) {
+static void test_sorted_fuzz(void)
+{
     printf(C_YELLOW "test_sorted_fuzz\n" RESET);
 
-    dictionary_t *d = dictionary_create(
-        sizeof(int), sizeof(int),
-        int_hash, int_cmp,
-        NULL, NULL,
-        int_cmp, NULL, NULL
-    );
+    dictionary_t *d = dictionary_create(sizeof(int), sizeof(int), int_hash, int_cmp, NULL, NULL, int_cmp, NULL, NULL);
 
     const int MAX = 2000;
     int ref[MAX];
-    for (int i = 0; i < MAX; ++i) ref[i] = -1;
+    for (int i = 0; i < MAX; ++i)
+        ref[i] = -1;
 
     srand((unsigned)time(NULL));
 
@@ -539,7 +547,8 @@ static void test_sorted_fuzz(void) {
 
         int ref_count = 0;
         for (int i = 0; i < MAX; ++i)
-            if (ref[i] != -1) ref_count++;
+            if (ref[i] != -1)
+                ref_count++;
 
         if (seen != ref_count) {
             fail("fuzz: foreach count mismatch");
@@ -553,16 +562,16 @@ done:
     dictionary_destroy(d);
 }
 
-void test_readme_example_deep(void) {
-    dictionary_t *dict = dictionary_create(sizeof(struct deep), sizeof(struct deep), deep_hash,
-                                           deep_cmp, deep_clone, deep_destroy,
-                                           deep_cmp, deep_clone, deep_destroy);
+void test_readme_example_deep(void)
+{
+    dictionary_t *dict = dictionary_create(sizeof(struct deep), sizeof(struct deep), deep_hash, deep_cmp, deep_clone,
+                                           deep_destroy, deep_cmp, deep_clone, deep_destroy);
 
-    struct deep k1 = { "k1", 1 };
-    struct deep v1 = { "v1", 10 };
+    struct deep k1 = {"k1", 1};
+    struct deep v1 = {"v1", 10};
 
-    struct deep k2 = { "k2", 2 };
-    struct deep v2 = { "v2", 20 };
+    struct deep k2 = {"k2", 2};
+    struct deep v2 = {"v2", 20};
 
     dictionary_set(dict, &k1, &v1);
     dictionary_set(dict, &k2, &v2);
@@ -570,24 +579,22 @@ void test_readme_example_deep(void) {
     struct deep out;
 
     if (dictionary_get(dict, &k1, &out)) {
-        printf("Value for key '%s': %s (%d)\n",
-               k1.name, out.name, out.value);
+        printf("Value for key '%s': %s (%d)\n", k1.name, out.name, out.value);
         free(out.name);
     }
 
     if (dictionary_get(dict, &k2, &out)) {
-        printf("Value for key '%s': %s (%d)\n",
-               k2.name, out.name, out.value);
+        printf("Value for key '%s': %s (%d)\n", k2.name, out.name, out.value);
         free(out.name);
     }
 
     dictionary_destroy(dict);
 }
 
-void test_readme_example_shallow(void) {
-    dictionary_t *dict = dictionary_create(sizeof(int), sizeof(char *), int_hash, 
-                                           int_cmp, NULL, NULL,
-                                           str_cmp, str_clone, str_destroy);
+void test_readme_example_shallow(void)
+{
+    dictionary_t *dict =
+        dictionary_create(sizeof(int), sizeof(char *), int_hash, int_cmp, NULL, NULL, str_cmp, str_clone, str_destroy);
 
     int k1 = 5, k2 = 6;
     const char *v1 = "hello";
@@ -619,23 +626,20 @@ void test_readme_example_shallow(void) {
  * key_cmp were used instead.
  * ------------------------------------------------------------- */
 
-static void test_sort_by_value(void) {
+static void test_sort_by_value(void)
+{
     printf(C_YELLOW "test_sort_by_value\n" RESET);
 
-    dictionary_t *d = dictionary_create(
-        sizeof(char *), sizeof(int),
-        str_hash, str_cmp,
-        str_clone, str_destroy,
-        int_cmp, NULL, NULL
-    );
+    dictionary_t *d =
+        dictionary_create(sizeof(char *), sizeof(int), str_hash, str_cmp, str_clone, str_destroy, int_cmp, NULL, NULL);
 
     /* Keys in alphabetical order would be: apple, banana, cherry, date, elderberry
      * Values assigned so that value order != key order:
      *   apple=3, banana=1, cherry=4, date=2, elderberry=5
      * Sorted by value: 1(banana), 2(date), 3(apple), 4(cherry), 5(elderberry)
      * Sorted by key:   apple,     banana,  cherry,   date,      elderberry    */
-    const char *keys[] = { "apple", "banana", "cherry", "date", "elderberry" };
-    int         vals[] = { 3,       1,        4,        2,      5            };
+    const char *keys[] = {"apple", "banana", "cherry", "date", "elderberry"};
+    int vals[] = {3, 1, 4, 2, 5};
 
     for (int i = 0; i < 5; ++i)
         dictionary_set(d, &keys[i], &vals[i]);
@@ -644,30 +648,42 @@ static void test_sort_by_value(void) {
     bool ok = true;
     for (size_t i = 0; i < 5; ++i) {
         const int *v = dictionary_get_value_sorted(d, i);
-        if (!v || *v != (int)(i + 1)) { ok = false; break; }
+        if (!v || *v != (int)(i + 1)) {
+            ok = false;
+            break;
+        }
     }
-    if (!ok) fail("sort-by-value: values not in int order");
-    else pass("sort-by-value: values in int order");
+    if (!ok)
+        fail("sort-by-value: values not in int order");
+    else
+        pass("sort-by-value: values in int order");
 
     /* Check dictionary_get_entry_sorted(SORT_BY_VALUE) yields keys in
      * value order, i.e. banana, date, apple, cherry, elderberry */
-    const char *expected_key_order[] = { "banana", "date", "apple", "cherry", "elderberry" };
+    const char *expected_key_order[] = {"banana", "date", "apple", "cherry", "elderberry"};
     ok = true;
     for (size_t i = 0; i < 5; ++i) {
         dictionary_entry_t *e;
         if (!dictionary_get_entry_sorted(d, i, DICTIONARY_SORT_BY_VALUE, &e)) {
-            ok = false; break;
+            ok = false;
+            break;
         }
         const char *k = *(const char **)dictionary_entry_key(e);
-        if (strcmp(k, expected_key_order[i]) != 0) { ok = false; break; }
+        if (strcmp(k, expected_key_order[i]) != 0) {
+            ok = false;
+            break;
+        }
     }
-    if (!ok) fail("sort-by-value: entry key order wrong");
-    else pass("sort-by-value: entry key order correct");
+    if (!ok)
+        fail("sort-by-value: entry key order wrong");
+    else
+        pass("sort-by-value: entry key order correct");
 
     dictionary_destroy(d);
 }
 
-static void example_dictionary_readme_examples(void) {
+static void example_dictionary_readme_examples(void)
+{
     printf(C_YELLOW "\ntesting README examples...\n" RESET);
 
     test_readme_example_deep();
@@ -678,7 +694,8 @@ static void example_dictionary_readme_examples(void) {
  * Main
  * ------------------------------------------------------------- */
 
-int tests_main(void) {
+int tests_main(void)
+{
     printf(BLUE "Running dictionary tests...\n" RESET);
 
     TEST_SECTION("Core");
@@ -696,9 +713,7 @@ int tests_main(void) {
     TEST_RUN_IN_GROUP(test_sort_by_value, tests, NULL);
 
     TEST_SECTION("README");
-    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_dictionary_readme_examples,
-                                  readme_examples,
-                                  "dictionary,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_dictionary_readme_examples, readme_examples, "dictionary,readme,output");
 
     printf(BLUE "Done.\n" RESET);
 

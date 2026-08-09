@@ -22,10 +22,10 @@
  * mutation or evaluation.
  */
 
-#include <stdlib.h>
-#include <limits.h>
-#include "number.h"
 #include "expr_bindings.h"
+#include "number.h"
+#include <limits.h>
+#include <stdlib.h>
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
 #include "expression.h"
@@ -36,21 +36,19 @@
  * not a general thread-safety mechanism for the DAG. */
 static const expr_t *tl_wrt = NULL;
 
-static struct _expr_t _EXPR_NAN_NODE = {
-    .ops = &ops_const,
-    .a = NULL,
-    .b = NULL,
-    .c = { { 0, 0, 0, 0, 0 } },
-    .x = { { 0, 0, 0, 0, 0 } },
-    .x_valid = 1,
-    .epoch = 0,
-    .simplified = true,
-    .simplify_epoch = 0,
-    .dx_cache = NULL,
-    .name = NULL,
-    .refcount = INT_MAX,
-    .var_id = 0
-};
+static struct _expr_t _EXPR_NAN_NODE = {.ops = &ops_const,
+                                        .a = NULL,
+                                        .b = NULL,
+                                        .c = {{0, 0, 0, 0, 0}},
+                                        .x = {{0, 0, 0, 0, 0}},
+                                        .x_valid = 1,
+                                        .epoch = 0,
+                                        .simplified = true,
+                                        .simplify_epoch = 0,
+                                        .dx_cache = NULL,
+                                        .name = NULL,
+                                        .refcount = INT_MAX,
+                                        .var_id = 0};
 
 static expr_t *expr_nan_const_shared(void)
 {
@@ -81,8 +79,7 @@ static number_t expr_eval_cached_num(const expr_t *dv)
         if (m->binding_expr) {
             number_t refreshed;
 
-            if (expr_binding_expr_eval_if_precision_increased(m->binding_expr,
-                                                            &refreshed)) {
+            if (expr_binding_expr_eval_if_precision_increased(m->binding_expr, &refreshed)) {
                 expr_store_const_num(m, num_clone(refreshed));
                 expr_store_value_num(m, refreshed);
                 m->x_valid = 1;
@@ -106,7 +103,7 @@ static number_t expr_eval_cached_num(const expr_t *dv)
     if (!m->x_valid || child_epoch > m->epoch) {
         expr_store_value_num(m, m->ops->eval(m));
         m->x_valid = 1;
-        m->epoch   = child_epoch;
+        m->epoch = child_epoch;
     }
     return m->x;
 }
@@ -139,9 +136,10 @@ static expr_t *expr_build_dx(expr_t *dv)
     /* Not cached: compute and insert at head. */
     expr_t *dx = dv->ops->deriv(dv); /* refcount = 1, tl_wrt still set */
     expr_deriv_cache_t *ce = malloc(sizeof *ce);
-    if (!ce) abort();
+    if (!ce)
+        abort();
     ce->wrt_id = wrt_id;
-    ce->dx   = dx;
+    ce->dx = dx;
     ce->next = dv->dx_cache;
     dv->dx_cache = ce;
     return dx; /* borrowed */
@@ -157,11 +155,9 @@ bool expr_is_differentiable(const expr_t *dv)
         return expr_is_differentiable(dv->a);
     if (dv->ops == &ops_polygamma)
         return expr_is_differentiable(dv->b);
-    if (dv->ops && dv->ops->arity != EXPR_OP_ATOM &&
-        !expr_is_differentiable(dv->a))
+    if (dv->ops && dv->ops->arity != EXPR_OP_ATOM && !expr_is_differentiable(dv->a))
         return false;
-    if (dv->ops && dv->ops->arity == EXPR_OP_BINARY &&
-        !expr_is_differentiable(dv->b))
+    if (dv->ops && dv->ops->arity == EXPR_OP_BINARY && !expr_is_differentiable(dv->b))
         return false;
     return true;
 }
@@ -201,8 +197,10 @@ number_t expr_eval(const expr_t *dv)
 
 const expr_t *expr_get_deriv(const expr_t *expr, const expr_t *wrt)
 {
-    if (!expr || !wrt) return NULL;
-    if (wrt->ops == &ops_const) return expr_nan_const_shared();
+    if (!expr || !wrt)
+        return NULL;
+    if (wrt->ops == &ops_const)
+        return expr_nan_const_shared();
     const expr_t *saved_wrt = tl_wrt;
     tl_wrt = wrt;
     const expr_t *result = expr_build_dx((expr_t *)expr);
@@ -220,11 +218,9 @@ void expr_set_val(expr_t *dv, number_t value)
 
     if (!dv)
         abort();
-    if (dv->ops != &ops_var &&
-        !(dv->ops == &ops_const && dv->name && *dv->name))
+    if (dv->ops != &ops_var && !(dv->ops == &ops_const && dv->name && *dv->name))
         abort();
-    if (dv->binding_expr &&
-        expr_binding_expr_is_numeric_literal(dv->binding_expr)) {
+    if (dv->binding_expr && expr_binding_expr_is_numeric_literal(dv->binding_expr)) {
         number_t binding_value = expr_binding_expr_eval(dv->binding_expr);
 
         preserve_binding_expr = num_eq(binding_value, value);
@@ -244,8 +240,10 @@ void expr_set_val(expr_t *dv, number_t value)
 
 void expr_set_name(expr_t *dv, const char *name)
 {
-    if (!dv) return;
-    if (dv->name) free(dv->name);
+    if (!dv)
+        return;
+    if (dv->name)
+        free(dv->name);
     dv->name = expr_normalise_name(name);
     dv->epoch++;
     dv->simplified = false;
@@ -254,11 +252,11 @@ void expr_set_name(expr_t *dv, const char *name)
 
 void expr_set_name_text(expr_t *dv, const string_t *name)
 {
-    if (!dv) return;
-    if (dv->name) free(dv->name);
-    dv->name = name
-        ? expr_take_string_as_c_string(expr_normalise_name_text(name))
-        : NULL;
+    if (!dv)
+        return;
+    if (dv->name)
+        free(dv->name);
+    dv->name = name ? expr_take_string_as_c_string(expr_normalise_name_text(name)) : NULL;
     dv->epoch++;
     dv->simplified = false;
     dv->simplify_epoch = 0;
@@ -297,7 +295,8 @@ expr_t *expr_new_pow_const_internal(const expr_t *a, number_t exponent)
     return dv;
 }
 
-int expr_cmp(const expr_t *expr1, const expr_t *expr2) {
+int expr_cmp(const expr_t *expr1, const expr_t *expr2)
+{
     NUM_SCOPE(scope);
     number_t a = expr_eval_num_internal(expr1);
     number_t b = expr_eval_num_internal(expr2);
@@ -314,15 +313,16 @@ int expr_cmp(const expr_t *expr1, const expr_t *expr2) {
     return cmp;
 }
 
-
 /* ------------------------------------------------------------------------- */
 /* Derivative creation (owning)                                              */
 /* ------------------------------------------------------------------------- */
 
 expr_t *expr_create_deriv(const expr_t *expr, const expr_t *wrt)
 {
-    if (!expr || !wrt) return NULL;
-    if (wrt->ops == &ops_const) return expr_nan_const_shared();
+    if (!expr || !wrt)
+        return NULL;
+    if (wrt->ops == &ops_const)
+        return expr_nan_const_shared();
     {
         expr_t *special = expr_deriv_rational_over_polynomial_power(expr, wrt);
 
@@ -332,8 +332,11 @@ expr_t *expr_create_deriv(const expr_t *expr, const expr_t *wrt)
     const expr_t *saved_wrt = tl_wrt;
     tl_wrt = wrt;
     expr_t *raw = expr_build_dx((expr_t *)expr); /* borrowed */
-    if (!raw) { tl_wrt = saved_wrt; return NULL; }
-    expr_retain(raw);                  /* now owning */
+    if (!raw) {
+        tl_wrt = saved_wrt;
+        return NULL;
+    }
+    expr_retain(raw); /* now owning */
     expr_t *simp = expr_simplify(raw);
     expr_free(raw);
     tl_wrt = saved_wrt;
@@ -343,7 +346,8 @@ expr_t *expr_create_deriv(const expr_t *expr, const expr_t *wrt)
 expr_t *expr_create_2nd_deriv(const expr_t *expr, const expr_t *wrt1, const expr_t *wrt2)
 {
     expr_t *g = expr_create_deriv(expr, wrt1);
-    if (!g) return NULL;
+    if (!g)
+        return NULL;
     expr_t *h = expr_create_deriv(g, wrt2);
     expr_free(g);
     return h;
@@ -352,10 +356,12 @@ expr_t *expr_create_2nd_deriv(const expr_t *expr, const expr_t *wrt1, const expr
 expr_t *expr_create_3rd_deriv(const expr_t *expr, const expr_t *wrt1, const expr_t *wrt2, const expr_t *wrt3)
 {
     expr_t *g = expr_create_deriv(expr, wrt1);
-    if (!g) return NULL;
+    if (!g)
+        return NULL;
     expr_t *h = expr_create_deriv(g, wrt2);
     expr_free(g);
-    if (!h) return NULL;
+    if (!h)
+        return NULL;
     expr_t *k = expr_create_deriv(h, wrt3);
     expr_free(h);
     return k;
@@ -366,9 +372,11 @@ expr_t *expr_create_nth_deriv(unsigned int n, const expr_t *expr, const expr_t *
     const expr_t *cur = expr;
     while (n--) {
         expr_t *next = expr_create_deriv(cur, wrt);
-        if (cur != expr) expr_free((expr_t *)cur);
+        if (cur != expr)
+            expr_free((expr_t *)cur);
         cur = next;
-        if (!cur) break;
+        if (!cur)
+            break;
     }
     return (expr_t *)cur;
 }

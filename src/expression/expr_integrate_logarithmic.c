@@ -3,8 +3,7 @@
 #define MARS_EXPR_INTEGRATE_INTERNAL_ACCESS
 #include "expr_integrate_internal.h"
 
-expr_t *integrate_log_over_proportional_affine(const expr_t *expr,
-                                               const expr_t *wrt)
+expr_t *integrate_log_over_proportional_affine(const expr_t *expr, const expr_t *wrt)
 {
     number_t log_constant = num_new();
     number_t log_coeff = num_new();
@@ -13,11 +12,9 @@ expr_t *integrate_log_over_proportional_affine(const expr_t *expr,
     expr_t *out = NULL;
 
     if (!expr || !expr->a || !expr->b ||
-        !match_affine_unary_data(expr->a, wrt, EXPR_PATTERN_UNARY_LOG,
-                                 &log_constant, &log_coeff) ||
-        !match_nonconstant_affine_linear_expr(expr->b, wrt, &denom_constant,
-                                              &denom_coeff) ||
-        num_is_zero(log_coeff) || num_is_zero(denom_coeff)) {
+        !match_affine_unary_data(expr->a, wrt, EXPR_PATTERN_UNARY_LOG, &log_constant, &log_coeff) ||
+        !match_nonconstant_affine_linear_expr(expr->b, wrt, &denom_constant, &denom_coeff) || num_is_zero(log_coeff) ||
+        num_is_zero(denom_coeff)) {
         num_destroy(&denom_coeff);
         num_destroy(&denom_constant);
         num_destroy(&log_coeff);
@@ -53,8 +50,7 @@ expr_t *integrate_log_rule(const expr_t *expr, const expr_t *wrt)
     number_t constant = num_new();
     number_t coeff = num_new();
 
-    if (!match_affine_unary(expr, wrt, EXPR_PATTERN_UNARY_LOG,
-                            &constant, &coeff)) {
+    if (!match_affine_unary(expr, wrt, EXPR_PATTERN_UNARY_LOG, &constant, &coeff)) {
         num_destroy(&coeff);
         num_destroy(&constant);
         raw = integrate_log_of_symbolic_affine(expr, wrt);
@@ -81,8 +77,7 @@ expr_t *integrate_log10_rule(const expr_t *expr, const expr_t *wrt)
     expr_t *u_over_ln10;
     expr_t *raw;
 
-    if (!match_affine_unary(expr, wrt, EXPR_PATTERN_UNARY_LOG10,
-                            &constant, &coeff)) {
+    if (!match_affine_unary(expr, wrt, EXPR_PATTERN_UNARY_LOG10, &constant, &coeff)) {
         num_destroy(&coeff);
         num_destroy(&constant);
         return NULL;
@@ -98,20 +93,16 @@ expr_t *integrate_log10_rule(const expr_t *expr, const expr_t *wrt)
     return div_number_owned_consuming(raw, &coeff);
 }
 
-static bool match_wrt_times_log_expr(const expr_t *expr,
-                                     const expr_t *wrt,
-                                     const expr_t **log_expr_out)
+static bool match_wrt_times_log_expr(const expr_t *expr, const expr_t *wrt, const expr_t **log_expr_out)
 {
     if (!expr || !wrt || !log_expr_out || !expr->a || !expr->b)
         return false;
 
-    if (is_wrt_symbolic_affine_leaf(expr->a, wrt) &&
-        expr_is_op(expr->b, &ops_log) && expr->b->a) {
+    if (is_wrt_symbolic_affine_leaf(expr->a, wrt) && expr_is_op(expr->b, &ops_log) && expr->b->a) {
         *log_expr_out = expr->b;
         return true;
     }
-    if (is_wrt_symbolic_affine_leaf(expr->b, wrt) &&
-        expr_is_op(expr->a, &ops_log) && expr->a->a) {
+    if (is_wrt_symbolic_affine_leaf(expr->b, wrt) && expr_is_op(expr->a, &ops_log) && expr->a->a) {
         *log_expr_out = expr->a;
         return true;
     }
@@ -128,9 +119,7 @@ expr_t *integrate_log_of_symbolic_affine(const expr_t *expr, const expr_t *wrt)
     expr_t *out = NULL;
 
     if (!expr || !wrt || !expr_is_op(expr, &ops_log) || !expr->a ||
-        !match_symbolic_affine_constant_and_coeff(expr->a, wrt,
-                                                  &constant_term, &coeff) ||
-        expr_is_exact_zero(coeff))
+        !match_symbolic_affine_constant_and_coeff(expr->a, wrt, &constant_term, &coeff) || expr_is_exact_zero(coeff))
         goto cleanup;
 
     log_base = expr_log(expr->a);
@@ -148,8 +137,7 @@ cleanup:
     return out;
 }
 
-expr_t *integrate_log_over_symbolic_proportional_affine(const expr_t *expr,
-                                                        const expr_t *wrt)
+expr_t *integrate_log_over_symbolic_proportional_affine(const expr_t *expr, const expr_t *wrt)
 {
     expr_t *log_constant = NULL;
     expr_t *log_coeff = NULL;
@@ -160,15 +148,10 @@ expr_t *integrate_log_over_symbolic_proportional_affine(const expr_t *expr,
     expr_t *denom = NULL;
     expr_t *out = NULL;
 
-    if (!expr || !wrt || !expr->a || !expr->b ||
-        !expr_is_op(expr->a, &ops_log) || !expr->a->a ||
-        !match_symbolic_affine_constant_and_coeff(expr->a->a, wrt,
-                                                  &log_constant, &log_coeff) ||
-        !match_symbolic_affine_constant_and_coeff(expr->b, wrt,
-                                                  &denom_constant, &denom_coeff) ||
-        !expr_is_exact_zero(log_constant) ||
-        !expr_is_exact_zero(denom_constant) ||
-        expr_is_exact_zero(denom_coeff))
+    if (!expr || !wrt || !expr->a || !expr->b || !expr_is_op(expr->a, &ops_log) || !expr->a->a ||
+        !match_symbolic_affine_constant_and_coeff(expr->a->a, wrt, &log_constant, &log_coeff) ||
+        !match_symbolic_affine_constant_and_coeff(expr->b, wrt, &denom_constant, &denom_coeff) ||
+        !expr_is_exact_zero(log_constant) || !expr_is_exact_zero(denom_constant) || expr_is_exact_zero(denom_coeff))
         goto cleanup;
 
     log_term = expr_log(expr->a->a);
@@ -188,10 +171,8 @@ cleanup:
     return out;
 }
 
-static expr_t *build_symbolic_quadratic_reciprocal_integral(const expr_t *wrt,
-                                                            const expr_t *quad_coeff,
-                                                            const expr_t *linear_coeff,
-                                                            const expr_t *constant_coeff)
+static expr_t *build_symbolic_quadratic_reciprocal_integral(const expr_t *wrt, const expr_t *quad_coeff,
+                                                            const expr_t *linear_coeff, const expr_t *constant_coeff)
 {
     expr_t *a_c = NULL;
     expr_t *four_ac = NULL;
@@ -241,12 +222,9 @@ cleanup:
     return out;
 }
 
-static expr_t *build_linear_over_symbolic_quadratic_integral(const expr_t *quadratic,
-                                                             const expr_t *wrt,
-                                                             const expr_t *quad_coeff,
-                                                             const expr_t *linear_coeff,
-                                                             const expr_t *constant_coeff,
-                                                             const expr_t *numer_linear,
+static expr_t *build_linear_over_symbolic_quadratic_integral(const expr_t *quadratic, const expr_t *wrt,
+                                                             const expr_t *quad_coeff, const expr_t *linear_coeff,
+                                                             const expr_t *constant_coeff, const expr_t *numer_linear,
                                                              const expr_t *numer_constant)
 {
     expr_t *two_a = NULL;
@@ -259,8 +237,7 @@ static expr_t *build_linear_over_symbolic_quadratic_integral(const expr_t *quadr
     expr_t *remainder_part = NULL;
     expr_t *out = NULL;
 
-    if (!quadratic || !wrt || !quad_coeff || !linear_coeff || !constant_coeff ||
-        !numer_linear || !numer_constant)
+    if (!quadratic || !wrt || !quad_coeff || !linear_coeff || !constant_coeff || !numer_linear || !numer_constant)
         goto cleanup;
 
     two_a = expr_mul_num(quad_coeff, &NUM_TWO);
@@ -275,10 +252,7 @@ static expr_t *build_linear_over_symbolic_quadratic_integral(const expr_t *quadr
     remainder = (numer_constant && alpha_b) ? expr_sub(numer_constant, alpha_b) : NULL;
     remainder = simplify_owned(remainder);
     if (remainder && !expr_is_exact_zero(remainder)) {
-        inverse_integral =
-            build_symbolic_quadratic_reciprocal_integral(wrt, quad_coeff,
-                                                         linear_coeff,
-                                                         constant_coeff);
+        inverse_integral = build_symbolic_quadratic_reciprocal_integral(wrt, quad_coeff, linear_coeff, constant_coeff);
         remainder_part = inverse_integral ? expr_mul(remainder, inverse_integral) : NULL;
     }
 
@@ -298,8 +272,7 @@ cleanup:
     return out;
 }
 
-expr_t *integrate_wrt_times_log_symbolic_affine(const expr_t *expr,
-                                                const expr_t *wrt)
+expr_t *integrate_wrt_times_log_symbolic_affine(const expr_t *expr, const expr_t *wrt)
 {
     const expr_t *log_expr = NULL;
     expr_t *constant_term = NULL;
@@ -324,8 +297,7 @@ expr_t *integrate_wrt_times_log_symbolic_affine(const expr_t *expr,
     number_t neg_quarter = num_neg(quarter);
 
     if (!match_wrt_times_log_expr(expr, wrt, &log_expr) ||
-        !match_symbolic_affine_constant_and_coeff(log_expr->a, wrt,
-                                                  &constant_term, &coeff) ||
+        !match_symbolic_affine_constant_and_coeff(log_expr->a, wrt, &constant_term, &coeff) ||
         expr_is_exact_zero(coeff))
         goto cleanup;
 
@@ -340,20 +312,14 @@ expr_t *integrate_wrt_times_log_symbolic_affine(const expr_t *expr,
     x_sq_for_quarter = NULL;
 
     two_coeff = coeff ? expr_mul_num(coeff, &NUM_TWO) : NULL;
-    constant_over_two_coeff = (constant_term && two_coeff)
-                                  ? expr_div(constant_term, two_coeff)
-                                  : NULL;
+    constant_over_two_coeff = (constant_term && two_coeff) ? expr_div(constant_term, two_coeff) : NULL;
     third = constant_over_two_coeff ? expr_mul(wrt, constant_over_two_coeff) : NULL;
 
     constant_sq = expr_pow(constant_term, &NUM_TWO);
     coeff_sq = expr_pow(coeff, &NUM_TWO);
     two_coeff_sq = coeff_sq ? expr_mul_num(coeff_sq, &NUM_TWO) : NULL;
-    constant_sq_over_two_coeff_sq = (constant_sq && two_coeff_sq)
-                                        ? expr_div(constant_sq, two_coeff_sq)
-                                        : NULL;
-    scaled_log = (constant_sq_over_two_coeff_sq && log_u)
-                     ? expr_mul(constant_sq_over_two_coeff_sq, log_u)
-                     : NULL;
+    constant_sq_over_two_coeff_sq = (constant_sq && two_coeff_sq) ? expr_div(constant_sq, two_coeff_sq) : NULL;
+    scaled_log = (constant_sq_over_two_coeff_sq && log_u) ? expr_mul(constant_sq_over_two_coeff_sq, log_u) : NULL;
     fourth = expr_negate_owned(scaled_log);
     scaled_log = NULL;
 
@@ -389,8 +355,7 @@ cleanup:
     return sum;
 }
 
-expr_t *integrate_wrt_times_log_symbolic_quadratic(const expr_t *expr,
-                                                   const expr_t *wrt)
+expr_t *integrate_wrt_times_log_symbolic_quadratic(const expr_t *expr, const expr_t *wrt)
 {
     const expr_t *log_expr = NULL;
     expr_t *quad_coeff = NULL;
@@ -417,9 +382,7 @@ expr_t *integrate_wrt_times_log_symbolic_quadratic(const expr_t *expr,
     number_t neg_half = num_neg(NUM_HALF);
 
     if (!match_wrt_times_log_expr(expr, wrt, &log_expr) ||
-        !match_symbolic_quadratic_coeffs(log_expr->a, wrt,
-                                         &quad_coeff, &linear_coeff,
-                                         &constant_coeff))
+        !match_symbolic_quadratic_coeffs(log_expr->a, wrt, &quad_coeff, &linear_coeff, &constant_coeff))
         goto cleanup;
 
     log_q = expr_log(log_expr->a);
@@ -433,9 +396,7 @@ expr_t *integrate_wrt_times_log_symbolic_quadratic(const expr_t *expr,
     x_sq_for_half = NULL;
 
     two_a = quad_coeff ? expr_mul_num(quad_coeff, &NUM_TWO) : NULL;
-    linear_over_two_a = (linear_coeff && two_a)
-                            ? expr_div(linear_coeff, two_a)
-                            : NULL;
+    linear_over_two_a = (linear_coeff && two_a) ? expr_div(linear_coeff, two_a) : NULL;
     third = linear_over_two_a ? expr_mul(wrt, linear_over_two_a) : NULL;
 
     linear_sq = expr_pow(linear_coeff, &NUM_TWO);
@@ -446,12 +407,8 @@ expr_t *integrate_wrt_times_log_symbolic_quadratic(const expr_t *expr,
     linear_c = expr_mul(linear_coeff, constant_coeff);
     numer_constant = (linear_c && quad_coeff) ? expr_div(linear_c, quad_coeff) : NULL;
     numer_constant = simplify_owned(numer_constant);
-    remainder_integral =
-        build_linear_over_symbolic_quadratic_integral(log_expr->a, wrt,
-                                                      quad_coeff, linear_coeff,
-                                                      constant_coeff,
-                                                      numer_linear,
-                                                      numer_constant);
+    remainder_integral = build_linear_over_symbolic_quadratic_integral(log_expr->a, wrt, quad_coeff, linear_coeff,
+                                                                       constant_coeff, numer_linear, numer_constant);
     fourth = remainder_integral ? mul_number_owned(remainder_integral, neg_half) : NULL;
     remainder_integral = NULL;
 

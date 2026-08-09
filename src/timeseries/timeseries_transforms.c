@@ -88,8 +88,7 @@ timeseries_t *ts_diff(const timeseries_t *series, size_t differences)
     return work;
 }
 
-timeseries_t *ts_seasonal_diff(const timeseries_t *series,
-                               size_t differences, size_t season_period)
+timeseries_t *ts_seasonal_diff(const timeseries_t *series, size_t differences, size_t season_period)
 {
     timeseries_t *work = ts_clone(series);
     size_t d;
@@ -140,8 +139,14 @@ timeseries_t *ts_cumsum(const timeseries_t *series)
     return out;
 }
 
-timeseries_t *ts_log(const timeseries_t *series) { return ts_unary_map(series, num_log); }
-timeseries_t *ts_exp(const timeseries_t *series) { return ts_unary_map(series, num_exp); }
+timeseries_t *ts_log(const timeseries_t *series)
+{
+    return ts_unary_map(series, num_log);
+}
+timeseries_t *ts_exp(const timeseries_t *series)
+{
+    return ts_unary_map(series, num_exp);
+}
 
 timeseries_t *ts_box_cox(const timeseries_t *series, const number_t *lambda)
 {
@@ -225,8 +230,10 @@ static timeseries_t *ts_roll_generic(const timeseries_t *series, size_t window, 
             if (state.count == 0u) {
                 state.minv = state.maxv = v;
             } else {
-                if (v < state.minv) state.minv = v;
-                if (v > state.maxv) state.maxv = v;
+                if (v < state.minv)
+                    state.minv = v;
+                if (v > state.maxv)
+                    state.maxv = v;
             }
             state.sum += v;
             state.sumsq += v * v;
@@ -245,10 +252,22 @@ static timeseries_t *ts_roll_generic(const timeseries_t *series, size_t window, 
     return out;
 }
 
-timeseries_t *ts_roll_mean(const timeseries_t *series, size_t window) { return ts_roll_generic(series, window, ts_roll_eval_mean); }
-timeseries_t *ts_roll_sum(const timeseries_t *series, size_t window) { return ts_roll_generic(series, window, ts_roll_eval_sum); }
-timeseries_t *ts_roll_var(const timeseries_t *series, size_t window) { return ts_roll_generic(series, window, ts_roll_eval_var); }
-timeseries_t *ts_roll_std(const timeseries_t *series, size_t window) { return ts_roll_generic(series, window, ts_roll_eval_std); }
+timeseries_t *ts_roll_mean(const timeseries_t *series, size_t window)
+{
+    return ts_roll_generic(series, window, ts_roll_eval_mean);
+}
+timeseries_t *ts_roll_sum(const timeseries_t *series, size_t window)
+{
+    return ts_roll_generic(series, window, ts_roll_eval_sum);
+}
+timeseries_t *ts_roll_var(const timeseries_t *series, size_t window)
+{
+    return ts_roll_generic(series, window, ts_roll_eval_var);
+}
+timeseries_t *ts_roll_std(const timeseries_t *series, size_t window)
+{
+    return ts_roll_generic(series, window, ts_roll_eval_std);
+}
 
 matrix_t *ts_to_column_matrix(const timeseries_t *series)
 {
@@ -264,8 +283,7 @@ matrix_t *ts_to_row_matrix(const timeseries_t *series)
     return mat_create(1u, series->length, series->values);
 }
 
-matrix_t *ts_design_matrix_lags(const timeseries_t *series, size_t max_lag,
-                                bool include_intercept)
+matrix_t *ts_design_matrix_lags(const timeseries_t *series, size_t max_lag, bool include_intercept)
 {
     size_t rows, cols, r, c;
     double *vals;
@@ -292,9 +310,7 @@ matrix_t *ts_design_matrix_lags(const timeseries_t *series, size_t max_lag,
     }
 }
 
-matrix_t *ts_design_matrix_trend(const timeseries_t *series,
-                                 bool include_intercept,
-                                 bool include_linear,
+matrix_t *ts_design_matrix_trend(const timeseries_t *series, bool include_intercept, bool include_linear,
                                  bool include_quadratic)
 {
     size_t rows, cols = 0u, r;
@@ -312,9 +328,12 @@ matrix_t *ts_design_matrix_trend(const timeseries_t *series,
         return NULL;
     for (r = 0u; r < rows; ++r) {
         col = 0u;
-        if (include_intercept) vals[r * cols + col++] = 1.0;
-        if (include_linear) vals[r * cols + col++] = (double)r;
-        if (include_quadratic) vals[r * cols + col++] = (double)r * (double)r;
+        if (include_intercept)
+            vals[r * cols + col++] = 1.0;
+        if (include_linear)
+            vals[r * cols + col++] = (double)r;
+        if (include_quadratic)
+            vals[r * cols + col++] = (double)r * (double)r;
     }
     {
         matrix_t *out = ts_make_matrix_from_doubles(vals, rows, cols);
@@ -323,9 +342,7 @@ matrix_t *ts_design_matrix_trend(const timeseries_t *series,
     }
 }
 
-matrix_t *ts_design_matrix_seasonal_dummies(const timeseries_t *series,
-                                            size_t season_period,
-                                            bool drop_first)
+matrix_t *ts_design_matrix_seasonal_dummies(const timeseries_t *series, size_t season_period, bool drop_first)
 {
     size_t rows, cols, r, c;
     double *vals;
@@ -351,9 +368,7 @@ matrix_t *ts_design_matrix_seasonal_dummies(const timeseries_t *series,
     }
 }
 
-matrix_t *ts_bind_columns(timeseries_t *const *series,
-                          size_t count,
-                          ts_join_type_t join_type)
+matrix_t *ts_bind_columns(timeseries_t *const *series, size_t count, ts_join_type_t join_type)
 {
     size_t i, j, rows;
     timeseries_t *base = NULL;
@@ -443,10 +458,8 @@ static double ts_aggregate_eval_max(const ts_aggregate_bucket_t *bucket)
     return bucket->maxv;
 }
 
-static timeseries_t *ts_aggregate_generic(const timeseries_t *series,
-                                          ts_frequency_t target_frequency,
-                                          ts_year_type_t year_type,
-                                          ts_aggregate_eval_fn eval)
+static timeseries_t *ts_aggregate_generic(const timeseries_t *series, ts_frequency_t target_frequency,
+                                          ts_year_type_t year_type, ts_aggregate_eval_fn eval)
 {
     size_t i = 0u, cap = 16u, len = 0u;
     number_t *values = calloc(cap, sizeof(*values));
@@ -461,14 +474,16 @@ static timeseries_t *ts_aggregate_generic(const timeseries_t *series,
         ts_aggregate_bucket_t bucket = {0};
 
         while (j < series->length &&
-               ts_datetime_same_bucket(series->index[i], series->index[j],
-                                       target_frequency, year_type)) {
+               ts_datetime_same_bucket(series->index[i], series->index[j], target_frequency, year_type)) {
             if (!series->missing[j]) {
                 double v = num_to_double(series->values[j]);
-                if (bucket.count == 0u) bucket.minv = bucket.maxv = v;
+                if (bucket.count == 0u)
+                    bucket.minv = bucket.maxv = v;
                 else {
-                    if (v < bucket.minv) bucket.minv = v;
-                    if (v > bucket.maxv) bucket.maxv = v;
+                    if (v < bucket.minv)
+                        bucket.minv = v;
+                    if (v > bucket.maxv)
+                        bucket.maxv = v;
                 }
                 bucket.sum += v;
                 bucket.count++;
@@ -482,10 +497,15 @@ static timeseries_t *ts_aggregate_generic(const timeseries_t *series,
             bool *nm = realloc(missing, new_cap * sizeof(*nm));
 
             if (!nv || !ni || !nm) {
-                free(nv); free(ni); free(nm);
+                free(nv);
+                free(ni);
+                free(nm);
                 goto fail;
             }
-            values = nv; index = ni; missing = nm; cap = new_cap;
+            values = nv;
+            index = ni;
+            missing = nm;
+            cap = new_cap;
         }
         index[len] = ts_bucket_label(series->index[i], target_frequency, year_type);
         if (bucket.count == 0u) {
@@ -502,9 +522,14 @@ static timeseries_t *ts_aggregate_generic(const timeseries_t *series,
     out = ts_alloc_empty(len);
     if (!out)
         goto fail;
-    free(out->values); out->values = values; values = NULL;
-    free(out->missing); out->missing = missing; missing = NULL;
-    out->index = index; index = NULL;
+    free(out->values);
+    out->values = values;
+    values = NULL;
+    free(out->missing);
+    out->missing = missing;
+    missing = NULL;
+    out->index = index;
+    index = NULL;
     out->has_index = true;
     out->frequency = target_frequency;
     out->year_type = year_type;
@@ -514,19 +539,20 @@ static timeseries_t *ts_aggregate_generic(const timeseries_t *series,
 
 fail:
     if (values) {
-        for (i = 0u; i < cap; ++i) num_destroy(&values[i]);
+        for (i = 0u; i < cap; ++i)
+            num_destroy(&values[i]);
         free(values);
     }
     if (index) {
-        for (i = 0u; i < cap; ++i) datetime_dealloc(index[i]);
+        for (i = 0u; i < cap; ++i)
+            datetime_dealloc(index[i]);
         free(index);
     }
     free(missing);
     return NULL;
 }
 
-timeseries_t *ts_as_frequency(const timeseries_t *series,
-                              ts_frequency_t target_frequency,
+timeseries_t *ts_as_frequency(const timeseries_t *series, ts_frequency_t target_frequency,
                               ts_missing_policy_t missing_policy)
 {
     (void)missing_policy;
@@ -537,15 +563,19 @@ timeseries_t *ts_as_frequency(const timeseries_t *series,
     return ts_aggregate_generic(series, target_frequency, series->year_type, ts_aggregate_eval_mean);
 }
 
-timeseries_t *ts_aggregate_sum(const timeseries_t *series,
-                               ts_frequency_t target_frequency,
-                               ts_year_type_t year_type) { return ts_aggregate_generic(series, target_frequency, year_type, ts_aggregate_eval_sum); }
-timeseries_t *ts_aggregate_mean(const timeseries_t *series,
-                                ts_frequency_t target_frequency,
-                                ts_year_type_t year_type) { return ts_aggregate_generic(series, target_frequency, year_type, ts_aggregate_eval_mean); }
-timeseries_t *ts_aggregate_min(const timeseries_t *series,
-                               ts_frequency_t target_frequency,
-                               ts_year_type_t year_type) { return ts_aggregate_generic(series, target_frequency, year_type, ts_aggregate_eval_min); }
-timeseries_t *ts_aggregate_max(const timeseries_t *series,
-                               ts_frequency_t target_frequency,
-                               ts_year_type_t year_type) { return ts_aggregate_generic(series, target_frequency, year_type, ts_aggregate_eval_max); }
+timeseries_t *ts_aggregate_sum(const timeseries_t *series, ts_frequency_t target_frequency, ts_year_type_t year_type)
+{
+    return ts_aggregate_generic(series, target_frequency, year_type, ts_aggregate_eval_sum);
+}
+timeseries_t *ts_aggregate_mean(const timeseries_t *series, ts_frequency_t target_frequency, ts_year_type_t year_type)
+{
+    return ts_aggregate_generic(series, target_frequency, year_type, ts_aggregate_eval_mean);
+}
+timeseries_t *ts_aggregate_min(const timeseries_t *series, ts_frequency_t target_frequency, ts_year_type_t year_type)
+{
+    return ts_aggregate_generic(series, target_frequency, year_type, ts_aggregate_eval_min);
+}
+timeseries_t *ts_aggregate_max(const timeseries_t *series, ts_frequency_t target_frequency, ts_year_type_t year_type)
+{
+    return ts_aggregate_generic(series, target_frequency, year_type, ts_aggregate_eval_max);
+}

@@ -1,12 +1,12 @@
 #ifndef NUMBER_H
 #define NUMBER_H
 
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdarg.h>
-#include <stdint.h>
 #include "qcomplex.h"
 #include "qfloat.h"
+#include <stdarg.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 
 typedef struct _string_t string_t;
 
@@ -151,8 +151,7 @@ static inline number_t number_inline_make_qfloat(qfloat_t value)
     return number;
 }
 
-static inline number_t number_inline_make_qcomplex_parts(qfloat_t real,
-                                                         qfloat_t imag)
+static inline number_t number_inline_make_qcomplex_parts(qfloat_t real, qfloat_t imag)
 {
     number_t number;
     number_inline_qfloat_bits_t real_bits;
@@ -205,15 +204,15 @@ typedef struct num_scope_t num_scope_t;
  * by value, the returned object may still manage heap-backed internal state.
  * @{
  */
-number_t num_new                   (void);
-number_t num_new_with_prec_bits    (size_t precision_bits);
+number_t num_new(void);
+number_t num_new_with_prec_bits(size_t precision_bits);
 
-number_t num_create_from_long      (long value);
-number_t num_create_from_frac      (long numerator, long denominator);
-number_t num_create_from_double    (double value);
-number_t num_create_from_cdouble   (double _Complex value);
-number_t num_create_from_qfloat    (qfloat_t value);
-number_t num_create_from_qcomplex  (qcomplex_t value);
+number_t num_create_from_long(long value);
+number_t num_create_from_frac(long numerator, long denominator);
+number_t num_create_from_double(double value);
+number_t num_create_from_cdouble(double _Complex value);
+number_t num_create_from_qfloat(qfloat_t value);
+number_t num_create_from_qcomplex(qcomplex_t value);
 
 /**
  * @brief Parses text into the most suitable numeric representation.
@@ -311,75 +310,75 @@ bool num_constant_value(const char *text, number_t *out);
  * @{
  */
 
-extern const number_t NUM_ZERO;          /**< exact 0 */
-extern const number_t NUM_ONE;           /**< exact 1 */
-extern const number_t NUM_NEG_ONE;       /**< exact -1 */
-extern const number_t NUM_HALF;          /**< exact ½ */
-extern const number_t NUM_ONE_AND_HALF;  /**< exact ³/₂ */
-extern const number_t NUM_ONE_THIRD;     /**< exact ⅓ */
-extern const number_t NUM_QUARTER;       /**< exact ¼ */
-extern const number_t NUM_ONE_SIXTH;     /**< exact ⅙ */
-extern const number_t NUM_ONE_EIGHTH;    /**< exact ⅛ */
-extern const number_t NUM_ONE_TENTH;     /**< exact ¹/₁₀ */
-extern const number_t NUM_TWO;           /**< exact 2 */
-extern const number_t NUM_TEN;           /**< exact 10 */
-extern const number_t NUM_NAN;           /**< NaN */
-extern const number_t NUM_INF;           /**< +∞ */
-extern const number_t NUM_NINF;          /**< -∞ */
+extern const number_t NUM_ZERO;         /**< exact 0 */
+extern const number_t NUM_ONE;          /**< exact 1 */
+extern const number_t NUM_NEG_ONE;      /**< exact -1 */
+extern const number_t NUM_HALF;         /**< exact ½ */
+extern const number_t NUM_ONE_AND_HALF; /**< exact ³/₂ */
+extern const number_t NUM_ONE_THIRD;    /**< exact ⅓ */
+extern const number_t NUM_QUARTER;      /**< exact ¼ */
+extern const number_t NUM_ONE_SIXTH;    /**< exact ⅙ */
+extern const number_t NUM_ONE_EIGHTH;   /**< exact ⅛ */
+extern const number_t NUM_ONE_TENTH;    /**< exact ¹/₁₀ */
+extern const number_t NUM_TWO;          /**< exact 2 */
+extern const number_t NUM_TEN;          /**< exact 10 */
+extern const number_t NUM_NAN;          /**< NaN */
+extern const number_t NUM_INF;          /**< +∞ */
+extern const number_t NUM_NINF;         /**< -∞ */
 
 /** @name Circular constants
  * Constants built from `pi`.
  * @{
  */
-extern const number_t NUM_PI;            /**< π */
-extern const number_t NUM_2PI;           /**< 2π */
-extern const number_t NUM_PI_2;          /**< π/2 */
-extern const number_t NUM_NEG_PI_2;      /**< -π/2 */
-extern const number_t NUM_PI_4;          /**< π/4 */
-extern const number_t NUM_3PI_4;         /**< 3π/4 */
-extern const number_t NUM_PI_6;          /**< π/6 */
-extern const number_t NUM_PI_3;          /**< π/3 */
-extern const number_t NUM_2_PI;          /**< 2/π */
+extern const number_t NUM_PI;       /**< π */
+extern const number_t NUM_2PI;      /**< 2π */
+extern const number_t NUM_PI_2;     /**< π/2 */
+extern const number_t NUM_NEG_PI_2; /**< -π/2 */
+extern const number_t NUM_PI_4;     /**< π/4 */
+extern const number_t NUM_3PI_4;    /**< 3π/4 */
+extern const number_t NUM_PI_6;     /**< π/6 */
+extern const number_t NUM_PI_3;     /**< π/3 */
+extern const number_t NUM_2_PI;     /**< 2/π */
 /** @} */
 
 /** @name Exponential and logarithmic constants
  * Constants built from `e` and natural logarithms.
  * @{
  */
-extern const number_t NUM_E;                 /**< e */
-extern const number_t NUM_INV_E;             /**< 1/e */
-extern const number_t NUM_NEG_INV_E;         /**< -1/e */
-extern const number_t NUM_LN2;               /**< ln(2) */
-extern const number_t NUM_LN10;              /**< ln(10) */
-extern const number_t NUM_INVLN2;            /**< 1/ln(2) */
-extern const number_t NUM_EULER_MASCHERONI;  /**< Euler-Mascheroni γ */
-extern const number_t NUM_PHI;               /**< golden ratio φ */
+extern const number_t NUM_E;                /**< e */
+extern const number_t NUM_INV_E;            /**< 1/e */
+extern const number_t NUM_NEG_INV_E;        /**< -1/e */
+extern const number_t NUM_LN2;              /**< ln(2) */
+extern const number_t NUM_LN10;             /**< ln(10) */
+extern const number_t NUM_INVLN2;           /**< 1/ln(2) */
+extern const number_t NUM_EULER_MASCHERONI; /**< Euler-Mascheroni γ */
+extern const number_t NUM_PHI;              /**< golden ratio φ */
 /** @} */
 
 /** @name Root and Gaussian-normalisation constants
  * Algebraic roots and common constants from Gaussian / gamma-function formulae.
  * @{
  */
-extern const number_t NUM_SQRT_HALF;         /**< √(1/2) */
-extern const number_t NUM_SQRT2;             /**< √2 */
-extern const number_t NUM_SQRT3;             /**< √3 */
-extern const number_t NUM_SQRT2_OVER_TWO;    /**< √2/2 */
-extern const number_t NUM_SQRT3_OVER_TWO;    /**< √3/2 */
-extern const number_t NUM_SQRT_2PI;          /**< √(2π) */
-extern const number_t NUM_SQRT_PI;           /**< √π */
-extern const number_t NUM_SQRT_PI_OVER_TWO;  /**< √(π/2) */
-extern const number_t NUM_SQRT1ONPI;         /**< 1/√π */
-extern const number_t NUM_2_SQRTPI;          /**< 2/√π */
+extern const number_t NUM_SQRT_HALF;            /**< √(1/2) */
+extern const number_t NUM_SQRT2;                /**< √2 */
+extern const number_t NUM_SQRT3;                /**< √3 */
+extern const number_t NUM_SQRT2_OVER_TWO;       /**< √2/2 */
+extern const number_t NUM_SQRT3_OVER_TWO;       /**< √3/2 */
+extern const number_t NUM_SQRT_2PI;             /**< √(2π) */
+extern const number_t NUM_SQRT_PI;              /**< √π */
+extern const number_t NUM_SQRT_PI_OVER_TWO;     /**< √(π/2) */
+extern const number_t NUM_SQRT1ONPI;            /**< 1/√π */
+extern const number_t NUM_2_SQRTPI;             /**< 2/√π */
 extern const number_t NUM_NEG_TWO_OVER_SQRT_PI; /**< -2/√π */
-extern const number_t NUM_INV_SQRT_2PI;      /**< 1/√(2π) */
-extern const number_t NUM_LOG_SQRT_2PI;      /**< log(√(2π)) */
-extern const number_t NUM_LN_2PI;            /**< ln(2π) */
-extern const number_t NUM_PI_SQUARED;        /**< π² */
-extern const number_t NUM_2PI_CUBED;         /**< (2π)³ */
+extern const number_t NUM_INV_SQRT_2PI;         /**< 1/√(2π) */
+extern const number_t NUM_LOG_SQRT_2PI;         /**< log(√(2π)) */
+extern const number_t NUM_LN_2PI;               /**< ln(2π) */
+extern const number_t NUM_PI_SQUARED;           /**< π² */
+extern const number_t NUM_2PI_CUBED;            /**< (2π)³ */
 /** @} */
 
-extern const number_t NUM_I;             /**< i */
-extern const number_t NUM_NEG_I;         /**< -i */
+extern const number_t NUM_I;     /**< i */
+extern const number_t NUM_NEG_I; /**< -i */
 /** @} */
 
 /**
@@ -505,14 +504,14 @@ number_t num_scope_detach(number_t value);
  */
 
 /** Default multiprecision working precision, expressed in bits or decimal digits. */
-int    num_set_default_prec_bits   (size_t precision_bits);
-size_t num_get_default_prec_bits   (void);
-int    num_set_default_prec_digits (size_t significant_digits);
-size_t num_get_default_prec_digits (void);
+int num_set_default_prec_bits(size_t precision_bits);
+size_t num_get_default_prec_bits(void);
+int num_set_default_prec_digits(size_t significant_digits);
+size_t num_get_default_prec_digits(void);
 
 /** Per-value working precision, expressed in bits or decimal digits. */
-int    num_set_prec_bits   (number_t *number, size_t precision_bits);
-size_t num_get_prec_bits   (const number_t number);
+int num_set_prec_bits(number_t *number, size_t precision_bits);
+size_t num_get_prec_bits(const number_t number);
 
 /**
  * @brief Returns the effective working precision in bits.
@@ -521,16 +520,16 @@ size_t num_get_prec_bits   (const number_t number);
  * participate with when mixed into inexact numeric work.
  */
 size_t num_get_effective_prec_bits(const number_t number);
-int    num_set_prec_digits (number_t *number, size_t significant_digits);
-size_t num_get_prec_digits (const number_t number);
+int num_set_prec_digits(number_t *number, size_t significant_digits);
+size_t num_get_prec_digits(const number_t number);
 
 /** In-place value replacement helpers. */
-int num_set_long      (number_t *number, long value);
-int num_set_frac      (number_t *number, long numerator, long denominator);
-int num_set_double    (number_t *number, double value);
-int num_set_cdouble   (number_t *number, double _Complex value);
-int num_set_qfloat    (number_t *number, qfloat_t value);
-int num_set_qcomplex  (number_t *number, qcomplex_t value);
+int num_set_long(number_t *number, long value);
+int num_set_frac(number_t *number, long numerator, long denominator);
+int num_set_double(number_t *number, double value);
+int num_set_cdouble(number_t *number, double _Complex value);
+int num_set_qfloat(number_t *number, qfloat_t value);
+int num_set_qcomplex(number_t *number, qcomplex_t value);
 
 /**
  * @brief Replaces a number by parsing the same literal forms as `num_create_from_string()`.
@@ -555,9 +554,9 @@ int num_set_from_text(number_t *number, const string_t *text);
  */
 string_t *num_to_string(const number_t number);
 /** @brief Returns the numeric value converted to `double`. */
-double   num_to_double (const number_t number);
+double num_to_double(const number_t number);
 /** @brief Returns the numeric value converted to `qfloat_t`. */
-qfloat_t num_to_qfloat (const number_t number);
+qfloat_t num_to_qfloat(const number_t number);
 /** @} */
 
 /** @name Formatted output
@@ -580,9 +579,10 @@ string_t *num_vsprintf_text(const char *fmt, va_list ap);
 /** @brief `%n` / `%N` formatting helper returning a newly allocated string. */
 string_t *num_sprintf_text(const char *fmt, ...);
 /** @brief `%n` / `%N` formatting helpers. `number_t` arguments are passed by value. */
-int num_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap);  /**< caller-provided buffer, `va_list` form */
-int num_sprintf (char *out, size_t out_size, const char *fmt, ...);         /**< caller-provided buffer, variadic form */
-int num_printf  (const char *fmt, ...);                                     /**< prints to standard output */
+int num_vsprintf(char *out, size_t out_size, const char *fmt,
+                 va_list ap);                                      /**< caller-provided buffer, `va_list` form */
+int num_sprintf(char *out, size_t out_size, const char *fmt, ...); /**< caller-provided buffer, variadic form */
+int num_printf(const char *fmt, ...);                              /**< prints to standard output */
 /** @} */
 
 /** @name Queries and comparisons
@@ -601,27 +601,27 @@ int num_printf  (const char *fmt, ...);                                     /**<
  * relation result or, for `num_cmp(...)`, an integer ordering result.
  * @{
  */
-bool   num_is_exact        (const number_t number);
-bool   num_is_real         (const number_t number);
-bool   num_is_integer      (const number_t number);
-bool   num_is_finite       (const number_t number);
-bool   num_is_nan          (const number_t number);
-bool   num_is_inf          (const number_t number);
-bool   num_is_zero         (const number_t number);
-bool   num_is_one          (const number_t number);
+bool num_is_exact(const number_t number);
+bool num_is_real(const number_t number);
+bool num_is_integer(const number_t number);
+bool num_is_finite(const number_t number);
+bool num_is_nan(const number_t number);
+bool num_is_inf(const number_t number);
+bool num_is_zero(const number_t number);
+bool num_is_one(const number_t number);
 
-short  num_get_sign         (const number_t number);
-long   num_get_exponent2    (const number_t number);
+short num_get_sign(const number_t number);
+long num_get_exponent2(const number_t number);
 size_t num_get_mantissa_bits(const number_t number);
-bool   num_get_mantissa_u64 (const number_t number, uint64_t *out);
-int    num_sign             (const number_t number);
+bool num_get_mantissa_u64(const number_t number, uint64_t *out);
+int num_sign(const number_t number);
 
-bool   num_eq               (const number_t a, const number_t b);
-bool   num_lt               (const number_t a, const number_t b);
-bool   num_le               (const number_t a, const number_t b);
-bool   num_gt               (const number_t a, const number_t b);
-bool   num_ge               (const number_t a, const number_t b);
-int    num_cmp              (const number_t a, const number_t b);
+bool num_eq(const number_t a, const number_t b);
+bool num_lt(const number_t a, const number_t b);
+bool num_le(const number_t a, const number_t b);
+bool num_gt(const number_t a, const number_t b);
+bool num_ge(const number_t a, const number_t b);
+int num_cmp(const number_t a, const number_t b);
 /** @} */
 
 /** @name Core arithmetic
@@ -635,18 +635,18 @@ int    num_cmp              (const number_t a, const number_t b);
  * handles. Implementations must not clear or otherwise destroy them.
  * @{
  */
-number_t num_neg          (const number_t number);
-number_t num_abs          (const number_t number);
-number_t num_inv          (const number_t number);
-number_t num_conj         (const number_t number);
-number_t num_real_part    (const number_t number);
-number_t num_imag_part    (const number_t number);
-number_t num_arg          (const number_t number);
+number_t num_neg(const number_t number);
+number_t num_abs(const number_t number);
+number_t num_inv(const number_t number);
+number_t num_conj(const number_t number);
+number_t num_real_part(const number_t number);
+number_t num_imag_part(const number_t number);
+number_t num_arg(const number_t number);
 #ifndef MARS_NUMBER_IMPLEMENTATION
-number_t num_add_slow     (const number_t a, const number_t b);
-number_t num_sub_slow     (const number_t a, const number_t b);
-number_t num_mul_slow     (const number_t a, const number_t b);
-number_t num_div_slow     (const number_t a, const number_t b);
+number_t num_add_slow(const number_t a, const number_t b);
+number_t num_sub_slow(const number_t a, const number_t b);
+number_t num_mul_slow(const number_t a, const number_t b);
+number_t num_div_slow(const number_t a, const number_t b);
 
 static inline number_t num_add(const number_t a, const number_t b)
 {
@@ -654,8 +654,7 @@ static inline number_t num_add(const number_t a, const number_t b)
 
     if (kind == number_inline_kind(b)) {
         if (kind == 2u)
-            return number_inline_make_qfloat(qf_add(number_inline_qfloat(a),
-                                                    number_inline_qfloat(b)));
+            return number_inline_make_qfloat(qf_add(number_inline_qfloat(a), number_inline_qfloat(b)));
         if (kind == 3u)
             return number_inline_make_qcomplex_parts(
                 qf_add(number_inline_qcomplex_real(a), number_inline_qcomplex_real(b)),
@@ -670,8 +669,7 @@ static inline number_t num_sub(const number_t a, const number_t b)
 
     if (kind == number_inline_kind(b)) {
         if (kind == 2u)
-            return number_inline_make_qfloat(qf_sub(number_inline_qfloat(a),
-                                                    number_inline_qfloat(b)));
+            return number_inline_make_qfloat(qf_sub(number_inline_qfloat(a), number_inline_qfloat(b)));
         if (kind == 3u)
             return number_inline_make_qcomplex_parts(
                 qf_sub(number_inline_qcomplex_real(a), number_inline_qcomplex_real(b)),
@@ -686,17 +684,15 @@ static inline number_t num_mul(const number_t a, const number_t b)
 
     if (kind == number_inline_kind(b)) {
         if (kind == 2u)
-            return number_inline_make_qfloat(qf_mul(number_inline_qfloat(a),
-                                                    number_inline_qfloat(b)));
+            return number_inline_make_qfloat(qf_mul(number_inline_qfloat(a), number_inline_qfloat(b)));
         if (kind == 3u) {
             qfloat_t ar = number_inline_qcomplex_real(a);
             qfloat_t ai = number_inline_qcomplex_imag(a);
             qfloat_t br = number_inline_qcomplex_real(b);
             qfloat_t bi = number_inline_qcomplex_imag(b);
 
-            return number_inline_make_qcomplex_parts(
-                qf_sub(qf_mul(ar, br), qf_mul(ai, bi)),
-                qf_add(qf_mul(ar, bi), qf_mul(ai, br)));
+            return number_inline_make_qcomplex_parts(qf_sub(qf_mul(ar, br), qf_mul(ai, bi)),
+                                                     qf_add(qf_mul(ar, bi), qf_mul(ai, br)));
         }
     }
     return num_mul_slow(a, b);
@@ -720,28 +716,27 @@ static inline number_t num_div(const number_t a, const number_t b)
             qfloat_t bi = number_inline_qcomplex_imag(b);
             qfloat_t denom = qf_add(qf_mul(br, br), qf_mul(bi, bi));
 
-            return number_inline_make_qcomplex_parts(
-                qf_div(qf_add(qf_mul(ar, br), qf_mul(ai, bi)), denom),
-                qf_div(qf_sub(qf_mul(ai, br), qf_mul(ar, bi)), denom));
+            return number_inline_make_qcomplex_parts(qf_div(qf_add(qf_mul(ar, br), qf_mul(ai, bi)), denom),
+                                                     qf_div(qf_sub(qf_mul(ai, br), qf_mul(ar, bi)), denom));
         }
     }
     return num_div_slow(a, b);
 }
 #else
-number_t num_add          (const number_t a, const number_t b);
-number_t num_sub          (const number_t a, const number_t b);
-number_t num_mul          (const number_t a, const number_t b);
-number_t num_div          (const number_t a, const number_t b);
-number_t num_add_slow     (const number_t a, const number_t b);
-number_t num_sub_slow     (const number_t a, const number_t b);
-number_t num_mul_slow     (const number_t a, const number_t b);
-number_t num_div_slow     (const number_t a, const number_t b);
+number_t num_add(const number_t a, const number_t b);
+number_t num_sub(const number_t a, const number_t b);
+number_t num_mul(const number_t a, const number_t b);
+number_t num_div(const number_t a, const number_t b);
+number_t num_add_slow(const number_t a, const number_t b);
+number_t num_sub_slow(const number_t a, const number_t b);
+number_t num_mul_slow(const number_t a, const number_t b);
+number_t num_div_slow(const number_t a, const number_t b);
 #endif
-number_t num_add_long     (const number_t number, long value);
-number_t num_mul_long     (const number_t number, long value);
-number_t num_pow          (const number_t base, const number_t exponent);
-number_t num_pow_int      (const number_t base, int exponent);
-number_t num_ldexp        (const number_t number, int exponent2);
+number_t num_add_long(const number_t number, long value);
+number_t num_mul_long(const number_t number, long value);
+number_t num_pow(const number_t base, const number_t exponent);
+number_t num_pow_int(const number_t base, int exponent);
+number_t num_ldexp(const number_t number, int exponent2);
 /** @} */
 
 /** @name Exact integer and number-theory helpers
@@ -766,30 +761,21 @@ number_t num_isqrt(const number_t number);
 number_t num_gcd(const number_t a, const number_t b);
 number_t num_lcm(const number_t a, const number_t b);
 number_t num_mod(const number_t number, const number_t modulus);
-int      num_divmod(const number_t number,
-                    const number_t divisor,
-                    number_t *quotient,
-                    number_t *remainder);
-int      num_gcdext(const number_t a,
-                    const number_t b,
-                    number_t *gcd_out,
-                    number_t *x_out,
-                    number_t *y_out);
+int num_divmod(const number_t number, const number_t divisor, number_t *quotient, number_t *remainder);
+int num_gcdext(const number_t a, const number_t b, number_t *gcd_out, number_t *x_out, number_t *y_out);
 
-number_t num_powmod(const number_t base,
-                    const number_t exponent,
-                    const number_t modulus);
+number_t num_powmod(const number_t base, const number_t exponent, const number_t modulus);
 number_t num_modinv(const number_t number, const number_t modulus);
 
-bool               num_is_prime(const number_t number);
+bool num_is_prime(const number_t number);
 number_primality_t num_prove_prime(const number_t number);
-number_t           num_next_prime(const number_t number);
-number_t           num_prev_prime(const number_t number);
-number_factors_t  *num_factors(const number_t number);
-void               num_factors_free(number_factors_t *factors);
+number_t num_next_prime(const number_t number);
+number_t num_prev_prime(const number_t number);
+number_factors_t *num_factors(const number_t number);
+void num_factors_free(number_factors_t *factors);
 
-size_t   num_bit_length(const number_t number);
-bool     num_test_bit(const number_t number, size_t bit_index);
+size_t num_bit_length(const number_t number);
+bool num_test_bit(const number_t number, size_t bit_index);
 number_t num_set_bit(const number_t number, size_t bit_index);
 number_t num_clear_bit(const number_t number, size_t bit_index);
 number_t num_bit_not(const number_t number);
@@ -808,15 +794,15 @@ number_t num_shr(const number_t number, long bits);
  * promote to a richer floating or complex backend first.
  * @{
  */
-number_t num_exp      (const number_t number);
-number_t num_log      (const number_t number);
-number_t num_log10    (const number_t number);
-number_t num_sqrt     (const number_t number);
-number_t num_sqr      (const number_t number);
-number_t num_floor    (const number_t number);
-number_t num_ceil     (const number_t number);
+number_t num_exp(const number_t number);
+number_t num_log(const number_t number);
+number_t num_log10(const number_t number);
+number_t num_sqrt(const number_t number);
+number_t num_sqr(const number_t number);
+number_t num_floor(const number_t number);
+number_t num_ceil(const number_t number);
 number_t num_mul_pow10(const number_t number, int exponent10);
-number_t num_hypot    (const number_t a, const number_t b);
+number_t num_hypot(const number_t a, const number_t b);
 /**
  * @brief Computes `sin(x)` and `cos(x)` into caller-provided outputs.
  *
@@ -825,28 +811,28 @@ number_t num_hypot    (const number_t a, const number_t b);
  * release any existing live contents in those outputs; callers remain
  * responsible for clearing them first if needed.
  */
-int      num_sincos   (const number_t x, number_t *sin_out, number_t *cos_out);
-number_t num_sin      (const number_t number);
-number_t num_cos      (const number_t number);
-number_t num_tan      (const number_t number);
-number_t num_sec      (const number_t number);
-number_t num_cosec    (const number_t number);
-number_t num_cot      (const number_t number);
-number_t num_versin   (const number_t number);
-number_t num_vercos   (const number_t number);
-number_t num_coversin (const number_t number);
-number_t num_covercos (const number_t number);
-number_t num_haversin (const number_t number);
-number_t num_havercos (const number_t number);
+int num_sincos(const number_t x, number_t *sin_out, number_t *cos_out);
+number_t num_sin(const number_t number);
+number_t num_cos(const number_t number);
+number_t num_tan(const number_t number);
+number_t num_sec(const number_t number);
+number_t num_cosec(const number_t number);
+number_t num_cot(const number_t number);
+number_t num_versin(const number_t number);
+number_t num_vercos(const number_t number);
+number_t num_coversin(const number_t number);
+number_t num_covercos(const number_t number);
+number_t num_haversin(const number_t number);
+number_t num_havercos(const number_t number);
 number_t num_hacoversin(const number_t number);
 number_t num_hacovercos(const number_t number);
-number_t num_atan     (const number_t number);
-number_t num_atan2    (const number_t y, const number_t x);
-number_t num_asin     (const number_t number);
-number_t num_acos     (const number_t number);
-number_t num_asec     (const number_t number);
-number_t num_acosec   (const number_t number);
-number_t num_acot     (const number_t number);
+number_t num_atan(const number_t number);
+number_t num_atan2(const number_t y, const number_t x);
+number_t num_asin(const number_t number);
+number_t num_acos(const number_t number);
+number_t num_asec(const number_t number);
+number_t num_acosec(const number_t number);
+number_t num_acot(const number_t number);
 number_t num_arcversin(const number_t number);
 number_t num_arcvercos(const number_t number);
 number_t num_arccoversin(const number_t number);
@@ -855,8 +841,8 @@ number_t num_archaversin(const number_t number);
 number_t num_archavercos(const number_t number);
 number_t num_archacoversin(const number_t number);
 number_t num_archacovercos(const number_t number);
-number_t num_sinh     (const number_t number);
-number_t num_cosh     (const number_t number);
+number_t num_sinh(const number_t number);
+number_t num_cosh(const number_t number);
 /**
  * @brief Computes `sinh(x)` and `cosh(x)` into caller-provided outputs.
  *
@@ -865,17 +851,17 @@ number_t num_cosh     (const number_t number);
  * release any existing live contents in those outputs; callers remain
  * responsible for destroying them first if needed.
  */
-int      num_sinhcosh (const number_t x, number_t *sinh_out, number_t *cosh_out);
-number_t num_tanh     (const number_t number);
-number_t num_sech     (const number_t number);
-number_t num_cosech   (const number_t number);
-number_t num_coth     (const number_t number);
-number_t num_asinh    (const number_t number);
-number_t num_acosh    (const number_t number);
-number_t num_atanh    (const number_t number);
-number_t num_asech    (const number_t number);
-number_t num_acosech  (const number_t number);
-number_t num_acoth    (const number_t number);
+int num_sinhcosh(const number_t x, number_t *sinh_out, number_t *cosh_out);
+number_t num_tanh(const number_t number);
+number_t num_sech(const number_t number);
+number_t num_cosech(const number_t number);
+number_t num_coth(const number_t number);
+number_t num_asinh(const number_t number);
+number_t num_acosh(const number_t number);
+number_t num_atanh(const number_t number);
+number_t num_asech(const number_t number);
+number_t num_acosech(const number_t number);
+number_t num_acoth(const number_t number);
 /** @} */
 
 /** @name Special functions
@@ -886,47 +872,47 @@ number_t num_acoth    (const number_t number);
  * to evaluate the requested function.
  * @{
  */
-number_t num_gamma        (const number_t number);
-number_t num_lgamma       (const number_t number);
-number_t num_digamma      (const number_t number);
-number_t num_trigamma     (const number_t number);
-number_t num_tetragamma   (const number_t number);
-number_t num_polygamma    (unsigned int order, const number_t number);
-number_t num_dilog        (const number_t number);
-number_t num_polylog      (const number_t order, const number_t number);
-number_t num_appell_f1    (const number_t a, const number_t b1,
-                           const number_t b2, const number_t c,
-                           const number_t x, const number_t y);
-number_t num_legendre_chi (const number_t order, const number_t number);
-number_t num_bessel_j     (const number_t order, const number_t argument);
-number_t num_bessel_y     (const number_t order, const number_t argument);
-number_t num_lommel_s     (const number_t mu, const number_t nu,
-                           const number_t argument);
-number_t num_lommel_s_derivative(const number_t mu, const number_t nu,
-                                 const number_t argument);
-number_t num_gammainv     (const number_t number);
-number_t num_erf          (const number_t number);
-number_t num_erfc         (const number_t number);
-number_t num_erfinv       (const number_t number);
-number_t num_erfcinv      (const number_t number);
-number_t num_lambert_wn   (const number_t branch, const number_t number);
-number_t num_lambert_w0   (const number_t number);
-number_t num_lambert_wm1  (const number_t number);
-number_t num_beta         (const number_t a, const number_t b);
-number_t num_logbeta      (const number_t a, const number_t b);
-number_t num_binomial     (const number_t n, const number_t k);
-number_t num_beta_pdf     (const number_t x, const number_t a, const number_t b);
-number_t num_logbeta_pdf  (const number_t x, const number_t a, const number_t b);
-number_t num_normal_pdf   (const number_t number);
-number_t num_normal_cdf   (const number_t number);
+number_t num_gamma(const number_t number);
+number_t num_lgamma(const number_t number);
+number_t num_digamma(const number_t number);
+number_t num_trigamma(const number_t number);
+number_t num_tetragamma(const number_t number);
+number_t num_polygamma(unsigned int order, const number_t number);
+number_t num_dilog(const number_t number);
+number_t num_polylog(const number_t order, const number_t number);
+number_t num_appell_f1(const number_t a, const number_t b1, const number_t b2, const number_t c, const number_t x,
+                       const number_t y);
+number_t num_lauricella_f(const number_t a, const number_t *b, const number_t c, const number_t *x,
+                          size_t variable_count);
+number_t num_hypergeometric_pFq(const number_t *upper, size_t upper_count, const number_t *lower, size_t lower_count,
+                                const number_t argument);
+number_t num_legendre_chi(const number_t order, const number_t number);
+number_t num_bessel_j(const number_t order, const number_t argument);
+number_t num_bessel_y(const number_t order, const number_t argument);
+number_t num_lommel_s(const number_t mu, const number_t nu, const number_t argument);
+number_t num_gammainv(const number_t number);
+number_t num_erf(const number_t number);
+number_t num_erfc(const number_t number);
+number_t num_erfinv(const number_t number);
+number_t num_erfcinv(const number_t number);
+number_t num_lambert_wn(const number_t branch, const number_t number);
+number_t num_lambert_w0(const number_t number);
+number_t num_lambert_wm1(const number_t number);
+number_t num_beta(const number_t a, const number_t b);
+number_t num_logbeta(const number_t a, const number_t b);
+number_t num_binomial(const number_t n, const number_t k);
+number_t num_beta_pdf(const number_t x, const number_t a, const number_t b);
+number_t num_logbeta_pdf(const number_t x, const number_t a, const number_t b);
+number_t num_normal_pdf(const number_t number);
+number_t num_normal_cdf(const number_t number);
 number_t num_normal_logpdf(const number_t number);
-number_t num_productlog   (const number_t number);
+number_t num_productlog(const number_t number);
 number_t num_gammainc_lower(const number_t s, const number_t x);
 number_t num_gammainc_upper(const number_t s, const number_t x);
-number_t num_gammainc_P   (const number_t s, const number_t x);
-number_t num_gammainc_Q   (const number_t s, const number_t x);
-number_t num_ei           (const number_t number);
-number_t num_e1           (const number_t number);
+number_t num_gammainc_P(const number_t s, const number_t x);
+number_t num_gammainc_Q(const number_t s, const number_t x);
+number_t num_ei(const number_t number);
+number_t num_e1(const number_t number);
 /** @} */
 
 #endif

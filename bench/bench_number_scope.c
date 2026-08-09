@@ -6,12 +6,7 @@
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
 
-enum {
-    REAL_BATCHES    = 600,
-    REAL_STEPS      = 64,
-    COMPLEX_BATCHES = 500,
-    COMPLEX_STEPS   = 48
-};
+enum { REAL_BATCHES = 600, REAL_STEPS = 64, COMPLEX_BATCHES = 500, COMPLEX_STEPS = 48 };
 
 static volatile double g_sink = 0.0;
 
@@ -24,9 +19,9 @@ static double bench_now_seconds(void)
 
 static double bench_real_manual(void)
 {
-    number_t seed  = num_create_from_string("1.23456789012345678901234567890123456789");
+    number_t seed = num_create_from_string("1.23456789012345678901234567890123456789");
     number_t scale = num_create_from_string("0.87500000000000000000000000000000000001");
-    number_t bias  = num_create_from_string("0.03125000000000000000000000000000000000");
+    number_t bias = num_create_from_string("0.03125000000000000000000000000000000000");
     double start = bench_now_seconds();
 
     for (int batch = 0; batch < REAL_BATCHES; ++batch) {
@@ -58,9 +53,9 @@ static double bench_real_manual(void)
 
 static double bench_real_scoped(void)
 {
-    number_t seed  = num_create_from_string("1.23456789012345678901234567890123456789");
+    number_t seed = num_create_from_string("1.23456789012345678901234567890123456789");
     number_t scale = num_create_from_string("0.87500000000000000000000000000000000001");
-    number_t bias  = num_create_from_string("0.03125000000000000000000000000000000000");
+    number_t bias = num_create_from_string("0.03125000000000000000000000000000000000");
     double start = bench_now_seconds();
 
     for (int batch = 0; batch < REAL_BATCHES; ++batch) {
@@ -87,9 +82,9 @@ static double bench_real_scoped(void)
 
 static double bench_real_scoped_rolling(void)
 {
-    number_t seed  = num_create_from_string("1.23456789012345678901234567890123456789");
+    number_t seed = num_create_from_string("1.23456789012345678901234567890123456789");
     number_t scale = num_create_from_string("0.87500000000000000000000000000000000001");
-    number_t bias  = num_create_from_string("0.03125000000000000000000000000000000000");
+    number_t bias = num_create_from_string("0.03125000000000000000000000000000000000");
     double start = bench_now_seconds();
 
     for (int batch = 0; batch < REAL_BATCHES; ++batch) {
@@ -246,10 +241,7 @@ static double bench_complex_scoped_rolling(void)
 static void bench_report(const char *label, double manual_s, double scoped_s)
 {
     double speedup = (scoped_s > 0.0) ? (manual_s / scoped_s) : 0.0;
-    printf("%-24s manual=%8.3f ms  scoped=%8.3f ms  ratio=%6.3fx\n",
-           label,
-           manual_s * 1000.0,
-           scoped_s * 1000.0,
+    printf("%-24s manual=%8.3f ms  scoped=%8.3f ms  ratio=%6.3fx\n", label, manual_s * 1000.0, scoped_s * 1000.0,
            speedup);
 }
 

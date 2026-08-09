@@ -39,18 +39,14 @@ void run_number_public_api_tests(void)
         assert_number_string("num_add(\"2\", \"3\")", sum, "5");
         assert_number_string("num_div(\"2\", \"3\")", quot, "⅔");
         assert_number_string("num_mul(\"5\", \"5/6\")", product, "²⁵⁄₆");
-        assert_number_string("num_mul(\"2 + 3i\", \"1 + 8i\")",
-                             complex_product, "-22 + 19i");
-        assert_number_string("num_div(\"5 + i\", \"5 - i\")",
-                             complex_quot, "¹²⁄₁₃ + ⁵⁄₁₃i");
+        assert_number_string("num_mul(\"2 + 3i\", \"1 + 8i\")", complex_product, "-22 + 19i");
+        assert_number_string("num_div(\"5 + i\", \"5 - i\")", complex_quot, "¹²⁄₁₃ + ⁵⁄₁₃i");
         assert_number_string("num_clone(\"25/6\")", cloned, "²⁵⁄₆");
         assert_number_string("num_log10(1000)", log10_thousand, "3");
         assert_number_string("num_floor(1.25)", floored, "1");
         assert_number_string("num_ceil(1.25)", ceiled, "2");
-        assert_number_string_prefix("NUM_PI", constant,
-                                    "3.141592653589793238462643383279");
-        assert_number_string_prefix("num_clone(NUM_PI)", pi_cloned,
-                                    "3.141592653589793238462643383279");
+        assert_number_string_prefix("NUM_PI", constant, "3.141592653589793238462643383279");
+        assert_number_string_prefix("num_clone(NUM_PI)", pi_cloned, "3.141592653589793238462643383279");
         assert_number_string("num_clone(NUM_I)", i_cloned, "i");
 
         ASSERT_TRUE(num_is_real(a));

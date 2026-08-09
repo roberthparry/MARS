@@ -40,9 +40,7 @@ int ts_append_text(ts_string_builder_t *sb, const string_t *text)
 
 size_t ts_builder_encoded_length(const ts_string_builder_t *sb)
 {
-    return (sb && sb->text)
-        ? string_view_length(string_view_all(sb->text))
-        : 0u;
+    return (sb && sb->text) ? string_view_length(string_view_all(sb->text)) : 0u;
 }
 
 void ts_builder_free(ts_string_builder_t *sb)
@@ -90,10 +88,22 @@ static int ts_datetime_is_month_end(const datetime_t *dt)
 typedef datetime_t *(*ts_datetime_step_fn)(datetime_t *dt);
 typedef datetime_t *(*ts_bucket_label_fn)(const datetime_t *dt, ts_year_type_t year_type);
 
-static datetime_t *ts_step_daily(datetime_t *dt) { return datetime_add_days(dt, 1L); }
-static datetime_t *ts_step_monthly(datetime_t *dt) { return datetime_add_months(dt, 1); }
-static datetime_t *ts_step_quarterly(datetime_t *dt) { return datetime_add_months(dt, 3); }
-static datetime_t *ts_step_yearly(datetime_t *dt) { return datetime_add_years(dt, 1); }
+static datetime_t *ts_step_daily(datetime_t *dt)
+{
+    return datetime_add_days(dt, 1L);
+}
+static datetime_t *ts_step_monthly(datetime_t *dt)
+{
+    return datetime_add_months(dt, 1);
+}
+static datetime_t *ts_step_quarterly(datetime_t *dt)
+{
+    return datetime_add_months(dt, 3);
+}
+static datetime_t *ts_step_yearly(datetime_t *dt)
+{
+    return datetime_add_years(dt, 1);
+}
 
 static const ts_datetime_step_fn ts_frequency_step_dispatch[] = {
     [TS_FREQ_DAILY] = ts_step_daily,
@@ -186,8 +196,8 @@ int ts_parse_date_text(const string_t *text, datetime_t **out)
     return 0;
 }
 
-bool ts_datetime_same_bucket(const datetime_t *a, const datetime_t *b,
-                             ts_frequency_t frequency, ts_year_type_t year_type)
+bool ts_datetime_same_bucket(const datetime_t *a, const datetime_t *b, ts_frequency_t frequency,
+                             ts_year_type_t year_type)
 {
     int ay, by;
     int am, bm;
@@ -200,8 +210,7 @@ bool ts_datetime_same_bucket(const datetime_t *a, const datetime_t *b,
     bm = (int)datetime_month(b);
 
     if (frequency == TS_FREQ_DAILY)
-        return datetime_year(a) == datetime_year(b) &&
-               datetime_month(a) == datetime_month(b) &&
+        return datetime_year(a) == datetime_year(b) && datetime_month(a) == datetime_month(b) &&
                datetime_day(a) == datetime_day(b);
     if (frequency == TS_FREQ_MONTHLY)
         return ay == by && am == bm;
@@ -270,17 +279,20 @@ static datetime_t *ts_bucket_label_quarterly(const datetime_t *dt, ts_year_type_
 
         if (m < 4)
             fiscal_year -= 1;
-        if (m >= 4 && m <= 6) qstart = 4;
-        else if (m <= 9) qstart = 7;
-        else if (m <= 12) qstart = 10;
-        else qstart = 1;
+        if (m >= 4 && m <= 6)
+            qstart = 4;
+        else if (m <= 9)
+            qstart = 7;
+        else if (m <= 12)
+            qstart = 10;
+        else
+            qstart = 1;
         if (m < 4)
             qstart = 1;
         return datetime_init_ymd(datetime_alloc(), (short)(qstart == 1 ? fiscal_year + 1 : fiscal_year),
                                  (month_t)qstart, 1u);
     }
-    return datetime_init_ymd(datetime_alloc(), year,
-                             (month_t)(((int)(month - 1) / 3) * 3 + 1), 1u);
+    return datetime_init_ymd(datetime_alloc(), year, (month_t)(((int)(month - 1) / 3) * 3 + 1), 1u);
 }
 
 static datetime_t *ts_bucket_label_yearly(const datetime_t *dt, ts_year_type_t year_type)
@@ -309,13 +321,11 @@ static const ts_bucket_label_fn ts_bucket_label_dispatch[] = {
     [TS_FREQ_YEARLY] = ts_bucket_label_yearly,
 };
 
-datetime_t *ts_bucket_label(const datetime_t *dt, ts_frequency_t frequency,
-                            ts_year_type_t year_type)
+datetime_t *ts_bucket_label(const datetime_t *dt, ts_frequency_t frequency, ts_year_type_t year_type)
 {
     size_t idx = (size_t)frequency;
 
-    if (idx < sizeof(ts_bucket_label_dispatch) / sizeof(ts_bucket_label_dispatch[0]) &&
-        ts_bucket_label_dispatch[idx])
+    if (idx < sizeof(ts_bucket_label_dispatch) / sizeof(ts_bucket_label_dispatch[0]) && ts_bucket_label_dispatch[idx])
         return ts_bucket_label_dispatch[idx](dt, year_type);
     return ts_datetime_clone(dt);
 }
@@ -428,9 +438,7 @@ int ts_copy_into(timeseries_t *dst, const timeseries_t *src)
     return 0;
 }
 
-timeseries_t *ts_make_empty_regular_series(size_t length,
-                                           const datetime_t *start,
-                                           ts_frequency_t frequency,
+timeseries_t *ts_make_empty_regular_series(size_t length, const datetime_t *start, ts_frequency_t frequency,
                                            ts_year_type_t year_type)
 {
     timeseries_t *series;
@@ -474,8 +482,7 @@ timeseries_t *ts_make_empty_regular_series(size_t length,
     return series;
 }
 
-int ts_series_to_double_array(const timeseries_t *series, double **out_values,
-                              size_t *out_count, size_t start)
+int ts_series_to_double_array(const timeseries_t *series, double **out_values, size_t *out_count, size_t start)
 {
     size_t i;
     size_t n = 0u;
@@ -626,14 +633,8 @@ void ts_arima_meta_remove(const ts_arima_result_t *owner)
     }
 }
 
-int ts_arima_meta_store(const ts_arima_result_t *owner,
-                        const ts_arima_spec_t *spec,
-                        bool has_intercept,
-                        bool has_drift,
-                        size_t trim,
-                        size_t fit_rows,
-                        const number_t *intercept,
-                        const matrix_t *xreg_history)
+int ts_arima_meta_store(const ts_arima_result_t *owner, const ts_arima_spec_t *spec, bool has_intercept, bool has_drift,
+                        size_t trim, size_t fit_rows, const number_t *intercept, const matrix_t *xreg_history)
 {
     ts_arima_meta_t *node;
 
@@ -665,8 +666,7 @@ int ts_arima_meta_store(const ts_arima_result_t *owner,
     return 0;
 }
 
-int ts_arima_meta_transfer(const ts_arima_result_t *dst,
-                           const ts_arima_result_t *src)
+int ts_arima_meta_transfer(const ts_arima_result_t *dst, const ts_arima_result_t *src)
 {
     ts_arima_meta_t *meta;
 
@@ -675,14 +675,8 @@ int ts_arima_meta_transfer(const ts_arima_result_t *dst,
     meta = ts_arima_meta_find(src);
     if (!meta)
         return 0;
-    return ts_arima_meta_store(dst,
-                               &meta->spec,
-                               meta->has_intercept,
-                               meta->has_drift,
-                               meta->trim,
-                               meta->fit_rows,
-                               meta->has_intercept ? &meta->intercept : NULL,
-                               meta->xreg_history);
+    return ts_arima_meta_store(dst, &meta->spec, meta->has_intercept, meta->has_drift, meta->trim, meta->fit_rows,
+                               meta->has_intercept ? &meta->intercept : NULL, meta->xreg_history);
 }
 
 void ts_result_clear_numbers(ts_fit_summary_t *summary)

@@ -28,10 +28,10 @@
 #ifndef QFLOAT_H
 #define QFLOAT_H
 
-#include <stdbool.h>
 #include <math.h>
-#include <stddef.h>
 #include <stdarg.h>
+#include <stdbool.h>
+#include <stddef.h>
 
 typedef struct _string_t string_t;
 
@@ -608,11 +608,9 @@ static inline qfloat_t qf_mul(qfloat_t a, qfloat_t b)
     ty = b.hi - hy;
 
     C = a.hi * b.hi;
-    c = ((((hx * hy - C) + hx * ty) + tx * hy) + tx * ty)
-        + (a.hi * b.lo + a.lo * b.hi)
-        + (a.lo * b.lo);
+    c = ((((hx * hy - C) + hx * ty) + tx * hy) + tx * ty) + (a.hi * b.lo + a.lo * b.hi) + (a.lo * b.lo);
     qf_inline_two_sum(C, c, &hi, &lo);
-    return (qfloat_t){ hi, lo };
+    return (qfloat_t){hi, lo};
 }
 #else
 qfloat_t qf_mul(qfloat_t a, qfloat_t b);
@@ -657,11 +655,11 @@ static inline qfloat_t qf_div(qfloat_t a, qfloat_t b)
 
     b_hi = b.hi;
     q1 = a.hi / b_hi;
-    q1q = (qfloat_t){ q1, 0.0 };
+    q1q = (qfloat_t){q1, 0.0};
     qb = qf_mul(q1q, b);
     r = qf_sub(a, qb);
     q2 = r.hi / b_hi;
-    q2q = (qfloat_t){ q2, 0.0 };
+    q2q = (qfloat_t){q2, 0.0};
     return qf_add(q1q, q2q);
 }
 #else
@@ -1233,8 +1231,26 @@ qfloat_t qf_polylog(qfloat_t s, qfloat_t x);
  * @param y Second variable.
  * @return F1(a; b1, b2; c; x, y), or NaN outside implemented coverage.
  */
-qfloat_t qf_appell_f1(qfloat_t a, qfloat_t b1, qfloat_t b2,
-                      qfloat_t c, qfloat_t x, qfloat_t y);
+qfloat_t qf_appell_f1(qfloat_t a, qfloat_t b1, qfloat_t b2, qfloat_t c, qfloat_t x, qfloat_t y);
+
+/**
+ * @brief Compute the Lauricella hypergeometric function F_D in n variables.
+ *
+ * The b and x arrays must each contain variable_count values.  The defining
+ * multivariate series is used in the polydisc max |x_i| < 1.  Appell F1 is
+ * the variable_count == 2 member of this family.
+ */
+qfloat_t qf_lauricella_f(qfloat_t a, const qfloat_t *b, qfloat_t c, const qfloat_t *x, size_t variable_count);
+
+/**
+ * @brief Compute the generalised hypergeometric function pFq.
+ *
+ * The numerator and denominator parameter arrays may be empty when their
+ * corresponding count is zero.  The defining series is used wherever it
+ * converges, including terminating series.
+ */
+qfloat_t qf_hypergeometric_pFq(const qfloat_t *upper, size_t upper_count, const qfloat_t *lower, size_t lower_count,
+                               qfloat_t argument);
 
 /**
  * @brief Compute the Legendre chi function chi_s(x) for integer real orders.
@@ -1261,10 +1277,6 @@ qfloat_t qf_bessel_y(qfloat_t order, qfloat_t argument);
  * real-domain violations return NaN.
  */
 qfloat_t qf_lommel_s(qfloat_t mu, qfloat_t nu, qfloat_t argument);
-
-/** @brief Derivative of s_(mu,nu)(argument) with respect to its argument. */
-qfloat_t qf_lommel_s_derivative(qfloat_t mu, qfloat_t nu,
-                                qfloat_t argument);
 
 /**
  * @brief Compute the main branch of the inverse of the gamma function.
@@ -1398,6 +1410,5 @@ qfloat_t qf_ei(qfloat_t x);
  * @brief Exponential integral E1(x) = ∫_{x}^{∞} (e^{-t} / t) dt,  x > 0
  */
 qfloat_t qf_e1(qfloat_t x);
-
 
 #endif /* QFLOAT_H */

@@ -94,9 +94,8 @@ string_t *number_format_mpfr_text(const number_t *number, bool scientific, int p
         snprintf(fmt, sizeof(fmt), scientific ? "%%.%dRE" : "%%.%dRg", precision);
     else
         snprintf(fmt, sizeof(fmt), scientific ? "%%.*RE" : "%%.*Rg");
-    needed = precision >= 0
-        ? mpfr_snprintf(NULL, 0u, fmt, value)
-        : mpfr_snprintf(NULL, 0u, fmt, (int)num_get_prec_digits(*number), value);
+    needed = precision >= 0 ? mpfr_snprintf(NULL, 0u, fmt, value)
+                            : mpfr_snprintf(NULL, 0u, fmt, (int)num_get_prec_digits(*number), value);
     if (needed < 0)
         return NULL;
     out = malloc((size_t)needed + 1u);
@@ -164,13 +163,10 @@ string_t *number_format_complex_text(const number_t *number, bool scientific, in
         const char *sep = imag_sign < 0 ? " - " : " + ";
 
         if (real_zero)
-            out = imag_is_unit
-                ? string_sprintf("%si", imag_sign < 0 ? "-" : "")
-                : string_sprintf("%s%Si", imag_sign < 0 ? "-" : "", imag);
+            out = imag_is_unit ? string_sprintf("%si", imag_sign < 0 ? "-" : "")
+                               : string_sprintf("%s%Si", imag_sign < 0 ? "-" : "", imag);
         else
-            out = imag_is_unit
-                ? string_sprintf("%S%si", real, sep)
-                : string_sprintf("%S%s%Si", real, sep, imag);
+            out = imag_is_unit ? string_sprintf("%S%si", real, sep) : string_sprintf("%S%s%Si", real, sep, imag);
     }
 
 done:
@@ -183,9 +179,7 @@ done:
     return out;
 }
 
-static string_t *number_format_inexact_text(const number_t *number,
-                                            bool scientific,
-                                            int precision)
+static string_t *number_format_inexact_text(const number_t *number, bool scientific, int precision)
 {
     const number_vtable_t *vt = number ? number_vt(number) : NULL;
 
@@ -207,15 +201,12 @@ static bool number_format_text_starts_with_ascii(const string_t *text, char ch)
     if (!cursor)
         return false;
 
-    found = string_cursor_peek_ascii(cursor, &ascii) &&
-            ascii == (unsigned char)ch;
+    found = string_cursor_peek_ascii(cursor, &ascii) && ascii == (unsigned char)ch;
     string_cursor_free(cursor);
     return found;
 }
 
-static string_t *number_format_value_text(number_t value,
-                                          char spec,
-                                          int precision)
+static string_t *number_format_value_text(number_t value, char spec, int precision)
 {
     if (num_is_exact(value) && !number_vt(&value)->is_complex)
         return num_to_string(value);
@@ -231,9 +222,7 @@ static int number_format_append_padding(string_t *out, int count, char fill)
     return 0;
 }
 
-static string_format_result_t number_format_callback(string_t *out,
-                                                     const string_format_spec_t *spec,
-                                                     va_list ap,
+static string_format_result_t number_format_callback(string_t *out, const string_format_spec_t *spec, va_list ap,
                                                      void *user)
 {
     int width;
@@ -270,11 +259,8 @@ static string_format_result_t number_format_callback(string_t *out,
     if (!core)
         return STRING_FORMAT_ERROR;
 
-    if ((spec->flag_sign || spec->flag_space) &&
-        !number_format_text_starts_with_ascii(core, '-')) {
-        string_t *prefixed = string_sprintf("%c%S",
-                                            spec->flag_sign ? '+' : ' ',
-                                            core);
+    if ((spec->flag_sign || spec->flag_space) && !number_format_text_starts_with_ascii(core, '-')) {
+        string_t *prefixed = string_sprintf("%c%S", spec->flag_sign ? '+' : ' ', core);
 
         string_free(core);
         core = prefixed;
@@ -301,15 +287,10 @@ fail:
 
 string_t *num_vsprintf_text(const char *fmt, va_list ap)
 {
-    return string_vsprintf_with_callback(fmt,
-                                         ap,
-                                         number_format_callback,
-                                         NULL);
+    return string_vsprintf_with_callback(fmt, ap, number_format_callback, NULL);
 }
 
-static int number_format_write_and_free_text(char *out,
-                                             size_t out_size,
-                                             string_t *text)
+static int number_format_write_and_free_text(char *out, size_t out_size, string_t *text)
 {
     size_t len;
 
@@ -330,8 +311,7 @@ static int number_format_write_and_free_text(char *out,
 
 static bool number_format_plain_number_spec(const char *fmt, char *spec_out)
 {
-    if (!fmt || fmt[0] != '%' || fmt[2] != '\0' ||
-        (fmt[1] != 'n' && fmt[1] != 'N'))
+    if (!fmt || fmt[0] != '%' || fmt[2] != '\0' || (fmt[1] != 'n' && fmt[1] != 'N'))
         return false;
 
     if (spec_out)
@@ -347,10 +327,7 @@ int num_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap)
     if (number_format_plain_number_spec(fmt, &spec)) {
         number_t value = va_arg(ap, number_t);
 
-        return number_format_write_and_free_text(
-            out,
-            out_size,
-            number_format_value_text(value, spec, -1));
+        return number_format_write_and_free_text(out, out_size, number_format_value_text(value, spec, -1));
     }
 
     text = num_vsprintf_text(fmt, ap);

@@ -74,10 +74,7 @@ static void equ_poly_canonicalize_real(number_t *poly, size_t count)
     }
 }
 
-static bool equ_poly_scale(const number_t *src,
-                                number_t scale,
-                                number_t *dst,
-                                size_t count)
+static bool equ_poly_scale(const number_t *src, number_t scale, number_t *dst, size_t count)
 {
     if (!num_is_finite(scale))
         return false;
@@ -91,15 +88,10 @@ static bool equ_poly_scale(const number_t *src,
     return true;
 }
 
-static bool equ_poly_add_sub(const number_t *left,
-                                  const number_t *right,
-                                  bool subtract,
-                                  number_t *out,
-                                  size_t count)
+static bool equ_poly_add_sub(const number_t *left, const number_t *right, bool subtract, number_t *out, size_t count)
 {
     for (size_t i = 0u; i < count; ++i) {
-        number_t value = subtract ? num_sub(left[i], right[i])
-                                  : num_add(left[i], right[i]);
+        number_t value = subtract ? num_sub(left[i], right[i]) : num_add(left[i], right[i]);
 
         num_destroy(&out[i]);
         out[i] = value;
@@ -107,10 +99,7 @@ static bool equ_poly_add_sub(const number_t *left,
     return true;
 }
 
-static bool equ_poly_mul(const number_t *left,
-                              const number_t *right,
-                              number_t *out,
-                              size_t max_degree)
+static bool equ_poly_mul(const number_t *left, const number_t *right, number_t *out, size_t max_degree)
 {
     size_t count = max_degree + 1u;
     size_t product_count;
@@ -145,14 +134,9 @@ static bool equ_poly_mul(const number_t *left,
     return ok;
 }
 
-static bool equ_collect_poly(const expr_t *expr,
-                                  const expr_t *wrt,
-                                  size_t max_degree,
-                                  number_t *out);
+static bool equ_collect_poly(const expr_t *expr, const expr_t *wrt, size_t max_degree, number_t *out);
 
-static bool equ_expr_numeric_parameter_value(const expr_t *expr,
-                                                  const expr_t *wrt,
-                                                  number_t *value_out)
+static bool equ_expr_numeric_parameter_value(const expr_t *expr, const expr_t *wrt, number_t *value_out)
 {
     expr_t *vars[1];
     bool used = false;
@@ -176,10 +160,7 @@ static bool equ_expr_numeric_parameter_value(const expr_t *expr,
     return true;
 }
 
-static bool equ_collect_scaled_poly(const expr_t *expr,
-                                         const expr_t *wrt,
-                                         size_t max_degree,
-                                         number_t *out)
+static bool equ_collect_scaled_poly(const expr_t *expr, const expr_t *wrt, size_t max_degree, number_t *out)
 {
     size_t count = max_degree + 1u;
     number_t scale = num_new();
@@ -193,8 +174,7 @@ static bool equ_collect_scaled_poly(const expr_t *expr,
     base_poly = equ_poly_new(count);
     if (!base_poly)
         goto cleanup_scale;
-    ok = equ_collect_poly(base, wrt, max_degree, base_poly) &&
-         equ_poly_scale(base_poly, scale, out, count);
+    ok = equ_collect_poly(base, wrt, max_degree, base_poly) && equ_poly_scale(base_poly, scale, out, count);
 
 cleanup_scale:
     equ_poly_free(base_poly, count);
@@ -221,10 +201,7 @@ static long equ_power_exponent(number_t exponent, size_t max_degree)
     return -1L;
 }
 
-static bool equ_collect_power_poly(const expr_t *expr,
-                                        const expr_t *wrt,
-                                        size_t max_degree,
-                                        number_t *out)
+static bool equ_collect_power_poly(const expr_t *expr, const expr_t *wrt, size_t max_degree, number_t *out)
 {
     size_t count = max_degree + 1u;
     number_t *base_poly = NULL;
@@ -269,11 +246,9 @@ static bool equ_collect_power_poly(const expr_t *expr,
 
     for (size_t power = (size_t)exponent; ok && power > 0u; power >>= 1u) {
         if ((power & 1u) != 0u)
-            ok = equ_poly_mul(
-                result_poly, factor_poly, result_poly, max_degree);
+            ok = equ_poly_mul(result_poly, factor_poly, result_poly, max_degree);
         if (ok && power > 1u)
-            ok = equ_poly_mul(
-                factor_poly, factor_poly, factor_poly, max_degree);
+            ok = equ_poly_mul(factor_poly, factor_poly, factor_poly, max_degree);
     }
     if (ok)
         equ_poly_copy(result_poly, out, count);
@@ -288,10 +263,7 @@ cleanup_exponent:
     return ok;
 }
 
-static bool equ_collect_poly(const expr_t *expr,
-                                  const expr_t *wrt,
-                                  size_t max_degree,
-                                  number_t *out)
+static bool equ_collect_poly(const expr_t *expr, const expr_t *wrt, size_t max_degree, number_t *out)
 {
     size_t count = max_degree + 1u;
     expr_t *vars[1];
@@ -324,8 +296,7 @@ static bool equ_collect_poly(const expr_t *expr,
     }
 
     vars[0] = (expr_t *)wrt;
-    if (max_degree >= 1u &&
-        expr_match_var_expr(expr, 1u, vars, &index) && index == 0u) {
+    if (max_degree >= 1u && expr_match_var_expr(expr, 1u, vars, &index) && index == 0u) {
         equ_poly_zero(out, count);
         num_destroy(&out[1]);
         out[1] = num_clone(NUM_ONE);
@@ -365,10 +336,7 @@ cleanup_value:
     return ok;
 }
 
-bool equ_match_polynomial_expr(const expr_t *expr,
-                                    const expr_t *wrt,
-                                    size_t max_degree,
-                                    number_t *coeffs_out)
+bool equ_match_polynomial_expr(const expr_t *expr, const expr_t *wrt, size_t max_degree, number_t *coeffs_out)
 {
     size_t count = max_degree + 1u;
     number_t *coeffs;
@@ -399,8 +367,7 @@ static bool equ_polynomial_exponent(number_t value, size_t *exponent_out)
     if (!exponent_out || !num_is_real(value) || !num_is_integer(value))
         return false;
     approximate = num_to_double(value);
-    if (!isfinite(approximate) || approximate < 0.0 ||
-        approximate > (double)LONG_MAX)
+    if (!isfinite(approximate) || approximate < 0.0 || approximate > (double)LONG_MAX)
         return false;
 
     exponent = (size_t)approximate;
@@ -414,9 +381,7 @@ static bool equ_polynomial_exponent(number_t value, size_t *exponent_out)
     return ok;
 }
 
-static bool equ_polynomial_degree(const expr_t *expr,
-                                  const expr_t *wrt,
-                                  size_t *degree_out)
+static bool equ_polynomial_degree(const expr_t *expr, const expr_t *wrt, size_t *degree_out)
 {
     expr_t *vars[1];
     size_t index = 0u;
@@ -434,8 +399,7 @@ static bool equ_polynomial_degree(const expr_t *expr,
     if (!expr || !wrt || !degree_out)
         goto cleanup;
 
-    if (expr_match_const_value(expr, &value) ||
-        equ_expr_numeric_parameter_value(expr, wrt, &value)) {
+    if (expr_match_const_value(expr, &value) || equ_expr_numeric_parameter_value(expr, wrt, &value)) {
         *degree_out = 0u;
         ok = true;
         goto cleanup;
@@ -448,35 +412,28 @@ static bool equ_polynomial_degree(const expr_t *expr,
         goto cleanup;
     }
 
-    if (expr_match_scaled_expr(expr, &scale, &base) &&
-        base && base != expr && num_is_finite(scale)) {
+    if (expr_match_scaled_expr(expr, &scale, &base) && base && base != expr && num_is_finite(scale)) {
         ok = equ_polynomial_degree(base, wrt, degree_out);
         goto cleanup;
     }
 
-    if (expr_match_pow_const(expr, &base, &value) &&
-        equ_polynomial_exponent(value, &exponent) &&
-        equ_polynomial_degree(base, wrt, &left_degree) &&
-        (left_degree == 0u || exponent <= SIZE_MAX / left_degree)) {
+    if (expr_match_pow_const(expr, &base, &value) && equ_polynomial_exponent(value, &exponent) &&
+        equ_polynomial_degree(base, wrt, &left_degree) && (left_degree == 0u || exponent <= SIZE_MAX / left_degree)) {
         *degree_out = left_degree * exponent;
         ok = true;
         goto cleanup;
     }
 
-    if (expr_match_add_sub_expr(expr, &left, &right, &is_sub) &&
-        equ_polynomial_degree(left, wrt, &left_degree) &&
+    if (expr_match_add_sub_expr(expr, &left, &right, &is_sub) && equ_polynomial_degree(left, wrt, &left_degree) &&
         equ_polynomial_degree(right, wrt, &right_degree)) {
         (void)is_sub;
-        *degree_out =
-            left_degree > right_degree ? left_degree : right_degree;
+        *degree_out = left_degree > right_degree ? left_degree : right_degree;
         ok = true;
         goto cleanup;
     }
 
-    if (expr_match_mul_expr(expr, &left, &right) &&
-        equ_polynomial_degree(left, wrt, &left_degree) &&
-        equ_polynomial_degree(right, wrt, &right_degree) &&
-        left_degree <= SIZE_MAX - right_degree) {
+    if (expr_match_mul_expr(expr, &left, &right) && equ_polynomial_degree(left, wrt, &left_degree) &&
+        equ_polynomial_degree(right, wrt, &right_degree) && left_degree <= SIZE_MAX - right_degree) {
         *degree_out = left_degree + right_degree;
         ok = true;
     }
@@ -487,10 +444,7 @@ cleanup:
     return ok;
 }
 
-bool equ_match_polynomial_alloc(const expr_t *expr,
-                                const expr_t *wrt,
-                                number_t **coeffs_out,
-                                size_t *degree_out)
+bool equ_match_polynomial_alloc(const expr_t *expr, const expr_t *wrt, number_t **coeffs_out, size_t *degree_out)
 {
     number_t *coeffs = NULL;
     number_t *trimmed = NULL;
@@ -498,8 +452,7 @@ bool equ_match_polynomial_alloc(const expr_t *expr,
     size_t allocated_degree;
     size_t count;
 
-    if (!coeffs_out || !degree_out ||
-        !equ_polynomial_degree(expr, wrt, &degree) || degree == SIZE_MAX)
+    if (!coeffs_out || !degree_out || !equ_polynomial_degree(expr, wrt, &degree) || degree == SIZE_MAX)
         return false;
 
     allocated_degree = degree;
@@ -530,10 +483,7 @@ bool equ_match_polynomial_alloc(const expr_t *expr,
     return true;
 }
 
-static expr_t *equ_polynomial_expression_from_coefficients(
-    const number_t *coeffs,
-    size_t degree,
-    const expr_t *wrt)
+static expr_t *equ_polynomial_expression_from_coefficients(const number_t *coeffs, size_t degree, const expr_t *wrt)
 {
     expr_t *sum = NULL;
 
@@ -598,17 +548,14 @@ fail:
     return NULL;
 }
 
-static expr_t *equ_display_expanded_side(const expr_t *expr,
-                                         const expr_t *wrt)
+static expr_t *equ_display_expanded_side(const expr_t *expr, const expr_t *wrt)
 {
     number_t *coeffs = NULL;
     size_t degree = 0u;
     expr_t *expanded = NULL;
 
-    if (expr && wrt &&
-        equ_match_polynomial_alloc(expr, wrt, &coeffs, &degree)) {
-        expanded = equ_polynomial_expression_from_coefficients(
-            coeffs, degree, wrt);
+    if (expr && wrt && equ_match_polynomial_alloc(expr, wrt, &coeffs, &degree)) {
+        expanded = equ_polynomial_expression_from_coefficients(coeffs, degree, wrt);
     }
 
     if (coeffs) {
@@ -618,8 +565,7 @@ static expr_t *equ_display_expanded_side(const expr_t *expr,
     return expanded ? expanded : expr_display_expanded(expr);
 }
 
-equation_t *equ_display_expanded(const equation_t *equation,
-                                 const expr_t *wrt)
+equation_t *equ_display_expanded(const equation_t *equation, const expr_t *wrt)
 {
     expr_t *lhs;
     expr_t *rhs;

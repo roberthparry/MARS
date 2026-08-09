@@ -1,7 +1,7 @@
-#include <stdbool.h>
 #include <math.h>
-#include <string.h>
+#include <stdbool.h>
 #include <stdlib.h>
+#include <string.h>
 #define MARS_EXPR_INTEGRATE_INTERNAL_ACCESS
 #include "expr_integrate_internal.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
@@ -146,10 +146,7 @@ static void poly_add_scaled_term_local(number_t *coeffs, size_t index, number_t 
     coeffs[index] = next;
 }
 
-static bool poly_match_affine_basis_deg4(const expr_t *expr,
-                                         const expr_t *wrt,
-                                         number_t *coeffs,
-                                         size_t *degree_out)
+static bool poly_match_affine_basis_deg4(const expr_t *expr, const expr_t *wrt, number_t *coeffs, size_t *degree_out)
 {
     expr_t *vars[1];
     number_t basis_constant = num_new();
@@ -167,11 +164,7 @@ static bool poly_match_affine_basis_deg4(const expr_t *expr,
 
     for (size_t power = 0; power < 5u; ++power) {
         static const long binom[5][5] = {
-            { 1, 0, 0, 0, 0 },
-            { 1, 1, 0, 0, 0 },
-            { 1, 2, 1, 0, 0 },
-            { 1, 3, 3, 1, 0 },
-            { 1, 4, 6, 4, 1 },
+            {1, 0, 0, 0, 0}, {1, 1, 0, 0, 0}, {1, 2, 1, 0, 0}, {1, 3, 3, 1, 0}, {1, 4, 6, 4, 1},
         };
 
         if (num_eq(affine_poly[power], NUM_ZERO))
@@ -223,9 +216,7 @@ static void poly_copy_local(number_t *dst, const number_t *src, size_t count)
     }
 }
 
-static bool split_wrt_independent_product_factor(const expr_t *expr,
-                                                 const expr_t *wrt,
-                                                 expr_t **factor_out,
+static bool split_wrt_independent_product_factor(const expr_t *expr, const expr_t *wrt, expr_t **factor_out,
                                                  expr_t **rest_out)
 {
     const expr_t *left = NULL;
@@ -295,10 +286,7 @@ static size_t poly_degree_local(const number_t *coeffs, size_t count)
     return 0u;
 }
 
-static bool poly_match_direct_limited_rec(const expr_t *expr,
-                                          const expr_t *wrt,
-                                          number_t *coeffs,
-                                          size_t count)
+static bool poly_match_direct_limited_rec(const expr_t *expr, const expr_t *wrt, number_t *coeffs, size_t count)
 {
     number_t constant = num_new();
     number_t exponent = num_new();
@@ -346,8 +334,7 @@ static bool poly_match_direct_limited_rec(const expr_t *expr,
         goto cleanup;
     }
 
-    if (expr->ops &&
-        (expr->ops->kind == EXPR_KIND_ADD || expr->ops->kind == EXPR_KIND_SUB)) {
+    if (expr->ops && (expr->ops->kind == EXPR_KIND_ADD || expr->ops->kind == EXPR_KIND_SUB)) {
         if (!poly_match_direct_limited_rec(expr->a, wrt, lhs, count)) {
             goto cleanup;
         }
@@ -357,9 +344,7 @@ static bool poly_match_direct_limited_rec(const expr_t *expr,
         }
         rhs_ready = true;
         for (size_t i = 0; i < count; ++i) {
-            number_t next = (expr->ops->kind == EXPR_KIND_ADD)
-                                ? num_add(lhs[i], rhs[i])
-                                : num_sub(lhs[i], rhs[i]);
+            number_t next = (expr->ops->kind == EXPR_KIND_ADD) ? num_add(lhs[i], rhs[i]) : num_sub(lhs[i], rhs[i]);
 
             num_destroy(&coeffs[i]);
             coeffs[i] = next;
@@ -393,10 +378,8 @@ static bool poly_match_direct_limited_rec(const expr_t *expr,
         goto cleanup;
     }
 
-    if (expr->ops && expr->ops->kind == EXPR_KIND_DIV &&
-        expr_match_const_value(expr->b, &constant) &&
-        num_is_real(constant) &&
-        !num_eq(constant, NUM_ZERO)) {
+    if (expr->ops && expr->ops->kind == EXPR_KIND_DIV && expr_match_const_value(expr->b, &constant) &&
+        num_is_real(constant) && !num_eq(constant, NUM_ZERO)) {
         if (!poly_match_direct_limited_rec(expr->a, wrt, lhs, count))
             goto cleanup;
         lhs_ready = true;
@@ -413,8 +396,7 @@ static bool poly_match_direct_limited_rec(const expr_t *expr,
     if (expr->ops && expr->ops->kind == EXPR_KIND_POW_D) {
         size_t power = 0u;
 
-        if (!small_positive_int_from_number(expr->c, &power) ||
-            power >= count ||
+        if (!small_positive_int_from_number(expr->c, &power) || power >= count ||
             !poly_match_direct_limited_rec(expr->a, wrt, lhs, count)) {
             goto cleanup;
         }
@@ -445,12 +427,10 @@ static bool poly_match_direct_limited_rec(const expr_t *expr,
         goto cleanup;
     }
 
-    if (expr->ops && expr->ops->kind == EXPR_KIND_POW &&
-        expr->b && expr_match_const_value(expr->b, &exponent)) {
+    if (expr->ops && expr->ops->kind == EXPR_KIND_POW && expr->b && expr_match_const_value(expr->b, &exponent)) {
         size_t power = 0u;
 
-        if (!small_positive_int_from_number(exponent, &power) ||
-            power >= count ||
+        if (!small_positive_int_from_number(exponent, &power) || power >= count ||
             !poly_match_direct_limited_rec(expr->a, wrt, lhs, count)) {
             goto cleanup;
         }
@@ -493,13 +473,9 @@ cleanup:
     return ok;
 }
 
-static bool poly_match_direct_deg4(const expr_t *expr,
-                                   const expr_t *wrt,
-                                   number_t *coeffs,
-                                   size_t *degree_out)
+static bool poly_match_direct_deg4(const expr_t *expr, const expr_t *wrt, number_t *coeffs, size_t *degree_out)
 {
-    if (!poly_match_direct_limited_rec(expr, wrt, coeffs,
-                                       partial_fraction_poly_coeff_count)) {
+    if (!poly_match_direct_limited_rec(expr, wrt, coeffs, partial_fraction_poly_coeff_count)) {
         if (!poly_match_affine_basis_deg4(expr, wrt, coeffs, degree_out))
             return false;
         return true;
@@ -517,9 +493,7 @@ fail:
     return false;
 }
 
-static bool partial_fraction_append_shift(partial_fraction_factorization_t *out,
-                                          number_t shift,
-                                          size_t multiplicity)
+static bool partial_fraction_append_shift(partial_fraction_factorization_t *out, number_t shift, size_t multiplicity)
 {
     for (size_t i = 0; i < out->count; ++i) {
         if (num_eq(out->factors[i].shift, shift)) {
@@ -557,8 +531,7 @@ static bool partial_fraction_scale_mul(partial_fraction_factorization_t *out, nu
     return true;
 }
 
-static bool partial_fraction_factor_poly_coeffs(const number_t *coeffs,
-                                                size_t degree,
+static bool partial_fraction_factor_poly_coeffs(const number_t *coeffs, size_t degree,
                                                 partial_fraction_factorization_t *out)
 {
     if (degree == 0u) {
@@ -567,8 +540,7 @@ static bool partial_fraction_factor_poly_coeffs(const number_t *coeffs,
 
     if (degree == 1u) {
         number_t shift = num_div(coeffs[0], coeffs[1]);
-        bool ok = partial_fraction_scale_mul(out, coeffs[1], 1u) &&
-                  partial_fraction_append_shift(out, shift, 1u);
+        bool ok = partial_fraction_scale_mul(out, coeffs[1], 1u) && partial_fraction_append_shift(out, shift, 1u);
 
         num_destroy(&shift);
         return ok;
@@ -585,8 +557,7 @@ static bool partial_fraction_factor_poly_coeffs(const number_t *coeffs,
         number_t disc = num_sub(disc_left, disc_right);
         number_t sqrt_disc = num_sqrt(disc);
         number_t sqrt_disc_sq = num_mul(sqrt_disc, sqrt_disc);
-        bool exact_square = num_is_real(sqrt_disc) &&
-                            num_eq(sqrt_disc_sq, disc);
+        bool exact_square = num_is_real(sqrt_disc) && num_eq(sqrt_disc_sq, disc);
 
         if (exact_square) {
             number_t root1_numer = num_add(minus_b, sqrt_disc);
@@ -596,8 +567,7 @@ static bool partial_fraction_factor_poly_coeffs(const number_t *coeffs,
             number_t shift1 = num_neg(root1);
             number_t shift2 = num_neg(root2);
             bool ok = partial_fraction_scale_mul(out, coeffs[2], 1u) &&
-                      partial_fraction_append_shift(out, shift1, 1u) &&
-                      partial_fraction_append_shift(out, shift2, 1u);
+                      partial_fraction_append_shift(out, shift1, 1u) && partial_fraction_append_shift(out, shift2, 1u);
 
             num_destroy(&shift2);
             num_destroy(&shift1);
@@ -649,8 +619,7 @@ static bool partial_fraction_factor_poly_coeffs(const number_t *coeffs,
     return false;
 }
 
-static bool partial_fraction_collect_linear_factors(const expr_t *expr,
-                                                    const expr_t *wrt,
+static bool partial_fraction_collect_linear_factors(const expr_t *expr, const expr_t *wrt,
                                                     partial_fraction_factorization_t *out)
 {
     number_t constant = num_new();
@@ -691,8 +660,7 @@ static bool partial_fraction_collect_linear_factors(const expr_t *expr,
                 goto cleanup;
             }
             for (size_t i = 0; i < base.count; ++i) {
-                if (!partial_fraction_append_shift(out, base.factors[i].shift,
-                                                   base.factors[i].multiplicity * degree)) {
+                if (!partial_fraction_append_shift(out, base.factors[i].shift, base.factors[i].multiplicity * degree)) {
                     partial_fraction_factorization_clear(&base);
                     goto cleanup;
                 }
@@ -705,8 +673,7 @@ static bool partial_fraction_collect_linear_factors(const expr_t *expr,
     }
 
     if (expr->ops && expr->ops->kind == EXPR_KIND_POW && expr->a && expr->b &&
-        expr_match_const_value(expr->b, &exponent) &&
-        small_positive_int_from_number(exponent, &degree)) {
+        expr_match_const_value(expr->b, &exponent) && small_positive_int_from_number(exponent, &degree)) {
         partial_fraction_factorization_t base;
 
         partial_fraction_factorization_init(&base);
@@ -718,8 +685,7 @@ static bool partial_fraction_collect_linear_factors(const expr_t *expr,
                 goto cleanup;
             }
             for (size_t i = 0; i < base.count; ++i) {
-                if (!partial_fraction_append_shift(out, base.factors[i].shift,
-                                                   base.factors[i].multiplicity * degree)) {
+                if (!partial_fraction_append_shift(out, base.factors[i].shift, base.factors[i].multiplicity * degree)) {
                     partial_fraction_factorization_clear(&base);
                     goto cleanup;
                 }
@@ -737,14 +703,11 @@ static bool partial_fraction_collect_linear_factors(const expr_t *expr,
         goto cleanup;
     }
 
-    if (match_nonconstant_affine_linear_expr(expr, wrt, &constant, &coeff) &&
-        num_is_real(constant) &&
-        num_is_real(coeff) &&
-        !num_eq(coeff, NUM_ZERO)) {
+    if (match_nonconstant_affine_linear_expr(expr, wrt, &constant, &coeff) && num_is_real(constant) &&
+        num_is_real(coeff) && !num_eq(coeff, NUM_ZERO)) {
         number_t shift = num_div(constant, coeff);
 
-        ok = partial_fraction_scale_mul(out, coeff, 1u) &&
-             partial_fraction_append_shift(out, shift, 1u);
+        ok = partial_fraction_scale_mul(out, coeff, 1u) && partial_fraction_append_shift(out, shift, 1u);
         num_destroy(&shift);
         goto cleanup;
     }
@@ -783,8 +746,7 @@ static void poly_mul_by_linear_in_place(number_t *coeffs, size_t *degree, number
     number_array_clear_local(next, 5);
 }
 
-static bool build_normalized_denominator_poly(const partial_fraction_factorization_t *factors,
-                                              number_t *coeffs)
+static bool build_normalized_denominator_poly(const partial_fraction_factorization_t *factors, number_t *coeffs)
 {
     size_t degree = 0u;
 
@@ -805,10 +767,8 @@ static bool build_normalized_denominator_poly(const partial_fraction_factorizati
     return true;
 }
 
-static void build_partial_fraction_basis_poly(const partial_fraction_factorization_t *factors,
-                                              size_t factor_index,
-                                              size_t power,
-                                              number_t *coeffs)
+static void build_partial_fraction_basis_poly(const partial_fraction_factorization_t *factors, size_t factor_index,
+                                              size_t power, number_t *coeffs)
 {
     size_t degree = 0u;
 
@@ -826,12 +786,8 @@ static void build_partial_fraction_basis_poly(const partial_fraction_factorizati
     }
 }
 
-static bool poly_divide_local(const number_t *numerator,
-                              size_t num_degree,
-                              const number_t *denominator,
-                              size_t den_degree,
-                              number_t *quotient,
-                              number_t *remainder)
+static bool poly_divide_local(const number_t *numerator, size_t num_degree, const number_t *denominator,
+                              size_t den_degree, number_t *quotient, number_t *remainder)
 {
     number_t work[5];
 
@@ -945,13 +901,9 @@ static expr_t *build_polynomial_antiderivative(const expr_t *wrt, const number_t
     return out;
 }
 
-static bool poly_match_direct_deg8(const expr_t *expr,
-                                   const expr_t *wrt,
-                                   number_t *coeffs,
-                                   size_t *degree_out)
+static bool poly_match_direct_deg8(const expr_t *expr, const expr_t *wrt, number_t *coeffs, size_t *degree_out)
 {
-    if (!poly_match_direct_limited_rec(expr, wrt, coeffs,
-                                       laurent_poly_coeff_count))
+    if (!poly_match_direct_limited_rec(expr, wrt, coeffs, laurent_poly_coeff_count))
         return false;
 
     if (!poly_is_exact_real_local(coeffs, laurent_poly_coeff_count - 1u))
@@ -966,22 +918,16 @@ fail:
     return false;
 }
 
-static bool poly_match_direct_deg16(const expr_t *expr,
-                                    const expr_t *wrt,
-                                    number_t *coeffs,
-                                    size_t *degree_out)
+static bool poly_match_direct_deg16(const expr_t *expr, const expr_t *wrt, number_t *coeffs, size_t *degree_out)
 {
-    if (!poly_match_direct_limited_rec(expr, wrt, coeffs,
-                                       rational_power_poly_coeff_count))
+    if (!poly_match_direct_limited_rec(expr, wrt, coeffs, rational_power_poly_coeff_count))
         return false;
 
-    if (!poly_is_exact_real_local(coeffs,
-                                  rational_power_poly_coeff_count - 1u))
+    if (!poly_is_exact_real_local(coeffs, rational_power_poly_coeff_count - 1u))
         goto fail;
 
     if (degree_out)
-        *degree_out = poly_degree_local(coeffs,
-                                        rational_power_poly_coeff_count);
+        *degree_out = poly_degree_local(coeffs, rational_power_poly_coeff_count);
     return true;
 
 fail:
@@ -989,9 +935,7 @@ fail:
     return false;
 }
 
-static bool match_positive_polynomial_power_local(const expr_t *expr,
-                                                  const expr_t **base_out,
-                                                  size_t *power_out)
+static bool match_positive_polynomial_power_local(const expr_t *expr, const expr_t **base_out, size_t *power_out)
 {
     number_t exponent = num_new();
     size_t power = 0u;
@@ -1000,18 +944,15 @@ static bool match_positive_polynomial_power_local(const expr_t *expr,
     if (!expr || !base_out || !power_out)
         goto cleanup;
 
-    if (expr->ops && expr->ops->kind == EXPR_KIND_POW_D && expr->a &&
-        small_positive_int_from_number(expr->c, &power)) {
+    if (expr->ops && expr->ops->kind == EXPR_KIND_POW_D && expr->a && small_positive_int_from_number(expr->c, &power)) {
         *base_out = expr->a;
         *power_out = power;
         ok = true;
         goto cleanup;
     }
 
-    if (expr->ops && expr->ops->kind == EXPR_KIND_POW &&
-        expr->a && expr->b &&
-        expr_match_const_value(expr->b, &exponent) &&
-        small_positive_int_from_number(exponent, &power)) {
+    if (expr->ops && expr->ops->kind == EXPR_KIND_POW && expr->a && expr->b &&
+        expr_match_const_value(expr->b, &exponent) && small_positive_int_from_number(exponent, &power)) {
         *base_out = expr->a;
         *power_out = power;
         ok = true;
@@ -1022,28 +963,21 @@ cleanup:
     return ok;
 }
 
-static bool solve_rectangular_system_local(
-    size_t row_count,
-    size_t column_count,
-    number_t matrix[rational_power_system_size]
-                   [rational_power_system_size + 1u],
-    number_t *solution)
+static bool solve_rectangular_system_local(size_t row_count, size_t column_count,
+                                           number_t matrix[rational_power_system_size][rational_power_system_size + 1u],
+                                           number_t *solution)
 {
     size_t pivot_columns[rational_power_system_size];
     size_t pivot_row = 0u;
 
-    if (row_count == 0u || column_count == 0u ||
-        row_count > rational_power_system_size ||
+    if (row_count == 0u || column_count == 0u || row_count > rational_power_system_size ||
         column_count > rational_power_system_size)
         return false;
 
-    for (size_t column = 0u;
-         column < column_count && pivot_row < row_count;
-         ++column) {
+    for (size_t column = 0u; column < column_count && pivot_row < row_count; ++column) {
         size_t pivot = pivot_row;
 
-        while (pivot < row_count &&
-               num_eq(matrix[pivot][column], NUM_ZERO))
+        while (pivot < row_count && num_eq(matrix[pivot][column], NUM_ZERO))
             ++pivot;
         if (pivot == row_count)
             continue;
@@ -1072,8 +1006,7 @@ static bool solve_rectangular_system_local(
         for (size_t row = 0u; row < row_count; ++row) {
             number_t factor;
 
-            if (row == pivot_row ||
-                num_eq(matrix[row][column], NUM_ZERO))
+            if (row == pivot_row || num_eq(matrix[row][column], NUM_ZERO))
                 continue;
 
             factor = num_clone(matrix[row][column]);
@@ -1117,9 +1050,7 @@ static bool solve_rectangular_system_local(
     return true;
 }
 
-static void rational_power_matrix_add_scaled_local(number_t *cell,
-                                                   number_t coefficient,
-                                                   long scale)
+static void rational_power_matrix_add_scaled_local(number_t *cell, number_t coefficient, long scale)
 {
     number_t factor = num_create_from_long(scale);
     number_t scaled = num_mul(coefficient, factor);
@@ -1131,9 +1062,7 @@ static void rational_power_matrix_add_scaled_local(number_t *cell,
     num_destroy(&factor);
 }
 
-static expr_t *build_expanded_polynomial_local(const expr_t *wrt,
-                                               const number_t *coefficients,
-                                               size_t count)
+static expr_t *build_expanded_polynomial_local(const expr_t *wrt, const number_t *coefficients, size_t count)
 {
     expr_t *sum = NULL;
 
@@ -1151,17 +1080,13 @@ static expr_t *build_expanded_polynomial_local(const expr_t *wrt,
         } else {
             number_t exponent = num_create_from_long((long)power);
 
-            base = power == 1u
-                ? expr_retain_expr(wrt)
-                : expr_pow(wrt, &exponent);
+            base = power == 1u ? expr_retain_expr(wrt) : expr_pow(wrt, &exponent);
             if (base && num_eq(coefficients[power], NUM_ONE))
                 term = expr_retain_expr(base);
             else if (base && num_eq(coefficients[power], NUM_NEG_ONE))
                 term = expr_neg(base);
             else
-                term = base
-                    ? expr_mul_num(base, &coefficients[power])
-                    : NULL;
+                term = base ? expr_mul_num(base, &coefficients[power]) : NULL;
             num_destroy(&exponent);
         }
         expr_free(base);
@@ -1188,15 +1113,12 @@ static expr_t *build_expanded_polynomial_local(const expr_t *wrt,
  * general rational-integration rule; no coefficients from a particular
  * integrand are embedded here.
  */
-static expr_t *integrate_rational_power_exact_derivative(
-    const expr_t *expr,
-    const expr_t *wrt)
+static expr_t *integrate_rational_power_exact_derivative(const expr_t *expr, const expr_t *wrt)
 {
     number_t numerator[rational_power_poly_coeff_count];
     number_t denominator[rational_power_poly_coeff_count];
     number_t solution[rational_power_poly_coeff_count];
-    number_t matrix[rational_power_system_size]
-                   [rational_power_system_size + 1u];
+    number_t matrix[rational_power_system_size][rational_power_system_size + 1u];
     const expr_t *denominator_base = NULL;
     size_t denominator_power = 0u;
     size_t numerator_degree = 0u;
@@ -1213,27 +1135,20 @@ static expr_t *integrate_rational_power_exact_derivative(
     bool matrix_ready = false;
 
     if (!expr || !wrt || !expr->a || !expr->b ||
-        !match_positive_polynomial_power_local(
-            expr->b, &denominator_base, &denominator_power) ||
+        !match_positive_polynomial_power_local(expr->b, &denominator_base, &denominator_power) ||
         denominator_power < 2u)
         goto cleanup;
 
-    numerator_ready = poly_match_direct_deg16(
-        expr->a, wrt, numerator, &numerator_degree);
-    denominator_ready = poly_match_direct_deg16(
-        denominator_base, wrt, denominator, &denominator_degree);
-    if (!numerator_ready || !denominator_ready ||
-        denominator_degree < 3u ||
-        denominator_power > SIZE_MAX / denominator_degree ||
-        numerator_degree >= denominator_power * denominator_degree)
+    numerator_ready = poly_match_direct_deg16(expr->a, wrt, numerator, &numerator_degree);
+    denominator_ready = poly_match_direct_deg16(denominator_base, wrt, denominator, &denominator_degree);
+    if (!numerator_ready || !denominator_ready || denominator_degree < 3u ||
+        denominator_power > SIZE_MAX / denominator_degree || numerator_degree >= denominator_power * denominator_degree)
         goto cleanup;
 
-    antiderivative_degree =
-        (denominator_power - 1u) * denominator_degree - 1u;
+    antiderivative_degree = (denominator_power - 1u) * denominator_degree - 1u;
     column_count = antiderivative_degree + 1u;
     row_count = antiderivative_degree + denominator_degree;
-    if (column_count > rational_power_poly_coeff_count ||
-        row_count > rational_power_system_size)
+    if (column_count > rational_power_poly_coeff_count || row_count > rational_power_system_size)
         goto cleanup;
 
     partial_fraction_array_zero(solution, column_count);
@@ -1242,58 +1157,41 @@ static expr_t *integrate_rational_power_exact_derivative(
         partial_fraction_array_zero(matrix[row], column_count + 1u);
     matrix_ready = true;
 
-    for (size_t a_power = 0u;
-         a_power <= antiderivative_degree;
-         ++a_power) {
+    for (size_t a_power = 0u; a_power <= antiderivative_degree; ++a_power) {
         if (a_power > 0u) {
-            for (size_t q_power = 0u;
-                 q_power <= denominator_degree;
-                 ++q_power) {
+            for (size_t q_power = 0u; q_power <= denominator_degree; ++q_power) {
                 size_t row = a_power - 1u + q_power;
 
-                rational_power_matrix_add_scaled_local(
-                    &matrix[row][a_power], denominator[q_power],
-                    (long)a_power);
+                rational_power_matrix_add_scaled_local(&matrix[row][a_power], denominator[q_power], (long)a_power);
             }
         }
 
-        for (size_t q_power = 1u;
-             q_power <= denominator_degree;
-             ++q_power) {
+        for (size_t q_power = 1u; q_power <= denominator_degree; ++q_power) {
             size_t row = a_power + q_power - 1u;
-            long scale = -(long)(denominator_power - 1u) *
-                         (long)q_power;
+            long scale = -(long)(denominator_power - 1u) * (long)q_power;
 
-            rational_power_matrix_add_scaled_local(
-                &matrix[row][a_power], denominator[q_power], scale);
+            rational_power_matrix_add_scaled_local(&matrix[row][a_power], denominator[q_power], scale);
         }
     }
 
     for (size_t row = 0u; row < row_count; ++row) {
         num_destroy(&matrix[row][column_count]);
-        matrix[row][column_count] = row <= numerator_degree
-            ? num_clone(numerator[row])
-            : num_clone(NUM_ZERO);
+        matrix[row][column_count] = row <= numerator_degree ? num_clone(numerator[row]) : num_clone(NUM_ZERO);
     }
 
-    if (!solve_rectangular_system_local(row_count, column_count,
-                                        matrix, solution))
+    if (!solve_rectangular_system_local(row_count, column_count, matrix, solution))
         goto cleanup;
 
-    numerator_expr = build_expanded_polynomial_local(
-        wrt, solution, column_count);
+    numerator_expr = build_expanded_polynomial_local(wrt, solution, column_count);
     if (denominator_power == 2u) {
         denominator_expr = expr_retain_expr(denominator_base);
     } else {
-        number_t exponent = num_create_from_long(
-            (long)(denominator_power - 1u));
+        number_t exponent = num_create_from_long((long)(denominator_power - 1u));
 
         denominator_expr = expr_pow(denominator_base, &exponent);
         num_destroy(&exponent);
     }
-    out = (numerator_expr && denominator_expr)
-        ? expr_div(numerator_expr, denominator_expr)
-        : NULL;
+    out = (numerator_expr && denominator_expr) ? expr_div(numerator_expr, denominator_expr) : NULL;
 
 cleanup:
     expr_free(denominator_expr);
@@ -1305,17 +1203,13 @@ cleanup:
     if (solution_ready)
         number_array_clear_local(solution, column_count);
     if (denominator_ready)
-        number_array_clear_local(denominator,
-                                 rational_power_poly_coeff_count);
+        number_array_clear_local(denominator, rational_power_poly_coeff_count);
     if (numerator_ready)
-        number_array_clear_local(numerator,
-                                 rational_power_poly_coeff_count);
+        number_array_clear_local(numerator, rational_power_poly_coeff_count);
     return out;
 }
 
-static bool match_monomial_wrt_power_denominator_rec(const expr_t *expr,
-                                                     const expr_t *wrt,
-                                                     number_t *scale_io,
+static bool match_monomial_wrt_power_denominator_rec(const expr_t *expr, const expr_t *wrt, number_t *scale_io,
                                                      size_t *power_io)
 {
     number_t constant = num_new();
@@ -1325,8 +1219,7 @@ static bool match_monomial_wrt_power_denominator_rec(const expr_t *expr,
     if (!expr || !wrt || !scale_io || !power_io)
         goto cleanup;
 
-    if (expr_match_const_value(expr, &constant) && num_is_real(constant) &&
-        !num_eq(constant, NUM_ZERO)) {
+    if (expr_match_const_value(expr, &constant) && num_is_real(constant) && !num_eq(constant, NUM_ZERO)) {
         number_t next = num_mul(*scale_io, constant);
 
         num_destroy(scale_io);
@@ -1342,15 +1235,12 @@ static bool match_monomial_wrt_power_denominator_rec(const expr_t *expr,
     }
 
     if (expr->ops && expr->ops->kind == EXPR_KIND_MUL) {
-        ok = match_monomial_wrt_power_denominator_rec(expr->a, wrt,
-                                                      scale_io, power_io) &&
-             match_monomial_wrt_power_denominator_rec(expr->b, wrt,
-                                                      scale_io, power_io);
+        ok = match_monomial_wrt_power_denominator_rec(expr->a, wrt, scale_io, power_io) &&
+             match_monomial_wrt_power_denominator_rec(expr->b, wrt, scale_io, power_io);
         goto cleanup;
     }
 
-    if (expr->ops && expr->ops->kind == EXPR_KIND_POW_D &&
-        expr->a && same_wrt_var_local(expr->a, wrt)) {
+    if (expr->ops && expr->ops->kind == EXPR_KIND_POW_D && expr->a && same_wrt_var_local(expr->a, wrt)) {
         size_t power = 0u;
 
         if (!small_positive_int_from_number(expr->c, &power))
@@ -1360,8 +1250,7 @@ static bool match_monomial_wrt_power_denominator_rec(const expr_t *expr,
         goto cleanup;
     }
 
-    if (expr->ops && expr->ops->kind == EXPR_KIND_POW &&
-        expr->a && expr->b && same_wrt_var_local(expr->a, wrt) &&
+    if (expr->ops && expr->ops->kind == EXPR_KIND_POW && expr->a && expr->b && same_wrt_var_local(expr->a, wrt) &&
         expr_match_const_value(expr->b, &exponent)) {
         size_t power = 0u;
 
@@ -1378,16 +1267,12 @@ cleanup:
     return ok;
 }
 
-static bool match_monomial_wrt_power_denominator(const expr_t *expr,
-                                                 const expr_t *wrt,
-                                                 number_t *scale_out,
+static bool match_monomial_wrt_power_denominator(const expr_t *expr, const expr_t *wrt, number_t *scale_out,
                                                  size_t *power_out)
 {
     number_t scale = num_clone(NUM_ONE);
     size_t power = 0u;
-    bool ok = match_monomial_wrt_power_denominator_rec(expr, wrt,
-                                                       &scale, &power) &&
-              power > 0u;
+    bool ok = match_monomial_wrt_power_denominator_rec(expr, wrt, &scale, &power) && power > 0u;
 
     if (ok) {
         num_destroy(scale_out);
@@ -1399,9 +1284,7 @@ static bool match_monomial_wrt_power_denominator(const expr_t *expr,
     return ok;
 }
 
-static expr_t *build_laurent_integral_term(const expr_t *wrt,
-                                           number_t coeff,
-                                           long exponent)
+static expr_t *build_laurent_integral_term(const expr_t *wrt, number_t coeff, long exponent)
 {
     expr_t *base = NULL;
     expr_t *term = NULL;
@@ -1452,16 +1335,12 @@ expr_t *integrate_polynomial_over_monomial_power(const expr_t *expr, const expr_
         expr_t *reduced_expr = NULL;
         expr_t *inner = NULL;
 
-        if (!split_wrt_independent_product_factor(expr->a, wrt,
-                                                  &scale,
-                                                  &reduced_numerator)) {
+        if (!split_wrt_independent_product_factor(expr->a, wrt, &scale, &reduced_numerator)) {
             goto cleanup;
         }
 
         reduced_expr = reduced_numerator ? expr_div(reduced_numerator, expr->b) : NULL;
-        inner = reduced_expr ? integrate_polynomial_over_monomial_power(reduced_expr,
-                                                                        wrt)
-                             : NULL;
+        inner = reduced_expr ? integrate_polynomial_over_monomial_power(reduced_expr, wrt) : NULL;
         sum = (scale && inner) ? expr_mul(scale, inner) : NULL;
 
         expr_free(inner);
@@ -1472,9 +1351,7 @@ expr_t *integrate_polynomial_over_monomial_power(const expr_t *expr, const expr_
     }
     numerator_ready = true;
 
-    if (!match_monomial_wrt_power_denominator(expr->b, wrt,
-                                              &denom_scale,
-                                              &denominator_power) ||
+    if (!match_monomial_wrt_power_denominator(expr->b, wrt, &denom_scale, &denominator_power) ||
         num_eq(denom_scale, NUM_ZERO)) {
         goto cleanup;
     }
@@ -1506,8 +1383,7 @@ cleanup:
     return simplify_owned(sum);
 }
 
-static expr_t *build_partial_fraction_antiderivative(const partial_fraction_factorization_t *factors,
-                                                     const expr_t *wrt,
+static expr_t *build_partial_fraction_antiderivative(const partial_fraction_factorization_t *factors, const expr_t *wrt,
                                                      const number_t *coeffs)
 {
     expr_t *sum = NULL;
@@ -1588,8 +1464,7 @@ static bool add_integral_term_owned(expr_t **sum, expr_t *term)
     return next != NULL;
 }
 
-static expr_t *build_exact_radical_scale(number_t rational_scale,
-                                         number_t radical)
+static expr_t *build_exact_radical_scale(number_t rational_scale, number_t radical)
 {
     number_t combined = num_mul(rational_scale, radical);
     number_t normalised = partial_fraction_normalize_small_rational(combined);
@@ -1602,9 +1477,7 @@ static expr_t *build_exact_radical_scale(number_t rational_scale,
     } else {
         expr_t *radical_expr = expr_new_const(radical);
 
-        out = radical_expr
-            ? expr_mul_num(radical_expr, &rational_scale)
-            : NULL;
+        out = radical_expr ? expr_mul_num(radical_expr, &rational_scale) : NULL;
         expr_free(radical_expr);
     }
 
@@ -1613,8 +1486,7 @@ static expr_t *build_exact_radical_scale(number_t rational_scale,
     return out;
 }
 
-static expr_t *integrate_general_palindromic_quartic(const expr_t *expr,
-                                                      const expr_t *wrt)
+static expr_t *integrate_general_palindromic_quartic(const expr_t *expr, const expr_t *wrt)
 {
     number_t numerator[5];
     number_t denominator[5];
@@ -1651,16 +1523,11 @@ static expr_t *integrate_general_palindromic_quartic(const expr_t *expr,
     if (!expr || !expr->a || !expr->b || !wrt)
         goto cleanup;
 
-    numerator_ready = poly_match_direct_deg4(
-        expr->a, wrt, numerator, &numerator_degree);
-    denominator_ready = poly_match_direct_deg4(
-        expr->b, wrt, denominator, &denominator_degree);
-    if (!numerator_ready || !denominator_ready ||
-        numerator_degree > 4u || denominator_degree != 4u ||
-        num_eq(denominator[4], NUM_ZERO) ||
-        !num_eq(denominator[0], denominator[4]) ||
-        !num_eq(denominator[1], NUM_ZERO) ||
-        !num_eq(denominator[3], NUM_ZERO))
+    numerator_ready = poly_match_direct_deg4(expr->a, wrt, numerator, &numerator_degree);
+    denominator_ready = poly_match_direct_deg4(expr->b, wrt, denominator, &denominator_degree);
+    if (!numerator_ready || !denominator_ready || numerator_degree > 4u || denominator_degree != 4u ||
+        num_eq(denominator[4], NUM_ZERO) || !num_eq(denominator[0], denominator[4]) ||
+        !num_eq(denominator[1], NUM_ZERO) || !num_eq(denominator[3], NUM_ZERO))
         goto cleanup;
 
     num_destroy(&middle);
@@ -1695,10 +1562,8 @@ static expr_t *integrate_general_palindromic_quartic(const expr_t *expr,
     atan_width_squared = num_add(two, middle);
     num_destroy(&factor_width_squared);
     factor_width_squared = num_sub(two, middle);
-    if (!num_is_real(atan_width_squared) ||
-        !num_is_real(factor_width_squared) ||
-        num_get_sign(atan_width_squared) <= 0 ||
-        num_get_sign(factor_width_squared) <= 0)
+    if (!num_is_real(atan_width_squared) || !num_is_real(factor_width_squared) ||
+        num_get_sign(atan_width_squared) <= 0 || num_get_sign(factor_width_squared) <= 0)
         goto cleanup;
 
     num_destroy(&atan_width);
@@ -1748,10 +1613,8 @@ static expr_t *integrate_general_palindromic_quartic(const expr_t *expr,
         expr_t *denom = (one && x_squared) ? expr_sub(one, x_squared) : NULL;
         expr_t *argument = (width_x && denom) ? expr_div(width_x, denom) : NULL;
         expr_t *angle = argument ? expr_atan(argument) : NULL;
-        number_t rational_scale = num_div(even_atan_scale,
-                                          atan_width_squared);
-        expr_t *exact_scale = build_exact_radical_scale(rational_scale,
-                                                        atan_width);
+        number_t rational_scale = num_div(even_atan_scale, atan_width_squared);
+        expr_t *exact_scale = build_exact_radical_scale(rational_scale, atan_width);
 
         term = (angle && exact_scale) ? expr_mul(exact_scale, angle) : NULL;
         expr_free(exact_scale);
@@ -1776,11 +1639,9 @@ static expr_t *integrate_general_palindromic_quartic(const expr_t *expr,
         expr_t *ratio = (minus_one && plus_one) ? expr_div(minus_one, plus_one) : NULL;
         expr_t *log_ratio = ratio ? expr_log(ratio) : NULL;
 
-        expr_t *exact_scale = build_exact_radical_scale(even_log_scale,
-                                                        factor_width);
+        expr_t *exact_scale = build_exact_radical_scale(even_log_scale, factor_width);
 
-        term = (log_ratio && exact_scale) ? expr_mul(exact_scale, log_ratio)
-                                          : NULL;
+        term = (log_ratio && exact_scale) ? expr_mul(exact_scale, log_ratio) : NULL;
         expr_free(exact_scale);
         expr_free(log_ratio);
         expr_free(ratio);
@@ -1798,9 +1659,7 @@ static expr_t *integrate_general_palindromic_quartic(const expr_t *expr,
     if (!num_eq(odd_log_scale, NUM_ZERO)) {
         expr_t *log_denominator = expr_log(expr->b);
 
-        term = log_denominator
-            ? expr_mul_num(log_denominator, &odd_log_scale)
-            : NULL;
+        term = log_denominator ? expr_mul_num(log_denominator, &odd_log_scale) : NULL;
         expr_free(log_denominator);
         if (!add_integral_term_owned(&sum, term))
             goto cleanup;
@@ -1808,19 +1667,12 @@ static expr_t *integrate_general_palindromic_quartic(const expr_t *expr,
     }
 
     if (!num_eq(odd_remainder, NUM_ZERO)) {
-        expr_t *twice_x_squared = x_squared
-            ? expr_mul_num(x_squared, &two)
-            : NULL;
-        expr_t *numerator_expr = twice_x_squared
-            ? expr_add_num(twice_x_squared, &middle)
-            : NULL;
+        expr_t *twice_x_squared = x_squared ? expr_mul_num(x_squared, &two) : NULL;
+        expr_t *numerator_expr = twice_x_squared ? expr_add_num(twice_x_squared, &middle) : NULL;
         expr_t *width_expr = expr_new_const(odd_width);
-        expr_t *argument = (numerator_expr && width_expr)
-            ? expr_div(numerator_expr, width_expr)
-            : NULL;
+        expr_t *argument = (numerator_expr && width_expr) ? expr_div(numerator_expr, width_expr) : NULL;
         expr_t *angle = argument ? expr_atan(argument) : NULL;
-        number_t width_squared = num_mul(atan_width_squared,
-                                        factor_width_squared);
+        number_t width_squared = num_mul(atan_width_squared, factor_width_squared);
         number_t odd_scale = num_div(odd_remainder, width_squared);
         expr_t *exact_scale = build_exact_radical_scale(odd_scale, odd_width);
 

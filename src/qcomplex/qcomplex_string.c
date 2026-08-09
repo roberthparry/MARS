@@ -3,7 +3,8 @@
 #include "qcomplex.h"
 #include "ustring.h"
 
-string_t *qc_to_text(qcomplex_t z) {
+string_t *qc_to_text(qcomplex_t z)
+{
     if (qf_cmp(qc_imag(z), qf_from_double(0.0)) == 0) {
         return qf_sprintf_text("%q", qc_real(z));
     } else if (qf_cmp(qc_real(z), qf_from_double(0.0)) == 0) {
@@ -48,9 +49,7 @@ static void qc_normalise_unit_imag_text(string_t *text)
     }
 }
 
-static int qc_parse_real_imag_parts_text(const string_t *re_text,
-                                         const string_t *im_text,
-                                         qcomplex_t *out)
+static int qc_parse_real_imag_parts_text(const string_t *re_text, const string_t *im_text, qcomplex_t *out)
 {
     qfloat_t re = qf_from_text(re_text);
     qfloat_t im = qf_from_text(im_text);
@@ -87,9 +86,7 @@ static string_t *qc_compact_text(const string_t *text)
             continue;
 
         rune = string_cursor_peek(cursor);
-        if (rune_is_none(rune) ||
-            string_append_rune(out, rune) != 0 ||
-            string_cursor_next(cursor) != 0) {
+        if (rune_is_none(rune) || string_append_rune(out, rune) != 0 || string_cursor_next(cursor) != 0) {
             string_cursor_free(cursor);
             string_free(out);
             return NULL;
@@ -122,8 +119,7 @@ static bool qc_find_char(const string_t *text, char ch, string_pos_t *pos_out)
         return false;
 
     while (!string_cursor_done(cursor)) {
-        if (string_cursor_peek_ascii(cursor, &ascii) &&
-            ascii == (unsigned char)ch) {
+        if (string_cursor_peek_ascii(cursor, &ascii) && ascii == (unsigned char)ch) {
             if (pos_out)
                 *pos_out = string_cursor_position(cursor);
             found = true;
@@ -147,8 +143,7 @@ static bool qc_find_last_char(const string_t *text, char ch, string_pos_t *pos_o
         return false;
 
     while (!string_cursor_done(cursor)) {
-        if (string_cursor_peek_ascii(cursor, &ascii) &&
-            ascii == (unsigned char)ch) {
+        if (string_cursor_peek_ascii(cursor, &ascii) && ascii == (unsigned char)ch) {
             if (pos_out)
                 *pos_out = string_cursor_position(cursor);
             found = true;
@@ -172,9 +167,7 @@ static bool qc_find_first_signed_split(const string_t *text, string_pos_t *pos_o
         return false;
 
     while (!string_cursor_done(cursor)) {
-        if (!first &&
-            string_cursor_peek_ascii(cursor, &ascii) &&
-            (ascii == '+' || ascii == '-')) {
+        if (!first && string_cursor_peek_ascii(cursor, &ascii) && (ascii == '+' || ascii == '-')) {
             if (pos_out)
                 *pos_out = string_cursor_position(cursor);
             found = true;
@@ -200,9 +193,7 @@ static bool qc_find_last_signed_split(const string_t *text, string_pos_t *pos_ou
         return false;
 
     while (!string_cursor_done(cursor)) {
-        if (!first &&
-            string_cursor_peek_ascii(cursor, &ascii) &&
-            (ascii == '+' || ascii == '-')) {
+        if (!first && string_cursor_peek_ascii(cursor, &ascii) && (ascii == '+' || ascii == '-')) {
             if (pos_out)
                 *pos_out = string_cursor_position(cursor);
             found = true;
@@ -251,10 +242,8 @@ qcomplex_t qc_from_text(const string_t *text)
         string_t *right;
         qcomplex_t z;
 
-        if (!qc_find_char(compact, ',', &comma_pos) ||
-            !qc_find_last_char(compact, ')', &close_pos) ||
-            comma_pos <= 1u ||
-            close_pos <= comma_pos) {
+        if (!qc_find_char(compact, ',', &comma_pos) || !qc_find_last_char(compact, ')', &close_pos) ||
+            comma_pos <= 1u || close_pos <= comma_pos) {
             z = qc_parse_fail_text("invalid (a,b) form", text);
             string_free(compact);
             return z;
@@ -288,10 +277,8 @@ qcomplex_t qc_from_text(const string_t *text)
         string_t *inside;
         qfloat_t r;
 
-        if (!qc_find_char(compact, '*', &star_pos) ||
-            star_pos >= exp_pos ||
-            !qc_find_last_char(compact, ')', &close_pos) ||
-            close_pos <= exp_pos + 4u) {
+        if (!qc_find_char(compact, '*', &star_pos) || star_pos >= exp_pos ||
+            !qc_find_last_char(compact, ')', &close_pos) || close_pos <= exp_pos + 4u) {
             qcomplex_t fail = qc_parse_fail_text("invalid r*exp(...) form", text);
             string_free(compact);
             return fail;
@@ -367,8 +354,7 @@ qcomplex_t qc_from_text(const string_t *text)
                 string_free(compact);
                 return qc_parse_fail_text("invalid angle in exp(theta i)", text);
             }
-            if (string_length(theta_text) == 0u ||
-                qc_text_equals_literal(theta_text, "+") ||
+            if (string_length(theta_text) == 0u || qc_text_equals_literal(theta_text, "+") ||
                 qc_text_equals_literal(theta_text, "-")) {
                 string_free(theta_text);
                 string_free(inside);
@@ -417,8 +403,7 @@ qcomplex_t qc_from_text(const string_t *text)
                 imag = qc_without_imag_suffix(right);
                 qc_normalise_unit_imag_text(imag);
 
-                if (left && imag &&
-                    qc_parse_real_imag_parts_text(left, imag, &z) == 0) {
+                if (left && imag && qc_parse_real_imag_parts_text(left, imag, &z) == 0) {
                     string_free(left);
                     string_free(right);
                     string_free(imag);
@@ -433,8 +418,7 @@ qcomplex_t qc_from_text(const string_t *text)
                 real = string_clone(right);
                 qc_normalise_unit_imag_text(imag);
 
-                if (real && imag &&
-                    qc_parse_real_imag_parts_text(real, imag, &z) == 0) {
+                if (real && imag && qc_parse_real_imag_parts_text(real, imag, &z) == 0) {
                     string_free(left);
                     string_free(right);
                     string_free(real);

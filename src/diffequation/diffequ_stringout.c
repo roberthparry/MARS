@@ -14,10 +14,7 @@ static const size_t de_tex_line_limit = 180u;
 
 static int de_append_superscript(string_t *out, size_t value)
 {
-    static const char *const digits[] = {
-        "⁰", "¹", "²", "³", "⁴",
-        "⁵", "⁶", "⁷", "⁸", "⁹"
-    };
+    static const char *const digits[] = {"⁰", "¹", "²", "³", "⁴", "⁵", "⁶", "⁷", "⁸", "⁹"};
     char text[3u * sizeof(size_t) + 1u];
 
     if (snprintf(text, sizeof(text), "%zu", value) < 0)
@@ -31,8 +28,7 @@ static int de_append_superscript(string_t *out, size_t value)
 
 static int de_is_derivative_letter(char value)
 {
-    return (value >= 'A' && value <= 'Z') ||
-           (value >= 'a' && value <= 'z');
+    return (value >= 'A' && value <= 'Z') || (value >= 'a' && value <= 'z');
 }
 
 static size_t de_derivative_letter_length(const char *text)
@@ -54,16 +50,13 @@ static size_t de_derivative_letter_length(const char *text)
     else
         return 0u;
     for (size_t i = 1u; i < length; ++i) {
-        if (!text[i] ||
-            ((unsigned char)text[i] & 0xc0u) != 0x80u)
+        if (!text[i] || ((unsigned char)text[i] & 0xc0u) != 0x80u)
             return 0u;
     }
     return length;
 }
 
-static int de_append_next_character(string_t *out,
-                                    const char *text,
-                                    size_t *position)
+static int de_append_next_character(string_t *out, const char *text, size_t *position)
 {
     size_t length = de_derivative_letter_length(text + *position);
 
@@ -75,9 +68,7 @@ static int de_append_next_character(string_t *out,
     return 0;
 }
 
-static string_t *de_normalise_greek_slice(const char *text,
-                                          size_t start,
-                                          size_t end)
+static string_t *de_normalise_greek_slice(const char *text, size_t start, size_t end)
 {
     size_t length = end - start;
     char *alias;
@@ -111,13 +102,11 @@ static string_t *de_greek_aliases_to_symbols(const string_t *source)
         size_t end;
         string_t *normalized = NULL;
 
-        if (text[index] == '@' &&
-            isalpha((unsigned char)text[index + 1u])) {
+        if (text[index] == '@' && isalpha((unsigned char)text[index + 1u])) {
             start = ++index;
             while (isalpha((unsigned char)text[index]))
                 ++index;
-            normalized = de_normalise_greek_slice(
-                text, start, index);
+            normalized = de_normalise_greek_slice(text, start, index);
             if (normalized) {
                 if (string_append_string(out, normalized) != 0)
                     goto fail_normalized;
@@ -131,8 +120,7 @@ static string_t *de_greek_aliases_to_symbols(const string_t *source)
             end = index;
             normalized = de_normalise_greek_slice(text, start, end);
             if (!normalized && end - start > 1u && text[start] == 'd') {
-                normalized = de_normalise_greek_slice(
-                    text, start + 1u, end);
+                normalized = de_normalise_greek_slice(text, start + 1u, end);
                 if (normalized && string_append_char(out, 'd') != 0)
                     goto fail_normalized;
             }
@@ -140,8 +128,7 @@ static string_t *de_greek_aliases_to_symbols(const string_t *source)
                 if (string_append_string(out, normalized) != 0)
                     goto fail_normalized;
                 string_free(normalized);
-            } else if (string_append_chars(
-                           out, text + start, end - start) != 0) {
+            } else if (string_append_chars(out, text + start, end - start) != 0) {
                 goto fail;
             }
             continue;
@@ -151,7 +138,7 @@ static string_t *de_greek_aliases_to_symbols(const string_t *source)
             goto fail;
         continue;
 
-fail_normalized:
+    fail_normalized:
         string_free(normalized);
         goto fail;
     }
@@ -162,28 +149,20 @@ fail:
     return NULL;
 }
 
-static int de_append_standard_derivative(
-    string_t *out,
-    const char *suffix,
-    size_t suffix_length,
-    size_t order,
-    const char *dependent,
-    size_t dependent_length,
-    bool partial)
+static int de_append_standard_derivative(string_t *out, const char *suffix, size_t suffix_length, size_t order,
+                                         const char *dependent, size_t dependent_length, bool partial)
 {
     if (string_append_cstr(out, partial ? "∂" : "d") != 0)
         return -1;
     if (order > 1u && de_append_superscript(out, order) != 0)
         return -1;
-    if (string_append_chars(out, dependent, dependent_length) != 0 ||
-        string_append_char(out, '/') != 0)
+    if (string_append_chars(out, dependent, dependent_length) != 0 || string_append_char(out, '/') != 0)
         return -1;
 
     if (!partial) {
         size_t variable_length = de_derivative_letter_length(suffix);
 
-        if (string_append_char(out, 'd') != 0 ||
-            variable_length == 0u ||
+        if (string_append_char(out, 'd') != 0 || variable_length == 0u ||
             string_append_chars(out, suffix, variable_length) != 0)
             return -1;
         return order > 1u ? de_append_superscript(out, order) : 0;
@@ -221,34 +200,27 @@ static int de_append_standard_derivative(
                 size_t previous = index - multiplicity - 1u;
 
                 if (lengths[previous] != lengths[variable] ||
-                    memcmp(suffix + offsets[previous],
-                           suffix + offsets[variable],
-                           lengths[variable]) != 0)
+                    memcmp(suffix + offsets[previous], suffix + offsets[variable], lengths[variable]) != 0)
                     break;
                 ++multiplicity;
             }
             if (string_append_cstr(out, "∂") != 0 ||
-                string_append_chars(out,
-                                    suffix + offsets[variable],
-                                    lengths[variable]) != 0 ||
-                (multiplicity > 1u &&
-                 de_append_superscript(out, multiplicity) != 0)) {
+                string_append_chars(out, suffix + offsets[variable], lengths[variable]) != 0 ||
+                (multiplicity > 1u && de_append_superscript(out, multiplicity) != 0)) {
                 status = -1;
                 goto partial_cleanup;
             }
             index -= multiplicity;
         }
 
-partial_cleanup:
+    partial_cleanup:
         free(lengths);
         free(offsets);
         return status;
     }
 }
 
-static string_t *de_derivatives_to_standard_text(
-    const string_t *source,
-    bool partial)
+static string_t *de_derivatives_to_standard_text(const string_t *source, bool partial)
 {
     const char *text = source ? string_c_str(source) : "";
     string_t *out = string_new();
@@ -262,8 +234,7 @@ static string_t *de_derivatives_to_standard_text(
         size_t dependent_start;
         size_t dependent_end;
 
-        if (text[index] != 'D' ||
-            de_derivative_letter_length(text + index + 1u) == 0u) {
+        if (text[index] != 'D' || de_derivative_letter_length(text + index + 1u) == 0u) {
             if (de_append_next_character(out, text, &index) != 0)
                 goto fail;
             continue;
@@ -273,8 +244,7 @@ static string_t *de_derivatives_to_standard_text(
         {
             size_t length;
 
-            while ((length = de_derivative_letter_length(
-                        text + suffix_end)) > 0u) {
+            while ((length = de_derivative_letter_length(text + suffix_end)) > 0u) {
                 suffix_end += length;
                 order++;
             }
@@ -287,29 +257,18 @@ static string_t *de_derivatives_to_standard_text(
 
         dependent_start = suffix_end + 1u;
         dependent_end = dependent_start;
-        while (text[dependent_end] &&
-               text[dependent_end] != ')' &&
-               text[dependent_end] != '(' &&
-               text[dependent_end] != ' ' &&
-               text[dependent_end] != '\t' &&
-               text[dependent_end] != '\r' &&
+        while (text[dependent_end] && text[dependent_end] != ')' && text[dependent_end] != '(' &&
+               text[dependent_end] != ' ' && text[dependent_end] != '\t' && text[dependent_end] != '\r' &&
                text[dependent_end] != '\n')
             ++dependent_end;
-        if (dependent_end == dependent_start ||
-            text[dependent_end] != ')') {
+        if (dependent_end == dependent_start || text[dependent_end] != ')') {
             if (de_append_next_character(out, text, &index) != 0)
                 goto fail;
             continue;
         }
 
-        if (de_append_standard_derivative(
-                out,
-                text + index + 1u,
-                suffix_end - index - 1u,
-                order,
-                text + dependent_start,
-                dependent_end - dependent_start,
-                partial) != 0)
+        if (de_append_standard_derivative(out, text + index + 1u, suffix_end - index - 1u, order,
+                                          text + dependent_start, dependent_end - dependent_start, partial) != 0)
             goto fail;
         index = dependent_end + 1u;
     }
@@ -320,9 +279,7 @@ fail:
     return NULL;
 }
 
-static string_t *de_conditions_to_text(
-    const diffequ_t *de,
-    bool partial_derivatives)
+static string_t *de_conditions_to_text(const diffequ_t *de, bool partial_derivatives)
 {
     string_t *out = string_new();
 
@@ -330,8 +287,7 @@ static string_t *de_conditions_to_text(
         return NULL;
 
     for (size_t i = 0u; i < de->condition_count; ++i) {
-        string_t *condition = de_derivatives_to_standard_text(
-            de->condition_texts[i], partial_derivatives);
+        string_t *condition = de_derivatives_to_standard_text(de->condition_texts[i], partial_derivatives);
 
         if (!condition)
             goto fail;
@@ -342,7 +298,7 @@ static string_t *de_conditions_to_text(
         string_free(condition);
         continue;
 
-condition_fail:
+    condition_fail:
         string_free(condition);
         goto fail;
     }
@@ -365,20 +321,15 @@ static string_t *de_to_expression_text(const diffequ_t *de)
     if (!de || !de->equation)
         return string_new_with("NULL");
 
-    partial_derivatives = de->independent_count > 1u ||
-        de->partial_derivative_input;
-    canonical_equation = de->differential_form_input &&
-        string_length(de->differential_form_text) > 0u
-        ? string_new_with(string_c_str(de->differential_form_text))
-        : string_length(de->equation_text) > 0u
-        ? string_new_with(string_c_str(de->equation_text))
-        : equ_to_text(de->equation, style_UNBOUND);
-    display_equation = de->differential_form_input
-        ? de_greek_aliases_to_symbols(canonical_equation)
-        : string_clone(canonical_equation);
+    partial_derivatives = de->independent_count > 1u || de->partial_derivative_input;
+    canonical_equation = de->differential_form_input && string_length(de->differential_form_text) > 0u
+                             ? string_new_with(string_c_str(de->differential_form_text))
+                         : string_length(de->equation_text) > 0u ? string_new_with(string_c_str(de->equation_text))
+                                                                 : equ_to_text(de->equation, style_UNBOUND);
+    display_equation = de->differential_form_input ? de_greek_aliases_to_symbols(canonical_equation)
+                                                   : string_clone(canonical_equation);
     string_free(canonical_equation);
-    equation = de_derivatives_to_standard_text(
-        display_equation, partial_derivatives);
+    equation = de_derivatives_to_standard_text(display_equation, partial_derivatives);
     string_free(display_equation);
     conditions = de_conditions_to_text(de, partial_derivatives);
     if (!equation || !conditions) {
@@ -387,41 +338,28 @@ static string_t *de_to_expression_text(const diffequ_t *de)
         return NULL;
     }
 
-    out = string_sprintf(
-        "{ %S | %S; %S; %S }",
-        equation,
-        de->independent_text,
-        de->constant_text,
-        conditions);
+    out = string_sprintf("{ %S | %S; %S; %S }", equation, de->independent_text, de->constant_text, conditions);
 
     string_free(conditions);
     string_free(equation);
     return out;
 }
 
-static char *de_expr_to_unbound_tex(
-    const expr_t *expr,
-    bool partial_derivatives)
+static char *de_expr_to_unbound_tex(const expr_t *expr, bool partial_derivatives)
 {
     const char *symbol_name;
     char *tex;
 
     symbol_name = expr_symbol_name(expr);
     if (symbol_name) {
-        expr_t *symbol =
-            expr_new_named_var(NUM_NAN, symbol_name);
+        expr_t *symbol = expr_new_named_var(NUM_NAN, symbol_name);
 
-        tex = symbol
-            ? expr_to_tex_body_wrapped(symbol, de_tex_line_limit)
-            : NULL;
+        tex = symbol ? expr_to_tex_body_wrapped(symbol, de_tex_line_limit) : NULL;
         expr_free(symbol);
         return tex;
     }
-    return partial_derivatives
-        ? expr_to_tex_body_wrapped_with_partials(
-              expr, de_tex_line_limit)
-        : expr_to_tex_body_wrapped_with_totals(
-              expr, de_tex_line_limit);
+    return partial_derivatives ? expr_to_tex_body_wrapped_with_partials(expr, de_tex_line_limit)
+                               : expr_to_tex_body_wrapped_with_totals(expr, de_tex_line_limit);
 }
 
 static expr_t *de_tex_binomial_coefficient(size_t n, size_t k)
@@ -429,9 +367,7 @@ static expr_t *de_tex_binomial_coefficient(size_t n, size_t k)
     number_t n_value = num_create_from_long((long)n);
     number_t k_value = num_create_from_long((long)k);
     number_t value = num_binomial(n_value, k_value);
-    expr_t *coefficient = num_is_finite(value)
-        ? expr_new_const(value)
-        : NULL;
+    expr_t *coefficient = num_is_finite(value) ? expr_new_const(value) : NULL;
 
     num_destroy(&value);
     num_destroy(&k_value);
@@ -441,9 +377,7 @@ static expr_t *de_tex_binomial_coefficient(size_t n, size_t k)
 
 static string_t *de_repeated_quadratic_to_tex(const diffequ_t *de)
 {
-    const expr_t *square_base = de
-        ? de->repeated_quadratic_square
-        : NULL;
+    const expr_t *square_base = de ? de->repeated_quadratic_square : NULL;
     expr_t *dependent = NULL;
     char *dependent_tex = NULL;
     char *independent_tex = NULL;
@@ -451,36 +385,23 @@ static string_t *de_repeated_quadratic_to_tex(const diffequ_t *de)
     bool negative_square;
     bool first = true;
 
-    if (!de || de->repeated_quadratic_power < 2u ||
-        !square_base || !de->repeated_quadratic_dependent ||
+    if (!de || de->repeated_quadratic_power < 2u || !square_base || !de->repeated_quadratic_dependent ||
         de->independent_count != 1u)
         return NULL;
-    negative_square = expr_match_neg_expr(
-        de->repeated_quadratic_square, &square_base);
-    dependent = expr_new_named_var(
-        NUM_NAN, de->repeated_quadratic_dependent);
-    dependent_tex = dependent
-        ? de_expr_to_unbound_tex(dependent, false)
-        : NULL;
-    independent_tex = de_expr_to_unbound_tex(
-        de->independent_vars[0], false);
+    negative_square = expr_match_neg_expr(de->repeated_quadratic_square, &square_base);
+    dependent = expr_new_named_var(NUM_NAN, de->repeated_quadratic_dependent);
+    dependent_tex = dependent ? de_expr_to_unbound_tex(dependent, false) : NULL;
+    independent_tex = de_expr_to_unbound_tex(de->independent_vars[0], false);
     out = dependent_tex && independent_tex ? string_new() : NULL;
     if (!out)
         goto fail;
 
-    for (size_t j = de->repeated_quadratic_power + 1u;
-         j > 0u;
-         --j) {
+    for (size_t j = de->repeated_quadratic_power + 1u; j > 0u; --j) {
         size_t derivative_power = j - 1u;
-        size_t square_power =
-            de->repeated_quadratic_power - derivative_power;
-        expr_t *binomial = de_tex_binomial_coefficient(
-            de->repeated_quadratic_power, derivative_power);
-        expr_t *power = expr_pow_long(
-            square_base, (long)square_power);
-        expr_t *coefficient = binomial && power
-            ? expr_mul(binomial, power)
-            : NULL;
+        size_t square_power = de->repeated_quadratic_power - derivative_power;
+        expr_t *binomial = de_tex_binomial_coefficient(de->repeated_quadratic_power, derivative_power);
+        expr_t *power = expr_pow_long(square_base, (long)square_power);
+        expr_t *coefficient = binomial && power ? expr_mul(binomial, power) : NULL;
         expr_t *display = NULL;
         const expr_t *magnitude;
         bool subtract;
@@ -489,16 +410,13 @@ static string_t *de_repeated_quadratic_to_tex(const diffequ_t *de)
         char *coefficient_tex = NULL;
         size_t order = 2u * derivative_power;
 
-        if (coefficient && negative_square &&
-            (square_power & 1u) != 0u) {
+        if (coefficient && negative_square && (square_power & 1u) != 0u) {
             expr_t *negative = expr_neg(coefficient);
 
             expr_free(coefficient);
             coefficient = negative;
         }
-        display = coefficient
-            ? expr_display_simplified(coefficient)
-            : NULL;
+        display = coefficient ? expr_display_simplified(coefficient) : NULL;
         expr_free(coefficient);
         expr_free(power);
         expr_free(binomial);
@@ -507,12 +425,9 @@ static string_t *de_repeated_quadratic_to_tex(const diffequ_t *de)
 
         magnitude = display;
         subtract = expr_match_neg_expr(display, &magnitude);
-        unit = expr_match_const_value(magnitude, &value) &&
-            num_eq(value, NUM_ONE);
+        unit = expr_match_const_value(magnitude, &value) && num_eq(value, NUM_ONE);
         num_destroy(&value);
-        coefficient_tex = unit
-            ? NULL
-            : de_expr_to_unbound_tex(magnitude, false);
+        coefficient_tex = unit ? NULL : de_expr_to_unbound_tex(magnitude, false);
         if (!unit && !coefficient_tex) {
             expr_free(display);
             goto fail;
@@ -521,24 +436,16 @@ static string_t *de_repeated_quadratic_to_tex(const diffequ_t *de)
         if (first) {
             if (subtract && string_append_char(out, '-') != 0)
                 goto term_fail;
-        } else if (string_append_cstr(
-                       out, subtract ? " - " : " + ") != 0) {
+        } else if (string_append_cstr(out, subtract ? " - " : " + ") != 0) {
             goto term_fail;
         }
-        if (!unit &&
-            (string_append_cstr(out, coefficient_tex) != 0 ||
-             string_append_cstr(out, " \\cdot ") != 0))
+        if (!unit && (string_append_cstr(out, coefficient_tex) != 0 || string_append_cstr(out, " \\cdot ") != 0))
             goto term_fail;
         if (order == 0u) {
             if (string_append_cstr(out, dependent_tex) != 0)
                 goto term_fail;
-        } else if (string_append_format(
-                       out,
-                       "\\frac{d^{%zu} %s}{d %s^{%zu}}",
-                       order,
-                       dependent_tex,
-                       independent_tex,
-                       order) < 0) {
+        } else if (string_append_format(out, "\\frac{d^{%zu} %s}{d %s^{%zu}}", order, dependent_tex, independent_tex,
+                                        order) < 0) {
             goto term_fail;
         }
         free(coefficient_tex);
@@ -546,7 +453,7 @@ static string_t *de_repeated_quadratic_to_tex(const diffequ_t *de)
         first = false;
         continue;
 
-term_fail:
+    term_fail:
         free(coefficient_tex);
         expr_free(display);
         goto fail;
@@ -582,10 +489,7 @@ static const expr_t *de_first_formal_derivative(const expr_t *expr)
     return found ? found : de_first_formal_derivative(right);
 }
 
-static int de_append_differential_term(string_t *out,
-                                       const expr_t *coefficient,
-                                       const expr_t *variable,
-                                       bool first)
+static int de_append_differential_term(string_t *out, const expr_t *coefficient, const expr_t *variable, bool first)
 {
     const expr_t *display = coefficient;
     const expr_t *negative = NULL;
@@ -602,11 +506,9 @@ static int de_append_differential_term(string_t *out,
 
     if (subtract)
         display = negative;
-    unit = expr_match_const_value(display, &value) &&
-           num_eq(value, NUM_ONE);
+    unit = expr_match_const_value(display, &value) && num_eq(value, NUM_ONE);
     num_destroy(&value);
-    additive = expr_match_add_sub_expr(
-        display, &left, &right, &is_sub);
+    additive = expr_match_add_sub_expr(display, &left, &right, &is_sub);
     if (!unit)
         coefficient_tex = de_expr_to_unbound_tex(display, false);
     variable_tex = de_expr_to_unbound_tex(variable, false);
@@ -616,8 +518,7 @@ static int de_append_differential_term(string_t *out,
     if (first) {
         if (subtract && string_append_char(out, '-') != 0)
             goto cleanup;
-    } else if (string_append_cstr(
-                   out, subtract ? " - " : " + ") != 0) {
+    } else if (string_append_cstr(out, subtract ? " - " : " + ") != 0) {
         goto cleanup;
     }
     if (!unit) {
@@ -650,29 +551,19 @@ static string_t *de_differential_form_to_tex(const diffequ_t *de)
     expr_t *independent_coefficient = NULL;
     string_t *out = NULL;
 
-    if (!de || !de->differential_form_input ||
-        de->independent_count != 1u)
+    if (!de || !de->differential_form_input || de->independent_count != 1u)
         return NULL;
     independent = de->independent_vars[0];
     residual = equ_residual(de->equation);
     derivative = de_first_formal_derivative(residual);
-    dependent = derivative
-        ? expr_formal_derivative_dependent(derivative)
-        : NULL;
+    dependent = derivative ? expr_formal_derivative_dependent(derivative) : NULL;
     if (!derivative || !dependent ||
-        !de_linear_decompose(
-            residual,
-            derivative,
-            &dependent_coefficient,
-            &independent_coefficient))
+        !de_linear_decompose(residual, derivative, &dependent_coefficient, &independent_coefficient))
         goto cleanup;
 
     out = string_new();
-    if (!out ||
-        de_append_differential_term(
-            out, dependent_coefficient, dependent, true) != 0 ||
-        de_append_differential_term(
-            out, independent_coefficient, independent, false) != 0 ||
+    if (!out || de_append_differential_term(out, dependent_coefficient, dependent, true) != 0 ||
+        de_append_differential_term(out, independent_coefficient, independent, false) != 0 ||
         string_append_cstr(out, " = 0") != 0) {
         string_free(out);
         out = NULL;
@@ -706,12 +597,8 @@ static string_t *de_to_tex(const diffequ_t *de)
             return out;
     }
 
-    lhs = de_expr_to_unbound_tex(
-        equ_lhs(de->equation),
-        de->independent_count > 1u || de->partial_derivative_input);
-    rhs = de_expr_to_unbound_tex(
-        equ_rhs(de->equation),
-        de->independent_count > 1u || de->partial_derivative_input);
+    lhs = de_expr_to_unbound_tex(equ_lhs(de->equation), de->independent_count > 1u || de->partial_derivative_input);
+    rhs = de_expr_to_unbound_tex(equ_rhs(de->equation), de->independent_count > 1u || de->partial_derivative_input);
     out = lhs && rhs ? string_sprintf("%s = %s", lhs, rhs) : NULL;
     free(rhs);
     free(lhs);

@@ -1,3 +1,5 @@
+#include <limits.h>
+#include <math.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,11 +26,12 @@ static inline expr_t *expr_math_wrap_binary(const expr_ops_t *ops, const expr_t 
 
 static expr_t *expr_appell_f1_pack(const expr_t *left, const expr_t *right);
 static expr_t *expr_appell_f1_from_packs(const expr_t *params, const expr_t *vars);
+static expr_t *expr_lauricella_f_from_packs(const expr_t *params, const expr_t *vars);
+static expr_t *expr_hypergeometric_pFq_pack(const expr_t *left, const expr_t *right);
+static expr_t *expr_hypergeometric_pFq_from_pack(const expr_t *parameters, const expr_t *argument);
 static expr_t *expr_lommel_s_pack(const expr_t *mu, const expr_t *nu);
-static expr_t *expr_lommel_s_from_pack(const expr_t *parameters,
-                                       const expr_t *argument);
-static expr_t *expr_lommel_s_derivative_from_pack(
-    const expr_t *parameters, const expr_t *argument);
+static expr_t *expr_lommel_s_from_pack(const expr_t *parameters, const expr_t *argument);
+static expr_t *expr_lommel_s_derivative_from_pack(const expr_t *parameters, const expr_t *argument);
 
 static number_t eval_formal_series_component(expr_t *dv)
 {
@@ -39,9 +42,7 @@ static number_t eval_formal_series_component(expr_t *dv)
 static expr_t *deriv_indexed_symbol(expr_t *dv)
 {
     expr_t *index_derivative = expr_get_dx_internal(dv->b);
-    expr_t *out = index_derivative && expr_is_exact_zero(index_derivative)
-        ? expr_new_const(NUM_ZERO)
-        : NULL;
+    expr_t *out = index_derivative && expr_is_exact_zero(index_derivative) ? expr_new_const(NUM_ZERO) : NULL;
 
     expr_free(index_derivative);
     return out;
@@ -50,9 +51,7 @@ static expr_t *deriv_indexed_symbol(expr_t *dv)
 static expr_t *deriv_summation(expr_t *dv)
 {
     expr_t *term_derivative = expr_get_dx_internal(dv->a);
-    expr_t *out = term_derivative
-        ? expr_new_summation(term_derivative, dv->b)
-        : NULL;
+    expr_t *out = term_derivative ? expr_new_summation(term_derivative, dv->b) : NULL;
 
     expr_free(term_derivative);
     return out;
@@ -68,9 +67,7 @@ static expr_t *integrate_summation(const expr_t *expr, const expr_t *wrt)
     integrated_term = expr_integrate(expr->a, wrt);
     if (!integrated_term)
         integrated_term = expr_integral(expr->a, wrt);
-    out = integrated_term
-        ? expr_new_summation(integrated_term, expr->b)
-        : NULL;
+    out = integrated_term ? expr_new_summation(integrated_term, expr->b) : NULL;
     expr_free(integrated_term);
     return out;
 }
@@ -98,994 +95,1440 @@ static expr_t *expr_inverse_lambert_internal(const expr_t *a)
     return out;
 }
 
-const expr_ops_t ops_atan2 = {
-    .eval = eval_atan2, .deriv = deriv_atan2, .reverse = expr_reverse_atan2,
-    .kind = EXPR_KIND_ATAN2, .arity = EXPR_OP_BINARY, .name = "atan2",
-    .tex_name = "\\operatorname{atan2}",
-    .apply_unary = NULL, .apply_binary = expr_atan2,
-    .simplify = expr_simplify_binary_operator, .fold_const_unary = NULL
-};
+const expr_ops_t ops_atan2 = {.eval = eval_atan2,
+                              .deriv = deriv_atan2,
+                              .reverse = expr_reverse_atan2,
+                              .kind = EXPR_KIND_ATAN2,
+                              .arity = EXPR_OP_BINARY,
+                              .name = "atan2",
+                              .tex_name = "\\operatorname{atan2}",
+                              .apply_unary = NULL,
+                              .apply_binary = expr_atan2,
+                              .simplify = expr_simplify_binary_operator,
+                              .fold_const_unary = NULL};
 
-
-const expr_ops_t ops_sin = {
-    .eval = eval_sin, .deriv = deriv_sin, .reverse = expr_reverse_sin,
-    .kind = EXPR_KIND_SIN, .arity = EXPR_OP_UNARY, .name = "sin",
-    .tex_name = "\\sin",
-    .direct_inverse = &ops_asin,
-    .inverse_unary = expr_asin,
-    .apply_unary = expr_sin, .apply_binary = NULL,
-    .integrate = expr_integrate_dispatch_primitive,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = expr_fold_zero_to_zero
-};
-const expr_ops_t ops_cos = {
-    .eval = eval_cos, .deriv = deriv_cos, .reverse = expr_reverse_cos,
-    .kind = EXPR_KIND_COS, .arity = EXPR_OP_UNARY, .name = "cos",
-    .tex_name = "\\cos",
-    .direct_inverse = &ops_acos,
-    .inverse_unary = expr_acos,
-    .apply_unary = expr_cos, .apply_binary = NULL,
-    .integrate = expr_integrate_dispatch_primitive,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = expr_fold_cos_const
-};
-const expr_ops_t ops_tan = {
-    .eval = eval_tan, .deriv = deriv_tan, .reverse = expr_reverse_tan,
-    .kind = EXPR_KIND_TAN, .arity = EXPR_OP_UNARY, .name = "tan",
-    .tex_name = "\\tan",
-    .direct_inverse = &ops_atan,
-    .inverse_unary = expr_atan,
-    .apply_unary = expr_tan, .apply_binary = NULL,
-    .integrate = expr_integrate_dispatch_primitive,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = expr_fold_zero_to_zero
-};
-const expr_ops_t ops_sec = {
-    .eval = eval_sec, .deriv = deriv_sec, .reverse = expr_reverse_sec,
-    .kind = EXPR_KIND_SEC, .arity = EXPR_OP_UNARY, .name = "sec",
-    .tex_name = "\\sec",
-    .direct_inverse = &ops_asec,
-    .inverse_unary = expr_asec,
-    .apply_unary = expr_sec, .apply_binary = NULL,
-    .integrate = expr_integrate_dispatch_primitive,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_cosec = {
-    .eval = eval_cosec, .deriv = deriv_cosec, .reverse = expr_reverse_cosec,
-    .kind = EXPR_KIND_COSEC, .arity = EXPR_OP_UNARY, .name = "cosec",
-    .tex_name = "\\operatorname{cosec}",
-    .direct_inverse = &ops_acosec,
-    .inverse_unary = expr_acosec,
-    .apply_unary = expr_cosec, .apply_binary = NULL,
-    .integrate = expr_integrate_dispatch_primitive,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_cot = {
-    .eval = eval_cot, .deriv = deriv_cot, .reverse = expr_reverse_cot,
-    .kind = EXPR_KIND_COT, .arity = EXPR_OP_UNARY, .name = "cot",
-    .tex_name = "\\cot",
-    .direct_inverse = &ops_acot,
-    .inverse_unary = expr_acot,
-    .apply_unary = expr_cot, .apply_binary = NULL,
-    .integrate = expr_integrate_dispatch_primitive,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_versin = {
-    .eval = eval_versin, .deriv = deriv_versin, .reverse = expr_reverse_versin,
-    .kind = EXPR_KIND_VERSIN, .arity = EXPR_OP_UNARY, .name = "versin",
-    .tex_name = "\\operatorname{versin}",
-    .direct_inverse = &ops_arcversin,
-    .inverse_unary = expr_arcversin,
-    .apply_unary = expr_versin, .apply_binary = NULL,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_vercos = {
-    .eval = eval_vercos, .deriv = deriv_vercos, .reverse = expr_reverse_vercos,
-    .kind = EXPR_KIND_VERCOS, .arity = EXPR_OP_UNARY, .name = "vercos",
-    .tex_name = "\\operatorname{vercos}",
-    .direct_inverse = &ops_arcvercos,
-    .inverse_unary = expr_arcvercos,
-    .apply_unary = expr_vercos, .apply_binary = NULL,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_coversin = {
-    .eval = eval_coversin, .deriv = deriv_coversin, .reverse = expr_reverse_coversin,
-    .kind = EXPR_KIND_COVERSIN, .arity = EXPR_OP_UNARY, .name = "coversin",
-    .tex_name = "\\operatorname{coversin}",
-    .direct_inverse = &ops_arccoversin,
-    .inverse_unary = expr_arccoversin,
-    .apply_unary = expr_coversin, .apply_binary = NULL,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_covercos = {
-    .eval = eval_covercos, .deriv = deriv_covercos, .reverse = expr_reverse_covercos,
-    .kind = EXPR_KIND_COVERCOS, .arity = EXPR_OP_UNARY, .name = "covercos",
-    .tex_name = "\\operatorname{covercos}",
-    .direct_inverse = &ops_arccovercos,
-    .inverse_unary = expr_arccovercos,
-    .apply_unary = expr_covercos, .apply_binary = NULL,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_haversin = {
-    .eval = eval_haversin, .deriv = deriv_haversin, .reverse = expr_reverse_haversin,
-    .kind = EXPR_KIND_HAVERSIN, .arity = EXPR_OP_UNARY, .name = "haversin",
-    .tex_name = "\\operatorname{haversin}",
-    .direct_inverse = &ops_archaversin,
-    .inverse_unary = expr_archaversin,
-    .apply_unary = expr_haversin, .apply_binary = NULL,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_havercos = {
-    .eval = eval_havercos, .deriv = deriv_havercos, .reverse = expr_reverse_havercos,
-    .kind = EXPR_KIND_HAVERCOS, .arity = EXPR_OP_UNARY, .name = "havercos",
-    .tex_name = "\\operatorname{havercos}",
-    .direct_inverse = &ops_archavercos,
-    .inverse_unary = expr_archavercos,
-    .apply_unary = expr_havercos, .apply_binary = NULL,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_hacoversin = {
-    .eval = eval_hacoversin, .deriv = deriv_hacoversin, .reverse = expr_reverse_hacoversin,
-    .kind = EXPR_KIND_HACOVERSIN, .arity = EXPR_OP_UNARY, .name = "hacoversin",
-    .tex_name = "\\operatorname{hacoversin}",
-    .direct_inverse = &ops_archacoversin,
-    .inverse_unary = expr_archacoversin,
-    .apply_unary = expr_hacoversin, .apply_binary = NULL,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_hacovercos = {
-    .eval = eval_hacovercos, .deriv = deriv_hacovercos, .reverse = expr_reverse_hacovercos,
-    .kind = EXPR_KIND_HACOVERCOS, .arity = EXPR_OP_UNARY, .name = "hacovercos",
-    .tex_name = "\\operatorname{hacovercos}",
-    .direct_inverse = &ops_archacovercos,
-    .inverse_unary = expr_archacovercos,
-    .apply_unary = expr_hacovercos, .apply_binary = NULL,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_sinh = {
-    .eval = eval_sinh, .deriv = deriv_sinh, .reverse = expr_reverse_sinh,
-    .kind = EXPR_KIND_SINH, .arity = EXPR_OP_UNARY, .name = "sinh",
-    .tex_name = "\\sinh",
-    .direct_inverse = &ops_asinh,
-    .inverse_unary = expr_asinh,
-    .apply_unary = expr_sinh, .apply_binary = NULL,
-    .integrate = expr_integrate_dispatch_primitive,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_cosh = {
-    .eval = eval_cosh, .deriv = deriv_cosh, .reverse = expr_reverse_cosh,
-    .kind = EXPR_KIND_COSH, .arity = EXPR_OP_UNARY, .name = "cosh",
-    .tex_name = "\\cosh",
-    .direct_inverse = &ops_acosh,
-    .inverse_unary = expr_acosh,
-    .apply_unary = expr_cosh, .apply_binary = NULL,
-    .integrate = expr_integrate_dispatch_primitive,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_tanh = {
-    .eval = eval_tanh, .deriv = deriv_tanh, .reverse = expr_reverse_tanh,
-    .kind = EXPR_KIND_TANH, .arity = EXPR_OP_UNARY, .name = "tanh",
-    .tex_name = "\\tanh",
-    .direct_inverse = &ops_atanh,
-    .inverse_unary = expr_atanh,
-    .apply_unary = expr_tanh, .apply_binary = NULL,
-    .integrate = expr_integrate_dispatch_primitive,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_sech = {
-    .eval = eval_sech, .deriv = deriv_sech, .reverse = expr_reverse_sech,
-    .kind = EXPR_KIND_SECH, .arity = EXPR_OP_UNARY, .name = "sech",
-    .tex_name = "\\operatorname{sech}",
-    .direct_inverse = &ops_asech,
-    .inverse_unary = expr_asech,
-    .apply_unary = expr_sech, .apply_binary = NULL,
-    .integrate = expr_integrate_dispatch_primitive,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_cosech = {
-    .eval = eval_cosech, .deriv = deriv_cosech, .reverse = expr_reverse_cosech,
-    .kind = EXPR_KIND_COSECH, .arity = EXPR_OP_UNARY, .name = "cosech",
-    .tex_name = "\\operatorname{cosech}",
-    .direct_inverse = &ops_acosech,
-    .inverse_unary = expr_acosech,
-    .apply_unary = expr_cosech, .apply_binary = NULL,
-    .integrate = expr_integrate_dispatch_primitive,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_coth = {
-    .eval = eval_coth, .deriv = deriv_coth, .reverse = expr_reverse_coth,
-    .kind = EXPR_KIND_COTH, .arity = EXPR_OP_UNARY, .name = "coth",
-    .tex_name = "\\coth",
-    .direct_inverse = &ops_acoth,
-    .inverse_unary = expr_acoth,
-    .apply_unary = expr_coth, .apply_binary = NULL,
-    .integrate = expr_integrate_dispatch_primitive,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_asin = {
-    .eval = eval_asin, .deriv = deriv_asin, .reverse = expr_reverse_asin,
-    .kind = EXPR_KIND_ASIN, .arity = EXPR_OP_UNARY, .name = "asin",
-    .tex_name = "\\sin^{-1}",
-    .inverse_unary = expr_sin,
-    .apply_unary = expr_asin, .apply_binary = NULL,
-    .integrate = expr_integrate_dispatch_primitive,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = expr_fold_asin_const
-};
-const expr_ops_t ops_acos = {
-    .eval = eval_acos, .deriv = deriv_acos, .reverse = expr_reverse_acos,
-    .kind = EXPR_KIND_ACOS, .arity = EXPR_OP_UNARY, .name = "acos",
-    .tex_name = "\\cos^{-1}",
-    .inverse_unary = expr_cos,
-    .apply_unary = expr_acos, .apply_binary = NULL,
-    .integrate = expr_integrate_dispatch_primitive,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = expr_fold_acos_const
-};
-const expr_ops_t ops_atan = {
-    .eval = eval_atan, .deriv = deriv_atan, .reverse = expr_reverse_atan,
-    .kind = EXPR_KIND_ATAN, .arity = EXPR_OP_UNARY, .name = "atan",
-    .tex_name = "\\arctan",
-    .inverse_unary = expr_tan,
-    .apply_unary = expr_atan, .apply_binary = NULL,
-    .integrate = expr_integrate_dispatch_primitive,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = expr_fold_atan_const
-};
-const expr_ops_t ops_asec = {
-    .eval = eval_asec, .deriv = deriv_asec, .reverse = expr_reverse_asec,
-    .kind = EXPR_KIND_ASEC, .arity = EXPR_OP_UNARY, .name = "asec",
-    .tex_name = "\\sec^{-1}",
-    .inverse_unary = expr_sec,
-    .apply_unary = expr_asec, .apply_binary = NULL,
-    .integrate = expr_integrate_dispatch_primitive,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = expr_fold_asec_const
-};
-const expr_ops_t ops_acosec = {
-    .eval = eval_acosec, .deriv = deriv_acosec, .reverse = expr_reverse_acosec,
-    .kind = EXPR_KIND_ACOSEC, .arity = EXPR_OP_UNARY, .name = "acosec",
-    .tex_name = "\\operatorname{cosec}^{-1}",
-    .inverse_unary = expr_cosec,
-    .apply_unary = expr_acosec, .apply_binary = NULL,
-    .integrate = expr_integrate_dispatch_primitive,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = expr_fold_acosec_const
-};
-const expr_ops_t ops_acot = {
-    .eval = eval_acot, .deriv = deriv_acot, .reverse = expr_reverse_acot,
-    .kind = EXPR_KIND_ACOT, .arity = EXPR_OP_UNARY, .name = "acot",
-    .tex_name = "\\cot^{-1}",
-    .inverse_unary = expr_cot,
-    .apply_unary = expr_acot, .apply_binary = NULL,
-    .integrate = expr_integrate_dispatch_primitive,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = expr_fold_acot_const
-};
-const expr_ops_t ops_arcversin = {
-    .eval = eval_arcversin, .deriv = deriv_arcversin, .reverse = expr_reverse_arcversin,
-    .kind = EXPR_KIND_ARCVERSIN, .arity = EXPR_OP_UNARY, .name = "arcversin",
-    .tex_name = "\\operatorname{arcversin}",
-    .inverse_unary = expr_versin,
-    .apply_unary = expr_arcversin, .apply_binary = NULL,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_arcvercos = {
-    .eval = eval_arcvercos, .deriv = deriv_arcvercos, .reverse = expr_reverse_arcvercos,
-    .kind = EXPR_KIND_ARCVERCOS, .arity = EXPR_OP_UNARY, .name = "arcvercos",
-    .tex_name = "\\operatorname{arcvercos}",
-    .inverse_unary = expr_vercos,
-    .apply_unary = expr_arcvercos, .apply_binary = NULL,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_arccoversin = {
-    .eval = eval_arccoversin, .deriv = deriv_arccoversin, .reverse = expr_reverse_arccoversin,
-    .kind = EXPR_KIND_ARCCOVERSIN, .arity = EXPR_OP_UNARY, .name = "arccoversin",
-    .tex_name = "\\operatorname{arccoversin}",
-    .inverse_unary = expr_coversin,
-    .apply_unary = expr_arccoversin, .apply_binary = NULL,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_arccovercos = {
-    .eval = eval_arccovercos, .deriv = deriv_arccovercos, .reverse = expr_reverse_arccovercos,
-    .kind = EXPR_KIND_ARCCOVERCOS, .arity = EXPR_OP_UNARY, .name = "arccovercos",
-    .tex_name = "\\operatorname{arccovercos}",
-    .inverse_unary = expr_covercos,
-    .apply_unary = expr_arccovercos, .apply_binary = NULL,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_archaversin = {
-    .eval = eval_archaversin, .deriv = deriv_archaversin, .reverse = expr_reverse_archaversin,
-    .kind = EXPR_KIND_ARCHAVERSIN, .arity = EXPR_OP_UNARY, .name = "archaversin",
-    .tex_name = "\\operatorname{archaversin}",
-    .inverse_unary = expr_haversin,
-    .apply_unary = expr_archaversin, .apply_binary = NULL,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_archavercos = {
-    .eval = eval_archavercos, .deriv = deriv_archavercos, .reverse = expr_reverse_archavercos,
-    .kind = EXPR_KIND_ARCHAVERCOS, .arity = EXPR_OP_UNARY, .name = "archavercos",
-    .tex_name = "\\operatorname{archavercos}",
-    .inverse_unary = expr_havercos,
-    .apply_unary = expr_archavercos, .apply_binary = NULL,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_archacoversin = {
-    .eval = eval_archacoversin, .deriv = deriv_archacoversin, .reverse = expr_reverse_archacoversin,
-    .kind = EXPR_KIND_ARCHACOVERSIN, .arity = EXPR_OP_UNARY, .name = "archacoversin",
-    .tex_name = "\\operatorname{archacoversin}",
-    .inverse_unary = expr_hacoversin,
-    .apply_unary = expr_archacoversin, .apply_binary = NULL,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_archacovercos = {
-    .eval = eval_archacovercos, .deriv = deriv_archacovercos, .reverse = expr_reverse_archacovercos,
-    .kind = EXPR_KIND_ARCHACOVERCOS, .arity = EXPR_OP_UNARY, .name = "archacovercos",
-    .tex_name = "\\operatorname{archacovercos}",
-    .inverse_unary = expr_hacovercos,
-    .apply_unary = expr_archacovercos, .apply_binary = NULL,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_asinh = {
-    .eval = eval_asinh, .deriv = deriv_asinh, .reverse = expr_reverse_asinh,
-    .kind = EXPR_KIND_ASINH, .arity = EXPR_OP_UNARY, .name = "asinh",
-    .tex_name = "\\sinh^{-1}",
-    .inverse_unary = expr_sinh,
-    .apply_unary = expr_asinh, .apply_binary = NULL,
-    .integrate = expr_integrate_dispatch_primitive,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_acosh = {
-    .eval = eval_acosh, .deriv = deriv_acosh, .reverse = expr_reverse_acosh,
-    .kind = EXPR_KIND_ACOSH, .arity = EXPR_OP_UNARY, .name = "acosh",
-    .tex_name = "\\cosh^{-1}",
-    .inverse_unary = expr_cosh,
-    .apply_unary = expr_acosh, .apply_binary = NULL,
-    .integrate = expr_integrate_dispatch_primitive,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_atanh = {
-    .eval = eval_atanh, .deriv = deriv_atanh, .reverse = expr_reverse_atanh,
-    .kind = EXPR_KIND_ATANH, .arity = EXPR_OP_UNARY, .name = "atanh",
-    .tex_name = "\\tanh^{-1}",
-    .inverse_unary = expr_tanh,
-    .apply_unary = expr_atanh, .apply_binary = NULL,
-    .integrate = expr_integrate_dispatch_primitive,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_asech = {
-    .eval = eval_asech, .deriv = deriv_asech, .reverse = expr_reverse_asech,
-    .kind = EXPR_KIND_ASECH, .arity = EXPR_OP_UNARY, .name = "asech",
-    .tex_name = "\\operatorname{sech}^{-1}",
-    .inverse_unary = expr_sech,
-    .apply_unary = expr_asech, .apply_binary = NULL,
-    .integrate = expr_integrate_dispatch_primitive,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_acosech = {
-    .eval = eval_acosech, .deriv = deriv_acosech, .reverse = expr_reverse_acosech,
-    .kind = EXPR_KIND_ACOSECH, .arity = EXPR_OP_UNARY, .name = "acosech",
-    .tex_name = "\\operatorname{cosech}^{-1}",
-    .inverse_unary = expr_cosech,
-    .apply_unary = expr_acosech, .apply_binary = NULL,
-    .integrate = expr_integrate_dispatch_primitive,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_acoth = {
-    .eval = eval_acoth, .deriv = deriv_acoth, .reverse = expr_reverse_acoth,
-    .kind = EXPR_KIND_ACOTH, .arity = EXPR_OP_UNARY, .name = "acoth",
-    .tex_name = "\\coth^{-1}",
-    .inverse_unary = expr_coth,
-    .apply_unary = expr_acoth, .apply_binary = NULL,
-    .integrate = expr_integrate_dispatch_primitive,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_exp = {
-    .eval = eval_exp, .deriv = deriv_exp, .reverse = expr_reverse_exp,
-    .kind = EXPR_KIND_EXP, .arity = EXPR_OP_UNARY, .name = "exp",
-    .tex_name = "\\exp",
-    .direct_inverse = &ops_log,
-    .inverse_unary = expr_log,
-    .apply_unary = expr_exp, .apply_binary = NULL,
-    .integrate = expr_integrate_dispatch_primitive,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = expr_fold_exp_const
-};
-const expr_ops_t ops_log = {
-    .eval = eval_log, .deriv = deriv_log, .reverse = expr_reverse_log,
-    .kind = EXPR_KIND_LOG, .arity = EXPR_OP_UNARY, .name = "ln",
-    .tex_name = "\\ln",
-    .direct_inverse = &ops_exp,
-    .inverse_unary = expr_exp,
-    .apply_unary = expr_log, .apply_binary = NULL,
-    .integrate = expr_integrate_dispatch_primitive,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = expr_fold_log_const
-};
-const expr_ops_t ops_log10 = {
-    .eval = eval_log10, .deriv = deriv_log10, .reverse = expr_reverse_log10,
-    .kind = EXPR_KIND_LOG10, .arity = EXPR_OP_UNARY, .name = "log",
-    .tex_name = "\\log",
-    .inverse_unary = expr_inverse_log10_internal,
-    .apply_unary = expr_log10, .apply_binary = NULL,
-    .integrate = expr_integrate_dispatch_primitive,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_sqrt = {
-    .eval = eval_sqrt, .deriv = deriv_sqrt, .reverse = expr_reverse_sqrt,
-    .kind = EXPR_KIND_SQRT, .arity = EXPR_OP_UNARY, .name = "sqrt",
-    .tex_name = "\\sqrt",
-    .inverse_unary = expr_inverse_sqrt_internal,
-    .apply_unary = expr_sqrt, .apply_binary = NULL,
-    .integrate = expr_integrate_dispatch_primitive,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = expr_fold_sqrt_const
-};
-const expr_ops_t ops_floor = {
-    .eval = eval_floor, .deriv = deriv_floor, .reverse = expr_reverse_floor,
-    .kind = EXPR_KIND_FLOOR, .arity = EXPR_OP_UNARY, .name = "floor",
-    .tex_name = "\\lfloor",
-    .apply_unary = expr_floor, .apply_binary = NULL,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = expr_fold_floor_const
-};
-const expr_ops_t ops_ceil = {
-    .eval = eval_ceil, .deriv = deriv_ceil, .reverse = expr_reverse_ceil,
-    .kind = EXPR_KIND_CEIL, .arity = EXPR_OP_UNARY, .name = "ceil",
-    .tex_name = "\\lceil",
-    .apply_unary = expr_ceil, .apply_binary = NULL,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_abs = {
-    .eval = eval_abs, .deriv = deriv_abs, .reverse = expr_reverse_abs,
-    .kind = EXPR_KIND_ABS, .arity = EXPR_OP_UNARY, .name = "abs",
-    .tex_name = NULL,
-    .apply_unary = expr_abs, .apply_binary = NULL,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_erf = {
-    .eval = eval_erf, .deriv = deriv_erf, .reverse = expr_reverse_erf,
-    .kind = EXPR_KIND_ERF, .arity = EXPR_OP_UNARY, .name = "erf",
-    .tex_name = "\\operatorname{erf}",
-    .direct_inverse = &ops_erfinv,
-    .inverse_unary = expr_erfinv,
-    .apply_unary = expr_erf, .apply_binary = NULL,
-    .integrate = expr_integrate_dispatch_primitive,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = expr_fold_erf_const
-};
-const expr_ops_t ops_erfc = {
-    .eval = eval_erfc, .deriv = deriv_erfc, .reverse = expr_reverse_erfc,
-    .kind = EXPR_KIND_ERFC, .arity = EXPR_OP_UNARY, .name = "erfc",
-    .tex_name = "\\operatorname{erfc}",
-    .direct_inverse = &ops_erfcinv,
-    .inverse_unary = expr_erfcinv,
-    .apply_unary = expr_erfc, .apply_binary = NULL,
-    .integrate = expr_integrate_dispatch_primitive,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = expr_fold_erfc_const
-};
-const expr_ops_t ops_lgamma = {
-    .eval = eval_lgamma, .deriv = deriv_lgamma, .reverse = expr_reverse_lgamma,
-    .kind = EXPR_KIND_LGAMMA, .arity = EXPR_OP_UNARY, .name = "lgamma",
-    .tex_name = "\\log\\Gamma",
-    .apply_unary = expr_lgamma, .apply_binary = NULL,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_hypot = {
-    .eval = eval_hypot, .deriv = deriv_hypot, .reverse = expr_reverse_hypot,
-    .kind = EXPR_KIND_HYPOT, .arity = EXPR_OP_BINARY, .name = "hypot",
-    .tex_name = "\\operatorname{hypot}",
-    .apply_unary = NULL, .apply_binary = expr_hypot,
-    .simplify = expr_simplify_hypot_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_erfinv = {
-    .eval = eval_erfinv, .deriv = deriv_erfinv, .reverse = expr_reverse_erfinv,
-    .kind = EXPR_KIND_ERFINV, .arity = EXPR_OP_UNARY, .name = "erfinv",
-    .tex_name = "\\operatorname{erf}^{-1}",
-    .inverse_unary = expr_erf,
-    .apply_unary = expr_erfinv, .apply_binary = NULL,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_erfcinv = {
-    .eval = eval_erfcinv, .deriv = deriv_erfcinv, .reverse = expr_reverse_erfcinv,
-    .kind = EXPR_KIND_ERFCINV, .arity = EXPR_OP_UNARY, .name = "erfcinv",
-    .tex_name = "\\operatorname{erfc}^{-1}",
-    .inverse_unary = expr_erfc,
-    .apply_unary = expr_erfcinv, .apply_binary = NULL,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_gamma = {
-    .eval = eval_gamma, .deriv = deriv_gamma, .reverse = expr_reverse_gamma,
-    .kind = EXPR_KIND_GAMMA, .arity = EXPR_OP_UNARY, .name = "gamma",
-    .tex_name = "\\Gamma",
-    .direct_inverse = &ops_gammainv,
-    .inverse_unary = expr_gammainv,
-    .apply_unary = expr_gamma, .apply_binary = NULL,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_digamma = {
-    .eval = eval_digamma, .deriv = deriv_digamma, .reverse = expr_reverse_digamma,
-    .kind = EXPR_KIND_DIGAMMA, .arity = EXPR_OP_UNARY, .name = "digamma",
-    .tex_name = "\\psi^{(0)}",
-    .apply_unary = expr_digamma, .apply_binary = NULL,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_trigamma = {
-    .eval = eval_trigamma, .deriv = deriv_trigamma, .reverse = expr_reverse_trigamma,
-    .kind = EXPR_KIND_TRIGAMMA, .arity = EXPR_OP_UNARY, .name = "trigamma",
-    .tex_name = "\\psi^{(1)}",
-    .apply_unary = expr_trigamma, .apply_binary = NULL,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_polygamma = {
-    .eval = eval_polygamma, .deriv = deriv_polygamma, .reverse = expr_reverse_polygamma,
-    .kind = EXPR_KIND_POLYGAMMA, .arity = EXPR_OP_BINARY, .name = "polygamma",
-    .tex_name = "\\psi",
-    .apply_unary = NULL, .apply_binary = expr_polygamma_xp,
-    .simplify = expr_simplify_binary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_dilog = {
-    .eval = eval_dilog, .deriv = deriv_dilog, .reverse = expr_reverse_dilog,
-    .kind = EXPR_KIND_DILOG, .arity = EXPR_OP_UNARY, .name = "dilog",
-    .tex_name = "\\operatorname{Li}_{2}",
-    .apply_unary = expr_dilog, .apply_binary = NULL,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_polylog = {
-    .eval = eval_polylog, .deriv = deriv_polylog, .reverse = expr_reverse_polylog,
-    .kind = EXPR_KIND_POLYLOG, .arity = EXPR_OP_BINARY, .name = "polylog",
-    .tex_name = "\\operatorname{Li}",
-    .apply_unary = NULL, .apply_binary = expr_polylog_xp,
-    .simplify = expr_simplify_binary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_legendre_chi = {
-    .eval = eval_legendre_chi, .deriv = deriv_legendre_chi,
-    .reverse = expr_reverse_legendre_chi,
-    .kind = EXPR_KIND_LEGENDRE_CHI, .arity = EXPR_OP_BINARY,
-    .name = "legendre_chi", .tex_name = "\\chi",
-    .apply_unary = NULL, .apply_binary = expr_legendre_chi_xp,
-    .simplify = expr_simplify_binary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_bessel_j = {
-    .eval = eval_bessel_j, .deriv = deriv_bessel_j, .reverse = NULL,
-    .kind = EXPR_KIND_BESSEL_J, .arity = EXPR_OP_BINARY,
-    .name = "BesselJ", .tex_name = "J",
-    .apply_unary = NULL, .apply_binary = expr_bessel_j,
-    .simplify = expr_simplify_binary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_bessel_y = {
-    .eval = eval_bessel_y, .deriv = deriv_bessel_y, .reverse = NULL,
-    .kind = EXPR_KIND_BESSEL_Y, .arity = EXPR_OP_BINARY,
-    .name = "BesselY", .tex_name = "Y",
-    .apply_unary = NULL, .apply_binary = expr_bessel_y,
-    .simplify = expr_simplify_binary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_lommel_s = {
-    .eval = eval_lommel_s, .deriv = deriv_lommel_s, .reverse = NULL,
-    .kind = EXPR_KIND_LOMMEL_S, .arity = EXPR_OP_BINARY,
-    .name = "LommelS", .tex_name = "s",
-    .apply_unary = NULL, .apply_binary = expr_lommel_s_from_pack,
-    .simplify = expr_simplify_rebuild_binary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_lommel_s_derivative = {
-    .eval = eval_lommel_s_derivative,
-    .deriv = deriv_lommel_s_derivative,
-    .reverse = NULL,
-    .kind = EXPR_KIND_LOMMEL_S_DERIVATIVE,
-    .arity = EXPR_OP_BINARY,
-    .name = "LommelSPrime",
-    .tex_name = "s'",
-    .apply_unary = NULL,
-    .apply_binary = expr_lommel_s_derivative_from_pack,
-    .simplify = expr_simplify_rebuild_binary_operator,
-    .fold_const_unary = NULL
-};
-const expr_ops_t ops_lommel_s_pack = {
-    .eval = eval_lommel_s_pack, .deriv = deriv_lommel_s_pack, .reverse = NULL,
-    .kind = EXPR_KIND_LOMMEL_S_PACK, .arity = EXPR_OP_BINARY,
-    .diff_kind = EXPR_DIFF_NONE,
-    .name = "lommel_s_pack", .tex_name = "\\operatorname{pack}",
-    .apply_unary = NULL, .apply_binary = expr_lommel_s_pack,
-    .simplify = expr_simplify_rebuild_binary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_appell_f1 = {
-    .eval = eval_appell_f1, .deriv = deriv_appell_f1, .reverse = NULL,
-    .kind = EXPR_KIND_APPELL_F1, .arity = EXPR_OP_BINARY,
-    .name = "appell_f1", .tex_name = "\\operatorname{F}_{1}",
-    .apply_unary = NULL, .apply_binary = expr_appell_f1_from_packs,
-    .simplify = expr_simplify_rebuild_binary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_appell_f1_pack = {
-    .eval = eval_appell_f1_pack, .deriv = deriv_appell_f1_pack, .reverse = NULL,
-    .kind = EXPR_KIND_APPELL_F1_PACK, .arity = EXPR_OP_BINARY,
-    .diff_kind = EXPR_DIFF_NONE,
-    .name = "appell_f1_pack", .tex_name = "\\operatorname{pack}",
-    .apply_unary = NULL, .apply_binary = expr_appell_f1_pack,
-    .simplify = expr_simplify_rebuild_binary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_gammainv = {
-    .eval = eval_gammainv, .deriv = deriv_gammainv, .reverse = expr_reverse_gammainv,
-    .kind = EXPR_KIND_GAMMAINV, .arity = EXPR_OP_UNARY, .name = "gammainv",
-    .tex_name = "\\Gamma^{-1}",
-    .inverse_unary = expr_gamma,
-    .apply_unary = expr_gammainv, .apply_binary = NULL,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_lambert_w = {
-    .eval = eval_lambert_w, .deriv = deriv_lambert_w, .reverse = expr_reverse_lambert_w,
-    .kind = EXPR_KIND_LAMBERT_W, .arity = EXPR_OP_UNARY, .name = "W",
-    .tex_name = "W",
-    .inverse_unary = expr_inverse_lambert_internal,
-    .apply_unary = expr_lambert_w, .apply_binary = NULL,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_lambert_wn = {
-    .eval = eval_lambert_wn, .deriv = deriv_lambert_wn, .reverse = expr_reverse_lambert_wn,
-    .kind = EXPR_KIND_LAMBERT_WN, .arity = EXPR_OP_BINARY, .name = "Wₙ",
-    .tex_name = "W",
-    .apply_unary = NULL, .apply_binary = expr_lambert_wn_xp,
-    .simplify = expr_simplify_binary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_lambert_w0 = {
-    .eval = eval_lambert_w0, .deriv = deriv_lambert_w0, .reverse = expr_reverse_lambert_w0,
-    .kind = EXPR_KIND_LAMBERT_W0, .arity = EXPR_OP_UNARY, .name = "W₀",
-    .tex_name = "W_{0}",
-    .inverse_unary = expr_inverse_lambert_internal,
-    .apply_unary = expr_lambert_w0, .apply_binary = NULL,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_lambert_wm1 = {
-    .eval = eval_lambert_wm1, .deriv = deriv_lambert_wm1, .reverse = expr_reverse_lambert_wm1,
-    .kind = EXPR_KIND_LAMBERT_WM1, .arity = EXPR_OP_UNARY, .name = "W₋₁",
-    .tex_name = "W_{-1}",
-    .inverse_unary = expr_inverse_lambert_internal,
-    .apply_unary = expr_lambert_wm1, .apply_binary = NULL,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_normal_pdf = {
-    .eval = eval_normal_pdf, .deriv = deriv_normal_pdf, .reverse = expr_reverse_normal_pdf,
-    .kind = EXPR_KIND_NORMAL_PDF, .arity = EXPR_OP_UNARY, .name = "normal_pdf",
-    .tex_name = "\\operatorname{normal\\_pdf}",
-    .apply_unary = expr_normal_pdf, .apply_binary = NULL,
-    .integrate = expr_integrate_dispatch_primitive,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_normal_cdf = {
-    .eval = eval_normal_cdf, .deriv = deriv_normal_cdf, .reverse = expr_reverse_normal_cdf,
-    .kind = EXPR_KIND_NORMAL_CDF, .arity = EXPR_OP_UNARY, .name = "normal_cdf",
-    .tex_name = "\\operatorname{normal\\_cdf}",
-    .apply_unary = expr_normal_cdf, .apply_binary = NULL,
-    .integrate = expr_integrate_dispatch_primitive,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_normal_logpdf = {
-    .eval = eval_normal_logpdf, .deriv = deriv_normal_logpdf, .reverse = expr_reverse_normal_logpdf,
-    .kind = EXPR_KIND_NORMAL_LOGPDF, .arity = EXPR_OP_UNARY, .name = "normal_logpdf",
-    .tex_name = "\\operatorname{normal\\_logpdf}",
-    .apply_unary = expr_normal_logpdf, .apply_binary = NULL,
-    .integrate = expr_integrate_dispatch_primitive,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_pdf = {
-    .eval = eval_normal_pdf, .deriv = deriv_pdf, .reverse = expr_reverse_normal_pdf,
-    .kind = EXPR_KIND_NORMAL_PDF, .arity = EXPR_OP_UNARY, .name = "pdf",
-    .tex_name = "\\operatorname{pdf}",
-    .apply_unary = expr_pdf, .apply_binary = NULL,
-    .integrate = expr_integrate_dispatch_primitive,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_cdf = {
-    .eval = eval_normal_cdf, .deriv = deriv_cdf, .reverse = expr_reverse_normal_cdf,
-    .kind = EXPR_KIND_NORMAL_CDF, .arity = EXPR_OP_UNARY, .name = "cdf",
-    .tex_name = "\\operatorname{cdf}",
-    .apply_unary = expr_cdf, .apply_binary = NULL,
-    .integrate = expr_integrate_dispatch_primitive,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_logpdf = {
-    .eval = eval_normal_logpdf, .deriv = deriv_logpdf, .reverse = expr_reverse_normal_logpdf,
-    .kind = EXPR_KIND_NORMAL_LOGPDF, .arity = EXPR_OP_UNARY, .name = "logpdf",
-    .tex_name = "\\operatorname{logpdf}",
-    .apply_unary = expr_logpdf, .apply_binary = NULL,
-    .integrate = expr_integrate_dispatch_primitive,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_ei = {
-    .eval = eval_ei, .deriv = deriv_ei, .reverse = expr_reverse_ei,
-    .kind = EXPR_KIND_EI, .arity = EXPR_OP_UNARY, .name = "Ei",
-    .tex_name = "\\operatorname{Ei}",
-    .apply_unary = expr_ei, .apply_binary = NULL,
-    .integrate = expr_integrate_dispatch_primitive,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_e1 = {
-    .eval = eval_e1, .deriv = deriv_e1, .reverse = expr_reverse_e1,
-    .kind = EXPR_KIND_E1, .arity = EXPR_OP_UNARY, .name = "E1",
-    .tex_name = "\\operatorname{E1}",
-    .apply_unary = expr_e1, .apply_binary = NULL,
-    .integrate = expr_integrate_dispatch_primitive,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_beta = {
-    .eval = eval_beta, .deriv = deriv_beta, .reverse = expr_reverse_beta,
-    .kind = EXPR_KIND_BETA, .arity = EXPR_OP_BINARY, .name = "beta",
-    .tex_name = "\\operatorname{beta}",
-    .apply_unary = NULL, .apply_binary = expr_beta,
-    .simplify = expr_simplify_binary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_indexed_symbol = {
-    .eval = eval_formal_series_component,
-    .deriv = deriv_indexed_symbol,
-    .reverse = expr_reverse_not_differentiable,
-    .kind = EXPR_KIND_INDEXED_SYMBOL,
-    .arity = EXPR_OP_BINARY,
-    .name = "indexed",
-    .tex_name = NULL,
-    .apply_unary = NULL,
-    .apply_binary = NULL,
-    .simplify = expr_simplify_binary_operator,
-    .fold_const_unary = NULL
-};
-const expr_ops_t ops_summation = {
-    .eval = eval_formal_series_component,
-    .deriv = deriv_summation,
-    .reverse = expr_reverse_not_differentiable,
-    .kind = EXPR_KIND_SUMMATION,
-    .arity = EXPR_OP_BINARY,
-    .name = "sum",
-    .tex_name = NULL,
-    .apply_unary = NULL,
-    .apply_binary = NULL,
-    .integrate = integrate_summation,
-    .simplify = expr_simplify_binary_operator,
-    .fold_const_unary = NULL
-};
-const expr_ops_t ops_logbeta = {
-    .eval = eval_logbeta, .deriv = deriv_logbeta, .reverse = expr_reverse_logbeta,
-    .kind = EXPR_KIND_LOGBETA, .arity = EXPR_OP_BINARY, .name = "logbeta",
-    .tex_name = "\\operatorname{logbeta}",
-    .apply_unary = NULL, .apply_binary = expr_logbeta,
-    .simplify = expr_simplify_binary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_gammainc_lower = {
-    .eval = eval_gammainc_lower, .deriv = deriv_gammainc_lower, .reverse = expr_reverse_gammainc_lower,
-    .kind = EXPR_KIND_GAMMAINC_LOWER, .arity = EXPR_OP_BINARY, .name = "gammainc_lower",
-    .tex_name = "\\gamma",
-    .apply_unary = NULL, .apply_binary = expr_gammainc_lower,
-    .simplify = expr_simplify_binary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_gammainc_upper = {
-    .eval = eval_gammainc_upper, .deriv = deriv_gammainc_upper, .reverse = expr_reverse_gammainc_upper,
-    .kind = EXPR_KIND_GAMMAINC_UPPER, .arity = EXPR_OP_BINARY, .name = "gammainc_upper",
-    .tex_name = "\\Gamma",
-    .apply_unary = NULL, .apply_binary = expr_gammainc_upper,
-    .simplify = expr_simplify_binary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_gammainc_P = {
-    .eval = eval_gammainc_P, .deriv = deriv_gammainc_P, .reverse = expr_reverse_gammainc_P,
-    .kind = EXPR_KIND_GAMMAINC_P, .arity = EXPR_OP_BINARY, .name = "gammainc_P",
-    .tex_name = "\\operatorname{P}",
-    .apply_unary = NULL, .apply_binary = expr_gammainc_P,
-    .simplify = expr_simplify_binary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_gammainc_Q = {
-    .eval = eval_gammainc_Q, .deriv = deriv_gammainc_Q, .reverse = expr_reverse_gammainc_Q,
-    .kind = EXPR_KIND_GAMMAINC_Q, .arity = EXPR_OP_BINARY, .name = "gammainc_Q",
-    .tex_name = "\\operatorname{Q}",
-    .apply_unary = NULL, .apply_binary = expr_gammainc_Q,
-    .simplify = expr_simplify_binary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_factorial = {
-    .eval = eval_factorial, .deriv = deriv_not_differentiable,
-    .reverse = expr_reverse_not_differentiable,
-    .kind = EXPR_KIND_FACTORIAL, .arity = EXPR_OP_UNARY, .diff_kind = EXPR_DIFF_NONE,
-    .name = "factorial", .tex_name = "\\operatorname{factorial}",
-    .apply_unary = expr_factorial, .apply_binary = NULL,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_fibonacci = {
-    .eval = eval_fibonacci, .deriv = deriv_not_differentiable,
-    .reverse = expr_reverse_not_differentiable,
-    .kind = EXPR_KIND_FIBONACCI, .arity = EXPR_OP_UNARY, .diff_kind = EXPR_DIFF_NONE,
-    .name = "fibonacci", .tex_name = "\\operatorname{fibonacci}",
-    .apply_unary = expr_fibonacci, .apply_binary = NULL,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_partition = {
-    .eval = eval_partition, .deriv = deriv_not_differentiable,
-    .reverse = expr_reverse_not_differentiable,
-    .kind = EXPR_KIND_PARTITION, .arity = EXPR_OP_UNARY, .diff_kind = EXPR_DIFF_NONE,
-    .name = "partition", .tex_name = "\\operatorname{partition}",
-    .apply_unary = expr_partition, .apply_binary = NULL,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_isqrt = {
-    .eval = eval_isqrt, .deriv = deriv_not_differentiable,
-    .reverse = expr_reverse_not_differentiable,
-    .kind = EXPR_KIND_ISQRT, .arity = EXPR_OP_UNARY, .diff_kind = EXPR_DIFF_NONE,
-    .name = "isqrt", .tex_name = "\\operatorname{isqrt}",
-    .apply_unary = expr_isqrt, .apply_binary = NULL,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_gcd = {
-    .eval = eval_gcd, .deriv = deriv_not_differentiable,
-    .reverse = expr_reverse_not_differentiable,
-    .kind = EXPR_KIND_GCD, .arity = EXPR_OP_BINARY, .diff_kind = EXPR_DIFF_NONE,
-    .name = "gcd", .tex_name = "\\gcd",
-    .apply_unary = NULL, .apply_binary = expr_gcd,
-    .simplify = expr_simplify_binary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_lcm = {
-    .eval = eval_lcm, .deriv = deriv_not_differentiable,
-    .reverse = expr_reverse_not_differentiable,
-    .kind = EXPR_KIND_LCM, .arity = EXPR_OP_BINARY, .diff_kind = EXPR_DIFF_NONE,
-    .name = "lcm", .tex_name = "\\operatorname{lcm}",
-    .apply_unary = NULL, .apply_binary = expr_lcm,
-    .simplify = expr_simplify_binary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_mod = {
-    .eval = eval_mod, .deriv = deriv_not_differentiable,
-    .reverse = expr_reverse_not_differentiable,
-    .kind = EXPR_KIND_MOD, .arity = EXPR_OP_BINARY, .diff_kind = EXPR_DIFF_NONE,
-    .name = "mod", .tex_name = "\\operatorname{mod}",
-    .apply_unary = NULL, .apply_binary = expr_mod,
-    .simplify = expr_simplify_binary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_modinv = {
-    .eval = eval_modinv, .deriv = deriv_not_differentiable,
-    .reverse = expr_reverse_not_differentiable,
-    .kind = EXPR_KIND_MODINV, .arity = EXPR_OP_BINARY, .diff_kind = EXPR_DIFF_NONE,
-    .name = "modinv", .tex_name = "\\operatorname{modinv}",
-    .apply_unary = NULL, .apply_binary = expr_modinv,
-    .simplify = expr_simplify_binary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_is_prime = {
-    .eval = eval_is_prime, .deriv = deriv_not_differentiable,
-    .reverse = expr_reverse_not_differentiable,
-    .kind = EXPR_KIND_IS_PRIME, .arity = EXPR_OP_UNARY, .diff_kind = EXPR_DIFF_NONE,
-    .name = "is_prime", .tex_name = "\\operatorname{is\\_prime}",
-    .apply_unary = expr_is_prime, .apply_binary = NULL,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_next_prime = {
-    .eval = eval_next_prime, .deriv = deriv_not_differentiable,
-    .reverse = expr_reverse_not_differentiable,
-    .kind = EXPR_KIND_NEXT_PRIME, .arity = EXPR_OP_UNARY, .diff_kind = EXPR_DIFF_NONE,
-    .name = "next_prime", .tex_name = "\\operatorname{next\\_prime}",
-    .apply_unary = expr_next_prime, .apply_binary = NULL,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_prev_prime = {
-    .eval = eval_prev_prime, .deriv = deriv_not_differentiable,
-    .reverse = expr_reverse_not_differentiable,
-    .kind = EXPR_KIND_PREV_PRIME, .arity = EXPR_OP_UNARY, .diff_kind = EXPR_DIFF_NONE,
-    .name = "prev_prime", .tex_name = "\\operatorname{prev\\_prime}",
-    .apply_unary = expr_prev_prime, .apply_binary = NULL,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_bit_and = {
-    .eval = eval_bit_and, .deriv = deriv_not_differentiable,
-    .reverse = expr_reverse_not_differentiable,
-    .kind = EXPR_KIND_BIT_AND, .arity = EXPR_OP_BINARY, .diff_kind = EXPR_DIFF_NONE,
-    .name = "AND", .tex_name = "\\operatorname{AND}",
-    .apply_unary = NULL, .apply_binary = expr_bit_and,
-    .simplify = expr_simplify_binary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_bit_or = {
-    .eval = eval_bit_or, .deriv = deriv_not_differentiable,
-    .reverse = expr_reverse_not_differentiable,
-    .kind = EXPR_KIND_BIT_OR, .arity = EXPR_OP_BINARY, .diff_kind = EXPR_DIFF_NONE,
-    .name = "OR", .tex_name = "\\operatorname{OR}",
-    .apply_unary = NULL, .apply_binary = expr_bit_or,
-    .simplify = expr_simplify_binary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_bit_xor = {
-    .eval = eval_bit_xor, .deriv = deriv_not_differentiable,
-    .reverse = expr_reverse_not_differentiable,
-    .kind = EXPR_KIND_BIT_XOR, .arity = EXPR_OP_BINARY, .diff_kind = EXPR_DIFF_NONE,
-    .name = "XOR", .tex_name = "\\operatorname{XOR}",
-    .apply_unary = NULL, .apply_binary = expr_bit_xor,
-    .simplify = expr_simplify_binary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_bit_not = {
-    .eval = eval_bit_not, .deriv = deriv_not_differentiable,
-    .reverse = expr_reverse_not_differentiable,
-    .kind = EXPR_KIND_BIT_NOT, .arity = EXPR_OP_UNARY, .diff_kind = EXPR_DIFF_NONE,
-    .name = "NOT", .tex_name = "\\operatorname{NOT}",
-    .apply_unary = expr_bit_not, .apply_binary = NULL,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_shl = {
-    .eval = eval_shl, .deriv = deriv_not_differentiable,
-    .reverse = expr_reverse_not_differentiable,
-    .kind = EXPR_KIND_SHL, .arity = EXPR_OP_BINARY, .diff_kind = EXPR_DIFF_NONE,
-    .name = "SHL", .tex_name = "\\operatorname{SHL}",
-    .apply_unary = NULL, .apply_binary = expr_shl,
-    .simplify = expr_simplify_binary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_shr = {
-    .eval = eval_shr, .deriv = deriv_not_differentiable,
-    .reverse = expr_reverse_not_differentiable,
-    .kind = EXPR_KIND_SHR, .arity = EXPR_OP_BINARY, .diff_kind = EXPR_DIFF_NONE,
-    .name = "SHR", .tex_name = "\\operatorname{SHR}",
-    .apply_unary = NULL, .apply_binary = expr_shr,
-    .simplify = expr_simplify_binary_operator, .fold_const_unary = NULL
-};
-const expr_ops_t ops_factors = {
-    .eval = eval_factors, .deriv = deriv_not_differentiable,
-    .reverse = expr_reverse_not_differentiable,
-    .kind = EXPR_KIND_FACTORS, .arity = EXPR_OP_UNARY, .diff_kind = EXPR_DIFF_NONE,
-    .name = "factors", .tex_name = "\\operatorname{factors}",
-    .apply_unary = expr_factors, .apply_binary = NULL,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
-};
+const expr_ops_t ops_sin = {.eval = eval_sin,
+                            .deriv = deriv_sin,
+                            .reverse = expr_reverse_sin,
+                            .kind = EXPR_KIND_SIN,
+                            .arity = EXPR_OP_UNARY,
+                            .name = "sin",
+                            .tex_name = "\\sin",
+                            .direct_inverse = &ops_asin,
+                            .inverse_unary = expr_asin,
+                            .apply_unary = expr_sin,
+                            .apply_binary = NULL,
+                            .integrate = expr_integrate_dispatch_primitive,
+                            .simplify = expr_simplify_unary_operator,
+                            .fold_const_unary = expr_fold_zero_to_zero};
+const expr_ops_t ops_cos = {.eval = eval_cos,
+                            .deriv = deriv_cos,
+                            .reverse = expr_reverse_cos,
+                            .kind = EXPR_KIND_COS,
+                            .arity = EXPR_OP_UNARY,
+                            .name = "cos",
+                            .tex_name = "\\cos",
+                            .direct_inverse = &ops_acos,
+                            .inverse_unary = expr_acos,
+                            .apply_unary = expr_cos,
+                            .apply_binary = NULL,
+                            .integrate = expr_integrate_dispatch_primitive,
+                            .simplify = expr_simplify_unary_operator,
+                            .fold_const_unary = expr_fold_cos_const};
+const expr_ops_t ops_tan = {.eval = eval_tan,
+                            .deriv = deriv_tan,
+                            .reverse = expr_reverse_tan,
+                            .kind = EXPR_KIND_TAN,
+                            .arity = EXPR_OP_UNARY,
+                            .name = "tan",
+                            .tex_name = "\\tan",
+                            .direct_inverse = &ops_atan,
+                            .inverse_unary = expr_atan,
+                            .apply_unary = expr_tan,
+                            .apply_binary = NULL,
+                            .integrate = expr_integrate_dispatch_primitive,
+                            .simplify = expr_simplify_unary_operator,
+                            .fold_const_unary = expr_fold_zero_to_zero};
+const expr_ops_t ops_sec = {.eval = eval_sec,
+                            .deriv = deriv_sec,
+                            .reverse = expr_reverse_sec,
+                            .kind = EXPR_KIND_SEC,
+                            .arity = EXPR_OP_UNARY,
+                            .name = "sec",
+                            .tex_name = "\\sec",
+                            .direct_inverse = &ops_asec,
+                            .inverse_unary = expr_asec,
+                            .apply_unary = expr_sec,
+                            .apply_binary = NULL,
+                            .integrate = expr_integrate_dispatch_primitive,
+                            .simplify = expr_simplify_unary_operator,
+                            .fold_const_unary = NULL};
+const expr_ops_t ops_cosec = {.eval = eval_cosec,
+                              .deriv = deriv_cosec,
+                              .reverse = expr_reverse_cosec,
+                              .kind = EXPR_KIND_COSEC,
+                              .arity = EXPR_OP_UNARY,
+                              .name = "cosec",
+                              .tex_name = "\\operatorname{cosec}",
+                              .direct_inverse = &ops_acosec,
+                              .inverse_unary = expr_acosec,
+                              .apply_unary = expr_cosec,
+                              .apply_binary = NULL,
+                              .integrate = expr_integrate_dispatch_primitive,
+                              .simplify = expr_simplify_unary_operator,
+                              .fold_const_unary = NULL};
+const expr_ops_t ops_cot = {.eval = eval_cot,
+                            .deriv = deriv_cot,
+                            .reverse = expr_reverse_cot,
+                            .kind = EXPR_KIND_COT,
+                            .arity = EXPR_OP_UNARY,
+                            .name = "cot",
+                            .tex_name = "\\cot",
+                            .direct_inverse = &ops_acot,
+                            .inverse_unary = expr_acot,
+                            .apply_unary = expr_cot,
+                            .apply_binary = NULL,
+                            .integrate = expr_integrate_dispatch_primitive,
+                            .simplify = expr_simplify_unary_operator,
+                            .fold_const_unary = NULL};
+const expr_ops_t ops_versin = {.eval = eval_versin,
+                               .deriv = deriv_versin,
+                               .reverse = expr_reverse_versin,
+                               .kind = EXPR_KIND_VERSIN,
+                               .arity = EXPR_OP_UNARY,
+                               .name = "versin",
+                               .tex_name = "\\operatorname{versin}",
+                               .direct_inverse = &ops_arcversin,
+                               .inverse_unary = expr_arcversin,
+                               .apply_unary = expr_versin,
+                               .apply_binary = NULL,
+                               .simplify = expr_simplify_unary_operator,
+                               .fold_const_unary = NULL};
+const expr_ops_t ops_vercos = {.eval = eval_vercos,
+                               .deriv = deriv_vercos,
+                               .reverse = expr_reverse_vercos,
+                               .kind = EXPR_KIND_VERCOS,
+                               .arity = EXPR_OP_UNARY,
+                               .name = "vercos",
+                               .tex_name = "\\operatorname{vercos}",
+                               .direct_inverse = &ops_arcvercos,
+                               .inverse_unary = expr_arcvercos,
+                               .apply_unary = expr_vercos,
+                               .apply_binary = NULL,
+                               .simplify = expr_simplify_unary_operator,
+                               .fold_const_unary = NULL};
+const expr_ops_t ops_coversin = {.eval = eval_coversin,
+                                 .deriv = deriv_coversin,
+                                 .reverse = expr_reverse_coversin,
+                                 .kind = EXPR_KIND_COVERSIN,
+                                 .arity = EXPR_OP_UNARY,
+                                 .name = "coversin",
+                                 .tex_name = "\\operatorname{coversin}",
+                                 .direct_inverse = &ops_arccoversin,
+                                 .inverse_unary = expr_arccoversin,
+                                 .apply_unary = expr_coversin,
+                                 .apply_binary = NULL,
+                                 .simplify = expr_simplify_unary_operator,
+                                 .fold_const_unary = NULL};
+const expr_ops_t ops_covercos = {.eval = eval_covercos,
+                                 .deriv = deriv_covercos,
+                                 .reverse = expr_reverse_covercos,
+                                 .kind = EXPR_KIND_COVERCOS,
+                                 .arity = EXPR_OP_UNARY,
+                                 .name = "covercos",
+                                 .tex_name = "\\operatorname{covercos}",
+                                 .direct_inverse = &ops_arccovercos,
+                                 .inverse_unary = expr_arccovercos,
+                                 .apply_unary = expr_covercos,
+                                 .apply_binary = NULL,
+                                 .simplify = expr_simplify_unary_operator,
+                                 .fold_const_unary = NULL};
+const expr_ops_t ops_haversin = {.eval = eval_haversin,
+                                 .deriv = deriv_haversin,
+                                 .reverse = expr_reverse_haversin,
+                                 .kind = EXPR_KIND_HAVERSIN,
+                                 .arity = EXPR_OP_UNARY,
+                                 .name = "haversin",
+                                 .tex_name = "\\operatorname{haversin}",
+                                 .direct_inverse = &ops_archaversin,
+                                 .inverse_unary = expr_archaversin,
+                                 .apply_unary = expr_haversin,
+                                 .apply_binary = NULL,
+                                 .simplify = expr_simplify_unary_operator,
+                                 .fold_const_unary = NULL};
+const expr_ops_t ops_havercos = {.eval = eval_havercos,
+                                 .deriv = deriv_havercos,
+                                 .reverse = expr_reverse_havercos,
+                                 .kind = EXPR_KIND_HAVERCOS,
+                                 .arity = EXPR_OP_UNARY,
+                                 .name = "havercos",
+                                 .tex_name = "\\operatorname{havercos}",
+                                 .direct_inverse = &ops_archavercos,
+                                 .inverse_unary = expr_archavercos,
+                                 .apply_unary = expr_havercos,
+                                 .apply_binary = NULL,
+                                 .simplify = expr_simplify_unary_operator,
+                                 .fold_const_unary = NULL};
+const expr_ops_t ops_hacoversin = {.eval = eval_hacoversin,
+                                   .deriv = deriv_hacoversin,
+                                   .reverse = expr_reverse_hacoversin,
+                                   .kind = EXPR_KIND_HACOVERSIN,
+                                   .arity = EXPR_OP_UNARY,
+                                   .name = "hacoversin",
+                                   .tex_name = "\\operatorname{hacoversin}",
+                                   .direct_inverse = &ops_archacoversin,
+                                   .inverse_unary = expr_archacoversin,
+                                   .apply_unary = expr_hacoversin,
+                                   .apply_binary = NULL,
+                                   .simplify = expr_simplify_unary_operator,
+                                   .fold_const_unary = NULL};
+const expr_ops_t ops_hacovercos = {.eval = eval_hacovercos,
+                                   .deriv = deriv_hacovercos,
+                                   .reverse = expr_reverse_hacovercos,
+                                   .kind = EXPR_KIND_HACOVERCOS,
+                                   .arity = EXPR_OP_UNARY,
+                                   .name = "hacovercos",
+                                   .tex_name = "\\operatorname{hacovercos}",
+                                   .direct_inverse = &ops_archacovercos,
+                                   .inverse_unary = expr_archacovercos,
+                                   .apply_unary = expr_hacovercos,
+                                   .apply_binary = NULL,
+                                   .simplify = expr_simplify_unary_operator,
+                                   .fold_const_unary = NULL};
+const expr_ops_t ops_sinh = {.eval = eval_sinh,
+                             .deriv = deriv_sinh,
+                             .reverse = expr_reverse_sinh,
+                             .kind = EXPR_KIND_SINH,
+                             .arity = EXPR_OP_UNARY,
+                             .name = "sinh",
+                             .tex_name = "\\sinh",
+                             .direct_inverse = &ops_asinh,
+                             .inverse_unary = expr_asinh,
+                             .apply_unary = expr_sinh,
+                             .apply_binary = NULL,
+                             .integrate = expr_integrate_dispatch_primitive,
+                             .simplify = expr_simplify_unary_operator,
+                             .fold_const_unary = NULL};
+const expr_ops_t ops_cosh = {.eval = eval_cosh,
+                             .deriv = deriv_cosh,
+                             .reverse = expr_reverse_cosh,
+                             .kind = EXPR_KIND_COSH,
+                             .arity = EXPR_OP_UNARY,
+                             .name = "cosh",
+                             .tex_name = "\\cosh",
+                             .direct_inverse = &ops_acosh,
+                             .inverse_unary = expr_acosh,
+                             .apply_unary = expr_cosh,
+                             .apply_binary = NULL,
+                             .integrate = expr_integrate_dispatch_primitive,
+                             .simplify = expr_simplify_unary_operator,
+                             .fold_const_unary = NULL};
+const expr_ops_t ops_tanh = {.eval = eval_tanh,
+                             .deriv = deriv_tanh,
+                             .reverse = expr_reverse_tanh,
+                             .kind = EXPR_KIND_TANH,
+                             .arity = EXPR_OP_UNARY,
+                             .name = "tanh",
+                             .tex_name = "\\tanh",
+                             .direct_inverse = &ops_atanh,
+                             .inverse_unary = expr_atanh,
+                             .apply_unary = expr_tanh,
+                             .apply_binary = NULL,
+                             .integrate = expr_integrate_dispatch_primitive,
+                             .simplify = expr_simplify_unary_operator,
+                             .fold_const_unary = NULL};
+const expr_ops_t ops_sech = {.eval = eval_sech,
+                             .deriv = deriv_sech,
+                             .reverse = expr_reverse_sech,
+                             .kind = EXPR_KIND_SECH,
+                             .arity = EXPR_OP_UNARY,
+                             .name = "sech",
+                             .tex_name = "\\operatorname{sech}",
+                             .direct_inverse = &ops_asech,
+                             .inverse_unary = expr_asech,
+                             .apply_unary = expr_sech,
+                             .apply_binary = NULL,
+                             .integrate = expr_integrate_dispatch_primitive,
+                             .simplify = expr_simplify_unary_operator,
+                             .fold_const_unary = NULL};
+const expr_ops_t ops_cosech = {.eval = eval_cosech,
+                               .deriv = deriv_cosech,
+                               .reverse = expr_reverse_cosech,
+                               .kind = EXPR_KIND_COSECH,
+                               .arity = EXPR_OP_UNARY,
+                               .name = "cosech",
+                               .tex_name = "\\operatorname{cosech}",
+                               .direct_inverse = &ops_acosech,
+                               .inverse_unary = expr_acosech,
+                               .apply_unary = expr_cosech,
+                               .apply_binary = NULL,
+                               .integrate = expr_integrate_dispatch_primitive,
+                               .simplify = expr_simplify_unary_operator,
+                               .fold_const_unary = NULL};
+const expr_ops_t ops_coth = {.eval = eval_coth,
+                             .deriv = deriv_coth,
+                             .reverse = expr_reverse_coth,
+                             .kind = EXPR_KIND_COTH,
+                             .arity = EXPR_OP_UNARY,
+                             .name = "coth",
+                             .tex_name = "\\coth",
+                             .direct_inverse = &ops_acoth,
+                             .inverse_unary = expr_acoth,
+                             .apply_unary = expr_coth,
+                             .apply_binary = NULL,
+                             .integrate = expr_integrate_dispatch_primitive,
+                             .simplify = expr_simplify_unary_operator,
+                             .fold_const_unary = NULL};
+const expr_ops_t ops_asin = {.eval = eval_asin,
+                             .deriv = deriv_asin,
+                             .reverse = expr_reverse_asin,
+                             .kind = EXPR_KIND_ASIN,
+                             .arity = EXPR_OP_UNARY,
+                             .name = "asin",
+                             .tex_name = "\\sin^{-1}",
+                             .inverse_unary = expr_sin,
+                             .apply_unary = expr_asin,
+                             .apply_binary = NULL,
+                             .integrate = expr_integrate_dispatch_primitive,
+                             .simplify = expr_simplify_unary_operator,
+                             .fold_const_unary = expr_fold_asin_const};
+const expr_ops_t ops_acos = {.eval = eval_acos,
+                             .deriv = deriv_acos,
+                             .reverse = expr_reverse_acos,
+                             .kind = EXPR_KIND_ACOS,
+                             .arity = EXPR_OP_UNARY,
+                             .name = "acos",
+                             .tex_name = "\\cos^{-1}",
+                             .inverse_unary = expr_cos,
+                             .apply_unary = expr_acos,
+                             .apply_binary = NULL,
+                             .integrate = expr_integrate_dispatch_primitive,
+                             .simplify = expr_simplify_unary_operator,
+                             .fold_const_unary = expr_fold_acos_const};
+const expr_ops_t ops_atan = {.eval = eval_atan,
+                             .deriv = deriv_atan,
+                             .reverse = expr_reverse_atan,
+                             .kind = EXPR_KIND_ATAN,
+                             .arity = EXPR_OP_UNARY,
+                             .name = "atan",
+                             .tex_name = "\\arctan",
+                             .inverse_unary = expr_tan,
+                             .apply_unary = expr_atan,
+                             .apply_binary = NULL,
+                             .integrate = expr_integrate_dispatch_primitive,
+                             .simplify = expr_simplify_unary_operator,
+                             .fold_const_unary = expr_fold_atan_const};
+const expr_ops_t ops_asec = {.eval = eval_asec,
+                             .deriv = deriv_asec,
+                             .reverse = expr_reverse_asec,
+                             .kind = EXPR_KIND_ASEC,
+                             .arity = EXPR_OP_UNARY,
+                             .name = "asec",
+                             .tex_name = "\\sec^{-1}",
+                             .inverse_unary = expr_sec,
+                             .apply_unary = expr_asec,
+                             .apply_binary = NULL,
+                             .integrate = expr_integrate_dispatch_primitive,
+                             .simplify = expr_simplify_unary_operator,
+                             .fold_const_unary = expr_fold_asec_const};
+const expr_ops_t ops_acosec = {.eval = eval_acosec,
+                               .deriv = deriv_acosec,
+                               .reverse = expr_reverse_acosec,
+                               .kind = EXPR_KIND_ACOSEC,
+                               .arity = EXPR_OP_UNARY,
+                               .name = "acosec",
+                               .tex_name = "\\operatorname{cosec}^{-1}",
+                               .inverse_unary = expr_cosec,
+                               .apply_unary = expr_acosec,
+                               .apply_binary = NULL,
+                               .integrate = expr_integrate_dispatch_primitive,
+                               .simplify = expr_simplify_unary_operator,
+                               .fold_const_unary = expr_fold_acosec_const};
+const expr_ops_t ops_acot = {.eval = eval_acot,
+                             .deriv = deriv_acot,
+                             .reverse = expr_reverse_acot,
+                             .kind = EXPR_KIND_ACOT,
+                             .arity = EXPR_OP_UNARY,
+                             .name = "acot",
+                             .tex_name = "\\cot^{-1}",
+                             .inverse_unary = expr_cot,
+                             .apply_unary = expr_acot,
+                             .apply_binary = NULL,
+                             .integrate = expr_integrate_dispatch_primitive,
+                             .simplify = expr_simplify_unary_operator,
+                             .fold_const_unary = expr_fold_acot_const};
+const expr_ops_t ops_arcversin = {.eval = eval_arcversin,
+                                  .deriv = deriv_arcversin,
+                                  .reverse = expr_reverse_arcversin,
+                                  .kind = EXPR_KIND_ARCVERSIN,
+                                  .arity = EXPR_OP_UNARY,
+                                  .name = "arcversin",
+                                  .tex_name = "\\operatorname{arcversin}",
+                                  .inverse_unary = expr_versin,
+                                  .apply_unary = expr_arcversin,
+                                  .apply_binary = NULL,
+                                  .simplify = expr_simplify_unary_operator,
+                                  .fold_const_unary = NULL};
+const expr_ops_t ops_arcvercos = {.eval = eval_arcvercos,
+                                  .deriv = deriv_arcvercos,
+                                  .reverse = expr_reverse_arcvercos,
+                                  .kind = EXPR_KIND_ARCVERCOS,
+                                  .arity = EXPR_OP_UNARY,
+                                  .name = "arcvercos",
+                                  .tex_name = "\\operatorname{arcvercos}",
+                                  .inverse_unary = expr_vercos,
+                                  .apply_unary = expr_arcvercos,
+                                  .apply_binary = NULL,
+                                  .simplify = expr_simplify_unary_operator,
+                                  .fold_const_unary = NULL};
+const expr_ops_t ops_arccoversin = {.eval = eval_arccoversin,
+                                    .deriv = deriv_arccoversin,
+                                    .reverse = expr_reverse_arccoversin,
+                                    .kind = EXPR_KIND_ARCCOVERSIN,
+                                    .arity = EXPR_OP_UNARY,
+                                    .name = "arccoversin",
+                                    .tex_name = "\\operatorname{arccoversin}",
+                                    .inverse_unary = expr_coversin,
+                                    .apply_unary = expr_arccoversin,
+                                    .apply_binary = NULL,
+                                    .simplify = expr_simplify_unary_operator,
+                                    .fold_const_unary = NULL};
+const expr_ops_t ops_arccovercos = {.eval = eval_arccovercos,
+                                    .deriv = deriv_arccovercos,
+                                    .reverse = expr_reverse_arccovercos,
+                                    .kind = EXPR_KIND_ARCCOVERCOS,
+                                    .arity = EXPR_OP_UNARY,
+                                    .name = "arccovercos",
+                                    .tex_name = "\\operatorname{arccovercos}",
+                                    .inverse_unary = expr_covercos,
+                                    .apply_unary = expr_arccovercos,
+                                    .apply_binary = NULL,
+                                    .simplify = expr_simplify_unary_operator,
+                                    .fold_const_unary = NULL};
+const expr_ops_t ops_archaversin = {.eval = eval_archaversin,
+                                    .deriv = deriv_archaversin,
+                                    .reverse = expr_reverse_archaversin,
+                                    .kind = EXPR_KIND_ARCHAVERSIN,
+                                    .arity = EXPR_OP_UNARY,
+                                    .name = "archaversin",
+                                    .tex_name = "\\operatorname{archaversin}",
+                                    .inverse_unary = expr_haversin,
+                                    .apply_unary = expr_archaversin,
+                                    .apply_binary = NULL,
+                                    .simplify = expr_simplify_unary_operator,
+                                    .fold_const_unary = NULL};
+const expr_ops_t ops_archavercos = {.eval = eval_archavercos,
+                                    .deriv = deriv_archavercos,
+                                    .reverse = expr_reverse_archavercos,
+                                    .kind = EXPR_KIND_ARCHAVERCOS,
+                                    .arity = EXPR_OP_UNARY,
+                                    .name = "archavercos",
+                                    .tex_name = "\\operatorname{archavercos}",
+                                    .inverse_unary = expr_havercos,
+                                    .apply_unary = expr_archavercos,
+                                    .apply_binary = NULL,
+                                    .simplify = expr_simplify_unary_operator,
+                                    .fold_const_unary = NULL};
+const expr_ops_t ops_archacoversin = {.eval = eval_archacoversin,
+                                      .deriv = deriv_archacoversin,
+                                      .reverse = expr_reverse_archacoversin,
+                                      .kind = EXPR_KIND_ARCHACOVERSIN,
+                                      .arity = EXPR_OP_UNARY,
+                                      .name = "archacoversin",
+                                      .tex_name = "\\operatorname{archacoversin}",
+                                      .inverse_unary = expr_hacoversin,
+                                      .apply_unary = expr_archacoversin,
+                                      .apply_binary = NULL,
+                                      .simplify = expr_simplify_unary_operator,
+                                      .fold_const_unary = NULL};
+const expr_ops_t ops_archacovercos = {.eval = eval_archacovercos,
+                                      .deriv = deriv_archacovercos,
+                                      .reverse = expr_reverse_archacovercos,
+                                      .kind = EXPR_KIND_ARCHACOVERCOS,
+                                      .arity = EXPR_OP_UNARY,
+                                      .name = "archacovercos",
+                                      .tex_name = "\\operatorname{archacovercos}",
+                                      .inverse_unary = expr_hacovercos,
+                                      .apply_unary = expr_archacovercos,
+                                      .apply_binary = NULL,
+                                      .simplify = expr_simplify_unary_operator,
+                                      .fold_const_unary = NULL};
+const expr_ops_t ops_asinh = {.eval = eval_asinh,
+                              .deriv = deriv_asinh,
+                              .reverse = expr_reverse_asinh,
+                              .kind = EXPR_KIND_ASINH,
+                              .arity = EXPR_OP_UNARY,
+                              .name = "asinh",
+                              .tex_name = "\\sinh^{-1}",
+                              .inverse_unary = expr_sinh,
+                              .apply_unary = expr_asinh,
+                              .apply_binary = NULL,
+                              .integrate = expr_integrate_dispatch_primitive,
+                              .simplify = expr_simplify_unary_operator,
+                              .fold_const_unary = NULL};
+const expr_ops_t ops_acosh = {.eval = eval_acosh,
+                              .deriv = deriv_acosh,
+                              .reverse = expr_reverse_acosh,
+                              .kind = EXPR_KIND_ACOSH,
+                              .arity = EXPR_OP_UNARY,
+                              .name = "acosh",
+                              .tex_name = "\\cosh^{-1}",
+                              .inverse_unary = expr_cosh,
+                              .apply_unary = expr_acosh,
+                              .apply_binary = NULL,
+                              .integrate = expr_integrate_dispatch_primitive,
+                              .simplify = expr_simplify_unary_operator,
+                              .fold_const_unary = NULL};
+const expr_ops_t ops_atanh = {.eval = eval_atanh,
+                              .deriv = deriv_atanh,
+                              .reverse = expr_reverse_atanh,
+                              .kind = EXPR_KIND_ATANH,
+                              .arity = EXPR_OP_UNARY,
+                              .name = "atanh",
+                              .tex_name = "\\tanh^{-1}",
+                              .inverse_unary = expr_tanh,
+                              .apply_unary = expr_atanh,
+                              .apply_binary = NULL,
+                              .integrate = expr_integrate_dispatch_primitive,
+                              .simplify = expr_simplify_unary_operator,
+                              .fold_const_unary = NULL};
+const expr_ops_t ops_asech = {.eval = eval_asech,
+                              .deriv = deriv_asech,
+                              .reverse = expr_reverse_asech,
+                              .kind = EXPR_KIND_ASECH,
+                              .arity = EXPR_OP_UNARY,
+                              .name = "asech",
+                              .tex_name = "\\operatorname{sech}^{-1}",
+                              .inverse_unary = expr_sech,
+                              .apply_unary = expr_asech,
+                              .apply_binary = NULL,
+                              .integrate = expr_integrate_dispatch_primitive,
+                              .simplify = expr_simplify_unary_operator,
+                              .fold_const_unary = NULL};
+const expr_ops_t ops_acosech = {.eval = eval_acosech,
+                                .deriv = deriv_acosech,
+                                .reverse = expr_reverse_acosech,
+                                .kind = EXPR_KIND_ACOSECH,
+                                .arity = EXPR_OP_UNARY,
+                                .name = "acosech",
+                                .tex_name = "\\operatorname{cosech}^{-1}",
+                                .inverse_unary = expr_cosech,
+                                .apply_unary = expr_acosech,
+                                .apply_binary = NULL,
+                                .integrate = expr_integrate_dispatch_primitive,
+                                .simplify = expr_simplify_unary_operator,
+                                .fold_const_unary = NULL};
+const expr_ops_t ops_acoth = {.eval = eval_acoth,
+                              .deriv = deriv_acoth,
+                              .reverse = expr_reverse_acoth,
+                              .kind = EXPR_KIND_ACOTH,
+                              .arity = EXPR_OP_UNARY,
+                              .name = "acoth",
+                              .tex_name = "\\coth^{-1}",
+                              .inverse_unary = expr_coth,
+                              .apply_unary = expr_acoth,
+                              .apply_binary = NULL,
+                              .integrate = expr_integrate_dispatch_primitive,
+                              .simplify = expr_simplify_unary_operator,
+                              .fold_const_unary = NULL};
+const expr_ops_t ops_exp = {.eval = eval_exp,
+                            .deriv = deriv_exp,
+                            .reverse = expr_reverse_exp,
+                            .kind = EXPR_KIND_EXP,
+                            .arity = EXPR_OP_UNARY,
+                            .name = "exp",
+                            .tex_name = "\\exp",
+                            .direct_inverse = &ops_log,
+                            .inverse_unary = expr_log,
+                            .apply_unary = expr_exp,
+                            .apply_binary = NULL,
+                            .integrate = expr_integrate_dispatch_primitive,
+                            .simplify = expr_simplify_unary_operator,
+                            .fold_const_unary = expr_fold_exp_const};
+const expr_ops_t ops_log = {.eval = eval_log,
+                            .deriv = deriv_log,
+                            .reverse = expr_reverse_log,
+                            .kind = EXPR_KIND_LOG,
+                            .arity = EXPR_OP_UNARY,
+                            .name = "ln",
+                            .tex_name = "\\ln",
+                            .direct_inverse = &ops_exp,
+                            .inverse_unary = expr_exp,
+                            .apply_unary = expr_log,
+                            .apply_binary = NULL,
+                            .integrate = expr_integrate_dispatch_primitive,
+                            .simplify = expr_simplify_unary_operator,
+                            .fold_const_unary = expr_fold_log_const};
+const expr_ops_t ops_log10 = {.eval = eval_log10,
+                              .deriv = deriv_log10,
+                              .reverse = expr_reverse_log10,
+                              .kind = EXPR_KIND_LOG10,
+                              .arity = EXPR_OP_UNARY,
+                              .name = "log",
+                              .tex_name = "\\log",
+                              .inverse_unary = expr_inverse_log10_internal,
+                              .apply_unary = expr_log10,
+                              .apply_binary = NULL,
+                              .integrate = expr_integrate_dispatch_primitive,
+                              .simplify = expr_simplify_unary_operator,
+                              .fold_const_unary = NULL};
+const expr_ops_t ops_sqrt = {.eval = eval_sqrt,
+                             .deriv = deriv_sqrt,
+                             .reverse = expr_reverse_sqrt,
+                             .kind = EXPR_KIND_SQRT,
+                             .arity = EXPR_OP_UNARY,
+                             .name = "sqrt",
+                             .tex_name = "\\sqrt",
+                             .inverse_unary = expr_inverse_sqrt_internal,
+                             .apply_unary = expr_sqrt,
+                             .apply_binary = NULL,
+                             .integrate = expr_integrate_dispatch_primitive,
+                             .simplify = expr_simplify_unary_operator,
+                             .fold_const_unary = expr_fold_sqrt_const};
+const expr_ops_t ops_floor = {.eval = eval_floor,
+                              .deriv = deriv_floor,
+                              .reverse = expr_reverse_floor,
+                              .kind = EXPR_KIND_FLOOR,
+                              .arity = EXPR_OP_UNARY,
+                              .name = "floor",
+                              .tex_name = "\\lfloor",
+                              .apply_unary = expr_floor,
+                              .apply_binary = NULL,
+                              .simplify = expr_simplify_unary_operator,
+                              .fold_const_unary = expr_fold_floor_const};
+const expr_ops_t ops_ceil = {.eval = eval_ceil,
+                             .deriv = deriv_ceil,
+                             .reverse = expr_reverse_ceil,
+                             .kind = EXPR_KIND_CEIL,
+                             .arity = EXPR_OP_UNARY,
+                             .name = "ceil",
+                             .tex_name = "\\lceil",
+                             .apply_unary = expr_ceil,
+                             .apply_binary = NULL,
+                             .simplify = expr_simplify_unary_operator,
+                             .fold_const_unary = NULL};
+const expr_ops_t ops_abs = {.eval = eval_abs,
+                            .deriv = deriv_abs,
+                            .reverse = expr_reverse_abs,
+                            .kind = EXPR_KIND_ABS,
+                            .arity = EXPR_OP_UNARY,
+                            .name = "abs",
+                            .tex_name = NULL,
+                            .apply_unary = expr_abs,
+                            .apply_binary = NULL,
+                            .simplify = expr_simplify_unary_operator,
+                            .fold_const_unary = NULL};
+const expr_ops_t ops_erf = {.eval = eval_erf,
+                            .deriv = deriv_erf,
+                            .reverse = expr_reverse_erf,
+                            .kind = EXPR_KIND_ERF,
+                            .arity = EXPR_OP_UNARY,
+                            .name = "erf",
+                            .tex_name = "\\operatorname{erf}",
+                            .direct_inverse = &ops_erfinv,
+                            .inverse_unary = expr_erfinv,
+                            .apply_unary = expr_erf,
+                            .apply_binary = NULL,
+                            .integrate = expr_integrate_dispatch_primitive,
+                            .simplify = expr_simplify_unary_operator,
+                            .fold_const_unary = expr_fold_erf_const};
+const expr_ops_t ops_erfc = {.eval = eval_erfc,
+                             .deriv = deriv_erfc,
+                             .reverse = expr_reverse_erfc,
+                             .kind = EXPR_KIND_ERFC,
+                             .arity = EXPR_OP_UNARY,
+                             .name = "erfc",
+                             .tex_name = "\\operatorname{erfc}",
+                             .direct_inverse = &ops_erfcinv,
+                             .inverse_unary = expr_erfcinv,
+                             .apply_unary = expr_erfc,
+                             .apply_binary = NULL,
+                             .integrate = expr_integrate_dispatch_primitive,
+                             .simplify = expr_simplify_unary_operator,
+                             .fold_const_unary = expr_fold_erfc_const};
+const expr_ops_t ops_lgamma = {.eval = eval_lgamma,
+                               .deriv = deriv_lgamma,
+                               .reverse = expr_reverse_lgamma,
+                               .kind = EXPR_KIND_LGAMMA,
+                               .arity = EXPR_OP_UNARY,
+                               .name = "lgamma",
+                               .tex_name = "\\log\\Gamma",
+                               .apply_unary = expr_lgamma,
+                               .apply_binary = NULL,
+                               .simplify = expr_simplify_unary_operator,
+                               .fold_const_unary = NULL};
+const expr_ops_t ops_hypot = {.eval = eval_hypot,
+                              .deriv = deriv_hypot,
+                              .reverse = expr_reverse_hypot,
+                              .kind = EXPR_KIND_HYPOT,
+                              .arity = EXPR_OP_BINARY,
+                              .name = "hypot",
+                              .tex_name = "\\operatorname{hypot}",
+                              .apply_unary = NULL,
+                              .apply_binary = expr_hypot,
+                              .simplify = expr_simplify_hypot_operator,
+                              .fold_const_unary = NULL};
+const expr_ops_t ops_erfinv = {.eval = eval_erfinv,
+                               .deriv = deriv_erfinv,
+                               .reverse = expr_reverse_erfinv,
+                               .kind = EXPR_KIND_ERFINV,
+                               .arity = EXPR_OP_UNARY,
+                               .name = "erfinv",
+                               .tex_name = "\\operatorname{erf}^{-1}",
+                               .inverse_unary = expr_erf,
+                               .apply_unary = expr_erfinv,
+                               .apply_binary = NULL,
+                               .simplify = expr_simplify_unary_operator,
+                               .fold_const_unary = NULL};
+const expr_ops_t ops_erfcinv = {.eval = eval_erfcinv,
+                                .deriv = deriv_erfcinv,
+                                .reverse = expr_reverse_erfcinv,
+                                .kind = EXPR_KIND_ERFCINV,
+                                .arity = EXPR_OP_UNARY,
+                                .name = "erfcinv",
+                                .tex_name = "\\operatorname{erfc}^{-1}",
+                                .inverse_unary = expr_erfc,
+                                .apply_unary = expr_erfcinv,
+                                .apply_binary = NULL,
+                                .simplify = expr_simplify_unary_operator,
+                                .fold_const_unary = NULL};
+const expr_ops_t ops_gamma = {.eval = eval_gamma,
+                              .deriv = deriv_gamma,
+                              .reverse = expr_reverse_gamma,
+                              .kind = EXPR_KIND_GAMMA,
+                              .arity = EXPR_OP_UNARY,
+                              .name = "gamma",
+                              .tex_name = "\\Gamma",
+                              .direct_inverse = &ops_gammainv,
+                              .inverse_unary = expr_gammainv,
+                              .apply_unary = expr_gamma,
+                              .apply_binary = NULL,
+                              .simplify = expr_simplify_unary_operator,
+                              .fold_const_unary = NULL};
+const expr_ops_t ops_digamma = {.eval = eval_digamma,
+                                .deriv = deriv_digamma,
+                                .reverse = expr_reverse_digamma,
+                                .kind = EXPR_KIND_DIGAMMA,
+                                .arity = EXPR_OP_UNARY,
+                                .name = "digamma",
+                                .tex_name = "\\psi^{(0)}",
+                                .apply_unary = expr_digamma,
+                                .apply_binary = NULL,
+                                .simplify = expr_simplify_unary_operator,
+                                .fold_const_unary = NULL};
+const expr_ops_t ops_trigamma = {.eval = eval_trigamma,
+                                 .deriv = deriv_trigamma,
+                                 .reverse = expr_reverse_trigamma,
+                                 .kind = EXPR_KIND_TRIGAMMA,
+                                 .arity = EXPR_OP_UNARY,
+                                 .name = "trigamma",
+                                 .tex_name = "\\psi^{(1)}",
+                                 .apply_unary = expr_trigamma,
+                                 .apply_binary = NULL,
+                                 .simplify = expr_simplify_unary_operator,
+                                 .fold_const_unary = NULL};
+const expr_ops_t ops_polygamma = {.eval = eval_polygamma,
+                                  .deriv = deriv_polygamma,
+                                  .reverse = expr_reverse_polygamma,
+                                  .kind = EXPR_KIND_POLYGAMMA,
+                                  .arity = EXPR_OP_BINARY,
+                                  .name = "polygamma",
+                                  .tex_name = "\\psi",
+                                  .apply_unary = NULL,
+                                  .apply_binary = expr_polygamma_xp,
+                                  .simplify = expr_simplify_binary_operator,
+                                  .fold_const_unary = NULL};
+const expr_ops_t ops_dilog = {.eval = eval_dilog,
+                              .deriv = deriv_dilog,
+                              .reverse = expr_reverse_dilog,
+                              .kind = EXPR_KIND_DILOG,
+                              .arity = EXPR_OP_UNARY,
+                              .name = "dilog",
+                              .tex_name = "\\operatorname{Li}_{2}",
+                              .apply_unary = expr_dilog,
+                              .apply_binary = NULL,
+                              .simplify = expr_simplify_unary_operator,
+                              .fold_const_unary = NULL};
+const expr_ops_t ops_polylog = {.eval = eval_polylog,
+                                .deriv = deriv_polylog,
+                                .reverse = expr_reverse_polylog,
+                                .kind = EXPR_KIND_POLYLOG,
+                                .arity = EXPR_OP_BINARY,
+                                .name = "polylog",
+                                .tex_name = "\\operatorname{Li}",
+                                .apply_unary = NULL,
+                                .apply_binary = expr_polylog_xp,
+                                .simplify = expr_simplify_binary_operator,
+                                .fold_const_unary = NULL};
+const expr_ops_t ops_legendre_chi = {.eval = eval_legendre_chi,
+                                     .deriv = deriv_legendre_chi,
+                                     .reverse = expr_reverse_legendre_chi,
+                                     .kind = EXPR_KIND_LEGENDRE_CHI,
+                                     .arity = EXPR_OP_BINARY,
+                                     .name = "legendre_chi",
+                                     .tex_name = "\\chi",
+                                     .apply_unary = NULL,
+                                     .apply_binary = expr_legendre_chi_xp,
+                                     .simplify = expr_simplify_binary_operator,
+                                     .fold_const_unary = NULL};
+const expr_ops_t ops_bessel_j = {.eval = eval_bessel_j,
+                                 .deriv = deriv_bessel_j,
+                                 .reverse = expr_reverse_bessel_j,
+                                 .kind = EXPR_KIND_BESSEL_J,
+                                 .arity = EXPR_OP_BINARY,
+                                 .name = "BesselJ",
+                                 .tex_name = "J",
+                                 .apply_unary = NULL,
+                                 .apply_binary = expr_bessel_j,
+                                 .integrate = expr_integrate_dispatch_primitive,
+                                 .simplify = expr_simplify_binary_operator,
+                                 .fold_const_unary = NULL};
+const expr_ops_t ops_bessel_y = {.eval = eval_bessel_y,
+                                 .deriv = deriv_bessel_y,
+                                 .reverse = expr_reverse_bessel_y,
+                                 .kind = EXPR_KIND_BESSEL_Y,
+                                 .arity = EXPR_OP_BINARY,
+                                 .name = "BesselY",
+                                 .tex_name = "Y",
+                                 .apply_unary = NULL,
+                                 .apply_binary = expr_bessel_y,
+                                 .integrate = expr_integrate_dispatch_primitive,
+                                 .simplify = expr_simplify_binary_operator,
+                                 .fold_const_unary = NULL};
+const expr_ops_t ops_lommel_s = {.eval = eval_lommel_s,
+                                 .deriv = deriv_lommel_s,
+                                 .reverse = expr_reverse_lommel_s,
+                                 .kind = EXPR_KIND_LOMMEL_S,
+                                 .arity = EXPR_OP_BINARY,
+                                 .name = "LommelS",
+                                 .tex_name = "s",
+                                 .apply_unary = NULL,
+                                 .apply_binary = expr_lommel_s_from_pack,
+                                 .integrate = expr_integrate_dispatch_primitive,
+                                 .simplify = expr_simplify_rebuild_binary_operator,
+                                 .fold_const_unary = NULL};
+const expr_ops_t ops_lommel_s_derivative = {.eval = eval_lommel_s_derivative,
+                                            .deriv = deriv_lommel_s_derivative,
+                                            .reverse = expr_reverse_lommel_s_derivative,
+                                            .kind = EXPR_KIND_LOMMEL_S_DERIVATIVE,
+                                            .arity = EXPR_OP_BINARY,
+                                            .name = "LommelSPrime",
+                                            .tex_name = "s'",
+                                            .apply_unary = NULL,
+                                            .apply_binary = expr_lommel_s_derivative_from_pack,
+                                            .simplify = expr_simplify_rebuild_binary_operator,
+                                            .fold_const_unary = NULL};
+const expr_ops_t ops_lommel_s_pack = {.eval = eval_lommel_s_pack,
+                                      .deriv = deriv_lommel_s_pack,
+                                      .reverse = expr_reverse_parameter_pack,
+                                      .kind = EXPR_KIND_LOMMEL_S_PACK,
+                                      .arity = EXPR_OP_BINARY,
+                                      .diff_kind = EXPR_DIFF_NONE,
+                                      .name = "lommel_s_pack",
+                                      .tex_name = "\\operatorname{pack}",
+                                      .apply_unary = NULL,
+                                      .apply_binary = expr_lommel_s_pack,
+                                      .simplify = expr_simplify_rebuild_binary_operator,
+                                      .fold_const_unary = NULL};
+const expr_ops_t ops_appell_f1 = {.eval = eval_appell_f1,
+                                  .deriv = deriv_appell_f1,
+                                  .reverse = expr_reverse_not_differentiable,
+                                  .reverse_many = expr_reverse_appell_f1_many,
+                                  .kind = EXPR_KIND_APPELL_F1,
+                                  .arity = EXPR_OP_BINARY,
+                                  .name = "appell_f1",
+                                  .tex_name = "\\operatorname{F}_{1}",
+                                  .apply_unary = NULL,
+                                  .apply_binary = expr_appell_f1_from_packs,
+                                  .simplify = expr_simplify_rebuild_binary_operator,
+                                  .fold_const_unary = NULL};
+const expr_ops_t ops_appell_f1_pack = {.eval = eval_appell_f1_pack,
+                                       .deriv = deriv_appell_f1_pack,
+                                       .reverse = expr_reverse_parameter_pack,
+                                       .kind = EXPR_KIND_APPELL_F1_PACK,
+                                       .arity = EXPR_OP_BINARY,
+                                       .diff_kind = EXPR_DIFF_NONE,
+                                       .name = "appell_f1_pack",
+                                       .tex_name = "\\operatorname{pack}",
+                                       .apply_unary = NULL,
+                                       .apply_binary = expr_appell_f1_pack,
+                                       .simplify = expr_simplify_rebuild_binary_operator,
+                                       .fold_const_unary = NULL};
+const expr_ops_t ops_lauricella_f = {.eval = eval_lauricella_f,
+                                     .deriv = deriv_lauricella_f,
+                                     .reverse = expr_reverse_not_differentiable,
+                                     .reverse_many = expr_reverse_lauricella_f_many,
+                                     .kind = EXPR_KIND_LAURICELLA_F,
+                                     .arity = EXPR_OP_BINARY,
+                                     .name = "lauricella_f",
+                                     .tex_name = "F_D",
+                                     .apply_unary = NULL,
+                                     .apply_binary = expr_lauricella_f_from_packs,
+                                     .simplify = expr_simplify_rebuild_binary_operator,
+                                     .fold_const_unary = NULL};
+const expr_ops_t ops_hypergeometric_pFq = {.eval = eval_hypergeometric_pFq,
+                                           .deriv = deriv_hypergeometric_pFq,
+                                           .reverse = expr_reverse_hypergeometric_pFq,
+                                           .kind = EXPR_KIND_HYPERGEOMETRIC_PFQ,
+                                           .arity = EXPR_OP_BINARY,
+                                           .name = "HypergeometricpFq",
+                                           .tex_name = "F",
+                                           .apply_unary = NULL,
+                                           .apply_binary = expr_hypergeometric_pFq_from_pack,
+                                           .integrate = expr_integrate_dispatch_primitive,
+                                           .simplify = expr_simplify_rebuild_binary_operator,
+                                           .fold_const_unary = NULL};
+const expr_ops_t ops_hypergeometric_pFq_pack = {.eval = eval_hypergeometric_pFq_pack,
+                                                .deriv = deriv_hypergeometric_pFq_pack,
+                                                .reverse = expr_reverse_parameter_pack,
+                                                .kind = EXPR_KIND_HYPERGEOMETRIC_PFQ_PACK,
+                                                .arity = EXPR_OP_BINARY,
+                                                .diff_kind = EXPR_DIFF_NONE,
+                                                .name = "hypergeometric_pFq_pack",
+                                                .tex_name = "\\operatorname{pack}",
+                                                .apply_unary = NULL,
+                                                .apply_binary = expr_hypergeometric_pFq_pack,
+                                                .simplify = expr_simplify_rebuild_binary_operator,
+                                                .fold_const_unary = NULL};
+const expr_ops_t ops_gammainv = {.eval = eval_gammainv,
+                                 .deriv = deriv_gammainv,
+                                 .reverse = expr_reverse_gammainv,
+                                 .kind = EXPR_KIND_GAMMAINV,
+                                 .arity = EXPR_OP_UNARY,
+                                 .name = "gammainv",
+                                 .tex_name = "\\Gamma^{-1}",
+                                 .inverse_unary = expr_gamma,
+                                 .apply_unary = expr_gammainv,
+                                 .apply_binary = NULL,
+                                 .simplify = expr_simplify_unary_operator,
+                                 .fold_const_unary = NULL};
+const expr_ops_t ops_lambert_w = {.eval = eval_lambert_w,
+                                  .deriv = deriv_lambert_w,
+                                  .reverse = expr_reverse_lambert_w,
+                                  .kind = EXPR_KIND_LAMBERT_W,
+                                  .arity = EXPR_OP_UNARY,
+                                  .name = "W",
+                                  .tex_name = "W",
+                                  .inverse_unary = expr_inverse_lambert_internal,
+                                  .apply_unary = expr_lambert_w,
+                                  .apply_binary = NULL,
+                                  .simplify = expr_simplify_unary_operator,
+                                  .fold_const_unary = NULL};
+const expr_ops_t ops_lambert_wn = {.eval = eval_lambert_wn,
+                                   .deriv = deriv_lambert_wn,
+                                   .reverse = expr_reverse_lambert_wn,
+                                   .kind = EXPR_KIND_LAMBERT_WN,
+                                   .arity = EXPR_OP_BINARY,
+                                   .name = "Wₙ",
+                                   .tex_name = "W",
+                                   .apply_unary = NULL,
+                                   .apply_binary = expr_lambert_wn_xp,
+                                   .simplify = expr_simplify_binary_operator,
+                                   .fold_const_unary = NULL};
+const expr_ops_t ops_lambert_w0 = {.eval = eval_lambert_w0,
+                                   .deriv = deriv_lambert_w0,
+                                   .reverse = expr_reverse_lambert_w0,
+                                   .kind = EXPR_KIND_LAMBERT_W0,
+                                   .arity = EXPR_OP_UNARY,
+                                   .name = "W₀",
+                                   .tex_name = "W_{0}",
+                                   .inverse_unary = expr_inverse_lambert_internal,
+                                   .apply_unary = expr_lambert_w0,
+                                   .apply_binary = NULL,
+                                   .simplify = expr_simplify_unary_operator,
+                                   .fold_const_unary = NULL};
+const expr_ops_t ops_lambert_wm1 = {.eval = eval_lambert_wm1,
+                                    .deriv = deriv_lambert_wm1,
+                                    .reverse = expr_reverse_lambert_wm1,
+                                    .kind = EXPR_KIND_LAMBERT_WM1,
+                                    .arity = EXPR_OP_UNARY,
+                                    .name = "W₋₁",
+                                    .tex_name = "W_{-1}",
+                                    .inverse_unary = expr_inverse_lambert_internal,
+                                    .apply_unary = expr_lambert_wm1,
+                                    .apply_binary = NULL,
+                                    .simplify = expr_simplify_unary_operator,
+                                    .fold_const_unary = NULL};
+const expr_ops_t ops_normal_pdf = {.eval = eval_normal_pdf,
+                                   .deriv = deriv_normal_pdf,
+                                   .reverse = expr_reverse_normal_pdf,
+                                   .kind = EXPR_KIND_NORMAL_PDF,
+                                   .arity = EXPR_OP_UNARY,
+                                   .name = "normal_pdf",
+                                   .tex_name = "\\operatorname{normal\\_pdf}",
+                                   .apply_unary = expr_normal_pdf,
+                                   .apply_binary = NULL,
+                                   .integrate = expr_integrate_dispatch_primitive,
+                                   .simplify = expr_simplify_unary_operator,
+                                   .fold_const_unary = NULL};
+const expr_ops_t ops_normal_cdf = {.eval = eval_normal_cdf,
+                                   .deriv = deriv_normal_cdf,
+                                   .reverse = expr_reverse_normal_cdf,
+                                   .kind = EXPR_KIND_NORMAL_CDF,
+                                   .arity = EXPR_OP_UNARY,
+                                   .name = "normal_cdf",
+                                   .tex_name = "\\operatorname{normal\\_cdf}",
+                                   .apply_unary = expr_normal_cdf,
+                                   .apply_binary = NULL,
+                                   .integrate = expr_integrate_dispatch_primitive,
+                                   .simplify = expr_simplify_unary_operator,
+                                   .fold_const_unary = NULL};
+const expr_ops_t ops_normal_logpdf = {.eval = eval_normal_logpdf,
+                                      .deriv = deriv_normal_logpdf,
+                                      .reverse = expr_reverse_normal_logpdf,
+                                      .kind = EXPR_KIND_NORMAL_LOGPDF,
+                                      .arity = EXPR_OP_UNARY,
+                                      .name = "normal_logpdf",
+                                      .tex_name = "\\operatorname{normal\\_logpdf}",
+                                      .apply_unary = expr_normal_logpdf,
+                                      .apply_binary = NULL,
+                                      .integrate = expr_integrate_dispatch_primitive,
+                                      .simplify = expr_simplify_unary_operator,
+                                      .fold_const_unary = NULL};
+const expr_ops_t ops_pdf = {.eval = eval_normal_pdf,
+                            .deriv = deriv_pdf,
+                            .reverse = expr_reverse_normal_pdf,
+                            .kind = EXPR_KIND_NORMAL_PDF,
+                            .arity = EXPR_OP_UNARY,
+                            .name = "pdf",
+                            .tex_name = "\\operatorname{pdf}",
+                            .apply_unary = expr_pdf,
+                            .apply_binary = NULL,
+                            .integrate = expr_integrate_dispatch_primitive,
+                            .simplify = expr_simplify_unary_operator,
+                            .fold_const_unary = NULL};
+const expr_ops_t ops_cdf = {.eval = eval_normal_cdf,
+                            .deriv = deriv_cdf,
+                            .reverse = expr_reverse_normal_cdf,
+                            .kind = EXPR_KIND_NORMAL_CDF,
+                            .arity = EXPR_OP_UNARY,
+                            .name = "cdf",
+                            .tex_name = "\\operatorname{cdf}",
+                            .apply_unary = expr_cdf,
+                            .apply_binary = NULL,
+                            .integrate = expr_integrate_dispatch_primitive,
+                            .simplify = expr_simplify_unary_operator,
+                            .fold_const_unary = NULL};
+const expr_ops_t ops_logpdf = {.eval = eval_normal_logpdf,
+                               .deriv = deriv_logpdf,
+                               .reverse = expr_reverse_normal_logpdf,
+                               .kind = EXPR_KIND_NORMAL_LOGPDF,
+                               .arity = EXPR_OP_UNARY,
+                               .name = "logpdf",
+                               .tex_name = "\\operatorname{logpdf}",
+                               .apply_unary = expr_logpdf,
+                               .apply_binary = NULL,
+                               .integrate = expr_integrate_dispatch_primitive,
+                               .simplify = expr_simplify_unary_operator,
+                               .fold_const_unary = NULL};
+const expr_ops_t ops_ei = {.eval = eval_ei,
+                           .deriv = deriv_ei,
+                           .reverse = expr_reverse_ei,
+                           .kind = EXPR_KIND_EI,
+                           .arity = EXPR_OP_UNARY,
+                           .name = "Ei",
+                           .tex_name = "\\operatorname{Ei}",
+                           .apply_unary = expr_ei,
+                           .apply_binary = NULL,
+                           .integrate = expr_integrate_dispatch_primitive,
+                           .simplify = expr_simplify_unary_operator,
+                           .fold_const_unary = NULL};
+const expr_ops_t ops_e1 = {.eval = eval_e1,
+                           .deriv = deriv_e1,
+                           .reverse = expr_reverse_e1,
+                           .kind = EXPR_KIND_E1,
+                           .arity = EXPR_OP_UNARY,
+                           .name = "E1",
+                           .tex_name = "\\operatorname{E1}",
+                           .apply_unary = expr_e1,
+                           .apply_binary = NULL,
+                           .integrate = expr_integrate_dispatch_primitive,
+                           .simplify = expr_simplify_unary_operator,
+                           .fold_const_unary = NULL};
+const expr_ops_t ops_beta = {.eval = eval_beta,
+                             .deriv = deriv_beta,
+                             .reverse = expr_reverse_beta,
+                             .kind = EXPR_KIND_BETA,
+                             .arity = EXPR_OP_BINARY,
+                             .name = "beta",
+                             .tex_name = "\\operatorname{beta}",
+                             .apply_unary = NULL,
+                             .apply_binary = expr_beta,
+                             .simplify = expr_simplify_binary_operator,
+                             .fold_const_unary = NULL};
+const expr_ops_t ops_indexed_symbol = {.eval = eval_formal_series_component,
+                                       .deriv = deriv_indexed_symbol,
+                                       .reverse = expr_reverse_not_differentiable,
+                                       .kind = EXPR_KIND_INDEXED_SYMBOL,
+                                       .arity = EXPR_OP_BINARY,
+                                       .name = "indexed",
+                                       .tex_name = NULL,
+                                       .apply_unary = NULL,
+                                       .apply_binary = NULL,
+                                       .simplify = expr_simplify_binary_operator,
+                                       .fold_const_unary = NULL};
+const expr_ops_t ops_summation = {.eval = eval_formal_series_component,
+                                  .deriv = deriv_summation,
+                                  .reverse = expr_reverse_not_differentiable,
+                                  .kind = EXPR_KIND_SUMMATION,
+                                  .arity = EXPR_OP_BINARY,
+                                  .name = "sum",
+                                  .tex_name = NULL,
+                                  .apply_unary = NULL,
+                                  .apply_binary = NULL,
+                                  .integrate = integrate_summation,
+                                  .simplify = expr_simplify_binary_operator,
+                                  .fold_const_unary = NULL};
+const expr_ops_t ops_logbeta = {.eval = eval_logbeta,
+                                .deriv = deriv_logbeta,
+                                .reverse = expr_reverse_logbeta,
+                                .kind = EXPR_KIND_LOGBETA,
+                                .arity = EXPR_OP_BINARY,
+                                .name = "logbeta",
+                                .tex_name = "\\operatorname{logbeta}",
+                                .apply_unary = NULL,
+                                .apply_binary = expr_logbeta,
+                                .simplify = expr_simplify_binary_operator,
+                                .fold_const_unary = NULL};
+const expr_ops_t ops_gammainc_lower = {.eval = eval_gammainc_lower,
+                                       .deriv = deriv_gammainc_lower,
+                                       .reverse = expr_reverse_gammainc_lower,
+                                       .kind = EXPR_KIND_GAMMAINC_LOWER,
+                                       .arity = EXPR_OP_BINARY,
+                                       .name = "gammainc_lower",
+                                       .tex_name = "\\gamma",
+                                       .apply_unary = NULL,
+                                       .apply_binary = expr_gammainc_lower,
+                                       .simplify = expr_simplify_binary_operator,
+                                       .fold_const_unary = NULL};
+const expr_ops_t ops_gammainc_upper = {.eval = eval_gammainc_upper,
+                                       .deriv = deriv_gammainc_upper,
+                                       .reverse = expr_reverse_gammainc_upper,
+                                       .kind = EXPR_KIND_GAMMAINC_UPPER,
+                                       .arity = EXPR_OP_BINARY,
+                                       .name = "gammainc_upper",
+                                       .tex_name = "\\Gamma",
+                                       .apply_unary = NULL,
+                                       .apply_binary = expr_gammainc_upper,
+                                       .simplify = expr_simplify_binary_operator,
+                                       .fold_const_unary = NULL};
+const expr_ops_t ops_gammainc_P = {.eval = eval_gammainc_P,
+                                   .deriv = deriv_gammainc_P,
+                                   .reverse = expr_reverse_gammainc_P,
+                                   .kind = EXPR_KIND_GAMMAINC_P,
+                                   .arity = EXPR_OP_BINARY,
+                                   .name = "gammainc_P",
+                                   .tex_name = "\\operatorname{P}",
+                                   .apply_unary = NULL,
+                                   .apply_binary = expr_gammainc_P,
+                                   .simplify = expr_simplify_binary_operator,
+                                   .fold_const_unary = NULL};
+const expr_ops_t ops_gammainc_Q = {.eval = eval_gammainc_Q,
+                                   .deriv = deriv_gammainc_Q,
+                                   .reverse = expr_reverse_gammainc_Q,
+                                   .kind = EXPR_KIND_GAMMAINC_Q,
+                                   .arity = EXPR_OP_BINARY,
+                                   .name = "gammainc_Q",
+                                   .tex_name = "\\operatorname{Q}",
+                                   .apply_unary = NULL,
+                                   .apply_binary = expr_gammainc_Q,
+                                   .simplify = expr_simplify_binary_operator,
+                                   .fold_const_unary = NULL};
+const expr_ops_t ops_factorial = {.eval = eval_factorial,
+                                  .deriv = deriv_not_differentiable,
+                                  .reverse = expr_reverse_not_differentiable,
+                                  .kind = EXPR_KIND_FACTORIAL,
+                                  .arity = EXPR_OP_UNARY,
+                                  .diff_kind = EXPR_DIFF_NONE,
+                                  .name = "factorial",
+                                  .tex_name = "\\operatorname{factorial}",
+                                  .apply_unary = expr_factorial,
+                                  .apply_binary = NULL,
+                                  .simplify = expr_simplify_unary_operator,
+                                  .fold_const_unary = NULL};
+const expr_ops_t ops_fibonacci = {.eval = eval_fibonacci,
+                                  .deriv = deriv_not_differentiable,
+                                  .reverse = expr_reverse_not_differentiable,
+                                  .kind = EXPR_KIND_FIBONACCI,
+                                  .arity = EXPR_OP_UNARY,
+                                  .diff_kind = EXPR_DIFF_NONE,
+                                  .name = "fibonacci",
+                                  .tex_name = "\\operatorname{fibonacci}",
+                                  .apply_unary = expr_fibonacci,
+                                  .apply_binary = NULL,
+                                  .simplify = expr_simplify_unary_operator,
+                                  .fold_const_unary = NULL};
+const expr_ops_t ops_partition = {.eval = eval_partition,
+                                  .deriv = deriv_not_differentiable,
+                                  .reverse = expr_reverse_not_differentiable,
+                                  .kind = EXPR_KIND_PARTITION,
+                                  .arity = EXPR_OP_UNARY,
+                                  .diff_kind = EXPR_DIFF_NONE,
+                                  .name = "partition",
+                                  .tex_name = "\\operatorname{partition}",
+                                  .apply_unary = expr_partition,
+                                  .apply_binary = NULL,
+                                  .simplify = expr_simplify_unary_operator,
+                                  .fold_const_unary = NULL};
+const expr_ops_t ops_isqrt = {.eval = eval_isqrt,
+                              .deriv = deriv_not_differentiable,
+                              .reverse = expr_reverse_not_differentiable,
+                              .kind = EXPR_KIND_ISQRT,
+                              .arity = EXPR_OP_UNARY,
+                              .diff_kind = EXPR_DIFF_NONE,
+                              .name = "isqrt",
+                              .tex_name = "\\operatorname{isqrt}",
+                              .apply_unary = expr_isqrt,
+                              .apply_binary = NULL,
+                              .simplify = expr_simplify_unary_operator,
+                              .fold_const_unary = NULL};
+const expr_ops_t ops_gcd = {.eval = eval_gcd,
+                            .deriv = deriv_not_differentiable,
+                            .reverse = expr_reverse_not_differentiable,
+                            .kind = EXPR_KIND_GCD,
+                            .arity = EXPR_OP_BINARY,
+                            .diff_kind = EXPR_DIFF_NONE,
+                            .name = "gcd",
+                            .tex_name = "\\gcd",
+                            .apply_unary = NULL,
+                            .apply_binary = expr_gcd,
+                            .simplify = expr_simplify_binary_operator,
+                            .fold_const_unary = NULL};
+const expr_ops_t ops_lcm = {.eval = eval_lcm,
+                            .deriv = deriv_not_differentiable,
+                            .reverse = expr_reverse_not_differentiable,
+                            .kind = EXPR_KIND_LCM,
+                            .arity = EXPR_OP_BINARY,
+                            .diff_kind = EXPR_DIFF_NONE,
+                            .name = "lcm",
+                            .tex_name = "\\operatorname{lcm}",
+                            .apply_unary = NULL,
+                            .apply_binary = expr_lcm,
+                            .simplify = expr_simplify_binary_operator,
+                            .fold_const_unary = NULL};
+const expr_ops_t ops_mod = {.eval = eval_mod,
+                            .deriv = deriv_not_differentiable,
+                            .reverse = expr_reverse_not_differentiable,
+                            .kind = EXPR_KIND_MOD,
+                            .arity = EXPR_OP_BINARY,
+                            .diff_kind = EXPR_DIFF_NONE,
+                            .name = "mod",
+                            .tex_name = "\\operatorname{mod}",
+                            .apply_unary = NULL,
+                            .apply_binary = expr_mod,
+                            .simplify = expr_simplify_binary_operator,
+                            .fold_const_unary = NULL};
+const expr_ops_t ops_modinv = {.eval = eval_modinv,
+                               .deriv = deriv_not_differentiable,
+                               .reverse = expr_reverse_not_differentiable,
+                               .kind = EXPR_KIND_MODINV,
+                               .arity = EXPR_OP_BINARY,
+                               .diff_kind = EXPR_DIFF_NONE,
+                               .name = "modinv",
+                               .tex_name = "\\operatorname{modinv}",
+                               .apply_unary = NULL,
+                               .apply_binary = expr_modinv,
+                               .simplify = expr_simplify_binary_operator,
+                               .fold_const_unary = NULL};
+const expr_ops_t ops_is_prime = {.eval = eval_is_prime,
+                                 .deriv = deriv_not_differentiable,
+                                 .reverse = expr_reverse_not_differentiable,
+                                 .kind = EXPR_KIND_IS_PRIME,
+                                 .arity = EXPR_OP_UNARY,
+                                 .diff_kind = EXPR_DIFF_NONE,
+                                 .name = "is_prime",
+                                 .tex_name = "\\operatorname{is\\_prime}",
+                                 .apply_unary = expr_is_prime,
+                                 .apply_binary = NULL,
+                                 .simplify = expr_simplify_unary_operator,
+                                 .fold_const_unary = NULL};
+const expr_ops_t ops_next_prime = {.eval = eval_next_prime,
+                                   .deriv = deriv_not_differentiable,
+                                   .reverse = expr_reverse_not_differentiable,
+                                   .kind = EXPR_KIND_NEXT_PRIME,
+                                   .arity = EXPR_OP_UNARY,
+                                   .diff_kind = EXPR_DIFF_NONE,
+                                   .name = "next_prime",
+                                   .tex_name = "\\operatorname{next\\_prime}",
+                                   .apply_unary = expr_next_prime,
+                                   .apply_binary = NULL,
+                                   .simplify = expr_simplify_unary_operator,
+                                   .fold_const_unary = NULL};
+const expr_ops_t ops_prev_prime = {.eval = eval_prev_prime,
+                                   .deriv = deriv_not_differentiable,
+                                   .reverse = expr_reverse_not_differentiable,
+                                   .kind = EXPR_KIND_PREV_PRIME,
+                                   .arity = EXPR_OP_UNARY,
+                                   .diff_kind = EXPR_DIFF_NONE,
+                                   .name = "prev_prime",
+                                   .tex_name = "\\operatorname{prev\\_prime}",
+                                   .apply_unary = expr_prev_prime,
+                                   .apply_binary = NULL,
+                                   .simplify = expr_simplify_unary_operator,
+                                   .fold_const_unary = NULL};
+const expr_ops_t ops_bit_and = {.eval = eval_bit_and,
+                                .deriv = deriv_not_differentiable,
+                                .reverse = expr_reverse_not_differentiable,
+                                .kind = EXPR_KIND_BIT_AND,
+                                .arity = EXPR_OP_BINARY,
+                                .diff_kind = EXPR_DIFF_NONE,
+                                .name = "AND",
+                                .tex_name = "\\operatorname{AND}",
+                                .apply_unary = NULL,
+                                .apply_binary = expr_bit_and,
+                                .simplify = expr_simplify_binary_operator,
+                                .fold_const_unary = NULL};
+const expr_ops_t ops_bit_or = {.eval = eval_bit_or,
+                               .deriv = deriv_not_differentiable,
+                               .reverse = expr_reverse_not_differentiable,
+                               .kind = EXPR_KIND_BIT_OR,
+                               .arity = EXPR_OP_BINARY,
+                               .diff_kind = EXPR_DIFF_NONE,
+                               .name = "OR",
+                               .tex_name = "\\operatorname{OR}",
+                               .apply_unary = NULL,
+                               .apply_binary = expr_bit_or,
+                               .simplify = expr_simplify_binary_operator,
+                               .fold_const_unary = NULL};
+const expr_ops_t ops_bit_xor = {.eval = eval_bit_xor,
+                                .deriv = deriv_not_differentiable,
+                                .reverse = expr_reverse_not_differentiable,
+                                .kind = EXPR_KIND_BIT_XOR,
+                                .arity = EXPR_OP_BINARY,
+                                .diff_kind = EXPR_DIFF_NONE,
+                                .name = "XOR",
+                                .tex_name = "\\operatorname{XOR}",
+                                .apply_unary = NULL,
+                                .apply_binary = expr_bit_xor,
+                                .simplify = expr_simplify_binary_operator,
+                                .fold_const_unary = NULL};
+const expr_ops_t ops_bit_not = {.eval = eval_bit_not,
+                                .deriv = deriv_not_differentiable,
+                                .reverse = expr_reverse_not_differentiable,
+                                .kind = EXPR_KIND_BIT_NOT,
+                                .arity = EXPR_OP_UNARY,
+                                .diff_kind = EXPR_DIFF_NONE,
+                                .name = "NOT",
+                                .tex_name = "\\operatorname{NOT}",
+                                .apply_unary = expr_bit_not,
+                                .apply_binary = NULL,
+                                .simplify = expr_simplify_unary_operator,
+                                .fold_const_unary = NULL};
+const expr_ops_t ops_shl = {.eval = eval_shl,
+                            .deriv = deriv_not_differentiable,
+                            .reverse = expr_reverse_not_differentiable,
+                            .kind = EXPR_KIND_SHL,
+                            .arity = EXPR_OP_BINARY,
+                            .diff_kind = EXPR_DIFF_NONE,
+                            .name = "SHL",
+                            .tex_name = "\\operatorname{SHL}",
+                            .apply_unary = NULL,
+                            .apply_binary = expr_shl,
+                            .simplify = expr_simplify_binary_operator,
+                            .fold_const_unary = NULL};
+const expr_ops_t ops_shr = {.eval = eval_shr,
+                            .deriv = deriv_not_differentiable,
+                            .reverse = expr_reverse_not_differentiable,
+                            .kind = EXPR_KIND_SHR,
+                            .arity = EXPR_OP_BINARY,
+                            .diff_kind = EXPR_DIFF_NONE,
+                            .name = "SHR",
+                            .tex_name = "\\operatorname{SHR}",
+                            .apply_unary = NULL,
+                            .apply_binary = expr_shr,
+                            .simplify = expr_simplify_binary_operator,
+                            .fold_const_unary = NULL};
+const expr_ops_t ops_factors = {.eval = eval_factors,
+                                .deriv = deriv_not_differentiable,
+                                .reverse = expr_reverse_not_differentiable,
+                                .kind = EXPR_KIND_FACTORS,
+                                .arity = EXPR_OP_UNARY,
+                                .diff_kind = EXPR_DIFF_NONE,
+                                .name = "factors",
+                                .tex_name = "\\operatorname{factors}",
+                                .apply_unary = expr_factors,
+                                .apply_binary = NULL,
+                                .simplify = expr_simplify_unary_operator,
+                                .fold_const_unary = NULL};
 
 expr_t *expr_apply_unary_kind(expr_op_kind_t kind, const expr_t *arg)
 {
-    static const expr_ops_t * const unary_ops_by_kind[EXPR_KIND_COUNT] = {
-        [EXPR_KIND_NEG] = &ops_neg,
-        [EXPR_KIND_SIN] = &ops_sin,
-        [EXPR_KIND_COS] = &ops_cos,
-        [EXPR_KIND_TAN] = &ops_tan,
-        [EXPR_KIND_SEC] = &ops_sec,
-        [EXPR_KIND_COSEC] = &ops_cosec,
-        [EXPR_KIND_COT] = &ops_cot,
-        [EXPR_KIND_VERSIN] = &ops_versin,
-        [EXPR_KIND_VERCOS] = &ops_vercos,
-        [EXPR_KIND_COVERSIN] = &ops_coversin,
-        [EXPR_KIND_COVERCOS] = &ops_covercos,
-        [EXPR_KIND_HAVERSIN] = &ops_haversin,
-        [EXPR_KIND_HAVERCOS] = &ops_havercos,
-        [EXPR_KIND_HACOVERSIN] = &ops_hacoversin,
-        [EXPR_KIND_HACOVERCOS] = &ops_hacovercos,
-        [EXPR_KIND_SINH] = &ops_sinh,
-        [EXPR_KIND_COSH] = &ops_cosh,
-        [EXPR_KIND_TANH] = &ops_tanh,
-        [EXPR_KIND_SECH] = &ops_sech,
-        [EXPR_KIND_COSECH] = &ops_cosech,
-        [EXPR_KIND_COTH] = &ops_coth,
-        [EXPR_KIND_ASIN] = &ops_asin,
-        [EXPR_KIND_ACOS] = &ops_acos,
-        [EXPR_KIND_ATAN] = &ops_atan,
-        [EXPR_KIND_ASEC] = &ops_asec,
-        [EXPR_KIND_ACOSEC] = &ops_acosec,
-        [EXPR_KIND_ACOT] = &ops_acot,
-        [EXPR_KIND_ARCVERSIN] = &ops_arcversin,
-        [EXPR_KIND_ARCVERCOS] = &ops_arcvercos,
-        [EXPR_KIND_ARCCOVERSIN] = &ops_arccoversin,
-        [EXPR_KIND_ARCCOVERCOS] = &ops_arccovercos,
-        [EXPR_KIND_ARCHAVERSIN] = &ops_archaversin,
-        [EXPR_KIND_ARCHAVERCOS] = &ops_archavercos,
-        [EXPR_KIND_ARCHACOVERSIN] = &ops_archacoversin,
-        [EXPR_KIND_ARCHACOVERCOS] = &ops_archacovercos,
-        [EXPR_KIND_ASINH] = &ops_asinh,
-        [EXPR_KIND_ACOSH] = &ops_acosh,
-        [EXPR_KIND_ATANH] = &ops_atanh,
-        [EXPR_KIND_ASECH] = &ops_asech,
-        [EXPR_KIND_ACOSECH] = &ops_acosech,
-        [EXPR_KIND_ACOTH] = &ops_acoth,
-        [EXPR_KIND_EXP] = &ops_exp,
-        [EXPR_KIND_LOG] = &ops_log,
-        [EXPR_KIND_LOG10] = &ops_log10,
-        [EXPR_KIND_SQRT] = &ops_sqrt,
-        [EXPR_KIND_FLOOR] = &ops_floor,
-        [EXPR_KIND_CEIL] = &ops_ceil,
-        [EXPR_KIND_ABS] = &ops_abs,
-        [EXPR_KIND_ERF] = &ops_erf,
-        [EXPR_KIND_ERFC] = &ops_erfc,
-        [EXPR_KIND_LGAMMA] = &ops_lgamma,
-        [EXPR_KIND_ERFINV] = &ops_erfinv,
-        [EXPR_KIND_ERFCINV] = &ops_erfcinv,
-        [EXPR_KIND_GAMMA] = &ops_gamma,
-        [EXPR_KIND_DIGAMMA] = &ops_digamma,
-        [EXPR_KIND_TRIGAMMA] = &ops_trigamma,
-        [EXPR_KIND_DILOG] = &ops_dilog,
-        [EXPR_KIND_GAMMAINV] = &ops_gammainv,
-        [EXPR_KIND_LAMBERT_W] = &ops_lambert_w,
-        [EXPR_KIND_LAMBERT_WN] = &ops_lambert_wn,
-        [EXPR_KIND_LAMBERT_W0] = &ops_lambert_w0,
-        [EXPR_KIND_LAMBERT_WM1] = &ops_lambert_wm1,
-        [EXPR_KIND_NORMAL_PDF] = &ops_normal_pdf,
-        [EXPR_KIND_NORMAL_CDF] = &ops_normal_cdf,
-        [EXPR_KIND_NORMAL_LOGPDF] = &ops_normal_logpdf,
-        [EXPR_KIND_EI] = &ops_ei,
-        [EXPR_KIND_E1] = &ops_e1,
-        [EXPR_KIND_FACTORIAL] = &ops_factorial,
-        [EXPR_KIND_FIBONACCI] = &ops_fibonacci,
-        [EXPR_KIND_PARTITION] = &ops_partition,
-        [EXPR_KIND_ISQRT] = &ops_isqrt,
-        [EXPR_KIND_IS_PRIME] = &ops_is_prime,
-        [EXPR_KIND_NEXT_PRIME] = &ops_next_prime,
-        [EXPR_KIND_PREV_PRIME] = &ops_prev_prime,
-        [EXPR_KIND_BIT_NOT] = &ops_bit_not,
-        [EXPR_KIND_FACTORS] = &ops_factors
-    };
+    static const expr_ops_t *const unary_ops_by_kind[EXPR_KIND_COUNT] = {[EXPR_KIND_NEG] = &ops_neg,
+                                                                         [EXPR_KIND_SIN] = &ops_sin,
+                                                                         [EXPR_KIND_COS] = &ops_cos,
+                                                                         [EXPR_KIND_TAN] = &ops_tan,
+                                                                         [EXPR_KIND_SEC] = &ops_sec,
+                                                                         [EXPR_KIND_COSEC] = &ops_cosec,
+                                                                         [EXPR_KIND_COT] = &ops_cot,
+                                                                         [EXPR_KIND_VERSIN] = &ops_versin,
+                                                                         [EXPR_KIND_VERCOS] = &ops_vercos,
+                                                                         [EXPR_KIND_COVERSIN] = &ops_coversin,
+                                                                         [EXPR_KIND_COVERCOS] = &ops_covercos,
+                                                                         [EXPR_KIND_HAVERSIN] = &ops_haversin,
+                                                                         [EXPR_KIND_HAVERCOS] = &ops_havercos,
+                                                                         [EXPR_KIND_HACOVERSIN] = &ops_hacoversin,
+                                                                         [EXPR_KIND_HACOVERCOS] = &ops_hacovercos,
+                                                                         [EXPR_KIND_SINH] = &ops_sinh,
+                                                                         [EXPR_KIND_COSH] = &ops_cosh,
+                                                                         [EXPR_KIND_TANH] = &ops_tanh,
+                                                                         [EXPR_KIND_SECH] = &ops_sech,
+                                                                         [EXPR_KIND_COSECH] = &ops_cosech,
+                                                                         [EXPR_KIND_COTH] = &ops_coth,
+                                                                         [EXPR_KIND_ASIN] = &ops_asin,
+                                                                         [EXPR_KIND_ACOS] = &ops_acos,
+                                                                         [EXPR_KIND_ATAN] = &ops_atan,
+                                                                         [EXPR_KIND_ASEC] = &ops_asec,
+                                                                         [EXPR_KIND_ACOSEC] = &ops_acosec,
+                                                                         [EXPR_KIND_ACOT] = &ops_acot,
+                                                                         [EXPR_KIND_ARCVERSIN] = &ops_arcversin,
+                                                                         [EXPR_KIND_ARCVERCOS] = &ops_arcvercos,
+                                                                         [EXPR_KIND_ARCCOVERSIN] = &ops_arccoversin,
+                                                                         [EXPR_KIND_ARCCOVERCOS] = &ops_arccovercos,
+                                                                         [EXPR_KIND_ARCHAVERSIN] = &ops_archaversin,
+                                                                         [EXPR_KIND_ARCHAVERCOS] = &ops_archavercos,
+                                                                         [EXPR_KIND_ARCHACOVERSIN] = &ops_archacoversin,
+                                                                         [EXPR_KIND_ARCHACOVERCOS] = &ops_archacovercos,
+                                                                         [EXPR_KIND_ASINH] = &ops_asinh,
+                                                                         [EXPR_KIND_ACOSH] = &ops_acosh,
+                                                                         [EXPR_KIND_ATANH] = &ops_atanh,
+                                                                         [EXPR_KIND_ASECH] = &ops_asech,
+                                                                         [EXPR_KIND_ACOSECH] = &ops_acosech,
+                                                                         [EXPR_KIND_ACOTH] = &ops_acoth,
+                                                                         [EXPR_KIND_EXP] = &ops_exp,
+                                                                         [EXPR_KIND_LOG] = &ops_log,
+                                                                         [EXPR_KIND_LOG10] = &ops_log10,
+                                                                         [EXPR_KIND_SQRT] = &ops_sqrt,
+                                                                         [EXPR_KIND_FLOOR] = &ops_floor,
+                                                                         [EXPR_KIND_CEIL] = &ops_ceil,
+                                                                         [EXPR_KIND_ABS] = &ops_abs,
+                                                                         [EXPR_KIND_ERF] = &ops_erf,
+                                                                         [EXPR_KIND_ERFC] = &ops_erfc,
+                                                                         [EXPR_KIND_LGAMMA] = &ops_lgamma,
+                                                                         [EXPR_KIND_ERFINV] = &ops_erfinv,
+                                                                         [EXPR_KIND_ERFCINV] = &ops_erfcinv,
+                                                                         [EXPR_KIND_GAMMA] = &ops_gamma,
+                                                                         [EXPR_KIND_DIGAMMA] = &ops_digamma,
+                                                                         [EXPR_KIND_TRIGAMMA] = &ops_trigamma,
+                                                                         [EXPR_KIND_DILOG] = &ops_dilog,
+                                                                         [EXPR_KIND_GAMMAINV] = &ops_gammainv,
+                                                                         [EXPR_KIND_LAMBERT_W] = &ops_lambert_w,
+                                                                         [EXPR_KIND_LAMBERT_WN] = &ops_lambert_wn,
+                                                                         [EXPR_KIND_LAMBERT_W0] = &ops_lambert_w0,
+                                                                         [EXPR_KIND_LAMBERT_WM1] = &ops_lambert_wm1,
+                                                                         [EXPR_KIND_NORMAL_PDF] = &ops_normal_pdf,
+                                                                         [EXPR_KIND_NORMAL_CDF] = &ops_normal_cdf,
+                                                                         [EXPR_KIND_NORMAL_LOGPDF] = &ops_normal_logpdf,
+                                                                         [EXPR_KIND_EI] = &ops_ei,
+                                                                         [EXPR_KIND_E1] = &ops_e1,
+                                                                         [EXPR_KIND_FACTORIAL] = &ops_factorial,
+                                                                         [EXPR_KIND_FIBONACCI] = &ops_fibonacci,
+                                                                         [EXPR_KIND_PARTITION] = &ops_partition,
+                                                                         [EXPR_KIND_ISQRT] = &ops_isqrt,
+                                                                         [EXPR_KIND_IS_PRIME] = &ops_is_prime,
+                                                                         [EXPR_KIND_NEXT_PRIME] = &ops_next_prime,
+                                                                         [EXPR_KIND_PREV_PRIME] = &ops_prev_prime,
+                                                                         [EXPR_KIND_BIT_NOT] = &ops_bit_not,
+                                                                         [EXPR_KIND_FACTORS] = &ops_factors};
     const expr_ops_t *ops = NULL;
 
     if ((unsigned)kind < (unsigned)EXPR_KIND_COUNT)
@@ -1096,64 +1539,238 @@ expr_t *expr_apply_unary_kind(expr_op_kind_t kind, const expr_t *arg)
     return NULL;
 }
 
-expr_t *expr_sqrt(const expr_t *a) { return expr_math_wrap_unary(&ops_sqrt, a); }
-expr_t *expr_exp(const expr_t *a) { return expr_math_wrap_unary(&ops_exp, a); }
-expr_t *expr_log(const expr_t *a) { return expr_math_wrap_unary(&ops_log, a); }
-expr_t *expr_log10(const expr_t *a) { return expr_math_wrap_unary(&ops_log10, a); }
-expr_t *expr_floor(const expr_t *a) { return expr_math_wrap_unary(&ops_floor, a); }
-expr_t *expr_ceil(const expr_t *a) { return expr_math_wrap_unary(&ops_ceil, a); }
-expr_t *expr_sin(const expr_t *a) { return expr_math_wrap_unary(&ops_sin, a); }
-expr_t *expr_cos(const expr_t *a) { return expr_math_wrap_unary(&ops_cos, a); }
-expr_t *expr_tan(const expr_t *a) { return expr_math_wrap_unary(&ops_tan, a); }
-expr_t *expr_sec(const expr_t *a) { return expr_math_wrap_unary(&ops_sec, a); }
-expr_t *expr_cosec(const expr_t *a) { return expr_math_wrap_unary(&ops_cosec, a); }
-expr_t *expr_cot(const expr_t *a) { return expr_math_wrap_unary(&ops_cot, a); }
-expr_t *expr_versin(const expr_t *a) { return expr_math_wrap_unary(&ops_versin, a); }
-expr_t *expr_vercos(const expr_t *a) { return expr_math_wrap_unary(&ops_vercos, a); }
-expr_t *expr_coversin(const expr_t *a) { return expr_math_wrap_unary(&ops_coversin, a); }
-expr_t *expr_covercos(const expr_t *a) { return expr_math_wrap_unary(&ops_covercos, a); }
-expr_t *expr_haversin(const expr_t *a) { return expr_math_wrap_unary(&ops_haversin, a); }
-expr_t *expr_havercos(const expr_t *a) { return expr_math_wrap_unary(&ops_havercos, a); }
-expr_t *expr_hacoversin(const expr_t *a) { return expr_math_wrap_unary(&ops_hacoversin, a); }
-expr_t *expr_hacovercos(const expr_t *a) { return expr_math_wrap_unary(&ops_hacovercos, a); }
-expr_t *expr_sinh(const expr_t *a) { return expr_math_wrap_unary(&ops_sinh, a); }
-expr_t *expr_cosh(const expr_t *a) { return expr_math_wrap_unary(&ops_cosh, a); }
-expr_t *expr_tanh(const expr_t *a) { return expr_math_wrap_unary(&ops_tanh, a); }
-expr_t *expr_sech(const expr_t *a) { return expr_math_wrap_unary(&ops_sech, a); }
-expr_t *expr_cosech(const expr_t *a) { return expr_math_wrap_unary(&ops_cosech, a); }
-expr_t *expr_coth(const expr_t *a) { return expr_math_wrap_unary(&ops_coth, a); }
-expr_t *expr_asin(const expr_t *a) { return expr_math_wrap_unary(&ops_asin, a); }
-expr_t *expr_acos(const expr_t *a) { return expr_math_wrap_unary(&ops_acos, a); }
-expr_t *expr_atan(const expr_t *a) { return expr_math_wrap_unary(&ops_atan, a); }
-expr_t *expr_asec(const expr_t *a) { return expr_math_wrap_unary(&ops_asec, a); }
-expr_t *expr_acosec(const expr_t *a) { return expr_math_wrap_unary(&ops_acosec, a); }
-expr_t *expr_acot(const expr_t *a) { return expr_math_wrap_unary(&ops_acot, a); }
-expr_t *expr_arcversin(const expr_t *a) { return expr_math_wrap_unary(&ops_arcversin, a); }
-expr_t *expr_arcvercos(const expr_t *a) { return expr_math_wrap_unary(&ops_arcvercos, a); }
-expr_t *expr_arccoversin(const expr_t *a) { return expr_math_wrap_unary(&ops_arccoversin, a); }
-expr_t *expr_arccovercos(const expr_t *a) { return expr_math_wrap_unary(&ops_arccovercos, a); }
-expr_t *expr_archaversin(const expr_t *a) { return expr_math_wrap_unary(&ops_archaversin, a); }
-expr_t *expr_archavercos(const expr_t *a) { return expr_math_wrap_unary(&ops_archavercos, a); }
-expr_t *expr_archacoversin(const expr_t *a) { return expr_math_wrap_unary(&ops_archacoversin, a); }
-expr_t *expr_archacovercos(const expr_t *a) { return expr_math_wrap_unary(&ops_archacovercos, a); }
-expr_t *expr_atan2(const expr_t *a, const expr_t *b) { return expr_math_wrap_binary(&ops_atan2, a, b); }
-expr_t *expr_asinh(const expr_t *a) { return expr_math_wrap_unary(&ops_asinh, a); }
-expr_t *expr_acosh(const expr_t *a) { return expr_math_wrap_unary(&ops_acosh, a); }
-expr_t *expr_atanh(const expr_t *a) { return expr_math_wrap_unary(&ops_atanh, a); }
-expr_t *expr_asech(const expr_t *a) { return expr_math_wrap_unary(&ops_asech, a); }
-expr_t *expr_acosech(const expr_t *a) { return expr_math_wrap_unary(&ops_acosech, a); }
-expr_t *expr_acoth(const expr_t *a) { return expr_math_wrap_unary(&ops_acoth, a); }
-expr_t *expr_abs(const expr_t *a) { return expr_math_wrap_unary(&ops_abs, a); }
-expr_t *expr_erf(const expr_t *a) { return expr_math_wrap_unary(&ops_erf, a); }
-expr_t *expr_erfc(const expr_t *a) { return expr_math_wrap_unary(&ops_erfc, a); }
-expr_t *expr_lgamma(const expr_t *a) { return expr_math_wrap_unary(&ops_lgamma, a); }
-expr_t *expr_hypot(const expr_t *a, const expr_t *b) { return expr_math_wrap_binary(&ops_hypot, a, b); }
-expr_t *expr_erfinv(const expr_t *a) { return expr_math_wrap_unary(&ops_erfinv, a); }
-expr_t *expr_erfcinv(const expr_t *a) { return expr_math_wrap_unary(&ops_erfcinv, a); }
-expr_t *expr_gamma(const expr_t *a) { return expr_math_wrap_unary(&ops_gamma, a); }
-expr_t *expr_digamma(const expr_t *a) { return expr_math_wrap_unary(&ops_digamma, a); }
-expr_t *expr_trigamma(const expr_t *a) { return expr_math_wrap_unary(&ops_trigamma, a); }
-expr_t *expr_polygamma_xp(const expr_t *order, const expr_t *arg) { return expr_math_wrap_binary(&ops_polygamma, order, arg); }
+expr_t *expr_sqrt(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_sqrt, a);
+}
+expr_t *expr_exp(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_exp, a);
+}
+expr_t *expr_log(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_log, a);
+}
+expr_t *expr_log10(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_log10, a);
+}
+expr_t *expr_floor(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_floor, a);
+}
+expr_t *expr_ceil(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_ceil, a);
+}
+expr_t *expr_sin(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_sin, a);
+}
+expr_t *expr_cos(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_cos, a);
+}
+expr_t *expr_tan(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_tan, a);
+}
+expr_t *expr_sec(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_sec, a);
+}
+expr_t *expr_cosec(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_cosec, a);
+}
+expr_t *expr_cot(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_cot, a);
+}
+expr_t *expr_versin(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_versin, a);
+}
+expr_t *expr_vercos(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_vercos, a);
+}
+expr_t *expr_coversin(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_coversin, a);
+}
+expr_t *expr_covercos(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_covercos, a);
+}
+expr_t *expr_haversin(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_haversin, a);
+}
+expr_t *expr_havercos(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_havercos, a);
+}
+expr_t *expr_hacoversin(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_hacoversin, a);
+}
+expr_t *expr_hacovercos(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_hacovercos, a);
+}
+expr_t *expr_sinh(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_sinh, a);
+}
+expr_t *expr_cosh(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_cosh, a);
+}
+expr_t *expr_tanh(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_tanh, a);
+}
+expr_t *expr_sech(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_sech, a);
+}
+expr_t *expr_cosech(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_cosech, a);
+}
+expr_t *expr_coth(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_coth, a);
+}
+expr_t *expr_asin(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_asin, a);
+}
+expr_t *expr_acos(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_acos, a);
+}
+expr_t *expr_atan(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_atan, a);
+}
+expr_t *expr_asec(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_asec, a);
+}
+expr_t *expr_acosec(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_acosec, a);
+}
+expr_t *expr_acot(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_acot, a);
+}
+expr_t *expr_arcversin(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_arcversin, a);
+}
+expr_t *expr_arcvercos(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_arcvercos, a);
+}
+expr_t *expr_arccoversin(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_arccoversin, a);
+}
+expr_t *expr_arccovercos(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_arccovercos, a);
+}
+expr_t *expr_archaversin(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_archaversin, a);
+}
+expr_t *expr_archavercos(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_archavercos, a);
+}
+expr_t *expr_archacoversin(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_archacoversin, a);
+}
+expr_t *expr_archacovercos(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_archacovercos, a);
+}
+expr_t *expr_atan2(const expr_t *a, const expr_t *b)
+{
+    return expr_math_wrap_binary(&ops_atan2, a, b);
+}
+expr_t *expr_asinh(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_asinh, a);
+}
+expr_t *expr_acosh(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_acosh, a);
+}
+expr_t *expr_atanh(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_atanh, a);
+}
+expr_t *expr_asech(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_asech, a);
+}
+expr_t *expr_acosech(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_acosech, a);
+}
+expr_t *expr_acoth(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_acoth, a);
+}
+expr_t *expr_abs(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_abs, a);
+}
+expr_t *expr_erf(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_erf, a);
+}
+expr_t *expr_erfc(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_erfc, a);
+}
+expr_t *expr_lgamma(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_lgamma, a);
+}
+expr_t *expr_hypot(const expr_t *a, const expr_t *b)
+{
+    return expr_math_wrap_binary(&ops_hypot, a, b);
+}
+expr_t *expr_erfinv(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_erfinv, a);
+}
+expr_t *expr_erfcinv(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_erfcinv, a);
+}
+expr_t *expr_gamma(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_gamma, a);
+}
+expr_t *expr_digamma(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_digamma, a);
+}
+expr_t *expr_trigamma(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_trigamma, a);
+}
+expr_t *expr_polygamma_xp(const expr_t *order, const expr_t *arg)
+{
+    return expr_math_wrap_binary(&ops_polygamma, order, arg);
+}
 expr_t *expr_polygamma(unsigned int order, const expr_t *a)
 {
     NUM_SCOPE(scope);
@@ -1164,8 +1781,14 @@ expr_t *expr_polygamma(unsigned int order, const expr_t *a)
     expr_free(order_xp);
     return out;
 }
-expr_t *expr_dilog(const expr_t *a) { return expr_math_wrap_unary(&ops_dilog, a); }
-expr_t *expr_polylog_xp(const expr_t *order, const expr_t *arg) { return expr_math_wrap_binary(&ops_polylog, order, arg); }
+expr_t *expr_dilog(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_dilog, a);
+}
+expr_t *expr_polylog_xp(const expr_t *order, const expr_t *arg)
+{
+    return expr_math_wrap_binary(&ops_polylog, order, arg);
+}
 expr_t *expr_polylog(unsigned int order, const expr_t *a)
 {
     NUM_SCOPE(scope);
@@ -1176,7 +1799,10 @@ expr_t *expr_polylog(unsigned int order, const expr_t *a)
     expr_free(order_xp);
     return out;
 }
-expr_t *expr_legendre_chi_xp(const expr_t *order, const expr_t *arg) { return expr_math_wrap_binary(&ops_legendre_chi, order, arg); }
+expr_t *expr_legendre_chi_xp(const expr_t *order, const expr_t *arg)
+{
+    return expr_math_wrap_binary(&ops_legendre_chi, order, arg);
+}
 expr_t *expr_legendre_chi(unsigned int order, const expr_t *a)
 {
     NUM_SCOPE(scope);
@@ -1196,25 +1822,19 @@ expr_t *expr_bessel_y(const expr_t *order, const expr_t *argument)
     return expr_math_wrap_binary(&ops_bessel_y, order, argument);
 }
 
-expr_t *expr_lommel_s(const expr_t *mu, const expr_t *nu,
-                      const expr_t *argument)
+expr_t *expr_lommel_s(const expr_t *mu, const expr_t *nu, const expr_t *argument)
 {
     expr_t *parameters = expr_lommel_s_pack(mu, nu);
-    expr_t *out = parameters
-        ? expr_math_wrap_binary(&ops_lommel_s, parameters, argument) : NULL;
+    expr_t *out = parameters ? expr_math_wrap_binary(&ops_lommel_s, parameters, argument) : NULL;
 
     expr_free(parameters);
     return out;
 }
 
-expr_t *expr_lommel_s_derivative_internal(const expr_t *mu,
-                                          const expr_t *nu,
-                                          const expr_t *argument)
+expr_t *expr_lommel_s_derivative_internal(const expr_t *mu, const expr_t *nu, const expr_t *argument)
 {
     expr_t *parameters = expr_lommel_s_pack(mu, nu);
-    expr_t *out = parameters
-        ? expr_math_wrap_binary(&ops_lommel_s_derivative,
-                                parameters, argument) : NULL;
+    expr_t *out = parameters ? expr_math_wrap_binary(&ops_lommel_s_derivative, parameters, argument) : NULL;
 
     expr_free(parameters);
     return out;
@@ -1225,17 +1845,14 @@ static expr_t *expr_lommel_s_pack(const expr_t *mu, const expr_t *nu)
     return expr_math_wrap_binary(&ops_lommel_s_pack, mu, nu);
 }
 
-static expr_t *expr_lommel_s_from_pack(const expr_t *parameters,
-                                       const expr_t *argument)
+static expr_t *expr_lommel_s_from_pack(const expr_t *parameters, const expr_t *argument)
 {
     return expr_math_wrap_binary(&ops_lommel_s, parameters, argument);
 }
 
-static expr_t *expr_lommel_s_derivative_from_pack(
-    const expr_t *parameters, const expr_t *argument)
+static expr_t *expr_lommel_s_derivative_from_pack(const expr_t *parameters, const expr_t *argument)
 {
-    return expr_math_wrap_binary(&ops_lommel_s_derivative,
-                                 parameters, argument);
+    return expr_math_wrap_binary(&ops_lommel_s_derivative, parameters, argument);
 }
 
 static expr_t *expr_appell_f1_pack(const expr_t *left, const expr_t *right)
@@ -1248,9 +1865,8 @@ static expr_t *expr_appell_f1_from_packs(const expr_t *params, const expr_t *var
     return expr_math_wrap_binary(&ops_appell_f1, params, vars);
 }
 
-expr_t *expr_appell_f1(const expr_t *a, const expr_t *b1,
-                       const expr_t *b2, const expr_t *c,
-                       const expr_t *x, const expr_t *y)
+expr_t *expr_appell_f1(const expr_t *a, const expr_t *b1, const expr_t *b2, const expr_t *c, const expr_t *x,
+                       const expr_t *y)
 {
     expr_t *ab = NULL;
     expr_t *bc = NULL;
@@ -1274,8 +1890,158 @@ expr_t *expr_appell_f1(const expr_t *a, const expr_t *b1,
     return out;
 }
 
-expr_t *expr_gammainv(const expr_t *a) { return expr_math_wrap_unary(&ops_gammainv, a); }
-expr_t *expr_lambert_w(const expr_t *a) { return expr_math_wrap_unary(&ops_lambert_w, a); }
+static expr_t *expr_hypergeometric_pFq_pack(const expr_t *left, const expr_t *right)
+{
+    return expr_math_wrap_binary(&ops_hypergeometric_pFq_pack, left, right);
+}
+
+static expr_t *expr_hypergeometric_pFq_from_pack(const expr_t *parameters, const expr_t *argument)
+{
+    return expr_math_wrap_binary(&ops_hypergeometric_pFq, parameters, argument);
+}
+
+static expr_t *expr_lauricella_f_from_packs(const expr_t *params, const expr_t *vars)
+{
+    return expr_math_wrap_binary(&ops_lauricella_f, params, vars);
+}
+
+static expr_t *expr_hypergeometric_parameter_values(size_t count, const expr_t *const *values, const expr_t *empty)
+{
+    expr_t *list;
+
+    if (count == 0u)
+        return expr_clone(empty);
+    if (!values || !values[0])
+        return NULL;
+    expr_retain(values[0]);
+    list = (expr_t *)values[0];
+    for (size_t i = 1u; list && i < count; ++i) {
+        expr_t *next;
+
+        if (!values[i]) {
+            expr_free(list);
+            return NULL;
+        }
+        next = expr_hypergeometric_pFq_pack(list, values[i]);
+        expr_free(list);
+        list = next;
+    }
+    return list;
+}
+
+static expr_t *expr_hypergeometric_parameter_set(size_t count, const expr_t *const *values)
+{
+    number_t count_value;
+    expr_t *count_expr;
+    expr_t *value_expr;
+    expr_t *set;
+
+    if (count > (size_t)LONG_MAX)
+        return NULL;
+    count_value = num_create_from_long((long)count);
+    count_expr = expr_new_const(count_value);
+    value_expr = count_expr ? expr_hypergeometric_parameter_values(count, values, count_expr) : NULL;
+    set = count_expr && value_expr ? expr_hypergeometric_pFq_pack(count_expr, value_expr) : NULL;
+    expr_free(value_expr);
+    expr_free(count_expr);
+    return set;
+}
+
+expr_t *expr_hypergeometric_pFq(size_t upper_count, const expr_t *const *upper, size_t lower_count,
+                                const expr_t *const *lower, const expr_t *argument)
+{
+    expr_t *upper_set = NULL;
+    expr_t *lower_set = NULL;
+    expr_t *parameters = NULL;
+    expr_t *out = NULL;
+
+    if ((upper_count > 0u && !upper) || (lower_count > 0u && !lower) || !argument)
+        return NULL;
+
+    upper_set = expr_hypergeometric_parameter_set(upper_count, upper);
+    lower_set = expr_hypergeometric_parameter_set(lower_count, lower);
+    parameters = upper_set && lower_set ? expr_hypergeometric_pFq_pack(upper_set, lower_set) : NULL;
+    out = parameters ? expr_math_wrap_binary(&ops_hypergeometric_pFq, parameters, argument) : NULL;
+
+    expr_free(parameters);
+    expr_free(lower_set);
+    expr_free(upper_set);
+    return out;
+}
+
+expr_t *expr_hypergeometric_pFq_from_args(size_t argument_count, expr_t *const *arguments)
+{
+    double upper_count_value;
+    double lower_count_value;
+    size_t upper_count;
+    size_t lower_count;
+
+    if (!arguments || argument_count < 3u || !expr_is_const(arguments[0]) || !expr_is_const(arguments[1]) ||
+        !num_is_real(arguments[0]->c) || !num_is_integer(arguments[0]->c) || !num_is_real(arguments[1]->c) ||
+        !num_is_integer(arguments[1]->c) || num_get_sign(arguments[0]->c) < 0 || num_get_sign(arguments[1]->c) < 0)
+        return NULL;
+    upper_count_value = num_to_double(arguments[0]->c);
+    lower_count_value = num_to_double(arguments[1]->c);
+    if (!isfinite(upper_count_value) || !isfinite(lower_count_value) || upper_count_value > 1024.0 ||
+        lower_count_value > 1024.0)
+        return NULL;
+    upper_count = (size_t)upper_count_value;
+    lower_count = (size_t)lower_count_value;
+    if (argument_count != upper_count + lower_count + 3u)
+        return NULL;
+    return expr_hypergeometric_pFq(upper_count, (const expr_t *const *)&arguments[2], lower_count,
+                                   (const expr_t *const *)&arguments[2u + upper_count], arguments[argument_count - 1u]);
+}
+
+expr_t *expr_lauricella_f(const expr_t *a, size_t variable_count, const expr_t *const *b, const expr_t *c,
+                          const expr_t *const *x)
+{
+    expr_t *a_c = NULL;
+    expr_t *b_set = NULL;
+    expr_t *x_set = NULL;
+    expr_t *parameters = NULL;
+    expr_t *out = NULL;
+
+    if (!a || !c || (variable_count > 0u && (!b || !x)))
+        return NULL;
+    a_c = expr_hypergeometric_pFq_pack(a, c);
+    b_set = expr_hypergeometric_parameter_set(variable_count, b);
+    x_set = expr_hypergeometric_parameter_set(variable_count, x);
+    parameters = a_c && b_set ? expr_hypergeometric_pFq_pack(a_c, b_set) : NULL;
+    out = parameters && x_set ? expr_math_wrap_binary(&ops_lauricella_f, parameters, x_set) : NULL;
+    expr_free(parameters);
+    expr_free(x_set);
+    expr_free(b_set);
+    expr_free(a_c);
+    return out;
+}
+
+expr_t *expr_lauricella_f_from_args(size_t argument_count, expr_t *const *arguments)
+{
+    double count_value;
+    size_t variable_count;
+
+    if (!arguments || argument_count < 3u || !expr_is_const(arguments[0]) || !num_is_real(arguments[0]->c) ||
+        !num_is_integer(arguments[0]->c) || num_get_sign(arguments[0]->c) < 0)
+        return NULL;
+    count_value = num_to_double(arguments[0]->c);
+    if (!isfinite(count_value) || count_value > 512.0)
+        return NULL;
+    variable_count = (size_t)count_value;
+    if (argument_count != 2u * variable_count + 3u)
+        return NULL;
+    return expr_lauricella_f(arguments[1], variable_count, (const expr_t *const *)&arguments[2],
+                             arguments[2u + variable_count], (const expr_t *const *)&arguments[3u + variable_count]);
+}
+
+expr_t *expr_gammainv(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_gammainv, a);
+}
+expr_t *expr_lambert_w(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_lambert_w, a);
+}
 expr_t *expr_lambert_wn_xp(const expr_t *branch, const expr_t *arg)
 {
     if (branch && expr_is_const(branch)) {
@@ -1286,25 +2052,62 @@ expr_t *expr_lambert_wn_xp(const expr_t *branch, const expr_t *arg)
     }
     return expr_math_wrap_binary(&ops_lambert_wn, branch, arg);
 }
-expr_t *expr_lambert_wn(const expr_t *branch, const expr_t *arg) { return expr_lambert_wn_xp(branch, arg); }
-expr_t *expr_lambert_w0(const expr_t *a) { return expr_math_wrap_unary(&ops_lambert_w0, a); }
-expr_t *expr_lambert_wm1(const expr_t *a) { return expr_math_wrap_unary(&ops_lambert_wm1, a); }
-expr_t *expr_normal_pdf(const expr_t *a) { return expr_math_wrap_unary(&ops_normal_pdf, a); }
-expr_t *expr_normal_cdf(const expr_t *a) { return expr_math_wrap_unary(&ops_normal_cdf, a); }
-expr_t *expr_normal_logpdf(const expr_t *a) { return expr_math_wrap_unary(&ops_normal_logpdf, a); }
-expr_t *expr_pdf(const expr_t *a) { return expr_math_wrap_unary(&ops_pdf, a); }
-expr_t *expr_cdf(const expr_t *a) { return expr_math_wrap_unary(&ops_cdf, a); }
-expr_t *expr_logpdf(const expr_t *a) { return expr_math_wrap_unary(&ops_logpdf, a); }
-expr_t *expr_ei(const expr_t *a) { return expr_math_wrap_unary(&ops_ei, a); }
-expr_t *expr_e1(const expr_t *a) { return expr_math_wrap_unary(&ops_e1, a); }
-expr_t *expr_beta(const expr_t *a, const expr_t *b) { return expr_math_wrap_binary(&ops_beta, a, b); }
-expr_t *expr_logbeta(const expr_t *a, const expr_t *b) { return expr_math_wrap_binary(&ops_logbeta, a, b); }
+expr_t *expr_lambert_wn(const expr_t *branch, const expr_t *arg)
+{
+    return expr_lambert_wn_xp(branch, arg);
+}
+expr_t *expr_lambert_w0(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_lambert_w0, a);
+}
+expr_t *expr_lambert_wm1(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_lambert_wm1, a);
+}
+expr_t *expr_normal_pdf(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_normal_pdf, a);
+}
+expr_t *expr_normal_cdf(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_normal_cdf, a);
+}
+expr_t *expr_normal_logpdf(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_normal_logpdf, a);
+}
+expr_t *expr_pdf(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_pdf, a);
+}
+expr_t *expr_cdf(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_cdf, a);
+}
+expr_t *expr_logpdf(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_logpdf, a);
+}
+expr_t *expr_ei(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_ei, a);
+}
+expr_t *expr_e1(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_e1, a);
+}
+expr_t *expr_beta(const expr_t *a, const expr_t *b)
+{
+    return expr_math_wrap_binary(&ops_beta, a, b);
+}
+expr_t *expr_logbeta(const expr_t *a, const expr_t *b)
+{
+    return expr_math_wrap_binary(&ops_logbeta, a, b);
+}
 expr_t *expr_new_indexed_symbol(const char *name, const expr_t *index)
 {
     expr_t *symbol = expr_new_named_const(NUM_NAN, name);
-    expr_t *out = symbol && index
-        ? expr_math_wrap_binary(&ops_indexed_symbol, symbol, index)
-        : NULL;
+    expr_t *out = symbol && index ? expr_math_wrap_binary(&ops_indexed_symbol, symbol, index) : NULL;
 
     expr_free(symbol);
     return out;
@@ -1314,40 +2117,98 @@ expr_t *expr_new_summation(const expr_t *term, const expr_t *index)
 {
     return expr_math_wrap_binary(&ops_summation, term, index);
 }
-expr_t *expr_new_finite_summation(const expr_t *term,
-                                  const expr_t *index,
-                                  const expr_t *upper)
+expr_t *expr_new_finite_summation(const expr_t *term, const expr_t *index, const expr_t *upper)
 {
-    expr_t *bounds = expr_math_wrap_binary(
-        &ops_argument_list, index, upper);
-    expr_t *out = bounds
-        ? expr_math_wrap_binary(&ops_summation, term, bounds)
-        : NULL;
+    expr_t *bounds = expr_math_wrap_binary(&ops_argument_list, index, upper);
+    expr_t *out = bounds ? expr_math_wrap_binary(&ops_summation, term, bounds) : NULL;
 
     expr_free(bounds);
     return out;
 }
-expr_t *expr_gammainc_lower(const expr_t *a, const expr_t *b) { return expr_math_wrap_binary(&ops_gammainc_lower, a, b); }
-expr_t *expr_gammainc_upper(const expr_t *a, const expr_t *b) { return expr_math_wrap_binary(&ops_gammainc_upper, a, b); }
-expr_t *expr_gammainc_P(const expr_t *a, const expr_t *b) { return expr_math_wrap_binary(&ops_gammainc_P, a, b); }
-expr_t *expr_gammainc_Q(const expr_t *a, const expr_t *b) { return expr_math_wrap_binary(&ops_gammainc_Q, a, b); }
-expr_t *expr_factorial(const expr_t *a) { return expr_math_wrap_unary(&ops_factorial, a); }
-expr_t *expr_fibonacci(const expr_t *a) { return expr_math_wrap_unary(&ops_fibonacci, a); }
-expr_t *expr_partition(const expr_t *a) { return expr_math_wrap_unary(&ops_partition, a); }
-expr_t *expr_isqrt(const expr_t *a) { return expr_math_wrap_unary(&ops_isqrt, a); }
-expr_t *expr_gcd(const expr_t *a, const expr_t *b) { return expr_math_wrap_binary(&ops_gcd, a, b); }
-expr_t *expr_lcm(const expr_t *a, const expr_t *b) { return expr_math_wrap_binary(&ops_lcm, a, b); }
-expr_t *expr_mod(const expr_t *a, const expr_t *b) { return expr_math_wrap_binary(&ops_mod, a, b); }
-expr_t *expr_modinv(const expr_t *a, const expr_t *b) { return expr_math_wrap_binary(&ops_modinv, a, b); }
-expr_t *expr_is_prime(const expr_t *a) { return expr_math_wrap_unary(&ops_is_prime, a); }
-expr_t *expr_next_prime(const expr_t *a) { return expr_math_wrap_unary(&ops_next_prime, a); }
-expr_t *expr_prev_prime(const expr_t *a) { return expr_math_wrap_unary(&ops_prev_prime, a); }
-expr_t *expr_bit_and(const expr_t *a, const expr_t *b) { return expr_math_wrap_binary(&ops_bit_and, a, b); }
-expr_t *expr_bit_or(const expr_t *a, const expr_t *b) { return expr_math_wrap_binary(&ops_bit_or, a, b); }
-expr_t *expr_bit_xor(const expr_t *a, const expr_t *b) { return expr_math_wrap_binary(&ops_bit_xor, a, b); }
-expr_t *expr_bit_not(const expr_t *a) { return expr_math_wrap_unary(&ops_bit_not, a); }
-expr_t *expr_shl(const expr_t *a, const expr_t *b) { return expr_math_wrap_binary(&ops_shl, a, b); }
-expr_t *expr_shr(const expr_t *a, const expr_t *b) { return expr_math_wrap_binary(&ops_shr, a, b); }
+expr_t *expr_gammainc_lower(const expr_t *a, const expr_t *b)
+{
+    return expr_math_wrap_binary(&ops_gammainc_lower, a, b);
+}
+expr_t *expr_gammainc_upper(const expr_t *a, const expr_t *b)
+{
+    return expr_math_wrap_binary(&ops_gammainc_upper, a, b);
+}
+expr_t *expr_gammainc_P(const expr_t *a, const expr_t *b)
+{
+    return expr_math_wrap_binary(&ops_gammainc_P, a, b);
+}
+expr_t *expr_gammainc_Q(const expr_t *a, const expr_t *b)
+{
+    return expr_math_wrap_binary(&ops_gammainc_Q, a, b);
+}
+expr_t *expr_factorial(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_factorial, a);
+}
+expr_t *expr_fibonacci(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_fibonacci, a);
+}
+expr_t *expr_partition(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_partition, a);
+}
+expr_t *expr_isqrt(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_isqrt, a);
+}
+expr_t *expr_gcd(const expr_t *a, const expr_t *b)
+{
+    return expr_math_wrap_binary(&ops_gcd, a, b);
+}
+expr_t *expr_lcm(const expr_t *a, const expr_t *b)
+{
+    return expr_math_wrap_binary(&ops_lcm, a, b);
+}
+expr_t *expr_mod(const expr_t *a, const expr_t *b)
+{
+    return expr_math_wrap_binary(&ops_mod, a, b);
+}
+expr_t *expr_modinv(const expr_t *a, const expr_t *b)
+{
+    return expr_math_wrap_binary(&ops_modinv, a, b);
+}
+expr_t *expr_is_prime(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_is_prime, a);
+}
+expr_t *expr_next_prime(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_next_prime, a);
+}
+expr_t *expr_prev_prime(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_prev_prime, a);
+}
+expr_t *expr_bit_and(const expr_t *a, const expr_t *b)
+{
+    return expr_math_wrap_binary(&ops_bit_and, a, b);
+}
+expr_t *expr_bit_or(const expr_t *a, const expr_t *b)
+{
+    return expr_math_wrap_binary(&ops_bit_or, a, b);
+}
+expr_t *expr_bit_xor(const expr_t *a, const expr_t *b)
+{
+    return expr_math_wrap_binary(&ops_bit_xor, a, b);
+}
+expr_t *expr_bit_not(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_bit_not, a);
+}
+expr_t *expr_shl(const expr_t *a, const expr_t *b)
+{
+    return expr_math_wrap_binary(&ops_shl, a, b);
+}
+expr_t *expr_shr(const expr_t *a, const expr_t *b)
+{
+    return expr_math_wrap_binary(&ops_shr, a, b);
+}
 
 static expr_t *expr_factor_product_from_number(number_t value)
 {
@@ -1355,8 +2216,7 @@ static expr_t *expr_factor_product_from_number(number_t value)
     number_factors_t *factors;
     expr_t *out = NULL;
 
-    if (!num_is_integer(value) || num_get_sign(value) <= 0 ||
-        num_bit_length(value) > FACTOR_MAX_BITS)
+    if (!num_is_integer(value) || num_get_sign(value) <= 0 || num_bit_length(value) > FACTOR_MAX_BITS)
         return NULL;
 
     factors = num_factors(value);
@@ -1378,9 +2238,7 @@ static expr_t *expr_factor_product_from_number(number_t value)
         {
             string_t *prime_text = num_to_string(factors->items[i].prime);
 
-            base->binding_expr =
-                expr_binding_expr_new_number_text(prime_text
-                    ? string_c_str(prime_text) : "NAN");
+            base->binding_expr = expr_binding_expr_new_number_text(prime_text ? string_c_str(prime_text) : "NAN");
             string_free(prime_text);
         }
         if (factors->items[i].exponent > 1u) {

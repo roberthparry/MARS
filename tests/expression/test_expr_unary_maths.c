@@ -36,9 +36,7 @@ void test_tan(void)
     expr_free(c);
 }
 
-static void check_expr_string_qf(const char *label,
-                                 const char *input,
-                                 qfloat_t expected)
+static void check_expr_string_qf(const char *label, const char *input, qfloat_t expected)
 {
     expr_bindings_t *bindings = NULL;
     expr_t *expr = expr_from_string(input, &bindings);
@@ -52,38 +50,22 @@ static void check_expr_string_qf(const char *label,
 
 void test_haversine_family(void)
 {
-    check_expr_string_qf("versin(0) = 0",
-                         "{ versin(0) }", QF_ZERO);
-    check_expr_string_qf("vercos(0) = 2",
-                         "{ vercos(0) }", QF_TWO);
-    check_expr_string_qf("coversin(0) = 1",
-                         "{ coversin(0) }", QF_ONE);
-    check_expr_string_qf("covercos(0) = 1",
-                         "{ covercos(0) }", QF_ONE);
-    check_expr_string_qf("haversin(0) = 0",
-                         "{ haversin(0) }", QF_ZERO);
-    check_expr_string_qf("havercos(0) = 1",
-                         "{ havercos(0) }", QF_ONE);
-    check_expr_string_qf("hacoversin(0) = 1/2",
-                         "{ hacoversin(0) }", QF_HALF);
-    check_expr_string_qf("hacovercos(0) = 1/2",
-                         "{ hacovercos(0) }", QF_HALF);
-    check_expr_string_qf("arcversin(0) = 0",
-                         "{ arcversin(0) }", QF_ZERO);
-    check_expr_string_qf("arcvercos(2) = 0",
-                         "{ arcvercos(2) }", QF_ZERO);
-    check_expr_string_qf("arccoversin(1) = 0",
-                         "{ arccoversin(1) }", QF_ZERO);
-    check_expr_string_qf("arccovercos(1) = 0",
-                         "{ arccovercos(1) }", QF_ZERO);
-    check_expr_string_qf("archaversin(0) = 0",
-                         "{ archaversin(0) }", QF_ZERO);
-    check_expr_string_qf("archavercos(1) = 0",
-                         "{ archavercos(1) }", QF_ZERO);
-    check_expr_string_qf("archacoversin(1/2) = 0",
-                         "{ archacoversin(1/2) }", QF_ZERO);
-    check_expr_string_qf("archacovercos(1/2) = 0",
-                         "{ archacovercos(1/2) }", QF_ZERO);
+    check_expr_string_qf("versin(0) = 0", "{ versin(0) }", QF_ZERO);
+    check_expr_string_qf("vercos(0) = 2", "{ vercos(0) }", QF_TWO);
+    check_expr_string_qf("coversin(0) = 1", "{ coversin(0) }", QF_ONE);
+    check_expr_string_qf("covercos(0) = 1", "{ covercos(0) }", QF_ONE);
+    check_expr_string_qf("haversin(0) = 0", "{ haversin(0) }", QF_ZERO);
+    check_expr_string_qf("havercos(0) = 1", "{ havercos(0) }", QF_ONE);
+    check_expr_string_qf("hacoversin(0) = 1/2", "{ hacoversin(0) }", QF_HALF);
+    check_expr_string_qf("hacovercos(0) = 1/2", "{ hacovercos(0) }", QF_HALF);
+    check_expr_string_qf("arcversin(0) = 0", "{ arcversin(0) }", QF_ZERO);
+    check_expr_string_qf("arcvercos(2) = 0", "{ arcvercos(2) }", QF_ZERO);
+    check_expr_string_qf("arccoversin(1) = 0", "{ arccoversin(1) }", QF_ZERO);
+    check_expr_string_qf("arccovercos(1) = 0", "{ arccovercos(1) }", QF_ZERO);
+    check_expr_string_qf("archaversin(0) = 0", "{ archaversin(0) }", QF_ZERO);
+    check_expr_string_qf("archavercos(1) = 0", "{ archavercos(1) }", QF_ZERO);
+    check_expr_string_qf("archacoversin(1/2) = 0", "{ archacoversin(1/2) }", QF_ZERO);
+    check_expr_string_qf("archacovercos(1/2) = 0", "{ archacovercos(1/2) }", QF_ZERO);
 }
 
 void test_sinh(void)
@@ -162,9 +144,10 @@ void test_atan2(void)
 {
     expr_t *base = test_expr_new_var_d(2.0);
     expr_t *expo = test_expr_new_const_d(3.0);
-    expr_t *f    = expr_atan2(base, expo);
+    expr_t *f = expr_atan2(base, expo);
 
-    check_q_at(__FILE__, __LINE__, 1, "atan2(2,3)", expr_eval_qf(f), qf_atan2(qf_from_double(2.0), qf_from_double(3.0)));
+    check_q_at(__FILE__, __LINE__, 1, "atan2(2,3)", expr_eval_qf(f),
+               qf_atan2(qf_from_double(2.0), qf_from_double(3.0)));
     print_expr_of(f);
 
     expr_free(f);
@@ -283,7 +266,7 @@ void test_ceil(void)
 void test_pow_d(void)
 {
     expr_t *base = test_expr_new_var_d(2.0);
-    expr_t *f    = expr_pow_d(base, 3.0);
+    expr_t *f = expr_pow_d(base, 3.0);
 
     check_q_at(__FILE__, __LINE__, 1, "2^3(d)", expr_eval_qf(f), qf_pow(qf_from_double(2.0), qf_from_double(3.0)));
     print_expr_of(f);
@@ -314,7 +297,7 @@ void test_pow(void)
 {
     expr_t *base = test_expr_new_var_d(2.0);
     expr_t *expo = test_expr_new_const_d(3.0);
-    expr_t *f    = expr_pow_xp(base, expo);
+    expr_t *f = expr_pow_xp(base, expo);
 
     check_q_at(__FILE__, __LINE__, 1, "2^3", expr_eval_qf(f), qf_pow(qf_from_double(2.0), qf_from_double(3.0)));
     print_expr_of(f);
@@ -333,14 +316,16 @@ void test_abs(void)
     expr_t *f = expr_abs(c);
     check_q_at(__FILE__, __LINE__, 1, "abs(-3) = 3", expr_eval_qf(f), qf_from_double(3.0));
     print_expr_of(f);
-    expr_free(f); expr_free(c);
+    expr_free(f);
+    expr_free(c);
 
     /* abs(0.7) = 0.7 */
     c = test_expr_new_var_d(0.7);
     f = expr_abs(c);
     check_q_at(__FILE__, __LINE__, 1, "abs(0.7) = 0.7", expr_eval_qf(f), qf_from_double(0.7));
     print_expr_of(f);
-    expr_free(f); expr_free(c);
+    expr_free(f);
+    expr_free(c);
 
     /* abs(-x) = abs(x) symmetry at x=1.5 */
     expr_t *cp = test_expr_new_const_d(1.5);
@@ -348,7 +333,10 @@ void test_abs(void)
     expr_t *fp = expr_abs(cp);
     expr_t *fn = expr_abs(cn);
     check_q_at(__FILE__, __LINE__, 1, "abs(-1.5) = abs(1.5)", expr_eval_qf(fn), expr_eval_qf(fp));
-    expr_free(fp); expr_free(fn); expr_free(cp); expr_free(cn);
+    expr_free(fp);
+    expr_free(fn);
+    expr_free(cp);
+    expr_free(cn);
 }
 
 void test_hypot(void)
@@ -359,7 +347,9 @@ void test_hypot(void)
     expr_t *f = expr_hypot(a, b);
     check_q_at(__FILE__, __LINE__, 1, "hypot(3,4) = 5", expr_eval_qf(f), qf_from_double(5.0));
     print_expr_of(f);
-    expr_free(f); expr_free(b); expr_free(a);
+    expr_free(f);
+    expr_free(b);
+    expr_free(a);
 
     /* hypot(5,12) = 13 — Pythagorean triple */
     a = test_expr_new_var_d(5.0);
@@ -367,7 +357,9 @@ void test_hypot(void)
     f = expr_hypot(a, b);
     check_q_at(__FILE__, __LINE__, 1, "hypot(5,12) = 13", expr_eval_qf(f), qf_from_double(13.0));
     print_expr_of(f);
-    expr_free(f); expr_free(b); expr_free(a);
+    expr_free(f);
+    expr_free(b);
+    expr_free(a);
 
     /* hypot(a,b) = hypot(b,a) symmetry */
     a = test_expr_new_const_d(2.0);
@@ -375,7 +367,10 @@ void test_hypot(void)
     expr_t *fab = expr_hypot(a, b);
     expr_t *fba = expr_hypot(b, a);
     check_q_at(__FILE__, __LINE__, 1, "hypot(2,7) = hypot(7,2)", expr_eval_qf(fab), expr_eval_qf(fba));
-    expr_free(fab); expr_free(fba); expr_free(a); expr_free(b);
+    expr_free(fab);
+    expr_free(fba);
+    expr_free(a);
+    expr_free(b);
 }
 
 void test_maths_functions(void)

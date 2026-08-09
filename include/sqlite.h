@@ -109,12 +109,8 @@ bool sqlite_init_object_store(sqlite_t *db);
  * @param data_len Number of payload bytes.
  * @return `true` on success, otherwise `false`.
  */
-bool sqlite_store_object(sqlite_t *db,
-                         const string_t *name,
-                         const string_t *type,
-                         const string_t *encoding,
-                         const void *data,
-                         size_t data_len);
+bool sqlite_store_object(sqlite_t *db, const string_t *name, const string_t *type, const string_t *encoding,
+                         const void *data, size_t data_len);
 
 /**
  * @brief Loads a typed binary payload from the default object store.
@@ -132,12 +128,8 @@ bool sqlite_store_object(sqlite_t *db,
  * @param out_data_len Receives the payload length in bytes.
  * @return `true` on success, otherwise `false`.
  */
-bool sqlite_load_object(sqlite_t *db,
-                        const string_t *name,
-                        string_t **out_type,
-                        string_t **out_encoding,
-                        void **out_data,
-                        size_t *out_data_len);
+bool sqlite_load_object(sqlite_t *db, const string_t *name, string_t **out_type, string_t **out_encoding,
+                        void **out_data, size_t *out_data_len);
 
 /**
  * @brief Frees object payload memory returned by this API.
@@ -156,9 +148,7 @@ void sqlite_free_object_data(void *data);
  * @param value String value to store.
  * @return `true` on success, otherwise `false`.
  */
-bool sqlite_store_string(sqlite_t *db,
-                         const string_t *name,
-                         const string_t *value);
+bool sqlite_store_string(sqlite_t *db, const string_t *name, const string_t *value);
 
 /**
  * @brief Loads a UTF-8 string value from the default object store.
@@ -171,9 +161,7 @@ bool sqlite_store_string(sqlite_t *db,
  * @param out_value Receives the loaded string.
  * @return `true` on success, otherwise `false`.
  */
-bool sqlite_load_string(sqlite_t *db,
-                        const string_t *name,
-                        string_t **out_value);
+bool sqlite_load_string(sqlite_t *db, const string_t *name, string_t **out_value);
 
 /**
  * @brief Prepares a parameterised SQL statement.

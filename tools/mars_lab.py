@@ -3699,7 +3699,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
               </div>
               <div class="integrator-bound-field">
                 <label for="almanacTime">GMT time</label>
-                <input id="almanacTime" type="text" inputmode="decimal" placeholder="17:47:05.8">
+                <input id="almanacTime" type="text" inputmode="decimal" placeholder="17:47:05.8" autocomplete="off">
               </div>
               <div class="integrator-bound-field">
                 <label for="almanacZone">Zone</label>
@@ -6542,6 +6542,29 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     function validDateText(value, fallback = DEFAULT_DATETIME_DATE) {
       const text = String(value || '').trim();
       return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : fallback;
+    }
+
+    function formatAlmanacTimeInput(value) {
+      const text = String(value || '').replace(',', '.');
+      const decimalAt = text.indexOf('.');
+      const clockText = decimalAt >= 0 ? text.slice(0, decimalAt) : text;
+      const fraction = decimalAt >= 0
+        ? text.slice(decimalAt + 1).replace(/\D/g, '')
+        : '';
+      const digits = clockText.replace(/\D/g, '').slice(0, 6);
+      let formatted = digits.slice(0, 2);
+
+      if (digits.length > 2)
+        formatted += ':';
+      if (digits.length > 2)
+        formatted += digits.slice(2, 4);
+      if (digits.length > 4)
+        formatted += ':';
+      if (digits.length > 4)
+        formatted += digits.slice(4, 6);
+      if (decimalAt >= 0 && digits.length === 6)
+        formatted += `.${fraction}`;
+      return formatted;
     }
 
     function validDatetimeJurisdiction(value, fallback = DEFAULT_DATETIME_JURISDICTION) {
@@ -10673,6 +10696,15 @@ __HOLIDAY_JURISDICTION_OPTIONS__
 	            });
 	          }
         });
+      });
+
+    if (almanacTime)
+      almanacTime.addEventListener('input', () => {
+        const formatted = formatAlmanacTimeInput(almanacTime.value);
+        if (formatted === almanacTime.value)
+          return;
+        almanacTime.value = formatted;
+        almanacTime.setSelectionRange(formatted.length, formatted.length);
       });
 
     [almanacDate, almanacTime, almanacZone, almanacJurisdiction, almanacTown, almanacLatitude, almanacLongitude, almanacElevation]

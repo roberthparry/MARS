@@ -33,11 +33,7 @@ static int equ_append_view(string_t *text, string_view_t view)
     return rc;
 }
 
-static bool equ_scan_depths(string_view_t view,
-                                 size_t pos,
-                                 int *paren_depth,
-                                 int *bracket_depth,
-                                 int *brace_depth)
+static bool equ_scan_depths(string_view_t view, size_t pos, int *paren_depth, int *bracket_depth, int *brace_depth)
 {
     unsigned char ch = 0u;
 
@@ -73,9 +69,7 @@ static bool equ_scan_depths(string_view_t view,
     return true;
 }
 
-static bool equ_find_top_level_char(string_view_t view,
-                                         char target,
-                                         size_t *pos_out)
+static bool equ_find_top_level_char(string_view_t view, char target, size_t *pos_out)
 {
     const size_t len = string_view_length(view);
     int paren_depth = 0;
@@ -83,10 +77,7 @@ static bool equ_find_top_level_char(string_view_t view,
     int brace_depth = 0;
 
     for (size_t i = 0u; i < len; ++i) {
-        if (paren_depth == 0 &&
-            bracket_depth == 0 &&
-            brace_depth == 0 &&
-            equ_view_ascii_at(view, i, target)) {
+        if (paren_depth == 0 && bracket_depth == 0 && brace_depth == 0 && equ_view_ascii_at(view, i, target)) {
             *pos_out = i;
             return true;
         }
@@ -146,10 +137,8 @@ static bool equ_parse_parts(const string_t *text, equation_parse_parts_t *parts)
     parts->has_bindings = equ_find_top_level_char(view, '|', &split_pos);
     if (parts->has_bindings) {
         equation_view = string_view_trim(string_view_slice(view, 0u, split_pos));
-        parts->bindings = string_view_trim(
-            string_view_slice(view,
-                              split_pos + 1u,
-                              string_view_length(view) - split_pos - 1u));
+        parts->bindings =
+            string_view_trim(string_view_slice(view, split_pos + 1u, string_view_length(view) - split_pos - 1u));
     } else {
         equation_view = view;
     }
@@ -161,9 +150,7 @@ static bool equ_parse_parts(const string_t *text, equation_parse_parts_t *parts)
 
     parts->lhs = string_view_trim(string_view_slice(equation_view, 0u, split_pos));
     parts->rhs = string_view_trim(
-        string_view_slice(equation_view,
-                          split_pos + 1u,
-                          string_view_length(equation_view) - split_pos - 1u));
+        string_view_slice(equation_view, split_pos + 1u, string_view_length(equation_view) - split_pos - 1u));
 
     if (string_view_is_empty(parts->lhs) || string_view_is_empty(parts->rhs)) {
         fprintf(stderr, "equ_from_text: equation side is empty\n");
@@ -180,17 +167,14 @@ static string_t *equ_make_binding_probe(const equation_parse_parts_t *parts)
     if (!probe)
         return NULL;
 
-    if (equ_append_view(probe, parts->lhs) != 0 ||
-        string_append_cstr(probe, ") + (") != 0 ||
-        equ_append_view(probe, parts->rhs) != 0 ||
-        string_append_char(probe, ')') != 0) {
+    if (equ_append_view(probe, parts->lhs) != 0 || string_append_cstr(probe, ") + (") != 0 ||
+        equ_append_view(probe, parts->rhs) != 0 || string_append_char(probe, ')') != 0) {
         string_free(probe);
         return NULL;
     }
 
     if (parts->has_bindings) {
-        if (string_append_cstr(probe, " | ") != 0 ||
-            equ_append_view(probe, parts->bindings) != 0) {
+        if (string_append_cstr(probe, " | ") != 0 || equ_append_view(probe, parts->bindings) != 0) {
             string_free(probe);
             return NULL;
         }
@@ -204,10 +188,8 @@ static string_t *equ_make_binding_probe(const equation_parse_parts_t *parts)
     return probe;
 }
 
-static int equ_build_symbol_arrays(expr_bindings_t *bindings,
-                                        const string_t ***names_out,
-                                        expr_t ***symbols_out,
-                                        size_t *count_out)
+static int equ_build_symbol_arrays(expr_bindings_t *bindings, const string_t ***names_out, expr_t ***symbols_out,
+                                   size_t *count_out)
 {
     const string_t **names = NULL;
     expr_t **symbols = NULL;
@@ -239,10 +221,8 @@ static int equ_build_symbol_arrays(expr_bindings_t *bindings,
     return 0;
 }
 
-static expr_t *equ_parse_side(string_view_t side,
-                                   const string_t *const *names,
-                                   expr_t *const *symbols,
-                                   size_t symbol_count)
+static expr_t *equ_parse_side(string_view_t side, const string_t *const *names, expr_t *const *symbols,
+                              size_t symbol_count)
 {
     string_t *side_text = string_from_view(&side);
     expr_t *expr;

@@ -16,8 +16,7 @@ static size_t expr_parse_literal_len(expr_parse_literal_t literal)
     return strlen(literal.text);
 }
 
-bool expr_parse_cursor_at_identifier_boundary(const string_cursor_t *cursor,
-                                              string_pos_t pos)
+bool expr_parse_cursor_at_identifier_boundary(const string_cursor_t *cursor, string_pos_t pos)
 {
     rune_t rune;
 
@@ -36,10 +35,7 @@ bool expr_parse_cursor_consume_char(string_cursor_t *cursor, char ch)
     return string_cursor_next(cursor) == 0;
 }
 
-bool expr_parse_cursor_peek_value_at(const string_cursor_t *cursor,
-                                     string_pos_t pos,
-                                     uint32_t *out,
-                                     size_t *width_out)
+bool expr_parse_cursor_peek_value_at(const string_cursor_t *cursor, string_pos_t pos, uint32_t *out, size_t *width_out)
 {
     string_cursor_t *scan;
     rune_t rune;
@@ -61,8 +57,7 @@ bool expr_parse_cursor_peek_value_at(const string_cursor_t *cursor,
     scan = string_cursor_clone(cursor);
     if (!scan)
         return false;
-    if (string_cursor_seek(scan, pos) != 0 ||
-        string_cursor_next(scan) != 0) {
+    if (string_cursor_seek(scan, pos) != 0 || string_cursor_next(scan) != 0) {
         string_cursor_free(scan);
         return false;
     }
@@ -71,29 +66,17 @@ bool expr_parse_cursor_peek_value_at(const string_cursor_t *cursor,
     return true;
 }
 
-bool expr_parse_cursor_peek_value(const string_cursor_t *cursor,
-                                  uint32_t *out,
-                                  size_t *width_out)
+bool expr_parse_cursor_peek_value(const string_cursor_t *cursor, uint32_t *out, size_t *width_out)
 {
-    return cursor
-        ? expr_parse_cursor_peek_value_at(cursor,
-                                          string_cursor_position(cursor),
-                                          out,
-                                          width_out)
-        : false;
+    return cursor ? expr_parse_cursor_peek_value_at(cursor, string_cursor_position(cursor), out, width_out) : false;
 }
 
-bool expr_parse_view_peek_ascii(string_view_t view,
-                                string_pos_t pos,
-                                unsigned char *out)
+bool expr_parse_view_peek_ascii(string_view_t view, string_pos_t pos, unsigned char *out)
 {
     return string_view_peek_ascii(view, pos, out);
 }
 
-bool expr_parse_view_peek_value(string_view_t view,
-                                string_pos_t pos,
-                                uint32_t *out,
-                                size_t *width_out)
+bool expr_parse_view_peek_value(string_view_t view, string_pos_t pos, uint32_t *out, size_t *width_out)
 {
     string_pos_t next = 0u;
 
@@ -106,8 +89,8 @@ bool expr_parse_view_peek_value(string_view_t view,
 
 bool expr_parse_is_superscript_digit(uint32_t value)
 {
-    return value == 0x00B2 || value == 0x00B3 || value == 0x00B9 ||
-           value == 0x2070 || (value >= 0x2074 && value <= 0x2079);
+    return value == 0x00B2 || value == 0x00B3 || value == 0x00B9 || value == 0x2070 ||
+           (value >= 0x2074 && value <= 0x2079);
 }
 
 int expr_parse_superscript_digit_value(uint32_t value)
@@ -139,12 +122,10 @@ int expr_parse_subscript_digit_value(uint32_t value)
 
 bool expr_parse_is_fraction_glyph(uint32_t value)
 {
-    return value == 0x00BC || value == 0x00BD || value == 0x00BE ||
-           (value >= 0x2150 && value <= 0x215E);
+    return value == 0x00BC || value == 0x00BD || value == 0x00BE || (value >= 0x2150 && value <= 0x215E);
 }
 
-size_t expr_parse_scan_unicode_fraction_len(string_view_t view,
-                                            string_pos_t pos)
+size_t expr_parse_scan_unicode_fraction_len(string_view_t view, string_pos_t pos)
 {
     string_pos_t p = pos;
     uint32_t value;
@@ -157,8 +138,7 @@ size_t expr_parse_scan_unicode_fraction_len(string_view_t view,
     if (expr_parse_is_fraction_glyph(value))
         return len;
 
-    while (expr_parse_view_peek_value(view, p, &value, &len) &&
-           expr_parse_is_superscript_digit(value)) {
+    while (expr_parse_view_peek_value(view, p, &value, &len) && expr_parse_is_superscript_digit(value)) {
         p += len;
         ++digits;
     }
@@ -170,8 +150,7 @@ size_t expr_parse_scan_unicode_fraction_len(string_view_t view,
     p += len;
 
     digits = 0;
-    while (expr_parse_view_peek_value(view, p, &value, &len) &&
-           expr_parse_is_subscript_digit(value)) {
+    while (expr_parse_view_peek_value(view, p, &value, &len) && expr_parse_is_subscript_digit(value)) {
         p += len;
         ++digits;
     }
@@ -190,46 +169,32 @@ static bool special_number_boundary(string_view_t view, string_pos_t pos)
     return !isalnum(c) && c != '_';
 }
 
-bool expr_parse_view_starts_with_text(string_view_t view,
-                                      const char *text,
-                                      bool case_insensitive)
+bool expr_parse_view_starts_with_text(string_view_t view, const char *text, bool case_insensitive)
 {
     string_t *literal = string_new_with(text);
-    bool matches = literal &&
-                   string_view_starts_with(view, literal, case_insensitive);
+    bool matches = literal && string_view_starts_with(view, literal, case_insensitive);
 
     string_free(literal);
     return matches;
 }
 
-size_t expr_parse_scan_special_number_len(string_view_t view,
-                                          string_pos_t pos,
-                                          bool include_unicode_infinity,
+size_t expr_parse_scan_special_number_len(string_view_t view, string_pos_t pos, bool include_unicode_infinity,
                                           bool require_identifier_boundary)
 {
-    static const expr_parse_literal_t specials[] = {
-        { .text = "infinity" },
-        { .text = "nan" },
-        { .text = "inf" }
-    };
-    string_view_t remaining = string_view_slice(view, pos,
-        string_view_length(view) > pos ? string_view_length(view) - pos : 0u);
+    static const expr_parse_literal_t specials[] = {{.text = "infinity"}, {.text = "nan"}, {.text = "inf"}};
+    string_view_t remaining =
+        string_view_slice(view, pos, string_view_length(view) > pos ? string_view_length(view) - pos : 0u);
     uint32_t value = 0u;
     size_t value_len = 0u;
 
-    if (include_unicode_infinity &&
-        expr_parse_view_peek_value(view, pos, &value, &value_len) &&
-        value == 0x221Eu)
+    if (include_unicode_infinity && expr_parse_view_peek_value(view, pos, &value, &value_len) && value == 0x221Eu)
         return value_len;
 
     for (size_t i = 0u; i < sizeof(specials) / sizeof(specials[0]); ++i) {
         size_t special_len = expr_parse_literal_len(specials[i]);
 
-        if (expr_parse_view_starts_with_text(remaining,
-                                             specials[i].text,
-                                             true) &&
-            (!require_identifier_boundary ||
-             special_number_boundary(view, pos + special_len)))
+        if (expr_parse_view_starts_with_text(remaining, specials[i].text, true) &&
+            (!require_identifier_boundary || special_number_boundary(view, pos + special_len)))
             return special_len;
     }
 
@@ -282,9 +247,7 @@ size_t expr_parse_scan_decimal_len(string_view_t view, string_pos_t pos)
     return i <= len ? i - pos : 0u;
 }
 
-size_t expr_parse_scan_number_atom_len(string_view_t view,
-                                       string_pos_t pos,
-                                       bool include_special_numbers)
+size_t expr_parse_scan_number_atom_len(string_view_t view, string_pos_t pos, bool include_special_numbers)
 {
     size_t len = expr_parse_scan_decimal_len(view, pos);
     string_pos_t p;
@@ -321,8 +284,7 @@ size_t expr_parse_scan_number_atom_len(string_view_t view,
     return p - pos;
 }
 
-static string_t *cursor_read_literal_name(string_cursor_t *cursor,
-                                          expr_parse_literal_t name)
+static string_t *cursor_read_literal_name(string_cursor_t *cursor, expr_parse_literal_t name)
 {
     string_t *result = string_new_with(name.text);
 
@@ -333,9 +295,7 @@ static string_t *cursor_read_literal_name(string_cursor_t *cursor,
 
 static int append_subscript_digit(string_t *out, unsigned char digit)
 {
-    static const char *const subscripts[10] = {
-        "₀", "₁", "₂", "₃", "₄", "₅", "₆", "₇", "₈", "₉"
-    };
+    static const char *const subscripts[10] = {"₀", "₁", "₂", "₃", "₄", "₅", "₆", "₇", "₈", "₉"};
 
     if (digit < '0' || digit > '9')
         return -1;
@@ -379,10 +339,7 @@ static string_t *read_bracketed_name(string_cursor_t *cursor)
         string_cursor_free(scan);
         return NULL;
     }
-    if (string_cursor_append_slice_between(name,
-                                           start_pos,
-                                           end_pos,
-                                           cursor) != 0) {
+    if (string_cursor_append_slice_between(name, start_pos, end_pos, cursor) != 0) {
         string_free(name);
         string_cursor_free(scan);
         return NULL;
@@ -394,20 +351,14 @@ static string_t *read_bracketed_name(string_cursor_t *cursor)
     return name;
 }
 
-static size_t cursor_alias_name_len(const string_cursor_t *cursor,
-                                    string_pos_t alias_pos)
+static size_t cursor_alias_name_len(const string_cursor_t *cursor, string_pos_t alias_pos)
 {
     return expr_match_leading_greek_alias_len(cursor, alias_pos);
 }
 
-static string_t *read_simple_name(string_cursor_t *cursor,
-                                  bool allow_plain_letters_after_first)
+static string_t *read_simple_name(string_cursor_t *cursor, bool allow_plain_letters_after_first)
 {
-    static const expr_parse_literal_t builtin_names[] = {
-        { .text = "pi" },
-        { .text = "phi" },
-        { .text = "gamma" }
-    };
+    static const expr_parse_literal_t builtin_names[] = {{.text = "pi"}, {.text = "phi"}, {.text = "gamma"}};
     string_cursor_t *scan;
     string_t *out;
     uint32_t value = 0;
@@ -421,11 +372,9 @@ static string_t *read_simple_name(string_cursor_t *cursor,
         return NULL;
 
     for (size_t i = 0u; i < sizeof(builtin_names) / sizeof(builtin_names[0]); ++i) {
-        if (string_cursor_match_at(
-                scan, string_cursor_position(scan), builtin_names[i].text) &&
-            expr_parse_cursor_at_identifier_boundary(
-                scan, string_cursor_position(scan) +
-                      expr_parse_literal_len(builtin_names[i]))) {
+        if (string_cursor_match_at(scan, string_cursor_position(scan), builtin_names[i].text) &&
+            expr_parse_cursor_at_identifier_boundary(scan, string_cursor_position(scan) +
+                                                               expr_parse_literal_len(builtin_names[i]))) {
             string_cursor_free(scan);
             return cursor_read_literal_name(cursor, builtin_names[i]);
         }
@@ -454,18 +403,14 @@ static string_t *read_simple_name(string_cursor_t *cursor,
         }
         string_cursor_skip(scan, 1u);
         allow_alias = true;
-        if (string_cursor_append_slice_between(out,
-                                               alias_start,
-                                               alias_start + alias_len,
-                                               cursor) != 0) {
+        if (string_cursor_append_slice_between(out, alias_start, alias_start + alias_len, cursor) != 0) {
             string_free(out);
             string_cursor_free(scan);
             return NULL;
         }
         string_cursor_skip(scan, alias_len);
     } else {
-        if (!expr_parse_cursor_peek_value(scan, &value, &width) ||
-            !fs_is_letter(value)) {
+        if (!expr_parse_cursor_peek_value(scan, &value, &width) || !fs_is_letter(value)) {
             string_free(out);
             string_cursor_free(scan);
             return NULL;
@@ -475,8 +420,7 @@ static string_t *read_simple_name(string_cursor_t *cursor,
             string_pos_t start_pos = string_cursor_position(scan);
 
             string_cursor_skip(scan, width);
-            if (string_cursor_append_slice_between(
-                    out, start_pos, string_cursor_position(scan), cursor) != 0) {
+            if (string_cursor_append_slice_between(out, start_pos, string_cursor_position(scan), cursor) != 0) {
                 string_free(out);
                 string_cursor_free(scan);
                 return NULL;
@@ -490,11 +434,9 @@ static string_t *read_simple_name(string_cursor_t *cursor,
         size_t next_width = 0u;
         unsigned char next = 0u;
 
-        if (expr_parse_cursor_peek_value(scan, &next_value, &next_width) &&
-            expr_parse_is_subscript_digit(next_value)) {
+        if (expr_parse_cursor_peek_value(scan, &next_value, &next_width) && expr_parse_is_subscript_digit(next_value)) {
             string_cursor_skip(scan, next_width);
-            if (string_cursor_append_slice_between(
-                    out, start_pos, string_cursor_position(scan), cursor) != 0) {
+            if (string_cursor_append_slice_between(out, start_pos, string_cursor_position(scan), cursor) != 0) {
                 string_free(out);
                 string_cursor_free(scan);
                 return NULL;
@@ -502,8 +444,7 @@ static string_t *read_simple_name(string_cursor_t *cursor,
             continue;
         }
 
-        if (allow_plain_letters_after_first &&
-            expr_parse_cursor_peek_value(scan, &next_value, &next_width) &&
+        if (allow_plain_letters_after_first && expr_parse_cursor_peek_value(scan, &next_value, &next_width) &&
             fs_is_letter(next_value)) {
             if (allow_alias && next_value >= 128u) {
                 string_free(out);
@@ -511,8 +452,7 @@ static string_t *read_simple_name(string_cursor_t *cursor,
                 return NULL;
             }
             string_cursor_skip(scan, next_width);
-            if (string_cursor_append_slice_between(
-                    out, start_pos, string_cursor_position(scan), cursor) != 0) {
+            if (string_cursor_append_slice_between(out, start_pos, string_cursor_position(scan), cursor) != 0) {
                 string_free(out);
                 string_cursor_free(scan);
                 return NULL;
@@ -520,9 +460,7 @@ static string_t *read_simple_name(string_cursor_t *cursor,
             continue;
         }
 
-        if (allow_alias &&
-            string_cursor_peek_ascii(scan, &b) &&
-            isdigit(b)) {
+        if (allow_alias && string_cursor_peek_ascii(scan, &b) && isdigit(b)) {
             if (string_append_char(out, (char)b) != 0) {
                 string_free(out);
                 string_cursor_free(scan);
@@ -532,9 +470,7 @@ static string_t *read_simple_name(string_cursor_t *cursor,
             continue;
         }
 
-        if (!allow_alias &&
-            string_cursor_peek_ascii(scan, &b) &&
-            isdigit(b)) {
+        if (!allow_alias && string_cursor_peek_ascii(scan, &b) && isdigit(b)) {
             if (append_subscript_digit(out, b) != 0) {
                 string_free(out);
                 string_cursor_free(scan);
@@ -544,13 +480,8 @@ static string_t *read_simple_name(string_cursor_t *cursor,
             continue;
         }
 
-        if (allow_alias &&
-            string_cursor_peek_ascii(scan, &b) &&
-            b == '_' &&
-            string_cursor_peek_ascii_at(scan,
-                                        string_cursor_position(scan) + 1u,
-                                        &next) &&
-            isdigit(next)) {
+        if (allow_alias && string_cursor_peek_ascii(scan, &b) && b == '_' &&
+            string_cursor_peek_ascii_at(scan, string_cursor_position(scan) + 1u, &next) && isdigit(next)) {
             if (string_append_char(out, '_') != 0) {
                 string_free(out);
                 string_cursor_free(scan);
@@ -568,13 +499,8 @@ static string_t *read_simple_name(string_cursor_t *cursor,
             continue;
         }
 
-        if (!allow_alias &&
-            string_cursor_peek_ascii(scan, &b) &&
-            b == '_' &&
-            string_cursor_peek_ascii_at(scan,
-                                        string_cursor_position(scan) + 1u,
-                                        &next) &&
-            isdigit(next)) {
+        if (!allow_alias && string_cursor_peek_ascii(scan, &b) && b == '_' &&
+            string_cursor_peek_ascii_at(scan, string_cursor_position(scan) + 1u, &next) && isdigit(next)) {
             if (append_subscript_digit(out, next) != 0) {
                 string_free(out);
                 string_cursor_free(scan);
@@ -592,16 +518,10 @@ static string_t *read_simple_name(string_cursor_t *cursor,
     return out;
 }
 
-string_t *expr_parse_read_name(string_cursor_t *cursor,
-                               bool allow_plain_letters_after_first)
+string_t *expr_parse_read_name(string_cursor_t *cursor, bool allow_plain_letters_after_first)
 {
     static const expr_parse_literal_t special_names[] = {
-        { .text = "@pi" },
-        { .text = "@phi" },
-        { .text = "@gamma" },
-        { .text = "@tau" },
-        { .text = "pi" }
-    };
+        {.text = "@pi"}, {.text = "@phi"}, {.text = "@gamma"}, {.text = "@tau"}, {.text = "pi"}};
     unsigned char b;
 
     if (!cursor)
@@ -611,12 +531,9 @@ string_t *expr_parse_read_name(string_cursor_t *cursor,
         return read_bracketed_name(cursor);
 
     for (size_t i = 0u; i < sizeof(special_names) / sizeof(special_names[0]); ++i) {
-        if (string_cursor_match_at(
-                cursor, string_cursor_position(cursor), special_names[i].text) &&
-            expr_parse_cursor_at_identifier_boundary(
-                cursor,
-                string_cursor_position(cursor) +
-                expr_parse_literal_len(special_names[i])))
+        if (string_cursor_match_at(cursor, string_cursor_position(cursor), special_names[i].text) &&
+            expr_parse_cursor_at_identifier_boundary(cursor, string_cursor_position(cursor) +
+                                                                 expr_parse_literal_len(special_names[i])))
             return cursor_read_literal_name(cursor, special_names[i]);
     }
 
@@ -634,8 +551,7 @@ int expr_parse_read_superscript_int(string_cursor_t *cursor)
     if (!scan)
         return -1;
 
-    while (expr_parse_cursor_peek_value(scan, &value, NULL) &&
-           expr_parse_is_superscript_digit(value)) {
+    while (expr_parse_cursor_peek_value(scan, &value, NULL) && expr_parse_is_superscript_digit(value)) {
         digit = expr_parse_superscript_digit_value(value);
         if (digit < 0)
             break;

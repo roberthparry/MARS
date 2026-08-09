@@ -19,13 +19,11 @@ static void test_goal_seek_real_one_variable(void)
     expr_t *x;
     number_t target = num_create_from_long(0L);
     number_t tolerance = num_create_from_string("1e-20");
-    expr_goal_seek_options_t options = {
-        .precision_digits = 32u,
-        .max_iterations = 160u,
-        .allow_complex = true,
-        .simplify_result = false,
-        .tolerance = tolerance
-    };
+    expr_goal_seek_options_t options = {.precision_digits = 32u,
+                                        .max_iterations = 160u,
+                                        .allow_complex = true,
+                                        .simplify_result = false,
+                                        .tolerance = tolerance};
     expr_goal_seek_result_t result;
     number_t x_value;
     number_t expected;
@@ -58,13 +56,11 @@ static void test_goal_seek_complex_fallback(void)
     expr_t *expr = expr_from_string("{ x^2 - i | x = NAN }", &bindings);
     number_t target = num_create_from_long(0L);
     number_t tolerance = num_create_from_string("1e-20");
-    expr_goal_seek_options_t options = {
-        .precision_digits = 40u,
-        .max_iterations = 80u,
-        .allow_complex = true,
-        .simplify_result = false,
-        .tolerance = tolerance
-    };
+    expr_goal_seek_options_t options = {.precision_digits = 40u,
+                                        .max_iterations = 80u,
+                                        .allow_complex = true,
+                                        .simplify_result = false,
+                                        .tolerance = tolerance};
     expr_goal_seek_result_t result;
 
     ASSERT_NOT_NULL(expr);
@@ -88,13 +84,11 @@ static void test_goal_seek_complex_fallback_from_real_axis(void)
     expr_t *x;
     number_t target = num_create_from_long(0L);
     number_t tolerance = num_create_from_string("1e-20");
-    expr_goal_seek_options_t options = {
-        .precision_digits = 40u,
-        .max_iterations = 120u,
-        .allow_complex = true,
-        .simplify_result = false,
-        .tolerance = tolerance
-    };
+    expr_goal_seek_options_t options = {.precision_digits = 40u,
+                                        .max_iterations = 120u,
+                                        .allow_complex = true,
+                                        .simplify_result = false,
+                                        .tolerance = tolerance};
     expr_goal_seek_result_t result;
     number_t x_value;
     number_t x_real;
@@ -124,8 +118,7 @@ static void test_goal_seek_complex_fallback_from_real_axis(void)
 
     text = expr_to_string(expr, style_EXPRESSION);
     ASSERT_NOT_NULL(text);
-    ASSERT_TRUE(strcmp(text, "{ x² + 1 | x = i }") == 0 ||
-                strcmp(text, "{ x² + 1 | x = -i }") == 0);
+    ASSERT_TRUE(strcmp(text, "{ x² + 1 | x = i }") == 0 || strcmp(text, "{ x² + 1 | x = -i }") == 0);
     free(text);
 
     expr_goal_seek_result_clear(&result);
@@ -141,11 +134,7 @@ static void test_goal_seek_complex_uses_guard_precision(void)
     expr_t *expr = expr_from_string("{ x^4 + 1 | x = NAN }", &bindings);
     number_t target = num_create_from_long(0L);
     expr_goal_seek_options_t options = {
-        .precision_digits = 8u,
-        .max_iterations = 120u,
-        .allow_complex = true,
-        .simplify_result = false
-    };
+        .precision_digits = 8u, .max_iterations = 120u, .allow_complex = true, .simplify_result = false};
     expr_goal_seek_result_t result;
 
     ASSERT_NOT_NULL(expr);
@@ -166,11 +155,7 @@ static void test_goal_seek_complex_lgamma_imaginary_axis(void)
     expr_bindings_t *bindings = NULL;
     expr_t *expr = expr_from_string("{ lgamma(ix) | x = NAN }", &bindings);
     number_t target = num_create_from_long(24L);
-    expr_goal_seek_options_t options = {
-        .precision_digits = 64u,
-        .allow_complex = true,
-        .simplify_result = false
-    };
+    expr_goal_seek_options_t options = {.precision_digits = 64u, .allow_complex = true, .simplify_result = false};
     expr_goal_seek_result_t result;
 
     ASSERT_NOT_NULL(expr);
@@ -191,11 +176,7 @@ static void test_goal_seek_tiny_complex_part_collapses_to_real(void)
     expr_bindings_t *bindings = NULL;
     expr_t *expr = expr_from_string("{ exp(sin(x)) | x = NAN }", &bindings);
     expr_t *x;
-    expr_goal_seek_options_t options = {
-        .precision_digits = 160u,
-        .allow_complex = true,
-        .simplify_result = false
-    };
+    expr_goal_seek_options_t options = {.precision_digits = 160u, .allow_complex = true, .simplify_result = false};
     expr_goal_seek_result_t result;
     number_t x_value;
 
@@ -219,18 +200,14 @@ static void test_goal_seek_tiny_complex_part_collapses_to_real(void)
 static void test_goal_seek_real_multi_variable(void)
 {
     expr_bindings_t *bindings = NULL;
-    expr_t *expr = expr_from_string(
-        "{ ax + by + cz - 8 | a = NAN, b = NAN, c = NAN; x = 1, y = 2, z = 3 }",
-        &bindings);
+    expr_t *expr = expr_from_string("{ ax + by + cz - 8 | a = NAN, b = NAN, c = NAN; x = 1, y = 2, z = 3 }", &bindings);
     number_t target = num_create_from_long(0L);
     number_t tolerance = num_create_from_string("1e-20");
-    expr_goal_seek_options_t options = {
-        .precision_digits = 32u,
-        .max_iterations = 160u,
-        .allow_complex = true,
-        .simplify_result = false,
-        .tolerance = tolerance
-    };
+    expr_goal_seek_options_t options = {.precision_digits = 32u,
+                                        .max_iterations = 160u,
+                                        .allow_complex = true,
+                                        .simplify_result = false,
+                                        .tolerance = tolerance};
     expr_goal_seek_result_t result;
 
     ASSERT_NOT_NULL(expr);
@@ -253,11 +230,7 @@ static void test_goal_seek_default_tolerance_uses_precision_digits(void)
     expr_t *expr = expr_from_string("{ x^2 - 2 | x = NAN }", &bindings);
     number_t target = num_create_from_long(0L);
     expr_goal_seek_options_t options = {
-        .precision_digits = 32u,
-        .max_iterations = 160u,
-        .allow_complex = false,
-        .simplify_result = false
-    };
+        .precision_digits = 32u, .max_iterations = 160u, .allow_complex = false, .simplify_result = false};
     expr_goal_seek_result_t result;
 
     ASSERT_NOT_NULL(expr);
@@ -278,11 +251,7 @@ static void test_goal_seek_default_iterations_scale_with_precision(void)
     expr_bindings_t *bindings = NULL;
     expr_t *expr = expr_from_string("{ x^2 - 2 | x = NAN }", &bindings);
     number_t target = num_create_from_long(0L);
-    expr_goal_seek_options_t options = {
-        .precision_digits = 96u,
-        .allow_complex = false,
-        .simplify_result = false
-    };
+    expr_goal_seek_options_t options = {.precision_digits = 96u, .allow_complex = false, .simplify_result = false};
     expr_goal_seek_result_t result;
 
     ASSERT_NOT_NULL(expr);

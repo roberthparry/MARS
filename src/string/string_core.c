@@ -14,8 +14,8 @@
  * explicit wide-string boundary and converts wchar_t input into UTF-8.
  */
 
-#include <stdbool.h>
 #include <limits.h>
+#include <stdbool.h>
 
 #ifdef HAVE_UNISTRING
 #include <unicase.h>
@@ -29,9 +29,7 @@
 #include "string_internal.h"
 #include "ustring.h"
 
-static bool string_utf8_decode_one_strict(const char *data,
-                                          size_t len,
-                                          uint32_t *out)
+static bool string_utf8_decode_one_strict(const char *data, size_t len, uint32_t *out)
 {
     const unsigned char *bytes = (const unsigned char *)data;
     uint32_t cp;
@@ -46,32 +44,20 @@ static bool string_utf8_decode_one_strict(const char *data,
     } else if (bytes[0] >= 0xC2u && bytes[0] <= 0xDFu) {
         if (len != 2u || (bytes[1] & 0xC0u) != 0x80u)
             return false;
-        cp = ((uint32_t)(bytes[0] & 0x1Fu) << 6) |
-             (uint32_t)(bytes[1] & 0x3Fu);
+        cp = ((uint32_t)(bytes[0] & 0x1Fu) << 6) | (uint32_t)(bytes[1] & 0x3Fu);
     } else if (bytes[0] >= 0xE0u && bytes[0] <= 0xEFu) {
-        if (len != 3u ||
-            (bytes[1] & 0xC0u) != 0x80u ||
-            (bytes[2] & 0xC0u) != 0x80u)
+        if (len != 3u || (bytes[1] & 0xC0u) != 0x80u || (bytes[2] & 0xC0u) != 0x80u)
             return false;
-        if ((bytes[0] == 0xE0u && bytes[1] < 0xA0u) ||
-            (bytes[0] == 0xEDu && bytes[1] >= 0xA0u))
+        if ((bytes[0] == 0xE0u && bytes[1] < 0xA0u) || (bytes[0] == 0xEDu && bytes[1] >= 0xA0u))
             return false;
-        cp = ((uint32_t)(bytes[0] & 0x0Fu) << 12) |
-             ((uint32_t)(bytes[1] & 0x3Fu) << 6) |
-             (uint32_t)(bytes[2] & 0x3Fu);
+        cp = ((uint32_t)(bytes[0] & 0x0Fu) << 12) | ((uint32_t)(bytes[1] & 0x3Fu) << 6) | (uint32_t)(bytes[2] & 0x3Fu);
     } else if (bytes[0] >= 0xF0u && bytes[0] <= 0xF4u) {
-        if (len != 4u ||
-            (bytes[1] & 0xC0u) != 0x80u ||
-            (bytes[2] & 0xC0u) != 0x80u ||
-            (bytes[3] & 0xC0u) != 0x80u)
+        if (len != 4u || (bytes[1] & 0xC0u) != 0x80u || (bytes[2] & 0xC0u) != 0x80u || (bytes[3] & 0xC0u) != 0x80u)
             return false;
-        if ((bytes[0] == 0xF0u && bytes[1] < 0x90u) ||
-            (bytes[0] == 0xF4u && bytes[1] >= 0x90u))
+        if ((bytes[0] == 0xF0u && bytes[1] < 0x90u) || (bytes[0] == 0xF4u && bytes[1] >= 0x90u))
             return false;
-        cp = ((uint32_t)(bytes[0] & 0x07u) << 18) |
-             ((uint32_t)(bytes[1] & 0x3Fu) << 12) |
-             ((uint32_t)(bytes[2] & 0x3Fu) << 6) |
-             (uint32_t)(bytes[3] & 0x3Fu);
+        cp = ((uint32_t)(bytes[0] & 0x07u) << 18) | ((uint32_t)(bytes[1] & 0x3Fu) << 12) |
+             ((uint32_t)(bytes[2] & 0x3Fu) << 6) | (uint32_t)(bytes[3] & 0x3Fu);
     } else {
         return false;
     }
@@ -100,14 +86,8 @@ static bool string_scalar_is_nfc_fast_append(uint32_t cp)
         return true;
 
     /* Conservative fast path for standalone Unicode number/fraction glyphs. */
-    return cp == 0x00B2u ||
-           cp == 0x00B3u ||
-           cp == 0x00B9u ||
-           (cp >= 0x00BCu && cp <= 0x00BEu) ||
-           cp == 0x2044u ||
-           cp == 0x2070u ||
-           (cp >= 0x2074u && cp <= 0x2079u) ||
-           (cp >= 0x2080u && cp <= 0x2089u) ||
+    return cp == 0x00B2u || cp == 0x00B3u || cp == 0x00B9u || (cp >= 0x00BCu && cp <= 0x00BEu) || cp == 0x2044u ||
+           cp == 0x2070u || (cp >= 0x2074u && cp <= 0x2079u) || (cp >= 0x2080u && cp <= 0x2089u) ||
            (cp >= 0x2150u && cp <= 0x215Eu);
 }
 
@@ -122,8 +102,7 @@ static bool string_fragment_is_nfc_fast_append(const char *data, size_t len)
         size_t width = string_utf8_scalar_width((unsigned char)data[pos]);
         uint32_t cp = 0u;
 
-        if (width == 0u || width > len - pos ||
-            !string_utf8_decode_one_strict(data + pos, width, &cp) ||
+        if (width == 0u || width > len - pos || !string_utf8_decode_one_strict(data + pos, width, &cp) ||
             !string_scalar_is_nfc_fast_append(cp))
             return false;
         pos += width;
@@ -159,8 +138,7 @@ static bool string_cstr_measure_fast_append(const char *data, size_t *len_out)
             if (data[pos + i] == '\0')
                 goto fallback;
         }
-        if (!string_utf8_decode_one_strict(data + pos, width, &cp) ||
-            !string_scalar_is_nfc_fast_append(cp))
+        if (!string_utf8_decode_one_strict(data + pos, width, &cp) || !string_scalar_is_nfc_fast_append(cp))
             goto fallback;
         pos += width;
     }
@@ -233,17 +211,19 @@ static int string_append_utf8_scalar(string_t *s, uint32_t value)
 
 int string_reserve(string_t *s, size_t needed)
 {
-    if (needed <= s->cap) return 0;
+    if (needed <= s->cap)
+        return 0;
 
     size_t new_cap = s->cap ? s->cap : 32;
     while (new_cap < needed)
         new_cap *= 2;
 
     char *p = realloc(s->data, new_cap);
-    if (!p) return -1;
+    if (!p)
+        return -1;
 
     s->data = p;
-    s->cap  = new_cap;
+    s->cap = new_cap;
     return 0;
 }
 
@@ -252,7 +232,8 @@ int string_reserve(string_t *s, size_t needed)
 string_t *string_new(void)
 {
     string_t *s = malloc(sizeof(*s));
-    if (!s) return NULL;
+    if (!s)
+        return NULL;
 
     s->data = NULL;
     s->len = 0u;
@@ -321,19 +302,16 @@ string_t *string_new_wide(const wchar_t *init)
     for (i = 0u; init[i] != L'\0'; ++i) {
         uint32_t value = (uint32_t)init[i];
 
-        if (sizeof(wchar_t) == 2u &&
-            value >= 0xD800u && value <= 0xDBFFu) {
+        if (sizeof(wchar_t) == 2u && value >= 0xD800u && value <= 0xDBFFu) {
             uint32_t next = (uint32_t)init[i + 1u];
 
             if (next >= 0xDC00u && next <= 0xDFFFu) {
-                value = 0x10000u +
-                        (((value - 0xD800u) << 10) | (next - 0xDC00u));
+                value = 0x10000u + (((value - 0xD800u) << 10) | (next - 0xDC00u));
                 ++i;
             } else {
                 value = 0xFFFDu;
             }
-        } else if (sizeof(wchar_t) == 2u &&
-                   value >= 0xDC00u && value <= 0xDFFFu) {
+        } else if (sizeof(wchar_t) == 2u && value >= 0xDC00u && value <= 0xDFFFu) {
             value = 0xFFFDu;
         }
 
@@ -371,7 +349,8 @@ string_t *string_clone(const string_t *src)
 
 void string_free(string_t *s)
 {
-    if (!s) return;
+    if (!s)
+        return;
     free(s->data);
     free(s->scratch);
     free(s);
@@ -400,7 +379,8 @@ size_t string_encoded_len(const string_t *s)
 
 void string_clear(string_t *s)
 {
-    if (!s) return;
+    if (!s)
+        return;
     s->len = 0;
     s->data[0] = '\0';
 }
@@ -445,9 +425,7 @@ int string_append_view(string_t *s, string_view_t suffix)
 
     if (string_append_fragment_raw(s, data, add) != 0)
         return -1;
-    return string_fragment_is_nfc_fast_append(data, add)
-        ? 0
-        : string_normalise_storage(s);
+    return string_fragment_is_nfc_fast_append(data, add) ? 0 : string_normalise_storage(s);
 }
 
 /* Append exactly `size` bytes from `buffer` to s (need not be null-terminated).
@@ -460,9 +438,7 @@ int string_append_chars(string_t *s, const char *buffer, size_t size)
 
     if (string_append_fragment_raw(s, buffer, size) != 0)
         return -1;
-    return string_fragment_is_nfc_fast_append(buffer, size)
-        ? 0
-        : string_normalise_storage(s);
+    return string_fragment_is_nfc_fast_append(buffer, size) ? 0 : string_normalise_storage(s);
 }
 
 /* Append a single character to s. Returns 0 on success, -1 on failure. */
@@ -475,9 +451,7 @@ int string_append_char(string_t *s, char c)
     if (string_append_fragment_raw(s, &c, 1u) != 0)
         return -1;
 
-    return (unsigned char)c < 0x80u
-        ? 0
-        : string_normalise_storage(s);
+    return (unsigned char)c < 0x80u ? 0 : string_normalise_storage(s);
 }
 
 /* Insert `text` at byte offset `pos`, shifting existing content right.
@@ -486,19 +460,13 @@ int string_append_char(string_t *s, char c)
 int string_insert(string_t *s, size_t pos, const char *text)
 {
     return (s && text)
-        ? string_insert_view(s,
-                             string_character_byte_offset(s, pos),
-                             string_view_from_chars(text, strlen(text)))
-        : -1;
+               ? string_insert_view(s, string_character_byte_offset(s, pos), string_view_from_chars(text, strlen(text)))
+               : -1;
 }
 
 int string_insert_string(string_t *s, size_t pos, const string_t *text)
 {
-    return (s && text)
-        ? string_insert_view(s,
-                             string_character_byte_offset(s, pos),
-                             string_view_all(text))
-        : -1;
+    return (s && text) ? string_insert_view(s, string_character_byte_offset(s, pos), string_view_all(text)) : -1;
 }
 
 int string_insert_view(string_t *s, size_t pos, string_view_t text)
@@ -559,19 +527,17 @@ void string_trim(string_t *s)
 
 #define STRING_FORMAT_CONV_BASE 'A'
 #define STRING_FORMAT_CONV_LAST 'z'
-#define STRING_FORMAT_CONV_RANGE \
-    ((unsigned int)((unsigned char)STRING_FORMAT_CONV_LAST - \
-                    (unsigned char)STRING_FORMAT_CONV_BASE))
+#define STRING_FORMAT_CONV_RANGE                                                                                       \
+    ((unsigned int)((unsigned char)STRING_FORMAT_CONV_LAST - (unsigned char)STRING_FORMAT_CONV_BASE))
 
 /* Bits are indexed from 'A'; the punctuation gap between 'Z' and 'a' is zero. */
 static const uint64_t STRING_FORMAT_STANDARD_MASK = UINT64_C(0x94e17d00800071); /* AEFGXacdefginopsux */
-static const uint64_t STRING_FORMAT_INTEGER_MASK  = UINT64_C(0x90410800800000); /* Xdioux */
-static const uint64_t STRING_FORMAT_FLOAT_MASK    = UINT64_C(0x00007100000071); /* AEFGaefg */
+static const uint64_t STRING_FORMAT_INTEGER_MASK = UINT64_C(0x90410800800000);  /* Xdioux */
+static const uint64_t STRING_FORMAT_FLOAT_MASK = UINT64_C(0x00007100000071);    /* AEFGaefg */
 
 static bool string_format_char_in_mask(char conv, uint64_t mask)
 {
-    unsigned int bit = (unsigned int)((unsigned char)conv -
-                                      (unsigned char)STRING_FORMAT_CONV_BASE);
+    unsigned int bit = (unsigned int)((unsigned char)conv - (unsigned char)STRING_FORMAT_CONV_BASE);
 
     if (bit > STRING_FORMAT_CONV_RANGE)
         return false;
@@ -589,64 +555,52 @@ static void string_format_spec_init(string_format_spec_t *spec)
     if (!spec)
         return;
 
-    *spec = (string_format_spec_t){
-        .conversion = '\0',
-        .trailing_modifier = '\0',
-        .flag_left = false,
-        .flag_sign = false,
-        .flag_space = false,
-        .flag_alternate = false,
-        .flag_zero = false,
-        .width = 0,
-        .precision = -1,
-        .width_from_argument = false,
-        .precision_from_argument = false,
-        .length = { 0, 0, 0 }
-    };
+    *spec = (string_format_spec_t){.conversion = '\0',
+                                   .trailing_modifier = '\0',
+                                   .flag_left = false,
+                                   .flag_sign = false,
+                                   .flag_space = false,
+                                   .flag_alternate = false,
+                                   .flag_zero = false,
+                                   .width = 0,
+                                   .precision = -1,
+                                   .width_from_argument = false,
+                                   .precision_from_argument = false,
+                                   .length = {0, 0, 0}};
 }
 
-static bool string_format_cursor_peek_ascii(const string_cursor_t *cursor,
-                                            unsigned char *out)
+static bool string_format_cursor_peek_ascii(const string_cursor_t *cursor, unsigned char *out)
 {
     return cursor && string_cursor_peek_ascii(cursor, out);
 }
 
-static bool string_format_cursor_peek_char(const string_cursor_t *cursor,
-                                           char expected)
+static bool string_format_cursor_peek_char(const string_cursor_t *cursor, char expected)
 {
     unsigned char actual = 0u;
 
-    return string_format_cursor_peek_ascii(cursor, &actual) &&
-           actual == (unsigned char)expected;
+    return string_format_cursor_peek_ascii(cursor, &actual) && actual == (unsigned char)expected;
 }
 
-static bool string_format_cursor_consume_char(string_cursor_t *cursor,
-                                              char expected)
+static bool string_format_cursor_consume_char(string_cursor_t *cursor, char expected)
 {
     if (!string_format_cursor_peek_char(cursor, expected))
         return false;
     return string_cursor_next(cursor) == 0;
 }
 
-static bool string_format_cursor_peek_ascii_at(const string_cursor_t *cursor,
-                                               string_pos_t pos,
-                                               unsigned char *out)
+static bool string_format_cursor_peek_ascii_at(const string_cursor_t *cursor, string_pos_t pos, unsigned char *out)
 {
     return cursor && string_cursor_peek_ascii_at(cursor, pos, out);
 }
 
-static char string_format_cursor_ascii_at(const string_cursor_t *cursor,
-                                          string_pos_t pos)
+static char string_format_cursor_ascii_at(const string_cursor_t *cursor, string_pos_t pos)
 {
     unsigned char value = 0u;
 
-    return string_format_cursor_peek_ascii_at(cursor, pos, &value)
-        ? (char)value
-        : '\0';
+    return string_format_cursor_peek_ascii_at(cursor, pos, &value) ? (char)value : '\0';
 }
 
-static bool string_format_cursor_skip(string_cursor_t *cursor,
-                                      string_pos_t span)
+static bool string_format_cursor_skip(string_cursor_t *cursor, string_pos_t span)
 {
     return cursor && string_cursor_skip(cursor, span);
 }
@@ -688,14 +642,11 @@ static bool string_format_has_string_module_specifier(const char *fmt)
             char c1 = c0 != '\0' ? p[1] : '\0';
             char c2 = c1 != '\0' ? p[2] : '\0';
 
-            if (c0 == 'h' && c1 == 'h' &&
-                string_format_char_is_standard_conversion(c2)) {
+            if (c0 == 'h' && c1 == 'h' && string_format_char_is_standard_conversion(c2)) {
                 p += 2;
-            } else if (c0 == 'l' && c1 == 'l' &&
-                       string_format_char_is_standard_conversion(c2)) {
+            } else if (c0 == 'l' && c1 == 'l' && string_format_char_is_standard_conversion(c2)) {
                 p += 2;
-            } else if (c0 != '\0' && strchr("hljztL", c0) &&
-                       string_format_char_is_standard_conversion(c1)) {
+            } else if (c0 != '\0' && strchr("hljztL", c0) && string_format_char_is_standard_conversion(c1)) {
                 ++p;
             }
         }
@@ -708,9 +659,7 @@ static bool string_format_has_string_module_specifier(const char *fmt)
     return false;
 }
 
-static int string_append_printf_piece(string_t *s,
-                                      const char *fmt,
-                                      ...)
+static int string_append_printf_piece(string_t *s, const char *fmt, ...)
 {
     int n;
     int written;
@@ -742,24 +691,18 @@ static int string_append_printf_piece(string_t *s,
     return written;
 }
 
-static int string_format_append_cursor_literal(string_t *s,
-                                               string_pos_t start,
-                                               string_pos_t end,
+static int string_format_append_cursor_literal(string_t *s, string_pos_t start, string_pos_t end,
                                                const string_cursor_t *cursor)
 {
     size_t before;
 
     if (start == end)
         return 0;
-    if (!s || !cursor || !cursor->source ||
-        start > end || end > cursor->source->len)
+    if (!s || !cursor || !cursor->source || start > end || end > cursor->source->len)
         return -1;
 
     before = string_encoded_len(s);
-    if (string_append_view(
-            s,
-            string_view_from_chars(cursor->source->data + start,
-                                   end - start)) != 0)
+    if (string_append_view(s, string_view_from_chars(cursor->source->data + start, end - start)) != 0)
         return -1;
     return (int)(string_encoded_len(s) - before);
 }
@@ -774,12 +717,8 @@ static int string_format_spec_has_float_conversion(char conv)
     return string_format_char_in_mask(conv, STRING_FORMAT_FLOAT_MASK);
 }
 
-static int string_format_append_standard_conversion(string_t *s,
-                                                    const string_t *spec_text,
-                                                    char conv,
-                                                    const char *length,
-                                                    int width_from_arg,
-                                                    int precision_from_arg,
+static int string_format_append_standard_conversion(string_t *s, const string_t *spec_text, char conv,
+                                                    const char *length, int width_from_arg, int precision_from_arg,
                                                     va_list ap)
 {
     const char *spec;
@@ -795,15 +734,15 @@ static int string_format_append_standard_conversion(string_t *s,
     if (precision_from_arg)
         precision = va_arg(ap, int);
 
-#define STRING_APPEND_FORMATTED(value) \
-    do { \
-        if (width_from_arg && precision_from_arg) \
-            return string_append_printf_piece(s, spec, width, precision, (value)); \
-        if (width_from_arg) \
-            return string_append_printf_piece(s, spec, width, (value)); \
-        if (precision_from_arg) \
-            return string_append_printf_piece(s, spec, precision, (value)); \
-        return string_append_printf_piece(s, spec, (value)); \
+#define STRING_APPEND_FORMATTED(value)                                                                                 \
+    do {                                                                                                               \
+        if (width_from_arg && precision_from_arg)                                                                      \
+            return string_append_printf_piece(s, spec, width, precision, (value));                                     \
+        if (width_from_arg)                                                                                            \
+            return string_append_printf_piece(s, spec, width, (value));                                                \
+        if (precision_from_arg)                                                                                        \
+            return string_append_printf_piece(s, spec, precision, (value));                                            \
+        return string_append_printf_piece(s, spec, (value));                                                           \
     } while (0)
 
     if (conv == 's') {
@@ -819,8 +758,7 @@ static int string_format_append_standard_conversion(string_t *s,
         STRING_APPEND_FORMATTED(value);
     }
     if (string_format_spec_has_integer_conversion(conv)) {
-        if (strcmp(length, "hh") == 0 || strcmp(length, "h") == 0 ||
-            length[0] == '\0') {
+        if (strcmp(length, "hh") == 0 || strcmp(length, "h") == 0 || length[0] == '\0') {
             if (conv == 'd' || conv == 'i') {
                 int value = va_arg(ap, int);
                 STRING_APPEND_FORMATTED(value);
@@ -883,11 +821,8 @@ static int string_format_append_standard_conversion(string_t *s,
 
 #define STRING_FORMAT_SIMPLE_FALLBACK INT_MIN
 
-static int string_append_simple_callback_format(string_t *s,
-                                                const char *fmt,
-                                                va_list ap,
-                                                string_format_callback_t callback,
-                                                void *callback_user)
+static int string_append_simple_callback_format(string_t *s, const char *fmt, va_list ap,
+                                                string_format_callback_t callback, void *callback_user)
 {
     const char *p = fmt;
     string_format_spec_t spec;
@@ -944,25 +879,21 @@ static int string_append_simple_callback_format(string_t *s,
         char c1 = c0 != '\0' ? p[1] : '\0';
         char c2 = c1 != '\0' ? p[2] : '\0';
 
-        if (c0 == 'h' && c1 == 'h' &&
-            string_format_char_is_standard_conversion(c2)) {
+        if (c0 == 'h' && c1 == 'h' && string_format_char_is_standard_conversion(c2)) {
             spec.length[0] = 'h';
             spec.length[1] = 'h';
             p += 2;
-        } else if (c0 == 'l' && c1 == 'l' &&
-                   string_format_char_is_standard_conversion(c2)) {
+        } else if (c0 == 'l' && c1 == 'l' && string_format_char_is_standard_conversion(c2)) {
             spec.length[0] = 'l';
             spec.length[1] = 'l';
             p += 2;
-        } else if (c0 != '\0' && strchr("hljztL", c0) &&
-                   string_format_char_is_standard_conversion(c1)) {
+        } else if (c0 != '\0' && strchr("hljztL", c0) && string_format_char_is_standard_conversion(c1)) {
             spec.length[0] = c0;
             ++p;
         }
     }
 
-    if (*p == '\0' || p[1] != '\0' ||
-        *p == 'S' || *p == 'W' || *p == 'R')
+    if (*p == '\0' || p[1] != '\0' || *p == 'S' || *p == 'W' || *p == 'R')
         return STRING_FORMAT_SIMPLE_FALLBACK;
 
     spec.conversion = *p;
@@ -977,12 +908,8 @@ static int string_append_simple_callback_format(string_t *s,
     return appended <= (size_t)INT_MAX ? (int)appended : -1;
 }
 
-static int string_append_vformat_with_string_module_objects(
-    string_t *s,
-    const char *fmt,
-    va_list ap,
-    string_format_callback_t callback,
-    void *callback_user)
+static int string_append_vformat_with_string_module_objects(string_t *s, const char *fmt, va_list ap,
+                                                            string_format_callback_t callback, void *callback_user)
 {
     string_t *format = NULL;
     string_cursor_t *cursor = NULL;
@@ -1002,7 +929,7 @@ static int string_append_vformat_with_string_module_objects(
 
     while (!string_cursor_done(cursor)) {
         string_pos_t spec_start;
-        char length[3] = { 0, 0, 0 };
+        char length[3] = {0, 0, 0};
         char conv;
         unsigned char ch = 0u;
         int width_from_arg = 0;
@@ -1018,11 +945,7 @@ static int string_append_vformat_with_string_module_objects(
             continue;
         }
 
-        appended = string_format_append_cursor_literal(
-            s,
-            literal_start,
-            string_cursor_position(cursor),
-            cursor);
+        appended = string_format_append_cursor_literal(s, literal_start, string_cursor_position(cursor), cursor);
         if (appended < 0)
             goto done;
         total += appended;
@@ -1038,8 +961,7 @@ static int string_append_vformat_with_string_module_objects(
             continue;
         }
 
-        while (string_format_cursor_peek_ascii(cursor, &ch) &&
-               strchr("-+ #0", (int)ch)) {
+        while (string_format_cursor_peek_ascii(cursor, &ch) && strchr("-+ #0", (int)ch)) {
             if (ch == '-')
                 spec.flag_left = true;
             else if (ch == '+')
@@ -1057,8 +979,7 @@ static int string_append_vformat_with_string_module_objects(
             width_from_arg = 1;
             spec.width_from_argument = true;
         } else {
-            while (string_format_cursor_peek_ascii(cursor, &ch) &&
-                   isdigit((unsigned char)ch)) {
+            while (string_format_cursor_peek_ascii(cursor, &ch) && isdigit((unsigned char)ch)) {
                 spec.width = spec.width * 10 + (int)(ch - '0');
                 if (string_cursor_next(cursor) != 0)
                     goto done;
@@ -1070,8 +991,7 @@ static int string_append_vformat_with_string_module_objects(
                 spec.precision_from_argument = true;
             } else {
                 spec.precision = 0;
-                while (string_format_cursor_peek_ascii(cursor, &ch) &&
-                       isdigit((unsigned char)ch)) {
+                while (string_format_cursor_peek_ascii(cursor, &ch) && isdigit((unsigned char)ch)) {
                     spec.precision = spec.precision * 10 + (int)(ch - '0');
                     if (string_cursor_next(cursor) != 0)
                         goto done;
@@ -1084,24 +1004,21 @@ static int string_append_vformat_with_string_module_objects(
             char c1 = string_format_cursor_ascii_at(cursor, pos + 1u);
             char c2 = string_format_cursor_ascii_at(cursor, pos + 2u);
 
-            if (c0 == 'h' && c1 == 'h' &&
-                string_format_char_is_standard_conversion(c2)) {
+            if (c0 == 'h' && c1 == 'h' && string_format_char_is_standard_conversion(c2)) {
                 length[0] = 'h';
                 length[1] = 'h';
                 spec.length[0] = 'h';
                 spec.length[1] = 'h';
                 if (!string_format_cursor_skip(cursor, 2u))
                     goto done;
-            } else if (c0 == 'l' && c1 == 'l' &&
-                       string_format_char_is_standard_conversion(c2)) {
+            } else if (c0 == 'l' && c1 == 'l' && string_format_char_is_standard_conversion(c2)) {
                 length[0] = 'l';
                 length[1] = 'l';
                 spec.length[0] = 'l';
                 spec.length[1] = 'l';
                 if (!string_format_cursor_skip(cursor, 2u))
                     goto done;
-            } else if (c0 != '\0' && strchr("hljztL", c0) &&
-                       string_format_char_is_standard_conversion(c1)) {
+            } else if (c0 != '\0' && strchr("hljztL", c0) && string_format_char_is_standard_conversion(c1)) {
                 length[0] = c0;
                 spec.length[0] = length[0];
                 if (string_cursor_next(cursor) != 0)
@@ -1115,10 +1032,8 @@ static int string_append_vformat_with_string_module_objects(
         spec.conversion = conv;
         if (string_cursor_next(cursor) != 0)
             goto done;
-        if (callback &&
-            (!string_format_char_is_standard_conversion(conv) || conv == 'n') &&
-            string_format_cursor_peek_ascii(cursor, &ch) &&
-            isalpha((unsigned char)ch)) {
+        if (callback && (!string_format_char_is_standard_conversion(conv) || conv == 'n') &&
+            string_format_cursor_peek_ascii(cursor, &ch) && isalpha((unsigned char)ch)) {
             spec.trailing_modifier = (char)ch;
         }
 
@@ -1128,11 +1043,9 @@ static int string_append_vformat_with_string_module_objects(
 
             if (handled == STRING_FORMAT_ERROR)
                 goto done;
-            if (handled == STRING_FORMAT_HANDLED ||
-                handled == STRING_FORMAT_HANDLED_WITH_TRAILING_MODIFIER) {
+            if (handled == STRING_FORMAT_HANDLED || handled == STRING_FORMAT_HANDLED_WITH_TRAILING_MODIFIER) {
                 total += (int)(string_encoded_len(s) - before);
-                if (handled == STRING_FORMAT_HANDLED_WITH_TRAILING_MODIFIER &&
-                    spec.trailing_modifier != '\0') {
+                if (handled == STRING_FORMAT_HANDLED_WITH_TRAILING_MODIFIER && spec.trailing_modifier != '\0') {
                     if (string_cursor_next(cursor) != 0)
                         goto done;
                 }
@@ -1151,9 +1064,7 @@ static int string_append_vformat_with_string_module_objects(
             if (length[0] != '\0')
                 goto done;
             value = va_arg(ap, const string_t *);
-            appended = value
-                ? string_append_string(s, value)
-                : string_append_cstr(s, "(null)");
+            appended = value ? string_append_string(s, value) : string_append_cstr(s, "(null)");
             if (appended != 0)
                 goto done;
             total += value ? (int)string_encoded_len(value) : 6;
@@ -1195,19 +1106,10 @@ static int string_append_vformat_with_string_module_objects(
         } else if (conv == 'n') {
             goto done;
         } else {
-            string_t *standard_spec = string_cursor_slice_between(
-                spec_start,
-                string_cursor_position(cursor),
-                cursor);
+            string_t *standard_spec = string_cursor_slice_between(spec_start, string_cursor_position(cursor), cursor);
 
-            appended = string_format_append_standard_conversion(
-                s,
-                standard_spec,
-                conv,
-                length,
-                width_from_arg,
-                precision_from_arg,
-                ap);
+            appended = string_format_append_standard_conversion(s, standard_spec, conv, length, width_from_arg,
+                                                                precision_from_arg, ap);
             string_free(standard_spec);
             if (appended < 0)
                 goto done;
@@ -1218,18 +1120,13 @@ static int string_append_vformat_with_string_module_objects(
     }
 
     {
-        int appended = string_format_append_cursor_literal(
-            s,
-            literal_start,
-            string_cursor_position(cursor),
-            cursor);
+        int appended = string_format_append_cursor_literal(s, literal_start, string_cursor_position(cursor), cursor);
         if (appended < 0)
             goto done;
         total += appended;
     }
 
-    if (!string_fragment_is_nfc_fast_append(s->data + append_start,
-                                            s->len - append_start) &&
+    if (!string_fragment_is_nfc_fast_append(s->data + append_start, s->len - append_start) &&
         string_normalise_storage(s) != 0)
         goto done;
     result = total;
@@ -1254,14 +1151,14 @@ int string_append_vformat(string_t *s, const char *fmt, va_list ap)
     int written;
     size_t need;
 
-    if (!s || !fmt) return -1;
+    if (!s || !fmt)
+        return -1;
 
     if (string_format_has_string_module_specifier(fmt)) {
         int result;
 
         va_copy(ap2, ap);
-        result = string_append_vformat_with_string_module_objects(
-            s, fmt, ap2, NULL, NULL);
+        result = string_append_vformat_with_string_module_objects(s, fmt, ap2, NULL, NULL);
         va_end(ap2);
         return result;
     }
@@ -1271,26 +1168,25 @@ int string_append_vformat(string_t *s, const char *fmt, va_list ap)
 
     n = vsnprintf(NULL, 0, fmt, ap2);
     va_end(ap2);
-    if (n < 0) return -1;
+    if (n < 0)
+        return -1;
 
     need = s->len + (size_t)n + 1;
-    if (string_reserve(s, need) != 0) return -1;
+    if (string_reserve(s, need) != 0)
+        return -1;
 
     written = vsnprintf(s->data + s->len, (size_t)n + 1, fmt, ap);
-    if (written < 0) return -1;
+    if (written < 0)
+        return -1;
 
     s->len += (size_t)written;
-    if (!string_fragment_is_nfc_fast_append(s->data + append_start,
-                                            s->len - append_start) &&
+    if (!string_fragment_is_nfc_fast_append(s->data + append_start, s->len - append_start) &&
         string_normalise_storage(s) != 0)
         return -1;
     return written;
 }
 
-int string_append_vformat_with_callback(string_t *s,
-                                        const char *fmt,
-                                        va_list ap,
-                                        string_format_callback_t callback,
+int string_append_vformat_with_callback(string_t *s, const char *fmt, va_list ap, string_format_callback_t callback,
                                         void *user)
 {
     va_list ap2;
@@ -1304,8 +1200,7 @@ int string_append_vformat_with_callback(string_t *s,
     va_copy(ap2, ap);
     result = string_append_simple_callback_format(s, fmt, ap2, callback, user);
     if (result == STRING_FORMAT_SIMPLE_FALLBACK)
-        result = string_append_vformat_with_string_module_objects(
-            s, fmt, ap2, callback, user);
+        result = string_append_vformat_with_string_module_objects(s, fmt, ap2, callback, user);
     va_end(ap2);
     return result;
 }
@@ -1343,10 +1238,7 @@ string_t *string_vsprintf(const char *fmt, va_list ap)
     return out;
 }
 
-string_t *string_vsprintf_with_callback(const char *fmt,
-                                        va_list ap,
-                                        string_format_callback_t callback,
-                                        void *user)
+string_t *string_vsprintf_with_callback(const char *fmt, va_list ap, string_format_callback_t callback, void *user)
 {
     string_t *out;
     va_list ap2;
@@ -1433,12 +1325,8 @@ int string_fprintf(FILE *stream, const char *fmt, ...)
 /* Return the byte offset of the first occurrence of `needle` in s, or -1 if
    not found, needle is empty, or either argument is NULL. */
 
-static bool string_find_bytes_index(const char *haystack,
-                                    size_t haystack_len,
-                                    const char *needle,
-                                    size_t needle_len,
-                                    size_t start,
-                                    size_t *index_out)
+static bool string_find_bytes_index(const char *haystack, size_t haystack_len, const char *needle, size_t needle_len,
+                                    size_t start, size_t *index_out)
 {
     if (!haystack || !needle || needle_len == 0u || needle_len > haystack_len)
         return false;
@@ -1458,16 +1346,12 @@ static bool string_find_bytes_index(const char *haystack,
 
 string_offset_t string_find(const string_t *s, const char *needle)
 {
-    return needle
-        ? string_find_view(s, string_view_from_chars(needle, strlen(needle)))
-        : -1;
+    return needle ? string_find_view(s, string_view_from_chars(needle, strlen(needle))) : -1;
 }
 
 string_offset_t string_find_string(const string_t *s, const string_t *needle)
 {
-    return needle
-        ? string_find_view(s, string_view_all(needle))
-        : -1;
+    return needle ? string_find_view(s, string_view_all(needle)) : -1;
 }
 
 string_offset_t string_find_view(const string_t *s, string_view_t needle)
@@ -1479,12 +1363,7 @@ string_offset_t string_find_view(const string_t *s, string_view_t needle)
     if (!s || !needle_data || needle_len == 0u)
         return -1;
 
-    if (!string_find_bytes_index(s->data,
-                                 s->len,
-                                 needle_data,
-                                 needle_len,
-                                 0u,
-                                 &index))
+    if (!string_find_bytes_index(s->data, s->len, needle_data, needle_len, 0u, &index))
         return -1;
 
     return (string_offset_t)index;
@@ -1498,9 +1377,12 @@ int string_compare(const string_t *a, const string_t *b)
     size_t min_len;
     int cmp;
 
-    if (!a && !b) return 0;
-    if (!a) return -1;
-    if (!b) return 1;
+    if (!a && !b)
+        return 0;
+    if (!a)
+        return -1;
+    if (!b)
+        return 1;
 
     min_len = a->len < b->len ? a->len : b->len;
     cmp = min_len > 0u ? memcmp(a->data, b->data, min_len) : 0;
@@ -1517,16 +1399,12 @@ int string_compare(const string_t *a, const string_t *b)
 
 bool string_starts_with(const string_t *s, const char *prefix)
 {
-    return prefix
-        ? string_starts_with_view(s, string_view_from_chars(prefix, strlen(prefix)))
-        : false;
+    return prefix ? string_starts_with_view(s, string_view_from_chars(prefix, strlen(prefix))) : false;
 }
 
 bool string_starts_with_string(const string_t *s, const string_t *prefix)
 {
-    return prefix
-        ? string_starts_with_view(s, string_view_all(prefix))
-        : false;
+    return prefix ? string_starts_with_view(s, string_view_all(prefix)) : false;
 }
 
 bool string_starts_with_view(const string_t *s, string_view_t prefix)
@@ -1544,16 +1422,12 @@ bool string_starts_with_view(const string_t *s, string_view_t prefix)
 
 bool string_ends_with(const string_t *s, const char *suffix)
 {
-    return suffix
-        ? string_ends_with_view(s, string_view_from_chars(suffix, strlen(suffix)))
-        : false;
+    return suffix ? string_ends_with_view(s, string_view_from_chars(suffix, strlen(suffix))) : false;
 }
 
 bool string_ends_with_string(const string_t *s, const string_t *suffix)
 {
-    return suffix
-        ? string_ends_with_view(s, string_view_all(suffix))
-        : false;
+    return suffix ? string_ends_with_view(s, string_view_all(suffix)) : false;
 }
 
 bool string_ends_with_view(const string_t *s, string_view_t suffix)
@@ -1564,9 +1438,7 @@ bool string_ends_with_view(const string_t *s, string_view_t suffix)
     if (!s || !suffix_data || suffix_len > s->len)
         return false;
 
-    return memcmp(s->data + (s->len - suffix_len),
-                  suffix_data,
-                  suffix_len) == 0;
+    return memcmp(s->data + (s->len - suffix_len), suffix_data, suffix_len) == 0;
 }
 
 /* Return a new string containing `len` bytes starting at `pos`. Both pos and
@@ -1574,14 +1446,18 @@ bool string_ends_with_view(const string_t *s, string_view_t suffix)
 
 string_t *string_substr(const string_t *s, size_t pos, size_t len)
 {
-    if (!s) return NULL;
-    if (pos > s->len) pos = s->len;
+    if (!s)
+        return NULL;
+    if (pos > s->len)
+        pos = s->len;
 
     size_t max = s->len - pos;
-    if (len > max) len = max;
+    if (len > max)
+        len = max;
 
     string_t *out = string_new();
-    if (!out) return NULL;
+    if (!out)
+        return NULL;
 
     if (string_reserve(out, len + 1) != 0) {
         string_free(out);
@@ -1609,20 +1485,14 @@ void string_reverse(string_t *s)
 
 int string_replace(string_t *s, const char *search, const char *replace)
 {
-    return (search && replace)
-        ? string_replace_view(s,
-                              string_view_from_chars(search, strlen(search)),
-                              string_view_from_chars(replace, strlen(replace)))
-        : -1;
+    return (search && replace) ? string_replace_view(s, string_view_from_chars(search, strlen(search)),
+                                                     string_view_from_chars(replace, strlen(replace)))
+                               : -1;
 }
 
-int string_replace_string(string_t *s,
-                          const string_t *search,
-                          const string_t *replace)
+int string_replace_string(string_t *s, const string_t *search, const string_t *replace)
 {
-    return (search && replace)
-        ? string_replace_view(s, string_view_all(search), string_view_all(replace))
-        : -1;
+    return (search && replace) ? string_replace_view(s, string_view_all(search), string_view_all(replace)) : -1;
 }
 
 int string_replace_view(string_t *s, string_view_t search, string_view_t replace)
@@ -1644,12 +1514,7 @@ int string_replace_view(string_t *s, string_view_t search, string_view_t replace
     if (search_len == 0u)
         return 0;
 
-    while (string_find_bytes_index(s->data,
-                                   s->len,
-                                   search_data,
-                                   search_len,
-                                   pos,
-                                   &match)) {
+    while (string_find_bytes_index(s->data, s->len, search_data, search_len, pos, &match)) {
         count++;
         pos = match + search_len;
     }
@@ -1657,19 +1522,14 @@ int string_replace_view(string_t *s, string_view_t search, string_view_t replace
     if (count == 0)
         return 0;
 
-    new_len = replace_len >= search_len
-        ? s->len + count * (replace_len - search_len)
-        : s->len - count * (search_len - replace_len);
+    new_len = replace_len >= search_len ? s->len + count * (replace_len - search_len)
+                                        : s->len - count * (search_len - replace_len);
 
     temp = malloc(new_len + 1);
-    if (!temp) return -1;
+    if (!temp)
+        return -1;
 
-    while (string_find_bytes_index(s->data,
-                                   s->len,
-                                   search_data,
-                                   search_len,
-                                   in_pos,
-                                   &match)) {
+    while (string_find_bytes_index(s->data, s->len, search_data, search_len, in_pos, &match)) {
         size_t prefix_len = match - in_pos;
 
         memcpy(&temp[out_pos], &s->data[in_pos], prefix_len);
@@ -1688,8 +1548,8 @@ int string_replace_view(string_t *s, string_view_t search, string_view_t replace
 
     free(s->data);
     s->data = temp;
-    s->len  = new_len;
-    s->cap  = new_len + 1;
+    s->len = new_len;
+    s->cap = new_len + 1;
     return string_normalise_storage(s);
 }
 
@@ -1700,9 +1560,8 @@ static int string_map_case(string_t *s, int to_upper)
 
 #ifdef HAVE_UNISTRING
     size_t out_len = 0u;
-    uint8_t *mapped = to_upper
-        ? u8_toupper((const uint8_t *)s->data, s->len, NULL, NULL, NULL, &out_len)
-        : u8_tolower((const uint8_t *)s->data, s->len, NULL, NULL, NULL, &out_len);
+    uint8_t *mapped = to_upper ? u8_toupper((const uint8_t *)s->data, s->len, NULL, NULL, NULL, &out_len)
+                               : u8_tolower((const uint8_t *)s->data, s->len, NULL, NULL, NULL, &out_len);
 
     if (!mapped)
         return -1;
@@ -1750,10 +1609,11 @@ void string_to_lower(string_t *s)
 
 unsigned long string_hash(const string_t *s)
 {
-    if (!s) return 0;
+    if (!s)
+        return 0;
 
     const unsigned long FNV_OFFSET = 1469598103934665603UL;
-    const unsigned long FNV_PRIME  = 1099511628211UL;
+    const unsigned long FNV_PRIME = 1099511628211UL;
 
     unsigned long hash = FNV_OFFSET;
 
@@ -1771,10 +1631,12 @@ unsigned long string_hash(const string_t *s)
 
 string_t **string_split(const string_t *s, const char *delim, size_t *out_count)
 {
-    if (!s || !delim || !out_count) return NULL;
+    if (!s || !delim || !out_count)
+        return NULL;
 
     char *copy = strdup(s->data);
-    if (!copy) return NULL;
+    if (!copy)
+        return NULL;
 
     size_t cap = 8;
     size_t count = 0;
@@ -1815,17 +1677,12 @@ string_t **string_split(const string_t *s, const char *delim, size_t *out_count)
     return arr;
 }
 
-string_t **string_split_string(const string_t *s,
-                               const string_t *delim,
-                               size_t *out_count)
+string_t **string_split_string(const string_t *s, const string_t *delim, size_t *out_count)
 {
-    return delim ? string_split_by_view(s, string_view_all(delim), out_count)
-                 : NULL;
+    return delim ? string_split_by_view(s, string_view_all(delim), out_count) : NULL;
 }
 
-string_t **string_split_by_view(const string_t *s,
-                                string_view_t delim,
-                                size_t *out_count)
+string_t **string_split_by_view(const string_t *s, string_view_t delim, size_t *out_count)
 {
     const char *delim_data = string_view_data(delim);
     size_t delim_len = string_view_length(delim);
@@ -1844,12 +1701,7 @@ string_t **string_split_by_view(const string_t *s,
         return NULL;
 
     source = string_view_all(s);
-    while (string_find_bytes_index(s->data,
-                                   s->len,
-                                   delim_data,
-                                   delim_len,
-                                   start,
-                                   &match)) {
+    while (string_find_bytes_index(s->data, s->len, delim_data, delim_len, start, &match)) {
         if (count == cap) {
             string_t **tmp;
             cap *= 2u;
@@ -1862,9 +1714,7 @@ string_t **string_split_by_view(const string_t *s,
         }
 
         {
-            string_view_t segment = string_view_slice(source,
-                                                      start,
-                                                      match - start);
+            string_view_t segment = string_view_slice(source, start, match - start);
 
             arr[count] = string_from_view(&segment);
         }
@@ -1886,9 +1736,7 @@ string_t **string_split_by_view(const string_t *s,
     }
 
     {
-        string_view_t segment = string_view_slice(source,
-                                                  start,
-                                                  s->len - start);
+        string_view_t segment = string_view_slice(source, start, s->len - start);
 
         arr[count] = string_from_view(&segment);
         if (!arr[count]) {
@@ -1906,7 +1754,8 @@ string_t **string_split_by_view(const string_t *s,
 
 void string_split_free(string_t **arr, size_t count)
 {
-    if (!arr) return;
+    if (!arr)
+        return;
     for (size_t i = 0; i < count; i++)
         string_free(arr[i]);
     free(arr);
@@ -1917,32 +1766,25 @@ void string_split_free(string_t **arr, size_t count)
 
 string_t *string_join(string_t **arr, size_t count, const char *sep)
 {
-    return sep
-        ? string_join_with_view(arr,
-                                count,
-                                string_view_from_chars(sep, strlen(sep)))
-        : string_join_with_view(arr,
-                                count,
-                                string_view_from_chars(NULL, 0u));
+    return sep ? string_join_with_view(arr, count, string_view_from_chars(sep, strlen(sep)))
+               : string_join_with_view(arr, count, string_view_from_chars(NULL, 0u));
 }
 
-string_t *string_join_string(string_t **arr,
-                             size_t count,
-                             const string_t *sep)
+string_t *string_join_string(string_t **arr, size_t count, const string_t *sep)
 {
     return sep ? string_join_with_view(arr, count, string_view_all(sep))
                : string_join_with_view(arr, count, string_view_from_chars(NULL, 0u));
 }
 
-string_t *string_join_with_view(string_t **arr,
-                                size_t count,
-                                string_view_t sep)
+string_t *string_join_with_view(string_t **arr, size_t count, string_view_t sep)
 {
     size_t sep_len = string_view_length(sep);
-    if (!arr || count == 0) return string_new_with("");
+    if (!arr || count == 0)
+        return string_new_with("");
 
     string_t *out = string_new();
-    if (!out) return NULL;
+    if (!out)
+        return NULL;
 
     for (size_t i = 0; i < count; i++) {
         if (string_append_view(out, string_view_all(arr[i])) != 0) {

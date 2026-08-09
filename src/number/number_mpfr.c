@@ -24,10 +24,7 @@ static int number_mpfr_set_si(mpfr_t out, long value)
     return 0;
 }
 
-static int number_mpfr_set_pi_fraction(mpfr_t out,
-                                       unsigned long numerator,
-                                       unsigned long denominator,
-                                       int sign)
+static int number_mpfr_set_pi_fraction(mpfr_t out, unsigned long numerator, unsigned long denominator, int sign)
 {
     mpfr_const_pi(out, MPFR_RNDN);
     if (numerator != 1u)
@@ -39,9 +36,7 @@ static int number_mpfr_set_pi_fraction(mpfr_t out,
     return 0;
 }
 
-static int number_mpfr_set_sqrt_ui_over_ui(mpfr_t out,
-                                           unsigned long radicand,
-                                           unsigned long denominator)
+static int number_mpfr_set_sqrt_ui_over_ui(mpfr_t out, unsigned long radicand, unsigned long denominator)
 {
     mpfr_set_ui(out, radicand, MPFR_RNDN);
     mpfr_sqrt(out, out, MPFR_RNDN);
@@ -50,17 +45,22 @@ static int number_mpfr_set_sqrt_ui_over_ui(mpfr_t out,
     return 0;
 }
 
-#define NUMBER_MPFR_CONST_UI(name, value)                  \
-    static int name(mpfr_t out) { return number_mpfr_set_ui(out, (value)); }
+#define NUMBER_MPFR_CONST_UI(name, value)                                                                              \
+    static int name(mpfr_t out)                                                                                        \
+    {                                                                                                                  \
+        return number_mpfr_set_ui(out, (value));                                                                       \
+    }
 
-#define NUMBER_MPFR_CONST_SI(name, value)                  \
-    static int name(mpfr_t out) { return number_mpfr_set_si(out, (value)); }
+#define NUMBER_MPFR_CONST_SI(name, value)                                                                              \
+    static int name(mpfr_t out)                                                                                        \
+    {                                                                                                                  \
+        return number_mpfr_set_si(out, (value));                                                                       \
+    }
 
-#define NUMBER_MPFR_CONST_PI(name, numerator, denominator, sign)       \
-    static int name(mpfr_t out)                                       \
-    {                                                                 \
-        return number_mpfr_set_pi_fraction(out, (numerator),          \
-                                           (denominator), (sign));    \
+#define NUMBER_MPFR_CONST_PI(name, numerator, denominator, sign)                                                       \
+    static int name(mpfr_t out)                                                                                        \
+    {                                                                                                                  \
+        return number_mpfr_set_pi_fraction(out, (numerator), (denominator), (sign));                                   \
     }
 
 NUMBER_MPFR_CONST_UI(number_mpfr_const_zero, 0u)
@@ -364,8 +364,7 @@ static const number_mpfr_const_set_fn number_mpfr_const_table[NUMBER_CONST_COUNT
     [NUMBER_CONST_2PI_CUBED] = number_mpfr_const_2pi_cubed,
     [NUMBER_CONST_NAN] = number_mpfr_const_nan,
     [NUMBER_CONST_INF] = number_mpfr_const_inf,
-    [NUMBER_CONST_NINF] = number_mpfr_const_ninf
-};
+    [NUMBER_CONST_NINF] = number_mpfr_const_ninf};
 
 static int number_mpfr_set_const_id(mpfr_t out, number_const_id_t id)
 {
@@ -385,8 +384,7 @@ number_mpfr_t *number_mpfr_new_prec(size_t precision_bits)
     if (!out)
         return NULL;
     out->constant_id = NUMBER_CONST_COUNT;
-    mpfr_init2(out->value, (mpfr_prec_t)(precision_bits
-        ? precision_bits : number_default_precision_bits));
+    mpfr_init2(out->value, (mpfr_prec_t)(precision_bits ? precision_bits : number_default_precision_bits));
     out->initialised = true;
     mpfr_set_zero(out->value, 0);
     return out;
@@ -399,8 +397,7 @@ int number_mpfr_ensure(const number_mpfr_t *value, size_t precision_bits)
 
     if (!mutable_value)
         return -1;
-    precision = (mpfr_prec_t)(precision_bits ? precision_bits
-                                             : number_default_precision_bits);
+    precision = (mpfr_prec_t)(precision_bits ? precision_bits : number_default_precision_bits);
     if (!mutable_value->initialised) {
         mpfr_init2(mutable_value->value, precision);
         mutable_value->initialised = true;
@@ -408,8 +405,7 @@ int number_mpfr_ensure(const number_mpfr_t *value, size_t precision_bits)
     if (precision_bits != 0u && mpfr_get_prec(mutable_value->value) < precision)
         mpfr_prec_round(mutable_value->value, precision, MPFR_RNDN);
     if (mutable_value->constant_id != NUMBER_CONST_COUNT)
-        return number_mpfr_set_const_id(mutable_value->value,
-                                        mutable_value->constant_id);
+        return number_mpfr_set_const_id(mutable_value->value, mutable_value->constant_id);
     return 0;
 }
 
@@ -426,8 +422,7 @@ number_mpfr_t *number_mpfr_from_mpfr(mpfr_srcptr value, size_t precision_bits)
 
     if (!value)
         return NULL;
-    out = number_mpfr_new_prec(precision_bits ? precision_bits
-                                              : (size_t)mpfr_get_prec(value));
+    out = number_mpfr_new_prec(precision_bits ? precision_bits : (size_t)mpfr_get_prec(value));
     if (!out)
         return NULL;
     mpfr_set(out->value, value, MPFR_RNDN);
@@ -474,13 +469,11 @@ number_mpfr_t *number_mpfr_from_text(const string_t *text, size_t precision_bits
     return out;
 }
 
-number_mpfr_t *number_mpfr_from_const_id(number_const_id_t id,
-                                         size_t precision_bits)
+number_mpfr_t *number_mpfr_from_const_id(number_const_id_t id, size_t precision_bits)
 {
     number_mpfr_t *out;
 
-    out = number_mpfr_new_prec(precision_bits ? precision_bits
-                                              : number_default_precision_bits);
+    out = number_mpfr_new_prec(precision_bits ? precision_bits : number_default_precision_bits);
     if (!out)
         return NULL;
     out->constant_id = id;
@@ -550,8 +543,7 @@ bool number_eq_same_tol_mpfr(const number_t *a, const number_t *b)
 {
     const number_vtable_t *vt = a ? number_vt(a) : NULL;
 
-    return number_eq_same_tol_with_precision(a, b,
-        (a && vt && vt->get_precision) ? vt->get_precision(a) : 0u);
+    return number_eq_same_tol_with_precision(a, b, (a && vt && vt->get_precision) ? vt->get_precision(a) : 0u);
 }
 
 bool number_is_finite_mpfr(const number_t *number)

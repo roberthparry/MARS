@@ -14,7 +14,8 @@ static void test_qd_sprintf_basic(void)
 
     /* %Q uses uppercase E */
     char *e = strchr(expected, 'e');
-    if (e) *e = 'E';
+    if (e)
+        *e = 'E';
 
     if (strcmp(buf, expected) == 0) {
         printf(C_GREEN "  OK: basic %%Q\n" C_RESET);
@@ -44,9 +45,11 @@ static void test_qd_sprintf_multiple(void)
 
     /* %Q uses uppercase E */
     char *e1 = strchr(ea, 'e');
-    if (e1) *e1 = 'E';
+    if (e1)
+        *e1 = 'E';
     char *e2 = strchr(eb, 'e');
-    if (e2) *e2 = 'E';
+    if (e2)
+        *e2 = 'E';
 
     char expected[256];
     snprintf(expected, sizeof(expected), "A=%s B=%s", ea, eb);
@@ -109,11 +112,14 @@ static void test_qd_sprintf_edge_cases(void)
 {
     printf(C_CYAN "TEST: qf_sprintf (edge cases)\n" C_RESET);
 
-    struct { char *input; double tolerance;} tests[] = {
-        { "0", 1e-31 },
-        { "-3.1415926535897932384626433832795", 2e-31 },
-        { "9.9999999999999999999999999999999E-30", 1e-31 },
-        { "1.2345678901234567890123456789012E+200", 7e-31 },
+    struct {
+        char *input;
+        double tolerance;
+    } tests[] = {
+        {"0", 1e-31},
+        {"-3.1415926535897932384626433832795", 2e-31},
+        {"9.9999999999999999999999999999999E-30", 1e-31},
+        {"1.2345678901234567890123456789012E+200", 7e-31},
     };
 
     for (int i = 0; i < 4; i++) {
@@ -132,7 +138,7 @@ static void test_qd_sprintf_edge_cases(void)
         char reparsed[128];
         test_qf_to_buffer(y, reparsed, sizeof(reparsed));
         printf("  reparsed  = %s\n", reparsed);
-        qfloat_t err = qf_abs(qf_sub(qf_div(x, y), (qfloat_t){1,0}));
+        qfloat_t err = qf_abs(qf_sub(qf_div(x, y), (qfloat_t){1, 0}));
         printf("  rel error = %.17g\n", err.hi);
 
         if (qf_close_rel(x, y, tests[i].tolerance || qf_close(x, y, tests[i].tolerance)) || qf_eq(x, y)) {
@@ -281,7 +287,8 @@ static void test_qd_sprintf_q_fallback_width(void)
     qf_sprintf(buf, sizeof(buf), "%40q", x);
 
     int leading_spaces = 0;
-    while (buf[leading_spaces] == ' ') leading_spaces++;
+    while (buf[leading_spaces] == ' ')
+        leading_spaces++;
 
     if (strstr(buf, "e+200") && strlen(buf) >= 40) {
         printf(C_GREEN "  OK: fallback width preserved\n" C_RESET);
@@ -295,43 +302,47 @@ static void test_qf_sprintf_q_concise(void)
 {
     printf(C_CYAN "TEST: qf_sprintf %%q (concise fixed-format)\n" C_RESET);
 
-    struct { char *input; char *expected; double tolerance; } tests[] = {
+    struct {
+        char *input;
+        char *expected;
+        double tolerance;
+    } tests[] = {
 
         /* --- integers --- */
-        { "0",                     "0",          1e-31 },
-        { "1",                     "1",          1e-31 },
-        { "-1",                    "-1",         1e-31 },
-        { "42",                    "42",         1e-31 },
-        { "-42",                   "-42",        1e-31 },
+        {"0", "0", 1e-31},
+        {"1", "1", 1e-31},
+        {"-1", "-1", 1e-31},
+        {"42", "42", 1e-31},
+        {"-42", "-42", 1e-31},
 
         /* --- simple fractions --- */
-        { "0.5",                   "0.5",        1e-31 },
-        { "-0.5",                  "-0.5",       1e-31 },
-        { "1.5",                   "1.5",        1e-31 },
-        { "2.25",                  "2.25",       1e-31 },
-        { "-2.25",                 "-2.25",      1e-31 },
+        {"0.5", "0.5", 1e-31},
+        {"-0.5", "-0.5", 1e-31},
+        {"1.5", "1.5", 1e-31},
+        {"2.25", "2.25", 1e-31},
+        {"-2.25", "-2.25", 1e-31},
 
         /* --- trimming trailing zeros --- */
-        { "1.2500",                "1.25",       1e-31 },
-        { "3.140000",              "3.14",       1e-31 },
-        { "-10.000",               "-10",        1e-31 },
+        {"1.2500", "1.25", 1e-31},
+        {"3.140000", "3.14", 1e-31},
+        {"-10.000", "-10", 1e-31},
 
         /* --- leading zeros after decimal --- */
-        { "0.000123",              "0.000123",   1e-31 },
-        { "-0.000123",             "-0.000123",  1e-31 },
+        {"0.000123", "0.000123", 1e-31},
+        {"-0.000123", "-0.000123", 1e-31},
 
         /* --- fixed-format exponent boundary (still fixed) --- */
-        { "1e32",                  "100000000000000000000000000000000", 1e-31 },
-        { "1e-6",                  "0.000001",   1e-31 },
+        {"1e32", "100000000000000000000000000000000", 1e-31},
+        {"1e-6", "0.000001", 1e-31},
 
         /* --- scientific fallback (outside fixed window) --- */
-        { "1e33",                  "1e+33",      1e-31 },
-        { "1e-7",                  "1e-7",       1e-31 },
+        {"1e33", "1e+33", 1e-31},
+        {"1e-7", "1e-7", 1e-31},
 
         /* --- reconstruction tests --- */
-        { "9.999999999999999e+1",  "99.99999999999999", 1e-31 },
-        { "1.23456789e+3",         "1234.56789",        1e-31 },
-        { "1.23456789e-3",         "0.00123456789",     1e-31 },
+        {"9.999999999999999e+1", "99.99999999999999", 1e-31},
+        {"1.23456789e+3", "1234.56789", 1e-31},
+        {"1.23456789e-3", "0.00123456789", 1e-31},
     };
 
     int N = sizeof(tests) / sizeof(tests[0]);
@@ -355,14 +366,11 @@ static void test_qf_sprintf_q_concise(void)
         test_qf_to_buffer(y, reparsed, sizeof(reparsed));
         printf("  reparsed  = %s\n", reparsed);
 
-        qfloat_t err = qf_abs(qf_sub(qf_div(x, y), (qfloat_t){1,0}));
+        qfloat_t err = qf_abs(qf_sub(qf_div(x, y), (qfloat_t){1, 0}));
         printf("  rel error = %.17g\n", err.hi);
 
         if (strcmp(buf, tests[i].expected) == 0 &&
-            (qf_close_rel(x, y, tests[i].tolerance) ||
-             qf_close(x, y, tests[i].tolerance) ||
-             qf_eq(x, y)))
-        {
+            (qf_close_rel(x, y, tests[i].tolerance) || qf_close(x, y, tests[i].tolerance) || qf_eq(x, y))) {
             printf(C_GREEN "    OK\n" C_RESET);
         } else {
             printf(C_RED "    FAIL  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
@@ -381,13 +389,14 @@ static void test_qf_sprintf_null_safe_new(void)
 
     /* First, get the canonical %Q string via qf_to_string + 'E' */
     char core[128];
-    test_qf_to_buffer(x, core, sizeof(core));   /* produces ...e+0 */
+    test_qf_to_buffer(x, core, sizeof(core)); /* produces ...e+0 */
 
     char expected[160];
     strcpy(expected, "x=");
     strcat(expected, core);
     char *e = strchr(expected, 'e');
-    if (e) *e = 'E';
+    if (e)
+        *e = 'E';
 
     int needed = qf_sprintf(NULL, 0, "x=%Q", x);
 
@@ -421,7 +430,8 @@ static void test_qf_sprintf_two_pass_new(void)
     strcpy(expected, "x=");
     strcat(expected, core);
     char *e = strchr(expected, 'e');
-    if (e) *e = 'E';
+    if (e)
+        *e = 'E';
 
     int needed = qf_sprintf(NULL, 0, "x=%Q", x);
 
@@ -431,7 +441,7 @@ static void test_qf_sprintf_two_pass_new(void)
     if (written == needed && strcmp(buf, expected) == 0) {
         printf(C_GREEN "  OK: two‑pass\n" C_RESET);
     } else {
-        printf(C_RED   "  FAIL: two‑pass  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
+        printf(C_RED "  FAIL: two‑pass  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
         printf("written = %d, needed = %d\n", written, needed);
         printf("     got = %s\n", buf);
         printf("expected = %s\n", expected);
@@ -448,16 +458,13 @@ static void test_qf_printf_stdout(void)
     FILE *in;
     char buf[256];
     char *p;
-    const char *expected =
-        "value=1.500000000000000000000000000000000E+0\n";
+    const char *expected = "value=1.500000000000000000000000000000000E+0\n";
 
     printf(C_CYAN "TEST: qf_printf (stdout)\n" C_RESET);
 
     qfloat_t x = qf_from_double(1.5);
-    saved_stdout = test_case_begin_stdout_capture("qfloat-printf-stdout.txt",
-                                                  &output_path);
-    TEST_ASSERT_TRUE(saved_stdout >= 0,
-                     "qfloat stdout capture should begin successfully");
+    saved_stdout = test_case_begin_stdout_capture("qfloat-printf-stdout.txt", &output_path);
+    TEST_ASSERT_TRUE(saved_stdout >= 0, "qfloat stdout capture should begin successfully");
     TEST_ASSERT_NOT_NULL(output_path);
 
     int n = qf_printf("value=%Q\n", x);
@@ -502,6 +509,7 @@ void test_qf_sprintf_and_printf(void)
     TEST_RUN_SUBTEST(test_qf_printf_stdout, NULL);
 }
 
-void test_printf(void) {
+void test_printf(void)
+{
     TEST_RUN_SUBTEST(test_qf_sprintf_and_printf, NULL);
 }

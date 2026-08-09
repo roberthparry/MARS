@@ -9,13 +9,11 @@ typedef struct {
     long value;
 } number_mpz_const_source_t;
 
-static const number_mpz_const_source_t number_mpz_const_sources[] = {
-    { NUMBER_CONST_ZERO, 0L },
-    { NUMBER_CONST_ONE, 1L },
-    { NUMBER_CONST_NEG_ONE, -1L },
-    { NUMBER_CONST_TWO, 2L },
-    { NUMBER_CONST_TEN, 10L }
-};
+static const number_mpz_const_source_t number_mpz_const_sources[] = {{NUMBER_CONST_ZERO, 0L},
+                                                                     {NUMBER_CONST_ONE, 1L},
+                                                                     {NUMBER_CONST_NEG_ONE, -1L},
+                                                                     {NUMBER_CONST_TWO, 2L},
+                                                                     {NUMBER_CONST_TEN, 10L}};
 
 static int number_mpz_init(number_mpz_t *value)
 {
@@ -28,9 +26,7 @@ static int number_mpz_init(number_mpz_t *value)
 
 static bool number_mpz_const_long(number_const_id_t id, long *out)
 {
-    for (size_t i = 0u;
-         i < sizeof(number_mpz_const_sources) / sizeof(number_mpz_const_sources[0]);
-         ++i) {
+    for (size_t i = 0u; i < sizeof(number_mpz_const_sources) / sizeof(number_mpz_const_sources[0]); ++i) {
         if (number_mpz_const_sources[i].id == id) {
             if (out)
                 *out = number_mpz_const_sources[i].value;
@@ -102,9 +98,7 @@ number_mpz_t *number_mpz_from_text(const string_t *text)
     else
         start = 0u;
 
-    digits = string_cursor_slice_between(start,
-                                         string_cursor_end_position(cursor),
-                                         cursor);
+    digits = string_cursor_slice_between(start, string_cursor_end_position(cursor), cursor);
     string_cursor_free(cursor);
     if (!digits)
         return NULL;

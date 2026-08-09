@@ -92,10 +92,9 @@ typedef struct _dict_entry dictionary_entry_t;
  * @brief Sorting mode for retrieving entries in sorted order.
  */
 typedef enum {
-    DICTIONARY_SORT_BY_KEY,   /**< Sort entries by key */
-    DICTIONARY_SORT_BY_VALUE  /**< Sort entries by value */
+    DICTIONARY_SORT_BY_KEY,  /**< Sort entries by key */
+    DICTIONARY_SORT_BY_VALUE /**< Sort entries by value */
 } dictionary_sort_mode;
-
 
 /* ------------------------------------------------------------------------- */
 /* Creation / destruction                                                    */
@@ -124,15 +123,10 @@ typedef enum {
  * functions (or shallow byte copies if clone is NULL). Destroy callbacks are
  * applied only to those stored copies.
  */
-dictionary_t *dictionary_create(size_t key_size,
-                                size_t value_size,
-                                dictionary_hash_fn key_hash,
-                                dictionary_cmp_fn key_cmp,
-                                dictionary_clone_fn key_clone,
-                                dictionary_destroy_fn key_destroy,
-                                dictionary_cmp_fn value_cmp,
-                                dictionary_clone_fn value_clone,
-                                dictionary_destroy_fn value_destroy);
+dictionary_t *dictionary_create(size_t key_size, size_t value_size, dictionary_hash_fn key_hash,
+                                dictionary_cmp_fn key_cmp, dictionary_clone_fn key_clone,
+                                dictionary_destroy_fn key_destroy, dictionary_cmp_fn value_cmp,
+                                dictionary_clone_fn value_clone, dictionary_destroy_fn value_destroy);
 
 /**
  * @brief Destroy a dictionary and free all associated memory.
@@ -266,9 +260,7 @@ const void *dictionary_get_value_sorted(dictionary_t *dict, size_t index);
  *
  * @return true on success, false on error.
  */
-bool dictionary_get_entry_sorted(dictionary_t *dict,
-                                 size_t index,
-                                 dictionary_sort_mode mode,
+bool dictionary_get_entry_sorted(dictionary_t *dict, size_t index, dictionary_sort_mode mode,
                                  dictionary_entry_t **out_entry);
 
 /* ------------------------------------------------------------------------- */
@@ -286,9 +278,7 @@ bool dictionary_get_entry_sorted(dictionary_t *dict,
  *
  * @return true if the key exists, false otherwise.
  */
-bool dictionary_get_entry(const dictionary_t *dict,
-                          const void *key,
-                          dictionary_entry_t **out_entry);
+bool dictionary_get_entry(const dictionary_t *dict, const void *key, dictionary_entry_t **out_entry);
 
 /**
  * @brief Replace the value associated with an existing entry handle.
@@ -299,9 +289,7 @@ bool dictionary_get_entry(const dictionary_t *dict,
  *
  * @return true on success, false if the entry is invalid.
  */
-bool dictionary_set_entry(dictionary_t *dict,
-                          dictionary_entry_t *entry,
-                          const void *value);
+bool dictionary_set_entry(dictionary_t *dict, dictionary_entry_t *entry, const void *value);
 
 /**
  * @brief Retrieve the key associated with an entry handle.
@@ -335,9 +323,7 @@ typedef void (*dictionary_foreach_fn)(const dictionary_entry_t *entry, void *use
  * The order is not guaranteed and may change after modifications. For sorted
  * iteration, use dictionary_get_entry_sorted().
  */
-void dictionary_foreach(const dictionary_t *dict,
-                        dictionary_foreach_fn fn,
-                        void *user_data);
+void dictionary_foreach(const dictionary_t *dict, dictionary_foreach_fn fn, void *user_data);
 
 /* ------------------------------------------------------------------------- */
 /* Cloning                                                                   */

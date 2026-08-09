@@ -57,8 +57,7 @@ expr_t *equ_residual(const equation_t *equation);
  * Non-polynomial sides fall back to the general display expansion. Inputs are
  * borrowed; release the returned equation with equ_free().
  */
-equation_t *equ_display_expanded(const equation_t *equation,
-                                 const expr_t *wrt);
+equation_t *equ_display_expanded(const equation_t *equation, const expr_t *wrt);
 
 /**
  * @brief Return true when the equation is already isolated as @c wrt = f(...)
@@ -94,9 +93,7 @@ size_t equ_solutions_count(const equation_solutions_t *solutions);
 /**
  * @brief Borrow the solution at @p index, or NULL when out of range.
  */
-const equation_t *equ_solutions_at(
-    const equation_solutions_t *solutions,
-    size_t index);
+const equation_t *equ_solutions_at(const equation_solutions_t *solutions, size_t index);
 
 /**
  * @brief Serialise @p equation to newly allocated text.
@@ -189,10 +186,7 @@ equation_t *equ_from_text(const string_t *text);
  * @param out_len Receives the payload length in bytes.
  * @return @c true on success, otherwise @c false.
  */
-bool equ_serialize(const equation_t *equation,
-                   string_t **out_type,
-                   string_t **out_encoding,
-                   void **out_data,
+bool equ_serialize(const equation_t *equation, string_t **out_type, string_t **out_encoding, void **out_data,
                    size_t *out_len);
 
 /**
@@ -204,9 +198,6 @@ bool equ_serialize(const equation_t *equation,
  * @param encoding Stored encoding label.
  * @return Newly allocated equation on success, otherwise @c NULL.
  */
-equation_t *equ_deserialise(const void *data,
-                            size_t len,
-                            const string_t *type,
-                            const string_t *encoding);
+equation_t *equ_deserialise(const void *data, size_t len, const string_t *type, const string_t *encoding);
 
 #endif

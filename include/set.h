@@ -77,11 +77,7 @@ typedef struct _set_t set_t;
  *   - If clone is NULL, elements are copied with memcpy.
  *   - If destroy is NULL, elements are not individually destroyed.
  */
-set_t *set_create(size_t elem_size,
-                  set_hash_fn hash,
-                  set_cmp_fn cmp,
-                  set_clone_fn clone,
-                  set_destroy_fn destroy);
+set_t *set_create(size_t elem_size, set_hash_fn hash, set_cmp_fn cmp, set_clone_fn clone, set_destroy_fn destroy);
 
 /* Destroy a set and free all associated memory.
  *

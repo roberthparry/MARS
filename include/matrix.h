@@ -1,9 +1,9 @@
 #ifndef MATRIX_H
 #define MATRIX_H
 
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stddef.h>
-#include <stdarg.h>
 
 #include "expression.h"
 
@@ -44,10 +44,7 @@ typedef enum {
 /**
  * @brief Matrix element type.
  */
-typedef enum {
-    MAT_TYPE_NUMBER,
-    MAT_TYPE_EXPR
-} mat_type_t;
+typedef enum { MAT_TYPE_NUMBER, MAT_TYPE_EXPR } mat_type_t;
 
 /**
  * @brief Matrix norm selector.
@@ -322,8 +319,7 @@ void mat_bindings_free(mat_bindings_t *bnd);
  * @return          Newly allocated derivative matrix on success, or NULL if
  *                  the named binding is not present or inputs are invalid.
  */
-matrix_t *mat_deriv_by_name(const matrix_t *A, mat_bindings_t *bindings,
-                            const char *name);
+matrix_t *mat_deriv_by_name(const matrix_t *A, mat_bindings_t *bindings, const char *name);
 
 /**
  * @brief Differentiate the trace of a matrix with respect to a returned binding name.
@@ -333,8 +329,7 @@ matrix_t *mat_deriv_by_name(const matrix_t *A, mat_bindings_t *bindings,
  *
  * @return Newly allocated symbolic derivative, or NULL on error.
  */
-expr_t *mat_deriv_trace_by_name(const matrix_t *A, mat_bindings_t *bindings,
-                                const char *name);
+expr_t *mat_deriv_trace_by_name(const matrix_t *A, mat_bindings_t *bindings, const char *name);
 
 /**
  * @brief Differentiate the determinant of a matrix with respect to a returned binding name.
@@ -344,8 +339,7 @@ expr_t *mat_deriv_trace_by_name(const matrix_t *A, mat_bindings_t *bindings,
  *
  * @return Newly allocated symbolic derivative, or NULL on error.
  */
-expr_t *mat_deriv_det_by_name(const matrix_t *A, mat_bindings_t *bindings,
-                              const char *name);
+expr_t *mat_deriv_det_by_name(const matrix_t *A, mat_bindings_t *bindings, const char *name);
 
 /**
  * @brief Build a Jacobian for a matrix-valued symbolic output by binding names.
@@ -361,8 +355,7 @@ expr_t *mat_deriv_det_by_name(const matrix_t *A, mat_bindings_t *bindings,
  * @return        Newly allocated Jacobian matrix on success, or NULL if any
  *                name is missing or inputs are invalid.
  */
-matrix_t *mat_jacobian_by_names(const matrix_t *A, mat_bindings_t *bindings,
-                                const char *const *names, size_t nnames);
+matrix_t *mat_jacobian_by_names(const matrix_t *A, mat_bindings_t *bindings, const char *const *names, size_t nnames);
 
 /* -------------------------------------------------------------------------
    Destruction
@@ -439,7 +432,7 @@ size_t mat_get_col_count(const matrix_t *A);
  * work. Dense storage is often simpler for very small matrices or for
  * algorithms that naturally touch nearly every entry.
  */
-bool   mat_is_sparse(const matrix_t *A);
+bool mat_is_sparse(const matrix_t *A);
 size_t mat_nonzero_count(const matrix_t *A);
 matrix_t *mat_to_sparse(const matrix_t *A);
 matrix_t *mat_to_dense(const matrix_t *A);
@@ -648,7 +641,7 @@ matrix_t *mat_deriv(const matrix_t *A, expr_t *wrt);
  * @param wrt  Symbolic differentiation variable.
  * @return     Newly allocated symbolic derivative, or NULL on error.
  */
-expr_t   *mat_deriv_trace(const matrix_t *A, expr_t *wrt);
+expr_t *mat_deriv_trace(const matrix_t *A, expr_t *wrt);
 
 /**
  * @brief Differentiate the determinant of a matrix with respect to a symbolic variable.
@@ -661,7 +654,7 @@ expr_t   *mat_deriv_trace(const matrix_t *A, expr_t *wrt);
  * @param wrt  Symbolic differentiation variable.
  * @return     Newly allocated symbolic derivative, or NULL on error.
  */
-expr_t   *mat_deriv_det(const matrix_t *A, expr_t *wrt);
+expr_t *mat_deriv_det(const matrix_t *A, expr_t *wrt);
 
 /**
  * @brief Differentiate the inverse of a matrix with respect to a symbolic variable.
@@ -684,8 +677,7 @@ matrix_t *mat_deriv_inverse(const matrix_t *A, expr_t *wrt);
  *
  * @return Newly allocated derivative matrix on success, or NULL on error.
  */
-matrix_t *mat_deriv_inverse_by_name(const matrix_t *A, mat_bindings_t *bindings,
-                                    const char *name);
+matrix_t *mat_deriv_inverse_by_name(const matrix_t *A, mat_bindings_t *bindings, const char *name);
 
 /**
  * @brief Differentiate the block inverse of a matrix with respect to a symbolic variable.
@@ -710,9 +702,7 @@ matrix_t *mat_deriv_block_inverse(const matrix_t *A, size_t split, expr_t *wrt);
  *
  * @return Newly allocated derivative matrix on success, or NULL on error.
  */
-matrix_t *mat_deriv_block_inverse_by_name(const matrix_t *A, size_t split,
-                                          mat_bindings_t *bindings,
-                                          const char *name);
+matrix_t *mat_deriv_block_inverse_by_name(const matrix_t *A, size_t split, mat_bindings_t *bindings, const char *name);
 
 /**
  * @brief Build a Jacobian for a matrix-valued symbolic output.
@@ -738,7 +728,7 @@ matrix_t *mat_jacobian(const matrix_t *A, expr_t *const *vars, size_t nvars);
  * @param trace  Output buffer for the trace value.
  * @return       0 on success, or a negative value on error.
  */
-int       mat_trace(const matrix_t *A, number_t *trace);
+int mat_trace(const matrix_t *A, number_t *trace);
 
 /**
  * @brief Compute the trace of a square symbolic matrix as a `expr_t *`.
@@ -749,7 +739,7 @@ int       mat_trace(const matrix_t *A, number_t *trace);
  * @param trace  Output buffer for the trace value.
  * @return       0 on success, or a negative value on error.
  */
-int       mat_trace_expr(const matrix_t *A, expr_t **trace);
+int mat_trace_expr(const matrix_t *A, expr_t **trace);
 
 /**
  * @brief Compute the determinant of a square matrix as a `number_t`.
@@ -758,7 +748,7 @@ int       mat_trace_expr(const matrix_t *A, expr_t **trace);
  * @param determinant  Output buffer for the determinant value.
  * @return             0 on success, or a negative value on error.
  */
-int       mat_det(const matrix_t *A, number_t *determinant);
+int mat_det(const matrix_t *A, number_t *determinant);
 
 /**
  * @brief Compute the determinant of a square symbolic matrix as a `expr_t *`.
@@ -769,7 +759,7 @@ int       mat_det(const matrix_t *A, number_t *determinant);
  * @param determinant  Output buffer for the determinant value.
  * @return             0 on success, or a negative value on error.
  */
-int       mat_det_expr(const matrix_t *A, expr_t **determinant);
+int mat_det_expr(const matrix_t *A, expr_t **determinant);
 
 /**
  * @brief Compute the characteristic polynomial of a square matrix.
@@ -868,8 +858,7 @@ matrix_t *mat_deriv_block_solve(const matrix_t *A, const matrix_t *B, size_t spl
  *
  * @return Newly allocated derivative matrix on success, or NULL on error.
  */
-matrix_t *mat_deriv_block_solve_by_name(const matrix_t *A, const matrix_t *B, size_t split,
-                                        mat_bindings_t *bindings,
+matrix_t *mat_deriv_block_solve_by_name(const matrix_t *A, const matrix_t *B, size_t split, mat_bindings_t *bindings,
                                         const char *name);
 
 /**
@@ -904,9 +893,7 @@ matrix_t *mat_deriv_solve(const matrix_t *A, const matrix_t *B, expr_t *wrt);
  *
  * @return Newly allocated derivative matrix on success, or NULL on error.
  */
-matrix_t *mat_deriv_solve_by_name(const matrix_t *A, const matrix_t *B,
-                                  mat_bindings_t *bindings,
-                                  const char *name);
+matrix_t *mat_deriv_solve_by_name(const matrix_t *A, const matrix_t *B, mat_bindings_t *bindings, const char *name);
 
 /**
  * @brief Solve the linear matrix equation A X = B.
@@ -977,7 +964,7 @@ matrix_t *mat_least_squares(const matrix_t *A, const matrix_t *B);
  * @param A  Input matrix.
  * @return   The computed rank, or a negative value on error.
  */
-int       mat_rank(const matrix_t *A);
+int mat_rank(const matrix_t *A);
 
 /**
  * @brief Compute the Moore-Penrose pseudoinverse of a matrix.
@@ -1030,7 +1017,7 @@ matrix_t *mat_nullspace(const matrix_t *A);
  * @param out   Output location for the norm value.
  * @return      0 on success, nonzero on error.
  */
-int       mat_norm(const matrix_t *A, mat_norm_type_t type, number_t *out);
+int mat_norm(const matrix_t *A, mat_norm_type_t type, number_t *out);
 
 /**
  * @brief Compute a matrix condition number in a chosen norm.
@@ -1045,7 +1032,7 @@ int       mat_norm(const matrix_t *A, mat_norm_type_t type, number_t *out);
  * @param out   Output location for the condition number.
  * @return      0 on success, nonzero on error.
  */
-int       mat_condition_number(const matrix_t *A, mat_norm_type_t type, number_t *out);
+int mat_condition_number(const matrix_t *A, mat_norm_type_t type, number_t *out);
 
 /**
  * @brief Compute an LU factorisation with pivoting.
@@ -1169,25 +1156,17 @@ void mat_schur_factor_free(mat_schur_factor_t *out);
    Eigenvalues / Eigenvectors
    ------------------------------------------------------------------------- */
 
-int       mat_eigenvalues(const matrix_t *A, number_t *eigenvalues);
-int       mat_eigenvalues_expr(const matrix_t *A, expr_t **eigenvalues);
-int       mat_eigendecompose(const matrix_t *A, number_t *eigenvalues,
-                             matrix_t **eigenvectors);
-int       mat_eigendecompose_expr(const matrix_t *A, expr_t **eigenvalues,
-                                matrix_t **eigenvectors);
+int mat_eigenvalues(const matrix_t *A, number_t *eigenvalues);
+int mat_eigenvalues_expr(const matrix_t *A, expr_t **eigenvalues);
+int mat_eigendecompose(const matrix_t *A, number_t *eigenvalues, matrix_t **eigenvectors);
+int mat_eigendecompose_expr(const matrix_t *A, expr_t **eigenvalues, matrix_t **eigenvectors);
 matrix_t *mat_eigenvectors(const matrix_t *A);
 matrix_t *mat_eigenspace(const matrix_t *A, const number_t *eigenvalue);
 matrix_t *mat_eigenspace_expr(const matrix_t *A, const expr_t *eigenvalue);
-matrix_t *mat_generalized_eigenspace(const matrix_t *A,
-                                     const number_t *eigenvalue,
-                                     size_t order);
-matrix_t *mat_generalized_eigenspace_expr(const matrix_t *A,
-                                        const expr_t *eigenvalue,
-                                        size_t order);
-matrix_t *mat_jordan_chain(const matrix_t *A, const number_t *eigenvalue,
-                           size_t order);
-matrix_t *mat_jordan_chain_expr(const matrix_t *A, const expr_t *eigenvalue,
-                              size_t order);
+matrix_t *mat_generalized_eigenspace(const matrix_t *A, const number_t *eigenvalue, size_t order);
+matrix_t *mat_generalized_eigenspace_expr(const matrix_t *A, const expr_t *eigenvalue, size_t order);
+matrix_t *mat_jordan_chain(const matrix_t *A, const number_t *eigenvalue, size_t order);
+matrix_t *mat_jordan_chain_expr(const matrix_t *A, const expr_t *eigenvalue, size_t order);
 matrix_t *mat_jordan_profile(const matrix_t *A, const number_t *eigenvalue);
 matrix_t *mat_jordan_profile_expr(const matrix_t *A, const expr_t *eigenvalue);
 
@@ -1322,11 +1301,7 @@ void mat_print(const matrix_t *A);
  * @param out_len Receives the payload length in bytes.
  * @return @c true on success, otherwise @c false.
  */
-bool mat_serialize(const matrix_t *A,
-                   string_t **out_type,
-                   string_t **out_encoding,
-                   void **out_data,
-                   size_t *out_len);
+bool mat_serialize(const matrix_t *A, string_t **out_type, string_t **out_encoding, void **out_data, size_t *out_len);
 
 /**
  * @brief Reconstruct a matrix from a serialised payload.
@@ -1340,9 +1315,6 @@ bool mat_serialize(const matrix_t *A,
  * @param encoding Stored encoding label.
  * @return Newly allocated matrix on success, otherwise @c NULL.
  */
-matrix_t *mat_deserialise(const void *data,
-                          size_t len,
-                          const string_t *type,
-                          const string_t *encoding);
+matrix_t *mat_deserialise(const void *data, size_t len, const string_t *type, const string_t *encoding);
 
 #endif /* MATRIX_H */

@@ -210,8 +210,7 @@ const equation_t *de_condition_at(const diffequ_t *de, size_t index);
  * @return The argument count, or zero when the condition has no local
  *         arguments or the indices are invalid.
  */
-size_t de_condition_argument_count(const diffequ_t *de,
-                                   size_t condition_index);
+size_t de_condition_argument_count(const diffequ_t *de, size_t condition_index);
 
 /**
  * @brief Access one local condition argument.
@@ -223,9 +222,7 @@ size_t de_condition_argument_count(const diffequ_t *de,
  *
  * The returned expression remains owned by @p de and must not be freed.
  */
-const expr_t *de_condition_argument_at(const diffequ_t *de,
-                                       size_t condition_index,
-                                       size_t argument_index);
+const expr_t *de_condition_argument_at(const diffequ_t *de, size_t condition_index, size_t argument_index);
 
 /**
  * @brief Format a differential-equation problem as an MARS string.
@@ -298,9 +295,7 @@ diffequ_solve_result_t *de_solve(const diffequ_t *de);
  * @return An owning solve result, or `NULL` only when the result object itself
  *         cannot be allocated. Release it with de_solve_result_free().
  */
-diffequ_solve_result_t *de_solve_with_options(
-    const diffequ_t *de,
-    unsigned int options);
+diffequ_solve_result_t *de_solve_with_options(const diffequ_t *de, unsigned int options);
 
 /**
  * @brief Destroy a differential-equation solve result.
@@ -315,8 +310,7 @@ void de_solve_result_free(diffequ_solve_result_t *result);
  * @param result Result to inspect.
  * @return Its status, or ::DE_SOLVE_STATUS_INVALID when @p result is `NULL`.
  */
-de_solve_status_t de_solve_result_status(
-    const diffequ_solve_result_t *result);
+de_solve_status_t de_solve_result_status(const diffequ_solve_result_t *result);
 
 /**
  * @brief Return the solver family used for a successful result.
@@ -332,8 +326,7 @@ de_solver_t de_solve_result_solver(const diffequ_solve_result_t *result);
  * @param result Result to inspect.
  * @return A borrowed null-terminated message, or `NULL`.
  */
-const char *de_solve_result_diagnostic(
-    const diffequ_solve_result_t *result);
+const char *de_solve_result_diagnostic(const diffequ_solve_result_t *result);
 
 /**
  * @brief Borrow the mathematical derivation produced by the selected solver.
@@ -348,10 +341,8 @@ const char *de_solve_result_diagnostic(
  * @return Borrowed multiline UTF-8 text, or `NULL` when derivations were not
  *         requested or the result was not solved.
  */
-const char *de_solve_result_steps(
-    const diffequ_solve_result_t *result);
-const char *de_solve_result_steps_tex(
-    const diffequ_solve_result_t *result);
+const char *de_solve_result_steps(const diffequ_solve_result_t *result);
+const char *de_solve_result_steps_tex(const diffequ_solve_result_t *result);
 
 /**
  * @brief Borrow the symmetry group identified by the selected solver.
@@ -359,8 +350,7 @@ const char *de_solve_result_steps_tex(
  * @param result Result to inspect.
  * @return Borrowed UTF-8 group name, or `NULL` when none was identified.
  */
-const char *de_solve_result_symmetry(
-    const diffequ_solve_result_t *result);
+const char *de_solve_result_symmetry(const diffequ_solve_result_t *result);
 
 /**
  * @brief Return the number of symbolic solution families.
@@ -377,8 +367,6 @@ size_t de_solve_result_count(const diffequ_solve_result_t *result);
  * @param index Zero-based solution index.
  * @return A borrowed equation, or `NULL` when @p index is out of range.
  */
-const equation_t *de_solve_result_at(
-    const diffequ_solve_result_t *result,
-    size_t index);
+const equation_t *de_solve_result_at(const diffequ_solve_result_t *result, size_t index);
 
 #endif /* DIFFEQUATION_H */

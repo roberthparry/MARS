@@ -23,8 +23,7 @@ bool expr_simplify_try_get_plain_real_const(const expr_t *dv, number_t *out)
 
 bool expr_simplify_is_simplifiable_const(const expr_t *dv)
 {
-    return expr_is_op(dv, &ops_const) &&
-           (!dv->name || !*dv->name || !dv->binding_expr);
+    return expr_is_op(dv, &ops_const) && (!dv->name || !*dv->name || !dv->binding_expr);
 }
 
 bool expr_simplify_allows_const_identity_fold(const expr_t *dv)
@@ -44,8 +43,7 @@ bool expr_simplify_allows_const_identity_fold(const expr_t *dv)
             num_destroy(&value);
         return is_default;
     }
-    return dv->binding_expr->kind == EXPR_BINDING_EXPR_NUMBER ||
-           dv->binding_expr->kind == EXPR_BINDING_EXPR_CONST;
+    return dv->binding_expr->kind == EXPR_BINDING_EXPR_NUMBER || dv->binding_expr->kind == EXPR_BINDING_EXPR_CONST;
 }
 
 number_t expr_simplify_normalise_simple_rational_coeff(number_t coeff)
@@ -79,9 +77,7 @@ expr_t *expr_simplify_try_log10_power_of_ten(expr_t *arg)
 {
     expr_t *inner;
 
-    if (!expr_is_op(arg, &ops_pow) ||
-        !expr_is_op(arg->a, &ops_const) ||
-        !num_eq(arg->a->c, NUM_TEN))
+    if (!expr_is_op(arg, &ops_pow) || !expr_is_op(arg->a, &ops_const) || !num_eq(arg->a->c, NUM_TEN))
         return NULL;
 
     inner = arg->b;
@@ -95,8 +91,7 @@ expr_t *expr_simplify_try_floor_ceil_const(const expr_t *op, expr_t *arg)
     number_t folded;
     expr_t *out;
 
-    if (!expr_is_op(arg, &ops_const) ||
-        !expr_ops_is_floor_or_ceil(op ? op->ops : NULL))
+    if (!expr_is_op(arg, &ops_const) || !expr_ops_is_floor_or_ceil(op ? op->ops : NULL))
         return NULL;
 
     folded = expr_is_op(op, &ops_floor) ? num_floor(arg->c) : num_ceil(arg->c);
@@ -190,9 +185,7 @@ cleanup:
     return out;
 }
 
-static expr_t *expr_simplify_try_unary_symbolic_inverse_fold(const expr_t *op,
-                                                             const number_t *value,
-                                                             expr_t *arg)
+static expr_t *expr_simplify_try_unary_symbolic_inverse_fold(const expr_t *op, const number_t *value, expr_t *arg)
 {
     long numer;
     unsigned long denom;
@@ -215,13 +208,11 @@ expr_t *expr_simplify_try_unary_const_fold(const expr_t *op, expr_t *arg)
     number_t folded;
     expr_t *out;
 
-    if (!expr_simplify_allows_const_identity_fold(arg) ||
-        !op->ops->fold_const_unary)
+    if (!expr_simplify_allows_const_identity_fold(arg) || !op->ops->fold_const_unary)
         return NULL;
 
     folded = num_new();
-    if (!op->ops->fold_const_unary(&arg->c, &folded) ||
-        !num_is_finite(folded)) {
+    if (!op->ops->fold_const_unary(&arg->c, &folded) || !num_is_finite(folded)) {
         num_destroy(&folded);
         return NULL;
     }
@@ -244,8 +235,7 @@ static bool expr_contains_var_for_value_fold(const expr_t *dv)
         return false;
     if (expr_is_var(dv))
         return true;
-    return expr_contains_var_for_value_fold(dv->a) ||
-           expr_contains_var_for_value_fold(dv->b);
+    return expr_contains_var_for_value_fold(dv->a) || expr_contains_var_for_value_fold(dv->b);
 }
 
 expr_t *expr_simplify_try_unary_const_value_fold(const expr_t *op, expr_t *arg)
@@ -254,15 +244,12 @@ expr_t *expr_simplify_try_unary_const_value_fold(const expr_t *op, expr_t *arg)
     number_t folded;
     expr_t *out = NULL;
 
-    if (!arg || !op || !op->ops->fold_const_unary ||
-        expr_contains_var_for_value_fold(arg))
+    if (!arg || !op || !op->ops->fold_const_unary || expr_contains_var_for_value_fold(arg))
         return NULL;
 
     value = expr_eval(arg);
     folded = num_new();
-    if (num_is_finite(value) &&
-        op->ops->fold_const_unary(&value, &folded) &&
-        num_is_finite(folded)) {
+    if (num_is_finite(value) && op->ops->fold_const_unary(&value, &folded) && num_is_finite(folded)) {
         out = expr_simplify_try_unary_symbolic_inverse_fold(op, &value, arg);
         if (!out) {
             out = expr_new_const(folded);
@@ -283,9 +270,7 @@ expr_t *expr_simplify_try_sqrt_scaled_square_const(expr_t *arg)
     expr_t *simp;
     expr_t *out;
 
-    if (!expr_is_op(arg, &ops_mul) ||
-        !expr_simplify_is_plain_real_const(arg->a) ||
-        !num_gt(arg->a->c, NUM_ZERO))
+    if (!expr_is_op(arg, &ops_mul) || !expr_simplify_is_plain_real_const(arg->a) || !num_gt(arg->a->c, NUM_ZERO))
         return NULL;
 
     coeff_root = num_sqrt(arg->a->c);
@@ -315,11 +300,8 @@ expr_t *expr_simplify_try_sqrt_quotient(expr_t *num, expr_t *den)
     expr_t *root;
     expr_t *out;
 
-    if (!expr_is_sqrt_expr(num) || !expr_is_sqrt_expr(den) ||
-        !num->a || !den->a ||
-        !expr_is_const(den->a) ||
-        !num_is_real(den->a->c) ||
-        !num_gt(den->a->c, NUM_ZERO))
+    if (!expr_is_sqrt_expr(num) || !expr_is_sqrt_expr(den) || !num->a || !den->a || !expr_is_const(den->a) ||
+        !num_is_real(den->a->c) || !num_gt(den->a->c, NUM_ZERO))
         return NULL;
 
     quotient = expr_div(num->a, den->a);
@@ -351,15 +333,13 @@ expr_t *expr_simplify_direct_inverse_pair(const expr_t *outer, expr_t *inner)
     return arg;
 }
 
-expr_t *expr_simplify_direct_inverse_pair_from_raw(const expr_t *outer,
-                                                 const expr_t *raw_inner,
-                                                 expr_t *simplified_inner)
+expr_t *expr_simplify_direct_inverse_pair_from_raw(const expr_t *outer, const expr_t *raw_inner,
+                                                   expr_t *simplified_inner)
 {
     expr_t *arg;
 
     if (!outer || !raw_inner || raw_inner->ops->arity != EXPR_OP_UNARY ||
-        !expr_ops_are_direct_inverse_pair(outer->ops, raw_inner->ops) ||
-        !raw_inner->a)
+        !expr_ops_are_direct_inverse_pair(outer->ops, raw_inner->ops) || !raw_inner->a)
         return NULL;
 
     arg = expr_simplify(raw_inner->a);
@@ -445,12 +425,12 @@ static expr_t *expr_simplify_lgamma_successor(expr_t *a, expr_t *b)
 }
 
 static const expr_binary_simplify_rule_t s_sum_rules[] = {
-    { expr_simplify_lgamma_successor },
+    {expr_simplify_lgamma_successor},
 };
 
 static const expr_binary_simplify_rule_t s_product_rules[] = {
-    { expr_simplify_repeated_factor },
-    { expr_simplify_gamma_successor },
+    {expr_simplify_repeated_factor},
+    {expr_simplify_gamma_successor},
 };
 
 expr_t *expr_simplify_try_basic_sum(expr_t *a, expr_t *b)
@@ -476,8 +456,7 @@ expr_t *expr_simplify_try_basic_product(expr_t *a, expr_t *b)
     if (!a || !b)
         return NULL;
 
-    for (i = 0; i < sizeof(s_product_rules) / sizeof(s_product_rules[0]);
-         ++i) {
+    for (i = 0; i < sizeof(s_product_rules) / sizeof(s_product_rules[0]); ++i) {
         expr_t *out = s_product_rules[i].apply(a, b);
 
         if (out)
@@ -486,8 +465,7 @@ expr_t *expr_simplify_try_basic_product(expr_t *a, expr_t *b)
     return NULL;
 }
 
-static bool expr_inverse_unary_candidate_domain_ok(const expr_ops_t *ops,
-                                                 const expr_t *candidate)
+static bool expr_inverse_unary_candidate_domain_ok(const expr_ops_t *ops, const expr_t *candidate)
 {
     number_t value;
     bool ok = true;
@@ -501,19 +479,15 @@ static bool expr_inverse_unary_candidate_domain_ok(const expr_ops_t *ops,
     return ok;
 }
 
-static expr_t *expr_try_simplify_vtable_inverse_candidate(
-    const expr_t *outer,
-    const expr_t *arg,
-    const expr_t *candidate)
+static expr_t *expr_try_simplify_vtable_inverse_candidate(const expr_t *outer, const expr_t *arg,
+                                                          const expr_t *candidate)
 {
     expr_t *inverse;
     expr_t *simplified_inverse;
     expr_t *out = NULL;
 
-    if (!outer || !outer->ops || !outer->ops->inverse_unary ||
-        !expr_ops_has_inverse_unary_simplify_rule(outer->ops) ||
-        !arg || !candidate ||
-        !expr_inverse_unary_candidate_domain_ok(outer->ops, candidate))
+    if (!outer || !outer->ops || !outer->ops->inverse_unary || !expr_ops_has_inverse_unary_simplify_rule(outer->ops) ||
+        !arg || !candidate || !expr_inverse_unary_candidate_domain_ok(outer->ops, candidate))
         return NULL;
 
     inverse = outer->ops->inverse_unary(candidate);
@@ -546,8 +520,7 @@ static const expr_t *expr_extract_exp_product_argument(const expr_t *arg)
     return NULL;
 }
 
-expr_t *expr_simplify_try_vtable_inverse_argument(const expr_t *outer,
-                                                const expr_t *arg)
+expr_t *expr_simplify_try_vtable_inverse_argument(const expr_t *outer, const expr_t *arg)
 {
     expr_t *out;
     const expr_t *exp_product_arg;
@@ -557,8 +530,7 @@ expr_t *expr_simplify_try_vtable_inverse_argument(const expr_t *outer,
 
     if (outer && expr_ops_is_lambert(outer->ops)) {
         exp_product_arg = expr_extract_exp_product_argument(arg);
-        out = expr_try_simplify_vtable_inverse_candidate(outer, arg,
-                                                       exp_product_arg);
+        out = expr_try_simplify_vtable_inverse_candidate(outer, arg, exp_product_arg);
         if (out)
             return out;
     }
@@ -566,9 +538,7 @@ expr_t *expr_simplify_try_vtable_inverse_argument(const expr_t *outer,
     return expr_try_simplify_vtable_inverse_candidate(outer, arg, arg);
 }
 
-static bool expr_is_trig_square_of(const expr_t *dv,
-                                 const expr_ops_t *op,
-                                 const expr_t **arg_out)
+static bool expr_is_trig_square_of(const expr_t *dv, const expr_ops_t *op, const expr_t **arg_out)
 {
     if (!expr_is_pow_d_expr(dv) || !num_eq(dv->c, NUM_TWO))
         return false;
@@ -607,18 +577,14 @@ bool expr_match_double_argument(const expr_t *expr, const expr_t *arg)
     if (!expr || !arg || !expr_match_mul_expr(expr, &factor, &other))
         goto cleanup;
 
-    if (expr_match_const_value(factor, &factor_value) &&
-        num_eq(factor_value, NUM_TWO) &&
-        expr_struct_eq(other, arg)) {
+    if (expr_match_const_value(factor, &factor_value) && num_eq(factor_value, NUM_TWO) && expr_struct_eq(other, arg)) {
         matched = true;
         goto cleanup;
     }
 
     num_destroy(&factor_value);
     factor_value = num_new();
-    if (expr_match_const_value(other, &factor_value) &&
-        num_eq(factor_value, NUM_TWO) &&
-        expr_struct_eq(factor, arg)) {
+    if (expr_match_const_value(other, &factor_value) && num_eq(factor_value, NUM_TWO) && expr_struct_eq(factor, arg)) {
         matched = true;
     }
 
@@ -627,9 +593,7 @@ cleanup:
     return matched;
 }
 
-expr_t *expr_try_trig_pythagorean_identity(const addend_t *terms, size_t n,
-                                         number_t c_const,
-                                         number_t common_coeff)
+expr_t *expr_try_trig_pythagorean_identity(const addend_t *terms, size_t n, number_t c_const, number_t common_coeff)
 {
     const expr_t *sin_arg = NULL;
     const expr_t *cos_arg = NULL;
@@ -653,33 +617,27 @@ expr_t *expr_try_trig_pythagorean_identity(const addend_t *terms, size_t n,
         if (nonzero_terms > 2)
             return NULL;
 
-        if (num_is_one(terms[i].coeff) &&
-            expr_is_trig_square_of(terms[i].base, &ops_sin, &sin_arg)) {
+        if (num_is_one(terms[i].coeff) && expr_is_trig_square_of(terms[i].base, &ops_sin, &sin_arg)) {
             have_sin = true;
             continue;
         }
-        if (num_is_one(terms[i].coeff) &&
-            expr_is_trig_square_of(terms[i].base, &ops_cos, &cos_arg)) {
+        if (num_is_one(terms[i].coeff) && expr_is_trig_square_of(terms[i].base, &ops_cos, &cos_arg)) {
             have_cos = true;
             continue;
         }
-        if (num_eq(terms[i].coeff, NUM_NEG_ONE) &&
-            expr_is_trig_square_of(terms[i].base, &ops_sin, &sin_arg)) {
+        if (num_eq(terms[i].coeff, NUM_NEG_ONE) && expr_is_trig_square_of(terms[i].base, &ops_sin, &sin_arg)) {
             have_neg_sin = true;
             continue;
         }
-        if (num_is_one(terms[i].coeff) &&
-            expr_is_trig_square_of(terms[i].base, &ops_cosh, &cosh_arg)) {
+        if (num_is_one(terms[i].coeff) && expr_is_trig_square_of(terms[i].base, &ops_cosh, &cosh_arg)) {
             have_cosh = true;
             continue;
         }
-        if (num_is_one(terms[i].coeff) &&
-            expr_is_trig_square_of(terms[i].base, &ops_sinh, &sinh_arg)) {
+        if (num_is_one(terms[i].coeff) && expr_is_trig_square_of(terms[i].base, &ops_sinh, &sinh_arg)) {
             have_sinh = true;
             continue;
         }
-        if (num_eq(terms[i].coeff, NUM_NEG_ONE) &&
-            expr_is_trig_square_of(terms[i].base, &ops_sinh, &sinh_arg)) {
+        if (num_eq(terms[i].coeff, NUM_NEG_ONE) && expr_is_trig_square_of(terms[i].base, &ops_sinh, &sinh_arg)) {
             have_neg_sinh = true;
             continue;
         }
@@ -688,41 +646,32 @@ expr_t *expr_try_trig_pythagorean_identity(const addend_t *terms, size_t n,
 
     if (nonzero_terms != 2)
         return NULL;
-    if (have_sin && have_cos && sin_arg && cos_arg &&
-        expr_struct_eq(sin_arg, cos_arg))
+    if (have_sin && have_cos && sin_arg && cos_arg && expr_struct_eq(sin_arg, cos_arg))
         return expr_new_const(common_coeff);
-    if (have_neg_sin && have_cos && sin_arg && cos_arg &&
-        expr_struct_eq(sin_arg, cos_arg))
+    if (have_neg_sin && have_cos && sin_arg && cos_arg && expr_struct_eq(sin_arg, cos_arg))
         return expr_make_scaled(common_coeff, expr_double_arg_unary(cos_arg, expr_cos));
-    if (have_sinh && have_cosh && sinh_arg && cosh_arg &&
-        expr_struct_eq(sinh_arg, cosh_arg))
+    if (have_sinh && have_cosh && sinh_arg && cosh_arg && expr_struct_eq(sinh_arg, cosh_arg))
         return expr_make_scaled(common_coeff, expr_double_arg_unary(cosh_arg, expr_cosh));
-    if (have_neg_sinh && have_cosh && sinh_arg && cosh_arg &&
-        expr_struct_eq(sinh_arg, cosh_arg))
+    if (have_neg_sinh && have_cosh && sinh_arg && cosh_arg && expr_struct_eq(sinh_arg, cosh_arg))
         return expr_new_const(common_coeff);
 
     return NULL;
 }
 
-static const expr_t *expr_find_trig_square_factor_local(
-    const expr_t *expr,
-    const expr_ops_t *op,
-    const expr_t *argument)
+static const expr_t *expr_find_trig_square_factor_local(const expr_t *expr, const expr_ops_t *op,
+                                                        const expr_t *argument)
 {
     const expr_t *found_argument = NULL;
     const expr_t *found;
 
     if (!expr)
         return NULL;
-    if (expr_is_trig_square_of(expr, op, &found_argument) &&
-        (!argument || expr_struct_eq(found_argument, argument)))
+    if (expr_is_trig_square_of(expr, op, &found_argument) && (!argument || expr_struct_eq(found_argument, argument)))
         return expr;
     if (!expr_is_op(expr, &ops_mul))
         return NULL;
     found = expr_find_trig_square_factor_local(expr->a, op, argument);
-    return found
-        ? found
-        : expr_find_trig_square_factor_local(expr->b, op, argument);
+    return found ? found : expr_find_trig_square_factor_local(expr->b, op, argument);
 }
 
 bool expr_combine_trig_pythagorean_addends(addend_t *terms, size_t n)
@@ -739,11 +688,8 @@ bool expr_combine_trig_pythagorean_addends(addend_t *terms, size_t n)
 
         if (!terms[i].base || num_is_zero(terms[i].coeff))
             continue;
-        sin_square = expr_find_trig_square_factor_local(
-            terms[i].base, &ops_sin, NULL);
-        if (!sin_square ||
-            !expr_is_trig_square_of(
-                sin_square, &ops_sin, &sin_argument))
+        sin_square = expr_find_trig_square_factor_local(terms[i].base, &ops_sin, NULL);
+        if (!sin_square || !expr_is_trig_square_of(sin_square, &ops_sin, &sin_argument))
             continue;
 
         for (size_t j = 0u; j < n; ++j) {
@@ -751,21 +697,15 @@ bool expr_combine_trig_pythagorean_addends(addend_t *terms, size_t n)
             expr_t *sin_quotient;
             expr_t *cos_quotient;
 
-            if (i == j || !terms[j].base ||
-                num_is_zero(terms[j].coeff) ||
-                !num_eq(terms[i].coeff, terms[j].coeff))
+            if (i == j || !terms[j].base || num_is_zero(terms[j].coeff) || !num_eq(terms[i].coeff, terms[j].coeff))
                 continue;
-            cos_square = expr_find_trig_square_factor_local(
-                terms[j].base, &ops_cos, sin_argument);
+            cos_square = expr_find_trig_square_factor_local(terms[j].base, &ops_cos, sin_argument);
             if (!cos_square)
                 continue;
 
-            sin_quotient = expr_simplify_extract_exact_factor_quotient(
-                terms[i].base, sin_square);
-            cos_quotient = expr_simplify_extract_exact_factor_quotient(
-                terms[j].base, cos_square);
-            if (sin_quotient && cos_quotient &&
-                expr_struct_eq(sin_quotient, cos_quotient)) {
+            sin_quotient = expr_simplify_extract_exact_factor_quotient(terms[i].base, sin_square);
+            cos_quotient = expr_simplify_extract_exact_factor_quotient(terms[j].base, cos_square);
+            if (sin_quotient && cos_quotient && expr_struct_eq(sin_quotient, cos_quotient)) {
                 expr_free(terms[i].base);
                 terms[i].base = sin_quotient;
                 sin_quotient = NULL;
@@ -783,13 +723,9 @@ bool expr_combine_trig_pythagorean_addends(addend_t *terms, size_t n)
     return combined;
 }
 
-static bool expr_match_trig_weighted_term_local(
-    const expr_t *expr,
-    const expr_ops_t **trig_op_out,
-    const expr_t **trig_out,
-    const expr_t **argument_out,
-    expr_t **common_out,
-    expr_t **remainder_out)
+static bool expr_match_trig_weighted_term_local(const expr_t *expr, const expr_ops_t **trig_op_out,
+                                                const expr_t **trig_out, const expr_t **argument_out,
+                                                expr_t **common_out, expr_t **remainder_out)
 {
     const expr_t *left = NULL;
     const expr_t *right = NULL;
@@ -812,22 +748,18 @@ static bool expr_match_trig_weighted_term_local(
     if (expr_is_op(left, &ops_sin) || expr_is_op(left, &ops_cos)) {
         trig = left;
         sum = right;
-    } else if (expr_is_op(right, &ops_sin) ||
-               expr_is_op(right, &ops_cos)) {
+    } else if (expr_is_op(right, &ops_sin) || expr_is_op(right, &ops_cos)) {
         trig = right;
         sum = left;
     } else {
         return false;
     }
-    if (!expr_match_add_sub_expr(
-            sum, &first, &second, &is_subtraction))
+    if (!expr_match_add_sub_expr(sum, &first, &second, &is_subtraction))
         return false;
 
     common = expr_simplify_extract_common_factor_quotient(first, trig);
     if (common) {
-        remainder = is_subtraction
-            ? expr_negate_owned(expr_clone(second))
-            : expr_clone(second);
+        remainder = is_subtraction ? expr_negate_owned(expr_clone(second)) : expr_clone(second);
     } else if (!is_subtraction) {
         common = expr_simplify_extract_common_factor_quotient(second, trig);
         remainder = common ? expr_clone(first) : NULL;
@@ -846,8 +778,7 @@ static bool expr_match_trig_weighted_term_local(
     return true;
 }
 
-expr_t *expr_simplify_try_trig_weighted_sum(const expr_t *a,
-                                            const expr_t *b)
+expr_t *expr_simplify_try_trig_weighted_sum(const expr_t *a, const expr_t *b)
 {
     const expr_ops_t *first_op = NULL;
     const expr_ops_t *second_op = NULL;
@@ -863,33 +794,23 @@ expr_t *expr_simplify_try_trig_weighted_sum(const expr_t *a,
     expr_t *second_tail = NULL;
     expr_t *out = NULL;
 
-    if (!expr_match_trig_weighted_term_local(
-            a, &first_op, &first_trig, &first_argument,
-            &first_common, &first_remainder) ||
-        !expr_match_trig_weighted_term_local(
-            b, &second_op, &second_trig, &second_argument,
-            &second_common, &second_remainder) ||
+    if (!expr_match_trig_weighted_term_local(a, &first_op, &first_trig, &first_argument, &first_common,
+                                             &first_remainder) ||
+        !expr_match_trig_weighted_term_local(b, &second_op, &second_trig, &second_argument, &second_common,
+                                             &second_remainder) ||
         first_op == second_op ||
-        !((first_op == &ops_sin && second_op == &ops_cos) ||
-          (first_op == &ops_cos && second_op == &ops_sin)) ||
-        !expr_struct_eq(first_argument, second_argument) ||
-        !expr_struct_eq(first_common, second_common))
+        !((first_op == &ops_sin && second_op == &ops_cos) || (first_op == &ops_cos && second_op == &ops_sin)) ||
+        !expr_struct_eq(first_argument, second_argument) || !expr_struct_eq(first_common, second_common))
         goto cleanup;
 
-    first_tail = expr_mul_simplify_owned(
-        expr_clone(first_trig), first_remainder);
+    first_tail = expr_mul_simplify_owned(expr_clone(first_trig), first_remainder);
     first_remainder = NULL;
-    second_tail = expr_mul_simplify_owned(
-        expr_clone(second_trig), second_remainder);
+    second_tail = expr_mul_simplify_owned(expr_clone(second_trig), second_remainder);
     second_remainder = NULL;
-    out = (first_tail && second_tail)
-        ? expr_add_simplify_owned(first_tail, second_tail)
-        : NULL;
+    out = (first_tail && second_tail) ? expr_add_simplify_owned(first_tail, second_tail) : NULL;
     first_tail = NULL;
     second_tail = NULL;
-    out = out
-        ? expr_add_simplify_owned(first_common, out)
-        : NULL;
+    out = out ? expr_add_simplify_owned(first_common, out) : NULL;
     first_common = NULL;
 
 cleanup:
@@ -902,20 +823,15 @@ cleanup:
     return out;
 }
 
-static expr_t *expr_simplify_try_double_angle_product(expr_t *a,
-                                                    expr_t *b,
-                                                    const expr_ops_t *left_op,
-                                                    const expr_ops_t *right_op,
-                                                    expr_apply_unary_fn builder)
+static expr_t *expr_simplify_try_double_angle_product(expr_t *a, expr_t *b, const expr_ops_t *left_op,
+                                                      const expr_ops_t *right_op, expr_apply_unary_fn builder)
 {
     const expr_t *arg = NULL;
     expr_t *double_angle;
 
-    if (expr_is_op(a, left_op) && expr_is_op(b, right_op) &&
-        expr_struct_eq(a->a, b->a)) {
+    if (expr_is_op(a, left_op) && expr_is_op(b, right_op) && expr_struct_eq(a->a, b->a)) {
         arg = a->a;
-    } else if (expr_is_op(a, right_op) && expr_is_op(b, left_op) &&
-               expr_struct_eq(a->a, b->a)) {
+    } else if (expr_is_op(a, right_op) && expr_is_op(b, left_op) && expr_struct_eq(a->a, b->a)) {
         arg = a->a;
     }
 
@@ -931,31 +847,25 @@ expr_t *expr_simplify_try_trig_product(expr_t *a, expr_t *b)
 {
     const expr_t *arg = NULL;
     expr_apply_unary_fn builder = NULL;
-    expr_t *double_angle = expr_simplify_try_double_angle_product(
-        a, b, &ops_sin, &ops_cos, expr_sin);
+    expr_t *double_angle = expr_simplify_try_double_angle_product(a, b, &ops_sin, &ops_cos, expr_sin);
 
     if (double_angle)
         return double_angle;
 
-    double_angle = expr_simplify_try_double_angle_product(
-        a, b, &ops_sinh, &ops_cosh, expr_sinh);
+    double_angle = expr_simplify_try_double_angle_product(a, b, &ops_sinh, &ops_cosh, expr_sinh);
     if (double_angle)
         return double_angle;
 
-    if (expr_is_op(a, &ops_cos) && expr_is_op(b, &ops_tan) &&
-        expr_struct_eq(a->a, b->a)) {
+    if (expr_is_op(a, &ops_cos) && expr_is_op(b, &ops_tan) && expr_struct_eq(a->a, b->a)) {
         arg = a->a;
         builder = expr_sin;
-    } else if (expr_is_op(a, &ops_tan) && expr_is_op(b, &ops_cos) &&
-               expr_struct_eq(a->a, b->a)) {
+    } else if (expr_is_op(a, &ops_tan) && expr_is_op(b, &ops_cos) && expr_struct_eq(a->a, b->a)) {
         arg = a->a;
         builder = expr_sin;
-    } else if (expr_is_op(a, &ops_cosh) && expr_is_op(b, &ops_tanh) &&
-               expr_struct_eq(a->a, b->a)) {
+    } else if (expr_is_op(a, &ops_cosh) && expr_is_op(b, &ops_tanh) && expr_struct_eq(a->a, b->a)) {
         arg = a->a;
         builder = expr_sinh;
-    } else if (expr_is_op(a, &ops_tanh) && expr_is_op(b, &ops_cosh) &&
-               expr_struct_eq(a->a, b->a)) {
+    } else if (expr_is_op(a, &ops_tanh) && expr_is_op(b, &ops_cosh) && expr_struct_eq(a->a, b->a)) {
         arg = a->a;
         builder = expr_sinh;
     }
@@ -979,13 +889,11 @@ expr_t *expr_simplify_try_lambert_exp(expr_t *arg)
         return NULL;
     const expr_t *lambert_arg = expr_lambert_arg(arg);
 
-    if (expr_is_const(lambert_arg) && num_is_real(lambert_arg->c) &&
-        num_eq(lambert_arg->c, NUM_ZERO)) {
+    if (expr_is_const(lambert_arg) && num_is_real(lambert_arg->c) && num_eq(lambert_arg->c, NUM_ZERO)) {
         num_destroy(&inner_value);
         return expr_new_const(NUM_ONE);
     }
-    if (expr_simplify_try_get_plain_real_const(lambert_arg, &inner_value) &&
-        num_eq(inner_value, NUM_ZERO)) {
+    if (expr_simplify_try_get_plain_real_const(lambert_arg, &inner_value) && num_eq(inner_value, NUM_ZERO)) {
         num_destroy(&inner_value);
         return expr_new_const(NUM_ONE);
     }
@@ -1045,8 +953,7 @@ static bool expr_i_unit_sign(const expr_t *dv, int *sign_out)
         }
     }
 
-    if (expr_is_op(dv, &ops_neg) &&
-        expr_i_unit_sign(dv->a, &child_sign)) {
+    if (expr_is_op(dv, &ops_neg) && expr_i_unit_sign(dv->a, &child_sign)) {
         *sign_out = -child_sign;
         return true;
     }
@@ -1054,9 +961,7 @@ static bool expr_i_unit_sign(const expr_t *dv, int *sign_out)
     return false;
 }
 
-static bool expr_extract_i_unit_factor(const expr_t *dv,
-                                     int *sign_out,
-                                     const expr_t **rest_out)
+static bool expr_extract_i_unit_factor(const expr_t *dv, int *sign_out, const expr_t **rest_out)
 {
     if (!dv || !sign_out || !rest_out)
         return false;
@@ -1090,8 +995,7 @@ expr_t *expr_simplify_try_i_unit_product(expr_t *a, expr_t *b)
     int b_sign;
     int coeff_sign;
 
-    if (!expr_extract_i_unit_factor(a, &a_sign, &a_rest) ||
-        !expr_extract_i_unit_factor(b, &b_sign, &b_rest))
+    if (!expr_extract_i_unit_factor(a, &a_sign, &a_rest) || !expr_extract_i_unit_factor(b, &b_sign, &b_rest))
         return NULL;
 
     coeff_sign = -(a_sign * b_sign);

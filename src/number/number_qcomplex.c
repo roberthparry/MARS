@@ -22,8 +22,7 @@ bool number_is_one_qcomplex(const number_t *number)
 
 bool number_eq_same_qcomplex(const number_t *a, const number_t *b)
 {
-    return a && b &&
-        qc_eq(number_impl_const(a)->value.qc, number_impl_const(b)->value.qc);
+    return a && b && qc_eq(number_impl_const(a)->value.qc, number_impl_const(b)->value.qc);
 }
 
 bool number_eq_same_tol_qcomplex(const number_t *a, const number_t *b)
@@ -33,8 +32,7 @@ bool number_eq_same_tol_qcomplex(const number_t *a, const number_t *b)
 
 bool number_is_finite_qcomplex(const number_t *number)
 {
-    return number && !qc_isnan(number_impl_const(number)->value.qc) &&
-        !qc_isinf(number_impl_const(number)->value.qc);
+    return number && !qc_isnan(number_impl_const(number)->value.qc) && !qc_isinf(number_impl_const(number)->value.qc);
 }
 
 bool number_is_nan_qcomplex(const number_t *number)
@@ -63,8 +61,7 @@ int number_cmp_same_qcomplex(const number_t *a, const number_t *b)
 bool number_is_integer_qcomplex(const number_t *number)
 {
     return number && qf_eq(qc_imag(number_impl_const(number)->value.qc), QF_ZERO) &&
-        qf_eq(qf_floor(qc_real(number_impl_const(number)->value.qc)),
-              qc_real(number_impl_const(number)->value.qc));
+           qf_eq(qf_floor(qc_real(number_impl_const(number)->value.qc)), qc_real(number_impl_const(number)->value.qc));
 }
 
 string_t *number_to_text_qcomplex(const number_t *number)
@@ -121,8 +118,9 @@ number_t *number_floor_qcomplex(const number_t *number)
 
 number_t *number_pow_int_qcomplex(const number_t *number, int exponent)
 {
-    return number ? number_wrap_qcomplex(qc_pow(number_impl_const(number)->value.qc,
-        qc_make(qf_from_double((double)exponent), QF_ZERO))) : NULL;
+    return number ? number_wrap_qcomplex(
+                        qc_pow(number_impl_const(number)->value.qc, qc_make(qf_from_double((double)exponent), QF_ZERO)))
+                  : NULL;
 }
 
 number_t *number_ldexp_qcomplex(const number_t *number, int exponent2)
@@ -132,22 +130,26 @@ number_t *number_ldexp_qcomplex(const number_t *number, int exponent2)
 
 number_t *number_add_same_qcomplex(const number_t *a, const number_t *b)
 {
-    return (a && b) ? number_wrap_qcomplex(qc_add(number_impl_const(a)->value.qc, number_impl_const(b)->value.qc)) : NULL;
+    return (a && b) ? number_wrap_qcomplex(qc_add(number_impl_const(a)->value.qc, number_impl_const(b)->value.qc))
+                    : NULL;
 }
 
 number_t *number_sub_same_qcomplex(const number_t *a, const number_t *b)
 {
-    return (a && b) ? number_wrap_qcomplex(qc_sub(number_impl_const(a)->value.qc, number_impl_const(b)->value.qc)) : NULL;
+    return (a && b) ? number_wrap_qcomplex(qc_sub(number_impl_const(a)->value.qc, number_impl_const(b)->value.qc))
+                    : NULL;
 }
 
 number_t *number_mul_same_qcomplex(const number_t *a, const number_t *b)
 {
-    return (a && b) ? number_wrap_qcomplex(qc_mul(number_impl_const(a)->value.qc, number_impl_const(b)->value.qc)) : NULL;
+    return (a && b) ? number_wrap_qcomplex(qc_mul(number_impl_const(a)->value.qc, number_impl_const(b)->value.qc))
+                    : NULL;
 }
 
 number_t *number_div_same_qcomplex(const number_t *a, const number_t *b)
 {
-    return (a && b) ? number_wrap_qcomplex(qc_div(number_impl_const(a)->value.qc, number_impl_const(b)->value.qc)) : NULL;
+    return (a && b) ? number_wrap_qcomplex(qc_div(number_impl_const(a)->value.qc, number_impl_const(b)->value.qc))
+                    : NULL;
 }
 
 number_t *number_exp_same_qcomplex(const number_t *number)

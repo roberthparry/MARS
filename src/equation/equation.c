@@ -43,9 +43,7 @@ void equ_solutions_free(equation_solutions_t *solutions)
     free(solutions);
 }
 
-equation_t *equ_new_with_owned_bindings(const expr_t *lhs,
-                                             const expr_t *rhs,
-                                             expr_bindings_t *bindings)
+equation_t *equ_new_with_owned_bindings(const expr_t *lhs, const expr_t *rhs, expr_bindings_t *bindings)
 {
     equation_t *equation;
 
@@ -148,12 +146,10 @@ static bool equ_lhs_is_wrt(const equation_t *equation, const expr_t *wrt)
 
 bool equ_is_solved_for(const equation_t *equation, const expr_t *wrt)
 {
-    return equ_lhs_is_wrt(equation, wrt) &&
-           !equ_expr_uses_wrt(equation->rhs, wrt);
+    return equ_lhs_is_wrt(equation, wrt) && !equ_expr_uses_wrt(equation->rhs, wrt);
 }
 
-static int equ_solutions_append(equation_solutions_t *solutions,
-                                        equation_t *solution)
+static int equ_solutions_append(equation_solutions_t *solutions, equation_t *solution)
 {
     equation_t **items;
 
@@ -174,8 +170,7 @@ static int equ_solutions_append(equation_solutions_t *solutions,
         return 0;
     }
 
-    items = realloc(solutions->solutions,
-                    (solutions->count + 1u) * sizeof(*solutions->solutions));
+    items = realloc(solutions->solutions, (solutions->count + 1u) * sizeof(*solutions->solutions));
     if (!items)
         return -1;
 
@@ -185,12 +180,9 @@ static int equ_solutions_append(equation_solutions_t *solutions,
     return 0;
 }
 
-static int equ_append_existing_solution(const equation_t *equation,
-                                             equation_solutions_t *solutions)
+static int equ_append_existing_solution(const equation_t *equation, equation_solutions_t *solutions)
 {
-    equation_t *solution = equ_new_with_owned_bindings(equation->lhs,
-                                                            equation->rhs,
-                                                            NULL);
+    equation_t *solution = equ_new_with_owned_bindings(equation->lhs, equation->rhs, NULL);
 
     if (!solution)
         return -1;
@@ -204,14 +196,10 @@ static int equ_append_existing_solution(const equation_t *equation,
 }
 
 static number_t *equ_snapshot_binding_values(expr_bindings_t *bindings);
-static void equ_restore_binding_values(expr_bindings_t *bindings,
-                                            number_t *values);
-static void equ_free_binding_value_snapshot(expr_bindings_t *bindings,
-                                                 number_t *values);
+static void equ_restore_binding_values(expr_bindings_t *bindings, number_t *values);
+static void equ_free_binding_value_snapshot(expr_bindings_t *bindings, number_t *values);
 
-int equ_append_solution_value(const expr_t *wrt,
-                                   number_t value,
-                                   equation_solutions_t *solutions)
+int equ_append_solution_value(const expr_t *wrt, number_t value, equation_solutions_t *solutions)
 {
     expr_t *rhs = expr_new_const(value);
     equation_t *solution = rhs ? equ_new(wrt, rhs) : NULL;
@@ -232,9 +220,7 @@ cleanup:
     return rc;
 }
 
-int equ_append_solution_expr(const expr_t *wrt,
-                                  const expr_t *rhs,
-                                  equation_solutions_t *solutions)
+int equ_append_solution_expr(const expr_t *wrt, const expr_t *rhs, equation_solutions_t *solutions)
 {
     equation_t *solution = equ_new(wrt, rhs);
 
@@ -266,8 +252,7 @@ static size_t equ_variable_binding_count(expr_bindings_t *bindings)
     return count;
 }
 
-static int equ_merge_solutions(equation_solutions_t *dst,
-                                    const equation_solutions_t *src)
+static int equ_merge_solutions(equation_solutions_t *dst, const equation_solutions_t *src)
 {
     if (!dst || !src)
         return -1;
@@ -277,9 +262,7 @@ static int equ_merge_solutions(equation_solutions_t *dst,
 
         if (!solution)
             continue;
-        if (equ_append_solution_expr(equ_lhs(solution),
-                                          equ_rhs(solution),
-                                          dst) != 0)
+        if (equ_append_solution_expr(equ_lhs(solution), equ_rhs(solution), dst) != 0)
             return -1;
     }
 
@@ -295,19 +278,16 @@ static int equ_default_goal_seek_options(expr_goal_seek_options_t *options)
     if (digits == 0u)
         digits = 64u;
 
-    *options = (expr_goal_seek_options_t){
-        .precision_digits = digits,
-        .max_iterations = 0u,
-        .allow_complex = true,
-        .simplify_result = false,
-        .tolerance = num_new()
-    };
+    *options = (expr_goal_seek_options_t){.precision_digits = digits,
+                                          .max_iterations = 0u,
+                                          .allow_complex = true,
+                                          .simplify_result = false,
+                                          .tolerance = num_new()};
     return 0;
 }
 
-static int equ_derive_symbolic_solutions(const equation_t *equation,
-                                              expr_bindings_t *bindings,
-                                              equation_solutions_t *solutions)
+static int equ_derive_symbolic_solutions(const equation_t *equation, expr_bindings_t *bindings,
+                                         equation_solutions_t *solutions)
 {
     number_t *original_values = NULL;
     size_t binding_count;
@@ -357,8 +337,7 @@ cleanup:
     return rc;
 }
 
-static int equ_derive_without_bindings(const equation_t *equation,
-                                            equation_solutions_t *solutions)
+static int equ_derive_without_bindings(const equation_t *equation, equation_solutions_t *solutions)
 {
     const expr_t *lhs;
 
@@ -378,25 +357,13 @@ static expr_t *equ_symbolic_pi_expr(void);
 static expr_t *equ_symbolic_two_pi_expr(void);
 static expr_t *equ_exact_tan_sqrt_three_family_expr(void);
 
-static int equ_try_solve_symbolic_affine(const expr_t *residual,
-                                              const expr_t *wrt,
-                                              equation_solutions_t *solutions);
-static int equ_try_solve_unary_periodic(const equation_t *equation,
-                                             const expr_t *wrt,
-                                             equation_solutions_t *solutions);
-static int equ_try_solve_unary_inverse(const equation_t *equation,
-                                            const expr_t *wrt,
-                                            equation_solutions_t *solutions);
-static int equ_try_solve_atan_sum(const equation_t *equation,
-                                  const expr_t *wrt,
-                                  equation_solutions_t *solutions);
-static int equ_try_solve_self_power(const equation_t *equation,
-                                         const expr_t *wrt,
-                                         equation_solutions_t *solutions);
+static int equ_try_solve_symbolic_affine(const expr_t *residual, const expr_t *wrt, equation_solutions_t *solutions);
+static int equ_try_solve_unary_periodic(const equation_t *equation, const expr_t *wrt, equation_solutions_t *solutions);
+static int equ_try_solve_unary_inverse(const equation_t *equation, const expr_t *wrt, equation_solutions_t *solutions);
+static int equ_try_solve_atan_sum(const equation_t *equation, const expr_t *wrt, equation_solutions_t *solutions);
+static int equ_try_solve_self_power(const equation_t *equation, const expr_t *wrt, equation_solutions_t *solutions);
 
-static int equ_try_solve_affine(const equation_t *equation,
-                                     const expr_t *wrt,
-                                     equation_solutions_t *solutions)
+static int equ_try_solve_affine(const equation_t *equation, const expr_t *wrt, equation_solutions_t *solutions)
 {
     expr_t *residual = equ_residual(equation);
     number_t constant = num_new();
@@ -434,9 +401,7 @@ cleanup:
     return rc;
 }
 
-static number_t equ_quadratic_discriminant(number_t constant,
-                                                number_t linear,
-                                                number_t quadratic)
+static number_t equ_quadratic_discriminant(number_t constant, number_t linear, number_t quadratic)
 {
     number_t linear_sq = num_mul(linear, linear);
     number_t quad_constant = num_mul(quadratic, constant);
@@ -449,9 +414,7 @@ static number_t equ_quadratic_discriminant(number_t constant,
     return discriminant;
 }
 
-static number_t equ_quadratic_root(number_t neg_linear,
-                                        number_t signed_sqrt_discriminant,
-                                        number_t denominator)
+static number_t equ_quadratic_root(number_t neg_linear, number_t signed_sqrt_discriminant, number_t denominator)
 {
     number_t numerator = num_add(neg_linear, signed_sqrt_discriminant);
     number_t root = num_div(numerator, denominator);
@@ -460,9 +423,7 @@ static number_t equ_quadratic_root(number_t neg_linear,
     return root;
 }
 
-int equ_solve_quadratic_coefficients(const number_t *coeffs,
-                                     const expr_t *wrt,
-                                     equation_solutions_t *solutions)
+int equ_solve_quadratic_coefficients(const number_t *coeffs, const expr_t *wrt, equation_solutions_t *solutions)
 {
     number_t discriminant;
     number_t sqrt_discriminant;
@@ -474,14 +435,12 @@ int equ_solve_quadratic_coefficients(const number_t *coeffs,
     if (!coeffs || !wrt || !solutions || num_is_zero(coeffs[2]))
         return -1;
 
-    discriminant =
-        equ_quadratic_discriminant(coeffs[0], coeffs[1], coeffs[2]);
+    discriminant = equ_quadratic_discriminant(coeffs[0], coeffs[1], coeffs[2]);
     sqrt_discriminant = num_sqrt(discriminant);
     neg_linear = num_neg(coeffs[1]);
     denominator = num_mul_long(coeffs[2], 2L);
 
-    root = equ_quadratic_root(
-        neg_linear, sqrt_discriminant, denominator);
+    root = equ_quadratic_root(neg_linear, sqrt_discriminant, denominator);
     if (equ_append_solution_value(wrt, root, solutions) != 0) {
         num_destroy(&root);
         goto error;
@@ -490,8 +449,7 @@ int equ_solve_quadratic_coefficients(const number_t *coeffs,
 
     if (!num_is_zero(sqrt_discriminant)) {
         neg_sqrt_discriminant = num_neg(sqrt_discriminant);
-        root = equ_quadratic_root(
-            neg_linear, neg_sqrt_discriminant, denominator);
+        root = equ_quadratic_root(neg_linear, neg_sqrt_discriminant, denominator);
         num_destroy(&neg_sqrt_discriminant);
         if (equ_append_solution_value(wrt, root, solutions) != 0) {
             num_destroy(&root);
@@ -550,8 +508,7 @@ static expr_t *equ_exact_sin_one_family_expr(void)
     expr_t *pi_over_two = (pi && two) ? expr_div(pi, two) : NULL;
     expr_t *four_n = (four && n) ? expr_mul(four, n) : NULL;
     expr_t *affine = (four_n && one) ? expr_add(four_n, one) : NULL;
-    expr_t *out = (pi_over_two && affine) ? expr_mul(pi_over_two, affine)
-                                          : NULL;
+    expr_t *out = (pi_over_two && affine) ? expr_mul(pi_over_two, affine) : NULL;
 
     expr_free(affine);
     expr_free(four_n);
@@ -580,8 +537,7 @@ static expr_t *equ_exact_tan_sqrt_three_family_expr(void)
     expr_t *three_n = (three && n) ? expr_mul(three, n) : NULL;
     expr_t *affine = (three_n && one) ? expr_add(three_n, one) : NULL;
     expr_t *pi_affine = (pi && affine) ? expr_mul(pi, affine) : NULL;
-    expr_t *out = (one_third && pi_affine) ? expr_mul(one_third, pi_affine)
-                                           : NULL;
+    expr_t *out = (one_third && pi_affine) ? expr_mul(one_third, pi_affine) : NULL;
 
     if (out)
         expr_set_binding_pi_linear_family(out, 3L, 3L, 1L);
@@ -600,8 +556,7 @@ static expr_t *equ_exact_tan_sqrt_three_family_expr(void)
     return out;
 }
 
-static expr_t *equ_symbolic_linear_root(const expr_t *constant,
-                                             const expr_t *linear)
+static expr_t *equ_symbolic_linear_root(const expr_t *constant, const expr_t *linear)
 {
     expr_t *neg_constant = expr_neg(constant);
     expr_t *quotient = neg_constant ? expr_div(neg_constant, linear) : NULL;
@@ -611,9 +566,7 @@ static expr_t *equ_symbolic_linear_root(const expr_t *constant,
     return root;
 }
 
-static expr_t *equ_symbolic_linear_phase_root(const expr_t *constant,
-                                                   const expr_t *linear,
-                                                   const expr_t *phase)
+static expr_t *equ_symbolic_linear_phase_root(const expr_t *constant, const expr_t *linear, const expr_t *phase)
 {
     if (equ_expr_is_zero(constant) && equ_expr_is_one(linear)) {
         expr_t *copy = (expr_t *)phase;
@@ -622,20 +575,14 @@ static expr_t *equ_symbolic_linear_phase_root(const expr_t *constant,
         return expr_simplify_owned(copy);
     }
 
-    expr_t *shifted_constant = (constant && phase)
-        ? expr_sub(constant, phase)
-        : NULL;
-    expr_t *root = shifted_constant
-        ? equ_symbolic_linear_root(shifted_constant, linear)
-        : NULL;
+    expr_t *shifted_constant = (constant && phase) ? expr_sub(constant, phase) : NULL;
+    expr_t *root = shifted_constant ? equ_symbolic_linear_root(shifted_constant, linear) : NULL;
 
     expr_free(shifted_constant);
     return root;
 }
 
-static expr_t *equ_periodic_family_expr(const expr_t *base,
-                                             const expr_t *period,
-                                             const expr_t *n)
+static expr_t *equ_periodic_family_expr(const expr_t *base, const expr_t *period, const expr_t *n)
 {
     expr_t *period_term = (period && n) ? expr_mul(period, n) : NULL;
     expr_t *sum = (base && period_term) ? expr_add(base, period_term) : NULL;
@@ -645,17 +592,12 @@ static expr_t *equ_periodic_family_expr(const expr_t *base,
     return out;
 }
 
-static expr_t *equ_periodic_sub_family_expr(const expr_t *offset,
-                                                 const expr_t *period,
-                                                 const expr_t *n,
-                                                 const expr_t *subtrahend)
+static expr_t *equ_periodic_sub_family_expr(const expr_t *offset, const expr_t *period, const expr_t *n,
+                                            const expr_t *subtrahend)
 {
     expr_t *period_term = (period && n) ? expr_mul(period, n) : NULL;
-    expr_t *offset_sum = (offset && period_term) ? expr_add(offset, period_term)
-                                                 : NULL;
-    expr_t *difference = (offset_sum && subtrahend)
-        ? expr_sub(offset_sum, subtrahend)
-        : NULL;
+    expr_t *offset_sum = (offset && period_term) ? expr_add(offset, period_term) : NULL;
+    expr_t *difference = (offset_sum && subtrahend) ? expr_sub(offset_sum, subtrahend) : NULL;
     expr_t *out = expr_simplify_owned(difference);
 
     expr_free(offset_sum);
@@ -663,18 +605,12 @@ static expr_t *equ_periodic_sub_family_expr(const expr_t *offset,
     return out;
 }
 
-static int equ_append_trig_family_root(const expr_t *wrt,
-                                            const expr_t *constant,
-                                            const expr_t *linear,
-                                            const expr_t *base,
-                                            const expr_t *period,
-                                            const expr_t *n,
-                                            equation_solutions_t *solutions)
+static int equ_append_trig_family_root(const expr_t *wrt, const expr_t *constant, const expr_t *linear,
+                                       const expr_t *base, const expr_t *period, const expr_t *n,
+                                       equation_solutions_t *solutions)
 {
     expr_t *family = equ_periodic_family_expr(base, period, n);
-    expr_t *root = family
-        ? equ_symbolic_linear_phase_root(constant, linear, family)
-        : NULL;
+    expr_t *root = family ? equ_symbolic_linear_phase_root(constant, linear, family) : NULL;
     int rc = -1;
 
     if (!root)
@@ -690,17 +626,10 @@ cleanup:
     return rc;
 }
 
-typedef enum {
-    EQU_PERIODIC_TRIG_SIN,
-    EQU_PERIODIC_TRIG_COS,
-    EQU_PERIODIC_TRIG_TAN
-} equ_periodic_trig_kind_t;
+typedef enum { EQU_PERIODIC_TRIG_SIN, EQU_PERIODIC_TRIG_COS, EQU_PERIODIC_TRIG_TAN } equ_periodic_trig_kind_t;
 
-static int equ_try_solve_periodic_trig_kind(equ_periodic_trig_kind_t kind,
-                                                 const expr_t *inner,
-                                                 const expr_t *target,
-                                                 const expr_t *wrt,
-                                                 equation_solutions_t *solutions)
+static int equ_try_solve_periodic_trig_kind(equ_periodic_trig_kind_t kind, const expr_t *inner, const expr_t *target,
+                                            const expr_t *wrt, equation_solutions_t *solutions)
 {
     expr_t *constant = NULL;
     expr_t *linear = NULL;
@@ -735,8 +664,7 @@ static int equ_try_solve_periodic_trig_kind(equ_periodic_trig_kind_t kind,
                     rc = equ_append_solution_expr(wrt, exact_family, solutions);
                     break;
                 }
-                exact_root = equ_symbolic_linear_phase_root(constant, linear,
-                                                            exact_family);
+                exact_root = equ_symbolic_linear_phase_root(constant, linear, exact_family);
                 if (!exact_root)
                     goto cleanup;
                 rc = equ_append_solution_expr(wrt, exact_root, solutions);
@@ -746,8 +674,7 @@ static int equ_try_solve_periodic_trig_kind(equ_periodic_trig_kind_t kind,
             period = equ_symbolic_two_pi_expr();
             if (!base || !period)
                 goto cleanup;
-            rc = equ_append_trig_family_root(wrt, constant, linear, base, period,
-                                            n, solutions);
+            rc = equ_append_trig_family_root(wrt, constant, linear, base, period, n, solutions);
             if (rc != 0)
                 goto cleanup;
             pi = equ_symbolic_pi_expr();
@@ -772,8 +699,7 @@ static int equ_try_solve_periodic_trig_kind(equ_periodic_trig_kind_t kind,
             period = equ_symbolic_two_pi_expr();
             if (!base || !period)
                 goto cleanup;
-            rc = equ_append_trig_family_root(wrt, constant, linear, base, period,
-                                            n, solutions);
+            rc = equ_append_trig_family_root(wrt, constant, linear, base, period, n, solutions);
             if (rc != 0)
                 goto cleanup;
             neg_base = base ? expr_neg(base) : NULL;
@@ -781,8 +707,7 @@ static int equ_try_solve_periodic_trig_kind(equ_periodic_trig_kind_t kind,
             neg_base = NULL;
             if (!alt_base)
                 goto cleanup;
-            if (equ_append_trig_family_root(wrt, constant, linear, alt_base, period,
-                                            n, solutions) != 0) {
+            if (equ_append_trig_family_root(wrt, constant, linear, alt_base, period, n, solutions) != 0) {
                 equ_solutions_clear(solutions);
                 rc = -1;
                 goto cleanup;
@@ -790,11 +715,9 @@ static int equ_try_solve_periodic_trig_kind(equ_periodic_trig_kind_t kind,
             rc = 0;
             break;
 
-        case EQU_PERIODIC_TRIG_TAN:
-        {
+        case EQU_PERIODIC_TRIG_TAN: {
             number_t target_value = num_new();
-            bool is_sqrt_three = expr_match_const_value(target, &target_value) &&
-                                num_eq(target_value, NUM_SQRT3);
+            bool is_sqrt_three = expr_match_const_value(target, &target_value) && num_eq(target_value, NUM_SQRT3);
 
             num_destroy(&target_value);
             if (is_sqrt_three) {
@@ -805,8 +728,7 @@ static int equ_try_solve_periodic_trig_kind(equ_periodic_trig_kind_t kind,
                     rc = equ_append_solution_expr(wrt, exact_family, solutions);
                     break;
                 }
-                exact_root = equ_symbolic_linear_phase_root(constant, linear,
-                                                            exact_family);
+                exact_root = equ_symbolic_linear_phase_root(constant, linear, exact_family);
                 if (!exact_root)
                     goto cleanup;
                 rc = equ_append_solution_expr(wrt, exact_root, solutions);
@@ -816,8 +738,7 @@ static int equ_try_solve_periodic_trig_kind(equ_periodic_trig_kind_t kind,
             period = equ_symbolic_pi_expr();
             if (!base || !period)
                 goto cleanup;
-            rc = equ_append_trig_family_root(wrt, constant, linear, base, period,
-                                            n, solutions);
+            rc = equ_append_trig_family_root(wrt, constant, linear, base, period, n, solutions);
             break;
         }
 
@@ -840,10 +761,8 @@ cleanup:
     return rc;
 }
 
-static int equ_try_solve_unary_periodic_side(const expr_t *lhs,
-                                                  const expr_t *rhs,
-                                                  const expr_t *wrt,
-                                                  equation_solutions_t *solutions)
+static int equ_try_solve_unary_periodic_side(const expr_t *lhs, const expr_t *rhs, const expr_t *wrt,
+                                             equation_solutions_t *solutions)
 {
     const expr_t *inner = NULL;
 
@@ -853,39 +772,29 @@ static int equ_try_solve_unary_periodic_side(const expr_t *lhs,
         return 1;
 
     if (expr_match_sin_expr(lhs, &inner))
-        return equ_try_solve_periodic_trig_kind(EQU_PERIODIC_TRIG_SIN, inner, rhs,
-                                                wrt, solutions);
+        return equ_try_solve_periodic_trig_kind(EQU_PERIODIC_TRIG_SIN, inner, rhs, wrt, solutions);
     if (expr_match_cos_expr(lhs, &inner))
-        return equ_try_solve_periodic_trig_kind(EQU_PERIODIC_TRIG_COS, inner, rhs,
-                                                wrt, solutions);
+        return equ_try_solve_periodic_trig_kind(EQU_PERIODIC_TRIG_COS, inner, rhs, wrt, solutions);
     if (expr_match_tan_expr(lhs, &inner))
-        return equ_try_solve_periodic_trig_kind(EQU_PERIODIC_TRIG_TAN, inner, rhs,
-                                                wrt, solutions);
+        return equ_try_solve_periodic_trig_kind(EQU_PERIODIC_TRIG_TAN, inner, rhs, wrt, solutions);
 
     return 1;
 }
 
-static int equ_try_solve_unary_periodic(const equation_t *equation,
-                                             const expr_t *wrt,
-                                             equation_solutions_t *solutions)
+static int equ_try_solve_unary_periodic(const equation_t *equation, const expr_t *wrt, equation_solutions_t *solutions)
 {
     int rc;
 
     if (!equation || !wrt || !solutions)
         return -1;
 
-    rc = equ_try_solve_unary_periodic_side(equation->lhs, equation->rhs,
-                                           wrt, solutions);
+    rc = equ_try_solve_unary_periodic_side(equation->lhs, equation->rhs, wrt, solutions);
     if (rc != 1)
         return rc;
-    return equ_try_solve_unary_periodic_side(equation->rhs, equation->lhs,
-                                             wrt, solutions);
+    return equ_try_solve_unary_periodic_side(equation->rhs, equation->lhs, wrt, solutions);
 }
 
-typedef enum {
-    EQU_UNARY_INVERSE_EXP,
-    EQU_UNARY_INVERSE_LOG
-} equ_unary_inverse_kind_t;
+typedef enum { EQU_UNARY_INVERSE_EXP, EQU_UNARY_INVERSE_LOG } equ_unary_inverse_kind_t;
 
 static expr_t *equ_unary_inverse_rhs(equ_unary_inverse_kind_t kind, const expr_t *rhs)
 {
@@ -899,9 +808,7 @@ static expr_t *equ_unary_inverse_rhs(equ_unary_inverse_kind_t kind, const expr_t
     }
 }
 
-static int equ_try_solve_unary_inverse_side(const expr_t *lhs,
-                                            const expr_t *rhs,
-                                            const expr_t *wrt,
+static int equ_try_solve_unary_inverse_side(const expr_t *lhs, const expr_t *rhs, const expr_t *wrt,
                                             equation_solutions_t *solutions)
 {
     const expr_t *inner = NULL;
@@ -938,21 +845,17 @@ cleanup:
     return rc;
 }
 
-static int equ_try_solve_unary_inverse(const equation_t *equation,
-                                            const expr_t *wrt,
-                                            equation_solutions_t *solutions)
+static int equ_try_solve_unary_inverse(const equation_t *equation, const expr_t *wrt, equation_solutions_t *solutions)
 {
     int rc;
 
     if (!equation || !wrt || !solutions)
         return -1;
 
-    rc = equ_try_solve_unary_inverse_side(equation->lhs, equation->rhs,
-                                          wrt, solutions);
+    rc = equ_try_solve_unary_inverse_side(equation->lhs, equation->rhs, wrt, solutions);
     if (rc != 1)
         return rc;
-    return equ_try_solve_unary_inverse_side(equation->rhs, equation->lhs,
-                                            wrt, solutions);
+    return equ_try_solve_unary_inverse_side(equation->rhs, equation->lhs, wrt, solutions);
 }
 
 static bool equ_expr_is_self_power(const expr_t *expr, const expr_t *wrt)
@@ -960,9 +863,7 @@ static bool equ_expr_is_self_power(const expr_t *expr, const expr_t *wrt)
     const expr_t *base = NULL;
     const expr_t *exponent = NULL;
 
-    return expr_match_pow_expr(expr, &base, &exponent) &&
-           expr_struct_eq(base, wrt) &&
-           expr_struct_eq(exponent, wrt);
+    return expr_match_pow_expr(expr, &base, &exponent) && expr_struct_eq(base, wrt) && expr_struct_eq(exponent, wrt);
 }
 
 static expr_t *equ_self_power_log_family_arg(const expr_t *rhs)
@@ -1001,9 +902,7 @@ static expr_t *equ_self_power_lambert_family_root(const expr_t *rhs)
     return out;
 }
 
-static bool equ_candidate_satisfies_equation(const expr_t *lhs,
-                                             const expr_t *rhs,
-                                             const expr_t *wrt,
+static bool equ_candidate_satisfies_equation(const expr_t *lhs, const expr_t *rhs, const expr_t *wrt,
                                              const expr_t *candidate)
 {
     expr_t *lhs_at = NULL;
@@ -1061,13 +960,8 @@ cleanup:
     return ok;
 }
 
-static int equ_append_self_power_root_if_valid(
-    const expr_t *lhs,
-    const expr_t *rhs,
-    const expr_t *wrt,
-    equation_solutions_t *solutions,
-    expr_t *root,
-    bool *appended_out)
+static int equ_append_self_power_root_if_valid(const expr_t *lhs, const expr_t *rhs, const expr_t *wrt,
+                                               equation_solutions_t *solutions, expr_t *root, bool *appended_out)
 {
     int rc = 0;
 
@@ -1087,10 +981,8 @@ static int equ_append_self_power_root_if_valid(
     return rc;
 }
 
-static int equ_try_solve_self_power_side(const expr_t *lhs,
-                                              const expr_t *rhs,
-                                              const expr_t *wrt,
-                                              equation_solutions_t *solutions)
+static int equ_try_solve_self_power_side(const expr_t *lhs, const expr_t *rhs, const expr_t *wrt,
+                                         equation_solutions_t *solutions)
 {
     expr_t *family_root = NULL;
     bool appended;
@@ -1104,8 +996,7 @@ static int equ_try_solve_self_power_side(const expr_t *lhs,
         return 1;
 
     family_root = equ_self_power_lambert_family_root(rhs);
-    if (equ_append_self_power_root_if_valid(
-            lhs, rhs, wrt, solutions, family_root, &appended) != 0) {
+    if (equ_append_self_power_root_if_valid(lhs, rhs, wrt, solutions, family_root, &appended) != 0) {
         expr_free(family_root);
         return -1;
     }
@@ -1115,34 +1006,27 @@ static int equ_try_solve_self_power_side(const expr_t *lhs,
     return saw_solution ? 0 : 1;
 }
 
-static int equ_try_solve_self_power(const equation_t *equation,
-                                         const expr_t *wrt,
-                                         equation_solutions_t *solutions)
+static int equ_try_solve_self_power(const equation_t *equation, const expr_t *wrt, equation_solutions_t *solutions)
 {
     int rc;
 
     if (!equation || !wrt || !solutions)
         return -1;
 
-    rc = equ_try_solve_self_power_side(equation->lhs, equation->rhs,
-                                       wrt, solutions);
+    rc = equ_try_solve_self_power_side(equation->lhs, equation->rhs, wrt, solutions);
     if (rc != 1)
         return rc;
-    return equ_try_solve_self_power_side(equation->rhs, equation->lhs,
-                                         wrt, solutions);
+    return equ_try_solve_self_power_side(equation->rhs, equation->lhs, wrt, solutions);
 }
 
-static int equ_try_solve_symbolic_affine(const expr_t *residual,
-                                              const expr_t *wrt,
-                                              equation_solutions_t *solutions)
+static int equ_try_solve_symbolic_affine(const expr_t *residual, const expr_t *wrt, equation_solutions_t *solutions)
 {
     expr_t *constant = NULL;
     expr_t *linear = NULL;
     expr_t *root = NULL;
     int rc = -1;
 
-    if (!equ_match_symbolic_linear_expr(residual, wrt, &constant,
-                                             &linear)) {
+    if (!equ_match_symbolic_linear_expr(residual, wrt, &constant, &linear)) {
         rc = 1;
         goto cleanup;
     }
@@ -1163,19 +1047,14 @@ cleanup:
     return rc;
 }
 
-static expr_t *equ_symbolic_quadratic_discriminant(const expr_t *constant,
-                                                        const expr_t *linear,
-                                                        const expr_t *quadratic)
+static expr_t *equ_symbolic_quadratic_discriminant(const expr_t *constant, const expr_t *linear,
+                                                   const expr_t *quadratic)
 {
     number_t four = num_create_from_long(4L);
     expr_t *linear_sq = expr_pow(linear, &NUM_TWO);
     expr_t *quad_constant = expr_mul(quadratic, constant);
-    expr_t *four_quad_constant = quad_constant
-        ? expr_mul_num(quad_constant, &four)
-        : NULL;
-    expr_t *discriminant = (linear_sq && four_quad_constant)
-        ? expr_sub(linear_sq, four_quad_constant)
-        : NULL;
+    expr_t *four_quad_constant = quad_constant ? expr_mul_num(quad_constant, &four) : NULL;
+    expr_t *discriminant = (linear_sq && four_quad_constant) ? expr_sub(linear_sq, four_quad_constant) : NULL;
     expr_t *out = expr_simplify_owned(discriminant);
 
     expr_free(four_quad_constant);
@@ -1185,24 +1064,15 @@ static expr_t *equ_symbolic_quadratic_discriminant(const expr_t *constant,
     return out;
 }
 
-static expr_t *equ_symbolic_quadratic_root(const expr_t *linear,
-                                                const expr_t *quadratic,
-                                                const expr_t *sqrt_discriminant,
-                                                bool add_root)
+static expr_t *equ_symbolic_quadratic_root(const expr_t *linear, const expr_t *quadratic,
+                                           const expr_t *sqrt_discriminant, bool add_root)
 {
     number_t two = num_create_from_long(2L);
     expr_t *neg_linear = expr_neg(linear);
-    expr_t *numerator = add_root
-        ? ((neg_linear && sqrt_discriminant)
-            ? expr_add(neg_linear, sqrt_discriminant)
-            : NULL)
-        : ((neg_linear && sqrt_discriminant)
-            ? expr_sub(neg_linear, sqrt_discriminant)
-            : NULL);
+    expr_t *numerator = add_root ? ((neg_linear && sqrt_discriminant) ? expr_add(neg_linear, sqrt_discriminant) : NULL)
+                                 : ((neg_linear && sqrt_discriminant) ? expr_sub(neg_linear, sqrt_discriminant) : NULL);
     expr_t *denominator = expr_mul_num(quadratic, &two);
-    expr_t *quotient = (numerator && denominator)
-        ? expr_div(numerator, denominator)
-        : NULL;
+    expr_t *quotient = (numerator && denominator) ? expr_div(numerator, denominator) : NULL;
     expr_t *root = expr_simplify_owned(quotient);
 
     expr_free(denominator);
@@ -1212,8 +1082,7 @@ static expr_t *equ_symbolic_quadratic_root(const expr_t *linear,
     return root;
 }
 
-static bool equ_expr_simplifies_equal(const expr_t *left,
-                                           const expr_t *right)
+static bool equ_expr_simplifies_equal(const expr_t *left, const expr_t *right)
 {
     expr_t *diff = (left && right) ? expr_sub(left, right) : NULL;
     expr_t *simplified = diff ? expr_simplify(diff) : NULL;
@@ -1228,20 +1097,16 @@ static bool equ_expr_text_equal(const expr_t *left, const expr_t *right)
 {
     string_t *left_text = left ? expr_to_text(left, style_EXPRESSION) : NULL;
     string_t *right_text = right ? expr_to_text(right, style_EXPRESSION) : NULL;
-    bool equal = left_text && right_text &&
-                 strcmp(string_c_str(left_text),
-                        string_c_str(right_text)) == 0;
+    bool equal = left_text && right_text && strcmp(string_c_str(left_text), string_c_str(right_text)) == 0;
 
     string_free(right_text);
     string_free(left_text);
     return equal;
 }
 
-static bool equ_expr_matches_expected(const expr_t *expr,
-                                           const expr_t *expected)
+static bool equ_expr_matches_expected(const expr_t *expr, const expr_t *expected)
 {
-    return equ_expr_text_equal(expr, expected) ||
-           equ_expr_simplifies_equal(expr, expected);
+    return equ_expr_text_equal(expr, expected) || equ_expr_simplifies_equal(expr, expected);
 }
 
 static bool equ_expr_is_zero(const expr_t *expr)
@@ -1262,8 +1127,7 @@ static bool equ_expr_is_one(const expr_t *expr)
     return ok;
 }
 
-static expr_t *equ_symbolic_negated_sum(const expr_t *left,
-                                             const expr_t *right)
+static expr_t *equ_symbolic_negated_sum(const expr_t *left, const expr_t *right)
 {
     expr_t *neg_left = left ? expr_neg(left) : NULL;
     expr_t *neg_right = right ? expr_neg(right) : NULL;
@@ -1275,12 +1139,9 @@ static expr_t *equ_symbolic_negated_sum(const expr_t *left,
     return out;
 }
 
-static int equ_try_solve_symbolic_quadratic_product_roots(
-    const expr_t *constant,
-    const expr_t *linear,
-    const expr_t *quadratic,
-    const expr_t *wrt,
-    equation_solutions_t *solutions)
+static int equ_try_solve_symbolic_quadratic_product_roots(const expr_t *constant, const expr_t *linear,
+                                                          const expr_t *quadratic, const expr_t *wrt,
+                                                          equation_solutions_t *solutions)
 {
     const expr_t *first = NULL;
     const expr_t *second = NULL;
@@ -1292,8 +1153,7 @@ static int equ_try_solve_symbolic_quadratic_product_roots(
         return 1;
     if (!expr_match_mul_expr(constant, &first, &second))
         return 1;
-    if (equ_expr_uses_wrt(first, wrt) ||
-        equ_expr_uses_wrt(second, wrt))
+    if (equ_expr_uses_wrt(first, wrt) || equ_expr_uses_wrt(second, wrt))
         return 1;
 
     expected_linear = equ_symbolic_negated_sum(first, second);
@@ -1328,9 +1188,7 @@ cleanup:
     return rc;
 }
 
-static int equ_try_solve_symbolic_quadratic(const expr_t *residual,
-                                                 const expr_t *wrt,
-                                                 equation_solutions_t *solutions)
+static int equ_try_solve_symbolic_quadratic(const expr_t *residual, const expr_t *wrt, equation_solutions_t *solutions)
 {
     expr_t *constant = NULL;
     expr_t *linear = NULL;
@@ -1341,29 +1199,20 @@ static int equ_try_solve_symbolic_quadratic(const expr_t *residual,
     expr_t *root_minus = NULL;
     int rc = -1;
 
-    if (!equ_match_symbolic_quadratic_expr(residual, wrt, &constant,
-                                                &linear, &quadratic)) {
+    if (!equ_match_symbolic_quadratic_expr(residual, wrt, &constant, &linear, &quadratic)) {
         rc = 1;
         goto cleanup;
     }
 
-    rc = equ_try_solve_symbolic_quadratic_product_roots(
-        constant, linear, quadratic, wrt, solutions);
+    rc = equ_try_solve_symbolic_quadratic_product_roots(constant, linear, quadratic, wrt, solutions);
     if (rc <= 0)
         goto cleanup;
 
-    discriminant = equ_symbolic_quadratic_discriminant(constant, linear,
-                                                            quadratic);
+    discriminant = equ_symbolic_quadratic_discriminant(constant, linear, quadratic);
     sqrt_discriminant = discriminant ? expr_sqrt(discriminant) : NULL;
     sqrt_discriminant = expr_simplify_owned(sqrt_discriminant);
-    root_plus = sqrt_discriminant
-        ? equ_symbolic_quadratic_root(linear, quadratic,
-                                           sqrt_discriminant, true)
-        : NULL;
-    root_minus = sqrt_discriminant
-        ? equ_symbolic_quadratic_root(linear, quadratic,
-                                           sqrt_discriminant, false)
-        : NULL;
+    root_plus = sqrt_discriminant ? equ_symbolic_quadratic_root(linear, quadratic, sqrt_discriminant, true) : NULL;
+    root_minus = sqrt_discriminant ? equ_symbolic_quadratic_root(linear, quadratic, sqrt_discriminant, false) : NULL;
 
     if (!root_plus || !root_minus)
         goto cleanup;
@@ -1388,9 +1237,7 @@ cleanup:
     return rc;
 }
 
-static int equ_try_solve_quadratic(const equation_t *equation,
-                                        const expr_t *wrt,
-                                        equation_solutions_t *solutions)
+static int equ_try_solve_quadratic(const equation_t *equation, const expr_t *wrt, equation_solutions_t *solutions)
 {
     expr_t *residual = equ_residual(equation);
     number_t coeffs[3] = {num_new(), num_new(), num_new()};
@@ -1400,8 +1247,7 @@ static int equ_try_solve_quadratic(const equation_t *equation,
     if (!residual)
         goto cleanup;
 
-    ok = equ_match_quadratic_expr(
-        residual, wrt, &coeffs[0], &coeffs[1], &coeffs[2]);
+    ok = equ_match_quadratic_expr(residual, wrt, &coeffs[0], &coeffs[1], &coeffs[2]);
     if (!ok) {
         rc = equ_try_solve_symbolic_quadratic(residual, wrt, solutions);
         goto cleanup;
@@ -1429,14 +1275,12 @@ static bool equ_expr_is_pi_over_four(const expr_t *expr)
     return matches;
 }
 
-static int equ_try_solve_atan_sum_side(const expr_t *lhs,
-                                       const expr_t *rhs,
-                                       const expr_t *wrt,
+static int equ_try_solve_atan_sum_side(const expr_t *lhs, const expr_t *rhs, const expr_t *wrt,
                                        equation_solutions_t *solutions)
 {
     const expr_t *first = NULL;
     const expr_t *second = NULL;
-    expr_t *vars[1] = { (expr_t *)wrt };
+    expr_t *vars[1] = {(expr_t *)wrt};
     number_t first_constant = num_new();
     number_t second_constant = num_new();
     number_t first_coefficient = num_new();
@@ -1461,18 +1305,12 @@ static int equ_try_solve_atan_sum_side(const expr_t *lhs,
         rc = -1;
         goto cleanup;
     }
-    if (!equ_expr_is_pi_over_four(rhs) ||
-        !expr_match_add_sub_expr(lhs, &first, &second, &is_sub) || is_sub)
+    if (!equ_expr_is_pi_over_four(rhs) || !expr_match_add_sub_expr(lhs, &first, &second, &is_sub) || is_sub)
         goto cleanup;
-    if (!expr_match_unary_affine_kind(
-            first, EXPR_PATTERN_UNARY_ATAN, 1u, vars,
-            &first_constant, &first_coefficient) ||
-        !expr_match_unary_affine_kind(
-            second, EXPR_PATTERN_UNARY_ATAN, 1u, vars,
-            &second_constant, &second_coefficient) ||
-        !num_is_zero(first_constant) ||
-        !num_is_zero(second_constant) ||
-        num_is_zero(first_coefficient) ||
+    if (!expr_match_unary_affine_kind(first, EXPR_PATTERN_UNARY_ATAN, 1u, vars, &first_constant, &first_coefficient) ||
+        !expr_match_unary_affine_kind(second, EXPR_PATTERN_UNARY_ATAN, 1u, vars, &second_constant,
+                                      &second_coefficient) ||
+        !num_is_zero(first_constant) || !num_is_zero(second_constant) || num_is_zero(first_coefficient) ||
         num_is_zero(second_coefficient))
         goto cleanup;
 
@@ -1482,13 +1320,9 @@ static int equ_try_solve_atan_sum_side(const expr_t *lhs,
     linear = num_add(first_coefficient, second_coefficient);
 
     wrt_squared = expr_pow(wrt, &NUM_TWO);
-    quadratic_term = wrt_squared
-        ? expr_mul_num(wrt_squared, &quadratic)
-        : NULL;
+    quadratic_term = wrt_squared ? expr_mul_num(wrt_squared, &quadratic) : NULL;
     linear_term = expr_mul_num(wrt, &linear);
-    sum = (quadratic_term && linear_term)
-        ? expr_add(quadratic_term, linear_term)
-        : NULL;
+    sum = (quadratic_term && linear_term) ? expr_add(quadratic_term, linear_term) : NULL;
     one = expr_const_one();
     raw_residual = (sum && one) ? expr_sub(sum, one) : NULL;
     residual = raw_residual ? expr_simplify_owned(raw_residual) : NULL;
@@ -1498,8 +1332,7 @@ static int equ_try_solve_atan_sum_side(const expr_t *lhs,
         goto cleanup;
     }
 
-    solve_rc = equ_try_solve_symbolic_quadratic(
-        residual, wrt, &candidates);
+    solve_rc = equ_try_solve_symbolic_quadratic(residual, wrt, &candidates);
     if (solve_rc != 0) {
         rc = solve_rc;
         goto cleanup;
@@ -1536,28 +1369,21 @@ cleanup:
     return rc;
 }
 
-static int equ_try_solve_atan_sum(const equation_t *equation,
-                                  const expr_t *wrt,
-                                  equation_solutions_t *solutions)
+static int equ_try_solve_atan_sum(const equation_t *equation, const expr_t *wrt, equation_solutions_t *solutions)
 {
     int rc;
 
     if (!equation || !wrt || !solutions)
         return -1;
 
-    rc = equ_try_solve_atan_sum_side(
-        equation->lhs, equation->rhs, wrt, solutions);
+    rc = equ_try_solve_atan_sum_side(equation->lhs, equation->rhs, wrt, solutions);
     if (rc != 1)
         return rc;
-    return equ_try_solve_atan_sum_side(
-        equation->rhs, equation->lhs, wrt, solutions);
+    return equ_try_solve_atan_sum_side(equation->rhs, equation->lhs, wrt, solutions);
 }
 
-static int equ_try_solve_zero_product_factor(const expr_t *factor,
-                                                  const expr_t *wrt,
-                                                  const expr_t *zero,
-                                                  equation_solutions_t *solutions,
-                                                  bool *saw_solved_factor)
+static int equ_try_solve_zero_product_factor(const expr_t *factor, const expr_t *wrt, const expr_t *zero,
+                                             equation_solutions_t *solutions, bool *saw_solved_factor)
 {
     const expr_t *left = NULL;
     const expr_t *right = NULL;
@@ -1568,12 +1394,10 @@ static int equ_try_solve_zero_product_factor(const expr_t *factor,
     equ_solutions_reset(&factor_result);
 
     if (expr_match_mul_expr(factor, &left, &right)) {
-        rc = equ_try_solve_zero_product_factor(left, wrt, zero, solutions,
-                                                    saw_solved_factor);
+        rc = equ_try_solve_zero_product_factor(left, wrt, zero, solutions, saw_solved_factor);
         if (rc != 0)
             goto cleanup;
-        rc = equ_try_solve_zero_product_factor(right, wrt, zero, solutions,
-                                                    saw_solved_factor);
+        rc = equ_try_solve_zero_product_factor(right, wrt, zero, solutions, saw_solved_factor);
         goto cleanup;
     }
 
@@ -1588,15 +1412,13 @@ static int equ_try_solve_zero_product_factor(const expr_t *factor,
 
     if (equ_solve_for_into(factor_equation, wrt, &factor_result) != 0)
         goto cleanup;
-    if (factor_result.status != EQUATION_SOLVE_SOLVED ||
-        factor_result.count == 0u) {
+    if (factor_result.status != EQUATION_SOLVE_SOLVED || factor_result.count == 0u) {
         rc = 1;
         goto cleanup;
     }
 
     for (size_t i = 0u; i < factor_result.count; ++i) {
-        if (equ_append_solution_expr(
-                wrt, equ_rhs(factor_result.solutions[i]), solutions) != 0)
+        if (equ_append_solution_expr(wrt, equ_rhs(factor_result.solutions[i]), solutions) != 0)
             goto cleanup;
     }
 
@@ -1609,9 +1431,7 @@ cleanup:
     return rc;
 }
 
-static int equ_try_solve_zero_product(const equation_t *equation,
-                                           const expr_t *wrt,
-                                           equation_solutions_t *solutions)
+static int equ_try_solve_zero_product(const equation_t *equation, const expr_t *wrt, equation_solutions_t *solutions)
 {
     const expr_t *product = NULL;
     const expr_t *left = NULL;
@@ -1637,8 +1457,7 @@ static int equ_try_solve_zero_product(const equation_t *equation,
     if (!zero)
         return -1;
 
-    rc = equ_try_solve_zero_product_factor(product, wrt, zero, solutions,
-                                                &saw_solved_factor);
+    rc = equ_try_solve_zero_product_factor(product, wrt, zero, solutions, &saw_solved_factor);
     expr_free(zero);
 
     if (rc != 0 || !saw_solved_factor) {
@@ -1649,8 +1468,7 @@ static int equ_try_solve_zero_product(const equation_t *equation,
     return 0;
 }
 
-static int equ_append_numeric_binding_solutions(expr_bindings_t *bindings,
-                                                     equation_solutions_t *solutions)
+static int equ_append_numeric_binding_solutions(expr_bindings_t *bindings, equation_solutions_t *solutions)
 {
     size_t binding_count;
 
@@ -1696,15 +1514,13 @@ static size_t equ_numeric_precision_digits(const expr_goal_seek_options_t *optio
 
 static number_t equ_numeric_tolerance(const expr_goal_seek_options_t *options)
 {
-    if (options && num_is_finite(options->tolerance) &&
-        !num_is_zero(options->tolerance))
+    if (options && num_is_finite(options->tolerance) && !num_is_zero(options->tolerance))
         return num_abs(options->tolerance);
 
     return num_pow10(-(int)equ_numeric_precision_digits(options));
 }
 
-static bool equ_numeric_residual_is_solved(const expr_t *residual,
-                                                const expr_goal_seek_options_t *options)
+static bool equ_numeric_residual_is_solved(const expr_t *residual, const expr_goal_seek_options_t *options)
 {
     number_t value;
     number_t mag;
@@ -1751,8 +1567,7 @@ static number_t *equ_snapshot_binding_values(expr_bindings_t *bindings)
     return values;
 }
 
-static void equ_restore_binding_values(expr_bindings_t *bindings,
-                                            number_t *values)
+static void equ_restore_binding_values(expr_bindings_t *bindings, number_t *values)
 {
     size_t binding_count;
 
@@ -1768,8 +1583,7 @@ static void equ_restore_binding_values(expr_bindings_t *bindings,
     }
 }
 
-static void equ_free_binding_value_snapshot(expr_bindings_t *bindings,
-                                                 number_t *values)
+static void equ_free_binding_value_snapshot(expr_bindings_t *bindings, number_t *values)
 {
     size_t binding_count;
 
@@ -1782,10 +1596,8 @@ static void equ_free_binding_value_snapshot(expr_bindings_t *bindings,
     free(values);
 }
 
-int equ_solve_numeric_into(const equation_t *equation,
-                                expr_bindings_t *bindings,
-                                const expr_goal_seek_options_t *options,
-                                equation_solutions_t *solutions)
+int equ_solve_numeric_into(const equation_t *equation, expr_bindings_t *bindings,
+                           const expr_goal_seek_options_t *options, equation_solutions_t *solutions)
 {
     expr_t *residual = NULL;
     number_t target = num_create_from_long(0L);
@@ -1835,9 +1647,7 @@ cleanup_no_goal:
     return rc < 0 ? -1 : 0;
 }
 
-int equ_solve_for_into(const equation_t *equation,
-                            const expr_t *wrt,
-                            equation_solutions_t *solutions)
+int equ_solve_for_into(const equation_t *equation, const expr_t *wrt, equation_solutions_t *solutions)
 {
     int unary_inverse_rc;
     int unary_periodic_rc;
@@ -1899,8 +1709,7 @@ int equ_solve_for_into(const equation_t *equation,
      * complex coefficients. Collect the complete polynomial first so
      * conjugate coefficients cancel before any individual factor is solved.
      */
-    general_polynomial_rc =
-        equ_try_solve_general_polynomial(equation, wrt, solutions);
+    general_polynomial_rc = equ_try_solve_general_polynomial(equation, wrt, solutions);
     if (general_polynomial_rc == 0)
         return 0;
     if (general_polynomial_rc < 0)
@@ -1961,8 +1770,7 @@ equation_solutions_t *equ_derive_solutions(const equation_t *equation)
     if (equ_derive_symbolic_solutions(equation, bindings, solutions) != 0)
         goto error;
 
-    if (equ_solutions_count(solutions) == 0u &&
-        equ_variable_binding_count(bindings) > 0u) {
+    if (equ_solutions_count(solutions) == 0u && equ_variable_binding_count(bindings) > 0u) {
         if (equ_default_goal_seek_options(&options) != 0)
             goto error;
         used_numeric = true;
@@ -1989,9 +1797,7 @@ size_t equ_solutions_count(const equation_solutions_t *solutions)
     return solutions ? solutions->count : 0u;
 }
 
-const equation_t *equ_solutions_at(
-    const equation_solutions_t *solutions,
-    size_t index)
+const equation_t *equ_solutions_at(const equation_solutions_t *solutions, size_t index)
 {
     if (!solutions || index >= solutions->count)
         return NULL;

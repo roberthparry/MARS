@@ -46,6 +46,7 @@ Before committing:
 
 ```sh
 make release
+make check-native-numeric-boundaries
 make test_number
 make test_qfloat
 make test_qcomplex
@@ -59,6 +60,11 @@ make test_bitset
 make test_matrix
 make test_integrator
 ```
+
+`make release` already includes `check-native-numeric-boundaries`; the explicit
+command is useful when changing only qfloat or qcomplex. It rejects direct
+MPFR/MPC includes, calls and unresolved symbols in those native double-double
+modules.
 
 For memory checks on the expression suite, use the normal release binary under
 Valgrind:

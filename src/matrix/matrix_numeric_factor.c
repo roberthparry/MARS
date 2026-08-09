@@ -1,17 +1,15 @@
+#include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
-#include <math.h>
 #define MARS_MATRIX_INTERNAL_ACCESS
+#include "matrix.h"
 #include "matrix_internal.h"
 #include "number.h"
-#include "matrix.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
 
-enum {
-    MATRIX_HERMITIAN_JACOBI_MAX_SWEEPS = 50
-};
+enum { MATRIX_HERMITIAN_JACOBI_MAX_SWEEPS = 50 };
 
 static double mat_numeric_epsilon_from_precision_bits(size_t precision_bits)
 {
@@ -298,7 +296,6 @@ int mat_cholesky(const matrix_t *A, mat_cholesky_t *out)
             }
             num_destroy(&sum);
         }
-
     }
 
     out->L = mat_create_lower_triangular_with_elem(n, n, &number_elem);
@@ -589,8 +586,10 @@ int mat_svd_factor(const matrix_t *A, mat_svd_factor_t *out)
             rc = -3;
             goto fail;
         }
-        for (size_t i = 0; i < (right_count ? right_count : 1u); ++i) RightN[i] = NUM_ZERO;
-        for (size_t i = 0; i < (left_count ? left_count : 1u); ++i) LeftN[i] = NUM_ZERO;
+        for (size_t i = 0; i < (right_count ? right_count : 1u); ++i)
+            RightN[i] = NUM_ZERO;
+        for (size_t i = 0; i < (left_count ? left_count : 1u); ++i)
+            LeftN[i] = NUM_ZERO;
 
         for (size_t j = 0; j < kdim; j++) {
             size_t idx = order[j];
@@ -678,8 +677,10 @@ int mat_svd_factor(const matrix_t *A, mat_svd_factor_t *out)
             rc = -3;
             goto fail;
         }
-        for (size_t i = 0; i < (left_count ? left_count : 1u); ++i) LeftN[i] = NUM_ZERO;
-        for (size_t i = 0; i < (right_count ? right_count : 1u); ++i) RightN[i] = NUM_ZERO;
+        for (size_t i = 0; i < (left_count ? left_count : 1u); ++i)
+            LeftN[i] = NUM_ZERO;
+        for (size_t i = 0; i < (right_count ? right_count : 1u); ++i)
+            RightN[i] = NUM_ZERO;
 
         for (size_t j = 0; j < kdim; j++) {
             size_t idx = order[j];
@@ -852,12 +853,10 @@ static int mat_norm_frobenius(const matrix_t *A, double *out)
     return 0;
 }
 
-static const mat_norm_function_t mat_norm_functions[] = {
-    [MAT_NORM_1] = mat_norm_one,
-    [MAT_NORM_INF] = mat_norm_infinity,
-    [MAT_NORM_FRO] = mat_norm_frobenius,
-    [MAT_NORM_2] = mat_norm_via_svd
-};
+static const mat_norm_function_t mat_norm_functions[] = {[MAT_NORM_1] = mat_norm_one,
+                                                         [MAT_NORM_INF] = mat_norm_infinity,
+                                                         [MAT_NORM_FRO] = mat_norm_frobenius,
+                                                         [MAT_NORM_2] = mat_norm_via_svd};
 
 static mat_norm_function_t mat_norm_function_for(mat_norm_type_t type)
 {
@@ -974,8 +973,7 @@ int mat_condition_number(const matrix_t *A, mat_norm_type_t type, number_t *out)
                 num_destroy(&sumsq);
                 num_destroy(&inv_sumsq);
                 return 0;
-            case MAT_NORM_FRO:
-            {
+            case MAT_NORM_FRO: {
                 number_t root_sumsq = num_sqrt(sumsq);
                 number_t root_inv_sumsq = num_sqrt(inv_sumsq);
                 *out = num_mul(root_sumsq, root_inv_sumsq);
@@ -1419,8 +1417,7 @@ matrix_t *mat_eigenspace_expr(const matrix_t *A, const expr_t *eigenvalue)
     return E;
 }
 
-matrix_t *mat_generalized_eigenspace(const matrix_t *A, const number_t *eigenvalue,
-                                     size_t order)
+matrix_t *mat_generalized_eigenspace(const matrix_t *A, const number_t *eigenvalue, size_t order)
 {
     matrix_t *Shifted = NULL;
     matrix_t *Power = NULL;
@@ -1448,8 +1445,7 @@ matrix_t *mat_generalized_eigenspace(const matrix_t *A, const number_t *eigenval
     return G;
 }
 
-matrix_t *mat_generalized_eigenspace_expr(const matrix_t *A, const expr_t *eigenvalue,
-                                        size_t order)
+matrix_t *mat_generalized_eigenspace_expr(const matrix_t *A, const expr_t *eigenvalue, size_t order)
 {
     matrix_t *Shifted = NULL;
     matrix_t *Power = NULL;
@@ -1477,8 +1473,7 @@ matrix_t *mat_generalized_eigenspace_expr(const matrix_t *A, const expr_t *eigen
     return G;
 }
 
-matrix_t *mat_jordan_chain(const matrix_t *A, const number_t *eigenvalue,
-                           size_t order)
+matrix_t *mat_jordan_chain(const matrix_t *A, const number_t *eigenvalue, size_t order)
 {
     matrix_t *Shifted = NULL;
     matrix_t *G = NULL;
@@ -1568,8 +1563,7 @@ fail:
     return NULL;
 }
 
-matrix_t *mat_jordan_chain_expr(const matrix_t *A, const expr_t *eigenvalue,
-                              size_t order)
+matrix_t *mat_jordan_chain_expr(const matrix_t *A, const expr_t *eigenvalue, size_t order)
 {
     matrix_t *Shifted = NULL;
     matrix_t *G = NULL;
@@ -1789,7 +1783,6 @@ fail:
     mat_free(P);
     return NULL;
 }
-
 
 typedef struct {
     number_t *W;
@@ -2084,9 +2077,7 @@ static void schur_workspace_free(schur_workspace_t *ws)
     ws->n = 0u;
 }
 
-static int mat_eigendecompose_hermitian_2x2(const matrix_t *A,
-                                            number_t *eigenvalues,
-                                            matrix_t **eigenvectors)
+static int mat_eigendecompose_hermitian_2x2(const matrix_t *A, number_t *eigenvalues, matrix_t **eigenvectors)
 {
     number_t a = mat_get_num(A, 0, 0);
     number_t b = mat_get_num(A, 0, 1);
@@ -2233,8 +2224,7 @@ static int mat_eigendecompose_hermitian_2x2(const matrix_t *A,
  *
  * After this call: (J† A J)[p][q] == 0,  V_new = V J.
  */
-static int mat_eigendecompose_hermitian(const matrix_t *A, number_t *eigenvalues,
-                                        matrix_t **eigenvectors)
+static int mat_eigendecompose_hermitian(const matrix_t *A, number_t *eigenvalues, matrix_t **eigenvectors)
 {
     size_t n = A->rows;
     hermitian_jacobi_ws_t ws = {0};
@@ -2276,9 +2266,12 @@ static int mat_eigendecompose_hermitian(const matrix_t *A, number_t *eigenvalues
 static double mat_numeric_algo_epsilon(const matrix_t *A)
 {
     double eps = mat_numeric_relative_epsilon(A);
-    if (!(eps > 0.0)) eps = 1e-30;
-    if (eps < 1e-36) eps = 1e-36;
-    if (eps > 1e-12) eps = 1e-12;
+    if (!(eps > 0.0))
+        eps = 1e-30;
+    if (eps < 1e-36)
+        eps = 1e-36;
+    if (eps > 1e-12)
+        eps = 1e-12;
     return eps * 8.0;
 }
 
@@ -2288,8 +2281,8 @@ static double mat_numeric_algo_epsilon(const matrix_t *A)
    ============================================================ */
 
 /* Index into flat n×n qcomplex array */
-#define QCM(a,i,j,n) ((a)[(size_t)(i)*(n)+(size_t)(j)])
-#define NCM(a,i,j,n) ((a)[(size_t)(i)*(n)+(size_t)(j)])
+#define QCM(a, i, j, n) ((a)[(size_t)(i) * (n) + (size_t)(j)])
+#define NCM(a, i, j, n) ((a)[(size_t)(i) * (n) + (size_t)(j)])
 
 static void mat_num_assign(number_t *slot, number_t value)
 {
@@ -2322,13 +2315,16 @@ static int schur_qr(number_t *Hn, number_t *Qn, size_t n, double eps);
 /* Detect whether A is Hermitian: A[i,j] == conj(A[j,i]) within tolerance */
 bool mat_is_hermitian(const matrix_t *A)
 {
-    if (!A || A->rows != A->cols) return false;
+    if (!A || A->rows != A->cols)
+        return false;
 
     size_t n = A->rows;
     const struct elem_vtable *e = A->elem;
-    unsigned char aij[MATRIX_SCALAR_STORAGE_BYTES], aji[MATRIX_SCALAR_STORAGE_BYTES], cji[MATRIX_SCALAR_STORAGE_BYTES], diff[MATRIX_SCALAR_STORAGE_BYTES], diag[MATRIX_SCALAR_STORAGE_BYTES];
+    unsigned char aij[MATRIX_SCALAR_STORAGE_BYTES], aji[MATRIX_SCALAR_STORAGE_BYTES], cji[MATRIX_SCALAR_STORAGE_BYTES],
+        diff[MATRIX_SCALAR_STORAGE_BYTES], diag[MATRIX_SCALAR_STORAGE_BYTES];
     double rel_eps = mat_numeric_relative_epsilon(A);
-    if (!(rel_eps > 0.0)) rel_eps = 1e-30;
+    if (!(rel_eps > 0.0))
+        rel_eps = 1e-30;
     rel_eps *= 8.0;
     double rel_eps2 = rel_eps * rel_eps;
 
@@ -2392,7 +2388,7 @@ static void backsub_eigenvec(const number_t *T, number_t *Y, size_t n, size_t k,
     QCM(Y, k, k, n) = num_clone(NUM_ONE);
 
     /* Back-substitute rows k-1 down to 0 */
-    for (size_t i = k; i-- > 0; ) {
+    for (size_t i = k; i-- > 0;) {
         /* (T[i,i] - lambda) y[i] = -sum_{j=i+1}^{k} T[i,j] y[j] */
         number_t rhs = num_clone(NUM_ZERO);
         for (size_t j = i + 1; j <= k; j++) {
@@ -2424,8 +2420,7 @@ static void backsub_eigenvec(const number_t *T, number_t *Y, size_t n, size_t k,
 
     /* Normalise */
     double nrm2 = 0.0;
-    for (size_t i = 0; i <= k; i++)
-    {
+    for (size_t i = 0; i <= k; i++) {
         number_t a = num_abs(QCM(Y, i, k, n));
         number_t a2 = num_mul(a, a);
         nrm2 += num_to_double(a2);
@@ -2435,8 +2430,7 @@ static void backsub_eigenvec(const number_t *T, number_t *Y, size_t n, size_t k,
     if (nrm2 > eps * eps) {
         double inv = 1.0 / sqrt(nrm2);
         number_t inv_num = num_create_from_double(inv);
-        for (size_t i = 0; i <= k; i++)
-        {
+        for (size_t i = 0; i <= k; i++) {
             number_t scaled = num_mul(inv_num, QCM(Y, i, k, n));
             num_destroy(&QCM(Y, i, k, n));
             QCM(Y, i, k, n) = scaled;
@@ -2451,8 +2445,7 @@ static void backsub_eigenvec(const number_t *T, number_t *Y, size_t n, size_t k,
 
    ============================================================ */
 
-
-   /* ---------- small helpers on qcomplex ---------- */
+/* ---------- small helpers on qcomplex ---------- */
 
 static matrix_t *mat_number_array_to_diagonal(size_t n, const number_t *data)
 {
@@ -2867,7 +2860,7 @@ static int schur_qr(number_t *Hn, number_t *Qn, size_t n, double eps)
     {
         const int max_iter = 1000 * (int)n;
 
-        for (size_t m = n - 1; m > 0; ) {
+        for (size_t m = n - 1; m > 0;) {
             number_t hml = num_clone(NCM(Hn, m, m - 1, n));
             number_t hml_abs = num_abs(hml);
             double hml_abs_d = num_to_double(hml_abs);
@@ -3053,8 +3046,7 @@ static int schur_qr(number_t *Hn, number_t *Qn, size_t n, double eps)
     return 0;
 }
 
-static int mat_eigendecompose_general(const matrix_t *A, number_t *eigenvalues,
-                                      matrix_t **eigenvectors)
+static int mat_eigendecompose_general(const matrix_t *A, number_t *eigenvalues, matrix_t **eigenvectors)
 {
     size_t n = A->rows;
     double eps = mat_numeric_algo_epsilon(A);
@@ -3080,7 +3072,10 @@ static int mat_eigendecompose_general(const matrix_t *A, number_t *eigenvalues,
 
     if (eigenvectors) {
         number_t *Y = (number_t *)calloc(n * n, sizeof(number_t));
-        if (!Y) { schur_workspace_free(&ws); return -3; }
+        if (!Y) {
+            schur_workspace_free(&ws);
+            return -3;
+        }
         for (size_t i = 0; i < n * n; ++i)
             Y[i] = NUM_ZERO;
 
@@ -3088,7 +3083,11 @@ static int mat_eigendecompose_general(const matrix_t *A, number_t *eigenvalues,
             backsub_eigenvec(ws.H, Y, n, k, eps);
 
         matrix_t *V = mat_create_dense_with_elem(n, n, &number_elem);
-        if (!V) { schur_workspace_free(&ws); free(Y); return -3; }
+        if (!V) {
+            schur_workspace_free(&ws);
+            free(Y);
+            return -3;
+        }
 
         number_t value;
         for (size_t i = 0; i < n; i++) {
@@ -3121,13 +3120,16 @@ static int mat_eigendecompose_general(const matrix_t *A, number_t *eigenvalues,
 
 int mat_eigendecompose(const matrix_t *A, number_t *eigenvalues, matrix_t **eigenvectors)
 {
-    if (!A) return -1;
-    if (A->rows != A->cols) return -2;
+    if (!A)
+        return -1;
+    if (A->rows != A->cols)
+        return -2;
 
     if (matrix_is_symbolic(A))
         return -3;
 
-    if (!elem_supports_numeric_algorithms(A->elem)) return -3;
+    if (!elem_supports_numeric_algorithms(A->elem))
+        return -3;
 
     if (mat_is_hermitian(A))
         return mat_eigendecompose_hermitian(A, eigenvalues, eigenvectors);
@@ -3168,8 +3170,10 @@ int mat_schur_factor(const matrix_t *A, mat_schur_factor_t *out)
     matrix_t *Tmat = NULL;
     double eps = 0.0;
 
-    if (!A || !out) return -1;
-    if (A->rows != A->cols) return -2;
+    if (!A || !out)
+        return -1;
+    if (A->rows != A->cols)
+        return -2;
     eps = mat_numeric_algo_epsilon(A);
 
     if (schur_workspace_init_from_matrix(&ws, A) != 0)
@@ -3214,8 +3218,11 @@ int mat_schur_factor(const matrix_t *A, mat_schur_factor_t *out)
 
 void mat_schur_factor_free(mat_schur_factor_t *S)
 {
-    if (!S) return;
-    if (S->Q) mat_free(S->Q);
-    if (S->T) mat_free(S->T);
+    if (!S)
+        return;
+    if (S->Q)
+        mat_free(S->Q);
+    if (S->T)
+        mat_free(S->T);
     S->Q = S->T = NULL;
 }

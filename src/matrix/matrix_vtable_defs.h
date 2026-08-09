@@ -27,7 +27,8 @@ bool diagonal_is_sparse_like(const struct matrix_t *A);
 bool diagonal_is_sparse_storage(const struct matrix_t *A);
 void diagonal_materialise(struct matrix_t *A);
 size_t diagonal_nonzero_count(const struct matrix_t *A);
-void diagonal_row_eliminate_from(struct matrix_t *A, size_t dst_row, size_t src_row, size_t col_start, const void *factor);
+void diagonal_row_eliminate_from(struct matrix_t *A, size_t dst_row, size_t src_row, size_t col_start,
+                                 const void *factor);
 void diagonal_set(struct matrix_t *A, size_t i, size_t j, const void *val);
 void diagonal_swap_rows(struct matrix_t *A, size_t r1, size_t r2);
 void expr_add_wrap(void *o, const void *a, const void *b);
@@ -93,7 +94,8 @@ bool lower_triangular_is_sparse_like(const struct matrix_t *A);
 bool lower_triangular_is_sparse_storage(const struct matrix_t *A);
 void lower_triangular_materialise(struct matrix_t *A);
 size_t lower_triangular_nonzero_count(const struct matrix_t *A);
-void lower_triangular_row_eliminate_from(struct matrix_t *A, size_t dst_row, size_t src_row, size_t col_start, const void *factor);
+void lower_triangular_row_eliminate_from(struct matrix_t *A, size_t dst_row, size_t src_row, size_t col_start,
+                                         const void *factor);
 void lower_triangular_set(struct matrix_t *A, size_t i, size_t j, const void *val);
 void lower_triangular_swap_rows(struct matrix_t *A, size_t r1, size_t r2);
 const struct store_vtable *lower_triangular_transpose_store(const struct matrix_t *A);
@@ -149,7 +151,8 @@ bool sparse_is_sparse_like(const struct matrix_t *A);
 bool sparse_is_sparse_storage(const struct matrix_t *A);
 void sparse_materialise(struct matrix_t *A);
 size_t sparse_nonzero_count(const struct matrix_t *A);
-void sparse_row_eliminate_from(struct matrix_t *A, size_t dst_row, size_t src_row, size_t col_start, const void *factor);
+void sparse_row_eliminate_from(struct matrix_t *A, size_t dst_row, size_t src_row, size_t col_start,
+                               const void *factor);
 void sparse_set(struct matrix_t *A, size_t i, size_t j, const void *val);
 void sparse_swap_rows(struct matrix_t *A, size_t r1, size_t r2);
 struct matrix_t *store_create_dense(size_t rows, size_t cols, const struct elem_vtable *elem);
@@ -169,7 +172,8 @@ bool upper_triangular_is_sparse_like(const struct matrix_t *A);
 bool upper_triangular_is_sparse_storage(const struct matrix_t *A);
 void upper_triangular_materialise(struct matrix_t *A);
 size_t upper_triangular_nonzero_count(const struct matrix_t *A);
-void upper_triangular_row_eliminate_from(struct matrix_t *A, size_t dst_row, size_t src_row, size_t col_start, const void *factor);
+void upper_triangular_row_eliminate_from(struct matrix_t *A, size_t dst_row, size_t src_row, size_t col_start,
+                                         const void *factor);
 void upper_triangular_set(struct matrix_t *A, size_t i, size_t j, const void *val);
 void upper_triangular_swap_rows(struct matrix_t *A, size_t r1, size_t r2);
 const struct store_vtable *upper_triangular_transpose_store(const struct matrix_t *A);

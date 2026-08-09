@@ -16,10 +16,7 @@
  * supplies its conjugate, so one real quadratic factor removes both at once.
  * The established quartic/cubic path finishes the final four roots.
  */
-enum {
-    EQU_POLY_NEWTON_ITERATIONS = 512u,
-    EQU_POLY_MIN_NEWTON_SEEDS = 37u
-};
+enum { EQU_POLY_NEWTON_ITERATIONS = 512u, EQU_POLY_MIN_NEWTON_SEEDS = 37u };
 
 static void equ_general_destroy_numbers(number_t *values, size_t count)
 {
@@ -43,8 +40,7 @@ static number_t *equ_general_new_numbers(size_t count)
     return values;
 }
 
-static bool equ_general_is_geometric_sum(const number_t *coeffs,
-                                         size_t degree)
+static bool equ_general_is_geometric_sum(const number_t *coeffs, size_t degree)
 {
     if (!coeffs || degree == 0u || num_is_zero(coeffs[0]))
         return false;
@@ -69,11 +65,8 @@ typedef struct {
     equ_standard_trig_magnitude_t magnitude;
 } equ_standard_trig_component_t;
 
-static bool equ_general_standard_trig_component(
-    size_t index,
-    size_t order,
-    bool cosine,
-    equ_standard_trig_component_t *component)
+static bool equ_general_standard_trig_component(size_t index, size_t order, bool cosine,
+                                                equ_standard_trig_component_t *component)
 {
     size_t twelfths;
 
@@ -103,13 +96,11 @@ static bool equ_general_standard_trig_component(
 
     switch (twelfths) {
         case 0u:
-            component->magnitude = cosine ? EQU_STANDARD_TRIG_ONE
-                                          : EQU_STANDARD_TRIG_ZERO;
+            component->magnitude = cosine ? EQU_STANDARD_TRIG_ONE : EQU_STANDARD_TRIG_ZERO;
             return true;
 
         case 2u:
-            component->magnitude = cosine ? EQU_STANDARD_TRIG_SQRT3_HALF
-                                          : EQU_STANDARD_TRIG_HALF;
+            component->magnitude = cosine ? EQU_STANDARD_TRIG_SQRT3_HALF : EQU_STANDARD_TRIG_HALF;
             return true;
 
         case 3u:
@@ -117,13 +108,11 @@ static bool equ_general_standard_trig_component(
             return true;
 
         case 4u:
-            component->magnitude = cosine ? EQU_STANDARD_TRIG_HALF
-                                          : EQU_STANDARD_TRIG_SQRT3_HALF;
+            component->magnitude = cosine ? EQU_STANDARD_TRIG_HALF : EQU_STANDARD_TRIG_SQRT3_HALF;
             return true;
 
         case 6u:
-            component->magnitude = cosine ? EQU_STANDARD_TRIG_ZERO
-                                          : EQU_STANDARD_TRIG_ONE;
+            component->magnitude = cosine ? EQU_STANDARD_TRIG_ZERO : EQU_STANDARD_TRIG_ONE;
             return true;
 
         default:
@@ -131,8 +120,7 @@ static bool equ_general_standard_trig_component(
     }
 }
 
-static expr_t *equ_general_standard_magnitude_expr(
-    equ_standard_trig_magnitude_t magnitude)
+static expr_t *equ_general_standard_magnitude_expr(equ_standard_trig_magnitude_t magnitude)
 {
     unsigned long radicand = 0u;
     expr_t *numerator = NULL;
@@ -174,11 +162,9 @@ static expr_t *equ_general_standard_magnitude_expr(
     return out;
 }
 
-static expr_t *equ_general_signed_component_expr(
-    equ_standard_trig_component_t component)
+static expr_t *equ_general_signed_component_expr(equ_standard_trig_component_t component)
 {
-    expr_t *magnitude =
-        equ_general_standard_magnitude_expr(component.magnitude);
+    expr_t *magnitude = equ_general_standard_magnitude_expr(component.magnitude);
     expr_t *out;
 
     if (!magnitude || component.sign >= 0)
@@ -199,10 +185,8 @@ static expr_t *equ_general_standard_root_of_unity(size_t index, size_t order)
     expr_t *raw = NULL;
     expr_t *root = NULL;
 
-    if (!equ_general_standard_trig_component(
-            index, order, true, &real_component) ||
-        !equ_general_standard_trig_component(
-            index, order, false, &imaginary_component))
+    if (!equ_general_standard_trig_component(index, order, true, &real_component) ||
+        !equ_general_standard_trig_component(index, order, false, &imaginary_component))
         return NULL;
 
     if (imaginary_component.magnitude == EQU_STANDARD_TRIG_ZERO)
@@ -218,19 +202,13 @@ static expr_t *equ_general_standard_root_of_unity(size_t index, size_t order)
     }
 
     if (real_component.magnitude == imaginary_component.magnitude) {
-        expr_t *real_unit = expr_new_const(
-            real_component.sign > 0 ? NUM_ONE : NUM_NEG_ONE);
-        expr_t *imaginary_unit = imaginary_component.sign > 0
-            ? i
-            : (i ? expr_neg(i) : NULL);
-        expr_t *factor = equ_general_standard_magnitude_expr(
-            real_component.magnitude);
+        expr_t *real_unit = expr_new_const(real_component.sign > 0 ? NUM_ONE : NUM_NEG_ONE);
+        expr_t *imaginary_unit = imaginary_component.sign > 0 ? i : (i ? expr_neg(i) : NULL);
+        expr_t *factor = equ_general_standard_magnitude_expr(real_component.magnitude);
 
         if (imaginary_unit != i)
             expr_free(i);
-        raw = (real_unit && imaginary_unit)
-            ? expr_add(real_unit, imaginary_unit)
-            : NULL;
+        raw = (real_unit && imaginary_unit) ? expr_add(real_unit, imaginary_unit) : NULL;
         imaginary_term = (raw && factor) ? expr_mul(raw, factor) : NULL;
         root = imaginary_term;
         imaginary_term = NULL;
@@ -273,8 +251,7 @@ static expr_t *equ_general_root_of_unity(size_t index, size_t order)
     expr_t *raw_root = NULL;
     expr_t *root = NULL;
 
-    if (index == 0u || order < 2u || index >= order ||
-        index > (size_t)LONG_MAX / 2u || order > (size_t)LONG_MAX)
+    if (index == 0u || order < 2u || index >= order || index > (size_t)LONG_MAX / 2u || order > (size_t)LONG_MAX)
         return NULL;
 
     root = equ_general_standard_root_of_unity(index, order);
@@ -314,11 +291,8 @@ static expr_t *equ_general_root_of_unity(size_t index, size_t order)
     return root;
 }
 
-static int equ_general_try_solve_geometric_sum(
-    const number_t *coeffs,
-    size_t degree,
-    const expr_t *wrt,
-    equation_solutions_t *solutions)
+static int equ_general_try_solve_geometric_sum(const number_t *coeffs, size_t degree, const expr_t *wrt,
+                                               equation_solutions_t *solutions)
 {
     size_t order;
 
@@ -348,10 +322,7 @@ static int equ_general_try_solve_geometric_sum(
     return 0;
 }
 
-static void equ_general_eval(const number_t *coeffs,
-                             size_t degree,
-                             number_t z,
-                             number_t *value_out,
+static void equ_general_eval(const number_t *coeffs, size_t degree, number_t z, number_t *value_out,
                              number_t *derivative_out)
 {
     number_t value = num_clone(coeffs[degree]);
@@ -443,14 +414,10 @@ static size_t equ_general_seed_count(size_t degree)
     if (degree > (SIZE_MAX - 5u) / 8u)
         return SIZE_MAX;
     count = degree * 8u + 5u;
-    return count > EQU_POLY_MIN_NEWTON_SEEDS
-        ? count
-        : EQU_POLY_MIN_NEWTON_SEEDS;
+    return count > EQU_POLY_MIN_NEWTON_SEEDS ? count : EQU_POLY_MIN_NEWTON_SEEDS;
 }
 
-static number_t equ_general_seed(size_t index,
-                                 size_t seed_count,
-                                 double bound)
+static number_t equ_general_seed(size_t index, size_t seed_count, double bound)
 {
     if (index == 0u)
         return num_clone(NUM_ZERO);
@@ -466,11 +433,8 @@ static number_t equ_general_seed(size_t index,
     {
         const size_t circle_count = seed_count - 5u;
         const size_t circle_index = index - 5u;
-        const double angle =
-            2.0 * acos(-1.0) * ((double)circle_index + 0.5) /
-            (double)circle_count;
-        const double ring =
-            0.25 + 0.75 * (double)(circle_index % 4u) / 3.0;
+        const double angle = 2.0 * acos(-1.0) * ((double)circle_index + 0.5) / (double)circle_count;
+        const double ring = 0.25 + 0.75 * (double)(circle_index % 4u) / 3.0;
         number_t real = num_create_from_double(bound * ring * cos(angle));
         number_t imag = num_create_from_double(bound * ring * sin(angle));
         number_t imag_term = num_mul(NUM_I, imag);
@@ -483,10 +447,7 @@ static number_t equ_general_seed(size_t index,
     }
 }
 
-static bool equ_general_newton_from(const number_t *coeffs,
-                                    size_t degree,
-                                    number_t start,
-                                    number_t tolerance,
+static bool equ_general_newton_from(const number_t *coeffs, size_t degree, number_t start, number_t tolerance,
                                     number_t *root_out)
 {
     number_t z = num_clone(start);
@@ -494,9 +455,7 @@ static bool equ_general_newton_from(const number_t *coeffs,
     number_t derivative = num_new();
     bool converged = false;
 
-    for (size_t iteration = 0u;
-         iteration < EQU_POLY_NEWTON_ITERATIONS;
-         ++iteration) {
+    for (size_t iteration = 0u; iteration < EQU_POLY_NEWTON_ITERATIONS; ++iteration) {
         number_t step;
         number_t next;
 
@@ -505,8 +464,7 @@ static bool equ_general_newton_from(const number_t *coeffs,
             converged = true;
             break;
         }
-        if (!num_is_finite(derivative) ||
-            equ_general_magnitude_le(derivative, tolerance))
+        if (!num_is_finite(derivative) || equ_general_magnitude_le(derivative, tolerance))
             break;
 
         step = num_div(value, derivative);
@@ -535,8 +493,7 @@ static bool equ_general_newton_from(const number_t *coeffs,
     return converged;
 }
 
-bool equ_polynomial_coefficients_real(const number_t *coeffs,
-                                      size_t degree)
+bool equ_polynomial_coefficients_real(const number_t *coeffs, size_t degree)
 {
     if (!coeffs)
         return false;
@@ -547,23 +504,18 @@ bool equ_polynomial_coefficients_real(const number_t *coeffs,
     return true;
 }
 
-bool equ_polynomial_root_effectively_real(number_t root,
-                                          number_t tolerance)
+bool equ_polynomial_root_effectively_real(number_t root, number_t tolerance)
 {
     number_t imaginary = num_imag_part(root);
     number_t magnitude = num_abs(imaginary);
-    bool effectively_real =
-        num_is_finite(magnitude) && num_le(magnitude, tolerance);
+    bool effectively_real = num_is_finite(magnitude) && num_le(magnitude, tolerance);
 
     num_destroy(&magnitude);
     num_destroy(&imaginary);
     return effectively_real;
 }
 
-static bool equ_general_find_real_root(const number_t *coeffs,
-                                       size_t degree,
-                                       number_t tolerance,
-                                       number_t *root_out)
+static bool equ_general_find_real_root(const number_t *coeffs, size_t degree, number_t tolerance, number_t *root_out)
 {
     const double bound = equ_general_root_bound(coeffs, degree);
     number_t left = num_create_from_double(-bound);
@@ -589,13 +541,10 @@ static bool equ_general_find_real_root(const number_t *coeffs,
         found = true;
         goto cleanup;
     }
-    if (!num_is_real(value_left) || !num_is_real(value_right) ||
-        num_sign(value_left) == num_sign(value_right))
+    if (!num_is_real(value_left) || !num_is_real(value_right) || num_sign(value_left) == num_sign(value_right))
         goto cleanup;
 
-    for (size_t iteration = 0u;
-         iteration < EQU_POLY_NEWTON_ITERATIONS;
-         ++iteration) {
+    for (size_t iteration = 0u; iteration < EQU_POLY_NEWTON_ITERATIONS; ++iteration) {
         number_t candidate = num_new();
         bool use_newton = false;
 
@@ -620,8 +569,7 @@ static bool equ_general_find_real_root(const number_t *coeffs,
             value_right = num_clone(value);
         }
 
-        if (num_is_real(derivative) &&
-            !equ_general_magnitude_le(derivative, tolerance)) {
+        if (num_is_real(derivative) && !equ_general_magnitude_le(derivative, tolerance)) {
             number_t step = num_div(value, derivative);
             number_t next = num_sub(z, step);
 
@@ -658,10 +606,7 @@ cleanup:
     return found;
 }
 
-static bool equ_general_find_complex_root(const number_t *coeffs,
-                                          size_t degree,
-                                          number_t tolerance,
-                                          number_t *root_out)
+static bool equ_general_find_complex_root(const number_t *coeffs, size_t degree, number_t tolerance, number_t *root_out)
 {
     const double bound = equ_general_root_bound(coeffs, degree);
     const size_t seed_count = equ_general_seed_count(degree);
@@ -670,8 +615,7 @@ static bool equ_general_find_complex_root(const number_t *coeffs,
         return false;
     for (size_t i = 0u; i < seed_count; ++i) {
         number_t seed = equ_general_seed(i, seed_count, bound);
-        bool found = equ_general_newton_from(
-            coeffs, degree, seed, tolerance, root_out);
+        bool found = equ_general_newton_from(coeffs, degree, seed, tolerance, root_out);
 
         num_destroy(&seed);
         if (found)
@@ -680,25 +624,16 @@ static bool equ_general_find_complex_root(const number_t *coeffs,
     return false;
 }
 
-static bool equ_general_find_root(const number_t *coeffs,
-                                  size_t degree,
-                                  number_t tolerance,
-                                  number_t *root_out)
+static bool equ_general_find_root(const number_t *coeffs, size_t degree, number_t tolerance, number_t *root_out)
 {
-    if ((degree & 1u) != 0u &&
-        equ_polynomial_coefficients_real(coeffs, degree) &&
-        equ_general_find_real_root(
-            coeffs, degree, tolerance, root_out))
+    if ((degree & 1u) != 0u && equ_polynomial_coefficients_real(coeffs, degree) &&
+        equ_general_find_real_root(coeffs, degree, tolerance, root_out))
         return true;
 
-    return equ_general_find_complex_root(
-        coeffs, degree, tolerance, root_out);
+    return equ_general_find_complex_root(coeffs, degree, tolerance, root_out);
 }
 
-void equ_polynomial_deflate_conjugate_pair(const number_t *coeffs,
-                                           size_t degree,
-                                           number_t root,
-                                           number_t *deflated)
+void equ_polynomial_deflate_conjugate_pair(const number_t *coeffs, size_t degree, number_t root, number_t *deflated)
 {
     number_t real = num_real_part(root);
     number_t imaginary = num_imag_part(root);
@@ -747,10 +682,7 @@ cleanup:
     num_destroy(&real);
 }
 
-static void equ_general_synthetic_divide(const number_t *coeffs,
-                                         size_t degree,
-                                         number_t root,
-                                         number_t *deflated)
+static void equ_general_synthetic_divide(const number_t *coeffs, size_t degree, number_t root, number_t *deflated)
 {
     num_destroy(&deflated[degree - 1u]);
     deflated[degree - 1u] = num_clone(coeffs[degree]);
@@ -765,30 +697,25 @@ static void equ_general_synthetic_divide(const number_t *coeffs,
     }
 }
 
-static number_t equ_general_snap_gaussian_integer(const number_t *coeffs,
-                                                  size_t degree,
-                                                  number_t root)
+static number_t equ_general_snap_gaussian_integer(const number_t *coeffs, size_t degree, number_t root)
 {
     number_t real = num_real_part(root);
     number_t imag = num_imag_part(root);
     double real_d = num_to_double(real);
     double imag_d = num_to_double(imag);
-    bool bounded = isfinite(real_d) && isfinite(imag_d) &&
-                   fabs(real_d) < 1000000.0 && fabs(imag_d) < 1000000.0;
+    bool bounded = isfinite(real_d) && isfinite(imag_d) && fabs(real_d) < 1000000.0 && fabs(imag_d) < 1000000.0;
     long real_i = bounded ? lround(real_d) : 0L;
     long imag_i = bounded ? lround(imag_d) : 0L;
     number_t candidate = num_new();
     number_t value = num_new();
 
-    if (bounded && fabs(real_d - (double)real_i) < 1e-6 &&
-        fabs(imag_d - (double)imag_i) < 1e-6) {
+    if (bounded && fabs(real_d - (double)real_i) < 1e-6 && fabs(imag_d - (double)imag_i) < 1e-6) {
         number_t real_part = num_create_from_long(real_i);
         number_t imag_part = num_create_from_long(imag_i);
         number_t imag_term = num_mul(NUM_I, imag_part);
 
         num_destroy(&candidate);
-        candidate = imag_i == 0L ? num_clone(real_part)
-                                 : num_add(real_part, imag_term);
+        candidate = imag_i == 0L ? num_clone(real_part) : num_add(real_part, imag_term);
         equ_general_eval(coeffs, degree, candidate, &value, NULL);
         num_destroy(&imag_term);
         num_destroy(&imag_part);
@@ -808,9 +735,7 @@ static number_t equ_general_snap_gaussian_integer(const number_t *coeffs,
     return num_clone(root);
 }
 
-static bool equ_general_roots_close(number_t left,
-                                    number_t right,
-                                    number_t tolerance)
+static bool equ_general_roots_close(number_t left, number_t right, number_t tolerance)
 {
     number_t difference = num_sub(left, right);
     bool close = equ_general_magnitude_le(difference, tolerance);
@@ -819,27 +744,18 @@ static bool equ_general_roots_close(number_t left,
     return close;
 }
 
-static int equ_general_append_distinct(const number_t *original_coeffs,
-                                       size_t original_degree,
-                                       const expr_t *wrt,
-                                       number_t candidate,
-                                       number_t newton_tolerance,
-                                       number_t distinct_tolerance,
-                                       number_t *seen,
-                                       size_t *seen_count,
-                                       equation_solutions_t *solutions)
+static int equ_general_append_distinct(const number_t *original_coeffs, size_t original_degree, const expr_t *wrt,
+                                       number_t candidate, number_t newton_tolerance, number_t distinct_tolerance,
+                                       number_t *seen, size_t *seen_count, equation_solutions_t *solutions)
 {
     number_t polished = num_new();
     number_t clean;
 
-    if (!equ_general_newton_from(
-            original_coeffs, original_degree, candidate,
-            newton_tolerance, &polished)) {
+    if (!equ_general_newton_from(original_coeffs, original_degree, candidate, newton_tolerance, &polished)) {
         num_destroy(&polished);
         polished = num_clone(candidate);
     }
-    clean = equ_general_snap_gaussian_integer(
-        original_coeffs, original_degree, polished);
+    clean = equ_general_snap_gaussian_integer(original_coeffs, original_degree, polished);
 
     for (size_t i = 0u; i < *seen_count; ++i) {
         if (equ_general_roots_close(clean, seen[i], distinct_tolerance)) {
@@ -862,9 +778,7 @@ static int equ_general_append_distinct(const number_t *original_coeffs,
     return 0;
 }
 
-int equ_try_solve_general_polynomial(const equation_t *equation,
-                                     const expr_t *wrt,
-                                     equation_solutions_t *solutions)
+int equ_try_solve_general_polynomial(const equation_t *equation, const expr_t *wrt, equation_solutions_t *solutions)
 {
     expr_t *residual = equ_residual(equation);
     number_t *original_coeffs = NULL;
@@ -879,21 +793,17 @@ int equ_try_solve_general_polynomial(const equation_t *equation,
     size_t deflated_count = 0u;
     number_t root = num_new();
     number_t newton_tolerance = equ_general_newton_tolerance();
-    number_t distinct_tolerance =
-        equ_general_distinct_tolerance(newton_tolerance);
+    number_t distinct_tolerance = equ_general_distinct_tolerance(newton_tolerance);
     equation_solutions_t quartic_solutions = {0};
     int rc = -1;
 
-    if (!residual ||
-        !equ_match_polynomial_alloc(
-            residual, wrt, &original_coeffs, &original_degree) ||
+    if (!residual || !equ_match_polynomial_alloc(residual, wrt, &original_coeffs, &original_degree) ||
         original_degree <= 5u) {
         rc = 1;
         goto cleanup;
     }
 
-    rc = equ_general_try_solve_geometric_sum(
-        original_coeffs, original_degree, wrt, solutions);
+    rc = equ_general_try_solve_geometric_sum(original_coeffs, original_degree, wrt, solutions);
     if (rc <= 0)
         goto cleanup;
 
@@ -914,22 +824,17 @@ int equ_try_solve_general_polynomial(const equation_t *equation,
     active_degree = original_degree;
     while (active_degree > 4u) {
         number_t snapped;
-        bool active_coefficients_real =
-            equ_polynomial_coefficients_real(active_coeffs, active_degree);
+        bool active_coefficients_real = equ_polynomial_coefficients_real(active_coeffs, active_degree);
 
-        if (!equ_general_find_root(
-                active_coeffs, active_degree, newton_tolerance, &root)) {
+        if (!equ_general_find_root(active_coeffs, active_degree, newton_tolerance, &root)) {
             rc = 1;
             goto cleanup;
         }
-        snapped = equ_general_snap_gaussian_integer(
-            active_coeffs, active_degree, root);
+        snapped = equ_general_snap_gaussian_integer(active_coeffs, active_degree, root);
         num_destroy(&root);
         root = snapped;
 
-        if (active_coefficients_real &&
-            equ_polynomial_root_effectively_real(
-                root, newton_tolerance)) {
+        if (active_coefficients_real && equ_polynomial_root_effectively_real(root, newton_tolerance)) {
             number_t real_root = num_real_part(root);
 
             num_destroy(&root);
@@ -947,15 +852,13 @@ int equ_try_solve_general_polynomial(const equation_t *equation,
             deflated_count = active_degree - 1u;
             deflated = equ_general_new_numbers(deflated_count);
             if (deflated)
-                equ_polynomial_deflate_conjugate_pair(
-                    active_coeffs, active_degree, root, deflated);
+                equ_polynomial_deflate_conjugate_pair(active_coeffs, active_degree, root, deflated);
             num_destroy(&conjugate);
         } else {
             deflated_count = active_degree;
             deflated = equ_general_new_numbers(deflated_count);
             if (deflated)
-                equ_general_synthetic_divide(
-                    active_coeffs, active_degree, root, deflated);
+                equ_general_synthetic_divide(active_coeffs, active_degree, root, deflated);
         }
         if (!deflated)
             goto cleanup;
@@ -963,30 +866,23 @@ int equ_try_solve_general_polynomial(const equation_t *equation,
         free(active_coeffs);
         active_coeffs = deflated;
         deflated = NULL;
-        active_degree =
-            active_coefficients_real && !num_is_real(root)
-            ? active_degree - 2u
-            : active_degree - 1u;
+        active_degree = active_coefficients_real && !num_is_real(root) ? active_degree - 2u : active_degree - 1u;
     }
 
-    if (equ_solve_quartic_coefficients(
-            active_coeffs, wrt, &quartic_solutions) != 0) {
+    if (equ_solve_quartic_coefficients(active_coeffs, wrt, &quartic_solutions) != 0) {
         rc = 1;
         goto cleanup;
     }
     for (size_t i = 0u; i < quartic_solutions.count; ++i) {
-        number_t value =
-            expr_eval(equ_rhs(quartic_solutions.solutions[i]));
+        number_t value = expr_eval(equ_rhs(quartic_solutions.solutions[i]));
 
         num_destroy(&roots[root_count]);
         roots[root_count++] = value;
     }
 
     for (size_t i = 0u; i < root_count; ++i) {
-        if (equ_general_append_distinct(
-                original_coeffs, original_degree, wrt, roots[i],
-                newton_tolerance, distinct_tolerance, seen, &seen_count,
-                solutions) != 0)
+        if (equ_general_append_distinct(original_coeffs, original_degree, wrt, roots[i], newton_tolerance,
+                                        distinct_tolerance, seen, &seen_count, solutions) != 0)
             goto cleanup;
     }
     rc = seen_count > 0u ? 0 : 1;
@@ -1006,8 +902,7 @@ cleanup:
         free(active_coeffs);
     }
     if (original_coeffs) {
-        equ_general_destroy_numbers(
-            original_coeffs, original_degree + 1u);
+        equ_general_destroy_numbers(original_coeffs, original_degree + 1u);
         free(original_coeffs);
     }
     num_destroy(&distinct_tolerance);

@@ -19,10 +19,7 @@ diffequ_t *de_new_owned(equation_t *equation)
     de->differential_form_text = string_new();
     de->independent_text = string_new();
     de->constant_text = string_new();
-    if (!de->equation_text ||
-        !de->differential_form_text ||
-        !de->independent_text ||
-        !de->constant_text) {
+    if (!de->equation_text || !de->differential_form_text || !de->independent_text || !de->constant_text) {
         string_free(de->constant_text);
         string_free(de->independent_text);
         string_free(de->differential_form_text);
@@ -107,9 +104,7 @@ expr_bindings_t *de_constants(const diffequ_t *de)
 
 expr_t *de_constant(const diffequ_t *de, const char *name)
 {
-    return de && de->constants
-        ? expr_bindings_get(de->constants, name)
-        : NULL;
+    return de && de->constants ? expr_bindings_get(de->constants, name) : NULL;
 }
 
 size_t de_condition_count(const diffequ_t *de)
@@ -124,22 +119,16 @@ const equation_t *de_condition_at(const diffequ_t *de, size_t index)
     return de->conditions[index];
 }
 
-size_t de_condition_argument_count(const diffequ_t *de,
-                                   size_t condition_index)
+size_t de_condition_argument_count(const diffequ_t *de, size_t condition_index)
 {
     if (!de || condition_index >= de->condition_count)
         return 0u;
     return de->condition_point_counts[condition_index];
 }
 
-const expr_t *de_condition_argument_at(const diffequ_t *de,
-                                       size_t condition_index,
-                                       size_t argument_index)
+const expr_t *de_condition_argument_at(const diffequ_t *de, size_t condition_index, size_t argument_index)
 {
-    if (!de ||
-        condition_index >= de->condition_count ||
-        argument_index >=
-            de->condition_point_counts[condition_index])
+    if (!de || condition_index >= de->condition_count || argument_index >= de->condition_point_counts[condition_index])
         return NULL;
     return de->condition_points[condition_index][argument_index];
 }

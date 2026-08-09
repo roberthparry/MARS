@@ -28,8 +28,7 @@ typedef struct {
     size_t multiplicity;
 } de_basis_t;
 
-static void de_constant_linear_form_clear(
-    de_constant_linear_form_t *form)
+static void de_constant_linear_form_clear(de_constant_linear_form_t *form)
 {
     if (!form)
         return;
@@ -77,12 +76,8 @@ static int de_basis_append(de_basis_t *basis, expr_t *item)
     return 0;
 }
 
-static bool de_collect_derivative_nodes(
-    const expr_t *expr,
-    const expr_t *dependent,
-    const expr_t *independent,
-    size_t order,
-    const expr_t **nodes)
+static bool de_collect_derivative_nodes(const expr_t *expr, const expr_t *dependent, const expr_t *independent,
+                                        size_t order, const expr_t **nodes)
 {
     const expr_t *left = NULL;
     const expr_t *right = NULL;
@@ -92,45 +87,26 @@ static bool de_collect_derivative_nodes(
         return true;
     if (expr_is_formal_derivative(expr)) {
         derivative_order = expr_formal_derivative_order(expr);
-        if (derivative_order == 0u ||
-            derivative_order > order ||
-            !expr_struct_eq(
-                expr_formal_derivative_dependent(expr), dependent))
+        if (derivative_order == 0u || derivative_order > order ||
+            !expr_struct_eq(expr_formal_derivative_dependent(expr), dependent))
             return false;
         for (size_t i = 0u; i < derivative_order; ++i) {
-            if (!expr_struct_eq(
-                    expr_formal_derivative_wrt_at(expr, i),
-                    independent))
+            if (!expr_struct_eq(expr_formal_derivative_wrt_at(expr, i), independent))
                 return false;
         }
-        if (nodes[derivative_order] &&
-            !expr_struct_eq(nodes[derivative_order], expr))
+        if (nodes[derivative_order] && !expr_struct_eq(nodes[derivative_order], expr))
             return false;
         nodes[derivative_order] = expr;
         return true;
     }
     if (!expr_child_exprs(expr, &left, &right))
         return true;
-    return de_collect_derivative_nodes(
-               left,
-               dependent,
-               independent,
-               order,
-               nodes) &&
-           de_collect_derivative_nodes(
-               right,
-               dependent,
-               independent,
-               order,
-               nodes);
+    return de_collect_derivative_nodes(left, dependent, independent, order, nodes) &&
+           de_collect_derivative_nodes(right, dependent, independent, order, nodes);
 }
 
-static bool de_decompose_constant_linear(
-    const expr_t *residual,
-    const expr_t *dependent,
-    const expr_t *independent,
-    size_t order,
-    de_constant_linear_form_t *form)
+static bool de_decompose_constant_linear(const expr_t *residual, const expr_t *dependent, const expr_t *independent,
+                                         size_t order, de_constant_linear_form_t *form)
 {
     const expr_t **nodes = NULL;
     expr_t *remainder = NULL;
@@ -139,17 +115,11 @@ static bool de_decompose_constant_linear(
     bool ok = false;
 
     form->order = order;
-    form->coefficients =
-        calloc(order + 1u, sizeof(*form->coefficients));
+    form->coefficients = calloc(order + 1u, sizeof(*form->coefficients));
     nodes = calloc(order + 1u, sizeof(*nodes));
     remainder = expr_clone(residual);
     if (!form->coefficients || !nodes || !remainder ||
-        !de_collect_derivative_nodes(
-            residual,
-            dependent,
-            independent,
-            order,
-            nodes))
+        !de_collect_derivative_nodes(residual, dependent, independent, order, nodes))
         goto cleanup;
 
     for (size_t k = order; k > 0u; --k) {
@@ -159,33 +129,22 @@ static bool de_decompose_constant_linear(
                 goto cleanup;
             continue;
         }
-        if (!de_linear_decompose(
-                remainder,
-                nodes[k],
-                &form->coefficients[k],
-                &next))
+        if (!de_linear_decompose(remainder, nodes[k], &form->coefficients[k], &next))
             goto cleanup;
         expr_free(remainder);
         remainder = next;
         next = NULL;
     }
 
-    if (!de_linear_decompose(
-            remainder,
-            dependent,
-            &form->coefficients[0],
-            &constant))
+    if (!de_linear_decompose(remainder, dependent, &form->coefficients[0], &constant))
         goto cleanup;
-    form->forcing =
-        de_simplify_unary_owned(constant, expr_neg);
+    form->forcing = de_simplify_unary_owned(constant, expr_neg);
     constant = NULL;
-    if (!form->forcing ||
-        expr_is_exact_zero(form->coefficients[order]))
+    if (!form->forcing || expr_is_exact_zero(form->coefficients[order]))
         goto cleanup;
 
     for (size_t k = 0u; k <= order; ++k) {
-        if (de_expr_uses(form->coefficients[k], independent) ||
-            de_expr_uses(form->coefficients[k], dependent))
+        if (de_expr_uses(form->coefficients[k], independent) || de_expr_uses(form->coefficients[k], dependent))
             goto cleanup;
     }
     if (de_expr_uses(form->forcing, dependent))
@@ -202,20 +161,13 @@ cleanup:
     return ok;
 }
 
-static expr_t *de_characteristic_polynomial(
-    const de_constant_linear_form_t *form,
-    const expr_t *root)
+static expr_t *de_characteristic_polynomial(const de_constant_linear_form_t *form, const expr_t *root)
 {
     expr_t *sum = expr_const_zero();
 
     for (size_t k = 0u; sum && k <= form->order; ++k) {
-        expr_t *power = k == 0u
-            ? expr_const_one()
-            : expr_pow_long(root, (long)k);
-        expr_t *term = power
-            ? expr_mul_simplify_owned(
-                  expr_clone(form->coefficients[k]), power)
-            : NULL;
+        expr_t *power = k == 0u ? expr_const_one() : expr_pow_long(root, (long)k);
+        expr_t *term = power ? expr_mul_simplify_owned(expr_clone(form->coefficients[k]), power) : NULL;
 
         sum = term ? expr_add_simplify_owned(sum, term) : NULL;
     }
@@ -226,9 +178,7 @@ static bool de_number_near_zero(number_t value)
 {
     number_t magnitude = num_abs(value);
     number_t tolerance = num_create_from_string("1e-30");
-    bool near = num_is_zero(magnitude) ||
-                (num_is_real(magnitude) &&
-                 num_lt(magnitude, tolerance));
+    bool near = num_is_zero(magnitude) || (num_is_real(magnitude) && num_lt(magnitude, tolerance));
 
     num_destroy(&tolerance);
     num_destroy(&magnitude);
@@ -248,20 +198,15 @@ static bool de_expr_near_zero(const expr_t *expr)
     return near;
 }
 
-static size_t de_root_multiplicity(
-    const expr_t *polynomial,
-    const expr_t *root_variable,
-    const expr_t *root,
-    size_t order)
+static size_t de_root_multiplicity(const expr_t *polynomial, const expr_t *root_variable, const expr_t *root,
+                                   size_t order)
 {
     expr_t *derivative = expr_clone(polynomial);
     size_t multiplicity = 0u;
 
     while (derivative && multiplicity < order) {
-        expr_t *at_root =
-            expr_substitute(derivative, root_variable, root);
-        expr_t *simplified =
-            at_root ? expr_simplify_owned(at_root) : NULL;
+        expr_t *at_root = expr_substitute(derivative, root_variable, root);
+        expr_t *simplified = at_root ? expr_simplify_owned(at_root) : NULL;
 
         if (!simplified || !de_expr_near_zero(simplified)) {
             expr_free(simplified);
@@ -270,8 +215,7 @@ static size_t de_root_multiplicity(
         expr_free(simplified);
         multiplicity++;
         {
-            expr_t *next =
-                expr_create_deriv(derivative, root_variable);
+            expr_t *next = expr_create_deriv(derivative, root_variable);
 
             expr_free(derivative);
             derivative = next ? expr_simplify_owned(next) : NULL;
@@ -290,67 +234,40 @@ static bool de_numbers_near(number_t first, number_t second)
     return near;
 }
 
-static bool de_root_seen(
-    const equation_solutions_t *roots,
-    size_t index)
+static bool de_root_seen(const equation_solutions_t *roots, size_t index)
 {
-    const expr_t *candidate =
-        equ_rhs(equ_solutions_at(roots, index));
+    const expr_t *candidate = equ_rhs(equ_solutions_at(roots, index));
     number_t candidate_value = expr_eval(candidate);
     bool seen = false;
 
     for (size_t i = 0u; i < index && !seen; ++i) {
-        const expr_t *previous =
-            equ_rhs(equ_solutions_at(roots, i));
+        const expr_t *previous = equ_rhs(equ_solutions_at(roots, i));
         number_t previous_value = expr_eval(previous);
 
-        seen = expr_struct_eq(candidate, previous) ||
-               de_numbers_near(candidate_value, previous_value);
+        seen = expr_struct_eq(candidate, previous) || de_numbers_near(candidate_value, previous_value);
         num_destroy(&previous_value);
     }
     num_destroy(&candidate_value);
     return seen;
 }
 
-static expr_t *de_polynomial_exponential_basis(
-    const expr_t *independent,
-    const expr_t *rate,
-    size_t power)
+static expr_t *de_polynomial_exponential_basis(const expr_t *independent, const expr_t *rate, size_t power)
 {
-    expr_t *argument =
-        expr_mul_simplify_owned(
-            expr_clone(rate), expr_clone(independent));
-    expr_t *exponential =
-        de_simplify_unary_owned(argument, expr_exp);
+    expr_t *argument = expr_mul_simplify_owned(expr_clone(rate), expr_clone(independent));
+    expr_t *exponential = de_simplify_unary_owned(argument, expr_exp);
 
     if (power == 0u)
         return exponential;
-    return exponential
-        ? expr_mul_simplify_owned(
-              expr_pow_long(independent, (long)power),
-              exponential)
-        : NULL;
+    return exponential ? expr_mul_simplify_owned(expr_pow_long(independent, (long)power), exponential) : NULL;
 }
 
-static expr_t *de_oscillatory_basis(
-    const expr_t *independent,
-    const expr_t *alpha,
-    const expr_t *beta,
-    size_t power,
-    bool sine)
+static expr_t *de_oscillatory_basis(const expr_t *independent, const expr_t *alpha, const expr_t *beta, size_t power,
+                                    bool sine)
 {
-    expr_t *envelope =
-        de_polynomial_exponential_basis(
-            independent, alpha, power);
-    expr_t *phase =
-        expr_mul_simplify_owned(
-            expr_clone(beta), expr_clone(independent));
-    expr_t *oscillation = phase
-        ? (sine ? expr_sin(phase) : expr_cos(phase))
-        : NULL;
-    expr_t *basis = envelope && oscillation
-        ? expr_mul_simplify_owned(envelope, oscillation)
-        : NULL;
+    expr_t *envelope = de_polynomial_exponential_basis(independent, alpha, power);
+    expr_t *phase = expr_mul_simplify_owned(expr_clone(beta), expr_clone(independent));
+    expr_t *oscillation = phase ? (sine ? expr_sin(phase) : expr_cos(phase)) : NULL;
+    expr_t *basis = envelope && oscillation ? expr_mul_simplify_owned(envelope, oscillation) : NULL;
 
     if (envelope && oscillation) {
         envelope = NULL;
@@ -367,9 +284,7 @@ static expr_t *de_binomial_coefficient_expr(size_t n, size_t k)
     number_t n_value = num_create_from_long((long)n);
     number_t k_value = num_create_from_long((long)k);
     number_t coefficient = num_binomial(n_value, k_value);
-    expr_t *expr = num_is_finite(coefficient)
-        ? expr_new_const(coefficient)
-        : NULL;
+    expr_t *expr = num_is_finite(coefficient) ? expr_new_const(coefficient) : NULL;
 
     num_destroy(&coefficient);
     num_destroy(&k_value);
@@ -377,14 +292,10 @@ static expr_t *de_binomial_coefficient_expr(size_t n, size_t k)
     return expr;
 }
 
-static bool de_repeated_quadratic_coefficients_match(
-    const de_constant_linear_form_t *form,
-    const expr_t *square,
-    bool negative_square,
-    size_t multiplicity)
+static bool de_repeated_quadratic_coefficients_match(const de_constant_linear_form_t *form, const expr_t *square,
+                                                     bool negative_square, size_t multiplicity)
 {
-    if (!form || !square || multiplicity == 0u ||
-        form->order != 2u * multiplicity)
+    if (!form || !square || multiplicity == 0u || form->order != 2u * multiplicity)
         return false;
 
     for (size_t order = 1u; order < form->order; order += 2u) {
@@ -393,34 +304,21 @@ static bool de_repeated_quadratic_coefficients_match(
     }
 
     for (size_t j = 0u; j <= multiplicity; ++j) {
-        expr_t *binomial =
-            de_binomial_coefficient_expr(multiplicity, j);
-        expr_t *square_power = expr_pow_long(
-            square, (long)(multiplicity - j));
-        expr_t *factor = binomial && square_power
-            ? expr_mul(binomial, square_power)
-            : NULL;
-        if (factor && negative_square &&
-            ((multiplicity - j) & 1u) != 0u) {
+        expr_t *binomial = de_binomial_coefficient_expr(multiplicity, j);
+        expr_t *square_power = expr_pow_long(square, (long)(multiplicity - j));
+        expr_t *factor = binomial && square_power ? expr_mul(binomial, square_power) : NULL;
+        if (factor && negative_square && ((multiplicity - j) & 1u) != 0u) {
             expr_t *negative = expr_neg(factor);
 
             expr_free(factor);
             factor = negative;
         }
-        expr_t *expected = factor
-            ? expr_mul(form->coefficients[form->order], factor)
-            : NULL;
-        expr_t *expected_display = expected
-            ? expr_display_simplified(expected)
-            : NULL;
-        bool matches = expected_display && expr_struct_eq(
-            form->coefficients[2u * j], expected_display);
-        expr_t *difference = !matches && expected_display
-            ? expr_sub(form->coefficients[2u * j], expected_display)
-            : NULL;
-        expr_t *check = difference
-            ? expr_display_simplified(difference)
-            : NULL;
+        expr_t *expected = factor ? expr_mul(form->coefficients[form->order], factor) : NULL;
+        expr_t *expected_display = expected ? expr_display_simplified(expected) : NULL;
+        bool matches = expected_display && expr_struct_eq(form->coefficients[2u * j], expected_display);
+        expr_t *difference =
+            !matches && expected_display ? expr_sub(form->coefficients[2u * j], expected_display) : NULL;
+        expr_t *check = difference ? expr_display_simplified(difference) : NULL;
 
         if (!matches)
             matches = check && expr_is_exact_zero(check);
@@ -438,10 +336,8 @@ static bool de_repeated_quadratic_coefficients_match(
     return true;
 }
 
-static int de_append_symbolic_repeated_quadratic_basis(
-    const de_constant_linear_form_t *form,
-    const expr_t *independent,
-    de_basis_t *basis)
+static int de_append_symbolic_repeated_quadratic_basis(const de_constant_linear_form_t *form, const expr_t *independent,
+                                                       de_basis_t *basis)
 {
     const expr_t *frequency = NULL;
     const expr_t *square = NULL;
@@ -459,58 +355,42 @@ static int de_append_symbolic_repeated_quadratic_basis(
     bool real_roots;
     int rc = -1;
 
-    if (!form || !independent || !basis || form->order < 4u ||
-        (form->order & 1u) != 0u)
+    if (!form || !independent || !basis || form->order < 4u || (form->order & 1u) != 0u)
         goto cleanup;
     multiplicity = form->order / 2u;
     basis_start = basis->count;
     group_start = basis->group;
     multiplicity_start = basis->multiplicity;
 
-    denominator = expr_mul_simplify_owned(
-        expr_const_long((long)multiplicity),
-        expr_clone(form->coefficients[form->order]));
-    signed_square = denominator
-        ? expr_div_simplify_owned(
-              expr_clone(form->coefficients[form->order - 2u]),
-              denominator)
-        : NULL;
+    denominator =
+        expr_mul_simplify_owned(expr_const_long((long)multiplicity), expr_clone(form->coefficients[form->order]));
+    signed_square =
+        denominator ? expr_div_simplify_owned(expr_clone(form->coefficients[form->order - 2u]), denominator) : NULL;
     if (denominator)
         denominator = NULL;
-    display_square = signed_square
-        ? expr_display_simplified(signed_square)
-        : NULL;
+    display_square = signed_square ? expr_display_simplified(signed_square) : NULL;
     square = display_square;
-    real_roots = display_square &&
-        expr_match_neg_expr(display_square, &square);
+    real_roots = display_square && expr_match_neg_expr(display_square, &square);
     if (!display_square || expr_is_exact_zero(display_square) ||
-        !de_repeated_quadratic_coefficients_match(
-            form, square, real_roots, multiplicity))
+        !de_repeated_quadratic_coefficients_match(form, square, real_roots, multiplicity))
         goto cleanup;
 
-    if (expr_match_pow_const(square, &frequency, &exponent) &&
-        num_eq(exponent, NUM_TWO)) {
+    if (expr_match_pow_const(square, &frequency, &exponent) && num_eq(exponent, NUM_TWO)) {
         frequency_display = expr_clone(frequency);
     } else {
         frequency_expr = expr_sqrt(square);
-        frequency_display = frequency_expr
-            ? expr_display_simplified(frequency_expr)
-            : NULL;
+        frequency_display = frequency_expr ? expr_display_simplified(frequency_expr) : NULL;
     }
     if (!frequency_display)
         goto cleanup;
 
     if (real_roots) {
         negative_frequency = expr_neg(frequency_display);
-        for (size_t family = 0u; negative_frequency && family < 2u;
-             ++family) {
-            const expr_t *rate = family == 0u
-                ? frequency_display
-                : negative_frequency;
+        for (size_t family = 0u; negative_frequency && family < 2u; ++family) {
+            const expr_t *rate = family == 0u ? frequency_display : negative_frequency;
 
             for (size_t power = 0u; power < multiplicity; ++power) {
-                expr_t *item = de_polynomial_exponential_basis(
-                    independent, rate, power);
+                expr_t *item = de_polynomial_exponential_basis(independent, rate, power);
 
                 if (!item || de_basis_append(basis, item) != 0) {
                     expr_free(item);
@@ -523,12 +403,7 @@ static int de_append_symbolic_repeated_quadratic_basis(
 
         for (size_t family = 0u; zero && family < 2u; ++family) {
             for (size_t power = 0u; power < multiplicity; ++power) {
-                expr_t *item = de_oscillatory_basis(
-                    independent,
-                    zero,
-                    frequency_display,
-                    power,
-                    family != 0u);
+                expr_t *item = de_oscillatory_basis(independent, zero, frequency_display, power, family != 0u);
 
                 if (!item || de_basis_append(basis, item) != 0) {
                     expr_free(item);
@@ -541,9 +416,7 @@ static int de_append_symbolic_repeated_quadratic_basis(
     }
     rc = basis->count == basis_start + 2u * multiplicity ? 0 : -1;
     if (rc == 0) {
-        basis->group = real_roots
-            ? DE_BASIS_GROUP_REPEATED_REAL
-            : DE_BASIS_GROUP_REPEATED_OSCILLATORY;
+        basis->group = real_roots ? DE_BASIS_GROUP_REPEATED_REAL : DE_BASIS_GROUP_REPEATED_OSCILLATORY;
         basis->multiplicity = multiplicity;
     }
 
@@ -567,11 +440,7 @@ cleanup:
     return rc;
 }
 
-static int de_append_root_basis(
-    de_basis_t *basis,
-    const expr_t *independent,
-    const expr_t *root,
-    size_t multiplicity)
+static int de_append_root_basis(de_basis_t *basis, const expr_t *independent, const expr_t *root, size_t multiplicity)
 {
     number_t value = expr_eval(root);
     number_t real = num_real_part(value);
@@ -583,8 +452,7 @@ static int de_append_root_basis(
     if (de_number_near_zero(imaginary)) {
         real_expr = expr_new_const(real);
         for (size_t k = 0u; real_expr && k < multiplicity; ++k) {
-            expr_t *item = de_polynomial_exponential_basis(
-                independent, real_expr, k);
+            expr_t *item = de_polynomial_exponential_basis(independent, real_expr, k);
 
             if (!item || de_basis_append(basis, item) != 0) {
                 expr_free(item);
@@ -602,16 +470,11 @@ static int de_append_root_basis(
 
     real_expr = expr_new_const(real);
     imaginary_expr = expr_new_const(imaginary);
-    for (size_t k = 0u;
-         real_expr && imaginary_expr && k < multiplicity;
-         ++k) {
-        expr_t *cosine = de_oscillatory_basis(
-            independent, real_expr, imaginary_expr, k, false);
-        expr_t *sine = de_oscillatory_basis(
-            independent, real_expr, imaginary_expr, k, true);
+    for (size_t k = 0u; real_expr && imaginary_expr && k < multiplicity; ++k) {
+        expr_t *cosine = de_oscillatory_basis(independent, real_expr, imaginary_expr, k, false);
+        expr_t *sine = de_oscillatory_basis(independent, real_expr, imaginary_expr, k, true);
 
-        if (!cosine || !sine ||
-            de_basis_append(basis, cosine) != 0) {
+        if (!cosine || !sine || de_basis_append(basis, cosine) != 0) {
             expr_free(sine);
             expr_free(cosine);
             goto cleanup;
@@ -634,8 +497,7 @@ cleanup:
     return rc;
 }
 
-static void de_characteristic_coefficients_free(number_t *coefficients,
-                                                size_t degree)
+static void de_characteristic_coefficients_free(number_t *coefficients, size_t degree)
 {
     if (!coefficients)
         return;
@@ -644,40 +506,32 @@ static void de_characteristic_coefficients_free(number_t *coefficients,
     free(coefficients);
 }
 
-static int de_solve_characteristic(
-    const equation_t *characteristic,
-    const expr_t *polynomial,
-    const expr_t *root_variable,
-    equation_solutions_t *roots)
+static int de_solve_characteristic(const equation_t *characteristic, const expr_t *polynomial,
+                                   const expr_t *root_variable, equation_solutions_t *roots)
 {
     number_t *coefficients = NULL;
     size_t degree = 0u;
     int rc;
 
     if (!characteristic || !polynomial || !root_variable || !roots ||
-        !equ_match_polynomial_alloc(
-            polynomial, root_variable, &coefficients, &degree))
+        !equ_match_polynomial_alloc(polynomial, root_variable, &coefficients, &degree))
         return -1;
 
     switch (degree) {
         case 2u:
-            rc = equ_solve_quadratic_coefficients(
-                coefficients, root_variable, roots);
+            rc = equ_solve_quadratic_coefficients(coefficients, root_variable, roots);
             break;
 
         case 3u:
-            rc = equ_solve_cubic_coefficients(
-                coefficients, root_variable, roots);
+            rc = equ_solve_cubic_coefficients(coefficients, root_variable, roots);
             break;
 
         case 4u:
-            rc = equ_solve_quartic_coefficients(
-                coefficients, root_variable, roots);
+            rc = equ_solve_quartic_coefficients(coefficients, root_variable, roots);
             break;
 
         default:
-            rc = equ_solve_for_into(
-                characteristic, root_variable, roots);
+            rc = equ_solve_for_into(characteristic, root_variable, roots);
             break;
     }
 
@@ -685,34 +539,22 @@ static int de_solve_characteristic(
     return rc;
 }
 
-static int de_construct_basis(
-    const de_constant_linear_form_t *form,
-    const expr_t *independent,
-    de_basis_t *basis)
+static int de_construct_basis(const de_constant_linear_form_t *form, const expr_t *independent, de_basis_t *basis)
 {
-    expr_t *root_variable =
-        expr_new_named_var(NUM_NAN, "r");
-    expr_t *polynomial = root_variable
-        ? de_characteristic_polynomial(form, root_variable)
-        : NULL;
+    expr_t *root_variable = expr_new_named_var(NUM_NAN, "r");
+    expr_t *polynomial = root_variable ? de_characteristic_polynomial(form, root_variable) : NULL;
     expr_t *zero = expr_const_zero();
-    equation_t *characteristic =
-        polynomial && zero ? equ_new(polynomial, zero) : NULL;
-    equation_solutions_t roots_storage = { 0 };
-    equation_solutions_t *roots = characteristic
-        ? &roots_storage
-        : NULL;
+    equation_t *characteristic = polynomial && zero ? equ_new(polynomial, zero) : NULL;
+    equation_solutions_t roots_storage = {0};
+    equation_solutions_t *roots = characteristic ? &roots_storage : NULL;
     int rc = -1;
 
-    if (de_append_symbolic_repeated_quadratic_basis(
-            form, independent, basis) == 0) {
+    if (de_append_symbolic_repeated_quadratic_basis(form, independent, basis) == 0) {
         rc = 0;
         goto cleanup;
     }
 
-    if (!roots ||
-        de_solve_characteristic(
-            characteristic, polynomial, root_variable, roots) != 0 ||
+    if (!roots || de_solve_characteristic(characteristic, polynomial, root_variable, roots) != 0 ||
         equ_solutions_count(roots) == 0u)
         goto cleanup;
 
@@ -723,18 +565,10 @@ static int de_construct_basis(
         if (de_root_seen(roots, i))
             continue;
         root = equ_rhs(equ_solutions_at(roots, i));
-        multiplicity = de_root_multiplicity(
-            polynomial,
-            root_variable,
-            root,
-            form->order);
+        multiplicity = de_root_multiplicity(polynomial, root_variable, root, form->order);
         if (multiplicity == 0u)
             multiplicity = 1u;
-        if (de_append_root_basis(
-                basis,
-                independent,
-                root,
-                multiplicity) != 0)
+        if (de_append_root_basis(basis, independent, root, multiplicity) != 0)
             goto cleanup;
     }
     if (basis->count == form->order)
@@ -749,56 +583,34 @@ cleanup:
     return rc;
 }
 
-static expr_t *de_derivative_at(
-    const expr_t *expr,
-    const expr_t *independent,
-    size_t order,
-    const expr_t *point)
+static expr_t *de_derivative_at(const expr_t *expr, const expr_t *independent, size_t order, const expr_t *point)
 {
-    expr_t *derivative = order
-        ? expr_create_nth_deriv(
-              (unsigned int)order, expr, independent)
-        : expr_clone(expr);
-    expr_t *at_point = derivative
-        ? expr_substitute(derivative, independent, point)
-        : NULL;
-    expr_t *simplified =
-        at_point ? expr_simplify_owned(at_point) : NULL;
+    expr_t *derivative = order ? expr_create_nth_deriv((unsigned int)order, expr, independent) : expr_clone(expr);
+    expr_t *at_point = derivative ? expr_substitute(derivative, independent, point) : NULL;
+    expr_t *simplified = at_point ? expr_simplify_owned(at_point) : NULL;
 
     expr_free(derivative);
     return simplified;
 }
 
-static bool de_condition_data(
-    const diffequ_t *de,
-    size_t index,
-    const expr_t *dependent,
-    const expr_t *independent,
-    size_t *order_out,
-    const expr_t **point_out,
-    const expr_t **value_out)
+static bool de_condition_data(const diffequ_t *de, size_t index, const expr_t *dependent, const expr_t *independent,
+                              size_t *order_out, const expr_t **point_out, const expr_t **value_out)
 {
     const equation_t *condition = de->conditions[index];
     const expr_t *left = condition ? equ_lhs(condition) : NULL;
 
-    if (!condition ||
-        !left ||
-        de->condition_point_counts[index] != 1u)
+    if (!condition || !left || de->condition_point_counts[index] != 1u)
         return false;
     if (expr_struct_eq(left, dependent)) {
         *order_out = 0u;
     } else {
         size_t order;
 
-        if (!expr_is_formal_derivative(left) ||
-            !expr_struct_eq(
-                expr_formal_derivative_dependent(left), dependent))
+        if (!expr_is_formal_derivative(left) || !expr_struct_eq(expr_formal_derivative_dependent(left), dependent))
             return false;
         order = expr_formal_derivative_order(left);
         for (size_t i = 0u; i < order; ++i) {
-            if (!expr_struct_eq(
-                    expr_formal_derivative_wrt_at(left, i),
-                    independent))
+            if (!expr_struct_eq(expr_formal_derivative_wrt_at(left, i), independent))
                 return false;
         }
         *order_out = order;
@@ -808,8 +620,7 @@ static bool de_condition_data(
     return true;
 }
 
-static bool de_match_e_power_forcing(const expr_t *forcing,
-                                     const expr_t **exponent_out)
+static bool de_match_e_power_forcing(const expr_t *forcing, const expr_t **exponent_out)
 {
     const expr_t *base = NULL;
     const expr_t *exponent = NULL;
@@ -827,26 +638,19 @@ static bool de_match_e_power_forcing(const expr_t *forcing,
     return matches;
 }
 
-static bool de_match_exponential_forcing(const expr_t *forcing,
-                                         const expr_t **exponent_out)
+static bool de_match_exponential_forcing(const expr_t *forcing, const expr_t **exponent_out)
 {
-    return expr_match_exp_expr(forcing, exponent_out) ||
-           de_match_e_power_forcing(forcing, exponent_out);
+    return expr_match_exp_expr(forcing, exponent_out) || de_match_e_power_forcing(forcing, exponent_out);
 }
 
-static bool de_is_unit_rate_exponential_forcing(
-    const expr_t *forcing,
-    const expr_t *independent)
+static bool de_is_unit_rate_exponential_forcing(const expr_t *forcing, const expr_t *independent)
 {
     const expr_t *exponent = NULL;
 
-    return de_match_exponential_forcing(forcing, &exponent) &&
-           expr_struct_eq(exponent, independent);
+    return de_match_exponential_forcing(forcing, &exponent) && expr_struct_eq(exponent, independent);
 }
 
-static expr_t *de_exponential_particular_solution(
-    const de_constant_linear_form_t *form,
-    const expr_t *independent)
+static expr_t *de_exponential_particular_solution(const de_constant_linear_form_t *form, const expr_t *independent)
 {
     const expr_t *exponent;
     number_t offset = num_new();
@@ -854,36 +658,23 @@ static expr_t *de_exponential_particular_solution(
     expr_t *characteristic_value = NULL;
     expr_t *particular = NULL;
 
-    if (!form || !form->forcing || !independent ||
-        !de_match_exponential_forcing(form->forcing, &exponent) ||
-        !equ_match_affine_linear_expr(
-            exponent, independent, false, &offset, &rate))
+    if (!form || !form->forcing || !independent || !de_match_exponential_forcing(form->forcing, &exponent) ||
+        !equ_match_affine_linear_expr(exponent, independent, false, &offset, &rate))
         goto cleanup;
 
     characteristic_value = expr_const_zero();
-    for (size_t i = 0u;
-         characteristic_value && i <= form->order;
-         ++i) {
+    for (size_t i = 0u; characteristic_value && i <= form->order; ++i) {
         number_t power = num_pow_int(rate, (int)i);
-        expr_t *term = expr_mul_simplify_owned(
-            expr_clone(form->coefficients[i]),
-            expr_new_const(power));
+        expr_t *term = expr_mul_simplify_owned(expr_clone(form->coefficients[i]), expr_new_const(power));
 
         num_destroy(&power);
-        characteristic_value = term
-            ? expr_add_simplify_owned(characteristic_value, term)
-            : NULL;
+        characteristic_value = term ? expr_add_simplify_owned(characteristic_value, term) : NULL;
     }
-    if (characteristic_value &&
-        !expr_is_exact_zero(characteristic_value)) {
-        expr_t *coefficient = expr_div_simplify_owned(
-            expr_const_one(), characteristic_value);
+    if (characteristic_value && !expr_is_exact_zero(characteristic_value)) {
+        expr_t *coefficient = expr_div_simplify_owned(expr_const_one(), characteristic_value);
 
         characteristic_value = NULL;
-        particular = coefficient
-            ? expr_mul_simplify_owned(
-                  coefficient, expr_clone(form->forcing))
-            : NULL;
+        particular = coefficient ? expr_mul_simplify_owned(coefficient, expr_clone(form->forcing)) : NULL;
     }
 
 cleanup:
@@ -913,9 +704,7 @@ static void de_number_array_free(number_t *values, size_t count)
     free(values);
 }
 
-static expr_t *de_add_owned_unsimplified(expr_t *left,
-                                         expr_t *right,
-                                         bool subtract)
+static expr_t *de_add_owned_unsimplified(expr_t *left, expr_t *right, bool subtract)
 {
     expr_t *result;
 
@@ -930,9 +719,7 @@ static expr_t *de_add_owned_unsimplified(expr_t *left,
     return result;
 }
 
-static expr_t *de_append_sum_owned(expr_t *sum,
-                                   expr_t *term,
-                                   bool subtract)
+static expr_t *de_append_sum_owned(expr_t *sum, expr_t *term, bool subtract)
 {
     const expr_t *left = NULL;
     const expr_t *right = NULL;
@@ -942,26 +729,20 @@ static expr_t *de_append_sum_owned(expr_t *sum,
         expr_free(sum);
         return NULL;
     }
-    if (expr_match_add_sub_expr(
-            term, &left, &right, &inner_subtraction)) {
+    if (expr_match_add_sub_expr(term, &left, &right, &inner_subtraction)) {
         expr_t *left_copy = expr_clone(left);
         expr_t *right_copy = expr_clone(right);
 
         expr_free(term);
         sum = de_append_sum_owned(sum, left_copy, subtract);
-        return de_append_sum_owned(
-            sum,
-            right_copy,
-            subtract != inner_subtraction);
+        return de_append_sum_owned(sum, right_copy, subtract != inner_subtraction);
     }
     if (!sum)
         return subtract ? expr_negate_owned(term) : term;
     return de_add_owned_unsimplified(sum, term, subtract);
 }
 
-static expr_t *de_combine_particulars_owned(expr_t *left,
-                                            expr_t *right,
-                                            bool subtract)
+static expr_t *de_combine_particulars_owned(expr_t *left, expr_t *right, bool subtract)
 {
     expr_t *sum = de_append_sum_owned(NULL, left, false);
 
@@ -981,10 +762,7 @@ static number_t de_derivative_factor(size_t degree, size_t order)
     return factor;
 }
 
-static expr_t *de_polynomial_from_coefficients(
-    const number_t *coefficients,
-    size_t degree,
-    const expr_t *independent)
+static expr_t *de_polynomial_from_coefficients(const number_t *coefficients, size_t degree, const expr_t *independent)
 {
     expr_t *polynomial = NULL;
 
@@ -996,9 +774,7 @@ static expr_t *de_polynomial_from_coefficients(
             continue;
         term = expr_new_const(coefficients[i]);
         if (i > 0u) {
-            term = expr_mul_simplify_owned(
-                term,
-                expr_pow_long(independent, (long)i));
+            term = expr_mul_simplify_owned(term, expr_pow_long(independent, (long)i));
         }
         if (!term) {
             expr_free(polynomial);
@@ -1007,16 +783,13 @@ static expr_t *de_polynomial_from_coefficients(
         if (!polynomial) {
             polynomial = term;
         } else {
-            polynomial = de_add_owned_unsimplified(
-                polynomial, term, false);
+            polynomial = de_add_owned_unsimplified(polynomial, term, false);
         }
     }
     return polynomial ? polynomial : expr_const_zero();
 }
 
-static expr_t *de_polynomial_particular_solution(
-    const de_constant_linear_form_t *form,
-    const expr_t *independent)
+static expr_t *de_polynomial_particular_solution(const de_constant_linear_form_t *form, const expr_t *independent)
 {
     number_t *forcing = NULL;
     number_t *operator_coefficients = NULL;
@@ -1026,22 +799,16 @@ static expr_t *de_polynomial_particular_solution(
     size_t solution_degree;
     expr_t *particular = NULL;
 
-    if (!equ_match_polynomial_alloc(
-            form->forcing,
-            independent,
-            &forcing,
-            &forcing_degree))
+    if (!equ_match_polynomial_alloc(form->forcing, independent, &forcing, &forcing_degree))
         return NULL;
 
-    operator_coefficients =
-        de_number_array_new(form->order + 1u);
+    operator_coefficients = de_number_array_new(form->order + 1u);
     if (!operator_coefficients)
         goto cleanup;
     for (size_t i = 0u; i <= form->order; ++i) {
         number_t value = num_new();
 
-        if (!expr_match_const_value(
-                form->coefficients[i], &value)) {
+        if (!expr_match_const_value(form->coefficients[i], &value)) {
             num_destroy(&value);
             value = expr_eval(form->coefficients[i]);
         }
@@ -1053,11 +820,9 @@ static expr_t *de_polynomial_particular_solution(
         operator_coefficients[i] = value;
     }
 
-    while (root_multiplicity <= form->order &&
-           num_is_zero(operator_coefficients[root_multiplicity]))
+    while (root_multiplicity <= form->order && num_is_zero(operator_coefficients[root_multiplicity]))
         root_multiplicity++;
-    if (root_multiplicity > form->order ||
-        forcing_degree > SIZE_MAX - root_multiplicity)
+    if (root_multiplicity > form->order || forcing_degree > SIZE_MAX - root_multiplicity)
         goto cleanup;
 
     solution_degree = forcing_degree + root_multiplicity;
@@ -1069,16 +834,11 @@ static expr_t *de_polynomial_particular_solution(
         size_t degree = cursor - 1u;
         number_t rhs = num_clone(forcing[degree]);
 
-        for (size_t order = root_multiplicity + 1u;
-             order <= form->order &&
-             degree + order <= solution_degree;
+        for (size_t order = root_multiplicity + 1u; order <= form->order && degree + order <= solution_degree;
              ++order) {
-            number_t factor =
-                de_derivative_factor(degree + order, order);
-            number_t scaled =
-                num_mul(operator_coefficients[order], factor);
-            number_t contribution =
-                num_mul(scaled, solution[degree + order]);
+            number_t factor = de_derivative_factor(degree + order, order);
+            number_t scaled = num_mul(operator_coefficients[order], factor);
+            number_t contribution = num_mul(scaled, solution[degree + order]);
             number_t next = num_sub(rhs, contribution);
 
             num_destroy(&contribution);
@@ -1089,10 +849,8 @@ static expr_t *de_polynomial_particular_solution(
         }
         {
             size_t solution_index = degree + root_multiplicity;
-            number_t factor = de_derivative_factor(
-                solution_index, root_multiplicity);
-            number_t denominator = num_mul(
-                operator_coefficients[root_multiplicity], factor);
+            number_t factor = de_derivative_factor(solution_index, root_multiplicity);
+            number_t denominator = num_mul(operator_coefficients[root_multiplicity], factor);
             number_t coefficient = num_div(rhs, denominator);
 
             num_destroy(&denominator);
@@ -1103,14 +861,11 @@ static expr_t *de_polynomial_particular_solution(
         }
     }
 
-    particular = de_polynomial_from_coefficients(
-        solution, solution_degree, independent);
+    particular = de_polynomial_from_coefficients(solution, solution_degree, independent);
 
 cleanup:
-    de_number_array_free(solution,
-                         solution ? solution_degree + 1u : 0u);
-    de_number_array_free(
-        operator_coefficients, form->order + 1u);
+    de_number_array_free(solution, solution ? solution_degree + 1u : 0u);
+    de_number_array_free(operator_coefficients, form->order + 1u);
     de_number_array_free(forcing, forcing_degree + 1u);
     return particular;
 }
@@ -1126,11 +881,9 @@ cleanup:
  * system gives a particular solution for every non-resonant affine sine or
  * cosine forcing; no frequency or operator coefficients are prescribed.
  */
-static expr_t *de_trigonometric_particular_solution(
-    const de_constant_linear_form_t *form,
-    const expr_t *independent)
+static expr_t *de_trigonometric_particular_solution(const de_constant_linear_form_t *form, const expr_t *independent)
 {
-    expr_t *variables[1] = { (expr_t *)independent };
+    expr_t *variables[1] = {(expr_t *)independent};
     const expr_t *argument = NULL;
     number_t phase_constant = num_new();
     number_t phase_rate = num_new();
@@ -1151,33 +904,18 @@ static expr_t *de_trigonometric_particular_solution(
 
     if (!form || !form->forcing || !independent)
         goto cleanup;
-    cosine_forcing = expr_match_unary_affine_kind(
-        form->forcing,
-        EXPR_PATTERN_UNARY_COS,
-        1u,
-        variables,
-        &phase_constant,
-        &phase_rate);
-    sine_forcing = !cosine_forcing && expr_match_unary_affine_kind(
-        form->forcing,
-        EXPR_PATTERN_UNARY_SIN,
-        1u,
-        variables,
-        &phase_constant,
-        &phase_rate);
-    if ((!cosine_forcing && !sine_forcing) ||
-        !expr_match_unary_expr(form->forcing, &argument))
+    cosine_forcing = expr_match_unary_affine_kind(form->forcing, EXPR_PATTERN_UNARY_COS, 1u, variables, &phase_constant,
+                                                  &phase_rate);
+    sine_forcing = !cosine_forcing && expr_match_unary_affine_kind(form->forcing, EXPR_PATTERN_UNARY_SIN, 1u, variables,
+                                                                   &phase_constant, &phase_rate);
+    if ((!cosine_forcing && !sine_forcing) || !expr_match_unary_expr(form->forcing, &argument))
         goto cleanup;
 
     even = expr_const_zero();
     odd = expr_const_zero();
-    for (size_t order = 0u;
-         even && odd && order <= form->order;
-         ++order) {
+    for (size_t order = 0u; even && odd && order <= form->order; ++order) {
         number_t rate_power = num_pow_int(phase_rate, (int)order);
-        expr_t *term = expr_mul_simplify_owned(
-            expr_clone(form->coefficients[order]),
-            expr_new_const(rate_power));
+        expr_t *term = expr_mul_simplify_owned(expr_clone(form->coefficients[order]), expr_new_const(rate_power));
 
         num_destroy(&rate_power);
         if (!term)
@@ -1191,9 +929,7 @@ static expr_t *de_trigonometric_particular_solution(
         else
             odd = expr_add_simplify_owned(odd, term);
     }
-    if (even && odd &&
-        expr_match_const_value(even, &even_value) &&
-        expr_match_const_value(odd, &odd_value)) {
+    if (even && odd && expr_match_const_value(even, &even_value) && expr_match_const_value(odd, &odd_value)) {
         number_t even_squared = num_mul(even_value, even_value);
         number_t odd_squared = num_mul(odd_value, odd_value);
         number_t denominator_value = num_add(even_squared, odd_squared);
@@ -1207,8 +943,7 @@ static expr_t *de_trigonometric_particular_solution(
                 num_destroy(&sine_value);
                 sine_value = num_div(odd_value, denominator_value);
             } else {
-                number_t odd_ratio = num_div(
-                    odd_value, denominator_value);
+                number_t odd_ratio = num_div(odd_value, denominator_value);
 
                 num_destroy(&cosine_value);
                 cosine_value = num_neg(odd_ratio);
@@ -1219,8 +954,7 @@ static expr_t *de_trigonometric_particular_solution(
             denominator = expr_new_const(denominator_value);
             cosine_coefficient = expr_new_const(cosine_value);
             sine_coefficient = expr_new_const(sine_value);
-            if (!denominator || !cosine_coefficient ||
-                !sine_coefficient) {
+            if (!denominator || !cosine_coefficient || !sine_coefficient) {
                 expr_free(sine_coefficient);
                 expr_free(cosine_coefficient);
                 expr_free(denominator);
@@ -1235,11 +969,7 @@ static expr_t *de_trigonometric_particular_solution(
         num_destroy(&odd_squared);
         num_destroy(&even_squared);
     } else {
-        denominator = even && odd
-            ? expr_add_simplify_owned(
-                  expr_pow_long(even, 2L),
-                  expr_pow_long(odd, 2L))
-            : NULL;
+        denominator = even && odd ? expr_add_simplify_owned(expr_pow_long(even, 2L), expr_pow_long(odd, 2L)) : NULL;
     }
     if (!denominator || expr_is_exact_zero(denominator))
         goto cleanup;
@@ -1247,32 +977,21 @@ static expr_t *de_trigonometric_particular_solution(
     if (cosine_coefficient && sine_coefficient) {
         /* Exact numeric coefficients were obtained above. */
     } else if (cosine_forcing) {
-        cosine_coefficient = expr_div_simplify_owned(
-            expr_clone(even), expr_clone(denominator));
-        sine_coefficient = expr_div_simplify_owned(
-            expr_clone(odd), expr_clone(denominator));
+        cosine_coefficient = expr_div_simplify_owned(expr_clone(even), expr_clone(denominator));
+        sine_coefficient = expr_div_simplify_owned(expr_clone(odd), expr_clone(denominator));
     } else {
-        cosine_coefficient = expr_negate_owned(
-            expr_div_simplify_owned(
-                expr_clone(odd), expr_clone(denominator)));
-        sine_coefficient = expr_div_simplify_owned(
-            expr_clone(even), expr_clone(denominator));
+        cosine_coefficient = expr_negate_owned(expr_div_simplify_owned(expr_clone(odd), expr_clone(denominator)));
+        sine_coefficient = expr_div_simplify_owned(expr_clone(even), expr_clone(denominator));
     }
     cosine = argument ? expr_cos(argument) : NULL;
     sine = argument ? expr_sin(argument) : NULL;
-    cosine_term = cosine_coefficient && cosine
-        ? expr_mul_simplify_owned(cosine_coefficient, cosine)
-        : NULL;
+    cosine_term = cosine_coefficient && cosine ? expr_mul_simplify_owned(cosine_coefficient, cosine) : NULL;
     cosine_coefficient = NULL;
     cosine = NULL;
-    sine_term = sine_coefficient && sine
-        ? expr_mul_simplify_owned(sine_coefficient, sine)
-        : NULL;
+    sine_term = sine_coefficient && sine ? expr_mul_simplify_owned(sine_coefficient, sine) : NULL;
     sine_coefficient = NULL;
     sine = NULL;
-    particular = cosine_term && sine_term
-        ? expr_add_simplify_owned(cosine_term, sine_term)
-        : NULL;
+    particular = cosine_term && sine_term ? expr_add_simplify_owned(cosine_term, sine_term) : NULL;
     cosine_term = NULL;
     sine_term = NULL;
 
@@ -1293,12 +1012,10 @@ cleanup:
     return particular;
 }
 
-static expr_t *de_secant_cubed_particular_solution(
-    const de_constant_linear_form_t *form,
-    const expr_t *independent)
+static expr_t *de_secant_cubed_particular_solution(const de_constant_linear_form_t *form, const expr_t *independent)
 {
     const expr_t *secant = NULL;
-    expr_t *variables[1] = { (expr_t *)independent };
+    expr_t *variables[1] = {(expr_t *)independent};
     number_t exponent = num_new();
     number_t affine_constant = num_new();
     number_t affine_coefficient = num_new();
@@ -1312,32 +1029,20 @@ static expr_t *de_secant_cubed_particular_solution(
     number_t three = num_create_from_long(3L);
     expr_t *particular = NULL;
 
-    if (!form || !independent || form->order != 2u ||
-        !expr_match_pow_const(form->forcing, &secant, &exponent) ||
+    if (!form || !independent || form->order != 2u || !expr_match_pow_const(form->forcing, &secant, &exponent) ||
         !num_eq(exponent, three) ||
-        !expr_match_unary_affine_kind(
-            secant,
-            EXPR_PATTERN_UNARY_SEC,
-            1u,
-            variables,
-            &affine_constant,
-            &affine_coefficient) ||
-        !expr_match_const_value(
-            form->coefficients[0], &dependent_coefficient) ||
-        !expr_match_const_value(
-            form->coefficients[1], &first_coefficient) ||
-        !expr_match_const_value(
-            form->coefficients[2], &leading_coefficient) ||
-        !num_eq(first_coefficient, NUM_ZERO) ||
+        !expr_match_unary_affine_kind(secant, EXPR_PATTERN_UNARY_SEC, 1u, variables, &affine_constant,
+                                      &affine_coefficient) ||
+        !expr_match_const_value(form->coefficients[0], &dependent_coefficient) ||
+        !expr_match_const_value(form->coefficients[1], &first_coefficient) ||
+        !expr_match_const_value(form->coefficients[2], &leading_coefficient) || !num_eq(first_coefficient, NUM_ZERO) ||
         num_eq(dependent_coefficient, NUM_ZERO))
         goto cleanup;
 
     num_destroy(&affine_squared);
-    affine_squared = num_mul(
-        affine_coefficient, affine_coefficient);
+    affine_squared = num_mul(affine_coefficient, affine_coefficient);
     num_destroy(&expected_dependent);
-    expected_dependent = num_mul(
-        leading_coefficient, affine_squared);
+    expected_dependent = num_mul(leading_coefficient, affine_squared);
     if (!num_eq(dependent_coefficient, expected_dependent))
         goto cleanup;
 
@@ -1368,10 +1073,8 @@ cleanup:
     return particular;
 }
 
-static expr_t *de_particular_solution(
-    const de_constant_linear_form_t *form,
-    const expr_t *independent,
-    const de_basis_t *basis)
+static expr_t *de_particular_solution(const de_constant_linear_form_t *form, const expr_t *independent,
+                                      const de_basis_t *basis)
 {
     matrix_t *wronskian = NULL;
     matrix_t *forcing = NULL;
@@ -1389,24 +1092,17 @@ static expr_t *de_particular_solution(
     if (particular)
         goto cleanup_scale;
 
-    if (expr_match_scaled_expr(
-            form->forcing, &scale, &scaled_base)) {
+    if (expr_match_scaled_expr(form->forcing, &scale, &scaled_base)) {
         de_constant_linear_form_t scaled_form = *form;
         const expr_t *scaled_left = NULL;
         const expr_t *scaled_right = NULL;
         bool scaled_subtraction = false;
 
-        if (expr_match_add_sub_expr(
-                scaled_base,
-                &scaled_left,
-                &scaled_right,
-                &scaled_subtraction)) {
+        if (expr_match_add_sub_expr(scaled_base, &scaled_left, &scaled_right, &scaled_subtraction)) {
             de_constant_linear_form_t left_form = *form;
             de_constant_linear_form_t right_form = *form;
-            expr_t *left_forcing = expr_mul_simplify_owned(
-                expr_new_const(scale), expr_clone(scaled_left));
-            expr_t *right_forcing = expr_mul_simplify_owned(
-                expr_new_const(scale), expr_clone(scaled_right));
+            expr_t *left_forcing = expr_mul_simplify_owned(expr_new_const(scale), expr_clone(scaled_left));
+            expr_t *right_forcing = expr_mul_simplify_owned(expr_new_const(scale), expr_clone(scaled_right));
             expr_t *left_particular;
             expr_t *right_particular;
 
@@ -1417,30 +1113,21 @@ static expr_t *de_particular_solution(
             }
             left_form.forcing = left_forcing;
             right_form.forcing = right_forcing;
-            left_particular = de_particular_solution(
-                &left_form, independent, basis);
-            right_particular = de_particular_solution(
-                &right_form, independent, basis);
+            left_particular = de_particular_solution(&left_form, independent, basis);
+            right_particular = de_particular_solution(&right_form, independent, basis);
             expr_free(right_forcing);
             expr_free(left_forcing);
-            particular = de_combine_particulars_owned(
-                left_particular,
-                right_particular,
-                scaled_subtraction);
+            particular = de_combine_particulars_owned(left_particular, right_particular, scaled_subtraction);
             goto cleanup_scale;
         }
 
         scaled_form.forcing = (expr_t *)scaled_base;
-        particular = de_particular_solution(
-            &scaled_form, independent, basis);
+        particular = de_particular_solution(&scaled_form, independent, basis);
         if (particular) {
             expr_t *expanded;
 
-            particular = expr_mul_simplify_owned(
-                expr_new_const(scale), particular);
-            expanded = particular
-                ? expr_display_expanded(particular)
-                : NULL;
+            particular = expr_mul_simplify_owned(expr_new_const(scale), particular);
+            expanded = particular ? expr_display_expanded(particular) : NULL;
             if (expanded) {
                 expr_free(particular);
                 particular = expanded;
@@ -1449,8 +1136,7 @@ static expr_t *de_particular_solution(
         goto cleanup_scale;
     }
 
-    if (expr_match_add_sub_expr(
-            form->forcing, &left, &right, &is_subtraction)) {
+    if (expr_match_add_sub_expr(form->forcing, &left, &right, &is_subtraction)) {
         de_constant_linear_form_t left_form = *form;
         de_constant_linear_form_t right_form = *form;
         expr_t *left_particular;
@@ -1458,44 +1144,31 @@ static expr_t *de_particular_solution(
 
         left_form.forcing = (expr_t *)left;
         right_form.forcing = (expr_t *)right;
-        left_particular = de_particular_solution(
-            &left_form, independent, basis);
-        right_particular = de_particular_solution(
-            &right_form, independent, basis);
+        left_particular = de_particular_solution(&left_form, independent, basis);
+        right_particular = de_particular_solution(&right_form, independent, basis);
         if (!left_particular || !right_particular) {
             expr_free(right_particular);
             expr_free(left_particular);
             goto cleanup_scale;
         }
-        particular = de_combine_particulars_owned(
-            left_particular,
-            right_particular,
-            is_subtraction);
+        particular = de_combine_particulars_owned(left_particular, right_particular, is_subtraction);
         goto cleanup_scale;
     }
 
-    use_direct_exponential =
-        form->order > 2u ||
-        de_is_unit_rate_exponential_forcing(
-            form->forcing, independent);
-    particular = use_direct_exponential
-        ? de_exponential_particular_solution(form, independent)
-        : NULL;
+    use_direct_exponential = form->order > 2u || de_is_unit_rate_exponential_forcing(form->forcing, independent);
+    particular = use_direct_exponential ? de_exponential_particular_solution(form, independent) : NULL;
     if (particular)
         goto cleanup_scale;
 
-    particular = de_polynomial_particular_solution(
-        form, independent);
+    particular = de_polynomial_particular_solution(form, independent);
     if (particular)
         goto cleanup_scale;
 
-    particular = de_trigonometric_particular_solution(
-        form, independent);
+    particular = de_trigonometric_particular_solution(form, independent);
     if (particular)
         goto cleanup_scale;
 
-    particular = de_secant_cubed_particular_solution(
-        form, independent);
+    particular = de_secant_cubed_particular_solution(form, independent);
     if (particular)
         goto cleanup_scale;
 
@@ -1505,11 +1178,9 @@ static expr_t *de_particular_solution(
         goto cleanup;
 
     for (size_t row = 0u; row < form->order; ++row) {
-        expr_t *rhs = row + 1u == form->order
-            ? expr_div_simplify_owned(
-                  expr_clone(form->forcing),
-                  expr_clone(form->coefficients[form->order]))
-            : expr_const_zero();
+        expr_t *rhs = row + 1u == form->order ? expr_div_simplify_owned(expr_clone(form->forcing),
+                                                                        expr_clone(form->coefficients[form->order]))
+                                              : expr_const_zero();
 
         if (!rhs)
             goto cleanup;
@@ -1517,12 +1188,8 @@ static expr_t *de_particular_solution(
         expr_free(rhs);
 
         for (size_t col = 0u; col < form->order; ++col) {
-            expr_t *entry = row
-                ? expr_create_nth_deriv(
-                      (unsigned int)row,
-                      basis->items[col],
-                      independent)
-                : expr_clone(basis->items[col]);
+            expr_t *entry = row ? expr_create_nth_deriv((unsigned int)row, basis->items[col], independent)
+                                : expr_clone(basis->items[col]);
 
             if (!entry)
                 goto cleanup;
@@ -1542,19 +1209,11 @@ static expr_t *de_particular_solution(
         expr_t *term;
 
         mat_get(rates, i, 0u, &rate);
-        simplified_rate =
-            rate ? expr_display_simplified(rate) : NULL;
-        integral = simplified_rate
-            ? de_integrate_or_formal(simplified_rate, independent)
-            : NULL;
+        simplified_rate = rate ? expr_display_simplified(rate) : NULL;
+        integral = simplified_rate ? de_integrate_or_formal(simplified_rate, independent) : NULL;
         expr_free(simplified_rate);
-        term = integral
-            ? expr_mul_simplify_owned(
-                  expr_clone(basis->items[i]), integral)
-            : NULL;
-        particular = term
-            ? expr_add_simplify_owned(particular, term)
-            : NULL;
+        term = integral ? expr_mul_simplify_owned(expr_clone(basis->items[i]), integral) : NULL;
+        particular = term ? expr_add_simplify_owned(particular, term) : NULL;
     }
     if (particular) {
         expr_t *expanded = expr_display_expanded(particular);
@@ -1574,12 +1233,8 @@ cleanup_scale:
     return particular;
 }
 
-static expr_t *de_apply_conditions(
-    const diffequ_t *de,
-    const expr_t *independent,
-    const expr_t *dependent,
-    const de_basis_t *basis,
-    const expr_t *particular)
+static expr_t *de_apply_conditions(const diffequ_t *de, const expr_t *independent, const expr_t *dependent,
+                                   const de_basis_t *basis, const expr_t *particular)
 {
     matrix_t *matrix = NULL;
     matrix_t *right = NULL;
@@ -1601,24 +1256,10 @@ static expr_t *de_apply_conditions(
         expr_t *particular_at;
         expr_t *rhs;
 
-        if (!de_condition_data(
-                de,
-                row,
-                dependent,
-                independent,
-                &derivative_order,
-                &point,
-                &value))
+        if (!de_condition_data(de, row, dependent, independent, &derivative_order, &point, &value))
             goto cleanup;
-        particular_at = de_derivative_at(
-            particular,
-            independent,
-            derivative_order,
-            point);
-        rhs = particular_at
-            ? expr_sub_simplify_owned(
-                  expr_clone(value), particular_at)
-            : NULL;
+        particular_at = de_derivative_at(particular, independent, derivative_order, point);
+        rhs = particular_at ? expr_sub_simplify_owned(expr_clone(value), particular_at) : NULL;
         if (particular_at)
             particular_at = NULL;
         if (!rhs)
@@ -1627,11 +1268,7 @@ static expr_t *de_apply_conditions(
         expr_free(rhs);
 
         for (size_t col = 0u; col < basis->count; ++col) {
-            expr_t *entry = de_derivative_at(
-                basis->items[col],
-                independent,
-                derivative_order,
-                point);
+            expr_t *entry = de_derivative_at(basis->items[col], independent, derivative_order, point);
 
             if (!entry)
                 goto cleanup;
@@ -1649,14 +1286,8 @@ static expr_t *de_apply_conditions(
         expr_t *term;
 
         mat_get(constants, i, 0u, &constant);
-        term = constant
-            ? expr_mul_simplify_owned(
-                  expr_clone(constant),
-                  expr_clone(basis->items[i]))
-            : NULL;
-        solution = term
-            ? expr_add_simplify_owned(solution, term)
-            : NULL;
+        term = constant ? expr_mul_simplify_owned(expr_clone(constant), expr_clone(basis->items[i])) : NULL;
+        solution = term ? expr_add_simplify_owned(solution, term) : NULL;
     }
     if (solution) {
         expr_t *display = expr_display_simplified(solution);
@@ -1682,32 +1313,21 @@ static expr_t *de_indexed_arbitrary_constant(size_t index)
     return expr_new_named_const(NUM_NAN, name);
 }
 
-static expr_t *de_explicit_amplitude(const expr_t *independent,
-                                     size_t multiplicity,
-                                     size_t first_constant)
+static expr_t *de_explicit_amplitude(const expr_t *independent, size_t multiplicity, size_t first_constant)
 {
     expr_t *amplitude = NULL;
 
     if (!independent || multiplicity == 0u)
         return NULL;
     for (size_t power = 0u; power < multiplicity; ++power) {
-        expr_t *constant = de_indexed_arbitrary_constant(
-            first_constant + power);
-        expr_t *independent_power = power == 1u
-            ? expr_clone(independent)
-            : power > 1u
-            ? expr_pow_long(independent, (long)power)
-            : NULL;
-        expr_t *term = power == 0u
-            ? expr_clone(constant)
-            : constant && independent_power
-            ? expr_mul(constant, independent_power)
-            : NULL;
-        expr_t *sum = amplitude && term
-            ? expr_add(amplitude, term)
-            : term
-            ? expr_clone(term)
-            : NULL;
+        expr_t *constant = de_indexed_arbitrary_constant(first_constant + power);
+        expr_t *independent_power = power == 1u  ? expr_clone(independent)
+                                    : power > 1u ? expr_pow_long(independent, (long)power)
+                                                 : NULL;
+        expr_t *term = power == 0u                     ? expr_clone(constant)
+                       : constant && independent_power ? expr_mul(constant, independent_power)
+                                                       : NULL;
+        expr_t *sum = amplitude && term ? expr_add(amplitude, term) : term ? expr_clone(term) : NULL;
 
         expr_free(term);
         expr_free(independent_power);
@@ -1720,29 +1340,15 @@ static expr_t *de_explicit_amplitude(const expr_t *independent,
     return amplitude;
 }
 
-static expr_t *de_summed_amplitude(const expr_t *independent,
-                                   size_t multiplicity,
-                                   size_t first_constant)
+static expr_t *de_summed_amplitude(const expr_t *independent, size_t multiplicity, size_t first_constant)
 {
     expr_t *index = expr_new_named_var(NUM_NAN, "k");
-    expr_t *constant_index = index
-        ? expr_add_long(index, (long)first_constant)
-        : NULL;
-    expr_t *constant = constant_index
-        ? expr_new_indexed_symbol("C", constant_index)
-        : NULL;
-    expr_t *power = index && independent
-        ? expr_pow_xp(independent, index)
-        : NULL;
-    expr_t *term = constant && power
-        ? expr_mul(constant, power)
-        : NULL;
-    expr_t *upper = multiplicity > 0u
-        ? expr_const_long((long)(multiplicity - 1u))
-        : NULL;
-    expr_t *amplitude = term && index && upper
-        ? expr_new_finite_summation(term, index, upper)
-        : NULL;
+    expr_t *constant_index = index ? expr_add_long(index, (long)first_constant) : NULL;
+    expr_t *constant = constant_index ? expr_new_indexed_symbol("C", constant_index) : NULL;
+    expr_t *power = index && independent ? expr_pow_xp(independent, index) : NULL;
+    expr_t *term = constant && power ? expr_mul(constant, power) : NULL;
+    expr_t *upper = multiplicity > 0u ? expr_const_long((long)(multiplicity - 1u)) : NULL;
+    expr_t *amplitude = term && index && upper ? expr_new_finite_summation(term, index, upper) : NULL;
 
     expr_free(upper);
     expr_free(term);
@@ -1753,10 +1359,8 @@ static expr_t *de_summed_amplitude(const expr_t *independent,
     return amplitude;
 }
 
-static expr_t *de_grouped_repeated_quadratic_solution(
-    const de_basis_t *basis,
-    const expr_t *independent,
-    const expr_t *particular)
+static expr_t *de_grouped_repeated_quadratic_solution(const de_basis_t *basis, const expr_t *independent,
+                                                      const expr_t *particular)
 {
     expr_t *first_amplitude = NULL;
     expr_t *second_amplitude = NULL;
@@ -1765,38 +1369,20 @@ static expr_t *de_grouped_repeated_quadratic_solution(
     expr_t *homogeneous = NULL;
     expr_t *solution = NULL;
 
-    if (!basis || !independent || !particular ||
-        basis->multiplicity < 2u ||
-        basis->count != 2u * basis->multiplicity ||
+    if (!basis || !independent || !particular || basis->multiplicity < 2u || basis->count != 2u * basis->multiplicity ||
         basis->group == DE_BASIS_GROUP_NONE)
         return NULL;
 
     if (basis->multiplicity < 4u) {
-        first_amplitude = de_explicit_amplitude(
-            independent, basis->multiplicity, 1u);
-        second_amplitude = de_explicit_amplitude(
-            independent,
-            basis->multiplicity,
-            basis->multiplicity + 1u);
+        first_amplitude = de_explicit_amplitude(independent, basis->multiplicity, 1u);
+        second_amplitude = de_explicit_amplitude(independent, basis->multiplicity, basis->multiplicity + 1u);
     } else {
-        first_amplitude = de_summed_amplitude(
-            independent, basis->multiplicity, 1u);
-        second_amplitude = de_summed_amplitude(
-            independent,
-            basis->multiplicity,
-            basis->multiplicity + 1u);
+        first_amplitude = de_summed_amplitude(independent, basis->multiplicity, 1u);
+        second_amplitude = de_summed_amplitude(independent, basis->multiplicity, basis->multiplicity + 1u);
     }
-    first_term = first_amplitude
-        ? expr_mul(first_amplitude, basis->items[0])
-        : NULL;
-    second_term = second_amplitude
-        ? expr_mul(
-              second_amplitude,
-              basis->items[basis->multiplicity])
-        : NULL;
-    homogeneous = first_term && second_term
-        ? expr_add(first_term, second_term)
-        : NULL;
+    first_term = first_amplitude ? expr_mul(first_amplitude, basis->items[0]) : NULL;
+    second_term = second_amplitude ? expr_mul(second_amplitude, basis->items[basis->multiplicity]) : NULL;
+    homogeneous = first_term && second_term ? expr_add(first_term, second_term) : NULL;
     if (!homogeneous)
         goto cleanup;
 
@@ -1816,20 +1402,14 @@ cleanup:
     return solution;
 }
 
-static expr_t *de_general_solution(
-    const de_basis_t *basis,
-    const expr_t *independent,
-    const expr_t *particular)
+static expr_t *de_general_solution(const de_basis_t *basis, const expr_t *independent, const expr_t *particular)
 {
     bool separate_particular = !expr_is_exact_zero(particular);
-    expr_t *solution = separate_particular
-        ? expr_clone(particular)
-        : expr_const_zero();
+    expr_t *solution = separate_particular ? expr_clone(particular) : expr_const_zero();
 
     if (basis && basis->group != DE_BASIS_GROUP_NONE) {
         expr_free(solution);
-        return de_grouped_repeated_quadratic_solution(
-            basis, independent, particular);
+        return de_grouped_repeated_quadratic_solution(basis, independent, particular);
     }
 
     for (size_t i = 0u; i < basis->count; ++i) {
@@ -1839,10 +1419,7 @@ static expr_t *de_general_solution(
 
         snprintf(name, sizeof(name), "C%zu", i + 1u);
         constant = expr_new_named_const(NUM_NAN, name);
-        term = constant
-            ? expr_mul_simplify_owned(
-                  constant, expr_clone(basis->items[i]))
-            : NULL;
+        term = constant ? expr_mul_simplify_owned(constant, expr_clone(basis->items[i])) : NULL;
         if (!term) {
             expr_free(solution);
             return NULL;
@@ -1860,46 +1437,29 @@ static expr_t *de_general_solution(
     return solution;
 }
 
-de_attempt_t de_attempt_constant_coefficient_linear(
-    const diffequ_t *de,
-    const expr_t *independent,
-    const expr_t *dependent,
-    size_t order,
-    const expr_t *residual,
-    equation_t **solution_out)
+de_attempt_t de_attempt_constant_coefficient_linear(const diffequ_t *de, const expr_t *independent,
+                                                    const expr_t *dependent, size_t order, const expr_t *residual,
+                                                    equation_t **solution_out)
 {
-    de_constant_linear_form_t form = { 0 };
-    de_basis_t basis = { 0 };
+    de_constant_linear_form_t form = {0};
+    de_basis_t basis = {0};
     expr_t *particular = NULL;
     expr_t *solution = NULL;
     de_attempt_t attempt = DE_ATTEMPT_NOT_MATCHED;
 
-    if (order < 2u ||
-        !de_decompose_constant_linear(
-            residual,
-            dependent,
-            independent,
-            order,
-            &form))
+    if (order < 2u || !de_decompose_constant_linear(residual, dependent, independent, order, &form))
         goto cleanup;
     attempt = DE_ATTEMPT_FAILED;
     if (de_construct_basis(&form, independent, &basis) != 0)
         goto cleanup;
-    particular =
-        de_particular_solution(&form, independent, &basis);
+    particular = de_particular_solution(&form, independent, &basis);
     if (!particular)
         goto cleanup;
 
     if (de->condition_count == 0u)
-        solution = de_general_solution(
-            &basis, independent, particular);
+        solution = de_general_solution(&basis, independent, particular);
     else
-        solution = de_apply_conditions(
-            de,
-            independent,
-            dependent,
-            &basis,
-            particular);
+        solution = de_apply_conditions(de, independent, dependent, &basis, particular);
     if (!solution)
         goto cleanup;
 
@@ -1915,18 +1475,14 @@ cleanup:
     return attempt;
 }
 
-de_attempt_t de_attempt_repeated_quadratic_operator(
-    const diffequ_t *de,
-    const expr_t *independent,
-    const expr_t *dependent,
-    const expr_t *signed_square,
-    size_t multiplicity,
-    equation_t **solution_out)
+de_attempt_t de_attempt_repeated_quadratic_operator(const diffequ_t *de, const expr_t *independent,
+                                                    const expr_t *dependent, const expr_t *signed_square,
+                                                    size_t multiplicity, equation_t **solution_out)
 {
     const expr_t *square = signed_square;
     const expr_t *frequency = NULL;
-    de_constant_linear_form_t form = { 0 };
-    de_basis_t basis = { 0 };
+    de_constant_linear_form_t form = {0};
+    de_basis_t basis = {0};
     number_t exponent = num_new();
     expr_t *frequency_expr = NULL;
     expr_t *frequency_display = NULL;
@@ -1942,22 +1498,18 @@ de_attempt_t de_attempt_repeated_quadratic_operator(
     bool real_roots;
     de_attempt_t attempt = DE_ATTEMPT_FAILED;
 
-    if (!de || !independent || !dependent || !signed_square ||
-        multiplicity < 2u || multiplicity > SIZE_MAX / 2u ||
+    if (!de || !independent || !dependent || !signed_square || multiplicity < 2u || multiplicity > SIZE_MAX / 2u ||
         !solution_out)
         return DE_ATTEMPT_NOT_MATCHED;
 
     real_roots = expr_match_neg_expr(signed_square, &square);
     if (!square || expr_is_exact_zero(square))
         goto cleanup;
-    if (expr_match_pow_const(square, &frequency, &exponent) &&
-        num_eq(exponent, NUM_TWO)) {
+    if (expr_match_pow_const(square, &frequency, &exponent) && num_eq(exponent, NUM_TWO)) {
         frequency_display = expr_clone(frequency);
     } else {
         frequency_expr = expr_sqrt(square);
-        frequency_display = frequency_expr
-            ? expr_display_simplified(frequency_expr)
-            : NULL;
+        frequency_display = frequency_expr ? expr_display_simplified(frequency_expr) : NULL;
     }
     if (!frequency_display)
         goto cleanup;
@@ -1965,50 +1517,23 @@ de_attempt_t de_attempt_repeated_quadratic_operator(
     if (de->condition_count == 0u) {
         if (real_roots) {
             negative_frequency = expr_neg(frequency_display);
-            first_basis = de_polynomial_exponential_basis(
-                independent, frequency_display, 0u);
-            second_basis = negative_frequency
-                ? de_polynomial_exponential_basis(
-                      independent, negative_frequency, 0u)
-                : NULL;
+            first_basis = de_polynomial_exponential_basis(independent, frequency_display, 0u);
+            second_basis =
+                negative_frequency ? de_polynomial_exponential_basis(independent, negative_frequency, 0u) : NULL;
         } else {
             expr_t *zero = expr_const_zero();
 
-            first_basis = zero
-                ? de_oscillatory_basis(
-                      independent,
-                      zero,
-                      frequency_display,
-                      0u,
-                      false)
-                : NULL;
-            second_basis = zero
-                ? de_oscillatory_basis(
-                      independent,
-                      zero,
-                      frequency_display,
-                      0u,
-                      true)
-                : NULL;
+            first_basis = zero ? de_oscillatory_basis(independent, zero, frequency_display, 0u, false) : NULL;
+            second_basis = zero ? de_oscillatory_basis(independent, zero, frequency_display, 0u, true) : NULL;
             expr_free(zero);
         }
-        first_amplitude = multiplicity < 4u
-            ? de_explicit_amplitude(independent, multiplicity, 1u)
-            : de_summed_amplitude(independent, multiplicity, 1u);
-        second_amplitude = multiplicity < 4u
-            ? de_explicit_amplitude(
-                  independent, multiplicity, multiplicity + 1u)
-            : de_summed_amplitude(
-                  independent, multiplicity, multiplicity + 1u);
-        first_term = first_amplitude && first_basis
-            ? expr_mul(first_amplitude, first_basis)
-            : NULL;
-        second_term = second_amplitude && second_basis
-            ? expr_mul(second_amplitude, second_basis)
-            : NULL;
-        solution = first_term && second_term
-            ? expr_add(first_term, second_term)
-            : NULL;
+        first_amplitude = multiplicity < 4u ? de_explicit_amplitude(independent, multiplicity, 1u)
+                                            : de_summed_amplitude(independent, multiplicity, 1u);
+        second_amplitude = multiplicity < 4u ? de_explicit_amplitude(independent, multiplicity, multiplicity + 1u)
+                                             : de_summed_amplitude(independent, multiplicity, multiplicity + 1u);
+        first_term = first_amplitude && first_basis ? expr_mul(first_amplitude, first_basis) : NULL;
+        second_term = second_amplitude && second_basis ? expr_mul(second_amplitude, second_basis) : NULL;
+        solution = first_term && second_term ? expr_add(first_term, second_term) : NULL;
         if (!solution)
             goto cleanup;
         *solution_out = equ_new(dependent, solution);
@@ -2018,23 +1543,16 @@ de_attempt_t de_attempt_repeated_quadratic_operator(
     }
 
     form.order = 2u * multiplicity;
-    form.coefficients =
-        calloc(form.order + 1u, sizeof(*form.coefficients));
+    form.coefficients = calloc(form.order + 1u, sizeof(*form.coefficients));
     if (!form.coefficients)
         goto cleanup;
 
     for (size_t j = 0u; j <= multiplicity; ++j) {
-        expr_t *binomial =
-            de_binomial_coefficient_expr(multiplicity, j);
-        expr_t *power = expr_pow_long(
-            signed_square, (long)(multiplicity - j));
-        expr_t *coefficient = binomial && power
-            ? expr_mul(binomial, power)
-            : NULL;
+        expr_t *binomial = de_binomial_coefficient_expr(multiplicity, j);
+        expr_t *power = expr_pow_long(signed_square, (long)(multiplicity - j));
+        expr_t *coefficient = binomial && power ? expr_mul(binomial, power) : NULL;
 
-        form.coefficients[2u * j] = coefficient
-            ? expr_display_simplified(coefficient)
-            : NULL;
+        form.coefficients[2u * j] = coefficient ? expr_display_simplified(coefficient) : NULL;
         expr_free(coefficient);
         expr_free(power);
         expr_free(binomial);
@@ -2052,14 +1570,8 @@ de_attempt_t de_attempt_repeated_quadratic_operator(
     particular = expr_const_zero();
     if (!particular)
         goto cleanup;
-    solution = de->condition_count == 0u
-        ? de_general_solution(&basis, independent, particular)
-        : de_apply_conditions(
-              de,
-              independent,
-              dependent,
-              &basis,
-              particular);
+    solution = de->condition_count == 0u ? de_general_solution(&basis, independent, particular)
+                                         : de_apply_conditions(de, independent, dependent, &basis, particular);
     if (!solution)
         goto cleanup;
 

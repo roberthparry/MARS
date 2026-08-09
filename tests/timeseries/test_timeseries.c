@@ -26,10 +26,8 @@ static matrix_t *test_submatrix_rows_local(const matrix_t *A, size_t start_row, 
     return out;
 }
 
-static matrix_t *test_aligned_xreg_from_columns(const timeseries_t *target,
-                                                const char *csv_path,
-                                                const char *date_column,
-                                                const char *const *columns,
+static matrix_t *test_aligned_xreg_from_columns(const timeseries_t *target, const char *csv_path,
+                                                const char *date_column, const char *const *columns,
                                                 size_t column_count)
 {
     timeseries_t **aligned_columns = NULL;
@@ -42,9 +40,8 @@ static matrix_t *test_aligned_xreg_from_columns(const timeseries_t *target,
     if (!aligned_columns)
         return NULL;
     for (i = 0u; i < column_count; ++i) {
-        timeseries_t *raw = ts_from_csv(csv_path, date_column, columns[i],
-                                        TS_FREQ_MONTHLY, TS_YEAR_FISCAL_UK_APR,
-                                        TS_MISSING_DROP);
+        timeseries_t *raw =
+            ts_from_csv(csv_path, date_column, columns[i], TS_FREQ_MONTHLY, TS_YEAR_FISCAL_UK_APR, TS_MISSING_DROP);
         timeseries_t *y_aligned = NULL;
 
         if (!raw || ts_align_pair(target, raw, TS_JOIN_INNER, &y_aligned, &aligned_columns[i]) != 0) {
@@ -71,12 +68,8 @@ static void test_csv_load_and_slice(void)
     string_t *path_text = string_new_with(TEST_TARGET_CSV);
     string_t *date_column = string_new_with("");
     string_t *value_column = string_new_with("test1");
-    timeseries_t *y = ts_from_csv_text(path_text,
-                                       date_column,
-                                       value_column,
-                                       TS_FREQ_MONTHLY,
-                                       TS_YEAR_FISCAL_UK_APR,
-                                       TS_MISSING_DROP);
+    timeseries_t *y =
+        ts_from_csv_text(path_text, date_column, value_column, TS_FREQ_MONTHLY, TS_YEAR_FISCAL_UK_APR, TS_MISSING_DROP);
     datetime_t *start = NULL;
     datetime_t *end = NULL;
     timeseries_t *head = NULL;
@@ -108,9 +101,9 @@ static void test_csv_load_and_slice(void)
 
 static void test_in_memory_constructors_and_builder(void)
 {
-    const double plain_values[4] = { 1.25, 2.50, NAN, 4.75 };
-    const double regular_values[3] = { 10.0, 11.5, 13.0 };
-    const double indexed_values[2] = { 21.0, 23.5 };
+    const double plain_values[4] = {1.25, 2.50, NAN, 4.75};
+    const double regular_values[3] = {10.0, 11.5, 13.0};
+    const double indexed_values[2] = {21.0, 23.5};
     timeseries_t *plain = NULL;
     timeseries_t *regular = NULL;
     timeseries_t *indexed = NULL;
@@ -119,7 +112,7 @@ static void test_in_memory_constructors_and_builder(void)
     datetime_t *start = NULL;
     datetime_t *idx0 = NULL;
     datetime_t *idx1 = NULL;
-    const datetime_t *index[2] = { NULL, NULL };
+    const datetime_t *index[2] = {NULL, NULL};
     datetime_t *observed = NULL;
     number_t value = NUM_ZERO;
 
@@ -133,16 +126,14 @@ static void test_in_memory_constructors_and_builder(void)
     num_destroy(&value);
 
     start = datetime_init_ymd(datetime_alloc(), 2024, DT_January, 15u);
-    regular = ts_new_regular_from_doubles(regular_values, 3u, start,
-                                          TS_FREQ_DAILY, TS_YEAR_CALENDAR);
+    regular = ts_new_regular_from_doubles(regular_values, 3u, start, TS_FREQ_DAILY, TS_YEAR_CALENDAR);
     TEST_ASSERT_NOT_NULL(regular);
     TEST_ASSERT_TRUE(ts_is_regular(regular), "regular double constructor records regular index");
     TEST_ASSERT_TRUE(ts_frequency(regular) == TS_FREQ_DAILY, "regular double constructor records frequency");
     observed = datetime_alloc();
     TEST_ASSERT_TRUE(ts_get_datetime(regular, 2u, observed) == 0, "regular double date available");
-    TEST_ASSERT_TRUE(datetime_year(observed) == 2024 &&
-                     datetime_month(observed) == DT_January &&
-                     datetime_day(observed) == 17u,
+    TEST_ASSERT_TRUE(datetime_year(observed) == 2024 && datetime_month(observed) == DT_January &&
+                         datetime_day(observed) == 17u,
                      "regular double constructor advances dates");
     datetime_dealloc(observed);
     observed = NULL;
@@ -151,9 +142,7 @@ static void test_in_memory_constructors_and_builder(void)
     idx1 = datetime_init_ymd(datetime_alloc(), 2025, DT_June, 30u);
     index[0] = idx0;
     index[1] = idx1;
-    indexed = ts_new_indexed_from_doubles(indexed_values, index,
-                                          2u, TS_FREQ_QUARTERLY,
-                                          TS_YEAR_FISCAL_UK_APR);
+    indexed = ts_new_indexed_from_doubles(indexed_values, index, 2u, TS_FREQ_QUARTERLY, TS_YEAR_FISCAL_UK_APR);
     TEST_ASSERT_NOT_NULL(indexed);
     TEST_ASSERT_TRUE(ts_index_info(indexed).has_datetimes, "indexed double constructor has dates");
     TEST_ASSERT_TRUE(ts_frequency(indexed) == TS_FREQ_QUARTERLY, "indexed double constructor records frequency");
@@ -192,14 +181,8 @@ static void test_in_memory_constructors_and_builder(void)
 
 static void test_transforms_and_aggregation(void)
 {
-    number_t vals[6] = {
-        num_create_from_long(10),
-        num_create_from_long(12),
-        num_create_from_long(14),
-        num_create_from_long(16),
-        num_create_from_long(18),
-        num_create_from_long(20)
-    };
+    number_t vals[6] = {num_create_from_long(10), num_create_from_long(12), num_create_from_long(14),
+                        num_create_from_long(16), num_create_from_long(18), num_create_from_long(20)};
     datetime_t *start = datetime_init_ymd(datetime_alloc(), 2024, DT_January, 31u);
     timeseries_t *s = ts_new_regular(vals, 6u, start, TS_FREQ_MONTHLY, TS_YEAR_CALENDAR);
     timeseries_t *lag1 = NULL;
@@ -235,10 +218,8 @@ static void test_transforms_and_aggregation(void)
 
 static void test_output_and_write_file(void)
 {
-    timeseries_t *y = ts_from_csv(TEST_TARGET_CSV,
-                                  "", "test1",
-                                  TS_FREQ_MONTHLY, TS_YEAR_FISCAL_UK_APR,
-                                  TS_MISSING_DROP);
+    timeseries_t *y =
+        ts_from_csv(TEST_TARGET_CSV, "", "test1", TS_FREQ_MONTHLY, TS_YEAR_FISCAL_UK_APR, TS_MISSING_DROP);
     timeseries_t *head = NULL;
     string_t *text = NULL;
     string_t *file_text = NULL;
@@ -246,7 +227,7 @@ static void test_output_and_write_file(void)
     FILE *f = NULL;
     char buf[128] = {0};
     size_t used = 0u;
-    const char *cols[] = { "test3" };
+    const char *cols[] = {"test3"};
     matrix_t *x = NULL;
     ts_regression_result_t fit = {0};
     string_t *summary = NULL;
@@ -260,8 +241,7 @@ static void test_output_and_write_file(void)
     string_free(text);
     text = NULL;
 
-    TEST_ASSERT_TRUE(ts_write_file(csv_path, head, TS_STRING_CSV) == 0,
-                     "write csv file");
+    TEST_ASSERT_TRUE(ts_write_file(csv_path, head, TS_STRING_CSV) == 0, "write csv file");
     f = fopen(csv_path, "r");
     TEST_ASSERT_NOT_NULL(f);
     used = fread(buf, 1u, sizeof(buf) - 1u, f);
@@ -273,24 +253,19 @@ static void test_output_and_write_file(void)
     string_free(file_text);
     file_text = NULL;
 
-    x = ts_matrix_from_csv(TEST_DRIVER_CSV,
-                           "DATE", cols, 1u,
-                           TS_FREQ_MONTHLY, TS_MISSING_DROP);
+    x = ts_matrix_from_csv(TEST_DRIVER_CSV, "DATE", cols, 1u, TS_FREQ_MONTHLY, TS_MISSING_DROP);
     TEST_ASSERT_NOT_NULL(x);
     TEST_ASSERT_TRUE(ts_regression_fit(y, x, NULL, &fit) == 0, "regression fit for summary");
     summary = ts_regression_summary_to_text(&fit);
     TEST_ASSERT_NOT_NULL(summary);
-    TEST_ASSERT_TRUE(string_find(summary, "Model comparison score (AIC):") >= 0,
-                     "summary uses plain-language labels");
+    TEST_ASSERT_TRUE(string_find(summary, "Model comparison score (AIC):") >= 0, "summary uses plain-language labels");
     TEST_ASSERT_TRUE(string_find(summary, "(comparison only; lower is better") >= 0,
                      "summary explains comparison-only metrics");
-    TEST_ASSERT_TRUE(string_find(summary, "Overall fit score (R2):") >= 0 &&
-                     string_find(summary, "(") >= 0,
+    TEST_ASSERT_TRUE(string_find(summary, "Overall fit score (R2):") >= 0 && string_find(summary, "(") >= 0,
                      "summary includes inline ratings");
     TEST_ASSERT_TRUE(string_find(summary, "Overall assessment: You've chosen") >= 0,
                      "summary includes a friendly overall assessment");
-    TEST_ASSERT_TRUE(string_find(summary, "improve") >= 0 ||
-                     string_find(summary, "better result") >= 0,
+    TEST_ASSERT_TRUE(string_find(summary, "improve") >= 0 || string_find(summary, "better result") >= 0,
                      "summary assessment includes improvement guidance");
 
     string_free(summary);
@@ -302,14 +277,10 @@ static void test_output_and_write_file(void)
 
 static void test_regression_and_forecast(void)
 {
-    timeseries_t *y = ts_from_csv(TEST_TARGET_CSV,
-                                  "", "test1",
-                                  TS_FREQ_MONTHLY, TS_YEAR_FISCAL_UK_APR,
-                                  TS_MISSING_DROP);
-    const char *cols[] = { "test3" };
-    matrix_t *x = ts_matrix_from_csv(TEST_DRIVER_CSV,
-                                     "DATE", cols, 1u,
-                                     TS_FREQ_MONTHLY, TS_MISSING_DROP);
+    timeseries_t *y =
+        ts_from_csv(TEST_TARGET_CSV, "", "test1", TS_FREQ_MONTHLY, TS_YEAR_FISCAL_UK_APR, TS_MISSING_DROP);
+    const char *cols[] = {"test3"};
+    matrix_t *x = ts_matrix_from_csv(TEST_DRIVER_CSV, "DATE", cols, 1u, TS_FREQ_MONTHLY, TS_MISSING_DROP);
     ts_regression_result_t fit = {0};
     ts_forecast_t fc = {0};
     matrix_t *future_x = NULL;
@@ -324,8 +295,7 @@ static void test_regression_and_forecast(void)
 
     future_x = test_submatrix_rows_local(x, mat_get_row_count(x) - 3u, 3u);
     TEST_ASSERT_NOT_NULL(future_x);
-    TEST_ASSERT_TRUE(ts_regression_forecast(&fit, future_x, y, TS_FREQ_MONTHLY,
-                                            TS_YEAR_FISCAL_UK_APR, level, &fc) == 0,
+    TEST_ASSERT_TRUE(ts_regression_forecast(&fit, future_x, y, TS_FREQ_MONTHLY, TS_YEAR_FISCAL_UK_APR, level, &fc) == 0,
                      "regression forecast");
     TEST_ASSERT_NOT_NULL(fc.mean);
     TEST_ASSERT_TRUE(ts_length(fc.mean) == 3u, "forecast length");
@@ -340,10 +310,8 @@ static void test_regression_and_forecast(void)
 
 static void test_arima_smoke(void)
 {
-    timeseries_t *y = ts_from_csv(TEST_TARGET_CSV,
-                                  "", "test1",
-                                  TS_FREQ_MONTHLY, TS_YEAR_FISCAL_UK_APR,
-                                  TS_MISSING_DROP);
+    timeseries_t *y =
+        ts_from_csv(TEST_TARGET_CSV, "", "test1", TS_FREQ_MONTHLY, TS_YEAR_FISCAL_UK_APR, TS_MISSING_DROP);
     ts_arima_spec_t spec = {0};
     ts_arima_result_t fit = {0};
     ts_forecast_t fc = {0};
@@ -376,8 +344,7 @@ static void test_arima_smoke(void)
     TEST_ASSERT_NOT_NULL(fit.fitted);
     TEST_ASSERT_TRUE(ts_get_value(fit.fitted, ts_length(fit.fitted) - 1u, &last_fitted) == 0,
                      "last fitted value available");
-    TEST_ASSERT_TRUE(ts_arima_forecast(&fit, y, NULL, 3u, level, &fc) == 0,
-                     "arima forecast");
+    TEST_ASSERT_TRUE(ts_arima_forecast(&fit, y, NULL, 3u, level, &fc) == 0, "arima forecast");
     TEST_ASSERT_NOT_NULL(fc.mean);
     TEST_ASSERT_TRUE(ts_length(fc.mean) == 3u, "arima horizon");
     TEST_ASSERT_TRUE(ts_get_value(y, ts_length(y) - 1u, &last_actual) == 0, "last actual available");
@@ -392,18 +359,15 @@ static void test_arima_smoke(void)
                      "arima fitted values remain on the original level scale");
     TEST_ASSERT_TRUE(fabs(first_value - last_value) < fabs(last_value) * 0.75,
                      "arima forecast remains on the original level scale");
-    TEST_ASSERT_TRUE(isfinite(first_value) && isfinite(third_value),
-                     "arima multi-step forecast remains finite");
+    TEST_ASSERT_TRUE(isfinite(first_value) && isfinite(third_value), "arima multi-step forecast remains finite");
     TEST_ASSERT_TRUE(isfinite(num_to_double(first_lower)) && num_to_double(first_lower) >= 0.0,
                      "arima lower bounds for nonnegative series remain finite and nonnegative");
     forecast_date = datetime_alloc();
     TEST_ASSERT_NOT_NULL(forecast_date);
-    TEST_ASSERT_TRUE(ts_get_datetime(fc.mean, 1u, forecast_date) == 0,
-                     "second forecast date available");
+    TEST_ASSERT_TRUE(ts_get_datetime(fc.mean, 1u, forecast_date) == 0, "second forecast date available");
     forecast_date_text = datetime_format(forecast_date, "%dd/%mm/%yyyy");
     TEST_ASSERT_NOT_NULL(forecast_date_text);
-    TEST_ASSERT_TRUE(strcmp(forecast_date_text, "31/07/2026") == 0,
-                     "monthly forecasts preserve month-end dates");
+    TEST_ASSERT_TRUE(strcmp(forecast_date_text, "31/07/2026") == 0, "monthly forecasts preserve month-end dates");
     num_destroy(&last_actual);
     num_destroy(&first_forecast);
     num_destroy(&third_forecast);
@@ -420,26 +384,21 @@ static void test_arima_smoke(void)
 
 static void test_exogenous_alignment_for_future_forecasts(void)
 {
-    timeseries_t *y = ts_from_csv(TEST_TARGET_CSV,
-                                  "", "test1",
-                                  TS_FREQ_MONTHLY, TS_YEAR_FISCAL_UK_APR,
-                                  TS_MISSING_DROP);
-    timeseries_t *x = ts_from_csv(TEST_DRIVER_CSV,
-                                  "DATE", "test3",
-                                  TS_FREQ_MONTHLY, TS_YEAR_FISCAL_UK_APR,
-                                  TS_MISSING_DROP);
+    timeseries_t *y =
+        ts_from_csv(TEST_TARGET_CSV, "", "test1", TS_FREQ_MONTHLY, TS_YEAR_FISCAL_UK_APR, TS_MISSING_DROP);
+    timeseries_t *x =
+        ts_from_csv(TEST_DRIVER_CSV, "DATE", "test3", TS_FREQ_MONTHLY, TS_YEAR_FISCAL_UK_APR, TS_MISSING_DROP);
     timeseries_t *y_aligned = NULL;
     timeseries_t *x_aligned = NULL;
     timeseries_t *x_future = NULL;
     datetime_t *future_start = NULL;
     datetime_t *future_end = NULL;
     matrix_t *future_x = NULL;
-    timeseries_t *cols[1] = { NULL };
+    timeseries_t *cols[1] = {NULL};
 
     TEST_ASSERT_NOT_NULL(y);
     TEST_ASSERT_NOT_NULL(x);
-    TEST_ASSERT_TRUE(ts_align_pair(y, x, TS_JOIN_INNER, &y_aligned, &x_aligned) == 0,
-                     "target and exogenous alignment");
+    TEST_ASSERT_TRUE(ts_align_pair(y, x, TS_JOIN_INNER, &y_aligned, &x_aligned) == 0, "target and exogenous alignment");
     TEST_ASSERT_NOT_NULL(y_aligned);
     TEST_ASSERT_NOT_NULL(x_aligned);
     TEST_ASSERT_TRUE(ts_length(y_aligned) > 0u, "aligned target retains a useful history");
@@ -478,14 +437,10 @@ static void test_exogenous_alignment_for_future_forecasts(void)
 
 static void test_arimax_with_moving_average_terms(void)
 {
-    timeseries_t *y = ts_from_csv(TEST_TARGET_CSV,
-                                  "", "test1",
-                                  TS_FREQ_MONTHLY, TS_YEAR_FISCAL_UK_APR,
-                                  TS_MISSING_DROP);
-    const char *cols[] = { "test3", "test4", "test5" };
-    matrix_t *x = test_aligned_xreg_from_columns(y,
-                                                 TEST_DRIVER_CSV,
-                                                 "DATE", cols, 3u);
+    timeseries_t *y =
+        ts_from_csv(TEST_TARGET_CSV, "", "test1", TS_FREQ_MONTHLY, TS_YEAR_FISCAL_UK_APR, TS_MISSING_DROP);
+    const char *cols[] = {"test3", "test4", "test5"};
+    matrix_t *x = test_aligned_xreg_from_columns(y, TEST_DRIVER_CSV, "DATE", cols, 3u);
     ts_arima_spec_t spec = {0};
     ts_arima_result_t fit = {0};
     ts_forecast_t fc = {0};
@@ -517,8 +472,7 @@ static void test_arimax_with_moving_average_terms(void)
 
     future_x = test_submatrix_rows_local(x, mat_get_row_count(x) - 3u, 3u);
     TEST_ASSERT_NOT_NULL(future_x);
-    TEST_ASSERT_TRUE(ts_arima_forecast(&fit, y, future_x, 3u, level, &fc) == 0,
-                     "arimax forecast with MA terms");
+    TEST_ASSERT_TRUE(ts_arima_forecast(&fit, y, future_x, 3u, level, &fc) == 0, "arimax forecast with MA terms");
     TEST_ASSERT_TRUE(ts_get_value(fc.mean, 0u, &first_forecast) == 0, "first arimax forecast available");
     TEST_ASSERT_TRUE(ts_get_value(fc.stderr, 1u, &second_stderr) == 0, "second arimax stderr available");
     TEST_ASSERT_TRUE(isfinite(num_to_double(first_forecast)), "arimax first forecast finite");
@@ -589,10 +543,8 @@ static void test_arimax_differences_exogenous_regressors(void)
 
     TEST_ASSERT_TRUE(ts_arima_forecast(&fit, y, future_x, 2u, level, &fc) == 0,
                      "arimax forecast transforms future exogenous regressors across history boundary");
-    TEST_ASSERT_TRUE(ts_get_value(fc.mean, 0u, &first_forecast) == 0,
-                     "first differenced-xreg forecast available");
-    TEST_ASSERT_TRUE(ts_get_value(fc.mean, 1u, &second_forecast) == 0,
-                     "second differenced-xreg forecast available");
+    TEST_ASSERT_TRUE(ts_get_value(fc.mean, 0u, &first_forecast) == 0, "first differenced-xreg forecast available");
+    TEST_ASSERT_TRUE(ts_get_value(fc.mean, 1u, &second_forecast) == 0, "second differenced-xreg forecast available");
     TEST_ASSERT_TRUE(fabs(num_to_double(first_forecast) - 158.0) < 1e-6,
                      "first future raw xreg value is converted to first difference");
     TEST_ASSERT_TRUE(fabs(num_to_double(second_forecast) - 170.0) < 1e-6,
@@ -611,14 +563,10 @@ static void test_arimax_differences_exogenous_regressors(void)
 
 static void test_auto_arima_preserves_selected_model_and_scale(void)
 {
-    timeseries_t *y = ts_from_csv(TEST_TARGET_CSV,
-                                  "", "test2",
-                                  TS_FREQ_MONTHLY, TS_YEAR_FISCAL_UK_APR,
-                                  TS_MISSING_DROP);
-    const char *cols[] = { "test4", "test5", "test6", "test7", "test8" };
-    matrix_t *x = test_aligned_xreg_from_columns(y,
-                                                 TEST_DRIVER_CSV,
-                                                 "DATE", cols, 5u);
+    timeseries_t *y =
+        ts_from_csv(TEST_TARGET_CSV, "", "test2", TS_FREQ_MONTHLY, TS_YEAR_FISCAL_UK_APR, TS_MISSING_DROP);
+    const char *cols[] = {"test4", "test5", "test6", "test7", "test8"};
+    matrix_t *x = test_aligned_xreg_from_columns(y, TEST_DRIVER_CSV, "DATE", cols, 5u);
     ts_arima_spec_t best_spec = {0};
     ts_arima_result_t fit = {0};
     ts_forecast_t fc = {0};
@@ -632,25 +580,17 @@ static void test_auto_arima_preserves_selected_model_and_scale(void)
 
     TEST_ASSERT_NOT_NULL(y);
     TEST_ASSERT_NOT_NULL(x);
-    TEST_ASSERT_TRUE(ts_auto_arima(y, x,
-                                   1u, 1u, 0u,
-                                   1u, 0u, 0u,
-                                   12u,
-                                   TS_IC_AIC,
-                                   NULL, &best_spec, &fit) == 0,
+    TEST_ASSERT_TRUE(ts_auto_arima(y, x, 1u, 1u, 0u, 1u, 0u, 0u, 12u, TS_IC_AIC, NULL, &best_spec, &fit) == 0,
                      "auto arima fit with exogenous search");
     summary = ts_arima_summary_to_text(&fit);
     TEST_ASSERT_NOT_NULL(summary);
-    TEST_ASSERT_TRUE(string_find(summary, "Model: (") >= 0,
-                     "auto arima summary keeps chosen model metadata");
-    TEST_ASSERT_TRUE(string_find(summary, "stderr =") >= 0 &&
-                     string_find(summary, "p =") >= 0,
+    TEST_ASSERT_TRUE(string_find(summary, "Model: (") >= 0, "auto arima summary keeps chosen model metadata");
+    TEST_ASSERT_TRUE(string_find(summary, "stderr =") >= 0 && string_find(summary, "p =") >= 0,
                      "auto arima summary includes coefficient quality details for exogenous drivers");
 
     future_x = test_submatrix_rows_local(x, mat_get_row_count(x) - 12u, 12u);
     TEST_ASSERT_NOT_NULL(future_x);
-    TEST_ASSERT_TRUE(ts_arima_forecast(&fit, y, future_x, 12u, level, &fc) == 0,
-                     "auto arima forecast");
+    TEST_ASSERT_TRUE(ts_arima_forecast(&fit, y, future_x, 12u, level, &fc) == 0, "auto arima forecast");
     TEST_ASSERT_TRUE(ts_get_value(y, ts_length(y) - 1u, &last_actual) == 0, "last actual available");
     TEST_ASSERT_TRUE(ts_get_value(fc.mean, 0u, &first_forecast) == 0, "first auto forecast available");
     last_value = num_to_double(last_actual);

@@ -1,9 +1,9 @@
-#include <stdbool.h>
 #include <math.h>
+#include <stdarg.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdarg.h>
 
 #include "datetime.h"
 #include "matrix.h"
@@ -46,19 +46,33 @@ static void to_be_announced_print_json_string(const char *text)
         unsigned char ch = bytes[i];
 
         switch (ch) {
-        case '\\': fputs("\\\\", stdout); break;
-        case '"': fputs("\\\"", stdout); break;
-        case '\b': fputs("\\b", stdout); break;
-        case '\f': fputs("\\f", stdout); break;
-        case '\n': fputs("\\n", stdout); break;
-        case '\r': fputs("\\r", stdout); break;
-        case '\t': fputs("\\t", stdout); break;
-        default:
-            if (ch < 0x20u)
-                printf("\\u%04x", (unsigned int)ch);
-            else
-                putchar((int)ch);
-            break;
+            case '\\':
+                fputs("\\\\", stdout);
+                break;
+            case '"':
+                fputs("\\\"", stdout);
+                break;
+            case '\b':
+                fputs("\\b", stdout);
+                break;
+            case '\f':
+                fputs("\\f", stdout);
+                break;
+            case '\n':
+                fputs("\\n", stdout);
+                break;
+            case '\r':
+                fputs("\\r", stdout);
+                break;
+            case '\t':
+                fputs("\\t", stdout);
+                break;
+            default:
+                if (ch < 0x20u)
+                    printf("\\u%04x", (unsigned int)ch);
+                else
+                    putchar((int)ch);
+                break;
         }
     }
     putchar('"');
@@ -200,51 +214,31 @@ static char *to_be_announced_series_value_text(const timeseries_t *series, size_
     return text;
 }
 
-static int to_be_announced_append_combined_csv_row(char **buf, size_t *len, size_t *cap,
-                                           const char *date_text,
-                                           const char *actual_text,
-                                           const char *mean_text,
-                                           const char *stderr_text,
-                                           const char *lower_text,
-                                           const char *upper_text)
+static int to_be_announced_append_combined_csv_row(char **buf, size_t *len, size_t *cap, const char *date_text,
+                                                   const char *actual_text, const char *mean_text,
+                                                   const char *stderr_text, const char *lower_text,
+                                                   const char *upper_text)
 {
-    return to_be_announced_appendf(buf, len, cap, "%s,%s,%s,%s,%s,%s\n",
-                           date_text ? date_text : "",
-                           actual_text ? actual_text : "",
-                           mean_text ? mean_text : "",
-                           stderr_text ? stderr_text : "",
-                           lower_text ? lower_text : "",
-                           upper_text ? upper_text : "");
+    return to_be_announced_appendf(buf, len, cap, "%s,%s,%s,%s,%s,%s\n", date_text ? date_text : "",
+                                   actual_text ? actual_text : "", mean_text ? mean_text : "",
+                                   stderr_text ? stderr_text : "", lower_text ? lower_text : "",
+                                   upper_text ? upper_text : "");
 }
 
-static int to_be_announced_append_combined_text_row(char **buf, size_t *len, size_t *cap,
-                                            const char *date_text,
-                                            const char *actual_text,
-                                            const char *mean_text,
-                                            const char *stderr_text,
-                                            const char *lower_text,
-                                            const char *upper_text)
+static int to_be_announced_append_combined_text_row(char **buf, size_t *len, size_t *cap, const char *date_text,
+                                                    const char *actual_text, const char *mean_text,
+                                                    const char *stderr_text, const char *lower_text,
+                                                    const char *upper_text)
 {
-    return to_be_announced_appendf(
-        buf, len, cap,
-        "%s: actual %s, mean %s%s%s%s%s%s%s\n",
-        date_text ? date_text : "",
-        actual_text ? actual_text : "n/a",
-        mean_text ? mean_text : "n/a",
-        stderr_text ? ", stderr " : "",
-        stderr_text ? stderr_text : "",
-        lower_text ? ", lower " : "",
-        lower_text ? lower_text : "",
-        upper_text ? ", upper " : "",
-        upper_text ? upper_text : ""
-    );
+    return to_be_announced_appendf(buf, len, cap, "%s: actual %s, mean %s%s%s%s%s%s%s\n", date_text ? date_text : "",
+                                   actual_text ? actual_text : "n/a", mean_text ? mean_text : "n/a",
+                                   stderr_text ? ", stderr " : "", stderr_text ? stderr_text : "",
+                                   lower_text ? ", lower " : "", lower_text ? lower_text : "",
+                                   upper_text ? ", upper " : "", upper_text ? upper_text : "");
 }
 
-static int to_be_announced_build_results_outputs(const timeseries_t *actual,
-                                         const timeseries_t *fitted,
-                                         const ts_forecast_t *forecast,
-                                         char **csv_out,
-                                         char **text_out)
+static int to_be_announced_build_results_outputs(const timeseries_t *actual, const timeseries_t *fitted,
+                                                 const ts_forecast_t *forecast, char **csv_out, char **text_out)
 {
     char *csv = NULL, *text = NULL;
     size_t csv_len = 0u, csv_cap = 0u, text_len = 0u, text_cap = 0u;
@@ -259,16 +253,18 @@ static int to_be_announced_build_results_outputs(const timeseries_t *actual,
         char *actual_text = to_be_announced_series_value_text(actual, i);
         char *mean_text = to_be_announced_series_value_text(fitted, i);
 
-        if (to_be_announced_append_combined_csv_row(&csv, &csv_len, &csv_cap,
-                                            date_text, actual_text, mean_text,
-                                            NULL, NULL, NULL) != 0 ||
-            to_be_announced_append_combined_text_row(&text, &text_len, &text_cap,
-                                             date_text, actual_text, mean_text,
-                                             NULL, NULL, NULL) != 0) {
-            free(date_text); free(actual_text); free(mean_text);
+        if (to_be_announced_append_combined_csv_row(&csv, &csv_len, &csv_cap, date_text, actual_text, mean_text, NULL,
+                                                    NULL, NULL) != 0 ||
+            to_be_announced_append_combined_text_row(&text, &text_len, &text_cap, date_text, actual_text, mean_text,
+                                                     NULL, NULL, NULL) != 0) {
+            free(date_text);
+            free(actual_text);
+            free(mean_text);
             goto fail;
         }
-        free(date_text); free(actual_text); free(mean_text);
+        free(date_text);
+        free(actual_text);
+        free(mean_text);
     }
     for (i = 0u; forecast && forecast->mean && i < ts_length(forecast->mean); ++i) {
         char *date_text = to_be_announced_series_date_text(forecast->mean, i);
@@ -277,16 +273,22 @@ static int to_be_announced_build_results_outputs(const timeseries_t *actual,
         char *lower_text = forecast->lower ? to_be_announced_series_value_text(forecast->lower, i) : NULL;
         char *upper_text = forecast->upper ? to_be_announced_series_value_text(forecast->upper, i) : NULL;
 
-        if (to_be_announced_append_combined_csv_row(&csv, &csv_len, &csv_cap,
-                                            date_text, NULL, mean_text,
-                                            stderr_text, lower_text, upper_text) != 0 ||
-            to_be_announced_append_combined_text_row(&text, &text_len, &text_cap,
-                                             date_text, NULL, mean_text,
-                                             stderr_text, lower_text, upper_text) != 0) {
-            free(date_text); free(mean_text); free(stderr_text); free(lower_text); free(upper_text);
+        if (to_be_announced_append_combined_csv_row(&csv, &csv_len, &csv_cap, date_text, NULL, mean_text, stderr_text,
+                                                    lower_text, upper_text) != 0 ||
+            to_be_announced_append_combined_text_row(&text, &text_len, &text_cap, date_text, NULL, mean_text,
+                                                     stderr_text, lower_text, upper_text) != 0) {
+            free(date_text);
+            free(mean_text);
+            free(stderr_text);
+            free(lower_text);
+            free(upper_text);
             goto fail;
         }
-        free(date_text); free(mean_text); free(stderr_text); free(lower_text); free(upper_text);
+        free(date_text);
+        free(mean_text);
+        free(stderr_text);
+        free(lower_text);
+        free(upper_text);
     }
     *csv_out = csv;
     *text_out = text;
@@ -337,10 +339,7 @@ static char **to_be_announced_split_columns(const char *text, size_t *count_out)
         while (tok[start] == ' ' || tok[start] == '\t')
             start++;
         while (end > start &&
-               (tok[end - 1u] == ' ' ||
-                tok[end - 1u] == '\t' ||
-                tok[end - 1u] == '\r' ||
-                tok[end - 1u] == '\n')) {
+               (tok[end - 1u] == ' ' || tok[end - 1u] == '\t' || tok[end - 1u] == '\r' || tok[end - 1u] == '\n')) {
             end--;
         }
         tok[end] = '\0';
@@ -380,13 +379,20 @@ static char **to_be_announced_split_columns(const char *text, size_t *count_out)
 static const char *to_be_announced_model_name(to_be_announced_model_t model)
 {
     switch (model) {
-    case TO_BE_ANNOUNCED_MODEL_REGRESSION: return "Regression";
-    case TO_BE_ANNOUNCED_MODEL_ARIMA: return "ARIMA";
-    case TO_BE_ANNOUNCED_MODEL_ARIMAX: return "ARIMAX";
-    case TO_BE_ANNOUNCED_MODEL_SARIMA: return "SARIMA";
-    case TO_BE_ANNOUNCED_MODEL_SARIMAX: return "SARIMAX";
-    case TO_BE_ANNOUNCED_MODEL_AUTO_ARIMA: return "Auto-ARIMA";
-    default: return "Forecast";
+        case TO_BE_ANNOUNCED_MODEL_REGRESSION:
+            return "Regression";
+        case TO_BE_ANNOUNCED_MODEL_ARIMA:
+            return "ARIMA";
+        case TO_BE_ANNOUNCED_MODEL_ARIMAX:
+            return "ARIMAX";
+        case TO_BE_ANNOUNCED_MODEL_SARIMA:
+            return "SARIMA";
+        case TO_BE_ANNOUNCED_MODEL_SARIMAX:
+            return "SARIMAX";
+        case TO_BE_ANNOUNCED_MODEL_AUTO_ARIMA:
+            return "Auto-ARIMA";
+        default:
+            return "Forecast";
     }
 }
 
@@ -464,36 +470,32 @@ static void to_be_announced_advance_datetime(datetime_t *dt, ts_frequency_t freq
         return;
     preserve_month_end = datetime_day(dt) == datetime_days_in_month(datetime_year(dt), datetime_month(dt));
     switch (frequency) {
-    case TS_FREQ_DAILY:
-        datetime_add_days(dt, 1L);
-        break;
-    case TS_FREQ_MONTHLY:
-        datetime_add_months(dt, 1);
-        break;
-    case TS_FREQ_QUARTERLY:
-        datetime_add_months(dt, 3);
-        break;
-    case TS_FREQ_YEARLY:
-        datetime_add_years(dt, 1);
-        break;
-    default:
-        return;
+        case TS_FREQ_DAILY:
+            datetime_add_days(dt, 1L);
+            break;
+        case TS_FREQ_MONTHLY:
+            datetime_add_months(dt, 1);
+            break;
+        case TS_FREQ_QUARTERLY:
+            datetime_add_months(dt, 3);
+            break;
+        case TS_FREQ_YEARLY:
+            datetime_add_years(dt, 1);
+            break;
+        default:
+            return;
     }
     if (preserve_month_end) {
         short year = datetime_year(dt);
         month_t month = datetime_month(dt);
         uint8_t last_day = (uint8_t)datetime_days_in_month(year, month);
 
-        datetime_init_ymdt(dt, year, month, last_day,
-                           datetime_hour(dt), datetime_minute(dt), datetime_second(dt));
+        datetime_init_ymdt(dt, year, month, last_day, datetime_hour(dt), datetime_minute(dt), datetime_second(dt));
     }
 }
 
-static int to_be_announced_load_x_columns(const to_be_announced_config_t *cfg,
-                                  const timeseries_t *y,
-                                  timeseries_t **aligned_y_out,
-                                  matrix_t **fit_x_out,
-                                  matrix_t **future_x_out)
+static int to_be_announced_load_x_columns(const to_be_announced_config_t *cfg, const timeseries_t *y,
+                                          timeseries_t **aligned_y_out, matrix_t **fit_x_out, matrix_t **future_x_out)
 {
     timeseries_t **raw = NULL;
     timeseries_t **aligned = NULL;
@@ -525,12 +527,8 @@ static int to_be_announced_load_x_columns(const to_be_announced_config_t *cfg,
         goto fail;
 
     for (i = 0u; i < cfg->xreg_column_count; ++i) {
-        raw[i] = ts_from_csv(cfg->xreg_path,
-                             cfg->xreg_date_column ? cfg->xreg_date_column : "DATE",
-                             cfg->xreg_columns[i],
-                             cfg->frequency,
-                             cfg->year_type,
-                             TS_MISSING_DROP);
+        raw[i] = ts_from_csv(cfg->xreg_path, cfg->xreg_date_column ? cfg->xreg_date_column : "DATE",
+                             cfg->xreg_columns[i], cfg->frequency, cfg->year_type, TS_MISSING_DROP);
         if (!raw[i])
             goto fail;
     }
@@ -629,21 +627,14 @@ fail:
     return -1;
 }
 
-static void to_be_announced_print_success(const to_be_announced_config_t *cfg,
-                                  const char *forecast_csv,
-                                  const char *forecast_text,
-                                  size_t fit_rows,
-                                  size_t effective_horizon,
-                                  bool stationary,
-                                  bool invertible,
-                                  const char *summary_text)
+static void to_be_announced_print_success(const to_be_announced_config_t *cfg, const char *forecast_csv,
+                                          const char *forecast_text, size_t fit_rows, size_t effective_horizon,
+                                          bool stationary, bool invertible, const char *summary_text)
 {
     fputs("{\"ok\":true,\"model\":", stdout);
     to_be_announced_print_json_string(to_be_announced_model_name(cfg->model));
-    printf(",\"fit_rows\":%zu,\"horizon\":%zu,\"stationary\":%s,\"invertible\":%s,",
-           fit_rows, effective_horizon,
-           stationary ? "true" : "false",
-           invertible ? "true" : "false");
+    printf(",\"fit_rows\":%zu,\"horizon\":%zu,\"stationary\":%s,\"invertible\":%s,", fit_rows, effective_horizon,
+           stationary ? "true" : "false", invertible ? "true" : "false");
     fputs("\"summary_text\":", stdout);
     to_be_announced_print_json_string(summary_text ? summary_text : "");
     fputs(",\"forecast_csv\":", stdout);
@@ -669,20 +660,15 @@ static int to_be_announced_run(const to_be_announced_config_t *cfg)
     if (!cfg || !cfg->target_path || !cfg->target_value_column)
         return to_be_announced_fail("Target dataset and value column are required.");
 
-    y = ts_from_csv(cfg->target_path,
-                    cfg->target_date_column ? cfg->target_date_column : "",
-                    cfg->target_value_column,
-                    cfg->frequency,
-                    cfg->year_type,
-                    TS_MISSING_DROP);
+    y = ts_from_csv(cfg->target_path, cfg->target_date_column ? cfg->target_date_column : "", cfg->target_value_column,
+                    cfg->frequency, cfg->year_type, TS_MISSING_DROP);
     if (!y)
         return to_be_announced_fail("Could not load the target time series.");
     if (to_be_announced_load_x_columns(cfg, y, &fit_y, &fit_x, &future_x) != 0) {
         ts_free(y);
         return to_be_announced_fail("Could not align the exogenous data with the target series.");
     }
-    if ((cfg->model == TO_BE_ANNOUNCED_MODEL_REGRESSION ||
-         cfg->model == TO_BE_ANNOUNCED_MODEL_ARIMAX ||
+    if ((cfg->model == TO_BE_ANNOUNCED_MODEL_REGRESSION || cfg->model == TO_BE_ANNOUNCED_MODEL_ARIMAX ||
          cfg->model == TO_BE_ANNOUNCED_MODEL_SARIMAX) &&
         !fit_x) {
         ts_free(y);
@@ -710,8 +696,7 @@ static int to_be_announced_run(const to_be_announced_config_t *cfg)
             return to_be_announced_fail("Regression fitting failed.");
         }
         if (effective_horizon > 0u && future_x &&
-            ts_regression_forecast(&fit, future_x, fit_y, cfg->frequency, cfg->year_type,
-                                   level, &forecast) != 0) {
+            ts_regression_forecast(&fit, future_x, fit_y, cfg->frequency, cfg->year_type, level, &forecast) != 0) {
             ts_regression_result_clear(&fit);
             num_destroy(&level);
             ts_free(y);
@@ -721,8 +706,7 @@ static int to_be_announced_run(const to_be_announced_config_t *cfg)
             return to_be_announced_fail("Regression forecasting failed.");
         }
         summary_text = ts_regression_summary_to_string(&fit);
-        if (to_be_announced_build_results_outputs(fit_y, fit.fitted, &forecast,
-                                          &forecast_csv, &forecast_text) != 0) {
+        if (to_be_announced_build_results_outputs(fit_y, fit.fitted, &forecast, &forecast_csv, &forecast_text) != 0) {
             ts_regression_result_clear(&fit);
             ts_forecast_clear(&forecast);
             num_destroy(&level);
@@ -746,17 +730,15 @@ static int to_be_announced_run(const to_be_announced_config_t *cfg)
             free(forecast_text);
             return to_be_announced_fail("Regression output formatting failed.");
         }
-        to_be_announced_print_success(cfg, forecast_csv, forecast_text,
-                              ts_length(fit_y), effective_horizon, true, true, summary_text);
+        to_be_announced_print_success(cfg, forecast_csv, forecast_text, ts_length(fit_y), effective_horizon, true, true,
+                                      summary_text);
         ts_regression_result_clear(&fit);
     } else {
         ts_arima_spec_t spec = cfg->spec;
         ts_arima_result_t fit = {0};
-        bool uses_xreg = (cfg->model == TO_BE_ANNOUNCED_MODEL_ARIMAX ||
-                          cfg->model == TO_BE_ANNOUNCED_MODEL_SARIMAX ||
+        bool uses_xreg = (cfg->model == TO_BE_ANNOUNCED_MODEL_ARIMAX || cfg->model == TO_BE_ANNOUNCED_MODEL_SARIMAX ||
                           cfg->model == TO_BE_ANNOUNCED_MODEL_AUTO_ARIMA);
-        bool seasonal = (cfg->model == TO_BE_ANNOUNCED_MODEL_SARIMA ||
-                         cfg->model == TO_BE_ANNOUNCED_MODEL_SARIMAX);
+        bool seasonal = (cfg->model == TO_BE_ANNOUNCED_MODEL_SARIMA || cfg->model == TO_BE_ANNOUNCED_MODEL_SARIMAX);
 
         if (!seasonal) {
             spec.P = 0u;
@@ -767,11 +749,8 @@ static int to_be_announced_run(const to_be_announced_config_t *cfg)
         if (cfg->model == TO_BE_ANNOUNCED_MODEL_AUTO_ARIMA) {
             ts_arima_spec_t best_spec = {0};
 
-            if (ts_auto_arima(fit_y, uses_xreg ? fit_x : NULL,
-                              spec.p, spec.d, spec.q,
-                              spec.P, spec.D, spec.Q,
-                              spec.season_period, cfg->criterion,
-                              NULL, &best_spec, &fit) != 0) {
+            if (ts_auto_arima(fit_y, uses_xreg ? fit_x : NULL, spec.p, spec.d, spec.q, spec.P, spec.D, spec.Q,
+                              spec.season_period, cfg->criterion, NULL, &best_spec, &fit) != 0) {
                 num_destroy(&level);
                 ts_free(y);
                 ts_free(fit_y);
@@ -788,8 +767,7 @@ static int to_be_announced_run(const to_be_announced_config_t *cfg)
             return to_be_announced_fail("ARIMA-family fitting failed.");
         }
         if (effective_horizon > 0u &&
-            ts_arima_forecast(&fit, fit_y, uses_xreg ? future_x : NULL,
-                              effective_horizon, level, &forecast) != 0) {
+            ts_arima_forecast(&fit, fit_y, uses_xreg ? future_x : NULL, effective_horizon, level, &forecast) != 0) {
             ts_arima_result_clear(&fit);
             num_destroy(&level);
             ts_free(y);
@@ -799,8 +777,7 @@ static int to_be_announced_run(const to_be_announced_config_t *cfg)
             return to_be_announced_fail("ARIMA-family forecasting failed.");
         }
         summary_text = ts_arima_summary_to_string(&fit);
-        if (to_be_announced_build_results_outputs(fit_y, fit.fitted, &forecast,
-                                          &forecast_csv, &forecast_text) != 0) {
+        if (to_be_announced_build_results_outputs(fit_y, fit.fitted, &forecast, &forecast_csv, &forecast_text) != 0) {
             ts_arima_result_clear(&fit);
             ts_forecast_clear(&forecast);
             num_destroy(&level);
@@ -824,11 +801,8 @@ static int to_be_announced_run(const to_be_announced_config_t *cfg)
             free(forecast_text);
             return to_be_announced_fail("ARIMA-family output formatting failed.");
         }
-        to_be_announced_print_success(cfg, forecast_csv, forecast_text,
-                              ts_length(fit_y), effective_horizon,
-                              ts_arima_is_stationary(&fit),
-                              ts_arima_is_invertible(&fit),
-                              summary_text);
+        to_be_announced_print_success(cfg, forecast_csv, forecast_text, ts_length(fit_y), effective_horizon,
+                                      ts_arima_is_stationary(&fit), ts_arima_is_invertible(&fit), summary_text);
         ts_arima_result_clear(&fit);
     }
 

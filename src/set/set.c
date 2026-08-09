@@ -8,27 +8,27 @@
 /* Internal structures */
 
 struct bucket {
-    size_t index;          /* index into arena */
-    struct bucket *next;   /* next in chain */
+    size_t index;        /* index into arena */
+    struct bucket *next; /* next in chain */
 };
 
 struct _set_t {
-    size_t elem_size;      /* size of each element */
-    size_t slot_stride;    /* bytes per slot: sizeof(size_t) + elem_size */
+    size_t elem_size;   /* size of each element */
+    size_t slot_stride; /* bytes per slot: sizeof(size_t) + elem_size */
 
-    size_t count;          /* number of elements stored */
-    size_t capacity;       /* number of slots allocated in arena */
+    size_t count;    /* number of elements stored */
+    size_t capacity; /* number of slots allocated in arena */
 
-    unsigned char *arena;  /* contiguous storage for slots */
+    unsigned char *arena; /* contiguous storage for slots */
 
     struct bucket **table; /* hash table: array of bucket* chains */
     size_t table_size;     /* number of buckets in table */
 
-    size_t prime_index;    /* index into primes[] for table sizing */
+    size_t prime_index; /* index into primes[] for table sizing */
 
-    size_t *sorted_idx;    /* lazily built array of indices for sorted view */
-    size_t sorted_cap;     /* capacity of sorted_idx */
-    bool sorted_valid;     /* whether sorted_idx is up-to-date */
+    size_t *sorted_idx; /* lazily built array of indices for sorted view */
+    size_t sorted_cap;  /* capacity of sorted_idx */
+    bool sorted_valid;  /* whether sorted_idx is up-to-date */
 
     set_hash_fn hash_fn;
     set_cmp_fn cmp_fn;
@@ -48,22 +48,21 @@ struct _set_t {
  * We implement this via a stride and pointer arithmetic.
  */
 
-static inline size_t *slot_hash_ptr(const struct _set_t *set, size_t index) {
+static inline size_t *slot_hash_ptr(const struct _set_t *set, size_t index)
+{
     return (size_t *)(set->arena + index * set->slot_stride);
 }
 
-static inline void *slot_data_ptr(const struct _set_t *set, size_t index) {
+static inline void *slot_data_ptr(const struct _set_t *set, size_t index)
+{
     return (void *)(set->arena + index * set->slot_stride + sizeof(size_t));
 }
 
 /* Prime sizes for hash table capacities */
-static const size_t primes[] = {
-    17ul, 37ul, 79ul, 163ul, 331ul, 673ul, 1361ul, 2729ul,
-    5471ul, 10949ul, 21911ul, 43853ul, 87719ul, 175447ul,
-    350899ul, 701819ul, 1403641ul, 2807303ul, 5614657ul,
-    11229331ul, 22458671ul, 44917381ul, 89834777ul, 179669557ul,
-    359339171ul, 718678369ul, 1437356741ul
-};
+static const size_t primes[] = {17ul,       37ul,       79ul,        163ul,       331ul,       673ul,       1361ul,
+                                2729ul,     5471ul,     10949ul,     21911ul,     43853ul,     87719ul,     175447ul,
+                                350899ul,   701819ul,   1403641ul,   2807303ul,   5614657ul,   11229331ul,  22458671ul,
+                                44917381ul, 89834777ul, 179669557ul, 359339171ul, 718678369ul, 1437356741ul};
 
 static const size_t num_primes = sizeof(primes) / sizeof(primes[0]);
 
@@ -75,11 +74,7 @@ static void set_invalidate_sorted(struct _set_t *set);
 static bool set_build_sorted(struct _set_t *set);
 
 /* Create a new set */
-set_t *set_create(size_t elem_size,
-                  set_hash_fn hash,
-                  set_cmp_fn cmp,
-                  set_clone_fn clone,
-                  set_destroy_fn destroy)
+set_t *set_create(size_t elem_size, set_hash_fn hash, set_cmp_fn cmp, set_clone_fn clone, set_destroy_fn destroy)
 {
     if (elem_size == 0 || hash == NULL || cmp == NULL) {
         return NULL;
@@ -187,12 +182,8 @@ size_t set_get_size(const set_t *set)
 }
 
 /* Internal: find bucket and previous bucket for an element */
-static bool set_find_bucket(const struct _set_t *set,
-                            const void *elem,
-                            size_t hash,
-                            size_t *out_bucket_index,
-                            struct bucket **out_prev,
-                            struct bucket **out_curr)
+static bool set_find_bucket(const struct _set_t *set, const void *elem, size_t hash, size_t *out_bucket_index,
+                            struct bucket **out_prev, struct bucket **out_curr)
 {
     if (!set || set->table_size == 0) {
         return false;
@@ -536,11 +527,7 @@ set_t *set_clone(const set_t *set)
         return NULL;
     }
 
-    struct _set_t *clone = set_create(set->elem_size,
-                                   set->hash_fn,
-                                   set->cmp_fn,
-                                   set->clone_fn,
-                                   set->destroy_fn);
+    struct _set_t *clone = set_create(set->elem_size, set->hash_fn, set->cmp_fn, set->clone_fn, set->destroy_fn);
     if (!clone) {
         return NULL;
     }
@@ -616,11 +603,7 @@ set_t *set_union(const set_t *a, const set_t *b)
         return NULL;
     }
 
-    struct _set_t *res = set_create(a->elem_size,
-                                 a->hash_fn,
-                                 a->cmp_fn,
-                                 a->clone_fn,
-                                 a->destroy_fn);
+    struct _set_t *res = set_create(a->elem_size, a->hash_fn, a->cmp_fn, a->clone_fn, a->destroy_fn);
     if (!res) {
         return NULL;
     }
@@ -658,11 +641,7 @@ set_t *set_intersection(const set_t *a, const set_t *b)
         return NULL;
     }
 
-    struct _set_t *res = set_create(a->elem_size,
-                                 a->hash_fn,
-                                 a->cmp_fn,
-                                 a->clone_fn,
-                                 a->destroy_fn);
+    struct _set_t *res = set_create(a->elem_size, a->hash_fn, a->cmp_fn, a->clone_fn, a->destroy_fn);
     if (!res) {
         return NULL;
     }
@@ -699,11 +678,7 @@ set_t *set_difference(const set_t *a, const set_t *b)
         return NULL;
     }
 
-    struct _set_t *res = set_create(a->elem_size,
-                                 a->hash_fn,
-                                 a->cmp_fn,
-                                 a->clone_fn,
-                                 a->destroy_fn);
+    struct _set_t *res = set_create(a->elem_size, a->hash_fn, a->cmp_fn, a->clone_fn, a->destroy_fn);
     if (!res) {
         return NULL;
     }

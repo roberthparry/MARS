@@ -63,17 +63,14 @@ static char *format_error_for_test_output(const number_t value)
     return out;
 }
 
-static number_t oracle_error_magnitude(const number_t got,
-                                       const number_t expected)
+static number_t oracle_error_magnitude(const number_t got, const number_t expected)
 {
     number_t promoted_got = num_clone(got);
     number_t diff;
     number_t error;
 
-    if (num_get_prec_bits(expected) > 0u &&
-        num_set_prec_bits(&promoted_got, num_get_prec_bits(expected)) != 0) {
-        test_mark_failure(__FILE__, __LINE__,
-                          "num_set_prec_bits(promoted_got) failed");
+    if (num_get_prec_bits(expected) > 0u && num_set_prec_bits(&promoted_got, num_get_prec_bits(expected)) != 0) {
+        test_mark_failure(__FILE__, __LINE__, "num_set_prec_bits(promoted_got) failed");
         num_destroy(&promoted_got);
         return num_create_from_double(NAN);
     }
@@ -96,8 +93,7 @@ static number_t oracle_error_magnitude(const number_t got,
     }
 }
 
-static int number_close_for_qfloat_precision(const number_t got,
-                                             const number_t expected)
+static int number_close_for_qfloat_precision(const number_t got, const number_t expected)
 {
     number_t error = oracle_error_magnitude(got, expected);
     number_t one = num_create_from_double(1.0);
@@ -105,8 +101,7 @@ static int number_close_for_qfloat_precision(const number_t got,
     int ok;
 
     if (num_set_prec_bits(&one, 106u) != 0) {
-        test_mark_failure(__FILE__, __LINE__,
-                          "num_set_prec_bits(one) failed");
+        test_mark_failure(__FILE__, __LINE__, "num_set_prec_bits(one) failed");
         num_destroy(&one);
         num_destroy(&error);
         return 0;
@@ -119,9 +114,7 @@ static int number_close_for_qfloat_precision(const number_t got,
     return ok;
 }
 
-static int number_close_with_tolerance_text(const number_t got,
-                                            const number_t expected,
-                                            const char *tolerance_text)
+static int number_close_with_tolerance_text(const number_t got, const number_t expected, const char *tolerance_text)
 {
     number_t error = oracle_error_magnitude(got, expected);
     number_t tolerance = num_create_from_string(tolerance_text);
@@ -132,9 +125,7 @@ static int number_close_with_tolerance_text(const number_t got,
     return ok;
 }
 
-static void print_precision_comparison(const char *label,
-                                       const number_t got,
-                                       const number_t expected)
+static void print_precision_comparison(const char *label, const number_t got, const number_t expected)
 {
     string_t *expected_text;
     string_t *got_text;
@@ -152,13 +143,11 @@ static void print_precision_comparison(const char *label,
     }
 
     if (!expected_text) {
-        test_mark_failure(__FILE__, __LINE__,
-                          "format_number_for_test_output(expected) failed");
+        test_mark_failure(__FILE__, __LINE__, "format_number_for_test_output(expected) failed");
         goto cleanup;
     }
     if (!got_text) {
-        test_mark_failure(__FILE__, __LINE__,
-                          "format_number_for_test_output(got) failed");
+        test_mark_failure(__FILE__, __LINE__, "format_number_for_test_output(got) failed");
         goto cleanup;
     }
     if (show_error && !error_text) {
@@ -167,8 +156,7 @@ static void print_precision_comparison(const char *label,
             memcpy(error_text, "(unavailable)", sizeof("(unavailable)"));
     }
     if (show_error && !error_text) {
-        test_mark_failure(__FILE__, __LINE__,
-                          "format_error_for_test_output(error) failed");
+        test_mark_failure(__FILE__, __LINE__, "format_error_for_test_output(error) failed");
         goto cleanup;
     }
 
@@ -177,8 +165,7 @@ static void print_precision_comparison(const char *label,
     printf("        got      = %s\n", formatted_number_cstr(got_text));
     if (show_error)
         printf("        error    = %s\n", error_text);
-    printf("        precision: %zu bits, %zu significant digits\n",
-           num_get_prec_bits(got), num_get_prec_digits(got));
+    printf("        precision: %zu bits, %zu significant digits\n", num_get_prec_bits(got), num_get_prec_digits(got));
 
 cleanup:
     free(error_text);
@@ -209,14 +196,14 @@ typedef struct {
     num_binary_builder_t num_fn;
 } binary_eval_case_t;
 
-#define UCASE(name_, input_, expr_fn_, num_fn_) \
-    { name_, input_, expr_fn_, num_fn_, NULL }
+#define UCASE(name_, input_, expr_fn_, num_fn_) {name_, input_, expr_fn_, num_fn_, NULL}
 
-#define UCASE_TOL(name_, input_, expr_fn_, num_fn_, tol_) \
-    { name_, input_, expr_fn_, num_fn_, tol_ }
+#define UCASE_TOL(name_, input_, expr_fn_, num_fn_, tol_) {name_, input_, expr_fn_, num_fn_, tol_}
 
-#define GAMMAINV_INPUT_TEXT \
-    "1.329340388179137020473625612505858887098162092091790346160355842389683463443274136031212992553908499062170117718211927999677114649293316951893820282202090301346528273989828842137443879771713119671699071534450972100130979"
+#define GAMMAINV_INPUT_TEXT                                                                                            \
+    "1."                                                                                                               \
+    "3293403881791370204736256125058588870981620920917903461603558423896834634432741360312129925539084990621701177182" \
+    "11927999677114649293316951893820282202090301346528273989828842137443879771713119671699071534450972100130979"
 
 static expr_t *expr_pow3_builder(const expr_t *x)
 {
@@ -265,10 +252,7 @@ static size_t high_precision_compare_bits(size_t value_bits)
     return value_bits / 2u + 64u;
 }
 
-static void assert_same_to_bits(const number_t got,
-                                const number_t expected,
-                                size_t compare_bits,
-                                const char *label)
+static void assert_same_to_bits(const number_t got, const number_t expected, size_t compare_bits, const char *label)
 {
     number_t got_cmp = num_clone(got);
     number_t expected_cmp = num_clone(expected);
@@ -357,8 +341,7 @@ static void check_binary_eval_case(const binary_eval_case_t *tc)
 static void test_removable_trig_quotient_at_zero_evaluates_to_limit(void)
 {
     expr_bindings_t *bindings = NULL;
-    expr_t *expr = expr_from_string("{ sin(5*x)/sin(9*x) | x = 0 }",
-                                    &bindings);
+    expr_t *expr = expr_from_string("{ sin(5*x)/sin(9*x) | x = 0 }", &bindings);
     number_t value = expr ? expr_eval(expr) : num_clone(NUM_NAN);
     number_t five = num_create_from_long(5);
     number_t nine = num_create_from_long(9);
@@ -384,15 +367,14 @@ static void check_unary_derivative_case(const unary_eval_case_t *tc)
     number_t value;
     number_t grad;
     number_t deriv_value = expr_eval(deriv);
-    const expr_t *vars[1] = { x };
+    const expr_t *vars[1] = {x};
     char label[128];
 
     ASSERT_EQ_INT(expr_eval_derivatives(expr, 1u, vars, &value, &grad), 0);
     snprintf(label, sizeof(label), "numeric derivative sweep: %s", tc->name);
     if (!(num_eq(deriv_value, grad) ||
-          (tc->deriv_tol_override
-               ? number_close_with_tolerance_text(deriv_value, grad, tc->deriv_tol_override)
-               : number_close_for_qfloat_precision(deriv_value, grad)))) {
+          (tc->deriv_tol_override ? number_close_with_tolerance_text(deriv_value, grad, tc->deriv_tol_override)
+                                  : number_close_for_qfloat_precision(deriv_value, grad)))) {
         string_t *got_text = format_number_for_test_output(deriv_value);
         string_t *expected_text = format_number_for_test_output(grad);
 
@@ -428,13 +410,12 @@ static void check_binary_derivative_case(const binary_eval_case_t *tc)
     number_t grads[2];
     number_t got_dx = expr_eval(deriv_x);
     number_t got_dy = expr_eval(deriv_y);
-    const expr_t *vars[2] = { x, y };
+    const expr_t *vars[2] = {x, y};
     char label[128];
 
     ASSERT_EQ_INT(expr_eval_derivatives(expr, 2u, vars, &value, grads), 0);
     snprintf(label, sizeof(label), "numeric derivative sweep d/dx: %s", tc->name);
-    if (!(num_eq(got_dx, grads[0]) ||
-          number_close_for_qfloat_precision(got_dx, grads[0]))) {
+    if (!(num_eq(got_dx, grads[0]) || number_close_for_qfloat_precision(got_dx, grads[0]))) {
         string_t *got_text = format_number_for_test_output(got_dx);
         string_t *expected_text = format_number_for_test_output(grads[0]);
 
@@ -446,8 +427,7 @@ static void check_binary_derivative_case(const binary_eval_case_t *tc)
         TEST_FAIL();
     }
     snprintf(label, sizeof(label), "numeric derivative sweep d/dy: %s", tc->name);
-    if (!(num_eq(got_dy, grads[1]) ||
-          number_close_for_qfloat_precision(got_dy, grads[1]))) {
+    if (!(num_eq(got_dy, grads[1]) || number_close_for_qfloat_precision(got_dy, grads[1]))) {
         string_t *got_text = format_number_for_test_output(got_dy);
         string_t *expected_text = format_number_for_test_output(grads[1]);
 
@@ -473,9 +453,7 @@ static void check_binary_derivative_case(const binary_eval_case_t *tc)
     num_destroy(&lhs);
 }
 
-static void check_high_precision_unary_value_case(const unary_eval_case_t *tc,
-                                                  size_t value_bits,
-                                                  size_t oracle_bits)
+static void check_high_precision_unary_value_case(const unary_eval_case_t *tc, size_t value_bits, size_t oracle_bits)
 {
     number_t input = num_from_text_bits(tc->input, value_bits);
     number_t oracle_input = num_from_text_bits(tc->input, oracle_bits);
@@ -498,9 +476,7 @@ static void check_high_precision_unary_value_case(const unary_eval_case_t *tc,
     num_destroy(&input);
 }
 
-static void check_high_precision_binary_value_case(const binary_eval_case_t *tc,
-                                                   size_t value_bits,
-                                                   size_t oracle_bits)
+static void check_high_precision_binary_value_case(const binary_eval_case_t *tc, size_t value_bits, size_t oracle_bits)
 {
     number_t lhs = num_from_text_bits(tc->lhs, value_bits);
     number_t rhs = num_from_text_bits(tc->rhs, value_bits);
@@ -531,8 +507,7 @@ static void check_high_precision_binary_value_case(const binary_eval_case_t *tc,
     num_destroy(&lhs);
 }
 
-static void check_high_precision_unary_derivative_case(const unary_eval_case_t *tc,
-                                                       size_t value_bits,
+static void check_high_precision_unary_derivative_case(const unary_eval_case_t *tc, size_t value_bits,
                                                        size_t oracle_bits)
 {
     number_t input = num_from_text_bits(tc->input, value_bits);
@@ -560,8 +535,7 @@ static void check_high_precision_unary_derivative_case(const unary_eval_case_t *
     num_destroy(&input);
 }
 
-static void check_high_precision_binary_derivative_case(const binary_eval_case_t *tc,
-                                                        size_t value_bits,
+static void check_high_precision_binary_derivative_case(const binary_eval_case_t *tc, size_t value_bits,
                                                         size_t oracle_bits)
 {
     number_t lhs = num_from_text_bits(tc->lhs, value_bits);
@@ -606,8 +580,7 @@ static void check_high_precision_binary_derivative_case(const binary_eval_case_t
     num_destroy(&lhs);
 }
 
-static void check_high_precision_complex_unary_value_case(const unary_eval_case_t *tc,
-                                                          size_t value_bits,
+static void check_high_precision_complex_unary_value_case(const unary_eval_case_t *tc, size_t value_bits,
                                                           size_t oracle_bits)
 {
     number_t input = num_from_text_bits(tc->input, value_bits);
@@ -631,8 +604,7 @@ static void check_high_precision_complex_unary_value_case(const unary_eval_case_
     num_destroy(&input);
 }
 
-static void check_high_precision_complex_binary_value_case(const binary_eval_case_t *tc,
-                                                           size_t value_bits,
+static void check_high_precision_complex_binary_value_case(const binary_eval_case_t *tc, size_t value_bits,
                                                            size_t oracle_bits)
 {
     number_t lhs = num_from_text_bits(tc->lhs, value_bits);
@@ -673,9 +645,8 @@ static void test_cmp_qfloat_precision(void)
     if (cmp < 0) {
         printf(C_BOLD C_GREEN "PASS" C_RESET " expr_cmp respects qfloat precision\n");
     } else {
-        printf(C_BOLD C_RED "FAIL" C_RESET
-               " expr_cmp lost qfloat precision %s:%d:1 (got %d, expected < 0)\n",
-               __FILE__, __LINE__, cmp);
+        printf(C_BOLD C_RED "FAIL" C_RESET " expr_cmp lost qfloat precision %s:%d:1 (got %d, expected < 0)\n", __FILE__,
+               __LINE__, cmp);
         TEST_FAIL();
     }
 
@@ -801,8 +772,7 @@ static void test_eval_expression_preserves_mpfr_precision(void)
         ASSERT_NOT_NULL(input_text);
         printf(C_BOLD C_GREEN "PASS" C_RESET " high-precision mpfr expr evaluation\n");
         printf("    input    = %s\n", formatted_number_cstr(input_text));
-        printf("    input precision: %zu bits, %zu significant digits\n",
-               num_get_prec_bits(n), num_get_prec_digits(n));
+        printf("    input precision: %zu bits, %zu significant digits\n", num_get_prec_bits(n), num_get_prec_digits(n));
         print_precision_comparison("x + 1", got_sum, expect_sum);
         print_precision_comparison("sqrt(x)", got_root, expect_root);
         printf("\n");
@@ -861,8 +831,7 @@ static void test_eval_expression_preserves_complex_precision(void)
         ASSERT_NOT_NULL(input_text);
         printf(C_BOLD C_GREEN "PASS" C_RESET " high-precision complex expr evaluation\n");
         printf("    input    = %s\n", formatted_number_cstr(input_text));
-        printf("    input precision: %zu bits, %zu significant digits\n",
-               num_get_prec_bits(n), num_get_prec_digits(n));
+        printf("    input precision: %zu bits, %zu significant digits\n", num_get_prec_bits(n), num_get_prec_digits(n));
         print_precision_comparison("z + 1", got_sum, expect_sum);
         print_precision_comparison("exp(z)", got_exp, expect_exp);
         printf("\n");
@@ -909,8 +878,7 @@ static void test_set_val_num_preserves_qfloat_precision(void)
     expr_t *dv = test_expr_new_var_d(0.0);
 
     expr_set_val(dv, n);
-    check_q_at(__FILE__, __LINE__, 1, "expr_set_val preserves qfloat precision",
-               expr_eval_qf(dv), q);
+    check_q_at(__FILE__, __LINE__, 1, "expr_set_val preserves qfloat precision", expr_eval_qf(dv), q);
 
     expr_free(dv);
     num_destroy(&n);
@@ -931,8 +899,7 @@ static void test_default_constants_preserve_builtin_precision(void)
     check_q_at(__FILE__, __LINE__, 1, "expr e uses qfloat precision", expr_eval_qf(e), QF_E);
     phi_value = expr_eval(phi);
     ASSERT_EQ_INT((int)num_get_prec_bits(phi_value), (int)num_get_default_prec_bits());
-    check_q_at(__FILE__, __LINE__, 1, "expr phi preserves builtin value",
-               num_to_qfloat(phi_value), QF_PHI);
+    check_q_at(__FILE__, __LINE__, 1, "expr phi preserves builtin value", num_to_qfloat(phi_value), QF_PHI);
 
     num_destroy(&phi_value);
     expr_free(phi);
@@ -1085,48 +1052,45 @@ static void test_eval_num_on_expression(void)
 static void test_eval_num_function_values(void)
 {
     static const unary_eval_case_t unary_cases[] = {
-        { "sin", "0.5", expr_sin, num_sin, NULL },
-        { "cos", "0.5", expr_cos, num_cos, NULL },
-        { "tan", "0.5", expr_tan, num_tan, NULL },
-        { "sinh", "0.5", expr_sinh, num_sinh, NULL },
-        { "cosh", "0.5", expr_cosh, num_cosh, NULL },
-        { "tanh", "0.5", expr_tanh, num_tanh, NULL },
-        { "asin", "0.25", expr_asin, num_asin, NULL },
-        { "acos", "0.25", expr_acos, num_acos, NULL },
-        { "atan", "0.25", expr_atan, num_atan, NULL },
-        { "asinh", "0.25", expr_asinh, num_asinh, NULL },
-        { "acosh", "1.25", expr_acosh, num_acosh, NULL },
-        { "atanh", "0.25", expr_atanh, num_atanh, NULL },
-        { "exp", "1.5", expr_exp, num_exp, NULL },
-        { "log", "1.5", expr_log, num_log, NULL },
-        { "log10", "1.5", expr_log10, num_log10, NULL },
-        { "sqrt", "2.0", expr_sqrt, num_sqrt, NULL },
-        { "pow_d", "2.0", expr_pow3_builder, num_pow3_builder, NULL },
-        { "abs", "-3.0", expr_abs, num_abs, NULL },
-        { "erf", "0.8", expr_erf, num_erf, NULL },
-        { "erfc", "1.2", expr_erfc, num_erfc, NULL },
-        { "erfinv", "0.5", expr_erfinv, num_erfinv, NULL },
-        { "erfcinv", "0.4", expr_erfcinv, num_erfcinv, NULL },
-        { "gamma", "2.5", expr_gamma, num_gamma, NULL },
-        { "gammainv", GAMMAINV_INPUT_TEXT, expr_gammainv, num_gammainv, NULL },
-        { "lgamma", "2.5", expr_lgamma, num_lgamma, NULL },
-        { "digamma", "2.5", expr_digamma, num_digamma, NULL },
-        { "trigamma", "2.5", expr_trigamma, num_trigamma, NULL },
-        { "W₀", "0.2", expr_lambert_w0, num_lambert_w0, NULL },
+        {"sin", "0.5", expr_sin, num_sin, NULL},
+        {"cos", "0.5", expr_cos, num_cos, NULL},
+        {"tan", "0.5", expr_tan, num_tan, NULL},
+        {"sinh", "0.5", expr_sinh, num_sinh, NULL},
+        {"cosh", "0.5", expr_cosh, num_cosh, NULL},
+        {"tanh", "0.5", expr_tanh, num_tanh, NULL},
+        {"asin", "0.25", expr_asin, num_asin, NULL},
+        {"acos", "0.25", expr_acos, num_acos, NULL},
+        {"atan", "0.25", expr_atan, num_atan, NULL},
+        {"asinh", "0.25", expr_asinh, num_asinh, NULL},
+        {"acosh", "1.25", expr_acosh, num_acosh, NULL},
+        {"atanh", "0.25", expr_atanh, num_atanh, NULL},
+        {"exp", "1.5", expr_exp, num_exp, NULL},
+        {"log", "1.5", expr_log, num_log, NULL},
+        {"log10", "1.5", expr_log10, num_log10, NULL},
+        {"sqrt", "2.0", expr_sqrt, num_sqrt, NULL},
+        {"pow_d", "2.0", expr_pow3_builder, num_pow3_builder, NULL},
+        {"abs", "-3.0", expr_abs, num_abs, NULL},
+        {"erf", "0.8", expr_erf, num_erf, NULL},
+        {"erfc", "1.2", expr_erfc, num_erfc, NULL},
+        {"erfinv", "0.5", expr_erfinv, num_erfinv, NULL},
+        {"erfcinv", "0.4", expr_erfcinv, num_erfcinv, NULL},
+        {"gamma", "2.5", expr_gamma, num_gamma, NULL},
+        {"gammainv", GAMMAINV_INPUT_TEXT, expr_gammainv, num_gammainv, NULL},
+        {"lgamma", "2.5", expr_lgamma, num_lgamma, NULL},
+        {"digamma", "2.5", expr_digamma, num_digamma, NULL},
+        {"trigamma", "2.5", expr_trigamma, num_trigamma, NULL},
+        {"W₀", "0.2", expr_lambert_w0, num_lambert_w0, NULL},
         UCASE_TOL("W₋₁", "-0.1", expr_lambert_wm1, num_lambert_wm1, "1e-30"),
-        { "normal_pdf", "1.0", expr_normal_pdf, num_normal_pdf, NULL },
-        { "normal_cdf", "1.0", expr_normal_cdf, num_normal_cdf, NULL },
-        { "normal_logpdf", "1.0", expr_normal_logpdf, num_normal_logpdf, NULL },
-        { "ei", "1.0", expr_ei, num_ei, NULL },
-        { "e1", "1.0", expr_e1, num_e1, NULL }
-    };
-    static const binary_eval_case_t binary_cases[] = {
-        { "atan2", "2.0", "3.0", expr_atan2, num_atan2 },
-        { "pow", "2.0", "3.0", expr_pow_xp, num_pow },
-        { "hypot", "3.0", "4.0", expr_hypot, num_hypot },
-        { "beta", "2.5", "1.5", expr_beta, num_beta },
-        { "logbeta", "2.5", "1.5", expr_logbeta, num_logbeta }
-    };
+        {"normal_pdf", "1.0", expr_normal_pdf, num_normal_pdf, NULL},
+        {"normal_cdf", "1.0", expr_normal_cdf, num_normal_cdf, NULL},
+        {"normal_logpdf", "1.0", expr_normal_logpdf, num_normal_logpdf, NULL},
+        {"ei", "1.0", expr_ei, num_ei, NULL},
+        {"e1", "1.0", expr_e1, num_e1, NULL}};
+    static const binary_eval_case_t binary_cases[] = {{"atan2", "2.0", "3.0", expr_atan2, num_atan2},
+                                                      {"pow", "2.0", "3.0", expr_pow_xp, num_pow},
+                                                      {"hypot", "3.0", "4.0", expr_hypot, num_hypot},
+                                                      {"beta", "2.5", "1.5", expr_beta, num_beta},
+                                                      {"logbeta", "2.5", "1.5", expr_logbeta, num_logbeta}};
     size_t i;
 
     for (i = 0; i < sizeof(unary_cases) / sizeof(unary_cases[0]); ++i)
@@ -1171,15 +1135,12 @@ static void test_eval_num_function_derivatives(void)
         UCASE("normal_cdf", "1.0", expr_normal_cdf, num_normal_cdf),
         UCASE("normal_logpdf", "1.0", expr_normal_logpdf, num_normal_logpdf),
         UCASE("ei", "1.0", expr_ei, num_ei),
-        UCASE("e1", "1.0", expr_e1, num_e1)
-    };
-    static const binary_eval_case_t binary_cases[] = {
-        { "atan2", "2.0", "3.0", expr_atan2, num_atan2 },
-        { "pow", "2.0", "3.0", expr_pow_xp, num_pow },
-        { "hypot", "3.0", "4.0", expr_hypot, num_hypot },
-        { "beta", "2.5", "1.5", expr_beta, num_beta },
-        { "logbeta", "2.5", "1.5", expr_logbeta, num_logbeta }
-    };
+        UCASE("e1", "1.0", expr_e1, num_e1)};
+    static const binary_eval_case_t binary_cases[] = {{"atan2", "2.0", "3.0", expr_atan2, num_atan2},
+                                                      {"pow", "2.0", "3.0", expr_pow_xp, num_pow},
+                                                      {"hypot", "3.0", "4.0", expr_hypot, num_hypot},
+                                                      {"beta", "2.5", "1.5", expr_beta, num_beta},
+                                                      {"logbeta", "2.5", "1.5", expr_logbeta, num_logbeta}};
     size_t i;
 
     for (i = 0; i < sizeof(unary_cases) / sizeof(unary_cases[0]); ++i)
@@ -1222,15 +1183,12 @@ static void test_high_precision_mpfr_function_values(void)
         UCASE("normal_cdf", "1.0", expr_normal_cdf, num_normal_cdf),
         UCASE("normal_logpdf", "1.0", expr_normal_logpdf, num_normal_logpdf),
         UCASE("ei", "1.0", expr_ei, num_ei),
-        UCASE("e1", "1.0", expr_e1, num_e1)
-    };
-    static const binary_eval_case_t binary_cases[] = {
-        { "atan2", "2.0", "3.0", expr_atan2, num_atan2 },
-        { "pow", "2.0", "3.0", expr_pow_xp, num_pow },
-        { "hypot", "3.0", "4.0", expr_hypot, num_hypot },
-        { "beta", "2.5", "1.5", expr_beta, num_beta },
-        { "logbeta", "2.5", "1.5", expr_logbeta, num_logbeta }
-    };
+        UCASE("e1", "1.0", expr_e1, num_e1)};
+    static const binary_eval_case_t binary_cases[] = {{"atan2", "2.0", "3.0", expr_atan2, num_atan2},
+                                                      {"pow", "2.0", "3.0", expr_pow_xp, num_pow},
+                                                      {"hypot", "3.0", "4.0", expr_hypot, num_hypot},
+                                                      {"beta", "2.5", "1.5", expr_beta, num_beta},
+                                                      {"logbeta", "2.5", "1.5", expr_logbeta, num_logbeta}};
     size_t i;
 
     for (i = 0; i < sizeof(unary_cases) / sizeof(unary_cases[0]); ++i)
@@ -1269,15 +1227,12 @@ static void test_high_precision_mpfr_function_derivatives(void)
         UCASE("normal_cdf", "1.0", expr_normal_cdf, num_normal_cdf),
         UCASE("normal_logpdf", "1.0", expr_normal_logpdf, num_normal_logpdf),
         UCASE("ei", "1.0", expr_ei, num_ei),
-        UCASE("e1", "1.0", expr_e1, num_e1)
-    };
-    static const binary_eval_case_t binary_cases[] = {
-        { "atan2", "2.0", "3.0", expr_atan2, num_atan2 },
-        { "pow", "2.0", "3.0", expr_pow_xp, num_pow },
-        { "hypot", "3.0", "4.0", expr_hypot, num_hypot },
-        { "beta", "2.5", "1.5", expr_beta, num_beta },
-        { "logbeta", "2.5", "1.5", expr_logbeta, num_logbeta }
-    };
+        UCASE("e1", "1.0", expr_e1, num_e1)};
+    static const binary_eval_case_t binary_cases[] = {{"atan2", "2.0", "3.0", expr_atan2, num_atan2},
+                                                      {"pow", "2.0", "3.0", expr_pow_xp, num_pow},
+                                                      {"hypot", "3.0", "4.0", expr_hypot, num_hypot},
+                                                      {"beta", "2.5", "1.5", expr_beta, num_beta},
+                                                      {"logbeta", "2.5", "1.5", expr_logbeta, num_logbeta}};
     size_t i;
 
     for (i = 0; i < sizeof(unary_cases) / sizeof(unary_cases[0]); ++i)
@@ -1289,20 +1244,12 @@ static void test_high_precision_mpfr_function_derivatives(void)
 static void test_high_precision_complex_function_values(void)
 {
     static const unary_eval_case_t unary_cases[] = {
-        UCASE("sin", "1 + 2i", expr_sin, num_sin),
-        UCASE("cos", "1 + 2i", expr_cos, num_cos),
-        UCASE("tan", "1 + 2i", expr_tan, num_tan),
-        UCASE("sinh", "1 + 2i", expr_sinh, num_sinh),
-        UCASE("cosh", "1 + 2i", expr_cosh, num_cosh),
-        UCASE("tanh", "1 + 2i", expr_tanh, num_tanh),
-        UCASE("exp", "1 + 2i", expr_exp, num_exp),
-        UCASE("log", "1 + 2i", expr_log, num_log),
-        UCASE("log10", "1 + 2i", expr_log10, num_log10),
-        UCASE("sqrt", "1 + 2i", expr_sqrt, num_sqrt)
-    };
-    static const binary_eval_case_t binary_cases[] = {
-        { "pow", "1 + 2i", "2 - i", expr_pow_xp, num_pow }
-    };
+        UCASE("sin", "1 + 2i", expr_sin, num_sin),       UCASE("cos", "1 + 2i", expr_cos, num_cos),
+        UCASE("tan", "1 + 2i", expr_tan, num_tan),       UCASE("sinh", "1 + 2i", expr_sinh, num_sinh),
+        UCASE("cosh", "1 + 2i", expr_cosh, num_cosh),    UCASE("tanh", "1 + 2i", expr_tanh, num_tanh),
+        UCASE("exp", "1 + 2i", expr_exp, num_exp),       UCASE("log", "1 + 2i", expr_log, num_log),
+        UCASE("log10", "1 + 2i", expr_log10, num_log10), UCASE("sqrt", "1 + 2i", expr_sqrt, num_sqrt)};
+    static const binary_eval_case_t binary_cases[] = {{"pow", "1 + 2i", "2 - i", expr_pow_xp, num_pow}};
     size_t i;
 
     for (i = 0; i < sizeof(unary_cases) / sizeof(unary_cases[0]); ++i)
@@ -1350,9 +1297,7 @@ static void test_to_string_unbound_omits_binding_wrapper(void)
 
 typedef expr_t *(*test_unary_expr_fn)(const expr_t *dv);
 
-static void check_direct_inverse_simplifies(const char *label,
-                                            test_unary_expr_fn outer,
-                                            test_unary_expr_fn inner)
+static void check_direct_inverse_simplifies(const char *label, test_unary_expr_fn outer, test_unary_expr_fn inner)
 {
     expr_t *x = test_expr_new_named_var_d(0.25, "x");
     expr_t *inner_x = inner(x);
@@ -1364,8 +1309,7 @@ static void check_direct_inverse_simplifies(const char *label,
     if (str_eq(text, expect))
         to_string_pass(label, text, expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1, label,
-                       text ? text : "(null)", expect);
+        to_string_fail(__FILE__, __LINE__, 1, label, text ? text : "(null)", expect);
 
     free(text);
     expr_free(simp);
@@ -1374,9 +1318,7 @@ static void check_direct_inverse_simplifies(const char *label,
     expr_free(x);
 }
 
-static void check_simplified_expression_string(const char *label,
-                                               const char *input,
-                                               const char *expect)
+static void check_simplified_expression_string(const char *label, const char *input, const char *expect)
 {
     expr_bindings_t *bindings = NULL;
     expr_t *expr = expr_from_string(input, &bindings);
@@ -1386,8 +1328,7 @@ static void check_simplified_expression_string(const char *label,
     if (str_eq(text, expect))
         to_string_pass(label, text, expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1, label,
-                       text ? text : "(null)", expect);
+        to_string_fail(__FILE__, __LINE__, 1, label, text ? text : "(null)", expect);
 
     free(text);
     expr_free(simp);
@@ -1404,32 +1345,24 @@ static void test_simplify_exact_rational_square_roots(void)
     expr_t *four_expr = expr_new_const(four);
     expr_t *nine_quarters_expr = expr_new_const(nine_quarters);
     expr_t *sqrt_four = four_expr ? expr_sqrt(four_expr) : NULL;
-    expr_t *sqrt_nine_quarters =
-        nine_quarters_expr ? expr_sqrt(nine_quarters_expr) : NULL;
+    expr_t *sqrt_nine_quarters = nine_quarters_expr ? expr_sqrt(nine_quarters_expr) : NULL;
     expr_t *simplified_four = sqrt_four ? expr_simplify(sqrt_four) : NULL;
-    expr_t *simplified_nine_quarters =
-        sqrt_nine_quarters ? expr_simplify(sqrt_nine_quarters) : NULL;
-    char *four_text =
-        simplified_four ? expr_to_string(simplified_four, style_UNBOUND) : NULL;
-    char *nine_quarters_text = simplified_nine_quarters
-        ? expr_to_string(simplified_nine_quarters, style_UNBOUND)
-        : NULL;
+    expr_t *simplified_nine_quarters = sqrt_nine_quarters ? expr_simplify(sqrt_nine_quarters) : NULL;
+    char *four_text = simplified_four ? expr_to_string(simplified_four, style_UNBOUND) : NULL;
+    char *nine_quarters_text =
+        simplified_nine_quarters ? expr_to_string(simplified_nine_quarters, style_UNBOUND) : NULL;
 
     if (str_eq(four_text, "2"))
         to_string_pass("generated sqrt(4) simplifies exactly", four_text, "2");
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "generated sqrt(4) simplifies exactly",
-                       four_text ? four_text : "(null)", "2");
+        to_string_fail(__FILE__, __LINE__, 1, "generated sqrt(4) simplifies exactly", four_text ? four_text : "(null)",
+                       "2");
 
     if (str_eq(nine_quarters_text, "³⁄₂"))
-        to_string_pass("generated sqrt(9/4) simplifies exactly",
-                       nine_quarters_text, "³⁄₂");
+        to_string_pass("generated sqrt(9/4) simplifies exactly", nine_quarters_text, "³⁄₂");
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "generated sqrt(9/4) simplifies exactly",
-                       nine_quarters_text ? nine_quarters_text : "(null)",
-                       "³⁄₂");
+        to_string_fail(__FILE__, __LINE__, 1, "generated sqrt(9/4) simplifies exactly",
+                       nine_quarters_text ? nine_quarters_text : "(null)", "³⁄₂");
 
     free(nine_quarters_text);
     free(four_text);
@@ -1492,24 +1425,15 @@ static void test_simplify_inverse_unary_pairs(void)
     else
         to_string_fail(__FILE__, __LINE__, 1, "log10(10^x) simplification (EXPR)", log10_ten_pow_s, expect);
 
-    check_direct_inverse_simplifies("sin(asin(x)) simplification (EXPR)",
-                                    expr_sin, expr_asin);
-    check_direct_inverse_simplifies("cos(acos(x)) simplification (EXPR)",
-                                    expr_cos, expr_acos);
-    check_direct_inverse_simplifies("tan(atan(x)) simplification (EXPR)",
-                                    expr_tan, expr_atan);
-    check_direct_inverse_simplifies("sinh(asinh(x)) simplification (EXPR)",
-                                    expr_sinh, expr_asinh);
-    check_direct_inverse_simplifies("cosh(acosh(x)) simplification (EXPR)",
-                                    expr_cosh, expr_acosh);
-    check_direct_inverse_simplifies("tanh(atanh(x)) simplification (EXPR)",
-                                    expr_tanh, expr_atanh);
-    check_direct_inverse_simplifies("erf(erfinv(x)) simplification (EXPR)",
-                                    expr_erf, expr_erfinv);
-    check_direct_inverse_simplifies("erfc(erfcinv(x)) simplification (EXPR)",
-                                    expr_erfc, expr_erfcinv);
-    check_direct_inverse_simplifies("gamma(gammainv(x)) simplification (EXPR)",
-                                    expr_gamma, expr_gammainv);
+    check_direct_inverse_simplifies("sin(asin(x)) simplification (EXPR)", expr_sin, expr_asin);
+    check_direct_inverse_simplifies("cos(acos(x)) simplification (EXPR)", expr_cos, expr_acos);
+    check_direct_inverse_simplifies("tan(atan(x)) simplification (EXPR)", expr_tan, expr_atan);
+    check_direct_inverse_simplifies("sinh(asinh(x)) simplification (EXPR)", expr_sinh, expr_asinh);
+    check_direct_inverse_simplifies("cosh(acosh(x)) simplification (EXPR)", expr_cosh, expr_acosh);
+    check_direct_inverse_simplifies("tanh(atanh(x)) simplification (EXPR)", expr_tanh, expr_atanh);
+    check_direct_inverse_simplifies("erf(erfinv(x)) simplification (EXPR)", expr_erf, expr_erfinv);
+    check_direct_inverse_simplifies("erfc(erfcinv(x)) simplification (EXPR)", expr_erfc, expr_erfcinv);
+    check_direct_inverse_simplifies("gamma(gammainv(x)) simplification (EXPR)", expr_gamma, expr_gammainv);
 
     free(log10_ten_pow_s);
     free(ten_pow_log10_s);
@@ -1539,14 +1463,9 @@ static void test_simplify_lambert_exp_to_quotient(void)
     expr_t *simp_zero;
     char *zero_text;
 
-    check_simplified_expression_string(
-        "exp(W(x)) simplification (EXPR)",
-        "{ exp(W(x)) | x = NAN }",
-        "{ x/W(x) | x = NAN }");
-    check_simplified_expression_string(
-        "exp(W(0)) keeps removable singularity folded (binding)",
-        "{ exp(W(0)) }",
-        "1");
+    check_simplified_expression_string("exp(W(x)) simplification (EXPR)", "{ exp(W(x)) | x = NAN }",
+                                       "{ x/W(x) | x = NAN }");
+    check_simplified_expression_string("exp(W(0)) keeps removable singularity folded (binding)", "{ exp(W(0)) }", "1");
 
     zero = expr_new_const(NUM_ZERO);
     w_zero = expr_lambert_w(zero);
@@ -1555,11 +1474,9 @@ static void test_simplify_lambert_exp_to_quotient(void)
     zero_text = simp_zero ? expr_to_string(simp_zero, style_EXPRESSION) : NULL;
 
     if (str_eq(zero_text, "1"))
-        to_string_pass("exp(W(0)) keeps removable singularity folded (EXPR)",
-                       zero_text, "1");
+        to_string_pass("exp(W(0)) keeps removable singularity folded (EXPR)", zero_text, "1");
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "exp(W(0)) keeps removable singularity folded (EXPR)",
+        to_string_fail(__FILE__, __LINE__, 1, "exp(W(0)) keeps removable singularity folded (EXPR)",
                        zero_text ? zero_text : "(null)", "1");
 
     free(zero_text);
@@ -1609,8 +1526,7 @@ static void test_simplify_two_exp_minus_one_to_two_over_e(void)
     if (str_eq(expr_s, expect))
         to_string_pass("2*exp(-1) simplification (UNBOUND)", expr_s, expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "2*exp(-1) simplification (UNBOUND)", expr_s, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "2*exp(-1) simplification (UNBOUND)", expr_s, expect);
 
     free(expr_s);
     expr_free(simp);
@@ -1890,9 +1806,7 @@ static void test_simplify_trig_and_hyperbolic_identities(void)
     };
 
     for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i)
-        check_simplified_expression_string(cases[i].label,
-                                           cases[i].input,
-                                           cases[i].expect);
+        check_simplified_expression_string(cases[i].label, cases[i].input, cases[i].expect);
 }
 
 static void test_to_string_imaginary_unit_omits_one(void)
@@ -1905,16 +1819,12 @@ static void test_to_string_imaginary_unit_omits_one(void)
     if (str_eq(i_text, "i"))
         to_string_pass("imaginary unit omits coefficient one", i_text, "i");
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "imaginary unit omits coefficient one",
-                       i_text ? i_text : "(null)", "i");
+        to_string_fail(__FILE__, __LINE__, 1, "imaginary unit omits coefficient one", i_text ? i_text : "(null)", "i");
 
     if (str_eq(neg_i_text, "-i"))
-        to_string_pass("negative imaginary unit omits coefficient one",
-                       neg_i_text, "-i");
+        to_string_pass("negative imaginary unit omits coefficient one", neg_i_text, "-i");
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "negative imaginary unit omits coefficient one",
+        to_string_fail(__FILE__, __LINE__, 1, "negative imaginary unit omits coefficient one",
                        neg_i_text ? neg_i_text : "(null)", "-i");
 
     free(neg_i_text);
@@ -1930,12 +1840,10 @@ static void test_complex_coefficient_stays_grouped(void)
     char *text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
 
     if (str_eq(text, "{ (2 + 3i)x | x = 5 }"))
-        to_string_pass("complex coefficient remains grouped",
-                       text, "{ (2 + 3i)x | x = 5 }");
+        to_string_pass("complex coefficient remains grouped", text, "{ (2 + 3i)x | x = 5 }");
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "complex coefficient remains grouped",
-                       text ? text : "(null)", "{ (2 + 3i)x | x = 5 }");
+        to_string_fail(__FILE__, __LINE__, 1, "complex coefficient remains grouped", text ? text : "(null)",
+                       "{ (2 + 3i)x | x = 5 }");
 
     free(text);
     expr_bindings_free(bindings);
@@ -1945,20 +1853,14 @@ static void test_complex_coefficient_stays_grouped(void)
 static void test_pure_imaginary_addend_stays_ungrouped(void)
 {
     expr_bindings_t *bindings = NULL;
-    expr_t *expr = expr_from_string(
-        "{ 1/13*exp(1/13*(x + 5i)) | x = ? }",
-        &bindings);
+    expr_t *expr = expr_from_string("{ 1/13*exp(1/13*(x + 5i)) | x = ? }", &bindings);
     char *text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
-    const char *expect =
-        "{ ¹⁄₁₃·exp(¹⁄₁₃·(x + 5i)) | x = NAN }";
+    const char *expect = "{ ¹⁄₁₃·exp(¹⁄₁₃·(x + 5i)) | x = NAN }";
 
     if (str_eq(text, expect))
-        to_string_pass("pure imaginary addend stays ungrouped",
-                       text, expect);
+        to_string_pass("pure imaginary addend stays ungrouped", text, expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "pure imaginary addend stays ungrouped",
-                       text ? text : "(null)", expect);
+        to_string_fail(__FILE__, __LINE__, 1, "pure imaginary addend stays ungrouped", text ? text : "(null)", expect);
 
     free(text);
     expr_bindings_free(bindings);
@@ -1968,29 +1870,22 @@ static void test_pure_imaginary_addend_stays_ungrouped(void)
 static void test_preserved_complex_function_addend_stays_ungrouped(void)
 {
     expr_bindings_t *bindings = NULL;
-    expr_t *expr = expr_from_string(
-        "{ -c*exp(c) + (W(-2)) | c = -2 }",
-        &bindings);
+    expr_t *expr = expr_from_string("{ -c*exp(c) + (W(-2)) | c = -2 }", &bindings);
     char *text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
     char *tex = expr ? expr_to_string(expr, style_TEX) : NULL;
     const char *expect = "{ -c·exp(c) + W(-2) | c = -2 }";
-    const char *expect_tex =
-        "\\left\\{ -c \\cdot e^{c} + W(-2) \\;\\middle|\\; c = -2 \\right\\}";
+    const char *expect_tex = "\\left\\{ -c \\cdot e^{c} + W(-2) \\;\\middle|\\; c = -2 \\right\\}";
 
     if (str_eq(text, expect))
-        to_string_pass("preserved complex function addend stays ungrouped",
-                       text, expect);
+        to_string_pass("preserved complex function addend stays ungrouped", text, expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "preserved complex function addend stays ungrouped",
+        to_string_fail(__FILE__, __LINE__, 1, "preserved complex function addend stays ungrouped",
                        text ? text : "(null)", expect);
 
     if (str_eq(tex, expect_tex))
-        to_string_pass("preserved complex function addend TeX stays ungrouped",
-                       tex, expect_tex);
+        to_string_pass("preserved complex function addend TeX stays ungrouped", tex, expect_tex);
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "preserved complex function addend TeX stays ungrouped",
+        to_string_fail(__FILE__, __LINE__, 1, "preserved complex function addend TeX stays ungrouped",
                        tex ? tex : "(null)", expect_tex);
 
     free(tex);
@@ -2001,12 +1896,10 @@ static void test_preserved_complex_function_addend_stays_ungrouped(void)
 
 static void test_updated_decimal_binding_stays_decimal(void)
 {
-    const char *input =
-        "{ (i)^2*sinh(x) | x = "
-        "-0.881373587019543025232609324979792309028160328261635410753295608653377184222026 }";
-    const char *expect =
-        "{ -sinh(x) | x = "
-        "-0.881373587019543025232609324979792309028160328261635410753295608653377184222026 }";
+    const char *input = "{ (i)^2*sinh(x) | x = "
+                        "-0.881373587019543025232609324979792309028160328261635410753295608653377184222026 }";
+    const char *expect = "{ -sinh(x) | x = "
+                         "-0.881373587019543025232609324979792309028160328261635410753295608653377184222026 }";
     expr_bindings_t *bindings = NULL;
     expr_t *expr = expr_from_string(input, &bindings);
     expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
@@ -2026,9 +1919,8 @@ static void test_updated_decimal_binding_stays_decimal(void)
     if (str_eq(text, expect))
         to_string_pass("updated exact decimal binding stays decimal", text, expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "updated exact decimal binding stays decimal",
-                       text ? text : "(null)", expect);
+        to_string_fail(__FILE__, __LINE__, 1, "updated exact decimal binding stays decimal", text ? text : "(null)",
+                       expect);
 
     free(text);
     expr_free(simp);
@@ -2044,24 +1936,18 @@ static void test_negative_decimal_function_argument_stays_decimal(void)
     char *text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
     char *tex = expr ? expr_to_string(expr, style_TEX) : NULL;
     int text_ok = str_eq(text, expect);
-    int tex_ok = tex &&
-                 strstr(tex, "-1.96") != NULL &&
-                 strstr(tex, "\\frac{49}{25}") == NULL;
+    int tex_ok = tex && strstr(tex, "-1.96") != NULL && strstr(tex, "\\frac{49}{25}") == NULL;
 
     if (text_ok)
-        to_string_pass("negative decimal function argument stays decimal",
-                       text, expect);
+        to_string_pass("negative decimal function argument stays decimal", text, expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "negative decimal function argument stays decimal",
+        to_string_fail(__FILE__, __LINE__, 1, "negative decimal function argument stays decimal",
                        text ? text : "(null)", expect);
 
     if (tex_ok)
-        to_string_pass("negative decimal function argument TeX stays decimal",
-                       tex, "TeX contains -1.96");
+        to_string_pass("negative decimal function argument TeX stays decimal", tex, "TeX contains -1.96");
     else {
-        printf(C_RED "  FAIL: negative decimal function argument TeX stays decimal\n"
-               C_RESET);
+        printf(C_RED "  FAIL: negative decimal function argument TeX stays decimal\n" C_RESET);
         printf("    tex = %s\n", tex ? tex : "(null)");
         TEST_FAIL();
     }
@@ -2073,36 +1959,27 @@ static void test_negative_decimal_function_argument_stays_decimal(void)
 
 static void test_exact_decimal_literal_stays_decimal_in_expression_render(void)
 {
-    const char *input =
-        "{ exp(sin(1.57079632679489661923132169163975144209858471948544343596133822168661754865486"
-        " - 8.98275566258534851033990592436991679214844400177870060641283930271949038958935E-441i)) }";
+    const char *input = "{ exp(sin(1.57079632679489661923132169163975144209858471948544343596133822168661754865486"
+                        " - 8.98275566258534851033990592436991679214844400177870060641283930271949038958935E-441i)) }";
     expr_t *expr = expr_from_string(input, NULL);
     char *text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
     char *func = expr ? expr_to_string(expr, style_FUNCTION) : NULL;
-    int text_ok = text &&
-                  strstr(text, "1.5707963267948966") != NULL &&
-                  strstr(text, "/5000000000000000") == NULL;
-    int func_ok = func &&
-                  strstr(func, "1.5707963267948966") != NULL &&
-                  strstr(func, "/5000000000000000") == NULL;
+    int text_ok = text && strstr(text, "1.5707963267948966") != NULL && strstr(text, "/5000000000000000") == NULL;
+    int func_ok = func && strstr(func, "1.5707963267948966") != NULL && strstr(func, "/5000000000000000") == NULL;
 
     if (text_ok)
-        to_string_pass("exact decimal literal expression render stays decimal",
-                       text, "contains original decimal literal");
+        to_string_pass("exact decimal literal expression render stays decimal", text,
+                       "contains original decimal literal");
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "exact decimal literal expression render stays decimal",
-                       text ? text : "(null)",
-                       "contains original decimal literal without giant fraction");
+        to_string_fail(__FILE__, __LINE__, 1, "exact decimal literal expression render stays decimal",
+                       text ? text : "(null)", "contains original decimal literal without giant fraction");
 
     if (func_ok)
-        to_string_pass("exact decimal literal function render stays decimal",
-                       func, "contains original decimal literal");
+        to_string_pass("exact decimal literal function render stays decimal", func,
+                       "contains original decimal literal");
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "exact decimal literal function render stays decimal",
-                       func ? func : "(null)",
-                       "contains original decimal literal without giant fraction");
+        to_string_fail(__FILE__, __LINE__, 1, "exact decimal literal function render stays decimal",
+                       func ? func : "(null)", "contains original decimal literal without giant fraction");
 
     free(func);
     free(text);
@@ -2122,15 +1999,13 @@ static void test_to_string_does_not_simplify_plain_expressions(void)
     if (str_eq(expr_text, expr_expect))
         to_string_pass("plain to_string preserves x*x", expr_text, expr_expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "plain to_string preserves x*x",
-                       expr_text ? expr_text : "(null)", expr_expect);
+        to_string_fail(__FILE__, __LINE__, 1, "plain to_string preserves x*x", expr_text ? expr_text : "(null)",
+                       expr_expect);
 
     if (deriv_text && str_eq(deriv_text, deriv_expect))
         to_string_pass("derivative creation still simplifies (x*x)'", deriv_text, deriv_expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "derivative creation still simplifies (x*x)'",
+        to_string_fail(__FILE__, __LINE__, 1, "derivative creation still simplifies (x*x)'",
                        deriv_text ? deriv_text : "(null)", deriv_expect);
 
     free(deriv_text);
@@ -2143,22 +2018,17 @@ static void test_to_string_does_not_simplify_plain_expressions(void)
 static void test_atan_quotient_derivative_simplifies_to_quartic(void)
 {
     expr_bindings_t *bindings = NULL;
-    expr_t *expr = expr_from_string(
-        "{ atan(x/(1-x^2)) + C | x = pi/2 }", &bindings);
+    expr_t *expr = expr_from_string("{ atan(x/(1-x^2)) + C | x = pi/2 }", &bindings);
     expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
     expr_t *derivative = (expr && x) ? expr_create_deriv(expr, x) : NULL;
-    char *text = derivative
-        ? expr_to_string(derivative, style_EXPRESSION)
-        : NULL;
+    char *text = derivative ? expr_to_string(derivative, style_EXPRESSION) : NULL;
     const char *expect = "{ (x² + 1)/(x⁴ - x² + 1) | x = π/2 }";
 
     if (text && str_eq(text, expect))
-        to_string_pass("atan quotient derivative simplifies to quartic",
-                       text, expect);
+        to_string_pass("atan quotient derivative simplifies to quartic", text, expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "atan quotient derivative simplifies to quartic",
-                       text ? text : "(null)", expect);
+        to_string_fail(__FILE__, __LINE__, 1, "atan quotient derivative simplifies to quartic", text ? text : "(null)",
+                       expect);
 
     free(text);
     expr_free(derivative);
@@ -2169,22 +2039,16 @@ static void test_atan_quotient_derivative_simplifies_to_quartic(void)
 static void test_polynomial_quotient_derivative_collects_numerator(void)
 {
     expr_bindings_t *bindings = NULL;
-    expr_t *expr = expr_from_string(
-        "{ (x^2+1)/(x^4-x^2+1) | x=pi/2 }", &bindings);
+    expr_t *expr = expr_from_string("{ (x^2+1)/(x^4-x^2+1) | x=pi/2 }", &bindings);
     expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
     expr_t *derivative = (expr && x) ? expr_create_deriv(expr, x) : NULL;
-    char *text = derivative
-        ? expr_to_string(derivative, style_EXPRESSION)
-        : NULL;
-    const char *expect =
-        "{ 2x·(2 - x⁴ - 2x²)/(x⁴ - x² + 1)² | x = π/2 }";
+    char *text = derivative ? expr_to_string(derivative, style_EXPRESSION) : NULL;
+    const char *expect = "{ 2x·(2 - x⁴ - 2x²)/(x⁴ - x² + 1)² | x = π/2 }";
 
     if (text && str_eq(text, expect))
-        to_string_pass("polynomial quotient derivative collects numerator",
-                       text, expect);
+        to_string_pass("polynomial quotient derivative collects numerator", text, expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "polynomial quotient derivative collects numerator",
+        to_string_fail(__FILE__, __LINE__, 1, "polynomial quotient derivative collects numerator",
                        text ? text : "(null)", expect);
 
     free(text);
@@ -2196,23 +2060,18 @@ static void test_polynomial_quotient_derivative_collects_numerator(void)
 static void test_compound_antiderivative_derivative_cancels_rational_terms(void)
 {
     expr_bindings_t *bindings = NULL;
-    expr_t *expr = expr_from_string(
-        "{ -1/4*(ln(x^4-x^2+1)-4*x*atan(x/(1-x^2))"
-        "+2*sqrt(3)*atan((2*x^2-1)/sqrt(3))) | x=pi/2 }",
-        &bindings);
+    expr_t *expr = expr_from_string("{ -1/4*(ln(x^4-x^2+1)-4*x*atan(x/(1-x^2))"
+                                    "+2*sqrt(3)*atan((2*x^2-1)/sqrt(3))) | x=pi/2 }",
+                                    &bindings);
     expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
     expr_t *derivative = (expr && x) ? expr_create_deriv(expr, x) : NULL;
-    char *text = derivative
-        ? expr_to_string(derivative, style_EXPRESSION)
-        : NULL;
+    char *text = derivative ? expr_to_string(derivative, style_EXPRESSION) : NULL;
     const char *expect = "{ atan(x/(1 - x²)) | x = π/2 }";
 
     if (text && str_eq(text, expect))
-        to_string_pass("compound antiderivative derivative cancels rational terms",
-                       text, expect);
+        to_string_pass("compound antiderivative derivative cancels rational terms", text, expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "compound antiderivative derivative cancels rational terms",
+        to_string_fail(__FILE__, __LINE__, 1, "compound antiderivative derivative cancels rational terms",
                        text ? text : "(null)", expect);
 
     free(text);
@@ -2231,11 +2090,9 @@ static void test_simplify_reuses_clean_nodes_and_dirty_mutations(void)
     char *second_text = second ? expr_to_string(second, style_EXPRESSION) : NULL;
 
     if (first && second && first == second && str_eq(first_text, "{ x² | x = 3 }"))
-        to_string_pass("expr_simplify reuses already simplified clean node",
-                       second_text, "{ x² | x = 3 }");
+        to_string_pass("expr_simplify reuses already simplified clean node", second_text, "{ x² | x = 3 }");
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "expr_simplify reuses already simplified clean node",
+        to_string_fail(__FILE__, __LINE__, 1, "expr_simplify reuses already simplified clean node",
                        second_text ? second_text : "(null)", "{ x² | x = 3 }");
 
     {
@@ -2248,11 +2105,9 @@ static void test_simplify_reuses_clean_nodes_and_dirty_mutations(void)
     char *third_text = third ? expr_to_string(third, style_EXPRESSION) : NULL;
 
     if (third && third != first && str_eq(third_text, "{ x² | x = 5 }"))
-        to_string_pass("expr_set_val dirties simplified ancestors lazily",
-                       third_text, "{ x² | x = 5 }");
+        to_string_pass("expr_set_val dirties simplified ancestors lazily", third_text, "{ x² | x = 5 }");
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "expr_set_val dirties simplified ancestors lazily",
+        to_string_fail(__FILE__, __LINE__, 1, "expr_set_val dirties simplified ancestors lazily",
                        third_text ? third_text : "(null)", "{ x² | x = 5 }");
 
     free(third_text);
@@ -2270,32 +2125,23 @@ static void test_gamma_successor_product_simplifies(void)
     expr_t *recurrence = expr_from_string("{ x*gamma(x) }", NULL);
     expr_t *not_recurrence = expr_from_string("{ (x + 1)*gamma(x) }", NULL);
     expr_t *recurrence_simp = recurrence ? expr_simplify(recurrence) : NULL;
-    expr_t *not_recurrence_simp =
-        not_recurrence ? expr_simplify(not_recurrence) : NULL;
-    char *recurrence_text =
-        recurrence_simp ? expr_to_string(recurrence_simp, style_EXPRESSION) : NULL;
-    char *not_recurrence_text =
-        not_recurrence_simp ? expr_to_string(not_recurrence_simp, style_EXPRESSION) : NULL;
+    expr_t *not_recurrence_simp = not_recurrence ? expr_simplify(not_recurrence) : NULL;
+    char *recurrence_text = recurrence_simp ? expr_to_string(recurrence_simp, style_EXPRESSION) : NULL;
+    char *not_recurrence_text = not_recurrence_simp ? expr_to_string(not_recurrence_simp, style_EXPRESSION) : NULL;
     const char *recurrence_expect = "{ Γ(x + 1) | x = NAN }";
     const char *not_recurrence_expect = "{ (x + 1)·Γ(x) | x = NAN }";
 
     if (str_eq(recurrence_text, recurrence_expect))
-        to_string_pass("x*gamma(x) simplifies by gamma recurrence",
-                       recurrence_text, recurrence_expect);
+        to_string_pass("x*gamma(x) simplifies by gamma recurrence", recurrence_text, recurrence_expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "x*gamma(x) simplifies by gamma recurrence",
-                       recurrence_text ? recurrence_text : "(null)",
-                       recurrence_expect);
+        to_string_fail(__FILE__, __LINE__, 1, "x*gamma(x) simplifies by gamma recurrence",
+                       recurrence_text ? recurrence_text : "(null)", recurrence_expect);
 
     if (str_eq(not_recurrence_text, not_recurrence_expect))
-        to_string_pass("(x+1)*gamma(x) is not the gamma recurrence",
-                       not_recurrence_text, not_recurrence_expect);
+        to_string_pass("(x+1)*gamma(x) is not the gamma recurrence", not_recurrence_text, not_recurrence_expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "(x+1)*gamma(x) is not the gamma recurrence",
-                       not_recurrence_text ? not_recurrence_text : "(null)",
-                       not_recurrence_expect);
+        to_string_fail(__FILE__, __LINE__, 1, "(x+1)*gamma(x) is not the gamma recurrence",
+                       not_recurrence_text ? not_recurrence_text : "(null)", not_recurrence_expect);
 
     free(not_recurrence_text);
     free(recurrence_text);
@@ -2308,35 +2154,25 @@ static void test_gamma_successor_product_simplifies(void)
 static void test_lgamma_successor_sum_simplifies(void)
 {
     expr_t *recurrence = expr_from_string("{ ln(x) + lgamma(x) }", NULL);
-    expr_t *not_recurrence =
-        expr_from_string("{ ln(x + 1) + lgamma(x) }", NULL);
+    expr_t *not_recurrence = expr_from_string("{ ln(x + 1) + lgamma(x) }", NULL);
     expr_t *recurrence_simp = recurrence ? expr_simplify(recurrence) : NULL;
-    expr_t *not_recurrence_simp =
-        not_recurrence ? expr_simplify(not_recurrence) : NULL;
-    char *recurrence_text =
-        recurrence_simp ? expr_to_string(recurrence_simp, style_EXPRESSION) : NULL;
-    char *not_recurrence_text =
-        not_recurrence_simp ? expr_to_string(not_recurrence_simp, style_EXPRESSION) : NULL;
+    expr_t *not_recurrence_simp = not_recurrence ? expr_simplify(not_recurrence) : NULL;
+    char *recurrence_text = recurrence_simp ? expr_to_string(recurrence_simp, style_EXPRESSION) : NULL;
+    char *not_recurrence_text = not_recurrence_simp ? expr_to_string(not_recurrence_simp, style_EXPRESSION) : NULL;
     const char *recurrence_expect = "{ lgamma(x + 1) | x = NAN }";
     const char *not_recurrence_expect = "{ ln(x + 1) + lgamma(x) | x = NAN }";
 
     if (str_eq(recurrence_text, recurrence_expect))
-        to_string_pass("ln(x)+lgamma(x) simplifies by log-gamma recurrence",
-                       recurrence_text, recurrence_expect);
+        to_string_pass("ln(x)+lgamma(x) simplifies by log-gamma recurrence", recurrence_text, recurrence_expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "ln(x)+lgamma(x) simplifies by log-gamma recurrence",
-                       recurrence_text ? recurrence_text : "(null)",
-                       recurrence_expect);
+        to_string_fail(__FILE__, __LINE__, 1, "ln(x)+lgamma(x) simplifies by log-gamma recurrence",
+                       recurrence_text ? recurrence_text : "(null)", recurrence_expect);
 
     if (str_eq(not_recurrence_text, not_recurrence_expect))
-        to_string_pass("ln(x+1)+lgamma(x) is not the log-gamma recurrence",
-                       not_recurrence_text, not_recurrence_expect);
+        to_string_pass("ln(x+1)+lgamma(x) is not the log-gamma recurrence", not_recurrence_text, not_recurrence_expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "ln(x+1)+lgamma(x) is not the log-gamma recurrence",
-                       not_recurrence_text ? not_recurrence_text : "(null)",
-                       not_recurrence_expect);
+        to_string_fail(__FILE__, __LINE__, 1, "ln(x+1)+lgamma(x) is not the log-gamma recurrence",
+                       not_recurrence_text ? not_recurrence_text : "(null)", not_recurrence_expect);
 
     free(not_recurrence_text);
     free(recurrence_text);
@@ -2371,11 +2207,9 @@ static void test_symbolic_negative_pi_derivative_stays_symbolic(void)
     const char *expect = "{ -³⁄₂π/√(x) | x = NAN }";
 
     if (str_eq(deriv_text, expect))
-        to_string_pass("negative symbolic pi derivative stays symbolic",
-                       deriv_text, expect);
+        to_string_pass("negative symbolic pi derivative stays symbolic", deriv_text, expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "negative symbolic pi derivative stays symbolic",
+        to_string_fail(__FILE__, __LINE__, 1, "negative symbolic pi derivative stays symbolic",
                        deriv_text ? deriv_text : "(null)", expect);
 
     free(deriv_text);
@@ -2394,12 +2228,10 @@ static void test_pow_derivative_preserves_literal_base_log(void)
     const char *expect = "{ ln(10)·10^x | x = NAN }";
 
     if (str_eq(deriv_text, expect))
-        to_string_pass("10^x derivative preserves ln(10)",
-                       deriv_text, expect);
+        to_string_pass("10^x derivative preserves ln(10)", deriv_text, expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "10^x derivative preserves ln(10)",
-                       deriv_text ? deriv_text : "(null)", expect);
+        to_string_fail(__FILE__, __LINE__, 1, "10^x derivative preserves ln(10)", deriv_text ? deriv_text : "(null)",
+                       expect);
 
     free(deriv_text);
     expr_free(deriv);
@@ -2415,15 +2247,10 @@ static void test_symbolic_complex_power_derivative_keeps_base_log(void)
     expr_t *deriv = (expr && x) ? expr_create_deriv(expr, x) : NULL;
     char *deriv_text = deriv ? expr_to_string(deriv, style_EXPRESSION) : NULL;
 
-    if (deriv_text &&
-        strstr(deriv_text, "ln(a)") &&
-        strstr(deriv_text, "a^(ix)") &&
-        !strstr(deriv_text, "AN²"))
+    if (deriv_text && strstr(deriv_text, "ln(a)") && strstr(deriv_text, "a^(ix)") && !strstr(deriv_text, "AN²"))
         to_string_pass("a^(ix) derivative keeps ln(a)", deriv_text, deriv_text);
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "a^(ix) derivative keeps ln(a)",
-                       deriv_text ? deriv_text : "(null)",
+        to_string_fail(__FILE__, __LINE__, 1, "a^(ix) derivative keeps ln(a)", deriv_text ? deriv_text : "(null)",
                        "{ i·ln(a)·a^(ix) | x = NAN; a = NAN }");
 
     free(deriv_text);
@@ -2442,11 +2269,9 @@ static void test_symbolic_power_derivative_uses_n_minus_one_form(void)
     const char *expect = "{ n·x^(n - 1) | n = NAN, x = NAN }";
 
     if (str_eq(deriv_text, expect))
-        to_string_pass("x^n derivative simplifies to n*x^(n-1)",
-                       deriv_text, expect);
+        to_string_pass("x^n derivative simplifies to n*x^(n-1)", deriv_text, expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "x^n derivative simplifies to n*x^(n-1)",
+        to_string_fail(__FILE__, __LINE__, 1, "x^n derivative simplifies to n*x^(n-1)",
                        deriv_text ? deriv_text : "(null)", expect);
 
     free(deriv_text);
@@ -2459,31 +2284,25 @@ static void test_named_half_exponent_round_trips_as_symbolic_power(void)
 {
     expr_bindings_t *bindings = NULL;
     expr_bindings_t *round_bindings = NULL;
-    expr_t *expr = expr_from_string("{ (x + a)^n | x = NAN; a = 2, n = 1/2 }",
-                                    &bindings);
+    expr_t *expr = expr_from_string("{ (x + a)^n | x = NAN; a = 2, n = 1/2 }", &bindings);
     char *expr_text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
     expr_t *round = expr_text ? expr_from_string(expr_text, &round_bindings) : NULL;
     expr_t *x = round_bindings ? expr_bindings_get(round_bindings, "x") : NULL;
     expr_t *deriv = (round && x) ? expr_create_deriv(round, x) : NULL;
     char *deriv_text = deriv ? expr_to_string(deriv, style_EXPRESSION) : NULL;
     const char *expr_expect = "{ (x + a)^n | x = NAN; a = 2, n = ¹⁄₂ }";
-    const char *deriv_expect =
-        "{ n·(x + a)^(n - 1) | x = NAN; n = ¹⁄₂, a = 2 }";
+    const char *deriv_expect = "{ n·(x + a)^(n - 1) | x = NAN; n = ¹⁄₂, a = 2 }";
 
     if (str_eq(expr_text, expr_expect))
-        to_string_pass("named half exponent round-trips as symbolic power",
-                       expr_text, expr_expect);
+        to_string_pass("named half exponent round-trips as symbolic power", expr_text, expr_expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "named half exponent round-trips as symbolic power",
+        to_string_fail(__FILE__, __LINE__, 1, "named half exponent round-trips as symbolic power",
                        expr_text ? expr_text : "(null)", expr_expect);
 
     if (str_eq(deriv_text, deriv_expect))
-        to_string_pass("named half exponent derivative keeps n",
-                       deriv_text, deriv_expect);
+        to_string_pass("named half exponent derivative keeps n", deriv_text, deriv_expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "named half exponent derivative keeps n",
+        to_string_fail(__FILE__, __LINE__, 1, "named half exponent derivative keeps n",
                        deriv_text ? deriv_text : "(null)", deriv_expect);
 
     free(deriv_text);
@@ -2509,16 +2328,13 @@ static void test_symbolic_function_power_matches_parenthesized_power(void)
     if (str_eq(expr_text, expr_expect))
         to_string_pass("sin^n(x) parses as sin(x)^n", expr_text, expr_expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "sin^n(x) parses as sin(x)^n",
-                       expr_text ? expr_text : "(null)", expr_expect);
+        to_string_fail(__FILE__, __LINE__, 1, "sin^n(x) parses as sin(x)^n", expr_text ? expr_text : "(null)",
+                       expr_expect);
 
     if (str_eq(deriv_text, deriv_expect))
-        to_string_pass("sin^n(x) derivative matches sin(x)^n",
-                       deriv_text, deriv_expect);
+        to_string_pass("sin^n(x) derivative matches sin(x)^n", deriv_text, deriv_expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "sin^n(x) derivative matches sin(x)^n",
+        to_string_fail(__FILE__, __LINE__, 1, "sin^n(x) derivative matches sin(x)^n",
                        deriv_text ? deriv_text : "(null)", deriv_expect);
 
     free(deriv_text);
@@ -2535,39 +2351,28 @@ static void test_inverse_power_function_notation_uses_supported_inverses_only(vo
     expr_t *sqrt_expr = expr_from_string("{ sqrt^-1(x) }", NULL);
     expr_t *sqrt_power_expr = expr_from_string("{ sqrt(x)^-1 }", NULL);
     char *asin_text = asin_expr ? expr_to_string(asin_expr, style_EXPRESSION) : NULL;
-    char *sqrt_power_text = sqrt_power_expr
-        ? expr_to_string(sqrt_power_expr, style_EXPRESSION) : NULL;
+    char *sqrt_power_text = sqrt_power_expr ? expr_to_string(sqrt_power_expr, style_EXPRESSION) : NULL;
 
     if (str_eq(asin_text, "{ asin(x) | x = NAN }"))
-        to_string_pass("sin^-1(x) parses as asin(x)",
-                       asin_text, "{ asin(x) | x = NAN }");
+        to_string_pass("sin^-1(x) parses as asin(x)", asin_text, "{ asin(x) | x = NAN }");
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "sin^-1(x) parses as asin(x)",
-                       asin_text ? asin_text : "(null)",
+        to_string_fail(__FILE__, __LINE__, 1, "sin^-1(x) parses as asin(x)", asin_text ? asin_text : "(null)",
                        "{ asin(x) | x = NAN }");
 
     if (log_expr == NULL)
         to_string_pass("log^-1(x) is rejected", "(null)", "(null)");
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "log^-1(x) is rejected",
-                       "(non-null)", "(null)");
+        to_string_fail(__FILE__, __LINE__, 1, "log^-1(x) is rejected", "(non-null)", "(null)");
 
     if (sqrt_expr == NULL)
         to_string_pass("sqrt^-1(x) is rejected", "(null)", "(null)");
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "sqrt^-1(x) is rejected",
-                       "(non-null)", "(null)");
+        to_string_fail(__FILE__, __LINE__, 1, "sqrt^-1(x) is rejected", "(non-null)", "(null)");
 
     if (str_eq(sqrt_power_text, "{ 1/√(x) | x = NAN }"))
-        to_string_pass("sqrt(x)^-1 remains valid", sqrt_power_text,
-                       "{ 1/√(x) | x = NAN }");
+        to_string_pass("sqrt(x)^-1 remains valid", sqrt_power_text, "{ 1/√(x) | x = NAN }");
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "sqrt(x)^-1 remains valid",
-                       sqrt_power_text ? sqrt_power_text : "(null)",
+        to_string_fail(__FILE__, __LINE__, 1, "sqrt(x)^-1 remains valid", sqrt_power_text ? sqrt_power_text : "(null)",
                        "{ 1/√(x) | x = NAN }");
 
     free(sqrt_power_text);
@@ -2586,19 +2391,12 @@ static void test_bound_euler_symbol_survives_derivative_simplify(void)
     expr_t *deriv = (expr && x) ? expr_create_deriv(expr, x) : NULL;
     char *deriv_text = deriv ? expr_to_string(deriv, style_EXPRESSION) : NULL;
 
-    if (deriv_text &&
-        strstr(deriv_text, "a^(ix)") &&
-        strstr(deriv_text, "x = π/4") &&
-        strstr(deriv_text, "a = e") &&
-        !strstr(deriv_text, "exp(ix)") &&
-        (strstr(deriv_text, "ln(a)") || strstr(deriv_text, "{ i·a^(ix) |")))
-        to_string_pass("a=e binding survives derivative simplify",
-                       deriv_text, deriv_text);
+    if (deriv_text && strstr(deriv_text, "a^(ix)") && strstr(deriv_text, "x = π/4") && strstr(deriv_text, "a = e") &&
+        !strstr(deriv_text, "exp(ix)") && (strstr(deriv_text, "ln(a)") || strstr(deriv_text, "{ i·a^(ix) |")))
+        to_string_pass("a=e binding survives derivative simplify", deriv_text, deriv_text);
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "a=e binding survives derivative simplify",
-                       deriv_text ? deriv_text : "(null)",
-                       "{ i·ln(a)·a^(ix) | x = π/4; a = e }");
+        to_string_fail(__FILE__, __LINE__, 1, "a=e binding survives derivative simplify",
+                       deriv_text ? deriv_text : "(null)", "{ i·ln(a)·a^(ix) | x = π/4; a = e }");
 
     free(deriv_text);
     expr_free(deriv);
@@ -2616,11 +2414,9 @@ static void test_log_of_imaginary_product_derivative_cancels_i(void)
     const char *expect = "{ 1/(x·ln(10)) | x = NAN }";
 
     if (str_eq(deriv_text, expect))
-        to_string_pass("log(ix) derivative cancels imaginary unit",
-                       deriv_text, expect);
+        to_string_pass("log(ix) derivative cancels imaginary unit", deriv_text, expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "log(ix) derivative cancels imaginary unit",
+        to_string_fail(__FILE__, __LINE__, 1, "log(ix) derivative cancels imaginary unit",
                        deriv_text ? deriv_text : "(null)", expect);
 
     free(deriv_text);
@@ -2633,20 +2429,16 @@ static void test_negative_quotient_derivative_has_single_sign(void)
 {
     expr_bindings_t *bindings = NULL;
     expr_t *expr = expr_from_string(
-        "{ -exp(tan(x))*(tan^2(x)+1)/(exp^2(tan(x))*(tan^2(x)+1)^2+y^2) | x = pi/2, y = pi/4 }",
-        &bindings);
+        "{ -exp(tan(x))*(tan^2(x)+1)/(exp^2(tan(x))*(tan^2(x)+1)^2+y^2) | x = pi/2, y = pi/4 }", &bindings);
     expr_t *y = bindings ? expr_bindings_get(bindings, "y") : NULL;
     expr_t *deriv = (expr && y) ? expr_create_deriv(expr, y) : NULL;
     char *deriv_text = deriv ? expr_to_string(deriv, style_EXPRESSION) : NULL;
-    const char *expect =
-        "{ 2y·exp(tan(x))·(tan²(x) + 1)/((tan²(x) + 1)²·exp(2·tan(x)) + y²)² | y = π/4, x = π/2 }";
+    const char *expect = "{ 2y·exp(tan(x))·(tan²(x) + 1)/((tan²(x) + 1)²·exp(2·tan(x)) + y²)² | y = π/4, x = π/2 }";
 
     if (str_eq(deriv_text, expect))
-        to_string_pass("negative quotient derivative has a single sign",
-                       deriv_text, expect);
+        to_string_pass("negative quotient derivative has a single sign", deriv_text, expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "negative quotient derivative has a single sign",
+        to_string_fail(__FILE__, __LINE__, 1, "negative quotient derivative has a single sign",
                        deriv_text ? deriv_text : "(null)", expect);
 
     free(deriv_text);
@@ -2663,12 +2455,9 @@ static void test_ln10_product_expression_round_trips(void)
     const char *expect = "{ 1/(x·ln(10)) | x = NAN }";
 
     if (str_eq(text, expect))
-        to_string_pass("ln(10) product expression round-trips",
-                       text, expect);
+        to_string_pass("ln(10) product expression round-trips", text, expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "ln(10) product expression round-trips",
-                       text ? text : "(null)", expect);
+        to_string_fail(__FILE__, __LINE__, 1, "ln(10) product expression round-trips", text ? text : "(null)", expect);
 
     free(text);
     expr_bindings_free(bindings);
@@ -2679,34 +2468,27 @@ static void test_lambert_inverse_argument_derivative_simplifies(void)
 {
     expr_bindings_t *bindings = NULL;
     expr_bindings_t *simplify_bindings = NULL;
-    expr_t *simplify_expr =
-        expr_from_string("{ W₀(x*exp(x)) | x = 5 }", &simplify_bindings);
+    expr_t *simplify_expr = expr_from_string("{ W₀(x*exp(x)) | x = 5 }", &simplify_bindings);
     expr_t *simplified_expr = simplify_expr ? expr_simplify(simplify_expr) : NULL;
     expr_t *expr = expr_from_string("{ W₀(x*exp(x)) | x = 5 }", &bindings);
     expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
     expr_t *deriv = (expr && x) ? expr_create_deriv(expr, x) : NULL;
-    char *simplify_text =
-        simplified_expr ? expr_to_string(simplified_expr, style_EXPRESSION) : NULL;
+    char *simplify_text = simplified_expr ? expr_to_string(simplified_expr, style_EXPRESSION) : NULL;
     char *deriv_text = deriv ? expr_to_string(deriv, style_EXPRESSION) : NULL;
     const char *expect_simplify = "5";
     const char *expect = "1";
 
     if (str_eq(simplify_text, expect_simplify))
-        to_string_pass("W0(x*exp(x)) resolves principal branch for x=5",
-                       simplify_text, expect_simplify);
+        to_string_pass("W0(x*exp(x)) resolves principal branch for x=5", simplify_text, expect_simplify);
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "W0(x*exp(x)) resolves principal branch for x=5",
-                       simplify_text ? simplify_text : "(null)",
-                       expect_simplify);
+        to_string_fail(__FILE__, __LINE__, 1, "W0(x*exp(x)) resolves principal branch for x=5",
+                       simplify_text ? simplify_text : "(null)", expect_simplify);
 
     if (str_eq(deriv_text, expect))
-        to_string_pass("W0(x*exp(x)) derivative simplifies",
-                       deriv_text, expect);
+        to_string_pass("W0(x*exp(x)) derivative simplifies", deriv_text, expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "W0(x*exp(x)) derivative simplifies",
-                       deriv_text ? deriv_text : "(null)", expect);
+        to_string_fail(__FILE__, __LINE__, 1, "W0(x*exp(x)) derivative simplifies", deriv_text ? deriv_text : "(null)",
+                       expect);
 
     free(deriv_text);
     free(simplify_text);
@@ -2727,38 +2509,27 @@ static void test_lambert_inverse_branch_selection(void)
     expr_t *w0 = expr_from_string("{ W₀(x*exp(x)) | x = -2 }", &bindings_w0);
     expr_t *wm1 = expr_from_string("{ W-1(x*exp(x)) | x = -2 }", &bindings_wm1);
     expr_t *w = expr_from_string("{ W(x*exp(x)) | x = -2 }", &bindings_w);
-    expr_t *productlog =
-        expr_from_string("{ productlog(x*exp(x)) | x = -2 }",
-                         &bindings_productlog);
+    expr_t *productlog = expr_from_string("{ productlog(x*exp(x)) | x = -2 }", &bindings_productlog);
     expr_t *wm1_simplified = wm1 ? expr_simplify(wm1) : NULL;
     expr_t *w_simplified = w ? expr_simplify(w) : NULL;
-    expr_t *productlog_simplified =
-        productlog ? expr_simplify(productlog) : NULL;
+    expr_t *productlog_simplified = productlog ? expr_simplify(productlog) : NULL;
     expr_t *w_branch = expr_from_string("{ W(-1/e) }", NULL);
-    expr_t *productlog_branch =
-        expr_from_string("{ productlog(-1/e) }", NULL);
+    expr_t *productlog_branch = expr_from_string("{ productlog(-1/e) }", NULL);
     expr_t *w0_branch = expr_from_string("{ W₀(-1/e) }", NULL);
     expr_t *wm1_branch = expr_from_string("{ W-1(-1/e) }", NULL);
     expr_t *w_outside_real_domain = expr_from_string("{ W(-2) }", NULL);
     number_t w_branch_value = w_branch ? expr_eval(w_branch) : NUM_NAN;
-    number_t productlog_branch_value =
-        productlog_branch ? expr_eval(productlog_branch) : NUM_NAN;
+    number_t productlog_branch_value = productlog_branch ? expr_eval(productlog_branch) : NUM_NAN;
     number_t w0_branch_value = w0_branch ? expr_eval(w0_branch) : NUM_NAN;
     number_t wm1_branch_value = wm1_branch ? expr_eval(wm1_branch) : NUM_NAN;
-    number_t w_outside_value = w_outside_real_domain
-        ? expr_eval(w_outside_real_domain) : NUM_NAN;
+    number_t w_outside_value = w_outside_real_domain ? expr_eval(w_outside_real_domain) : NUM_NAN;
     number_t w_outside_exp = num_exp(w_outside_value);
     number_t w_outside_check = num_mul(w_outside_value, w_outside_exp);
     number_t neg_two = num_create_from_string("-2");
     char *w0_text = w0 ? expr_to_string(w0, style_EXPRESSION) : NULL;
-    char *wm1_text =
-        wm1_simplified ? expr_to_string(wm1_simplified, style_EXPRESSION) : NULL;
-    char *w_text =
-        w_simplified ? expr_to_string(w_simplified, style_EXPRESSION) : NULL;
-    char *productlog_text =
-        productlog_simplified
-            ? expr_to_string(productlog_simplified, style_EXPRESSION)
-            : NULL;
+    char *wm1_text = wm1_simplified ? expr_to_string(wm1_simplified, style_EXPRESSION) : NULL;
+    char *w_text = w_simplified ? expr_to_string(w_simplified, style_EXPRESSION) : NULL;
+    char *productlog_text = productlog_simplified ? expr_to_string(productlog_simplified, style_EXPRESSION) : NULL;
     string_t *w_branch_text = num_to_string(w_branch_value);
     string_t *productlog_branch_text = num_to_string(productlog_branch_value);
     string_t *w0_branch_text = num_to_string(w0_branch_value);
@@ -2769,76 +2540,57 @@ static void test_lambert_inverse_branch_selection(void)
     const char *expect_branch = "-1";
 
     if (str_eq(w0_text, expect_w0))
-        to_string_pass("W0(x*exp(x)) keeps principal branch for x=-2",
-                       w0_text, expect_w0);
+        to_string_pass("W0(x*exp(x)) keeps principal branch for x=-2", w0_text, expect_w0);
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "W0(x*exp(x)) keeps principal branch for x=-2",
+        to_string_fail(__FILE__, __LINE__, 1, "W0(x*exp(x)) keeps principal branch for x=-2",
                        w0_text ? w0_text : "(null)", expect_w0);
 
     if (str_eq(wm1_text, expect_wm1))
-        to_string_pass("W-1(x*exp(x)) resolves lower branch for x=-2",
-                       wm1_text, expect_wm1);
+        to_string_pass("W-1(x*exp(x)) resolves lower branch for x=-2", wm1_text, expect_wm1);
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "W-1(x*exp(x)) resolves lower branch for x=-2",
+        to_string_fail(__FILE__, __LINE__, 1, "W-1(x*exp(x)) resolves lower branch for x=-2",
                        wm1_text ? wm1_text : "(null)", expect_wm1);
 
     if (str_eq(w_text, expect_w))
-        to_string_pass("W(x*exp(x)) chooses lower branch for x=-2",
-                       w_text, expect_w);
+        to_string_pass("W(x*exp(x)) chooses lower branch for x=-2", w_text, expect_w);
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "W(x*exp(x)) chooses lower branch for x=-2",
-                       w_text ? w_text : "(null)", expect_w);
+        to_string_fail(__FILE__, __LINE__, 1, "W(x*exp(x)) chooses lower branch for x=-2", w_text ? w_text : "(null)",
+                       expect_w);
 
     if (str_eq(productlog_text, expect_w))
-        to_string_pass("productlog(x*exp(x)) chooses lower branch for x=-2",
-                       productlog_text, expect_w);
+        to_string_pass("productlog(x*exp(x)) chooses lower branch for x=-2", productlog_text, expect_w);
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "productlog(x*exp(x)) chooses lower branch for x=-2",
+        to_string_fail(__FILE__, __LINE__, 1, "productlog(x*exp(x)) chooses lower branch for x=-2",
                        productlog_text ? productlog_text : "(null)", expect_w);
 
     if (str_eq(formatted_number_cstr(w_branch_text), expect_branch))
-        to_string_pass("W(-1/e) resolves branch point exactly",
-                       formatted_number_cstr(w_branch_text), expect_branch);
+        to_string_pass("W(-1/e) resolves branch point exactly", formatted_number_cstr(w_branch_text), expect_branch);
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "W(-1/e) resolves branch point exactly",
-                       formatted_number_cstr(w_branch_text),
-                       expect_branch);
+        to_string_fail(__FILE__, __LINE__, 1, "W(-1/e) resolves branch point exactly",
+                       formatted_number_cstr(w_branch_text), expect_branch);
 
     if (str_eq(formatted_number_cstr(productlog_branch_text), expect_branch))
-        to_string_pass("productlog(-1/e) resolves branch point exactly",
-                       formatted_number_cstr(productlog_branch_text), expect_branch);
-    else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "productlog(-1/e) resolves branch point exactly",
-                       formatted_number_cstr(productlog_branch_text),
+        to_string_pass("productlog(-1/e) resolves branch point exactly", formatted_number_cstr(productlog_branch_text),
                        expect_branch);
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "productlog(-1/e) resolves branch point exactly",
+                       formatted_number_cstr(productlog_branch_text), expect_branch);
 
     if (str_eq(formatted_number_cstr(w0_branch_text), expect_branch))
-        to_string_pass("W0(-1/e) resolves branch point exactly",
-                       formatted_number_cstr(w0_branch_text), expect_branch);
+        to_string_pass("W0(-1/e) resolves branch point exactly", formatted_number_cstr(w0_branch_text), expect_branch);
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "W0(-1/e) resolves branch point exactly",
-                       formatted_number_cstr(w0_branch_text),
-                       expect_branch);
+        to_string_fail(__FILE__, __LINE__, 1, "W0(-1/e) resolves branch point exactly",
+                       formatted_number_cstr(w0_branch_text), expect_branch);
 
     if (str_eq(formatted_number_cstr(wm1_branch_text), expect_branch))
-        to_string_pass("W-1(-1/e) resolves branch point exactly",
-                       formatted_number_cstr(wm1_branch_text), expect_branch);
-    else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "W-1(-1/e) resolves branch point exactly",
-                       formatted_number_cstr(wm1_branch_text),
+        to_string_pass("W-1(-1/e) resolves branch point exactly", formatted_number_cstr(wm1_branch_text),
                        expect_branch);
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "W-1(-1/e) resolves branch point exactly",
+                       formatted_number_cstr(wm1_branch_text), expect_branch);
 
     ASSERT_TRUE(!num_is_real(w_outside_value));
-    ASSERT_TRUE(number_close_with_tolerance_text(w_outside_check, neg_two,
-                                                "1e-25"));
+    ASSERT_TRUE(number_close_with_tolerance_text(w_outside_check, neg_two, "1e-25"));
 
     num_destroy(&neg_two);
     num_destroy(&w_outside_check);
@@ -2883,11 +2635,9 @@ static void test_productlog_small_complex_inverse_uses_principal_branch(void)
     const char *expect_text = "1/13i";
 
     if (str_eq(expr_text, expect_text))
-        to_string_pass("productlog complex principal branch simplifies",
-                       expr_text, expect_text);
+        to_string_pass("productlog complex principal branch simplifies", expr_text, expect_text);
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "productlog complex principal branch simplifies",
+        to_string_fail(__FILE__, __LINE__, 1, "productlog complex principal branch simplifies",
                        expr_text ? expr_text : "(null)", expect_text);
 
     ASSERT_TRUE(number_close_with_tolerance_text(value, expected, "1e-30"));
@@ -2937,11 +2687,9 @@ static void test_repeated_preserved_log_factor_combines_as_power(void)
     const char *expect = "{ ln(10)²·10^x | x = NAN }";
 
     if (str_eq(deriv_text, expect))
-        to_string_pass("repeated preserved ln(10) factors combine as ln(10)^2",
-                       deriv_text, expect);
+        to_string_pass("repeated preserved ln(10) factors combine as ln(10)^2", deriv_text, expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "repeated preserved ln(10) factors combine as ln(10)^2",
+        to_string_fail(__FILE__, __LINE__, 1, "repeated preserved ln(10) factors combine as ln(10)^2",
                        deriv_text ? deriv_text : "(null)", expect);
 
     free(deriv_text);
@@ -2953,8 +2701,7 @@ static void test_repeated_preserved_log_factor_combines_as_power(void)
 static void test_preserved_log_power_chain_combines_as_power(void)
 {
     expr_bindings_t *bindings = NULL;
-    expr_t *expr = expr_from_string("{ ln(10)^2*ln(10)*10^x | x = NAN }",
-                                    &bindings);
+    expr_t *expr = expr_from_string("{ ln(10)^2*ln(10)*10^x | x = NAN }", &bindings);
     expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
     expr_t *deriv = (expr && x) ? expr_create_deriv(expr, x) : NULL;
     char *expr_text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
@@ -2963,19 +2710,15 @@ static void test_preserved_log_power_chain_combines_as_power(void)
     const char *deriv_expect = "{ ln(10)⁴·10^x | x = NAN }";
 
     if (str_eq(expr_text, expr_expect))
-        to_string_pass("preserved ln(10)^2*ln(10) combines as ln(10)^3",
-                       expr_text, expr_expect);
+        to_string_pass("preserved ln(10)^2*ln(10) combines as ln(10)^3", expr_text, expr_expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "preserved ln(10)^2*ln(10) combines as ln(10)^3",
+        to_string_fail(__FILE__, __LINE__, 1, "preserved ln(10)^2*ln(10) combines as ln(10)^3",
                        expr_text ? expr_text : "(null)", expr_expect);
 
     if (str_eq(deriv_text, deriv_expect))
-        to_string_pass("derivative preserves combined ln(10)^4 factor",
-                       deriv_text, deriv_expect);
+        to_string_pass("derivative preserves combined ln(10)^4 factor", deriv_text, deriv_expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "derivative preserves combined ln(10)^4 factor",
+        to_string_fail(__FILE__, __LINE__, 1, "derivative preserves combined ln(10)^4 factor",
                        deriv_text ? deriv_text : "(null)", deriv_expect);
 
     free(deriv_text);
@@ -2992,9 +2735,9 @@ static void test_unary_constants_preserve_user_literals_in_derivatives(void)
         const char *expect;
         const char *label;
     } cases[] = {
-        { "{ sin(1)*x | x = NAN }",  "sin(1)", "sin(1)*x derivative preserves sin(1)" },
-        { "{ sqrt(2)*x | x = NAN }", "√(2)",   "sqrt(2)*x derivative preserves sqrt(2)" },
-        { "{ exp(1)*x | x = NAN }",  "exp(1)", "exp(1)*x derivative preserves exp(1)" },
+        {"{ sin(1)*x | x = NAN }", "sin(1)", "sin(1)*x derivative preserves sin(1)"},
+        {"{ sqrt(2)*x | x = NAN }", "√(2)", "sqrt(2)*x derivative preserves sqrt(2)"},
+        {"{ exp(1)*x | x = NAN }", "exp(1)", "exp(1)*x derivative preserves exp(1)"},
     };
 
     for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
@@ -3007,9 +2750,7 @@ static void test_unary_constants_preserve_user_literals_in_derivatives(void)
         if (str_eq(deriv_text, cases[i].expect))
             to_string_pass(cases[i].label, deriv_text, cases[i].expect);
         else
-            to_string_fail(__FILE__, __LINE__, 1, cases[i].label,
-                           deriv_text ? deriv_text : "(null)",
-                           cases[i].expect);
+            to_string_fail(__FILE__, __LINE__, 1, cases[i].label, deriv_text ? deriv_text : "(null)", cases[i].expect);
 
         free(deriv_text);
         expr_free(deriv);
@@ -3037,26 +2778,18 @@ static void test_preserved_reciprocal_constant_derivative_round_trips(void)
     deriv = (expr && x) ? expr_create_deriv(expr, x) : NULL;
     deriv_text = deriv ? expr_to_string(deriv, style_EXPRESSION) : NULL;
     deriv_tex = deriv ? expr_to_string(deriv, style_TEX) : NULL;
-    derivative_is_parse_safe =
-        deriv_text &&
-        strcmp(deriv_text, deriv_expect) == 0 &&
-        !strstr(deriv_text, "-21/√(π)");
-    tex_keeps_symbolic_pi =
-        deriv_tex &&
-        strstr(deriv_tex, "\\sqrt{\\pi}") &&
-        strstr(deriv_tex, "\\frac{") &&
-        !strstr(deriv_tex, "1.128379");
+    derivative_is_parse_safe = deriv_text && strcmp(deriv_text, deriv_expect) == 0 && !strstr(deriv_text, "-21/√(π)");
+    tex_keeps_symbolic_pi = deriv_tex && strstr(deriv_tex, "\\sqrt{\\pi}") && strstr(deriv_tex, "\\frac{") &&
+                            !strstr(deriv_tex, "1.128379");
 
     if (derivative_is_parse_safe && tex_keeps_symbolic_pi) {
-        to_string_pass("preserved reciprocal derivative round-trips safely",
-                       deriv_text, "symbolic reciprocal coefficient");
+        to_string_pass("preserved reciprocal derivative round-trips safely", deriv_text,
+                       "symbolic reciprocal coefficient");
     } else {
-        printf(C_RED "  FAIL: preserved reciprocal derivative round-trips safely\n"
-               C_RESET);
+        printf(C_RED "  FAIL: preserved reciprocal derivative round-trips safely\n" C_RESET);
         printf("    derivative = %s\n", deriv_text ? deriv_text : "(null)");
         printf("    tex        = %s\n", deriv_tex ? deriv_tex : "(null)");
-        printf("    expected   = %s, with TeX keeping sqrt(pi) as a fraction\n",
-               deriv_expect);
+        printf("    expected   = %s, with TeX keeping sqrt(pi) as a fraction\n", deriv_expect);
         num_set_default_prec_digits(old_precision);
         TEST_FAIL();
     }
@@ -3078,72 +2811,38 @@ static void test_binary_constants_preserve_user_literals_in_derivatives(void)
         const char *label;
         bool simplify_expr;
     } cases[] = {
-        {
-            "{ atan2(1,2)*x | x = NAN }",
-            "{ atan2(1, 2)x | x = NAN }",
-            "atan2(1, 2)",
-            "atan2(1,2)*x preserves atan2(1,2)",
-            false
-        },
-        {
-            "{ hypot(3,4)*x | x = NAN }",
-            "{ hypot(3, 4)x | x = NAN }",
-            "hypot(3, 4)",
-            "hypot(3,4)*x preserves hypot(3,4)",
-            false
-        },
-        {
-            "{ beta(2,3)*x | x = NAN }",
-            "{ beta(2, 3)x | x = NAN }",
-            "beta(2, 3)",
-            "beta(2,3)*x preserves beta(2,3)",
-            false
-        },
-        {
-            "{ logbeta(2,3)*x | x = NAN }",
-            "{ -ln(12)x | x = NAN }",
-            "-ln(12)",
-            "logbeta(2,3)*x rewrites exactly to -ln(12)",
-            true
-        },
-        {
-            "{ logbeta(1,1)*x | x = NAN }",
-            "0",
-            "0",
-            "logbeta(1,1)*x rewrites exactly to zero",
-            true
-        },
+        {"{ atan2(1,2)*x | x = NAN }", "{ atan2(1, 2)x | x = NAN }", "atan2(1, 2)", "atan2(1,2)*x preserves atan2(1,2)",
+         false},
+        {"{ hypot(3,4)*x | x = NAN }", "{ hypot(3, 4)x | x = NAN }", "hypot(3, 4)", "hypot(3,4)*x preserves hypot(3,4)",
+         false},
+        {"{ beta(2,3)*x | x = NAN }", "{ beta(2, 3)x | x = NAN }", "beta(2, 3)", "beta(2,3)*x preserves beta(2,3)",
+         false},
+        {"{ logbeta(2,3)*x | x = NAN }", "{ -ln(12)x | x = NAN }", "-ln(12)",
+         "logbeta(2,3)*x rewrites exactly to -ln(12)", true},
+        {"{ logbeta(1,1)*x | x = NAN }", "0", "0", "logbeta(1,1)*x rewrites exactly to zero", true},
     };
 
     for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
         expr_bindings_t *bindings = NULL;
         expr_t *expr = expr_from_string(cases[i].input, &bindings);
         expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
-        expr_t *expr_for_text = cases[i].simplify_expr && expr
-            ? expr_simplify(expr)
-            : NULL;
+        expr_t *expr_for_text = cases[i].simplify_expr && expr ? expr_simplify(expr) : NULL;
         expr_t *deriv = (expr && x) ? expr_create_deriv(expr, x) : NULL;
-        char *expr_text = expr
-            ? expr_to_string(expr_for_text ? expr_for_text : expr,
-                             style_EXPRESSION)
-            : NULL;
+        char *expr_text = expr ? expr_to_string(expr_for_text ? expr_for_text : expr, style_EXPRESSION) : NULL;
         char *deriv_text = deriv ? expr_to_string(deriv, style_EXPRESSION) : NULL;
         char deriv_label[128];
 
         if (str_eq(expr_text, cases[i].expr_expect))
             to_string_pass(cases[i].label, expr_text, cases[i].expr_expect);
         else
-            to_string_fail(__FILE__, __LINE__, 1, cases[i].label,
-                           expr_text ? expr_text : "(null)",
+            to_string_fail(__FILE__, __LINE__, 1, cases[i].label, expr_text ? expr_text : "(null)",
                            cases[i].expr_expect);
 
-        snprintf(deriv_label, sizeof(deriv_label),
-                 "%s derivative", cases[i].label);
+        snprintf(deriv_label, sizeof(deriv_label), "%s derivative", cases[i].label);
         if (str_eq(deriv_text, cases[i].deriv_expect))
             to_string_pass(deriv_label, deriv_text, cases[i].deriv_expect);
         else
-            to_string_fail(__FILE__, __LINE__, 1, deriv_label,
-                           deriv_text ? deriv_text : "(null)",
+            to_string_fail(__FILE__, __LINE__, 1, deriv_label, deriv_text ? deriv_text : "(null)",
                            cases[i].deriv_expect);
 
         free(deriv_text);
@@ -3158,17 +2857,14 @@ static void test_binary_constants_preserve_user_literals_in_derivatives(void)
 static void test_symbolic_negative_pi_quotient_stays_symbolic(void)
 {
     expr_bindings_t *bindings = NULL;
-    expr_t *expr =
-        expr_from_string("{ (1/2)*(-3*pi)/sqrt(x) | x = NAN }", &bindings);
+    expr_t *expr = expr_from_string("{ (1/2)*(-3*pi)/sqrt(x) | x = NAN }", &bindings);
     char *expr_text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
     const char *expect = "{ -³⁄₂π/√(x) | x = NAN }";
 
     if (str_eq(expr_text, expect))
-        to_string_pass("negative symbolic pi quotient stays symbolic",
-                       expr_text, expect);
+        to_string_pass("negative symbolic pi quotient stays symbolic", expr_text, expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "negative symbolic pi quotient stays symbolic",
+        to_string_fail(__FILE__, __LINE__, 1, "negative symbolic pi quotient stays symbolic",
                        expr_text ? expr_text : "(null)", expect);
 
     free(expr_text);
@@ -3188,11 +2884,9 @@ static void test_sqrt_quotient_combines_positive_real_denominator(void)
     const char *expect = "√(π/2)";
 
     if (str_eq(text, expect))
-        to_string_pass("sqrt quotient combines positive real denominator",
-                       text, expect);
+        to_string_pass("sqrt quotient combines positive real denominator", text, expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "sqrt quotient combines positive real denominator",
+        to_string_fail(__FILE__, __LINE__, 1, "sqrt quotient combines positive real denominator",
                        text ? text : "(null)", expect);
 
     free(text);
@@ -3207,26 +2901,21 @@ static void test_sqrt_quotient_combines_positive_real_denominator(void)
 static void test_nested_symbolic_pi_derivative_has_no_decimalized_coefficients(void)
 {
     expr_bindings_t *bindings = NULL;
-    expr_t *expr = expr_from_string(
-        "{ (1/16)*pi*exp(pi*sqrt(x))*(15*pi*sqrt(x) + "
-        "x*(pi*(-3*pi*sqrt(x) + pi^2*x)/sqrt(x) + 2*pi^2) - "
-        "5*pi^2*x - 15)/x^(7/2) | x = pi/6 }",
-        &bindings);
+    expr_t *expr = expr_from_string("{ (1/16)*pi*exp(pi*sqrt(x))*(15*pi*sqrt(x) + "
+                                    "x*(pi*(-3*pi*sqrt(x) + pi^2*x)/sqrt(x) + 2*pi^2) - "
+                                    "5*pi^2*x - 15)/x^(7/2) | x = pi/6 }",
+                                    &bindings);
     expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
     expr_t *deriv = (expr && x) ? expr_create_deriv(expr, x) : NULL;
     char *deriv_text = deriv ? expr_to_string(deriv, style_EXPRESSION) : NULL;
     int has_decimalized_pi =
-        deriv_text &&
-        (strstr(deriv_text, "4.712") ||
-         strstr(deriv_text, "9.424") ||
-         strstr(deriv_text, "3.084"));
+        deriv_text && (strstr(deriv_text, "4.712") || strstr(deriv_text, "9.424") || strstr(deriv_text, "3.084"));
 
     if (deriv_text && !has_decimalized_pi)
-        to_string_pass("nested symbolic pi derivative keeps coefficients symbolic",
-                       deriv_text, "(no decimalized pi coefficients)");
+        to_string_pass("nested symbolic pi derivative keeps coefficients symbolic", deriv_text,
+                       "(no decimalized pi coefficients)");
     else {
-        printf(C_RED "  FAIL: nested symbolic pi derivative keeps coefficients symbolic\n"
-               C_RESET);
+        printf(C_RED "  FAIL: nested symbolic pi derivative keeps coefficients symbolic\n" C_RESET);
         printf("    got      = %s\n", deriv_text ? deriv_text : "(null)");
         printf("    expected = no 4.712..., 9.424..., or 3.084... coefficients\n");
         TEST_FAIL();
@@ -3270,9 +2959,7 @@ static void test_binding_exact_unary_numeric_expression_simplifies(void)
         if (str_eq(expr_text, cases[i].expect))
             to_string_pass(cases[i].label, expr_text, cases[i].expect);
         else
-            to_string_fail(__FILE__, __LINE__, 1, cases[i].label,
-                           expr_text ? expr_text : "(null)",
-                           cases[i].expect);
+            to_string_fail(__FILE__, __LINE__, 1, cases[i].label, expr_text ? expr_text : "(null)", cases[i].expect);
 
         free(expr_text);
         expr_bindings_free(bindings);
@@ -3283,17 +2970,14 @@ static void test_binding_exact_unary_numeric_expression_simplifies(void)
 static void test_binding_exact_trig_numeric_expression_simplifies(void)
 {
     expr_bindings_t *bindings = NULL;
-    expr_t *expr =
-        expr_from_string("{ x | x = sin(pi/6)*pi/180*30 }", &bindings);
+    expr_t *expr = expr_from_string("{ x | x = sin(pi/6)*pi/180*30 }", &bindings);
     char *expr_text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
     const char *expect = "¹⁄₁₂π";
 
     if (str_eq(expr_text, expect))
-        to_string_pass("binding sin(pi/6)*pi/180*30 simplifies exactly",
-                       expr_text, expect);
+        to_string_pass("binding sin(pi/6)*pi/180*30 simplifies exactly", expr_text, expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       "binding sin(pi/6)*pi/180*30 simplifies exactly",
+        to_string_fail(__FILE__, __LINE__, 1, "binding sin(pi/6)*pi/180*30 simplifies exactly",
                        expr_text ? expr_text : "(null)", expect);
 
     free(expr_text);
@@ -3332,9 +3016,7 @@ static void test_symbolic_pi_ratio_addsub_uses_number_fraction_arithmetic(void)
         if (str_eq(expr_text, cases[i].expect))
             to_string_pass(cases[i].label, expr_text, cases[i].expect);
         else
-            to_string_fail(__FILE__, __LINE__, 1, cases[i].label,
-                           expr_text ? expr_text : "(null)",
-                           cases[i].expect);
+            to_string_fail(__FILE__, __LINE__, 1, cases[i].label, expr_text ? expr_text : "(null)", cases[i].expect);
 
         free(expr_text);
         expr_free(expr);
@@ -3348,17 +3030,17 @@ static void test_binding_direct_inverse_numeric_expression_simplifies(void)
         const char *expect;
         const char *label;
     } cases[] = {
-        { "{ x | x = sin(asin(12)) }",       "12", "binding sin(asin(12))" },
-        { "{ x | x = cos(acos(12)) }",       "12", "binding cos(acos(12))" },
-        { "{ x | x = tan(atan(12)) }",       "12", "binding tan(atan(12))" },
-        { "{ x | x = sinh(asinh(12)) }",     "12", "binding sinh(asinh(12))" },
-        { "{ x | x = cosh(acosh(12)) }",     "12", "binding cosh(acosh(12))" },
-        { "{ x | x = tanh(atanh(12)) }",     "12", "binding tanh(atanh(12))" },
-        { "{ x | x = exp(ln(12)) }",         "12", "binding exp(ln(12))" },
-        { "{ x | x = ln(exp(12)) }",         "12", "binding ln(exp(12))" },
-        { "{ x | x = erf(erfinv(12)) }",     "12", "binding erf(erfinv(12))" },
-        { "{ x | x = erfc(erfcinv(12)) }",   "12", "binding erfc(erfcinv(12))" },
-        { "{ x | x = gamma(gammainv(12)) }", "12", "binding gamma(gammainv(12))" },
+        {"{ x | x = sin(asin(12)) }", "12", "binding sin(asin(12))"},
+        {"{ x | x = cos(acos(12)) }", "12", "binding cos(acos(12))"},
+        {"{ x | x = tan(atan(12)) }", "12", "binding tan(atan(12))"},
+        {"{ x | x = sinh(asinh(12)) }", "12", "binding sinh(asinh(12))"},
+        {"{ x | x = cosh(acosh(12)) }", "12", "binding cosh(acosh(12))"},
+        {"{ x | x = tanh(atanh(12)) }", "12", "binding tanh(atanh(12))"},
+        {"{ x | x = exp(ln(12)) }", "12", "binding exp(ln(12))"},
+        {"{ x | x = ln(exp(12)) }", "12", "binding ln(exp(12))"},
+        {"{ x | x = erf(erfinv(12)) }", "12", "binding erf(erfinv(12))"},
+        {"{ x | x = erfc(erfcinv(12)) }", "12", "binding erfc(erfcinv(12))"},
+        {"{ x | x = gamma(gammainv(12)) }", "12", "binding gamma(gammainv(12))"},
     };
 
     for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
@@ -3369,9 +3051,7 @@ static void test_binding_direct_inverse_numeric_expression_simplifies(void)
         if (str_eq(expr_text, cases[i].expect))
             to_string_pass(cases[i].label, expr_text, cases[i].expect);
         else
-            to_string_fail(__FILE__, __LINE__, 1, cases[i].label,
-                           expr_text ? expr_text : "(null)",
-                           cases[i].expect);
+            to_string_fail(__FILE__, __LINE__, 1, cases[i].label, expr_text ? expr_text : "(null)", cases[i].expect);
 
         free(expr_text);
         expr_bindings_free(bindings);
@@ -3386,10 +3066,10 @@ static void test_binding_principal_inverse_numeric_expression_simplifies(void)
         const char *expect;
         const char *label;
     } cases[] = {
-        { "{ x | x = atan(tan(pi/5)) }", "π/5", "binding atan(tan(pi/5))" },
-        { "{ x | x = asin(sin(pi/5)) }", "π/5", "binding asin(sin(pi/5))" },
-        { "{ x | x = acos(cos(pi/5)) }", "π/5", "binding acos(cos(pi/5))" },
-        { "{ x | x = atan(tan(3*pi/5)) }", "atan(tan(⅗π))", "binding atan(tan(3*pi/5)) is not principal" },
+        {"{ x | x = atan(tan(pi/5)) }", "π/5", "binding atan(tan(pi/5))"},
+        {"{ x | x = asin(sin(pi/5)) }", "π/5", "binding asin(sin(pi/5))"},
+        {"{ x | x = acos(cos(pi/5)) }", "π/5", "binding acos(cos(pi/5))"},
+        {"{ x | x = atan(tan(3*pi/5)) }", "atan(tan(⅗π))", "binding atan(tan(3*pi/5)) is not principal"},
     };
 
     for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
@@ -3400,9 +3080,7 @@ static void test_binding_principal_inverse_numeric_expression_simplifies(void)
         if (str_eq(expr_text, cases[i].expect))
             to_string_pass(cases[i].label, expr_text, cases[i].expect);
         else
-            to_string_fail(__FILE__, __LINE__, 1, cases[i].label,
-                           expr_text ? expr_text : "(null)",
-                           cases[i].expect);
+            to_string_fail(__FILE__, __LINE__, 1, cases[i].label, expr_text ? expr_text : "(null)", cases[i].expect);
 
         free(expr_text);
         expr_bindings_free(bindings);
@@ -3467,9 +3145,7 @@ static void test_binding_lambert_inverse_numeric_expression_simplifies(void)
         if (str_eq(expr_text, cases[i].expect))
             to_string_pass(cases[i].label, expr_text, cases[i].expect);
         else
-            to_string_fail(__FILE__, __LINE__, 1, cases[i].label,
-                           expr_text ? expr_text : "(null)",
-                           cases[i].expect);
+            to_string_fail(__FILE__, __LINE__, 1, cases[i].label, expr_text ? expr_text : "(null)", cases[i].expect);
 
         free(expr_text);
         expr_bindings_free(bindings);
@@ -3664,9 +3340,7 @@ static void test_binding_successor_and_trig_shape_simplifies(void)
         if (expr_text && str_eq(expr_text, cases[i].expect))
             to_string_pass(cases[i].label, expr_text, cases[i].expect);
         else
-            to_string_fail(__FILE__, __LINE__, 1, cases[i].label,
-                           expr_text ? expr_text : "(null)",
-                           cases[i].expect);
+            to_string_fail(__FILE__, __LINE__, 1, cases[i].label, expr_text ? expr_text : "(null)", cases[i].expect);
 
         free(expr_text);
         expr_bindings_free(bindings);
@@ -3681,69 +3355,69 @@ static void test_binding_exact_core_trig_values_simplify(void)
         const char *expect;
         const char *label;
     } cases[] = {
-        { "{ x | x = sin(0) }",      "0",       "sin(0)" },
-        { "{ x | x = sin(pi/6) }",   "½",       "sin(pi/6)" },
-        { "{ x | x = sin(⅙π) }",     "½",       "sin(⅙π)" },
-        { "{ x | x = sin(pi/4) }",   "√(2)/2",  "sin(pi/4)" },
-        { "{ x | x = sin(pi/3) }",   "√(3)/2",  "sin(pi/3)" },
-        { "{ x | x = sin(pi/2) }",   "1",       "sin(pi/2)" },
-        { "{ x | x = sin(pi) }",     "0",       "sin(pi)" },
-        { "{ x | x = cos(0) }",      "1",       "cos(0)" },
-        { "{ x | x = cos(pi/6) }",   "√(3)/2",  "cos(pi/6)" },
-        { "{ x | x = cos(pi/4) }",   "√(2)/2",  "cos(pi/4)" },
-        { "{ x | x = cos(pi/3) }",   "½",       "cos(pi/3)" },
-        { "{ x | x = cos(pi/2) }",   "0",       "cos(pi/2)" },
-        { "{ x | x = cos(pi) }",     "-1",      "cos(pi)" },
-        { "{ x | x = tan(0) }",      "0",       "tan(0)" },
-        { "{ x | x = tan(pi/6) }",   "√(3)/3",  "tan(pi/6)" },
-        { "{ x | x = tan(pi/4) }",   "1",       "tan(pi/4)" },
-        { "{ x | x = tan(pi/3) }",   "√(3)",    "tan(pi/3)" },
-        { "{ x | x = tan(pi/2) }",   "∞",       "tan(pi/2)" },
-        { "{ x | x = tan(-pi/2) }",  "-∞",      "tan(-pi/2)" },
-        { "{ x | x = tan(pi) }",     "0",       "tan(pi)" },
-        { "{ x | x = sec(0) }",      "1",       "sec(0)" },
-        { "{ x | x = sec(pi/6) }",   "2·√(3)/3", "sec(pi/6)" },
-        { "{ x | x = sec(pi/4) }",   "√(2)",    "sec(pi/4)" },
-        { "{ x | x = sec(pi/3) }",   "2",       "sec(pi/3)" },
-        { "{ x | x = cosec(pi/6) }", "2",       "cosec(pi/6)" },
-        { "{ x | x = cosec(pi/4) }", "√(2)",    "cosec(pi/4)" },
-        { "{ x | x = cosec(pi/3) }", "2·√(3)/3", "cosec(pi/3)" },
-        { "{ x | x = cosec(pi/2) }", "1",       "cosec(pi/2)" },
-        { "{ x | x = cot(pi/6) }",   "√(3)",    "cot(pi/6)" },
-        { "{ x | x = cot(pi/4) }",   "1",       "cot(pi/4)" },
-        { "{ x | x = cot(pi/3) }",   "√(3)/3",  "cot(pi/3)" },
-        { "{ x | x = cot(pi/2) }",   "0",       "cot(pi/2)" },
-        { "{ x | x = asin(0) }",         "0",       "asin(0)" },
-        { "{ x | x = asin(1/2) }",       "π/6",     "asin(1/2)" },
-        { "{ x | x = asin(1/sqrt(2)) }", "π/4",     "asin(1/sqrt(2))" },
-        { "{ x | x = asin(sqrt(3)/2) }", "π/3",     "asin(sqrt(3)/2)" },
-        { "{ x | x = asin(1) }",         "π/2",     "asin(1)" },
-        { "{ x | x = asin(-1/2) }",      "-(π/6)",  "asin(-1/2)" },
-        { "{ x | x = asin(-1/sqrt(2)) }","-(π/4)",  "asin(-1/sqrt(2))" },
-        { "{ x | x = acos(1) }",             "0",       "acos(1)" },
-        { "{ x | x = acos(sqrt(3)/2) }",     "π/6",     "acos(sqrt(3)/2)" },
-        { "{ x | x = acos(1/sqrt(2)) }",     "π/4",     "acos(1/sqrt(2))" },
-        { "{ x | x = acos(1/2) }",           "π/3",     "acos(1/2)" },
-        { "{ x | x = acos(0) }",             "π/2",     "acos(0)" },
-        { "{ x | x = acos(-1) }",            "π",       "acos(-1)" },
-        { "{ x | x = atan(0) }",             "0",       "atan(0)" },
-        { "{ x | x = atan(sqrt(3)/3) }",     "π/6",     "atan(sqrt(3)/3)" },
-        { "{ x | x = atan(1) }",             "π/4",     "atan(1)" },
-        { "{ x | x = atan(sqrt(3)) }",       "π/3",     "atan(sqrt(3))" },
-        { "{ x | x = atan(-1) }",            "-(π/4)",  "atan(-1)" },
-        { "{ x | x = asec(1) }",             "0",       "asec(1)" },
-        { "{ x | x = asec(2/sqrt(3)) }",     "π/6",     "asec(2/sqrt(3))" },
-        { "{ x | x = asec(sqrt(2)) }",       "π/4",     "asec(sqrt(2))" },
-        { "{ x | x = asec(2) }",             "π/3",     "asec(2)" },
-        { "{ x | x = acosec(-1) }",          "-(π/2)",  "acosec(-1)" },
-        { "{ x | x = acosec(1) }",           "π/2",     "acosec(1)" },
-        { "{ x | x = acosec(2/sqrt(3)) }",   "π/3",     "acosec(2/sqrt(3))" },
-        { "{ x | x = acosec(sqrt(2)) }",     "π/4",     "acosec(sqrt(2))" },
-        { "{ x | x = acosec(2) }",           "π/6",     "acosec(2)" },
-        { "{ x | x = acot(sqrt(3)) }",       "π/6",     "acot(sqrt(3))" },
-        { "{ x | x = acot(1) }",             "π/4",     "acot(1)" },
-        { "{ x | x = acot(1/sqrt(3)) }",     "π/3",     "acot(1/sqrt(3))" },
-        { "{ x | x = acot(0) }",             "π/2",     "acot(0)" },
+        {"{ x | x = sin(0) }", "0", "sin(0)"},
+        {"{ x | x = sin(pi/6) }", "½", "sin(pi/6)"},
+        {"{ x | x = sin(⅙π) }", "½", "sin(⅙π)"},
+        {"{ x | x = sin(pi/4) }", "√(2)/2", "sin(pi/4)"},
+        {"{ x | x = sin(pi/3) }", "√(3)/2", "sin(pi/3)"},
+        {"{ x | x = sin(pi/2) }", "1", "sin(pi/2)"},
+        {"{ x | x = sin(pi) }", "0", "sin(pi)"},
+        {"{ x | x = cos(0) }", "1", "cos(0)"},
+        {"{ x | x = cos(pi/6) }", "√(3)/2", "cos(pi/6)"},
+        {"{ x | x = cos(pi/4) }", "√(2)/2", "cos(pi/4)"},
+        {"{ x | x = cos(pi/3) }", "½", "cos(pi/3)"},
+        {"{ x | x = cos(pi/2) }", "0", "cos(pi/2)"},
+        {"{ x | x = cos(pi) }", "-1", "cos(pi)"},
+        {"{ x | x = tan(0) }", "0", "tan(0)"},
+        {"{ x | x = tan(pi/6) }", "√(3)/3", "tan(pi/6)"},
+        {"{ x | x = tan(pi/4) }", "1", "tan(pi/4)"},
+        {"{ x | x = tan(pi/3) }", "√(3)", "tan(pi/3)"},
+        {"{ x | x = tan(pi/2) }", "∞", "tan(pi/2)"},
+        {"{ x | x = tan(-pi/2) }", "-∞", "tan(-pi/2)"},
+        {"{ x | x = tan(pi) }", "0", "tan(pi)"},
+        {"{ x | x = sec(0) }", "1", "sec(0)"},
+        {"{ x | x = sec(pi/6) }", "2·√(3)/3", "sec(pi/6)"},
+        {"{ x | x = sec(pi/4) }", "√(2)", "sec(pi/4)"},
+        {"{ x | x = sec(pi/3) }", "2", "sec(pi/3)"},
+        {"{ x | x = cosec(pi/6) }", "2", "cosec(pi/6)"},
+        {"{ x | x = cosec(pi/4) }", "√(2)", "cosec(pi/4)"},
+        {"{ x | x = cosec(pi/3) }", "2·√(3)/3", "cosec(pi/3)"},
+        {"{ x | x = cosec(pi/2) }", "1", "cosec(pi/2)"},
+        {"{ x | x = cot(pi/6) }", "√(3)", "cot(pi/6)"},
+        {"{ x | x = cot(pi/4) }", "1", "cot(pi/4)"},
+        {"{ x | x = cot(pi/3) }", "√(3)/3", "cot(pi/3)"},
+        {"{ x | x = cot(pi/2) }", "0", "cot(pi/2)"},
+        {"{ x | x = asin(0) }", "0", "asin(0)"},
+        {"{ x | x = asin(1/2) }", "π/6", "asin(1/2)"},
+        {"{ x | x = asin(1/sqrt(2)) }", "π/4", "asin(1/sqrt(2))"},
+        {"{ x | x = asin(sqrt(3)/2) }", "π/3", "asin(sqrt(3)/2)"},
+        {"{ x | x = asin(1) }", "π/2", "asin(1)"},
+        {"{ x | x = asin(-1/2) }", "-(π/6)", "asin(-1/2)"},
+        {"{ x | x = asin(-1/sqrt(2)) }", "-(π/4)", "asin(-1/sqrt(2))"},
+        {"{ x | x = acos(1) }", "0", "acos(1)"},
+        {"{ x | x = acos(sqrt(3)/2) }", "π/6", "acos(sqrt(3)/2)"},
+        {"{ x | x = acos(1/sqrt(2)) }", "π/4", "acos(1/sqrt(2))"},
+        {"{ x | x = acos(1/2) }", "π/3", "acos(1/2)"},
+        {"{ x | x = acos(0) }", "π/2", "acos(0)"},
+        {"{ x | x = acos(-1) }", "π", "acos(-1)"},
+        {"{ x | x = atan(0) }", "0", "atan(0)"},
+        {"{ x | x = atan(sqrt(3)/3) }", "π/6", "atan(sqrt(3)/3)"},
+        {"{ x | x = atan(1) }", "π/4", "atan(1)"},
+        {"{ x | x = atan(sqrt(3)) }", "π/3", "atan(sqrt(3))"},
+        {"{ x | x = atan(-1) }", "-(π/4)", "atan(-1)"},
+        {"{ x | x = asec(1) }", "0", "asec(1)"},
+        {"{ x | x = asec(2/sqrt(3)) }", "π/6", "asec(2/sqrt(3))"},
+        {"{ x | x = asec(sqrt(2)) }", "π/4", "asec(sqrt(2))"},
+        {"{ x | x = asec(2) }", "π/3", "asec(2)"},
+        {"{ x | x = acosec(-1) }", "-(π/2)", "acosec(-1)"},
+        {"{ x | x = acosec(1) }", "π/2", "acosec(1)"},
+        {"{ x | x = acosec(2/sqrt(3)) }", "π/3", "acosec(2/sqrt(3))"},
+        {"{ x | x = acosec(sqrt(2)) }", "π/4", "acosec(sqrt(2))"},
+        {"{ x | x = acosec(2) }", "π/6", "acosec(2)"},
+        {"{ x | x = acot(sqrt(3)) }", "π/6", "acot(sqrt(3))"},
+        {"{ x | x = acot(1) }", "π/4", "acot(1)"},
+        {"{ x | x = acot(1/sqrt(3)) }", "π/3", "acot(1/sqrt(3))"},
+        {"{ x | x = acot(0) }", "π/2", "acot(0)"},
     };
 
     for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
@@ -3754,9 +3428,7 @@ static void test_binding_exact_core_trig_values_simplify(void)
         if (str_eq(expr_text, cases[i].expect))
             to_string_pass(cases[i].label, expr_text, cases[i].expect);
         else
-            to_string_fail(__FILE__, __LINE__, 1, cases[i].label,
-                           expr_text ? expr_text : "(null)",
-                           cases[i].expect);
+            to_string_fail(__FILE__, __LINE__, 1, cases[i].label, expr_text ? expr_text : "(null)", cases[i].expect);
 
         free(expr_text);
         expr_bindings_free(bindings);
@@ -3772,22 +3444,12 @@ static void test_tan_poles_display_as_infinity(void)
         const char *tex_expect;
         int inf_sign;
         const char *label;
-    } cases[] = {
-        {
-            "{ tan(x) | x = π/2 }",
-            "{ tan(x) | x = π/2 }",
-            "\\left\\{ \\tan(x) \\;\\middle|\\; x = \\frac{\\pi}{2} \\right\\}",
-            1,
-            "tan(pi/2) evaluates to infinity"
-        },
-        {
-            "{ tan(x) | x = -π/2 }",
-            "{ tan(x) | x = -π/2 }",
-            "\\left\\{ \\tan(x) \\;\\middle|\\; x = \\frac{-\\pi}{2} \\right\\}",
-            -1,
-            "tan(-pi/2) evaluates to negative infinity"
-        }
-    };
+    } cases[] = {{"{ tan(x) | x = π/2 }", "{ tan(x) | x = π/2 }",
+                  "\\left\\{ \\tan(x) \\;\\middle|\\; x = \\frac{\\pi}{2} \\right\\}", 1,
+                  "tan(pi/2) evaluates to infinity"},
+                 {"{ tan(x) | x = -π/2 }", "{ tan(x) | x = -π/2 }",
+                  "\\left\\{ \\tan(x) \\;\\middle|\\; x = \\frac{-\\pi}{2} \\right\\}", -1,
+                  "tan(-pi/2) evaluates to negative infinity"}};
 
     for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
         expr_bindings_t *bindings = NULL;
@@ -3796,28 +3458,23 @@ static void test_tan_poles_display_as_infinity(void)
         char *tex_text = expr ? expr_to_string(expr, style_TEX) : NULL;
         number_t value = expr ? expr_eval(expr) : num_clone(NUM_NAN);
 
-        if (num_is_inf(value) &&
-            num_get_sign(value) == cases[i].inf_sign)
+        if (num_is_inf(value) && num_get_sign(value) == cases[i].inf_sign)
             printf(C_BOLD C_GREEN "PASS" C_RESET " %s\n\n", cases[i].label);
         else {
-            printf(C_BOLD C_RED "FAIL" C_RESET " %s: value was not expected infinity\n\n",
-                   cases[i].label);
+            printf(C_BOLD C_RED "FAIL" C_RESET " %s: value was not expected infinity\n\n", cases[i].label);
             TEST_FAIL();
         }
 
         if (str_eq(expr_text, cases[i].expr_expect))
             to_string_pass(cases[i].label, expr_text, cases[i].expr_expect);
         else
-            to_string_fail(__FILE__, __LINE__, 1, cases[i].label,
-                           expr_text ? expr_text : "(null)",
+            to_string_fail(__FILE__, __LINE__, 1, cases[i].label, expr_text ? expr_text : "(null)",
                            cases[i].expr_expect);
 
         if (str_eq(tex_text, cases[i].tex_expect))
             to_string_pass(cases[i].label, tex_text, cases[i].tex_expect);
         else
-            to_string_fail(__FILE__, __LINE__, 1, cases[i].label,
-                           tex_text ? tex_text : "(null)",
-                           cases[i].tex_expect);
+            to_string_fail(__FILE__, __LINE__, 1, cases[i].label, tex_text ? tex_text : "(null)", cases[i].tex_expect);
 
         num_destroy(&value);
         free(tex_text);
@@ -3827,10 +3484,7 @@ static void test_tan_poles_display_as_infinity(void)
     }
 }
 
-static void expect_sqrt_negative_text(const char *label,
-                                      const char *field,
-                                      const char *got,
-                                      const char *expected)
+static void expect_sqrt_negative_text(const char *label, const char *field, const char *got, const char *expected)
 {
     char full_label[160];
 
@@ -3838,10 +3492,7 @@ static void expect_sqrt_negative_text(const char *label,
     if (str_eq(got, expected))
         to_string_pass(full_label, got, expected);
     else
-        to_string_fail(__FILE__, __LINE__, 1,
-                       full_label,
-                       got ? got : "(null)",
-                       expected);
+        to_string_fail(__FILE__, __LINE__, 1, full_label, got ? got : "(null)", expected);
 }
 
 static void test_sqrt_negative_exact_evaluates_to_i(void)
@@ -3853,42 +3504,25 @@ static void test_sqrt_negative_exact_evaluates_to_i(void)
         const char *expression;
         const char *function;
         const char *tex;
-    } cases[] = {
-        {
-            "sqrt(-1)",
-            "{ sqrt(-1) }",
-            "i",
-            "√(-1)",
-            "expression expr(void) {\n"
-            "    return sqrt(-1);\n"
-            "}\n\n"
-            "output(expr());",
-            "\\sqrt{-1}"
-        },
-        {
-            "sqrt(-4)",
-            "{ sqrt(-4) }",
-            "2i",
-            "√(-4)",
-            "expression expr(void) {\n"
-            "    return sqrt(-4);\n"
-            "}\n\n"
-            "output(expr());",
-            "\\sqrt{-4}"
-        },
-        {
-            "sqrt(x) with x = -1",
-            "{ sqrt(x) | x = -1 }",
-            "i",
-            "{ √(x) | x = -1 }",
-            "expression expr(x) {\n"
-            "    return sqrt(x);\n"
-            "}\n\n"
-            "x = -1\n"
-            "output(expr(x));",
-            "\\left\\{ \\sqrt{x} \\;\\middle|\\; x = -1 \\right\\}"
-        }
-    };
+    } cases[] = {{"sqrt(-1)", "{ sqrt(-1) }", "i", "√(-1)",
+                  "expression expr(void) {\n"
+                  "    return sqrt(-1);\n"
+                  "}\n\n"
+                  "output(expr());",
+                  "\\sqrt{-1}"},
+                 {"sqrt(-4)", "{ sqrt(-4) }", "2i", "√(-4)",
+                  "expression expr(void) {\n"
+                  "    return sqrt(-4);\n"
+                  "}\n\n"
+                  "output(expr());",
+                  "\\sqrt{-4}"},
+                 {"sqrt(x) with x = -1", "{ sqrt(x) | x = -1 }", "i", "{ √(x) | x = -1 }",
+                  "expression expr(x) {\n"
+                  "    return sqrt(x);\n"
+                  "}\n\n"
+                  "x = -1\n"
+                  "output(expr(x));",
+                  "\\left\\{ \\sqrt{x} \\;\\middle|\\; x = -1 \\right\\}"}};
 
     for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
         expr_bindings_t *bindings = NULL;
@@ -3899,15 +3533,10 @@ static void test_sqrt_negative_exact_evaluates_to_i(void)
         number_t value = expr ? expr_eval(expr) : num_clone(NUM_NAN);
         string_t *value_text = num_to_string(value);
 
-        expect_sqrt_negative_text(cases[i].label, "value",
-                                  formatted_number_cstr(value_text),
-                                  cases[i].value);
-        expect_sqrt_negative_text(cases[i].label, "expression",
-                                  expr_text, cases[i].expression);
-        expect_sqrt_negative_text(cases[i].label, "function",
-                                  function_text, cases[i].function);
-        expect_sqrt_negative_text(cases[i].label, "TeX",
-                                  tex_text, cases[i].tex);
+        expect_sqrt_negative_text(cases[i].label, "value", formatted_number_cstr(value_text), cases[i].value);
+        expect_sqrt_negative_text(cases[i].label, "expression", expr_text, cases[i].expression);
+        expect_sqrt_negative_text(cases[i].label, "function", function_text, cases[i].function);
+        expect_sqrt_negative_text(cases[i].label, "TeX", tex_text, cases[i].tex);
 
         string_free(value_text);
         num_destroy(&value);
@@ -3962,10 +3591,7 @@ static void test_iterated_symbolic_integration_moves_out_of_lab(void)
     expr_t *x;
     expr_t *y;
     expr_t *vars[2];
-    expr_integration_bound_kind_t kinds[2] = {
-        EXPR_INTEGRATION_BOUND_DEFINITE,
-        EXPR_INTEGRATION_BOUND_DEFINITE
-    };
+    expr_integration_bound_kind_t kinds[2] = {EXPR_INTEGRATION_BOUND_DEFINITE, EXPR_INTEGRATION_BOUND_DEFINITE};
     expr_t *lo[2];
     expr_t *hi[2];
     expr_t *result = NULL;
@@ -3992,8 +3618,7 @@ static void test_iterated_symbolic_integration_moves_out_of_lab(void)
     ASSERT_NOT_NULL(hi[0]);
     ASSERT_NOT_NULL(hi[1]);
 
-    result = expr_integrate_iterated(expr, 2u, vars, kinds, lo, hi, 2u,
-                                     &completed_steps, &first_antiderivative);
+    result = expr_integrate_iterated(expr, 2u, vars, kinds, lo, hi, 2u, &completed_steps, &first_antiderivative);
     ASSERT_NOT_NULL(result);
     ASSERT_NOT_NULL(first_antiderivative);
     ASSERT_EQ_INT((int)completed_steps, 2);
@@ -4024,11 +3649,8 @@ static void test_iterated_symbolic_best_effort_reduces_remaining_numeric_dims(vo
     expr_t *x;
     expr_t *y;
     expr_t *vars[2];
-    expr_t *remaining_vars[2] = { NULL, NULL };
-    expr_integration_bound_kind_t kinds[2] = {
-        EXPR_INTEGRATION_BOUND_DEFINITE,
-        EXPR_INTEGRATION_BOUND_DEFINITE
-    };
+    expr_t *remaining_vars[2] = {NULL, NULL};
+    expr_integration_bound_kind_t kinds[2] = {EXPR_INTEGRATION_BOUND_DEFINITE, EXPR_INTEGRATION_BOUND_DEFINITE};
     expr_t *lo[2];
     expr_t *hi[2];
     number_t lo_num[2];
@@ -4050,10 +3672,7 @@ static void test_iterated_symbolic_best_effort_reduces_remaining_numeric_dims(vo
 
     expected_names[0] = "x";
     expected_symbols[0] = x;
-    expected = expr_from_expression_string("sin(x^2) / 2",
-                                           expected_names,
-                                           expected_symbols,
-                                           1u);
+    expected = expr_from_expression_string("sin(x^2) / 2", expected_names, expected_symbols, 1u);
     ASSERT_NOT_NULL(expected);
 
     vars[0] = x;
@@ -4076,11 +3695,8 @@ static void test_iterated_symbolic_best_effort_reduces_remaining_numeric_dims(vo
     remaining_hi_num[0] = num_new();
     remaining_hi_num[1] = num_new();
 
-    result = expr_integrate_iterated_best_effort(expr, 2u, vars, kinds, lo, hi,
-                                                 &completed_steps, &remaining_ndim,
-                                                 remaining_vars,
-                                                 remaining_lo_num, remaining_hi_num,
-                                                 lo_num, hi_num);
+    result = expr_integrate_iterated_best_effort(expr, 2u, vars, kinds, lo, hi, &completed_steps, &remaining_ndim,
+                                                 remaining_vars, remaining_lo_num, remaining_hi_num, lo_num, hi_num);
     ASSERT_NOT_NULL(result);
     ASSERT_EQ_INT((int)completed_steps, 1);
     ASSERT_EQ_INT((int)remaining_ndim, 1);
@@ -4146,8 +3762,7 @@ void test_runtime_regressions(void)
     TEST_RUN_SUBTEST(test_to_string_does_not_simplify_plain_expressions, NULL);
     TEST_RUN_SUBTEST(test_atan_quotient_derivative_simplifies_to_quartic, NULL);
     TEST_RUN_SUBTEST(test_polynomial_quotient_derivative_collects_numerator, NULL);
-    TEST_RUN_SUBTEST(
-        test_compound_antiderivative_derivative_cancels_rational_terms, NULL);
+    TEST_RUN_SUBTEST(test_compound_antiderivative_derivative_cancels_rational_terms, NULL);
     TEST_RUN_SUBTEST(test_simplify_reuses_clean_nodes_and_dirty_mutations, NULL);
     TEST_RUN_SUBTEST(test_gamma_successor_product_simplifies, NULL);
     TEST_RUN_SUBTEST(test_lgamma_successor_sum_simplifies, NULL);

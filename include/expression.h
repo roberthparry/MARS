@@ -1,11 +1,11 @@
 #ifndef EXPRESSION_H
 #define EXPRESSION_H
 
+#include "number.h"
+#include "ustring.h"
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stddef.h>
-#include "number.h"
-#include "ustring.h"
 
 /**
  * @file expression.h
@@ -39,9 +39,9 @@ typedef struct expr_bindings_t expr_bindings_t;
  * These are process-lifetime constant nodes. `EXPR_LN10` evaluates to the
  * current `number_t` ln(10) constant at the library default precision.
  */
-extern const expr_t * const EXPR_ZERO;
-extern const expr_t * const EXPR_ONE;
-extern const expr_t * const EXPR_LN10;
+extern const expr_t *const EXPR_ZERO;
+extern const expr_t *const EXPR_ONE;
+extern const expr_t *const EXPR_LN10;
 
 /* ------------------------------------------------------------------------- */
 /* Constructors — constants                                                  */
@@ -211,11 +211,8 @@ number_t expr_eval(const expr_t *expr);
  * On success, any non-NULL outputs receive owning `number_t` values that the
  * caller must later release with num_destroy().
  */
-int expr_eval_derivatives(const expr_t *expr,
-                        size_t nvars,
-                        const expr_t *const *vars,
-                        number_t *value_out,
-                        number_t *derivs_out);
+int expr_eval_derivatives(const expr_t *expr, size_t nvars, const expr_t *const *vars, number_t *value_out,
+                          number_t *derivs_out);
 
 /* ------------------------------------------------------------------------- */
 /* Goal seek                                                                 */
@@ -268,11 +265,8 @@ typedef struct expr_goal_seek_result {
  * remain unchanged. Returns 0 on convergence and non-zero on invalid input or
  * failure to converge.
  */
-int expr_goal_seek(expr_t *expr,
-                 expr_bindings_t *bindings,
-                 number_t target,
-                 const expr_goal_seek_options_t *options,
-                 expr_goal_seek_result_t *result);
+int expr_goal_seek(expr_t *expr, expr_bindings_t *bindings, number_t target, const expr_goal_seek_options_t *options,
+                   expr_goal_seek_result_t *result);
 
 /**
  * @brief Release owning fields in a goal-seek result.
@@ -351,9 +345,7 @@ expr_t *expr_clone(const expr_t *expr);
  *
  * Returns an owning expression. Inputs are borrowed and are not consumed.
  */
-expr_t *expr_substitute(const expr_t *expr,
-                        const expr_t *needle,
-                        const expr_t *replacement);
+expr_t *expr_substitute(const expr_t *expr, const expr_t *needle, const expr_t *replacement);
 
 /**
  * @brief Return an owning display-oriented simplification of @p expr.
@@ -535,11 +527,13 @@ expr_t *expr_polylog(unsigned int order, const expr_t *expr);
 expr_t *expr_legendre_chi(unsigned int order, const expr_t *expr);
 expr_t *expr_bessel_j(const expr_t *order, const expr_t *argument);
 expr_t *expr_bessel_y(const expr_t *order, const expr_t *argument);
-expr_t *expr_lommel_s(const expr_t *mu, const expr_t *nu,
-                      const expr_t *argument);
-expr_t *expr_appell_f1(const expr_t *a, const expr_t *b1,
-                       const expr_t *b2, const expr_t *c,
-                       const expr_t *x, const expr_t *y);
+expr_t *expr_lommel_s(const expr_t *mu, const expr_t *nu, const expr_t *argument);
+expr_t *expr_appell_f1(const expr_t *a, const expr_t *b1, const expr_t *b2, const expr_t *c, const expr_t *x,
+                       const expr_t *y);
+expr_t *expr_lauricella_f(const expr_t *a, size_t variable_count, const expr_t *const *b, const expr_t *c,
+                          const expr_t *const *x);
+expr_t *expr_hypergeometric_pFq(size_t upper_count, const expr_t *const *upper, size_t lower_count,
+                                const expr_t *const *lower, const expr_t *argument);
 expr_t *expr_gammainv(const expr_t *expr);
 expr_t *expr_gammainc_lower(const expr_t *s, const expr_t *x);
 expr_t *expr_gammainc_upper(const expr_t *s, const expr_t *x);
@@ -621,7 +615,6 @@ void expr_free(expr_t *expr);
  */
 expr_t *expr_simplify(const expr_t *expr);
 
-
 /* ------------------------------------------------------------------------- */
 /* String conversion                                                         */
 /* ------------------------------------------------------------------------- */
@@ -637,12 +630,7 @@ expr_t *expr_simplify(const expr_t *expr);
  * style_UNBOUND     — infix expression body without the { ... | bindings }
  *                     wrapper, e.g. "sin(x₀)"
  */
-typedef enum {
-    style_FUNCTION,
-    style_EXPRESSION,
-    style_TEX,
-    style_UNBOUND
-} style_t;
+typedef enum { style_FUNCTION, style_EXPRESSION, style_TEX, style_UNBOUND } style_t;
 
 /**
  * @brief Serialise @p expr to newly allocated text.
@@ -821,11 +809,7 @@ expr_t *expr_from_text(const string_t *text, expr_bindings_t **bnd_out);
  * @param out_len Receives the payload length in bytes.
  * @return @c true on success, otherwise @c false.
  */
-bool expr_serialize(const expr_t *expr,
-                    string_t **out_type,
-                    string_t **out_encoding,
-                    void **out_data,
-                    size_t *out_len);
+bool expr_serialize(const expr_t *expr, string_t **out_type, string_t **out_encoding, void **out_data, size_t *out_len);
 
 /**
  * @brief Reconstruct an expression from a serialised payload.
@@ -839,10 +823,7 @@ bool expr_serialize(const expr_t *expr,
  * @param encoding Stored encoding label.
  * @return Newly allocated expression on success, otherwise @c NULL.
  */
-expr_t *expr_deserialise(const void *data,
-                         size_t len,
-                         const string_t *type,
-                         const string_t *encoding);
+expr_t *expr_deserialise(const void *data, size_t len, const string_t *type, const string_t *encoding);
 
 /**
  * @brief Look up a parsed binding by name.
@@ -904,10 +885,7 @@ bool expr_bindings_has_symbolic_integral(const expr_bindings_t *bnd);
  * unresolved. On success, @p bindings_out receives bindings for the returned
  * expression.
  */
-expr_t *expr_edit_binding(const expr_t *expr,
-                          const expr_bindings_t *bindings,
-                          const char *name,
-                          const char *value_text,
+expr_t *expr_edit_binding(const expr_t *expr, const expr_bindings_t *bindings, const char *name, const char *value_text,
                           expr_bindings_t **bindings_out);
 
 /**
@@ -929,9 +907,7 @@ void expr_bindings_free(expr_bindings_t *bnd);
  * Returns an owning handle on success, or NULL on error (details written to
  * stderr). The caller must call expr_free() on the returned pointer exactly once.
  */
-expr_t *expr_from_expression_string(const char *expr,
-                                    const char *const *names,
-                                    expr_t *const *symbols,
+expr_t *expr_from_expression_string(const char *expr, const char *const *names, expr_t *const *symbols,
                                     size_t nsymbols);
 
 /**
@@ -940,9 +916,7 @@ expr_t *expr_from_expression_string(const char *expr,
  * This is the string_t-based counterpart to expr_from_expression_string(). The
  * input text is borrowed and is not modified.
  */
-expr_t *expr_from_expression_text(const string_t *expr,
-                                  const string_t *const *names,
-                                  expr_t *const *symbols,
+expr_t *expr_from_expression_text(const string_t *expr, const string_t *const *names, expr_t *const *symbols,
                                   size_t nsymbols);
 
 #endif /* EXPRESSION_H */

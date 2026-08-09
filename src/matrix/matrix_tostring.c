@@ -82,12 +82,11 @@ static int mt_value_is_nan(const string_t *value)
             goto done;
     }
 
-    result =
-        string_view_equals_literal(string_view_all(compact), "nan") ||
-        string_view_equals_literal(string_view_all(compact), "nan+0i") ||
-        string_view_equals_literal(string_view_all(compact), "nan-0i") ||
-        string_view_equals_literal(string_view_all(compact), "nan+0.0i") ||
-        string_view_equals_literal(string_view_all(compact), "nan-0.0i");
+    result = string_view_equals_literal(string_view_all(compact), "nan") ||
+             string_view_equals_literal(string_view_all(compact), "nan+0i") ||
+             string_view_equals_literal(string_view_all(compact), "nan-0i") ||
+             string_view_equals_literal(string_view_all(compact), "nan+0.0i") ||
+             string_view_equals_literal(string_view_all(compact), "nan-0.0i");
 
 done:
     string_cursor_free(cursor);
@@ -135,9 +134,7 @@ static string_t *mb_take(mat_buf_t *b)
     return text;
 }
 
-static string_t *mt_cursor_slice_trimmed_text(const string_cursor_t *cursor,
-                                              string_pos_t start,
-                                              string_pos_t end)
+static string_t *mt_cursor_slice_trimmed_text(const string_cursor_t *cursor, string_pos_t start, string_pos_t end)
 {
     string_cursor_t *scan;
     string_t *text = NULL;
@@ -166,9 +163,7 @@ static string_t *mt_cursor_slice_trimmed_text(const string_cursor_t *cursor,
         }
     }
 
-    text = seen
-        ? string_cursor_slice_between(trimmed_start, trimmed_end, cursor)
-        : string_new_with("");
+    text = seen ? string_cursor_slice_between(trimmed_start, trimmed_end, cursor) : string_new_with("");
 
 done:
     string_cursor_free(scan);
@@ -194,10 +189,7 @@ static int mt_binding_contains(string_t **bindings, size_t nb, const string_t *t
     return 0;
 }
 
-static void mt_append_binding(string_t ***bindings,
-                              size_t *nbindings,
-                              size_t *capbindings,
-                              string_t *token)
+static void mt_append_binding(string_t ***bindings, size_t *nbindings, size_t *capbindings, string_t *token)
 {
     if (!token || string_length(token) == 0u) {
         string_free(token);
@@ -223,12 +215,8 @@ static void mt_append_binding(string_t ***bindings,
     (*bindings)[(*nbindings)++] = token;
 }
 
-static void mt_collect_bindings(string_t ***var_bindings,
-                                size_t *nvar_bindings,
-                                size_t *capvar_bindings,
-                                string_t ***const_bindings,
-                                size_t *nconst_bindings,
-                                size_t *capconst_bindings,
+static void mt_collect_bindings(string_t ***var_bindings, size_t *nvar_bindings, size_t *capvar_bindings,
+                                string_t ***const_bindings, size_t *nconst_bindings, size_t *capconst_bindings,
                                 const string_t *binding_text)
 {
     string_cursor_t *cursor;
@@ -242,8 +230,7 @@ static void mt_collect_bindings(string_t ***var_bindings,
         goto done;
 
     while (!string_cursor_done(cursor)) {
-        while (mt_rune_is_token_space(string_cursor_peek(cursor)) ||
-               rune_is_equal(string_cursor_peek(cursor), ',')) {
+        while (mt_rune_is_token_space(string_cursor_peek(cursor)) || rune_is_equal(string_cursor_peek(cursor), ',')) {
             if (string_cursor_next(cursor) != 0)
                 goto done;
         }
@@ -257,16 +244,13 @@ static void mt_collect_bindings(string_t ***var_bindings,
             break;
 
         string_pos_t start = string_cursor_position(cursor);
-        while (!string_cursor_done(cursor) &&
-               !rune_is_equal(string_cursor_peek(cursor), ',') &&
+        while (!string_cursor_done(cursor) && !rune_is_equal(string_cursor_peek(cursor), ',') &&
                !rune_is_equal(string_cursor_peek(cursor), ';')) {
             if (string_cursor_next(cursor) != 0)
                 goto done;
         }
 
-        string_t *token = mt_cursor_slice_trimmed_text(cursor,
-                                                       start,
-                                                       string_cursor_position(cursor));
+        string_t *token = mt_cursor_slice_trimmed_text(cursor, start, string_cursor_position(cursor));
         if (in_constants)
             mt_append_binding(const_bindings, nconst_bindings, capconst_bindings, token);
         else
@@ -300,25 +284,17 @@ done:
     return ok;
 }
 
-static void mt_collect_expr_bindings(const expr_t *dv,
-                                     string_t ***var_bindings,
-                                     size_t *nvar_bindings,
-                                     size_t *capvar_bindings,
-                                     string_t ***const_bindings,
-                                     size_t *nconst_bindings,
-                                     size_t *capconst_bindings,
-                                     const string_t *binding_text)
+static void mt_collect_expr_bindings(const expr_t *dv, string_t ***var_bindings, size_t *nvar_bindings,
+                                     size_t *capvar_bindings, string_t ***const_bindings, size_t *nconst_bindings,
+                                     size_t *capconst_bindings, const string_t *binding_text)
 {
-    if (dv && expr_is_named_const(dv) &&
-        mt_text_is_nonempty_without_semicolon(binding_text)) {
-        mt_append_binding(const_bindings, nconst_bindings, capconst_bindings,
-                          string_clone(binding_text));
+    if (dv && expr_is_named_const(dv) && mt_text_is_nonempty_without_semicolon(binding_text)) {
+        mt_append_binding(const_bindings, nconst_bindings, capconst_bindings, string_clone(binding_text));
         return;
     }
 
-    mt_collect_bindings(var_bindings, nvar_bindings, capvar_bindings,
-                        const_bindings, nconst_bindings, capconst_bindings,
-                        binding_text);
+    mt_collect_bindings(var_bindings, nvar_bindings, capvar_bindings, const_bindings, nconst_bindings,
+                        capconst_bindings, binding_text);
 }
 
 static string_t *mt_join_binding_list(string_t **bindings, size_t nbindings)
@@ -371,9 +347,8 @@ static int mt_parse_binding_token(const string_t *binding, mt_binding_token_t *o
     out->name = mt_cursor_slice_trimmed_text(cursor, 0u, eq_pos);
     if (string_cursor_next(cursor) != 0)
         goto done;
-    out->value = mt_cursor_slice_trimmed_text(cursor,
-                                              string_cursor_position(cursor),
-                                              string_cursor_end_position(cursor));
+    out->value =
+        mt_cursor_slice_trimmed_text(cursor, string_cursor_position(cursor), string_cursor_end_position(cursor));
     if (!out->name || !out->value) {
         mt_free_binding_token(out);
         goto done;
@@ -394,9 +369,7 @@ static int mt_has_long_binding(string_t **bindings, size_t nbindings, size_t thr
     return 0;
 }
 
-static int mt_all_bindings_are_nan(string_t **var_bindings,
-                                   size_t nvar_bindings,
-                                   string_t **const_bindings,
+static int mt_all_bindings_are_nan(string_t **var_bindings, size_t nvar_bindings, string_t **const_bindings,
                                    size_t nconst_bindings)
 {
     for (size_t i = 0; i < nvar_bindings; ++i) {
@@ -426,11 +399,8 @@ static int mt_all_bindings_are_nan(string_t **var_bindings,
     return (nvar_bindings + nconst_bindings) > 0;
 }
 
-static string_t *mt_join_bindings(string_t **var_bindings,
-                                  size_t nvar_bindings,
-                                  string_t **const_bindings,
-                                  size_t nconst_bindings,
-                                  int scientific)
+static string_t *mt_join_bindings(string_t **var_bindings, size_t nvar_bindings, string_t **const_bindings,
+                                  size_t nconst_bindings, int scientific)
 {
     string_t *vars = NULL;
     string_t *consts = NULL;
@@ -467,8 +437,7 @@ static string_t *mt_join_bindings(string_t **var_bindings,
                     goto scientific_fail;
                 if (emitted > 0 && string_append_cstr(consts, ", ") != 0)
                     goto scientific_fail;
-                if (string_append_string(consts, token.name) != 0 ||
-                    string_append_cstr(consts, " = ") != 0 ||
+                if (string_append_string(consts, token.name) != 0 || string_append_cstr(consts, " = ") != 0 ||
                     string_append_string(consts, value_text) != 0)
                     goto scientific_fail;
                 emitted++;
@@ -477,7 +446,7 @@ static string_t *mt_join_bindings(string_t **var_bindings,
                 mt_free_binding_token(&token);
                 continue;
 
-scientific_fail:
+            scientific_fail:
                 string_free(value_text);
                 num_destroy(&value);
                 mt_free_binding_token(&token);
@@ -504,12 +473,10 @@ scientific_fail:
     if (!out)
         goto fail;
 
-    if (string_length(vars) > 0u &&
-        string_append_string(out, vars) != 0)
+    if (string_length(vars) > 0u && string_append_string(out, vars) != 0)
         goto fail;
     if (string_length(consts) > 0u) {
-        if (string_length(vars) > 0u &&
-            string_append_cstr(out, "; ") != 0)
+        if (string_length(vars) > 0u && string_append_cstr(out, "; ") != 0)
             goto fail;
         if (string_append_string(out, consts) != 0)
             goto fail;
@@ -526,12 +493,7 @@ fail:
     return NULL;
 }
 
-static void mt_emit_cells(mat_buf_t *out,
-                          string_t **cells,
-                          size_t rows,
-                          size_t cols,
-                          const size_t *widths,
-                          int layout)
+static void mt_emit_cells(mat_buf_t *out, string_t **cells, size_t rows, size_t cols, const size_t *widths, int layout)
 {
     if (!layout)
         mb_putc(out, '(');
@@ -546,9 +508,7 @@ static void mt_emit_cells(mat_buf_t *out,
             if (j > 0)
                 mb_puts(out, layout ? " " : ", ");
             if (layout) {
-                for (size_t pad = mt_text_display_length(cells[idx]);
-                     pad < widths[j];
-                     ++pad)
+                for (size_t pad = mt_text_display_length(cells[idx]); pad < widths[j]; ++pad)
                     mb_putc(out, ' ');
             }
             if (cells[idx])
@@ -567,10 +527,7 @@ static void mt_emit_cells(mat_buf_t *out,
         mb_putc(out, ')');
 }
 
-static void mt_emit_cells_tex(mat_buf_t *out,
-                              string_t **cells,
-                              size_t rows,
-                              size_t cols)
+static void mt_emit_cells_tex(mat_buf_t *out, string_t **cells, size_t rows, size_t cols)
 {
     mb_puts(out, "\\begin{bmatrix}");
     for (size_t i = 0; i < rows; ++i) {
@@ -588,9 +545,7 @@ static void mt_emit_cells_tex(mat_buf_t *out,
     mb_puts(out, "\\end{bmatrix}");
 }
 
-static int mt_split_expr_repr(const expr_t *dv,
-                              string_t **expr_out,
-                              string_t **bindings_out)
+static int mt_split_expr_repr(const expr_t *dv, string_t **expr_out, string_t **bindings_out)
 {
     string_t *tmp_text;
     string_t *expr_text = NULL;
@@ -621,8 +576,7 @@ static int mt_split_expr_repr(const expr_t *dv,
         goto done;
 
     body_end = string_cursor_end_position(cursor);
-    if (body_end >= 4u &&
-        string_cursor_match_at(cursor, 0u, "{ ") &&
+    if (body_end >= 4u && string_cursor_match_at(cursor, 0u, "{ ") &&
         string_cursor_match_at(cursor, body_end - 2u, " }")) {
         body_start = 2u;
         body_end -= 2u;
@@ -635,8 +589,7 @@ static int mt_split_expr_repr(const expr_t *dv,
     while (string_cursor_position(scan) < body_end) {
         string_pos_t pos = string_cursor_position(scan);
 
-        if (pos + 3u <= body_end &&
-            string_cursor_match_at(scan, pos, " | ")) {
+        if (pos + 3u <= body_end && string_cursor_match_at(scan, pos, " | ")) {
             sep_pos = pos;
             found_sep = 1;
             break;
@@ -676,9 +629,7 @@ done:
     return ok ? 0 : -1;
 }
 
-static int mt_expr_tex_parts_text(const expr_t *dv,
-                                  string_t **expr_out,
-                                  string_t **bindings_out)
+static int mt_expr_tex_parts_text(const expr_t *dv, string_t **expr_out, string_t **bindings_out)
 {
     char *expr = NULL;
     char *bindings = NULL;
@@ -702,9 +653,7 @@ static int mt_expr_tex_parts_text(const expr_t *dv,
     return ok ? 0 : -1;
 }
 
-static void mt_pretty_expr_expr(string_t **expr_io,
-                                string_t **const_bindings,
-                                size_t nconst_bindings)
+static void mt_pretty_expr_expr(string_t **expr_io, string_t **const_bindings, size_t nconst_bindings)
 {
     string_t *expr;
 
@@ -718,8 +667,7 @@ static void mt_pretty_expr_expr(string_t **expr_io,
         if (mt_parse_binding_token(const_bindings[i], &token) != 0)
             continue;
 
-        if (mt_text_display_length(const_bindings[i]) > 16 &&
-            mt_text_equal(expr, token.value)) {
+        if (mt_text_display_length(const_bindings[i]) > 16 && mt_text_equal(expr, token.value)) {
             string_t *replacement = string_clone(token.name);
             if (replacement) {
                 string_free(*expr_io);
@@ -733,10 +681,7 @@ static void mt_pretty_expr_expr(string_t **expr_io,
     }
 }
 
-static string_t *mt_format_scalar(const matrix_t *A,
-                                  size_t i,
-                                  size_t j,
-                                  int scientific)
+static string_t *mt_format_scalar(const matrix_t *A, size_t i, size_t j, int scientific)
 {
     unsigned char *raw;
     string_t *text = NULL;
@@ -792,9 +737,7 @@ fail:
     return NULL;
 }
 
-static string_t *mt_join_bindings_tex(string_t **var_bindings,
-                                      size_t nvar_bindings,
-                                      string_t **const_bindings,
+static string_t *mt_join_bindings_tex(string_t **var_bindings, size_t nvar_bindings, string_t **const_bindings,
                                       size_t nconst_bindings)
 {
     string_t *vars = nvar_bindings ? mt_texify_binding_list(var_bindings, nvar_bindings) : string_new();
@@ -813,12 +756,10 @@ static string_t *mt_join_bindings_tex(string_t **var_bindings,
     if (!out)
         goto fail;
 
-    if (string_length(vars) > 0u &&
-        string_append_string(out, vars) != 0)
+    if (string_length(vars) > 0u && string_append_string(out, vars) != 0)
         goto fail;
     if (string_length(consts) > 0u) {
-        if (string_length(vars) > 0u &&
-            string_append_cstr(out, "; ") != 0)
+        if (string_length(vars) > 0u && string_append_cstr(out, "; ") != 0)
             goto fail;
         if (string_append_string(out, consts) != 0)
             goto fail;
@@ -841,10 +782,8 @@ static string_t *mat_to_string_numeric(const matrix_t *A, mat_string_style_t sty
     string_t **cells = NULL;
     size_t *widths = NULL;
     int tex = (style == MAT_STRING_TEX);
-    int layout = (style == MAT_STRING_LAYOUT_SCIENTIFIC ||
-                  style == MAT_STRING_LAYOUT_PRETTY);
-    int scientific = (style == MAT_STRING_INLINE_SCIENTIFIC ||
-                      style == MAT_STRING_LAYOUT_SCIENTIFIC);
+    int layout = (style == MAT_STRING_LAYOUT_SCIENTIFIC || style == MAT_STRING_LAYOUT_PRETTY);
+    int scientific = (style == MAT_STRING_INLINE_SCIENTIFIC || style == MAT_STRING_LAYOUT_SCIENTIFIC);
     int ok = 1;
 
     size_t ncell = A->rows * A->cols;
@@ -862,9 +801,8 @@ static string_t *mat_to_string_numeric(const matrix_t *A, mat_string_style_t sty
                 ok = 0;
                 break;
             }
-            cells[idx] = tex
-                ? mt_string_from_owned_cstr(expr_tostring_texify(string_c_str(scalar)))
-                : string_clone(scalar);
+            cells[idx] =
+                tex ? mt_string_from_owned_cstr(expr_tostring_texify(string_c_str(scalar))) : string_clone(scalar);
             string_free(scalar);
             if (!cells[idx]) {
                 ok = 0;
@@ -908,10 +846,8 @@ static string_t *mat_to_string_expr(const matrix_t *A, mat_string_style_t style)
     mat_buf_t out = {0};
     int ok = exprs && widths;
     int tex = (style == MAT_STRING_TEX);
-    int layout = (style == MAT_STRING_LAYOUT_SCIENTIFIC ||
-                  style == MAT_STRING_LAYOUT_PRETTY);
-    int scientific = (style == MAT_STRING_INLINE_SCIENTIFIC ||
-                      style == MAT_STRING_LAYOUT_SCIENTIFIC);
+    int layout = (style == MAT_STRING_LAYOUT_SCIENTIFIC || style == MAT_STRING_LAYOUT_PRETTY);
+    int scientific = (style == MAT_STRING_INLINE_SCIENTIFIC || style == MAT_STRING_LAYOUT_SCIENTIFIC);
     int omit_wrapper = 0;
 
     for (size_t i = 0; ok && i < A->rows; ++i) {
@@ -930,10 +866,8 @@ static string_t *mat_to_string_expr(const matrix_t *A, mat_string_style_t style)
                 break;
             }
             exprs[idx] = expr;
-            mt_collect_expr_bindings(dv,
-                                     &var_bindings, &nvar_bindings, &capvar_bindings,
-                                     &const_bindings, &nconst_bindings, &capconst_bindings,
-                                     binding_text);
+            mt_collect_expr_bindings(dv, &var_bindings, &nvar_bindings, &capvar_bindings, &const_bindings,
+                                     &nconst_bindings, &capconst_bindings, binding_text);
             if (!tex) {
                 mt_pretty_expr_expr(&exprs[idx], const_bindings, nconst_bindings);
             }
@@ -947,10 +881,8 @@ static string_t *mat_to_string_expr(const matrix_t *A, mat_string_style_t style)
         string_free(out.text);
         out.text = string_new_with("<expr matrix>");
     } else if (tex) {
-        omit_wrapper = mt_all_bindings_are_nan(var_bindings, nvar_bindings,
-                                               const_bindings, nconst_bindings);
-        string_t *joined = mt_join_bindings_tex(var_bindings, nvar_bindings,
-                                                const_bindings, nconst_bindings);
+        omit_wrapper = mt_all_bindings_are_nan(var_bindings, nvar_bindings, const_bindings, nconst_bindings);
+        string_t *joined = mt_join_bindings_tex(var_bindings, nvar_bindings, const_bindings, nconst_bindings);
         if (!omit_wrapper)
             mb_puts(&out, "\\left\\{ ");
         mt_emit_cells_tex(&out, exprs, A->rows, A->cols);
@@ -962,11 +894,8 @@ static string_t *mat_to_string_expr(const matrix_t *A, mat_string_style_t style)
             mb_puts(&out, " \\right\\}");
         string_free(joined);
     } else if (!layout) {
-        omit_wrapper = mt_all_bindings_are_nan(var_bindings, nvar_bindings,
-                                               const_bindings, nconst_bindings);
-        string_t *joined = mt_join_bindings(var_bindings, nvar_bindings,
-                                            const_bindings, nconst_bindings,
-                                            scientific);
+        omit_wrapper = mt_all_bindings_are_nan(var_bindings, nvar_bindings, const_bindings, nconst_bindings);
+        string_t *joined = mt_join_bindings(var_bindings, nvar_bindings, const_bindings, nconst_bindings, scientific);
         if (!omit_wrapper)
             mb_puts(&out, "{ ");
         mt_emit_cells(&out, exprs, A->rows, A->cols, widths, 0);
@@ -978,11 +907,8 @@ static string_t *mat_to_string_expr(const matrix_t *A, mat_string_style_t style)
             mb_puts(&out, " }");
         string_free(joined);
     } else {
-        omit_wrapper = mt_all_bindings_are_nan(var_bindings, nvar_bindings,
-                                               const_bindings, nconst_bindings);
-        string_t *joined = mt_join_bindings(var_bindings, nvar_bindings,
-                                            const_bindings, nconst_bindings,
-                                            scientific);
+        omit_wrapper = mt_all_bindings_are_nan(var_bindings, nvar_bindings, const_bindings, nconst_bindings);
+        string_t *joined = mt_join_bindings(var_bindings, nvar_bindings, const_bindings, nconst_bindings, scientific);
         if (!omit_wrapper)
             mb_puts(&out, "{ ");
         mt_emit_cells(&out, exprs, A->rows, A->cols, widths, 1);
@@ -1031,11 +957,7 @@ char *mat_to_string(const matrix_t *A, mat_string_style_t style)
     return out;
 }
 
-bool mat_serialize(const matrix_t *A,
-                   string_t **out_type,
-                   string_t **out_encoding,
-                   void **out_data,
-                   size_t *out_len)
+bool mat_serialize(const matrix_t *A, string_t **out_type, string_t **out_encoding, void **out_data, size_t *out_len)
 {
     string_t *type = NULL;
     string_t *encoding = NULL;
@@ -1074,18 +996,14 @@ bool mat_serialize(const matrix_t *A,
     return true;
 }
 
-matrix_t *mat_deserialise(const void *data,
-                          size_t len,
-                          const string_t *type,
-                          const string_t *encoding)
+matrix_t *mat_deserialise(const void *data, size_t len, const string_t *type, const string_t *encoding)
 {
     string_t *text;
     matrix_t *matrix;
 
     if (!data || !type || !encoding)
         return NULL;
-    if (strcmp(string_c_str(type), "matrix_t") != 0 ||
-        strcmp(string_c_str(encoding), "mars/matrix-text") != 0)
+    if (strcmp(string_c_str(type), "matrix_t") != 0 || strcmp(string_c_str(encoding), "mars/matrix-text") != 0)
         return NULL;
 
     text = string_new();

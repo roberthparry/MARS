@@ -1,6 +1,6 @@
 #include <stdint.h>
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "array.h"
@@ -70,10 +70,8 @@ static void test_sqlite_string_round_trip_is_encrypted(void)
     TEST_ASSERT_TRUE(sqlite_store_string(db, name, value), "string stores");
     sqlite_close(db);
 
-    TEST_ASSERT_TRUE(!file_contains(path_text, "SQLite format 3"),
-                     "file does not expose a plain SQLite header");
-    TEST_ASSERT_TRUE(!file_contains(path_text, "classified"),
-                     "file does not expose plaintext content");
+    TEST_ASSERT_TRUE(!file_contains(path_text, "SQLite format 3"), "file does not expose a plain SQLite header");
+    TEST_ASSERT_TRUE(!file_contains(path_text, "classified"), "file does not expose plaintext content");
 
     db = sqlite_open_encrypted(path, key);
     TEST_ASSERT_NOT_NULL(db);
@@ -117,7 +115,7 @@ static void test_sqlite_rejects_wrong_key(void)
 static void test_sqlite_object_blob_round_trip(void)
 {
     const char *path_text = test_case_temp_path("mars-secure-blob.db");
-    const uint8_t payload[] = { 0x00u, 0x01u, 0x02u, 0xffu, 'M', 'A', 'R', 'S' };
+    const uint8_t payload[] = {0x00u, 0x01u, 0x02u, 0xffu, 'M', 'A', 'R', 'S'};
     string_t *path = s(path_text);
     string_t *key = s("blob key");
     string_t *name = s("raw-object");
@@ -131,23 +129,10 @@ static void test_sqlite_object_blob_round_trip(void)
 
     TEST_ASSERT_NOT_NULL(db);
     TEST_ASSERT_TRUE(sqlite_init_object_store(db), "object store initialises");
-    TEST_ASSERT_TRUE(sqlite_store_object(db,
-                                        name,
-                                        type,
-                                        encoding,
-                                        payload,
-                                        sizeof(payload)),
-                     "blob stores");
-    TEST_ASSERT_TRUE(sqlite_load_object(db,
-                                       name,
-                                       &loaded_type,
-                                       &loaded_encoding,
-                                       &loaded,
-                                       &loaded_len),
-                     "blob loads");
+    TEST_ASSERT_TRUE(sqlite_store_object(db, name, type, encoding, payload, sizeof(payload)), "blob stores");
+    TEST_ASSERT_TRUE(sqlite_load_object(db, name, &loaded_type, &loaded_encoding, &loaded, &loaded_len), "blob loads");
     ASSERT_EQ_INT((int)loaded_len, (int)sizeof(payload));
-    TEST_ASSERT_TRUE(memcmp(loaded, payload, sizeof(payload)) == 0,
-                     "blob payload round-trips exactly");
+    TEST_ASSERT_TRUE(memcmp(loaded, payload, sizeof(payload)) == 0, "blob payload round-trips exactly");
     TEST_ASSERT_STR_EQ(string_c_str(loaded_type), "test/blob");
     TEST_ASSERT_STR_EQ(string_c_str(loaded_encoding), "raw");
 
@@ -185,34 +170,27 @@ static void example_sqlite_readme_prepared_statement_query(void)
     ASSERT_NOT_NULL(key);
     ASSERT_NOT_NULL(db);
 
-    TEST_ASSERT_TRUE(sqlite_exec_cstr(db,
-                                      "create table if not exists city ("
-                                      "  name text not null,"
-                                      "  population integer not null"
-                                      ");"),
+    TEST_ASSERT_TRUE(sqlite_exec_cstr(db, "create table if not exists city ("
+                                          "  name text not null,"
+                                          "  population integer not null"
+                                          ");"),
                      "city table creates");
-    TEST_ASSERT_TRUE(sqlite_exec_cstr(db, "delete from city;"),
-                     "city table clears");
-    TEST_ASSERT_TRUE(sqlite_exec_cstr(db,
-                                      "insert into city(name, population) values "
-                                      "('Liverpool', 486100),"
-                                      "('Leeds', 536280),"
-                                      "('Manchester', 395500),"
-                                      "('Rhyl', 25743);"),
+    TEST_ASSERT_TRUE(sqlite_exec_cstr(db, "delete from city;"), "city table clears");
+    TEST_ASSERT_TRUE(sqlite_exec_cstr(db, "insert into city(name, population) values "
+                                          "('Liverpool', 486100),"
+                                          "('Leeds', 536280),"
+                                          "('Manchester', 395500),"
+                                          "('Rhyl', 25743);"),
                      "city rows insert");
 
-    stmt = sqlite_stmt_prepare(db,
-                               "select name, population from city "
-                               "where population >= ?1 "
-                               "order by population desc;");
+    stmt = sqlite_stmt_prepare(db, "select name, population from city "
+                                   "where population >= ?1 "
+                                   "order by population desc;");
     ASSERT_NOT_NULL(stmt);
-    TEST_ASSERT_TRUE(sqlite_stmt_bind_int(stmt, 1, 350000),
-                     "population threshold binds");
+    TEST_ASSERT_TRUE(sqlite_stmt_bind_int(stmt, 1, 350000), "population threshold binds");
 
     while (sqlite_stmt_step(stmt) == SQLITE_STEP_ROW) {
-        printf("%s: %d\n",
-               sqlite_stmt_column_text(stmt, 0),
-               sqlite_stmt_column_int(stmt, 1));
+        printf("%s: %d\n", sqlite_stmt_column_text(stmt, 0), sqlite_stmt_column_int(stmt, 1));
     }
 
     sqlite_stmt_finalize(stmt);
@@ -281,26 +259,15 @@ static void example_sqlite_readme_array_object_storage(void)
 
     ASSERT_TRUE(array_serialize(values, &type, &encoding, &payload, &payload_len));
     TEST_ASSERT_TRUE(sqlite_init_object_store(db), "object store initialises");
-    TEST_ASSERT_TRUE(sqlite_store_object(db, name, type, encoding, payload, payload_len),
-                     "array payload stores");
-    TEST_ASSERT_TRUE(sqlite_load_object(db,
-                                        name,
-                                        &loaded_type,
-                                        &loaded_encoding,
-                                        &loaded_payload,
-                                        &loaded_payload_len),
+    TEST_ASSERT_TRUE(sqlite_store_object(db, name, type, encoding, payload, payload_len), "array payload stores");
+    TEST_ASSERT_TRUE(sqlite_load_object(db, name, &loaded_type, &loaded_encoding, &loaded_payload, &loaded_payload_len),
                      "array payload loads");
 
-    loaded_values = array_deserialise(loaded_payload,
-                                      loaded_payload_len,
-                                      loaded_type,
-                                      loaded_encoding);
+    loaded_values = array_deserialise(loaded_payload, loaded_payload_len, loaded_type, loaded_encoding);
     ASSERT_NOT_NULL(loaded_values);
 
     for (i = 0u; i < array_size(loaded_values); ++i)
-        printf("%d%s",
-               *(int32_t *)array_get(loaded_values, i),
-               (i + 1u < array_size(loaded_values)) ? " " : "\n");
+        printf("%d%s", *(int32_t *)array_get(loaded_values, i), (i + 1u < array_size(loaded_values)) ? " " : "\n");
 
     array_destroy(loaded_values);
     sqlite_free_object_data(loaded_payload);
@@ -342,35 +309,18 @@ static void example_sqlite_readme_timeseries_object_storage(void)
     ASSERT_NOT_NULL(db);
     ASSERT_NOT_NULL(start);
 
-    series = ts_new_regular_from_doubles(values,
-                                         sizeof(values) / sizeof(values[0]),
-                                         start,
-                                         TS_FREQ_DAILY,
-                                         TS_YEAR_CALENDAR);
+    series =
+        ts_new_regular_from_doubles(values, sizeof(values) / sizeof(values[0]), start, TS_FREQ_DAILY, TS_YEAR_CALENDAR);
     ASSERT_NOT_NULL(series);
 
     ASSERT_TRUE(ts_serialize(series, &type, &encoding, &payload, &payload_len));
 
     TEST_ASSERT_TRUE(sqlite_init_object_store(db), "object store initialises");
-    TEST_ASSERT_TRUE(sqlite_store_object(db,
-                                         name,
-                                         type,
-                                         encoding,
-                                         payload,
-                                         payload_len),
-                     "timeseries text stores");
-    TEST_ASSERT_TRUE(sqlite_load_object(db,
-                                        name,
-                                        &loaded_type,
-                                        &loaded_encoding,
-                                        &loaded_payload,
-                                        &loaded_payload_len),
+    TEST_ASSERT_TRUE(sqlite_store_object(db, name, type, encoding, payload, payload_len), "timeseries text stores");
+    TEST_ASSERT_TRUE(sqlite_load_object(db, name, &loaded_type, &loaded_encoding, &loaded_payload, &loaded_payload_len),
                      "timeseries text loads");
 
-    loaded_series = ts_deserialise(loaded_payload,
-                                   loaded_payload_len,
-                                   loaded_type,
-                                   loaded_encoding);
+    loaded_series = ts_deserialise(loaded_payload, loaded_payload_len, loaded_type, loaded_encoding);
     ASSERT_NOT_NULL(loaded_series);
     loaded_text = ts_to_text(loaded_series, TS_STRING_CSV);
     ASSERT_NOT_NULL(loaded_text);
@@ -425,25 +375,11 @@ static void example_sqlite_readme_expression_object_storage(void)
     ASSERT_TRUE(expr_serialize(expr, &type, &encoding, &payload, &payload_len));
 
     TEST_ASSERT_TRUE(sqlite_init_object_store(db), "object store initialises");
-    TEST_ASSERT_TRUE(sqlite_store_object(db,
-                                         name,
-                                         type,
-                                         encoding,
-                                         payload,
-                                         payload_len),
-                     "expression text stores");
-    TEST_ASSERT_TRUE(sqlite_load_object(db,
-                                        name,
-                                        &loaded_type,
-                                        &loaded_encoding,
-                                        &loaded_payload,
-                                        &loaded_payload_len),
+    TEST_ASSERT_TRUE(sqlite_store_object(db, name, type, encoding, payload, payload_len), "expression text stores");
+    TEST_ASSERT_TRUE(sqlite_load_object(db, name, &loaded_type, &loaded_encoding, &loaded_payload, &loaded_payload_len),
                      "expression text loads");
 
-    loaded_expr = expr_deserialise(loaded_payload,
-                                   loaded_payload_len,
-                                   loaded_type,
-                                   loaded_encoding);
+    loaded_expr = expr_deserialise(loaded_payload, loaded_payload_len, loaded_type, loaded_encoding);
     ASSERT_NOT_NULL(loaded_expr);
     loaded_roundtrip = expr_to_text(loaded_expr, style_EXPRESSION);
     ASSERT_NOT_NULL(loaded_roundtrip);
@@ -482,20 +418,14 @@ int tests_main(void)
 
     TEST_SECTION("README Output Examples");
     printf(C_BOLD C_YELLOW "Running README examples...\n" C_RESET);
-    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_sqlite_readme_encrypted_string_storage,
-                                  readme_examples,
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_sqlite_readme_encrypted_string_storage, readme_examples,
                                   "sqlite,readme,output");
-    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_sqlite_readme_array_object_storage,
-                                  readme_examples,
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_sqlite_readme_array_object_storage, readme_examples, "sqlite,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_sqlite_readme_timeseries_object_storage, readme_examples,
                                   "sqlite,readme,output");
-    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_sqlite_readme_timeseries_object_storage,
-                                  readme_examples,
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_sqlite_readme_expression_object_storage, readme_examples,
                                   "sqlite,readme,output");
-    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_sqlite_readme_expression_object_storage,
-                                  readme_examples,
-                                  "sqlite,readme,output");
-    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_sqlite_readme_prepared_statement_query,
-                                  readme_examples,
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_sqlite_readme_prepared_statement_query, readme_examples,
                                   "sqlite,readme,output");
 
     return TEST_EXIT_CODE();

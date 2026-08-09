@@ -1,9 +1,9 @@
-#include <stdio.h>
-#include <stdbool.h>
-#include <stdlib.h>
-#include <string.h>
 #include <ctype.h>
 #include <limits.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "equation.h"
 #include "expression.h"
@@ -35,8 +35,7 @@ static char *expr_tex_body_dup(const expr_t *expr)
     return body ? body : expr_text_dup(expr, style_TEX);
 }
 
-static expr_t *display_polynomial_simplified(const expr_t *expr,
-                                             const expr_t *wrt)
+static expr_t *display_polynomial_simplified(const expr_t *expr, const expr_t *wrt)
 {
     expr_t *zero = NULL;
     expr_t *display = NULL;
@@ -139,9 +138,7 @@ static int parse_long_suffix(const char *text, size_t start, long *out)
     if (!saw_digit)
         return 0;
 
-    *out = negative && value == (unsigned long)LONG_MAX + 1u
-        ? LONG_MIN
-        : (negative ? -(long)value : (long)value);
+    *out = negative && value == (unsigned long)LONG_MAX + 1u ? LONG_MIN : (negative ? -(long)value : (long)value);
     return 1;
 }
 
@@ -206,15 +203,11 @@ static char *format_scientific_as_general(char *scientific, int precision)
                 size_t tail_pos = strcspn(out, "E");
 
                 while (tail_pos > dot_pos + 1u && out[tail_pos - 1u] == '0') {
-                    memmove(&out[tail_pos - 1u],
-                            &out[tail_pos],
-                            strlen(&out[tail_pos]) + 1u);
+                    memmove(&out[tail_pos - 1u], &out[tail_pos], strlen(&out[tail_pos]) + 1u);
                     tail_pos--;
                 }
                 if (tail_pos == dot_pos + 1u)
-                    memmove(&out[dot_pos],
-                            &out[dot_pos + 1u],
-                            strlen(&out[dot_pos + 1u]) + 1u);
+                    memmove(&out[dot_pos], &out[dot_pos + 1u], strlen(&out[dot_pos + 1u]) + 1u);
             }
         }
         return out;
@@ -247,9 +240,7 @@ static char *format_scientific_as_general(char *scientific, int precision)
         memcpy(&out[pos], digits, (size_t)decimal_pos);
         pos += (size_t)decimal_pos;
         out[pos++] = '.';
-        memcpy(&out[pos],
-               &digits[decimal_pos],
-               digit_count - (size_t)decimal_pos);
+        memcpy(&out[pos], &digits[decimal_pos], digit_count - (size_t)decimal_pos);
         pos += digit_count - (size_t)decimal_pos;
     }
     out[pos] = '\0';
@@ -385,9 +376,8 @@ static char *owned_number_text(number_t value, int precision)
     } else if (num_is_inf(value)) {
         text = xstrdup_local(num_get_sign(value) < 0 ? "-∞" : "∞");
     } else {
-        text = num_is_real(value)
-             ? format_real_number(num_clone(value), display_precision)
-             : format_complex_number(value, display_precision);
+        text = num_is_real(value) ? format_real_number(num_clone(value), display_precision)
+                                  : format_complex_number(value, display_precision);
     }
 
     num_destroy(&value);
@@ -402,9 +392,7 @@ static void print_owned_number(const char *label, number_t value, int precision)
     free(text);
 }
 
-static void print_bindings(const char *label,
-                           expr_bindings_t *bindings,
-                           int precision)
+static void print_bindings(const char *label, expr_bindings_t *bindings, int precision)
 {
     size_t count = expr_bindings_count(bindings);
 
@@ -417,12 +405,7 @@ static void print_bindings(const char *label,
             continue;
 
         value_text = owned_number_text(expr_get_val(binding), precision);
-        printf("%-20s %s\t%s\t%s\n",
-               label,
-               expr_bindings_is_constant_at(bindings, i)
-                   ? "constant"
-                   : "variable",
-               name,
+        printf("%-20s %s\t%s\t%s\n", label, expr_bindings_is_constant_at(bindings, i) ? "constant" : "variable", name,
                value_text ? value_text : "(num_to_string failed)");
         free(value_text);
     }
@@ -433,9 +416,7 @@ static bool expression_evaluation_ready(const expr_t *expr)
     return expr != NULL;
 }
 
-static void print_expression_bindings(const char *label,
-                                      const char *expression_text,
-                                      int precision)
+static void print_expression_bindings(const char *label, const char *expression_text, int precision)
 {
     expr_bindings_t *bindings = NULL;
     expr_t *expr;
@@ -452,8 +433,7 @@ static void print_expression_bindings(const char *label,
     expr_bindings_free(bindings);
 }
 
-static void preserve_matching_binding_values(expr_bindings_t *bindings,
-                                             const char *source_expression)
+static void preserve_matching_binding_values(expr_bindings_t *bindings, const char *source_expression)
 {
     expr_bindings_t *source_bindings = NULL;
     expr_t *source_expr;
@@ -511,9 +491,7 @@ cleanup:
     return rc;
 }
 
-static int apply_goal_start(expr_bindings_t *bindings,
-                            const char *assignment,
-                            int precision)
+static int apply_goal_start(expr_bindings_t *bindings, const char *assignment, int precision)
 {
     char *copy;
     char *name;
@@ -575,9 +553,7 @@ static int run_goal_seek(int argc, char **argv)
     int rc = 1;
 
     if (argc < 5) {
-        fprintf(stderr,
-                "Usage: %s --goal-seek <expression> <target> <precision> [name=start ...]\n",
-                argv[0]);
+        fprintf(stderr, "Usage: %s --goal-seek <expression> <target> <precision> [name=start ...]\n", argv[0]);
         return 1;
     }
 
@@ -647,8 +623,7 @@ cleanup:
 
 int main(int argc, char **argv)
 {
-    const char *raw_input =
-        argc > 1 ? argv[1] : "{ exp(sin(x)) + 3*x^2 - 7 | x = 1.25 }";
+    const char *raw_input = argc > 1 ? argv[1] : "{ exp(sin(x)) + 3*x^2 - 7 | x = 1.25 }";
     const char *wrt_name = argc > 2 ? argv[2] : "x";
     int precision = argc > 3 ? atoi(argv[3]) : -1;
     const char *action = argc > 4 ? argv[4] : "";
@@ -674,9 +649,7 @@ int main(int argc, char **argv)
     bool integral_request = strcmp(action, "integral") == 0;
     bool bindings_request = strcmp(action, "bindings") == 0;
     bool binding_edit_request = strcmp(action, "binding-edit") == 0;
-    bool evaluate_request = strcmp(action, "evaluate") == 0 ||
-                            bindings_request ||
-                            binding_edit_request;
+    bool evaluate_request = strcmp(action, "evaluate") == 0 || bindings_request || binding_edit_request;
     bool derivative_request = !integral_request && !evaluate_request;
     bool wrt_is_variable = false;
     bool display_expr_owned = false;
@@ -698,12 +671,7 @@ int main(int argc, char **argv)
 
     if (binding_edit_request) {
         expr_bindings_t *edited_bindings = NULL;
-        expr_t *edited = expr_edit_binding(
-            expr,
-            bindings,
-            wrt_name,
-            argc > 5 ? argv[5] : "",
-            &edited_bindings);
+        expr_t *edited = expr_edit_binding(expr, bindings, wrt_name, argc > 5 ? argv[5] : "", &edited_bindings);
 
         if (!edited) {
             fprintf(stderr, "Could not edit binding '%s'\n", wrt_name);
@@ -741,8 +709,7 @@ int main(int argc, char **argv)
     printf("tex         %s\n", tex_text ? tex_text : "(null)");
     print_bindings("binding", bindings, precision);
     printf("differentiable  %s\n", expr_is_differentiable(expr) ? "yes" : "no");
-    printf("evaluation_ready  %s\n",
-           expression_evaluation_ready(expr) ? "yes" : "no");
+    printf("evaluation_ready  %s\n", expression_evaluation_ready(expr) ? "yes" : "no");
     value_note[0] = '\0';
     {
         number_t value_number = expr_eval(expr);
@@ -756,8 +723,7 @@ int main(int argc, char **argv)
     if (wrt_is_variable && derivative_request) {
         deriv = expr_create_deriv(expr, wrt);
         if (!deriv) {
-            fprintf(stderr, "Failed to build derivative with respect to %s\n",
-                    wrt_name);
+            fprintf(stderr, "Failed to build derivative with respect to %s\n", wrt_name);
             rc = 1;
             goto cleanup;
         }
@@ -770,15 +736,10 @@ int main(int argc, char **argv)
         deriv_text = expr_text_dup(display_deriv, style_EXPRESSION);
         deriv_func_text = expr_text_dup(display_deriv, style_FUNCTION);
         deriv_tex_text = expr_tex_body_dup(display_deriv);
-        printf("derivative  d/d%s = %s\n",
-               wrt_name,
-               deriv_text ? deriv_text : "(null)");
-        printf("derivative_function  %s\n",
-               deriv_func_text ? deriv_func_text : "(null)");
+        printf("derivative  d/d%s = %s\n", wrt_name, deriv_text ? deriv_text : "(null)");
+        printf("derivative_function  %s\n", deriv_func_text ? deriv_func_text : "(null)");
         printf("derivative_tex  %s\n", deriv_tex_text ? deriv_tex_text : "");
-        print_expression_bindings("derivative_binding",
-                                  deriv_text,
-                                  precision);
+        print_expression_bindings("derivative_binding", deriv_text, precision);
         print_owned_number("d value", expr_eval(deriv), precision);
     } else if (derivative_request) {
         printf("derivative  no variable binding named '%s'\n", wrt_name);
@@ -788,25 +749,16 @@ int main(int argc, char **argv)
         if (wrt_is_variable) {
             integral = expr_integrate_family(expr, wrt);
             if (!integral) {
-                printf("integral  no symbolic integral with respect to %s\n",
-                       wrt_name);
+                printf("integral  no symbolic integral with respect to %s\n", wrt_name);
             } else {
                 display_integral = integral;
-                integral_text = expr_text_dup(display_integral,
-                                             style_EXPRESSION);
-                integral_func_text = expr_text_dup(display_integral,
-                                                  style_FUNCTION);
+                integral_text = expr_text_dup(display_integral, style_EXPRESSION);
+                integral_func_text = expr_text_dup(display_integral, style_FUNCTION);
                 integral_tex_text = expr_tex_body_dup(display_integral);
-                printf("integral  ∫d%s = %s\n",
-                       wrt_name,
-                       integral_text ? integral_text : "(null)");
-                printf("integral_function  %s\n",
-                       integral_func_text ? integral_func_text : "(null)");
-                printf("integral_tex  %s\n",
-                       integral_tex_text ? integral_tex_text : "");
-                print_expression_bindings("integral_binding",
-                                          integral_text,
-                                          precision);
+                printf("integral  ∫d%s = %s\n", wrt_name, integral_text ? integral_text : "(null)");
+                printf("integral_function  %s\n", integral_func_text ? integral_func_text : "(null)");
+                printf("integral_tex  %s\n", integral_tex_text ? integral_tex_text : "");
+                print_expression_bindings("integral_binding", integral_text, precision);
                 print_owned_number("i value", expr_eval(integral), precision);
             }
         } else {

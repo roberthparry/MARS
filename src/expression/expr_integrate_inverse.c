@@ -9,8 +9,7 @@ expr_t *integrate_asec_rule(const expr_t *expr, const expr_t *wrt)
     expr_t *acosh_u;
     expr_t *raw;
 
-    if (!match_affine_unary(expr, wrt, EXPR_PATTERN_UNARY_ASEC,
-                            &constant, &coeff)) {
+    if (!match_affine_unary(expr, wrt, EXPR_PATTERN_UNARY_ASEC, &constant, &coeff)) {
         num_destroy(&coeff);
         num_destroy(&constant);
         return NULL;
@@ -34,8 +33,7 @@ expr_t *integrate_acosec_rule(const expr_t *expr, const expr_t *wrt)
     expr_t *acosh_u;
     expr_t *raw;
 
-    if (!match_affine_unary(expr, wrt, EXPR_PATTERN_UNARY_ACOSEC,
-                            &constant, &coeff)) {
+    if (!match_affine_unary(expr, wrt, EXPR_PATTERN_UNARY_ACOSEC, &constant, &coeff)) {
         num_destroy(&coeff);
         num_destroy(&constant);
         return NULL;
@@ -62,8 +60,7 @@ expr_t *integrate_acot_rule(const expr_t *expr, const expr_t *wrt)
     expr_t *half_log_term;
     expr_t *raw;
 
-    if (!match_affine_unary(expr, wrt, EXPR_PATTERN_UNARY_ACOT,
-                            &constant, &coeff)) {
+    if (!match_affine_unary(expr, wrt, EXPR_PATTERN_UNARY_ACOT, &constant, &coeff)) {
         num_destroy(&coeff);
         num_destroy(&constant);
         return NULL;
@@ -95,8 +92,7 @@ expr_t *integrate_asin_rule(const expr_t *expr, const expr_t *wrt)
     expr_t *root;
     expr_t *raw;
 
-    if (!match_affine_unary(expr, wrt, EXPR_PATTERN_UNARY_ASIN,
-                            &constant, &coeff)) {
+    if (!match_affine_unary(expr, wrt, EXPR_PATTERN_UNARY_ASIN, &constant, &coeff)) {
         num_destroy(&coeff);
         num_destroy(&constant);
         return NULL;
@@ -131,8 +127,7 @@ expr_t *integrate_acos_rule(const expr_t *expr, const expr_t *wrt)
     expr_t *root;
     expr_t *raw;
 
-    if (!match_affine_unary(expr, wrt, EXPR_PATTERN_UNARY_ACOS,
-                            &constant, &coeff)) {
+    if (!match_affine_unary(expr, wrt, EXPR_PATTERN_UNARY_ACOS, &constant, &coeff)) {
         num_destroy(&coeff);
         num_destroy(&constant);
         return NULL;
@@ -170,9 +165,7 @@ expr_t *integrate_atan_rule(const expr_t *expr, const expr_t *wrt)
     expr_t *out;
 
     if (!expr_is_op(expr, &ops_atan) || !expr->a ||
-        !match_symbolic_affine_constant_and_coeff(expr->a, wrt,
-                                                  &constant, &coeff) ||
-        expr_const_is_zero(coeff)) {
+        !match_symbolic_affine_constant_and_coeff(expr->a, wrt, &constant, &coeff) || expr_const_is_zero(coeff)) {
         expr_free(coeff);
         expr_free(constant);
         return integrate_poly_times_rational_unary_by_parts(expr, wrt);
@@ -207,8 +200,7 @@ expr_t *integrate_asinh_rule(const expr_t *expr, const expr_t *wrt)
     expr_t *root;
     expr_t *raw;
 
-    if (!match_affine_unary(expr, wrt, EXPR_PATTERN_UNARY_ASINH,
-                            &constant, &coeff)) {
+    if (!match_affine_unary(expr, wrt, EXPR_PATTERN_UNARY_ASINH, &constant, &coeff)) {
         num_destroy(&coeff);
         num_destroy(&constant);
         return NULL;
@@ -240,8 +232,7 @@ expr_t *integrate_acosh_rule(const expr_t *expr, const expr_t *wrt)
     expr_t *root_product;
     expr_t *raw;
 
-    if (!match_affine_unary(expr, wrt, EXPR_PATTERN_UNARY_ACOSH,
-                            &constant, &coeff)) {
+    if (!match_affine_unary(expr, wrt, EXPR_PATTERN_UNARY_ACOSH, &constant, &coeff)) {
         num_destroy(&coeff);
         num_destroy(&constant);
         return NULL;
@@ -276,8 +267,7 @@ expr_t *integrate_atanh_rule(const expr_t *expr, const expr_t *wrt)
     expr_t *half_log_term;
     expr_t *raw;
 
-    if (!match_affine_unary(expr, wrt, EXPR_PATTERN_UNARY_ATANH,
-                            &constant, &coeff)) {
+    if (!match_affine_unary(expr, wrt, EXPR_PATTERN_UNARY_ATANH, &constant, &coeff)) {
         num_destroy(&coeff);
         num_destroy(&constant);
         return NULL;
@@ -312,8 +302,7 @@ expr_t *integrate_asech_rule(const expr_t *expr, const expr_t *wrt)
     expr_t *asin_u;
     expr_t *raw;
 
-    if (!match_affine_unary(expr, wrt, EXPR_PATTERN_UNARY_ASECH,
-                            &constant, &coeff)) {
+    if (!match_affine_unary(expr, wrt, EXPR_PATTERN_UNARY_ASECH, &constant, &coeff)) {
         num_destroy(&coeff);
         num_destroy(&constant);
         return NULL;
@@ -337,8 +326,7 @@ expr_t *integrate_acosech_rule(const expr_t *expr, const expr_t *wrt)
     expr_t *asinh_u;
     expr_t *raw;
 
-    if (!match_affine_unary(expr, wrt, EXPR_PATTERN_UNARY_ACOSECH,
-                            &constant, &coeff)) {
+    if (!match_affine_unary(expr, wrt, EXPR_PATTERN_UNARY_ACOSECH, &constant, &coeff)) {
         num_destroy(&coeff);
         num_destroy(&constant);
         return NULL;
@@ -365,8 +353,7 @@ expr_t *integrate_acoth_rule(const expr_t *expr, const expr_t *wrt)
     expr_t *half_log_term;
     expr_t *raw;
 
-    if (!match_affine_unary(expr, wrt, EXPR_PATTERN_UNARY_ACOTH,
-                            &constant, &coeff)) {
+    if (!match_affine_unary(expr, wrt, EXPR_PATTERN_UNARY_ACOTH, &constant, &coeff)) {
         num_destroy(&coeff);
         num_destroy(&constant);
         return NULL;

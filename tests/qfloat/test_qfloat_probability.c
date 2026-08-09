@@ -1,6 +1,7 @@
 #include "test_qfloat.h"
 
-static void test_qf_lambert_w0(void) {
+static void test_qf_lambert_w0(void)
+{
     printf(C_CYAN "TEST: qf_lambert_w0\n" C_RESET);
 
     char buf[256], buf_exp[256];
@@ -12,27 +13,26 @@ static void test_qf_lambert_w0(void) {
     } tests[] = {
 
         /* Basic values */
-        { "0",     "0", 1e-30 },
-        { "1e-6",  "9.999990000014999973333385416558667e-7", 1e-30 },
-                    
-        { "1e-3",  "0.0009990014973385308899578278741077856", 1e-30 },
-        { "0.1",   "0.09127652716086226429989572142317956",   1e-30 },
-        { "1",     "0.56714329040978387299996866221035555",   1e-30 },
-        { "2",     "0.8526055020137254913464724146953175",    1e-30 },
-        { "5",     "1.3267246652422002236350992977580797",    1e-30 },
-        { "10",    "1.7455280027406993830743012648753899",    1e-30 },
-        { "20",    "2.2050032780240599704930659773870498",    1e-30 },
+        {"0", "0", 1e-30},
+        {"1e-6", "9.999990000014999973333385416558667e-7", 1e-30},
+
+        {"1e-3", "0.0009990014973385308899578278741077856", 1e-30},
+        {"0.1", "0.09127652716086226429989572142317956", 1e-30},
+        {"1", "0.56714329040978387299996866221035555", 1e-30},
+        {"2", "0.8526055020137254913464724146953175", 1e-30},
+        {"5", "1.3267246652422002236350992977580797", 1e-30},
+        {"10", "1.7455280027406993830743012648753899", 1e-30},
+        {"20", "2.2050032780240599704930659773870498", 1e-30},
 
         /* Endpoint */
-        { "-0.3678794411714423215955237701614609", "-1", 1e-30 }, /* -1/e */
+        {"-0.3678794411714423215955237701614609", "-1", 1e-30}, /* -1/e */
 
         /* End marker */
-        { NULL, NULL, 0.0 }
-    };
+        {NULL, NULL, 0.0}};
 
     for (int i = 0; tests[i].xs != NULL; i++) {
 
-        qfloat_t x   = qf_from_string(tests[i].xs);
+        qfloat_t x = qf_from_string(tests[i].xs);
         qfloat_t got = qf_lambert_w0(x);
         qfloat_t exp = qf_from_string(tests[i].expected);
 
@@ -48,7 +48,8 @@ static void test_qf_lambert_w0(void) {
     printf("\n");
 }
 
-static void test_qf_lambert_wm1(void) {
+static void test_qf_lambert_wm1(void)
+{
     printf(C_CYAN "TEST: qf_lambert_wm1\n" C_RESET);
 
     char buf[256], buf_exp[256];
@@ -60,21 +61,20 @@ static void test_qf_lambert_wm1(void) {
     } tests[] = {
 
         /* Endpoint */
-        { "-0.3678794411714423215955237701614609", "-1", 1e-30 }, /* -1/e */
+        {"-0.3678794411714423215955237701614609", "-1", 1e-30}, /* -1/e */
 
         /* Values near 0− */
-        { "-0.1",   "-3.577152063957297218409391963511995", 1e-30 },
-        { "-0.01",  "-6.472775124394004694741057892724488", 1e-30 },
-        { "-0.001", "-9.118006470402740121258337182046814", 1e-30 },
-        { "-1e-6",  "-16.62650890137247338770643216398468", 1e-30 },
+        {"-0.1", "-3.577152063957297218409391963511995", 1e-30},
+        {"-0.01", "-6.472775124394004694741057892724488", 1e-30},
+        {"-0.001", "-9.118006470402740121258337182046814", 1e-30},
+        {"-1e-6", "-16.62650890137247338770643216398468", 1e-30},
 
         /* End marker */
-        { NULL, NULL, 0.0 }
-    };
+        {NULL, NULL, 0.0}};
 
     for (int i = 0; tests[i].xs != NULL; i++) {
 
-        qfloat_t x   = qf_from_string(tests[i].xs);
+        qfloat_t x = qf_from_string(tests[i].xs);
         qfloat_t got = qf_lambert_wm1(x);
         qfloat_t exp = qf_from_string(tests[i].expected);
 
@@ -108,16 +108,16 @@ static void test_qf_beta_definition(void)
 {
     printf(C_CYAN "TEST: qf_beta definition  B(a,b) = Γ(a)Γ(b)/Γ(a+b)\n" C_RESET);
 
-    double as[] = { 0.5, 1.0, 2.0, 5.0 };
-    double bs[] = { 0.5, 1.0, 3.0, 4.0 };
+    double as[] = {0.5, 1.0, 2.0, 5.0};
+    double bs[] = {0.5, 1.0, 3.0, 4.0};
 
-    for (int i = 0; i < (int)(sizeof(as)/sizeof(as[0])); ++i) {
-        for (int j = 0; j < (int)(sizeof(bs)/sizeof(bs[0])); ++j) {
+    for (int i = 0; i < (int)(sizeof(as) / sizeof(as[0])); ++i) {
+        for (int j = 0; j < (int)(sizeof(bs) / sizeof(bs[0])); ++j) {
 
             qfloat_t a = qf_from_double(as[i]);
             qfloat_t b = qf_from_double(bs[j]);
 
-            qfloat_t B  = qf_beta(a, b);
+            qfloat_t B = qf_beta(a, b);
             qfloat_t ga = qf_gamma(a);
             qfloat_t gb = qf_gamma(b);
             qfloat_t gab = qf_gamma(qf_add(a, b));
@@ -139,11 +139,11 @@ static void test_qf_beta_symmetry(void)
 {
     printf(C_CYAN "TEST: qf_beta symmetry  B(a,b) = B(b,a)\n" C_RESET);
 
-    double as[] = { 0.5, 1.0, 2.0, 5.0 };
-    double bs[] = { 0.5, 1.0, 3.0, 4.0 };
+    double as[] = {0.5, 1.0, 2.0, 5.0};
+    double bs[] = {0.5, 1.0, 3.0, 4.0};
 
-    for (int i = 0; i < (int)(sizeof(as)/sizeof(as[0])); ++i) {
-        for (int j = 0; j < (int)(sizeof(bs)/sizeof(bs[0])); ++j) {
+    for (int i = 0; i < (int)(sizeof(as) / sizeof(as[0])); ++i) {
+        for (int j = 0; j < (int)(sizeof(bs) / sizeof(bs[0])); ++j) {
 
             qfloat_t a = qf_from_double(as[i]);
             qfloat_t b = qf_from_double(bs[j]);
@@ -152,8 +152,7 @@ static void test_qf_beta_symmetry(void)
             qfloat_t Bba = qf_beta(b, a);
 
             TEST_ASSERT_QFLOAT_CLOSE(Bab, Bba);
-            printf(C_GREEN "  OK: B(%g,%g) = B(%g,%g)\n" C_RESET,
-                   as[i], bs[j], bs[j], as[i]);
+            printf(C_GREEN "  OK: B(%g,%g) = B(%g,%g)\n" C_RESET, as[i], bs[j], bs[j], as[i]);
         }
     }
 
@@ -167,9 +166,9 @@ static void test_qf_beta_special_cases(void)
 {
     printf(C_CYAN "TEST: qf_beta special cases  B(1,b)=1/b, B(a,1)=1/a\n" C_RESET);
 
-    double vals[] = { 0.5, 1.0, 2.0, 5.0 };
+    double vals[] = {0.5, 1.0, 2.0, 5.0};
 
-    for (int i = 0; i < (int)(sizeof(vals)/sizeof(vals[0])); ++i) {
+    for (int i = 0; i < (int)(sizeof(vals) / sizeof(vals[0])); ++i) {
 
         qfloat_t b = qf_from_double(vals[i]);
         qfloat_t a = qf_from_double(vals[i]);
@@ -206,23 +205,23 @@ static void test_qf_logbeta_definition(void)
 {
     printf(C_CYAN "TEST: qf_logbeta definition  logB = lgamma(a)+lgamma(b)-lgamma(a+b)\n" C_RESET);
 
-    double as[] = { 0.5, 1.0, 2.0, 5.0 };
-    double bs[] = { 0.5, 1.0, 3.0, 4.0 };
+    double as[] = {0.5, 1.0, 2.0, 5.0};
+    double bs[] = {0.5, 1.0, 3.0, 4.0};
 
-    for (int i = 0; i < (int)(sizeof(as)/sizeof(as[0])); ++i) {
-        for (int j = 0; j < (int)(sizeof(bs)/sizeof(bs[0])); ++j) {
+    for (int i = 0; i < (int)(sizeof(as) / sizeof(as[0])); ++i) {
+        for (int j = 0; j < (int)(sizeof(bs) / sizeof(bs[0])); ++j) {
 
             qfloat_t a = qf_from_double(as[i]);
             qfloat_t b = qf_from_double(bs[j]);
 
             qfloat_t logB = qf_logbeta(a, b);
 
-            qfloat_t lg_a  = qf_lgamma(a);
-            qfloat_t lg_b  = qf_lgamma(b);
+            qfloat_t lg_a = qf_lgamma(a);
+            qfloat_t lg_b = qf_lgamma(b);
             qfloat_t lg_ab = qf_lgamma(qf_add(a, b));
 
             qfloat_t rhs = qf_add(lg_a, lg_b);
-            rhs        = qf_sub(rhs, lg_ab);
+            rhs = qf_sub(rhs, lg_ab);
 
             TEST_ASSERT_QFLOAT_CLOSE(logB, rhs);
             printf(C_GREEN "  OK: logB(%g,%g)\n" C_RESET, as[i], bs[j]);
@@ -240,22 +239,21 @@ static void test_qf_logbeta_consistency(void)
 {
     printf(C_CYAN "TEST: qf_logbeta consistency with qf_beta\n" C_RESET);
 
-    double as[] = { 0.5, 1.0, 2.0, 5.0 };
-    double bs[] = { 0.5, 1.0, 3.0, 4.0 };
+    double as[] = {0.5, 1.0, 2.0, 5.0};
+    double bs[] = {0.5, 1.0, 3.0, 4.0};
 
-    for (int i = 0; i < (int)(sizeof(as)/sizeof(as[0])); ++i) {
-        for (int j = 0; j < (int)(sizeof(bs)/sizeof(bs[0])); ++j) {
+    for (int i = 0; i < (int)(sizeof(as) / sizeof(as[0])); ++i) {
+        for (int j = 0; j < (int)(sizeof(bs) / sizeof(bs[0])); ++j) {
 
             qfloat_t a = qf_from_double(as[i]);
             qfloat_t b = qf_from_double(bs[j]);
 
             qfloat_t logB = qf_logbeta(a, b);
-            qfloat_t B    = qf_beta(a, b);
+            qfloat_t B = qf_beta(a, b);
             qfloat_t logB_expected = qf_log(B);
 
             TEST_ASSERT_QFLOAT_CLOSE(logB, logB_expected);
-            printf(C_GREEN "  OK: logB(%g,%g) matches log(beta)\n" C_RESET,
-                   as[i], bs[j]);
+            printf(C_GREEN "  OK: logB(%g,%g) matches log(beta)\n" C_RESET, as[i], bs[j]);
         }
     }
 
@@ -269,11 +267,11 @@ static void test_qf_logbeta_symmetry(void)
 {
     printf(C_CYAN "TEST: qf_logbeta symmetry  logB(a,b) = logB(b,a)\n" C_RESET);
 
-    double as[] = { 0.5, 1.0, 2.0, 5.0 };
-    double bs[] = { 0.5, 1.0, 3.0, 4.0 };
+    double as[] = {0.5, 1.0, 2.0, 5.0};
+    double bs[] = {0.5, 1.0, 3.0, 4.0};
 
-    for (int i = 0; i < (int)(sizeof(as)/sizeof(as[0])); ++i) {
-        for (int j = 0; j < (int)(sizeof(bs)/sizeof(bs[0])); ++j) {
+    for (int i = 0; i < (int)(sizeof(as) / sizeof(as[0])); ++i) {
+        for (int j = 0; j < (int)(sizeof(bs) / sizeof(bs[0])); ++j) {
 
             qfloat_t a = qf_from_double(as[i]);
             qfloat_t b = qf_from_double(bs[j]);
@@ -282,8 +280,7 @@ static void test_qf_logbeta_symmetry(void)
             qfloat_t lba = qf_logbeta(b, a);
 
             TEST_ASSERT_QFLOAT_CLOSE(lab, lba);
-            printf(C_GREEN "  OK: logB(%g,%g) = logB(%g,%g)\n" C_RESET,
-                   as[i], bs[j], bs[j], as[i]);
+            printf(C_GREEN "  OK: logB(%g,%g) = logB(%g,%g)\n" C_RESET, as[i], bs[j], bs[j], as[i]);
         }
     }
 
@@ -299,9 +296,9 @@ static void test_qf_logbeta_special_cases(void)
 {
     printf(C_CYAN "TEST: qf_logbeta special cases\n" C_RESET);
 
-    double vals[] = { 0.5, 1.0, 2.0, 5.0 };
+    double vals[] = {0.5, 1.0, 2.0, 5.0};
 
-    for (int i = 0; i < (int)(sizeof(vals)/sizeof(vals[0])); ++i) {
+    for (int i = 0; i < (int)(sizeof(vals) / sizeof(vals[0])); ++i) {
 
         qfloat_t v = qf_from_double(vals[i]);
 
@@ -313,8 +310,7 @@ static void test_qf_logbeta_special_cases(void)
 
         TEST_ASSERT_QFLOAT_CLOSE(logB1v, logB1v_expected);
         TEST_ASSERT_QFLOAT_CLOSE(logBv1, logBv1_expected);
-        printf(C_GREEN "  OK: logB(1,%g) and logB(%g,1)\n" C_RESET,
-               vals[i], vals[i]);
+        printf(C_GREEN "  OK: logB(1,%g) and logB(%g,1)\n" C_RESET, vals[i], vals[i]);
     }
 
     printf("\n");
@@ -339,19 +335,19 @@ static void test_qf_binomial_definition(void)
 {
     printf(C_CYAN "TEST: qf_binomial definition  C(a,b)=Γ(a+1)/(Γ(b+1)Γ(a-b+1))\n" C_RESET);
 
-    double as[] = { 2.0, 5.0, 10.0, 2.5 };
-    double bs[] = { 0.0, 1.0, 2.0, 1.5 };
+    double as[] = {2.0, 5.0, 10.0, 2.5};
+    double bs[] = {0.0, 1.0, 2.0, 1.5};
 
-    for (int i = 0; i < (int)(sizeof(as)/sizeof(as[0])); ++i) {
-        for (int j = 0; j < (int)(sizeof(bs)/sizeof(bs[0])); ++j) {
+    for (int i = 0; i < (int)(sizeof(as) / sizeof(as[0])); ++i) {
+        for (int j = 0; j < (int)(sizeof(bs) / sizeof(bs[0])); ++j) {
 
             qfloat_t a = qf_from_double(as[i]);
             qfloat_t b = qf_from_double(bs[j]);
 
             qfloat_t C = qf_binomial(a, b);
 
-            qfloat_t ga1   = qf_gamma(qf_add(a, qf_from_double(1.0)));
-            qfloat_t gb1   = qf_gamma(qf_add(b, qf_from_double(1.0)));
+            qfloat_t ga1 = qf_gamma(qf_add(a, qf_from_double(1.0)));
+            qfloat_t gb1 = qf_gamma(qf_add(b, qf_from_double(1.0)));
             qfloat_t gamb1 = qf_gamma(qf_add(qf_sub(a, b), qf_from_double(1.0)));
 
             qfloat_t rhs = qf_div(ga1, qf_mul(gb1, gamb1));
@@ -374,23 +370,22 @@ static void test_qf_binomial_symmetry(void)
 {
     printf(C_CYAN "TEST: qf_binomial symmetry  C(n,k)=C(n,n-k)\n" C_RESET);
 
-    int ns[] = { 2, 5, 10, 20 };
+    int ns[] = {2, 5, 10, 20};
 
-    for (int i = 0; i < (int)(sizeof(ns)/sizeof(ns[0])); ++i) {
+    for (int i = 0; i < (int)(sizeof(ns) / sizeof(ns[0])); ++i) {
         int n = ns[i];
 
         for (int k = 0; k <= n; ++k) {
 
             qfloat_t nq = qf_from_double((double)n);
             qfloat_t kq = qf_from_double((double)k);
-            qfloat_t nkq = qf_from_double((double)(n-k));
+            qfloat_t nkq = qf_from_double((double)(n - k));
 
             qfloat_t C1 = qf_binomial(nq, kq);
             qfloat_t C2 = qf_binomial(nq, nkq);
 
             if (qf_close_rel(C1, C2, 1e-30)) {
-                printf(C_GREEN "  OK: C(%d,%d) = C(%d,%d)\n" C_RESET,
-                       n, k, n, n-k);
+                printf(C_GREEN "  OK: C(%d,%d) = C(%d,%d)\n" C_RESET, n, k, n, n - k);
             } else {
                 TEST_ASSERT_QFLOAT_CLOSE(C1, C2);
             }
@@ -407,9 +402,9 @@ static void test_qf_binomial_special_cases(void)
 {
     printf(C_CYAN "TEST: qf_binomial special cases\n" C_RESET);
 
-    int ns[] = { 1, 2, 5, 10, 20 };
+    int ns[] = {1, 2, 5, 10, 20};
 
-    for (int i = 0; i < (int)(sizeof(ns)/sizeof(ns[0])); ++i) {
+    for (int i = 0; i < (int)(sizeof(ns) / sizeof(ns[0])); ++i) {
         int n = ns[i];
         qfloat_t nq = qf_from_double((double)n);
 
@@ -447,13 +442,13 @@ static void test_qf_beta_pdf_definition(void)
 {
     printf(C_CYAN "TEST: qf_beta_pdf definition\n" C_RESET);
 
-    double xs[] = { 0.1, 0.3, 0.5, 0.8 };
-    double as[] = { 0.5, 1.0, 2.0, 5.0 };
-    double bs[] = { 0.5, 1.0, 3.0, 4.0 };
+    double xs[] = {0.1, 0.3, 0.5, 0.8};
+    double as[] = {0.5, 1.0, 2.0, 5.0};
+    double bs[] = {0.5, 1.0, 3.0, 4.0};
 
-    for (int i = 0; i < (int)(sizeof(xs)/sizeof(xs[0])); ++i) {
-        for (int j = 0; j < (int)(sizeof(as)/sizeof(as[0])); ++j) {
-            for (int k = 0; k < (int)(sizeof(bs)/sizeof(bs[0])); ++k) {
+    for (int i = 0; i < (int)(sizeof(xs) / sizeof(xs[0])); ++i) {
+        for (int j = 0; j < (int)(sizeof(as) / sizeof(as[0])); ++j) {
+            for (int k = 0; k < (int)(sizeof(bs) / sizeof(bs[0])); ++k) {
 
                 qfloat_t x = qf_from_double(xs[i]);
                 qfloat_t a = qf_from_double(as[j]);
@@ -462,10 +457,10 @@ static void test_qf_beta_pdf_definition(void)
                 qfloat_t pdf = qf_beta_pdf(x, a, b);
 
                 /* RHS = x^(a-1) (1-x)^(b-1) / B(a,b) */
-                qfloat_t xpow   = qf_exp(qf_mul(qf_sub(a, qf_from_double(1.0)), qf_log(x)));
-                qfloat_t omxpow = qf_exp(qf_mul(qf_sub(b, qf_from_double(1.0)),
-                                              qf_log(qf_sub(qf_from_double(1.0), x))));
-                qfloat_t B      = qf_beta(a, b);
+                qfloat_t xpow = qf_exp(qf_mul(qf_sub(a, qf_from_double(1.0)), qf_log(x)));
+                qfloat_t omxpow =
+                    qf_exp(qf_mul(qf_sub(b, qf_from_double(1.0)), qf_log(qf_sub(qf_from_double(1.0), x))));
+                qfloat_t B = qf_beta(a, b);
 
                 qfloat_t rhs = qf_div(qf_mul(xpow, omxpow), B);
 
@@ -489,13 +484,13 @@ static void test_qf_beta_pdf_logform(void)
 {
     printf(C_CYAN "TEST: qf_beta_pdf log-form consistency\n" C_RESET);
 
-    double xs[] = { 0.2, 0.4, 0.7 };
-    double as[] = { 0.5, 2.0, 5.0 };
-    double bs[] = { 0.5, 3.0, 4.0 };
+    double xs[] = {0.2, 0.4, 0.7};
+    double as[] = {0.5, 2.0, 5.0};
+    double bs[] = {0.5, 3.0, 4.0};
 
-    for (int i = 0; i < (int)(sizeof(xs)/sizeof(xs[0])); ++i) {
-        for (int j = 0; j < (int)(sizeof(as)/sizeof(as[0])); ++j) {
-            for (int k = 0; k < (int)(sizeof(bs)/sizeof(bs[0])); ++k) {
+    for (int i = 0; i < (int)(sizeof(xs) / sizeof(xs[0])); ++i) {
+        for (int j = 0; j < (int)(sizeof(as) / sizeof(as[0])); ++j) {
+            for (int k = 0; k < (int)(sizeof(bs) / sizeof(bs[0])); ++k) {
 
                 qfloat_t x = qf_from_double(xs[i]);
                 qfloat_t a = qf_from_double(as[j]);
@@ -504,12 +499,12 @@ static void test_qf_beta_pdf_logform(void)
                 qfloat_t pdf = qf_beta_pdf(x, a, b);
                 qfloat_t logpdf = qf_log(pdf);
 
-                qfloat_t log_x   = qf_log(x);
+                qfloat_t log_x = qf_log(x);
                 qfloat_t log_1mx = qf_log(qf_sub(qf_from_double(1.0), x));
 
                 qfloat_t term1 = qf_mul(qf_sub(a, qf_from_double(1.0)), log_x);
                 qfloat_t term2 = qf_mul(qf_sub(b, qf_from_double(1.0)), log_1mx);
-                qfloat_t logB  = qf_logbeta(a, b);
+                qfloat_t logB = qf_logbeta(a, b);
 
                 qfloat_t rhs = qf_sub(qf_add(term1, term2), logB);
 
@@ -533,13 +528,13 @@ static void test_qf_beta_pdf_symmetry(void)
 {
     printf(C_CYAN "TEST: qf_beta_pdf symmetry  f(x;a,b)=f(1-x;b,a)\n" C_RESET);
 
-    double xs[] = { 0.1, 0.3, 0.6, 0.8 };
-    double as[] = { 0.5, 2.0, 5.0 };
-    double bs[] = { 0.5, 3.0, 4.0 };
+    double xs[] = {0.1, 0.3, 0.6, 0.8};
+    double as[] = {0.5, 2.0, 5.0};
+    double bs[] = {0.5, 3.0, 4.0};
 
-    for (int i = 0; i < (int)(sizeof(xs)/sizeof(xs[0])); ++i) {
-        for (int j = 0; j < (int)(sizeof(as)/sizeof(as[0])); ++j) {
-            for (int k = 0; k < (int)(sizeof(bs)/sizeof(bs[0])); ++k) {
+    for (int i = 0; i < (int)(sizeof(xs) / sizeof(xs[0])); ++i) {
+        for (int j = 0; j < (int)(sizeof(as) / sizeof(as[0])); ++j) {
+            for (int k = 0; k < (int)(sizeof(bs) / sizeof(bs[0])); ++k) {
 
                 qfloat_t x = qf_from_double(xs[i]);
                 qfloat_t a = qf_from_double(as[j]);
@@ -549,8 +544,7 @@ static void test_qf_beta_pdf_symmetry(void)
                 qfloat_t f2 = qf_beta_pdf(qf_sub(qf_from_double(1.0), x), b, a);
 
                 if (qf_close_rel(f1, f2, 1e-30)) {
-                    printf(C_GREEN "  OK: symmetry (%g; %g,%g)\n" C_RESET,
-                           xs[i], as[j], bs[k]);
+                    printf(C_GREEN "  OK: symmetry (%g; %g,%g)\n" C_RESET, xs[i], as[j], bs[k]);
                 } else {
                     TEST_ASSERT_QFLOAT_CLOSE(f1, f2);
                 }
@@ -579,13 +573,13 @@ static void test_qf_logbeta_pdf_definition(void)
 {
     printf(C_CYAN "TEST: qf_logbeta_pdf definition\n" C_RESET);
 
-    double xs[] = { 0.1, 0.3, 0.6 };
-    double as[] = { 0.5, 1.0, 2.0, 5.0 };
-    double bs[] = { 0.5, 1.0, 3.0, 4.0 };
+    double xs[] = {0.1, 0.3, 0.6};
+    double as[] = {0.5, 1.0, 2.0, 5.0};
+    double bs[] = {0.5, 1.0, 3.0, 4.0};
 
-    for (int i = 0; i < (int)(sizeof(xs)/sizeof(xs[0])); ++i) {
-        for (int j = 0; j < (int)(sizeof(as)/sizeof(as[0])); ++j) {
-            for (int k = 0; k < (int)(sizeof(bs)/sizeof(bs[0])); ++k) {
+    for (int i = 0; i < (int)(sizeof(xs) / sizeof(xs[0])); ++i) {
+        for (int j = 0; j < (int)(sizeof(as) / sizeof(as[0])); ++j) {
+            for (int k = 0; k < (int)(sizeof(bs) / sizeof(bs[0])); ++k) {
 
                 qfloat_t x = qf_from_double(xs[i]);
                 qfloat_t a = qf_from_double(as[j]);
@@ -593,18 +587,17 @@ static void test_qf_logbeta_pdf_definition(void)
 
                 qfloat_t logpdf = qf_logbeta_pdf(x, a, b);
 
-                qfloat_t log_x   = qf_log(x);
+                qfloat_t log_x = qf_log(x);
                 qfloat_t log_1mx = qf_log(qf_sub(qf_from_double(1.0), x));
 
                 qfloat_t term1 = qf_mul(qf_sub(a, qf_from_double(1.0)), log_x);
                 qfloat_t term2 = qf_mul(qf_sub(b, qf_from_double(1.0)), log_1mx);
-                qfloat_t logB  = qf_logbeta(a, b);
+                qfloat_t logB = qf_logbeta(a, b);
 
                 qfloat_t rhs = qf_sub(qf_add(term1, term2), logB);
 
                 if (qf_close_rel(logpdf, rhs, 1e-30)) {
-                    printf(C_GREEN "  OK: log f(%g; %g,%g)\n" C_RESET,
-                           xs[i], as[j], bs[k]);
+                    printf(C_GREEN "  OK: log f(%g; %g,%g)\n" C_RESET, xs[i], as[j], bs[k]);
                 } else {
                     TEST_ASSERT_QFLOAT_CLOSE(logpdf, rhs);
                 }
@@ -623,21 +616,21 @@ static void test_qf_logbeta_pdf_consistency(void)
 {
     printf(C_CYAN "TEST: qf_logbeta_pdf consistency with qf_beta_pdf\n" C_RESET);
 
-    double xs[] = { 0.2, 0.4, 0.7 };
-    double as[] = { 0.5, 2.0, 5.0 };
-    double bs[] = { 0.5, 3.0, 4.0 };
+    double xs[] = {0.2, 0.4, 0.7};
+    double as[] = {0.5, 2.0, 5.0};
+    double bs[] = {0.5, 3.0, 4.0};
 
-    for (int i = 0; i < (int)(sizeof(xs)/sizeof(xs[0])); ++i) {
-        for (int j = 0; j < (int)(sizeof(as)/sizeof(as[0])); ++j) {
-            for (int k = 0; k < (int)(sizeof(bs)/sizeof(bs[0])); ++k) {
+    for (int i = 0; i < (int)(sizeof(xs) / sizeof(xs[0])); ++i) {
+        for (int j = 0; j < (int)(sizeof(as) / sizeof(as[0])); ++j) {
+            for (int k = 0; k < (int)(sizeof(bs) / sizeof(bs[0])); ++k) {
 
                 qfloat_t x = qf_from_double(xs[i]);
                 qfloat_t a = qf_from_double(as[j]);
                 qfloat_t b = qf_from_double(bs[k]);
 
-                qfloat_t pdf    = qf_beta_pdf(x, a, b);
+                qfloat_t pdf = qf_beta_pdf(x, a, b);
                 qfloat_t logpdf = qf_logbeta_pdf(x, a, b);
-                qfloat_t rhs    = qf_log(pdf);
+                qfloat_t rhs = qf_log(pdf);
 
                 if (qf_close_rel(logpdf, rhs, 1e-30)) {
                     printf(C_GREEN "  OK: log f matches log(pdf)\n" C_RESET);
@@ -659,13 +652,13 @@ static void test_qf_logbeta_pdf_symmetry(void)
 {
     printf(C_CYAN "TEST: qf_logbeta_pdf symmetry\n" C_RESET);
 
-    double xs[] = { 0.1, 0.3, 0.6, 0.8 };
-    double as[] = { 0.5, 2.0, 5.0 };
-    double bs[] = { 0.5, 3.0, 4.0 };
+    double xs[] = {0.1, 0.3, 0.6, 0.8};
+    double as[] = {0.5, 2.0, 5.0};
+    double bs[] = {0.5, 3.0, 4.0};
 
-    for (int i = 0; i < (int)(sizeof(xs)/sizeof(xs[0])); ++i) {
-        for (int j = 0; j < (int)(sizeof(as)/sizeof(as[0])); ++j) {
-            for (int k = 0; k < (int)(sizeof(bs)/sizeof(bs[0])); ++k) {
+    for (int i = 0; i < (int)(sizeof(xs) / sizeof(xs[0])); ++i) {
+        for (int j = 0; j < (int)(sizeof(as) / sizeof(as[0])); ++j) {
+            for (int k = 0; k < (int)(sizeof(bs) / sizeof(bs[0])); ++k) {
 
                 qfloat_t x = qf_from_double(xs[i]);
                 qfloat_t a = qf_from_double(as[j]);
@@ -675,8 +668,7 @@ static void test_qf_logbeta_pdf_symmetry(void)
                 qfloat_t f2 = qf_logbeta_pdf(qf_sub(qf_from_double(1.0), x), b, a);
 
                 if (qf_close_rel(f1, f2, 1e-30)) {
-                    printf(C_GREEN "  OK: symmetry (%g; %g,%g)\n" C_RESET,
-                           xs[i], as[j], bs[k]);
+                    printf(C_GREEN "  OK: symmetry (%g; %g,%g)\n" C_RESET, xs[i], as[j], bs[k]);
                 } else {
                     TEST_ASSERT_QFLOAT_CLOSE(f1, f2);
                 }
@@ -705,17 +697,17 @@ static void test_qf_normal_pdf_definition(void)
 {
     printf(C_CYAN "TEST: qf_normal_pdf definition\n" C_RESET);
 
-    double xs[] = { -3.0, -1.0, -0.5, 0.0, 0.5, 1.0, 3.0 };
+    double xs[] = {-3.0, -1.0, -0.5, 0.0, 0.5, 1.0, 3.0};
 
-    for (int i = 0; i < (int)(sizeof(xs)/sizeof(xs[0])); ++i) {
+    for (int i = 0; i < (int)(sizeof(xs) / sizeof(xs[0])); ++i) {
 
         qfloat_t x = qf_from_double(xs[i]);
         qfloat_t pdf = qf_normal_pdf(x);
 
         /* RHS = exp(-x^2/2) / sqrt(2π) */
-        qfloat_t x2   = qf_mul(x, x);
+        qfloat_t x2 = qf_mul(x, x);
         qfloat_t expo = qf_mul(qf_neg(x2), qf_from_double(0.5));
-        qfloat_t e    = qf_exp(expo);
+        qfloat_t e = qf_exp(expo);
 
         qfloat_t inv_sqrt_2pi = qf_from_string("0.3989422804014326779399460599343819");
         qfloat_t rhs = qf_mul(inv_sqrt_2pi, e);
@@ -742,14 +734,14 @@ static void test_qf_normal_pdf_symmetry(void)
 {
     printf(C_CYAN "TEST: qf_normal_pdf symmetry\n" C_RESET);
 
-    double xs[] = { 0.1, 0.5, 1.0, 2.0, 3.0 };
+    double xs[] = {0.1, 0.5, 1.0, 2.0, 3.0};
 
-    for (int i = 0; i < (int)(sizeof(xs)/sizeof(xs[0])); ++i) {
+    for (int i = 0; i < (int)(sizeof(xs) / sizeof(xs[0])); ++i) {
 
-        qfloat_t x  = qf_from_double(xs[i]);
+        qfloat_t x = qf_from_double(xs[i]);
         qfloat_t nx = qf_neg(x);
 
-        qfloat_t fx  = qf_normal_pdf(x);
+        qfloat_t fx = qf_normal_pdf(x);
         qfloat_t fnx = qf_normal_pdf(nx);
 
         int ok = qf_close_rel(fx, fnx, 1e-30);
@@ -799,20 +791,19 @@ static void test_qf_normal_pdf_logform(void)
 {
     printf(C_CYAN "TEST: qf_normal_pdf log-form consistency\n" C_RESET);
 
-    double xs[] = { -2.0, -1.0, -0.5, 0.5, 1.0, 2.0 };
+    double xs[] = {-2.0, -1.0, -0.5, 0.5, 1.0, 2.0};
 
     qfloat_t log_2pi = qf_log(QF_2PI);
 
-    for (int i = 0; i < (int)(sizeof(xs)/sizeof(xs[0])); ++i) {
+    for (int i = 0; i < (int)(sizeof(xs) / sizeof(xs[0])); ++i) {
 
         qfloat_t x = qf_from_double(xs[i]);
 
-        qfloat_t pdf    = qf_normal_pdf(x);
+        qfloat_t pdf = qf_normal_pdf(x);
         qfloat_t logpdf = qf_log(pdf);
 
-        qfloat_t x2     = qf_mul(x, x);
-        qfloat_t rhs    = qf_sub(qf_mul(qf_from_double(-0.5), log_2pi),
-                               qf_mul(qf_from_double(0.5), x2));
+        qfloat_t x2 = qf_mul(x, x);
+        qfloat_t rhs = qf_sub(qf_mul(qf_from_double(-0.5), log_2pi), qf_mul(qf_from_double(0.5), x2));
 
         int ok = qf_close_rel(logpdf, rhs, 1e-30);
 
@@ -848,13 +839,13 @@ static void test_qf_normal_cdf_definition(void)
 {
     printf(C_CYAN "TEST: qf_normal_cdf definition\n" C_RESET);
 
-    double xs[] = { -3.0, -1.0, -0.5, 0.0, 0.5, 1.0, 3.0 };
+    double xs[] = {-3.0, -1.0, -0.5, 0.0, 0.5, 1.0, 3.0};
 
     qfloat_t inv_sqrt2 = QF_SQRT_HALF;
     qfloat_t half = qf_from_double(0.5);
-    qfloat_t one  = qf_from_double(1.0);
+    qfloat_t one = qf_from_double(1.0);
 
-    for (int i = 0; i < (int)(sizeof(xs)/sizeof(xs[0])); ++i) {
+    for (int i = 0; i < (int)(sizeof(xs) / sizeof(xs[0])); ++i) {
 
         qfloat_t x = qf_from_double(xs[i]);
         qfloat_t cdf = qf_normal_cdf(x);
@@ -884,16 +875,16 @@ static void test_qf_normal_cdf_symmetry(void)
 {
     printf(C_CYAN "TEST: qf_normal_cdf symmetry\n" C_RESET);
 
-    double xs[] = { 0.1, 0.5, 1.0, 2.0, 3.0 };
+    double xs[] = {0.1, 0.5, 1.0, 2.0, 3.0};
 
     qfloat_t one = qf_from_double(1.0);
 
-    for (int i = 0; i < (int)(sizeof(xs)/sizeof(xs[0])); ++i) {
+    for (int i = 0; i < (int)(sizeof(xs) / sizeof(xs[0])); ++i) {
 
-        qfloat_t x  = qf_from_double(xs[i]);
+        qfloat_t x = qf_from_double(xs[i]);
         qfloat_t nx = qf_neg(x);
 
-        qfloat_t Fx  = qf_normal_cdf(x);
+        qfloat_t Fx = qf_normal_cdf(x);
         qfloat_t Fnx = qf_normal_cdf(nx);
 
         qfloat_t rhs = qf_sub(one, Fx);
@@ -946,22 +937,22 @@ static void test_qf_normal_cdf_pdf_consistency(void)
 {
     printf(C_CYAN "TEST: qf_normal_cdf derivative consistency\n" C_RESET);
 
-    double xs[] = { -2.0, -1.0, -0.5, 0.5, 1.0, 2.0 };
+    double xs[] = {-2.0, -1.0, -0.5, 0.5, 1.0, 2.0};
 
     /* h chosen to avoid cancellation but still small */
     qfloat_t h = qf_from_double(1e-9);
 
-    qfloat_t two   = qf_from_double(2.0);
+    qfloat_t two = qf_from_double(2.0);
     qfloat_t three = qf_from_double(3.0);
-    qfloat_t four  = qf_from_double(4.0);
+    qfloat_t four = qf_from_double(4.0);
 
-    qfloat_t c3    = qf_from_double(3.0);
-    qfloat_t c32   = qf_from_double(32.0);
-    qfloat_t c168  = qf_from_double(168.0);
-    qfloat_t c672  = qf_from_double(672.0);
-    qfloat_t c840  = qf_from_double(840.0);
+    qfloat_t c3 = qf_from_double(3.0);
+    qfloat_t c32 = qf_from_double(32.0);
+    qfloat_t c168 = qf_from_double(168.0);
+    qfloat_t c672 = qf_from_double(672.0);
+    qfloat_t c840 = qf_from_double(840.0);
 
-    for (int i = 0; i < (int)(sizeof(xs)/sizeof(xs[0])); ++i) {
+    for (int i = 0; i < (int)(sizeof(xs) / sizeof(xs[0])); ++i) {
 
         qfloat_t x = qf_from_double(xs[i]);
 
@@ -979,15 +970,15 @@ static void test_qf_normal_cdf_pdf_consistency(void)
         /* 9-point stencil numerator */
         qfloat_t num = {0.0, 0.0};
 
-        num = qf_add(num, qf_mul(c3,   Fm4));
-        num = qf_sub(num, qf_mul(c32,  Fm3));
+        num = qf_add(num, qf_mul(c3, Fm4));
+        num = qf_sub(num, qf_mul(c32, Fm3));
         num = qf_add(num, qf_mul(c168, Fm2));
         num = qf_sub(num, qf_mul(c672, Fm1));
 
         num = qf_add(num, qf_mul(c672, Fp1));
         num = qf_sub(num, qf_mul(c168, Fp2));
-        num = qf_add(num, qf_mul(c32,  Fp3));
-        num = qf_sub(num, qf_mul(c3,   Fp4));
+        num = qf_add(num, qf_mul(c32, Fp3));
+        num = qf_sub(num, qf_mul(c3, Fp4));
 
         /* denominator = 840 h */
         qfloat_t denom = qf_mul(c840, h);
@@ -1029,19 +1020,18 @@ static void test_qf_normal_logpdf_definition(void)
 {
     printf(C_CYAN "TEST: qf_normal_logpdf definition\n" C_RESET);
 
-    double xs[] = { -3.0, -1.0, -0.5, 0.0, 0.5, 1.0, 3.0 };
+    double xs[] = {-3.0, -1.0, -0.5, 0.0, 0.5, 1.0, 3.0};
 
     qfloat_t log_2pi = QF_LN_2PI;
     qfloat_t half = qf_from_double(0.5);
 
-    for (int i = 0; i < (int)(sizeof(xs)/sizeof(xs[0])); ++i) {
+    for (int i = 0; i < (int)(sizeof(xs) / sizeof(xs[0])); ++i) {
 
         qfloat_t x = qf_from_double(xs[i]);
         qfloat_t logpdf = qf_normal_logpdf(x);
 
         qfloat_t x2 = qf_mul(x, x);
-        qfloat_t rhs = qf_neg(qf_add(qf_mul(half, log_2pi),
-                                   qf_mul(half, x2)));
+        qfloat_t rhs = qf_neg(qf_add(qf_mul(half, log_2pi), qf_mul(half, x2)));
 
         int ok = qf_close_rel(logpdf, rhs, 1e-30);
 
@@ -1066,15 +1056,15 @@ static void test_qf_normal_logpdf_consistency(void)
 {
     printf(C_CYAN "TEST: qf_normal_logpdf consistency with qf_normal_pdf\n" C_RESET);
 
-    double xs[] = { -2.0, -1.0, -0.5, 0.5, 1.0, 2.0 };
+    double xs[] = {-2.0, -1.0, -0.5, 0.5, 1.0, 2.0};
 
-    for (int i = 0; i < (int)(sizeof(xs)/sizeof(xs[0])); ++i) {
+    for (int i = 0; i < (int)(sizeof(xs) / sizeof(xs[0])); ++i) {
 
         qfloat_t x = qf_from_double(xs[i]);
 
         qfloat_t logpdf = qf_normal_logpdf(x);
-        qfloat_t pdf    = qf_normal_pdf(x);
-        qfloat_t rhs    = qf_log(pdf);
+        qfloat_t pdf = qf_normal_pdf(x);
+        qfloat_t rhs = qf_log(pdf);
 
         int ok = qf_close_rel(logpdf, rhs, 1e-30);
 
@@ -1098,14 +1088,14 @@ static void test_qf_normal_logpdf_symmetry(void)
 {
     printf(C_CYAN "TEST: qf_normal_logpdf symmetry\n" C_RESET);
 
-    double xs[] = { 0.1, 0.5, 1.0, 2.0, 3.0 };
+    double xs[] = {0.1, 0.5, 1.0, 2.0, 3.0};
 
-    for (int i = 0; i < (int)(sizeof(xs)/sizeof(xs[0])); ++i) {
+    for (int i = 0; i < (int)(sizeof(xs) / sizeof(xs[0])); ++i) {
 
-        qfloat_t x  = qf_from_double(xs[i]);
+        qfloat_t x = qf_from_double(xs[i]);
         qfloat_t nx = qf_neg(x);
 
-        qfloat_t fx  = qf_normal_logpdf(x);
+        qfloat_t fx = qf_normal_logpdf(x);
         qfloat_t fnx = qf_normal_logpdf(nx);
 
         int ok = qf_close_rel(fx, fnx, 1e-30);
@@ -1159,13 +1149,15 @@ static void test_qf_normal_logpdf_all(void)
     TEST_RUN_SUBTEST(test_qf_normal_logpdf_at_zero, NULL);
 }
 
-void test_lambert_w(void) {
+void test_lambert_w(void)
+{
     TEST_RUN_SUBTEST(test_qf_lambert_w0, NULL);
     TEST_RUN_SUBTEST(test_qf_lambert_wm1, NULL);
     TEST_RUN_SUBTEST(test_qf_productlog_all, NULL);
 }
 
-void test_beta_logbeta_binomial_beta_pdf_logbeta_pdf_normal_pdf_cdf_logpdf(void) {
+void test_beta_logbeta_binomial_beta_pdf_logbeta_pdf_normal_pdf_cdf_logpdf(void)
+{
     TEST_RUN_SUBTEST(test_qf_beta_all, NULL);
     TEST_RUN_SUBTEST(test_qf_logbeta_all, NULL);
     TEST_RUN_SUBTEST(test_qf_binomial_all, NULL);

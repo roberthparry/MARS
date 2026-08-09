@@ -214,8 +214,7 @@ string_t *number_to_text_mpq(const number_t *number);
 string_t *number_to_text_qcomplex(const number_t *number);
 string_t *number_to_text_qfloat(const number_t *number);
 bool number_immortal_id_mpfr(const number_t *number, number_const_id_t *id_out);
-bool number_immortal_id_cdouble(const number_t *number,
-                                    number_const_id_t *id_out);
+bool number_immortal_id_cdouble(const number_t *number, number_const_id_t *id_out);
 bool number_immortal_id_mpz(const number_t *number, number_const_id_t *id_out);
 bool number_immortal_id_mpq(const number_t *number, number_const_id_t *id_out);
 bool number_value_is_immortal_double(const number_t *number);
@@ -229,8 +228,7 @@ number_t *number_abs_cdouble(const number_t *number);
 number_t *number_add_same_cdouble(const number_t *a, const number_t *b);
 number_t *number_arg_cdouble(const number_t *number);
 number_t *number_clone_cdouble(const number_t *number);
-number_t *number_const_prec_cdouble(const number_t *number,
-                                        size_t precision_bits);
+number_t *number_const_prec_cdouble(const number_t *number, size_t precision_bits);
 int number_cmp_same_cdouble(const number_t *a, const number_t *b);
 number_t *number_conj_cdouble(const number_t *number);
 number_t number_const_like_cdouble(const number_t *like, number_const_id_t id);

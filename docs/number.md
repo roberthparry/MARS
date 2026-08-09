@@ -389,8 +389,9 @@ The generic layer exposes:
   - `num_bessel_j`
   - `num_bessel_y`
   - `num_lommel_s`
-  - `num_lommel_s_derivative`
   - `num_appell_f1`
+  - `num_lauricella_f`
+  - `num_hypergeometric_pFq`
 - exact integer and number-theory helpers:
   - `num_factorial`
   - `num_fibonacci`
@@ -421,6 +422,12 @@ The generic layer exposes:
 
 Binary arithmetic mixes supported backends automatically by promoting to a
 common target representation before dispatch.
+
+Appell F₁ is implemented through `num_lauricella_f(...)` as the two-variable
+Lauricella F_D member. General pFq and higher-dimensional Lauricella calls use
+the native qfloat or qcomplex implementation after ordinary `number_t`
+promotion. Real two-variable Appell calls retain the multiprecision backend
+when their inputs require it.
 
 Return conventions in this area:
 

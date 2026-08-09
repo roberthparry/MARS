@@ -1,8 +1,8 @@
 #ifndef QCOMPLEX_H
 #define QCOMPLEX_H
 
-#include <stddef.h>
 #include <stdarg.h>
+#include <stddef.h>
 
 #include "qfloat.h"
 
@@ -214,22 +214,25 @@ extern const qcomplex_t QC_EULER_MASCHERONI;
 /**
  * @brief Construct a qcomplex_t from real and imaginary parts.
  */
-static inline qcomplex_t qc_make(qfloat_t re, qfloat_t im) {
-    qcomplex_t z = { re, im };
+static inline qcomplex_t qc_make(qfloat_t re, qfloat_t im)
+{
+    qcomplex_t z = {re, im};
     return z;
 }
 
 /**
  * @brief Return the real component of a complex value.
  */
-static inline qfloat_t qc_real(qcomplex_t z) {
+static inline qfloat_t qc_real(qcomplex_t z)
+{
     return z.re;
 }
 
 /**
  * @brief Return the imaginary component of a complex value.
  */
-static inline qfloat_t qc_imag(qcomplex_t z) {
+static inline qfloat_t qc_imag(qcomplex_t z)
+{
     return z.im;
 }
 
@@ -237,20 +240,20 @@ static inline qfloat_t qc_imag(qcomplex_t z) {
  * @name Basic arithmetic
  * @{
  */
-qcomplex_t qc_add(qcomplex_t a, qcomplex_t b);   /**< a + b */
-qcomplex_t qc_sub(qcomplex_t a, qcomplex_t b);   /**< a - b */
-qcomplex_t qc_mul(qcomplex_t a, qcomplex_t b);   /**< a * b */
-qcomplex_t qc_div(qcomplex_t a, qcomplex_t b);   /**< a / b */
-qcomplex_t qc_neg(qcomplex_t a);                 /**< -a */
-qcomplex_t qc_conj(qcomplex_t a);                /**< conjugate(a) */
+qcomplex_t qc_add(qcomplex_t a, qcomplex_t b); /**< a + b */
+qcomplex_t qc_sub(qcomplex_t a, qcomplex_t b); /**< a - b */
+qcomplex_t qc_mul(qcomplex_t a, qcomplex_t b); /**< a * b */
+qcomplex_t qc_div(qcomplex_t a, qcomplex_t b); /**< a / b */
+qcomplex_t qc_neg(qcomplex_t a);               /**< -a */
+qcomplex_t qc_conj(qcomplex_t a);              /**< conjugate(a) */
 /** @} */
 
 /**
  * @name Magnitude and argument
  * @{
  */
-qfloat_t   qc_abs(qcomplex_t z);                 /**< |z| */
-qfloat_t   qc_arg(qcomplex_t z);                 /**< arg(z) */
+qfloat_t qc_abs(qcomplex_t z); /**< |z| */
+qfloat_t qc_arg(qcomplex_t z); /**< arg(z) */
 /** @} */
 
 /**
@@ -260,18 +263,18 @@ qfloat_t   qc_arg(qcomplex_t z);                 /**< arg(z) */
 /** Construct z = r * exp(i*theta) from polar coordinates. */
 qcomplex_t qc_from_polar(qfloat_t r, qfloat_t theta);
 /** Decompose z into (r, theta) where r = |z| and theta = arg(z) in (-pi, pi]. */
-void       qc_to_polar(qcomplex_t z, qfloat_t *r, qfloat_t *theta);
+void qc_to_polar(qcomplex_t z, qfloat_t *r, qfloat_t *theta);
 /** @} */
 
 /**
  * @name Elementary functions
  * @{
  */
-qcomplex_t qc_exp(qcomplex_t z);                 /**< exp(z) */
-qcomplex_t qc_log(qcomplex_t z);                 /**< log(z) */
-qcomplex_t qc_log10(qcomplex_t z);               /**< log10(z) */
-qcomplex_t qc_pow(qcomplex_t a, qcomplex_t b);   /**< a^b */
-qcomplex_t qc_sqrt(qcomplex_t z);                /**< sqrt(z) */
+qcomplex_t qc_exp(qcomplex_t z);               /**< exp(z) */
+qcomplex_t qc_log(qcomplex_t z);               /**< log(z) */
+qcomplex_t qc_log10(qcomplex_t z);             /**< log10(z) */
+qcomplex_t qc_pow(qcomplex_t a, qcomplex_t b); /**< a^b */
+qcomplex_t qc_sqrt(qcomplex_t z);              /**< sqrt(z) */
 /** @} */
 
 /**
@@ -313,57 +316,61 @@ qcomplex_t qc_atan2(qcomplex_t y, qcomplex_t x); /**< atan2(y, x) */
  * @name Hyperbolic functions
  * @{
  */
-qcomplex_t qc_sinh(qcomplex_t z);                /**< sinh(z) */
-qcomplex_t qc_cosh(qcomplex_t z);                /**< cosh(z) */
-qcomplex_t qc_tanh(qcomplex_t z);                /**< tanh(z) */
-qcomplex_t qc_sech(qcomplex_t z);                /**< sech(z) */
-qcomplex_t qc_cosech(qcomplex_t z);              /**< cosech(z) */
-qcomplex_t qc_coth(qcomplex_t z);                /**< coth(z) */
-qcomplex_t qc_asinh(qcomplex_t z);               /**< asinh(z) */
-qcomplex_t qc_acosh(qcomplex_t z);               /**< acosh(z) */
-qcomplex_t qc_atanh(qcomplex_t z);               /**< atanh(z) */
-qcomplex_t qc_asech(qcomplex_t z);               /**< asech(z) */
-qcomplex_t qc_acosech(qcomplex_t z);             /**< acosech(z) */
-qcomplex_t qc_acoth(qcomplex_t z);               /**< acoth(z) */
+qcomplex_t qc_sinh(qcomplex_t z);    /**< sinh(z) */
+qcomplex_t qc_cosh(qcomplex_t z);    /**< cosh(z) */
+qcomplex_t qc_tanh(qcomplex_t z);    /**< tanh(z) */
+qcomplex_t qc_sech(qcomplex_t z);    /**< sech(z) */
+qcomplex_t qc_cosech(qcomplex_t z);  /**< cosech(z) */
+qcomplex_t qc_coth(qcomplex_t z);    /**< coth(z) */
+qcomplex_t qc_asinh(qcomplex_t z);   /**< asinh(z) */
+qcomplex_t qc_acosh(qcomplex_t z);   /**< acosh(z) */
+qcomplex_t qc_atanh(qcomplex_t z);   /**< atanh(z) */
+qcomplex_t qc_asech(qcomplex_t z);   /**< asech(z) */
+qcomplex_t qc_acosech(qcomplex_t z); /**< acosech(z) */
+qcomplex_t qc_acoth(qcomplex_t z);   /**< acoth(z) */
 /** @} */
 
 /**
  * @name Special functions
  * @{
  */
-qcomplex_t qc_erf(qcomplex_t z);                 /**< error function */
-qcomplex_t qc_erfc(qcomplex_t z);                /**< complementary error function */
-qcomplex_t qc_erfinv(qcomplex_t z);              /**< inverse error function */
-qcomplex_t qc_erfcinv(qcomplex_t z);             /**< inverse complementary error function */
-qcomplex_t qc_gamma(qcomplex_t z);               /**< gamma function */
-qcomplex_t qc_lgamma(qcomplex_t z);              /**< log gamma */
-qcomplex_t qc_digamma(qcomplex_t z);             /**< digamma */
-qcomplex_t qc_trigamma(qcomplex_t z);            /**< trigamma */
-qcomplex_t qc_tetragamma(qcomplex_t z);          /**< tetragamma */
+qcomplex_t qc_erf(qcomplex_t z);                           /**< error function */
+qcomplex_t qc_erfc(qcomplex_t z);                          /**< complementary error function */
+qcomplex_t qc_erfinv(qcomplex_t z);                        /**< inverse error function */
+qcomplex_t qc_erfcinv(qcomplex_t z);                       /**< inverse complementary error function */
+qcomplex_t qc_gamma(qcomplex_t z);                         /**< gamma function */
+qcomplex_t qc_lgamma(qcomplex_t z);                        /**< log gamma */
+qcomplex_t qc_digamma(qcomplex_t z);                       /**< digamma */
+qcomplex_t qc_trigamma(qcomplex_t z);                      /**< trigamma */
+qcomplex_t qc_tetragamma(qcomplex_t z);                    /**< tetragamma */
 qcomplex_t qc_polygamma(unsigned int order, qcomplex_t z); /**< polygamma ψ⁽ⁿ⁾ */
-qcomplex_t qc_dilog(qcomplex_t z);                 /**< dilogarithm Li₂(z) */
-qcomplex_t qc_polylog(qcomplex_t s, qcomplex_t z); /**< polylogarithm Li_s(z), integer s */
-qcomplex_t qc_appell_f1(qcomplex_t a, qcomplex_t b1, qcomplex_t b2,
-                        qcomplex_t c, qcomplex_t x, qcomplex_t y); /**< Appell F1(a;b1,b2;c;x,y) */
-qcomplex_t qc_legendre_chi(qcomplex_t s, qcomplex_t z); /**< Legendre chi chi_s(z), integer s */
-qcomplex_t qc_gammainv(qcomplex_t z);            /**< inverse gamma */
-qcomplex_t qc_beta(qcomplex_t a, qcomplex_t b);  /**< beta function */
-qcomplex_t qc_logbeta(qcomplex_t a, qcomplex_t b); /**< log beta */
-qcomplex_t qc_binomial(qcomplex_t a, qcomplex_t b); /**< binomial coefficient */
-qcomplex_t qc_beta_pdf(qcomplex_t x, qcomplex_t a, qcomplex_t b); /**< beta PDF */
-qcomplex_t qc_logbeta_pdf(qcomplex_t x, qcomplex_t a, qcomplex_t b); /**< log beta PDF */
-qcomplex_t qc_normal_pdf(qcomplex_t z);          /**< normal PDF */
-qcomplex_t qc_normal_cdf(qcomplex_t z);          /**< normal CDF */
-qcomplex_t qc_normal_logpdf(qcomplex_t z);       /**< normal log PDF */
-qcomplex_t qc_lambert_wn(int branch, qcomplex_t z); /**< Lambert W integer branch */
-qcomplex_t qc_lambert_wm1(qcomplex_t z);         /**< Lambert W branch -1 */
-qcomplex_t qc_productlog(qcomplex_t z);          /**< product log (Lambert W principal branch) */
+qcomplex_t qc_dilog(qcomplex_t z);                         /**< dilogarithm Li₂(z) */
+qcomplex_t qc_polylog(qcomplex_t s, qcomplex_t z);         /**< polylogarithm Li_s(z), integer s */
+qcomplex_t qc_appell_f1(qcomplex_t a, qcomplex_t b1, qcomplex_t b2, qcomplex_t c, qcomplex_t x,
+                        qcomplex_t y); /**< Appell F1(a;b1,b2;c;x,y) */
+qcomplex_t qc_lauricella_f(qcomplex_t a, const qcomplex_t *b, qcomplex_t c, const qcomplex_t *x,
+                           size_t variable_count); /**< Lauricella F_D */
+qcomplex_t qc_hypergeometric_pFq(const qcomplex_t *upper, size_t upper_count, const qcomplex_t *lower,
+                                 size_t lower_count, qcomplex_t argument); /**< Generalised hypergeometric pFq */
+qcomplex_t qc_legendre_chi(qcomplex_t s, qcomplex_t z);                    /**< Legendre chi chi_s(z), integer s */
+qcomplex_t qc_gammainv(qcomplex_t z);                                      /**< inverse gamma */
+qcomplex_t qc_beta(qcomplex_t a, qcomplex_t b);                            /**< beta function */
+qcomplex_t qc_logbeta(qcomplex_t a, qcomplex_t b);                         /**< log beta */
+qcomplex_t qc_binomial(qcomplex_t a, qcomplex_t b);                        /**< binomial coefficient */
+qcomplex_t qc_beta_pdf(qcomplex_t x, qcomplex_t a, qcomplex_t b);          /**< beta PDF */
+qcomplex_t qc_logbeta_pdf(qcomplex_t x, qcomplex_t a, qcomplex_t b);       /**< log beta PDF */
+qcomplex_t qc_normal_pdf(qcomplex_t z);                                    /**< normal PDF */
+qcomplex_t qc_normal_cdf(qcomplex_t z);                                    /**< normal CDF */
+qcomplex_t qc_normal_logpdf(qcomplex_t z);                                 /**< normal log PDF */
+qcomplex_t qc_lambert_wn(int branch, qcomplex_t z);                        /**< Lambert W integer branch */
+qcomplex_t qc_lambert_wm1(qcomplex_t z);                                   /**< Lambert W branch -1 */
+qcomplex_t qc_productlog(qcomplex_t z);                   /**< product log (Lambert W principal branch) */
 qcomplex_t qc_gammainc_lower(qcomplex_t s, qcomplex_t x); /**< lower incomplete gamma */
 qcomplex_t qc_gammainc_upper(qcomplex_t s, qcomplex_t x); /**< upper incomplete gamma */
 qcomplex_t qc_gammainc_P(qcomplex_t s, qcomplex_t x);     /**< regularised lower gamma */
 qcomplex_t qc_gammainc_Q(qcomplex_t s, qcomplex_t x);     /**< regularised upper gamma */
-qcomplex_t qc_ei(qcomplex_t z);                  /**< exponential integral Ei */
-qcomplex_t qc_e1(qcomplex_t z);                  /**< exponential integral E1 */
+qcomplex_t qc_ei(qcomplex_t z);                           /**< exponential integral Ei */
+qcomplex_t qc_e1(qcomplex_t z);                           /**< exponential integral E1 */
 /** @} */
 
 /**
@@ -379,11 +386,11 @@ qcomplex_t qc_hypot(qcomplex_t x, qcomplex_t y); /**< sqrt(|x|^2 + |y|^2) */
  * @name Comparison
  * @{
  */
-bool qc_eq(qcomplex_t a, qcomplex_t b);          /**< a == b */
-bool qc_isnan(qcomplex_t z);                     /**< isnan(z) */
-bool qc_isinf(qcomplex_t z);                     /**< isinf(z) */
-bool qc_isposinf(qcomplex_t z);                  /**< isposinf(z) */
-bool qc_isneginf(qcomplex_t z);                  /**< isneginf(z) */
+bool qc_eq(qcomplex_t a, qcomplex_t b); /**< a == b */
+bool qc_isnan(qcomplex_t z);            /**< isnan(z) */
+bool qc_isinf(qcomplex_t z);            /**< isinf(z) */
+bool qc_isposinf(qcomplex_t z);         /**< isposinf(z) */
+bool qc_isneginf(qcomplex_t z);         /**< isneginf(z) */
 /** @} */
 
 /**

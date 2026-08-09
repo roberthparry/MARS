@@ -22,25 +22,19 @@ typedef struct cubed_unary_rule {
 enum {
     squared_unary_rule_kind_first = EXPR_PATTERN_UNARY_SIN,
     squared_unary_rule_kind_last = EXPR_PATTERN_UNARY_COTH,
-    squared_unary_rule_kind_count =
-        squared_unary_rule_kind_last - squared_unary_rule_kind_first + 1,
+    squared_unary_rule_kind_count = squared_unary_rule_kind_last - squared_unary_rule_kind_first + 1,
     squared_unary_op_kind_first = EXPR_KIND_SIN,
     squared_unary_op_kind_last = EXPR_KIND_COTH,
-    squared_unary_op_kind_count =
-        squared_unary_op_kind_last - squared_unary_op_kind_first + 1,
+    squared_unary_op_kind_count = squared_unary_op_kind_last - squared_unary_op_kind_first + 1,
     cubed_unary_rule_kind_first = EXPR_PATTERN_UNARY_SIN,
     cubed_unary_rule_kind_last = EXPR_PATTERN_UNARY_COT,
-    cubed_unary_rule_kind_count =
-        cubed_unary_rule_kind_last - cubed_unary_rule_kind_first + 1,
+    cubed_unary_rule_kind_count = cubed_unary_rule_kind_last - cubed_unary_rule_kind_first + 1,
     cubed_unary_op_kind_first = EXPR_KIND_SIN,
     cubed_unary_op_kind_last = EXPR_KIND_COT,
-    cubed_unary_op_kind_count =
-        cubed_unary_op_kind_last - cubed_unary_op_kind_first + 1
+    cubed_unary_op_kind_count = cubed_unary_op_kind_last - cubed_unary_op_kind_first + 1
 };
 
-static expr_t *build_double_angle_squared_raw(const expr_t *u,
-                                              expr_apply_unary_fn oscillation_fn,
-                                              bool scaled_first,
+static expr_t *build_double_angle_squared_raw(const expr_t *u, expr_apply_unary_fn oscillation_fn, bool scaled_first,
                                               expr_binary_build_fn combine)
 {
     expr_t *two_u = u ? expr_mul_num(u, &NUM_TWO) : NULL;
@@ -207,9 +201,7 @@ static expr_t *build_cot_cubed_raw(const expr_t *u)
     expr_t *neg_half_cot_sq = half_cot_sq ? expr_neg(half_cot_sq) : NULL;
     expr_t *sin_u = expr_sin(u);
     expr_t *log_sin = sin_u ? expr_log(sin_u) : NULL;
-    expr_t *raw = (neg_half_cot_sq && log_sin)
-                      ? expr_sub(neg_half_cot_sq, log_sin)
-                      : NULL;
+    expr_t *raw = (neg_half_cot_sq && log_sin) ? expr_sub(neg_half_cot_sq, log_sin) : NULL;
 
     expr_free(log_sin);
     expr_free(sin_u);
@@ -261,52 +253,30 @@ static expr_t *build_cosec_cubed_raw(const expr_t *u)
 }
 
 static const squared_unary_rule_t squared_unary_rules[] = {
-    [EXPR_PATTERN_UNARY_SIN - squared_unary_rule_kind_first] =
-        { EXPR_KIND_SIN, build_sin_squared_raw, 4 },
-    [EXPR_PATTERN_UNARY_COS - squared_unary_rule_kind_first] =
-        { EXPR_KIND_COS, build_cos_squared_raw, 4 },
-    [EXPR_PATTERN_UNARY_TAN - squared_unary_rule_kind_first] =
-        { EXPR_KIND_TAN, build_tan_squared_raw, 1 },
-    [EXPR_PATTERN_UNARY_SEC - squared_unary_rule_kind_first] =
-        { EXPR_KIND_SEC, build_sec_squared_raw, 1 },
-    [EXPR_PATTERN_UNARY_COSEC - squared_unary_rule_kind_first] =
-        { EXPR_KIND_COSEC, build_cosec_squared_raw, 1 },
-    [EXPR_PATTERN_UNARY_COT - squared_unary_rule_kind_first] =
-        { EXPR_KIND_COT, build_cot_squared_raw, 1 },
-    [EXPR_PATTERN_UNARY_SINH - squared_unary_rule_kind_first] =
-        { EXPR_KIND_SINH, build_sinh_squared_raw, 4 },
-    [EXPR_PATTERN_UNARY_COSH - squared_unary_rule_kind_first] =
-        { EXPR_KIND_COSH, build_cosh_squared_raw, 4 },
-    [EXPR_PATTERN_UNARY_COSECH - squared_unary_rule_kind_first] =
-        { EXPR_KIND_COSECH, build_cosech_squared_raw, 1 },
-    [EXPR_PATTERN_UNARY_TANH - squared_unary_rule_kind_first] =
-        { EXPR_KIND_TANH, build_tanh_squared_raw, 1 },
-    [EXPR_PATTERN_UNARY_SECH - squared_unary_rule_kind_first] =
-        { EXPR_KIND_SECH, build_sech_squared_raw, 1 },
-    [EXPR_PATTERN_UNARY_COTH - squared_unary_rule_kind_first] =
-        { EXPR_KIND_COTH, build_coth_squared_raw, 1 }
-};
+    [EXPR_PATTERN_UNARY_SIN - squared_unary_rule_kind_first] = {EXPR_KIND_SIN, build_sin_squared_raw, 4},
+    [EXPR_PATTERN_UNARY_COS - squared_unary_rule_kind_first] = {EXPR_KIND_COS, build_cos_squared_raw, 4},
+    [EXPR_PATTERN_UNARY_TAN - squared_unary_rule_kind_first] = {EXPR_KIND_TAN, build_tan_squared_raw, 1},
+    [EXPR_PATTERN_UNARY_SEC - squared_unary_rule_kind_first] = {EXPR_KIND_SEC, build_sec_squared_raw, 1},
+    [EXPR_PATTERN_UNARY_COSEC - squared_unary_rule_kind_first] = {EXPR_KIND_COSEC, build_cosec_squared_raw, 1},
+    [EXPR_PATTERN_UNARY_COT - squared_unary_rule_kind_first] = {EXPR_KIND_COT, build_cot_squared_raw, 1},
+    [EXPR_PATTERN_UNARY_SINH - squared_unary_rule_kind_first] = {EXPR_KIND_SINH, build_sinh_squared_raw, 4},
+    [EXPR_PATTERN_UNARY_COSH - squared_unary_rule_kind_first] = {EXPR_KIND_COSH, build_cosh_squared_raw, 4},
+    [EXPR_PATTERN_UNARY_COSECH - squared_unary_rule_kind_first] = {EXPR_KIND_COSECH, build_cosech_squared_raw, 1},
+    [EXPR_PATTERN_UNARY_TANH - squared_unary_rule_kind_first] = {EXPR_KIND_TANH, build_tanh_squared_raw, 1},
+    [EXPR_PATTERN_UNARY_SECH - squared_unary_rule_kind_first] = {EXPR_KIND_SECH, build_sech_squared_raw, 1},
+    [EXPR_PATTERN_UNARY_COTH - squared_unary_rule_kind_first] = {EXPR_KIND_COTH, build_coth_squared_raw, 1}};
 
 static const cubed_unary_rule_t cubed_unary_rules[] = {
-    [EXPR_PATTERN_UNARY_SIN - cubed_unary_rule_kind_first] =
-        { build_sin_cubed_raw },
-    [EXPR_PATTERN_UNARY_COS - cubed_unary_rule_kind_first] =
-        { build_cos_cubed_raw },
-    [EXPR_PATTERN_UNARY_TAN - cubed_unary_rule_kind_first] =
-        { build_tan_cubed_raw },
-    [EXPR_PATTERN_UNARY_SEC - cubed_unary_rule_kind_first] =
-        { build_sec_cubed_raw },
-    [EXPR_PATTERN_UNARY_COSEC - cubed_unary_rule_kind_first] =
-        { build_cosec_cubed_raw },
-    [EXPR_PATTERN_UNARY_COT - cubed_unary_rule_kind_first] =
-        { build_cot_cubed_raw }
-};
+    [EXPR_PATTERN_UNARY_SIN - cubed_unary_rule_kind_first] = {build_sin_cubed_raw},
+    [EXPR_PATTERN_UNARY_COS - cubed_unary_rule_kind_first] = {build_cos_cubed_raw},
+    [EXPR_PATTERN_UNARY_TAN - cubed_unary_rule_kind_first] = {build_tan_cubed_raw},
+    [EXPR_PATTERN_UNARY_SEC - cubed_unary_rule_kind_first] = {build_sec_cubed_raw},
+    [EXPR_PATTERN_UNARY_COSEC - cubed_unary_rule_kind_first] = {build_cosec_cubed_raw},
+    [EXPR_PATTERN_UNARY_COT - cubed_unary_rule_kind_first] = {build_cot_cubed_raw}};
 
-_Static_assert(sizeof(squared_unary_rules) / sizeof(squared_unary_rules[0]) ==
-                   squared_unary_rule_kind_count,
+_Static_assert(sizeof(squared_unary_rules) / sizeof(squared_unary_rules[0]) == squared_unary_rule_kind_count,
                "squared_unary_rules must follow the unary square kind range");
-_Static_assert(sizeof(cubed_unary_rules) / sizeof(cubed_unary_rules[0]) ==
-                   cubed_unary_rule_kind_count,
+_Static_assert(sizeof(cubed_unary_rules) / sizeof(cubed_unary_rules[0]) == cubed_unary_rule_kind_count,
                "cubed_unary_rules must follow the unary cube kind range");
 
 static const squared_unary_rule_t *find_squared_unary_rule(expr_pattern_unary_affine_kind_t kind)
@@ -333,8 +303,7 @@ static const cubed_unary_rule_t *find_cubed_unary_rule(expr_pattern_unary_affine
     return rule->build_raw ? rule : NULL;
 }
 
-static bool squared_unary_kind_from_op(expr_op_kind_t op_kind,
-                                       expr_pattern_unary_affine_kind_t *kind_out)
+static bool squared_unary_kind_from_op(expr_op_kind_t op_kind, expr_pattern_unary_affine_kind_t *kind_out)
 {
     static const expr_pattern_unary_affine_kind_t kinds[] = {
         [EXPR_KIND_SIN - squared_unary_op_kind_first] = EXPR_PATTERN_UNARY_SIN,
@@ -348,11 +317,9 @@ static bool squared_unary_kind_from_op(expr_op_kind_t op_kind,
         [EXPR_KIND_TANH - squared_unary_op_kind_first] = EXPR_PATTERN_UNARY_TANH,
         [EXPR_KIND_SECH - squared_unary_op_kind_first] = EXPR_PATTERN_UNARY_SECH,
         [EXPR_KIND_COSECH - squared_unary_op_kind_first] = EXPR_PATTERN_UNARY_COSECH,
-        [EXPR_KIND_COTH - squared_unary_op_kind_first] = EXPR_PATTERN_UNARY_COTH
-    };
+        [EXPR_KIND_COTH - squared_unary_op_kind_first] = EXPR_PATTERN_UNARY_COTH};
 
-    if (!kind_out ||
-        (unsigned)op_kind < (unsigned)squared_unary_op_kind_first ||
+    if (!kind_out || (unsigned)op_kind < (unsigned)squared_unary_op_kind_first ||
         (unsigned)op_kind > (unsigned)squared_unary_op_kind_last) {
         return false;
     }
@@ -361,8 +328,7 @@ static bool squared_unary_kind_from_op(expr_op_kind_t op_kind,
     return find_squared_unary_rule(*kind_out) != NULL;
 }
 
-static bool cubed_unary_kind_from_op(expr_op_kind_t op_kind,
-                                     expr_pattern_unary_affine_kind_t *kind_out)
+static bool cubed_unary_kind_from_op(expr_op_kind_t op_kind, expr_pattern_unary_affine_kind_t *kind_out)
 {
     static const expr_pattern_unary_affine_kind_t kinds[] = {
         [EXPR_KIND_SIN - cubed_unary_op_kind_first] = EXPR_PATTERN_UNARY_SIN,
@@ -370,11 +336,9 @@ static bool cubed_unary_kind_from_op(expr_op_kind_t op_kind,
         [EXPR_KIND_TAN - cubed_unary_op_kind_first] = EXPR_PATTERN_UNARY_TAN,
         [EXPR_KIND_SEC - cubed_unary_op_kind_first] = EXPR_PATTERN_UNARY_SEC,
         [EXPR_KIND_COSEC - cubed_unary_op_kind_first] = EXPR_PATTERN_UNARY_COSEC,
-        [EXPR_KIND_COT - cubed_unary_op_kind_first] = EXPR_PATTERN_UNARY_COT
-    };
+        [EXPR_KIND_COT - cubed_unary_op_kind_first] = EXPR_PATTERN_UNARY_COT};
 
-    if (!kind_out ||
-        (unsigned)op_kind < (unsigned)cubed_unary_op_kind_first ||
+    if (!kind_out || (unsigned)op_kind < (unsigned)cubed_unary_op_kind_first ||
         (unsigned)op_kind > (unsigned)cubed_unary_op_kind_last) {
         return false;
     }
@@ -383,11 +347,8 @@ static bool cubed_unary_kind_from_op(expr_op_kind_t op_kind,
     return find_cubed_unary_rule(*kind_out) != NULL;
 }
 
-static bool match_symbolic_squared_unary_base(const expr_t *expr,
-                                              expr_pattern_unary_affine_kind_t kind,
-                                              const expr_t *wrt,
-                                              const expr_t **base_out,
-                                              expr_t **coeff_out)
+static bool match_symbolic_squared_unary_base(const expr_t *expr, expr_pattern_unary_affine_kind_t kind,
+                                              const expr_t *wrt, const expr_t **base_out, expr_t **coeff_out)
 {
     const squared_unary_rule_t *rule = find_squared_unary_rule(kind);
     number_t exponent = num_new();
@@ -402,18 +363,12 @@ static bool match_symbolic_squared_unary_base(const expr_t *expr,
     if (expr->ops && expr->ops->kind == EXPR_KIND_POW_D && expr->a) {
         if (num_eq(expr->c, NUM_TWO))
             base = expr->a;
-    } else if (expr->ops && expr->ops->kind == EXPR_KIND_POW &&
-               expr->a && expr->b &&
-               expr_match_const_value(expr->b, &exponent) &&
-               num_eq(exponent, NUM_TWO)) {
+    } else if (expr->ops && expr->ops->kind == EXPR_KIND_POW && expr->a && expr->b &&
+               expr_match_const_value(expr->b, &exponent) && num_eq(exponent, NUM_TWO)) {
         base = expr->a;
     }
 
-    if (!base ||
-        !base->ops ||
-        !base->a ||
-        !rule ||
-        base->ops->kind != rule->op_kind ||
+    if (!base || !base->ops || !base->a || !rule || base->ops->kind != rule->op_kind ||
         !match_symbolic_affine_constant_and_coeff(base->a, wrt, &constant, &coeff)) {
         goto cleanup;
     }
@@ -430,8 +385,7 @@ cleanup:
     return ok;
 }
 
-static expr_t *divide_owned_by_symbolic_factor(expr_t *numerator,
-                                               expr_t *factor)
+static expr_t *divide_owned_by_symbolic_factor(expr_t *numerator, expr_t *factor)
 {
     expr_t *quotient = (numerator && factor) ? expr_div(numerator, factor) : NULL;
 
@@ -440,11 +394,9 @@ static expr_t *divide_owned_by_symbolic_factor(expr_t *numerator,
     return simplify_owned(quotient);
 }
 
-static expr_t *integrate_symbolic_squared_unary_affine(
-    const expr_t *expr,
-    const expr_t *wrt,
-    expr_pattern_unary_affine_kind_t kind,
-    const squared_unary_rule_t *rule)
+static expr_t *integrate_symbolic_squared_unary_affine(const expr_t *expr, const expr_t *wrt,
+                                                       expr_pattern_unary_affine_kind_t kind,
+                                                       const squared_unary_rule_t *rule)
 {
     const expr_t *base = NULL;
     expr_t *coeff = NULL;
@@ -473,9 +425,7 @@ static expr_t *integrate_symbolic_squared_unary_affine(
     return divide_owned_by_symbolic_factor(raw, denom);
 }
 
-expr_t *integrate_squared_unary_affine(const expr_t *expr,
-                                      const expr_t *wrt,
-                                      expr_pattern_unary_affine_kind_t kind)
+expr_t *integrate_squared_unary_affine(const expr_t *expr, const expr_t *wrt, expr_pattern_unary_affine_kind_t kind)
 {
     const squared_unary_rule_t *rule = find_squared_unary_rule(kind);
     number_t constant = num_new();
@@ -483,8 +433,7 @@ expr_t *integrate_squared_unary_affine(const expr_t *expr,
     expr_t *u;
     expr_t *raw = NULL;
 
-    if (!rule ||
-        !expr || !expr->a || !num_eq(expr->c, NUM_TWO) ||
+    if (!rule || !expr || !expr->a || !num_eq(expr->c, NUM_TWO) ||
         !match_affine_unary_data(expr->a, wrt, kind, &constant, &coeff)) {
         num_destroy(&coeff);
         num_destroy(&constant);
@@ -502,9 +451,7 @@ expr_t *integrate_squared_unary_affine(const expr_t *expr,
     return raw;
 }
 
-expr_t *integrate_cubed_unary_affine(const expr_t *expr,
-                                    const expr_t *wrt,
-                                    expr_pattern_unary_affine_kind_t kind)
+expr_t *integrate_cubed_unary_affine(const expr_t *expr, const expr_t *wrt, expr_pattern_unary_affine_kind_t kind)
 {
     const cubed_unary_rule_t *rule = find_cubed_unary_rule(kind);
     number_t constant = num_new();
@@ -512,9 +459,7 @@ expr_t *integrate_cubed_unary_affine(const expr_t *expr,
     expr_t *u;
     expr_t *raw = NULL;
 
-    if (!rule ||
-        !expr || !expr->a ||
-        !match_affine_unary_data(expr->a, wrt, kind, &constant, &coeff)) {
+    if (!rule || !expr || !expr->a || !match_affine_unary_data(expr->a, wrt, kind, &constant, &coeff)) {
         num_destroy(&coeff);
         num_destroy(&constant);
         return NULL;
@@ -527,15 +472,12 @@ expr_t *integrate_cubed_unary_affine(const expr_t *expr,
     return div_number_owned_consuming(raw, &coeff);
 }
 
-static bool expr_affine_parts_match_double(const expr_t *single_constant,
-                                           const expr_t *single_coeff,
-                                           const expr_t *double_constant,
-                                           const expr_t *double_coeff)
+static bool expr_affine_parts_match_double(const expr_t *single_constant, const expr_t *single_coeff,
+                                           const expr_t *double_constant, const expr_t *double_coeff)
 {
     expr_t *twice_constant = single_constant ? expr_mul_num(single_constant, &NUM_TWO) : NULL;
     expr_t *twice_coeff = single_coeff ? expr_mul_num(single_coeff, &NUM_TWO) : NULL;
-    bool ok = twice_constant && twice_coeff &&
-              expr_equal_exact_local(twice_constant, double_constant) &&
+    bool ok = twice_constant && twice_coeff && expr_equal_exact_local(twice_constant, double_constant) &&
               expr_equal_exact_local(twice_coeff, double_coeff);
 
     expr_free(twice_coeff);
@@ -543,8 +485,7 @@ static bool expr_affine_parts_match_double(const expr_t *single_constant,
     return ok;
 }
 
-static bool match_tan_plus_cot_same_arg(const expr_t *expr,
-                                        const expr_t **arg_out)
+static bool match_tan_plus_cot_same_arg(const expr_t *expr, const expr_t **arg_out)
 {
     const expr_t *left = NULL;
     const expr_t *right = NULL;
@@ -566,8 +507,7 @@ static bool match_tan_plus_cot_same_arg(const expr_t *expr,
         return false;
     }
 
-    if (!tan_expr->a || !cot_expr->a ||
-        !expr_equal_exact_local(tan_expr->a, cot_expr->a)) {
+    if (!tan_expr->a || !cot_expr->a || !expr_equal_exact_local(tan_expr->a, cot_expr->a)) {
         return false;
     }
 
@@ -575,15 +515,12 @@ static bool match_tan_plus_cot_same_arg(const expr_t *expr,
     return true;
 }
 
-static bool match_sec_log_tan_cot_product(const expr_t *expr,
-                                          const expr_t **sec_expr_out,
-                                          const expr_t **log_expr_out)
+static bool match_sec_log_tan_cot_product(const expr_t *expr, const expr_t **sec_expr_out, const expr_t **log_expr_out)
 {
     const expr_t *left = NULL;
     const expr_t *right = NULL;
 
-    if (!expr || !sec_expr_out || !log_expr_out ||
-        !expr_match_mul_expr(expr, &left, &right))
+    if (!expr || !sec_expr_out || !log_expr_out || !expr_match_mul_expr(expr, &left, &right))
         return false;
 
     if (expr_is_op(left, &ops_sec) && expr_is_op(right, &ops_log)) {
@@ -601,8 +538,7 @@ static bool match_sec_log_tan_cot_product(const expr_t *expr,
     return false;
 }
 
-static bool match_sec_squared_log_tan_cot_product(const expr_t *expr,
-                                                  const expr_t **sec_expr_out,
+static bool match_sec_squared_log_tan_cot_product(const expr_t *expr, const expr_t **sec_expr_out,
                                                   const expr_t **log_expr_out)
 {
     const expr_t *left = NULL;
@@ -612,8 +548,7 @@ static bool match_sec_squared_log_tan_cot_product(const expr_t *expr,
     number_t exponent = num_new();
     bool ok = false;
 
-    if (!expr || !sec_expr_out || !log_expr_out ||
-        !expr_match_mul_expr(expr, &left, &right)) {
+    if (!expr || !sec_expr_out || !log_expr_out || !expr_match_mul_expr(expr, &left, &right)) {
         goto cleanup;
     }
 
@@ -627,8 +562,7 @@ static bool match_sec_squared_log_tan_cot_product(const expr_t *expr,
         goto cleanup;
     }
 
-    if (sec_sq && sec_sq->ops && sec_sq->ops->kind == EXPR_KIND_POW_D &&
-        sec_sq->a && expr_is_op(sec_sq->a, &ops_sec) &&
+    if (sec_sq && sec_sq->ops && sec_sq->ops->kind == EXPR_KIND_POW_D && sec_sq->a && expr_is_op(sec_sq->a, &ops_sec) &&
         num_eq(sec_sq->c, NUM_TWO)) {
         *sec_expr_out = sec_sq->a;
         *log_expr_out = log_expr;
@@ -636,11 +570,8 @@ static bool match_sec_squared_log_tan_cot_product(const expr_t *expr,
         goto cleanup;
     }
 
-    if (sec_sq && sec_sq->ops && sec_sq->ops->kind == EXPR_KIND_POW &&
-        sec_sq->a && sec_sq->b &&
-        expr_is_op(sec_sq->a, &ops_sec) &&
-        expr_match_const_value(sec_sq->b, &exponent) &&
-        num_eq(exponent, NUM_TWO)) {
+    if (sec_sq && sec_sq->ops && sec_sq->ops->kind == EXPR_KIND_POW && sec_sq->a && sec_sq->b &&
+        expr_is_op(sec_sq->a, &ops_sec) && expr_match_const_value(sec_sq->b, &exponent) && num_eq(exponent, NUM_TWO)) {
         *sec_expr_out = sec_sq->a;
         *log_expr_out = log_expr;
         ok = true;
@@ -716,8 +647,7 @@ static expr_t *build_sec_squared_log_tan_cot_raw(const expr_t *u)
     return raw;
 }
 
-expr_t *integrate_sec_squared_log_tan_cot(const expr_t *expr,
-                                          const expr_t *wrt)
+expr_t *integrate_sec_squared_log_tan_cot(const expr_t *expr, const expr_t *wrt)
 {
     const expr_t *sec_expr = NULL;
     const expr_t *log_expr = NULL;
@@ -729,14 +659,11 @@ expr_t *integrate_sec_squared_log_tan_cot(const expr_t *expr,
     expr_t *raw = NULL;
     expr_t *out = NULL;
 
-    if (!expr || !wrt ||
-        !match_sec_squared_log_tan_cot_product(expr, &sec_expr, &log_expr) ||
-        !sec_expr->a || !log_expr->a ||
-        !match_tan_plus_cot_same_arg(log_expr->a, &tan_arg) ||
+    if (!expr || !wrt || !match_sec_squared_log_tan_cot_product(expr, &sec_expr, &log_expr) || !sec_expr->a ||
+        !log_expr->a || !match_tan_plus_cot_same_arg(log_expr->a, &tan_arg) ||
         !match_symbolic_affine_constant_and_coeff(tan_arg, wrt, &tan_constant, &tan_coeff) ||
         !match_symbolic_affine_constant_and_coeff(sec_expr->a, wrt, &sec_constant, &sec_coeff) ||
-        expr_const_is_zero(tan_coeff) ||
-        !expr_equal_exact_local(tan_constant, sec_constant) ||
+        expr_const_is_zero(tan_coeff) || !expr_equal_exact_local(tan_constant, sec_constant) ||
         !expr_equal_exact_local(tan_coeff, sec_coeff)) {
         goto cleanup;
     }
@@ -756,8 +683,7 @@ cleanup:
     return out;
 }
 
-expr_t *integrate_sec_double_angle_log_tan_cot(const expr_t *expr,
-                                               const expr_t *wrt)
+expr_t *integrate_sec_double_angle_log_tan_cot(const expr_t *expr, const expr_t *wrt)
 {
     const expr_t *sec_expr = NULL;
     const expr_t *log_expr = NULL;
@@ -769,9 +695,7 @@ expr_t *integrate_sec_double_angle_log_tan_cot(const expr_t *expr,
     expr_t *raw = NULL;
     expr_t *out = NULL;
 
-    if (!expr || !wrt ||
-        !match_sec_log_tan_cot_product(expr, &sec_expr, &log_expr) ||
-        !sec_expr->a || !log_expr->a ||
+    if (!expr || !wrt || !match_sec_log_tan_cot_product(expr, &sec_expr, &log_expr) || !sec_expr->a || !log_expr->a ||
         !match_tan_plus_cot_same_arg(log_expr->a, &tan_arg) ||
         !match_symbolic_affine_constant_and_coeff(tan_arg, wrt, &tan_constant, &tan_coeff) ||
         !match_symbolic_affine_constant_and_coeff(sec_expr->a, wrt, &sec_constant, &sec_coeff) ||
@@ -795,10 +719,7 @@ cleanup:
     return out;
 }
 
-static bool match_wrt_trig_coeff(const expr_t *expr,
-                                 const expr_t *wrt,
-                                 bool want_sin,
-                                 long want_coeff)
+static bool match_wrt_trig_coeff(const expr_t *expr, const expr_t *wrt, bool want_sin, long want_coeff)
 {
     bool is_sin = false;
     expr_t *coeff_expr = NULL;
@@ -819,10 +740,7 @@ cleanup:
     return ok;
 }
 
-static bool match_sum_of_sin_cos_coeffs(const expr_t *expr,
-                                        const expr_t *wrt,
-                                        long sin_coeff,
-                                        long cos_coeff)
+static bool match_sum_of_sin_cos_coeffs(const expr_t *expr, const expr_t *wrt, long sin_coeff, long cos_coeff)
 {
     const expr_t *left = NULL;
     const expr_t *right = NULL;
@@ -831,33 +749,24 @@ static bool match_sum_of_sin_cos_coeffs(const expr_t *expr,
         return false;
     left = expr->a;
     right = expr->b;
-    return (match_wrt_trig_coeff(left, wrt, true, sin_coeff) &&
-            match_wrt_trig_coeff(right, wrt, false, cos_coeff)) ||
-           (match_wrt_trig_coeff(left, wrt, false, cos_coeff) &&
-            match_wrt_trig_coeff(right, wrt, true, sin_coeff));
+    return (match_wrt_trig_coeff(left, wrt, true, sin_coeff) && match_wrt_trig_coeff(right, wrt, false, cos_coeff)) ||
+           (match_wrt_trig_coeff(left, wrt, false, cos_coeff) && match_wrt_trig_coeff(right, wrt, true, sin_coeff));
 }
 
-static bool match_sqrt_sin_cos_factor(const expr_t *expr,
-                                      const expr_t *wrt,
-                                      long sin_coeff,
-                                      long cos_coeff)
+static bool match_sqrt_sin_cos_factor(const expr_t *expr, const expr_t *wrt, long sin_coeff, long cos_coeff)
 {
-    return expr && expr_is_op(expr, &ops_sqrt) &&
-           match_sum_of_sin_cos_coeffs(expr->a, wrt, sin_coeff, cos_coeff);
+    return expr && expr_is_op(expr, &ops_sqrt) && match_sum_of_sin_cos_coeffs(expr->a, wrt, sin_coeff, cos_coeff);
 }
 
-static bool match_sqrt_sin_cos_sin3_cos_denominator(const expr_t *expr,
-                                                    const expr_t *wrt)
+static bool match_sqrt_sin_cos_sin3_cos_denominator(const expr_t *expr, const expr_t *wrt)
 {
     const expr_t *left = NULL;
     const expr_t *right = NULL;
 
     if (!expr_match_mul_expr(expr, &left, &right))
         return false;
-    return (match_sqrt_sin_cos_factor(left, wrt, 1, 1) &&
-            match_sqrt_sin_cos_factor(right, wrt, 3, 1)) ||
-           (match_sqrt_sin_cos_factor(left, wrt, 3, 1) &&
-            match_sqrt_sin_cos_factor(right, wrt, 1, 1));
+    return (match_sqrt_sin_cos_factor(left, wrt, 1, 1) && match_sqrt_sin_cos_factor(right, wrt, 3, 1)) ||
+           (match_sqrt_sin_cos_factor(left, wrt, 3, 1) && match_sqrt_sin_cos_factor(right, wrt, 1, 1));
 }
 
 static expr_t *build_sin_cos_sin3_cos_double_radicand(const expr_t *wrt)
@@ -900,8 +809,7 @@ cleanup:
     return out;
 }
 
-static bool match_sqrt_sin_cos_sin3_cos_simplified_denominator(const expr_t *expr,
-                                                               const expr_t *wrt)
+static bool match_sqrt_sin_cos_sin3_cos_simplified_denominator(const expr_t *expr, const expr_t *wrt)
 {
     expr_t *expected = NULL;
     bool ok = false;
@@ -915,8 +823,7 @@ static bool match_sqrt_sin_cos_sin3_cos_simplified_denominator(const expr_t *exp
     return ok;
 }
 
-static bool match_sqrt_sin_cos_sin3_cos_scaled_denominator(const expr_t *expr,
-                                                           const expr_t *wrt)
+static bool match_sqrt_sin_cos_sin3_cos_scaled_denominator(const expr_t *expr, const expr_t *wrt)
 {
     const expr_t *left = NULL;
     const expr_t *right = NULL;
@@ -926,15 +833,13 @@ static bool match_sqrt_sin_cos_sin3_cos_scaled_denominator(const expr_t *expr,
     if (!expr_match_mul_expr(expr, &left, &right))
         goto cleanup;
 
-    if (expr_match_const_value(left, &scale) &&
-        num_eq(scale, NUM_SQRT_HALF) &&
+    if (expr_match_const_value(left, &scale) && num_eq(scale, NUM_SQRT_HALF) &&
         match_sqrt_sin_cos_sin3_cos_simplified_denominator(right, wrt)) {
         ok = true;
         goto cleanup;
     }
 
-    if (expr_match_const_value(right, &scale) &&
-        num_eq(scale, NUM_SQRT_HALF) &&
+    if (expr_match_const_value(right, &scale) && num_eq(scale, NUM_SQRT_HALF) &&
         match_sqrt_sin_cos_sin3_cos_simplified_denominator(left, wrt)) {
         ok = true;
         goto cleanup;
@@ -1002,16 +907,14 @@ static expr_t *build_inverse_sqrt_sin_cos_sin3_cos_raw(const expr_t *wrt)
     return out;
 }
 
-expr_t *integrate_inverse_sqrt_sin_cos_sin3_cos(const expr_t *expr,
-                                                const expr_t *wrt)
+expr_t *integrate_inverse_sqrt_sin_cos_sin3_cos(const expr_t *expr, const expr_t *wrt)
 {
     number_t numerator = num_new();
     expr_t *raw = NULL;
     expr_t *out = NULL;
     bool matched = false;
 
-    if (!expr || !wrt || !expr_is_div(expr) ||
-        !expr_match_const_value(expr->a, &numerator))
+    if (!expr || !wrt || !expr_is_div(expr) || !expr_match_const_value(expr->a, &numerator))
         goto cleanup;
 
     if (num_eq(numerator, NUM_ONE))
@@ -1047,8 +950,7 @@ static expr_t *build_scaled_quartic_minus_one(const expr_t *wrt, long scale)
         goto cleanup;
 
     x4 = expr_pow(wrt, &four);
-    scaled = (scale == 1) ? (x4 ? expr_simplify(x4) : NULL)
-                          : (x4 ? expr_mul_num(x4, &scale_num) : NULL);
+    scaled = (scale == 1) ? (x4 ? expr_simplify(x4) : NULL) : (x4 ? expr_mul_num(x4, &scale_num) : NULL);
     one = expr_new_const(NUM_ONE);
     diff = (scaled && one) ? expr_sub(scaled, one) : NULL;
     out = simplify_owned(diff);
@@ -1092,8 +994,7 @@ static expr_t *build_inverse_quartic_appell_denominator(const expr_t *wrt)
     return out;
 }
 
-static bool match_inverse_quartic_appell_denominator(const expr_t *expr,
-                                                     const expr_t *wrt)
+static bool match_inverse_quartic_appell_denominator(const expr_t *expr, const expr_t *wrt)
 {
     expr_t *actual = expr ? expr_simplify(expr) : NULL;
     expr_t *expected = build_inverse_quartic_appell_denominator(wrt);
@@ -1221,17 +1122,14 @@ cleanup:
     return raw;
 }
 
-expr_t *integrate_inverse_quartic_appell_f1(const expr_t *expr,
-                                            const expr_t *wrt)
+expr_t *integrate_inverse_quartic_appell_f1(const expr_t *expr, const expr_t *wrt)
 {
     number_t numerator = num_new();
     expr_t *raw = NULL;
     expr_t *out = NULL;
 
-    if (!expr || !wrt || !expr_is_div(expr) ||
-        !expr_match_const_value(expr->a, &numerator) ||
-        !num_eq(numerator, NUM_ONE) ||
-        !match_inverse_quartic_appell_denominator(expr->b, wrt))
+    if (!expr || !wrt || !expr_is_div(expr) || !expr_match_const_value(expr->a, &numerator) ||
+        !num_eq(numerator, NUM_ONE) || !match_inverse_quartic_appell_denominator(expr->b, wrt))
         goto cleanup;
 
     raw = build_inverse_quartic_elementary_raw(wrt);
@@ -1244,38 +1142,30 @@ cleanup:
     return out;
 }
 
-expr_t *integrate_matching_squared_unary_affine(const expr_t *expr,
-                                                const expr_t *wrt)
+expr_t *integrate_matching_squared_unary_affine(const expr_t *expr, const expr_t *wrt)
 {
     expr_pattern_unary_affine_kind_t kind = EXPR_PATTERN_UNARY_COUNT;
 
-    if (!expr || !expr->a || !expr->a->ops ||
-        !squared_unary_kind_from_op(expr->a->ops->kind, &kind)) {
+    if (!expr || !expr->a || !expr->a->ops || !squared_unary_kind_from_op(expr->a->ops->kind, &kind)) {
         return NULL;
     }
 
     return integrate_squared_unary_affine(expr, wrt, kind);
 }
 
-expr_t *integrate_matching_cubed_unary_affine(const expr_t *expr,
-                                              const expr_t *wrt)
+expr_t *integrate_matching_cubed_unary_affine(const expr_t *expr, const expr_t *wrt)
 {
     expr_pattern_unary_affine_kind_t kind = EXPR_PATTERN_UNARY_COUNT;
 
-    if (!expr || !expr->a || !expr->a->ops ||
-        !cubed_unary_kind_from_op(expr->a->ops->kind, &kind)) {
+    if (!expr || !expr->a || !expr->a->ops || !cubed_unary_kind_from_op(expr->a->ops->kind, &kind)) {
         return NULL;
     }
 
     return integrate_cubed_unary_affine(expr, wrt, kind);
 }
 
-static bool match_affine_unary_power_data(const expr_t *expr,
-                                          const expr_t *wrt,
-                                          expr_pattern_unary_affine_kind_t kind,
-                                          number_t exponent,
-                                          number_t *constant_out,
-                                          number_t *coeff_out)
+static bool match_affine_unary_power_data(const expr_t *expr, const expr_t *wrt, expr_pattern_unary_affine_kind_t kind,
+                                          number_t exponent, number_t *constant_out, number_t *coeff_out)
 {
     number_t matched_exponent = num_new();
     const expr_t *base = NULL;
@@ -1287,8 +1177,7 @@ static bool match_affine_unary_power_data(const expr_t *expr,
     if (expr->ops && expr->ops->kind == EXPR_KIND_POW_D) {
         base = expr->a;
         ok = num_eq(expr->c, exponent);
-    } else if (expr->ops && expr->ops->kind == EXPR_KIND_POW &&
-               expr->a && expr->b &&
+    } else if (expr->ops && expr->ops->kind == EXPR_KIND_POW && expr->a && expr->b &&
                expr_match_const_value(expr->b, &matched_exponent)) {
         base = expr->a;
         ok = num_eq(matched_exponent, exponent);
@@ -1302,12 +1191,9 @@ cleanup:
     return ok;
 }
 
-static bool match_affine_unary_any_power_data(const expr_t *expr,
-                                              const expr_t *wrt,
-                                              expr_pattern_unary_affine_kind_t kind,
-                                              expr_t **exponent_out,
-                                              number_t *constant_out,
-                                              number_t *coeff_out)
+static bool match_affine_unary_any_power_data(const expr_t *expr, const expr_t *wrt,
+                                              expr_pattern_unary_affine_kind_t kind, expr_t **exponent_out,
+                                              number_t *constant_out, number_t *coeff_out)
 {
     const expr_t *base = NULL;
     expr_t *exponent = NULL;
@@ -1319,8 +1205,7 @@ static bool match_affine_unary_any_power_data(const expr_t *expr,
     if (expr->ops && expr->ops->kind == EXPR_KIND_POW_D && expr->a) {
         base = expr->a;
         exponent = expr_new_const(expr->c);
-    } else if (expr->ops && expr->ops->kind == EXPR_KIND_POW &&
-               expr->a && expr->b && !depends_on_wrt(expr->b, wrt)) {
+    } else if (expr->ops && expr->ops->kind == EXPR_KIND_POW && expr->a && expr->b && !depends_on_wrt(expr->b, wrt)) {
         base = expr->a;
         exponent = expr_retain_expr(expr->b);
     }
@@ -1339,13 +1224,10 @@ cleanup:
     return ok;
 }
 
-static expr_t *integrate_affine_unary_power_times_unary_product(
-    const expr_t *expr,
-    const expr_t *wrt,
-    expr_pattern_unary_affine_kind_t power_kind,
-    expr_pattern_unary_affine_kind_t trigger_kind,
-    expr_apply_unary_fn power_fn,
-    bool negate)
+static expr_t *integrate_affine_unary_power_times_unary_product(const expr_t *expr, const expr_t *wrt,
+                                                                expr_pattern_unary_affine_kind_t power_kind,
+                                                                expr_pattern_unary_affine_kind_t trigger_kind,
+                                                                expr_apply_unary_fn power_fn, bool negate)
 {
     number_t power_constant = num_new();
     number_t power_coeff = num_new();
@@ -1365,22 +1247,16 @@ static expr_t *integrate_affine_unary_power_times_unary_product(
     if (!expr || !expr->a || !expr->b || !power_fn)
         goto cleanup;
 
-    if (match_affine_unary_any_power_data(expr->a, wrt, power_kind, &exponent,
-                                          &power_constant, &power_coeff) &&
-        match_affine_unary_data(expr->b, wrt, trigger_kind,
-                                &trigger_constant, &trigger_coeff) &&
-        affine_linear_match_eq(power_constant, power_coeff,
-                               trigger_constant, trigger_coeff)) {
+    if (match_affine_unary_any_power_data(expr->a, wrt, power_kind, &exponent, &power_constant, &power_coeff) &&
+        match_affine_unary_data(expr->b, wrt, trigger_kind, &trigger_constant, &trigger_coeff) &&
+        affine_linear_match_eq(power_constant, power_coeff, trigger_constant, trigger_coeff)) {
         matched = true;
     } else {
         expr_free(exponent);
         exponent = NULL;
-        if (match_affine_unary_data(expr->a, wrt, trigger_kind,
-                                    &trigger_constant, &trigger_coeff) &&
-            match_affine_unary_any_power_data(expr->b, wrt, power_kind, &exponent,
-                                              &power_constant, &power_coeff) &&
-            affine_linear_match_eq(power_constant, power_coeff,
-                                   trigger_constant, trigger_coeff)) {
+        if (match_affine_unary_data(expr->a, wrt, trigger_kind, &trigger_constant, &trigger_coeff) &&
+            match_affine_unary_any_power_data(expr->b, wrt, power_kind, &exponent, &power_constant, &power_coeff) &&
+            affine_linear_match_eq(power_constant, power_coeff, trigger_constant, trigger_coeff)) {
             matched = true;
         }
     }
@@ -1415,33 +1291,23 @@ cleanup:
     return out;
 }
 
-static bool match_exp_and_unary_affine_product(const expr_t *expr,
-                                               const expr_t *wrt,
-                                               expr_pattern_unary_affine_kind_t kind,
-                                               number_t *exp_constant,
-                                               number_t *exp_coeff,
-                                               number_t *unary_constant,
-                                               number_t *unary_coeff)
+static bool match_exp_and_unary_affine_product(const expr_t *expr, const expr_t *wrt,
+                                               expr_pattern_unary_affine_kind_t kind, number_t *exp_constant,
+                                               number_t *exp_coeff, number_t *unary_constant, number_t *unary_coeff)
 {
     if (!expr || !expr->a || !expr->b)
         return false;
 
-    if (match_affine_unary_data(expr->a, wrt, EXPR_PATTERN_UNARY_EXP,
-                                exp_constant, exp_coeff) &&
-        match_affine_unary_data(expr->b, wrt, kind,
-                                unary_constant, unary_coeff))
+    if (match_affine_unary_data(expr->a, wrt, EXPR_PATTERN_UNARY_EXP, exp_constant, exp_coeff) &&
+        match_affine_unary_data(expr->b, wrt, kind, unary_constant, unary_coeff))
         return true;
 
-    return match_affine_unary_data(expr->b, wrt, EXPR_PATTERN_UNARY_EXP,
-                                   exp_constant, exp_coeff) &&
-           match_affine_unary_data(expr->a, wrt, kind,
-                                   unary_constant, unary_coeff);
+    return match_affine_unary_data(expr->b, wrt, EXPR_PATTERN_UNARY_EXP, exp_constant, exp_coeff) &&
+           match_affine_unary_data(expr->a, wrt, kind, unary_constant, unary_coeff);
 }
 
-static expr_t *integrate_exp_times_trig_affine_product(
-    const expr_t *expr,
-    const expr_t *wrt,
-    expr_pattern_unary_affine_kind_t kind)
+static expr_t *integrate_exp_times_trig_affine_product(const expr_t *expr, const expr_t *wrt,
+                                                       expr_pattern_unary_affine_kind_t kind)
 {
     number_t exp_constant = num_new();
     number_t exp_coeff = num_new();
@@ -1457,9 +1323,7 @@ static expr_t *integrate_exp_times_trig_affine_product(
     expr_t *product = NULL;
     expr_t *out = NULL;
 
-    if (!match_exp_and_unary_affine_product(expr, wrt, kind,
-                                            &exp_constant, &exp_coeff,
-                                            &trig_constant, &trig_coeff))
+    if (!match_exp_and_unary_affine_product(expr, wrt, kind, &exp_constant, &exp_coeff, &trig_constant, &trig_coeff))
         goto cleanup;
 
     exp_u = build_affine_from_match(wrt, exp_constant, exp_coeff);
@@ -1519,10 +1383,8 @@ cleanup:
     return out;
 }
 
-static expr_t *integrate_exp_times_hyperbolic_affine_product(
-    const expr_t *expr,
-    const expr_t *wrt,
-    expr_pattern_unary_affine_kind_t kind)
+static expr_t *integrate_exp_times_hyperbolic_affine_product(const expr_t *expr, const expr_t *wrt,
+                                                             expr_pattern_unary_affine_kind_t kind)
 {
     number_t exp_constant = num_new();
     number_t exp_coeff = num_new();
@@ -1541,9 +1403,7 @@ static expr_t *integrate_exp_times_hyperbolic_affine_product(
     expr_t *combined = NULL;
     expr_t *out = NULL;
 
-    if (!match_exp_and_unary_affine_product(expr, wrt, kind,
-                                            &exp_constant, &exp_coeff,
-                                            &hyper_constant, &hyper_coeff))
+    if (!match_exp_and_unary_affine_product(expr, wrt, kind, &exp_constant, &exp_coeff, &hyper_constant, &hyper_coeff))
         goto cleanup;
 
     num_destroy(&sum_coeff);
@@ -1591,36 +1451,24 @@ cleanup:
     return out;
 }
 
-static bool match_sinh_cosh_affine_product(const expr_t *expr,
-                                           const expr_t *wrt,
-                                           number_t *sinh_constant,
-                                           number_t *sinh_coeff,
-                                           number_t *cosh_constant,
-                                           number_t *cosh_coeff)
+static bool match_sinh_cosh_affine_product(const expr_t *expr, const expr_t *wrt, number_t *sinh_constant,
+                                           number_t *sinh_coeff, number_t *cosh_constant, number_t *cosh_coeff)
 {
     if (!expr || !expr->a || !expr->b)
         return false;
 
-    if (match_affine_unary_data(expr->a, wrt, EXPR_PATTERN_UNARY_SINH,
-                                sinh_constant, sinh_coeff) &&
-        match_affine_unary_data(expr->b, wrt, EXPR_PATTERN_UNARY_COSH,
-                                cosh_constant, cosh_coeff))
+    if (match_affine_unary_data(expr->a, wrt, EXPR_PATTERN_UNARY_SINH, sinh_constant, sinh_coeff) &&
+        match_affine_unary_data(expr->b, wrt, EXPR_PATTERN_UNARY_COSH, cosh_constant, cosh_coeff))
         return true;
 
-    return match_affine_unary_data(expr->b, wrt, EXPR_PATTERN_UNARY_SINH,
-                                   sinh_constant, sinh_coeff) &&
-           match_affine_unary_data(expr->a, wrt, EXPR_PATTERN_UNARY_COSH,
-                                   cosh_constant, cosh_coeff);
+    return match_affine_unary_data(expr->b, wrt, EXPR_PATTERN_UNARY_SINH, sinh_constant, sinh_coeff) &&
+           match_affine_unary_data(expr->a, wrt, EXPR_PATTERN_UNARY_COSH, cosh_constant, cosh_coeff);
 }
 
-static bool match_affine_unary_pair_product(const expr_t *expr,
-                                            const expr_t *wrt,
+static bool match_affine_unary_pair_product(const expr_t *expr, const expr_t *wrt,
                                             expr_pattern_unary_affine_kind_t first_kind,
-                                            expr_pattern_unary_affine_kind_t second_kind,
-                                            number_t *first_constant,
-                                            number_t *first_coeff,
-                                            number_t *second_constant,
-                                            number_t *second_coeff)
+                                            expr_pattern_unary_affine_kind_t second_kind, number_t *first_constant,
+                                            number_t *first_coeff, number_t *second_constant, number_t *second_coeff)
 {
     if (!expr || !expr->a || !expr->b)
         return false;
@@ -1633,11 +1481,8 @@ static bool match_affine_unary_pair_product(const expr_t *expr,
            match_affine_unary_data(expr->a, wrt, second_kind, second_constant, second_coeff);
 }
 
-static expr_t *integrate_unary_affine_argument(const expr_t *arg,
-                                               const number_t *coeff,
-                                               const expr_t *wrt,
-                                               expr_apply_unary_fn integrand_fn,
-                                               expr_apply_unary_fn antiderivative_fn,
+static expr_t *integrate_unary_affine_argument(const expr_t *arg, const number_t *coeff, const expr_t *wrt,
+                                               expr_apply_unary_fn integrand_fn, expr_apply_unary_fn antiderivative_fn,
                                                bool negate_antiderivative)
 {
     expr_t *primitive = NULL;
@@ -1664,30 +1509,22 @@ static expr_t *integrate_unary_affine_argument(const expr_t *arg,
     return div_number_owned(primitive, *coeff);
 }
 
-static expr_t *integrate_cos_affine_argument(const expr_t *arg,
-                                             const number_t *coeff,
-                                             const expr_t *wrt)
+static expr_t *integrate_cos_affine_argument(const expr_t *arg, const number_t *coeff, const expr_t *wrt)
 {
     return integrate_unary_affine_argument(arg, coeff, wrt, expr_cos, expr_sin, false);
 }
 
-static expr_t *integrate_sin_affine_argument(const expr_t *arg,
-                                             const number_t *coeff,
-                                             const expr_t *wrt)
+static expr_t *integrate_sin_affine_argument(const expr_t *arg, const number_t *coeff, const expr_t *wrt)
 {
     return integrate_unary_affine_argument(arg, coeff, wrt, expr_sin, expr_cos, true);
 }
 
-static expr_t *integrate_cosh_affine_argument(const expr_t *arg,
-                                              const number_t *coeff,
-                                              const expr_t *wrt)
+static expr_t *integrate_cosh_affine_argument(const expr_t *arg, const number_t *coeff, const expr_t *wrt)
 {
     return integrate_unary_affine_argument(arg, coeff, wrt, expr_cosh, expr_sinh, false);
 }
 
-static expr_t *integrate_sinh_affine_argument(const expr_t *arg,
-                                              const number_t *coeff,
-                                              const expr_t *wrt)
+static expr_t *integrate_sinh_affine_argument(const expr_t *arg, const number_t *coeff, const expr_t *wrt)
 {
     return integrate_unary_affine_argument(arg, coeff, wrt, expr_sinh, expr_cosh, false);
 }
@@ -1705,8 +1542,7 @@ static expr_t *combine_half_sum_difference(expr_t *left, expr_t *right, bool sub
     return out;
 }
 
-static expr_t *integrate_trig_affine_product(const expr_t *expr,
-                                             const expr_t *wrt,
+static expr_t *integrate_trig_affine_product(const expr_t *expr, const expr_t *wrt,
                                              expr_pattern_unary_affine_kind_t first_kind,
                                              expr_pattern_unary_affine_kind_t second_kind)
 {
@@ -1724,8 +1560,7 @@ static expr_t *integrate_trig_affine_product(const expr_t *expr,
     expr_t *diff_term = NULL;
     expr_t *out = NULL;
 
-    if (!match_affine_unary_pair_product(expr, wrt, first_kind, second_kind,
-                                         &first_constant, &first_coeff,
+    if (!match_affine_unary_pair_product(expr, wrt, first_kind, second_kind, &first_constant, &first_coeff,
                                          &second_constant, &second_coeff))
         goto cleanup;
 
@@ -1741,22 +1576,19 @@ static expr_t *integrate_trig_affine_product(const expr_t *expr,
     if (!sum_arg || !diff_arg)
         goto cleanup;
 
-    if (first_kind == EXPR_PATTERN_UNARY_SIN &&
-        second_kind == EXPR_PATTERN_UNARY_SIN) {
+    if (first_kind == EXPR_PATTERN_UNARY_SIN && second_kind == EXPR_PATTERN_UNARY_SIN) {
         diff_term = integrate_cos_affine_argument(diff_arg, &diff_coeff, wrt);
         sum_term = integrate_cos_affine_argument(sum_arg, &sum_coeff, wrt);
         out = combine_half_sum_difference(diff_term, sum_term, true);
         diff_term = NULL;
         sum_term = NULL;
-    } else if (first_kind == EXPR_PATTERN_UNARY_COS &&
-               second_kind == EXPR_PATTERN_UNARY_COS) {
+    } else if (first_kind == EXPR_PATTERN_UNARY_COS && second_kind == EXPR_PATTERN_UNARY_COS) {
         sum_term = integrate_cos_affine_argument(sum_arg, &sum_coeff, wrt);
         diff_term = integrate_cos_affine_argument(diff_arg, &diff_coeff, wrt);
         out = combine_half_sum_difference(sum_term, diff_term, false);
         sum_term = NULL;
         diff_term = NULL;
-    } else if (first_kind == EXPR_PATTERN_UNARY_SIN &&
-               second_kind == EXPR_PATTERN_UNARY_COS) {
+    } else if (first_kind == EXPR_PATTERN_UNARY_SIN && second_kind == EXPR_PATTERN_UNARY_COS) {
         sum_term = integrate_sin_affine_argument(sum_arg, &sum_coeff, wrt);
         diff_term = integrate_sin_affine_argument(diff_arg, &diff_coeff, wrt);
         out = combine_half_sum_difference(sum_term, diff_term, false);
@@ -1780,8 +1612,7 @@ cleanup:
     return out;
 }
 
-static expr_t *integrate_hyperbolic_affine_product(const expr_t *expr,
-                                                   const expr_t *wrt,
+static expr_t *integrate_hyperbolic_affine_product(const expr_t *expr, const expr_t *wrt,
                                                    expr_pattern_unary_affine_kind_t first_kind,
                                                    expr_pattern_unary_affine_kind_t second_kind)
 {
@@ -1799,8 +1630,7 @@ static expr_t *integrate_hyperbolic_affine_product(const expr_t *expr,
     expr_t *diff_term = NULL;
     expr_t *out = NULL;
 
-    if (!match_affine_unary_pair_product(expr, wrt, first_kind, second_kind,
-                                         &first_constant, &first_coeff,
+    if (!match_affine_unary_pair_product(expr, wrt, first_kind, second_kind, &first_constant, &first_coeff,
                                          &second_constant, &second_coeff))
         goto cleanup;
 
@@ -1816,22 +1646,19 @@ static expr_t *integrate_hyperbolic_affine_product(const expr_t *expr,
     if (!sum_arg || !diff_arg)
         goto cleanup;
 
-    if (first_kind == EXPR_PATTERN_UNARY_SINH &&
-        second_kind == EXPR_PATTERN_UNARY_SINH) {
+    if (first_kind == EXPR_PATTERN_UNARY_SINH && second_kind == EXPR_PATTERN_UNARY_SINH) {
         sum_term = integrate_cosh_affine_argument(sum_arg, &sum_coeff, wrt);
         diff_term = integrate_cosh_affine_argument(diff_arg, &diff_coeff, wrt);
         out = combine_half_sum_difference(sum_term, diff_term, true);
         sum_term = NULL;
         diff_term = NULL;
-    } else if (first_kind == EXPR_PATTERN_UNARY_COSH &&
-               second_kind == EXPR_PATTERN_UNARY_COSH) {
+    } else if (first_kind == EXPR_PATTERN_UNARY_COSH && second_kind == EXPR_PATTERN_UNARY_COSH) {
         sum_term = integrate_cosh_affine_argument(sum_arg, &sum_coeff, wrt);
         diff_term = integrate_cosh_affine_argument(diff_arg, &diff_coeff, wrt);
         out = combine_half_sum_difference(sum_term, diff_term, false);
         sum_term = NULL;
         diff_term = NULL;
-    } else if (first_kind == EXPR_PATTERN_UNARY_SINH &&
-               second_kind == EXPR_PATTERN_UNARY_COSH) {
+    } else if (first_kind == EXPR_PATTERN_UNARY_SINH && second_kind == EXPR_PATTERN_UNARY_COSH) {
         sum_term = integrate_sinh_affine_argument(sum_arg, &sum_coeff, wrt);
         diff_term = integrate_sinh_affine_argument(diff_arg, &diff_coeff, wrt);
         out = combine_half_sum_difference(sum_term, diff_term, false);
@@ -1855,11 +1682,9 @@ cleanup:
     return out;
 }
 
-static expr_t *integrate_trig_hyperbolic_affine_product(
-    const expr_t *expr,
-    const expr_t *wrt,
-    expr_pattern_unary_affine_kind_t trig_kind,
-    expr_pattern_unary_affine_kind_t hyper_kind)
+static expr_t *integrate_trig_hyperbolic_affine_product(const expr_t *expr, const expr_t *wrt,
+                                                        expr_pattern_unary_affine_kind_t trig_kind,
+                                                        expr_pattern_unary_affine_kind_t hyper_kind)
 {
     number_t trig_constant = num_new();
     number_t trig_coeff = num_new();
@@ -1882,9 +1707,8 @@ static expr_t *integrate_trig_hyperbolic_affine_product(
     expr_t *out = NULL;
     bool subtract = false;
 
-    if (!match_affine_unary_pair_product(expr, wrt, trig_kind, hyper_kind,
-                                         &trig_constant, &trig_coeff,
-                                         &hyper_constant, &hyper_coeff))
+    if (!match_affine_unary_pair_product(expr, wrt, trig_kind, hyper_kind, &trig_constant, &trig_coeff, &hyper_constant,
+                                         &hyper_coeff))
         goto cleanup;
 
     num_destroy(&trig_coeff_sq);
@@ -1903,27 +1727,23 @@ static expr_t *integrate_trig_hyperbolic_affine_product(
     sinh_v = v ? expr_sinh(v) : NULL;
     cosh_v = v ? expr_cosh(v) : NULL;
 
-    if (trig_kind == EXPR_PATTERN_UNARY_COS &&
-        hyper_kind == EXPR_PATTERN_UNARY_COSH) {
+    if (trig_kind == EXPR_PATTERN_UNARY_COS && hyper_kind == EXPR_PATTERN_UNARY_COSH) {
         left_factor = (sin_u && cosh_v) ? expr_mul(sin_u, cosh_v) : NULL;
         right_factor = (cos_u && sinh_v) ? expr_mul(cos_u, sinh_v) : NULL;
         left = left_factor ? expr_mul_num(left_factor, &trig_coeff) : NULL;
         right = right_factor ? expr_mul_num(right_factor, &hyper_coeff) : NULL;
-    } else if (trig_kind == EXPR_PATTERN_UNARY_COS &&
-               hyper_kind == EXPR_PATTERN_UNARY_SINH) {
+    } else if (trig_kind == EXPR_PATTERN_UNARY_COS && hyper_kind == EXPR_PATTERN_UNARY_SINH) {
         left_factor = (cos_u && cosh_v) ? expr_mul(cos_u, cosh_v) : NULL;
         right_factor = (sin_u && sinh_v) ? expr_mul(sin_u, sinh_v) : NULL;
         left = left_factor ? expr_mul_num(left_factor, &hyper_coeff) : NULL;
         right = right_factor ? expr_mul_num(right_factor, &trig_coeff) : NULL;
-    } else if (trig_kind == EXPR_PATTERN_UNARY_SIN &&
-               hyper_kind == EXPR_PATTERN_UNARY_COSH) {
+    } else if (trig_kind == EXPR_PATTERN_UNARY_SIN && hyper_kind == EXPR_PATTERN_UNARY_COSH) {
         left_factor = (sin_u && sinh_v) ? expr_mul(sin_u, sinh_v) : NULL;
         right_factor = (cos_u && cosh_v) ? expr_mul(cos_u, cosh_v) : NULL;
         left = left_factor ? expr_mul_num(left_factor, &hyper_coeff) : NULL;
         right = right_factor ? expr_mul_num(right_factor, &trig_coeff) : NULL;
         subtract = true;
-    } else if (trig_kind == EXPR_PATTERN_UNARY_SIN &&
-               hyper_kind == EXPR_PATTERN_UNARY_SINH) {
+    } else if (trig_kind == EXPR_PATTERN_UNARY_SIN && hyper_kind == EXPR_PATTERN_UNARY_SINH) {
         left_factor = (sin_u && cosh_v) ? expr_mul(sin_u, cosh_v) : NULL;
         right_factor = (cos_u && sinh_v) ? expr_mul(cos_u, sinh_v) : NULL;
         left = left_factor ? expr_mul_num(left_factor, &hyper_coeff) : NULL;
@@ -1957,8 +1777,7 @@ cleanup:
     return out;
 }
 
-static expr_t *integrate_sinh_cosh_affine_product(const expr_t *expr,
-                                                  const expr_t *wrt)
+static expr_t *integrate_sinh_cosh_affine_product(const expr_t *expr, const expr_t *wrt)
 {
     number_t sinh_constant = num_new();
     number_t sinh_coeff = num_new();
@@ -1977,9 +1796,7 @@ static expr_t *integrate_sinh_cosh_affine_product(const expr_t *expr,
     expr_t *combined = NULL;
     expr_t *out = NULL;
 
-    if (!match_sinh_cosh_affine_product(expr, wrt,
-                                        &sinh_constant, &sinh_coeff,
-                                        &cosh_constant, &cosh_coeff))
+    if (!match_sinh_cosh_affine_product(expr, wrt, &sinh_constant, &sinh_coeff, &cosh_constant, &cosh_coeff))
         goto cleanup;
 
     num_destroy(&sum_coeff);
@@ -2050,53 +1867,43 @@ expr_t *integrate_same_affine_special_product(const expr_t *expr, const expr_t *
     if (out)
         goto cleanup;
 
-    out = integrate_trig_affine_product(expr, wrt, EXPR_PATTERN_UNARY_SIN,
-                                        EXPR_PATTERN_UNARY_SIN);
+    out = integrate_trig_affine_product(expr, wrt, EXPR_PATTERN_UNARY_SIN, EXPR_PATTERN_UNARY_SIN);
     if (out)
         goto cleanup;
 
-    out = integrate_trig_affine_product(expr, wrt, EXPR_PATTERN_UNARY_COS,
-                                        EXPR_PATTERN_UNARY_COS);
+    out = integrate_trig_affine_product(expr, wrt, EXPR_PATTERN_UNARY_COS, EXPR_PATTERN_UNARY_COS);
     if (out)
         goto cleanup;
 
-    out = integrate_trig_affine_product(expr, wrt, EXPR_PATTERN_UNARY_SIN,
-                                        EXPR_PATTERN_UNARY_COS);
+    out = integrate_trig_affine_product(expr, wrt, EXPR_PATTERN_UNARY_SIN, EXPR_PATTERN_UNARY_COS);
     if (out)
         goto cleanup;
 
-    out = integrate_hyperbolic_affine_product(expr, wrt, EXPR_PATTERN_UNARY_SINH,
-                                              EXPR_PATTERN_UNARY_SINH);
+    out = integrate_hyperbolic_affine_product(expr, wrt, EXPR_PATTERN_UNARY_SINH, EXPR_PATTERN_UNARY_SINH);
     if (out)
         goto cleanup;
 
-    out = integrate_hyperbolic_affine_product(expr, wrt, EXPR_PATTERN_UNARY_COSH,
-                                              EXPR_PATTERN_UNARY_COSH);
+    out = integrate_hyperbolic_affine_product(expr, wrt, EXPR_PATTERN_UNARY_COSH, EXPR_PATTERN_UNARY_COSH);
     if (out)
         goto cleanup;
 
-    out = integrate_hyperbolic_affine_product(expr, wrt, EXPR_PATTERN_UNARY_SINH,
-                                              EXPR_PATTERN_UNARY_COSH);
+    out = integrate_hyperbolic_affine_product(expr, wrt, EXPR_PATTERN_UNARY_SINH, EXPR_PATTERN_UNARY_COSH);
     if (out)
         goto cleanup;
 
-    out = integrate_trig_hyperbolic_affine_product(expr, wrt, EXPR_PATTERN_UNARY_COS,
-                                                   EXPR_PATTERN_UNARY_COSH);
+    out = integrate_trig_hyperbolic_affine_product(expr, wrt, EXPR_PATTERN_UNARY_COS, EXPR_PATTERN_UNARY_COSH);
     if (out)
         goto cleanup;
 
-    out = integrate_trig_hyperbolic_affine_product(expr, wrt, EXPR_PATTERN_UNARY_COS,
-                                                   EXPR_PATTERN_UNARY_SINH);
+    out = integrate_trig_hyperbolic_affine_product(expr, wrt, EXPR_PATTERN_UNARY_COS, EXPR_PATTERN_UNARY_SINH);
     if (out)
         goto cleanup;
 
-    out = integrate_trig_hyperbolic_affine_product(expr, wrt, EXPR_PATTERN_UNARY_SIN,
-                                                   EXPR_PATTERN_UNARY_COSH);
+    out = integrate_trig_hyperbolic_affine_product(expr, wrt, EXPR_PATTERN_UNARY_SIN, EXPR_PATTERN_UNARY_COSH);
     if (out)
         goto cleanup;
 
-    out = integrate_trig_hyperbolic_affine_product(expr, wrt, EXPR_PATTERN_UNARY_SIN,
-                                                   EXPR_PATTERN_UNARY_SINH);
+    out = integrate_trig_hyperbolic_affine_product(expr, wrt, EXPR_PATTERN_UNARY_SIN, EXPR_PATTERN_UNARY_SINH);
     if (out)
         goto cleanup;
 
@@ -2129,8 +1936,8 @@ expr_t *integrate_same_affine_special_product(const expr_t *expr, const expr_t *
         expr_free(u);
         out = div_number_owned_by_product(sin_sq, NUM_TWO, k1);
     } else if (match_affine_unary_data(expr->a, wrt, EXPR_PATTERN_UNARY_EXP, &c1, &k1) &&
-        match_affine_unary_data(expr->b, wrt, EXPR_PATTERN_UNARY_SIN, &c2, &k2) &&
-        affine_linear_match_eq(c1, k1, c2, k2)) {
+               match_affine_unary_data(expr->b, wrt, EXPR_PATTERN_UNARY_SIN, &c2, &k2) &&
+               affine_linear_match_eq(c1, k1, c2, k2)) {
         expr_t *exp_u;
         expr_t *sin_u;
         expr_t *cos_u;
@@ -2303,13 +2110,11 @@ expr_t *integrate_same_affine_special_product(const expr_t *expr, const expr_t *
     }
 
     if (!out)
-        out = integrate_affine_unary_power_times_unary_product(
-            expr, wrt, EXPR_PATTERN_UNARY_SEC, EXPR_PATTERN_UNARY_TAN,
-            expr_sec, false);
+        out = integrate_affine_unary_power_times_unary_product(expr, wrt, EXPR_PATTERN_UNARY_SEC,
+                                                               EXPR_PATTERN_UNARY_TAN, expr_sec, false);
     if (!out)
-        out = integrate_affine_unary_power_times_unary_product(
-            expr, wrt, EXPR_PATTERN_UNARY_COSEC, EXPR_PATTERN_UNARY_COT,
-            expr_cosec, true);
+        out = integrate_affine_unary_power_times_unary_product(expr, wrt, EXPR_PATTERN_UNARY_COSEC,
+                                                               EXPR_PATTERN_UNARY_COT, expr_cosec, true);
     if (out) {
         goto cleanup;
     } else if (((match_affine_unary_data(expr->a, wrt, EXPR_PATTERN_UNARY_SEC, &c1, &k1) &&

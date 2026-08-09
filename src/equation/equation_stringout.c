@@ -17,9 +17,7 @@ static void equ_emit_function_name(sbuf_t *buffer, const char *name)
     emit_name_func(buffer, name);
 }
 
-static void equ_emit_function_parameter_list(sbuf_t *buffer,
-                                             const varlist_t *variables,
-                                             const varlist_t *constants)
+static void equ_emit_function_parameter_list(sbuf_t *buffer, const varlist_t *variables, const varlist_t *constants)
 {
     if (variables->count == 0u && constants->count == 0u) {
         sbuf_puts(buffer, "void");
@@ -29,8 +27,7 @@ static void equ_emit_function_parameter_list(sbuf_t *buffer,
     for (size_t i = 0u; i < variables->count; ++i) {
         if (i > 0u)
             sbuf_puts(buffer, ", ");
-        equ_emit_function_name(
-            buffer, expr_name_or_default(variables->vars[i], "x"));
+        equ_emit_function_name(buffer, expr_name_or_default(variables->vars[i], "x"));
     }
     for (size_t i = 0u; i < constants->count; ++i) {
         if (variables->count > 0u || i > 0u)
@@ -40,15 +37,12 @@ static void equ_emit_function_parameter_list(sbuf_t *buffer,
     }
 }
 
-static void equ_emit_function_argument_list(sbuf_t *buffer,
-                                            const varlist_t *variables,
-                                            const varlist_t *constants)
+static void equ_emit_function_argument_list(sbuf_t *buffer, const varlist_t *variables, const varlist_t *constants)
 {
     for (size_t i = 0u; i < variables->count; ++i) {
         if (i > 0u)
             sbuf_puts(buffer, ", ");
-        equ_emit_function_name(
-            buffer, expr_name_or_default(variables->vars[i], "x"));
+        equ_emit_function_name(buffer, expr_name_or_default(variables->vars[i], "x"));
     }
     for (size_t i = 0u; i < constants->count; ++i) {
         if (variables->count > 0u || i > 0u)
@@ -57,8 +51,7 @@ static void equ_emit_function_argument_list(sbuf_t *buffer,
     }
 }
 
-static void equ_emit_unknown_variable_hint(sbuf_t *buffer,
-                                           const varlist_t *variables)
+static void equ_emit_unknown_variable_hint(sbuf_t *buffer, const varlist_t *variables)
 {
     bool emitted = false;
 
@@ -74,8 +67,7 @@ static void equ_emit_unknown_variable_hint(sbuf_t *buffer,
             sbuf_puts(buffer, "// ");
         else
             sbuf_puts(buffer, ", ");
-        equ_emit_function_name(
-            buffer, expr_name_or_default(variables->vars[i], "x"));
+        equ_emit_function_name(buffer, expr_name_or_default(variables->vars[i], "x"));
         sbuf_puts(buffer, " = ?");
         emitted = true;
     }
@@ -96,17 +88,12 @@ static char *equ_function_expression_dup(const expr_t *expression)
     return text;
 }
 
-static bool equ_is_function_break_operator(char operation,
-                                           bool multiplicative)
+static bool equ_is_function_break_operator(char operation, bool multiplicative)
 {
-    return multiplicative
-        ? operation == '*' || operation == '/'
-        : operation == '+' || operation == '-';
+    return multiplicative ? operation == '*' || operation == '/' : operation == '+' || operation == '-';
 }
 
-static const char *equ_find_top_level_function_separator(
-    const char *text,
-    bool multiplicative)
+static const char *equ_find_top_level_function_separator(const char *text, bool multiplicative)
 {
     int parentheses = 0;
     int brackets = 0;
@@ -123,33 +110,26 @@ static const char *equ_find_top_level_function_separator(
             brackets++;
         else if (*cursor == ']' && brackets > 0)
             brackets--;
-        else if (parentheses == 0 && brackets == 0 &&
-                 *cursor == ' ' &&
-                 equ_is_function_break_operator(cursor[1], multiplicative) &&
-                 cursor[2] == ' ')
+        else if (parentheses == 0 && brackets == 0 && *cursor == ' ' &&
+                 equ_is_function_break_operator(cursor[1], multiplicative) && cursor[2] == ' ')
             return cursor;
     }
 
     return NULL;
 }
 
-static void equ_emit_function_text_range(sbuf_t *buffer,
-                                         const char *start,
-                                         const char *end)
+static void equ_emit_function_text_range(sbuf_t *buffer, const char *start, const char *end)
 {
     for (const char *cursor = start; cursor && cursor < end; ++cursor)
         sbuf_putc(buffer, *cursor);
 }
 
-static void equ_emit_aligned_function_expression(sbuf_t *buffer,
-                                                 const char *text)
+static void equ_emit_aligned_function_expression(sbuf_t *buffer, const char *text)
 {
     static const size_t line_limit = 88u;
     const char *term = text ? text : "0";
-    bool multiplicative =
-        equ_find_top_level_function_separator(term, false) == NULL;
-    const char *separator = equ_find_top_level_function_separator(
-        term, multiplicative);
+    bool multiplicative = equ_find_top_level_function_separator(term, false) == NULL;
+    const char *separator = equ_find_top_level_function_separator(term, multiplicative);
     const char *end = separator ? separator : term + strlen(term);
     size_t column;
 
@@ -167,8 +147,7 @@ static void equ_emit_aligned_function_expression(sbuf_t *buffer,
         size_t term_length;
 
         term = separator + 3;
-        separator = equ_find_top_level_function_separator(
-            term, multiplicative);
+        separator = equ_find_top_level_function_separator(term, multiplicative);
         end = separator ? separator : term + strlen(term);
         term_length = (size_t)(end - term);
         if (column + 3u + term_length > line_limit) {
@@ -188,8 +167,7 @@ static void equ_emit_aligned_function_expression(sbuf_t *buffer,
     sbuf_putc(buffer, '\n');
 }
 
-static void equ_emit_function_equation_return(sbuf_t *buffer,
-                                              const equation_t *equation)
+static void equ_emit_function_equation_return(sbuf_t *buffer, const equation_t *equation)
 {
     static const size_t compact_line_limit = 88u;
     char *lhs = equ_function_expression_dup(equ_lhs(equation));
@@ -240,8 +218,7 @@ static int equ_append_padding(string_t *out, int count)
     return 0;
 }
 
-static style_t equ_format_style(const string_format_spec_t *spec,
-                                string_format_result_t *result)
+static style_t equ_format_style(const string_format_spec_t *spec, string_format_result_t *result)
 {
     if (!spec || !result)
         return style_EXPRESSION;
@@ -264,9 +241,7 @@ static style_t equ_format_style(const string_format_spec_t *spec,
     }
 }
 
-static string_format_result_t equ_format_callback(string_t *out,
-                                                  const string_format_spec_t *spec,
-                                                  va_list ap,
+static string_format_result_t equ_format_callback(string_t *out, const string_format_spec_t *spec, va_list ap,
                                                   void *user)
 {
     bool left;
@@ -399,8 +374,7 @@ static string_t *equ_to_text_expression(const equation_t *equation)
     if (!lhs || !rhs)
         goto cleanup;
 
-    out = bindings ? string_sprintf("{ %S = %S | %S }", lhs, rhs, bindings)
-                   : string_sprintf("{ %S = %S }", lhs, rhs);
+    out = bindings ? string_sprintf("{ %S = %S | %S }", lhs, rhs, bindings) : string_sprintf("{ %S = %S }", lhs, rhs);
 
 cleanup:
     string_free(bindings);
@@ -565,10 +539,7 @@ void equ_print(const equation_t *equation)
         string_printf("NULL\n");
 }
 
-bool equ_serialize(const equation_t *equation,
-                   string_t **out_type,
-                   string_t **out_encoding,
-                   void **out_data,
+bool equ_serialize(const equation_t *equation, string_t **out_type, string_t **out_encoding, void **out_data,
                    size_t *out_len)
 {
     string_t *type = NULL;
@@ -608,18 +579,14 @@ bool equ_serialize(const equation_t *equation,
     return true;
 }
 
-equation_t *equ_deserialise(const void *data,
-                            size_t len,
-                            const string_t *type,
-                            const string_t *encoding)
+equation_t *equ_deserialise(const void *data, size_t len, const string_t *type, const string_t *encoding)
 {
     string_t *text;
     equation_t *equation;
 
     if (!data || !type || !encoding)
         return NULL;
-    if (strcmp(string_c_str(type), "equation_t") != 0 ||
-        strcmp(string_c_str(encoding), "mars/equation") != 0)
+    if (strcmp(string_c_str(type), "equation_t") != 0 || strcmp(string_c_str(encoding), "mars/equation") != 0)
         return NULL;
 
     text = string_new();

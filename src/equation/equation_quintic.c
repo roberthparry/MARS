@@ -29,10 +29,7 @@ static void equ_quintic_destroy_numbers(number_t *values, size_t count)
         num_destroy(&values[i]);
 }
 
-static void equ_quintic_eval(const number_t *coeffs,
-                             number_t z,
-                             number_t *value_out,
-                             number_t *derivative_out)
+static void equ_quintic_eval(const number_t *coeffs, number_t z, number_t *value_out, number_t *derivative_out)
 {
     number_t value = num_clone(coeffs[EQU_QUINTIC_DEGREE]);
     number_t derivative = num_new();
@@ -118,19 +115,14 @@ static double equ_quintic_root_bound(const number_t *coeffs)
     return isfinite(bound) && bound > 0.0 ? bound : 1.0;
 }
 
-static bool equ_quintic_newton_from(const number_t *coeffs,
-                                    number_t start,
-                                    number_t tolerance,
-                                    number_t *root_out)
+static bool equ_quintic_newton_from(const number_t *coeffs, number_t start, number_t tolerance, number_t *root_out)
 {
     number_t z = num_clone(start);
     number_t value = num_new();
     number_t derivative = num_new();
     bool converged = false;
 
-    for (size_t iteration = 0u;
-         iteration < EQU_QUINTIC_NEWTON_ITERATIONS;
-         ++iteration) {
+    for (size_t iteration = 0u; iteration < EQU_QUINTIC_NEWTON_ITERATIONS; ++iteration) {
         number_t step;
         number_t next;
 
@@ -139,8 +131,7 @@ static bool equ_quintic_newton_from(const number_t *coeffs,
             converged = true;
             break;
         }
-        if (!num_is_finite(derivative) ||
-            equ_quintic_magnitude_le(derivative, tolerance))
+        if (!num_is_finite(derivative) || equ_quintic_magnitude_le(derivative, tolerance))
             break;
 
         step = num_div(value, derivative);
@@ -169,9 +160,7 @@ static bool equ_quintic_newton_from(const number_t *coeffs,
     return converged;
 }
 
-static bool equ_quintic_find_real_root(const number_t *coeffs,
-                                       number_t tolerance,
-                                       number_t *root_out)
+static bool equ_quintic_find_real_root(const number_t *coeffs, number_t tolerance, number_t *root_out)
 {
     const double bound = equ_quintic_root_bound(coeffs);
     number_t left = num_create_from_double(-bound);
@@ -197,13 +186,10 @@ static bool equ_quintic_find_real_root(const number_t *coeffs,
         found = true;
         goto cleanup;
     }
-    if (!num_is_real(value_left) || !num_is_real(value_right) ||
-        num_sign(value_left) == num_sign(value_right))
+    if (!num_is_real(value_left) || !num_is_real(value_right) || num_sign(value_left) == num_sign(value_right))
         goto cleanup;
 
-    for (size_t iteration = 0u;
-         iteration < EQU_QUINTIC_NEWTON_ITERATIONS;
-         ++iteration) {
+    for (size_t iteration = 0u; iteration < EQU_QUINTIC_NEWTON_ITERATIONS; ++iteration) {
         number_t candidate = num_new();
         bool use_newton = false;
 
@@ -228,8 +214,7 @@ static bool equ_quintic_find_real_root(const number_t *coeffs,
             value_right = num_clone(value);
         }
 
-        if (num_is_real(derivative) &&
-            !equ_quintic_magnitude_le(derivative, tolerance)) {
+        if (num_is_real(derivative) && !equ_quintic_magnitude_le(derivative, tolerance)) {
             number_t step = num_div(value, derivative);
             number_t next = num_sub(z, step);
 
@@ -266,9 +251,7 @@ cleanup:
     return found;
 }
 
-static void equ_quintic_synthetic_divide(const number_t *coeffs,
-                                         number_t root,
-                                         number_t *quartic)
+static void equ_quintic_synthetic_divide(const number_t *coeffs, number_t root, number_t *quartic)
 {
     num_destroy(&quartic[4]);
     quartic[4] = num_clone(coeffs[5]);
@@ -283,29 +266,25 @@ static void equ_quintic_synthetic_divide(const number_t *coeffs,
     }
 }
 
-static number_t equ_quintic_snap_gaussian_integer(const number_t *coeffs,
-                                                  number_t root)
+static number_t equ_quintic_snap_gaussian_integer(const number_t *coeffs, number_t root)
 {
     number_t real = num_real_part(root);
     number_t imag = num_imag_part(root);
     double real_d = num_to_double(real);
     double imag_d = num_to_double(imag);
-    bool bounded = isfinite(real_d) && isfinite(imag_d) &&
-                   fabs(real_d) < 1000000.0 && fabs(imag_d) < 1000000.0;
+    bool bounded = isfinite(real_d) && isfinite(imag_d) && fabs(real_d) < 1000000.0 && fabs(imag_d) < 1000000.0;
     long real_i = bounded ? lround(real_d) : 0L;
     long imag_i = bounded ? lround(imag_d) : 0L;
     number_t candidate = num_new();
     number_t value = num_new();
 
-    if (bounded && fabs(real_d - (double)real_i) < 1e-6 &&
-        fabs(imag_d - (double)imag_i) < 1e-6) {
+    if (bounded && fabs(real_d - (double)real_i) < 1e-6 && fabs(imag_d - (double)imag_i) < 1e-6) {
         number_t real_part = num_create_from_long(real_i);
         number_t imag_part = num_create_from_long(imag_i);
         number_t imag_term = num_mul(NUM_I, imag_part);
 
         num_destroy(&candidate);
-        candidate = imag_i == 0L ? num_clone(real_part)
-                                 : num_add(real_part, imag_term);
+        candidate = imag_i == 0L ? num_clone(real_part) : num_add(real_part, imag_term);
         equ_quintic_eval(coeffs, candidate, &value, NULL);
         num_destroy(&imag_term);
         num_destroy(&imag_part);
@@ -325,9 +304,7 @@ static number_t equ_quintic_snap_gaussian_integer(const number_t *coeffs,
     return num_clone(root);
 }
 
-static bool equ_quintic_roots_close(number_t left,
-                                    number_t right,
-                                    number_t tolerance)
+static bool equ_quintic_roots_close(number_t left, number_t right, number_t tolerance)
 {
     number_t difference = num_sub(left, right);
     bool close = equ_quintic_magnitude_le(difference, tolerance);
@@ -336,20 +313,14 @@ static bool equ_quintic_roots_close(number_t left,
     return close;
 }
 
-static int equ_quintic_append_distinct(const number_t *coeffs,
-                                       const expr_t *wrt,
-                                       number_t candidate,
-                                       number_t newton_tolerance,
-                                       number_t distinct_tolerance,
-                                       number_t *seen,
-                                       size_t *seen_count,
-                                       equation_solutions_t *solutions)
+static int equ_quintic_append_distinct(const number_t *coeffs, const expr_t *wrt, number_t candidate,
+                                       number_t newton_tolerance, number_t distinct_tolerance, number_t *seen,
+                                       size_t *seen_count, equation_solutions_t *solutions)
 {
     number_t polished = num_new();
     number_t clean;
 
-    if (!equ_quintic_newton_from(
-            coeffs, candidate, newton_tolerance, &polished)) {
+    if (!equ_quintic_newton_from(coeffs, candidate, newton_tolerance, &polished)) {
         num_destroy(&polished);
         polished = num_clone(candidate);
     }
@@ -375,17 +346,14 @@ static int equ_quintic_append_distinct(const number_t *coeffs,
     return 0;
 }
 
-int equ_try_solve_quintic(const equation_t *equation,
-                          const expr_t *wrt,
-                          equation_solutions_t *solutions)
+int equ_try_solve_quintic(const equation_t *equation, const expr_t *wrt, equation_solutions_t *solutions)
 {
     expr_t *residual = equ_residual(equation);
     number_t coeffs[EQU_QUINTIC_COEFF_COUNT];
     number_t quartic[5];
     number_t first_root = num_new();
     number_t newton_tolerance = equ_quintic_newton_tolerance();
-    number_t distinct_tolerance =
-        equ_quintic_distinct_tolerance(newton_tolerance);
+    number_t distinct_tolerance = equ_quintic_distinct_tolerance(newton_tolerance);
     number_t seen[EQU_QUINTIC_DEGREE];
     size_t seen_count = 0u;
     equation_solutions_t quartic_solutions = {0};
@@ -406,27 +374,23 @@ int equ_try_solve_quintic(const equation_t *equation,
     }
 
     {
-        number_t snapped =
-            equ_quintic_snap_gaussian_integer(coeffs, first_root);
+        number_t snapped = equ_quintic_snap_gaussian_integer(coeffs, first_root);
 
         num_destroy(&first_root);
         first_root = snapped;
     }
     equ_quintic_synthetic_divide(coeffs, first_root, quartic);
-    if (equ_solve_quartic_coefficients(
-            quartic, wrt, &quartic_solutions) != 0)
+    if (equ_solve_quartic_coefficients(quartic, wrt, &quartic_solutions) != 0)
         goto cleanup;
 
-    if (equ_quintic_append_distinct(
-            coeffs, wrt, first_root, newton_tolerance, distinct_tolerance,
-            seen, &seen_count, solutions) != 0)
+    if (equ_quintic_append_distinct(coeffs, wrt, first_root, newton_tolerance, distinct_tolerance, seen, &seen_count,
+                                    solutions) != 0)
         goto cleanup;
 
     for (size_t i = 0u; i < quartic_solutions.count; ++i) {
         number_t root = expr_eval(equ_rhs(quartic_solutions.solutions[i]));
-        int append_rc = equ_quintic_append_distinct(
-            coeffs, wrt, root, newton_tolerance, distinct_tolerance,
-            seen, &seen_count, solutions);
+        int append_rc = equ_quintic_append_distinct(coeffs, wrt, root, newton_tolerance, distinct_tolerance, seen,
+                                                    &seen_count, solutions);
 
         num_destroy(&root);
         if (append_rc != 0)

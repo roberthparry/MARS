@@ -5,11 +5,8 @@
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
 
-bool equ_match_affine_linear_expr(const expr_t *expr,
-                                       const expr_t *wrt,
-                                       bool require_nonzero_coeff,
-                                       number_t *constant_out,
-                                       number_t *coeff_out)
+bool equ_match_affine_linear_expr(const expr_t *expr, const expr_t *wrt, bool require_nonzero_coeff,
+                                  number_t *constant_out, number_t *coeff_out)
 {
     expr_t *vars[1];
     number_t poly[5];
@@ -28,13 +25,9 @@ bool equ_match_affine_linear_expr(const expr_t *expr,
         poly[i] = num_new();
     basis_coeffs[0] = num_new();
 
-    ok = expr_match_affine_poly_deg4(expr, 1u, vars, poly, &basis_constant,
-                                     basis_coeffs) &&
-         num_is_zero(poly[2]) &&
-         num_is_zero(poly[3]) &&
-         num_is_zero(poly[4]) &&
-         (!require_nonzero_coeff ||
-          (!num_is_zero(poly[1]) && !num_is_zero(basis_coeffs[0])));
+    ok = expr_match_affine_poly_deg4(expr, 1u, vars, poly, &basis_constant, basis_coeffs) && num_is_zero(poly[2]) &&
+         num_is_zero(poly[3]) && num_is_zero(poly[4]) &&
+         (!require_nonzero_coeff || (!num_is_zero(poly[1]) && !num_is_zero(basis_coeffs[0])));
     if (!ok)
         goto cleanup;
 

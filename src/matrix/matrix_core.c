@@ -1,13 +1,13 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 #define MARS_MATRIX_INTERNAL_ACCESS
+#include "matrix.h"
 #include "matrix_internal.h"
 #include "matrix_vtable_defs.h"
 #include "number.h"
-#include "qfloat.h"
 #include "qcomplex.h"
-#include "matrix.h"
+#include "qfloat.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
 #include "ustring.h"
@@ -16,59 +16,49 @@
    Internal matrix construction helpers (forward declarations)
    ============================================================ */
 
- struct matrix_t *store_create_dense(size_t rows, size_t cols,
-                                           const struct elem_vtable *elem);
- struct matrix_t *store_create_sparse(size_t rows, size_t cols,
-                                            const struct elem_vtable *elem);
- struct matrix_t *store_create_identity(size_t rows, size_t cols,
-                                              const struct elem_vtable *elem);
- struct matrix_t *store_create_diagonal(size_t rows, size_t cols,
-                                              const struct elem_vtable *elem);
- struct matrix_t *store_create_upper_triangular(size_t rows, size_t cols,
-                                                      const struct elem_vtable *elem);
- struct matrix_t *store_create_lower_triangular(size_t rows, size_t cols,
-                                                      const struct elem_vtable *elem);
- bool dense_is_sparse_storage(const struct matrix_t *A);
- bool sparse_is_sparse_storage(const struct matrix_t *A);
- bool identity_is_sparse_storage(const struct matrix_t *A);
- bool diagonal_is_sparse_storage(const struct matrix_t *A);
- bool upper_triangular_is_sparse_storage(const struct matrix_t *A);
- bool lower_triangular_is_sparse_storage(const struct matrix_t *A);
- bool dense_is_sparse_like(const struct matrix_t *A);
- bool sparse_is_sparse_like(const struct matrix_t *A);
- bool identity_is_sparse_like(const struct matrix_t *A);
- bool diagonal_is_sparse_like(const struct matrix_t *A);
- bool upper_triangular_is_sparse_like(const struct matrix_t *A);
- bool lower_triangular_is_sparse_like(const struct matrix_t *A);
- bool store_true(const struct matrix_t *A);
+struct matrix_t *store_create_dense(size_t rows, size_t cols, const struct elem_vtable *elem);
+struct matrix_t *store_create_sparse(size_t rows, size_t cols, const struct elem_vtable *elem);
+struct matrix_t *store_create_identity(size_t rows, size_t cols, const struct elem_vtable *elem);
+struct matrix_t *store_create_diagonal(size_t rows, size_t cols, const struct elem_vtable *elem);
+struct matrix_t *store_create_upper_triangular(size_t rows, size_t cols, const struct elem_vtable *elem);
+struct matrix_t *store_create_lower_triangular(size_t rows, size_t cols, const struct elem_vtable *elem);
+bool dense_is_sparse_storage(const struct matrix_t *A);
+bool sparse_is_sparse_storage(const struct matrix_t *A);
+bool identity_is_sparse_storage(const struct matrix_t *A);
+bool diagonal_is_sparse_storage(const struct matrix_t *A);
+bool upper_triangular_is_sparse_storage(const struct matrix_t *A);
+bool lower_triangular_is_sparse_storage(const struct matrix_t *A);
+bool dense_is_sparse_like(const struct matrix_t *A);
+bool sparse_is_sparse_like(const struct matrix_t *A);
+bool identity_is_sparse_like(const struct matrix_t *A);
+bool diagonal_is_sparse_like(const struct matrix_t *A);
+bool upper_triangular_is_sparse_like(const struct matrix_t *A);
+bool lower_triangular_is_sparse_like(const struct matrix_t *A);
+bool store_true(const struct matrix_t *A);
 static bool store_false(const struct matrix_t *A);
- bool dense_is_diagonal(const struct matrix_t *A);
- bool sparse_is_diagonal(const struct matrix_t *A);
- bool upper_triangular_is_diagonal(const struct matrix_t *A);
- bool lower_triangular_is_diagonal(const struct matrix_t *A);
- bool generic_is_upper_triangular(const struct matrix_t *A);
- bool generic_is_lower_triangular(const struct matrix_t *A);
- size_t dense_nonzero_count(const struct matrix_t *A);
- size_t sparse_nonzero_count(const struct matrix_t *A);
- size_t identity_nonzero_count(const struct matrix_t *A);
- size_t diagonal_nonzero_count(const struct matrix_t *A);
- size_t upper_triangular_nonzero_count(const struct matrix_t *A);
+bool dense_is_diagonal(const struct matrix_t *A);
+bool sparse_is_diagonal(const struct matrix_t *A);
+bool upper_triangular_is_diagonal(const struct matrix_t *A);
+bool lower_triangular_is_diagonal(const struct matrix_t *A);
+bool generic_is_upper_triangular(const struct matrix_t *A);
+bool generic_is_lower_triangular(const struct matrix_t *A);
+size_t dense_nonzero_count(const struct matrix_t *A);
+size_t sparse_nonzero_count(const struct matrix_t *A);
+size_t identity_nonzero_count(const struct matrix_t *A);
+size_t diagonal_nonzero_count(const struct matrix_t *A);
+size_t upper_triangular_nonzero_count(const struct matrix_t *A);
 size_t lower_triangular_nonzero_count(const struct matrix_t *A);
- const struct store_vtable *store_self_unary(const struct matrix_t *A);
- const struct store_vtable *identity_unary_store(const struct matrix_t *A);
- const struct store_vtable *store_self_transpose(const struct matrix_t *A);
- const struct store_vtable *upper_triangular_transpose_store(const struct matrix_t *A);
- const struct store_vtable *lower_triangular_transpose_store(const struct matrix_t *A);
-struct matrix_t *mat_create_with_store(size_t rows, size_t cols,
-                                       const struct elem_vtable *elem,
+const struct store_vtable *store_self_unary(const struct matrix_t *A);
+const struct store_vtable *identity_unary_store(const struct matrix_t *A);
+const struct store_vtable *store_self_transpose(const struct matrix_t *A);
+const struct store_vtable *upper_triangular_transpose_store(const struct matrix_t *A);
+const struct store_vtable *lower_triangular_transpose_store(const struct matrix_t *A);
+struct matrix_t *mat_create_with_store(size_t rows, size_t cols, const struct elem_vtable *elem,
                                        const struct store_vtable *store);
-struct matrix_t *mat_create_transpose_result(size_t rows, size_t cols,
-                                             const struct elem_vtable *elem,
+struct matrix_t *mat_create_transpose_result(size_t rows, size_t cols, const struct elem_vtable *elem,
                                              const struct matrix_t *layout_src);
-static struct matrix_t *mat_create_binary_result(size_t rows, size_t cols,
-                                                 const struct elem_vtable *elem,
-                                                 const struct matrix_t *A,
-                                                 const struct matrix_t *B);
+static struct matrix_t *mat_create_binary_result(size_t rows, size_t cols, const struct elem_vtable *elem,
+                                                 const struct matrix_t *A, const struct matrix_t *B);
 static bool mat_uses_sparse_storage(const struct matrix_t *A);
 static bool mat_is_sparse_like(const struct matrix_t *A);
 bool mat_has_diagonal_structure(const struct matrix_t *A);
@@ -232,9 +222,7 @@ size_t mat_cached_numeric_precision_bits(const struct matrix_t *A)
     return A->meta.numeric_min_precision_bits ? A->meta.numeric_min_precision_bits : 106u;
 }
 
-void mat_numeric_precision_note_set(struct matrix_t *A,
-                                    const void *old_val,
-                                    const void *new_val)
+void mat_numeric_precision_note_set(struct matrix_t *A, const void *old_val, const void *new_val)
 {
     size_t old_bits;
     size_t new_bits;
@@ -398,8 +386,7 @@ number_t mat_raw_value_to_number(const struct elem_vtable *elem, const void *val
     return NUM_ZERO;
 }
 
-void mat_raw_value_from_number(const struct elem_vtable *elem, void *out,
-                               const number_t *value)
+void mat_raw_value_from_number(const struct elem_vtable *elem, void *out, const number_t *value)
 {
     const number_t *source = value ? value : &NUM_ZERO;
 
@@ -555,19 +542,19 @@ void mat_set_num_owned(struct matrix_t *A, size_t i, size_t j, number_t *value)
     }
 }
 
- void num_init_zero_slot(void *slot)
+void num_init_zero_slot(void *slot)
 {
     *(number_t *)slot = NUM_ZERO;
 }
 
- void num_copy_value(void *dst, const void *src)
+void num_copy_value(void *dst, const void *src)
 {
     const number_t *value = src ? (const number_t *)src : &NUM_ZERO;
 
     *(number_t *)dst = num_is_immortal(*value) ? *value : num_clone(*value);
 }
 
- void num_destroy_value(void *slot)
+void num_destroy_value(void *slot)
 {
     number_t *value = (number_t *)slot;
 
@@ -575,24 +562,24 @@ void mat_set_num_owned(struct matrix_t *A, size_t i, size_t j, number_t *value)
     *value = NUM_ZERO;
 }
 
- bool num_is_structural_zero(const void *val)
+bool num_is_structural_zero(const void *val)
 {
     return !val || num_is_zero(*(const number_t *)val);
 }
 
- void expr_init_zero_slot(void *slot)
+void expr_init_zero_slot(void *slot)
 {
     *(expr_t **)slot = NULL;
 }
 
- void expr_copy_value(void *dst, const void *src)
+void expr_copy_value(void *dst, const void *src)
 {
     expr_t *dv = src ? *(expr_t *const *)src : NULL;
 
     *(expr_t **)dst = expr_clone_for_storage(dv);
 }
 
- void expr_destroy_value(void *slot)
+void expr_destroy_value(void *slot)
 {
     expr_t *dv = *(expr_t **)slot;
 
@@ -601,7 +588,7 @@ void mat_set_num_owned(struct matrix_t *A, size_t i, size_t j, number_t *value)
     *(expr_t **)slot = NULL;
 }
 
- void expr_simplify_value(void *slot)
+void expr_simplify_value(void *slot)
 {
     expr_t *dv = *(expr_t **)slot;
     expr_t *simp;
@@ -614,15 +601,16 @@ void mat_set_num_owned(struct matrix_t *A, size_t i, size_t j, number_t *value)
     *(expr_t **)slot = simp;
 }
 
- bool expr_is_structural_zero(const void *val)
+bool expr_is_structural_zero(const void *val)
 {
     return expr_node_is_exact_zero(*(expr_t *const *)val);
 }
 
- bool dense_alloc(struct matrix_t *A) {
+bool dense_alloc(struct matrix_t *A)
+{
     size_t n = A->rows, m = A->cols, es = A->elem->size;
 
-    A->data = malloc(n * sizeof(void*));
+    A->data = malloc(n * sizeof(void *));
     if (!A->data)
         return false;
     for (size_t i = 0; i < n; i++) {
@@ -648,8 +636,10 @@ void mat_set_num_owned(struct matrix_t *A, size_t i, size_t j, number_t *value)
     return true;
 }
 
- void dense_free(struct matrix_t *A) {
-    if (!A->data) return;
+void dense_free(struct matrix_t *A)
+{
+    if (!A->data)
+        return;
     for (size_t i = 0; i < A->rows; i++) {
         for (size_t j = 0; j < A->cols; j++) {
             void *slot = (char *)A->data[i] + j * A->elem->size;
@@ -661,13 +651,13 @@ void mat_set_num_owned(struct matrix_t *A, size_t i, size_t j, number_t *value)
     A->data = NULL;
 }
 
- void dense_get(const struct matrix_t *A, size_t i, size_t j, void *out) {
-    memcpy(out,
-           (char*)A->data[i] + j * A->elem->size,
-           A->elem->size);
+void dense_get(const struct matrix_t *A, size_t i, size_t j, void *out)
+{
+    memcpy(out, (char *)A->data[i] + j * A->elem->size, A->elem->size);
 }
 
- void dense_set(struct matrix_t *A, size_t i, size_t j, const void *val) {
+void dense_set(struct matrix_t *A, size_t i, size_t j, const void *val)
+{
     void *slot = (char *)A->data[i] + j * A->elem->size;
     number_t old_num;
     int was_zero = elem_is_structural_zero(A->elem, slot);
@@ -698,10 +688,10 @@ void dense_swap_rows(struct matrix_t *A, size_t r1, size_t r2)
     A->data[r2] = tmp;
 }
 
- void dense_row_eliminate_from(struct matrix_t *A, size_t dst_row, size_t src_row,
-                                     size_t col_start, const void *factor)
+void dense_row_eliminate_from(struct matrix_t *A, size_t dst_row, size_t src_row, size_t col_start, const void *factor)
 {
-    unsigned char src[MATRIX_SCALAR_STORAGE_BYTES], dst[MATRIX_SCALAR_STORAGE_BYTES], prod[MATRIX_SCALAR_STORAGE_BYTES], out[MATRIX_SCALAR_STORAGE_BYTES];
+    unsigned char src[MATRIX_SCALAR_STORAGE_BYTES], dst[MATRIX_SCALAR_STORAGE_BYTES], prod[MATRIX_SCALAR_STORAGE_BYTES],
+        out[MATRIX_SCALAR_STORAGE_BYTES];
 
     if (!A || !factor || dst_row == src_row)
         return;
@@ -721,7 +711,6 @@ void dense_swap_rows(struct matrix_t *A, size_t r1, size_t r2)
     elem_destroy_value(A->elem, prod);
 }
 
-
 /* ---------- sparse storage ---------- */
 
 static sparse_entry_t *sparse_find_prev(const struct matrix_t *A, size_t row, size_t col)
@@ -737,7 +726,7 @@ static sparse_entry_t *sparse_find_prev(const struct matrix_t *A, size_t row, si
     return prev;
 }
 
- bool sparse_alloc(struct matrix_t *A)
+bool sparse_alloc(struct matrix_t *A)
 {
     A->data = calloc(A->rows, sizeof(void *));
     if (!A->data)
@@ -746,7 +735,7 @@ static sparse_entry_t *sparse_find_prev(const struct matrix_t *A, size_t row, si
     return true;
 }
 
- void sparse_free(struct matrix_t *A)
+void sparse_free(struct matrix_t *A)
 {
     if (!A->data)
         return;
@@ -766,7 +755,7 @@ static sparse_entry_t *sparse_find_prev(const struct matrix_t *A, size_t row, si
     A->nnz = 0;
 }
 
- void sparse_get(const struct matrix_t *A, size_t i, size_t j, void *out)
+void sparse_get(const struct matrix_t *A, size_t i, size_t j, void *out)
 {
     sparse_entry_t *prev = sparse_find_prev(A, i, j);
     sparse_entry_t *cur = prev ? prev->next : (A->data ? (sparse_entry_t *)A->data[i] : NULL);
@@ -779,7 +768,7 @@ static sparse_entry_t *sparse_find_prev(const struct matrix_t *A, size_t row, si
     memcpy(out, A->elem->zero, A->elem->size);
 }
 
- void sparse_set(struct matrix_t *A, size_t i, size_t j, const void *val)
+void sparse_set(struct matrix_t *A, size_t i, size_t j, const void *val)
 {
     sparse_entry_t *prev;
     sparse_entry_t *cur;
@@ -832,7 +821,7 @@ static sparse_entry_t *sparse_find_prev(const struct matrix_t *A, size_t row, si
     A->nnz++;
 }
 
- void sparse_swap_rows(struct matrix_t *A, size_t r1, size_t r2)
+void sparse_swap_rows(struct matrix_t *A, size_t r1, size_t r2)
 {
     void *tmp;
 
@@ -844,8 +833,7 @@ static sparse_entry_t *sparse_find_prev(const struct matrix_t *A, size_t row, si
     A->data[r2] = tmp;
 }
 
- void sparse_row_eliminate_from(struct matrix_t *A, size_t dst_row, size_t src_row,
-                                      size_t col_start, const void *factor)
+void sparse_row_eliminate_from(struct matrix_t *A, size_t dst_row, size_t src_row, size_t col_start, const void *factor)
 {
     sparse_entry_t *cur;
     unsigned char dst[MATRIX_SCALAR_STORAGE_BYTES], prod[MATRIX_SCALAR_STORAGE_BYTES], out[MATRIX_SCALAR_STORAGE_BYTES];
@@ -870,7 +858,7 @@ static sparse_entry_t *sparse_find_prev(const struct matrix_t *A, size_t row, si
     }
 }
 
- void sparse_materialise(struct matrix_t *A)
+void sparse_materialise(struct matrix_t *A)
 {
     void **old_rows;
     size_t old_nnz;
@@ -907,47 +895,47 @@ static sparse_entry_t *sparse_find_prev(const struct matrix_t *A, size_t row, si
     free(old_rows);
 }
 
-
 /* ---------- identity storage ---------- */
 
- void ident_materialise(struct matrix_t *A);
+void ident_materialise(struct matrix_t *A);
 
- bool ident_alloc(struct matrix_t *A) {
+bool ident_alloc(struct matrix_t *A)
+{
     A->data = NULL;
     A->nnz = A->rows;
     return true;
 }
 
- void ident_free(struct matrix_t *A) {
+void ident_free(struct matrix_t *A)
+{
     (void)A;
 }
 
- void ident_get(const struct matrix_t *A, size_t i, size_t j, void *out) {
-    memcpy(out,
-           (i == j) ? A->elem->one : A->elem->zero,
-           A->elem->size);
+void ident_get(const struct matrix_t *A, size_t i, size_t j, void *out)
+{
+    memcpy(out, (i == j) ? A->elem->one : A->elem->zero, A->elem->size);
 }
 
- void ident_set(struct matrix_t *A, size_t i, size_t j, const void *val) {
+void ident_set(struct matrix_t *A, size_t i, size_t j, const void *val)
+{
     ident_materialise(A);
     dense_set(A, i, j, val);
 }
 
- void ident_swap_rows(struct matrix_t *A, size_t r1, size_t r2)
+void ident_swap_rows(struct matrix_t *A, size_t r1, size_t r2)
 {
     ident_materialise(A);
     dense_swap_rows(A, r1, r2);
 }
 
- void ident_row_eliminate_from(struct matrix_t *A, size_t dst_row, size_t src_row,
-                                     size_t col_start, const void *factor)
+void ident_row_eliminate_from(struct matrix_t *A, size_t dst_row, size_t src_row, size_t col_start, const void *factor)
 {
     ident_materialise(A);
     dense_row_eliminate_from(A, dst_row, src_row, col_start, factor);
 }
 
-
- void ident_materialise(struct matrix_t *A) {
+void ident_materialise(struct matrix_t *A)
+{
     A->store = &dense_store;
     if (!dense_alloc(A))
         return;
@@ -959,7 +947,7 @@ static sparse_entry_t *sparse_find_prev(const struct matrix_t *A, size_t row, si
 
 /* ---------- diagonal storage ---------- */
 
- bool diagonal_alloc(struct matrix_t *A)
+bool diagonal_alloc(struct matrix_t *A)
 {
     size_t i;
 
@@ -986,7 +974,7 @@ static sparse_entry_t *sparse_find_prev(const struct matrix_t *A, size_t row, si
     return true;
 }
 
- void diagonal_free(struct matrix_t *A)
+void diagonal_free(struct matrix_t *A)
 {
     if (!A->data)
         return;
@@ -1000,12 +988,12 @@ static sparse_entry_t *sparse_find_prev(const struct matrix_t *A, size_t row, si
     A->nnz = 0;
 }
 
- void diagonal_get(const struct matrix_t *A, size_t i, size_t j, void *out)
+void diagonal_get(const struct matrix_t *A, size_t i, size_t j, void *out)
 {
     memcpy(out, (i == j) ? A->data[i] : A->elem->zero, A->elem->size);
 }
 
- void diagonal_materialise(struct matrix_t *A)
+void diagonal_materialise(struct matrix_t *A)
 {
     void **old_diagonal = A->data;
     size_t old_nnz = A->nnz;
@@ -1028,7 +1016,7 @@ static sparse_entry_t *sparse_find_prev(const struct matrix_t *A, size_t row, si
     free(old_diagonal);
 }
 
- void diagonal_set(struct matrix_t *A, size_t i, size_t j, const void *val)
+void diagonal_set(struct matrix_t *A, size_t i, size_t j, const void *val)
 {
     if (i == j) {
         int was_zero = elem_is_structural_zero(A->elem, A->data[i]);
@@ -1055,19 +1043,18 @@ static sparse_entry_t *sparse_find_prev(const struct matrix_t *A, size_t row, si
     dense_set(A, i, j, val);
 }
 
- void diagonal_swap_rows(struct matrix_t *A, size_t r1, size_t r2)
+void diagonal_swap_rows(struct matrix_t *A, size_t r1, size_t r2)
 {
     diagonal_materialise(A);
     dense_swap_rows(A, r1, r2);
 }
 
- void diagonal_row_eliminate_from(struct matrix_t *A, size_t dst_row, size_t src_row,
-                                        size_t col_start, const void *factor)
+void diagonal_row_eliminate_from(struct matrix_t *A, size_t dst_row, size_t src_row, size_t col_start,
+                                 const void *factor)
 {
     diagonal_materialise(A);
     dense_row_eliminate_from(A, dst_row, src_row, col_start, factor);
 }
-
 
 /* ---------- triangular storage ---------- */
 
@@ -1116,15 +1103,14 @@ static bool triangular_alloc(struct matrix_t *A, size_t (*row_width)(const struc
     return true;
 }
 
- void triangular_free(struct matrix_t *A)
+void triangular_free(struct matrix_t *A)
 {
     if (!A->data)
         return;
 
     for (size_t i = 0; i < A->rows; i++) {
-        size_t width = (A->store == &upper_triangular_store)
-                     ? upper_triangular_row_width(A, i)
-                     : lower_triangular_row_width(A, i);
+        size_t width =
+            (A->store == &upper_triangular_store) ? upper_triangular_row_width(A, i) : lower_triangular_row_width(A, i);
         for (size_t j = 0; j < width; j++) {
             void *slot = (char *)A->data[i] + j * A->elem->size;
             elem_destroy_value(A->elem, slot);
@@ -1136,41 +1122,37 @@ static bool triangular_alloc(struct matrix_t *A, size_t (*row_width)(const struc
     A->nnz = 0;
 }
 
- bool upper_triangular_alloc(struct matrix_t *A)
+bool upper_triangular_alloc(struct matrix_t *A)
 {
     return triangular_alloc(A, upper_triangular_row_width);
 }
 
- bool lower_triangular_alloc(struct matrix_t *A)
+bool lower_triangular_alloc(struct matrix_t *A)
 {
     return triangular_alloc(A, lower_triangular_row_width);
 }
 
- void upper_triangular_get(const struct matrix_t *A, size_t i, size_t j, void *out)
+void upper_triangular_get(const struct matrix_t *A, size_t i, size_t j, void *out)
 {
     if (i <= j && i < A->cols) {
-        memcpy(out,
-               (char *)A->data[i] + (j - i) * A->elem->size,
-               A->elem->size);
+        memcpy(out, (char *)A->data[i] + (j - i) * A->elem->size, A->elem->size);
         return;
     }
 
     memcpy(out, A->elem->zero, A->elem->size);
 }
 
- void lower_triangular_get(const struct matrix_t *A, size_t i, size_t j, void *out)
+void lower_triangular_get(const struct matrix_t *A, size_t i, size_t j, void *out)
 {
     if (j <= i && j < A->cols) {
-        memcpy(out,
-               (char *)A->data[i] + j * A->elem->size,
-               A->elem->size);
+        memcpy(out, (char *)A->data[i] + j * A->elem->size, A->elem->size);
         return;
     }
 
     memcpy(out, A->elem->zero, A->elem->size);
 }
 
- void upper_triangular_materialise(struct matrix_t *A)
+void upper_triangular_materialise(struct matrix_t *A)
 {
     void **old_rows = A->data;
     size_t old_nnz = A->nnz;
@@ -1197,7 +1179,7 @@ static bool triangular_alloc(struct matrix_t *A, size_t (*row_width)(const struc
     free(old_rows);
 }
 
- void lower_triangular_materialise(struct matrix_t *A)
+void lower_triangular_materialise(struct matrix_t *A)
 {
     void **old_rows = A->data;
     size_t old_nnz = A->nnz;
@@ -1224,7 +1206,7 @@ static bool triangular_alloc(struct matrix_t *A, size_t (*row_width)(const struc
     free(old_rows);
 }
 
- void upper_triangular_set(struct matrix_t *A, size_t i, size_t j, const void *val)
+void upper_triangular_set(struct matrix_t *A, size_t i, size_t j, const void *val)
 {
     if (i <= j && i < A->cols) {
         void *slot = (char *)A->data[i] + (j - i) * A->elem->size;
@@ -1252,7 +1234,7 @@ static bool triangular_alloc(struct matrix_t *A, size_t (*row_width)(const struc
     dense_set(A, i, j, val);
 }
 
- void lower_triangular_set(struct matrix_t *A, size_t i, size_t j, const void *val)
+void lower_triangular_set(struct matrix_t *A, size_t i, size_t j, const void *val)
 {
     if (j <= i && j < A->cols) {
         void *slot = (char *)A->data[i] + j * A->elem->size;
@@ -1280,22 +1262,23 @@ static bool triangular_alloc(struct matrix_t *A, size_t (*row_width)(const struc
     dense_set(A, i, j, val);
 }
 
- void upper_triangular_swap_rows(struct matrix_t *A, size_t r1, size_t r2)
+void upper_triangular_swap_rows(struct matrix_t *A, size_t r1, size_t r2)
 {
     upper_triangular_materialise(A);
     dense_swap_rows(A, r1, r2);
 }
 
- void lower_triangular_swap_rows(struct matrix_t *A, size_t r1, size_t r2)
+void lower_triangular_swap_rows(struct matrix_t *A, size_t r1, size_t r2)
 {
     lower_triangular_materialise(A);
     dense_swap_rows(A, r1, r2);
 }
 
- void upper_triangular_row_eliminate_from(struct matrix_t *A, size_t dst_row, size_t src_row,
-                                                size_t col_start, const void *factor)
+void upper_triangular_row_eliminate_from(struct matrix_t *A, size_t dst_row, size_t src_row, size_t col_start,
+                                         const void *factor)
 {
-    unsigned char src[MATRIX_SCALAR_STORAGE_BYTES], dst[MATRIX_SCALAR_STORAGE_BYTES], prod[MATRIX_SCALAR_STORAGE_BYTES], out[MATRIX_SCALAR_STORAGE_BYTES];
+    unsigned char src[MATRIX_SCALAR_STORAGE_BYTES], dst[MATRIX_SCALAR_STORAGE_BYTES], prod[MATRIX_SCALAR_STORAGE_BYTES],
+        out[MATRIX_SCALAR_STORAGE_BYTES];
 
     if (!A || !factor || dst_row == src_row)
         return;
@@ -1315,32 +1298,30 @@ static bool triangular_alloc(struct matrix_t *A, size_t (*row_width)(const struc
     elem_destroy_value(A->elem, prod);
 }
 
- void lower_triangular_row_eliminate_from(struct matrix_t *A, size_t dst_row, size_t src_row,
-                                                size_t col_start, const void *factor)
+void lower_triangular_row_eliminate_from(struct matrix_t *A, size_t dst_row, size_t src_row, size_t col_start,
+                                         const void *factor)
 {
     lower_triangular_materialise(A);
     dense_row_eliminate_from(A, dst_row, src_row, col_start, factor);
 }
 
-
-
 /* ============================================================
    Internal constructor helper
    ============================================================ */
 
-static struct matrix_t *mat_create_internal(size_t rows, size_t cols,
-                                            const struct elem_vtable *elem,
+static struct matrix_t *mat_create_internal(size_t rows, size_t cols, const struct elem_vtable *elem,
                                             const struct store_vtable *store)
 {
     struct matrix_t *A = malloc(sizeof(*A));
-    if (!A) return NULL;
+    if (!A)
+        return NULL;
 
-    A->rows  = rows;
-    A->cols  = cols;
-    A->elem  = elem;
+    A->rows = rows;
+    A->cols = cols;
+    A->elem = elem;
     A->store = store;
-    A->data  = NULL;
-    A->nnz   = 0;
+    A->data = NULL;
+    A->nnz = 0;
     A->meta.numeric_min_precision_bits = 106u;
     A->meta.numeric_inexact_count = 0;
     A->meta.numeric_precision_hist = NULL;
@@ -1360,42 +1341,36 @@ static struct matrix_t *mat_create_internal(size_t rows, size_t cols,
    Matrix construction policy helpers
    ============================================================ */
 
- struct matrix_t *store_create_dense(size_t rows, size_t cols,
-                                           const struct elem_vtable *elem)
+struct matrix_t *store_create_dense(size_t rows, size_t cols, const struct elem_vtable *elem)
 {
     return mat_create_internal(rows, cols, elem, &dense_store);
 }
 
- struct matrix_t *store_create_sparse(size_t rows, size_t cols,
-                                            const struct elem_vtable *elem)
+struct matrix_t *store_create_sparse(size_t rows, size_t cols, const struct elem_vtable *elem)
 {
     return mat_create_internal(rows, cols, elem, &sparse_store);
 }
 
- struct matrix_t *store_create_identity(size_t rows, size_t cols,
-                                              const struct elem_vtable *elem)
+struct matrix_t *store_create_identity(size_t rows, size_t cols, const struct elem_vtable *elem)
 {
     if (rows != cols)
         return NULL;
     return mat_create_internal(rows, cols, elem, &identity_store);
 }
 
- struct matrix_t *store_create_diagonal(size_t rows, size_t cols,
-                                              const struct elem_vtable *elem)
+struct matrix_t *store_create_diagonal(size_t rows, size_t cols, const struct elem_vtable *elem)
 {
     if (rows != cols)
         return NULL;
     return mat_create_internal(rows, cols, elem, &diagonal_store);
 }
 
- struct matrix_t *store_create_upper_triangular(size_t rows, size_t cols,
-                                                      const struct elem_vtable *elem)
+struct matrix_t *store_create_upper_triangular(size_t rows, size_t cols, const struct elem_vtable *elem)
 {
     return mat_create_internal(rows, cols, elem, &upper_triangular_store);
 }
 
- struct matrix_t *store_create_lower_triangular(size_t rows, size_t cols,
-                                                      const struct elem_vtable *elem)
+struct matrix_t *store_create_lower_triangular(size_t rows, size_t cols, const struct elem_vtable *elem)
 {
     return mat_create_internal(rows, cols, elem, &lower_triangular_store);
 }
@@ -1406,72 +1381,72 @@ static bool store_false(const struct matrix_t *A)
     return false;
 }
 
- bool store_true(const struct matrix_t *A)
+bool store_true(const struct matrix_t *A)
 {
     return A != NULL;
 }
 
- bool dense_is_sparse_storage(const struct matrix_t *A)
+bool dense_is_sparse_storage(const struct matrix_t *A)
 {
     return store_false(A);
 }
 
- bool sparse_is_sparse_storage(const struct matrix_t *A)
+bool sparse_is_sparse_storage(const struct matrix_t *A)
 {
     return store_true(A);
 }
 
- bool identity_is_sparse_storage(const struct matrix_t *A)
+bool identity_is_sparse_storage(const struct matrix_t *A)
 {
     return store_false(A);
 }
 
- bool diagonal_is_sparse_storage(const struct matrix_t *A)
+bool diagonal_is_sparse_storage(const struct matrix_t *A)
 {
     return store_false(A);
 }
 
- bool upper_triangular_is_sparse_storage(const struct matrix_t *A)
+bool upper_triangular_is_sparse_storage(const struct matrix_t *A)
 {
     return store_false(A);
 }
 
- bool lower_triangular_is_sparse_storage(const struct matrix_t *A)
+bool lower_triangular_is_sparse_storage(const struct matrix_t *A)
 {
     return store_false(A);
 }
 
- bool dense_is_sparse_like(const struct matrix_t *A)
+bool dense_is_sparse_like(const struct matrix_t *A)
 {
     return store_false(A);
 }
 
- bool sparse_is_sparse_like(const struct matrix_t *A)
+bool sparse_is_sparse_like(const struct matrix_t *A)
 {
     return store_true(A);
 }
 
- bool identity_is_sparse_like(const struct matrix_t *A)
+bool identity_is_sparse_like(const struct matrix_t *A)
 {
     return store_true(A);
 }
 
- bool diagonal_is_sparse_like(const struct matrix_t *A)
+bool diagonal_is_sparse_like(const struct matrix_t *A)
 {
     return store_true(A);
 }
 
- bool upper_triangular_is_sparse_like(const struct matrix_t *A)
+bool upper_triangular_is_sparse_like(const struct matrix_t *A)
 {
     return store_false(A);
 }
 
- bool lower_triangular_is_sparse_like(const struct matrix_t *A)
+bool lower_triangular_is_sparse_like(const struct matrix_t *A)
 {
     return store_false(A);
 }
 
- bool dense_is_diagonal(const struct matrix_t *A)
+bool dense_is_diagonal(const struct matrix_t *A)
 {
     unsigned char raw[MATRIX_SCALAR_STORAGE_BYTES];
     size_t diag_cap;
@@ -1492,7 +1467,7 @@ static bool store_false(const struct matrix_t *A)
     return true;
 }
 
- bool sparse_is_diagonal(const struct matrix_t *A)
+bool sparse_is_diagonal(const struct matrix_t *A)
 {
     for (size_t i = 0; i < A->rows; i++) {
         sparse_entry_t *cur = A->data ? (sparse_entry_t *)A->data[i] : NULL;
@@ -1505,7 +1480,7 @@ static bool store_false(const struct matrix_t *A)
     return true;
 }
 
- bool upper_triangular_is_diagonal(const struct matrix_t *A)
+bool upper_triangular_is_diagonal(const struct matrix_t *A)
 {
     for (size_t i = 0; i < A->rows; i++) {
         size_t width = upper_triangular_row_width(A, i);
@@ -1518,7 +1493,7 @@ static bool store_false(const struct matrix_t *A)
     return true;
 }
 
- bool lower_triangular_is_diagonal(const struct matrix_t *A)
+bool lower_triangular_is_diagonal(const struct matrix_t *A)
 {
     for (size_t i = 0; i < A->rows; i++) {
         size_t width = lower_triangular_row_width(A, i);
@@ -1531,7 +1506,7 @@ static bool store_false(const struct matrix_t *A)
     return true;
 }
 
- bool generic_is_upper_triangular(const struct matrix_t *A)
+bool generic_is_upper_triangular(const struct matrix_t *A)
 {
     unsigned char raw[MATRIX_SCALAR_STORAGE_BYTES];
     size_t cap = upper_triangular_capacity(A->rows, A->cols);
@@ -1549,7 +1524,7 @@ static bool store_false(const struct matrix_t *A)
     return true;
 }
 
- bool generic_is_lower_triangular(const struct matrix_t *A)
+bool generic_is_lower_triangular(const struct matrix_t *A)
 {
     unsigned char raw[MATRIX_SCALAR_STORAGE_BYTES];
     size_t cap = lower_triangular_capacity(A->rows, A->cols);
@@ -1567,66 +1542,65 @@ static bool store_false(const struct matrix_t *A)
     return true;
 }
 
- size_t dense_nonzero_count(const struct matrix_t *A)
+size_t dense_nonzero_count(const struct matrix_t *A)
 {
     return A ? A->nnz : 0u;
 }
 
- size_t sparse_nonzero_count(const struct matrix_t *A)
+size_t sparse_nonzero_count(const struct matrix_t *A)
 {
     return A->nnz;
 }
 
- size_t identity_nonzero_count(const struct matrix_t *A)
+size_t identity_nonzero_count(const struct matrix_t *A)
 {
     return A->rows;
 }
 
- size_t diagonal_nonzero_count(const struct matrix_t *A)
+size_t diagonal_nonzero_count(const struct matrix_t *A)
 {
     return A->nnz;
 }
 
- size_t upper_triangular_nonzero_count(const struct matrix_t *A)
+size_t upper_triangular_nonzero_count(const struct matrix_t *A)
 {
     return A->nnz;
 }
 
- size_t lower_triangular_nonzero_count(const struct matrix_t *A)
+size_t lower_triangular_nonzero_count(const struct matrix_t *A)
 {
     return A->nnz;
 }
 
- const struct store_vtable *store_self_unary(const struct matrix_t *A)
+const struct store_vtable *store_self_unary(const struct matrix_t *A)
 {
     return A ? A->store : NULL;
 }
 
- const struct store_vtable *identity_unary_store(const struct matrix_t *A)
+const struct store_vtable *identity_unary_store(const struct matrix_t *A)
 {
     (void)A;
     return &diagonal_store;
 }
 
- const struct store_vtable *store_self_transpose(const struct matrix_t *A)
+const struct store_vtable *store_self_transpose(const struct matrix_t *A)
 {
     return A ? A->store : NULL;
 }
 
- const struct store_vtable *upper_triangular_transpose_store(const struct matrix_t *A)
+const struct store_vtable *upper_triangular_transpose_store(const struct matrix_t *A)
 {
     (void)A;
     return &lower_triangular_store;
 }
 
- const struct store_vtable *lower_triangular_transpose_store(const struct matrix_t *A)
+const struct store_vtable *lower_triangular_transpose_store(const struct matrix_t *A)
 {
     (void)A;
     return &upper_triangular_store;
 }
 
-struct matrix_t *mat_create_with_store(size_t rows, size_t cols,
-                                       const struct elem_vtable *elem,
+struct matrix_t *mat_create_with_store(size_t rows, size_t cols, const struct elem_vtable *elem,
                                        const struct store_vtable *store)
 {
     if (!elem || !store || !store->create)
@@ -1634,44 +1608,37 @@ struct matrix_t *mat_create_with_store(size_t rows, size_t cols,
     return store->create(rows, cols, elem);
 }
 
-struct matrix_t *mat_create_dense_with_elem(size_t rows, size_t cols,
-                                            const struct elem_vtable *elem)
+struct matrix_t *mat_create_dense_with_elem(size_t rows, size_t cols, const struct elem_vtable *elem)
 {
     return mat_create_with_store(rows, cols, elem, &dense_store);
 }
 
-struct matrix_t *mat_create_sparse_with_elem(size_t rows, size_t cols,
-                                             const struct elem_vtable *elem)
+struct matrix_t *mat_create_sparse_with_elem(size_t rows, size_t cols, const struct elem_vtable *elem)
 {
     return mat_create_with_store(rows, cols, elem, &sparse_store);
 }
 
-struct matrix_t *mat_create_identity_with_elem(size_t n,
-                                               const struct elem_vtable *elem)
+struct matrix_t *mat_create_identity_with_elem(size_t n, const struct elem_vtable *elem)
 {
     return mat_create_with_store(n, n, elem, &identity_store);
 }
 
-struct matrix_t *mat_create_diagonal_with_elem(size_t n,
-                                               const struct elem_vtable *elem)
+struct matrix_t *mat_create_diagonal_with_elem(size_t n, const struct elem_vtable *elem)
 {
     return mat_create_with_store(n, n, elem, &diagonal_store);
 }
 
-struct matrix_t *mat_create_upper_triangular_with_elem(size_t rows, size_t cols,
-                                                       const struct elem_vtable *elem)
+struct matrix_t *mat_create_upper_triangular_with_elem(size_t rows, size_t cols, const struct elem_vtable *elem)
 {
     return mat_create_with_store(rows, cols, elem, &upper_triangular_store);
 }
 
-struct matrix_t *mat_create_lower_triangular_with_elem(size_t rows, size_t cols,
-                                                       const struct elem_vtable *elem)
+struct matrix_t *mat_create_lower_triangular_with_elem(size_t rows, size_t cols, const struct elem_vtable *elem)
 {
     return mat_create_with_store(rows, cols, elem, &lower_triangular_store);
 }
 
-struct matrix_t *mat_create_elementwise_unary_result(size_t rows, size_t cols,
-                                                     const struct elem_vtable *elem,
+struct matrix_t *mat_create_elementwise_unary_result(size_t rows, size_t cols, const struct elem_vtable *elem,
                                                      const struct matrix_t *layout_src)
 {
     const struct store_vtable *store;
@@ -1683,8 +1650,7 @@ struct matrix_t *mat_create_elementwise_unary_result(size_t rows, size_t cols,
     return mat_create_with_store(rows, cols, elem, store);
 }
 
-struct matrix_t *mat_create_transpose_result(size_t rows, size_t cols,
-                                             const struct elem_vtable *elem,
+struct matrix_t *mat_create_transpose_result(size_t rows, size_t cols, const struct elem_vtable *elem,
                                              const struct matrix_t *layout_src)
 {
     const struct store_vtable *store;
@@ -1696,15 +1662,12 @@ struct matrix_t *mat_create_transpose_result(size_t rows, size_t cols,
     return mat_create_with_store(rows, cols, elem, store);
 }
 
-static struct matrix_t *mat_create_binary_result(size_t rows, size_t cols,
-                                                 const struct elem_vtable *elem,
-                                                 const struct matrix_t *A,
-                                                 const struct matrix_t *B)
+static struct matrix_t *mat_create_binary_result(size_t rows, size_t cols, const struct elem_vtable *elem,
+                                                 const struct matrix_t *A, const struct matrix_t *B)
 {
     const struct store_vtable *store = &dense_store;
 
-    if (rows == cols &&
-        mat_has_diagonal_structure(A) && mat_has_diagonal_structure(B))
+    if (rows == cols && mat_has_diagonal_structure(A) && mat_has_diagonal_structure(B))
         store = &diagonal_store;
     else if ((mat_has_upper_triangular_structure(A) && mat_has_upper_triangular_structure(B)) ||
              (mat_has_diagonal_structure(A) && mat_has_upper_triangular_structure(B)) ||
@@ -1722,32 +1685,27 @@ static struct matrix_t *mat_create_binary_result(size_t rows, size_t cols,
 
 static bool mat_uses_sparse_storage(const struct matrix_t *A)
 {
-    return A && A->store && A->store->is_sparse_storage &&
-           A->store->is_sparse_storage(A);
+    return A && A->store && A->store->is_sparse_storage && A->store->is_sparse_storage(A);
 }
 
 static bool mat_is_sparse_like(const struct matrix_t *A)
 {
-    return A && A->store && A->store->is_sparse_like &&
-           A->store->is_sparse_like(A);
+    return A && A->store && A->store->is_sparse_like && A->store->is_sparse_like(A);
 }
 
 bool mat_has_diagonal_structure(const struct matrix_t *A)
 {
-    return A && A->store && A->store->is_diagonal &&
-           A->store->is_diagonal(A);
+    return A && A->store && A->store->is_diagonal && A->store->is_diagonal(A);
 }
 
 bool mat_has_upper_triangular_structure(const struct matrix_t *A)
 {
-    return A && A->store && A->store->is_upper_triangular &&
-           A->store->is_upper_triangular(A);
+    return A && A->store && A->store->is_upper_triangular && A->store->is_upper_triangular(A);
 }
 
 bool mat_has_lower_triangular_structure(const struct matrix_t *A)
 {
-    return A && A->store && A->store->is_lower_triangular &&
-           A->store->is_lower_triangular(A);
+    return A && A->store && A->store->is_lower_triangular && A->store->is_lower_triangular(A);
 }
 
 /* ---------- number ---------- */
@@ -1760,27 +1718,27 @@ static void num_replace_value(void *slot, number_t value)
     *out = value;
 }
 
- void num_add_wrap(void *o, const void *a, const void *b)
+void num_add_wrap(void *o, const void *a, const void *b)
 {
     num_replace_value(o, num_add(*(const number_t *)a, *(const number_t *)b));
 }
 
- void num_sub_wrap(void *o, const void *a, const void *b)
+void num_sub_wrap(void *o, const void *a, const void *b)
 {
     num_replace_value(o, num_sub(*(const number_t *)a, *(const number_t *)b));
 }
 
- void num_mul_wrap(void *o, const void *a, const void *b)
+void num_mul_wrap(void *o, const void *a, const void *b)
 {
     num_replace_value(o, num_mul(*(const number_t *)a, *(const number_t *)b));
 }
 
- void num_inv_wrap(void *o, const void *a)
+void num_inv_wrap(void *o, const void *a)
 {
     num_replace_value(o, num_inv(*(const number_t *)a));
 }
 
- int number_cmp_wrap(const void *a, const void *b)
+int number_cmp_wrap(const void *a, const void *b)
 {
     return num_cmp(*(const number_t *)a, *(const number_t *)b);
 }
@@ -1800,50 +1758,147 @@ string_t *num_format_scalar_text(const void *v, int scientific)
     return num_sprintf_text(fmt, value);
 }
 
- void num_conj_elem(void *o, const void *a)
+void num_conj_elem(void *o, const void *a)
 {
     num_replace_value(o, num_conj(*(const number_t *)a));
 }
 
- void num_scalar_exp(void *out, const void *a) { num_replace_value(out, num_exp(*(const number_t *)a)); }
- void num_scalar_log(void *out, const void *a) { num_replace_value(out, num_log(*(const number_t *)a)); }
- void num_scalar_sin(void *out, const void *a) { num_replace_value(out, num_sin(*(const number_t *)a)); }
- void num_scalar_cos(void *out, const void *a) { num_replace_value(out, num_cos(*(const number_t *)a)); }
- void num_scalar_tan(void *out, const void *a) { num_replace_value(out, num_tan(*(const number_t *)a)); }
- void num_scalar_sinh(void *out, const void *a) { num_replace_value(out, num_sinh(*(const number_t *)a)); }
- void num_scalar_cosh(void *out, const void *a) { num_replace_value(out, num_cosh(*(const number_t *)a)); }
- void num_scalar_tanh(void *out, const void *a) { num_replace_value(out, num_tanh(*(const number_t *)a)); }
- void num_scalar_sqrt(void *out, const void *a) { num_replace_value(out, num_sqrt(*(const number_t *)a)); }
- void num_scalar_asin(void *out, const void *a) { num_replace_value(out, num_asin(*(const number_t *)a)); }
- void num_scalar_acos(void *out, const void *a) { num_replace_value(out, num_acos(*(const number_t *)a)); }
- void num_scalar_atan(void *out, const void *a) { num_replace_value(out, num_atan(*(const number_t *)a)); }
- void num_scalar_asinh(void *out, const void *a) { num_replace_value(out, num_asinh(*(const number_t *)a)); }
- void num_scalar_acosh(void *out, const void *a) { num_replace_value(out, num_acosh(*(const number_t *)a)); }
- void num_scalar_atanh(void *out, const void *a) { num_replace_value(out, num_atanh(*(const number_t *)a)); }
- void num_scalar_erf(void *out, const void *a) { num_replace_value(out, num_erf(*(const number_t *)a)); }
- void num_scalar_erfc(void *out, const void *a) { num_replace_value(out, num_erfc(*(const number_t *)a)); }
- void num_scalar_erfinv(void *out, const void *a) { num_replace_value(out, num_erfinv(*(const number_t *)a)); }
- void num_scalar_erfcinv(void *out, const void *a) { num_replace_value(out, num_erfcinv(*(const number_t *)a)); }
- void num_scalar_gamma(void *out, const void *a) { num_replace_value(out, num_gamma(*(const number_t *)a)); }
- void num_scalar_lgamma(void *out, const void *a) { num_replace_value(out, num_lgamma(*(const number_t *)a)); }
- void num_scalar_digamma(void *out, const void *a) { num_replace_value(out, num_digamma(*(const number_t *)a)); }
- void num_scalar_trigamma(void *out, const void *a) { num_replace_value(out, num_trigamma(*(const number_t *)a)); }
- void num_scalar_tetragamma(void *out, const void *a) { num_replace_value(out, num_tetragamma(*(const number_t *)a)); }
- void num_scalar_gammainv(void *out, const void *a) { num_replace_value(out, num_gammainv(*(const number_t *)a)); }
- void num_scalar_normal_pdf(void *out, const void *a) { num_replace_value(out, num_normal_pdf(*(const number_t *)a)); }
- void num_scalar_normal_cdf(void *out, const void *a) { num_replace_value(out, num_normal_cdf(*(const number_t *)a)); }
- void num_scalar_normal_logpdf(void *out, const void *a) { num_replace_value(out, num_normal_logpdf(*(const number_t *)a)); }
- void num_scalar_lambert_w0(void *out, const void *a) { num_replace_value(out, num_lambert_w0(*(const number_t *)a)); }
- void num_scalar_lambert_wm1(void *out, const void *a) { num_replace_value(out, num_lambert_wm1(*(const number_t *)a)); }
- void num_scalar_productlog(void *out, const void *a) { num_replace_value(out, num_productlog(*(const number_t *)a)); }
- void num_scalar_ei(void *out, const void *a) { num_replace_value(out, num_ei(*(const number_t *)a)); }
- void num_scalar_e1(void *out, const void *a) { num_replace_value(out, num_e1(*(const number_t *)a)); }
-
-
+void num_scalar_exp(void *out, const void *a)
+{
+    num_replace_value(out, num_exp(*(const number_t *)a));
+}
+void num_scalar_log(void *out, const void *a)
+{
+    num_replace_value(out, num_log(*(const number_t *)a));
+}
+void num_scalar_sin(void *out, const void *a)
+{
+    num_replace_value(out, num_sin(*(const number_t *)a));
+}
+void num_scalar_cos(void *out, const void *a)
+{
+    num_replace_value(out, num_cos(*(const number_t *)a));
+}
+void num_scalar_tan(void *out, const void *a)
+{
+    num_replace_value(out, num_tan(*(const number_t *)a));
+}
+void num_scalar_sinh(void *out, const void *a)
+{
+    num_replace_value(out, num_sinh(*(const number_t *)a));
+}
+void num_scalar_cosh(void *out, const void *a)
+{
+    num_replace_value(out, num_cosh(*(const number_t *)a));
+}
+void num_scalar_tanh(void *out, const void *a)
+{
+    num_replace_value(out, num_tanh(*(const number_t *)a));
+}
+void num_scalar_sqrt(void *out, const void *a)
+{
+    num_replace_value(out, num_sqrt(*(const number_t *)a));
+}
+void num_scalar_asin(void *out, const void *a)
+{
+    num_replace_value(out, num_asin(*(const number_t *)a));
+}
+void num_scalar_acos(void *out, const void *a)
+{
+    num_replace_value(out, num_acos(*(const number_t *)a));
+}
+void num_scalar_atan(void *out, const void *a)
+{
+    num_replace_value(out, num_atan(*(const number_t *)a));
+}
+void num_scalar_asinh(void *out, const void *a)
+{
+    num_replace_value(out, num_asinh(*(const number_t *)a));
+}
+void num_scalar_acosh(void *out, const void *a)
+{
+    num_replace_value(out, num_acosh(*(const number_t *)a));
+}
+void num_scalar_atanh(void *out, const void *a)
+{
+    num_replace_value(out, num_atanh(*(const number_t *)a));
+}
+void num_scalar_erf(void *out, const void *a)
+{
+    num_replace_value(out, num_erf(*(const number_t *)a));
+}
+void num_scalar_erfc(void *out, const void *a)
+{
+    num_replace_value(out, num_erfc(*(const number_t *)a));
+}
+void num_scalar_erfinv(void *out, const void *a)
+{
+    num_replace_value(out, num_erfinv(*(const number_t *)a));
+}
+void num_scalar_erfcinv(void *out, const void *a)
+{
+    num_replace_value(out, num_erfcinv(*(const number_t *)a));
+}
+void num_scalar_gamma(void *out, const void *a)
+{
+    num_replace_value(out, num_gamma(*(const number_t *)a));
+}
+void num_scalar_lgamma(void *out, const void *a)
+{
+    num_replace_value(out, num_lgamma(*(const number_t *)a));
+}
+void num_scalar_digamma(void *out, const void *a)
+{
+    num_replace_value(out, num_digamma(*(const number_t *)a));
+}
+void num_scalar_trigamma(void *out, const void *a)
+{
+    num_replace_value(out, num_trigamma(*(const number_t *)a));
+}
+void num_scalar_tetragamma(void *out, const void *a)
+{
+    num_replace_value(out, num_tetragamma(*(const number_t *)a));
+}
+void num_scalar_gammainv(void *out, const void *a)
+{
+    num_replace_value(out, num_gammainv(*(const number_t *)a));
+}
+void num_scalar_normal_pdf(void *out, const void *a)
+{
+    num_replace_value(out, num_normal_pdf(*(const number_t *)a));
+}
+void num_scalar_normal_cdf(void *out, const void *a)
+{
+    num_replace_value(out, num_normal_cdf(*(const number_t *)a));
+}
+void num_scalar_normal_logpdf(void *out, const void *a)
+{
+    num_replace_value(out, num_normal_logpdf(*(const number_t *)a));
+}
+void num_scalar_lambert_w0(void *out, const void *a)
+{
+    num_replace_value(out, num_lambert_w0(*(const number_t *)a));
+}
+void num_scalar_lambert_wm1(void *out, const void *a)
+{
+    num_replace_value(out, num_lambert_wm1(*(const number_t *)a));
+}
+void num_scalar_productlog(void *out, const void *a)
+{
+    num_replace_value(out, num_productlog(*(const number_t *)a));
+}
+void num_scalar_ei(void *out, const void *a)
+{
+    num_replace_value(out, num_ei(*(const number_t *)a));
+}
+void num_scalar_e1(void *out, const void *a)
+{
+    num_replace_value(out, num_e1(*(const number_t *)a));
+}
 
 /* ---------- expr_t* ---------- */
 
- void expr_add_wrap(void *o, const void *a, const void *b)
+void expr_add_wrap(void *o, const void *a, const void *b)
 {
     const expr_t *lhs = (*(expr_t *const *)a) ? *(expr_t *const *)a : EXPR_ZERO;
     const expr_t *rhs = (*(expr_t *const *)b) ? *(expr_t *const *)b : EXPR_ZERO;
@@ -1855,7 +1910,7 @@ string_t *num_format_scalar_text(const void *v, int scientific)
     *(expr_t **)o = res;
 }
 
- void expr_sub_wrap(void *o, const void *a, const void *b)
+void expr_sub_wrap(void *o, const void *a, const void *b)
 {
     const expr_t *lhs = (*(expr_t *const *)a) ? *(expr_t *const *)a : EXPR_ZERO;
     const expr_t *rhs = (*(expr_t *const *)b) ? *(expr_t *const *)b : EXPR_ZERO;
@@ -1867,7 +1922,7 @@ string_t *num_format_scalar_text(const void *v, int scientific)
     *(expr_t **)o = res;
 }
 
- void expr_mul_wrap(void *o, const void *a, const void *b)
+void expr_mul_wrap(void *o, const void *a, const void *b)
 {
     const expr_t *lhs = (*(expr_t *const *)a) ? *(expr_t *const *)a : EXPR_ZERO;
     const expr_t *rhs = (*(expr_t *const *)b) ? *(expr_t *const *)b : EXPR_ZERO;
@@ -1879,7 +1934,7 @@ string_t *num_format_scalar_text(const void *v, int scientific)
     *(expr_t **)o = res;
 }
 
- void expr_inv_wrap(void *o, const void *a)
+void expr_inv_wrap(void *o, const void *a)
 {
     expr_t *arg = *(expr_t *const *)a;
     expr_t *prev = *(expr_t **)o;
@@ -1890,7 +1945,7 @@ string_t *num_format_scalar_text(const void *v, int scientific)
     *(expr_t **)o = res;
 }
 
- int expr_cmp_wrap(const void *a, const void *b)
+int expr_cmp_wrap(const void *a, const void *b)
 {
     expr_t *lhs = *(expr_t *const *)a;
     expr_t *rhs = *(expr_t *const *)b;
@@ -1904,7 +1959,7 @@ string_t *num_format_scalar_text(const void *v, int scientific)
     return expr_cmp(lhs, rhs);
 }
 
- void expr_conj_elem(void *o, const void *a)
+void expr_conj_elem(void *o, const void *a)
 {
     expr_t *arg = *(expr_t *const *)a;
     expr_t *prev = *(expr_t **)o;
@@ -1916,7 +1971,7 @@ string_t *num_format_scalar_text(const void *v, int scientific)
     *(expr_t **)o = arg;
 }
 
- void expr_scalar_exp(void *out, const void *a)
+void expr_scalar_exp(void *out, const void *a)
 {
     expr_t *arg = *(expr_t *const *)a;
     expr_t *prev = *(expr_t **)out;
@@ -1927,7 +1982,7 @@ string_t *num_format_scalar_text(const void *v, int scientific)
     *(expr_t **)out = res;
 }
 
- void expr_scalar_log(void *out, const void *a)
+void expr_scalar_log(void *out, const void *a)
 {
     expr_t *arg = *(expr_t *const *)a;
     expr_t *prev = *(expr_t **)out;
@@ -1938,7 +1993,7 @@ string_t *num_format_scalar_text(const void *v, int scientific)
     *(expr_t **)out = res;
 }
 
- void expr_scalar_sin(void *out, const void *a)
+void expr_scalar_sin(void *out, const void *a)
 {
     expr_t *arg = *(expr_t *const *)a;
     expr_t *prev = *(expr_t **)out;
@@ -1949,7 +2004,7 @@ string_t *num_format_scalar_text(const void *v, int scientific)
     *(expr_t **)out = res;
 }
 
- void expr_scalar_cos(void *out, const void *a)
+void expr_scalar_cos(void *out, const void *a)
 {
     expr_t *arg = *(expr_t *const *)a;
     expr_t *prev = *(expr_t **)out;
@@ -1960,7 +2015,7 @@ string_t *num_format_scalar_text(const void *v, int scientific)
     *(expr_t **)out = res;
 }
 
- void expr_scalar_tan(void *out, const void *a)
+void expr_scalar_tan(void *out, const void *a)
 {
     expr_t *arg = *(expr_t *const *)a;
     expr_t *prev = *(expr_t **)out;
@@ -1971,7 +2026,7 @@ string_t *num_format_scalar_text(const void *v, int scientific)
     *(expr_t **)out = res;
 }
 
- void expr_scalar_sinh(void *out, const void *a)
+void expr_scalar_sinh(void *out, const void *a)
 {
     expr_t *arg = *(expr_t *const *)a;
     expr_t *prev = *(expr_t **)out;
@@ -1982,7 +2037,7 @@ string_t *num_format_scalar_text(const void *v, int scientific)
     *(expr_t **)out = res;
 }
 
- void expr_scalar_cosh(void *out, const void *a)
+void expr_scalar_cosh(void *out, const void *a)
 {
     expr_t *arg = *(expr_t *const *)a;
     expr_t *prev = *(expr_t **)out;
@@ -1993,7 +2048,7 @@ string_t *num_format_scalar_text(const void *v, int scientific)
     *(expr_t **)out = res;
 }
 
- void expr_scalar_tanh(void *out, const void *a)
+void expr_scalar_tanh(void *out, const void *a)
 {
     expr_t *arg = *(expr_t *const *)a;
     expr_t *prev = *(expr_t **)out;
@@ -2004,7 +2059,7 @@ string_t *num_format_scalar_text(const void *v, int scientific)
     *(expr_t **)out = res;
 }
 
- void expr_scalar_sqrt(void *out, const void *a)
+void expr_scalar_sqrt(void *out, const void *a)
 {
     expr_t *arg = *(expr_t *const *)a;
     expr_t *prev = *(expr_t **)out;
@@ -2015,7 +2070,7 @@ string_t *num_format_scalar_text(const void *v, int scientific)
     *(expr_t **)out = res;
 }
 
- void expr_scalar_asin(void *out, const void *a)
+void expr_scalar_asin(void *out, const void *a)
 {
     expr_t *arg = *(expr_t *const *)a;
     expr_t *prev = *(expr_t **)out;
@@ -2026,7 +2081,7 @@ string_t *num_format_scalar_text(const void *v, int scientific)
     *(expr_t **)out = res;
 }
 
- void expr_scalar_acos(void *out, const void *a)
+void expr_scalar_acos(void *out, const void *a)
 {
     expr_t *arg = *(expr_t *const *)a;
     expr_t *prev = *(expr_t **)out;
@@ -2037,7 +2092,7 @@ string_t *num_format_scalar_text(const void *v, int scientific)
     *(expr_t **)out = res;
 }
 
- void expr_scalar_atan(void *out, const void *a)
+void expr_scalar_atan(void *out, const void *a)
 {
     expr_t *arg = *(expr_t *const *)a;
     expr_t *prev = *(expr_t **)out;
@@ -2048,7 +2103,7 @@ string_t *num_format_scalar_text(const void *v, int scientific)
     *(expr_t **)out = res;
 }
 
- void expr_scalar_asinh(void *out, const void *a)
+void expr_scalar_asinh(void *out, const void *a)
 {
     expr_t *arg = *(expr_t *const *)a;
     expr_t *prev = *(expr_t **)out;
@@ -2059,7 +2114,7 @@ string_t *num_format_scalar_text(const void *v, int scientific)
     *(expr_t **)out = res;
 }
 
- void expr_scalar_acosh(void *out, const void *a)
+void expr_scalar_acosh(void *out, const void *a)
 {
     expr_t *arg = *(expr_t *const *)a;
     expr_t *prev = *(expr_t **)out;
@@ -2070,7 +2125,7 @@ string_t *num_format_scalar_text(const void *v, int scientific)
     *(expr_t **)out = res;
 }
 
- void expr_scalar_atanh(void *out, const void *a)
+void expr_scalar_atanh(void *out, const void *a)
 {
     expr_t *arg = *(expr_t *const *)a;
     expr_t *prev = *(expr_t **)out;
@@ -2081,7 +2136,7 @@ string_t *num_format_scalar_text(const void *v, int scientific)
     *(expr_t **)out = res;
 }
 
- void expr_scalar_erf(void *out, const void *a)
+void expr_scalar_erf(void *out, const void *a)
 {
     expr_t *arg = *(expr_t *const *)a;
     expr_t *prev = *(expr_t **)out;
@@ -2092,7 +2147,7 @@ string_t *num_format_scalar_text(const void *v, int scientific)
     *(expr_t **)out = res;
 }
 
- void expr_scalar_erfc(void *out, const void *a)
+void expr_scalar_erfc(void *out, const void *a)
 {
     expr_t *arg = *(expr_t *const *)a;
     expr_t *prev = *(expr_t **)out;
@@ -2103,7 +2158,7 @@ string_t *num_format_scalar_text(const void *v, int scientific)
     *(expr_t **)out = res;
 }
 
- void expr_scalar_erfinv(void *out, const void *a)
+void expr_scalar_erfinv(void *out, const void *a)
 {
     expr_t *arg = *(expr_t *const *)a;
     expr_t *prev = *(expr_t **)out;
@@ -2114,7 +2169,7 @@ string_t *num_format_scalar_text(const void *v, int scientific)
     *(expr_t **)out = res;
 }
 
- void expr_scalar_erfcinv(void *out, const void *a)
+void expr_scalar_erfcinv(void *out, const void *a)
 {
     expr_t *arg = *(expr_t *const *)a;
     expr_t *prev = *(expr_t **)out;
@@ -2125,7 +2180,7 @@ string_t *num_format_scalar_text(const void *v, int scientific)
     *(expr_t **)out = res;
 }
 
- void expr_scalar_gamma(void *out, const void *a)
+void expr_scalar_gamma(void *out, const void *a)
 {
     expr_t *arg = *(expr_t *const *)a;
     expr_t *prev = *(expr_t **)out;
@@ -2136,7 +2191,7 @@ string_t *num_format_scalar_text(const void *v, int scientific)
     *(expr_t **)out = res;
 }
 
- void expr_scalar_gammainv(void *out, const void *a)
+void expr_scalar_gammainv(void *out, const void *a)
 {
     expr_t *arg = *(expr_t *const *)a;
     expr_t *prev = *(expr_t **)out;
@@ -2147,7 +2202,7 @@ string_t *num_format_scalar_text(const void *v, int scientific)
     *(expr_t **)out = res;
 }
 
- void expr_scalar_lgamma(void *out, const void *a)
+void expr_scalar_lgamma(void *out, const void *a)
 {
     expr_t *arg = *(expr_t *const *)a;
     expr_t *prev = *(expr_t **)out;
@@ -2158,7 +2213,7 @@ string_t *num_format_scalar_text(const void *v, int scientific)
     *(expr_t **)out = res;
 }
 
- void expr_scalar_digamma(void *out, const void *a)
+void expr_scalar_digamma(void *out, const void *a)
 {
     expr_t *arg = *(expr_t *const *)a;
     expr_t *prev = *(expr_t **)out;
@@ -2169,7 +2224,7 @@ string_t *num_format_scalar_text(const void *v, int scientific)
     *(expr_t **)out = res;
 }
 
- void expr_scalar_trigamma(void *out, const void *a)
+void expr_scalar_trigamma(void *out, const void *a)
 {
     expr_t *arg = *(expr_t *const *)a;
     expr_t *prev = *(expr_t **)out;
@@ -2180,7 +2235,7 @@ string_t *num_format_scalar_text(const void *v, int scientific)
     *(expr_t **)out = res;
 }
 
- void expr_scalar_normal_pdf(void *out, const void *a)
+void expr_scalar_normal_pdf(void *out, const void *a)
 {
     expr_t *arg = *(expr_t *const *)a;
     expr_t *prev = *(expr_t **)out;
@@ -2191,7 +2246,7 @@ string_t *num_format_scalar_text(const void *v, int scientific)
     *(expr_t **)out = res;
 }
 
- void expr_scalar_normal_cdf(void *out, const void *a)
+void expr_scalar_normal_cdf(void *out, const void *a)
 {
     expr_t *arg = *(expr_t *const *)a;
     expr_t *prev = *(expr_t **)out;
@@ -2202,7 +2257,7 @@ string_t *num_format_scalar_text(const void *v, int scientific)
     *(expr_t **)out = res;
 }
 
- void expr_scalar_normal_logpdf(void *out, const void *a)
+void expr_scalar_normal_logpdf(void *out, const void *a)
 {
     expr_t *arg = *(expr_t *const *)a;
     expr_t *prev = *(expr_t **)out;
@@ -2213,7 +2268,7 @@ string_t *num_format_scalar_text(const void *v, int scientific)
     *(expr_t **)out = res;
 }
 
- void expr_scalar_lambert_w0(void *out, const void *a)
+void expr_scalar_lambert_w0(void *out, const void *a)
 {
     expr_t *arg = *(expr_t *const *)a;
     expr_t *prev = *(expr_t **)out;
@@ -2224,7 +2279,7 @@ string_t *num_format_scalar_text(const void *v, int scientific)
     *(expr_t **)out = res;
 }
 
- void expr_scalar_lambert_wm1(void *out, const void *a)
+void expr_scalar_lambert_wm1(void *out, const void *a)
 {
     expr_t *arg = *(expr_t *const *)a;
     expr_t *prev = *(expr_t **)out;
@@ -2235,7 +2290,7 @@ string_t *num_format_scalar_text(const void *v, int scientific)
     *(expr_t **)out = res;
 }
 
- void expr_scalar_productlog(void *out, const void *a)
+void expr_scalar_productlog(void *out, const void *a)
 {
     expr_t *arg = *(expr_t *const *)a;
     expr_t *prev = *(expr_t **)out;
@@ -2247,7 +2302,7 @@ string_t *num_format_scalar_text(const void *v, int scientific)
     *(expr_t **)out = res;
 }
 
- void expr_scalar_ei(void *out, const void *a)
+void expr_scalar_ei(void *out, const void *a)
 {
     expr_t *arg = *(expr_t *const *)a;
     expr_t *prev = *(expr_t **)out;
@@ -2258,7 +2313,7 @@ string_t *num_format_scalar_text(const void *v, int scientific)
     *(expr_t **)out = res;
 }
 
- void expr_scalar_e1(void *out, const void *a)
+void expr_scalar_e1(void *out, const void *a)
 {
     expr_t *arg = *(expr_t *const *)a;
     expr_t *prev = *(expr_t **)out;
@@ -2269,17 +2324,17 @@ string_t *num_format_scalar_text(const void *v, int scientific)
     *(expr_t **)out = res;
 }
 
-
-
 /* ============================================================
    Conversion helpers for mixed-type arithmetic
    ============================================================ */
 
-static inline void num_as_expr(expr_t **out, const number_t *a) {
+static inline void num_as_expr(expr_t **out, const number_t *a)
+{
     *out = expr_new_const(*a);
 }
 
-static inline void id_expr(expr_t **out, expr_t *const *a) {
+static inline void id_expr(expr_t **out, expr_t *const *a)
+{
     *out = (expr_t *)((a && *a) ? *a : EXPR_ZERO);
 }
 
@@ -2401,11 +2456,7 @@ typedef struct {
     void (*mul)(void *out, const void *a, const void *b);
 } binop_vtable;
 
-typedef enum {
-    BIN_ELEM_NUMBER = 0,
-    BIN_ELEM_EXPR = 1,
-    BIN_ELEM_MAX
-} binop_elem_kind;
+typedef enum { BIN_ELEM_NUMBER = 0, BIN_ELEM_EXPR = 1, BIN_ELEM_MAX } binop_elem_kind;
 
 static binop_elem_kind elem_binop_kind(const struct elem_vtable *elem)
 {
@@ -2417,41 +2468,18 @@ static binop_elem_kind elem_binop_kind(const struct elem_vtable *elem)
 }
 
 static const binop_vtable binops[BIN_ELEM_MAX][BIN_ELEM_MAX] = {
-    [BIN_ELEM_NUMBER] = {
-        [BIN_ELEM_NUMBER] = {
-            .result_elem = &number_elem,
-            .add = add_num_num,
-            .sub = sub_num_num,
-            .mul = mul_num_num
-        },
-        [BIN_ELEM_EXPR] = {
-            .result_elem = &expr_elem,
-            .add = add_num_expr,
-            .sub = sub_num_expr,
-            .mul = mul_num_expr
-        }
-    },
+    [BIN_ELEM_NUMBER] =
+        {[BIN_ELEM_NUMBER] = {.result_elem = &number_elem, .add = add_num_num, .sub = sub_num_num, .mul = mul_num_num},
+         [BIN_ELEM_EXPR] = {.result_elem = &expr_elem, .add = add_num_expr, .sub = sub_num_expr, .mul = mul_num_expr}},
 
     [BIN_ELEM_EXPR] = {
         /* expr op number -> expr */
-        [BIN_ELEM_NUMBER] = {
-            .result_elem = &expr_elem,
-            .add = add_expr_num,
-            .sub = sub_expr_num,
-            .mul = mul_expr_num
-        },
+        [BIN_ELEM_NUMBER] = {.result_elem = &expr_elem, .add = add_expr_num, .sub = sub_expr_num, .mul = mul_expr_num},
         /* expr op expr -> expr */
         [BIN_ELEM_EXPR] = {
-            .result_elem = &expr_elem,
-            .add = add_expr_expr,
-            .sub = sub_expr_expr,
-            .mul = mul_expr_expr
-        }
-    }
-};
+            .result_elem = &expr_elem, .add = add_expr_expr, .sub = sub_expr_expr, .mul = mul_expr_expr}}};
 
-const struct elem_vtable *mat_binary_result_elem(const matrix_t *A,
-                                                 const matrix_t *B)
+const struct elem_vtable *mat_binary_result_elem(const matrix_t *A, const matrix_t *B)
 {
     binop_elem_kind ak, bk;
 
@@ -2489,7 +2517,8 @@ matrix_t *mat_evaluate(const matrix_t *A)
 
 matrix_t *mat_scalar_mul(matrix_t *A, const number_t *s)
 {
-    if (!A || !s) return NULL;
+    if (!A || !s)
+        return NULL;
 
     binop_elem_kind ak = elem_binop_kind(elem_of(A));
     const binop_vtable *op;
@@ -2539,14 +2568,13 @@ matrix_t *mat_scalar_div(matrix_t *A, const number_t *s)
    Mixed-type matrix operations (2D vtable driven)
    ============================================================ */
 
-static struct matrix_t *mat_add_or_sub_sparse(const struct matrix_t *A,
-                                              const struct matrix_t *B,
-                                              const binop_vtable *op,
-                                              int is_sub)
+static struct matrix_t *mat_add_or_sub_sparse(const struct matrix_t *A, const struct matrix_t *B,
+                                              const binop_vtable *op, int is_sub)
 {
     const struct elem_vtable *re = op->result_elem;
     struct matrix_t *C = mat_create_sparse_with_elem(A->rows, A->cols, re);
-    unsigned char a_raw[MATRIX_SCALAR_STORAGE_BYTES] = {0}, b_raw[MATRIX_SCALAR_STORAGE_BYTES] = {0}, out[MATRIX_SCALAR_STORAGE_BYTES] = {0};
+    unsigned char a_raw[MATRIX_SCALAR_STORAGE_BYTES] = {0}, b_raw[MATRIX_SCALAR_STORAGE_BYTES] = {0},
+                  out[MATRIX_SCALAR_STORAGE_BYTES] = {0};
 
     if (!C)
         return NULL;
@@ -2569,14 +2597,14 @@ static struct matrix_t *mat_add_or_sub_sparse(const struct matrix_t *A,
     return C;
 }
 
-static struct matrix_t *mat_mul_sparse(const struct matrix_t *A,
-                                       const struct matrix_t *B,
-                                       const binop_vtable *op)
+static struct matrix_t *mat_mul_sparse(const struct matrix_t *A, const struct matrix_t *B, const binop_vtable *op)
 {
     const struct elem_vtable *re = op->result_elem;
     struct matrix_t *As = NULL, *Bs = NULL, *C = NULL;
-    unsigned char x_raw[MATRIX_SCALAR_STORAGE_BYTES] = {0}, y_raw[MATRIX_SCALAR_STORAGE_BYTES] = {0}, prod[MATRIX_SCALAR_STORAGE_BYTES] = {0};
-    unsigned char sum[MATRIX_SCALAR_STORAGE_BYTES] = {0}, sum_acc[MATRIX_SCALAR_STORAGE_BYTES] = {0}, next_sum[MATRIX_SCALAR_STORAGE_BYTES] = {0};
+    unsigned char x_raw[MATRIX_SCALAR_STORAGE_BYTES] = {0}, y_raw[MATRIX_SCALAR_STORAGE_BYTES] = {0},
+                  prod[MATRIX_SCALAR_STORAGE_BYTES] = {0};
+    unsigned char sum[MATRIX_SCALAR_STORAGE_BYTES] = {0}, sum_acc[MATRIX_SCALAR_STORAGE_BYTES] = {0},
+                  next_sum[MATRIX_SCALAR_STORAGE_BYTES] = {0};
 
     if (!re)
         return NULL;
@@ -2651,7 +2679,8 @@ static struct matrix_t *mat_mul_sparse(const struct matrix_t *A,
     return C;
 }
 
-struct matrix_t *mat_add(const struct matrix_t *A, const struct matrix_t *B) {
+struct matrix_t *mat_add(const struct matrix_t *A, const struct matrix_t *B)
+{
     binop_elem_kind ak, bk;
     const binop_vtable *op;
 
@@ -2671,9 +2700,11 @@ struct matrix_t *mat_add(const struct matrix_t *A, const struct matrix_t *B) {
 
     const struct elem_vtable *re = op->result_elem;
     struct matrix_t *C = mat_create_binary_result(A->rows, A->cols, re, A, B);
-    if (!C) return NULL;
+    if (!C)
+        return NULL;
 
-    unsigned char a_raw[MATRIX_SCALAR_STORAGE_BYTES] = {0}, b_raw[MATRIX_SCALAR_STORAGE_BYTES] = {0}, out[MATRIX_SCALAR_STORAGE_BYTES] = {0};
+    unsigned char a_raw[MATRIX_SCALAR_STORAGE_BYTES] = {0}, b_raw[MATRIX_SCALAR_STORAGE_BYTES] = {0},
+                  out[MATRIX_SCALAR_STORAGE_BYTES] = {0};
     elem_init_zero_value(re, out);
 
     for (size_t i = 0; i < A->rows; i++)
@@ -2689,7 +2720,8 @@ struct matrix_t *mat_add(const struct matrix_t *A, const struct matrix_t *B) {
     return C;
 }
 
-struct matrix_t *mat_sub(const struct matrix_t *A, const struct matrix_t *B) {
+struct matrix_t *mat_sub(const struct matrix_t *A, const struct matrix_t *B)
+{
     binop_elem_kind ak, bk;
     const binop_vtable *op;
 
@@ -2709,9 +2741,11 @@ struct matrix_t *mat_sub(const struct matrix_t *A, const struct matrix_t *B) {
 
     const struct elem_vtable *re = op->result_elem;
     struct matrix_t *C = mat_create_binary_result(A->rows, A->cols, re, A, B);
-    if (!C) return NULL;
+    if (!C)
+        return NULL;
 
-    unsigned char a_raw[MATRIX_SCALAR_STORAGE_BYTES] = {0}, b_raw[MATRIX_SCALAR_STORAGE_BYTES] = {0}, out[MATRIX_SCALAR_STORAGE_BYTES] = {0};
+    unsigned char a_raw[MATRIX_SCALAR_STORAGE_BYTES] = {0}, b_raw[MATRIX_SCALAR_STORAGE_BYTES] = {0},
+                  out[MATRIX_SCALAR_STORAGE_BYTES] = {0};
     elem_init_zero_value(re, out);
 
     for (size_t i = 0; i < A->rows; i++)
@@ -2727,7 +2761,8 @@ struct matrix_t *mat_sub(const struct matrix_t *A, const struct matrix_t *B) {
     return C;
 }
 
-struct matrix_t *mat_mul(const struct matrix_t *A, const struct matrix_t *B) {
+struct matrix_t *mat_mul(const struct matrix_t *A, const struct matrix_t *B)
+{
     binop_elem_kind ak, bk;
     const binop_vtable *op;
 
@@ -2747,9 +2782,11 @@ struct matrix_t *mat_mul(const struct matrix_t *A, const struct matrix_t *B) {
 
     const struct elem_vtable *re = op->result_elem;
     struct matrix_t *C = mat_create_binary_result(A->rows, B->cols, re, A, B);
-    if (!C) return NULL;
+    if (!C)
+        return NULL;
 
-    unsigned char x_raw[MATRIX_SCALAR_STORAGE_BYTES] = {0}, y_raw[MATRIX_SCALAR_STORAGE_BYTES] = {0}, prod[MATRIX_SCALAR_STORAGE_BYTES] = {0};
+    unsigned char x_raw[MATRIX_SCALAR_STORAGE_BYTES] = {0}, y_raw[MATRIX_SCALAR_STORAGE_BYTES] = {0},
+                  prod[MATRIX_SCALAR_STORAGE_BYTES] = {0};
     unsigned char sum[MATRIX_SCALAR_STORAGE_BYTES] = {0}, next_sum[MATRIX_SCALAR_STORAGE_BYTES] = {0};
     elem_init_zero_value(re, prod);
     elem_init_zero_value(re, sum);
@@ -2818,14 +2855,12 @@ matrix_t *mat_neg(const matrix_t *A)
     return R;
 }
 
-
 /* ============================================================
    Schur decomposition: A = Q T Q*
    Full, Hessenberg + implicit double-shift QR, number_t backend
    ============================================================ */
 
-static number_t mat_eval_number_scalar_number(void (*scalar_f)(void *out, const void *in),
-                                              const number_t *input)
+static number_t mat_eval_number_scalar_number(void (*scalar_f)(void *out, const void *in), const number_t *input)
 {
     number_t safe_input = input ? num_clone(*input) : num_clone(NUM_ZERO);
     number_t output = number_invalid();
@@ -2838,10 +2873,8 @@ static number_t mat_eval_number_scalar_number(void (*scalar_f)(void *out, const 
     return result;
 }
 
-static void mat_eval_number_scalar_elem(const struct elem_vtable *elem,
-                                        void *out,
-                                        void (*scalar_f)(void *out, const void *in),
-                                        const void *in)
+static void mat_eval_number_scalar_elem(const struct elem_vtable *elem, void *out,
+                                        void (*scalar_f)(void *out, const void *in), const void *in)
 {
     number_t input = mat_raw_value_to_number(elem, in);
     number_t result = mat_eval_number_scalar_number(scalar_f, &input);
@@ -2850,11 +2883,8 @@ static void mat_eval_number_scalar_elem(const struct elem_vtable *elem,
     num_destroy(&input);
 }
 
-static void num_fun_coeffs_up_to_second(number_t *c0,
-                                        number_t *c1,
-                                        number_t *c2,
-                                        void (*scalar_f)(void *out, const void *in),
-                                        const number_t *lambda)
+static void num_fun_coeffs_up_to_second(number_t *c0, number_t *c1, number_t *c2,
+                                        void (*scalar_f)(void *out, const void *in), const number_t *lambda)
 {
     NUM_SCOPE(scope);
     number_t f0 = mat_eval_number_scalar_number(scalar_f, lambda);
@@ -2878,16 +2908,14 @@ static void num_fun_coeffs_up_to_second(number_t *c0,
     if (scalar_f == number_elem.fun->digamma) {
         if (c1)
             *c1 = num_scope_detach(num_trigamma(*lambda));
-        if (c2)
-        {
+        if (c2) {
             number_t tetra = num_tetragamma(*lambda);
             *c2 = num_scope_detach(num_mul(NUM_HALF, tetra));
         }
         return;
     }
 
-    if (scalar_f == number_elem.fun->lambert_w0 ||
-        scalar_f == number_elem.fun->lambert_wm1) {
+    if (scalar_f == number_elem.fun->lambert_w0 || scalar_f == number_elem.fun->lambert_wm1) {
         number_t one = num_clone(NUM_ONE);
         number_t two = num_create_from_double(2.0);
         number_t wp1 = num_add(one, f0);
@@ -2929,8 +2957,7 @@ static void num_fun_coeffs_up_to_second(number_t *c0,
         number_t neg_lambda = num_neg(*lambda);
         number_t emlambda = num_exp(neg_lambda);
         number_t lam2 = num_mul(*lambda, *lambda);
-        if (c1)
-        {
+        if (c1) {
             number_t neg_emlambda = num_neg(emlambda);
             *c1 = num_scope_detach(num_div(neg_emlambda, *lambda));
         }
@@ -2951,8 +2978,7 @@ static void num_fun_coeffs_up_to_second(number_t *c0,
         number_t fp = num_mul(scale, exp_term);
         if (c1)
             *c1 = num_scope_detach(num_clone(fp));
-        if (c2)
-        {
+        if (c2) {
             number_t prod = num_mul(*lambda, fp);
             *c2 = num_scope_detach(num_neg(prod));
         }
@@ -2967,8 +2993,7 @@ static void num_fun_coeffs_up_to_second(number_t *c0,
         number_t fp = num_mul(scale, exp_term);
         if (c1)
             *c1 = num_scope_detach(num_clone(fp));
-        if (c2)
-        {
+        if (c2) {
             number_t prod = num_mul(*lambda, fp);
             *c2 = num_scope_detach(num_neg(prod));
         }
@@ -2993,8 +3018,7 @@ static void num_fun_coeffs_up_to_second(number_t *c0,
         number_t pdf = num_normal_pdf(*lambda);
         if (c1)
             *c1 = num_scope_detach(num_clone(pdf));
-        if (c2)
-        {
+        if (c2) {
             number_t lambda_pdf = num_mul(*lambda, pdf);
             number_t neg_half = num_create_from_double(-0.5);
             *c2 = num_scope_detach(num_mul(neg_half, lambda_pdf));
@@ -3046,8 +3070,7 @@ static void num_array_destroy(number_t *values, size_t count)
         num_destroy(&values[i]);
 }
 
-static matrix_t *mat_fun_triangular_equal_diag(const matrix_t *T,
-                                               void (*scalar_f)(void *out, const void *in))
+static matrix_t *mat_fun_triangular_equal_diag(const matrix_t *T, void (*scalar_f)(void *out, const void *in))
 {
     size_t n = T->rows;
     const struct elem_vtable *e = T->elem;
@@ -3133,9 +3156,7 @@ static matrix_t *mat_fun_triangular_equal_diag(const matrix_t *T,
     return F;
 }
 
-static int num_divided_difference_perturbed(number_t *out,
-                                            const number_t *nodes,
-                                            size_t count,
+static int num_divided_difference_perturbed(number_t *out, const number_t *nodes, size_t count,
                                             void (*scalar_f)(void *out, const void *in))
 {
     number_t *pts = NULL;
@@ -3209,8 +3230,7 @@ static int num_divided_difference_perturbed(number_t *out,
             number_t denom = number_invalid();
             number_t quot = number_invalid();
 
-            numer = num_sub(table[(i + 1) * count + (order - 1)],
-                            table[i * count + (order - 1)]);
+            numer = num_sub(table[(i + 1) * count + (order - 1)], table[i * count + (order - 1)]);
             denom = num_sub(pts[i + order], pts[i]);
             quot = num_div(numer, denom);
             table[i * count + order] = quot;
@@ -3230,9 +3250,7 @@ static int num_divided_difference_perturbed(number_t *out,
     return 0;
 }
 
-static int num_divided_difference_ordinary(number_t *out,
-                                           const number_t *nodes,
-                                           size_t count,
+static int num_divided_difference_ordinary(number_t *out, const number_t *nodes, size_t count,
                                            void (*scalar_f)(void *out, const void *in))
 {
     number_t *table = NULL;
@@ -3252,8 +3270,7 @@ static int num_divided_difference_ordinary(number_t *out,
 
     for (size_t order = 1; order < count; ++order) {
         for (size_t i = 0; i + order < count; ++i) {
-            number_t numer = num_sub(table[(i + 1) * count + (order - 1)],
-                                     table[i * count + (order - 1)]);
+            number_t numer = num_sub(table[(i + 1) * count + (order - 1)], table[i * count + (order - 1)]);
             number_t denom = num_sub(nodes[i + order], nodes[i]);
             table[i * count + order] = num_div(numer, denom);
             num_destroy(&denom);
@@ -3267,9 +3284,7 @@ static int num_divided_difference_ordinary(number_t *out,
     return 0;
 }
 
-static int num_divided_difference_confluent(number_t *out,
-                                            const number_t *nodes,
-                                            size_t count,
+static int num_divided_difference_confluent(number_t *out, const number_t *nodes, size_t count,
                                             void (*scalar_f)(void *out, const void *in))
 {
     NUM_SCOPE(scope);
@@ -3362,14 +3377,8 @@ static int num_divided_difference_confluent(number_t *out,
     return num_divided_difference_ordinary(out, nodes, count, scalar_f);
 }
 
-static int mat_fun_triangular_confluent_sum_paths(number_t *out,
-                                                  const matrix_t *T,
-                                                  size_t start,
-                                                  size_t current,
-                                                  size_t end,
-                                                  number_t edge_prod,
-                                                  number_t *nodes,
-                                                  size_t depth,
+static int mat_fun_triangular_confluent_sum_paths(number_t *out, const matrix_t *T, size_t start, size_t current,
+                                                  size_t end, number_t edge_prod, number_t *nodes, size_t depth,
                                                   void (*scalar_f)(void *out, const void *in))
 {
     const struct elem_vtable *e = T->elem;
@@ -3420,9 +3429,8 @@ static int mat_fun_triangular_confluent_sum_paths(number_t *out,
         num_destroy(&nodes[depth]);
         nodes[depth] = num_clone(lam_next);
         next_prod = num_mul(edge_prod, tij);
-        if (mat_fun_triangular_confluent_sum_paths(out, T, start, next, end,
-                                                   next_prod, nodes, depth + 1,
-                                                   scalar_f) != 0) {
+        if (mat_fun_triangular_confluent_sum_paths(out, T, start, next, end, next_prod, nodes, depth + 1, scalar_f) !=
+            0) {
             num_destroy(&next_prod);
             num_destroy(&lam_next);
             num_destroy(&tij);
@@ -3436,10 +3444,7 @@ static int mat_fun_triangular_confluent_sum_paths(number_t *out,
     return 0;
 }
 
-static int mat_fun_triangular_confluent_fallback(number_t *out,
-                                                 const matrix_t *T,
-                                                 size_t i,
-                                                 size_t j,
+static int mat_fun_triangular_confluent_fallback(number_t *out, const matrix_t *T, size_t i, size_t j,
                                                  void (*scalar_f)(void *out, const void *in))
 {
     const struct elem_vtable *e = T->elem;
@@ -3461,8 +3466,7 @@ static int mat_fun_triangular_confluent_fallback(number_t *out,
     nodes[0] = mat_raw_value_to_number(e, raw);
     {
         number_t edge_prod = num_clone(NUM_ONE);
-        if (mat_fun_triangular_confluent_sum_paths(out, T, i, i, j, edge_prod,
-                                                   nodes, 1, scalar_f) != 0) {
+        if (mat_fun_triangular_confluent_sum_paths(out, T, i, i, j, edge_prod, nodes, 1, scalar_f) != 0) {
             num_destroy(&edge_prod);
             num_array_destroy(nodes, j - i + 1);
             free(nodes);
@@ -3476,8 +3480,7 @@ static int mat_fun_triangular_confluent_fallback(number_t *out,
     return 0;
 }
 
-matrix_t *mat_fun_triangular(const matrix_t *T,
-                             void (*scalar_f)(void *out, const void *in))
+matrix_t *mat_fun_triangular(const matrix_t *T, void (*scalar_f)(void *out, const void *in))
 {
     if (!T || !scalar_f)
         return NULL;
@@ -3488,10 +3491,14 @@ matrix_t *mat_fun_triangular(const matrix_t *T,
     size_t n = T->rows;
     const struct elem_vtable *e = T->elem;
 
-    unsigned char t_ii[MATRIX_SCALAR_STORAGE_BYTES] = {0}, t_jj[MATRIX_SCALAR_STORAGE_BYTES] = {0}, t_ij[MATRIX_SCALAR_STORAGE_BYTES] = {0};
-    unsigned char f_ii[MATRIX_SCALAR_STORAGE_BYTES] = {0}, f_jj[MATRIX_SCALAR_STORAGE_BYTES] = {0}, f_ij[MATRIX_SCALAR_STORAGE_BYTES] = {0};
-    unsigned char num[MATRIX_SCALAR_STORAGE_BYTES] = {0}, tmp[MATRIX_SCALAR_STORAGE_BYTES] = {0}, sum[MATRIX_SCALAR_STORAGE_BYTES] = {0};
-    unsigned char t_ik[MATRIX_SCALAR_STORAGE_BYTES] = {0}, t_kj[MATRIX_SCALAR_STORAGE_BYTES] = {0}, f_ik[MATRIX_SCALAR_STORAGE_BYTES] = {0}, f_kj[MATRIX_SCALAR_STORAGE_BYTES] = {0};
+    unsigned char t_ii[MATRIX_SCALAR_STORAGE_BYTES] = {0}, t_jj[MATRIX_SCALAR_STORAGE_BYTES] = {0},
+                  t_ij[MATRIX_SCALAR_STORAGE_BYTES] = {0};
+    unsigned char f_ii[MATRIX_SCALAR_STORAGE_BYTES] = {0}, f_jj[MATRIX_SCALAR_STORAGE_BYTES] = {0},
+                  f_ij[MATRIX_SCALAR_STORAGE_BYTES] = {0};
+    unsigned char num[MATRIX_SCALAR_STORAGE_BYTES] = {0}, tmp[MATRIX_SCALAR_STORAGE_BYTES] = {0},
+                  sum[MATRIX_SCALAR_STORAGE_BYTES] = {0};
+    unsigned char t_ik[MATRIX_SCALAR_STORAGE_BYTES] = {0}, t_kj[MATRIX_SCALAR_STORAGE_BYTES] = {0},
+                  f_ik[MATRIX_SCALAR_STORAGE_BYTES] = {0}, f_kj[MATRIX_SCALAR_STORAGE_BYTES] = {0};
     unsigned char denom[MATRIX_SCALAR_STORAGE_BYTES] = {0}, inv_denom[MATRIX_SCALAR_STORAGE_BYTES] = {0};
 
     bool all_diag_equal = true;
@@ -3539,7 +3546,7 @@ matrix_t *mat_fun_triangular(const matrix_t *T,
 
     /* 2. Off-diagonal: Parlett recurrence */
     for (size_t j = 1; j < n; ++j) {
-        for (size_t i = j; i-- > 0; ) {
+        for (size_t i = j; i-- > 0;) {
             if (i == j)
                 continue;
 
@@ -3570,9 +3577,9 @@ matrix_t *mat_fun_triangular(const matrix_t *T,
             mat_get(F, i, i, f_ii);
             mat_get(F, j, j, f_jj);
 
-            e->sub(tmp, f_ii, f_jj);      /* tmp = F_ii - F_jj */
-            e->mul(num, t_ij, tmp);       /* num = T_ij * (F_ii - F_jj) */
-            e->add(num, num, sum);        /* num += sum */
+            e->sub(tmp, f_ii, f_jj); /* tmp = F_ii - F_jj */
+            e->mul(num, t_ij, tmp);  /* num = T_ij * (F_ii - F_jj) */
+            e->add(num, num, sum);   /* num += sum */
 
             /* Handle T_ii == T_jj: avoid 0/0 */
             if (e->cmp(denom, e->zero) == 0) {

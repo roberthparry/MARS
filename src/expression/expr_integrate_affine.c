@@ -5,9 +5,7 @@
 
 static bool is_wrt_square_power(const expr_t *expr, const expr_t *wrt);
 
-static bool match_wrt_monomial_degree(const expr_t *expr,
-                                      const expr_t *wrt,
-                                      unsigned int *degree_out)
+static bool match_wrt_monomial_degree(const expr_t *expr, const expr_t *wrt, unsigned int *degree_out)
 {
     if (!expr || !wrt || !degree_out)
         return false;
@@ -25,12 +23,8 @@ static bool match_wrt_monomial_degree(const expr_t *expr,
     return false;
 }
 
-static bool match_symbolic_affine_power_factor(const expr_t *expr,
-                                               const expr_t *wrt,
-                                               expr_t **base_out,
-                                               expr_t **constant_out,
-                                               expr_t **coeff_out,
-                                               number_t *exponent_out)
+static bool match_symbolic_affine_power_factor(const expr_t *expr, const expr_t *wrt, expr_t **base_out,
+                                               expr_t **constant_out, expr_t **coeff_out, number_t *exponent_out)
 {
     number_t exponent = num_new();
     const expr_t *base = NULL;
@@ -68,8 +62,7 @@ static bool match_symbolic_affine_power_factor(const expr_t *expr,
                 *exponent_out = num_clone(expr->c);
             }
         }
-    } else if (expr->ops && expr->ops->kind == EXPR_KIND_POW &&
-               expr->a && expr->b &&
+    } else if (expr->ops && expr->ops->kind == EXPR_KIND_POW && expr->a && expr->b &&
                expr_match_const_value(expr->b, &exponent)) {
         base = expr->a;
         ok = match_symbolic_affine_constant_and_coeff(base, wrt, &constant, &coeff);
@@ -112,9 +105,7 @@ static bool match_symbolic_affine_power_factor(const expr_t *expr,
     return ok;
 }
 
-static bool match_symbolic_constant_plus_minus_wrt(const expr_t *expr,
-                                                   const expr_t *wrt,
-                                                   expr_t **constant_out,
+static bool match_symbolic_constant_plus_minus_wrt(const expr_t *expr, const expr_t *wrt, expr_t **constant_out,
                                                    bool *is_minus_out)
 {
     if (!expr || !wrt || !constant_out || !is_minus_out)
@@ -143,9 +134,7 @@ static bool match_symbolic_constant_plus_minus_wrt(const expr_t *expr,
         }
     }
 
-    if (expr_is_op(expr, &ops_sub) &&
-        !depends_on_wrt(expr->a, wrt) &&
-        is_wrt_symbolic_affine_leaf(expr->b, wrt)) {
+    if (expr_is_op(expr, &ops_sub) && !depends_on_wrt(expr->a, wrt) && is_wrt_symbolic_affine_leaf(expr->b, wrt)) {
         *constant_out = expr_clone(expr->a);
         *is_minus_out = true;
         return *constant_out != NULL;
@@ -154,16 +143,12 @@ static bool match_symbolic_constant_plus_minus_wrt(const expr_t *expr,
     return false;
 }
 
-static bool match_symbolic_wrt_minus_constant(const expr_t *expr,
-                                              const expr_t *wrt,
-                                              expr_t **constant_out)
+static bool match_symbolic_wrt_minus_constant(const expr_t *expr, const expr_t *wrt, expr_t **constant_out)
 {
     if (!expr || !wrt || !constant_out)
         return false;
 
-    if (expr_is_op(expr, &ops_sub) &&
-        is_wrt_symbolic_affine_leaf(expr->a, wrt) &&
-        !depends_on_wrt(expr->b, wrt)) {
+    if (expr_is_op(expr, &ops_sub) && is_wrt_symbolic_affine_leaf(expr->a, wrt) && !depends_on_wrt(expr->b, wrt)) {
         *constant_out = expr_clone(expr->b);
         return *constant_out != NULL;
     }
@@ -171,10 +156,8 @@ static bool match_symbolic_wrt_minus_constant(const expr_t *expr,
     return false;
 }
 
-bool match_symbolic_affine_constant_and_coeff(const expr_t *expr,
-                                                     const expr_t *wrt,
-                                                     expr_t **constant_term_out,
-                                                     expr_t **coeff_out)
+bool match_symbolic_affine_constant_and_coeff(const expr_t *expr, const expr_t *wrt, expr_t **constant_term_out,
+                                              expr_t **coeff_out)
 {
     const expr_t *left = NULL;
     const expr_t *right = NULL;
@@ -200,8 +183,7 @@ bool match_symbolic_affine_constant_and_coeff(const expr_t *expr,
 
     coeff = match_symbolic_wrt_factor_coeff(left, wrt);
     if (coeff && !depends_on_wrt(right, wrt)) {
-        *constant_term_out = is_sub ? expr_negate_owned(expr_clone(right))
-                                    : expr_clone(right);
+        *constant_term_out = is_sub ? expr_negate_owned(expr_clone(right)) : expr_clone(right);
         if (!*constant_term_out) {
             expr_free(coeff);
             return false;
@@ -231,13 +213,10 @@ static bool symbolic_depends_on_wrt_leaf(const expr_t *expr, const expr_t *wrt)
         return false;
     if (is_wrt_symbolic_affine_leaf(expr, wrt))
         return true;
-    return symbolic_depends_on_wrt_leaf(expr->a, wrt) ||
-           symbolic_depends_on_wrt_leaf(expr->b, wrt);
+    return symbolic_depends_on_wrt_leaf(expr->a, wrt) || symbolic_depends_on_wrt_leaf(expr->b, wrt);
 }
 
-static bool match_symbolic_wrt_monomial_coeff_rec(const expr_t *expr,
-                                                  const expr_t *wrt,
-                                                  unsigned int *degree_out,
+static bool match_symbolic_wrt_monomial_coeff_rec(const expr_t *expr, const expr_t *wrt, unsigned int *degree_out,
                                                   expr_t **coeff_out)
 {
     const expr_t *left = NULL;
@@ -285,8 +264,7 @@ static bool match_symbolic_wrt_monomial_coeff_rec(const expr_t *expr,
         return *coeff_out != NULL;
     }
 
-    if (expr_is_op(expr, &ops_div) && expr->a && expr->b &&
-        !symbolic_depends_on_wrt_leaf(expr->b, wrt)) {
+    if (expr_is_op(expr, &ops_div) && expr->a && expr->b && !symbolic_depends_on_wrt_leaf(expr->b, wrt)) {
         if (!match_symbolic_wrt_monomial_coeff_rec(expr->a, wrt, degree_out, &left_coeff))
             return false;
         right_coeff = expr_clone(expr->b);
@@ -306,9 +284,7 @@ static bool match_symbolic_wrt_monomial_coeff_rec(const expr_t *expr,
     return false;
 }
 
-static bool match_symbolic_wrt_monomial_coeff(const expr_t *expr,
-                                              const expr_t *wrt,
-                                              unsigned int degree,
+static bool match_symbolic_wrt_monomial_coeff(const expr_t *expr, const expr_t *wrt, unsigned int degree,
                                               expr_t **coeff_out)
 {
     unsigned int matched_degree = 0u;
@@ -317,8 +293,7 @@ static bool match_symbolic_wrt_monomial_coeff(const expr_t *expr,
     if (!expr || !wrt || !coeff_out)
         return false;
 
-    if (!match_symbolic_wrt_monomial_coeff_rec(expr, wrt, &matched_degree, &coeff) ||
-        matched_degree != degree) {
+    if (!match_symbolic_wrt_monomial_coeff_rec(expr, wrt, &matched_degree, &coeff) || matched_degree != degree) {
         expr_free(coeff);
         return false;
     }
@@ -339,12 +314,8 @@ static bool add_quadratic_coeff_term(expr_t **slot, expr_t *term)
     return *slot != NULL;
 }
 
-static bool collect_symbolic_quadratic_coeffs(const expr_t *expr,
-                                              const expr_t *wrt,
-                                              bool negate,
-                                              expr_t **quad_io,
-                                              expr_t **linear_io,
-                                              expr_t **constant_io)
+static bool collect_symbolic_quadratic_coeffs(const expr_t *expr, const expr_t *wrt, bool negate, expr_t **quad_io,
+                                              expr_t **linear_io, expr_t **constant_io)
 {
     const expr_t *left = NULL;
     const expr_t *right = NULL;
@@ -355,15 +326,12 @@ static bool collect_symbolic_quadratic_coeffs(const expr_t *expr,
         return false;
 
     if (expr_match_add_sub_expr(expr, &left, &right, &is_sub)) {
-        return collect_symbolic_quadratic_coeffs(left, wrt, negate,
-                                                 quad_io, linear_io, constant_io) &&
-               collect_symbolic_quadratic_coeffs(right, wrt, negate ^ is_sub,
-                                                 quad_io, linear_io, constant_io);
+        return collect_symbolic_quadratic_coeffs(left, wrt, negate, quad_io, linear_io, constant_io) &&
+               collect_symbolic_quadratic_coeffs(right, wrt, negate ^ is_sub, quad_io, linear_io, constant_io);
     }
 
     if (expr_is_neg(expr))
-        return collect_symbolic_quadratic_coeffs(expr->a, wrt, !negate,
-                                                 quad_io, linear_io, constant_io);
+        return collect_symbolic_quadratic_coeffs(expr->a, wrt, !negate, quad_io, linear_io, constant_io);
 
     if (match_symbolic_wrt_monomial_coeff(expr, wrt, 2u, &term)) {
         if (negate)
@@ -387,10 +355,7 @@ static bool collect_symbolic_quadratic_coeffs(const expr_t *expr,
     return false;
 }
 
-bool match_symbolic_quadratic_coeffs(const expr_t *expr,
-                                     const expr_t *wrt,
-                                     expr_t **quad_out,
-                                     expr_t **linear_out,
+bool match_symbolic_quadratic_coeffs(const expr_t *expr, const expr_t *wrt, expr_t **quad_out, expr_t **linear_out,
                                      expr_t **constant_out)
 {
     expr_t *quad = NULL;
@@ -407,8 +372,7 @@ bool match_symbolic_quadratic_coeffs(const expr_t *expr,
     if (!quad || !linear || !constant)
         goto cleanup;
 
-    if (!collect_symbolic_quadratic_coeffs(expr, wrt, false, &quad, &linear, &constant) ||
-        expr_is_exact_zero(quad))
+    if (!collect_symbolic_quadratic_coeffs(expr, wrt, false, &quad, &linear, &constant) || expr_is_exact_zero(quad))
         goto cleanup;
 
     *quad_out = quad;
@@ -444,12 +408,10 @@ expr_t *integrate_sqrt_wrt_over_symbolic_unit_affine(const expr_t *base, const e
     if (!base || !wrt)
         goto cleanup;
 
-    if (expr_is_op(base, &ops_div) &&
-        is_wrt_symbolic_affine_leaf(base->a, wrt) &&
+    if (expr_is_op(base, &ops_div) && is_wrt_symbolic_affine_leaf(base->a, wrt) &&
         match_symbolic_constant_plus_minus_wrt(base->b, wrt, &constant, &is_minus)) {
         denom = expr_clone(base->b);
-    } else if (expr_is_op(base, &ops_div) &&
-               is_negated_wrt_symbolic_affine_leaf(base->a, wrt) &&
+    } else if (expr_is_op(base, &ops_div) && is_negated_wrt_symbolic_affine_leaf(base->a, wrt) &&
                match_symbolic_wrt_minus_constant(base->b, wrt, &constant)) {
         tmp_left = expr_clone(constant);
         tmp_right = expr_clone(wrt);
@@ -459,9 +421,7 @@ expr_t *integrate_sqrt_wrt_over_symbolic_unit_affine(const expr_t *base, const e
         tmp_right = NULL;
         tmp_left = NULL;
         is_minus = true;
-    } else if (expr_is_neg(base) &&
-               expr_is_op(base->a, &ops_div) &&
-               is_wrt_symbolic_affine_leaf(base->a->a, wrt) &&
+    } else if (expr_is_neg(base) && expr_is_op(base->a, &ops_div) && is_wrt_symbolic_affine_leaf(base->a->a, wrt) &&
                match_symbolic_wrt_minus_constant(base->a->b, wrt, &constant)) {
         tmp_left = expr_clone(constant);
         tmp_right = expr_clone(wrt);
@@ -533,9 +493,8 @@ expr_t *integrate_wrt_over_symbolic_affine_root(const expr_t *expr, const expr_t
     expr_t *three = expr_from_string("{ 3 }", NULL);
     expr_t *two = expr_from_string("{ 2 }", NULL);
 
-    if (!expr || !wrt || !expr->a || !expr->b ||
-        !is_wrt_symbolic_affine_leaf(expr->a, wrt) ||
-        !expr->b->ops || expr->b->ops->kind != EXPR_KIND_SQRT || !expr->b->a ||
+    if (!expr || !wrt || !expr->a || !expr->b || !is_wrt_symbolic_affine_leaf(expr->a, wrt) || !expr->b->ops ||
+        expr->b->ops->kind != EXPR_KIND_SQRT || !expr->b->a ||
         !match_symbolic_affine_constant_and_coeff(expr->b->a, wrt, &constant_term, &coeff))
         goto cleanup;
 
@@ -651,8 +610,7 @@ expr_t *integrate_symbolic_monomial_times_affine_power(const expr_t *expr, const
         next3 = num_add(next2, NUM_ONE);
     }
 
-    if (num_eq(next1, NUM_ZERO) || num_eq(next2, NUM_ZERO) ||
-        (degree == 2u && num_eq(next3, NUM_ZERO)))
+    if (num_eq(next1, NUM_ZERO) || num_eq(next2, NUM_ZERO) || (degree == 2u && num_eq(next3, NUM_ZERO)))
         goto cleanup;
 
     tmp_left = expr_clone(coeff);
@@ -782,14 +740,11 @@ static bool match_square_power_base(const expr_t *expr, const expr_t **base_out)
         return false;
     }
 
-    if (expr->ops && expr->ops->kind == EXPR_KIND_POW_D &&
-        expr->a && num_eq(expr->c, NUM_TWO)) {
+    if (expr->ops && expr->ops->kind == EXPR_KIND_POW_D && expr->a && num_eq(expr->c, NUM_TWO)) {
         *base_out = expr->a;
         ok = true;
-    } else if (expr->ops && expr->ops->kind == EXPR_KIND_POW &&
-               expr->a && expr->b &&
-               expr_match_const_value(expr->b, &exponent) &&
-               num_eq(exponent, NUM_TWO)) {
+    } else if (expr->ops && expr->ops->kind == EXPR_KIND_POW && expr->a && expr->b &&
+               expr_match_const_value(expr->b, &exponent) && num_eq(exponent, NUM_TWO)) {
         *base_out = expr->a;
         ok = true;
     }
@@ -802,8 +757,7 @@ static bool is_wrt_square_power(const expr_t *expr, const expr_t *wrt)
 {
     const expr_t *base = NULL;
 
-    return match_square_power_base(expr, &base) &&
-           is_wrt_symbolic_affine_leaf(base, wrt);
+    return match_square_power_base(expr, &base) && is_wrt_symbolic_affine_leaf(base, wrt);
 }
 
 static bool is_negated_wrt_square_power(const expr_t *expr, const expr_t *wrt)
@@ -811,9 +765,7 @@ static bool is_negated_wrt_square_power(const expr_t *expr, const expr_t *wrt)
     return expr && expr_is_neg(expr) && is_wrt_square_power(expr->a, wrt);
 }
 
-static bool match_symbolic_constant_square_power(const expr_t *expr,
-                                                 const expr_t *wrt,
-                                                 expr_t **base_out)
+static bool match_symbolic_constant_square_power(const expr_t *expr, const expr_t *wrt, expr_t **base_out)
 {
     const expr_t *base = NULL;
 
@@ -827,17 +779,12 @@ static bool match_symbolic_constant_square_power(const expr_t *expr,
     return *base_out != NULL;
 }
 
-static bool match_negated_symbolic_constant_square_power(const expr_t *expr,
-                                                         const expr_t *wrt,
-                                                         expr_t **base_out)
+static bool match_negated_symbolic_constant_square_power(const expr_t *expr, const expr_t *wrt, expr_t **base_out)
 {
-    return expr && expr_is_neg(expr) &&
-           match_symbolic_constant_square_power(expr->a, wrt, base_out);
+    return expr && expr_is_neg(expr) && match_symbolic_constant_square_power(expr->a, wrt, base_out);
 }
 
-static bool match_symbolic_square_family(const expr_t *expr,
-                                         const expr_t *wrt,
-                                         expr_t **param_out,
+static bool match_symbolic_square_family(const expr_t *expr, const expr_t *wrt, expr_t **param_out,
                                          symbolic_square_family_kind_t *kind_out)
 {
     const expr_t *left = NULL;
@@ -877,42 +824,32 @@ static bool match_symbolic_square_family(const expr_t *expr,
     param = NULL;
 
     if (!is_sub) {
-        if (left_wrt &&
-            match_symbolic_constant_square_power(right, wrt, &param)) {
+        if (left_wrt && match_symbolic_constant_square_power(right, wrt, &param)) {
             *param_out = param;
             *kind_out = SYMBOLIC_SQUARE_PLUS;
             return true;
         }
-        if (right_wrt &&
-            match_symbolic_constant_square_power(left, wrt, &param)) {
+        if (right_wrt && match_symbolic_constant_square_power(left, wrt, &param)) {
             *param_out = param;
             *kind_out = SYMBOLIC_SQUARE_PLUS;
             return true;
         }
-        if (left_const &&
-            right_neg_wrt &&
-            match_symbolic_constant_square_power(left, wrt, &param)) {
+        if (left_const && right_neg_wrt && match_symbolic_constant_square_power(left, wrt, &param)) {
             *param_out = param;
             *kind_out = SYMBOLIC_SQUARE_A2_MINUS_X2;
             return true;
         }
-        if (left_wrt &&
-            right_neg_const &&
-            match_negated_symbolic_constant_square_power(right, wrt, &param)) {
+        if (left_wrt && right_neg_const && match_negated_symbolic_constant_square_power(right, wrt, &param)) {
             *param_out = param;
             *kind_out = SYMBOLIC_SQUARE_X2_MINUS_A2;
             return true;
         }
-        if (right_const &&
-            left_neg_wrt &&
-            match_symbolic_constant_square_power(right, wrt, &param)) {
+        if (right_const && left_neg_wrt && match_symbolic_constant_square_power(right, wrt, &param)) {
             *param_out = param;
             *kind_out = SYMBOLIC_SQUARE_A2_MINUS_X2;
             return true;
         }
-        if (right_wrt &&
-            left_neg_const &&
-            match_negated_symbolic_constant_square_power(left, wrt, &param)) {
+        if (right_wrt && left_neg_const && match_negated_symbolic_constant_square_power(left, wrt, &param)) {
             *param_out = param;
             *kind_out = SYMBOLIC_SQUARE_X2_MINUS_A2;
             return true;
@@ -920,19 +857,15 @@ static bool match_symbolic_square_family(const expr_t *expr,
         return false;
     }
 
-    if (left_const &&
-        right_wrt &&
-        match_symbolic_constant_square_power(left, wrt, &param)) {
-            *param_out = param;
-            *kind_out = SYMBOLIC_SQUARE_A2_MINUS_X2;
-            return true;
+    if (left_const && right_wrt && match_symbolic_constant_square_power(left, wrt, &param)) {
+        *param_out = param;
+        *kind_out = SYMBOLIC_SQUARE_A2_MINUS_X2;
+        return true;
     }
     expr_free(param);
     param = NULL;
 
-    if (left_wrt &&
-        right_const &&
-        match_symbolic_constant_square_power(right, wrt, &param)) {
+    if (left_wrt && right_const && match_symbolic_constant_square_power(right, wrt, &param)) {
         *param_out = param;
         *kind_out = SYMBOLIC_SQUARE_X2_MINUS_A2;
         return true;
@@ -1014,9 +947,7 @@ expr_t *integrate_symbolic_square_family_root(const expr_t *quadratic, const exp
         log_term = sum ? expr_log(sum) : NULL;
         second = (param_sq && log_term) ? expr_mul(param_sq, log_term) : NULL;
         second = second ? mul_number_owned(second, NUM_HALF) : NULL;
-        out = simplify_owned(first
-            ? expr_add_owned(first, expr_negate_owned(second))
-            : NULL);
+        out = simplify_owned(first ? expr_add_owned(first, expr_negate_owned(second)) : NULL);
         first = NULL;
         second = NULL;
         expr_free(log_term);
@@ -1050,8 +981,7 @@ expr_t *integrate_symbolic_square_family_inverse_root(const expr_t *expr, const 
     number_t one = num_clone(NUM_ONE);
     expr_t *out = NULL;
 
-    if (!expr || !wrt || !expr->a || !expr->b ||
-        !expr_match_const_value(expr->a, &one) || !num_eq(one, NUM_ONE) ||
+    if (!expr || !wrt || !expr->a || !expr->b || !expr_match_const_value(expr->a, &one) || !num_eq(one, NUM_ONE) ||
         !expr->b->ops || expr->b->ops->kind != EXPR_KIND_SQRT || !expr->b->a ||
         !match_symbolic_square_family(expr->b->a, wrt, &param, &kind))
         goto cleanup;
@@ -1106,9 +1036,8 @@ expr_t *integrate_symbolic_square_family_wrt_over_root(const expr_t *expr, const
     expr_t *root_arg = NULL;
     expr_t *out = NULL;
 
-    if (!expr || !wrt || !expr->a || !expr->b ||
-        !is_wrt_symbolic_affine_leaf(expr->a, wrt) ||
-        !expr->b->ops || expr->b->ops->kind != EXPR_KIND_SQRT || !expr->b->a ||
+    if (!expr || !wrt || !expr->a || !expr->b || !is_wrt_symbolic_affine_leaf(expr->a, wrt) || !expr->b->ops ||
+        expr->b->ops->kind != EXPR_KIND_SQRT || !expr->b->a ||
         !match_symbolic_square_family(expr->b->a, wrt, &param, &kind))
         goto cleanup;
 

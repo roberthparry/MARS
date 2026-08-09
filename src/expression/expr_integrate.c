@@ -17,51 +17,54 @@ typedef struct expr_integrate_dispatch_rule {
 } expr_integrate_dispatch_rule_t;
 
 static const expr_integrate_dispatch_rule_t integrate_dispatch_rules[EXPR_KIND_COUNT] = {
-    [EXPR_KIND_CONST]         = { .structural = integrate_constant_rule },
-    [EXPR_KIND_VAR]           = { .structural = integrate_var_rule },
-    [EXPR_KIND_ADD]           = { .structural = integrate_add_rule },
-    [EXPR_KIND_SUB]           = { .structural = integrate_sub_rule },
-    [EXPR_KIND_NEG]           = { .structural = integrate_neg_rule },
-    [EXPR_KIND_MUL]           = { .structural = integrate_mul_rule },
-    [EXPR_KIND_DIV]           = { .structural = integrate_div_rule },
-    [EXPR_KIND_POW]           = { .structural = integrate_pow_rule },
-    [EXPR_KIND_POW_D]         = { .structural = integrate_pow_d_rule },
-    [EXPR_KIND_SQRT]          = { .primitive  = integrate_sqrt_rule },
-    [EXPR_KIND_LOG]           = { .primitive  = integrate_log_rule },
-    [EXPR_KIND_LOG10]         = { .primitive  = integrate_log10_rule },
-    [EXPR_KIND_EXP]           = { .primitive  = integrate_exp_rule },
-    [EXPR_KIND_SIN]           = { .primitive  = integrate_sin_rule },
-    [EXPR_KIND_COS]           = { .primitive  = integrate_cos_rule },
-    [EXPR_KIND_TAN]           = { .primitive  = integrate_tan_rule },
-    [EXPR_KIND_SEC]           = { .primitive  = integrate_sec_rule },
-    [EXPR_KIND_COSEC]         = { .primitive  = integrate_cosec_rule },
-    [EXPR_KIND_COT]           = { .primitive  = integrate_cot_rule },
-    [EXPR_KIND_SINH]          = { .primitive  = integrate_sinh_rule },
-    [EXPR_KIND_COSH]          = { .primitive  = integrate_cosh_rule },
-    [EXPR_KIND_COSECH]        = { .primitive  = integrate_cosech_rule },
-    [EXPR_KIND_TANH]          = { .primitive  = integrate_tanh_rule },
-    [EXPR_KIND_SECH]          = { .primitive  = integrate_sech_rule },
-    [EXPR_KIND_COTH]          = { .primitive  = integrate_coth_rule },
-    [EXPR_KIND_ASIN]          = { .primitive  = integrate_asin_rule },
-    [EXPR_KIND_ACOS]          = { .primitive  = integrate_acos_rule },
-    [EXPR_KIND_ATAN]          = { .primitive  = integrate_atan_rule },
-    [EXPR_KIND_ASEC]          = { .primitive  = integrate_asec_rule },
-    [EXPR_KIND_ACOSEC]        = { .primitive  = integrate_acosec_rule },
-    [EXPR_KIND_ACOT]          = { .primitive  = integrate_acot_rule },
-    [EXPR_KIND_ASINH]         = { .primitive  = integrate_asinh_rule },
-    [EXPR_KIND_ACOSH]         = { .primitive  = integrate_acosh_rule },
-    [EXPR_KIND_ATANH]         = { .primitive  = integrate_atanh_rule },
-    [EXPR_KIND_ASECH]         = { .primitive  = integrate_asech_rule },
-    [EXPR_KIND_ACOSECH]       = { .primitive  = integrate_acosech_rule },
-    [EXPR_KIND_ACOTH]         = { .primitive  = integrate_acoth_rule },
-    [EXPR_KIND_ERF]           = { .primitive  = integrate_erf_rule },
-    [EXPR_KIND_ERFC]          = { .primitive  = integrate_erfc_rule },
-    [EXPR_KIND_NORMAL_PDF]    = { .primitive  = integrate_normal_pdf_rule },
-    [EXPR_KIND_NORMAL_CDF]    = { .primitive  = integrate_normal_cdf_rule },
-    [EXPR_KIND_NORMAL_LOGPDF] = { .primitive  = integrate_normal_logpdf_rule },
-    [EXPR_KIND_EI]            = { .primitive  = integrate_ei_rule },
-    [EXPR_KIND_E1]            = { .primitive  = integrate_e1_rule }
-};
+    [EXPR_KIND_CONST] = {.structural = integrate_constant_rule},
+    [EXPR_KIND_VAR] = {.structural = integrate_var_rule},
+    [EXPR_KIND_ADD] = {.structural = integrate_add_rule},
+    [EXPR_KIND_SUB] = {.structural = integrate_sub_rule},
+    [EXPR_KIND_NEG] = {.structural = integrate_neg_rule},
+    [EXPR_KIND_MUL] = {.structural = integrate_mul_rule},
+    [EXPR_KIND_DIV] = {.structural = integrate_div_rule},
+    [EXPR_KIND_POW] = {.structural = integrate_pow_rule},
+    [EXPR_KIND_POW_D] = {.structural = integrate_pow_d_rule},
+    [EXPR_KIND_SQRT] = {.primitive = integrate_sqrt_rule},
+    [EXPR_KIND_LOG] = {.primitive = integrate_log_rule},
+    [EXPR_KIND_LOG10] = {.primitive = integrate_log10_rule},
+    [EXPR_KIND_EXP] = {.primitive = integrate_exp_rule},
+    [EXPR_KIND_SIN] = {.primitive = integrate_sin_rule},
+    [EXPR_KIND_COS] = {.primitive = integrate_cos_rule},
+    [EXPR_KIND_TAN] = {.primitive = integrate_tan_rule},
+    [EXPR_KIND_SEC] = {.primitive = integrate_sec_rule},
+    [EXPR_KIND_COSEC] = {.primitive = integrate_cosec_rule},
+    [EXPR_KIND_COT] = {.primitive = integrate_cot_rule},
+    [EXPR_KIND_SINH] = {.primitive = integrate_sinh_rule},
+    [EXPR_KIND_COSH] = {.primitive = integrate_cosh_rule},
+    [EXPR_KIND_COSECH] = {.primitive = integrate_cosech_rule},
+    [EXPR_KIND_TANH] = {.primitive = integrate_tanh_rule},
+    [EXPR_KIND_SECH] = {.primitive = integrate_sech_rule},
+    [EXPR_KIND_COTH] = {.primitive = integrate_coth_rule},
+    [EXPR_KIND_ASIN] = {.primitive = integrate_asin_rule},
+    [EXPR_KIND_ACOS] = {.primitive = integrate_acos_rule},
+    [EXPR_KIND_ATAN] = {.primitive = integrate_atan_rule},
+    [EXPR_KIND_ASEC] = {.primitive = integrate_asec_rule},
+    [EXPR_KIND_ACOSEC] = {.primitive = integrate_acosec_rule},
+    [EXPR_KIND_ACOT] = {.primitive = integrate_acot_rule},
+    [EXPR_KIND_ASINH] = {.primitive = integrate_asinh_rule},
+    [EXPR_KIND_ACOSH] = {.primitive = integrate_acosh_rule},
+    [EXPR_KIND_ATANH] = {.primitive = integrate_atanh_rule},
+    [EXPR_KIND_ASECH] = {.primitive = integrate_asech_rule},
+    [EXPR_KIND_ACOSECH] = {.primitive = integrate_acosech_rule},
+    [EXPR_KIND_ACOTH] = {.primitive = integrate_acoth_rule},
+    [EXPR_KIND_ERF] = {.primitive = integrate_erf_rule},
+    [EXPR_KIND_ERFC] = {.primitive = integrate_erfc_rule},
+    [EXPR_KIND_NORMAL_PDF] = {.primitive = integrate_normal_pdf_rule},
+    [EXPR_KIND_NORMAL_CDF] = {.primitive = integrate_normal_cdf_rule},
+    [EXPR_KIND_NORMAL_LOGPDF] = {.primitive = integrate_normal_logpdf_rule},
+    [EXPR_KIND_EI] = {.primitive = integrate_ei_rule},
+    [EXPR_KIND_E1] = {.primitive = integrate_e1_rule},
+    [EXPR_KIND_BESSEL_J] = {.primitive = integrate_bessel_j_rule},
+    [EXPR_KIND_BESSEL_Y] = {.primitive = integrate_bessel_y_rule},
+    [EXPR_KIND_LOMMEL_S] = {.primitive = integrate_lommel_s_rule},
+    [EXPR_KIND_HYPERGEOMETRIC_PFQ] = {.primitive = integrate_hypergeometric_pFq_rule}};
 
 static const expr_integrate_dispatch_rule_t *integrate_dispatch_rule_for_kind(expr_op_kind_t kind)
 {
@@ -74,13 +77,10 @@ static int expr_var_matches_local(const expr_t *left, const expr_t *right)
 {
     if (!left || !right || !expr_is_var(left) || !expr_is_var(right))
         return 0;
-    return left == right ||
-           (left->var_id != 0u && left->var_id == right->var_id);
+    return left == right || (left->var_id != 0u && left->var_id == right->var_id);
 }
 
-static int expr_is_bound_in_var_list_local(const expr_t *expr,
-                                           size_t nvars,
-                                           expr_t *const *vars)
+static int expr_is_bound_in_var_list_local(const expr_t *expr, size_t nvars, expr_t *const *vars)
 {
     size_t i;
 
@@ -94,25 +94,19 @@ static int expr_is_bound_in_var_list_local(const expr_t *expr,
     return 0;
 }
 
-static bool expr_integrate_positive_small_integer_local(number_t value,
-                                                        unsigned int *out)
+static bool expr_integrate_positive_small_integer_local(number_t value, unsigned int *out)
 {
     long numerator;
     long denominator;
 
-    if (!out ||
-        !num_get_small_rational(value, &numerator, &denominator) ||
-        denominator != 1L ||
-        numerator <= 0L ||
+    if (!out || !num_get_small_rational(value, &numerator, &denominator) || denominator != 1L || numerator <= 0L ||
         numerator > 64L)
         return false;
     *out = (unsigned int)numerator;
     return true;
 }
 
-static bool expr_integrate_poly_degree_local(const expr_t *expr,
-                                             const expr_t *var,
-                                             unsigned int max_degree,
+static bool expr_integrate_poly_degree_local(const expr_t *expr, const expr_t *var, unsigned int max_degree,
                                              unsigned int *degree_out)
 {
     expr_t *vars[1];
@@ -131,8 +125,7 @@ static bool expr_integrate_poly_degree_local(const expr_t *expr,
         goto cleanup;
 
     vars[0] = (expr_t *)var;
-    if (expr_match_var_expr(expr, 1u, vars, &var_index) &&
-        var_index == 0u) {
+    if (expr_match_var_expr(expr, 1u, vars, &var_index) && var_index == 0u) {
         *degree_out = 1u;
         ok = max_degree >= 1u;
         goto cleanup;
@@ -145,34 +138,26 @@ static bool expr_integrate_poly_degree_local(const expr_t *expr,
     }
 
     if (expr_match_unary_op(expr, EXPR_KIND_NEG, &base)) {
-        ok = expr_integrate_poly_degree_local(base, var, max_degree,
-                                              degree_out);
+        ok = expr_integrate_poly_degree_local(base, var, max_degree, degree_out);
         goto cleanup;
     }
 
     if (expr_match_add_sub_expr(expr, &left, &right, &is_sub)) {
         (void)is_sub;
-        ok = expr_integrate_poly_degree_local(left, var, max_degree,
-                                              &left_degree) &&
-             expr_integrate_poly_degree_local(right, var, max_degree,
-                                              &right_degree);
+        ok = expr_integrate_poly_degree_local(left, var, max_degree, &left_degree) &&
+             expr_integrate_poly_degree_local(right, var, max_degree, &right_degree);
         if (ok) {
-            *degree_out = left_degree > right_degree ? left_degree
-                                                     : right_degree;
+            *degree_out = left_degree > right_degree ? left_degree : right_degree;
             ok = *degree_out <= max_degree;
         }
         goto cleanup;
     }
 
     if (expr_match_mul_expr(expr, &left, &right)) {
-        ok = expr_integrate_poly_degree_local(left, var, max_degree,
-                                              &left_degree) &&
-             expr_integrate_poly_degree_local(right, var, max_degree,
-                                              &right_degree);
+        ok = expr_integrate_poly_degree_local(left, var, max_degree, &left_degree) &&
+             expr_integrate_poly_degree_local(right, var, max_degree, &right_degree);
         if (ok) {
-            if (left_degree > max_degree ||
-                right_degree > max_degree ||
-                left_degree + right_degree > max_degree) {
+            if (left_degree > max_degree || right_degree > max_degree || left_degree + right_degree > max_degree) {
                 ok = false;
             } else {
                 *degree_out = left_degree + right_degree;
@@ -181,13 +166,9 @@ static bool expr_integrate_poly_degree_local(const expr_t *expr,
         goto cleanup;
     }
 
-    if (expr_match_pow_const(expr, &base, &value) &&
-        expr_integrate_positive_small_integer_local(value, &exponent) &&
-        expr_integrate_poly_degree_local(base, var, max_degree,
-                                         &left_degree) &&
-        left_degree <= max_degree &&
-        exponent <= max_degree &&
-        left_degree * exponent <= max_degree) {
+    if (expr_match_pow_const(expr, &base, &value) && expr_integrate_positive_small_integer_local(value, &exponent) &&
+        expr_integrate_poly_degree_local(base, var, max_degree, &left_degree) && left_degree <= max_degree &&
+        exponent <= max_degree && left_degree * exponent <= max_degree) {
         *degree_out = left_degree * exponent;
         ok = true;
         goto cleanup;
@@ -198,8 +179,7 @@ cleanup:
     return ok;
 }
 
-static bool expr_integrate_raw_poly_quotient_is_final_local(const expr_t *expr,
-                                                            const expr_t *wrt)
+static bool expr_integrate_raw_poly_quotient_is_final_local(const expr_t *expr, const expr_t *wrt)
 {
     const expr_t *denominator_base = NULL;
     number_t exponent = num_new();
@@ -211,9 +191,7 @@ static bool expr_integrate_raw_poly_quotient_is_final_local(const expr_t *expr,
         goto cleanup;
 
     if (!expr_match_pow_const(expr->b, &denominator_base, &exponent) ||
-        !expr_integrate_positive_small_integer_local(exponent,
-                                                    &denominator_power) ||
-        denominator_power == 0u)
+        !expr_integrate_positive_small_integer_local(exponent, &denominator_power) || denominator_power == 0u)
         goto cleanup;
 
     ok = expr_integrate_poly_degree_local(expr->a, wrt, 16u, &degree) &&
@@ -234,10 +212,7 @@ static void expr_integrate_normalize_small_rationals_local(expr_t *expr)
     expr_integrate_normalize_small_rationals_local(expr->a);
     expr_integrate_normalize_small_rationals_local(expr->b);
 
-    if (!expr_is_const(expr) ||
-        expr->refcount != 1 ||
-        !num_is_real(expr->c) ||
-        !num_is_finite(expr->c))
+    if (!expr_is_const(expr) || expr->refcount != 1 || !num_is_real(expr->c) || !num_is_finite(expr->c))
         return;
     value = num_to_double(expr->c);
     if (!isfinite(value))
@@ -271,11 +246,8 @@ static void expr_integrate_normalize_small_rationals_local(expr_t *expr)
     }
 }
 
-static expr_t *expr_apply_symbolic_bound_step_local(expr_t *anti,
-                                                    expr_integration_bound_kind_t kind,
-                                                    expr_t *var,
-                                                    expr_t *lo,
-                                                    expr_t *hi)
+static expr_t *expr_apply_symbolic_bound_step_local(expr_t *anti, expr_integration_bound_kind_t kind, expr_t *var,
+                                                    expr_t *lo, expr_t *hi)
 {
     expr_t *upper = NULL;
     expr_t *lower = NULL;
@@ -342,8 +314,7 @@ expr_t *expr_integrate_dispatch(const expr_t *expr, const expr_t *wrt)
     return NULL;
 }
 
-static bool expr_integrate_short_sum_local(const expr_t *expr,
-                                           size_t *term_count)
+static bool expr_integrate_short_sum_local(const expr_t *expr, size_t *term_count)
 {
     if (!expr || !term_count || *term_count > 8u)
         return false;
@@ -357,8 +328,7 @@ static bool expr_integrate_short_sum_local(const expr_t *expr,
     return *term_count <= 8u;
 }
 
-static expr_t *expr_integrate_distribute_factor_local(const expr_t *factor,
-                                                       const expr_t *sum)
+static expr_t *expr_integrate_distribute_factor_local(const expr_t *factor, const expr_t *sum)
 {
     expr_t *left;
     expr_t *right;
@@ -367,10 +337,7 @@ static expr_t *expr_integrate_distribute_factor_local(const expr_t *factor,
     if (expr_is_op(sum, &ops_add) || expr_is_op(sum, &ops_sub)) {
         left = expr_integrate_distribute_factor_local(factor, sum->a);
         right = expr_integrate_distribute_factor_local(factor, sum->b);
-        out = (left && right)
-            ? (expr_is_op(sum, &ops_add) ? expr_add(left, right)
-                                         : expr_sub(left, right))
-            : NULL;
+        out = (left && right) ? (expr_is_op(sum, &ops_add) ? expr_add(left, right) : expr_sub(left, right)) : NULL;
         expr_free(right);
         expr_free(left);
         return out;
@@ -396,8 +363,7 @@ static bool expr_integrate_plain_rational_local(const expr_t *expr)
  * integration-result normalisation rather than unrestricted product
  * expansion, which would make many otherwise compact expressions larger.
  */
-static expr_t *expr_integrate_expand_constant_sums_local(const expr_t *expr,
-                                                          const expr_t *wrt)
+static expr_t *expr_integrate_expand_constant_sums_local(const expr_t *expr, const expr_t *wrt)
 {
     expr_t *left;
     expr_t *right;
@@ -409,10 +375,7 @@ static expr_t *expr_integrate_expand_constant_sums_local(const expr_t *expr,
     if (expr_is_op(expr, &ops_add) || expr_is_op(expr, &ops_sub)) {
         left = expr_integrate_expand_constant_sums_local(expr->a, wrt);
         right = expr_integrate_expand_constant_sums_local(expr->b, wrt);
-        out = (left && right)
-            ? (expr_is_op(expr, &ops_add) ? expr_add(left, right)
-                                          : expr_sub(left, right))
-            : NULL;
+        out = (left && right) ? (expr_is_op(expr, &ops_add) ? expr_add(left, right) : expr_sub(left, right)) : NULL;
         expr_free(right);
         expr_free(left);
         return out;
@@ -438,12 +401,10 @@ static expr_t *expr_integrate_expand_constant_sums_local(const expr_t *expr,
             return NULL;
         }
 
-        if (!depends_on_wrt(left, wrt) && expr_is_addsub(right) &&
-            !expr_integrate_plain_rational_local(left)) {
+        if (!depends_on_wrt(left, wrt) && expr_is_addsub(right) && !expr_integrate_plain_rational_local(left)) {
             factor = left;
             sum = right;
-        } else if (!depends_on_wrt(right, wrt) && expr_is_addsub(left) &&
-                   !expr_integrate_plain_rational_local(right)) {
+        } else if (!depends_on_wrt(right, wrt) && expr_is_addsub(left) && !expr_integrate_plain_rational_local(right)) {
             factor = right;
             sum = left;
         }
@@ -470,31 +431,22 @@ typedef struct expr_integrate_addend_local {
     bool consumed;
 } expr_integrate_addend_local_t;
 
-static bool expr_integrate_collect_addends_local(
-    const expr_t *expr,
-    int sign,
-    expr_integrate_addend_local_t *addends,
-    size_t *count,
-    size_t capacity)
+static bool expr_integrate_collect_addends_local(const expr_t *expr, int sign, expr_integrate_addend_local_t *addends,
+                                                 size_t *count, size_t capacity)
 {
     if (!expr || !addends || !count || *count >= capacity)
         return false;
 
     if (expr_is_op(expr, &ops_add)) {
-        return expr_integrate_collect_addends_local(
-                   expr->a, sign, addends, count, capacity) &&
-               expr_integrate_collect_addends_local(
-                   expr->b, sign, addends, count, capacity);
+        return expr_integrate_collect_addends_local(expr->a, sign, addends, count, capacity) &&
+               expr_integrate_collect_addends_local(expr->b, sign, addends, count, capacity);
     }
     if (expr_is_op(expr, &ops_sub)) {
-        return expr_integrate_collect_addends_local(
-                   expr->a, sign, addends, count, capacity) &&
-               expr_integrate_collect_addends_local(
-                   expr->b, -sign, addends, count, capacity);
+        return expr_integrate_collect_addends_local(expr->a, sign, addends, count, capacity) &&
+               expr_integrate_collect_addends_local(expr->b, -sign, addends, count, capacity);
     }
     if (expr_is_op(expr, &ops_neg))
-        return expr_integrate_collect_addends_local(
-            expr->a, -sign, addends, count, capacity);
+        return expr_integrate_collect_addends_local(expr->a, -sign, addends, count, capacity);
 
     addends[*count].term = expr;
     addends[*count].sign = sign;
@@ -551,8 +503,7 @@ static const expr_t *expr_integrate_radical_factor_local(const expr_t *expr)
 
     if (!expr)
         return NULL;
-    if (expr_is_unnamed_const(expr) &&
-        (num_eq(expr->c, NUM_SQRT2) || num_eq(expr->c, NUM_SQRT3)))
+    if (expr_is_unnamed_const(expr) && (num_eq(expr->c, NUM_SQRT2) || num_eq(expr->c, NUM_SQRT3)))
         return expr;
     if (expr_is_sqrt_expr(expr))
         return expr;
@@ -569,8 +520,7 @@ static expr_t *expr_integrate_collect_common_radical_local(expr_t *coefficient)
 
     if (!factor)
         return coefficient;
-    quotient = expr_simplify_extract_common_factor_quotient(
-        coefficient, factor);
+    quotient = expr_simplify_extract_common_factor_quotient(coefficient, factor);
     if (!quotient)
         return coefficient;
     simplified = simplify_owned(quotient);
@@ -641,8 +591,7 @@ static expr_t *expr_integrate_combine_function_terms_local(const expr_t *sum)
     size_t count = 0u;
     expr_t *out = NULL;
 
-    if (!expr_integrate_collect_addends_local(
-            sum, 1, addends, &count, MAX_ADDENDS))
+    if (!expr_integrate_collect_addends_local(sum, 1, addends, &count, MAX_ADDENDS))
         return expr_retain_expr(sum);
 
     for (size_t i = 0u; i < count; ++i) {
@@ -661,14 +610,11 @@ static expr_t *expr_integrate_combine_function_terms_local(const expr_t *sum)
 
             if (addends[j].consumed)
                 continue;
-            quotient = expr_simplify_extract_common_factor_quotient(
-                addends[j].term, factor);
+            quotient = expr_simplify_extract_common_factor_quotient(addends[j].term, factor);
             if (!quotient)
                 continue;
-            quotient = expr_integrate_signed_term_local(
-                quotient, addends[j].sign);
-            coefficient_sum = expr_integrate_append_sum_local(
-                coefficient_sum, quotient);
+            quotient = expr_integrate_signed_term_local(quotient, addends[j].sign);
+            coefficient_sum = expr_integrate_append_sum_local(coefficient_sum, quotient);
             addends[j].consumed = true;
             ++matches;
         }
@@ -678,14 +624,11 @@ static expr_t *expr_integrate_combine_function_terms_local(const expr_t *sum)
             expr_t *radical_coefficient;
             expr_t *term;
 
-            radical_coefficient =
-                expr_integrate_normalize_radical_products(coefficient);
+            radical_coefficient = expr_integrate_normalize_radical_products(coefficient);
             expr_free(coefficient);
             coefficient = simplify_owned(radical_coefficient);
-            coefficient =
-                expr_integrate_collect_common_radical_local(coefficient);
-            coefficient =
-                expr_integrate_fold_known_radical_local(coefficient);
+            coefficient = expr_integrate_collect_common_radical_local(coefficient);
+            coefficient = expr_integrate_fold_known_radical_local(coefficient);
             term = coefficient ? expr_mul(coefficient, factor) : NULL;
             expr_free(coefficient);
             out = expr_integrate_append_sum_local(out, term);
@@ -726,10 +669,7 @@ static expr_t *expr_integrate_collect_function_sums_local(const expr_t *expr)
     if (expr_is_op(expr, &ops_mul) || expr_is_div(expr)) {
         left = expr_integrate_collect_function_sums_local(expr->a);
         right = expr_integrate_collect_function_sums_local(expr->b);
-        out = (left && right)
-            ? (expr_is_op(expr, &ops_mul) ? expr_mul(left, right)
-                                          : expr_div(left, right))
-            : NULL;
+        out = (left && right) ? (expr_is_op(expr, &ops_mul) ? expr_mul(left, right) : expr_div(left, right)) : NULL;
         expr_free(right);
         expr_free(left);
         return out;
@@ -737,10 +677,8 @@ static expr_t *expr_integrate_collect_function_sums_local(const expr_t *expr)
     return expr_retain_expr(expr);
 }
 
-static bool expr_integrate_has_repeated_function_local(const expr_t *expr,
-                                                        const expr_t **seen,
-                                                        size_t *count,
-                                                        size_t capacity)
+static bool expr_integrate_has_repeated_function_local(const expr_t *expr, const expr_t **seen, size_t *count,
+                                                       size_t capacity)
 {
     if (!expr || !seen || !count)
         return false;
@@ -752,10 +690,8 @@ static bool expr_integrate_has_repeated_function_local(const expr_t *expr,
         if (*count < capacity)
             seen[(*count)++] = expr;
     }
-    return expr_integrate_has_repeated_function_local(
-               expr->a, seen, count, capacity) ||
-           expr_integrate_has_repeated_function_local(
-               expr->b, seen, count, capacity);
+    return expr_integrate_has_repeated_function_local(expr->a, seen, count, capacity) ||
+           expr_integrate_has_repeated_function_local(expr->b, seen, count, capacity);
 }
 
 static bool expr_integrate_needs_function_collection_local(const expr_t *expr)
@@ -764,8 +700,7 @@ static bool expr_integrate_needs_function_collection_local(const expr_t *expr)
     const expr_t *seen[MAX_FUNCTIONS];
     size_t count = 0u;
 
-    return expr_integrate_has_repeated_function_local(
-        expr, seen, &count, MAX_FUNCTIONS);
+    return expr_integrate_has_repeated_function_local(expr, seen, &count, MAX_FUNCTIONS);
 }
 
 expr_t *expr_integrate(const expr_t *expr, const expr_t *wrt)
@@ -814,26 +749,21 @@ static bool expr_tree_has_symbol_name(const expr_t *expr, const char *name)
         return false;
     if (expr->name && strcmp(expr->name, name) == 0)
         return true;
-    return expr_tree_has_symbol_name(expr->a, name) ||
-           expr_tree_has_symbol_name(expr->b, name);
+    return expr_tree_has_symbol_name(expr->a, name) || expr_tree_has_symbol_name(expr->b, name);
 }
 
-static void expr_integral_constant_name(char *out, size_t out_size,
-                                        unsigned int index)
+static void expr_integral_constant_name(char *out, size_t out_size, unsigned int index)
 {
     if (!out || out_size == 0u)
         return;
     snprintf(out, out_size, "C_%u", index);
 }
 
-static void expr_integral_constant_unicode_name(char *out, size_t out_size,
-                                                unsigned int index)
+static void expr_integral_constant_unicode_name(char *out, size_t out_size, unsigned int index)
 {
     static const char *subdigits[] = {
-        "\xE2\x82\x80", "\xE2\x82\x81", "\xE2\x82\x82",
-        "\xE2\x82\x83", "\xE2\x82\x84", "\xE2\x82\x85",
-        "\xE2\x82\x86", "\xE2\x82\x87", "\xE2\x82\x88",
-        "\xE2\x82\x89",
+        "\xE2\x82\x80", "\xE2\x82\x81", "\xE2\x82\x82", "\xE2\x82\x83", "\xE2\x82\x84",
+        "\xE2\x82\x85", "\xE2\x82\x86", "\xE2\x82\x87", "\xE2\x82\x88", "\xE2\x82\x89",
     };
     char digits[16];
     size_t pos = 0u;
@@ -860,53 +790,35 @@ static void expr_integral_constant_unicode_name(char *out, size_t out_size,
     }
 }
 
-static bool expr_integration_constant_name_in_use(
-    const expr_t *expr,
-    const expr_t *wrt,
-    const expr_t *anti,
-    const char *name,
-    const char *unicode_name)
+static bool expr_integration_constant_name_in_use(const expr_t *expr, const expr_t *wrt, const expr_t *anti,
+                                                  const char *name, const char *unicode_name)
 {
-    return expr_tree_has_symbol_name(expr, name) ||
-           (unicode_name &&
-            expr_tree_has_symbol_name(expr, unicode_name)) ||
-           expr_tree_has_symbol_name(wrt, name) ||
-           (unicode_name &&
-            expr_tree_has_symbol_name(wrt, unicode_name)) ||
-           expr_tree_has_symbol_name(anti, name) ||
-           (unicode_name &&
-            expr_tree_has_symbol_name(anti, unicode_name));
+    return expr_tree_has_symbol_name(expr, name) || (unicode_name && expr_tree_has_symbol_name(expr, unicode_name)) ||
+           expr_tree_has_symbol_name(wrt, name) || (unicode_name && expr_tree_has_symbol_name(wrt, unicode_name)) ||
+           expr_tree_has_symbol_name(anti, name) || (unicode_name && expr_tree_has_symbol_name(anti, unicode_name));
 }
 
-expr_t *expr_new_integration_constant_internal(const expr_t *expr,
-                                               const expr_t *wrt,
-                                               const expr_t *anti)
+expr_t *expr_new_integration_constant_internal(const expr_t *expr, const expr_t *wrt, const expr_t *anti)
 {
     char name[32];
     char unicode_name[32];
     bool plain_in_use;
     bool indexed_in_use = false;
 
-    plain_in_use = expr_integration_constant_name_in_use(
-        expr, wrt, anti, "C", NULL);
+    plain_in_use = expr_integration_constant_name_in_use(expr, wrt, anti, "C", NULL);
     for (unsigned int i = 0u; !indexed_in_use && i < 1000u; ++i) {
         expr_integral_constant_name(name, sizeof(name), i);
-        expr_integral_constant_unicode_name(
-            unicode_name, sizeof(unicode_name), i);
-        indexed_in_use = expr_integration_constant_name_in_use(
-            expr, wrt, anti, name, unicode_name);
+        expr_integral_constant_unicode_name(unicode_name, sizeof(unicode_name), i);
+        indexed_in_use = expr_integration_constant_name_in_use(expr, wrt, anti, name, unicode_name);
     }
 
     if (!plain_in_use && !indexed_in_use)
         return expr_new_named_const(NUM_NAN, "C");
 
-    for (unsigned int i = plain_in_use ? 1u : 0u;
-         i < 1000u;
-         ++i) {
+    for (unsigned int i = plain_in_use ? 1u : 0u; i < 1000u; ++i) {
         expr_integral_constant_name(name, sizeof(name), i);
         expr_integral_constant_unicode_name(unicode_name, sizeof(unicode_name), i);
-        if (!expr_integration_constant_name_in_use(
-                expr, wrt, anti, name, unicode_name)) {
+        if (!expr_integration_constant_name_in_use(expr, wrt, anti, name, unicode_name)) {
             return expr_new_named_const(NUM_NAN, name);
         }
     }
@@ -936,30 +848,20 @@ expr_t *expr_integrate_family(const expr_t *expr, const expr_t *wrt)
     return family;
 }
 
-bool expr_has_unbound_parameters(const expr_t *expr,
-                                 size_t nvars,
-                                 expr_t *const *vars)
+bool expr_has_unbound_parameters(const expr_t *expr, size_t nvars, expr_t *const *vars)
 {
     if (!expr)
         return false;
-    if ((expr_is_var(expr) || expr_is_const(expr)) &&
-        !expr_is_bound_in_var_list_local(expr, nvars, vars) &&
+    if ((expr_is_var(expr) || expr_is_const(expr)) && !expr_is_bound_in_var_list_local(expr, nvars, vars) &&
         num_is_nan(expr->c)) {
         return true;
     }
-    return expr_has_unbound_parameters(expr->a, nvars, vars) ||
-           expr_has_unbound_parameters(expr->b, nvars, vars);
+    return expr_has_unbound_parameters(expr->a, nvars, vars) || expr_has_unbound_parameters(expr->b, nvars, vars);
 }
 
-expr_t *expr_integrate_iterated(const expr_t *integrand,
-                                size_t ndim,
-                                expr_t *const *vars,
-                                const expr_integration_bound_kind_t *kinds,
-                                expr_t *const *lo,
-                                expr_t *const *hi,
-                                size_t max_steps,
-                                size_t *completed_steps_out,
-                                expr_t **first_antiderivative_out)
+expr_t *expr_integrate_iterated(const expr_t *integrand, size_t ndim, expr_t *const *vars,
+                                const expr_integration_bound_kind_t *kinds, expr_t *const *lo, expr_t *const *hi,
+                                size_t max_steps, size_t *completed_steps_out, expr_t **first_antiderivative_out)
 {
     expr_t *current = NULL;
     size_t completed_steps = 0u;
@@ -1011,30 +913,20 @@ expr_t *expr_integrate_iterated(const expr_t *integrand,
     return current;
 }
 
-expr_t *expr_integrate_iterated_best_effort(
-    const expr_t *integrand,
-    size_t ndim,
-    expr_t *const *vars,
-    const expr_integration_bound_kind_t *kinds,
-    expr_t *const *lo,
-    expr_t *const *hi,
-    size_t *completed_steps_out,
-    size_t *remaining_ndim_out,
-    expr_t **remaining_vars_out,
-    number_t *remaining_lo_num_out,
-    number_t *remaining_hi_num_out,
-    const number_t *lo_num,
-    const number_t *hi_num)
+expr_t *expr_integrate_iterated_best_effort(const expr_t *integrand, size_t ndim, expr_t *const *vars,
+                                            const expr_integration_bound_kind_t *kinds, expr_t *const *lo,
+                                            expr_t *const *hi, size_t *completed_steps_out, size_t *remaining_ndim_out,
+                                            expr_t **remaining_vars_out, number_t *remaining_lo_num_out,
+                                            number_t *remaining_hi_num_out, const number_t *lo_num,
+                                            const number_t *hi_num)
 {
     expr_t *current = NULL;
     int *active = NULL;
     size_t remaining = ndim;
     size_t completed = 0u;
 
-    if (!integrand || !vars || !kinds || !lo || !hi || !completed_steps_out ||
-        !remaining_ndim_out || !remaining_vars_out ||
-        (ndim > 0u && (!remaining_lo_num_out || !remaining_hi_num_out ||
-                       !lo_num || !hi_num)))
+    if (!integrand || !vars || !kinds || !lo || !hi || !completed_steps_out || !remaining_ndim_out ||
+        !remaining_vars_out || (ndim > 0u && (!remaining_lo_num_out || !remaining_hi_num_out || !lo_num || !hi_num)))
         return NULL;
 
     *completed_steps_out = 0u;

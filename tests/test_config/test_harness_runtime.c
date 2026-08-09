@@ -14,11 +14,7 @@
 #include "test_harness.h"
 #include "ustring.h"
 
-typedef enum {
-    TEST_OUTCOME_PASS,
-    TEST_OUTCOME_FAIL,
-    TEST_OUTCOME_SKIP
-} test_outcome_t;
+typedef enum { TEST_OUTCOME_PASS, TEST_OUTCOME_FAIL, TEST_OUTCOME_SKIP } test_outcome_t;
 
 typedef struct {
     string_t *file;
@@ -98,12 +94,8 @@ static const string_t *g_test_case_temp_dir = NULL;
 
 static int test_run_case_fixture_setup(const char *file, int line);
 static void test_run_case_fixture_teardown(const char *file, int line);
-static void test_run_in_group_text(const string_t *file_text,
-                                   int line,
-                                   const string_t *name_text,
-                                   const string_t *parent_text,
-                                   const string_t *tags_text,
-                                   const char *file_boundary,
+static void test_run_in_group_text(const string_t *file_text, int line, const string_t *name_text,
+                                   const string_t *parent_text, const string_t *tags_text, const char *file_boundary,
                                    test_fn fn);
 static int test_case_register_cleanup(test_cleanup_fn fn, void *ctx);
 static void test_case_cleanup_all(void);
@@ -169,14 +161,9 @@ static int test_string_has_text(const string_t *text)
     return text && string_length(text) > 0u;
 }
 
-typedef bool (*test_config_string_query_fn)(const string_t *file,
-                                            const string_t *func,
-                                            const string_t *parent);
+typedef bool (*test_config_string_query_fn)(const string_t *file, const string_t *func, const string_t *parent);
 
-static bool test_harness_config_query(const char *file,
-                                      const char *func,
-                                      const char *parent,
-                                      bool fallback,
+static bool test_harness_config_query(const char *file, const char *func, const char *parent, bool fallback,
                                       test_config_string_query_fn query)
 {
     string_t *file_text = test_string_from_boundary(file);
@@ -184,10 +171,7 @@ static bool test_harness_config_query(const char *file,
     string_t *parent_text = parent ? test_string_from_boundary(parent) : NULL;
     bool result = fallback;
 
-    if (query &&
-        file_text &&
-        func_text &&
-        (!parent || parent_text))
+    if (query && file_text && func_text && (!parent || parent_text))
         result = query(file_text, func_text, parent_text);
 
     string_free(parent_text);
@@ -196,32 +180,19 @@ static bool test_harness_config_query(const char *file,
     return result;
 }
 
-bool test_harness_config_is_enabled(const char *file,
-                                    const char *func,
-                                    const char *parent)
+bool test_harness_config_is_enabled(const char *file, const char *func, const char *parent)
 {
-    return test_harness_config_query(file,
-                                     func,
-                                     parent,
-                                     true,
-                                     test_config_is_enabled);
+    return test_harness_config_query(file, func, parent, true, test_config_is_enabled);
 }
 
-bool test_harness_config_has_key(const char *file,
-                                 const char *func,
-                                 const char *parent)
+bool test_harness_config_has_key(const char *file, const char *func, const char *parent)
 {
-    return test_harness_config_query(file,
-                                     func,
-                                     parent,
-                                     false,
-                                     test_config_has_key_for);
+    return test_harness_config_query(file, func, parent, false, test_config_has_key_for);
 }
 
 static double test_elapsed_ms(struct timespec t0, struct timespec t1)
 {
-    return (t1.tv_sec - t0.tv_sec) * 1000.0
-         + (t1.tv_nsec - t0.tv_nsec) / 1e6;
+    return (t1.tv_sec - t0.tv_sec) * 1000.0 + (t1.tv_nsec - t0.tv_nsec) / 1e6;
 }
 
 static void test_print_time(double ms)
@@ -255,8 +226,7 @@ void test_section(const char *title)
     string_free(title_text);
 }
 
-void test_register_validity_checker(const char *name,
-                                    const test_validity_contract_t *contract)
+void test_register_validity_checker(const char *name, const test_validity_contract_t *contract)
 {
     string_t *name_text;
     size_t i;
@@ -278,8 +248,7 @@ void test_register_validity_checker(const char *name,
 
     if (g_test_validity_registry_count == g_test_validity_registry_cap) {
         size_t new_cap = g_test_validity_registry_cap ? g_test_validity_registry_cap * 2u : 8u;
-        test_validity_registry_entry_t *grown =
-            realloc(g_test_validity_registry, new_cap * sizeof(*grown));
+        test_validity_registry_entry_t *grown = realloc(g_test_validity_registry, new_cap * sizeof(*grown));
 
         if (!grown) {
             string_free(name_text);
@@ -319,21 +288,14 @@ const test_validity_contract_t *test_find_validity_checker(const char *name)
     return found;
 }
 
-bool test_require_validity_checker(const char *name,
-                                   const char *file,
-                                   int line)
+bool test_require_validity_checker(const char *name, const char *file, int line)
 {
     if (test_find_validity_checker(name))
         return true;
 
-    string_printf(C_RED
-           "    Setup failed at %s:%d: missing validity checker '%s'\n"
-           C_RESET,
-           file,
-           line,
-           name ? name : "(null)");
-    test_set_failure_detailf("missing validity checker '%s'",
-                             name ? name : "(null)");
+    string_printf(C_RED "    Setup failed at %s:%d: missing validity checker '%s'\n" C_RESET, file, line,
+                  name ? name : "(null)");
+    test_set_failure_detailf("missing validity checker '%s'", name ? name : "(null)");
     g_test_failure_count++;
     test_string_replace_boundary(&g_test_last_fail_file, file);
     g_test_last_fail_line = line;
@@ -347,8 +309,7 @@ static int test_case_register_cleanup(test_cleanup_fn fn, void *ctx)
 
     if (g_test_case_cleanup_count == g_test_case_cleanup_cap) {
         size_t new_cap = g_test_case_cleanup_cap ? g_test_case_cleanup_cap * 2u : 8u;
-        test_cleanup_entry_t *grown =
-            realloc(g_test_case_cleanups, new_cap * sizeof(*grown));
+        test_cleanup_entry_t *grown = realloc(g_test_case_cleanups, new_cap * sizeof(*grown));
 
         if (!grown)
             return 0;
@@ -371,9 +332,7 @@ static void test_case_cleanup_string(void *ctx)
 static int test_remove_tree_string(const string_t *path_text)
 {
     struct stat st;
-    const char *path = test_string_has_text(path_text)
-        ? string_c_str(path_text)
-        : NULL;
+    const char *path = test_string_has_text(path_text) ? string_c_str(path_text) : NULL;
 
     if (!path)
         return 0;
@@ -391,8 +350,7 @@ static int test_remove_tree_string(const string_t *path_text)
             string_t *entry_text;
             string_t *child_text;
 
-            if (test_boundary_text_equals(ent->d_name, ".") ||
-                test_boundary_text_equals(ent->d_name, ".."))
+            if (test_boundary_text_equals(ent->d_name, ".") || test_boundary_text_equals(ent->d_name, ".."))
                 continue;
 
             entry_text = test_string_from_boundary(ent->d_name);
@@ -454,10 +412,14 @@ static void test_print_tags(const string_t *tags)
 static const char *test_outcome_name(test_outcome_t outcome)
 {
     switch (outcome) {
-        case TEST_OUTCOME_PASS: return "pass";
-        case TEST_OUTCOME_FAIL: return "fail";
-        case TEST_OUTCOME_SKIP: return "skip";
-        default: return "unknown";
+        case TEST_OUTCOME_PASS:
+            return "pass";
+        case TEST_OUTCOME_FAIL:
+            return "fail";
+        case TEST_OUTCOME_SKIP:
+            return "skip";
+        default:
+            return "unknown";
     }
 }
 
@@ -519,36 +481,21 @@ static int test_cstr_format(const void *value, string_t *out, void *ctx)
 
 const test_validity_contract_t *test_validity_contract_int(void)
 {
-    static const test_validity_contract_t contract = {
-        "int-equality",
-        test_int_equal,
-        test_int_format,
-        NULL
-    };
+    static const test_validity_contract_t contract = {"int-equality", test_int_equal, test_int_format, NULL};
 
     return &contract;
 }
 
 const test_validity_contract_t *test_validity_contract_long(void)
 {
-    static const test_validity_contract_t contract = {
-        "long-equality",
-        test_long_equal,
-        test_long_format,
-        NULL
-    };
+    static const test_validity_contract_t contract = {"long-equality", test_long_equal, test_long_format, NULL};
 
     return &contract;
 }
 
 const test_validity_contract_t *test_validity_contract_cstr(void)
 {
-    static const test_validity_contract_t contract = {
-        "cstr-equality",
-        test_cstr_equal,
-        test_cstr_format,
-        NULL
-    };
+    static const test_validity_contract_t contract = {"cstr-equality", test_cstr_equal, test_cstr_format, NULL};
 
     return &contract;
 }
@@ -724,22 +671,18 @@ static int test_missing_config_path_seen(const string_t *full_key)
     return 0;
 }
 
-static void test_note_missing_config_path(const string_t *file,
-                                          const string_t *path)
+static void test_note_missing_config_path(const string_t *file, const string_t *path)
 {
     string_t *full_key;
 
-    if (test_suite_mode == TEST_CONFIG_NONE ||
-        !test_string_has_text(file) ||
-        !test_string_has_text(path))
+    if (test_suite_mode == TEST_CONFIG_NONE || !test_string_has_text(file) || !test_string_has_text(path))
         return;
 
     full_key = string_sprintf("%S::%S", file, path);
     if (!full_key)
         return;
 
-    if (test_missing_config_path_seen(full_key))
-    {
+    if (test_missing_config_path_seen(full_key)) {
         string_free(full_key);
         return;
     }
@@ -761,19 +704,9 @@ static void test_note_missing_config_path(const string_t *file,
     g_test_missing_config_count++;
 }
 
-static void test_record_case(const string_t *file,
-                             int declaration_line,
-                             const string_t *name,
-                             const string_t *parent,
-                             const string_t *path,
-                             const string_t *tags,
-                             test_outcome_t outcome,
-                             int enabled,
-                             int is_group,
-                             int is_output,
-                             int group_passed,
-                             int group_failed,
-                             int group_skipped,
+static void test_record_case(const string_t *file, int declaration_line, const string_t *name, const string_t *parent,
+                             const string_t *path, const string_t *tags, test_outcome_t outcome, int enabled,
+                             int is_group, int is_output, int group_passed, int group_failed, int group_skipped,
                              double ms)
 {
     test_record_t *next;
@@ -795,11 +728,10 @@ static void test_record_case(const string_t *file,
     next->parent = test_string_clone_or_empty(parent);
     next->path = test_string_clone_or_empty(path);
     next->tags = test_string_clone_or_empty(tags);
-    next->failure_file = (outcome == TEST_OUTCOME_FAIL || outcome == TEST_OUTCOME_SKIP)
-        ? test_string_clone_or_empty(outcome == TEST_OUTCOME_FAIL
-                                         ? g_test_last_fail_file
-                                         : g_test_last_skip_file)
-        : NULL;
+    next->failure_file =
+        (outcome == TEST_OUTCOME_FAIL || outcome == TEST_OUTCOME_SKIP)
+            ? test_string_clone_or_empty(outcome == TEST_OUTCOME_FAIL ? g_test_last_fail_file : g_test_last_skip_file)
+            : NULL;
     if (outcome == TEST_OUTCOME_FAIL)
         next->failure_detail = test_string_clone_or_empty(g_test_last_fail_detail);
     else if (outcome == TEST_OUTCOME_SKIP)
@@ -927,8 +859,7 @@ void test_mark_skip(const char *file, int line, const char *detail)
     g_test_skip_requested = 1;
     test_string_replace_boundary(&g_test_last_skip_file, file);
     g_test_last_skip_line = line;
-    test_string_replace(&g_test_last_skip_detail,
-                        string_sprintf("%s", detail ? detail : "test skipped"));
+    test_string_replace(&g_test_last_skip_detail, string_sprintf("%s", detail ? detail : "test skipped"));
 }
 
 bool test_request_skip(const char *file, int line, const char *detail)
@@ -937,16 +868,12 @@ bool test_request_skip(const char *file, int line, const char *detail)
     return false;
 }
 
-bool test_assert_true(bool expr,
-                      const char *file,
-                      int line,
-                      const char *detail)
+bool test_assert_true(bool expr, const char *file, int line, const char *detail)
 {
     if (expr)
         return true;
 
-    string_printf(C_RED "    Assertion failed at %s:%d: %s\n" C_RESET,
-           file, line, detail ? detail : "expected true");
+    string_printf(C_RED "    Assertion failed at %s:%d: %s\n" C_RESET, file, line, detail ? detail : "expected true");
     test_set_failure_detailf("%s", detail ? detail : "expected true");
     g_test_failure_count++;
     test_string_replace_boundary(&g_test_last_fail_file, file);
@@ -954,16 +881,12 @@ bool test_assert_true(bool expr,
     return false;
 }
 
-bool test_assert_false(bool expr,
-                       const char *file,
-                       int line,
-                       const char *detail)
+bool test_assert_false(bool expr, const char *file, int line, const char *detail)
 {
     if (!expr)
         return true;
 
-    string_printf(C_RED "    Assertion failed at %s:%d: %s\n" C_RESET,
-           file, line, detail ? detail : "expected false");
+    string_printf(C_RED "    Assertion failed at %s:%d: %s\n" C_RESET, file, line, detail ? detail : "expected false");
     test_set_failure_detailf("%s", detail ? detail : "expected false");
     g_test_failure_count++;
     test_string_replace_boundary(&g_test_last_fail_file, file);
@@ -971,17 +894,12 @@ bool test_assert_false(bool expr,
     return false;
 }
 
-bool test_assert_int_eq(int actual,
-                        int expected,
-                        const char *file,
-                        int line)
+bool test_assert_int_eq(int actual, int expected, const char *file, int line)
 {
     if (actual == expected)
         return true;
 
-    string_printf(C_RED "    Assertion failed at %s:%d: expected %d, got %d\n"
-           C_RESET,
-           file, line, expected, actual);
+    string_printf(C_RED "    Assertion failed at %s:%d: expected %d, got %d\n" C_RESET, file, line, expected, actual);
     test_set_failure_detailf("expected %d, got %d", expected, actual);
     g_test_failure_count++;
     test_string_replace_boundary(&g_test_last_fail_file, file);
@@ -989,17 +907,12 @@ bool test_assert_int_eq(int actual,
     return false;
 }
 
-bool test_assert_long_eq(long actual,
-                         long expected,
-                         const char *file,
-                         int line)
+bool test_assert_long_eq(long actual, long expected, const char *file, int line)
 {
     if (actual == expected)
         return true;
 
-    string_printf(C_RED "    Assertion failed at %s:%d: expected %ld, got %ld\n"
-           C_RESET,
-           file, line, expected, actual);
+    string_printf(C_RED "    Assertion failed at %s:%d: expected %ld, got %ld\n" C_RESET, file, line, expected, actual);
     test_set_failure_detailf("expected %ld, got %ld", expected, actual);
     g_test_failure_count++;
     test_string_replace_boundary(&g_test_last_fail_file, file);
@@ -1007,19 +920,13 @@ bool test_assert_long_eq(long actual,
     return false;
 }
 
-bool test_assert_double_eq(double actual,
-                           double expected,
-                           double eps,
-                           const char *file,
-                           int line)
+bool test_assert_double_eq(double actual, double expected, double eps, const char *file, int line)
 {
     if (fabs(actual - expected) <= eps)
         return true;
 
-    string_printf(C_RED
-           "    Assertion failed at %s:%d: expected %.12f, got %.12f\n"
-           C_RESET,
-           file, line, expected, actual);
+    string_printf(C_RED "    Assertion failed at %s:%d: expected %.12f, got %.12f\n" C_RESET, file, line, expected,
+                  actual);
     test_set_failure_detailf("expected %.12f, got %.12f", expected, actual);
     g_test_failure_count++;
     test_string_replace_boundary(&g_test_last_fail_file, file);
@@ -1027,17 +934,12 @@ bool test_assert_double_eq(double actual,
     return false;
 }
 
-bool test_assert_not_null(const void *ptr,
-                          const char *file,
-                          int line)
+bool test_assert_not_null(const void *ptr, const char *file, int line)
 {
     if (ptr)
         return true;
 
-    string_printf(C_RED
-           "    Assertion failed at %s:%d: expected non-null pointer\n"
-           C_RESET,
-           file, line);
+    string_printf(C_RED "    Assertion failed at %s:%d: expected non-null pointer\n" C_RESET, file, line);
     test_set_failure_detailf("expected non-null pointer");
     g_test_failure_count++;
     test_string_replace_boundary(&g_test_last_fail_file, file);
@@ -1045,17 +947,12 @@ bool test_assert_not_null(const void *ptr,
     return false;
 }
 
-bool test_assert_null(const void *ptr,
-                      const char *file,
-                      int line)
+bool test_assert_null(const void *ptr, const char *file, int line)
 {
     if (!ptr)
         return true;
 
-    string_printf(C_RED
-           "    Assertion failed at %s:%d: expected NULL pointer\n"
-           C_RESET,
-           file, line);
+    string_printf(C_RED "    Assertion failed at %s:%d: expected NULL pointer\n" C_RESET, file, line);
     test_set_failure_detailf("expected NULL pointer");
     g_test_failure_count++;
     test_string_replace_boundary(&g_test_last_fail_file, file);
@@ -1063,11 +960,8 @@ bool test_assert_null(const void *ptr,
     return false;
 }
 
-bool test_assert_validity(const test_validity_contract_t *contract,
-                          const void *actual,
-                          const void *expected,
-                          const char *file,
-                          int line)
+bool test_assert_validity(const test_validity_contract_t *contract, const void *actual, const void *expected,
+                          const char *file, int line)
 {
     string_t *actual_text = NULL;
     string_t *expected_text = NULL;
@@ -1075,10 +969,7 @@ bool test_assert_validity(const test_validity_contract_t *contract,
     int ok;
 
     if (!contract || !contract->equal) {
-        string_printf(C_RED
-               "    Assertion failed at %s:%d: invalid validity contract\n"
-               C_RESET,
-               file, line);
+        string_printf(C_RED "    Assertion failed at %s:%d: invalid validity contract\n" C_RESET, file, line);
         test_set_failure_detailf("invalid validity contract");
         g_test_failure_count++;
         test_string_replace_boundary(&g_test_last_fail_file, file);
@@ -1095,10 +986,8 @@ bool test_assert_validity(const test_validity_contract_t *contract,
     if (!actual_text || !expected_text) {
         string_free(actual_text);
         string_free(expected_text);
-        string_printf(C_RED
-               "    Assertion failed at %s:%d: out of memory formatting validity failure\n"
-               C_RESET,
-               file, line);
+        string_printf(C_RED "    Assertion failed at %s:%d: out of memory formatting validity failure\n" C_RESET, file,
+                      line);
         test_set_failure_detailf("out of memory formatting validity failure");
         g_test_failure_count++;
         test_string_replace_boundary(&g_test_last_fail_file, file);
@@ -1119,10 +1008,8 @@ bool test_assert_validity(const test_validity_contract_t *contract,
                test_format_value_fallback(actual, actual_text) != 0) {
         string_free(actual_text);
         string_free(expected_text);
-        string_printf(C_RED
-               "    Assertion failed at %s:%d: out of memory formatting validity failure\n"
-               C_RESET,
-               file, line);
+        string_printf(C_RED "    Assertion failed at %s:%d: out of memory formatting validity failure\n" C_RESET, file,
+                      line);
         test_set_failure_detailf("out of memory formatting validity failure");
         g_test_failure_count++;
         test_string_replace_boundary(&g_test_last_fail_file, file);
@@ -1130,18 +1017,11 @@ bool test_assert_validity(const test_validity_contract_t *contract,
         return false;
     }
 
-    contract_name = (contract->name && *contract->name)
-        ? contract->name
-        : "validity";
+    contract_name = (contract->name && *contract->name) ? contract->name : "validity";
 
-    string_printf(C_RED
-           "    Assertion failed at %s:%d [%s]: expected %S, got %S\n"
-           C_RESET,
-           file, line, contract_name, expected_text, actual_text);
-    test_set_failure_detailf("[%s] expected %S, got %S",
-                             contract_name,
-                             expected_text,
-                             actual_text);
+    string_printf(C_RED "    Assertion failed at %s:%d [%s]: expected %S, got %S\n" C_RESET, file, line, contract_name,
+                  expected_text, actual_text);
+    test_set_failure_detailf("[%s] expected %S, got %S", contract_name, expected_text, actual_text);
     string_free(actual_text);
     string_free(expected_text);
     g_test_failure_count++;
@@ -1150,23 +1030,14 @@ bool test_assert_validity(const test_validity_contract_t *contract,
     return false;
 }
 
-bool test_assert_validity_named(const char *name,
-                                const void *actual,
-                                const void *expected,
-                                const char *file,
-                                int line)
+bool test_assert_validity_named(const char *name, const void *actual, const void *expected, const char *file, int line)
 {
     const test_validity_contract_t *contract = test_find_validity_checker(name);
 
     if (!contract) {
-        string_printf(C_RED
-               "    Assertion failed at %s:%d: missing named validity checker: %s\n"
-               C_RESET,
-               file,
-               line,
-               name ? name : "(null)");
-        test_set_failure_detailf("missing named validity checker: %s",
-                                 name ? name : "(null)");
+        string_printf(C_RED "    Assertion failed at %s:%d: missing named validity checker: %s\n" C_RESET, file, line,
+                      name ? name : "(null)");
+        test_set_failure_detailf("missing named validity checker: %s", name ? name : "(null)");
         g_test_failure_count++;
         test_string_replace_boundary(&g_test_last_fail_file, file);
         g_test_last_fail_line = line;
@@ -1176,47 +1047,29 @@ bool test_assert_validity_named(const char *name,
     return test_assert_validity(contract, actual, expected, file, line);
 }
 
-bool test_assert_cstr_eq(const char *actual,
-                         const char *expected,
-                         const char *file,
-                         int line)
+bool test_assert_cstr_eq(const char *actual, const char *expected, const char *file, int line)
 {
     const char *actual_text = actual;
     const char *expected_text = expected;
 
-    return test_assert_validity(TEST_VALID_CSTR(),
-                                &actual_text,
-                                &expected_text,
-                                file,
-                                line);
+    return test_assert_validity(TEST_VALID_CSTR(), &actual_text, &expected_text, file, line);
 }
 
-void test_run_case(const char *file,
-                   int line,
-                   const char *name,
-                   const char *tags,
-                   test_fn fn)
+void test_run_case(const char *file, int line, const char *name, const char *tags, test_fn fn)
 {
     test_run_in_group(file, line, name, NULL, tags, fn);
 }
 
-void test_run_subtest(const char *file,
-                      int line,
-                      const char *name,
-                      const char *tags,
-                      test_fn fn)
+void test_run_subtest(const char *file, int line, const char *name, const char *tags, test_fn fn)
 {
     string_t *file_text = NULL;
     string_t *name_text = NULL;
     string_t *tags_text = NULL;
 
     if (!test_string_has_text(g_test_current_path)) {
-        string_printf(C_RED
-               "    Harness misuse at %s:%d: test_run_subtest(%s) requires an active parent test/group\n"
-               C_RESET,
-               file,
-               line,
-               name ? name : "(unnamed)");
+        string_printf(
+            C_RED "    Harness misuse at %s:%d: test_run_subtest(%s) requires an active parent test/group\n" C_RESET,
+            file, line, name ? name : "(unnamed)");
         test_mark_failure(file, line, "test_run_subtest requires an active parent");
         return;
     }
@@ -1232,25 +1085,15 @@ void test_run_subtest(const char *file,
         return;
     }
 
-    test_run_in_group_text(file_text,
-                           line,
-                           name_text,
-                           g_test_current_path,
-                           tags_text,
-                           file,
-                           fn);
+    test_run_in_group_text(file_text, line, name_text, g_test_current_path, tags_text, file, fn);
 
     string_free(tags_text);
     string_free(name_text);
     string_free(file_text);
 }
 
-static void test_run_in_group_text(const string_t *file_text,
-                                   int line,
-                                   const string_t *name_text,
-                                   const string_t *parent_text,
-                                   const string_t *tags_text,
-                                   const char *file_boundary,
+static void test_run_in_group_text(const string_t *file_text, int line, const string_t *name_text,
+                                   const string_t *parent_text, const string_t *tags_text, const char *file_boundary,
                                    test_fn fn)
 {
     bool enabled;
@@ -1293,13 +1136,12 @@ static void test_run_in_group_text(const string_t *file_text,
 
     if (!enabled) {
         if (parent_text)
-            string_printf(C_YELLOW "SKIP: %S (in %S)" C_RESET "\n",
-                   name_text, parent_text);
+            string_printf(C_YELLOW "SKIP: %S (in %S)" C_RESET "\n", name_text, parent_text);
         else
             string_printf(C_YELLOW "SKIP: %S" C_RESET "\n", name_text);
         g_test_skip_count++;
-        test_record_case(file_text, line, name_text, parent_text, full_path_text, tags_text,
-                         TEST_OUTCOME_SKIP, 0, 0, 0, 0, 0, 0, 0.0);
+        test_record_case(file_text, line, name_text, parent_text, full_path_text, tags_text, TEST_OUTCOME_SKIP, 0, 0, 0,
+                         0, 0, 0, 0.0);
         goto cleanup;
     }
 
@@ -1318,9 +1160,7 @@ static void test_run_in_group_text(const string_t *file_text,
         fixture_ran = 1;
         fixture_continue = test_run_case_fixture_setup(file_boundary, line);
     }
-    if (fixture_continue &&
-        g_test_failure_count == failure_count_before &&
-        !g_test_skip_requested) {
+    if (fixture_continue && g_test_failure_count == failure_count_before && !g_test_skip_requested) {
         fn();
     }
     if (fixture_ran && fixture_continue)
@@ -1345,51 +1185,35 @@ static void test_run_in_group_text(const string_t *file_text,
         int failed = g_test_failed_cases - failed_cases_before;
         test_outcome_t outcome = failed == 0 ? TEST_OUTCOME_PASS : TEST_OUTCOME_FAIL;
 
-        string_printf(C_CYAN "GROUP: %S " C_RESET
-               "(" C_GREEN "%d passed" C_RESET
-               "," C_RED " %d failed" C_RESET
-               "," C_YELLOW " %d skipped" C_RESET ")",
-               name_text, passed, failed, skipped);
+        string_printf(C_CYAN "GROUP: %S " C_RESET "(" C_GREEN "%d passed" C_RESET "," C_RED " %d failed" C_RESET
+                             "," C_YELLOW " %d skipped" C_RESET ")",
+                      name_text, passed, failed, skipped);
         test_print_tags(tags_text);
-        test_record_case(file_text, line, name_text, parent_text, full_path_text, tags_text,
-                         outcome, 1, 1, 0, passed, failed, skipped, disp_ms);
+        test_record_case(file_text, line, name_text, parent_text, full_path_text, tags_text, outcome, 1, 1, 0, passed,
+                         failed, skipped, disp_ms);
     } else if (g_test_skip_requested) {
         g_test_skip_count++;
-        print_file = test_string_has_text(g_test_last_skip_file)
-            ? g_test_last_skip_file
-            : file_text;
-        string_printf(C_YELLOW "SKIP: %S " C_YELLOW "(%S:%d)" C_RESET,
-               name_text,
-               print_file,
-               g_test_last_skip_line);
+        print_file = test_string_has_text(g_test_last_skip_file) ? g_test_last_skip_file : file_text;
+        string_printf(C_YELLOW "SKIP: %S " C_YELLOW "(%S:%d)" C_RESET, name_text, print_file, g_test_last_skip_line);
         if (test_string_has_text(g_test_last_skip_detail))
-            string_printf(" " C_GREY "[%S]" C_RESET,
-                          g_test_last_skip_detail);
+            string_printf(" " C_GREY "[%S]" C_RESET, g_test_last_skip_detail);
         test_print_tags(tags_text);
-        test_record_case(file_text, line, name_text, parent_text, full_path_text, tags_text,
-                         TEST_OUTCOME_SKIP, 1, 0, 0, 0, 0, 0, disp_ms);
+        test_record_case(file_text, line, name_text, parent_text, full_path_text, tags_text, TEST_OUTCOME_SKIP, 1, 0, 0,
+                         0, 0, 0, disp_ms);
     } else if (g_test_failure_count == failure_count_before) {
         g_test_passed_cases++;
-        string_printf(C_BOLD C_GREEN "PASS: "
-               C_RESET "%S", name_text);
+        string_printf(C_BOLD C_GREEN "PASS: " C_RESET "%S", name_text);
         test_print_tags(tags_text);
-        test_record_case(file_text, line, name_text, parent_text, full_path_text, tags_text,
-                         TEST_OUTCOME_PASS, 1, 0, 0, 0, 0, 0, disp_ms);
+        test_record_case(file_text, line, name_text, parent_text, full_path_text, tags_text, TEST_OUTCOME_PASS, 1, 0, 0,
+                         0, 0, 0, disp_ms);
     } else {
         g_test_failed_cases++;
-        print_file = test_string_has_text(g_test_last_fail_file)
-            ? g_test_last_fail_file
-            : file_text;
-        string_printf(C_BOLD C_RED "FAIL: " C_RESET
-               "%S " C_RED "(%S:%d)" C_RESET,
-               name_text,
-               print_file,
-               test_string_has_text(g_test_last_fail_file)
-                   ? g_test_last_fail_line
-                   : 0);
+        print_file = test_string_has_text(g_test_last_fail_file) ? g_test_last_fail_file : file_text;
+        string_printf(C_BOLD C_RED "FAIL: " C_RESET "%S " C_RED "(%S:%d)" C_RESET, name_text, print_file,
+                      test_string_has_text(g_test_last_fail_file) ? g_test_last_fail_line : 0);
         test_print_tags(tags_text);
-        test_record_case(file_text, line, name_text, parent_text, full_path_text, tags_text,
-                         TEST_OUTCOME_FAIL, 1, 0, 0, 0, 0, 0, disp_ms);
+        test_record_case(file_text, line, name_text, parent_text, full_path_text, tags_text, TEST_OUTCOME_FAIL, 1, 0, 0,
+                         0, 0, 0, disp_ms);
     }
 
     test_print_time(disp_ms);
@@ -1398,12 +1222,7 @@ cleanup:
     string_free(full_path_text);
 }
 
-void test_run_in_group(const char *file,
-                       int line,
-                       const char *name,
-                       const char *parent,
-                       const char *tags,
-                       test_fn fn)
+void test_run_in_group(const char *file, int line, const char *name, const char *parent, const char *tags, test_fn fn)
 {
     string_t *file_text = NULL;
     string_t *name_text = NULL;
@@ -1422,13 +1241,7 @@ void test_run_in_group(const char *file,
         goto cleanup;
     }
 
-    test_run_in_group_text(file_text,
-                           line,
-                           name_text,
-                           parent_text,
-                           tags_text,
-                           file,
-                           fn);
+    test_run_in_group_text(file_text, line, name_text, parent_text, tags_text, file, fn);
 
 cleanup:
     string_free(tags_text);
@@ -1437,20 +1250,12 @@ cleanup:
     string_free(file_text);
 }
 
-void test_run_output_case(const char *file,
-                          int line,
-                          const char *tags,
-                          const char *name,
-                          test_fn fn)
+void test_run_output_case(const char *file, int line, const char *tags, const char *name, test_fn fn)
 {
     test_run_output_in_group(file, line, name, NULL, tags, fn);
 }
 
-void test_run_output_in_group(const char *file,
-                              int line,
-                              const char *name,
-                              const char *parent,
-                              const char *tags,
+void test_run_output_in_group(const char *file, int line, const char *name, const char *parent, const char *tags,
                               test_fn fn)
 {
     int failure_count_before;
@@ -1503,8 +1308,8 @@ void test_run_output_in_group(const char *file,
         g_test_output_skip_count++;
         string_printf(C_YELLOW "OUTPUT SKIP: %S" C_RESET, name_text);
         test_print_tags(tags_text);
-        test_record_case(file_text, line, name_text, parent_text, full_path_text, tags_text,
-                         TEST_OUTCOME_SKIP, 0, 0, 1, 0, 0, 0, 0.0);
+        test_record_case(file_text, line, name_text, parent_text, full_path_text, tags_text, TEST_OUTCOME_SKIP, 0, 0, 1,
+                         0, 0, 0, 0.0);
         string_printf("\n");
         goto cleanup;
     }
@@ -1518,15 +1323,10 @@ void test_run_output_in_group(const char *file,
         fixture_ran = 1;
         fixture_continue = test_run_case_fixture_setup(file_boundary, line);
     }
-    if (fixture_continue &&
-        g_test_failure_count == failure_count_before &&
-        !g_test_skip_requested) {
-        saved_stdout = test_case_begin_stdout_capture("output-example-stdout.txt",
-                                                      &stdout_capture_path);
+    if (fixture_continue && g_test_failure_count == failure_count_before && !g_test_skip_requested) {
+        saved_stdout = test_case_begin_stdout_capture("output-example-stdout.txt", &stdout_capture_path);
     }
-    if (fixture_continue &&
-        g_test_failure_count == failure_count_before &&
-        !g_test_skip_requested) {
+    if (fixture_continue && g_test_failure_count == failure_count_before && !g_test_skip_requested) {
         fn();
     }
     if (saved_stdout >= 0) {
@@ -1541,41 +1341,28 @@ void test_run_output_in_group(const char *file,
 
     if (g_test_skip_requested) {
         g_test_output_skip_count++;
-        print_file = test_string_has_text(g_test_last_skip_file)
-            ? g_test_last_skip_file
-            : file_text;
-        string_printf(C_YELLOW "OUTPUT SKIP: %S " C_YELLOW "(%S:%d)" C_RESET,
-               name_text,
-               print_file,
-               g_test_last_skip_line);
+        print_file = test_string_has_text(g_test_last_skip_file) ? g_test_last_skip_file : file_text;
+        string_printf(C_YELLOW "OUTPUT SKIP: %S " C_YELLOW "(%S:%d)" C_RESET, name_text, print_file,
+                      g_test_last_skip_line);
         if (test_string_has_text(g_test_last_skip_detail))
-            string_printf(" " C_GREY "[%S]" C_RESET,
-                          g_test_last_skip_detail);
+            string_printf(" " C_GREY "[%S]" C_RESET, g_test_last_skip_detail);
         test_print_tags(tags_text);
-        test_record_case(file_text, line, name_text, parent_text, full_path_text, tags_text,
-                         TEST_OUTCOME_SKIP, 1, 0, 1, 0, 0, 0, ms);
+        test_record_case(file_text, line, name_text, parent_text, full_path_text, tags_text, TEST_OUTCOME_SKIP, 1, 0, 1,
+                         0, 0, 0, ms);
     } else if (g_test_failure_count == failure_count_before) {
         g_test_output_pass_count++;
-        string_printf(C_BOLD C_CYAN "OUTPUT: "
-               C_RESET "%S", name_text);
+        string_printf(C_BOLD C_CYAN "OUTPUT: " C_RESET "%S", name_text);
         test_print_tags(tags_text);
-        test_record_case(file_text, line, name_text, parent_text, full_path_text, tags_text,
-                         TEST_OUTCOME_PASS, 1, 0, 1, 0, 0, 0, ms);
+        test_record_case(file_text, line, name_text, parent_text, full_path_text, tags_text, TEST_OUTCOME_PASS, 1, 0, 1,
+                         0, 0, 0, ms);
     } else {
         g_test_output_failure_count++;
-        print_file = test_string_has_text(g_test_last_fail_file)
-            ? g_test_last_fail_file
-            : file_text;
-        string_printf(C_BOLD C_RED "OUTPUT FAIL: " C_RESET
-               "%S " C_RED "(%S:%d)" C_RESET,
-               name_text,
-               print_file,
-               test_string_has_text(g_test_last_fail_file)
-                   ? g_test_last_fail_line
-                   : 0);
+        print_file = test_string_has_text(g_test_last_fail_file) ? g_test_last_fail_file : file_text;
+        string_printf(C_BOLD C_RED "OUTPUT FAIL: " C_RESET "%S " C_RED "(%S:%d)" C_RESET, name_text, print_file,
+                      test_string_has_text(g_test_last_fail_file) ? g_test_last_fail_line : 0);
         test_print_tags(tags_text);
-        test_record_case(file_text, line, name_text, parent_text, full_path_text, tags_text,
-                         TEST_OUTCOME_FAIL, 1, 0, 1, 0, 0, 0, ms);
+        test_record_case(file_text, line, name_text, parent_text, full_path_text, tags_text, TEST_OUTCOME_FAIL, 1, 0, 1,
+                         0, 0, 0, ms);
     }
 
     test_print_time(ms);
@@ -1607,15 +1394,11 @@ static void test_run_suite_setup_case(void)
     if (g_test_failure_count == failure_count_before) {
         string_printf(C_GREEN "validity contract ok - ready\n" C_RESET);
     } else {
-        string_printf(C_BOLD C_RED "SETUP FAIL: " C_RESET
-               C_RED "(%s:%d)" C_RESET,
-               test_string_has_text(g_test_last_fail_file)
-                   ? string_c_str(g_test_last_fail_file)
-                   : __FILE__,
-               g_test_last_fail_line);
+        string_printf(C_BOLD C_RED "SETUP FAIL: " C_RESET C_RED "(%s:%d)" C_RESET,
+                      test_string_has_text(g_test_last_fail_file) ? string_c_str(g_test_last_fail_file) : __FILE__,
+                      g_test_last_fail_line);
         if (test_string_has_text(g_test_last_fail_detail))
-            string_printf(" " C_GREY "[%S]" C_RESET,
-                          g_test_last_fail_detail);
+            string_printf(" " C_GREY "[%S]" C_RESET, g_test_last_fail_detail);
         string_printf("\n");
     }
 }
@@ -1629,8 +1412,7 @@ static int test_run_case_fixture_setup(const char *file, int line)
 
     failure_count_before = g_test_failure_count;
     if (!test_fixture_setup_hook()) {
-        if (!g_test_skip_requested &&
-            g_test_failure_count == failure_count_before) {
+        if (!g_test_skip_requested && g_test_failure_count == failure_count_before) {
             test_mark_failure(file, line, "test fixture setup returned false");
         }
         return 0;
@@ -1647,9 +1429,7 @@ static void test_run_case_fixture_teardown(const char *file, int line)
         return;
 
     failure_count_before = g_test_failure_count;
-    if (!test_fixture_teardown_hook() &&
-        !g_test_skip_requested &&
-        g_test_failure_count == failure_count_before) {
+    if (!test_fixture_teardown_hook() && !g_test_skip_requested && g_test_failure_count == failure_count_before) {
         test_mark_failure(file, line, "test fixture teardown returned false");
     }
 }
@@ -1679,25 +1459,21 @@ static void test_print_slowest_cases(void)
         size_t j;
 
         for (j = 0; j < g_test_record_count; ++j) {
-            if (g_test_records[j].outcome == TEST_OUTCOME_SKIP ||
-                used[j])
+            if (g_test_records[j].outcome == TEST_OUTCOME_SKIP || used[j])
                 continue;
 
-            if (best_idx == (size_t)-1 ||
-                g_test_records[j].ms > g_test_records[best_idx].ms)
+            if (best_idx == (size_t)-1 || g_test_records[j].ms > g_test_records[best_idx].ms)
                 best_idx = j;
         }
 
         if (best_idx == (size_t)-1)
             break;
 
-        string_printf("  %d. %S", printed + 1,
-               g_test_records[best_idx].path);
+        string_printf("  %d. %S", printed + 1, g_test_records[best_idx].path);
         test_print_tags(g_test_records[best_idx].tags);
         string_printf(" ");
         test_print_time(g_test_records[best_idx].ms);
-        string_printf(" " C_GREY "[%s]" C_RESET "\n",
-               test_outcome_name(g_test_records[best_idx].outcome));
+        string_printf(" " C_GREY "[%s]" C_RESET "\n", test_outcome_name(g_test_records[best_idx].outcome));
         used[best_idx] = 1u;
         ++printed;
     }
@@ -1712,15 +1488,13 @@ static void test_report_missing_config_keys(void)
     if (test_suite_mode == TEST_CONFIG_NONE || g_test_missing_config_count == 0)
         return;
 
-    string_fprintf(stderr,
-            C_YELLOW
-            "test_harness: discovered %d test/group path%s without config keys; regenerated them as enabled.\n"
-            C_RESET,
-            g_test_missing_config_count,
-            g_test_missing_config_count == 1 ? "" : "s");
+    string_fprintf(
+        stderr,
+        C_YELLOW
+        "test_harness: discovered %d test/group path%s without config keys; regenerated them as enabled.\n" C_RESET,
+        g_test_missing_config_count, g_test_missing_config_count == 1 ? "" : "s");
     for (i = 0; i < g_test_missing_config_path_count; ++i)
-        string_fprintf(stderr, C_YELLOW "  added: %S\n" C_RESET,
-                g_test_missing_config_paths[i]);
+        string_fprintf(stderr, C_YELLOW "  added: %S\n" C_RESET, g_test_missing_config_paths[i]);
 }
 
 int main(void)
@@ -1747,29 +1521,18 @@ int main(void)
     test_config_shutdown();
     exit_code = rc ? rc : test_exit_code();
 
-    string_printf("\n" C_CYAN "SUMMARY: " C_RESET
-           "%d run, " C_GREEN "%d passed" C_RESET ", "
-           C_RED "%d failed" C_RESET ", "
-           C_YELLOW "%d skipped" C_RESET,
-           g_test_run_count,
-           g_test_passed_cases,
-           g_test_failed_cases,
-           g_test_skip_count);
+    string_printf("\n" C_CYAN "SUMMARY: " C_RESET "%d run, " C_GREEN "%d passed" C_RESET ", " C_RED "%d failed" C_RESET
+                  ", " C_YELLOW "%d skipped" C_RESET,
+                  g_test_run_count, g_test_passed_cases, g_test_failed_cases, g_test_skip_count);
     if (g_test_group_count)
-        string_printf(", " C_CYAN "%d group%s" C_RESET,
-               g_test_group_count,
-               g_test_group_count == 1 ? "" : "s");
+        string_printf(", " C_CYAN "%d group%s" C_RESET, g_test_group_count, g_test_group_count == 1 ? "" : "s");
     if (g_test_output_count)
-        string_printf(", " C_CYAN "%d output example%s" C_RESET,
-               g_test_output_count,
-               g_test_output_count == 1 ? "" : "s");
+        string_printf(", " C_CYAN "%d output example%s" C_RESET, g_test_output_count,
+                      g_test_output_count == 1 ? "" : "s");
     if (g_test_output_count)
-        string_printf(" (" C_GREEN "%d passed" C_RESET
-               ", " C_RED "%d failed" C_RESET
-               ", " C_YELLOW "%d skipped" C_RESET ")",
-               g_test_output_pass_count,
-               g_test_output_failure_count,
-               g_test_output_skip_count);
+        string_printf(" (" C_GREEN "%d passed" C_RESET ", " C_RED "%d failed" C_RESET ", " C_YELLOW "%d skipped" C_RESET
+                      ")",
+                      g_test_output_pass_count, g_test_output_failure_count, g_test_output_skip_count);
     if (g_test_abort_requested)
         string_printf(", " C_MAGENTA "fail-fast stop" C_RESET);
     test_print_time(g_test_total_ms);

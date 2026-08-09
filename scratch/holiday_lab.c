@@ -137,9 +137,7 @@ static char *format_display_date(const datetime_t *dttm)
     return out;
 }
 
-static bool print_bank_holidays_from_database(jurisdiction_t *holiday,
-                                              const datetime_t *start,
-                                              const datetime_t *end)
+static bool print_bank_holidays_from_database(jurisdiction_t *holiday, const datetime_t *start, const datetime_t *end)
 {
     array_t *events = NULL;
     bool produced = false;
@@ -159,8 +157,7 @@ static bool print_bank_holidays_from_database(jurisdiction_t *holiday,
         if (!event)
             continue;
         display_date = format_display_date(event->holiday_date);
-        printf("bank_holiday %s: %s\n",
-               event->holiday_name ? event->holiday_name : "unavailable",
+        printf("bank_holiday %s: %s\n", event->holiday_name ? event->holiday_name : "unavailable",
                display_date ? display_date : "unavailable");
         free(display_date);
         produced = true;
@@ -186,8 +183,7 @@ static bool print_jurisdiction_location_from_database(jurisdiction_t *holiday)
     return true;
 }
 
-static bool print_jurisdiction_gmt_offset_from_database(jurisdiction_t *holiday,
-                                                        const datetime_t *date)
+static bool print_jurisdiction_gmt_offset_from_database(jurisdiction_t *holiday, const datetime_t *date)
 {
     double offset_hours;
 
@@ -221,18 +217,9 @@ int main(int argc, char **argv)
         }
     }
 
-    date = datetime_init_ymd(datetime_alloc(),
-                             options.date_year,
-                             options.date_month,
-                             options.date_day);
-    start = datetime_init_ymd(datetime_alloc(),
-                              options.start_year,
-                              options.start_month,
-                              options.start_day);
-    end = datetime_init_ymd(datetime_alloc(),
-                            options.end_year,
-                            options.end_month,
-                            options.end_day);
+    date = datetime_init_ymd(datetime_alloc(), options.date_year, options.date_month, options.date_day);
+    start = datetime_init_ymd(datetime_alloc(), options.start_year, options.start_month, options.start_day);
+    end = datetime_init_ymd(datetime_alloc(), options.end_year, options.end_month, options.end_day);
     if (!date || !start || !end) {
         datetime_dealloc(date);
         datetime_dealloc(start);

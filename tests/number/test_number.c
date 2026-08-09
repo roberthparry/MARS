@@ -9,8 +9,7 @@ TEST_SUITE_SETUP(test_number_suite_setup);
 
 static bool test_number_suite_setup(void)
 {
-    test_register_validity_checker("number-exact",
-                                   number_validity_contract_exact());
+    test_register_validity_checker("number-exact", number_validity_contract_exact());
     return TEST_REQUIRE_VALIDITY_CHECKER("number-exact");
 }
 
@@ -38,8 +37,7 @@ int tests_main(void)
     TEST_RUN_IN_GROUP(run_number_formatting_tests, tests, "number,formatting");
 
     TEST_SECTION("Special Functions");
-    TEST_RUN_IN_GROUP(run_number_special_function_tests, tests,
-                      "number,special-functions");
+    TEST_RUN_IN_GROUP(run_number_special_function_tests, tests, "number,special-functions");
 
     TEST_SECTION("Backend Parity");
     TEST_RUN_IN_GROUP(run_number_backend_parity_tests, tests, "number,backend-parity");
@@ -50,11 +48,8 @@ int tests_main(void)
     /* README examples intentionally run last because they produce output. */
     TEST_SECTION("README Output Examples");
     printf(C_YELLOW "\nRunning number README-equivalent examples...\n" C_RESET);
-    TEST_RUN_OUTPUT_IN_GROUP_TAGS(run_number_readme_example_tests,
-                                  readme_examples,
-                                  "number,readme,output");
-    TEST_RUN_OUTPUT_IN_GROUP_TAGS(run_number_readme_mersenne_prime_search,
-                                  readme_examples,
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(run_number_readme_example_tests, readme_examples, "number,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(run_number_readme_mersenne_prime_search, readme_examples,
                                   "number,readme,mersenne,output");
 
     return TEST_EXIT_CODE();

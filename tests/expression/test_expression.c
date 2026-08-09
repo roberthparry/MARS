@@ -1,15 +1,9 @@
 #include "test_expr.h"
 
 static bool test_expr_suite_setup(void);
-static int expr_number_exact_equal(const void *actual,
-                                   const void *expected,
-                                   void *ctx);
-static int expr_number_close_equal(const void *actual,
-                                   const void *expected,
-                                   void *ctx);
-static int expr_number_format(const void *value,
-                              string_t *out,
-                              void *ctx);
+static int expr_number_exact_equal(const void *actual, const void *expected, void *ctx);
+static int expr_number_close_equal(const void *actual, const void *expected, void *ctx);
+static int expr_number_format(const void *value, string_t *out, void *ctx);
 static number_t expr_error_magnitude(number_t got, number_t expected);
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
@@ -19,17 +13,12 @@ TEST_SUITE_SETUP(test_expr_suite_setup);
 
 static bool test_expr_suite_setup(void)
 {
-    test_register_validity_checker("expr-number-exact",
-                                   expr_validity_contract_number_exact());
-    test_register_validity_checker("expr-number-close",
-                                   expr_validity_contract_number_close());
-    return TEST_REQUIRE_VALIDITY_CHECKER("expr-number-exact") &&
-           TEST_REQUIRE_VALIDITY_CHECKER("expr-number-close");
+    test_register_validity_checker("expr-number-exact", expr_validity_contract_number_exact());
+    test_register_validity_checker("expr-number-close", expr_validity_contract_number_close());
+    return TEST_REQUIRE_VALIDITY_CHECKER("expr-number-exact") && TEST_REQUIRE_VALIDITY_CHECKER("expr-number-close");
 }
 
-static int expr_number_exact_equal(const void *actual,
-                                   const void *expected,
-                                   void *ctx)
+static int expr_number_exact_equal(const void *actual, const void *expected, void *ctx)
 {
     (void)ctx;
     return num_eq(*(const number_t *)actual, *(const number_t *)expected);
@@ -41,8 +30,7 @@ static number_t expr_error_magnitude(number_t got, number_t expected)
     number_t diff;
     number_t error;
 
-    if (num_get_prec_bits(expected) > 0u &&
-        num_set_prec_bits(&promoted_got, num_get_prec_bits(expected)) != 0) {
+    if (num_get_prec_bits(expected) > 0u && num_set_prec_bits(&promoted_got, num_get_prec_bits(expected)) != 0) {
         num_destroy(&promoted_got);
         return num_create_from_double(NAN);
     }
@@ -65,9 +53,7 @@ static number_t expr_error_magnitude(number_t got, number_t expected)
     }
 }
 
-static int expr_number_close_equal(const void *actual,
-                                   const void *expected,
-                                   void *ctx)
+static int expr_number_close_equal(const void *actual, const void *expected, void *ctx)
 {
     number_t got = *(const number_t *)actual;
     number_t want = *(const number_t *)expected;
@@ -95,9 +81,7 @@ static int expr_number_close_equal(const void *actual,
     return ok;
 }
 
-static int expr_number_format(const void *value,
-                              string_t *out,
-                              void *ctx)
+static int expr_number_format(const void *value, string_t *out, void *ctx)
 {
     string_t *text;
 
@@ -118,10 +102,7 @@ static int expr_number_format(const void *value,
 const test_validity_contract_t *expr_validity_contract_number_exact(void)
 {
     static const test_validity_contract_t contract =
-        TEST_VALIDITY_CONTRACT("expr-number-exact",
-                               expr_number_exact_equal,
-                               expr_number_format,
-                               NULL);
+        TEST_VALIDITY_CONTRACT("expr-number-exact", expr_number_exact_equal, expr_number_format, NULL);
 
     return &contract;
 }
@@ -129,10 +110,7 @@ const test_validity_contract_t *expr_validity_contract_number_exact(void)
 const test_validity_contract_t *expr_validity_contract_number_close(void)
 {
     static const test_validity_contract_t contract =
-        TEST_VALIDITY_CONTRACT("expr-number-close",
-                               expr_number_close_equal,
-                               expr_number_format,
-                               NULL);
+        TEST_VALIDITY_CONTRACT("expr-number-close", expr_number_close_equal, expr_number_format, NULL);
 
     return &contract;
 }
@@ -141,14 +119,13 @@ const test_validity_contract_t *expr_validity_contract_number_close(void)
 /* Compact qfloat_t comparison (kept exactly as-is, but using harness colours) */
 /* ------------------------------------------------------------------------- */
 
-void check_q_at(const char *file, int line, int col,
-                const char *label, qfloat_t got, qfloat_t expect)
+void check_q_at(const char *file, int line, int col, const char *label, qfloat_t got, qfloat_t expect)
 {
     qfloat_t diff = qf_sub(got, expect);
     double abs_err = fabs(qf_to_double(diff));
-    double exp_d   = fabs(qf_to_double(expect));
+    double exp_d = fabs(qf_to_double(expect));
 
-    double rel_err = (exp_d > 0)? abs_err / exp_d : abs_err;
+    double rel_err = (exp_d > 0) ? abs_err / exp_d : abs_err;
 
     const double ABS_TOL = 1e-15;
     const double REL_TOL = 1e-15;
@@ -172,7 +149,6 @@ void check_q_at(const char *file, int line, int col,
     qf_printf("%.34q", diff);
 
     printf("\n");
-
 }
 
 void print_expr_of(const expr_t *f)
@@ -229,12 +205,12 @@ static expr_t *make_readme_f(expr_t *x)
     number_t two = num_create_from_long(2);
     number_t three = num_create_from_long(3);
     number_t seven = num_create_from_long(7);
-    expr_t *sinx   = expr_sin(x);
+    expr_t *sinx = expr_sin(x);
     expr_t *exp_sx = expr_exp(sinx);
-    expr_t *x2     = expr_pow(x, &two);
-    expr_t *term2  = expr_mul_num(x2, &three);
-    expr_t *f0     = expr_add(exp_sx, term2);
-    expr_t *f      = expr_sub_num(f0, &seven);
+    expr_t *x2 = expr_pow(x, &two);
+    expr_t *term2 = expr_mul_num(x2, &three);
+    expr_t *f0 = expr_add(exp_sx, term2);
+    expr_t *f = expr_sub_num(f0, &seven);
 
     expr_free(sinx);
     expr_free(exp_sx);
@@ -294,16 +270,18 @@ static int run_readme_example(void)
         return 1;
     }
 
-    f_val  = expr_eval(f);
+    f_val = expr_eval(f);
     d1_val = expr_eval(df_dx);
     d2_val = expr_eval(d2f_dx);
 
-    printf("f(x)    = "); expr_print(f);
-    printf("f'(x)   = "); expr_print(df_dx);
-    printf("f''(x)  = "); expr_print(d2f_dx);
+    printf("f(x)    = ");
+    expr_print(f);
+    printf("f'(x)   = ");
+    expr_print(df_dx);
+    printf("f''(x)  = ");
+    expr_print(d2f_dx);
 
-    printf("\nAt x = 1.25 (384 bits, %zu significant digits):\n",
-           num_get_prec_digits(f_val));
+    printf("\nAt x = 1.25 (384 bits, %zu significant digits):\n", num_get_prec_digits(f_val));
     print_num_line("f(x)", f_val);
     print_num_line("f'(x)", d1_val);
     print_num_line("f''(x)", d2_val);
@@ -332,8 +310,7 @@ static int run_readme_from_string_example(void)
 
     if (num_set_default_prec_bits(384u) != 0)
         return 1;
-    f = expr_from_string("{ exp(sin(x)) + 3*x^2 - 7 | x = 1.25 }",
-                         &bindings);
+    f = expr_from_string("{ exp(sin(x)) + 3*x^2 - 7 | x = 1.25 }", &bindings);
     if (!f) {
         num_set_default_prec_bits(old_prec_bits);
         return 1;
@@ -363,16 +340,18 @@ static int run_readme_from_string_example(void)
         return 1;
     }
 
-    f_val  = expr_eval(f);
+    f_val = expr_eval(f);
     d1_val = expr_eval(df_dx);
     d2_val = expr_eval(d2f_dx);
 
-    printf("f(x)    = "); expr_print(f);
-    printf("f'(x)   = "); expr_print(df_dx);
-    printf("f''(x)  = "); expr_print(d2f_dx);
+    printf("f(x)    = ");
+    expr_print(f);
+    printf("f'(x)   = ");
+    expr_print(df_dx);
+    printf("f''(x)  = ");
+    expr_print(d2f_dx);
 
-    printf("\nAt x = 1.25 (384 bits, %zu significant digits):\n",
-           num_get_prec_digits(f_val));
+    printf("\nAt x = 1.25 (384 bits, %zu significant digits):\n", num_get_prec_digits(f_val));
     print_num_line("f(x)", f_val);
     print_num_line("f'(x)", d1_val);
     print_num_line("f''(x)", d2_val);
@@ -420,28 +399,37 @@ static int run_readme_partial_example(void)
     f = expr_add(t0, y2);
 
     if (!x || !y || !x2 || !xy || !y2 || !t0 || !f) {
-        expr_free(f); expr_free(t0); expr_free(y2); expr_free(xy); expr_free(x2);
-        expr_free(y); expr_free(x);
+        expr_free(f);
+        expr_free(t0);
+        expr_free(y2);
+        expr_free(xy);
+        expr_free(x2);
+        expr_free(y);
+        expr_free(x);
         num_set_default_prec_bits(old_prec_bits);
         return 1;
     }
 
-    df_dx    = expr_create_deriv(f, x);
-    df_dy    = expr_create_deriv(f, y);
+    df_dx = expr_create_deriv(f, x);
+    df_dy = expr_create_deriv(f, y);
     d2f_dxdy = expr_create_2nd_deriv(f, x, y);
     if (!df_dx || !df_dy || !d2f_dxdy) {
         expr_free(d2f_dxdy);
         expr_free(df_dy);
         expr_free(df_dx);
-        expr_free(f); expr_free(t0); expr_free(y2); expr_free(xy); expr_free(x2);
-        expr_free(y); expr_free(x);
+        expr_free(f);
+        expr_free(t0);
+        expr_free(y2);
+        expr_free(xy);
+        expr_free(x2);
+        expr_free(y);
+        expr_free(x);
         num_set_default_prec_bits(old_prec_bits);
         return 1;
     }
 
     value = expr_eval(f);
-    printf("At x=1, y=2 (384 bits, %zu significant digits):\n",
-           num_get_prec_digits(value));
+    printf("At x=1, y=2 (384 bits, %zu significant digits):\n", num_get_prec_digits(value));
     print_num_line("f", value);
     num_destroy(&value);
     value = expr_eval(df_dx);
@@ -459,8 +447,13 @@ static int run_readme_partial_example(void)
         expr_free(d2f_dxdy);
         expr_free(df_dy);
         expr_free(df_dx);
-        expr_free(f); expr_free(t0); expr_free(y2); expr_free(xy); expr_free(x2);
-        expr_free(y); expr_free(x);
+        expr_free(f);
+        expr_free(t0);
+        expr_free(y2);
+        expr_free(xy);
+        expr_free(x2);
+        expr_free(y);
+        expr_free(x);
         num_set_default_prec_bits(old_prec_bits);
         return 1;
     }
@@ -479,8 +472,13 @@ static int run_readme_partial_example(void)
     expr_free(d2f_dxdy);
     expr_free(df_dy);
     expr_free(df_dx);
-    expr_free(f); expr_free(t0); expr_free(y2); expr_free(xy); expr_free(x2);
-    expr_free(y); expr_free(x);
+    expr_free(f);
+    expr_free(t0);
+    expr_free(y2);
+    expr_free(xy);
+    expr_free(x2);
+    expr_free(y);
+    expr_free(x);
     num_set_default_prec_bits(old_prec_bits);
     return 0;
 }
@@ -546,8 +544,7 @@ static int run_readme_eval_derivatives_example(void)
         return 1;
     }
 
-    printf("Evaluating derivatives at x=1, y=2 (384 bits, %zu significant digits):\n",
-           num_get_prec_digits(value));
+    printf("Evaluating derivatives at x=1, y=2 (384 bits, %zu significant digits):\n", num_get_prec_digits(value));
     print_num_line("f", value);
     print_num_line("∂f/∂x", grads[0]);
     print_num_line("∂f/∂y", grads[1]);
@@ -639,8 +636,7 @@ int tests_main(void)
     TEST_RUN_IN_GROUP(test_reverse_mode, tests, NULL);
 
     TEST_SECTION("README Output Examples");
-    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_readme_examples, readme_examples,
-                                  "expression,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_readme_examples, readme_examples, "expression,readme,output");
 
     return TESTS_EXIT_CODE();
 }

@@ -63,18 +63,14 @@ expr_t *div_number_owned_consuming(expr_t *expr, number_t *denom)
     return out;
 }
 
-expr_t *div_number_owned_by_product(expr_t *expr,
-                                    number_t left,
-                                    number_t right)
+expr_t *div_number_owned_by_product(expr_t *expr, number_t left, number_t right)
 {
     number_t denom = num_mul(left, right);
 
     return div_number_owned_consuming(expr, &denom);
 }
 
-expr_t *div_number_owned_by_long_product(expr_t *expr,
-                                         long left,
-                                         number_t right)
+expr_t *div_number_owned_by_long_product(expr_t *expr, long left, number_t right)
 {
     number_t factor = num_create_from_long(left);
     expr_t *out = div_number_owned_by_product(expr, factor, right);

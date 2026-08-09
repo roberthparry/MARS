@@ -24,9 +24,7 @@ static number_t number_cdouble_const(number_const_id_t id, double complex value)
     return out;
 }
 
-static string_t *number_format_cdouble_value_text(double value,
-                                                  bool scientific,
-                                                  int precision)
+static string_t *number_format_cdouble_value_text(double value, bool scientific, int precision)
 {
     char fmt[32];
 
@@ -37,9 +35,7 @@ static string_t *number_format_cdouble_value_text(double value,
     return string_sprintf(fmt, value);
 }
 
-string_t *number_format_cdouble_text(const number_t *number,
-                                     bool scientific,
-                                     int precision)
+string_t *number_format_cdouble_text(const number_t *number, bool scientific, int precision)
 {
     double complex value;
     double real;
@@ -75,9 +71,8 @@ string_t *number_format_cdouble_text(const number_t *number,
         goto done;
     sign = imag < 0.0 ? "-" : "+";
     {
-        out = fabs(imag) == 1.0
-            ? string_sprintf("%S %s i", real_text, sign)
-            : string_sprintf("%S %s %Si", real_text, sign, imag_text);
+        out = fabs(imag) == 1.0 ? string_sprintf("%S %s i", real_text, sign)
+                                : string_sprintf("%S %s %Si", real_text, sign, imag_text);
     }
 
 done:
@@ -93,8 +88,7 @@ string_t *number_to_text_cdouble(const number_t *number)
 
 bool number_is_zero_cdouble(const number_t *number)
 {
-    return number && creal(number_cdouble_value(number)) == 0.0 &&
-        cimag(number_cdouble_value(number)) == 0.0;
+    return number && creal(number_cdouble_value(number)) == 0.0 && cimag(number_cdouble_value(number)) == 0.0;
 }
 
 bool number_is_real_cdouble(const number_t *number)
@@ -104,8 +98,7 @@ bool number_is_real_cdouble(const number_t *number)
 
 bool number_is_one_cdouble(const number_t *number)
 {
-    return number && creal(number_cdouble_value(number)) == 1.0 &&
-        cimag(number_cdouble_value(number)) == 0.0;
+    return number && creal(number_cdouble_value(number)) == 1.0 && cimag(number_cdouble_value(number)) == 0.0;
 }
 
 bool number_eq_same_cdouble(const number_t *a, const number_t *b)
@@ -179,8 +172,7 @@ number_t *number_clone_cdouble(const number_t *number)
     return copy;
 }
 
-number_t *number_const_prec_cdouble(const number_t *number,
-                                        size_t precision_bits)
+number_t *number_const_prec_cdouble(const number_t *number, size_t precision_bits)
 {
     (void)precision_bits;
     return number_clone_cdouble(number);
@@ -233,17 +225,12 @@ number_t *number_floor_cdouble(const number_t *number)
 
 number_t *number_pow_int_cdouble(const number_t *number, int exponent)
 {
-    return number
-        ? number_wrap_cdouble(cpow(number_cdouble_value(number), (double)exponent))
-        : NULL;
+    return number ? number_wrap_cdouble(cpow(number_cdouble_value(number), (double)exponent)) : NULL;
 }
 
 number_t *number_mul_pow10_cdouble(const number_t *number, int exponent10)
 {
-    return number
-        ? number_wrap_cdouble(number_cdouble_value(number) *
-                              pow(10.0, (double)exponent10))
-        : NULL;
+    return number ? number_wrap_cdouble(number_cdouble_value(number) * pow(10.0, (double)exponent10)) : NULL;
 }
 
 number_t *number_ldexp_cdouble(const number_t *number, int exponent2)
@@ -253,32 +240,27 @@ number_t *number_ldexp_cdouble(const number_t *number, int exponent2)
     if (!number)
         return NULL;
     value = number_cdouble_value(number);
-    return number_wrap_cdouble(ldexp(creal(value), exponent2) +
-                               ldexp(cimag(value), exponent2) * I);
+    return number_wrap_cdouble(ldexp(creal(value), exponent2) + ldexp(cimag(value), exponent2) * I);
 }
 
 number_t *number_add_same_cdouble(const number_t *a, const number_t *b)
 {
-    return (a && b) ? number_wrap_cdouble(number_cdouble_value(a) +
-                                          number_cdouble_value(b)) : NULL;
+    return (a && b) ? number_wrap_cdouble(number_cdouble_value(a) + number_cdouble_value(b)) : NULL;
 }
 
 number_t *number_sub_same_cdouble(const number_t *a, const number_t *b)
 {
-    return (a && b) ? number_wrap_cdouble(number_cdouble_value(a) -
-                                          number_cdouble_value(b)) : NULL;
+    return (a && b) ? number_wrap_cdouble(number_cdouble_value(a) - number_cdouble_value(b)) : NULL;
 }
 
 number_t *number_mul_same_cdouble(const number_t *a, const number_t *b)
 {
-    return (a && b) ? number_wrap_cdouble(number_cdouble_value(a) *
-                                          number_cdouble_value(b)) : NULL;
+    return (a && b) ? number_wrap_cdouble(number_cdouble_value(a) * number_cdouble_value(b)) : NULL;
 }
 
 number_t *number_div_same_cdouble(const number_t *a, const number_t *b)
 {
-    return (a && b) ? number_wrap_cdouble(number_cdouble_value(a) /
-                                          number_cdouble_value(b)) : NULL;
+    return (a && b) ? number_wrap_cdouble(number_cdouble_value(a) / number_cdouble_value(b)) : NULL;
 }
 
 number_t *number_exp_same_cdouble(const number_t *number)
@@ -304,8 +286,7 @@ number_t number_const_like_cdouble(const number_t *like, number_const_id_t id)
     return number_invalid();
 }
 
-number_t number_imag_const_like_cdouble(const number_t *like,
-                                            number_const_id_t id)
+number_t number_imag_const_like_cdouble(const number_t *like, number_const_id_t id)
 {
     (void)like;
     if (id == NUMBER_CONST_ONE)
@@ -322,11 +303,10 @@ number_t number_imag_const_like_cdouble(const number_t *like,
 bool number_value_is_immortal_cdouble(const number_t *number)
 {
     return number && number_impl_const(number)->value.cd.immortal &&
-        number_impl_const(number)->value.cd.constant_id < NUMBER_CONST_COUNT;
+           number_impl_const(number)->value.cd.constant_id < NUMBER_CONST_COUNT;
 }
 
-bool number_immortal_id_cdouble(const number_t *number,
-                                    number_const_id_t *id_out)
+bool number_immortal_id_cdouble(const number_t *number, number_const_id_t *id_out)
 {
     if (!number_value_is_immortal_cdouble(number) || !id_out)
         return false;

@@ -1,9 +1,9 @@
 // test_set.c — tests for the generic value-set container using the new test harness
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdbool.h>
 #include <time.h>
 
 #include "test_harness.h"
@@ -16,10 +16,12 @@ TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
  * strdup replacement for strict C99
  * ------------------------------------------------------------- */
 
-static char *strclone(const char *s) {
+static char *strclone(const char *s)
+{
     size_t n = strlen(s) + 1;
     char *p = malloc(n);
-    if (p) memcpy(p, s, n);
+    if (p)
+        memcpy(p, s, n);
     return p;
 }
 
@@ -27,13 +29,15 @@ static char *strclone(const char *s) {
  * Hash and compare for int
  * ------------------------------------------------------------- */
 
-static size_t int_hash(const void *p) {
+static size_t int_hash(const void *p)
+{
     int v;
     memcpy(&v, p, sizeof(int));
     return (size_t)v * 2654435761u;
 }
 
-static int int_cmp(const void *a, const void *b) {
+static int int_cmp(const void *a, const void *b)
+{
     int x, y;
     memcpy(&x, a, sizeof(int));
     memcpy(&y, b, sizeof(int));
@@ -44,28 +48,32 @@ static int int_cmp(const void *a, const void *b) {
  * Hash and compare for char*
  * ------------------------------------------------------------- */
 
-static size_t str_hash(const void *p) {
-    const char *s = *(const char * const *)p;
+static size_t str_hash(const void *p)
+{
+    const char *s = *(const char *const *)p;
     size_t h = 146527;
     for (size_t i = 0u; s[i] != '\0'; ++i)
         h = (h * 33) ^ (unsigned char)s[i];
     return h;
 }
 
-static int str_cmp(const void *a, const void *b) {
-    const char *sa = *(const char * const *)a;
-    const char *sb = *(const char * const *)b;
+static int str_cmp(const void *a, const void *b)
+{
+    const char *sa = *(const char *const *)a;
+    const char *sb = *(const char *const *)b;
     return strcmp(sa, sb);
 }
 
 /* Clone/destroy for char* */
-static void str_clone(void *dst, const void *src) {
-    const char *s = *(const char * const *)src;
+static void str_clone(void *dst, const void *src)
+{
+    const char *s = *(const char *const *)src;
     char *copy = strclone(s);
     memcpy(dst, &copy, sizeof(char *));
 }
 
-static void str_destroy(void *elem) {
+static void str_destroy(void *elem)
+{
     char *s = *(char **)elem;
     free(s);
 }
@@ -79,7 +87,8 @@ struct deep {
     int value;
 };
 
-static size_t deep_hash(const void *p) {
+static size_t deep_hash(const void *p)
+{
     const struct deep *d = p;
     size_t h = 146527;
     const char *s = d->name;
@@ -88,22 +97,26 @@ static size_t deep_hash(const void *p) {
     return h ^ (size_t)d->value;
 }
 
-static int deep_cmp(const void *a, const void *b) {
+static int deep_cmp(const void *a, const void *b)
+{
     const struct deep *da = a;
     const struct deep *db = b;
     int c = strcmp(da->name, db->name);
-    if (c != 0) return c;
+    if (c != 0)
+        return c;
     return (da->value > db->value) - (da->value < db->value);
 }
 
-static void deep_clone(void *dst, const void *src) {
+static void deep_clone(void *dst, const void *src)
+{
     const struct deep *s = src;
     struct deep *d = dst;
     d->value = s->value;
     d->name = strclone(s->name);
 }
 
-static void deep_destroy(void *elem) {
+static void deep_destroy(void *elem)
+{
     struct deep *d = elem;
     free(d->name);
 }
@@ -112,7 +125,8 @@ static void deep_destroy(void *elem) {
  * Tests
  * ------------------------------------------------------------- */
 
-void test_ints(void) {
+void test_ints(void)
+{
     set_t *s = set_create(sizeof(int), int_hash, int_cmp, NULL, NULL);
 
     int a = 5, b = 10, c = 5;
@@ -122,14 +136,15 @@ void test_ints(void) {
 
     ASSERT_TRUE(set_contains(s, &a));
     ASSERT_TRUE(set_contains(s, &b));
-    ASSERT_TRUE(!set_add(s, &c));     // duplicate should fail
+    ASSERT_TRUE(!set_add(s, &c)); // duplicate should fail
     ASSERT_TRUE(set_remove(s, &a));
     ASSERT_TRUE(!set_contains(s, &a));
 
     set_destroy(s);
 }
 
-void test_strings(void) {
+void test_strings(void)
+{
     set_t *s = set_create(sizeof(char *), str_hash, str_cmp, str_clone, str_destroy);
 
     const char *a = "hello";
@@ -140,25 +155,26 @@ void test_strings(void) {
     set_add(s, &b);
 
     ASSERT_TRUE(set_contains(s, &a));
-    ASSERT_TRUE(!set_add(s, &c));     // duplicate
+    ASSERT_TRUE(!set_add(s, &c)); // duplicate
     ASSERT_TRUE(set_remove(s, &a));
     ASSERT_TRUE(!set_contains(s, &a));
 
     set_destroy(s);
 }
 
-void test_deep(void) {
+void test_deep(void)
+{
     set_t *s = set_create(sizeof(struct deep), deep_hash, deep_cmp, deep_clone, deep_destroy);
 
-    struct deep a = { strclone("alpha"), 1 };
-    struct deep b = { strclone("beta"), 2 };
-    struct deep c = { strclone("alpha"), 1 };
+    struct deep a = {strclone("alpha"), 1};
+    struct deep b = {strclone("beta"), 2};
+    struct deep c = {strclone("alpha"), 1};
 
     set_add(s, &a);
     set_add(s, &b);
 
     ASSERT_TRUE(set_contains(s, &a));
-    ASSERT_TRUE(!set_add(s, &c));     // duplicate
+    ASSERT_TRUE(!set_add(s, &c)); // duplicate
     ASSERT_TRUE(set_remove(s, &a));
     ASSERT_TRUE(!set_contains(s, &a));
 
@@ -169,11 +185,13 @@ void test_deep(void) {
     set_destroy(s);
 }
 
-void test_sorted(void) {
+void test_sorted(void)
+{
     set_t *s = set_create(sizeof(int), int_hash, int_cmp, NULL, NULL);
 
-    int vals[] = { 5, 1, 3, 4, 2 };
-    for (int i = 0; i < 5; ++i) set_add(s, &vals[i]);
+    int vals[] = {5, 1, 3, 4, 2};
+    for (int i = 0; i < 5; ++i)
+        set_add(s, &vals[i]);
 
     for (size_t i = 0; i < 5; ++i) {
         const int *p = set_get_sorted(s, i);
@@ -183,7 +201,8 @@ void test_sorted(void) {
     set_destroy(s);
 }
 
-void test_fuzz(void) {
+void test_fuzz(void)
+{
     set_t *s = set_create(sizeof(int), int_hash, int_cmp, NULL, NULL);
 
     srand((unsigned)time(NULL));
@@ -203,15 +222,10 @@ void test_fuzz(void) {
     set_destroy(s);
 }
 
-static void example_set_strings(void) {
+static void example_set_strings(void)
+{
     /* Create a set of strings with deep‑copy semantics */
-    set_t *s = set_create(
-        sizeof(char *),
-        str_hash,
-        str_cmp,
-        str_clone,
-        str_destroy
-    );
+    set_t *s = set_create(sizeof(char *), str_hash, str_cmp, str_clone, str_destroy);
 
     const char *a = "hello";
     const char *b = "world";
@@ -234,7 +248,8 @@ static void example_set_strings(void) {
     set_destroy(s);
 }
 
-static void example_set_deep_strings(void) {
+static void example_set_deep_strings(void)
+{
     set_t *s = set_create(sizeof(char *), str_hash, str_cmp, str_clone, str_destroy);
 
     const char *a = "hello";
@@ -255,7 +270,8 @@ static void example_set_deep_strings(void) {
  * tests_main() — the harness entry point
  * ------------------------------------------------------------- */
 
-int tests_main(void) {
+int tests_main(void)
+{
 
     TEST_SECTION("Integer Tests");
     TEST_RUN_IN_GROUP(test_ints, tests, NULL);
@@ -273,10 +289,8 @@ int tests_main(void) {
     TEST_RUN_IN_GROUP(test_fuzz, tests, NULL);
 
     printf(C_YELLOW "\nRunning README examples...\n" C_RESET);
-    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_set_strings, readme_examples,
-                                  "set,readme,output");
-    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_set_deep_strings, readme_examples,
-                                  "set,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_set_strings, readme_examples, "set,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_set_deep_strings, readme_examples, "set,readme,output");
 
     return TESTS_EXIT_CODE();
 }

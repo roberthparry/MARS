@@ -17,34 +17,14 @@ typedef struct {
 } number_mpq_fraction_glyph_t;
 
 static const number_mpq_const_source_t number_mpq_const_sources[] = {
-    { NUMBER_CONST_HALF, 1L, 2u },
-    { NUMBER_CONST_ONE_AND_HALF, 3L, 2u },
-    { NUMBER_CONST_ONE_THIRD, 1L, 3u },
-    { NUMBER_CONST_QUARTER, 1L, 4u },
-    { NUMBER_CONST_ONE_SIXTH, 1L, 6u },
-    { NUMBER_CONST_ONE_EIGHTH, 1L, 8u },
-    { NUMBER_CONST_ONE_TENTH, 1L, 10u }
-};
+    {NUMBER_CONST_HALF, 1L, 2u},      {NUMBER_CONST_ONE_AND_HALF, 3L, 2u}, {NUMBER_CONST_ONE_THIRD, 1L, 3u},
+    {NUMBER_CONST_QUARTER, 1L, 4u},   {NUMBER_CONST_ONE_SIXTH, 1L, 6u},    {NUMBER_CONST_ONE_EIGHTH, 1L, 8u},
+    {NUMBER_CONST_ONE_TENTH, 1L, 10u}};
 
 static const number_mpq_fraction_glyph_t number_mpq_fraction_glyphs[] = {
-    { 1u, 2u, "½"  },
-    { 1u, 3u, "⅓"  },
-    { 2u, 3u, "⅔"  },
-    { 1u, 4u, "¼"  },
-    { 3u, 4u, "¾"  },
-    { 1u, 5u, "⅕"  },
-    { 2u, 5u, "⅖"  },
-    { 3u, 5u, "⅗"  },
-    { 4u, 5u, "⅘"  },
-    { 1u, 6u, "⅙"  },
-    { 5u, 6u, "⅚"  },
-    { 1u, 7u, "⅐"  },
-    { 1u, 8u, "⅛"  },
-    { 3u, 8u, "⅜"  },
-    { 5u, 8u, "⅝"  },
-    { 7u, 8u, "⅞"  },
-    { 1u, 9u, "⅑"  },
-    { 1u, 10u, "⅒" },
+    {1u, 2u, "½"}, {1u, 3u, "⅓"}, {2u, 3u, "⅔"}, {1u, 4u, "¼"}, {3u, 4u, "¾"}, {1u, 5u, "⅕"},
+    {2u, 5u, "⅖"}, {3u, 5u, "⅗"}, {4u, 5u, "⅘"}, {1u, 6u, "⅙"}, {5u, 6u, "⅚"}, {1u, 7u, "⅐"},
+    {1u, 8u, "⅛"}, {3u, 8u, "⅜"}, {5u, 8u, "⅝"}, {7u, 8u, "⅞"}, {1u, 9u, "⅑"}, {1u, 10u, "⅒"},
 };
 
 static const char *const number_mpq_superscript_digits[] = {
@@ -64,13 +44,9 @@ static int number_mpq_init(number_mpq_t *value)
     return 0;
 }
 
-static bool number_mpq_const_fraction(number_const_id_t id,
-                                      long *numerator_out,
-                                      unsigned long *denominator_out)
+static bool number_mpq_const_fraction(number_const_id_t id, long *numerator_out, unsigned long *denominator_out)
 {
-    for (size_t i = 0u;
-         i < sizeof(number_mpq_const_sources) / sizeof(number_mpq_const_sources[0]);
-         ++i) {
+    for (size_t i = 0u; i < sizeof(number_mpq_const_sources) / sizeof(number_mpq_const_sources[0]); ++i) {
         if (number_mpq_const_sources[i].id == id) {
             if (numerator_out)
                 *numerator_out = number_mpq_const_sources[i].numerator;
@@ -82,8 +58,7 @@ static bool number_mpq_const_fraction(number_const_id_t id,
     return false;
 }
 
-static const char *number_mpq_fraction_glyph_lookup(mpz_srcptr numerator,
-                                                    mpz_srcptr denominator)
+static const char *number_mpq_fraction_glyph_lookup(mpz_srcptr numerator, mpz_srcptr denominator)
 {
     unsigned long n;
     unsigned long d;
@@ -92,19 +67,14 @@ static const char *number_mpq_fraction_glyph_lookup(mpz_srcptr numerator,
         return NULL;
     n = mpz_get_ui(numerator);
     d = mpz_get_ui(denominator);
-    for (size_t i = 0u;
-         i < sizeof(number_mpq_fraction_glyphs) / sizeof(number_mpq_fraction_glyphs[0]);
-         ++i) {
-        if (number_mpq_fraction_glyphs[i].numerator == n &&
-            number_mpq_fraction_glyphs[i].denominator == d)
+    for (size_t i = 0u; i < sizeof(number_mpq_fraction_glyphs) / sizeof(number_mpq_fraction_glyphs[0]); ++i) {
+        if (number_mpq_fraction_glyphs[i].numerator == n && number_mpq_fraction_glyphs[i].denominator == d)
             return number_mpq_fraction_glyphs[i].glyph;
     }
     return NULL;
 }
 
-static bool number_mpq_append_digit_table_cstr(string_t *out,
-                                               const char *digits,
-                                               const char *const table[])
+static bool number_mpq_append_digit_table_cstr(string_t *out, const char *digits, const char *const table[])
 {
     if (!out || !digits || !table)
         return false;
@@ -112,15 +82,13 @@ static bool number_mpq_append_digit_table_cstr(string_t *out,
     for (size_t i = 0u; digits[i] != '\0'; ++i) {
         unsigned char digit = (unsigned char)digits[i];
 
-        if (digit < '0' || digit > '9' ||
-            string_append_cstr(out, table[(unsigned int)(digit - '0')]) != 0)
+        if (digit < '0' || digit > '9' || string_append_cstr(out, table[(unsigned int)(digit - '0')]) != 0)
             return false;
     }
     return true;
 }
 
-static string_t *number_mpq_decode_digit_sequence(string_cursor_t *cursor,
-                                                  const char *const table[])
+static string_t *number_mpq_decode_digit_sequence(string_cursor_t *cursor, const char *const table[])
 {
     string_t *digits = string_new();
     bool found = false;
@@ -157,17 +125,11 @@ static string_t *number_mpq_decode_digit_sequence(string_cursor_t *cursor,
     return digits;
 }
 
-static int number_mpq_parse_glyph_fraction(mpq_t value,
-                                           string_view_t text,
-                                           bool negative)
+static int number_mpq_parse_glyph_fraction(mpq_t value, string_view_t text, bool negative)
 {
-    for (size_t i = 0u;
-         i < sizeof(number_mpq_fraction_glyphs) / sizeof(number_mpq_fraction_glyphs[0]);
-         ++i) {
+    for (size_t i = 0u; i < sizeof(number_mpq_fraction_glyphs) / sizeof(number_mpq_fraction_glyphs[0]); ++i) {
         if (string_view_equals_literal(text, number_mpq_fraction_glyphs[i].glyph)) {
-            mpq_set_ui(value,
-                       number_mpq_fraction_glyphs[i].numerator,
-                       number_mpq_fraction_glyphs[i].denominator);
+            mpq_set_ui(value, number_mpq_fraction_glyphs[i].numerator, number_mpq_fraction_glyphs[i].denominator);
             if (negative)
                 mpz_neg(mpq_numref(value), mpq_numref(value));
             mpq_canonicalize(value);
@@ -177,9 +139,7 @@ static int number_mpq_parse_glyph_fraction(mpq_t value,
     return -1;
 }
 
-static int number_mpq_parse_stacked_fraction(mpq_t value,
-                                             string_cursor_t *cursor,
-                                             bool negative)
+static int number_mpq_parse_stacked_fraction(mpq_t value, string_cursor_t *cursor, bool negative)
 {
     string_t *num_text;
     string_t *den_text;
@@ -201,8 +161,7 @@ static int number_mpq_parse_stacked_fraction(mpq_t value,
         goto cleanup_den;
 
     if (mpz_set_str(mpq_numref(value), string_c_str(num_text), 10) != 0 ||
-        mpz_set_str(mpq_denref(value), string_c_str(den_text), 10) != 0 ||
-        mpz_sgn(mpq_denref(value)) == 0)
+        mpz_set_str(mpq_denref(value), string_c_str(den_text), 10) != 0 || mpz_sgn(mpq_denref(value)) == 0)
         goto cleanup_den;
 
     if (negative)
@@ -241,9 +200,7 @@ static int number_mpq_set_unicode_fraction(mpq_t value, const string_t *text)
     }
 
     start = string_cursor_position(cursor);
-    unsigned_text = string_cursor_view_between(start,
-                                               string_cursor_end_position(cursor),
-                                               cursor);
+    unsigned_text = string_cursor_view_between(start, string_cursor_end_position(cursor), cursor);
     if (number_mpq_parse_glyph_fraction(value, unsigned_text, negative) == 0) {
         string_cursor_free(cursor);
         return 0;
@@ -261,8 +218,7 @@ static string_t *number_mpq_format_glyph_fraction_text(bool negative, const char
 
     if (!text)
         return NULL;
-    if ((negative && string_append_char(text, '-') != 0) ||
-        string_append_cstr(text, glyph) != 0) {
+    if ((negative && string_append_char(text, '-') != 0) || string_append_cstr(text, glyph) != 0) {
         string_free(text);
         return NULL;
     }
@@ -281,9 +237,7 @@ static string_t *number_mpq_text_from_mpz(mpz_srcptr value)
     return text;
 }
 
-static string_t *number_mpq_format_stacked_fraction_text(bool negative,
-                                                         mpz_srcptr numerator,
-                                                         mpz_srcptr denominator)
+static string_t *number_mpq_format_stacked_fraction_text(bool negative, mpz_srcptr numerator, mpz_srcptr denominator)
 {
     static const char fraction_slash[] = "⁄";
     char *num_text;
@@ -362,8 +316,7 @@ number_mpq_t *number_mpq_from_frac_long(long numerator, long denominator)
     out = number_mpq_new();
     if (!out)
         return NULL;
-    den_mag = denominator > 0 ? (unsigned long)denominator
-                              : (unsigned long)(-(denominator + 1L)) + 1ul;
+    den_mag = denominator > 0 ? (unsigned long)denominator : (unsigned long)(-(denominator + 1L)) + 1ul;
     mpq_set_si(out->value, numerator, den_mag);
     if (denominator < 0)
         mpz_neg(mpq_numref(out->value), mpq_numref(out->value));
@@ -398,8 +351,7 @@ static bool number_mpq_text_has_ascii(const string_t *text, char needle)
         return false;
 
     while (!string_cursor_done(cursor)) {
-        if (string_cursor_peek_ascii(cursor, &ch) &&
-            ch == (unsigned char)needle) {
+        if (string_cursor_peek_ascii(cursor, &ch) && ch == (unsigned char)needle) {
             string_cursor_free(cursor);
             return true;
         }
@@ -421,9 +373,8 @@ number_mpq_t *number_mpq_from_text(const string_t *text)
         return NULL;
     }
 
-    rc = number_mpq_text_has_ascii(text, '/')
-        ? mpq_set_str(out->value, string_c_str(text), 10)
-        : number_mpq_set_unicode_fraction(out->value, text);
+    rc = number_mpq_text_has_ascii(text, '/') ? mpq_set_str(out->value, string_c_str(text), 10)
+                                              : number_mpq_set_unicode_fraction(out->value, text);
     if (rc != 0 || mpz_sgn(mpq_denref(out->value)) == 0) {
         number_mpq_free(out);
         return NULL;
@@ -487,18 +438,14 @@ string_t *number_mpq_to_text(const number_mpq_t *value)
     mpz_abs(numerator, mpq_numref(value->value));
     glyph = number_mpq_fraction_glyph_lookup(numerator, mpq_denref(value->value));
     text = glyph ? number_mpq_format_glyph_fraction_text(negative, glyph)
-                 : number_mpq_format_stacked_fraction_text(
-                       negative, numerator, mpq_denref(value->value));
+                 : number_mpq_format_stacked_fraction_text(negative, numerator, mpq_denref(value->value));
     mpz_clear(numerator);
     return text;
 }
 
-bool number_mpq_get_small_fraction(const number_mpq_t *value,
-                                   long *numerator,
-                                   long *denominator)
+bool number_mpq_get_small_fraction(const number_mpq_t *value, long *numerator, long *denominator)
 {
-    if (!numerator || !denominator || number_mpq_ensure(value) != 0 ||
-        !mpz_fits_slong_p(mpq_numref(value->value)) ||
+    if (!numerator || !denominator || number_mpq_ensure(value) != 0 || !mpz_fits_slong_p(mpq_numref(value->value)) ||
         !mpz_fits_slong_p(mpq_denref(value->value)))
         return false;
     *numerator = mpz_get_si(mpq_numref(value->value));
@@ -520,15 +467,13 @@ bool number_mpq_is_zero(const number_mpq_t *value)
 
 bool number_mpq_is_one(const number_mpq_t *value)
 {
-    return number_mpq_ensure(value) == 0 &&
-        mpz_cmp_si(mpq_numref(value->value), 1L) == 0 &&
-        mpz_cmp_ui(mpq_denref(value->value), 1u) == 0;
+    return number_mpq_ensure(value) == 0 && mpz_cmp_si(mpq_numref(value->value), 1L) == 0 &&
+           mpz_cmp_ui(mpq_denref(value->value), 1u) == 0;
 }
 
 bool number_mpq_is_integer(const number_mpq_t *value)
 {
-    return number_mpq_ensure(value) == 0 &&
-        mpz_cmp_ui(mpq_denref(value->value), 1u) == 0;
+    return number_mpq_ensure(value) == 0 && mpz_cmp_ui(mpq_denref(value->value), 1u) == 0;
 }
 
 bool number_mpq_is_negative(const number_mpq_t *value)

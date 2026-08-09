@@ -143,6 +143,14 @@ Run the full test suite:
 make test
 ```
 
+The normal build also runs `check-native-numeric-boundaries`. This guard checks
+both source references and undefined object symbols to ensure that the qfloat
+and qcomplex modules remain independent of MPFR and MPC:
+
+```sh
+make check-native-numeric-boundaries
+```
+
 Run a single test binary:
 
 ```sh

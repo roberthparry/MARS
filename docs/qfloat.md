@@ -19,7 +19,9 @@ maintained after every operation.
 - ~106 bits of precision (~31–32 decimal digits)
 - arithmetic: add, subtract, multiply, divide, power
 - elementary functions: exp, log, sqrt, sin, cos, tan, atan2, hypot, the versine/haversine family, and inverses
-- special functions: gamma, polygamma, erf, Lambert W, beta, incomplete gamma, exponential integrals, polylogarithms, Appell F₁, normal distribution
+- special functions: gamma, polygamma, erf, Lambert W, beta, incomplete gamma,
+  exponential integrals, polylogarithms, generalised hypergeometric pFq,
+  Lauricella F_D, Appell F₁, Bessel J/Y, Lommel s and the normal distribution
 - decimal parsing and formatting
 - `printf` support through `%q` and `%Q`
 
@@ -277,13 +279,14 @@ All declarations are in `include/qfloat.h`.
 - `qfloat_t qf_bessel_j(qfloat_t order, qfloat_t argument)` — Bessel function of the first kind J_order(argument), for real order and argument
 - `qfloat_t qf_bessel_y(qfloat_t order, qfloat_t argument)` — Bessel function of the second kind Y_order(argument), for real order and argument
 
-Integer orders use MPFR's native Bessel operations. Non-integer real orders
-are evaluated by the defining series and the standard J/Y connection formula.
+These functions are implemented entirely in qfloat arithmetic.  Integer
+orders use the defining series and recurrence relations; non-integer real
+orders use the defining series and the standard J/Y connection formula.
+The qfloat layer has no dependency on MPFR.
 
 **Lommel function**
 
 - `qfloat_t qf_lommel_s(qfloat_t mu, qfloat_t nu, qfloat_t argument)` — lower-case Lommel function s_mu,nu(argument), evaluated from its convergent series
-- `qfloat_t qf_lommel_s_derivative(qfloat_t mu, qfloat_t nu, qfloat_t argument)` — derivative with respect to the argument, evaluated by differentiating the same general series
 
 **Lambert W**
 
@@ -315,7 +318,28 @@ are evaluated by the defining series and the standard J/Y connection formula.
 - `qfloat_t qf_dilog(qfloat_t x)` — principal dilogarithm Li₂(x)
 - `qfloat_t qf_polylog(qfloat_t s, qfloat_t x)` — polylogarithm Li_s(x) for integer real orders currently supported by the implementation
 - `qfloat_t qf_legendre_chi(qfloat_t s, qfloat_t x)` — Legendre chi χ_s(x) for integer real orders currently supported by the implementation
-- `qfloat_t qf_appell_f1(qfloat_t a, qfloat_t b1, qfloat_t b2, qfloat_t c, qfloat_t x, qfloat_t y)` — Appell hypergeometric function F₁(a; b₁, b₂; c; x, y), within the currently implemented convergence region
+
+**Hypergeometric families**
+
+- `qfloat_t qf_hypergeometric_pFq(const qfloat_t *upper, size_t upper_count, const qfloat_t *lower, size_t lower_count, qfloat_t argument)` — generalised hypergeometric pFq; either parameter array may be `NULL` when its count is zero
+- `qfloat_t qf_lauricella_f(qfloat_t a, const qfloat_t *b, qfloat_t c, const qfloat_t *x, size_t variable_count)` — Lauricella F_D in the implemented convergence polydisc
+- `qfloat_t qf_appell_f1(qfloat_t a, qfloat_t b1, qfloat_t b2, qfloat_t c, qfloat_t x, qfloat_t y)` — Appell F₁, implemented as the two-variable Lauricella F_D member
+
+The defining series use convergence tests and grow temporary storage only as
+needed; they do not reserve a fixed maximum-sized term array. The qfloat
+implementation remains independent of MPFR and MPC.
+
+Input and output for a simple pFq identity:
+
+```c
+qfloat_t x = qf_from_string("0.2");
+qfloat_t value = qf_hypergeometric_pFq(NULL, 0, NULL, 0, x);
+qf_printf("0F0(0.2) = %.34q\n", value);
+```
+
+```text
+0F0(0.2) = 1.221402758160169833921071994639675
+```
 
 ### Formatted Output
 

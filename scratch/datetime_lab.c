@@ -141,21 +141,30 @@ static const datetime_event_descriptor_t buddhist_events[] = {
 };
 
 static const datetime_event_descriptor_t muslim_events[] = {
-    {"ramadan", "Ramadan begins (civil Islamic)", datetime_init_ramadan, 0, "ramadan_starts_local", "Ramadan begins at sunset (local time)", 1},
-    {"eid_al_fitr", "Eid al-Fitr (civil Islamic)", datetime_init_eid_al_fitr, 2, "eid_al_fitr_starts_local", "Eid al-Fitr begins at sunset (local time)", 3},
-    {"muslim_new_year", "Muslim New Year (civil Islamic)", datetime_init_muslim_new_year, 4, "muslim_new_year_starts_local", "Muslim New Year begins at sunset (local time)", 5},
+    {"ramadan", "Ramadan begins (civil Islamic)", datetime_init_ramadan, 0, "ramadan_starts_local",
+     "Ramadan begins at sunset (local time)", 1},
+    {"eid_al_fitr", "Eid al-Fitr (civil Islamic)", datetime_init_eid_al_fitr, 2, "eid_al_fitr_starts_local",
+     "Eid al-Fitr begins at sunset (local time)", 3},
+    {"muslim_new_year", "Muslim New Year (civil Islamic)", datetime_init_muslim_new_year, 4,
+     "muslim_new_year_starts_local", "Muslim New Year begins at sunset (local time)", 5},
 };
 
 static const datetime_event_descriptor_t jewish_events[] = {
-    {"passover", "Passover", datetime_init_passover, 0, "passover_starts_local", "Passover begins at sunset (local time)", 1},
-    {"jewish_new_year", "Jewish New Year", datetime_init_jewish_new_year, 2, "jewish_new_year_starts_local", "Jewish New Year begins at sunset (local time)", 3},
+    {"passover", "Passover", datetime_init_passover, 0, "passover_starts_local",
+     "Passover begins at sunset (local time)", 1},
+    {"jewish_new_year", "Jewish New Year", datetime_init_jewish_new_year, 2, "jewish_new_year_starts_local",
+     "Jewish New Year begins at sunset (local time)", 3},
 };
 
 static const datetime_event_descriptor_t cherokee_events[] = {
-    {"cherokee_new_moon_festival", "New Moon Festival (estimated)", datetime_init_cherokee_new_moon_festival, 0, NULL, NULL, 0},
-    {"cherokee_green_corn_ceremony", "Green Corn Ceremony (estimated)", datetime_init_cherokee_green_corn_ceremony, 1, NULL, NULL, 0},
-    {"cherokee_ripe_corn_ceremony", "Ripe Corn Ceremony (estimated)", datetime_init_cherokee_ripe_corn_ceremony, 2, NULL, NULL, 0},
-    {"cherokee_great_new_moon_festival", "Great New Moon Festival (estimated)", datetime_init_cherokee_great_new_moon_festival, 3, NULL, NULL, 0},
+    {"cherokee_new_moon_festival", "New Moon Festival (estimated)", datetime_init_cherokee_new_moon_festival, 0, NULL,
+     NULL, 0},
+    {"cherokee_green_corn_ceremony", "Green Corn Ceremony (estimated)", datetime_init_cherokee_green_corn_ceremony, 1,
+     NULL, NULL, 0},
+    {"cherokee_ripe_corn_ceremony", "Ripe Corn Ceremony (estimated)", datetime_init_cherokee_ripe_corn_ceremony, 2,
+     NULL, NULL, 0},
+    {"cherokee_great_new_moon_festival", "Great New Moon Festival (estimated)",
+     datetime_init_cherokee_great_new_moon_festival, 3, NULL, NULL, 0},
 };
 
 static const datetime_event_descriptor_t mayan_events[] = {
@@ -165,7 +174,8 @@ static const datetime_event_descriptor_t mayan_events[] = {
 
 static const datetime_event_descriptor_t aztec_events[] = {
     {"aztec_nemontemi_start", "Nemontemi begins", datetime_init_aztec_nemontemi_start, 0, NULL, NULL, 0},
-    {"aztec_xiuhpohualli_new_year", "Xiuhpohualli New Year", datetime_init_aztec_xiuhpohualli_new_year, 1, NULL, NULL, 0},
+    {"aztec_xiuhpohualli_new_year", "Xiuhpohualli New Year", datetime_init_aztec_xiuhpohualli_new_year, 1, NULL, NULL,
+     0},
 };
 
 static const datetime_event_descriptor_t ethiopian_events[] = {
@@ -177,7 +187,8 @@ static const datetime_event_descriptor_t ethiopian_events[] = {
 };
 
 static const calendar_section_descriptor_t calendar_sections[] = {
-    {"calendar_section_christian", datetime_christian_calendar_date_text, christian_events, ARRAY_LEN(christian_events)},
+    {"calendar_section_christian", datetime_christian_calendar_date_text, christian_events,
+     ARRAY_LEN(christian_events)},
     {"calendar_section_chinese", datetime_chinese_calendar_date_text, chinese_events, ARRAY_LEN(chinese_events)},
     {"calendar_section_hindu", datetime_hindu_calendar_date_text, hindu_events, ARRAY_LEN(hindu_events)},
     {"calendar_section_buddhist", datetime_buddhist_calendar_date_text, buddhist_events, ARRAY_LEN(buddhist_events)},
@@ -186,7 +197,8 @@ static const calendar_section_descriptor_t calendar_sections[] = {
     {"calendar_section_cherokee", datetime_cherokee_calendar_date_text, cherokee_events, ARRAY_LEN(cherokee_events)},
     {"calendar_section_mayan", datetime_mayan_calendar_date_text, mayan_events, ARRAY_LEN(mayan_events)},
     {"calendar_section_aztec", datetime_aztec_calendar_date_text, aztec_events, ARRAY_LEN(aztec_events)},
-    {"calendar_section_ethiopian", datetime_ethiopian_calendar_date_text, ethiopian_events, ARRAY_LEN(ethiopian_events)},
+    {"calendar_section_ethiopian", datetime_ethiopian_calendar_date_text, ethiopian_events,
+     ARRAY_LEN(ethiopian_events)},
 };
 
 static bool parse_date_text(const char *text, short *year, month_t *month, uint8_t *day)
@@ -326,27 +338,15 @@ static string_t *cache_key_for_options(const datetime_lab_options_t *options)
         snprintf(gmt_offset, sizeof(gmt_offset), "local");
     else
         snprintf(gmt_offset, sizeof(gmt_offset), "%.9f", options->gmt_offset);
-    if (snprintf(key,
-                 sizeof(key),
-                 "mars_lab/%s/date=%04d-%02d-%02d/jdn=%s%ld/start=%04d-%02d-%02d/end=%04d-%02d-%02d/year=%d/jurisdiction=%s/lat=%.9f/lon=%.9f/elevation=%.9f/gmt_offset=%s",
-                 DATETIME_LAB_CACHE_SCHEMA,
-                 options->date_year,
-                 (int)options->date_month,
-                 (int)options->date_day,
+    if (snprintf(key, sizeof(key),
+                 "mars_lab/%s/date=%04d-%02d-%02d/jdn=%s%ld/start=%04d-%02d-%02d/end=%04d-%02d-%02d/year=%d/"
+                 "jurisdiction=%s/lat=%.9f/lon=%.9f/elevation=%.9f/gmt_offset=%s",
+                 DATETIME_LAB_CACHE_SCHEMA, options->date_year, (int)options->date_month, (int)options->date_day,
                  options->use_julian_day_number ? "" : "none:",
-                 options->use_julian_day_number ? options->julian_day_number : 0L,
-                 options->start_year,
-                 (int)options->start_month,
-                 (int)options->start_day,
-                 options->end_year,
-                 (int)options->end_month,
-                 (int)options->end_day,
-                 options->year,
-                 options->jurisdiction,
-                 options->latitude,
-                 options->longitude,
-                 options->elevation_metres,
-                 gmt_offset) >= (int)sizeof(key)) {
+                 options->use_julian_day_number ? options->julian_day_number : 0L, options->start_year,
+                 (int)options->start_month, (int)options->start_day, options->end_year, (int)options->end_month,
+                 (int)options->end_day, options->year, options->jurisdiction, options->latitude, options->longitude,
+                 options->elevation_metres, gmt_offset) >= (int)sizeof(key)) {
         return NULL;
     }
     return string_new_with(key);
@@ -390,7 +390,8 @@ static bool store_cached_output(const datetime_lab_options_t *options, const str
         if (!stored) {
             const string_t *error = sqlite_last_error(db);
 
-            fprintf(stderr, "failed to store datetime cache object: %s\n", error ? string_c_str(error) : "unknown sqlite error");
+            fprintf(stderr, "failed to store datetime cache object: %s\n",
+                    error ? string_c_str(error) : "unknown sqlite error");
         }
     } else {
         fprintf(stderr, "failed to open datetime object store\n");
@@ -500,8 +501,7 @@ static bool apply_arg(datetime_lab_options_t *options, const char *arg)
         options->use_julian_day_number = false;
         return true;
     }
-    if (key_equals(arg, key_len, "jdn") ||
-        key_equals(arg, key_len, "julian_day_number")) {
+    if (key_equals(arg, key_len, "jdn") || key_equals(arg, key_len, "julian_day_number")) {
         datetime_t *probe;
 
         if (!parse_long_text(value, &long_integer))
@@ -510,9 +510,7 @@ static bool apply_arg(datetime_lab_options_t *options, const char *arg)
         if (!probe)
             return false;
         if (datetime_year(probe) < 1 || datetime_year(probe) > 9999 ||
-            !datetime_valid_ymd(datetime_year(probe),
-                                datetime_month(probe),
-                                datetime_day(probe))) {
+            !datetime_valid_ymd(datetime_year(probe), datetime_month(probe), datetime_day(probe))) {
             datetime_dealloc(probe);
             return false;
         }
@@ -609,11 +607,8 @@ static void resolve_jurisdiction_gmt_offset(datetime_lab_options_t *options)
         goto done;
 
     date = options->use_julian_day_number
-        ? datetime_init_jdn(datetime_alloc(), options->julian_day_number)
-        : datetime_init_ymd(datetime_alloc(),
-                            options->date_year,
-                            options->date_month,
-                            options->date_day);
+               ? datetime_init_jdn(datetime_alloc(), options->julian_day_number)
+               : datetime_init_ymd(datetime_alloc(), options->date_year, options->date_month, options->date_day);
     if (!date)
         goto done;
     if (!jurisdict_default_gmt_offset(holiday, date, &offset_hours))
@@ -626,12 +621,9 @@ done:
     jurisdict_close(holiday);
 }
 
-static bool resolve_jurisdiction_dst_transitions(const datetime_lab_options_t *options,
-                                                 datetime_t **clocks_forward,
-                                                 double *forward_from_offset,
-                                                 double *forward_to_offset,
-                                                 datetime_t **clocks_back,
-                                                 double *back_from_offset,
+static bool resolve_jurisdiction_dst_transitions(const datetime_lab_options_t *options, datetime_t **clocks_forward,
+                                                 double *forward_from_offset, double *forward_to_offset,
+                                                 datetime_t **clocks_back, double *back_from_offset,
                                                  double *back_to_offset)
 {
     jurisdiction_t *holiday = NULL;
@@ -655,14 +647,8 @@ static bool resolve_jurisdiction_dst_transitions(const datetime_lab_options_t *o
     holiday = jurisdict_open(options->jurisdiction);
     if (!holiday)
         goto done;
-    ok = jurisdict_dst_transition_details(holiday,
-                                          options->date_year,
-                                          clocks_forward,
-                                          forward_from_offset,
-                                          forward_to_offset,
-                                          clocks_back,
-                                          back_from_offset,
-                                          back_to_offset);
+    ok = jurisdict_dst_transition_details(holiday, options->date_year, clocks_forward, forward_from_offset,
+                                          forward_to_offset, clocks_back, back_from_offset, back_to_offset);
 
 done:
     jurisdict_close(holiday);
@@ -769,13 +755,7 @@ static char *format_almanac_event_seconds(const almanac_event_time_t *event_time
     out = malloc(64u);
     if (!out)
         return NULL;
-    snprintf(out, 64u, "%04d-%02d-%02d %02d:%02d:%02d",
-             year,
-             month,
-             day,
-             hour,
-             minute,
-             second);
+    snprintf(out, 64u, "%04d-%02d-%02d %02d:%02d:%02d", year, month, day, hour, minute, second);
     return out;
 }
 
@@ -800,21 +780,18 @@ static void print_iso_time_field(const char *name, const datetime_t *dttm)
     free(text);
 }
 
-static char *describe_adjacent_sun_event(long jdn,
-                                         double latitude,
-                                         double longitude,
-                                         double gmt_offset,
-                                         bool sunrise,
+static char *describe_adjacent_sun_event(long jdn, double latitude, double longitude, double gmt_offset, bool sunrise,
                                          bool previous)
 {
     datetime_sun_status_t status = DATETIME_SUN_UNAVAILABLE;
-    datetime_t *dttm = previous
-        ? (sunrise
-            ? datetime_init_previous_sunrise_checked(datetime_alloc(), jdn, latitude, longitude, gmt_offset, &status)
-            : datetime_init_previous_sunset_checked(datetime_alloc(), jdn, latitude, longitude, gmt_offset, &status))
-        : (sunrise
-            ? datetime_init_next_sunrise_checked(datetime_alloc(), jdn, latitude, longitude, gmt_offset, &status)
-            : datetime_init_next_sunset_checked(datetime_alloc(), jdn, latitude, longitude, gmt_offset, &status));
+    datetime_t *dttm = previous ? (sunrise ? datetime_init_previous_sunrise_checked(datetime_alloc(), jdn, latitude,
+                                                                                    longitude, gmt_offset, &status)
+                                           : datetime_init_previous_sunset_checked(datetime_alloc(), jdn, latitude,
+                                                                                   longitude, gmt_offset, &status))
+                                : (sunrise ? datetime_init_next_sunrise_checked(datetime_alloc(), jdn, latitude,
+                                                                                longitude, gmt_offset, &status)
+                                           : datetime_init_next_sunset_checked(datetime_alloc(), jdn, latitude,
+                                                                               longitude, gmt_offset, &status));
     char *text = NULL;
 
     if (!dttm || status != DATETIME_SUN_OK) {
@@ -827,11 +804,7 @@ static char *describe_adjacent_sun_event(long jdn,
     return text;
 }
 
-static void print_polar_sun_status(const char *name,
-                                   long jdn,
-                                   double latitude,
-                                   double longitude,
-                                   double gmt_offset,
+static void print_polar_sun_status(const char *name, long jdn, double latitude, double longitude, double gmt_offset,
                                    datetime_sun_status_t status)
 {
     char *last_event_text = NULL;
@@ -842,8 +815,7 @@ static void print_polar_sun_status(const char *name,
         next_event_text = describe_adjacent_sun_event(jdn, latitude, longitude, gmt_offset, false, false);
         printf("%s unavailable\n", name);
         if (last_event_text || next_event_text) {
-            printf("%s_status sun remains above the horizon; last sunrise %s; next sunset %s\n",
-                   name,
+            printf("%s_status sun remains above the horizon; last sunrise %s; next sunset %s\n", name,
                    last_event_text ? last_event_text : "unavailable",
                    next_event_text ? next_event_text : "unavailable");
         } else {
@@ -854,8 +826,7 @@ static void print_polar_sun_status(const char *name,
         next_event_text = describe_adjacent_sun_event(jdn, latitude, longitude, gmt_offset, true, false);
         printf("%s unavailable\n", name);
         if (last_event_text || next_event_text) {
-            printf("%s_status sun remains below the horizon; last sunset %s; next sunrise %s\n",
-                   name,
+            printf("%s_status sun remains below the horizon; last sunset %s; next sunrise %s\n", name,
                    last_event_text ? last_event_text : "unavailable",
                    next_event_text ? next_event_text : "unavailable");
         } else {
@@ -895,21 +866,13 @@ static int calendar_section_row_compare(const void *lhs, const void *rhs)
 }
 
 static void print_optional_date_field(const char *name, const datetime_t *dttm);
-static datetime_t *datetime_init_observance_start_local(datetime_t *dttm,
-                                                        almanac_t *almanac,
-                                                        jurisdiction_t *jurisdiction,
-                                                        const datetime_t *observance,
-                                                        double latitude,
-                                                        double longitude,
-                                                        double elevation_metres,
+static datetime_t *datetime_init_observance_start_local(datetime_t *dttm, almanac_t *almanac,
+                                                        jurisdiction_t *jurisdiction, const datetime_t *observance,
+                                                        double latitude, double longitude, double elevation_metres,
                                                         double fallback_gmt_offset);
-static void print_optional_start_local_field(const char *name,
-                                             const datetime_t *local_start);
+static void print_optional_start_local_field(const char *name, const datetime_t *local_start);
 
-static bool calendar_section_add_row(array_t *rows,
-                                     const char *label,
-                                     const char *value,
-                                     const datetime_t *sort_date,
+static bool calendar_section_add_row(array_t *rows, const char *label, const char *value, const datetime_t *sort_date,
                                      int sequence)
 {
     calendar_section_row_t row;
@@ -925,38 +888,26 @@ static bool calendar_section_add_row(array_t *rows,
     return array_add(rows, &row);
 }
 
-static bool calendar_section_add_date_row(array_t *rows,
-                                          const char *label,
-                                          const datetime_t *date,
-                                          int sequence)
+static bool calendar_section_add_date_row(array_t *rows, const char *label, const datetime_t *date, int sequence)
 {
     char date_text[32];
 
     if (!date || datetime_jdn(date) == LONG_MAX)
         return false;
-    snprintf(date_text,
-             sizeof(date_text),
-             "%04d-%02d-%02d",
-             (int)datetime_year(date),
-             (int)datetime_month(date),
+    snprintf(date_text, sizeof(date_text), "%04d-%02d-%02d", (int)datetime_year(date), (int)datetime_month(date),
              (int)datetime_day(date));
     return calendar_section_add_row(rows, label, date_text, date, sequence);
 }
 
-static bool calendar_section_add_text_row(array_t *rows,
-                                          const char *label,
-                                          const char *value,
-                                          const datetime_t *sort_date,
-                                          int sequence)
+static bool calendar_section_add_text_row(array_t *rows, const char *label, const char *value,
+                                          const datetime_t *sort_date, int sequence)
 {
     if (!sort_date || datetime_jdn(sort_date) == LONG_MAX)
         return false;
     return calendar_section_add_row(rows, label, value, sort_date, sequence);
 }
 
-static void print_calendar_section_field(const char *name,
-                                         const char *current_value,
-                                         array_t *rows)
+static void print_calendar_section_field(const char *name, const char *current_value, array_t *rows)
 {
     if (!name || !current_value)
         return;
@@ -974,8 +925,7 @@ static void print_calendar_section_field(const char *name,
     }
 }
 
-static bool init_section_runtimes(calendar_section_runtime_t *states,
-                                  const calendar_section_descriptor_t *sections,
+static bool init_section_runtimes(calendar_section_runtime_t *states, const calendar_section_descriptor_t *sections,
                                   size_t section_count)
 {
     if (!states || !sections)
@@ -1037,9 +987,7 @@ static bool allocate_section_event_datetimes(calendar_section_runtime_t *states,
     return true;
 }
 
-static void init_section_event_datetimes(calendar_section_runtime_t *states,
-                                         size_t section_count,
-                                         int year)
+static void init_section_event_datetimes(calendar_section_runtime_t *states, size_t section_count, int year)
 {
     if (!states)
         return;
@@ -1056,14 +1004,9 @@ static void init_section_event_datetimes(calendar_section_runtime_t *states,
     }
 }
 
-static void init_section_event_start_datetimes(calendar_section_runtime_t *states,
-                                               size_t section_count,
-                                               almanac_t *almanac,
-                                               jurisdiction_t *jurisdiction,
-                                               double latitude,
-                                               double longitude,
-                                               double elevation_metres,
-                                               double fallback_gmt_offset)
+static void init_section_event_start_datetimes(calendar_section_runtime_t *states, size_t section_count,
+                                               almanac_t *almanac, jurisdiction_t *jurisdiction, double latitude,
+                                               double longitude, double elevation_metres, double fallback_gmt_offset)
 {
     if (!states)
         return;
@@ -1074,20 +1017,14 @@ static void init_section_event_start_datetimes(calendar_section_runtime_t *state
 
             if (!event->descriptor->start_gmt_field_name || !event->value)
                 continue;
-            event->start_local = datetime_init_observance_start_local(datetime_alloc(),
-                                                                      almanac,
-                                                                      jurisdiction,
-                                                                      event->value,
-                                                                      latitude,
-                                                                      longitude,
-                                                                      elevation_metres,
-                                                                      fallback_gmt_offset);
+            event->start_local =
+                datetime_init_observance_start_local(datetime_alloc(), almanac, jurisdiction, event->value, latitude,
+                                                     longitude, elevation_metres, fallback_gmt_offset);
         }
     }
 }
 
-static void print_event_fields(const datetime_event_runtime_t *events,
-                               size_t count)
+static void print_event_fields(const datetime_event_runtime_t *events, size_t count)
 {
     if (!events)
         return;
@@ -1095,48 +1032,36 @@ static void print_event_fields(const datetime_event_runtime_t *events,
     for (size_t i = 0; i < count; i++) {
         print_optional_date_field(events[i].descriptor->field_name, events[i].value);
         if (events[i].descriptor->start_gmt_field_name) {
-            print_optional_start_local_field(events[i].descriptor->start_gmt_field_name,
-                                             events[i].start_local);
+            print_optional_start_local_field(events[i].descriptor->start_gmt_field_name, events[i].start_local);
         }
     }
 }
 
-static void append_sunset_start_section_row(array_t *rows,
-                                            const char *label,
-                                            const datetime_t *observance,
-                                            const datetime_t *local_start,
-                                            int sequence)
+static void append_sunset_start_section_row(array_t *rows, const char *label, const datetime_t *observance,
+                                            const datetime_t *local_start, int sequence)
 {
     char start_text[32];
 
     if (!rows || !label || !observance || !local_start)
         return;
 
-    snprintf(start_text,
-             sizeof(start_text),
-             "%04d-%02d-%02d %02d:%02d",
-             (int)datetime_year(local_start),
-             (int)datetime_month(local_start),
-             (int)datetime_day(local_start),
-             (int)datetime_hour(local_start),
+    snprintf(start_text, sizeof(start_text), "%04d-%02d-%02d %02d:%02d", (int)datetime_year(local_start),
+             (int)datetime_month(local_start), (int)datetime_day(local_start), (int)datetime_hour(local_start),
              (int)datetime_minute(local_start));
     calendar_section_add_text_row(rows, label, start_text, observance, sequence);
 }
 
-static void print_section_event_fields(const calendar_section_runtime_t *states,
-                                       size_t section_count)
+static void print_section_event_fields(const calendar_section_runtime_t *states, size_t section_count)
 {
     if (!states)
         return;
 
     for (size_t i = 0; i < section_count; i++) {
-        print_event_fields(states[i].events,
-                           states[i].event_count);
+        print_event_fields(states[i].events, states[i].event_count);
     }
 }
 
-static void populate_calendar_section_rows(const calendar_section_runtime_t *states,
-                                           size_t section_count,
+static void populate_calendar_section_rows(const calendar_section_runtime_t *states, size_t section_count,
                                            array_t **section_rows)
 {
     if (!states || !section_rows)
@@ -1147,16 +1072,11 @@ static void populate_calendar_section_rows(const calendar_section_runtime_t *sta
             const datetime_event_descriptor_t *event_descriptor = states[i].events[j].descriptor;
             datetime_t *event = states[i].events[j].value;
 
-            calendar_section_add_date_row(section_rows[i],
-                                          event_descriptor->section_label,
-                                          event,
+            calendar_section_add_date_row(section_rows[i], event_descriptor->section_label, event,
                                           event_descriptor->sequence);
             if (event_descriptor->start_gmt_section_label) {
-                append_sunset_start_section_row(section_rows[i],
-                                                event_descriptor->start_gmt_section_label,
-                                                event,
-                                                states[i].events[j].start_local,
-                                                event_descriptor->start_gmt_sequence);
+                append_sunset_start_section_row(section_rows[i], event_descriptor->start_gmt_section_label, event,
+                                                states[i].events[j].start_local, event_descriptor->start_gmt_sequence);
             }
         }
     }
@@ -1171,10 +1091,8 @@ static void print_optional_date_field(const char *name, const datetime_t *dttm)
     print_date_field(name, dttm);
 }
 
-static bool resolve_local_offset_for_datetime(jurisdiction_t *jurisdiction,
-                                              const datetime_t *dttm,
-                                              double fallback_gmt_offset,
-                                              double *offset_hours)
+static bool resolve_local_offset_for_datetime(jurisdiction_t *jurisdiction, const datetime_t *dttm,
+                                              double fallback_gmt_offset, double *offset_hours)
 {
     if (!dttm || !offset_hours)
         return false;
@@ -1200,17 +1118,14 @@ static bool datetime_add_offset_hours(datetime_t *dttm, double offset_hours)
     return datetime_add_minutes(dttm, (int)total_minutes) != NULL;
 }
 
-static datetime_t *datetime_init_almanac_event_time(datetime_t *dttm,
-                                                    const almanac_event_time_t *event_time)
+static datetime_t *datetime_init_almanac_event_time(datetime_t *dttm, const almanac_event_time_t *event_time)
 {
     if (!dttm || !event_time || !event_time->valid)
         return NULL;
     return almanac_event_time_datetime(event_time, dttm) ? dttm : NULL;
 }
 
-static almanac_observer_t datetime_lab_observer(double latitude,
-                                                double longitude,
-                                                double elevation_metres)
+static almanac_observer_t datetime_lab_observer(double latitude, double longitude, double elevation_metres)
 {
     almanac_observer_t observer;
 
@@ -1224,18 +1139,12 @@ static almanac_observer_t datetime_lab_observer_from_options(const datetime_lab_
 {
     if (!options)
         return datetime_lab_observer(0.0, 0.0, 0.0);
-    return datetime_lab_observer(options->latitude,
-                                 options->longitude,
-                                 options->elevation_metres);
+    return datetime_lab_observer(options->latitude, options->longitude, options->elevation_metres);
 }
 
-static datetime_t *datetime_init_observance_start_local(datetime_t *dttm,
-                                                        almanac_t *almanac,
-                                                        jurisdiction_t *jurisdiction,
-                                                        const datetime_t *observance,
-                                                        double latitude,
-                                                        double longitude,
-                                                        double elevation_metres,
+static datetime_t *datetime_init_observance_start_local(datetime_t *dttm, almanac_t *almanac,
+                                                        jurisdiction_t *jurisdiction, const datetime_t *observance,
+                                                        double latitude, double longitude, double elevation_metres,
                                                         double fallback_gmt_offset)
 {
     datetime_t *start_utc = NULL;
@@ -1249,8 +1158,7 @@ static datetime_t *datetime_init_observance_start_local(datetime_t *dttm,
         almanac_observer_t observer = datetime_lab_observer(latitude, longitude, elevation_metres);
         almanac_sun_times_t sun_times;
 
-        if (previous_day &&
-            datetime_add_days(previous_day, -1) &&
+        if (previous_day && datetime_add_days(previous_day, -1) &&
             almanac_sunrise_sunset(almanac, jurisdiction, previous_day, &observer, &sun_times) &&
             sun_times.set.status == ALMANAC_RISE_SET_OK &&
             datetime_init_almanac_event_time(dttm, &sun_times.set.time)) {
@@ -1260,17 +1168,10 @@ static datetime_t *datetime_init_observance_start_local(datetime_t *dttm,
         datetime_dealloc(previous_day);
     }
 
-    start_utc = datetime_init_sunset_observance_start(datetime_alloc(),
-                                                      observance,
-                                                      latitude,
-                                                      longitude,
-                                                      0.0);
+    start_utc = datetime_init_sunset_observance_start(datetime_alloc(), observance, latitude, longitude, 0.0);
     if (!start_utc)
         return NULL;
-    if (!resolve_local_offset_for_datetime(jurisdiction,
-                                           start_utc,
-                                           fallback_gmt_offset,
-                                           &offset_hours)) {
+    if (!resolve_local_offset_for_datetime(jurisdiction, start_utc, fallback_gmt_offset, &offset_hours)) {
         datetime_dealloc(start_utc);
         return NULL;
     }
@@ -1283,8 +1184,7 @@ static datetime_t *datetime_init_observance_start_local(datetime_t *dttm,
     return dttm;
 }
 
-static void print_optional_start_local_field(const char *name,
-                                             const datetime_t *local_start)
+static void print_optional_start_local_field(const char *name, const datetime_t *local_start)
 {
     if (!local_start) {
         printf("%s unavailable\n", name);
@@ -1294,29 +1194,14 @@ static void print_optional_start_local_field(const char *name,
     print_time_field(name, local_start);
 }
 
-static void print_sun_time_field(const char *name,
-                                 long jdn,
-                                 double latitude,
-                                 double longitude,
-                                 double gmt_offset,
+static void print_sun_time_field(const char *name, long jdn, double latitude, double longitude, double gmt_offset,
                                  bool sunrise)
 {
     datetime_sun_status_t status = DATETIME_SUN_UNAVAILABLE;
     datetime_t *dttm;
 
-    dttm = sunrise
-        ? datetime_init_sunrise_checked(datetime_alloc(),
-                                        jdn,
-                                        latitude,
-                                        longitude,
-                                        gmt_offset,
-                                        &status)
-        : datetime_init_sunset_checked(datetime_alloc(),
-                                       jdn,
-                                       latitude,
-                                       longitude,
-                                       gmt_offset,
-                                       &status);
+    dttm = sunrise ? datetime_init_sunrise_checked(datetime_alloc(), jdn, latitude, longitude, gmt_offset, &status)
+                   : datetime_init_sunset_checked(datetime_alloc(), jdn, latitude, longitude, gmt_offset, &status);
     if (!dttm) {
         printf("%s unavailable\n", name);
         printf("%s_status unavailable\n", name);
@@ -1352,16 +1237,14 @@ static const char *rise_set_status_text(almanac_rise_set_status_t status)
         [ALMANAC_RISE_SET_NOT_ON_DATE] = "not on selected date",
         [ALMANAC_RISE_SET_NEVER_RISES] = "never rises",
         [ALMANAC_RISE_SET_NEVER_SETS] = "never sets",
-        [ALMANAC_RISE_SET_UNAVAILABLE] = "unavailable"
-    };
+        [ALMANAC_RISE_SET_UNAVAILABLE] = "unavailable"};
 
     if (status < ALMANAC_RISE_SET_OK || status > ALMANAC_RISE_SET_UNAVAILABLE)
         return "unavailable";
     return text_by_status[status];
 }
 
-static void print_rise_set_event_field(const char *name,
-                                       const almanac_rise_set_event_t *event)
+static void print_rise_set_event_field(const char *name, const almanac_rise_set_event_t *event)
 {
     char *text;
 
@@ -1393,10 +1276,8 @@ static void print_unavailable_moon_times(void)
     printf("moonset_status unavailable\n");
 }
 
-static bool print_actual_sun_times(const datetime_lab_options_t *options,
-                                   almanac_t *almanac,
-                                   jurisdiction_t *jurisdiction,
-                                   const datetime_t *date)
+static bool print_actual_sun_times(const datetime_lab_options_t *options, almanac_t *almanac,
+                                   jurisdiction_t *jurisdiction, const datetime_t *date)
 {
     almanac_sun_times_t sun_times;
     almanac_observer_t observer;
@@ -1418,9 +1299,7 @@ static bool print_actual_sun_times(const datetime_lab_options_t *options,
     return true;
 }
 
-static bool print_moon_times(const datetime_lab_options_t *options,
-                             almanac_t *almanac,
-                             jurisdiction_t *jurisdiction,
+static bool print_moon_times(const datetime_lab_options_t *options, almanac_t *almanac, jurisdiction_t *jurisdiction,
                              const datetime_t *date)
 {
     almanac_moon_times_t moon_times;
@@ -1502,13 +1381,8 @@ int main(int argc, char **argv)
     if (options.cache_only)
         return 3;
 
-    (void)resolve_jurisdiction_dst_transitions(&options,
-                                               &dst_forward,
-                                               &dst_forward_from_offset,
-                                               &dst_forward_to_offset,
-                                               &dst_back,
-                                               &dst_back_from_offset,
-                                               &dst_back_to_offset);
+    (void)resolve_jurisdiction_dst_transitions(&options, &dst_forward, &dst_forward_from_offset, &dst_forward_to_offset,
+                                               &dst_back, &dst_back_from_offset, &dst_back_to_offset);
     trace_timing("dst transitions", &timing_last);
 
     date = datetime_alloc();
@@ -1541,13 +1415,8 @@ int main(int argc, char **argv)
             observance_almanac = almanac_open();
         }
         init_section_event_datetimes(section_states, section_count, options.year);
-        init_section_event_start_datetimes(section_states,
-                                           section_count,
-                                           observance_almanac,
-                                           observance_jurisdiction,
-                                           options.latitude,
-                                           options.longitude,
-                                           options.elevation_metres,
+        init_section_event_start_datetimes(section_states, section_count, observance_almanac, observance_jurisdiction,
+                                           options.latitude, options.longitude, options.elevation_metres,
                                            options.gmt_offset);
         if (!section_states[CALENDAR_SECTION_CHRISTIAN].events[0].value ||
             !section_states[CALENDAR_SECTION_CHRISTIAN].events[1].value) {
@@ -1628,8 +1497,7 @@ int main(int argc, char **argv)
         printf("duration_months %u\n", span.months);
         printf("duration_days %u\n", span.days);
 
-        print_section_event_fields(section_states,
-                                   section_count);
+        print_section_event_fields(section_states, section_count);
         trace_timing("event fields", &timing_last);
 
         {
@@ -1641,15 +1509,12 @@ int main(int argc, char **argv)
                 section_rows[i] = array_create(sizeof(calendar_section_row_t), NULL, NULL);
             }
 
-            populate_calendar_section_rows(section_states,
-                                           section_count,
-                                           section_rows);
+            populate_calendar_section_rows(section_states, section_count, section_rows);
             trace_timing("calendar rows", &timing_last);
 
             for (size_t i = 0; i < section_count; i++) {
                 print_calendar_section_field(calendar_sections[i].field_name,
-                                             current_texts[i] ? string_c_str(current_texts[i]) : "",
-                                             section_rows[i]);
+                                             current_texts[i] ? string_c_str(current_texts[i]) : "", section_rows[i]);
                 string_free(current_texts[i]);
                 array_destroy(section_rows[i]);
             }

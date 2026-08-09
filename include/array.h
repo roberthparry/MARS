@@ -9,8 +9,8 @@
  * via user-supplied clone and destroy callbacks.
  */
 
-#include <stddef.h>
 #include <stdbool.h>
+#include <stddef.h>
 
 typedef struct _string_t string_t;
 
@@ -64,9 +64,7 @@ typedef struct _array_t array_t;
  * @param destroy   Element destroy function (NULL for no-op).
  * @return Pointer to new array, or NULL on allocation failure.
  */
-array_t *array_create(size_t elem_size,
-                      array_clone_fn clone,
-                      array_destroy_fn destroy);
+array_t *array_create(size_t elem_size, array_clone_fn clone, array_destroy_fn destroy);
 
 /**
  * @brief Destroy the array and free all memory.
@@ -133,10 +131,7 @@ void *array_get(const array_t *arr, size_t index);
  * @param out_len Receives the payload length in bytes.
  * @return @c true on success, otherwise @c false.
  */
-bool array_serialize(const array_t *arr,
-                     string_t **out_type,
-                     string_t **out_encoding,
-                     void **out_data,
+bool array_serialize(const array_t *arr, string_t **out_type, string_t **out_encoding, void **out_data,
                      size_t *out_len);
 
 /**
@@ -151,10 +146,7 @@ bool array_serialize(const array_t *arr,
  * @param encoding Stored encoding label.
  * @return Newly allocated array on success, otherwise @c NULL.
  */
-array_t *array_deserialise(const void *data,
-                           size_t len,
-                           const string_t *type,
-                           const string_t *encoding);
+array_t *array_deserialise(const void *data, size_t len, const string_t *type, const string_t *encoding);
 
 /* --- Mutation: add, insert, remove, bulk ops --- */
 

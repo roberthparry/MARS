@@ -1,6 +1,6 @@
+#include <complex.h>
 #include <stdio.h>
 #include <string.h>
-#include <complex.h>
 
 #include "test_number.h"
 
@@ -57,22 +57,13 @@ void run_number_formatting_tests(void)
         ASSERT_EQ_INT(written, (int)strlen("value=³⁵⁵⁄₁₁₃!"));
         ASSERT_TRUE(strcmp(buf, "value=³⁵⁵⁄₁₁₃!") == 0);
 
-        assert_number_string_prefix("num_beta(2, 2)", beta,
-                                    "0.166666666666666666666666666666");
-        assert_number_string_prefix("num_atan2(1, 1)", angle,
-                                    "0.785398163397448309615660845819");
+        assert_number_string_prefix("num_beta(2, 2)", beta, "0.166666666666666666666666666666");
+        assert_number_string_prefix("num_atan2(1, 1)", angle, "0.785398163397448309615660845819");
         assert_number_string("num_gamma(5)", gamma5, "24");
-        assert_number_string_prefix("num_ei(1)", ei1,
-                                    "1.895117816355936755466520934331");
-        assert_number_string("num_create_from_cdouble(1 + i)",
-                             cdouble_unit,
-                             "1 + i");
-        assert_number_string("num_create_from_cdouble(1 - i)",
-                             cdouble_neg_unit,
-                             "1 - i");
-        assert_number_string("num_create_from_cdouble(i)",
-                             cdouble_pure_unit,
-                             "i");
+        assert_number_string_prefix("num_ei(1)", ei1, "1.895117816355936755466520934331");
+        assert_number_string("num_create_from_cdouble(1 + i)", cdouble_unit, "1 + i");
+        assert_number_string("num_create_from_cdouble(1 - i)", cdouble_neg_unit, "1 - i");
+        assert_number_string("num_create_from_cdouble(i)", cdouble_pure_unit, "i");
 
         num_destroy(&dec);
         num_destroy(&rat);

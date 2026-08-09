@@ -1,5 +1,5 @@
-#include <stdio.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 #include "diffequation.h"
@@ -65,10 +65,7 @@ static const char *solver_name(de_solver_t solver)
     return "none";
 }
 
-static void print_solution_field(
-    const char *key,
-    const diffequ_solve_result_t *result,
-    style_t style)
+static void print_solution_field(const char *key, const diffequ_solve_result_t *result, style_t style)
 {
     size_t count = de_solve_result_count(result);
 
@@ -83,9 +80,7 @@ static void print_solution_field(
     }
 }
 
-static void print_solution_tex(const char *key,
-                               const diffequ_solve_result_t *result,
-                               size_t line_limit)
+static void print_solution_tex(const char *key, const diffequ_solve_result_t *result, size_t line_limit)
 {
     size_t count = de_solve_result_count(result);
 
@@ -95,17 +90,10 @@ static void print_solution_tex(const char *key,
     printf("%s \\begin{aligned}[t]\n", key);
     for (size_t i = 0u; i < count; ++i) {
         const equation_t *solution = de_solve_result_at(result, i);
-        char *lhs = solution
-            ? expr_to_tex_body_wrapped(equ_lhs(solution), line_limit)
-            : NULL;
-        char *rhs = solution
-            ? expr_to_tex_body_wrapped(equ_rhs(solution), line_limit)
-            : NULL;
+        char *lhs = solution ? expr_to_tex_body_wrapped(equ_lhs(solution), line_limit) : NULL;
+        char *rhs = solution ? expr_to_tex_body_wrapped(equ_rhs(solution), line_limit) : NULL;
 
-        printf("%s &= %s%s\n",
-               lhs ? lhs : "\\text{null}",
-               rhs ? rhs : "\\text{null}",
-               i + 1u < count ? " \\\\" : "");
+        printf("%s &= %s%s\n", lhs ? lhs : "\\text{null}", rhs ? rhs : "\\text{null}", i + 1u < count ? " \\\\" : "");
         free(rhs);
         free(lhs);
     }

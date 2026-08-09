@@ -1,9 +1,7 @@
 #define MARS_TIMESERIES_INTERNAL_ACCESS
 #include "timeseries_internal.h"
 
-int ts_accuracy(const timeseries_t *actual,
-                const timeseries_t *predicted,
-                ts_accuracy_t *out)
+int ts_accuracy(const timeseries_t *actual, const timeseries_t *predicted, ts_accuracy_t *out)
 {
     timeseries_t *a = NULL, *p = NULL;
     size_t i, n = 0u;
@@ -29,7 +27,8 @@ int ts_accuracy(const timeseries_t *actual,
         n++;
     }
     if (n == 0u) {
-        ts_free(a); ts_free(p);
+        ts_free(a);
+        ts_free(p);
         return -1;
     }
     out->mae = num_create_from_double(mae / (double)n);
@@ -38,15 +37,13 @@ int ts_accuracy(const timeseries_t *actual,
     out->mape = num_create_from_double(mape / (double)n);
     out->smape = num_create_from_double(smape / (double)n);
     out->mase = num_clone(out->mae);
-    ts_free(a); ts_free(p);
+    ts_free(a);
+    ts_free(p);
     return 0;
 }
 
-int ts_backtest_regression(const timeseries_t *y,
-                           const matrix_t *xreg,
-                           const ts_fit_options_t *options,
-                           const ts_backtest_spec_t *spec,
-                           ts_accuracy_t *out)
+int ts_backtest_regression(const timeseries_t *y, const matrix_t *xreg, const ts_fit_options_t *options,
+                           const ts_backtest_spec_t *spec, ts_accuracy_t *out)
 {
     ts_regression_result_t fit = {0};
     ts_forecast_t fc = {0};
@@ -69,21 +66,23 @@ int ts_backtest_regression(const timeseries_t *y,
     rc = ts_accuracy(test, fc.mean, out);
     ts_regression_result_clear(&fit);
     ts_forecast_clear(&fc);
-    ts_free(train); ts_free(test); mat_free(x_train); mat_free(x_test);
+    ts_free(train);
+    ts_free(test);
+    mat_free(x_train);
+    mat_free(x_test);
     return rc;
 fail:
     ts_regression_result_clear(&fit);
     ts_forecast_clear(&fc);
-    ts_free(train); ts_free(test); mat_free(x_train); mat_free(x_test);
+    ts_free(train);
+    ts_free(test);
+    mat_free(x_train);
+    mat_free(x_test);
     return -1;
 }
 
-int ts_backtest_arima(const timeseries_t *y,
-                      const matrix_t *xreg,
-                      const ts_arima_spec_t *model_spec,
-                      const ts_fit_options_t *options,
-                      const ts_backtest_spec_t *spec,
-                      ts_accuracy_t *out)
+int ts_backtest_arima(const timeseries_t *y, const matrix_t *xreg, const ts_arima_spec_t *model_spec,
+                      const ts_fit_options_t *options, const ts_backtest_spec_t *spec, ts_accuracy_t *out)
 {
     ts_arima_result_t fit = {0};
     ts_forecast_t fc = {0};
@@ -108,12 +107,18 @@ int ts_backtest_arima(const timeseries_t *y,
     rc = ts_accuracy(test, fc.mean, out);
     ts_arima_result_clear(&fit);
     ts_forecast_clear(&fc);
-    ts_free(train); ts_free(test); mat_free(x_train); mat_free(x_test);
+    ts_free(train);
+    ts_free(test);
+    mat_free(x_train);
+    mat_free(x_test);
     return rc;
 fail:
     ts_arima_result_clear(&fit);
     ts_forecast_clear(&fc);
-    ts_free(train); ts_free(test); mat_free(x_train); mat_free(x_test);
+    ts_free(train);
+    ts_free(test);
+    mat_free(x_train);
+    mat_free(x_test);
     return -1;
 }
 

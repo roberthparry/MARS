@@ -51,7 +51,9 @@ int ts_pacf(const timeseries_t *series, size_t max_lag, matrix_t **out)
     pacf = calloc(max_lag + 1u, sizeof(*pacf));
     if (!acf || !phi || !pacf) {
         mat_free(acf_mat);
-        free(acf); free(phi); free(pacf);
+        free(acf);
+        free(phi);
+        free(pacf);
         return -1;
     }
     for (i = 0u; i <= max_lag; ++i) {
@@ -70,16 +72,16 @@ int ts_pacf(const timeseries_t *series, size_t max_lag, matrix_t **out)
         }
         phi[k * (max_lag + 1u) + k] = den == 0.0 ? 0.0 : num / den;
         for (i = 1u; i < k; ++i) {
-            phi[k * (max_lag + 1u) + i] =
-                phi[(k - 1u) * (max_lag + 1u) + i] -
-                phi[k * (max_lag + 1u) + k] *
-                phi[(k - 1u) * (max_lag + 1u) + (k - i)];
+            phi[k * (max_lag + 1u) + i] = phi[(k - 1u) * (max_lag + 1u) + i] -
+                                          phi[k * (max_lag + 1u) + k] * phi[(k - 1u) * (max_lag + 1u) + (k - i)];
         }
         pacf[k] = phi[k * (max_lag + 1u) + k];
     }
     *out = ts_make_column_matrix_from_doubles(pacf, max_lag + 1u);
     mat_free(acf_mat);
-    free(acf); free(phi); free(pacf);
+    free(acf);
+    free(phi);
+    free(pacf);
     return *out ? 0 : -1;
 }
 
@@ -96,7 +98,8 @@ int ts_ccf(const timeseries_t *x, const timeseries_t *y, size_t max_lag, matrix_
         max_lag = n - 1u;
     vals = calloc(max_lag + 1u, sizeof(*vals));
     if (!vals) {
-        ts_free(xa); ts_free(ya);
+        ts_free(xa);
+        ts_free(ya);
         return -1;
     }
     for (lag = 0u; lag <= max_lag; ++lag) {
@@ -115,12 +118,12 @@ int ts_ccf(const timeseries_t *x, const timeseries_t *y, size_t max_lag, matrix_
     }
     *out = ts_make_column_matrix_from_doubles(vals, max_lag + 1u);
     free(vals);
-    ts_free(xa); ts_free(ya);
+    ts_free(xa);
+    ts_free(ya);
     return *out ? 0 : -1;
 }
 
-int ts_ljung_box(const timeseries_t *series, size_t max_lag,
-                 number_t *statistic, number_t *p_value)
+int ts_ljung_box(const timeseries_t *series, size_t max_lag, number_t *statistic, number_t *p_value)
 {
     matrix_t *acf = NULL;
     double q = 0.0;
@@ -146,8 +149,7 @@ int ts_ljung_box(const timeseries_t *series, size_t max_lag,
     return 0;
 }
 
-int ts_adf(const timeseries_t *series,
-           number_t *statistic, number_t *p_value)
+int ts_adf(const timeseries_t *series, number_t *statistic, number_t *p_value)
 {
     timeseries_t *d = NULL;
     size_t n, i;
@@ -172,8 +174,7 @@ int ts_adf(const timeseries_t *series,
     return 0;
 }
 
-int ts_kpss(const timeseries_t *series,
-            number_t *statistic, number_t *p_value)
+int ts_kpss(const timeseries_t *series, number_t *statistic, number_t *p_value)
 {
     double *vals = NULL, mean = 0.0, cum = 0.0, sumsq = 0.0, eta = 0.0;
     size_t n = 0u, i;

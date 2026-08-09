@@ -9,8 +9,8 @@
  * any index passed to a mutating function. Out-of-range reads return false.
  */
 
-#include <stddef.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 /**

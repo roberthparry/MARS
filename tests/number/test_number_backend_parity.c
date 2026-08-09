@@ -16,9 +16,7 @@ static number_t number_text(const char *text)
     return num_create_from_string(text);
 }
 
-static void assert_number_close_text(const char *label,
-                                     number_t got,
-                                     const char *expected_text,
+static void assert_number_close_text(const char *label, number_t got, const char *expected_text,
                                      const char *tolerance_text)
 {
     number_t expected = number_text(expected_text);
@@ -29,8 +27,7 @@ static void assert_number_close_text(const char *label,
     printf(C_WHITE C_BOLD "%s" C_RESET "\n", label ? label : "<unspecified>");
     printf("    expected = %s\n", expected_text);
     printf("    tol      = %s\n", tolerance_text);
-    printf("    error    = %s\n\n",
-           error_text ? string_c_str(error_text) : "<format-error>");
+    printf("    error    = %s\n\n", error_text ? string_c_str(error_text) : "<format-error>");
     ASSERT_TRUE(num_le(error, tolerance));
 
     string_free(error_text);
@@ -39,9 +36,7 @@ static void assert_number_close_text(const char *label,
     num_destroy(&expected);
 }
 
-static void assert_number_real_imag_prefix(const char *label,
-                                           number_t value,
-                                           const char *real_prefix,
+static void assert_number_real_imag_prefix(const char *label, number_t value, const char *real_prefix,
                                            const char *imag_prefix)
 {
     char real_label[160];
@@ -58,11 +53,8 @@ static void assert_number_real_imag_prefix(const char *label,
     num_destroy(&real);
 }
 
-static void assert_number_real_imag_close(const char *label,
-                                          number_t value,
-                                          const char *real_text,
-                                          const char *imag_text,
-                                          const char *tolerance_text)
+static void assert_number_real_imag_close(const char *label, number_t value, const char *real_text,
+                                          const char *imag_text, const char *tolerance_text)
 {
     char real_label[160];
     char imag_label[160];
@@ -182,76 +174,44 @@ static void test_number_real_elementary_parity(void)
     ASSERT_EQ_INT(num_sincos(half, &sin_pair, &cos_pair), 0);
     ASSERT_EQ_INT(num_sinhcosh(half, &sinh_pair, &cosh_pair), 0);
 
-    assert_number_string_prefix("sin(0.5)", sin_half,
-                                "0.479425538604203000273287935215571");
-    assert_number_string_prefix("cos(0.5)", cos_half,
-                                "0.877582561890372716116281582603829");
-    assert_number_string_prefix("tan(0.5)", tan_half,
-                                "0.546302489843790513255179465780285");
-    assert_number_close_text("sec(0.5) * cos(0.5)", sec_cos, "1",
-                             NUMBER_PARITY_TIGHT_TOL);
-    assert_number_close_text("cosec(0.5) * sin(0.5)", cosec_sin, "1",
-                             NUMBER_PARITY_TIGHT_TOL);
-    assert_number_close_text("cot(0.5) * tan(0.5)", cot_tan, "1",
-                             NUMBER_PARITY_TIGHT_TOL);
-    assert_number_string_prefix("sinh(0.5)", sinh_half,
-                                "0.521095305493747361622425626411491");
-    assert_number_string_prefix("cosh(0.5)", cosh_half,
-                                "1.127625965206380785226225161402672");
-    assert_number_string_prefix("tanh(0.5)", tanh_half,
-                                "0.462117157260009758502318483643672");
-    assert_number_close_text("sech(0.5) * cosh(0.5)", sech_cosh, "1",
-                             NUMBER_PARITY_TIGHT_TOL);
-    assert_number_close_text("cosech(0.5) * sinh(0.5)", cosech_sinh, "1",
-                             NUMBER_PARITY_TIGHT_TOL);
-    assert_number_close_text("coth(0.5) * tanh(0.5)", coth_tanh, "1",
-                             NUMBER_PARITY_TIGHT_TOL);
-    assert_number_string_prefix("atan(0.5)", atan_half,
-                                "0.463647609000806116214256231461214");
-    assert_number_string_prefix("asin(0.5)", asin_half,
-                                "0.523598775598298873077107230546583");
-    assert_number_string_prefix("acos(0.5)", acos_half,
-                                "1.04719755119659774615421446109316");
-    assert_number_string_prefix("asec(2)", asec_two,
-                                "1.04719755119659774615421446109316");
-    assert_number_string_prefix("acosec(2)", acosec_two,
-                                "0.523598775598298873077107230546583");
+    assert_number_string_prefix("sin(0.5)", sin_half, "0.479425538604203000273287935215571");
+    assert_number_string_prefix("cos(0.5)", cos_half, "0.877582561890372716116281582603829");
+    assert_number_string_prefix("tan(0.5)", tan_half, "0.546302489843790513255179465780285");
+    assert_number_close_text("sec(0.5) * cos(0.5)", sec_cos, "1", NUMBER_PARITY_TIGHT_TOL);
+    assert_number_close_text("cosec(0.5) * sin(0.5)", cosec_sin, "1", NUMBER_PARITY_TIGHT_TOL);
+    assert_number_close_text("cot(0.5) * tan(0.5)", cot_tan, "1", NUMBER_PARITY_TIGHT_TOL);
+    assert_number_string_prefix("sinh(0.5)", sinh_half, "0.521095305493747361622425626411491");
+    assert_number_string_prefix("cosh(0.5)", cosh_half, "1.127625965206380785226225161402672");
+    assert_number_string_prefix("tanh(0.5)", tanh_half, "0.462117157260009758502318483643672");
+    assert_number_close_text("sech(0.5) * cosh(0.5)", sech_cosh, "1", NUMBER_PARITY_TIGHT_TOL);
+    assert_number_close_text("cosech(0.5) * sinh(0.5)", cosech_sinh, "1", NUMBER_PARITY_TIGHT_TOL);
+    assert_number_close_text("coth(0.5) * tanh(0.5)", coth_tanh, "1", NUMBER_PARITY_TIGHT_TOL);
+    assert_number_string_prefix("atan(0.5)", atan_half, "0.463647609000806116214256231461214");
+    assert_number_string_prefix("asin(0.5)", asin_half, "0.523598775598298873077107230546583");
+    assert_number_string_prefix("acos(0.5)", acos_half, "1.04719755119659774615421446109316");
+    assert_number_string_prefix("asec(2)", asec_two, "1.04719755119659774615421446109316");
+    assert_number_string_prefix("acosec(2)", acosec_two, "0.523598775598298873077107230546583");
     ASSERT_TRUE(num_is_nan(asec_zero));
     ASSERT_TRUE(num_is_nan(acosec_zero));
     ASSERT_TRUE(num_is_nan(asec_complex_zero));
     ASSERT_TRUE(num_is_nan(acosec_complex_zero));
-    assert_number_string_prefix("asec(inf)", asec_inf,
-                                "1.57079632679489661923132169163975");
+    assert_number_string_prefix("asec(inf)", asec_inf, "1.57079632679489661923132169163975");
     assert_number_string("acosec(inf)", acosec_inf, "0");
-    assert_number_string_prefix("acot(0)", acot_zero,
-                                "1.57079632679489661923132169163975");
+    assert_number_string_prefix("acot(0)", acot_zero, "1.57079632679489661923132169163975");
     assert_number_string("acot(inf)", acot_inf, "0");
-    assert_number_string_prefix("acot(-inf)", acot_ninf,
-                                "3.14159265358979323846264338327950");
-    assert_number_string_prefix("acot(1)", acot_one,
-                                "0.785398163397448309615660845819875");
-    assert_number_string_prefix("asinh(0.5)", asinh_half,
-                                "0.481211825059603447497758913424368");
-    assert_number_string_prefix("acosh(2)", acosh_two,
-                                "1.316957896924816708625046347307968");
-    assert_number_string_prefix("atanh(0.5)", atanh_half,
-                                "0.549306144334054845697622618461262");
-    assert_number_string_prefix("asech(0.5)", asech_half,
-                                "1.316957896924816708625046347307968");
-    assert_number_string_prefix("acosech(1)", acosech_one,
-                                "0.881373587019543025232609324979792");
-    assert_number_string_prefix("acoth(2)", acoth_two,
-                                "0.549306144334054845697622618461262");
-    assert_number_string_prefix("atan2(0.5, -1)", atan2_quad_ii,
-                                "2.67794504458898712224838715181828");
-    assert_number_string_prefix("sincos(0.5).sin", sin_pair,
-                                "0.479425538604203000273287935215571");
-    assert_number_string_prefix("sincos(0.5).cos", cos_pair,
-                                "0.877582561890372716116281582603829");
-    assert_number_string_prefix("sinhcosh(0.5).sinh", sinh_pair,
-                                "0.521095305493747361622425626411491");
-    assert_number_string_prefix("sinhcosh(0.5).cosh", cosh_pair,
-                                "1.127625965206380785226225161402672");
+    assert_number_string_prefix("acot(-inf)", acot_ninf, "3.14159265358979323846264338327950");
+    assert_number_string_prefix("acot(1)", acot_one, "0.785398163397448309615660845819875");
+    assert_number_string_prefix("asinh(0.5)", asinh_half, "0.481211825059603447497758913424368");
+    assert_number_string_prefix("acosh(2)", acosh_two, "1.316957896924816708625046347307968");
+    assert_number_string_prefix("atanh(0.5)", atanh_half, "0.549306144334054845697622618461262");
+    assert_number_string_prefix("asech(0.5)", asech_half, "1.316957896924816708625046347307968");
+    assert_number_string_prefix("acosech(1)", acosech_one, "0.881373587019543025232609324979792");
+    assert_number_string_prefix("acoth(2)", acoth_two, "0.549306144334054845697622618461262");
+    assert_number_string_prefix("atan2(0.5, -1)", atan2_quad_ii, "2.67794504458898712224838715181828");
+    assert_number_string_prefix("sincos(0.5).sin", sin_pair, "0.479425538604203000273287935215571");
+    assert_number_string_prefix("sincos(0.5).cos", cos_pair, "0.877582561890372716116281582603829");
+    assert_number_string_prefix("sinhcosh(0.5).sinh", sinh_pair, "0.521095305493747361622425626411491");
+    assert_number_string_prefix("sinhcosh(0.5).cosh", cosh_pair, "1.127625965206380785226225161402672");
 
     num_destroy(&cosh_pair);
     num_destroy(&sinh_pair);
@@ -346,56 +306,32 @@ static void test_number_real_special_parity(void)
     number_t e1_one = num_e1(one);
 
     assert_number_string("gamma(5)", gamma5, "24");
-    assert_number_string_prefix("gamma(2.345)", gamma_2345,
-        "1.199297829415319285526815335887956");
-    assert_number_string_prefix("lgamma(2.345)", lgamma_2345,
-        "0.181736243377572037978629332299959");
-    assert_number_string_prefix("digamma(2.345)", digamma_2345,
-        "0.624166816851114101398494286434486");
-    assert_number_string_prefix("trigamma(2.345)", trigamma_2345,
-        "0.529868755482033898168534051754644");
-    assert_number_string_prefix("tetragamma(2.345)", tetragamma_2345,
-        "-0.275072127759200054732994928499661");
-    assert_number_string_prefix("erf(0.5)", erf_half,
-        "0.520499877813046537682746653891964");
-    assert_number_string_prefix("erfc(0.5)", erfc_half,
-        "0.479500122186953462317253346108035");
-    assert_number_string_prefix("erfinv(0.5)", erfinv_half,
-        "0.47693627620446987");
-    assert_number_string_prefix("erfcinv(0.5)", erfcinv_half,
-        "0.47693627620446987");
-    assert_number_string_prefix("gammainv(3)", gammainv_three,
-        "3.4058699863095669");
-    assert_number_string_prefix("lambert_w0(1)", w0_one,
-        "0.567143290409783872999968662210355");
-    assert_number_string_prefix("lambert_wm1(-0.1)", wm1_neg_tenth,
-        "-3.57715206395729721840939196351199");
-    assert_number_string_prefix("beta(2, 3)", beta_2_3,
-        "0.083333333333333333333333333333333");
-    assert_number_string_prefix("logbeta(2.5, 3.5)", logbeta_25_35,
-        "-3.30183526996205260979918438338982");
+    assert_number_string_prefix("gamma(2.345)", gamma_2345, "1.199297829415319285526815335887956");
+    assert_number_string_prefix("lgamma(2.345)", lgamma_2345, "0.181736243377572037978629332299959");
+    assert_number_string_prefix("digamma(2.345)", digamma_2345, "0.624166816851114101398494286434486");
+    assert_number_string_prefix("trigamma(2.345)", trigamma_2345, "0.529868755482033898168534051754644");
+    assert_number_string_prefix("tetragamma(2.345)", tetragamma_2345, "-0.275072127759200054732994928499661");
+    assert_number_string_prefix("erf(0.5)", erf_half, "0.520499877813046537682746653891964");
+    assert_number_string_prefix("erfc(0.5)", erfc_half, "0.479500122186953462317253346108035");
+    assert_number_string_prefix("erfinv(0.5)", erfinv_half, "0.47693627620446987");
+    assert_number_string_prefix("erfcinv(0.5)", erfcinv_half, "0.47693627620446987");
+    assert_number_string_prefix("gammainv(3)", gammainv_three, "3.4058699863095669");
+    assert_number_string_prefix("lambert_w0(1)", w0_one, "0.567143290409783872999968662210355");
+    assert_number_string_prefix("lambert_wm1(-0.1)", wm1_neg_tenth, "-3.57715206395729721840939196351199");
+    assert_number_string_prefix("beta(2, 3)", beta_2_3, "0.083333333333333333333333333333333");
+    assert_number_string_prefix("logbeta(2.5, 3.5)", logbeta_25_35, "-3.30183526996205260979918438338982");
     assert_number_string("binomial(5.5, 2.5)", binomial_55_25, "14.4375");
-    assert_number_string_prefix("beta_pdf(0.5, 2.5, 3.5)", beta_pdf,
-        "1.697652726313550248201426809306819");
-    assert_number_string_prefix("logbeta_pdf(0.5, 2.5, 3.5)", logbeta_pdf,
-        "0.529246547722271372130255897557121");
-    assert_number_string_prefix("normal_pdf(0.5)", normal_pdf,
-        "0.352065326764299477774680441596517");
-    assert_number_string_prefix("normal_logpdf(0.5)", normal_logpdf,
-        "-1.04393853320467274178032973640561");
+    assert_number_string_prefix("beta_pdf(0.5, 2.5, 3.5)", beta_pdf, "1.697652726313550248201426809306819");
+    assert_number_string_prefix("logbeta_pdf(0.5, 2.5, 3.5)", logbeta_pdf, "0.529246547722271372130255897557121");
+    assert_number_string_prefix("normal_pdf(0.5)", normal_pdf, "0.352065326764299477774680441596517");
+    assert_number_string_prefix("normal_logpdf(0.5)", normal_logpdf, "-1.04393853320467274178032973640561");
     assert_number_string("normal_cdf(0)", normal_cdf0, "0.5");
-    assert_number_string_prefix("gammainc_lower(1, 1)", lower_1_1,
-        "0.632120558828557678404476229838539");
-    assert_number_string_prefix("gammainc_upper(1, 1)", upper_1_1,
-        "0.367879441171442321595523770161460");
-    assert_number_string_prefix("gammainc_P(1, 1)", p_1_1,
-        "0.632120558828557678404476229838539");
-    assert_number_string_prefix("gammainc_Q(1, 1)", q_1_1,
-        "0.367879441171442321595523770161460");
-    assert_number_string_prefix("ei(1)", ei_one,
-        "1.895117816355936755466520934331634");
-    assert_number_string_prefix("e1(1)", e1_one,
-        "0.219383934395520273677163775460121");
+    assert_number_string_prefix("gammainc_lower(1, 1)", lower_1_1, "0.632120558828557678404476229838539");
+    assert_number_string_prefix("gammainc_upper(1, 1)", upper_1_1, "0.367879441171442321595523770161460");
+    assert_number_string_prefix("gammainc_P(1, 1)", p_1_1, "0.632120558828557678404476229838539");
+    assert_number_string_prefix("gammainc_Q(1, 1)", q_1_1, "0.367879441171442321595523770161460");
+    assert_number_string_prefix("ei(1)", ei_one, "1.895117816355936755466520934331634");
+    assert_number_string_prefix("e1(1)", e1_one, "0.219383934395520273677163775460121");
 
     num_destroy(&e1_one);
     num_destroy(&ei_one);
@@ -458,14 +394,10 @@ static void test_number_real_special_identities(void)
     number_t exp_logbeta = num_exp(num_logbeta(two_point_5, three_point_5));
     number_t beta_error = num_sub(beta, exp_logbeta);
 
-    assert_number_close_text("lgamma(x + 1) - lgamma(x) - log(x)",
-                             lgamma_diff, "0", NUMBER_PARITY_TIGHT_TOL);
-    assert_number_close_text("gammainc_P(0.5, 1) + gammainc_Q(0.5, 1) - 1",
-                             pq_sum, "0", NUMBER_PARITY_TIGHT_TOL);
-    assert_number_close_text("productlog(x) * exp(productlog(x)) - x",
-                             productlog_error, "0", NUMBER_PARITY_TIGHT_TOL);
-    assert_number_close_text("beta(2.5, 3.5) - exp(logbeta(2.5, 3.5))",
-                             beta_error, "0", NUMBER_PARITY_TIGHT_TOL);
+    assert_number_close_text("lgamma(x + 1) - lgamma(x) - log(x)", lgamma_diff, "0", NUMBER_PARITY_TIGHT_TOL);
+    assert_number_close_text("gammainc_P(0.5, 1) + gammainc_Q(0.5, 1) - 1", pq_sum, "0", NUMBER_PARITY_TIGHT_TOL);
+    assert_number_close_text("productlog(x) * exp(productlog(x)) - x", productlog_error, "0", NUMBER_PARITY_TIGHT_TOL);
+    assert_number_close_text("beta(2.5, 3.5) - exp(logbeta(2.5, 3.5))", beta_error, "0", NUMBER_PARITY_TIGHT_TOL);
 
     num_destroy(&beta_error);
     num_destroy(&exp_logbeta);
@@ -509,12 +441,9 @@ static void test_number_complex_arithmetic_parity(void)
     assert_number_real_imag_prefix("(3 + 4i) / (1 - 2i)", div, "-1", "2");
     assert_number_real_imag_prefix("conj(-1 + 2i)", conj, "-1", "-2");
     assert_number_real_imag_prefix("1 / (-1 - 2i)", inv, "-⅕", "⅖");
-    assert_number_string_prefix("abs(-0.2 + 0.4i)", abs_inv,
-                                "0.447213595499957939281834733746255");
-    assert_number_real_imag_prefix("cdouble (3 + 4i) * (1 - 2i)",
-                                   cdouble_mul, "11", "-2");
-    assert_number_real_imag_prefix("cdouble (3 + 4i) / (1 - 2i)",
-                                   cdouble_div, "-1", "2");
+    assert_number_string_prefix("abs(-0.2 + 0.4i)", abs_inv, "0.447213595499957939281834733746255");
+    assert_number_real_imag_prefix("cdouble (3 + 4i) * (1 - 2i)", cdouble_mul, "11", "-2");
+    assert_number_real_imag_prefix("cdouble (3 + 4i) / (1 - 2i)", cdouble_div, "-1", "2");
 
     num_destroy(&cdouble_div);
     num_destroy(&cdouble_mul);
@@ -558,46 +487,28 @@ static void test_number_complex_elementary_parity(void)
     number_t cosh_acosh = num_sub(num_cosh(acosh_value), acosh_input);
     number_t tanh_atanh = num_sub(num_tanh(atanh_small), small);
     number_t log_roundtrip_input = number_text("0.75 + 1.25i");
-    number_t log_roundtrip = num_sub(num_exp(num_log(log_roundtrip_input)),
-                                     log_roundtrip_input);
+    number_t log_roundtrip = num_sub(num_exp(num_log(log_roundtrip_input)), log_roundtrip_input);
 
-    assert_number_real_imag_close("exp(i*pi)", exp_i_pi, "-1", "0",
-                                  NUMBER_PARITY_LOOSE_TOL);
-    assert_number_real_imag_close("log(-1 + 0i)", log_neg_one, "0",
-                                  "3.141592653589793238462643383279502",
+    assert_number_real_imag_close("exp(i*pi)", exp_i_pi, "-1", "0", NUMBER_PARITY_LOOSE_TOL);
+    assert_number_real_imag_close("log(-1 + 0i)", log_neg_one, "0", "3.141592653589793238462643383279502",
                                   NUMBER_PARITY_BRANCH_TOL);
-    assert_number_real_imag_close("log(-3)", log_neg_three,
-                                  "1.098612288668109691395245236922526",
-                                  "3.141592653589793238462643383279502",
-                                  NUMBER_PARITY_BRANCH_TOL);
-    assert_number_real_imag_close("log10(-1)", log10_neg_one, "0",
-                                  "1.364376353841841347485783625431355",
+    assert_number_real_imag_close("log(-3)", log_neg_three, "1.098612288668109691395245236922526",
+                                  "3.141592653589793238462643383279502", NUMBER_PARITY_BRANCH_TOL);
+    assert_number_real_imag_close("log10(-1)", log10_neg_one, "0", "1.364376353841841347485783625431355",
                                   NUMBER_PARITY_BRANCH_TOL);
     assert_number_string("log10(100)", log10_100, "2");
-    assert_number_real_imag_prefix("sin(0.567 + 0.321i)", sin_z,
-                                   "0.56501421", "0.27544272");
-    assert_number_real_imag_prefix("cos(0.567 + 0.321i)", cos_z,
-                                   "0.8873489", "-0.17538654");
-    assert_number_real_imag_prefix("tan(0.567 + 0.321i)", tan_z,
-                                   "0.5537574", "0.41986226");
-    assert_number_real_imag_prefix("sinh(0.567 + 0.321i)", sinh_z,
-                                   "0.5673337", "0.36760644");
-    assert_number_real_imag_prefix("cosh(0.567 + 0.321i)", cosh_z,
-                                   "1.1055846", "0.1886382");
-    assert_number_real_imag_prefix("tanh(0.567 + 0.321i)", tanh_z,
-                                   "0.55376346", "0.23801478");
-    assert_number_close_text("sin(asin(z)) - z", sin_asin, "0",
-                             NUMBER_PARITY_LOOSE_TOL);
-    assert_number_close_text("cos(acos(z)) - z", cos_acos, "0",
-                             NUMBER_PARITY_LOOSE_TOL);
-    assert_number_close_text("sinh(asinh(z)) - z", sinh_asinh, "0",
-                             NUMBER_PARITY_LOOSE_TOL);
-    assert_number_close_text("cosh(acosh(z)) - z", cosh_acosh, "0",
-                             NUMBER_PARITY_LOOSE_TOL);
-    assert_number_close_text("tanh(atanh(z)) - z", tanh_atanh, "0",
-                             NUMBER_PARITY_LOOSE_TOL);
-    assert_number_close_text("exp(log(0.75 + 1.25i)) - input",
-                             log_roundtrip, "0", NUMBER_PARITY_LOOSE_TOL);
+    assert_number_real_imag_prefix("sin(0.567 + 0.321i)", sin_z, "0.56501421", "0.27544272");
+    assert_number_real_imag_prefix("cos(0.567 + 0.321i)", cos_z, "0.8873489", "-0.17538654");
+    assert_number_real_imag_prefix("tan(0.567 + 0.321i)", tan_z, "0.5537574", "0.41986226");
+    assert_number_real_imag_prefix("sinh(0.567 + 0.321i)", sinh_z, "0.5673337", "0.36760644");
+    assert_number_real_imag_prefix("cosh(0.567 + 0.321i)", cosh_z, "1.1055846", "0.1886382");
+    assert_number_real_imag_prefix("tanh(0.567 + 0.321i)", tanh_z, "0.55376346", "0.23801478");
+    assert_number_close_text("sin(asin(z)) - z", sin_asin, "0", NUMBER_PARITY_LOOSE_TOL);
+    assert_number_close_text("cos(acos(z)) - z", cos_acos, "0", NUMBER_PARITY_LOOSE_TOL);
+    assert_number_close_text("sinh(asinh(z)) - z", sinh_asinh, "0", NUMBER_PARITY_LOOSE_TOL);
+    assert_number_close_text("cosh(acosh(z)) - z", cosh_acosh, "0", NUMBER_PARITY_LOOSE_TOL);
+    assert_number_close_text("tanh(atanh(z)) - z", tanh_atanh, "0", NUMBER_PARITY_LOOSE_TOL);
+    assert_number_close_text("exp(log(0.75 + 1.25i)) - input", log_roundtrip, "0", NUMBER_PARITY_LOOSE_TOL);
 
     num_destroy(&log_roundtrip);
     num_destroy(&log_roundtrip_input);
@@ -661,23 +572,14 @@ static void test_number_complex_special_parity(void)
     number_t w_roundtrip = num_sub(num_mul(w, num_exp(w)), w_input);
 
     assert_number_real_imag_prefix("gamma(1 + 0i)", gamma_one, "1", "0");
-    assert_number_real_imag_prefix("erf(1 + 0i)", erf_one,
-                                   "0.84270079294971486934122063508262",
-                                   "0");
-    assert_number_close_text("gamma(z) - exp(lgamma(z))", gamma_roundtrip, "0",
-                             NUMBER_PARITY_QCOMPLEX_TOL);
-    assert_number_close_text("gamma(z + 1) - z * gamma(z)",
-                             gamma_recurrence, "0", NUMBER_PARITY_QCOMPLEX_TOL);
-    assert_number_close_text("erf(z) + erfc(z) - 1", erf_erfc, "0",
-                             NUMBER_PARITY_QCOMPLEX_TOL);
-    assert_number_close_text("beta(a,b) - exp(logbeta(a,b))",
-                             beta_identity, "0", NUMBER_PARITY_QCOMPLEX_TOL);
-    assert_number_close_text("gammainc_lower + gammainc_upper - gamma",
-                             inc_sum, "0", NUMBER_PARITY_QCOMPLEX_TOL);
-    assert_number_close_text("gammainc_P + gammainc_Q - 1",
-                             inc_pq, "0", NUMBER_PARITY_QCOMPLEX_TOL);
-    assert_number_close_text("productlog(z) * exp(productlog(z)) - z",
-                             w_roundtrip, "0", NUMBER_PARITY_QCOMPLEX_TOL);
+    assert_number_real_imag_prefix("erf(1 + 0i)", erf_one, "0.84270079294971486934122063508262", "0");
+    assert_number_close_text("gamma(z) - exp(lgamma(z))", gamma_roundtrip, "0", NUMBER_PARITY_QCOMPLEX_TOL);
+    assert_number_close_text("gamma(z + 1) - z * gamma(z)", gamma_recurrence, "0", NUMBER_PARITY_QCOMPLEX_TOL);
+    assert_number_close_text("erf(z) + erfc(z) - 1", erf_erfc, "0", NUMBER_PARITY_QCOMPLEX_TOL);
+    assert_number_close_text("beta(a,b) - exp(logbeta(a,b))", beta_identity, "0", NUMBER_PARITY_QCOMPLEX_TOL);
+    assert_number_close_text("gammainc_lower + gammainc_upper - gamma", inc_sum, "0", NUMBER_PARITY_QCOMPLEX_TOL);
+    assert_number_close_text("gammainc_P + gammainc_Q - 1", inc_pq, "0", NUMBER_PARITY_QCOMPLEX_TOL);
+    assert_number_close_text("productlog(z) * exp(productlog(z)) - z", w_roundtrip, "0", NUMBER_PARITY_QCOMPLEX_TOL);
 
     num_destroy(&w_roundtrip);
     num_destroy(&w);

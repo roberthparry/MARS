@@ -5,11 +5,7 @@
 #include "expression.h"
 #include "number.h"
 
-enum {
-    DEFAULT_SIMPLIFY_ITERS = 4000,
-    DEFAULT_REVERSE_ITERS  = 2500,
-    DEFAULT_RUNS           = 5
-};
+enum { DEFAULT_SIMPLIFY_ITERS = 4000, DEFAULT_REVERSE_ITERS = 2500, DEFAULT_RUNS = 5 };
 
 static volatile double g_sink = 0.0;
 
@@ -33,8 +29,7 @@ static int bench_scale(void)
     return value > 0 ? (int)value : 1;
 }
 
-static expr_t *build_simplify_expr(const expr_t *x, const expr_t *y,
-                                   const expr_t *z, const expr_t *w)
+static expr_t *build_simplify_expr(const expr_t *x, const expr_t *y, const expr_t *z, const expr_t *w)
 {
     number_t three = num_create_from_long(3);
     number_t minus_three = num_create_from_long(-3);
@@ -207,11 +202,8 @@ static void print_stats(const char *label, double *samples, int runs, int iterat
             worst = samples[i];
     }
 
-    printf("%-24s avg=%8.3f ms  best=%8.3f ms  worst=%8.3f ms  per-iter=%8.3f us\n",
-           label,
-           (sum / (double)runs) * 1000.0,
-           best * 1000.0,
-           worst * 1000.0,
+    printf("%-24s avg=%8.3f ms  best=%8.3f ms  worst=%8.3f ms  per-iter=%8.3f us\n", label,
+           (sum / (double)runs) * 1000.0, best * 1000.0, worst * 1000.0,
            (sum / (double)runs) * 1e6 / (double)iterations);
 }
 

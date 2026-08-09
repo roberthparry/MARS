@@ -1,7 +1,7 @@
-#include "ustring.h"
 #include "test_string.h"
-#include <stdio.h>
+#include "ustring.h"
 #include <stdarg.h>
+#include <stdio.h>
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 
@@ -74,7 +74,7 @@ static void test_join_empty_fields(void)
     string_t *b = string_new_with("");
     string_t *c = string_new_with("");
 
-    string_t *arr[3] = { a, b, c };
+    string_t *arr[3] = {a, b, c};
 
     string_t *joined = string_join(arr, 3, ",");
 
@@ -99,7 +99,7 @@ static void test_string_replace(void)
 static void test_string_new_wide(void)
 {
     string_t *s = string_new_wide(L"hello \u03C0 \U0001F642");
-    wchar_t invalid_wide[] = { (wchar_t)0xD800u, L'\0' };
+    wchar_t invalid_wide[] = {(wchar_t)0xD800u, L'\0'};
     string_t *replacement = string_new_wide(invalid_wide);
 
     ASSERT_NOT_NULL(s);
@@ -165,13 +165,7 @@ static void test_append_format(void)
     ASSERT_STREQ(string_c_str(s), "Hello universe 2 + 3 = 5");
 
     string_clear(s);
-    string_append_format(s,
-                         "%S:%W:%R:%04d:%s",
-                         name,
-                         name_view,
-                         string_at(greek, 0u),
-                         7,
-                         "ready");
+    string_append_format(s, "%S:%W:%R:%04d:%s", name, name_view, string_at(greek, 0u), 7, "ready");
     ASSERT_STREQ(string_c_str(s), "MARS:AR:α:0007:ready");
 
     created = string_sprintf("%S/%W/%R", name, name_view, string_at(greek, 1u));
@@ -280,7 +274,7 @@ static void test_text_character_api(void)
     string_t *word = string_substring(s, 2, 4);
     string_t *family_copy = rune_to_string(family);
     string_builder_t *collected = string_builder_new();
-    each_char_state_t state = { collected, 0u };
+    each_char_state_t state = {collected, 0u};
 
     ASSERT_EQ((long)string_length(s), 8L);
     ASSERT_FALSE(rune_is_none(family));
@@ -330,7 +324,6 @@ static void test_string_view(void)
     string_free(expected);
     string_free(s);
     string_free(sub);
-
 }
 
 static void test_string_cursor_view_rune_values(void)
@@ -444,15 +437,9 @@ static bool test_parser_identifier_rune(rune_t rune)
     return rune_is_alpha_numeric(rune) || rune_is_equal(rune, '_');
 }
 
-typedef enum {
-    TEST_TOKEN_ID,
-    TEST_TOKEN_NUMBER,
-    TEST_TOKEN_OPERATOR
-} test_parser_token_kind_t;
+typedef enum { TEST_TOKEN_ID, TEST_TOKEN_NUMBER, TEST_TOKEN_OPERATOR } test_parser_token_kind_t;
 
-static void test_parser_append_token(string_t *out,
-                                     test_parser_token_kind_t kind,
-                                     const string_t *text)
+static void test_parser_append_token(string_t *out, test_parser_token_kind_t kind, const string_t *text)
 {
     if (string_length(out) > 0u)
         string_append_cstr(out, " ");
@@ -506,8 +493,7 @@ static bool test_parser_read_number(string_cursor_t *cursor, string_t *out)
     do {
         string_cursor_next(cursor);
         rune = string_cursor_peek(cursor);
-    } while (!rune_is_none(rune) &&
-             (rune_is_digit(rune) || rune_is_equal(rune, '/')));
+    } while (!rune_is_none(rune) && (rune_is_digit(rune) || rune_is_equal(rune, '/')));
 
     token = string_cursor_extract(start, cursor);
     if (!token)
@@ -559,8 +545,7 @@ static void test_string_cursor_parser_example(void)
     string_t *tokens = test_parser_tokenise(source);
 
     ASSERT_NOT_NULL(tokens);
-    ASSERT_STREQ(string_c_str(tokens),
-                 "id[cdf] op[(] id[α_1] op[)] op[+] number[355/113]");
+    ASSERT_STREQ(string_c_str(tokens), "id[cdf] op[(] id[α_1] op[)] op[+] number[355/113]");
 
     string_free(tokens);
     string_free(source);
@@ -807,7 +792,8 @@ static void test_text_mutation_canonicalises_when_needed(void)
     string_free(append);
 }
 
-static void test_readme_example_Basic_UTF_8_Manipulation(void) {
+static void test_readme_example_Basic_UTF_8_Manipulation(void)
+{
     string_t *s = string_new_with("Héllo");
 
     /* Append UTF‑8 text */
@@ -819,7 +805,6 @@ static void test_readme_example_Basic_UTF_8_Manipulation(void) {
     string_printf("%S\n", s);
 
     string_free(s);
-
 }
 
 static int print_character(rune_t rune, size_t index, void *user)
@@ -828,7 +813,8 @@ static int print_character(rune_t rune, size_t index, void *user)
     return string_printf("[%zu] %R\n", index, rune) < 0 ? -1 : 0;
 }
 
-static void test_readme_example_Character_Iteration(void) {
+static void test_readme_example_Character_Iteration(void)
+{
     string_t *s = string_new_with("👨‍👩‍👧‍👦 family");
 
     size_t count = string_length(s);
@@ -840,7 +826,8 @@ static void test_readme_example_Character_Iteration(void) {
     string_free(s);
 }
 
-static void test_readme_example_Unicode_Text_Just_Works(void) {
+static void test_readme_example_Unicode_Text_Just_Works(void)
+{
     string_t *s = string_new_with("👨‍👩‍👧‍👦 café 🇬🇧");
     rune_t first = string_at(s, 0);
     string_t *first_text = rune_to_string(first);
@@ -858,7 +845,8 @@ static void test_readme_example_Unicode_Text_Just_Works(void) {
     string_free(s);
 }
 
-static void test_readme_example_Using_the_Builder_API(void) {
+static void test_readme_example_Using_the_Builder_API(void)
+{
     string_builder_t *b = string_builder_new();
     string_builder_append(b, "Hello");
     string_builder_append(b, ", ");
@@ -869,10 +857,10 @@ static void test_readme_example_Using_the_Builder_API(void) {
     string_printf("%S\n", out);
 
     string_free(out);
-
 }
 
-static void test_readme_example_Escaping_Wide_C_Strings(void) {
+static void test_readme_example_Escaping_Wide_C_Strings(void)
+{
     string_t *s = string_new_wide(L"hello \u03C0");
 
     string_printf("%S\n", s);
@@ -880,7 +868,8 @@ static void test_readme_example_Escaping_Wide_C_Strings(void) {
     string_free(s);
 }
 
-static void test_readme_example_Using_string_t_With_a_Parser(void) {
+static void test_readme_example_Using_string_t_With_a_Parser(void)
+{
     string_t *source = string_new_with("cdf(α_1) + 355/113");
     string_t *tokens = test_parser_tokenise(source);
 
@@ -890,7 +879,8 @@ static void test_readme_example_Using_string_t_With_a_Parser(void) {
     string_free(source);
 }
 
-static void test_readme_example_Fixed_Capacity_Buffer(void) {
+static void test_readme_example_Fixed_Capacity_Buffer(void)
+{
     char storage[64];
     string_buffer_t buf;
 
@@ -900,7 +890,8 @@ static void test_readme_example_Fixed_Capacity_Buffer(void) {
     string_printf("%s\n", string_buffer_c_str(&buf));
 }
 
-static void example_readme_examples(void) {
+static void example_readme_examples(void)
+{
     test_readme_example_Basic_UTF_8_Manipulation();
     test_readme_example_Unicode_Text_Just_Works();
     test_readme_example_Escaping_Wide_C_Strings();
@@ -950,8 +941,7 @@ int tests_main(void)
     TEST_RUN_IN_GROUP(test_text_mutation_canonicalises_when_needed, tests, NULL);
 
     TEST_SECTION("README");
-    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_readme_examples, readme_examples,
-                                  "string,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_readme_examples, readme_examples, "string,readme,output");
 
     return TEST_EXIT_CODE();
 }

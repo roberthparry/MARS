@@ -39,9 +39,7 @@ static void holiday_case_row_clone(void *dst, const void *src)
     to->rule_id = from->rule_id;
     to->event_year = from->event_year;
     to->derived_from_observance = from->derived_from_observance;
-    to->holiday_date = from->holiday_date
-        ? datetime_init_copy(datetime_alloc(), from->holiday_date)
-        : NULL;
+    to->holiday_date = from->holiday_date ? datetime_init_copy(datetime_alloc(), from->holiday_date) : NULL;
     to->holiday_name = from->holiday_name ? strdup(from->holiday_name) : NULL;
     to->holiday_class = from->holiday_class ? strdup(from->holiday_class) : NULL;
 }
@@ -132,9 +130,7 @@ static void print_events_summary(const char *label, const array_t *events)
 {
     char *found = describe_events(events);
 
-    printf("    %s (%zu)\n%s\n",
-           label ? label : "events",
-           events ? array_size(events) : 0u,
+    printf("    %s (%zu)\n%s\n", label ? label : "events", events ? array_size(events) : 0u,
            found ? found : "(unavailable)");
     free(found);
 }
@@ -158,13 +154,8 @@ static bool collect_event(const holiday_event_t *event, void *ctx)
     return array_add(rows, &row);
 }
 
-static array_t *load_events(const char *jurisdiction,
-                            short start_year,
-                            month_t start_month,
-                            uint8_t start_day,
-                            short end_year,
-                            month_t end_month,
-                            uint8_t end_day)
+static array_t *load_events(const char *jurisdiction, short start_year, month_t start_month, uint8_t start_day,
+                            short end_year, month_t end_month, uint8_t end_day)
 {
     jurisdiction_t *holiday = jurisdict_open(jurisdiction);
     datetime_t *start = datetime_init_ymd(datetime_alloc(), start_year, start_month, start_day);
@@ -179,7 +170,8 @@ static array_t *load_events(const char *jurisdiction,
         datetime_dealloc(end);
         datetime_dealloc(start);
         if (!holiday) {
-            test_set_failure_detailf("jurisdiction data unavailable; install the jurisdiction database to provision the rule source");
+            test_set_failure_detailf(
+                "jurisdiction data unavailable; install the jurisdiction database to provision the rule source");
         }
         return NULL;
     }
@@ -212,8 +204,7 @@ done:
     return rows;
 }
 
-static const holiday_case_row_t *find_event_by_name_and_date(const array_t *events,
-                                                             const char *holiday_name,
+static const holiday_case_row_t *find_event_by_name_and_date(const array_t *events, const char *holiday_name,
                                                              const char *holiday_date)
 {
     size_t i;
@@ -224,8 +215,7 @@ static const holiday_case_row_t *find_event_by_name_and_date(const array_t *even
     for (i = 0u; i < array_size(events); ++i) {
         const holiday_case_row_t *row = array_get(events, i);
 
-        if (row && row->holiday_name && row->holiday_date &&
-            strcmp(row->holiday_name, holiday_name) == 0 &&
+        if (row && row->holiday_name && row->holiday_date && strcmp(row->holiday_name, holiday_name) == 0 &&
             datetime_matches_iso_date(row->holiday_date, holiday_date))
             return row;
     }
@@ -233,9 +223,7 @@ static const holiday_case_row_t *find_event_by_name_and_date(const array_t *even
     return NULL;
 }
 
-static size_t count_equivalent_events(const array_t *events,
-                                      const char *holiday_name,
-                                      const char *holiday_date)
+static size_t count_equivalent_events(const array_t *events, const char *holiday_name, const char *holiday_date)
 {
     size_t i;
     size_t count = 0u;
@@ -254,8 +242,7 @@ static size_t count_equivalent_events(const array_t *events,
     return count;
 }
 
-static const holiday_case_row_t *find_event_by_id_and_date(const array_t *events,
-                                                           int holiday_id,
+static const holiday_case_row_t *find_event_by_id_and_date(const array_t *events, int holiday_id,
                                                            const char *holiday_date)
 {
     size_t i;
@@ -274,36 +261,28 @@ static const holiday_case_row_t *find_event_by_id_and_date(const array_t *events
     return NULL;
 }
 
-static bool assert_event_present(const array_t *events,
-                                 const char *holiday_name,
-                                 const char *holiday_date)
+static bool assert_event_present(const array_t *events, const char *holiday_name, const char *holiday_date)
 {
     char *found;
 
     if (find_event_by_name_and_date(events, holiday_name, holiday_date))
         return true;
     found = describe_events(events);
-    test_set_failure_detailf("expected %s on %s; found: %s",
-                             holiday_name ? holiday_name : "(null)",
-                             holiday_date ? holiday_date : "(null)",
-                             found ? found : "(unavailable)");
+    test_set_failure_detailf("expected %s on %s; found: %s", holiday_name ? holiday_name : "(null)",
+                             holiday_date ? holiday_date : "(null)", found ? found : "(unavailable)");
     free(found);
     return false;
 }
 
-static bool assert_event_absent(const array_t *events,
-                                const char *holiday_name,
-                                const char *holiday_date)
+static bool assert_event_absent(const array_t *events, const char *holiday_name, const char *holiday_date)
 {
     char *found;
 
     if (!find_event_by_name_and_date(events, holiday_name, holiday_date))
         return true;
     found = describe_events(events);
-    test_set_failure_detailf("did not expect %s on %s; found: %s",
-                             holiday_name ? holiday_name : "(null)",
-                             holiday_date ? holiday_date : "(null)",
-                             found ? found : "(unavailable)");
+    test_set_failure_detailf("did not expect %s on %s; found: %s", holiday_name ? holiday_name : "(null)",
+                             holiday_date ? holiday_date : "(null)", found ? found : "(unavailable)");
     free(found);
     return false;
 }
@@ -387,12 +366,8 @@ static void test_ireland_historic_whit_monday_exists_in_1960(void)
     ASSERT_NOT_NULL(easter);
     print_events_summary("Ireland 1960 holidays", events);
     datetime_add_days(easter, 50);
-    snprintf(expected_whit_monday,
-             sizeof(expected_whit_monday),
-             "%04d-%02d-%02d",
-             datetime_year(easter),
-             (int)datetime_month(easter),
-             (int)datetime_day(easter));
+    snprintf(expected_whit_monday, sizeof(expected_whit_monday), "%04d-%02d-%02d", datetime_year(easter),
+             (int)datetime_month(easter), (int)datetime_day(easter));
 
     ASSERT_TRUE(assert_event_present(events, "Whit Monday", expected_whit_monday));
     ASSERT_TRUE(assert_event_absent(events, "June Bank Holiday", expected_whit_monday));
@@ -516,8 +491,7 @@ static void test_jurisdiction_alaska_default_location_uses_juneau(void)
     ASSERT_NOT_NULL(summer);
     ASSERT_TRUE(jurisdict_default_location(holiday, &latitude, &longitude));
     ASSERT_TRUE(jurisdict_default_gmt_offset(holiday, summer, &offset));
-    printf("    Alaska default location: latitude=%.4f longitude=%.4f offset=%.1f\n",
-           latitude, longitude, offset);
+    printf("    Alaska default location: latitude=%.4f longitude=%.4f offset=%.1f\n", latitude, longitude, offset);
     ASSERT_TRUE(fabs(latitude - 58.3019) < 0.01);
     ASSERT_TRUE(fabs(longitude - (-134.4197)) < 0.01);
     ASSERT_TRUE(fabs(offset - (-8.0)) < 0.001);
@@ -538,8 +512,7 @@ static void test_jurisdiction_iceland_default_location_uses_reykjavik(void)
     ASSERT_NOT_NULL(summer);
     ASSERT_TRUE(jurisdict_default_location(holiday, &latitude, &longitude));
     ASSERT_TRUE(jurisdict_default_gmt_offset(holiday, summer, &offset));
-    printf("    Iceland default location: latitude=%.4f longitude=%.4f offset=%.1f\n",
-           latitude, longitude, offset);
+    printf("    Iceland default location: latitude=%.4f longitude=%.4f offset=%.1f\n", latitude, longitude, offset);
     ASSERT_TRUE(fabs(latitude - 64.1466) < 0.01);
     ASSERT_TRUE(fabs(longitude - (-21.9426)) < 0.01);
     ASSERT_TRUE(fabs(offset - 0.0) < 0.001);
@@ -560,8 +533,7 @@ static void test_jurisdiction_svalbard_default_location_uses_longyearbyen(void)
     ASSERT_NOT_NULL(summer);
     ASSERT_TRUE(jurisdict_default_location(holiday, &latitude, &longitude));
     ASSERT_TRUE(jurisdict_default_gmt_offset(holiday, summer, &offset));
-    printf("    Svalbard default location: latitude=%.4f longitude=%.4f offset=%.1f\n",
-           latitude, longitude, offset);
+    printf("    Svalbard default location: latitude=%.4f longitude=%.4f offset=%.1f\n", latitude, longitude, offset);
     ASSERT_TRUE(fabs(latitude - 78.2232) < 0.01);
     ASSERT_TRUE(fabs(longitude - 15.6469) < 0.01);
     ASSERT_TRUE(fabs(offset - 2.0) < 0.001);
@@ -628,12 +600,12 @@ static void test_jurisdiction_dst_transition_datetimes_expose_forward_and_back_c
 
     ASSERT_NOT_NULL(england);
     ASSERT_NOT_NULL(denmark);
-    ASSERT_TRUE(jurisdict_dst_transition_details(england, 2026,
-                                                 &england_forward, &england_forward_from, &england_forward_to,
-                                                 &england_back, &england_back_from, &england_back_to));
-    ASSERT_TRUE(jurisdict_dst_transition_details(denmark, 2026,
-                                                 &denmark_forward, &denmark_forward_from, &denmark_forward_to,
-                                                 &denmark_back, &denmark_back_from, &denmark_back_to));
+    ASSERT_TRUE(jurisdict_dst_transition_details(england, 2026, &england_forward, &england_forward_from,
+                                                 &england_forward_to, &england_back, &england_back_from,
+                                                 &england_back_to));
+    ASSERT_TRUE(jurisdict_dst_transition_details(denmark, 2026, &denmark_forward, &denmark_forward_from,
+                                                 &denmark_forward_to, &denmark_back, &denmark_back_from,
+                                                 &denmark_back_to));
     ASSERT_NOT_NULL(england_forward);
     ASSERT_NOT_NULL(england_back);
     ASSERT_NOT_NULL(denmark_forward);
@@ -641,14 +613,14 @@ static void test_jurisdiction_dst_transition_datetimes_expose_forward_and_back_c
 
     printf("    England DST 2026: forward=%04d-%02d-%02d %02d:%02d back=%04d-%02d-%02d %02d:%02d\n",
            datetime_year(england_forward), (int)datetime_month(england_forward), (int)datetime_day(england_forward),
-           (int)datetime_hour(england_forward), (int)datetime_minute(england_forward),
-           datetime_year(england_back), (int)datetime_month(england_back), (int)datetime_day(england_back),
-           (int)datetime_hour(england_back), (int)datetime_minute(england_back));
+           (int)datetime_hour(england_forward), (int)datetime_minute(england_forward), datetime_year(england_back),
+           (int)datetime_month(england_back), (int)datetime_day(england_back), (int)datetime_hour(england_back),
+           (int)datetime_minute(england_back));
     printf("    Denmark DST 2026: forward=%04d-%02d-%02d %02d:%02d back=%04d-%02d-%02d %02d:%02d\n",
            datetime_year(denmark_forward), (int)datetime_month(denmark_forward), (int)datetime_day(denmark_forward),
-           (int)datetime_hour(denmark_forward), (int)datetime_minute(denmark_forward),
-           datetime_year(denmark_back), (int)datetime_month(denmark_back), (int)datetime_day(denmark_back),
-           (int)datetime_hour(denmark_back), (int)datetime_minute(denmark_back));
+           (int)datetime_hour(denmark_forward), (int)datetime_minute(denmark_forward), datetime_year(denmark_back),
+           (int)datetime_month(denmark_back), (int)datetime_day(denmark_back), (int)datetime_hour(denmark_back),
+           (int)datetime_minute(denmark_back));
 
     ASSERT_TRUE(datetime_matches_iso_date(england_forward, "2026-03-29"));
     ASSERT_TRUE(datetime_matches_iso_date(england_back, "2026-10-25"));
@@ -719,16 +691,13 @@ static void example_holiday_readme_queries(void)
 
         ASSERT_NOT_NULL(event);
         date_text = datetime_format(event->holiday_date, "%yyyy-%MM-%dd");
-        printf("- %s: %s\n",
-               event->holiday_name ? event->holiday_name : "(unavailable)",
+        printf("- %s: %s\n", event->holiday_name ? event->holiday_name : "(unavailable)",
                date_text ? date_text : "(unavailable)");
         free(date_text);
     }
 
-    printf("2021-12-25 weekend: %s\n",
-           jurisdict_is_weekend(holiday, bank_holiday) ? "yes" : "no");
-    printf("2021-12-25 national holiday: %s\n",
-           jurisdict_is_national_holiday(holiday, bank_holiday) ? "yes" : "no");
+    printf("2021-12-25 weekend: %s\n", jurisdict_is_weekend(holiday, bank_holiday) ? "yes" : "no");
+    printf("2021-12-25 national holiday: %s\n", jurisdict_is_national_holiday(holiday, bank_holiday) ? "yes" : "no");
 
     working_days = jurisdict_working_days_between(holiday, range_start, range_end);
     ASSERT_EQ_LONG(working_days, 4L);
@@ -750,10 +719,9 @@ static bool holiday_suite_setup(void)
         return true;
     }
 
-    fprintf(stderr,
-            "Holiday tests require the configured jurisdiction rule source.\n"
-            "Install the jurisdiction database first, for example with `make install-jurisdiction-db`.\n"
-            "if you also want the desktop app, use `make install-mars-lab`.\n");
+    fprintf(stderr, "Holiday tests require the configured jurisdiction rule source.\n"
+                    "Install the jurisdiction database first, for example with `make install-jurisdiction-db`.\n"
+                    "if you also want the desktop app, use `make install-mars-lab`.\n");
     return false;
 }
 
@@ -785,7 +753,6 @@ int tests_main(void)
 
     TEST_SECTION("README Output Examples");
     printf(C_BOLD C_YELLOW "Running README examples...\n" C_RESET);
-    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_holiday_readme_queries, readme_examples,
-                                  "holiday,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_holiday_readme_queries, readme_examples, "holiday,readme,output");
     return TEST_EXIT_CODE();
 }

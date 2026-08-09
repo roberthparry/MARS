@@ -11,8 +11,7 @@ static int const_is_protected_bound_symbol(const expr_t *dv)
     int has_default;
     int is_default;
 
-    if (!dv || !expr_is_const(dv) || !dv->binding_expr ||
-        !dv->name || !*dv->name)
+    if (!dv || !expr_is_const(dv) || !dv->binding_expr || !dv->name || !*dv->name)
         return 0;
 
     has_default = expr_get_default_constant_num(dv->name, &value);
@@ -25,24 +24,18 @@ static int const_is_protected_bound_symbol(const expr_t *dv)
 
 static int const_struct_eq(const expr_t *u, const expr_t *v)
 {
-    if (const_is_protected_bound_symbol(u) ||
-        const_is_protected_bound_symbol(v)) {
-        return const_is_protected_bound_symbol(u) &&
-               const_is_protected_bound_symbol(v) &&
-               u->name && v->name &&
-               strcmp(u->name, v->name) == 0 &&
-               expr_binding_expr_struct_eq(u->binding_expr, v->binding_expr);
+    if (const_is_protected_bound_symbol(u) || const_is_protected_bound_symbol(v)) {
+        return const_is_protected_bound_symbol(u) && const_is_protected_bound_symbol(v) && u->name && v->name &&
+               strcmp(u->name, v->name) == 0 && expr_binding_expr_struct_eq(u->binding_expr, v->binding_expr);
     }
 
     if (u->binding_expr || v->binding_expr) {
         if (expr_binding_expr_struct_eq(u->binding_expr, v->binding_expr))
             return 1;
         return num_eq(u->c, v->c) &&
-               (!u->binding_expr ||
-                u->binding_expr->kind == EXPR_BINDING_EXPR_NUMBER ||
+               (!u->binding_expr || u->binding_expr->kind == EXPR_BINDING_EXPR_NUMBER ||
                 u->binding_expr->kind == EXPR_BINDING_EXPR_CONST) &&
-               (!v->binding_expr ||
-                v->binding_expr->kind == EXPR_BINDING_EXPR_NUMBER ||
+               (!v->binding_expr || v->binding_expr->kind == EXPR_BINDING_EXPR_NUMBER ||
                 v->binding_expr->kind == EXPR_BINDING_EXPR_CONST);
     }
 
@@ -59,10 +52,7 @@ static void *expr_match_xrealloc(void *ptr, size_t size)
     abort();
 }
 
-static void collect_mul_factors_borrowed(const expr_t *dv,
-                                         number_t *c_acc,
-                                         const expr_t ***terms,
-                                         size_t *nterms,
+static void collect_mul_factors_borrowed(const expr_t *dv, number_t *c_acc, const expr_t ***terms, size_t *nterms,
                                          size_t *cap)
 {
     NUM_SCOPE(scope);
@@ -147,13 +137,9 @@ cleanup:
 
 static int sqrt_half_pow_struct_eq(const expr_t *u, const expr_t *v)
 {
-    if (expr_is_sqrt_expr(u) &&
-        expr_is_pow_d_expr(v) &&
-        num_eq(v->c, NUM_HALF))
+    if (expr_is_sqrt_expr(u) && expr_is_pow_d_expr(v) && num_eq(v->c, NUM_HALF))
         return expr_struct_eq(u->a, v->a);
-    if (expr_is_pow_d_expr(u) &&
-        num_eq(u->c, NUM_HALF) &&
-        expr_is_sqrt_expr(v))
+    if (expr_is_pow_d_expr(u) && num_eq(u->c, NUM_HALF) && expr_is_sqrt_expr(v))
         return expr_struct_eq(u->a, v->a);
     return 0;
 }
@@ -173,8 +159,7 @@ int expr_struct_eq(const expr_t *u, const expr_t *v)
     if (expr_is_var(u))
         return u->var_id != 0 && u->var_id == v->var_id;
     if (expr_is_formal_derivative(u)) {
-        if (u->formal_wrt_count != v->formal_wrt_count ||
-            !expr_struct_eq(u->a, v->a))
+        if (u->formal_wrt_count != v->formal_wrt_count || !expr_struct_eq(u->a, v->a))
             return 0;
         for (size_t i = 0u; i < u->formal_wrt_count; ++i)
             if (!expr_struct_eq(u->formal_wrts[i], v->formal_wrts[i]))
@@ -182,9 +167,7 @@ int expr_struct_eq(const expr_t *u, const expr_t *v)
         return 1;
     }
     if (expr_is_arbitrary_function(u))
-        return u->name && v->name &&
-               strcmp(u->name, v->name) == 0 &&
-               expr_struct_eq(u->a, v->a);
+        return u->name && v->name && strcmp(u->name, v->name) == 0 && expr_struct_eq(u->a, v->a);
     if (expr_is_mul(u))
         return mul_struct_eq(u, v);
     if (expr_is_neg(u))
@@ -194,27 +177,22 @@ int expr_struct_eq(const expr_t *u, const expr_t *v)
     return expr_struct_eq(u->a, v->a) && expr_struct_eq(u->b, v->b);
 }
 
-static bool expr_simplify_same_named_leaf_local(const expr_t *left,
-                                                const expr_t *right)
+static bool expr_simplify_same_named_leaf_local(const expr_t *left, const expr_t *right)
 {
     const char *left_name = (left && left->name && *left->name) ? left->name : NULL;
     const char *right_name = (right && right->name && *right->name) ? right->name : NULL;
 
-    if (left && right && left->ops && right->ops &&
-        left->ops->kind == EXPR_KIND_VAR &&
-        right->ops->kind == EXPR_KIND_VAR &&
-        left->var_id != 0 && right->var_id != 0) {
+    if (left && right && left->ops && right->ops && left->ops->kind == EXPR_KIND_VAR &&
+        right->ops->kind == EXPR_KIND_VAR && left->var_id != 0 && right->var_id != 0) {
         return left->var_id == right->var_id;
     }
 
     if (left_name || right_name)
-        return left_name && right_name && strcmp(left_name, right_name) == 0 &&
-               num_eq(left->c, right->c);
+        return left_name && right_name && strcmp(left_name, right_name) == 0 && num_eq(left->c, right->c);
     return left && right && num_eq(left->c, right->c);
 }
 
-static bool expr_simplify_same_shape_local(const expr_t *left,
-                                           const expr_t *right)
+static bool expr_simplify_same_shape_local(const expr_t *left, const expr_t *right)
 {
     if (left == right)
         return true;
@@ -225,21 +203,17 @@ static bool expr_simplify_same_shape_local(const expr_t *left,
         return expr_simplify_same_named_leaf_local(left, right);
 
     if (left->ops->kind == EXPR_KIND_POW_D)
-        return num_eq(left->c, right->c) &&
-               expr_simplify_same_shape_local(left->a, right->a);
+        return num_eq(left->c, right->c) && expr_simplify_same_shape_local(left->a, right->a);
 
     if (left->ops->arity == EXPR_OP_UNARY)
         return expr_simplify_same_shape_local(left->a, right->a);
 
     if (left->ops->arity == EXPR_OP_BINARY) {
-        if (expr_simplify_same_shape_local(left->a, right->a) &&
-            expr_simplify_same_shape_local(left->b, right->b)) {
+        if (expr_simplify_same_shape_local(left->a, right->a) && expr_simplify_same_shape_local(left->b, right->b)) {
             return true;
         }
-        if ((left->ops->kind == EXPR_KIND_MUL ||
-             left->ops->kind == EXPR_KIND_ADD) &&
-            expr_simplify_same_shape_local(left->a, right->b) &&
-            expr_simplify_same_shape_local(left->b, right->a)) {
+        if ((left->ops->kind == EXPR_KIND_MUL || left->ops->kind == EXPR_KIND_ADD) &&
+            expr_simplify_same_shape_local(left->a, right->b) && expr_simplify_same_shape_local(left->b, right->a)) {
             return true;
         }
     }
@@ -247,8 +221,7 @@ static bool expr_simplify_same_shape_local(const expr_t *left,
     return false;
 }
 
-static bool expr_simplify_equal_exact_local(const expr_t *left,
-                                            const expr_t *right)
+static bool expr_simplify_equal_exact_local(const expr_t *left, const expr_t *right)
 {
     expr_t *diff = NULL;
     expr_t *simplified = NULL;
@@ -271,13 +244,11 @@ static bool expr_simplify_equal_exact_local(const expr_t *left,
 
 bool expr_simplify_same_factor(const expr_t *left, const expr_t *right)
 {
-    return expr_struct_eq(left, right) ||
-           expr_simplify_same_shape_local(left, right) ||
+    return expr_struct_eq(left, right) || expr_simplify_same_shape_local(left, right) ||
            expr_simplify_equal_exact_local(left, right);
 }
 
-static void expr_simplify_additive_terms_clear_local(addend_t *terms,
-                                                     size_t count)
+static void expr_simplify_additive_terms_clear_local(addend_t *terms, size_t count)
 {
     for (size_t i = 0u; i < count; ++i) {
         expr_free(terms[i].base);
@@ -286,8 +257,7 @@ static void expr_simplify_additive_terms_clear_local(addend_t *terms,
     free(terms);
 }
 
-bool expr_simplify_additive_terms_equal(const expr_t *left,
-                                        const expr_t *right)
+bool expr_simplify_additive_terms_equal(const expr_t *left, const expr_t *right)
 {
     addend_t *left_terms = NULL;
     addend_t *right_terms = NULL;
@@ -302,10 +272,8 @@ bool expr_simplify_additive_terms_equal(const expr_t *left,
     if (!left || !right)
         goto cleanup;
 
-    expr_collect_addends((expr_t *)left, NUM_ONE, &left_const,
-                         &left_terms, &left_count, &left_capacity);
-    expr_collect_addends((expr_t *)right, NUM_ONE, &right_const,
-                         &right_terms, &right_count, &right_capacity);
+    expr_collect_addends((expr_t *)left, NUM_ONE, &left_const, &left_terms, &left_count, &left_capacity);
+    expr_collect_addends((expr_t *)right, NUM_ONE, &right_const, &right_terms, &right_count, &right_capacity);
     expr_sort_addends(left_terms, left_count);
     expr_sort_addends(right_terms, right_count);
 
@@ -314,8 +282,7 @@ bool expr_simplify_additive_terms_equal(const expr_t *left,
 
     for (size_t i = 0u; i < left_count; ++i) {
         if (!num_eq(left_terms[i].coeff, right_terms[i].coeff) ||
-            !expr_simplify_same_factor(left_terms[i].base,
-                                       right_terms[i].base)) {
+            !expr_simplify_same_factor(left_terms[i].base, right_terms[i].base)) {
             goto cleanup;
         }
     }
@@ -335,8 +302,7 @@ typedef struct {
     number_t exponent;
 } expr_simplify_factor_t;
 
-static void expr_simplify_free_factors_local(expr_simplify_factor_t *factors,
-                                             size_t count)
+static void expr_simplify_free_factors_local(expr_simplify_factor_t *factors, size_t count)
 {
     for (size_t i = 0u; i < count; ++i) {
         expr_free(factors[i].base);
@@ -345,11 +311,8 @@ static void expr_simplify_free_factors_local(expr_simplify_factor_t *factors,
     free(factors);
 }
 
-static bool expr_simplify_append_factor_local(expr_simplify_factor_t **factors,
-                                              size_t *count,
-                                              size_t *capacity,
-                                              const expr_t *base,
-                                              number_t exponent)
+static bool expr_simplify_append_factor_local(expr_simplify_factor_t **factors, size_t *count, size_t *capacity,
+                                              const expr_t *base, number_t exponent)
 {
     for (size_t i = 0u; i < *count; ++i) {
         if (expr_simplify_same_factor((*factors)[i].base, base)) {
@@ -363,8 +326,7 @@ static bool expr_simplify_append_factor_local(expr_simplify_factor_t **factors,
 
     if (*count == *capacity) {
         size_t next_capacity = *capacity ? (*capacity * 2u) : 8u;
-        expr_simplify_factor_t *grown =
-            realloc(*factors, next_capacity * sizeof(**factors));
+        expr_simplify_factor_t *grown = realloc(*factors, next_capacity * sizeof(**factors));
 
         if (!grown)
             return false;
@@ -380,13 +342,8 @@ static bool expr_simplify_append_factor_local(expr_simplify_factor_t **factors,
     return true;
 }
 
-static bool expr_simplify_split_factor_product_local(
-    const expr_t *expr,
-    number_t sign,
-    number_t *coeff_io,
-    expr_simplify_factor_t **factors,
-    size_t *count,
-    size_t *capacity)
+static bool expr_simplify_split_factor_product_local(const expr_t *expr, number_t sign, number_t *coeff_io,
+                                                     expr_simplify_factor_t **factors, size_t *count, size_t *capacity)
 {
     const expr_t *left = NULL;
     const expr_t *right = NULL;
@@ -398,27 +355,22 @@ static bool expr_simplify_split_factor_product_local(
         return true;
 
     if (expr_match_mul_expr(expr, &left, &right)) {
-        ok = expr_simplify_split_factor_product_local(
-                 left, sign, coeff_io, factors, count, capacity) &&
-             expr_simplify_split_factor_product_local(
-                 right, sign, coeff_io, factors, count, capacity);
+        ok = expr_simplify_split_factor_product_local(left, sign, coeff_io, factors, count, capacity) &&
+             expr_simplify_split_factor_product_local(right, sign, coeff_io, factors, count, capacity);
         goto cleanup;
     }
 
     if (expr_is_div(expr) && expr->a && expr->b) {
         number_t neg_sign = num_neg(sign);
 
-        ok = expr_simplify_split_factor_product_local(
-                 expr->a, sign, coeff_io, factors, count, capacity) &&
-             expr_simplify_split_factor_product_local(
-                 expr->b, neg_sign, coeff_io, factors, count, capacity);
+        ok = expr_simplify_split_factor_product_local(expr->a, sign, coeff_io, factors, count, capacity) &&
+             expr_simplify_split_factor_product_local(expr->b, neg_sign, coeff_io, factors, count, capacity);
         num_destroy(&neg_sign);
         goto cleanup;
     }
 
     if (expr_match_const_value(expr, &const_value)) {
-        number_t updated = num_lt(sign, NUM_ZERO) ? num_div(*coeff_io, const_value)
-                                                  : num_mul(*coeff_io, const_value);
+        number_t updated = num_lt(sign, NUM_ZERO) ? num_div(*coeff_io, const_value) : num_mul(*coeff_io, const_value);
 
         num_destroy(coeff_io);
         *coeff_io = updated;
@@ -429,23 +381,20 @@ static bool expr_simplify_split_factor_product_local(
     if (expr_is_pow_d_expr(expr) && expr->a) {
         num_destroy(&exponent);
         exponent = num_mul(expr->c, sign);
-        ok = expr_simplify_append_factor_local(factors, count, capacity,
-                                               expr->a, exponent);
+        ok = expr_simplify_append_factor_local(factors, count, capacity, expr->a, exponent);
         goto cleanup;
     }
 
-    if (expr && expr->ops && expr->ops->kind == EXPR_KIND_POW &&
-        expr->a && expr->b && expr_match_const_value(expr->b, &exponent)) {
+    if (expr && expr->ops && expr->ops->kind == EXPR_KIND_POW && expr->a && expr->b &&
+        expr_match_const_value(expr->b, &exponent)) {
         number_t signed_exponent = num_mul(exponent, sign);
 
-        ok = expr_simplify_append_factor_local(factors, count, capacity,
-                                               expr->a, signed_exponent);
+        ok = expr_simplify_append_factor_local(factors, count, capacity, expr->a, signed_exponent);
         num_destroy(&signed_exponent);
         goto cleanup;
     }
 
-    ok = expr_simplify_append_factor_local(factors, count, capacity,
-                                           expr, sign);
+    ok = expr_simplify_append_factor_local(factors, count, capacity, expr, sign);
 
 cleanup:
     num_destroy(&exponent);
@@ -453,10 +402,7 @@ cleanup:
     return ok;
 }
 
-static expr_t *expr_simplify_rebuild_factor_product_local(
-    number_t coeff,
-    expr_simplify_factor_t *factors,
-    size_t count)
+static expr_t *expr_simplify_rebuild_factor_product_local(number_t coeff, expr_simplify_factor_t *factors, size_t count)
 {
     expr_t *out = expr_new_const(coeff);
 
@@ -489,8 +435,7 @@ static expr_t *expr_simplify_rebuild_factor_product_local(
     return expr_simplify_owned(out);
 }
 
-expr_t *expr_simplify_extract_exact_factor_quotient(const expr_t *expr,
-                                                    const expr_t *factor)
+expr_t *expr_simplify_extract_exact_factor_quotient(const expr_t *expr, const expr_t *factor)
 {
     expr_simplify_factor_t *expr_factors = NULL;
     expr_simplify_factor_t *factor_factors = NULL;
@@ -504,12 +449,10 @@ expr_t *expr_simplify_extract_exact_factor_quotient(const expr_t *expr,
 
     if (!expr || !factor)
         goto cleanup;
-    if (!expr_simplify_split_factor_product_local(
-            expr, NUM_ONE, &expr_coeff, &expr_factors,
-            &expr_count, &expr_capacity) ||
-        !expr_simplify_split_factor_product_local(
-            factor, NUM_ONE, &factor_coeff, &factor_factors,
-            &factor_count, &factor_capacity) ||
+    if (!expr_simplify_split_factor_product_local(expr, NUM_ONE, &expr_coeff, &expr_factors, &expr_count,
+                                                  &expr_capacity) ||
+        !expr_simplify_split_factor_product_local(factor, NUM_ONE, &factor_coeff, &factor_factors, &factor_count,
+                                                  &factor_capacity) ||
         num_eq(factor_coeff, NUM_ZERO)) {
         goto cleanup;
     }
@@ -518,10 +461,8 @@ expr_t *expr_simplify_extract_exact_factor_quotient(const expr_t *expr,
         bool matched = false;
 
         for (size_t j = 0u; j < expr_count; ++j) {
-            if (expr_simplify_same_factor(expr_factors[j].base,
-                                          factor_factors[i].base)) {
-                number_t updated = num_sub(expr_factors[j].exponent,
-                                           factor_factors[i].exponent);
+            if (expr_simplify_same_factor(expr_factors[j].base, factor_factors[i].base)) {
+                number_t updated = num_sub(expr_factors[j].exponent, factor_factors[i].exponent);
 
                 num_destroy(&expr_factors[j].exponent);
                 expr_factors[j].exponent = updated;
@@ -537,9 +478,7 @@ expr_t *expr_simplify_extract_exact_factor_quotient(const expr_t *expr,
     {
         number_t quotient_coeff = num_div(expr_coeff, factor_coeff);
 
-        out = expr_simplify_rebuild_factor_product_local(quotient_coeff,
-                                                         expr_factors,
-                                                         expr_count);
+        out = expr_simplify_rebuild_factor_product_local(quotient_coeff, expr_factors, expr_count);
         num_destroy(&quotient_coeff);
     }
 
@@ -551,8 +490,7 @@ cleanup:
     return out;
 }
 
-expr_t *expr_simplify_extract_common_factor_quotient(const expr_t *expr,
-                                                     const expr_t *factor)
+expr_t *expr_simplify_extract_common_factor_quotient(const expr_t *expr, const expr_t *factor)
 {
     const expr_t *left_node = NULL;
     const expr_t *right_node = NULL;
@@ -579,8 +517,7 @@ expr_t *expr_simplify_extract_common_factor_quotient(const expr_t *expr,
             return expr_simplify_owned(out);
         }
 
-        right = expr_simplify_extract_common_factor_quotient(right_node,
-                                                            factor);
+        right = expr_simplify_extract_common_factor_quotient(right_node, factor);
         if (right) {
             out = expr_mul(left_node, right);
             expr_free(right);
@@ -594,8 +531,7 @@ expr_t *expr_simplify_extract_common_factor_quotient(const expr_t *expr,
         left = expr_simplify_extract_common_factor_quotient(expr->a, factor);
         right = expr_simplify_extract_common_factor_quotient(expr->b, factor);
         out = (left && right) ? expr_add(left, right) : NULL;
-    } else if (expr->ops && expr->ops->kind == EXPR_KIND_SUB &&
-               expr->a && expr->b) {
+    } else if (expr->ops && expr->ops->kind == EXPR_KIND_SUB && expr->a && expr->b) {
         left = expr_simplify_extract_common_factor_quotient(expr->a, factor);
         right = expr_simplify_extract_common_factor_quotient(expr->b, factor);
         out = (left && right) ? expr_sub(left, right) : NULL;
@@ -621,8 +557,7 @@ expr_t *expr_simplify_normalize_negated_mul_factor(const expr_t *expr)
     if (!expr)
         return NULL;
 
-    if (expr->ops && expr->ops->kind == EXPR_KIND_NEG && expr->a &&
-        expr_match_mul_expr(expr->a, &left, &right)) {
+    if (expr->ops && expr->ops->kind == EXPR_KIND_NEG && expr->a && expr_match_mul_expr(expr->a, &left, &right)) {
         expr_t *neg_left = expr_neg(left);
 
         out = neg_left ? expr_mul(neg_left, right) : NULL;

@@ -100,28 +100,21 @@ int symtab_add_borrowed_text(symtab_t *t, const string_t *name, expr_t *node)
 
 static size_t binding_name_hash(const void *key)
 {
-    return (size_t)string_hash(*(string_t * const *)key);
+    return (size_t)string_hash(*(string_t *const *)key);
 }
 
 static int binding_name_cmp(const void *a, const void *b)
 {
-    const string_t *ka = *(const string_t * const *)a;
-    const string_t *kb = *(const string_t * const *)b;
+    const string_t *ka = *(const string_t *const *)a;
+    const string_t *kb = *(const string_t *const *)b;
 
     return string_compare(ka, kb);
 }
 
 static dictionary_t *binding_index_create(void)
 {
-    return dictionary_create(sizeof(string_t *),
-                             sizeof(expr_binding_entry_t *),
-                             binding_name_hash,
-                             binding_name_cmp,
-                             NULL,
-                             NULL,
-                             NULL,
-                             NULL,
-                             NULL);
+    return dictionary_create(sizeof(string_t *), sizeof(expr_binding_entry_t *), binding_name_hash, binding_name_cmp,
+                             NULL, NULL, NULL, NULL, NULL);
 }
 
 static void bindings_destroy_partial(expr_bindings_t *bindings)
@@ -157,13 +150,11 @@ static expr_bindings_t *bindings_create(size_t count)
     return bindings;
 }
 
-static int bindings_index_entry(expr_bindings_t *bindings,
-                                expr_binding_entry_t *entry);
+static int bindings_index_entry(expr_bindings_t *bindings, expr_binding_entry_t *entry);
 
 static bool binding_is_noneditable_builtin(const expr_t *node)
 {
-    return expr_is_immortal_default_const_local(node) &&
-           (!node->name || strcmp(node->name, "i") != 0);
+    return expr_is_immortal_default_const_local(node) && (!node->name || strcmp(node->name, "i") != 0);
 }
 
 expr_bindings_t *expr_bindings_from_expr_internal(const expr_t *expr)
@@ -186,8 +177,7 @@ expr_bindings_t *expr_bindings_from_expr_internal(const expr_t *expr)
         if (vars.vars[i]->name && *vars.vars[i]->name)
             count++;
     for (size_t i = 0u; i < constants.count; ++i)
-        if (constants.vars[i]->name && *constants.vars[i]->name &&
-            !binding_is_noneditable_builtin(constants.vars[i]))
+        if (constants.vars[i]->name && *constants.vars[i]->name && !binding_is_noneditable_builtin(constants.vars[i]))
             count++;
 
     if (count == 0u) {
@@ -239,14 +229,12 @@ fail:
     return NULL;
 }
 
-static int bindings_index_entry(expr_bindings_t *bindings,
-                                expr_binding_entry_t *entry)
+static int bindings_index_entry(expr_bindings_t *bindings, expr_binding_entry_t *entry)
 {
     return dictionary_set(bindings->index, &entry->name, &entry) ? 0 : -1;
 }
 
-static bool bindings_has_name(const expr_bindings_t *bindings,
-                              const string_t *name)
+static bool bindings_has_name(const expr_bindings_t *bindings, const string_t *name)
 {
     if (!bindings || !name)
         return false;
@@ -257,9 +245,8 @@ static bool bindings_has_name(const expr_bindings_t *bindings,
     return false;
 }
 
-expr_bindings_t *expr_bindings_merge_internal(
-    const expr_bindings_t *bindings,
-    const expr_bindings_t *additional_bindings)
+expr_bindings_t *expr_bindings_merge_internal(const expr_bindings_t *bindings,
+                                              const expr_bindings_t *additional_bindings)
 {
     expr_bindings_t *merged;
     size_t count = bindings ? bindings->count : 0u;
@@ -282,8 +269,7 @@ expr_bindings_t *expr_bindings_merge_internal(
         return NULL;
 
     for (size_t group = 0u; group < 2u; ++group) {
-        const expr_bindings_t *source =
-            group == 0u ? bindings : additional_bindings;
+        const expr_bindings_t *source = group == 0u ? bindings : additional_bindings;
 
         if (!source)
             continue;
@@ -291,8 +277,7 @@ expr_bindings_t *expr_bindings_merge_internal(
             const expr_binding_entry_t *source_entry = &source->entries[i];
             expr_binding_entry_t *entry;
 
-            if (group == 1u &&
-                bindings_has_name(bindings, source_entry->name))
+            if (group == 1u && bindings_has_name(bindings, source_entry->name))
                 continue;
 
             entry = &merged->entries[out++];
@@ -311,20 +296,14 @@ expr_bindings_t *expr_bindings_merge_internal(
         }
     }
 
-    merged->has_symbolic_derivative =
-        (bindings && bindings->has_symbolic_derivative) ||
-        (additional_bindings &&
-         additional_bindings->has_symbolic_derivative);
-    merged->has_symbolic_integral =
-        (bindings && bindings->has_symbolic_integral) ||
-        (additional_bindings &&
-         additional_bindings->has_symbolic_integral);
+    merged->has_symbolic_derivative = (bindings && bindings->has_symbolic_derivative) ||
+                                      (additional_bindings && additional_bindings->has_symbolic_derivative);
+    merged->has_symbolic_integral = (bindings && bindings->has_symbolic_integral) ||
+                                    (additional_bindings && additional_bindings->has_symbolic_integral);
     return merged;
 }
 
-expr_bindings_t *expr_bindings_clone_internal(
-    const expr_bindings_t *bindings,
-    bool constants_only)
+expr_bindings_t *expr_bindings_clone_internal(const expr_bindings_t *bindings, bool constants_only)
 {
     expr_bindings_t *copy;
     size_t count = 0u;
@@ -389,8 +368,7 @@ expr_bindings_t *symtab_build_bindings(const symtab_t *t)
         }
         entry->expr = t->entries[i].node;
         expr_retain(entry->expr);
-        entry->is_constant = (t->entries[i].node &&
-                              t->entries[i].node->ops == &ops_const);
+        entry->is_constant = (t->entries[i].node && t->entries[i].node->ops == &ops_const);
         if (bindings_index_entry(bindings, entry) != 0) {
             bindings_destroy_partial(bindings);
             return NULL;
@@ -406,8 +384,7 @@ static int expr_contains_node(const expr_t *expr, const expr_t *node)
         return 0;
     if (expr == node)
         return 1;
-    return expr_contains_node(expr->a, node) ||
-           expr_contains_node(expr->b, node);
+    return expr_contains_node(expr->a, node) || expr_contains_node(expr->b, node);
 }
 
 static int expr_integral_binds_name(const expr_t *expr, const char *name)
@@ -421,8 +398,7 @@ static int expr_integral_binds_name(const expr_t *expr, const char *name)
         if (dummy && dummy->name && strcmp(dummy->name, name) == 0)
             return 1;
     }
-    return expr_integral_binds_name(expr->a, name) ||
-           expr_integral_binds_name(expr->b, name);
+    return expr_integral_binds_name(expr->a, name) || expr_integral_binds_name(expr->b, name);
 }
 
 static int expr_contains_integral(const expr_t *expr)
@@ -431,15 +407,13 @@ static int expr_contains_integral(const expr_t *expr)
         return 0;
     if (expr_is_op(expr, &ops_integral))
         return 1;
-    return expr_contains_integral(expr->a) ||
-           expr_contains_integral(expr->b);
+    return expr_contains_integral(expr->a) || expr_contains_integral(expr->b);
 }
 
-static int symtab_binding_is_needed_for_expr(const expr_t *expr,
-                                             const expr_t *node)
+static int symtab_binding_is_needed_for_expr(const expr_t *expr, const expr_t *node)
 {
     expr_t *vars[1];
-    bool used[1] = { false };
+    bool used[1] = {false};
 
     if (!node)
         return 0;
@@ -452,8 +426,7 @@ static int symtab_binding_is_needed_for_expr(const expr_t *expr,
             return 1;
         if (node->name && expr_integral_binds_name(expr, node->name))
             return 0;
-        if (node->name && strcmp(node->name, "d") == 0 &&
-            expr_contains_integral(expr))
+        if (node->name && strcmp(node->name, "d") == 0 && expr_contains_integral(expr))
             return 0;
         return 1;
     }
@@ -466,8 +439,7 @@ static int symtab_binding_is_needed_for_expr(const expr_t *expr,
     return expr_collect_var_usage(expr, 1u, vars, used) && used[0];
 }
 
-expr_bindings_t *symtab_build_bindings_for_expr(const symtab_t *t,
-                                                const expr_t *expr)
+expr_bindings_t *symtab_build_bindings_for_expr(const symtab_t *t, const expr_t *expr)
 {
     expr_bindings_t *bindings;
     size_t count = 0u;
@@ -501,8 +473,7 @@ expr_bindings_t *symtab_build_bindings_for_expr(const symtab_t *t,
         }
         entry->expr = t->entries[i].node;
         expr_retain(entry->expr);
-        entry->is_constant = (t->entries[i].node &&
-                              t->entries[i].node->ops == &ops_const);
+        entry->is_constant = (t->entries[i].node && t->entries[i].node->ops == &ops_const);
         if (bindings_index_entry(bindings, entry) != 0) {
             bindings_destroy_partial(bindings);
             return NULL;
@@ -516,8 +487,7 @@ expr_bindings_t *single_binding_from_node(expr_t *node)
 {
     expr_bindings_t *bindings;
 
-    if (!node || !node->name || !*node->name ||
-        binding_is_noneditable_builtin(node))
+    if (!node || !node->name || !*node->name || binding_is_noneditable_builtin(node))
         return NULL;
 
     bindings = bindings_create(1u);

@@ -18,10 +18,7 @@ static void equ_destroy_numbers(number_t *values, size_t count)
         num_destroy(&values[i]);
 }
 
-static number_t equ_quadratic_constant(number_t p0,
-                                            number_t p1,
-                                            number_t p2,
-                                            number_t basis_constant)
+static number_t equ_quadratic_constant(number_t p0, number_t p1, number_t p2, number_t basis_constant)
 {
     number_t linear_offset = num_mul(p1, basis_constant);
     number_t basis_sq = num_mul(basis_constant, basis_constant);
@@ -36,10 +33,7 @@ static number_t equ_quadratic_constant(number_t p0,
     return constant;
 }
 
-static number_t equ_quadratic_linear(number_t p1,
-                                          number_t p2,
-                                          number_t basis_constant,
-                                          number_t basis_coeff)
+static number_t equ_quadratic_linear(number_t p1, number_t p2, number_t basis_constant, number_t basis_coeff)
 {
     number_t p1_term = num_mul(p1, basis_coeff);
     number_t p2_basis = num_mul(p2, basis_constant);
@@ -63,11 +57,8 @@ static number_t equ_quadratic_coeff(number_t p2, number_t basis_coeff)
     return quadratic;
 }
 
-bool equ_match_quadratic_expr(const expr_t *expr,
-                                   const expr_t *wrt,
-                                   number_t *constant_out,
-                                   number_t *linear_out,
-                                   number_t *quadratic_out)
+bool equ_match_quadratic_expr(const expr_t *expr, const expr_t *wrt, number_t *constant_out, number_t *linear_out,
+                              number_t *quadratic_out)
 {
     expr_t *vars[1];
     number_t direct_poly[3];
@@ -83,8 +74,7 @@ bool equ_match_quadratic_expr(const expr_t *expr,
         return false;
 
     equ_init_numbers(direct_poly, 3u);
-    if (equ_match_polynomial_expr(expr, wrt, 2u, direct_poly) &&
-        !num_is_zero(direct_poly[2])) {
+    if (equ_match_polynomial_expr(expr, wrt, 2u, direct_poly) && !num_is_zero(direct_poly[2])) {
         num_destroy(constant_out);
         *constant_out = num_clone(direct_poly[0]);
         num_destroy(linear_out);
@@ -101,19 +91,13 @@ bool equ_match_quadratic_expr(const expr_t *expr,
     equ_init_numbers(poly, 5u);
     vars[0] = (expr_t *)wrt;
 
-    ok = expr_match_affine_poly_deg4(expr, 1u, vars, poly, &basis_constant,
-                                     basis_coeffs) &&
-         num_is_zero(poly[3]) &&
-         num_is_zero(poly[4]) &&
-         !num_is_zero(poly[2]) &&
-         !num_is_zero(basis_coeffs[0]);
+    ok = expr_match_affine_poly_deg4(expr, 1u, vars, poly, &basis_constant, basis_coeffs) && num_is_zero(poly[3]) &&
+         num_is_zero(poly[4]) && !num_is_zero(poly[2]) && !num_is_zero(basis_coeffs[0]);
     if (!ok)
         goto cleanup;
 
-    constant = equ_quadratic_constant(poly[0], poly[1], poly[2],
-                                           basis_constant);
-    linear = equ_quadratic_linear(poly[1], poly[2], basis_constant,
-                                       basis_coeffs[0]);
+    constant = equ_quadratic_constant(poly[0], poly[1], poly[2], basis_constant);
+    linear = equ_quadratic_linear(poly[1], poly[2], basis_constant, basis_coeffs[0]);
     quadratic = equ_quadratic_coeff(poly[2], basis_coeffs[0]);
 
     if (num_is_zero(quadratic)) {
