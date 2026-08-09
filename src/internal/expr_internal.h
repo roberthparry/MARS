@@ -139,8 +139,8 @@ string_t *expr_normalise_greek_alias_text(const string_t *alias);
 string_t *expr_normalise_binding_name_text(const string_t *name);
 int expr_is_default_constant_name_text(const string_t *name);
 char *expr_tostring_texify(const char *text);
-int expr_to_tex_parts(const expr_t *dv, char **expr_out, char **bindings_out);
-char *expr_to_tex_body_wrapped_with_partials(const expr_t *expr, size_t line_limit);
-char *expr_to_tex_body_wrapped_with_totals(const expr_t *expr, size_t line_limit);
+int expr_to_TeX_parts(const expr_t *dv, char **expr_out, char **bindings_out);
+char *expr_to_TeX_body_wrapped_with_partials(const expr_t *expr, size_t line_limit);
+char *expr_to_TeX_body_wrapped_with_totals(const expr_t *expr, size_t line_limit);
 
 #endif /* EXPR_SHARED_INTERNAL_H */

@@ -38,7 +38,7 @@ typedef enum {
     MAT_STRING_INLINE_PRETTY,
     MAT_STRING_LAYOUT_SCIENTIFIC,
     MAT_STRING_LAYOUT_PRETTY,
-    MAT_STRING_TEX
+    MAT_STRING_LATEX
 } mat_string_style_t;
 
 /**
@@ -320,6 +320,21 @@ void mat_bindings_free(mat_bindings_t *bnd);
  *                  the named binding is not present or inputs are invalid.
  */
 matrix_t *mat_deriv_by_name(const matrix_t *A, mat_bindings_t *bindings, const char *name);
+
+/**
+ * @brief Integrate a matrix entrywise with respect to a returned binding name.
+ *
+ * This is a convenience wrapper around mat_bindings_get(...) followed by
+ * mat_integrate(...). It returns one antiderivative for each entry and does not
+ * append arbitrary integration constants.
+ *
+ * @param A         Matrix to integrate.
+ * @param bindings  Borrowed bindings previously returned by mat_from_string_expr().
+ * @param name      Binding name to integrate with respect to.
+ * @return          Newly allocated antiderivative matrix on success, or NULL if
+ *                  the named binding is not present or an entry is unsupported.
+ */
+matrix_t *mat_integrate_by_name(const matrix_t *A, mat_bindings_t *bindings, const char *name);
 
 /**
  * @brief Differentiate the trace of a matrix with respect to a returned binding name.
@@ -629,6 +644,20 @@ matrix_t *mat_hermitian(const matrix_t *A);
  * @return     Newly allocated derivative matrix on success, or NULL on error.
  */
 matrix_t *mat_deriv(const matrix_t *A, expr_t *wrt);
+
+/**
+ * @brief Integrate a matrix entrywise with respect to a symbolic variable.
+ *
+ * Each output entry is one antiderivative of the corresponding input entry
+ * with respect to `wrt`. Arbitrary integration constants are deliberately
+ * omitted; callers may add an independent constant matrix when required.
+ *
+ * @param A    Matrix to integrate.
+ * @param wrt  Symbolic integration variable.
+ * @return     Newly allocated antiderivative matrix on success, or NULL when
+ *             an entry cannot be integrated by the available symbolic rules.
+ */
+matrix_t *mat_integrate(const matrix_t *A, expr_t *wrt);
 
 /**
  * @brief Differentiate the trace of a matrix with respect to a symbolic variable.

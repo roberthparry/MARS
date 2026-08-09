@@ -629,7 +629,7 @@ void test_bessel(void)
     qfloat_t expected_y = qf_neg(qf_mul(scale, qf_cos(argument)));
     qfloat_t expected_dj = qf_mul(qf_from_double(0.5), qf_sub(qf_bessel_j(qf_from_double(-0.5), argument),
                                                               qf_bessel_j(qf_from_double(1.5), argument)));
-    char *tex = expr_to_tex_body(j);
+    char *tex = expr_to_TeX_body(j);
 
     ASSERT_NOT_NULL(j);
     ASSERT_NOT_NULL(y);
@@ -674,15 +674,19 @@ void test_bessel(void)
         const expr_t *dlommel = expr_get_deriv(lommel, x);
         qfloat_t expected_lommel = qf_sub(QF_ONE, qf_bessel_j(QF_ZERO, argument));
         qfloat_t expected_derivative = qf_bessel_j(QF_ONE, argument);
-        char *lommel_tex = expr_to_tex_body(lommel);
+        char *lommel_TeX = expr_to_TeX_body(lommel);
+        char *dlommel_text = dlommel ? expr_to_string(dlommel, style_UNBOUND) : NULL;
 
         ASSERT_NOT_NULL(lommel);
         ASSERT_NOT_NULL(dlommel);
-        ASSERT_NOT_NULL(lommel_tex);
+        ASSERT_NOT_NULL(lommel_TeX);
+        ASSERT_NOT_NULL(dlommel_text);
         check_q_at(__FILE__, __LINE__, 1, "Lommel s_(1,0) = 1 - J0", expr_eval_qf(lommel), expected_lommel);
         check_q_at(__FILE__, __LINE__, 1, "Lommel argument derivative recurrence", expr_eval_qf(dlommel),
                    expected_derivative);
-        ASSERT_NOT_NULL(strstr(lommel_tex, "s_{"));
+        ASSERT_NOT_NULL(strstr(lommel_TeX, "s_{"));
+        ASSERT_NULL(strstr(dlommel_text, "Prime"));
+        ASSERT_NULL(strstr(dlommel_text, "derivative"));
 
         {
             static const char *const spellings[] = {"LommelS", "lommel_s"};
@@ -707,7 +711,8 @@ void test_bessel(void)
             }
         }
 
-        free(lommel_tex);
+        free(dlommel_text);
+        free(lommel_TeX);
         expr_free(lommel);
         expr_free(nu);
         expr_free(mu);

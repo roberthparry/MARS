@@ -21,6 +21,8 @@ some GNU C extensions, so MSVC/Windows builds are not currently guaranteed.
 - **`qcomplex_t`** — double-double complex arithmetic and complex
   special-function families without an MPFR or MPC dependency
 - **`matrix_t`** — generic high-precision matrix over numeric `number_t` values or symbolic `expr_t *` entries, with string-based matrix parsing and formatting, symbolic linear algebra support including Schur complements, block inverse/solve, Jordan helpers, entrywise matrix derivatives, Jacobian helpers, first matrix-calculus helpers for trace, determinant, inverse, block inverse, solve, and block solve, and high-precision eigendecomposition and matrix functions through the numeric `number_t` layer
+- **`diffequ_t`** — ODE and PDE parsing with rule-based symbolic solving,
+  optional derivations, linearisations and symmetry metadata
 - **`expr_t`** — differentiable expression DAGs with symbolic and reverse-mode
   derivatives, symbolic antiderivatives for conservative rule families,
   symbolic matrix integration and structural matcher helpers for higher-level
@@ -305,6 +307,7 @@ int main(void) {
 | `qcomplex_t` | Double-double complex arithmetic, circular function families, and special functions | [`docs/qcomplex.md`](./docs/qcomplex.md) |
 | `matrix_t` | Generic high-precision matrix with numeric and symbolic element types | [`docs/matrix.md`](./docs/matrix.md) |
 | `equation_t` | Parsed equations with symbolic isolation and numeric fallback | [`docs/equation.md`](./docs/equation.md) |
+| `diffequ_t` | ODE and PDE parsing with rule-based symbolic solving, optional derivations, linearisations and symmetry metadata | [`docs/diffequation.md`](./docs/diffequation.md) |
 | `expr_t` | Differentiable expression DAGs with symbolic differentiation and conservative symbolic antiderivatives | [`docs/expression.md`](./docs/expression.md) |
 | `almanac_t` | Ephemeris-backed SHA and declination lookups and snapshot queries | [`docs/almanac.md`](./docs/almanac.md) |
 | `jurisdiction_t` | Jurisdiction-aware holiday and working-day queries | [`docs/jurisdiction.md`](./docs/jurisdiction.md) |

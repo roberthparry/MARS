@@ -10,7 +10,7 @@
 #include "internal/expr_internal.h"
 
 /* TeX commands are considerably wider in source than when rendered. */
-static const size_t de_tex_line_limit = 180u;
+static const size_t de_TeX_line_limit = 180u;
 
 static int de_append_superscript(string_t *out, size_t value)
 {
@@ -345,7 +345,7 @@ static string_t *de_to_expression_text(const diffequ_t *de)
     return out;
 }
 
-static char *de_expr_to_unbound_tex(const expr_t *expr, bool partial_derivatives)
+static char *de_expr_to_unbound_TeX(const expr_t *expr, bool partial_derivatives)
 {
     const char *symbol_name;
     char *tex;
@@ -354,15 +354,15 @@ static char *de_expr_to_unbound_tex(const expr_t *expr, bool partial_derivatives
     if (symbol_name) {
         expr_t *symbol = expr_new_named_var(NUM_NAN, symbol_name);
 
-        tex = symbol ? expr_to_tex_body_wrapped(symbol, de_tex_line_limit) : NULL;
+        tex = symbol ? expr_to_TeX_body_wrapped(symbol, de_TeX_line_limit) : NULL;
         expr_free(symbol);
         return tex;
     }
-    return partial_derivatives ? expr_to_tex_body_wrapped_with_partials(expr, de_tex_line_limit)
-                               : expr_to_tex_body_wrapped_with_totals(expr, de_tex_line_limit);
+    return partial_derivatives ? expr_to_TeX_body_wrapped_with_partials(expr, de_TeX_line_limit)
+                               : expr_to_TeX_body_wrapped_with_totals(expr, de_TeX_line_limit);
 }
 
-static expr_t *de_tex_binomial_coefficient(size_t n, size_t k)
+static expr_t *de_TeX_binomial_coefficient(size_t n, size_t k)
 {
     number_t n_value = num_create_from_long((long)n);
     number_t k_value = num_create_from_long((long)k);
@@ -375,12 +375,12 @@ static expr_t *de_tex_binomial_coefficient(size_t n, size_t k)
     return coefficient;
 }
 
-static string_t *de_repeated_quadratic_to_tex(const diffequ_t *de)
+static string_t *de_repeated_quadratic_to_TeX(const diffequ_t *de)
 {
     const expr_t *square_base = de ? de->repeated_quadratic_square : NULL;
     expr_t *dependent = NULL;
-    char *dependent_tex = NULL;
-    char *independent_tex = NULL;
+    char *dependent_TeX = NULL;
+    char *independent_TeX = NULL;
     string_t *out = NULL;
     bool negative_square;
     bool first = true;
@@ -390,16 +390,16 @@ static string_t *de_repeated_quadratic_to_tex(const diffequ_t *de)
         return NULL;
     negative_square = expr_match_neg_expr(de->repeated_quadratic_square, &square_base);
     dependent = expr_new_named_var(NUM_NAN, de->repeated_quadratic_dependent);
-    dependent_tex = dependent ? de_expr_to_unbound_tex(dependent, false) : NULL;
-    independent_tex = de_expr_to_unbound_tex(de->independent_vars[0], false);
-    out = dependent_tex && independent_tex ? string_new() : NULL;
+    dependent_TeX = dependent ? de_expr_to_unbound_TeX(dependent, false) : NULL;
+    independent_TeX = de_expr_to_unbound_TeX(de->independent_vars[0], false);
+    out = dependent_TeX && independent_TeX ? string_new() : NULL;
     if (!out)
         goto fail;
 
     for (size_t j = de->repeated_quadratic_power + 1u; j > 0u; --j) {
         size_t derivative_power = j - 1u;
         size_t square_power = de->repeated_quadratic_power - derivative_power;
-        expr_t *binomial = de_tex_binomial_coefficient(de->repeated_quadratic_power, derivative_power);
+        expr_t *binomial = de_TeX_binomial_coefficient(de->repeated_quadratic_power, derivative_power);
         expr_t *power = expr_pow_long(square_base, (long)square_power);
         expr_t *coefficient = binomial && power ? expr_mul(binomial, power) : NULL;
         expr_t *display = NULL;
@@ -407,7 +407,7 @@ static string_t *de_repeated_quadratic_to_tex(const diffequ_t *de)
         bool subtract;
         bool unit;
         number_t value = num_new();
-        char *coefficient_tex = NULL;
+        char *coefficient_TeX = NULL;
         size_t order = 2u * derivative_power;
 
         if (coefficient && negative_square && (square_power & 1u) != 0u) {
@@ -427,8 +427,8 @@ static string_t *de_repeated_quadratic_to_tex(const diffequ_t *de)
         subtract = expr_match_neg_expr(display, &magnitude);
         unit = expr_match_const_value(magnitude, &value) && num_eq(value, NUM_ONE);
         num_destroy(&value);
-        coefficient_tex = unit ? NULL : de_expr_to_unbound_tex(magnitude, false);
-        if (!unit && !coefficient_tex) {
+        coefficient_TeX = unit ? NULL : de_expr_to_unbound_TeX(magnitude, false);
+        if (!unit && !coefficient_TeX) {
             expr_free(display);
             goto fail;
         }
@@ -439,36 +439,36 @@ static string_t *de_repeated_quadratic_to_tex(const diffequ_t *de)
         } else if (string_append_cstr(out, subtract ? " - " : " + ") != 0) {
             goto term_fail;
         }
-        if (!unit && (string_append_cstr(out, coefficient_tex) != 0 || string_append_cstr(out, " \\cdot ") != 0))
+        if (!unit && (string_append_cstr(out, coefficient_TeX) != 0 || string_append_cstr(out, " \\cdot ") != 0))
             goto term_fail;
         if (order == 0u) {
-            if (string_append_cstr(out, dependent_tex) != 0)
+            if (string_append_cstr(out, dependent_TeX) != 0)
                 goto term_fail;
-        } else if (string_append_format(out, "\\frac{d^{%zu} %s}{d %s^{%zu}}", order, dependent_tex, independent_tex,
+        } else if (string_append_format(out, "\\frac{d^{%zu} %s}{d %s^{%zu}}", order, dependent_TeX, independent_TeX,
                                         order) < 0) {
             goto term_fail;
         }
-        free(coefficient_tex);
+        free(coefficient_TeX);
         expr_free(display);
         first = false;
         continue;
 
     term_fail:
-        free(coefficient_tex);
+        free(coefficient_TeX);
         expr_free(display);
         goto fail;
     }
     if (string_append_cstr(out, " = 0") != 0)
         goto fail;
-    free(independent_tex);
-    free(dependent_tex);
+    free(independent_TeX);
+    free(dependent_TeX);
     expr_free(dependent);
     return out;
 
 fail:
     string_free(out);
-    free(independent_tex);
-    free(dependent_tex);
+    free(independent_TeX);
+    free(dependent_TeX);
     expr_free(dependent);
     return NULL;
 }
@@ -500,8 +500,8 @@ static int de_append_differential_term(string_t *out, const expr_t *coefficient,
     bool subtract = expr_match_neg_expr(coefficient, &negative);
     bool unit;
     bool additive;
-    char *coefficient_tex = NULL;
-    char *variable_tex = NULL;
+    char *coefficient_TeX = NULL;
+    char *variable_TeX = NULL;
     int status = -1;
 
     if (subtract)
@@ -510,9 +510,9 @@ static int de_append_differential_term(string_t *out, const expr_t *coefficient,
     num_destroy(&value);
     additive = expr_match_add_sub_expr(display, &left, &right, &is_sub);
     if (!unit)
-        coefficient_tex = de_expr_to_unbound_tex(display, false);
-    variable_tex = de_expr_to_unbound_tex(variable, false);
-    if ((!unit && !coefficient_tex) || !variable_tex)
+        coefficient_TeX = de_expr_to_unbound_TeX(display, false);
+    variable_TeX = de_expr_to_unbound_TeX(variable, false);
+    if ((!unit && !coefficient_TeX) || !variable_TeX)
         goto cleanup;
 
     if (first) {
@@ -524,24 +524,24 @@ static int de_append_differential_term(string_t *out, const expr_t *coefficient,
     if (!unit) {
         if (additive && string_append_cstr(out, "\\left(") != 0)
             goto cleanup;
-        if (string_append_cstr(out, coefficient_tex) != 0)
+        if (string_append_cstr(out, coefficient_TeX) != 0)
             goto cleanup;
         if (additive && string_append_cstr(out, "\\right)") != 0)
             goto cleanup;
         if (string_append_cstr(out, "\\,") != 0)
             goto cleanup;
     }
-    if (string_append_format(out, "d%s", variable_tex) < 0)
+    if (string_append_format(out, "d%s", variable_TeX) < 0)
         goto cleanup;
     status = 0;
 
 cleanup:
-    free(variable_tex);
-    free(coefficient_tex);
+    free(variable_TeX);
+    free(coefficient_TeX);
     return status;
 }
 
-static string_t *de_differential_form_to_tex(const diffequ_t *de)
+static string_t *de_differential_form_to_TeX(const diffequ_t *de)
 {
     const expr_t *derivative;
     const expr_t *dependent;
@@ -576,7 +576,7 @@ cleanup:
     return out;
 }
 
-static string_t *de_to_tex(const diffequ_t *de)
+static string_t *de_to_TeX(const diffequ_t *de)
 {
     char *lhs;
     char *rhs;
@@ -586,19 +586,19 @@ static string_t *de_to_tex(const diffequ_t *de)
         return string_new_with("NULL");
 
     if (de->repeated_quadratic_power >= 2u) {
-        out = de_repeated_quadratic_to_tex(de);
+        out = de_repeated_quadratic_to_TeX(de);
         if (out)
             return out;
     }
 
     if (de->differential_form_input) {
-        out = de_differential_form_to_tex(de);
+        out = de_differential_form_to_TeX(de);
         if (out)
             return out;
     }
 
-    lhs = de_expr_to_unbound_tex(equ_lhs(de->equation), de->independent_count > 1u || de->partial_derivative_input);
-    rhs = de_expr_to_unbound_tex(equ_rhs(de->equation), de->independent_count > 1u || de->partial_derivative_input);
+    lhs = de_expr_to_unbound_TeX(equ_lhs(de->equation), de->independent_count > 1u || de->partial_derivative_input);
+    rhs = de_expr_to_unbound_TeX(equ_rhs(de->equation), de->independent_count > 1u || de->partial_derivative_input);
     out = lhs && rhs ? string_sprintf("%s = %s", lhs, rhs) : NULL;
     free(rhs);
     free(lhs);
@@ -611,8 +611,8 @@ string_t *de_to_text(const diffequ_t *de, style_t style)
         return string_new_with("NULL");
     if (style == style_UNBOUND)
         return equ_to_text(de->equation, style_UNBOUND);
-    if (style == style_TEX)
-        return de_to_tex(de);
+    if (style == style_LATEX)
+        return de_to_TeX(de);
     return de_to_expression_text(de);
 }
 

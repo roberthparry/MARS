@@ -71,6 +71,8 @@ static void assert_string_antiderivative_round_trips(const char *input)
     ASSERT_NOT_NULL(anti);
     ASSERT_NOT_NULL(text);
     ASSERT_NOT_NULL(round_trip);
+    ASSERT_TRUE(strstr(text, "LommelSPrime") == NULL);
+    ASSERT_TRUE(strstr(text, "lommel_s_derivative") == NULL);
 
     expr_free(round_trip);
     expr_bindings_free(round_trip_bindings);
@@ -1687,7 +1689,7 @@ static void test_integrate_symbolic_shifted_sqrt(void)
     simplified_integrand = integrand ? expr_simplify(integrand) : NULL;
     anti = simplified_integrand ? expr_integrate(simplified_integrand, x) : NULL;
     text = anti ? expr_to_string(anti, style_UNBOUND) : NULL;
-    tex = anti ? expr_to_string(anti, style_TEX) : NULL;
+    tex = anti ? expr_to_string(anti, style_LATEX) : NULL;
 
     ASSERT_NOT_NULL(anti);
     ASSERT_NOT_NULL(text);
@@ -1739,7 +1741,7 @@ static void test_integrate_symbolic_shifted_sqrt(void)
     simplified_integrand = integrand ? expr_simplify(integrand) : NULL;
     anti = simplified_integrand ? expr_integrate(simplified_integrand, x) : NULL;
     text = anti ? expr_to_string(anti, style_UNBOUND) : NULL;
-    tex = anti ? expr_to_string(anti, style_TEX) : NULL;
+    tex = anti ? expr_to_string(anti, style_LATEX) : NULL;
 
     ASSERT_NOT_NULL(anti);
     ASSERT_NOT_NULL(text);
@@ -1774,7 +1776,7 @@ static void test_integrate_symbolic_shifted_sqrt(void)
     simplified_integrand = integrand ? expr_simplify(integrand) : NULL;
     anti = simplified_integrand ? expr_integrate(simplified_integrand, x) : NULL;
     text = anti ? expr_to_string(anti, style_UNBOUND) : NULL;
-    tex = anti ? expr_to_string(anti, style_TEX) : NULL;
+    tex = anti ? expr_to_string(anti, style_LATEX) : NULL;
 
     ASSERT_NOT_NULL(anti);
     ASSERT_NOT_NULL(text);
@@ -1798,7 +1800,7 @@ static void test_integrate_symbolic_shifted_sqrt(void)
     simplified_integrand = integrand ? expr_simplify(integrand) : NULL;
     anti = simplified_integrand ? expr_integrate(simplified_integrand, x) : NULL;
     text = anti ? expr_to_string(anti, style_UNBOUND) : NULL;
-    tex = anti ? expr_to_string(anti, style_TEX) : NULL;
+    tex = anti ? expr_to_string(anti, style_LATEX) : NULL;
 
     ASSERT_NOT_NULL(anti);
     ASSERT_NOT_NULL(text);
@@ -1820,7 +1822,7 @@ static void test_integrate_symbolic_shifted_sqrt(void)
     simplified_integrand = integrand ? expr_simplify(integrand) : NULL;
     anti = simplified_integrand ? expr_integrate(simplified_integrand, x) : NULL;
     text = anti ? expr_to_string(anti, style_UNBOUND) : NULL;
-    tex = anti ? expr_to_string(anti, style_TEX) : NULL;
+    tex = anti ? expr_to_string(anti, style_LATEX) : NULL;
 
     ASSERT_NOT_NULL(anti);
     ASSERT_NOT_NULL(text);

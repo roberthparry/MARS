@@ -100,7 +100,6 @@ typedef enum {
     EXPR_KIND_BESSEL_J,
     EXPR_KIND_BESSEL_Y,
     EXPR_KIND_LOMMEL_S,
-    EXPR_KIND_LOMMEL_S_DERIVATIVE,
     EXPR_KIND_LOMMEL_S_PACK,
     EXPR_KIND_APPELL_F1,
     EXPR_KIND_APPELL_F1_PACK,
@@ -211,7 +210,7 @@ typedef struct expr_ops {
     expr_arity_t arity;
     expr_diff_kind_t diff_kind;
     const char *name;
-    const char *tex_name;
+    const char *TeX_name;
     const struct expr_ops *direct_inverse;
     expr_inverse_unary_fn inverse_unary;
     expr_apply_unary_fn apply_unary;
@@ -396,7 +395,6 @@ extern const expr_ops_t ops_legendre_chi;
 extern const expr_ops_t ops_bessel_j;
 extern const expr_ops_t ops_bessel_y;
 extern const expr_ops_t ops_lommel_s;
-extern const expr_ops_t ops_lommel_s_derivative;
 extern const expr_ops_t ops_lommel_s_pack;
 extern const expr_ops_t ops_appell_f1;
 extern const expr_ops_t ops_appell_f1_pack;
@@ -798,7 +796,6 @@ void expr_reverse_legendre_chi(const expr_t *dv, const number_t *out_bar, number
 void expr_reverse_bessel_j(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void expr_reverse_bessel_y(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void expr_reverse_lommel_s(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_lommel_s_derivative(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void expr_reverse_parameter_pack(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void expr_reverse_hypergeometric_pFq(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 int expr_reverse_appell_f1_many(const expr_t *dv, const number_t *out_bar, expr_reverse_accumulate_fn accumulate,
@@ -915,8 +912,8 @@ int expr_is_default_constant_name_text(const string_t *name);
 const char *expr_default_constant_canonical_name(const char *name);
 string_t *expr_default_constant_canonical_name_text(const string_t *name);
 char *expr_tostring_texify(const char *text);
-int expr_to_tex_parts(const expr_t *dv, char **expr_out, char **bindings_out);
-char *expr_to_tex_body_wrapped(const expr_t *expr, size_t line_limit);
+int expr_to_TeX_parts(const expr_t *dv, char **expr_out, char **bindings_out);
+char *expr_to_TeX_body_wrapped(const expr_t *expr, size_t line_limit);
 void *fs_xmalloc(size_t n);
 int fs_is_letter(unsigned int c);
 void symtab_init(symtab_t *t);

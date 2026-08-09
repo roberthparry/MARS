@@ -1872,9 +1872,9 @@ static void test_preserved_complex_function_addend_stays_ungrouped(void)
     expr_bindings_t *bindings = NULL;
     expr_t *expr = expr_from_string("{ -c*exp(c) + (W(-2)) | c = -2 }", &bindings);
     char *text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
-    char *tex = expr ? expr_to_string(expr, style_TEX) : NULL;
+    char *tex = expr ? expr_to_string(expr, style_LATEX) : NULL;
     const char *expect = "{ -c·exp(c) + W(-2) | c = -2 }";
-    const char *expect_tex = "\\left\\{ -c \\cdot e^{c} + W(-2) \\;\\middle|\\; c = -2 \\right\\}";
+    const char *expect_TeX = "\\left\\{ -c \\cdot e^{c} + W(-2) \\;\\middle|\\; c = -2 \\right\\}";
 
     if (str_eq(text, expect))
         to_string_pass("preserved complex function addend stays ungrouped", text, expect);
@@ -1882,11 +1882,11 @@ static void test_preserved_complex_function_addend_stays_ungrouped(void)
         to_string_fail(__FILE__, __LINE__, 1, "preserved complex function addend stays ungrouped",
                        text ? text : "(null)", expect);
 
-    if (str_eq(tex, expect_tex))
-        to_string_pass("preserved complex function addend TeX stays ungrouped", tex, expect_tex);
+    if (str_eq(tex, expect_TeX))
+        to_string_pass("preserved complex function addend TeX stays ungrouped", tex, expect_TeX);
     else
         to_string_fail(__FILE__, __LINE__, 1, "preserved complex function addend TeX stays ungrouped",
-                       tex ? tex : "(null)", expect_tex);
+                       tex ? tex : "(null)", expect_TeX);
 
     free(tex);
     free(text);
@@ -1934,9 +1934,9 @@ static void test_negative_decimal_function_argument_stays_decimal(void)
     const char *expect = "normal_cdf(1.96) - normal_cdf(-1.96)";
     expr_t *expr = expr_from_string(input, NULL);
     char *text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
-    char *tex = expr ? expr_to_string(expr, style_TEX) : NULL;
+    char *tex = expr ? expr_to_string(expr, style_LATEX) : NULL;
     int text_ok = str_eq(text, expect);
-    int tex_ok = tex && strstr(tex, "-1.96") != NULL && strstr(tex, "\\frac{49}{25}") == NULL;
+    int TeX_ok = tex && strstr(tex, "-1.96") != NULL && strstr(tex, "\\frac{49}{25}") == NULL;
 
     if (text_ok)
         to_string_pass("negative decimal function argument stays decimal", text, expect);
@@ -1944,7 +1944,7 @@ static void test_negative_decimal_function_argument_stays_decimal(void)
         to_string_fail(__FILE__, __LINE__, 1, "negative decimal function argument stays decimal",
                        text ? text : "(null)", expect);
 
-    if (tex_ok)
+    if (TeX_ok)
         to_string_pass("negative decimal function argument TeX stays decimal", tex, "TeX contains -1.96");
     else {
         printf(C_RED "  FAIL: negative decimal function argument TeX stays decimal\n" C_RESET);
@@ -2767,9 +2767,9 @@ static void test_preserved_reciprocal_constant_derivative_round_trips(void)
     expr_t *x = NULL;
     expr_t *deriv = NULL;
     char *deriv_text = NULL;
-    char *deriv_tex = NULL;
+    char *deriv_TeX = NULL;
     int derivative_is_parse_safe;
-    int tex_keeps_symbolic_pi;
+    int TeX_keeps_symbolic_pi;
     const char *deriv_expect = "{ -2x·exp(-x²)/√(π) | x = NAN }";
 
     num_set_default_prec_digits(100u);
@@ -2777,24 +2777,24 @@ static void test_preserved_reciprocal_constant_derivative_round_trips(void)
     x = bindings ? expr_bindings_get(bindings, "x") : NULL;
     deriv = (expr && x) ? expr_create_deriv(expr, x) : NULL;
     deriv_text = deriv ? expr_to_string(deriv, style_EXPRESSION) : NULL;
-    deriv_tex = deriv ? expr_to_string(deriv, style_TEX) : NULL;
+    deriv_TeX = deriv ? expr_to_string(deriv, style_LATEX) : NULL;
     derivative_is_parse_safe = deriv_text && strcmp(deriv_text, deriv_expect) == 0 && !strstr(deriv_text, "-21/√(π)");
-    tex_keeps_symbolic_pi = deriv_tex && strstr(deriv_tex, "\\sqrt{\\pi}") && strstr(deriv_tex, "\\frac{") &&
-                            !strstr(deriv_tex, "1.128379");
+    TeX_keeps_symbolic_pi = deriv_TeX && strstr(deriv_TeX, "\\sqrt{\\pi}") && strstr(deriv_TeX, "\\frac{") &&
+                            !strstr(deriv_TeX, "1.128379");
 
-    if (derivative_is_parse_safe && tex_keeps_symbolic_pi) {
+    if (derivative_is_parse_safe && TeX_keeps_symbolic_pi) {
         to_string_pass("preserved reciprocal derivative round-trips safely", deriv_text,
                        "symbolic reciprocal coefficient");
     } else {
         printf(C_RED "  FAIL: preserved reciprocal derivative round-trips safely\n" C_RESET);
         printf("    derivative = %s\n", deriv_text ? deriv_text : "(null)");
-        printf("    tex        = %s\n", deriv_tex ? deriv_tex : "(null)");
+        printf("    tex        = %s\n", deriv_TeX ? deriv_TeX : "(null)");
         printf("    expected   = %s, with TeX keeping sqrt(pi) as a fraction\n", deriv_expect);
         num_set_default_prec_digits(old_precision);
         TEST_FAIL();
     }
 
-    free(deriv_tex);
+    free(deriv_TeX);
     free(deriv_text);
     expr_free(deriv);
     expr_bindings_free(bindings);
@@ -3441,7 +3441,7 @@ static void test_tan_poles_display_as_infinity(void)
     struct {
         const char *input;
         const char *expr_expect;
-        const char *tex_expect;
+        const char *TeX_expect;
         int inf_sign;
         const char *label;
     } cases[] = {{"{ tan(x) | x = π/2 }", "{ tan(x) | x = π/2 }",
@@ -3455,7 +3455,7 @@ static void test_tan_poles_display_as_infinity(void)
         expr_bindings_t *bindings = NULL;
         expr_t *expr = expr_from_string(cases[i].input, &bindings);
         char *expr_text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
-        char *tex_text = expr ? expr_to_string(expr, style_TEX) : NULL;
+        char *TeX_text = expr ? expr_to_string(expr, style_LATEX) : NULL;
         number_t value = expr ? expr_eval(expr) : num_clone(NUM_NAN);
 
         if (num_is_inf(value) && num_get_sign(value) == cases[i].inf_sign)
@@ -3471,13 +3471,13 @@ static void test_tan_poles_display_as_infinity(void)
             to_string_fail(__FILE__, __LINE__, 1, cases[i].label, expr_text ? expr_text : "(null)",
                            cases[i].expr_expect);
 
-        if (str_eq(tex_text, cases[i].tex_expect))
-            to_string_pass(cases[i].label, tex_text, cases[i].tex_expect);
+        if (str_eq(TeX_text, cases[i].TeX_expect))
+            to_string_pass(cases[i].label, TeX_text, cases[i].TeX_expect);
         else
-            to_string_fail(__FILE__, __LINE__, 1, cases[i].label, tex_text ? tex_text : "(null)", cases[i].tex_expect);
+            to_string_fail(__FILE__, __LINE__, 1, cases[i].label, TeX_text ? TeX_text : "(null)", cases[i].TeX_expect);
 
         num_destroy(&value);
-        free(tex_text);
+        free(TeX_text);
         free(expr_text);
         expr_bindings_free(bindings);
         expr_free(expr);
@@ -3529,18 +3529,18 @@ static void test_sqrt_negative_exact_evaluates_to_i(void)
         expr_t *expr = expr_from_string(cases[i].input, &bindings);
         char *expr_text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
         char *function_text = expr ? expr_to_string(expr, style_FUNCTION) : NULL;
-        char *tex_text = expr ? expr_to_string(expr, style_TEX) : NULL;
+        char *TeX_text = expr ? expr_to_string(expr, style_LATEX) : NULL;
         number_t value = expr ? expr_eval(expr) : num_clone(NUM_NAN);
         string_t *value_text = num_to_string(value);
 
         expect_sqrt_negative_text(cases[i].label, "value", formatted_number_cstr(value_text), cases[i].value);
         expect_sqrt_negative_text(cases[i].label, "expression", expr_text, cases[i].expression);
         expect_sqrt_negative_text(cases[i].label, "function", function_text, cases[i].function);
-        expect_sqrt_negative_text(cases[i].label, "TeX", tex_text, cases[i].tex);
+        expect_sqrt_negative_text(cases[i].label, "TeX", TeX_text, cases[i].tex);
 
         string_free(value_text);
         num_destroy(&value);
-        free(tex_text);
+        free(TeX_text);
         free(function_text);
         free(expr_text);
         expr_bindings_free(bindings);

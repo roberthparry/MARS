@@ -35,7 +35,7 @@ typedef struct {
 char *expr_number_to_string_local(number_t value);
 char *expr_const_to_string_local(const expr_t *dv);
 char *expr_eval_to_string_local(const expr_t *dv);
-char *expr_text_to_tex_local(const char *text);
+char *expr_text_to_TeX_local(const char *text);
 bool expr_is_immortal_default_const_local(const expr_t *dv);
 bool expr_set_number_scientific_local(bool scientific);
 int expr_set_number_precision_local(int precision);
@@ -52,21 +52,21 @@ const char *expr_name_or_default(const expr_t *dv, const char *fallback);
 
 /* Binding RHS formatting. */
 char *binding_rhs_expr_string_local(const expr_t *dv);
-char *binding_rhs_tex_string_local(const expr_t *dv);
+char *binding_rhs_TeX_string_local(const expr_t *dv);
 char *binding_rhs_c_string_local(const expr_t *dv);
 
 /* Expression emitters. */
 void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec);
-void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec);
+void emit_TeX_expr(const expr_t *f, sbuf_t *b, int parent_prec);
 void emit_func(const expr_t *f, sbuf_t *b, int parent_prec);
 void emit_func_display(const expr_t *f, sbuf_t *b, int parent_prec);
-void emit_tex_name(sbuf_t *b, const char *name);
-void expr_tex_partial_derivatives_push(void);
-void expr_tex_partial_derivatives_pop(void);
-bool expr_tex_partial_derivatives_enabled(void);
-void expr_tex_total_derivatives_push(void);
-void expr_tex_total_derivatives_pop(void);
-bool expr_tex_total_derivatives_enabled(void);
+void emit_TeX_name(sbuf_t *b, const char *name);
+void expr_TeX_partial_derivatives_push(void);
+void expr_TeX_partial_derivatives_pop(void);
+bool expr_TeX_partial_derivatives_enabled(void);
+void expr_TeX_total_derivatives_push(void);
+void expr_TeX_total_derivatives_pop(void);
+bool expr_TeX_total_derivatives_enabled(void);
 
 /* Top-level text builders. */
 string_t *expr_to_text_expr(const expr_t *f);

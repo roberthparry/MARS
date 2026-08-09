@@ -28,11 +28,11 @@ static char *expr_text_dup(const expr_t *expr, style_t style)
     return expr_to_string(expr, style);
 }
 
-static char *expr_tex_body_dup(const expr_t *expr)
+static char *expr_TeX_body_dup(const expr_t *expr)
 {
-    char *body = expr_to_tex_body_wrapped(expr, 110u);
+    char *body = expr_to_TeX_body_wrapped(expr, 110u);
 
-    return body ? body : expr_text_dup(expr, style_TEX);
+    return body ? body : expr_text_dup(expr, style_LATEX);
 }
 
 static expr_t *display_polynomial_simplified(const expr_t *expr, const expr_t *wrt)
@@ -549,7 +549,7 @@ static int run_goal_seek(int argc, char **argv)
     char *expr_text = NULL;
     char *unbound_text = NULL;
     char *func_text = NULL;
-    char *tex_text = NULL;
+    char *TeX_text = NULL;
     int rc = 1;
 
     if (argc < 5) {
@@ -594,13 +594,13 @@ static int run_goal_seek(int argc, char **argv)
     expr_text = expr_text_dup(result.expr, style_EXPRESSION);
     unbound_text = expr_text_dup(result.expr, style_UNBOUND);
     func_text = expr_text_dup(result.expr, style_FUNCTION);
-    tex_text = expr_tex_body_dup(result.expr);
+    TeX_text = expr_TeX_body_dup(result.expr);
 
     printf("input       %s\n", raw_input);
     printf("expression  %s\n", expr_text ? expr_text : "(null)");
     printf("unbound     %s\n", unbound_text ? unbound_text : "(null)");
     printf("function    %s\n", func_text ? func_text : "(null)");
-    printf("tex         %s\n", tex_text ? tex_text : "(null)");
+    printf("tex         %s\n", TeX_text ? TeX_text : "(null)");
     print_bindings("binding", bindings, precision);
     print_owned_number("value", num_clone(result.value), precision);
     print_owned_number("residual", num_clone(result.residual), precision);
@@ -611,7 +611,7 @@ static int run_goal_seek(int argc, char **argv)
     rc = 0;
 
 cleanup:
-    free(tex_text);
+    free(TeX_text);
     free(func_text);
     free(unbound_text);
     free(expr_text);
@@ -638,13 +638,13 @@ int main(int argc, char **argv)
     char *expr_text = NULL;
     char *unbound_text = NULL;
     char *func_text = NULL;
-    char *tex_text = NULL;
+    char *TeX_text = NULL;
     char *deriv_text = NULL;
     char *deriv_func_text = NULL;
-    char *deriv_tex_text = NULL;
+    char *deriv_TeX_text = NULL;
     char *integral_text = NULL;
     char *integral_func_text = NULL;
-    char *integral_tex_text = NULL;
+    char *integral_TeX_text = NULL;
     char value_note[512];
     bool integral_request = strcmp(action, "integral") == 0;
     bool bindings_request = strcmp(action, "bindings") == 0;
@@ -700,13 +700,13 @@ int main(int argc, char **argv)
     expr_text = expr_text_dup(display_expr, style_EXPRESSION);
     unbound_text = expr_text_dup(display_expr, style_UNBOUND);
     func_text = expr_text_dup(display_expr, style_FUNCTION);
-    tex_text = expr_tex_body_dup(display_expr);
+    TeX_text = expr_TeX_body_dup(display_expr);
 
     printf("input       %s\n", raw_input);
     printf("expression  %s\n", expr_text ? expr_text : "(null)");
     printf("unbound     %s\n", unbound_text ? unbound_text : "(null)");
     printf("function    %s\n", func_text ? func_text : "(null)");
-    printf("tex         %s\n", tex_text ? tex_text : "(null)");
+    printf("tex         %s\n", TeX_text ? TeX_text : "(null)");
     print_bindings("binding", bindings, precision);
     printf("differentiable  %s\n", expr_is_differentiable(expr) ? "yes" : "no");
     printf("evaluation_ready  %s\n", expression_evaluation_ready(expr) ? "yes" : "no");
@@ -735,10 +735,10 @@ int main(int argc, char **argv)
         }
         deriv_text = expr_text_dup(display_deriv, style_EXPRESSION);
         deriv_func_text = expr_text_dup(display_deriv, style_FUNCTION);
-        deriv_tex_text = expr_tex_body_dup(display_deriv);
+        deriv_TeX_text = expr_TeX_body_dup(display_deriv);
         printf("derivative  d/d%s = %s\n", wrt_name, deriv_text ? deriv_text : "(null)");
         printf("derivative_function  %s\n", deriv_func_text ? deriv_func_text : "(null)");
-        printf("derivative_tex  %s\n", deriv_tex_text ? deriv_tex_text : "");
+        printf("derivative_TeX  %s\n", deriv_TeX_text ? deriv_TeX_text : "");
         print_expression_bindings("derivative_binding", deriv_text, precision);
         print_owned_number("d value", expr_eval(deriv), precision);
     } else if (derivative_request) {
@@ -754,10 +754,10 @@ int main(int argc, char **argv)
                 display_integral = integral;
                 integral_text = expr_text_dup(display_integral, style_EXPRESSION);
                 integral_func_text = expr_text_dup(display_integral, style_FUNCTION);
-                integral_tex_text = expr_tex_body_dup(display_integral);
+                integral_TeX_text = expr_TeX_body_dup(display_integral);
                 printf("integral  ∫d%s = %s\n", wrt_name, integral_text ? integral_text : "(null)");
                 printf("integral_function  %s\n", integral_func_text ? integral_func_text : "(null)");
-                printf("integral_tex  %s\n", integral_tex_text ? integral_tex_text : "");
+                printf("integral_TeX  %s\n", integral_TeX_text ? integral_TeX_text : "");
                 print_expression_bindings("integral_binding", integral_text, precision);
                 print_owned_number("i value", expr_eval(integral), precision);
             }
@@ -769,13 +769,13 @@ int main(int argc, char **argv)
 cleanup:
     if (display_expr_owned)
         expr_free(display_expr);
-    free(integral_tex_text);
+    free(integral_TeX_text);
     free(integral_func_text);
     free(integral_text);
-    free(deriv_tex_text);
+    free(deriv_TeX_text);
     free(deriv_func_text);
     free(deriv_text);
-    free(tex_text);
+    free(TeX_text);
     free(func_text);
     free(unbound_text);
     free(expr_text);

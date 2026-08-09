@@ -43,7 +43,7 @@ struct diffequ_solve_result_t {
     size_t solution_count;
     char *diagnostic;
     char *steps;
-    char *steps_tex;
+    char *steps_TeX;
     char *symmetry;
 };
 
@@ -51,7 +51,7 @@ diffequ_t *de_new_owned(equation_t *equation);
 diffequ_solve_result_t *de_solve_result_new(de_solve_status_t status, de_solver_t solver, const char *diagnostic);
 int de_solve_result_append(diffequ_solve_result_t *result, equation_t *solution);
 int de_solve_result_set_steps(diffequ_solve_result_t *result, const char *steps);
-int de_solve_result_set_steps_tex(diffequ_solve_result_t *result, const char *steps_tex);
+int de_solve_result_set_steps_TeX(diffequ_solve_result_t *result, const char *steps_TeX);
 int de_solve_result_set_symmetry(diffequ_solve_result_t *result, const char *symmetry);
 int de_solve_result_ensure_rule_steps(const diffequ_t *de, diffequ_solve_result_t *result);
 bool de_linear_decompose(const expr_t *expr, const expr_t *needle, expr_t **coefficient_out, expr_t **constant_out);

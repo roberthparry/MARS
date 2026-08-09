@@ -102,7 +102,7 @@ static void test_diffequ_derivations_are_opt_in(void)
         EXPECT_POINTER("default solve result", result, true);
         EXPECT_LONG("default solve status", (long)de_solve_result_status(result), (long)DE_SOLVE_STATUS_SOLVED);
         EXPECT_POINTER("default solve omits plain-text derivation", de_solve_result_steps(result), false);
-        EXPECT_POINTER("default solve omits TeX derivation", de_solve_result_steps_tex(result), false);
+        EXPECT_POINTER("default solve omits TeX derivation", de_solve_result_steps_TeX(result), false);
 
         de_solve_result_free(result);
         de_free(de);
@@ -114,7 +114,7 @@ static void test_diffequ_derivations_are_opt_in(void)
 
         EXPECT_POINTER("solve result with derivation", result, true);
         EXPECT_POINTER("opt-in plain-text derivation", de_solve_result_steps(result), true);
-        EXPECT_POINTER("opt-in TeX derivation", de_solve_result_steps_tex(result), true);
+        EXPECT_POINTER("opt-in TeX derivation", de_solve_result_steps_TeX(result), true);
 
         de_solve_result_free(result);
         de_free(de);
@@ -262,11 +262,11 @@ static void test_diffequ_parses_greek_differential_forms(void)
     diffequ_t *alpha = de_from_string("(alpha+y)dy + y dalpha = 0");
     char *alias_text = alias ? de_to_string(alias, style_EXPRESSION) : NULL;
     char *plain_text = plain ? de_to_string(plain, style_EXPRESSION) : NULL;
-    char *alias_tex = alias ? de_to_string(alias, style_TEX) : NULL;
-    char *plain_tex = plain ? de_to_string(plain, style_TEX) : NULL;
+    char *alias_TeX = alias ? de_to_string(alias, style_LATEX) : NULL;
+    char *plain_TeX = plain ? de_to_string(plain, style_LATEX) : NULL;
     char *alpha_text = alpha ? de_to_string(alpha, style_EXPRESSION) : NULL;
     diffequ_t *round_trip = alias_text ? de_from_string(alias_text) : NULL;
-    char *round_trip_tex = round_trip ? de_to_string(round_trip, style_TEX) : NULL;
+    char *round_trip_TeX = round_trip ? de_to_string(round_trip, style_LATEX) : NULL;
 
     EXPECT_POINTER("parsed @theta differential form", alias, true);
     EXPECT_POINTER("parsed plain theta differential form", plain, true);
@@ -274,8 +274,8 @@ static void test_diffequ_parses_greek_differential_forms(void)
     EXPECT_POINTER("Greek derivative text round-trips", round_trip, true);
     EXPECT_LONG("@theta differential-form independent count", (long)de_independent_count(alias), 1L);
     EXPECT_LONG("plain theta differential-form independent count", (long)de_independent_count(plain), 1L);
-    EXPECT_TEXT("Greek differential forms agree", plain_tex, alias_tex);
-    EXPECT_TEXT("Greek derivative round-trip agrees", round_trip_tex, alias_tex);
+    EXPECT_TEXT("Greek differential forms agree", plain_TeX, alias_TeX);
+    EXPECT_TEXT("Greek derivative round-trip agrees", round_trip_TeX, alias_TeX);
     EXPECT_POINTER("@theta differential form displays Greek theta", alias_text ? strstr(alias_text, "dθ") : NULL, true);
     EXPECT_POINTER("plain theta differential form displays Greek theta", plain_text ? strstr(plain_text, "dθ") : NULL,
                    true);
@@ -284,9 +284,9 @@ static void test_diffequ_parses_greek_differential_forms(void)
     EXPECT_TEXT("Greek differential-form text agrees", plain_text, alias_text);
 
     free(alpha_text);
-    free(round_trip_tex);
-    free(plain_tex);
-    free(alias_tex);
+    free(round_trip_TeX);
+    free(plain_TeX);
+    free(alias_TeX);
     free(plain_text);
     free(alias_text);
     de_free(plain);
@@ -352,7 +352,7 @@ static void test_diffequ_parses_and_solves_prime_ode_shorthand(void)
     string_t *time_dependent_solution_text =
         time_dependent_solution ? equ_to_text(time_dependent_solution, style_UNBOUND) : NULL;
     string_t *fraction_equation_text = fraction ? equ_to_text(de_equation(fraction), style_UNBOUND) : NULL;
-    char *fraction_tex = fraction ? de_to_string(fraction, style_TEX) : NULL;
+    char *fraction_TeX = fraction ? de_to_string(fraction, style_LATEX) : NULL;
 
     EXPECT_POINTER("parsed prime-notation ODE", de, true);
     EXPECT_TEXT("normalized prime-notation ODE", equation_text ? string_c_str(equation_text) : NULL, "Dxx(y) + 4y = 0");
@@ -378,9 +378,9 @@ static void test_diffequ_parses_and_solves_prime_ode_shorthand(void)
                 "x = C₁·cos(t) + C₂·sin(t)");
     EXPECT_TEXT("ordinary derivative fraction input",
                 fraction_equation_text ? string_c_str(fraction_equation_text) : NULL, "Dxx(y) + 4y = 0");
-    EXPECT_TEXT("ordinary derivative fraction TeX", fraction_tex, "\\frac{d^{2} y}{d x^{2}} + 4 y = 0");
+    EXPECT_TEXT("ordinary derivative fraction TeX", fraction_TeX, "\\frac{d^{2} y}{d x^{2}} + 4 y = 0");
 
-    free(fraction_tex);
+    free(fraction_TeX);
     string_free(fraction_equation_text);
     string_free(time_dependent_solution_text);
     string_free(time_dependent_equation_text);
@@ -416,13 +416,13 @@ static void test_diffequ_parses_subscript_partial_derivatives(void)
     string_t *first_text = first ? equ_to_text(de_equation(first), style_UNBOUND) : NULL;
     string_t *mixed_text = mixed ? equ_to_text(de_equation(mixed), style_UNBOUND) : NULL;
     string_t *nested_text = nested ? equ_to_text(de_equation(nested), style_UNBOUND) : NULL;
-    char *greek_tex = greek ? de_to_string(greek, style_TEX) : NULL;
-    char *mixed_tex = mixed ? de_to_string(mixed, style_TEX) : NULL;
+    char *greek_TeX = greek ? de_to_string(greek, style_LATEX) : NULL;
+    char *mixed_TeX = mixed ? de_to_string(mixed, style_LATEX) : NULL;
     string_t *unicode_first_text = unicode_first ? equ_to_text(de_equation(unicode_first), style_UNBOUND) : NULL;
     string_t *unicode_mixed_text = unicode_mixed ? equ_to_text(de_equation(unicode_mixed), style_UNBOUND) : NULL;
     string_t *unicode_repeated_text =
         unicode_repeated ? equ_to_text(de_equation(unicode_repeated), style_UNBOUND) : NULL;
-    char *compact_tex = compact ? de_to_string(compact, style_TEX) : NULL;
+    char *compact_TeX = compact ? de_to_string(compact, style_LATEX) : NULL;
 
     printf("  subscript partial-derivative shorthand\n"
            "    input:    %s\n"
@@ -442,8 +442,8 @@ static void test_diffequ_parses_subscript_partial_derivatives(void)
     EXPECT_TEXT("normalized mixed partial derivative", mixed_text ? string_c_str(mixed_text) : NULL, "Dxy(u) = 0");
     EXPECT_TEXT("u_xy agrees with Dy(Dx(u))", mixed_text ? string_c_str(mixed_text) : NULL,
                 nested_text ? string_c_str(nested_text) : NULL);
-    EXPECT_TEXT("mixed-partial TeX notation", mixed_tex, "\\frac{\\partial^{2} u}{\\partial y\\,\\partial x} = 0");
-    EXPECT_TEXT("Greek-name subscript derivative", greek_tex,
+    EXPECT_TEXT("mixed-partial TeX notation", mixed_TeX, "\\frac{\\partial^{2} u}{\\partial y\\,\\partial x} = 0");
+    EXPECT_TEXT("Greek-name subscript derivative", greek_TeX,
                 "\\frac{\\partial \\phi}{\\partial x} + "
                 "\\frac{\\partial \\phi}{\\partial y} = 0");
     EXPECT_TEXT("Unicode first partial derivatives", unicode_first_text ? string_c_str(unicode_first_text) : NULL,
@@ -452,19 +452,19 @@ static void test_diffequ_parses_subscript_partial_derivatives(void)
                 "Dxy(u) = 0");
     EXPECT_TEXT("Unicode repeated partial derivatives",
                 unicode_repeated_text ? string_c_str(unicode_repeated_text) : NULL, "Dxx(u) + Dyy(u) = 0");
-    EXPECT_TEXT("visually short PDE stays on one line", compact_tex,
+    EXPECT_TEXT("visually short PDE stays on one line", compact_TeX,
                 "x \\cdot \\left(y - z\\right) \\cdot "
                 "\\frac{\\partial z}{\\partial x} + "
                 "y \\cdot \\left(z - x\\right) \\cdot "
                 "\\frac{\\partial z}{\\partial y} = "
                 "z \\cdot \\left(x - y\\right)");
 
-    free(compact_tex);
+    free(compact_TeX);
     string_free(unicode_repeated_text);
     string_free(unicode_mixed_text);
     string_free(unicode_first_text);
-    free(mixed_tex);
-    free(greek_tex);
+    free(mixed_TeX);
+    free(greek_TeX);
     string_free(nested_text);
     string_free(mixed_text);
     string_free(first_text);
@@ -1302,13 +1302,13 @@ static void test_diffequ_linearizes_modified_emden_problem(void)
     if (de_solve_result_steps(result))
         EXPECT_POINTER("modified-Emden derivation contains transformed ODE",
                        strstr(de_solve_result_steps(result), "d²Y/dX² = 0"), true);
-    if (de_solve_result_steps_tex(result)) {
+    if (de_solve_result_steps_TeX(result)) {
         EXPECT_POINTER("modified-Emden TeX uses the dependent symbol directly",
-                       strstr(de_solve_result_steps_tex(result), "y''+3(1)yy'"), true);
+                       strstr(de_solve_result_steps_TeX(result), "y''+3(1)yy'"), true);
         EXPECT_POINTER("modified-Emden TeX omits binding wrappers",
-                       strstr(de_solve_result_steps_tex(result), "\\middle|"), false);
+                       strstr(de_solve_result_steps_TeX(result), "\\middle|"), false);
         EXPECT_POINTER("modified-Emden TeX omits unbound sentinel values",
-                       strstr(de_solve_result_steps_tex(result), "NAN"), false);
+                       strstr(de_solve_result_steps_TeX(result), "NAN"), false);
     }
     EXPECT_LONG("modified-Emden solution count", (long)de_solve_result_count(result), 1L);
     {
@@ -1659,11 +1659,11 @@ static void test_diffequ_solves_power_law_bessel_family(void)
         EXPECT_POINTER("power-law Bessel derivation names its substitution",
                        strstr(de_solve_result_steps(result), "y = sqrt(x)*u(z)"), true);
         EXPECT_POINTER("power-law Bessel TeX uses conventional Bessel notation",
-                       strstr(de_solve_result_steps_tex(result), "J_{-\\frac"), true);
+                       strstr(de_solve_result_steps_TeX(result), "J_{-\\frac"), true);
         EXPECT_POINTER("power-law Bessel TeX omits binding wrappers",
-                       strstr(de_solve_result_steps_tex(result), "\\middle|"), false);
+                       strstr(de_solve_result_steps_TeX(result), "\\middle|"), false);
         EXPECT_POINTER("power-law Bessel TeX omits unbound sentinel values",
-                       strstr(de_solve_result_steps_tex(result), "NAN"), false);
+                       strstr(de_solve_result_steps_TeX(result), "NAN"), false);
 
         string_free(text);
         de_solve_result_free(result);
@@ -1713,7 +1713,7 @@ static void test_diffequ_solves_forced_power_law_lommel_family(void)
         }
         EXPECT_POINTER("forced power-law derivation names monomial forcing",
                        strstr(de_solve_result_steps(result), "monomial forcing"), true);
-        EXPECT_POINTER("forced power-law TeX uses Lommel notation", strstr(de_solve_result_steps_tex(result), "s_{0,"),
+        EXPECT_POINTER("forced power-law TeX uses Lommel notation", strstr(de_solve_result_steps_TeX(result), "s_{0,"),
                        true);
 
         string_free(text);
@@ -2309,7 +2309,7 @@ static void test_diffequ_solves_transport_with_reaction_term(void)
 static void test_diffequ_solves_transport_with_variable_forcing(void)
 {
     diffequ_t *de = de_from_string("Dx(z) + Dy(z) + z = x");
-    char *tex = de ? de_to_string(de, style_TEX) : NULL;
+    char *tex = de ? de_to_string(de, style_LATEX) : NULL;
 
     EXPECT_TEXT("variable-forcing PDE TeX", tex,
                 "\\frac{\\partial z}{\\partial x} + "
@@ -2334,7 +2334,7 @@ static void test_diffequ_uses_builtin_alias_as_dependent_symbol(void)
 {
     const char *source = "Dx(@phi) - Dy(@phi) = sin(x) + cos(y)";
     diffequ_t *de = de_from_string(source);
-    char *tex = de ? de_to_string(de, style_TEX) : NULL;
+    char *tex = de ? de_to_string(de, style_LATEX) : NULL;
 
     EXPECT_TEXT("contextual dependent-symbol TeX", tex,
                 "\\frac{\\partial \\phi}{\\partial x} - "
@@ -2641,7 +2641,7 @@ static void test_diffequ_solves_monomial_linear_characteristic_pde(void)
 {
     const char *source = "x^2*Dx(@psi) - x*y*Dy(@psi) + y*@psi = 0";
     diffequ_t *de = de_from_string(source);
-    char *tex = de ? de_to_string(de, style_TEX) : NULL;
+    char *tex = de ? de_to_string(de, style_LATEX) : NULL;
 
     EXPECT_TEXT("Greek dependent-symbol TeX", tex,
                 "x^{2} \\cdot \\frac{\\partial \\psi}{\\partial x} - "
@@ -2685,7 +2685,7 @@ static void test_diffequ_solves_parameter_linear_pde(void)
     const equation_t *solution = result ? de_solve_result_at(result, 0u) : NULL;
     string_t *text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
     char *problem = de ? de_to_string(de, style_EXPRESSION) : NULL;
-    char *tex = de ? de_to_string(de, style_TEX) : NULL;
+    char *tex = de ? de_to_string(de, style_LATEX) : NULL;
 
     printf("  parameter-dependent linear PDE\n"
            "    input:    %s\n"
@@ -2708,7 +2708,7 @@ static void test_diffequ_solves_parameter_linear_pde(void)
         EXPECT_POINTER("parameter-linear PDE derivation reaches arbitrary function",
                        strstr(de_solve_result_steps(result), "μz = ½x·(y² - 1)·exp(y²) + F(x)"), true);
     }
-    EXPECT_POINTER("parameter-linear PDE TeX derivation", result ? de_solve_result_steps_tex(result) : NULL, true);
+    EXPECT_POINTER("parameter-linear PDE TeX derivation", result ? de_solve_result_steps_TeX(result) : NULL, true);
 
     free(tex);
     free(problem);

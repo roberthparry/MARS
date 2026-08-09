@@ -7,13 +7,13 @@
 
 char *expr_tostring_texify(const char *text);
 
-static int expr_tostring_text_needs_parse_for_tex_local(const char *text)
+static int expr_tostring_text_needs_parse_for_TeX_local(const char *text)
 {
     return text && (strchr(text, '/') != NULL || strchr(text, '^') != NULL || strchr(text, '(') != NULL ||
                     strchr(text, ')') != NULL || strstr(text, "√") != NULL || strstr(text, "·") != NULL);
 }
 
-static const char *expr_tostring_known_text_tex_local(const char *text)
+static const char *expr_tostring_known_text_TeX_local(const char *text)
 {
     if (!text)
         return NULL;
@@ -69,22 +69,22 @@ char *expr_tostring_xstrdup(const char *s)
     return p;
 }
 
-char *expr_text_to_tex_local(const char *text)
+char *expr_text_to_TeX_local(const char *text)
 {
-    const char *known_tex;
+    const char *known_TeX;
     expr_t *parsed;
     string_t *wrapped = NULL;
-    string_t *tex_text;
+    string_t *TeX_text;
     char *tex;
 
     if (!text)
         return NULL;
 
-    known_tex = expr_tostring_known_text_tex_local(text);
-    if (known_tex)
-        return expr_tostring_xstrdup(known_tex);
+    known_TeX = expr_tostring_known_text_TeX_local(text);
+    if (known_TeX)
+        return expr_tostring_xstrdup(known_TeX);
 
-    if (!expr_tostring_text_needs_parse_for_tex_local(text))
+    if (!expr_tostring_text_needs_parse_for_TeX_local(text))
         return expr_tostring_texify(text);
 
     wrapped = string_sprintf("{ %s }", text);
@@ -93,9 +93,9 @@ char *expr_text_to_tex_local(const char *text)
     if (!parsed)
         return expr_tostring_texify(text);
 
-    tex_text = expr_to_text(parsed, style_TEX);
-    tex = tex_text ? expr_tostring_xstrdup(string_c_str(tex_text)) : NULL;
-    string_free(tex_text);
+    TeX_text = expr_to_text(parsed, style_LATEX);
+    tex = TeX_text ? expr_tostring_xstrdup(string_c_str(TeX_text)) : NULL;
+    string_free(TeX_text);
     expr_free(parsed);
     return tex ? tex : expr_tostring_texify(text);
 }
@@ -328,19 +328,19 @@ static int expr_tostring_is_subscript_cp(unsigned int c)
 typedef struct {
     unsigned int codepoint;
     const char *text;
-} expr_tostring_tex_map_t;
+} expr_tostring_TeX_map_t;
 
 typedef struct {
     unsigned int codepoint;
     char ascii;
 } expr_tostring_ascii_map_t;
 
-#define EXPR_TEX_HASH_FRACTION_SIZE 21u
-#define EXPR_TEX_HASH_SYMBOL_SIZE 9u
+#define EXPR_LATEX_HASH_FRACTION_SIZE 21u
+#define EXPR_LATEX_HASH_SYMBOL_SIZE 9u
 #define EXPR_ASCII_HASH_SUPERSCRIPT_SIZE 28u
 #define EXPR_ASCII_SUBSCRIPT_BASE 0x2080u
 
-static const expr_tostring_tex_map_t expr_tostring_greek_tex_table[] = {
+static const expr_tostring_TeX_map_t expr_tostring_greek_TeX_table[] = {
     {0x0391, "A"},          {0x0392, "B"},          {0x0393, "\\Gamma"},     {0x0394, "\\Delta"},
     {0x0395, "E"},          {0x0396, "Z"},          {0x0397, "H"},           {0x0398, "\\Theta"},
     {0x0399, "I"},          {0x039A, "K"},          {0x039B, "\\Lambda"},    {0x039C, "M"},
@@ -356,7 +356,7 @@ static const expr_tostring_tex_map_t expr_tostring_greek_tex_table[] = {
     {0x03C9, "\\omega"},    {0x03D1, "\\vartheta"}, {0x03D5, "\\varphi"},    {0x03D6, "\\varpi"},
     {0x03F0, "\\varkappa"}, {0x03F1, "\\varrho"},   {0x03F5, "\\varepsilon"}};
 
-static const expr_tostring_tex_map_t expr_tostring_vulgar_fraction_tex_table[EXPR_TEX_HASH_FRACTION_SIZE] = {
+static const expr_tostring_TeX_map_t expr_tostring_vulgar_fraction_TeX_table[EXPR_LATEX_HASH_FRACTION_SIZE] = {
     [0] = {0x00BD, "\\frac{1}{2}"},  [1] = {0x00BE, "\\frac{3}{4}"},  [2] = {0x2150, "\\frac{1}{7}"},
     [3] = {0x2151, "\\frac{1}{9}"},  [4] = {0x2152, "\\frac{1}{10}"}, [5] = {0x2153, "\\frac{1}{3}"},
     [6] = {0x2154, "\\frac{2}{3}"},  [7] = {0x2155, "\\frac{1}{5}"},  [8] = {0x2156, "\\frac{2}{5}"},
@@ -364,7 +364,7 @@ static const expr_tostring_tex_map_t expr_tostring_vulgar_fraction_tex_table[EXP
     [12] = {0x215A, "\\frac{5}{6}"}, [13] = {0x215B, "\\frac{1}{8}"}, [14] = {0x215C, "\\frac{3}{8}"},
     [15] = {0x215D, "\\frac{5}{8}"}, [16] = {0x215E, "\\frac{7}{8}"}, [20] = {0x00BC, "\\frac{1}{4}"}};
 
-static const expr_tostring_tex_map_t expr_tostring_symbol_tex_table[EXPR_TEX_HASH_SYMBOL_SIZE] = {
+static const expr_tostring_TeX_map_t expr_tostring_symbol_TeX_table[EXPR_LATEX_HASH_SYMBOL_SIZE] = {
     [0] = {0x2260, "\\neq"}, [1] = {0x2202, "\\partial"}, [2] = {0x221E, "\\infty"},  [3] = {0x00B7, " \\cdot "},
     [4] = {0x2264, "\\leq"}, [5] = {0x2265, "\\geq"},     [7] = {0x221A, "\\sqrt{}"}, [8] = {0x00D7, " \\times "}};
 
@@ -378,12 +378,12 @@ static const char expr_tostring_subscript_ascii_table[] = {'0', '1', '2', '3', '
 
 static size_t expr_tostring_fraction_hash(unsigned int cp)
 {
-    return cp % EXPR_TEX_HASH_FRACTION_SIZE;
+    return cp % EXPR_LATEX_HASH_FRACTION_SIZE;
 }
 
 static size_t expr_tostring_symbol_hash(unsigned int cp)
 {
-    return (cp ^ (cp >> 12)) % EXPR_TEX_HASH_SYMBOL_SIZE;
+    return (cp ^ (cp >> 12)) % EXPR_LATEX_HASH_SYMBOL_SIZE;
 }
 
 static size_t expr_tostring_superscript_ascii_hash(unsigned int cp)
@@ -391,7 +391,7 @@ static size_t expr_tostring_superscript_ascii_hash(unsigned int cp)
     return cp % EXPR_ASCII_HASH_SUPERSCRIPT_SIZE;
 }
 
-static const char *expr_tostring_tex_lookup(const expr_tostring_tex_map_t *table, size_t idx, unsigned int cp)
+static const char *expr_tostring_TeX_lookup(const expr_tostring_TeX_map_t *table, size_t idx, unsigned int cp)
 {
     return table[idx].codepoint == cp ? table[idx].text : NULL;
 }
@@ -421,23 +421,23 @@ static char expr_tostring_subscript_ascii(unsigned int c)
     return expr_tostring_subscript_ascii_table[idx];
 }
 
-static const char *expr_tostring_greek_tex(unsigned int cp)
+static const char *expr_tostring_greek_TeX(unsigned int cp)
 {
-    for (size_t i = 0u; i < sizeof(expr_tostring_greek_tex_table) / sizeof(expr_tostring_greek_tex_table[0]); ++i) {
-        if (expr_tostring_greek_tex_table[i].codepoint == cp)
-            return expr_tostring_greek_tex_table[i].text;
+    for (size_t i = 0u; i < sizeof(expr_tostring_greek_TeX_table) / sizeof(expr_tostring_greek_TeX_table[0]); ++i) {
+        if (expr_tostring_greek_TeX_table[i].codepoint == cp)
+            return expr_tostring_greek_TeX_table[i].text;
     }
     return NULL;
 }
 
-static const char *expr_tostring_vulgar_fraction_tex(unsigned int cp)
+static const char *expr_tostring_vulgar_fraction_TeX(unsigned int cp)
 {
-    return expr_tostring_tex_lookup(expr_tostring_vulgar_fraction_tex_table, expr_tostring_fraction_hash(cp), cp);
+    return expr_tostring_TeX_lookup(expr_tostring_vulgar_fraction_TeX_table, expr_tostring_fraction_hash(cp), cp);
 }
 
-static const char *expr_tostring_symbol_tex(unsigned int cp)
+static const char *expr_tostring_symbol_TeX(unsigned int cp)
 {
-    return expr_tostring_tex_lookup(expr_tostring_symbol_tex_table, expr_tostring_symbol_hash(cp), cp);
+    return expr_tostring_TeX_lookup(expr_tostring_symbol_TeX_table, expr_tostring_symbol_hash(cp), cp);
 }
 
 static int expr_tostring_is_ascii_letter(char c)
@@ -504,7 +504,7 @@ char *expr_tostring_texify(const char *text)
         const char *mapped;
         sbuf_t seq;
 
-        mapped = expr_tostring_vulgar_fraction_tex(cp);
+        mapped = expr_tostring_vulgar_fraction_TeX(cp);
         if (mapped) {
             sbuf_puts(&out, mapped);
             string_cursor_next(cursor);
@@ -551,7 +551,7 @@ char *expr_tostring_texify(const char *text)
             continue;
         }
 
-        mapped = expr_tostring_greek_tex(cp);
+        mapped = expr_tostring_greek_TeX(cp);
         if (mapped) {
             unsigned char next_ascii;
 
@@ -562,7 +562,7 @@ char *expr_tostring_texify(const char *text)
             continue;
         }
 
-        mapped = expr_tostring_symbol_tex(cp);
+        mapped = expr_tostring_symbol_TeX(cp);
         if (mapped) {
             sbuf_puts(&out, mapped);
             string_cursor_next(cursor);

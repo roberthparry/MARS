@@ -5,7 +5,7 @@
 
 static void check_parse_num(const char *label, const char *s, const char *expect_text, int line);
 static void check_parse_expr(const char *label, const char *s, const char *expect_expr, int line);
-static void check_parse_tex(const char *label, const char *s, const char *expect_tex, int line);
+static void check_parse_TeX(const char *label, const char *s, const char *expect_TeX, int line);
 static void check_parse_simplified_expr(const char *label, const char *s, const char *expect_expr, int line);
 
 static void test_from_string_function_hash(void)
@@ -1073,10 +1073,10 @@ static void check_parse_expr(const char *label, const char *s, const char *expec
     expr_free(expr);
 }
 
-static void check_parse_tex(const char *label, const char *s, const char *expect_tex, int line)
+static void check_parse_TeX(const char *label, const char *s, const char *expect_TeX, int line)
 {
     expr_t *expr = expr_from_string(s, NULL);
-    char *tex_text;
+    char *TeX_text;
 
     if (!expr) {
         printf(C_BOLD C_RED "FAIL" C_RESET " %s %s:%d:1\n", label, __FILE__, line);
@@ -1086,20 +1086,20 @@ static void check_parse_tex(const char *label, const char *s, const char *expect
         return;
     }
 
-    tex_text = expr_to_string(expr, style_TEX);
-    if (tex_text && strcmp(tex_text, expect_tex) == 0) {
+    TeX_text = expr_to_string(expr, style_LATEX);
+    if (TeX_text && strcmp(TeX_text, expect_TeX) == 0) {
         printf(C_BOLD C_GREEN "PASS" C_RESET " %s\n", label);
         printf(C_BOLD "  input  " C_RESET "%s\n", s);
-        printf(C_BOLD "  tex    " C_RESET "%s\n\n", tex_text);
+        printf(C_BOLD "  tex    " C_RESET "%s\n\n", TeX_text);
     } else {
         printf(C_BOLD C_RED "FAIL" C_RESET " %s %s:%d:1\n", label, __FILE__, line);
         printf(C_BOLD "  input  " C_RESET "%s\n", s);
-        printf(C_BOLD "  got    " C_RESET "%s\n", tex_text ? tex_text : "(null)");
-        printf(C_BOLD "  expect " C_RESET "%s\n\n", expect_tex);
+        printf(C_BOLD "  got    " C_RESET "%s\n", TeX_text ? TeX_text : "(null)");
+        printf(C_BOLD "  expect " C_RESET "%s\n\n", expect_TeX);
         TEST_FAIL();
     }
 
-    free(tex_text);
+    free(TeX_text);
     expr_free(expr);
 }
 
@@ -1147,7 +1147,7 @@ static void test_from_string_number_literals(void)
     check_parse_expr("stacked unicode rational atom simplifies display", "{ ²³¹⁄₂₃₁₀ }", "⅒", __LINE__);
     check_parse_expr("unparenthesised radical constant round-trips", "{ √3/2 }", "√(3)/2", __LINE__);
     check_parse_expr("unparenthesised radical supports implicit multiplication", "{ 4√3/2 }", "2·√(3)", __LINE__);
-    check_parse_tex("stacked unicode rational atom renders TeX", "{ ²³¹⁄₂₃₁₀ }", "\\frac{1}{10}", __LINE__);
+    check_parse_TeX("stacked unicode rational atom renders TeX", "{ ²³¹⁄₂₃₁₀ }", "\\frac{1}{10}", __LINE__);
     check_parse_expr("NAN is a numeric placeholder, not a variable name", "{ NAN }", "NAN", __LINE__);
     check_parse_expr("lowercase nan is a numeric placeholder", "{ nan }", "NAN", __LINE__);
     check_parse_expr("repeated unary signs simplify", "{ --2x | x = ? }", "{ 2x | x = NAN }", __LINE__);

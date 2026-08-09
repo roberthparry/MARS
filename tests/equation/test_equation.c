@@ -647,11 +647,11 @@ static void test_equation_solves_symbolic_quadratic_formula(void)
     ASSERT_EQ_INT((int)RESULT_COUNT(result), 2);
     ASSERT_TRUE(equ_is_solved_for(RESULT_SOLUTION(result, 0u), x));
     ASSERT_TRUE(equ_is_solved_for(RESULT_SOLUTION(result, 1u), x));
-    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(result, style_TEX, "\\sqrt{b^{2} - 4 a c}"));
+    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(result, style_LATEX, "\\sqrt{b^{2} - 4 a c}"));
     ASSERT_TRUE(
-        test_equation_result_has_rhs_text_containing(result, style_TEX, "\\frac{\\sqrt{b^{2} - 4 a c} - b}{2 a}"));
+        test_equation_result_has_rhs_text_containing(result, style_LATEX, "\\frac{\\sqrt{b^{2} - 4 a c} - b}{2 a}"));
     ASSERT_TRUE(
-        test_equation_result_has_rhs_text_containing(result, style_TEX, "\\frac{-\\sqrt{b^{2} - 4 a c} - b}{2 a}"));
+        test_equation_result_has_rhs_text_containing(result, style_LATEX, "\\frac{-\\sqrt{b^{2} - 4 a c} - b}{2 a}"));
 
     equ_solve_result_free(result);
     equ_free(equation);
@@ -713,7 +713,7 @@ static void test_equation_solves_atan_sum_as_branch_valid_surd(void)
     ASSERT_TRUE(RESULT_IS_SOLVED(result));
     ASSERT_EQ_INT((int)RESULT_COUNT(result), 1);
     ASSERT_TRUE(equ_is_solved_for(RESULT_SOLUTION(result, 0u), x));
-    ASSERT_TRUE(test_equation_rhs_text_contains(RESULT_SOLUTION(result, 0u), style_TEX, "\\sqrt{17}"));
+    ASSERT_TRUE(test_equation_rhs_text_contains(RESULT_SOLUTION(result, 0u), style_LATEX, "\\sqrt{17}"));
     ASSERT_TRUE(test_equation_all_solutions_satisfy(equation, x, result, "1e-24"));
 
     equ_solve_result_free(result);
@@ -899,10 +899,10 @@ static void test_equation_solves_symbolic_cubic_cardano(void)
     ASSERT_TRUE(equ_is_solved_for(RESULT_SOLUTION(result, 0u), x));
     ASSERT_TRUE(equ_is_solved_for(RESULT_SOLUTION(result, 1u), x));
     ASSERT_TRUE(equ_is_solved_for(RESULT_SOLUTION(result, 2u), x));
-    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(result, style_TEX, "^{\\frac{1}{3}}"));
-    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(result, style_TEX, "\\sqrt{"));
-    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(result, style_TEX, "3 a c - b^{2}"));
-    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(result, style_TEX, "27 a d - 9 b c"));
+    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(result, style_LATEX, "^{\\frac{1}{3}}"));
+    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(result, style_LATEX, "\\sqrt{"));
+    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(result, style_LATEX, "3 a c - b^{2}"));
+    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(result, style_LATEX, "27 a d - 9 b c"));
 
     equ_solve_result_free(result);
     equ_free(equation);

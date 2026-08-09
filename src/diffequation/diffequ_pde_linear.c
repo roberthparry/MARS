@@ -296,7 +296,7 @@ static bool de_pde_parameter_linear_steps(const expr_t *independent, const expr_
                                           const expr_t *coefficient_integral, const expr_t *integrating_factor,
                                           const expr_t *weighted_forcing, const expr_t *forcing_integral,
                                           const expr_t *arbitrary, const expr_t *solved_right, char **steps_out,
-                                          char **steps_tex_out)
+                                          char **steps_TeX_out)
 {
     char *independent_text = NULL;
     char *dependent_text = NULL;
@@ -309,26 +309,26 @@ static bool de_pde_parameter_linear_steps(const expr_t *independent, const expr_
     char *forcing_integral_text = NULL;
     char *arbitrary_text = NULL;
     char *solved_right_text = NULL;
-    char *independent_tex = NULL;
-    char *dependent_tex = NULL;
-    char *parameters_tex = NULL;
-    char *coefficient_tex = NULL;
-    char *forcing_tex = NULL;
-    char *coefficient_integral_tex = NULL;
-    char *integrating_factor_tex = NULL;
-    char *weighted_forcing_tex = NULL;
-    char *forcing_integral_tex = NULL;
-    char *arbitrary_tex = NULL;
-    char *solved_right_tex = NULL;
+    char *independent_TeX = NULL;
+    char *dependent_TeX = NULL;
+    char *parameters_TeX = NULL;
+    char *coefficient_TeX = NULL;
+    char *forcing_TeX = NULL;
+    char *coefficient_integral_TeX = NULL;
+    char *integrating_factor_TeX = NULL;
+    char *weighted_forcing_TeX = NULL;
+    char *forcing_integral_TeX = NULL;
+    char *arbitrary_TeX = NULL;
+    char *solved_right_TeX = NULL;
     expr_t *independent_symbol = NULL;
     string_t *parameter_text_builder = NULL;
-    string_t *parameter_tex_builder = NULL;
+    string_t *parameter_TeX_builder = NULL;
     string_t *steps = NULL;
-    string_t *steps_tex = NULL;
+    string_t *steps_TeX = NULL;
     bool success = false;
 
     *steps_out = NULL;
-    *steps_tex_out = NULL;
+    *steps_TeX_out = NULL;
     if (!independent || !dependent || !parameters || parameter_count == 0u || !coefficient || !forcing ||
         !coefficient_integral || !integrating_factor || !weighted_forcing || !forcing_integral || !arbitrary ||
         !solved_right)
@@ -346,49 +346,49 @@ static bool de_pde_parameter_linear_steps(const expr_t *independent, const expr_
     solved_right_text = expr_to_string(solved_right, style_UNBOUND);
 
     independent_symbol = expr_new_named_const(NUM_NAN, expr_symbol_name(independent));
-    independent_tex = expr_to_tex_body(independent_symbol);
-    dependent_tex = expr_to_tex_body(dependent);
-    coefficient_tex = expr_to_tex_body(coefficient);
-    forcing_tex = expr_to_tex_body(forcing);
-    coefficient_integral_tex = expr_to_tex_body(coefficient_integral);
-    integrating_factor_tex = expr_to_tex_body(integrating_factor);
-    weighted_forcing_tex = expr_to_tex_body(weighted_forcing);
-    forcing_integral_tex = expr_to_tex_body(forcing_integral);
-    arbitrary_tex = expr_to_tex_body(arbitrary);
-    solved_right_tex = expr_to_tex_body(solved_right);
+    independent_TeX = expr_to_TeX_body(independent_symbol);
+    dependent_TeX = expr_to_TeX_body(dependent);
+    coefficient_TeX = expr_to_TeX_body(coefficient);
+    forcing_TeX = expr_to_TeX_body(forcing);
+    coefficient_integral_TeX = expr_to_TeX_body(coefficient_integral);
+    integrating_factor_TeX = expr_to_TeX_body(integrating_factor);
+    weighted_forcing_TeX = expr_to_TeX_body(weighted_forcing);
+    forcing_integral_TeX = expr_to_TeX_body(forcing_integral);
+    arbitrary_TeX = expr_to_TeX_body(arbitrary);
+    solved_right_TeX = expr_to_TeX_body(solved_right);
 
     parameter_text_builder = string_new();
-    parameter_tex_builder = string_new();
-    for (size_t i = 0u; parameter_text_builder && parameter_tex_builder && i < parameter_count; ++i) {
+    parameter_TeX_builder = string_new();
+    for (size_t i = 0u; parameter_text_builder && parameter_TeX_builder && i < parameter_count; ++i) {
         char *text = expr_to_string(parameters[i], style_UNBOUND);
-        char *tex = expr_to_tex_body(parameters[i]);
+        char *tex = expr_to_TeX_body(parameters[i]);
 
         if (!text || !tex ||
             (i > 0u && (string_append_cstr(parameter_text_builder, ", ") != 0 ||
-                        string_append_cstr(parameter_tex_builder, ", ") != 0)) ||
+                        string_append_cstr(parameter_TeX_builder, ", ") != 0)) ||
             string_append_cstr(parameter_text_builder, text) != 0 ||
-            string_append_cstr(parameter_tex_builder, tex) != 0) {
-            string_free(parameter_tex_builder);
+            string_append_cstr(parameter_TeX_builder, tex) != 0) {
+            string_free(parameter_TeX_builder);
             string_free(parameter_text_builder);
-            parameter_tex_builder = NULL;
+            parameter_TeX_builder = NULL;
             parameter_text_builder = NULL;
         }
         free(tex);
         free(text);
     }
     parameters_text = parameter_text_builder ? strdup(string_c_str(parameter_text_builder)) : NULL;
-    parameters_tex = parameter_tex_builder ? strdup(string_c_str(parameter_tex_builder)) : NULL;
+    parameters_TeX = parameter_TeX_builder ? strdup(string_c_str(parameter_TeX_builder)) : NULL;
 
     if (!independent_text || !dependent_text || !parameters_text || !coefficient_text || !forcing_text ||
         !coefficient_integral_text || !integrating_factor_text || !weighted_forcing_text || !forcing_integral_text ||
-        !arbitrary_text || !solved_right_text || !independent_tex || !dependent_tex || !parameters_tex ||
-        !coefficient_tex || !forcing_tex || !coefficient_integral_tex || !integrating_factor_tex ||
-        !weighted_forcing_tex || !forcing_integral_tex || !arbitrary_tex || !solved_right_tex)
+        !arbitrary_text || !solved_right_text || !independent_TeX || !dependent_TeX || !parameters_TeX ||
+        !coefficient_TeX || !forcing_TeX || !coefficient_integral_TeX || !integrating_factor_TeX ||
+        !weighted_forcing_TeX || !forcing_integral_TeX || !arbitrary_TeX || !solved_right_TeX)
         goto cleanup;
 
     steps = string_new();
-    steps_tex = string_new();
-    if (!steps || !steps_tex ||
+    steps_TeX = string_new();
+    if (!steps || !steps_TeX ||
         string_append_format(
             steps,
             "Treat %s as parameter%s and solve in %s.\n"
@@ -413,7 +413,7 @@ static bool de_pde_parameter_linear_steps(const expr_t *independent, const expr_
             independent_text, coefficient_text, dependent_text, independent_text, independent_text, dependent_text,
             forcing_text, dependent_text, independent_text, forcing_text, weighted_forcing_text, independent_text,
             dependent_text, forcing_integral_text, arbitrary_text, dependent_text, solved_right_text) < 0 ||
-        string_append_format(steps_tex,
+        string_append_format(steps_TeX,
                              "\\begin{aligned}[t]"
                              "\\text{Treat }%s&\\text{ as parameter%s and solve in }%s."
                              "\\\\[5pt]"
@@ -438,42 +438,42 @@ static bool de_pde_parameter_linear_steps(const expr_t *independent, const expr_
                              "\\mu %s&=%s+%s\\\\[5pt]"
                              "%s&=%s"
                              "\\end{aligned}",
-                             parameters_tex, parameter_count == 1u ? "" : "s", independent_tex, dependent_tex,
-                             independent_tex, coefficient_tex, dependent_tex, forcing_tex, coefficient_tex, forcing_tex,
-                             coefficient_tex, independent_tex, coefficient_integral_tex, coefficient_tex,
-                             independent_tex, integrating_factor_tex, independent_tex, coefficient_tex, dependent_tex,
-                             independent_tex, independent_tex, dependent_tex, forcing_tex, independent_tex,
-                             dependent_tex, forcing_tex, weighted_forcing_tex, dependent_tex, forcing_integral_tex,
-                             arbitrary_tex, dependent_tex, solved_right_tex) < 0)
+                             parameters_TeX, parameter_count == 1u ? "" : "s", independent_TeX, dependent_TeX,
+                             independent_TeX, coefficient_TeX, dependent_TeX, forcing_TeX, coefficient_TeX, forcing_TeX,
+                             coefficient_TeX, independent_TeX, coefficient_integral_TeX, coefficient_TeX,
+                             independent_TeX, integrating_factor_TeX, independent_TeX, coefficient_TeX, dependent_TeX,
+                             independent_TeX, independent_TeX, dependent_TeX, forcing_TeX, independent_TeX,
+                             dependent_TeX, forcing_TeX, weighted_forcing_TeX, dependent_TeX, forcing_integral_TeX,
+                             arbitrary_TeX, dependent_TeX, solved_right_TeX) < 0)
         goto cleanup;
 
     *steps_out = strdup(string_c_str(steps));
-    *steps_tex_out = strdup(string_c_str(steps_tex));
-    success = *steps_out && *steps_tex_out;
+    *steps_TeX_out = strdup(string_c_str(steps_TeX));
+    success = *steps_out && *steps_TeX_out;
 
 cleanup:
     if (!success) {
-        free(*steps_tex_out);
+        free(*steps_TeX_out);
         free(*steps_out);
-        *steps_tex_out = NULL;
+        *steps_TeX_out = NULL;
         *steps_out = NULL;
     }
-    string_free(steps_tex);
+    string_free(steps_TeX);
     string_free(steps);
-    string_free(parameter_tex_builder);
+    string_free(parameter_TeX_builder);
     string_free(parameter_text_builder);
     expr_free(independent_symbol);
-    free(solved_right_tex);
-    free(arbitrary_tex);
-    free(forcing_integral_tex);
-    free(weighted_forcing_tex);
-    free(integrating_factor_tex);
-    free(coefficient_integral_tex);
-    free(forcing_tex);
-    free(coefficient_tex);
-    free(parameters_tex);
-    free(dependent_tex);
-    free(independent_tex);
+    free(solved_right_TeX);
+    free(arbitrary_TeX);
+    free(forcing_integral_TeX);
+    free(weighted_forcing_TeX);
+    free(integrating_factor_TeX);
+    free(coefficient_integral_TeX);
+    free(forcing_TeX);
+    free(coefficient_TeX);
+    free(parameters_TeX);
+    free(dependent_TeX);
+    free(independent_TeX);
     free(solved_right_text);
     free(arbitrary_text);
     free(forcing_integral_text);
@@ -490,7 +490,7 @@ cleanup:
 
 de_attempt_t de_pde_attempt_parameter_linear(const diffequ_t *de, const expr_t *independent, const expr_t *dependent,
                                              const expr_t *derivative_right, bool include_steps,
-                                             equation_t **solution_out, char **steps_out, char **steps_tex_out)
+                                             equation_t **solution_out, char **steps_out, char **steps_TeX_out)
 {
     expr_t **parameters = NULL;
     size_t parameter_count = 0u;
@@ -515,7 +515,7 @@ de_attempt_t de_pde_attempt_parameter_linear(const diffequ_t *de, const expr_t *
 
     *solution_out = NULL;
     *steps_out = NULL;
-    *steps_tex_out = NULL;
+    *steps_TeX_out = NULL;
     if (!de || !de->partial_derivative_input || de->condition_count != 0u || !independent || !dependent ||
         !derivative_right || !expr_symbol_name(independent))
         return DE_ATTEMPT_NOT_MATCHED;
@@ -580,7 +580,7 @@ de_attempt_t de_pde_attempt_parameter_linear(const diffequ_t *de, const expr_t *
     if (!*solution_out || (include_steps && !de_pde_parameter_linear_steps(
                                                 independent, dependent, parameters, parameter_count, coefficient,
                                                 forcing, coefficient_integral, integrating_factor, weighted_forcing,
-                                                forcing_integral, arbitrary, solved_right, steps_out, steps_tex_out)))
+                                                forcing_integral, arbitrary, solved_right, steps_out, steps_TeX_out)))
         goto cleanup;
     attempt = DE_ATTEMPT_SOLVED;
 
@@ -588,9 +588,9 @@ cleanup:
     if (attempt != DE_ATTEMPT_SOLVED) {
         equ_free(*solution_out);
         *solution_out = NULL;
-        free(*steps_tex_out);
+        free(*steps_TeX_out);
         free(*steps_out);
-        *steps_tex_out = NULL;
+        *steps_TeX_out = NULL;
         *steps_out = NULL;
     }
     expr_free(forcing_check_raw);
