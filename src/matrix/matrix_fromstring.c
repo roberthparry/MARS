@@ -671,6 +671,59 @@ static bool mf_rune_is_space(rune_t rune)
            cp == 0x200Au || cp == 0x2028u || cp == 0x2029u || cp == 0x202Fu || cp == 0x205Fu || cp == 0x3000u;
 }
 
+static bool mf_rune_can_end_compact_entry(rune_t rune)
+{
+    uint32_t cp = rune_value(rune);
+
+    return rune_is_alpha_numeric(rune) || cp == '.' || cp == ')' || cp == ']' || mf_rune_is_subscript_digit(rune);
+}
+
+static bool mf_rune_can_start_compact_entry(rune_t rune)
+{
+    uint32_t cp = rune_value(rune);
+
+    return rune_is_alpha_numeric(rune) || cp == '.' || cp == '[' || cp == '@' || mf_rune_is_subscript_digit(rune);
+}
+
+static bool mf_text_token_ends_compact_entry(const string_cursor_t *cursor, string_pos_t start, string_pos_t end)
+{
+    string_t *token = string_cursor_slice_between(start, end, cursor);
+    size_t length;
+    bool result;
+
+    if (!token)
+        return false;
+    string_trim(token);
+    length = string_length(token);
+    result = length > 0u && mf_rune_can_end_compact_entry(string_at(token, length - 1u));
+    string_free(token);
+    return result;
+}
+
+static bool mf_space_starts_compact_entry(const string_cursor_t *cursor)
+{
+    string_cursor_t *lookahead = string_cursor_clone(cursor);
+    rune_t rune;
+    uint32_t cp;
+    bool result = false;
+
+    if (!lookahead)
+        return false;
+    string_cursor_skip_spaces(lookahead);
+    rune = string_cursor_peek(lookahead);
+    cp = rune_value(rune);
+    if (mf_rune_can_start_compact_entry(rune)) {
+        result = true;
+    } else if (cp == '+' || cp == '-') {
+        if (string_cursor_next(lookahead) == 0) {
+            rune = string_cursor_peek(lookahead);
+            result = !mf_rune_is_space(rune) && mf_rune_can_start_compact_entry(rune);
+        }
+    }
+    string_cursor_free(lookahead);
+    return result;
+}
+
 static int mf_push_trimmed_text_token(text_vec_t *cells, const string_cursor_t *cursor, string_pos_t start,
                                       string_pos_t end, bool required)
 {
@@ -703,6 +756,20 @@ static int mf_finish_paren_text_field(text_vec_t *entries, string_cursor_t *curs
     (*current_cols)++;
     if (string_cursor_next(cursor) != 0)
         return -1;
+    string_cursor_skip_spaces(cursor);
+    *token_start = string_cursor_position(cursor);
+    return 0;
+}
+
+static int mf_finish_compact_text_field(text_vec_t *entries, string_cursor_t *cursor, string_pos_t *token_start,
+                                        size_t *current_cols)
+{
+    string_pos_t end = string_cursor_position(cursor);
+
+    if (mf_push_trimmed_text_token(entries, cursor, *token_start, end, true) != 0)
+        return -1;
+
+    (*current_cols)++;
     string_cursor_skip_spaces(cursor);
     *token_start = string_cursor_position(cursor);
     return 0;
@@ -842,6 +909,13 @@ static int mf_parse_matrix_body_text(const string_t *body, string_t ***entries_o
                     if (mf_commit_paren_row(&rows, &cols, current_cols) != 0)
                         goto fail_paren;
                     current_cols = 0;
+                    continue;
+                }
+                if (paren_depth == 0 && mf_rune_is_space(rune) &&
+                    mf_text_token_ends_compact_entry(cursor, token_start, string_cursor_position(cursor)) &&
+                    mf_space_starts_compact_entry(cursor)) {
+                    if (mf_finish_compact_text_field(&entries, cursor, &token_start, &current_cols) != 0)
+                        goto fail_paren;
                     continue;
                 }
             }

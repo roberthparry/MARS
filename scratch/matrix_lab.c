@@ -78,66 +78,21 @@ static char *duplicate_range(const char *start, const char *end)
     return copy;
 }
 
-static bool compact_matrix_entry_end(unsigned char c)
-{
-    return isalnum(c) || c == '.' || c == ')' || c == ']' || c >= 0x80u;
-}
-
-static bool compact_matrix_entry_start(unsigned char c)
-{
-    return isalnum(c) || c == '.' || c == '(' || c == '[' || c == '@' || c >= 0x80u;
-}
-
-static char *compact_matrix_argument(const char *start, const char *end)
+static char *parenthesised_matrix_literal(const char *start, const char *end)
 {
     size_t length = (size_t)(end - start);
     char *matrix_text = malloc(length + 3u);
-    size_t output = 0u;
-    int paren_depth = 0;
-    int bracket_depth = 0;
 
     if (!matrix_text)
         return NULL;
-
-    matrix_text[output++] = '(';
-    for (size_t i = 0u; i < length;) {
-        unsigned char c = (unsigned char)start[i];
-
-        if (isspace(c)) {
-            size_t next = i + 1u;
-
-            while (next < length && isspace((unsigned char)start[next]))
-                next++;
-            if (paren_depth == 0 && bracket_depth == 0 && output > 1u && next < length &&
-                compact_matrix_entry_end((unsigned char)matrix_text[output - 1u]) &&
-                compact_matrix_entry_start((unsigned char)start[next])) {
-                matrix_text[output++] = ',';
-            } else if (output > 1u && matrix_text[output - 1u] != ' ') {
-                matrix_text[output++] = ' ';
-            }
-            i = next;
-            continue;
-        }
-
-        matrix_text[output++] = (char)c;
-        if (c == '(')
-            paren_depth++;
-        else if (c == ')' && paren_depth > 0)
-            paren_depth--;
-        else if (c == '[')
-            bracket_depth++;
-        else if (c == ']' && bracket_depth > 0)
-            bracket_depth--;
-        i++;
-    }
-    if (output > 1u && matrix_text[output - 1u] == ' ')
-        output--;
-    matrix_text[output++] = ')';
-    matrix_text[output] = '\0';
+    matrix_text[0] = '(';
+    memcpy(matrix_text + 1u, start, length);
+    matrix_text[length + 1u] = ')';
+    matrix_text[length + 2u] = '\0';
     return matrix_text;
 }
 
-static char *compact_matrix_literal(const char *start, const char *end)
+static char *matrix_literal_text(const char *start, const char *end)
 {
     while (start < end && isspace((unsigned char)*start))
         start++;
@@ -146,11 +101,9 @@ static char *compact_matrix_literal(const char *start, const char *end)
     if (start == end)
         return NULL;
 
-    if (*start == '(' && end[-1] == ')')
-        return compact_matrix_argument(start + 1, end - 1);
-    if (*start == '[' || *start == '{')
+    if (*start == '(' || *start == '[' || *start == '{')
         return duplicate_range(start, end);
-    return compact_matrix_argument(start, end);
+    return parenthesised_matrix_literal(start, end);
 }
 
 static bool direct_unary_operation_name(const char *start, const char *open, const char **operation_out)
@@ -262,9 +215,9 @@ static const char *matrix_expression_product_operator(const char *start, const c
     return product;
 }
 
-static matrix_t *parse_compact_matrix_span(const char *start, const char *end, mat_bindings_t **bindings)
+static matrix_t *parse_matrix_span(const char *start, const char *end, mat_bindings_t **bindings)
 {
-    char *matrix_text = compact_matrix_literal(start, end);
+    char *matrix_text = matrix_literal_text(start, end);
     matrix_t *matrix;
 
     if (!matrix_text)
@@ -276,7 +229,7 @@ static matrix_t *parse_compact_matrix_span(const char *start, const char *end, m
 
 static matrix_t *evaluate_matrix_calculus_literal(const char *start, const char *end, const char *variable, bool integrate)
 {
-    char *matrix_text = compact_matrix_literal(start, end);
+    char *matrix_text = matrix_literal_text(start, end);
     mat_bindings_t *bindings = NULL;
     matrix_t *matrix = NULL;
     matrix_t *result = NULL;
@@ -400,7 +353,7 @@ static matrix_t *evaluate_matrix_expression_span(const char *start, const char *
     }
 
     if (allow_literal)
-        return parse_compact_matrix_span(start, end, NULL);
+        return parse_matrix_span(start, end, NULL);
     return NULL;
 
 cleanup:
@@ -1054,7 +1007,7 @@ int main(int argc, char **argv)
         goto result_ready;
     }
 
-    matrix = parse_compact_matrix_span(matrix_input, matrix_input + strlen(matrix_input), &bindings);
+    matrix = parse_matrix_span(matrix_input, matrix_input + strlen(matrix_input), &bindings);
     if (!matrix) {
         fprintf(stderr, "Could not parse matrix input\n");
         goto cleanup;
@@ -1089,7 +1042,7 @@ int main(int argc, char **argv)
             fprintf(stderr, "%s needs a right-hand-side matrix\n", strcmp(operation, "solve") == 0 ? "Solve" : "Multiply");
             goto cleanup;
         }
-        other = parse_compact_matrix_span(operand_input, operand_input + strlen(operand_input), NULL);
+        other = parse_matrix_span(operand_input, operand_input + strlen(operand_input), NULL);
         if (!other) {
             fprintf(stderr, "Could not parse %s operand\n", operation);
             goto cleanup;

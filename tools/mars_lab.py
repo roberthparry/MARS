@@ -609,7 +609,7 @@ DEFAULT_EQUATION = "{ x^2 + y^2 = 5 | x = 1, y = 1 }"
 DEFAULT_DIFFEQUATION = "Dx(y) = x*y; y(0) = 1"
 DEFAULT_EQUATION_VARIABLE = "x"
 DEFAULT_MATRIX = "(1, 2; 3, 4)"
-DEFAULT_MATRIX_OPERATION = "inverse"
+DEFAULT_MATRIX_OPERATION = "eval"
 MATRIX_OPERATIONS = frozenset({
     "eval", "inverse", "multiply", "eigenvalues", "eigendecompose", "charpoly", "det", "trace", "rank", "simplify",
     "solve",
@@ -3554,59 +3554,8 @@ __THEME_OVERRIDES__
       </div>
       <textarea id="expr" spellcheck="false" aria-labelledby="leftPaneTitle">__INITIAL_EXPRESSION__</textarea>
       <div class="mode-panel hidden" id="matrixControls">
-        <label id="matrixOperationLabel" for="matrixOperation">Matrix operation</label>
-        <select id="matrixOperation">
-          <optgroup label="Matrix operations">
-            <option value="eval">Evaluate entries</option>
-            <option value="inverse" selected>Inverse</option>
-            <option value="multiply">Multiply by another matrix</option>
-            <option value="eigenvalues">Eigenvalues</option>
-            <option value="eigendecompose">Eigendecompose</option>
-            <option value="charpoly">Characteristic polynomial</option>
-            <option value="det">Determinant</option>
-            <option value="trace">Trace</option>
-            <option value="rank">Rank</option>
-            <option value="simplify">Simplify symbolic</option>
-            <option value="solve">Solve A X = B</option>
-          </optgroup>
-          <optgroup label="Elementary matrix functions">
-            <option value="exp">Exponential exp(A)</option>
-            <option value="log">Natural logarithm log(A)</option>
-            <option value="log10">Common logarithm log10(A)</option>
-            <option value="sqrt">Principal square root sqrt(A)</option>
-            <option value="sin">Sine sin(A)</option>
-            <option value="cos">Cosine cos(A)</option>
-            <option value="tan">Tangent tan(A)</option>
-            <option value="asin">Inverse sine asin(A)</option>
-            <option value="acos">Inverse cosine acos(A)</option>
-            <option value="atan">Inverse tangent atan(A)</option>
-            <option value="sinh">Hyperbolic sine sinh(A)</option>
-            <option value="cosh">Hyperbolic cosine cosh(A)</option>
-            <option value="tanh">Hyperbolic tangent tanh(A)</option>
-            <option value="asinh">Inverse hyperbolic sine asinh(A)</option>
-            <option value="acosh">Inverse hyperbolic cosine acosh(A)</option>
-            <option value="atanh">Inverse hyperbolic tangent atanh(A)</option>
-          </optgroup>
-          <optgroup label="Special matrix functions">
-            <option value="erf">Error function erf(A)</option>
-            <option value="erfc">Complementary error function erfc(A)</option>
-            <option value="erfinv">Inverse error function erfinv(A)</option>
-            <option value="erfcinv">Inverse complementary error function erfcinv(A)</option>
-            <option value="gamma">Gamma gamma(A)</option>
-            <option value="lgamma">Log gamma lgamma(A)</option>
-            <option value="digamma">Digamma digamma(A)</option>
-            <option value="trigamma">Trigamma trigamma(A)</option>
-            <option value="tetragamma">Tetragamma tetragamma(A)</option>
-            <option value="gammainv">Reciprocal gamma gammainv(A)</option>
-            <option value="normal_pdf">Normal density normal_pdf(A)</option>
-            <option value="normal_cdf">Normal distribution normal_cdf(A)</option>
-            <option value="normal_logpdf">Log normal density normal_logpdf(A)</option>
-            <option value="lambert_w0">Lambert W principal branch W0(A)</option>
-            <option value="lambert_wm1">Lambert W minus-one branch W-1(A)</option>
-            <option value="productlog">Product logarithm productlog(A)</option>
-            <option value="ei">Exponential integral Ei(A)</option>
-            <option value="e1">Exponential integral E1(A)</option>
-          </optgroup>
+        <select class="hidden" id="matrixOperation" aria-hidden="true" tabindex="-1">
+          <option value="eval" selected>Evaluate</option>
         </select>
         <label class="hidden" for="matrixOperand" id="matrixOperandLabel">Right-hand side matrix</label>
         <textarea class="hidden secondary-editor" id="matrixOperand" spellcheck="false" placeholder="(1; 0)"></textarea>
@@ -3900,7 +3849,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             <li><code>Expression</code>: type a formula, then set any variable values needed for numeric evaluation. Symbolic operations such as <code>Dx(...)</code> can run with their differentiation variables left blank.</li>
             <li><code>Equation</code>: type an equation and choose which variable to solve for.</li>
             <li><code>Differential Equation</code>: type an ODE followed by optional semicolon-separated initial or boundary conditions.</li>
-            <li><code>Matrix</code>: type a matrix expression and pick an operation.</li>
+            <li><code>Matrix</code>: type the complete matrix expression, then press <code>Evaluate</code>.</li>
             <li><code>Integrator</code>: type the integrand, then add one row per variable you want to integrate over.</li>
             <li><code>Datetime</code>: choose dates, a year, and a location to calculate calendar and solar facts.</li>
             <li><code>Almanac</code>: choose a GMT moment and observer location to inspect navigational bodies, visibility, and local eclipse/transit events.</li>
@@ -3918,14 +3867,14 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         </div>
         <div class="help-card" data-help-modes="matrix">
           <div class="help-kicker">Matrix Functions</div>
-          <p>Write a function directly around a matrix, or enter the matrix itself and choose a function from the operation list. These are genuine matrix functions calculated by MARSlib, not functions applied independently to each displayed entry.</p>
+          <p>Write the complete matrix expression in the editor, then press <code>Evaluate</code>. These are genuine matrix functions calculated by MARSlib, not functions applied independently to each displayed entry.</p>
           <ul>
             <li><code>sin(1 2; 4 5)</code> calculates the sine of the complete 2x2 matrix. Spaces separate columns and semicolons separate rows.</li>
             <li><code>inverse(a b; c d)</code> calculates a symbolic inverse, while <code>(a b; c d).(e f; g h)</code> performs matrix multiplication. Matrix operations compose, so <code>inverse(a b; c d).(x; y)</code> solves the corresponding 2x2 linear system.</li>
             <li><code>Dx(ax+b cx+d; y xy)</code> differentiates every entry with respect to <code>x</code>. <code>@S^x((ax+b cx+d; y xy))</code> returns one entrywise antiderivative.</li>
             <li>Matrix functions require a square matrix. A rectangular matrix is rejected rather than having the scalar function applied entry by entry.</li>
-            <li>For <code>(0, 1; -1, 0)</code>, choose <code>Exponential exp(A)</code> to calculate the matrix exponential.</li>
-            <li>For <code>(4, 0; 0, 9)</code>, choose <code>Principal square root sqrt(A)</code> to obtain <code>(2, 0; 0, 3)</code>.</li>
+            <li><code>exp(0 1; -1 0)</code> calculates the matrix exponential.</li>
+            <li><code>sqrt(4 0; 0 9)</code> obtains <code>(2, 0; 0, 3)</code>.</li>
             <li>Logarithms, inverse functions and special functions require a matrix whose spectrum lies in a supported domain; otherwise MARS Lab reports that the matrix function failed.</li>
           </ul>
         </div>
@@ -4260,7 +4209,6 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       };
     }
 
-    enhanceRoundedSelect(matrixOperation);
     enhanceRoundedSelect(datetimeJurisdiction, {
       searchable: true,
       searchPlaceholder: 'Search jurisdictions',
@@ -4767,7 +4715,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       document.body.classList.toggle('datetime-mode', datetimeMode);
       document.body.classList.toggle('almanac-mode', almanacMode);
       document.body.classList.toggle('diffequation-mode', diffequationMode);
-      matrixControls.classList.toggle('hidden', !matrixMode);
+      matrixControls.classList.add('hidden');
       equationControls.classList.toggle('hidden', !equationMode);
       diffequationControls.classList.toggle('hidden', !diffequationMode);
       integratorControls.classList.toggle('hidden', !integratorMode);
@@ -4799,7 +4747,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         setValueCardVisible(true);
       } else if (matrixMode) {
         leftPaneTitle.textContent = 'Matrix';
-        subtitle.textContent = 'Enter a matrix expression on the left, choose an operation, and inspect both the formatted result and the raw matrix output.';
+        subtitle.textContent = 'Enter a complete matrix expression on the left, press Evaluate, and inspect both the formatted result and the raw matrix output.';
         setResultTitles('Rendered TeX', 'Result', 'Layout', 'Summary');
         setAuxResultCardsVisible(true);
         setValueCardVisible(false);
@@ -7001,7 +6949,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     function validMatrixOperation(value) {
       const operation = String(value || '').trim();
       const allowed = Array.from(matrixOperation.options).map((option) => option.value);
-      return allowed.includes(operation) ? operation : 'inverse';
+      return allowed.includes(operation) ? operation : 'eval';
     }
 
     function validLabMode(value) {
@@ -7485,7 +7433,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         equationVariable.value = String(state.variable || DEFAULT_EQUATION_VARIABLE_TEXT).trim() ||
           DEFAULT_EQUATION_VARIABLE_TEXT;
       } else if (state.mode === 'matrix') {
-        matrixOperation.value = state.operation || 'inverse';
+        matrixOperation.value = state.operation || 'eval';
         matrixOperand.value = String(state.operand || '').trim();
       } else if (state.mode === 'integrator') {
         restoreIntegratorBoundsText(state.bounds || DEFAULT_INTEGRATOR_BOUNDS_TEXT);
@@ -10570,7 +10518,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       expr.value = '';
       if (currentMode() === 'matrix') {
         matrixOperand.value = '';
-        matrixOperation.value = 'inverse';
+        matrixOperation.value = 'eval';
       }
       if (currentMode() === 'equation' && equationVariable)
         equationVariable.value = DEFAULT_EQUATION_VARIABLE_TEXT;

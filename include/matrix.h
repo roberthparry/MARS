@@ -256,6 +256,11 @@ matrix_t *mat_from_text(const string_t *text);
  * as `π₁`, but remain ordinary symbolic variables rather than built-in
  * constants.
  *
+ * Within parenthesised matrices, columns may be separated by commas or by
+ * unambiguous top-level whitespace. Thus `(1 2; 4 5)` is equivalent to
+ * `(1, 2; 4, 5)`, while whitespace surrounding an operator inside an entry,
+ * as in `1 + i`, remains part of that scalar expression.
+ *
  * This is a convenience wrapper around mat_from_text_expr(...), so internally
  * the parser works with the string module rather than C-string pointer
  * arithmetic.
