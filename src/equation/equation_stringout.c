@@ -231,7 +231,7 @@ static style_t equ_format_style(const string_format_spec_t *spec, string_format_
         case 't':
         case 'T':
             *result = STRING_FORMAT_HANDLED_WITH_TRAILING_MODIFIER;
-            return style_TEX;
+            return style_LATEX;
         case 'f':
         case 'F':
             *result = STRING_FORMAT_HANDLED_WITH_TRAILING_MODIFIER;
@@ -400,10 +400,10 @@ cleanup:
     return out;
 }
 
-static string_t *equ_to_text_tex(const equation_t *equation)
+static string_t *equ_to_text_TeX(const equation_t *equation)
 {
-    string_t *lhs = expr_to_text(equ_lhs(equation), style_TEX);
-    string_t *rhs = expr_to_text(equ_rhs(equation), style_TEX);
+    string_t *lhs = expr_to_text(equ_lhs(equation), style_LATEX);
+    string_t *rhs = expr_to_text(equ_rhs(equation), style_LATEX);
     string_t *out = NULL;
 
     if (!lhs || !rhs)
@@ -464,8 +464,8 @@ string_t *equ_to_text(const equation_t *equation, style_t style)
     if (!equation)
         return string_new_with("NULL");
 
-    if (style == style_TEX)
-        return equ_to_text_tex(equation);
+    if (style == style_LATEX)
+        return equ_to_text_TeX(equation);
     if (style == style_UNBOUND)
         return equ_to_text_unbound(equation);
     if (style == style_FUNCTION)

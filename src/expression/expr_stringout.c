@@ -23,7 +23,7 @@
  *                       Useful for debugging graph structure and generated
  *                       callable forms.
  *
- *   style_TEX         — native TeX notation generated directly from the DAG,
+ *   style_LATEX         — native TeX notation generated directly from the DAG,
  *                       e.g.
  *                         \left\{ \sin(x)\cos(y) \;\middle|\;
  *                         x = 1, y = \frac{\pi}{2} \right\}
@@ -34,7 +34,7 @@
  *   • Shared low-level expression, TeX, and function-body emitters
  *
  * Style-specific wrappers live in expr_stringout_expr.c,
- * expr_stringout_tex.c, and expr_stringout_func.c.
+ * expr_stringout_TeX.c, and expr_stringout_func.c.
  *
  * Algebraic simplification is deliberately not part of ordinary rendering:
  * callers see the expression shape they built or parsed.  Owning derivative
@@ -95,7 +95,7 @@ static style_t expr_format_style(const string_format_spec_t *spec, string_format
         case 't':
         case 'T':
             *result = STRING_FORMAT_HANDLED_WITH_TRAILING_MODIFIER;
-            return style_TEX;
+            return style_LATEX;
         case 'f':
         case 'F':
             *result = STRING_FORMAT_HANDLED_WITH_TRAILING_MODIFIER;
@@ -358,7 +358,7 @@ static bool emit_negative_const_binding_expr_abs(const expr_t *f, sbuf_t *b, boo
     if (!f || !f->binding_expr)
         return false;
 
-    raw = tex ? expr_binding_expr_to_tex(f->binding_expr) : expr_binding_expr_to_string(f->binding_expr);
+    raw = tex ? expr_binding_expr_to_TeX(f->binding_expr) : expr_binding_expr_to_string(f->binding_expr);
     if (!raw)
         return false;
 
@@ -924,8 +924,8 @@ static void sort_factors(expr_t **fac, int n)
 void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec);
 static void emit_expr_abs(const expr_t *f, sbuf_t *b, int parent_prec);
 static void emit_expr_abs_bars(const expr_t *f, sbuf_t *b);
-void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec);
-static void emit_tex_expr_abs(const expr_t *f, sbuf_t *b, int parent_prec);
+void emit_TeX_expr(const expr_t *f, sbuf_t *b, int parent_prec);
+static void emit_TeX_expr_abs(const expr_t *f, sbuf_t *b, int parent_prec);
 void emit_func(const expr_t *f, sbuf_t *b, int parent_prec);
 static void emit_func_abs(const expr_t *f, sbuf_t *b, int parent_prec);
 
@@ -981,39 +981,39 @@ static void emit_formal_derivative_expr(const expr_t *f, sbuf_t *b)
     sbuf_putc(b, ')');
 }
 
-static _Thread_local unsigned int expr_tex_partial_derivative_depth;
-static _Thread_local unsigned int expr_tex_total_derivative_depth;
+static _Thread_local unsigned int expr_TeX_partial_derivative_depth;
+static _Thread_local unsigned int expr_TeX_total_derivative_depth;
 
-void expr_tex_partial_derivatives_push(void)
+void expr_TeX_partial_derivatives_push(void)
 {
-    expr_tex_partial_derivative_depth++;
+    expr_TeX_partial_derivative_depth++;
 }
 
-void expr_tex_partial_derivatives_pop(void)
+void expr_TeX_partial_derivatives_pop(void)
 {
-    if (expr_tex_partial_derivative_depth > 0u)
-        expr_tex_partial_derivative_depth--;
+    if (expr_TeX_partial_derivative_depth > 0u)
+        expr_TeX_partial_derivative_depth--;
 }
 
-bool expr_tex_partial_derivatives_enabled(void)
+bool expr_TeX_partial_derivatives_enabled(void)
 {
-    return expr_tex_partial_derivative_depth > 0u;
+    return expr_TeX_partial_derivative_depth > 0u;
 }
 
-void expr_tex_total_derivatives_push(void)
+void expr_TeX_total_derivatives_push(void)
 {
-    expr_tex_total_derivative_depth++;
+    expr_TeX_total_derivative_depth++;
 }
 
-void expr_tex_total_derivatives_pop(void)
+void expr_TeX_total_derivatives_pop(void)
 {
-    if (expr_tex_total_derivative_depth > 0u)
-        expr_tex_total_derivative_depth--;
+    if (expr_TeX_total_derivative_depth > 0u)
+        expr_TeX_total_derivative_depth--;
 }
 
-bool expr_tex_total_derivatives_enabled(void)
+bool expr_TeX_total_derivatives_enabled(void)
 {
-    return expr_tex_total_derivative_depth > 0u;
+    return expr_TeX_total_derivative_depth > 0u;
 }
 
 static void emit_formal_partial_denominator(const expr_t *f, sbuf_t *b)
@@ -1031,7 +1031,7 @@ static void emit_formal_partial_denominator(const expr_t *f, sbuf_t *b)
         if (!first)
             sbuf_puts(b, "\\,");
         sbuf_puts(b, "\\partial ");
-        emit_tex_name(b, (wrt && wrt->name) ? wrt->name : "x");
+        emit_TeX_name(b, (wrt && wrt->name) ? wrt->name : "x");
         if (multiplicity > 1u) {
             char exponent[32];
 
@@ -1043,9 +1043,9 @@ static void emit_formal_partial_denominator(const expr_t *f, sbuf_t *b)
     }
 }
 
-static void emit_formal_derivative_tex(const expr_t *f, sbuf_t *b)
+static void emit_formal_derivative_TeX(const expr_t *f, sbuf_t *b)
 {
-    if (expr_tex_partial_derivatives_enabled()) {
+    if (expr_TeX_partial_derivatives_enabled()) {
         sbuf_puts(b, "\\frac{\\partial");
         if (f->formal_wrt_count > 1u) {
             char order[32];
@@ -1054,13 +1054,13 @@ static void emit_formal_derivative_tex(const expr_t *f, sbuf_t *b)
             sbuf_puts(b, order);
         }
         sbuf_putc(b, ' ');
-        emit_tex_expr(f->a, b, PREC_LOWEST);
+        emit_TeX_expr(f->a, b, PREC_LOWEST);
         sbuf_puts(b, "}{");
         emit_formal_partial_denominator(f, b);
         sbuf_putc(b, '}');
         return;
     }
-    if (expr_tex_total_derivatives_enabled()) {
+    if (expr_TeX_total_derivatives_enabled()) {
         const expr_t *wrt = f->formal_wrt_count > 0u ? f->formal_wrts[0] : NULL;
 
         sbuf_puts(b, "\\frac{d");
@@ -1071,9 +1071,9 @@ static void emit_formal_derivative_tex(const expr_t *f, sbuf_t *b)
             sbuf_puts(b, order);
         }
         sbuf_putc(b, ' ');
-        emit_tex_expr(f->a, b, PREC_LOWEST);
+        emit_TeX_expr(f->a, b, PREC_LOWEST);
         sbuf_puts(b, "}{d ");
-        emit_tex_name(b, (wrt && wrt->name) ? wrt->name : "x");
+        emit_TeX_name(b, (wrt && wrt->name) ? wrt->name : "x");
         if (f->formal_wrt_count > 1u) {
             char order[32];
 
@@ -1090,10 +1090,10 @@ static void emit_formal_derivative_tex(const expr_t *f, sbuf_t *b)
 
         if (i > 0u)
             sbuf_putc(b, ' ');
-        emit_tex_name(b, (wrt && wrt->name) ? wrt->name : "x");
+        emit_TeX_name(b, (wrt && wrt->name) ? wrt->name : "x");
     }
     sbuf_puts(b, "}\\left(");
-    emit_tex_expr(f->a, b, PREC_LOWEST);
+    emit_TeX_expr(f->a, b, PREC_LOWEST);
     sbuf_puts(b, "\\right)");
 }
 
@@ -1153,7 +1153,7 @@ static void emit_argument_list_expr(const expr_t *f, sbuf_t *b)
     emit_expr(f->b, b, PREC_LOWEST);
 }
 
-static void emit_arbitrary_function_tex(const expr_t *f, sbuf_t *b)
+static void emit_arbitrary_function_TeX(const expr_t *f, sbuf_t *b)
 {
     const char *name = f->name ? f->name : "F";
     size_t length = strlen(name);
@@ -1161,9 +1161,9 @@ static void emit_arbitrary_function_tex(const expr_t *f, sbuf_t *b)
 
     if (strcmp(name, "BesselJ") == 0 && f->a && f->a->ops == &ops_argument_list) {
         sbuf_puts(b, "J_{");
-        emit_tex_expr(f->a->a, b, PREC_LOWEST);
+        emit_TeX_expr(f->a->a, b, PREC_LOWEST);
         sbuf_puts(b, "}\\left(");
-        emit_tex_expr(f->a->b, b, PREC_LOWEST);
+        emit_TeX_expr(f->a->b, b, PREC_LOWEST);
         sbuf_puts(b, "\\right)");
         return;
     }
@@ -1171,11 +1171,11 @@ static void emit_arbitrary_function_tex(const expr_t *f, sbuf_t *b)
     if (strcmp(name, "LommelS") == 0 && f->a && f->a->ops == &ops_argument_list && f->a->a &&
         f->a->a->ops == &ops_argument_list) {
         sbuf_puts(b, "s_{");
-        emit_tex_expr(f->a->a->a, b, PREC_LOWEST);
+        emit_TeX_expr(f->a->a->a, b, PREC_LOWEST);
         sbuf_puts(b, ",");
-        emit_tex_expr(f->a->a->b, b, PREC_LOWEST);
+        emit_TeX_expr(f->a->a->b, b, PREC_LOWEST);
         sbuf_puts(b, "}\\left(");
-        emit_tex_expr(f->a->b, b, PREC_LOWEST);
+        emit_TeX_expr(f->a->b, b, PREC_LOWEST);
         sbuf_puts(b, "\\right)");
         return;
     }
@@ -1184,7 +1184,7 @@ static void emit_arbitrary_function_tex(const expr_t *f, sbuf_t *b)
         sbuf_puts(b, "\\operatorname{");
         sbuf_puts(b, name);
         sbuf_puts(b, "}\\left(");
-        emit_tex_expr(f->a, b, PREC_LOWEST);
+        emit_TeX_expr(f->a, b, PREC_LOWEST);
         sbuf_puts(b, "\\right)");
         return;
     }
@@ -1195,29 +1195,29 @@ static void emit_arbitrary_function_tex(const expr_t *f, sbuf_t *b)
         char *base_name = strndup(name, length - prime_count);
 
         if (base_name) {
-            emit_tex_name(b, base_name);
+            emit_TeX_name(b, base_name);
             free(base_name);
             for (size_t i = 0u; i < prime_count; ++i)
                 sbuf_putc(b, '\'');
         } else {
-            emit_tex_name(b, name);
+            emit_TeX_name(b, name);
         }
     } else {
-        emit_tex_name(b, name);
+        emit_TeX_name(b, name);
     }
     sbuf_puts(b, "\\left(");
-    emit_tex_expr(f->a, b, PREC_LOWEST);
+    emit_TeX_expr(f->a, b, PREC_LOWEST);
     sbuf_puts(b, "\\right)");
 }
 
-static void emit_argument_list_tex(const expr_t *f, sbuf_t *b)
+static void emit_argument_list_TeX(const expr_t *f, sbuf_t *b)
 {
-    emit_tex_expr(f->a, b, PREC_LOWEST);
+    emit_TeX_expr(f->a, b, PREC_LOWEST);
     sbuf_puts(b, ", ");
-    emit_tex_expr(f->b, b, PREC_LOWEST);
+    emit_TeX_expr(f->b, b, PREC_LOWEST);
 }
 
-static void emit_tex_integral(const expr_t *f, sbuf_t *b, int parent_prec)
+static void emit_TeX_integral(const expr_t *f, sbuf_t *b, int parent_prec)
 {
     int need = PREC_UNARY < parent_prec;
     const expr_t *lower = expr_integral_lower_bound_expr(f);
@@ -1230,15 +1230,15 @@ static void emit_tex_integral(const expr_t *f, sbuf_t *b, int parent_prec)
     sbuf_puts(b, "\\int");
     if (lower) {
         sbuf_puts(b, "_{");
-        emit_tex_expr(lower, b, PREC_LOWEST);
+        emit_TeX_expr(lower, b, PREC_LOWEST);
         sbuf_putc(b, '}');
     }
     sbuf_puts(b, "^{");
-    emit_tex_expr(upper, b, PREC_LOWEST);
+    emit_TeX_expr(upper, b, PREC_LOWEST);
     sbuf_puts(b, "} ");
-    emit_tex_expr(display_integrand, b, PREC_LOWEST);
+    emit_TeX_expr(display_integrand, b, PREC_LOWEST);
     sbuf_puts(b, "\\, d");
-    emit_tex_expr(display_dummy, b, PREC_LOWEST);
+    emit_TeX_expr(display_dummy, b, PREC_LOWEST);
     if (need)
         sbuf_puts(b, "\\right)");
 }
@@ -1277,7 +1277,7 @@ static void emit_func_integral(const expr_t *f, sbuf_t *b)
     emit_func(display_dummy, b, PREC_LOWEST);
 }
 
-static void emit_tex_sqrt_power(const expr_t *base, sbuf_t *b, int parent_prec, bool reciprocal)
+static void emit_TeX_sqrt_power(const expr_t *base, sbuf_t *b, int parent_prec, bool reciprocal)
 {
     if (reciprocal) {
         int need = PREC_MUL < parent_prec;
@@ -1285,7 +1285,7 @@ static void emit_tex_sqrt_power(const expr_t *base, sbuf_t *b, int parent_prec, 
         if (need)
             sbuf_puts(b, "\\left(");
         sbuf_puts(b, "\\frac{1}{\\sqrt{");
-        emit_tex_expr(base, b, PREC_LOWEST);
+        emit_TeX_expr(base, b, PREC_LOWEST);
         sbuf_puts(b, "}}");
         if (need)
             sbuf_puts(b, "\\right)");
@@ -1298,7 +1298,7 @@ static void emit_tex_sqrt_power(const expr_t *base, sbuf_t *b, int parent_prec, 
         if (need)
             sbuf_puts(b, "\\left(");
         sbuf_puts(b, "\\sqrt{");
-        emit_tex_expr(base, b, PREC_LOWEST);
+        emit_TeX_expr(base, b, PREC_LOWEST);
         sbuf_putc(b, '}');
         if (need)
             sbuf_puts(b, "\\right)");
@@ -1806,7 +1806,7 @@ static bool emit_expr_display_polynomial_sum(const expr_t *expr, sbuf_t *b, int 
     return true;
 }
 
-static bool emit_tex_display_polynomial_sum(const expr_t *expr, sbuf_t *b, int parent_prec)
+static bool emit_TeX_display_polynomial_sum(const expr_t *expr, sbuf_t *b, int parent_prec)
 {
     display_poly_term_t terms[96];
     size_t count = 0u;
@@ -1833,9 +1833,9 @@ static bool emit_tex_display_polynomial_sum(const expr_t *expr, sbuf_t *b, int p
         if (term_needs_parens)
             sbuf_puts(b, "\\left(");
         if (term_negative)
-            emit_tex_expr_abs(terms[i].expr, b, PREC_ADD);
+            emit_TeX_expr_abs(terms[i].expr, b, PREC_ADD);
         else
-            emit_tex_expr(terms[i].expr, b, PREC_ADD);
+            emit_TeX_expr(terms[i].expr, b, PREC_ADD);
         if (term_needs_parens)
             sbuf_puts(b, "\\right)");
     }
@@ -1988,7 +1988,7 @@ static void emit_expr_abs_bars(const expr_t *f, sbuf_t *b)
     sbuf_putc(b, '|');
 }
 
-void emit_tex_name(sbuf_t *b, const char *name)
+void emit_TeX_name(sbuf_t *b, const char *name)
 {
     char *tex;
 
@@ -2019,7 +2019,7 @@ void emit_tex_name(sbuf_t *b, const char *name)
     sbuf_putc(b, ']');
 }
 
-static const char *expr_known_constant_tex_local(number_t value)
+static const char *expr_known_constant_TeX_local(number_t value)
 {
     if (num_eq(value, NUM_SQRT1ONPI))
         return "\\frac{1}{\\sqrt{\\pi}}";
@@ -2048,9 +2048,9 @@ static const char *expr_known_constant_tex_local(number_t value)
     return NULL;
 }
 
-static void emit_tex_number_value(sbuf_t *b, number_t value)
+static void emit_TeX_number_value(sbuf_t *b, number_t value)
 {
-    const char *constant_tex = NULL;
+    const char *constant_TeX = NULL;
     char *text = expr_number_to_string_local(num_clone(value));
     char *tex;
 
@@ -2058,14 +2058,14 @@ static void emit_tex_number_value(sbuf_t *b, number_t value)
         return;
 
     if (!num_is_exact(value))
-        constant_tex = expr_known_constant_tex_local(value);
-    if (constant_tex) {
-        sbuf_puts(b, constant_tex);
+        constant_TeX = expr_known_constant_TeX_local(value);
+    if (constant_TeX) {
+        sbuf_puts(b, constant_TeX);
         free(text);
         return;
     }
 
-    tex = expr_text_to_tex_local(text);
+    tex = expr_text_to_TeX_local(text);
     if (tex) {
         sbuf_puts(b, tex);
         free(tex);
@@ -2075,9 +2075,9 @@ static void emit_tex_number_value(sbuf_t *b, number_t value)
     free(text);
 }
 
-static void emit_tex_const_value(sbuf_t *b, const expr_t *dv)
+static void emit_TeX_const_value(sbuf_t *b, const expr_t *dv)
 {
-    const char *constant_tex = NULL;
+    const char *constant_TeX = NULL;
     char *text = expr_const_to_string_local(dv);
     char *tex;
 
@@ -2085,14 +2085,14 @@ static void emit_tex_const_value(sbuf_t *b, const expr_t *dv)
         return;
 
     if (dv && !num_is_exact(dv->c))
-        constant_tex = expr_known_constant_tex_local(dv->c);
-    if (constant_tex) {
-        sbuf_puts(b, constant_tex);
+        constant_TeX = expr_known_constant_TeX_local(dv->c);
+    if (constant_TeX) {
+        sbuf_puts(b, constant_TeX);
         free(text);
         return;
     }
 
-    tex = expr_text_to_tex_local(text);
+    tex = expr_text_to_TeX_local(text);
     if (tex) {
         sbuf_puts(b, tex);
         free(tex);
@@ -2102,7 +2102,7 @@ static void emit_tex_const_value(sbuf_t *b, const expr_t *dv)
     free(text);
 }
 
-static bool emit_tex_exp_unit_fraction_root(const expr_t *arg, sbuf_t *b)
+static bool emit_TeX_exp_unit_fraction_root(const expr_t *arg, sbuf_t *b)
 {
     long numerator;
     long denominator;
@@ -2124,32 +2124,32 @@ static bool emit_tex_exp_unit_fraction_root(const expr_t *arg, sbuf_t *b)
     return true;
 }
 
-static void emit_tex_atom(const expr_t *f, sbuf_t *b)
+static void emit_TeX_atom(const expr_t *f, sbuf_t *b)
 {
     if (expr_is_const(f)) {
         if (expr_tostring_should_emit_binding_expr(f)) {
-            char *text = expr_binding_expr_to_tex(f->binding_expr);
+            char *text = expr_binding_expr_to_TeX(f->binding_expr);
 
             if (text) {
                 sbuf_puts(b, text);
                 free(text);
             }
         } else if (f->name && *f->name)
-            emit_tex_name(b, f->name);
+            emit_TeX_name(b, f->name);
         else
-            emit_tex_const_value(b, f);
+            emit_TeX_const_value(b, f);
         return;
     }
 
     if (expr_is_var(f)) {
-        emit_tex_name(b, f->name ? f->name : "x");
+        emit_TeX_name(b, f->name ? f->name : "x");
         return;
     }
 
-    emit_tex_number_value(b, expr_eval(f));
+    emit_TeX_number_value(b, expr_eval(f));
 }
 
-static const char *tex_unary_name(const expr_t *f)
+static const char *TeX_unary_name(const expr_t *f)
 {
     if (!f || !f->ops)
         return NULL;
@@ -2158,10 +2158,10 @@ static const char *tex_unary_name(const expr_t *f)
         return NULL;
     if (expr_is_sqrt_expr(f))
         return "\\sqrt";
-    return f->ops->tex_name;
+    return f->ops->TeX_name;
 }
 
-static bool tex_unary_arg_is_greek_symbol(const expr_t *arg)
+static bool TeX_unary_arg_is_greek_symbol(const expr_t *arg)
 {
     const char *name;
     string_t *name_text;
@@ -2390,7 +2390,7 @@ static void emit_expr_lommel_s(const expr_t *f, sbuf_t *b)
 
     if (!expr_lommel_s_unpack(f, &mu, &nu, &argument))
         return;
-    sbuf_puts(b, expr_is_op(f, &ops_lommel_s_derivative) ? "LommelSPrime(" : "LommelS(");
+    sbuf_puts(b, "LommelS(");
     emit_expr(mu, b, 0);
     sbuf_puts(b, ", ");
     emit_expr(nu, b, 0);
@@ -2399,7 +2399,7 @@ static void emit_expr_lommel_s(const expr_t *f, sbuf_t *b)
     sbuf_putc(b, ')');
 }
 
-static void emit_tex_polygamma(const expr_t *f, sbuf_t *b)
+static void emit_TeX_polygamma(const expr_t *f, sbuf_t *b)
 {
     long order;
     char buf[32];
@@ -2410,11 +2410,11 @@ static void emit_tex_polygamma(const expr_t *f, sbuf_t *b)
     snprintf(buf, sizeof(buf), "%ld", order);
     sbuf_puts(b, buf);
     sbuf_puts(b, ")}(");
-    emit_tex_expr(f->b, b, 0);
+    emit_TeX_expr(f->b, b, 0);
     sbuf_putc(b, ')');
 }
 
-static void emit_tex_polylog(const expr_t *f, sbuf_t *b)
+static void emit_TeX_polylog(const expr_t *f, sbuf_t *b)
 {
     long order;
     char buf[32];
@@ -2425,11 +2425,11 @@ static void emit_tex_polylog(const expr_t *f, sbuf_t *b)
     sbuf_puts(b, "\\operatorname{Li}_{");
     sbuf_puts(b, buf);
     sbuf_puts(b, "}(");
-    emit_tex_expr(f->b, b, 0);
+    emit_TeX_expr(f->b, b, 0);
     sbuf_putc(b, ')');
 }
 
-static void emit_tex_legendre_chi(const expr_t *f, sbuf_t *b)
+static void emit_TeX_legendre_chi(const expr_t *f, sbuf_t *b)
 {
     long order;
     char buf[32];
@@ -2440,11 +2440,11 @@ static void emit_tex_legendre_chi(const expr_t *f, sbuf_t *b)
     sbuf_puts(b, "\\chi_{");
     sbuf_puts(b, buf);
     sbuf_puts(b, "}(");
-    emit_tex_expr(f->b, b, 0);
+    emit_TeX_expr(f->b, b, 0);
     sbuf_putc(b, ')');
 }
 
-static void emit_tex_appell_f1(const expr_t *f, sbuf_t *b)
+static void emit_TeX_appell_f1(const expr_t *f, sbuf_t *b)
 {
     const expr_t *a = NULL;
     const expr_t *b1 = NULL;
@@ -2456,21 +2456,21 @@ static void emit_tex_appell_f1(const expr_t *f, sbuf_t *b)
     if (!expr_appell_f1_unpack(f, &a, &b1, &b2, &c, &x, &y))
         return;
     sbuf_puts(b, "F_{1}\\left(");
-    emit_tex_expr(a, b, 0);
+    emit_TeX_expr(a, b, 0);
     sbuf_puts(b, "; ");
-    emit_tex_expr(b1, b, 0);
+    emit_TeX_expr(b1, b, 0);
     sbuf_puts(b, ", ");
-    emit_tex_expr(b2, b, 0);
+    emit_TeX_expr(b2, b, 0);
     sbuf_puts(b, "; ");
-    emit_tex_expr(c, b, 0);
+    emit_TeX_expr(c, b, 0);
     sbuf_puts(b, "; ");
-    emit_tex_expr(x, b, 0);
+    emit_TeX_expr(x, b, 0);
     sbuf_puts(b, ", ");
-    emit_tex_expr(y, b, 0);
+    emit_TeX_expr(y, b, 0);
     sbuf_puts(b, "\\right)");
 }
 
-static void emit_tex_lauricella_f(const expr_t *f, sbuf_t *out)
+static void emit_TeX_lauricella_f(const expr_t *f, sbuf_t *out)
 {
     const expr_t *a = NULL;
     const expr_t **parameters = NULL;
@@ -2483,27 +2483,27 @@ static void emit_tex_lauricella_f(const expr_t *f, sbuf_t *out)
         return;
     snprintf(prefix, sizeof(prefix), "F_D^{(%zu)}\\left(", count);
     sbuf_puts(out, prefix);
-    emit_tex_expr(a, out, 0);
+    emit_TeX_expr(a, out, 0);
     sbuf_puts(out, "; ");
     for (size_t i = 0u; i < count; ++i) {
         if (i > 0u)
             sbuf_puts(out, ", ");
-        emit_tex_expr(parameters[i], out, 0);
+        emit_TeX_expr(parameters[i], out, 0);
     }
     sbuf_puts(out, "; ");
-    emit_tex_expr(c, out, 0);
+    emit_TeX_expr(c, out, 0);
     sbuf_puts(out, "; ");
     for (size_t i = 0u; i < count; ++i) {
         if (i > 0u)
             sbuf_puts(out, ", ");
-        emit_tex_expr(variables[i], out, 0);
+        emit_TeX_expr(variables[i], out, 0);
     }
     sbuf_puts(out, "\\right)");
     free(variables);
     free(parameters);
 }
 
-static void emit_tex_hypergeometric_pFq(const expr_t *f, sbuf_t *b)
+static void emit_TeX_hypergeometric_pFq(const expr_t *f, sbuf_t *b)
 {
     const expr_t **upper = NULL;
     const expr_t **lower = NULL;
@@ -2521,7 +2521,7 @@ static void emit_tex_hypergeometric_pFq(const expr_t *f, sbuf_t *b)
     for (size_t i = 0u; i < p; ++i) {
         if (i > 0u)
             sbuf_puts(b, ", ");
-        emit_tex_expr(upper[i], b, 0);
+        emit_TeX_expr(upper[i], b, 0);
     }
     sbuf_puts(b, "\\\\");
     if (q == 0u)
@@ -2529,16 +2529,16 @@ static void emit_tex_hypergeometric_pFq(const expr_t *f, sbuf_t *b)
     for (size_t i = 0u; i < q; ++i) {
         if (i > 0u)
             sbuf_puts(b, ", ");
-        emit_tex_expr(lower[i], b, 0);
+        emit_TeX_expr(lower[i], b, 0);
     }
     sbuf_puts(b, "\\end{matrix}; ");
-    emit_tex_expr(argument, b, 0);
+    emit_TeX_expr(argument, b, 0);
     sbuf_puts(b, "\\right)");
     free(lower);
     free(upper);
 }
 
-static void emit_tex_lommel_s(const expr_t *f, sbuf_t *b)
+static void emit_TeX_lommel_s(const expr_t *f, sbuf_t *b)
 {
     const expr_t *mu = NULL;
     const expr_t *nu = NULL;
@@ -2546,21 +2546,21 @@ static void emit_tex_lommel_s(const expr_t *f, sbuf_t *b)
 
     if (!expr_lommel_s_unpack(f, &mu, &nu, &argument))
         return;
-    sbuf_puts(b, expr_is_op(f, &ops_lommel_s_derivative) ? "s'_{" : "s_{");
-    emit_tex_expr(mu, b, 0);
+    sbuf_puts(b, "s_{");
+    emit_TeX_expr(mu, b, 0);
     sbuf_puts(b, ",");
-    emit_tex_expr(nu, b, 0);
+    emit_TeX_expr(nu, b, 0);
     sbuf_puts(b, "}\\left(");
-    emit_tex_expr(argument, b, 0);
+    emit_TeX_expr(argument, b, 0);
     sbuf_puts(b, "\\right)");
 }
 
-static void emit_tex_lambert_wn(const expr_t *f, sbuf_t *b)
+static void emit_TeX_lambert_wn(const expr_t *f, sbuf_t *b)
 {
     sbuf_puts(b, "W_{");
-    emit_tex_expr(f->a, b, 0);
+    emit_TeX_expr(f->a, b, 0);
     sbuf_puts(b, "}(");
-    emit_tex_expr(f->b, b, 0);
+    emit_TeX_expr(f->b, b, 0);
     sbuf_putc(b, ')');
 }
 
@@ -2670,7 +2670,7 @@ static void emit_func_lommel_s(const expr_t *f, sbuf_t *b)
 
     if (!expr_lommel_s_unpack(f, &mu, &nu, &argument))
         return;
-    sbuf_puts(b, expr_is_op(f, &ops_lommel_s_derivative) ? "lommel_s_derivative(" : "lommel_s(");
+    sbuf_puts(b, "lommel_s(");
     emit_func(mu, b, 0);
     sbuf_puts(b, ", ");
     emit_func(nu, b, 0);
@@ -2688,7 +2688,7 @@ static void emit_func_lambert_wn(const expr_t *f, sbuf_t *b)
     sbuf_putc(b, ')');
 }
 
-static int tex_exp_needs_parens(const expr_t *e)
+static int TeX_exp_needs_parens(const expr_t *e)
 {
     if (!e)
         return 0;
@@ -2703,15 +2703,15 @@ static int tex_exp_needs_parens(const expr_t *e)
     return 0;
 }
 
-static void emit_tex_factor_abs(const expr_t *f, sbuf_t *b)
+static void emit_TeX_factor_abs(const expr_t *f, sbuf_t *b)
 {
     if (expr_is_negative(f))
-        emit_tex_expr_abs(f, b, PREC_MUL);
+        emit_TeX_expr_abs(f, b, PREC_MUL);
     else
-        emit_tex_expr(f, b, PREC_MUL);
+        emit_TeX_expr(f, b, PREC_MUL);
 }
 
-static void emit_tex_expr_abs(const expr_t *f, sbuf_t *b, int parent_prec)
+static void emit_TeX_expr_abs(const expr_t *f, sbuf_t *b, int parent_prec)
 {
     if (!f) {
         sbuf_puts(b, "0");
@@ -2724,7 +2724,7 @@ static void emit_tex_expr_abs(const expr_t *f, sbuf_t *b, int parent_prec)
         {
             number_t positive = num_neg(f->c);
 
-            emit_tex_number_value(b, positive);
+            emit_TeX_number_value(b, positive);
             num_destroy(&positive);
         }
         return;
@@ -2736,14 +2736,14 @@ static void emit_tex_expr_abs(const expr_t *f, sbuf_t *b, int parent_prec)
         {
             number_t positive = num_neg(f->c);
 
-            emit_tex_number_value(b, positive);
+            emit_TeX_number_value(b, positive);
             num_destroy(&positive);
         }
         return;
     }
 
     if (expr_is_neg(f)) {
-        emit_tex_expr(f->a, b, parent_prec);
+        emit_TeX_expr(f->a, b, parent_prec);
         return;
     }
 
@@ -2775,7 +2775,7 @@ static void emit_tex_expr_abs(const expr_t *f, sbuf_t *b, int parent_prec)
             }
             if (n > 1 && mul_factor_needs_visible_parens(fac[i]))
                 sbuf_puts(b, "\\left(");
-            emit_tex_factor_abs(fac[i], b);
+            emit_TeX_factor_abs(fac[i], b);
             if (n > 1 && mul_factor_needs_visible_parens(fac[i]))
                 sbuf_puts(b, "\\right)");
         }
@@ -2787,16 +2787,16 @@ static void emit_tex_expr_abs(const expr_t *f, sbuf_t *b, int parent_prec)
         if (need)
             sbuf_puts(b, "\\left(");
         sbuf_puts(b, "\\frac{");
-        emit_tex_expr_abs(f->a, b, PREC_LOWEST);
+        emit_TeX_expr_abs(f->a, b, PREC_LOWEST);
         sbuf_puts(b, "}{");
-        emit_tex_expr(f->b, b, PREC_LOWEST);
+        emit_TeX_expr(f->b, b, PREC_LOWEST);
         sbuf_putc(b, '}');
         if (need)
             sbuf_puts(b, "\\right)");
         return;
     }
 
-    emit_tex_expr(f, b, parent_prec);
+    emit_TeX_expr(f, b, parent_prec);
 }
 
 static bool emit_expr_abs_needs_visible_add_parens(const expr_t *expr)
@@ -2806,7 +2806,7 @@ static bool emit_expr_abs_needs_visible_add_parens(const expr_t *expr)
     return constant && expr_is_const(constant) && mul_factor_needs_visible_parens(constant);
 }
 
-static bool emit_tex_expr_abs_needs_visible_add_parens(const expr_t *expr)
+static bool emit_TeX_expr_abs_needs_visible_add_parens(const expr_t *expr)
 {
     return emit_expr_abs_needs_visible_add_parens(expr);
 }
@@ -2845,7 +2845,7 @@ static void emit_func_abs(const expr_t *f, sbuf_t *b, int parent_prec)
     sbuf_free(&tmp);
 }
 
-void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec)
+void emit_TeX_expr(const expr_t *f, sbuf_t *b, int parent_prec)
 {
     if (!f) {
         sbuf_puts(b, "0");
@@ -2853,25 +2853,25 @@ void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec)
     }
 
     if (expr_is_formal_derivative(f)) {
-        emit_formal_derivative_tex(f, b);
+        emit_formal_derivative_TeX(f, b);
         return;
     }
     if (expr_is_arbitrary_function(f)) {
-        emit_arbitrary_function_tex(f, b);
+        emit_arbitrary_function_TeX(f, b);
         return;
     }
     if (expr_is_op(f, &ops_argument_list)) {
-        emit_argument_list_tex(f, b);
+        emit_argument_list_TeX(f, b);
         return;
     }
 
     if (expr_is_const(f) || expr_is_var(f)) {
-        emit_tex_atom(f, b);
+        emit_TeX_atom(f, b);
         return;
     }
 
     if (expr_is_op(f, &ops_integral)) {
-        emit_tex_integral(f, b, parent_prec);
+        emit_TeX_integral(f, b, parent_prec);
         return;
     }
 
@@ -2882,15 +2882,15 @@ void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec)
         if (need)
             sbuf_puts(b, "\\left(");
         if (expr_is_neg(a)) {
-            emit_tex_expr(a->a, b, 0);
+            emit_TeX_expr(a->a, b, 0);
         } else if (expr_is_negative(a)) {
-            emit_tex_expr_abs(a, b, 0);
+            emit_TeX_expr_abs(a, b, 0);
         } else {
             int child_needs_paren = expr_is_addsub(a);
             sbuf_putc(b, '-');
             if (child_needs_paren)
                 sbuf_puts(b, "\\left(");
-            emit_tex_expr(a, b, 0);
+            emit_TeX_expr(a, b, 0);
             if (child_needs_paren)
                 sbuf_puts(b, "\\right)");
         }
@@ -2901,41 +2901,41 @@ void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec)
 
     if (f->ops->arity == EXPR_OP_UNARY) {
         int need = PREC_UNARY < parent_prec;
-        const char *name = tex_unary_name(f);
+        const char *name = TeX_unary_name(f);
 
         if (need)
             sbuf_puts(b, "\\left(");
 
         if (expr_is_op(f, &ops_abs)) {
             sbuf_puts(b, "\\left|");
-            emit_tex_expr_abs(f->a, b, 0);
+            emit_TeX_expr_abs(f->a, b, 0);
             sbuf_puts(b, "\\right|");
         } else if (expr_is_op(f, &ops_floor)) {
             sbuf_puts(b, "\\left\\lfloor ");
-            emit_tex_expr(f->a, b, 0);
+            emit_TeX_expr(f->a, b, 0);
             sbuf_puts(b, " \\right\\rfloor");
         } else if (expr_is_op(f, &ops_ceil)) {
             sbuf_puts(b, "\\left\\lceil ");
-            emit_tex_expr(f->a, b, 0);
+            emit_TeX_expr(f->a, b, 0);
             sbuf_puts(b, " \\right\\rceil");
         } else if (expr_is_sqrt_expr(f)) {
             sbuf_puts(b, "\\sqrt{");
-            emit_tex_expr(f->a, b, 0);
+            emit_TeX_expr(f->a, b, 0);
             sbuf_putc(b, '}');
         } else if (expr_is_op(f, &ops_exp)) {
-            if (!emit_tex_exp_unit_fraction_root(f->a, b)) {
+            if (!emit_TeX_exp_unit_fraction_root(f->a, b)) {
                 sbuf_puts(b, "e^{");
-                emit_tex_expr(f->a, b, 0);
+                emit_TeX_expr(f->a, b, 0);
                 sbuf_putc(b, '}');
             }
         } else {
             sbuf_puts(b, name ? name : "\\operatorname{f}");
-            if (tex_unary_arg_is_greek_symbol(f->a)) {
+            if (TeX_unary_arg_is_greek_symbol(f->a)) {
                 sbuf_putc(b, ' ');
-                emit_tex_expr(f->a, b, PREC_UNARY);
+                emit_TeX_expr(f->a, b, PREC_UNARY);
             } else {
                 sbuf_putc(b, '(');
-                emit_tex_expr(f->a, b, 0);
+                emit_TeX_expr(f->a, b, 0);
                 sbuf_putc(b, ')');
             }
         }
@@ -2951,12 +2951,12 @@ void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec)
         int exponent_has_small_int = expr_try_get_small_integer_exponent(f->c, &ei);
 
         if (num_eq(f->c, NUM_HALF)) {
-            emit_tex_sqrt_power(f->a, b, parent_prec, false);
+            emit_TeX_sqrt_power(f->a, b, parent_prec, false);
             return;
         }
 
         if (number_is_neg_half_local(f->c)) {
-            emit_tex_sqrt_power(f->a, b, parent_prec, true);
+            emit_TeX_sqrt_power(f->a, b, parent_prec, true);
             return;
         }
 
@@ -2967,7 +2967,7 @@ void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec)
             if (recip_need)
                 sbuf_puts(b, "\\left(");
             sbuf_puts(b, "\\frac{1}{");
-            emit_tex_expr(f->a, b, positive_exponent == 1L ? PREC_LOWEST : PREC_POW);
+            emit_TeX_expr(f->a, b, positive_exponent == 1L ? PREC_LOWEST : PREC_POW);
             if (positive_exponent != 1L) {
                 char buf[64];
 
@@ -2985,7 +2985,7 @@ void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec)
         if (need)
             sbuf_puts(b, "\\left(");
 
-        const char *unary_name = f->a->ops->arity == EXPR_OP_UNARY ? tex_unary_name(f->a) : NULL;
+        const char *unary_name = f->a->ops->arity == EXPR_OP_UNARY ? TeX_unary_name(f->a) : NULL;
         if (f->a->ops->arity == EXPR_OP_UNARY && !expr_is_formal_derivative(f->a) && !expr_is_neg(f->a) &&
             !expr_is_sqrt_expr(f->a) && !expr_is_op(f->a, &ops_abs) && !strchr(unary_name ? unary_name : "", '^')) {
             const char *name = unary_name;
@@ -2996,14 +2996,14 @@ void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec)
                 snprintf(buf, sizeof(buf), "%ld", ei);
                 sbuf_puts(b, buf);
             } else {
-                emit_tex_const_value(b, f);
+                emit_TeX_const_value(b, f);
             }
-            if (tex_unary_arg_is_greek_symbol(f->a->a)) {
+            if (TeX_unary_arg_is_greek_symbol(f->a->a)) {
                 sbuf_puts(b, "} ");
-                emit_tex_expr(f->a->a, b, PREC_UNARY);
+                emit_TeX_expr(f->a->a, b, PREC_UNARY);
             } else {
                 sbuf_puts(b, "}(");
-                emit_tex_expr(f->a->a, b, 0);
+                emit_TeX_expr(f->a->a, b, 0);
                 sbuf_putc(b, ')');
             }
         } else {
@@ -3011,7 +3011,7 @@ void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec)
 
             if (base_needs_parens)
                 sbuf_puts(b, "\\left(");
-            emit_tex_expr(f->a, b, base_needs_parens ? PREC_LOWEST : PREC_POW);
+            emit_TeX_expr(f->a, b, base_needs_parens ? PREC_LOWEST : PREC_POW);
             if (base_needs_parens)
                 sbuf_puts(b, "\\right)");
             sbuf_puts(b, "^{");
@@ -3020,7 +3020,7 @@ void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec)
                 snprintf(buf, sizeof(buf), "%ld", ei);
                 sbuf_puts(b, buf);
             } else {
-                emit_tex_const_value(b, f);
+                emit_TeX_const_value(b, f);
             }
             sbuf_putc(b, '}');
         }
@@ -3082,7 +3082,7 @@ void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec)
             }
             if (n > 1 && mul_factor_needs_visible_parens(fac[i]))
                 sbuf_puts(b, "\\left(");
-            emit_tex_factor_abs(fac[i], b);
+            emit_TeX_factor_abs(fac[i], b);
             if (n > 1 && mul_factor_needs_visible_parens(fac[i]))
                 sbuf_puts(b, "\\right)");
         }
@@ -3104,9 +3104,9 @@ void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec)
         if (match_add_negative_complex_rhs(f, &negative_complex_base, &negative_complex_rhs)) {
             if (need)
                 sbuf_puts(b, "\\left(");
-            emit_tex_expr(negative_complex_base, b, PREC_ADD);
+            emit_TeX_expr(negative_complex_base, b, PREC_ADD);
             sbuf_puts(b, " - \\left(");
-            emit_tex_expr_abs(negative_complex_rhs, b, PREC_ADD);
+            emit_TeX_expr_abs(negative_complex_rhs, b, PREC_ADD);
             sbuf_puts(b, "\\right)");
             if (need)
                 sbuf_puts(b, "\\right)");
@@ -3118,26 +3118,26 @@ void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec)
 
             if (need)
                 sbuf_puts(b, "\\left(");
-            emit_tex_expr(complex_shift_base, b, PREC_ADD);
+            emit_TeX_expr(complex_shift_base, b, PREC_ADD);
             sbuf_puts(b, " - \\left(");
-            emit_tex_expr(complex_shift_real, b, PREC_ADD);
+            emit_TeX_expr(complex_shift_real, b, PREC_ADD);
             sbuf_puts(b, imag_neg ? " - " : " + ");
             if (imag_neg)
-                emit_tex_expr_abs(complex_shift_imag, b, PREC_ADD);
+                emit_TeX_expr_abs(complex_shift_imag, b, PREC_ADD);
             else
-                emit_tex_expr(complex_shift_imag, b, PREC_ADD);
+                emit_TeX_expr(complex_shift_imag, b, PREC_ADD);
             sbuf_puts(b, "\\right)");
             if (need)
                 sbuf_puts(b, "\\right)");
             return;
         }
 
-        if (emit_tex_display_polynomial_sum(f, b, parent_prec))
+        if (emit_TeX_display_polynomial_sum(f, b, parent_prec))
             return;
 
         if (need)
             sbuf_puts(b, "\\left(");
-        emit_tex_expr(f->a, b, PREC_ADD);
+        emit_TeX_expr(f->a, b, PREC_ADD);
 
         if (expr_is_op(f, &ops_add))
             sbuf_puts(b, neg ? " - " : " + ");
@@ -3146,13 +3146,13 @@ void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec)
 
         int rhs_parens = add_rhs_needs_visible_parens(f->b);
         if (neg && !rhs_parens)
-            rhs_parens = emit_tex_expr_abs_needs_visible_add_parens(f->b);
+            rhs_parens = emit_TeX_expr_abs_needs_visible_add_parens(f->b);
         if (rhs_parens)
             sbuf_puts(b, "\\left(");
         if (neg)
-            emit_tex_expr_abs(f->b, b, PREC_ADD);
+            emit_TeX_expr_abs(f->b, b, PREC_ADD);
         else
-            emit_tex_expr(f->b, b, PREC_ADD);
+            emit_TeX_expr(f->b, b, PREC_ADD);
         if (rhs_parens)
             sbuf_puts(b, "\\right)");
 
@@ -3172,9 +3172,9 @@ void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec)
             if (need)
                 sbuf_puts(b, "\\left(");
             sbuf_puts(b, "\\frac{1}{");
-            emit_tex_expr(denominator, b, PREC_LOWEST);
+            emit_TeX_expr(denominator, b, PREC_LOWEST);
             sbuf_puts(b, "} ");
-            emit_tex_expr(atan_expr, b, PREC_MUL);
+            emit_TeX_expr(atan_expr, b, PREC_MUL);
             if (need)
                 sbuf_puts(b, "\\right)");
             return;
@@ -3187,14 +3187,14 @@ void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec)
 
         sbuf_puts(b, "\\frac{");
         if (neg_num)
-            emit_tex_expr_abs(f->a, b, PREC_LOWEST);
+            emit_TeX_expr_abs(f->a, b, PREC_LOWEST);
         else
-            emit_tex_expr(f->a, b, PREC_LOWEST);
+            emit_TeX_expr(f->a, b, PREC_LOWEST);
         sbuf_puts(b, "}{");
         if (neg_den)
-            emit_tex_expr_abs(f->b, b, PREC_LOWEST);
+            emit_TeX_expr_abs(f->b, b, PREC_LOWEST);
         else
-            emit_tex_expr(f->b, b, PREC_LOWEST);
+            emit_TeX_expr(f->b, b, PREC_LOWEST);
         sbuf_putc(b, '}');
 
         if (need)
@@ -3207,12 +3207,12 @@ void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec)
         int base_needs_parens = pow_base_needs_visible_parens(f->a);
 
         if (expr_const_half_can_render_as_sqrt_local(f->b)) {
-            emit_tex_sqrt_power(f->a, b, parent_prec, false);
+            emit_TeX_sqrt_power(f->a, b, parent_prec, false);
             return;
         }
 
         if (expr_const_neg_half_can_render_as_sqrt_local(f->b)) {
-            emit_tex_sqrt_power(f->a, b, parent_prec, true);
+            emit_TeX_sqrt_power(f->a, b, parent_prec, true);
             return;
         }
 
@@ -3220,14 +3220,14 @@ void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec)
             sbuf_puts(b, "\\left(");
         if (base_needs_parens)
             sbuf_puts(b, "\\left(");
-        emit_tex_expr(f->a, b, base_needs_parens ? PREC_LOWEST : PREC_POW);
+        emit_TeX_expr(f->a, b, base_needs_parens ? PREC_LOWEST : PREC_POW);
         if (base_needs_parens)
             sbuf_puts(b, "\\right)");
         sbuf_puts(b, "^{");
-        if (tex_exp_needs_parens(f->b))
-            emit_tex_expr(f->b, b, 0);
+        if (TeX_exp_needs_parens(f->b))
+            emit_TeX_expr(f->b, b, 0);
         else
-            emit_tex_expr(f->b, b, 0);
+            emit_TeX_expr(f->b, b, 0);
         sbuf_putc(b, '}');
         if (need)
             sbuf_puts(b, "\\right)");
@@ -3236,9 +3236,9 @@ void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec)
 
     if (f->ops->arity == EXPR_OP_BINARY) {
         if (expr_is_op(f, &ops_indexed_symbol)) {
-            emit_tex_expr(f->a, b, 0);
+            emit_TeX_expr(f->a, b, 0);
             sbuf_puts(b, "_{");
-            emit_tex_expr(f->b, b, 0);
+            emit_TeX_expr(f->b, b, 0);
             sbuf_putc(b, '}');
             return;
         }
@@ -3251,68 +3251,68 @@ void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec)
                 upper = f->b->b;
             }
             sbuf_puts(b, "\\sum_{");
-            emit_tex_expr(index, b, 0);
+            emit_TeX_expr(index, b, 0);
             sbuf_puts(b, "=0}^{");
             if (upper)
-                emit_tex_expr(upper, b, 0);
+                emit_TeX_expr(upper, b, 0);
             else
                 sbuf_puts(b, "\\infty");
             sbuf_putc(b, '}');
-            emit_tex_expr(f->a, b, PREC_MUL);
+            emit_TeX_expr(f->a, b, PREC_MUL);
             return;
         }
         if (expr_has_polygamma_order(f)) {
-            emit_tex_polygamma(f, b);
+            emit_TeX_polygamma(f, b);
             return;
         }
         if (expr_has_polylog_order(f)) {
-            emit_tex_polylog(f, b);
+            emit_TeX_polylog(f, b);
             return;
         }
         if (expr_has_legendre_chi_order(f)) {
-            emit_tex_legendre_chi(f, b);
+            emit_TeX_legendre_chi(f, b);
             return;
         }
         if (expr_is_op(f, &ops_bessel_j) || expr_is_op(f, &ops_bessel_y)) {
-            sbuf_puts(b, f->ops->tex_name);
+            sbuf_puts(b, f->ops->TeX_name);
             sbuf_puts(b, "_{");
-            emit_tex_expr(f->a, b, PREC_LOWEST);
+            emit_TeX_expr(f->a, b, PREC_LOWEST);
             sbuf_puts(b, "}\\left(");
-            emit_tex_expr(f->b, b, PREC_LOWEST);
+            emit_TeX_expr(f->b, b, PREC_LOWEST);
             sbuf_puts(b, "\\right)");
             return;
         }
-        if (expr_is_op(f, &ops_lommel_s) || expr_is_op(f, &ops_lommel_s_derivative)) {
-            emit_tex_lommel_s(f, b);
+        if (expr_is_op(f, &ops_lommel_s)) {
+            emit_TeX_lommel_s(f, b);
             return;
         }
         if (expr_is_op(f, &ops_lambert_wn)) {
-            emit_tex_lambert_wn(f, b);
+            emit_TeX_lambert_wn(f, b);
             return;
         }
         if (expr_is_op(f, &ops_appell_f1)) {
-            emit_tex_appell_f1(f, b);
+            emit_TeX_appell_f1(f, b);
             return;
         }
         if (expr_is_op(f, &ops_lauricella_f)) {
-            emit_tex_lauricella_f(f, b);
+            emit_TeX_lauricella_f(f, b);
             return;
         }
         if (expr_is_op(f, &ops_hypergeometric_pFq)) {
-            emit_tex_hypergeometric_pFq(f, b);
+            emit_TeX_hypergeometric_pFq(f, b);
             return;
         }
         sbuf_puts(b, "\\operatorname{");
         sbuf_puts(b, f->ops->name);
         sbuf_puts(b, "}(");
-        emit_tex_expr(f->a, b, 0);
+        emit_TeX_expr(f->a, b, 0);
         sbuf_puts(b, ", ");
-        emit_tex_expr(f->b, b, 0);
+        emit_TeX_expr(f->b, b, 0);
         sbuf_putc(b, ')');
         return;
     }
 
-    emit_tex_atom(f, b);
+    emit_TeX_atom(f, b);
 }
 
 void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
@@ -3777,7 +3777,7 @@ void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
             emit_expr_lambert_wn(f, b);
             return;
         }
-        if (expr_is_op(f, &ops_lommel_s) || expr_is_op(f, &ops_lommel_s_derivative)) {
+        if (expr_is_op(f, &ops_lommel_s)) {
             emit_expr_lommel_s(f, b);
             return;
         }
@@ -4067,7 +4067,7 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
             emit_func_polygamma(f, b);
             return;
         }
-        if (expr_is_op(f, &ops_lommel_s) || expr_is_op(f, &ops_lommel_s_derivative)) {
+        if (expr_is_op(f, &ops_lommel_s)) {
             emit_func_lommel_s(f, b);
             return;
         }
@@ -4103,14 +4103,14 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
 /* Public entry points                                                       */
 /* ------------------------------------------------------------------------- */
 
-static string_t *expr_to_tex_text(const expr_t *dv)
+static string_t *expr_to_TeX_text(const expr_t *dv)
 {
     char *expr = NULL;
     char *bindings = NULL;
     sbuf_t b;
     string_t *out;
 
-    if (expr_to_tex_parts(dv, &expr, &bindings) != 0)
+    if (expr_to_TeX_parts(dv, &expr, &bindings) != 0)
         return expr_to_text_expr(dv);
 
     sbuf_init(&b);
@@ -4164,8 +4164,8 @@ string_t *expr_to_text(const expr_t *dv, style_t style)
     if (!dv)
         return string_new_with("NULL");
 
-    if (style == style_TEX) {
-        text = expr_to_tex_text(dv);
+    if (style == style_LATEX) {
+        text = expr_to_TeX_text(dv);
     } else if (style == style_FUNCTION) {
         text = expr_to_text_function(dv);
     } else if (style == style_UNBOUND) {

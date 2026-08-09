@@ -3,28 +3,28 @@
 typedef struct {
     char *label;
     char *tex;
-} tex_preview_entry_t;
+} TeX_preview_entry_t;
 
-static tex_preview_entry_t *g_tex_preview_entries = NULL;
-static size_t g_tex_preview_count = 0u;
-static size_t g_tex_preview_cap = 0u;
-static int g_tex_preview_cleanup_registered = 0;
+static TeX_preview_entry_t *g_TeX_preview_entries = NULL;
+static size_t g_TeX_preview_count = 0u;
+static size_t g_TeX_preview_cap = 0u;
+static int g_TeX_preview_cleanup_registered = 0;
 
-static void tex_preview_cleanup(void)
+static void TeX_preview_cleanup(void)
 {
     size_t i;
 
-    for (i = 0u; i < g_tex_preview_count; ++i) {
-        free(g_tex_preview_entries[i].label);
-        free(g_tex_preview_entries[i].tex);
+    for (i = 0u; i < g_TeX_preview_count; ++i) {
+        free(g_TeX_preview_entries[i].label);
+        free(g_TeX_preview_entries[i].tex);
     }
-    free(g_tex_preview_entries);
-    g_tex_preview_entries = NULL;
-    g_tex_preview_count = 0u;
-    g_tex_preview_cap = 0u;
+    free(g_TeX_preview_entries);
+    g_TeX_preview_entries = NULL;
+    g_TeX_preview_count = 0u;
+    g_TeX_preview_cap = 0u;
 }
 
-static char *tex_preview_strdup(const char *s)
+static char *TeX_preview_strdup(const char *s)
 {
     size_t n;
     char *copy;
@@ -40,7 +40,7 @@ static char *tex_preview_strdup(const char *s)
     return copy;
 }
 
-static char *tex_preview_path_from_source(const char *source_file)
+static char *TeX_preview_path_from_source(const char *source_file)
 {
     size_t len = strlen(source_file);
     char *path = malloc(len + 5u);
@@ -57,7 +57,7 @@ static char *tex_preview_path_from_source(const char *source_file)
     return path;
 }
 
-static void tex_preview_write_escaped(FILE *f, const char *s)
+static void TeX_preview_write_escaped(FILE *f, const char *s)
 {
     const char *p;
 
@@ -100,7 +100,7 @@ static void tex_preview_write_escaped(FILE *f, const char *s)
     }
 }
 
-static void tex_preview_emit_case(const char *source_file, const char *label, const char *tex)
+static void TeX_preview_emit_case(const char *source_file, const char *label, const char *tex)
 {
     char *path;
     FILE *f;
@@ -109,32 +109,32 @@ static void tex_preview_emit_case(const char *source_file, const char *label, co
     if (!label || !tex)
         return;
 
-    if (!g_tex_preview_cleanup_registered) {
-        atexit(tex_preview_cleanup);
-        g_tex_preview_cleanup_registered = 1;
+    if (!g_TeX_preview_cleanup_registered) {
+        atexit(TeX_preview_cleanup);
+        g_TeX_preview_cleanup_registered = 1;
     }
 
-    if (g_tex_preview_count == g_tex_preview_cap) {
-        size_t new_cap = g_tex_preview_cap == 0u ? 8u : g_tex_preview_cap * 2u;
-        tex_preview_entry_t *new_entries = realloc(g_tex_preview_entries, new_cap * sizeof(*new_entries));
+    if (g_TeX_preview_count == g_TeX_preview_cap) {
+        size_t new_cap = g_TeX_preview_cap == 0u ? 8u : g_TeX_preview_cap * 2u;
+        TeX_preview_entry_t *new_entries = realloc(g_TeX_preview_entries, new_cap * sizeof(*new_entries));
         if (!new_entries)
             return;
-        g_tex_preview_entries = new_entries;
-        g_tex_preview_cap = new_cap;
+        g_TeX_preview_entries = new_entries;
+        g_TeX_preview_cap = new_cap;
     }
 
-    g_tex_preview_entries[g_tex_preview_count].label = tex_preview_strdup(label);
-    g_tex_preview_entries[g_tex_preview_count].tex = tex_preview_strdup(tex);
-    if (!g_tex_preview_entries[g_tex_preview_count].label || !g_tex_preview_entries[g_tex_preview_count].tex) {
-        free(g_tex_preview_entries[g_tex_preview_count].label);
-        free(g_tex_preview_entries[g_tex_preview_count].tex);
-        g_tex_preview_entries[g_tex_preview_count].label = NULL;
-        g_tex_preview_entries[g_tex_preview_count].tex = NULL;
+    g_TeX_preview_entries[g_TeX_preview_count].label = TeX_preview_strdup(label);
+    g_TeX_preview_entries[g_TeX_preview_count].tex = TeX_preview_strdup(tex);
+    if (!g_TeX_preview_entries[g_TeX_preview_count].label || !g_TeX_preview_entries[g_TeX_preview_count].tex) {
+        free(g_TeX_preview_entries[g_TeX_preview_count].label);
+        free(g_TeX_preview_entries[g_TeX_preview_count].tex);
+        g_TeX_preview_entries[g_TeX_preview_count].label = NULL;
+        g_TeX_preview_entries[g_TeX_preview_count].tex = NULL;
         return;
     }
-    ++g_tex_preview_count;
+    ++g_TeX_preview_count;
 
-    path = tex_preview_path_from_source(source_file);
+    path = TeX_preview_path_from_source(source_file);
     if (!path)
         return;
 
@@ -150,19 +150,19 @@ static void tex_preview_emit_case(const char *source_file, const char *label, co
     fprintf(f, "\\begin{document}\n");
     fprintf(f, "\\section*{Generated TeX Samples}\n");
     fprintf(f, "\\noindent Source: \\texttt{");
-    tex_preview_write_escaped(f, source_file);
+    TeX_preview_write_escaped(f, source_file);
     fprintf(f, "}\n\n");
 
-    for (i = 0u; i < g_tex_preview_count; ++i) {
+    for (i = 0u; i < g_TeX_preview_count; ++i) {
         fprintf(f, "\\subsection*{Sample %zu}\n", i + 1u);
         fprintf(f, "\\noindent\\texttt{");
-        tex_preview_write_escaped(f, g_tex_preview_entries[i].label);
+        TeX_preview_write_escaped(f, g_TeX_preview_entries[i].label);
         fprintf(f,
                 "}\n"
                 "\\begin{flushleft}\n"
                 "$\\displaystyle %s$\n"
                 "\\end{flushleft}\n\n",
-                g_tex_preview_entries[i].tex);
+                g_TeX_preview_entries[i].tex);
     }
 
     fprintf(f, "\\end{document}\n");
@@ -692,14 +692,14 @@ void test_to_string_basic_var(void)
     TEST_RUN_SUBTEST(test_to_string_basic_var_func, NULL);
 }
 
-static void test_to_string_basic_var_tex(void)
+static void test_to_string_basic_var_TeX(void)
 {
     expr_t *x = test_expr_new_named_var_d(42.0, "x0");
-    char *got = expr_to_string(x, style_TEX);
+    char *got = expr_to_string(x, style_LATEX);
 
     const char *expect = "\\left\\{ x_{0} \\;\\middle|\\; x_{0} = 42 \\right\\}";
 
-    tex_preview_emit_case(__FILE__, "basic var (TEX)", got);
+    TeX_preview_emit_case(__FILE__, "basic var (TEX)", got);
 
     if (str_eq(got, expect))
         to_string_pass("basic var (TEX)", got, expect);
@@ -710,7 +710,7 @@ static void test_to_string_basic_var_tex(void)
     expr_free(x);
 }
 
-static void test_to_string_nested_transcendental_tex(void)
+static void test_to_string_nested_transcendental_TeX(void)
 {
     expr_t *x = test_expr_new_named_var_d(1.0, "x0");
     expr_t *y = test_expr_new_named_var_d(2.0, "y1");
@@ -720,12 +720,12 @@ static void test_to_string_nested_transcendental_tex(void)
     expr_t *log_y = expr_log(y);
     expr_t *x_log_y = expr_mul(x, log_y);
     expr_t *f = expr_add(exp_term, x_log_y);
-    char *got = expr_to_string(f, style_TEX);
+    char *got = expr_to_string(f, style_LATEX);
 
     const char *expect = "\\left\\{ e^{\\sin(x_{0} y_{1})} + x_{0} \\cdot \\ln(y_{1}) "
                          "\\;\\middle|\\; x_{0} = 1, y_{1} = 2 \\right\\}";
 
-    tex_preview_emit_case(__FILE__, "nested transcendental (TEX)", got);
+    TeX_preview_emit_case(__FILE__, "nested transcendental (TEX)", got);
 
     if (str_eq(got, expect))
         to_string_pass("nested transcendental (TEX)", got, expect);
@@ -743,11 +743,11 @@ static void test_to_string_nested_transcendental_tex(void)
     expr_free(y);
 }
 
-static void test_to_string_atan_tex(void)
+static void test_to_string_atan_TeX(void)
 {
     expr_t *x = test_expr_new_named_var_d(1.0, "x");
     expr_t *f = expr_atan(x);
-    char *got = expr_to_tex_body(f);
+    char *got = expr_to_TeX_body(f);
     const char *expect = "\\arctan(x)";
 
     if (str_eq(got, expect))
@@ -760,7 +760,7 @@ static void test_to_string_atan_tex(void)
     expr_free(x);
 }
 
-static void test_to_string_nested_quotient_pow_tex(void)
+static void test_to_string_nested_quotient_pow_TeX(void)
 {
     expr_t *x = test_expr_new_named_var_d(2.0, "x0");
     expr_t *y = test_expr_new_named_var_d(3.0, "y1");
@@ -770,12 +770,12 @@ static void test_to_string_nested_quotient_pow_tex(void)
     expr_t *den = expr_add_d(y, 1.0);
     expr_t *frac = expr_div(sum, den);
     expr_t *f = expr_log(frac);
-    char *got = expr_to_string(f, style_TEX);
+    char *got = expr_to_string(f, style_LATEX);
 
     const char *expect = "\\left\\{ \\ln(\\frac{x_{0}^{2} + y_{1}^{2}}{y_{1} + 1}) "
                          "\\;\\middle|\\; x_{0} = 2, y_{1} = 3 \\right\\}";
 
-    tex_preview_emit_case(__FILE__, "nested quotient pow (TEX)", got);
+    TeX_preview_emit_case(__FILE__, "nested quotient pow (TEX)", got);
 
     if (str_eq(got, expect))
         to_string_pass("nested quotient pow (TEX)", got, expect);
@@ -793,15 +793,15 @@ static void test_to_string_nested_quotient_pow_tex(void)
     expr_free(y);
 }
 
-static void test_to_string_log10_tex(void)
+static void test_to_string_log10_TeX(void)
 {
     expr_t *x = test_expr_new_named_var_d(100.0, "x0");
     expr_t *f = expr_log10(x);
-    char *got = expr_to_string(f, style_TEX);
+    char *got = expr_to_string(f, style_LATEX);
 
     const char *expect = "\\left\\{ \\log(x_{0}) \\;\\middle|\\; x_{0} = 100 \\right\\}";
 
-    tex_preview_emit_case(__FILE__, "log10 (TEX)", got);
+    TeX_preview_emit_case(__FILE__, "log10 (TEX)", got);
 
     if (str_eq(got, expect))
         to_string_pass("log10 (TEX)", got, expect);
@@ -813,11 +813,11 @@ static void test_to_string_log10_tex(void)
     expr_free(x);
 }
 
-static void test_to_string_exp_unit_fraction_root_tex(void)
+static void test_to_string_exp_unit_fraction_root_TeX(void)
 {
     expr_t *eighth = expr_new_const(NUM_ONE_EIGHTH);
     expr_t *f = expr_exp(eighth);
-    char *got = f ? expr_to_string(f, style_TEX) : NULL;
+    char *got = f ? expr_to_string(f, style_LATEX) : NULL;
     const char *expect = "\\sqrt[8]{e}";
 
     if (str_eq(got, expect))
@@ -830,10 +830,10 @@ static void test_to_string_exp_unit_fraction_root_tex(void)
     expr_free(eighth);
 }
 
-static void test_to_string_parsed_exp_unit_fraction_root_tex(void)
+static void test_to_string_parsed_exp_unit_fraction_root_TeX(void)
 {
     expr_t *f = expr_from_string("{ exp(1/8) }", NULL);
-    char *got = f ? expr_to_string(f, style_TEX) : NULL;
+    char *got = f ? expr_to_string(f, style_LATEX) : NULL;
     const char *expect = "\\sqrt[8]{e}";
 
     if (str_eq(got, expect))
@@ -846,14 +846,14 @@ static void test_to_string_parsed_exp_unit_fraction_root_tex(void)
     expr_free(f);
 }
 
-static void test_to_string_symbolic_constants_tex(void)
+static void test_to_string_symbolic_constants_TeX(void)
 {
     expr_t *f = expr_from_string("{ exp(@pi*i*3/2*x) }", NULL);
-    char *got = f ? expr_to_string(f, style_TEX) : NULL;
+    char *got = f ? expr_to_string(f, style_LATEX) : NULL;
 
     const char *expect = "\\left\\{ e^{\\pi i \\cdot \\frac{3}{2} x} \\;\\middle|\\; x = NAN \\right\\}";
 
-    tex_preview_emit_case(__FILE__, "symbolic constants (TEX)", got);
+    TeX_preview_emit_case(__FILE__, "symbolic constants (TEX)", got);
 
     if (str_eq(got, expect))
         to_string_pass("symbolic constants (TEX)", got, expect);
@@ -864,14 +864,14 @@ static void test_to_string_symbolic_constants_tex(void)
     expr_free(f);
 }
 
-static void test_to_string_symbolic_constant_quotient_tex(void)
+static void test_to_string_symbolic_constant_quotient_TeX(void)
 {
     expr_t *f = expr_from_string("{ 1/pi }", NULL);
-    char *got = f ? expr_to_string(f, style_TEX) : NULL;
+    char *got = f ? expr_to_string(f, style_LATEX) : NULL;
 
     const char *expect = "\\frac{1}{\\pi}";
 
-    tex_preview_emit_case(__FILE__, "symbolic constant quotient (TEX)", got);
+    TeX_preview_emit_case(__FILE__, "symbolic constant quotient (TEX)", got);
 
     if (str_eq(got, expect))
         to_string_pass("symbolic constant quotient (TEX)", got, expect);
@@ -882,20 +882,20 @@ static void test_to_string_symbolic_constant_quotient_tex(void)
     expr_free(f);
 }
 
-static void test_to_string_lambert_w_tex(void)
+static void test_to_string_lambert_w_TeX(void)
 {
     expr_t *x0 = test_expr_new_named_var_d(1.0, "x0");
     expr_t *x1 = test_expr_new_named_var_s("-0.2", "x1");
     expr_t *w0 = expr_lambert_w0(x0);
     expr_t *wm1 = expr_lambert_wm1(x1);
-    char *got_w0 = expr_to_string(w0, style_TEX);
-    char *got_wm1 = expr_to_string(wm1, style_TEX);
+    char *got_w0 = expr_to_string(w0, style_LATEX);
+    char *got_wm1 = expr_to_string(wm1, style_LATEX);
 
     const char *expect_w0 = "\\left\\{ W_{0}(x_{0}) \\;\\middle|\\; x_{0} = 1 \\right\\}";
     const char *expect_wm1 = "\\left\\{ W_{-1}(x_{1}) \\;\\middle|\\; x_{1} = -0.2 \\right\\}";
 
-    tex_preview_emit_case(__FILE__, "lambert W0 (TEX)", got_w0);
-    tex_preview_emit_case(__FILE__, "lambert W-1 (TEX)", got_wm1);
+    TeX_preview_emit_case(__FILE__, "lambert W0 (TEX)", got_w0);
+    TeX_preview_emit_case(__FILE__, "lambert W-1 (TEX)", got_wm1);
 
     if (str_eq(got_w0, expect_w0))
         to_string_pass("lambert W0 (TEX)", got_w0, expect_w0);
@@ -915,15 +915,15 @@ static void test_to_string_lambert_w_tex(void)
     expr_free(x1);
 }
 
-static void test_to_string_gammainv_tex(void)
+static void test_to_string_gammainv_TeX(void)
 {
     expr_t *f = expr_from_string("{ lgamma(x) - ln(5) | x = gammainv(5) }", NULL);
-    char *got = f ? expr_to_string(f, style_TEX) : NULL;
+    char *got = f ? expr_to_string(f, style_LATEX) : NULL;
 
     const char *expect = "\\left\\{ \\log\\Gamma(x) - \\ln(5) \\;\\middle|\\; "
                          "x = \\Gamma^{-1}(5) \\right\\}";
 
-    tex_preview_emit_case(__FILE__, "gammainv inverse gamma (TEX)", got);
+    TeX_preview_emit_case(__FILE__, "gammainv inverse gamma (TEX)", got);
 
     if (str_eq(got, expect))
         to_string_pass("gammainv inverse gamma (TEX)", got, expect);
@@ -939,12 +939,12 @@ static void test_to_string_gamma_polygamma_standard_names(void)
     expr_t *f = expr_from_string("{ gamma(x) + digamma(x) + trigamma(x) + polygamma(2, x) | x = 3 }", NULL);
     expr_t *second = expr_from_string("{ gamma(x)*(trigamma(x)+digamma(x)^2) | x = 2 }", NULL);
     char *got_expr = f ? expr_to_string(f, style_EXPRESSION) : NULL;
-    char *got_tex = f ? expr_to_string(f, style_TEX) : NULL;
+    char *got_TeX = f ? expr_to_string(f, style_LATEX) : NULL;
     char *got_func = f ? expr_to_string(f, style_FUNCTION) : NULL;
-    char *got_second_tex = second ? expr_to_string(second, style_TEX) : NULL;
+    char *got_second_TeX = second ? expr_to_string(second, style_LATEX) : NULL;
 
     const char *expect_expr = "{ Γ(x) + ψ⁽⁰⁾(x) + ψ⁽¹⁾(x) + ψ⁽²⁾(x) | x = 3 }";
-    const char *expect_tex = "\\left\\{ \\Gamma(x) + \\psi^{(0)}(x) + \\psi^{(1)}(x) + \\psi^{(2)}(x) "
+    const char *expect_TeX = "\\left\\{ \\Gamma(x) + \\psi^{(0)}(x) + \\psi^{(1)}(x) + \\psi^{(2)}(x) "
                              "\\;\\middle|\\; x = 3 \\right\\}";
     const char *expect_func = "expression expr(x) {\n"
                               "    return gamma(x) + digamma(x) + trigamma(x) + polygamma(2, x);\n"
@@ -952,7 +952,7 @@ static void test_to_string_gamma_polygamma_standard_names(void)
                               "\n"
                               "x = 3\n"
                               "output(expr(x));";
-    const char *expect_second_tex = "\\left\\{ \\Gamma(x) \\cdot \\left(\\psi^{(1)}(x) + "
+    const char *expect_second_TeX = "\\left\\{ \\Gamma(x) \\cdot \\left(\\psi^{(1)}(x) + "
                                     "\\psi^{(0)}(x)^{2}\\right) \\;\\middle|\\; x = 2 \\right\\}";
 
     if (str_eq(got_expr, expect_expr))
@@ -960,26 +960,26 @@ static void test_to_string_gamma_polygamma_standard_names(void)
     else
         to_string_fail(__FILE__, __LINE__, 1, "gamma/polygamma standard names (EXPR)", got_expr, expect_expr);
 
-    if (str_eq(got_tex, expect_tex))
-        to_string_pass("gamma/polygamma standard names (TEX)", got_tex, expect_tex);
+    if (str_eq(got_TeX, expect_TeX))
+        to_string_pass("gamma/polygamma standard names (TEX)", got_TeX, expect_TeX);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "gamma/polygamma standard names (TEX)", got_tex, expect_tex);
+        to_string_fail(__FILE__, __LINE__, 1, "gamma/polygamma standard names (TEX)", got_TeX, expect_TeX);
 
     if (str_eq(got_func, expect_func))
         to_string_pass("gamma/polygamma standard names (FUNCTION)", got_func, expect_func);
     else
         to_string_fail(__FILE__, __LINE__, 1, "gamma/polygamma standard names (FUNCTION)", got_func, expect_func);
 
-    if (str_eq(got_second_tex, expect_second_tex))
-        to_string_pass("gamma second derivative polygamma power (TEX)", got_second_tex, expect_second_tex);
+    if (str_eq(got_second_TeX, expect_second_TeX))
+        to_string_pass("gamma second derivative polygamma power (TEX)", got_second_TeX, expect_second_TeX);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "gamma second derivative polygamma power (TEX)", got_second_tex,
-                       expect_second_tex);
+        to_string_fail(__FILE__, __LINE__, 1, "gamma second derivative polygamma power (TEX)", got_second_TeX,
+                       expect_second_TeX);
 
     free(got_expr);
-    free(got_tex);
+    free(got_TeX);
     free(got_func);
-    free(got_second_tex);
+    free(got_second_TeX);
     expr_free(f);
     expr_free(second);
 }
@@ -1083,7 +1083,7 @@ void test_to_string_addition(void)
     TEST_RUN_SUBTEST(test_to_string_addition_func, NULL);
 }
 
-static void test_to_string_wrapped_tex_aligned_subtraction(void)
+static void test_to_string_wrapped_TeX_aligned_subtraction(void)
 {
     expr_t *x = test_expr_new_named_var_d(1, "x");
     expr_t *y = test_expr_new_named_var_d(2, "y");
@@ -1091,7 +1091,7 @@ static void test_to_string_wrapped_tex_aligned_subtraction(void)
     expr_t *neg_y = expr_neg(y);
     expr_t *x_minus_y = expr_add(x, neg_y);
     expr_t *f = expr_add(x_minus_y, z);
-    char *got = expr_to_tex_body_wrapped(f, 1u);
+    char *got = expr_to_TeX_body_wrapped(f, 1u);
     const char *expect = "aligned wrapped TeX with subtraction, not + -";
 
     if (got && strstr(got, "\\begin{aligned}[t]") && strstr(got, "\\\\") && strstr(got, "{} - y") &&
@@ -1109,7 +1109,7 @@ static void test_to_string_wrapped_tex_aligned_subtraction(void)
     expr_free(z);
 }
 
-static void test_to_string_wrapped_tex_distributes_scale(void)
+static void test_to_string_wrapped_TeX_distributes_scale(void)
 {
     expr_t *x = test_expr_new_named_var_d(1, "x");
     expr_t *y = test_expr_new_named_var_d(2, "y");
@@ -1119,7 +1119,7 @@ static void test_to_string_wrapped_tex_distributes_scale(void)
     expr_t *x_minus_y = expr_add(x, neg_y);
     expr_t *sum = expr_add(x_minus_y, z);
     expr_t *f = expr_mul(k, sum);
-    char *got = expr_to_tex_body_wrapped(f, 1u);
+    char *got = expr_to_TeX_body_wrapped(f, 1u);
     const char *expect = "scaled wrapped TeX distributes factor without tall delimiters";
 
     if (got && strstr(got, "\\begin{aligned}[t]") && strstr(got, "k\\cdot x") && strstr(got, "{} - k\\cdot y") &&
@@ -1467,13 +1467,13 @@ static void test_to_string_complex_const_pow_func(void)
     num_destroy(&n);
 }
 
-static void test_to_string_complex_const_pow_tex(void)
+static void test_to_string_complex_const_pow_TeX(void)
 {
     number_t n = num_create_from_string("1 + 2i");
     expr_t *base = expr_new_const(n);
     expr_t *pow = expr_pow_d(base, 6.0);
     expr_t *f = expr_add_d(pow, 1.0);
-    char *got = expr_to_string(f, style_TEX);
+    char *got = expr_to_string(f, style_LATEX);
     const char *expect = "\\left(1 + 2i\\right)^{6} + 1";
 
     if (str_eq(got, expect))
@@ -1488,10 +1488,10 @@ static void test_to_string_complex_const_pow_tex(void)
     num_destroy(&n);
 }
 
-static void test_to_string_parsed_complex_const_pow_tex(void)
+static void test_to_string_parsed_complex_const_pow_TeX(void)
 {
     expr_t *f = expr_from_string("{ (1 + 2i)^6 + 1 }", NULL);
-    char *got = f ? expr_to_string(f, style_TEX) : NULL;
+    char *got = f ? expr_to_string(f, style_LATEX) : NULL;
     const char *expect = "\\left(1 + 2i\\right)^{6} + 1";
 
     if (str_eq(got, expect))
@@ -1518,14 +1518,14 @@ static void test_to_string_parsed_complex_const_pow_expr(void)
     expr_free(f);
 }
 
-static void test_to_string_power_base_is_grouped_tex(void)
+static void test_to_string_power_base_is_grouped_TeX(void)
 {
     expr_t *a = test_expr_new_named_var_d(2, "a");
     expr_t *x = test_expr_new_named_var_d(3, "x");
     expr_t *neg_x = expr_neg(x);
     expr_t *inner = expr_pow_xp(a, neg_x);
     expr_t *f = expr_pow(inner, &NUM_TWO);
-    char *got = expr_to_string(f, style_TEX);
+    char *got = expr_to_string(f, style_LATEX);
     const char *expect = "\\left\\{ \\left(a^{-x}\\right)^{2} \\;\\middle|\\; "
                          "a = 2, x = 3 \\right\\}";
 
@@ -1559,10 +1559,10 @@ static void test_to_string_power_of_power_simplifies_expr(void)
     expr_free(f);
 }
 
-static void test_to_string_powered_exponent_tex(void)
+static void test_to_string_powered_exponent_TeX(void)
 {
     expr_t *f = expr_from_string("{ a^(x^2) | x = NAN; a = NAN }", NULL);
-    char *got = f ? expr_to_string(f, style_TEX) : NULL;
+    char *got = f ? expr_to_string(f, style_LATEX) : NULL;
     const char *expect = "\\left\\{ a^{x^{2}} \\;\\middle|\\; "
                          "x = NAN; a = NAN \\right\\}";
 
@@ -1581,12 +1581,12 @@ void test_to_string_pow_superscript(void)
     TEST_RUN_SUBTEST(test_to_string_pow_superscript_func, NULL);
     TEST_RUN_SUBTEST(test_to_string_complex_const_pow_expr, NULL);
     TEST_RUN_SUBTEST(test_to_string_complex_const_pow_func, NULL);
-    TEST_RUN_SUBTEST(test_to_string_complex_const_pow_tex, NULL);
-    TEST_RUN_SUBTEST(test_to_string_parsed_complex_const_pow_tex, NULL);
+    TEST_RUN_SUBTEST(test_to_string_complex_const_pow_TeX, NULL);
+    TEST_RUN_SUBTEST(test_to_string_parsed_complex_const_pow_TeX, NULL);
     TEST_RUN_SUBTEST(test_to_string_parsed_complex_const_pow_expr, NULL);
-    TEST_RUN_SUBTEST(test_to_string_power_base_is_grouped_tex, NULL);
+    TEST_RUN_SUBTEST(test_to_string_power_base_is_grouped_TeX, NULL);
     TEST_RUN_SUBTEST(test_to_string_power_of_power_simplifies_expr, NULL);
-    TEST_RUN_SUBTEST(test_to_string_powered_exponent_tex, NULL);
+    TEST_RUN_SUBTEST(test_to_string_powered_exponent_TeX, NULL);
 }
 
 /* ============================================================
@@ -2061,13 +2061,13 @@ static void test_to_string_appell_f1(void)
                                          "{ F_1(1, 1, 1, 2, x, y) }", "{ F₁(1, 1, 1, 2, x, y) }", NULL};
     const char *expect_expr = "F₁(1; 1, 1; 2; x, y)";
     const char *expect_func = "appell_f1(1, 1, 1, 2, x, y)";
-    const char *expect_tex = "F_{1}\\left(1; 1, 1; 2; x, y\\right)";
+    const char *expect_TeX = "F_{1}\\left(1; 1, 1; 2; x, y\\right)";
 
     for (size_t i = 0u; inputs[i]; ++i) {
         expr_t *f = expr_from_string(inputs[i], NULL);
         char *got_expr = f ? expr_to_string(f, style_EXPRESSION) : NULL;
         char *got_func = f ? expr_to_string(f, style_FUNCTION) : NULL;
-        char *got_tex = f ? expr_to_string(f, style_TEX) : NULL;
+        char *got_TeX = f ? expr_to_string(f, style_LATEX) : NULL;
 
         ASSERT_NOT_NULL(f);
         if (got_expr)
@@ -2078,12 +2078,12 @@ static void test_to_string_appell_f1(void)
             to_string_pass("appell_f1 alias (FUNCTION)", got_func, expect_func);
         else
             to_string_fail(__FILE__, __LINE__, 1, "appell_f1 alias (FUNCTION)", "(null)", expect_func);
-        if (got_tex)
-            to_string_pass("appell_f1 alias (TEX)", got_tex, expect_tex);
+        if (got_TeX)
+            to_string_pass("appell_f1 alias (TEX)", got_TeX, expect_TeX);
         else
-            to_string_fail(__FILE__, __LINE__, 1, "appell_f1 alias (TEX)", "(null)", expect_tex);
+            to_string_fail(__FILE__, __LINE__, 1, "appell_f1 alias (TEX)", "(null)", expect_TeX);
 
-        free(got_tex);
+        free(got_TeX);
         free(got_func);
         free(got_expr);
         expr_free(f);
@@ -2098,22 +2098,22 @@ void test_to_string_all(void)
 {
     TEST_RUN_SUBTEST(test_to_string_basic_const, NULL);
     TEST_RUN_SUBTEST(test_to_string_basic_var, NULL);
-    TEST_RUN_SUBTEST(test_to_string_basic_var_tex, NULL);
-    TEST_RUN_SUBTEST(test_to_string_nested_transcendental_tex, NULL);
-    TEST_RUN_SUBTEST(test_to_string_atan_tex, NULL);
-    TEST_RUN_SUBTEST(test_to_string_nested_quotient_pow_tex, NULL);
-    TEST_RUN_SUBTEST(test_to_string_log10_tex, NULL);
-    TEST_RUN_SUBTEST(test_to_string_exp_unit_fraction_root_tex, NULL);
-    TEST_RUN_SUBTEST(test_to_string_parsed_exp_unit_fraction_root_tex, NULL);
-    TEST_RUN_SUBTEST(test_to_string_symbolic_constants_tex, NULL);
-    TEST_RUN_SUBTEST(test_to_string_symbolic_constant_quotient_tex, NULL);
-    TEST_RUN_SUBTEST(test_to_string_lambert_w_tex, NULL);
-    TEST_RUN_SUBTEST(test_to_string_gammainv_tex, NULL);
+    TEST_RUN_SUBTEST(test_to_string_basic_var_TeX, NULL);
+    TEST_RUN_SUBTEST(test_to_string_nested_transcendental_TeX, NULL);
+    TEST_RUN_SUBTEST(test_to_string_atan_TeX, NULL);
+    TEST_RUN_SUBTEST(test_to_string_nested_quotient_pow_TeX, NULL);
+    TEST_RUN_SUBTEST(test_to_string_log10_TeX, NULL);
+    TEST_RUN_SUBTEST(test_to_string_exp_unit_fraction_root_TeX, NULL);
+    TEST_RUN_SUBTEST(test_to_string_parsed_exp_unit_fraction_root_TeX, NULL);
+    TEST_RUN_SUBTEST(test_to_string_symbolic_constants_TeX, NULL);
+    TEST_RUN_SUBTEST(test_to_string_symbolic_constant_quotient_TeX, NULL);
+    TEST_RUN_SUBTEST(test_to_string_lambert_w_TeX, NULL);
+    TEST_RUN_SUBTEST(test_to_string_gammainv_TeX, NULL);
     TEST_RUN_SUBTEST(test_to_string_gamma_polygamma_standard_names, NULL);
     TEST_RUN_SUBTEST(test_to_string_non_simple_var_bracketed, NULL);
     TEST_RUN_SUBTEST(test_to_string_addition, NULL);
-    TEST_RUN_SUBTEST(test_to_string_wrapped_tex_aligned_subtraction, NULL);
-    TEST_RUN_SUBTEST(test_to_string_wrapped_tex_distributes_scale, NULL);
+    TEST_RUN_SUBTEST(test_to_string_wrapped_TeX_aligned_subtraction, NULL);
+    TEST_RUN_SUBTEST(test_to_string_wrapped_TeX_distributes_scale, NULL);
     TEST_RUN_SUBTEST(test_to_string_negative_rhs_expr, NULL);
     TEST_RUN_SUBTEST(test_to_string_double_negative_expr, NULL);
     TEST_RUN_SUBTEST(test_to_string_nested_negative_rhs_expr, NULL);

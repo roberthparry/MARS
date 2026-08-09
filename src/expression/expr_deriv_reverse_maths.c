@@ -720,39 +720,6 @@ void expr_reverse_lommel_s(const expr_t *dv, const number_t *out_bar, number_t *
     expr_reverse_binary(NUM_NAN, num_mul(*out_bar, factor), a_bar, b_bar);
 }
 
-void expr_reverse_lommel_s_derivative(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
-{
-    const expr_t *mu = NULL;
-    const expr_t *nu = NULL;
-    const expr_t *argument_expr = NULL;
-    number_t mu_value;
-    number_t nu_value;
-    number_t argument;
-    number_t forcing;
-    number_t prime;
-    number_t original;
-    number_t nu_squared;
-    number_t argument_squared;
-    number_t coefficient;
-    number_t second_derivative;
-
-    if (!expr_lommel_s_unpack(dv, &mu, &nu, &argument_expr)) {
-        expr_reverse_binary(NUM_NAN, NUM_NAN, a_bar, b_bar);
-        return;
-    }
-    mu_value = expr_eval_num_internal(mu);
-    nu_value = expr_eval_num_internal(nu);
-    argument = expr_eval_num_internal(argument_expr);
-    forcing = num_pow(argument, num_sub(mu_value, NUM_ONE));
-    prime = num_lommel_s_derivative_internal(mu_value, nu_value, argument);
-    original = num_lommel_s(mu_value, nu_value, argument);
-    nu_squared = num_sqr(nu_value);
-    argument_squared = num_sqr(argument);
-    coefficient = num_sub(NUM_ONE, num_div(nu_squared, argument_squared));
-    second_derivative = num_sub(num_sub(forcing, num_div(prime, argument)), num_mul(coefficient, original));
-    expr_reverse_binary(NUM_NAN, num_mul(*out_bar, second_derivative), a_bar, b_bar);
-}
-
 void expr_reverse_hypergeometric_pFq(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
     const expr_t **upper = NULL;

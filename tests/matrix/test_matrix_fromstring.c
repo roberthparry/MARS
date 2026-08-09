@@ -512,6 +512,8 @@ static void test_mat_symbolic_derivative_helpers_by_name(void)
     mat_bindings_t *bindings = NULL;
     matrix_t *A = mat_from_string_expr("([radius], x*y; y, c1)", &bindings);
     matrix_t *Dr = NULL;
+    matrix_t *Ix = NULL;
+    matrix_t *DIx = NULL;
     expr_t *dtr = NULL;
     expr_t *ddet = NULL;
     expr_t *dv = NULL;
@@ -523,10 +525,14 @@ static void test_mat_symbolic_derivative_helpers_by_name(void)
     check_bool("mat symbolic helpers set c₁", test_mat_bindings_set_d(bindings, "c₁", 7.0) == 0);
 
     Dr = mat_deriv_by_name(A, bindings, "[radius]");
+    Ix = mat_integrate_by_name(A, bindings, "x");
+    DIx = mat_deriv_by_name(Ix, bindings, "x");
     dtr = mat_deriv_trace_by_name(A, bindings, "[radius]");
     ddet = mat_deriv_det_by_name(A, bindings, "[radius]");
 
     check_bool("mat_deriv_by_name([radius]) not NULL", Dr != NULL);
+    check_bool("mat_integrate_by_name(x) not NULL", Ix != NULL);
+    check_bool("mat_deriv_by_name(mat_integrate_by_name(A,x),x) not NULL", DIx != NULL);
     check_bool("mat_deriv_trace_by_name([radius]) not NULL", dtr != NULL);
     check_bool("mat_deriv_det_by_name([radius]) not NULL", ddet != NULL);
     check_bool("mat_deriv_by_name missing symbol returns NULL", mat_deriv_by_name(A, bindings, "missing") == NULL);
@@ -542,6 +548,17 @@ static void test_mat_symbolic_derivative_helpers_by_name(void)
         check_matrix_fromstring_expr_double("mat_deriv_by_name [1,1] = 0", dv, 0.0, 1e-18);
     }
 
+    if (DIx) {
+        mat_get(DIx, 0, 0, &dv);
+        check_matrix_fromstring_expr_double("matrix integral derivative [0,0] = [radius]", dv, 5.0, 1e-18);
+        mat_get(DIx, 0, 1, &dv);
+        check_matrix_fromstring_expr_double("matrix integral derivative [0,1] = xy", dv, 6.0, 1e-18);
+        mat_get(DIx, 1, 0, &dv);
+        check_matrix_fromstring_expr_double("matrix integral derivative [1,0] = y", dv, 3.0, 1e-18);
+        mat_get(DIx, 1, 1, &dv);
+        check_matrix_fromstring_expr_double("matrix integral derivative [1,1] = c₁", dv, 7.0, 1e-18);
+    }
+
     if (dtr)
         check_matrix_fromstring_expr_double("mat_deriv_trace_by_name([radius]) = 1", dtr, 1.0, 1e-18);
     if (ddet)
@@ -549,6 +566,8 @@ static void test_mat_symbolic_derivative_helpers_by_name(void)
 
     expr_free(ddet);
     expr_free(dtr);
+    mat_free(DIx);
+    mat_free(Ix);
     mat_free(Dr);
     mat_bindings_free(bindings);
     mat_free(A);

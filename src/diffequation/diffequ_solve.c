@@ -268,45 +268,45 @@ expr_t *de_arbitrary_constant(void)
 }
 
 static bool de_modified_emden_steps(const expr_t *independent, const expr_t *dependent, const expr_t *scale,
-                                    char **steps_out, char **steps_tex_out)
+                                    char **steps_out, char **steps_TeX_out)
 {
     const char *x_name = expr_symbol_name(independent);
     char *x = x_name ? strdup(x_name) : NULL;
     char *y = expr_to_string(dependent, style_UNBOUND);
     char *a = expr_to_string(scale, style_UNBOUND);
-    char *x_tex = x_name ? strdup(x_name) : NULL;
-    char *y_tex = expr_to_tex_body(dependent);
-    char *a_tex = expr_to_tex_body(scale);
+    char *x_TeX = x_name ? strdup(x_name) : NULL;
+    char *y_TeX = expr_to_TeX_body(dependent);
+    char *a_TeX = expr_to_TeX_body(scale);
     char *ay = NULL;
     char *au = NULL;
     char *ay_den = NULL;
     char *au_den = NULL;
-    char *ay_tex = NULL;
-    char *au_tex = NULL;
+    char *ay_TeX = NULL;
+    char *au_TeX = NULL;
     string_t *steps = string_new();
-    string_t *steps_tex = string_new();
+    string_t *steps_TeX = string_new();
     if (a && strcmp(a, "1") == 0) {
         ay = y ? strdup(y) : NULL;
         au = strdup("u");
-        ay_tex = y_tex ? strdup(y_tex) : NULL;
-        au_tex = strdup("u");
+        ay_TeX = y_TeX ? strdup(y_TeX) : NULL;
+        au_TeX = strdup("u");
         ay_den = y ? strdup(y) : NULL;
         au_den = strdup("u");
     } else {
         int ay_length = a && y ? asprintf(&ay, "%s%s", a, y) : -1;
         int au_length = a ? asprintf(&au, "%su", a) : -1;
-        int ay_tex_length = a_tex && y_tex ? asprintf(&ay_tex, "%s%s", a_tex, y_tex) : -1;
-        int au_tex_length = a_tex ? asprintf(&au_tex, "%su", a_tex) : -1;
+        int ay_TeX_length = a_TeX && y_TeX ? asprintf(&ay_TeX, "%s%s", a_TeX, y_TeX) : -1;
+        int au_TeX_length = a_TeX ? asprintf(&au_TeX, "%su", a_TeX) : -1;
 
-        if (ay_length < 0 || au_length < 0 || ay_tex_length < 0 || au_tex_length < 0) {
+        if (ay_length < 0 || au_length < 0 || ay_TeX_length < 0 || au_TeX_length < 0) {
             free(ay);
             free(au);
-            free(ay_tex);
-            free(au_tex);
+            free(ay_TeX);
+            free(au_TeX);
             ay = NULL;
             au = NULL;
-            ay_tex = NULL;
-            au_tex = NULL;
+            ay_TeX = NULL;
+            au_TeX = NULL;
         }
         if (ay && au) {
             if (asprintf(&ay_den, "(%s)", ay) < 0)
@@ -316,8 +316,8 @@ static bool de_modified_emden_steps(const expr_t *independent, const expr_t *dep
         }
     }
     bool success =
-        x && y && a && x_tex && y_tex && a_tex && ay && au && ay_den && au_den && ay_tex && au_tex && steps &&
-        steps_tex &&
+        x && y && a && x_TeX && y_TeX && a_TeX && ay && au && ay_den && au_den && ay_TeX && au_TeX && steps &&
+        steps_TeX &&
         string_append_format(steps,
                              "Recognise the modified-Emden rule\n"
                              "      %s″ + 3(%s)%s%s′ + (%s)²%s³ = 0\n"
@@ -330,7 +330,7 @@ static bool de_modified_emden_steps(const expr_t *independent, const expr_t *dep
                              "      Y = %s/%s − %s²/2\n"
                              "and d²Y/dX² = 0.",
                              y, a, y, y, a, y, y, au_den, y, a, y, y, a, y, au_den, x, ay_den, x, ay_den, x) >= 0 &&
-        string_append_format(steps_tex,
+        string_append_format(steps_TeX,
                              "\\begin{aligned}[t]"
                              "\\text{Recognise the rule:}\\quad&%s''+3(%s)%s%s'"
                              "+(%s)^2%s^3=0\\\\"
@@ -343,31 +343,31 @@ static bool de_modified_emden_steps(const expr_t *independent, const expr_t *dep
                              "&Y=\\frac{%s}{%s}-\\frac{%s^2}{2}\\\\"
                              "&\\frac{d^2Y}{dX^2}=0"
                              "\\end{aligned}",
-                             y_tex, a_tex, y_tex, y_tex, a_tex, y_tex, y_tex, au_tex, y_tex, a_tex, y_tex, y_tex, a_tex,
-                             y_tex, au_tex, x_tex, ay_tex, x_tex, ay_tex, x_tex) >= 0;
+                             y_TeX, a_TeX, y_TeX, y_TeX, a_TeX, y_TeX, y_TeX, au_TeX, y_TeX, a_TeX, y_TeX, y_TeX, a_TeX,
+                             y_TeX, au_TeX, x_TeX, ay_TeX, x_TeX, ay_TeX, x_TeX) >= 0;
 
     if (success) {
         *steps_out = strdup(string_c_str(steps));
-        *steps_tex_out = strdup(string_c_str(steps_tex));
-        success = *steps_out && *steps_tex_out;
+        *steps_TeX_out = strdup(string_c_str(steps_TeX));
+        success = *steps_out && *steps_TeX_out;
     }
     if (!success) {
         free(*steps_out);
-        free(*steps_tex_out);
+        free(*steps_TeX_out);
         *steps_out = NULL;
-        *steps_tex_out = NULL;
+        *steps_TeX_out = NULL;
     }
-    string_free(steps_tex);
+    string_free(steps_TeX);
     string_free(steps);
-    free(au_tex);
-    free(ay_tex);
+    free(au_TeX);
+    free(ay_TeX);
     free(au_den);
     free(ay_den);
     free(au);
     free(ay);
-    free(a_tex);
-    free(y_tex);
-    free(x_tex);
+    free(a_TeX);
+    free(y_TeX);
+    free(x_TeX);
     free(a);
     free(y);
     free(x);
@@ -556,7 +556,7 @@ diffequ_solve_result_t *de_solve_with_options(const diffequ_t *de, unsigned int 
     expr_t *negative_remainder = NULL;
     expr_t *derivative_right = NULL;
     char *solution_steps = NULL;
-    char *solution_steps_tex = NULL;
+    char *solution_steps_TeX = NULL;
     equation_t *solution = NULL;
     equation_t *derivative_quadratic_solutions[3] = {NULL, NULL, NULL};
     equation_t *exact_derivative_solutions[7] = {NULL, NULL, NULL, NULL, NULL, NULL, NULL};
@@ -673,7 +673,7 @@ diffequ_solve_result_t *de_solve_with_options(const diffequ_t *de, unsigned int 
             &modified_emden_count, &modified_emden_scale);
         if (linear_transformation == DE_ATTEMPT_SOLVED) {
             char *modified_emden_steps = NULL;
-            char *modified_emden_steps_tex = NULL;
+            char *modified_emden_steps_TeX = NULL;
             char *scale_text = expr_to_string(modified_emden_scale, style_UNBOUND);
             string_t *diagnostic = string_new();
 
@@ -684,29 +684,29 @@ diffequ_solve_result_t *de_solve_with_options(const diffequ_t *de, unsigned int 
                                                                     "u''' = 0",
                                      scale_text) < 0 ||
                 (include_steps && !de_modified_emden_steps(independent, dependent, modified_emden_scale,
-                                                           &modified_emden_steps, &modified_emden_steps_tex))) {
+                                                           &modified_emden_steps, &modified_emden_steps_TeX))) {
                 free(scale_text);
                 string_free(diagnostic);
-                free(modified_emden_steps_tex);
+                free(modified_emden_steps_TeX);
                 free(modified_emden_steps);
                 goto cleanup;
             }
             result =
                 de_solve_result_new(DE_SOLVE_STATUS_SOLVED, DE_SOLVER_LINEAR_TRANSFORMATION, string_c_str(diagnostic));
             if (!result || (include_steps && de_solve_result_set_steps(result, modified_emden_steps) != 0) ||
-                (include_steps && de_solve_result_set_steps_tex(result, modified_emden_steps_tex) != 0) ||
+                (include_steps && de_solve_result_set_steps_TeX(result, modified_emden_steps_TeX) != 0) ||
                 de_solve_result_set_symmetry(result, "SL(3, ℝ)") != 0) {
                 de_solve_result_free(result);
                 result = NULL;
                 free(scale_text);
                 string_free(diagnostic);
-                free(modified_emden_steps_tex);
+                free(modified_emden_steps_TeX);
                 free(modified_emden_steps);
                 goto cleanup;
             }
             free(scale_text);
             string_free(diagnostic);
-            free(modified_emden_steps_tex);
+            free(modified_emden_steps_TeX);
             free(modified_emden_steps);
             for (size_t i = 0u; i < modified_emden_count; ++i) {
                 if (de_solve_result_append(result, modified_emden_solutions[i]) != 0) {
@@ -824,12 +824,12 @@ diffequ_solve_result_t *de_solve_with_options(const diffequ_t *de, unsigned int 
     }
 
     parameter_linear_pde = de_pde_attempt_parameter_linear(de, independent, dependent, derivative_right, include_steps,
-                                                           &solution, &solution_steps, &solution_steps_tex);
+                                                           &solution, &solution_steps, &solution_steps_TeX);
     if (parameter_linear_pde == DE_ATTEMPT_SOLVED) {
         result = de_solve_result_new(DE_SOLVE_STATUS_SOLVED, DE_SOLVER_PARAMETER_LINEAR_PDE,
                                      "solved as a parameter-dependent first-order linear PDE");
         if (!result || (include_steps && de_solve_result_set_steps(result, solution_steps) != 0) ||
-            (include_steps && de_solve_result_set_steps_tex(result, solution_steps_tex) != 0)) {
+            (include_steps && de_solve_result_set_steps_TeX(result, solution_steps_TeX) != 0)) {
             de_solve_result_free(result);
             result = NULL;
             goto cleanup;
@@ -916,7 +916,7 @@ append:
     solution = NULL;
 
 cleanup:
-    free(solution_steps_tex);
+    free(solution_steps_TeX);
     free(solution_steps);
     for (size_t i = 0u; i < 2u; ++i)
         equ_free(exact_first_order_solutions[i]);

@@ -361,46 +361,46 @@ static int is_plain_decimal_bound(const char *text)
     return text[pos] == '\0';
 }
 
-static char *bound_tex_input(const char *raw_input, const expr_t *expr)
+static char *bound_TeX_input(const char *raw_input, const expr_t *expr)
 {
     if (is_plain_decimal_bound(raw_input))
         return dup_string(raw_input);
     if (expr) {
-        char *body = expr_to_tex_body(expr);
+        char *body = expr_to_TeX_body(expr);
 
         if (body)
             return body;
     }
-    return expr ? expr_text_dup(expr, style_TEX) : dup_string(raw_input);
+    return expr ? expr_text_dup(expr, style_LATEX) : dup_string(raw_input);
 }
 
-static char *expr_tex_body(const expr_t *expr)
+static char *expr_TeX_body(const expr_t *expr)
 {
     char *body;
 
     if (!expr)
         return NULL;
-    body = expr_to_tex_body(expr);
+    body = expr_to_TeX_body(expr);
     if (body)
         return body;
-    return expr_text_dup(expr, style_TEX);
+    return expr_text_dup(expr, style_LATEX);
 }
 
-static char *expr_tex_body_display(const expr_t *expr)
+static char *expr_TeX_body_display(const expr_t *expr)
 {
     char *body;
 
     if (!expr)
         return NULL;
-    body = expr_to_tex_body_wrapped(expr, 110u);
+    body = expr_to_TeX_body_wrapped(expr, 110u);
     if (body)
         return body;
-    return expr_tex_body(expr);
+    return expr_TeX_body(expr);
 }
 
-static char *combine_aligned_equation_tex(const char *lhs, const char *rhs, int add_constant);
+static char *combine_aligned_equation_TeX(const char *lhs, const char *rhs, int add_constant);
 
-static char *combine_equation_tex(const char *lhs, const char *rhs)
+static char *combine_equation_TeX(const char *lhs, const char *rhs)
 {
     size_t lhs_n;
     size_t rhs_n;
@@ -408,7 +408,7 @@ static char *combine_equation_tex(const char *lhs, const char *rhs)
 
     if (!lhs || !*lhs || !rhs || !*rhs)
         return NULL;
-    out = combine_aligned_equation_tex(lhs, rhs, 0);
+    out = combine_aligned_equation_TeX(lhs, rhs, 0);
     if (out)
         return out;
     lhs_n = strlen(lhs);
@@ -420,7 +420,7 @@ static char *combine_equation_tex(const char *lhs, const char *rhs)
     return out;
 }
 
-static char *combine_aligned_equation_tex(const char *lhs, const char *rhs, int add_constant)
+static char *combine_aligned_equation_TeX(const char *lhs, const char *rhs, int add_constant)
 {
     static const char prefix[] = "\\begin{aligned}[t]\n";
     static const char suffix[] = "\n\\end{aligned}";
@@ -459,7 +459,7 @@ static char *combine_aligned_equation_tex(const char *lhs, const char *rhs, int 
     return out;
 }
 
-static char *combine_antiderivative_tex(const char *lhs, const char *rhs)
+static char *combine_antiderivative_TeX(const char *lhs, const char *rhs)
 {
     size_t lhs_n;
     size_t rhs_n;
@@ -467,7 +467,7 @@ static char *combine_antiderivative_tex(const char *lhs, const char *rhs)
 
     if (!lhs || !*lhs || !rhs || !*rhs)
         return NULL;
-    out = combine_aligned_equation_tex(lhs, rhs, 1);
+    out = combine_aligned_equation_TeX(lhs, rhs, 1);
     if (out)
         return out;
     lhs_n = strlen(lhs);
@@ -532,7 +532,7 @@ static int should_try_symbolic_first(const expr_t *expr, size_t ndim, expr_t *co
     return intg_integrand_has_unbound_parameters(expr, ndim, vars);
 }
 
-static char *integral_tex(const char *body, size_t ndim, const bound_kind_t *kinds, const char *const *var_names,
+static char *integral_TeX(const char *body, size_t ndim, const bound_kind_t *kinds, const char *const *var_names,
                           const char *const *lo, const char *const *hi)
 {
     char *result = NULL;
@@ -623,23 +623,23 @@ int main(int argc, char **argv)
     expr_t **hi_expr = NULL;
     char **lo_display_inputs = NULL;
     char **hi_display_inputs = NULL;
-    char **lo_tex_inputs = NULL;
-    char **hi_tex_inputs = NULL;
+    char **lo_TeX_inputs = NULL;
+    char **hi_TeX_inputs = NULL;
     number_t value_num = num_new();
     number_t error_num = num_new();
     number_t symbolic_num = num_new();
     char *expr_text = NULL;
     char *binding_expr_text = NULL;
-    char *tex_text = NULL;
-    char *base_tex_text = NULL;
-    char *integrand_tex = NULL;
+    char *TeX_text = NULL;
+    char *base_TeX_text = NULL;
+    char *integrand_TeX = NULL;
     char *value_text = NULL;
     char *error_text = NULL;
     char *symbolic_value_text = NULL;
     char *symbolic_text = NULL;
-    char *symbolic_tex = NULL;
+    char *symbolic_TeX = NULL;
     char *antiderivative_text = NULL;
-    char *antiderivative_tex = NULL;
+    char *antiderivative_TeX = NULL;
     char *display_input = NULL;
     expr_t *display_expr = NULL;
     expr_t *symbolic_result = NULL;
@@ -720,11 +720,11 @@ int main(int argc, char **argv)
     remaining_hi_num = calloc(ndim, sizeof(*remaining_hi_num));
     lo_display_inputs = calloc(ndim, sizeof(*lo_display_inputs));
     hi_display_inputs = calloc(ndim, sizeof(*hi_display_inputs));
-    lo_tex_inputs = calloc(ndim, sizeof(*lo_tex_inputs));
-    hi_tex_inputs = calloc(ndim, sizeof(*hi_tex_inputs));
+    lo_TeX_inputs = calloc(ndim, sizeof(*lo_TeX_inputs));
+    hi_TeX_inputs = calloc(ndim, sizeof(*hi_TeX_inputs));
     if (!vars || !owned_vars || !var_names || !lo_inputs || !hi_inputs || !bound_kinds || !lo_num || !hi_num ||
         !lo_expr || !hi_expr || !remaining_numeric_vars || !remaining_lo_num || !remaining_hi_num ||
-        !lo_display_inputs || !hi_display_inputs || !lo_tex_inputs || !hi_tex_inputs)
+        !lo_display_inputs || !hi_display_inputs || !lo_TeX_inputs || !hi_TeX_inputs)
         goto cleanup;
 
     if (argi + 2 >= argc) {
@@ -803,19 +803,19 @@ int main(int argc, char **argv)
         if (!hi_display_inputs[i] && hi_expr[i])
             hi_display_inputs[i] = expr_text_dup(hi_expr[i], style_UNBOUND);
         if (lo_expr[i]) {
-            lo_tex_inputs[i] = bound_tex_input(lo_inputs[i], lo_expr[i]);
+            lo_TeX_inputs[i] = bound_TeX_input(lo_inputs[i], lo_expr[i]);
         }
         if (hi_expr[i]) {
-            hi_tex_inputs[i] = bound_tex_input(hi_inputs[i], hi_expr[i]);
+            hi_TeX_inputs[i] = bound_TeX_input(hi_inputs[i], hi_expr[i]);
         }
         if (!lo_display_inputs[i] && lo_inputs[i])
             lo_display_inputs[i] = dup_string(lo_inputs[i]);
         if (!hi_display_inputs[i] && hi_inputs[i])
             hi_display_inputs[i] = dup_string(hi_inputs[i]);
-        if (!lo_tex_inputs[i] && lo_inputs[i])
-            lo_tex_inputs[i] = dup_string(lo_inputs[i]);
-        if (!hi_tex_inputs[i] && hi_inputs[i])
-            hi_tex_inputs[i] = dup_string(hi_inputs[i]);
+        if (!lo_TeX_inputs[i] && lo_inputs[i])
+            lo_TeX_inputs[i] = dup_string(lo_inputs[i]);
+        if (!hi_TeX_inputs[i] && hi_inputs[i])
+            hi_TeX_inputs[i] = dup_string(hi_inputs[i]);
     }
 
     ig = intg_new();
@@ -830,7 +830,7 @@ int main(int argc, char **argv)
         display_input = wrap_expression(expr_text);
         display_expr = expr_from_string(display_input ? display_input : expr_text, NULL);
     }
-    integrand_tex = expr_tex_body(display_expr);
+    integrand_TeX = expr_TeX_body(display_expr);
 
     has_unbound_params = intg_integrand_has_unbound_parameters(expr, ndim, vars);
     if (should_try_symbolic_first(expr, ndim, vars, all_bounds_numeric)) {
@@ -840,11 +840,11 @@ int main(int argc, char **argv)
             first_antiderivative = make_unevaluated_antiderivative(expr, vars[0]);
         if (first_antiderivative) {
             antiderivative_text = expr_text_dup(first_antiderivative, style_UNBOUND);
-            antiderivative_tex = expr_tex_body_display(first_antiderivative);
+            antiderivative_TeX = expr_TeX_body_display(first_antiderivative);
         }
         if (symbolic_result) {
             symbolic_text = expr_text_dup(symbolic_result, style_UNBOUND);
-            symbolic_tex = expr_tex_body_display(symbolic_result);
+            symbolic_TeX = expr_TeX_body_display(symbolic_result);
             symbolic_num = expr_eval(symbolic_result);
             if (!num_is_nan(symbolic_num) && num_is_finite(symbolic_num) && num_is_real(symbolic_num))
                 symbolic_value_text = number_text(symbolic_num);
@@ -871,7 +871,7 @@ int main(int argc, char **argv)
             symbolic_result = partially_symbolic_result;
             partially_symbolic_result = NULL;
             symbolic_text = expr_text_dup(symbolic_result, style_UNBOUND);
-            symbolic_tex = expr_tex_body_display(symbolic_result);
+            symbolic_TeX = expr_TeX_body_display(symbolic_result);
             symbolic_num = expr_eval(symbolic_result);
             if (!num_is_nan(symbolic_num) && num_is_finite(symbolic_num) && num_is_real(symbolic_num)) {
                 symbolic_value_text = number_text(symbolic_num);
@@ -925,14 +925,14 @@ int main(int argc, char **argv)
         goto cleanup;
     }
 
-    if (ran_numeric_integrator && intg_rc >= 0 && !symbolic_result && !symbolic_text && !symbolic_tex) {
+    if (ran_numeric_integrator && intg_rc >= 0 && !symbolic_result && !symbolic_text && !symbolic_TeX) {
         symbolic_result = (expr_t *)intg_get_exact_result(ig);
         if (symbolic_result)
             expr_retain(symbolic_result);
         if (symbolic_result) {
             used_core_exact_result = 1;
             symbolic_text = expr_text_dup(symbolic_result, style_UNBOUND);
-            symbolic_tex = expr_tex_body_display(symbolic_result);
+            symbolic_TeX = expr_TeX_body_display(symbolic_result);
             symbolic_num = expr_eval(symbolic_result);
             if (!num_is_nan(symbolic_num) && num_is_finite(symbolic_num) && num_is_real(symbolic_num)) {
                 symbolic_value_text = number_text(symbolic_num);
@@ -948,25 +948,25 @@ int main(int argc, char **argv)
         error_text = dup_string("");
     }
 
-    base_tex_text = integrand_tex ? integral_tex(integrand_tex, ndim, bound_kinds, var_names,
-                                                 (const char *const *)lo_tex_inputs, (const char *const *)hi_tex_inputs)
+    base_TeX_text = integrand_TeX ? integral_TeX(integrand_TeX, ndim, bound_kinds, var_names,
+                                                 (const char *const *)lo_TeX_inputs, (const char *const *)hi_TeX_inputs)
                                   : NULL;
     if (used_unevaluated_antiderivative_fallback)
-        tex_text = dup_string(antiderivative_tex ? antiderivative_tex : "");
-    else if (symbolic_tex && all_bounds_indefinite(ndim, bound_kinds))
-        tex_text = combine_antiderivative_tex(base_tex_text, symbolic_tex);
+        TeX_text = dup_string(antiderivative_TeX ? antiderivative_TeX : "");
+    else if (symbolic_TeX && all_bounds_indefinite(ndim, bound_kinds))
+        TeX_text = combine_antiderivative_TeX(base_TeX_text, symbolic_TeX);
     else
-        tex_text = symbolic_tex ? combine_equation_tex(base_tex_text, symbolic_tex) : NULL;
-    if (!tex_text)
-        tex_text = dup_string(base_tex_text ? base_tex_text : "");
+        TeX_text = symbolic_TeX ? combine_equation_TeX(base_TeX_text, symbolic_TeX) : NULL;
+    if (!TeX_text)
+        TeX_text = dup_string(base_TeX_text ? base_TeX_text : "");
 
     print_integrator_context(input, expr_text, binding_expr_text, ndim, bound_kinds, var_names, lo_display_inputs,
                              hi_display_inputs, lo_inputs, hi_inputs);
-    printf("tex         %s\n", tex_text ? tex_text : "(null)");
+    printf("tex         %s\n", TeX_text ? TeX_text : "(null)");
     printf("antiderivative %s\n", antiderivative_text ? antiderivative_text : "");
-    printf("antiderivative_tex %s\n", antiderivative_tex ? antiderivative_tex : "");
+    printf("antiderivative_TeX %s\n", antiderivative_TeX ? antiderivative_TeX : "");
     printf("symbolic    %s\n", symbolic_text ? symbolic_text : "");
-    printf("symbolic_tex %s\n", symbolic_tex ? symbolic_tex : "");
+    printf("symbolic_TeX %s\n", symbolic_TeX ? symbolic_TeX : "");
     printf("symbolic_value %s\n", symbolic_value_text ? symbolic_value_text : "");
     printf("value       %s\n", value_text ? value_text : "");
     printf("error       %s\n", error_text ? error_text : "");
@@ -998,19 +998,19 @@ int main(int argc, char **argv)
     rc = 0;
 
 cleanup:
-    free(antiderivative_tex);
+    free(antiderivative_TeX);
     free(antiderivative_text);
     free(symbolic_value_text);
-    free(symbolic_tex);
+    free(symbolic_TeX);
     free(symbolic_text);
     free(error_text);
     free(value_text);
     num_destroy(&symbolic_num);
     num_destroy(&error_num);
     num_destroy(&value_num);
-    free(integrand_tex);
-    free(base_tex_text);
-    free(tex_text);
+    free(integrand_TeX);
+    free(base_TeX_text);
+    free(TeX_text);
     free(binding_expr_text);
     free(expr_text);
     free(display_input);
@@ -1033,13 +1033,13 @@ cleanup:
         for (size_t i = 0; i < ndim; ++i)
             free(hi_display_inputs[i]);
     }
-    if (lo_tex_inputs) {
+    if (lo_TeX_inputs) {
         for (size_t i = 0; i < ndim; ++i)
-            free(lo_tex_inputs[i]);
+            free(lo_TeX_inputs[i]);
     }
-    if (hi_tex_inputs) {
+    if (hi_TeX_inputs) {
         for (size_t i = 0; i < ndim; ++i)
-            free(hi_tex_inputs[i]);
+            free(hi_TeX_inputs[i]);
     }
     if (hi_num) {
         for (size_t i = 0; i < ndim; ++i)
@@ -1065,8 +1065,8 @@ cleanup:
     free(bound_kinds);
     free(hi_expr);
     free(lo_expr);
-    free(hi_tex_inputs);
-    free(lo_tex_inputs);
+    free(hi_TeX_inputs);
+    free(lo_TeX_inputs);
     free(hi_display_inputs);
     free(lo_display_inputs);
     free(hi_inputs);

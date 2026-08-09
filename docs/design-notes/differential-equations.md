@@ -485,7 +485,7 @@ Dxx(y) + 3*Dx(y) + 2*y = sin(x)
 
 renders as:
 
-```tex
+```latex
 y'' + 3y' + 2y = \sin x
 ```
 
@@ -497,7 +497,7 @@ Dxx(u) + Dyy(u) = 0
 
 renders as:
 
-```tex
+```latex
 \frac{\partial^2 u}{\partial x^2}
 + \frac{\partial^2 u}{\partial y^2} = 0
 ```
@@ -510,13 +510,13 @@ Dxy(u)
 
 renders as:
 
-```tex
+```latex
 \frac{\partial^2 u}{\partial y\,\partial x}
 ```
 
 A boundary condition such as `Dy(u)(x, 1) = sin(x)` renders as:
 
-```tex
+```latex
 \left.\frac{\partial u}{\partial y}\right|_{y=1} = \sin x
 ```
 
@@ -525,7 +525,7 @@ aligned mathematical system.
 
 ## Text Output
 
-`style_EXPRESSION` uses the canonical, round-trippable syntax. `style_TEX`
+`style_EXPRESSION` uses the canonical, round-trippable syntax. `style_LATEX`
 uses the mathematical rendering described above. A future `style_FUNCTION`
 form should remain compact and operate on the complete problem rather than
 reconstructing its components in client code:

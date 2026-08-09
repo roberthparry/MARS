@@ -287,7 +287,7 @@ diffequ_solve_result_t *de_solve(const diffequ_t *de);
  *
  * This performs the same symbolic solve as de_solve(). Pass
  * ::DE_SOLVE_OPTION_STEPS when a presenting client also needs the derivation
- * returned by de_solve_result_steps() and de_solve_result_steps_tex().
+ * returned by de_solve_result_steps() and de_solve_result_steps_TeX().
  * Omitting that option avoids constructing the derivation.
  *
  * @param de Differential-equation problem to solve.
@@ -342,7 +342,7 @@ const char *de_solve_result_diagnostic(const diffequ_solve_result_t *result);
  *         requested or the result was not solved.
  */
 const char *de_solve_result_steps(const diffequ_solve_result_t *result);
-const char *de_solve_result_steps_tex(const diffequ_solve_result_t *result);
+const char *de_solve_result_steps_TeX(const diffequ_solve_result_t *result);
 
 /**
  * @brief Borrow the symmetry group identified by the selected solver.

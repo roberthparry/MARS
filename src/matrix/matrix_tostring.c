@@ -527,12 +527,12 @@ static void mt_emit_cells(mat_buf_t *out, string_t **cells, size_t rows, size_t 
         mb_putc(out, ')');
 }
 
-static void mt_emit_cells_tex(mat_buf_t *out, string_t **cells, size_t rows, size_t cols)
+static void mt_emit_cells_TeX(mat_buf_t *out, string_t **cells, size_t rows, size_t cols)
 {
     mb_puts(out, "\\begin{bmatrix}");
     for (size_t i = 0; i < rows; ++i) {
         if (i > 0)
-            mb_puts(out, " \\\\ ");
+            mb_puts(out, " \\\\[4pt] ");
         for (size_t j = 0; j < cols; ++j) {
             size_t idx = i * cols + j;
 
@@ -629,7 +629,7 @@ done:
     return ok ? 0 : -1;
 }
 
-static int mt_expr_tex_parts_text(const expr_t *dv, string_t **expr_out, string_t **bindings_out)
+static int mt_expr_TeX_parts_text(const expr_t *dv, string_t **expr_out, string_t **bindings_out)
 {
     char *expr = NULL;
     char *bindings = NULL;
@@ -638,7 +638,7 @@ static int mt_expr_tex_parts_text(const expr_t *dv, string_t **expr_out, string_
     *expr_out = NULL;
     *bindings_out = NULL;
 
-    if (expr_to_tex_parts(dv, &expr, &bindings) != 0)
+    if (expr_to_TeX_parts(dv, &expr, &bindings) != 0)
         return -1;
 
     *expr_out = mt_string_from_owned_cstr(expr);
@@ -737,7 +737,7 @@ fail:
     return NULL;
 }
 
-static string_t *mt_join_bindings_tex(string_t **var_bindings, size_t nvar_bindings, string_t **const_bindings,
+static string_t *mt_join_bindings_TeX(string_t **var_bindings, size_t nvar_bindings, string_t **const_bindings,
                                       size_t nconst_bindings)
 {
     string_t *vars = nvar_bindings ? mt_texify_binding_list(var_bindings, nvar_bindings) : string_new();
@@ -781,7 +781,7 @@ static string_t *mat_to_string_numeric(const matrix_t *A, mat_string_style_t sty
     mat_buf_t out = {0};
     string_t **cells = NULL;
     size_t *widths = NULL;
-    int tex = (style == MAT_STRING_TEX);
+    int tex = (style == MAT_STRING_LATEX);
     int layout = (style == MAT_STRING_LAYOUT_SCIENTIFIC || style == MAT_STRING_LAYOUT_PRETTY);
     int scientific = (style == MAT_STRING_INLINE_SCIENTIFIC || style == MAT_STRING_LAYOUT_SCIENTIFIC);
     int ok = 1;
@@ -820,7 +820,7 @@ static string_t *mat_to_string_numeric(const matrix_t *A, mat_string_style_t sty
     }
 
     if (tex)
-        mt_emit_cells_tex(&out, cells, A->rows, A->cols);
+        mt_emit_cells_TeX(&out, cells, A->rows, A->cols);
     else
         mt_emit_cells(&out, cells, A->rows, A->cols, widths, layout);
 
@@ -845,7 +845,7 @@ static string_t *mat_to_string_expr(const matrix_t *A, mat_string_style_t style)
     size_t *widths = calloc(A->cols ? A->cols : 1, sizeof(*widths));
     mat_buf_t out = {0};
     int ok = exprs && widths;
-    int tex = (style == MAT_STRING_TEX);
+    int tex = (style == MAT_STRING_LATEX);
     int layout = (style == MAT_STRING_LAYOUT_SCIENTIFIC || style == MAT_STRING_LAYOUT_PRETTY);
     int scientific = (style == MAT_STRING_INLINE_SCIENTIFIC || style == MAT_STRING_LAYOUT_SCIENTIFIC);
     int omit_wrapper = 0;
@@ -858,7 +858,7 @@ static string_t *mat_to_string_expr(const matrix_t *A, mat_string_style_t style)
             size_t idx = i * A->cols + j;
 
             mat_get(A, i, j, &dv);
-            if ((tex && mt_expr_tex_parts_text(dv, &expr, &binding_text) != 0) ||
+            if ((tex && mt_expr_TeX_parts_text(dv, &expr, &binding_text) != 0) ||
                 (!tex && mt_split_expr_repr(dv, &expr, &binding_text) != 0)) {
                 string_free(expr);
                 string_free(binding_text);
@@ -882,10 +882,10 @@ static string_t *mat_to_string_expr(const matrix_t *A, mat_string_style_t style)
         out.text = string_new_with("<expr matrix>");
     } else if (tex) {
         omit_wrapper = mt_all_bindings_are_nan(var_bindings, nvar_bindings, const_bindings, nconst_bindings);
-        string_t *joined = mt_join_bindings_tex(var_bindings, nvar_bindings, const_bindings, nconst_bindings);
+        string_t *joined = mt_join_bindings_TeX(var_bindings, nvar_bindings, const_bindings, nconst_bindings);
         if (!omit_wrapper)
             mb_puts(&out, "\\left\\{ ");
-        mt_emit_cells_tex(&out, exprs, A->rows, A->cols);
+        mt_emit_cells_TeX(&out, exprs, A->rows, A->cols);
         if (!omit_wrapper && joined && string_length(joined) > 0u) {
             mb_puts(&out, " \\;\\middle|\\; ");
             mb_put_text(&out, joined);

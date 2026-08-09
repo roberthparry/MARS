@@ -23,6 +23,6 @@ bool expr_binding_expr_needs_explicit_mul_separator(const expr_binding_expr_t *e
 /* Rendering. */
 char *expr_binding_expr_to_string(const expr_binding_expr_t *expr);
 char *expr_binding_expr_to_function_string(const expr_binding_expr_t *expr);
-char *expr_binding_expr_to_tex(const expr_binding_expr_t *expr);
+char *expr_binding_expr_to_TeX(const expr_binding_expr_t *expr);
 
 #endif /* EXPR_BINDINGS_H */

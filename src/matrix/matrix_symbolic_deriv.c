@@ -72,6 +72,64 @@ matrix_t *mat_deriv_by_name(const matrix_t *A, mat_bindings_t *bindings, const c
     return mat_deriv(A, binding);
 }
 
+/* Integrate a matrix entrywise using a binding returned by the matrix parser. */
+matrix_t *mat_integrate_by_name(const matrix_t *A, mat_bindings_t *bindings, const char *name)
+{
+    expr_t *binding;
+
+    if (!A || !bindings || !name)
+        return NULL;
+
+    binding = mat_bindings_get(bindings, name);
+    if (!binding)
+        return NULL;
+
+    return mat_integrate(A, binding);
+}
+
+/* Integrate every matrix entry with the general symbolic integration rules. */
+matrix_t *mat_integrate(const matrix_t *A, expr_t *wrt)
+{
+    matrix_t *integrated;
+
+    if (!A || !wrt || !A->elem)
+        return NULL;
+
+    integrated = mat_create_zero_with_elem(A->rows, A->cols, &expr_elem);
+    if (!integrated)
+        return NULL;
+
+    for (size_t row = 0u; row < A->rows; ++row) {
+        for (size_t col = 0u; col < A->cols; ++col) {
+            expr_t *owned_entry = NULL;
+            expr_t *entry = NULL;
+            expr_t *antiderivative;
+
+            if (matrix_is_symbolic(A)) {
+                mat_get(A, row, col, &entry);
+                if (!entry)
+                    entry = (expr_t *)EXPR_ZERO;
+            } else {
+                number_t value = mat_get_num(A, row, col);
+
+                owned_entry = expr_new_const(value);
+                num_destroy(&value);
+                entry = owned_entry;
+            }
+
+            antiderivative = entry ? expr_integrate(entry, wrt) : NULL;
+            expr_free(owned_entry);
+            if (!antiderivative) {
+                mat_free(integrated);
+                return NULL;
+            }
+            mat_set(integrated, row, col, &antiderivative);
+            expr_free(antiderivative);
+        }
+    }
+    return integrated;
+}
+
 expr_t *mat_deriv_trace(const matrix_t *A, expr_t *wrt)
 {
     expr_t *trace = NULL;

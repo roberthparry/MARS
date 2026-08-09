@@ -70,14 +70,14 @@ static char *number_precision_text_dup(number_t value, int precision)
     return out;
 }
 
-static char *expr_tex_body_dup(const expr_t *expr)
+static char *expr_TeX_body_dup(const expr_t *expr)
 {
-    char *body = expr_to_tex_body_wrapped(expr, 110u);
+    char *body = expr_to_TeX_body_wrapped(expr, 110u);
 
-    return body ? body : expr_text_dup(expr, style_TEX);
+    return body ? body : expr_text_dup(expr, style_LATEX);
 }
 
-static bool tex_wrapped_aligned_body(const char *tex, const char **body_out, size_t *body_len_out)
+static bool TeX_wrapped_aligned_body(const char *tex, const char **body_out, size_t *body_len_out)
 {
     static const char prefix[] = "\\begin{aligned}[t]\n";
     static const char suffix[] = "\n\\end{aligned}";
@@ -119,13 +119,13 @@ static void print_aligned_equation_fragment(const char *lhs, const char *rhs)
         lhs = "\\text{null}";
     if (!rhs)
         rhs = "\\text{null}";
-    if (tex_wrapped_aligned_body(rhs, &body, &body_len))
+    if (TeX_wrapped_aligned_body(rhs, &body, &body_len))
         printf("%s &= %.*s", lhs, (int)body_len, body);
     else
         printf("%s &= %s", lhs, rhs);
 }
 
-static char *equation_display_tex_dup(const equation_t *equation)
+static char *equation_display_TeX_dup(const equation_t *equation)
 {
     char *lhs = NULL;
     char *rhs = NULL;
@@ -137,12 +137,12 @@ static char *equation_display_tex_dup(const equation_t *equation)
     if (!equation)
         return NULL;
 
-    lhs = expr_tex_body_dup(equ_lhs(equation));
-    rhs = expr_tex_body_dup(equ_rhs(equation));
+    lhs = expr_TeX_body_dup(equ_lhs(equation));
+    rhs = expr_TeX_body_dup(equ_rhs(equation));
     if (!lhs || !rhs)
         goto cleanup;
 
-    if (tex_wrapped_aligned_body(rhs, &rhs_body, &rhs_body_len)) {
+    if (TeX_wrapped_aligned_body(rhs, &rhs_body, &rhs_body_len)) {
         needed =
             snprintf(NULL, 0, "\\begin{aligned}[t]\n%s ={}& %.*s\n\\end{aligned}", lhs, (int)rhs_body_len, rhs_body);
     } else {
@@ -154,7 +154,7 @@ static char *equation_display_tex_dup(const equation_t *equation)
     out = malloc((size_t)needed + 1u);
     if (!out)
         goto cleanup;
-    if (tex_wrapped_aligned_body(rhs, &rhs_body, &rhs_body_len)) {
+    if (TeX_wrapped_aligned_body(rhs, &rhs_body, &rhs_body_len)) {
         snprintf(out, (size_t)needed + 1u, "\\begin{aligned}[t]\n%s ={}& %.*s\n\\end{aligned}", lhs, (int)rhs_body_len,
                  rhs_body);
     } else {
@@ -471,32 +471,32 @@ static void print_solutions(const equation_solutions_t *solutions, expr_bindings
     }
 }
 
-static void print_solutions_tex(const equation_solutions_t *solutions, expr_bindings_t *bindings, const size_t *order)
+static void print_solutions_TeX(const equation_solutions_t *solutions, expr_bindings_t *bindings, const size_t *order)
 {
     size_t count = equ_solutions_count(solutions);
 
     if (count == 0u) {
-        printf("solutions_tex \n");
+        printf("solutions_TeX \n");
         return;
     }
 
-    printf("solutions_tex \\begin{aligned}");
+    printf("solutions_TeX \\begin{aligned}");
     for (size_t i = 0u; i < count; ++i) {
         const equation_t *solution = ordered_solution_at(solutions, order, i);
         const char *name = solution_binding_name(bindings, solution);
         equation_t *display = solution_with_bound_constants(solution, bindings);
         const equation_t *shown = display ? display : solution;
-        char *rhs_tex = expr_tex_body_dup(equ_rhs(shown));
-        char *tex = equ_text_dup(shown, style_TEX);
+        char *rhs_TeX = expr_TeX_body_dup(equ_rhs(shown));
+        char *tex = equ_text_dup(shown, style_LATEX);
 
-        if (name && rhs_tex) {
+        if (name && rhs_TeX) {
             printf("%s", i == 0u ? " " : " \\\\\n");
-            print_aligned_equation_fragment(name, rhs_tex);
+            print_aligned_equation_fragment(name, rhs_TeX);
         } else
             printf("%s%s", i == 0u ? " " : " \\\\\n", tex ? tex : "\\text{null}");
         equ_free(display);
         free(tex);
-        free(rhs_tex);
+        free(rhs_TeX);
     }
     printf(" \\end{aligned}\n");
 }
@@ -642,7 +642,7 @@ static void print_equation_fields(const equation_t *equation, const equation_sol
     char *equation_text = equ_text_dup(equation, style_EXPRESSION);
     char *unbound_text = equ_text_dup(shown_equation, style_UNBOUND);
     char *function_text = equ_text_dup(shown_equation, style_FUNCTION);
-    char *tex = equation_display_tex_dup(shown_equation);
+    char *tex = equation_display_TeX_dup(shown_equation);
     char *residual_text = display_residual ? expr_text_dup(display_residual, style_UNBOUND) : NULL;
     char *residual_value_text = number_text_dup(residual_value);
     size_t *solution_order = ordered_solution_indices(solutions, bindings);
@@ -656,7 +656,7 @@ static void print_equation_fields(const equation_t *equation, const equation_sol
     printf("error       %s\n", residual_value_text ? residual_value_text : "");
     printf("status      %s\n", status ? status : "unsolved");
     print_solutions(solutions, bindings, solution_order);
-    print_solutions_tex(solutions, bindings, solution_order);
+    print_solutions_TeX(solutions, bindings, solution_order);
     print_solution_numerics(solutions, bindings, solution_order, precision);
 
     free(solution_order);

@@ -11,9 +11,9 @@ typedef struct {
     int *signs;
     size_t count;
     size_t cap;
-} tex_add_terms_t;
+} TeX_add_terms_t;
 
-static void tex_add_terms_free(tex_add_terms_t *terms)
+static void TeX_add_terms_free(TeX_add_terms_t *terms)
 {
     if (!terms)
         return;
@@ -25,7 +25,7 @@ static void tex_add_terms_free(tex_add_terms_t *terms)
     terms->cap = 0u;
 }
 
-static int tex_add_terms_push(tex_add_terms_t *terms, const expr_t *expr, int sign)
+static int TeX_add_terms_push(TeX_add_terms_t *terms, const expr_t *expr, int sign)
 {
     const expr_t **new_exprs;
     int *new_signs;
@@ -51,24 +51,24 @@ static int tex_add_terms_push(tex_add_terms_t *terms, const expr_t *expr, int si
     return 0;
 }
 
-static int tex_collect_add_terms(const expr_t *expr, int sign, tex_add_terms_t *terms)
+static int TeX_collect_add_terms(const expr_t *expr, int sign, TeX_add_terms_t *terms)
 {
     if (!expr)
         return -1;
     if (expr_is_neg(expr))
-        return tex_collect_add_terms(expr->a, -sign, terms);
+        return TeX_collect_add_terms(expr->a, -sign, terms);
     if (expr_is_op(expr, &ops_add))
-        return tex_collect_add_terms(expr->a, sign, terms) == 0 && tex_collect_add_terms(expr->b, sign, terms) == 0
+        return TeX_collect_add_terms(expr->a, sign, terms) == 0 && TeX_collect_add_terms(expr->b, sign, terms) == 0
                    ? 0
                    : -1;
     if (expr_is_op(expr, &ops_sub))
-        return tex_collect_add_terms(expr->a, sign, terms) == 0 && tex_collect_add_terms(expr->b, -sign, terms) == 0
+        return TeX_collect_add_terms(expr->a, sign, terms) == 0 && TeX_collect_add_terms(expr->b, -sign, terms) == 0
                    ? 0
                    : -1;
-    return tex_add_terms_push(terms, expr, sign);
+    return TeX_add_terms_push(terms, expr, sign);
 }
 
-static int tex_term_consume_leading_minus(char **term)
+static int TeX_term_consume_leading_minus(char **term)
 {
     char *text;
 
@@ -83,29 +83,29 @@ static int tex_term_consume_leading_minus(char **term)
     return 1;
 }
 
-static char *tex_body_for_node(const expr_t *expr, int parent_prec)
+static char *TeX_body_for_node(const expr_t *expr, int parent_prec)
 {
     sbuf_t b;
     char *out;
 
     sbuf_init(&b);
-    emit_tex_expr(expr, &b, parent_prec);
+    emit_TeX_expr(expr, &b, parent_prec);
     out = expr_tostring_texify(sbuf_c_str(&b));
     sbuf_free(&b);
     return out;
 }
 
-static char *tex_aligned_add_terms(const expr_t *expr, size_t line_limit, int wrap_in_parens)
+static char *TeX_aligned_add_terms(const expr_t *expr, size_t line_limit, int wrap_in_parens)
 {
-    tex_add_terms_t terms = {0};
+    TeX_add_terms_t terms = {0};
     sbuf_t b;
     char *one_line = NULL;
     char *out = NULL;
 
-    if (!expr_is_addsub(expr) || tex_collect_add_terms(expr, 1, &terms) != 0 || terms.count < 2u)
+    if (!expr_is_addsub(expr) || TeX_collect_add_terms(expr, 1, &terms) != 0 || terms.count < 2u)
         goto cleanup;
 
-    one_line = tex_body_for_node(expr, PREC_LOWEST);
+    one_line = TeX_body_for_node(expr, PREC_LOWEST);
     if (!one_line || (line_limit > 0u && strlen(one_line) <= line_limit))
         goto cleanup;
 
@@ -116,7 +116,7 @@ static char *tex_aligned_add_terms(const expr_t *expr, size_t line_limit, int wr
         sbuf_puts(&b, "\\begin{aligned}[t]\n");
 
     for (size_t i = 0u; i < terms.count; ++i) {
-        char *term_alloc = tex_body_for_node(terms.exprs[i], PREC_ADD);
+        char *term_alloc = TeX_body_for_node(terms.exprs[i], PREC_ADD);
         char *term = term_alloc;
         int sign = terms.signs[i];
 
@@ -124,7 +124,7 @@ static char *tex_aligned_add_terms(const expr_t *expr, size_t line_limit, int wr
             sbuf_free(&b);
             goto cleanup;
         }
-        if (tex_term_consume_leading_minus(&term))
+        if (TeX_term_consume_leading_minus(&term))
             sign = -sign;
         if (i > 0u)
             sbuf_puts(&b, " \\\\\n");
@@ -146,38 +146,38 @@ static char *tex_aligned_add_terms(const expr_t *expr, size_t line_limit, int wr
 
 cleanup:
     free(one_line);
-    tex_add_terms_free(&terms);
+    TeX_add_terms_free(&terms);
     return out;
 }
 
-static char *tex_aligned_scaled_add_terms(const expr_t *sum, const expr_t *factor, size_t line_limit)
+static char *TeX_aligned_scaled_add_terms(const expr_t *sum, const expr_t *factor, size_t line_limit)
 {
-    tex_add_terms_t terms = {0};
+    TeX_add_terms_t terms = {0};
     sbuf_t b;
     char *one_line = NULL;
     char *factor_alloc = NULL;
-    char *factor_tex = NULL;
+    char *factor_TeX = NULL;
     char *out = NULL;
     int factor_sign = 1;
 
-    if (!sum || !factor || !expr_is_addsub(sum) || tex_collect_add_terms(sum, 1, &terms) != 0 || terms.count < 2u)
+    if (!sum || !factor || !expr_is_addsub(sum) || TeX_collect_add_terms(sum, 1, &terms) != 0 || terms.count < 2u)
         goto cleanup;
 
-    one_line = tex_body_for_node(sum, PREC_LOWEST);
+    one_line = TeX_body_for_node(sum, PREC_LOWEST);
     if (!one_line || (line_limit > 0u && strlen(one_line) <= line_limit))
         goto cleanup;
 
-    factor_alloc = tex_body_for_node(factor, PREC_MUL);
-    factor_tex = factor_alloc;
+    factor_alloc = TeX_body_for_node(factor, PREC_MUL);
+    factor_TeX = factor_alloc;
     if (!factor_alloc)
         goto cleanup;
-    if (tex_term_consume_leading_minus(&factor_tex))
+    if (TeX_term_consume_leading_minus(&factor_TeX))
         factor_sign = -1;
 
     sbuf_init(&b);
     sbuf_puts(&b, "\\begin{aligned}[t]\n");
     for (size_t i = 0u; i < terms.count; ++i) {
-        char *term_alloc = tex_body_for_node(terms.exprs[i], PREC_MUL);
+        char *term_alloc = TeX_body_for_node(terms.exprs[i], PREC_MUL);
         char *term = term_alloc;
         int sign = terms.signs[i] * factor_sign;
 
@@ -185,7 +185,7 @@ static char *tex_aligned_scaled_add_terms(const expr_t *sum, const expr_t *facto
             sbuf_free(&b);
             goto cleanup;
         }
-        if (tex_term_consume_leading_minus(&term))
+        if (TeX_term_consume_leading_minus(&term))
             sign = -sign;
         if (i > 0u)
             sbuf_puts(&b, " \\\\\n");
@@ -194,7 +194,7 @@ static char *tex_aligned_scaled_add_terms(const expr_t *sum, const expr_t *facto
             sbuf_puts(&b, i == 0u ? "-" : "{} - ");
         else if (i > 0u)
             sbuf_puts(&b, "{} + ");
-        sbuf_puts(&b, factor_tex);
+        sbuf_puts(&b, factor_TeX);
         sbuf_puts(&b, "\\cdot ");
         sbuf_puts(&b, term);
         free(term_alloc);
@@ -206,11 +206,11 @@ static char *tex_aligned_scaled_add_terms(const expr_t *sum, const expr_t *facto
 cleanup:
     free(one_line);
     free(factor_alloc);
-    tex_add_terms_free(&terms);
+    TeX_add_terms_free(&terms);
     return out;
 }
 
-static char *tex_wrapped_mul_with_additive_factor(const expr_t *expr, size_t line_limit)
+static char *TeX_wrapped_mul_with_additive_factor(const expr_t *expr, size_t line_limit)
 {
     const expr_t *factor = NULL;
     const expr_t *sum = NULL;
@@ -228,10 +228,10 @@ static char *tex_wrapped_mul_with_additive_factor(const expr_t *expr, size_t lin
         return NULL;
     }
 
-    return tex_aligned_scaled_add_terms(sum, factor, line_limit);
+    return TeX_aligned_scaled_add_terms(sum, factor, line_limit);
 }
 
-static char *tex_wrapped_body_inner(const expr_t *expr, size_t line_limit)
+static char *TeX_wrapped_body_inner(const expr_t *expr, size_t line_limit)
 {
     char *one_line = NULL;
     char *wrapped = NULL;
@@ -241,13 +241,13 @@ static char *tex_wrapped_body_inner(const expr_t *expr, size_t line_limit)
     if (line_limit == 0u)
         line_limit = 110u;
 
-    one_line = tex_body_for_node(expr, PREC_LOWEST);
+    one_line = TeX_body_for_node(expr, PREC_LOWEST);
     if (!one_line || strlen(one_line) <= line_limit)
         return one_line;
 
-    wrapped = tex_wrapped_mul_with_additive_factor(expr, line_limit);
+    wrapped = TeX_wrapped_mul_with_additive_factor(expr, line_limit);
     if (!wrapped && expr_is_addsub(expr))
-        wrapped = tex_aligned_add_terms(expr, line_limit, 0);
+        wrapped = TeX_aligned_add_terms(expr, line_limit, 0);
     if (wrapped) {
         free(one_line);
         return wrapped;
@@ -255,16 +255,16 @@ static char *tex_wrapped_body_inner(const expr_t *expr, size_t line_limit)
     return one_line;
 }
 
-static int tex_tree_contains_formal_derivative(const expr_t *expr)
+static int TeX_tree_contains_formal_derivative(const expr_t *expr)
 {
     if (!expr)
         return 0;
     if (expr_is_formal_derivative(expr))
         return 1;
-    return tex_tree_contains_formal_derivative(expr->a) || tex_tree_contains_formal_derivative(expr->b);
+    return TeX_tree_contains_formal_derivative(expr->a) || TeX_tree_contains_formal_derivative(expr->b);
 }
 
-int expr_to_tex_parts(const expr_t *dv, char **expr_out, char **bindings_out)
+int expr_to_TeX_parts(const expr_t *dv, char **expr_out, char **bindings_out)
 {
     autoname_table_t vnames;
     const expr_t *g;
@@ -285,8 +285,8 @@ int expr_to_tex_parts(const expr_t *dv, char **expr_out, char **bindings_out)
      * derivative.  Render the expression tree whenever formal derivatives are
      * present so (Dx(y))^2 remains visibly distinct from Dxx(y).
      */
-    if (dv && dv->binding_expr && !expr_is_const(dv) && !tex_tree_contains_formal_derivative(dv)) {
-        *expr_out = expr_binding_expr_to_tex(dv->binding_expr);
+    if (dv && dv->binding_expr && !expr_is_const(dv) && !TeX_tree_contains_formal_derivative(dv)) {
+        *expr_out = expr_binding_expr_to_TeX(dv->binding_expr);
         *bindings_out = expr_tostring_xstrdup("");
         return (*expr_out && *bindings_out) ? 0 : -1;
     }
@@ -308,7 +308,7 @@ int expr_to_tex_parts(const expr_t *dv, char **expr_out, char **bindings_out)
     find_named_consts_dfs(g, &cl);
 
     sbuf_init(&expr);
-    emit_tex_expr(g, &expr, PREC_LOWEST);
+    emit_TeX_expr(g, &expr, PREC_LOWEST);
 
     sbuf_init(&bindings);
     if (vl.count > 0u || cl.count > 0u) {
@@ -318,9 +318,9 @@ int expr_to_tex_parts(const expr_t *dv, char **expr_out, char **bindings_out)
 
             if (i > 0u)
                 sbuf_puts(&bindings, ", ");
-            emit_tex_name(&bindings, expr_name_or_default(v, "x"));
+            emit_TeX_name(&bindings, expr_name_or_default(v, "x"));
             sbuf_puts(&bindings, " = ");
-            binding_text = binding_rhs_tex_string_local(v);
+            binding_text = binding_rhs_TeX_string_local(v);
             if (binding_text) {
                 sbuf_puts(&bindings, binding_text);
                 free(binding_text);
@@ -335,9 +335,9 @@ int expr_to_tex_parts(const expr_t *dv, char **expr_out, char **bindings_out)
 
                 if (i > 0u)
                     sbuf_puts(&bindings, ", ");
-                emit_tex_name(&bindings, c->name);
+                emit_TeX_name(&bindings, c->name);
                 sbuf_puts(&bindings, " = ");
-                binding_text = binding_rhs_tex_string_local(c);
+                binding_text = binding_rhs_TeX_string_local(c);
                 if (binding_text) {
                     sbuf_puts(&bindings, binding_text);
                     free(binding_text);
@@ -366,14 +366,14 @@ int expr_to_tex_parts(const expr_t *dv, char **expr_out, char **bindings_out)
     return 0;
 }
 
-char *expr_to_tex_body(const expr_t *expr)
+char *expr_to_TeX_body(const expr_t *expr)
 {
     char *body = NULL;
     char *bindings = NULL;
 
     if (!expr)
         return NULL;
-    if (expr_to_tex_parts(expr, &body, &bindings) == 0) {
+    if (expr_to_TeX_parts(expr, &body, &bindings) == 0) {
         free(bindings);
         return body;
     }
@@ -382,7 +382,7 @@ char *expr_to_tex_body(const expr_t *expr)
     return NULL;
 }
 
-char *expr_to_tex_body_wrapped(const expr_t *expr, size_t line_limit)
+char *expr_to_TeX_body_wrapped(const expr_t *expr, size_t line_limit)
 {
     autoname_table_t vnames;
     char *body = NULL;
@@ -390,31 +390,31 @@ char *expr_to_tex_body_wrapped(const expr_t *expr, size_t line_limit)
     if (!expr)
         return NULL;
     if (expr->binding_expr && !expr_is_const(expr))
-        return expr_to_tex_body(expr);
+        return expr_to_TeX_body(expr);
 
     autoname_init(&vnames);
     assign_unnamed_vars_dfs((expr_t *)expr, &vnames);
-    body = tex_wrapped_body_inner(expr, line_limit);
+    body = TeX_wrapped_body_inner(expr, line_limit);
     autoname_restore(&vnames);
     return body;
 }
 
-char *expr_to_tex_body_wrapped_with_partials(const expr_t *expr, size_t line_limit)
+char *expr_to_TeX_body_wrapped_with_partials(const expr_t *expr, size_t line_limit)
 {
     char *body;
 
-    expr_tex_partial_derivatives_push();
-    body = expr_to_tex_body_wrapped(expr, line_limit);
-    expr_tex_partial_derivatives_pop();
+    expr_TeX_partial_derivatives_push();
+    body = expr_to_TeX_body_wrapped(expr, line_limit);
+    expr_TeX_partial_derivatives_pop();
     return body;
 }
 
-char *expr_to_tex_body_wrapped_with_totals(const expr_t *expr, size_t line_limit)
+char *expr_to_TeX_body_wrapped_with_totals(const expr_t *expr, size_t line_limit)
 {
     char *body;
 
-    expr_tex_total_derivatives_push();
-    body = expr_to_tex_body_wrapped(expr, line_limit);
-    expr_tex_total_derivatives_pop();
+    expr_TeX_total_derivatives_push();
+    body = expr_to_TeX_body_wrapped(expr, line_limit);
+    expr_TeX_total_derivatives_pop();
     return body;
 }

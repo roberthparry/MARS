@@ -162,7 +162,7 @@ static expr_t *integrate_bessel_kind_rule(const expr_t *expr, const expr_t *wrt,
     j_difference = (j_lower && j_upper) ? expr_sub(j_lower, j_upper) : NULL;
     j_prime = j_difference ? expr_div_num(j_difference, &NUM_TWO) : NULL;
     lommel = mu_expr ? expr_lommel_s(mu_expr, expr->a, expr->b) : NULL;
-    lommel_prime = mu_expr ? expr_lommel_s_derivative_internal(mu_expr, expr->a, expr->b) : NULL;
+    lommel_prime = mu_expr ? expr_lommel_s_argument_derivative_expansion(mu_expr, expr->a, expr->b) : NULL;
     left_product = (j && lommel_prime) ? expr_mul(j, lommel_prime) : NULL;
     right_product = (j_prime && lommel) ? expr_mul(j_prime, lommel) : NULL;
     wronskian = (left_product && right_product) ? expr_sub(left_product, right_product) : NULL;

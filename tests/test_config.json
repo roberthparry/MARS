@@ -773,7 +773,7 @@
             "test_to_string_atan2_expr": true,
             "test_to_string_atan2_func": true
           },
-          "test_to_string_atan_tex": true,
+          "test_to_string_atan_TeX": true,
           "test_to_string_basic_const": {
             "enabled": true,
             "test_to_string_basic_const_expr": true,
@@ -784,9 +784,9 @@
             "test_to_string_basic_var_expr": true,
             "test_to_string_basic_var_func": true
           },
-          "test_to_string_basic_var_tex": true,
+          "test_to_string_basic_var_TeX": true,
           "test_to_string_double_negative_expr": true,
-          "test_to_string_exp_unit_fraction_root_tex": true,
+          "test_to_string_exp_unit_fraction_root_TeX": true,
           "test_to_string_floor_ceil": {
             "enabled": true,
             "test_to_string_floor_ceil_expr": true,
@@ -801,9 +801,9 @@
             "test_to_string_function_style_sub_negative_product": true
           },
           "test_to_string_gamma_polygamma_standard_names": true,
-          "test_to_string_gammainv_tex": true,
-          "test_to_string_lambert_w_tex": true,
-          "test_to_string_log10_tex": true,
+          "test_to_string_gammainv_TeX": true,
+          "test_to_string_lambert_w_TeX": true,
+          "test_to_string_log10_TeX": true,
           "test_to_string_negative_rhs_expr": true,
           "test_to_string_nested_mul_add": {
             "enabled": true,
@@ -812,30 +812,30 @@
             "test_to_string_polynomial_degree_order_expr": true
           },
           "test_to_string_nested_negative_rhs_expr": true,
-          "test_to_string_nested_quotient_pow_tex": true,
-          "test_to_string_nested_transcendental_tex": true,
+          "test_to_string_nested_quotient_pow_TeX": true,
+          "test_to_string_nested_transcendental_TeX": true,
           "test_to_string_non_simple_var_bracketed": {
             "enabled": true,
             "test_to_string_non_simple_var_bracketed_expr": true,
             "test_to_string_non_simple_var_bracketed_func": true
           },
-          "test_to_string_parsed_exp_unit_fraction_root_tex": true,
+          "test_to_string_parsed_exp_unit_fraction_root_TeX": true,
           "test_to_string_pow_superscript": {
             "enabled": true,
+            "test_to_string_complex_const_pow_TeX": true,
             "test_to_string_complex_const_pow_expr": true,
             "test_to_string_complex_const_pow_func": true,
-            "test_to_string_complex_const_pow_tex": true,
+            "test_to_string_parsed_complex_const_pow_TeX": true,
             "test_to_string_parsed_complex_const_pow_expr": true,
-            "test_to_string_parsed_complex_const_pow_tex": true,
             "test_to_string_pow_superscript_expr": true,
             "test_to_string_pow_superscript_func": true,
-            "test_to_string_power_base_is_grouped_tex": true,
+            "test_to_string_power_base_is_grouped_TeX": true,
             "test_to_string_power_of_power_simplifies_expr": true,
-            "test_to_string_powered_exponent_tex": true
+            "test_to_string_powered_exponent_TeX": true
           },
           "test_to_string_special_functions": true,
-          "test_to_string_symbolic_constant_quotient_tex": true,
-          "test_to_string_symbolic_constants_tex": true,
+          "test_to_string_symbolic_constant_quotient_TeX": true,
+          "test_to_string_symbolic_constants_TeX": true,
           "test_to_string_unary_sin": {
             "enabled": true,
             "test_to_string_unary_sin_expr": true,
@@ -846,8 +846,8 @@
             "test_to_string_unary_sqrt_expr": true,
             "test_to_string_unary_sqrt_func": true
           },
-          "test_to_string_wrapped_tex_aligned_subtraction": true,
-          "test_to_string_wrapped_tex_distributes_scale": true
+          "test_to_string_wrapped_TeX_aligned_subtraction": true,
+          "test_to_string_wrapped_TeX_distributes_scale": true
         }
       }
     }
@@ -1274,15 +1274,15 @@
   "tests/matrix/test_matrix_tostring.c": {
     "test_mat_to_string_number_precision": true,
     "test_mat_to_string_numeric": true,
-    "test_mat_to_string_numeric_tex": true,
+    "test_mat_to_string_numeric_TeX": true,
     "test_mat_to_string_symbolic": true,
+    "test_mat_to_string_symbolic_TeX": true,
+    "test_mat_to_string_symbolic_TeX_exact": true,
+    "test_mat_to_string_symbolic_TeX_no_bindings_exact": true,
+    "test_mat_to_string_symbolic_all_nan_TeX_elides_wrapper": true,
     "test_mat_to_string_symbolic_all_nan_elides_wrapper": true,
-    "test_mat_to_string_symbolic_all_nan_tex_elides_wrapper": true,
     "test_mat_to_string_symbolic_derivative_roundtrip": true,
-    "test_mat_to_string_symbolic_roundtrip": true,
-    "test_mat_to_string_symbolic_tex": true,
-    "test_mat_to_string_symbolic_tex_exact": true,
-    "test_mat_to_string_symbolic_tex_no_bindings_exact": true
+    "test_mat_to_string_symbolic_roundtrip": true
   },
   "tests/number/test_number.c": {
     "readme_examples": {

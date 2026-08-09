@@ -77,7 +77,6 @@ number_t eval_legendre_chi(expr_t *dv);
 number_t eval_bessel_j(expr_t *dv);
 number_t eval_bessel_y(expr_t *dv);
 number_t eval_lommel_s(expr_t *dv);
-number_t eval_lommel_s_derivative(expr_t *dv);
 number_t eval_lommel_s_pack(expr_t *dv);
 number_t eval_appell_f1(expr_t *dv);
 number_t eval_appell_f1_pack(expr_t *dv);
@@ -196,7 +195,6 @@ expr_t *deriv_legendre_chi(expr_t *dv);
 expr_t *deriv_bessel_j(expr_t *dv);
 expr_t *deriv_bessel_y(expr_t *dv);
 expr_t *deriv_lommel_s(expr_t *dv);
-expr_t *deriv_lommel_s_derivative(expr_t *dv);
 expr_t *deriv_lommel_s_pack(expr_t *dv);
 expr_t *deriv_appell_f1(expr_t *dv);
 expr_t *deriv_appell_f1_pack(expr_t *dv);
@@ -236,6 +234,6 @@ expr_t *deriv_gammainc_Q(expr_t *dv);
 expr_t *deriv_not_differentiable(expr_t *dv);
 expr_t *deriv_atan2(expr_t *dv);
 
-expr_t *expr_lommel_s_derivative_internal(const expr_t *mu, const expr_t *nu, const expr_t *argument);
+expr_t *expr_lommel_s_argument_derivative_expansion(const expr_t *mu, const expr_t *nu, const expr_t *argument);
 
 #endif /* EXPR_MATHS_H */

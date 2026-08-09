@@ -626,11 +626,11 @@ expr_t *expr_simplify(const expr_t *expr);
  *                     "expression expr(x) { return sin(x); } output(expr(1));"
  * style_EXPRESSION  — round-trip infix notation, e.g.
  *                     "{ sin(x₀) | x₀ = 1.0 }"
- * style_TEX         — TeX mathematical notation, e.g. "\left\{ x_{0} \;\middle|\; x_{0} = 1.0 \right\}"
+ * style_LATEX         — TeX mathematical notation, e.g. "\left\{ x_{0} \;\middle|\; x_{0} = 1.0 \right\}"
  * style_UNBOUND     — infix expression body without the { ... | bindings }
  *                     wrapper, e.g. "sin(x₀)"
  */
-typedef enum { style_FUNCTION, style_EXPRESSION, style_TEX, style_UNBOUND } style_t;
+typedef enum { style_FUNCTION, style_EXPRESSION, style_LATEX, style_UNBOUND } style_t;
 
 /**
  * @brief Serialise @p expr to newly allocated text.
@@ -657,12 +657,12 @@ char *expr_to_string(const expr_t *expr, style_t style);
  * The returned C string is allocated with malloc() and must be released with
  * free(). Returns NULL on invalid input or allocation failure.
  */
-char *expr_to_tex_body(const expr_t *expr);
+char *expr_to_TeX_body(const expr_t *expr);
 
 /**
  * @brief Return a display-oriented TeX expression body with line breaks.
  *
- * This keeps the ordinary expr_to_tex_body() spelling available for exact
+ * This keeps the ordinary expr_to_TeX_body() spelling available for exact
  * serialisation, but may wrap long additive expressions in an amsmath
  * aligned environment for display. @p line_limit is a soft character budget;
  * pass 0 for the default.
@@ -670,7 +670,7 @@ char *expr_to_tex_body(const expr_t *expr);
  * The returned C string is allocated with malloc() and must be released with
  * free(). Returns NULL on invalid input or allocation failure.
  */
-char *expr_to_tex_body_wrapped(const expr_t *expr, size_t line_limit);
+char *expr_to_TeX_body_wrapped(const expr_t *expr, size_t line_limit);
 
 /**
  * @brief Format expression-aware text into a new string_t from a va_list.

@@ -240,7 +240,7 @@ about 64 significant decimal digits before the equation is parsed and solved.
   with a comment such as `// x = ?`, then uses the compact
   `output(equ(...).solve())` form
 - `equ_to_text(..., style_UNBOUND)` shows the plain equation body
-- `equ_to_text(..., style_TEX)` emits TeX-ready display text
+- `equ_to_text(..., style_LATEX)` emits TeX-ready display text
 - `equ_display_expanded(...)` builds a display equation whose polynomial sides
   are collected and written in descending powers of the selected variable
 - `equ_residual(...)` builds the simplified residual `lhs - rhs`

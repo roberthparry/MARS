@@ -136,14 +136,14 @@ Fourier transform.
 
 The forward Laplace transform is unilateral:
 
-```tex
+```latex
 \mathcal{L}\{f(t)\}(s)
   = \int_0^\infty e^{-st} f(t)\,dt
 ```
 
 The inverse Laplace transform is the Bromwich integral:
 
-```tex
+```latex
 \mathcal{L}^{-1}\{F(s)\}(t)
   = \frac{1}{2\pi i}
     \int_{\gamma-i\infty}^{\gamma+i\infty} e^{st}F(s)\,ds
@@ -151,12 +151,12 @@ The inverse Laplace transform is the Bromwich integral:
 
 The Fourier transform uses angular spatial frequency and the convention:
 
-```tex
+```latex
 \mathcal{F}\{f(x)\}(k)
   = \int_{-\infty}^{\infty} f(x)e^{-ikx}\,dx
 ```
 
-```tex
+```latex
 \mathcal{F}^{-1}\{F(k)\}(x)
   = \frac{1}{2\pi}
     \int_{-\infty}^{\infty} F(k)e^{ikx}\,dk
@@ -212,13 +212,13 @@ TeX output uses conventional calligraphic operators:
 
 renders as:
 
-```tex
+```latex
 \mathcal{L}_{t\to s}\{f(t)\}
 ```
 
 The remaining operators render as:
 
-```tex
+```latex
 \mathcal{L}^{-1}_{s\to t}\{F(s)\}
 \mathcal{F}_{x\to k}\{f(x)\}
 \mathcal{F}^{-1}_{k\to x}\{F(k)\}

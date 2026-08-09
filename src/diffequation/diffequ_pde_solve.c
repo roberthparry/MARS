@@ -137,20 +137,20 @@ static bool de_pde_set_stationary_steps(diffequ_solve_result_t *result, const ex
     char *h = expr_to_string(spatial_operator, style_UNBOUND);
     char *u0 = expr_to_string(initial, style_UNBOUND);
     char *lambda = expr_to_string(rate, style_UNBOUND);
-    char *u_tex = expr_to_string(dependent, style_TEX);
-    char *t_tex = expr_to_string(time_coordinate, style_TEX);
-    char *t0_tex = expr_to_string(time_point, style_TEX);
-    char *a_tex = expr_to_string(time_coefficient, style_TEX);
-    char *h_tex = expr_to_string(spatial_operator, style_TEX);
-    char *u0_tex = expr_to_string(initial, style_TEX);
-    char *lambda_tex = expr_to_string(rate, style_TEX);
+    char *u_TeX = expr_to_string(dependent, style_LATEX);
+    char *t_TeX = expr_to_string(time_coordinate, style_LATEX);
+    char *t0_TeX = expr_to_string(time_point, style_LATEX);
+    char *a_TeX = expr_to_string(time_coefficient, style_LATEX);
+    char *h_TeX = expr_to_string(spatial_operator, style_LATEX);
+    char *u0_TeX = expr_to_string(initial, style_LATEX);
+    char *lambda_TeX = expr_to_string(rate, style_LATEX);
     string_t *solution_text = equ_to_text(solution, style_UNBOUND);
-    string_t *solution_tex = equ_to_text(solution, style_TEX);
+    string_t *solution_TeX = equ_to_text(solution, style_LATEX);
     string_t *steps = string_new();
-    string_t *steps_tex = string_new();
+    string_t *steps_TeX = string_new();
     bool success =
-        u && t && t0 && a && h && u0 && lambda && u_tex && t_tex && t0_tex && a_tex && h_tex && u0_tex && lambda_tex &&
-        solution_text && solution_tex && steps && steps_tex &&
+        u && t && t0 && a && h && u0 && lambda && u_TeX && t_TeX && t0_TeX && a_TeX && h_TeX && u0_TeX && lambda_TeX &&
+        solution_text && solution_TeX && steps && steps_TeX &&
         string_append_format(steps,
                              "Separate the evolution derivative from the spatial operator:\n"
                              "      A·∂%s/∂%s + H[%s] = 0\n"
@@ -163,7 +163,7 @@ static bool de_pde_set_stationary_steps(diffequ_solve_result_t *result, const ex
                              "      %s",
                              u, t, u, a, u, h, t, t0, u, u0, u, u, u, lambda, u, u, t, t0,
                              string_c_str(solution_text)) >= 0 &&
-        string_append_format(steps_tex,
+        string_append_format(steps_TeX,
                              "\\begin{aligned}[t]"
                              "A\\frac{\\partial %s}{\\partial %s}+H[%s]&=0\\\\"
                              "A&=%s,\\qquad H[%s]=%s\\\\"
@@ -172,22 +172,22 @@ static bool de_pde_set_stationary_steps(diffequ_solve_result_t *result, const ex
                              "%s&=%s_0e^{\\lambda(%s-%s)}\\\\"
                              "&%s"
                              "\\end{aligned}",
-                             u_tex, t_tex, u_tex, a_tex, u_tex, h_tex, u_tex, u0_tex, t_tex, t0_tex, u_tex, u_tex,
-                             lambda_tex, u_tex, u_tex, t_tex, t0_tex, string_c_str(solution_tex)) >= 0 &&
+                             u_TeX, t_TeX, u_TeX, a_TeX, u_TeX, h_TeX, u_TeX, u0_TeX, t_TeX, t0_TeX, u_TeX, u_TeX,
+                             lambda_TeX, u_TeX, u_TeX, t_TeX, t0_TeX, string_c_str(solution_TeX)) >= 0 &&
         de_solve_result_set_steps(result, string_c_str(steps)) == 0 &&
-        de_solve_result_set_steps_tex(result, string_c_str(steps_tex)) == 0;
+        de_solve_result_set_steps_TeX(result, string_c_str(steps_TeX)) == 0;
 
-    string_free(steps_tex);
+    string_free(steps_TeX);
     string_free(steps);
-    string_free(solution_tex);
+    string_free(solution_TeX);
     string_free(solution_text);
-    free(lambda_tex);
-    free(u0_tex);
-    free(h_tex);
-    free(a_tex);
-    free(t0_tex);
-    free(t_tex);
-    free(u_tex);
+    free(lambda_TeX);
+    free(u0_TeX);
+    free(h_TeX);
+    free(a_TeX);
+    free(t0_TeX);
+    free(t_TeX);
+    free(u_TeX);
     free(lambda);
     free(u0);
     free(h);
@@ -318,7 +318,7 @@ cleanup:
 }
 
 static bool de_pde_cartesian_laplace_steps(const diffequ_t *de, const equation_t *solution, char **steps_out,
-                                           char **steps_tex_out)
+                                           char **steps_TeX_out)
 {
     const expr_t *dependent = solution ? equ_lhs(solution) : NULL;
     const expr_t *right = solution ? equ_rhs(solution) : NULL;
@@ -348,23 +348,23 @@ static bool de_pde_cartesian_laplace_steps(const diffequ_t *de, const equation_t
     char *right_text = NULL;
     char *first_second_derivative_text = NULL;
     char *second_second_derivative_text = NULL;
-    char *dependent_tex = NULL;
-    char *first_coordinate_tex = NULL;
-    char *second_coordinate_tex = NULL;
-    char *positive_coordinate_tex = NULL;
-    char *negative_coordinate_tex = NULL;
-    char *right_tex = NULL;
-    char *first_second_derivative_tex = NULL;
-    char *second_second_derivative_tex = NULL;
+    char *dependent_TeX = NULL;
+    char *first_coordinate_TeX = NULL;
+    char *second_coordinate_TeX = NULL;
+    char *positive_coordinate_TeX = NULL;
+    char *negative_coordinate_TeX = NULL;
+    char *right_TeX = NULL;
+    char *first_second_derivative_TeX = NULL;
+    char *second_second_derivative_TeX = NULL;
     string_t *steps = NULL;
-    string_t *steps_tex = NULL;
+    string_t *steps_TeX = NULL;
     bool success = false;
 
     if (steps_out)
         *steps_out = NULL;
-    if (steps_tex_out)
-        *steps_tex_out = NULL;
-    if (!de || de->independent_count != 2u || !dependent || !right || !steps_out || !steps_tex_out)
+    if (steps_TeX_out)
+        *steps_TeX_out = NULL;
+    if (!de || de->independent_count != 2u || !dependent || !right || !steps_out || !steps_TeX_out)
         return false;
     first_coordinate = de->independent_vars[0];
     second_coordinate = de->independent_vars[1];
@@ -396,7 +396,7 @@ static bool de_pde_cartesian_laplace_steps(const diffequ_t *de, const equation_t
         goto cleanup;
 
 #define DE_LAPLACE_TEXT(name, expression) name = expr_to_string((expression), style_UNBOUND)
-#define DE_LAPLACE_TEX(name, expression) name = expr_to_tex_body((expression))
+#define DE_LAPLACE_LATEX(name, expression) name = expr_to_TeX_body((expression))
     DE_LAPLACE_TEXT(dependent_text, dependent);
     first_coordinate_text = strdup(expr_symbol_name(first_coordinate));
     second_coordinate_text = strdup(expr_symbol_name(second_coordinate));
@@ -405,25 +405,25 @@ static bool de_pde_cartesian_laplace_steps(const diffequ_t *de, const equation_t
     DE_LAPLACE_TEXT(right_text, right);
     DE_LAPLACE_TEXT(first_second_derivative_text, first_second_derivative);
     DE_LAPLACE_TEXT(second_second_derivative_text, second_second_derivative);
-    DE_LAPLACE_TEX(dependent_tex, dependent);
-    DE_LAPLACE_TEX(first_coordinate_tex, first_coordinate_symbol);
-    DE_LAPLACE_TEX(second_coordinate_tex, second_coordinate_symbol);
-    DE_LAPLACE_TEX(positive_coordinate_tex, positive_coordinate);
-    DE_LAPLACE_TEX(negative_coordinate_tex, negative_coordinate);
-    DE_LAPLACE_TEX(right_tex, right);
-    DE_LAPLACE_TEX(first_second_derivative_tex, first_second_derivative);
-    DE_LAPLACE_TEX(second_second_derivative_tex, second_second_derivative);
-#undef DE_LAPLACE_TEX
+    DE_LAPLACE_LATEX(dependent_TeX, dependent);
+    DE_LAPLACE_LATEX(first_coordinate_TeX, first_coordinate_symbol);
+    DE_LAPLACE_LATEX(second_coordinate_TeX, second_coordinate_symbol);
+    DE_LAPLACE_LATEX(positive_coordinate_TeX, positive_coordinate);
+    DE_LAPLACE_LATEX(negative_coordinate_TeX, negative_coordinate);
+    DE_LAPLACE_LATEX(right_TeX, right);
+    DE_LAPLACE_LATEX(first_second_derivative_TeX, first_second_derivative);
+    DE_LAPLACE_LATEX(second_second_derivative_TeX, second_second_derivative);
+#undef DE_LAPLACE_LATEX
 #undef DE_LAPLACE_TEXT
     if (!dependent_text || !first_coordinate_text || !second_coordinate_text || !positive_coordinate_text ||
         !negative_coordinate_text || !right_text || !first_second_derivative_text || !second_second_derivative_text ||
-        !dependent_tex || !first_coordinate_tex || !second_coordinate_tex || !positive_coordinate_tex ||
-        !negative_coordinate_tex || !right_tex || !first_second_derivative_tex || !second_second_derivative_tex)
+        !dependent_TeX || !first_coordinate_TeX || !second_coordinate_TeX || !positive_coordinate_TeX ||
+        !negative_coordinate_TeX || !right_TeX || !first_second_derivative_TeX || !second_second_derivative_TeX)
         goto cleanup;
 
     steps = string_new();
-    steps_tex = string_new();
-    if (!steps || !steps_tex ||
+    steps_TeX = string_new();
+    if (!steps || !steps_TeX ||
         string_append_format(steps,
                              "Use the parsed coordinates to form:\n"
                              "      z = %s,    w = %s\n"
@@ -441,7 +441,7 @@ static bool de_pde_cartesian_laplace_steps(const diffequ_t *de, const equation_t
                              second_coordinate_text, second_second_derivative_text, dependent_text, dependent_text,
                              first_coordinate_text, dependent_text, second_coordinate_text,
                              first_second_derivative_text, second_second_derivative_text) < 0 ||
-        string_append_format(steps_tex,
+        string_append_format(steps_TeX,
                              "\\begin{aligned}[t]"
                              "\\text{From the parsed coordinates,}\\quad z&=%s\\\\"
                              "w&=%s\\\\[4pt]"
@@ -455,34 +455,34 @@ static bool de_pde_cartesian_laplace_steps(const diffequ_t *de, const equation_t
                              "&\\quad+\\left(%s\\right)\\\\"
                              "&=0"
                              "\\end{aligned}",
-                             positive_coordinate_tex, negative_coordinate_tex, dependent_tex, right_tex, dependent_tex,
-                             first_coordinate_tex, first_second_derivative_tex, dependent_tex, second_coordinate_tex,
-                             second_second_derivative_tex, dependent_tex, dependent_tex, first_coordinate_tex,
-                             dependent_tex, second_coordinate_tex, first_second_derivative_tex,
-                             second_second_derivative_tex) < 0)
+                             positive_coordinate_TeX, negative_coordinate_TeX, dependent_TeX, right_TeX, dependent_TeX,
+                             first_coordinate_TeX, first_second_derivative_TeX, dependent_TeX, second_coordinate_TeX,
+                             second_second_derivative_TeX, dependent_TeX, dependent_TeX, first_coordinate_TeX,
+                             dependent_TeX, second_coordinate_TeX, first_second_derivative_TeX,
+                             second_second_derivative_TeX) < 0)
         goto cleanup;
 
     *steps_out = strdup(string_c_str(steps));
-    *steps_tex_out = strdup(string_c_str(steps_tex));
-    success = *steps_out && *steps_tex_out;
+    *steps_TeX_out = strdup(string_c_str(steps_TeX));
+    success = *steps_out && *steps_TeX_out;
 
 cleanup:
     if (!success) {
-        free(*steps_tex_out);
+        free(*steps_TeX_out);
         free(*steps_out);
-        *steps_tex_out = NULL;
+        *steps_TeX_out = NULL;
         *steps_out = NULL;
     }
-    string_free(steps_tex);
+    string_free(steps_TeX);
     string_free(steps);
-    free(second_second_derivative_tex);
-    free(first_second_derivative_tex);
-    free(right_tex);
-    free(negative_coordinate_tex);
-    free(positive_coordinate_tex);
-    free(second_coordinate_tex);
-    free(first_coordinate_tex);
-    free(dependent_tex);
+    free(second_second_derivative_TeX);
+    free(first_second_derivative_TeX);
+    free(right_TeX);
+    free(negative_coordinate_TeX);
+    free(positive_coordinate_TeX);
+    free(second_coordinate_TeX);
+    free(first_coordinate_TeX);
+    free(dependent_TeX);
     free(second_second_derivative_text);
     free(first_second_derivative_text);
     free(right_text);
@@ -532,7 +532,7 @@ diffequ_solve_result_t *de_pde_solve_two_variable(const diffequ_t *de, const exp
                                               "and w²/r² = exp(−2iθ).\n"
                                               "Therefore Δu = 0, and the general harmonic family is:\n"
                                               "      u(r, θ) = F(r·exp(iθ)) + G(r·exp(−iθ))";
-    static const char polar_laplace_steps_tex[] = "\\begin{aligned}[t]"
+    static const char polar_laplace_steps_TeX[] = "\\begin{aligned}[t]"
                                                   "\\text{Set}\\quad z&=r e^{i\\theta},"
                                                   "\\qquad w=r e^{-i\\theta}\\\\"
                                                   "u&=F(z)+G(w)\\\\[6pt]"
@@ -576,7 +576,7 @@ diffequ_solve_result_t *de_pde_solve_two_variable(const diffequ_t *de, const exp
     de_attempt_t polar_laplace;
     diffequ_solve_result_t *result = NULL;
     char *laplace_steps = NULL;
-    char *laplace_steps_tex = NULL;
+    char *laplace_steps_TeX = NULL;
     diffequ_solve_result_t *stationary = NULL;
 
     polar_laplace = residual ? de_pde_attempt_polar_laplace(de, residual, &polar_laplace_solution) : DE_ATTEMPT_FAILED;
@@ -585,7 +585,7 @@ diffequ_solve_result_t *de_pde_solve_two_variable(const diffequ_t *de, const exp
                                      "solved as the polar form of the two-dimensional "
                                      "Laplace equation");
         if (!result || (include_steps && de_solve_result_set_steps(result, polar_laplace_steps) != 0) ||
-            (include_steps && de_solve_result_set_steps_tex(result, polar_laplace_steps_tex) != 0) ||
+            (include_steps && de_solve_result_set_steps_TeX(result, polar_laplace_steps_TeX) != 0) ||
             de_solve_result_append(result, polar_laplace_solution) != 0) {
             de_solve_result_free(result);
             result = NULL;
@@ -598,14 +598,14 @@ diffequ_solve_result_t *de_pde_solve_two_variable(const diffequ_t *de, const exp
     laplace = residual ? de_pde_attempt_laplace(de, residual, &laplace_solution) : DE_ATTEMPT_FAILED;
     if (laplace == DE_ATTEMPT_SOLVED) {
         if (include_steps &&
-            !de_pde_cartesian_laplace_steps(de, laplace_solution, &laplace_steps, &laplace_steps_tex)) {
+            !de_pde_cartesian_laplace_steps(de, laplace_solution, &laplace_steps, &laplace_steps_TeX)) {
             result = NULL;
             goto cleanup;
         }
         result = de_solve_result_new(DE_SOLVE_STATUS_SOLVED, DE_SOLVER_LAPLACE,
                                      "solved as the two-dimensional Laplace equation");
         if (!result || (include_steps && de_solve_result_set_steps(result, laplace_steps) != 0) ||
-            (include_steps && de_solve_result_set_steps_tex(result, laplace_steps_tex) != 0) ||
+            (include_steps && de_solve_result_set_steps_TeX(result, laplace_steps_TeX) != 0) ||
             de_solve_result_append(result, laplace_solution) != 0) {
             de_solve_result_free(result);
             result = NULL;
@@ -668,7 +668,7 @@ diffequ_solve_result_t *de_pde_solve_two_variable(const diffequ_t *de, const exp
                                                         : "no available symbolic PDE solver matched the equation");
 
 cleanup:
-    free(laplace_steps_tex);
+    free(laplace_steps_TeX);
     free(laplace_steps);
     for (size_t i = 0u; i < 2u; ++i)
         equ_free(characteristic_solutions[i]);

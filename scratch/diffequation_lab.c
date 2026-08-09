@@ -80,7 +80,7 @@ static void print_solution_field(const char *key, const diffequ_solve_result_t *
     }
 }
 
-static void print_solution_tex(const char *key, const diffequ_solve_result_t *result, size_t line_limit)
+static void print_solution_TeX(const char *key, const diffequ_solve_result_t *result, size_t line_limit)
 {
     size_t count = de_solve_result_count(result);
 
@@ -90,8 +90,8 @@ static void print_solution_tex(const char *key, const diffequ_solve_result_t *re
     printf("%s \\begin{aligned}[t]\n", key);
     for (size_t i = 0u; i < count; ++i) {
         const equation_t *solution = de_solve_result_at(result, i);
-        char *lhs = solution ? expr_to_tex_body_wrapped(equ_lhs(solution), line_limit) : NULL;
-        char *rhs = solution ? expr_to_tex_body_wrapped(equ_rhs(solution), line_limit) : NULL;
+        char *lhs = solution ? expr_to_TeX_body_wrapped(equ_lhs(solution), line_limit) : NULL;
+        char *rhs = solution ? expr_to_TeX_body_wrapped(equ_rhs(solution), line_limit) : NULL;
 
         printf("%s &= %s%s\n", lhs ? lhs : "\\text{null}", rhs ? rhs : "\\text{null}", i + 1u < count ? " \\\\" : "");
         free(rhs);
@@ -103,12 +103,12 @@ static void print_solution_tex(const char *key, const diffequ_solve_result_t *re
 static void print_solver_steps(const diffequ_solve_result_t *result)
 {
     const char *steps = de_solve_result_steps(result);
-    const char *steps_tex = de_solve_result_steps_tex(result);
+    const char *steps_TeX = de_solve_result_steps_TeX(result);
 
     if (steps)
         printf("steps %s\n", steps);
-    if (steps_tex)
-        printf("steps_tex %s\n", steps_tex);
+    if (steps_TeX)
+        printf("steps_TeX %s\n", steps_TeX);
 }
 
 int main(int argc, char **argv)
@@ -117,7 +117,7 @@ int main(int argc, char **argv)
     diffequ_t *de;
     diffequ_solve_result_t *result;
     char *problem;
-    char *problem_tex;
+    char *problem_TeX;
     const char *diagnostic;
 
     if (argc < 2) {
@@ -140,12 +140,12 @@ int main(int argc, char **argv)
     }
 
     problem = de_to_string(de, style_EXPRESSION);
-    problem_tex = de_to_string(de, style_TEX);
+    problem_TeX = de_to_string(de, style_LATEX);
     diagnostic = de_solve_result_diagnostic(result);
 
     printf("input %s\n", source);
     printf("problem %s\n", problem ? problem : "");
-    printf("problem_tex %s\n", problem_tex ? problem_tex : "");
+    printf("problem_TeX %s\n", problem_TeX ? problem_TeX : "");
     printf("status %s\n", solve_status_name(de_solve_result_status(result)));
     printf("solver %s\n", solver_name(de_solve_result_solver(result)));
     printf("diagnostic %s\n", diagnostic ? diagnostic : "");
@@ -153,10 +153,10 @@ int main(int argc, char **argv)
         printf("symmetry %s\n", de_solve_result_symmetry(result));
     print_solver_steps(result);
     print_solution_field("solutions", result, style_UNBOUND);
-    print_solution_tex("solutions_tex", result, SIZE_MAX);
-    print_solution_tex("solutions_wrapped_tex", result, 1u);
+    print_solution_TeX("solutions_TeX", result, SIZE_MAX);
+    print_solution_TeX("solutions_wrapped_TeX", result, 1u);
 
-    free(problem_tex);
+    free(problem_TeX);
     free(problem);
     de_solve_result_free(result);
     de_free(de);

@@ -37,7 +37,7 @@ transport equations with explicit axis-aligned boundary data.
 - Equations returned by `de_solve_result_at(...)` are borrowed from the solve
   result.
 - Text returned by `de_solve_result_diagnostic(...)`,
-  `de_solve_result_steps(...)`, `de_solve_result_steps_tex(...)`, and
+  `de_solve_result_steps(...)`, `de_solve_result_steps_TeX(...)`, and
   `de_solve_result_symmetry(...)` is borrowed from the solve result.
 
 The public declarations are in:
@@ -62,7 +62,7 @@ solution. `de_solve(...)` therefore performs no derivation formatting. A
 presenting client can call
 `de_solve_with_options(de, DE_SOLVE_OPTION_STEPS)` to request plain-text and
 TeX derivations through `de_solve_result_steps(...)` and
-`de_solve_result_steps_tex(...)`. A specialised solver may expose its detailed
+`de_solve_result_steps_TeX(...)`. A specialised solver may expose its detailed
 intermediate expressions directly. Otherwise the common derivation layer
 states the selected family rule, the actual parsed equation and every derived
 solution branch. MARS Lab requests and displays these strings; other clients
@@ -242,7 +242,7 @@ solution = y = (x + C₁)/(x² + 2C₁x + 2C₂)
 group identified by the selected solver. It currently returns `SL(3, ℝ)`
 for the two modified-Emden inputs shown above and `NULL` when the solver has
 not identified a group. The TeX derivation available through
-`de_solve_result_steps_tex(...)` renders the same group as
+`de_solve_result_steps_TeX(...)` renders the same group as
 `\mathrm{SL}(3,\mathrm R)`.
 
 This metadata is deliberately narrower than a general Lie-symmetry solver.

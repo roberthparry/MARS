@@ -3,13 +3,13 @@
 typedef struct {
     char *label;
     char *tex;
-} matrix_tex_preview_entry_t;
+} matrix_TeX_preview_entry_t;
 
-static matrix_tex_preview_entry_t *g_matrix_tex_preview_entries = NULL;
-static size_t g_matrix_tex_preview_count = 0u;
-static size_t g_matrix_tex_preview_cap = 0u;
+static matrix_TeX_preview_entry_t *g_matrix_TeX_preview_entries = NULL;
+static size_t g_matrix_TeX_preview_count = 0u;
+static size_t g_matrix_TeX_preview_cap = 0u;
 
-static char *matrix_tex_preview_strdup(const char *s)
+static char *matrix_TeX_preview_strdup(const char *s)
 {
     size_t n;
     char *copy;
@@ -25,7 +25,7 @@ static char *matrix_tex_preview_strdup(const char *s)
     return copy;
 }
 
-static char *matrix_tex_preview_path_from_source(const char *source_file)
+static char *matrix_TeX_preview_path_from_source(const char *source_file)
 {
     size_t len = strlen(source_file);
     char *path = malloc(len + 5u);
@@ -42,7 +42,7 @@ static char *matrix_tex_preview_path_from_source(const char *source_file)
     return path;
 }
 
-static void matrix_tex_preview_write_escaped(FILE *f, const char *s)
+static void matrix_TeX_preview_write_escaped(FILE *f, const char *s)
 {
     const char *p;
 
@@ -85,7 +85,7 @@ static void matrix_tex_preview_write_escaped(FILE *f, const char *s)
     }
 }
 
-static void matrix_tex_preview_emit_case(const char *source_file, const char *label, const char *tex)
+static void matrix_TeX_preview_emit_case(const char *source_file, const char *label, const char *tex)
 {
     char *path;
     FILE *f;
@@ -94,28 +94,28 @@ static void matrix_tex_preview_emit_case(const char *source_file, const char *la
     if (!label || !tex)
         return;
 
-    if (g_matrix_tex_preview_count == g_matrix_tex_preview_cap) {
-        size_t new_cap = g_matrix_tex_preview_cap == 0u ? 8u : g_matrix_tex_preview_cap * 2u;
-        matrix_tex_preview_entry_t *new_entries = realloc(g_matrix_tex_preview_entries, new_cap * sizeof(*new_entries));
+    if (g_matrix_TeX_preview_count == g_matrix_TeX_preview_cap) {
+        size_t new_cap = g_matrix_TeX_preview_cap == 0u ? 8u : g_matrix_TeX_preview_cap * 2u;
+        matrix_TeX_preview_entry_t *new_entries = realloc(g_matrix_TeX_preview_entries, new_cap * sizeof(*new_entries));
         if (!new_entries)
             return;
-        g_matrix_tex_preview_entries = new_entries;
-        g_matrix_tex_preview_cap = new_cap;
+        g_matrix_TeX_preview_entries = new_entries;
+        g_matrix_TeX_preview_cap = new_cap;
     }
 
-    g_matrix_tex_preview_entries[g_matrix_tex_preview_count].label = matrix_tex_preview_strdup(label);
-    g_matrix_tex_preview_entries[g_matrix_tex_preview_count].tex = matrix_tex_preview_strdup(tex);
-    if (!g_matrix_tex_preview_entries[g_matrix_tex_preview_count].label ||
-        !g_matrix_tex_preview_entries[g_matrix_tex_preview_count].tex) {
-        free(g_matrix_tex_preview_entries[g_matrix_tex_preview_count].label);
-        free(g_matrix_tex_preview_entries[g_matrix_tex_preview_count].tex);
-        g_matrix_tex_preview_entries[g_matrix_tex_preview_count].label = NULL;
-        g_matrix_tex_preview_entries[g_matrix_tex_preview_count].tex = NULL;
+    g_matrix_TeX_preview_entries[g_matrix_TeX_preview_count].label = matrix_TeX_preview_strdup(label);
+    g_matrix_TeX_preview_entries[g_matrix_TeX_preview_count].tex = matrix_TeX_preview_strdup(tex);
+    if (!g_matrix_TeX_preview_entries[g_matrix_TeX_preview_count].label ||
+        !g_matrix_TeX_preview_entries[g_matrix_TeX_preview_count].tex) {
+        free(g_matrix_TeX_preview_entries[g_matrix_TeX_preview_count].label);
+        free(g_matrix_TeX_preview_entries[g_matrix_TeX_preview_count].tex);
+        g_matrix_TeX_preview_entries[g_matrix_TeX_preview_count].label = NULL;
+        g_matrix_TeX_preview_entries[g_matrix_TeX_preview_count].tex = NULL;
         return;
     }
-    ++g_matrix_tex_preview_count;
+    ++g_matrix_TeX_preview_count;
 
-    path = matrix_tex_preview_path_from_source(source_file);
+    path = matrix_TeX_preview_path_from_source(source_file);
     if (!path)
         return;
 
@@ -131,19 +131,19 @@ static void matrix_tex_preview_emit_case(const char *source_file, const char *la
     fprintf(f, "\\begin{document}\n");
     fprintf(f, "\\section*{Generated TeX Samples}\n");
     fprintf(f, "\\noindent Source: \\texttt{");
-    matrix_tex_preview_write_escaped(f, source_file);
+    matrix_TeX_preview_write_escaped(f, source_file);
     fprintf(f, "}\n\n");
 
-    for (i = 0u; i < g_matrix_tex_preview_count; ++i) {
+    for (i = 0u; i < g_matrix_TeX_preview_count; ++i) {
         fprintf(f, "\\subsection*{Sample %zu}\n", i + 1u);
         fprintf(f, "\\noindent\\texttt{");
-        matrix_tex_preview_write_escaped(f, g_matrix_tex_preview_entries[i].label);
+        matrix_TeX_preview_write_escaped(f, g_matrix_TeX_preview_entries[i].label);
         fprintf(f,
                 "}\n"
                 "\\begin{flushleft}\n"
                 "$\\displaystyle %s$\n"
                 "\\end{flushleft}\n\n",
-                g_matrix_tex_preview_entries[i].tex);
+                g_matrix_TeX_preview_entries[i].tex);
     }
 
     fprintf(f, "\\end{document}\n");
@@ -151,16 +151,16 @@ static void matrix_tex_preview_emit_case(const char *source_file, const char *la
     free(path);
 }
 
-static void matrix_tex_preview_cleanup(void)
+static void matrix_TeX_preview_cleanup(void)
 {
-    for (size_t i = 0u; i < g_matrix_tex_preview_count; ++i) {
-        free(g_matrix_tex_preview_entries[i].label);
-        free(g_matrix_tex_preview_entries[i].tex);
+    for (size_t i = 0u; i < g_matrix_TeX_preview_count; ++i) {
+        free(g_matrix_TeX_preview_entries[i].label);
+        free(g_matrix_TeX_preview_entries[i].tex);
     }
-    free(g_matrix_tex_preview_entries);
-    g_matrix_tex_preview_entries = NULL;
-    g_matrix_tex_preview_count = 0u;
-    g_matrix_tex_preview_cap = 0u;
+    free(g_matrix_TeX_preview_entries);
+    g_matrix_TeX_preview_entries = NULL;
+    g_matrix_TeX_preview_count = 0u;
+    g_matrix_TeX_preview_cap = 0u;
 }
 
 static void check_matrix_tostring_expr_double(const char *label, const expr_t *dv, double expected, double tol)
@@ -254,19 +254,19 @@ static void test_mat_to_string_numeric(void)
         num_destroy(&vals[i]);
 }
 
-static void test_mat_to_string_numeric_tex(void)
+static void test_mat_to_string_numeric_TeX(void)
 {
     number_t vals[4] = {num_create_from_long(1), num_create_from_long(2), num_create_from_long(3),
                         num_create_from_long(4)};
     matrix_t *A = mat_create(2, 2, vals);
-    char *tex = mat_to_string(A, MAT_STRING_TEX);
+    char *tex = mat_to_string(A, MAT_STRING_LATEX);
 
-    matrix_tex_preview_emit_case(__FILE__, "numeric matrix (TEX)", tex);
+    matrix_TeX_preview_emit_case(__FILE__, "numeric matrix (TEX)", tex);
 
     check_bool("mat_to_string number tex non-null", tex != NULL);
     check_bool("mat_to_string number tex begins bmatrix", tex && strstr(tex, "\\begin{bmatrix}") != NULL);
     check_bool("mat_to_string number tex uses column separator", tex && strstr(tex, "1 & 2") != NULL);
-    check_bool("mat_to_string number tex uses row separator", tex && strstr(tex, " \\\\ 3 & 4") != NULL);
+    check_bool("mat_to_string number tex uses spaced row separator", tex && strstr(tex, " \\\\[4pt] 3 & 4") != NULL);
 
     free(tex);
     mat_free(A);
@@ -355,13 +355,13 @@ static void test_mat_to_string_symbolic(void)
     mat_free(A);
 }
 
-static void test_mat_to_string_symbolic_tex(void)
+static void test_mat_to_string_symbolic_TeX(void)
 {
     mat_bindings_t *bindings = NULL;
     matrix_t *A = mat_from_string_expr("{ (x0, 1; 1, c1) | x0 = 2; c1 = 3 }", &bindings);
-    char *tex = mat_to_string(A, MAT_STRING_TEX);
+    char *tex = mat_to_string(A, MAT_STRING_LATEX);
 
-    matrix_tex_preview_emit_case(__FILE__, "symbolic matrix with bindings (TEX)", tex);
+    matrix_TeX_preview_emit_case(__FILE__, "symbolic matrix with bindings (TEX)", tex);
 
     check_bool("mat_to_string symbolic tex non-null", tex != NULL);
     check_bool("mat_to_string symbolic tex wrapped", tex && strstr(tex, "\\left\\{") != NULL);
@@ -375,17 +375,17 @@ static void test_mat_to_string_symbolic_tex(void)
     mat_free(A);
 }
 
-static void test_mat_to_string_symbolic_tex_exact(void)
+static void test_mat_to_string_symbolic_TeX_exact(void)
 {
     mat_bindings_t *bindings = NULL;
     matrix_t *A = mat_from_string_expr("{ (sin(x0), exp(c1); ln(x0), c1^2) | x0 = 2; c1 = 5 }", &bindings);
-    char *tex = mat_to_string(A, MAT_STRING_TEX);
+    char *tex = mat_to_string(A, MAT_STRING_LATEX);
 
-    const char *expect = "\\left\\{ \\begin{bmatrix}\\sin(x_{0}) & e^{c_{1}} \\\\ "
+    const char *expect = "\\left\\{ \\begin{bmatrix}\\sin(x_{0}) & e^{c_{1}} \\\\[4pt] "
                          "\\ln(x_{0}) & c_{1}^{2}\\end{bmatrix} \\;\\middle|\\; "
                          "x_{0} = 2; c_{1} = 5 \\right\\}";
 
-    matrix_tex_preview_emit_case(__FILE__, "symbolic matrix exact with bindings (TEX)", tex);
+    matrix_TeX_preview_emit_case(__FILE__, "symbolic matrix exact with bindings (TEX)", tex);
 
     check_bool("mat_to_string symbolic tex exact non-null", tex != NULL);
     check_bool("mat_to_string symbolic tex exact string", tex && strcmp(tex, expect) == 0);
@@ -395,15 +395,15 @@ static void test_mat_to_string_symbolic_tex_exact(void)
     mat_free(A);
 }
 
-static void test_mat_to_string_symbolic_tex_no_bindings_exact(void)
+static void test_mat_to_string_symbolic_TeX_no_bindings_exact(void)
 {
     mat_bindings_t *bindings = NULL;
     matrix_t *A = mat_from_string_expr("(sin(x0), exp(c1); ln(x0), c1^2)", &bindings);
-    char *tex = mat_to_string(A, MAT_STRING_TEX);
-    const char *expect = "\\begin{bmatrix}\\sin(x_{0}) & e^{c_{1}} \\\\ "
+    char *tex = mat_to_string(A, MAT_STRING_LATEX);
+    const char *expect = "\\begin{bmatrix}\\sin(x_{0}) & e^{c_{1}} \\\\[4pt] "
                          "\\ln(x_{0}) & c_{1}^{2}\\end{bmatrix}";
 
-    matrix_tex_preview_emit_case(__FILE__, "symbolic matrix exact without bindings (TEX)", tex);
+    matrix_TeX_preview_emit_case(__FILE__, "symbolic matrix exact without bindings (TEX)", tex);
 
     check_bool("mat_to_string symbolic tex no-bindings non-null", tex != NULL);
     check_bool("mat_to_string symbolic tex no-bindings omits wrapper",
@@ -435,13 +435,13 @@ static void test_mat_to_string_symbolic_all_nan_elides_wrapper(void)
     mat_free(A);
 }
 
-static void test_mat_to_string_symbolic_all_nan_tex_elides_wrapper(void)
+static void test_mat_to_string_symbolic_all_nan_TeX_elides_wrapper(void)
 {
     mat_bindings_t *bindings = NULL;
     matrix_t *A = mat_from_string_expr("(x, c1)", &bindings);
-    char *tex = mat_to_string(A, MAT_STRING_TEX);
+    char *tex = mat_to_string(A, MAT_STRING_LATEX);
 
-    matrix_tex_preview_emit_case(__FILE__, "symbolic all-NaN matrix without bindings (TEX)", tex);
+    matrix_TeX_preview_emit_case(__FILE__, "symbolic all-NaN matrix without bindings (TEX)", tex);
 
     check_bool("mat_to_string symbolic all-NaN tex non-null", tex != NULL);
     check_bool("mat_to_string symbolic all-NaN tex omits wrapper",
@@ -560,15 +560,15 @@ static void test_mat_to_string_symbolic_derivative_roundtrip(void)
 void run_matrix_tostring_tests(void)
 {
     TEST_RUN_CASE(test_mat_to_string_numeric, NULL);
-    TEST_RUN_CASE(test_mat_to_string_numeric_tex, NULL);
+    TEST_RUN_CASE(test_mat_to_string_numeric_TeX, NULL);
     TEST_RUN_CASE(test_mat_to_string_number_precision, NULL);
     TEST_RUN_CASE(test_mat_to_string_symbolic, NULL);
-    TEST_RUN_CASE(test_mat_to_string_symbolic_tex, NULL);
-    TEST_RUN_CASE(test_mat_to_string_symbolic_tex_exact, NULL);
-    TEST_RUN_CASE(test_mat_to_string_symbolic_tex_no_bindings_exact, NULL);
+    TEST_RUN_CASE(test_mat_to_string_symbolic_TeX, NULL);
+    TEST_RUN_CASE(test_mat_to_string_symbolic_TeX_exact, NULL);
+    TEST_RUN_CASE(test_mat_to_string_symbolic_TeX_no_bindings_exact, NULL);
     TEST_RUN_CASE(test_mat_to_string_symbolic_all_nan_elides_wrapper, NULL);
-    TEST_RUN_CASE(test_mat_to_string_symbolic_all_nan_tex_elides_wrapper, NULL);
+    TEST_RUN_CASE(test_mat_to_string_symbolic_all_nan_TeX_elides_wrapper, NULL);
     TEST_RUN_CASE(test_mat_to_string_symbolic_roundtrip, NULL);
     TEST_RUN_CASE(test_mat_to_string_symbolic_derivative_roundtrip, NULL);
-    matrix_tex_preview_cleanup();
+    matrix_TeX_preview_cleanup();
 }

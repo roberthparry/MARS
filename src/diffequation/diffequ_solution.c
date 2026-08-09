@@ -67,17 +67,17 @@ int de_solve_result_set_symmetry(diffequ_solve_result_t *result, const char *sym
     return 0;
 }
 
-int de_solve_result_set_steps_tex(diffequ_solve_result_t *result, const char *steps_tex)
+int de_solve_result_set_steps_TeX(diffequ_solve_result_t *result, const char *steps_TeX)
 {
     char *copy;
 
-    if (!result || !steps_tex)
+    if (!result || !steps_TeX)
         return -1;
-    copy = strdup(steps_tex);
+    copy = strdup(steps_TeX);
     if (!copy)
         return -1;
-    free(result->steps_tex);
-    result->steps_tex = copy;
+    free(result->steps_TeX);
+    result->steps_TeX = copy;
     return 0;
 }
 
@@ -194,7 +194,7 @@ static const char *de_solver_rule_plain(de_solver_t solver)
     }
 }
 
-static const char *de_solver_rule_tex(de_solver_t solver)
+static const char *de_solver_rule_TeX(de_solver_t solver)
 {
     switch (solver) {
         case DE_SOLVER_SEPARABLE:
@@ -254,70 +254,70 @@ static const char *de_solver_rule_tex(de_solver_t solver)
 int de_solve_result_ensure_rule_steps(const diffequ_t *de, diffequ_solve_result_t *result)
 {
     char *problem = NULL;
-    char *problem_tex = NULL;
+    char *problem_TeX = NULL;
     string_t *steps = NULL;
-    string_t *steps_tex = NULL;
+    string_t *steps_TeX = NULL;
     bool success = false;
 
     if (!result || result->status != DE_SOLVE_STATUS_SOLVED || result->solution_count == 0u)
         return 0;
-    if (result->steps && result->steps_tex)
+    if (result->steps && result->steps_TeX)
         return 0;
 
     problem = de_to_string(de, style_EXPRESSION);
-    problem_tex = de_to_string(de, style_TEX);
+    problem_TeX = de_to_string(de, style_LATEX);
     steps = string_new();
-    steps_tex = string_new();
-    if (!problem || !problem_tex || !steps || !steps_tex ||
+    steps_TeX = string_new();
+    if (!problem || !problem_TeX || !steps || !steps_TeX ||
         string_append_format(steps,
                              "Recognise the %s.\nParsed equation:\n      %s\nRule:\n"
                              "      %s\nDerived solution%s:\n",
                              de_solver_rule_name(result->solver), problem, de_solver_rule_plain(result->solver),
                              result->solution_count == 1u ? "" : "s") < 0 ||
-        string_append_format(steps_tex,
+        string_append_format(steps_TeX,
                              "\\begin{aligned}[t]"
                              "\\text{Rule:}\\quad&\\text{%s}\\\\"
                              "\\text{Parsed equation:}\\quad&%s\\\\"
                              "\\text{Reduction:}\\quad&%s",
-                             de_solver_rule_name(result->solver), problem_tex, de_solver_rule_tex(result->solver)) < 0)
+                             de_solver_rule_name(result->solver), problem_TeX, de_solver_rule_TeX(result->solver)) < 0)
         goto cleanup;
 
     for (size_t i = 0u; i < result->solution_count; ++i) {
         string_t *solution = equ_to_text(result->solutions[i], style_UNBOUND);
-        char *solution_lhs_tex = expr_to_tex_body(equ_lhs(result->solutions[i]));
-        char *solution_rhs_tex = expr_to_tex_body(equ_rhs(result->solutions[i]));
-        string_t *solution_tex =
-            solution_lhs_tex && solution_rhs_tex ? string_sprintf("%s = %s", solution_lhs_tex, solution_rhs_tex) : NULL;
+        char *solution_lhs_TeX = expr_to_TeX_body(equ_lhs(result->solutions[i]));
+        char *solution_rhs_TeX = expr_to_TeX_body(equ_rhs(result->solutions[i]));
+        string_t *solution_TeX =
+            solution_lhs_TeX && solution_rhs_TeX ? string_sprintf("%s = %s", solution_lhs_TeX, solution_rhs_TeX) : NULL;
 
-        if (!solution || !solution_tex ||
+        if (!solution || !solution_TeX ||
             string_append_format(steps, "      %s%s", string_c_str(solution),
                                  i + 1u < result->solution_count ? "\n" : "") < 0 ||
-            string_append_format(steps_tex, "\\\\\\text{Solution%s:}\\quad&%s",
-                                 result->solution_count == 1u ? "" : " branch", string_c_str(solution_tex)) < 0) {
-            free(solution_rhs_tex);
-            free(solution_lhs_tex);
-            string_free(solution_tex);
+            string_append_format(steps_TeX, "\\\\\\text{Solution%s:}\\quad&%s",
+                                 result->solution_count == 1u ? "" : " branch", string_c_str(solution_TeX)) < 0) {
+            free(solution_rhs_TeX);
+            free(solution_lhs_TeX);
+            string_free(solution_TeX);
             string_free(solution);
             goto cleanup;
         }
-        free(solution_rhs_tex);
-        free(solution_lhs_tex);
-        string_free(solution_tex);
+        free(solution_rhs_TeX);
+        free(solution_lhs_TeX);
+        string_free(solution_TeX);
         string_free(solution);
     }
-    if (string_append_cstr(steps_tex, "\\end{aligned}") != 0)
+    if (string_append_cstr(steps_TeX, "\\end{aligned}") != 0)
         goto cleanup;
 
     if (!result->steps && de_solve_result_set_steps(result, string_c_str(steps)) != 0)
         goto cleanup;
-    if (!result->steps_tex && de_solve_result_set_steps_tex(result, string_c_str(steps_tex)) != 0)
+    if (!result->steps_TeX && de_solve_result_set_steps_TeX(result, string_c_str(steps_TeX)) != 0)
         goto cleanup;
     success = true;
 
 cleanup:
-    string_free(steps_tex);
+    string_free(steps_TeX);
     string_free(steps);
-    free(problem_tex);
+    free(problem_TeX);
     free(problem);
     return success ? 0 : -1;
 }
@@ -332,7 +332,7 @@ void de_solve_result_free(diffequ_solve_result_t *result)
     free(result->solutions);
     free(result->symmetry);
     free(result->steps);
-    free(result->steps_tex);
+    free(result->steps_TeX);
     free(result->diagnostic);
     free(result);
 }
@@ -362,9 +362,9 @@ const char *de_solve_result_symmetry(const diffequ_solve_result_t *result)
     return result ? result->symmetry : NULL;
 }
 
-const char *de_solve_result_steps_tex(const diffequ_solve_result_t *result)
+const char *de_solve_result_steps_TeX(const diffequ_solve_result_t *result)
 {
-    return result ? result->steps_tex : NULL;
+    return result ? result->steps_TeX : NULL;
 }
 
 size_t de_solve_result_count(const diffequ_solve_result_t *result)

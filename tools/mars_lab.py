@@ -610,6 +610,14 @@ DEFAULT_DIFFEQUATION = "Dx(y) = x*y; y(0) = 1"
 DEFAULT_EQUATION_VARIABLE = "x"
 DEFAULT_MATRIX = "(1, 2; 3, 4)"
 DEFAULT_MATRIX_OPERATION = "inverse"
+MATRIX_OPERATIONS = frozenset({
+    "eval", "inverse", "multiply", "eigenvalues", "eigendecompose", "charpoly", "det", "trace", "rank", "simplify",
+    "solve",
+    "exp", "log", "log10", "sqrt", "sin", "cos", "tan", "asin", "acos", "atan", "sinh", "cosh", "tanh",
+    "asinh", "acosh", "atanh", "erf", "erfc", "erfinv", "erfcinv", "gamma", "lgamma", "digamma", "trigamma",
+    "tetragamma", "gammainv", "normal_pdf", "normal_cdf", "normal_logpdf", "lambert_w0", "lambert_wm1",
+    "productlog", "ei", "e1",
+})
 DEFAULT_INTEGRATOR_EXPRESSION = "{ exp(-x^2) | x = ? }"
 DEFAULT_INTEGRATOR_BOUNDS = "x = 0 .. 1"
 DEFAULT_INTEGRATOR_INTERVAL_CAP = 5000
@@ -3548,16 +3556,57 @@ __THEME_OVERRIDES__
       <div class="mode-panel hidden" id="matrixControls">
         <label id="matrixOperationLabel" for="matrixOperation">Matrix operation</label>
         <select id="matrixOperation">
-          <option value="eval">Evaluate</option>
-          <option value="inverse" selected>Inverse</option>
-          <option value="eigenvalues">Eigenvalues</option>
-          <option value="eigendecompose">Eigendecompose</option>
-          <option value="charpoly">Characteristic polynomial</option>
-          <option value="det">Determinant</option>
-          <option value="trace">Trace</option>
-          <option value="rank">Rank</option>
-          <option value="simplify">Simplify symbolic</option>
-          <option value="solve">Solve A X = B</option>
+          <optgroup label="Matrix operations">
+            <option value="eval">Evaluate entries</option>
+            <option value="inverse" selected>Inverse</option>
+            <option value="multiply">Multiply by another matrix</option>
+            <option value="eigenvalues">Eigenvalues</option>
+            <option value="eigendecompose">Eigendecompose</option>
+            <option value="charpoly">Characteristic polynomial</option>
+            <option value="det">Determinant</option>
+            <option value="trace">Trace</option>
+            <option value="rank">Rank</option>
+            <option value="simplify">Simplify symbolic</option>
+            <option value="solve">Solve A X = B</option>
+          </optgroup>
+          <optgroup label="Elementary matrix functions">
+            <option value="exp">Exponential exp(A)</option>
+            <option value="log">Natural logarithm log(A)</option>
+            <option value="log10">Common logarithm log10(A)</option>
+            <option value="sqrt">Principal square root sqrt(A)</option>
+            <option value="sin">Sine sin(A)</option>
+            <option value="cos">Cosine cos(A)</option>
+            <option value="tan">Tangent tan(A)</option>
+            <option value="asin">Inverse sine asin(A)</option>
+            <option value="acos">Inverse cosine acos(A)</option>
+            <option value="atan">Inverse tangent atan(A)</option>
+            <option value="sinh">Hyperbolic sine sinh(A)</option>
+            <option value="cosh">Hyperbolic cosine cosh(A)</option>
+            <option value="tanh">Hyperbolic tangent tanh(A)</option>
+            <option value="asinh">Inverse hyperbolic sine asinh(A)</option>
+            <option value="acosh">Inverse hyperbolic cosine acosh(A)</option>
+            <option value="atanh">Inverse hyperbolic tangent atanh(A)</option>
+          </optgroup>
+          <optgroup label="Special matrix functions">
+            <option value="erf">Error function erf(A)</option>
+            <option value="erfc">Complementary error function erfc(A)</option>
+            <option value="erfinv">Inverse error function erfinv(A)</option>
+            <option value="erfcinv">Inverse complementary error function erfcinv(A)</option>
+            <option value="gamma">Gamma gamma(A)</option>
+            <option value="lgamma">Log gamma lgamma(A)</option>
+            <option value="digamma">Digamma digamma(A)</option>
+            <option value="trigamma">Trigamma trigamma(A)</option>
+            <option value="tetragamma">Tetragamma tetragamma(A)</option>
+            <option value="gammainv">Reciprocal gamma gammainv(A)</option>
+            <option value="normal_pdf">Normal density normal_pdf(A)</option>
+            <option value="normal_cdf">Normal distribution normal_cdf(A)</option>
+            <option value="normal_logpdf">Log normal density normal_logpdf(A)</option>
+            <option value="lambert_w0">Lambert W principal branch W0(A)</option>
+            <option value="lambert_wm1">Lambert W minus-one branch W-1(A)</option>
+            <option value="productlog">Product logarithm productlog(A)</option>
+            <option value="ei">Exponential integral Ei(A)</option>
+            <option value="e1">Exponential integral E1(A)</option>
+          </optgroup>
         </select>
         <label class="hidden" for="matrixOperand" id="matrixOperandLabel">Right-hand side matrix</label>
         <textarea class="hidden secondary-editor" id="matrixOperand" spellcheck="false" placeholder="(1; 0)"></textarea>
@@ -3865,6 +3914,19 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             <li><code>Dxx(y) = y; y(0) = 1; y'(0) = 1</code> is a second-order problem and uses prime notation in a condition.</li>
             <li><code>Dxxx(y) + 3*Dxx(y) + 3*Dx(y) + y = x + sin(x)</code> is a forced third-order constant-coefficient ODE.</li>
             <li><code>y'' + 4y = exp(x)</code>, <code>d²y/dx² + 4y = exp(x)</code>, and <code>Dxx(y) + 4y = exp(x)</code> are equivalent forms.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="matrix">
+          <div class="help-kicker">Matrix Functions</div>
+          <p>Write a function directly around a matrix, or enter the matrix itself and choose a function from the operation list. These are genuine matrix functions calculated by MARSlib, not functions applied independently to each displayed entry.</p>
+          <ul>
+            <li><code>sin(1 2; 4 5)</code> calculates the sine of the complete 2x2 matrix. Spaces separate columns and semicolons separate rows.</li>
+            <li><code>inverse(a b; c d)</code> calculates a symbolic inverse, while <code>(a b; c d).(e f; g h)</code> performs matrix multiplication. Matrix operations compose, so <code>inverse(a b; c d).(x; y)</code> solves the corresponding 2x2 linear system.</li>
+            <li><code>Dx(ax+b cx+d; y xy)</code> differentiates every entry with respect to <code>x</code>. <code>@S^x((ax+b cx+d; y xy))</code> returns one entrywise antiderivative.</li>
+            <li>Matrix functions require a square matrix. A rectangular matrix is rejected rather than having the scalar function applied entry by entry.</li>
+            <li>For <code>(0, 1; -1, 0)</code>, choose <code>Exponential exp(A)</code> to calculate the matrix exponential.</li>
+            <li>For <code>(4, 0; 0, 9)</code>, choose <code>Principal square root sqrt(A)</code> to obtain <code>(2, 0; 0, 3)</code>.</li>
+            <li>Logarithms, inverse functions and special functions require a matrix whose spectrum lies in a supported domain; otherwise MARS Lab reports that the matrix function failed.</li>
           </ul>
         </div>
         <div class="help-card" data-help-modes="diffequation">
@@ -4687,7 +4749,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
 
     function syncMatrixControls() {
       syncRoundedSelect(matrixOperation);
-      const needsOperand = currentMode() === 'matrix' && matrixOperation.value === 'solve';
+      const needsOperand = currentMode() === 'matrix' && (matrixOperation.value === 'solve' || matrixOperation.value === 'multiply');
       matrixOperand.classList.toggle('hidden', !needsOperand);
       matrixOperandLabel.classList.toggle('hidden', !needsOperand);
     }
@@ -9321,8 +9383,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     }
 
     function setRenderedResult(data) {
-      const displayTex = data.display_tex || data.tex || '';
-      const fullDisplayTex = data.full_display_tex || data.tex || '';
+      const displayTex = data.display_TeX || data.tex || '';
+      const fullDisplayTex = data.full_display_TeX || data.tex || '';
 
       clearRenderedError();
       lastTex = data.tex || '';
@@ -9345,7 +9407,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     }
 
     async function renderTexSvg(tex) {
-      const response = await fetch('/render_tex', {
+      const response = await fetch('/render_TeX', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({tex})
@@ -9623,6 +9685,11 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         setExpandableText(parsed, parsedMore, data.result || '', data.result || '');
         setResultInputText(data.result || '');
         setMatrixPrettyResult(data.result || '', data.pretty || '');
+        if (data.operation && matrixOperation) {
+          matrixOperation.value = validMatrixOperation(data.operation);
+          syncRoundedSelect(matrixOperation);
+          syncMatrixControls();
+        }
         value.textContent = '';
         setValueCardVisible(false);
         if (Array.isArray(data.binding_values))
@@ -9677,18 +9744,18 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         clearResultDetails({keepBindings: true});
         clearRenderedError();
         lastTex = data.tex || '';
-        rendered.dataset.displayTex = data.display_tex || data.tex || '';
-        rendered.dataset.fullTex = data.full_display_tex || data.tex || '';
+        rendered.dataset.displayTex = data.display_TeX || data.tex || '';
+        rendered.dataset.fullTex = data.full_display_TeX || data.tex || '';
         rendered.dataset.displaySvg = data.svg || '';
         rendered.dataset.fullSvg = '';
         rendered.dataset.renderError = data.render_error || '';
         setRenderedContent(data.svg || '', data.render_error || (data.tex || 'No rendered TeX available'));
         resetMoreDigitsButton(
           renderedMore,
-          !!data.full_display_tex &&
-            !!data.display_tex &&
-            data.full_display_tex !== data.display_tex &&
-            hasAbbreviatedValue(data.display_tex)
+          !!data.full_display_TeX &&
+            !!data.display_TeX &&
+            data.full_display_TeX !== data.display_TeX &&
+            hasAbbreviatedValue(data.display_TeX)
         );
         setExpandableText(
           parsed,
@@ -9776,14 +9843,14 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         clearResultDetails({keepBindings: true});
         clearRenderedError();
         renderedTitle.textContent = data.status === 'solved' ? 'Solution' : 'Reduction';
-        lastTex = data.solutions_tex || data.problem_tex || '';
+        lastTex = data.solutions_TeX || data.problem_TeX || '';
         rendered.dataset.displayTex = lastTex;
         rendered.dataset.fullTex = lastTex;
         rendered.dataset.displaySvg = data.svg || '';
         rendered.dataset.fullSvg = '';
         rendered.dataset.renderError = data.render_error || '';
         rendered.dataset.compactTex = lastTex;
-        rendered.dataset.wrappedTex = data.solutions_wrapped_tex || lastTex;
+        rendered.dataset.wrappedTex = data.solutions_wrapped_TeX || lastTex;
         rendered.dataset.compactSvg = data.svg || '';
         rendered.dataset.wrappedSvg = data.wrapped_svg || '';
         rendered.dataset.responsiveFallback =
@@ -9807,7 +9874,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         ].filter(Boolean).join('\n');
         setExpandableText(functionStyle, functionMore, solverDetails, solverDetails);
         functionStyle.classList.remove('equation-function');
-        const solverTexSource = data.steps_left_tex || data.steps_tex ||
+        const solverTexSource = data.steps_left_TeX || data.steps_TeX ||
           solverTextToTex(solverDetails);
         if (solverTexSource) {
           try {
@@ -9816,7 +9883,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
               functionStyle.classList.add('equation-function');
               functionStyle.dataset.solverCompactTex = solverTexSource;
               functionStyle.dataset.solverWrappedTex =
-                data.steps_wrapped_tex || solverTexSource;
+                data.steps_wrapped_TeX || solverTexSource;
               functionStyle.dataset.solverCompactSvg = solverTex.svg;
               functionStyle.dataset.solverWrappedSvg = '';
               delete functionStyle.dataset.solverVariant;
@@ -10253,7 +10320,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       try {
         const {response, data} = await fetchEvaluation(text, wrt);
         const derivativeExpression = derivativeExpressionFromLine(data.derivative);
-        const derivativeTex = data.derivative_tex || '';
+        const derivativeTex = data.derivative_TeX || '';
         const derivativeSvg = data.derivative_svg || '';
         const derivativeFunction = data.display_derivative_function || data.derivative_function || derivativeExpression || '';
         const fullDerivativeFunction = data.full_display_derivative_function || data.derivative_function || derivativeExpression || '';
@@ -10331,9 +10398,9 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       try {
         const {response, data} = await fetchEvaluation(text, wrt, 'integral');
         const integralExpression = integralExpressionFromLine(data.integral);
-        const integralTex = data.integral_tex || '';
+        const integralTex = data.integral_TeX || '';
         const integralSvg = data.integral_svg || '';
-        const integralWrappedTex = data.integral_wrapped_tex || integralTex;
+        const integralWrappedTex = data.integral_wrapped_TeX || integralTex;
         const integralWrappedSvg = data.integral_wrapped_svg || '';
         const integralFunction = data.display_integral_function || data.integral_function || integralExpression || '';
         const fullIntegralFunction = data.full_display_integral_function || data.integral_function || integralExpression || '';
@@ -11069,18 +11136,7 @@ def load_state_data() -> dict[str, object]:
         state["diffequation"] = DEFAULT_DIFFEQUATION
 
     matrix_operation = str(state.get("matrix_operation", "")).strip()
-    if matrix_operation not in {
-        "eval",
-        "inverse",
-        "eigenvalues",
-        "eigendecompose",
-        "charpoly",
-        "det",
-        "trace",
-        "rank",
-        "simplify",
-        "solve",
-    }:
+    if matrix_operation not in MATRIX_OPERATIONS:
         state["matrix_operation"] = DEFAULT_MATRIX_OPERATION
 
     integrator_expression = str(state.get("integrator_expression", "")).strip()
@@ -11213,7 +11269,7 @@ def function_for_display(function: str) -> str:
     return re.sub(r"(=\s*)NAN\b", r"\1?", str(function or ""))
 
 
-def tex_for_display(tex: str) -> str:
+def TeX_for_display(tex: str) -> str:
     return re.sub(r"(=\s*)NAN\b", r"\1?", str(tex or ""))
 
 
@@ -11264,7 +11320,7 @@ def _tex_additive_break_positions(row: str) -> list[int]:
     return [position for position, depth in positions if depth == shallowest]
 
 
-def wrap_rendered_tex_additive_lines(tex: str, threshold: int = 120) -> str:
+def wrap_rendered_TeX_additive_lines(tex: str, threshold: int = 120) -> str:
     source = str(tex or "").strip()
     begin = r"\begin{aligned}[t]"
     end = r"\end{aligned}"
@@ -11308,7 +11364,7 @@ def wrap_rendered_tex_additive_lines(tex: str, threshold: int = 120) -> str:
     return begin + "\n" + " \\\\\n".join(wrapped_rows) + "\n" + end
 
 
-def wrap_solver_tex_lines(
+def wrap_solver_TeX_lines(
     tex: str,
     threshold: int | None = 160,
 ) -> str:
@@ -12382,12 +12438,12 @@ def parse_mars_lab_output(output: str) -> dict[str, str]:
         "complex": r"^complex\s+(.*)$",
         "derivative": r"^derivative\s+(.*)$",
         "derivative_function": r"^derivative_function\s{2,}(.*)$",
-        "derivative_tex": r"^derivative_tex\s*(.*)$",
+        "derivative_TeX": r"^derivative_TeX\s*(.*)$",
         "derivative_bindings": r"^derivative_binding\s{2,}(.*)$",
         "derivative_value": r"^d value\s+(.*)$",
         "integral": r"^integral\s+(.*)$",
         "integral_function": r"^integral_function\s{2,}(.*)$",
-        "integral_tex": r"^integral_tex\s*(.*)$",
+        "integral_TeX": r"^integral_TeX\s*(.*)$",
         "integral_bindings": r"^integral_binding\s{2,}(.*)$",
         "integral_value": r"^i value\s+(.*)$",
     }
@@ -12398,9 +12454,9 @@ def parse_mars_lab_output(output: str) -> dict[str, str]:
             "function",
             "tex",
             "derivative_function",
-            "derivative_tex",
+            "derivative_TeX",
             "integral_function",
-            "integral_tex",
+            "integral_TeX",
         },
     )
 
@@ -12437,9 +12493,9 @@ def parse_integrator_lab_output(output: str) -> dict[str, str]:
             "bound_lower": r"^bound_lower\s*(.*)$",
             "bound_upper": r"^bound_upper\s*(.*)$",
             "tex": r"^tex\s+(.*)$",
-            "symbolic_tex": r"^symbolic_tex\s*(.*)$",
+            "symbolic_TeX": r"^symbolic_TeX\s*(.*)$",
             "symbolic_value": r"^symbolic_value\s*(.*)$",
-            "antiderivative_tex": r"^antiderivative_tex\s*(.*)$",
+            "antiderivative_TeX": r"^antiderivative_TeX\s*(.*)$",
             "antiderivative": r"^antiderivative\s+(.*)$",
             "symbolic": r"^symbolic\s+(.*)$",
             "value": r"^value\s*(.*)$",
@@ -12451,7 +12507,7 @@ def parse_integrator_lab_output(output: str) -> dict[str, str]:
             "max_intervals": r"^max_intervals\s+(.*)$",
             "status": r"^status\s+(.*)$",
         },
-        {"tex", "symbolic_tex", "antiderivative_tex"},
+        {"tex", "symbolic_TeX", "antiderivative_TeX"},
     )
 
 
@@ -12467,11 +12523,11 @@ def parse_equation_lab_output(output: str) -> dict[str, str]:
             "residual": r"^residual\s+(.*)$",
             "value": r"^value\s+(.*)$",
             "status": r"^status\s+(.*)$",
-            "solutions_tex": r"^solutions_tex\s*(.*)$",
+            "solutions_TeX": r"^solutions_TeX\s*(.*)$",
             "solutions": r"^solutions\s+(.*)$",
             "numeric": r"^numeric\s+(.*)$",
         },
-        {"function", "tex", "solutions_tex", "solutions", "numeric"},
+        {"function", "tex", "solutions_TeX", "solutions", "numeric"},
     )
 
 
@@ -12481,24 +12537,24 @@ def parse_diffequation_lab_output(output: str) -> dict[str, str]:
         {
             "input": r"^input\s+(.*)$",
             "problem": r"^problem\s+(.*)$",
-            "problem_tex": r"^problem_tex\s*(.*)$",
+            "problem_TeX": r"^problem_TeX\s*(.*)$",
             "status": r"^status\s+(.*)$",
             "solver": r"^solver\s+(.*)$",
             "diagnostic": r"^diagnostic\s*(.*)$",
             "symmetry": r"^symmetry\s*(.*)$",
-            "steps_tex": r"^steps_tex\s*(.*)$",
+            "steps_TeX": r"^steps_TeX\s*(.*)$",
             "steps": r"^steps\s*(.*)$",
             "solutions": r"^solutions\s+(.*)$",
-            "solutions_tex": r"^solutions_tex\s*(.*)$",
-            "solutions_wrapped_tex": r"^solutions_wrapped_tex\s*(.*)$",
+            "solutions_TeX": r"^solutions_TeX\s*(.*)$",
+            "solutions_wrapped_TeX": r"^solutions_wrapped_TeX\s*(.*)$",
         },
         {
-            "problem_tex",
+            "problem_TeX",
             "steps",
-            "steps_tex",
+            "steps_TeX",
             "solutions",
-            "solutions_tex",
-            "solutions_wrapped_tex",
+            "solutions_TeX",
+            "solutions_wrapped_TeX",
         },
     )
 
@@ -12875,7 +12931,7 @@ def format_number_text_for_precision(
     return _trim_decimal_tail(format(rounded, "g").replace("e", "E"))
 
 
-def render_tex_to_svg(tex: str) -> tuple[str | None, str | None]:
+def render_TeX_to_svg(tex: str) -> tuple[str | None, str | None]:
     if not tex:
         return None, None
 
@@ -12903,13 +12959,13 @@ def render_tex_to_svg(tex: str) -> tuple[str | None, str | None]:
 
     with tempfile.TemporaryDirectory(prefix="mars-expr-tex-") as tmp_name:
         tmp = Path(tmp_name)
-        tex_file = tmp / "expr.tex"
+        TeX_file = tmp / "expr.tex"
         dvi_file = tmp / "expr.dvi"
         svg_file = tmp / "expr.svg"
-        tex_file.write_text(document, encoding="utf-8")
+        TeX_file.write_text(document, encoding="utf-8")
 
         latex = subprocess.run(
-            ["latex", "-interaction=nonstopmode", "-halt-on-error", tex_file.name],
+            ["latex", "-interaction=nonstopmode", "-halt-on-error", TeX_file.name],
             cwd=tmp,
             text=True,
             capture_output=True,
@@ -13111,7 +13167,7 @@ _SUPERSCRIPT_DIGIT_MAP = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻", "012
 _SUBSCRIPT_DIGIT_MAP = str.maketrans("₀₁₂₃₄₅₆₇₈₉₊₋", "0123456789+-")
 
 
-def _plain_numeric_to_tex_literal(text: str) -> str:
+def _plain_numeric_to_TeX_literal(text: str) -> str:
     source = str(text or "").strip()
     match = re.fullmatch(r"([⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻]+)⁄([₀₁₂₃₄₅₆₇₈₉₊₋]+)", source)
     if match:
@@ -13141,7 +13197,7 @@ def source_constant_replacements(
     for name, source_value in source_constants.items():
         solved_value = solved_constants.get(name)
         if solved_value and solved_value != source_value:
-            replacements.append((solved_value, source_value, _plain_numeric_to_tex_literal(solved_value)))
+            replacements.append((solved_value, source_value, _plain_numeric_to_TeX_literal(solved_value)))
     return sorted(replacements, key=lambda item: len(item[0]), reverse=True)
 
 
@@ -13156,15 +13212,15 @@ def replace_source_constant_spellings_in_text(
     return rendered
 
 
-def replace_source_constant_spellings_in_tex(
+def replace_source_constant_spellings_in_TeX(
     tex: str,
     source_expression: str,
     solved_expression: str,
 ) -> str:
     rendered = str(tex or "")
-    for exact_value, source_value, tex_literal in source_constant_replacements(source_expression, solved_expression):
-        if tex_literal and tex_literal != exact_value:
-            rendered = rendered.replace(tex_literal, source_value)
+    for exact_value, source_value, TeX_literal in source_constant_replacements(source_expression, solved_expression):
+        if TeX_literal and TeX_literal != exact_value:
+            rendered = rendered.replace(TeX_literal, source_value)
         rendered = rendered.replace(exact_value, source_value)
     return rendered
 
@@ -13998,10 +14054,10 @@ def prepare_evaluation_fields(
 
     display_expression_source = fields.get("unbound", "") or fields.get("expression", "")
     fields["full_display_expression"] = expression_for_display(display_expression_source)
-    fields["full_display_tex"] = tex_for_display(fields.get("tex", ""))
+    fields["full_display_TeX"] = TeX_for_display(fields.get("tex", ""))
     fields["full_display_function"] = function_for_display(fields.get("function", ""))
     fields["display_expression"] = compact_display_text(str(fields["full_display_expression"]))
-    fields["display_tex"] = compact_display_text(str(fields["full_display_tex"]))
+    fields["display_TeX"] = compact_display_text(str(fields["full_display_TeX"]))
     fields["display_function"] = compact_function_text(str(fields["full_display_function"]))
     fields["full_display_derivative_function"] = function_for_display(
         fields.get("derivative_function", "")
@@ -14009,10 +14065,10 @@ def prepare_evaluation_fields(
     fields["display_derivative_function"] = compact_function_text(
         str(fields["full_display_derivative_function"])
     )
-    derivative_tex = tex_for_display(str(fields.get("derivative_tex") or ""))
-    fields["derivative_tex"] = derivative_tex
-    if derivative_tex:
-        derivative_svg, derivative_render_error = render_tex_to_svg(derivative_tex)
+    derivative_TeX = TeX_for_display(str(fields.get("derivative_TeX") or ""))
+    fields["derivative_TeX"] = derivative_TeX
+    if derivative_TeX:
+        derivative_svg, derivative_render_error = render_TeX_to_svg(derivative_TeX)
         if derivative_svg:
             fields["derivative_svg"] = derivative_svg
         elif derivative_render_error:
@@ -14023,18 +14079,18 @@ def prepare_evaluation_fields(
     fields["display_integral_function"] = compact_function_text(
         str(fields["full_display_integral_function"])
     )
-    integral_tex = tex_for_display(str(fields.get("integral_tex") or ""))
-    fields["integral_tex"] = integral_tex
-    if integral_tex:
-        integral_wrapped_tex = wrap_rendered_tex_additive_lines(integral_tex)
-        fields["integral_wrapped_tex"] = integral_wrapped_tex
-        integral_svg, integral_render_error = render_tex_to_svg(integral_tex)
+    integral_TeX = TeX_for_display(str(fields.get("integral_TeX") or ""))
+    fields["integral_TeX"] = integral_TeX
+    if integral_TeX:
+        integral_wrapped_TeX = wrap_rendered_TeX_additive_lines(integral_TeX)
+        fields["integral_wrapped_TeX"] = integral_wrapped_TeX
+        integral_svg, integral_render_error = render_TeX_to_svg(integral_TeX)
         if integral_svg:
             fields["integral_svg"] = integral_svg
         elif integral_render_error:
             fields["integral_render_error"] = integral_render_error
-        if integral_wrapped_tex != integral_tex:
-            integral_wrapped_svg, _ = render_tex_to_svg(integral_wrapped_tex)
+        if integral_wrapped_TeX != integral_TeX:
+            integral_wrapped_svg, _ = render_TeX_to_svg(integral_wrapped_TeX)
             if integral_wrapped_svg:
                 fields["integral_wrapped_svg"] = integral_wrapped_svg
     symbolic_binding_values = expression_variable_binding_values(
@@ -14053,7 +14109,7 @@ def prepare_evaluation_fields(
         fields.get("integral_bindings")
     )
 
-    svg, render_error = render_tex_to_svg(str(fields.get("display_tex", "")))
+    svg, render_error = render_TeX_to_svg(str(fields.get("display_TeX", "")))
     if svg:
         fields["svg"] = svg
     elif render_error:
@@ -14075,7 +14131,7 @@ def prepare_matrix_fields(fields: dict[str, str], precision: int) -> dict[str, o
     svg = None
     render_error = None
     if tex and tex != "(null)":
-        svg, render_error = render_tex_to_svg(tex)
+        svg, render_error = render_TeX_to_svg(tex)
 
     summary_parts = []
     if kind:
@@ -14142,16 +14198,16 @@ def prepare_integrator_fields(fields: dict[str, str], precision: int) -> dict[st
     binding_expression = str(
         fields.get("binding_expression") or fields.get("input") or ""
     ).strip()
-    tex = integrator_tex_for_display(tex)
+    tex = integrator_TeX_for_display(tex)
     symbolic_text = str(fields.get("symbolic") or "").strip()
-    symbolic_tex = str(fields.get("symbolic_tex") or "").strip()
+    symbolic_TeX = str(fields.get("symbolic_TeX") or "").strip()
     antiderivative_text = str(fields.get("antiderivative") or "").strip()
-    antiderivative_tex = str(fields.get("antiderivative_tex") or "").strip()
+    antiderivative_TeX = str(fields.get("antiderivative_TeX") or "").strip()
 
     svg = None
     render_error = None
     if tex and tex != "(null)":
-        svg, render_error = render_tex_to_svg(tex)
+        svg, render_error = render_TeX_to_svg(tex)
 
     payload: dict[str, object] = {
         "ok": True,
@@ -14160,9 +14216,9 @@ def prepare_integrator_fields(fields: dict[str, str], precision: int) -> dict[st
         "binding_expression": binding_expression,
         "tex": "" if tex == "(null)" else tex,
         "antiderivative": antiderivative_text,
-        "antiderivative_tex": antiderivative_tex,
+        "antiderivative_TeX": antiderivative_TeX,
         "symbolic": symbolic_text,
-        "symbolic_tex": symbolic_tex,
+        "symbolic_TeX": symbolic_TeX,
         "symbolic_value": numeric_value_for_display(fields.get("symbolic_value")),
         "value": numeric_value_for_display(fields.get("value")),
         "error": str(fields.get("error") or "").strip(),
@@ -14194,7 +14250,7 @@ def prepare_equation_fields(fields: dict[str, str], precision: int) -> dict[str,
 
     source_equation_text = str(fields.get("input") or "").strip()
     solved_equation_text = str(fields.get("equation") or "").strip()
-    for key in ("equation", "unbound", "tex", "residual", "solutions", "solutions_tex"):
+    for key in ("equation", "unbound", "tex", "residual", "solutions", "solutions_TeX"):
         value = str(fields.get(key) or "")
         if not value:
             continue
@@ -14211,18 +14267,18 @@ def prepare_equation_fields(fields: dict[str, str], precision: int) -> dict[str,
         source_equation_text,
         solved_equation_text,
     )
-    equation_tex = replace_source_constant_spellings_in_tex(
+    equation_TeX = replace_source_constant_spellings_in_TeX(
         str(fields.get("tex") or "").strip(),
         source_equation_text,
         solved_equation_text,
     )
-    solutions_tex = replace_source_constant_spellings_in_tex(
-        str(fields.get("solutions_tex") or "").strip(),
+    solutions_TeX = replace_source_constant_spellings_in_TeX(
+        str(fields.get("solutions_TeX") or "").strip(),
         source_equation_text,
         solved_equation_text,
     )
-    render_tex = solutions_tex or equation_tex
-    display_tex = compact_display_text(render_tex)
+    render_TeX = solutions_TeX or equation_TeX
+    display_TeX = compact_display_text(render_TeX)
     solution_lines = [line.strip() for line in solutions_text.splitlines() if line.strip()]
     numeric_solution_lines = equation_lab_numeric_solution_lines(fields, precision)
     if not numeric_solution_lines:
@@ -14234,8 +14290,8 @@ def prepare_equation_fields(fields: dict[str, str], precision: int) -> dict[str,
 
     svg = None
     render_error = None
-    if display_tex and display_tex != "(null)":
-        svg, render_error = render_tex_to_svg(display_tex)
+    if display_TeX and display_TeX != "(null)":
+        svg, render_error = render_TeX_to_svg(display_TeX)
 
     payload: dict[str, object] = {
         "ok": True,
@@ -14243,9 +14299,9 @@ def prepare_equation_fields(fields: dict[str, str], precision: int) -> dict[str,
         "equation": equation_text,
         "unbound": unbound_text,
         "function": str(fields.get("function") or "").strip(),
-        "tex": "" if render_tex == "(null)" else render_tex,
-        "equation_tex": "" if equation_tex == "(null)" else equation_tex,
-        "solutions_tex": "" if solutions_tex == "(null)" else solutions_tex,
+        "tex": "" if render_TeX == "(null)" else render_TeX,
+        "equation_TeX": "" if equation_TeX == "(null)" else equation_TeX,
+        "solutions_TeX": "" if solutions_TeX == "(null)" else solutions_TeX,
         "residual": str(fields.get("residual") or "").strip(),
         "value": numeric_value_for_display(fields.get("value")),
         "status": str(fields.get("status") or "").strip(),
@@ -14254,8 +14310,8 @@ def prepare_equation_fields(fields: dict[str, str], precision: int) -> dict[str,
         "numeric_solutions": numeric_solution_lines,
         "full_display_equation": expression_for_display(unbound_text or equation_text),
         "display_equation": compact_display_text(expression_for_display(unbound_text or equation_text)),
-        "full_display_tex": render_tex,
-        "display_tex": display_tex,
+        "full_display_TeX": render_TeX,
+        "display_TeX": display_TeX,
         "binding_values": expression_variable_binding_values(source_equation_text or equation_text, precision),
     }
     if svg:
@@ -14266,28 +14322,28 @@ def prepare_equation_fields(fields: dict[str, str], precision: int) -> dict[str,
 
 
 def prepare_diffequation_fields(fields: dict[str, str]) -> dict[str, object]:
-    solutions_tex = tex_for_display(
-        str(fields.get("solutions_tex") or "").strip()
+    solutions_TeX = TeX_for_display(
+        str(fields.get("solutions_TeX") or "").strip()
     )
-    solutions_wrapped_tex = tex_for_display(
-        str(fields.get("solutions_wrapped_tex") or "").strip()
+    solutions_wrapped_TeX = TeX_for_display(
+        str(fields.get("solutions_wrapped_TeX") or "").strip()
     )
-    problem_tex = tex_for_display(
-        str(fields.get("problem_tex") or "").strip()
+    problem_TeX = TeX_for_display(
+        str(fields.get("problem_TeX") or "").strip()
     )
-    steps_tex = tex_for_display(
-        str(fields.get("steps_tex") or "").strip()
+    steps_TeX = TeX_for_display(
+        str(fields.get("steps_TeX") or "").strip()
     )
-    steps_left_tex = wrap_solver_tex_lines(steps_tex, threshold=None)
-    steps_wrapped_tex = wrap_solver_tex_lines(steps_tex)
-    render_tex = solutions_tex or problem_tex
+    steps_left_TeX = wrap_solver_TeX_lines(steps_TeX, threshold=None)
+    steps_wrapped_TeX = wrap_solver_TeX_lines(steps_TeX)
+    render_TeX = solutions_TeX or problem_TeX
     svg = None
     wrapped_svg = None
     render_error = None
-    if render_tex:
-        svg, render_error = render_tex_to_svg(render_tex)
-    if solutions_wrapped_tex and solutions_wrapped_tex != solutions_tex:
-        wrapped_svg, _ = render_tex_to_svg(solutions_wrapped_tex)
+    if render_TeX:
+        svg, render_error = render_TeX_to_svg(render_TeX)
+    if solutions_wrapped_TeX and solutions_wrapped_TeX != solutions_TeX:
+        wrapped_svg, _ = render_TeX_to_svg(solutions_wrapped_TeX)
 
     payload: dict[str, object] = {
         "ok": True,
@@ -14296,20 +14352,20 @@ def prepare_diffequation_fields(fields: dict[str, str]) -> dict[str, object]:
         "problem": expression_for_display(
             str(fields.get("problem") or "").strip()
         ),
-        "problem_tex": problem_tex,
+        "problem_TeX": problem_TeX,
         "solutions": expression_for_display(
             normalize_multiline_display_text(fields.get("solutions") or "")
         ),
-        "solutions_tex": solutions_tex,
-        "solutions_wrapped_tex": solutions_wrapped_tex,
+        "solutions_TeX": solutions_TeX,
+        "solutions_wrapped_TeX": solutions_wrapped_TeX,
         "status": str(fields.get("status") or "").strip(),
         "solver": str(fields.get("solver") or "").strip(),
         "diagnostic": str(fields.get("diagnostic") or "").strip(),
         "symmetry": str(fields.get("symmetry") or "").strip(),
         "steps": str(fields.get("steps") or "").strip(),
-        "steps_tex": steps_tex,
-        "steps_left_tex": steps_left_tex,
-        "steps_wrapped_tex": steps_wrapped_tex,
+        "steps_TeX": steps_TeX,
+        "steps_left_TeX": steps_left_TeX,
+        "steps_wrapped_TeX": steps_wrapped_TeX,
     }
     if svg:
         payload["svg"] = svg
@@ -15673,7 +15729,7 @@ def prepare_almanac_fields(fields: dict[str, str]) -> dict[str, object]:
     }
 
 
-def integrator_tex_for_display(tex: str) -> str:
+def integrator_TeX_for_display(tex: str) -> str:
     tex = str(tex or "").strip()
     if not tex:
         return ""
@@ -15909,18 +15965,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                     updates["equation_variable"] = equation_variable
 
                 matrix_operation = str(payload.get("matrix_operation", "")).strip()
-                if matrix_operation in {
-                    "eval",
-                    "inverse",
-                    "eigenvalues",
-                    "eigendecompose",
-                    "charpoly",
-                    "det",
-                    "trace",
-                    "rank",
-                    "simplify",
-                    "solve",
-                }:
+                if matrix_operation in MATRIX_OPERATIONS:
                     updates["matrix_operation"] = matrix_operation
 
                 if "matrix_operand" in payload:
@@ -15991,7 +16036,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                 self.send_json(400, {"ok": False, "error": f"Bad request: {exc}"})
             return
 
-        if path == "/render_tex":
+        if path == "/render_TeX":
             try:
                 length = int(self.headers.get("Content-Length", "0"))
                 body = self.rfile.read(length)
@@ -16001,7 +16046,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                 self.send_json(400, {"ok": False, "error": f"Bad request: {exc}"})
                 return
 
-            svg, render_error = render_tex_to_svg(tex)
+            svg, render_error = render_TeX_to_svg(tex)
             if svg:
                 self.send_json(200, {"ok": True, "svg": svg})
             else:
@@ -16110,6 +16155,9 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
             if not matrix_text:
                 self.send_json(400, {"ok": False, "error": "Matrix input is empty"})
                 return
+            if operation not in MATRIX_OPERATIONS:
+                self.send_json(400, {"ok": False, "error": f"Unknown matrix operation: {operation}"})
+                return
 
             try:
                 precision = max(17, min(MAX_VALUE_PRECISION_DIGITS, precision))
@@ -16126,10 +16174,11 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                 return
 
             if returncode != 0:
+                effective_operation = str(fields.get("operation") or operation).strip()
                 hint = matrix_failure_hint(
                     self.matrix_binary,
                     matrix_text,
-                    operation,
+                    effective_operation,
                     precision,
                     operand,
                 )
@@ -16137,9 +16186,10 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                 self.send_json(422, {"ok": False, "error": message})
                 return
 
+            effective_operation = str(fields.get("operation") or operation).strip()
             save_state_data({
                 "matrix": matrix_text,
-                "matrix_operation": operation,
+                "matrix_operation": effective_operation,
                 "matrix_operand": operand,
             })
             self.send_json(200, prepare_matrix_fields(fields, precision))
@@ -16923,13 +16973,13 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                 fields["residual"] = format_number_text_for_precision(
                     fields["residual"], precision, zero_subprecision=True)
             fields["full_display_expression"] = expression_for_display(fields.get("expression", ""))
-            fields["full_display_tex"] = tex_for_display(fields.get("tex", ""))
+            fields["full_display_TeX"] = TeX_for_display(fields.get("tex", ""))
             fields["full_display_function"] = function_for_display(fields.get("function", ""))
             fields["display_expression"] = compact_display_text(fields["full_display_expression"])
-            fields["display_tex"] = compact_display_text(fields["full_display_tex"])
+            fields["display_TeX"] = compact_display_text(fields["full_display_TeX"])
             fields["display_function"] = compact_function_text(fields["full_display_function"])
             fields["binding_values"] = mars_binding_values(fields.get("bindings"))
-            svg, render_error = render_tex_to_svg(fields.get("display_tex", ""))
+            svg, render_error = render_TeX_to_svg(fields.get("display_TeX", ""))
             if svg:
                 fields["svg"] = svg
             elif render_error:

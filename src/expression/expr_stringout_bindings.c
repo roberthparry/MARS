@@ -243,18 +243,18 @@ char *binding_rhs_expr_string_local(const expr_t *dv)
     return out;
 }
 
-char *binding_rhs_tex_string_local(const expr_t *dv)
+char *binding_rhs_TeX_string_local(const expr_t *dv)
 {
     string_t *number_text;
     char *text;
     char *tex;
 
     if (dv && dv->binding_expr)
-        return expr_binding_expr_to_tex(dv->binding_expr);
+        return expr_binding_expr_to_TeX(dv->binding_expr);
     number_text = dv ? num_to_string(dv->c) : NULL;
     text = number_text ? expr_tostring_xstrdup(string_c_str(number_text)) : NULL;
     string_free(number_text);
-    tex = expr_text_to_tex_local(text);
+    tex = expr_text_to_TeX_local(text);
     free(text);
     return tex;
 }
