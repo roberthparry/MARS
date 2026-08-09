@@ -1417,6 +1417,35 @@ class ExpressionResultTests(unittest.TestCase):
         self.assertEqual(payload["binding_values"][1]["name"], "C")
         self.assertEqual(payload["binding_values"][1]["kind"], "constant")
 
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_bessel_derivative_is_rendered_as_TeX(self) -> None:
+        expression = "{ BesselJ(-1/4, x) | x = pi/2 }"
+        completed = subprocess.run(
+            [str(self.expression_binary), expression, "x", "256", "derivative"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        fields = mars_lab.parse_mars_lab_output(completed.stdout)
+        payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary,
+            fields,
+            expression,
+            256,
+            False,
+        )
+
+        self.assertEqual(
+            payload["derivative_TeX"],
+            r"\frac{1}{2} \cdot J_{-\frac{5}{4}}\left(x\right) - "
+            r"\frac{1}{2} \cdot J_{\frac{3}{4}}\left(x\right)",
+        )
+        self.assertTrue(payload.get("derivative_svg"))
+        self.assertNotIn("derivative_render_error", payload)
+
     def test_expression_binding_edit_does_not_recalculate_symbolically(self) -> None:
         binding_commit = mars_lab.INDEX_HTML.split(
             "async function commitBindingInput(input) {", 1
@@ -1723,6 +1752,137 @@ class AlmanacLocationTests(unittest.TestCase):
             )
 
         self.assertEqual(searched_kinds, ["all"])
+
+
+# README examples: this class is named to sort after the ordinary regressions
+# and deliberately runs the examples documented in docs/mars-lab.md last.
+class ZZMarsLabReadmeExamples(unittest.TestCase):
+    @unittest.skipUnless(
+        all(
+            (ROOT / "build" / "release" / "scratch" / name).is_file()
+            for name in (
+                "mars_lab",
+                "equation_lab",
+                "diffequation_lab",
+                "matrix_lab",
+                "integrator_lab",
+                "datetime_lab",
+                "almanac_lab",
+            )
+        ),
+        "release MARS Lab helpers are not built",
+    )
+    def test_mars_lab_readme_examples_run_last(self) -> None:
+        scratch = ROOT / "build" / "release" / "scratch"
+
+        expression, raw, returncode = mars_lab.run_mars_lab_fields(
+            scratch / "mars_lab",
+            "{ sin(x)^2 + cos(x)^2 | x = pi/7 }",
+            64,
+        )
+        self.assertEqual(returncode, 0, raw)
+        self.assertEqual(expression["value"], "1")
+
+        equation, raw, returncode = mars_lab.run_equation_lab_fields(
+            scratch / "equation_lab",
+            "atan(2x) + atan(x) = pi/4",
+            64,
+        )
+        self.assertEqual(returncode, 0, raw)
+        self.assertEqual(equation["solutions"], "x = ¼·(√(17) - 3)")
+
+        diffequation, raw, returncode = mars_lab.run_diffequation_lab_fields(
+            scratch / "diffequation_lab",
+            "y'' + x^2y = 0",
+        )
+        self.assertEqual(returncode, 0, raw)
+        self.assertEqual(diffequation["solver"], "power-law Bessel")
+        self.assertIn("BesselJ(-¼, ½·x^2)", diffequation["solutions"])
+
+        matrix, raw, returncode = mars_lab.run_matrix_lab_fields(
+            scratch / "matrix_lab",
+            "sin(1 2; 4 5)",
+            "eval",
+            53,
+        )
+        self.assertEqual(returncode, 0, raw)
+        self.assertEqual(matrix["operation"], "sin")
+        self.assertEqual((matrix["rows"], matrix["cols"]), ("2", "2"))
+        self.assertTrue(matrix["result"].startswith("(-0.315002573091184"))
+
+        symbolic_matrix_examples = (
+            ("inverse(a b; c d)", "(d/(ad - bc), -b/(ad - bc); -c/(ad - bc), a/(ad - bc))"),
+            ("(a b; c d).(e f; g h)", "(ae + bg, af + bh; ce + dg, cf + dh)"),
+            ("inverse(a b; c d).(x; y)", "((dx - by)/(ad - bc); (ay - cx)/(ad - bc))"),
+            ("Dx(ax+b cx+d; y xy)", "(a, c; 0, y)"),
+            ("@S^x((ax+b cx+d; y xy))", "(½·(ax² + 2bx), ½·(cx² + 2dx); xy, ½x²y)"),
+        )
+        for source, expected in symbolic_matrix_examples:
+            with self.subTest(matrix_source=source):
+                fields, raw, returncode = mars_lab.run_matrix_lab_fields(
+                    scratch / "matrix_lab", source, "eval", 64
+                )
+                self.assertEqual(returncode, 0, raw)
+                self.assertEqual(fields["result"], expected)
+
+        integral, raw, returncode = mars_lab.run_integrator_lab_fields(
+            scratch / "integrator_lab",
+            "sin^2(x)",
+            [{"name": "x", "lo": "0", "hi": "1"}],
+            64,
+        )
+        self.assertEqual(returncode, 0, raw)
+        self.assertEqual(integral["antiderivative"], "¼·(2x - sin(2x))")
+        self.assertEqual(integral["symbolic"], "¼·(2 - sin(2))")
+
+        datetime, raw, returncode = mars_lab.run_datetime_lab_fields(
+            scratch / "datetime_lab",
+            {
+                "date": "2026-08-08",
+                "start": "2026-08-08",
+                "end": "2026-08-15",
+                "year": "2026",
+                "lat": "51.5074",
+                "lon": "-0.1278",
+                "elevation": "0",
+                "gmt_offset": "1",
+                "jurisdiction": "GB-ENG",
+            },
+        )
+        self.assertEqual(returncode, 0, raw)
+        self.assertEqual(datetime["weekday"], "Saturday")
+        self.assertEqual(datetime["sunrise"], "2026-08-08 05:34:54")
+        self.assertEqual(datetime["moon_phase"], "Waning Crescent")
+
+        almanac, raw, returncode = mars_lab.run_almanac_lab_fields(
+            scratch / "almanac_lab",
+            {
+                "date": "2026-08-08",
+                "time": "09:02:43",
+                "zone": "0",
+                "lat": "51.5074",
+                "lon": "-0.1278",
+                "body": "Sun",
+            },
+        )
+        self.assertEqual(returncode, 0, raw)
+        self.assertEqual(almanac["selected_name"], "Sun")
+        self.assertEqual(almanac["selected_visible"], "YES")
+        self.assertIn("SUN|Sun|sun", almanac["snapshot"])
+
+        for mode in (
+            "expression",
+            "equation",
+            "differential-equation",
+            "matrix",
+            "integrator",
+            "datetime",
+            "almanac",
+        ):
+            screenshot = ROOT / "docs" / "images" / "mars-lab" / f"{mode}.png"
+            with self.subTest(screenshot=mode):
+                self.assertTrue(screenshot.is_file())
+                self.assertTrue(screenshot.read_bytes().startswith(b"\x89PNG\r\n\x1a\n"))
 
 
 if __name__ == "__main__":

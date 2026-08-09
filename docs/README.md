@@ -4,6 +4,7 @@ This directory contains the longer module documentation for MARS.
 
 ## Getting Started
 
+- [MARS Lab](./mars-lab.md)
 - [Building](./building.md)
 - [Testing](./testing.md)
 - [Benchmarks](./benchmarks.md)
