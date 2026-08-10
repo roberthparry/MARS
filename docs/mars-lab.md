@@ -78,9 +78,17 @@ has no conditions.
 
 Matrix mode accepts complete numeric and symbolic matrix expressions. Spaces
 separate columns and semicolons separate rows in compact input; comma-separated
-entries are also accepted. Enter the operation as part of the expression and
-press **Evaluate**. Functions such as the inverse, logarithm and trigonometric
+entries are also accepted. Write matrix functions directly in the expression,
+so `sin(1 2; 4 5)` means the sine of that complete matrix. The **Matrix
+operation** selector remains available for inverse, multiplication, solving,
+eigenvalue and other structural operations while their direct notation is
+still unfamiliar. Functions such as the inverse, logarithm and trigonometric
 families require a square matrix.
+
+MARS Lab passes the entered text unchanged to
+`mat_expression_from_string(...)`. MARSlib owns the complete grammar and
+performs all matrix parsing and evaluation; neither the browser nor the native
+MARS Lab helper interprets matrix-expression syntax.
 
 The captured input is `sin(1 2; 4 5)`. MARS returns the sine of the complete
 `2 x 2` matrix, rather than applying scalar sine separately to its four

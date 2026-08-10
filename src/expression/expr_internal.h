@@ -670,6 +670,7 @@ expr_t *expr_simplify_try_basic_product(expr_t *a, expr_t *b);
 expr_t *expr_simplify_try_trig_product(expr_t *a, expr_t *b);
 expr_t *expr_simplify_try_trig_weighted_sum(const expr_t *a, const expr_t *b);
 expr_t *expr_simplify_try_lambert_exp(expr_t *arg);
+expr_t *expr_simplify_try_lambert_argument(expr_t *arg);
 expr_t *expr_simplify_try_lambert_product(expr_t *a, expr_t *b);
 expr_t *expr_simplify_try_i_unit_product(expr_t *a, expr_t *b);
 expr_t *expr_simplify_try_imag_trig_bridge(const expr_t *op, expr_t *arg);

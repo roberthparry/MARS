@@ -500,6 +500,123 @@ static void test_mat_from_string_invalid_syntax(void)
     check_bool("mat_from_string invalid symbolic clears bindings", bindings == NULL);
 }
 
+static void test_mat_expression_from_string(void)
+{
+    const char *exp_operation = NULL;
+    const char *product_operation = NULL;
+    matrix_t *actual = mat_expression_from_string("exp(-(.1 2; 4 5))", NULL, &exp_operation);
+    matrix_t *negative = mat_from_string("(-.1 -2; -4 -5)");
+    matrix_t *expected = mat_exp(negative);
+    matrix_t *product = mat_expression_from_string("(1 2; 3 4).(5; 6)", NULL, &product_operation);
+    number_t actual_value = NUM_ZERO;
+    number_t expected_value = NUM_ZERO;
+    number_t seventeen = num_create_from_long(17);
+    number_t thirty_nine = num_create_from_long(39);
+
+    check_bool("complete matrix expression exp parses in MARSlib", actual != NULL);
+    check_bool("complete matrix expression exp reports operation", exp_operation && strcmp(exp_operation, "exp") == 0);
+    check_bool("complete matrix expression explicit comparison parses", expected != NULL);
+
+    if (actual && expected) {
+        for (size_t row = 0u; row < 2u; ++row) {
+            for (size_t col = 0u; col < 2u; ++col) {
+                actual_value = mat_get_num(actual, row, col);
+                expected_value = mat_get_num(expected, row, col);
+                check_matrix_fromstring_num("grouped unary matrix exponential matches explicit negation", actual_value,
+                                            expected_value, 1e-18);
+                num_destroy(&expected_value);
+                num_destroy(&actual_value);
+            }
+        }
+    }
+
+    check_bool("complete matrix expression product parses in MARSlib", product != NULL);
+    check_bool("complete matrix expression product reports operation",
+               product_operation && strcmp(product_operation, "multiply") == 0);
+    if (product) {
+        actual_value = mat_get_num(product, 0u, 0u);
+        check_matrix_fromstring_num("complete matrix expression product first entry", actual_value, seventeen, 1e-18);
+        num_destroy(&actual_value);
+        actual_value = mat_get_num(product, 1u, 0u);
+        check_matrix_fromstring_num("complete matrix expression product second entry", actual_value, thirty_nine, 1e-18);
+        num_destroy(&actual_value);
+    }
+
+    num_destroy(&thirty_nine);
+    num_destroy(&seventeen);
+    mat_free(product);
+    mat_free(expected);
+    mat_free(negative);
+    mat_free(actual);
+}
+
+static void test_mat_expression_registered_function_aliases(void)
+{
+    const char *natural_log_operation = NULL;
+    const char *common_log_operation = NULL;
+    const char *gamma_operation = NULL;
+    const char *floor_operation = NULL;
+    const char *symbolic_operation = NULL;
+    mat_bindings_t *symbolic_bindings = NULL;
+    matrix_t *natural_log = mat_expression_from_string("ln(1 0; 0 2)", NULL, &natural_log_operation);
+    matrix_t *common_log = mat_expression_from_string("log(1 0; 0 100)", NULL, &common_log_operation);
+    matrix_t *gamma = mat_expression_from_string("Γ(1 0; 0 2)", NULL, &gamma_operation);
+    matrix_t *floor_matrix = mat_expression_from_string("floor(1.5 0; 0 2.9)", NULL, &floor_operation);
+    matrix_t *symbolic = mat_expression_from_string("sin({ (x 0; 0 y) | x = 0, y = 1; })", &symbolic_bindings,
+                                                    &symbolic_operation);
+    expr_t *x_binding = mat_bindings_get(symbolic_bindings, "x");
+    expr_t *diagonal_entry = NULL;
+    number_t value = NUM_ZERO;
+    number_t two = num_create_from_long(2);
+    number_t one = num_create_from_long(1);
+
+    check_bool("registered ln alias resolves through expression function hash", natural_log != NULL);
+    check_bool("registered ln alias reports canonical operation",
+               natural_log_operation && strcmp(natural_log_operation, "ln") == 0);
+    check_bool("registered log spelling resolves as common matrix logarithm", common_log != NULL);
+    check_bool("registered log spelling reports canonical operation",
+               common_log_operation && strcmp(common_log_operation, "log") == 0);
+    check_bool("registered Greek gamma alias resolves through expression function hash", gamma != NULL);
+    check_bool("registered Greek gamma alias reports canonical operation",
+               gamma_operation && strcmp(gamma_operation, "gamma") == 0);
+    check_bool("registered function outside the former matrix subset resolves", floor_matrix != NULL);
+    check_bool("registered floor function reports canonical operation", floor_operation && strcmp(floor_operation, "floor") == 0);
+    check_bool("symbolic matrix function preserves argument bindings",
+               symbolic != NULL && symbolic_bindings != NULL && x_binding != NULL);
+    check_bool("symbolic matrix function reports canonical operation",
+               symbolic_operation && strcmp(symbolic_operation, "sin") == 0);
+
+    if (common_log) {
+        value = mat_get_num(common_log, 1u, 1u);
+        check_matrix_fromstring_num("registered log alias retains scalar registry semantics", value, two, 1e-18);
+        num_destroy(&value);
+    }
+    if (gamma) {
+        value = mat_get_num(gamma, 1u, 1u);
+        check_matrix_fromstring_num("registered gamma alias evaluates matrix function", value, one, 1e-18);
+        num_destroy(&value);
+    }
+    if (floor_matrix) {
+        value = mat_get_num(floor_matrix, 1u, 1u);
+        check_matrix_fromstring_num("registered floor function evaluates diagonal entries through expression", value, two, 1e-18);
+        num_destroy(&value);
+    }
+    if (symbolic && x_binding) {
+        mat_get(symbolic, 0u, 0u, &diagonal_entry);
+        test_expr_set_val_d(x_binding, 1.57079632679489661923);
+        check_matrix_fromstring_expr_num("symbolic matrix function retains live external binding", diagonal_entry, one, 1e-18);
+    }
+
+    num_destroy(&one);
+    num_destroy(&two);
+    mat_bindings_free(symbolic_bindings);
+    mat_free(symbolic);
+    mat_free(floor_matrix);
+    mat_free(gamma);
+    mat_free(common_log);
+    mat_free(natural_log);
+}
+
 static void test_mat_from_string_bracketed_names(void)
 {
     mat_bindings_t *bindings = NULL;
@@ -723,5 +840,7 @@ void run_matrix_fromstring_tests(void)
     TEST_RUN_CASE(test_mat_symbolic_derivative_helpers_by_name, NULL);
     TEST_RUN_CASE(test_mat_symbolic_jacobian_helper_by_names, NULL);
     TEST_RUN_CASE(test_mat_symbolic_matrix_calculus_helpers_by_name, NULL);
+    TEST_RUN_CASE(test_mat_expression_from_string, NULL);
+    TEST_RUN_CASE(test_mat_expression_registered_function_aliases, NULL);
     TEST_RUN_CASE(test_mat_from_string_invalid_syntax, NULL);
 }

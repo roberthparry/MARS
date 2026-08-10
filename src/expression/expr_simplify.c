@@ -2204,6 +2204,7 @@ expr_t *expr_simplify_unary_operator(const expr_t *dv, expr_t *a, expr_t *b)
     expr_t *branch_inverse;
     expr_t *direct_inverse;
     expr_t *imag_bridge;
+    expr_t *lambert_argument;
 
     (void)b;
     if (expr_is_exp_expr(dv)) {
@@ -2219,6 +2220,14 @@ expr_t *expr_simplify_unary_operator(const expr_t *dv, expr_t *a, expr_t *b)
         if (lambert_exp) {
             expr_free(a);
             return lambert_exp;
+        }
+    }
+
+    if (expr_is_op(dv, &ops_lambert_w) || expr_is_op(dv, &ops_lambert_w0)) {
+        lambert_argument = expr_simplify_try_lambert_argument(a);
+        if (lambert_argument) {
+            expr_free(a);
+            return lambert_argument;
         }
     }
 

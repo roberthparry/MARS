@@ -509,7 +509,7 @@ static void test_from_string_implicit_symbolic_bindings(void)
     expr_t *tau_alias = expr_from_string("{ @tau }", NULL);
     expr_t *f = expr_from_string("{ [radius]^2 + c_1 + π + e }", NULL);
     expr_t *plain_integral_constant = expr_from_string("{ x + C }", NULL);
-    expr_t *integral_family = expr_from_string("{ C_0*x + C₁ + cos(x)*exp(sin(x)) }", NULL);
+    expr_t *integral_family = expr_from_string("{ C₁ + C_0*x + cos(x)*exp(sin(x)) }", NULL);
     char *xs = x ? expr_to_string(x, style_EXPRESSION) : NULL;
     char *x_pow_ns = x_pow_n ? expr_to_string(x_pow_n, style_EXPRESSION) : NULL;
     char *es = e ? expr_to_string(e, style_EXPRESSION) : NULL;
@@ -613,13 +613,13 @@ static void test_from_string_implicit_symbolic_bindings(void)
     }
 
     if (integral_family && integral_family_s &&
-        str_eq(integral_family_s, "{ C₁ + C₀x + cos(x)·exp(sin(x)) | x = NAN; C₀ = NAN, C₁ = NAN }")) {
+        str_eq(integral_family_s, "{ C₁ + C₀x + cos(x)·exp(sin(x)) | x = NAN; C₁ = NAN, C₀ = NAN }")) {
         to_string_pass("implicit integration constants stay constant", integral_family_s,
-                       "{ C₁ + C₀x + cos(x)·exp(sin(x)) | x = NAN; C₀ = NAN, C₁ = NAN }");
+                       "{ C₁ + C₀x + cos(x)·exp(sin(x)) | x = NAN; C₁ = NAN, C₀ = NAN }");
     } else {
         to_string_fail(__FILE__, __LINE__, 1, "implicit integration constants stay constant",
                        integral_family_s ? integral_family_s : "(null)",
-                       "{ C₁ + C₀x + cos(x)·exp(sin(x)) | x = NAN; C₀ = NAN, C₁ = NAN }");
+                       "{ C₁ + C₀x + cos(x)·exp(sin(x)) | x = NAN; C₁ = NAN, C₀ = NAN }");
     }
 
     if (plain_integral_constant && plain_integral_constant_s &&

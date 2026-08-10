@@ -1180,6 +1180,8 @@
     "test_writing": true
   },
   "tests/matrix/test_matrix_fromstring.c": {
+    "test_mat_expression_from_string": true,
+    "test_mat_expression_registered_function_aliases": true,
     "test_mat_from_string_bracketed_names": true,
     "test_mat_from_string_compact_columns": true,
     "test_mat_from_string_invalid_syntax": true,

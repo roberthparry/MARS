@@ -125,18 +125,36 @@ class EquationResultTests(unittest.TestCase):
 
 
 class MatrixResultTests(unittest.TestCase):
-    def test_matrix_functions_use_direct_expression_syntax(self) -> None:
+    def test_matrix_functions_use_direct_syntax_while_structural_operations_remain_available(self) -> None:
         representative_operations = {
             "exp", "log", "sqrt", "sin", "cos", "tan", "sinh", "cosh", "tanh", "erf", "gamma", "lambert_w0",
         }
+        structural_operations = {
+            "eval", "inverse", "multiply", "eigenvalues", "eigendecompose", "charpoly", "det", "trace", "rank",
+            "simplify", "solve",
+        }
 
-        self.assertTrue(representative_operations.issubset(mars_lab.MATRIX_OPERATIONS))
         for operation in representative_operations:
+            self.assertNotIn(operation, mars_lab.MATRIX_OPERATIONS)
             self.assertNotIn(f'value="{operation}"', mars_lab.INDEX_HTML)
-        self.assertNotIn('id="matrixOperationLabel"', mars_lab.INDEX_HTML)
-        self.assertIn('<option value="eval" selected>Evaluate</option>', mars_lab.INDEX_HTML)
+        for operation in structural_operations:
+            self.assertIn(f'value="{operation}"', mars_lab.INDEX_HTML)
+        self.assertIn('id="matrixOperationLabel"', mars_lab.INDEX_HTML)
+        self.assertIn("matrixControls.classList.toggle('hidden', !matrixMode);", mars_lab.INDEX_HTML)
+        self.assertIn('<option value="eval" selected>Evaluate expression</option>', mars_lab.INDEX_HTML)
         self.assertIn("genuine matrix functions calculated by MARSlib", mars_lab.INDEX_HTML)
         self.assertIn("sin(1 2; 4 5)", mars_lab.INDEX_HTML)
+
+    def test_native_helper_delegates_complete_matrix_expression_parsing_to_marslib(self) -> None:
+        source = (ROOT / "scratch" / "matrix_lab.c").read_text(encoding="utf-8")
+
+        self.assertIn("mat_expression_from_string(input, &bindings, &parsed_operation)", source)
+        self.assertIn("mat_expression_from_string(operand, NULL, NULL)", source)
+        self.assertNotIn("evaluate_matrix_expression_span", source)
+        self.assertNotIn("direct_unary_operation_name", source)
+        self.assertNotIn("matrix_product_operator", source)
+        self.assertNotIn("matrix_unary_operations", source)
+        self.assertNotIn("matrix_unary_function_for", source)
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "matrix_lab").is_file(),
@@ -145,18 +163,18 @@ class MatrixResultTests(unittest.TestCase):
     def test_native_helper_evaluates_representative_matrix_functions(self) -> None:
         matrix_binary = ROOT / "build" / "release" / "scratch" / "matrix_lab"
         cases = (
-            ("(0, 0; 0, 0)", "exp", "(1, 0; 0, 1)"),
-            ("(1, 0; 0, e)", "log", "(0, 0; 0, 1)"),
-            ("(4, 0; 0, 9)", "sqrt", "(2, 0; 0, 3)"),
-            ("(0, 0; 0, 0)", "sin", "(0, 0; 0, 0)"),
+            ("exp(0, 0; 0, 0)", "exp", "(1, 0; 0, 1)"),
+            ("ln(1, 0; 0, e)", "ln", "(0, 0; 0, 1)"),
+            ("sqrt(4, 0; 0, 9)", "sqrt", "(2, 0; 0, 3)"),
+            ("sin(0, 0; 0, 0)", "sin", "(0, 0; 0, 0)"),
         )
 
-        for matrix_text, operation, expected in cases:
-            with self.subTest(operation=operation):
-                fields, raw, returncode = mars_lab.run_matrix_lab_fields(matrix_binary, matrix_text, operation, 64)
+        for matrix_text, expected_operation, expected in cases:
+            with self.subTest(operation=expected_operation):
+                fields, raw, returncode = mars_lab.run_matrix_lab_fields(matrix_binary, matrix_text, "eval", 64)
 
                 self.assertEqual(returncode, 0, raw)
-                self.assertEqual(fields["operation"], operation)
+                self.assertEqual(fields["operation"], expected_operation)
                 self.assertEqual(fields["result"], expected)
                 self.assertNotIn("i", fields["result"])
 
@@ -174,6 +192,25 @@ class MatrixResultTests(unittest.TestCase):
         self.assertEqual(direct_fields["operation"], "sin")
         self.assertEqual((direct_fields["rows"], direct_fields["cols"]), ("2", "2"))
         self.assertTrue(direct_fields["result"].startswith("(-0.315002573091184"))
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "matrix_lab").is_file(),
+        "release matrix_lab helper is not built",
+    )
+    def test_native_helper_accepts_a_grouped_negated_matrix_function_argument(self) -> None:
+        matrix_binary = ROOT / "build" / "release" / "scratch" / "matrix_lab"
+        direct_fields, direct_raw, direct_returncode = mars_lab.run_matrix_lab_fields(
+            matrix_binary, "exp(-(.1 2; 4 5))", "eval", 64
+        )
+        explicit_fields, explicit_raw, explicit_returncode = mars_lab.run_matrix_lab_fields(
+            matrix_binary, "exp(-.1 -2; -4 -5)", "eval", 64
+        )
+
+        self.assertEqual(direct_returncode, 0, direct_raw)
+        self.assertEqual(explicit_returncode, 0, explicit_raw)
+        self.assertEqual(direct_fields["operation"], "exp")
+        self.assertEqual((direct_fields["rows"], direct_fields["cols"]), ("2", "2"))
+        self.assertEqual(direct_fields["result"], explicit_fields["result"])
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "matrix_lab").is_file(),

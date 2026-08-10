@@ -499,6 +499,25 @@ static const func_entry_t *lookup_func(string_view_t kw)
     return NULL;
 }
 
+/* Apply a registered unary function resolved through the expression parser's perfect hash. */
+expr_t *expr_apply_unary_function(const char *name, const expr_t *argument, const char **canonical_name_out)
+{
+    const func_entry_t *entry;
+
+    if (canonical_name_out)
+        *canonical_name_out = NULL;
+    if (!name || !argument)
+        return NULL;
+
+    entry = lookup_func(string_view_from_chars(name, strlen(name)));
+    if (!entry || entry->arity != 1u || !entry->ufn)
+        return NULL;
+
+    if (canonical_name_out)
+        *canonical_name_out = entry->ops && entry->ops->name ? entry->ops->name : entry->kw;
+    return entry->ufn(argument);
+}
+
 bool expr_stringin_function_hash_is_valid(void)
 {
     bool bucket_used[FUNC_TABLE_SIZE] = {false};
@@ -1634,37 +1653,71 @@ static expr_t *apply_unary_preserving_constexpr(const expr_ops_t *ops, expr_t *a
     }
 }
 
-static expr_binding_expr_t *binding_expr_for_binary_constexpr(const expr_ops_t *ops, const expr_t *left,
-                                                              const expr_t *right)
+static expr_binding_expr_t *binding_expr_from_const_node(const expr_t *node)
 {
-    expr_binding_expr_t *l = expr_binding_expr_clone(left->binding_expr);
-    expr_binding_expr_t *r = expr_binding_expr_clone(right->binding_expr);
+    const char *canonical_name;
+    string_t *text;
+    expr_binding_expr_t *binding;
 
-    if (ops == &ops_add)
-        return expr_binding_expr_new_add(l, r);
-    if (ops == &ops_sub)
-        return expr_binding_expr_new_sub(l, r);
-    if (ops == &ops_mul)
-        return expr_binding_expr_new_mul(l, r);
-    if (ops == &ops_div)
-        return expr_binding_expr_new_div(l, r);
-    if (ops == &ops_pow)
-        return expr_binding_expr_new_binary_op(&ops_pow, l, r);
+    if (!node || !expr_is_const(node))
+        return NULL;
+    if (node->binding_expr && node_has_preserved_constexpr(node))
+        return expr_binding_expr_clone(node->binding_expr);
+    if (node->binding_expr)
+        return NULL;
 
-    return expr_binding_expr_new_binary_op(ops, l, r);
+    canonical_name = node->name ? expr_default_constant_canonical_name(node->name) : NULL;
+    if (canonical_name) {
+        if (strcmp(canonical_name, "e") == 0)
+            return expr_binding_expr_new_const(EXPR_BINDING_CONST_E);
+        if (strcmp(canonical_name, "i") == 0)
+            return expr_binding_expr_new_const(EXPR_BINDING_CONST_I);
+        if (strcmp(canonical_name, "@pi") == 0)
+            return expr_binding_expr_new_const(EXPR_BINDING_CONST_PI);
+        if (strcmp(canonical_name, "@phi") == 0)
+            return expr_binding_expr_new_const(EXPR_BINDING_CONST_PHI);
+        if (strcmp(canonical_name, "@gamma") == 0)
+            return expr_binding_expr_new_const(EXPR_BINDING_CONST_GAMMA);
+        return NULL;
+    }
+    if (node->name && *node->name)
+        return NULL;
+
+    text = num_to_string(node->c);
+    binding = expr_binding_expr_new_number_text(text ? string_c_str(text) : "NAN");
+    string_free(text);
+    return binding;
 }
 
 static expr_t *apply_binary_preserving_constexpr(const expr_ops_t *ops, expr_t *left, expr_t *right,
                                                  expr_t *(*fallback)(const expr_t *, const expr_t *))
 {
-    if (node_has_preserved_constexpr(left) && node_has_preserved_constexpr(right)) {
-        expr_binding_expr_t *expr = binding_expr_for_binary_constexpr(ops, left, right);
-        expr_t *node = const_node_from_binding_expr(expr);
+    expr_binding_expr_t *left_binding = binding_expr_from_const_node(left);
+    expr_binding_expr_t *right_binding = binding_expr_from_const_node(right);
+
+    if (left_binding && right_binding) {
+        expr_binding_expr_t *expr;
+        expr_t *node;
+
+        if (ops == &ops_add)
+            expr = expr_binding_expr_new_add(left_binding, right_binding);
+        else if (ops == &ops_sub)
+            expr = expr_binding_expr_new_sub(left_binding, right_binding);
+        else if (ops == &ops_mul)
+            expr = expr_binding_expr_new_mul(left_binding, right_binding);
+        else if (ops == &ops_div)
+            expr = expr_binding_expr_new_div(left_binding, right_binding);
+        else
+            expr = expr_binding_expr_new_binary_op(ops, left_binding, right_binding);
+        node = const_node_from_binding_expr(expr);
 
         expr_free(left);
         expr_free(right);
         return node;
     }
+
+    expr_binding_expr_free(right_binding);
+    expr_binding_expr_free(left_binding);
 
     {
         expr_t *node = fallback(left, right);
@@ -3553,8 +3606,14 @@ static expr_t *expr_from_string_view_impl(string_view_t source, expr_bindings_t 
 
         if (result) {
             if (bindings_out) {
-                *bindings_out =
-                    has_symbolic_integral ? expr_bindings_from_expr_internal(result) : single_binding_from_node(result);
+                symtab_init(&syms);
+                if (has_symbolic_integral)
+                    *bindings_out = expr_bindings_from_expr_internal(result);
+                else if (collect_implicit_symbols(content, &syms) == 0 && syms.count > 0)
+                    *bindings_out = symtab_build_bindings_for_expr(&syms, result);
+                else
+                    *bindings_out = single_binding_from_node(result);
+                symtab_free(&syms);
                 *bindings_out = merge_symbolic_integral_bindings(*bindings_out, symbolic_integral_bindings);
                 symbolic_integral_bindings = NULL;
             }

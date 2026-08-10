@@ -2127,6 +2127,10 @@ expr_t *expr_gammainv(const expr_t *a)
 }
 expr_t *expr_lambert_w(const expr_t *a)
 {
+    expr_t *inverse = expr_simplify_try_lambert_argument((expr_t *)a);
+
+    if (inverse)
+        return inverse;
     return expr_math_wrap_unary(&ops_lambert_w, a);
 }
 expr_t *expr_lambert_wn_xp(const expr_t *branch, const expr_t *arg)
@@ -2145,6 +2149,10 @@ expr_t *expr_lambert_wn(const expr_t *branch, const expr_t *arg)
 }
 expr_t *expr_lambert_w0(const expr_t *a)
 {
+    expr_t *inverse = expr_simplify_try_lambert_argument((expr_t *)a);
+
+    if (inverse)
+        return inverse;
     return expr_math_wrap_unary(&ops_lambert_w0, a);
 }
 expr_t *expr_lambert_wm1(const expr_t *a)

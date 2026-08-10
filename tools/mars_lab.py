@@ -613,10 +613,6 @@ DEFAULT_MATRIX_OPERATION = "eval"
 MATRIX_OPERATIONS = frozenset({
     "eval", "inverse", "multiply", "eigenvalues", "eigendecompose", "charpoly", "det", "trace", "rank", "simplify",
     "solve",
-    "exp", "log", "log10", "sqrt", "sin", "cos", "tan", "asin", "acos", "atan", "sinh", "cosh", "tanh",
-    "asinh", "acosh", "atanh", "erf", "erfc", "erfinv", "erfcinv", "gamma", "lgamma", "digamma", "trigamma",
-    "tetragamma", "gammainv", "normal_pdf", "normal_cdf", "normal_logpdf", "lambert_w0", "lambert_wm1",
-    "productlog", "ei", "e1",
 })
 DEFAULT_INTEGRATOR_EXPRESSION = "{ exp(-x^2) | x = ? }"
 DEFAULT_INTEGRATOR_BOUNDS = "x = 0 .. 1"
@@ -3554,8 +3550,19 @@ __THEME_OVERRIDES__
       </div>
       <textarea id="expr" spellcheck="false" aria-labelledby="leftPaneTitle">__INITIAL_EXPRESSION__</textarea>
       <div class="mode-panel hidden" id="matrixControls">
-        <select class="hidden" id="matrixOperation" aria-hidden="true" tabindex="-1">
-          <option value="eval" selected>Evaluate</option>
+        <label id="matrixOperationLabel" for="matrixOperation">Matrix operation</label>
+        <select id="matrixOperation">
+          <option value="eval" selected>Evaluate expression</option>
+          <option value="inverse">Inverse</option>
+          <option value="multiply">Multiply by another matrix</option>
+          <option value="eigenvalues">Eigenvalues</option>
+          <option value="eigendecompose">Eigendecompose</option>
+          <option value="charpoly">Characteristic polynomial</option>
+          <option value="det">Determinant</option>
+          <option value="trace">Trace</option>
+          <option value="rank">Rank</option>
+          <option value="simplify">Simplify symbolic matrix</option>
+          <option value="solve">Solve A X = B</option>
         </select>
         <label class="hidden" for="matrixOperand" id="matrixOperandLabel">Right-hand side matrix</label>
         <textarea class="hidden secondary-editor" id="matrixOperand" spellcheck="false" placeholder="(1; 0)"></textarea>
@@ -4715,7 +4722,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       document.body.classList.toggle('datetime-mode', datetimeMode);
       document.body.classList.toggle('almanac-mode', almanacMode);
       document.body.classList.toggle('diffequation-mode', diffequationMode);
-      matrixControls.classList.add('hidden');
+      matrixControls.classList.toggle('hidden', !matrixMode);
       equationControls.classList.toggle('hidden', !equationMode);
       diffequationControls.classList.toggle('hidden', !diffequationMode);
       integratorControls.classList.toggle('hidden', !integratorMode);
