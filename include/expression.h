@@ -426,6 +426,21 @@ int expr_cmp(const expr_t *expr1, const expr_t *expr2);
 /* ------------------------------------------------------------------------- */
 
 /**
+ * @brief Apply a registered unary expression function by name.
+ *
+ * The name is resolved by the expression parser's perfect hash, including all
+ * accepted aliases. @p argument is borrowed. The returned expression is an
+ * owning handle and must be released with expr_free(). When requested,
+ * @p canonical_name_out receives a borrowed process-lifetime canonical name.
+ *
+ * @param name Function name or accepted alias.
+ * @param argument Expression supplied as the function argument.
+ * @param canonical_name_out Optional destination for the canonical name.
+ * @return A newly allocated expression, or NULL if the name is not a registered unary function.
+ */
+expr_t *expr_apply_unary_function(const char *name, const expr_t *argument, const char **canonical_name_out);
+
+/**
  * All elementary functions build a new DAG node and return an owning handle.
  * Arguments are retained (not consumed).
  *

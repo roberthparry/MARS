@@ -641,6 +641,8 @@ All functions return owning handles.
 
 ### Elementary Functions (owning)
 
+- `expr_t *expr_apply_unary_function(const char *name, const expr_t *argument, const char **canonical_name_out)` —
+  resolve any registered unary name or alias through the parser's perfect hash and construct the corresponding expression
 - `expr_t *expr_sin(const expr_t *expr)` — sin
 - `expr_t *expr_cos(const expr_t *expr)` — cos
 - `expr_t *expr_tan(const expr_t *expr)` — tan

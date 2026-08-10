@@ -38,7 +38,8 @@ the API. Internally each matrix carries:
 - matrix norms: 1-norm, infinity-norm, Frobenius norm, 2-norm
 - matrix factorisations: LU, QR, Cholesky, SVD, Schur
 - condition number computation
-- matrix functions: exp, sin, cos, tan, sinh, cosh, tanh, sqrt, log, log10, asin, acos, atan, asinh, acosh, atanh, erf, erfc
+- matrix functions: named APIs for exp, sin, cos, tan, sinh, cosh, tanh, sqrt, log, log10, asin, acos, atan, asinh,
+  acosh, atanh, erf, and erfc; complete matrix-expression input resolves every applicable unary expression function
 - power functions: integer power (binary exponentiation), real power via exp/log
 - numeric eigendecomposition and matrix functions are computed through the high-precision numeric `number_t` layer regardless of how the original numeric entries were written
 
@@ -1008,6 +1009,7 @@ typedef struct mat_bindings_t mat_bindings_t;
 
 matrix_t *mat_from_string(const char *s);
 matrix_t *mat_from_string_expr(const char *s, mat_bindings_t **bnd_out);
+matrix_t *mat_expression_from_string(const char *text, mat_bindings_t **bnd_out, const char **operation_out);
 expr_t *mat_bindings_get(mat_bindings_t *bnd, const char *name);
 void mat_bindings_free(mat_bindings_t *bnd);
 matrix_t *mat_deriv_by_name(const matrix_t *A, mat_bindings_t *bindings, const char *name);
@@ -1049,6 +1051,24 @@ matrix.
 `mat_from_string_expr(...)` is the symbolic-capable entry point. It returns a
 `MAT_TYPE_EXPR` matrix for symbolic input and optionally returns bindings
 through `bnd_out`.
+
+`mat_expression_from_string(...)` is the complete matrix-expression entry
+point. It recognises matrix literals, grouped unary signs, matrix products,
+`inverse(...)`, registered unary expression functions such as `exp(...)` and
+`sin(...)`, and entrywise calculus forms such as `Dx(...)` and `@S^x(...)`.
+This parsing and evaluation belongs to MARSlib; clients pass the input string
+through unchanged. When requested, `operation_out` identifies the explicit
+operation that was recognised.
+
+Function names and aliases are resolved by the expression module's perfect
+hash registry. Matrix parsing therefore has no separate linear name scan and
+no duplicate list of accepted spellings: `ln(...)`, `log(...)`, `gamma(...)`,
+`Γ(...)`, and every other registered spelling have the same identity in both
+expression and matrix input. Expression constructs the scalar function on each
+numeric or symbolic diagonal value and evaluates it when the value is numeric;
+Matrix is responsible for the matrix decomposition and reconstruction. Symbolic diagonal values retain
+the same variable and constant nodes as the original matrix, and
+`mat_expression_from_string(...)` returns those live bindings to its caller.
 
 Rows are separated by semicolons. Columns may be separated by commas or by
 unambiguous top-level whitespace, so `(1 2; 4 5)` and `(1, 2; 4, 5)` both

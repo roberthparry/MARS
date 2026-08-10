@@ -281,6 +281,24 @@ matrix_t *mat_from_string_expr(const char *s, mat_bindings_t **bnd_out);
 matrix_t *mat_from_text_expr(const string_t *text, mat_bindings_t **bnd_out);
 
 /**
+ * @brief Parse and evaluate a complete matrix expression from a C string.
+ *
+ * In addition to matrix literals accepted by mat_from_string_expr(), this parser accepts grouped unary signs,
+ * matrix products, inverse(...), every registered unary expression function such as exp(...) and sin(...), and
+ * entrywise calculus forms such as Dx(...) and @S^x(...).
+ *
+ * When @p operation_out is non-NULL, it receives a borrowed static operation name for an explicit operation, or NULL
+ * when @p text is a matrix literal alone. When @p bnd_out is non-NULL, bindings referenced by a literal or unary
+ * matrix-function argument are returned and remain shared by the resulting symbolic matrix expressions.
+ *
+ * @param text          Matrix expression to parse and evaluate.
+ * @param bnd_out       Optional destination for symbolic bindings.
+ * @param operation_out Optional destination for the recognised operation name.
+ * @return              Newly allocated result matrix on success, or NULL on error.
+ */
+matrix_t *mat_expression_from_string(const char *text, mat_bindings_t **bnd_out, const char **operation_out);
+
+/**
  * @brief Look up a parsed matrix binding by string object name.
  *
  * The lookup accepts the same normalised names as the parser. Bracketed names

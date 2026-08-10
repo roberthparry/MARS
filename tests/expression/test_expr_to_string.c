@@ -235,7 +235,6 @@ void to_string_pass(const char *msg, const char *got, const char *expected)
 void to_string_fail(const char *file, int line, int col, const char *msg, const char *got, const char *expected)
 {
     fprintf(stderr, C_BOLD C_RED "FAIL" C_RESET " %s: " C_RED "%s:%d:%d\n" C_RESET, msg, file, line, col);
-    TEST_FAIL();
 
     int multi = is_multiline(got) || is_multiline(expected);
 
@@ -245,6 +244,7 @@ void to_string_fail(const char *file, int line, int col, const char *msg, const 
         fprintf(stderr, "  ───────────────────────────────\n");
 
     print_multiline("expected", expected);
+    TEST_FAIL();
 }
 
 /* Compare two strings ignoring trailing whitespace */

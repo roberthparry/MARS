@@ -1450,6 +1450,496 @@ matrix_t *mat_from_text_expr(const string_t *text, mat_bindings_t **bindings_out
     return mf_parse_matrix_text(text, bindings_out);
 }
 
+static void mf_expr_array_free(expr_t **values, size_t count)
+{
+    if (!values)
+        return;
+    for (size_t i = 0u; i < count; ++i)
+        expr_free(values[i]);
+    free(values);
+}
+
+static void mf_number_array_destroy(number_t *values, size_t count)
+{
+    if (!values)
+        return;
+    for (size_t i = 0u; i < count; ++i)
+        num_destroy(&values[i]);
+    free(values);
+}
+
+static number_t mf_registered_unary_number(const char *function_name, const number_t value)
+{
+    expr_t *argument = expr_new_const(value);
+    expr_t *mapped = argument ? expr_apply_unary_function(function_name, argument, NULL) : NULL;
+    number_t result = mapped ? expr_eval(mapped) : num_clone(NUM_NAN);
+
+    expr_free(mapped);
+    expr_free(argument);
+    return result;
+}
+
+static matrix_t *mf_registered_unary_diagonal(const matrix_t *matrix, const char *function_name)
+{
+    size_t order = mat_get_row_count(matrix);
+
+    if (mat_typeof(matrix) == MAT_TYPE_EXPR) {
+        expr_t **mapped = calloc(order, sizeof(*mapped));
+        matrix_t *result = NULL;
+
+        if (!mapped)
+            return NULL;
+        for (size_t i = 0u; i < order; ++i) {
+            expr_t *argument = NULL;
+
+            mat_get(matrix, i, i, &argument);
+            mapped[i] = argument ? expr_apply_unary_function(function_name, argument, NULL) : NULL;
+            if (!mapped[i]) {
+                mf_expr_array_free(mapped, order);
+                return NULL;
+            }
+        }
+        result = mat_create_diagonal_expr(order, mapped);
+        mf_expr_array_free(mapped, order);
+        return result;
+    }
+
+    {
+        number_t *mapped = calloc(order, sizeof(*mapped));
+        matrix_t *result;
+
+        if (!mapped)
+            return NULL;
+        for (size_t i = 0u; i < order; ++i) {
+            number_t argument = mat_get_num(matrix, i, i);
+
+            mapped[i] = mf_registered_unary_number(function_name, argument);
+            num_destroy(&argument);
+        }
+        result = mat_create_diagonal(order, mapped);
+        mf_number_array_destroy(mapped, order);
+        return result;
+    }
+}
+
+static matrix_t *mf_registered_unary_symbolic(const matrix_t *matrix, const char *function_name)
+{
+    size_t order = mat_get_row_count(matrix);
+    expr_t **eigenvalues = calloc(order, sizeof(*eigenvalues));
+    expr_t **mapped = calloc(order, sizeof(*mapped));
+    matrix_t *eigenvectors = NULL;
+    matrix_t *diagonal = NULL;
+    matrix_t *product = NULL;
+    matrix_t *inverse = NULL;
+    matrix_t *result = NULL;
+
+    if (!eigenvalues || !mapped)
+        goto cleanup;
+    if (mat_eigendecompose_expr(matrix, eigenvalues, &eigenvectors) != 0 || !eigenvectors)
+        goto cleanup;
+    for (size_t i = 0u; i < order; ++i) {
+        mapped[i] = expr_apply_unary_function(function_name, eigenvalues[i], NULL);
+        if (!mapped[i])
+            goto cleanup;
+    }
+    diagonal = mat_create_diagonal_expr(order, mapped);
+    inverse = mat_inverse(eigenvectors);
+    product = diagonal ? mat_mul(eigenvectors, diagonal) : NULL;
+    result = product && inverse ? mat_mul(product, inverse) : NULL;
+
+cleanup:
+    mat_free(inverse);
+    mat_free(product);
+    mat_free(diagonal);
+    mat_free(eigenvectors);
+    mf_expr_array_free(mapped, order);
+    mf_expr_array_free(eigenvalues, order);
+    return result;
+}
+
+static matrix_t *mf_registered_unary_numeric(const matrix_t *matrix, const char *function_name)
+{
+    size_t order = mat_get_row_count(matrix);
+    number_t *eigenvalues = calloc(order, sizeof(*eigenvalues));
+    number_t *mapped = calloc(order, sizeof(*mapped));
+    matrix_t *eigenvectors = NULL;
+    matrix_t *diagonal = NULL;
+    matrix_t *product = NULL;
+    matrix_t *inverse = NULL;
+    matrix_t *result = NULL;
+
+    if (!eigenvalues || !mapped)
+        goto cleanup;
+    if (mat_eigendecompose(matrix, eigenvalues, &eigenvectors) != 0 || !eigenvectors)
+        goto cleanup;
+    for (size_t i = 0u; i < order; ++i)
+        mapped[i] = mf_registered_unary_number(function_name, eigenvalues[i]);
+    diagonal = mat_create_diagonal(order, mapped);
+    inverse = mat_inverse(eigenvectors);
+    product = diagonal ? mat_mul(eigenvectors, diagonal) : NULL;
+    result = product && inverse ? mat_mul(product, inverse) : NULL;
+
+cleanup:
+    mat_free(inverse);
+    mat_free(product);
+    mat_free(diagonal);
+    mat_free(eigenvectors);
+    mf_number_array_destroy(mapped, order);
+    mf_number_array_destroy(eigenvalues, order);
+    return result;
+}
+
+static matrix_t *mf_registered_unary_apply(const matrix_t *matrix, const char *function_name)
+{
+    if (!matrix || !function_name || mat_get_row_count(matrix) != mat_get_col_count(matrix))
+        return NULL;
+    if (mat_is_diagonal(matrix))
+        return mf_registered_unary_diagonal(matrix, function_name);
+    if (mat_typeof(matrix) == MAT_TYPE_EXPR)
+        return mf_registered_unary_symbolic(matrix, function_name);
+    return mf_registered_unary_numeric(matrix, function_name);
+}
+
+static char *mf_expression_duplicate_range(const char *start, const char *end)
+{
+    size_t length;
+    char *copy;
+
+    if (!start || !end || end < start)
+        return NULL;
+
+    length = (size_t)(end - start);
+    copy = malloc(length + 1u);
+    if (!copy)
+        return NULL;
+    memcpy(copy, start, length);
+    copy[length] = '\0';
+    return copy;
+}
+
+static char *mf_expression_parenthesised_literal(const char *start, const char *end)
+{
+    size_t length = (size_t)(end - start);
+    char *matrix_text = malloc(length + 3u);
+
+    if (!matrix_text)
+        return NULL;
+    matrix_text[0] = '(';
+    memcpy(matrix_text + 1u, start, length);
+    matrix_text[length + 1u] = ')';
+    matrix_text[length + 2u] = '\0';
+    return matrix_text;
+}
+
+static char *mf_expression_literal_text(const char *start, const char *end)
+{
+    while (start < end && isspace((unsigned char)*start))
+        start++;
+    while (end > start && isspace((unsigned char)end[-1]))
+        end--;
+    if (start == end)
+        return NULL;
+
+    if (*start == '(' || *start == '[' || *start == '{')
+        return mf_expression_duplicate_range(start, end);
+    return mf_expression_parenthesised_literal(start, end);
+}
+
+static bool mf_expression_unary_operation_name(const char *start, const char *open, bool *inverse_out,
+                                               char **function_name_out, const char **canonical_name_out)
+{
+    size_t input_length = (size_t)(open - start);
+    expr_t *zero = NULL;
+    expr_t *probe = NULL;
+    bool found;
+
+    *inverse_out = false;
+    *function_name_out = NULL;
+    if (canonical_name_out)
+        *canonical_name_out = NULL;
+    if (input_length == strlen("inverse") && strncmp(start, "inverse", input_length) == 0) {
+        *inverse_out = true;
+        return true;
+    }
+
+    *function_name_out = mf_expression_duplicate_range(start, open);
+    zero = *function_name_out ? expr_new_const(NUM_ZERO) : NULL;
+    probe = zero ? expr_apply_unary_function(*function_name_out, zero, canonical_name_out) : NULL;
+    found = probe != NULL;
+    expr_free(probe);
+    expr_free(zero);
+    if (*function_name_out && found)
+        return true;
+
+    free(*function_name_out);
+    *function_name_out = NULL;
+    return false;
+}
+
+static bool mf_expression_calculus_name(const char *start, const char *open, bool *integrate_out, char *variable,
+                                        size_t variable_size)
+{
+    const char *variable_start;
+    size_t variable_length;
+
+    if (!start || !open || !integrate_out || !variable || variable_size == 0u)
+        return false;
+
+    if (open - start > 1 && *start == 'D') {
+        *integrate_out = false;
+        variable_start = start + 1;
+    } else if (open - start > 3 && strncmp(start, "@S^", 3u) == 0) {
+        *integrate_out = true;
+        variable_start = start + 3;
+    } else {
+        return false;
+    }
+
+    variable_length = (size_t)(open - variable_start);
+    if (variable_length == 0u || variable_length >= variable_size)
+        return false;
+    memcpy(variable, variable_start, variable_length);
+    variable[variable_length] = '\0';
+    return true;
+}
+
+static void mf_expression_trim_span(const char **start, const char **end)
+{
+    while (*start < *end && isspace((unsigned char)**start))
+        (*start)++;
+    while (*end > *start && isspace((unsigned char)(*end)[-1]))
+        (*end)--;
+}
+
+static const char *mf_expression_matching_parenthesis(const char *open, const char *end)
+{
+    int depth = 0;
+
+    if (!open || open >= end || *open != '(')
+        return NULL;
+
+    for (const char *cursor = open; cursor < end; ++cursor) {
+        if (*cursor == '(')
+            depth++;
+        else if (*cursor == ')') {
+            depth--;
+            if (depth == 0)
+                return cursor;
+            if (depth < 0)
+                return NULL;
+        }
+    }
+    return NULL;
+}
+
+static const char *mf_expression_product_operator(const char *start, const char *end)
+{
+    const char *product = NULL;
+    int paren_depth = 0;
+    int bracket_depth = 0;
+    int brace_depth = 0;
+
+    for (const char *cursor = start; cursor < end; ++cursor) {
+        unsigned char c = (unsigned char)*cursor;
+
+        if (c == '(')
+            paren_depth++;
+        else if (c == ')')
+            paren_depth--;
+        else if (c == '[')
+            bracket_depth++;
+        else if (c == ']')
+            bracket_depth--;
+        else if (c == '{')
+            brace_depth++;
+        else if (c == '}')
+            brace_depth--;
+        else if (c == '.' && paren_depth == 0 && bracket_depth == 0 && brace_depth == 0) {
+            bool decimal_point = cursor + 1 < end && isdigit((unsigned char)cursor[1]) &&
+                                 (cursor == start || isdigit((unsigned char)cursor[-1]) ||
+                                  isspace((unsigned char)cursor[-1]) || cursor[-1] == '+' || cursor[-1] == '-');
+
+            if (!decimal_point)
+                product = cursor;
+        }
+    }
+    return product;
+}
+
+static matrix_t *mf_expression_parse_literal(const char *start, const char *end, mat_bindings_t **bindings)
+{
+    char *matrix_text = mf_expression_literal_text(start, end);
+    matrix_t *matrix;
+
+    if (!matrix_text)
+        return NULL;
+    matrix = mat_from_string_expr(matrix_text, bindings);
+    free(matrix_text);
+    return matrix;
+}
+
+static matrix_t *mf_expression_calculus_literal(const char *start, const char *end, const char *variable, bool integrate)
+{
+    char *matrix_text = mf_expression_literal_text(start, end);
+    mat_bindings_t *bindings = NULL;
+    matrix_t *matrix = NULL;
+    matrix_t *result = NULL;
+    expr_t *temporary_variable = NULL;
+    expr_t *wrt;
+
+    if (!matrix_text)
+        return NULL;
+    matrix = mat_from_string_expr(matrix_text, &bindings);
+    free(matrix_text);
+    if (!matrix)
+        goto cleanup;
+
+    wrt = mat_bindings_get(bindings, variable);
+    if (!wrt) {
+        temporary_variable = expr_new_named_var(NUM_ZERO, variable);
+        wrt = temporary_variable;
+    }
+    if (wrt)
+        result = integrate ? mat_integrate(matrix, wrt) : mat_deriv(matrix, wrt);
+
+cleanup:
+    expr_free(temporary_variable);
+    mat_bindings_free(bindings);
+    mat_free(matrix);
+    return result;
+}
+
+static matrix_t *mf_expression_evaluate_span(const char *start, const char *end, bool allow_literal,
+                                             mat_bindings_t **bindings_out, const char **operation_out)
+{
+    const char *product;
+    const char *open;
+    const char *close;
+    char *unary_function_spelling = NULL;
+    const char *unary_function_name = NULL;
+    bool inverse = false;
+    char calculus_variable[128];
+    bool integrate = false;
+    matrix_t *left = NULL;
+    matrix_t *right = NULL;
+    matrix_t *result = NULL;
+
+    mf_expression_trim_span(&start, &end);
+    if (start == end)
+        return NULL;
+
+    if ((*start == '+' || *start == '-') && start + 1 < end) {
+        const char *operand_start = start + 1;
+
+        while (operand_start < end && isspace((unsigned char)*operand_start))
+            operand_start++;
+        if (operand_start < end && (*operand_start == '(' || isalpha((unsigned char)*operand_start) || *operand_start == '@')) {
+            if (operation_out)
+                *operation_out = "eval";
+            left = mf_expression_evaluate_span(operand_start, end, true, NULL, NULL);
+            if (!left) {
+                mf_report_error("could not parse unary matrix operand");
+                goto cleanup;
+            }
+            result = *start == '-' ? mat_neg(left) : left;
+            if (*start == '+')
+                left = NULL;
+            goto cleanup;
+        }
+    }
+
+    if (allow_literal && *start == '(') {
+        close = mf_expression_matching_parenthesis(start, end);
+        if (close && close + 1 == end)
+            return mf_expression_evaluate_span(start + 1, close, true, bindings_out, operation_out);
+    }
+
+    product = mf_expression_product_operator(start, end);
+    if (product) {
+        if (operation_out)
+            *operation_out = "multiply";
+        left = mf_expression_evaluate_span(start, product, true, NULL, NULL);
+        right = mf_expression_evaluate_span(product + 1, end, true, NULL, NULL);
+        if (!left || !right) {
+            mf_report_error("could not parse matrix multiplication operand");
+            goto cleanup;
+        }
+        if (mat_get_col_count(left) != mat_get_row_count(right)) {
+            fprintf(stderr, "mat_from_string: matrix multiplication requires matching inner dimensions; received %zux%zu and "
+                            "%zux%zu\n",
+                    mat_get_row_count(left), mat_get_col_count(left), mat_get_row_count(right), mat_get_col_count(right));
+            goto cleanup;
+        }
+        result = mat_mul(left, right);
+        goto cleanup;
+    }
+
+    open = memchr(start, '(', (size_t)(end - start));
+    if (open && mf_expression_calculus_name(start, open, &integrate, calculus_variable, sizeof(calculus_variable))) {
+        if (operation_out)
+            *operation_out = "eval";
+        close = mf_expression_matching_parenthesis(open, end);
+        if (!close || close + 1 != end) {
+            mf_report_error("could not parse matrix calculus input");
+            return NULL;
+        }
+        result = mf_expression_calculus_literal(open + 1, close, calculus_variable, integrate);
+        if (!result)
+            fprintf(stderr, "mat_from_string: could not %s matrix entries with respect to %s\n",
+                    integrate ? "integrate" : "differentiate", calculus_variable);
+        return result;
+    }
+
+    if (open && mf_expression_unary_operation_name(start, open, &inverse, &unary_function_spelling, &unary_function_name)) {
+        const char *unary_operation = inverse ? "inverse" : unary_function_name;
+
+        if (operation_out)
+            *operation_out = unary_operation;
+        close = mf_expression_matching_parenthesis(open, end);
+        if (!close || close + 1 != end) {
+            mf_report_error("could not parse matrix function input");
+            return NULL;
+        }
+
+        left = mf_expression_evaluate_span(open + 1, close, true, bindings_out, NULL);
+        if (!left) {
+            mf_report_error("could not parse matrix function argument");
+            goto cleanup;
+        }
+        if (mat_get_row_count(left) != mat_get_col_count(left)) {
+            fprintf(stderr, "mat_from_string: matrix function %s requires a square matrix; received %zux%zu\n", unary_operation,
+                    mat_get_row_count(left), mat_get_col_count(left));
+            goto cleanup;
+        }
+        if (inverse)
+            result = mat_inverse(left);
+        else
+            result = mf_registered_unary_apply(left, unary_function_spelling);
+        goto cleanup;
+    }
+
+    if (allow_literal)
+        return mf_expression_parse_literal(start, end, bindings_out);
+
+cleanup:
+    free(unary_function_spelling);
+    mat_free(right);
+    mat_free(left);
+    return result;
+}
+
+/* Parse and evaluate a complete matrix expression supplied as a C string. */
+matrix_t *mat_expression_from_string(const char *text, mat_bindings_t **bindings_out, const char **operation_out)
+{
+    if (bindings_out)
+        *bindings_out = NULL;
+    if (operation_out)
+        *operation_out = NULL;
+    if (!text)
+        return NULL;
+    return mf_expression_evaluate_span(text, text + strlen(text), true, bindings_out, operation_out);
+}
+
 matrix_t *mat_from_string(const char *s)
 {
     string_t *text = s ? string_new_with(s) : NULL;

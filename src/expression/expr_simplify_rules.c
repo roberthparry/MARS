@@ -902,6 +902,53 @@ expr_t *expr_simplify_try_lambert_exp(expr_t *arg)
     return expr_div(lambert_arg, arg);
 }
 
+static bool expr_is_e_power_of_local(const expr_t *power, const expr_t *exponent)
+{
+    if (!power || !exponent)
+        return false;
+    if (expr_is_exp_expr(power))
+        return expr_struct_eq(power->a, exponent);
+    if (expr_is_pow_d_expr(power) && power->a && expr_is_const(power->a) && num_eq(power->a->c, NUM_E) &&
+        expr_is_const(exponent))
+        return num_eq(power->c, exponent->c);
+    return expr_is_op(power, &ops_pow) && power->a && power->b && expr_is_const(power->a) &&
+           num_eq(power->a->c, NUM_E) && expr_struct_eq(power->b, exponent);
+}
+
+static expr_t *expr_lambert_principal_argument_factor_local(const expr_t *argument)
+{
+    const expr_t *factor = NULL;
+
+    if (!argument || !expr_is_op(argument, &ops_mul))
+        return NULL;
+    if (expr_is_e_power_of_local(argument->b, argument->a))
+        factor = argument->a;
+    else if (expr_is_e_power_of_local(argument->a, argument->b))
+        factor = argument->b;
+    if (!factor || !expr_is_const(factor) || !num_is_real(factor->c) || num_lt(factor->c, NUM_NEG_ONE))
+        return NULL;
+
+    expr_retain((expr_t *)factor);
+    return (expr_t *)factor;
+}
+
+expr_t *expr_simplify_try_lambert_argument(expr_t *arg)
+{
+    expr_t *factor;
+    expr_t *expanded;
+
+    factor = expr_lambert_principal_argument_factor_local(arg);
+    if (factor)
+        return factor;
+    if (!expr_is_unnamed_const(arg) || !arg->binding_expr)
+        return NULL;
+
+    expanded = expr_binding_expr_eval_expr(arg->binding_expr);
+    factor = expr_lambert_principal_argument_factor_local(expanded);
+    expr_free(expanded);
+    return factor;
+}
+
 expr_t *expr_simplify_try_lambert_product(expr_t *a, expr_t *b)
 {
     expr_t *w;
