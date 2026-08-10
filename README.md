@@ -4,8 +4,10 @@
 [![Licence: MIT](https://img.shields.io/badge/Licence-MIT-yellow.svg)](https://en.wikipedia.org/wiki/MIT_License)
 ![C99/GNU C](https://img.shields.io/badge/C-C99%20%2B%20GNU%20extensions-blue.svg)
 
-Linux-focused C99/GNU C library for high-precision numerics, automatic
-differentiation, datetime utilities, UTF-8 strings, and generic containers.
+MARS is a Linux-focused C99/GNU C library for high-precision numerics,
+automatic differentiation, symbolic mathematics, datetime utilities, UTF-8
+strings and generic containers. It also includes **MARS Lab**, a local
+browser-based workspace for using those facilities interactively.
 
 **Supported build target:** Linux with GCC or Clang. The code intentionally uses
 some GNU C extensions, so MSVC/Windows builds are not currently guaranteed.
@@ -35,6 +37,32 @@ some GNU C extensions, so MSVC/Windows builds are not currently guaranteed.
 - **`string_t`** — UTF-8-aware dynamic strings and grapheme operations
 - **`bitset_t`** — dynamic thread-safe bitset with bitwise operations
 - **`integrator_t`** — adaptive G7K15 / Turan T15/T4 integration with symbolic fast paths for affine-family `expr_t` integrands
+
+## MARS Lab
+
+MARS Lab provides an approachable graphical front end to MARSlib. Its seven
+workspaces cover expressions, equations, ordinary and partial differential
+equations, matrices, symbolic and numerical integration, civil date
+calculations and the astronomical almanac. The browser handles presentation;
+the mathematical work remains in MARSlib and the MARS helper programs running
+locally.
+
+After building MARS and installing the Lab's runtime dependencies, start it
+from the repository root:
+
+```sh
+python3 tools/mars_lab.py
+```
+
+```text
+MARS Lab running at http://localhost:<port>/
+Press Ctrl+C to stop.
+```
+
+[![MARS Lab evaluating the sine of a complete matrix](docs/images/mars-lab/matrix.png)](docs/images/mars-lab/matrix.png)
+
+See the [MARS Lab guide](docs/mars-lab.md) for installation details, notation,
+worked examples, all seven modes and private mobile access through Tailscale.
 
 ## Requirements
 
