@@ -3899,7 +3899,18 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             <li>Matrix functions require a square matrix. A rectangular matrix is rejected rather than having the scalar function applied entry by entry.</li>
             <li><code>exp(0 1; -1 0)</code> calculates the matrix exponential.</li>
             <li><code>sqrt(4 0; 0 9)</code> obtains <code>(2, 0; 0, 3)</code>.</li>
+            <li>The native expression-function registry also supplies exponential, logarithmic, trigonometric, inverse-trigonometric, hyperbolic, error, gamma, normal-density, Lambert W, and exponential-integral matrix functions.</li>
+            <li>Exact symbolic matrices use an exact structured or small-matrix rule where one is available. Otherwise, supply numeric bindings before applying a general numeric matrix function.</li>
             <li>Logarithms, inverse functions and special functions require a matrix whose spectrum lies in a supported domain; otherwise MARS Lab reports that the matrix function failed.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="matrix">
+          <div class="help-kicker">Matrix Operation Selector</div>
+          <p>Direct notation composes naturally, while the selector provides convenient access to structural operations.</p>
+          <ul>
+            <li><code>Evaluate expression</code>, <code>Inverse</code>, <code>Eigenvalues</code>, <code>Eigendecompose</code>, <code>Characteristic polynomial</code>, <code>Determinant</code>, <code>Trace</code>, <code>Rank</code>, and <code>Simplify symbolic matrix</code> use the main editor.</li>
+            <li><code>Multiply by another matrix</code> and <code>Solve A X = B</code> reveal a right-hand matrix editor.</li>
+            <li>The selected operation, right-hand operand, and Matrix editor are retained between sessions. <code>Back</code> and <code>Forward</code> navigate Matrix workspace history.</li>
           </ul>
         </div>
         <div class="help-card" data-help-modes="matrix">
@@ -3921,6 +3932,17 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             <li>An antiderivative is displayed as <code>A(x) + C</code>, where <code>C</code> is an independent constant matrix with entries <code>C₁₁</code>, <code>C₁₂</code>, <code>C₂₁</code>, and <code>C₂₂</code> for a 2x2 result.</li>
             <li><code>Rendered TeX</code>, <code>Result</code>, and <code>Layout</code> preserve the symbolic answer. <code>Value</code> separately shows the numeric or partially evaluated matrix obtained from supplied bindings.</li>
             <li>Long numbers in rendered TeX use an ellipsis by default. Choose <code>Show more digits</code> for the full mantissa; scientific notation is displayed as multiplication by a power of ten.</li>
+            <li><code>Use as input</code> copies the reusable result expression back into the Matrix editor.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="matrix">
+          <div class="help-kicker">Symbolic Matrix-power Calculus</div>
+          <p>For <code>A = (1 2; 3 4)</code>, enter <code>A^x</code> as <code>(1 2; 3 4)^x</code>. Its eigenvalues are <code>λ₊ = (5 + √33)/2</code> and <code>λ₋ = (5 - √33)/2</code>.</p>
+          <ul>
+            <li>With spectral projectors <code>P₊ = (A - λ₋I)/√33</code> and <code>P₋ = (λ₊I - A)/√33</code>, MARSlib represents the power exactly as <code>A^x = λ₊^x P₊ + λ₋^x P₋</code>.</li>
+            <li><code>x derivative</code> gives <code>ln(λ₊)λ₊^x P₊ + ln(λ₋)λ₋^x P₋</code>.</li>
+            <li><code>x integral</code> gives <code>λ₊^x P₊/ln(λ₊) + λ₋^x P₋/ln(λ₋) + C</code>, with an independent constant matrix <code>C</code>.</li>
+            <li>The result cards expand this compact spectral description into the exact 2x2 matrix containing √33.</li>
           </ul>
         </div>
         <div class="help-card" data-help-modes="diffequation">
