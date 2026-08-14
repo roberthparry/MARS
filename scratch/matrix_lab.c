@@ -185,9 +185,9 @@ static void print_number_eigenvalues_TeX(number_t *values, size_t count)
 
 static void print_matrix_fields(const matrix_t *matrix)
 {
-    char *inline_text = mat_to_string(matrix, MAT_STRING_INLINE_PRETTY);
-    char *pretty_text = mat_to_string(matrix, MAT_STRING_LAYOUT_PRETTY);
-    char *TeX_text = mat_to_string(matrix, MAT_STRING_LATEX);
+    char *inline_text = mat_body_to_string(matrix, MAT_STRING_INLINE_PRETTY);
+    char *pretty_text = mat_body_to_string(matrix, MAT_STRING_LAYOUT_PRETTY);
+    char *TeX_text = mat_body_to_string(matrix, MAT_STRING_LATEX);
 
     printf("kind        %s\n", matrix_type_name(matrix));
     printf("rows        %zu\n", mat_get_row_count(matrix));
@@ -199,6 +199,186 @@ static void print_matrix_fields(const matrix_t *matrix)
     free(TeX_text);
     free(pretty_text);
     free(inline_text);
+}
+
+static void print_matrix_value_fields(const matrix_t *matrix)
+{
+    char *inline_text = mat_body_to_string(matrix, MAT_STRING_INLINE_PRETTY);
+    char *pretty_text = mat_body_to_string(matrix, MAT_STRING_LAYOUT_PRETTY);
+    char *TeX_text = mat_body_to_string(matrix, MAT_STRING_LATEX);
+
+    printf("value       %s\n", inline_text ? inline_text : "(null)");
+    printf("value_pretty  %s\n", pretty_text ? pretty_text : "(null)");
+    printf("value_tex   %s\n", TeX_text ? TeX_text : "(null)");
+
+    free(TeX_text);
+    free(pretty_text);
+    free(inline_text);
+}
+
+static void print_matrix_bindings(mat_bindings_t *bindings)
+{
+    size_t count = mat_bindings_count(bindings);
+
+    for (size_t i = 0u; i < count; ++i) {
+        const char *name = mat_bindings_name_at(bindings, i);
+        expr_t *binding = mat_bindings_expr_at(bindings, i);
+        char *value_text;
+
+        if (!name || !binding)
+            continue;
+        {
+            number_t value = expr_get_val(binding);
+
+            value_text = number_text_dup(value);
+            num_destroy(&value);
+        }
+        printf("%-12s %s\t%s\t%s\n", "binding", mat_bindings_is_constant_at(bindings, i) ? "constant" : "variable", name,
+               value_text ? value_text : "(num_to_string failed)");
+        free(value_text);
+    }
+}
+
+static bool matrix_bindings_contains_name(mat_bindings_t *bindings, const char *name)
+{
+    return name && mat_bindings_get(bindings, name) != NULL;
+}
+
+static void print_additional_matrix_bindings(mat_bindings_t *bindings, mat_bindings_t *already_printed)
+{
+    size_t count = mat_bindings_count(bindings);
+
+    for (size_t i = 0u; i < count; ++i) {
+        const char *name = mat_bindings_name_at(bindings, i);
+        expr_t *binding = mat_bindings_expr_at(bindings, i);
+        char *value_text;
+
+        if (!name || !binding || matrix_bindings_contains_name(already_printed, name))
+            continue;
+        {
+            number_t value = expr_get_val(binding);
+
+            value_text = number_text_dup(value);
+            num_destroy(&value);
+        }
+        printf("%-12s %s\t%s\t%s\n", "binding", mat_bindings_is_constant_at(bindings, i) ? "constant" : "variable", name,
+               value_text ? value_text : "(num_to_string failed)");
+        free(value_text);
+    }
+}
+
+static bool matrix_bindings_are_resolved(mat_bindings_t *bindings)
+{
+    size_t count = mat_bindings_count(bindings);
+
+    for (size_t i = 0u; i < count; ++i) {
+        expr_t *binding = mat_bindings_expr_at(bindings, i);
+        number_t value;
+        bool resolved;
+
+        if (!binding)
+            return false;
+        value = expr_get_val(binding);
+        resolved = !num_is_nan(value);
+        num_destroy(&value);
+        if (!resolved)
+            return false;
+    }
+    return true;
+}
+
+static bool matrix_bindings_have_variables(mat_bindings_t *bindings)
+{
+    size_t count = mat_bindings_count(bindings);
+
+    for (size_t i = 0u; i < count; ++i) {
+        if (!mat_bindings_is_constant_at(bindings, i))
+            return true;
+    }
+    return false;
+}
+
+static bool matrix_bindings_have_resolved_values(mat_bindings_t *bindings)
+{
+    size_t count = mat_bindings_count(bindings);
+
+    for (size_t i = 0u; i < count; ++i) {
+        expr_t *binding = mat_bindings_expr_at(bindings, i);
+        number_t value;
+        bool resolved;
+
+        if (!binding)
+            continue;
+        value = expr_get_val(binding);
+        resolved = !num_is_nan(value);
+        num_destroy(&value);
+        if (resolved)
+            return true;
+    }
+    return false;
+}
+
+static matrix_t *matrix_partially_evaluate(const matrix_t *matrix, mat_bindings_t *bindings)
+{
+    matrix_t *evaluated;
+    size_t rows;
+    size_t cols;
+
+    if (!matrix || mat_typeof(matrix) != MAT_TYPE_EXPR)
+        return NULL;
+    rows = mat_get_row_count(matrix);
+    cols = mat_get_col_count(matrix);
+    evaluated = mat_new_expr(rows, cols);
+    if (!evaluated)
+        return NULL;
+
+    for (size_t row = 0u; row < rows; ++row) {
+        for (size_t col = 0u; col < cols; ++col) {
+            expr_t *entry = NULL;
+
+            mat_get(matrix, row, col, &entry);
+            if (!entry)
+                goto fail;
+            expr_retain(entry);
+            for (size_t binding_index = 0u; binding_index < mat_bindings_count(bindings); ++binding_index) {
+                expr_t *binding = mat_bindings_expr_at(bindings, binding_index);
+                number_t value;
+
+                if (!binding)
+                    continue;
+                value = expr_get_val(binding);
+                if (!num_is_nan(value)) {
+                    expr_t *replacement = expr_new_const(num_clone(value));
+                    expr_t *substituted = replacement ? expr_substitute(entry, binding, replacement) : NULL;
+
+                    expr_free(replacement);
+                    if (!substituted) {
+                        num_destroy(&value);
+                        expr_free(entry);
+                        goto fail;
+                    }
+                    expr_free(entry);
+                    entry = substituted;
+                }
+                num_destroy(&value);
+            }
+            {
+                expr_t *simplified = expr_display_simplified(entry);
+
+                if (simplified) {
+                    expr_free(entry);
+                    entry = simplified;
+                }
+            }
+            mat_set(evaluated, row, col, &entry);
+            expr_free(entry);
+        }
+    }
+    return evaluated;
+
+fail:
+    mat_free(evaluated);
+    return NULL;
 }
 
 static char *expr_to_unbound_TeX(expr_t *expr)
@@ -434,7 +614,7 @@ static void print_expr_scalar_field(const matrix_t *matrix, const char *operatio
 {
     char *text = expr ? expr_text_dup(expr, style_EXPRESSION) : NULL;
     char *tex = expr ? expr_text_dup(expr, style_LATEX) : NULL;
-    char *lhs_TeX = matrix_scalar_lhs_TeX(matrix, operation);
+    char *lhs_TeX = matrix ? matrix_scalar_lhs_TeX(matrix, operation) : NULL;
 
     printf("%-12s %s\n", label, text ? text : "(null)");
     if (lhs_TeX && tex)
@@ -623,16 +803,17 @@ int main(int argc, char **argv)
     int precision = argc > 3 ? atoi(argv[3]) : 64;
     const char *operand = argc > 4 ? argv[4] : NULL;
     mat_bindings_t *bindings = NULL;
+    mat_bindings_t *result_bindings = NULL;
     matrix_t *matrix = NULL;
     matrix_t *other = NULL;
     matrix_t *result = NULL;
+    expr_t *scalar_result = NULL;
     int rc = 1;
 
     if (precision > 0)
         num_set_default_prec_digits((size_t)precision + 8u);
 
-    matrix = mat_expression_from_string(input, &bindings, &parsed_operation);
-    if (!matrix) {
+    if (mat_expression_evaluate(input, &bindings, &parsed_operation, &matrix, &scalar_result) != 0) {
         if (parsed_operation)
             operation = parsed_operation;
         printf("input       %s\n", input);
@@ -641,10 +822,43 @@ int main(int argc, char **argv)
         goto cleanup;
     }
 
+    if (scalar_result) {
+        number_t evaluated_value = num_clone(NUM_NAN);
+
+        operation = parsed_operation ? parsed_operation : operation;
+        printf("input       %s\n", input);
+        printf("operation   %s\n", operation);
+        if (matrix_bindings_are_resolved(bindings))
+            evaluated_value = expr_eval(scalar_result);
+        print_expr_scalar_field(NULL, operation, "result", scalar_result);
+        scalar_result = NULL;
+        if (!num_is_nan(evaluated_value)) {
+            char *value_text = number_text_dup(evaluated_value);
+
+            printf("value       %s\n", value_text ? value_text : "(null)");
+            free(value_text);
+        }
+        num_destroy(&evaluated_value);
+        print_matrix_bindings(bindings);
+        rc = 0;
+        goto cleanup;
+    }
+
     if (parsed_operation) {
         operation = parsed_operation;
         printf("input       %s\n", input);
         printf("operation   %s\n", operation);
+        if (strcmp(operation, "eval") == 0 && mat_typeof(matrix) == MAT_TYPE_EXPR &&
+            matrix_bindings_have_variables(bindings) && matrix_bindings_have_resolved_values(bindings)) {
+            result = matrix_bindings_are_resolved(bindings) ? mat_evaluate(matrix)
+                                                            : matrix_partially_evaluate(matrix, bindings);
+            print_matrix_fields(matrix);
+            if (result)
+                print_matrix_value_fields(result);
+            print_matrix_bindings(bindings);
+            rc = result ? 0 : 1;
+            goto cleanup;
+        }
         result = matrix;
         matrix = NULL;
         goto result_ready;
@@ -654,7 +868,13 @@ int main(int argc, char **argv)
     printf("operation   %s\n", operation);
 
     if (strcmp(operation, "eval") == 0) {
-        result = mat_evaluate(matrix);
+        if (mat_typeof(matrix) == MAT_TYPE_EXPR &&
+            (!matrix_bindings_are_resolved(bindings) || !matrix_bindings_have_variables(bindings))) {
+            result = matrix;
+            matrix = NULL;
+        } else {
+            result = mat_evaluate(matrix);
+        }
     } else if (strcmp(operation, "simplify") == 0) {
         result = mat_simplify_symbolic(matrix);
     } else if (strcmp(operation, "inverse") == 0) {
@@ -712,13 +932,18 @@ result_ready:
         }
     }
 
+    result_bindings = mat_bindings_from_matrix(result);
     print_matrix_fields(result);
+    print_matrix_bindings(result_bindings);
+    print_additional_matrix_bindings(bindings, result_bindings);
     rc = 0;
 
 cleanup:
     mat_free(result);
     mat_free(other);
     mat_free(matrix);
+    mat_bindings_free(result_bindings);
     mat_bindings_free(bindings);
+    expr_free(scalar_result);
     return rc;
 }

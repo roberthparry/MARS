@@ -502,6 +502,13 @@ void expr_reverse_abs(const expr_t *dv, const number_t *out_bar, number_t *a_bar
     *b_bar = NUM_ZERO;
 }
 
+void expr_reverse_conj(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
+{
+    (void)dv;
+    *a_bar = num_conj(*out_bar);
+    *b_bar = NUM_ZERO;
+}
+
 void expr_reverse_hypot(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
     number_t ax = num_div(expr_eval_num_internal(dv->a), expr_eval_num_internal(dv));

@@ -60,6 +60,7 @@ number_t eval_sqrt(expr_t *dv);
 number_t eval_floor(expr_t *dv);
 number_t eval_ceil(expr_t *dv);
 number_t eval_abs(expr_t *dv);
+number_t eval_conj(expr_t *dv);
 
 /* Evaluation: special functions. */
 number_t eval_erf(expr_t *dv);
@@ -178,6 +179,7 @@ expr_t *deriv_sqrt(expr_t *dv);
 expr_t *deriv_floor(expr_t *dv);
 expr_t *deriv_ceil(expr_t *dv);
 expr_t *deriv_abs(expr_t *dv);
+expr_t *deriv_conj(expr_t *dv);
 
 /* Derivatives: special functions. */
 expr_t *deriv_erf(expr_t *dv);

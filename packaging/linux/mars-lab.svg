@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="MARS Lab Wizard Prism KDE-style icon">
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="8 0 240 240" role="img" aria-label="MARS Lab Wizard Prism KDE-style icon">
   <defs>
     <linearGradient id="cool" x1="42" y1="30" x2="214" y2="226" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#58b6e8"/>

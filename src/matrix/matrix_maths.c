@@ -63,6 +63,8 @@ static matrix_t *mat_fun_elementwise_same_type(const matrix_t *A, void (*scalar_
 static matrix_t *mat_fun_expr_uniform_diag_offdiag(const matrix_t *A, void (*scalar_f)(void *out, const void *in));
 static matrix_t *mat_fun_expr_scalar_plus_rank_one(const matrix_t *A, void (*scalar_f)(void *out, const void *in));
 static matrix_t *mat_fun_expr_quartic_biquadratic_exact(const matrix_t *A, void (*scalar_f)(void *out, const void *in));
+static matrix_t *mat_pow_exact_principal_sqrt(const matrix_t *A);
+static matrix_t *mat_pow_expr_exact_small(const matrix_t *A, const expr_t *exponent);
 static int expr_fun_coeffs_up_to_second(expr_t **c0, expr_t **c1, expr_t **c2,
                                         void (*scalar_f)(void *out, const void *in), expr_t *lambda);
 static matrix_t *mat_exp_number_triangular_equal_diag(const matrix_t *A);
@@ -107,6 +109,144 @@ static matrix_t *mat_apply_unary(const matrix_t *A, void (*number_f)(void *out, 
 static int mat_elem_supports_numeric_algorithms(const matrix_t *A)
 {
     return A && !matrix_is_symbolic(A);
+}
+
+static bool mat_number_entries_are_exact_real(const matrix_t *A)
+{
+    if (!A || matrix_is_symbolic(A))
+        return false;
+
+    for (size_t row = 0u; row < A->rows; ++row) {
+        for (size_t col = 0u; col < A->cols; ++col) {
+            number_t value = mat_get_num(A, row, col);
+            bool exact_real = num_is_exact(value) && num_is_real(value);
+
+            num_destroy(&value);
+            if (!exact_real)
+                return false;
+        }
+    }
+
+    return true;
+}
+
+static expr_t *mat_exact_expr_quotient(expr_t *numerator, const expr_t *denominator)
+{
+    expr_t *quotient;
+
+    if (!numerator || !denominator) {
+        expr_free(numerator);
+        return NULL;
+    }
+
+    quotient = expr_div(numerator, denominator);
+    expr_free(numerator);
+    return quotient;
+}
+
+/* Retain an exact algebraic 1x1 or 2x2 principal square root instead of prematurely evaluating its surds. */
+static matrix_t *mat_pow_exact_principal_sqrt(const matrix_t *A)
+{
+    matrix_t *result = NULL;
+    expr_t *determinant_expr = NULL;
+    expr_t *determinant_root = NULL;
+    expr_t *denominator_argument = NULL;
+    expr_t *denominator = NULL;
+    number_t determinant = number_invalid();
+    number_t trace = number_invalid();
+    number_t denominator_value = number_invalid();
+
+    if (!A || A->rows != A->cols || (A->rows != 1u && A->rows != 2u) || !mat_number_entries_are_exact_real(A))
+        return NULL;
+
+    if (A->rows == 1u) {
+        number_t value = mat_get_num(A, 0u, 0u);
+        expr_t *argument = expr_new_const(value);
+        expr_t *root = argument ? expr_sqrt(argument) : NULL;
+
+        num_destroy(&value);
+        expr_free(argument);
+        if (!root)
+            return NULL;
+
+        root = expr_simplify_owned(root);
+        result = root ? mat_create_expr(1u, 1u, &root) : NULL;
+        expr_free(root);
+        return result;
+    }
+
+    if (mat_det(A, &determinant) != 0 || mat_trace(A, &trace) != 0)
+        goto cleanup;
+
+    /* With both eigenvalues on the negative real axis this sign of sqrt(det(A)) does not select the principal root. */
+    if (num_sign(determinant) >= 0 && num_sign(trace) < 0)
+        goto cleanup;
+
+    determinant_expr = expr_new_const(determinant);
+    if (num_sign(determinant) < 0) {
+        number_t absolute_determinant = num_neg(determinant);
+        expr_t *absolute_expr = expr_new_const(absolute_determinant);
+        expr_t *real_root = absolute_expr ? expr_sqrt(absolute_expr) : NULL;
+
+        num_destroy(&absolute_determinant);
+        expr_free(absolute_expr);
+        determinant_root = real_root ? expr_mul_simplify_owned(real_root, expr_new_const(NUM_I)) : NULL;
+    } else {
+        determinant_root = determinant_expr ? expr_sqrt(determinant_expr) : NULL;
+    }
+    determinant_root = expr_simplify_owned(determinant_root);
+    if (!determinant_root)
+        goto cleanup;
+
+    denominator_argument = expr_mul_simplify_owned(expr_const_long(2), expr_clone(determinant_root));
+    denominator_argument = expr_add_simplify_owned(expr_new_const(trace), denominator_argument);
+    denominator = denominator_argument ? expr_sqrt(denominator_argument) : NULL;
+    denominator = expr_simplify_owned(denominator);
+    if (!denominator)
+        goto cleanup;
+
+    denominator_value = expr_eval(denominator);
+    if (!num_is_finite(denominator_value) || num_is_zero(denominator_value))
+        goto cleanup;
+
+    result = mat_new_expr(2u, 2u);
+    if (!result)
+        goto cleanup;
+
+    for (size_t row = 0u; row < 2u; ++row) {
+        for (size_t col = 0u; col < 2u; ++col) {
+            number_t value = mat_get_num(A, row, col);
+            expr_t *numerator = expr_new_const(value);
+            expr_t *entry;
+
+            num_destroy(&value);
+            if (row == col) {
+                numerator = expr_add_simplify_owned(numerator, expr_clone(determinant_root));
+            }
+
+            entry = mat_exact_expr_quotient(numerator, denominator);
+            if (!entry) {
+                mat_free(result);
+                result = NULL;
+                goto cleanup;
+            }
+
+            mat_set(result, row, col, &entry);
+            expr_free(entry);
+        }
+    }
+
+    result = mat_finalize_symbolic_result(result);
+
+cleanup:
+    num_destroy(&denominator_value);
+    num_destroy(&trace);
+    num_destroy(&determinant);
+    expr_free(denominator);
+    expr_free(denominator_argument);
+    expr_free(determinant_root);
+    expr_free(determinant_expr);
+    return result;
 }
 
 static void mat_free_if_distinct(matrix_t *A, const matrix_t *keep)
@@ -3803,6 +3943,12 @@ matrix_t *mat_sqrt(const matrix_t *A)
 {
     matrix_t *structured = NULL;
 
+    if (A && A->elem == &number_elem) {
+        structured = mat_pow_exact_principal_sqrt(A);
+        if (structured)
+            return structured;
+    }
+
     if (A && A->elem == &number_elem && A->rows == A->cols &&
         (mat_is_upper_triangular(A) || mat_is_lower_triangular(A)) && mat_number_diagonal_equal_local(A)) {
         structured = mat_sqrt_number_triangular_equal_diag(A);
@@ -4167,25 +4313,319 @@ matrix_t *mat_pow_int(const matrix_t *A, int n)
     return simplified;
 }
 
+static number_t mat_scalar_principal_power(number_t base, const number_t *exponent)
+{
+    number_t result = num_pow(base, *exponent);
+
+    if (!num_is_nan(result) || !num_is_real(base) || !num_is_real(*exponent) || num_get_sign(base) >= 0)
+        return result;
+
+    {
+        size_t precision = num_get_prec_bits(base);
+        size_t exponent_precision = num_get_prec_bits(*exponent);
+        number_t complex_base;
+        number_t complex_exponent;
+
+        if (exponent_precision > precision)
+            precision = exponent_precision;
+        complex_base = num_as_complex_prec(base, precision);
+        complex_exponent = num_as_complex_prec(*exponent, precision);
+        num_destroy(&result);
+        result = num_pow(complex_base, complex_exponent);
+        num_destroy(&complex_exponent);
+        num_destroy(&complex_base);
+    }
+    return result;
+}
+
+static matrix_t *mat_pow_diagonalizable(const matrix_t *A, const number_t *s)
+{
+    const size_t n = A->rows;
+    number_t *eigenvalues = calloc(n, sizeof(*eigenvalues));
+    matrix_t *eigenvectors = NULL;
+    matrix_t *diagonal = NULL;
+    matrix_t *scaled_eigenvectors = NULL;
+    matrix_t *inverse_eigenvectors = NULL;
+    matrix_t *result = NULL;
+
+    if (!eigenvalues)
+        return NULL;
+    mat_fun_number_array_invalidate(eigenvalues, n);
+
+    if (mat_eigendecompose(A, eigenvalues, &eigenvectors) != 0 || !eigenvectors)
+        goto cleanup;
+
+    if (!mat_is_hermitian(A)) {
+        number_t repeated_tolerance = num_create_from_double(1e-20);
+
+        for (size_t i = 0; i < n; ++i) {
+            for (size_t j = i + 1; j < n; ++j) {
+                number_t difference = num_sub(eigenvalues[i], eigenvalues[j]);
+                number_t magnitude = num_abs(difference);
+                bool repeated = num_le(magnitude, repeated_tolerance);
+
+                num_destroy(&magnitude);
+                num_destroy(&difference);
+                if (repeated) {
+                    num_destroy(&repeated_tolerance);
+                    goto cleanup;
+                }
+            }
+        }
+        num_destroy(&repeated_tolerance);
+    }
+
+    inverse_eigenvectors = mat_inverse(eigenvectors);
+    if (!inverse_eigenvectors)
+        goto cleanup;
+
+    diagonal = mat_create_diagonal_with_elem(n, &number_elem);
+    if (!diagonal)
+        goto cleanup;
+
+    for (size_t i = 0; i < n; ++i) {
+        number_t powered = mat_scalar_principal_power(eigenvalues[i], s);
+
+        if (num_is_nan(powered)) {
+            num_destroy(&powered);
+            goto cleanup;
+        }
+        mat_set_num_owned(diagonal, i, i, &powered);
+    }
+
+    scaled_eigenvectors = mat_mul(eigenvectors, diagonal);
+    if (scaled_eigenvectors)
+        result = mat_mul(scaled_eigenvectors, inverse_eigenvectors);
+
+cleanup:
+    mat_free(inverse_eigenvectors);
+    mat_free(scaled_eigenvectors);
+    mat_free(diagonal);
+    mat_free(eigenvectors);
+    mat_fun_number_array_destroy(eigenvalues, n);
+    free(eigenvalues);
+    return result;
+}
+
+static expr_t *mat_pow_expr_projector_entry(const matrix_t *A, size_t row, size_t col, const expr_t *lambda_plus,
+                                            const expr_t *lambda_minus, const expr_t *lambda_plus_power,
+                                            const expr_t *lambda_minus_power, const expr_t *eigenvalue_difference)
+{
+    number_t value = number_invalid();
+    expr_t *entry = NULL;
+    expr_t *plus_numerator;
+    expr_t *minus_numerator;
+    expr_t *plus_term;
+    expr_t *minus_term;
+    expr_t *result;
+
+    if (mat_typeof(A) == MAT_TYPE_EXPR) {
+        mat_get(A, row, col, &entry);
+        if (entry)
+            expr_retain(entry);
+    } else {
+        value = mat_get_num(A, row, col);
+        entry = expr_new_const(value);
+        num_destroy(&value);
+    }
+    if (!entry)
+        return NULL;
+
+    if (row == col) {
+        plus_numerator = expr_sub(entry, lambda_minus);
+        minus_numerator = expr_sub(lambda_plus, entry);
+    } else {
+        plus_numerator = expr_clone(entry);
+        minus_numerator = expr_neg(entry);
+    }
+    expr_free(entry);
+
+    plus_term = plus_numerator ? expr_mul(lambda_plus_power, plus_numerator) : NULL;
+    minus_term = minus_numerator ? expr_mul(lambda_minus_power, minus_numerator) : NULL;
+    expr_free(plus_numerator);
+    expr_free(minus_numerator);
+    result = plus_term && minus_term ? expr_add(plus_term, minus_term) : NULL;
+    expr_free(plus_term);
+    expr_free(minus_term);
+    if (!result)
+        return NULL;
+
+    entry = expr_div(result, eigenvalue_difference);
+    expr_free(result);
+    return expr_simplify_owned(entry);
+}
+
+static matrix_t *mat_pow_expr_exact_small(const matrix_t *A, const expr_t *exponent)
+{
+    number_t trace = number_invalid();
+    number_t determinant = number_invalid();
+    number_t four = num_create_from_long(4L);
+    number_t four_determinant = number_invalid();
+    number_t trace_squared = number_invalid();
+    number_t discriminant = number_invalid();
+    expr_t *discriminant_expr = NULL;
+    expr_t *root = NULL;
+    expr_t *trace_expr = NULL;
+    expr_t *lambda_plus = NULL;
+    expr_t *lambda_minus = NULL;
+    expr_t *lambda_plus_power = NULL;
+    expr_t *lambda_minus_power = NULL;
+    matrix_t *result = NULL;
+
+    if (!A || !exponent || A->rows != A->cols || (A->rows != 1u && A->rows != 2u) ||
+        (mat_typeof(A) != MAT_TYPE_EXPR && !mat_number_entries_are_exact_real(A)))
+        goto cleanup;
+
+    if (A->rows == 1u) {
+        number_t value = number_invalid();
+        expr_t *base = NULL;
+        expr_t *power;
+
+        if (mat_typeof(A) == MAT_TYPE_EXPR) {
+            mat_get(A, 0u, 0u, &base);
+            if (base)
+                expr_retain(base);
+        } else {
+            value = mat_get_num(A, 0u, 0u);
+            base = expr_new_const(value);
+            num_destroy(&value);
+        }
+        power = base ? expr_pow_xp(base, exponent) : NULL;
+        expr_free(base);
+        result = power ? mat_create_expr(1u, 1u, &power) : NULL;
+        expr_free(power);
+        goto cleanup;
+    }
+
+    if (mat_typeof(A) == MAT_TYPE_EXPR) {
+        expr_t *a = NULL;
+        expr_t *b = NULL;
+        expr_t *c = NULL;
+        expr_t *d = NULL;
+        expr_t *diagonal_difference = NULL;
+        expr_t *diagonal_square = NULL;
+        expr_t *off_diagonal_product = NULL;
+        expr_t *four_off_diagonal_product = NULL;
+
+        if (mat_trace_expr(A, &trace_expr) != 0)
+            goto cleanup;
+        mat_get(A, 0u, 0u, &a);
+        mat_get(A, 0u, 1u, &b);
+        mat_get(A, 1u, 0u, &c);
+        mat_get(A, 1u, 1u, &d);
+        diagonal_difference = a && d ? expr_sub(a, d) : NULL;
+        diagonal_difference = expr_simplify_owned(diagonal_difference);
+        diagonal_square = diagonal_difference ? expr_mul(diagonal_difference, diagonal_difference) : NULL;
+        off_diagonal_product = b && c ? expr_mul(b, c) : NULL;
+        four_off_diagonal_product = off_diagonal_product ? expr_mul_long(off_diagonal_product, 4L) : NULL;
+        discriminant_expr = diagonal_square && four_off_diagonal_product
+                                ? expr_add(diagonal_square, four_off_diagonal_product)
+                                : NULL;
+        expr_free(four_off_diagonal_product);
+        expr_free(off_diagonal_product);
+        expr_free(diagonal_square);
+        expr_free(diagonal_difference);
+        discriminant_expr = expr_simplify_owned(discriminant_expr);
+    } else {
+        if (mat_trace(A, &trace) != 0 || mat_det(A, &determinant) != 0)
+            goto cleanup;
+        trace_squared = num_mul(trace, trace);
+        four_determinant = num_mul(four, determinant);
+        discriminant = num_sub(trace_squared, four_determinant);
+        if (!num_is_real(discriminant) || num_sign(discriminant) <= 0)
+            goto cleanup;
+        discriminant_expr = expr_new_const(discriminant);
+        trace_expr = expr_new_const(trace);
+    }
+    root = discriminant_expr ? expr_sqrt(discriminant_expr) : NULL;
+    if (root && trace_expr) {
+        expr_t *sum = expr_add(trace_expr, root);
+        expr_t *difference = expr_sub(trace_expr, root);
+
+        lambda_plus = sum ? expr_div_long(sum, 2L) : NULL;
+        lambda_minus = difference ? expr_div_long(difference, 2L) : NULL;
+        expr_free(sum);
+        expr_free(difference);
+        lambda_plus = expr_simplify_owned(lambda_plus);
+        lambda_minus = expr_simplify_owned(lambda_minus);
+    }
+    lambda_plus_power = lambda_plus ? expr_pow_xp(lambda_plus, exponent) : NULL;
+    lambda_minus_power = lambda_minus ? expr_pow_xp(lambda_minus, exponent) : NULL;
+    if (!lambda_plus_power || !lambda_minus_power)
+        goto cleanup;
+
+    result = mat_new_expr(2u, 2u);
+    if (!result)
+        goto cleanup;
+    for (size_t row = 0u; row < 2u; ++row) {
+        for (size_t col = 0u; col < 2u; ++col) {
+            expr_t *entry = mat_pow_expr_projector_entry(A, row, col, lambda_plus, lambda_minus, lambda_plus_power,
+                                                         lambda_minus_power, root);
+
+            if (!entry) {
+                mat_free(result);
+                result = NULL;
+                goto cleanup;
+            }
+            mat_set(result, row, col, &entry);
+            expr_free(entry);
+        }
+    }
+    result = mat_finalize_symbolic_result(result);
+
+cleanup:
+    expr_free(lambda_minus_power);
+    expr_free(lambda_plus_power);
+    expr_free(lambda_minus);
+    expr_free(lambda_plus);
+    expr_free(trace_expr);
+    expr_free(root);
+    expr_free(discriminant_expr);
+    num_destroy(&discriminant);
+    num_destroy(&trace_squared);
+    num_destroy(&four_determinant);
+    num_destroy(&four);
+    num_destroy(&determinant);
+    num_destroy(&trace);
+    return result;
+}
+
+/* Raise an exact small matrix to a symbolic exponent by spectral projectors. */
+matrix_t *mat_pow_expr(const matrix_t *A, const expr_t *exponent)
+{
+    return mat_pow_expr_exact_small(A, exponent);
+}
+
 /* ============================================================
-   mat_pow  —  A^s = exp(s · log(A))
-   Requires A to admit a principal logarithm (positive definite).
+   mat_pow  —  principal A^s for a real or complex number_t exponent
    ============================================================ */
 
+/* Raise a numeric square matrix to a real or complex number_t power. */
 matrix_t *mat_pow(const matrix_t *A, const number_t *s)
 {
     matrix_t *result = NULL;
+    matrix_t *L = NULL;
 
     if (!A || A->rows != A->cols)
         return NULL;
-    if (!s)
+    if (!s || !num_is_finite(*s))
         return NULL;
     if (matrix_is_symbolic(A))
         return NULL;
     if (!mat_elem_supports_numeric_algorithms(A))
         return NULL;
 
-    matrix_t *L = mat_log(A);
+    if (num_eq(*s, NUM_HALF)) {
+        result = mat_pow_exact_principal_sqrt(A);
+        if (result)
+            return result;
+    }
+
+    result = mat_pow_diagonalizable(A, s);
+    if (result)
+        return result;
+
+    L = mat_log(A);
     if (!L)
         return NULL;
 

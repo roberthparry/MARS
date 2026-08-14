@@ -3,8 +3,8 @@
 #include <string.h>
 
 #include "qfloat.h"
-#define MARS_EXPR_STRINGIN_INTERNAL_ACCESS
-#include "expr_stringin_internal.h"
+#define MARS_EXPR_INTERNAL_ACCESS
+#include "expr_internal.h"
 #include "expr_stringout.h"
 #define MARS_EXPR_STRINGOUT_INTERNAL_ACCESS
 #include "expr_stringout_internal.h"
@@ -154,7 +154,19 @@ static int bindings_index_entry(expr_bindings_t *bindings, expr_binding_entry_t 
 
 static bool binding_is_noneditable_builtin(const expr_t *node)
 {
-    return expr_is_immortal_default_const_local(node) && (!node->name || strcmp(node->name, "i") != 0);
+    string_t *name;
+    number_t value = NUM_ZERO;
+    bool is_builtin;
+
+    if (!node || !expr_is_const(node) || !node->name || !*node->name)
+        return false;
+
+    name = string_new_with(node->name);
+    is_builtin = name && expr_get_default_constant_num_text(name, &value);
+    if (is_builtin)
+        num_destroy(&value);
+    string_free(name);
+    return is_builtin;
 }
 
 expr_bindings_t *expr_bindings_from_expr_internal(const expr_t *expr)

@@ -1258,6 +1258,29 @@ int mat_det_expr_exact(const matrix_t *A, expr_t **determinant)
         return *determinant ? 0 : -3;
     }
 
+    if (n == 2) {
+        expr_t *a = NULL;
+        expr_t *b = NULL;
+        expr_t *c = NULL;
+        expr_t *d = NULL;
+        expr_t *ad;
+        expr_t *bc;
+        expr_t *bc_simplified;
+
+        mat_get(A, 0u, 0u, &a);
+        mat_get(A, 0u, 1u, &b);
+        mat_get(A, 1u, 0u, &c);
+        mat_get(A, 1u, 1u, &d);
+        ad = expr_mul(a, d);
+        bc = expr_mul(b, c);
+        bc_simplified = bc ? expr_simplify(bc) : NULL;
+        *determinant = ad && bc_simplified ? expr_sub(ad, bc_simplified) : NULL;
+        expr_free(bc_simplified);
+        expr_free(bc);
+        expr_free(ad);
+        return *determinant ? 0 : -3;
+    }
+
     M = mat_create_dense_with_elem(A->rows, A->cols, &expr_elem);
     if (!M)
         return -3;

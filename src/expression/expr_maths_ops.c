@@ -717,6 +717,19 @@ const expr_ops_t ops_abs = {.eval = eval_abs,
                             .apply_binary = NULL,
                             .simplify = expr_simplify_unary_operator,
                             .fold_const_unary = NULL};
+const expr_ops_t ops_conj = {.eval = eval_conj,
+                             .deriv = deriv_conj,
+                             .reverse = expr_reverse_conj,
+                             .kind = EXPR_KIND_CONJ,
+                             .arity = EXPR_OP_UNARY,
+                             .name = "conj",
+                             .TeX_name = "\\operatorname{conj}",
+                             .direct_inverse = &ops_conj,
+                             .inverse_unary = expr_conj,
+                             .apply_unary = expr_conj,
+                             .apply_binary = NULL,
+                             .simplify = expr_simplify_unary_operator,
+                             .fold_const_unary = NULL};
 const expr_ops_t ops_erf = {.eval = eval_erf,
                             .deriv = deriv_erf,
                             .reverse = expr_reverse_erf,
@@ -1489,6 +1502,7 @@ expr_t *expr_apply_unary_kind(expr_op_kind_t kind, const expr_t *arg)
                                                                          [EXPR_KIND_FLOOR] = &ops_floor,
                                                                          [EXPR_KIND_CEIL] = &ops_ceil,
                                                                          [EXPR_KIND_ABS] = &ops_abs,
+                                                                         [EXPR_KIND_CONJ] = &ops_conj,
                                                                          [EXPR_KIND_ERF] = &ops_erf,
                                                                          [EXPR_KIND_ERFC] = &ops_erfc,
                                                                          [EXPR_KIND_LGAMMA] = &ops_lgamma,
@@ -1718,6 +1732,11 @@ expr_t *expr_acoth(const expr_t *a)
 expr_t *expr_abs(const expr_t *a)
 {
     return expr_math_wrap_unary(&ops_abs, a);
+}
+/* Construct the complex conjugate of an expression. */
+expr_t *expr_conj(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_conj, a);
 }
 expr_t *expr_erf(const expr_t *a)
 {

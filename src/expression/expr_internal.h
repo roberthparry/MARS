@@ -75,6 +75,7 @@ typedef enum {
     EXPR_KIND_FLOOR,
     EXPR_KIND_CEIL,
     EXPR_KIND_ABS,
+    EXPR_KIND_CONJ,
     EXPR_KIND_HYPOT,
     EXPR_KIND_ERF,
     EXPR_KIND_ERFC,
@@ -380,6 +381,7 @@ extern const expr_ops_t ops_sqrt;
 extern const expr_ops_t ops_floor;
 extern const expr_ops_t ops_ceil;
 extern const expr_ops_t ops_abs;
+extern const expr_ops_t ops_conj;
 extern const expr_ops_t ops_hypot;
 extern const expr_ops_t ops_erf;
 extern const expr_ops_t ops_erfc;
@@ -658,7 +660,6 @@ const expr_ops_t *expr_ops_reciprocal_unary(const expr_ops_t *ops);
 
 /* Integration and inverse-function simplification helpers. */
 expr_t *expr_integrate_dispatch_primitive(const expr_t *expr, const expr_t *wrt);
-expr_t *expr_new_integration_constant_internal(const expr_t *expr, const expr_t *wrt, const expr_t *anti);
 expr_bindings_t *expr_bindings_from_expr_internal(const expr_t *expr);
 expr_bindings_t *expr_bindings_merge_internal(const expr_bindings_t *bindings,
                                               const expr_bindings_t *additional_bindings);
@@ -781,6 +782,7 @@ void expr_reverse_sqrt(const expr_t *dv, const number_t *out_bar, number_t *a_ba
 void expr_reverse_floor(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void expr_reverse_ceil(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void expr_reverse_abs(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_conj(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void expr_reverse_hypot(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void expr_reverse_erf(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void expr_reverse_erfc(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);

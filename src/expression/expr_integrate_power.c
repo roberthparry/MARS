@@ -333,6 +333,45 @@ static expr_t *integrate_power_of_affine_symbolic_exponent(const expr_t *base, c
     return out;
 }
 
+static expr_t *integrate_constant_base_affine_exponent(const expr_t *power, const expr_t *base, const expr_t *exponent,
+                                                       const expr_t *wrt)
+{
+    number_t constant = num_new();
+    number_t coefficient = num_new();
+    expr_t *coefficient_expr = NULL;
+    expr_t *logarithm;
+    expr_t *denominator;
+    expr_t *quotient;
+    bool matched;
+
+    if (!power || !base || !exponent || depends_on_wrt(base, wrt) || !depends_on_wrt(exponent, wrt)) {
+        num_destroy(&coefficient);
+        num_destroy(&constant);
+        return NULL;
+    }
+
+    matched = match_nonconstant_affine_linear_expr(exponent, wrt, &constant, &coefficient);
+    if (matched) {
+        coefficient_expr = expr_new_const(coefficient);
+    } else {
+        coefficient_expr = match_symbolic_affine_base_coeff(exponent, wrt);
+        matched = coefficient_expr != NULL;
+    }
+    num_destroy(&coefficient);
+    num_destroy(&constant);
+    if (!matched)
+        return NULL;
+
+    logarithm = expr_log(base);
+    denominator = (coefficient_expr && logarithm) ? expr_mul(coefficient_expr, logarithm) : NULL;
+    quotient = denominator ? expr_div(power, denominator) : NULL;
+
+    expr_free(denominator);
+    expr_free(logarithm);
+    expr_free(coefficient_expr);
+    return simplify_owned(quotient);
+}
+
 static bool number_is_supported_sqrt_power_lift_exponent_local(number_t value)
 {
     long numerator = 0;
@@ -353,7 +392,9 @@ expr_t *integrate_pow_rule(const expr_t *expr, const expr_t *wrt)
     }
 
     if (!expr_match_const_value(expr->b, &exponent)) {
-        out = integrate_power_of_wrt_symbolic_exponent(expr->a, expr->b, wrt);
+        out = integrate_constant_base_affine_exponent(expr, expr->a, expr->b, wrt);
+        if (!out)
+            out = integrate_power_of_wrt_symbolic_exponent(expr->a, expr->b, wrt);
         if (!out)
             out = integrate_power_of_affine_symbolic_exponent(expr->a, expr->b, wrt);
         num_destroy(&exponent);

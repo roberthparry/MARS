@@ -1966,9 +1966,7 @@ void expr_conj_elem(void *o, const void *a)
 
     if (prev)
         expr_free(prev);
-    if (arg)
-        expr_retain(arg);
-    *(expr_t **)o = arg;
+    *(expr_t **)o = arg ? expr_conj(arg) : NULL;
 }
 
 void expr_scalar_exp(void *out, const void *a)

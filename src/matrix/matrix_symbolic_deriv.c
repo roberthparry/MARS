@@ -1,9 +1,34 @@
+#include <stdio.h>
 #include <stdlib.h>
 
 #define MARS_MATRIX_INTERNAL_ACCESS
 #include "matrix_internal.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
+
+static expr_t *mat_deriv_entry(const expr_t *entry, expr_t *wrt)
+{
+    const expr_t *numerator = NULL;
+    const expr_t *denominator = NULL;
+    expr_t *denominator_derivative = NULL;
+    expr_t *numerator_derivative = NULL;
+    expr_t *derivative = NULL;
+
+    if (!expr_match_div_expr(entry, &numerator, &denominator))
+        return expr_create_deriv(entry, wrt);
+
+    denominator_derivative = expr_create_deriv(denominator, wrt);
+    if (!denominator_derivative || !expr_is_exact_zero(denominator_derivative)) {
+        expr_free(denominator_derivative);
+        return expr_create_deriv(entry, wrt);
+    }
+
+    numerator_derivative = expr_create_deriv(numerator, wrt);
+    derivative = numerator_derivative ? expr_div(numerator_derivative, denominator) : NULL;
+    expr_free(numerator_derivative);
+    expr_free(denominator_derivative);
+    return derivative;
+}
 
 matrix_t *mat_deriv(const matrix_t *A, expr_t *wrt)
 {
@@ -30,7 +55,7 @@ matrix_t *mat_deriv(const matrix_t *A, expr_t *wrt)
             if (!entry)
                 entry = (expr_t *)EXPR_ZERO;
 
-            deriv = expr_create_deriv(entry, wrt);
+            deriv = mat_deriv_entry(entry, wrt);
             if (!deriv) {
                 mat_free(D);
                 return NULL;
@@ -128,6 +153,66 @@ matrix_t *mat_integrate(const matrix_t *A, expr_t *wrt)
         }
     }
     return integrated;
+}
+
+/* Integrate every entry and append one independent arbitrary constant per entry. */
+matrix_t *mat_integrate_family(const matrix_t *A, expr_t *wrt)
+{
+    matrix_t *family = NULL;
+
+    if (!A || !wrt || !A->elem)
+        return NULL;
+
+    family = mat_create_zero_with_elem(A->rows, A->cols, &expr_elem);
+    if (!family)
+        return NULL;
+
+    for (size_t row = 0u; row < A->rows; ++row) {
+        for (size_t col = 0u; col < A->cols; ++col) {
+            expr_t *owned_entry = NULL;
+            expr_t *entry = NULL;
+            expr_t *antiderivative;
+            expr_t *constant;
+            expr_t *entry_family;
+            char constant_name[64];
+
+            if (matrix_is_symbolic(A)) {
+                mat_get(A, row, col, &entry);
+                if (!entry)
+                    entry = (expr_t *)EXPR_ZERO;
+            } else {
+                number_t value = mat_get_num(A, row, col);
+
+                owned_entry = expr_new_const(value);
+                num_destroy(&value);
+                entry = owned_entry;
+            }
+
+            antiderivative = entry ? expr_integrate(entry, wrt) : NULL;
+            expr_free(owned_entry);
+            if (!antiderivative)
+                goto fail;
+
+            snprintf(constant_name, sizeof(constant_name), "C_%zu%zu", row + 1u, col + 1u);
+            constant = expr_new_named_const(NUM_NAN, constant_name);
+            entry_family = constant ? expr_add(antiderivative, constant) : NULL;
+            expr_free(constant);
+            expr_free(antiderivative);
+            if (!entry_family) {
+                expr_free(entry_family);
+                goto fail;
+            }
+
+            mat_set(family, row, col, &entry_family);
+            expr_free(entry_family);
+        }
+    }
+
+    return family;
+
+fail:
+    mat_free(family);
+    return NULL;
 }
 
 expr_t *mat_deriv_trace(const matrix_t *A, expr_t *wrt)

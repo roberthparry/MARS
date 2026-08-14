@@ -4,6 +4,8 @@
 #include <string.h>
 
 #include "almanac.h"
+#define MARS_ALMANAC_INTERNAL_ACCESS
+#include "almanac/almanac_internal.h"
 #include "datetime.h"
 #include "jurisdiction.h"
 #include "spice_oracle.h"
@@ -662,6 +664,45 @@ static void test_almanac_find_solar_eclipses_returns_august_2026_event(void)
     assert_solar_eclipse_search_case();
 }
 
+static void test_almanac_2027_totality_seed_uses_the_towns_local_maximum(void)
+{
+    almanac_observer_t london = {51.5074, -0.1278, 11.0};
+    almanac_observer_t malaga = {36.7202, -4.4203, 22.0};
+    almanac_solar_totality_location_t location;
+    datetime_t *start = datetime_alloc();
+    datetime_t *end = datetime_alloc();
+    almanac_t *almanac = almanac_open();
+    array_t *events;
+    const almanac_solar_eclipse_t *event;
+    double score_degrees = NAN;
+
+    TEST_ASSERT_NOT_NULL(start);
+    TEST_ASSERT_NOT_NULL(end);
+    TEST_ASSERT_NOT_NULL(almanac);
+    TEST_ASSERT_NOT_NULL(datetime_init_ymdt(start, 2027, DT_August, 1, 0, 0, 0.0));
+    TEST_ASSERT_NOT_NULL(datetime_init_ymdt(end, 2027, DT_August, 4, 0, 0, 0.0));
+    events = almanac_find_solar_eclipses(almanac, &london, start, end);
+    TEST_ASSERT_NOT_NULL(events);
+    TEST_ASSERT_TRUE(array_size(events) == 1u, "August 2027 window contains the expected solar eclipse");
+    event = array_get(events, 0u);
+    TEST_ASSERT_NOT_NULL(event);
+    TEST_ASSERT_TRUE(almanac_solar_eclipse_totality_seed_score(almanac, &malaga, event, &score_degrees),
+                     almanac_last_error(almanac));
+    TEST_ASSERT_TRUE(score_degrees <= 0.0, "Málaga lies inside the totality path at its local maximum");
+    TEST_ASSERT_TRUE(almanac_solar_eclipse_totality_from_seed(almanac, &london, &malaga, event, 1.0, &location),
+                     almanac_last_error(almanac));
+    TEST_ASSERT_TRUE(location.found, "Málaga resolves as a named totality location");
+    TEST_ASSERT_TRUE(fabs(location.latitude_degrees - malaga.latitude_degrees) < 1e-9,
+                     "the resolved totality latitude remains at Málaga");
+    TEST_ASSERT_TRUE(fabs(location.longitude_degrees - malaga.longitude_degrees) < 1e-9,
+                     "the resolved totality longitude remains at Málaga");
+
+    array_destroy(events);
+    almanac_close(almanac);
+    datetime_dealloc(end);
+    datetime_dealloc(start);
+}
+
 static void assert_lunar_eclipse_search_case(void)
 {
     datetime_t *start;
@@ -1040,6 +1081,7 @@ int tests_main(void)
     TEST_RUN_IN_GROUP(test_almanac_sunrise_sunset_returns_local_day_times, tests, NULL);
     TEST_RUN_IN_GROUP(test_almanac_moonrise_moonset_returns_local_day_times, tests, NULL);
     TEST_RUN_IN_GROUP(test_almanac_find_solar_eclipses_returns_august_2026_event, tests, NULL);
+    TEST_RUN_IN_GROUP(test_almanac_2027_totality_seed_uses_the_towns_local_maximum, tests, NULL);
     TEST_RUN_IN_GROUP(test_almanac_find_lunar_eclipses_returns_events_in_2025, tests, NULL);
     TEST_RUN_IN_GROUP(test_almanac_find_lunar_eclipses_matches_july_2028_partial_event, tests, NULL);
     TEST_RUN_IN_GROUP(test_almanac_find_solar_transits_returns_mercury_event, tests, NULL);

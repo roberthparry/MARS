@@ -22,7 +22,7 @@ some GNU C extensions, so MSVC/Windows builds are not currently guaranteed.
   hypergeometric and Lauricella families (~31–32 decimal digits of precision)
 - **`qcomplex_t`** — double-double complex arithmetic and complex
   special-function families without an MPFR or MPC dependency
-- **`matrix_t`** — generic high-precision matrix over numeric `number_t` values or symbolic `expr_t *` entries, with string-based matrix parsing and formatting, symbolic linear algebra support including Schur complements, block inverse/solve, Jordan helpers, entrywise matrix derivatives, Jacobian helpers, first matrix-calculus helpers for trace, determinant, inverse, block inverse, solve, and block solve, and high-precision eigendecomposition and matrix functions through the numeric `number_t` layer
+- **`matrix_t`** — generic high-precision matrix over numeric `number_t` values or symbolic `expr_t *` entries, with native string-based matrix-expression parsing, determinant/trace/inverse/transpose/adjoint aliases, symbolic powers, formatting, symbolic linear algebra support including Schur complements, block inverse/solve, Jordan helpers, entrywise matrix derivatives, Jacobian helpers, matrix-calculus helpers for trace, determinant, inverse, block inverse, solve, and block solve, and high-precision eigendecomposition and matrix functions through the numeric `number_t` layer
 - **`diffequ_t`** — ODE and PDE parsing with rule-based symbolic solving,
   optional derivations, linearisations and symmetry metadata
 - **`expr_t`** — differentiable expression DAGs with symbolic and reverse-mode

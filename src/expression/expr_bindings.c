@@ -8,8 +8,8 @@
 #include "expr_binding_simplify.h"
 #include "expr_bindings.h"
 #include "expression.h"
-#define MARS_EXPR_STRINGIN_INTERNAL_ACCESS
-#include "expr_stringin_internal.h"
+#define MARS_EXPR_INTERNAL_ACCESS
+#include "expr_internal.h"
 #include "expr_stringin_scan.h"
 #include "expr_stringout.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
@@ -1679,6 +1679,12 @@ static const binding_func_entry_t s_binding_funcs[BINDING_FUNC_TABLE_SIZE] = {
     [164] = {.kw = "acosech", .is_binary = false, .ops = &ops_acosech},
 };
 
+/* Collision-free auxiliary table for conjugation aliases (length modulo three). */
+static const binding_func_entry_t s_binding_conjugate_funcs[3] = {
+    [0] = {.kw = "conjugate", .is_binary = false, .ops = &ops_conj},
+    [1] = {.kw = "conj",      .is_binary = false, .ops = &ops_conj},
+};
+
 static unsigned binding_func_hash_values(string_view_t kw, unsigned seed)
 {
     size_t len = string_view_length(kw);
@@ -1724,11 +1730,16 @@ static bool binding_func_entry_matches(const binding_func_entry_t *entry, string
 static const binding_func_entry_t *binding_func_lookup(string_view_t kw)
 {
     const binding_func_entry_t *entry;
+    const binding_func_entry_t *conjugate_entry;
     unsigned bucket;
     unsigned slot;
 
     if (string_view_is_empty(kw))
         return NULL;
+
+    conjugate_entry = &s_binding_conjugate_funcs[string_view_length(kw) % 3u];
+    if (conjugate_entry->kw && binding_func_entry_matches(conjugate_entry, kw))
+        return conjugate_entry;
 
     bucket = binding_func_bucket_hash(kw);
     slot = (binding_func_slot_hash(kw) + s_binding_func_displacements[bucket]) % BINDING_FUNC_TABLE_SIZE;

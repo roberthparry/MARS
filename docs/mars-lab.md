@@ -90,6 +90,60 @@ MARS Lab passes the entered text unchanged to
 performs all matrix parsing and evaluation; neither the browser nor the native
 MARS Lab helper interprets matrix-expression syntax.
 
+### Matrix-expression notation
+
+Matrix expressions may be grouped and composed directly. `.` is matrix
+multiplication, while `+` and `-` combine equally sized matrices. Integer,
+fractional and symbolic powers use `^`; for example,
+`((1 2; 3 4) - lambdaI)^x` is accepted. Where the matrix order is clear,
+`lambdaI`, `lambda.I` and `lambda*I` all mean the scalar `lambda` multiplied by
+the identity matrix. Matrix division is deliberately not defined because the
+side on which an inverse should act would be ambiguous.
+
+The structural function names and their aliases are:
+
+| Operation | Accepted notation |
+|---|---|
+| Inverse | `inverse(A)`, `inv(A)` |
+| Determinant | `det(A)`, `determinant(A)`, `|A|`, `||A||`, `‖A‖` |
+| Trace | `trace(A)`, `tr(A)` |
+| Transpose | `transpose(A)`, `trans(A)` |
+| Conjugate transpose | `hermitian(A)`, `adjoint(A)`, `ctranspose(A)`, `conjtrans(A)`, `conjugate_transpose(A)`, `A^dagger`, `A^H`, `A^*`, `A^†`, `A†` |
+
+Determinant bars must be paired: an input beginning with `|` or `||` without
+the corresponding closing delimiter is rejected. A determinant is a scalar,
+not a one-by-one matrix. The function vocabulary is recognised by MARSlib's
+native collision-free lookup table; the browser does not recognise or rewrite
+these names.
+
+Scalar entries use the expression grammar. `conj(z)` and `conjugate(z)` are
+equivalent to the postfix form `z^*`. Likewise, `abs(z)` and `|z|` denote the
+same scalar absolute value. For a complex expression this is the modulus
+`sqrt(z*z^*)`. Context distinguishes scalar absolute-value bars from the
+determinant bars surrounding a matrix.
+
+Greek names may be entered as Unicode or through their ASCII aliases. Thus
+`lambda`, `@lambda` and `λ` identify the same symbol and are normalised to `λ`
+in output. This also applies inside compact matrix literals and identity
+multiples.
+
+Entrywise calculus uses `Dx(A)` for differentiation and `@S^x(A)` for an
+antiderivative. The variable buttons below the editor invoke the same native
+operations. A matrix antiderivative is displayed as `A(x) + C`, where `C` is a
+constant matrix with entries such as `C₁₁`, `C₁₂`, `C₂₁` and `C₂₂`.
+
+Result cards have distinct purposes:
+
+- **Rendered TeX** shows the exact symbolic result. Long decimal mantissas are
+  abbreviated with an ellipsis by default; **Show more digits** reveals them.
+  Scientific notation is rendered as multiplication by a power of ten.
+- **Result** contains the copyable inline result.
+- **Layout** contains the plain-text matrix layout.
+- **Value** appears when supplied bindings allow a numeric or partially
+  evaluated result. For example, setting `lambda` to `3` evaluates
+  `(1 2; 3 4) - lambdaI` to `(-2 2; 3 1)` without replacing the symbolic
+  result above it.
+
 The captured input is `sin(1 2; 4 5)`. MARS returns the sine of the complete
 `2 x 2` matrix, rather than applying scalar sine separately to its four
 entries. At normal display precision the output is approximately
@@ -102,10 +156,13 @@ The direct symbolic forms use the same editor:
 | Input | Output |
 |---|---|
 | `inverse(a b; c d)` | `(d/(ad-bc), -b/(ad-bc); -c/(ad-bc), a/(ad-bc))` |
+| `det((1 2; 3 4) - lambdaI)` | `(1-lambda)(4-lambda)-6` |
+| `tr(a b; c d)` | `a+d` |
+| `(a b; c d)^dagger` | `(conj(a) conj(c); conj(b) conj(d))` |
 | `(a b; c d).(e f; g h)` | `(ae+bg, af+bh; ce+dg, cf+dh)` |
 | `inverse(a b; c d).(x; y)` | `((dx-by)/(ad-bc); (ay-cx)/(ad-bc))` |
 | `Dx(ax+b cx+d; y xy)` | `(a, c; 0, y)` |
-| `@S^x((ax+b cx+d; y xy))` | `(1/2(ax^2+2bx), 1/2(cx^2+2dx); xy, 1/2x^2y)` |
+| `@S^x((ax+b cx+d; y xy))` | `(1/2(ax^2+2bx)+C, 1/2(cx^2+2dx)+C_1; xy+C_2, 1/2x^2y+C_3)` |
 
 ## Integrator mode
 

@@ -789,7 +789,7 @@ static expr_t *expr_display_add_integration_constant(expr_t *anti)
     if (!anti)
         return NULL;
 
-    constant = expr_new_integration_constant_internal(anti, NULL, anti);
+    constant = expr_new_integration_constant(anti, NULL, anti);
     if (!constant)
         return anti;
 
