@@ -284,8 +284,9 @@ matrix_t *mat_from_text_expr(const string_t *text, mat_bindings_t **bnd_out);
  * @brief Parse and evaluate a complete matrix expression from a C string.
  *
  * In addition to matrix literals accepted by mat_from_string_expr(), this parser accepts grouped unary signs,
- * matrix products, inverse(...), every registered unary expression function such as exp(...) and sin(...), and
- * entrywise calculus forms such as Dx(...) and @S^x(...).
+ * matrix products, scalar matrix powers such as `(1 2; 3 4)^(1/2)` with real or complex `number_t` exponents,
+ * inverse(...), every registered unary expression function such as exp(...) and sin(...), and entrywise calculus forms
+ * such as Dx(...) and @S^x(...).
  *
  * When @p operation_out is non-NULL, it receives a borrowed static operation name for an explicit operation, or NULL
  * when @p text is a matrix literal alone. When @p bnd_out is non-NULL, bindings referenced by a literal or unary
@@ -297,6 +298,36 @@ matrix_t *mat_from_text_expr(const string_t *text, mat_bindings_t **bnd_out);
  * @return              Newly allocated result matrix on success, or NULL on error.
  */
 matrix_t *mat_expression_from_string(const char *text, mat_bindings_t **bnd_out, const char **operation_out);
+
+/**
+ * @brief Parse and evaluate a complete expression whose result may be a matrix or a scalar.
+ *
+ * This is the typed entry point for matrix-language expressions. In addition to the matrix-valued forms accepted by
+ * mat_expression_from_string(), it accepts scalar-valued matrix operations such as `det(A)`, `determinant(A)`, and
+ * `|A|`. Exactly one of @p matrix_out and @p scalar_out is populated on success. The caller owns that result.
+ *
+ * @param text          Expression to parse and evaluate.
+ * @param bnd_out       Optional destination for symbolic bindings.
+ * @param operation_out Optional destination for the recognised operation name.
+ * @param matrix_out    Destination for a newly allocated matrix result, or NULL when the result is scalar.
+ * @param scalar_out    Destination for a newly allocated scalar expression, or NULL when the result is a matrix.
+ * @return              Zero on success, or non-zero on error.
+ */
+int mat_expression_evaluate(const char *text, mat_bindings_t **bnd_out, const char **operation_out,
+                            matrix_t **matrix_out, expr_t **scalar_out);
+
+/**
+ * @brief Discover the symbolic bindings referenced by a matrix.
+ *
+ * The returned bindings are collected from every symbolic matrix entry and are independent of the parser call that
+ * originally produced the matrix. This is useful after operations involving several matrices, where the result may
+ * contain bindings contributed by any operand. The caller owns the returned object and must release it with
+ * mat_bindings_free().
+ *
+ * @param A Matrix whose symbolic entries are to be inspected.
+ * @return  Newly allocated bindings, or NULL when the matrix has no editable symbolic bindings or an error occurs.
+ */
+mat_bindings_t *mat_bindings_from_matrix(const matrix_t *A);
 
 /**
  * @brief Look up a parsed matrix binding by string object name.
@@ -323,6 +354,31 @@ expr_t *mat_bindings_get_text(mat_bindings_t *bnd, const string_t *name);
  * @return Borrowed symbolic leaf on success, or NULL if not found.
  */
 expr_t *mat_bindings_get(mat_bindings_t *bnd, const char *name);
+
+/**
+ * @brief Return the number of parsed matrix bindings.
+ */
+size_t mat_bindings_count(const mat_bindings_t *bnd);
+
+/**
+ * @brief Borrow a parsed matrix binding name by index.
+ */
+const char *mat_bindings_name_at(const mat_bindings_t *bnd, size_t index);
+
+/**
+ * @brief Borrow a parsed matrix binding name object by index.
+ */
+const string_t *mat_bindings_name_text_at(const mat_bindings_t *bnd, size_t index);
+
+/**
+ * @brief Borrow a parsed matrix binding expression by index.
+ */
+expr_t *mat_bindings_expr_at(mat_bindings_t *bnd, size_t index);
+
+/**
+ * @brief Report whether a parsed matrix binding is a constant.
+ */
+bool mat_bindings_is_constant_at(const mat_bindings_t *bnd, size_t index);
 
 /**
  * @brief Release a bindings object previously returned by mat_from_string_expr().
@@ -681,6 +737,20 @@ matrix_t *mat_deriv(const matrix_t *A, expr_t *wrt);
  *             an entry cannot be integrated by the available symbolic rules.
  */
 matrix_t *mat_integrate(const matrix_t *A, expr_t *wrt);
+
+/**
+ * @brief Integrate a matrix entrywise and append an arbitrary constant matrix.
+ *
+ * Each output entry is an antiderivative of the corresponding input entry plus
+ * an independent symbolic constant. This represents the complete indefinite
+ * integral family, unlike mat_integrate(), which returns one representative.
+ *
+ * @param A    Matrix to integrate.
+ * @param wrt  Symbolic integration variable.
+ * @return     Newly allocated antiderivative family on success, or NULL when
+ *             an entry cannot be integrated by the available symbolic rules.
+ */
+matrix_t *mat_integrate_family(const matrix_t *A, expr_t *wrt);
 
 /**
  * @brief Differentiate the trace of a matrix with respect to a symbolic variable.
@@ -1288,15 +1358,26 @@ matrix_t *mat_simplify_symbolic(const matrix_t *A);
 matrix_t *mat_pow_int(const matrix_t *A, int n);
 
 /**
- * @brief Number power: A^s = exp(s * log(A)).
+ * @brief Principal matrix power for a real or complex exponent.
  *
  * The exponent is supplied as a `number_t`, matching the matrix library's
  * numeric element model directly.
  *
- * Requires A to have a well-defined matrix logarithm (positive definite
- * for real matrices). Returns NULL on error or if `s` is NULL.
+ * Exact 1x1 and 2x2 matrices raised to one half retain an exact symbolic principal square root, including any required
+ * real or complex surds. Other diagonalisable matrices are evaluated by applying the scalar principal power to every
+ * eigenvalue. Defective matrices fall back to `exp(s * log(A))` and therefore require a principal matrix logarithm.
+ * Returns NULL on error or if `s` is NULL.
  */
 matrix_t *mat_pow(const matrix_t *A, const number_t *s);
+
+/**
+ * @brief Symbolic principal matrix power for an expression exponent.
+ *
+ * For an exact real 1x1 matrix, or an exact real 2x2 matrix with distinct eigenvalues, this constructs an exact
+ * expression matrix using the spectral-projector rule. The exponent is retained in every resulting DAG and may
+ * therefore be supplied through an editable binding. Returns NULL when no exact symbolic rule is available.
+ */
+matrix_t *mat_pow_expr(const matrix_t *A, const expr_t *exponent);
 
 /* -------------------------------------------------------------------------
    Debugging / I/O
@@ -1317,6 +1398,21 @@ string_t *mat_to_text(const matrix_t *A, mat_string_style_t style);
  * buffer and must release it with free().
  */
 char *mat_to_string(const matrix_t *A, mat_string_style_t style);
+
+/**
+ * @brief Convert a matrix body to newly allocated text without serialising bindings.
+ *
+ * This formatter preserves symbolic entries but omits the outer binding wrapper. It is intended for interfaces that
+ * present editable bindings separately. The caller owns the returned string and must release it with string_free().
+ */
+string_t *mat_body_to_text(const matrix_t *A, mat_string_style_t style);
+
+/**
+ * @brief Convert a matrix body to a newly allocated C string without serialising bindings.
+ *
+ * Compatibility wrapper around mat_body_to_text(). The caller owns the returned buffer and must release it with free().
+ */
+char *mat_body_to_string(const matrix_t *A, mat_string_style_t style);
 
 /**
  * @brief Format matrix-aware text into a new string_t from a va_list.

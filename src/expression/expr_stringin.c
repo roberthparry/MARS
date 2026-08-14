@@ -58,8 +58,6 @@
 #include "expr_bindings.h"
 #include "expr_maths.h"
 #include "qfloat.h"
-#define MARS_EXPR_STRINGIN_INTERNAL_ACCESS
-#include "expr_stringin_internal.h"
 #include "expr_stringin_scan.h"
 #include "expression.h"
 #include "string/string_view.h"
@@ -436,6 +434,12 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
 };
 // clang-format on
 
+/* Collision-free auxiliary table for conjugation aliases (length modulo three). */
+static const func_entry_t s_conjugate_funcs[3] = {
+    [0] = {.kw = "conjugate", .arity = 1u, .ops = &ops_conj, .ufn = expr_conj},
+    [1] = {.kw = "conj",      .arity = 1u, .ops = &ops_conj, .ufn = expr_conj},
+};
+
 static void func_hashes(string_view_t kw, unsigned *bucket_out, unsigned *slot_out)
 {
     const size_t byte_len = string_view_length(kw);
@@ -484,11 +488,15 @@ static size_t func_entry_kw_len(const func_entry_t *entry)
 static const func_entry_t *lookup_func(string_view_t kw)
 {
     const func_entry_t *entry;
+    const func_entry_t *conjugate_entry;
     unsigned bucket;
     unsigned slot;
 
     if (string_view_is_empty(kw))
         return NULL;
+    conjugate_entry = &s_conjugate_funcs[string_view_length(kw) % 3u];
+    if (conjugate_entry->kw && func_entry_matches(conjugate_entry, kw))
+        return conjugate_entry;
     func_hashes(kw, &bucket, &slot);
     slot = (slot + s_func_displacements[bucket]) % FUNC_TABLE_SIZE;
     entry = &s_funcs[slot];
@@ -542,11 +550,20 @@ bool expr_stringin_function_hash_is_valid(void)
             return false;
     }
 
+    for (size_t slot = 0u; slot < sizeof(s_conjugate_funcs) / sizeof(s_conjugate_funcs[0]); ++slot) {
+        const func_entry_t *entry = &s_conjugate_funcs[slot];
+
+        if (!entry->kw)
+            continue;
+        if (lookup_func(string_view_from_chars(entry->kw, strlen(entry->kw))) != entry)
+            return false;
+    }
+
     return true;
 }
 
 /* ------------------------------------------------------------------ */
-/* Binary function argument parser helper                               */
+/* Binary function argument parser helper                             */
 /* ------------------------------------------------------------------ */
 
 static int parse_two_args(expr_parse_state_t *p, expr_t **a_out, expr_t **b_out)
@@ -2804,6 +2821,13 @@ static expr_t *parse_power(expr_parse_state_t *p)
         expr_t *exponent = NULL;
 
         expr_parse_skip_spaces(p);
+
+        if (expr_parse_consume_char(p, '*')) {
+            base = apply_unary_preserving_constexpr(&ops_conj, base, expr_conj);
+            if (!base)
+                return NULL;
+            continue;
+        }
 
         if (expr_parse_consume_char(p, '(')) {
             exponent = parse_enclosed_addexpr(p, ')', "expected ')' after exponent");

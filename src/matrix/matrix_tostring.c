@@ -834,7 +834,7 @@ cleanup:
     return mb_take(&out);
 }
 
-static string_t *mat_to_string_expr(const matrix_t *A, mat_string_style_t style)
+static string_t *mat_to_string_expr(const matrix_t *A, mat_string_style_t style, int include_bindings)
 {
     size_t n = A->rows * A->cols;
     string_t **exprs = calloc(n ? n : 1, sizeof(*exprs));
@@ -881,7 +881,7 @@ static string_t *mat_to_string_expr(const matrix_t *A, mat_string_style_t style)
         string_free(out.text);
         out.text = string_new_with("<expr matrix>");
     } else if (tex) {
-        omit_wrapper = mt_all_bindings_are_nan(var_bindings, nvar_bindings, const_bindings, nconst_bindings);
+        omit_wrapper = !include_bindings || mt_all_bindings_are_nan(var_bindings, nvar_bindings, const_bindings, nconst_bindings);
         string_t *joined = mt_join_bindings_TeX(var_bindings, nvar_bindings, const_bindings, nconst_bindings);
         if (!omit_wrapper)
             mb_puts(&out, "\\left\\{ ");
@@ -894,7 +894,7 @@ static string_t *mat_to_string_expr(const matrix_t *A, mat_string_style_t style)
             mb_puts(&out, " \\right\\}");
         string_free(joined);
     } else if (!layout) {
-        omit_wrapper = mt_all_bindings_are_nan(var_bindings, nvar_bindings, const_bindings, nconst_bindings);
+        omit_wrapper = !include_bindings || mt_all_bindings_are_nan(var_bindings, nvar_bindings, const_bindings, nconst_bindings);
         string_t *joined = mt_join_bindings(var_bindings, nvar_bindings, const_bindings, nconst_bindings, scientific);
         if (!omit_wrapper)
             mb_puts(&out, "{ ");
@@ -907,7 +907,7 @@ static string_t *mat_to_string_expr(const matrix_t *A, mat_string_style_t style)
             mb_puts(&out, " }");
         string_free(joined);
     } else {
-        omit_wrapper = mt_all_bindings_are_nan(var_bindings, nvar_bindings, const_bindings, nconst_bindings);
+        omit_wrapper = !include_bindings || mt_all_bindings_are_nan(var_bindings, nvar_bindings, const_bindings, nconst_bindings);
         string_t *joined = mt_join_bindings(var_bindings, nvar_bindings, const_bindings, nconst_bindings, scientific);
         if (!omit_wrapper)
             mb_puts(&out, "{ ");
@@ -940,13 +940,38 @@ string_t *mat_to_text(const matrix_t *A, mat_string_style_t style)
         return string_new_with("(null)");
 
     if (matrix_is_symbolic(A))
-        return mat_to_string_expr(A, style);
+        return mat_to_string_expr(A, style, 1);
     return mat_to_string_numeric(A, style);
 }
 
 char *mat_to_string(const matrix_t *A, mat_string_style_t style)
 {
     string_t *text = mat_to_text(A, style);
+    char *out;
+
+    if (!text)
+        return NULL;
+
+    out = strdup(string_c_str(text));
+    string_free(text);
+    return out;
+}
+
+/* Convert a matrix body to owned text without serialising its bindings. */
+string_t *mat_body_to_text(const matrix_t *A, mat_string_style_t style)
+{
+    if (!A)
+        return string_new_with("(null)");
+
+    if (matrix_is_symbolic(A))
+        return mat_to_string_expr(A, style, 0);
+    return mat_to_string_numeric(A, style);
+}
+
+/* Convert a matrix body to an owned C string without serialising its bindings. */
+char *mat_body_to_string(const matrix_t *A, mat_string_style_t style)
+{
+    string_t *text = mat_body_to_text(A, style);
     char *out;
 
     if (!text)

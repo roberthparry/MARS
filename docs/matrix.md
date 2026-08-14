@@ -40,7 +40,8 @@ the API. Internally each matrix carries:
 - condition number computation
 - matrix functions: named APIs for exp, sin, cos, tan, sinh, cosh, tanh, sqrt, log, log10, asin, acos, atan, asinh,
   acosh, atanh, erf, and erfc; complete matrix-expression input resolves every applicable unary expression function
-- power functions: integer power (binary exponentiation), real power via exp/log
+- power functions: integer power (binary exponentiation), real power via exp/log, and exact symbolic powers of small
+  numeric or symbolic matrices through spectral projectors
 - numeric eigendecomposition and matrix functions are computed through the high-precision numeric `number_t` layer regardless of how the original numeric entries were written
 
 ## `expr_t *` Matrices
@@ -83,6 +84,46 @@ What is still intentionally unsupported for `expr` matrices:
 The current design is to use `matrix<expr_t *>` for symbolic construction,
 differentiation, and exact structured operations, then evaluate to a numeric
 matrix type when you want the full numerical linear-algebra toolbox.
+
+## Native Matrix-expression Grammar
+
+`mat_expression_from_string(...)` owns the complete matrix-expression grammar.
+Clients should pass input through unchanged rather than recognising matrix
+function names or rewriting syntax themselves.
+
+Compact literals use spaces or commas between columns and semicolons between
+rows. Parentheses may group complete expressions. `+` and `-` operate on
+equally sized matrices, `.` is ordered matrix multiplication, and `^` accepts
+integer, fractional or symbolic exponents. Matrix division has no parser
+operator because `A/B` does not say whether `A inv(B)` or `inv(B) A` is meant.
+
+The native collision-free matrix-function table recognises these names:
+
+| Canonical operation | Aliases |
+|---|---|
+| `inverse` | `inv` |
+| `det` | `determinant` |
+| `trace` | `tr` |
+| `transpose` | `trans` |
+| `hermitian` | `adjoint`, `ctranspose`, `conjtrans`, `conjugate_transpose` |
+
+The Hermitian operation is the conjugate transpose. Its postfix spellings are
+`^dagger`, `^H`, `^*`, `^†` and `†`. Determinants additionally accept paired
+`|A|`, `||A||` and `‖A‖` delimiters. Missing closing bars are rejected, and the
+result of a determinant or trace is a scalar.
+
+When a scalar identity multiple is unambiguous, `lambdaI`, `lambda.I` and
+`lambda*I` are accepted. Greek ASCII names, `@` aliases and Unicode spellings
+normalise to the same binding, so `lambda`, `@lambda` and `λ` all denote λ.
+
+Matrix entries use the scalar expression parser. Consequently `conj(z)`,
+`conjugate(z)` and `z^*` are equivalent, as are `abs(z)` and paired `|z|`.
+For complex scalars the latter is the modulus `sqrt(z*z^*)`.
+
+`Dx(A)` differentiates each entry with respect to `x`, and `@S^x(A)` produces
+an entrywise antiderivative. A matrix antiderivative has one independent
+constant per entry and is formatted as `A(x) + C`, with `C` carrying indexed
+constants such as `C₁₁` and `C₁₂`.
 
 ## Example
 

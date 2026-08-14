@@ -58,6 +58,7 @@ typedef enum {
 
 bool expr_is_exact_zero(const expr_t *dv);
 bool expr_is_named_const(const expr_t *dv);
+bool expr_stringin_function_hash_is_valid(void);
 int expr_get_default_constant_num_text(const string_t *name, number_t *value_out);
 expr_t *expr_const_zero(void);
 expr_t *expr_const_one(void);
@@ -66,6 +67,9 @@ expr_t *expr_retain_expr(const expr_t *expr);
 expr_t *expr_from_expression_text_formal(const string_t *expr, const string_t *const *names, expr_t *const *symbols,
                                          size_t nsymbols);
 expr_bindings_t *expr_bindings_clone_internal(const expr_bindings_t *bindings, bool constants_only);
+expr_bindings_t *expr_bindings_from_expr_internal(const expr_t *expr);
+expr_bindings_t *expr_bindings_merge_internal(const expr_bindings_t *bindings,
+                                              const expr_bindings_t *additional_bindings);
 expr_t *expr_simplify_owned(expr_t *expr);
 expr_t *expr_negate_owned(expr_t *expr);
 expr_t *expr_mul_long(const expr_t *expr, long value);

@@ -693,9 +693,17 @@ All functions return owning handles.
 - `expr_t *expr_pow(const expr_t *expr, const number_t *exponent)` — `expr ^ exponent` (borrowed scalar numeric exponent)
 - `expr_t *expr_pow_xp(const expr_t *base, const expr_t *exponent)` — `base ^ exponent`
 
+The string grammar accepts `conj(z)` and `conjugate(z)` for complex
+conjugation. Postfix `z^*` is equivalent. `abs(z)` and paired bars `|z|` are
+also equivalent for every scalar type; for complex values and expressions
+they denote the modulus `sqrt(z*z^*)`. An unmatched bar is a syntax error.
+These function names are resolved by the native expression parser's
+collision-free lookup tables rather than by a client-side rewrite.
+
 ### Special Functions (owning)
 
 - `expr_t *expr_abs(const expr_t *expr)` — absolute value
+- `expr_t *expr_conj(const expr_t *expr)` — complex conjugate
 - `expr_t *expr_hypot(const expr_t *left, const expr_t *right)` — sqrt(left² + right²)
 - `expr_t *expr_erf(const expr_t *expr)` — error function
 - `expr_t *expr_erfc(const expr_t *expr)` — complementary error function

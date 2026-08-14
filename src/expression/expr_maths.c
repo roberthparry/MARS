@@ -448,6 +448,10 @@ number_t eval_abs(expr_t *dv)
 {
     return expr_eval_unary_num(dv, num_abs);
 }
+number_t eval_conj(expr_t *dv)
+{
+    return expr_eval_unary_num(dv, num_conj);
+}
 number_t eval_erf(expr_t *dv)
 {
     return expr_eval_unary_num(dv, num_erf);
@@ -1505,6 +1509,15 @@ expr_t *deriv_abs(expr_t *dv)
     expr_free(da);
     expr_free(absa);
     expr_free(sign);
+    return out;
+}
+
+expr_t *deriv_conj(expr_t *dv)
+{
+    expr_t *derivative = expr_get_dx_internal(dv->a);
+    expr_t *out = derivative ? expr_conj(derivative) : NULL;
+
+    expr_free(derivative);
     return out;
 }
 

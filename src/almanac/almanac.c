@@ -3631,7 +3631,8 @@ static double almanac_find_contact_jd(almanac_t *almanac, almanac_event_residual
 }
 
 static double almanac_find_local_minimum_jd(almanac_t *almanac, almanac_event_metric_fn metric, void *context,
-                                            double centre_jd, double half_span_days, double sample_step_days)
+                                            double centre_jd, double half_span_days, double sample_step_days,
+                                            int refinement_iterations)
 {
     double best_jd = centre_jd;
     double best_value;
@@ -3668,7 +3669,7 @@ static double almanac_find_local_minimum_jd(almanac_t *almanac, almanac_event_me
     if (!(step > 0.0))
         return best_jd;
 
-    for (iteration = 0; iteration < 9 && step > 1e-10; ++iteration) {
+    for (iteration = 0; iteration < refinement_iterations && step > 1e-10; ++iteration) {
         double left_value = metric(almanac, best_jd - step, context);
         double centre_value = metric(almanac, best_jd, context);
         double right_value = metric(almanac, best_jd + step, context);
@@ -3810,6 +3811,33 @@ static double almanac_solar_eclipse_metric(almanac_t *almanac, double jd, void *
     if (geometry.sun_altitude_degrees + geometry.sun_sd <= 0.0)
         return NAN;
     return geometry.separation;
+}
+
+static bool almanac_solar_totality_score_at_local_minimum(almanac_t *almanac, const almanac_observer_t *observer,
+                                                          double seed_jd, double *out_jd, double *out_score_degrees)
+{
+    almanac_eclipse_contact_context_t contact = {ALMANAC_BODY_ID_MOON, observer, ALMANAC_CONTACT_LEVEL_OUTER};
+    almanac_solar_eclipse_geometry_t geometry;
+    double local_jd;
+    double score_degrees;
+
+    if (out_jd)
+        *out_jd = NAN;
+    if (out_score_degrees)
+        *out_score_degrees = NAN;
+    if (!almanac || !observer || !out_score_degrees)
+        return false;
+    local_jd = almanac_find_local_minimum_jd(almanac, almanac_solar_eclipse_metric, &contact, seed_jd, 0.25,
+                                             1.0 / 12.0, 3);
+    if (!almanac_solar_eclipse_geometry(almanac, local_jd, observer, &geometry))
+        return false;
+    score_degrees = almanac_solar_totality_score_degrees(&geometry);
+    if (!(score_degrees == score_degrees))
+        return false;
+    if (out_jd)
+        *out_jd = local_jd;
+    *out_score_degrees = score_degrees;
+    return true;
 }
 
 static bool almanac_lunar_eclipse_geometry(almanac_t *almanac, double jd, const almanac_observer_t *observer,
@@ -4166,8 +4194,8 @@ static bool almanac_refine_solar_totality(almanac_t *almanac, const almanac_obse
     contact.body_id = ALMANAC_BODY_ID_MOON;
     contact.observer = &observer;
     contact.contact_level = ALMANAC_CONTACT_LEVEL_OUTER;
-    local_jd =
-        almanac_find_local_minimum_jd(almanac, almanac_solar_eclipse_metric, &contact, seed_jd, 0.125, 1.0 / 96.0);
+    local_jd = almanac_find_local_minimum_jd(almanac, almanac_solar_eclipse_metric, &contact, seed_jd, 0.125,
+                                             1.0 / 96.0, 9);
     if (!almanac_solar_eclipse_geometry(almanac, local_jd, &observer, &geometry))
         return false;
     if (!almanac_solar_eclipse_circumstance_from_geometry(&geometry, &circumstance) ||
@@ -4377,6 +4405,8 @@ bool almanac_solar_eclipse_totality_from_seed(almanac_t *almanac, const almanac_
                                               double tolerance_degrees, almanac_solar_totality_location_t *out)
 {
     almanac_solar_totality_location_t candidate;
+    double local_jd;
+    double score_degrees;
 
     if (out)
         memset(out, 0, sizeof(*out));
@@ -4388,18 +4418,19 @@ bool almanac_solar_eclipse_totality_from_seed(almanac_t *almanac, const almanac_
         !(eclipse->greatest_eclipse.jd == eclipse->greatest_eclipse.jd) || !(tolerance_degrees >= 0.0)) {
         return false;
     }
-    if (!almanac_probe_solar_totality_candidate(almanac, origin, eclipse->greatest_eclipse.jd, seed->latitude_degrees,
-                                                seed->longitude_degrees, tolerance_degrees, &candidate)) {
+    if (!almanac_solar_totality_score_at_local_minimum(almanac, seed, eclipse->greatest_eclipse.jd, &local_jd,
+                                                       &score_degrees) ||
+        score_degrees > tolerance_degrees) {
         return false;
     }
-    return almanac_refine_solar_totality(almanac, origin, eclipse->greatest_eclipse.jd, &candidate, out);
+    almanac_fill_solar_totality_location(origin, seed->latitude_degrees, seed->longitude_degrees, local_jd, NAN, NAN,
+                                         &candidate);
+    return almanac_refine_solar_totality(almanac, origin, local_jd, &candidate, out);
 }
 
 bool almanac_solar_eclipse_totality_seed_score(almanac_t *almanac, const almanac_observer_t *seed,
                                                const almanac_solar_eclipse_t *eclipse, double *out_score_degrees)
 {
-    almanac_solar_eclipse_geometry_t geometry;
-
     if (out_score_degrees)
         *out_score_degrees = NAN;
     if (!almanac || !seed || !eclipse || !out_score_degrees) {
@@ -4409,10 +4440,8 @@ bool almanac_solar_eclipse_totality_seed_score(almanac_t *almanac, const almanac
     if (!almanac_observer_is_valid(almanac, seed) || !(eclipse->greatest_eclipse.jd == eclipse->greatest_eclipse.jd)) {
         return false;
     }
-    if (!almanac_solar_eclipse_geometry(almanac, eclipse->greatest_eclipse.jd, seed, &geometry))
-        return false;
-    *out_score_degrees = almanac_solar_totality_score_degrees(&geometry);
-    return *out_score_degrees == *out_score_degrees;
+    return almanac_solar_totality_score_at_local_minimum(almanac, seed, eclipse->greatest_eclipse.jd, NULL,
+                                                         out_score_degrees);
 }
 
 bool almanac_nearest_solar_totality_land(almanac_t *almanac, const almanac_observer_t *observer,
@@ -4904,8 +4933,8 @@ array_t *almanac_find_solar_eclipses(almanac_t *almanac, const almanac_observer_
         }
         if (phase_jd < start_jd - 1.0 || phase_jd > end_jd + 1.0)
             continue;
-        local_jd =
-            almanac_find_local_minimum_jd(almanac, almanac_solar_eclipse_metric, &contact, phase_jd, 0.75, 1.0 / 8.0);
+        local_jd = almanac_find_local_minimum_jd(almanac, almanac_solar_eclipse_metric, &contact, phase_jd, 0.75,
+                                                 1.0 / 8.0, 9);
         if (local_jd >= start_jd - 1e-9 && local_jd <= end_jd + 1e-9 &&
             almanac_fill_solar_eclipse(almanac, local_jd, observer, &eclipse) && !array_add(events, &eclipse)) {
             array_destroy(events);
@@ -4975,8 +5004,8 @@ array_t *almanac_find_lunar_eclipses(almanac_t *almanac, const almanac_observer_
         }
         if (phase_jd < start_jd - 1.0 || phase_jd > end_jd + 1.0)
             continue;
-        local_jd =
-            almanac_find_local_minimum_jd(almanac, almanac_lunar_eclipse_metric, &contact, phase_jd, 0.75, 1.0 / 8.0);
+        local_jd = almanac_find_local_minimum_jd(almanac, almanac_lunar_eclipse_metric, &contact, phase_jd, 0.75,
+                                                 1.0 / 8.0, 9);
         if (local_jd >= start_jd - 1e-9 && local_jd <= end_jd + 1e-9 &&
             almanac_fill_lunar_eclipse(almanac, local_jd, observer, &eclipse) && !array_add(events, &eclipse)) {
             array_destroy(events);
@@ -5049,7 +5078,7 @@ array_t *almanac_find_solar_transits_for_body(almanac_t *almanac, almanac_body_i
                 continue;
             previous_root = conjunction_jd;
             local_jd = almanac_find_local_minimum_jd(almanac, almanac_solar_transit_metric, &contact, conjunction_jd,
-                                                     0.75, 1.0 / 8.0);
+                                                     0.75, 1.0 / 8.0, 9);
             if (local_jd < start_jd - 1e-9 || local_jd > end_jd + 1e-9)
                 continue;
             if (almanac_fill_solar_transit(almanac, body_id, local_jd, observer, &transit) &&

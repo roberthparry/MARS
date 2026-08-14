@@ -1551,6 +1551,33 @@ static void test_integrate_symbolic_power_exponent(void)
     expr_bindings_free(bindings);
 }
 
+static void test_integrate_constant_base_affine_exponent(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *integrand = expr_from_string("{ a^(3*x+1) | x = NAN; a = NAN }", &bindings);
+    expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    expr_t *antiderivative = (integrand && x) ? expr_integrate(integrand, x) : NULL;
+    expr_t *derivative = (antiderivative && x) ? expr_create_deriv(antiderivative, x) : NULL;
+    expr_t *difference = derivative ? expr_sub(derivative, integrand) : NULL;
+    expr_t *simplified = difference ? expr_simplify(difference) : NULL;
+    char *antiderivative_text = antiderivative ? expr_to_string(antiderivative, style_UNBOUND) : NULL;
+
+    ASSERT_NOT_NULL(antiderivative);
+    ASSERT_NOT_NULL(antiderivative_text);
+    ASSERT_TRUE(strstr(antiderivative_text, "a^(3x + 1)") != NULL);
+    ASSERT_TRUE(strstr(antiderivative_text, "ln(a)") != NULL);
+    ASSERT_NOT_NULL(simplified);
+    ASSERT_TRUE(expr_is_exact_zero(simplified));
+
+    free(antiderivative_text);
+    expr_free(simplified);
+    expr_free(difference);
+    expr_free(derivative);
+    expr_free(antiderivative);
+    expr_free(integrand);
+    expr_bindings_free(bindings);
+}
+
 static void test_integrate_symbolic_shifted_sqrt(void)
 {
     static const double quotient_minus_points[] = {0.25, 1.0, 2.0, 3.5};
@@ -3307,6 +3334,7 @@ void test_symbolic_integration(void)
     TEST_RUN_SUBTEST(test_integrate_inverse_square_with_exact_bound, NULL);
     TEST_RUN_SUBTEST(test_integrate_shifted_inverse_square_with_symbolic_constant, NULL);
     TEST_RUN_SUBTEST(test_integrate_symbolic_power_exponent, NULL);
+    TEST_RUN_SUBTEST(test_integrate_constant_base_affine_exponent, NULL);
     TEST_RUN_SUBTEST(test_integrate_symbolic_shifted_sqrt, NULL);
     TEST_RUN_SUBTEST(test_integrate_poly_times_affine_power, NULL);
     TEST_RUN_SUBTEST(test_integrate_poly_over_centered_quadratic, NULL);

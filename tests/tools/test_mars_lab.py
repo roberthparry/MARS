@@ -12,6 +12,11 @@ import mars_lab
 
 
 class MobileAccessTests(unittest.TestCase):
+    def test_calendar_opens_below_its_field_without_covering_the_page_header(self) -> None:
+        self.assertIn("const top = anchorBottom + 8;", mars_lab.INDEX_HTML)
+        self.assertIn("marsDatePicker.style.maxHeight = `${availableHeight}px`;", mars_lab.INDEX_HTML)
+        self.assertNotIn("rect.top - pickerRect.height - 8", mars_lab.INDEX_HTML)
+
     def test_almanac_time_uses_styled_mobile_input_with_automatic_separators(self) -> None:
         self.assertIn(
             'id="almanacTime" type="text" inputmode="decimal"',
@@ -125,6 +130,312 @@ class EquationResultTests(unittest.TestCase):
 
 
 class MatrixResultTests(unittest.TestCase):
+    def test_matrix_determinant_bar_is_not_treated_as_a_binding_separator(self) -> None:
+        html = mars_lab.INDEX_HTML
+
+        self.assertIn("if (!bindings || indexOfTopLevel(bindings, '=') < 0)\n        return null;", html)
+
+    def test_matrix_editor_keeps_discovered_unset_bindings_out_of_hidden_input(self) -> None:
+        html = mars_lab.INDEX_HTML
+
+        self.assertIn("setExpressionEditor(editorBody, matrixBindings, editorBody);", html)
+        self.assertIn("if (currentMode() === 'matrix' && !bindingParts(current))", html)
+        self.assertIn(".filter((binding) => binding.name && binding.value);", html)
+
+    def test_scalar_matrix_result_omits_single_unset_variable_wrapper(self) -> None:
+        fields = {
+            "input": "|(1 2; 3 4) - (lambda 0; 0 lambda)|",
+            "operation": "det",
+            "result": "{ (1 - λ)·(4 - λ) - 6 | λ = NAN }",
+            "tex": (
+                r"\left\{ \left(1 - \lambda\right) \cdot \left(4 - \lambda\right) - 6 "
+                r"\;\middle|\; \lambda = NAN \right\}"
+            ),
+            "bindings": "variable\tλ\tNAN",
+        }
+
+        payload = mars_lab.prepare_matrix_fields(fields, 32)
+
+        self.assertEqual(payload["result"], "(1 - λ)·(4 - λ) - 6")
+        self.assertTrue(payload["scalar"])
+        self.assertNotIn(r"\middle|", payload["tex"])
+        self.assertNotIn(r"\left\{", payload["tex"])
+        self.assertEqual(
+            payload["binding_values"],
+            [{"name": "λ", "value": "NAN", "display": "", "kind": "variable"}],
+        )
+
+    def test_resolved_scalar_matrix_result_includes_its_evaluated_value(self) -> None:
+        fields = {
+            "input": "{ |(1 2; 3 4) - (lambda 0; 0 lambda)| | lambda = 4 }",
+            "operation": "det",
+            "result": "{ (1 - λ)·(4 - λ) - 6 | λ = 4 }",
+            "value": "-6",
+            "bindings": "variable\tλ\t4",
+        }
+
+        payload = mars_lab.prepare_matrix_fields(fields, 32)
+
+        self.assertEqual(payload["result"], "{ (1 - λ)·(4 - λ) - 6 | λ = 4 }")
+        self.assertEqual(payload["value"], "-6")
+        self.assertIn("value.textContent = data.value || '';", mars_lab.INDEX_HTML)
+        self.assertIn("setValueCardVisible(!!data.value);", mars_lab.INDEX_HTML)
+
+    def test_resolved_matrix_result_includes_an_evaluated_value_matrix(self) -> None:
+        fields = {
+            "input": "{ (1 2; 3 4) - (lambda 0; 0 lambda) | lambda = 3 }",
+            "operation": "eval",
+            "kind": "expr",
+            "rows": "2",
+            "cols": "2",
+            "result": "(1 - λ, 2; 3, 4 - λ)",
+            "pretty": "(\n  1 - λ     2\n      3 4 - λ\n)",
+            "value": "(-2, 2; 3, 1)",
+            "value_pretty": "(\n  -2 2\n   3 1\n)",
+            "value_tex": r"\begin{bmatrix}-2 & 2 \\ 3 & 1\end{bmatrix}",
+            "bindings": "variable\tλ\t3",
+        }
+
+        payload = mars_lab.prepare_matrix_fields(fields, 32)
+
+        self.assertEqual(payload["result"], "(1 - λ, 2; 3, 4 - λ)")
+        self.assertEqual(payload["value"], "(-2, 2; 3, 1)")
+        self.assertEqual(payload["value_pretty"], "(\n  -2 2\n   3 1\n)")
+        self.assertIn("setMatrixPrettyResult(data.value || '', data.value_pretty, value, null);", mars_lab.INDEX_HTML)
+        self.assertIn("valueTitle.textContent = data.value ? 'Value' : 'Summary';", mars_lab.INDEX_HTML)
+
+    def test_matrix_scalar_calculus_uses_the_expression_backend(self) -> None:
+        html = mars_lab.INDEX_HTML
+
+        self.assertIn("lastMatrixScalarExpression = data.scalar ? (data.result || '') : '';", html)
+        self.assertIn("await takeMatrixScalarCalculus(wrt, action, actionButton);", html)
+        self.assertIn("const {response, data} = await fetchEvaluation(", html)
+        self.assertIn("? integralExpressionFromLine(data.integral)", html)
+        self.assertIn("const variables = [...currentVariables];", html)
+        self.assertIn("currentVariables = variables;\n        currentDifferentiable = differentiable;", html)
+
+    def test_generated_matrix_integral_request_is_recovered_as_the_original_input(self) -> None:
+        self.assertEqual(
+            mars_lab.recover_generated_matrix_calculus_input("@S^x((((1 2; 3 4)^x)))"),
+            "(1 2; 3 4)^x",
+        )
+        self.assertEqual(
+            mars_lab.recover_generated_matrix_calculus_input("@S^x(((1 2; 3 4)))"),
+            "(1 2; 3 4)",
+        )
+        self.assertEqual(
+            mars_lab.recover_generated_matrix_calculus_input("(1 2; 3 4)^x"),
+            "(1 2; 3 4)^x",
+        )
+
+    def test_matrix_mode_exposes_native_derivative_and_integral_actions(self) -> None:
+        html = mars_lab.INDEX_HTML
+
+        self.assertIn("derivativeButtons.classList.toggle('hidden', !expressionMode && !matrixMode);", html)
+        self.assertIn("await takeMatrixCalculus(wrt, 'derivative', actionButton);", html)
+        self.assertIn("await takeMatrixCalculus(wrt, 'integral', actionButton);", html)
+        self.assertIn("? `@S^${wrt}((${source}))`\n        : `D${wrt}(${source})`;", html)
+        self.assertIn("const sourceText = String(currentExpressionText() || '').trim();", html)
+        self.assertIn("const text = expressionBodyForEditor(sourceText);", html)
+        self.assertIn("const calculusBody = matrixCalculusInput(text, wrt, action);", html)
+        self.assertIn("? `∫ A(${wrt}) d${wrt} RESULT`", html)
+        self.assertIn(
+            "const calculusText = expressionWithBindings(calculusBody, compactExpressionForEditor(sourceText).bindings);",
+            html,
+        )
+        self.assertNotIn(
+            "const text = String(resultUseInput.dataset.inputText || currentExpressionText() || '').trim();", html
+        )
+        self.assertLess(html.index("`${name} derivative`"), html.index("`${name} integral`"))
+
+    def test_use_as_input_restores_the_native_matrix_result_without_scalar_parsing(self) -> None:
+        self.assertIn(
+            "if (currentMode() === 'matrix') {\n"
+            "        const sourceBindings = compactExpressionForEditor(currentExpressionText()).bindings || [];\n"
+            "        const bindings = resultInputBindings.length\n"
+            "          ? bindingsWithAuthoredValues(resultInputBindings, expressionWithBindings(resultText, sourceBindings))\n"
+            "          : sourceBindings;\n"
+            "        setExpressionEditor(expressionWithBindings(resultText, bindings), bindings, resultText);\n"
+            "        matrixOperation.value = 'eval';\n"
+            "        matrixOperand.value = '';",
+            mars_lab.INDEX_HTML,
+        )
+
+    def test_matrix_calculus_preserves_result_only_integration_constants_for_use_as_input(self) -> None:
+        html = mars_lab.INDEX_HTML
+
+        self.assertIn("let resultInputBindings = [];", html)
+        self.assertIn("function setResultInputText(text, bindings = null)", html)
+        self.assertIn("setResultInputText(data.result || '', data.binding_values || []);", html)
+        self.assertIn("transient: !!options.skipSave", html)
+        self.assertIn(
+            "if not transient:\n                save_state_data({",
+            (ROOT / "tools" / "mars_lab.py").read_text(encoding="utf-8"),
+        )
+
+    def test_matrix_integral_payload_displays_antiderivative_plus_constant_matrix(self) -> None:
+        fields = {
+            "input": "{ @S^x((x, 2x; 3x, 4x)) | x = ? }",
+            "operation": "eval",
+            "kind": "expr",
+            "rows": "2",
+            "cols": "2",
+            "result": "(½x² + C₁₁, x² + C₁₂; 3/2x² + C₂₁, 2x² + C₂₂)",
+            "pretty": "unused",
+            "tex": (
+                r"\begin{bmatrix}\frac{1}{2}x^{2} + C_{11} & x^{2} + C_{12} \\ "
+                r"\frac{3}{2}x^{2} + C_{21} & 2x^{2} + C_{22}\end{bmatrix}"
+            ),
+            "bindings": (
+                "variable\tx\tNAN\nconstant\tC₁₁\tNAN\nconstant\tC₁₂\tNAN\n"
+                "constant\tC₂₁\tNAN\nconstant\tC₂₂\tNAN"
+            ),
+        }
+
+        payload = mars_lab.prepare_matrix_fields(fields, 64)
+
+        self.assertEqual(payload["result"], "(½x², x²; 3/2x², 2x²) + (C₁₁, C₁₂; C₂₁, C₂₂)")
+        self.assertIn(r"\end{bmatrix} + \begin{bmatrix}C_{11} & C_{12}", payload["tex"])
+        self.assertIn("const matrices = terms.length && terms.every((rows) => rows) ? terms : null;", mars_lab.INDEX_HTML)
+        self.assertIn("operator.className = 'matrix-sum-operator';", mars_lab.INDEX_HTML)
+
+    def test_matrix_payload_uses_native_matrix_bindings(self) -> None:
+        fields = {
+            "input": "(xy, c)",
+            "operation": "eval",
+            "kind": "expr",
+            "rows": "1",
+            "cols": "2",
+            "result": "(xy, c)",
+            "pretty": "( xy c )",
+            "tex": r"\begin{bmatrix}xy & c\end{bmatrix}",
+            "bindings": "variable\tx\tNAN\nvariable\ty\tNAN\nconstant\tc\tNAN",
+        }
+
+        payload = mars_lab.prepare_matrix_fields(fields, 53)
+
+        self.assertEqual(
+            payload["binding_values"],
+            [
+                {"name": "x", "value": "NAN", "display": "", "kind": "variable"},
+                {"name": "y", "value": "NAN", "display": "", "kind": "variable"},
+                {"name": "c", "value": "NAN", "display": "", "kind": "constant"},
+            ],
+        )
+
+    def test_matrix_payload_compacts_complex_TeX_and_suppresses_round_off_noise(self) -> None:
+        complex_fields = {
+            "operation": "power",
+            "kind": "number",
+            "rows": "1",
+            "cols": "1",
+            "result": "(0.553688567145911196672859 + 0.464394162839070687990736i)",
+            "pretty": "( 0.553688567145911196672859 + 0.464394162839070687990736i )",
+            "tex": r"\begin{bmatrix}0.553688567145911196672859 + 0.464394162839070687990736i\end{bmatrix}",
+        }
+        noisy_real_fields = {
+            "operation": "multiply",
+            "kind": "number",
+            "rows": "1",
+            "cols": "1",
+            "result": "(0.999999999999999999999998 - 9.82276977406720363909798e-25i)",
+            "pretty": "( 0.999999999999999999999998 - 9.82276977406720363909798e-25i )",
+            "tex": r"\begin{bmatrix}0.999999999999999999999998 - 9.82276977406720363909798e-25i\end{bmatrix}",
+        }
+
+        complex_payload = mars_lab.prepare_matrix_fields(complex_fields, 17)
+        noisy_real_payload = mars_lab.prepare_matrix_fields(noisy_real_fields, 17)
+
+        self.assertEqual(
+            complex_payload["tex"],
+            r"\begin{bmatrix}\substack{0.5536885671459112 \\ {}+ 0.46439416283907069i}\end{bmatrix}",
+        )
+        self.assertEqual(noisy_real_payload["tex"], r"\begin{bmatrix}1\end{bmatrix}")
+        self.assertEqual(noisy_real_payload["display_result"], "(1)")
+        self.assertNotEqual(complex_payload["tex"], complex_payload["full_TeX"])
+
+    def test_matrix_payload_abbreviates_long_TeX_numbers_but_retains_full_TeX(self) -> None:
+        long_number = "-0.011496470345797809322568930188283039555624303287995"
+        fields = {
+            "input": "(1 2; 3 4)^2 - (1 2; 3 4)^2.001",
+            "operation": "eval",
+            "kind": "number",
+            "rows": "1",
+            "cols": "1",
+            "result": f"({long_number})",
+            "pretty": f"(\n  {long_number}\n)",
+            "tex": rf"\begin{{bmatrix}}{long_number}\end{{bmatrix}}",
+        }
+
+        payload = mars_lab.prepare_matrix_fields(fields, 270)
+
+        self.assertIn("-0.0114964703457...", payload["tex"])
+        self.assertNotIn("...", payload["full_TeX"])
+        self.assertIn(long_number, payload["full_TeX"])
+        self.assertIn("svg", payload)
+
+    def test_matrix_payload_renders_scientific_notation_as_times_ten(self) -> None:
+        fields = {
+            "operation": "eval",
+            "kind": "number",
+            "rows": "1",
+            "cols": "1",
+            "result": "(1.515888050297733E-7)",
+            "pretty": "( 1.515888050297733E-7 )",
+            "tex": r"\begin{bmatrix}1.515888050297733E-7\end{bmatrix}",
+        }
+
+        payload = mars_lab.prepare_matrix_fields(fields, 270)
+
+        expected = r"1.515888050297733\times 10^{-7}"
+        self.assertIn(expected, payload["tex"])
+        self.assertIn(expected, payload["full_TeX"])
+        self.assertNotIn("E-7", payload["tex"])
+        self.assertIn("svg", payload)
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "matrix_lab").is_file(),
+        "release matrix_lab helper is not built",
+    )
+    def test_symbolic_matrix_evaluation_preserves_algebra_and_exposes_bindings(self) -> None:
+        matrix_binary = ROOT / "build" / "release" / "scratch" / "matrix_lab"
+        matrix_text = "(xy + 8x + 1, 2*exp(x)*(5y + 1); 3xy + 16x + 3, 2*exp(x)*(10y + 3))"
+        fields, raw, returncode = mars_lab.run_matrix_lab_fields(matrix_binary, matrix_text, "eval", 64)
+        payload = mars_lab.prepare_matrix_fields(fields, 53)
+
+        self.assertEqual(returncode, 0, raw)
+        self.assertEqual(
+            payload["result"],
+            "(xy + 8x + 1, 2·exp(x)·(5y + 1); 3xy + 16x + 3, 2·exp(x)·(10y + 3))",
+        )
+        self.assertEqual(
+            payload["binding_values"],
+            [
+                {"name": "x", "value": "NAN", "display": "", "kind": "variable"},
+                {"name": "y", "value": "NAN", "display": "", "kind": "variable"},
+            ],
+        )
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "matrix_lab").is_file(),
+        "release matrix_lab helper is not built",
+    )
+    def test_exact_matrix_result_round_trips_without_decimal_evaluation(self) -> None:
+        matrix_binary = ROOT / "build" / "release" / "scratch" / "matrix_lab"
+        matrix_text = (
+            "((i·√(2) + 1)/√(2i·√(2) + 5), 2/√(2i·√(2) + 5); "
+            "3/√(2i·√(2) + 5), (i·√(2) + 4)/√(2i·√(2) + 5))"
+        )
+        fields, raw, returncode = mars_lab.run_matrix_lab_fields(matrix_binary, matrix_text, "eval", 64)
+
+        self.assertEqual(returncode, 0, raw)
+        self.assertEqual(fields.get("kind"), "expr")
+        self.assertIn("√(2)", fields.get("result", ""))
+        self.assertNotIn("0.553688", fields.get("result", ""))
+        self.assertFalse(fields.get("result", "").startswith("{"))
+        self.assertNotIn(r"\left\{", fields.get("tex", ""))
+        self.assertEqual(mars_lab.prepare_matrix_fields(fields, 53)["binding_values"], [])
+
     def test_matrix_functions_use_direct_syntax_while_structural_operations_remain_available(self) -> None:
         representative_operations = {
             "exp", "log", "sqrt", "sin", "cos", "tan", "sinh", "cosh", "tanh", "erf", "gamma", "lambert_w0",
@@ -144,17 +455,131 @@ class MatrixResultTests(unittest.TestCase):
         self.assertIn('<option value="eval" selected>Evaluate expression</option>', mars_lab.INDEX_HTML)
         self.assertIn("genuine matrix functions calculated by MARSlib", mars_lab.INDEX_HTML)
         self.assertIn("sin(1 2; 4 5)", mars_lab.INDEX_HTML)
+        self.assertIn("inv(a b; c d)", mars_lab.INDEX_HTML)
+        self.assertIn("Matrix division is not defined", mars_lab.INDEX_HTML)
+
+    def test_help_documents_complete_native_matrix_expression_syntax(self) -> None:
+        help_html = mars_lab.INDEX_HTML
+
+        self.assertIn("Matrix Notation And Aliases", help_html)
+        self.assertIn("((1 2; 3 4) - lambdaI)^x", help_html)
+        self.assertIn("<code>A^dagger</code>", help_html)
+        self.assertIn("<code>||A||</code>", help_html)
+        self.assertIn("<code>determinant(A)</code>", help_html)
+        self.assertIn("<code>conjugate_transpose(A)</code>", help_html)
+        self.assertIn("Matrix Calculus And Values", help_html)
+        self.assertIn("<code>A(x) + C</code>", help_html)
+        self.assertIn("<code>Value</code> separately shows", help_html)
+        self.assertIn("<code>conjugate(z)</code>", help_html)
+        self.assertIn("<code>|z|</code>", help_html)
 
     def test_native_helper_delegates_complete_matrix_expression_parsing_to_marslib(self) -> None:
         source = (ROOT / "scratch" / "matrix_lab.c").read_text(encoding="utf-8")
 
-        self.assertIn("mat_expression_from_string(input, &bindings, &parsed_operation)", source)
+        self.assertIn("mat_expression_evaluate(input, &bindings, &parsed_operation, &matrix, &scalar_result)", source)
         self.assertIn("mat_expression_from_string(operand, NULL, NULL)", source)
         self.assertNotIn("evaluate_matrix_expression_span", source)
         self.assertNotIn("direct_unary_operation_name", source)
         self.assertNotIn("matrix_product_operator", source)
         self.assertNotIn("matrix_unary_operations", source)
         self.assertNotIn("matrix_unary_function_for", source)
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "matrix_lab").is_file(),
+        "release matrix_lab helper is not built",
+    )
+    def test_native_helper_emits_symbolic_and_evaluated_bound_matrices(self) -> None:
+        matrix_binary = ROOT / "build" / "release" / "scratch" / "matrix_lab"
+        fields, raw, returncode = mars_lab.run_matrix_lab_fields(
+            matrix_binary,
+            "{ (1 2; 3 4) - (lambda 0; 0 lambda) | lambda = 3 }",
+            "eval",
+            32,
+        )
+
+        self.assertEqual(returncode, 0, raw)
+        self.assertEqual(fields["result"], "(1 - λ, 2; 3, 4 - λ)")
+        self.assertEqual(fields["value"], "(-2, 2; 3, 1)")
+        self.assertIn("-2 2", fields["value_pretty"])
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "matrix_lab").is_file(),
+        "release matrix_lab helper is not built",
+    )
+    def test_readme_examples_for_composite_matrix_notation(self) -> None:
+        """README examples: matrix aliases, identity multiples and a symbolic power."""
+        matrix_binary = ROOT / "build" / "release" / "scratch" / "matrix_lab"
+        cases = (
+            ("det((1 2; 3 4) - lambdaI)", "det"),
+            ("tr(a b; c d)", "trace"),
+            ("(a b; c d)^dagger", "hermitian"),
+            ("((1 2; 3 4) - lambdaI)^x", "power"),
+        )
+
+        for matrix_text, expected_operation in cases:
+            with self.subTest(matrix_text=matrix_text):
+                fields, raw, returncode = mars_lab.run_matrix_lab_fields(matrix_binary, matrix_text, "eval", 32)
+
+                self.assertEqual(returncode, 0, raw)
+                self.assertEqual(fields["operation"], expected_operation)
+                self.assertTrue(fields["result"])
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "matrix_lab").is_file(),
+        "release matrix_lab helper is not built",
+    )
+    def test_bound_matrix_integral_emits_a_partial_value_matrix(self) -> None:
+        matrix_binary = ROOT / "build" / "release" / "scratch" / "matrix_lab"
+        fields, raw, returncode = mars_lab.run_matrix_lab_fields(
+            matrix_binary,
+            "{ @S^λ(((1 2; 3 4) - (lambda 0; 0 lambda))) | lambda = 3 }",
+            "eval",
+            32,
+        )
+        payload = mars_lab.prepare_matrix_fields(fields, 32)
+
+        self.assertEqual(returncode, 0, raw)
+        self.assertEqual(
+            payload["value"],
+            "(-1.5, 6; 9, 7.5) + (C₁₁, C₁₂; C₂₁, C₂₂)",
+        )
+        self.assertIn("valueTitle.textContent = data.value ? 'Value' : 'Summary';", mars_lab.INDEX_HTML)
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "matrix_lab").is_file(),
+        "release matrix_lab helper is not built",
+    )
+    def test_native_helper_returns_determinant_expressions_as_scalars(self) -> None:
+        matrix_binary = ROOT / "build" / "release" / "scratch" / "matrix_lab"
+        inputs = (
+            "det((1 2; 3 4) - (lambda 0; 0 lambda))",
+            "|(1 2; 3 4) - (lambda 0; 0 lambda)|",
+            "||(1 2; 3 4) - (lambda 0; 0 lambda)||",
+            "‖(1 2; 3 4) - (lambda 0; 0 lambda)‖",
+        )
+
+        for matrix_text in inputs:
+            with self.subTest(matrix_text=matrix_text):
+                fields, raw, returncode = mars_lab.run_matrix_lab_fields(matrix_binary, matrix_text, "eval", 32)
+
+                self.assertEqual(returncode, 0, raw)
+                self.assertEqual(fields["operation"], "det")
+                self.assertNotIn("rows", fields)
+                self.assertNotIn("cols", fields)
+                self.assertIn("(1 - λ)·(4 - λ) - 6", fields["result"])
+                self.assertNotIn("value", fields)
+                self.assertIn(r"\lambda", fields["tex"])
+                self.assertIn("binding      variable\tλ\tNAN", raw)
+
+        bound_fields, bound_raw, bound_returncode = mars_lab.run_matrix_lab_fields(
+            matrix_binary,
+            "{ |(1 2; 3 4) - (lambda 0; 0 lambda)| | lambda = 4 }",
+            "det",
+            32,
+        )
+        self.assertEqual(bound_returncode, 0, bound_raw)
+        self.assertIn("(1 - λ)·(4 - λ) - 6", bound_fields["result"])
+        self.assertEqual(bound_fields["value"], "-6")
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "matrix_lab").is_file(),
@@ -235,6 +660,27 @@ class MatrixResultTests(unittest.TestCase):
         (ROOT / "build" / "release" / "scratch" / "matrix_lab").is_file(),
         "release matrix_lab helper is not built",
     )
+    def test_native_helper_reports_bindings_contributed_by_the_right_operand(self) -> None:
+        matrix_binary = ROOT / "build" / "release" / "scratch" / "matrix_lab"
+        fields, raw, returncode = mars_lab.run_matrix_lab_fields(
+            matrix_binary,
+            "(1 2; 3 4)",
+            "multiply",
+            64,
+            "(x+3y x*exp(y); x+y y*exp(y))",
+        )
+
+        self.assertEqual(returncode, 0, raw)
+        payload = mars_lab.prepare_matrix_fields(fields, 64)
+        self.assertEqual(
+            [binding["name"] for binding in payload["binding_values"]],
+            ["x", "y"],
+        )
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "matrix_lab").is_file(),
+        "release matrix_lab helper is not built",
+    )
     def test_native_helper_explains_that_matrix_functions_require_square_matrices(self) -> None:
         matrix_binary = ROOT / "build" / "release" / "scratch" / "matrix_lab"
         fields, raw, returncode = mars_lab.run_matrix_lab_fields(matrix_binary, "sin(1 2 3; 4 5 6)", "eval", 64)
@@ -301,16 +747,91 @@ class MatrixResultTests(unittest.TestCase):
         derivative, derivative_raw, derivative_returncode = mars_lab.run_matrix_lab_fields(
             matrix_binary, "Dx(ax+b cx+d; y xy)", "eval", 64
         )
+        nested_derivative, nested_derivative_raw, nested_derivative_returncode = mars_lab.run_matrix_lab_fields(
+            matrix_binary, "Dx(exp(-(1+x 2; 4 5)))", "eval", 64
+        )
+        second_derivative, second_derivative_raw, second_derivative_returncode = mars_lab.run_matrix_lab_fields(
+            matrix_binary, "Dxx(1+x 2e^x; 4x 5)", "eval", 64
+        )
         integral, integral_raw, integral_returncode = mars_lab.run_matrix_lab_fields(
             matrix_binary, "@S^x((ax+b cx+d; y xy))", "eval", 64
         )
 
         self.assertEqual(derivative_returncode, 0, derivative_raw)
         self.assertEqual(derivative["result"], "(a, c; 0, y)")
+        self.assertEqual(nested_derivative_returncode, 0, nested_derivative_raw)
+        self.assertEqual(nested_derivative["operation"], "eval")
+        self.assertEqual((nested_derivative["rows"], nested_derivative["cols"]), ("2", "2"))
+        self.assertIn("x", nested_derivative["result"])
+        self.assertEqual(second_derivative_returncode, 0, second_derivative_raw)
+        self.assertEqual(second_derivative["result"], "(0, 2·exp(x); 0, 0)")
         self.assertEqual(integral_returncode, 0, integral_raw)
         self.assertEqual(integral["rows"], "2")
         self.assertEqual(integral["cols"], "2")
-        self.assertEqual(integral["result"], "(½·(ax² + 2bx), ½·(cx² + 2dx); xy, ½x²y)")
+        self.assertEqual(
+            mars_lab.prepare_matrix_fields(integral, 64)["result"],
+            "(½·(ax² + 2bx), ½·(cx² + 2dx); xy, ½x²y) + (C₁₁, C₁₂; C₂₁, C₂₂)",
+        )
+        for constant in ("C₁₁", "C₁₂", "C₂₁", "C₂₂"):
+            self.assertIn(f"binding      constant\t{constant}\tNAN", integral_raw)
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "matrix_lab").is_file(),
+        "release matrix_lab helper is not built",
+    )
+    def test_native_helper_integrates_symbolic_matrix_power(self) -> None:
+        matrix_binary = ROOT / "build" / "release" / "scratch" / "matrix_lab"
+        integral, raw, returncode = mars_lab.run_matrix_lab_fields(
+            matrix_binary, "@S^x(((1, 2; 3, 4)^x))", "eval", 64
+        )
+
+        self.assertEqual(returncode, 0, raw)
+        self.assertEqual((integral["rows"], integral["cols"]), ("2", "2"))
+        self.assertNotIn("∫", integral["result"])
+        self.assertIn("ln(", integral["result"])
+        self.assertIn("(5 - √(33))", integral["result"])
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "matrix_lab").is_file(),
+        "release matrix_lab helper is not built",
+    )
+    def test_native_helper_keeps_symbolic_matrix_power_derivative_in_spectral_form(self) -> None:
+        matrix_binary = ROOT / "build" / "release" / "scratch" / "matrix_lab"
+        derivative, raw, returncode = mars_lab.run_matrix_lab_fields(
+            matrix_binary, "Dx(((1, 2; 3, 4)^x))", "eval", 64
+        )
+
+        self.assertEqual(returncode, 0, raw)
+        self.assertEqual((derivative["rows"], derivative["cols"]), ("2", "2"))
+        self.assertIn("ln(½·(√(33) + 5))", derivative["result"])
+        self.assertIn("/√(33)", derivative["result"])
+        self.assertNotIn("√(33)/66", derivative["result"])
+        self.assertNotIn("√(33)/33", derivative["result"])
+        self.assertNotIn("√(33)/11", derivative["result"])
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "matrix_lab").is_file(),
+        "release matrix_lab helper is not built",
+    )
+    def test_native_helper_matrix_calculus_keeps_bindings_outside_operation(self) -> None:
+        matrix_binary = ROOT / "build" / "release" / "scratch" / "matrix_lab"
+        integral, raw, returncode = mars_lab.run_matrix_lab_fields(
+            matrix_binary, "{ @S^x((((1, 2; 3, 4)^x))) | x = ? }", "eval", 64
+        )
+        derivative, derivative_raw, derivative_returncode = mars_lab.run_matrix_lab_fields(
+            matrix_binary, "{ Dx((1+x, 2; 3, 4)) | x = ? }", "eval", 64
+        )
+
+        self.assertEqual(returncode, 0, raw)
+        self.assertEqual((integral["rows"], integral["cols"]), ("2", "2"))
+        self.assertIn("binding      variable\tx\tNAN", raw)
+        for constant in ("C₁₁", "C₁₂", "C₂₁", "C₂₂"):
+            self.assertIn(f"binding      constant\t{constant}\tNAN", raw)
+        self.assertNotIn("∫", integral["result"])
+        self.assertIn("ln(", integral["result"])
+        self.assertEqual(derivative_returncode, 0, derivative_raw)
+        self.assertEqual(derivative["result"], "(1, 0; 0, 0)")
+        self.assertIn("binding      variable\tx\tNAN", derivative_raw)
 
 
 class DiffequationResultTests(unittest.TestCase):
@@ -1749,6 +2270,51 @@ class ExpressionResultTests(unittest.TestCase):
 
 
 class AlmanacLocationTests(unittest.TestCase):
+    def test_eclipse_kind_and_magnitude_columns_do_not_overlap(self) -> None:
+        self.assertIn('.almanac-event-table .event-kind {\n      width: 5.6rem;', mars_lab.INDEX_HTML)
+        self.assertIn('class="event-kind" data-label="Kind"', mars_lab.INDEX_HTML)
+        self.assertIn('class="number event-measure" data-label="Magnitude"', mars_lab.INDEX_HTML)
+
+    def test_almanac_event_helper_receives_the_jurisdiction_database_environment(self) -> None:
+        completed = subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
+
+        with (
+            mock.patch.object(mars_lab, "mars_lab_object_store_runtime_env", return_value={"MARS_STORE": "store"}),
+            mock.patch.object(mars_lab, "jurisdiction_db_runtime_env", return_value={"MARS_TOWNS": "towns"}),
+            mock.patch.object(mars_lab.subprocess, "run", return_value=completed) as run,
+        ):
+            mars_lab.run_almanac_event_lab_rows({"start": "2027-08-01", "end": "2027-08-03", "kind": "solar"})
+
+        child_env = run.call_args.kwargs["env"]
+        self.assertEqual(child_env["MARS_STORE"], "store")
+        self.assertEqual(child_env["MARS_TOWNS"], "towns")
+
+    def test_almanac_result_identifies_the_selected_town(self) -> None:
+        payload = mars_lab.prepare_almanac_fields({
+            "date": "2027-08-02",
+            "time": "08:48:57",
+            "zone": "2.00",
+            "latitude": "36.720200",
+            "longitude": "-4.420300",
+            "town": "Málaga|36.7202|-4.4203|22",
+            "jurisdiction": "ES",
+            "visibility": "visible",
+            "events_cached": "yes",
+        })
+
+        self.assertEqual(
+            payload["observer_text"],
+            "Observer: Málaga, Spain, zone 2.00, latitude 36.720200, longitude -4.420300",
+        )
+
+    def test_town_search_matches_names_without_typed_accents(self) -> None:
+        malaga = next(town for town in mars_lab.JURISDICTION_TOWN_OPTIONS["ES"] if town["name"] == "Málaga")
+
+        self.assertEqual(malaga["latitude"], "36.7202")
+        self.assertIn("function normaliseSelectSearchText(value)", mars_lab.INDEX_HTML)
+        self.assertIn(".normalize('NFD')", mars_lab.INDEX_HTML)
+        self.assertIn("const query = normaliseSelectSearchText(searchInput && searchInput.value).trim();", mars_lab.INDEX_HTML)
+
     def test_unmatched_coordinates_do_not_display_the_first_town(self) -> None:
         selected_option = mars_lab.INDEX_HTML.split(
             "function selectedOption() {", 1
@@ -1869,7 +2435,7 @@ class ZZMarsLabReadmeExamples(unittest.TestCase):
             ("(a b; c d).(e f; g h)", "(ae + bg, af + bh; ce + dg, cf + dh)"),
             ("inverse(a b; c d).(x; y)", "((dx - by)/(ad - bc); (ay - cx)/(ad - bc))"),
             ("Dx(ax+b cx+d; y xy)", "(a, c; 0, y)"),
-            ("@S^x((ax+b cx+d; y xy))", "(½·(ax² + 2bx), ½·(cx² + 2dx); xy, ½x²y)"),
+            ("@S^x((ax+b cx+d; y xy))", "(½·(ax² + 2bx) + C₁₁, ½·(cx² + 2dx) + C₁₂; xy + C₂₁, ½x²y + C₂₂)"),
         )
         for source, expected in symbolic_matrix_examples:
             with self.subTest(matrix_source=source):

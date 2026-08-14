@@ -4,8 +4,8 @@
 #include <limits.h>
 #include <string.h>
 
-#define MARS_EXPR_STRINGIN_INTERNAL_ACCESS
-#include "expr_stringin_internal.h"
+#define MARS_EXPR_INTERNAL_ACCESS
+#include "expr_internal.h"
 
 typedef struct {
     const char *text;

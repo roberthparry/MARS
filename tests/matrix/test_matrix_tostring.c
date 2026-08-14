@@ -342,13 +342,22 @@ static void test_mat_to_string_symbolic(void)
     matrix_t *A = mat_from_string_expr("{ (x, 1; 1, c1) | x = 2; c1 = 3 }", &bindings);
     char *inline_pretty = mat_to_string(A, MAT_STRING_INLINE_PRETTY);
     char *layout_pretty = mat_to_string(A, MAT_STRING_LAYOUT_PRETTY);
+    char *body_inline = mat_body_to_string(A, MAT_STRING_INLINE_PRETTY);
+    char *body_layout = mat_body_to_string(A, MAT_STRING_LAYOUT_PRETTY);
 
     check_bool("mat_to_string symbolic inline non-null", inline_pretty != NULL);
     check_bool("mat_to_string symbolic layout non-null", layout_pretty != NULL);
     check_bool("mat_to_string symbolic inline wrapped", inline_pretty && strstr(inline_pretty, "{ (") != NULL);
     check_bool("mat_to_string symbolic inline has bindings", inline_pretty && strstr(inline_pretty, "x = 2") != NULL);
     check_bool("mat_to_string symbolic layout has newline", layout_pretty && strchr(layout_pretty, '\n') != NULL);
+    check_bool("mat_body_to_string symbolic inline omits bindings",
+               body_inline && strcmp(body_inline, "(x, 1; 1, c₁)") == 0);
+    check_bool("mat_body_to_string symbolic layout omits bindings",
+               body_layout && body_layout[0] == '(' && strchr(body_layout, '\n') != NULL && strstr(body_layout, "x = 2") == NULL &&
+                   strstr(body_layout, "c₁ = 3") == NULL && strchr(body_layout, '{') == NULL);
 
+    free(body_layout);
+    free(body_inline);
     free(inline_pretty);
     free(layout_pretty);
     mat_bindings_free(bindings);
@@ -360,6 +369,7 @@ static void test_mat_to_string_symbolic_TeX(void)
     mat_bindings_t *bindings = NULL;
     matrix_t *A = mat_from_string_expr("{ (x0, 1; 1, c1) | x0 = 2; c1 = 3 }", &bindings);
     char *tex = mat_to_string(A, MAT_STRING_LATEX);
+    char *body_tex = mat_body_to_string(A, MAT_STRING_LATEX);
 
     matrix_TeX_preview_emit_case(__FILE__, "symbolic matrix with bindings (TEX)", tex);
 
@@ -369,7 +379,10 @@ static void test_mat_to_string_symbolic_TeX(void)
     check_bool("mat_to_string symbolic tex has subscripted names",
                tex && strstr(tex, "x_{0}") != NULL && strstr(tex, "c_{1}") != NULL);
     check_bool("mat_to_string symbolic tex has middle bar", tex && strstr(tex, "\\middle|") != NULL);
+    check_bool("mat_body_to_string symbolic tex omits bindings",
+               body_tex && strcmp(body_tex, "\\begin{bmatrix}x_{0} & 1 \\\\[4pt] 1 & c_{1}\\end{bmatrix}") == 0);
 
+    free(body_tex);
     free(tex);
     mat_bindings_free(bindings);
     mat_free(A);

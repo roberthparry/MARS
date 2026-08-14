@@ -30,16 +30,14 @@ typedef struct almanac_event_lab_options_t {
     almanac_event_lab_kind_t kind;
 } almanac_event_lab_options_t;
 
-#define ALMANAC_EVENT_LAB_CACHE_SCHEMA "almanac_event_lab_output_v19"
+#define ALMANAC_EVENT_LAB_CACHE_SCHEMA "almanac_event_lab_output_v20"
 #define ALMANAC_EVENT_LAB_CACHE_PATH_ENV "MARS_LAB_OBJECT_STORE_PATH"
 #define ALMANAC_EVENT_LAB_CACHE_KEY_ENV "MARS_LAB_OBJECT_STORE_KEY"
 #define JURISDICTION_DB_PATH_ENV "MARS_JURISDICTION_DB_PATH"
 #define JURISDICTION_DB_KEY_ENV "MARS_JURISDICTION_DB_KEY"
 #define LEGACY_HOLIDAY_DB_PATH_ENV "MARS_HOLIDAY_DB_PATH"
 #define LEGACY_HOLIDAY_DB_KEY_ENV "MARS_HOLIDAY_DB_KEY"
-#define TOTALITY_TOWN_SCORE_LIMIT 256u
-#define TOTALITY_TOWN_REFINE_LIMIT 16u
-#define TOTALITY_TOWN_DEFAULT_SEED_PRIORITY 1000
+#define TOTALITY_TOWN_SCORE_LIMIT 1024u
 
 typedef struct almanac_totality_town_t {
     char jurisdiction_id[32];
@@ -50,9 +48,6 @@ typedef struct almanac_totality_town_t {
     double elevation_metres;
     double distance_km;
     double path_distance_km;
-    double seed_score_degrees;
-    int seed_priority;
-    bool seed_score_valid;
 } almanac_totality_town_t;
 
 static bool parse_date_text(const char *text, short *year, month_t *month, uint8_t *day)
@@ -87,20 +82,6 @@ static bool parse_double_text(const char *text, double *out)
     if (end == text || *end != '\0')
         return false;
     *out = value;
-    return true;
-}
-
-static bool parse_int_text(const char *text, int *out)
-{
-    char *end = NULL;
-    long value;
-
-    if (!text || !out)
-        return false;
-    value = strtol(text, &end, 10);
-    if (end == text || *end != '\0' || value < 0 || value > 1000000L)
-        return false;
-    *out = (int)value;
     return true;
 }
 
@@ -347,10 +328,6 @@ static int totality_town_compare(const void *lhs, const void *rhs)
     const almanac_totality_town_t *left = lhs;
     const almanac_totality_town_t *right = rhs;
 
-    if (left->seed_priority < right->seed_priority)
-        return -1;
-    if (left->seed_priority > right->seed_priority)
-        return 1;
     if (left->path_distance_km < right->path_distance_km)
         return -1;
     if (left->path_distance_km > right->path_distance_km)
@@ -360,52 +337,6 @@ static int totality_town_compare(const void *lhs, const void *rhs)
     if (left->distance_km > right->distance_km)
         return 1;
     return strcmp(left->town_name, right->town_name);
-}
-
-static int totality_town_seed_score_compare(const void *lhs, const void *rhs)
-{
-    const almanac_totality_town_t *left = lhs;
-    const almanac_totality_town_t *right = rhs;
-
-    if (left->seed_priority < right->seed_priority)
-        return -1;
-    if (left->seed_priority > right->seed_priority)
-        return 1;
-    if (left->seed_score_valid && !right->seed_score_valid)
-        return -1;
-    if (!left->seed_score_valid && right->seed_score_valid)
-        return 1;
-    if (left->seed_score_valid && right->seed_score_valid) {
-        if (left->seed_score_degrees < right->seed_score_degrees)
-            return -1;
-        if (left->seed_score_degrees > right->seed_score_degrees)
-            return 1;
-    }
-    return totality_town_compare(lhs, rhs);
-}
-
-static int totality_town_seed_priority_fallback(const char *jurisdiction_id, const char *town_name)
-{
-    static const struct {
-        const char *jurisdiction_id;
-        const char *town_name;
-        int seed_priority;
-    } seeds[] = {{"ES", "Oviedo", 0},      {"ES", "Madrid", 1},    {"ES", "Santander", 2},
-                 {"ES", "Bilbao", 3},      {"ES", "Burgos", 4},    {"ES", "Zaragoza", 5},
-                 {"ES", "Valencia", 6},    {"GI", "Gibraltar", 7}, {"MA", "Tangier", 8},
-                 {"MA", "Rabat", 9},       {"TN", "Tunis", 10},    {"LY", "Tripoli", 11},
-                 {"EG", "Alexandria", 12}, {"EG", "Cairo", 13},    {"IS", "Reykjav\303\255k", 14},
-                 {"GL", "Nuuk", 15},       {"PT", "Lisbon", 16},   {"FR", "Paris", 17}};
-    size_t i;
-
-    if (!jurisdiction_id || !town_name)
-        return TOTALITY_TOWN_DEFAULT_SEED_PRIORITY;
-    for (i = 0u; i < sizeof(seeds) / sizeof(seeds[0]); ++i) {
-        if (strcmp(jurisdiction_id, seeds[i].jurisdiction_id) == 0 && strcmp(town_name, seeds[i].town_name) == 0) {
-            return seeds[i].seed_priority;
-        }
-    }
-    return TOTALITY_TOWN_DEFAULT_SEED_PRIORITY;
 }
 
 static void copy_text_field(char *dst, size_t dst_size, const char *src)
@@ -440,34 +371,7 @@ static almanac_totality_town_t *load_totality_towns(const almanac_observer_t *ob
                                                     const almanac_solar_totality_location_t *path_reference,
                                                     size_t *out_count)
 {
-    static const char *sql_with_seed_priority =
-        "select town_jurisdiction.jurisdiction_id, "
-        "       town_name.town_name, "
-        "       town_latitude.latitude, "
-        "       town_longitude.longitude, "
-        "       coalesce(timezone_canonical.canonical_timezone_name, timezone_code.timezone_name, ''), "
-        "       coalesce(town_elevation.elevation_metres, 0), "
-        "       coalesce(totality_seed.totality_seed_priority, 1000) "
-        "from jurisdiction_town_entity as town "
-        "join jurisdiction_town_jurisdiction_id as town_jurisdiction "
-        "  on town_jurisdiction.jurisdiction_town_id = town.jurisdiction_town_id "
-        "join jurisdiction_town_name as town_name "
-        "  on town_name.jurisdiction_town_id = town.jurisdiction_town_id "
-        "join jurisdiction_town_latitude as town_latitude "
-        "  on town_latitude.jurisdiction_town_id = town.jurisdiction_town_id "
-        "join jurisdiction_town_longitude as town_longitude "
-        "  on town_longitude.jurisdiction_town_id = town.jurisdiction_town_id "
-        "left join jurisdiction_town_elevation as town_elevation "
-        "  on town_elevation.jurisdiction_town_id = town.jurisdiction_town_id "
-        "left join jurisdiction_town_timezone as town_timezone "
-        "  on town_timezone.jurisdiction_town_id = town.jurisdiction_town_id "
-        "left join timezone_code "
-        "  on timezone_code.timezone_code = town_timezone.timezone_code "
-        "left join timezone_canonical "
-        "  on timezone_canonical.timezone_name = timezone_code.timezone_name "
-        "left join jurisdiction_town_totality_seed_priority as totality_seed "
-        "  on totality_seed.jurisdiction_town_id = town.jurisdiction_town_id";
-    static const char *sql_without_seed_priority =
+    static const char *sql =
         "select town_jurisdiction.jurisdiction_id, "
         "       town_name.town_name, "
         "       town_latitude.latitude, "
@@ -497,7 +401,6 @@ static almanac_totality_town_t *load_totality_towns(const almanac_observer_t *ob
     almanac_totality_town_t *towns = NULL;
     size_t count = 0u;
     size_t capacity = 0u;
-    bool has_seed_priority = true;
 
     if (out_count)
         *out_count = 0u;
@@ -506,13 +409,9 @@ static almanac_totality_town_t *load_totality_towns(const almanac_observer_t *ob
     db = open_jurisdiction_db();
     if (!db)
         return NULL;
-    stmt = sqlite_stmt_prepare(db, sql_with_seed_priority);
-    if (!stmt) {
-        has_seed_priority = false;
-        stmt = sqlite_stmt_prepare(db, sql_without_seed_priority);
-        if (!stmt)
-            goto done;
-    }
+    stmt = sqlite_stmt_prepare(db, sql);
+    if (!stmt)
+        goto done;
     while ((rc = sqlite_stmt_step(stmt)) == SQLITE_STEP_ROW) {
         almanac_totality_town_t town;
         const char *jurisdiction_id = sqlite_stmt_column_text(stmt, 0);
@@ -521,11 +420,9 @@ static almanac_totality_town_t *load_totality_towns(const almanac_observer_t *ob
         const char *longitude_text = sqlite_stmt_column_text(stmt, 3);
         const char *timezone_name = sqlite_stmt_column_text(stmt, 4);
         const char *elevation_text = sqlite_stmt_column_text(stmt, 5);
-        const char *priority_text = has_seed_priority ? sqlite_stmt_column_text(stmt, 6) : NULL;
         double latitude;
         double longitude;
         double elevation = 0.0;
-        int seed_priority = totality_town_seed_priority_fallback(jurisdiction_id, town_name);
 
         if (!jurisdiction_id || !town_name || !latitude_text || !longitude_text)
             continue;
@@ -541,11 +438,6 @@ static almanac_totality_town_t *load_totality_towns(const almanac_observer_t *ob
         town.latitude_degrees = latitude;
         town.longitude_degrees = longitude;
         town.elevation_metres = elevation;
-        if (priority_text)
-            (void)parse_int_text(priority_text, &seed_priority);
-        town.seed_priority = seed_priority;
-        town.seed_score_degrees = NAN;
-        town.seed_score_valid = false;
         town.distance_km =
             surface_distance_km(observer->latitude_degrees, observer->longitude_degrees, latitude, longitude);
         if (path_reference && path_reference->found) {
@@ -587,7 +479,6 @@ static bool nearest_totality_town_text(char *out, size_t out_size, almanac_t *al
     almanac_totality_town_t *towns = NULL;
     size_t town_count = 0u;
     size_t score_limit;
-    size_t refine_count = 0u;
     size_t i;
     const almanac_totality_town_t *best_town = NULL;
     almanac_solar_totality_location_t best_location;
@@ -602,37 +493,26 @@ static bool nearest_totality_town_text(char *out, size_t out_size, almanac_t *al
     if (!towns || town_count == 0u)
         return false;
     score_limit = town_count < TOTALITY_TOWN_SCORE_LIMIT ? town_count : TOTALITY_TOWN_SCORE_LIMIT;
+    memset(&best_location, 0, sizeof(best_location));
     for (i = 0u; i < score_limit; ++i) {
         almanac_observer_t town_observer;
+        almanac_solar_totality_location_t candidate;
         double score_degrees = NAN;
 
         town_observer.latitude_degrees = towns[i].latitude_degrees;
         town_observer.longitude_degrees = towns[i].longitude_degrees;
         town_observer.elevation_metres = towns[i].elevation_metres;
-        towns[i].seed_score_valid =
-            almanac_solar_eclipse_totality_seed_score(almanac, &town_observer, event, &score_degrees) &&
-            score_degrees == score_degrees && score_degrees <= 1.0;
-        towns[i].seed_score_degrees = score_degrees;
-    }
-    qsort(towns, score_limit, sizeof(*towns), totality_town_seed_score_compare);
-
-    memset(&best_location, 0, sizeof(best_location));
-    for (i = 0u; i < score_limit && refine_count < TOTALITY_TOWN_REFINE_LIMIT; ++i) {
-        almanac_solar_totality_location_t candidate;
-
+        if (!almanac_solar_eclipse_totality_seed_score(almanac, &town_observer, event, &score_degrees) ||
+            !(score_degrees <= 0.0)) {
+            continue;
+        }
         memset(&candidate, 0, sizeof(candidate));
-        if (!towns[i].seed_score_valid)
-            break;
-        if (found && towns[i].distance_km > best_location.distance_km + 50.0)
-            break;
-        refine_count += 1u;
         if (!town_seeds_total_solar_eclipse(almanac, observer, event, &towns[i], &candidate))
             continue;
-        if (!found || candidate.distance_km < best_location.distance_km) {
-            best_location = candidate;
-            best_town = &towns[i];
-            found = true;
-        }
+        best_location = candidate;
+        best_town = &towns[i];
+        found = true;
+        break;
     }
     if (found && best_town) {
         snprintf(out, out_size, "town\t%s\t%s\t%s\t%.6f\t%.6f\t%.9f\t%.1f\t%.0f", best_town->town_name,

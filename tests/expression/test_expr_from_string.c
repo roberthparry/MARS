@@ -1,7 +1,7 @@
 #include "test_expr.h"
 
-#define MARS_EXPR_STRINGIN_INTERNAL_ACCESS
-#include "expression/expr_stringin_internal.h"
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
+#include "internal/expr_internal.h"
 
 static void check_parse_num(const char *label, const char *s, const char *expect_text, int line);
 static void check_parse_expr(const char *label, const char *s, const char *expect_expr, int line);
@@ -11,6 +11,22 @@ static void check_parse_simplified_expr(const char *label, const char *s, const 
 static void test_from_string_function_hash(void)
 {
     ASSERT_TRUE(expr_stringin_function_hash_is_valid());
+}
+
+static void test_from_string_conjugation(void)
+{
+    check_parse_expr("conj alias parses", "conj(1 + 2i)", "conj(1 + 2i)", __LINE__);
+    check_parse_expr("conjugate alias canonicalises", "conjugate(1 + 2i)", "conj(1 + 2i)", __LINE__);
+    check_parse_expr("postfix conjugate parses", "(1 + 2i)^*", "conj(1 + 2i)", __LINE__);
+    check_parse_num("conj alias evaluates", "conj(1 + 2i)", "1 - 2i", __LINE__);
+    check_parse_num("conjugate alias evaluates", "conjugate(1 + 2i)", "1 - 2i", __LINE__);
+    check_parse_num("postfix conjugate evaluates", "(1 + 2i)^*", "1 - 2i", __LINE__);
+    check_parse_expr("symbolic modulus bars parse", "|z|", "{ |z| | z = NAN }", __LINE__);
+    check_parse_val("complex modulus bars evaluate", "|1 + 2i|", sqrt(5.0), __LINE__);
+    check_parse_val("complex modulus agrees with sqrt(z z*)",
+                    "{ |z| - sqrt(z * z^*) | z = 1 + 2i }", 0.0, __LINE__);
+    check_parse_val("abs and modulus bars agree for complex scalars",
+                    "{ abs(z) - |z| | z = 1 + 2i }", 0.0, __LINE__);
 }
 
 static void test_from_string_pure_const(void)
@@ -1823,10 +1839,11 @@ static void test_from_string_bindings_skip_function_name_letters(void)
         TEST_FAIL();
     }
 
-    if (i_binding) {
-        printf(C_BOLD C_GREEN "PASS" C_RESET " implicit i binding still returned\n\n");
+    if (!i_binding) {
+        printf(C_BOLD C_GREEN "PASS" C_RESET " implicit i is not returned as an editable binding\n\n");
     } else {
-        printf(C_BOLD C_RED "FAIL" C_RESET " implicit i binding still returned %s:%d:1\n\n", __FILE__, __LINE__);
+        printf(C_BOLD C_RED "FAIL" C_RESET " implicit i is not returned as an editable binding %s:%d:1\n\n", __FILE__,
+               __LINE__);
         TEST_FAIL();
     }
 
@@ -2582,6 +2599,7 @@ static void test_from_string_round_trips(void)
 void test_expr_t_from_string(void)
 {
     TEST_RUN_SUBTEST(test_from_string_function_hash, NULL);
+    TEST_RUN_SUBTEST(test_from_string_conjugation, NULL);
     TEST_RUN_SUBTEST(test_from_string_pure_const, NULL);
     TEST_RUN_SUBTEST(test_from_string_arithmetic, NULL);
     TEST_RUN_SUBTEST(test_from_string_functions, NULL);

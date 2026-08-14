@@ -326,6 +326,16 @@ expr_t *expr_integrate(const expr_t *expr, const expr_t *wrt);
 expr_t *expr_integrate_family(const expr_t *expr, const expr_t *wrt);
 
 /**
+ * @brief Create an arbitrary integration constant whose name does not collide with supplied expressions.
+ *
+ * The returned named constant is selected from C, C_0, C_1, and subsequent indexed names after inspecting
+ * @p expr, @p wrt, and @p antiderivative for existing symbols.
+ *
+ * @return A newly allocated named constant, or NULL on allocation failure.
+ */
+expr_t *expr_new_integration_constant(const expr_t *expr, const expr_t *wrt, const expr_t *antiderivative);
+
+/**
  * @brief Build an unevaluated integral node representing ∫^upper f(t) dt.
  *
  * The node stores the displayed integrand with its dummy variable substituted
@@ -527,6 +537,13 @@ expr_t *expr_pow_xp(const expr_t *expr1, const expr_t *expr2);
  * they evaluate normally, but they are not differentiable.
  */
 expr_t *expr_abs(const expr_t *expr);
+/**
+ * @brief Construct the complex conjugate of an expression.
+ *
+ * @param expr Expression to conjugate; it is retained rather than consumed.
+ * @return     Newly allocated conjugate expression, or NULL on error.
+ */
+expr_t *expr_conj(const expr_t *expr);
 expr_t *expr_hypot(const expr_t *expr1, const expr_t *expr2);
 expr_t *expr_erf(const expr_t *expr);
 expr_t *expr_erfc(const expr_t *expr);

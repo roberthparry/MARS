@@ -798,7 +798,8 @@ static bool expr_integration_constant_name_in_use(const expr_t *expr, const expr
            expr_tree_has_symbol_name(anti, name) || (unicode_name && expr_tree_has_symbol_name(anti, unicode_name));
 }
 
-expr_t *expr_new_integration_constant_internal(const expr_t *expr, const expr_t *wrt, const expr_t *anti)
+/* Create a collision-free arbitrary integration constant for an antiderivative family. */
+expr_t *expr_new_integration_constant(const expr_t *expr, const expr_t *wrt, const expr_t *anti)
 {
     char name[32];
     char unicode_name[32];
@@ -836,7 +837,7 @@ expr_t *expr_integrate_family(const expr_t *expr, const expr_t *wrt)
     if (!anti)
         return NULL;
 
-    constant = expr_new_integration_constant_internal(expr, wrt, anti);
+    constant = expr_new_integration_constant(expr, wrt, anti);
     if (!constant) {
         expr_free(anti);
         return NULL;

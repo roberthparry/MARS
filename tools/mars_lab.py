@@ -638,7 +638,7 @@ DEFAULT_ALMANAC_LONGITUDE = DEFAULT_TIMEZONE_LONGITUDE
 DEFAULT_ALMANAC_ELEVATION = "0"
 DEFAULT_ALMANAC_BODY = "MOON"
 DEFAULT_ALMANAC_VISIBILITY = "all"
-ALMANAC_LAND_TOTALITY_SEARCH_TIMEOUT_SECONDS = 12
+ALMANAC_LAND_TOTALITY_SEARCH_TIMEOUT_SECONDS = 20
 MIN_INTEGRATOR_INTERVAL_CAP = 500
 MAX_INTEGRATOR_INTERVAL_CAP = 100000
 INTEGRATOR_INTERVAL_CAP_CHOICES = (500, 5000, 20000, 50000, 100000)
@@ -1560,7 +1560,8 @@ INDEX_HTML = r"""<!doctype html>
     }
 
     .almanac-event-table .event-kind {
-      width: 4.1rem;
+      width: 5.6rem;
+      white-space: nowrap;
     }
 
     .almanac-event-table .event-measure {
@@ -1779,6 +1780,8 @@ INDEX_HTML = r"""<!doctype html>
         inset 0 1px 0 rgba(255, 243, 214, 0.08),
         0 24px 70px rgba(0, 0, 0, 0.4);
       backdrop-filter: blur(10px);
+      overflow-x: hidden;
+      overflow-y: auto;
     }
 
     .mars-date-picker.hidden {
@@ -2949,6 +2952,18 @@ INDEX_HTML = r"""<!doctype html>
       font-variant-ligatures: none;
     }
 
+    .matrix-sum-display {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.9rem;
+      width: max-content;
+    }
+
+    .matrix-sum-operator {
+      color: var(--cream);
+      font: 2rem/1 Georgia, "Times New Roman", serif;
+    }
+
     .matrix-bracket {
       display: flex;
       align-items: center;
@@ -3877,12 +3892,35 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           <p>Write the complete matrix expression in the editor, then press <code>Evaluate</code>. These are genuine matrix functions calculated by MARSlib, not functions applied independently to each displayed entry.</p>
           <ul>
             <li><code>sin(1 2; 4 5)</code> calculates the sine of the complete 2x2 matrix. Spaces separate columns and semicolons separate rows.</li>
-            <li><code>inverse(a b; c d)</code> calculates a symbolic inverse, while <code>(a b; c d).(e f; g h)</code> performs matrix multiplication. Matrix operations compose, so <code>inverse(a b; c d).(x; y)</code> solves the corresponding 2x2 linear system.</li>
+            <li><code>inverse(a b; c d)</code> and <code>inv(a b; c d)</code> calculate a symbolic inverse, while <code>(a b; c d).(e f; g h)</code> performs matrix multiplication. Matrix division is not defined. Matrix operations compose, so <code>inv(a b; c d).(x; y)</code> solves the corresponding 2x2 linear system.</li>
+            <li><code>det(A)</code> and <code>determinant(A)</code> return a scalar determinant; <code>trace(A)</code> and <code>tr(A)</code> return a scalar trace.</li>
+            <li><code>transpose(A)</code>/<code>trans(A)</code> transpose a matrix. <code>hermitian(A)</code>, <code>adjoint(A)</code>, <code>ctranspose(A)</code>, <code>conjtrans(A)</code>, and <code>conjugate_transpose(A)</code> calculate its conjugate transpose.</li>
             <li><code>Dx(ax+b cx+d; y xy)</code> differentiates every entry with respect to <code>x</code>. <code>@S^x((ax+b cx+d; y xy))</code> returns one entrywise antiderivative.</li>
             <li>Matrix functions require a square matrix. A rectangular matrix is rejected rather than having the scalar function applied entry by entry.</li>
             <li><code>exp(0 1; -1 0)</code> calculates the matrix exponential.</li>
             <li><code>sqrt(4 0; 0 9)</code> obtains <code>(2, 0; 0, 3)</code>.</li>
             <li>Logarithms, inverse functions and special functions require a matrix whose spectrum lies in a supported domain; otherwise MARS Lab reports that the matrix function failed.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="matrix">
+          <div class="help-kicker">Matrix Notation And Aliases</div>
+          <p>MARSlib parses the complete expression. The browser passes your text through unchanged and does not recognise function names itself.</p>
+          <ul>
+            <li>Use <code>+/-</code> for same-sized matrices, <code>.</code> for ordered matrix multiplication, and <code>^</code> for integer, fractional, or symbolic powers. Parenthesised composite bases such as <code>((1 2; 3 4) - lambdaI)^x</code> are accepted.</li>
+            <li><code>lambdaI</code>, <code>lambda.I</code>, and <code>lambda*I</code> mean λ times the identity when the required order is clear.</li>
+            <li><code>A^dagger</code>, <code>A^H</code>, <code>A^*</code>, <code>A^†</code>, and <code>A†</code> are postfix forms of the Hermitian adjoint.</li>
+            <li><code>|A|</code>, <code>||A||</code>, and <code>‖A‖</code> are determinant forms. Both opening and closing bars are required.</li>
+            <li>Matrix division is deliberately absent: <code>A/B</code> would not say on which side <code>inv(B)</code> should multiply.</li>
+            <li><code>lambda</code>, <code>@lambda</code>, and <code>λ</code> are the same Greek symbol and render as λ.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="matrix">
+          <div class="help-kicker">Matrix Calculus And Values</div>
+          <ul>
+            <li>The variable derivative and integral buttons apply entrywise and remain available while the corresponding variable is present.</li>
+            <li>An antiderivative is displayed as <code>A(x) + C</code>, where <code>C</code> is an independent constant matrix with entries <code>C₁₁</code>, <code>C₁₂</code>, <code>C₂₁</code>, and <code>C₂₂</code> for a 2x2 result.</li>
+            <li><code>Rendered TeX</code>, <code>Result</code>, and <code>Layout</code> preserve the symbolic answer. <code>Value</code> separately shows the numeric or partially evaluated matrix obtained from supplied bindings.</li>
+            <li>Long numbers in rendered TeX use an ellipsis by default. Choose <code>Show more digits</code> for the full mantissa; scientific notation is displayed as multiplication by a power of ten.</li>
           </ul>
         </div>
         <div class="help-card" data-help-modes="diffequation">
@@ -4069,6 +4107,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           <h3>Unary Functions</h3>
           <ul>
             <li>Elementary: <code>abs(x)</code>, <code>floor(x)</code>, <code>ceil(x)</code>, <code>sqrt(x)</code>, <code>exp(x)</code>, <code>ln(x)</code>, <code>log(x)</code>, <code>lg(x)</code>, <code>log10(x)</code>.</li>
+            <li>Complex conjugation: <code>conj(z)</code>, <code>conjugate(z)</code>, and postfix <code>z^*</code> are equivalent.</li>
+            <li>Absolute value: <code>abs(z)</code> and paired bars <code>|z|</code> are equivalent for every scalar type. For complex values they mean <code>sqrt(z*z^*)</code>; a missing closing bar is rejected.</li>
             <li>Trigonometric: <code>sin(x)</code>, <code>cos(x)</code>, <code>tan(x)</code>, <code>asin(x)</code>, <code>acos(x)</code>, <code>atan(x)</code>.</li>
             <li>Versine/haversine: <code>versin(x)</code>, <code>vercos(x)</code>, <code>coversin(x)</code>, <code>covercos(x)</code>, <code>haversin(x)</code>, <code>havercos(x)</code>, <code>hacoversin(x)</code>, <code>hacovercos(x)</code>.</li>
             <li>Versine/haversine inverses: <code>arcversin(x)</code>, <code>arcvercos(x)</code>, <code>arccoversin(x)</code>, <code>arccovercos(x)</code>, <code>archaversin(x)</code>, <code>archavercos(x)</code>, <code>archacoversin(x)</code>, <code>archacovercos(x)</code>.</li>
@@ -4271,6 +4311,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     const RESULT_ZOOM_LEVELS = [0.5, 0.67, 0.8, 1, 1.25, 1.5, 2, 3, 4, 6, 8];
     const RESULT_ZOOM_DEFAULT_INDEX = 3;
     let lastTex = '';
+    let resultInputBindings = [];
     let diffequationFitFrame = 0;
     let solverFitFrame = 0;
     let solverWrapRenderPending = false;
@@ -4312,6 +4353,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       window.history.replaceState(null, '', window.location.pathname + window.location.hash);
     }
     let lastEvaluationInputText = '';
+    let lastMatrixScalarExpression = '';
     let bindingValueCache = new Map();
     const DOUBLE_PRECISION_BITS = 53;
     const DOUBLE_PRECISION_DIGITS = 17;
@@ -4731,7 +4773,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       if (datetimeLocal)
         datetimeLocal.classList.toggle('hidden', !datetimeMode || !String(datetimeLocalBody?.textContent || '').trim());
       targetRow.classList.toggle('hidden', !expressionMode || targetRow.classList.contains('hidden'));
-      derivativeButtons.classList.toggle('hidden', !expressionMode);
+      derivativeButtons.classList.toggle('hidden', !expressionMode && !matrixMode);
       goalSeek.classList.toggle('hidden', !expressionMode);
 
       if (expressionMode) {
@@ -4882,6 +4924,13 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       syncRoundedSelect(select);
     }
 
+    function normaliseSelectSearchText(value) {
+      return String(value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase();
+    }
+
     function enhanceRoundedSelect(select, options = {}) {
       if (!select)
         return null;
@@ -4995,11 +5044,13 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       }
 
       function filterOptions() {
-        const query = String(searchInput && searchInput.value || '').trim().toLowerCase();
+        const query = normaliseSelectSearchText(searchInput && searchInput.value).trim();
         let visibleCount = 0;
 
         optionButtons.forEach((item) => {
-          const haystack = `${item.dataset.searchText || item.textContent || ''} ${item.dataset.value || ''}`.toLowerCase();
+          const haystack = normaliseSelectSearchText(
+            `${item.dataset.searchText || item.textContent || ''} ${item.dataset.value || ''}`
+          );
           const visible = !query || haystack.includes(query);
           item.classList.toggle('hidden', !visible);
           if (visible)
@@ -5279,24 +5330,22 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       const rect = marsDatePickerAnchorRect(shell);
       if (!rect)
         return;
+      const buttonRect = marsDatePickerState.button?.getBoundingClientRect();
+      const anchorBottom = buttonRect && buttonRect.height > 1 ? buttonRect.bottom : rect.bottom;
       const margin = 12;
       const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+      const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
       const maxWidth = Math.max(0, viewportWidth - margin * 2);
       const minWidth = Math.min(448, maxWidth);
       const width = Math.min(maxWidth, Math.max(rect.width, minWidth));
       const left = Math.max(margin, Math.min(rect.left, viewportWidth - width - margin));
-      let top = rect.bottom + 8;
+      const top = anchorBottom + 8;
+      const availableHeight = Math.max(8, viewportHeight - top - margin);
 
       marsDatePicker.style.width = `${width}px`;
       marsDatePicker.style.left = `${left}px`;
       marsDatePicker.style.top = `${top}px`;
-
-      const pickerRect = marsDatePicker.getBoundingClientRect();
-      const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
-      if (pickerRect.bottom > viewportHeight - margin) {
-        top = Math.max(margin, rect.top - pickerRect.height - 8);
-        marsDatePicker.style.top = `${top}px`;
-      }
+      marsDatePicker.style.maxHeight = `${availableHeight}px`;
     }
 
     function commitMarsDateValue(input, value) {
@@ -5705,6 +5754,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
 
       const body = text.slice(0, pipe).trim();
       const bindings = text.slice(pipe + 1).trim();
+      if (!bindings || indexOfTopLevel(bindings, '=') < 0)
+        return null;
       const semi = indexOfTopLevel(bindings, ';');
       const variables = semi >= 0 ? bindings.slice(0, semi).trim() : bindings;
       const constants = semi >= 0 ? bindings.slice(semi + 1).trim() : '';
@@ -6207,14 +6258,28 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       let current = currentExpressionText();
       let updated = current;
 
-      inputs.forEach((input) => {
-        const name = input.dataset.bindingName || '';
-        const kind = input.dataset.bindingKind || 'variable';
-        const valueText = normalisedBindingInputValue(input);
-        updated = kind === 'constant' && valueText === '?' && isIntegrationConstantName(name)
-          ? removeBindingFromExpression(updated, kind, name)
-          : replaceBindingValueInExpression(updated, kind, name, valueText);
-      });
+      if (currentMode() === 'matrix' && !bindingParts(current)) {
+        const enteredBindings = inputs
+          .map((input) => ({
+            name: input.dataset.bindingName || '',
+            kind: input.dataset.bindingKind || 'variable',
+            value: String(input.value || '').trim()
+          }))
+          .filter((binding) => binding.name && binding.value);
+
+        if (!enteredBindings.length)
+          return false;
+        updated = expressionWithBindings(current, enteredBindings);
+      } else {
+        inputs.forEach((input) => {
+          const name = input.dataset.bindingName || '';
+          const kind = input.dataset.bindingKind || 'variable';
+          const valueText = normalisedBindingInputValue(input);
+          updated = kind === 'constant' && valueText === '?' && isIntegrationConstantName(name)
+            ? removeBindingFromExpression(updated, kind, name)
+            : replaceBindingValueInExpression(updated, kind, name, valueText);
+        });
+      }
 
       if (!updated || updated === current)
         return false;
@@ -7656,7 +7721,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         derivativeButton.textContent = `${name} derivative`;
         derivativeButton.addEventListener('click', () => takeDerivative(name, derivativeButton));
         derivativeButtons.appendChild(derivativeButton);
-
+      });
+      variables.forEach((name) => {
         const integralButton = document.createElement('button');
         integralButton.className = 'secondary';
         integralButton.type = 'button';
@@ -8059,17 +8125,19 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       return raw;
     }
 
-    async function fetchMatrixEvaluation() {
-      saveLastMatrixState();
-      const matrixText = currentExpressionText() || expr.value.trim();
+    async function fetchMatrixEvaluation(options = {}) {
+      if (!options.skipSave)
+        saveLastMatrixState();
+      const matrixText = String(options.matrixText || currentExpressionText() || expr.value.trim()).trim();
       const response = await fetch('/matrix-eval', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
           matrix: matrixText,
-          operation: matrixOperation.value,
-          operand: matrixOperand.value.trim(),
-          precision: requestedValuePrecision()
+          operation: options.operation || matrixOperation.value,
+          operand: options.operand === undefined ? matrixOperand.value.trim() : String(options.operand || '').trim(),
+          precision: requestedValuePrecision(),
+          transient: !!options.skipSave
         })
       });
       const data = await response.json();
@@ -8494,9 +8562,9 @@ __HOLIDAY_JURISDICTION_OPTIONS__
                 <tr data-almanac-event-jd="${escapeHtml(event.jd || '')}">
                   <td data-label="Class">${escapeHtml(event.category || '')}</td>
                   <td class="body-name" data-label="Event">${escapeHtml(event.name || '')}</td>
-                  <td data-label="Kind">${escapeHtml(event.kind || '')}</td>
-                  <td class="number" data-label="Magnitude">${escapeHtml(event.magnitude || '')}</td>
-                  <td class="number" data-label="Obscuration">${escapeHtml(event.obscuration || '')}</td>
+                  <td class="event-kind" data-label="Kind">${escapeHtml(event.kind || '')}</td>
+                  <td class="number event-measure" data-label="Magnitude">${escapeHtml(event.magnitude || '')}</td>
+                  <td class="number event-measure" data-label="Obscuration">${escapeHtml(event.obscuration || '')}</td>
                   <td class="number event-date" data-label="Date">${escapeHtml(almanacEventDateText(event))}</td>
                   <td class="number event-time" data-label="First" title="${escapeHtml(event.first_contact || '')}">${escapeHtml(compactAlmanacLocalTime(event.first_contact || ''))}</td>
                   <td class="number event-time" data-label="Greatest" title="${escapeHtml(event.greatest || event.time || '')}">${escapeHtml(compactAlmanacLocalTime(event.greatest || event.time || ''))}</td>
@@ -8755,9 +8823,12 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       ).trim();
     }
 
-    function setResultInputText(text) {
+    function setResultInputText(text, bindings = null) {
       const inputText = expressionForEditor(String(text || '')).trim();
       resultUseInput.dataset.inputText = inputText;
+      resultInputBindings = Array.isArray(bindings)
+        ? bindings.map((binding) => ({...binding}))
+        : [];
       resultUseInput.disabled = !inputText;
       resultUseInput.classList.toggle('hidden', !inputText);
       resultUseInput.title = inputText
@@ -8783,7 +8854,17 @@ __HOLIDAY_JURISDICTION_OPTIONS__
 
       clearGoalSeekRequest();
       hideTargetEntry();
-      if (currentMode() === 'equation' || currentMode() === 'diffequation')
+      if (currentMode() === 'matrix') {
+        const sourceBindings = compactExpressionForEditor(currentExpressionText()).bindings || [];
+        const bindings = resultInputBindings.length
+          ? bindingsWithAuthoredValues(resultInputBindings, expressionWithBindings(resultText, sourceBindings))
+          : sourceBindings;
+        setExpressionEditor(expressionWithBindings(resultText, bindings), bindings, resultText);
+        matrixOperation.value = 'eval';
+        matrixOperand.value = '';
+        syncRoundedSelect(matrixOperation);
+        syncMatrixControls();
+      } else if (currentMode() === 'equation' || currentMode() === 'diffequation')
         setExpressionEditor(resultText);
       else if (!await applyMarsBindingExpression(resultText))
         return;
@@ -9295,46 +9376,60 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       return rows;
     }
 
-    function setMatrixPrettyResult(resultText, prettyText) {
-      const rows = parseMatrixResultText(resultText);
-      functionStyle.classList.add('matrix-pretty');
-      functionStyle.dataset.displayText = prettyText || resultText || '';
-      functionStyle.dataset.fullText = prettyText || resultText || '';
-      resetMoreDigitsButton(functionMore, false);
+    function setMatrixPrettyResult(resultText, prettyText, element = functionStyle, moreButton = functionMore) {
+      const terms = splitTopLevel(String(resultText || ''), '+')
+        .map((term) => parseMatrixResultText(term.trim()));
+      const matrices = terms.length && terms.every((rows) => rows) ? terms : null;
+      element.classList.add('matrix-pretty');
+      element.dataset.displayText = prettyText || resultText || '';
+      element.dataset.fullText = prettyText || resultText || '';
+      if (moreButton)
+        resetMoreDigitsButton(moreButton, false);
 
-      if (!rows) {
-        renderMatrixSectionHeadings(functionStyle, prettyText || resultText || '');
+      if (!matrices) {
+        renderMatrixSectionHeadings(element, prettyText || resultText || '');
         return;
       }
 
-      functionStyle.replaceChildren();
-      const display = document.createElement('span');
-      display.className = 'matrix-display';
+      element.replaceChildren();
+      const sum = document.createElement('span');
+      sum.className = 'matrix-sum-display';
+      matrices.forEach((rows, matrixIndex) => {
+        if (matrixIndex) {
+          const operator = document.createElement('span');
+          operator.className = 'matrix-sum-operator';
+          operator.textContent = '+';
+          sum.appendChild(operator);
+        }
 
-      const left = document.createElement('span');
-      left.className = 'matrix-bracket';
-      left.textContent = '(';
-      display.appendChild(left);
+        const display = document.createElement('span');
+        display.className = 'matrix-display';
 
-      const grid = document.createElement('span');
-      grid.className = 'matrix-grid';
-      grid.style.gridTemplateColumns = `repeat(${rows[0].length}, max-content)`;
-      rows.forEach((row) => {
-        row.forEach((cellText) => {
-          const cell = document.createElement('span');
-          cell.className = 'matrix-cell';
-          cell.textContent = cellText;
-          grid.appendChild(cell);
+        const left = document.createElement('span');
+        left.className = 'matrix-bracket';
+        left.textContent = '(';
+        display.appendChild(left);
+
+        const grid = document.createElement('span');
+        grid.className = 'matrix-grid';
+        grid.style.gridTemplateColumns = `repeat(${rows[0].length}, max-content)`;
+        rows.forEach((row) => {
+          row.forEach((cellText) => {
+            const cell = document.createElement('span');
+            cell.className = 'matrix-cell';
+            cell.textContent = cellText;
+            grid.appendChild(cell);
+          });
         });
+        display.appendChild(grid);
+
+        const right = document.createElement('span');
+        right.className = 'matrix-bracket';
+        right.textContent = ')';
+        display.appendChild(right);
+        sum.appendChild(display);
       });
-      display.appendChild(grid);
-
-      const right = document.createElement('span');
-      right.className = 'matrix-bracket';
-      right.textContent = ')';
-      display.appendChild(right);
-
-      functionStyle.appendChild(display);
+      element.appendChild(sum);
     }
 
     function setRenderedResult(data) {
@@ -9616,6 +9711,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           pushExpressionHistory(previousState);
         const {response, data} = await fetchMatrixEvaluation();
         if (!response.ok || !data.ok) {
+          lastMatrixScalarExpression = '';
           setRenderedError(data.error || 'Matrix evaluation failed');
           resetMoreDigitsButton(renderedMore, false);
           clearResultDetails({keepBindings: true});
@@ -9626,9 +9722,9 @@ __HOLIDAY_JURISDICTION_OPTIONS__
 
         clearResultDetails({keepBindings: true});
         clearRenderedError();
-        lastTex = data.tex || '';
+        lastTex = data.full_TeX || data.tex || '';
         rendered.dataset.displayTex = data.tex || '';
-        rendered.dataset.fullTex = data.tex || '';
+        rendered.dataset.fullTex = data.full_TeX || data.tex || '';
         rendered.dataset.displaySvg = data.svg || '';
         rendered.dataset.fullSvg = '';
         rendered.dataset.renderError = data.render_error || '';
@@ -9636,25 +9732,37 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           data.svg || '',
           data.render_error || (data.tex || 'No rendered TeX available')
         );
-        resetMoreDigitsButton(renderedMore, false);
-        setExpandableText(parsed, parsedMore, data.result || '', data.result || '');
-        setResultInputText(data.result || '');
-        setMatrixPrettyResult(data.result || '', data.pretty || '');
+        resetMoreDigitsButton(
+          renderedMore,
+          !!data.full_TeX && !!data.tex && data.full_TeX !== data.tex
+        );
+        setExpandableText(parsed, parsedMore, data.display_result || data.result || '', data.result || '');
+        lastMatrixScalarExpression = data.scalar ? (data.result || '') : '';
+        setResultInputText(data.result || '', data.binding_values || []);
+        setMatrixPrettyResult(data.display_result || data.result || '', data.pretty || '');
         if (data.operation && matrixOperation) {
           matrixOperation.value = validMatrixOperation(data.operation);
           syncRoundedSelect(matrixOperation);
           syncMatrixControls();
         }
-        value.textContent = '';
-        setValueCardVisible(false);
-        if (Array.isArray(data.binding_values))
-          renderVariableValues(data.binding_values);
+        valueTitle.textContent = data.value ? 'Value' : 'Summary';
+        if (data.value_pretty)
+          setMatrixPrettyResult(data.value || '', data.value_pretty, value, null);
         else
+          value.textContent = data.value || '';
+        setValueCardVisible(!!data.value);
+        if (Array.isArray(data.binding_values) && data.binding_values.length) {
+          const matrixBindings = bindingsWithAuthoredValues(data.binding_values, text);
+          const editorBody = expressionBodyForEditor(text);
+
+          setExpressionEditor(editorBody, matrixBindings, editorBody);
+        } else {
           clearVariableValues();
-        modeEditorText.matrix = text;
+        }
+        modeEditorText.matrix = currentExpressionText() || text;
         saveLastMatrixState();
-        currentVariables = [];
-        currentDifferentiable = false;
+        currentVariables = variableNamesFromBindings(data.binding_values || []);
+        currentDifferentiable = currentVariables.length > 0;
         renderDerivativeButtons(currentVariables);
         commitModeState();
         setStatus('Ready');
@@ -9910,9 +10018,9 @@ __HOLIDAY_JURISDICTION_OPTIONS__
 
         clearResultDetails({keepBindings: true});
         clearRenderedError();
-        lastTex = data.tex || '';
+        lastTex = data.full_TeX || data.tex || '';
         rendered.dataset.displayTex = data.tex || '';
-        rendered.dataset.fullTex = data.tex || '';
+        rendered.dataset.fullTex = data.full_TeX || data.tex || '';
         rendered.dataset.displaySvg = data.svg || '';
         rendered.dataset.fullSvg = '';
         rendered.dataset.renderError = data.render_error || '';
@@ -9920,7 +10028,10 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           data.svg || '',
           data.render_error || (data.tex || 'No rendered TeX available')
         );
-        resetMoreDigitsButton(renderedMore, false);
+        resetMoreDigitsButton(
+          renderedMore,
+          !!data.full_TeX && !!data.tex && data.full_TeX !== data.tex
+        );
         setExpandableText(parsed, parsedMore, data.expression || '', data.expression || '');
         setResultInputText(data.antiderivative || '');
         const workUnits = data.work_units || data.intervals || '';
@@ -10261,7 +10372,176 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       evaluateCurrentMode({skipHistoryUpdate: true});
     });
 
+    function matrixCalculusInput(text, wrt, action) {
+      const source = String(text || '').trim();
+
+      return action === 'integral'
+        ? `@S^${wrt}((${source}))`
+        : `D${wrt}(${source})`;
+    }
+
+    async function takeMatrixCalculus(wrt, action, actionButton = null) {
+      commitVisibleBindingInputs();
+      await pendingExpressionBindingCommit;
+      if (lastMatrixScalarExpression) {
+        await takeMatrixScalarCalculus(wrt, action, actionButton);
+        return;
+      }
+      const sourceText = String(currentExpressionText() || '').trim();
+      const text = expressionBodyForEditor(sourceText);
+      if (!text || !wrt)
+        return;
+
+      const variables = [...currentVariables];
+      const differentiable = currentDifferentiable;
+      const actionLabel = action === 'integral' ? 'integral' : 'derivative';
+      const calculusBody = matrixCalculusInput(text, wrt, action);
+      const calculusText = expressionWithBindings(calculusBody, compactExpressionForEditor(sourceText).bindings);
+
+      setActionRunning(actionButton, true);
+      showResults();
+      rightPaneTitle.textContent = action === 'integral'
+        ? `∫ A(${wrt}) d${wrt} RESULT`
+        : `${wrt} ${actionLabel} RESULT`;
+      setBusy(true);
+      setStatus(action === 'integral'
+        ? `Integrating matrix with respect to ${wrt}...`
+        : `Differentiating matrix d/d${wrt}...`);
+      try {
+        const {response, data} = await fetchMatrixEvaluation({
+          matrixText: calculusText,
+          operation: 'eval',
+          operand: '',
+          skipSave: true
+        });
+
+        if (!response.ok || !data.ok) {
+          clearResultDetails({keepBindings: true});
+          currentVariables = variables;
+          currentDifferentiable = differentiable;
+          renderDerivativeButtons(currentVariables);
+          setRenderedError(data.error || `No matrix ${actionLabel} for ${wrt}`);
+          resetMoreDigitsButton(renderedMore, false);
+          setStatus('Error');
+          return;
+        }
+
+        clearResultDetails({keepBindings: true});
+        clearRenderedError();
+        lastTex = data.full_TeX || data.tex || '';
+        rendered.dataset.displayTex = data.tex || '';
+        rendered.dataset.fullTex = data.full_TeX || data.tex || '';
+        rendered.dataset.displaySvg = data.svg || '';
+        rendered.dataset.fullSvg = '';
+        rendered.dataset.renderError = data.render_error || '';
+        setRenderedContent(data.svg || '', data.render_error || (data.tex || 'No rendered TeX available'));
+        resetMoreDigitsButton(
+          renderedMore,
+          !!data.full_TeX && !!data.tex && data.full_TeX !== data.tex
+        );
+        setExpandableText(parsed, parsedMore, data.result || '', data.result || '');
+        setResultInputText(data.result || '', data.binding_values || []);
+        setMatrixPrettyResult(data.result || '', data.pretty || '');
+        valueTitle.textContent = data.value ? 'Value' : 'Summary';
+        if (data.value_pretty)
+          setMatrixPrettyResult(data.value || '', data.value_pretty, value, null);
+        else
+          value.textContent = data.value || '';
+        setValueCardVisible(!!data.value);
+        currentVariables = variables;
+        currentDifferentiable = differentiable;
+        renderDerivativeButtons(currentVariables);
+        commitModeState();
+        setStatus('Ready');
+      } catch (err) {
+        clearResultDetails({keepBindings: true});
+        currentVariables = variables;
+        currentDifferentiable = differentiable;
+        renderDerivativeButtons(currentVariables);
+        setRenderedError(String(err));
+        resetMoreDigitsButton(renderedMore, false);
+        setStatus('Error');
+      } finally {
+        setBusy(false);
+        setActionRunning(actionButton, false);
+      }
+    }
+
+    async function takeMatrixScalarCalculus(wrt, action, actionButton = null) {
+      const source = lastMatrixScalarExpression;
+      const actionLabel = action === 'integral' ? 'integral' : 'derivative';
+      const variables = [...currentVariables];
+      const differentiable = currentDifferentiable;
+
+      if (!source || !wrt)
+        return;
+      setActionRunning(actionButton, true);
+      showResults();
+      rightPaneTitle.textContent = action === 'integral'
+        ? `∫ f(${wrt}) d${wrt} RESULT`
+        : `${wrt} derivative RESULT`;
+      setBusy(true);
+      setStatus(action === 'integral'
+        ? `Integrating scalar result with respect to ${wrt}...`
+        : `Differentiating scalar result d/d${wrt}...`);
+      try {
+        const {response, data} = await fetchEvaluation(
+          source,
+          wrt,
+          action === 'integral' ? 'integral' : ''
+        );
+        const resultExpression = action === 'integral'
+          ? integralExpressionFromLine(data.integral)
+          : derivativeExpressionFromLine(data.derivative);
+        const resultTex = action === 'integral' ? data.integral_TeX : data.derivative_TeX;
+        const resultSvg = action === 'integral' ? data.integral_svg : data.derivative_svg;
+        const resultValue = action === 'integral' ? data.integral_value : data.derivative_value;
+        const renderError = action === 'integral'
+          ? data.integral_render_error
+          : data.derivative_render_error;
+
+        if (!response.ok || !data.ok || !resultExpression)
+          throw new Error(data.error || data.raw || `No scalar ${actionLabel} for ${wrt}`);
+
+        clearResultDetails({keepBindings: true});
+        clearRenderedError();
+        setExpandableText(parsed, parsedMore, resultExpression, resultExpression);
+        setResultInputText(resultExpression);
+        setMatrixPrettyResult(resultExpression, '');
+        value.textContent = resultValue || '';
+        setValueCardVisible(!!resultValue);
+        lastTex = resultTex || '';
+        rendered.dataset.displayTex = resultTex || '';
+        rendered.dataset.fullTex = resultTex || '';
+        rendered.dataset.displaySvg = resultSvg || '';
+        rendered.dataset.fullSvg = '';
+        rendered.dataset.renderError = renderError || '';
+        setRenderedContent(resultSvg || '', renderError || resultTex || resultExpression);
+        resetMoreDigitsButton(renderedMore, false);
+        currentVariables = variables;
+        currentDifferentiable = differentiable;
+        renderDerivativeButtons(currentVariables);
+        setStatus('Ready');
+      } catch (err) {
+        clearResultDetails({keepBindings: true});
+        currentVariables = variables;
+        currentDifferentiable = differentiable;
+        renderDerivativeButtons(currentVariables);
+        setRenderedError(String(err));
+        resetMoreDigitsButton(renderedMore, false);
+        setStatus('Error');
+      } finally {
+        setBusy(false);
+        setActionRunning(actionButton, false);
+      }
+    }
+
     async function takeDerivative(wrt, actionButton = null) {
+      if (currentMode() === 'matrix') {
+        await takeMatrixCalculus(wrt, 'derivative', actionButton);
+        return;
+      }
+
       commitVisibleBindingInputs();
       await pendingExpressionBindingCommit;
       const text = currentExpressionText();
@@ -10340,6 +10620,11 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     }
 
     async function takeIntegral(wrt, actionButton = null) {
+      if (currentMode() === 'matrix') {
+        await takeMatrixCalculus(wrt, 'integral', actionButton);
+        return;
+      }
+
       commitVisibleBindingInputs();
       await pendingExpressionBindingCommit;
       const text = currentExpressionText();
@@ -11044,6 +11329,33 @@ def write_state_data(state: dict[str, object]) -> None:
         pass
 
 
+def recover_generated_matrix_calculus_input(matrix: str) -> str:
+    text = str(matrix or "").strip()
+    match = re.fullmatch(r"@S\^[^()\s]+\(\((.*)\)\)", text, flags=re.DOTALL)
+    if not match:
+        return text
+
+    recovered = match.group(1).strip()
+    while len(recovered) >= 2 and recovered[0] == "(" and recovered[-1] == ")":
+        depth = 0
+        close = -1
+        for index, char in enumerate(recovered):
+            if char == "(":
+                depth += 1
+            elif char == ")":
+                depth -= 1
+                if depth == 0:
+                    close = index
+                    break
+        if close != len(recovered) - 1:
+            break
+        inner = recovered[1:-1].strip()
+        if index_top_level_text(inner, ";") >= 0 or index_top_level_text(inner, ",") >= 0:
+            break
+        recovered = inner
+    return recovered or text
+
+
 def load_state_data() -> dict[str, object]:
     state = default_state()
     try:
@@ -11071,6 +11383,8 @@ def load_state_data() -> dict[str, object]:
     matrix = str(state.get("matrix", "")).strip()
     if "..." in matrix:
         state["matrix"] = DEFAULT_MATRIX
+    else:
+        state["matrix"] = recover_generated_matrix_calculus_input(matrix)
 
     lab_mode = str(state.get("lab_mode", "")).strip()
     if lab_mode not in {"expression", "equation", "diffequation", "matrix", "integrator", "datetime", "almanac"}:
@@ -12157,19 +12471,66 @@ def compact_long_numeric_tokens(text: str) -> str:
     )
 
 
-def precision_numeric_tokens(text: str, precision: int) -> str:
+def precision_numeric_tokens(text: str, precision: int, zero_subprecision: bool = False) -> str:
     if not text:
         return text
 
     text = decimalize_long_terminating_rational_tokens(text)
 
     def precision_match(match: re.Match[str]) -> str:
-        return match.group(1) + format_number_text_for_precision(match.group(2), precision)
+        return match.group(1) + format_number_text_for_precision(
+            match.group(2), precision, zero_subprecision=zero_subprecision)
 
-    return re.sub(
+    rounded = re.sub(
         r"(^|[^A-Za-z0-9_.])([+-]?(?:\d+\.\d+|\d{21,})(?:[Ee][+-]?\d+)?)",
         precision_match,
         text,
+    )
+    if zero_subprecision:
+        rounded = re.sub(
+            r"(?<![A-Za-z0-9_.])([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[Ee][+-]?\d+)?)\s*[+-]\s*0i\b",
+            r"\1",
+            rounded,
+        )
+    return rounded
+
+
+def matrix_display_TeX(tex: str, precision: int) -> str:
+    display_TeX = precision_numeric_tokens(tex, precision, zero_subprecision=True)
+    begin = r"\begin{bmatrix}"
+    end = r"\end{bmatrix}"
+
+    if not display_TeX.startswith(begin) or not display_TeX.endswith(end):
+        return matrix_scientific_notation_TeX(compact_long_numeric_tokens(display_TeX))
+
+    body = display_TeX[len(begin):-len(end)]
+    rows = body.split(r" \\[4pt] ")
+    complex_literal = re.compile(
+        r"^([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[Ee][+-]?\d+)?)\s*([+-])\s*"
+        r"((?:\d+(?:\.\d*)?|\.\d+)(?:[Ee][+-]?\d+)?)i$"
+    )
+
+    for row_index, row in enumerate(rows):
+        cells = row.split(" & ")
+        for cell_index, cell in enumerate(cells):
+            match = complex_literal.fullmatch(cell.strip())
+            if match:
+                cells[cell_index] = rf"\substack{{{match.group(1)} \\ {{}}{match.group(2)} {match.group(3)}i}}"
+        rows[row_index] = " & ".join(cells)
+
+    compact_TeX = compact_long_numeric_tokens(begin + r" \\[4pt] ".join(rows) + end)
+    return matrix_scientific_notation_TeX(compact_TeX)
+
+
+def matrix_scientific_notation_TeX(tex: str) -> str:
+    def replace_scientific(match: re.Match[str]) -> str:
+        exponent = int(match.group(2))
+        return rf"{match.group(1)}\times 10^{{{exponent}}}"
+
+    return re.sub(
+        r"(?<![A-Za-z0-9_.])([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:\.\.\.)?)[Ee]([+-]?\d+)",
+        replace_scientific,
+        str(tex or ""),
     )
 
 
@@ -12427,11 +12788,15 @@ def parse_matrix_lab_output(output: str) -> dict[str, str]:
             "rows": r"^rows\s+(.*)$",
             "cols": r"^cols\s+(.*)$",
             "result": r"^result\s+(.*)$",
+            "value": r"^value\s+(.*)$",
+            "value_pretty": r"^value_pretty\s+(.*)$",
+            "value_tex": r"^value_tex\s+(.*)$",
             "pretty": r"^pretty\s+(.*)$",
             "tex": r"^tex\s+(.*)$",
+            "bindings": r"^binding\s{2,}(.*)$",
             "error": r"^error\s+(.*)$",
         },
-        {"pretty", "tex"},
+        {"pretty", "tex", "value_pretty", "value_tex"},
     )
 
 
@@ -13743,6 +14108,7 @@ def run_almanac_event_lab_rows(options: dict[str, str],
             command.append(f"{key}={str(options.get(key, '')).strip()}")
     child_env = os.environ.copy()
     child_env.update(mars_lab_object_store_runtime_env())
+    child_env.update(jurisdiction_db_runtime_env())
     if timeout_seconds is None:
         timeout_seconds = ALMANAC_LAND_TOTALITY_SEARCH_TIMEOUT_SECONDS if str(options.get("totality") or "").strip() == "land" else 20
     completed = subprocess.run(
@@ -14073,20 +14439,175 @@ def prepare_evaluation_fields(
     return fields
 
 
+def matrix_integral_sum_display(
+    result: str,
+    tex: str,
+    input_text: str,
+    rows_text: str,
+    cols_text: str,
+) -> tuple[str, str, str] | None:
+    if "@S^" not in input_text:
+        return None
+
+    try:
+        rows = int(rows_text)
+        cols = int(cols_text)
+    except (TypeError, ValueError):
+        return None
+    body = str(result or "").strip()
+    if rows <= 0 or cols <= 0 or len(body) < 2 or body[0] != "(" or body[-1] != ")":
+        return None
+
+    source_rows = split_top_level_text(body[1:-1], ";")
+    if len(source_rows) != rows:
+        return None
+
+    anti_rows: list[list[str]] = []
+    constant_rows: list[list[str]] = []
+    subscript_digits = str.maketrans("0123456789", "₀₁₂₃₄₅₆₇₈₉")
+    transformed_tex = str(tex or "")
+    for row_index, source_row in enumerate(source_rows, start=1):
+        source_cells = split_top_level_text(source_row, ",")
+        if len(source_cells) != cols:
+            return None
+
+        anti_cells: list[str] = []
+        constant_cells: list[str] = []
+        for col_index, source_cell in enumerate(source_cells, start=1):
+            ascii_index = f"{row_index}{col_index}"
+            constant = "C" + ascii_index.translate(subscript_digits)
+            match = re.match(rf"^(.*)\s+\+\s+{re.escape(constant)}$", source_cell.strip())
+            constant_first = re.match(
+                rf"^{re.escape(constant)}\s*([+-])\s*(.+)$",
+                source_cell.strip(),
+            )
+            if match:
+                anti_cell = match.group(1).strip()
+            elif constant_first:
+                remainder = constant_first.group(2).strip()
+                anti_cell = remainder if constant_first.group(1) == "+" else f"-{remainder}"
+            elif source_cell.strip() == constant:
+                anti_cell = "0"
+            else:
+                return None
+            anti_cells.append(anti_cell)
+            constant_cells.append(constant)
+
+            tex_suffix = re.compile(rf"\s*\+\s*C_\{{{ascii_index}\}}")
+            transformed_tex, substitutions = tex_suffix.subn("", transformed_tex, count=1)
+            if substitutions != 1:
+                tex_prefix = re.compile(rf"C_\{{{ascii_index}\}}\s*([+-])\s*")
+
+                def remove_tex_prefix(prefix_match: re.Match[str]) -> str:
+                    return "" if prefix_match.group(1) == "+" else "-"
+
+                transformed_tex, substitutions = tex_prefix.subn(remove_tex_prefix, transformed_tex, count=1)
+                if substitutions != 1:
+                    return None
+
+        anti_rows.append(anti_cells)
+        constant_rows.append(constant_cells)
+
+    inline_anti = "; ".join(", ".join(cells) for cells in anti_rows)
+    inline_constants = "; ".join(", ".join(cells) for cells in constant_rows)
+    inline = f"({inline_anti}) + ({inline_constants})"
+
+    pretty_anti = "\n".join("  " + "  ".join(cells) for cells in anti_rows)
+    pretty_constants = "\n".join("  " + "  ".join(cells) for cells in constant_rows)
+    pretty = f"(\n{pretty_anti}\n) + (\n{pretty_constants}\n)"
+
+    constant_tex_rows = [" & ".join(f"C_{{{row}{col}}}" for col in range(1, cols + 1))
+                         for row in range(1, rows + 1)]
+    constant_tex = r"\begin{bmatrix}" + r" \\ ".join(constant_tex_rows) + r"\end{bmatrix}"
+    return inline, pretty, transformed_tex + " + " + constant_tex
+
+
+def matrix_scalar_display_without_single_unset_binding(
+    result_text: str,
+    pretty_text: str,
+    tex: str,
+    binding_values: list[dict[str, str]],
+) -> tuple[str, str, str]:
+    if len(binding_values) != 1:
+        return result_text, pretty_text, tex
+
+    binding = binding_values[0]
+    if binding.get("kind") != "variable" or str(binding.get("value") or "").upper() != "NAN":
+        return result_text, pretty_text, tex
+
+    name = str(binding.get("name") or "").strip()
+
+    def unwrapped_text(text: str) -> str:
+        source = str(text or "").strip()
+        if not source.startswith("{") or not source.endswith("}"):
+            return source
+        body, variables, constants = parse_expression_body(source)
+        assignments = parse_binding_assignments(variables)
+        if constants or assignments != [(name, "NAN")]:
+            return source
+        return body
+
+    tex_match = re.fullmatch(
+        r"\s*\\left\\\{\s*(.*?)\s*\\;\\middle\|\\;.*?\\right\\\}\s*",
+        str(tex or ""),
+        re.DOTALL,
+    )
+    unwrapped_tex = tex_match.group(1).strip() if tex_match else tex
+    return unwrapped_text(result_text), unwrapped_text(pretty_text), unwrapped_tex
+
+
 def prepare_matrix_fields(fields: dict[str, str], precision: int) -> dict[str, object]:
     result_text = str(fields.get("result") or fields.get("value") or "").strip()
     pretty_text = str(fields.get("pretty") or "").strip()
     tex = str(fields.get("tex") or "").strip()
+    integral_sum = matrix_integral_sum_display(
+        result_text,
+        tex,
+        str(fields.get("input") or ""),
+        str(fields.get("rows") or ""),
+        str(fields.get("cols") or ""),
+    )
+    if integral_sum:
+        result_text, pretty_text, tex = integral_sum
     operation = str(fields.get("operation") or "eval").strip()
     kind = str(fields.get("kind") or "").strip()
     rows = str(fields.get("rows") or "").strip()
     cols = str(fields.get("cols") or "").strip()
     input_text = str(fields.get("input") or "").strip()
+    evaluated_value = str(fields.get("value") or "").strip() if fields.get("result") else ""
+    evaluated_pretty = str(fields.get("value_pretty") or "").strip()
+    evaluated_TeX = str(fields.get("value_tex") or "").strip()
+    evaluated_integral_sum = matrix_integral_sum_display(
+        evaluated_value,
+        evaluated_TeX,
+        input_text,
+        rows,
+        cols,
+    )
+    if evaluated_integral_sum:
+        evaluated_value, evaluated_pretty, evaluated_TeX = evaluated_integral_sum
+    if evaluated_value:
+        evaluated_value = numeric_value_for_display(
+            format_number_text_for_precision(evaluated_value, precision, zero_subprecision=True)
+        )
+    if evaluated_pretty:
+        evaluated_pretty = precision_numeric_tokens(evaluated_pretty, precision, zero_subprecision=True)
+    binding_values = mars_binding_values(fields.get("bindings"))
+    if not rows and not cols:
+        result_text, pretty_text, tex = matrix_scalar_display_without_single_unset_binding(
+            result_text,
+            pretty_text,
+            tex,
+            binding_values,
+        )
+    display_result_text = precision_numeric_tokens(result_text, precision, zero_subprecision=True)
+    display_pretty_text = precision_numeric_tokens(pretty_text, precision, zero_subprecision=True)
+    display_TeX = matrix_display_TeX(tex, precision)
 
     svg = None
     render_error = None
-    if tex and tex != "(null)":
-        svg, render_error = render_TeX_to_svg(tex)
+    if display_TeX and display_TeX != "(null)":
+        svg, render_error = render_TeX_to_svg(display_TeX)
 
     summary_parts = []
     if kind:
@@ -14100,12 +14621,21 @@ def prepare_matrix_fields(fields: dict[str, str], precision: int) -> dict[str, o
         "ok": True,
         "mode": "matrix",
         "operation": operation,
+        "scalar": not rows and not cols,
         "result": result_text,
-        "pretty": pretty_text,
-        "tex": "" if tex == "(null)" else tex,
+        "display_result": display_result_text,
+        "pretty": display_pretty_text,
+        "tex": "" if display_TeX == "(null)" else display_TeX,
+        "full_TeX": "" if tex == "(null)" else matrix_scientific_notation_TeX(tex),
         "summary": " · ".join(summary_parts),
-        "binding_values": expression_variable_binding_values(input_text, precision),
+        "binding_values": binding_values,
     }
+    if evaluated_value:
+        payload["value"] = evaluated_value
+    if evaluated_pretty:
+        payload["value_pretty"] = evaluated_pretty
+    if evaluated_TeX:
+        payload["value_TeX"] = matrix_display_TeX(evaluated_TeX, precision)
     if svg:
         payload["svg"] = svg
     elif render_error:
@@ -15061,7 +15591,7 @@ ALMANAC_EVENT_OFFSET_CACHE: dict[tuple[str, str], float] = {}
 ALMANAC_JURISDICTION_LOCATION_CACHE: dict[tuple[str, str], tuple[str, str, str]] = {}
 JURISDICTION_OFFSET_TEXT_CACHE: dict[tuple[str, str], str] = {}
 DATETIME_FIELDS_CACHE: dict[tuple[str, str, str, str, str, str, str, str, str, str], dict[str, str]] = {}
-ALMANAC_RESPONSE_CACHE: dict[tuple[str, str, str, str, str, str, str, str], dict[str, object]] = {}
+ALMANAC_RESPONSE_CACHE: dict[tuple[str, str, str, str, str, str, str, str, str], dict[str, object]] = {}
 
 
 def canonical_float_cache_text(value: object) -> str:
@@ -15099,10 +15629,11 @@ def almanac_response_cache_key(date_text: str,
                                time_text: str,
                                zone_text: str,
                                jurisdiction: str,
+                               town_text: str,
                                latitude_text: str,
                                longitude_text: str,
                                body_text: str,
-                               visibility_text: str) -> tuple[str, str, str, str, str, str, str, str]:
+                               visibility_text: str) -> tuple[str, str, str, str, str, str, str, str, str]:
     time_match = re.fullmatch(r"(\d{2}):(\d{2})(?::(\d{2}(?:\.\d+)?))?", str(time_text or "").strip())
     if time_match:
         hour = int(time_match.group(1))
@@ -15128,6 +15659,7 @@ def almanac_response_cache_key(date_text: str,
         canonical_time,
         canonical_zone,
         normalize_holiday_jurisdiction(str(jurisdiction or "").strip()),
+        str(town_text or "").strip(),
         canonical_latitude,
         canonical_longitude,
         str(body_text or "").strip().upper(),
@@ -15543,8 +16075,11 @@ def prepare_almanac_fields(fields: dict[str, str]) -> dict[str, object]:
     zone_text = str(fields.get("zone") or "").strip()
     latitude_text = str(fields.get("latitude") or "").strip()
     longitude_text = str(fields.get("longitude") or "").strip()
+    town_name = str(fields.get("town") or "").split("|", 1)[0].strip()
     gha_aries = str(fields.get("gha_aries") or "").strip()
     jurisdiction_text = normalize_holiday_jurisdiction(str(fields.get("jurisdiction") or DEFAULT_HOLIDAY_JURISDICTION).strip())
+    jurisdiction_label = HOLIDAY_JURISDICTION_LABELS.get(jurisdiction_text, jurisdiction_text)
+    observer_location = f"{town_name}, {jurisdiction_label}" if town_name else jurisdiction_label
     event_year = str(fields.get("event_year") or date_text[:4]).strip()
     event_window = str(fields.get("event_window") or "").strip().replace("|", " to ")
     try:
@@ -15664,7 +16199,7 @@ def prepare_almanac_fields(fields: dict[str, str]) -> dict[str, object]:
         "mode": "almanac",
         "worksheet_title": ALMANAC_WORKSHEET_TITLE,
         "moment_text": f"GMT moment: {date_text} {time_text}".strip(),
-        "observer_text": f"Observer: {jurisdiction_text}, zone {zone_text}, latitude {latitude_text}, longitude {longitude_text}",
+        "observer_text": f"Observer: {observer_location}, zone {zone_text}, latitude {latitude_text}, longitude {longitude_text}",
         "body_text": (
             "Location of Navigational Bodies; "
             f"{'visible bodies only' if visibility_text == 'visible' else 'all bodies shown'}"
@@ -16103,6 +16638,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                 operation = str(payload.get("operation", "eval")).strip() or "eval"
                 operand = str(payload.get("operand", "")).strip()
                 precision = int(payload.get("precision", 96))
+                transient = bool(payload.get("transient", False))
             except Exception as exc:
                 self.send_json(400, {"ok": False, "error": f"Bad request: {exc}"})
                 return
@@ -16142,11 +16678,12 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                 return
 
             effective_operation = str(fields.get("operation") or operation).strip()
-            save_state_data({
-                "matrix": matrix_text,
-                "matrix_operation": effective_operation,
-                "matrix_operand": operand,
-            })
+            if not transient:
+                save_state_data({
+                    "matrix": matrix_text,
+                    "matrix_operation": effective_operation,
+                    "matrix_operand": operand,
+                })
             self.send_json(200, prepare_matrix_fields(fields, precision))
             return
 
@@ -16714,6 +17251,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                 time_text,
                 zone_text,
                 jurisdiction,
+                town_text,
                 latitude_text,
                 longitude_text,
                 body_text,
@@ -16769,6 +17307,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                         "almanac_visibility": visibility_text,
                     })
                     fields["jurisdiction"] = jurisdiction
+                    fields["town"] = town_text
                     fields["visibility"] = visibility_text
                     prepare_start = time.perf_counter()
                     response_payload = prepare_almanac_fields(fields)
@@ -16842,6 +17381,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                 "almanac_visibility": visibility_text,
             })
             fields["jurisdiction"] = jurisdiction
+            fields["town"] = town_text
             fields["visibility"] = visibility_text
             try:
                 prepare_start = time.perf_counter()
@@ -16880,6 +17420,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                     str(fields.get("time") or time_text).strip(),
                     str(fields.get("zone") or zone_text).strip(),
                     jurisdiction,
+                    town_text,
                     str(fields.get("latitude") or latitude_text).strip(),
                     str(fields.get("longitude") or longitude_text).strip(),
                     body_text,
