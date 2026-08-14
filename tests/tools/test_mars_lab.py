@@ -462,14 +462,22 @@ class MatrixResultTests(unittest.TestCase):
         help_html = mars_lab.INDEX_HTML
 
         self.assertIn("Matrix Notation And Aliases", help_html)
+        self.assertIn("Matrix Operation Selector", help_html)
+        self.assertIn("<code>Solve A X = B</code>", help_html)
         self.assertIn("((1 2; 3 4) - lambdaI)^x", help_html)
         self.assertIn("<code>A^dagger</code>", help_html)
         self.assertIn("<code>||A||</code>", help_html)
         self.assertIn("<code>determinant(A)</code>", help_html)
         self.assertIn("<code>conjugate_transpose(A)</code>", help_html)
         self.assertIn("Matrix Calculus And Values", help_html)
+        self.assertIn("Symbolic Matrix-power Calculus", help_html)
+        self.assertIn("<code>(1 2; 3 4)^x</code>", help_html)
+        self.assertIn("<code>x derivative</code> gives", help_html)
+        self.assertIn("<code>x integral</code> gives", help_html)
         self.assertIn("<code>A(x) + C</code>", help_html)
         self.assertIn("<code>Value</code> separately shows", help_html)
+        self.assertIn("<code>Use as input</code> copies", help_html)
+        self.assertIn("Lambert W, and exponential-integral matrix functions", help_html)
         self.assertIn("<code>conjugate(z)</code>", help_html)
         self.assertIn("<code>|z|</code>", help_html)
 
@@ -2503,6 +2511,17 @@ class ZZMarsLabReadmeExamples(unittest.TestCase):
             with self.subTest(screenshot=mode):
                 self.assertTrue(screenshot.is_file())
                 self.assertTrue(screenshot.read_bytes().startswith(b"\x89PNG\r\n\x1a\n"))
+
+        documentation = (ROOT / "docs" / "mars-lab.md").read_text(encoding="utf-8")
+        self.assertIn("After clicking <strong>Evaluate</strong>", documentation)
+        self.assertIn("After clicking <strong>x derivative</strong>", documentation)
+        self.assertIn("After clicking <strong>x integral</strong>", documentation)
+        for name in ("matrix-power-derivative", "matrix-power-integral"):
+            screenshot = ROOT / "docs" / "images" / "mars-lab" / f"{name}.png"
+            with self.subTest(screenshot=name):
+                self.assertTrue(screenshot.is_file())
+                self.assertTrue(screenshot.read_bytes().startswith(b"\x89PNG\r\n\x1a\n"))
+                self.assertIn(f"images/mars-lab/{name}.png", documentation)
 
 
 if __name__ == "__main__":

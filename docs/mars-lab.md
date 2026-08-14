@@ -80,10 +80,11 @@ Matrix mode accepts complete numeric and symbolic matrix expressions. Spaces
 separate columns and semicolons separate rows in compact input; comma-separated
 entries are also accepted. Write matrix functions directly in the expression,
 so `sin(1 2; 4 5)` means the sine of that complete matrix. The **Matrix
-operation** selector remains available for inverse, multiplication, solving,
-eigenvalue and other structural operations while their direct notation is
-still unfamiliar. Functions such as the inverse, logarithm and trigonometric
-families require a square matrix.
+operation** selector provides **Evaluate expression**, **Inverse**, **Multiply
+by another matrix**, **Eigenvalues**, **Eigendecompose**, **Characteristic
+polynomial**, **Determinant**, **Trace**, **Rank**, **Simplify symbolic matrix**
+and **Solve A X = B**. Functions such as the inverse, logarithm and
+trigonometric families require a square matrix.
 
 MARS Lab passes the entered text unchanged to
 `mat_expression_from_string(...)`. MARSlib owns the complete grammar and
@@ -110,6 +111,15 @@ The structural function names and their aliases are:
 | Transpose | `transpose(A)`, `trans(A)` |
 | Conjugate transpose | `hermitian(A)`, `adjoint(A)`, `ctranspose(A)`, `conjtrans(A)`, `conjugate_transpose(A)`, `A^dagger`, `A^H`, `A^*`, `A^†`, `A†` |
 
+Any unary scalar function supported by the native expression registry may be
+written around a square matrix. This includes exponential, logarithmic,
+trigonometric, inverse-trigonometric, hyperbolic, error, gamma, normal-density,
+Lambert W and exponential-integral families. The parser reports the canonical
+function name even when an alias such as `ln`, `log`, `Γ` or `productlog` was
+entered. Exact symbolic matrices are supported where MARSlib has an exact
+structured or small-matrix rule; otherwise, bind the entries to obtain a
+numeric matrix before applying a general numeric matrix function.
+
 Determinant bars must be paired: an input beginning with `|` or `||` without
 the corresponding closing delimiter is rejected. A determinant is a scalar,
 not a one-by-one matrix. The function vocabulary is recognised by MARSlib's
@@ -132,6 +142,38 @@ antiderivative. The variable buttons below the editor invoke the same native
 operations. A matrix antiderivative is displayed as `A(x) + C`, where `C` is a
 constant matrix with entries such as `C₁₁`, `C₁₂`, `C₂₁` and `C₂₂`.
 
+For a symbolic matrix-power example, enter `A^x` with `A = (1 2; 3 4)`.
+Writing
+
+- `λ₊ = (5 + √33)/2` and `λ₋ = (5 - √33)/2`, and
+- `P₊ = (A - λ₋I)/√33` and `P₋ = (λ₊I - A)/√33`,
+
+the evaluated expression is `A^x = λ₊^x P₊ + λ₋^x P₋`. The **x derivative**
+button returns
+`ln(λ₊)λ₊^x P₊ + ln(λ₋)λ₋^x P₋`. The **x integral** button returns
+`λ₊^x P₊/ln(λ₊) + λ₋^x P₋/ln(λ₋) + C`, where `C` is the independent constant
+matrix. MARS Lab expands these projector expressions into a `2 x 2` matrix in
+the result cards while retaining the exact `√33` terms.
+
+<figure>
+  <a href="images/mars-lab/matrix.png"><img src="images/mars-lab/matrix.png" alt="MARS Lab evaluating the symbolic matrix power (1 2; 3 4) raised to x"></a>
+  <figcaption><em>After clicking <strong>Evaluate</strong>.</em></figcaption>
+</figure>
+
+<br>
+
+<figure>
+  <a href="images/mars-lab/matrix-power-derivative.png"><img src="images/mars-lab/matrix-power-derivative.png" alt="MARS Lab differentiating the symbolic matrix power with respect to x"></a>
+  <figcaption><em>After clicking <strong>x derivative</strong>.</em></figcaption>
+</figure>
+
+<br>
+
+<figure>
+  <a href="images/mars-lab/matrix-power-integral.png"><img src="images/mars-lab/matrix-power-integral.png" alt="MARS Lab integrating the symbolic matrix power with respect to x and displaying the constant matrix"></a>
+  <figcaption><em>After clicking <strong>x integral</strong>.</em></figcaption>
+</figure>
+
 Result cards have distinct purposes:
 
 - **Rendered TeX** shows the exact symbolic result. Long decimal mantissas are
@@ -144,25 +186,23 @@ Result cards have distinct purposes:
   `(1 2; 3 4) - lambdaI` to `(-2 2; 3 1)` without replacing the symbolic
   result above it.
 
-The captured input is `sin(1 2; 4 5)`. MARS returns the sine of the complete
-`2 x 2` matrix, rather than applying scalar sine separately to its four
-entries. At normal display precision the output is approximately
-`(-0.3150025731, 0.1811582616; 0.3623165233, 0.0473139502)`.
-
-[![MARS Lab matrix mode calculating the sine of a complete matrix](images/mars-lab/matrix.png)](images/mars-lab/matrix.png)
+**Use as input** copies the reusable result expression back into the Matrix
+editor. **Back** and **Forward** navigate the Lab's Matrix workspace history;
+the editor, selected operation and right-hand operand are retained between
+sessions.
 
 The direct symbolic forms use the same editor:
 
 | Input | Output |
 |---|---|
 | `inverse(a b; c d)` | `(d/(ad-bc), -b/(ad-bc); -c/(ad-bc), a/(ad-bc))` |
-| `det((1 2; 3 4) - lambdaI)` | `(1-lambda)(4-lambda)-6` |
-| `tr(a b; c d)` | `a+d` |
+| `det((1 2; 3 4) - lambdaI)` | `(1-λ)(4-λ)-6` |
+| `tr(a b; c d)` | `{ a+d \|; a=NAN, d=NAN }` |
 | `(a b; c d)^dagger` | `(conj(a) conj(c); conj(b) conj(d))` |
 | `(a b; c d).(e f; g h)` | `(ae+bg, af+bh; ce+dg, cf+dh)` |
 | `inverse(a b; c d).(x; y)` | `((dx-by)/(ad-bc); (ay-cx)/(ad-bc))` |
 | `Dx(ax+b cx+d; y xy)` | `(a, c; 0, y)` |
-| `@S^x((ax+b cx+d; y xy))` | `(1/2(ax^2+2bx)+C, 1/2(cx^2+2dx)+C_1; xy+C_2, 1/2x^2y+C_3)` |
+| `@S^x((ax+b cx+d; y xy))` | `(½(ax²+2bx), ½(cx²+2dx); xy, ½x²y) + (C₁₁, C₁₂; C₂₁, C₂₂)` |
 
 ## Integrator mode
 
