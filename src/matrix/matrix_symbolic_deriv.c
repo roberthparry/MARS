@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define MARS_MATRIX_INTERNAL_ACCESS
 #include "matrix_internal.h"
@@ -14,8 +15,16 @@ static expr_t *mat_deriv_entry(const expr_t *entry, expr_t *wrt)
     expr_t *numerator_derivative = NULL;
     expr_t *derivative = NULL;
 
-    if (!expr_match_div_expr(entry, &numerator, &denominator))
-        return expr_create_deriv(entry, wrt);
+    if (!expr_match_div_expr(entry, &numerator, &denominator)) {
+        derivative = expr_create_deriv(entry, wrt);
+        if (derivative) {
+            expr_t *factored = expr_factor_common_post_calculus(derivative);
+
+            expr_free(derivative);
+            derivative = factored;
+        }
+        return derivative;
+    }
 
     denominator_derivative = expr_create_deriv(denominator, wrt);
     if (!denominator_derivative || !expr_is_exact_zero(denominator_derivative)) {
@@ -25,6 +34,12 @@ static expr_t *mat_deriv_entry(const expr_t *entry, expr_t *wrt)
 
     numerator_derivative = expr_create_deriv(numerator, wrt);
     derivative = numerator_derivative ? expr_div(numerator_derivative, denominator) : NULL;
+    if (derivative) {
+        expr_t *factored = expr_factor_common_post_calculus(derivative);
+
+        expr_free(derivative);
+        derivative = factored;
+    }
     expr_free(numerator_derivative);
     expr_free(denominator_derivative);
     return derivative;
@@ -148,6 +163,14 @@ matrix_t *mat_integrate(const matrix_t *A, expr_t *wrt)
                 mat_free(integrated);
                 return NULL;
             }
+            {
+                expr_t *factored = expr_factor_common_post_calculus(antiderivative);
+
+                if (factored) {
+                    expr_free(antiderivative);
+                    antiderivative = factored;
+                }
+            }
             mat_set(integrated, row, col, &antiderivative);
             expr_free(antiderivative);
         }
@@ -192,6 +215,15 @@ matrix_t *mat_integrate_family(const matrix_t *A, expr_t *wrt)
             expr_free(owned_entry);
             if (!antiderivative)
                 goto fail;
+
+            {
+                expr_t *factored = expr_factor_common_post_calculus(antiderivative);
+
+                if (factored) {
+                    expr_free(antiderivative);
+                    antiderivative = factored;
+                }
+            }
 
             snprintf(constant_name, sizeof(constant_name), "C_%zu%zu", row + 1u, col + 1u);
             constant = expr_new_named_const(NUM_NAN, constant_name);

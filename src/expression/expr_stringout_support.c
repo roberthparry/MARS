@@ -365,7 +365,8 @@ static const expr_tostring_TeX_map_t expr_tostring_vulgar_fraction_TeX_table[EXP
     [15] = {0x215D, "\\frac{5}{8}"}, [16] = {0x215E, "\\frac{7}{8}"}, [20] = {0x00BC, "\\frac{1}{4}"}};
 
 static const expr_tostring_TeX_map_t expr_tostring_symbol_TeX_table[EXPR_LATEX_HASH_SYMBOL_SIZE] = {
-    [0] = {0x2260, "\\neq"}, [1] = {0x2202, "\\partial"}, [2] = {0x221E, "\\infty"},  [3] = {0x00B7, " \\cdot "},
+    [0] = {0x2260, "\\neq"}, [1] = {0x2202, "\\partial"}, [2] = {0x221E, "\\infty"},
+    [3] = {0x00B7, "\\mkern-2mu "},
     [4] = {0x2264, "\\leq"}, [5] = {0x2265, "\\geq"},     [7] = {0x221A, "\\sqrt{}"}, [8] = {0x00D7, " \\times "}};
 
 static const expr_tostring_ascii_map_t expr_tostring_superscript_ascii_table[EXPR_ASCII_HASH_SUPERSCRIPT_SIZE] = {

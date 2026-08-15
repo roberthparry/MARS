@@ -2680,7 +2680,7 @@ number_t num_log(const number_t number)
         qf = number_impl_const(&number)->value.qf;
         return qf_lt(qf, QF_ZERO) ? number_qfloat_qcomplex_unary(qf, qc_log) : num_create_from_qfloat(qf_log(qf));
     }
-    if (number_is_plain_inexact_value(&number))
+    if (number_is_plain_inexact_value(&number) && (!num_is_real(number) || !num_lt(number, NUM_ZERO)))
         return number_log_backend(&number);
 
     if (!num_is_real(number)) {
@@ -2868,6 +2868,17 @@ number_t num_pow(const number_t base, const number_t exponent)
 
     if (number_try_get_exact_int(exponent, &exp_int))
         return num_pow_int(base, exp_int);
+
+    if (num_is_real(base) && num_lt(base, NUM_ZERO)) {
+        const number_binary_math_ops_t ops = {
+            .qreal = NULL,
+            .qcomplex = qc_pow,
+            .mpfr = NULL,
+            .mpc_complex = mpc_pow,
+        };
+
+        return number_apply_binary_mpc_complex(&base, &exponent, NUMBER_COMPLEX, &ops);
+    }
 
     return number_apply_binary_math(base, exponent, qf_pow, qc_pow, number_mpfr_pow_mut, mpc_pow);
 }

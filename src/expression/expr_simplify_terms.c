@@ -91,6 +91,15 @@ static int product_factor_group(const expr_t *dv)
 
     if (!base)
         return 3;
+    if (expr_is_unnamed_const(dv) && dv->binding_expr && dv->binding_expr->kind == EXPR_BINDING_EXPR_BINARY_OP &&
+        dv->binding_expr->u.binary_op.ops == &ops_pow) {
+        number_t power_base = expr_binding_expr_eval(dv->binding_expr->u.binary_op.left);
+        bool numeric_power = num_is_finite(power_base) && num_is_real(power_base);
+
+        num_destroy(&power_base);
+        if (numeric_power)
+            return 1;
+    }
     if ((expr_is_op(base, &ops_const) || expr_is_op(base, &ops_var)) && base->name && *base->name) {
         if (expr_is_op(base, &ops_var) && product_factor_is_primary_variable_name(base->name))
             return 1;
@@ -506,9 +515,13 @@ expr_t *expr_make_scaled(number_t coeff, expr_t *base)
         expr_free(base);
 
         scaled_num = expr_make_scaled(coeff, num);
-        r = expr_div(scaled_num, den);
-        expr_free(scaled_num);
-        expr_free(den);
+        if (expr_simplify_is_plain_real_const(scaled_num) && expr_is_op(den, &ops_pow)) {
+            r = expr_div_simplify_owned(scaled_num, den);
+        } else {
+            r = expr_div(scaled_num, den);
+            expr_free(scaled_num);
+            expr_free(den);
+        }
         return r;
     }
     {

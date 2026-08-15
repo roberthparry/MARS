@@ -72,10 +72,11 @@ static const binding_simplify_rule_t s_binding_mul_rules[] = {
     {binding_expr_try_fold_mul_leading_numbers}, {binding_expr_try_simplify_basic_product},
     {binding_expr_try_simplify_i_unit_product},  {binding_expr_try_simplify_exp_product},
     {binding_expr_try_simplify_lambert_product}, {binding_expr_try_simplify_trig_product},
-    {binding_expr_try_combine_mul_powers}};
+    {binding_expr_try_combine_mul_powers},       {binding_expr_try_combine_positive_numeric_square_roots}};
 
 static const binding_simplify_rule_t s_binding_div_rules[] = {{binding_expr_try_fold_exact_complex_owned},
                                                               {binding_expr_try_fold_number_owned},
+                                                              {binding_expr_try_absorb_numerator_power_base},
                                                               {binding_expr_try_simplify_basic_quotient},
                                                               {binding_expr_try_simplify_reciprocal_unary},
                                                               {binding_expr_try_fold_div_leading_number}};

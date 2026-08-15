@@ -293,15 +293,162 @@ expr_t *expr_simplify_try_sqrt_scaled_square_const(expr_t *arg)
     return out;
 }
 
+static expr_t *simplify_scaled_radical_quotient_term(const expr_t *term, const expr_t *den,
+                                                      const expr_t *den_root)
+{
+    const expr_t *coefficient;
+    const expr_t *remainder;
+    expr_t *quotient;
+    expr_t *out;
+
+    if (!expr_is_op(term, &ops_mul))
+        return NULL;
+    if (expr_is_addsub(term->a)) {
+        coefficient = term->a;
+        remainder = term->b;
+    } else if (expr_is_addsub(term->b)) {
+        coefficient = term->b;
+        remainder = term->a;
+    } else {
+        return NULL;
+    }
+    if (!expr_struct_eq(coefficient->a, den_root) || !expr_simplify_is_plain_real_const(coefficient->b))
+        return NULL;
+
+    quotient = expr_div_simplify_owned(expr_clone(coefficient), expr_clone(den));
+    out = quotient ? expr_mul_simplify_owned(quotient, expr_clone(remainder)) : NULL;
+    return out;
+}
+
 expr_t *expr_simplify_try_sqrt_quotient(expr_t *num, expr_t *den)
 {
+    bool pure_square_root;
+    bool scaled_square_root;
+    const expr_t *scalar = NULL;
+    const expr_t *rest = NULL;
     expr_t *quotient;
     expr_t *simplified_quotient;
     expr_t *root;
     expr_t *out;
 
-    if (!expr_is_sqrt_expr(num) || !expr_is_sqrt_expr(den) || !num->a || !den->a || !expr_is_const(den->a) ||
-        !num_is_real(den->a->c) || !num_gt(den->a->c, NUM_ZERO))
+    pure_square_root = expr_is_sqrt_expr(den) && den->a && expr_is_const(den->a) && num_is_real(den->a->c) &&
+                       num_gt(den->a->c, NUM_ZERO);
+    scaled_square_root = expr_is_op(den, &ops_mul) &&
+                         ((expr_simplify_is_plain_real_const(den->a) && expr_is_sqrt_expr(den->b)) ||
+                          (expr_is_sqrt_expr(den->a) && expr_simplify_is_plain_real_const(den->b)));
+    if (!pure_square_root && !scaled_square_root)
+        return NULL;
+
+    if (scaled_square_root && expr_is_addsub(num)) {
+        const expr_t *den_root = expr_simplify_is_plain_real_const(den->a) ? den->b : den->a;
+        expr_t *left = simplify_scaled_radical_quotient_term(num->a, den, den_root);
+        expr_t *right = simplify_scaled_radical_quotient_term(num->b, den, den_root);
+
+        if (left && right) {
+            out = expr_is_op(num, &ops_add) ? expr_add_simplify_owned(left, right)
+                                            : expr_sub_simplify_owned(left, right);
+            expr_free(num);
+            expr_free(den);
+            return out;
+        }
+        expr_free(right);
+        expr_free(left);
+    }
+
+    if (scaled_square_root && (expr_is_op(num, &ops_add) || expr_is_op(num, &ops_sub))) {
+        const expr_t *scale = expr_simplify_is_plain_real_const(den->a) ? den->a : den->b;
+        const expr_t *den_root = scale == den->a ? den->b : den->a;
+
+        if (expr_struct_eq(num->a, den_root) && expr_simplify_is_plain_real_const(num->b)) {
+            expr_t *ratio = expr_div_simplify_owned(expr_clone(num->b), expr_clone(den_root));
+            expr_t *one = expr_new_const(NUM_ONE);
+            expr_t *inside = expr_is_op(num, &ops_add) ? expr_add_simplify_owned(one, ratio)
+                                                       : expr_sub_simplify_owned(one, ratio);
+
+            out = expr_div_simplify_owned(inside, expr_clone(scale));
+            if (out) {
+                expr_free(num);
+                expr_free(den);
+            }
+            return out;
+        }
+    }
+
+    if ((expr_is_op(num, &ops_add) || expr_is_op(num, &ops_sub)) &&
+        (pure_square_root || (expr_is_div(num->a) && expr_is_div(num->b)))) {
+        expr_t *left = expr_div_simplify_owned(expr_clone(num->a), expr_clone(den));
+        expr_t *right = expr_div_simplify_owned(expr_clone(num->b), expr_clone(den));
+
+        out = expr_is_op(num, &ops_add) ? expr_add_simplify_owned(left, right) : expr_sub_simplify_owned(left, right);
+        if (out) {
+            expr_free(num);
+            expr_free(den);
+        }
+        return out;
+    }
+    if (!pure_square_root)
+        return NULL;
+
+    if (expr_simplify_is_plain_real_const(num)) {
+        scalar = num;
+    } else if (expr_is_op(num, &ops_mul) && expr_simplify_is_plain_real_const(num->a)) {
+        scalar = num->a;
+        rest = num->b;
+    }
+    if (scalar) {
+        number_t square = num_mul(scalar->c, scalar->c);
+        number_t common_factor;
+        number_t radicand;
+        expr_t *radicand_expr;
+        expr_t *raw_root;
+        expr_t *simplified_root;
+        expr_t *signed_root;
+
+        if (!num_is_integer(square) || !num_is_integer(den->a->c)) {
+            num_destroy(&square);
+            return NULL;
+        }
+        common_factor = num_gcd(square, den->a->c);
+        if (!num_gt(common_factor, NUM_ONE)) {
+            num_destroy(&common_factor);
+            num_destroy(&square);
+            return NULL;
+        }
+        num_destroy(&common_factor);
+        radicand = num_div(square, den->a->c);
+        radicand_expr = expr_new_const(radicand);
+        raw_root = radicand_expr ? expr_sqrt(radicand_expr) : NULL;
+        simplified_root = raw_root ? expr_simplify(raw_root) : NULL;
+        signed_root = simplified_root;
+        num_destroy(&radicand);
+        num_destroy(&square);
+        expr_free(raw_root);
+        expr_free(radicand_expr);
+        if (!simplified_root)
+            return NULL;
+        if (num_lt(scalar->c, NUM_ZERO)) {
+            signed_root = expr_neg(simplified_root);
+            expr_free(simplified_root);
+            if (!signed_root)
+                return NULL;
+        }
+        if (rest) {
+            expr_t *raw_product = expr_mul(signed_root, rest);
+
+            out = raw_product ? expr_simplify(raw_product) : NULL;
+            expr_free(raw_product);
+        } else {
+            out = signed_root;
+            signed_root = NULL;
+        }
+        expr_free(signed_root);
+        if (out) {
+            expr_free(num);
+            expr_free(den);
+        }
+        return out;
+    }
+    if (!expr_is_sqrt_expr(num) || !num->a)
         return NULL;
 
     quotient = expr_div(num->a, den->a);

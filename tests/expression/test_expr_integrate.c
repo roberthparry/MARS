@@ -1775,7 +1775,7 @@ static void test_integrate_symbolic_shifted_sqrt(void)
     ASSERT_NOT_NULL(tex);
     print_antiderivative_text("{ 1/sqrt(a-bx) }", text);
     ASSERT_TRUE(strstr(text, "-2·√(a - bx)/b") != NULL);
-    ASSERT_TRUE(strstr(tex, "\\sqrt{a - b x}") != NULL);
+    ASSERT_TRUE(strstr(tex, "\\sqrt{a - b\\,x}") != NULL);
     ASSERT_TRUE(strstr(tex, "^{\\frac{1}{2}}") == NULL);
 
     free(tex);
@@ -1810,7 +1810,7 @@ static void test_integrate_symbolic_shifted_sqrt(void)
     ASSERT_NOT_NULL(tex);
     print_antiderivative_text("{ 1/sqrt((a-bx)^3) }", text);
     ASSERT_TRUE(strstr(text, "2/(b·√(a - bx))") != NULL);
-    ASSERT_TRUE(strstr(tex, "\\frac{2}{b \\cdot \\sqrt{a - b x}}") != NULL);
+    ASSERT_TRUE(strstr(tex, "\\frac{2}{b\\,\\sqrt{a - b x}}") != NULL);
     ASSERT_TRUE(strstr(tex, "\\sqrt{a - b x}") != NULL);
     ASSERT_TRUE(strstr(tex, "^{\\frac{1}{2}}") == NULL);
 
@@ -1834,7 +1834,7 @@ static void test_integrate_symbolic_shifted_sqrt(void)
     ASSERT_NOT_NULL(tex);
     print_antiderivative_text("{ 1/sqrt((a-bx)^4) }", text);
     ASSERT_TRUE(strstr(text, "1/(b·(a - bx))") != NULL);
-    ASSERT_TRUE(strstr(tex, "\\frac{1}{b \\cdot \\left(a - b x\\right)}") != NULL);
+    ASSERT_TRUE(strstr(tex, "\\frac{1}{b\\,\\left(a - b x\\right)}") != NULL);
 
     free(tex);
     free(text);
@@ -1856,7 +1856,7 @@ static void test_integrate_symbolic_shifted_sqrt(void)
     ASSERT_NOT_NULL(tex);
     print_antiderivative_text("{ 1/sqrt((a-bx)^5) }", text);
     ASSERT_TRUE(strstr(text, "2/(3b·(a - bx)^³⁄₂)") != NULL);
-    ASSERT_TRUE(strstr(tex, "\\frac{2}{3 b \\cdot \\left(a - b x\\right)^{\\frac{3}{2}}}") != NULL);
+    ASSERT_TRUE(strstr(tex, "\\frac{2}{3 b\\,\\left(a - b x\\right)^{\\frac{3}{2}}}") != NULL);
     ASSERT_TRUE(strstr(tex, "\\frac{\\frac{2}{3}}") == NULL);
 
     free(tex);

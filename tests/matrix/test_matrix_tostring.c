@@ -266,7 +266,7 @@ static void test_mat_to_string_numeric_TeX(void)
     check_bool("mat_to_string number tex non-null", tex != NULL);
     check_bool("mat_to_string number tex begins bmatrix", tex && strstr(tex, "\\begin{bmatrix}") != NULL);
     check_bool("mat_to_string number tex uses column separator", tex && strstr(tex, "1 & 2") != NULL);
-    check_bool("mat_to_string number tex uses spaced row separator", tex && strstr(tex, " \\\\[4pt] 3 & 4") != NULL);
+    check_bool("mat_to_string number tex uses spaced row separator", tex && strstr(tex, " \\\\[10pt] 3 & 4") != NULL);
 
     free(tex);
     mat_free(A);
@@ -380,7 +380,7 @@ static void test_mat_to_string_symbolic_TeX(void)
                tex && strstr(tex, "x_{0}") != NULL && strstr(tex, "c_{1}") != NULL);
     check_bool("mat_to_string symbolic tex has middle bar", tex && strstr(tex, "\\middle|") != NULL);
     check_bool("mat_body_to_string symbolic tex omits bindings",
-               body_tex && strcmp(body_tex, "\\begin{bmatrix}x_{0} & 1 \\\\[4pt] 1 & c_{1}\\end{bmatrix}") == 0);
+               body_tex && strcmp(body_tex, "\\begin{bmatrix}x_{0} & 1 \\\\[10pt] 1 & c_{1}\\end{bmatrix}") == 0);
 
     free(body_tex);
     free(tex);
@@ -394,7 +394,7 @@ static void test_mat_to_string_symbolic_TeX_exact(void)
     matrix_t *A = mat_from_string_expr("{ (sin(x0), exp(c1); ln(x0), c1^2) | x0 = 2; c1 = 5 }", &bindings);
     char *tex = mat_to_string(A, MAT_STRING_LATEX);
 
-    const char *expect = "\\left\\{ \\begin{bmatrix}\\sin(x_{0}) & e^{c_{1}} \\\\[4pt] "
+    const char *expect = "\\left\\{ \\begin{bmatrix}\\sin(x_{0}) & e^{c_{1}} \\\\[10pt] "
                          "\\ln(x_{0}) & c_{1}^{2}\\end{bmatrix} \\;\\middle|\\; "
                          "x_{0} = 2; c_{1} = 5 \\right\\}";
 
@@ -413,7 +413,7 @@ static void test_mat_to_string_symbolic_TeX_no_bindings_exact(void)
     mat_bindings_t *bindings = NULL;
     matrix_t *A = mat_from_string_expr("(sin(x0), exp(c1); ln(x0), c1^2)", &bindings);
     char *tex = mat_to_string(A, MAT_STRING_LATEX);
-    const char *expect = "\\begin{bmatrix}\\sin(x_{0}) & e^{c_{1}} \\\\[4pt] "
+    const char *expect = "\\begin{bmatrix}\\sin(x_{0}) & e^{c_{1}} \\\\[10pt] "
                          "\\ln(x_{0}) & c_{1}^{2}\\end{bmatrix}";
 
     matrix_TeX_preview_emit_case(__FILE__, "symbolic matrix exact without bindings (TEX)", tex);

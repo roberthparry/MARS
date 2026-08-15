@@ -886,9 +886,57 @@ static const char *factor_sort_name(const expr_t *f)
     return first_var_name(f->a);
 }
 
-/* Stable insertion sort for factor arrays.
- * Within group 4 (functions), sort shallower expressions first so that
- * e.g. cos(x) (depth 2) appears before exp(sin(x)) (depth 3). */
+static int factor_power_log_order(const expr_t *left, const expr_t *right)
+{
+    bool left_sum = expr_is_addsub(left);
+    bool right_sum = expr_is_addsub(right);
+    bool left_power = expr_is_op(left, &ops_pow) || expr_is_pow_d_expr(left);
+    bool right_power = expr_is_op(right, &ops_pow) || expr_is_pow_d_expr(right);
+    bool left_log = expr_is_op(left, &ops_log);
+    bool right_log = expr_is_op(right, &ops_log);
+    bool left_preserved_power = expr_is_unnamed_const(left) && left->binding_expr &&
+                                left->binding_expr->kind == EXPR_BINDING_EXPR_BINARY_OP &&
+                                left->binding_expr->u.binary_op.ops == &ops_pow;
+    bool right_preserved_power = expr_is_unnamed_const(right) && right->binding_expr &&
+                                 right->binding_expr->kind == EXPR_BINDING_EXPR_BINARY_OP &&
+                                 right->binding_expr->u.binary_op.ops == &ops_pow;
+    bool left_preserved_sqrt = expr_is_unnamed_const(left) && left->binding_expr &&
+                               left->binding_expr->kind == EXPR_BINDING_EXPR_UNARY_OP &&
+                               left->binding_expr->u.unary_op.ops == &ops_sqrt;
+    bool right_preserved_sqrt = expr_is_unnamed_const(right) && right->binding_expr &&
+                                right->binding_expr->kind == EXPR_BINDING_EXPR_UNARY_OP &&
+                                right->binding_expr->u.unary_op.ops == &ops_sqrt;
+
+    if (left_preserved_power && right_preserved_power) {
+        number_t left_exponent = expr_binding_expr_eval(left->binding_expr->u.binary_op.right);
+        number_t right_exponent = expr_binding_expr_eval(right->binding_expr->u.binary_op.right);
+        bool left_symbolic = num_is_nan(left_exponent);
+        bool right_symbolic = num_is_nan(right_exponent);
+
+        num_destroy(&right_exponent);
+        num_destroy(&left_exponent);
+        if (left_symbolic != right_symbolic)
+            return left_symbolic ? -1 : 1;
+    }
+
+    if (left_preserved_power && right_preserved_sqrt)
+        return -1;
+    if (left_preserved_sqrt && right_preserved_power)
+        return 1;
+
+    if (left_sum && right_power)
+        return -1;
+    if (left_power && right_sum)
+        return 1;
+    if (left_power && right_log)
+        return -1;
+    if (left_log && right_power)
+        return 1;
+    return 0;
+}
+
+/* Stable insertion sort for factor arrays. Within the function group, place powers before logarithms; otherwise sort
+ * shallower expressions first so that, for example, cos(x) appears before exp(sin(x)). */
 static void sort_factors(expr_t **fac, int n)
 {
     for (int s = 1; s < n; s++) {
@@ -899,12 +947,20 @@ static void sort_factors(expr_t **fac, int n)
         int t = s - 1;
         while (t >= 0) {
             int tg = factor_group(fac[t]);
-            int cmp;
-            if (tg != kg) {
+            int cmp = factor_power_log_order(fac[t], key);
+
+            if (cmp != 0) {
+                /* Keep this explicit algebraic preference across the broader factor groups. */
+            } else if (tg != kg) {
                 cmp = tg - kg;
             } else if (kg == 5) {
-                int td = factor_depth(fac[t]);
-                cmp = (td != kd) ? (td - kd) : strcmp(factor_sort_name(fac[t]), kn);
+                cmp = factor_power_log_order(fac[t], key);
+
+                if (cmp == 0) {
+                    int td = factor_depth(fac[t]);
+
+                    cmp = (td != kd) ? (td - kd) : strcmp(factor_sort_name(fac[t]), kn);
+                }
             } else {
                 cmp = strcmp(factor_sort_name(fac[t]), kn);
             }
@@ -1346,6 +1402,34 @@ static bool match_atan_over_argument_denominator(const expr_t *expr, const expr_
     if (denominator_out)
         *denominator_out = expr->b;
     return true;
+}
+
+static bool match_sum_quotient(const expr_t *expr, const expr_t **factor_out, const expr_t **sum_out)
+{
+    if (!expr || !expr_is_op(expr, &ops_div) || !expr->a || !expr->b)
+        return false;
+    if (expr_is_addsub(expr->a)) {
+        *factor_out = NULL;
+        *sum_out = expr->a;
+        return true;
+    }
+    if (expr_is_mul(expr->a) && expr_is_addsub(expr->a->a)) {
+        *factor_out = expr->a->b;
+        *sum_out = expr->a->a;
+        return true;
+    }
+    if (expr_is_mul(expr->a) && expr_is_addsub(expr->a->b)) {
+        *factor_out = expr->a->a;
+        *sum_out = expr->a->b;
+        return true;
+    }
+    return false;
+}
+
+static bool match_sqrt_plus_positive_constant(const expr_t *expr)
+{
+    return expr && expr_is_op(expr, &ops_add) && expr->a && expr->b && expr_is_sqrt_expr(expr->a) &&
+           expr_is_const(expr->b) && num_is_real(expr->b->c) && num_gt(expr->b->c, NUM_ZERO);
 }
 
 static int expr_is_negative(const expr_t *f)
@@ -2711,6 +2795,21 @@ static void emit_TeX_factor_abs(const expr_t *f, sbuf_t *b)
         emit_TeX_expr(f, b, PREC_MUL);
 }
 
+static void emit_TeX_mul_separator(const expr_t *left, const expr_t *right, sbuf_t *b)
+{
+    (void)left;
+    (void)right;
+    sbuf_puts(b, "\\mkern-2mu ");
+}
+
+static bool expr_is_rendered_log_local(const expr_t *expr)
+{
+    return expr_is_op(expr, &ops_log) ||
+           (expr && expr_is_const(expr) && expr->binding_expr &&
+            expr->binding_expr->kind == EXPR_BINDING_EXPR_UNARY_OP &&
+            expr->binding_expr->u.unary_op.ops == &ops_log);
+}
+
 static void emit_TeX_expr_abs(const expr_t *f, sbuf_t *b, int parent_prec)
 {
     if (!f) {
@@ -2764,15 +2863,8 @@ static void emit_TeX_expr_abs(const expr_t *f, sbuf_t *b, int parent_prec)
         }
 
         for (int i = 0; i < n; ++i) {
-            if (i > 0) {
-                int left_atomic = is_atomic_for_mul(fac[i - 1]);
-                int right_atomic = is_atomic_for_mul(fac[i]);
-
-                if (left_atomic && right_atomic)
-                    sbuf_putc(b, ' ');
-                else
-                    sbuf_puts(b, " \\cdot ");
-            }
+            if (i > 0)
+                emit_TeX_mul_separator(fac[i - 1], fac[i], b);
             if (n > 1 && mul_factor_needs_visible_parens(fac[i]))
                 sbuf_puts(b, "\\left(");
             emit_TeX_factor_abs(fac[i], b);
@@ -3071,15 +3163,8 @@ void emit_TeX_expr(const expr_t *f, sbuf_t *b, int parent_prec)
             sbuf_putc(b, '-');
 
         for (int i = 0; i < n; i++) {
-            if (i > 0) {
-                int left_atomic = is_atomic_for_mul(fac[i - 1]);
-                int right_atomic = is_atomic_for_mul(fac[i]);
-
-                if (left_atomic && right_atomic)
-                    sbuf_putc(b, ' ');
-                else
-                    sbuf_puts(b, " \\cdot ");
-            }
+            if (i > 0)
+                emit_TeX_mul_separator(fac[i - 1], fac[i], b);
             if (n > 1 && mul_factor_needs_visible_parens(fac[i]))
                 sbuf_puts(b, "\\left(");
             emit_TeX_factor_abs(fac[i], b);
@@ -3100,6 +3185,17 @@ void emit_TeX_expr(const expr_t *f, sbuf_t *b, int parent_prec)
         const expr_t *complex_shift_base = NULL;
         const expr_t *complex_shift_real = NULL;
         const expr_t *complex_shift_imag = NULL;
+
+        if (match_sqrt_plus_positive_constant(f)) {
+            if (need)
+                sbuf_puts(b, "\\left(");
+            emit_TeX_expr(f->b, b, PREC_ADD);
+            sbuf_puts(b, " + ");
+            emit_TeX_expr(f->a, b, PREC_ADD);
+            if (need)
+                sbuf_puts(b, "\\right)");
+            return;
+        }
 
         if (match_add_negative_complex_rhs(f, &negative_complex_base, &negative_complex_rhs)) {
             if (need)
@@ -3167,6 +3263,41 @@ void emit_TeX_expr(const expr_t *f, sbuf_t *b, int parent_prec)
         bool neg_den = expr_is_negative(f->b);
         const expr_t *atan_expr = NULL;
         const expr_t *denominator = NULL;
+        const expr_t *common_numerator_factor = NULL;
+        const expr_t *common_sum = NULL;
+
+        if (expr_is_div(f->a) && f->a->a && f->a->b) {
+            if (need)
+                sbuf_puts(b, "\\left(");
+            sbuf_puts(b, "\\frac{");
+            emit_TeX_expr(f->a->a, b, PREC_LOWEST);
+            sbuf_puts(b, "}{");
+            emit_TeX_expr(f->a->b, b, PREC_MUL);
+            sbuf_puts(b, "\\mkern-2mu ");
+            emit_TeX_expr(f->b, b, PREC_MUL);
+            sbuf_putc(b, '}');
+            if (need)
+                sbuf_puts(b, "\\right)");
+            return;
+        }
+
+        if (!expr_is_rendered_log_local(f->b) && match_sum_quotient(f, &common_numerator_factor, &common_sum)) {
+            if (need)
+                sbuf_puts(b, "\\left(");
+            sbuf_puts(b, "\\frac{1}{");
+            emit_TeX_expr(f->b, b, PREC_LOWEST);
+            sbuf_putc(b, '}');
+            if (common_numerator_factor) {
+                sbuf_puts(b, "\\mkern-2mu ");
+                emit_TeX_expr(common_numerator_factor, b, PREC_LOWEST);
+            }
+            sbuf_puts(b, "\\mkern-5mu \\left(");
+            emit_TeX_expr(common_sum, b, PREC_LOWEST);
+            sbuf_puts(b, "\\right)");
+            if (need)
+                sbuf_puts(b, "\\right)");
+            return;
+        }
 
         if (match_atan_over_argument_denominator(f, &atan_expr, &denominator) && !expr_is_negative(denominator)) {
             if (need)
@@ -3588,6 +3719,17 @@ void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
         const expr_t *complex_shift_real = NULL;
         const expr_t *complex_shift_imag = NULL;
 
+        if (match_sqrt_plus_positive_constant(f)) {
+            if (need)
+                sbuf_putc(b, '(');
+            emit_expr(f->b, b, PREC_ADD);
+            sbuf_puts(b, " + ");
+            emit_expr(f->a, b, PREC_ADD);
+            if (need)
+                sbuf_putc(b, ')');
+            return;
+        }
+
         if (match_add_negative_complex_rhs(f, &negative_complex_base, &negative_complex_rhs)) {
             if (need)
                 sbuf_putc(b, '(');
@@ -3662,6 +3804,38 @@ void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
         bool neg = neg_num ^ neg_den;
         const expr_t *atan_expr = NULL;
         const expr_t *denominator = NULL;
+        const expr_t *common_numerator_factor = NULL;
+        const expr_t *common_sum = NULL;
+
+        if (expr_is_div(f->a) && f->a->a && f->a->b) {
+            if (need)
+                sbuf_putc(b, '(');
+            emit_expr(f->a->a, b, PREC_MUL);
+            sbuf_putc(b, '/');
+            emit_expr(f->a->b, b, PREC_MUL);
+            sbuf_puts(b, "·");
+            emit_expr(f->b, b, PREC_MUL);
+            if (need)
+                sbuf_putc(b, ')');
+            return;
+        }
+
+        if (!expr_is_rendered_log_local(f->b) && match_sum_quotient(f, &common_numerator_factor, &common_sum)) {
+            if (need)
+                sbuf_putc(b, '(');
+            if (common_numerator_factor)
+                emit_expr(common_numerator_factor, b, PREC_MUL);
+            else
+                sbuf_putc(b, '1');
+            sbuf_putc(b, '/');
+            emit_expr(f->b, b, PREC_POW);
+            sbuf_puts(b, "·(");
+            emit_expr(common_sum, b, PREC_LOWEST);
+            sbuf_putc(b, ')');
+            if (need)
+                sbuf_putc(b, ')');
+            return;
+        }
 
         if (match_atan_over_argument_denominator(f, &atan_expr, &denominator) && !expr_is_negative(denominator)) {
             if (need)
@@ -3966,6 +4140,17 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
     if (expr_is_addsub(f)) {
         int need = PREC_ADD < parent_prec;
         int neg;
+
+        if (match_sqrt_plus_positive_constant(f)) {
+            if (need)
+                sbuf_putc(b, '(');
+            emit_func(f->b, b, PREC_ADD);
+            sbuf_puts(b, " + ");
+            emit_func(f->a, b, PREC_ADD);
+            if (need)
+                sbuf_putc(b, ')');
+            return;
+        }
 
         if (need)
             sbuf_putc(b, '(');

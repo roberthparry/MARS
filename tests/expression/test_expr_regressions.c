@@ -1874,7 +1874,7 @@ static void test_preserved_complex_function_addend_stays_ungrouped(void)
     char *text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
     char *tex = expr ? expr_to_string(expr, style_LATEX) : NULL;
     const char *expect = "{ -c·exp(c) + W(-2) | c = -2 }";
-    const char *expect_TeX = "\\left\\{ -c \\cdot e^{c} + W(-2) \\;\\middle|\\; c = -2 \\right\\}";
+    const char *expect_TeX = "\\left\\{ -c\\,e^{c} + W(-2) \\;\\middle|\\; c = -2 \\right\\}";
 
     if (str_eq(text, expect))
         to_string_pass("preserved complex function addend stays ungrouped", text, expect);
@@ -2898,6 +2898,64 @@ static void test_sqrt_quotient_combines_positive_real_denominator(void)
     expr_free(pi);
 }
 
+static void test_real_scalar_over_square_root_combines_into_one_root(void)
+{
+    number_t three_value = num_create_from_long(3L);
+    number_t thirty_three_value = num_create_from_long(33L);
+    expr_t *three = expr_new_const(three_value);
+    expr_t *thirty_three = expr_new_const(thirty_three_value);
+    expr_t *scaled_three = expr_new_const(three_value);
+    expr_t *scaled_thirty_three = expr_new_const(thirty_three_value);
+    expr_t *x = expr_new_var(NUM_NAN);
+    expr_t *scalar_root = expr_sqrt(thirty_three);
+    expr_t *scaled_root = expr_sqrt(scaled_thirty_three);
+    expr_t *scaled_num;
+    expr_t *raw_scalar;
+    expr_t *raw_scaled;
+    expr_t *scalar;
+    expr_t *scaled;
+    char *scalar_text;
+    char *scaled_text;
+
+    expr_set_name(x, "x");
+    scaled_num = expr_mul(scaled_three, x);
+    raw_scalar = expr_div(three, scalar_root);
+    raw_scaled = expr_div(scaled_num, scaled_root);
+    scalar = raw_scalar ? expr_simplify(raw_scalar) : NULL;
+    scaled = raw_scaled ? expr_simplify(raw_scaled) : NULL;
+    scalar_text = scalar ? expr_to_string(scalar, style_UNBOUND) : NULL;
+    scaled_text = scaled ? expr_to_string(scaled, style_UNBOUND) : NULL;
+
+    if (str_eq(scalar_text, "√(³⁄₁₁)"))
+        to_string_pass("real scalar over square root combines into one root", scalar_text, "√(³⁄₁₁)");
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "real scalar over square root combines into one root",
+                       scalar_text ? scalar_text : "(null)", "√(³⁄₁₁)");
+
+    if (str_eq(scaled_text, "√(³⁄₁₁)·x"))
+        to_string_pass("leading real scalar over square root combines into one root", scaled_text, "√(³⁄₁₁)·x");
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "leading real scalar over square root combines into one root",
+                       scaled_text ? scaled_text : "(null)", "√(³⁄₁₁)·x");
+
+    free(scaled_text);
+    free(scalar_text);
+    expr_free(scaled);
+    expr_free(scalar);
+    expr_free(raw_scaled);
+    expr_free(raw_scalar);
+    expr_free(scaled_num);
+    expr_free(scaled_root);
+    expr_free(scalar_root);
+    expr_free(x);
+    expr_free(scaled_thirty_three);
+    expr_free(scaled_three);
+    expr_free(thirty_three);
+    expr_free(three);
+    num_destroy(&thirty_three_value);
+    num_destroy(&three_value);
+}
+
 static void test_nested_symbolic_pi_derivative_has_no_decimalized_coefficients(void)
 {
     expr_bindings_t *bindings = NULL;
@@ -3798,6 +3856,7 @@ void test_runtime_regressions(void)
     TEST_RUN_SUBTEST(test_binary_constants_preserve_user_literals_in_derivatives, NULL);
     TEST_RUN_SUBTEST(test_symbolic_negative_pi_quotient_stays_symbolic, NULL);
     TEST_RUN_SUBTEST(test_sqrt_quotient_combines_positive_real_denominator, NULL);
+    TEST_RUN_SUBTEST(test_real_scalar_over_square_root_combines_into_one_root, NULL);
     TEST_RUN_SUBTEST(test_symbolic_power_derivative_uses_n_minus_one_form, NULL);
     TEST_RUN_SUBTEST(test_named_half_exponent_round_trips_as_symbolic_power, NULL);
     TEST_RUN_SUBTEST(test_symbolic_function_power_matches_parenthesized_power, NULL);

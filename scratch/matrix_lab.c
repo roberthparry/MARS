@@ -848,10 +848,9 @@ int main(int argc, char **argv)
         operation = parsed_operation;
         printf("input       %s\n", input);
         printf("operation   %s\n", operation);
-        if (strcmp(operation, "eval") == 0 && mat_typeof(matrix) == MAT_TYPE_EXPR &&
+        if ((strcmp(operation, "eval") == 0 || strcmp(operation, "power") == 0) && mat_typeof(matrix) == MAT_TYPE_EXPR &&
             matrix_bindings_have_variables(bindings) && matrix_bindings_have_resolved_values(bindings)) {
-            result = matrix_bindings_are_resolved(bindings) ? mat_evaluate(matrix)
-                                                            : matrix_partially_evaluate(matrix, bindings);
+            result = matrix_partially_evaluate(matrix, bindings);
             print_matrix_fields(matrix);
             if (result)
                 print_matrix_value_fields(result);

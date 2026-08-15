@@ -4409,7 +4409,8 @@ cleanup:
 
 static expr_t *mat_pow_expr_projector_entry(const matrix_t *A, size_t row, size_t col, const expr_t *lambda_plus,
                                             const expr_t *lambda_minus, const expr_t *lambda_plus_power,
-                                            const expr_t *lambda_minus_power, const expr_t *eigenvalue_difference)
+                                            const expr_t *lambda_minus_power, const expr_t *eigenvalue_difference,
+                                            const expr_t *eigenvalue_difference_squared, const expr_t *exponent)
 {
     number_t value = number_invalid();
     expr_t *entry = NULL;
@@ -4430,6 +4431,55 @@ static expr_t *mat_pow_expr_projector_entry(const matrix_t *A, size_t row, size_
     }
     if (!entry)
         return NULL;
+
+    value = expr_get_val(entry);
+    if (row != col && num_is_exact(value) && num_eq(value, NUM_TWO)) {
+        expr_t *unscaled_plus = expr_mul_long(lambda_plus, 2L);
+        expr_t *unscaled_minus = expr_mul_long(lambda_minus, 2L);
+
+        unscaled_plus = expr_simplify_owned(unscaled_plus);
+        unscaled_minus = expr_simplify_owned(unscaled_minus);
+        expr_t *unscaled_plus_power = unscaled_plus ? expr_pow_xp(unscaled_plus, exponent) : NULL;
+        expr_t *unscaled_minus_power = unscaled_minus ? expr_pow_xp(unscaled_minus, exponent) : NULL;
+        expr_t *numerator = unscaled_plus_power && unscaled_minus_power
+                                ? expr_sub(unscaled_plus_power, unscaled_minus_power)
+                                : NULL;
+        expr_t *one = expr_new_const(NUM_ONE);
+        expr_t *two = expr_new_const(NUM_TWO);
+        expr_t *shifted_exponent = one ? expr_sub(exponent, one) : NULL;
+        expr_t *two_power = shifted_exponent && two ? expr_pow_xp(two, shifted_exponent) : NULL;
+        expr_t *denominator = NULL;
+        number_t shifted_value = shifted_exponent ? expr_get_val(shifted_exponent) : number_invalid();
+
+        if (!expr_is_variable(exponent) && num_is_exact(shifted_value) && num_eq(shifted_value, NUM_HALF) &&
+            eigenvalue_difference_squared) {
+            expr_t *combined_radicand = expr_mul_long(eigenvalue_difference_squared, 2L);
+
+            combined_radicand = expr_simplify_owned(combined_radicand);
+            denominator = combined_radicand ? expr_sqrt(combined_radicand) : NULL;
+            expr_free(combined_radicand);
+            denominator = expr_simplify_owned(denominator);
+        } else {
+            denominator = two_power ? expr_mul(two_power, eigenvalue_difference) : NULL;
+        }
+        num_destroy(&shifted_value);
+
+        num_destroy(&value);
+        result = numerator && denominator ? expr_div(numerator, denominator) : NULL;
+        expr_free(denominator);
+        expr_free(two_power);
+        expr_free(shifted_exponent);
+        expr_free(two);
+        expr_free(one);
+        expr_free(numerator);
+        expr_free(unscaled_minus_power);
+        expr_free(unscaled_plus_power);
+        expr_free(unscaled_minus);
+        expr_free(unscaled_plus);
+        expr_free(entry);
+        return result;
+    }
+    num_destroy(&value);
 
     if (row == col) {
         plus_numerator = expr_sub(entry, lambda_minus);
@@ -4560,7 +4610,7 @@ static matrix_t *mat_pow_expr_exact_small(const matrix_t *A, const expr_t *expon
     for (size_t row = 0u; row < 2u; ++row) {
         for (size_t col = 0u; col < 2u; ++col) {
             expr_t *entry = mat_pow_expr_projector_entry(A, row, col, lambda_plus, lambda_minus, lambda_plus_power,
-                                                         lambda_minus_power, root);
+                                                         lambda_minus_power, root, discriminant_expr, exponent);
 
             if (!entry) {
                 mat_free(result);
@@ -4571,7 +4621,7 @@ static matrix_t *mat_pow_expr_exact_small(const matrix_t *A, const expr_t *expon
             expr_free(entry);
         }
     }
-    result = mat_finalize_symbolic_result(result);
+    /* Each projector entry is simplified as it is constructed. */
 
 cleanup:
     expr_free(lambda_minus_power);

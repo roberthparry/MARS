@@ -439,7 +439,8 @@ static string_t *de_repeated_quadratic_to_TeX(const diffequ_t *de)
         } else if (string_append_cstr(out, subtract ? " - " : " + ") != 0) {
             goto term_fail;
         }
-        if (!unit && (string_append_cstr(out, coefficient_TeX) != 0 || string_append_cstr(out, " \\cdot ") != 0))
+        if (!unit &&
+            (string_append_cstr(out, coefficient_TeX) != 0 || string_append_cstr(out, "\\mkern-2mu ") != 0))
             goto term_fail;
         if (order == 0u) {
             if (string_append_cstr(out, dependent_TeX) != 0)

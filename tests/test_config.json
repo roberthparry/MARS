@@ -640,6 +640,7 @@
         "test_preserved_reciprocal_constant_derivative_round_trips": true,
         "test_productlog_small_complex_inverse_uses_principal_branch": true,
         "test_pure_imaginary_addend_stays_ungrouped": true,
+        "test_real_scalar_over_square_root_combines_into_one_root": true,
         "test_removable_trig_quotient_at_zero_evaluates_to_limit": true,
         "test_repeated_preserved_log_factor_combines_as_power": true,
         "test_set_val_num_named_constant": true,

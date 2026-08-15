@@ -87,6 +87,10 @@ static void print_solution_TeX(const char *key, const diffequ_solve_result_t *re
     if (!key || count == 0u)
         return;
 
+    /* Preserve the conventional factored Bessel basis in responsive output. */
+    if (de_solve_result_solver(result) == DE_SOLVER_POWER_LAW_BESSEL)
+        line_limit = SIZE_MAX;
+
     printf("%s \\begin{aligned}[t]\n", key);
     for (size_t i = 0u; i < count; ++i) {
         const equation_t *solution = de_solve_result_at(result, i);
