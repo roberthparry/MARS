@@ -4204,6 +4204,34 @@ static expr_t *expr_simplify_absorb_numerator_into_denominator_power_local(const
     return new_denominator ? expr_div_simplify_owned(expr_new_const(NUM_ONE), new_denominator) : NULL;
 }
 
+static bool expr_clone_effective_power_local(const expr_t *expr, expr_t **base_out, expr_t **exponent_out)
+{
+    if (!expr || !base_out || !exponent_out)
+        return false;
+
+    *base_out = NULL;
+    *exponent_out = NULL;
+    if (expr_is_op(expr, &ops_pow)) {
+        *base_out = expr_clone(expr->a);
+        *exponent_out = expr_clone(expr->b);
+    } else if (expr_is_unnamed_const(expr) && expr->binding_expr &&
+               expr->binding_expr->kind == EXPR_BINDING_EXPR_BINARY_OP &&
+               expr->binding_expr->u.binary_op.ops == &ops_pow) {
+        *base_out = expr_from_preserved_binding_expr_local(
+            expr_binding_expr_clone(expr->binding_expr->u.binary_op.left));
+        *exponent_out = expr_from_preserved_binding_expr_local(
+            expr_binding_expr_clone(expr->binding_expr->u.binary_op.right));
+    }
+
+    if (*base_out && *exponent_out)
+        return true;
+    expr_free(*exponent_out);
+    expr_free(*base_out);
+    *base_out = NULL;
+    *exponent_out = NULL;
+    return false;
+}
+
 expr_t *expr_simplify_div_operator(const expr_t *dv, expr_t *a, expr_t *b)
 {
     NUM_SCOPE(scope);
@@ -4221,6 +4249,84 @@ expr_t *expr_simplify_div_operator(const expr_t *dv, expr_t *a, expr_t *b)
     if (expr_is_op(b, &ops_const) && expr_const_is_one(b)) {
         expr_free(b);
         return a;
+    }
+    {
+        expr_t *a_base = NULL, *a_exponent = NULL, *b_base = NULL, *b_exponent = NULL;
+
+        if (expr_clone_effective_power_local(a, &a_base, &a_exponent) &&
+            expr_clone_effective_power_local(b, &b_base, &b_exponent) &&
+            expr_simplify_same_factor(a_base, b_base)) {
+            number_t base_value = expr_eval(a_base);
+            bool nonzero_base = num_is_finite(base_value) && !num_is_zero(base_value);
+
+            num_destroy(&base_value);
+            if (nonzero_base) {
+                expr_t *difference = expr_sub_simplify_owned(a_exponent, b_exponent);
+                expr_t *out = difference ? expr_pow_xp(a_base, difference) : NULL;
+
+                expr_free(difference);
+                expr_free(a_base);
+                expr_free(b_base);
+                expr_free(a);
+                expr_free(b);
+                return expr_simplify_owned(out);
+            }
+        }
+        expr_free(b_exponent);
+        expr_free(b_base);
+        expr_free(a_exponent);
+        expr_free(a_base);
+    }
+    if (expr_is_op(a, &ops_pow) && expr_is_op(b, &ops_mul)) {
+        const expr_t *power = expr_is_op(b->a, &ops_pow) ? b->a : expr_is_op(b->b, &ops_pow) ? b->b : NULL;
+        const expr_t *remainder = power == b->a ? b->b : power == b->b ? b->a : NULL;
+
+        if (power && remainder && power->a && expr_simplify_same_factor(a->a, power->a)) {
+            number_t base_value = expr_eval(a->a);
+            bool nonzero_base = num_is_finite(base_value) && !num_is_zero(base_value);
+
+            num_destroy(&base_value);
+            if (nonzero_base) {
+                expr_t *ratio = expr_div_simplify_owned(expr_clone(a), expr_clone(power));
+                expr_t *out = ratio ? expr_div_simplify_owned(ratio, expr_clone(remainder)) : NULL;
+
+                expr_free(a);
+                expr_free(b);
+                return out;
+            }
+        }
+    }
+    if (expr_is_op(b, &ops_mul)) {
+        const expr_t *power = NULL;
+        const expr_t *remainder = NULL;
+        const expr_t *power_base = NULL;
+        number_t power_exponent = num_new();
+
+        if (expr_match_pow_const(b->a, &power_base, &power_exponent) && num_eq(power_exponent, NUM_NEG_ONE)) {
+            power = b->a;
+            remainder = b->b;
+        } else {
+            num_destroy(&power_exponent);
+            power_exponent = num_new();
+            if (expr_match_pow_const(b->b, &power_base, &power_exponent) && num_eq(power_exponent, NUM_NEG_ONE)) {
+                power = b->b;
+                remainder = b->a;
+            }
+        }
+        num_destroy(&power_exponent);
+        if (power && remainder && power_base) {
+            number_t base_value = expr_eval(power_base);
+            bool nonzero_base = num_is_finite(base_value) && !num_is_zero(base_value);
+
+            num_destroy(&base_value);
+            if (nonzero_base) {
+                expr_t *new_numerator = expr_mul_simplify_owned(a, expr_clone(power_base));
+                expr_t *out = new_numerator ? expr_div_simplify_owned(new_numerator, expr_clone(remainder)) : NULL;
+
+                expr_free(b);
+                return out;
+            }
+        }
     }
     {
         expr_t *absorbed_power = expr_simplify_absorb_numerator_into_denominator_power_local(a, b);
@@ -4558,6 +4664,113 @@ div_fallback_2:
 
 /* --- */
 
+static long expr_simplify_gcd_long_local(long a, long b)
+{
+    a = a < 0L ? -a : a;
+    b = b < 0L ? -b : b;
+    while (b != 0L) {
+        long remainder = a % b;
+
+        a = b;
+        b = remainder;
+    }
+    return a;
+}
+
+static long expr_simplify_square_divisor_root_local(long value)
+{
+    long remaining = value;
+    long root = 1L;
+
+    for (long factor = 2L; factor <= remaining / factor; ++factor) {
+        unsigned int exponent = 0u;
+
+        while (remaining % factor == 0L) {
+            remaining /= factor;
+            exponent++;
+        }
+        for (unsigned int pair = 0u; pair < exponent / 2u; ++pair)
+            root *= factor;
+    }
+    return root;
+}
+
+static expr_t *expr_simplify_binomial_three_halves_local(const expr_t *base)
+{
+    const expr_t *constant = NULL;
+    const expr_t *radical = NULL;
+    number_t constant_value = number_invalid();
+    number_t radicand_value = number_invalid();
+    long a, radicand, denominator, a_squared, a_cubed, three_a, plain_term, radical_term;
+    long square_root;
+    bool subtract_radical = false;
+    expr_t *radicand_constant = NULL;
+    expr_t *radical_expr = NULL;
+    expr_t *scaled_radical = NULL;
+    expr_t *plain_expr = NULL;
+    expr_t *expanded = NULL;
+    expr_t *root = NULL;
+    expr_t *out = NULL;
+
+    if (expr_is_op(base, &ops_add)) {
+        if (expr_is_const(base->a) && expr_is_sqrt_expr(base->b)) {
+            constant = base->a;
+            radical = base->b;
+        } else if (expr_is_const(base->a) && expr_is_neg(base->b) && expr_is_sqrt_expr(base->b->a)) {
+            constant = base->a;
+            radical = base->b->a;
+            subtract_radical = true;
+        } else if (expr_is_sqrt_expr(base->a) && expr_is_const(base->b)) {
+            constant = base->b;
+            radical = base->a;
+        } else if (expr_is_neg(base->a) && expr_is_sqrt_expr(base->a->a) && expr_is_const(base->b)) {
+            constant = base->b;
+            radical = base->a->a;
+            subtract_radical = true;
+        }
+    } else if (expr_is_op(base, &ops_sub) && expr_is_const(base->a) && expr_is_sqrt_expr(base->b)) {
+        constant = base->a;
+        radical = base->b;
+        subtract_radical = true;
+    }
+    if (!constant || !radical || !expr_match_const_value(constant, &constant_value) ||
+        !expr_match_const_value(radical->a, &radicand_value) ||
+        !num_get_small_rational(constant_value, &a, &denominator) || denominator != 1L ||
+        !num_get_small_rational(radicand_value, &radicand, &denominator) || denominator != 1L || a <= 0L ||
+        radicand <= 0L || __builtin_mul_overflow(a, a, &a_squared) ||
+        __builtin_mul_overflow(a_squared, a, &a_cubed) ||
+        __builtin_mul_overflow(3L, a, &three_a) || __builtin_mul_overflow(three_a, radicand, &plain_term) ||
+        __builtin_add_overflow(a_cubed, plain_term, &plain_term) ||
+        __builtin_mul_overflow(3L, a_squared, &radical_term) ||
+        __builtin_add_overflow(radical_term, radicand, &radical_term))
+        goto cleanup;
+
+    square_root = expr_simplify_square_divisor_root_local(expr_simplify_gcd_long_local(plain_term, radical_term));
+    plain_term /= square_root * square_root;
+    radical_term /= square_root * square_root;
+    radicand_constant = expr_const_long(radicand);
+    radical_expr = radicand_constant ? expr_sqrt(radicand_constant) : NULL;
+    scaled_radical = radical_expr ? expr_mul_long(radical_expr, radical_term) : NULL;
+    plain_expr = expr_const_long(plain_term);
+    expanded = plain_expr && scaled_radical ? (subtract_radical ? expr_sub(plain_expr, scaled_radical)
+                                                                : expr_add(plain_expr, scaled_radical))
+                               : NULL;
+    root = expanded ? expr_sqrt(expanded) : NULL;
+    out = root ? expr_mul_long(root, square_root) : NULL;
+    out = expr_simplify_owned(out);
+
+cleanup:
+    expr_free(plain_expr);
+    expr_free(root);
+    expr_free(expanded);
+    expr_free(scaled_radical);
+    expr_free(radical_expr);
+    expr_free(radicand_constant);
+    num_destroy(&radicand_value);
+    num_destroy(&constant_value);
+    return out;
+}
+
 expr_t *expr_simplify_pow_d_operator(const expr_t *dv, expr_t *a, expr_t *b)
 {
     NUM_SCOPE(scope);
@@ -4570,6 +4783,20 @@ expr_t *expr_simplify_pow_d_operator(const expr_t *dv, expr_t *a, expr_t *b)
     if (num_eq(exponent, NUM_ZERO)) {
         expr_free(a);
         return expr_new_const(NUM_ONE);
+    }
+
+    {
+        long numerator;
+        long denominator;
+
+        if (num_get_small_rational(exponent, &numerator, &denominator) && numerator == 3L && denominator == 2L) {
+            expr_t *expanded_root = expr_simplify_binomial_three_halves_local(a);
+
+            if (expanded_root) {
+                expr_free(a);
+                return expanded_root;
+            }
+        }
     }
 
     if (expr_is_pow_d_expr(a)) {
@@ -4715,6 +4942,25 @@ expr_t *expr_simplify_pow_operator(const expr_t *dv, expr_t *a, expr_t *b)
         expr_free(a);
         expr_free(b);
         return expr_new_const(NUM_ONE);
+    }
+    {
+        number_t exponent = number_invalid();
+        long numerator;
+        long denominator;
+
+        if (expr_match_const_value(b, &exponent) && num_get_small_rational(exponent, &numerator, &denominator) &&
+            numerator == 3L && denominator == 2L) {
+            expr_t *expanded_root = expr_simplify_binomial_three_halves_local(a);
+
+            num_destroy(&exponent);
+            if (expanded_root) {
+                expr_free(a);
+                expr_free(b);
+                return expanded_root;
+            }
+        } else {
+            num_destroy(&exponent);
+        }
     }
     if (expr_simplify_is_simplifiable_const(a) && expr_const_is_one(a)) {
         expr_free(a);

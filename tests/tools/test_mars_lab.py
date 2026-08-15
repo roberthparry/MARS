@@ -165,6 +165,23 @@ class MatrixResultTests(unittest.TestCase):
             [{"name": "λ", "value": "NAN", "display": "", "kind": "variable"}],
         )
 
+    def test_scalar_matrix_result_omits_multiple_unset_constant_bindings(self) -> None:
+        fields = {
+            "input": "trace(a 0; 0 d)",
+            "operation": "trace",
+            "result": "{ a+d |; a=NAN, d=NAN }",
+            "pretty": "{ a+d |; a=NAN, d=NAN }",
+            "tex": r"\left\{ a+d \;\middle|\; ; a=NAN, d=NAN \right\}",
+            "bindings": "constant\ta\tNAN\nconstant\td\tNAN",
+        }
+
+        payload = mars_lab.prepare_matrix_fields(fields, 32)
+
+        self.assertEqual(payload["result"], "a+d")
+        self.assertEqual(payload["pretty"], "a+d")
+        self.assertEqual(payload["tex"], "a+d")
+        self.assertEqual([binding["name"] for binding in payload["binding_values"]], ["a", "d"])
+
     def test_resolved_scalar_matrix_result_includes_its_evaluated_value(self) -> None:
         fields = {
             "input": "{ |(1 2; 3 4) - (lambda 0; 0 lambda)| | lambda = 4 }",
@@ -216,11 +233,11 @@ class MatrixResultTests(unittest.TestCase):
 
     def test_generated_matrix_integral_request_is_recovered_as_the_original_input(self) -> None:
         self.assertEqual(
-            mars_lab.recover_generated_matrix_calculus_input("@S^x((((1 2; 3 4)^x)))"),
+            mars_lab.recover_generated_matrix_calculus_input("@S(1 2; 3 4)^xdx"),
             "(1 2; 3 4)^x",
         )
         self.assertEqual(
-            mars_lab.recover_generated_matrix_calculus_input("@S^x(((1 2; 3 4)))"),
+            mars_lab.recover_generated_matrix_calculus_input("@S(1 2; 3 4)dx"),
             "(1 2; 3 4)",
         )
         self.assertEqual(
@@ -234,7 +251,7 @@ class MatrixResultTests(unittest.TestCase):
         self.assertIn("derivativeButtons.classList.toggle('hidden', !expressionMode && !matrixMode);", html)
         self.assertIn("await takeMatrixCalculus(wrt, 'derivative', actionButton);", html)
         self.assertIn("await takeMatrixCalculus(wrt, 'integral', actionButton);", html)
-        self.assertIn("? `@S^${wrt}((${source}))`\n        : `D${wrt}(${source})`;", html)
+        self.assertIn("? `@S${source}d${wrt}`\n        : `D${wrt}(${source})`;", html)
         self.assertIn("const sourceText = String(currentExpressionText() || '').trim();", html)
         self.assertIn("const text = expressionBodyForEditor(sourceText);", html)
         self.assertIn("const calculusBody = matrixCalculusInput(text, wrt, action);", html)
@@ -275,7 +292,7 @@ class MatrixResultTests(unittest.TestCase):
 
     def test_matrix_integral_payload_displays_antiderivative_plus_constant_matrix(self) -> None:
         fields = {
-            "input": "{ @S^x((x, 2x; 3x, 4x)) | x = ? }",
+            "input": "{ @S (x, 2x; 3x, 4x) dx | x = ? }",
             "operation": "eval",
             "kind": "expr",
             "rows": "2",
@@ -474,6 +491,13 @@ class MatrixResultTests(unittest.TestCase):
         self.assertIn("<code>(1 2; 3 4)^x</code>", help_html)
         self.assertIn("<code>x derivative</code> gives", help_html)
         self.assertIn("<code>x integral</code> gives", help_html)
+        self.assertIn("<code>Dxx(A)</code>", help_html)
+        self.assertIn("<code>Dxy(A)</code>", help_html)
+        self.assertIn("<code>@S(ax+b cx+d; y xy)dx</code>", help_html)
+        self.assertIn("<code>@S^x(ax+b cx+d; y xy)dx</code>", help_html)
+        self.assertIn("constant square matrices of any order", help_html)
+        self.assertIn("numeric reverse-mode gradient path", help_html)
+        self.assertIn("future numeric forward-mode JVP path", help_html)
         self.assertIn("<code>A(x) + C</code>", help_html)
         self.assertIn("<code>Value</code> separately shows", help_html)
         self.assertIn("<code>Use as input</code> copies", help_html)
@@ -531,7 +555,8 @@ class MatrixResultTests(unittest.TestCase):
         self.assertIn(r"\sqrt{33}", fields["value_tex"])
 
         displayed_value_TeX = mars_lab.matrix_display_TeX(fields["value_tex"], 32)
-        self.assertIn(r"\frac{1}{\sqrt{66}}", displayed_value_TeX)
+        self.assertIn(r"\frac{2}{\sqrt{66}}", displayed_value_TeX)
+        self.assertIn(r"\sqrt{27\mkern-2mu \sqrt{33} + 155}", displayed_value_TeX)
         self.assertNotIn(r"\sqrt{2}\mkern-2mu \sqrt{33}", displayed_value_TeX)
 
     @unittest.skipUnless(
@@ -548,9 +573,88 @@ class MatrixResultTests(unittest.TestCase):
         )
 
         self.assertEqual(returncode, 0, raw)
-        self.assertIn("1/√(66)", fields["result"])
-        self.assertIn(r"\frac{1}{\sqrt{66}}", fields["tex"])
+        self.assertIn(r"\sqrt{\sqrt{33} + 5}", fields["tex"])
+        self.assertIn(r"\sqrt{\sqrt{33} - 5}", fields["tex"])
+        self.assertNotIn(r"\sqrt{155 + 27\mkern-2mu \sqrt{33}}", fields["tex"])
+        self.assertNotIn(r"\sqrt{155 - 27\mkern-2mu \sqrt{33}}", fields["tex"])
+        self.assertNotIn(r"\left(5 + \sqrt{33}\right)^{\frac{3}{2}}", fields["tex"])
         self.assertNotIn("2^(³⁄₂ - 1)", fields["result"])
+        self.assertEqual(fields["tex"].count(r"\frac{1}{\sqrt{66}}"), 1)
+        self.assertEqual(fields["result"].count("1/√(66)"), 1)
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "matrix_lab").is_file(),
+        "release matrix_lab helper is not built",
+    )
+    def test_native_helper_factors_integer_content_before_matrix_beautification(self) -> None:
+        matrix_binary = ROOT / "build" / "release" / "scratch" / "matrix_lab"
+        fields, raw, returncode = mars_lab.run_matrix_lab_fields(
+            matrix_binary,
+            "(1 2; 3 4)^(5/2)",
+            "eval",
+            32,
+        )
+
+        self.assertEqual(returncode, 0, raw)
+        self.assertEqual(fields["tex"].count(r"\frac{1}{\sqrt{66}}"), 1)
+        self.assertIn(r"2\mkern-2mu \left(27\mkern-2mu", fields["tex"])
+        self.assertIn(r"2\mkern-2mu \left(59\mkern-2mu", fields["tex"])
+        self.assertIn("5√2", fields["result"])
+        self.assertIn("11√2", fields["result"])
+        self.assertNotIn("10√2", fields["result"])
+        self.assertNotIn("22√2", fields["result"])
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "matrix_lab").is_file(),
+        "release matrix_lab helper is not built",
+    )
+    def test_native_helper_renders_matrix_square_root_radicals_in_TeX(self) -> None:
+        matrix_binary = ROOT / "build" / "release" / "scratch" / "matrix_lab"
+        fields, raw, returncode = mars_lab.run_matrix_lab_fields(
+            matrix_binary,
+            "(1 2; 3 4)^(1/2)",
+            "eval",
+            32,
+        )
+
+        self.assertEqual(returncode, 0, raw)
+        self.assertIn(r"\frac{1}{\sqrt{66}}", fields["tex"])
+        self.assertEqual(fields["tex"].count(r"\frac{1}{\sqrt{66}}"), 1)
+        self.assertEqual(fields["result"].count("1/√(66)"), 1)
+        self.assertIn(r"\sqrt{2}\mkern-2mu \sqrt{\sqrt{33} - 5}", fields["tex"])
+        self.assertIn(
+            r"i\mkern-2mu \left(\sqrt{2}\mkern-2mu \sqrt{\sqrt{33} + 5} - "
+            r"\sqrt{\sqrt{33} - 5}\right)",
+            fields["tex"],
+        )
+        self.assertNotIn(r"\sqrt{2i\mkern-2mu \sqrt{2} + 5}", fields["tex"])
+        self.assertNotIn(r"\left(5 + \sqrt{33}\right)^{\frac{1}{2}}", fields["tex"])
+        self.assertNotIn(r"\left(5 - \sqrt{33}\right)^{\frac{1}{2}}", fields["tex"])
+        self.assertIn("√(√(33) + 5)", fields["result"])
+        self.assertIn("√(√(33) - 5)", fields["result"])
+        self.assertNotIn(")·(1 + i·√(2))", fields["result"])
+        self.assertNotIn("i2", fields["result"])
+        self.assertNotIn("√(-2)", fields["result"])
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "matrix_lab").is_file(),
+        "release matrix_lab helper is not built",
+    )
+    def test_native_helper_renders_matrix_cube_root_radicals_in_TeX(self) -> None:
+        matrix_binary = ROOT / "build" / "release" / "scratch" / "matrix_lab"
+        fields, raw, returncode = mars_lab.run_matrix_lab_fields(
+            matrix_binary,
+            "(1 2; 3 4)^(1/3)",
+            "eval",
+            32,
+        )
+
+        self.assertEqual(returncode, 0, raw)
+        self.assertIn(r"\sqrt[3]{5 + \sqrt{33}}", fields["tex"])
+        self.assertIn(r"\sqrt[3]{5 - \sqrt{33}}", fields["tex"])
+        self.assertIn(r"\frac{\sqrt[3]{4}}{\sqrt{33}}", fields["tex"])
+        self.assertNotIn(r"^{\frac{1}{3}}", fields["tex"])
+        self.assertNotIn(r"2^{\frac{1}{3} - 1}", fields["tex"])
 
     def test_matrix_TeX_places_a_symbolic_power_before_its_radical_factor(self) -> None:
         tex = r"\begin{bmatrix}\frac{1}{\sqrt{33}\mkern-2mu 2^{x - 1}}\end{bmatrix}"
@@ -559,6 +663,26 @@ class MatrixResultTests(unittest.TestCase):
             mars_lab.matrix_display_TeX(tex, 32),
             r"\begin{bmatrix}\frac{1}{2^{x - 1}\mkern-2mu \sqrt{33}}\end{bmatrix}",
         )
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "matrix_lab").is_file(),
+        "release matrix_lab helper is not built",
+    )
+    def test_symbolic_matrix_power_reduces_residual_common_power_quotients(self) -> None:
+        matrix_binary = ROOT / "build" / "release" / "scratch" / "matrix_lab"
+        fields, raw, returncode = mars_lab.run_matrix_lab_fields(
+            matrix_binary,
+            "(1 2; 3 4)^x",
+            "eval",
+            32,
+        )
+
+        self.assertEqual(returncode, 0, raw)
+        self.assertTrue(fields["result"].startswith("1/2^x.(½·"))
+        self.assertIn("2/√(33)·", fields["result"])
+        self.assertNotIn("2^x/2^(x + 1)", fields["result"])
+        self.assertNotIn("2^x/(√(33)·2^(x - 1))", fields["result"])
+        self.assertIn(r"\frac{2}{\sqrt{33}}", fields["tex"])
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "matrix_lab").is_file(),
@@ -576,6 +700,26 @@ class MatrixResultTests(unittest.TestCase):
         self.assertEqual(returncode, 0, raw)
         self.assertIn("√(33)", fields["value"])
         self.assertNotIn("NAN", fields["value"].upper())
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "matrix_lab").is_file(),
+        "release matrix_lab helper is not built",
+    )
+    def test_constant_symbolic_matrix_power_uses_the_spectral_derivative_rule(self) -> None:
+        matrix_binary = ROOT / "build" / "release" / "scratch" / "matrix_lab"
+        fields, raw, returncode = mars_lab.run_matrix_lab_fields(
+            matrix_binary,
+            "Dx((1 2; 3 4)^x)",
+            "eval",
+            32,
+        )
+
+        self.assertEqual(returncode, 0, raw)
+        self.assertTrue(fields["result"].startswith("1/2^x.(½·"))
+        self.assertIn("2/√(33)·", fields["result"])
+        self.assertIn("√(³⁄₁₁)·", fields["result"])
+        self.assertEqual(fields["result"].count("ln(½·(5 + √(33)))"), 4)
+        self.assertEqual(fields["result"].count("ln(½·(5 - √(33)))"), 4)
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "matrix_lab").is_file(),
@@ -811,7 +955,7 @@ class MatrixResultTests(unittest.TestCase):
         self.assertEqual(fields["operation"], "multiply")
         self.assertEqual(fields["rows"], "2")
         self.assertEqual(fields["cols"], "1")
-        self.assertEqual(fields["result"], "((dx - by)/(ad - bc); (ay - cx)/(ad - bc))")
+        self.assertEqual(fields["result"], "(1/(ad - bc)·(dx - by); 1/(ad - bc)·(ay - cx))")
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "matrix_lab").is_file(),
@@ -829,7 +973,10 @@ class MatrixResultTests(unittest.TestCase):
             matrix_binary, "Dxx(1+x 2e^x; 4x 5)", "eval", 64
         )
         integral, integral_raw, integral_returncode = mars_lab.run_matrix_lab_fields(
-            matrix_binary, "@S^x((ax+b cx+d; y xy))", "eval", 64
+            matrix_binary, "@S(ax+b cx+d; y xy)dx", "eval", 64
+        )
+        antiderivative, antiderivative_raw, antiderivative_returncode = mars_lab.run_matrix_lab_fields(
+            matrix_binary, "@S^x(ax+b cx+d; y xy)dx", "eval", 64
         )
 
         self.assertEqual(derivative_returncode, 0, derivative_raw)
@@ -849,6 +996,9 @@ class MatrixResultTests(unittest.TestCase):
         )
         for constant in ("C₁₁", "C₁₂", "C₂₁", "C₂₂"):
             self.assertIn(f"binding      constant\t{constant}\tNAN", integral_raw)
+        self.assertEqual(antiderivative_returncode, 0, antiderivative_raw)
+        self.assertEqual(antiderivative["result"], "(½·(ax² + 2bx), ½·(cx² + 2dx); xy, ½x²y)")
+        self.assertNotIn("C₁₁", antiderivative_raw)
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "matrix_lab").is_file(),
@@ -859,9 +1009,10 @@ class MatrixResultTests(unittest.TestCase):
         power, raw, returncode = mars_lab.run_matrix_lab_fields(matrix_binary, "(1, 2; 3, 4)^x", "eval", 64)
 
         self.assertEqual(returncode, 0, raw)
-        self.assertIn("1/2^(x + 1)·((1 - √(³⁄₁₁))·(5 + √(33))^x", power["result"])
-        self.assertIn("2/(2^x·√(33))·((5 + √(33))^x - (5 - √(33))^x)", power["result"])
-        self.assertIn("√(³⁄₁₁)/2^x·((5 + √(33))^x - (5 - √(33))^x)", power["result"])
+        self.assertTrue(power["result"].startswith("1/2^x.("))
+        self.assertIn("½·((1 - √(³⁄₁₁))·(5 + √(33))^x", power["result"])
+        self.assertIn("2/√(33)·((5 + √(33))^x - (5 - √(33))^x)", power["result"])
+        self.assertIn("√(³⁄₁₁)·((5 + √(33))^x - (5 - √(33))^x)", power["result"])
         self.assertNotIn("(½·(5 + √(33)))^x", power["result"])
 
     @unittest.skipUnless(
@@ -871,7 +1022,7 @@ class MatrixResultTests(unittest.TestCase):
     def test_native_helper_integrates_symbolic_matrix_power(self) -> None:
         matrix_binary = ROOT / "build" / "release" / "scratch" / "matrix_lab"
         integral, raw, returncode = mars_lab.run_matrix_lab_fields(
-            matrix_binary, "@S^x(((1, 2; 3, 4)^x))", "eval", 64
+            matrix_binary, "@S(1, 2; 3, 4)^xdx", "eval", 64
         )
 
         self.assertEqual(returncode, 0, raw)
@@ -879,14 +1030,16 @@ class MatrixResultTests(unittest.TestCase):
         self.assertNotIn("∫", integral["result"])
         self.assertIn("ln(", integral["result"])
         self.assertIn("(5 - √(33))", integral["result"])
-        self.assertIn("1/2^(x + 1)·(", integral["result"])
+        self.assertTrue(integral["result"].startswith("1/2^x.("))
         self.assertIn("(1 - √(³⁄₁₁))", integral["result"])
         self.assertIn("(1 + √(³⁄₁₁))", integral["result"])
-        self.assertIn("√(³⁄₁₁)/2^x·((5 + √(33))^x", integral["result"])
+        self.assertIn("√(³⁄₁₁)·((5 + √(33))^x", integral["result"])
         self.assertIn("(1 - √(³⁄₁₁))·(5 + √(33))^x/ln(½·(5 + √(33)))", integral["result"])
+        self.assertIn(" + (C₁₁, C₁₂; C₂₁, C₂₂)", integral["result"])
+        self.assertNotIn("1/(1/2^x)", integral["result"])
         self.assertNotIn("½·(√(33) - 3)", integral["result"])
-        self.assertIn(r"\frac{1}{2^{x + 1}}\mkern-5mu \left(", integral["tex"])
-        self.assertIn(r"\frac{1}{2^{x}}\mkern-2mu \sqrt{\frac{3}{11}}\mkern-5mu \left(", integral["tex"])
+        self.assertTrue(integral["tex"].startswith(r"\frac{1}{2^{x}}\mkern-5mu \begin{bmatrix}"))
+        self.assertIn(r"\sqrt{\frac{3}{11}}\mkern-2mu \left(", integral["tex"])
         self.assertIn(
             r"\frac{\left(1 - \sqrt{\frac{3}{11}}\right)\mkern-2mu \left(5 + \sqrt{33}\right)^{x}}{\ln",
             integral["tex"],
@@ -910,10 +1063,11 @@ class MatrixResultTests(unittest.TestCase):
         self.assertIn(r"\left(5 + \sqrt{33}\right)^{x}\mkern-2mu \ln", derivative["tex"])
         self.assertNotIn(r"\ln(\frac{1}{2})", derivative["tex"])
         self.assertNotIn("ln(½)·", derivative["result"])
-        self.assertIn(r"\frac{1}{2^{x + 1}}\mkern-5mu \left(\left(1 - \sqrt{\frac{3}{11}}\right)",
+        self.assertTrue(derivative["tex"].startswith(r"\frac{1}{2^{x}}\mkern-5mu \begin{bmatrix}"))
+        self.assertIn(r"\frac{1}{2}\mkern-2mu \left(\left(1 - \sqrt{\frac{3}{11}}\right)",
                       derivative["tex"])
         self.assertNotIn(r"\frac{\left(\sqrt{33} - 3\right)", derivative["tex"])
-        self.assertIn("/(2^x·√(33))", derivative["result"])
+        self.assertIn("2/√(33)·((5 + √(33))^x", derivative["result"])
         self.assertNotIn("√(33)/66", derivative["result"])
         self.assertNotIn("√(33)/33", derivative["result"])
         self.assertNotIn("√(33)/11", derivative["result"])
@@ -925,7 +1079,7 @@ class MatrixResultTests(unittest.TestCase):
     def test_native_helper_matrix_calculus_keeps_bindings_outside_operation(self) -> None:
         matrix_binary = ROOT / "build" / "release" / "scratch" / "matrix_lab"
         integral, raw, returncode = mars_lab.run_matrix_lab_fields(
-            matrix_binary, "{ @S^x((((1, 2; 3, 4)^x))) | x = ? }", "eval", 64
+            matrix_binary, "{ @S(1, 2; 3, 4)^xdx | x = ? }", "eval", 64
         )
         derivative, derivative_raw, derivative_returncode = mars_lab.run_matrix_lab_fields(
             matrix_binary, "{ Dx((1+x, 2; 3, 4)) | x = ? }", "eval", 64
@@ -941,6 +1095,90 @@ class MatrixResultTests(unittest.TestCase):
         self.assertEqual(derivative_returncode, 0, derivative_raw)
         self.assertEqual(derivative["result"], "(1, 0; 0, 0)")
         self.assertIn("binding      variable\tx\tNAN", derivative_raw)
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "matrix_lab").is_file(),
+        "release matrix_lab helper is not built",
+    )
+    def test_native_helper_supports_ordered_higher_matrix_power_calculus(self) -> None:
+        matrix_binary = ROOT / "build" / "release" / "scratch" / "matrix_lab"
+        derivative, derivative_raw, derivative_returncode = mars_lab.run_matrix_lab_fields(
+            matrix_binary, "Dxx(((1 2; 3 4)^x))", "eval", 64
+        )
+        integral, integral_raw, integral_returncode = mars_lab.run_matrix_lab_fields(
+            matrix_binary, "@S^x^2(((1 2; 3 4)^x))", "eval", 64
+        )
+
+        self.assertEqual(derivative_returncode, 0, derivative_raw)
+        self.assertNotIn("<expr matrix>", derivative["result"])
+        self.assertIn("ln²(", derivative["result"])
+        self.assertEqual(integral_returncode, 0, integral_raw)
+        self.assertNotIn("<expr matrix>", integral["result"])
+        self.assertIn("/ln²(", integral["result"])
+        self.assertIn(" + (C₁₁, C₁₂; C₂₁, C₂₂)", integral["result"])
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "matrix_lab").is_file(),
+        "release matrix_lab helper is not built",
+    )
+    def test_native_helper_supports_mixed_matrix_power_calculus(self) -> None:
+        matrix_binary = ROOT / "build" / "release" / "scratch" / "matrix_lab"
+        derivative, derivative_raw, derivative_returncode = mars_lab.run_matrix_lab_fields(
+            matrix_binary, "Dxy(((1 0; 0 2)^(x+y)))", "eval", 64
+        )
+        integral, integral_raw, integral_returncode = mars_lab.run_matrix_lab_fields(
+            matrix_binary, "@S^xy(((1 0; 0 2)^(x+y)))", "eval", 64
+        )
+
+        self.assertEqual(derivative_returncode, 0, derivative_raw)
+        self.assertEqual(derivative["result"], "(0, 0; 0, ln²(2)·2^(x + y))")
+        self.assertIn("binding      variable\tx\tNAN", derivative_raw)
+        self.assertIn("binding      variable\ty\tNAN", derivative_raw)
+        self.assertEqual(integral_returncode, 0, integral_raw)
+        self.assertIn("(xy, 0; 0, 2^(x + y)/ln²(2))", integral["result"])
+        self.assertIn(" + (C₁₁, C₁₂; C₂₁, C₂₂)", integral["result"])
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "matrix_lab").is_file(),
+        "release matrix_lab helper is not built",
+    )
+    def test_native_helper_applies_matrix_power_calculus_to_larger_square_matrices(self) -> None:
+        matrix_binary = ROOT / "build" / "release" / "scratch" / "matrix_lab"
+        derivative, derivative_raw, derivative_returncode = mars_lab.run_matrix_lab_fields(
+            matrix_binary, "Dx(((1 0 0; 0 2 0; 0 0 3)^x))", "eval", 64
+        )
+        integral, integral_raw, integral_returncode = mars_lab.run_matrix_lab_fields(
+            matrix_binary, "@S(1 0 0; 0 2 0; 0 0 3)^xdx", "eval", 64
+        )
+
+        self.assertEqual(derivative_returncode, 0, derivative_raw)
+        self.assertEqual((derivative["rows"], derivative["cols"]), ("3", "3"))
+        self.assertIn("2^x·ln(2)", derivative["result"])
+        self.assertIn("3^x·ln(3)", derivative["result"])
+        self.assertEqual(integral_returncode, 0, integral_raw)
+        self.assertEqual((integral["rows"], integral["cols"]), ("3", "3"))
+        self.assertIn("2^x/ln(2)", integral["result"])
+        self.assertIn("3^x/ln(3)", integral["result"])
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "matrix_lab").is_file(),
+        "release matrix_lab helper is not built",
+    )
+    def test_native_helper_treats_functions_of_constant_square_matrices_as_constant(self) -> None:
+        matrix_binary = ROOT / "build" / "release" / "scratch" / "matrix_lab"
+        derivative, derivative_raw, derivative_returncode = mars_lab.run_matrix_lab_fields(
+            matrix_binary, "Dx(exp(1 0 0; 0 2 0; 0 0 3))", "eval", 64
+        )
+        integral, integral_raw, integral_returncode = mars_lab.run_matrix_lab_fields(
+            matrix_binary, "@S exp(1 0 0; 0 2 0; 0 0 3)dx", "eval", 64
+        )
+
+        self.assertEqual(derivative_returncode, 0, derivative_raw)
+        self.assertEqual(derivative["result"], "(0, 0, 0; 0, 0, 0; 0, 0, 0)")
+        self.assertEqual(integral_returncode, 0, integral_raw)
+        self.assertIn("ex", integral["result"])
+        self.assertIn("C₃₃", integral["result"])
+        self.assertIn("binding      variable\tx\tNAN", integral_raw)
 
 
 class DiffequationResultTests(unittest.TestCase):
@@ -2547,9 +2785,14 @@ class ZZMarsLabReadmeExamples(unittest.TestCase):
         symbolic_matrix_examples = (
             ("inverse(a b; c d)", "(d/(ad - bc), -b/(ad - bc); -c/(ad - bc), a/(ad - bc))"),
             ("(a b; c d).(e f; g h)", "(ae + bg, af + bh; ce + dg, cf + dh)"),
-            ("inverse(a b; c d).(x; y)", "((dx - by)/(ad - bc); (ay - cx)/(ad - bc))"),
+            ("inverse(a b; c d).(x; y)", "(1/(ad - bc)·(dx - by); 1/(ad - bc)·(ay - cx))"),
             ("Dx(ax+b cx+d; y xy)", "(a, c; 0, y)"),
-            ("@S^x((ax+b cx+d; y xy))", "(½·(ax² + 2bx) + C₁₁, ½·(cx² + 2dx) + C₁₂; xy + C₂₁, ½x²y + C₂₂)"),
+            ("Dxx(x^3 xy; y^2 x^2y)", "(6x, 0; 0, 2y)"),
+            ("Dxy(x^2y x*y^2; y^3 x^3y)", "(2x, 2y; 0, 3x²)"),
+            (
+                "@S(ax+b cx+d; y xy)dx",
+                "(½·(ax² + 2bx), ½·(cx² + 2dx); xy, ½x²y) + (C₁₁, C₁₂; C₂₁, C₂₂)",
+            ),
         )
         for source, expected in symbolic_matrix_examples:
             with self.subTest(matrix_source=source):

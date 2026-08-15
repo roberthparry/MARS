@@ -1585,16 +1585,16 @@ static void test_from_string_bindings_with_constant_expression_value(void)
         "{ y²z²·exp(sin(xyz))·(cos²(xyz) - sin(xyz)) | y = NAN, z = NAN, x = NAN }", __LINE__);
     check_parse_simplified_expr("reparsed symbolic pi derivative simplifies explicitly",
                                 "{ (-2π·exp(π·√(x)) + 2·π²·√(x)·exp(π·√(x)))/(2·√(x))/(2·√(x))² | x = 163 }",
-                                "{ exp(π·√(x))·(π^2·√(x) - π)/(4x^³⁄₂) | x = 163 }", __LINE__);
+                                "{ ¼·exp(π·√(x))/x^³⁄₂·(π^2·√(x) - π) | x = 163 }", __LINE__);
     check_parse_simplified_expr(
         "nested rational derivative numerator canonicalizes",
         "{ (2*(x^2 + 3*x + 5)*(2*(x + 1)*(2*x + 3) - 9*x - (-x - 1)*(2*x + 3) - 3*x^2 - 15) - 6*(2*x + 3)*((-x - "
         "1)*(x^2 + 3*x + 5) - (2*x + 3)*(3*x - (x + 1)*(2*x + 3) + x^2 + 5)))/(x^2 + 3*x + 5)^4 | x = 1 }",
-        "{ 6·(12x² + 44x - x⁴ - 4x³ + 23)/(x² + 3x + 5)⁴ | x = 1 }", __LINE__);
+        "{ 6/(x² + 3x + 5)⁴·(12x² + 44x - x⁴ - 4x³ + 23) | x = 1 }", __LINE__);
     check_parse_simplified_expr("higher rational derivative numerator canonicalizes",
                                 "{ (24*(x^2 + 3*x + 5)*(6*x - x^3 - 3*x^2 + 11) - 24*(2*x + 3)*(12*x^2 + 44*x - x^4 - "
                                 "4*x^3 + 23))/(x^2 + 3*x + 5)^5 | x = ? }",
-                                "{ 24·(x⁵ + 5x⁴ - 20x³ - 110x² - 115x - 14)/(x² + 3x + 5)⁵ | x = NAN }", __LINE__);
+                                "{ 24/(x² + 3x + 5)⁵·(x⁵ + 5x⁴ - 20x³ - 110x² - 115x - 14) | x = NAN }", __LINE__);
     bindings = NULL;
     expr = expr_from_string(
         "{ 720*(x^7 + 7*x^6 - 42*x^5 - 385*x^4 - 805*x^3 - 294*x^2 + 511*x + 289)/(x^2 + 3*x + 5)^7 | x = ? }",
@@ -1602,8 +1602,8 @@ static void test_from_string_bindings_with_constant_expression_value(void)
     x = bindings ? expr_bindings_get(bindings, "x") : NULL;
     deriv = (expr && x) ? expr_create_deriv(expr, x) : NULL;
     deriv_text = deriv ? expr_to_string(deriv, style_EXPRESSION) : NULL;
-    if (deriv_text && strcmp(deriv_text, "{ (-5040x⁸ - 40320x⁷ + 282240x⁶ + 3104640x⁵ + 8114400x⁴ + 3951360x³ - "
-                                         "10301760x² - 11652480x - 2530080)/(x² + 3x + 5)⁸ | x = NAN }") == 0) {
+    if (deriv_text && strcmp(deriv_text, "{ 1/(x² + 3x + 5)⁸·(-5040x⁸ - 40320x⁷ + 282240x⁶ + 3104640x⁵ + "
+                                         "8114400x⁴ + 3951360x³ - 10301760x² - 11652480x - 2530080) | x = NAN }") == 0) {
         printf(C_BOLD C_GREEN "PASS" C_RESET " rational quadratic-power derivative uses polynomial fast path\n");
         printf(C_BOLD "  expr   " C_RESET "%s\n\n", deriv_text);
     } else {
@@ -1629,8 +1629,8 @@ static void test_from_string_bindings_with_constant_expression_value(void)
     deriv = (expr && x) ? expr_create_deriv(expr, x) : NULL;
     deriv_text = deriv ? expr_to_string(deriv, style_EXPRESSION) : NULL;
     if (deriv_text &&
-        strcmp(deriv_text, "{ (40320x⁹ + 362880x⁸ - 2903040x⁷ - 37255680x⁶ - 116847360x⁵ - 71124480x⁴ + 247242240x³ + "
-                           "419489280x² + 182165760x + 2459520)/(x² + 3x + 5)⁹ | x = NAN }") == 0) {
+        strcmp(deriv_text, "{ 1/(x² + 3x + 5)⁹·(40320x⁹ + 362880x⁸ - 2903040x⁷ - 37255680x⁶ - 116847360x⁵ - "
+                           "71124480x⁴ + 247242240x³ + 419489280x² + 182165760x + 2459520) | x = NAN }") == 0) {
         printf(C_BOLD C_GREEN "PASS" C_RESET " rational derivative polynomial storage follows degree\n");
         printf(C_BOLD "  expr   " C_RESET "%s\n\n", deriv_text);
     } else {
@@ -1754,12 +1754,12 @@ static void test_from_string_bindings_with_constant_expression_value(void)
     deriv = (expr && x) ? expr_create_deriv(expr, x) : NULL;
     deriv_text = deriv ? expr_to_string(deriv, style_EXPRESSION) : NULL;
 
-    if (deriv_text && strcmp(deriv_text, "{ π·exp(π·√(x))·(π·√(x) - 1)/(4x^³⁄₂) | x = 163 }") == 0) {
+    if (deriv_text && strcmp(deriv_text, "{ ¼π·exp(π·√(x))/x^³⁄₂·(π·√(x) - 1) | x = 163 }") == 0) {
         to_string_pass("symbolic pi derivative keeps exact coefficient", deriv_text,
-                       "{ π·exp(π·√(x))·(π·√(x) - 1)/(4x^³⁄₂) | x = 163 }");
+                       "{ ¼π·exp(π·√(x))/x^³⁄₂·(π·√(x) - 1) | x = 163 }");
     } else {
         to_string_fail(__FILE__, __LINE__, 1, "symbolic pi derivative keeps exact coefficient",
-                       deriv_text ? deriv_text : "(null)", "{ π·exp(π·√(x))·(π·√(x) - 1)/(4x^³⁄₂) | x = 163 }");
+                       deriv_text ? deriv_text : "(null)", "{ ¼π·exp(π·√(x))/x^³⁄₂·(π·√(x) - 1) | x = 163 }");
     }
 
     free(deriv_text);
@@ -1775,12 +1775,12 @@ static void test_from_string_bindings_with_constant_expression_value(void)
     deriv = (expr && x) ? expr_create_deriv(expr, x) : NULL;
     deriv_text = deriv ? expr_to_string(deriv, style_EXPRESSION) : NULL;
 
-    if (deriv_text && strcmp(deriv_text, "{ ⅛π·exp(π·√(x))·(3 - 3π·√(x) + π²·x)/x^⁵⁄₂ | x = ⅙π }") == 0) {
+    if (deriv_text && strcmp(deriv_text, "{ ⅛π·exp(π·√(x))/x^⁵⁄₂·(3 - 3π·√(x) + π²·x) | x = ⅙π }") == 0) {
         to_string_pass("symbolic coefficient folding happens in derivative DAG", deriv_text,
-                       "{ ⅛π·exp(π·√(x))·(3 - 3π·√(x) + π²·x)/x^⁵⁄₂ | x = ⅙π }");
+                       "{ ⅛π·exp(π·√(x))/x^⁵⁄₂·(3 - 3π·√(x) + π²·x) | x = ⅙π }");
     } else {
         to_string_fail(__FILE__, __LINE__, 1, "symbolic coefficient folding happens in derivative DAG",
-                       deriv_text ? deriv_text : "(null)", "{ ⅛π·exp(π·√(x))·(3 - 3π·√(x) + π²·x)/x^⁵⁄₂ | x = ⅙π }");
+                       deriv_text ? deriv_text : "(null)", "{ ⅛π·exp(π·√(x))/x^⁵⁄₂·(3 - 3π·√(x) + π²·x) | x = ⅙π }");
     }
 
     free(deriv_text);
@@ -1796,12 +1796,12 @@ static void test_from_string_bindings_with_constant_expression_value(void)
     deriv = (expr && x) ? expr_create_deriv(expr, x) : NULL;
     deriv_text = deriv ? expr_to_string(deriv, style_EXPRESSION) : NULL;
 
-    if (deriv_text && strcmp(deriv_text, "{ ⅛π·exp(π·√(x))·(3 - 3π·√(x) + π²·x)/x^⁵⁄₂ | x = 163 }") == 0) {
+    if (deriv_text && strcmp(deriv_text, "{ ⅛π·exp(π·√(x))/x^⁵⁄₂·(3 - 3π·√(x) + π²·x) | x = 163 }") == 0) {
         to_string_pass("nested symbolic pi derivative factors common terms", deriv_text,
-                       "{ ⅛π·exp(π·√(x))·(3 - 3π·√(x) + π²·x)/x^⁵⁄₂ | x = 163 }");
+                       "{ ⅛π·exp(π·√(x))/x^⁵⁄₂·(3 - 3π·√(x) + π²·x) | x = 163 }");
     } else {
         to_string_fail(__FILE__, __LINE__, 1, "nested symbolic pi derivative factors common terms",
-                       deriv_text ? deriv_text : "(null)", "{ ⅛π·exp(π·√(x))·(3 - 3π·√(x) + π²·x)/x^⁵⁄₂ | x = 163 }");
+                       deriv_text ? deriv_text : "(null)", "{ ⅛π·exp(π·√(x))/x^⁵⁄₂·(3 - 3π·√(x) + π²·x) | x = 163 }");
     }
 
     free(deriv_text);

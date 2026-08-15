@@ -56,15 +56,20 @@ Current matrix integration is strongest for:
 
 - symbolic matrix construction and pretty-printing
 - entrywise symbolic algebra through matrix add, subtract, and multiply
+- ordered higher and mixed matrix derivatives and iterated antiderivatives
+- exact spectral differentiation and integration of constant square-matrix
+  powers, with a numeric diagonalisation fallback for supported larger matrices
 - exact structured matrix functions
-- exact `1×1` and `2×2` symbolic inverse
+- exact symbolic inverse and solve families
+- style-independent expression simplification followed by matrix-wide
+  presentation beautification
 
 After a matrix operation, each output entry is still an `expr_t` expression, so
 you can differentiate individual matrix entries with the normal `expr` API.
 
-The full numerical matrix toolbox is still separate. General eigensolvers,
-factorisations, and Schur-based matrix functions remain numeric-only unless the
-`expr` input first falls into a supported exact structured case.
+The full numerical matrix toolbox is still separate. General factorisations
+and Schur-based matrix functions remain numeric-only unless the `expr` input
+first falls into a supported exact structured case.
 
 ## Symbolic Integrator Helpers
 
@@ -537,10 +542,22 @@ are obtained by differentiating derivative expressions again with
 variable pointer so the library knows which variable to differentiate with
 respect to; all other variable nodes in the graph are treated as constants.
 
+This is symbolic differentiation, not forward-mode automatic differentiation:
+it constructs another expression DAG. MARS does not currently expose a numeric
+forward-mode Jacobian-vector-product (JVP) API. Such an API would propagate one
+or more tangents through each node and is most useful when there are few input
+directions and many outputs.
+
 `expr_eval_derivatives(...)` does not build one symbolic derivative graph per
 requested variable. It evaluates the primal once, then performs a reverse-mode
 adjoint sweep over the existing DAG and returns owning `number_t` results for
 the primal and requested first derivatives.
+
+Reverse mode naturally computes a vector-Jacobian product (VJP). It is the
+appropriate existing numeric path for a scalar output with many inputs. The
+symbolic Jacobians built by `matrix_t` are neither JVPs nor VJPs; numeric
+forward- or reverse-mode evaluation may consume their scalar expressions, but
+does not change the symbolic calculus or simplification rules.
 
 That reverse-mode path is numeric rather than purely symbolic. Unevaluated
 integral nodes therefore remain symbolically differentiable through
@@ -571,7 +588,11 @@ on the next evaluation pass.
 
 The library applies algebraic simplification rules during derivative
 construction. This keeps derivative expressions compact and fast to evaluate.
-The simplifier is exposed internally via `expr_simplify()` (see `expr_internal.h`).
+`expr_simplify()` is the public algebraic pass. `expr_beautify()` first
+simplifies and then arranges an equivalent expression for readable
+presentation, including symmetric surds and Cartesian complex products. The
+beautifier does not select a different expression for TeX output; rendering
+style is applied afterwards.
 
 ---
 
@@ -606,6 +627,14 @@ All public declarations are in `include/expression.h`.
 
 - `number_t expr_eval(const expr_t *expr)` — evaluate and return an owning `number_t`
 - `int expr_eval_derivatives(const expr_t *expr, size_t nvars, const expr_t *const *vars, number_t *value_out, number_t *derivs_out)` — reverse-mode derivative evaluation returning owning `number_t` primal and derivative results
+
+There is deliberately no forward-mode entry in this list yet. Repeated
+symbolic differentiation is not described as forward mode.
+
+### Simplification and presentation
+
+- `expr_t *expr_simplify(const expr_t *expr)` — return an algebraically simplified owning expression
+- `expr_t *expr_beautify(const expr_t *expr)` — simplify and arrange an equivalent owning expression for readable presentation
 
 ### Derivative Construction (owning)
 

@@ -722,7 +722,7 @@ static void test_to_string_nested_transcendental_TeX(void)
     expr_t *f = expr_add(exp_term, x_log_y);
     char *got = expr_to_string(f, style_LATEX);
 
-    const char *expect = "\\left\\{ e^{\\sin(x_{0}\\,y_{1})} + x_{0}\\,\\ln(y_{1}) "
+    const char *expect = "\\left\\{ e^{\\sin(x_{0}\\mkern-2mu y_{1})} + x_{0}\\mkern-2mu \\ln(y_{1}) "
                          "\\;\\middle|\\; x_{0} = 1, y_{1} = 2 \\right\\}";
 
     TeX_preview_emit_case(__FILE__, "nested transcendental (TEX)", got);
@@ -851,7 +851,8 @@ static void test_to_string_symbolic_constants_TeX(void)
     expr_t *f = expr_from_string("{ exp(@pi*i*3/2*x) }", NULL);
     char *got = f ? expr_to_string(f, style_LATEX) : NULL;
 
-    const char *expect = "\\left\\{ e^{\\pi\\,i\\,\\frac{3}{2}\\,x} \\;\\middle|\\; x = NAN \\right\\}";
+    const char *expect = "\\left\\{ e^{\\pi\\mkern-2mu i\\mkern-2mu \\frac{3}{2}\\mkern-2mu x} "
+                         "\\;\\middle|\\; x = NAN \\right\\}";
 
     TeX_preview_emit_case(__FILE__, "symbolic constants (TEX)", got);
 
@@ -952,7 +953,7 @@ static void test_to_string_gamma_polygamma_standard_names(void)
                               "\n"
                               "x = 3\n"
                               "output(expr(x));";
-    const char *expect_second_TeX = "\\left\\{ \\Gamma(x)\\,\\left(\\psi^{(1)}(x) + "
+    const char *expect_second_TeX = "\\left\\{ \\Gamma(x)\\mkern-2mu \\left(\\psi^{(1)}(x) + "
                                     "\\psi^{(0)}(x)^{2}\\right) \\;\\middle|\\; x = 2 \\right\\}";
 
     if (str_eq(got_expr, expect_expr))
@@ -1122,8 +1123,9 @@ static void test_to_string_wrapped_TeX_distributes_scale(void)
     char *got = expr_to_TeX_body_wrapped(f, 1u);
     const char *expect = "scaled wrapped TeX distributes factor without tall delimiters";
 
-    if (got && strstr(got, "\\begin{aligned}[t]") && strstr(got, "k\\,x") && strstr(got, "{} - k\\,y") &&
-        strstr(got, "{} + k\\,z") && !strstr(got, "\\left(\\begin{aligned}"))
+    if (got && strstr(got, "\\begin{aligned}[t]") && strstr(got, "k\\mkern-2mu x") &&
+        strstr(got, "{} - k\\mkern-2mu y") && strstr(got, "{} + k\\mkern-2mu z") &&
+        !strstr(got, "\\left(\\begin{aligned}"))
         to_string_pass("wrapped TeX distributes scale", got, expect);
     else
         to_string_fail(__FILE__, __LINE__, 1, "wrapped TeX distributes scale", got, expect);

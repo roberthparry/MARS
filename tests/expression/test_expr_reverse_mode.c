@@ -74,7 +74,7 @@ static void test_reverse_gradient_shared_subexpression(void)
     expr_free(x);
 }
 
-static void test_reverse_matches_forward_composite(void)
+static void test_reverse_matches_symbolic_composite(void)
 {
     expr_t *x = test_expr_new_named_var_d(1.0, "x");
     expr_t *y = test_expr_new_named_var_d(2.0, "y");
@@ -370,7 +370,7 @@ void test_reverse_mode(void)
 {
     TEST_RUN_SUBTEST(test_reverse_gradient_polynomial, NULL);
     TEST_RUN_SUBTEST(test_reverse_gradient_shared_subexpression, NULL);
-    TEST_RUN_SUBTEST(test_reverse_matches_forward_composite, NULL);
+    TEST_RUN_SUBTEST(test_reverse_matches_symbolic_composite, NULL);
     TEST_RUN_SUBTEST(test_reverse_gradient_missing_variable, NULL);
     TEST_RUN_SUBTEST(test_reverse_gradient_polynomial_num, NULL);
     TEST_RUN_SUBTEST(test_reverse_gradient_complex_number_t, NULL);

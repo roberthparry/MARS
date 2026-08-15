@@ -653,6 +653,23 @@ static int mt_expr_TeX_parts_text(const expr_t *dv, string_t **expr_out, string_
     return ok ? 0 : -1;
 }
 
+static string_t *mt_matrix_factor_text(const expr_t *factor, mat_string_style_t style)
+{
+    string_t *expression = NULL;
+    string_t *bindings = NULL;
+
+    if (!factor)
+        return NULL;
+    if (style == MAT_STRING_LATEX) {
+        if (mt_expr_TeX_parts_text(factor, &expression, &bindings) != 0)
+            return NULL;
+    } else if (mt_split_expr_repr(factor, &expression, &bindings) != 0) {
+        return NULL;
+    }
+    string_free(bindings);
+    return expression;
+}
+
 static void mt_pretty_expr_expr(string_t **expr_io, string_t **const_bindings, size_t nconst_bindings)
 {
     string_t *expr;
@@ -838,38 +855,40 @@ static string_t *mat_to_string_expr(const matrix_t *A, mat_string_style_t style,
 {
     size_t n = A->rows * A->cols;
     string_t **exprs = calloc(n ? n : 1, sizeof(*exprs));
+    string_t **additive_constants = calloc(n ? n : 1, sizeof(*additive_constants));
+    mat_expr_beautification_t beautification = {0};
     string_t **var_bindings = NULL;
     string_t **const_bindings = NULL;
     size_t nvar_bindings = 0, capvar_bindings = 0;
     size_t nconst_bindings = 0, capconst_bindings = 0;
     size_t *widths = calloc(A->cols ? A->cols : 1, sizeof(*widths));
+    size_t *constant_widths = calloc(A->cols ? A->cols : 1, sizeof(*constant_widths));
     mat_buf_t out = {0};
-    int ok = exprs && widths;
+    int ok = exprs && additive_constants && widths && constant_widths;
     int tex = (style == MAT_STRING_LATEX);
     int layout = (style == MAT_STRING_LAYOUT_SCIENTIFIC || style == MAT_STRING_LAYOUT_PRETTY);
     int scientific = (style == MAT_STRING_INLINE_SCIENTIFIC || style == MAT_STRING_LAYOUT_SCIENTIFIC);
     int omit_wrapper = 0;
+    string_t *common_factor_text = NULL;
+
+    if (ok && mat_beautify_expression_matrix(A, &beautification) != 0)
+        ok = 0;
+    common_factor_text = mt_matrix_factor_text(beautification.common_factor, style);
+    if (beautification.common_factor && !common_factor_text)
+        ok = 0;
 
     for (size_t i = 0; ok && i < A->rows; ++i) {
         for (size_t j = 0; j < A->cols; ++j) {
             string_t *expr = NULL;
             string_t *binding_text = NULL;
-            expr_t *dv = NULL;
-            expr_t *display_expr = NULL;
+            string_t *constant_binding_text = NULL;
             size_t idx = i * A->cols + j;
+            expr_t *display_expr = beautification.entries[idx];
 
-            mat_get(A, i, j, &dv);
-            if (expr_contains_half_scaled_symbolic_power(dv))
-                display_expr = expr_factor_common_post_calculus(dv);
-            if (!display_expr && dv) {
-                expr_retain(dv);
-                display_expr = dv;
-            }
             if ((tex && mt_expr_TeX_parts_text(display_expr, &expr, &binding_text) != 0) ||
                 (!tex && mt_split_expr_repr(display_expr, &expr, &binding_text) != 0)) {
                 string_free(expr);
                 string_free(binding_text);
-                expr_free(display_expr);
                 ok = 0;
                 break;
             }
@@ -881,8 +900,25 @@ static string_t *mat_to_string_expr(const matrix_t *A, mat_string_style_t style,
             }
             if (mt_text_display_length(exprs[idx]) > widths[j])
                 widths[j] = mt_text_display_length(exprs[idx]);
+            if (beautification.additive_constants) {
+                if ((tex && mt_expr_TeX_parts_text(beautification.additive_constants[idx], &additive_constants[idx],
+                                                   &constant_binding_text) != 0) ||
+                    (!tex && mt_split_expr_repr(beautification.additive_constants[idx], &additive_constants[idx],
+                                                &constant_binding_text) != 0)) {
+                    string_free(constant_binding_text);
+                    ok = 0;
+                    break;
+                }
+                mt_collect_expr_bindings(beautification.additive_constants[idx], &var_bindings, &nvar_bindings,
+                                         &capvar_bindings, &const_bindings, &nconst_bindings, &capconst_bindings,
+                                         constant_binding_text);
+                if (!tex)
+                    mt_pretty_expr_expr(&additive_constants[idx], const_bindings, nconst_bindings);
+                if (mt_text_display_length(additive_constants[idx]) > constant_widths[j])
+                    constant_widths[j] = mt_text_display_length(additive_constants[idx]);
+                string_free(constant_binding_text);
+            }
             string_free(binding_text);
-            expr_free(display_expr);
         }
     }
 
@@ -894,7 +930,15 @@ static string_t *mat_to_string_expr(const matrix_t *A, mat_string_style_t style,
         string_t *joined = mt_join_bindings_TeX(var_bindings, nvar_bindings, const_bindings, nconst_bindings);
         if (!omit_wrapper)
             mb_puts(&out, "\\left\\{ ");
+        if (common_factor_text) {
+            mb_put_text(&out, common_factor_text);
+            mb_puts(&out, "\\mkern-5mu ");
+        }
         mt_emit_cells_TeX(&out, exprs, A->rows, A->cols);
+        if (beautification.additive_constants) {
+            mb_puts(&out, " + ");
+            mt_emit_cells_TeX(&out, additive_constants, A->rows, A->cols);
+        }
         if (!omit_wrapper && joined && string_length(joined) > 0u) {
             mb_puts(&out, " \\;\\middle|\\; ");
             mb_put_text(&out, joined);
@@ -907,7 +951,15 @@ static string_t *mat_to_string_expr(const matrix_t *A, mat_string_style_t style,
         string_t *joined = mt_join_bindings(var_bindings, nvar_bindings, const_bindings, nconst_bindings, scientific);
         if (!omit_wrapper)
             mb_puts(&out, "{ ");
+        if (common_factor_text) {
+            mb_put_text(&out, common_factor_text);
+            mb_puts(&out, ".");
+        }
         mt_emit_cells(&out, exprs, A->rows, A->cols, widths, 0);
+        if (beautification.additive_constants) {
+            mb_puts(&out, " + ");
+            mt_emit_cells(&out, additive_constants, A->rows, A->cols, constant_widths, 0);
+        }
         if (!omit_wrapper && joined && string_length(joined) > 0u) {
             mb_puts(&out, " | ");
             mb_put_text(&out, joined);
@@ -920,7 +972,15 @@ static string_t *mat_to_string_expr(const matrix_t *A, mat_string_style_t style,
         string_t *joined = mt_join_bindings(var_bindings, nvar_bindings, const_bindings, nconst_bindings, scientific);
         if (!omit_wrapper)
             mb_puts(&out, "{ ");
+        if (common_factor_text) {
+            mb_put_text(&out, common_factor_text);
+            mb_puts(&out, ".");
+        }
         mt_emit_cells(&out, exprs, A->rows, A->cols, widths, 1);
+        if (beautification.additive_constants) {
+            mb_puts(&out, " + ");
+            mt_emit_cells(&out, additive_constants, A->rows, A->cols, constant_widths, 1);
+        }
         if (!omit_wrapper && joined && string_length(joined) > 0u) {
             mb_puts(&out, " | ");
             mb_put_text(&out, joined);
@@ -932,14 +992,20 @@ static string_t *mat_to_string_expr(const matrix_t *A, mat_string_style_t style,
 
     for (size_t i = 0; i < n; ++i)
         string_free(exprs[i]);
+    for (size_t i = 0; i < n; ++i)
+        string_free(additive_constants[i]);
     for (size_t i = 0; i < nvar_bindings; ++i)
         string_free(var_bindings[i]);
     for (size_t i = 0; i < nconst_bindings; ++i)
         string_free(const_bindings[i]);
     free(var_bindings);
     free(const_bindings);
+    string_free(common_factor_text);
+    mat_expr_beautification_clear(&beautification);
     free(exprs);
+    free(additive_constants);
     free(widths);
+    free(constant_widths);
     return mb_take(&out);
 }
 

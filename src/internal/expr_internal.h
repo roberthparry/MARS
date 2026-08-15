@@ -71,6 +71,7 @@ expr_bindings_t *expr_bindings_from_expr_internal(const expr_t *expr);
 expr_bindings_t *expr_bindings_merge_internal(const expr_bindings_t *bindings,
                                               const expr_bindings_t *additional_bindings);
 expr_t *expr_simplify_owned(expr_t *expr);
+expr_t *expr_beautify(const expr_t *expr);
 expr_t *expr_factor_common_post_calculus(const expr_t *expr);
 bool expr_contains_half_scaled_symbolic_power(const expr_t *expr);
 expr_t *expr_negate_owned(expr_t *expr);
@@ -113,7 +114,13 @@ bool expr_match_const_value(const expr_t *expr, number_t *value_out);
 bool expr_match_var_expr(const expr_t *expr, size_t nvars, expr_t *const *vars, size_t *index_out);
 bool expr_match_scaled_expr(const expr_t *expr, number_t *scale_out, const expr_t **base_out);
 bool expr_match_add_sub_expr(const expr_t *expr, const expr_t **left_out, const expr_t **right_out, bool *is_sub_out);
+const expr_t *expr_first_child(const expr_t *expr);
+const expr_t *expr_second_child(const expr_t *expr);
+bool expr_simplify_same_factor(const expr_t *left, const expr_t *right);
 bool expr_match_mul_expr(const expr_t *expr, const expr_t **left_out, const expr_t **right_out);
+
+expr_t *expr_simplify_extract_common_factor_quotient(const expr_t *expr, const expr_t *factor);
+expr_t *expr_simplify_find_common_factor(expr_t *const *expressions, size_t count);
 bool expr_match_div_expr(const expr_t *expr, const expr_t **left_out, const expr_t **right_out);
 bool expr_collect_var_usage(const expr_t *expr, size_t nvars, expr_t *const *vars, bool *used_out);
 bool expr_has_unbound_parameters(const expr_t *expr, size_t nvars, expr_t *const *vars);

@@ -123,6 +123,24 @@ Install the desktop MARS Lab launcher with:
 make install-mars-lab
 ```
 
+During development, the Makefile can manage the local Lab process without a
+manual `pgrep` and `kill` cycle:
+
+```sh
+make mars-lab
+make mars-lab-stop
+make mars-lab-restart
+```
+
+```text
+MARS Lab running at http://localhost:<port>/
+Stopped MARS Lab.
+MARS Lab running at http://localhost:<port>/
+```
+
+`make mars-lab-restart` stops a Lab process belonging to the current user,
+rebuilds the helper when necessary and launches it again.
+
 That installer now prompts for a password to protect the private jurisdiction
 database, stores the resulting configuration in
 `~/.mars/config/jurisdiction-db.env`, and builds the encrypted jurisdiction database at

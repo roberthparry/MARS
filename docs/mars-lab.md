@@ -11,9 +11,8 @@ is sent to the local MARS helper programs, which use MARSlib.
 Build MARS and install the TeX rendering tools before starting the Lab:
 
 ```sh
-make release
 sudo apt install texlive-latex-base dvisvgm sqlcipher
-python3 tools/mars_lab.py
+make mars-lab
 ```
 
 ```text
@@ -25,6 +24,9 @@ The port is selected automatically. Use `python3 tools/mars_lab.py --help` to
 see the command-line options, including a fixed host or port and
 `--no-browser`. To install the desktop launcher and its private jurisdiction
 database, run `make install-mars-lab` from the repository root.
+
+Use `make mars-lab-stop` to stop a Lab process belonging to the current user,
+or `make mars-lab-restart` after changing the native helper or client.
 
 The selected mode and recent workspace state are retained between sessions.
 The precision buttons change the working precision used by the mathematical
@@ -41,7 +43,7 @@ numeric value for a selected variable.
 The captured input is `sin(x)^2 + cos(x)^2` with `x = pi/7`. MARS simplifies
 the expression to the exact output `1`.
 
-[![MARS Lab expression mode simplifying a trigonometric identity to one](images/mars-lab/expression.png?v=20260814-3)](images/mars-lab/expression.png?v=20260814-3)
+[![MARS Lab expression mode simplifying a trigonometric identity to one](images/mars-lab/expression.png?v=20260815-1)](images/mars-lab/expression.png?v=20260815-1)
 
 ## Equation mode
 
@@ -118,8 +120,11 @@ trigonometric, inverse-trigonometric, hyperbolic, error, gamma, normal-density,
 Lambert W and exponential-integral families. The parser reports the canonical
 function name even when an alias such as `ln`, `log`, `Γ` or `productlog` was
 entered. Exact symbolic matrices are supported where MARSlib has an exact
-structured or small-matrix rule; otherwise, bind the entries to obtain a
-numeric matrix before applying a general numeric matrix function.
+structured rule; otherwise, bind the entries to obtain a numeric matrix before
+applying a general numeric matrix function. Symbolic exponents on supported
+constant diagonalizable numeric square matrices are retained for any matrix
+order; the exact `1 x 1` and eligible `2 x 2` cases additionally retain exact
+spectral projectors.
 
 Determinant bars must be paired: an input beginning with `|` or `||` without
 the corresponding closing delimiter is rejected. A determinant is a scalar,
@@ -138,10 +143,20 @@ Greek names may be entered as Unicode or through their ASCII aliases. Thus
 in output. This also applies inside compact matrix literals and identity
 multiples.
 
-Entrywise calculus uses `Dx(A)` for differentiation and `@S^x(A)` for an
-antiderivative. The variable buttons below the editor invoke the same native
-operations. A matrix antiderivative is displayed as `A(x) + C`, where `C` is a
-constant matrix with entries such as `C₁₁`, `C₁₂`, `C₂₁` and `C₂₂`.
+Entrywise calculus uses `Dx(A)` for differentiation. Write `@S(A)dx` for an
+indefinite entrywise integral with an additive constant matrix, or `@S^x(A)dx`
+for the corresponding antiderivative without additive constants. Repeating a
+derivative variable requests higher-order calculus, as in `Dxx(A)`, while a
+suffix containing distinct variables requests ordered mixed calculus, as in
+`Dxy(A)`. The variable buttons
+below the editor invoke the corresponding first-order native operation. A
+matrix antiderivative is displayed as `A(x) + C`, where `C` is a constant
+matrix with entries such as `C₁₁`, `C₁₂`, `C₂₁` and `C₂₂`.
+
+| Input | Output |
+|---|---|
+| `Dxx(x^3 xy; y^2 x^2y)` | `(6x, 0; 0, 2y)` |
+| `Dxy(x^2y x*y^2; y^3 x^3y)` | `(2x, 2y; 0, 3x²)` |
 
 For a symbolic matrix-power example, enter `A^x` with `A = (1 2; 3 4)`.
 Writing
@@ -156,22 +171,29 @@ button returns
 matrix. MARS Lab expands these projector expressions into a `2 x 2` matrix in
 the result cards while retaining the exact `√33` terms.
 
+MARSlib applies the spectral scalar rule before reconstructing the matrix. In
+compact notation, `d(A^x)/dx = A^x log(A)` and, when `log(A)` is invertible,
+`∫A^x dx = A^x inverse(log(A)) + C`. An eigenvalue-one projector is integrated
+as a linear term rather than divided by zero. The same machinery supports
+ordered higher and mixed derivatives and iterated integrals, and is not limited
+to `2 x 2` matrices.
+
 <figure>
-  <a href="images/mars-lab/matrix.png?v=20260815-5"><img src="images/mars-lab/matrix.png?v=20260815-5" alt="MARS Lab evaluating the symbolic matrix power (1 2; 3 4) raised to x"></a>
+  <a href="images/mars-lab/matrix.png?v=20260815-6"><img src="images/mars-lab/matrix.png?v=20260815-6" alt="MARS Lab evaluating the symbolic matrix power (1 2; 3 4) raised to x"></a>
   <figcaption><em>After clicking <strong>Evaluate</strong>.</em></figcaption>
 </figure>
 
 <br>
 
 <figure>
-  <a href="images/mars-lab/matrix-power-derivative.png?v=20260815-4"><img src="images/mars-lab/matrix-power-derivative.png?v=20260815-4" alt="MARS Lab differentiating the symbolic matrix power with respect to x"></a>
+  <a href="images/mars-lab/matrix-power-derivative.png?v=20260815-5"><img src="images/mars-lab/matrix-power-derivative.png?v=20260815-5" alt="MARS Lab differentiating the symbolic matrix power with respect to x"></a>
   <figcaption><em>After clicking <strong>x derivative</strong>.</em></figcaption>
 </figure>
 
 <br>
 
 <figure>
-  <a href="images/mars-lab/matrix-power-integral.png?v=20260815-4"><img src="images/mars-lab/matrix-power-integral.png?v=20260815-4" alt="MARS Lab integrating the symbolic matrix power with respect to x and displaying the constant matrix"></a>
+  <a href="images/mars-lab/matrix-power-integral.png?v=20260815-5"><img src="images/mars-lab/matrix-power-integral.png?v=20260815-5" alt="MARS Lab integrating the symbolic matrix power with respect to x and displaying the constant matrix"></a>
   <figcaption><em>After clicking <strong>x integral</strong>.</em></figcaption>
 </figure>
 
@@ -187,6 +209,12 @@ Result cards have distinct purposes:
   `(1 2; 3 4) - lambdaI` to `(-2 2; 3 1)` without replacing the symbolic
   result above it.
 
+Symbolic matrix calculus constructs expression DAGs. It does not depend on the
+numeric automatic-differentiation mode: the scalar expression evaluator has a
+reverse-mode gradient path, while a numeric forward-mode JVP path is a separate
+future facility. The symbolic Jacobian is therefore not described as either a
+JVP or a VJP.
+
 **Use as input** copies the reusable result expression back into the Matrix
 editor. **Back** and **Forward** navigate the Lab's Matrix workspace history;
 the editor, selected operation and right-hand operand are retained between
@@ -198,12 +226,14 @@ The direct symbolic forms use the same editor:
 |---|---|
 | `inverse(a b; c d)` | `(d/(ad-bc), -b/(ad-bc); -c/(ad-bc), a/(ad-bc))` |
 | `det((1 2; 3 4) - lambdaI)` | `(1-λ)(4-λ)-6` |
-| `tr(a b; c d)` | `{ a+d \|; a=NAN, d=NAN }` |
+| `tr(a b; c d)` | `a+d` |
 | `(a b; c d)^dagger` | `(conj(a) conj(c); conj(b) conj(d))` |
 | `(a b; c d).(e f; g h)` | `(ae+bg, af+bh; ce+dg, cf+dh)` |
-| `inverse(a b; c d).(x; y)` | `((dx-by)/(ad-bc); (ay-cx)/(ad-bc))` |
+| `inverse(a b; c d).(x; y)` | `(1/(ad-bc)(dx-by); 1/(ad-bc)(ay-cx))` |
 | `Dx(ax+b cx+d; y xy)` | `(a, c; 0, y)` |
-| `@S^x((ax+b cx+d; y xy))` | `(½(ax²+2bx), ½(cx²+2dx); xy, ½x²y) + (C₁₁, C₁₂; C₂₁, C₂₂)` |
+| `Dxx(x^3 xy; y^2 x^2y)` | `(6x, 0; 0, 2y)` |
+| `Dxy(x^2y x*y^2; y^3 x^3y)` | `(2x, 2y; 0, 3x²)` |
+| `@S(ax+b cx+d; y xy)dx` | `(½(ax²+2bx), ½(cx²+2dx); xy, ½x²y) + (C₁₁, C₁₂; C₂₁, C₂₂)` |
 
 ## Integrator mode
 

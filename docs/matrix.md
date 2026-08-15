@@ -34,14 +34,18 @@ the API. Internally each matrix carries:
 - structural: transpose, conjugate, Hermitian (conjugate transpose)
 - string I/O: parse matrices from strings, render them back to strings, and print them with matrix-aware format specifiers
 - linear algebra: determinant, trace, characteristic polynomial, minimal polynomial, polynomial application, adjugate, inverse, block inverse, Schur complements, solve, block solve, eigenvalues, eigendecomposition, eigenvectors, eigenspaces, generalised eigenspaces, Jordan-chain helpers, rank, pseudoinverse, nullspace
-- symbolic matrix calculus: entrywise derivatives via `mat_deriv(...)`, Jacobian helpers, plus derivative helpers for trace, determinant, inverse, block inverse, solve, and block solve
+- symbolic matrix calculus: entrywise derivatives and antiderivatives, ordered
+  higher and mixed calculus, Jacobian helpers, constant-matrix power shortcuts,
+  plus derivative helpers for trace, determinant, inverse, block inverse, solve,
+  and block solve
 - matrix norms: 1-norm, infinity-norm, Frobenius norm, 2-norm
 - matrix factorisations: LU, QR, Cholesky, SVD, Schur
 - condition number computation
 - matrix functions: named APIs for exp, sin, cos, tan, sinh, cosh, tanh, sqrt, log, log10, asin, acos, atan, asinh,
   acosh, atanh, erf, and erfc; complete matrix-expression input resolves every applicable unary expression function
-- power functions: integer power (binary exponentiation), real power via exp/log, and exact symbolic powers of small
-  numeric or symbolic matrices through spectral projectors
+- power functions: integer power, principal numeric power, exact symbolic
+  spectral powers for eligible `1×1` and `2×2` matrices, and retained symbolic
+  exponents for supported diagonalizable numeric square matrices of any order
 - numeric eigendecomposition and matrix functions are computed through the high-precision numeric `number_t` layer regardless of how the original numeric entries were written
 
 ## `expr_t *` Matrices
@@ -63,6 +67,10 @@ What currently works for `expr` matrices:
 - exact Schur complements, block inverses, and block solves, including symbolic `expr` block expressions when the leading block is invertible
 - eigenspaces, generalised eigenspaces, Jordan chains, and Jordan block-size profiles for disciplined symbolic cases
 - entrywise symbolic matrix derivatives with respect to a chosen `expr` variable
+- ordered higher and mixed derivatives through `mat_deriv_sequence(...)`
+- entrywise symbolic antiderivatives and iterated integrals through
+  `mat_integrate(...)`, `mat_integrate_sequence(...)` and
+  `mat_integrate_family(...)`
 - row-major Jacobian extraction for matrix-valued symbolic outputs
 - symbolic derivative helpers for `trace(A)`, `det(A)`, and `A^{-1}`
 - symbolic derivative helper for `solve(A, B)`
@@ -120,10 +128,23 @@ Matrix entries use the scalar expression parser. Consequently `conj(z)`,
 `conjugate(z)` and `z^*` are equivalent, as are `abs(z)` and paired `|z|`.
 For complex scalars the latter is the modulus `sqrt(z*z^*)`.
 
-`Dx(A)` differentiates each entry with respect to `x`, and `@S^x(A)` produces
-an entrywise antiderivative. A matrix antiderivative has one independent
-constant per entry and is formatted as `A(x) + C`, with `C` carrying indexed
-constants such as `C₁₁` and `C₁₂`.
+`Dx(A)` differentiates each entry with respect to `x`, while `Dxx(A)` repeats
+the derivative and `Dxy(A)` differentiates in the stated order. `@S(A)dx`
+produces an indefinite entrywise integral, whereas `@S^x(A)dx` produces the
+corresponding antiderivative without additive constants. A displayed indefinite
+matrix integral has one
+independent constant per entry and is formatted as `A(x) + C`, with `C`
+carrying indexed constants such as `C₁₁` and `C₁₂`.
+
+Examples and their outputs are:
+
+```text
+Input:  Dxx(x^3 xy; y^2 x^2y)
+Output: (6x, 0; 0, 2y)
+
+Input:  Dxy(x^2y x*y^2; y^3 x^3y)
+Output: (2x, 2y; 0, 3x²)
+```
 
 ## Example
 
@@ -495,10 +516,14 @@ compatible shapes for mul). They return a newly allocated matrix.
 | `mat_conj(A)` | Element-wise complex conjugate |
 | `mat_hermitian(A)` | Conjugate transpose: `A^† = conj(A)^T` |
 
-#### Matrix Derivative
+#### Entrywise Matrix Calculus
 
 ```c
 matrix_t *mat_deriv(const matrix_t *A, expr_t *wrt);
+matrix_t *mat_deriv_sequence(const matrix_t *A, size_t count, expr_t *const *wrts);
+matrix_t *mat_integrate(const matrix_t *A, expr_t *wrt);
+matrix_t *mat_integrate_sequence(const matrix_t *A, size_t count, expr_t *const *wrts);
+matrix_t *mat_integrate_family(const matrix_t *A, expr_t *wrt);
 ```
 
 Returns the entrywise derivative of `A` with respect to `wrt`, so the output
@@ -515,16 +540,21 @@ differentiated expressions.
 For non-`expr` matrices, `A` is treated as a constant matrix and the result is a
 newly allocated zero matrix with the same shape and element type as `A`.
 
+`mat_deriv_sequence(...)` applies the variables in order. Repeated variables
+give higher derivatives; distinct variables give mixed partial derivatives.
+`mat_integrate_sequence(...)` uses the same ordered convention for iterated
+antiderivatives. The basic integration functions omit arbitrary constants;
+`mat_integrate_family(...)` appends one independent constant to every entry.
+
 #### Matrix Calculus Helpers
 
 ```c
 expr_t   *mat_deriv_trace_by_name(const matrix_t *A, mat_bindings_t *bindings, const char *name);
 expr_t   *mat_deriv_det_by_name(const matrix_t *A, mat_bindings_t *bindings, const char *name);
 matrix_t *mat_deriv_by_name(const matrix_t *A, mat_bindings_t *bindings, const char *name);
+matrix_t *mat_integrate_by_name(const matrix_t *A, mat_bindings_t *bindings, const char *name);
 expr_t   *mat_deriv_trace(const matrix_t *A, expr_t *wrt);
 expr_t   *mat_deriv_det(const matrix_t *A, expr_t *wrt);
-expr_t   *mat_deriv_trace_by_name(const matrix_t *A, mat_bindings_t *bindings, const char *name);
-expr_t   *mat_deriv_det_by_name(const matrix_t *A, mat_bindings_t *bindings, const char *name);
 matrix_t *mat_deriv_inverse(const matrix_t *A, expr_t *wrt);
 matrix_t *mat_deriv_inverse_by_name(const matrix_t *A, mat_bindings_t *bindings, const char *name);
 matrix_t *mat_deriv_block_inverse(const matrix_t *A, size_t split, expr_t *wrt);
@@ -540,6 +570,7 @@ matrix_t *mat_jacobian(const matrix_t *A, expr_t *const *vars, size_t nvars);
 These helpers build on the symbolic `expr` matrix layer:
 
 - `mat_deriv_by_name(A, bindings, n, "x")` looks up a parsed binding and differentiates entrywise with respect to it
+- `mat_integrate_by_name(...)` performs the corresponding entrywise antiderivative
 - `mat_deriv_trace_by_name(...)` and `mat_deriv_det_by_name(...)` do the same for `trace(A)` and `det(A)`
 - `mat_deriv_trace(A, wrt)` returns the derivative of `trace(A)` as a symbolic scalar
 - `mat_deriv_det(A, wrt)` returns the derivative of `det(A)` as a symbolic scalar
@@ -567,6 +598,11 @@ For non-`expr` matrices, they treat the matrix inputs as constants:
 For `mat_jacobian(...)`, row `i * cols(A) + j` corresponds to the entry
 `A[i,j]`, and column `k` corresponds to differentiation with respect to
 `vars[k]`.
+
+These APIs construct symbolic expression DAGs. A symbolic Jacobian is not a
+numeric forward-mode JVP or reverse-mode VJP. The expression layer currently
+provides numeric reverse-mode gradients for scalar outputs; a numeric
+forward-mode tangent evaluator is a separate future facility.
 
 ### Linear Algebra
 
@@ -1030,10 +1066,60 @@ if `A` is NULL, not square, or inversion fails when `n < 0`.
 matrix_t *mat_pow(const matrix_t *A, const number_t *s);
 ```
 
-Computes `Aˢ = exp(s · log(A))` for a borrowed numeric exponent `s`. Requires
-`A` to have a well-defined matrix logarithm — positive definite real matrices
-always satisfy this. Returns NULL on any error (NULL input, NULL exponent,
-non-square matrix, or `mat_log` failure).
+For exact `1×1` and `2×2` inputs raised to one half, MARS retains an exact
+symbolic principal square root. Other diagonalizable matrices apply the scalar
+principal power to their eigenvalues. Defective inputs fall back to
+`exp(s log(A))` and therefore require a well-defined principal logarithm.
+
+#### Symbolic power and constant-matrix calculus
+
+```c
+matrix_t *mat_pow_expr(const matrix_t *A, const expr_t *exponent);
+matrix_t *mat_deriv_pow_expr(const matrix_t *A, const expr_t *exponent, expr_t *wrt);
+matrix_t *mat_deriv_pow_expr_sequence(const matrix_t *A, const expr_t *exponent,
+                                      size_t count, expr_t *const *wrts);
+matrix_t *mat_integrate_pow_expr(const matrix_t *A, const expr_t *exponent, expr_t *wrt);
+matrix_t *mat_integrate_pow_expr_sequence(const matrix_t *A, const expr_t *exponent,
+                                          size_t count, expr_t *const *wrts);
+```
+
+For a constant square matrix `A`, these helpers transform each scalar spectral
+power before reconstructing the matrix. In particular,
+
+```text
+d(A^x)/dx = A^x log(A)
+∫ A^x dx = A^x inverse(log(A)) + C
+```
+
+The second compact form assumes that `log(A)` is invertible. The spectral
+implementation also handles an eigenvalue equal to one correctly by integrating
+its projector as a linear term. Exact projectors are retained where available;
+otherwise supported diagonalizable numeric square matrices use a numeric
+eigendecomposition while retaining the symbolic exponent. The ordered sequence
+forms support repeated and mixed calculus without restricting the matrix to
+`2×2`.
+
+The derivative shortcut is symbolic and independent of numeric AD mode. It
+does not turn symbolic differentiation into forward mode, nor does it invoke
+the scalar reverse-mode gradient evaluator.
+
+### Symbolic Simplification and Beautification
+
+```c
+matrix_t *mat_simplify_symbolic(const matrix_t *A);
+matrix_t *mat_beautify_symbolic(const matrix_t *A);
+```
+
+Simplification and presentation are deliberately staged. Scalar expression
+simplification first reduces every entry and factors entry-local content.
+Matrix simplification can then identify a factor common to every entry. Only
+after those algebraic transformations does matrix beautification recognise
+symmetry across entries, arrange surds and separate an antiderivative matrix
+from its constant matrix.
+
+The resulting expression structure is shared by every output style. TeX does
+not select a different simplified expression: its only style-specific change
+is replacing implied-multiplication dots with narrow mathematical spacing.
 
 ### Debugging / I/O
 
@@ -1054,6 +1140,7 @@ matrix_t *mat_expression_from_string(const char *text, mat_bindings_t **bnd_out,
 expr_t *mat_bindings_get(mat_bindings_t *bnd, const char *name);
 void mat_bindings_free(mat_bindings_t *bnd);
 matrix_t *mat_deriv_by_name(const matrix_t *A, mat_bindings_t *bindings, const char *name);
+matrix_t *mat_integrate_by_name(const matrix_t *A, mat_bindings_t *bindings, const char *name);
 expr_t *mat_deriv_trace_by_name(const matrix_t *A, mat_bindings_t *bindings, const char *name);
 expr_t *mat_deriv_det_by_name(const matrix_t *A, mat_bindings_t *bindings, const char *name);
 matrix_t *mat_deriv_inverse_by_name(const matrix_t *A, mat_bindings_t *bindings, const char *name);
@@ -1096,7 +1183,8 @@ through `bnd_out`.
 `mat_expression_from_string(...)` is the complete matrix-expression entry
 point. It recognises matrix literals, grouped unary signs, matrix products,
 `inverse(...)`, registered unary expression functions such as `exp(...)` and
-`sin(...)`, and entrywise calculus forms such as `Dx(...)` and `@S^x(...)`.
+`sin(...)`, and entrywise calculus forms such as `Dx(...)`, `@S(...)dx`, and
+`@S^x(...)dx`.
 This parsing and evaluation belongs to MARSlib; clients pass the input string
 through unchanged. When requested, `operation_out` identifies the explicit
 operation that was recognised.
@@ -1217,6 +1305,24 @@ matrix-specific format specifiers:
 ---
 
 ## Design Notes
+
+### Symbolic Calculus Pipeline
+
+Matrix symbolic calculus is split by responsibility:
+
+- `src/matrix/matrix_deriv.c` owns entrywise derivatives, ordered derivative
+  sequences, spectral power derivatives and the matrix-calculus derivative
+  identities.
+- `src/matrix/matrix_integrate.c` owns entrywise antiderivatives, ordered
+  integration sequences, spectral power integration and independent constant
+  matrices.
+- `src/matrix/matrix_simplify.c` performs algebraic entry and matrix-wide
+  reductions, including common-factor extraction.
+- `src/matrix/matrix_beautify.c` runs after simplification and arranges the
+  already simplified matrix for consistent human-readable output.
+
+The parser selects these general operations; it does not contain a display-only
+special case for the documented `(1 2; 3 4)^x` example.
 
 ### Vtable Dispatch
 

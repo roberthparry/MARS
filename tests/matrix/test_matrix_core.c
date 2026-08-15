@@ -4283,7 +4283,7 @@ static void test_inverse_expr_2x2(void)
         print_mdv("A^{-1}", Ai);
         check_bool("inverse(expr 2x2) exact text simplified",
                    ai_text &&
-                       strcmp(ai_text, "{ (2/(2x - y), -1/(2x - y); -y/(2x - y), x/(2x - y)) | x = 3, y = 4 }") == 0);
+                       strcmp(ai_text, "{ 1/(2x - y).(2, -1; -y, x) | y = 4, x = 3 }") == 0);
         P = mat_mul(A, Ai);
         check_bool("A * A^{-1} (expr) non-null", P != NULL);
         if (P) {

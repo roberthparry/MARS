@@ -248,6 +248,16 @@ bool expr_simplify_same_factor(const expr_t *left, const expr_t *right)
            expr_simplify_equal_exact_local(left, right);
 }
 
+const expr_t *expr_first_child(const expr_t *expr)
+{
+    return expr ? expr->a : NULL;
+}
+
+const expr_t *expr_second_child(const expr_t *expr)
+{
+    return expr ? expr->b : NULL;
+}
+
 static void expr_simplify_additive_terms_clear_local(addend_t *terms, size_t count)
 {
     for (size_t i = 0u; i < count; ++i) {
@@ -490,6 +500,58 @@ cleanup:
     return out;
 }
 
+static expr_t *expr_simplify_extract_reciprocal_sqrt_local(const expr_t *expr, const expr_t *radicand)
+{
+    expr_t *left;
+    expr_t *right;
+    expr_t *out;
+
+    if (!expr || !radicand)
+        return NULL;
+    if (expr_is_sqrt_expr(expr) && expr->a && expr->a->ops && expr->a->ops->kind == EXPR_KIND_DIV && expr->a->a &&
+        expr->a->b && expr_struct_eq(expr->a->b, radicand))
+        return expr_sqrt(expr->a->a);
+    if (expr->ops && expr->ops->kind == EXPR_KIND_DIV && expr->a && expr_is_sqrt_expr(expr->b) && expr->b->a &&
+        expr_struct_eq(expr->b->a, radicand))
+        return expr_clone(expr->a);
+    if (expr->ops && (expr->ops->kind == EXPR_KIND_ADD || expr->ops->kind == EXPR_KIND_SUB) && expr->a && expr->b) {
+        left = expr_simplify_extract_reciprocal_sqrt_local(expr->a, radicand);
+        right = expr_simplify_extract_reciprocal_sqrt_local(expr->b, radicand);
+        if (!left || !right) {
+            expr_free(left);
+            expr_free(right);
+            return NULL;
+        }
+        out = expr->ops->kind == EXPR_KIND_ADD ? expr_add(left, right) : expr_sub(left, right);
+        expr_free(left);
+        expr_free(right);
+        return out;
+    }
+    if (expr->ops && expr->ops->kind == EXPR_KIND_MUL && expr->a && expr->b) {
+        left = expr_simplify_extract_reciprocal_sqrt_local(expr->a, radicand);
+        if (left) {
+            out = expr_mul(left, expr->b);
+            expr_free(left);
+            return out;
+        }
+        right = expr_simplify_extract_reciprocal_sqrt_local(expr->b, radicand);
+        if (right) {
+            out = expr_mul(expr->a, right);
+            expr_free(right);
+            return out;
+        }
+    }
+    if (expr->ops && expr->ops->kind == EXPR_KIND_NEG && expr->a) {
+        left = expr_simplify_extract_reciprocal_sqrt_local(expr->a, radicand);
+        if (left) {
+            out = expr_neg(left);
+            expr_free(left);
+            return out;
+        }
+    }
+    return NULL;
+}
+
 expr_t *expr_simplify_extract_common_factor_quotient(const expr_t *expr, const expr_t *factor)
 {
     const expr_t *left_node = NULL;
@@ -500,6 +562,20 @@ expr_t *expr_simplify_extract_common_factor_quotient(const expr_t *expr, const e
 
     if (!expr || !factor)
         return NULL;
+
+    if (factor->ops && factor->ops->kind == EXPR_KIND_DIV && factor->a && factor->b && expr_is_sqrt_expr(factor->b) &&
+        factor->b->a) {
+        number_t numerator = num_new();
+        bool unit_numerator = expr_match_const_value(factor->a, &numerator) && num_eq(numerator, NUM_ONE);
+
+        num_destroy(&numerator);
+        if (unit_numerator) {
+            expr_t *quotient = expr_simplify_extract_reciprocal_sqrt_local(expr, factor->b->a);
+
+            if (quotient)
+                return quotient;
+        }
+    }
 
     if (expr_simplify_same_factor(expr, factor))
         return expr_new_const(NUM_ONE);
@@ -546,6 +622,54 @@ expr_t *expr_simplify_extract_common_factor_quotient(const expr_t *expr, const e
     expr_free(right);
     expr_free(left);
     return expr_simplify_owned(out);
+}
+
+static bool expr_simplify_contains_denominator_local(const expr_t *expr, const expr_t *denominator)
+{
+    if (!expr)
+        return false;
+    if (expr->ops && expr->ops->kind == EXPR_KIND_DIV && expr->b && expr_struct_eq(expr->b, denominator))
+        return true;
+    return expr_simplify_contains_denominator_local(expr->a, denominator) ||
+           expr_simplify_contains_denominator_local(expr->b, denominator);
+}
+
+static expr_t *expr_simplify_find_common_denominator_local(const expr_t *expr, expr_t *const *expressions, size_t count)
+{
+    expr_t *found;
+
+    if (!expr)
+        return NULL;
+    if (expr->ops && expr->ops->kind == EXPR_KIND_DIV && expr_is_sqrt_expr(expr->b) && expr->b->a) {
+        number_t radicand = num_new();
+        bool positive_numeric_radicand =
+            expr_match_const_value(expr->b->a, &radicand) && num_is_real(radicand) && num_sign(radicand) > 0;
+        size_t index;
+
+        num_destroy(&radicand);
+        if (positive_numeric_radicand) {
+            for (index = 1u; index < count; ++index) {
+                if (!expr_simplify_contains_denominator_local(expressions[index], expr->b))
+                    break;
+            }
+            if (index == count) {
+                expr_t *one = expr_new_const(NUM_ONE);
+                expr_t *reciprocal = one ? expr_div(one, expr->b) : NULL;
+
+                expr_free(one);
+                return reciprocal;
+            }
+        }
+    }
+    found = expr_simplify_find_common_denominator_local(expr->a, expressions, count);
+    return found ? found : expr_simplify_find_common_denominator_local(expr->b, expressions, count);
+}
+
+expr_t *expr_simplify_find_common_factor(expr_t *const *expressions, size_t count)
+{
+    if (!expressions || count == 0u || !expressions[0])
+        return NULL;
+    return expr_simplify_find_common_denominator_local(expressions[0], expressions, count);
 }
 
 expr_t *expr_simplify_normalize_negated_mul_factor(const expr_t *expr)

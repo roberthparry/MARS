@@ -684,7 +684,7 @@
         "test_reverse_gradient_shared_subexpression": true,
         "test_reverse_hypergeometric_argument": true,
         "test_reverse_lauricella_variables": true,
-        "test_reverse_matches_forward_composite": true,
+        "test_reverse_matches_symbolic_composite": true,
         "test_reverse_special_function_arguments": true
       }
     }

@@ -1194,7 +1194,10 @@ static void test_mat_symbolic_derivative_helpers_by_name(void)
 static void test_mat_indefinite_integral_has_independent_constant_matrix(void)
 {
     mat_bindings_t *bindings = NULL;
-    matrix_t *family = mat_expression_from_string("{ @S^x((1 2; 3 4)) | x = ? }", &bindings, NULL);
+    mat_bindings_t *antiderivative_bindings = NULL;
+    matrix_t *family = mat_expression_from_string("{ @S(1 2; 3 4)dx | x = ? }", &bindings, NULL);
+    matrix_t *antiderivative = mat_expression_from_string("{ @S^x(1 2; 3 4)dx | x = ? }",
+                                                          &antiderivative_bindings, NULL);
     matrix_t *derivative = NULL;
     expr_t *entry = NULL;
 
@@ -1204,6 +1207,10 @@ static void test_mat_indefinite_integral_has_independent_constant_matrix(void)
     check_bool("matrix indefinite integral family has C_12", mat_bindings_get(bindings, "C_12") != NULL);
     check_bool("matrix indefinite integral family has C_21", mat_bindings_get(bindings, "C_21") != NULL);
     check_bool("matrix indefinite integral family has C_22", mat_bindings_get(bindings, "C_22") != NULL);
+    check_bool("matrix upper-form antiderivative is non-null", antiderivative != NULL);
+    check_bool("matrix upper-form antiderivative omits additive constants",
+               mat_bindings_count(antiderivative_bindings) == 1u &&
+                   mat_bindings_get(antiderivative_bindings, "C_11") == NULL);
 
     derivative = family ? mat_deriv_by_name(family, bindings, "x") : NULL;
     check_bool("matrix indefinite integral family differentiates", derivative != NULL);
@@ -1219,6 +1226,8 @@ static void test_mat_indefinite_integral_has_independent_constant_matrix(void)
     }
 
     mat_free(derivative);
+    mat_free(antiderivative);
+    mat_bindings_free(antiderivative_bindings);
     mat_bindings_free(bindings);
     mat_free(family);
 }

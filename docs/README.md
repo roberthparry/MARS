@@ -17,11 +17,14 @@ This directory contains the longer module documentation for MARS.
   special functions
 - [`qcomplex_t`](./qcomplex.md) — independent double-double complex arithmetic
   and complex special functions
-- [`matrix_t`](./matrix.md) — generic high-precision matrix with pluggable element types and storage kinds
+- [`matrix_t`](./matrix.md) — generic high-precision matrix with numeric and
+  symbolic entries, native expression parsing, symbolic calculus and
+  matrix-wide simplification
 - [`equation_t`](./equation.md) — parsed equations with symbolic isolation and numeric fallback
 - [`diffequ_t`](./diffequation.md) — ODE/PDE parsing and symbolic solving, including selected linearisations and symmetry metadata
-- [`expr_t`](./expression.md) — differentiable expression DAGs, reverse-mode
-  derivatives, symbolic integration and helper APIs
+- [`expr_t`](./expression.md) — differentiable expression DAGs, symbolic
+  derivatives, numeric reverse-mode gradients, symbolic integration and helper
+  APIs
 - [`almanac_t`](./almanac.md) — ephemeris-backed SHA/declination lookups and snapshot queries
 - [`datetime_t`](./datetime.md) — civil and astronomical date/time utilities
 - [`jurisdiction_t`](./jurisdiction.md) — jurisdiction-aware holiday and working-day queries

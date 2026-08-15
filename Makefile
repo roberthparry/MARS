@@ -125,7 +125,7 @@ TEST_BINS  := $(patsubst tests/%.c,$(TEST_BUILD_DIR)/%,$(TEST_SRCS))
 # ------------------------------------------------------------
 # Default target
 # ------------------------------------------------------------
-.PHONY: all clean test memtest debug release check-deps check-native-numeric-boundaries check-jurisdiction-db-deps check-lab-deps install uninstall mars-lab to-be-announced-lab install-almanac-db uninstall-almanac-db install-jurisdiction-db uninstall-jurisdiction-db install-mars-lab uninstall-mars-lab help
+.PHONY: all clean test memtest debug release check-deps check-native-numeric-boundaries check-jurisdiction-db-deps check-lab-deps install uninstall mars-lab mars-lab-stop mars-lab-restart to-be-announced-lab install-almanac-db uninstall-almanac-db install-jurisdiction-db uninstall-jurisdiction-db install-mars-lab uninstall-mars-lab help
 
 all: check-native-numeric-boundaries $(STATIC_LIB) $(SHARED_LIB) $(TEST_BINS) $(BENCH_BINS) $(SCRATCH_BINS)
 
@@ -407,9 +407,20 @@ $(foreach bin,$(SCRATCH_BINS),$(eval $(call SCRATCH_ALIAS_RULES,$(notdir $(bin))
 .PHONY: scratch
 scratch: $(SCRATCH_BINS)
 
-.PHONY: mars-lab to-be-announced-lab install-almanac-db uninstall-almanac-db install-jurisdiction-db uninstall-jurisdiction-db install-mars-lab uninstall-mars-lab install-to-be-announced-lab uninstall-to-be-announced-lab
+.PHONY: mars-lab mars-lab-stop mars-lab-restart to-be-announced-lab install-almanac-db uninstall-almanac-db install-jurisdiction-db uninstall-jurisdiction-db install-mars-lab uninstall-mars-lab install-to-be-announced-lab uninstall-to-be-announced-lab
 mars-lab: check-lab-deps $(BUILD_DIR)/scratch/mars_lab
 	@tools/mars-lab
+
+mars-lab-stop:
+	@if pgrep -u "$$USER" -f '[p]ython3 tools/mars_lab.py' >/dev/null; then \
+		pkill -u "$$USER" -f '[p]ython3 tools/mars_lab.py'; \
+		echo "Stopped MARS Lab."; \
+	else \
+		echo "MARS Lab is not running."; \
+	fi
+
+mars-lab-restart: mars-lab-stop
+	@$(MAKE) --no-print-directory mars-lab
 
 .PHONY: to-be-announced-lab
 to-be-announced-lab: $(BUILD_DIR)/scratch/to-be-announced_lab
@@ -540,6 +551,8 @@ help:
 	@echo "  make scratch/mars_lab       Build scratch/mars_lab.c"
 	@echo "  make scratch/to-be-announced_lab      Build scratch/to-be-announced_lab.c"
 	@echo "  make mars-lab               Launch the local MARS Lab"
+	@echo "  make mars-lab-stop          Stop the local MARS Lab"
+	@echo "  make mars-lab-restart       Stop and relaunch the local MARS Lab"
 	@echo "  make to-be-announced-lab              Launch the local To-Be-Announced Lab"
 	@echo "  make install-mars-lab       Install a user desktop launcher for MARS Lab"
 	@echo "  make uninstall-mars-lab     Remove the user desktop launcher for MARS Lab"
