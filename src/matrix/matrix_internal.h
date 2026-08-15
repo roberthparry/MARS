@@ -177,6 +177,26 @@ expr_t *expr_clone_for_storage(const expr_t *dv);
 matrix_t *mat_finalize_symbolic_result(matrix_t *A);
 int mat_simplify_symbolic_inplace(matrix_t *A);
 
+typedef struct {
+    expr_t **entries;
+    expr_t **additive_constants;
+    size_t count;
+    expr_t *common_factor;
+} mat_expr_beautification_t;
+
+typedef expr_t *(*mat_spectral_expression_map_fn)(const expr_t *spectral_expression, void *context);
+
+int mat_simplify_common_expression_factor(expr_t **entries, size_t count, expr_t **factor_out);
+expr_t *mat_simplify_expression_for_beautification(const expr_t *entry);
+expr_t *mat_simplify_post_calculus_expression(expr_t *entry);
+matrix_t *mat_simplify_exact_principal_sqrt(const matrix_t *A);
+matrix_t *mat_simplify_exact_half_integer_power(const matrix_t *A, long numerator);
+matrix_t *mat_pow_expr_spectral_map(const matrix_t *A, const expr_t *exponent, mat_spectral_expression_map_fn map,
+                                    void *context);
+matrix_t *mat_integrate_append_constants(const matrix_t *antiderivative);
+int mat_beautify_expression_matrix(const matrix_t *A, mat_expr_beautification_t *beautification);
+void mat_expr_beautification_clear(mat_expr_beautification_t *beautification);
+
 /* ============================================================
    Matrix construction helpers (internal)
    ============================================================ */

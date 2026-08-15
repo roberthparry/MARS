@@ -2294,33 +2294,73 @@ cleanup:
     return identity;
 }
 
-static matrix_t *mf_expression_apply_derivative_sequence(const matrix_t *matrix, mat_bindings_t *bindings,
-                                                         const char *suffix)
+typedef struct {
+    expr_t **wrts;
+    size_t count;
+    size_t capacity;
+} mf_calculus_variables_t;
+
+static void mf_calculus_variables_clear(mf_calculus_variables_t *variables)
+{
+    if (!variables)
+        return;
+    for (size_t index = 0u; index < variables->count; ++index)
+        expr_free(variables->wrts[index]);
+    free(variables->wrts);
+    *variables = (mf_calculus_variables_t){0};
+}
+
+static bool mf_calculus_variables_append(mf_calculus_variables_t *variables, expr_t *wrt, size_t repeat)
+{
+    if (!variables || !wrt || repeat == 0u || variables->count > SIZE_MAX - repeat)
+        return false;
+    if (variables->count + repeat > variables->capacity) {
+        size_t capacity = variables->capacity ? variables->capacity : 4u;
+        expr_t **grown;
+
+        while (capacity < variables->count + repeat) {
+            if (capacity > SIZE_MAX / 2u)
+                return false;
+            capacity *= 2u;
+        }
+        grown = realloc(variables->wrts, capacity * sizeof(*variables->wrts));
+        if (!grown)
+            return false;
+        variables->wrts = grown;
+        variables->capacity = capacity;
+    }
+    for (size_t index = 0u; index < repeat; ++index) {
+        expr_retain(wrt);
+        variables->wrts[variables->count++] = wrt;
+    }
+    return true;
+}
+
+static bool mf_calculus_variables_parse(mat_bindings_t *bindings, const char *suffix,
+                                        mf_calculus_variables_t *variables_out)
 {
     string_view_t variables;
     string_t *variables_string = NULL;
     char *variables_copy;
-    const char *variables_text = NULL;
+    const char *variables_text;
     size_t variables_length;
     size_t position = 0u;
-    matrix_t *current = (matrix_t *)matrix;
 
-    if (!matrix || !suffix)
-        return NULL;
-
+    if (!suffix || !variables_out)
+        return false;
+    *variables_out = (mf_calculus_variables_t){0};
     variables_length = strlen(suffix);
     if (variables_length >= 2u && suffix[0] == '[' && suffix[variables_length - 1u] == ']') {
         suffix++;
         variables_length -= 2u;
     }
     if (variables_length == 0u)
-        return NULL;
-
+        return false;
     variables_copy = mf_expression_duplicate_range(suffix, suffix + variables_length);
     variables_string = variables_copy ? string_new_with(variables_copy) : NULL;
     free(variables_copy);
     if (!variables_string)
-        return NULL;
+        return false;
     variables_text = string_c_str(variables_string);
     variables = string_view_all(variables_string);
     while (position < variables_length) {
@@ -2333,12 +2373,10 @@ static matrix_t *mf_expression_apply_derivative_sequence(const matrix_t *matrix,
 
         if (!string_view_peek_rune_value(variables, position, &value, &next_position) || !mf_is_letter(value))
             goto fail;
-
         variable_name = mf_expression_duplicate_range(variables_text + position, variables_text + next_position);
         if (!variable_name)
             goto fail;
         position = next_position;
-
         if (position < variables_length) {
             unsigned char marker;
 
@@ -2347,7 +2385,8 @@ static matrix_t *mf_expression_apply_derivative_sequence(const matrix_t *matrix,
                 bool has_digit = false;
 
                 position++;
-                while (position < variables_length && string_view_peek_ascii(variables, position, &marker) && isdigit(marker)) {
+                while (position < variables_length && string_view_peek_ascii(variables, position, &marker) &&
+                       isdigit(marker)) {
                     size_t digit = (size_t)(marker - '0');
 
                     if (parsed_repeat > (SIZE_MAX - digit) / 10u) {
@@ -2390,38 +2429,206 @@ static matrix_t *mf_expression_apply_derivative_sequence(const matrix_t *matrix,
                 }
             }
         }
-
-        wrt = mat_bindings_get(bindings, variable_name);
+        wrt = bindings ? mat_bindings_get(bindings, variable_name) : NULL;
         if (!wrt) {
-            temporary_variable = expr_new_named_var(NUM_ZERO, variable_name);
+            temporary_variable = expr_new_named_var(NUM_NAN, variable_name);
             wrt = temporary_variable;
         }
         free(variable_name);
-        if (!wrt)
+        if (!wrt || !mf_calculus_variables_append(variables_out, wrt, repeat)) {
+            expr_free(temporary_variable);
             goto fail;
-
-        for (size_t derivative = 0u; derivative < repeat; ++derivative) {
-            matrix_t *next = mat_deriv(current, wrt);
-
-            if (current != matrix)
-                mat_free(current);
-            current = next;
-            if (!current) {
-                expr_free(temporary_variable);
-                goto fail;
-            }
         }
         expr_free(temporary_variable);
     }
-
     string_free(variables_string);
-    return current == matrix ? NULL : current;
+    return true;
 
 fail:
-    if (current != matrix)
-        mat_free(current);
     string_free(variables_string);
-    return NULL;
+    mf_calculus_variables_clear(variables_out);
+    return false;
+}
+
+static matrix_t *mf_expression_power_calculus_span(const char *start, const char *end, const char *binding_start,
+                                                   const char *binding_end, const char *variable_name, bool integrate,
+                                                   bool append_constants, mat_bindings_t **bindings_out)
+{
+    const char *power;
+    mat_bindings_t *base_bindings = NULL;
+    mat_bindings_t *merged_bindings = NULL;
+    expr_bindings_t *exponent_bindings = NULL;
+    matrix_t *base = NULL;
+    matrix_t *result = NULL;
+    char *exponent_text = NULL;
+    expr_t *exponent = NULL;
+    mf_calculus_variables_t variables = {0};
+
+    mf_expression_trim_span(&start, &end);
+    while (start < end && *start == '(') {
+        const char *close = mf_expression_matching_parenthesis(start, end);
+
+        if (!close || close + 1 != end)
+            break;
+        start++;
+        end = close;
+        mf_expression_trim_span(&start, &end);
+    }
+    power = mf_expression_power_operator(start, end);
+    if (!power || !variable_name || !*variable_name)
+        return NULL;
+    base = mf_expression_evaluate_span(start, power, true, binding_start, binding_end, &base_bindings, NULL);
+    exponent_text = mf_expression_with_bindings(power + 1, end, binding_start, binding_end);
+    exponent = exponent_text ? expr_from_string(exponent_text, &exponent_bindings) : NULL;
+    merged_bindings = exponent ? mf_bindings_merge_expression(base_bindings, exponent_bindings) : NULL;
+    if (base && exponent && mf_calculus_variables_parse(merged_bindings, variable_name, &variables)) {
+        if (integrate) {
+            matrix_t *antiderivative =
+                mat_integrate_pow_expr_sequence(base, exponent, variables.count, variables.wrts);
+
+            result = append_constants && antiderivative ? mat_integrate_append_constants(antiderivative) : antiderivative;
+            if (!append_constants)
+                antiderivative = NULL;
+            mat_free(antiderivative);
+        } else {
+            result = mat_deriv_pow_expr_sequence(base, exponent, variables.count, variables.wrts);
+        }
+    }
+
+    if (result && bindings_out) {
+        *bindings_out = merged_bindings;
+        merged_bindings = NULL;
+    }
+    mat_bindings_free(merged_bindings);
+    mf_calculus_variables_clear(&variables);
+    expr_free(exponent);
+    expr_bindings_free(exponent_bindings);
+    free(exponent_text);
+    mat_bindings_free(base_bindings);
+    mat_free(base);
+    return result;
+}
+
+static matrix_t *mf_expression_apply_calculus_sequence(const matrix_t *matrix, mat_bindings_t *bindings,
+                                                       const char *suffix, bool integrate)
+{
+    mf_calculus_variables_t variables = {0};
+    matrix_t *result;
+
+    if (!matrix || !mf_calculus_variables_parse(bindings, suffix, &variables))
+        return NULL;
+    if (integrate) {
+        matrix_t *antiderivative = mat_integrate_sequence(matrix, variables.count, variables.wrts);
+
+        result = antiderivative ? mat_integrate_append_constants(antiderivative) : NULL;
+        mat_free(antiderivative);
+    } else {
+        result = mat_deriv_sequence(matrix, variables.count, variables.wrts);
+    }
+    mf_calculus_variables_clear(&variables);
+    return result;
+}
+
+static matrix_t *mf_expression_integral_notation_span(const char *start, const char *end,
+                                                      const char *binding_start, const char *binding_end,
+                                                      mat_bindings_t **bindings_out)
+{
+    const char *integrand_start;
+    const char *integrand_end;
+    const char *differential;
+    const char *variable_start;
+    char *variable = NULL;
+    bool has_upper = false;
+    mat_bindings_t *integrand_bindings = NULL;
+    mf_calculus_variables_t variables = {0};
+    matrix_t *integrand = NULL;
+    matrix_t *antiderivative = NULL;
+    matrix_t *result = NULL;
+
+    if (!start || !end || end - start < 5 || strncmp(start, "@S", 2u) != 0)
+        return NULL;
+    integrand_start = start + 2;
+    if (integrand_start < end && *integrand_start == '^') {
+        const char *upper_start = ++integrand_start;
+
+        while (integrand_start < end && !isspace((unsigned char)*integrand_start) && *integrand_start != '(')
+            integrand_start++;
+        if (integrand_start == upper_start)
+            return NULL;
+        variable = mf_expression_duplicate_range(upper_start, integrand_start);
+        has_upper = variable != NULL;
+    }
+    while (integrand_start < end && isspace((unsigned char)*integrand_start))
+        integrand_start++;
+    integrand_end = end;
+    while (integrand_end > integrand_start && isspace((unsigned char)integrand_end[-1]))
+        integrand_end--;
+    if (has_upper) {
+        size_t variable_length = strlen(variable);
+
+        if ((size_t)(integrand_end - integrand_start) <= variable_length ||
+            integrand_end[-(ptrdiff_t)variable_length - 1] != 'd' ||
+            memcmp(integrand_end - variable_length, variable, variable_length) != 0) {
+            goto cleanup;
+        }
+        differential = integrand_end - variable_length - 1;
+    } else {
+        differential = NULL;
+        for (const char *candidate = integrand_end - 1; candidate > integrand_start; --candidate) {
+            bool plain_suffix = true;
+
+            if (*candidate != 'd' || candidate + 1 == integrand_end)
+                continue;
+            for (const char *suffix = candidate + 1; suffix < integrand_end; ++suffix) {
+                if (isspace((unsigned char)*suffix) || *suffix == '(' || *suffix == ')') {
+                    plain_suffix = false;
+                    break;
+                }
+            }
+            if (plain_suffix) {
+                differential = candidate;
+                break;
+            }
+        }
+        if (!differential)
+            goto cleanup;
+        variable_start = differential + 1;
+        variable = mf_expression_duplicate_range(variable_start, integrand_end);
+        if (!variable)
+            goto cleanup;
+    }
+    integrand_end = differential;
+    mf_expression_trim_span(&integrand_start, &integrand_end);
+    if (integrand_start == integrand_end)
+        goto cleanup;
+    antiderivative = mf_expression_power_calculus_span(integrand_start, integrand_end, binding_start, binding_end,
+                                                       variable, true, false, &integrand_bindings);
+    if (antiderivative) {
+        result = has_upper ? antiderivative : mat_integrate_append_constants(antiderivative);
+        if (has_upper)
+            antiderivative = NULL;
+        if (result && bindings_out)
+            *bindings_out = mat_bindings_from_matrix(result);
+        goto cleanup;
+    }
+    integrand = mf_expression_evaluate_span(integrand_start, integrand_end, true, binding_start, binding_end,
+                                            &integrand_bindings, NULL);
+    if (!integrand || !mf_calculus_variables_parse(integrand_bindings, variable, &variables))
+        goto cleanup;
+    antiderivative = mat_integrate_sequence(integrand, variables.count, variables.wrts);
+    result = has_upper ? antiderivative : antiderivative ? mat_integrate_append_constants(antiderivative) : NULL;
+    if (has_upper)
+        antiderivative = NULL;
+    if (result && bindings_out)
+        *bindings_out = mat_bindings_from_matrix(result);
+
+cleanup:
+    mat_free(antiderivative);
+    mat_free(integrand);
+    mf_calculus_variables_clear(&variables);
+    mat_bindings_free(integrand_bindings);
+    free(variable);
+    return result;
 }
 
 static matrix_t *mf_expression_evaluate_span(const char *start, const char *end, bool allow_literal,
@@ -2445,7 +2652,6 @@ static matrix_t *mf_expression_evaluate_span(const char *start, const char *end,
     mat_bindings_t *power_bindings = NULL;
     expr_bindings_t *exponent_bindings = NULL;
     expr_t *exponent_expr = NULL;
-    expr_t *temporary_variable = NULL;
     matrix_t *left = NULL;
     matrix_t *right = NULL;
     matrix_t *result = NULL;
@@ -2454,6 +2660,15 @@ static matrix_t *mf_expression_evaluate_span(const char *start, const char *end,
     mf_expression_trim_span(&start, &end);
     if (start == end)
         return NULL;
+
+    if (end - start >= 2 && strncmp(start, "@S", 2u) == 0) {
+        result = mf_expression_integral_notation_span(start, end, binding_start, binding_end, bindings_out);
+        if (result) {
+            if (operation_out)
+                *operation_out = "eval";
+            goto cleanup;
+        }
+    }
 
     if ((*start == '+' || *start == '-') && start + 1 < end) {
         const char *operand_start = start + 1;
@@ -2512,9 +2727,48 @@ static matrix_t *mf_expression_evaluate_span(const char *start, const char *end,
             *operation_out = "multiply";
         left = mf_expression_evaluate_span(start, product, true, binding_start, binding_end, NULL, NULL);
         right = mf_expression_evaluate_span(product + 1, end, true, binding_start, binding_end, NULL, NULL);
+        if (!left && right && mat_get_row_count(right) == mat_get_col_count(right))
+            left = mf_expression_scalar_identity(start, product, mat_get_row_count(right), binding_start, binding_end);
         if (!left || !right) {
             mf_report_error("could not parse matrix multiplication operand");
             goto cleanup;
+        }
+        if (mat_get_row_count(left) == 1u && mat_get_col_count(left) == 1u &&
+            (mat_get_row_count(right) != 1u || mat_get_col_count(right) != 1u)) {
+            matrix_t *expanded = NULL;
+
+            if (mat_get_row_count(right) == mat_get_col_count(right) && mat_typeof(left) == MAT_TYPE_EXPR) {
+                size_t order = mat_get_row_count(right);
+                expr_t *scalar = NULL;
+                expr_t **diagonal = calloc(order, sizeof(*diagonal));
+
+                mat_get(left, 0u, 0u, &scalar);
+                if (diagonal && scalar) {
+                    for (size_t index = 0u; index < order; ++index)
+                        diagonal[index] = scalar;
+                    expanded = mat_create_diagonal_expr(order, diagonal);
+                }
+                free(diagonal);
+            } else if (mat_get_row_count(right) == mat_get_col_count(right)) {
+                size_t order = mat_get_row_count(right);
+                number_t scalar = mat_get_num(left, 0u, 0u);
+                number_t *diagonal = calloc(order, sizeof(*diagonal));
+
+                if (diagonal) {
+                    for (size_t index = 0u; index < order; ++index)
+                        diagonal[index] = num_clone(scalar);
+                    expanded = mat_create_diagonal(order, diagonal);
+                    for (size_t index = 0u; index < order; ++index)
+                        num_destroy(&diagonal[index]);
+                }
+                free(diagonal);
+                num_destroy(&scalar);
+            }
+
+            if (expanded) {
+                mat_free(left);
+                left = expanded;
+            }
         }
         if (mat_get_col_count(left) != mat_get_row_count(right)) {
             fprintf(stderr, "mat_from_string: matrix multiplication requires matching inner dimensions; received %zux%zu and "
@@ -2604,21 +2858,18 @@ static matrix_t *mf_expression_evaluate_span(const char *start, const char *end,
             mf_report_error("could not parse matrix calculus input");
             return NULL;
         }
-        left = mf_expression_evaluate_span(open + 1, close, true, binding_start, binding_end, &calculus_bindings, NULL);
-        if (left) {
-            if (integrate) {
-                expr_t *wrt = mat_bindings_get(calculus_bindings, calculus_variable);
-
-                if (!wrt) {
-                    temporary_variable = expr_new_named_var(NUM_ZERO, calculus_variable);
-                    wrt = temporary_variable;
-                }
-                if (wrt)
-                    result = mat_integrate_family(left, wrt);
-            } else {
-                result = mf_expression_apply_derivative_sequence(left, calculus_bindings, calculus_variable);
+        result = mf_expression_power_calculus_span(open + 1, close, binding_start, binding_end, calculus_variable,
+                                                   integrate, true, &calculus_bindings);
+        if (result) {
+            if (bindings_out) {
+                *bindings_out = calculus_bindings;
+                calculus_bindings = NULL;
             }
+            goto cleanup;
         }
+        left = mf_expression_evaluate_span(open + 1, close, true, binding_start, binding_end, &calculus_bindings, NULL);
+        if (left)
+            result = mf_expression_apply_calculus_sequence(left, calculus_bindings, calculus_variable, integrate);
         if (!result)
             fprintf(stderr, "mat_from_string: could not %s matrix entries with respect to %s\n",
                     integrate ? "integrate" : "differentiate", calculus_variable);
@@ -2675,7 +2926,6 @@ cleanup:
     expr_free(exponent_expr);
     expr_bindings_free(exponent_bindings);
     free(exponent_text);
-    expr_free(temporary_variable);
     mat_bindings_free(calculus_bindings);
     mat_bindings_free(power_bindings);
     mat_bindings_free(power_base_bindings);
@@ -2712,6 +2962,9 @@ matrix_t *mat_expression_from_string(const char *text, mat_bindings_t **bindings
         int bracket_depth = 0;
         int brace_depth = 0;
 
+        body_start = start + 1;
+        body_end = end - 1;
+
         for (const char *cursor = start + 1; cursor < end - 1; ++cursor) {
             if (*cursor == '(')
                 paren_depth++;
@@ -2727,7 +2980,6 @@ matrix_t *mat_expression_from_string(const char *text, mat_bindings_t **bindings
                 brace_depth--;
             else if (*cursor == '|' && paren_depth == 0 && bracket_depth == 0 && brace_depth == 0 &&
                      memchr(cursor + 1, '=', (size_t)((end - 1) - (cursor + 1))) != NULL) {
-                body_start = start + 1;
                 body_end = cursor;
                 binding_start = cursor + 1;
                 binding_end = end - 1;

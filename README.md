@@ -5,9 +5,10 @@
 ![C99/GNU C](https://img.shields.io/badge/C-C99%20%2B%20GNU%20extensions-blue.svg)
 
 MARS is a Linux-focused C99/GNU C library for high-precision numerics,
-automatic differentiation, symbolic mathematics, datetime utilities, UTF-8
-strings and generic containers. It also includes **MARS Lab**, a local
-browser-based workspace for using those facilities interactively.
+symbolic differentiation, reverse-mode automatic differentiation, symbolic
+mathematics, datetime utilities, UTF-8 strings and generic containers. It also
+includes **MARS Lab**, a local browser-based workspace for using those
+facilities interactively.
 
 **Supported build target:** Linux with GCC or Clang. The code intentionally uses
 some GNU C extensions, so MSVC/Windows builds are not currently guaranteed.
@@ -22,11 +23,16 @@ some GNU C extensions, so MSVC/Windows builds are not currently guaranteed.
   hypergeometric and Lauricella families (~31–32 decimal digits of precision)
 - **`qcomplex_t`** — double-double complex arithmetic and complex
   special-function families without an MPFR or MPC dependency
-- **`matrix_t`** — generic high-precision matrix over numeric `number_t` values or symbolic `expr_t *` entries, with native string-based matrix-expression parsing, determinant/trace/inverse/transpose/adjoint aliases, symbolic powers, formatting, symbolic linear algebra support including Schur complements, block inverse/solve, Jordan helpers, entrywise matrix derivatives, Jacobian helpers, matrix-calculus helpers for trace, determinant, inverse, block inverse, solve, and block solve, and high-precision eigendecomposition and matrix functions through the numeric `number_t` layer
+- **`matrix_t`** — generic high-precision matrix over numeric `number_t` values
+  or symbolic `expr_t *` entries, with native matrix-expression parsing,
+  symbolic powers, ordered higher and mixed derivatives and antiderivatives,
+  constant-square-matrix spectral calculus, matrix-wide simplification and
+  presentation beautification, symbolic linear algebra, and high-precision
+  eigendecomposition and matrix functions through the numeric `number_t` layer
 - **`diffequ_t`** — ODE and PDE parsing with rule-based symbolic solving,
   optional derivations, linearisations and symmetry metadata
-- **`expr_t`** — differentiable expression DAGs with symbolic and reverse-mode
-  derivatives, symbolic antiderivatives for conservative rule families,
+- **`expr_t`** — differentiable expression DAGs with arbitrary-order symbolic
+  derivatives and numeric reverse-mode gradients, symbolic antiderivatives for conservative rule families,
   symbolic matrix integration and structural matcher helpers for higher-level
   symbolic code
 - **`datetime_t`** — civil and astronomical date/time helpers
@@ -51,7 +57,7 @@ After building MARS and installing the Lab's runtime dependencies, start it
 from the repository root:
 
 ```sh
-python3 tools/mars_lab.py
+make mars-lab
 ```
 
 ```text
@@ -59,7 +65,10 @@ MARS Lab running at http://localhost:<port>/
 Press Ctrl+C to stop.
 ```
 
-[![MARS Lab evaluating the sine of a complete matrix](docs/images/mars-lab/matrix.png)](docs/images/mars-lab/matrix.png)
+[![MARS Lab evaluating a symbolic matrix power](docs/images/mars-lab/matrix.png)](docs/images/mars-lab/matrix.png)
+
+Use `make mars-lab-stop` to stop a background Lab process and
+`make mars-lab-restart` to rebuild and relaunch it.
 
 See the [MARS Lab guide](docs/mars-lab.md) for installation details, notation,
 worked examples, all seven modes and private mobile access through Tailscale.

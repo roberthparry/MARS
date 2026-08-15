@@ -725,6 +725,19 @@ matrix_t *mat_hermitian(const matrix_t *A);
 matrix_t *mat_deriv(const matrix_t *A, expr_t *wrt);
 
 /**
+ * @brief Differentiate a matrix successively with respect to an ordered variable sequence.
+ *
+ * Repeated variables produce higher-order derivatives and distinct variables produce mixed partial derivatives in the
+ * supplied order. The sequence must contain at least one non-NULL variable.
+ *
+ * @param A           Matrix to differentiate.
+ * @param count       Number of variables in @p wrts.
+ * @param wrts        Ordered differentiation variables.
+ * @return            Newly allocated derivative matrix on success, or NULL on error.
+ */
+matrix_t *mat_deriv_sequence(const matrix_t *A, size_t count, expr_t *const *wrts);
+
+/**
  * @brief Integrate a matrix entrywise with respect to a symbolic variable.
  *
  * Each output entry is one antiderivative of the corresponding input entry
@@ -737,6 +750,19 @@ matrix_t *mat_deriv(const matrix_t *A, expr_t *wrt);
  *             an entry cannot be integrated by the available symbolic rules.
  */
 matrix_t *mat_integrate(const matrix_t *A, expr_t *wrt);
+
+/**
+ * @brief Integrate a matrix successively with respect to an ordered variable sequence.
+ *
+ * Repeated variables produce repeated antiderivatives and distinct variables produce iterated integrals in the
+ * supplied order. Arbitrary integration constants are omitted.
+ *
+ * @param A           Matrix to integrate.
+ * @param count       Number of variables in @p wrts.
+ * @param wrts        Ordered integration variables.
+ * @return            Newly allocated antiderivative matrix on success, or NULL on error.
+ */
+matrix_t *mat_integrate_sequence(const matrix_t *A, size_t count, expr_t *const *wrts);
 
 /**
  * @brief Integrate a matrix entrywise and append an arbitrary constant matrix.
@@ -835,6 +861,9 @@ matrix_t *mat_deriv_block_inverse_by_name(const matrix_t *A, size_t split, mat_b
  *
  * For non-`expr` matrices the input is treated as constant, so the returned
  * Jacobian is symbolic zero throughout.
+ *
+ * This constructs derivative expression DAGs. It is neither a numeric forward-mode JVP nor a reverse-mode VJP; those
+ * evaluations may consume the resulting expressions, but do not alter symbolic matrix-calculus or simplification rules.
  *
  * @param A      Matrix-valued symbolic output.
  * @param vars   Array of symbolic differentiation variables.
@@ -1345,6 +1374,14 @@ matrix_t *mat_e1(const matrix_t *A);
  */
 matrix_t *mat_simplify_symbolic(const matrix_t *A);
 
+/**
+ * @brief Return a copy of a matrix whose symbolic entries have been arranged for readable presentation.
+ *
+ * The scalar expression beautifier is applied after ordinary symbolic simplification. Non-symbolic matrices are
+ * copied unchanged. The caller owns the returned matrix.
+ */
+matrix_t *mat_beautify_symbolic(const matrix_t *A);
+
 /* -------------------------------------------------------------------------
    Power functions
    ------------------------------------------------------------------------- */
@@ -1373,11 +1410,60 @@ matrix_t *mat_pow(const matrix_t *A, const number_t *s);
 /**
  * @brief Symbolic principal matrix power for an expression exponent.
  *
- * For an exact real 1x1 matrix, or an exact real 2x2 matrix with distinct eigenvalues, this constructs an exact
- * expression matrix using the spectral-projector rule. The exponent is retained in every resulting DAG and may
- * therefore be supplied through an editable binding. Returns NULL when no exact symbolic rule is available.
+ * Exact real 1x1 and eligible 2x2 matrices use symbolic spectral projectors. Other diagonalizable numeric square
+ * matrices use a numeric eigendecomposition while retaining the exponent in the resulting expression DAGs. Returns
+ * NULL when no supported spectral representation is available.
  */
 matrix_t *mat_pow_expr(const matrix_t *A, const expr_t *exponent);
+
+/**
+ * @brief Differentiate a constant square matrix raised to an expression exponent.
+ *
+ * This differentiates the scalar spectral powers before reconstructing the matrix. Exact symbolic projectors are used
+ * when available; otherwise a numeric eigendecomposition is used for a diagonalizable numeric matrix. This operation
+ * builds an exact symbolic derivative where the spectral representation is exact and is independent of the numeric
+ * forward- or reverse-mode automatic-differentiation path. The caller owns the returned expression matrix.
+ */
+matrix_t *mat_deriv_pow_expr(const matrix_t *A, const expr_t *exponent, expr_t *wrt);
+
+/**
+ * @brief Differentiate a constant square-matrix power through an ordered variable sequence.
+ *
+ * The scalar spectral powers are differentiated before the matrix is reconstructed. Repeated and mixed partial
+ * derivatives are retained in the order supplied by @p wrts.
+ *
+ * @param A           Constant square matrix.
+ * @param exponent    Symbolic exponent.
+ * @param count       Number of variables in @p wrts.
+ * @param wrts        Ordered differentiation variables.
+ * @return            Newly allocated derivative matrix on success, or NULL when no supported spectral rule is available.
+ */
+matrix_t *mat_deriv_pow_expr_sequence(const matrix_t *A, const expr_t *exponent, size_t count, expr_t *const *wrts);
+
+/**
+ * @brief Integrate a constant square matrix raised to an expression exponent.
+ *
+ * This integrates each scalar spectral power and then reconstructs the matrix. For an exponent equal to the integration
+ * variable, this is equivalent to `A^exponent * inverse(log(A))` when the logarithm is invertible, while correctly
+ * integrating an eigenvalue-one projector as a linear term. Exact symbolic projectors are used when available;
+ * otherwise a numeric eigendecomposition is used for a diagonalizable numeric matrix. Arbitrary constants are omitted.
+ */
+matrix_t *mat_integrate_pow_expr(const matrix_t *A, const expr_t *exponent, expr_t *wrt);
+
+/**
+ * @brief Integrate a constant square-matrix power through an ordered variable sequence.
+ *
+ * The scalar spectral powers are integrated before the matrix is reconstructed. Arbitrary integration constants are
+ * omitted so that callers can append the appropriate constant matrix after matrix simplification and beautification.
+ *
+ * @param A           Constant square matrix.
+ * @param exponent    Symbolic exponent.
+ * @param count       Number of variables in @p wrts.
+ * @param wrts        Ordered integration variables.
+ * @return            Newly allocated antiderivative matrix on success, or NULL when no supported spectral rule is available.
+ */
+matrix_t *mat_integrate_pow_expr_sequence(const matrix_t *A, const expr_t *exponent, size_t count,
+                                          expr_t *const *wrts);
 
 /* -------------------------------------------------------------------------
    Debugging / I/O

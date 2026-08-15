@@ -189,10 +189,10 @@ number_t expr_eval(const expr_t *expr);
  * @brief Evaluate a scalar expression and compute derivatives with respect to
  *        several variables.
  *
- * This routine evaluates @p expr once and computes derivatives with respect to
- * the variable nodes listed in @p vars. It is useful when one scalar output
- * depends on many input variables, because all requested derivatives can be obtained
- * in a single pass over the expression DAG.
+ * This reverse-mode routine evaluates @p expr once and computes derivatives with respect to the variable nodes listed
+ * in @p vars. It is useful when one scalar output depends on many input variables, because all requested derivatives
+ * can be obtained in a single reverse pass over the expression DAG. It is separate from symbolic differentiation and
+ * from any forward-mode directional-derivative evaluation.
  *
  * @p expr must be a scalar expression DAG. @p vars points to an array of
  * variable nodes whose derivatives are desired; entries not present in the DAG
@@ -646,6 +646,14 @@ void expr_free(expr_t *expr);
  * must call expr_free() on it.
  */
 expr_t *expr_simplify(const expr_t *expr);
+
+/**
+ * @brief Return an algebraically equivalent expression arranged for readable presentation.
+ *
+ * Ordinary simplification is completed first. The subsequent pass preserves the expression's value while preferring
+ * symmetric radicals, common factors and balanced forms. The input is not consumed; the caller owns the result.
+ */
+expr_t *expr_beautify(const expr_t *expr);
 
 /* ------------------------------------------------------------------------- */
 /* String conversion                                                         */

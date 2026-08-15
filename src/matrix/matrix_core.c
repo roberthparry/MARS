@@ -272,18 +272,6 @@ expr_t *expr_clone_for_storage(const expr_t *dv)
     return (expr_t *)dv;
 }
 
-matrix_t *mat_finalize_symbolic_result(matrix_t *A)
-{
-    matrix_t *simplified;
-
-    if (!A || A->elem != &expr_elem)
-        return A;
-
-    simplified = mat_simplify_symbolic(A);
-    mat_free(A);
-    return simplified;
-}
-
 void elem_init_zero_value(const struct elem_vtable *elem, void *slot)
 {
     if (!elem || !slot)

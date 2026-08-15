@@ -1333,32 +1333,55 @@ static void emit_func_integral(const expr_t *f, sbuf_t *b)
     emit_func(display_dummy, b, PREC_LOWEST);
 }
 
-static void emit_TeX_sqrt_power(const expr_t *base, sbuf_t *b, int parent_prec, bool reciprocal)
+static bool emit_TeX_unit_fraction_power(const expr_t *base, number_t exponent, sbuf_t *b, int parent_prec)
 {
-    if (reciprocal) {
-        int need = PREC_MUL < parent_prec;
+    long numerator;
+    long denominator;
+    bool reciprocal;
+    bool group_power_base;
+    int need;
+    unsigned long magnitude;
 
-        if (need)
-            sbuf_puts(b, "\\left(");
-        sbuf_puts(b, "\\frac{1}{\\sqrt{");
-        emit_TeX_expr(base, b, PREC_LOWEST);
-        sbuf_puts(b, "}}");
-        if (need)
-            sbuf_puts(b, "\\right)");
-        return;
-    }
+    if (!num_get_small_rational(exponent, &numerator, &denominator) || numerator == 0L || denominator <= 1L)
+        return false;
 
-    {
-        int need = PREC_UNARY < parent_prec;
-
-        if (need)
-            sbuf_puts(b, "\\left(");
+    reciprocal = numerator < 0L;
+    magnitude = reciprocal ? (unsigned long)(-(numerator + 1L)) + 1u : (unsigned long)numerator;
+    group_power_base = magnitude > 1u && pow_base_needs_visible_parens(base);
+    need = (reciprocal ? PREC_MUL : PREC_UNARY) < parent_prec;
+    if (need)
+        sbuf_puts(b, "\\left(");
+    if (reciprocal)
+        sbuf_puts(b, "\\frac{1}{");
+    if (denominator == 2L) {
         sbuf_puts(b, "\\sqrt{");
-        emit_TeX_expr(base, b, PREC_LOWEST);
-        sbuf_putc(b, '}');
-        if (need)
-            sbuf_puts(b, "\\right)");
+    } else {
+        char index_text[32];
+
+        snprintf(index_text, sizeof(index_text), "%ld", denominator);
+        sbuf_puts(b, "\\sqrt[");
+        sbuf_puts(b, index_text);
+        sbuf_puts(b, "]{");
     }
+    if (group_power_base)
+        sbuf_puts(b, "\\left(");
+    emit_TeX_expr(base, b, magnitude > 1u ? PREC_POW : PREC_LOWEST);
+    if (magnitude > 1u) {
+        char exponent_text[32];
+
+        snprintf(exponent_text, sizeof(exponent_text), "%lu", magnitude);
+        if (group_power_base)
+            sbuf_puts(b, "\\right)");
+        sbuf_puts(b, "^{");
+        sbuf_puts(b, exponent_text);
+        sbuf_putc(b, '}');
+    }
+    sbuf_putc(b, '}');
+    if (reciprocal)
+        sbuf_putc(b, '}');
+    if (need)
+        sbuf_puts(b, "\\right)");
+    return true;
 }
 
 static void emit_expr_sqrt_power(const expr_t *base, sbuf_t *b, int parent_prec, bool reciprocal)
@@ -1424,12 +1447,6 @@ static bool match_sum_quotient(const expr_t *expr, const expr_t **factor_out, co
         return true;
     }
     return false;
-}
-
-static bool match_sqrt_plus_positive_constant(const expr_t *expr)
-{
-    return expr && expr_is_op(expr, &ops_add) && expr->a && expr->b && expr_is_sqrt_expr(expr->a) &&
-           expr_is_const(expr->b) && num_is_real(expr->b->c) && num_gt(expr->b->c, NUM_ZERO);
 }
 
 static int expr_is_negative(const expr_t *f)
@@ -3042,15 +3059,8 @@ void emit_TeX_expr(const expr_t *f, sbuf_t *b, int parent_prec)
         long ei = 0;
         int exponent_has_small_int = expr_try_get_small_integer_exponent(f->c, &ei);
 
-        if (num_eq(f->c, NUM_HALF)) {
-            emit_TeX_sqrt_power(f->a, b, parent_prec, false);
+        if (emit_TeX_unit_fraction_power(f->a, f->c, b, parent_prec))
             return;
-        }
-
-        if (number_is_neg_half_local(f->c)) {
-            emit_TeX_sqrt_power(f->a, b, parent_prec, true);
-            return;
-        }
 
         if (exponent_has_small_int && ei < 0) {
             int recip_need = PREC_MUL < parent_prec;
@@ -3186,17 +3196,6 @@ void emit_TeX_expr(const expr_t *f, sbuf_t *b, int parent_prec)
         const expr_t *complex_shift_real = NULL;
         const expr_t *complex_shift_imag = NULL;
 
-        if (match_sqrt_plus_positive_constant(f)) {
-            if (need)
-                sbuf_puts(b, "\\left(");
-            emit_TeX_expr(f->b, b, PREC_ADD);
-            sbuf_puts(b, " + ");
-            emit_TeX_expr(f->a, b, PREC_ADD);
-            if (need)
-                sbuf_puts(b, "\\right)");
-            return;
-        }
-
         if (match_add_negative_complex_rhs(f, &negative_complex_base, &negative_complex_rhs)) {
             if (need)
                 sbuf_puts(b, "\\left(");
@@ -3284,16 +3283,19 @@ void emit_TeX_expr(const expr_t *f, sbuf_t *b, int parent_prec)
         if (!expr_is_rendered_log_local(f->b) && match_sum_quotient(f, &common_numerator_factor, &common_sum)) {
             if (need)
                 sbuf_puts(b, "\\left(");
-            sbuf_puts(b, "\\frac{1}{");
+            sbuf_puts(b, "\\frac{");
+            if (common_numerator_factor)
+                emit_TeX_expr(common_numerator_factor, b, PREC_LOWEST);
+            else
+                emit_TeX_expr(common_sum, b, PREC_LOWEST);
+            sbuf_puts(b, "}{");
             emit_TeX_expr(f->b, b, PREC_LOWEST);
             sbuf_putc(b, '}');
             if (common_numerator_factor) {
-                sbuf_puts(b, "\\mkern-2mu ");
-                emit_TeX_expr(common_numerator_factor, b, PREC_LOWEST);
+                sbuf_puts(b, "\\mkern-2mu \\left(");
+                emit_TeX_expr(common_sum, b, PREC_LOWEST);
+                sbuf_puts(b, "\\right)");
             }
-            sbuf_puts(b, "\\mkern-5mu \\left(");
-            emit_TeX_expr(common_sum, b, PREC_LOWEST);
-            sbuf_puts(b, "\\right)");
             if (need)
                 sbuf_puts(b, "\\right)");
             return;
@@ -3337,15 +3339,9 @@ void emit_TeX_expr(const expr_t *f, sbuf_t *b, int parent_prec)
         int need = PREC_POW < parent_prec;
         int base_needs_parens = pow_base_needs_visible_parens(f->a);
 
-        if (expr_const_half_can_render_as_sqrt_local(f->b)) {
-            emit_TeX_sqrt_power(f->a, b, parent_prec, false);
+        if (expr_is_const(f->b) && (!f->b->name || !*f->b->name) &&
+            emit_TeX_unit_fraction_power(f->a, f->b->c, b, parent_prec))
             return;
-        }
-
-        if (expr_const_neg_half_can_render_as_sqrt_local(f->b)) {
-            emit_TeX_sqrt_power(f->a, b, parent_prec, true);
-            return;
-        }
 
         if (need)
             sbuf_puts(b, "\\left(");
@@ -3718,17 +3714,6 @@ void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
         const expr_t *complex_shift_base = NULL;
         const expr_t *complex_shift_real = NULL;
         const expr_t *complex_shift_imag = NULL;
-
-        if (match_sqrt_plus_positive_constant(f)) {
-            if (need)
-                sbuf_putc(b, '(');
-            emit_expr(f->b, b, PREC_ADD);
-            sbuf_puts(b, " + ");
-            emit_expr(f->a, b, PREC_ADD);
-            if (need)
-                sbuf_putc(b, ')');
-            return;
-        }
 
         if (match_add_negative_complex_rhs(f, &negative_complex_base, &negative_complex_rhs)) {
             if (need)
@@ -4140,17 +4125,6 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
     if (expr_is_addsub(f)) {
         int need = PREC_ADD < parent_prec;
         int neg;
-
-        if (match_sqrt_plus_positive_constant(f)) {
-            if (need)
-                sbuf_putc(b, '(');
-            emit_func(f->b, b, PREC_ADD);
-            sbuf_puts(b, " + ");
-            emit_func(f->a, b, PREC_ADD);
-            if (need)
-                sbuf_putc(b, ')');
-            return;
-        }
 
         if (need)
             sbuf_putc(b, '(');

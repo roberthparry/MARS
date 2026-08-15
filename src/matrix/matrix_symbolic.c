@@ -18,34 +18,6 @@ typedef struct {
     size_t rank;
 } expr_rref_info_t;
 
-int mat_simplify_symbolic_inplace(matrix_t *A)
-{
-    expr_t *dv = NULL;
-    expr_t *simp = NULL;
-
-    if (!A)
-        return -1;
-    if (A->elem != &expr_elem)
-        return 0;
-
-    for (size_t i = 0; i < A->rows; ++i) {
-        for (size_t j = 0; j < A->cols; ++j) {
-            dv = NULL;
-            simp = NULL;
-            mat_get(A, i, j, &dv);
-            if (!dv)
-                continue;
-            simp = expr_simplify(dv);
-            if (!simp)
-                return -1;
-            mat_set(A, i, j, &simp);
-            expr_free(simp);
-        }
-    }
-
-    return 0;
-}
-
 static expr_t *expr_det2_simplify(expr_t *a, expr_t *b, expr_t *c, expr_t *d)
 {
     expr_t *left = NULL, *right = NULL;

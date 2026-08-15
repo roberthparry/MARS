@@ -3895,12 +3895,13 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             <li><code>inverse(a b; c d)</code> and <code>inv(a b; c d)</code> calculate a symbolic inverse, while <code>(a b; c d).(e f; g h)</code> performs matrix multiplication. Matrix division is not defined. Matrix operations compose, so <code>inv(a b; c d).(x; y)</code> solves the corresponding 2x2 linear system.</li>
             <li><code>det(A)</code> and <code>determinant(A)</code> return a scalar determinant; <code>trace(A)</code> and <code>tr(A)</code> return a scalar trace.</li>
             <li><code>transpose(A)</code>/<code>trans(A)</code> transpose a matrix. <code>hermitian(A)</code>, <code>adjoint(A)</code>, <code>ctranspose(A)</code>, <code>conjtrans(A)</code>, and <code>conjugate_transpose(A)</code> calculate its conjugate transpose.</li>
-            <li><code>Dx(ax+b cx+d; y xy)</code> differentiates every entry with respect to <code>x</code>. <code>@S^x((ax+b cx+d; y xy))</code> returns one entrywise antiderivative.</li>
+            <li><code>Dx(ax+b cx+d; y xy)</code> differentiates every entry with respect to <code>x</code>. Repeated or mixed suffixes such as <code>Dxx(A)</code> and <code>Dxy(A)</code> request ordered higher or mixed derivatives.</li>
+            <li><code>@S(ax+b cx+d; y xy)dx</code> returns an indefinite entrywise integral plus its constant matrix. <code>@S^x(ax+b cx+d; y xy)dx</code> returns the corresponding antiderivative without additive constants. Whitespace around the matrix and differential is optional.</li>
             <li>Matrix functions require a square matrix. A rectangular matrix is rejected rather than having the scalar function applied entry by entry.</li>
             <li><code>exp(0 1; -1 0)</code> calculates the matrix exponential.</li>
             <li><code>sqrt(4 0; 0 9)</code> obtains <code>(2, 0; 0, 3)</code>.</li>
             <li>The native expression-function registry also supplies exponential, logarithmic, trigonometric, inverse-trigonometric, hyperbolic, error, gamma, normal-density, Lambert W, and exponential-integral matrix functions.</li>
-            <li>Exact symbolic matrices use an exact structured or small-matrix rule where one is available. Otherwise, supply numeric bindings before applying a general numeric matrix function.</li>
+            <li>Exact symbolic matrices use an exact structured rule where one is available. Otherwise, supply numeric bindings before applying a general numeric matrix function.</li>
             <li>Logarithms, inverse functions and special functions require a matrix whose spectrum lies in a supported domain; otherwise MARS Lab reports that the matrix function failed.</li>
           </ul>
         </div>
@@ -3929,6 +3930,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           <div class="help-kicker">Matrix Calculus And Values</div>
           <ul>
             <li>The variable derivative and integral buttons apply entrywise and remain available while the corresponding variable is present.</li>
+            <li>Direct <code>Dxx(A)</code> and <code>Dxy(A)</code> notation supports ordered higher and mixed differentiation. Matrix integration uses the same <code>@S(...)dx</code> notation as scalar expressions.</li>
             <li>An antiderivative is displayed as <code>A(x) + C</code>, where <code>C</code> is an independent constant matrix with entries <code>C₁₁</code>, <code>C₁₂</code>, <code>C₂₁</code>, and <code>C₂₂</code> for a 2x2 result.</li>
             <li><code>Rendered TeX</code>, <code>Result</code>, and <code>Layout</code> preserve the symbolic answer. <code>Value</code> separately shows the numeric or partially evaluated matrix obtained from supplied bindings.</li>
             <li>Long numbers in rendered TeX use an ellipsis by default. Choose <code>Show more digits</code> for the full mantissa; scientific notation is displayed as multiplication by a power of ten.</li>
@@ -3943,6 +3945,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             <li><code>x derivative</code> gives <code>ln(λ₊)λ₊^x P₊ + ln(λ₋)λ₋^x P₋</code>.</li>
             <li><code>x integral</code> gives <code>λ₊^x P₊/ln(λ₊) + λ₋^x P₋/ln(λ₋) + C</code>, with an independent constant matrix <code>C</code>.</li>
             <li>The result cards expand this compact spectral description into the exact 2x2 matrix containing √33.</li>
+            <li>The same spectral calculus applies to supported diagonalizable constant square matrices of any order. An eigenvalue-one projector differentiates to zero and integrates to a linear term.</li>
+            <li>Symbolic differentiation constructs expression DAGs. It is distinct from the scalar evaluator's numeric reverse-mode gradient path and from a future numeric forward-mode JVP path.</li>
           </ul>
         </div>
         <div class="help-card" data-help-modes="diffequation">
@@ -10398,7 +10402,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       const source = String(text || '').trim();
 
       return action === 'integral'
-        ? `@S^${wrt}((${source}))`
+        ? `@S${source}d${wrt}`
         : `D${wrt}(${source})`;
     }
 
@@ -11353,7 +11357,9 @@ def write_state_data(state: dict[str, object]) -> None:
 
 def recover_generated_matrix_calculus_input(matrix: str) -> str:
     text = str(matrix or "").strip()
-    match = re.fullmatch(r"@S\^[^()\s]+\(\((.*)\)\)", text, flags=re.DOTALL)
+    match = re.fullmatch(r"@S\s*(.+?)\s*d[^\s()]+", text, flags=re.DOTALL)
+    if not match:
+        match = re.fullmatch(r"@S\^[^()\s]+\(\((.*)\)\)", text, flags=re.DOTALL)
     if not match:
         return text
 
@@ -14478,7 +14484,8 @@ def matrix_integral_sum_display(
     rows_text: str,
     cols_text: str,
 ) -> tuple[str, str, str] | None:
-    if "@S^" not in input_text:
+    input_body, _, _ = parse_expression_body(str(input_text or "").strip())
+    if not input_body.lstrip().startswith("@S"):
         return None
 
     try:
@@ -14554,28 +14561,32 @@ def matrix_integral_sum_display(
     return inline, pretty, transformed_tex + " + " + constant_tex
 
 
-def matrix_scalar_display_without_single_unset_binding(
+def matrix_scalar_display_without_unset_bindings(
     result_text: str,
     pretty_text: str,
     tex: str,
     binding_values: list[dict[str, str]],
 ) -> tuple[str, str, str]:
-    if len(binding_values) != 1:
+    if not binding_values:
         return result_text, pretty_text, tex
 
-    binding = binding_values[0]
-    if binding.get("kind") != "variable" or str(binding.get("value") or "").upper() != "NAN":
+    if any(str(binding.get("value") or "").upper() != "NAN" for binding in binding_values):
         return result_text, pretty_text, tex
 
-    name = str(binding.get("name") or "").strip()
+    expected = sorted(
+        (str(binding.get("name") or "").strip(), str(binding.get("kind") or "variable"))
+        for binding in binding_values
+    )
 
     def unwrapped_text(text: str) -> str:
         source = str(text or "").strip()
         if not source.startswith("{") or not source.endswith("}"):
             return source
         body, variables, constants = parse_expression_body(source)
-        assignments = parse_binding_assignments(variables)
-        if constants or assignments != [(name, "NAN")]:
+        assignments = [(name, value, "variable") for name, value in parse_binding_assignments(variables)]
+        assignments.extend((name, value, "constant") for name, value in parse_binding_assignments(constants))
+        actual = sorted((name, kind) for name, value, kind in assignments if value.upper() == "NAN")
+        if len(actual) != len(assignments) or actual != expected:
             return source
         return body
 
@@ -14626,7 +14637,7 @@ def prepare_matrix_fields(fields: dict[str, str], precision: int) -> dict[str, o
         evaluated_pretty = precision_numeric_tokens(evaluated_pretty, precision, zero_subprecision=True)
     binding_values = mars_binding_values(fields.get("bindings"))
     if not rows and not cols:
-        result_text, pretty_text, tex = matrix_scalar_display_without_single_unset_binding(
+        result_text, pretty_text, tex = matrix_scalar_display_without_unset_bindings(
             result_text,
             pretty_text,
             tex,

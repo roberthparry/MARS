@@ -47,25 +47,6 @@ matrix_t *mat_copy_as_dense(const matrix_t *A)
     return mat_copy_with_store(A, &dense_store);
 }
 
-matrix_t *mat_simplify_symbolic(const matrix_t *A)
-{
-    matrix_t *C;
-
-    if (!A)
-        return NULL;
-
-    C = mat_copy_preserving_store(A);
-    if (!C)
-        return NULL;
-
-    if (mat_simplify_symbolic_inplace(C) != 0) {
-        mat_free(C);
-        return NULL;
-    }
-
-    return C;
-}
-
 matrix_t *mat_convert_with_store(const matrix_t *A, const struct elem_vtable *target, const struct store_vtable *store)
 {
     matrix_t *C;
