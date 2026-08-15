@@ -238,23 +238,54 @@ static void expr_append_factor_local(expr_factor_t **factors, size_t *n, size_t 
     ++(*n);
 }
 
-static void expr_split_product_factors_scaled_local(const expr_t *dv, number_t sign, expr_factor_t **factors, size_t *n,
-                                                    size_t *cap)
+static void expr_split_product_factors_scaled_local(const expr_t *dv, number_t sign, bool split_symbolic_scalar_power,
+                                                    expr_factor_t **factors, size_t *n, size_t *cap)
 {
     if (!dv)
         return;
     if (expr_is_op(dv, &ops_mul)) {
-        expr_split_product_factors_scaled_local(dv->a, sign, factors, n, cap);
-        expr_split_product_factors_scaled_local(dv->b, sign, factors, n, cap);
+        expr_split_product_factors_scaled_local(dv->a, sign, split_symbolic_scalar_power, factors, n, cap);
+        expr_split_product_factors_scaled_local(dv->b, sign, split_symbolic_scalar_power, factors, n, cap);
         return;
     }
     if (expr_is_div(dv)) {
         number_t neg_sign = num_neg(sign);
 
-        expr_split_product_factors_scaled_local(dv->a, sign, factors, n, cap);
-        expr_split_product_factors_scaled_local(dv->b, neg_sign, factors, n, cap);
+        expr_split_product_factors_scaled_local(dv->a, sign, split_symbolic_scalar_power, factors, n, cap);
+        expr_split_product_factors_scaled_local(dv->b, neg_sign, split_symbolic_scalar_power, factors, n, cap);
         num_destroy(&neg_sign);
         return;
+    }
+    if (split_symbolic_scalar_power && expr_is_op(dv, &ops_pow) && dv->a && dv->b && expr_is_op(dv->a, &ops_mul)) {
+        const expr_t *scalar = NULL;
+        const expr_t *remainder = NULL;
+
+        if (expr_simplify_is_plain_real_const(dv->a->a) && num_gt(dv->a->a->c, NUM_ZERO)) {
+            scalar = dv->a->a;
+            remainder = dv->a->b;
+        } else if (expr_simplify_is_plain_real_const(dv->a->b) && num_gt(dv->a->b->c, NUM_ZERO)) {
+            scalar = dv->a->b;
+            remainder = dv->a->a;
+        }
+        if (scalar && remainder) {
+            long numerator = 0L;
+            long denominator = 0L;
+            bool reciprocal_integer = num_get_small_rational(scalar->c, &numerator, &denominator) &&
+                                      numerator == 1L && denominator > 1L;
+            expr_t *scalar_base = reciprocal_integer ? expr_const_long(denominator) : (expr_t *)scalar;
+            expr_t *scalar_power = expr_pow_xp(scalar_base, dv->b);
+            expr_t *remainder_power = expr_pow_xp(remainder, dv->b);
+            number_t scalar_sign = reciprocal_integer ? num_neg(sign) : num_clone(sign);
+
+            expr_append_factor_local(factors, n, cap, scalar_power, scalar_sign);
+            expr_append_factor_local(factors, n, cap, remainder_power, sign);
+            num_destroy(&scalar_sign);
+            expr_free(remainder_power);
+            expr_free(scalar_power);
+            if (reciprocal_integer)
+                expr_free(scalar_base);
+            return;
+        }
     }
     if (expr_is_pow_d_expr(dv)) {
         number_t exponent = num_mul(dv->c, sign);
@@ -264,11 +295,6 @@ static void expr_split_product_factors_scaled_local(const expr_t *dv, number_t s
         return;
     }
     expr_append_factor_local(factors, n, cap, dv, sign);
-}
-
-static void expr_split_product_factors_local(const expr_t *dv, expr_factor_t **factors, size_t *n, size_t *cap)
-{
-    expr_split_product_factors_scaled_local(dv, NUM_ONE, factors, n, cap);
 }
 
 static expr_t *expr_simplify_atan_tan_sawtooth(expr_t *inner)
@@ -558,26 +584,35 @@ static int expr_common_factors_nonempty_local(const expr_factor_t *factors, size
 static int expr_common_factors_useful_local(const expr_factor_t *factors, size_t n)
 {
     size_t i;
+    int useful = 0;
 
     for (i = 0u; i < n; ++i) {
         if (num_is_zero(factors[i].exponent))
             continue;
-        if (num_lt(factors[i].exponent, NUM_ZERO))
-            return 0;
-        if (!expr_is_op(factors[i].base, &ops_var))
-            return 1;
+        if (num_lt(factors[i].exponent, NUM_ZERO)) {
+            if ((!expr_is_op(factors[i].base, &ops_pow) || !factors[i].base->a ||
+                 !expr_simplify_is_plain_real_const(factors[i].base->a) ||
+                 !num_eq(factors[i].base->a->c, NUM_TWO)) &&
+                !expr_simplify_is_plain_real_const(factors[i].base)) {
+                return 0;
+            }
+            useful = 1;
+        } else if (!expr_is_op(factors[i].base, &ops_var)) {
+            useful = 1;
+        }
     }
-    return 0;
+    return useful;
 }
 
-static expr_t *expr_reduce_by_common_factors_local(const expr_t *base, const expr_factor_t *common, size_t ncommon)
+static expr_t *expr_reduce_by_common_factors_local(const expr_t *base, const expr_factor_t *common, size_t ncommon,
+                                                   bool split_symbolic_scalar_power)
 {
     expr_factor_t *factors = NULL;
     size_t n = 0u;
     size_t cap = 0u;
     size_t i;
 
-    expr_split_product_factors_local(base, &factors, &n, &cap);
+    expr_split_product_factors_scaled_local(base, NUM_ONE, split_symbolic_scalar_power, &factors, &n, &cap);
 
     for (i = 0u; i < ncommon; ++i) {
         size_t j;
@@ -663,7 +698,7 @@ static int expr_factor_candidate_preserves_value_local(const expr_t *before, con
     return ok;
 }
 
-static expr_t *expr_try_factor_common_symbolic_product_local(expr_t *sum)
+static expr_t *expr_try_factor_common_symbolic_product_mode_local(expr_t *sum, bool split_symbolic_scalar_power)
 {
     number_t c_const = num_const(NUM_ZERO);
     addend_t *terms = NULL;
@@ -697,13 +732,8 @@ static expr_t *expr_try_factor_common_symbolic_product_local(expr_t *sum)
         if (!terms[i].base || num_is_zero(terms[i].coeff))
             continue;
 
-        expr_split_product_factors_local(terms[i].base, &factors, &nfactors, &fcap);
-        for (size_t j = 0u; j < nfactors; ++j) {
-            if (num_lt(factors[j].exponent, NUM_ZERO)) {
-                expr_free_factors_local(factors, nfactors);
-                goto no_factor;
-            }
-        }
+        expr_split_product_factors_scaled_local(terms[i].base, NUM_ONE, split_symbolic_scalar_power, &factors,
+                                                &nfactors, &fcap);
         if (!common) {
             common = factors;
             ncommon = nfactors;
@@ -730,11 +760,12 @@ static expr_t *expr_try_factor_common_symbolic_product_local(expr_t *sum)
             continue;
         }
 
-        reduced = expr_reduce_by_common_factors_local(terms[i].base, common, ncommon);
-        if (reduced)
+        reduced = expr_reduce_by_common_factors_local(terms[i].base, common, ncommon, split_symbolic_scalar_power);
+        if (reduced) {
             term = expr_make_scaled_owned_local(terms[i].coeff, reduced);
-        else
+        } else {
             term = expr_new_const_owned_local(terms[i].coeff);
+        }
 
         expr_free(terms[i].base);
         num_destroy(&terms[i].coeff);
@@ -783,6 +814,71 @@ no_factor:
     free(terms);
     num_destroy(&c_const);
     return NULL;
+}
+
+static expr_t *expr_try_factor_common_symbolic_product_local(expr_t *sum)
+{
+    return expr_try_factor_common_symbolic_product_mode_local(sum, false);
+}
+
+static bool expr_product_has_half_factor_local(const expr_t *expr)
+{
+    if (!expr)
+        return false;
+    if (expr_is_const(expr))
+        return num_eq(expr->c, NUM_HALF);
+    if (!expr_is_mul(expr))
+        return false;
+    return expr_product_has_half_factor_local(expr->a) || expr_product_has_half_factor_local(expr->b);
+}
+
+bool expr_contains_half_scaled_symbolic_power(const expr_t *expr)
+{
+    if (!expr)
+        return false;
+    if (expr_is_op(expr, &ops_pow) && expr_product_has_half_factor_local(expr->a))
+        return true;
+    return expr_contains_half_scaled_symbolic_power(expr->a) || expr_contains_half_scaled_symbolic_power(expr->b);
+}
+
+expr_t *expr_factor_common_post_calculus(const expr_t *expr)
+{
+    expr_t *left;
+    expr_t *right;
+    expr_t *out;
+    expr_t *factored;
+
+    if (!expr)
+        return NULL;
+    if (!expr_is_addsub(expr) && !expr_is_op(expr, &ops_mul) && !expr_is_div(expr)) {
+        expr_retain((expr_t *)expr);
+        return (expr_t *)expr;
+    }
+
+    left = expr_factor_common_post_calculus(expr->a);
+    right = expr_factor_common_post_calculus(expr->b);
+    if (!left || !right) {
+        expr_free(right);
+        expr_free(left);
+        return NULL;
+    }
+
+    if (expr_is_op(expr, &ops_add))
+        out = expr_add_simplify_owned(left, right);
+    else if (expr_is_op(expr, &ops_sub))
+        out = expr_sub_simplify_owned(left, right);
+    else if (expr_is_op(expr, &ops_mul))
+        out = expr_mul_simplify_owned(left, right);
+    else
+        out = expr_div_simplify_owned(left, right);
+
+    if (!out || !expr_is_addsub(out))
+        return out;
+    factored = expr_try_factor_common_symbolic_product_mode_local(out, true);
+    if (!factored)
+        return out;
+    expr_free(out);
+    return factored;
 }
 
 static long expr_gcd_long_local(long a, long b)
@@ -2055,19 +2151,15 @@ static void expr_simplify_split_small_rational_quotient_coeff_local(number_t *c_
         return;
     }
 
-    should_split = nterms == 0u;
-    if (!should_split) {
-        number_t four = num_create_from_long(4L);
-        number_t quarter = num_div(NUM_ONE, four);
-
-        should_split = num_eq(*c_acc, quarter);
-        num_destroy(&quarter);
-        num_destroy(&four);
-    }
-
-    if (!should_split || !num_get_small_rational(*c_acc, &numerator, &denominator) || denominator <= 1L) {
+    if (!num_get_small_rational(*c_acc, &numerator, &denominator) || denominator <= 1L) {
         return;
     }
+    should_split = nterms == 0u;
+    for (size_t i = 0u; !should_split && i < *nden_terms; ++i) {
+        should_split = (numerator == 1L || numerator == -1L) && expr_is_sqrt_expr((*den_terms)[i]);
+    }
+    if (!should_split)
+        return;
 
     numerator_value = num_create_from_long(numerator);
     denominator_value = num_create_from_long(denominator);
@@ -2077,6 +2169,61 @@ static void expr_simplify_split_small_rational_quotient_coeff_local(number_t *c_
     *c_acc = numerator_value;
     expr_append_node(den_terms, nden_terms, den_cap, denominator_node);
     num_destroy(&denominator_value);
+}
+
+static expr_t *expr_simplify_radical_ratio_factor_local(const expr_t *numerator_factor,
+                                                        const expr_t *denominator_factor)
+{
+    number_t square;
+    number_t common_factor;
+    number_t radicand;
+    expr_t *radicand_expr;
+    expr_t *raw_root;
+    expr_t *ratio;
+    expr_t *one;
+    expr_t *inside;
+    expr_t *out;
+    bool add_ratio;
+
+    if (!expr_is_addsub(numerator_factor) || !expr_is_sqrt_expr(numerator_factor->a) ||
+        !expr_struct_eq(numerator_factor->a, denominator_factor) ||
+        !expr_simplify_is_plain_real_const(numerator_factor->b) || !denominator_factor->a ||
+        !expr_simplify_is_plain_real_const(denominator_factor->a))
+        return NULL;
+
+    square = num_mul(numerator_factor->b->c, numerator_factor->b->c);
+    if (!num_is_integer(square) || !num_is_integer(denominator_factor->a->c)) {
+        num_destroy(&square);
+        return NULL;
+    }
+    common_factor = num_gcd(square, denominator_factor->a->c);
+    if (!num_gt(common_factor, NUM_ONE)) {
+        num_destroy(&common_factor);
+        num_destroy(&square);
+        return NULL;
+    }
+    num_destroy(&common_factor);
+
+    radicand = num_div(square, denominator_factor->a->c);
+    radicand_expr = expr_new_const(radicand);
+    raw_root = radicand_expr ? expr_sqrt(radicand_expr) : NULL;
+    ratio = raw_root ? expr_simplify(raw_root) : NULL;
+    num_destroy(&radicand);
+    num_destroy(&square);
+    expr_free(raw_root);
+    expr_free(radicand_expr);
+    if (!ratio)
+        return NULL;
+
+    add_ratio = (expr_is_op(numerator_factor, &ops_add) && num_gt(numerator_factor->b->c, NUM_ZERO)) ||
+                (expr_is_op(numerator_factor, &ops_sub) && num_lt(numerator_factor->b->c, NUM_ZERO));
+    one = expr_new_const(NUM_ONE);
+    inside = add_ratio ? expr_add(one, ratio) : expr_sub(one, ratio);
+    expr_free(one);
+    expr_free(ratio);
+    out = inside ? expr_simplify(inside) : NULL;
+    expr_free(inside);
+    return out;
 }
 
 static expr_t *expr_simplify_flat_quotient_local(expr_t *a, expr_t *b)
@@ -2108,6 +2255,19 @@ static expr_t *expr_simplify_flat_quotient_local(expr_t *a, expr_t *b)
     expr_combine_like_powers(terms, nterms);
     expr_combine_like_powers(den_terms, nden_terms);
     expr_cancel_common_powers(terms, nterms, den_terms, nden_terms);
+    for (size_t i = 0u; i < nterms; ++i) {
+        for (size_t j = 0u; j < nden_terms; ++j) {
+            expr_t *replacement = expr_simplify_radical_ratio_factor_local(terms[i], den_terms[j]);
+
+            if (!replacement)
+                continue;
+            expr_free(terms[i]);
+            expr_free(den_terms[j]);
+            terms[i] = replacement;
+            den_terms[j] = NULL;
+            break;
+        }
+    }
     for (size_t i = 0u; i < nterms; ++i) {
         expr_t *term = terms[i];
 
@@ -3874,6 +4034,176 @@ cleanup:
     return out;
 }
 
+static expr_t *expr_simplify_try_extract_half_base_power_over_log_local(const expr_t *numerator,
+                                                                        const expr_t *denominator)
+{
+    number_t numerator_coefficient = num_clone(NUM_ONE);
+    expr_t **numerator_terms = NULL;
+    size_t numerator_count = 0u;
+    size_t numerator_capacity = 0u;
+    int numerator_is_zero = 0;
+    size_t power_index = SIZE_MAX;
+    expr_t *unscaled_base = NULL;
+    expr_t *new_numerator = NULL;
+    expr_t *shifted_exponent = NULL;
+    expr_t *two_power = NULL;
+    expr_t *new_denominator = NULL;
+    expr_t *division = NULL;
+    expr_t *out = NULL;
+
+    if (!numerator || !denominator || !expr_is_op(denominator, &ops_log))
+        goto cleanup;
+
+    collect_mul_flat((expr_t *)numerator, &numerator_coefficient, &numerator_is_zero, &numerator_terms,
+                     &numerator_count, &numerator_capacity);
+    if (numerator_is_zero || (num_eq(numerator_coefficient, NUM_ONE) && numerator_count == 1u))
+        goto cleanup;
+
+    for (size_t i = 0u; i < numerator_count; ++i) {
+        number_t base_coefficient = num_clone(NUM_ONE);
+        expr_t **base_terms = NULL;
+        size_t base_count = 0u;
+        size_t base_capacity = 0u;
+        int base_is_zero = 0;
+
+        if (!expr_is_op(numerator_terms[i], &ops_pow) || !numerator_terms[i]->a || !numerator_terms[i]->b)
+            continue;
+
+        collect_mul_flat(numerator_terms[i]->a, &base_coefficient, &base_is_zero, &base_terms, &base_count,
+                         &base_capacity);
+        if (!base_is_zero && base_count != 0u && num_eq(base_coefficient, NUM_HALF)) {
+            unscaled_base = expr_rebuild_product_chain(NUM_ONE, base_terms, base_count);
+            base_terms = NULL;
+            power_index = i;
+        }
+        expr_free_node_array(base_terms, base_count);
+        num_destroy(&base_coefficient);
+        if (power_index != SIZE_MAX)
+            break;
+    }
+    if (power_index == SIZE_MAX || !unscaled_base)
+        goto cleanup;
+    if (num_eq(numerator_coefficient, NUM_ONE)) {
+        int has_sqrt_factor = 0;
+
+        for (size_t i = 0u; i < numerator_count; ++i) {
+            if (i != power_index && expr_is_sqrt_expr(numerator_terms[i])) {
+                has_sqrt_factor = 1;
+                break;
+            }
+        }
+        if (!has_sqrt_factor)
+            goto cleanup;
+    }
+
+    {
+        expr_t *replacement_power = expr_pow_xp(unscaled_base, numerator_terms[power_index]->b);
+        expr_t *exponent = expr_clone(numerator_terms[power_index]->b);
+
+        if (num_eq(numerator_coefficient, NUM_HALF)) {
+            shifted_exponent = expr_add_simplify_owned(exponent, expr_new_const(NUM_ONE));
+            num_destroy(&numerator_coefficient);
+            numerator_coefficient = num_clone(NUM_ONE);
+        } else {
+            shifted_exponent = exponent;
+        }
+        expr_free(numerator_terms[power_index]);
+        numerator_terms[power_index] = replacement_power;
+    }
+    new_numerator = expr_rebuild_product_chain(numerator_coefficient, numerator_terms, numerator_count);
+    numerator_terms = NULL;
+    if (shifted_exponent) {
+        expr_t *two = expr_new_const(NUM_TWO);
+
+        two_power = expr_pow_xp(two, shifted_exponent);
+        expr_free(two);
+    }
+    new_denominator = two_power ? expr_mul(two_power, (expr_t *)denominator) : NULL;
+    division = (new_numerator && new_denominator) ? expr_div(new_numerator, new_denominator) : NULL;
+    out = division ? expr_simplify(division) : NULL;
+
+cleanup:
+    expr_free(division);
+    expr_free(new_denominator);
+    expr_free(two_power);
+    expr_free(shifted_exponent);
+    expr_free(new_numerator);
+    expr_free(unscaled_base);
+    expr_free_node_array(numerator_terms, numerator_count);
+    num_destroy(&numerator_coefficient);
+    return out;
+}
+
+static expr_t *expr_simplify_absorb_numerator_into_denominator_power_local(const expr_t *numerator,
+                                                                           const expr_t *denominator)
+{
+    const expr_t *power_factor;
+    expr_t *remainder = NULL;
+    expr_t *power_base = NULL;
+    expr_t *power_exponent = NULL;
+    expr_t *shifted_exponent;
+    expr_t *shifted_power;
+    expr_t *new_denominator;
+
+    if (!expr_simplify_is_plain_real_const(numerator))
+        return NULL;
+
+    power_factor = denominator;
+    if (expr_is_op(denominator, &ops_mul)) {
+        power_factor = denominator->a;
+        remainder = expr_clone(denominator->b);
+        if (!expr_is_op(power_factor, &ops_pow) &&
+            !(expr_is_unnamed_const(power_factor) && power_factor->binding_expr &&
+              power_factor->binding_expr->kind == EXPR_BINDING_EXPR_BINARY_OP &&
+              power_factor->binding_expr->u.binary_op.ops == &ops_pow)) {
+            power_factor = denominator->b;
+            expr_free(remainder);
+            remainder = expr_clone(denominator->a);
+        }
+    } else if (expr_is_unnamed_const(denominator) && denominator->binding_expr &&
+               denominator->binding_expr->kind == EXPR_BINDING_EXPR_BINARY_OP &&
+               denominator->binding_expr->u.binary_op.ops == &ops_mul) {
+        const expr_binding_expr_t *left = denominator->binding_expr->u.binary_op.left;
+        const expr_binding_expr_t *right = denominator->binding_expr->u.binary_op.right;
+        bool left_is_power = left && left->kind == EXPR_BINDING_EXPR_BINARY_OP && left->u.binary_op.ops == &ops_pow;
+        bool right_is_power = right && right->kind == EXPR_BINDING_EXPR_BINARY_OP && right->u.binary_op.ops == &ops_pow;
+
+        if (left_is_power || right_is_power) {
+            const expr_binding_expr_t *power_expr = left_is_power ? left : right;
+
+            power_base = expr_from_preserved_binding_expr_local(expr_binding_expr_clone(power_expr->u.binary_op.left));
+            power_exponent =
+                expr_from_preserved_binding_expr_local(expr_binding_expr_clone(power_expr->u.binary_op.right));
+            remainder = expr_from_preserved_binding_expr_local(expr_binding_expr_clone(left_is_power ? right : left));
+        }
+    }
+
+    if (!power_base && expr_is_op(power_factor, &ops_pow)) {
+        power_base = expr_clone(power_factor->a);
+        power_exponent = expr_clone(power_factor->b);
+    } else if (!power_base && expr_is_unnamed_const(power_factor) && power_factor->binding_expr &&
+               power_factor->binding_expr->kind == EXPR_BINDING_EXPR_BINARY_OP &&
+               power_factor->binding_expr->u.binary_op.ops == &ops_pow) {
+        power_base = expr_from_preserved_binding_expr_local(
+            expr_binding_expr_clone(power_factor->binding_expr->u.binary_op.left));
+        power_exponent = expr_from_preserved_binding_expr_local(
+            expr_binding_expr_clone(power_factor->binding_expr->u.binary_op.right));
+    }
+    if (!power_base || !power_exponent || !expr_struct_eq(numerator, power_base)) {
+        expr_free(remainder);
+        expr_free(power_exponent);
+        expr_free(power_base);
+        return NULL;
+    }
+
+    shifted_exponent = expr_sub_simplify_owned(power_exponent, expr_new_const(NUM_ONE));
+    shifted_power = shifted_exponent ? expr_pow_xp(power_base, shifted_exponent) : NULL;
+    expr_free(power_base);
+    expr_free(shifted_exponent);
+    new_denominator = shifted_power && remainder ? expr_mul_simplify_owned(shifted_power, remainder) : shifted_power;
+    return new_denominator ? expr_div_simplify_owned(expr_new_const(NUM_ONE), new_denominator) : NULL;
+}
+
 expr_t *expr_simplify_div_operator(const expr_t *dv, expr_t *a, expr_t *b)
 {
     NUM_SCOPE(scope);
@@ -3891,6 +4221,67 @@ expr_t *expr_simplify_div_operator(const expr_t *dv, expr_t *a, expr_t *b)
     if (expr_is_op(b, &ops_const) && expr_const_is_one(b)) {
         expr_free(b);
         return a;
+    }
+    {
+        expr_t *absorbed_power = expr_simplify_absorb_numerator_into_denominator_power_local(a, b);
+
+        if (absorbed_power) {
+            expr_free(a);
+            expr_free(b);
+            return absorbed_power;
+        }
+    }
+    if (expr_simplify_is_plain_real_const(a) && expr_is_op(b, &ops_pow) && b->a && b->b &&
+        expr_simplify_is_plain_real_const(b->a)) {
+        long numerator = 0L;
+        long denominator = 0L;
+        long power_base = 0L;
+        long power_base_denominator = 0L;
+
+        if (num_get_small_rational(a->c, &numerator, &denominator) && numerator == 1L && denominator > 1L &&
+            num_get_small_rational(b->a->c, &power_base, &power_base_denominator) &&
+            power_base_denominator == 1L && power_base == denominator) {
+            expr_t *shifted_exponent = expr_add_simplify_owned(expr_clone(b->b), expr_new_const(NUM_ONE));
+            expr_t *shifted_power = expr_pow_xp(expr_clone(b->a), shifted_exponent);
+            expr_t *one = expr_new_const(NUM_ONE);
+            expr_t *out = expr_div_simplify_owned(one, shifted_power);
+
+            expr_free(a);
+            expr_free(b);
+            return out;
+        }
+    }
+    if (expr_is_op(a, &ops_mul) && expr_is_op(b, &ops_pow) && b->a && b->b &&
+        expr_simplify_is_plain_real_const(b->a)) {
+        const expr_t *coefficient = expr_simplify_is_plain_real_const(a->a) ? a->a :
+                                    expr_simplify_is_plain_real_const(a->b) ? a->b : NULL;
+        const expr_t *remainder = coefficient == a->a ? a->b : coefficient == a->b ? a->a : NULL;
+        long numerator = 0L;
+        long denominator = 0L;
+        long power_base = 0L;
+        long power_base_denominator = 0L;
+
+        if (coefficient && remainder && num_get_small_rational(coefficient->c, &numerator, &denominator) &&
+            numerator == 1L && denominator > 1L &&
+            num_get_small_rational(b->a->c, &power_base, &power_base_denominator) &&
+            power_base_denominator == 1L && power_base == denominator) {
+            expr_t *shifted_exponent = expr_add_simplify_owned(expr_clone(b->b), expr_new_const(NUM_ONE));
+            expr_t *shifted_power = expr_pow_xp(expr_clone(b->a), shifted_exponent);
+            expr_t *out = expr_div_simplify_owned(expr_clone(remainder), shifted_power);
+
+            expr_free(a);
+            expr_free(b);
+            return out;
+        }
+    }
+    {
+        expr_t *combined_half_power = expr_simplify_try_extract_half_base_power_over_log_local(a, b);
+
+        if (combined_half_power) {
+            expr_free(a);
+            expr_free(b);
+            return combined_half_power;
+        }
     }
     if (expr_is_op(a, &ops_exp) && expr_is_op(b, &ops_exp)) {
         expr_t *difference = expr_sub_simplify_owned(expr_clone(a->a), expr_clone(b->a));

@@ -2582,10 +2582,13 @@ static matrix_t *mf_expression_evaluate_span(const char *start, const char *end,
             goto cleanup;
         }
 
-        if (num_get_small_rational(exponent, &numerator, &denominator) && denominator == 1L && numerator >= INT_MIN &&
-            numerator <= INT_MAX)
-            result = mat_pow_int(left, (int)numerator);
-        else
+        if (num_get_small_rational(exponent, &numerator, &denominator)) {
+            if (denominator == 1L && numerator >= INT_MIN && numerator <= INT_MAX)
+                result = mat_pow_int(left, (int)numerator);
+            else
+                result = mat_pow_expr(left, exponent_expr);
+        }
+        if (!result)
             result = mat_pow(left, &exponent);
         if (!result)
             mf_report_error("could not calculate matrix power");

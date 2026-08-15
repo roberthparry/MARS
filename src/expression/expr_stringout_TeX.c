@@ -195,7 +195,7 @@ static char *TeX_aligned_scaled_add_terms(const expr_t *sum, const expr_t *facto
         else if (i > 0u)
             sbuf_puts(&b, "{} + ");
         sbuf_puts(&b, factor_TeX);
-        sbuf_puts(&b, "\\cdot ");
+        sbuf_puts(&b, "\\mkern-2mu ");
         sbuf_puts(&b, term);
         free(term_alloc);
     }

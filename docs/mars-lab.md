@@ -41,7 +41,7 @@ numeric value for a selected variable.
 The captured input is `sin(x)^2 + cos(x)^2` with `x = pi/7`. MARS simplifies
 the expression to the exact output `1`.
 
-[![MARS Lab expression mode simplifying a trigonometric identity to one](images/mars-lab/expression.png)](images/mars-lab/expression.png)
+[![MARS Lab expression mode simplifying a trigonometric identity to one](images/mars-lab/expression.png?v=20260814-3)](images/mars-lab/expression.png?v=20260814-3)
 
 ## Equation mode
 
@@ -52,7 +52,7 @@ constants and supply starting values for numeric solving.
 The captured input is `atan(2x) + atan(x) = pi/4`. The exact output is
 `x = (sqrt(17) - 3)/4`, accompanied by its decimal value.
 
-[![MARS Lab equation mode returning an exact surd solution](images/mars-lab/equation.png)](images/mars-lab/equation.png)
+[![MARS Lab equation mode returning an exact surd solution](images/mars-lab/equation.png?v=20260814-3)](images/mars-lab/equation.png?v=20260814-3)
 
 ## Differential-equation mode
 
@@ -63,12 +63,13 @@ enabled, returns the rule-derived working shown in the **Solver** card.
 
 The captured input is `y'' + x^2y = 0`. The output is the Bessel basis
 
-\[
-y=\sqrt{x}\left(C_1J_{-1/4}\!\left(\frac{x^2}{2}\right)
-                 +C_2J_{1/4}\!\left(\frac{x^2}{2}\right)\right).
-\]
+<div align="left">
 
-[![MARS Lab differential-equation mode solving a power-law Bessel equation](images/mars-lab/differential-equation.png)](images/mars-lab/differential-equation.png)
+$y = \sqrt{x}\left(C_1 J_{-1/4}\!\left(\frac{x^2}{2}\right) + C_2 J_{1/4}\!\left(\frac{x^2}{2}\right)\right).$
+
+</div>
+
+[![MARS Lab differential-equation mode solving a power-law Bessel equation](images/mars-lab/differential-equation.png?v=20260814-3)](images/mars-lab/differential-equation.png?v=20260814-3)
 
 Select **Help** in this mode for the accepted prime, `D`, partial-derivative and
 differential-form notation. Arbitrary constants are preserved when the problem
@@ -156,21 +157,21 @@ matrix. MARS Lab expands these projector expressions into a `2 x 2` matrix in
 the result cards while retaining the exact `√33` terms.
 
 <figure>
-  <a href="images/mars-lab/matrix.png"><img src="images/mars-lab/matrix.png" alt="MARS Lab evaluating the symbolic matrix power (1 2; 3 4) raised to x"></a>
+  <a href="images/mars-lab/matrix.png?v=20260815-5"><img src="images/mars-lab/matrix.png?v=20260815-5" alt="MARS Lab evaluating the symbolic matrix power (1 2; 3 4) raised to x"></a>
   <figcaption><em>After clicking <strong>Evaluate</strong>.</em></figcaption>
 </figure>
 
 <br>
 
 <figure>
-  <a href="images/mars-lab/matrix-power-derivative.png"><img src="images/mars-lab/matrix-power-derivative.png" alt="MARS Lab differentiating the symbolic matrix power with respect to x"></a>
+  <a href="images/mars-lab/matrix-power-derivative.png?v=20260815-4"><img src="images/mars-lab/matrix-power-derivative.png?v=20260815-4" alt="MARS Lab differentiating the symbolic matrix power with respect to x"></a>
   <figcaption><em>After clicking <strong>x derivative</strong>.</em></figcaption>
 </figure>
 
 <br>
 
 <figure>
-  <a href="images/mars-lab/matrix-power-integral.png"><img src="images/mars-lab/matrix-power-integral.png" alt="MARS Lab integrating the symbolic matrix power with respect to x and displaying the constant matrix"></a>
+  <a href="images/mars-lab/matrix-power-integral.png?v=20260815-4"><img src="images/mars-lab/matrix-power-integral.png?v=20260815-4" alt="MARS Lab integrating the symbolic matrix power with respect to x and displaying the constant matrix"></a>
   <figcaption><em>After clicking <strong>x integral</strong>.</em></figcaption>
 </figure>
 
@@ -216,7 +217,7 @@ The captured input is `sin(x)^2` with `x` from `0` to `1`. MARS returns the
 exact antiderivative `(2x - sin(2x))/4` and the definite output
 `(2 - sin(2))/4`.
 
-[![MARS Lab integrator mode returning exact indefinite and definite results](images/mars-lab/integrator.png)](images/mars-lab/integrator.png)
+[![MARS Lab integrator mode returning exact indefinite and definite results](images/mars-lab/integrator.png?v=20260814-3)](images/mars-lab/integrator.png?v=20260814-3)
 
 ## Datetime mode
 

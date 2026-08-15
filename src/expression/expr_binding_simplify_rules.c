@@ -472,6 +472,47 @@ expr_binding_expr_t *binding_expr_try_combine_mul_powers(expr_binding_expr_t *ex
     return expr_binding_expr_simplify(expr_binding_expr_new_powi(base, sum_exponent));
 }
 
+/* Combine square roots only where the real principal-root identity is valid. */
+expr_binding_expr_t *binding_expr_try_combine_positive_numeric_square_roots(expr_binding_expr_t *expr)
+{
+    expr_binding_expr_t *left;
+    expr_binding_expr_t *right;
+    number_t left_value;
+    number_t right_value;
+    number_t product;
+    expr_binding_expr_t *radicand;
+
+    if (!expr || expr->kind != EXPR_BINDING_EXPR_MUL)
+        return expr;
+
+    left = expr->u.binary.left;
+    right = expr->u.binary.right;
+    if (!left || left->kind != EXPR_BINDING_EXPR_UNARY_OP || left->u.unary_op.ops != &ops_sqrt ||
+        !right || right->kind != EXPR_BINDING_EXPR_UNARY_OP || right->u.unary_op.ops != &ops_sqrt ||
+        !expr_binding_expr_number_value(left->u.unary_op.child, &left_value))
+        return expr;
+
+    if (!expr_binding_expr_number_value(right->u.unary_op.child, &right_value)) {
+        num_destroy(&left_value);
+        return expr;
+    }
+
+    if (!num_is_real(left_value) || !num_gt(left_value, NUM_ZERO) || !num_is_real(right_value) ||
+        !num_gt(right_value, NUM_ZERO)) {
+        num_destroy(&right_value);
+        num_destroy(&left_value);
+        return expr;
+    }
+
+    product = num_scope_detach(num_mul(left_value, right_value));
+    num_destroy(&right_value);
+    num_destroy(&left_value);
+    expr_binding_expr_free(expr);
+    radicand = binding_expr_number_from_value(product);
+    num_destroy(&product);
+    return expr_binding_expr_new_unary_op(&ops_sqrt, radicand);
+}
+
 expr_binding_expr_t *binding_expr_try_simplify_nested_power(expr_binding_expr_t *expr)
 {
     expr_binding_expr_t *inner;
@@ -2616,4 +2657,42 @@ expr_binding_expr_t *binding_expr_try_fold_div_leading_number(expr_binding_expr_
     num_destroy(&right_coeff);
     expr_binding_expr_free(expr);
     return binding_expr_scaled_product_owned(folded, left_rest, NULL);
+}
+
+expr_binding_expr_t *binding_expr_try_absorb_numerator_power_base(expr_binding_expr_t *expr)
+{
+    expr_binding_expr_t *denominator;
+    expr_binding_expr_t *power;
+    expr_binding_expr_t *remainder = NULL;
+    expr_binding_expr_t *shifted_exponent;
+    expr_binding_expr_t *shifted_power;
+    expr_binding_expr_t *new_denominator;
+    expr_binding_expr_t *out;
+
+    if (!expr || expr->kind != EXPR_BINDING_EXPR_DIV)
+        return expr;
+
+    denominator = expr->u.binary.right;
+    power = denominator;
+    if (denominator && denominator->kind == EXPR_BINDING_EXPR_MUL) {
+        power = denominator->u.binary.left;
+        remainder = denominator->u.binary.right;
+        if (!power || power->kind != EXPR_BINDING_EXPR_BINARY_OP || power->u.binary_op.ops != &ops_pow) {
+            power = denominator->u.binary.right;
+            remainder = denominator->u.binary.left;
+        }
+    }
+    if (!power || power->kind != EXPR_BINDING_EXPR_BINARY_OP || power->u.binary_op.ops != &ops_pow ||
+        !expr_binding_expr_struct_eq(expr->u.binary.left, power->u.binary_op.left))
+        return expr;
+
+    shifted_exponent = expr_binding_expr_simplify(expr_binding_expr_new_add(
+        expr_binding_expr_clone(power->u.binary_op.right), binding_expr_new_long(-1L)));
+    shifted_power = expr_binding_expr_new_binary_op(&ops_pow, expr_binding_expr_clone(power->u.binary_op.left),
+                                                    shifted_exponent);
+    new_denominator = remainder ? expr_binding_expr_new_mul(shifted_power, expr_binding_expr_clone(remainder))
+                                : shifted_power;
+    out = expr_binding_expr_new_div(binding_expr_new_long(1L), new_denominator);
+    expr_binding_expr_free(expr);
+    return expr_binding_expr_simplify(out);
 }

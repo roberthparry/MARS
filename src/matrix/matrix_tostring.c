@@ -532,7 +532,7 @@ static void mt_emit_cells_TeX(mat_buf_t *out, string_t **cells, size_t rows, siz
     mb_puts(out, "\\begin{bmatrix}");
     for (size_t i = 0; i < rows; ++i) {
         if (i > 0)
-            mb_puts(out, " \\\\[4pt] ");
+            mb_puts(out, " \\\\[10pt] ");
         for (size_t j = 0; j < cols; ++j) {
             size_t idx = i * cols + j;
 
@@ -855,18 +855,26 @@ static string_t *mat_to_string_expr(const matrix_t *A, mat_string_style_t style,
             string_t *expr = NULL;
             string_t *binding_text = NULL;
             expr_t *dv = NULL;
+            expr_t *display_expr = NULL;
             size_t idx = i * A->cols + j;
 
             mat_get(A, i, j, &dv);
-            if ((tex && mt_expr_TeX_parts_text(dv, &expr, &binding_text) != 0) ||
-                (!tex && mt_split_expr_repr(dv, &expr, &binding_text) != 0)) {
+            if (expr_contains_half_scaled_symbolic_power(dv))
+                display_expr = expr_factor_common_post_calculus(dv);
+            if (!display_expr && dv) {
+                expr_retain(dv);
+                display_expr = dv;
+            }
+            if ((tex && mt_expr_TeX_parts_text(display_expr, &expr, &binding_text) != 0) ||
+                (!tex && mt_split_expr_repr(display_expr, &expr, &binding_text) != 0)) {
                 string_free(expr);
                 string_free(binding_text);
+                expr_free(display_expr);
                 ok = 0;
                 break;
             }
             exprs[idx] = expr;
-            mt_collect_expr_bindings(dv, &var_bindings, &nvar_bindings, &capvar_bindings, &const_bindings,
+            mt_collect_expr_bindings(display_expr, &var_bindings, &nvar_bindings, &capvar_bindings, &const_bindings,
                                      &nconst_bindings, &capconst_bindings, binding_text);
             if (!tex) {
                 mt_pretty_expr_expr(&exprs[idx], const_bindings, nconst_bindings);
@@ -874,6 +882,7 @@ static string_t *mat_to_string_expr(const matrix_t *A, mat_string_style_t style,
             if (mt_text_display_length(exprs[idx]) > widths[j])
                 widths[j] = mt_text_display_length(exprs[idx]);
             string_free(binding_text);
+            expr_free(display_expr);
         }
     }
 

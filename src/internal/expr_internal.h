@@ -71,6 +71,8 @@ expr_bindings_t *expr_bindings_from_expr_internal(const expr_t *expr);
 expr_bindings_t *expr_bindings_merge_internal(const expr_bindings_t *bindings,
                                               const expr_bindings_t *additional_bindings);
 expr_t *expr_simplify_owned(expr_t *expr);
+expr_t *expr_factor_common_post_calculus(const expr_t *expr);
+bool expr_contains_half_scaled_symbolic_power(const expr_t *expr);
 expr_t *expr_negate_owned(expr_t *expr);
 expr_t *expr_mul_long(const expr_t *expr, long value);
 expr_t *expr_div_long(const expr_t *expr, long value);

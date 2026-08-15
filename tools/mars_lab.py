@@ -10423,7 +10423,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       setActionRunning(actionButton, true);
       showResults();
       rightPaneTitle.textContent = action === 'integral'
-        ? `∫ A(${wrt}) d${wrt} RESULT`
+        ? `${wrt} integral RESULT`
         : `${wrt} ${actionLabel} RESULT`;
       setBusy(true);
       setStatus(action === 'integral'
@@ -12519,6 +12519,16 @@ def precision_numeric_tokens(text: str, precision: int, zero_subprecision: bool 
 
 def matrix_display_TeX(tex: str, precision: int) -> str:
     display_TeX = precision_numeric_tokens(tex, precision, zero_subprecision=True)
+    display_TeX = re.sub(
+        r"\\sqrt\{(\d+)\}\\mkern-2mu \\sqrt\{(\d+)\}",
+        lambda match: rf"\sqrt{{{int(match.group(1)) * int(match.group(2))}}}",
+        display_TeX,
+    )
+    display_TeX = re.sub(
+        r"(\\sqrt\{[^{}]+\})\\mkern-2mu (\d+\^\{[^{}]+\})",
+        r"\2\\mkern-2mu \1",
+        display_TeX,
+    )
     begin = r"\begin{bmatrix}"
     end = r"\end{bmatrix}"
 
@@ -12526,7 +12536,7 @@ def matrix_display_TeX(tex: str, precision: int) -> str:
         return matrix_scientific_notation_TeX(compact_long_numeric_tokens(display_TeX))
 
     body = display_TeX[len(begin):-len(end)]
-    rows = body.split(r" \\[4pt] ")
+    rows = body.split(r" \\[10pt] ")
     complex_literal = re.compile(
         r"^([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[Ee][+-]?\d+)?)\s*([+-])\s*"
         r"((?:\d+(?:\.\d*)?|\.\d+)(?:[Ee][+-]?\d+)?)i$"
@@ -12540,7 +12550,7 @@ def matrix_display_TeX(tex: str, precision: int) -> str:
                 cells[cell_index] = rf"\substack{{{match.group(1)} \\ {{}}{match.group(2)} {match.group(3)}i}}"
         rows[row_index] = " & ".join(cells)
 
-    compact_TeX = compact_long_numeric_tokens(begin + r" \\[4pt] ".join(rows) + end)
+    compact_TeX = compact_long_numeric_tokens(begin + r" \\[10pt] ".join(rows) + end)
     return matrix_scientific_notation_TeX(compact_TeX)
 
 

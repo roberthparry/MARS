@@ -2926,16 +2926,41 @@ static void emit_binding_TeX_mul_separator(const expr_binding_expr_t *left, cons
 {
     if (left && left->kind == EXPR_BINDING_EXPR_NUMBER && binding_expr_is_const_id(right, EXPR_BINDING_CONST_I))
         return;
-    if (binding_expr_is_atomic(left) && binding_expr_is_atomic(right))
-        sbuf_putc(b, ' ');
-    else
-        sbuf_puts(b, " \\cdot ");
+    sbuf_puts(b, "\\mkern-2mu ");
+}
+
+static bool binding_mul_should_swap_power_before_radical(const expr_binding_expr_t *left,
+                                                         const expr_binding_expr_t *right)
+{
+    number_t left_exponent;
+    number_t right_exponent;
+    bool swap;
+
+    if (!left || !right || left->kind != EXPR_BINDING_EXPR_BINARY_OP || right->kind != EXPR_BINDING_EXPR_BINARY_OP ||
+        left->u.binary_op.ops != &ops_pow || right->u.binary_op.ops != &ops_pow)
+        return false;
+
+    left_exponent = expr_binding_expr_eval(left->u.binary_op.right);
+    right_exponent = expr_binding_expr_eval(right->u.binary_op.right);
+    swap = num_is_finite(left_exponent) && num_is_nan(right_exponent);
+    num_destroy(&right_exponent);
+    num_destroy(&left_exponent);
+    return swap;
 }
 
 static void emit_binding_expr_mul(const expr_binding_expr_t *left, const expr_binding_expr_t *right, sbuf_t *b,
                                   int parent_prec)
 {
     bool need = BIND_PREC_MUL < parent_prec;
+
+    if ((left && left->kind == EXPR_BINDING_EXPR_UNARY_OP && left->u.unary_op.ops == &ops_sqrt && right &&
+         right->kind == EXPR_BINDING_EXPR_BINARY_OP && right->u.binary_op.ops == &ops_pow) ||
+        binding_mul_should_swap_power_before_radical(left, right)) {
+        const expr_binding_expr_t *tmp = left;
+
+        left = right;
+        right = tmp;
+    }
 
     if (need)
         sbuf_putc(b, '(');
@@ -2950,6 +2975,15 @@ static void emit_binding_TeX_mul(const expr_binding_expr_t *left, const expr_bin
                                  int parent_prec)
 {
     bool need = BIND_PREC_MUL < parent_prec;
+
+    if ((left && left->kind == EXPR_BINDING_EXPR_UNARY_OP && left->u.unary_op.ops == &ops_sqrt && right &&
+         right->kind == EXPR_BINDING_EXPR_BINARY_OP && right->u.binary_op.ops == &ops_pow) ||
+        binding_mul_should_swap_power_before_radical(left, right)) {
+        const expr_binding_expr_t *tmp = left;
+
+        left = right;
+        right = tmp;
+    }
 
     if (need)
         sbuf_putc(b, '(');

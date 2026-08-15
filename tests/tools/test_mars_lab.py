@@ -238,7 +238,7 @@ class MatrixResultTests(unittest.TestCase):
         self.assertIn("const sourceText = String(currentExpressionText() || '').trim();", html)
         self.assertIn("const text = expressionBodyForEditor(sourceText);", html)
         self.assertIn("const calculusBody = matrixCalculusInput(text, wrt, action);", html)
-        self.assertIn("? `∫ A(${wrt}) d${wrt} RESULT`", html)
+        self.assertIn("? `${wrt} integral RESULT`", html)
         self.assertIn(
             "const calculusText = expressionWithBindings(calculusBody, compactExpressionForEditor(sourceText).bindings);",
             html,
@@ -509,6 +509,73 @@ class MatrixResultTests(unittest.TestCase):
         self.assertEqual(fields["result"], "(1 - λ, 2; 3, 4 - λ)")
         self.assertEqual(fields["value"], "(-2, 2; 3, 1)")
         self.assertIn("-2 2", fields["value_pretty"])
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "matrix_lab").is_file(),
+        "release matrix_lab helper is not built",
+    )
+    def test_native_helper_preserves_exact_surds_for_a_bound_rational_matrix_power(self) -> None:
+        matrix_binary = ROOT / "build" / "release" / "scratch" / "matrix_lab"
+        fields, raw, returncode = mars_lab.run_matrix_lab_fields(
+            matrix_binary,
+            "{ (1 2; 3 4)^x | x = 3/2 }",
+            "eval",
+            32,
+        )
+
+        self.assertEqual(returncode, 0, raw)
+        self.assertEqual(fields["operation"], "power")
+        self.assertIn("√(33)", fields["value"])
+        self.assertIn("^³⁄₂", fields["value"])
+        self.assertNotIn("2.974570", fields["value"])
+        self.assertIn(r"\sqrt{33}", fields["value_tex"])
+
+        displayed_value_TeX = mars_lab.matrix_display_TeX(fields["value_tex"], 32)
+        self.assertIn(r"\frac{1}{\sqrt{66}}", displayed_value_TeX)
+        self.assertNotIn(r"\sqrt{2}\mkern-2mu \sqrt{33}", displayed_value_TeX)
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "matrix_lab").is_file(),
+        "release matrix_lab helper is not built",
+    )
+    def test_native_helper_simplifies_a_direct_rational_matrix_power_denominator(self) -> None:
+        matrix_binary = ROOT / "build" / "release" / "scratch" / "matrix_lab"
+        fields, raw, returncode = mars_lab.run_matrix_lab_fields(
+            matrix_binary,
+            "(1 2; 3 4)^(3/2)",
+            "eval",
+            32,
+        )
+
+        self.assertEqual(returncode, 0, raw)
+        self.assertIn("1/√(66)", fields["result"])
+        self.assertIn(r"\frac{1}{\sqrt{66}}", fields["tex"])
+        self.assertNotIn("2^(³⁄₂ - 1)", fields["result"])
+
+    def test_matrix_TeX_places_a_symbolic_power_before_its_radical_factor(self) -> None:
+        tex = r"\begin{bmatrix}\frac{1}{\sqrt{33}\mkern-2mu 2^{x - 1}}\end{bmatrix}"
+
+        self.assertEqual(
+            mars_lab.matrix_display_TeX(tex, 32),
+            r"\begin{bmatrix}\frac{1}{2^{x - 1}\mkern-2mu \sqrt{33}}\end{bmatrix}",
+        )
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "matrix_lab").is_file(),
+        "release matrix_lab helper is not built",
+    )
+    def test_bound_rational_matrix_power_derivative_has_a_complex_value(self) -> None:
+        matrix_binary = ROOT / "build" / "release" / "scratch" / "matrix_lab"
+        fields, raw, returncode = mars_lab.run_matrix_lab_fields(
+            matrix_binary,
+            "{ Dx((1 2; 3 4)^x) | x = 3/2 }",
+            "eval",
+            32,
+        )
+
+        self.assertEqual(returncode, 0, raw)
+        self.assertIn("√(33)", fields["value"])
+        self.assertNotIn("NAN", fields["value"].upper())
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "matrix_lab").is_file(),
@@ -787,6 +854,20 @@ class MatrixResultTests(unittest.TestCase):
         (ROOT / "build" / "release" / "scratch" / "matrix_lab").is_file(),
         "release matrix_lab helper is not built",
     )
+    def test_native_helper_factors_symbolic_matrix_power_entries(self) -> None:
+        matrix_binary = ROOT / "build" / "release" / "scratch" / "matrix_lab"
+        power, raw, returncode = mars_lab.run_matrix_lab_fields(matrix_binary, "(1, 2; 3, 4)^x", "eval", 64)
+
+        self.assertEqual(returncode, 0, raw)
+        self.assertIn("1/2^(x + 1)·((1 - √(³⁄₁₁))·(5 + √(33))^x", power["result"])
+        self.assertIn("2/(2^x·√(33))·((5 + √(33))^x - (5 - √(33))^x)", power["result"])
+        self.assertIn("√(³⁄₁₁)/2^x·((5 + √(33))^x - (5 - √(33))^x)", power["result"])
+        self.assertNotIn("(½·(5 + √(33)))^x", power["result"])
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "matrix_lab").is_file(),
+        "release matrix_lab helper is not built",
+    )
     def test_native_helper_integrates_symbolic_matrix_power(self) -> None:
         matrix_binary = ROOT / "build" / "release" / "scratch" / "matrix_lab"
         integral, raw, returncode = mars_lab.run_matrix_lab_fields(
@@ -798,6 +879,20 @@ class MatrixResultTests(unittest.TestCase):
         self.assertNotIn("∫", integral["result"])
         self.assertIn("ln(", integral["result"])
         self.assertIn("(5 - √(33))", integral["result"])
+        self.assertIn("1/2^(x + 1)·(", integral["result"])
+        self.assertIn("(1 - √(³⁄₁₁))", integral["result"])
+        self.assertIn("(1 + √(³⁄₁₁))", integral["result"])
+        self.assertIn("√(³⁄₁₁)/2^x·((5 + √(33))^x", integral["result"])
+        self.assertIn("(1 - √(³⁄₁₁))·(5 + √(33))^x/ln(½·(5 + √(33)))", integral["result"])
+        self.assertNotIn("½·(√(33) - 3)", integral["result"])
+        self.assertIn(r"\frac{1}{2^{x + 1}}\mkern-5mu \left(", integral["tex"])
+        self.assertIn(r"\frac{1}{2^{x}}\mkern-2mu \sqrt{\frac{3}{11}}\mkern-5mu \left(", integral["tex"])
+        self.assertIn(
+            r"\frac{\left(1 - \sqrt{\frac{3}{11}}\right)\mkern-2mu \left(5 + \sqrt{33}\right)^{x}}{\ln",
+            integral["tex"],
+        )
+        self.assertNotIn(r"\frac{1}{\ln", integral["tex"])
+        self.assertNotIn(r"\frac{\frac{1}{2}\mkern-2mu \left(\sqrt{33} - 3\right)", integral["tex"])
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "matrix_lab").is_file(),
@@ -811,8 +906,14 @@ class MatrixResultTests(unittest.TestCase):
 
         self.assertEqual(returncode, 0, raw)
         self.assertEqual((derivative["rows"], derivative["cols"]), ("2", "2"))
-        self.assertIn("ln(½·(√(33) + 5))", derivative["result"])
-        self.assertIn("/√(33)", derivative["result"])
+        self.assertIn("ln(½·(5 + √(33)))", derivative["result"])
+        self.assertIn(r"\left(5 + \sqrt{33}\right)^{x}\mkern-2mu \ln", derivative["tex"])
+        self.assertNotIn(r"\ln(\frac{1}{2})", derivative["tex"])
+        self.assertNotIn("ln(½)·", derivative["result"])
+        self.assertIn(r"\frac{1}{2^{x + 1}}\mkern-5mu \left(\left(1 - \sqrt{\frac{3}{11}}\right)",
+                      derivative["tex"])
+        self.assertNotIn(r"\frac{\left(\sqrt{33} - 3\right)", derivative["tex"])
+        self.assertIn("/(2^x·√(33))", derivative["result"])
         self.assertNotIn("√(33)/66", derivative["result"])
         self.assertNotIn("√(33)/33", derivative["result"])
         self.assertNotIn("√(33)/11", derivative["result"])
@@ -910,7 +1011,7 @@ class DiffequationResultTests(unittest.TestCase):
             fields["problem_TeX"],
         )
         self.assertIn(
-            r"\phi &= F\left(x + i y\right) + G\left(x - i y\right)",
+            r"\phi &= F\left(x + i\mkern-2mu y\right) + G\left(x - i\mkern-2mu y\right)",
             fields["solutions_TeX"],
         )
         self.assertIn(
@@ -957,7 +1058,7 @@ class DiffequationResultTests(unittest.TestCase):
         )
         self.assertEqual(renamed_fields["status"], "solved")
         self.assertIn(
-            r"u &= F\left(i t + s\right) + G\left(s - i t\right)",
+            r"u &= F\left(i\mkern-2mu t + s\right) + G\left(s - i\mkern-2mu t\right)",
             renamed_fields["solutions_TeX"],
         )
         self.assertIn(
@@ -996,7 +1097,7 @@ class DiffequationResultTests(unittest.TestCase):
             polar_fields["problem_TeX"],
         )
         self.assertIn(
-            r"F\left(r \cdot e^{i \theta}\right)",
+            r"F\left(r\mkern-2mu e^{i\mkern-2mu \theta}\right)",
             polar_fields["solutions_TeX"],
         )
         self.assertIn(r"z_{\theta\theta}=-z", polar_fields["steps_TeX"])
@@ -1037,16 +1138,16 @@ class DiffequationResultTests(unittest.TestCase):
         self.assertEqual(fields["status"], "solved")
         self.assertEqual(fields["solver"], "parameter-dependent linear PDE")
         self.assertIn(
-            r"z &= \frac{1}{2} x \cdot \left(y^{2} - 1\right)",
+            r"z &= \frac{1}{2}\mkern-2mu x\mkern-2mu \left(y^{2} - 1\right)",
             fields["solutions_TeX"],
         )
         self.assertIn(
-            r"\mu&=e^{\int\left(2 y\right)\,dy}=e^{y^{2}}",
+            r"\mu&=e^{\int\left(2\mkern-2mu y\right)\,dy}=e^{y^{2}}",
             fields["steps_TeX"],
         )
         self.assertIn(
             r"\frac{\partial\mu}{\partial y}"
-            r"&=\left(2 y\right)\mu",
+            r"&=\left(2\mkern-2mu y\right)\mu",
             fields["steps_TeX"],
         )
         self.assertIn(
@@ -1054,11 +1155,11 @@ class DiffequationResultTests(unittest.TestCase):
             r"+\frac{\partial\mu}{\partial y}z",
             fields["steps_TeX"],
         )
-        self.assertIn(r"=\mu x y^{3}", fields["steps_TeX"])
+        self.assertIn(r"=\mu x\mkern-2mu y^{3}", fields["steps_TeX"])
         self.assertNotIn(r"\mu\cdot x y^{3}", fields["steps_TeX"])
         self.assertNotIn(r"\mu\left(x y^{3}\right)", fields["steps_TeX"])
         self.assertIn(
-            r"\mu z&=\frac{1}{2} x \cdot \left(y^{2} - 1\right)",
+            r"\mu z&=\frac{1}{2}\mkern-2mu x\mkern-2mu \left(y^{2} - 1\right)\mkern-2mu e^{y^{2}}",
             fields["steps_TeX"],
         )
         self.assertIn(r"F\left(x\right)", fields["steps_TeX"])
@@ -1097,15 +1198,15 @@ class DiffequationResultTests(unittest.TestCase):
             "parameter-dependent linear PDE",
         )
         self.assertIn(
-            r"\frac{1}{2} y^{3}",
+            r"\frac{1}{2}\mkern-2mu y^{3}",
             parameter_rate_fields["solutions_TeX"],
         )
         self.assertIn(
-            r"F\left(x\right) \cdot e^{-2 x y}",
+            r"F\left(x\right)\mkern-2mu e^{-2\mkern-2mu x\mkern-2mu y}",
             parameter_rate_fields["solutions_TeX"],
         )
         self.assertIn(
-            r"\mu&=e^{\int\left(2 x\right)\,dy}=e^{2 x y}",
+            r"\mu&=e^{\int\left(2\mkern-2mu x\right)\,dy}=e^{2\mkern-2mu x\mkern-2mu y}",
             parameter_rate_fields["steps_TeX"],
         )
 
@@ -1136,11 +1237,11 @@ class DiffequationResultTests(unittest.TestCase):
 
         self.assertEqual(solution_TeX.count(r"\begin{aligned}[t]"), 1)
         self.assertIn(
-            r"\left(C_{1} + C_{2} t\right) \cdot e^{\omega t}",
+            r"\left(C_{1} + C_{2}\mkern-2mu t\right)\mkern-2mu e^{\omega\mkern-2mu t}",
             solution_TeX,
         )
         self.assertIn(
-            r"\left(C_{3} + C_{4} t\right) \cdot e^{-\omega t}",
+            r"\left(C_{3} + C_{4}\mkern-2mu t\right)\mkern-2mu e^{-\omega\mkern-2mu t}",
             solution_TeX,
         )
         self.assertGreater(wrapped_TeX.count(r"\begin{aligned}[t]"), 1)
@@ -1183,18 +1284,18 @@ class DiffequationResultTests(unittest.TestCase):
         solution_TeX = fields["solutions_TeX"]
 
         self.assertIn(r"\frac{d^{6} x}{d t^{6}}", fields["problem_TeX"])
-        self.assertIn(r"\omega^{6} \cdot x", fields["problem_TeX"])
+        self.assertIn(r"\omega^{6}\mkern-2mu x", fields["problem_TeX"])
         self.assertNotIn(r"\sum", solution_TeX)
         self.assertIn(
-            r"\left(C_{1} + C_{2} t + C_{3} t^{2}\right)",
+            r"\left(C_{1} + C_{2}\mkern-2mu t + C_{3}\mkern-2mu t^{2}\right)",
             solution_TeX,
         )
         self.assertIn(
-            r"\left(C_{4} + C_{5} t + C_{6} t^{2}\right)",
+            r"\left(C_{4} + C_{5}\mkern-2mu t + C_{6}\mkern-2mu t^{2}\right)",
             solution_TeX,
         )
-        self.assertIn(r"\cos(\omega t)", solution_TeX)
-        self.assertIn(r"\sin(\omega t)", solution_TeX)
+        self.assertIn(r"\cos(\omega\mkern-2mu t)", solution_TeX)
+        self.assertIn(r"\sin(\omega\mkern-2mu t)", solution_TeX)
 
         completed = subprocess.run(
             [
@@ -1216,10 +1317,10 @@ class DiffequationResultTests(unittest.TestCase):
         self.assertIn(r"\frac{d^{8} \phi}{d x^{8}}", fields["problem_TeX"])
         self.assertNotIn(r"\left[phi\right]", fields["problem_TeX"])
         self.assertIn(r"\phi &=", solution_TeX)
-        self.assertIn(r"\sum_{k=0}^{3}C_{k + 1} \cdot x^{k}", solution_TeX)
-        self.assertIn(r"\sum_{k=0}^{3}C_{k + 5} \cdot x^{k}", solution_TeX)
-        self.assertIn(r"\cos(\omega x)", solution_TeX)
-        self.assertIn(r"\sin(\omega x)", solution_TeX)
+        self.assertIn(r"\sum_{k=0}^{3}C_{k + 1}\mkern-2mu x^{k}", solution_TeX)
+        self.assertIn(r"\sum_{k=0}^{3}C_{k + 5}\mkern-2mu x^{k}", solution_TeX)
+        self.assertIn(r"\cos(\omega\mkern-2mu x)", solution_TeX)
+        self.assertIn(r"\sin(\omega\mkern-2mu x)", solution_TeX)
 
         payload = mars_lab.prepare_diffequation_fields(fields)
         self.assertTrue(payload.get("svg"))
@@ -1409,7 +1510,7 @@ solutions y = final
         self.assertIn("X = x − 1/y", payload["steps"])
         self.assertIn("Y = x/y − x²/2", payload["steps"])
         self.assertNotIn("General solution", payload["steps"])
-        self.assertIn(r"\frac{2 x + C_{1}}", payload["solutions_TeX"])
+        self.assertIn(r"\frac{2\mkern-2mu x + C_{1}}", payload["solutions_TeX"])
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
@@ -1491,6 +1592,11 @@ solutions y = final
         self.assertEqual(payload["solver"], "power-law Bessel")
         self.assertIn("BesselJ(-¼, ½·x^2)", payload["solutions"])
         self.assertIn(r"J_{-\frac{1}{4}}", payload["solutions_TeX"])
+        self.assertEqual(payload["solutions_wrapped_TeX"], payload["solutions_TeX"])
+        self.assertIn(r"\sqrt{x}\mkern-2mu \left(C_{1}\mkern-2mu J_{-\frac{1}{4}}", payload["solutions_TeX"])
+        self.assertNotIn(r"\cdot", payload["solutions_TeX"])
+        self.assertIn(r"\left(\frac{1}{2}\mkern-2mu x^{2}\right)", payload["solutions_TeX"])
+        self.assertNotIn(r"\frac{1}{2} \cdot x^{2}", payload["solutions_TeX"])
         self.assertIn("y = sqrt(x)*u(z)", payload["steps"])
         self.assertNotIn(r"\middle|", payload["steps_TeX"])
         self.assertNotIn("NAN", payload["steps_TeX"])
@@ -2023,8 +2129,8 @@ class ExpressionResultTests(unittest.TestCase):
 
         self.assertEqual(
             payload["derivative_TeX"],
-            r"\frac{1}{2} \cdot J_{-\frac{5}{4}}\left(x\right) - "
-            r"\frac{1}{2} \cdot J_{\frac{3}{4}}\left(x\right)",
+            r"\frac{1}{2}\mkern-2mu J_{-\frac{5}{4}}\left(x\right) - "
+            r"\frac{1}{2}\mkern-2mu J_{\frac{3}{4}}\left(x\right)",
         )
         self.assertTrue(payload.get("derivative_svg"))
         self.assertNotIn("derivative_render_error", payload)

@@ -685,6 +685,8 @@ bool expr_simplify_same_factor(const expr_t *left, const expr_t *right);
 bool expr_simplify_additive_terms_equal(const expr_t *left, const expr_t *right);
 expr_t *expr_simplify_extract_exact_factor_quotient(const expr_t *expr, const expr_t *factor);
 expr_t *expr_simplify_extract_common_factor_quotient(const expr_t *expr, const expr_t *factor);
+expr_t *expr_factor_common_post_calculus(const expr_t *expr);
+bool expr_contains_half_scaled_symbolic_power(const expr_t *expr);
 expr_t *expr_simplify_normalize_negated_mul_factor(const expr_t *expr);
 expr_t *expr_make_scaled(number_t coeff, expr_t *base);
 expr_t *expr_make_pow_like(expr_t *base, number_t exponent);
