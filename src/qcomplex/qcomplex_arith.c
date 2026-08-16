@@ -39,6 +39,13 @@ qcomplex_t qc_conj(qcomplex_t a)
 {
     return qc_make(qc_real(a), qf_neg(qc_imag(a)));
 }
+
+/* Return the complex conjugate through the long-form public alias. */
+qcomplex_t qc_conjugate(qcomplex_t a)
+{
+    return qc_conj(a);
+}
+
 qcomplex_t qc_mul(qcomplex_t a, qcomplex_t b)
 {
     qfloat_t re = qf_sub(qf_mul(qc_real(a), qc_real(b)), qf_mul(qc_imag(a), qc_imag(b)));
@@ -110,6 +117,27 @@ qcomplex_t qc_sqrt(qcomplex_t z)
     qfloat_t sqrt_r = qf_sqrt(r);
     qfloat_t half_theta = qf_ldexp(qc_arg(z), -1);
     return qc_make(qf_mul(sqrt_r, qf_cos(half_theta)), qf_mul(sqrt_r, qf_sin(half_theta)));
+}
+
+/* Return the single principal n-th root. */
+qcomplex_t qc_root(qcomplex_t z, unsigned int n)
+{
+    qfloat_t reciprocal;
+
+    if (n <= 1u)
+        return qc_make(QF_NAN, QF_NAN);
+    if (n == 2u)
+        return qc_sqrt(z);
+    if (qc_eq(z, QC_ZERO) || qc_eq(z, QC_ONE))
+        return z;
+    reciprocal = qf_div(QF_ONE, qf_from_double((double)n));
+    return qc_exp(qc_mul(qc_make(reciprocal, QF_ZERO), qc_log(z)));
+}
+
+/* Return the single principal cube root. */
+qcomplex_t qc_cubrt(qcomplex_t z)
+{
+    return qc_root(z, 3u);
 }
 
 /* Trigonometric */

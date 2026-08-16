@@ -27,6 +27,8 @@ static const expr_integrate_dispatch_rule_t integrate_dispatch_rules[EXPR_KIND_C
     [EXPR_KIND_POW] = {.structural = integrate_pow_rule},
     [EXPR_KIND_POW_D] = {.structural = integrate_pow_d_rule},
     [EXPR_KIND_SQRT] = {.primitive = integrate_sqrt_rule},
+    [EXPR_KIND_CUBRT] = {.primitive = integrate_cubrt_rule},
+    [EXPR_KIND_ROOT] = {.primitive = integrate_root_rule},
     [EXPR_KIND_LOG] = {.primitive = integrate_log_rule},
     [EXPR_KIND_LOG10] = {.primitive = integrate_log10_rule},
     [EXPR_KIND_EXP] = {.primitive = integrate_exp_rule},

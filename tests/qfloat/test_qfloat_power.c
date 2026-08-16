@@ -104,6 +104,17 @@ static void test_qf_pow()
             TEST_FAIL();
         }
     }
+
+    {
+        qfloat_t cube_root = qf_cubrt(qf_from_double(27.0));
+        qfloat_t fourth_root = qf_root(qf_from_double(81.0), 4u);
+
+        TEST_ASSERT_QFLOAT_CLOSE(cube_root, qf_from_double(3.0));
+        TEST_ASSERT_QFLOAT_CLOSE(fourth_root, qf_from_double(3.0));
+        TEST_ASSERT_TRUE(qf_isnan(qf_root(qf_from_double(-8.0), 3u)), "negative qfloat root is outside its domain");
+        TEST_ASSERT_TRUE(qf_isnan(qf_root(qf_from_double(8.0), 1u)), "qfloat root order must exceed one");
+        printf("%s  OK: principal qfloat roots%s\n", C_GREEN, C_RESET);
+    }
 }
 
 static void test_qf_pow10(void)

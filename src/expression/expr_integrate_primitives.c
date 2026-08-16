@@ -745,6 +745,38 @@ expr_t *integrate_cos_rule(const expr_t *expr, const expr_t *wrt)
     return integrate_affine_unary_kind(expr, wrt, EXPR_PATTERN_UNARY_COS, expr_sin, NUM_ONE);
 }
 
+static expr_t *integrate_tan_symbolic_affine(const expr_t *expr, const expr_t *wrt)
+{
+    expr_t *constant = NULL;
+    expr_t *coefficient = NULL;
+    expr_t *cosine = NULL;
+    expr_t *log_cosine = NULL;
+    expr_t *negative_log_cosine = NULL;
+    expr_t *quotient = NULL;
+    expr_t *out = NULL;
+
+    if (!expr || !wrt || !expr->a ||
+        !match_symbolic_affine_constant_and_coeff(expr->a, wrt, &constant, &coefficient) ||
+        expr_const_is_zero(coefficient))
+        goto cleanup;
+
+    cosine = expr_cos(expr->a);
+    log_cosine = cosine ? expr_log(cosine) : NULL;
+    negative_log_cosine = log_cosine ? expr_neg(log_cosine) : NULL;
+    quotient = (negative_log_cosine && coefficient) ? expr_div(negative_log_cosine, coefficient) : NULL;
+    out = simplify_owned(quotient);
+    quotient = NULL;
+
+cleanup:
+    expr_free(quotient);
+    expr_free(negative_log_cosine);
+    expr_free(log_cosine);
+    expr_free(cosine);
+    expr_free(coefficient);
+    expr_free(constant);
+    return out;
+}
+
 expr_t *integrate_tan_rule(const expr_t *expr, const expr_t *wrt)
 {
     expr_t *vars[1];
@@ -761,7 +793,7 @@ expr_t *integrate_tan_rule(const expr_t *expr, const expr_t *wrt)
         num_eq(coeffs[0], NUM_ZERO)) {
         num_destroy(&coeffs[0]);
         num_destroy(&constant);
-        return NULL;
+        return integrate_tan_symbolic_affine(expr, wrt);
     }
 
     cos_arg = expr_cos(expr->a);

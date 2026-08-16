@@ -798,6 +798,19 @@ number_t num_exp(const number_t number);
 number_t num_log(const number_t number);
 number_t num_log10(const number_t number);
 number_t num_sqrt(const number_t number);
+/**
+ * @brief Return the single principal cube root of @p number.
+ *
+ * Negative real inputs are promoted to the complex domain.
+ */
+number_t num_cubrt(const number_t number);
+/**
+ * @brief Return the single principal root of @p number with integer order @p order.
+ *
+ * The order must be a real integer greater than one. Negative real radicands
+ * are promoted to the complex domain.
+ */
+number_t num_root(const number_t number, const number_t order);
 number_t num_sqr(const number_t number);
 number_t num_floor(const number_t number);
 number_t num_ceil(const number_t number);

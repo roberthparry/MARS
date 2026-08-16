@@ -1,5 +1,6 @@
 #include <errno.h>
 #include <limits.h>
+#include <math.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -1011,6 +1012,206 @@ static void binding_exact_complex_set(binding_exact_complex_t *out, number_t rea
     out->imag = num_scope_detach(imag);
 }
 
+static bool binding_nearest_small_rational(number_t value, long *numerator_out, long *denominator_out)
+{
+    enum { MAX_DENOMINATOR = 64 };
+    const double as_double = num_to_double(value);
+    const double tolerance = 1e-12 * fmax(1.0, fabs(as_double));
+    long denominator;
+
+    if (!numerator_out || !denominator_out || !isfinite(as_double))
+        return false;
+
+    for (denominator = 1L; denominator <= MAX_DENOMINATOR; ++denominator) {
+        const double scaled = as_double * (double)denominator;
+        const double nearest = round(scaled);
+
+        if (nearest < (double)LONG_MIN || nearest > (double)LONG_MAX)
+            continue;
+        if (fabs(as_double - nearest / (double)denominator) <= tolerance) {
+            *numerator_out = (long)nearest;
+            *denominator_out = denominator;
+            return true;
+        }
+    }
+    return false;
+}
+
+bool expr_exact_complex_rational_power(const binding_exact_complex_t *base, number_t exponent, number_t *value_out)
+{
+    NUM_SCOPE(scope);
+    number_t base_value;
+    number_t principal;
+    number_t principal_real;
+    number_t principal_imaginary;
+    number_t candidate_real;
+    number_t candidate_imaginary;
+    number_t candidate;
+    number_t candidate_power;
+    number_t expected_power;
+    number_t candidate_power_real;
+    number_t candidate_power_imaginary;
+    number_t expected_power_real;
+    number_t expected_power_imaginary;
+    long exponent_numerator;
+    long exponent_denominator;
+    long real_numerator;
+    long real_denominator;
+    long imaginary_numerator;
+    long imaginary_denominator;
+    bool verified;
+
+    if (!base || !value_out || !num_get_small_rational(exponent, &exponent_numerator, &exponent_denominator) ||
+        exponent_denominator <= 1L || exponent_denominator > INT_MAX || exponent_numerator < INT_MIN ||
+        exponent_numerator > INT_MAX || num_is_zero(base->imag))
+        return false;
+
+    base_value = num_add(base->real, num_mul(base->imag, NUM_I));
+    principal = num_pow(base_value, exponent);
+    if (!num_is_finite(principal) || num_is_real(principal))
+        return false;
+
+    principal_real = num_real_part(principal);
+    principal_imaginary = num_imag_part(principal);
+    if (!binding_nearest_small_rational(principal_real, &real_numerator, &real_denominator) ||
+        !binding_nearest_small_rational(principal_imaginary, &imaginary_numerator, &imaginary_denominator))
+        return false;
+
+    candidate_real = num_create_from_frac(real_numerator, real_denominator);
+    candidate_imaginary = num_create_from_frac(imaginary_numerator, imaginary_denominator);
+    candidate = num_add(candidate_real, num_mul(candidate_imaginary, NUM_I));
+    candidate_power = num_pow_int(candidate, (int)exponent_denominator);
+    expected_power = num_pow_int(base_value, (int)exponent_numerator);
+    candidate_power_real = num_real_part(candidate_power);
+    candidate_power_imaginary = num_imag_part(candidate_power);
+    expected_power_real = num_real_part(expected_power);
+    expected_power_imaginary = num_imag_part(expected_power);
+    verified = num_eq(candidate_power_real, expected_power_real) &&
+               num_eq(candidate_power_imaginary, expected_power_imaginary);
+    if (verified) {
+        num_destroy(value_out);
+        *value_out = num_scope_detach(candidate);
+    }
+    return verified;
+}
+
+static bool binding_exact_complex_root_seed(const binding_exact_complex_t *base, long order, number_t *seed_out)
+{
+    enum { MAX_EXPLICIT_ROOTS = 32 };
+    NUM_SCOPE(scope);
+    number_t base_value;
+    number_t reciprocal;
+    number_t principal;
+
+    if (!base || !seed_out || order < 2L || order > MAX_EXPLICIT_ROOTS)
+        return false;
+
+    base_value = num_add(base->real, num_mul(base->imag, NUM_I));
+    reciprocal = num_create_from_frac(1L, order);
+    principal = num_pow(base_value, reciprocal);
+    if (!num_is_finite(principal))
+        return false;
+
+    for (long branch_index = 0L; branch_index < order; ++branch_index) {
+        number_t angle = num_mul(num_create_from_frac(2L * branch_index, order), NUM_PI);
+        number_t rotation = num_add(num_cos(angle), num_mul(num_sin(angle), NUM_I));
+        number_t branch = num_mul(principal, rotation);
+        number_t branch_real = num_real_part(branch);
+        number_t branch_imaginary = num_imag_part(branch);
+        long real_numerator;
+        long real_denominator;
+        long imaginary_numerator;
+        long imaginary_denominator;
+
+        if (binding_nearest_small_rational(branch_real, &real_numerator, &real_denominator) &&
+            binding_nearest_small_rational(branch_imaginary, &imaginary_numerator, &imaginary_denominator)) {
+            number_t candidate_real = num_create_from_frac(real_numerator, real_denominator);
+            number_t candidate_imaginary = num_create_from_frac(imaginary_numerator, imaginary_denominator);
+            number_t candidate = num_add(candidate_real, num_mul(candidate_imaginary, NUM_I));
+            number_t candidate_power = num_pow_int(candidate, (int)order);
+            number_t candidate_power_real = num_real_part(candidate_power);
+            number_t candidate_power_imaginary = num_imag_part(candidate_power);
+
+            if (num_eq(candidate_power_real, base->real) && num_eq(candidate_power_imaginary, base->imag)) {
+                num_destroy(seed_out);
+                *seed_out = num_scope_detach(candidate);
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+bool expr_exact_complex_root_seed(const expr_t *expr, number_t *seed_out, long *order_out)
+{
+    binding_exact_complex_t base = {number_invalid(), number_invalid()};
+    number_t exponent = number_invalid();
+    const expr_t *base_expr = NULL;
+    long numerator;
+    long denominator;
+    bool have_base = false;
+    bool matched = false;
+    bool success = false;
+
+    if (!expr || !seed_out || !order_out)
+        return false;
+
+    if (expr->binding_expr && expr->binding_expr->kind == EXPR_BINDING_EXPR_BINARY_OP &&
+        expr->binding_expr->u.binary_op.ops == &ops_pow) {
+        have_base = expr_binding_expr_exact_complex(expr->binding_expr->u.binary_op.left, &base);
+        matched = have_base && expr_binding_expr_number_value(expr->binding_expr->u.binary_op.right, &exponent);
+    } else if (expr_match_pow_const(expr, &base_expr, &exponent)) {
+        have_base = expr_exact_complex_value(base_expr, &base);
+        matched = have_base;
+    }
+
+    if (!matched || !num_get_small_rational(exponent, &numerator, &denominator) || numerator != 1L ||
+        denominator < 2L || !binding_exact_complex_root_seed(&base, denominator, seed_out))
+        goto cleanup;
+
+    *order_out = denominator;
+    success = true;
+
+cleanup:
+    num_destroy(&exponent);
+    if (have_base)
+        expr_binding_exact_complex_clear(&base);
+    else {
+        num_destroy(&base.imag);
+        num_destroy(&base.real);
+    }
+    return success;
+}
+
+bool expr_explicit_root_order(const expr_t *expr, long *order_out)
+{
+    number_t exponent = number_invalid();
+    const expr_t *base = NULL;
+    long numerator;
+    long denominator;
+    bool matched = false;
+
+    if (!expr || !order_out)
+        return false;
+
+    if (expr->binding_expr && expr->binding_expr->kind == EXPR_BINDING_EXPR_BINARY_OP &&
+        expr->binding_expr->u.binary_op.ops == &ops_pow) {
+        matched = expr_binding_expr_number_value(expr->binding_expr->u.binary_op.right, &exponent);
+    } else {
+        matched = expr_match_pow_const(expr, &base, &exponent);
+    }
+
+    if (!matched || !num_get_small_rational(exponent, &numerator, &denominator) || numerator != 1L ||
+        denominator < 2L || denominator > 32L) {
+        num_destroy(&exponent);
+        return false;
+    }
+
+    num_destroy(&exponent);
+    *order_out = denominator;
+    return true;
+}
+
 static void binding_num_destroy_detached(number_t *value)
 {
     if (!value)
@@ -1028,6 +1229,76 @@ bool expr_binding_expr_exact_complex(const expr_binding_expr_t *expr, binding_ex
 
     ops = binding_expr_ops_for_kind(expr->kind);
     return ops && ops->exact_complex ? ops->exact_complex(expr, out) : false;
+}
+
+bool expr_exact_complex_value(const expr_t *expr, binding_exact_complex_t *out)
+{
+    binding_exact_complex_t left;
+    binding_exact_complex_t right;
+
+    if (!expr || !out)
+        return false;
+
+    if (expr->binding_expr && expr_binding_expr_exact_complex(expr->binding_expr, out))
+        return true;
+
+    if (expr_is_op(expr, &ops_const)) {
+        number_t real = num_real_part(expr->c);
+        number_t imaginary = num_imag_part(expr->c);
+
+        if (!num_is_exact(real) || !num_is_exact(imaginary)) {
+            num_destroy(&imaginary);
+            num_destroy(&real);
+            return false;
+        }
+        binding_exact_complex_set(out, real, imaginary);
+        return true;
+    }
+
+    if (expr_is_op(expr, &ops_neg)) {
+        if (!expr_exact_complex_value(expr->a, &left))
+            return false;
+        binding_exact_complex_set(out, num_neg(left.real), num_neg(left.imag));
+        expr_binding_exact_complex_clear(&left);
+        return true;
+    }
+
+    if (!expr_is_op(expr, &ops_add) && !expr_is_op(expr, &ops_sub) && !expr_is_op(expr, &ops_mul) &&
+        !expr_is_op(expr, &ops_div))
+        return false;
+    if (!expr_exact_complex_value(expr->a, &left))
+        return false;
+    if (!expr_exact_complex_value(expr->b, &right)) {
+        expr_binding_exact_complex_clear(&left);
+        return false;
+    }
+
+    if (expr_is_op(expr, &ops_add) || expr_is_op(expr, &ops_sub)) {
+        const bool subtract = expr_is_op(expr, &ops_sub);
+
+        binding_exact_complex_set(out, subtract ? num_sub(left.real, right.real) : num_add(left.real, right.real),
+                                  subtract ? num_sub(left.imag, right.imag) : num_add(left.imag, right.imag));
+    } else if (expr_is_op(expr, &ops_mul)) {
+        binding_exact_complex_set(out, num_sub(num_mul(left.real, right.real), num_mul(left.imag, right.imag)),
+                                  num_add(num_mul(left.real, right.imag), num_mul(left.imag, right.real)));
+    } else {
+        number_t denominator = num_add(num_mul(right.real, right.real), num_mul(right.imag, right.imag));
+
+        if (num_is_zero(denominator)) {
+            num_destroy(&denominator);
+            expr_binding_exact_complex_clear(&right);
+            expr_binding_exact_complex_clear(&left);
+            return false;
+        }
+        binding_exact_complex_set(
+            out, num_div(num_add(num_mul(left.real, right.real), num_mul(left.imag, right.imag)), denominator),
+            num_div(num_sub(num_mul(left.imag, right.real), num_mul(left.real, right.imag)), denominator));
+        num_destroy(&denominator);
+    }
+
+    expr_binding_exact_complex_clear(&right);
+    expr_binding_exact_complex_clear(&left);
+    return true;
 }
 
 static bool binding_string_is_single_ascii(const string_t *text, char ch)
@@ -1540,11 +1811,17 @@ typedef struct {
 #define BINDING_FUNC_TABLE_SIZE 167u
 
 static const unsigned char s_binding_func_displacements[BINDING_FUNC_TABLE_SIZE] = {
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3,  0, 4, 0, 0, 0,  0, 0, 0, 0, 0, 0, 3,  0, 1, 0, 1, 0, 0, 0, 7,
-    2, 0, 2, 0, 0, 0, 0, 0, 2, 1, 0, 0, 2, 0,  0, 0, 0, 0, 13, 0, 0, 0, 1, 0, 0, 0,  2, 1, 0, 1, 0, 1, 0, 0,
-    0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0,  1, 0, 0, 0, 4,  0, 0, 0, 0, 0, 0, 10, 2, 2, 0, 0, 0, 0, 0, 0,
-    0, 1, 0, 5, 0, 0, 1, 0, 0, 1, 2, 0, 0, 13, 2, 0, 0, 0, 0,  0, 0, 1, 2, 1, 0, 0,  0, 3, 0, 0, 0, 1, 0, 0,
-    0, 0, 0, 0, 0, 0, 2, 1, 0, 1, 1, 0, 0, 0,  0, 0, 0, 3, 0,  0, 0, 0, 4, 0, 0, 0,  0, 0, 0, 0, 0};
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 4,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 1, 0, 1, 0, 0,
+    0, 7, 2, 0, 2, 0, 0, 0, 0, 0, 2, 1, 0, 5, 2, 0,
+    0, 0, 0, 0, 13, 0, 0, 0, 1, 0, 0, 0, 2, 1, 0, 1,
+    0, 1, 0, 0, 0, 0, 2, 0, 0, 3, 0, 0, 0, 0, 0, 0,
+    0, 0, 1, 15, 0, 0, 4, 0, 0, 0, 0, 0, 0, 10, 2, 2,
+    0, 0, 0, 0, 0, 0, 0, 1, 0, 5, 0, 0, 1, 0, 0, 1,
+    2, 0, 0, 13, 2, 0, 0, 0, 0, 0, 0, 1, 2, 1, 0, 0,
+    0, 3, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 22, 0, 2, 1,
+    0, 1, 1, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 4, 0,
+    0, 0, 0, 0, 0, 0, 0};
 
 static const binding_func_entry_t s_binding_funcs[BINDING_FUNC_TABLE_SIZE] = {
     [2] = {.kw = "sin", .is_binary = false, .ops = &ops_sin},
@@ -1576,7 +1853,6 @@ static const binding_func_entry_t s_binding_funcs[BINDING_FUNC_TABLE_SIZE] = {
     [36] = {.kw = "tanh", .is_binary = false, .ops = &ops_tanh},
     [37] = {.kw = "acot", .is_binary = false, .ops = &ops_acot},
     [38] = {.kw = "asinh", .is_binary = false, .ops = &ops_asinh},
-    [39] = {.kw = "hacoversin", .is_binary = false, .ops = &ops_hacoversin},
     [40] = {.kw = "next_prime", .is_binary = false, .ops = &ops_next_prime},
     [41] = {.kw = "normal_pdf", .is_binary = false, .ops = &ops_normal_pdf},
     [42] = {.kw = "asin", .is_binary = false, .ops = &ops_asin},
@@ -1597,6 +1873,7 @@ static const binding_func_entry_t s_binding_funcs[BINDING_FUNC_TABLE_SIZE] = {
     [58] = {.kw = "sech", .is_binary = false, .ops = &ops_sech},
     [59] = {.kw = "sinh", .is_binary = false, .ops = &ops_sinh},
     [60] = {.kw = "lommel_s", .is_ternary = true, .ops = &ops_lommel_s},
+    [61] = {.kw = "hacoversin", .is_binary = false, .ops = &ops_hacoversin},
     [62] = {.kw = "BesselJ", .is_binary = true, .ops = &ops_bessel_j},
     [63] = {.kw = "W_n", .is_binary = true, .ops = &ops_lambert_wn},
     [64] = {.kw = "arccsc", .is_binary = false, .ops = &ops_acosec},
@@ -1615,6 +1892,7 @@ static const binding_func_entry_t s_binding_funcs[BINDING_FUNC_TABLE_SIZE] = {
     [79] = {.kw = "dilog", .is_binary = false, .ops = &ops_dilog},
     [80] = {.kw = "E1", .is_binary = false, .ops = &ops_e1},
     [81] = {.kw = "erfc", .is_binary = false, .ops = &ops_erfc},
+    [82] = {.kw = "cubrt", .is_binary = false, .ops = &ops_cubrt},
     [84] = {.kw = "acos", .is_binary = false, .ops = &ops_acos},
     [85] = {.kw = "atanh", .is_binary = false, .ops = &ops_atanh},
     [88] = {.kw = "chi", .is_binary = true, .ops = &ops_legendre_chi},
@@ -1663,6 +1941,7 @@ static const binding_func_entry_t s_binding_funcs[BINDING_FUNC_TABLE_SIZE] = {
     [145] = {.kw = "archacoversin", .is_binary = false, .ops = &ops_archacoversin},
     [146] = {.kw = "gammainv", .is_binary = false, .ops = &ops_gammainv},
     [147] = {.kw = "archaversin", .is_binary = false, .ops = &ops_archaversin},
+    [148] = {.kw = "conjugate", .is_binary = false, .ops = &ops_conj},
     [149] = {.kw = "legendre_chi", .is_binary = true, .ops = &ops_legendre_chi},
     [150] = {.kw = "logpdf", .is_binary = false, .ops = &ops_logpdf},
     [151] = {.kw = "XOR", .is_binary = true, .ops = &ops_bit_xor},
@@ -1671,18 +1950,14 @@ static const binding_func_entry_t s_binding_funcs[BINDING_FUNC_TABLE_SIZE] = {
     [154] = {.kw = "sqrt", .is_binary = false, .ops = &ops_sqrt},
     [155] = {.kw = "covercos", .is_binary = false, .ops = &ops_covercos},
     [156] = {.kw = "bessel_y", .is_binary = true, .ops = &ops_bessel_y},
+    [157] = {.kw = "conj", .is_binary = false, .ops = &ops_conj},
     [158] = {.kw = "asech", .is_binary = false, .ops = &ops_asech},
     [159] = {.kw = "partition", .is_binary = false, .ops = &ops_partition},
     [160] = {.kw = "Wₙ", .is_binary = true, .ops = &ops_lambert_wn},
+    [161] = {.kw = "root", .is_binary = true, .ops = &ops_root},
     [162] = {.kw = "productlog", .is_binary = false, .ops = &ops_lambert_w},
     [163] = {.kw = "normal_cdf", .is_binary = false, .ops = &ops_normal_cdf},
     [164] = {.kw = "acosech", .is_binary = false, .ops = &ops_acosech},
-};
-
-/* Collision-free auxiliary table for conjugation aliases (length modulo three). */
-static const binding_func_entry_t s_binding_conjugate_funcs[3] = {
-    [0] = {.kw = "conjugate", .is_binary = false, .ops = &ops_conj},
-    [1] = {.kw = "conj",      .is_binary = false, .ops = &ops_conj},
 };
 
 static unsigned binding_func_hash_values(string_view_t kw, unsigned seed)
@@ -1730,16 +2005,11 @@ static bool binding_func_entry_matches(const binding_func_entry_t *entry, string
 static const binding_func_entry_t *binding_func_lookup(string_view_t kw)
 {
     const binding_func_entry_t *entry;
-    const binding_func_entry_t *conjugate_entry;
     unsigned bucket;
     unsigned slot;
 
     if (string_view_is_empty(kw))
         return NULL;
-
-    conjugate_entry = &s_binding_conjugate_funcs[string_view_length(kw) % 3u];
-    if (conjugate_entry->kw && binding_func_entry_matches(conjugate_entry, kw))
-        return conjugate_entry;
 
     bucket = binding_func_bucket_hash(kw);
     slot = (binding_func_slot_hash(kw) + s_binding_func_displacements[bucket]) % BINDING_FUNC_TABLE_SIZE;
@@ -2924,8 +3194,8 @@ static void emit_binding_expr_mul_separator(const expr_binding_expr_t *left, con
 
 static void emit_binding_TeX_mul_separator(const expr_binding_expr_t *left, const expr_binding_expr_t *right, sbuf_t *b)
 {
-    if (left && left->kind == EXPR_BINDING_EXPR_NUMBER && binding_expr_is_const_id(right, EXPR_BINDING_CONST_I))
-        return;
+    (void)left;
+    (void)right;
     sbuf_puts(b, "\\mkern-2mu ");
 }
 
@@ -3345,6 +3615,22 @@ static void emit_binding_TeX_unary_sqrt(const expr_ops_t *ops, const expr_bindin
     sbuf_putc(b, '}');
 }
 
+static void emit_binding_expr_unary_cubrt(const expr_ops_t *ops, const expr_binding_expr_t *child, sbuf_t *b)
+{
+    (void)ops;
+    sbuf_puts(b, "cubrt(");
+    emit_binding_expr(child, b, BIND_PREC_LOWEST);
+    sbuf_putc(b, ')');
+}
+
+static void emit_binding_TeX_unary_cubrt(const expr_ops_t *ops, const expr_binding_expr_t *child, sbuf_t *b)
+{
+    (void)ops;
+    sbuf_puts(b, "\\sqrt[3]{");
+    emit_binding_TeX_expr(child, b, BIND_PREC_LOWEST);
+    sbuf_putc(b, '}');
+}
+
 static void emit_binding_expr_unary_abs(const expr_ops_t *ops, const expr_binding_expr_t *child, sbuf_t *b)
 {
     (void)ops;
@@ -3456,6 +3742,7 @@ typedef struct {
 static const binding_unary_render_t s_binding_unary_renderers[EXPR_KIND_COUNT] = {
     [EXPR_KIND_NEG] = {emit_binding_expr_unary_neg_op, emit_binding_TeX_unary_neg_op},
     [EXPR_KIND_SQRT] = {emit_binding_expr_unary_sqrt, emit_binding_TeX_unary_sqrt},
+    [EXPR_KIND_CUBRT] = {emit_binding_expr_unary_cubrt, emit_binding_TeX_unary_cubrt},
     [EXPR_KIND_ABS] = {emit_binding_expr_unary_abs, emit_binding_TeX_unary_abs},
     [EXPR_KIND_FLOOR] = {emit_binding_expr_unary_floor, emit_binding_TeX_unary_floor},
     [EXPR_KIND_CEIL] = {emit_binding_expr_unary_ceil, emit_binding_TeX_unary_ceil},
@@ -3729,6 +4016,15 @@ static void emit_binding_TeX_binary_op(const expr_binding_expr_t *expr, sbuf_t *
             sbuf_puts(b, "\\right)");
         sbuf_puts(b, "^{");
         emit_binding_TeX_expr(expr->u.binary_op.right, b, BIND_PREC_LOWEST);
+        sbuf_putc(b, '}');
+        return;
+    }
+
+    if (ops == &ops_root) {
+        sbuf_puts(b, "\\sqrt[");
+        emit_binding_TeX_expr(expr->u.binary_op.right, b, BIND_PREC_LOWEST);
+        sbuf_puts(b, "]{");
+        emit_binding_TeX_expr(expr->u.binary_op.left, b, BIND_PREC_LOWEST);
         sbuf_putc(b, '}');
         return;
     }

@@ -71,6 +71,8 @@ static void test_from_string_arithmetic(void)
     /* Caret exponent */
     check_parse_val("x^2.5 at 4 = 32", "{ x^2.5 | x = 4 }", 32.0, __LINE__);
     check_parse_expr("power binds before following division", "{ x^2/6 | x = NAN }", "{ x²/6 | x = NAN }", __LINE__);
+    check_parse_expr("unit fractional exponent shorthand remains an exponent", "{ x^1/3 | x = NAN }",
+                     "{ x^⅓ | x = NAN }", __LINE__);
     check_parse_expr("parenthesised rational remains an exponent", "{ x^(2/6) | x = NAN }", "{ x^⅓ | x = NAN }",
                      __LINE__);
     check_parse_num("decimal binding stays exact through cancellation-sensitive cube",
@@ -151,6 +153,12 @@ static void test_from_string_functions(void)
     check_parse_val("log10(x) at 1000", "{ log10(x) | x = 1000 }", 3.0, __LINE__);
     check_parse_val("lg(x) at 1000", "{ lg(x) | x = 1000 }", 3.0, __LINE__);
     check_parse_val("sqrt(x) at 4", "{ sqrt(x) | x = 4 }", 2.0, __LINE__);
+    check_parse_val("cubrt(x) at 27", "{ cubrt(x) | x = 27 }", 3.0, __LINE__);
+    check_parse_val("root(x,n) at 81,4", "{ root(x,n) | x = 81, n = 4 }", 3.0, __LINE__);
+    check_parse_TeX("cubrt uses an indexed radical in TeX", "cubrt(x)",
+                    "\\left\\{ \\sqrt[3]{x} \\;\\middle|\\; x = NAN \\right\\}", __LINE__);
+    check_parse_TeX("root uses its order as the TeX radical index", "root(x, n)",
+                    "\\left\\{ \\sqrt[n]{x} \\;\\middle|\\; x = NAN; n = NAN \\right\\}", __LINE__);
     check_parse_val("floor(x) at 1.75", "{ floor(x) | x = 1.75 }", 1.0, __LINE__);
     check_parse_val("ceil(x) at 1.25", "{ ceil(x) | x = 1.25 }", 2.0, __LINE__);
     check_parse_num("10! lowers to gamma(11)", "{ 10! }", "3628800", __LINE__);
@@ -189,6 +197,8 @@ static void test_from_string_functions(void)
     check_parse_val("exp(sin(x)) at 0 = 1", "{ exp(sin(x)) | x = 0 }", 1.0, __LINE__);
     check_parse_val("Greek aliases in ordinary expressions parse", "{ sin(@alpha) + @beta | @alpha = 0, @beta = 1 }",
                     1.0, __LINE__);
+    check_parse_expr("plain Greek aliases use the perfect hash", "{ cos(theta) + i*sin(theta) }",
+                     "{ cos(θ) + i·sin(θ) | θ = NAN }", __LINE__);
     check_parse_val("sqrt(exp(x)) at 0 = 1", "{ sqrt(exp(x)) | x = 0 }", 1.0, __LINE__);
     /* Function applied to parenthesised expression */
     check_parse_val("sin(x\xe2\x82\x80 + x\xe2\x82\x81) = sin(π/2) = 1",
@@ -1498,6 +1508,33 @@ static void test_from_string_bindings_api(void)
     expr_free(expr);
 }
 
+static void test_from_string_greek_binding_lookup(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = expr_from_string("cos(theta) + i*sin(theta)", &bindings);
+    expr_t *unicode_binding;
+    string_t *plain_name;
+
+    TEST_ASSERT_NOT_NULL(expr);
+    TEST_ASSERT_NOT_NULL(bindings);
+
+    unicode_binding = expr_bindings_get(bindings, "θ");
+    TEST_ASSERT_NOT_NULL(unicode_binding);
+    TEST_ASSERT_TRUE(expr_bindings_get(bindings, "theta") == unicode_binding,
+                     "plain Greek alias resolves to the canonical binding");
+    TEST_ASSERT_TRUE(expr_bindings_get(bindings, "@theta") == unicode_binding,
+                     "at-prefixed Greek alias resolves to the canonical binding");
+
+    plain_name = string_new_with("theta");
+    TEST_ASSERT_NOT_NULL(plain_name);
+    TEST_ASSERT_TRUE(expr_bindings_get_text(bindings, plain_name) == unicode_binding,
+                     "string Greek alias resolves to the canonical binding");
+
+    string_free(plain_name);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+}
+
 static void test_from_string_bindings_with_implicit_builtin_constant(void)
 {
     expr_bindings_t *bindings = NULL;
@@ -2615,6 +2652,7 @@ void test_expr_t_from_string(void)
     TEST_RUN_SUBTEST(test_from_string_errors, NULL);
     TEST_RUN_SUBTEST(test_from_expression_string_api, NULL);
     TEST_RUN_SUBTEST(test_from_string_bindings_api, NULL);
+    TEST_RUN_SUBTEST(test_from_string_greek_binding_lookup, NULL);
     TEST_RUN_SUBTEST(test_from_string_bindings_with_implicit_builtin_constant, NULL);
     TEST_RUN_SUBTEST(test_from_string_bindings_with_constant_expression_value, NULL);
     TEST_RUN_SUBTEST(test_from_string_bindings_skip_function_name_letters, NULL);

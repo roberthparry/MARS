@@ -1,3 +1,4 @@
+#include <limits.h>
 #include <stdbool.h>
 #include <string.h>
 
@@ -570,4 +571,74 @@ expr_t *integrate_sqrt_rule(const expr_t *expr, const expr_t *wrt)
     if (out)
         return out;
     return integrate_power_of_symbolic_affine(expr->a, NUM_HALF, wrt);
+}
+
+expr_t *integrate_cubrt_rule(const expr_t *expr, const expr_t *wrt)
+{
+    expr_t *coefficient;
+    expr_t *three;
+    expr_t *four;
+    expr_t *base_times_root;
+    expr_t *numerator;
+    expr_t *denominator;
+    expr_t *quotient;
+    expr_t *out;
+
+    if (!expr || !expr->a)
+        return NULL;
+    coefficient = match_symbolic_affine_base_coeff(expr->a, wrt);
+    if (!coefficient)
+        return NULL;
+
+    three = expr_const_long(3);
+    four = expr_const_long(4);
+    base_times_root = expr_mul(expr->a, expr);
+    numerator = expr_mul(three, base_times_root);
+    denominator = expr_mul(four, coefficient);
+    quotient = expr_div(numerator, denominator);
+    out = simplify_owned(quotient);
+    expr_free(denominator);
+    expr_free(numerator);
+    expr_free(base_times_root);
+    expr_free(four);
+    expr_free(three);
+    expr_free(coefficient);
+    return out;
+}
+
+expr_t *integrate_root_rule(const expr_t *expr, const expr_t *wrt)
+{
+    long numerator;
+    long denominator;
+    expr_t *coefficient;
+    expr_t *order;
+    expr_t *next_order;
+    expr_t *base_times_root;
+    expr_t *scaled_numerator;
+    expr_t *scaled_denominator;
+    expr_t *quotient;
+    expr_t *out;
+
+    if (!expr || !expr->a || !expr->b || !expr_is_const(expr->b) ||
+        !num_get_small_rational(expr->b->c, &numerator, &denominator) || denominator != 1L || numerator <= 1L ||
+        numerator > INT_MAX)
+        return NULL;
+
+    coefficient = match_symbolic_affine_base_coeff(expr->a, wrt);
+    if (!coefficient)
+        return NULL;
+    order = expr_const_long(numerator);
+    next_order = expr_const_long(numerator + 1L);
+    base_times_root = expr_mul(expr->a, expr);
+    scaled_numerator = expr_mul(order, base_times_root);
+    scaled_denominator = expr_mul(next_order, coefficient);
+    quotient = expr_div(scaled_numerator, scaled_denominator);
+    out = simplify_owned(quotient);
+    expr_free(scaled_denominator);
+    expr_free(scaled_numerator);
+    expr_free(base_times_root);
+    expr_free(next_order);
+    expr_free(order);
+    expr_free(coefficient);
+    return out;
 }

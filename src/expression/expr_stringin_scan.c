@@ -410,20 +410,34 @@ static string_t *read_simple_name(string_cursor_t *cursor, bool allow_plain_lett
         }
         string_cursor_skip(scan, alias_len);
     } else {
-        if (!expr_parse_cursor_peek_value(scan, &value, &width) || !fs_is_letter(value)) {
-            string_free(out);
-            string_cursor_free(scan);
-            return NULL;
-        }
+        string_pos_t alias_start = string_cursor_position(scan);
 
-        {
-            string_pos_t start_pos = string_cursor_position(scan);
-
-            string_cursor_skip(scan, width);
-            if (string_cursor_append_slice_between(out, start_pos, string_cursor_position(scan), cursor) != 0) {
+        alias_len = cursor_alias_name_len(scan, alias_start);
+        if (alias_len > 0u && expr_parse_cursor_at_identifier_boundary(scan, alias_start + alias_len)) {
+            if (string_append_char(out, '@') != 0 ||
+                string_cursor_append_slice_between(out, alias_start, alias_start + alias_len, cursor) != 0) {
                 string_free(out);
                 string_cursor_free(scan);
                 return NULL;
+            }
+            string_cursor_skip(scan, alias_len);
+            allow_alias = true;
+        } else {
+            if (!expr_parse_cursor_peek_value(scan, &value, &width) || !fs_is_letter(value)) {
+                string_free(out);
+                string_cursor_free(scan);
+                return NULL;
+            }
+
+            {
+                string_pos_t start_pos = string_cursor_position(scan);
+
+                string_cursor_skip(scan, width);
+                if (string_cursor_append_slice_between(out, start_pos, string_cursor_position(scan), cursor) != 0) {
+                    string_free(out);
+                    string_cursor_free(scan);
+                    return NULL;
+                }
             }
         }
     }

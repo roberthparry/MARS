@@ -205,6 +205,10 @@ All declarations are in `include/qfloat.h`.
 ### Elementary Functions
 
 - `qfloat_t qf_sqrt(qfloat_t x)` — square root via Newton refinement
+- `qfloat_t qf_cubrt(qfloat_t x)` — principal real cube root, equivalent to `qf_root(x, 3)`; the real-only
+  qfloat layer returns NaN for a negative radicand
+- `qfloat_t qf_root(qfloat_t x, unsigned int n)` — principal real `n`-th root for an integer order greater than one;
+  returns NaN for a negative radicand or an invalid order
 - `qfloat_t qf_exp(qfloat_t x)` — natural exponential
 - `qfloat_t qf_log(qfloat_t x)` — natural logarithm (`x > 0`)
 - `qfloat_t qf_log10(qfloat_t x)` — common logarithm (`x > 0`)

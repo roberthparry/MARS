@@ -131,18 +131,18 @@ static bool expr_simplify_is_i_times_unary_local(const expr_t *dv, const expr_op
     return true;
 }
 
-static bool expr_simplify_is_euler_sum_local(const expr_t *dv, const expr_t **arg_out)
+static bool expr_simplify_is_euler_sum_operands_local(const expr_t *a, const expr_t *b, const expr_t **arg_out)
 {
     const expr_t *cos_arg = NULL;
     const expr_t *sin_arg = NULL;
 
-    if (!dv || !arg_out || !expr_is_op(dv, &ops_add))
+    if (!a || !b || !arg_out)
         return false;
 
-    if (expr_is_op(dv->a, &ops_cos) && expr_simplify_is_i_times_unary_local(dv->b, &ops_sin, &sin_arg)) {
-        cos_arg = dv->a->a;
-    } else if (expr_is_op(dv->b, &ops_cos) && expr_simplify_is_i_times_unary_local(dv->a, &ops_sin, &sin_arg)) {
-        cos_arg = dv->b->a;
+    if (expr_is_op(a, &ops_cos) && expr_simplify_is_i_times_unary_local(b, &ops_sin, &sin_arg)) {
+        cos_arg = a->a;
+    } else if (expr_is_op(b, &ops_cos) && expr_simplify_is_i_times_unary_local(a, &ops_sin, &sin_arg)) {
+        cos_arg = b->a;
     } else {
         return false;
     }
@@ -152,6 +152,33 @@ static bool expr_simplify_is_euler_sum_local(const expr_t *dv, const expr_t **ar
 
     *arg_out = cos_arg;
     return true;
+}
+
+static bool expr_simplify_is_euler_sum_local(const expr_t *dv, const expr_t **arg_out)
+{
+    return dv && expr_is_op(dv, &ops_add) && expr_simplify_is_euler_sum_operands_local(dv->a, dv->b, arg_out);
+}
+
+static expr_t *expr_simplify_try_euler_sum_exp_local(const expr_t *a, const expr_t *b)
+{
+    const expr_t *arg = NULL;
+    expr_t *i_term;
+    expr_t *raw_arg;
+    expr_t *raw_exp;
+    expr_t *out;
+
+    if (!expr_simplify_is_euler_sum_operands_local(a, b, &arg))
+        return NULL;
+
+    i_term = expr_new_named_const(NUM_I, "i");
+    raw_arg = expr_mul(i_term, arg);
+    raw_exp = expr_exp(raw_arg);
+    out = expr_simplify(raw_exp);
+
+    expr_free(raw_exp);
+    expr_free(raw_arg);
+    expr_free(i_term);
+    return out;
 }
 
 static expr_t *expr_simplify_try_euler_square_local(expr_t *base)
@@ -189,6 +216,157 @@ static expr_t *expr_simplify_try_euler_square_local(expr_t *base)
     expr_free(raw_double_arg);
     expr_free(two);
     expr_free(base);
+    return out;
+}
+
+static bool expr_simplify_i_unit_sign_local(const expr_t *expr, int *sign_out)
+{
+    int child_sign;
+
+    if (!expr || !sign_out)
+        return false;
+    if (expr_is_op(expr, &ops_const)) {
+        if (num_eq(expr->c, NUM_I)) {
+            *sign_out = 1;
+            return true;
+        }
+        if (num_eq(expr->c, NUM_NEG_I)) {
+            *sign_out = -1;
+            return true;
+        }
+    }
+    if (expr_is_op(expr, &ops_neg) && expr_simplify_i_unit_sign_local(expr->a, &child_sign)) {
+        *sign_out = -child_sign;
+        return true;
+    }
+    return false;
+}
+
+static expr_t *expr_simplify_extract_i_coefficient_local(const expr_t *expr, int *sign_out)
+{
+    number_t real_part;
+    number_t imaginary_part;
+    number_t magnitude;
+    expr_t *coefficient;
+    int child_sign;
+
+    if (!expr || !sign_out)
+        return NULL;
+    if (expr_simplify_i_unit_sign_local(expr, sign_out)) {
+        return expr_new_const(NUM_ONE);
+    }
+    if (expr_is_op(expr, &ops_const) && !num_is_real(expr->c)) {
+        real_part = num_real_part(expr->c);
+        imaginary_part = num_imag_part(expr->c);
+        if (!num_is_zero(real_part) || num_is_zero(imaginary_part)) {
+            num_destroy(&imaginary_part);
+            num_destroy(&real_part);
+            return NULL;
+        }
+        *sign_out = num_sign(imaginary_part) < 0 ? -1 : 1;
+        magnitude = num_abs(imaginary_part);
+        coefficient = expr_new_const(magnitude);
+        num_destroy(&magnitude);
+        num_destroy(&imaginary_part);
+        num_destroy(&real_part);
+        return coefficient;
+    }
+    if (expr_is_op(expr, &ops_neg)) {
+        coefficient = expr_simplify_extract_i_coefficient_local(expr->a, &child_sign);
+        if (coefficient) {
+            *sign_out = -child_sign;
+            return coefficient;
+        }
+    }
+    if (expr_is_op(expr, &ops_mul)) {
+        const expr_t *other;
+
+        coefficient = expr_simplify_extract_i_coefficient_local(expr->a, &child_sign);
+        other = expr->b;
+        if (!coefficient) {
+            coefficient = expr_simplify_extract_i_coefficient_local(expr->b, &child_sign);
+            other = expr->a;
+        }
+        if (coefficient) {
+            expr_t *raw = expr_mul(coefficient, other);
+            expr_t *simplified = raw ? expr_simplify(raw) : NULL;
+
+            expr_free(raw);
+            expr_free(coefficient);
+            *sign_out = child_sign;
+            return simplified;
+        }
+    }
+    return NULL;
+}
+
+static expr_t *expr_simplify_try_cartesian_square_local(const expr_t *base)
+{
+    const expr_t *left;
+    const expr_t *right;
+    const expr_t *real;
+    const expr_t *imaginary_coefficient;
+    expr_t *left_coefficient = NULL;
+    expr_t *right_coefficient = NULL;
+    expr_t *real_square = NULL;
+    expr_t *imaginary_square = NULL;
+    expr_t *real_part = NULL;
+    expr_t *cross_product = NULL;
+    expr_t *scaled_cross_product = NULL;
+    expr_t *imaginary_unit = NULL;
+    expr_t *imaginary_term = NULL;
+    expr_t *raw = NULL;
+    expr_t *out = NULL;
+    int left_sign = 1;
+    int right_sign = 1;
+    int imaginary_sign;
+    bool left_is_imaginary;
+    bool right_is_imaginary;
+    bool subtract;
+
+    if (!expr_match_binary_op(base, EXPR_KIND_ADD, &left, &right) &&
+        !expr_match_binary_op(base, EXPR_KIND_SUB, &left, &right))
+        goto cleanup;
+    subtract = expr_match_binary_op(base, EXPR_KIND_SUB, &left, &right);
+    left_coefficient = expr_simplify_extract_i_coefficient_local(left, &left_sign);
+    right_coefficient = expr_simplify_extract_i_coefficient_local(right, &right_sign);
+    left_is_imaginary = left_coefficient != NULL;
+    right_is_imaginary = right_coefficient != NULL;
+    if (left_is_imaginary == right_is_imaginary)
+        goto cleanup;
+
+    if (right_is_imaginary) {
+        real = left;
+        imaginary_coefficient = right_coefficient;
+        imaginary_sign = subtract ? -right_sign : right_sign;
+    } else {
+        imaginary_coefficient = left_coefficient;
+        imaginary_sign = subtract ? -left_sign : left_sign;
+        real = right;
+    }
+    real_square = expr_pow_long(real, 2L);
+    imaginary_square = expr_pow_long(imaginary_coefficient, 2L);
+    real_part = real_square && imaginary_square ? expr_sub(real_square, imaginary_square) : NULL;
+    cross_product = expr_mul(real, imaginary_coefficient);
+    scaled_cross_product = cross_product ? expr_mul_long(cross_product, 2L) : NULL;
+    imaginary_unit = expr_new_named_const(NUM_I, "i");
+    imaginary_term = scaled_cross_product && imaginary_unit ? expr_mul(scaled_cross_product, imaginary_unit) : NULL;
+    raw = real_part && imaginary_term
+              ? (imaginary_sign < 0 ? expr_sub(real_part, imaginary_term) : expr_add(real_part, imaginary_term))
+              : NULL;
+    out = raw ? expr_simplify(raw) : NULL;
+
+cleanup:
+    expr_free(raw);
+    expr_free(imaginary_term);
+    expr_free(imaginary_unit);
+    expr_free(scaled_cross_product);
+    expr_free(cross_product);
+    expr_free(real_part);
+    expr_free(imaginary_square);
+    expr_free(real_square);
+    expr_free(right_coefficient);
+    expr_free(left_coefficient);
     return out;
 }
 
@@ -821,6 +999,56 @@ static expr_t *expr_try_factor_common_symbolic_product_local(expr_t *sum)
     return expr_try_factor_common_symbolic_product_mode_local(sum, false);
 }
 
+static bool expr_term_has_explicit_i_factor_local(const expr_t *expr)
+{
+    number_t real_part;
+    int sign;
+
+    if (!expr)
+        return false;
+    if (expr_simplify_i_unit_sign_local(expr, &sign))
+        return true;
+    if (expr_is_op(expr, &ops_const) && !num_is_real(expr->c)) {
+        bool is_pure_imaginary;
+
+        real_part = num_real_part(expr->c);
+        is_pure_imaginary = num_is_zero(real_part);
+        num_destroy(&real_part);
+        if (is_pure_imaginary)
+            return true;
+    }
+    if (expr_is_op(expr, &ops_neg))
+        return expr_term_has_explicit_i_factor_local(expr->a);
+    if (expr_is_op(expr, &ops_mul))
+        return expr_term_has_explicit_i_factor_local(expr->a) || expr_term_has_explicit_i_factor_local(expr->b);
+    return false;
+}
+
+static void expr_sum_cartesian_parts_local(const expr_t *expr, bool *has_real, bool *has_imaginary)
+{
+    if (!expr || !has_real || !has_imaginary)
+        return;
+    if (expr_is_op(expr, &ops_add) || expr_is_op(expr, &ops_sub)) {
+        expr_sum_cartesian_parts_local(expr->a, has_real, has_imaginary);
+        expr_sum_cartesian_parts_local(expr->b, has_real, has_imaginary);
+        return;
+    }
+
+    if (expr_term_has_explicit_i_factor_local(expr))
+        *has_imaginary = true;
+    else
+        *has_real = true;
+}
+
+static bool expr_sum_has_explicit_cartesian_split_local(const expr_t *expr)
+{
+    bool has_real = false;
+    bool has_imaginary = false;
+
+    expr_sum_cartesian_parts_local(expr, &has_real, &has_imaginary);
+    return has_real && has_imaginary;
+}
+
 static bool expr_product_has_half_factor_local(const expr_t *expr)
 {
     if (!expr)
@@ -1077,6 +1305,53 @@ static bool expr_is_pure_numeric_arithmetic_local(const expr_t *dv)
         return expr_is_pure_numeric_arithmetic_local(dv->a) && expr_is_pure_numeric_arithmetic_local(dv->b);
 
     return false;
+}
+
+static expr_t *expr_try_fold_numeric_complex_integer_power_local(const expr_t *base, number_t exponent)
+{
+    number_t base_value;
+    number_t folded;
+
+    if (!num_is_real(exponent) || !num_is_integer(exponent) || !expr_is_pure_numeric_arithmetic_local(base))
+        return NULL;
+
+    base_value = expr_eval(base);
+    if (!num_is_finite(base_value) || num_is_real(base_value)) {
+        num_destroy(&base_value);
+        return NULL;
+    }
+
+    folded = num_pow(base_value, exponent);
+    num_destroy(&base_value);
+    return expr_new_const_owned_local(folded);
+}
+
+static expr_t *expr_try_fold_numeric_complex_rational_power_local(const expr_t *base, number_t exponent)
+{
+    binding_exact_complex_t exact_base = {number_invalid(), number_invalid()};
+    number_t candidate = number_invalid();
+    expr_t *out = NULL;
+    bool exact_base_live = false;
+    long numerator;
+    long denominator;
+
+    /* Explicit reciprocal powers denote the complete root family.  Keep the
+     * power node intact; sqrt() is the separate, single-valued operation. */
+    if (num_get_small_rational(exponent, &numerator, &denominator) && numerator == 1L && denominator > 1L)
+        return NULL;
+
+    exact_base_live = expr_exact_complex_value(base, &exact_base);
+    if (exact_base_live && expr_exact_complex_rational_power(&exact_base, exponent, &candidate))
+        out = expr_new_const_owned_local(candidate);
+
+    num_destroy(&candidate);
+    if (exact_base_live)
+        expr_binding_exact_complex_clear(&exact_base);
+    else {
+        num_destroy(&exact_base.imag);
+        num_destroy(&exact_base.real);
+    }
+    return out;
 }
 
 static expr_t *expr_try_fold_numeric_arithmetic_local(const expr_t *dv, expr_t *a, expr_t *b)
@@ -1624,6 +1899,49 @@ static bool expr_long_perfect_square_root_local(long value, long *root_out)
     return false;
 }
 
+static int expr_long_power_compare_local(long base, unsigned long exponent, long value)
+{
+    long product = 1L;
+
+    if (exponent == 0u)
+        return 1L < value ? -1 : (1L > value ? 1 : 0);
+    if (base == 0L)
+        return value == 0L ? 0 : -1;
+    if (base == 1L)
+        return value == 1L ? 0 : -1;
+
+    for (unsigned long i = 0u; i < exponent; ++i) {
+        if (base != 0L && product > value / base)
+            return 1;
+        product *= base;
+    }
+    return product < value ? -1 : (product > value ? 1 : 0);
+}
+
+static bool expr_long_perfect_nth_root_local(long value, unsigned long order, long *root_out)
+{
+    long lo = 0L;
+    long hi = value;
+
+    if (value < 0L || order <= 1u || !root_out)
+        return false;
+
+    while (lo <= hi) {
+        long mid = lo + (hi - lo) / 2L;
+        int comparison = expr_long_power_compare_local(mid, order, value);
+
+        if (comparison == 0) {
+            *root_out = mid;
+            return true;
+        }
+        if (comparison < 0)
+            lo = mid + 1L;
+        else
+            hi = mid - 1L;
+    }
+    return false;
+}
+
 int expr_fold_sqrt_const(const number_t *in, number_t *out)
 {
     long numerator;
@@ -1639,6 +1957,31 @@ int expr_fold_sqrt_const(const number_t *in, number_t *out)
     if (!num_get_small_rational(*in, &numerator, &denominator) || numerator < 0L || denominator <= 0L ||
         !expr_long_perfect_square_root_local(numerator, &root_numerator) ||
         !expr_long_perfect_square_root_local(denominator, &root_denominator) || root_denominator == 0L)
+        return 0;
+
+    numerator_value = num_create_from_long(root_numerator);
+    denominator_value = num_create_from_long(root_denominator);
+    root = num_div(numerator_value, denominator_value);
+    num_destroy(&denominator_value);
+    num_destroy(&numerator_value);
+    num_destroy(out);
+    *out = root;
+    return 1;
+}
+
+int expr_fold_cubrt_const(const number_t *in, number_t *out)
+{
+    long numerator;
+    long denominator;
+    long root_numerator;
+    long root_denominator;
+    number_t numerator_value;
+    number_t denominator_value;
+    number_t root;
+
+    if (!in || !out || !num_get_small_rational(*in, &numerator, &denominator) || numerator < 0L || denominator <= 0L ||
+        !expr_long_perfect_nth_root_local(numerator, 3u, &root_numerator) ||
+        !expr_long_perfect_nth_root_local(denominator, 3u, &root_denominator) || root_denominator == 0L)
         return 0;
 
     numerator_value = num_create_from_long(root_numerator);
@@ -1977,6 +2320,13 @@ static expr_t *expr_try_simplify_preserved_integer_power_local(expr_t *base, num
     if (!expr_is_unnamed_const(base) || !base->binding_expr || base->binding_expr->kind == EXPR_BINDING_EXPR_NUMBER ||
         !num_get_small_rational(exponent, &numerator, &denominator) || denominator != 1L)
         return NULL;
+
+    if (!num_is_real(base->c)) {
+        number_t folded = num_pow(base->c, exponent);
+
+        expr_free(base);
+        return expr_new_const_owned_local(folded);
+    }
 
     pow_expr = expr_binding_expr_new_powi(expr_binding_expr_clone(base->binding_expr), numerator);
     out = expr_from_preserved_binding_expr_local(pow_expr);
@@ -2495,6 +2845,56 @@ expr_t *expr_simplify_binary_operator(const expr_t *dv, expr_t *a, expr_t *b)
     return out;
 }
 
+expr_t *expr_simplify_root_operator(const expr_t *dv, expr_t *a, expr_t *b)
+{
+    long numerator;
+    long denominator;
+    long order;
+    long order_denominator;
+    long root_numerator;
+    long root_denominator;
+
+    if (!dv || !a || !b)
+        return expr_simplify_passthrough(dv, a, b);
+
+    if (expr_is_unnamed_const(b) && num_get_small_rational(b->c, &order, &order_denominator) &&
+        order_denominator == 1L && order > 1L) {
+        if (expr_is_unnamed_const(a) && num_get_small_rational(a->c, &numerator, &denominator) && numerator >= 0L &&
+            denominator > 0L && expr_long_perfect_nth_root_local(numerator, (unsigned long)order, &root_numerator) &&
+            expr_long_perfect_nth_root_local(denominator, (unsigned long)order, &root_denominator) &&
+            root_denominator != 0L) {
+            number_t root_numerator_value = num_create_from_long(root_numerator);
+            number_t root_denominator_value = num_create_from_long(root_denominator);
+            number_t value = num_div(root_numerator_value, root_denominator_value);
+            expr_t *out = expr_new_const_owned_local(value);
+
+            num_destroy(&value);
+            num_destroy(&root_denominator_value);
+            num_destroy(&root_numerator_value);
+            expr_free(a);
+            expr_free(b);
+            return out;
+        }
+
+        if (order == 2L) {
+            expr_t *out = expr_sqrt(a);
+
+            expr_free(a);
+            expr_free(b);
+            return out;
+        }
+        if (order == 3L) {
+            expr_t *out = expr_cubrt(a);
+
+            expr_free(a);
+            expr_free(b);
+            return out;
+        }
+    }
+
+    return expr_simplify_binary_operator(dv, a, b);
+}
+
 /* ========================================================================= */
 /* Per-operation simplifiers                                                 */
 /* ========================================================================= */
@@ -2876,6 +3276,16 @@ expr_t *expr_simplify_add_sub_operator(const expr_t *dv, expr_t *a, expr_t *b)
     }
 
     if (expr_is_op(dv, &ops_add)) {
+        expr_t *euler_exp = expr_simplify_try_euler_sum_exp_local(a, b);
+
+        if (euler_exp) {
+            expr_free(a);
+            expr_free(b);
+            num_destroy(&c_const);
+            num_destroy(&common_coeff);
+            return euler_exp;
+        }
+
         expr_t *trig_weighted_sum = expr_simplify_try_trig_weighted_sum(a, b);
 
         if (trig_weighted_sum) {
@@ -3037,7 +3447,7 @@ expr_t *expr_simplify_add_sub_operator(const expr_t *dv, expr_t *a, expr_t *b)
     if (!cur)
         cur = expr_new_const(NUM_ZERO);
 
-    if (!const_emitted && num_is_zero(scaled_const)) {
+    if (!const_emitted && num_is_zero(scaled_const) && !expr_sum_has_explicit_cartesian_split_local(cur)) {
         expr_t *factored = expr_try_factor_common_symbolic_product_local(cur);
 
         if (factored) {
@@ -4237,6 +4647,15 @@ expr_t *expr_simplify_div_operator(const expr_t *dv, expr_t *a, expr_t *b)
     NUM_SCOPE(scope);
 
     {
+        expr_t *tangent_sum = expr_simplify_try_tangent_addition_quotient(a, b);
+
+        if (tangent_sum) {
+            expr_free(a);
+            expr_free(b);
+            return tangent_sum;
+        }
+    }
+    {
         expr_t *folded_numeric = expr_try_fold_numeric_arithmetic_local(dv, a, b);
 
         if (folded_numeric) {
@@ -4695,6 +5114,259 @@ static long expr_simplify_square_divisor_root_local(long value)
     return root;
 }
 
+static bool expr_simplify_match_square_base_local(const expr_t *expr, const expr_t **base_out)
+{
+    number_t exponent = number_invalid();
+    long numerator;
+    long denominator;
+    bool matched;
+
+    if (!expr || !base_out || !expr_match_pow_const(expr, base_out, &exponent))
+        return false;
+
+    matched = num_get_small_rational(exponent, &numerator, &denominator) && numerator == 2L && denominator == 1L;
+    num_destroy(&exponent);
+    return matched;
+}
+
+static bool expr_simplify_match_norm_for_real_part_local(const expr_t *norm, const expr_t *real_part,
+                                                         const expr_t **imaginary_part_out)
+{
+    const expr_t *sum_left = NULL;
+    const expr_t *sum_right = NULL;
+    const expr_t *left_base = NULL;
+    const expr_t *right_base = NULL;
+    bool is_subtraction;
+
+    if (!norm || !real_part || !imaginary_part_out || !expr_is_sqrt_expr(norm) ||
+        !expr_match_add_sub_expr(norm->a, &sum_left, &sum_right, &is_subtraction) || is_subtraction ||
+        !expr_simplify_match_square_base_local(sum_left, &left_base) ||
+        !expr_simplify_match_square_base_local(sum_right, &right_base))
+        return false;
+
+    if (expr_struct_eq(left_base, real_part)) {
+        *imaginary_part_out = right_base;
+        return true;
+    }
+    if (expr_struct_eq(right_base, real_part)) {
+        *imaginary_part_out = left_base;
+        return true;
+    }
+    return false;
+}
+
+static bool expr_simplify_match_scaled_add_sub_local(const expr_t *expr, bool require_subtraction,
+                                                     number_t *scale_out, const expr_t **left_out,
+                                                     const expr_t **right_out)
+{
+    const expr_t *base = expr;
+    number_t scale = num_new();
+    bool is_subtraction;
+
+    if (!expr || !scale_out || !left_out || !right_out)
+        return false;
+
+    if (!expr_match_scaled_expr(expr, &scale, &base)) {
+        num_destroy(&scale);
+        scale = num_clone(NUM_ONE);
+        base = expr;
+    }
+    if (!expr_match_add_sub_expr(base, left_out, right_out, &is_subtraction)) {
+        num_destroy(&scale);
+        return false;
+    }
+    if (require_subtraction && !is_subtraction) {
+        if (expr_is_neg(*right_out) && (*right_out)->a) {
+            *right_out = (*right_out)->a;
+            is_subtraction = true;
+        } else if (expr_is_neg(*left_out) && (*left_out)->a) {
+            const expr_t *positive = *right_out;
+
+            *right_out = (*left_out)->a;
+            *left_out = positive;
+            is_subtraction = true;
+        }
+    }
+    if (is_subtraction != require_subtraction) {
+        num_destroy(&scale);
+        return false;
+    }
+
+    num_destroy(scale_out);
+    *scale_out = scale;
+    return true;
+}
+
+static const expr_t *expr_simplify_find_cartesian_imaginary_root_local(const expr_t *expr, const expr_t *norm,
+                                                                       const expr_t *real_part, number_t scale)
+{
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+    number_t candidate_scale = num_new();
+
+    if (!expr)
+        goto no_match;
+    if (expr_is_sqrt_expr(expr)) {
+        bool shape = expr_simplify_match_scaled_add_sub_local(expr->a, true, &candidate_scale, &left, &right);
+
+        if (shape && num_eq(candidate_scale, scale) && expr_struct_eq(left, norm) &&
+            expr_struct_eq(right, real_part)) {
+            num_destroy(&candidate_scale);
+            return expr;
+        }
+    }
+    num_destroy(&candidate_scale);
+
+    if (expr->a) {
+        const expr_t *found = expr_simplify_find_cartesian_imaginary_root_local(expr->a, norm, real_part, scale);
+
+        if (found)
+            return found;
+    }
+    return expr->b ? expr_simplify_find_cartesian_imaginary_root_local(expr->b, norm, real_part, scale) : NULL;
+
+no_match:
+    num_destroy(&candidate_scale);
+    return NULL;
+}
+
+static bool expr_simplify_cartesian_root_scale_is_unit_local(const expr_t *outer_scale, number_t root_scale)
+{
+    expr_t *outer_square = outer_scale ? expr_pow_long(outer_scale, 2L) : expr_const_one();
+    expr_t *root_scale_expr = expr_new_const(root_scale);
+    expr_t *scaled = outer_square && root_scale_expr ? expr_mul(outer_square, root_scale_expr) : NULL;
+    expr_t *doubled = scaled ? expr_mul_long(scaled, 2L) : NULL;
+    expr_t *simplified = doubled ? expr_simplify(doubled) : NULL;
+    bool is_unit = simplified && expr_const_is_one(simplified);
+
+    expr_free(simplified);
+    expr_free(doubled);
+    expr_free(scaled);
+    expr_free(root_scale_expr);
+    expr_free(outer_square);
+    return is_unit;
+}
+
+static expr_t *expr_simplify_try_cartesian_root_local(const expr_t *base)
+{
+    const expr_t *outer_scale = NULL;
+    const expr_t *sum = base;
+    const expr_t *sum_left = NULL;
+    const expr_t *sum_right = NULL;
+    const expr_t *real_root = NULL;
+    const expr_t *imaginary_term = NULL;
+    const expr_t *real_sum_left = NULL;
+    const expr_t *real_sum_right = NULL;
+    const expr_t *norm = NULL;
+    const expr_t *real_part = NULL;
+    const expr_t *imaginary_part = NULL;
+    const expr_t *imaginary_root = NULL;
+    const expr_t *product_left = NULL;
+    const expr_t *product_right = NULL;
+    number_t root_scale = num_new();
+    bool sum_is_subtraction;
+    bool matched_real_sum;
+    expr_t *absolute_imaginary = NULL;
+    expr_t *imaginary_unit = NULL;
+    expr_t *actual_scaled_raw = NULL;
+    expr_t *actual_scaled = NULL;
+    expr_t *expected_scaled_product = NULL;
+    expr_t *expected_scaled_raw = NULL;
+    expr_t *expected_scaled = NULL;
+    expr_t *imaginary_product = NULL;
+    expr_t *raw_result = NULL;
+    expr_t *result = NULL;
+
+    if (!base)
+        goto cleanup;
+
+    if (expr_match_mul_expr(base, &product_left, &product_right)) {
+        if (expr_is_addsub(product_left)) {
+            outer_scale = product_right;
+            sum = product_left;
+        } else if (expr_is_addsub(product_right)) {
+            outer_scale = product_left;
+            sum = product_right;
+        }
+    }
+    if (!expr_match_add_sub_expr(sum, &sum_left, &sum_right, &sum_is_subtraction))
+        goto cleanup;
+
+    if (expr_is_sqrt_expr(sum_left)) {
+        real_root = sum_left;
+        imaginary_term = sum_right;
+    } else if (!sum_is_subtraction && expr_is_sqrt_expr(sum_right)) {
+        real_root = sum_right;
+        imaginary_term = sum_left;
+    } else {
+        goto cleanup;
+    }
+
+    matched_real_sum = expr_simplify_match_scaled_add_sub_local(real_root->a, false, &root_scale, &real_sum_left,
+                                                                &real_sum_right);
+    if (!matched_real_sum || !num_is_exact(root_scale) || !num_is_real(root_scale) || num_sign(root_scale) <= 0)
+        goto cleanup;
+
+    if (expr_simplify_match_norm_for_real_part_local(real_sum_left, real_sum_right, &imaginary_part)) {
+        norm = real_sum_left;
+        real_part = real_sum_right;
+    } else if (expr_simplify_match_norm_for_real_part_local(real_sum_right, real_sum_left, &imaginary_part)) {
+        norm = real_sum_right;
+        real_part = real_sum_left;
+    } else {
+        goto cleanup;
+    }
+
+    imaginary_root = expr_simplify_find_cartesian_imaginary_root_local(imaginary_term, norm, real_part, root_scale);
+    if (!imaginary_root)
+        goto cleanup;
+    if (!expr_simplify_cartesian_root_scale_is_unit_local(outer_scale, root_scale))
+        goto cleanup;
+
+    absolute_imaginary = expr_abs(imaginary_part);
+    imaginary_unit = expr_new_named_const(NUM_I, "i");
+    actual_scaled_raw = absolute_imaginary ? expr_mul(imaginary_term, absolute_imaginary) : NULL;
+    actual_scaled = actual_scaled_raw ? expr_simplify(actual_scaled_raw) : NULL;
+    expected_scaled_product = imaginary_unit ? expr_mul(imaginary_unit, imaginary_part) : NULL;
+    expected_scaled_raw = expected_scaled_product ? expr_mul(expected_scaled_product, imaginary_root) : NULL;
+    expected_scaled = expected_scaled_raw ? expr_simplify(expected_scaled_raw) : NULL;
+    if (!actual_scaled || !expected_scaled || !expr_struct_eq(actual_scaled, expected_scaled))
+        goto cleanup;
+
+    imaginary_product = expr_mul(imaginary_unit, imaginary_part);
+    raw_result = imaginary_product
+                     ? (sum_is_subtraction ? expr_sub(real_part, imaginary_product)
+                                           : expr_add(real_part, imaginary_product))
+                     : NULL;
+    result = raw_result ? expr_sqrt(raw_result) : NULL;
+
+cleanup:
+    expr_free(raw_result);
+    expr_free(imaginary_product);
+    expr_free(expected_scaled);
+    expr_free(expected_scaled_raw);
+    expr_free(expected_scaled_product);
+    expr_free(actual_scaled);
+    expr_free(actual_scaled_raw);
+    expr_free(imaginary_unit);
+    expr_free(absolute_imaginary);
+    num_destroy(&root_scale);
+    return result;
+}
+
+static expr_t *expr_simplify_try_cartesian_root_square_local(const expr_t *base)
+{
+    expr_t *root = expr_simplify_try_cartesian_root_local(base);
+    expr_t *result;
+
+    if (!root)
+        return NULL;
+
+    result = expr_is_sqrt_expr(root) ? expr_clone(root->a) : NULL;
+    expr_free(root);
+    return result;
+}
+
 static expr_t *expr_simplify_binomial_three_halves_local(const expr_t *base)
 {
     const expr_t *constant = NULL;
@@ -4785,6 +5457,24 @@ expr_t *expr_simplify_pow_d_operator(const expr_t *dv, expr_t *a, expr_t *b)
         return expr_new_const(NUM_ONE);
     }
 
+    if (num_eq(exponent, NUM_TWO)) {
+        expr_t *cartesian_root_square = expr_simplify_try_cartesian_root_square_local(a);
+
+        if (cartesian_root_square) {
+            expr_free(a);
+            return cartesian_root_square;
+        }
+
+        {
+            expr_t *cartesian_square = expr_simplify_try_cartesian_square_local(a);
+
+            if (cartesian_square) {
+                expr_free(a);
+                return cartesian_square;
+            }
+        }
+    }
+
     {
         long numerator;
         long denominator;
@@ -4807,6 +5497,24 @@ expr_t *expr_simplify_pow_d_operator(const expr_t *dv, expr_t *a, expr_t *b)
         base = a->a;
         expr_free(a);
         return expr_make_pow_like_owned_local(base, folded_exponent);
+    }
+
+    {
+        expr_t *folded_power = expr_try_fold_numeric_complex_integer_power_local(a, exponent);
+
+        if (folded_power) {
+            expr_free(a);
+            return folded_power;
+        }
+    }
+
+    {
+        expr_t *folded_power = expr_try_fold_numeric_complex_rational_power_local(a, exponent);
+
+        if (folded_power) {
+            expr_free(a);
+            return folded_power;
+        }
     }
 
     /* (a^b)^n -> a^(bn), limited to integer n to avoid changing
@@ -4969,6 +5677,31 @@ expr_t *expr_simplify_pow_operator(const expr_t *dv, expr_t *a, expr_t *b)
     }
 
     if (expr_is_op(b, &ops_const)) {
+        expr_t *folded_power = expr_try_fold_numeric_complex_integer_power_local(a, b->c);
+
+        if (folded_power) {
+            expr_free(a);
+            expr_free(b);
+            return folded_power;
+        }
+    }
+
+    {
+        number_t exponent = number_invalid();
+        expr_t *folded_power = NULL;
+
+        if (expr_match_const_value(b, &exponent))
+            folded_power = expr_try_fold_numeric_complex_rational_power_local(a, exponent);
+        num_destroy(&exponent);
+
+        if (folded_power) {
+            expr_free(a);
+            expr_free(b);
+            return folded_power;
+        }
+    }
+
+    if (expr_is_op(b, &ops_const)) {
         expr_t *i_power = expr_try_simplify_i_power_local(a, b->c);
 
         if (i_power) {
@@ -5086,6 +5819,15 @@ static expr_t *expr_simplify_once(const expr_t *dv)
         out = dv->ops->simplify(dv, a, b);
     else
         out = expr_simplify_passthrough(dv, a, b);
+
+    if (out && out != dv) {
+        expr_t *cartesian_root = expr_simplify_try_cartesian_root_local(out);
+
+        if (cartesian_root) {
+            expr_free(out);
+            return cartesian_root;
+        }
+    }
 
     if (out == dv)
         return expr_simplify_mark_current(out);

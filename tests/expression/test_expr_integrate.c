@@ -652,8 +652,11 @@ static void test_integrate_affine_tangent(void)
 {
     static const double points[] = {-0.5, -0.1, 0.0, 0.35};
     expr_t *x = test_expr_new_named_var_d(0.0, "x");
+    expr_t *y = test_expr_new_named_var_d(0.2, "y");
     expr_t *tan_x = expr_tan(x);
     expr_t *tanh_x = expr_tanh(x);
+    expr_t *translated_arg = expr_add(x, y);
+    expr_t *tan_translated = expr_tan(translated_arg);
     expr_t *two_x = test_expr_mul_d(x, 2.0);
     expr_t *affine_arg = test_expr_sub_d(two_x, 1.0);
     expr_t *tan_affine = expr_tan(affine_arg);
@@ -662,6 +665,8 @@ static void test_integrate_affine_tangent(void)
     assert_antiderivative_matches("integral derivative of tan(x)", tan_x, x, points,
                                   sizeof(points) / sizeof(points[0]));
     assert_antiderivative_matches("integral derivative of tan(2*x - 1)", tan_affine, x, points,
+                                  sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of tan(x + y) with respect to x", tan_translated, x, points,
                                   sizeof(points) / sizeof(points[0]));
     assert_antiderivative_matches("integral derivative of tanh(x)", tanh_x, x, points,
                                   sizeof(points) / sizeof(points[0]));
@@ -672,8 +677,11 @@ static void test_integrate_affine_tangent(void)
     expr_free(tan_affine);
     expr_free(affine_arg);
     expr_free(two_x);
+    expr_free(tan_translated);
+    expr_free(translated_arg);
     expr_free(tanh_x);
     expr_free(tan_x);
+    expr_free(y);
     expr_free(x);
 }
 
@@ -830,6 +838,10 @@ static void test_integrate_affine_powers_and_remaining_inverse_families(void)
     expr_t *reciprocal = test_expr_d_div(1.0, affine);
     expr_t *affine_pow3 = test_expr_pow_d(affine, 3.0);
     expr_t *affine_sqrt = expr_sqrt(affine);
+    expr_t *affine_cubrt = expr_cubrt(affine);
+    number_t four_value = num_create_from_long(4L);
+    expr_t *four = expr_new_const(four_value);
+    expr_t *affine_fourth_root = expr_root(affine, four);
     expr_t *cosech_arg = test_expr_add_d(x, 2.0);
     expr_t *cosech_term = expr_cosech(cosech_arg);
     expr_t *asec_arg = test_expr_add_d(x, 2.5);
@@ -852,6 +864,10 @@ static void test_integrate_affine_powers_and_remaining_inverse_families(void)
     assert_antiderivative_matches("integral derivative of (2*x + 1)^3", affine_pow3, x, positive_points,
                                   sizeof(positive_points) / sizeof(positive_points[0]));
     assert_antiderivative_matches("integral derivative of sqrt(2*x + 1)", affine_sqrt, x, positive_points,
+                                  sizeof(positive_points) / sizeof(positive_points[0]));
+    assert_antiderivative_matches("integral derivative of cubrt(2*x + 1)", affine_cubrt, x, positive_points,
+                                  sizeof(positive_points) / sizeof(positive_points[0]));
+    assert_antiderivative_matches("integral derivative of root(2*x + 1, 4)", affine_fourth_root, x, positive_points,
                                   sizeof(positive_points) / sizeof(positive_points[0]));
     assert_antiderivative_matches("integral derivative of cosech(x + 2)", cosech_term, x, positive_points,
                                   sizeof(positive_points) / sizeof(positive_points[0]));
@@ -886,6 +902,10 @@ static void test_integrate_affine_powers_and_remaining_inverse_families(void)
     expr_free(asec_arg);
     expr_free(cosech_term);
     expr_free(cosech_arg);
+    expr_free(affine_fourth_root);
+    expr_free(four);
+    num_destroy(&four_value);
+    expr_free(affine_cubrt);
     expr_free(affine_sqrt);
     expr_free(affine_pow3);
     expr_free(reciprocal);

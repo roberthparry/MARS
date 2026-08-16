@@ -409,12 +409,35 @@ void test_deriv_sqrt(void)
     expr_t *x = test_expr_new_var_d(4.0);
     expr_t *f = expr_sqrt(x);
     const expr_t *df = expr_get_deriv(f, x);
+    expr_t *cube_root;
+    expr_t *cube_root_derivative;
+    expr_t *order;
+    expr_t *fourth_root;
+    expr_t *fourth_root_derivative;
 
     qfloat_t expect = qf_div(qf_from_double(1.0), qf_mul(qf_from_double(2.0), qf_sqrt(qf_from_double(4.0))));
 
     check_q_at(__FILE__, __LINE__, 1, "d/dx{sqrt(x)} | x=4", expr_eval_qf(df), expect);
     print_expr_of(df);
 
+    test_expr_set_val_d(x, 8.0);
+    cube_root = expr_cubrt(x);
+    cube_root_derivative = expr_create_deriv(cube_root, x);
+    check_q_at(__FILE__, __LINE__, 1, "d/dx{cubrt(x)} | x=8", expr_eval_qf(cube_root_derivative),
+               qf_from_string("0.0833333333333333333333333333333333"));
+
+    test_expr_set_val_d(x, 16.0);
+    order = test_expr_new_const_d(4.0);
+    fourth_root = expr_root(x, order);
+    fourth_root_derivative = expr_create_deriv(fourth_root, x);
+    check_q_at(__FILE__, __LINE__, 1, "d/dx{root(x,4)} | x=16", expr_eval_qf(fourth_root_derivative),
+               qf_from_string("0.03125"));
+
+    expr_free(fourth_root_derivative);
+    expr_free(fourth_root);
+    expr_free(order);
+    expr_free(cube_root_derivative);
+    expr_free(cube_root);
     expr_free(f);
     expr_free(x);
 }

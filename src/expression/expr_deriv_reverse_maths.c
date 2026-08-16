@@ -467,6 +467,42 @@ void expr_reverse_sqrt(const expr_t *dv, const number_t *out_bar, number_t *a_ba
     expr_reverse_unary(expr_reverse_num_div(*out_bar, denom), a_bar, b_bar);
 }
 
+void expr_reverse_cubrt(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
+{
+    number_t root_squared = num_sqr(expr_eval_num_internal(dv));
+    number_t three = num_create_from_long(3);
+    number_t denominator = num_mul(three, root_squared);
+    number_t contribution = num_div(*out_bar, denominator);
+
+    num_destroy(&root_squared);
+    num_destroy(&three);
+    num_destroy(&denominator);
+    expr_reverse_unary(contribution, a_bar, b_bar);
+}
+
+void expr_reverse_root(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
+{
+    number_t value = expr_eval_num_internal(dv);
+    number_t base = expr_eval_num_internal(dv->a);
+    number_t order = expr_eval_num_internal(dv->b);
+    number_t scaled = num_mul(*out_bar, value);
+    number_t base_denominator = num_mul(base, order);
+    number_t log_base = num_log(base);
+    number_t order_squared = num_sqr(order);
+    number_t order_contribution = num_mul(scaled, log_base);
+    number_t neg_order_contribution;
+
+    *a_bar = num_div(scaled, base_denominator);
+    neg_order_contribution = num_neg(order_contribution);
+    *b_bar = num_div(neg_order_contribution, order_squared);
+    num_destroy(&scaled);
+    num_destroy(&base_denominator);
+    num_destroy(&log_base);
+    num_destroy(&order_squared);
+    num_destroy(&order_contribution);
+    num_destroy(&neg_order_contribution);
+}
+
 void expr_reverse_floor(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
     (void)dv;

@@ -503,9 +503,47 @@ expr_t *expr_acoth(const expr_t *expr);
 expr_t *expr_exp(const expr_t *expr);
 expr_t *expr_log(const expr_t *expr);
 expr_t *expr_log10(const expr_t *expr);
+/**
+ * @brief Construct the single-valued principal square root of an expression.
+ *
+ * For a complex value z, this is exp(Log(z) / 2), where the principal argument
+ * lies in (-pi, pi]. Equivalently, the result has non-negative real part; on
+ * the negative real axis it has positive imaginary part.
+ *
+ * @param expr Expression whose principal square root is required; it is retained.
+ * @return A newly allocated principal-square-root expression, or NULL on error.
+ */
 expr_t *expr_sqrt(const expr_t *expr);
+/**
+ * @brief Construct the single-valued principal cube root of an expression.
+ *
+ * @param expr Radicand expression; it is retained.
+ * @return A newly allocated principal-cube-root expression, or NULL on error.
+ */
+expr_t *expr_cubrt(const expr_t *expr);
+/**
+ * @brief Construct the single-valued principal root of an expression.
+ *
+ * The order must evaluate to a real integer greater than one.
+ *
+ * @param expr Radicand expression; it is retained.
+ * @param order Root-order expression; it is retained.
+ * @return A newly allocated principal-root expression, or NULL on error.
+ */
+expr_t *expr_root(const expr_t *expr, const expr_t *order);
 expr_t *expr_floor(const expr_t *expr);
 expr_t *expr_ceil(const expr_t *expr);
+/**
+ * @brief Construct a power with a constant numeric exponent.
+ *
+ * An explicit reciprocal-integer exponent is retained so a result consumer can
+ * enumerate the complete root family. Numeric evaluation still selects the
+ * principal member; use expr_sqrt() when a single-valued square root is meant.
+ *
+ * @param expr Base expression; it is retained.
+ * @param exponent Constant exponent; it is borrowed.
+ * @return A newly allocated power expression, or NULL on error.
+ */
 expr_t *expr_pow(const expr_t *expr, const number_t *exponent);
 expr_t *expr_pow_xp(const expr_t *expr1, const expr_t *expr2);
 
@@ -870,8 +908,8 @@ expr_t *expr_deserialise(const void *data, size_t len, const string_t *type, con
  *
  * The lookup accepts normalised binding names. Bracketed names may be queried
  * either as @p [radius] or @p radius. Greek-style aliases are normalised too,
- * so a parsed binding may be queried as either @p @pi or @p π, @p @phi or
- * @p φ, @p @gamma or @p γ, and @p @tau or @p τ.
+ * so a parsed binding may be queried using its plain ASCII, at-prefixed ASCII,
+ * or Unicode spelling, for example @p theta, @p @theta, or @p θ.
  *
  * Returns the borrowed `expr_t *` leaf for that binding, or NULL if no such
  * binding exists.

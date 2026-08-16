@@ -239,6 +239,33 @@ static void test_reverse_gradient_complex_number_t(void)
     expr_free(exp_z);
     expr_free(z);
     num_destroy(&z0);
+
+    {
+        expr_t *x = test_expr_new_named_var_d(16.0, "x");
+        expr_t *cube_root = expr_cubrt(x);
+        expr_t *order = test_expr_new_const_d(4.0);
+        expr_t *fourth_root = expr_root(x, order);
+        expr_t *sum = expr_add(cube_root, fourth_root);
+        expr_t *derivative = expr_create_deriv(sum, x);
+        const expr_t *root_vars[1] = {x};
+        number_t root_value;
+        number_t root_gradient;
+        number_t expected_gradient;
+
+        ASSERT_EQ_INT(expr_eval_derivatives(sum, 1u, root_vars, &root_value, &root_gradient), 0);
+        expected_gradient = expr_eval(derivative);
+        ASSERT_EXPR_NUMBER_CLOSE(root_gradient, expected_gradient);
+
+        num_destroy(&expected_gradient);
+        num_destroy(&root_gradient);
+        num_destroy(&root_value);
+        expr_free(derivative);
+        expr_free(sum);
+        expr_free(fourth_root);
+        expr_free(order);
+        expr_free(cube_root);
+        expr_free(x);
+    }
 }
 
 static void assert_reverse_matches_symbolic(expr_t *function, size_t variable_count, expr_t *const *variables)

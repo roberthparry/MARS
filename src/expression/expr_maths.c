@@ -436,6 +436,14 @@ number_t eval_sqrt(expr_t *dv)
 {
     return expr_eval_unary_num(dv, num_sqrt);
 }
+number_t eval_cubrt(expr_t *dv)
+{
+    return expr_eval_unary_num(dv, num_cubrt);
+}
+number_t eval_root(expr_t *dv)
+{
+    return expr_eval_binary_num(dv, num_root);
+}
 number_t eval_floor(expr_t *dv)
 {
     return expr_eval_unary_num(dv, num_floor);
@@ -1255,6 +1263,50 @@ expr_t *deriv_sqrt(expr_t *dv)
     expr_free(da);
     expr_free(two);
     expr_free(den);
+    return out;
+}
+
+expr_t *deriv_cubrt(expr_t *dv)
+{
+    expr_t *da = expr_get_dx_internal(dv->a);
+    expr_t *root = expr_cubrt(dv->a);
+    expr_t *root_squared = expr_pow(root, &NUM_TWO);
+    expr_t *three = expr_const_long(3);
+    expr_t *denominator = expr_mul(three, root_squared);
+    expr_t *out = expr_div(da, denominator);
+
+    expr_free(da);
+    expr_free(root);
+    expr_free(root_squared);
+    expr_free(three);
+    expr_free(denominator);
+    return out;
+}
+
+expr_t *deriv_root(expr_t *dv)
+{
+    expr_t *da = expr_get_dx_internal(dv->a);
+    expr_t *dn = expr_get_dx_internal(dv->b);
+    expr_t *root = expr_root(dv->a, dv->b);
+    expr_t *an = expr_mul(dv->a, dv->b);
+    expr_t *base_term = expr_div(da, an);
+    expr_t *log_base = expr_log(dv->a);
+    expr_t *order_squared = expr_pow(dv->b, &NUM_TWO);
+    expr_t *order_term_numerator = expr_mul(dn, log_base);
+    expr_t *order_term = expr_div(order_term_numerator, order_squared);
+    expr_t *difference = expr_sub(base_term, order_term);
+    expr_t *out = expr_mul(root, difference);
+
+    expr_free(da);
+    expr_free(dn);
+    expr_free(root);
+    expr_free(an);
+    expr_free(base_term);
+    expr_free(log_base);
+    expr_free(order_squared);
+    expr_free(order_term_numerator);
+    expr_free(order_term);
+    expr_free(difference);
     return out;
 }
 

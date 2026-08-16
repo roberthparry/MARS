@@ -72,6 +72,7 @@ expr_bindings_t *expr_bindings_merge_internal(const expr_bindings_t *bindings,
                                               const expr_bindings_t *additional_bindings);
 expr_t *expr_simplify_owned(expr_t *expr);
 expr_t *expr_beautify(const expr_t *expr);
+expr_t *expr_beautify_presimplified(const expr_t *expr);
 expr_t *expr_factor_common_post_calculus(const expr_t *expr);
 bool expr_contains_half_scaled_symbolic_power(const expr_t *expr);
 expr_t *expr_negate_owned(expr_t *expr);
@@ -109,6 +110,8 @@ bool expr_match_pow_const(const expr_t *expr, const expr_t **base_out, number_t 
 bool expr_match_pow_expr(const expr_t *expr, const expr_t **base_out, const expr_t **exponent_out);
 bool expr_match_integral_expr(const expr_t *expr, const expr_t **integrand_out, const expr_t **domain_out);
 void expr_set_binding_pi_linear_family(expr_t *expr, long denominator, long n_coeff, long offset);
+bool expr_exact_complex_root_seed(const expr_t *expr, number_t *seed_out, long *order_out);
+bool expr_explicit_root_order(const expr_t *expr, long *order_out);
 
 bool expr_match_const_value(const expr_t *expr, number_t *value_out);
 bool expr_match_var_expr(const expr_t *expr, size_t nvars, expr_t *const *vars, size_t *index_out);

@@ -149,6 +149,8 @@ expr_t *integrate_div_rule(const expr_t *expr, const expr_t *wrt);
 expr_t *integrate_pow_rule(const expr_t *expr, const expr_t *wrt);
 expr_t *integrate_pow_d_rule(const expr_t *expr, const expr_t *wrt);
 expr_t *integrate_sqrt_rule(const expr_t *expr, const expr_t *wrt);
+expr_t *integrate_cubrt_rule(const expr_t *expr, const expr_t *wrt);
+expr_t *integrate_root_rule(const expr_t *expr, const expr_t *wrt);
 expr_t *integrate_log_rule(const expr_t *expr, const expr_t *wrt);
 expr_t *integrate_log10_rule(const expr_t *expr, const expr_t *wrt);
 expr_t *integrate_sin_rule(const expr_t *expr, const expr_t *wrt);

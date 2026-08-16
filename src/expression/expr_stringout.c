@@ -3031,6 +3031,10 @@ void emit_TeX_expr(const expr_t *f, sbuf_t *b, int parent_prec)
             sbuf_puts(b, "\\sqrt{");
             emit_TeX_expr(f->a, b, 0);
             sbuf_putc(b, '}');
+        } else if (expr_is_op(f, &ops_cubrt)) {
+            sbuf_puts(b, "\\sqrt[3]{");
+            emit_TeX_expr(f->a, b, 0);
+            sbuf_putc(b, '}');
         } else if (expr_is_op(f, &ops_exp)) {
             if (!emit_TeX_exp_unit_fraction_root(f->a, b)) {
                 sbuf_puts(b, "e^{");
@@ -3362,6 +3366,14 @@ void emit_TeX_expr(const expr_t *f, sbuf_t *b, int parent_prec)
     }
 
     if (f->ops->arity == EXPR_OP_BINARY) {
+        if (expr_is_op(f, &ops_root)) {
+            sbuf_puts(b, "\\sqrt[");
+            emit_TeX_expr(f->b, b, PREC_LOWEST);
+            sbuf_puts(b, "]{");
+            emit_TeX_expr(f->a, b, PREC_LOWEST);
+            sbuf_putc(b, '}');
+            return;
+        }
         if (expr_is_op(f, &ops_indexed_symbol)) {
             emit_TeX_expr(f->a, b, 0);
             sbuf_puts(b, "_{");

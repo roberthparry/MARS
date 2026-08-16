@@ -90,6 +90,7 @@ All declarations are in `include/qcomplex.h`.
 | `qc_div(a, b)` | `a / b` |
 | `qc_neg(a)` | `-a` |
 | `qc_conj(a)` | complex conjugate `re - i*im` |
+| `qc_conjugate(a)` | long-form alias of `qc_conj(a)` |
 
 ### Magnitude and Argument
 
@@ -114,6 +115,11 @@ All declarations are in `include/qcomplex.h`.
 | `qc_log10(z)` | principal common logarithm `log10(z)` |
 | `qc_pow(a, b)` | `a^b = exp(b * log(a))` (principal branch) |
 | `qc_sqrt(z)` | principal square root |
+| `qc_cubrt(z)` | single principal cube root, equivalent to `qc_root(z, 3)` |
+| `qc_root(z, n)` | single principal `n`-th root for an integer order greater than one |
+
+`qc_sqrt`, `qc_cubrt`, and `qc_root` are single-valued. They use the principal logarithmic branch, with argument in
+`(-π, π]`; they do not return the complete family of roots.
 
 ### Trigonometric Functions
 

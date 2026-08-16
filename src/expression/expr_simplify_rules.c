@@ -571,11 +571,28 @@ static expr_t *expr_simplify_lgamma_successor(expr_t *a, expr_t *b)
     return out;
 }
 
+static expr_t *expr_simplify_tangent_addition_product(expr_t *a, expr_t *b)
+{
+    const expr_t *reciprocal = NULL;
+    const expr_t *numerator = NULL;
+
+    if (expr_is_div(a) && expr_const_is_one(a->a)) {
+        reciprocal = a;
+        numerator = b;
+    } else if (expr_is_div(b) && expr_const_is_one(b->a)) {
+        reciprocal = b;
+        numerator = a;
+    }
+
+    return reciprocal ? expr_simplify_try_tangent_addition_quotient(numerator, reciprocal->b) : NULL;
+}
+
 static const expr_binary_simplify_rule_t s_sum_rules[] = {
     {expr_simplify_lgamma_successor},
 };
 
 static const expr_binary_simplify_rule_t s_product_rules[] = {
+    {expr_simplify_tangent_addition_product},
     {expr_simplify_repeated_factor},
     {expr_simplify_gamma_successor},
 };
@@ -1021,6 +1038,78 @@ expr_t *expr_simplify_try_trig_product(expr_t *a, expr_t *b)
         return NULL;
 
     return builder(arg);
+}
+
+static bool expr_simplify_match_tangent_product(const expr_t *expr, const expr_t *first_argument,
+                                                const expr_t *second_argument)
+{
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+
+    if (!expr_match_mul_expr(expr, &left, &right) || !expr_is_op(left, &ops_tan) ||
+        !expr_is_op(right, &ops_tan))
+        return false;
+
+    return (expr_struct_eq(left->a, first_argument) && expr_struct_eq(right->a, second_argument)) ||
+           (expr_struct_eq(left->a, second_argument) && expr_struct_eq(right->a, first_argument));
+}
+
+expr_t *expr_simplify_try_tangent_addition_quotient(const expr_t *numerator, const expr_t *denominator)
+{
+    const expr_t *numerator_left = NULL;
+    const expr_t *numerator_right = NULL;
+    const expr_t *denominator_left = NULL;
+    const expr_t *denominator_right = NULL;
+    const expr_t *product = NULL;
+    bool numerator_is_subtraction = false;
+    bool denominator_is_subtraction = false;
+    expr_t *raw_argument;
+    expr_t *argument;
+    expr_t *out;
+
+    if (!expr_match_add_sub_expr(numerator, &numerator_left, &numerator_right, &numerator_is_subtraction) ||
+        !expr_is_op(numerator_left, &ops_tan))
+        return NULL;
+
+    if (!numerator_is_subtraction && expr_is_neg(numerator_right)) {
+        numerator_right = numerator_right->a;
+        numerator_is_subtraction = true;
+    }
+    if (!expr_is_op(numerator_right, &ops_tan) ||
+        !expr_match_add_sub_expr(denominator, &denominator_left, &denominator_right,
+                                 &denominator_is_subtraction))
+        return NULL;
+
+    if (denominator_is_subtraction) {
+        if (!expr_const_is_one(denominator_left))
+            return NULL;
+        product = denominator_right;
+    } else if (expr_const_is_one(denominator_left)) {
+        product = denominator_right;
+    } else if (expr_const_is_one(denominator_right)) {
+        product = denominator_left;
+    } else {
+        return NULL;
+    }
+
+    if (!denominator_is_subtraction && expr_is_neg(product)) {
+        product = product->a;
+        denominator_is_subtraction = true;
+    }
+
+    if (denominator_is_subtraction == numerator_is_subtraction)
+        return NULL;
+
+    if (!expr_simplify_match_tangent_product(product, numerator_left->a, numerator_right->a))
+        return NULL;
+
+    raw_argument = numerator_is_subtraction ? expr_sub(numerator_left->a, numerator_right->a)
+                                            : expr_add(numerator_left->a, numerator_right->a);
+    argument = raw_argument ? expr_simplify(raw_argument) : NULL;
+    out = argument ? expr_tan(argument) : NULL;
+    expr_free(argument);
+    expr_free(raw_argument);
+    return out;
 }
 
 static bool expr_is_lambert_expr(const expr_t *dv)

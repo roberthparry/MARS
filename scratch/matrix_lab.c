@@ -1,3 +1,4 @@
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -57,6 +58,63 @@ static char *dup_string(const char *text)
     if (copy)
         memcpy(copy, text, n + 1u);
     return copy;
+}
+
+static char *dup_trimmed_range(const char *start, const char *end)
+{
+    char *copy;
+    size_t length;
+
+    while (start < end && isspace((unsigned char)*start))
+        start++;
+    while (end > start && isspace((unsigned char)end[-1]))
+        end--;
+    length = (size_t)(end - start);
+    copy = malloc(length + 1u);
+    if (!copy)
+        return NULL;
+    memcpy(copy, start, length);
+    copy[length] = '\0';
+    return copy;
+}
+
+static char *matrix_algebraic_input(const char *text)
+{
+    const char *start = text;
+    const char *end;
+    const char *binding_separator = NULL;
+    int parenthesis_depth = 0;
+    int bracket_depth = 0;
+    int brace_depth = 0;
+
+    if (!text)
+        return NULL;
+    end = text + strlen(text);
+    while (start < end && isspace((unsigned char)*start))
+        start++;
+    while (end > start && isspace((unsigned char)end[-1]))
+        end--;
+    if (end - start < 2 || *start != '{' || end[-1] != '}')
+        return dup_trimmed_range(start, end);
+
+    for (const char *cursor = start + 1; cursor < end - 1; ++cursor) {
+        if (*cursor == '(')
+            parenthesis_depth++;
+        else if (*cursor == ')')
+            parenthesis_depth--;
+        else if (*cursor == '[')
+            bracket_depth++;
+        else if (*cursor == ']')
+            bracket_depth--;
+        else if (*cursor == '{')
+            brace_depth++;
+        else if (*cursor == '}')
+            brace_depth--;
+        else if (*cursor == '|' && parenthesis_depth == 0 && bracket_depth == 0 && brace_depth == 0 &&
+                 memchr(cursor + 1, '=', (size_t)((end - 1) - (cursor + 1))) != NULL)
+            binding_separator = cursor;
+    }
+    return binding_separator ? dup_trimmed_range(start + 1, binding_separator) : dup_trimmed_range(start, end);
 }
 
 static char *expr_text_dup(const expr_t *expr, style_t style)
@@ -803,11 +861,16 @@ int main(int argc, char **argv)
     int precision = argc > 3 ? atoi(argv[3]) : 64;
     const char *operand = argc > 4 ? argv[4] : NULL;
     mat_bindings_t *bindings = NULL;
+    mat_bindings_t *algebraic_bindings = NULL;
     mat_bindings_t *result_bindings = NULL;
     matrix_t *matrix = NULL;
+    matrix_t *bound_matrix = NULL;
     matrix_t *other = NULL;
     matrix_t *result = NULL;
     expr_t *scalar_result = NULL;
+    expr_t *bound_scalar_result = NULL;
+    char *algebraic_input = NULL;
+    bool bound_matrix_is_result = false;
     int rc = 1;
 
     if (precision > 0)
@@ -822,6 +885,27 @@ int main(int argc, char **argv)
         goto cleanup;
     }
 
+    if (matrix_bindings_have_resolved_values(bindings)) {
+        const char *algebraic_operation = NULL;
+        matrix_t *algebraic_matrix = NULL;
+        expr_t *algebraic_scalar = NULL;
+
+        algebraic_input = matrix_algebraic_input(input);
+        if (algebraic_input && strcmp(algebraic_input, input) != 0 &&
+            mat_expression_evaluate(algebraic_input, &algebraic_bindings, &algebraic_operation, &algebraic_matrix,
+                                    &algebraic_scalar) == 0 &&
+            ((matrix && algebraic_matrix) || (scalar_result && algebraic_scalar))) {
+            bound_matrix = matrix;
+            matrix = algebraic_matrix;
+            algebraic_matrix = NULL;
+            bound_scalar_result = scalar_result;
+            scalar_result = algebraic_scalar;
+            algebraic_scalar = NULL;
+        }
+        mat_free(algebraic_matrix);
+        expr_free(algebraic_scalar);
+    }
+
     if (scalar_result) {
         number_t evaluated_value = num_clone(NUM_NAN);
 
@@ -829,7 +913,7 @@ int main(int argc, char **argv)
         printf("input       %s\n", input);
         printf("operation   %s\n", operation);
         if (matrix_bindings_are_resolved(bindings))
-            evaluated_value = expr_eval(scalar_result);
+            evaluated_value = expr_eval(bound_scalar_result ? bound_scalar_result : scalar_result);
         print_expr_scalar_field(NULL, operation, "result", scalar_result);
         scalar_result = NULL;
         if (!num_is_nan(evaluated_value)) {
@@ -848,18 +932,9 @@ int main(int argc, char **argv)
         operation = parsed_operation;
         printf("input       %s\n", input);
         printf("operation   %s\n", operation);
-        if ((strcmp(operation, "eval") == 0 || strcmp(operation, "power") == 0) && mat_typeof(matrix) == MAT_TYPE_EXPR &&
-            matrix_bindings_have_variables(bindings) && matrix_bindings_have_resolved_values(bindings)) {
-            result = matrix_partially_evaluate(matrix, bindings);
-            print_matrix_fields(matrix);
-            if (result)
-                print_matrix_value_fields(result);
-            print_matrix_bindings(bindings);
-            rc = result ? 0 : 1;
-            goto cleanup;
-        }
         result = matrix;
         matrix = NULL;
+        bound_matrix_is_result = bound_matrix != NULL;
         goto result_ready;
     }
 
@@ -867,7 +942,11 @@ int main(int argc, char **argv)
     printf("operation   %s\n", operation);
 
     if (strcmp(operation, "eval") == 0) {
-        if (mat_typeof(matrix) == MAT_TYPE_EXPR &&
+        if (bound_matrix) {
+            result = matrix;
+            matrix = NULL;
+            bound_matrix_is_result = true;
+        } else if (mat_typeof(matrix) == MAT_TYPE_EXPR &&
             (!matrix_bindings_are_resolved(bindings) || !matrix_bindings_have_variables(bindings))) {
             result = matrix;
             matrix = NULL;
@@ -933,16 +1012,33 @@ result_ready:
 
     result_bindings = mat_bindings_from_matrix(result);
     print_matrix_fields(result);
-    print_matrix_bindings(result_bindings);
-    print_additional_matrix_bindings(bindings, result_bindings);
+    if (bound_matrix_is_result) {
+        matrix_t *value_matrix = mat_typeof(bound_matrix) == MAT_TYPE_EXPR
+                                     ? matrix_partially_evaluate(bound_matrix, bindings)
+                                     : NULL;
+
+        print_matrix_value_fields(value_matrix ? value_matrix : bound_matrix);
+        mat_free(value_matrix);
+    }
+    if (bound_matrix_is_result) {
+        print_matrix_bindings(bindings);
+        print_additional_matrix_bindings(result_bindings, bindings);
+    } else {
+        print_matrix_bindings(result_bindings);
+        print_additional_matrix_bindings(bindings, result_bindings);
+    }
     rc = 0;
 
 cleanup:
     mat_free(result);
     mat_free(other);
     mat_free(matrix);
+    mat_free(bound_matrix);
+    mat_bindings_free(algebraic_bindings);
     mat_bindings_free(result_bindings);
     mat_bindings_free(bindings);
     expr_free(scalar_result);
+    expr_free(bound_scalar_result);
+    free(algebraic_input);
     return rc;
 }

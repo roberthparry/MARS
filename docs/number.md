@@ -341,6 +341,8 @@ The generic layer exposes:
   - `num_log`
   - `num_log10`
   - `num_sqrt`
+  - `num_cubrt`
+  - `num_root`
   - `num_sin`, `num_cos`, `num_tan`
   - `num_sec`, `num_cosec`, `num_cot`
   - `num_versin`, `num_vercos`, `num_coversin`, `num_covercos`
@@ -354,6 +356,9 @@ The generic layer exposes:
   - `num_asinh`, `num_acosh`, `num_atanh`
   - `num_asech`, `num_acosech`, `num_acoth`
   - `num_atan2`
+
+`num_sqrt`, `num_cubrt`, and `num_root` return one principal value. `num_root(number, order)` requires an exact
+integer order greater than one and promotes a negative real radicand to a complex result when necessary.
 - special functions:
   - `num_gamma`
   - `num_lgamma`

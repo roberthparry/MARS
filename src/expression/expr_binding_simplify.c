@@ -72,11 +72,13 @@ static const binding_simplify_rule_t s_binding_mul_rules[] = {
     {binding_expr_try_fold_mul_leading_numbers}, {binding_expr_try_simplify_basic_product},
     {binding_expr_try_simplify_i_unit_product},  {binding_expr_try_simplify_exp_product},
     {binding_expr_try_simplify_lambert_product}, {binding_expr_try_simplify_trig_product},
-    {binding_expr_try_combine_mul_powers},       {binding_expr_try_combine_positive_numeric_square_roots}};
+    {binding_expr_try_simplify_tangent_addition_quotient},
+    {binding_expr_try_combine_mul_powers}, {binding_expr_try_combine_positive_numeric_square_roots}};
 
 static const binding_simplify_rule_t s_binding_div_rules[] = {{binding_expr_try_fold_exact_complex_owned},
                                                               {binding_expr_try_fold_number_owned},
                                                               {binding_expr_try_absorb_numerator_power_base},
+                                                              {binding_expr_try_simplify_tangent_addition_quotient},
                                                               {binding_expr_try_simplify_basic_quotient},
                                                               {binding_expr_try_simplify_reciprocal_unary},
                                                               {binding_expr_try_fold_div_leading_number}};
@@ -85,15 +87,19 @@ static const binding_simplify_rule_t s_binding_unary_exact_rules[] = {{binding_e
                                                                       {binding_expr_try_simplify_lambert_exp},
                                                                       {binding_expr_try_simplify_lambert_inverse},
                                                                       {binding_expr_try_simplify_complex_floor_ceil},
+                                                                      {binding_expr_try_simplify_sqrt_numeric_square},
                                                                       {binding_expr_try_simplify_log_e},
                                                                       {binding_expr_try_simplify_log10_power},
                                                                       {binding_expr_try_simplify_imag_trig_bridge},
                                                                       {binding_expr_try_simplify_asin_exact},
                                                                       {binding_expr_try_simplify_trig_exact}};
 
-static const binding_simplify_rule_t s_binding_binary_op_rules[] = {{binding_expr_try_simplify_sqrt_square},
-                                                                    {binding_expr_try_simplify_e_power},
-                                                                    {binding_expr_try_simplify_logbeta_integers}};
+static const binding_simplify_rule_t s_binding_binary_op_rules[] = {
+    {binding_expr_try_simplify_integer_power},
+    {binding_expr_try_simplify_exact_complex_rational_power},
+    {binding_expr_try_simplify_sqrt_square},
+    {binding_expr_try_simplify_e_power},
+    {binding_expr_try_simplify_logbeta_integers}};
 
 static expr_binding_expr_t *binding_try_simplify_unary_exact(expr_binding_expr_t *expr)
 {
@@ -170,6 +176,12 @@ expr_binding_expr_t *expr_binding_simplify_powi(expr_binding_expr_t *expr)
     if (!expr || expr->kind != EXPR_BINDING_EXPR_POWI)
         return expr;
     expr = binding_expr_try_simplify_euler_square(expr);
+    if (!expr || expr->kind != EXPR_BINDING_EXPR_POWI)
+        return expr;
+    expr = binding_expr_try_simplify_cartesian_square(expr);
+    if (!expr || expr->kind != EXPR_BINDING_EXPR_POWI)
+        return expr;
+    expr = binding_expr_try_fold_exact_complex_owned(expr);
     if (!expr || expr->kind != EXPR_BINDING_EXPR_POWI)
         return expr;
     return binding_expr_try_fold_number_owned(expr);
