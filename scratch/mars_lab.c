@@ -25,6 +25,35 @@ static char *xstrdup_local(const char *text)
     return copy;
 }
 
+static bool replace_literal_once_owned(char **text, const char *needle, const char *replacement)
+{
+    char *match;
+    char *replaced;
+    size_t prefix_length;
+    size_t needle_length;
+    size_t replacement_length;
+    size_t suffix_length;
+
+    if (!text || !*text || !needle || !replacement)
+        return false;
+    match = strstr(*text, needle);
+    if (!match)
+        return true;
+    prefix_length = (size_t)(match - *text);
+    needle_length = strlen(needle);
+    replacement_length = strlen(replacement);
+    suffix_length = strlen(match + needle_length);
+    replaced = malloc(prefix_length + replacement_length + suffix_length + 1u);
+    if (!replaced)
+        return false;
+    memcpy(replaced, *text, prefix_length);
+    memcpy(replaced + prefix_length, replacement, replacement_length);
+    memcpy(replaced + prefix_length + replacement_length, match + needle_length, suffix_length + 1u);
+    free(*text);
+    *text = replaced;
+    return true;
+}
+
 static char *expr_text_dup(const expr_t *expr, style_t style)
 {
     return expr_to_string(expr, style);
@@ -404,44 +433,558 @@ static void print_owned_number(const char *label, number_t value, int precision)
     free(text);
 }
 
-static bool explicit_reciprocal_power(const expr_t *expr, const expr_t **base_out, long *order_out)
+static bool explicit_reciprocal_power(const expr_t *expr, expr_t **base_out, long *order_out)
 {
-    const expr_t *base = NULL;
-    number_t exponent = (number_t){0};
-    bool matched;
-
     if (!expr || !base_out || !order_out)
         return false;
+    *base_out = expr_explicit_root_base(expr, order_out);
+    return *base_out != NULL;
+}
 
-    matched = expr_explicit_root_order(expr, order_out);
-    if (expr_match_pow_const(expr, &base, &exponent))
-        *base_out = base;
-    num_destroy(&exponent);
-    if (!matched)
+static bool root_family_texts_dup(const expr_t *seed, long order, char **expression_out, char **function_out)
+{
+    expr_bindings_t *bindings = NULL;
+    char *source = NULL;
+    size_t source_size = 0u;
+    FILE *stream;
+    expr_t *rotation_expr = NULL;
+    expr_t *family_expr = NULL;
+    char *expression = NULL;
+    char *function = NULL;
+    char *name;
+
+    if (!seed || order < 2L || !expression_out || !function_out)
         return false;
+    *expression_out = NULL;
+    *function_out = NULL;
+    stream = open_memstream(&source, &source_size);
+    if (!stream)
+        return false;
+    fputs("{ ", stream);
+    if (order == 2L)
+        fputs("(-1)^k", stream);
+    else if (order % 2L == 0L)
+        fprintf(stream, "exp(i*k*pi/%ld)", order / 2L);
+    else
+        fprintf(stream, "exp(2*i*k*pi/%ld)", order);
+    fputs(" | ; k = [", stream);
+    for (long root_index = 0L; root_index < order; ++root_index) {
+        if (root_index > 0L)
+            fputs(", ", stream);
+        fprintf(stream, "%ld", root_index);
+    }
+    fputs("] }", stream);
+    fclose(stream);
+
+    rotation_expr = expr_from_string(source, &bindings);
+    family_expr = rotation_expr ? expr_mul(seed, rotation_expr) : NULL;
+    expression = family_expr ? expr_text_dup(family_expr, style_EXPRESSION) : NULL;
+    function = family_expr ? expr_text_dup(family_expr, style_FUNCTION) : NULL;
+    if (function) {
+        if (!replace_literal_once_owned(&function, "expression expr(", "expression roots(") ||
+            !replace_literal_once_owned(&function, "output(expr(", "output(roots(")) {
+            free(function);
+            function = NULL;
+        }
+    }
+    if (function) {
+        name = strstr(function, "\narray const k = [");
+        if (name)
+            memmove(name + 1u, name + 1u + strlen("array "), strlen(name + 1u + strlen("array ")) + 1u);
+        name = strstr(function, "π.i.k");
+        if (name)
+            memcpy(name, "i.k.π", strlen("i.k.π"));
+    }
+
+    expr_free(family_expr);
+    expr_free(rotation_expr);
+    expr_bindings_free(bindings);
+    free(source);
+    if (!expression || !function) {
+        free(expression);
+        free(function);
+        return false;
+    }
+    *expression_out = expression;
+    *function_out = function;
     return true;
 }
 
-static void print_explicit_root_family(const expr_t *expr)
+static char *numeric_root_family_dup(const number_t seed, long order, int precision)
+{
+    char *roots = NULL;
+    size_t roots_size = 0u;
+    FILE *stream;
+
+    if (!num_is_finite(seed) || order < 2L)
+        return NULL;
+    stream = open_memstream(&roots, &roots_size);
+    if (!stream)
+        return NULL;
+
+    fputs("[", stream);
+    for (long root_index = 0L; root_index < order; ++root_index) {
+        number_t root;
+        char *root_text;
+
+        if (root_index == 0L) {
+            root = num_clone(seed);
+        } else if (order == 2L) {
+            root = num_neg(seed);
+        } else {
+            number_t turn = num_new();
+            number_t angle;
+            number_t sine = num_new();
+            number_t cosine = num_new();
+            number_t imaginary;
+            number_t rotation;
+
+            num_set_frac(&turn, 2L * root_index, order);
+            angle = num_mul(NUM_PI, turn);
+            num_sincos(angle, &sine, &cosine);
+            imaginary = num_mul(NUM_I, sine);
+            rotation = num_add(cosine, imaginary);
+            root = num_mul(seed, rotation);
+            num_destroy(&rotation);
+            num_destroy(&imaginary);
+            num_destroy(&cosine);
+            num_destroy(&sine);
+            num_destroy(&angle);
+            num_destroy(&turn);
+        }
+
+        root_text = owned_number_text(root, precision);
+        if (root_index > 0L)
+            fputs(", ", stream);
+        fputs(root_text ? root_text : "NAN", stream);
+        free(root_text);
+    }
+    fputs("]", stream);
+    fclose(stream);
+    return roots;
+}
+
+static expr_t *expr_principal_root_display(const expr_t *base, long order)
+{
+    expr_bindings_t *bindings = NULL;
+    char *base_text = base ? expr_text_dup(base, style_UNBOUND) : NULL;
+    char *source = NULL;
+    size_t source_size = 0u;
+    FILE *stream;
+    expr_t *parsed = NULL;
+    expr_t *display = NULL;
+
+    if (!base_text)
+        return NULL;
+    stream = open_memstream(&source, &source_size);
+    if (stream) {
+        fprintf(stream, "root(%s,%ld)", base_text, order);
+        fclose(stream);
+        parsed = expr_from_string(source, &bindings);
+        display = parsed ? expr_beautify_presimplified(parsed) : NULL;
+    }
+    expr_bindings_free(bindings);
+    expr_free(parsed);
+    free(source);
+    free(base_text);
+    return display;
+}
+
+static bool expr_imaginary_product_parts(const expr_t *expr, const expr_t **coefficient_out, int *sign_out)
+{
+    const expr_t *left;
+    const expr_t *right;
+    number_t value = (number_t){0};
+    bool matched = false;
+
+    if (!expr || !coefficient_out || !sign_out || !expr_match_mul_expr(expr, &left, &right))
+        goto cleanup;
+    value = expr_eval(left);
+    if (num_eq(value, NUM_I) || num_eq(value, NUM_NEG_I)) {
+        *coefficient_out = right;
+        *sign_out = num_eq(value, NUM_I) ? 1 : -1;
+        matched = true;
+        goto cleanup;
+    }
+    num_destroy(&value);
+    value = (number_t){0};
+    value = expr_eval(right);
+    if (num_eq(value, NUM_I) || num_eq(value, NUM_NEG_I)) {
+        *coefficient_out = left;
+        *sign_out = num_eq(value, NUM_I) ? 1 : -1;
+        matched = true;
+    }
+
+cleanup:
+    num_destroy(&value);
+    return matched;
+}
+
+static bool expr_scaled_cartesian_parts(const expr_t *expr, const expr_t **scale_out, const expr_t **real_out,
+                                        const expr_t **imaginary_out, int *imaginary_sign_out)
+{
+    const expr_t *left;
+    const expr_t *right;
+    const expr_t *inner_left;
+    const expr_t *inner_right;
+    bool subtract;
+    int imaginary_sign;
+
+    if (!expr || !scale_out || !real_out || !imaginary_out || !imaginary_sign_out)
+        return false;
+    *scale_out = NULL;
+    if (expr_match_add_sub_expr(expr, &inner_left, &inner_right, &subtract) &&
+        expr_imaginary_product_parts(inner_right, imaginary_out, &imaginary_sign)) {
+        *real_out = inner_left;
+        *imaginary_sign_out = subtract ? -imaginary_sign : imaginary_sign;
+        return true;
+    }
+    if (!expr_match_mul_expr(expr, &left, &right))
+        return false;
+    if (expr_match_add_sub_expr(right, &inner_left, &inner_right, &subtract) &&
+        expr_imaginary_product_parts(inner_right, imaginary_out, &imaginary_sign)) {
+        *scale_out = left;
+        *real_out = inner_left;
+        *imaginary_sign_out = subtract ? -imaginary_sign : imaginary_sign;
+        return true;
+    }
+    if (expr_match_add_sub_expr(left, &inner_left, &inner_right, &subtract) &&
+        expr_imaginary_product_parts(inner_right, imaginary_out, &imaginary_sign)) {
+        *scale_out = right;
+        *real_out = inner_left;
+        *imaginary_sign_out = subtract ? -imaginary_sign : imaginary_sign;
+        return true;
+    }
+    return false;
+}
+
+static char *expr_quarter_turn_root_TeX_dup(const expr_t *seed, long root_index)
+{
+    const expr_t *scale;
+    const expr_t *real;
+    const expr_t *imaginary;
+    const expr_t *real_source;
+    const expr_t *imaginary_source;
+    char *scale_TeX = NULL;
+    char *real_TeX = NULL;
+    char *imaginary_TeX = NULL;
+    char *display_TeX = NULL;
+    FILE *stream = NULL;
+    size_t display_TeX_size = 0U;
+    int seed_imaginary_sign;
+    int real_sign;
+    int imaginary_sign;
+
+    if (!seed || root_index < 0L || root_index > 3L ||
+        !expr_scaled_cartesian_parts(seed, &scale, &real, &imaginary, &seed_imaginary_sign))
+        return root_index == 0L ? expr_TeX_body_dup(seed) : NULL;
+
+    switch (root_index) {
+        case 0L:
+            real_source = real;
+            imaginary_source = imaginary;
+            real_sign = 1;
+            imaginary_sign = seed_imaginary_sign;
+            break;
+
+        case 1L:
+            real_source = imaginary;
+            imaginary_source = real;
+            real_sign = -seed_imaginary_sign;
+            imaginary_sign = 1;
+            break;
+
+        case 2L:
+            real_source = real;
+            imaginary_source = imaginary;
+            real_sign = -1;
+            imaginary_sign = -seed_imaginary_sign;
+            break;
+
+        default:
+            real_source = imaginary;
+            imaginary_source = real;
+            real_sign = seed_imaginary_sign;
+            imaginary_sign = -1;
+            break;
+    }
+
+    scale_TeX = scale ? expr_TeX_body_dup(scale) : NULL;
+    real_TeX = expr_TeX_body_dup(real_source);
+    imaginary_TeX = expr_TeX_body_dup(imaginary_source);
+    if (!real_TeX || !imaginary_TeX || (scale && !scale_TeX))
+        goto cleanup;
+    stream = open_memstream(&display_TeX, &display_TeX_size);
+    if (!stream)
+        goto cleanup;
+    if (scale_TeX) {
+        fputs(scale_TeX, stream);
+        fputs("\\mkern-2mu \\left(", stream);
+    }
+    if (real_sign < 0)
+        fputs("\\mathord{-}\\mkern-2mu ", stream);
+    fputs(real_TeX, stream);
+    fputs(imaginary_sign > 0 ? " + i\\mkern-2mu " : " - i\\mkern-2mu ", stream);
+    fputs(imaginary_TeX, stream);
+    if (scale_TeX)
+        fputs("\\right)", stream);
+    fclose(stream);
+    stream = NULL;
+
+cleanup:
+    if (stream)
+        fclose(stream);
+    free(imaginary_TeX);
+    free(real_TeX);
+    free(scale_TeX);
+    return display_TeX;
+}
+
+static bool expr_contains_root_turn_trig(const expr_t *expr)
+{
+    char *text = expr ? expr_text_dup(expr, style_UNBOUND) : NULL;
+    bool contains_trig = text && (strstr(text, "sin(") || strstr(text, "cos("));
+
+    free(text);
+    return contains_trig;
+}
+
+static expr_t *expr_root_turn_trig_display(long root_index, long order, bool sine)
+{
+    expr_bindings_t *bindings = NULL;
+    char source[96];
+    expr_t *parsed;
+    expr_t *display;
+
+    if (root_index < 0L || order < 2L)
+        return NULL;
+    snprintf(source, sizeof(source), "%s(%ld*pi/%ld)", sine ? "sin" : "cos", 2L * root_index, order);
+    parsed = expr_from_string(source, &bindings);
+    display = parsed ? expr_beautify(parsed) : NULL;
+    expr_free(parsed);
+    expr_bindings_free(bindings);
+    if (expr_contains_root_turn_trig(display)) {
+        expr_free(display);
+        return NULL;
+    }
+    return display;
+}
+
+static expr_t *expr_reorder_positive_sum_for_display(const expr_t *expr)
+{
+    const expr_t *left;
+    const expr_t *right;
+    number_t left_value = (number_t){0};
+    number_t right_value = (number_t){0};
+    expr_t *left_magnitude = NULL;
+    expr_t *reordered = NULL;
+    bool subtract;
+
+    if (!expr_match_add_sub_expr(expr, &left, &right, &subtract) || subtract)
+        goto cleanup;
+    left_value = expr_eval(left);
+    right_value = expr_eval(right);
+    if (!num_is_real(left_value) || !num_is_real(right_value) || num_get_sign(left_value) >= 0 ||
+        num_get_sign(right_value) < 0)
+        goto cleanup;
+    left_magnitude = expr_distribute_negative_for_display(left);
+    reordered = left_magnitude ? expr_sub(right, left_magnitude) : NULL;
+
+cleanup:
+    expr_free(left_magnitude);
+    num_destroy(&right_value);
+    num_destroy(&left_value);
+    return reordered;
+}
+
+static char *expr_rotated_cartesian_root_TeX_dup(const expr_t *seed, long root_index, long order)
+{
+    const expr_t *scale;
+    const expr_t *real;
+    const expr_t *imaginary;
+    number_t seed_value = (number_t){0};
+    number_t real_value = (number_t){0};
+    number_t imaginary_value = (number_t){0};
+    number_t imaginary_magnitude = (number_t){0};
+    expr_t *owned_real = NULL;
+    expr_t *owned_imaginary = NULL;
+    expr_t *cosine = NULL;
+    expr_t *sine = NULL;
+    expr_t *signed_imaginary = NULL;
+    expr_t *real_cosine = NULL;
+    expr_t *imaginary_sine = NULL;
+    expr_t *real_sine = NULL;
+    expr_t *imaginary_cosine = NULL;
+    expr_t *real_part = NULL;
+    expr_t *imaginary_part = NULL;
+    expr_t *scaled_real = NULL;
+    expr_t *scaled_imaginary = NULL;
+    expr_t *real_display = NULL;
+    expr_t *imaginary_display = NULL;
+    expr_t *positive_imaginary = NULL;
+    expr_t *positive_imaginary_display = NULL;
+    expr_t *ordered_display = NULL;
+    number_t displayed_real_value = (number_t){0};
+    number_t displayed_imaginary_value = (number_t){0};
+    char *real_TeX = NULL;
+    char *imaginary_TeX = NULL;
+    char *display_TeX = NULL;
+    size_t display_TeX_size = 0u;
+    FILE *stream = NULL;
+    bool real_is_zero;
+    bool imaginary_is_zero;
+    bool imaginary_is_unit;
+    bool imaginary_is_negative;
+    int imaginary_sign;
+
+    if (!seed || root_index <= 0L || order < 2L)
+        goto cleanup;
+    if (!expr_scaled_cartesian_parts(seed, &scale, &real, &imaginary, &imaginary_sign)) {
+        seed_value = expr_eval(seed);
+        real_value = num_real_part(seed_value);
+        imaginary_value = num_imag_part(seed_value);
+        if (!num_is_finite(seed_value) || num_is_zero(imaginary_value))
+            goto cleanup;
+        imaginary_sign = num_get_sign(imaginary_value) < 0 ? -1 : 1;
+        imaginary_magnitude = num_abs(imaginary_value);
+        owned_real = expr_new_const(real_value);
+        owned_imaginary = expr_new_const(imaginary_magnitude);
+        scale = NULL;
+        real = owned_real;
+        imaginary = owned_imaginary;
+    }
+    cosine = expr_root_turn_trig_display(root_index, order, false);
+    sine = expr_root_turn_trig_display(root_index, order, true);
+    if (!cosine || !sine)
+        goto cleanup;
+
+    signed_imaginary = imaginary_sign > 0 ? expr_clone(imaginary) : expr_neg(imaginary);
+    real_cosine = expr_mul(real, cosine);
+    imaginary_sine = signed_imaginary ? expr_mul(signed_imaginary, sine) : NULL;
+    real_sine = expr_mul(real, sine);
+    imaginary_cosine = signed_imaginary ? expr_mul(signed_imaginary, cosine) : NULL;
+    real_part = real_cosine && imaginary_sine ? expr_sub(real_cosine, imaginary_sine) : NULL;
+    imaginary_part = real_sine && imaginary_cosine ? expr_add(real_sine, imaginary_cosine) : NULL;
+    scaled_real = real_part ? (scale ? expr_mul(scale, real_part) : expr_clone(real_part)) : NULL;
+    scaled_imaginary = imaginary_part ? (scale ? expr_mul(scale, imaginary_part) : expr_clone(imaginary_part)) : NULL;
+    real_display = scaled_real ? expr_display_expanded(scaled_real) : NULL;
+    imaginary_display = scaled_imaginary ? expr_beautify(scaled_imaginary) : NULL;
+    if (!real_display || !imaginary_display)
+        goto cleanup;
+    ordered_display = expr_reorder_positive_sum_for_display(real_display);
+    if (ordered_display) {
+        expr_free(real_display);
+        real_display = ordered_display;
+        ordered_display = NULL;
+    }
+
+    displayed_real_value = expr_eval(real_display);
+    displayed_imaginary_value = expr_eval(imaginary_display);
+    real_is_zero = num_is_zero(displayed_real_value);
+    imaginary_is_zero = num_is_zero(displayed_imaginary_value);
+    imaginary_is_negative = num_get_sign(displayed_imaginary_value) < 0;
+    if (imaginary_is_negative) {
+        positive_imaginary = expr_distribute_negative_for_display(imaginary_display);
+        positive_imaginary_display = positive_imaginary ? expr_display_expanded(positive_imaginary) : NULL;
+        if (!positive_imaginary_display)
+            goto cleanup;
+        expr_free(imaginary_display);
+        imaginary_display = positive_imaginary_display;
+        positive_imaginary_display = NULL;
+        num_destroy(&displayed_imaginary_value);
+        displayed_imaginary_value = expr_eval(imaginary_display);
+    }
+    ordered_display = expr_reorder_positive_sum_for_display(imaginary_display);
+    if (ordered_display) {
+        expr_free(imaginary_display);
+        imaginary_display = ordered_display;
+        ordered_display = NULL;
+    }
+    imaginary_is_unit = num_eq(displayed_imaginary_value, NUM_ONE);
+    real_TeX = real_is_zero ? NULL : expr_TeX_body_dup(real_display);
+    imaginary_TeX = imaginary_is_zero || imaginary_is_unit ? NULL : expr_TeX_body_dup(imaginary_display);
+    if ((!real_is_zero && !real_TeX) || (!imaginary_is_zero && !imaginary_is_unit && !imaginary_TeX))
+        goto cleanup;
+
+    stream = open_memstream(&display_TeX, &display_TeX_size);
+    if (!stream)
+        goto cleanup;
+    if (!real_is_zero)
+        fputs(real_TeX, stream);
+    if (!imaginary_is_zero) {
+        if (!real_is_zero)
+            fputs(imaginary_is_negative ? " - " : " + ", stream);
+        else if (imaginary_is_negative)
+            fputs("\\mathord{-}\\mkern-2mu ", stream);
+        if (!imaginary_is_unit) {
+            const expr_t *sum_left;
+            const expr_t *sum_right;
+            bool sum_subtract;
+            bool needs_parentheses = expr_match_add_sub_expr(imaginary_display, &sum_left, &sum_right, &sum_subtract);
+
+            if (needs_parentheses)
+                fputs("\\left(", stream);
+            fputs(imaginary_TeX, stream);
+            if (needs_parentheses)
+                fputs("\\right)", stream);
+            fputs("\\mkern-2mu ", stream);
+        }
+        fputs("i", stream);
+    } else if (real_is_zero) {
+        fputs("0", stream);
+    }
+    fclose(stream);
+    stream = NULL;
+
+cleanup:
+    if (stream)
+        fclose(stream);
+    free(imaginary_TeX);
+    free(real_TeX);
+    num_destroy(&displayed_imaginary_value);
+    num_destroy(&displayed_real_value);
+    expr_free(ordered_display);
+    expr_free(positive_imaginary_display);
+    expr_free(positive_imaginary);
+    expr_free(imaginary_display);
+    expr_free(real_display);
+    expr_free(owned_imaginary);
+    expr_free(owned_real);
+    num_destroy(&imaginary_magnitude);
+    num_destroy(&imaginary_value);
+    num_destroy(&real_value);
+    num_destroy(&seed_value);
+    expr_free(scaled_imaginary);
+    expr_free(scaled_real);
+    expr_free(imaginary_part);
+    expr_free(real_part);
+    expr_free(imaginary_cosine);
+    expr_free(real_sine);
+    expr_free(imaginary_sine);
+    expr_free(real_cosine);
+    expr_free(signed_imaginary);
+    expr_free(sine);
+    expr_free(cosine);
+    return display_TeX;
+}
+
+static void print_explicit_root_family(const expr_t *expr, int precision)
 {
     number_t seed = (number_t){0};
-    const expr_t *base = NULL;
+    number_t seed_value = (number_t){0};
+    expr_t *base = NULL;
     long order = 0L;
     expr_t *seed_expr = NULL;
     expr_t *negative_seed = NULL;
-    char *seed_expression;
     char *seed_TeX;
     char *negative_expression = NULL;
     char *negative_TeX = NULL;
     char *root_expression = NULL;
     char *root_TeX = NULL;
     char *root_function = NULL;
-    size_t root_expression_size = 0u;
+    char *root_value = NULL;
     size_t root_TeX_size = 0u;
-    size_t root_function_size = 0u;
-    FILE *expression_stream;
     FILE *TeX_stream;
-    FILE *function_stream;
     bool exact_seed;
 
     if (!explicit_reciprocal_power(expr, &base, &order)) {
@@ -452,93 +995,84 @@ static void print_explicit_root_family(const expr_t *expr)
     exact_seed = expr_exact_complex_root_seed(expr, &seed, &order);
     if (exact_seed) {
         seed_expr = expr_new_const(seed);
-    } else if (order == 2L && base) {
-        seed_expr = expr_sqrt(base);
+    } else if (base) {
+        seed_expr = expr_principal_root_display(base, order);
     } else {
         seed_expr = expr_clone(expr);
     }
-    seed_expression = seed_expr ? expr_text_dup(seed_expr, style_UNBOUND) : NULL;
     seed_TeX = seed_expr ? expr_TeX_body_dup(seed_expr) : NULL;
-    if (!seed_expression || !seed_TeX)
+    if (!seed_TeX)
         goto cleanup;
+    seed_value = expr_eval(seed_expr);
 
     if (order == 2L) {
-        expr_t *raw_negative = expr_neg(seed_expr);
-
-        negative_seed = exact_seed && raw_negative ? expr_simplify(raw_negative) : raw_negative;
-        if (negative_seed == raw_negative)
-            raw_negative = NULL;
-        expr_free(raw_negative);
+        negative_seed = expr_distribute_negative_for_display(seed_expr);
         negative_expression = negative_seed ? expr_text_dup(negative_seed, style_UNBOUND) : NULL;
         negative_TeX = negative_seed ? expr_TeX_body_dup(negative_seed) : NULL;
         if (!negative_expression || !negative_TeX)
             goto cleanup;
     }
 
-    expression_stream = open_memstream(&root_expression, &root_expression_size);
     TeX_stream = open_memstream(&root_TeX, &root_TeX_size);
-    function_stream = open_memstream(&root_function, &root_function_size);
-    if (!expression_stream || !TeX_stream || !function_stream) {
-        if (expression_stream)
-            fclose(expression_stream);
-        if (TeX_stream)
-            fclose(TeX_stream);
-        if (function_stream)
-            fclose(function_stream);
+    if (!TeX_stream)
         goto cleanup;
-    }
 
-    fputs("{ ", expression_stream);
-    fputs("\\left\\{", TeX_stream);
+    fputs("\\begin{aligned}[t]", TeX_stream);
     for (long root_index = 0L; root_index < order; ++root_index) {
-        if (root_index > 0L) {
-            fputs(", ", expression_stream);
-            fputs(",\\;", TeX_stream);
-        }
-        if (root_index == 0L) {
-            fputs(seed_expression, expression_stream);
+        char *quarter_turn_TeX = NULL;
+        char *cartesian_TeX = NULL;
+
+        if (root_index > 0L)
+            fputs("\\\\[0.65em]", TeX_stream);
+        fputs("&", TeX_stream);
+        if (order == 4L)
+            quarter_turn_TeX = expr_quarter_turn_root_TeX_dup(seed_expr, root_index);
+        else if (root_index > 0L && order > 2L)
+            cartesian_TeX = expr_rotated_cartesian_root_TeX_dup(seed_expr, root_index, order);
+        if (quarter_turn_TeX) {
+            fputs(quarter_turn_TeX, TeX_stream);
+        } else if (cartesian_TeX) {
+            fputs(cartesian_TeX, TeX_stream);
+        } else if (root_index == 0L) {
             fputs(seed_TeX, TeX_stream);
         } else if (order == 2L) {
-            fputs(negative_expression, expression_stream);
-            fputs(negative_TeX, TeX_stream);
+            if (negative_TeX[0] == '-') {
+                fputs("\\mathord{-}\\mkern-2mu ", TeX_stream);
+                fputs(negative_TeX + 1, TeX_stream);
+            } else {
+                fputs(negative_TeX, TeX_stream);
+            }
         } else {
-            fprintf(expression_stream, "(%s)·exp(%ld·π·i/%ld)", seed_expression, 2L * root_index, order);
             fprintf(TeX_stream, "\\left(%s\\right)e^{\\frac{%ld\\pi i}{%ld}}", seed_TeX, 2L * root_index,
                     order);
         }
+        free(cartesian_TeX);
+        free(quarter_turn_TeX);
     }
-    fputs(" }", expression_stream);
-    fputs("\\right\\}", TeX_stream);
+    fputs("\\end{aligned}", TeX_stream);
 
-    fprintf(function_stream,
-            "expression root(k) {\n    return (%s) * exp(2 * pi * i * k / %ld);\n}\n\nk = { ",
-            seed_expression, order);
-    for (long root_index = 0L; root_index < order; ++root_index) {
-        if (root_index > 0L)
-            fputs(", ", function_stream);
-        fprintf(function_stream, "%ld", root_index);
-    }
-    fputs(" }\noutput(root(k));", function_stream);
-
-    fclose(function_stream);
     fclose(TeX_stream);
-    fclose(expression_stream);
+    if (!root_family_texts_dup(seed_expr, order, &root_expression, &root_function))
+        goto cleanup;
+    root_value = numeric_root_family_dup(seed_value, order, precision);
     printf("root_expression  %s\n", root_expression);
     printf("root_tex    %s\n", root_TeX);
     printf("root_function  %s\n", root_function);
-    if (exact_seed)
-        printf("root_value  %s\n", root_expression);
+    if (root_value)
+        printf("root_value  %s\n", root_value);
 
 cleanup:
+    free(root_value);
     free(root_function);
     free(root_TeX);
     free(root_expression);
     free(seed_TeX);
-    free(seed_expression);
     free(negative_TeX);
     free(negative_expression);
     expr_free(negative_seed);
     expr_free(seed_expr);
+    expr_free(base);
+    num_destroy(&seed_value);
     num_destroy(&seed);
 }
 
@@ -861,7 +1395,7 @@ int main(int argc, char **argv)
     printf("differentiable  %s\n", expr_is_differentiable(expr) ? "yes" : "no");
     printf("evaluation_ready  %s\n", expression_evaluation_ready(expr) ? "yes" : "no");
     if (evaluate_request)
-        print_explicit_root_family(expr);
+        print_explicit_root_family(expr, precision);
     value_note[0] = '\0';
     {
         number_t value_number = expr_eval(expr);

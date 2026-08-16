@@ -2493,6 +2493,32 @@ expr_binding_expr_t *binding_expr_try_simplify_trig_exact(expr_binding_expr_t *e
     return expr;
 }
 
+/* Build an exact trigonometric value at a rational multiple of pi. */
+expr_t *binding_expr_exact_trig_pi_ratio(const expr_ops_t *ops, long numerator, unsigned long denominator)
+{
+    expr_binding_expr_t *ratio = NULL;
+    expr_binding_expr_t *trig = NULL;
+    expr_binding_expr_t *simplified = NULL;
+    expr_t *out = NULL;
+
+    if (!ops || denominator == 0ul)
+        return NULL;
+    ratio = binding_expr_new_pi_ratio_long(numerator, denominator);
+    trig = ratio ? expr_binding_expr_new_unary_op(ops, ratio) : NULL;
+    ratio = NULL;
+    simplified = trig ? binding_expr_try_simplify_trig_exact(trig) : NULL;
+    trig = NULL;
+    if (!simplified || simplified->kind == EXPR_BINDING_EXPR_UNARY_OP)
+        goto cleanup;
+    out = expr_binding_expr_eval_expr(simplified);
+
+cleanup:
+    expr_binding_expr_free(simplified);
+    expr_binding_expr_free(trig);
+    expr_binding_expr_free(ratio);
+    return out;
+}
+
 expr_binding_expr_t *binding_expr_try_simplify_direct_inverse(expr_binding_expr_t *expr)
 {
     expr_binding_expr_t *inner;

@@ -105,8 +105,8 @@ const equation_t *equ_solutions_at(const equation_solutions_t *solutions, size_t
  * Function style produces an equation-valued callable that preserves both
  * sides of the relation, followed by a compact solve-and-output call:
  *
- *   equation equ(x) { return equation(lhs = rhs); }
- *   output(equ(x).solve());
+ *   equation equ(x) { return equation(lhs = rhs). }
+ *   output(equ(x).solve()).
  *
  * Use equ_from_text() or equ_from_string() to parse it back.
  */

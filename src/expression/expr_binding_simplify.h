@@ -73,4 +73,7 @@ expr_binding_expr_t *binding_expr_try_simplify_asin_exact(expr_binding_expr_t *e
 expr_binding_expr_t *binding_expr_try_simplify_trig_exact(expr_binding_expr_t *expr);
 expr_binding_expr_t *binding_expr_try_simplify_logbeta_integers(expr_binding_expr_t *expr);
 
+/* Exact expression-tree construction shared by later display passes. */
+expr_t *binding_expr_exact_trig_pi_ratio(const expr_ops_t *ops, long numerator, unsigned long denominator);
+
 #endif /* EXPR_BINDING_SIMPLIFY_H */

@@ -40,10 +40,32 @@ expressions. When variables are present, the buttons beneath the editor can
 differentiate or integrate with respect to each variable. **Goal seek** finds a
 numeric value for a selected variable.
 
-The captured input is `sin(x)^2 + cos(x)^2` with `x = pi/7`. MARS simplifies
-the expression to the exact output `1`.
+The captured input is `root(117 + 44i,6)`. This named root asks for one
+principal value, which MARS simplifies to the exact Cartesian surd
 
-[![MARS Lab expression mode simplifying a trigonometric identity to one](images/mars-lab/expression.png?v=20260815-1)](images/mars-lab/expression.png?v=20260815-1)
+$$
+\frac{2\sqrt{3}+1}{2}+i\left(1-\frac{\sqrt{3}}{2}\right).
+$$
+
+The four result cards deliberately show different representations:
+
+- **Rendered TeX** shows the simplified mathematical result without bindings.
+- **Expression** shows the parseable MARS expression, including variable and
+  constant bindings when the input has them.
+- **Function** shows an evaluable MARS function. Reused expression-DAG nodes
+  are named once as intermediate constants or variables before the return
+  expression.
+- **Value** appears when a numerical value can be produced. It remains
+  numerical even when the other cards have an exact surd result.
+
+[![MARS Lab expression mode displaying the exact principal sixth root of 117 plus 44i as Cartesian surds](images/mars-lab/expression.png?v=20260817-1)](images/mars-lab/expression.png?v=20260817-1)
+
+Function cards use MARS syntax rather than C syntax. A full stop terminates a
+statement, `.` within a statement denotes multiplication, and `/` is printed
+without surrounding spaces. Constants use `const`; arrays use `array`; and a
+short repeated constant may receive a descriptive name such as `$[sqrt(3)]`.
+The syntax colouring distinguishes keywords, functions, variables, numbers and
+comments, but does not alter the copyable Function text.
 
 ## Equation mode
 
@@ -138,8 +160,11 @@ same scalar absolute value. For a complex expression this is the modulus
 `sqrt(z*z^*)`. Context distinguishes scalar absolute-value bars from the
 determinant bars surrounding a matrix.
 
-`sqrt(z)`, `cubrt(z)`, and `root(z,n)` return one principal scalar root. Explicit fractional-power syntax such as
-`z^(1/n)` denotes the complete family of `n` roots when MARS Lab presents an expression result.
+`sqrt(z)`, `cubrt(z)`, and `root(z,n)` return one principal scalar root. Exact
+complex arguments are written in Cartesian `a + bi` surd form when such a form
+is available. Explicit fractional-power syntax such as `z^(1/n)` instead
+denotes the complete family of `n` roots when MARS Lab presents an expression
+result.
 
 Greek names may be entered as Unicode or through their ASCII aliases. Thus
 `lambda`, `@lambda` and `λ` identify the same symbol and are normalised to `λ`

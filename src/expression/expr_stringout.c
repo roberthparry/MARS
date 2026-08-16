@@ -14,12 +14,12 @@
  *                       { expr | bindings } wrapper is added, e.g.
  *                         sin(x)·cos(y)
  *
- *   style_FUNCTION    — C-like function notation, e.g.
+ *   style_FUNCTION    — MARS function notation, e.g.
  *                         expression expr(x, y, const c₀) {
- *                             return sin(x) * cos(y);
+ *                             return sin(x).cos(y).
  *                         }
  *
- *                         output(expr(x, y, c₀));
+ *                         output(expr(x, y, c₀)).
  *                       Useful for debugging graph structure and generated
  *                       callable forms.
  *
@@ -476,8 +476,10 @@ static int pow_base_needs_visible_parens(const expr_t *base)
             return 0;
     }
 
-    if (!base || !expr_is_const(base) || num_is_real(base->c))
+    if (!base || !expr_is_const(base))
         return 0;
+    if (num_is_real(base->c))
+        return num_lt(base->c, NUM_ZERO);
     real = num_real_part(base->c);
     has_real_part = !num_eq(real, NUM_ZERO);
     num_destroy(&real);
@@ -640,6 +642,41 @@ static void flatten_mul(expr_t *f, expr_t **buf, int *count, int max)
     if (expr_is_mul(f)) {
         flatten_mul(f->a, buf, count, max);
         flatten_mul(f->b, buf, count, max);
+    } else {
+        buf[(*count)++] = f;
+    }
+}
+
+typedef struct {
+    const expr_t *const *nodes;
+    const char *const *names;
+    size_t count;
+    const expr_t *expanded_node;
+} function_temporary_context_t;
+
+static _Thread_local function_temporary_context_t function_temporary_context;
+
+static const char *function_temporary_name(const expr_t *expr)
+{
+    if (!expr || expr == function_temporary_context.expanded_node)
+        return NULL;
+
+    for (size_t index = 0u; index < function_temporary_context.count; ++index) {
+        if (function_temporary_context.nodes[index] == expr ||
+            expr_struct_eq(function_temporary_context.nodes[index], expr))
+            return function_temporary_context.names[index];
+    }
+    return NULL;
+}
+
+static void flatten_func_mul(expr_t *f, expr_t **buf, int *count, int max)
+{
+    if (!f || *count >= max)
+        return;
+
+    if (expr_is_mul(f) && !function_temporary_name(f)) {
+        flatten_func_mul(f->a, buf, count, max);
+        flatten_func_mul(f->b, buf, count, max);
     } else {
         buf[(*count)++] = f;
     }
@@ -1990,6 +2027,19 @@ void emit_func_display(const expr_t *f, sbuf_t *b, int parent_prec)
     if (f && expr_is_addsub(f) && emit_func_display_polynomial_sum(f, b, parent_prec))
         return;
     emit_func(f, b, parent_prec);
+}
+
+void emit_func_with_temporaries(const expr_t *f, sbuf_t *b, int parent_prec, const expr_t *const *nodes,
+                                const char *const *names, size_t count, const expr_t *expanded_node)
+{
+    function_temporary_context_t previous = function_temporary_context;
+
+    function_temporary_context.nodes = nodes;
+    function_temporary_context.names = names;
+    function_temporary_context.count = count;
+    function_temporary_context.expanded_node = expanded_node;
+    emit_func(f, b, parent_prec);
+    function_temporary_context = previous;
 }
 
 static void emit_expr_abs(const expr_t *f, sbuf_t *b, int parent_prec)
@@ -3981,8 +4031,58 @@ void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
 /* FUNCTION MODE (calculator-style)                                          */
 /* ------------------------------------------------------------------------- */
 
+static void emit_func_fragment(sbuf_t *b, const char *text)
+{
+    char *normalised;
+    size_t input_index = 0u;
+    size_t output_index = 0u;
+
+    if (!text)
+        return;
+
+    normalised = malloc(strlen(text) + 1u);
+    if (!normalised) {
+        sbuf_puts(b, text);
+        return;
+    }
+
+    while (text[input_index] != '\0') {
+        if (text[input_index] == ' ') {
+            size_t operator_index = input_index;
+
+            while (text[operator_index] == ' ')
+                ++operator_index;
+            if (text[operator_index] == '*') {
+                input_index = operator_index + 1u;
+                while (text[input_index] == ' ')
+                    ++input_index;
+                normalised[output_index++] = '.';
+                continue;
+            }
+        }
+        if (text[input_index] == '*') {
+            normalised[output_index++] = '.';
+            ++input_index;
+            while (text[input_index] == ' ')
+                ++input_index;
+            continue;
+        }
+        normalised[output_index++] = text[input_index++];
+    }
+    normalised[output_index] = '\0';
+    sbuf_puts(b, normalised);
+    free(normalised);
+}
+
 void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
 {
+    const char *temporary_name = function_temporary_name(f);
+
+    if (temporary_name) {
+        sbuf_puts(b, temporary_name);
+        return;
+    }
+
     if (!f) {
         sbuf_puts(b, "0");
         return;
@@ -4006,7 +4106,7 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
             char *text = expr_binding_expr_to_function_string(f->binding_expr);
 
             if (text) {
-                sbuf_puts(b, text);
+                emit_func_fragment(b, text);
                 free(text);
             }
         } else if (f->name && *f->name)
@@ -4014,7 +4114,7 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
         else {
             char *text = expr_const_to_string_local(f);
             if (text) {
-                sbuf_puts(b, text);
+                emit_func_fragment(b, text);
                 free(text);
             }
         }
@@ -4058,7 +4158,7 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
 
             if (recip_need)
                 sbuf_putc(b, '(');
-            sbuf_puts(b, "1 / ");
+            sbuf_puts(b, "1/");
             if (positive_exponent == 1L) {
                 emit_func(f->a, b, PREC_POW);
             } else {
@@ -4089,7 +4189,7 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
         sbuf_putc(b, '^');
         char *text = expr_const_to_string_local(f);
         if (text) {
-            sbuf_puts(b, text);
+            emit_func_fragment(b, text);
             free(text);
         }
 
@@ -4108,7 +4208,7 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
 
         expr_t *fac[64];
         int n = 0;
-        flatten_mul((expr_t *)f, fac, &n, 64);
+        flatten_func_mul((expr_t *)f, fac, &n, 64);
         sort_factors(fac, n);
         leading_half_as_divisor = n > 1 && expr_is_const_half_local(fac[0]);
 
@@ -4117,17 +4217,17 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
                 continue;
 
             if (emitted)
-                sbuf_puts(b, " * ");
-            if (n > 1 && mul_factor_needs_visible_parens(fac[i]))
+                sbuf_putc(b, '.');
+            if (n > 1 && !function_temporary_name(fac[i]) && mul_factor_needs_visible_parens(fac[i]))
                 sbuf_putc(b, '(');
             emit_func(fac[i], b, PREC_MUL);
-            if (n > 1 && mul_factor_needs_visible_parens(fac[i]))
+            if (n > 1 && !function_temporary_name(fac[i]) && mul_factor_needs_visible_parens(fac[i]))
                 sbuf_putc(b, ')');
             emitted = true;
         }
 
         if (leading_half_as_divisor)
-            sbuf_puts(b, " / 2");
+            sbuf_puts(b, "/2");
 
         if (need)
             sbuf_putc(b, ')');
@@ -4142,14 +4242,14 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
             sbuf_putc(b, '(');
 
         emit_func(f->a, b, PREC_ADD);
-        neg = expr_renders_negative(f->b);
+        neg = function_temporary_name(f->b) ? 0 : expr_renders_negative(f->b);
 
         if (expr_is_op(f, &ops_add))
             sbuf_puts(b, neg ? " - " : " + ");
         else
             sbuf_puts(b, neg ? " + " : " - ");
 
-        int rhs_parens = add_rhs_needs_visible_parens(f->b);
+        int rhs_parens = !function_temporary_name(f->b) && add_rhs_needs_visible_parens(f->b);
         if (rhs_parens)
             sbuf_putc(b, '(');
         if (neg)
@@ -4171,7 +4271,7 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
             sbuf_putc(b, '(');
 
         emit_func(f->a, b, PREC_MUL);
-        sbuf_puts(b, " / ");
+        sbuf_putc(b, '/');
         emit_func(f->b, b, PREC_POW);
 
         if (need)
@@ -4191,7 +4291,7 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
         emit_func(f->a, b, base_needs_parens ? PREC_LOWEST : PREC_POW);
         if (base_needs_parens)
             sbuf_putc(b, ')');
-        sbuf_puts(b, " ^ ");
+        sbuf_putc(b, '^');
         int ep = pow_exp_needs_parens(f->b);
         if (ep)
             sbuf_putc(b, '(');

@@ -58,6 +58,7 @@ static void test_from_string_arithmetic(void)
     /* Implicit multiplication (juxtaposition) */
     check_parse_val("x\xe2\x82\x80x\xe2\x82\x81 implicit = 12",
                     "{ x\xe2\x82\x80x\xe2\x82\x81 | x\xe2\x82\x80 = 3, x\xe2\x82\x81 = 4 }", 12.0, __LINE__);
+    check_parse_num("whitespace separates implicitly multiplied factors", "44 i", "44i", __LINE__);
     /* Explicit middle-dot multiplication */
     check_parse_val("x\xe2\x82\x80\xc2\xb7x\xe2\x82\x81 middle-dot = 12",
                     "{ x\xe2\x82\x80\xc2\xb7x\xe2\x82\x81 | x\xe2\x82\x80 = 3, x\xe2\x82\x81 = 4 }", 12.0, __LINE__);
@@ -429,6 +430,67 @@ static void test_from_string_named_consts(void)
                     2 * 3.141592653589793 + 2.718281828459045, __LINE__);
     /* Bracketed name in const section */
     check_parse_val("[scale]·x = 6", "{ [scale]x | x = 3; [scale] = 2 }", 6.0, __LINE__);
+}
+
+static void test_from_string_array_bindings(void)
+{
+    static const struct {
+        const char *label;
+        const char *input;
+        const char *expression;
+        const char *function;
+    } cases[] = {
+        {"array variable as expression body",
+         "{ x | x = [1, 2, 3] }",
+         "{ x | x = [1, 2, 3] }",
+         "expression expr(array x) {\n"
+         "    return x;\n"
+         "}\n\n"
+         "x = [1, 2, 3];\n"
+         "output(expr(x));"},
+        {"specified array variable binding",
+         "{ x^2 + c | x = [1, 2, 3]; c = 4 }",
+         "{ x² + c | x = [1, 2, 3]; c = 4 }",
+         "expression expr(array x, const c) {\n"
+         "    return x^2 + c;\n"
+         "}\n\n"
+         "x = [1, 2, 3];\n"
+         "const c = 4;\n"
+         "output(expr(x, c));"},
+        {"specified array constant binding",
+         "{ x^2 + c | x = ?; c = [1, 2, 3] }",
+         "{ x² + c | x = NAN; c = [1, 2, 3] }",
+         "expression expr(x, array const c) {\n"
+         "    return x^2 + c;\n"
+         "}\n\n"
+         "x = ?;\n"
+         "array const c = [1, 2, 3];\n"
+         "output(expr(x, c));"},
+        {"unspecified array bindings",
+         "{ x + c | x = []; c = [?] }",
+         "{ x + c | x = [?]; c = [?] }",
+         "expression expr(array x, array const c) {\n"
+         "    return x + c;\n"
+         "}\n\n"
+         "x = [?];\n"
+         "array const c = [?];\n"
+         "output(expr(x, c));"},
+    };
+
+    for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+        expr_bindings_t *bindings = NULL;
+        expr_t *expr = expr_from_string(cases[i].input, &bindings);
+        char *expression = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
+        char *function = expr ? expr_to_string(expr, style_FUNCTION) : NULL;
+
+        TEST_ASSERT_TRUE(expr != NULL, cases[i].label);
+        TEST_ASSERT_STR_EQ(expression, cases[i].expression);
+        TEST_ASSERT_STR_EQ(function, cases[i].function);
+        free(function);
+        free(expression);
+        expr_bindings_free(bindings);
+        expr_free(expr);
+    }
 }
 
 /* ---- Bracketed (multi-character) names ---- */
@@ -1353,7 +1415,7 @@ static void test_from_string_errors(void)
     /* Missing closing ']' in bracketed name */
     check_parse_null("missing closing bracket", "{ [radius | [radius] = 5 }", __LINE__);
     /* Trailing expression input */
-    check_parse_null("trailing input after expression", "{ x y z | x = 1, y = 2, z = 3 }", __LINE__);
+    check_parse_val("whitespace-separated symbolic factors", "{ x y z | x = 1, y = 2, z = 3 }", 6.0, __LINE__);
     /* Extra comma in binary function */
     check_parse_null("binary function extra comma", "{ atan2(x, y, z) | x = 1, y = 2, z = 3 }", __LINE__);
 }
@@ -1930,8 +1992,8 @@ static void test_binding_edit_preserves_symbolic_value(void)
     char *func_text = edited ? expr_to_string(edited, style_FUNCTION) : NULL;
     char *fraction_func_text = fraction ? expr_to_string(fraction, style_FUNCTION) : NULL;
     bool expression_preserved = expr_text && strstr(expr_text, "x = π");
-    bool function_preserved = func_text && strstr(func_text, "x = @pi\noutput(expr(x));");
-    bool fraction_preserved = fraction_func_text && strstr(fraction_func_text, "x = ½\noutput(expr(x));");
+    bool function_preserved = func_text && strstr(func_text, "x = @pi;\noutput(expr(x));");
+    bool fraction_preserved = fraction_func_text && strstr(fraction_func_text, "x = ½;\noutput(expr(x));");
 
     free(fraction_func_text);
     free(func_text);
@@ -1946,6 +2008,32 @@ static void test_binding_edit_preserves_symbolic_value(void)
     TEST_ASSERT_TRUE(expression_preserved, "binding edit preserves pi in expression output");
     TEST_ASSERT_TRUE(function_preserved, "binding edit preserves pi in function output");
     TEST_ASSERT_TRUE(fraction_preserved, "function output preserves a Unicode fraction binding");
+}
+
+static void test_binding_edit_preserves_array_value(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_bindings_t *edited_bindings = NULL;
+    expr_t *expr = expr_from_string("{ x^2 + c | x = NAN; c = 4 }", &bindings);
+    expr_t *edited = expr_edit_binding(expr, bindings, "x", "[1, 2, 3]", &edited_bindings);
+    char *expression = edited ? expr_to_string(edited, style_EXPRESSION) : NULL;
+    char *function = edited ? expr_to_string(edited, style_FUNCTION) : NULL;
+
+    TEST_ASSERT_STR_EQ(expression, "{ x² + c | x = [1, 2, 3]; c = 4 }");
+    TEST_ASSERT_STR_EQ(function,
+                       "expression expr(array x, const c) {\n"
+                       "    return x^2 + c;\n"
+                       "}\n\n"
+                       "x = [1, 2, 3];\n"
+                       "const c = 4;\n"
+                       "output(expr(x, c));");
+
+    free(function);
+    free(expression);
+    expr_bindings_free(edited_bindings);
+    expr_free(edited);
+    expr_bindings_free(bindings);
+    expr_free(expr);
 }
 
 static void test_from_string_unevaluated_integral(void)
@@ -2644,6 +2732,7 @@ void test_expr_t_from_string(void)
     TEST_RUN_SUBTEST(test_from_string_special_functions, NULL);
     TEST_RUN_SUBTEST(test_from_string_exact_value_functions, NULL);
     TEST_RUN_SUBTEST(test_from_string_named_consts, NULL);
+    TEST_RUN_SUBTEST(test_from_string_array_bindings, NULL);
     TEST_RUN_SUBTEST(test_from_string_bracketed_names, NULL);
     TEST_RUN_SUBTEST(test_from_string_number_literals, NULL);
     TEST_RUN_SUBTEST(test_from_string_name_normalisation, NULL);
@@ -2658,6 +2747,7 @@ void test_expr_t_from_string(void)
     TEST_RUN_SUBTEST(test_from_string_bindings_skip_function_name_letters, NULL);
     TEST_RUN_SUBTEST(test_binding_edit_is_owned_by_expression_library, NULL);
     TEST_RUN_SUBTEST(test_binding_edit_preserves_symbolic_value, NULL);
+    TEST_RUN_SUBTEST(test_binding_edit_preserves_array_value, NULL);
     TEST_RUN_SUBTEST(test_from_string_unevaluated_integral, NULL);
     TEST_RUN_SUBTEST(test_from_string_round_trips, NULL);
     TEST_RUN_SUBTEST(test_from_string_deriv, NULL);

@@ -426,9 +426,9 @@ static void test_equation_function_style_preserves_both_sides(void)
     text = equ_to_text(equation, style_FUNCTION);
     ASSERT_NOT_NULL(text);
     ASSERT_TRUE(strstr(string_c_str(text), "equation equ(x, y, z, const a)") != NULL);
-    ASSERT_TRUE(strstr(string_c_str(text), "return equation(x + y = a * z);") != NULL);
-    ASSERT_TRUE(strstr(string_c_str(text), "return x + y - a * z;") == NULL);
-    ASSERT_TRUE(strstr(string_c_str(text), "output(equ(x, y, z, a).solve());") != NULL);
+    ASSERT_TRUE(strstr(string_c_str(text), "return equation(x + y = a.z).") != NULL);
+    ASSERT_TRUE(strstr(string_c_str(text), "return x + y - a.z.") == NULL);
+    ASSERT_TRUE(strstr(string_c_str(text), "output(equ(x, y, z, a).solve()).") != NULL);
     ASSERT_TRUE(strstr(string_c_str(text), "constant[] solve") == NULL);
     ASSERT_TRUE(strstr(string_c_str(text), "print(") == NULL);
     ASSERT_TRUE(strstr(string_c_str(text), "equ_eval") == NULL);
@@ -466,12 +466,11 @@ static void test_equation_display_expansion_distributes_sum_products(void)
     ASSERT_TRUE(strstr(string_c_str(unbound), "+ 24x² + 1120x - 1200 = 0") != NULL);
     ASSERT_TRUE(strstr(string_c_str(unbound), "(x + 10)") == NULL);
     ASSERT_TRUE(strstr(string_c_str(function), "x^10") != NULL);
-    ASSERT_TRUE(strstr(string_c_str(function), "(x + 10) *") == NULL);
-    ASSERT_TRUE(strstr(string_c_str(function), "return equation(\n"
-                                               "          x^10 - 73 * x^8 + 280 * x^7 - 25 * x^6 "
-                                               "- 1120 * x^5 + 1273 * x^4 - 280 * x^3\n") != NULL);
-    ASSERT_TRUE(strstr(string_c_str(function), "        + 24 * x^2 + 1120 * x - 1200 = 0\n"
-                                               "    );") != NULL);
+    ASSERT_TRUE(strstr(string_c_str(function), "(x + 10).") == NULL);
+    ASSERT_TRUE(strstr(string_c_str(function), "return equation(") != NULL);
+    ASSERT_TRUE(strstr(string_c_str(function), "x^10 - 73.x^8 + 280.x^7 - 25.x^6") != NULL);
+    ASSERT_TRUE(strstr(string_c_str(function), "24.x^2") != NULL);
+    ASSERT_TRUE(strstr(string_c_str(function), "1120.x - 1200 = 0") != NULL);
 
     string_free(function);
     string_free(unbound);
@@ -501,13 +500,11 @@ static void test_equation_expands_conjugate_factors_and_solves_all_roots(void)
 
     ASSERT_TRUE(strcmp(string_c_str(unbound), "x⁹ + x⁸ + 7x⁷ + 99x⁶ - 284x⁵ - 256x⁴ + "
                                               "1188x³ - 884x² - 912x + 1040 = 0") == 0);
-    ASSERT_TRUE(strstr(string_c_str(function), "          x^9 + x^8 + 7 * x^7 + 99 * x^6 "
-                                               "- 284 * x^5 - 256 * x^4 + 1188 * x^3\n"
-                                               "        - 884 * x^2 - 912 * x + 1040 = 0\n") != NULL);
-    ASSERT_TRUE(strstr(string_c_str(function), "    );\n"
-                                               "}\n\n"
-                                               "// x = ?\n"
-                                               "output(equ(x).solve());") != NULL);
+    ASSERT_TRUE(strstr(string_c_str(function), "x^9 + x^8 + 7.x^7 + 99.x^6") != NULL);
+    ASSERT_TRUE(strstr(string_c_str(function), "884.x^2") != NULL);
+    ASSERT_TRUE(strstr(string_c_str(function), "912.x") != NULL);
+    ASSERT_TRUE(strstr(string_c_str(function), "1040 = 0") != NULL);
+    ASSERT_TRUE(strstr(string_c_str(function), "`` x = ?\noutput(equ(x).solve()).") != NULL);
     ASSERT_TRUE(strstr(string_c_str(function), "(x - (1 + i))") == NULL);
 
     ASSERT_EQ_INT(equ_solve_for(equation, x, result), 0);

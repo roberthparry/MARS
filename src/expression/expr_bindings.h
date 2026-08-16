@@ -10,9 +10,11 @@
 
 /* Parsing, evaluation and simplification. */
 expr_binding_expr_t *expr_binding_expr_parse_view(string_view_t text, string_t *errmsg);
+expr_binding_expr_t *expr_binding_expr_parse_array_view(string_view_t text, string_t *errmsg);
 expr_t *expr_binding_expr_eval_expr(const expr_binding_expr_t *expr);
 bool expr_binding_expr_number_value(const expr_binding_expr_t *expr, number_t *out);
 expr_binding_expr_t *expr_binding_expr_simplify(expr_binding_expr_t *expr);
+bool expr_binding_expr_is_array(const expr_binding_expr_t *expr);
 
 /* Structural helpers. */
 bool expr_binding_expr_struct_eq(const expr_binding_expr_t *left, const expr_binding_expr_t *right);

@@ -237,8 +237,8 @@ about 64 significant decimal digits before the equation is parsed and solved.
 - `equ_to_text(..., style_EXPRESSION)` produces a parseable wrapper form
 - `equ_to_text(..., style_FUNCTION)` produces an equation-valued callable
   that preserves the left- and right-hand expressions, notes unbound variables
-  with a comment such as `// x = ?`, then uses the compact
-  `output(equ(...).solve())` form
+  with a Function-style line comment beginning with two backticks, then uses
+  the compact `output(equ(...).solve()).` form
 - `equ_to_text(..., style_UNBOUND)` shows the plain equation body
 - `equ_to_text(..., style_LATEX)` emits TeX-ready display text
 - `equ_display_expanded(...)` builds a display equation whose polynomial sides

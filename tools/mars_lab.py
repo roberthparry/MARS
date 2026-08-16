@@ -2720,14 +2720,14 @@ INDEX_HTML = r"""<!doctype html>
 
     .card {
       --result-zoom: 1;
-      --render-base-scale: 2;
-      --render-zoom: 2;
+      --render-base-scale: 1.35;
+      --render-zoom: 1.35;
       --result-base-font-rem: 0.92;
       --result-font-size: 0.92rem;
-      --render-base-font-rem: 1.78;
-      --render-font-size: 1.78rem;
-      --render-base-margin-rem: 5;
-      --render-margin-bottom: 5rem;
+      --render-base-font-rem: 1.15;
+      --render-font-size: 1.15rem;
+      --render-base-margin-rem: 3;
+      --render-margin-bottom: 3rem;
       border: 2px solid rgba(233, 244, 239, 0.28);
       border-radius: 18px;
       background: rgba(8, 29, 22, 0.62);
@@ -2910,11 +2910,46 @@ INDEX_HTML = r"""<!doctype html>
       line-height: 1.45;
     }
 
+    .function-token-keyword {
+      color: #f3bd68;
+      font-weight: 700;
+    }
+
+    .function-token-variable {
+      color: #c7d0cb;
+    }
+
+    .function-token-array {
+      text-decoration: underline;
+      text-underline-offset: 0.16em;
+    }
+
+    .function-token-function {
+      color: #72ddd0;
+      font-weight: 700;
+    }
+
+    .function-token-number {
+      color: #e78fcb;
+    }
+
+    .function-token-comment {
+      color: #83d49b;
+      font-style: italic;
+    }
+
     #value {
       overflow: auto;
-      white-space: pre-wrap;
-      overflow-wrap: anywhere;
-      word-break: break-all;
+      white-space: pre;
+      overflow-wrap: normal;
+      word-break: normal;
+    }
+
+    #functionStyle:not(.equation-function) {
+      overflow-x: auto;
+      white-space: pre;
+      overflow-wrap: normal;
+      word-break: normal;
     }
 
     #functionStyle.equation-function {
@@ -3268,14 +3303,14 @@ INDEX_HTML = r"""<!doctype html>
 
       .card {
         border-radius: 15px;
-        --render-base-scale: 1.35;
-        --render-zoom: 1.35;
+        --render-base-scale: 1.05;
+        --render-zoom: 1.05;
         --result-base-font-rem: 0.82;
         --result-font-size: 0.82rem;
-        --render-base-font-rem: 1.3;
-        --render-font-size: 1.3rem;
-        --render-base-margin-rem: 2.5;
-        --render-margin-bottom: 2.5rem;
+        --render-base-font-rem: 1rem;
+        --render-font-size: 1rem;
+        --render-base-margin-rem: 2;
+        --render-margin-bottom: 2rem;
       }
 
       .mobile-result-extra {
@@ -4351,6 +4386,10 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     const resultCards = Array.from(document.querySelectorAll('.result-card'));
     const expandCardButtons = Array.from(document.querySelectorAll('[data-expand-card]'));
     const zoomButtons = Array.from(document.querySelectorAll('[data-zoom-step], [data-zoom-reset]'));
+    const MARS_FUNCTION_KEYWORDS = new Set([
+      'array', 'const', 'equation', 'expression', 'i', 'return'
+    ]);
+    const MARS_FUNCTION_CONSTANTS = new Set(['NAN', 'e', 'pi', 'π']);
     const RESULT_ZOOM_LEVELS = [0.5, 0.67, 0.8, 1, 1.25, 1.5, 2, 3, 4, 6, 8];
     const RESULT_ZOOM_DEFAULT_INDEX = 3;
     let lastTex = '';
@@ -9025,10 +9064,10 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       const index = resultZoomIndex(card);
       const zoom = RESULT_ZOOM_LEVELS[index];
       const computed = getComputedStyle(card);
-      const renderBase = Number.parseFloat(computed.getPropertyValue('--render-base-scale')) || 2;
+      const renderBase = Number.parseFloat(computed.getPropertyValue('--render-base-scale')) || 1.35;
       const textBase = Number.parseFloat(computed.getPropertyValue('--result-base-font-rem')) || 0.92;
-      const renderFontBase = Number.parseFloat(computed.getPropertyValue('--render-base-font-rem')) || 1.78;
-      const marginBase = Number.parseFloat(computed.getPropertyValue('--render-base-margin-rem')) || 5;
+      const renderFontBase = Number.parseFloat(computed.getPropertyValue('--render-base-font-rem')) || 1.15;
+      const marginBase = Number.parseFloat(computed.getPropertyValue('--render-base-margin-rem')) || 3;
       const renderScale = renderBase * zoom;
 
       card.dataset.zoomIndex = String(index);
@@ -9136,7 +9175,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       const style = getComputedStyle(card);
       const base = Number.parseFloat(
         style.getPropertyValue('--render-base-scale')
-      ) || 2;
+      ) || 1.35;
       return base * RESULT_ZOOM_LEVELS[resultZoomIndex(card)];
     }
 
@@ -9301,6 +9340,149 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       rendered.style.fontFamily = 'Georgia, "Times New Roman", serif';
     }
 
+    function looksLikeMarsFunction(source) {
+      return /(?:^|\n)\s*(?:array\s+)?(?:equation|expression)\s+[\p{L}_$][\p{L}\p{M}\p{N}_$]*\s*\(/u
+        .test(String(source || ''));
+    }
+
+    function appendFunctionToken(fragment, text, className = '') {
+      if (!className) {
+        fragment.appendChild(document.createTextNode(text));
+        return;
+      }
+
+      const token = document.createElement('span');
+      token.className = className;
+      token.textContent = text;
+      fragment.appendChild(token);
+    }
+
+    function renderMarsFunctionSyntax(element, text) {
+      const source = String(text || '');
+      const fragment = document.createDocumentFragment();
+      const identifierStart = character => /[\p{L}_]/u.test(character);
+      const identifierPart = character => /[\p{L}\p{M}\p{N}_]/u.test(character);
+      const functionDeclaration = source.match(
+        /(?:^|\n)\s*(?:array\s+)?(?:equation|expression)\s+[\p{L}_$][\p{L}\p{M}\p{N}_$]*\s*\(([^)]*)\)/u
+      );
+      const functionArrayVariables = new Set();
+      let index = 0;
+
+      if (functionDeclaration) {
+        functionDeclaration[1].split(',').forEach(parameter => {
+          const name = parameter.trim().match(/[\p{L}_][\p{L}\p{M}\p{N}_]*$/u);
+          if (name && /(?:^|\s)array(?:\s|$)/u.test(parameter))
+            functionArrayVariables.add(name[0]);
+        });
+      }
+
+      for (const declaration of source.matchAll(
+        /(?:^|\n)\s*array\s+(?:const\s+)?([\p{L}_][\p{L}\p{M}\p{N}_]*)\s*=/gu
+      ))
+        functionArrayVariables.add(declaration[1]);
+
+      while (index < source.length) {
+        if (source.startsWith('``', index)) {
+          const end = source.indexOf('\n', index + 2);
+          const next = end < 0 ? source.length : end;
+          appendFunctionToken(fragment, source.slice(index, next), 'function-token-comment');
+          index = next;
+          continue;
+        }
+
+        if (source[index] === '`') {
+          let next = index + 1;
+          while (next < source.length) {
+            if (source[next] === '`' && source[next - 1] !== '\\') {
+              next += 1;
+              break;
+            }
+            next += 1;
+          }
+          appendFunctionToken(fragment, source.slice(index, next), 'function-token-comment');
+          index = next;
+          continue;
+        }
+
+        if (source.startsWith('$[', index)) {
+          let next = index + 2;
+          let depth = 1;
+          while (next < source.length && depth > 0) {
+            if (source[next] === '[')
+              depth += 1;
+            else if (source[next] === ']')
+              depth -= 1;
+            next += 1;
+          }
+          appendFunctionToken(fragment, '$', 'function-token-keyword');
+          appendFunctionToken(fragment, '[', 'function-token-keyword');
+          appendFunctionToken(fragment, source.slice(index + 2, next - 1), 'function-token-variable');
+          appendFunctionToken(fragment, ']', 'function-token-keyword');
+          index = next;
+          continue;
+        }
+
+        if (source[index] === '$') {
+          appendFunctionToken(fragment, '$', 'function-token-keyword');
+          index += 1;
+          continue;
+        }
+
+        if (source[index] === '[' || source[index] === ']') {
+          appendFunctionToken(fragment, source[index], 'function-token-keyword');
+          index += 1;
+          continue;
+        }
+
+        if (source[index] === '"' || source[index] === "'") {
+          const quote = source[index];
+          let next = index + 1;
+          while (next < source.length) {
+            if (source[next] === quote && source[next - 1] !== '\\') {
+              next += 1;
+              break;
+            }
+            next += 1;
+          }
+          appendFunctionToken(fragment, source.slice(index, next));
+          index = next;
+          continue;
+        }
+
+        const numberMatch = source.slice(index).match(/^(?:\d+(?:\.\d+)?|\.\d+)(?:[eE][+-]?\d+)?/u);
+        if (numberMatch) {
+          appendFunctionToken(fragment, numberMatch[0], 'function-token-number');
+          index += numberMatch[0].length;
+          continue;
+        }
+
+        if (identifierStart(source[index])) {
+          let next = index + 1;
+          while (next < source.length && identifierPart(source[next]))
+            next += 1;
+          const identifier = source.slice(index, next);
+          let following = next;
+          while (following < source.length && /\s/u.test(source[following]))
+            following += 1;
+          const className = MARS_FUNCTION_KEYWORDS.has(identifier)
+            ? 'function-token-keyword'
+            : (source[following] === '('
+              ? 'function-token-function'
+              : (!MARS_FUNCTION_CONSTANTS.has(identifier)
+                ? `function-token-variable${functionArrayVariables.has(identifier) ? ' function-token-array' : ''}`
+                : ''));
+          appendFunctionToken(fragment, identifier, className);
+          index = next;
+          continue;
+        }
+
+        appendFunctionToken(fragment, source[index]);
+        index += 1;
+      }
+
+      element.replaceChildren(fragment);
+    }
+
     function renderMatrixSectionHeadings(element, text) {
       const source = String(text || '');
       const lines = source.split('\n');
@@ -9328,8 +9510,16 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       });
     }
 
+    function renderResultText(element, text) {
+      if (element === functionStyle && looksLikeMarsFunction(text)) {
+        renderMarsFunctionSyntax(element, text);
+        return;
+      }
+      renderMatrixSectionHeadings(element, text);
+    }
+
     function setExpandableText(element, button, displayText, fullText) {
-      renderMatrixSectionHeadings(element, displayText || fullText || '');
+      renderResultText(element, displayText || fullText || '');
       element.dataset.displayText = displayText || '';
       element.dataset.fullText = fullText || '';
       resetMoreDigitsButton(
@@ -9577,11 +9767,11 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     function toggleTextDigits(element, button) {
       const expanded = button.dataset.expanded === 'true';
       if (expanded) {
-        renderMatrixSectionHeadings(element, element.dataset.displayText || element.textContent);
+        renderResultText(element, element.dataset.displayText || element.textContent);
         button.textContent = 'Show more digits';
         button.dataset.expanded = 'false';
       } else {
-        renderMatrixSectionHeadings(element, element.dataset.fullText || element.textContent);
+        renderResultText(element, element.dataset.fullText || element.textContent);
         button.textContent = 'Show fewer digits';
         button.dataset.expanded = 'true';
       }
@@ -11628,8 +11818,45 @@ def expression_for_display(expression: str) -> str:
     return expression_for_editor(expression)
 
 
+def array_values_for_display(values: object) -> str:
+    text = expression_for_display(str(values or "")).strip()
+    if not (text.startswith("[") and text.endswith("]")):
+        return text
+
+    body = text[1:-1].strip()
+    if not body:
+        return ""
+
+    entries: list[str] = []
+    entry_start = 0
+    depth = 0
+    matching_closers = {")": "(", "]": "[", "}": "{"}
+    openers: list[str] = []
+    for index, character in enumerate(body):
+        if character in "([{":
+            openers.append(character)
+            depth += 1
+        elif character in matching_closers and openers and openers[-1] == matching_closers[character]:
+            openers.pop()
+            depth -= 1
+        elif character == "," and depth == 0:
+            entries.append(body[entry_start:index].strip())
+            entry_start = index + 1
+    entries.append(body[entry_start:].strip())
+    return "\n".join(entry for entry in entries if entry)
+
+
 def function_for_display(function: str) -> str:
     return re.sub(r"(=\s*)NAN\b", r"\1?", str(function or ""))
+
+
+def function_with_source_comment(function: str, source_expression: str) -> str:
+    rendered_function = str(function or "").strip()
+    source_body, _, _ = parse_expression_body(source_expression)
+    source_body = source_body.strip()
+    if not rendered_function or not source_body:
+        return rendered_function
+    return f"`` {source_body}\n{rendered_function}"
 
 
 def TeX_for_display(tex: str) -> str:
@@ -14491,7 +14718,10 @@ def function_binding_initializers(function: str) -> dict[str, str]:
     initializers: dict[str, str] = {}
 
     for line in str(function or "").splitlines():
-        match = re.match(r"^\s*(?:const\s+)?([^\s=/]+)\s*=\s*(.+?)\s*$", line)
+        match = re.match(
+            r"^\s*(?:(?:array\s+)?const\s+|array\s+)?([^\s=/;.]+)\s*=\s*(.*?)\s*[.;]?\s*$",
+            line,
+        )
         if match:
             initializers[match.group(1)] = match.group(2)
     return initializers
@@ -14509,7 +14739,24 @@ def function_for_result_card(
     lines: list[str] = []
 
     for line in str(algebraic_function or "").splitlines():
-        match = re.match(r"^(\s*)//\s*([^=]+?)\s*=\s*\?\s*$", line)
+        assignment = re.match(
+            r"^(\s*)(?:(?:array\s+)?const\s+|array\s+)?([^\s=/;.]+)\s*=\s*(.*?)\s*[.;]?\s*$",
+            line,
+        )
+        if assignment and assignment.group(2) in values:
+            indent, name = assignment.group(1), assignment.group(2)
+            value = initializers.get(name, values[name])
+            if value.upper() == "NAN":
+                value = "?"
+            is_array = value.startswith("[")
+            qualifier = "array const " if kinds.get(name) == "constant" and is_array else (
+                "const " if kinds.get(name) == "constant" else ""
+            )
+            lines.append(f"{indent}{qualifier}{name} = {value}.")
+            seen.add(name)
+            continue
+
+        match = re.match(r"^(\s*)``\s*([^=]+?)\s*=\s*\?\s*$", line)
         if not match:
             lines.append(line)
             continue
@@ -14521,7 +14768,7 @@ def function_for_result_card(
         if value.upper() == "NAN":
             value = "?"
         qualifier = "const " if kinds.get(name) == "constant" else ""
-        lines.append(f"{indent}{qualifier}{name} = {value}")
+        lines.append(f"{indent}{qualifier}{name} = {value}.")
         seen.add(name)
 
     missing = [item for item in bindings if item["name"] not in seen]
@@ -14531,8 +14778,12 @@ def function_for_result_card(
         for item in missing:
             name = item["name"]
             value = initializers.get(name, str(item.get("value") or "?"))
-            qualifier = "const " if item.get("kind") == "constant" else ""
-            additions.append(f"{qualifier}{name} = {'?' if value.upper() == 'NAN' else value}")
+            rendered_value = "?" if value.upper() == "NAN" else value
+            is_array = rendered_value.startswith("[")
+            qualifier = "array const " if item.get("kind") == "constant" and is_array else (
+                "const " if item.get("kind") == "constant" else ""
+            )
+            additions.append(f"{qualifier}{name} = {rendered_value}.")
         lines[output_index:output_index] = additions
 
     return "\n".join(lines)
@@ -14707,9 +14958,12 @@ def prepare_evaluation_fields(
     display_expression_source = fields.get("root_expression", "") or fields.get("expression", "") or fields.get("unbound", "")
     fields["full_display_expression"] = expression_for_display(display_expression_source)
     fields["full_display_TeX"] = TeX_for_display(fields.get("root_TeX", "") or fields.get("tex", ""))
-    fields["full_display_function"] = function_for_display(fields.get("root_function", "") or fields.get("function", ""))
+    fields["full_display_function"] = function_with_source_comment(
+        function_for_display(fields.get("root_function", "") or fields.get("function", "")),
+        expression,
+    )
     if fields.get("root_value"):
-        fields["value"] = expression_for_display(str(fields["root_value"]))
+        fields["value"] = array_values_for_display(fields["root_value"])
     fields["display_expression"] = compact_display_text(str(fields["full_display_expression"]))
     fields["display_TeX"] = compact_display_text(str(fields["full_display_TeX"]))
     fields["display_function"] = compact_function_text(str(fields["full_display_function"]))

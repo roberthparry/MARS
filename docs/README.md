@@ -44,6 +44,10 @@ This directory contains the longer module documentation for MARS.
 - [`set_t` copying and cleanup](./set.md#copying-and-cleanup)
 - [`array_t` copying and cleanup](./array.md#copying-and-cleanup)
 
+## Design Notes
+
+- [Literate comments and notebook output](./design-notes/literate-comments-and-notebooks.md)
+
 ## Acknowledgements
 
 `number_t` uses the GNU multiprecision libraries internally for its exact and

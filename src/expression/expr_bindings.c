@@ -33,7 +33,7 @@ typedef enum {
 } binding_prec_t;
 
 #define BINDING_CONST_COUNT 5u
-#define BINDING_EXPR_KIND_COUNT 10u
+#define BINDING_EXPR_KIND_COUNT 11u
 
 typedef struct {
     expr_binding_const_id_t id;
@@ -96,6 +96,7 @@ static const char *binding_const_TeX_name(expr_binding_const_id_t const_id)
 }
 
 static void binding_free_none(expr_binding_expr_t *expr);
+static void binding_free_array(expr_binding_expr_t *expr);
 static void binding_free_number(expr_binding_expr_t *expr);
 static void binding_free_unary(expr_binding_expr_t *expr);
 static void binding_free_binary(expr_binding_expr_t *expr);
@@ -104,6 +105,7 @@ static void binding_free_unary_op(expr_binding_expr_t *expr);
 static void binding_free_binary_op(expr_binding_expr_t *expr);
 
 static expr_binding_expr_t *binding_clone_number(const expr_binding_expr_t *expr);
+static expr_binding_expr_t *binding_clone_array(const expr_binding_expr_t *expr);
 static expr_binding_expr_t *binding_clone_const(const expr_binding_expr_t *expr);
 static expr_binding_expr_t *binding_clone_neg(const expr_binding_expr_t *expr);
 static expr_binding_expr_t *binding_clone_add(const expr_binding_expr_t *expr);
@@ -115,6 +117,7 @@ static expr_binding_expr_t *binding_clone_unary_op(const expr_binding_expr_t *ex
 static expr_binding_expr_t *binding_clone_binary_op(const expr_binding_expr_t *expr);
 
 static expr_t *binding_eval_number(const expr_binding_expr_t *expr);
+static expr_t *binding_eval_array(const expr_binding_expr_t *expr);
 static expr_t *binding_eval_const(const expr_binding_expr_t *expr);
 static expr_t *binding_eval_neg(const expr_binding_expr_t *expr);
 static expr_t *binding_eval_add(const expr_binding_expr_t *expr);
@@ -135,6 +138,7 @@ static bool binding_number_value_div(const expr_binding_expr_t *expr, number_t *
 static bool binding_number_value_powi(const expr_binding_expr_t *expr, number_t *out);
 
 static bool binding_struct_eq_number(const expr_binding_expr_t *left, const expr_binding_expr_t *right);
+static bool binding_struct_eq_array(const expr_binding_expr_t *left, const expr_binding_expr_t *right);
 static bool binding_struct_eq_const(const expr_binding_expr_t *left, const expr_binding_expr_t *right);
 static bool binding_struct_eq_unary(const expr_binding_expr_t *left, const expr_binding_expr_t *right);
 static bool binding_struct_eq_binary(const expr_binding_expr_t *left, const expr_binding_expr_t *right);
@@ -164,6 +168,7 @@ static bool binding_explicit_mul_separator_mul(const expr_binding_expr_t *expr);
 static bool binding_explicit_mul_separator_powi(const expr_binding_expr_t *expr);
 
 static void emit_binding_expr_number(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
+static void emit_binding_expr_array(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
 static void emit_binding_expr_const(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
 static void emit_binding_expr_neg(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
 static void emit_binding_expr_add(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
@@ -175,6 +180,7 @@ static void emit_binding_expr_unary_op(const expr_binding_expr_t *expr, sbuf_t *
 static void emit_binding_expr_binary_op(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
 
 static void emit_binding_func_number(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
+static void emit_binding_func_array(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
 static void emit_binding_func_const(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
 static void emit_binding_func_neg(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
 static void emit_binding_func_add(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
@@ -184,8 +190,10 @@ static void emit_binding_func_div(const expr_binding_expr_t *expr, sbuf_t *b, in
 static void emit_binding_func_powi(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
 static void emit_binding_func_unary_op(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
 static void emit_binding_func_binary_op(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
+static void emit_binding_func_expr(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
 
 static void emit_binding_TeX_number(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
+static void emit_binding_TeX_array(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
 static void emit_binding_TeX_const(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
 static void emit_binding_TeX_neg(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
 static void emit_binding_TeX_add(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
@@ -196,6 +204,20 @@ static void emit_binding_TeX_powi(const expr_binding_expr_t *expr, sbuf_t *b, in
 static void emit_binding_TeX_unary_op(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
 static void emit_binding_TeX_binary_op(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
 static const binding_expr_ops_t s_binding_expr_ops[BINDING_EXPR_KIND_COUNT] = {
+    [EXPR_BINDING_EXPR_ARRAY] = {.precedence = BIND_PREC_ATOM,
+                                 .atomic = true,
+                                 .free_payload = binding_free_array,
+                                 .clone = binding_clone_array,
+                                 .eval_expr = binding_eval_array,
+                                 .number_value = binding_number_value_false,
+                                 .simplify = expr_binding_simplify_atom,
+                                 .struct_eq = binding_struct_eq_array,
+                                 .numeric_literal = binding_numeric_literal_false,
+                                 .exact_complex = NULL,
+                                 .explicit_mul_separator = binding_explicit_mul_separator_false,
+                                 .emit_expr = emit_binding_expr_array,
+                                 .emit_func = emit_binding_func_array,
+                                 .emit_TeX = emit_binding_TeX_array},
     [EXPR_BINDING_EXPR_NUMBER] = {.precedence = BIND_PREC_ATOM,
                                   .atomic = true,
                                   .free_payload = binding_free_number,
@@ -355,6 +377,16 @@ static expr_binding_expr_t *binding_expr_alloc(expr_binding_expr_kind_t kind)
     return expr;
 }
 
+static expr_binding_expr_t *expr_binding_expr_new_array(expr_binding_expr_t **items, size_t count, bool unspecified)
+{
+    expr_binding_expr_t *expr = binding_expr_alloc(EXPR_BINDING_EXPR_ARRAY);
+
+    expr->u.array.items = items;
+    expr->u.array.count = count;
+    expr->u.array.unspecified = unspecified;
+    return expr;
+}
+
 expr_binding_expr_t *expr_binding_expr_new_number_text(const char *text)
 {
     expr_binding_expr_t *expr = binding_expr_alloc(EXPR_BINDING_EXPR_NUMBER);
@@ -471,6 +503,13 @@ static void binding_free_none(expr_binding_expr_t *expr)
     (void)expr;
 }
 
+static void binding_free_array(expr_binding_expr_t *expr)
+{
+    for (size_t i = 0u; i < expr->u.array.count; ++i)
+        expr_binding_expr_free(expr->u.array.items[i]);
+    free(expr->u.array.items);
+}
+
 static void binding_free_number(expr_binding_expr_t *expr)
 {
     free(expr->u.text);
@@ -513,6 +552,20 @@ static expr_binding_expr_t *binding_clone_binary_plain(const expr_binding_expr_t
 static expr_binding_expr_t *binding_clone_number(const expr_binding_expr_t *expr)
 {
     return expr_binding_expr_new_number_text(expr->u.text);
+}
+
+static expr_binding_expr_t *binding_clone_array(const expr_binding_expr_t *expr)
+{
+    expr_binding_expr_t **items = NULL;
+
+    if (expr->u.array.count > 0u) {
+        items = calloc(expr->u.array.count, sizeof(*items));
+        if (!items)
+            abort();
+        for (size_t i = 0u; i < expr->u.array.count; ++i)
+            items[i] = expr_binding_expr_clone(expr->u.array.items[i]);
+    }
+    return expr_binding_expr_new_array(items, expr->u.array.count, expr->u.array.unspecified);
 }
 
 static expr_binding_expr_t *binding_clone_const(const expr_binding_expr_t *expr)
@@ -807,6 +860,12 @@ static expr_t *binding_eval_number(const expr_binding_expr_t *expr)
     return node;
 }
 
+static expr_t *binding_eval_array(const expr_binding_expr_t *expr)
+{
+    (void)expr;
+    return expr_new_const(NUM_NAN);
+}
+
 static expr_t *binding_eval_const(const expr_binding_expr_t *expr)
 {
     number_t value = binding_const_number(expr->u.const_id);
@@ -874,6 +933,17 @@ static bool binding_struct_eq_number(const expr_binding_expr_t *left, const expr
     if (!left->u.text || !right->u.text)
         return left->u.text == right->u.text;
     return strcmp(left->u.text, right->u.text) == 0;
+}
+
+static bool binding_struct_eq_array(const expr_binding_expr_t *left, const expr_binding_expr_t *right)
+{
+    if (left->u.array.unspecified != right->u.array.unspecified || left->u.array.count != right->u.array.count)
+        return false;
+    for (size_t i = 0u; i < left->u.array.count; ++i) {
+        if (!expr_binding_expr_struct_eq(left->u.array.items[i], right->u.array.items[i]))
+            return false;
+    }
+    return true;
 }
 
 static bool binding_struct_eq_const(const expr_binding_expr_t *left, const expr_binding_expr_t *right)
@@ -1151,21 +1221,35 @@ bool expr_exact_complex_root_seed(const expr_t *expr, number_t *seed_out, long *
     long denominator;
     bool have_base = false;
     bool matched = false;
+    bool named_root = false;
     bool success = false;
 
     if (!expr || !seed_out || !order_out)
         return false;
 
     if (expr->binding_expr && expr->binding_expr->kind == EXPR_BINDING_EXPR_BINARY_OP &&
-        expr->binding_expr->u.binary_op.ops == &ops_pow) {
+        (expr->binding_expr->u.binary_op.ops == &ops_pow || expr->binding_expr->u.binary_op.ops == &ops_root)) {
+        named_root = expr->binding_expr->u.binary_op.ops == &ops_root;
         have_base = expr_binding_expr_exact_complex(expr->binding_expr->u.binary_op.left, &base);
         matched = have_base && expr_binding_expr_number_value(expr->binding_expr->u.binary_op.right, &exponent);
+    } else if (expr_is_op(expr, &ops_root) && expr->a && expr->b) {
+        named_root = true;
+        have_base = expr_exact_complex_value(expr->a, &base);
+        matched = have_base && expr_match_const_value(expr->b, &exponent);
     } else if (expr_match_pow_const(expr, &base_expr, &exponent)) {
         have_base = expr_exact_complex_value(base_expr, &base);
         matched = have_base;
     }
 
-    if (!matched || !num_get_small_rational(exponent, &numerator, &denominator) || numerator != 1L ||
+    if (!matched || !num_get_small_rational(exponent, &numerator, &denominator))
+        goto cleanup;
+    if (named_root) {
+        if (denominator != 1L)
+            goto cleanup;
+        denominator = numerator;
+        numerator = 1L;
+    }
+    if (numerator != 1L ||
         denominator < 2L || !binding_exact_complex_root_seed(&base, denominator, seed_out))
         goto cleanup;
 
@@ -1181,6 +1265,43 @@ cleanup:
         num_destroy(&base.real);
     }
     return success;
+}
+
+/* Recover the authored base of an explicit reciprocal power. */
+expr_t *expr_explicit_root_base(const expr_t *expr, long *order_out)
+{
+    number_t exponent = number_invalid();
+    const expr_t *tree_base = NULL;
+    expr_t *base = NULL;
+    long numerator;
+    long denominator;
+
+    if (!expr || !order_out)
+        return NULL;
+
+    if (expr->binding_expr && expr->binding_expr->kind == EXPR_BINDING_EXPR_BINARY_OP &&
+        expr->binding_expr->u.binary_op.ops == &ops_pow) {
+        if (!expr_binding_expr_number_value(expr->binding_expr->u.binary_op.right, &exponent))
+            goto cleanup;
+        base = expr_binding_expr_eval_expr(expr->binding_expr->u.binary_op.left);
+        if (base) {
+            expr_binding_expr_free(base->binding_expr);
+            base->binding_expr = expr_binding_expr_clone(expr->binding_expr->u.binary_op.left);
+        }
+    } else if (expr_match_pow_const(expr, &tree_base, &exponent)) {
+        base = expr_clone(tree_base);
+    }
+
+    if (!base || !num_get_small_rational(exponent, &numerator, &denominator) || numerator != 1L || denominator < 2L) {
+        expr_free(base);
+        base = NULL;
+        goto cleanup;
+    }
+    *order_out = denominator;
+
+cleanup:
+    num_destroy(&exponent);
+    return base;
 }
 
 bool expr_explicit_root_order(const expr_t *expr, long *order_out)
@@ -2693,6 +2814,127 @@ expr_binding_expr_t *expr_binding_expr_parse_view(string_view_t text, string_t *
     return NULL;
 }
 
+expr_binding_expr_t *expr_binding_expr_parse_array_view(string_view_t text, string_t *errmsg)
+{
+    string_cursor_t *cursor;
+    expr_binding_expr_t **items = NULL;
+    size_t count = 0u;
+    size_t capacity = 0u;
+    unsigned char ch;
+
+    if (errmsg)
+        string_clear(errmsg);
+    text = string_view_trim(text);
+    cursor = string_cursor_new_view(text);
+    if (!cursor)
+        return NULL;
+    string_cursor_skip_spaces(cursor);
+    if (!expr_parse_cursor_consume_char(cursor, '['))
+        goto syntax_error;
+    string_cursor_skip_spaces(cursor);
+
+    if (expr_parse_cursor_consume_char(cursor, ']')) {
+        string_cursor_skip_spaces(cursor);
+        if (!string_cursor_done(cursor))
+            goto syntax_error;
+        string_cursor_free(cursor);
+        return expr_binding_expr_new_array(NULL, 0u, true);
+    }
+
+    if (expr_parse_cursor_consume_char(cursor, '?')) {
+        string_cursor_skip_spaces(cursor);
+        if (!expr_parse_cursor_consume_char(cursor, ']'))
+            goto syntax_error;
+        string_cursor_skip_spaces(cursor);
+        if (!string_cursor_done(cursor))
+            goto syntax_error;
+        string_cursor_free(cursor);
+        return expr_binding_expr_new_array(NULL, 0u, true);
+    }
+
+    for (;;) {
+        size_t start = string_cursor_position(cursor);
+        size_t end;
+        unsigned paren_depth = 0u;
+        unsigned bracket_depth = 0u;
+        bool absolute_open = false;
+        expr_binding_expr_t *item;
+        string_view_t item_text;
+
+        while (!string_cursor_done(cursor)) {
+            if (!string_cursor_peek_ascii(cursor, &ch)) {
+                (void)string_cursor_next(cursor);
+                continue;
+            }
+            if (ch == '(') {
+                paren_depth++;
+            } else if (ch == ')' && paren_depth > 0u) {
+                paren_depth--;
+            } else if (ch == '[') {
+                bracket_depth++;
+            } else if (ch == ']' && bracket_depth > 0u) {
+                bracket_depth--;
+            } else if (ch == '|') {
+                absolute_open = !absolute_open;
+            } else if (paren_depth == 0u && bracket_depth == 0u && !absolute_open && (ch == ',' || ch == ']')) {
+                break;
+            }
+            (void)string_cursor_next(cursor);
+        }
+
+        end = string_cursor_position(cursor);
+        item_text = string_cursor_view_between(start, end, cursor);
+        item_text = string_view_trim(item_text);
+        if (string_view_is_empty(item_text))
+            goto syntax_error;
+        item = expr_binding_expr_parse_view(item_text, errmsg);
+        if (!item)
+            goto fail;
+        item = expr_binding_expr_simplify(item);
+
+        if (count == capacity) {
+            size_t next_capacity = capacity ? capacity * 2u : 4u;
+            expr_binding_expr_t **next = realloc(items, next_capacity * sizeof(*next));
+
+            if (!next)
+                abort();
+            items = next;
+            capacity = next_capacity;
+        }
+        items[count++] = item;
+
+        if (!string_cursor_peek_ascii(cursor, &ch))
+            goto syntax_error;
+        (void)string_cursor_next(cursor);
+        if (ch == ']')
+            break;
+        string_cursor_skip_spaces(cursor);
+    }
+
+    string_cursor_skip_spaces(cursor);
+    if (!string_cursor_done(cursor))
+        goto syntax_error;
+    string_cursor_free(cursor);
+    return expr_binding_expr_new_array(items, count, false);
+
+syntax_error:
+    if (errmsg) {
+        string_clear(errmsg);
+        string_append_cstr(errmsg, "invalid array binding");
+    }
+fail:
+    for (size_t i = 0u; i < count; ++i)
+        expr_binding_expr_free(items[i]);
+    free(items);
+    string_cursor_free(cursor);
+    return NULL;
+}
+
+bool expr_binding_expr_is_array(const expr_binding_expr_t *expr)
+{
+    return expr && expr->kind == EXPR_BINDING_EXPR_ARRAY;
+}
+
 static int binding_expr_prec(const expr_binding_expr_t *expr)
 {
     const binding_expr_ops_t *ops;
@@ -3270,6 +3512,22 @@ static void emit_binding_expr_number(const expr_binding_expr_t *expr, sbuf_t *b,
     emit_binding_number_text(expr->u.text, b);
 }
 
+static void emit_binding_expr_array(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec)
+{
+    (void)parent_prec;
+    sbuf_putc(b, '[');
+    if (expr->u.array.unspecified) {
+        sbuf_putc(b, '?');
+    } else {
+        for (size_t i = 0u; i < expr->u.array.count; ++i) {
+            if (i > 0u)
+                sbuf_puts(b, ", ");
+            emit_binding_expr(expr->u.array.items[i], b, BIND_PREC_LOWEST);
+        }
+    }
+    sbuf_putc(b, ']');
+}
+
 static void emit_binding_expr_const(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec)
 {
     (void)parent_prec;
@@ -3430,6 +3688,22 @@ static void emit_binding_TeX_number(const expr_binding_expr_t *expr, sbuf_t *b, 
         sbuf_puts(b, tex);
         free(tex);
     }
+}
+
+static void emit_binding_TeX_array(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec)
+{
+    (void)parent_prec;
+    sbuf_puts(b, "\\left[");
+    if (expr->u.array.unspecified) {
+        sbuf_putc(b, '?');
+    } else {
+        for (size_t i = 0u; i < expr->u.array.count; ++i) {
+            if (i > 0u)
+                sbuf_puts(b, ", ");
+            emit_binding_TeX_expr(expr->u.array.items[i], b, BIND_PREC_LOWEST);
+        }
+    }
+    sbuf_puts(b, "\\right]");
 }
 
 static void emit_binding_TeX_const(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec)
@@ -3828,11 +4102,25 @@ static void emit_binding_expr_binary_op(const expr_binding_expr_t *expr, sbuf_t 
     sbuf_putc(b, ')');
 }
 
-static void emit_binding_func_expr(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
-
 static void emit_binding_func_number(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec)
 {
     emit_binding_expr_number(expr, b, parent_prec);
+}
+
+static void emit_binding_func_array(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec)
+{
+    (void)parent_prec;
+    sbuf_putc(b, '[');
+    if (expr->u.array.unspecified) {
+        sbuf_putc(b, '?');
+    } else {
+        for (size_t i = 0u; i < expr->u.array.count; ++i) {
+            if (i > 0u)
+                sbuf_puts(b, ", ");
+            emit_binding_func_expr(expr->u.array.items[i], b, BIND_PREC_LOWEST);
+        }
+    }
+    sbuf_putc(b, ']');
 }
 
 static void emit_binding_func_const(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec)
@@ -3896,7 +4184,7 @@ static void emit_binding_func_div(const expr_binding_expr_t *expr, sbuf_t *b, in
     if (need)
         sbuf_putc(b, '(');
     emit_binding_func_expr(expr->u.binary.left, b, BIND_PREC_MUL);
-    sbuf_puts(b, " / ");
+    sbuf_putc(b, '/');
     emit_binding_func_expr(expr->u.binary.right, b, BIND_PREC_POW);
     if (need)
         sbuf_putc(b, ')');
@@ -3914,7 +4202,7 @@ static void emit_binding_func_powi(const expr_binding_expr_t *expr, sbuf_t *b, i
 
         if (recip_need)
             sbuf_putc(b, '(');
-        sbuf_puts(b, "1 / ");
+        sbuf_puts(b, "1/");
         if (positive_exponent == 1L) {
             emit_binding_func_expr(expr->u.powi.base, b, BIND_PREC_POW);
         } else {
@@ -3982,7 +4270,7 @@ static void emit_binding_func_binary_op(const expr_binding_expr_t *expr, sbuf_t 
         emit_binding_func_expr(expr->u.binary_op.left, b, base_need ? BIND_PREC_LOWEST : BIND_PREC_POW);
         if (base_need)
             sbuf_putc(b, ')');
-        sbuf_puts(b, " ^ ");
+        sbuf_putc(b, '^');
         if (exp_need)
             sbuf_putc(b, '(');
         emit_binding_func_expr(expr->u.binary_op.right, b, BIND_PREC_LOWEST);
