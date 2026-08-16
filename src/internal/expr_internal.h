@@ -111,6 +111,7 @@ bool expr_match_pow_expr(const expr_t *expr, const expr_t **base_out, const expr
 bool expr_match_integral_expr(const expr_t *expr, const expr_t **integrand_out, const expr_t **domain_out);
 void expr_set_binding_pi_linear_family(expr_t *expr, long denominator, long n_coeff, long offset);
 bool expr_exact_complex_root_seed(const expr_t *expr, number_t *seed_out, long *order_out);
+expr_t *expr_explicit_root_base(const expr_t *expr, long *order_out);
 bool expr_explicit_root_order(const expr_t *expr, long *order_out);
 
 bool expr_match_const_value(const expr_t *expr, number_t *value_out);
@@ -129,6 +130,7 @@ bool expr_collect_var_usage(const expr_t *expr, size_t nvars, expr_t *const *var
 bool expr_has_unbound_parameters(const expr_t *expr, size_t nvars, expr_t *const *vars);
 expr_t *expr_expand_products_internal(const expr_t *expr);
 expr_t *expr_canonicalize_known_radicals_internal(const expr_t *expr);
+expr_t *expr_distribute_negative_for_display(const expr_t *expr);
 string_t *expr_default_constant_canonical_name_text(const string_t *name);
 expr_t *expr_integrate_iterated(const expr_t *integrand, size_t ndim, expr_t *const *vars,
                                 const expr_integration_bound_kind_t *kinds, expr_t *const *lo, expr_t *const *hi,

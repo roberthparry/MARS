@@ -1176,7 +1176,7 @@ expr_t *expr_simplify_try_lambert_argument(expr_t *arg)
     factor = expr_lambert_principal_argument_factor_local(arg);
     if (factor)
         return factor;
-    if (!expr_is_unnamed_const(arg) || !arg->binding_expr)
+    if (!expr_is_unnamed_const(arg) || !arg->binding_expr || expr_binding_expr_is_array(arg->binding_expr))
         return NULL;
 
     expanded = expr_binding_expr_eval_expr(arg->binding_expr);
@@ -1206,7 +1206,8 @@ expr_t *expr_simplify_try_lambert_product(expr_t *a, expr_t *b)
 
     inner = (expr_t *)expr_lambert_arg(w);
 
-    if (!expr_current_wrt_internal() && expr_is_var(inner) && inner->binding_expr)
+    if (!expr_current_wrt_internal() && expr_is_var(inner) && inner->binding_expr &&
+        !expr_binding_expr_is_array(inner->binding_expr))
         return expr_binding_expr_eval_expr(inner->binding_expr);
 
     expr_retain(inner);

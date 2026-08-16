@@ -533,14 +533,14 @@ reconstructing its components in client code:
 ```text
 diffequation de(x) {
     return {
-        Dxx(y) + 3 * Dx(y) + 2 * y = sin(x)
+        Dxx(y) + 3.Dx(y) + 2.y = sin(x)
         | x = ?;
         A = 1, C = 0;
         y(0) = A, Dx(y)(0) = C
-    };
+    }.
 }
 
-output(de(x).solve());
+output(de(x).solve()).
 ```
 
 The function-style form remains a presentation target; the C API currently

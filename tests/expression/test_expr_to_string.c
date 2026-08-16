@@ -359,7 +359,7 @@ static char *test_c_style_body_from_legacy(const char *body)
 
     for (size_t pos = 0u; body[pos] != '\0'; ++pos) {
         if (body[pos] == '*' || body[pos] == '/') {
-            if (!test_sbuf_puts(&out, body[pos] == '*' ? " * " : " / ")) {
+            if (!test_sbuf_puts(&out, body[pos] == '*' ? "." : "/")) {
                 free(out.buf);
                 return NULL;
             }
@@ -435,18 +435,7 @@ static int test_emit_c_arg_list(test_sbuf_t *out, const char *args, int typed, c
             free(name);
             return 0;
         }
-        const char *argument = name;
-
-        if (!typed && test_legacy_arg_is_const(name, bindings, nbindings)) {
-            for (size_t i = 0u; i < nbindings; ++i) {
-                if (strcmp(bindings[i].name, name) == 0 && strcmp(bindings[i].value, "NAN") != 0 &&
-                    strcmp(bindings[i].value, "?") != 0) {
-                    argument = bindings[i].value;
-                    break;
-                }
-            }
-        }
-        if (!test_sbuf_puts(out, argument)) {
+        if (!test_sbuf_puts(out, name)) {
             free(name);
             return 0;
         }
@@ -481,23 +470,21 @@ static int test_emit_c_variable_bindings(test_sbuf_t *out, const char *args, con
         if (!name)
             return 0;
 
-        if (!test_legacy_arg_is_const(name, bindings, nbindings)) {
-            for (size_t i = 0u; i < nbindings; ++i) {
-                if (strcmp(bindings[i].name, name) == 0) {
-                    value = bindings[i].value;
-                    break;
-                }
+        for (size_t i = 0u; i < nbindings; ++i) {
+            if (strcmp(bindings[i].name, name) == 0) {
+                value = bindings[i].value;
+                break;
             }
-            if (strcmp(value, "NAN") == 0 || strcmp(value, "?") == 0) {
-                if (!test_sbuf_puts(out, "// ") || !test_sbuf_puts(out, name) || !test_sbuf_puts(out, " = ?\n")) {
-                    free(name);
-                    return 0;
-                }
-            } else if (!test_sbuf_puts(out, name) || !test_sbuf_puts(out, " = ") || !test_sbuf_puts(out, value) ||
-                       !test_sbuf_puts(out, "\n")) {
-                free(name);
-                return 0;
-            }
+        }
+        if (test_legacy_arg_is_const(name, bindings, nbindings) && !test_sbuf_puts(out, "const ")) {
+            free(name);
+            return 0;
+        }
+        if (!test_sbuf_puts(out, name) || !test_sbuf_puts(out, " = ") ||
+            !test_sbuf_puts(out, strcmp(value, "NAN") == 0 || strcmp(value, "?") == 0 ? "?" : value) ||
+            !test_sbuf_puts(out, ".\n")) {
+            free(name);
+            return 0;
         }
 
         free(name);
@@ -562,9 +549,9 @@ static char *test_legacy_function_expect_to_c(const char *legacy)
 
     if (!test_sbuf_puts(&out, "expression expr(") || !test_emit_c_arg_list(&out, args, 1, bindings, nbindings) ||
         !test_sbuf_puts(&out, ") {\n") || !test_sbuf_puts(&out, "    return ") || !test_sbuf_puts(&out, body_c) ||
-        !test_sbuf_puts(&out, ";\n}\n\n") || !test_emit_c_variable_bindings(&out, args, bindings, nbindings) ||
+        !test_sbuf_puts(&out, ".\n}\n\n") || !test_emit_c_variable_bindings(&out, args, bindings, nbindings) ||
         !test_sbuf_puts(&out, "output(expr(") || !test_emit_c_arg_list(&out, args, 0, bindings, nbindings) ||
-        !test_sbuf_puts(&out, "));"))
+        !test_sbuf_puts(&out, "))."))
         goto fail;
 
     for (size_t i = 0; i < nbindings; ++i) {
@@ -609,11 +596,11 @@ static void test_to_string_basic_const_func(void)
     expr_t *c = test_expr_new_const_d(3.5);
     char *got = expr_to_string(c, style_FUNCTION);
 
-    const char *expect = "expression expr(void) {\n"
-                         "    return 3.5;\n"
+    const char *expect = "expression expr() {\n"
+                         "    return 3.5.\n"
                          "}\n"
                          "\n"
-                         "output(expr());";
+                         "output(expr()).";
 
     if (str_eq(got, expect))
         to_string_pass("basic const (FUNC)", got, expect);
@@ -658,17 +645,17 @@ static void test_to_string_basic_var_func(void)
     char *unknown_got = expr_to_string(unknown, style_FUNCTION);
 
     const char *expect = "expression expr(x) {\n"
-                         "    return x;\n"
+                         "    return x.\n"
                          "}\n"
                          "\n"
-                         "x = 42\n"
-                         "output(expr(x));";
+                         "x = 42.\n"
+                         "output(expr(x)).";
     const char *unknown_expect = "expression expr(x) {\n"
-                                 "    return x;\n"
+                                 "    return x.\n"
                                  "}\n"
                                  "\n"
-                                 "// x = ?\n"
-                                 "output(expr(x));";
+                                 "x = ?.\n"
+                                 "output(expr(x)).";
 
     if (str_eq(got, expect))
         to_string_pass("basic var (FUNC)", got, expect);
@@ -948,11 +935,11 @@ static void test_to_string_gamma_polygamma_standard_names(void)
     const char *expect_TeX = "\\left\\{ \\Gamma(x) + \\psi^{(0)}(x) + \\psi^{(1)}(x) + \\psi^{(2)}(x) "
                              "\\;\\middle|\\; x = 3 \\right\\}";
     const char *expect_func = "expression expr(x) {\n"
-                              "    return gamma(x) + digamma(x) + trigamma(x) + polygamma(2, x);\n"
+                              "    return gamma(x) + digamma(x) + trigamma(x) + polygamma(2, x).\n"
                               "}\n"
                               "\n"
-                              "x = 3\n"
-                              "output(expr(x));";
+                              "x = 3.\n"
+                              "output(expr(x)).";
     const char *expect_second_TeX = "\\left\\{ \\Gamma(x)\\mkern-2mu \\left(\\psi^{(1)}(x) + "
                                     "\\psi^{(0)}(x)^{2}\\right) \\;\\middle|\\; x = 2 \\right\\}";
 
@@ -1007,11 +994,11 @@ static void test_to_string_non_simple_var_bracketed_func(void)
     char *got = expr_to_string(v, style_FUNCTION);
 
     const char *expect = "expression expr([a0b₀]) {\n"
-                         "    return [a0b₀];\n"
+                         "    return [a0b₀].\n"
                          "}\n"
                          "\n"
-                         "[a0b₀] = 42\n"
-                         "output(expr([a0b₀]));";
+                         "[a0b₀] = 42.\n"
+                         "output(expr([a0b₀])).";
 
     if (str_eq(got, expect))
         to_string_pass("non-simple var bracketed (FUNC)", got, expect);
@@ -1060,12 +1047,12 @@ static void test_to_string_addition_func(void)
 
     char *got = expr_to_string(f, style_FUNCTION);
     const char *expect = "expression expr(x, y) {\n"
-                         "    return x + y;\n"
+                         "    return x + y.\n"
                          "}\n"
                          "\n"
-                         "x = 1\n"
-                         "y = 2\n"
-                         "output(expr(x, y));";
+                         "x = 1.\n"
+                         "y = 2.\n"
+                         "output(expr(x, y)).";
 
     if (str_eq(got, expect))
         to_string_pass("addition (FUNC)", got, expect);
@@ -1267,13 +1254,13 @@ static void test_to_string_nested_mul_add_func(void)
 
     char *got = expr_to_string(simp, style_FUNCTION);
     const char *expect = "expression expr(z, x, y) {\n"
-                         "    return z + x * y;\n"
+                         "    return z + x.y.\n"
                          "}\n"
                          "\n"
-                         "z = 4\n"
-                         "x = 2\n"
-                         "y = 3\n"
-                         "output(expr(z, x, y));";
+                         "z = 4.\n"
+                         "x = 2.\n"
+                         "y = 3.\n"
+                         "output(expr(z, x, y)).";
 
     if (str_eq(got, expect))
         to_string_pass("nested mul+add (FUNC)", got, expect);
@@ -1354,12 +1341,12 @@ static void test_to_string_atan2_func(void)
 
     char *got = expr_to_string(f, style_FUNCTION);
     const char *expect = "expression expr(x, y) {\n"
-                         "    return atan2(x, y);\n"
+                         "    return atan2(x, y).\n"
                          "}\n"
                          "\n"
-                         "x = 2\n"
-                         "y = 3\n"
-                         "output(expr(x, y));";
+                         "x = 2.\n"
+                         "y = 3.\n"
+                         "output(expr(x, y)).";
 
     if (str_eq(got, expect))
         to_string_pass("atan2 (FUNC)", got, expect);
@@ -1407,11 +1394,11 @@ static void test_to_string_pow_superscript_func(void)
 
     char *got = expr_to_string(f, style_FUNCTION);
     const char *expect = "expression expr(x) {\n"
-                         "    return x^3;\n"
+                         "    return x^3.\n"
                          "}\n"
                          "\n"
-                         "x = 2\n"
-                         "output(expr(x));";
+                         "x = 2.\n"
+                         "output(expr(x)).";
 
     if (str_eq(got, expect))
         to_string_pass("pow superscript (FUNC)", got, expect);
@@ -1451,11 +1438,11 @@ static void test_to_string_complex_const_pow_func(void)
     expr_t *pow = expr_pow_d(base, 6.0);
     expr_t *f = expr_add_d(pow, 1.0);
     char *got = expr_to_string(f, style_FUNCTION);
-    const char *expect = "expression expr(void) {\n"
-                         "    return (1 + 2i)^6 + 1;\n"
+    const char *expect = "expression expr() {\n"
+                         "    return (1 + 2i)^6 + 1.\n"
                          "}\n"
                          "\n"
-                         "output(expr());";
+                         "output(expr()).";
 
     if (str_eq(got, expect))
         to_string_pass("complex const power base (FUNC)", got, expect);
@@ -1544,6 +1531,24 @@ static void test_to_string_power_base_is_grouped_TeX(void)
     expr_free(a);
 }
 
+static void test_to_string_negative_const_power_base_is_grouped(void)
+{
+    expr_t *f = expr_from_string("{ (-1)^k | k = NAN }", NULL);
+    char *expression = f ? expr_to_string(f, style_EXPRESSION) : NULL;
+    char *function = f ? expr_to_string(f, style_FUNCTION) : NULL;
+    const char *expected = "(-1)^k";
+
+    if (expression && function && strstr(expression, expected) && strstr(function, expected))
+        to_string_pass("negative constant power base is grouped", expression, expected);
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "negative constant power base is grouped",
+                       expression ? expression : function, expected);
+
+    free(function);
+    free(expression);
+    expr_free(f);
+}
+
 static void test_to_string_power_of_power_simplifies_expr(void)
 {
     expr_t *f = expr_from_string("{ (a^(-x))² | x = NAN; a = NAN }", NULL);
@@ -1587,6 +1592,7 @@ void test_to_string_pow_superscript(void)
     TEST_RUN_SUBTEST(test_to_string_parsed_complex_const_pow_TeX, NULL);
     TEST_RUN_SUBTEST(test_to_string_parsed_complex_const_pow_expr, NULL);
     TEST_RUN_SUBTEST(test_to_string_power_base_is_grouped_TeX, NULL);
+    TEST_RUN_SUBTEST(test_to_string_negative_const_power_base_is_grouped, NULL);
     TEST_RUN_SUBTEST(test_to_string_power_of_power_simplifies_expr, NULL);
     TEST_RUN_SUBTEST(test_to_string_powered_exponent_TeX, NULL);
 }
@@ -1620,11 +1626,11 @@ static void test_to_string_unary_sin_func(void)
 
     char *got = expr_to_string(f, style_FUNCTION);
     const char *expect = "expression expr(x) {\n"
-                         "    return sin(x);\n"
+                         "    return sin(x).\n"
                          "}\n"
                          "\n"
-                         "x = 0.5\n"
-                         "output(expr(x));";
+                         "x = 0.5.\n"
+                         "output(expr(x)).";
 
     if (str_eq(got, expect))
         to_string_pass("unary sin (FUNC)", got, expect);
@@ -1665,11 +1671,11 @@ static void test_to_string_unary_sqrt_func(void)
     expr_t *f = expr_sqrt(x);
     char *got = expr_to_string(f, style_FUNCTION);
     const char *expect = "expression expr(x) {\n"
-                         "    return sqrt(x);\n"
+                         "    return sqrt(x).\n"
                          "}\n"
                          "\n"
-                         "x = 4\n"
-                         "output(expr(x));";
+                         "x = 4.\n"
+                         "output(expr(x)).";
 
     if (str_eq(got, expect))
         to_string_pass("unary sqrt (FUNC)", got, expect);
@@ -1713,11 +1719,11 @@ static void test_to_string_function_style_func(void)
     char *got = expr_to_string(x, style_FUNCTION);
 
     const char *expect = "expression expr(x) {\n"
-                         "    return x;\n"
+                         "    return x.\n"
                          "}\n"
                          "\n"
-                         "x = 10\n"
-                         "output(expr(x));";
+                         "x = 10.\n"
+                         "output(expr(x)).";
 
     if (str_eq(got, expect))
         to_string_pass("function style identity (FUNC)", got, expect);
@@ -1743,11 +1749,11 @@ static void test_to_string_function_style_signed_sum(void)
     char *got = expr_to_string(simp, style_FUNCTION);
 
     const char *expect = "expression expr(x) {\n"
-                         "    return exp(sin(x)) + 3 * x^2 - 7;\n"
+                         "    return exp(sin(x)) + 3.x^2 - 7.\n"
                          "}\n"
                          "\n"
-                         "x = 1\n"
-                         "output(expr(x));";
+                         "x = 1.\n"
+                         "output(expr(x)).";
 
     if (str_eq(got, expect))
         to_string_pass("function style signed sum (FUNC)", got, expect);
@@ -1777,12 +1783,12 @@ static void test_to_string_function_style_sub_negative_product(void)
     char *got = expr_to_string(f, style_FUNCTION);
 
     const char *expect = "expression expr(E, e) {\n"
-                         "    return E - e * sin(E);\n"
+                         "    return E - e.sin(E).\n"
                          "}\n"
                          "\n"
-                         "E = 0.8000000000000000444089209850062616\n"
-                         "e = 0.01669999999999999956701302039618894\n"
-                         "output(expr(E, e));";
+                         "E = 0.8000000000000000444089209850062616.\n"
+                         "e = 0.01669999999999999956701302039618894.\n"
+                         "output(expr(E, e)).";
 
     if (str_eq(got, expect))
         to_string_pass("function style negative product rhs (FUNC)", got, expect);
@@ -1799,21 +1805,64 @@ static void test_to_string_function_style_sub_negative_product(void)
 
 static void test_to_string_function_style_preserves_math_names(void)
 {
-    expr_t *f = expr_from_string("{ tan(x*y*c0/2) | x = 3.25, y = 4.5; c0 = gamma }", NULL);
+    /* README example: style_FUNCTION variable and constant declarations. */
+    expr_t *f = expr_from_string(
+        "{ tan(x*y*c0/2) | "
+        "x = 3.29929295579108949982756921421358070866178174810740656177232818327906094186165, "
+        "y = 3.29929295579108949982756921421358070866178174810740656177232818327906094186165; c0 = gamma }",
+        NULL);
     char *got = expr_to_string(f, style_FUNCTION);
 
     const char *expect = "expression expr(x, y, const c₀) {\n"
-                         "    return tan(c₀ * x * y / 2);\n"
+                         "    return tan(c₀.x.y/2).\n"
                          "}\n"
                          "\n"
-                         "x = 3.25\n"
-                         "y = 4.5\n"
-                         "output(expr(x, y, γ));";
+                         "x = 3.29929295579108949982756921421358070866178174810740656177232818327906094186165.\n"
+                         "y = 3.29929295579108949982756921421358070866178174810740656177232818327906094186165.\n"
+                         "const c₀ = @gamma.\n"
+                         "output(expr(x, y, c₀)).";
 
     if (str_eq(got, expect))
         to_string_pass("function style preserves mathematical names (FUNC)", got, expect);
     else
         to_string_fail(__FILE__, __LINE__, 1, "function style preserves mathematical names (FUNC)", got, expect);
+
+    free(got);
+    expr_free(f);
+}
+
+static void test_to_string_function_style_extracts_variable_dependent_dag_nodes(void)
+{
+    expr_t *f = expr_from_string("cos(sin(x))+exp(sin(x))+ln(sin(x))+tan(sin(x))+sqrt(sin(x))+asin(sin(x))"
+                                 "+cosh(sin(x))+sinh(sin(x))+tanh(sin(x))+acos(sin(x))+atan(sin(x))",
+                                 NULL);
+    char *got = expr_to_string(f, style_FUNCTION);
+    const char *expected_assignment = "    v1 = sin(x).\n";
+
+    if (got && !strstr(got, "Intermediate expressions") && strstr(got, expected_assignment) &&
+        !strstr(got, "const v1 = sin(x)."))
+        to_string_pass("function style extracts variable-dependent DAG nodes (FUNC)", got, expected_assignment);
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "function style extracts variable-dependent DAG nodes (FUNC)", got,
+                       expected_assignment);
+
+    free(got);
+    expr_free(f);
+}
+
+static void test_to_string_function_style_extracts_short_shared_dag_nodes(void)
+{
+    expr_t *f = expr_from_string("cos(sin(x))+exp(sin(x))", NULL);
+    char *got = expr_to_string(f, style_FUNCTION);
+    const char *expected_assignment = "    v1 = sin(x).\n";
+    const char *expected_return = "    return cos(v1) + exp(v1).\n";
+
+    if (got && !strstr(got, "Intermediate expressions") && strstr(got, expected_assignment) &&
+        strstr(got, expected_return))
+        to_string_pass("function style extracts short shared DAG nodes (FUNC)", got, expected_return);
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "function style extracts short shared DAG nodes (FUNC)", got,
+                       expected_return);
 
     free(got);
     expr_free(f);
@@ -1826,6 +1875,8 @@ void test_to_string_function_style(void)
     TEST_RUN_SUBTEST(test_to_string_function_style_signed_sum, NULL);
     TEST_RUN_SUBTEST(test_to_string_function_style_sub_negative_product, NULL);
     TEST_RUN_SUBTEST(test_to_string_function_style_preserves_math_names, NULL);
+    TEST_RUN_SUBTEST(test_to_string_function_style_extracts_variable_dependent_dag_nodes, NULL);
+    TEST_RUN_SUBTEST(test_to_string_function_style_extracts_short_shared_dag_nodes, NULL);
 }
 
 static void test_to_string_floor_ceil_expr(void)
@@ -1860,12 +1911,12 @@ static void test_to_string_floor_ceil_func(void)
     expr_t *f = expr_add(floor_x, ceil_y);
     char *got = expr_to_string(f, style_FUNCTION);
     const char *expect = "expression expr(x, y) {\n"
-                         "    return floor(x) + ceil(y);\n"
+                         "    return floor(x) + ceil(y).\n"
                          "}\n"
                          "\n"
-                         "x = 1.5\n"
-                         "y = -1.5\n"
-                         "output(expr(x, y));";
+                         "x = 1.5.\n"
+                         "y = -1.5.\n"
+                         "output(expr(x, y)).";
 
     if (str_eq(got, expect))
         to_string_pass("floor/ceil function notation (FUNC)", got, expect);

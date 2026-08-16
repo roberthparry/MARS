@@ -235,6 +235,7 @@ typedef struct {
 } addend_t;
 
 typedef enum {
+    EXPR_BINDING_EXPR_ARRAY,
     EXPR_BINDING_EXPR_NUMBER,
     EXPR_BINDING_EXPR_CONST,
     EXPR_BINDING_EXPR_NEG,
@@ -262,6 +263,11 @@ typedef struct expr_binding_expr {
     bool cached_value_valid;
     union {
         char *text;
+        struct {
+            struct expr_binding_expr **items;
+            size_t count;
+            bool unspecified;
+        } array;
         expr_binding_const_id_t const_id;
         struct {
             struct expr_binding_expr *child;

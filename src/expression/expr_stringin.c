@@ -215,7 +215,7 @@ static int at_middle_dot(const expr_parse_state_t *p)
 }
 
 /* True if the current position can start a new multiplication factor.
- * Spaces are NOT skipped — they only appear before binary '+'/'-'. */
+ * The caller decides whether whitespace should be skipped before this probe. */
 static int can_start_factor(const expr_parse_state_t *p)
 {
     size_t pos = expr_parse_pos(p);
@@ -2955,6 +2955,7 @@ static expr_t *parse_mulexpr(expr_parse_state_t *p)
          * before committing so a failed probe leaves the cursor untouched. */
         {
             string_cursor_t *scan = string_cursor_clone(p->cursor);
+            expr_parse_state_t probe;
             unsigned char op = 0u;
 
             if (!scan) {
@@ -2962,6 +2963,21 @@ static expr_t *parse_mulexpr(expr_parse_state_t *p)
                 return NULL;
             }
             string_cursor_skip_spaces(scan);
+            probe = *p;
+            probe.cursor = scan;
+            if (at_middle_dot(&probe)) {
+                string_cursor_seek(p->cursor, string_cursor_position(scan));
+                string_cursor_free(scan);
+                expr_parse_skip(p, 2u);
+                expr_parse_skip_spaces(p);
+                expr_t *rhs = parse_signed_power(p);
+                if (!rhs) {
+                    expr_free(lhs);
+                    return NULL;
+                }
+                lhs = apply_binary_preserving_constexpr(&ops_mul, lhs, rhs, expr_mul);
+                continue;
+            }
             if (string_cursor_peek_ascii(scan, &op) && (op == '*' || op == '.' || op == '/')) {
                 string_cursor_seek(p->cursor, string_cursor_position(scan));
                 string_cursor_free(scan);
@@ -2979,15 +2995,30 @@ static expr_t *parse_mulexpr(expr_parse_state_t *p)
             string_cursor_free(scan);
         }
 
-        /* Implicit multiplication: next position can start a factor */
-        if (can_start_factor(p)) {
-            expr_t *rhs = parse_signed_power(p);
-            if (!rhs) {
+        /* Implicit multiplication: whitespace may separate adjacent factors. */
+        {
+            string_cursor_t *scan = string_cursor_clone(p->cursor);
+            expr_parse_state_t probe;
+
+            if (!scan) {
                 expr_free(lhs);
                 return NULL;
             }
-            lhs = apply_binary_preserving_constexpr(&ops_mul, lhs, rhs, expr_mul);
-            continue;
+            string_cursor_skip_spaces(scan);
+            probe = *p;
+            probe.cursor = scan;
+            if (can_start_factor(&probe)) {
+                string_cursor_seek(p->cursor, string_cursor_position(scan));
+                string_cursor_free(scan);
+                expr_t *rhs = parse_signed_power(p);
+                if (!rhs) {
+                    expr_free(lhs);
+                    return NULL;
+                }
+                lhs = apply_binary_preserving_constexpr(&ops_mul, lhs, rhs, expr_mul);
+                continue;
+            }
+            string_cursor_free(scan);
         }
 
         break;
@@ -3124,7 +3155,20 @@ static int parse_bindings(string_view_t text, int is_var, symtab_t *syms, string
         number_t val;
         expr_t *node;
 
-        binding_expr = expr_binding_expr_parse_view(value, errmsg);
+        {
+            string_cursor_t *value_cursor = string_cursor_new_view(value);
+            bool is_array = false;
+
+            if (value_cursor) {
+                unsigned char first;
+
+                string_cursor_skip_spaces(value_cursor);
+                is_array = string_cursor_peek_ascii(value_cursor, &first) && first == '[';
+                string_cursor_free(value_cursor);
+            }
+            binding_expr = is_array ? expr_binding_expr_parse_array_view(value, errmsg)
+                                    : expr_binding_expr_parse_view(value, errmsg);
+        }
         if (!binding_expr) {
             binding_parse_error(errmsg, name, value);
             string_free(name);
@@ -3926,6 +3970,7 @@ expr_t *expr_edit_binding(const expr_t *expr, const expr_bindings_t *bindings, c
     expr_binding_expr_t *authored_binding_expr = NULL;
     number_t value = NUM_NAN;
     bool empty;
+    bool array_value = false;
 
     if (bindings_out)
         *bindings_out = NULL;
@@ -3958,22 +4003,33 @@ expr_t *expr_edit_binding(const expr_t *expr, const expr_bindings_t *bindings, c
                 goto cleanup;
             value_source = string_new_with(value_copy);
             if (value_source) {
-                authored_binding_expr = expr_binding_expr_parse_view(string_view_all(value_source), NULL);
+                string_cursor_t *value_cursor = string_cursor_new(value_source);
+                unsigned char first;
+
+                if (value_cursor) {
+                    string_cursor_skip_spaces(value_cursor);
+                    array_value = string_cursor_peek_ascii(value_cursor, &first) && first == '[';
+                    string_cursor_free(value_cursor);
+                }
+                authored_binding_expr = array_value ? expr_binding_expr_parse_array_view(string_view_all(value_source), NULL)
+                                                    : expr_binding_expr_parse_view(string_view_all(value_source), NULL);
                 authored_binding_expr = expr_binding_expr_simplify(authored_binding_expr);
             }
             string_free(value_source);
-            value_expr = expr_from_string(value_copy, NULL);
+            if (!array_value)
+                value_expr = expr_from_string(value_copy, NULL);
             free(value_copy);
-            if (!value_expr || !authored_binding_expr)
+            if ((!array_value && !value_expr) || !authored_binding_expr)
                 goto cleanup;
-            value = expr_eval(value_expr);
+            if (value_expr)
+                value = expr_eval(value_expr);
         }
 
         replacement = entry->is_constant ? expr_new_named_const(value, name) : expr_new_named_var(value, name);
         if (!empty)
             num_destroy(&value);
-        if (replacement && value_expr && value_expr->binding_expr) {
-            replacement->binding_expr = expr_binding_expr_clone(value_expr->binding_expr);
+        if (replacement && authored_binding_expr) {
+            replacement->binding_expr = expr_binding_expr_clone(authored_binding_expr);
             if (!replacement->binding_expr)
                 goto cleanup;
         }

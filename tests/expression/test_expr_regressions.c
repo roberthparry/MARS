@@ -3594,13 +3594,13 @@ static void test_sqrt_negative_exact_evaluates_to_i(void)
         const char *function;
         const char *tex;
     } cases[] = {{"sqrt(-1)", "{ sqrt(-1) }", "i", "√(-1)",
-                  "expression expr(void) {\n"
+                  "expression expr() {\n"
                   "    return sqrt(-1);\n"
                   "}\n\n"
                   "output(expr());",
                   "\\sqrt{-1}"},
                  {"sqrt(-4)", "{ sqrt(-4) }", "2i", "√(-4)",
-                  "expression expr(void) {\n"
+                  "expression expr() {\n"
                   "    return sqrt(-4);\n"
                   "}\n\n"
                   "output(expr());",
@@ -3682,6 +3682,95 @@ static void test_unit_complex_square_root_keeps_conjugate_surds_together(void)
     ASSERT_NOT_NULL(expr);
     ASSERT_NOT_NULL(beautified);
     TEST_ASSERT_STR_EQ(text, "√(½·(√(2) + 1)) + i·√(½·(√(2) - 1))");
+
+    free(text);
+    expr_free(beautified);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+}
+
+static void test_unit_complex_cube_root_beautifies_to_cartesian_surds(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = expr_from_string("cubrt(1 + i)", &bindings);
+    expr_t *beautified = expr ? expr_beautify_presimplified(expr) : NULL;
+    char *text = beautified ? expr_to_string(beautified, style_UNBOUND) : NULL;
+
+    ASSERT_NOT_NULL(expr);
+    ASSERT_NOT_NULL(beautified);
+    TEST_ASSERT_STR_EQ(text, "1/(2·cubrt(2))·(√(3) + 1 + i·(√(3) - 1))");
+
+    free(text);
+    expr_free(beautified);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+}
+
+static void test_conjugate_unit_complex_cube_root_keeps_cartesian_surd_symmetry(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = expr_from_string("cubrt(1 - i)", &bindings);
+    expr_t *beautified = expr ? expr_beautify_presimplified(expr) : NULL;
+    char *text = beautified ? expr_to_string(beautified, style_UNBOUND) : NULL;
+
+    ASSERT_NOT_NULL(expr);
+    ASSERT_NOT_NULL(beautified);
+    TEST_ASSERT_STR_EQ(text, "1/(2·cubrt(2))·(√(3) + 1 - i·(√(3) - 1))");
+
+    free(text);
+    expr_free(beautified);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+}
+
+static void test_root_order_three_uses_the_principal_cube_root_beautification(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = expr_from_string("root(1 + i, 3)", &bindings);
+    expr_t *beautified = expr ? expr_beautify_presimplified(expr) : NULL;
+    char *text = beautified ? expr_to_string(beautified, style_UNBOUND) : NULL;
+
+    ASSERT_NOT_NULL(expr);
+    ASSERT_NOT_NULL(beautified);
+    TEST_ASSERT_STR_EQ(text, "1/(2·cubrt(2))·(√(3) + 1 + i·(√(3) - 1))");
+
+    free(text);
+    expr_free(beautified);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+}
+
+static void test_unit_complex_fourth_root_beautifies_to_cartesian_surds(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = expr_from_string("root(1 + i, 4)", &bindings);
+    expr_t *beautified = expr ? expr_beautify_presimplified(expr) : NULL;
+    char *text = beautified ? expr_to_string(beautified, style_UNBOUND) : NULL;
+
+    ASSERT_NOT_NULL(expr);
+    ASSERT_NOT_NULL(beautified);
+    TEST_ASSERT_STR_EQ(text,
+                       "1/√(2)·(√(root(2, 4) + √(1/2·(√(2) + 1))) + "
+                       "i·√(root(2, 4) - √(1/2·(√(2) + 1))))");
+
+    free(text);
+    expr_free(beautified);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+}
+
+static void test_conjugate_unit_complex_fourth_root_keeps_cartesian_surd_symmetry(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = expr_from_string("root(1 - i, 4)", &bindings);
+    expr_t *beautified = expr ? expr_beautify_presimplified(expr) : NULL;
+    char *text = beautified ? expr_to_string(beautified, style_UNBOUND) : NULL;
+
+    ASSERT_NOT_NULL(expr);
+    ASSERT_NOT_NULL(beautified);
+    TEST_ASSERT_STR_EQ(text,
+                       "1/√(2)·(√(root(2, 4) + √(1/2·(√(2) + 1))) - "
+                       "i·√(root(2, 4) - √(1/2·(√(2) + 1))))");
 
     free(text);
     expr_free(beautified);
@@ -3855,6 +3944,38 @@ static void test_exact_complex_fifth_root_family_finds_cartesian_seed(void)
 
     num_destroy(&expected);
     num_destroy(&seed);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+}
+
+/* README example: a named complex sixth root is one exact Cartesian principal value. */
+static void test_named_sixth_root_uses_exact_cartesian_principal_value(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = expr_from_string("root(117 + 44i, 6)", &bindings);
+    expr_t *simplified = expr ? expr_simplify(expr) : NULL;
+    expr_t *beautified = simplified ? expr_beautify_presimplified(simplified) : NULL;
+    char *text = beautified ? expr_to_string(beautified, style_UNBOUND) : NULL;
+    number_t seed = (number_t){0};
+    number_t expected_seed = num_add(NUM_ONE, num_mul(NUM_TWO, NUM_I));
+    long order = 0L;
+
+    ASSERT_NOT_NULL(expr);
+    ASSERT_NOT_NULL(simplified);
+    ASSERT_TRUE(expr_exact_complex_root_seed(expr, &seed, &order));
+    ASSERT_EQ_INT(order, 6L);
+    ASSERT_TRUE(num_eq(seed, expected_seed));
+    ASSERT_NOT_NULL(beautified);
+    ASSERT_NOT_NULL(text);
+    ASSERT_NULL(strstr(text, "root("));
+    ASSERT_NOT_NULL(strstr(text, "√(3)"));
+    ASSERT_NOT_NULL(strstr(text, "i"));
+
+    num_destroy(&expected_seed);
+    num_destroy(&seed);
+    free(text);
+    expr_free(beautified);
+    expr_free(simplified);
     expr_bindings_free(bindings);
     expr_free(expr);
 }
@@ -4145,6 +4266,11 @@ void test_runtime_regressions(void)
     TEST_RUN_SUBTEST(test_symbolic_complex_square_root_beautifies_to_cartesian_form, NULL);
     TEST_RUN_SUBTEST(test_exact_complex_square_root_beautifies_to_cartesian_surds, NULL);
     TEST_RUN_SUBTEST(test_unit_complex_square_root_keeps_conjugate_surds_together, NULL);
+    TEST_RUN_SUBTEST(test_unit_complex_cube_root_beautifies_to_cartesian_surds, NULL);
+    TEST_RUN_SUBTEST(test_conjugate_unit_complex_cube_root_keeps_cartesian_surd_symmetry, NULL);
+    TEST_RUN_SUBTEST(test_root_order_three_uses_the_principal_cube_root_beautification, NULL);
+    TEST_RUN_SUBTEST(test_unit_complex_fourth_root_beautifies_to_cartesian_surds, NULL);
+    TEST_RUN_SUBTEST(test_conjugate_unit_complex_fourth_root_keeps_cartesian_surd_symmetry, NULL);
     TEST_RUN_SUBTEST(test_exact_complex_square_root_reduces_perfect_square_components, NULL);
     TEST_RUN_SUBTEST(test_pure_imaginary_square_root_reduces_to_cartesian_components, NULL);
     TEST_RUN_SUBTEST(test_larger_complex_square_root_reduces_perfect_square_components, NULL);
@@ -4153,6 +4279,7 @@ void test_runtime_regressions(void)
     TEST_RUN_SUBTEST(test_explicit_complex_cube_root_preserves_family_and_evaluates_principal_value, NULL);
     TEST_RUN_SUBTEST(test_sqrt_is_principal_but_explicit_half_power_preserves_both_roots, NULL);
     TEST_RUN_SUBTEST(test_exact_complex_fifth_root_family_finds_cartesian_seed, NULL);
+    TEST_RUN_SUBTEST(test_named_sixth_root_uses_exact_cartesian_principal_value, NULL);
     TEST_RUN_SUBTEST(test_symbolic_complex_square_expands_to_cartesian_form, NULL);
     TEST_RUN_SUBTEST(test_goal_seek_large_target_uses_significant_digit_tolerance, NULL);
     TEST_RUN_SUBTEST(test_iterated_symbolic_integration_moves_out_of_lab, NULL);

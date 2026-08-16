@@ -22,7 +22,7 @@ string_t *expr_to_text_expr(const expr_t *f)
     const expr_t *g = f;
     string_t *out;
 
-    if (f && f->binding_expr && !expr_is_const(f))
+    if (f && f->binding_expr && !expr_is_const(f) && !expr_binding_expr_is_array(f->binding_expr))
         return expr_text_from_owned_c_string(expr_binding_expr_to_string(f->binding_expr));
 
     autoname_init(&vnames);
@@ -96,7 +96,7 @@ string_t *expr_to_text_unbound(const expr_t *f)
     const expr_t *g = f;
     string_t *out;
 
-    if (f && f->binding_expr && !expr_is_const(f))
+    if (f && f->binding_expr && !expr_is_const(f) && !expr_binding_expr_is_array(f->binding_expr))
         return expr_text_from_owned_c_string(expr_binding_expr_to_string(f->binding_expr));
 
     autoname_init(&vnames);

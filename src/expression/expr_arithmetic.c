@@ -1161,7 +1161,7 @@ static expr_t *deriv_rational_over_polynomial_power(expr_t *dv)
 static int expr_has_composite_preserved_binding_expr_node(const expr_t *dv)
 {
     return expr_is_const(dv) && dv->binding_expr && dv->binding_expr->kind != EXPR_BINDING_EXPR_NUMBER &&
-           dv->binding_expr->kind != EXPR_BINDING_EXPR_CONST;
+           dv->binding_expr->kind != EXPR_BINDING_EXPR_CONST && !expr_binding_expr_is_array(dv->binding_expr);
 }
 
 static int expr_binding_aware_search(const expr_t *dv, const expr_t *needle, int null_needle_matches_any,

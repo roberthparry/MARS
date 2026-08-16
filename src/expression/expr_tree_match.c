@@ -60,7 +60,7 @@ static bool expr_is_named_leaf(const expr_t *expr)
 static bool expr_has_composite_preserved_binding_leaf(const expr_t *expr)
 {
     return expr_is_const(expr) && expr->binding_expr && expr->binding_expr->kind != EXPR_BINDING_EXPR_NUMBER &&
-           expr->binding_expr->kind != EXPR_BINDING_EXPR_CONST;
+           expr->binding_expr->kind != EXPR_BINDING_EXPR_CONST && !expr_binding_expr_is_array(expr->binding_expr);
 }
 
 static bool expr_is_same_named_leaf_for_substitution(const expr_t *expr, const expr_t *needle)

@@ -730,6 +730,11 @@ All functions return owning handles.
 - Explicit `z^(1/n)` syntax denotes the complete family of `n` roots. MARS Lab displays every member of the family;
   for example, `(3+4i)^(1/2)` displays `{ 2+i, -2-i }`, while `sqrt(3+4i)` displays only `2+i`. Numeric evaluation
   of the underlying power node uses the principal member when a scalar value is required.
+- Exact complex principal roots are beautified into Cartesian surds when MARS
+  can prove such a representation. For example, `root(117+44i,6)` becomes
+  `½(2√3+1) + i(1-√3/2)`, whose numerical value is approximately
+  `2.232050807568877 + 0.133974596215561i`. In contrast,
+  `(117+44i)^(1/6)` retains the complete six-member root family.
 - `expr_t *expr_floor(const expr_t *expr)` — floor
 - `expr_t *expr_ceil(const expr_t *expr)` — ceiling
 - `expr_t *expr_pow(const expr_t *expr, const number_t *exponent)` — `expr ^ exponent` (borrowed scalar numeric exponent)
@@ -819,12 +824,35 @@ decide whether derivative controls should be shown.
 - `string_t *expr_to_text(const expr_t *expr, style_t style)` — serialise the expression; `style` is `style_FUNCTION`, `style_EXPRESSION`, `style_LATEX`, or `style_UNBOUND`. In expression style, `sqrt(...)` is printed as `√(...)` and `abs(...)` as `|...|`. `style_UNBOUND` returns the expression body before the `{ body | bindings }` wrapper is added. Returns a newly allocated string; the caller must release it with `string_free(...)`.
 - `void expr_print(const expr_t *expr)` — print the expression to stdout in `style_EXPRESSION` format
 
-`style_FUNCTION` prints a small C-like evaluable sketch. Untyped parameters are
-treated as differentiable variables, while `const` parameters and bindings are
-displayed as non-differentiable constants. Its final `output(expr(...))` call
-uses variable names. Known variable bindings are assigned immediately before
-the call, while unknown variables use a hint such as `// x = ?`. Symbolic
-assignment values use input aliases such as `@pi`.
+`style_FUNCTION` prints a small MARS evaluable sketch. Untyped parameters are
+treated as differentiable variables, while `const` parameters and declarations
+are non-differentiable constants. Scalar and array bindings use the same
+structure: array parameters are introduced with `array`, array constants with
+`array const`, and both known and unknown bindings are declared before the final
+`output(expr(...))` call. A compact `.` denotes multiplication within a line,
+and `/` is likewise written without surrounding spaces. A `.` followed by
+whitespace or end of input terminates a statement. Consequently, several
+statements may share a line when whitespace separates them. Unknown scalars use
+`?`; `[]` and `[?]` both denote an
+unspecified array and are serialised canonically as `[?]`. Symbolic assignment
+values use input aliases such as `@pi`.
+
+Before emitting the return statement, Function style traverses the expression
+DAG and gives shared non-trivial nodes intermediate names in dependency order.
+Short, recognisable constant operations use a compact semantic name such as
+`$[sqrt(2)]` or `$[root(2,4)]`; spaces are never retained inside `$[...]`.
+Other constant intermediates use `c1`, `c2`, and so on, while intermediates
+that depend on variables use `v1`, `v2`, and so on. This keeps repeated work
+visible and makes the generated function suitable for later differentiation.
+
+Function-style ordinary comments use backticks. One backtick opens a delimited
+comment and the next unescaped backtick closes it; the comment may span lines.
+Two consecutive opening backticks introduce a line comment that ends at a
+newline or end of input. The lexer applies longest-match, so two backticks always
+open a line comment rather than representing an empty delimited comment. A
+backslash escapes a literal backtick within a delimited comment. Comments behave
+as whitespace before full-stop statement termination is interpreted.
+
 Unevaluated integral nodes are
 printed in function form as `@S^upper integrand d<dummy>` and in
 expression form as `∫^upper integrand d<dummy>`; for example,
@@ -832,12 +860,13 @@ expression form as `∫^upper integrand d<dummy>`; for example,
 
 ```text
 expression expr(x, y, const c₀) {
-    return tan(x * y * c₀ / 2);
+    return tan(c₀.x.y / 2).
 }
 
-x = 3.29929295579108949982756921421358070866178174810740656177232818327906094186165
-y = 3.29929295579108949982756921421358070866178174810740656177232818327906094186165
-output(expr(x, y, γ));
+x = 3.29929295579108949982756921421358070866178174810740656177232818327906094186165.
+y = 3.29929295579108949982756921421358070866178174810740656177232818327906094186165.
+const c₀ = @gamma.
+output(expr(x, y, c₀)).
 ```
 
 ### Parsing

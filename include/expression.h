@@ -700,10 +700,12 @@ expr_t *expr_beautify(const expr_t *expr);
 /**
  * @brief Output style for expr_to_text().
  *
- * style_FUNCTION    — C-like function notation, e.g.
- *                     "expression expr(x) { return sin(x); } output(expr(1));"
- * style_EXPRESSION  — round-trip infix notation, e.g.
- *                     "{ sin(x₀) | x₀ = 1.0 }"
+ * style_FUNCTION    — MARS function notation, including @c array parameters and @c array @c const parameters for
+ *                     array-valued bindings, e.g. "expression expr(array x) { return sin(x). }"; a full stop followed
+ *                     by whitespace or end of input terminates a statement, while an internal full stop multiplies;
+ *                     paired backticks delimit comments and two opening backticks introduce a line comment
+ * style_EXPRESSION  — round-trip infix notation, including array bindings such as
+ *                     "{ sin(x₀) | x₀ = [1, 2, 3] }"; @c [] and @c [?] both denote an unspecified array
  * style_LATEX         — TeX mathematical notation, e.g. "\left\{ x_{0} \;\middle|\; x_{0} = 1.0 \right\}"
  * style_UNBOUND     — infix expression body without the { ... | bindings }
  *                     wrapper, e.g. "sin(x₀)"

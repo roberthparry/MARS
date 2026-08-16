@@ -64,7 +64,7 @@ static void equ_emit_unknown_variable_hint(sbuf_t *buffer, const varlist_t *vari
             continue;
 
         if (!emitted)
-            sbuf_puts(buffer, "// ");
+            sbuf_puts(buffer, "`` ");
         else
             sbuf_puts(buffer, ", ");
         equ_emit_function_name(buffer, expr_name_or_default(variables->vars[i], "x"));
@@ -179,7 +179,7 @@ static void equ_emit_function_equation_return(sbuf_t *buffer, const equation_t *
     if (!lhs || !rhs) {
         free(rhs);
         free(lhs);
-        sbuf_puts(buffer, "    return equation(0 = 0);\n");
+        sbuf_puts(buffer, "    return equation(0 = 0).\n");
         return;
     }
 
@@ -188,20 +188,20 @@ static void equ_emit_function_equation_return(sbuf_t *buffer, const equation_t *
     if (!relation) {
         free(rhs);
         free(lhs);
-        sbuf_puts(buffer, "    return equation(0 = 0);\n");
+        sbuf_puts(buffer, "    return equation(0 = 0).\n");
         return;
     }
     snprintf(relation, relation_length + 1u, "%s = %s", lhs, rhs);
 
-    compact_length = strlen("    return equation();") + relation_length;
+    compact_length = strlen("    return equation().") + relation_length;
     if (compact_length <= compact_line_limit) {
         sbuf_puts(buffer, "    return equation(");
         sbuf_puts(buffer, relation);
-        sbuf_puts(buffer, ");\n");
+        sbuf_puts(buffer, ").\n");
     } else {
         sbuf_puts(buffer, "    return equation(\n");
         equ_emit_aligned_function_expression(buffer, relation);
-        sbuf_puts(buffer, "    );\n");
+        sbuf_puts(buffer, "    ).\n");
     }
 
     free(relation);
@@ -449,7 +449,7 @@ static string_t *equ_to_text_function(const equation_t *equation)
     equ_emit_unknown_variable_hint(&buffer, &variables);
     sbuf_puts(&buffer, "output(equ(");
     equ_emit_function_argument_list(&buffer, &variables, &constants);
-    sbuf_puts(&buffer, ").solve());");
+    sbuf_puts(&buffer, ").solve()).");
 
     out = sbuf_to_string(&buffer);
     sbuf_free(&buffer);

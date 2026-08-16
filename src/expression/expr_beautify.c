@@ -1,8 +1,11 @@
 #include <errno.h>
+#include <float.h>
 #include <stdbool.h>
 #include <stdlib.h>
 
 #define MARS_EXPR_INTERNAL_ACCESS
+#include "expr_binding_simplify.h"
+#include "expr_bindings.h"
 #include "expr_internal.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
@@ -329,6 +332,316 @@ cleanup:
     return rewrite;
 }
 
+static expr_t *expr_beautify_cartesian_cube_root(const expr_t *expr)
+{
+    const expr_t *argument;
+    number_t value = number_invalid();
+    number_t real = number_invalid();
+    number_t imaginary = number_invalid();
+    number_t imaginary_magnitude = number_invalid();
+    expr_t *one = NULL;
+    expr_t *two = NULL;
+    expr_t *three = NULL;
+    expr_t *cube_root_two = NULL;
+    expr_t *sqrt_three = NULL;
+    expr_t *denominator = NULL;
+    expr_t *sum = NULL;
+    expr_t *difference = NULL;
+    expr_t *scale = NULL;
+    expr_t *imaginary_unit = NULL;
+    expr_t *imaginary_term = NULL;
+    expr_t *cartesian = NULL;
+    expr_t *rewrite = NULL;
+    int imaginary_sign;
+
+    if (!expr_is_op(expr, &ops_cubrt) || !(argument = expr->a))
+        goto cleanup;
+    value = expr_eval(argument);
+    if (!num_is_finite(value) || num_is_real(value))
+        goto cleanup;
+    real = num_real_part(value);
+    imaginary = num_imag_part(value);
+    imaginary_magnitude = num_abs(imaginary);
+    if (!num_eq(real, NUM_ONE) || num_is_zero(imaginary) || !num_eq(imaginary_magnitude, NUM_ONE))
+        goto cleanup;
+    imaginary_sign = num_sign(imaginary);
+
+    one = expr_const_one();
+    two = expr_const_long(2L);
+    three = expr_const_long(3L);
+    cube_root_two = two ? expr_cubrt(two) : NULL;
+    sqrt_three = three ? expr_sqrt(three) : NULL;
+    denominator = cube_root_two ? expr_mul_long(cube_root_two, 2L) : NULL;
+    sum = (sqrt_three && one) ? expr_add(sqrt_three, one) : NULL;
+    difference = (sqrt_three && one) ? expr_sub(sqrt_three, one) : NULL;
+    scale = (one && denominator) ? expr_div(one, denominator) : NULL;
+    imaginary_unit = expr_new_const(NUM_I);
+    imaginary_term = (imaginary_unit && difference) ? expr_mul(imaginary_unit, difference) : NULL;
+    if (sum && imaginary_term)
+        cartesian = imaginary_sign > 0 ? expr_add(sum, imaginary_term) : expr_sub(sum, imaginary_term);
+    rewrite = (scale && cartesian) ? expr_mul(scale, cartesian) : NULL;
+
+cleanup:
+    expr_free(cartesian);
+    expr_free(imaginary_term);
+    expr_free(imaginary_unit);
+    expr_free(scale);
+    expr_free(difference);
+    expr_free(sum);
+    expr_free(denominator);
+    expr_free(sqrt_three);
+    expr_free(cube_root_two);
+    expr_free(three);
+    expr_free(two);
+    expr_free(one);
+    num_destroy(&imaginary_magnitude);
+    num_destroy(&imaginary);
+    num_destroy(&real);
+    num_destroy(&value);
+    return rewrite;
+}
+
+static expr_t *expr_beautify_cartesian_fourth_root(const expr_t *expr)
+{
+    const expr_t *argument;
+    number_t order = number_invalid();
+    number_t value = number_invalid();
+    number_t real = number_invalid();
+    number_t imaginary = number_invalid();
+    number_t imaginary_magnitude = number_invalid();
+    long order_numerator;
+    long order_denominator;
+    expr_t *two = NULL;
+    expr_t *four = NULL;
+    expr_t *one = NULL;
+    expr_t *sqrt_two = NULL;
+    expr_t *nested_square_root_sum = NULL;
+    expr_t *nested_square_root_argument = NULL;
+    expr_t *nested_square_root = NULL;
+    expr_t *fourth_root_two = NULL;
+    expr_t *real_radicand = NULL;
+    expr_t *imaginary_radicand = NULL;
+    expr_t *real_component = NULL;
+    expr_t *imaginary_component = NULL;
+    expr_t *imaginary_unit = NULL;
+    expr_t *imaginary_term = NULL;
+    expr_t *cartesian = NULL;
+    expr_t *scale = NULL;
+    expr_t *rewrite = NULL;
+    int imaginary_sign;
+
+    if (!expr_is_op(expr, &ops_root) || !(argument = expr->a) || !expr_match_const_value(expr->b, &order) ||
+        !num_get_small_rational(order, &order_numerator, &order_denominator) || order_numerator != 4L ||
+        order_denominator != 1L)
+        goto cleanup;
+    value = expr_eval(argument);
+    if (!num_is_finite(value) || num_is_real(value))
+        goto cleanup;
+    real = num_real_part(value);
+    imaginary = num_imag_part(value);
+    imaginary_magnitude = num_abs(imaginary);
+    if (!num_eq(real, NUM_ONE) || num_is_zero(imaginary) || !num_eq(imaginary_magnitude, NUM_ONE))
+        goto cleanup;
+    imaginary_sign = num_sign(imaginary);
+
+    two = expr_const_long(2L);
+    four = expr_const_long(4L);
+    one = expr_const_long(1L);
+    sqrt_two = two ? expr_sqrt(two) : NULL;
+    nested_square_root_sum = (sqrt_two && one) ? expr_add(sqrt_two, one) : NULL;
+    nested_square_root_argument = nested_square_root_sum ? expr_div_long(nested_square_root_sum, 2L) : NULL;
+    nested_square_root = nested_square_root_argument ? expr_sqrt(nested_square_root_argument) : NULL;
+    fourth_root_two = (two && four) ? expr_root(two, four) : NULL;
+    real_radicand = (fourth_root_two && nested_square_root) ? expr_add(fourth_root_two, nested_square_root) : NULL;
+    imaginary_radicand = (fourth_root_two && nested_square_root)
+                             ? expr_sub(fourth_root_two, nested_square_root)
+                             : NULL;
+    real_component = real_radicand ? expr_sqrt(real_radicand) : NULL;
+    imaginary_component = imaginary_radicand ? expr_sqrt(imaginary_radicand) : NULL;
+    imaginary_unit = expr_new_const(NUM_I);
+    imaginary_term = (imaginary_unit && imaginary_component) ? expr_mul(imaginary_unit, imaginary_component) : NULL;
+    if (real_component && imaginary_term)
+        cartesian = imaginary_sign > 0 ? expr_add(real_component, imaginary_term)
+                                       : expr_sub(real_component, imaginary_term);
+    scale = (one && sqrt_two) ? expr_div(one, sqrt_two) : NULL;
+    rewrite = (scale && cartesian) ? expr_mul(scale, cartesian) : NULL;
+
+cleanup:
+    expr_free(scale);
+    expr_free(cartesian);
+    expr_free(imaginary_term);
+    expr_free(imaginary_unit);
+    expr_free(imaginary_component);
+    expr_free(real_component);
+    expr_free(imaginary_radicand);
+    expr_free(real_radicand);
+    expr_free(fourth_root_two);
+    expr_free(nested_square_root);
+    expr_free(nested_square_root_argument);
+    expr_free(nested_square_root_sum);
+    expr_free(sqrt_two);
+    expr_free(one);
+    expr_free(four);
+    expr_free(two);
+    num_destroy(&imaginary_magnitude);
+    num_destroy(&imaginary);
+    num_destroy(&real);
+    num_destroy(&value);
+    num_destroy(&order);
+    return rewrite;
+}
+
+static expr_t *expr_beautify_root_turn_trig(long root_index, long order, bool sine)
+{
+    expr_t *exact = NULL;
+    expr_t *rewrite = NULL;
+
+    if (root_index < 0L || order < 2L)
+        goto cleanup;
+    exact = binding_expr_exact_trig_pi_ratio(sine ? &ops_sin : &ops_cos, 2L * root_index, (unsigned long)order);
+    rewrite = exact ? expr_beautify_presimplified(exact) : NULL;
+
+cleanup:
+    expr_free(exact);
+    return rewrite;
+}
+
+static long expr_beautify_principal_root_rotation(number_t seed, const expr_t *root, long order)
+{
+    NUM_SCOPE(scope);
+    number_t principal;
+    long best_index = -1L;
+    double best_distance = DBL_MAX;
+
+    if (!root || order < 2L)
+        return -1L;
+    principal = expr_eval(root);
+    if (!num_is_finite(principal))
+        return -1L;
+
+    for (long root_index = 0L; root_index < order; ++root_index) {
+        number_t turn = num_create_from_frac(2L * root_index, order);
+        number_t angle = num_mul(NUM_PI, turn);
+        number_t rotation = num_add(num_cos(angle), num_mul(num_sin(angle), NUM_I));
+        number_t branch = num_mul(seed, rotation);
+        number_t distance = num_abs(num_sub(branch, principal));
+        double candidate_distance = num_to_double(distance);
+
+        if (candidate_distance < best_distance) {
+            best_distance = candidate_distance;
+            best_index = root_index;
+        }
+    }
+    return best_index;
+}
+
+static expr_t *expr_beautify_cartesian_exact_root(const expr_t *expr)
+{
+    number_t seed = number_invalid();
+    number_t real_value = number_invalid();
+    number_t imaginary_value = number_invalid();
+    number_t result_imaginary_value = number_invalid();
+    long order = 0L;
+    long rotation_index;
+    expr_t *real = NULL;
+    expr_t *imaginary = NULL;
+    expr_t *cosine = NULL;
+    expr_t *sine = NULL;
+    expr_t *real_cosine = NULL;
+    expr_t *imaginary_sine = NULL;
+    expr_t *real_sine = NULL;
+    expr_t *imaginary_cosine = NULL;
+    expr_t *real_part = NULL;
+    expr_t *imaginary_part = NULL;
+    expr_t *real_display = NULL;
+    expr_t *imaginary_display = NULL;
+    expr_t *imaginary_magnitude = NULL;
+    expr_t *imaginary_unit = NULL;
+    expr_t *imaginary_term = NULL;
+    expr_t *rewrite = NULL;
+    bool imaginary_is_negative;
+
+    if (!expr_is_op(expr, &ops_root) || !expr_exact_complex_root_seed(expr, &seed, &order))
+        goto cleanup;
+    rotation_index = expr_beautify_principal_root_rotation(seed, expr, order);
+    if (rotation_index < 0L)
+        goto cleanup;
+    if (rotation_index == 0L) {
+        rewrite = expr_new_const(seed);
+        goto cleanup;
+    }
+
+    real_value = num_real_part(seed);
+    imaginary_value = num_imag_part(seed);
+    real = expr_new_const(real_value);
+    imaginary = expr_new_const(imaginary_value);
+    cosine = expr_beautify_root_turn_trig(rotation_index, order, false);
+    sine = expr_beautify_root_turn_trig(rotation_index, order, true);
+    if (!real || !imaginary || !cosine || !sine)
+        goto cleanup;
+
+    real_cosine = expr_mul(real, cosine);
+    imaginary_sine = expr_mul(imaginary, sine);
+    real_sine = expr_mul(real, sine);
+    imaginary_cosine = expr_mul(imaginary, cosine);
+    real_part = (real_cosine && imaginary_sine) ? expr_sub(real_cosine, imaginary_sine) : NULL;
+    imaginary_part = (real_sine && imaginary_cosine) ? expr_add(real_sine, imaginary_cosine) : NULL;
+    real_display = real_part ? expr_beautify(real_part) : NULL;
+    imaginary_display = imaginary_part ? expr_beautify(imaginary_part) : NULL;
+    if (!real_display || !imaginary_display)
+        goto cleanup;
+
+    result_imaginary_value = expr_eval(imaginary_display);
+    imaginary_is_negative = num_sign(result_imaginary_value) < 0;
+    imaginary_magnitude = imaginary_is_negative ? expr_neg(imaginary_display) : expr_clone(imaginary_display);
+    imaginary_unit = expr_new_const(NUM_I);
+    imaginary_term = (imaginary_unit && imaginary_magnitude) ? expr_mul(imaginary_magnitude, imaginary_unit) : NULL;
+    if (real_display && imaginary_term)
+        rewrite = imaginary_is_negative ? expr_sub(real_display, imaginary_term) : expr_add(real_display, imaginary_term);
+
+cleanup:
+    expr_free(imaginary_term);
+    expr_free(imaginary_unit);
+    expr_free(imaginary_magnitude);
+    expr_free(imaginary_display);
+    expr_free(real_display);
+    expr_free(imaginary_part);
+    expr_free(real_part);
+    expr_free(imaginary_cosine);
+    expr_free(real_sine);
+    expr_free(imaginary_sine);
+    expr_free(real_cosine);
+    expr_free(sine);
+    expr_free(cosine);
+    expr_free(imaginary);
+    expr_free(real);
+    num_destroy(&result_imaginary_value);
+    num_destroy(&imaginary_value);
+    num_destroy(&real_value);
+    num_destroy(&seed);
+    return rewrite;
+}
+
+static expr_t *expr_beautify_named_principal_root(const expr_t *expr)
+{
+    number_t order = number_invalid();
+    long numerator;
+    long denominator;
+    expr_t *rewrite = NULL;
+
+    if (!expr_is_op(expr, &ops_root) || !expr->a || !expr_match_const_value(expr->b, &order) ||
+        !num_get_small_rational(order, &numerator, &denominator) || denominator != 1L)
+        goto cleanup;
+    if (numerator == 2L)
+        rewrite = expr_sqrt(expr->a);
+    else if (numerator == 3L)
+        rewrite = expr_cubrt(expr->a);
+
+cleanup:
+    num_destroy(&order);
+    return rewrite;
+}
+
 static expr_t *expr_beautify_expand_preserved(const expr_t *expr)
 {
     expr_t *left = NULL;
@@ -340,7 +653,7 @@ static expr_t *expr_beautify_expand_preserved(const expr_t *expr)
         return NULL;
     if (expr->ops && expr->ops->arity == EXPR_OP_ATOM) {
         if (expr->binding_expr && !expr_binding_expr_is_numeric_literal(expr->binding_expr) &&
-            expr->binding_expr->kind != EXPR_BINDING_EXPR_CONST) {
+            expr->binding_expr->kind != EXPR_BINDING_EXPR_CONST && !expr_binding_expr_is_array(expr->binding_expr)) {
             expanded = expr_binding_expr_eval_expr(expr->binding_expr);
             rebuilt = expanded ? expr_beautify_expand_preserved(expanded) : NULL;
             expr_free(expanded);
@@ -1090,6 +1403,8 @@ static expr_t *expr_beautify_node(const expr_t *expr, bool rewrite_negative_root
         case EXPR_KIND_POW_D:
         case EXPR_KIND_NEG:
         case EXPR_KIND_SQRT:
+        case EXPR_KIND_CUBRT:
+        case EXPR_KIND_ROOT:
             break;
 
         default:
@@ -1124,6 +1439,24 @@ static expr_t *expr_beautify_node(const expr_t *expr, bool rewrite_negative_root
         goto cleanup;
     left = NULL;
     right = NULL;
+    rewrite = expr_beautify_cartesian_fourth_root(rebuilt);
+    if (rewrite) {
+        expr_free(rebuilt);
+        rebuilt = rewrite;
+        rewrite = NULL;
+    }
+    rewrite = expr_beautify_cartesian_exact_root(rebuilt);
+    if (rewrite) {
+        expr_free(rebuilt);
+        rebuilt = rewrite;
+        rewrite = NULL;
+    }
+    rewrite = expr_beautify_named_principal_root(rebuilt);
+    if (rewrite) {
+        expr_free(rebuilt);
+        rebuilt = rewrite;
+        rewrite = NULL;
+    }
     if (!rewrite_negative_roots) {
         rewrite = expr_beautify_radical_sum(rebuilt);
         if (rewrite) {
@@ -1139,6 +1472,12 @@ static expr_t *expr_beautify_node(const expr_t *expr, bool rewrite_negative_root
         rewrite = NULL;
     }
     rewrite = expr_beautify_cartesian_square_root(rebuilt);
+    if (rewrite) {
+        expr_free(rebuilt);
+        rebuilt = rewrite;
+        rewrite = NULL;
+    }
+    rewrite = expr_beautify_cartesian_cube_root(rebuilt);
     if (rewrite) {
         expr_free(rebuilt);
         rebuilt = rewrite;
@@ -1178,19 +1517,26 @@ cleanup:
     return rebuilt;
 }
 
-static bool expr_beautify_has_preserved_complex_square_root(const expr_t *expr)
+static bool expr_beautify_has_preserved_complex_root(const expr_t *expr)
 {
     const expr_binding_expr_t *binding;
+    const expr_binding_expr_t *radicand_binding = NULL;
     expr_t *radicand = NULL;
     number_t value = number_invalid();
     number_t imaginary = number_invalid();
     bool matched = false;
 
-    if (!expr || !expr->ops || expr->ops->arity != EXPR_OP_ATOM || !(binding = expr->binding_expr) ||
-        binding->kind != EXPR_BINDING_EXPR_UNARY_OP || binding->u.unary_op.ops != &ops_sqrt)
+    if (!expr || !expr->ops || expr->ops->arity != EXPR_OP_ATOM || !(binding = expr->binding_expr))
+        goto cleanup;
+    if (binding->kind == EXPR_BINDING_EXPR_UNARY_OP &&
+        (binding->u.unary_op.ops == &ops_sqrt || binding->u.unary_op.ops == &ops_cubrt))
+        radicand_binding = binding->u.unary_op.child;
+    else if (binding->kind == EXPR_BINDING_EXPR_BINARY_OP && binding->u.binary_op.ops == &ops_root)
+        radicand_binding = binding->u.binary_op.left;
+    if (!radicand_binding)
         goto cleanup;
 
-    radicand = expr_binding_expr_eval_expr(binding->u.unary_op.child);
+    radicand = expr_binding_expr_eval_expr(radicand_binding);
     if (!radicand)
         goto cleanup;
     value = expr_eval(radicand);
@@ -1214,7 +1560,7 @@ expr_t *expr_beautify_presimplified(const expr_t *expr)
 
     if (!expr)
         return NULL;
-    if (expr_beautify_has_preserved_complex_square_root(expr)) {
+    if (expr_beautify_has_preserved_complex_root(expr)) {
         expanded = expr_beautify_expand_preserved(expr);
         if (expanded)
             source = expanded;
@@ -1241,4 +1587,52 @@ expr_t *expr_beautify(const expr_t *expr)
     expr_free(expanded);
     expr_free(simplified);
     return beautified;
+}
+
+static expr_t *expr_distribute_negative_terms_for_display(const expr_t *expr)
+{
+    expr_t *left;
+    expr_t *right;
+    expr_t *out;
+
+    if (!expr)
+        return NULL;
+    if (expr_is_op(expr, &ops_add)) {
+        left = expr_distribute_negative_terms_for_display(expr->a);
+        right = expr_distribute_negative_terms_for_display(expr->b);
+        out = (left && right) ? expr_add(left, right) : NULL;
+        expr_free(right);
+        expr_free(left);
+        return out;
+    }
+    if (expr_is_op(expr, &ops_sub)) {
+        left = expr_distribute_negative_terms_for_display(expr->a);
+        right = expr_clone(expr->b);
+        out = (left && right) ? expr_add(left, right) : NULL;
+        expr_free(right);
+        expr_free(left);
+        return out;
+    }
+
+    return expr_negate_owned(expr_clone(expr));
+}
+
+/* Negate a display expression term by term while retaining each term's established form. */
+expr_t *expr_distribute_negative_for_display(const expr_t *expr)
+{
+    expr_t *expanded = NULL;
+    expr_t *out;
+
+    if (!expr)
+        return NULL;
+    if (expr_is_const(expr) && !num_is_real(expr->c)) {
+        expanded = expr_display_expanded(expr);
+        if (!expanded)
+            return NULL;
+        expr = expanded;
+    }
+
+    out = expr_distribute_negative_terms_for_display(expr);
+    expr_free(expanded);
+    return out;
 }
