@@ -684,6 +684,30 @@ const expr_ops_t ops_sqrt = {.eval = eval_sqrt,
                              .integrate = expr_integrate_dispatch_primitive,
                              .simplify = expr_simplify_unary_operator,
                              .fold_const_unary = expr_fold_sqrt_const};
+const expr_ops_t ops_cubrt = {.eval = eval_cubrt,
+                              .deriv = deriv_cubrt,
+                              .reverse = expr_reverse_cubrt,
+                              .kind = EXPR_KIND_CUBRT,
+                              .arity = EXPR_OP_UNARY,
+                              .name = "cubrt",
+                              .TeX_name = "\\sqrt[3]",
+                              .apply_unary = expr_cubrt,
+                              .apply_binary = NULL,
+                              .integrate = expr_integrate_dispatch_primitive,
+                              .simplify = expr_simplify_unary_operator,
+                              .fold_const_unary = expr_fold_cubrt_const};
+const expr_ops_t ops_root = {.eval = eval_root,
+                             .deriv = deriv_root,
+                             .reverse = expr_reverse_root,
+                             .kind = EXPR_KIND_ROOT,
+                             .arity = EXPR_OP_BINARY,
+                             .name = "root",
+                             .TeX_name = "\\sqrt",
+                             .apply_unary = NULL,
+                             .apply_binary = expr_root,
+                             .integrate = expr_integrate_dispatch_primitive,
+                             .simplify = expr_simplify_root_operator,
+                             .fold_const_unary = NULL};
 const expr_ops_t ops_floor = {.eval = eval_floor,
                               .deriv = deriv_floor,
                               .reverse = expr_reverse_floor,
@@ -1499,6 +1523,7 @@ expr_t *expr_apply_unary_kind(expr_op_kind_t kind, const expr_t *arg)
                                                                          [EXPR_KIND_LOG] = &ops_log,
                                                                          [EXPR_KIND_LOG10] = &ops_log10,
                                                                          [EXPR_KIND_SQRT] = &ops_sqrt,
+                                                                         [EXPR_KIND_CUBRT] = &ops_cubrt,
                                                                          [EXPR_KIND_FLOOR] = &ops_floor,
                                                                          [EXPR_KIND_CEIL] = &ops_ceil,
                                                                          [EXPR_KIND_ABS] = &ops_abs,
@@ -1541,9 +1566,20 @@ expr_t *expr_apply_unary_kind(expr_op_kind_t kind, const expr_t *arg)
     return NULL;
 }
 
+/* Construct the single-valued principal square root. */
 expr_t *expr_sqrt(const expr_t *a)
 {
     return expr_math_wrap_unary(&ops_sqrt, a);
+}
+/* Construct the single-valued principal cube root. */
+expr_t *expr_cubrt(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_cubrt, a);
+}
+/* Construct the single-valued principal root. */
+expr_t *expr_root(const expr_t *a, const expr_t *order)
+{
+    return expr_math_wrap_binary(&ops_root, a, order);
 }
 expr_t *expr_exp(const expr_t *a)
 {

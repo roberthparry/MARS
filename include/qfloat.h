@@ -732,6 +732,23 @@ qfloat_t qf_ldexp(qfloat_t x, int k);
 qfloat_t qf_sqrt(qfloat_t x);
 
 /**
+ * @brief Principal cube root of a non-negative qfloat_t.
+ *
+ * @param x Input value.
+ * @return The principal cube root, or qfloat_t-NaN when @p x is negative.
+ */
+qfloat_t qf_cubrt(qfloat_t x);
+
+/**
+ * @brief Principal @p n-th root of a non-negative qfloat_t.
+ *
+ * @param x Input value.
+ * @param n Integer root order, which must be greater than one.
+ * @return The principal root, or qfloat_t-NaN on a domain error.
+ */
+qfloat_t qf_root(qfloat_t x, unsigned int n);
+
+/**
  * @brief Natural exponential function.
  *
  * Uses a 40‑term Taylor series, sufficient for full double‑double precision.

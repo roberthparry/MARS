@@ -2939,8 +2939,25 @@ INDEX_HTML = r"""<!doctype html>
     .matrix-pretty {
       overflow-x: auto;
       overflow-y: visible;
-      white-space: pre-wrap;
+      white-space: pre;
       font: 1.05rem/1.5 "Cascadia Code", "DejaVu Sans Mono", monospace;
+    }
+
+    .matrix-term-display {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.22rem;
+      width: max-content;
+    }
+
+    .matrix-factor,
+    .matrix-product-operator {
+      flex: none;
+      white-space: nowrap;
+    }
+
+    .matrix-product-operator {
+      color: var(--cream);
     }
 
     .matrix-display {
@@ -4807,7 +4824,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         subtitle.textContent = 'Switch between expression, equation, differential-equation, matrix, and integrator experiments. Each mode runs through a local MARS scratch binary and shows the result on the right.';
         setResultTitles('Rendered TeX', 'Expression', 'Function', 'Value');
         setAuxResultCardsVisible(true);
-        setValueCardVisible(true);
+        setValueCardVisible(Boolean(String(value.textContent || '').trim()));
       } else if (equationMode) {
         leftPaneTitle.textContent = 'Equation';
         subtitle.textContent = 'Enter an equation on the left. The lab tries symbolic isolation first, then numeric solving for all variable bindings.';
@@ -9402,17 +9419,45 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       return rows;
     }
 
+    function parseMatrixDisplayTerm(text) {
+      const source = String(text || '').trim();
+      const directRows = parseMatrixResultText(source);
+      if (directRows)
+        return {factor: '', rows: directRows};
+
+      let depth = 0;
+      for (let index = 0; index < source.length; index += 1) {
+        const char = source[index];
+        if ('([{'.includes(char)) {
+          depth += 1;
+          continue;
+        }
+        if (')]}'.includes(char)) {
+          depth = Math.max(0, depth - 1);
+          continue;
+        }
+        if (depth || (char !== '.' && char !== '·'))
+          continue;
+
+        const factor = source.slice(0, index).trim();
+        const rows = parseMatrixResultText(source.slice(index + 1).trim());
+        if (factor && rows)
+          return {factor, rows};
+      }
+      return null;
+    }
+
     function setMatrixPrettyResult(resultText, prettyText, element = functionStyle, moreButton = functionMore) {
       const terms = splitTopLevel(String(resultText || ''), '+')
-        .map((term) => parseMatrixResultText(term.trim()));
-      const matrices = terms.length && terms.every((rows) => rows) ? terms : null;
+        .map((term) => parseMatrixDisplayTerm(term));
+      const matrixTerms = terms.length && terms.every((term) => term) ? terms : null;
       element.classList.add('matrix-pretty');
       element.dataset.displayText = prettyText || resultText || '';
       element.dataset.fullText = prettyText || resultText || '';
       if (moreButton)
         resetMoreDigitsButton(moreButton, false);
 
-      if (!matrices) {
+      if (!matrixTerms) {
         renderMatrixSectionHeadings(element, prettyText || resultText || '');
         return;
       }
@@ -9420,12 +9465,26 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       element.replaceChildren();
       const sum = document.createElement('span');
       sum.className = 'matrix-sum-display';
-      matrices.forEach((rows, matrixIndex) => {
+      matrixTerms.forEach((term, matrixIndex) => {
         if (matrixIndex) {
           const operator = document.createElement('span');
           operator.className = 'matrix-sum-operator';
           operator.textContent = '+';
           sum.appendChild(operator);
+        }
+
+        const termDisplay = document.createElement('span');
+        termDisplay.className = 'matrix-term-display';
+        if (term.factor) {
+          const factor = document.createElement('span');
+          factor.className = 'matrix-factor';
+          factor.textContent = term.factor;
+          termDisplay.appendChild(factor);
+
+          const product = document.createElement('span');
+          product.className = 'matrix-product-operator';
+          product.textContent = '·';
+          termDisplay.appendChild(product);
         }
 
         const display = document.createElement('span');
@@ -9438,8 +9497,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
 
         const grid = document.createElement('span');
         grid.className = 'matrix-grid';
-        grid.style.gridTemplateColumns = `repeat(${rows[0].length}, max-content)`;
-        rows.forEach((row) => {
+        grid.style.gridTemplateColumns = `repeat(${term.rows[0].length}, max-content)`;
+        term.rows.forEach((row) => {
           row.forEach((cellText) => {
             const cell = document.createElement('span');
             cell.className = 'matrix-cell';
@@ -9453,7 +9512,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         right.className = 'matrix-bracket';
         right.textContent = ')';
         display.appendChild(right);
-        sum.appendChild(display);
+        termDisplay.appendChild(display);
+        sum.appendChild(termDisplay);
       });
       element.appendChild(sum);
     }
@@ -9625,6 +9685,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       delete rendered.dataset.responsiveVariant;
       setResultInputText('');
       value.textContent = '';
+      if (currentMode() === 'expression')
+        setValueCardVisible(false);
       lastTex = '';
       lastDerivativeExpression = '';
       currentVariables = [];
@@ -9695,6 +9757,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         value.textContent = data.value_note
           ? `${data.value || ''}\n${data.value_note}`
           : (data.value || '');
+        valueTitle.textContent = data.root_value ? 'Values' : 'Value';
+        setValueCardVisible(!!data.value);
         lastEvaluationInputText = text;
         if (!data.partial_error)
           saveLastExpression(editorText || fullExpressionText || expr.value.trim());
@@ -10610,6 +10674,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           fullDerivativeFunction
         );
         value.textContent = data.derivative_value || '';
+        setValueCardVisible(!!data.derivative_value);
         lastDerivativeExpression = derivativeExpression;
         {
           const variableBindings = variableNamesFromBindings(data.binding_values || []);
@@ -10695,6 +10760,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           fullIntegralFunction
         );
         value.textContent = data.integral_value || '';
+        setValueCardVisible(!!data.integral_value);
         lastDerivativeExpression = '';
         {
           const variableBindings = variableNamesFromBindings(data.binding_values || []);
@@ -12782,6 +12848,10 @@ def parse_mars_lab_output(output: str) -> dict[str, str]:
         "unbound": r"^unbound\s+(.*)$",
         "function": r"^function\s+(.*)$",
         "tex": r"^tex\s+(.*)$",
+        "root_expression": r"^root_expression\s{2,}(.*)$",
+        "root_TeX": r"^root_tex\s+(.*)$",
+        "root_function": r"^root_function\s{2,}(.*)$",
+        "root_value": r"^root_value\s{2,}(.*)$",
         "bindings": r"^binding\s{2,}(.*)$",
         "differentiable": r"^differentiable\s+(.*)$",
         "evaluation_ready": r"^evaluation_ready\s+(.*)$",
@@ -12807,6 +12877,7 @@ def parse_mars_lab_output(output: str) -> dict[str, str]:
         {
             "function",
             "tex",
+            "root_function",
             "derivative_function",
             "derivative_TeX",
             "integral_function",
@@ -14337,6 +14408,184 @@ def mars_binding_values(records: object) -> list[dict[str, str]]:
     return values
 
 
+def expression_with_unset_bindings(expression: str) -> str:
+    body, variable_text, constant_text = parse_expression_body(expression)
+    variables = [name for name, _ in parse_binding_assignments(variable_text) if name]
+    constants = [name for name, _ in parse_binding_assignments(constant_text) if name]
+
+    if not variables and not constants:
+        return body
+
+    variable_bindings = ", ".join(f"{name} = ?" for name in variables)
+    constant_bindings = ", ".join(f"{name} = ?" for name in constants)
+    if constant_bindings:
+        return f"{{ {body} | {variable_bindings}; {constant_bindings} }}"
+    return f"{{ {body} | {variable_bindings} }}"
+
+
+def expression_card_binding_values(
+    source_expression: str,
+    algebraic_expression: str,
+    bound_expression: str,
+    bound_records: object,
+    precision: int,
+) -> list[dict[str, str]]:
+    authored = expression_variable_binding_values(source_expression, precision)
+    algebraic = expression_variable_binding_values(algebraic_expression, precision)
+    canonical = expression_variable_binding_values(bound_expression, precision)
+    bound = mars_binding_values(bound_records)
+    authored_by_key = {(item["kind"], item["name"]): item for item in authored}
+    canonical_by_key = {(item["kind"], item["name"]): item for item in canonical}
+    bound_by_key = {(item["kind"], item["name"]): item for item in bound}
+    algebraic_keys = [(item["kind"], item["name"]) for item in algebraic]
+    ordered_keys = [
+        (item["kind"], item["name"])
+        for item in authored
+        if (item["kind"], item["name"]) in algebraic_keys
+    ]
+    ordered_keys.extend(key for key in algebraic_keys if key not in ordered_keys)
+
+    values: list[dict[str, str]] = []
+    for key in ordered_keys:
+        selected = canonical_by_key.get(key) or authored_by_key.get(key) or bound_by_key.get(key) or {
+            "kind": key[0],
+            "name": key[1],
+            "value": "?",
+            "display": "",
+        }
+        value = str(selected.get("value") or "?").strip()
+        if value.upper() == "NAN":
+            value = "?"
+        values.append({
+            "name": key[1],
+            "value": value,
+            "display": "" if value == "?" else _compact_long_text_value(value),
+            "kind": key[0],
+        })
+
+    return sorted(values, key=lambda item: item["kind"] == "constant")
+
+
+def expression_for_result_card(body: str, bindings: list[dict[str, str]]) -> str:
+    body = str(body or "").strip()
+    variables = [item for item in bindings if item.get("kind") == "variable"]
+    constants = [item for item in bindings if item.get("kind") == "constant"]
+
+    if not variables and not constants:
+        return body
+
+    def assignments(items: list[dict[str, str]]) -> str:
+        return ", ".join(
+            f"{item['name']} = {str(item.get('value') or '?').replace('NAN', '?')}"
+            for item in items
+        )
+
+    variable_text = assignments(variables)
+    constant_text = assignments(constants)
+    if constant_text:
+        return f"{{ {body} | {variable_text}; {constant_text} }}"
+    return f"{{ {body} | {variable_text} }}"
+
+
+def function_binding_initializers(function: str) -> dict[str, str]:
+    initializers: dict[str, str] = {}
+
+    for line in str(function or "").splitlines():
+        match = re.match(r"^\s*(?:const\s+)?([^\s=/]+)\s*=\s*(.+?)\s*$", line)
+        if match:
+            initializers[match.group(1)] = match.group(2)
+    return initializers
+
+
+def function_for_result_card(
+    algebraic_function: str,
+    bindings: list[dict[str, str]],
+    bound_function: str = "",
+) -> str:
+    values = {item["name"]: str(item.get("value") or "?") for item in bindings}
+    kinds = {item["name"]: str(item.get("kind") or "variable") for item in bindings}
+    initializers = function_binding_initializers(bound_function)
+    seen: set[str] = set()
+    lines: list[str] = []
+
+    for line in str(algebraic_function or "").splitlines():
+        match = re.match(r"^(\s*)//\s*([^=]+?)\s*=\s*\?\s*$", line)
+        if not match:
+            lines.append(line)
+            continue
+        indent, name = match.group(1), match.group(2).strip()
+        if name not in values:
+            lines.append(line)
+            continue
+        value = initializers.get(name, values[name])
+        if value.upper() == "NAN":
+            value = "?"
+        qualifier = "const " if kinds.get(name) == "constant" else ""
+        lines.append(f"{indent}{qualifier}{name} = {value}")
+        seen.add(name)
+
+    missing = [item for item in bindings if item["name"] not in seen]
+    if missing:
+        output_index = next((index for index, line in enumerate(lines) if line.lstrip().startswith("output(")), len(lines))
+        additions = []
+        for item in missing:
+            name = item["name"]
+            value = initializers.get(name, str(item.get("value") or "?"))
+            qualifier = "const " if item.get("kind") == "constant" else ""
+            additions.append(f"{qualifier}{name} = {'?' if value.upper() == 'NAN' else value}")
+        lines[output_index:output_index] = additions
+
+    return "\n".join(lines)
+
+
+def merge_algebraic_expression_fields(
+    fields: dict[str, str],
+    algebraic_fields: dict[str, str],
+    source_expression: str,
+    precision: int,
+) -> list[dict[str, str]]:
+    bound_expression = fields.get("expression", "")
+    bindings = expression_card_binding_values(
+        source_expression,
+        algebraic_fields.get("expression", ""),
+        bound_expression,
+        fields.get("bindings"),
+        precision,
+    )
+    algebraic_body = str(algebraic_fields.get("unbound") or algebraic_fields.get("expression") or "").strip()
+    bound_function = fields.get("function", "")
+
+    fields["unbound"] = algebraic_body
+    fields["expression"] = expression_for_result_card(algebraic_body, bindings)
+    fields["function"] = function_for_result_card(algebraic_fields.get("function", ""), bindings, bound_function)
+    fields["tex"] = algebraic_fields.get("tex", fields.get("tex", ""))
+
+    for prefix in ("derivative", "integral"):
+        algebraic_result = str(algebraic_fields.get(prefix) or "").strip()
+        if not algebraic_result:
+            continue
+        marker = "="
+        result_body = algebraic_result.split(marker, 1)[1].strip() if marker in algebraic_result else algebraic_result
+        result_bindings = expression_card_binding_values(
+            result_body,
+            result_body,
+            str(fields.get(prefix) or result_body),
+            fields.get(f"{prefix}_bindings"),
+            precision,
+        )
+        result_source = expression_for_result_card(parse_expression_body(result_body)[0], result_bindings)
+        label = algebraic_result.split(marker, 1)[0].rstrip() if marker in algebraic_result else ""
+        fields[prefix] = f"{label} = {result_source}" if label else result_source
+        fields[f"{prefix}_function"] = function_for_result_card(
+            algebraic_fields.get(f"{prefix}_function", ""),
+            result_bindings,
+            fields.get(f"{prefix}_function", ""),
+        )
+        fields[f"{prefix}_TeX"] = algebraic_fields.get(f"{prefix}_TeX", fields.get(f"{prefix}_TeX", ""))
+
+    return bindings
+
+
 def goal_seek_expression(
     binary: Path,
     expression: str,
@@ -14390,7 +14639,47 @@ def prepare_evaluation_fields(
     precision: int,
     save_expression: bool,
     wrt: str = "x",
+    action: str = "",
 ) -> dict[str, object]:
+    card_binding_values: list[dict[str, str]] | None = None
+
+    if action != "binding-edit":
+        algebraic_action = action if action in {"derivative", "integral"} else "evaluate"
+        algebraic_expression = expression_with_unset_bindings(expression)
+        try:
+            algebraic_fields, _, algebraic_returncode = run_mars_lab_fields(
+                binary,
+                algebraic_expression,
+                precision,
+                wrt,
+                algebraic_action,
+            )
+        except (OSError, subprocess.SubprocessError):
+            algebraic_fields = {}
+            algebraic_returncode = 1
+        if algebraic_returncode == 0:
+            card_binding_values = merge_algebraic_expression_fields(
+                fields,
+                algebraic_fields,
+                expression,
+                precision,
+            )
+            if (
+                not card_binding_values
+                and fields.get("unbound")
+                and numeric_value_for_display(str(fields.get("value") or "")) == "?"
+            ):
+                constant_fields, _, constant_returncode = run_mars_lab_fields(
+                    binary,
+                    str(fields["unbound"]),
+                    precision,
+                    wrt,
+                    "evaluate",
+                )
+                constant_value = numeric_value_for_display(str(constant_fields.get("value") or ""))
+                if constant_returncode == 0 and constant_value != "?":
+                    fields["value"] = constant_fields["value"]
+
     if fields.get("value"):
         fields["value"] = format_number_text_for_precision(
             fields["value"], precision, zero_subprecision=True)
@@ -14405,16 +14694,22 @@ def prepare_evaluation_fields(
     for key in ("value", "derivative_value", "integral_value"):
         if key in fields:
             fields[key] = numeric_value_for_display(fields[key])
+            if fields[key] == "?":
+                fields.pop(key, None)
+    if not fields.get("value"):
+        fields.pop("value_note", None)
 
     precision_limit_result_fields(fields, precision)
     fields["editor_expression"] = editor_expression_from_fields(fields)
     if save_expression and fields.get("expression"):
         save_state_expression(expression_for_editor(expression))
 
-    display_expression_source = fields.get("unbound", "") or fields.get("expression", "")
+    display_expression_source = fields.get("root_expression", "") or fields.get("expression", "") or fields.get("unbound", "")
     fields["full_display_expression"] = expression_for_display(display_expression_source)
-    fields["full_display_TeX"] = TeX_for_display(fields.get("tex", ""))
-    fields["full_display_function"] = function_for_display(fields.get("function", ""))
+    fields["full_display_TeX"] = TeX_for_display(fields.get("root_TeX", "") or fields.get("tex", ""))
+    fields["full_display_function"] = function_for_display(fields.get("root_function", "") or fields.get("function", ""))
+    if fields.get("root_value"):
+        fields["value"] = expression_for_display(str(fields["root_value"]))
     fields["display_expression"] = compact_display_text(str(fields["full_display_expression"]))
     fields["display_TeX"] = compact_display_text(str(fields["full_display_TeX"]))
     fields["display_function"] = compact_function_text(str(fields["full_display_function"]))
@@ -14452,14 +14747,9 @@ def prepare_evaluation_fields(
             integral_wrapped_svg, _ = render_TeX_to_svg(integral_wrapped_TeX)
             if integral_wrapped_svg:
                 fields["integral_wrapped_svg"] = integral_wrapped_svg
-    symbolic_binding_values = expression_variable_binding_values(
-        str(fields.get("expression") or expression),
-        precision,
-    )
-    fields["binding_values"] = (
-        symbolic_binding_values
-        if symbolic_binding_values
-        else mars_binding_values(fields.get("bindings"))
+    symbolic_binding_values = expression_variable_binding_values(str(fields.get("expression") or expression), precision)
+    fields["binding_values"] = card_binding_values if card_binding_values is not None else (
+        symbolic_binding_values if symbolic_binding_values else mars_binding_values(fields.get("bindings"))
     )
     fields["derivative_binding_values"] = mars_binding_values(
         fields.get("derivative_bindings")
@@ -17626,6 +17916,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                             precision,
                             save_expression=False,
                             wrt=wrt,
+                            action="integral" if integral_request else ("derivative" if derivative_request else action),
                         )
                         self.send_json(200, fallback_fields)
                         return
@@ -17661,6 +17952,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
             precision,
             save_expression=not operation_request,
             wrt=wrt,
+            action=action or ("integral" if integral_request else ("derivative" if derivative_request else "")),
         )
 
         self.send_json(200, fields)

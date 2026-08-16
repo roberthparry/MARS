@@ -262,6 +262,7 @@ static void test_conj(void)
 
     qcomplex_t z = qcz(3.0, 4.0);
     check_qc("conj(3+4i) = 3-4i", qc_conj(z), qcz(3.0, -4.0), 1e-30);
+    check_qc("conjugate(3+4i) = 3-4i", qc_conjugate(z), qcz(3.0, -4.0), 1e-30);
 
     qcomplex_t a = qcz(1.5, -2.5);
     qcomplex_t b = qcz(-0.5, 3.0);
@@ -369,6 +370,11 @@ static void test_pow_sqrt(void)
     }
 
     check_qc("pow(-1, 0.5) = i", qc_pow(qcr(-1.0), qcr(0.5)), qci(1.0), 1e-30);
+    check_qc("cubrt(-8) is the principal complex root", qc_cubrt(qcr(-8.0)),
+             qc_make(QF_ONE, qf_sqrt(qf_from_double(3.0))), 1e-28);
+    check_qc("root(-4, 2) = 2i", qc_root(qcr(-4.0), 2u), qci(2.0), 1e-28);
+    check_qc("root(81, 4) = 3", qc_root(qcr(81.0), 4u), qcr(3.0), 1e-28);
+    check_bool("root order one is invalid", qc_isnan(qc_root(qcr(3.0), 1u)));
 
     {
         qcomplex_t a = qcz(1.5, 0.5);

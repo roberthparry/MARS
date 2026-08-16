@@ -2657,6 +2657,7 @@ expr_t *expr_integral_with_bounds_internal(const expr_t *integrand, const expr_t
     return integral;
 }
 
+/* Construct a constant-exponent power while retaining explicit root syntax. */
 expr_t *expr_pow(const expr_t *dv, const number_t *exponent)
 {
     if (!dv || !exponent)

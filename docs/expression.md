@@ -716,7 +716,20 @@ All functions return owning handles.
 - `expr_t *expr_exp(const expr_t *expr)` — natural exponential
 - `expr_t *expr_log(const expr_t *expr)` — natural logarithm
 - `expr_t *expr_log10(const expr_t *expr)` — common logarithm
-- `expr_t *expr_sqrt(const expr_t *expr)` — square root
+- `expr_t *expr_sqrt(const expr_t *expr)` — the single-valued principal square root. For complex `z`, MARS defines
+  it as `exp(Log(z)/2)`, with the principal argument in `(-pi, pi]`. Thus the real part is non-negative and a value
+  on the negative real axis has a positive imaginary square root.
+- `expr_t *expr_cubrt(const expr_t *expr)` — the single-valued principal cube root.
+- `expr_t *expr_root(const expr_t *expr, const expr_t *order)` — the single-valued principal integer-order root;
+  `order` must evaluate to an integer greater than one.
+- Symbolic differentiation supports both functions. For constant integer `n`,
+  `d(root(u,n))/dx = root(u,n)u'/(nu)`, and `cubrt(u)` uses the corresponding `n = 3` rule. Reverse-mode
+  differentiation uses the same local derivatives.
+- Symbolic integration recognises affine radicands: for constant integer `n > 1` and constant non-zero `u'`,
+  `integral(root(u,n),x) = n*u*root(u,n)/((n+1)u')`; `cubrt(u)` is the `n = 3` case.
+- Explicit `z^(1/n)` syntax denotes the complete family of `n` roots. MARS Lab displays every member of the family;
+  for example, `(3+4i)^(1/2)` displays `{ 2+i, -2-i }`, while `sqrt(3+4i)` displays only `2+i`. Numeric evaluation
+  of the underlying power node uses the principal member when a scalar value is required.
 - `expr_t *expr_floor(const expr_t *expr)` — floor
 - `expr_t *expr_ceil(const expr_t *expr)` — ceiling
 - `expr_t *expr_pow(const expr_t *expr, const number_t *exponent)` — `expr ^ exponent` (borrowed scalar numeric exponent)
@@ -868,7 +881,9 @@ output(expr(x, y, γ));
   - symbolic integral requests `@S f(x) dx`, `@S^u f(x) dx`,
     `@S^b_a f(x) dx`, and `@S_a^b f(x) dx`; `*`, `.`, or `·` may appear
     before the terminal differential
-  - `sqrt(x)` or `√(x)` for square roots
+  - `sqrt(x)` or `√(x)` for a single principal square root; `cubrt(x)` and `root(x, n)` for single principal cube
+    and integer-order roots
+  - `conj(x)` and `conjugate(x)` for complex conjugation, with postfix `x^*` as the equivalent shorthand
   - `ln(x)` for natural logarithm; `log(x)`, `lg(x)`, and `log10(x)` for common logarithm
   - `versin(x)`, `vercos(x)`, `coversin(x)`, `covercos(x)`,
     `haversin(x)`, `havercos(x)`, `hacoversin(x)`, and `hacovercos(x)`

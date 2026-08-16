@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <stdbool.h>
 #include <stdlib.h>
 
@@ -73,6 +74,261 @@ static expr_t *expr_beautify_negative_square_root(const expr_t *expr)
     return rewrite;
 }
 
+static bool expr_beautify_i_unit_sign(const expr_t *expr, int *sign_out)
+{
+    int child_sign;
+
+    if (!expr || !sign_out)
+        return false;
+    if (expr_is_const(expr) && num_eq(expr->c, NUM_I)) {
+        *sign_out = 1;
+        return true;
+    }
+    if (expr_is_const(expr) && num_eq(expr->c, NUM_NEG_I)) {
+        *sign_out = -1;
+        return true;
+    }
+    if (expr_is_op(expr, &ops_neg) && expr_beautify_i_unit_sign(expr->a, &child_sign)) {
+        *sign_out = -child_sign;
+        return true;
+    }
+    return false;
+}
+
+static bool expr_beautify_extract_i_factor(const expr_t *expr, int *sign_out, const expr_t **coefficient_out)
+{
+    if (!expr || !sign_out || !coefficient_out)
+        return false;
+    if (expr_beautify_i_unit_sign(expr, sign_out)) {
+        *coefficient_out = NULL;
+        return true;
+    }
+    if (!expr_is_op(expr, &ops_mul))
+        return false;
+    if (expr_beautify_i_unit_sign(expr->a, sign_out)) {
+        *coefficient_out = expr->b;
+        return true;
+    }
+    if (expr_beautify_i_unit_sign(expr->b, sign_out)) {
+        *coefficient_out = expr->a;
+        return true;
+    }
+    return false;
+}
+
+static expr_t *expr_beautify_extract_exact_imaginary_coefficient(const expr_t *expr, int *sign_out)
+{
+    number_t value = number_invalid();
+    number_t real = number_invalid();
+    number_t imaginary = number_invalid();
+    number_t magnitude = number_invalid();
+    expr_t *coefficient = NULL;
+
+    if (!expr || !sign_out || !expr_match_const_value(expr, &value) || !num_is_exact(value))
+        goto cleanup;
+    real = num_real_part(value);
+    imaginary = num_imag_part(value);
+    if (!num_is_zero(real) || num_is_zero(imaginary))
+        goto cleanup;
+    magnitude = num_abs(imaginary);
+    coefficient = expr_new_const(magnitude);
+    *sign_out = num_sign(imaginary);
+
+cleanup:
+    num_destroy(&magnitude);
+    num_destroy(&imaginary);
+    num_destroy(&real);
+    num_destroy(&value);
+    return coefficient;
+}
+
+static expr_t *expr_beautify_simplified_square_root(const expr_t *argument)
+{
+    number_t value = number_invalid();
+    number_t root_value = number_invalid();
+    expr_t *root = NULL;
+    string_t *root_text = NULL;
+    const char *root_chars;
+    char *end = NULL;
+    long root_long;
+
+    if (!argument)
+        goto cleanup;
+    if (expr_match_const_value(argument, &value)) {
+        if (expr_fold_sqrt_const(&value, &root_value)) {
+            root = expr_new_const(root_value);
+            goto cleanup;
+        }
+        num_destroy(&root_value);
+        root_value = num_sqrt(value);
+        if (num_is_real(root_value) && num_is_integer(root_value) && num_get_sign(root_value) >= 0) {
+            root_text = num_to_string(root_value);
+            root_chars = root_text ? string_c_str(root_text) : NULL;
+            errno = 0;
+            root_long = root_chars ? strtol(root_chars, &end, 10) : 0L;
+            if (root_chars && end && *end == '\0' && errno == 0) {
+                root = expr_const_long(root_long);
+                goto cleanup;
+            }
+        }
+    }
+    root = expr_sqrt(argument);
+
+cleanup:
+    string_free(root_text);
+    num_destroy(&root_value);
+    num_destroy(&value);
+    return root;
+}
+
+static expr_t *expr_beautify_cartesian_square_root(const expr_t *expr)
+{
+    const expr_t *argument;
+    const expr_t *left;
+    const expr_t *right;
+    const expr_t *real_part = NULL;
+    const expr_t *imaginary_coefficient = NULL;
+    expr_t *owned_real_part = NULL;
+    expr_t *owned_imaginary_coefficient = NULL;
+    number_t argument_value = number_invalid();
+    number_t real_value = number_invalid();
+    number_t imaginary_value = number_invalid();
+    number_t coefficient_value = number_invalid();
+    expr_t *real_square = NULL;
+    expr_t *imaginary_square = NULL;
+    expr_t *norm_square = NULL;
+    expr_t *norm = NULL;
+    expr_t *real_sum = NULL;
+    expr_t *imaginary_difference = NULL;
+    expr_t *real_argument = NULL;
+    expr_t *imaginary_argument = NULL;
+    expr_t *real_root = NULL;
+    expr_t *imaginary_root = NULL;
+    expr_t *absolute_imaginary = NULL;
+    expr_t *orientation = NULL;
+    expr_t *oriented_imaginary = NULL;
+    expr_t *imaginary_unit = NULL;
+    expr_t *imaginary_term = NULL;
+    expr_t *rewrite = NULL;
+    int imaginary_sign;
+    bool subtract;
+
+    if (!expr_is_sqrt_expr(expr) || !(argument = expr->a))
+        goto cleanup;
+
+    if (expr_match_const_value(argument, &argument_value) && !num_is_real(argument_value)) {
+        number_t imaginary_magnitude;
+
+        real_value = num_real_part(argument_value);
+        imaginary_value = num_imag_part(argument_value);
+        if (num_is_zero(imaginary_value))
+            goto cleanup;
+        imaginary_magnitude = num_abs(imaginary_value);
+        owned_real_part = expr_new_const(real_value);
+        owned_imaginary_coefficient = expr_new_const(imaginary_magnitude);
+        num_destroy(&imaginary_magnitude);
+        if (!owned_real_part || !owned_imaginary_coefficient)
+            goto cleanup;
+        real_part = owned_real_part;
+        imaginary_coefficient = owned_imaginary_coefficient;
+        imaginary_sign = num_sign(imaginary_value);
+    } else if (expr_beautify_extract_i_factor(argument, &imaginary_sign, &imaginary_coefficient)) {
+        owned_real_part = expr_new_const(NUM_ZERO);
+        real_part = owned_real_part;
+    } else if ((owned_imaginary_coefficient =
+                    expr_beautify_extract_exact_imaginary_coefficient(argument, &imaginary_sign))) {
+        owned_real_part = expr_new_const(NUM_ZERO);
+        real_part = owned_real_part;
+        imaginary_coefficient = owned_imaginary_coefficient;
+    } else {
+        if (!(subtract = expr_match_binary_op(argument, EXPR_KIND_SUB, &left, &right)) &&
+            !expr_match_binary_op(argument, EXPR_KIND_ADD, &left, &right))
+            goto cleanup;
+
+
+        if (expr_beautify_extract_i_factor(right, &imaginary_sign, &imaginary_coefficient)) {
+            real_part = left;
+            if (subtract)
+                imaginary_sign = -imaginary_sign;
+        } else if ((owned_imaginary_coefficient =
+                        expr_beautify_extract_exact_imaginary_coefficient(right, &imaginary_sign))) {
+            real_part = left;
+            imaginary_coefficient = owned_imaginary_coefficient;
+            if (subtract)
+                imaginary_sign = -imaginary_sign;
+        } else if (!subtract && expr_beautify_extract_i_factor(left, &imaginary_sign, &imaginary_coefficient)) {
+            real_part = right;
+        } else if (!subtract &&
+                   (owned_imaginary_coefficient =
+                        expr_beautify_extract_exact_imaginary_coefficient(left, &imaginary_sign))) {
+            real_part = right;
+            imaginary_coefficient = owned_imaginary_coefficient;
+        } else {
+            goto cleanup;
+        }
+
+        if (!imaginary_coefficient) {
+            owned_imaginary_coefficient = expr_const_one();
+            imaginary_coefficient = owned_imaginary_coefficient;
+        }
+    }
+    if (!imaginary_coefficient)
+        goto cleanup;
+
+    real_square = expr_simplify_owned(expr_pow_long(real_part, 2L));
+    imaginary_square = expr_simplify_owned(expr_pow_long(imaginary_coefficient, 2L));
+    norm_square = expr_add_simplify_owned(real_square, imaginary_square);
+    real_square = NULL;
+    imaginary_square = NULL;
+    norm = expr_beautify_simplified_square_root(norm_square);
+    real_sum = norm ? expr_simplify_owned(expr_add(norm, real_part)) : NULL;
+    imaginary_difference = norm ? expr_simplify_owned(expr_sub(norm, real_part)) : NULL;
+    real_argument = real_sum ? expr_simplify_owned(expr_div_long(real_sum, 2L)) : NULL;
+    imaginary_argument = imaginary_difference ? expr_simplify_owned(expr_div_long(imaginary_difference, 2L)) : NULL;
+    real_root = expr_beautify_simplified_square_root(real_argument);
+    imaginary_root = expr_beautify_simplified_square_root(imaginary_argument);
+    if (expr_match_const_value(imaginary_coefficient, &coefficient_value) && num_is_real(coefficient_value) &&
+        !num_is_zero(coefficient_value)) {
+        if (num_sign(coefficient_value) < 0)
+            imaginary_sign = -imaginary_sign;
+        oriented_imaginary = imaginary_root ? expr_clone(imaginary_root) : NULL;
+    } else {
+        absolute_imaginary = expr_abs(imaginary_coefficient);
+        orientation = absolute_imaginary ? expr_div(imaginary_coefficient, absolute_imaginary) : NULL;
+        oriented_imaginary = orientation && imaginary_root ? expr_mul(orientation, imaginary_root) : NULL;
+    }
+    imaginary_unit = expr_new_const(NUM_I);
+    if (imaginary_unit && oriented_imaginary)
+        imaginary_term = expr_beautify_is_one(oriented_imaginary) ? expr_clone(imaginary_unit)
+                                                                   : expr_mul(oriented_imaginary, imaginary_unit);
+    if (real_root && imaginary_term)
+        rewrite = imaginary_sign > 0 ? expr_add(real_root, imaginary_term) : expr_sub(real_root, imaginary_term);
+
+cleanup:
+    expr_free(imaginary_term);
+    expr_free(imaginary_unit);
+    expr_free(oriented_imaginary);
+    expr_free(orientation);
+    expr_free(absolute_imaginary);
+    expr_free(imaginary_root);
+    expr_free(real_root);
+    expr_free(imaginary_argument);
+    expr_free(real_argument);
+    expr_free(imaginary_difference);
+    expr_free(real_sum);
+    expr_free(norm);
+    expr_free(norm_square);
+    expr_free(imaginary_square);
+    expr_free(real_square);
+    expr_free(owned_imaginary_coefficient);
+    expr_free(owned_real_part);
+    num_destroy(&coefficient_value);
+    num_destroy(&imaginary_value);
+    num_destroy(&real_value);
+    num_destroy(&argument_value);
+    return rewrite;
+}
+
 static expr_t *expr_beautify_expand_preserved(const expr_t *expr)
 {
     expr_t *left = NULL;
@@ -97,13 +353,13 @@ static expr_t *expr_beautify_expand_preserved(const expr_t *expr)
     left = expr_beautify_expand_preserved(expr->a);
     if (!left)
         goto cleanup;
-    if (expr->ops->arity == EXPR_OP_BINARY) {
+    if (expr_is_pow_d_expr(expr)) {
+        rebuilt = expr_new_pow_const_internal(left, expr->c);
+    } else if (expr->ops->arity == EXPR_OP_BINARY) {
         right = expr_beautify_expand_preserved(expr->b);
         if (!right)
             goto cleanup;
         rebuilt = expr_new_binary_internal(expr->ops, left, right);
-    } else if (expr_is_pow_d_expr(expr)) {
-        rebuilt = expr_new_pow_const_internal(left, expr->c);
     } else {
         rebuilt = expr_new_unary_internal(expr->ops, left);
     }
@@ -451,9 +707,14 @@ static expr_t *expr_beautify_cartesian_product(const expr_t *expr)
     long real_coefficient = 1L;
     long imaginary_coefficient = 1L;
     long common_coefficient = 1L;
+    int imaginary_unit_sign;
 
-    if (!expr_match_binary_op(expr, EXPR_KIND_MUL, &left, &right) ||
-        !expr_beautify_cartesian_parts(expr, &real, &imaginary, &has_imaginary) || !has_imaginary)
+    if (!expr_match_binary_op(expr, EXPR_KIND_MUL, &left, &right))
+        goto cleanup;
+    if ((expr_beautify_i_unit_sign(left, &imaginary_unit_sign) && expr_beautify_manifestly_real(right)) ||
+        (expr_beautify_i_unit_sign(right, &imaginary_unit_sign) && expr_beautify_manifestly_real(left)))
+        goto cleanup;
+    if (!expr_beautify_cartesian_parts(expr, &real, &imaginary, &has_imaginary) || !has_imaginary)
         goto cleanup;
     factored_real = expr_factor_common_post_calculus(real);
     factored_imaginary = expr_factor_common_post_calculus(imaginary);
@@ -522,6 +783,103 @@ cleanup:
     expr_free(imaginary_term);
     expr_free(imaginary);
     expr_free(real);
+    return rewrite;
+}
+
+static void expr_beautify_collect_product_factors(const expr_t *expr, const expr_t ***factors, size_t *count,
+                                                   size_t *capacity)
+{
+    if (!expr || !factors || !count || !capacity)
+        return;
+    if (expr_is_op(expr, &ops_mul)) {
+        expr_beautify_collect_product_factors(expr->a, factors, count, capacity);
+        expr_beautify_collect_product_factors(expr->b, factors, count, capacity);
+        return;
+    }
+    if (*count == *capacity) {
+        size_t next_capacity = *capacity ? *capacity * 2u : 4u;
+        const expr_t **next = realloc((void *)*factors, next_capacity * sizeof(*next));
+
+        if (!next)
+            return;
+        *factors = next;
+        *capacity = next_capacity;
+    }
+    (*factors)[(*count)++] = expr;
+}
+
+static expr_t *expr_beautify_imaginary_product(const expr_t *expr)
+{
+    const expr_t **factors = NULL;
+    size_t count = 0u;
+    size_t capacity = 0u;
+    size_t imaginary_index = 0u;
+    number_t imaginary_part = number_invalid();
+    number_t real_part = number_invalid();
+    number_t magnitude = number_invalid();
+    expr_t *product = NULL;
+    expr_t *imaginary_unit = NULL;
+    expr_t *rewrite = NULL;
+    bool found = false;
+    bool negative = false;
+
+    if (!expr_is_op(expr, &ops_mul))
+        goto cleanup;
+    expr_beautify_collect_product_factors(expr, &factors, &count, &capacity);
+    for (size_t i = 0u; i < count; ++i) {
+        if (!expr_is_const(factors[i]) || num_is_real(factors[i]->c))
+            continue;
+        real_part = num_real_part(factors[i]->c);
+        imaginary_part = num_imag_part(factors[i]->c);
+        if (num_is_zero(real_part) && !num_is_zero(imaginary_part)) {
+            imaginary_index = i;
+            found = true;
+            break;
+        }
+        num_destroy(&imaginary_part);
+        imaginary_part = number_invalid();
+        num_destroy(&real_part);
+        real_part = number_invalid();
+    }
+    if (!found || count < 2u || (imaginary_index + 1u == count && num_eq(imaginary_part, NUM_ONE)))
+        goto cleanup;
+
+    negative = num_sign(imaginary_part) < 0;
+    magnitude = num_abs(imaginary_part);
+    if (!num_is_one(magnitude))
+        product = expr_new_const(magnitude);
+    for (size_t i = 0u; i < count; ++i) {
+        expr_t *factor;
+
+        if (i == imaginary_index)
+            continue;
+        factor = expr_clone(factors[i]);
+        if (!product) {
+            product = factor;
+        } else {
+            expr_t *next = expr_mul(product, factor);
+
+            expr_free(factor);
+            expr_free(product);
+            product = next;
+        }
+    }
+    imaginary_unit = expr_new_named_const(NUM_I, "i");
+    rewrite = product && imaginary_unit ? expr_mul(product, imaginary_unit) : NULL;
+    if (negative && rewrite) {
+        expr_t *negated = expr_neg(rewrite);
+
+        expr_free(rewrite);
+        rewrite = negated;
+    }
+
+cleanup:
+    expr_free(imaginary_unit);
+    expr_free(product);
+    num_destroy(&magnitude);
+    num_destroy(&real_part);
+    num_destroy(&imaginary_part);
+    free((void *)factors);
     return rewrite;
 }
 
@@ -752,13 +1110,13 @@ static expr_t *expr_beautify_node(const expr_t *expr, bool rewrite_negative_root
     left = expr_beautify_node(expr->a, rewrite_negative_roots);
     if (!left)
         goto cleanup;
-    if (expr->ops->arity == EXPR_OP_BINARY) {
+    if (expr_is_pow_d_expr(expr)) {
+        rebuilt = expr_new_pow_const_internal(left, expr->c);
+    } else if (expr->ops->arity == EXPR_OP_BINARY) {
         right = expr_beautify_node(expr->b, rewrite_negative_roots);
         if (!right)
             goto cleanup;
         rebuilt = expr_new_binary_internal(expr->ops, left, right);
-    } else if (expr_is_pow_d_expr(expr)) {
-        rebuilt = expr_new_pow_const_internal(left, expr->c);
     } else {
         rebuilt = expr_new_unary_internal(expr->ops, left);
     }
@@ -766,13 +1124,21 @@ static expr_t *expr_beautify_node(const expr_t *expr, bool rewrite_negative_root
         goto cleanup;
     left = NULL;
     right = NULL;
-    rewrite = expr_beautify_radical_sum(rebuilt);
+    if (!rewrite_negative_roots) {
+        rewrite = expr_beautify_radical_sum(rebuilt);
+        if (rewrite) {
+            expr_free(rebuilt);
+            rebuilt = rewrite;
+            rewrite = NULL;
+        }
+    }
+    rewrite = expr_beautify_symmetric_square_root(rebuilt);
     if (rewrite) {
         expr_free(rebuilt);
         rebuilt = rewrite;
         rewrite = NULL;
     }
-    rewrite = expr_beautify_symmetric_square_root(rebuilt);
+    rewrite = expr_beautify_cartesian_square_root(rebuilt);
     if (rewrite) {
         expr_free(rebuilt);
         rebuilt = rewrite;
@@ -792,6 +1158,12 @@ static expr_t *expr_beautify_node(const expr_t *expr, bool rewrite_negative_root
             rewrite = NULL;
         }
     }
+    rewrite = expr_beautify_imaginary_product(rebuilt);
+    if (rewrite) {
+        expr_free(rebuilt);
+        rebuilt = rewrite;
+        rewrite = NULL;
+    }
     rewrite = expr_beautify_complex_square_root_reciprocal(rebuilt);
     if (rewrite) {
         expr_free(rebuilt);
@@ -806,21 +1178,66 @@ cleanup:
     return rebuilt;
 }
 
+static bool expr_beautify_has_preserved_complex_square_root(const expr_t *expr)
+{
+    const expr_binding_expr_t *binding;
+    expr_t *radicand = NULL;
+    number_t value = number_invalid();
+    number_t imaginary = number_invalid();
+    bool matched = false;
+
+    if (!expr || !expr->ops || expr->ops->arity != EXPR_OP_ATOM || !(binding = expr->binding_expr) ||
+        binding->kind != EXPR_BINDING_EXPR_UNARY_OP || binding->u.unary_op.ops != &ops_sqrt)
+        goto cleanup;
+
+    radicand = expr_binding_expr_eval_expr(binding->u.unary_op.child);
+    if (!radicand)
+        goto cleanup;
+    value = expr_eval(radicand);
+    imaginary = num_imag_part(value);
+    matched = !num_is_zero(imaginary);
+
+cleanup:
+    num_destroy(&imaginary);
+    num_destroy(&value);
+    expr_free(radicand);
+    return matched;
+}
+
+/* Beautify an expression tree which has already received its intended algebraic simplification. */
+expr_t *expr_beautify_presimplified(const expr_t *expr)
+{
+    expr_t *expanded = NULL;
+    expr_t *symmetric;
+    expr_t *beautified;
+    const expr_t *source = expr;
+
+    if (!expr)
+        return NULL;
+    if (expr_beautify_has_preserved_complex_square_root(expr)) {
+        expanded = expr_beautify_expand_preserved(expr);
+        if (expanded)
+            source = expanded;
+    }
+    symmetric = expr_beautify_node(source, false);
+    beautified = symmetric ? expr_beautify_node(symmetric, true) : NULL;
+    expr_free(symmetric);
+    expr_free(expanded);
+    return beautified;
+}
+
 /* Return a display-oriented but algebraically equivalent expression tree. */
 expr_t *expr_beautify(const expr_t *expr)
 {
     expr_t *simplified;
     expr_t *expanded;
-    expr_t *symmetric;
     expr_t *beautified;
 
     if (!expr)
         return NULL;
     simplified = expr_simplify(expr);
     expanded = simplified ? expr_beautify_expand_preserved(simplified) : NULL;
-    symmetric = expanded ? expr_beautify_node(expanded, false) : NULL;
-    beautified = symmetric ? expr_beautify_node(symmetric, true) : NULL;
-    expr_free(symmetric);
+    beautified = expanded ? expr_beautify_presimplified(expanded) : NULL;
     expr_free(expanded);
     expr_free(simplified);
     return beautified;

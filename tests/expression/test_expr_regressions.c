@@ -1564,6 +1564,16 @@ static void test_simplify_trig_and_hyperbolic_identities(void)
             "sin(x)/cos(x) simplifies to tan(x)",
         },
         {
+            "{ (tan(x) + tan(y))/(1 - tan(x)*tan(y)) | x = ?, y = ? }",
+            "{ tan(x + y) | x = NAN, y = NAN }",
+            "tangent addition quotient simplifies to tan(x+y)",
+        },
+        {
+            "{ (tan(x) - tan(y))/(1 + tan(y)*tan(x)) | x = ?, y = ? }",
+            "{ tan(x - y) | x = NAN, y = NAN }",
+            "tangent subtraction quotient simplifies to tan(x-y)",
+        },
+        {
             "{ (x^2)^3 | x = NAN }",
             "{ x⁶ | x = NAN }",
             "(x^2)^3 simplifies to x^6",
@@ -1674,9 +1684,30 @@ static void test_simplify_trig_and_hyperbolic_identities(void)
             "cos(x)*sin(x) simplifies to half sin double angle",
         },
         {
+            "{ cos(x)+i*sin(x) | x = NAN }",
+            "{ exp(ix) | x = NAN }",
+            "Euler identity simplifies to exponential form",
+        },
+        {
+            "{ ln(cos(x)+i*sin(x)) | x = NAN }",
+            "{ ix | x = NAN }",
+            "logarithm of an Euler identity simplifies",
+        },
+        {
             "{ (cos(x)+i*sin(x))^2 | x = NAN }",
-            "{ cos(2x) + i·sin(2x) | x = NAN }",
-            "Euler-form square simplifies to double angle",
+            "{ exp(2ix) | x = NAN }",
+            "Euler-form square simplifies to an exponential",
+        },
+        {
+            "sqrt(2^2)",
+            "2",
+            "square root of a positive numeric square simplifies",
+        },
+        {
+            "{ (sqrt(2)/2*sqrt(sqrt(x^2+y^2)+x)+i*sqrt(2)/2*y*sqrt(sqrt(x^2+y^2)-x)/abs(y))^2 | "
+            "x = NAN, y = NAN }",
+            "{ x + iy | x = NAN, y = NAN }",
+            "square of the Cartesian principal complex root simplifies to its argument",
         },
         {
             "{ cosh(x)^2 - sinh(x)^2 | x = NAN }",
@@ -3320,8 +3351,8 @@ static void test_binding_successor_and_trig_shape_simplifies(void)
         },
         {
             "{ x | x = (cos(pi/5)+i*sin(pi/5))^2 }",
-            "cos(⅖π) + i·sin(⅖π)",
-            "binding Euler-form square simplifies",
+            "exp(2·i·π/5)",
+            "binding Euler-form square simplifies to an exponential",
         },
         {
             "{ x | x = sinh(pi/5)*cosh(pi/5) }",
@@ -3606,6 +3637,245 @@ static void test_sqrt_negative_exact_evaluates_to_i(void)
     }
 }
 
+static void test_symbolic_complex_square_root_beautifies_to_cartesian_form(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = expr_from_string("sqrt(x + iy)", &bindings);
+    expr_t *beautified = expr ? expr_beautify_presimplified(expr) : NULL;
+    char *text = beautified ? expr_to_string(beautified, style_UNBOUND) : NULL;
+
+    ASSERT_NOT_NULL(expr);
+    ASSERT_NOT_NULL(beautified);
+    TEST_ASSERT_STR_EQ(text,
+                       "√(½·(√(x² + y²) + x)) + i·y/|y|·√(½·(√(x² + y²) - x))");
+
+    free(text);
+    expr_free(beautified);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+}
+
+static void test_exact_complex_square_root_beautifies_to_cartesian_surds(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = expr_from_string("sqrt(2 + 3i)", &bindings);
+    expr_t *beautified = expr ? expr_beautify_presimplified(expr) : NULL;
+    char *text = beautified ? expr_to_string(beautified, style_UNBOUND) : NULL;
+
+    ASSERT_NOT_NULL(expr);
+    ASSERT_NOT_NULL(beautified);
+    TEST_ASSERT_STR_EQ(text, "√(½·(√(13) + 2)) + i·√(½·(√(13) - 2))");
+
+    free(text);
+    expr_free(beautified);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+}
+
+static void test_unit_complex_square_root_keeps_conjugate_surds_together(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = expr_from_string("sqrt(1 + i)", &bindings);
+    expr_t *beautified = expr ? expr_beautify_presimplified(expr) : NULL;
+    char *text = beautified ? expr_to_string(beautified, style_UNBOUND) : NULL;
+
+    ASSERT_NOT_NULL(expr);
+    ASSERT_NOT_NULL(beautified);
+    TEST_ASSERT_STR_EQ(text, "√(½·(√(2) + 1)) + i·√(½·(√(2) - 1))");
+
+    free(text);
+    expr_free(beautified);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+}
+
+static void test_exact_complex_square_root_reduces_perfect_square_components(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = expr_from_string("sqrt(3 + 4i)", &bindings);
+    expr_t *beautified = expr ? expr_beautify_presimplified(expr) : NULL;
+    char *text = beautified ? expr_to_string(beautified, style_UNBOUND) : NULL;
+
+    ASSERT_NOT_NULL(expr);
+    ASSERT_NOT_NULL(beautified);
+    TEST_ASSERT_STR_EQ(text, "2 + i");
+
+    free(text);
+    expr_free(beautified);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+}
+
+static void test_pure_imaginary_square_root_reduces_to_cartesian_components(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = expr_from_string("sqrt(2i)", &bindings);
+    expr_t *beautified = expr ? expr_beautify_presimplified(expr) : NULL;
+    char *text = beautified ? expr_to_string(beautified, style_UNBOUND) : NULL;
+
+    ASSERT_NOT_NULL(expr);
+    ASSERT_NOT_NULL(beautified);
+    TEST_ASSERT_STR_EQ(text, "1 + i");
+
+    free(text);
+    expr_free(beautified);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+}
+
+static void test_larger_complex_square_root_reduces_perfect_square_components(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = expr_from_string("sqrt(5 + 12i)", &bindings);
+    expr_t *beautified = expr ? expr_beautify_presimplified(expr) : NULL;
+    char *text = beautified ? expr_to_string(beautified, style_UNBOUND) : NULL;
+
+    ASSERT_NOT_NULL(expr);
+    ASSERT_NOT_NULL(beautified);
+    TEST_ASSERT_STR_EQ(text, "3 + 2i");
+
+    free(text);
+    expr_free(beautified);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+}
+
+static void test_exact_complex_integer_power_folds_to_cartesian_value(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = expr_from_string("(1 + i)^2", &bindings);
+    expr_t *simplified = expr ? expr_simplify(expr) : NULL;
+    char *text = simplified ? expr_to_string(simplified, style_UNBOUND) : NULL;
+
+    ASSERT_NOT_NULL(expr);
+    ASSERT_NOT_NULL(simplified);
+    TEST_ASSERT_STR_EQ(text, "2i");
+
+    free(text);
+    expr_free(simplified);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+}
+
+static void test_exact_complex_integer_power_with_negative_real_part_folds_to_cartesian_value(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = expr_from_string("(-3 + 4i)^2", &bindings);
+    expr_t *simplified = expr ? expr_simplify(expr) : NULL;
+    char *text = simplified ? expr_to_string(simplified, style_UNBOUND) : NULL;
+
+    ASSERT_NOT_NULL(expr);
+    ASSERT_NOT_NULL(simplified);
+    TEST_ASSERT_STR_EQ(text, "-7 - 24i");
+
+    free(text);
+    expr_free(simplified);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+}
+
+static void test_explicit_complex_cube_root_preserves_family_and_evaluates_principal_value(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = expr_from_string("(-2 + 2i)^(1/3)", &bindings);
+    expr_t *simplified = expr ? expr_simplify(expr) : NULL;
+    char *text = simplified ? expr_to_string(simplified, style_UNBOUND) : NULL;
+    number_t value = expr ? expr_eval(expr) : (number_t){0};
+    number_t expected = num_add(NUM_ONE, NUM_I);
+    number_t seed = (number_t){0};
+    long order = 0L;
+
+    ASSERT_NOT_NULL(expr);
+    ASSERT_NOT_NULL(simplified);
+    TEST_ASSERT_STR_EQ(text, "(-2 + 2i)^⅓");
+    ASSERT_TRUE(num_eq(value, expected));
+    ASSERT_TRUE(expr_exact_complex_root_seed(expr, &seed, &order));
+    ASSERT_EQ_INT(order, 3L);
+    ASSERT_TRUE(num_eq(seed, expected));
+
+    num_destroy(&seed);
+    num_destroy(&expected);
+    num_destroy(&value);
+    free(text);
+    expr_free(simplified);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+}
+
+static void test_sqrt_is_principal_but_explicit_half_power_preserves_both_roots(void)
+{
+    expr_bindings_t *sqrt_bindings = NULL;
+    expr_bindings_t *power_bindings = NULL;
+    expr_t *sqrt_expr = expr_from_string("sqrt(3 + 4i)", &sqrt_bindings);
+    expr_t *power_expr = expr_from_string("(3 + 4i)^(1/2)", &power_bindings);
+    expr_t *sqrt_simplified = sqrt_expr ? expr_simplify(sqrt_expr) : NULL;
+    expr_t *power_simplified = power_expr ? expr_simplify(power_expr) : NULL;
+    char *sqrt_text = sqrt_simplified ? expr_to_string(sqrt_simplified, style_UNBOUND) : NULL;
+    char *power_text = power_simplified ? expr_to_string(power_simplified, style_UNBOUND) : NULL;
+    number_t seed = (number_t){0};
+    number_t expected = num_add(NUM_TWO, NUM_I);
+    long order = 0L;
+
+    ASSERT_NOT_NULL(sqrt_expr);
+    ASSERT_NOT_NULL(power_expr);
+    ASSERT_NOT_NULL(sqrt_simplified);
+    ASSERT_NOT_NULL(power_simplified);
+    TEST_ASSERT_STR_EQ(sqrt_text, "2 + i");
+    TEST_ASSERT_STR_EQ(power_text, "(3 + 4i)^½");
+    ASSERT_FALSE(expr_explicit_root_order(sqrt_expr, &order));
+    ASSERT_TRUE(expr_explicit_root_order(power_expr, &order));
+    ASSERT_EQ_INT(order, 2L);
+    ASSERT_TRUE(expr_exact_complex_root_seed(power_expr, &seed, &order));
+    ASSERT_TRUE(num_eq(seed, expected));
+
+    num_destroy(&expected);
+    num_destroy(&seed);
+    free(power_text);
+    free(sqrt_text);
+    expr_free(power_simplified);
+    expr_free(sqrt_simplified);
+    expr_bindings_free(power_bindings);
+    expr_bindings_free(sqrt_bindings);
+    expr_free(power_expr);
+    expr_free(sqrt_expr);
+}
+
+static void test_exact_complex_fifth_root_family_finds_cartesian_seed(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = expr_from_string("(-4 + 4i)^(1/5)", &bindings);
+    number_t seed = (number_t){0};
+    number_t expected = num_sub(NUM_ONE, NUM_I);
+    long order = 0L;
+
+    ASSERT_NOT_NULL(expr);
+    ASSERT_TRUE(expr_exact_complex_root_seed(expr, &seed, &order));
+    ASSERT_EQ_INT(order, 5L);
+    ASSERT_TRUE(num_eq(seed, expected));
+
+    num_destroy(&expected);
+    num_destroy(&seed);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+}
+
+static void test_symbolic_complex_square_expands_to_cartesian_form(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = expr_from_string("(a + bi)^2", &bindings);
+    expr_t *beautified = expr ? expr_beautify(expr) : NULL;
+    char *text = beautified ? expr_to_string(beautified, style_UNBOUND) : NULL;
+
+    ASSERT_NOT_NULL(expr);
+    ASSERT_NOT_NULL(beautified);
+    TEST_ASSERT_STR_EQ(text, "a² - b² + 2abi");
+
+    free(text);
+    expr_free(beautified);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+}
+
 static void test_goal_seek_large_target_uses_significant_digit_tolerance(void)
 {
     expr_bindings_t *bindings = NULL;
@@ -3872,6 +4142,18 @@ void test_runtime_regressions(void)
     TEST_RUN_SUBTEST(test_binding_exact_core_trig_values_simplify, NULL);
     TEST_RUN_SUBTEST(test_tan_poles_display_as_infinity, NULL);
     TEST_RUN_SUBTEST(test_sqrt_negative_exact_evaluates_to_i, NULL);
+    TEST_RUN_SUBTEST(test_symbolic_complex_square_root_beautifies_to_cartesian_form, NULL);
+    TEST_RUN_SUBTEST(test_exact_complex_square_root_beautifies_to_cartesian_surds, NULL);
+    TEST_RUN_SUBTEST(test_unit_complex_square_root_keeps_conjugate_surds_together, NULL);
+    TEST_RUN_SUBTEST(test_exact_complex_square_root_reduces_perfect_square_components, NULL);
+    TEST_RUN_SUBTEST(test_pure_imaginary_square_root_reduces_to_cartesian_components, NULL);
+    TEST_RUN_SUBTEST(test_larger_complex_square_root_reduces_perfect_square_components, NULL);
+    TEST_RUN_SUBTEST(test_exact_complex_integer_power_folds_to_cartesian_value, NULL);
+    TEST_RUN_SUBTEST(test_exact_complex_integer_power_with_negative_real_part_folds_to_cartesian_value, NULL);
+    TEST_RUN_SUBTEST(test_explicit_complex_cube_root_preserves_family_and_evaluates_principal_value, NULL);
+    TEST_RUN_SUBTEST(test_sqrt_is_principal_but_explicit_half_power_preserves_both_roots, NULL);
+    TEST_RUN_SUBTEST(test_exact_complex_fifth_root_family_finds_cartesian_seed, NULL);
+    TEST_RUN_SUBTEST(test_symbolic_complex_square_expands_to_cartesian_form, NULL);
     TEST_RUN_SUBTEST(test_goal_seek_large_target_uses_significant_digit_tolerance, NULL);
     TEST_RUN_SUBTEST(test_iterated_symbolic_integration_moves_out_of_lab, NULL);
     TEST_RUN_SUBTEST(test_iterated_symbolic_best_effort_reduces_remaining_numeric_dims, NULL);

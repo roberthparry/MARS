@@ -766,8 +766,43 @@ static int compare_addend_bases(const expr_t *lhs, const expr_t *rhs)
     }
 }
 
+static int addend_base_has_explicit_imaginary_factor(const expr_t *expr)
+{
+    number_t real;
+    int pure_imaginary;
+
+    if (!expr)
+        return 0;
+    if (expr_is_const(expr) && !num_is_real(expr->c)) {
+        real = num_real_part(expr->c);
+        pure_imaginary = num_is_zero(real);
+        num_destroy(&real);
+        if (pure_imaginary)
+            return 1;
+    }
+    if (expr_is_neg(expr))
+        return addend_base_has_explicit_imaginary_factor(expr->a);
+    return expr_is_mul(expr) && (addend_base_has_explicit_imaginary_factor(expr->a) ||
+                                 addend_base_has_explicit_imaginary_factor(expr->b));
+}
+
 static int compare_addends(const addend_t *lhs, const addend_t *rhs)
 {
+    number_t lhs_real;
+    number_t rhs_real;
+    int lhs_imaginary;
+    int rhs_imaginary;
+
+    lhs_real = num_real_part(lhs->coeff);
+    rhs_real = num_real_part(rhs->coeff);
+    lhs_imaginary = (!num_is_real(lhs->coeff) && num_is_zero(lhs_real)) ||
+                    addend_base_has_explicit_imaginary_factor(lhs->base);
+    rhs_imaginary = (!num_is_real(rhs->coeff) && num_is_zero(rhs_real)) ||
+                    addend_base_has_explicit_imaginary_factor(rhs->base);
+    num_destroy(&rhs_real);
+    num_destroy(&lhs_real);
+    if (lhs_imaginary != rhs_imaginary)
+        return lhs_imaginary - rhs_imaginary;
     return compare_addend_bases(lhs->base, rhs->base);
 }
 
@@ -1099,6 +1134,29 @@ expr_t *expr_make_pow_like(expr_t *base, number_t exponent)
     }
     if (num_eq(exponent, NUM_ONE))
         return base;
+    if (num_eq(exponent, NUM_TWO) && expr_is_sqrt_expr(base)) {
+        expr_t *inner = base->a;
+
+        expr_retain(inner);
+        expr_free(base);
+        return inner;
+    }
+    if (num_eq(exponent, NUM_TWO) && expr_is_unnamed_const(base) && base->binding_expr &&
+        base->binding_expr->kind == EXPR_BINDING_EXPR_UNARY_OP &&
+        base->binding_expr->u.unary_op.ops == &ops_sqrt) {
+        expr_t *inner = expr_binding_expr_eval_expr(base->binding_expr->u.unary_op.child);
+
+        expr_free(base);
+        return inner;
+    }
+    if (num_eq(exponent, NUM_TWO) && expr_is_unnamed_const(base) && !base->binding_expr) {
+        number_t squared = num_pow(base->c, exponent);
+        expr_t *out = expr_new_const(squared);
+
+        num_destroy(&squared);
+        expr_free(base);
+        return out;
+    }
     if (num_eq(exponent, NUM_TWO) && expr_is_op(base, &ops_const) && !base->binding_expr &&
         (num_eq(base->c, NUM_I) || num_eq(base->c, NUM_NEG_I))) {
         expr_free(base);

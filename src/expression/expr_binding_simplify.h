@@ -41,15 +41,20 @@ expr_binding_expr_t *binding_expr_try_simplify_scaled_const_addsub(expr_binding_
 /* Algebraic rewrite rules. */
 expr_binding_expr_t *binding_expr_try_combine_mul_powers(expr_binding_expr_t *expr);
 expr_binding_expr_t *binding_expr_try_combine_positive_numeric_square_roots(expr_binding_expr_t *expr);
+expr_binding_expr_t *binding_expr_try_simplify_integer_power(expr_binding_expr_t *expr);
+expr_binding_expr_t *binding_expr_try_simplify_exact_complex_rational_power(expr_binding_expr_t *expr);
 expr_binding_expr_t *binding_expr_try_simplify_nested_power(expr_binding_expr_t *expr);
 expr_binding_expr_t *binding_expr_try_simplify_sqrt_square(expr_binding_expr_t *expr);
+expr_binding_expr_t *binding_expr_try_simplify_sqrt_numeric_square(expr_binding_expr_t *expr);
 expr_binding_expr_t *binding_expr_try_simplify_integer_exp_power(expr_binding_expr_t *expr);
 expr_binding_expr_t *binding_expr_try_simplify_exp_product(expr_binding_expr_t *expr);
 expr_binding_expr_t *binding_expr_try_simplify_euler_square(expr_binding_expr_t *expr);
+expr_binding_expr_t *binding_expr_try_simplify_cartesian_square(expr_binding_expr_t *expr);
 expr_binding_expr_t *binding_expr_try_simplify_log_difference(expr_binding_expr_t *expr);
 expr_binding_expr_t *binding_expr_try_simplify_basic_sum(expr_binding_expr_t *expr);
 expr_binding_expr_t *binding_expr_try_simplify_basic_product(expr_binding_expr_t *expr);
 expr_binding_expr_t *binding_expr_try_simplify_basic_quotient(expr_binding_expr_t *expr);
+expr_binding_expr_t *binding_expr_try_simplify_tangent_addition_quotient(expr_binding_expr_t *expr);
 expr_binding_expr_t *binding_expr_try_simplify_reciprocal_unary(expr_binding_expr_t *expr);
 expr_binding_expr_t *binding_expr_try_simplify_i_unit_product(expr_binding_expr_t *expr);
 expr_binding_expr_t *binding_expr_try_simplify_trig_product(expr_binding_expr_t *expr);

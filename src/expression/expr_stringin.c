@@ -276,11 +276,17 @@ typedef struct {
 } func_entry_t;
 
 static const unsigned char s_func_displacements[FUNC_TABLE_SIZE] = {
-    0, 0, 0,  0, 0, 0, 0, 0, 5,  0, 0, 0, 0, 1, 0, 5, 0, 1, 0, 0,  3, 2, 1, 0, 1, 0, 0, 1, 0, 4, 1, 1, 0, 0,
-    0, 0, 11, 0, 0, 0, 0, 1, 0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0, 0, 0, 0, 0, 0, 3, 0, 1, 0, 2, 0, 5, 12,
-    0, 0, 0,  0, 0, 0, 0, 3, 13, 0, 4, 0, 6, 0, 0, 0, 0, 0, 1, 0,  0, 0, 6, 0, 0, 0, 0, 2, 0, 0, 6, 0, 1, 0,
-    0, 8, 1,  6, 3, 5, 0, 1, 0,  0, 0, 1, 0, 0, 0, 4, 8, 4, 4, 17, 1, 0, 0, 0, 0, 0, 4, 0, 1, 0, 5, 4, 2, 0,
-    0, 0, 0,  0, 0, 0, 0, 0, 0,  3, 0, 0, 2, 0, 5, 0, 2, 0, 2, 0,  5, 0, 2, 3, 0, 0, 0, 2, 0, 0, 3,
+    0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 1, 0, 5,
+    0, 1, 0, 0, 3, 2, 1, 0, 103, 0, 0, 1, 0, 4, 1, 1,
+    0, 0, 0, 0, 11, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 1, 0,
+    2, 0, 5, 12, 8, 0, 0, 0, 0, 0, 0, 3, 13, 0, 4, 0,
+    6, 0, 1, 0, 0, 0, 1, 0, 0, 0, 6, 0, 0, 0, 0, 2,
+    0, 0, 6, 0, 1, 0, 0, 8, 1, 6, 3, 5, 0, 1, 0, 0,
+    0, 1, 0, 0, 0, 4, 8, 4, 4, 17, 1, 0, 0, 0, 0, 0,
+    4, 0, 1, 0, 5, 4, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 3, 0, 0, 2, 0, 5, 0, 2, 0, 2, 0, 5, 0, 2, 3,
+    0, 0, 0, 2, 0, 0, 3,
 };
 
 // clang-format off
@@ -292,6 +298,7 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
     [9]   = { .kw = "logpdf",             .arity = 1u,       .ops = &ops_logpdf,         .ufn = expr_logpdf },
     [10]  = { .kw = "abs",                .arity = 1u,       .ops = &ops_abs,            .ufn = expr_abs },
     [11]  = { .kw = "tan",                .arity = 1u,       .ops = &ops_tan,            .ufn = expr_tan },
+    [12]  = { .kw = "conj",               .arity = 1u,       .ops = &ops_conj,           .ufn = expr_conj },
     [13]  = { .kw = "AND",                .arity = 2u,       .ops = &ops_bit_and,        .bfn = expr_bit_and },
     [14]  = { .kw = "bessel_j",           .arity = 2u,       .ops = &ops_bessel_j,       .bfn = expr_bessel_j },
     [15]  = { .kw = "log10",              .arity = 1u,       .ops = &ops_log10,          .ufn = expr_log10 },
@@ -322,6 +329,7 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
     [42]  = { .kw = "Wn",                 .arity = 2u,       .ops = &ops_lambert_wn,     .bfn = expr_lambert_wn_xp },
     [44]  = { .kw = "beta",               .arity = 2u,       .ops = &ops_beta,           .bfn = expr_beta },
     [46]  = { .kw = "W_-1",               .arity = 1u,       .ops = &ops_lambert_wm1,    .ufn = expr_lambert_wm1 },
+    [47]  = { .kw = "cubrt",              .arity = 1u,       .ops = &ops_cubrt,          .ufn = expr_cubrt },
     [48]  = { .kw = "hacovercos",         .arity = 1u,       .ops = &ops_hacovercos,     .ufn = expr_hacovercos },
     [49]  = { .kw = "digamma",            .arity = 1u,       .ops = &ops_digamma,        .ufn = expr_digamma },
     [50]  = { .kw = "archavercos",        .arity = 1u,       .ops = &ops_archavercos,    .ufn = expr_archavercos },
@@ -329,7 +337,6 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
     [52]  = { .kw = "arccot",             .arity = 1u,       .ops = &ops_acot,           .ufn = expr_acot },
     [53]  = { .kw = "versin",             .arity = 1u,       .ops = &ops_versin,         .ufn = expr_versin },
     [54]  = { .kw = "gammainc_P",         .arity = 2u,       .ops = &ops_gammainc_P,     .bfn = expr_gammainc_P },
-    [55]  = { .kw = "lambert_w0",         .arity = 1u,       .ops = &ops_lambert_w0,     .ufn = expr_lambert_w0 },
     [56]  = { .kw = "fibonacci",          .arity = 1u,       .ops = &ops_fibonacci,      .ufn = expr_fibonacci },
     [58]  = { .kw = "productlog",         .arity = 1u,       .ops = &ops_lambert_w,      .ufn = expr_lambert_w },
     [59]  = { .kw = "arccoversin",        .arity = 1u,       .ops = &ops_arccoversin,    .ufn = expr_arccoversin },
@@ -344,6 +351,7 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
     [68]  = { .kw = "polygamma",          .arity = 2u,       .ops = &ops_polygamma,      .bfn = expr_polygamma_xp },
     [69]  = { .kw = "factors",            .arity = 1u,       .ops = &ops_factors,        .ufn = expr_factors },
     [70]  = { .kw = "arcversin",          .arity = 1u,       .ops = &ops_arcversin,      .ufn = expr_arcversin },
+    [71]  = { .kw = "root",               .arity = 2u,       .ops = &ops_root,           .bfn = expr_root },
     [72]  = { .kw = "pow",                .arity = 2u,       .ops = &ops_pow,            .bfn = expr_pow_xp },
     [73]  = { .kw = "XOR",                .arity = 2u,       .ops = &ops_bit_xor,        .bfn = expr_bit_xor },
     [74]  = { .kw = "sec",                .arity = 1u,       .ops = &ops_sec,            .ufn = expr_sec },
@@ -424,7 +432,9 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
     [154] = { .kw = "arcvercos",          .arity = 1u,       .ops = &ops_arcvercos,      .ufn = expr_arcvercos },
     [155] = { .kw = "is_prime",           .arity = 1u,       .ops = &ops_is_prime,       .ufn = expr_is_prime },
     [156] = { .kw = "appell_f1",          .arity = 6u,                                   .sfn = expr_appell_f1 },
+    [157] = { .kw = "lambert_w0",         .arity = 1u,       .ops = &ops_lambert_w0,     .ufn = expr_lambert_w0 },
     [158] = { .kw = "logbeta_pdf",        .arity = 3u,                                   .tfn = expr_logbeta_pdf },
+    [159] = { .kw = "conjugate",          .arity = 1u,       .ops = &ops_conj,           .ufn = expr_conj },
     [161] = { .kw = "asech",              .arity = 1u,       .ops = &ops_asech,          .ufn = expr_asech },
     [162] = { .kw = "OR",                 .arity = 2u,       .ops = &ops_bit_or,         .bfn = expr_bit_or },
     [163] = { .kw = "log",                .arity = 1u,       .ops = &ops_log10,          .ufn = expr_log10 },
@@ -433,12 +443,6 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
     [166] = { .kw = "lgamma",             .arity = 1u,       .ops = &ops_lgamma,         .ufn = expr_lgamma },
 };
 // clang-format on
-
-/* Collision-free auxiliary table for conjugation aliases (length modulo three). */
-static const func_entry_t s_conjugate_funcs[3] = {
-    [0] = {.kw = "conjugate", .arity = 1u, .ops = &ops_conj, .ufn = expr_conj},
-    [1] = {.kw = "conj",      .arity = 1u, .ops = &ops_conj, .ufn = expr_conj},
-};
 
 static void func_hashes(string_view_t kw, unsigned *bucket_out, unsigned *slot_out)
 {
@@ -488,15 +492,11 @@ static size_t func_entry_kw_len(const func_entry_t *entry)
 static const func_entry_t *lookup_func(string_view_t kw)
 {
     const func_entry_t *entry;
-    const func_entry_t *conjugate_entry;
     unsigned bucket;
     unsigned slot;
 
     if (string_view_is_empty(kw))
         return NULL;
-    conjugate_entry = &s_conjugate_funcs[string_view_length(kw) % 3u];
-    if (conjugate_entry->kw && func_entry_matches(conjugate_entry, kw))
-        return conjugate_entry;
     func_hashes(kw, &bucket, &slot);
     slot = (slot + s_func_displacements[bucket]) % FUNC_TABLE_SIZE;
     entry = &s_funcs[slot];
@@ -547,15 +547,6 @@ bool expr_stringin_function_hash_is_valid(void)
 
     for (size_t bucket = 0u; bucket < FUNC_TABLE_SIZE; ++bucket) {
         if (!bucket_used[bucket] && s_func_displacements[bucket] != 0u)
-            return false;
-    }
-
-    for (size_t slot = 0u; slot < sizeof(s_conjugate_funcs) / sizeof(s_conjugate_funcs[0]); ++slot) {
-        const func_entry_t *entry = &s_conjugate_funcs[slot];
-
-        if (!entry->kw)
-            continue;
-        if (lookup_func(string_view_from_chars(entry->kw, strlen(entry->kw))) != entry)
             return false;
     }
 
@@ -2790,6 +2781,22 @@ static expr_t *parse_power_operand(expr_parse_state_t *p)
     return parse_power_operand_mode(p, true);
 }
 
+/* Recognise the common unparenthesised root shorthand ^1/n without changing the meaning of general a^m/n. */
+static bool power_exponent_starts_with_unit_fraction(const expr_parse_state_t *p)
+{
+    string_view_t text = expr_parse_text(p);
+    size_t pos = expr_parse_pos(p);
+    unsigned char c = 0u;
+
+    if (expr_parse_view_peek_ascii(text, pos, &c) && (c == '+' || c == '-'))
+        ++pos;
+    if (!expr_parse_view_peek_ascii(text, pos, &c) || c != '1')
+        return false;
+    if (!expr_parse_view_peek_ascii(text, pos + 1u, &c) || c != '/')
+        return false;
+    return expr_parse_view_peek_ascii(text, pos + 2u, &c) && isdigit(c);
+}
+
 static expr_t *parse_power(expr_parse_state_t *p)
 {
     NUM_SCOPE(scope);
@@ -2832,7 +2839,7 @@ static expr_t *parse_power(expr_parse_state_t *p)
         if (expr_parse_consume_char(p, '(')) {
             exponent = parse_enclosed_addexpr(p, ')', "expected ')' after exponent");
         } else {
-            exponent = parse_signed_power_operand_mode(p, false);
+            exponent = parse_signed_power_operand_mode(p, power_exponent_starts_with_unit_fraction(p));
         }
 
         if (!exponent) {
@@ -3815,6 +3822,7 @@ expr_t *expr_from_string(const char *s, expr_bindings_t **bnd_out)
 static expr_binding_entry_t *bnd_find_entry_text(expr_bindings_t *bnd, const string_t *name)
 {
     string_t *norm;
+    string_t *greek_norm = NULL;
     expr_binding_entry_t *entry = NULL;
 
     if (!bnd || !bnd->index || !name)
@@ -3825,10 +3833,17 @@ static expr_binding_entry_t *bnd_find_entry_text(expr_bindings_t *bnd, const str
         return NULL;
 
     dictionary_get(bnd->index, &norm, &entry);
+    if (!entry) {
+        greek_norm = expr_normalise_greek_alias_text(norm);
+        if (greek_norm)
+            dictionary_get(bnd->index, &greek_norm, &entry);
+    }
+    string_free(greek_norm);
     string_free(norm);
     return entry;
 }
 
+/* Return the parsed binding whose canonical name or Greek alias matches the supplied text. */
 expr_t *expr_bindings_get_text(expr_bindings_t *bnd, const string_t *name)
 {
     expr_binding_entry_t *entry = bnd_find_entry_text(bnd, name);
@@ -3836,6 +3851,7 @@ expr_t *expr_bindings_get_text(expr_bindings_t *bnd, const string_t *name)
     return entry ? entry->expr : NULL;
 }
 
+/* Return the parsed binding whose canonical name or Greek alias matches the supplied C string. */
 expr_t *expr_bindings_get(expr_bindings_t *bnd, const char *name)
 {
     string_t *text;

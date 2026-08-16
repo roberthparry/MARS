@@ -556,6 +556,53 @@ expr_binding_expr_t *binding_expr_try_simplify_nested_power(expr_binding_expr_t 
     return expr_binding_expr_simplify(expr_binding_expr_new_binary_op(&ops_pow, base, scaled_exponent));
 }
 
+expr_binding_expr_t *binding_expr_try_simplify_integer_power(expr_binding_expr_t *expr)
+{
+    expr_binding_expr_t *base;
+    long exponent;
+
+    if (!expr || expr->kind != EXPR_BINDING_EXPR_BINARY_OP || expr->u.binary_op.ops != &ops_pow ||
+        !binding_number_text_to_long(expr->u.binary_op.right, &exponent) || exponent < INT_MIN || exponent > INT_MAX)
+        return expr;
+
+    base = expr_binding_expr_clone(expr->u.binary_op.left);
+    expr_binding_expr_free(expr);
+    return expr_binding_expr_simplify(expr_binding_expr_new_powi(base, exponent));
+}
+
+expr_binding_expr_t *binding_expr_try_simplify_exact_complex_rational_power(expr_binding_expr_t *expr)
+{
+    binding_exact_complex_t base = {number_invalid(), number_invalid()};
+    number_t exponent = number_invalid();
+    number_t value = number_invalid();
+    bool have_base = false;
+    bool folded = false;
+    long numerator;
+    long denominator;
+
+    if (!expr || expr->kind != EXPR_BINDING_EXPR_BINARY_OP || expr->u.binary_op.ops != &ops_pow)
+        return expr;
+
+    have_base = expr_binding_expr_exact_complex(expr->u.binary_op.left, &base);
+    if (have_base && expr_binding_expr_number_value(expr->u.binary_op.right, &exponent)) {
+        if (num_get_small_rational(exponent, &numerator, &denominator) && numerator == 1L && denominator > 1L) {
+            num_destroy(&exponent);
+            expr_binding_exact_complex_clear(&base);
+            return expr;
+        }
+        folded = expr_exact_complex_rational_power(&base, exponent, &value);
+    }
+
+    num_destroy(&exponent);
+    if (have_base)
+        expr_binding_exact_complex_clear(&base);
+    if (!folded) {
+        num_destroy(&value);
+        return expr;
+    }
+    return binding_expr_fold_to_number_owned(expr, value);
+}
+
 expr_binding_expr_t *binding_expr_try_simplify_sqrt_square(expr_binding_expr_t *expr)
 {
     expr_binding_expr_t *sqrt_expr;
@@ -584,6 +631,34 @@ expr_binding_expr_t *binding_expr_try_simplify_sqrt_square(expr_binding_expr_t *
     expr_binding_expr_free(expr);
     expr_binding_expr_free(sqrt_expr);
     return expr_binding_expr_simplify(inner);
+}
+
+expr_binding_expr_t *binding_expr_try_simplify_sqrt_numeric_square(expr_binding_expr_t *expr)
+{
+    const expr_binding_expr_t *power;
+    const expr_binding_expr_t *base;
+    number_t value;
+    number_t magnitude;
+
+    if (!expr || expr->kind != EXPR_BINDING_EXPR_UNARY_OP || expr->u.unary_op.ops != &ops_sqrt ||
+        !(power = expr->u.unary_op.child))
+        return expr;
+
+    if (power->kind == EXPR_BINDING_EXPR_POWI && power->u.powi.exponent == 2L) {
+        base = power->u.powi.base;
+    } else if (power->kind == EXPR_BINDING_EXPR_BINARY_OP && power->u.binary_op.ops == &ops_pow &&
+               binding_number_text_eq_long(power->u.binary_op.right, 2L)) {
+        base = power->u.binary_op.left;
+    } else {
+        return expr;
+    }
+
+    if (!expr_binding_expr_number_value(base, &value) || !num_is_real(value))
+        return expr;
+
+    magnitude = num_abs(value);
+    num_destroy(&value);
+    return binding_expr_fold_to_number_owned(expr, magnitude);
 }
 
 static expr_binding_expr_t *binding_expr_number_from_value(number_t value)
@@ -877,6 +952,46 @@ static bool binding_expr_is_unary_op(const expr_binding_expr_t *expr, const expr
     return expr && expr->kind == EXPR_BINDING_EXPR_UNARY_OP && expr->u.unary_op.ops == ops;
 }
 
+static bool binding_expr_is_matching_tangent_product(const expr_binding_expr_t *expr,
+                                                      const expr_binding_expr_t *left_tangent,
+                                                      const expr_binding_expr_t *right_tangent)
+{
+    if (!expr || expr->kind != EXPR_BINDING_EXPR_MUL)
+        return false;
+
+    return (expr_binding_expr_struct_eq(expr->u.binary.left, left_tangent) &&
+            expr_binding_expr_struct_eq(expr->u.binary.right, right_tangent)) ||
+           (expr_binding_expr_struct_eq(expr->u.binary.left, right_tangent) &&
+            expr_binding_expr_struct_eq(expr->u.binary.right, left_tangent));
+}
+
+static bool binding_expr_is_tangent_addition_denominator(const expr_binding_expr_t *expr,
+                                                         const expr_binding_expr_t *left_tangent,
+                                                         const expr_binding_expr_t *right_tangent, bool subtract)
+{
+    const expr_binding_expr_t *product;
+
+    if (!expr)
+        return false;
+
+    if (!subtract) {
+        if (expr->kind != EXPR_BINDING_EXPR_SUB || !binding_number_text_eq_long(expr->u.binary.left, 1L))
+            return false;
+        product = expr->u.binary.right;
+    } else {
+        if (expr->kind != EXPR_BINDING_EXPR_ADD)
+            return false;
+        if (binding_number_text_eq_long(expr->u.binary.left, 1L))
+            product = expr->u.binary.right;
+        else if (binding_number_text_eq_long(expr->u.binary.right, 1L))
+            product = expr->u.binary.left;
+        else
+            return false;
+    }
+
+    return binding_expr_is_matching_tangent_product(product, left_tangent, right_tangent);
+}
+
 static const expr_binding_expr_t *binding_expr_matching_unary_args(const expr_binding_expr_t *a,
                                                                    const expr_binding_expr_t *b,
                                                                    const expr_ops_t *left_ops,
@@ -969,6 +1084,99 @@ expr_binding_expr_t *binding_expr_try_simplify_euler_square(expr_binding_expr_t 
     imag_term = expr_binding_expr_new_mul(expr_binding_expr_new_const(EXPR_BINDING_CONST_I), sin_term);
     out = expr_binding_expr_new_add(cos_term, imag_term);
 
+    return binding_expr_fold_to_expr_owned(expr, expr_binding_expr_simplify(out));
+}
+
+static bool binding_expr_extract_i_factor(const expr_binding_expr_t *expr, int *sign_out,
+                                          const expr_binding_expr_t **coefficient_out)
+{
+    if (!expr || !sign_out || !coefficient_out)
+        return false;
+    if (binding_expr_is_const_id(expr, EXPR_BINDING_CONST_I)) {
+        *sign_out = 1;
+        *coefficient_out = NULL;
+        return true;
+    }
+    if (expr->kind == EXPR_BINDING_EXPR_NEG &&
+        binding_expr_extract_i_factor(expr->u.unary.child, sign_out, coefficient_out)) {
+        *sign_out = -*sign_out;
+        return true;
+    }
+    if (expr->kind != EXPR_BINDING_EXPR_MUL)
+        return false;
+    if (binding_expr_is_const_id(expr->u.binary.left, EXPR_BINDING_CONST_I)) {
+        *sign_out = 1;
+        *coefficient_out = expr->u.binary.right;
+        return true;
+    }
+    if (binding_expr_is_const_id(expr->u.binary.right, EXPR_BINDING_CONST_I)) {
+        *sign_out = 1;
+        *coefficient_out = expr->u.binary.left;
+        return true;
+    }
+    return false;
+}
+
+expr_binding_expr_t *binding_expr_try_simplify_cartesian_square(expr_binding_expr_t *expr)
+{
+    const expr_binding_expr_t *left;
+    const expr_binding_expr_t *right;
+    const expr_binding_expr_t *real;
+    const expr_binding_expr_t *imaginary_coefficient;
+    const expr_binding_expr_t *left_coefficient = NULL;
+    const expr_binding_expr_t *right_coefficient = NULL;
+    expr_binding_expr_t *owned_imaginary = NULL;
+    expr_binding_expr_t *real_square;
+    expr_binding_expr_t *imaginary_square;
+    expr_binding_expr_t *real_part;
+    expr_binding_expr_t *cross_product;
+    expr_binding_expr_t *imaginary_term;
+    expr_binding_expr_t *out;
+    int left_sign = 1;
+    int right_sign = 1;
+    int imaginary_sign;
+    bool left_is_imaginary;
+    bool right_is_imaginary;
+    bool subtract;
+
+    if (!expr || expr->kind != EXPR_BINDING_EXPR_POWI || expr->u.powi.exponent != 2L || !expr->u.powi.base)
+        return expr;
+    if (expr->u.powi.base->kind != EXPR_BINDING_EXPR_ADD && expr->u.powi.base->kind != EXPR_BINDING_EXPR_SUB)
+        return expr;
+
+    left = expr->u.powi.base->u.binary.left;
+    right = expr->u.powi.base->u.binary.right;
+    subtract = expr->u.powi.base->kind == EXPR_BINDING_EXPR_SUB;
+    left_is_imaginary = binding_expr_extract_i_factor(left, &left_sign, &left_coefficient);
+    right_is_imaginary = binding_expr_extract_i_factor(right, &right_sign, &right_coefficient);
+    if (left_is_imaginary == right_is_imaginary)
+        return expr;
+
+    if (right_is_imaginary) {
+        real = left;
+        imaginary_coefficient = right_coefficient;
+        imaginary_sign = subtract ? -right_sign : right_sign;
+    } else {
+        imaginary_coefficient = left_coefficient;
+        imaginary_sign = subtract ? -left_sign : left_sign;
+        real = right;
+    }
+    if (!imaginary_coefficient) {
+        owned_imaginary = expr_binding_expr_new_number_text("1");
+        imaginary_coefficient = owned_imaginary;
+    }
+
+    real_square = expr_binding_expr_new_powi(expr_binding_expr_clone(real), 2L);
+    imaginary_square = expr_binding_expr_new_powi(expr_binding_expr_clone(imaginary_coefficient), 2L);
+    real_part = expr_binding_expr_new_sub(real_square, imaginary_square);
+    cross_product = expr_binding_expr_new_mul(
+        expr_binding_expr_new_number_text("2"),
+        expr_binding_expr_new_mul(expr_binding_expr_clone(real), expr_binding_expr_clone(imaginary_coefficient)));
+    imaginary_term = expr_binding_expr_new_mul(cross_product, expr_binding_expr_new_const(EXPR_BINDING_CONST_I));
+    out = imaginary_sign < 0 ? expr_binding_expr_new_sub(real_part, imaginary_term)
+                             : expr_binding_expr_new_add(real_part, imaginary_term);
+
+    expr_binding_expr_free(owned_imaginary);
     return binding_expr_fold_to_expr_owned(expr, expr_binding_expr_simplify(out));
 }
 
@@ -1251,6 +1459,57 @@ static bool binding_expr_scaled_gamma_product_parts(const expr_binding_expr_t *e
     return false;
 }
 
+expr_binding_expr_t *binding_expr_try_simplify_tangent_addition_quotient(expr_binding_expr_t *expr)
+{
+    const expr_binding_expr_t *numerator;
+    const expr_binding_expr_t *denominator;
+    const expr_binding_expr_t *left_tangent;
+    const expr_binding_expr_t *right_tangent;
+    expr_binding_expr_t *argument;
+    expr_binding_expr_t *out;
+    bool subtract;
+
+    if (!expr)
+        return NULL;
+
+    if (expr->kind == EXPR_BINDING_EXPR_DIV) {
+        numerator = expr->u.binary.left;
+        denominator = expr->u.binary.right;
+    } else if (expr->kind == EXPR_BINDING_EXPR_MUL && expr->u.binary.left->kind == EXPR_BINDING_EXPR_DIV &&
+               binding_number_text_eq_long(expr->u.binary.left->u.binary.left, 1L)) {
+        numerator = expr->u.binary.right;
+        denominator = expr->u.binary.left->u.binary.right;
+    } else if (expr->kind == EXPR_BINDING_EXPR_MUL && expr->u.binary.right->kind == EXPR_BINDING_EXPR_DIV &&
+               binding_number_text_eq_long(expr->u.binary.right->u.binary.left, 1L)) {
+        numerator = expr->u.binary.left;
+        denominator = expr->u.binary.right->u.binary.right;
+    } else {
+        return expr;
+    }
+
+    if (!numerator || (numerator->kind != EXPR_BINDING_EXPR_ADD && numerator->kind != EXPR_BINDING_EXPR_SUB))
+        return expr;
+
+    left_tangent = numerator->u.binary.left;
+    right_tangent = numerator->u.binary.right;
+    if (!binding_expr_is_unary_op(left_tangent, &ops_tan) || !binding_expr_is_unary_op(right_tangent, &ops_tan))
+        return expr;
+
+    subtract = numerator->kind == EXPR_BINDING_EXPR_SUB;
+    if (!binding_expr_is_tangent_addition_denominator(denominator, left_tangent, right_tangent, subtract))
+        return expr;
+
+    if (subtract)
+        argument = expr_binding_expr_new_sub(expr_binding_expr_clone(left_tangent->u.unary_op.child),
+                                             expr_binding_expr_clone(right_tangent->u.unary_op.child));
+    else
+        argument = expr_binding_expr_new_add(expr_binding_expr_clone(left_tangent->u.unary_op.child),
+                                             expr_binding_expr_clone(right_tangent->u.unary_op.child));
+
+    out = expr_binding_expr_new_unary_op(&ops_tan, expr_binding_expr_simplify(argument));
+    return binding_expr_fold_to_expr_owned(expr, expr_binding_expr_simplify(out));
+}
+
 expr_binding_expr_t *binding_expr_try_simplify_basic_quotient(expr_binding_expr_t *expr)
 {
     const expr_binding_expr_t *scaled_arg;
@@ -1340,12 +1599,21 @@ expr_binding_expr_t *binding_expr_try_simplify_trig_sum(expr_binding_expr_t *exp
 {
     const expr_binding_expr_t *left_arg = NULL;
     const expr_binding_expr_t *right_arg = NULL;
+    const expr_binding_expr_t *euler_arg = NULL;
     bool subtract;
 
     if (!expr || (expr->kind != EXPR_BINDING_EXPR_ADD && expr->kind != EXPR_BINDING_EXPR_SUB))
         return expr;
 
     subtract = expr->kind == EXPR_BINDING_EXPR_SUB;
+
+    if (!subtract && binding_expr_is_euler_sum(expr, &euler_arg)) {
+        expr_binding_expr_t *exponent = expr_binding_expr_simplify(expr_binding_expr_new_mul(
+            expr_binding_expr_new_const(EXPR_BINDING_CONST_I), expr_binding_expr_clone(euler_arg)));
+        expr_binding_expr_t *out = expr_binding_expr_new_unary_op(&ops_exp, exponent);
+
+        return binding_expr_fold_to_expr_owned(expr, expr_binding_expr_simplify(out));
+    }
 
     if (!subtract && binding_expr_is_square_of_unary(expr->u.binary.left, &ops_sin, &left_arg) &&
         binding_expr_is_square_of_unary(expr->u.binary.right, &ops_cos, &right_arg) &&

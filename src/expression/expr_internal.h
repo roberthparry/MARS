@@ -72,6 +72,8 @@ typedef enum {
     EXPR_KIND_LOG,
     EXPR_KIND_LOG10,
     EXPR_KIND_SQRT,
+    EXPR_KIND_CUBRT,
+    EXPR_KIND_ROOT,
     EXPR_KIND_FLOOR,
     EXPR_KIND_CEIL,
     EXPR_KIND_ABS,
@@ -378,6 +380,8 @@ extern const expr_ops_t ops_exp;
 extern const expr_ops_t ops_log;
 extern const expr_ops_t ops_log10;
 extern const expr_ops_t ops_sqrt;
+extern const expr_ops_t ops_cubrt;
+extern const expr_ops_t ops_root;
 extern const expr_ops_t ops_floor;
 extern const expr_ops_t ops_ceil;
 extern const expr_ops_t ops_abs;
@@ -630,6 +634,7 @@ expr_t *expr_simplify_passthrough(const expr_t *dv, expr_t *a, expr_t *b);
 expr_t *expr_simplify_rebuild_binary_operator(const expr_t *dv, expr_t *a, expr_t *b);
 expr_t *expr_simplify_unary_operator(const expr_t *dv, expr_t *a, expr_t *b);
 expr_t *expr_simplify_binary_operator(const expr_t *dv, expr_t *a, expr_t *b);
+expr_t *expr_simplify_root_operator(const expr_t *dv, expr_t *a, expr_t *b);
 expr_t *expr_simplify_neg_operator(const expr_t *dv, expr_t *a, expr_t *b);
 expr_t *expr_simplify_add_sub_operator(const expr_t *dv, expr_t *a, expr_t *b);
 expr_t *expr_simplify_mul_operator(const expr_t *dv, expr_t *a, expr_t *b);
@@ -670,6 +675,7 @@ expr_t *expr_simplify_try_basic_sum(expr_t *a, expr_t *b);
 expr_t *expr_simplify_try_basic_product(expr_t *a, expr_t *b);
 expr_t *expr_simplify_try_trig_product(expr_t *a, expr_t *b);
 expr_t *expr_simplify_try_trig_weighted_sum(const expr_t *a, const expr_t *b);
+expr_t *expr_simplify_try_tangent_addition_quotient(const expr_t *numerator, const expr_t *denominator);
 expr_t *expr_simplify_try_lambert_exp(expr_t *arg);
 expr_t *expr_simplify_try_lambert_argument(expr_t *arg);
 expr_t *expr_simplify_try_lambert_product(expr_t *a, expr_t *b);
@@ -724,6 +730,7 @@ int expr_inverse_trig_exact_pi_ratio(const expr_ops_t *ops, const number_t *in, 
 int expr_fold_exp_const(const number_t *in, number_t *out);
 int expr_fold_log_const(const number_t *in, number_t *out);
 int expr_fold_sqrt_const(const number_t *in, number_t *out);
+int expr_fold_cubrt_const(const number_t *in, number_t *out);
 int expr_fold_floor_const(const number_t *in, number_t *out);
 int expr_fold_erf_const(const number_t *in, number_t *out);
 int expr_fold_erfc_const(const number_t *in, number_t *out);
@@ -782,6 +789,8 @@ void expr_reverse_exp(const expr_t *dv, const number_t *out_bar, number_t *a_bar
 void expr_reverse_log(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void expr_reverse_log10(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void expr_reverse_sqrt(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_cubrt(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_root(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void expr_reverse_floor(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void expr_reverse_ceil(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void expr_reverse_abs(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
@@ -836,6 +845,7 @@ expr_t *expr_const_long(long value);
 expr_t *expr_retain_expr(const expr_t *expr);
 expr_t *expr_simplify_owned(expr_t *expr);
 expr_t *expr_beautify(const expr_t *expr);
+expr_t *expr_beautify_presimplified(const expr_t *expr);
 expr_t *expr_negate_owned(expr_t *expr);
 expr_t *expr_add_owned(expr_t *left, expr_t *right);
 expr_t *expr_add_long(const expr_t *expr, long value);
@@ -959,6 +969,10 @@ expr_t *expr_binding_expr_eval_expr(const expr_binding_expr_t *expr);
 bool expr_binding_expr_is_numeric_literal(const expr_binding_expr_t *expr);
 bool expr_binding_expr_exact_complex(const expr_binding_expr_t *expr, binding_exact_complex_t *out);
 void expr_binding_exact_complex_clear(binding_exact_complex_t *value);
+bool expr_exact_complex_value(const expr_t *expr, binding_exact_complex_t *out);
+bool expr_exact_complex_rational_power(const binding_exact_complex_t *base, number_t exponent, number_t *value_out);
+bool expr_exact_complex_root_seed(const expr_t *expr, number_t *seed_out, long *order_out);
+bool expr_explicit_root_order(const expr_t *expr, long *order_out);
 
 /* Precision-sensitive binding evaluation. */
 bool expr_binding_expr_eval_if_precision_increased(expr_binding_expr_t *expr, number_t *value_out);

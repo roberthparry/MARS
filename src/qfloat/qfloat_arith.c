@@ -169,6 +169,27 @@ qfloat_t qf_sqrt(qfloat_t x)
     return y;
 }
 
+/* Return the principal real n-th root. */
+qfloat_t qf_root(qfloat_t x, unsigned int n)
+{
+    qfloat_t reciprocal;
+
+    if (n <= 1u || qf_lt(x, QF_ZERO))
+        return QF_NAN;
+    if (n == 2u)
+        return qf_sqrt(x);
+    if (qf_eq(x, QF_ZERO) || qf_eq(x, QF_ONE))
+        return x;
+    reciprocal = qf_div(QF_ONE, qf_from_double((double)n));
+    return qf_exp(qf_mul(reciprocal, qf_log(x)));
+}
+
+/* Return the principal real cube root. */
+qfloat_t qf_cubrt(qfloat_t x)
+{
+    return qf_root(x, 3u);
+}
+
 qfloat_t qf_add_double(qfloat_t x, double y)
 {
     double H, h, S, s, e;

@@ -7,6 +7,8 @@
 
 #include "equation.h"
 #include "expression.h"
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
+#include "internal/expr_internal.h"
 #include "ustring.h"
 
 static char *xstrdup_local(const char *text)
@@ -30,7 +32,7 @@ static char *expr_text_dup(const expr_t *expr, style_t style)
 
 static char *expr_TeX_body_dup(const expr_t *expr)
 {
-    char *body = expr_to_TeX_body_wrapped(expr, 110u);
+    char *body = expr_to_TeX_body_wrapped(expr, 280u);
 
     return body ? body : expr_text_dup(expr, style_LATEX);
 }
@@ -41,30 +43,40 @@ static expr_t *display_polynomial_simplified(const expr_t *expr, const expr_t *w
     expr_t *display = NULL;
     equation_t *polynomial = NULL;
     equation_t *expanded = NULL;
+    expr_t *result;
+    expr_t *beautified;
 
     if (!expr)
         return NULL;
     if (expr_contains_integral_operation(expr))
         return NULL;
 
-    zero = expr_new_const(NUM_ZERO);
-    polynomial = zero ? equ_new(expr, zero) : NULL;
-    expanded = polynomial ? equ_display_expanded(polynomial, wrt) : NULL;
-    if (expanded) {
-        expr_t *rebound;
+    if (wrt) {
+        zero = expr_new_const(NUM_ZERO);
+        polynomial = zero ? equ_new(expr, zero) : NULL;
+        expanded = polynomial ? equ_display_expanded(polynomial, wrt) : NULL;
+        if (expanded) {
+            expr_t *rebound;
 
-        display = expr_clone(equ_lhs(expanded));
-        rebound = display ? expr_substitute(display, wrt, wrt) : NULL;
-        if (rebound) {
-            expr_free(display);
-            display = rebound;
+            display = expr_clone(equ_lhs(expanded));
+            rebound = display ? expr_substitute(display, wrt, wrt) : NULL;
+            if (rebound) {
+                expr_free(display);
+                display = rebound;
+            }
         }
     }
 
     equ_free(expanded);
     equ_free(polynomial);
     expr_free(zero);
-    return display ? display : expr_simplify(expr);
+    result = display ? display : expr_simplify(expr);
+    beautified = result ? expr_beautify_presimplified(result) : NULL;
+    if (beautified) {
+        expr_free(result);
+        result = beautified;
+    }
+    return result;
 }
 
 static char *trim_ascii_in_place(char *text)
@@ -392,6 +404,144 @@ static void print_owned_number(const char *label, number_t value, int precision)
     free(text);
 }
 
+static bool explicit_reciprocal_power(const expr_t *expr, const expr_t **base_out, long *order_out)
+{
+    const expr_t *base = NULL;
+    number_t exponent = (number_t){0};
+    bool matched;
+
+    if (!expr || !base_out || !order_out)
+        return false;
+
+    matched = expr_explicit_root_order(expr, order_out);
+    if (expr_match_pow_const(expr, &base, &exponent))
+        *base_out = base;
+    num_destroy(&exponent);
+    if (!matched)
+        return false;
+    return true;
+}
+
+static void print_explicit_root_family(const expr_t *expr)
+{
+    number_t seed = (number_t){0};
+    const expr_t *base = NULL;
+    long order = 0L;
+    expr_t *seed_expr = NULL;
+    expr_t *negative_seed = NULL;
+    char *seed_expression;
+    char *seed_TeX;
+    char *negative_expression = NULL;
+    char *negative_TeX = NULL;
+    char *root_expression = NULL;
+    char *root_TeX = NULL;
+    char *root_function = NULL;
+    size_t root_expression_size = 0u;
+    size_t root_TeX_size = 0u;
+    size_t root_function_size = 0u;
+    FILE *expression_stream;
+    FILE *TeX_stream;
+    FILE *function_stream;
+    bool exact_seed;
+
+    if (!explicit_reciprocal_power(expr, &base, &order)) {
+        num_destroy(&seed);
+        return;
+    }
+
+    exact_seed = expr_exact_complex_root_seed(expr, &seed, &order);
+    if (exact_seed) {
+        seed_expr = expr_new_const(seed);
+    } else if (order == 2L && base) {
+        seed_expr = expr_sqrt(base);
+    } else {
+        seed_expr = expr_clone(expr);
+    }
+    seed_expression = seed_expr ? expr_text_dup(seed_expr, style_UNBOUND) : NULL;
+    seed_TeX = seed_expr ? expr_TeX_body_dup(seed_expr) : NULL;
+    if (!seed_expression || !seed_TeX)
+        goto cleanup;
+
+    if (order == 2L) {
+        expr_t *raw_negative = expr_neg(seed_expr);
+
+        negative_seed = exact_seed && raw_negative ? expr_simplify(raw_negative) : raw_negative;
+        if (negative_seed == raw_negative)
+            raw_negative = NULL;
+        expr_free(raw_negative);
+        negative_expression = negative_seed ? expr_text_dup(negative_seed, style_UNBOUND) : NULL;
+        negative_TeX = negative_seed ? expr_TeX_body_dup(negative_seed) : NULL;
+        if (!negative_expression || !negative_TeX)
+            goto cleanup;
+    }
+
+    expression_stream = open_memstream(&root_expression, &root_expression_size);
+    TeX_stream = open_memstream(&root_TeX, &root_TeX_size);
+    function_stream = open_memstream(&root_function, &root_function_size);
+    if (!expression_stream || !TeX_stream || !function_stream) {
+        if (expression_stream)
+            fclose(expression_stream);
+        if (TeX_stream)
+            fclose(TeX_stream);
+        if (function_stream)
+            fclose(function_stream);
+        goto cleanup;
+    }
+
+    fputs("{ ", expression_stream);
+    fputs("\\left\\{", TeX_stream);
+    for (long root_index = 0L; root_index < order; ++root_index) {
+        if (root_index > 0L) {
+            fputs(", ", expression_stream);
+            fputs(",\\;", TeX_stream);
+        }
+        if (root_index == 0L) {
+            fputs(seed_expression, expression_stream);
+            fputs(seed_TeX, TeX_stream);
+        } else if (order == 2L) {
+            fputs(negative_expression, expression_stream);
+            fputs(negative_TeX, TeX_stream);
+        } else {
+            fprintf(expression_stream, "(%s)·exp(%ld·π·i/%ld)", seed_expression, 2L * root_index, order);
+            fprintf(TeX_stream, "\\left(%s\\right)e^{\\frac{%ld\\pi i}{%ld}}", seed_TeX, 2L * root_index,
+                    order);
+        }
+    }
+    fputs(" }", expression_stream);
+    fputs("\\right\\}", TeX_stream);
+
+    fprintf(function_stream,
+            "expression root(k) {\n    return (%s) * exp(2 * pi * i * k / %ld);\n}\n\nk = { ",
+            seed_expression, order);
+    for (long root_index = 0L; root_index < order; ++root_index) {
+        if (root_index > 0L)
+            fputs(", ", function_stream);
+        fprintf(function_stream, "%ld", root_index);
+    }
+    fputs(" }\noutput(root(k));", function_stream);
+
+    fclose(function_stream);
+    fclose(TeX_stream);
+    fclose(expression_stream);
+    printf("root_expression  %s\n", root_expression);
+    printf("root_tex    %s\n", root_TeX);
+    printf("root_function  %s\n", root_function);
+    if (exact_seed)
+        printf("root_value  %s\n", root_expression);
+
+cleanup:
+    free(root_function);
+    free(root_TeX);
+    free(root_expression);
+    free(seed_TeX);
+    free(seed_expression);
+    free(negative_TeX);
+    free(negative_expression);
+    expr_free(negative_seed);
+    expr_free(seed_expr);
+    num_destroy(&seed);
+}
+
 static void print_bindings(const char *label, expr_bindings_t *bindings, int precision)
 {
     size_t count = expr_bindings_count(bindings);
@@ -690,8 +840,8 @@ int main(int argc, char **argv)
     if (bindings)
         wrt = expr_bindings_get(bindings, wrt_name);
     wrt_is_variable = wrt && expr_is_variable(wrt);
-    if (evaluate_request && wrt_is_variable) {
-        display_expr = display_polynomial_simplified(expr, wrt);
+    if (evaluate_request) {
+        display_expr = display_polynomial_simplified(expr, wrt_is_variable ? wrt : NULL);
         display_expr_owned = display_expr != NULL;
     }
     if (!display_expr)
@@ -710,6 +860,8 @@ int main(int argc, char **argv)
     print_bindings("binding", bindings, precision);
     printf("differentiable  %s\n", expr_is_differentiable(expr) ? "yes" : "no");
     printf("evaluation_ready  %s\n", expression_evaluation_ready(expr) ? "yes" : "no");
+    if (evaluate_request)
+        print_explicit_root_family(expr);
     value_note[0] = '\0';
     {
         number_t value_number = expr_eval(expr);

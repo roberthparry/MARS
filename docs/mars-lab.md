@@ -138,6 +138,9 @@ same scalar absolute value. For a complex expression this is the modulus
 `sqrt(z*z^*)`. Context distinguishes scalar absolute-value bars from the
 determinant bars surrounding a matrix.
 
+`sqrt(z)`, `cubrt(z)`, and `root(z,n)` return one principal scalar root. Explicit fractional-power syntax such as
+`z^(1/n)` denotes the complete family of `n` roots when MARS Lab presents an expression result.
+
 Greek names may be entered as Unicode or through their ASCII aliases. Thus
 `lambda`, `@lambda` and `λ` identify the same symbol and are normalised to `λ`
 in output. This also applies inside compact matrix literals and identity

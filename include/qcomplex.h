@@ -246,6 +246,8 @@ qcomplex_t qc_mul(qcomplex_t a, qcomplex_t b); /**< a * b */
 qcomplex_t qc_div(qcomplex_t a, qcomplex_t b); /**< a / b */
 qcomplex_t qc_neg(qcomplex_t a);               /**< -a */
 qcomplex_t qc_conj(qcomplex_t a);              /**< conjugate(a) */
+/** @brief Return the complex conjugate of @p a; this is the long-form alias of qc_conj(). */
+qcomplex_t qc_conjugate(qcomplex_t a);
 /** @} */
 
 /**
@@ -275,6 +277,10 @@ qcomplex_t qc_log(qcomplex_t z);               /**< log(z) */
 qcomplex_t qc_log10(qcomplex_t z);             /**< log10(z) */
 qcomplex_t qc_pow(qcomplex_t a, qcomplex_t b); /**< a^b */
 qcomplex_t qc_sqrt(qcomplex_t z);              /**< sqrt(z) */
+/** @brief Return the single principal cube root of @p z. */
+qcomplex_t qc_cubrt(qcomplex_t z);
+/** @brief Return the single principal @p n-th root of @p z, where @p n is greater than one. */
+qcomplex_t qc_root(qcomplex_t z, unsigned int n);
 /** @} */
 
 /**

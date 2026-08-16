@@ -2799,6 +2799,37 @@ done:
     return number_take(result);
 }
 
+/* Return the single principal root for an integer order greater than one. */
+number_t num_root(const number_t number, const number_t order)
+{
+    number_t exponent;
+    number_t order_value;
+    number_t result;
+    int order_int;
+
+    if (!number_is_valid_value(&number) || !number_try_get_exact_int(order, &order_int) || order_int <= 1)
+        return number_invalid();
+    if (order_int == 2)
+        return num_sqrt(number);
+
+    order_value = num_create_from_long(order_int);
+    exponent = num_div(NUM_ONE, order_value);
+    num_destroy(&order_value);
+    result = num_pow(number, exponent);
+    num_destroy(&exponent);
+    return result;
+}
+
+/* Return the single principal cube root. */
+number_t num_cubrt(const number_t number)
+{
+    number_t three = num_create_from_long(3);
+    number_t result = num_root(number, three);
+
+    num_destroy(&three);
+    return result;
+}
+
 number_t num_pow(const number_t base, const number_t exponent)
 {
     number_t half;

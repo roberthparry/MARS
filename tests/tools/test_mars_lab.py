@@ -313,8 +313,10 @@ class MatrixResultTests(unittest.TestCase):
 
         self.assertEqual(payload["result"], "(½x², x²; 3/2x², 2x²) + (C₁₁, C₁₂; C₂₁, C₂₂)")
         self.assertIn(r"\end{bmatrix} + \begin{bmatrix}C_{11} & C_{12}", payload["tex"])
-        self.assertIn("const matrices = terms.length && terms.every((rows) => rows) ? terms : null;", mars_lab.INDEX_HTML)
+        self.assertIn("const matrixTerms = terms.length && terms.every((term) => term) ? terms : null;", mars_lab.INDEX_HTML)
         self.assertIn("operator.className = 'matrix-sum-operator';", mars_lab.INDEX_HTML)
+        self.assertIn("termDisplay.className = 'matrix-term-display';", mars_lab.INDEX_HTML)
+        self.assertIn("product.className = 'matrix-product-operator';", mars_lab.INDEX_HTML)
 
     def test_matrix_payload_uses_native_matrix_bindings(self) -> None:
         fields = {
@@ -558,6 +560,34 @@ class MatrixResultTests(unittest.TestCase):
         self.assertIn(r"\frac{2}{\sqrt{66}}", displayed_value_TeX)
         self.assertIn(r"\sqrt{27\mkern-2mu \sqrt{33} + 155}", displayed_value_TeX)
         self.assertNotIn(r"\sqrt{2}\mkern-2mu \sqrt{33}", displayed_value_TeX)
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "matrix_lab").is_file(),
+        "release matrix_lab helper is not built",
+    )
+    def test_bound_matrix_power_substitutes_only_in_the_value_fields(self) -> None:
+        matrix_binary = ROOT / "build" / "release" / "scratch" / "matrix_lab"
+        unbound_fields, unbound_raw, unbound_returncode = mars_lab.run_matrix_lab_fields(
+            matrix_binary,
+            "(1 2; 3 4)^x",
+            "eval",
+            32,
+        )
+        bound_fields, bound_raw, bound_returncode = mars_lab.run_matrix_lab_fields(
+            matrix_binary,
+            "{ (1 2; 3 4)^x | x = -2.5 }",
+            "eval",
+            32,
+        )
+
+        self.assertEqual(unbound_returncode, 0, unbound_raw)
+        self.assertEqual(bound_returncode, 0, bound_raw)
+        for field in ("result", "pretty", "tex"):
+            self.assertEqual(bound_fields[field], unbound_fields[field], field)
+        self.assertNotIn("√(128)", bound_fields["result"])
+        self.assertNotIn(r"\sqrt{128}", bound_fields["tex"])
+        self.assertIn("^-⁵⁄₂", bound_fields["value"])
+        self.assertNotEqual(bound_fields["value"], bound_fields["result"])
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "matrix_lab").is_file(),
@@ -2315,6 +2345,773 @@ class ExpressionResultTests(unittest.TestCase):
             mars_lab.INDEX_HTML,
         )
 
+    def test_expression_value_card_visibility_follows_the_payload(self) -> None:
+        expression_evaluation = mars_lab.INDEX_HTML.split(
+            "async function evaluateExpression(options = {}) {", 1
+        )[1].split("\n    async function evaluateMatrix", 1)[0]
+
+        self.assertIn("setValueCardVisible(!!data.value);", expression_evaluation)
+        self.assertIn(
+            "setValueCardVisible(Boolean(String(value.textContent || '').trim()));",
+            mars_lab.INDEX_HTML,
+        )
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_expression_cards_keep_algebra_separate_from_bound_value(self) -> None:
+        expression = "{ x^2 + y | x = 3, y = 4 }"
+        fields, _, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary,
+            expression,
+            32,
+            "x",
+            "evaluate",
+        )
+
+        self.assertEqual(returncode, 0)
+        payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary,
+            fields,
+            expression,
+            32,
+            False,
+            action="evaluate",
+        )
+
+        self.assertEqual(payload["full_display_TeX"], "x^{2} + y")
+        self.assertEqual(payload["full_display_expression"], "{ x² + y | x = 3, y = 4 }")
+        self.assertIn("return y + x^2;", payload["full_display_function"])
+        self.assertIn("x = 3", payload["full_display_function"])
+        self.assertIn("y = 4", payload["full_display_function"])
+        self.assertEqual(payload["value"], "13")
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_expression_without_a_numerical_result_omits_value(self) -> None:
+        expression = "{ x^2 + y | x = ?, y = ? }"
+        fields, _, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary,
+            expression,
+            32,
+            "x",
+            "evaluate",
+        )
+
+        self.assertEqual(returncode, 0)
+        payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary,
+            fields,
+            expression,
+            32,
+            False,
+            action="evaluate",
+        )
+
+        self.assertEqual(payload["full_display_expression"], "{ x² + y | x = ?, y = ? }")
+        self.assertIn("x = ?", payload["full_display_function"])
+        self.assertIn("y = ?", payload["full_display_function"])
+        self.assertNotIn("value", payload)
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_simplified_identity_has_a_value_without_an_input_binding(self) -> None:
+        expression = "sin(x)^2 + cos(x)^2"
+        fields, _, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary,
+            expression,
+            32,
+            "x",
+            "evaluate",
+        )
+
+        self.assertEqual(returncode, 0)
+        payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary,
+            fields,
+            expression,
+            32,
+            False,
+            action="evaluate",
+        )
+
+        self.assertEqual(payload["full_display_TeX"], "1")
+        self.assertEqual(payload["full_display_expression"], "1")
+        self.assertIn("expression expr(void)", payload["full_display_function"])
+        self.assertEqual(payload["binding_values"], [])
+        self.assertEqual(payload["value"], "1")
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_tangent_addition_identity_is_shared_by_all_algebraic_cards(self) -> None:
+        expression = "(tan(cx) + tan(pi*y))/(1 - tan(cx)tan(pi*y))"
+        fields, _, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary,
+            expression,
+            32,
+            "x",
+            "evaluate",
+        )
+
+        self.assertEqual(returncode, 0)
+        payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary,
+            fields,
+            expression,
+            32,
+            False,
+            action="evaluate",
+        )
+
+        self.assertEqual(payload["full_display_TeX"], r"\tan(c\mkern-2mu x + \pi\mkern-2mu y)")
+        self.assertEqual(payload["full_display_expression"], "{ tan(cx + πy) | x = ?, y = ?; c = ? }")
+        self.assertIn("expression expr(x, y, const c)", payload["full_display_function"])
+        self.assertIn("return tan(c * x + π * y);", payload["full_display_function"])
+        self.assertIn("\nconst c = ?\n", payload["full_display_function"])
+        self.assertNotIn("value", payload)
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_plain_theta_uses_the_expression_greek_alias_table(self) -> None:
+        expression = "cos(theta) + i*sin(theta)"
+        fields, _, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary,
+            expression,
+            32,
+            "theta",
+            "evaluate",
+        )
+
+        self.assertEqual(returncode, 0)
+        payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary,
+            fields,
+            expression,
+            32,
+            False,
+            wrt="theta",
+            action="evaluate",
+        )
+
+        self.assertEqual(payload["full_display_TeX"], r"e^{i\mkern-2mu \theta}")
+        self.assertEqual(payload["full_display_expression"], "{ exp(iθ) | θ = ? }")
+        self.assertEqual([item["name"] for item in payload["binding_values"]], ["θ"])
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_logarithm_of_euler_identity_simplifies_in_all_algebraic_cards(self) -> None:
+        expression = "{ ln(cos(theta) + isin(theta)) | θ = pi }"
+        fields, _, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary,
+            expression,
+            32,
+            "x",
+            "evaluate",
+        )
+
+        self.assertEqual(returncode, 0)
+        payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary,
+            fields,
+            expression,
+            32,
+            False,
+            action="evaluate",
+        )
+
+        self.assertEqual(payload["full_display_TeX"], r"i\mkern-2mu \theta")
+        self.assertEqual(payload["full_display_expression"], "{ iθ | θ = π }")
+        self.assertIn("return i * θ;", payload["full_display_function"])
+        self.assertIn("θ = @pi", payload["full_display_function"])
+        self.assertIn("value", payload)
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_symbolic_complex_square_root_uses_cartesian_form_in_all_algebraic_cards(self) -> None:
+        expression = "sqrt(x + iy)"
+        fields, _, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary,
+            expression,
+            32,
+            "x",
+            "evaluate",
+        )
+
+        self.assertEqual(returncode, 0)
+        payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary,
+            fields,
+            expression,
+            32,
+            False,
+            action="evaluate",
+        )
+
+        self.assertIn(r"\sqrt{x^{2} + y^{2}}", payload["full_display_TeX"])
+        self.assertIn(r"\frac{y}{\left|y\right|}", payload["full_display_TeX"])
+        self.assertNotIn(r"\begin{aligned}", payload["full_display_TeX"])
+        self.assertNotIn(r"\\", payload["full_display_TeX"])
+        self.assertIn(" + i", payload["full_display_expression"])
+        self.assertIn("abs(y)", payload["full_display_function"])
+        self.assertNotIn("value", payload)
+
+        bound_expression = "{ sqrt(x + iy) | x = 3, y = 4 }"
+        bound_fields, _, bound_returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary,
+            bound_expression,
+            32,
+            "x",
+            "evaluate",
+        )
+        self.assertEqual(bound_returncode, 0)
+        bound_payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary,
+            bound_fields,
+            bound_expression,
+            32,
+            False,
+            action="evaluate",
+        )
+
+        self.assertIn(r"\sqrt{x^{2} + y^{2}}", bound_payload["full_display_TeX"])
+        self.assertNotIn("3", bound_payload["full_display_TeX"])
+        self.assertEqual(bound_payload["value"], "2 + i")
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_exact_complex_square_root_uses_cartesian_surds_in_algebraic_cards(self) -> None:
+        expression = "sqrt(2 + 3i)"
+        fields, _, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary,
+            expression,
+            32,
+            "x",
+            "evaluate",
+        )
+
+        self.assertEqual(returncode, 0)
+        payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary,
+            fields,
+            expression,
+            32,
+            False,
+            action="evaluate",
+        )
+
+        self.assertEqual(
+            payload["full_display_TeX"],
+            r"\sqrt{\frac{1}{2}\mkern-2mu \left(\sqrt{13} + 2\right)} + "
+            r"i\mkern-2mu \sqrt{\frac{1}{2}\mkern-2mu \left(\sqrt{13} - 2\right)}",
+        )
+        self.assertEqual(
+            payload["full_display_expression"],
+            "√(½·(√(13) + 2)) + i·√(½·(√(13) - 2))",
+        )
+        self.assertIn(
+            "return sqrt((sqrt(13) + 2) / 2) + i * sqrt((sqrt(13) - 2) / 2);",
+            payload["full_display_function"],
+        )
+        self.assertIn(" + ", payload["value"])
+        self.assertTrue(payload["value"].endswith("i"))
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_unit_complex_square_root_keeps_conjugate_surds_together(self) -> None:
+        expression = "sqrt(1 + i)"
+        fields, _, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary,
+            expression,
+            32,
+            "x",
+            "evaluate",
+        )
+
+        self.assertEqual(returncode, 0)
+        payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary,
+            fields,
+            expression,
+            32,
+            False,
+            action="evaluate",
+        )
+
+        self.assertEqual(
+            payload["full_display_TeX"],
+            r"\sqrt{\frac{1}{2}\mkern-2mu \left(\sqrt{2} + 1\right)} + "
+            r"i\mkern-2mu \sqrt{\frac{1}{2}\mkern-2mu \left(\sqrt{2} - 1\right)}",
+        )
+        self.assertEqual(
+            payload["full_display_expression"],
+            "√(½·(√(2) + 1)) + i·√(½·(√(2) - 1))",
+        )
+        self.assertIn(
+            "return sqrt((sqrt(2) + 1) / 2) + i * sqrt((sqrt(2) - 1) / 2);",
+            payload["full_display_function"],
+        )
+        self.assertTrue(payload["value"].endswith("i"))
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_exact_complex_square_root_reduces_perfect_square_components(self) -> None:
+        expression = "sqrt(3 + 4i)"
+        fields, _, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary,
+            expression,
+            32,
+            "x",
+            "evaluate",
+        )
+
+        self.assertEqual(returncode, 0)
+        payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary,
+            fields,
+            expression,
+            32,
+            False,
+            action="evaluate",
+        )
+
+        self.assertEqual(payload["full_display_TeX"], "2 + i")
+        self.assertEqual(payload["full_display_expression"], "2 + i")
+        self.assertIn("return 2 + i;", payload["full_display_function"])
+        self.assertEqual(payload["value"], "2 + i")
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_pure_imaginary_square_root_reduces_to_cartesian_components(self) -> None:
+        expression = "sqrt(2i)"
+        fields, _, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary,
+            expression,
+            32,
+            "x",
+            "evaluate",
+        )
+
+        self.assertEqual(returncode, 0)
+        payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary,
+            fields,
+            expression,
+            32,
+            False,
+            action="evaluate",
+        )
+
+        self.assertEqual(payload["full_display_TeX"], "1 + i")
+        self.assertEqual(payload["full_display_expression"], "1 + i")
+        self.assertIn("return 1 + i;", payload["full_display_function"])
+        self.assertEqual(payload["value"], "1 + i")
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_exact_complex_fifth_power_displays_all_five_roots(self) -> None:
+        expression = "(-4 + 4i)^(1/5)"
+        fields, raw, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary,
+            expression,
+            32,
+            "x",
+            "evaluate",
+        )
+
+        self.assertEqual(returncode, 0, raw)
+        payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary,
+            fields,
+            expression,
+            32,
+            False,
+            action="evaluate",
+        )
+
+        self.assertTrue(payload.get("svg"), payload.get("render_error"))
+        self.assertIn(r"\left\{1 - i,", payload["full_display_TeX"])
+        self.assertEqual(payload["full_display_TeX"].count(r"e^{\frac{"), 4)
+        self.assertEqual(payload["full_display_expression"].count("exp("), 4)
+        self.assertIn("expression root(k)", payload["full_display_function"])
+        self.assertIn("k = { 0, 1, 2, 3, 4 }", payload["full_display_function"])
+        self.assertIn("output(root(k));", payload["full_display_function"])
+        self.assertIn("i", payload["value"])
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_larger_complex_square_root_reduces_perfect_square_components(self) -> None:
+        expression = "sqrt(5 + 12i)"
+        fields, _, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary,
+            expression,
+            32,
+            "x",
+            "evaluate",
+        )
+
+        self.assertEqual(returncode, 0)
+        payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary,
+            fields,
+            expression,
+            32,
+            False,
+            action="evaluate",
+        )
+
+        self.assertEqual(payload["full_display_TeX"], r"3 + 2\mkern-2mu i")
+        self.assertEqual(payload["full_display_expression"], "3 + 2i")
+        self.assertIn("return 3 + 2 * i;", payload["full_display_function"])
+        self.assertEqual(payload["value"], "3 + 2i")
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_exact_complex_integer_power_folds_to_cartesian_value(self) -> None:
+        expression = "(1 + i)^2"
+        fields, _, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary,
+            expression,
+            32,
+            "x",
+            "evaluate",
+        )
+
+        self.assertEqual(returncode, 0)
+        payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary,
+            fields,
+            expression,
+            32,
+            False,
+            action="evaluate",
+        )
+
+        self.assertEqual(payload["full_display_TeX"], r"2\mkern-2mu i")
+        self.assertEqual(payload["full_display_expression"], "2i")
+        self.assertIn("return 2 * i;", payload["full_display_function"])
+        self.assertEqual(payload["value"], "2i")
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_exact_complex_integer_power_with_negative_real_part_folds_to_cartesian_value(self) -> None:
+        expression = "(-3 + 4i)^2"
+        fields, _, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary,
+            expression,
+            32,
+            "x",
+            "evaluate",
+        )
+
+        self.assertEqual(returncode, 0)
+        payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary,
+            fields,
+            expression,
+            32,
+            False,
+            action="evaluate",
+        )
+
+        self.assertEqual(payload["full_display_TeX"], r"-7 - 24\mkern-2mu i")
+        self.assertEqual(payload["full_display_expression"], "-7 - 24i")
+        self.assertIn("return -7 - 24 * i;", payload["full_display_function"])
+        self.assertEqual(payload["value"], "-7 - 24i")
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_exact_complex_cube_power_displays_all_three_roots(self) -> None:
+        expression = "(-2 + 2i)^(1/3)"
+        fields, _, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary,
+            expression,
+            32,
+            "x",
+            "evaluate",
+        )
+
+        self.assertEqual(returncode, 0)
+        payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary,
+            fields,
+            expression,
+            32,
+            False,
+            action="evaluate",
+        )
+
+        self.assertIn(r"\left\{1 + i,", payload["full_display_TeX"])
+        self.assertEqual(payload["full_display_TeX"].count(r"e^{\frac{"), 2)
+        self.assertEqual(payload["full_display_expression"].count("exp("), 2)
+        self.assertIn("expression root(k)", payload["full_display_function"])
+        self.assertIn("k = { 0, 1, 2 }", payload["full_display_function"])
+        self.assertIn("output(root(k));", payload["full_display_function"])
+        self.assertEqual(payload["value"], payload["full_display_expression"])
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_sqrt_is_principal_but_explicit_half_power_displays_both_roots(self) -> None:
+        sqrt_expression = "sqrt(3 + 4i)"
+        power_expression = "(3 + 4i)^(1/2)"
+
+        sqrt_fields, _, sqrt_returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary, sqrt_expression, 32, "x", "evaluate"
+        )
+        power_fields, _, power_returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary, power_expression, 32, "x", "evaluate"
+        )
+        self.assertEqual(sqrt_returncode, 0)
+        self.assertEqual(power_returncode, 0)
+
+        sqrt_payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary, sqrt_fields, sqrt_expression, 32, False, action="evaluate"
+        )
+        power_payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary, power_fields, power_expression, 32, False, action="evaluate"
+        )
+
+        self.assertEqual(sqrt_payload["full_display_TeX"], "2 + i")
+        self.assertEqual(sqrt_payload["full_display_expression"], "2 + i")
+        self.assertIn("return 2 + i;", sqrt_payload["full_display_function"])
+        self.assertEqual(sqrt_payload["value"], "2 + i")
+        self.assertEqual(power_payload["full_display_TeX"], r"\left\{2 + i,\;-2 - i\right\}")
+        self.assertEqual(power_payload["full_display_expression"], "{ 2 + i, -2 - i }")
+        self.assertIn("expression root(k)", power_payload["full_display_function"])
+        self.assertIn("k = { 0, 1 }", power_payload["full_display_function"])
+        self.assertIn("output(root(k));", power_payload["full_display_function"])
+        self.assertEqual(power_payload["value"], "{ 2 + i, -2 - i }")
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_symbolic_explicit_half_power_displays_two_symbolic_roots(self) -> None:
+        expression = "(a + bi)^(1/2)"
+        fields, _, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary, expression, 32, "x", "evaluate"
+        )
+
+        self.assertEqual(returncode, 0)
+        payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary, fields, expression, 32, False, action="evaluate"
+        )
+
+        self.assertEqual(
+            payload["full_display_TeX"],
+            r"\left\{\sqrt{a + b\mkern-2mu i},\;-\sqrt{a + b\mkern-2mu i}\right\}",
+        )
+        self.assertEqual(payload["full_display_expression"], "{ √(a + bi), -√(a + bi) }")
+        self.assertIn("expression root(k)", payload["full_display_function"])
+        self.assertIn("k = { 0, 1 }", payload["full_display_function"])
+        self.assertIn("output(root(k));", payload["full_display_function"])
+        self.assertNotIn("value", payload)
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_symbolic_complex_square_expands_to_cartesian_form(self) -> None:
+        expression = "(a + bi)^2"
+        fields, _, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary,
+            expression,
+            32,
+            "x",
+            "evaluate",
+        )
+
+        self.assertEqual(returncode, 0)
+        payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary,
+            fields,
+            expression,
+            32,
+            False,
+            action="evaluate",
+        )
+
+        self.assertEqual(
+            payload["full_display_TeX"],
+            r"a^{2} - b^{2} + 2\mkern-2mu a\mkern-2mu b\mkern-2mu i",
+        )
+        self.assertEqual(payload["full_display_expression"], "{ a² - b² + 2abi | ; a = ?, b = ? }")
+        self.assertIn("return a^2 - b^2 + 2 * a * b * i;", payload["full_display_function"])
+        self.assertNotIn("value", payload)
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_unparenthesised_unit_fraction_remains_a_power_exponent(self) -> None:
+        expression = "(-3 + 4i)^1/3"
+        fields, _, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary,
+            expression,
+            32,
+            "x",
+            "evaluate",
+        )
+
+        self.assertEqual(returncode, 0)
+        payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary,
+            fields,
+            expression,
+            32,
+            False,
+            action="evaluate",
+        )
+
+        self.assertEqual(payload["full_display_TeX"], r"\left(-3 + 4\mkern-2mu i\right)^{\frac{1}{3}}")
+        self.assertEqual(payload["full_display_expression"], "(-3 + 4i)^⅓")
+        self.assertIn("return (-3 + 4 * i) ^ ⅓;", payload["full_display_function"])
+        self.assertTrue(payload["value"].startswith("1.2649529063577516597006089547489 + "))
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_squared_cartesian_root_simplifies_to_the_original_complex_expression(self) -> None:
+        expression = (
+            "(sqrt(2)/2*sqrt(sqrt(x^2+y^2)+x)"
+            "+i*sqrt(2)/2*y*sqrt(sqrt(x^2+y^2)-x)/abs(y))^2"
+        )
+        fields, _, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary,
+            expression,
+            32,
+            "x",
+            "evaluate",
+        )
+
+        self.assertEqual(returncode, 0)
+        payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary,
+            fields,
+            expression,
+            32,
+            False,
+            action="evaluate",
+        )
+
+        self.assertEqual(payload["full_display_TeX"], r"x + i\mkern-2mu y")
+        self.assertEqual(payload["full_display_expression"], "{ x + iy | x = ?, y = ? }")
+        self.assertIn("return x + i * y;", payload["full_display_function"])
+
+        bound_expression = "{ " + expression + " | x = 3, y = 2 }"
+        bound_fields, _, bound_returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary,
+            bound_expression,
+            32,
+            "x",
+            "evaluate",
+        )
+        self.assertEqual(bound_returncode, 0)
+        bound_payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary,
+            bound_fields,
+            bound_expression,
+            32,
+            False,
+            action="evaluate",
+        )
+
+        self.assertEqual(bound_payload["full_display_TeX"], r"x + i\mkern-2mu y")
+        self.assertEqual(bound_payload["full_display_expression"], "{ x + iy | x = 3, y = 2 }")
+        self.assertEqual(bound_payload["value"], "3 + 2i")
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_reciprocal_cartesian_root_integrates_after_use_as_input_round_trip(self) -> None:
+        expression = "1/(√2/2·(√(√(x² + y²) + x) + iy·√(√(x² + y²) - x)/|y|))"
+        fields, _, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary,
+            expression,
+            32,
+            "x",
+            "integral",
+        )
+
+        self.assertEqual(returncode, 0)
+        payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary,
+            fields,
+            expression,
+            32,
+            False,
+            action="integral",
+        )
+
+        self.assertEqual(payload["integral_TeX"], r"2\mkern-2mu \sqrt{x + i\mkern-2mu y} + C")
+        self.assertEqual(payload["integral"], "∫dx = { 2·√(x + iy) + C | x = ?, y = ?; C = ? }")
+        self.assertIn("return 2 * (x + i * y)^½ + C;", payload["full_display_integral_function"])
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_translated_tangent_has_a_symbolic_integral(self) -> None:
+        expression = "tan(x+y)"
+        fields, _, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary,
+            expression,
+            78,
+            "x",
+            "integral",
+        )
+
+        self.assertEqual(returncode, 0)
+        payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary,
+            fields,
+            expression,
+            78,
+            False,
+            action="integral",
+        )
+
+        self.assertEqual(payload["integral_TeX"], r"-\ln(\cos(x + y)) + C")
+        self.assertEqual(
+            payload["integral"],
+            "∫dx = { -ln(cos(x + y)) + C | x = ?, y = ?; C = ? }",
+        )
+        self.assertIn("\nconst C = ?\n", payload["full_display_integral_function"])
+
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
         "release mars_lab helper is not built",
@@ -2337,7 +3134,7 @@ class ExpressionResultTests(unittest.TestCase):
         )
 
         self.assertIn("x = π/2", fields["expression"])
-        self.assertIn("; C = NAN", fields["expression"])
+        self.assertIn("; C = ?", fields["expression"])
         self.assertEqual(payload["binding_values"][0]["name"], "x")
         self.assertEqual(payload["binding_values"][0]["value"], "π/2")
         self.assertEqual(payload["binding_values"][0]["display"], "π/2")
@@ -2437,7 +3234,7 @@ class ExpressionResultTests(unittest.TestCase):
             save_expression=False,
             wrt="z",
         )
-        self.assertEqual(fields["value"], "?")
+        self.assertNotIn("value", fields)
 
     def test_lab_displays_nan_numeric_values_as_unknown(self) -> None:
         for value in ("NAN", "nan", "+NAN", "-nan"):
@@ -2608,7 +3405,7 @@ class ExpressionResultTests(unittest.TestCase):
         )
         self.assertEqual(
             payload["full_display_expression"],
-            "20x³ - 72x² - 12x + 72",
+            "{ 20x³ - 72x² - 12x + 72 | x = π }",
         )
         self.assertIn(
             "return 20 * x^3 - 72 * x^2 - 12 * x + 72;",
