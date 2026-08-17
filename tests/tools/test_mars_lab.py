@@ -33,9 +33,7 @@ class MobileAccessTests(unittest.TestCase):
         self.assertIn("source.startsWith('``', index)", html)
         self.assertIn("source[index] === '`'", html)
         self.assertIn("source.startsWith('$[', index)", html)
-        self.assertIn("appendFunctionToken(fragment, '$', 'function-token-keyword');", html)
-        self.assertIn("appendFunctionToken(fragment, '[', 'function-token-keyword');", html)
-        self.assertIn("appendFunctionToken(fragment, ']', 'function-token-keyword');", html)
+        self.assertIn("appendFunctionToken(fragment, source.slice(index, next), 'function-token-variable');", html)
         self.assertIn("source[index] === '[' || source[index] === ']'", html)
         self.assertIn("'array', 'const', 'equation', 'expression', 'i', 'return'", html)
         self.assertIn("const numberMatch = source.slice(index).match", html)
@@ -43,7 +41,10 @@ class MobileAccessTests(unittest.TestCase):
     def test_function_syntax_colouring_uses_the_semantic_palette(self) -> None:
         html = mars_lab.INDEX_HTML
 
-        self.assertIn(".function-token-variable {\n      color: #c7d0cb;", html)
+        self.assertIn(
+            ".function-token-variable {\n      color: #c7d0cb;\n      font-style: italic;",
+            html,
+        )
         self.assertIn(
             ".function-token-array {\n      text-decoration: underline;\n      text-underline-offset: 0.16em;",
             html,
