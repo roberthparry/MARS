@@ -32,9 +32,10 @@ some GNU C extensions, so MSVC/Windows builds are not currently guaranteed.
 - **`diffequ_t`** — ODE and PDE parsing with rule-based symbolic solving,
   optional derivations, linearisations and symmetry metadata
 - **`expr_t`** — differentiable expression DAGs with arbitrary-order symbolic
-  derivatives and numeric reverse-mode gradients, symbolic antiderivatives for conservative rule families,
-  symbolic matrix integration and structural matcher helpers for higher-level
-  symbolic code
+  derivatives and numeric reverse-mode gradients, Cartesian presentation of
+  complex elementary functions, symbolic antiderivatives for conservative rule
+  families, symbolic matrix integration and structural matcher helpers for
+  higher-level symbolic code
 - **`datetime_t`** — civil and astronomical date/time helpers
 - **`timeseries_t`** — datetime-indexed forecasting and time-series analysis for regression and ARIMA-family models
 - **`json_t`** — opaque JSON value tree with string-backed parsing, serialisation, file round-tripping, and `number_t` extension support
@@ -51,7 +52,10 @@ workspaces cover expressions, equations, ordinary and partial differential
 equations, matrices, symbolic and numerical integration, civil date
 calculations and the astronomical almanac. The browser handles presentation;
 the mathematical work remains in MARSlib and the MARS helper programs running
-locally.
+locally. Expression mode presents supported functions of `x + iy`, their
+derivatives and their antiderivatives in Cartesian `p + qi` form. Explicit
+fractional powers retain every root branch, while named root functions remain
+single-valued.
 
 After building MARS and installing the Lab's runtime dependencies, start it
 from the repository root:

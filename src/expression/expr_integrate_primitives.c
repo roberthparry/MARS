@@ -639,8 +639,9 @@ cleanup:
     return out;
 }
 
-static expr_t *integrate_tanh_symbolic_proportional_wrt(const expr_t *expr, const expr_t *wrt)
+static expr_t *integrate_tanh_symbolic_affine(const expr_t *expr, const expr_t *wrt)
 {
+    expr_t *constant = NULL;
     expr_t *coeff = NULL;
     expr_t *cosh_arg = NULL;
     expr_t *log_cosh = NULL;
@@ -650,8 +651,8 @@ static expr_t *integrate_tanh_symbolic_proportional_wrt(const expr_t *expr, cons
     if (!expr || !wrt || !expr->a || !expr_is_op(expr, &ops_tanh))
         return NULL;
 
-    coeff = match_symbolic_wrt_factor_coeff_primitives(expr->a, wrt);
-    if (!coeff || expr_const_is_zero(coeff))
+    if (!match_symbolic_affine_constant_and_coeff(expr->a, wrt, &constant, &coeff) ||
+        expr_const_is_zero(coeff))
         goto cleanup;
 
     cosh_arg = expr_cosh(expr->a);
@@ -665,6 +666,7 @@ cleanup:
     expr_free(log_cosh);
     expr_free(cosh_arg);
     expr_free(coeff);
+    expr_free(constant);
     return out;
 }
 
@@ -971,7 +973,7 @@ expr_t *integrate_tanh_rule(const expr_t *expr, const expr_t *wrt)
         num_eq(coeffs[0], NUM_ZERO)) {
         num_destroy(&coeffs[0]);
         num_destroy(&constant);
-        return integrate_tanh_symbolic_proportional_wrt(expr, wrt);
+        return integrate_tanh_symbolic_affine(expr, wrt);
     }
 
     cosh_arg = expr_cosh(expr->a);

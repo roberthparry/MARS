@@ -25,6 +25,10 @@ see the command-line options, including a fixed host or port and
 `--no-browser`. To install the desktop launcher and its private jurisdiction
 database, run `make install-mars-lab` from the repository root.
 
+The `tools/mars-lab` launcher checks the native expression-helper build target
+before it starts the client and rebuilds the helper when needed, so a restarted
+development instance cannot silently reuse a stale binary.
+
 Use `make mars-lab-stop` to stop a Lab process belonging to the current user,
 or `make mars-lab-restart` after changing the native helper or client.
 
@@ -40,11 +44,30 @@ expressions. When variables are present, the buttons beneath the editor can
 differentiate or integrate with respect to each variable. **Goal seek** finds a
 numeric value for a selected variable.
 
-The captured input is `root(117 + 44i,6)`. This named root asks for one
-principal value, which MARS simplifies to the exact Cartesian surd
+Supported elementary functions with an explicit symbolic complex argument are
+presented in Cartesian `p + qi` form. This applies to inputs written with both
+parts—`exp(x + iy)` is displayed as
+`exp(x)·cos(y) + i·exp(x)·sin(y)`—and to pure-imaginary inputs, for which
+`sin(iy)` is displayed as `0 + i·sinh(y)`.
+The derivative and integral buttons use the same separated Cartesian algebra,
+so their Rendered TeX, Expression and Function cards do not fall back to the
+original unsplit function call. Indefinite integrals always place their
+constant of integration last in all three representations.
+
+Explicit fractional powers retain their complete root family. Their
+derivatives likewise show every Cartesian branch; when bindings permit numeric
+evaluation, the result card is titled **Values** and contains one value per
+branch. Named `sqrt`, `cubrt` and `root` calls remain principal and
+single-valued.
+
+The captured input is `root(1+i, 4)`. This named root asks for the principal
+fourth root, which MARS simplifies to the exact Cartesian surd
 
 $$
-\frac{2\sqrt{3}+1}{2}+i\left(1-\frac{\sqrt{3}}{2}\right).
+\frac{1}{\sqrt{2}}\left(
+\sqrt{\sqrt[4]{2}+\sqrt{\frac{\sqrt{2}+1}{2}}}
++i\sqrt{\sqrt[4]{2}-\sqrt{\frac{\sqrt{2}+1}{2}}}
+\right).
 $$
 
 The four result cards deliberately show different representations:
@@ -58,7 +81,7 @@ The four result cards deliberately show different representations:
 - **Value** appears when a numerical value can be produced. It remains
   numerical even when the other cards have an exact surd result.
 
-[![MARS Lab expression mode displaying the exact principal sixth root of 117 plus 44i as Cartesian surds](images/mars-lab/expression.png?v=20260817-2)](images/mars-lab/expression.png?v=20260817-2)
+[![MARS Lab expression mode displaying the exact principal fourth root of 1 plus i as Cartesian surds](images/mars-lab/expression.png?v=20260818-1)](images/mars-lab/expression.png?v=20260818-1)
 
 Function cards use MARS syntax rather than C syntax. A full stop terminates a
 statement, `.` within a statement denotes multiplication, and `/` is printed
@@ -67,7 +90,9 @@ short repeated constant may receive a descriptive name such as `$[sqrt(3)]`.
 The complete descriptive name, including `$[` and `]`, uses the subdued
 off-white italic styling of variable and constant names.
 The syntax colouring distinguishes keywords, functions, variables, numbers and
-comments, but does not alter the copyable Function text.
+comments. Function-call brackets use the same gold hue as operators without
+bold weight, while grouping brackets retain the ordinary text colour. The
+colouring does not alter the copyable Function text.
 
 ## Equation mode
 

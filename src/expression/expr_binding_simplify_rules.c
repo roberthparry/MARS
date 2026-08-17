@@ -1117,6 +1117,131 @@ static bool binding_expr_extract_i_factor(const expr_binding_expr_t *expr, int *
     return false;
 }
 
+static expr_binding_expr_t *binding_expr_unary_product(const expr_ops_t *left_ops,
+                                                       const expr_binding_expr_t *left_arg,
+                                                       const expr_ops_t *right_ops,
+                                                       const expr_binding_expr_t *right_arg)
+{
+    return expr_binding_expr_new_mul(expr_binding_expr_new_unary_op(left_ops, expr_binding_expr_clone(left_arg)),
+                                     expr_binding_expr_new_unary_op(right_ops, expr_binding_expr_clone(right_arg)));
+}
+
+static expr_binding_expr_t *binding_expr_cartesian_tangent_part(const expr_binding_expr_t *real,
+                                                                const expr_binding_expr_t *imaginary,
+                                                                bool hyperbolic, bool imaginary_part)
+{
+    expr_binding_expr_t *double_real = binding_expr_double_arg(real);
+    expr_binding_expr_t *double_imaginary = binding_expr_double_arg(imaginary);
+    expr_binding_expr_t *numerator;
+    expr_binding_expr_t *denominator_left;
+    expr_binding_expr_t *denominator_right;
+
+    if (hyperbolic) {
+        numerator = expr_binding_expr_new_unary_op(imaginary_part ? &ops_sin : &ops_sinh,
+                                                   expr_binding_expr_clone(imaginary_part ? double_imaginary
+                                                                                         : double_real));
+        denominator_left = expr_binding_expr_new_unary_op(&ops_cosh, expr_binding_expr_clone(double_real));
+        denominator_right = expr_binding_expr_new_unary_op(&ops_cos, expr_binding_expr_clone(double_imaginary));
+    } else {
+        numerator = expr_binding_expr_new_unary_op(imaginary_part ? &ops_sinh : &ops_sin,
+                                                   expr_binding_expr_clone(imaginary_part ? double_imaginary
+                                                                                         : double_real));
+        denominator_left = expr_binding_expr_new_unary_op(&ops_cos, expr_binding_expr_clone(double_real));
+        denominator_right = expr_binding_expr_new_unary_op(&ops_cosh, expr_binding_expr_clone(double_imaginary));
+    }
+    expr_binding_expr_free(double_real);
+    expr_binding_expr_free(double_imaginary);
+    return expr_binding_expr_new_div(numerator, expr_binding_expr_new_add(denominator_left, denominator_right));
+}
+
+expr_binding_expr_t *binding_expr_try_simplify_complex_unary_cartesian(expr_binding_expr_t *expr)
+{
+    const expr_binding_expr_t *argument;
+    const expr_binding_expr_t *left;
+    const expr_binding_expr_t *right;
+    const expr_binding_expr_t *real;
+    const expr_binding_expr_t *imaginary;
+    const expr_binding_expr_t *imaginary_coefficient = NULL;
+    expr_binding_expr_t *owned_imaginary = NULL;
+    expr_binding_expr_t *real_part;
+    expr_binding_expr_t *imaginary_part;
+    expr_binding_expr_t *out;
+    int imaginary_sign;
+    bool subtract;
+    bool cosine;
+    bool exponential;
+    bool hyperbolic_cosine;
+    bool hyperbolic_sine;
+    bool hyperbolic_tangent;
+    bool sine;
+    bool tangent;
+
+    if (!expr || expr->kind != EXPR_BINDING_EXPR_UNARY_OP)
+        return expr;
+
+    cosine = expr->u.unary_op.ops == &ops_cos;
+    exponential = expr->u.unary_op.ops == &ops_exp;
+    hyperbolic_cosine = expr->u.unary_op.ops == &ops_cosh;
+    hyperbolic_sine = expr->u.unary_op.ops == &ops_sinh;
+    hyperbolic_tangent = expr->u.unary_op.ops == &ops_tanh;
+    sine = expr->u.unary_op.ops == &ops_sin;
+    tangent = expr->u.unary_op.ops == &ops_tan;
+    if (!sine && !cosine && !tangent && !hyperbolic_sine && !hyperbolic_cosine && !hyperbolic_tangent &&
+        !exponential)
+        return expr;
+
+    argument = expr->u.unary_op.child;
+    if (!argument || (argument->kind != EXPR_BINDING_EXPR_ADD && argument->kind != EXPR_BINDING_EXPR_SUB))
+        return expr;
+
+    left = argument->u.binary.left;
+    right = argument->u.binary.right;
+    subtract = argument->kind == EXPR_BINDING_EXPR_SUB;
+
+    if (binding_expr_extract_i_factor(right, &imaginary_sign, &imaginary_coefficient)) {
+        real = left;
+        imaginary_sign = subtract ? -imaginary_sign : imaginary_sign;
+    } else if (!subtract && binding_expr_extract_i_factor(left, &imaginary_sign, &imaginary_coefficient)) {
+        real = right;
+    } else {
+        return expr;
+    }
+
+    if (imaginary_coefficient) {
+        imaginary = imaginary_coefficient;
+    } else {
+        owned_imaginary = binding_expr_new_long(1L);
+        imaginary = owned_imaginary;
+    }
+
+    if (sine) {
+        real_part = binding_expr_unary_product(&ops_sin, real, &ops_cosh, imaginary);
+        imaginary_part = binding_expr_unary_product(&ops_cos, real, &ops_sinh, imaginary);
+    } else if (cosine) {
+        real_part = binding_expr_unary_product(&ops_cos, real, &ops_cosh, imaginary);
+        imaginary_part = binding_expr_unary_product(&ops_sin, real, &ops_sinh, imaginary);
+        imaginary_sign = -imaginary_sign;
+    } else if (hyperbolic_sine) {
+        real_part = binding_expr_unary_product(&ops_sinh, real, &ops_cos, imaginary);
+        imaginary_part = binding_expr_unary_product(&ops_cosh, real, &ops_sin, imaginary);
+    } else if (hyperbolic_cosine) {
+        real_part = binding_expr_unary_product(&ops_cosh, real, &ops_cos, imaginary);
+        imaginary_part = binding_expr_unary_product(&ops_sinh, real, &ops_sin, imaginary);
+    } else if (exponential) {
+        real_part = binding_expr_unary_product(&ops_exp, real, &ops_cos, imaginary);
+        imaginary_part = binding_expr_unary_product(&ops_exp, real, &ops_sin, imaginary);
+    } else {
+        real_part = binding_expr_cartesian_tangent_part(real, imaginary, hyperbolic_tangent, false);
+        imaginary_part = binding_expr_cartesian_tangent_part(real, imaginary, hyperbolic_tangent, true);
+    }
+    imaginary_part = expr_binding_expr_new_mul(expr_binding_expr_new_const(EXPR_BINDING_CONST_I), imaginary_part);
+    out = imaginary_sign < 0 ? expr_binding_expr_new_sub(real_part, imaginary_part)
+                             : expr_binding_expr_new_add(real_part, imaginary_part);
+
+    expr_binding_expr_free(owned_imaginary);
+    return binding_expr_fold_to_expr_owned(expr, expr_binding_expr_simplify(out));
+}
+
 expr_binding_expr_t *binding_expr_try_simplify_cartesian_square(expr_binding_expr_t *expr)
 {
     const expr_binding_expr_t *left;

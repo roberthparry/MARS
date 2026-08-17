@@ -34,6 +34,8 @@ of these graphs.
 - expression construction from constants, variables, and operators
 - lazy evaluation with result caching
 - symbolic differentiation to arbitrary order
+- Cartesian presentation of supported elementary functions with symbolic
+  complex arguments
 - symbolic antiderivatives for conservative, reliable expression families,
   including unevaluated integral fallback nodes for partially supported sums
 - evaluation of derivatives for scalar outputs
@@ -109,7 +111,10 @@ terms such as `sin(3*x - 1)` are part of that fast path. The special-function
 rules also cover supported power-composed Bessel J, Bessel Y and lower-case
 Lommel functions, together with monomial compositions of the generalised
 hypergeometric pFq family. These are structural rules rather than matches for
-one memorised input.
+one memorised input. Primitive dispatch preserves a symbolic affine complex
+argument long enough to integrate it before presentation expansion; in
+particular, both the `x` and `y` antiderivatives of `tanh(x + iy)` are returned
+as native Cartesian expressions rather than unevaluated integral nodes.
 
 For additive expressions, supported terms may still be integrated even when
 other terms are not. In that case the unsupported additive pieces are left as
@@ -594,6 +599,15 @@ presentation, including symmetric surds and Cartesian complex products. The
 beautifier does not select a different expression for TeX output; rendering
 style is applied afterwards.
 
+When an elementary function has a supported symbolic Cartesian identity, the
+native display pass separates an explicit `x + iy` argument into real and
+imaginary parts. For example, `exp(x + iy)` becomes
+`exp(x)·cos(y) + i·exp(x)·sin(y)`. The same pass covers the circular and
+hyperbolic sine, cosine and tangent families, together with `atan`, `ln` and
+`log10`; pure-imaginary forms additionally use the native inverse and
+reciprocal-family identities. Subsequent differentiation and presentation
+beautification preserve the separated `p + qi` structure.
+
 ---
 
 ## API Reference
@@ -729,7 +743,9 @@ All functions return owning handles.
   `integral(root(u,n),x) = n*u*root(u,n)/((n+1)u')`; `cubrt(u)` is the `n = 3` case.
 - Explicit `z^(1/n)` syntax denotes the complete family of `n` roots. MARS Lab displays every member of the family;
   for example, `(3+4i)^(1/2)` displays `{ 2+i, -2-i }`, while `sqrt(3+4i)` displays only `2+i`. Numeric evaluation
-  of the underlying power node uses the principal member when a scalar value is required.
+  of the underlying power node uses the principal member when a scalar value is required. MARS Lab also retains the
+  complete branch family when differentiating explicit fractional powers and labels the numeric result card
+  **Values** when it contains more than one branch.
 - Exact complex principal roots are beautified into Cartesian surds when MARS
   can prove such a representation. For example, `root(117+44i,6)` becomes
   `½(2√3+1) + i(1-√3/2)`, whose numerical value is approximately
@@ -847,6 +863,10 @@ separately coloured syntax.
 Other constant intermediates use `c1`, `c2`, and so on, while intermediates
 that depend on variables use `v1`, `v2`, and so on. This keeps repeated work
 visible and makes the generated function suitable for later differentiation.
+MARS Lab applies presentation-only syntax colouring to this text: function
+names are bold turquoise and their matching call brackets are non-bold gold.
+Grouping brackets retain the ordinary text colour, and copied Function text is
+unchanged.
 
 Function-style ordinary comments use backticks. One backtick opens a delimited
 comment and the next unescaped backtick closes it; the comment may span lines.

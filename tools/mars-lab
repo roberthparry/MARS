@@ -26,8 +26,6 @@ fi
 
 cd "$root"
 
-if [ ! -x build/release/scratch/mars_lab ]; then
-    make scratch/mars_lab
-fi
+make --no-print-directory scratch/mars_lab
 
 exec python3 tools/mars_lab.py "$@"

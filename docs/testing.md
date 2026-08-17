@@ -79,6 +79,12 @@ freed and `ERROR SUMMARY: 0 errors from 0 contexts`. If a Valgrind failure needs
 to be narrowed, prefer temporarily filtering cases in `tests/test_config.json`
 over adding diagnostic instrumentation to the code under test.
 
+MARS Lab expression-presentation regressions live in
+`tests/tools/test_mars_lab.py`. They exercise native Cartesian complex
+evaluation, differentiation and integration as well as the browser's Function
+syntax colouring. Markdown examples are collected in
+`ZZMarsLabReadmeExamples`, which runs after the other Lab tests.
+
 ## Notes
 
 - Run commands from the repository root.

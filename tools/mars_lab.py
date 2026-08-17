@@ -2930,6 +2930,11 @@ INDEX_HTML = r"""<!doctype html>
       font-weight: 700;
     }
 
+    .function-token-bracket {
+      color: #f3bd68;
+      font-weight: 400;
+    }
+
     .function-token-number {
       color: #e78fcb;
     }
@@ -9367,6 +9372,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         /(?:^|\n)\s*(?:array\s+)?(?:equation|expression)\s+[\p{L}_$][\p{L}\p{M}\p{N}_$]*\s*\(([^)]*)\)/u
       );
       const functionArrayVariables = new Set();
+      const functionOpeningBrackets = new Set();
+      const functionBracketStack = [];
       let index = 0;
 
       if (functionDeclaration) {
@@ -9469,8 +9476,35 @@ __HOLIDAY_JURISDICTION_OPTIONS__
               : (!MARS_FUNCTION_CONSTANTS.has(identifier)
                 ? `function-token-variable${functionArrayVariables.has(identifier) ? ' function-token-array' : ''}`
                 : ''));
+          if (source[following] === '(')
+            functionOpeningBrackets.add(following);
           appendFunctionToken(fragment, identifier, className);
           index = next;
+          continue;
+        }
+
+        if (source[index] === '(') {
+          const isFunctionBracket = functionOpeningBrackets.has(index);
+          functionBracketStack.push(isFunctionBracket);
+          appendFunctionToken(
+            fragment,
+            source[index],
+            isFunctionBracket ? 'function-token-bracket' : ''
+          );
+          index += 1;
+          continue;
+        }
+
+        if (source[index] === ')') {
+          const isFunctionBracket = functionBracketStack.length
+            ? functionBracketStack.pop()
+            : false;
+          appendFunctionToken(
+            fragment,
+            source[index],
+            isFunctionBracket ? 'function-token-bracket' : ''
+          );
+          index += 1;
           continue;
         }
 
@@ -10787,6 +10821,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         setResultInputText(resultExpression);
         setMatrixPrettyResult(resultExpression, '');
         value.textContent = resultValue || '';
+        valueTitle.textContent = data.derivative_values ? 'Values' : 'Value';
         setValueCardVisible(!!resultValue);
         lastTex = resultTex || '';
         rendered.dataset.displayTex = resultTex || '';
@@ -10862,6 +10897,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           fullDerivativeFunction
         );
         value.textContent = data.derivative_value || '';
+        valueTitle.textContent = data.derivative_values ? 'Values' : 'Value';
         setValueCardVisible(!!data.derivative_value);
         lastDerivativeExpression = derivativeExpression;
         {
@@ -13090,6 +13126,7 @@ def parse_mars_lab_output(output: str) -> dict[str, str]:
         "derivative_TeX": r"^derivative_TeX\s*(.*)$",
         "derivative_bindings": r"^derivative_binding\s{2,}(.*)$",
         "derivative_value": r"^d value\s+(.*)$",
+        "derivative_values": r"^d values\s+(.*)$",
         "integral": r"^integral\s+(.*)$",
         "integral_function": r"^integral_function\s{2,}(.*)$",
         "integral_TeX": r"^integral_TeX\s*(.*)$",
@@ -14962,6 +14999,8 @@ def prepare_evaluation_fields(
     )
     if fields.get("root_value"):
         fields["value"] = array_values_for_display(fields["root_value"])
+    if fields.get("derivative_values"):
+        fields["derivative_value"] = array_values_for_display(fields["derivative_values"])
     fields["display_expression"] = compact_display_text(str(fields["full_display_expression"]))
     fields["display_TeX"] = compact_display_text(str(fields["full_display_TeX"]))
     fields["display_function"] = compact_function_text(str(fields["full_display_function"]))

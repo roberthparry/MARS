@@ -1269,6 +1269,42 @@ static bool expr_extract_i_unit_factor(const expr_t *dv, int *sign_out, const ex
     return false;
 }
 
+static expr_t *expr_extract_i_unit_factor_owned(const expr_t *expr, int *sign_out)
+{
+    expr_t *coefficient = NULL;
+    expr_t *other = NULL;
+    expr_t *combined = NULL;
+    int child_sign;
+
+    if (!expr || !sign_out)
+        return NULL;
+    if (expr_i_unit_sign(expr, sign_out))
+        return expr_const_one();
+    if (expr_is_op(expr, &ops_neg)) {
+        coefficient = expr_extract_i_unit_factor_owned(expr->a, &child_sign);
+        if (coefficient)
+            *sign_out = -child_sign;
+        return coefficient;
+    }
+    if (!expr_is_op(expr, &ops_mul))
+        return NULL;
+
+    coefficient = expr_extract_i_unit_factor_owned(expr->a, &child_sign);
+    other = coefficient ? expr_clone(expr->b) : NULL;
+    if (!coefficient) {
+        coefficient = expr_extract_i_unit_factor_owned(expr->b, &child_sign);
+        other = coefficient ? expr_clone(expr->a) : NULL;
+    }
+    if (!coefficient || !other) {
+        expr_free(other);
+        expr_free(coefficient);
+        return NULL;
+    }
+    combined = expr_mul_simplify_owned(coefficient, other);
+    *sign_out = child_sign;
+    return combined;
+}
+
 expr_t *expr_simplify_try_i_unit_product(expr_t *a, expr_t *b)
 {
     const expr_t *a_rest = NULL;
@@ -1323,6 +1359,288 @@ static bool expr_extract_i_product_arg(const expr_t *dv, const expr_t **arg_out)
     return false;
 }
 
+static expr_t *expr_unary_product(expr_apply_unary_fn left_fn, const expr_t *left_arg, expr_apply_unary_fn right_fn,
+                                  const expr_t *right_arg)
+{
+    expr_t *left = left_fn(left_arg);
+    expr_t *right = right_fn(right_arg);
+
+    if (!left || !right) {
+        expr_free(left);
+        expr_free(right);
+        return NULL;
+    }
+    return expr_mul_simplify_owned(left, right);
+}
+
+static expr_t *expr_double_arg(const expr_t *arg)
+{
+    return expr_mul_simplify_owned(expr_const_long(2L), expr_clone(arg));
+}
+
+static expr_t *expr_cartesian_tangent_part(const expr_t *real, const expr_t *imaginary, bool hyperbolic,
+                                           bool imaginary_part)
+{
+    expr_t *double_real = expr_double_arg(real);
+    expr_t *double_imaginary = expr_double_arg(imaginary);
+    expr_t *numerator;
+    expr_t *denominator_left;
+    expr_t *denominator_right;
+    expr_t *denominator;
+
+    if (!double_real || !double_imaginary) {
+        expr_free(double_real);
+        expr_free(double_imaginary);
+        return NULL;
+    }
+
+    if (hyperbolic) {
+        numerator = imaginary_part ? expr_sin(double_imaginary) : expr_sinh(double_real);
+        denominator_left = expr_cosh(double_real);
+        denominator_right = expr_cos(double_imaginary);
+    } else {
+        numerator = imaginary_part ? expr_sinh(double_imaginary) : expr_sin(double_real);
+        denominator_left = expr_cos(double_real);
+        denominator_right = expr_cosh(double_imaginary);
+    }
+    expr_free(double_real);
+    expr_free(double_imaginary);
+
+    if (!denominator_left || !denominator_right) {
+        expr_free(numerator);
+        expr_free(denominator_left);
+        expr_free(denominator_right);
+        return NULL;
+    }
+    denominator = expr_add_simplify_owned(denominator_left, denominator_right);
+    if (!numerator || !denominator) {
+        expr_free(numerator);
+        expr_free(denominator);
+        return NULL;
+    }
+    return expr_div_simplify_owned(numerator, denominator);
+}
+
+expr_t *expr_simplify_try_complex_unary_cartesian(const expr_t *op, expr_t *arg_node)
+{
+    const expr_t *left;
+    const expr_t *right;
+    const expr_t *real;
+    const expr_t *imaginary = NULL;
+    expr_t *owned_real = NULL;
+    expr_t *owned_imaginary = NULL;
+    expr_t *real_part;
+    expr_t *imaginary_coefficient;
+    expr_t *imaginary_unit;
+    expr_t *imaginary_part;
+    expr_t *out;
+    expr_t *simplified;
+    int imaginary_sign;
+    bool subtract;
+    bool cosine = expr_is_op(op, &ops_cos);
+    bool exponential = expr_is_op(op, &ops_exp);
+    bool hyperbolic_cosine = expr_is_op(op, &ops_cosh);
+    bool hyperbolic_sine = expr_is_op(op, &ops_sinh);
+    bool hyperbolic_tangent = expr_is_op(op, &ops_tanh);
+    bool inverse_tangent = expr_is_op(op, &ops_atan);
+    bool logarithm = expr_is_op(op, &ops_log);
+    bool common_logarithm = expr_is_op(op, &ops_log10);
+    bool sine = expr_is_op(op, &ops_sin);
+    bool tangent = expr_is_op(op, &ops_tan);
+
+    if ((!sine && !cosine && !tangent && !hyperbolic_sine && !hyperbolic_cosine && !hyperbolic_tangent &&
+         !exponential && !logarithm && !common_logarithm && !inverse_tangent) ||
+        !arg_node)
+        return NULL;
+
+    if (expr_is_op(arg_node, &ops_add) || expr_is_op(arg_node, &ops_sub)) {
+        left = arg_node->a;
+        right = arg_node->b;
+        subtract = expr_is_op(arg_node, &ops_sub);
+
+        owned_imaginary = expr_extract_i_unit_factor_owned(right, &imaginary_sign);
+        if (owned_imaginary) {
+            real = left;
+            imaginary_sign = subtract ? -imaginary_sign : imaginary_sign;
+        } else if (!subtract && (owned_imaginary = expr_extract_i_unit_factor_owned(left, &imaginary_sign))) {
+            real = right;
+        } else {
+            return NULL;
+        }
+    } else {
+        owned_imaginary = expr_extract_i_unit_factor_owned(arg_node, &imaginary_sign);
+        owned_real = owned_imaginary ? expr_const_zero() : NULL;
+        if (!owned_imaginary || !owned_real) {
+            expr_free(owned_imaginary);
+            expr_free(owned_real);
+            return NULL;
+        }
+        real = owned_real;
+    }
+
+    imaginary = owned_imaginary;
+
+    if (inverse_tangent) {
+        expr_t *real_squared = expr_pow(real, &NUM_TWO);
+        expr_t *imaginary_squared = expr_pow(imaginary, &NUM_TWO);
+        expr_t *two_real = expr_mul_simplify_owned(expr_const_long(2L), expr_clone(real));
+        expr_t *real_denominator = real_squared && imaginary_squared
+                                           ? expr_sub_simplify_owned(
+                                                 expr_sub_simplify_owned(expr_const_one(), real_squared),
+                                                 imaginary_squared)
+                                           : NULL;
+        expr_t *real_angle = two_real && real_denominator ? expr_atan2(two_real, real_denominator) : NULL;
+        expr_t *imaginary_plus_one = expr_add_simplify_owned(expr_clone(imaginary), expr_const_one());
+        expr_t *imaginary_minus_one = expr_sub_simplify_owned(expr_clone(imaginary), expr_const_one());
+        expr_t *upper = imaginary_plus_one ? expr_pow(imaginary_plus_one, &NUM_TWO) : NULL;
+        expr_t *lower = imaginary_minus_one ? expr_pow(imaginary_minus_one, &NUM_TWO) : NULL;
+        expr_t *real_square_for_upper = expr_pow(real, &NUM_TWO);
+        expr_t *real_square_for_lower = expr_pow(real, &NUM_TWO);
+        expr_t *ratio;
+        expr_t *ratio_log;
+
+        expr_free(imaginary_minus_one);
+        expr_free(imaginary_plus_one);
+        expr_free(real_denominator);
+        expr_free(two_real);
+        upper = upper && real_square_for_upper ? expr_add_simplify_owned(real_square_for_upper, upper) : NULL;
+        lower = lower && real_square_for_lower ? expr_add_simplify_owned(real_square_for_lower, lower) : NULL;
+        ratio = upper && lower ? expr_div_simplify_owned(upper, lower) : NULL;
+        ratio_log = ratio ? expr_log(ratio) : NULL;
+        expr_free(ratio);
+        real_part = real_angle ? expr_mul_simplify_owned(expr_new_const(NUM_HALF), real_angle) : NULL;
+        imaginary_coefficient = ratio_log ? expr_mul_simplify_owned(expr_new_const(NUM_QUARTER), ratio_log) : NULL;
+    } else if (logarithm || common_logarithm) {
+        expr_t *real_squared = expr_pow(real, &NUM_TWO);
+        expr_t *imaginary_squared = expr_pow(imaginary, &NUM_TWO);
+        expr_t *modulus_squared =
+            real_squared && imaginary_squared ? expr_add_simplify_owned(real_squared, imaginary_squared) : NULL;
+        expr_t *modulus_log = modulus_squared ? expr_log(modulus_squared) : NULL;
+        expr_t *half = expr_new_const(NUM_HALF);
+
+        expr_free(modulus_squared);
+        real_part = modulus_log && half ? expr_mul_simplify_owned(half, modulus_log) : NULL;
+        if (!real_part) {
+            expr_free(half);
+            expr_free(modulus_log);
+        }
+        imaginary_coefficient = expr_atan2(imaginary, real);
+        if (common_logarithm) {
+            expr_t *ten = expr_const_long(10L);
+            expr_t *log_ten = ten ? expr_log(ten) : NULL;
+
+            expr_free(ten);
+            if (log_ten) {
+                real_part = expr_div_simplify_owned(real_part, expr_clone(log_ten));
+                imaginary_coefficient = expr_div_simplify_owned(imaginary_coefficient, log_ten);
+            } else {
+                expr_free(real_part);
+                expr_free(imaginary_coefficient);
+                real_part = NULL;
+                imaginary_coefficient = NULL;
+            }
+        }
+    } else if (sine) {
+        real_part = expr_unary_product(expr_sin, real, expr_cosh, imaginary);
+        imaginary_coefficient = expr_unary_product(expr_cos, real, expr_sinh, imaginary);
+    } else if (cosine) {
+        real_part = expr_unary_product(expr_cos, real, expr_cosh, imaginary);
+        imaginary_coefficient = expr_unary_product(expr_sin, real, expr_sinh, imaginary);
+        imaginary_sign = -imaginary_sign;
+    } else if (hyperbolic_sine) {
+        real_part = expr_unary_product(expr_sinh, real, expr_cos, imaginary);
+        imaginary_coefficient = expr_unary_product(expr_cosh, real, expr_sin, imaginary);
+    } else if (hyperbolic_cosine) {
+        real_part = expr_unary_product(expr_cosh, real, expr_cos, imaginary);
+        imaginary_coefficient = expr_unary_product(expr_sinh, real, expr_sin, imaginary);
+    } else if (exponential) {
+        real_part = expr_unary_product(expr_exp, real, expr_cos, imaginary);
+        imaginary_coefficient = expr_unary_product(expr_exp, real, expr_sin, imaginary);
+    } else {
+        real_part = expr_cartesian_tangent_part(real, imaginary, hyperbolic_tangent, false);
+        imaginary_coefficient = expr_cartesian_tangent_part(real, imaginary, hyperbolic_tangent, true);
+    }
+    imaginary_unit = expr_new_named_const(NUM_I, "i");
+    imaginary_part = imaginary_unit && imaginary_coefficient ? expr_mul(imaginary_unit, imaginary_coefficient) : NULL;
+    out = real_part && imaginary_part
+              ? (imaginary_sign < 0 ? expr_sub(real_part, imaginary_part) : expr_add(real_part, imaginary_part))
+              : NULL;
+    simplified = out;
+
+    expr_free(imaginary_part);
+    expr_free(imaginary_unit);
+    expr_free(imaginary_coefficient);
+    expr_free(real_part);
+    expr_free(owned_imaginary);
+    expr_free(owned_real);
+    if (simplified)
+        expr_free(arg_node);
+    return simplified;
+}
+
+static expr_t *expr_complex_unary_cartesian_for_display_recursive(const expr_t *expr, bool *changed)
+{
+    expr_t *left = NULL;
+    expr_t *right = NULL;
+    expr_t *rebuilt = NULL;
+    expr_t *argument = NULL;
+    expr_t *expanded = NULL;
+
+    if (!expr)
+        return NULL;
+    if (!expr->ops || expr->ops->arity == EXPR_OP_ATOM)
+        return expr_clone(expr);
+
+    left = expr_complex_unary_cartesian_for_display_recursive(expr->a, changed);
+    if (!left)
+        goto cleanup;
+    if (expr->ops->arity == EXPR_OP_BINARY) {
+        right = expr_complex_unary_cartesian_for_display_recursive(expr->b, changed);
+        if (!right)
+            goto cleanup;
+        rebuilt = expr_new_binary_internal(expr->ops, left, right);
+    } else {
+        rebuilt = expr_new_unary_internal(expr->ops, left);
+    }
+    if (rebuilt) {
+        left = NULL;
+        right = NULL;
+    }
+    if (rebuilt && rebuilt->ops->arity == EXPR_OP_UNARY && rebuilt->a) {
+        argument = expr_clone(rebuilt->a);
+        expanded = argument ? expr_simplify_try_complex_unary_cartesian(rebuilt, argument) : NULL;
+        if (expanded) {
+            expr_free(rebuilt);
+            rebuilt = expanded;
+            expanded = NULL;
+            *changed = true;
+        } else {
+            expr_free(argument);
+        }
+        argument = NULL;
+    }
+
+cleanup:
+    expr_free(expanded);
+    expr_free(argument);
+    expr_free(right);
+    expr_free(left);
+    return rebuilt;
+}
+
+/* Expand supported complex unary functions recursively for presentation. */
+expr_t *expr_complex_unary_cartesian_for_display(const expr_t *expr)
+{
+    bool changed = false;
+    expr_t *expanded = expr_complex_unary_cartesian_for_display_recursive(expr, &changed);
+
+    if (!changed) {
+        expr_free(expanded);
+        return NULL;
+    }
+    return expanded;
+}
+
 expr_t *expr_simplify_try_imag_trig_bridge(const expr_t *op, expr_t *arg_node)
 {
     const expr_t *arg_borrowed = NULL;
@@ -1352,6 +1670,106 @@ expr_t *expr_simplify_try_imag_trig_bridge(const expr_t *op, expr_t *arg_node)
         expr_free(arg_node);
         simp = expr_simplify(inner);
         expr_free(inner);
+        return simp;
+    }
+
+    if (expr_is_op(op, &ops_tan) || expr_is_op(op, &ops_tanh)) {
+        expr_t *i = expr_new_named_const(NUM_I, "i");
+
+        inner = expr_is_op(op, &ops_tan) ? expr_tanh(arg) : expr_tan(arg);
+        out = i && inner ? expr_mul(i, inner) : NULL;
+        expr_free(i);
+        expr_free(inner);
+        expr_free(arg);
+        if (!out)
+            return NULL;
+        expr_free(arg_node);
+        return out;
+    }
+
+    if (expr_is_op(op, &ops_sec) || expr_is_op(op, &ops_sech)) {
+        inner = expr_is_op(op, &ops_sec) ? expr_sech(arg) : expr_sec(arg);
+        expr_free(arg);
+        if (!inner)
+            return NULL;
+        expr_free(arg_node);
+        return inner;
+    }
+
+    if (expr_is_op(op, &ops_cosec) || expr_is_op(op, &ops_cot) || expr_is_op(op, &ops_cosech) ||
+        expr_is_op(op, &ops_coth)) {
+        expr_t *negative_i = expr_new_named_const(NUM_NEG_I, "-i");
+
+        if (expr_is_op(op, &ops_cosec))
+            inner = expr_cosech(arg);
+        else if (expr_is_op(op, &ops_cot))
+            inner = expr_coth(arg);
+        else if (expr_is_op(op, &ops_cosech))
+            inner = expr_cosec(arg);
+        else
+            inner = expr_cot(arg);
+        out = negative_i && inner ? expr_mul(negative_i, inner) : NULL;
+        expr_free(negative_i);
+        expr_free(inner);
+        expr_free(arg);
+        if (!out)
+            return NULL;
+        expr_free(arg_node);
+        return out;
+    }
+
+    if (expr_is_op(op, &ops_asin) || expr_is_op(op, &ops_atan) || expr_is_op(op, &ops_asinh) ||
+        expr_is_op(op, &ops_atanh)) {
+        expr_t *i = expr_new_named_const(NUM_I, "i");
+
+        if (expr_is_op(op, &ops_asin))
+            inner = expr_asinh(arg);
+        else if (expr_is_op(op, &ops_atan))
+            inner = expr_atanh(arg);
+        else if (expr_is_op(op, &ops_asinh))
+            inner = expr_asin(arg);
+        else
+            inner = expr_atan(arg);
+        out = i && inner ? expr_mul(i, inner) : NULL;
+        expr_free(i);
+        expr_free(inner);
+        expr_free(arg);
+        if (!out)
+            return NULL;
+        expr_free(arg_node);
+        return out;
+    }
+
+    if (expr_is_op(op, &ops_log) || expr_is_op(op, &ops_log10)) {
+        expr_t *square = expr_pow(arg, &NUM_TWO);
+        expr_t *modulus_log = square ? expr_log(square) : NULL;
+        expr_t *real_part = modulus_log ? expr_mul_simplify_owned(expr_new_const(NUM_HALF), modulus_log) : NULL;
+        expr_t *zero = expr_const_zero();
+        expr_t *phase = zero ? expr_atan2(arg, zero) : NULL;
+        expr_t *i = expr_new_named_const(NUM_I, "i");
+        expr_t *imaginary = i && phase ? expr_mul(i, phase) : NULL;
+
+        expr_free(i);
+        expr_free(phase);
+        expr_free(zero);
+        if (expr_is_op(op, &ops_log10)) {
+            expr_t *ten = expr_const_long(10L);
+            expr_t *log_ten = ten ? expr_log(ten) : NULL;
+
+            expr_free(ten);
+            real_part = log_ten ? expr_div_simplify_owned(real_part, expr_clone(log_ten)) : NULL;
+            imaginary = log_ten ? expr_div_simplify_owned(imaginary, log_ten) : NULL;
+        }
+        out = real_part && imaginary ? expr_add(real_part, imaginary) : NULL;
+        expr_free(imaginary);
+        expr_free(real_part);
+        expr_free(square);
+        expr_free(arg);
+        if (!out)
+            return NULL;
+        expr_free(arg_node);
+        simp = expr_simplify(out);
+        expr_free(out);
         return simp;
     }
 
