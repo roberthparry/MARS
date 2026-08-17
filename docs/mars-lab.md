@@ -58,12 +58,14 @@ The four result cards deliberately show different representations:
 - **Value** appears when a numerical value can be produced. It remains
   numerical even when the other cards have an exact surd result.
 
-[![MARS Lab expression mode displaying the exact principal sixth root of 117 plus 44i as Cartesian surds](images/mars-lab/expression.png?v=20260817-1)](images/mars-lab/expression.png?v=20260817-1)
+[![MARS Lab expression mode displaying the exact principal sixth root of 117 plus 44i as Cartesian surds](images/mars-lab/expression.png?v=20260817-2)](images/mars-lab/expression.png?v=20260817-2)
 
 Function cards use MARS syntax rather than C syntax. A full stop terminates a
 statement, `.` within a statement denotes multiplication, and `/` is printed
 without surrounding spaces. Constants use `const`; arrays use `array`; and a
 short repeated constant may receive a descriptive name such as `$[sqrt(3)]`.
+The complete descriptive name, including `$[` and `]`, uses the subdued
+off-white italic styling of variable and constant names.
 The syntax colouring distinguishes keywords, functions, variables, numbers and
 comments, but does not alter the copyable Function text.
 

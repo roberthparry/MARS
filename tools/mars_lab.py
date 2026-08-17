@@ -2917,6 +2917,7 @@ INDEX_HTML = r"""<!doctype html>
 
     .function-token-variable {
       color: #c7d0cb;
+      font-style: italic;
     }
 
     .function-token-array {
@@ -9414,10 +9415,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
               depth -= 1;
             next += 1;
           }
-          appendFunctionToken(fragment, '$', 'function-token-keyword');
-          appendFunctionToken(fragment, '[', 'function-token-keyword');
-          appendFunctionToken(fragment, source.slice(index + 2, next - 1), 'function-token-variable');
-          appendFunctionToken(fragment, ']', 'function-token-keyword');
+          appendFunctionToken(fragment, source.slice(index, next), 'function-token-variable');
           index = next;
           continue;
         }

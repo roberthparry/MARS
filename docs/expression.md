@@ -841,6 +841,9 @@ Before emitting the return statement, Function style traverses the expression
 DAG and gives shared non-trivial nodes intermediate names in dependency order.
 Short, recognisable constant operations use a compact semantic name such as
 `$[sqrt(2)]` or `$[root(2,4)]`; spaces are never retained inside `$[...]`.
+The complete `$[...]` name is rendered in the same subdued off-white italics
+as other variable and constant names; its punctuation is part of the name, not
+separately coloured syntax.
 Other constant intermediates use `c1`, `c2`, and so on, while intermediates
 that depend on variables use `v1`, `v2`, and so on. This keeps repeated work
 visible and makes the generated function suitable for later differentiation.
