@@ -140,6 +140,8 @@ MARS Lab running at http://localhost:<port>/
 
 `make mars-lab-restart` stops a Lab process belonging to the current user,
 rebuilds the helper when necessary and launches it again.
+The direct `tools/mars-lab` launcher performs the same helper build check
+before starting the browser client.
 
 That installer now prompts for a password to protect the private jurisdiction
 database, stores the resulting configuration in

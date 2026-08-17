@@ -54,6 +54,16 @@ static bool replace_literal_once_owned(char **text, const char *needle, const ch
     return true;
 }
 
+static void normalise_double_minus_owned(char **text)
+{
+    if (!text || !*text)
+        return;
+    while (strstr(*text, " -  -") && replace_literal_once_owned(text, " -  -", " + ")) {
+    }
+    while (strstr(*text, " - -") && replace_literal_once_owned(text, " - -", " + ")) {
+    }
+}
+
 static char *expr_text_dup(const expr_t *expr, style_t style)
 {
     return expr_to_string(expr, style);
@@ -64,6 +74,46 @@ static char *expr_TeX_body_dup(const expr_t *expr)
     char *body = expr_to_TeX_body_wrapped(expr, 280u);
 
     return body ? body : expr_text_dup(expr, style_LATEX);
+}
+
+static bool expr_scaled_cartesian_parts(const expr_t *expr, const expr_t **scale_out, const expr_t **real_out,
+                                        const expr_t **imaginary_out, int *imaginary_sign_out);
+
+static bool expr_contains_imaginary_unit_for_display(const expr_t *expr)
+{
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+    number_t value = (number_t){0};
+    bool matched = false;
+
+    if (!expr)
+        return false;
+    value = expr_eval(expr);
+    matched = num_eq(value, NUM_I) || num_eq(value, NUM_NEG_I);
+    num_destroy(&value);
+    if (matched)
+        return true;
+    if (!expr_child_exprs(expr, &left, &right))
+        return false;
+    return expr_contains_imaginary_unit_for_display(left) || expr_contains_imaginary_unit_for_display(right);
+}
+
+static bool expr_is_cartesian_sum_with_unit_imaginary_for_display(const expr_t *expr)
+{
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+    number_t value = (number_t){0};
+    bool subtract = false;
+    bool matched;
+
+    if (!expr_match_add_sub_expr(expr, &left, &right, &subtract))
+        return false;
+    (void)left;
+    (void)subtract;
+    value = expr_eval(right);
+    matched = num_eq(value, NUM_I) || num_eq(value, NUM_NEG_I);
+    num_destroy(&value);
+    return matched;
 }
 
 static expr_t *display_polynomial_simplified(const expr_t *expr, const expr_t *wrt)
@@ -102,10 +152,104 @@ static expr_t *display_polynomial_simplified(const expr_t *expr, const expr_t *w
     result = display ? display : expr_simplify(expr);
     beautified = result ? expr_beautify_presimplified(result) : NULL;
     if (beautified) {
+        expr_t *reciprocal_cartesian =
+            wrt ? expr_beautify_symbolic_complex_square_root_reciprocal_for_display(beautified) : NULL;
+        const expr_t *reciprocal_source = reciprocal_cartesian ? reciprocal_cartesian : beautified;
+        expr_t *rotated_cartesian =
+            wrt ? expr_beautify_imaginary_cartesian_product_for_display(reciprocal_source) : NULL;
+        const expr_t *beautified_source = rotated_cartesian ? rotated_cartesian : reciprocal_source;
+        expr_t *cartesian_unary = expr_complex_unary_cartesian_for_display(beautified_source);
+        const expr_t *cartesian_source = cartesian_unary ? cartesian_unary : beautified_source;
+        const expr_t *cartesian_scale = NULL;
+        const expr_t *cartesian_real = NULL;
+        const expr_t *cartesian_imaginary = NULL;
+        int cartesian_imaginary_sign = 1;
+        bool already_cartesian =
+            expr_scaled_cartesian_parts(beautified_source, &cartesian_scale, &cartesian_real, &cartesian_imaginary,
+                                        &cartesian_imaginary_sign) ||
+            expr_is_cartesian_sum_with_unit_imaginary_for_display(beautified_source);
+        expr_t *cartesian_separated =
+            (!cartesian_unary && !already_cartesian) ? expr_separate_cartesian_for_display(cartesian_source) : NULL;
+        expr_t *cartesian_expanded = NULL;
+
+        if (!cartesian_separated && !cartesian_unary && !already_cartesian &&
+            expr_contains_imaginary_unit_for_display(cartesian_source)) {
+            cartesian_expanded = expr_display_expanded(cartesian_source);
+            if (cartesian_expanded)
+                cartesian_separated = expr_separate_cartesian_for_display(cartesian_expanded);
+        }
+
         expr_free(result);
-        result = beautified;
+        if (cartesian_unary || already_cartesian) {
+            result = expr_clone(cartesian_source);
+            expr_free(cartesian_separated);
+            expr_free(cartesian_expanded);
+        } else if (cartesian_separated) {
+            result = cartesian_separated;
+            expr_free(cartesian_expanded);
+        } else if (cartesian_expanded) {
+            result = cartesian_expanded;
+        } else {
+            result = expr_clone(cartesian_source);
+        }
+        expr_free(cartesian_unary);
+        expr_free(rotated_cartesian);
+        expr_free(reciprocal_cartesian);
+        expr_free(beautified);
     }
     return result;
+}
+
+static expr_t *remove_named_addend_for_display(const expr_t *expr, const char *name, expr_t **removed)
+{
+    const expr_t *left_source = NULL;
+    const expr_t *right_source = NULL;
+    const expr_t *negated_source = NULL;
+    expr_t *left = NULL;
+    expr_t *right = NULL;
+    expr_t *out = NULL;
+    bool subtract = false;
+
+    if (!expr || !name || !removed)
+        return NULL;
+    if (!*removed && expr_is_named_const(expr) && expr_symbol_name(expr) &&
+        strcmp(expr_symbol_name(expr), name) == 0) {
+        *removed = expr_clone(expr);
+        return NULL;
+    }
+    if (expr_match_neg_expr(expr, &negated_source)) {
+        left = remove_named_addend_for_display(negated_source, name, removed);
+        out = left ? expr_neg(left) : NULL;
+        expr_free(left);
+        return out;
+    }
+    if (!expr_match_add_sub_expr(expr, &left_source, &right_source, &subtract))
+        return expr_clone(expr);
+
+    left = remove_named_addend_for_display(left_source, name, removed);
+    right = remove_named_addend_for_display(right_source, name, removed);
+    if (left && right)
+        out = subtract ? expr_sub(left, right) : expr_add(left, right);
+    else if (left)
+        out = expr_clone(left);
+    else if (right)
+        out = subtract ? expr_neg(right) : expr_clone(right);
+    expr_free(right);
+    expr_free(left);
+    return out;
+}
+
+static expr_t *move_named_addend_last_for_display(const expr_t *expr, const char *name)
+{
+    expr_t *constant = NULL;
+    expr_t *rest = remove_named_addend_for_display(expr, name, &constant);
+    expr_t *out = NULL;
+
+    if (constant)
+        out = rest ? expr_add(rest, constant) : expr_clone(constant);
+    expr_free(rest);
+    expr_free(constant);
+    return out;
 }
 
 static char *trim_ascii_in_place(char *text)
@@ -770,6 +914,197 @@ static expr_t *expr_root_turn_trig_display(long root_index, long order, bool sin
     return display;
 }
 
+static unsigned long root_display_gcd(unsigned long a, unsigned long b)
+{
+    while (b != 0u) {
+        unsigned long remainder = a % b;
+
+        a = b;
+        b = remainder;
+    }
+    return a ? a : 1u;
+}
+
+static bool expr_complex_argument_pi_ratio(const expr_t *expr, long *numerator_out, unsigned long *denominator_out)
+{
+    number_t value = (number_t){0};
+    number_t real = (number_t){0};
+    number_t imaginary = (number_t){0};
+    number_t ratio = (number_t){0};
+    number_t three = (number_t){0};
+    number_t sqrt_three_over_three = (number_t){0};
+    number_t negative_sqrt_three = (number_t){0};
+    number_t negative_sqrt_three_over_three = (number_t){0};
+    long numerator = 0L;
+    unsigned long denominator = 1u;
+    bool matched = false;
+
+    if (!expr || !numerator_out || !denominator_out)
+        goto cleanup;
+    value = expr_eval(expr);
+    if (!num_is_finite(value) || num_is_real(value))
+        goto cleanup;
+    real = num_real_part(value);
+    imaginary = num_imag_part(value);
+    if (num_is_zero(real)) {
+        numerator = num_get_sign(imaginary) < 0 ? -1L : 1L;
+        denominator = 2u;
+        matched = true;
+        goto normalise;
+    }
+    ratio = num_div(imaginary, real);
+    three = num_create_from_long(3L);
+    sqrt_three_over_three = num_div(NUM_SQRT3, three);
+    negative_sqrt_three = num_neg(NUM_SQRT3);
+    negative_sqrt_three_over_three = num_neg(sqrt_three_over_three);
+    if (num_eq(ratio, NUM_NEG_ONE)) {
+        numerator = -1L;
+        denominator = 4u;
+    } else if (num_eq(ratio, negative_sqrt_three_over_three)) {
+        numerator = -1L;
+        denominator = 6u;
+    } else if (num_eq(ratio, NUM_ZERO)) {
+        numerator = 0L;
+        denominator = 1u;
+    } else if (num_eq(ratio, sqrt_three_over_three)) {
+        numerator = 1L;
+        denominator = 6u;
+    } else if (num_eq(ratio, NUM_ONE)) {
+        numerator = 1L;
+        denominator = 4u;
+    } else if (num_eq(ratio, NUM_SQRT3)) {
+        numerator = 1L;
+        denominator = 3u;
+    } else if (num_eq(ratio, negative_sqrt_three)) {
+        numerator = -1L;
+        denominator = 3u;
+    } else {
+        goto cleanup;
+    }
+    if (num_get_sign(real) < 0)
+        numerator += num_get_sign(imaginary) < 0 ? -(long)denominator : (long)denominator;
+
+normalise:
+    while (numerator < 0L)
+        numerator += 2L * (long)denominator;
+    while (numerator >= 2L * (long)denominator)
+        numerator -= 2L * (long)denominator;
+    *numerator_out = numerator;
+    *denominator_out = denominator;
+    matched = true;
+
+cleanup:
+    num_destroy(&negative_sqrt_three_over_three);
+    num_destroy(&negative_sqrt_three);
+    num_destroy(&sqrt_three_over_three);
+    num_destroy(&three);
+    num_destroy(&ratio);
+    num_destroy(&imaginary);
+    num_destroy(&real);
+    num_destroy(&value);
+    return matched;
+}
+
+static void print_pi_ratio_TeX(FILE *stream, long numerator, unsigned long denominator)
+{
+    unsigned long magnitude;
+    unsigned long divisor;
+
+    if (!stream)
+        return;
+    magnitude = (unsigned long)(numerator < 0L ? -numerator : numerator);
+    divisor = root_display_gcd(magnitude, denominator);
+    numerator /= (long)divisor;
+    denominator /= divisor;
+    if (numerator == 0L) {
+        fputs("0", stream);
+    } else if (denominator == 1u) {
+        if (numerator == -1L)
+            fputs("-", stream);
+        else if (numerator != 1L)
+            fprintf(stream, "%ld", numerator);
+        fputs("\\pi", stream);
+    } else {
+        fputs("\\frac{", stream);
+        if (numerator == -1L)
+            fputs("-", stream);
+        else if (numerator != 1L)
+            fprintf(stream, "%ld", numerator);
+        fprintf(stream, "\\pi}{%lu}", denominator);
+    }
+}
+
+static char *expr_polar_cartesian_root_TeX_dup(const expr_t *base, long root_index, long order)
+{
+    number_t value = (number_t){0};
+    number_t real = (number_t){0};
+    number_t imaginary = (number_t){0};
+    number_t real_squared = (number_t){0};
+    number_t imaginary_squared = (number_t){0};
+    number_t modulus_squared = (number_t){0};
+    expr_t *modulus_squared_expr = NULL;
+    expr_t *root_order = NULL;
+    expr_t *radial = NULL;
+    expr_t *radial_display = NULL;
+    char *radial_TeX = NULL;
+    char *display_TeX = NULL;
+    FILE *stream = NULL;
+    size_t display_TeX_size = 0u;
+    long phase_numerator;
+    unsigned long phase_denominator;
+    long angle_numerator;
+    unsigned long angle_denominator;
+
+    if (!base || root_index < 0L || order < 2L || order > LONG_MAX / 2L ||
+        !expr_complex_argument_pi_ratio(base, &phase_numerator, &phase_denominator))
+        goto cleanup;
+    if (phase_denominator > ULONG_MAX / (unsigned long)order ||
+        root_index > (LONG_MAX - phase_numerator) / (2L * (long)phase_denominator))
+        goto cleanup;
+    value = expr_eval(base);
+    real = num_real_part(value);
+    imaginary = num_imag_part(value);
+    real_squared = num_mul(real, real);
+    imaginary_squared = num_mul(imaginary, imaginary);
+    modulus_squared = num_add(real_squared, imaginary_squared);
+    modulus_squared_expr = expr_new_const(modulus_squared);
+    root_order = expr_const_long(2L * order);
+    radial = (modulus_squared_expr && root_order) ? expr_root(modulus_squared_expr, root_order) : NULL;
+    radial_display = radial ? expr_beautify(radial) : NULL;
+    radial_TeX = radial_display ? expr_TeX_body_dup(radial_display) : NULL;
+    if (!radial_TeX)
+        goto cleanup;
+
+    angle_numerator = phase_numerator + 2L * root_index * (long)phase_denominator;
+    angle_denominator = phase_denominator * (unsigned long)order;
+    stream = open_memstream(&display_TeX, &display_TeX_size);
+    if (!stream)
+        goto cleanup;
+    fprintf(stream, "%s\\mkern-2mu \\cos\\left(", radial_TeX);
+    print_pi_ratio_TeX(stream, angle_numerator, angle_denominator);
+    fprintf(stream, "\\right) + i\\mkern-2mu %s\\mkern-2mu \\sin\\left(", radial_TeX);
+    print_pi_ratio_TeX(stream, angle_numerator, angle_denominator);
+    fputs("\\right)", stream);
+    fclose(stream);
+    stream = NULL;
+
+cleanup:
+    if (stream)
+        fclose(stream);
+    free(radial_TeX);
+    expr_free(radial_display);
+    expr_free(radial);
+    expr_free(root_order);
+    expr_free(modulus_squared_expr);
+    num_destroy(&modulus_squared);
+    num_destroy(&imaginary_squared);
+    num_destroy(&real_squared);
+    num_destroy(&imaginary);
+    num_destroy(&real);
+    num_destroy(&value);
+    return display_TeX;
+}
+
 static expr_t *expr_reorder_positive_sum_for_display(const expr_t *expr)
 {
     const expr_t *left;
@@ -968,6 +1303,61 @@ cleanup:
     return display_TeX;
 }
 
+static char *expr_branch_family_TeX_dup(const expr_t *seed, long order)
+{
+    char *seed_TeX = NULL;
+    char *family_TeX = NULL;
+    size_t family_TeX_size = 0u;
+    FILE *stream = NULL;
+
+    if (!seed || order < 2L)
+        return NULL;
+    seed_TeX = expr_TeX_body_dup(seed);
+    if (!seed_TeX)
+        return NULL;
+    stream = open_memstream(&family_TeX, &family_TeX_size);
+    if (!stream)
+        goto cleanup;
+    fputs("\\begin{aligned}[t]", stream);
+    for (long root_index = 0L; root_index < order; ++root_index) {
+        char *branch_TeX = NULL;
+
+        if (root_index > 0L)
+            fputs("\\\\[0.65em]", stream);
+        fputs("&", stream);
+        if (root_index == 0L) {
+            branch_TeX = xstrdup_local(seed_TeX);
+        } else if (order == 2L) {
+            branch_TeX = expr_quarter_turn_root_TeX_dup(seed, 2L);
+            if (!branch_TeX) {
+                expr_t *negative = expr_distribute_negative_for_display(seed);
+
+                branch_TeX = negative ? expr_TeX_body_dup(negative) : NULL;
+                expr_free(negative);
+            }
+        } else if (order == 4L) {
+            branch_TeX = expr_quarter_turn_root_TeX_dup(seed, root_index * (4L / order));
+        } else {
+            branch_TeX = expr_rotated_cartesian_root_TeX_dup(seed, root_index, order);
+        }
+        if (branch_TeX) {
+            fputs(branch_TeX, stream);
+        } else {
+            fprintf(stream, "\\left(%s\\right)e^{\\frac{%ld\\pi i}{%ld}}", seed_TeX, 2L * root_index, order);
+        }
+        free(branch_TeX);
+    }
+    fputs("\\end{aligned}", stream);
+    fclose(stream);
+    stream = NULL;
+
+cleanup:
+    if (stream)
+        fclose(stream);
+    free(seed_TeX);
+    return family_TeX;
+}
+
 static void print_explicit_root_family(const expr_t *expr, int precision)
 {
     number_t seed = (number_t){0};
@@ -986,6 +1376,11 @@ static void print_explicit_root_family(const expr_t *expr, int precision)
     size_t root_TeX_size = 0u;
     FILE *TeX_stream;
     bool exact_seed;
+    bool seed_has_cartesian_parts;
+    const expr_t *seed_scale;
+    const expr_t *seed_real;
+    const expr_t *seed_imaginary;
+    int seed_imaginary_sign;
 
     if (!explicit_reciprocal_power(expr, &base, &order)) {
         num_destroy(&seed);
@@ -1004,6 +1399,8 @@ static void print_explicit_root_family(const expr_t *expr, int precision)
     if (!seed_TeX)
         goto cleanup;
     seed_value = expr_eval(seed_expr);
+    seed_has_cartesian_parts = expr_scaled_cartesian_parts(seed_expr, &seed_scale, &seed_real, &seed_imaginary,
+                                                           &seed_imaginary_sign);
 
     if (order == 2L) {
         negative_seed = expr_distribute_negative_for_display(seed_expr);
@@ -1021,15 +1418,20 @@ static void print_explicit_root_family(const expr_t *expr, int precision)
     for (long root_index = 0L; root_index < order; ++root_index) {
         char *quarter_turn_TeX = NULL;
         char *cartesian_TeX = NULL;
+        char *polar_cartesian_TeX = NULL;
 
         if (root_index > 0L)
             fputs("\\\\[0.65em]", TeX_stream);
         fputs("&", TeX_stream);
-        if (order == 4L)
-            quarter_turn_TeX = expr_quarter_turn_root_TeX_dup(seed_expr, root_index);
-        else if (root_index > 0L && order > 2L)
+        if (!exact_seed && !seed_has_cartesian_parts)
+            polar_cartesian_TeX = expr_polar_cartesian_root_TeX_dup(base, root_index, order);
+        if (!polar_cartesian_TeX && (order == 2L || order == 4L))
+            quarter_turn_TeX = expr_quarter_turn_root_TeX_dup(seed_expr, root_index * (4L / order));
+        else if (!polar_cartesian_TeX && root_index > 0L && order > 2L)
             cartesian_TeX = expr_rotated_cartesian_root_TeX_dup(seed_expr, root_index, order);
-        if (quarter_turn_TeX) {
+        if (polar_cartesian_TeX) {
+            fputs(polar_cartesian_TeX, TeX_stream);
+        } else if (quarter_turn_TeX) {
             fputs(quarter_turn_TeX, TeX_stream);
         } else if (cartesian_TeX) {
             fputs(cartesian_TeX, TeX_stream);
@@ -1046,6 +1448,7 @@ static void print_explicit_root_family(const expr_t *expr, int precision)
             fprintf(TeX_stream, "\\left(%s\\right)e^{\\frac{%ld\\pi i}{%ld}}", seed_TeX, 2L * root_index,
                     order);
         }
+        free(polar_cartesian_TeX);
         free(cartesian_TeX);
         free(quarter_turn_TeX);
     }
@@ -1326,6 +1729,7 @@ int main(int argc, char **argv)
     char *deriv_text = NULL;
     char *deriv_func_text = NULL;
     char *deriv_TeX_text = NULL;
+    char *deriv_values_text = NULL;
     char *integral_text = NULL;
     char *integral_func_text = NULL;
     char *integral_TeX_text = NULL;
@@ -1374,10 +1778,8 @@ int main(int argc, char **argv)
     if (bindings)
         wrt = expr_bindings_get(bindings, wrt_name);
     wrt_is_variable = wrt && expr_is_variable(wrt);
-    if (evaluate_request) {
-        display_expr = display_polynomial_simplified(expr, wrt_is_variable ? wrt : NULL);
-        display_expr_owned = display_expr != NULL;
-    }
+    display_expr = display_polynomial_simplified(expr, wrt_is_variable ? wrt : NULL);
+    display_expr_owned = display_expr != NULL;
     if (!display_expr)
         display_expr = expr;
 
@@ -1407,7 +1809,10 @@ int main(int argc, char **argv)
     }
 
     if (wrt_is_variable && derivative_request) {
-        deriv = expr_create_deriv(expr, wrt);
+        expr_t *derivative_root_base = NULL;
+        long derivative_root_order = 0L;
+
+        deriv = expr_create_deriv(display_expr, wrt);
         if (!deriv) {
             fprintf(stderr, "Failed to build derivative with respect to %s\n", wrt_name);
             rc = 1;
@@ -1419,14 +1824,36 @@ int main(int argc, char **argv)
         } else {
             display_deriv = deriv;
         }
-        deriv_text = expr_text_dup(display_deriv, style_EXPRESSION);
-        deriv_func_text = expr_text_dup(display_deriv, style_FUNCTION);
-        deriv_TeX_text = expr_TeX_body_dup(display_deriv);
+        if (explicit_reciprocal_power(expr, &derivative_root_base, &derivative_root_order)) {
+            number_t derivative_seed_value;
+
+            if (!root_family_texts_dup(display_deriv, derivative_root_order, &deriv_text, &deriv_func_text)) {
+                fprintf(stderr, "Failed to build derivative branch family\n");
+                expr_free(derivative_root_base);
+                rc = 1;
+                goto cleanup;
+            }
+            deriv_TeX_text = expr_branch_family_TeX_dup(display_deriv, derivative_root_order);
+            derivative_seed_value = expr_eval(deriv);
+            deriv_values_text = numeric_root_family_dup(derivative_seed_value, derivative_root_order, precision);
+            num_destroy(&derivative_seed_value);
+        } else {
+            deriv_text = expr_text_dup(display_deriv, style_EXPRESSION);
+            deriv_func_text = expr_text_dup(display_deriv, style_FUNCTION);
+            deriv_TeX_text = expr_TeX_body_dup(display_deriv);
+        }
+        normalise_double_minus_owned(&deriv_text);
+        normalise_double_minus_owned(&deriv_func_text);
+        normalise_double_minus_owned(&deriv_TeX_text);
+        expr_free(derivative_root_base);
         printf("derivative  d/d%s = %s\n", wrt_name, deriv_text ? deriv_text : "(null)");
         printf("derivative_function  %s\n", deriv_func_text ? deriv_func_text : "(null)");
         printf("derivative_TeX  %s\n", deriv_TeX_text ? deriv_TeX_text : "");
         print_expression_bindings("derivative_binding", deriv_text, precision);
-        print_owned_number("d value", expr_eval(deriv), precision);
+        if (deriv_values_text)
+            printf("d values     %s\n", deriv_values_text);
+        else
+            print_owned_number("d value", expr_eval(deriv), precision);
     } else if (derivative_request) {
         printf("derivative  no variable binding named '%s'\n", wrt_name);
     }
@@ -1437,7 +1864,30 @@ int main(int argc, char **argv)
             if (!integral) {
                 printf("integral  no symbolic integral with respect to %s\n", wrt_name);
             } else {
-                display_integral = integral;
+                const expr_t *family_left = NULL;
+                const expr_t *family_right = NULL;
+                const char *integration_constant_name = NULL;
+                bool family_subtract = false;
+
+                if (expr_match_add_sub_expr(integral, &family_left, &family_right, &family_subtract) &&
+                    !family_subtract && expr_is_named_const(family_right))
+                    integration_constant_name = expr_symbol_name(family_right);
+                (void)family_left;
+
+                display_integral = display_polynomial_simplified(integral, wrt);
+                if (!display_integral) {
+                    display_integral = integral;
+                }
+                if (integration_constant_name) {
+                    expr_t *ordered_integral =
+                        move_named_addend_last_for_display(display_integral, integration_constant_name);
+
+                    if (ordered_integral) {
+                        if (display_integral != integral)
+                            expr_free(display_integral);
+                        display_integral = ordered_integral;
+                    }
+                }
                 integral_text = expr_text_dup(display_integral, style_EXPRESSION);
                 integral_func_text = expr_text_dup(display_integral, style_FUNCTION);
                 integral_TeX_text = expr_TeX_body_dup(display_integral);
@@ -1461,6 +1911,7 @@ cleanup:
     free(deriv_TeX_text);
     free(deriv_func_text);
     free(deriv_text);
+    free(deriv_values_text);
     free(TeX_text);
     free(func_text);
     free(unbound_text);

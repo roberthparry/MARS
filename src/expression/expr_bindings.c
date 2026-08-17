@@ -1279,10 +1279,12 @@ expr_t *expr_explicit_root_base(const expr_t *expr, long *order_out)
     if (!expr || !order_out)
         return NULL;
 
-    if (expr->binding_expr && expr->binding_expr->kind == EXPR_BINDING_EXPR_BINARY_OP &&
-        expr->binding_expr->u.binary_op.ops == &ops_pow) {
-        if (!expr_binding_expr_number_value(expr->binding_expr->u.binary_op.right, &exponent))
+    if (expr->binding_expr) {
+        if (expr->binding_expr->kind != EXPR_BINDING_EXPR_BINARY_OP ||
+            expr->binding_expr->u.binary_op.ops != &ops_pow ||
+            !expr_binding_expr_number_value(expr->binding_expr->u.binary_op.right, &exponent)) {
             goto cleanup;
+        }
         base = expr_binding_expr_eval_expr(expr->binding_expr->u.binary_op.left);
         if (base) {
             expr_binding_expr_free(base->binding_expr);

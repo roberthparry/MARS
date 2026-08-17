@@ -4,7 +4,8 @@ This directory contains the longer module documentation for MARS.
 
 ## Getting Started
 
-- [MARS Lab](./mars-lab.md)
+- [MARS Lab](./mars-lab.md) — browser workspace with Cartesian complex
+  expression and calculus results
 - [Building](./building.md)
 - [Testing](./testing.md)
 - [Benchmarks](./benchmarks.md)
@@ -23,8 +24,8 @@ This directory contains the longer module documentation for MARS.
 - [`equation_t`](./equation.md) — parsed equations with symbolic isolation and numeric fallback
 - [`diffequ_t`](./diffequation.md) — ODE/PDE parsing and symbolic solving, including selected linearisations and symmetry metadata
 - [`expr_t`](./expression.md) — differentiable expression DAGs, symbolic
-  derivatives, numeric reverse-mode gradients, symbolic integration and helper
-  APIs
+  derivatives, numeric reverse-mode gradients, Cartesian complex presentation,
+  symbolic integration and helper APIs
 - [`almanac_t`](./almanac.md) — ephemeris-backed SHA/declination lookups and snapshot queries
 - [`datetime_t`](./datetime.md) — civil and astronomical date/time utilities
 - [`jurisdiction_t`](./jurisdiction.md) — jurisdiction-aware holiday and working-day queries

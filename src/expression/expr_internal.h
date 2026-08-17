@@ -686,6 +686,7 @@ expr_t *expr_simplify_try_lambert_exp(expr_t *arg);
 expr_t *expr_simplify_try_lambert_argument(expr_t *arg);
 expr_t *expr_simplify_try_lambert_product(expr_t *a, expr_t *b);
 expr_t *expr_simplify_try_i_unit_product(expr_t *a, expr_t *b);
+expr_t *expr_simplify_try_complex_unary_cartesian(const expr_t *op, expr_t *arg);
 expr_t *expr_simplify_try_imag_trig_bridge(const expr_t *op, expr_t *arg);
 bool expr_match_double_argument(const expr_t *expr, const expr_t *arg);
 expr_t *expr_try_trig_pythagorean_identity(const addend_t *terms, size_t n, number_t c_const, number_t common_coeff);

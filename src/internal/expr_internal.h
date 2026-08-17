@@ -18,6 +18,38 @@ typedef enum expr_integration_bound_kind {
     EXPR_INTEGRATION_BOUND_INDEFINITE
 } expr_integration_bound_kind_t;
 
+/**
+ * @brief Return an owning Cartesian display form without factoring out a shared real scale.
+ *
+ * @param expr Expression to separate into real and imaginary terms.
+ * @return Owning separated expression, or `NULL` when no Cartesian separation is available.
+ */
+expr_t *expr_separate_cartesian_for_display(const expr_t *expr);
+
+/**
+ * @brief Expand supported unary functions of Cartesian arguments recursively for display.
+ *
+ * @param expr Expression whose supported unary nodes should be expanded.
+ * @return Owning Cartesian expression, or `NULL` when no display expansion applies.
+ */
+expr_t *expr_complex_unary_cartesian_for_display(const expr_t *expr);
+
+/**
+ * @brief Rotate a top-level Cartesian product by an exact imaginary factor for display.
+ *
+ * @param expr Expression whose Cartesian product should be rotated.
+ * @return Owning rotated expression, or `NULL` when the rewrite does not apply.
+ */
+expr_t *expr_beautify_imaginary_cartesian_product_for_display(const expr_t *expr);
+
+/**
+ * @brief Write a symbolic reciprocal square root in Cartesian surd form for display.
+ *
+ * @param expr Expression to rewrite.
+ * @return Owning Cartesian reciprocal-root expression, or `NULL` when the rewrite does not apply.
+ */
+expr_t *expr_beautify_symbolic_complex_square_root_reciprocal_for_display(const expr_t *expr);
+
 typedef enum {
     EXPR_PATTERN_UNARY_EXP,
     EXPR_PATTERN_UNARY_LOG,

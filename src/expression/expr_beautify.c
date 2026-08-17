@@ -1,6 +1,7 @@
 #include <errno.h>
 #include <float.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdlib.h>
 
 #define MARS_EXPR_INTERNAL_ACCESS
@@ -1100,6 +1101,167 @@ cleanup:
 }
 
 static void expr_beautify_collect_product_factors(const expr_t *expr, const expr_t ***factors, size_t *count,
+                                                   size_t *capacity);
+
+static expr_t *expr_beautify_extract_imaginary_product_coefficient(const expr_t *expr, int *sign_out)
+{
+    const expr_t *numerator;
+    const expr_t *denominator;
+    const expr_t **factors = NULL;
+    expr_t *coefficient = NULL;
+    size_t count = 0u;
+    size_t capacity = 0u;
+    size_t imaginary_index = SIZE_MAX;
+    int sign = 1;
+
+    if (!expr || !sign_out)
+        goto cleanup;
+    if (expr_match_binary_op(expr, EXPR_KIND_DIV, &numerator, &denominator)) {
+        expr_t *quotient;
+
+        coefficient = expr_beautify_extract_imaginary_product_coefficient(numerator, sign_out);
+        quotient = coefficient ? expr_div(coefficient, denominator) : NULL;
+        expr_free(coefficient);
+        coefficient = quotient;
+        goto cleanup;
+    }
+    expr_beautify_collect_product_factors(expr, &factors, &count, &capacity);
+    for (size_t index = 0u; index < count; ++index) {
+        int factor_sign;
+
+        if (imaginary_index == SIZE_MAX && expr_beautify_i_unit_sign(factors[index], &factor_sign)) {
+            imaginary_index = index;
+            sign = factor_sign;
+        }
+    }
+    if (imaginary_index == SIZE_MAX)
+        goto cleanup;
+    for (size_t index = 0u; index < count; ++index) {
+        expr_t *factor;
+
+        if (index == imaginary_index)
+            continue;
+        factor = expr_clone(factors[index]);
+        if (coefficient) {
+            expr_t *product = expr_mul(coefficient, factor);
+
+            expr_free(factor);
+            expr_free(coefficient);
+            coefficient = product;
+        } else {
+            coefficient = factor;
+        }
+    }
+    if (!coefficient)
+        coefficient = expr_const_one();
+    *sign_out = sign;
+
+cleanup:
+    free((void *)factors);
+    return coefficient;
+}
+
+/* Rotate an explicit Cartesian product by its exact imaginary factor for presentation. */
+expr_t *expr_beautify_imaginary_cartesian_product_for_display(const expr_t *expr)
+{
+    const expr_t **factors = NULL;
+    const expr_t *cartesian_real = NULL;
+    const expr_t *cartesian_imaginary = NULL;
+    const expr_t *cartesian_denominator = NULL;
+    expr_t *owned_cartesian_imaginary = NULL;
+    expr_t *outer_magnitude = NULL;
+    expr_t *scale = NULL;
+    expr_t *real_term = NULL;
+    expr_t *imaginary_coefficient = NULL;
+    expr_t *imaginary_unit = NULL;
+    expr_t *imaginary_term = NULL;
+    expr_t *sum = NULL;
+    expr_t *rewrite = NULL;
+    expr_t *rotated_numerator = NULL;
+    int outer_sign = 1;
+    int inner_sign = 1;
+    size_t count = 0u;
+    size_t capacity = 0u;
+    size_t imaginary_index = SIZE_MAX;
+    size_t cartesian_index = SIZE_MAX;
+
+    if (expr_match_binary_op(expr, EXPR_KIND_DIV, &cartesian_real, &cartesian_imaginary)) {
+        rotated_numerator = expr_beautify_imaginary_cartesian_product_for_display(cartesian_real);
+        rewrite = rotated_numerator ? expr_div(rotated_numerator, cartesian_imaginary) : NULL;
+        goto cleanup;
+    }
+    cartesian_real = NULL;
+    cartesian_imaginary = NULL;
+    if (!expr_is_op(expr, &ops_mul))
+        goto cleanup;
+    expr_beautify_collect_product_factors(expr, &factors, &count, &capacity);
+    for (size_t index = 0u; index < count; ++index) {
+        expr_t *magnitude;
+        const expr_t *candidate = factors[index];
+        const expr_t *left;
+        const expr_t *right;
+        const expr_t *denominator = NULL;
+        int sign;
+        bool subtract;
+
+        magnitude = expr_beautify_extract_imaginary_product_coefficient(factors[index], &sign);
+        if (magnitude && imaginary_index == SIZE_MAX) {
+            imaginary_index = index;
+            outer_magnitude = magnitude;
+            outer_sign = sign;
+            continue;
+        }
+        expr_free(magnitude);
+        if (expr_match_binary_op(candidate, EXPR_KIND_DIV, &left, &denominator))
+            candidate = left;
+        if (!(subtract = expr_match_binary_op(candidate, EXPR_KIND_SUB, &left, &right)) &&
+            !expr_match_binary_op(candidate, EXPR_KIND_ADD, &left, &right))
+            continue;
+        owned_cartesian_imaginary = expr_beautify_extract_imaginary_product_coefficient(right, &sign);
+        if (!owned_cartesian_imaginary)
+            continue;
+        cartesian_imaginary = owned_cartesian_imaginary;
+        cartesian_index = index;
+        cartesian_real = left;
+        cartesian_denominator = denominator;
+        inner_sign = subtract ? -sign : sign;
+    }
+    if (imaginary_index == SIZE_MAX || cartesian_index == SIZE_MAX)
+        goto cleanup;
+    scale = expr_clone(outer_magnitude);
+    for (size_t index = 0u; index < count && scale; ++index) {
+        if (index == imaginary_index || index == cartesian_index)
+            continue;
+        scale = expr_mul_simplify_owned(scale, expr_clone(factors[index]));
+    }
+    if (scale && cartesian_denominator)
+        scale = expr_div_simplify_owned(scale, expr_clone(cartesian_denominator));
+    real_term = expr_clone(cartesian_imaginary);
+    if (outer_sign * inner_sign > 0)
+        real_term = expr_negate_owned(real_term);
+    imaginary_coefficient = expr_clone(cartesian_real);
+    imaginary_unit = expr_new_const(NUM_I);
+    imaginary_term = imaginary_unit && imaginary_coefficient ? expr_mul(imaginary_unit, imaginary_coefficient) : NULL;
+    if (outer_sign < 0)
+        imaginary_term = expr_negate_owned(imaginary_term);
+    sum = real_term && imaginary_term ? expr_add(real_term, imaginary_term) : NULL;
+    rewrite = scale && sum ? expr_mul(scale, sum) : NULL;
+
+cleanup:
+    free((void *)factors);
+    expr_free(rotated_numerator);
+    expr_free(sum);
+    expr_free(imaginary_term);
+    expr_free(imaginary_unit);
+    expr_free(imaginary_coefficient);
+    expr_free(real_term);
+    expr_free(scale);
+    expr_free(outer_magnitude);
+    expr_free(owned_cartesian_imaginary);
+    return rewrite;
+}
+
+static void expr_beautify_collect_product_factors(const expr_t *expr, const expr_t ***factors, size_t *count,
                                                    size_t *capacity)
 {
     if (!expr || !factors || !count || !capacity)
@@ -1250,6 +1412,187 @@ cleanup:
     num_destroy(&real);
     num_destroy(&value);
     return square;
+}
+
+/* Write a symbolic reciprocal square root in Cartesian surd form. */
+static expr_t *expr_beautify_symbolic_complex_square_root_reciprocal_direct(const expr_t *expr)
+{
+    const expr_t *argument;
+    const expr_t *left;
+    const expr_t *right;
+    const expr_t *real_part = NULL;
+    const expr_t *imaginary_coefficient = NULL;
+    expr_t *owned_imaginary_coefficient = NULL;
+    number_t exponent = number_invalid();
+    number_t coefficient_value = number_invalid();
+    long exponent_numerator;
+    long exponent_denominator;
+    expr_t *real_square = NULL;
+    expr_t *imaginary_square = NULL;
+    expr_t *norm_square = NULL;
+    expr_t *norm = NULL;
+    expr_t *real_sum = NULL;
+    expr_t *imaginary_difference = NULL;
+    expr_t *real_argument = NULL;
+    expr_t *imaginary_argument = NULL;
+    expr_t *real_root = NULL;
+    expr_t *imaginary_root = NULL;
+    expr_t *absolute_imaginary = NULL;
+    expr_t *orientation = NULL;
+    expr_t *oriented_imaginary = NULL;
+    expr_t *imaginary_unit = NULL;
+    expr_t *imaginary_term = NULL;
+    expr_t *cartesian = NULL;
+    expr_t *rewrite = NULL;
+    int imaginary_sign;
+    bool subtract;
+
+    if (!expr_match_pow_const(expr, &argument, &exponent) ||
+        !num_get_small_rational(exponent, &exponent_numerator, &exponent_denominator) ||
+        exponent_numerator != -1L || exponent_denominator != 2L) {
+        goto cleanup;
+    }
+    if (!argument)
+        goto cleanup;
+    if (!(subtract = expr_match_binary_op(argument, EXPR_KIND_SUB, &left, &right)) &&
+        !expr_match_binary_op(argument, EXPR_KIND_ADD, &left, &right))
+        goto cleanup;
+
+    if (expr_beautify_extract_i_factor(right, &imaginary_sign, &imaginary_coefficient)) {
+        real_part = left;
+        if (subtract)
+            imaginary_sign = -imaginary_sign;
+    } else if ((owned_imaginary_coefficient =
+                    expr_beautify_extract_exact_imaginary_coefficient(right, &imaginary_sign))) {
+        real_part = left;
+        imaginary_coefficient = owned_imaginary_coefficient;
+        if (subtract)
+            imaginary_sign = -imaginary_sign;
+    } else if (!subtract && expr_beautify_extract_i_factor(left, &imaginary_sign, &imaginary_coefficient)) {
+        real_part = right;
+    } else if (!subtract &&
+               (owned_imaginary_coefficient =
+                    expr_beautify_extract_exact_imaginary_coefficient(left, &imaginary_sign))) {
+        real_part = right;
+        imaginary_coefficient = owned_imaginary_coefficient;
+    } else {
+        goto cleanup;
+    }
+    if (!imaginary_coefficient) {
+        owned_imaginary_coefficient = expr_const_one();
+        imaginary_coefficient = owned_imaginary_coefficient;
+    }
+    if (!real_part || !imaginary_coefficient)
+        goto cleanup;
+
+    real_square = expr_simplify_owned(expr_pow_long(real_part, 2L));
+    imaginary_square = expr_simplify_owned(expr_pow_long(imaginary_coefficient, 2L));
+    norm_square = real_square && imaginary_square ? expr_add_simplify_owned(real_square, imaginary_square) : NULL;
+    real_square = NULL;
+    imaginary_square = NULL;
+    norm = norm_square ? expr_beautify_simplified_square_root(norm_square) : NULL;
+    real_sum = norm ? expr_add(norm, real_part) : NULL;
+    imaginary_difference = norm ? expr_sub(norm, real_part) : NULL;
+    real_argument = real_sum ? expr_simplify_owned(expr_div_long(real_sum, 2L)) : NULL;
+    imaginary_argument = imaginary_difference ? expr_simplify_owned(expr_div_long(imaginary_difference, 2L)) : NULL;
+    real_root = real_argument ? expr_beautify_simplified_square_root(real_argument) : NULL;
+    imaginary_root = imaginary_argument ? expr_beautify_simplified_square_root(imaginary_argument) : NULL;
+
+    if (expr_match_const_value(imaginary_coefficient, &coefficient_value) && num_is_real(coefficient_value) &&
+        !num_is_zero(coefficient_value)) {
+        if (num_sign(coefficient_value) < 0)
+            imaginary_sign = -imaginary_sign;
+        oriented_imaginary = imaginary_root ? expr_clone(imaginary_root) : NULL;
+    } else {
+        absolute_imaginary = expr_abs(imaginary_coefficient);
+        orientation = absolute_imaginary ? expr_div(imaginary_coefficient, absolute_imaginary) : NULL;
+        oriented_imaginary = orientation && imaginary_root ? expr_mul(orientation, imaginary_root) : NULL;
+    }
+
+    imaginary_unit = expr_new_const(NUM_I);
+    imaginary_term = imaginary_unit && oriented_imaginary ? expr_mul(imaginary_unit, oriented_imaginary) : NULL;
+    if (real_root && imaginary_term)
+        cartesian = imaginary_sign > 0 ? expr_sub(real_root, imaginary_term) : expr_add(real_root, imaginary_term);
+    rewrite = cartesian && norm ? expr_div(cartesian, norm) : NULL;
+
+cleanup:
+    expr_free(cartesian);
+    expr_free(imaginary_term);
+    expr_free(imaginary_unit);
+    expr_free(oriented_imaginary);
+    expr_free(orientation);
+    expr_free(absolute_imaginary);
+    expr_free(imaginary_root);
+    expr_free(real_root);
+    expr_free(imaginary_argument);
+    expr_free(real_argument);
+    expr_free(imaginary_difference);
+    expr_free(real_sum);
+    expr_free(norm);
+    expr_free(norm_square);
+    expr_free(imaginary_square);
+    expr_free(real_square);
+    num_destroy(&coefficient_value);
+    num_destroy(&exponent);
+    expr_free(owned_imaginary_coefficient);
+    return rewrite;
+}
+
+static expr_t *expr_beautify_symbolic_complex_square_root_reciprocal_recursive(const expr_t *expr, bool *changed)
+{
+    expr_t *left = NULL;
+    expr_t *right = NULL;
+    expr_t *rebuilt = NULL;
+    expr_t *rewrite = NULL;
+
+    if (!expr)
+        return NULL;
+    if (!expr->ops || expr->ops->arity == EXPR_OP_ATOM)
+        return expr_clone(expr);
+
+    left = expr_beautify_symbolic_complex_square_root_reciprocal_recursive(expr->a, changed);
+    if (!left)
+        goto cleanup;
+    if (expr_is_pow_d_expr(expr)) {
+        rebuilt = expr_new_pow_const_internal(left, expr->c);
+    } else if (expr->ops->arity == EXPR_OP_BINARY) {
+        right = expr_beautify_symbolic_complex_square_root_reciprocal_recursive(expr->b, changed);
+        if (!right)
+            goto cleanup;
+        rebuilt = expr_new_binary_internal(expr->ops, left, right);
+    } else {
+        rebuilt = expr_new_unary_internal(expr->ops, left);
+    }
+    if (!rebuilt)
+        goto cleanup;
+    left = NULL;
+    right = NULL;
+    rewrite = expr_beautify_symbolic_complex_square_root_reciprocal_direct(rebuilt);
+    if (rewrite) {
+        expr_free(rebuilt);
+        rebuilt = rewrite;
+        rewrite = NULL;
+        *changed = true;
+    }
+
+cleanup:
+    expr_free(rewrite);
+    expr_free(right);
+    expr_free(left);
+    return rebuilt;
+}
+
+/* Rewrite symbolic reciprocal square roots recursively for Cartesian presentation. */
+expr_t *expr_beautify_symbolic_complex_square_root_reciprocal_for_display(const expr_t *expr)
+{
+    bool changed = false;
+    expr_t *rewrite = expr_beautify_symbolic_complex_square_root_reciprocal_recursive(expr, &changed);
+
+    if (!changed) {
+        expr_free(rewrite);
+        return NULL;
+    }
+    return rewrite;
 }
 
 static expr_t *expr_beautify_complex_square_root_reciprocal(const expr_t *expr)
@@ -1634,5 +1977,115 @@ expr_t *expr_distribute_negative_for_display(const expr_t *expr)
 
     out = expr_distribute_negative_terms_for_display(expr);
     expr_free(expanded);
+    return out;
+}
+
+/* Separate a top-level Cartesian value without factoring a shared real scale back out. */
+expr_t *expr_separate_cartesian_for_display(const expr_t *expr)
+{
+    const expr_t *product_left;
+    const expr_t *product_right;
+    const expr_t *inner_left;
+    const expr_t *inner_right;
+    const expr_t *scale = NULL;
+    const expr_t *real_source = NULL;
+    expr_t *owned_scale = NULL;
+    expr_t *direct_imaginary = NULL;
+    expr_t *real = NULL;
+    expr_t *imaginary = NULL;
+    expr_t *imaginary_unit = NULL;
+    expr_t *imaginary_term = NULL;
+    expr_t *out = NULL;
+    bool has_imaginary = false;
+    bool subtract = false;
+    int imaginary_sign = 1;
+
+    direct_imaginary = expr_beautify_extract_imaginary_product_coefficient(expr, &imaginary_sign);
+    if (direct_imaginary) {
+        real = expr_const_zero();
+        imaginary = direct_imaginary;
+        direct_imaginary = NULL;
+        if (imaginary_sign < 0)
+            imaginary = expr_negate_owned(imaginary);
+        imaginary_unit = expr_new_const(NUM_I);
+        imaginary_term = imaginary_unit ? expr_new_binary_internal(&ops_mul, imaginary_unit, imaginary) : NULL;
+        if (imaginary_term) {
+            imaginary_unit = NULL;
+            imaginary = NULL;
+        }
+        out = real && imaginary_term ? expr_new_binary_internal(&ops_add, real, imaginary_term) : NULL;
+        if (out) {
+            real = NULL;
+            imaginary_term = NULL;
+        }
+        goto cleanup;
+    }
+
+    if (expr_match_binary_op(expr, EXPR_KIND_DIV, &product_left, &product_right) &&
+        ((subtract = expr_match_binary_op(product_left, EXPR_KIND_SUB, &inner_left, &inner_right)) ||
+         expr_match_binary_op(product_left, EXPR_KIND_ADD, &inner_left, &inner_right))) {
+        direct_imaginary = expr_beautify_extract_imaginary_product_coefficient(inner_right, &imaginary_sign);
+        owned_scale = expr_div_simplify_owned(expr_const_one(), expr_clone(product_right));
+        scale = owned_scale;
+        real_source = inner_left;
+    } else if (expr_match_binary_op(expr, EXPR_KIND_MUL, &product_left, &product_right)) {
+        if ((subtract = expr_match_binary_op(product_right, EXPR_KIND_SUB, &inner_left, &inner_right)) ||
+            expr_match_binary_op(product_right, EXPR_KIND_ADD, &inner_left, &inner_right)) {
+            direct_imaginary = expr_beautify_extract_imaginary_product_coefficient(inner_right, &imaginary_sign);
+            scale = product_left;
+            real_source = inner_left;
+        } else if ((subtract = expr_match_binary_op(product_left, EXPR_KIND_SUB, &inner_left, &inner_right)) ||
+                   expr_match_binary_op(product_left, EXPR_KIND_ADD, &inner_left, &inner_right)) {
+            direct_imaginary = expr_beautify_extract_imaginary_product_coefficient(inner_right, &imaginary_sign);
+            scale = product_right;
+            real_source = inner_left;
+        }
+    }
+    if (scale && real_source && direct_imaginary) {
+        real = expr_mul_simplify_owned(expr_clone(scale), expr_clone(real_source));
+        imaginary = expr_mul_simplify_owned(expr_clone(scale), direct_imaginary);
+        direct_imaginary = NULL;
+        imaginary_sign = subtract ? -imaginary_sign : imaginary_sign;
+        imaginary_unit = expr_new_const(NUM_I);
+        imaginary_term = imaginary_unit ? expr_new_binary_internal(&ops_mul, imaginary_unit, imaginary) : NULL;
+        if (imaginary_term) {
+            imaginary_unit = NULL;
+            imaginary = NULL;
+        }
+        out = real && imaginary_term
+                  ? expr_new_binary_internal(imaginary_sign < 0 ? &ops_sub : &ops_add, real, imaginary_term)
+                  : NULL;
+        if (out) {
+            real = NULL;
+            imaginary_term = NULL;
+            expr_binding_expr_free(out->binding_expr);
+            out->binding_expr = NULL;
+        }
+        goto cleanup;
+    }
+
+    if (!expr_beautify_cartesian_parts(expr, &real, &imaginary, &has_imaginary) || !has_imaginary)
+        goto cleanup;
+    imaginary_unit = expr_new_const(NUM_I);
+    imaginary_term = imaginary_unit ? expr_new_binary_internal(&ops_mul, imaginary_unit, imaginary) : NULL;
+    if (imaginary_term) {
+        imaginary_unit = NULL;
+        imaginary = NULL;
+    }
+    out = imaginary_term ? expr_new_binary_internal(&ops_add, real, imaginary_term) : NULL;
+    if (out) {
+        real = NULL;
+        imaginary_term = NULL;
+        expr_binding_expr_free(out->binding_expr);
+        out->binding_expr = NULL;
+    }
+
+cleanup:
+    expr_free(owned_scale);
+    expr_free(direct_imaginary);
+    expr_free(imaginary_term);
+    expr_free(imaginary_unit);
+    expr_free(imaginary);
+    expr_free(real);
     return out;
 }

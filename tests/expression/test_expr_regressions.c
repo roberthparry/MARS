@@ -3655,6 +3655,46 @@ static void test_symbolic_complex_square_root_beautifies_to_cartesian_form(void)
     expr_free(expr);
 }
 
+static void test_symbolic_complex_square_root_reciprocal_beautifies_to_cartesian_form(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = expr_from_string("(x + iy)^(-1/2)", &bindings);
+    expr_t *beautified = expr ? expr_beautify_symbolic_complex_square_root_reciprocal_for_display(expr) : NULL;
+    char *text = beautified ? expr_to_string(beautified, style_UNBOUND) : NULL;
+
+    ASSERT_NOT_NULL(expr);
+    ASSERT_NOT_NULL(beautified);
+    TEST_ASSERT_STR_EQ(text,
+                       "1/√(x² + y²)·(√(½·(√(x² + y²) + x)) - "
+                       "i·y/|y|·√(½·(√(x² + y²) - x)))");
+
+    free(text);
+    expr_free(beautified);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+}
+
+static void test_imaginary_symbolic_complex_square_root_reciprocal_rotates_cartesian_parts(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = expr_from_string("i*(x + iy)^(-1/2)", &bindings);
+    expr_t *reciprocal = expr ? expr_beautify_symbolic_complex_square_root_reciprocal_for_display(expr) : NULL;
+    expr_t *beautified = reciprocal ? expr_beautify_imaginary_cartesian_product_for_display(reciprocal) : NULL;
+    char *text = beautified ? expr_to_string(beautified, style_UNBOUND) : NULL;
+
+    ASSERT_NOT_NULL(expr);
+    ASSERT_NOT_NULL(beautified);
+    TEST_ASSERT_STR_EQ(text,
+                       "1/√(x² + y²)·(y/|y|·√(½·(√(x² + y²) - x)) + "
+                       "i·√(½·(√(x² + y²) + x)))");
+
+    free(text);
+    expr_free(beautified);
+    expr_free(reciprocal);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+}
+
 static void test_exact_complex_square_root_beautifies_to_cartesian_surds(void)
 {
     expr_bindings_t *bindings = NULL;
@@ -3997,6 +4037,37 @@ static void test_symbolic_complex_square_expands_to_cartesian_form(void)
     expr_free(expr);
 }
 
+static void test_cartesian_tanh_has_native_symbolic_integrals(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = expr_from_string("{ tanh(x+iy) | x = NAN, y = NAN }", &bindings);
+    expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    expr_t *y = bindings ? expr_bindings_get(bindings, "y") : NULL;
+    expr_t *x_integral = x ? expr_integrate_family(expr, x) : NULL;
+    expr_t *y_integral = y ? expr_integrate_family(expr, y) : NULL;
+    char *x_text = x_integral ? expr_to_string(x_integral, style_UNBOUND) : NULL;
+    char *y_text = y_integral ? expr_to_string(y_integral, style_UNBOUND) : NULL;
+
+    ASSERT_NOT_NULL(expr);
+    ASSERT_NOT_NULL(x_integral);
+    ASSERT_NOT_NULL(y_integral);
+    ASSERT_NOT_NULL(x_text);
+    ASSERT_NOT_NULL(y_text);
+    ASSERT_NOT_NULL(strstr(x_text, "ln("));
+    ASSERT_NOT_NULL(strstr(x_text, "atan2("));
+    ASSERT_NOT_NULL(strstr(x_text, "i"));
+    ASSERT_NOT_NULL(strstr(y_text, "ln("));
+    ASSERT_NOT_NULL(strstr(y_text, "atan2("));
+    ASSERT_NOT_NULL(strstr(y_text, "i"));
+
+    free(y_text);
+    free(x_text);
+    expr_free(y_integral);
+    expr_free(x_integral);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+}
+
 static void test_goal_seek_large_target_uses_significant_digit_tolerance(void)
 {
     expr_bindings_t *bindings = NULL;
@@ -4264,6 +4335,8 @@ void test_runtime_regressions(void)
     TEST_RUN_SUBTEST(test_tan_poles_display_as_infinity, NULL);
     TEST_RUN_SUBTEST(test_sqrt_negative_exact_evaluates_to_i, NULL);
     TEST_RUN_SUBTEST(test_symbolic_complex_square_root_beautifies_to_cartesian_form, NULL);
+    TEST_RUN_SUBTEST(test_symbolic_complex_square_root_reciprocal_beautifies_to_cartesian_form, NULL);
+    TEST_RUN_SUBTEST(test_imaginary_symbolic_complex_square_root_reciprocal_rotates_cartesian_parts, NULL);
     TEST_RUN_SUBTEST(test_exact_complex_square_root_beautifies_to_cartesian_surds, NULL);
     TEST_RUN_SUBTEST(test_unit_complex_square_root_keeps_conjugate_surds_together, NULL);
     TEST_RUN_SUBTEST(test_unit_complex_cube_root_beautifies_to_cartesian_surds, NULL);
@@ -4281,6 +4354,7 @@ void test_runtime_regressions(void)
     TEST_RUN_SUBTEST(test_exact_complex_fifth_root_family_finds_cartesian_seed, NULL);
     TEST_RUN_SUBTEST(test_named_sixth_root_uses_exact_cartesian_principal_value, NULL);
     TEST_RUN_SUBTEST(test_symbolic_complex_square_expands_to_cartesian_form, NULL);
+    TEST_RUN_SUBTEST(test_cartesian_tanh_has_native_symbolic_integrals, NULL);
     TEST_RUN_SUBTEST(test_goal_seek_large_target_uses_significant_digit_tolerance, NULL);
     TEST_RUN_SUBTEST(test_iterated_symbolic_integration_moves_out_of_lab, NULL);
     TEST_RUN_SUBTEST(test_iterated_symbolic_best_effort_reduces_remaining_numeric_dims, NULL);
