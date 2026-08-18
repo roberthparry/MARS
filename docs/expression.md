@@ -602,11 +602,15 @@ style is applied afterwards.
 When an elementary function has a supported symbolic Cartesian identity, the
 native display pass separates an explicit `x + iy` argument into real and
 imaginary parts. For example, `exp(x + iy)` becomes
-`exp(x)·cos(y) + exp(x)·sin(y)·i`. The same pass covers the circular and
-hyperbolic sine, cosine and tangent families, together with `atan`, `ln` and
-`log10`; pure-imaginary forms additionally use the native inverse and
-reciprocal-family identities. Subsequent differentiation and presentation
-beautification preserve the separated `p + qi` structure.
+`exp(x)·cos(y) + exp(x)·sin(y)·i`. The pass covers `exp`, `ln`, `log10`, all six
+circular functions, all six hyperbolic functions, and all twelve inverse
+circular and inverse hyperbolic functions. It applies equally to pure-imaginary
+arguments.
+
+Differentiation and integration with respect to either Cartesian component
+preserve the separated `p + qi` structure. The imaginary unit remains the
+final factor of the imaginary term, and an indefinite integration constant is
+always the final addend.
 
 ---
 

@@ -993,5 +993,11 @@ bool expr_binding_expr_eval_if_precision_increased(expr_binding_expr_t *expr, nu
 expr_t *expr_simplify(const expr_t *dv);
 expr_t *expr_expand_products_internal(const expr_t *expr);
 expr_t *expr_canonicalize_known_radicals_internal(const expr_t *expr);
+expr_t *expr_complex_unary_cartesian_for_display(const expr_t *expr);
+expr_t *expr_expand_preserved_for_display(const expr_t *expr);
+expr_t *expr_separate_cartesian_for_display(const expr_t *expr);
+expr_t *expr_prepend_zero_real_component_for_display(const expr_t *expr);
+bool expr_cartesian_parts_for_display(const expr_t *expr, expr_t **real_out, expr_t **imaginary_out,
+                                      bool *has_imaginary_out);
 
 #endif /* EXPR_INTERNAL_H */

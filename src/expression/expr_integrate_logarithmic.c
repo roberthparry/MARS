@@ -69,8 +69,11 @@ expr_t *integrate_log_rule(const expr_t *expr, const expr_t *wrt)
     return div_number_owned_consuming(raw, &coeff);
 }
 
+/* Integrate a base-ten logarithm with an affine argument. */
 expr_t *integrate_log10_rule(const expr_t *expr, const expr_t *wrt)
 {
+    expr_t *symbolic_constant = NULL;
+    expr_t *symbolic_coeff = NULL;
     number_t constant = num_new();
     number_t coeff = num_new();
     expr_t *u_log10_u;
@@ -80,7 +83,27 @@ expr_t *integrate_log10_rule(const expr_t *expr, const expr_t *wrt)
     if (!match_affine_unary(expr, wrt, EXPR_PATTERN_UNARY_LOG10, &constant, &coeff)) {
         num_destroy(&coeff);
         num_destroy(&constant);
-        return NULL;
+        if (!expr_integrate_contains_imaginary_unit(expr) || !expr || !expr->a ||
+            !match_symbolic_affine_constant_and_coeff(expr->a, wrt, &symbolic_constant, &symbolic_coeff) ||
+            expr_const_is_zero(symbolic_coeff)) {
+            expr_free(symbolic_coeff);
+            expr_free(symbolic_constant);
+            return NULL;
+        }
+        u_log10_u = expr_mul(expr->a, expr);
+        u_over_ln10 = expr->a ? expr_div_num(expr->a, &NUM_LN10) : NULL;
+        raw = u_log10_u && u_over_ln10 ? expr_sub(u_log10_u, u_over_ln10) : NULL;
+        {
+            expr_t *out = raw && symbolic_coeff ? expr_div(raw, symbolic_coeff) : NULL;
+
+            out = simplify_owned(out);
+            expr_free(raw);
+            expr_free(u_over_ln10);
+            expr_free(u_log10_u);
+            expr_free(symbolic_coeff);
+            expr_free(symbolic_constant);
+            return out;
+        }
     }
 
     u_log10_u = expr_mul(expr->a, expr);

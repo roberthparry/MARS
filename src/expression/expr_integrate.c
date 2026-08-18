@@ -204,14 +204,35 @@ cleanup:
     return ok;
 }
 
-static bool expr_integrate_contains_imaginary_unit_local(const expr_t *expr)
+static expr_t *expr_integrate_symbolic_affine_unary_local(const expr_t *expr, const expr_t *wrt)
 {
-    if (!expr)
-        return false;
-    if (expr_is_const(expr) && (num_eq(expr->c, NUM_I) || num_eq(expr->c, NUM_NEG_I)))
-        return true;
-    return expr_integrate_contains_imaginary_unit_local(expr->a) ||
-           expr_integrate_contains_imaginary_unit_local(expr->b);
+    expr_t *constant = NULL;
+    expr_t *coefficient = NULL;
+    expr_t *unit_argument_function = NULL;
+    expr_t *unit_antiderivative = NULL;
+    expr_t *back_substituted = NULL;
+    expr_t *quotient = NULL;
+    expr_t *out = NULL;
+
+    if (!expr || !wrt || !expr->ops || expr->ops->arity != EXPR_OP_UNARY || !expr->ops->apply_unary || !expr->a ||
+        !match_symbolic_affine_constant_and_coeff(expr->a, wrt, &constant, &coefficient) ||
+        expr_const_is_zero(coefficient))
+        goto cleanup;
+    unit_argument_function = expr->ops->apply_unary(wrt);
+    unit_antiderivative = unit_argument_function ? expr_integrate_dispatch_primitive(unit_argument_function, wrt) : NULL;
+    back_substituted = unit_antiderivative ? expr_substitute(unit_antiderivative, wrt, expr->a) : NULL;
+    quotient = back_substituted ? expr_div(back_substituted, coefficient) : NULL;
+    out = simplify_owned(quotient);
+    quotient = NULL;
+
+cleanup:
+    expr_free(quotient);
+    expr_free(back_substituted);
+    expr_free(unit_antiderivative);
+    expr_free(unit_argument_function);
+    expr_free(coefficient);
+    expr_free(constant);
+    return out;
 }
 
 static void expr_integrate_normalize_small_rationals_local(expr_t *expr)
@@ -730,7 +751,9 @@ expr_t *expr_integrate(const expr_t *expr, const expr_t *wrt)
 
     /* Preserve primitive unary forms long enough to integrate symbolic affine
      * complex arguments before Cartesian simplification expands them. */
-    raw = expr_integrate_contains_imaginary_unit_local(expr) ? expr_integrate_dispatch_primitive(expr, wrt) : NULL;
+    raw = expr_integrate_contains_imaginary_unit(expr) ? expr_integrate_dispatch_primitive(expr, wrt) : NULL;
+    if (!raw && expr_integrate_contains_imaginary_unit(expr))
+        raw = expr_integrate_symbolic_affine_unary_local(expr, wrt);
     if (raw)
         goto normalise_result;
 
@@ -742,6 +765,18 @@ expr_t *expr_integrate(const expr_t *expr, const expr_t *wrt)
     expr_free(simplified);
 
 normalise_result:
+    if (raw) {
+        expr_t *expanded_raw = expr_expand_preserved_for_display(raw);
+        expr_t *cartesian = expanded_raw ? expr_complex_unary_cartesian_for_display(expanded_raw) : NULL;
+
+        if (cartesian) {
+            expr_free(expanded_raw);
+            expr_free(raw);
+            expr_integrate_normalize_small_rationals_local(cartesian);
+            return cartesian;
+        }
+        expr_free(expanded_raw);
+    }
     if (expr_integrate_raw_poly_quotient_is_final_local(raw, wrt))
         return raw;
 

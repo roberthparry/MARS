@@ -722,6 +722,92 @@ cleanup:
     return out;
 }
 
+static expr_t *integrate_symbolic_affine_primitive(const expr_t *expr, const expr_t *wrt,
+                                                   expr_apply_unary_fn primitive_builder, number_t sign)
+{
+    expr_t *constant = NULL;
+    expr_t *coefficient = NULL;
+    expr_t *primitive = NULL;
+    expr_t *quotient = NULL;
+    expr_t *out = NULL;
+
+    if (!expr || !wrt || !expr->a || !primitive_builder || !expr_integrate_contains_imaginary_unit(expr) ||
+        !match_symbolic_affine_constant_and_coeff(expr->a, wrt, &constant, &coefficient) ||
+        expr_const_is_zero(coefficient))
+        goto cleanup;
+    primitive = primitive_builder(expr->a);
+    if (primitive && num_eq(sign, NUM_NEG_ONE))
+        primitive = expr_negate_owned(primitive);
+    quotient = primitive && coefficient ? expr_div(primitive, coefficient) : NULL;
+    out = simplify_owned(quotient);
+    quotient = NULL;
+
+cleanup:
+    expr_free(quotient);
+    expr_free(primitive);
+    expr_free(coefficient);
+    expr_free(constant);
+    return out;
+}
+
+static expr_t *build_sec_primitive(const expr_t *argument)
+{
+    expr_t *sine = expr_sin(argument);
+    expr_t *out = sine ? expr_atanh(sine) : NULL;
+
+    expr_free(sine);
+    return out;
+}
+
+static expr_t *build_cosec_primitive(const expr_t *argument)
+{
+    expr_t *cosine = expr_cos(argument);
+    expr_t *inverse_hyperbolic_tangent = cosine ? expr_atanh(cosine) : NULL;
+    expr_t *out = inverse_hyperbolic_tangent ? expr_neg(inverse_hyperbolic_tangent) : NULL;
+
+    expr_free(inverse_hyperbolic_tangent);
+    expr_free(cosine);
+    return out;
+}
+
+static expr_t *build_cot_primitive(const expr_t *argument)
+{
+    expr_t *sine = expr_sin(argument);
+    expr_t *out = sine ? expr_log(sine) : NULL;
+
+    expr_free(sine);
+    return out;
+}
+
+static expr_t *build_sech_primitive(const expr_t *argument)
+{
+    expr_t *hyperbolic_sine = expr_sinh(argument);
+    expr_t *out = hyperbolic_sine ? expr_atan(hyperbolic_sine) : NULL;
+
+    expr_free(hyperbolic_sine);
+    return out;
+}
+
+static expr_t *build_cosech_primitive(const expr_t *argument)
+{
+    expr_t *half_argument = expr_mul_num(argument, &NUM_HALF);
+    expr_t *hyperbolic_tangent = half_argument ? expr_tanh(half_argument) : NULL;
+    expr_t *out = hyperbolic_tangent ? expr_log(hyperbolic_tangent) : NULL;
+
+    expr_free(hyperbolic_tangent);
+    expr_free(half_argument);
+    return out;
+}
+
+static expr_t *build_coth_primitive(const expr_t *argument)
+{
+    expr_t *hyperbolic_sine = expr_sinh(argument);
+    expr_t *out = hyperbolic_sine ? expr_log(hyperbolic_sine) : NULL;
+
+    expr_free(hyperbolic_sine);
+    return out;
+}
+
 expr_t *integrate_exp_rule(const expr_t *expr, const expr_t *wrt)
 {
     expr_t *out = integrate_affine_unary_kind(expr, wrt, EXPR_PATTERN_UNARY_EXP, expr_exp, NUM_ONE);
@@ -810,6 +896,7 @@ expr_t *integrate_tan_rule(const expr_t *expr, const expr_t *wrt)
     return out;
 }
 
+/* Integrate an affine secant. */
 expr_t *integrate_sec_rule(const expr_t *expr, const expr_t *wrt)
 {
     expr_t *vars[1];
@@ -827,7 +914,7 @@ expr_t *integrate_sec_rule(const expr_t *expr, const expr_t *wrt)
         num_eq(coeffs[0], NUM_ZERO)) {
         num_destroy(&coeffs[0]);
         num_destroy(&constant);
-        return NULL;
+        return integrate_symbolic_affine_primitive(expr, wrt, build_sec_primitive, NUM_ONE);
     }
 
     sec_arg = expr_sec(expr->a);
@@ -844,6 +931,7 @@ expr_t *integrate_sec_rule(const expr_t *expr, const expr_t *wrt)
     return out;
 }
 
+/* Integrate an affine cosecant. */
 expr_t *integrate_cosec_rule(const expr_t *expr, const expr_t *wrt)
 {
     expr_t *vars[1];
@@ -862,7 +950,7 @@ expr_t *integrate_cosec_rule(const expr_t *expr, const expr_t *wrt)
         num_eq(coeffs[0], NUM_ZERO)) {
         num_destroy(&coeffs[0]);
         num_destroy(&constant);
-        return NULL;
+        return integrate_symbolic_affine_primitive(expr, wrt, build_cosec_primitive, NUM_ONE);
     }
 
     cosec_arg = expr_cosec(expr->a);
@@ -881,6 +969,7 @@ expr_t *integrate_cosec_rule(const expr_t *expr, const expr_t *wrt)
     return out;
 }
 
+/* Integrate an affine cotangent. */
 expr_t *integrate_cot_rule(const expr_t *expr, const expr_t *wrt)
 {
     expr_t *vars[1];
@@ -896,7 +985,7 @@ expr_t *integrate_cot_rule(const expr_t *expr, const expr_t *wrt)
         num_eq(coeffs[0], NUM_ZERO)) {
         num_destroy(&coeffs[0]);
         num_destroy(&constant);
-        return NULL;
+        return integrate_symbolic_affine_primitive(expr, wrt, build_cot_primitive, NUM_ONE);
     }
 
     sin_arg = expr_sin(expr->a);
@@ -927,6 +1016,7 @@ expr_t *integrate_cosh_rule(const expr_t *expr, const expr_t *wrt)
     return integrate_cosh_symbolic_proportional_wrt(expr, wrt);
 }
 
+/* Integrate an affine hyperbolic cosecant. */
 expr_t *integrate_cosech_rule(const expr_t *expr, const expr_t *wrt)
 {
     expr_t *vars[1];
@@ -943,7 +1033,7 @@ expr_t *integrate_cosech_rule(const expr_t *expr, const expr_t *wrt)
         num_eq(coeffs[0], NUM_ZERO)) {
         num_destroy(&coeffs[0]);
         num_destroy(&constant);
-        return NULL;
+        return integrate_symbolic_affine_primitive(expr, wrt, build_cosech_primitive, NUM_ONE);
     }
 
     half_arg = expr_mul_num(expr->a, &NUM_HALF);
@@ -986,6 +1076,7 @@ expr_t *integrate_tanh_rule(const expr_t *expr, const expr_t *wrt)
     return out;
 }
 
+/* Integrate an affine hyperbolic secant. */
 expr_t *integrate_sech_rule(const expr_t *expr, const expr_t *wrt)
 {
     expr_t *vars[1];
@@ -1001,7 +1092,7 @@ expr_t *integrate_sech_rule(const expr_t *expr, const expr_t *wrt)
         num_eq(coeffs[0], NUM_ZERO)) {
         num_destroy(&coeffs[0]);
         num_destroy(&constant);
-        return NULL;
+        return integrate_symbolic_affine_primitive(expr, wrt, build_sech_primitive, NUM_ONE);
     }
 
     sinh_arg = expr_sinh(expr->a);
@@ -1014,6 +1105,7 @@ expr_t *integrate_sech_rule(const expr_t *expr, const expr_t *wrt)
     return out;
 }
 
+/* Integrate an affine hyperbolic cotangent. */
 expr_t *integrate_coth_rule(const expr_t *expr, const expr_t *wrt)
 {
     expr_t *vars[1];
@@ -1029,7 +1121,7 @@ expr_t *integrate_coth_rule(const expr_t *expr, const expr_t *wrt)
         num_eq(coeffs[0], NUM_ZERO)) {
         num_destroy(&coeffs[0]);
         num_destroy(&constant);
-        return NULL;
+        return integrate_symbolic_affine_primitive(expr, wrt, build_coth_primitive, NUM_ONE);
     }
 
     sinh_arg = expr_sinh(expr->a);
