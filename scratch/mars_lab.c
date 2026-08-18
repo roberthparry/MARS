@@ -192,64 +192,20 @@ static expr_t *display_polynomial_simplified(const expr_t *expr, const expr_t *w
         } else {
             result = expr_clone(cartesian_source);
         }
+        if (wrt && result) {
+            expr_t *final_rotated = expr_beautify_imaginary_cartesian_product_for_display(result);
+
+            if (final_rotated) {
+                expr_free(result);
+                result = final_rotated;
+            }
+        }
         expr_free(cartesian_unary);
         expr_free(rotated_cartesian);
         expr_free(reciprocal_cartesian);
         expr_free(beautified);
     }
     return result;
-}
-
-static expr_t *remove_named_addend_for_display(const expr_t *expr, const char *name, expr_t **removed)
-{
-    const expr_t *left_source = NULL;
-    const expr_t *right_source = NULL;
-    const expr_t *negated_source = NULL;
-    expr_t *left = NULL;
-    expr_t *right = NULL;
-    expr_t *out = NULL;
-    bool subtract = false;
-
-    if (!expr || !name || !removed)
-        return NULL;
-    if (!*removed && expr_is_named_const(expr) && expr_symbol_name(expr) &&
-        strcmp(expr_symbol_name(expr), name) == 0) {
-        *removed = expr_clone(expr);
-        return NULL;
-    }
-    if (expr_match_neg_expr(expr, &negated_source)) {
-        left = remove_named_addend_for_display(negated_source, name, removed);
-        out = left ? expr_neg(left) : NULL;
-        expr_free(left);
-        return out;
-    }
-    if (!expr_match_add_sub_expr(expr, &left_source, &right_source, &subtract))
-        return expr_clone(expr);
-
-    left = remove_named_addend_for_display(left_source, name, removed);
-    right = remove_named_addend_for_display(right_source, name, removed);
-    if (left && right)
-        out = subtract ? expr_sub(left, right) : expr_add(left, right);
-    else if (left)
-        out = expr_clone(left);
-    else if (right)
-        out = subtract ? expr_neg(right) : expr_clone(right);
-    expr_free(right);
-    expr_free(left);
-    return out;
-}
-
-static expr_t *move_named_addend_last_for_display(const expr_t *expr, const char *name)
-{
-    expr_t *constant = NULL;
-    expr_t *rest = remove_named_addend_for_display(expr, name, &constant);
-    expr_t *out = NULL;
-
-    if (constant)
-        out = rest ? expr_add(rest, constant) : expr_clone(constant);
-    expr_free(rest);
-    expr_free(constant);
-    return out;
 }
 
 static char *trim_ascii_in_place(char *text)
@@ -1880,7 +1836,7 @@ int main(int argc, char **argv)
                 }
                 if (integration_constant_name) {
                     expr_t *ordered_integral =
-                        move_named_addend_last_for_display(display_integral, integration_constant_name);
+                        expr_move_named_addend_last_for_display(display_integral, integration_constant_name);
 
                     if (ordered_integral) {
                         if (display_integral != integral)

@@ -35,12 +35,21 @@ expr_t *expr_separate_cartesian_for_display(const expr_t *expr);
 expr_t *expr_complex_unary_cartesian_for_display(const expr_t *expr);
 
 /**
- * @brief Rotate a top-level Cartesian product by an exact imaginary factor for display.
+ * @brief Rotate Cartesian expressions by exact imaginary factors recursively for display.
  *
  * @param expr Expression whose Cartesian product should be rotated.
  * @return Owning rotated expression, or `NULL` when the rewrite does not apply.
  */
 expr_t *expr_beautify_imaginary_cartesian_product_for_display(const expr_t *expr);
+
+/**
+ * @brief Move a named additive constant last without resimplifying the displayed algebra.
+ *
+ * @param expr Expression whose named addend should be reordered.
+ * @param name Name of the additive constant to move.
+ * @return Owning reordered expression, or `NULL` when the named addend is absent.
+ */
+expr_t *expr_move_named_addend_last_for_display(const expr_t *expr, const char *name);
 
 /**
  * @brief Write a symbolic reciprocal square root in Cartesian surd form for display.

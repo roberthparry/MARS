@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_binding_simplify.h"
@@ -1118,6 +1119,13 @@ static expr_t *expr_beautify_extract_imaginary_product_coefficient(const expr_t 
         goto cleanup;
     if (expr_match_binary_op(expr, EXPR_KIND_DIV, &numerator, &denominator)) {
         expr_t *quotient;
+        int denominator_sign;
+
+        if (expr_beautify_i_unit_sign(denominator, &denominator_sign)) {
+            coefficient = expr_clone(numerator);
+            *sign_out = -denominator_sign;
+            goto cleanup;
+        }
 
         coefficient = expr_beautify_extract_imaginary_product_coefficient(numerator, sign_out);
         quotient = coefficient ? expr_div(coefficient, denominator) : NULL;
@@ -1161,8 +1169,54 @@ cleanup:
     return coefficient;
 }
 
-/* Rotate an explicit Cartesian product by its exact imaginary factor for presentation. */
-expr_t *expr_beautify_imaginary_cartesian_product_for_display(const expr_t *expr)
+static expr_t *expr_beautify_division_by_imaginary_unit_for_display(const expr_t *expr)
+{
+    const expr_t *numerator;
+    const expr_t *denominator;
+    const expr_t *real_part;
+    const expr_t *imaginary_part;
+    expr_t *imaginary_coefficient = NULL;
+    expr_t *real_term = NULL;
+    expr_t *imaginary_unit = NULL;
+    expr_t *imaginary_term = NULL;
+    expr_t *rewrite = NULL;
+    int denominator_sign;
+    int imaginary_sign;
+    bool subtract;
+
+    if (!expr_match_binary_op(expr, EXPR_KIND_DIV, &numerator, &denominator) ||
+        !expr_beautify_i_unit_sign(denominator, &denominator_sign))
+        goto cleanup;
+    if (!(subtract = expr_match_binary_op(numerator, EXPR_KIND_SUB, &real_part, &imaginary_part)) &&
+        !expr_match_binary_op(numerator, EXPR_KIND_ADD, &real_part, &imaginary_part))
+        goto cleanup;
+    imaginary_coefficient = expr_beautify_extract_imaginary_product_coefficient(imaginary_part, &imaginary_sign);
+    if (!imaginary_coefficient)
+        goto cleanup;
+
+    imaginary_sign *= subtract ? -1 : 1;
+    real_term = expr_clone(imaginary_coefficient);
+    if (imaginary_sign * denominator_sign < 0)
+        real_term = expr_negate_owned(real_term);
+    imaginary_unit = expr_new_const(NUM_I);
+    imaginary_term = imaginary_unit ? expr_mul(imaginary_unit, real_part) : NULL;
+    if (real_term && imaginary_term) {
+        rewrite = expr_new_binary_internal(denominator_sign > 0 ? &ops_sub : &ops_add, real_term, imaginary_term);
+        if (rewrite) {
+            real_term = NULL;
+            imaginary_term = NULL;
+        }
+    }
+
+cleanup:
+    expr_free(imaginary_term);
+    expr_free(imaginary_unit);
+    expr_free(real_term);
+    expr_free(imaginary_coefficient);
+    return rewrite;
+}
+
+static expr_t *expr_beautify_imaginary_cartesian_product_direct(const expr_t *expr)
 {
     const expr_t **factors = NULL;
     const expr_t *cartesian_real = NULL;
@@ -1177,7 +1231,6 @@ expr_t *expr_beautify_imaginary_cartesian_product_for_display(const expr_t *expr
     expr_t *imaginary_term = NULL;
     expr_t *sum = NULL;
     expr_t *rewrite = NULL;
-    expr_t *rotated_numerator = NULL;
     int outer_sign = 1;
     int inner_sign = 1;
     size_t count = 0u;
@@ -1185,13 +1238,9 @@ expr_t *expr_beautify_imaginary_cartesian_product_for_display(const expr_t *expr
     size_t imaginary_index = SIZE_MAX;
     size_t cartesian_index = SIZE_MAX;
 
-    if (expr_match_binary_op(expr, EXPR_KIND_DIV, &cartesian_real, &cartesian_imaginary)) {
-        rotated_numerator = expr_beautify_imaginary_cartesian_product_for_display(cartesian_real);
-        rewrite = rotated_numerator ? expr_div(rotated_numerator, cartesian_imaginary) : NULL;
+    rewrite = expr_beautify_division_by_imaginary_unit_for_display(expr);
+    if (rewrite)
         goto cleanup;
-    }
-    cartesian_real = NULL;
-    cartesian_imaginary = NULL;
     if (!expr_is_op(expr, &ops_mul))
         goto cleanup;
     expr_beautify_collect_product_factors(expr, &factors, &count, &capacity);
@@ -1249,7 +1298,6 @@ expr_t *expr_beautify_imaginary_cartesian_product_for_display(const expr_t *expr
 
 cleanup:
     free((void *)factors);
-    expr_free(rotated_numerator);
     expr_free(sum);
     expr_free(imaginary_term);
     expr_free(imaginary_unit);
@@ -1259,6 +1307,128 @@ cleanup:
     expr_free(outer_magnitude);
     expr_free(owned_cartesian_imaginary);
     return rewrite;
+}
+
+static expr_t *expr_beautify_imaginary_cartesian_product_recursive(const expr_t *expr, bool *changed)
+{
+    expr_t *left = NULL;
+    expr_t *right = NULL;
+    expr_t *rebuilt = NULL;
+    expr_t *rewrite = NULL;
+
+    if (!expr)
+        return NULL;
+    if (!expr->ops || expr->ops->arity == EXPR_OP_ATOM)
+        return expr_clone(expr);
+
+    left = expr_beautify_imaginary_cartesian_product_recursive(expr->a, changed);
+    if (!left)
+        goto cleanup;
+    if (expr_is_pow_d_expr(expr)) {
+        rebuilt = expr_new_pow_const_internal(left, expr->c);
+    } else if (expr->ops->arity == EXPR_OP_BINARY) {
+        right = expr_beautify_imaginary_cartesian_product_recursive(expr->b, changed);
+        if (!right)
+            goto cleanup;
+        rebuilt = expr_new_binary_internal(expr->ops, left, right);
+    } else {
+        rebuilt = expr_new_unary_internal(expr->ops, left);
+    }
+    if (!rebuilt)
+        goto cleanup;
+    left = NULL;
+    right = NULL;
+    rewrite = expr_beautify_imaginary_cartesian_product_direct(rebuilt);
+    if (rewrite) {
+        expr_free(rebuilt);
+        rebuilt = rewrite;
+        rewrite = NULL;
+        *changed = true;
+    }
+
+cleanup:
+    expr_free(rewrite);
+    expr_free(right);
+    expr_free(left);
+    return rebuilt;
+}
+
+/* Rotate Cartesian expressions by exact imaginary factors recursively for presentation. */
+expr_t *expr_beautify_imaginary_cartesian_product_for_display(const expr_t *expr)
+{
+    bool changed = false;
+    expr_t *rewrite = expr_beautify_imaginary_cartesian_product_recursive(expr, &changed);
+
+    if (!changed) {
+        expr_free(rewrite);
+        return NULL;
+    }
+    return rewrite;
+}
+
+static expr_t *expr_beautify_remove_named_addend_for_display(const expr_t *expr, const char *name, expr_t **removed)
+{
+    const expr_t *left_source;
+    const expr_t *right_source;
+    expr_t *left = NULL;
+    expr_t *right = NULL;
+    expr_t *out = NULL;
+    bool subtract = false;
+
+    if (!expr || !name || !removed)
+        return NULL;
+    if (!*removed && expr_is_named_const(expr) && expr_symbol_name(expr) && strcmp(expr_symbol_name(expr), name) == 0) {
+        *removed = expr_clone(expr);
+        return NULL;
+    }
+    if (expr_is_op(expr, &ops_neg)) {
+        left = expr_beautify_remove_named_addend_for_display(expr->a, name, removed);
+        out = left ? expr_new_unary_internal(&ops_neg, left) : NULL;
+        if (out)
+            left = NULL;
+        expr_free(left);
+        return out;
+    }
+    if (!expr_match_add_sub_expr(expr, &left_source, &right_source, &subtract))
+        return expr_clone(expr);
+
+    left = expr_beautify_remove_named_addend_for_display(left_source, name, removed);
+    right = expr_beautify_remove_named_addend_for_display(right_source, name, removed);
+    if (left && right) {
+        out = expr_new_binary_internal(subtract ? &ops_sub : &ops_add, left, right);
+        if (out) {
+            left = NULL;
+            right = NULL;
+        }
+    } else if (left) {
+        out = expr_clone(left);
+    } else if (right) {
+        out = subtract ? expr_new_unary_internal(&ops_neg, right) : expr_clone(right);
+        if (subtract && out)
+            right = NULL;
+    }
+    expr_free(right);
+    expr_free(left);
+    return out;
+}
+
+/* Move a named additive constant last without resimplifying the displayed algebra. */
+expr_t *expr_move_named_addend_last_for_display(const expr_t *expr, const char *name)
+{
+    expr_t *constant = NULL;
+    expr_t *rest = expr_beautify_remove_named_addend_for_display(expr, name, &constant);
+    expr_t *out = NULL;
+
+    if (constant) {
+        out = rest ? expr_new_binary_internal(&ops_add, rest, constant) : expr_clone(constant);
+        if (rest && out) {
+            rest = NULL;
+            constant = NULL;
+        }
+    }
+    expr_free(rest);
+    expr_free(constant);
+    return out;
 }
 
 static void expr_beautify_collect_product_factors(const expr_t *expr, const expr_t ***factors, size_t *count,
