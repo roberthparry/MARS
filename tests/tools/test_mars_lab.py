@@ -1,3 +1,4 @@
+import datetime as py_datetime
 import subprocess
 import sys
 import unittest
@@ -4179,6 +4180,122 @@ class AlmanacLocationTests(unittest.TestCase):
         self.assertEqual(shrewsbury["longitude"], "-2.7541")
         self.assertEqual(shrewsbury["elevation"], "75")
         self.assertTrue(shrewsbury["default"])
+
+    def test_upcoming_almanac_window_excludes_finished_events_and_keeps_in_progress_events(self) -> None:
+        def event(name: str, first: str, last: str) -> dict[str, str]:
+            first_moment = py_datetime.datetime.fromisoformat(first).replace(tzinfo=py_datetime.timezone.utc)
+            last_moment = py_datetime.datetime.fromisoformat(last).replace(tzinfo=py_datetime.timezone.utc)
+            greatest = first_moment + (last_moment - first_moment) / 2
+            return {
+                "category": "Solar" if "solar" in name.lower() else "Lunar",
+                "name": name,
+                "time": greatest.strftime("%Y-%m-%d %H:%M:%S"),
+                "sort_time": greatest.isoformat(),
+                "jd": f"{mars_lab.almanac_datetime_jd(greatest):.9f}",
+                "first_jd": f"{mars_lab.almanac_datetime_jd(first_moment):.9f}",
+                "last_jd": f"{mars_lab.almanac_datetime_jd(last_moment):.9f}",
+            }
+
+        events_by_year = {
+            2026: [
+                event("Finished solar eclipse", "2026-08-12T18:00:00", "2026-08-12T20:00:00"),
+                event("Ongoing lunar eclipse", "2026-08-18T21:30:00", "2026-08-18T22:30:00"),
+                event("Future lunar eclipse", "2026-08-28T02:00:00", "2026-08-28T08:00:00"),
+            ],
+            2027: [
+                event("Next-year solar eclipse", "2027-08-02T08:00:00", "2027-08-02T11:00:00"),
+                event("Beyond-window lunar eclipse", "2027-08-19T08:00:00", "2027-08-19T11:00:00"),
+            ],
+        }
+
+        with mock.patch.object(
+            mars_lab,
+            "generate_annual_almanac_events",
+            side_effect=lambda year, *args: events_by_year.get(year, []),
+        ):
+            events, window = mars_lab.generate_upcoming_almanac_events(
+                "2026-08-18",
+                "22:17:53",
+                1.0,
+                "GB-ENG",
+                "51.5074",
+                "-0.1278",
+            )
+
+        self.assertEqual(
+            [item["name"] for item in events],
+            ["Ongoing lunar eclipse", "Future lunar eclipse", "Next-year solar eclipse"],
+        )
+        self.assertEqual(
+            window,
+            "2026-08-18T22:17:53+00:00|2027-08-18T22:17:53+00:00",
+        )
+
+    def test_old_annual_almanac_cache_is_replaced_by_upcoming_window(self) -> None:
+        future_event = {
+            "category": "Lunar",
+            "name": "Future lunar eclipse",
+            "kind": "partial",
+            "time": "2026-08-28 05:12:49 GMT+01:00",
+        }
+        expected_window = "2026-08-18T22:17:53+00:00|2027-08-18T22:17:53+00:00"
+
+        with mock.patch.object(
+            mars_lab,
+            "generate_upcoming_almanac_events",
+            return_value=([future_event], expected_window),
+        ) as generate:
+            payload = mars_lab.prepare_almanac_fields({
+                "date": "2026-08-18",
+                "time": "22:17:53",
+                "zone": "1.00",
+                "latitude": "51.507400",
+                "longitude": "-0.127800",
+                "jurisdiction": "GB-ENG",
+                "events_cached": "yes",
+                "event_window": "2026-01-01|2027-01-01",
+                "events": "Solar|Solar eclipse|partial|2026-08-12 19:13:16 GMT+01:00|||||||||",
+            })
+
+        generate.assert_called_once()
+        self.assertEqual([event["name"] for event in payload["events"]], ["Future lunar eclipse"])
+        self.assertEqual(payload["event_window"], expected_window)
+        self.assertEqual(
+            payload["event_title"],
+            "Upcoming eclipses and inner planetary transits through 2027-08-18",
+        )
+
+    def test_upcoming_almanac_cache_replaces_annual_metadata_and_preserves_contacts(self) -> None:
+        event_window = "2026-08-18T22:17:53+00:00|2027-08-18T22:17:53+00:00"
+        payload = {
+            "event_year": "2026",
+            "event_window": event_window,
+            "events": [{
+                "category": "Lunar",
+                "name": "Lunar eclipse",
+                "kind": "partial",
+                "time": "2026-08-28 05:12:49 GMT+01:00",
+                "jd": "2461280.675567",
+                "first_jd": "2461280.598773",
+                "last_jd": "2461280.793993",
+            }],
+        }
+
+        output = mars_lab.almanac_output_with_events(
+            "date 2026-08-18\ntime 22:17:53\n"
+            "event_year 2026\nevent_window 2026-01-01|2027-01-01\n"
+            "events_cached yes\nevent Solar|Solar eclipse|partial|old\n",
+            {"date": "2026-08-18", "event_year": "2026"},
+            payload,
+        )
+        fields = mars_lab.parse_almanac_lab_output(output)
+        events = mars_lab.parse_almanac_event_rows(fields["events"])
+
+        self.assertEqual(fields["event_window_mode"], mars_lab.ALMANAC_EVENT_WINDOW_MODE)
+        self.assertEqual(fields["event_window"], event_window)
+        self.assertNotIn("2026-01-01|2027-01-01", output)
+        self.assertEqual(events[0]["first_jd"], "2461280.598773")
+        self.assertEqual(events[0]["last_jd"], "2461280.793993")
 
     def test_annual_events_use_one_native_estimate_and_refine_search(self) -> None:
         searched_kinds: list[str] = []

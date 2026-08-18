@@ -4059,7 +4059,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             <li><code>Zone</code> is used to present local event times, such as eclipse contacts. It does not change the GMT instant entered above.</li>
             <li><code>Jurisdiction</code> and <code>Town/location</code> fill in latitude, longitude, altitude, and local time rules where available.</li>
             <li>You can type latitude, longitude, and altitude directly if the exact observing point is not in the town list.</li>
-            <li>The <code>All</code>/<code>Visible</code> toggle controls the body table only; events are still searched for the selected observer and year.</li>
+            <li>The <code>All</code>/<code>Visible</code> toggle controls the body table only;
+              events are still searched for the selected observer from the chosen GMT moment through one year ahead.</li>
           </ul>
         </div>
         <div class="help-card" data-help-modes="almanac">
@@ -4075,7 +4076,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         <div class="help-card" data-help-modes="almanac">
           <div class="help-kicker">Eclipses And Transits</div>
           <ul>
-            <li>The event table covers the selected calendar year and reports only events that occur locally for the selected observer.</li>
+            <li>The event table starts at the selected GMT moment and covers one year ahead.
+              An event already in progress remains listed until its final contact.</li>
             <li><code>Date</code> gives the local civil date of greatest eclipse or transit, so the row remains meaningful even if nearest totality cannot be found.</li>
             <li><code>First</code>, <code>Greatest</code>, and <code>Fourth</code> are local civil progress times. Use <code>GMT</code> when comparing against the body table.</li>
             <li><code>Mag.</code> is eclipse magnitude; <code>Obsc.</code> is obscuration or totality percentage.</li>
@@ -13376,6 +13378,7 @@ def parse_almanac_lab_output(output: str) -> dict[str, str]:
             "selected_visible": r"^selected_visible\s+(.*)$",
             "event_year": r"^event_year\s+(.*)$",
             "event_window": r"^event_window\s+(.*)$",
+            "event_window_mode": r"^event_window_mode\s+(.*)$",
             "events_cached": r"^events_cached\s+(.*)$",
         },
     )
@@ -16071,6 +16074,8 @@ def parse_almanac_event_rows(text: str) -> list[dict[str, str]]:
           "greatest": parts[10].strip() if len(parts) > 10 else "",
           "fourth_contact": parts[11].strip() if len(parts) > 11 else "",
           "gmt_time": parts[12].strip() if len(parts) > 12 else "",
+          "first_jd": parts[13].strip() if len(parts) > 13 else "",
+          "last_jd": parts[14].strip() if len(parts) > 14 else "",
       })
     rows.sort(key=lambda row: str(row.get("time") or ""))
     return rows
@@ -16085,10 +16090,11 @@ def almanac_output_with_events(
     fields: dict[str, str],
     payload: dict[str, object],
 ) -> str:
-    lines = [line for line in str(raw or "").splitlines() if not line.startswith("event ")]
+    replaced_prefixes = ("event ", "event_year ", "event_window ", "event_window_mode ", "events_cached ")
+    lines = [line for line in str(raw or "").splitlines() if not line.startswith(replaced_prefixes)]
     date_text = str(fields.get("date") or "").strip()
-    event_year = str(fields.get("event_year") or date_text[:4]).strip()
-    event_window = str(fields.get("event_window") or "").strip()
+    event_year = str(payload.get("event_year") or fields.get("event_year") or date_text[:4]).strip()
+    event_window = str(payload.get("event_window") or fields.get("event_window") or "").strip()
     events = payload.get("events")
 
     if not event_year:
@@ -16101,12 +16107,10 @@ def almanac_output_with_events(
             event_year = str(event_year_int)
         event_window = f"{event_year_int:04d}-01-01|{event_year_int + 1:04d}-01-01"
 
-    if not any(line.startswith("event_year ") for line in lines):
-        lines.append(f"event_year {event_year}")
-    if not any(line.startswith("event_window ") for line in lines):
-        lines.append(f"event_window {event_window}")
-    if not any(line.startswith("events_cached ") for line in lines):
-        lines.append("events_cached yes")
+    lines.append(f"event_year {event_year}")
+    lines.append(f"event_window {event_window}")
+    lines.append(f"event_window_mode {ALMANAC_EVENT_WINDOW_MODE}")
+    lines.append("events_cached yes")
 
     if isinstance(events, list):
         for event in events:
@@ -16129,6 +16133,8 @@ def almanac_output_with_events(
                         almanac_cache_field_value(event.get("greatest")),
                         almanac_cache_field_value(event.get("fourth_contact")),
                         almanac_cache_field_value(event.get("gmt_time")),
+                        almanac_cache_field_value(event.get("first_jd")),
+                        almanac_cache_field_value(event.get("last_jd")),
                     ]
                 )
             )
@@ -16216,6 +16222,7 @@ ALMANAC_JURISDICTION_LOCATION_CACHE: dict[tuple[str, str], tuple[str, str, str]]
 JURISDICTION_OFFSET_TEXT_CACHE: dict[tuple[str, str], str] = {}
 DATETIME_FIELDS_CACHE: dict[tuple[str, str, str, str, str, str, str, str, str, str], dict[str, str]] = {}
 ALMANAC_RESPONSE_CACHE: dict[tuple[str, str, str, str, str, str, str, str, str], dict[str, object]] = {}
+ALMANAC_EVENT_WINDOW_MODE = "upcoming-v1"
 
 
 def canonical_float_cache_text(value: object) -> str:
@@ -16553,6 +16560,8 @@ def generate_annual_almanac_events(
                 "greatest": time_text,
                 "fourth_contact": "",
                 "gmt_time": almanac_gmt_event_time_from_jd(jd),
+                "first_jd": f"{jd:.9f}",
+                "last_jd": f"{jd:.9f}",
             })
 
     def add_exact_eclipse(row: dict[str, str]) -> None:
@@ -16608,6 +16617,8 @@ def generate_annual_almanac_events(
             "greatest": progress_times.get("greatest", time_text),
             "fourth_contact": progress_times.get("fourth_contact", ""),
             "gmt_time": almanac_gmt_event_time_from_jd(jd),
+            "first_jd": str(row.get("first_jd") or "").strip(),
+            "last_jd": str(row.get("last_jd") or "").strip(),
         })
 
     k0 = math.floor((year - 2000) * 12.3685) - 2
@@ -16680,10 +16691,86 @@ def generate_annual_almanac_events(
                 "greatest": "",
                 "fourth_contact": "",
                 "gmt_time": "",
+                "first_jd": "",
+                "last_jd": "",
             })
 
     events.sort(key=lambda row: str(row.get("sort_time") or row.get("time") or ""))
     return events
+
+
+def almanac_upcoming_event_window(date_text: str,
+                                  time_text: str) -> tuple[py_datetime.datetime, py_datetime.datetime, str]:
+    """Return the selected GMT moment, its one-year endpoint, and the cache label."""
+    start = py_datetime.datetime.fromisoformat(f"{date_text}T{time_text}").replace(tzinfo=py_datetime.timezone.utc)
+    try:
+        end = start.replace(year=start.year + 1)
+    except ValueError:
+        end = start.replace(year=start.year + 1, day=28)
+    timespec = "microseconds" if start.microsecond else "seconds"
+    label = f"{start.isoformat(timespec=timespec)}|{end.isoformat(timespec=timespec)}"
+    return start, end, label
+
+
+def almanac_datetime_jd(moment: py_datetime.datetime) -> float:
+    """Convert a timezone-aware datetime to its Julian date."""
+    epoch = py_datetime.datetime(1970, 1, 1, tzinfo=py_datetime.timezone.utc)
+    return 2440587.5 + (moment - epoch).total_seconds() / 86400.0
+
+
+def almanac_event_overlaps_window(event: dict[str, str],
+                                  start: py_datetime.datetime,
+                                  end: py_datetime.datetime) -> bool:
+    """Return whether an event is still active or begins in the forward window."""
+    event_jd = str(event.get("jd") or "").strip()
+    first_jd = str(event.get("first_jd") or event_jd).strip()
+    last_jd = str(event.get("last_jd") or event_jd).strip()
+    try:
+        event_start_jd = float(first_jd)
+        event_end_jd = float(last_jd)
+    except ValueError:
+        event_date_text = str(event.get("time") or "")[:10]
+        try:
+            event_date = py_datetime.date.fromisoformat(event_date_text)
+        except ValueError:
+            return False
+        return start.date() <= event_date <= end.date()
+    return event_end_jd >= almanac_datetime_jd(start) and event_start_jd <= almanac_datetime_jd(end)
+
+
+def generate_upcoming_almanac_events(date_text: str,
+                                     time_text: str,
+                                     zone_hours: float = 0.0,
+                                     jurisdiction: str = "",
+                                     latitude: str = DEFAULT_ALMANAC_LATITUDE,
+                                     longitude: str = DEFAULT_ALMANAC_LONGITUDE) -> tuple[list[dict[str, str]], str]:
+    """Generate local events from the selected GMT moment through one year ahead."""
+    start, end, label = almanac_upcoming_event_window(date_text, time_text)
+    local_start = start + py_datetime.timedelta(hours=zone_hours)
+    local_end = end + py_datetime.timedelta(hours=zone_hours)
+    events: list[dict[str, str]] = []
+    seen: set[tuple[str, str, str]] = set()
+    for year in range(local_start.year, local_end.year + 1):
+        for event in generate_annual_almanac_events(
+            year,
+            zone_hours,
+            jurisdiction,
+            latitude,
+            longitude,
+        ):
+            if not almanac_event_overlaps_window(event, start, end):
+                continue
+            key = (
+                str(event.get("category") or "").strip(),
+                str(event.get("jd") or event.get("time") or "").strip(),
+                str(event.get("name") or "").strip(),
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+            events.append(event)
+    events.sort(key=lambda row: str(row.get("sort_time") or row.get("time") or ""))
+    return events, label
 
 
 def prepare_almanac_fields(fields: dict[str, str]) -> dict[str, object]:
@@ -16704,29 +16791,35 @@ def prepare_almanac_fields(fields: dict[str, str]) -> dict[str, object]:
     jurisdiction_text = normalize_holiday_jurisdiction(str(fields.get("jurisdiction") or DEFAULT_HOLIDAY_JURISDICTION).strip())
     jurisdiction_label = HOLIDAY_JURISDICTION_LABELS.get(jurisdiction_text, jurisdiction_text)
     observer_location = f"{town_name}, {jurisdiction_label}" if town_name else jurisdiction_label
-    event_year = str(fields.get("event_year") or date_text[:4]).strip()
-    event_window = str(fields.get("event_window") or "").strip().replace("|", " to ")
-    try:
-        event_year_int = int(event_year)
-    except ValueError:
-        event_year_int = py_datetime.date.today().year
-        event_year = str(event_year_int)
+    event_year = date_text[:4]
     try:
         event_zone = float(zone_text)
     except ValueError:
         event_zone = 0.0
+    window_start, window_end, event_window = almanac_upcoming_event_window(date_text, time_text)
+    cached_event_window = str(fields.get("event_window") or "").strip()
+    cached_window_mode = str(fields.get("event_window_mode") or "").strip()
     events = parse_almanac_event_rows(fields.get("events", ""))
     events_cached = str(fields.get("events_cached") or "").strip().lower() in {"1", "yes", "true"}
-    if not events and not events_cached:
-        events = generate_annual_almanac_events(
-            event_year_int,
+    valid_upcoming_cache = (
+        events_cached
+        and cached_window_mode == ALMANAC_EVENT_WINDOW_MODE
+        and cached_event_window == event_window
+    )
+    if not valid_upcoming_cache:
+        events, event_window = generate_upcoming_almanac_events(
+            date_text,
+            time_text,
             event_zone,
             jurisdiction_text,
             latitude_text,
             longitude_text,
         )
-    if not event_window:
-        event_window = f"{event_year_int:04d}-01-01 to {event_year_int + 1:04d}-01-01"
+    window_text = (
+        f"{window_start:%Y-%m-%d %H:%M:%S} GMT to "
+        f"{window_end:%Y-%m-%d %H:%M:%S} GMT"
+    )
+    event_title = f"Upcoming eclipses and inner planetary transits through {window_end:%Y-%m-%d}"
 
     worksheet_lines = [
         ALMANAC_WORKSHEET_TITLE,
@@ -16762,7 +16855,7 @@ def prepare_almanac_fields(fields: dict[str, str]) -> dict[str, object]:
         )
     worksheet_lines.extend([
         "",
-        f"Eclipses and inner planetary transits for {event_year}",
+        event_title,
         "Progress times are local civil times. Use Greatest GMT in the GMT time field when comparing the body table.",
         "Class | Event | Kind | Magnitude | Obscuration | Date | First contact | Greatest eclipse | Fourth contact | Greatest GMT | Notes | Nearest totality",
     ])
@@ -16813,7 +16906,7 @@ def prepare_almanac_fields(fields: dict[str, str]) -> dict[str, object]:
             f"GHA Aries: {gha_aries} deg",
             f"Jurisdiction: {jurisdiction_text}",
             f"Body filter: {'visible only' if visibility_text == 'visible' else 'all bodies'}",
-            f"Event year: {event_year} ({event_window})",
+            f"Event window: {window_text}",
             "Enter date and time in GMT, then zone, latitude, and longitude.",
             ALMANAC_ACCURACY_NOTE,
         ]
@@ -16828,8 +16921,9 @@ def prepare_almanac_fields(fields: dict[str, str]) -> dict[str, object]:
             "Location of Navigational Bodies; "
             f"{'visible bodies only' if visibility_text == 'visible' else 'all bodies shown'}"
         ),
-        "event_title": f"Eclipses and inner planetary transits for {event_year}",
+        "event_title": event_title,
         "event_year": event_year,
+        "event_window": event_window,
         "selected_code": "",
         "visibility": visibility_text,
         "all_rows": all_rows,
