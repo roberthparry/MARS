@@ -2390,6 +2390,10 @@ class ExpressionResultTests(unittest.TestCase):
                 self.assertIn("ln(cosh²(x)·cos²(y) + sinh²(x)·sin²(y))", fields["integral"])
                 self.assertIn("C", fields["integral"])
                 self.assertNotIn("tanh(x + iy)", fields["integral"])
+                if wrt == "y":
+                    self.assertNotIn("/i", fields["integral"])
+                    self.assertNotIn("/i", fields["integral_function"])
+                    self.assertNotIn(r"}{i}", fields["integral_TeX"])
 
     def test_evaluation_preserves_user_authored_expression_input(self) -> None:
         self.assertIn(
@@ -3731,6 +3735,10 @@ class ExpressionResultTests(unittest.TestCase):
                 self.assertIn("atan2(", payload["integral"])
                 self.assertIn("i", payload["integral"])
                 self.assertNotIn("No integral", payload["integral"])
+                if wrt == "y":
+                    self.assertNotIn("/i", payload["integral"])
+                    self.assertNotIn("/i", payload["full_display_integral_function"])
+                    self.assertNotIn(r"}{i}", payload["integral_TeX"])
                 self.assertIn("const C = ?.", payload["full_display_integral_function"])
                 self.assertTrue(payload["integral"].split(" |", 1)[0].endswith(" + C"))
                 self.assertTrue(payload["integral_TeX"].endswith(" + C"))
